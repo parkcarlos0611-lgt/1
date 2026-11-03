@@ -2246,7 +2246,7 @@ function load(){try{const s=localStorage.getItem('cage_save');if(!s)return false
 function titleScreen(){const has=!!(()=>{try{return localStorage.getItem('cage_save')}catch(e){}})();
   app().innerHTML=`<div class="title"><div class="tbg"></div><div class="tin"><div class="tsub">FIGHTER LIFE SIMULATOR</div><h1 class="H">격투가로 인생살기<br><span>CAGE LEGENDS</span></h1>
   <p class="tdesc">2005~2025 · PRIDE에서 UFC, RIZIN, ONE까지 · 실제 선수 ${FDB.length}명 · 간편 스와이프 조작 + FM식 능력치 · Claude가 받아치는 기자회견</p>
-  <div class="tbtns"><button class="btn big" data-new>새 커리어</button>${has?'<button class="btn big ghost" data-cont>이어하기</button>':''}<button class="btn big ghost" data-quick>빠른 대전</button><button class="btn big ghost" data-ctrl>조작법</button>${legacy().length?'<button class="btn big ghost" data-hof>🏛️ 명예의 전당</button>':''}</div>
+  <div class="tbtns"><button class="btn big" data-new>새 커리어</button>${has?'<button class="btn big ghost" data-cont>이어하기</button>':''}<button class="btn big ghost" data-quick>빠른 대전</button><button class="btn big ghost" data-ctrl>조작법</button><a class="btn big ghost" href="engine2/lab.html" style="text-decoration:none;text-align:center">🧪 신규 엔진 FIGHTER LAB</a>${legacy().length?'<button class="btn big ghost" data-hof>🏛️ 명예의 전당</button>':''}</div>
   <p class="tnote">실존 선수 능력치와 경력은 공개 전적을 바탕으로 한 게임용 추정치입니다. 자산 브랜드는 패러디 이름입니다.</p></div></div>`;
   app().querySelector('[data-new]').onclick=()=>{SFXI.init();newCareer()};app().querySelector('[data-quick]').onclick=()=>{SFXI.init();quickFight()};app().querySelector('[data-ctrl]').onclick=()=>ctrlHelp();const hf=app().querySelector('[data-hof]');if(hf)hf.onclick=hofModal;
   const c=app().querySelector('[data-cont]');if(c)c.onclick=()=>{SFXI.init();if(load())hub();else toast('저장 데이터를 불러오지 못했어요')}}

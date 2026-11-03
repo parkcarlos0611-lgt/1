@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Fighter Lab</title>
+<style>
+:root{--bg:#07080b;--panel:rgba(14,16,22,.86);--ln:#2a2e38;--tx:#eef0f4;--mu:#8b92a1;--red:#d4141b;--gold:#f2b544}
+*{box-sizing:border-box}html,body{margin:0;height:100%;background:var(--bg);color:var(--tx);font:14px 'Noto Sans KR',system-ui,sans-serif;overflow:hidden}
+canvas{display:block;width:100vw;height:100vh;touch-action:none}
+.pn{position:fixed;right:max(12px,env(safe-area-inset-right));top:12px;width:260px;max-height:calc(100vh - 24px);overflow:auto;background:var(--panel);border:1px solid var(--ln);border-radius:12px;padding:12px}
+.pn h1{font:700 16px Oswald,'Noto Sans KR',sans-serif;letter-spacing:.06em;margin:0 0 2px}.pn p{margin:4px 0;color:var(--mu);font-size:12px}
+.g{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin:8px 0}
+button{background:#1b1e26;border:1px solid var(--ln);color:var(--tx);border-radius:8px;padding:8px 4px;font:600 12.5px 'Noto Sans KR',sans-serif;cursor:pointer}button:active{transform:scale(.96)}
+button.on{background:var(--red);border-color:var(--red)}button.wide{grid-column:span 3}
+label{display:block;font-size:12px;color:var(--mu);margin-top:8px}input[type=range]{width:100%;accent-color:var(--red)}
+.st{font:12px ui-monospace,Menlo,monospace;color:#9fe;white-space:pre-line;margin-top:8px}
+.hint{position:fixed;left:12px;bottom:12px;color:var(--mu);font-size:12px;background:var(--panel);padding:6px 10px;border-radius:8px;border:1px solid var(--ln)}
+@media (max-width:700px){.pn{left:8px;right:8px;top:auto;bottom:8px;width:auto;max-height:46vh}.hint{display:none}}
+</style></head><body>
+<canvas id="cv"></canvas>
+<div class="pn">
+  <h1>FIGHTER LAB</h1><p>신규 엔진 1단계 — 모델·물리 품질 확인용</p>
+  <label>빨강 선수 공격</label>
+  <div class="g">
+    <button data-s="jab">잽</button><button data-s="cross">스트레이트</button><button data-s="hookL">리드 훅</button>
+    <button data-s="hookR">리어 훅</button><button data-s="upper">어퍼컷</button><button data-s="bodyHook">바디 훅</button>
+    <button data-s="lowKick">로킥</button><button data-s="midKick">미들킥</button><button data-s="highKick">하이킥</button>
+  </div>
+  <label>파랑 선수</label>
+  <div class="g"><button id="guard" class="on">가드 올림</button><button id="ko">KO (힘 풀기)</button><button id="reset">리셋</button></div>
+  <label>화면</label>
+  <div class="g"><button id="slow">슬로모션</button><button id="dbg">관절 보기</button><button id="auto">자동 공격</button></div>
+  <label>카메라 각도 <span id="yv"></span></label><input id="yaw" type="range" min="-180" max="180" value="-36">
+  <label>거리 (선수 간격)</label><input id="dist" type="range" min="60" max="120" value="80">
+  <label>클릭 타격 세기</label><input id="pow" type="range" min="2" max="40" value="14">
+  <div class="st" id="st"></div>
+</div>
+<div class="hint">파랑 선수를 클릭/탭하면 그 지점을 때립니다 · 드래그로 카메라 회전</div>
+<script src="rig.js"></script><script src="physics.js"></script><script src="render.js"></script>
+<script>
+(function(){const V=E2.V,cv=document.getElementById('cv'),ctx=cv.getContext('2d');let W,H,dpr;
+function resize(){dpr=Math.min(2,devicePixelRatio||1);W=innerWidth;H=innerHeight;cv.width=W*dpr|0;cv.height=H*dpr|0}addEventListener('resize',resize);resize();
+const cam=new E2.Camera();let A,B,slow=false,debug=false,auto=false,autoT=0;
+function make(){const d=+document.getElementById('dist').value/200;
+  A=new E2.Body({cx:-d,yaw:0,side:0,name:'RED',corner:'#c41010',look:{skin:[200,146,108],shorts:[150,22,26],band:[235,235,235]}});
+  B=new E2.Body({cx:d,yaw:Math.PI,side:1,name:'BLUE',corner:'#1f5fd6',look:{skin:[176,120,88],shorts:[28,52,120],band:[230,230,230]},lowGuard:!document.getElementById('guard').classList.contains('on')});
+  A.opp=B;B.opp=A;for(let i=0;i<30;i++){A.step(1/60);B.step(1/60)}}
+make();
+document.querySelectorAll('[data-s]').forEach(b=>b.onclick=()=>A.play(b.dataset.s));
+const tg=(id,fn)=>{const e=document.getElementById(id);e.onclick=()=>{e.classList.toggle('on');fn(e.classList.contains('on'))}};
+tg('guard',on=>{B.setGuard(on);document.getElementById('guard').textContent=on?'가드 올림':'가드 내림'});
+document.getElementById('ko').onclick=()=>{B.setKO(!B.ko);document.getElementById('ko').classList.toggle('on',B.ko)};
+document.getElementById('reset').onclick=()=>{make();document.getElementById('ko').classList.remove('on')};
+tg('slow',on=>slow=on);tg('dbg',on=>debug=on);tg('auto',on=>auto=on);
+document.getElementById('dist').oninput=()=>make();
+const yawEl=document.getElementById('yaw');yawEl.oninput=()=>cam.yaw=+yawEl.value*Math.PI/180;cam.yaw=+yawEl.value*Math.PI/180;
+/* camera drag + click to hit */
+let drag=null;cv.addEventListener('pointerdown',e=>{drag={x:e.clientX,y:e.clientY,yaw:cam.yaw,pitch:cam.pitch,moved:false}});
+addEventListener('pointermove',e=>{if(!drag)return;const dx=e.clientX-drag.x,dy=e.clientY-drag.y;if(Math.abs(dx)+Math.abs(dy)>6)drag.moved=true;if(drag.moved){cam.yaw=drag.yaw-dx*.006;cam.pitch=Math.max(-.1,Math.min(.6,drag.pitch+dy*.004));yawEl.value=Math.round(((cam.yaw*180/Math.PI+540)%360)-180)}});
+addEventListener('pointerup',e=>{if(drag&&!drag.moved)hitAt(e.clientX,e.clientY);drag=null});
+function hitAt(sx,sy){/* ray through the pixel → nearest particle of BLUE to the ray */let best=null,bd=.22;for(let i=0;i<B.n;i++){const p=cam.proj(V.n(B.x[i],B.y[i],B.z[i]));if(!p)continue;const d=Math.hypot(p.x-sx,p.y-sy)/cam.foc*p.z;if(d<bd){bd=d;best=i}}
+  if(best==null)return;const q=V.n(B.x[best],B.y[best],B.z[best]);const dir=V.norm(V.sub(q,cam.pos));B.poke(q,dir,+document.getElementById('pow').value)}
+/* loop */let last=performance.now(),acc=0,fps=60,quads=0;const strikes=['jab','cross','hookL','hookR','upper','bodyHook','lowKick','midKick','highKick'];
+function frame(now){requestAnimationFrame(frame);let dt=Math.min(.05,(now-last)/1000);last=now;fps=fps*.95+(1/Math.max(.001,dt))*.05;acc+=dt*(slow?.25:1);
+  while(acc>=1/60){acc-=1/60;A.step(1/60);B.step(1/60);if(auto&&!B.ko){autoT-=1/60;if(autoT<=0&&!A.clip){A.play(strikes[Math.random()*strikes.length|0]);autoT=.5+Math.random()*.8}}}
+  ctx.setTransform(dpr,0,0,dpr,0,0);cam.target=V.n(0,1.0,0);cam.setup(W,H);E2.drawArena(ctx,cam,W,H);quads=E2.draw(ctx,cam,[A,B],{debug});
+  /* recent impacts */for(const h of B.hits){const age=B.t-h.t;if(age>.35)continue;const p=cam.proj(h.p);if(!p)continue;const s=cam.foc/p.z;ctx.strokeStyle=`rgba(255,240,200,${1-age/.35})`;ctx.lineWidth=2;ctx.beginPath();ctx.arc(p.x,p.y,(.03+age*.5)*s,0,7);ctx.stroke()}
+  const c=E2.physCount(B);document.getElementById('st').textContent=`관절(물리 입자) ${c.joints} /선수\n살·근육 관성 노드 ${c.flesh} /선수\n피부 표면 노드 ${c.skin} /선수\n물리 노드 합계 ${c.total} /선수\n구속 조건 ${c.constraints}\n그린 면 ${quads}  ·  ${fps.toFixed(0)} fps`+(B.hits.length?`\n최근 충격량 ${B.hits[B.hits.length-1].J.toFixed(1)} N·s (${B.hits[B.hits.length-1].zone})`:'')}
+requestAnimationFrame(frame);window.__lab={A,B,cam,get A(){return A},get B(){return B}};})();
+</script></body></html>

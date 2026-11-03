@@ -224,12 +224,19 @@ function fenceClamp(B){const Wl=window.__cageWall;if(!Wl||!B.J.hd||B.look&&B.loo
     if(ov>0){for(const k in J)J[k]={x:J[k].x-sg*ov,y:J[k].y}}
     /* legs / arms: the whole limb swings at the hip / shoulder (knee and elbow keep their own bend) just enough
        for its farthest point to rest on the fence */
-    for(const s of['l','r']){rotClamp(J,s+'H',[s+'K',s+'A',s+'He',s+'T',s+'Sn'],sg,Wl);rotClamp(J,s+'S',[s+'E',s+'W',s+'G'],sg,Wl)}}}
+    for(const s of['l','r']){if(rotClamp(J,s+'H',[s+'K',s+'A',s+'He',s+'T',s+'Sn'],sg,Wl))footDown(J,s,sg,Wl);rotClamp(J,s+'S',[s+'E',s+'W',s+'G'],sg,Wl)}}}
+/* the foot that met the fence turns down at the ankle: flat on the mat when it is low, toes pointing down
+   (sole toward the fence) when it is raised — never past the fence or under the floor */
+function footDown(J,s,sg,Wl){const A=J[s+'A'],He=J[s+'He'],T=J[s+'T'];if(!A||!He||!T)return;const fx=T.x-He.x,fy=T.y-He.y,L=Math.hypot(fx,fy)||1e-6;
+  const low=A.y<.16;const want=low?{x:Math.sign(fx)||sg,y:0}:{x:sg*.35,y:-.94};const a0=Math.atan2(fy,fx),a1=Math.atan2(want.y,want.x);let da=a1-a0;da=Math.atan2(Math.sin(da),Math.cos(da));da=clamp(da,-1.4,1.4);
+  const rot=(q,a)=>{const c=Math.cos(a),n=Math.sin(a);return{x:A.x+(q.x-A.x)*c-(q.y-A.y)*n,y:A.y+(q.x-A.x)*n+(q.y-A.y)*c}};
+  let k=1;for(let it=0;it<8;it++){const h=rot(He,da*k),t=rot(T,da*k);if(Math.max(h.x*sg,t.x*sg)<=Wl+1e-4&&Math.min(h.y,t.y)>=-1e-4)break;k*=.7}
+  J[s+'He']=rot(He,da*k);J[s+'T']=rot(T,da*k);for(const n of[s+'He',s+'T']){if(J[n].y<0)J[n]={x:J[n].x,y:0};if(J[n].x*sg>Wl)J[n]={x:sg*Wl,y:J[n].y}}}
 function rotClamp(J,piv,keys,sg,Wl){const P=J[piv];if(!P)return;const pts=keys.filter(k=>J[k]);const f=th=>{const c=Math.cos(th),s=Math.sin(th);let m=-9;for(const k of pts){const q=J[k];const x=P.x+(q.x-P.x)*c-(q.y-P.y)*s;m=Math.max(m,x*sg-Wl)}return m};
-  if(f(0)<=0)return;/* swing the way that pulls the limb back inside */const dir=f(.05)<f(-.05)?1:-1;let lo=0,hi=2.2*dir;if(f(hi)>0){hi=(Math.PI-.05)*dir}
+  if(f(0)<=0)return false;/* swing the way that pulls the limb back inside */const dir=f(.05)<f(-.05)?1:-1;let lo=0,hi=2.2*dir;if(f(hi)>0){hi=(Math.PI-.05)*dir}
   for(let it=0;it<22;it++){const m=(lo+hi)/2;if(f(m)>0)lo=m;else hi=m}const c=Math.cos(hi),sn=Math.sin(hi);
   for(const k of pts){const q=J[k];J[k]={x:P.x+(q.x-P.x)*c-(q.y-P.y)*sn,y:P.y+(q.x-P.x)*sn+(q.y-P.y)*c}}
-  /* a foot swung into the floor stays on the floor */for(const k of pts)if(J[k].y<0)J[k]={x:J[k].x,y:0}}
+  /* a foot swung into the floor stays on the floor */for(const k of pts)if(J[k].y<0)J[k]={x:J[k].x,y:0};return true}
 window.fenceClamp=fenceClamp;
 {const sv=Body.prototype.solve;Body.prototype.solve=function(p,X,d){const J=sv.call(this,p,X,d);if(!this.rag)fenceClamp(this);return J}}
 /* ragdoll: particles cannot pass the fence either */

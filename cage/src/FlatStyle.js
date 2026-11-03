@@ -30,7 +30,11 @@ const calm=c=>{try{const[r,g,b]=rgbOf(c);const m=(r+g+b)/3;const k=.18;return`rg
 let ROUND=.12;/* as round as the shape allows: corners are no longer visible */
 function rpath(ctx,P,R){const n=P.length;if(n<3||R<=0){ctx.moveTo(P[0].x,P[0].y);for(let i=1;i<n;i++)ctx.lineTo(P[i].x,P[i].y);ctx.closePath();return}
   const m=(a,b)=>({x:(a.x+b.x)/2,y:(a.y+b.y)/2});const s0=m(P[n-1],P[0]);ctx.moveTo(s0.x,s0.y);
-  for(let i=0;i<n;i++){const a=P[(i+n-1)%n],b=P[i],c=P[(i+1)%n];const r=Math.min(R,.5*Math.hypot(b.x-a.x,b.y-a.y),.5*Math.hypot(c.x-b.x,c.y-b.y));const e=m(b,c);if(r>1e-5)ctx.arcTo(b.x,b.y,e.x,e.y,r);else ctx.lineTo(b.x,b.y)}ctx.closePath()}
+  for(let i=0;i<n;i++){const a=P[(i+n-1)%n],b=P[i],c=P[(i+1)%n];const l1=Math.hypot(b.x-a.x,b.y-a.y),l2=Math.hypot(c.x-b.x,c.y-b.y);const e=m(b,c);
+    if(l1<1e-6||l2<1e-6){ctx.lineTo(b.x,b.y);continue}
+    /* corner angle: the tangent points sit r/tan(phi/2) from the corner — keep them on the two edges (nearly straight corners get no arc) */
+    const cs=((a.x-b.x)*(c.x-b.x)+(a.y-b.y)*(c.y-b.y))/(l1*l2);const phi=Math.acos(Math.max(-1,Math.min(1,cs)));const t=Math.tan(phi/2);
+    const r=Math.min(R,t*.5*Math.min(l1,l2));if(phi>3.1||r<1e-5)ctx.lineTo(b.x,b.y);else ctx.arcTo(b.x,b.y,e.x,e.y,r)}ctx.closePath()}
 const poly=(ctx,P,col,R)=>{if(!P.length)return;ctx.fillStyle=col;ctx.beginPath();rpath(ctx,P,R==null?ROUND:R);ctx.fill()};
 const lerp=(a,b,t)=>({x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t});
 const circ=(ctx,c,r,col)=>{ctx.fillStyle=col;ctx.beginPath();ctx.arc(c.x,c.y,r,0,Math.PI*2);ctx.fill()};
@@ -111,15 +115,20 @@ function footFlat(ctx,A,He,T,M,C,d){const ux0=T.x-He.x,uy0=T.y-He.y,Lf=Math.hypo
   const Q=(u,v)=>({x:He.x+ux*u*Lf+nx*v*Lf,y:He.y+uy*u*Lf+ny*v*Lf});
   /* toes: break at the ball; when the ball is on the canvas the toes lie flat on it */
   const ball=Q(.7,.02);let tx=ux,ty=uy;if(ball.y<.05&&ty<-.05){tx=Math.sign(ux)||d;ty=0}
-  const tl=.27*Lf;let tnx=-ty,tny=tx;if(tnx*nx+tny*ny<0){tnx=-tnx;tny=-tny}const TP=(u,v)=>({x:ball.x+tx*u*Lf+tnx*v*Lf,y:ball.y+ty*u*Lf+tny*v*Lf});
-  /* a fuller foot: high instep, thick heel pad, rounded heel and rounded toe block */
-  poly(ctx,[Q(.14,.5),Q(-.02,.36),Q(-.08,.2),Q(-.06,.05),Q(.04,-.01),Q(.4,0),Q(.7,-.005),TP(0,.17),Q(.5,.3),Q(.3,.4)],C.b);
-  circ(ctx,Q(.05,.12),.13*Lf,C.b);/* heel */
-  const tr=.085*Lf;poly(ctx,[TP(-.02,-.005),TP(tl/Lf-tr/Lf,-.005),TP(tl/Lf-tr/Lf,.17),TP(-.02,.18)],C.b);circ(ctx,TP(tl/Lf-tr/Lf,tr/Lf),tr,C.b);/* toes, round tip */
-  /* planes: sole edge, inner arch shadow, heel facet, ankle bone */
-  poly(ctx,[Q(-.04,.03),Q(.06,-.01),Q(.7,-.005),Q(.6,.07),Q(.2,.085)],C.s);
-  poly(ctx,[Q(-.08,.2),Q(-.02,.36),Q(.14,.5),Q(.1,.24)],C.s);
-  circ(ctx,Q(.18,.38),.016*M,C.s)}
+  let tnx=-ty,tny=tx;if(tnx*nx+tny*ny<0){tnx=-tnx;tny=-tny}const TP=(u,v)=>({x:ball.x+tx*u*Lf+tnx*v*Lf,y:ball.y+ty*u*Lf+tny*v*Lf});
+  const R=Lf*.09;
+  /* 1) midfoot: high instep on top, the sole arches up between the heel pad and the ball */
+  poly(ctx,[Q(.16,.5),Q(.42,.38),Q(.62,.26),Q(.74,.16),Q(.74,.0),Q(.6,.045),Q(.46,.1),Q(.32,.08),Q(.2,.04),Q(.14,.2)],C.b,R*.9);
+  poly(ctx,[Q(.24,.05),Q(.34,.1),Q(.47,.12),Q(.6,.06),Q(.66,.02),Q(.46,.07),Q(.32,.06)],C.s,R*.4);/* inner arch shadow */
+  /* 2) heel: a rounded pad that carries the weight at the back */
+  poly(ctx,[Q(-.07,.24),Q(-.06,.06),Q(.02,-.01),Q(.2,-.005),Q(.27,.06),Q(.26,.3),Q(.12,.44),Q(-.02,.38)],C.b,R*1.3);
+  poly(ctx,[Q(-.06,.08),Q(.02,-.01),Q(.18,-.005),Q(.12,.05),Q(.0,.07)],C.s,R*.6);/* heel underside */
+  /* 3) toes: a rounded block from the ball to the tip, with a soft crease */
+  const tl=.29;poly(ctx,[TP(-.04,-.004),TP(tl*.55,-.006),TP(tl,.02),TP(tl,.09),TP(tl*.7,.15),TP(.0,.17),TP(-.06,.12)],C.b,R*1.1);
+  poly(ctx,[TP(tl*.35,.0),TP(tl*.42,.0),TP(tl*.42,.11),TP(tl*.35,.12)],C.s,R*.2);/* toe crease */
+  poly(ctx,[TP(-.04,-.004),TP(tl*.55,-.006),TP(tl*.5,.025),TP(-.02,.03)],C.s,R*.4);/* toe pads */
+  /* seams between the three parts (soft, slightly darker) */poly(ctx,[Q(.24,.36),Q(.28,.36),Q(.28,.06),Q(.24,.06)],C.s,R*.2);
+  circ(ctx,Q(.18,.4),.016*M,C.s)}
 
 /* ---------- torso: lats, pecs, abs, obliques ---------- */
 function torsoFlat(ctx,J,H,M,sk,d,lk,B){const sp=[J.hip,J.mid,J.sh,J.nk];const segL=[0];for(let i=1;i<4;i++)segL.push(segL[i-1]+Math.hypot(sp[i].x-sp[i-1].x,sp[i].y-sp[i-1].y));const TL=segL[3]||1;

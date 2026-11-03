@@ -23,8 +23,8 @@ const DebugLayer={
     if(M.dbgParry&&now_s()-M.dbgParry.t<.5){ctx.strokeStyle='#7fffd4';ctx.lineWidth=.02;ctx.beginPath();ctx.arc(M.dbgParry.x,M.dbgParry.y,.12,0,7);ctx.stroke()}
     /* screen-space panel */
     ctx.setTransform(S.dpr,0,0,S.dpr,0,0);ctx.font='11px ui-monospace,Menlo,monospace';const now=performance.now();this._fps=this._fps?this._fps*.92+(1000/Math.max(1,now-(this._lt||now)))*.08:60;this._lt=now;
-    const lines=[`DEBUG (F9)  fps ${this._fps.toFixed(0)}  phase ${M.phase}  hitstop ${Math.max(0,M.hitstop).toFixed(2)}`];
-    M.f.forEach((f,i)=>{const a=f.act;let s=`${i?'BLUE':'RED '} ${f.state}${f.hm?' hm:'+f.hm:''}${f.guard?' guard:'+f.guard:''} sta ${f.sta.toFixed(0)}/${f.staMax.toFixed(0)} stun ${f.stun.toFixed(0)} chinD ${(f.chinD||0).toFixed(0)}`;
+    const lines=[`DEBUG (F9)  fps ${this._fps.toFixed(0)}  phase ${M.phase}  hitstop ${Math.max(0,M.hitstop).toFixed(2)}  arena ${S.arena?S.arena.kind+' '+S.arena.ft+'ft R='+S.R:''}${M.stopping?'  REF STOPPING':''}`];
+    M.f.forEach((f,i)=>{const a=f.act;let s=`${i?'BLUE':'RED '} ${f.state}${f.hm?' hm:'+f.hm:''}${f.guard?' guard:'+f.guard:''} sta ${f.sta.toFixed(0)}/${f.staMax.toFixed(0)} stun ${f.stun.toFixed(0)}${typeof StunModel!=='undefined'?` conc ${(f.conc||0).toFixed(1)}/${StunModel.T(f).toFixed(0)} (${StunModel.ratio(f).toFixed(2)}) dng ${(f.dng||0).toFixed(0)}`:''}${f.planted?' feet '+f.planted.join('/'):''}`;
       if(a&&a.c)s+=`  ${a.key} ${CombatEngine.phase(a)} t=${a.t.toFixed(2)} x${a.speed.toFixed(2)}${a.outcome?' '+a.outcome:''}`;
       if(f.buf&&f.buf.q.length)s+=`  buf[${f.buf.q.map(e=>e.key).join(',')}]`;if(f.dbgCancel&&now/1000-f.dbgCancel.t<.6)s+=`  CANCEL(${f.dbgCancel.why})`;
       const R=f.body.rag;if(R){const st=R.stats();s+=`  RAG t=${st.t.toFixed(2)} KE ${st.ke.toFixed(2)} pen ${(st.pen*100).toFixed(1)}cm lim ${st.lim.toFixed(2)}${st.asleep?' ASLEEP':''}`}lines.push(s)});

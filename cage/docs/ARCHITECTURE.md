@@ -24,6 +24,7 @@ index.html  (inline core: Body, F2, MV, Stage, In2, AI2, Match, World, Career, U
   └─ src/ArenaRenderer.js      arena backdrop (red ambient, LED screens, truss + beams, crowd tiers), padded cage, sprite-cached mat
   └─ src/RefereeModel.js       new referee figure (generic looks, state poses)
   └─ src/GPURenderer.js        WebGL compositor (DoF, bloom, rim, grade, vignette) + dynamic resolution
+  └─ src/MotionPhysics.js      joint spring physics, bouncy footwork, no shadows, stamina drain ×0.6
   └─ src/DebugLayer.js          F9 overlay: hitboxes, ragdoll joints, buffer, ref path, conc gauge
   └─ src/CareerManager.js       InjuryModel, Matchmaker, coaching staff, scheduler / fight-card tab
   tools/careerbench.js          multi-year career bench (injuries, weeks lost, fights, rematches)
@@ -279,6 +280,28 @@ sponsors).
 New front-view official: black polo (collar, buttons, sleeve hems, chest patch), slacks with belt and
 crease, polished shoes, blue gloves; generic look picked per fight (6 skin / hair presets). Poses blend
 between watch, ground (crouched), break (arms out), wave-off and raise, driven by RefereeAI's `r.mode`.
+
+## Phase 6 — Joint physics, lighter movement, controls, referees
+
+- **Joint physics** (MotionPhysics): every pose channel has an underdamped spring-damper offset added
+  before the skeleton is solved (so hitboxes follow). Hits push impulses by strike and zone:
+  straight → head snaps back (−0.40 rad peak ~8 frames, overshoot +0.11, settled ~0.7 s);
+  hook / head kick → head and torso whip sideways, and for a head kick the legs scissor and stumble;
+  uppercut → head up and back; body → folds; leg kick → kicked leg buckles. The kicking leg recoils on
+  contact (knee folds). Accelerating / stopping makes torso and arms lag. The engine's own reaction
+  springs are scaled down so the two don't double up.
+- **Movement**: speed ×1.22, light bounce on the balls of the feet (≈2.3 Hz standing, 3.3 Hz moving,
+  damped while striking); feet stay planted through FootPlant.
+- **Shadows removed**: floor shadows (fighters, referee), the dark side of the lighting layer, CSS
+  text / box shadows and the drop-shadow filter in the match HUD.
+- **Stamina**: every decrease of stamina and max stamina is ×0.6 (`motion.staminaDrain`). In AI-vs-AI
+  benches nobody reaches GASSED any more; finish rates LW 28·18·54 %, HW 38·12·50 %.
+- **Touch**: only ⤵ 위브 and ⇄ 스텝 remain, larger (96×68). Above the action pad on tablets/desktop;
+  on short phone screens they stack in the free space above the jab button so they don't cover the HUD
+  (no overlap with pad or HUD at 740×360, 844×390, 1024×600, 1180×820).
+- **Referees**: stylised likenesses of two well-known referees, picked per fight — Herb Dean style (tall,
+  dark skin, bald, full beard) and Marc Goddard style (stocky, light skin, shaved head, stubble, heavy
+  brows); black polo, slacks, blue gloves.
 
 ## Delivery phases
 1. ✅ Architecture + hitboxes + 2D ragdoll + combat feel + debug layer

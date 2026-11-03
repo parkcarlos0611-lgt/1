@@ -8,7 +8,10 @@
      wave   — waving it off (stoppage)
      raise  — winner's arm up
    Shaded with gradients (overhead light), drawn in world units like the fighters. */
-const REF_LOOKS=[{skin:'#7a4b33',hair:'bald'},{skin:'#e1b592',hair:'short',hc:'#3b2a1d'},{skin:'#c08a60',hair:'buzz',hc:'#1d1712'},{skin:'#efc9a6',hair:'side',hc:'#8e8e8e'},{skin:'#9a6847',hair:'short',hc:'#120e0b'},{skin:'#d8a77f',hair:'buzz',hc:'#5a4030'}];
+/* stylised likenesses of two well-known MMA referees (public appearance only: build, skin, head, beard) */
+const REF_LOOKS=[
+  {name:'Herb Dean',skin:'#6b4029',hair:'bald',beard:'full',bc:'#141010',brow:1,build:{w:1.04,h:1.04}},
+  {name:'Marc Goddard',skin:'#e2b08f',hair:'shaved',hc:'#6b5a4c',beard:'stubble',bc:'#7a6250',brow:1.35,build:{w:1.1,h:.97}}];
 function drawRefFront2(ctx0,r,t){
   /* GPU path: the referee lives on the near layer (with the cage), under the fighters */
   let ctx=ctx0;if(window.__gpuFig&&ctx0.canvas===window.__gpuFig&&window.__gpuNearX){ctx=window.__gpuNearX;ctx.setTransform(ctx0.getTransform())}
@@ -18,7 +21,8 @@ function drawRefFront2(ctx0,r,t){
   const skin=lk.skin,skD=shade(skin,-.22),skL=shade(skin,.12),shirt='#17181d',shirtD='#0c0d10',shirtL='#2b2d34',pants='#141519',pantsL='#24262c',glove='#3d7be6',gloveL='#7fb0ff';
   const hip=(.5-crouch)*H+Math.abs(Math.sin(ph))*.01*mv,sh=(.815-crouch)*H,head=sh+.17;const sw=Math.sin(ph)*.06*mv;const kneeOut=mode==='ground'?.07:.02;
   /* shadow */
-  ctx.fillStyle='rgba(0,0,0,.32)';ctx.beginPath();ctx.ellipse(x,0,.36,.045,0,0,7);ctx.fill();
+  /* (no floor shadow) */
+  const bw=(lk.build&&lk.build.w)||1,bh=(lk.build&&lk.build.h)||1;ctx.translate(x,0);ctx.scale(bw,bh);ctx.translate(-x,0);
   /* legs */
   const leg=(sx,off)=>{const k={x:x+sx*(.11+kneeOut)+off*.5,y:hip*.5},f={x:x+sx*.12+off,y:.07};const g=ctx.createLinearGradient(x+sx*.02,0,x+sx*.2,0);g.addColorStop(0,sx<0?pantsL:pants);g.addColorStop(1,sx<0?pants:shirtD);ctx.fillStyle=g;
     ctx.beginPath();ctx.moveTo(x+sx*.005,hip+.02);ctx.lineTo(x+sx*.165,hip+.02);ctx.quadraticCurveTo(k.x+sx*.075,k.y+.05,f.x+sx*.065,f.y);ctx.lineTo(f.x-sx*.06,f.y);ctx.quadraticCurveTo(k.x-sx*.06,k.y,x+sx*.005,hip-.08);ctx.closePath();ctx.fill();
@@ -55,15 +59,19 @@ function drawRefFront2(ctx0,r,t){
   ctx.beginPath();ctx.moveTo(x,hy+.115);ctx.bezierCurveTo(x+.085,hy+.115,x+.09,hy+.03,x+.084,hy-.025);ctx.bezierCurveTo(x+.078,hy-.085,x+.04,hy-.118,x,hy-.122);ctx.bezierCurveTo(x-.04,hy-.118,x-.078,hy-.085,x-.084,hy-.025);ctx.bezierCurveTo(x-.09,hy+.03,x-.085,hy+.115,x,hy+.115);ctx.fill();
   ctx.fillStyle=skD;ctx.beginPath();ctx.ellipse(x-.088,hy,.015,.03,0,0,7);ctx.ellipse(x+.088,hy,.015,.03,0,0,7);ctx.fill();
   /* hair */
-  const hc=lk.hc||skD;if(lk.hair==='bald'){ctx.fillStyle='rgba(255,255,255,.16)';ctx.beginPath();ctx.ellipse(x-.02,hy+.088,.042,.018,-.2,0,7);ctx.fill()}
+  const hc=lk.hc||skD;if(lk.hair==='bald'){ctx.fillStyle='rgba(255,255,255,.2)';ctx.beginPath();ctx.ellipse(x-.02,hy+.088,.045,.02,-.2,0,7);ctx.fill()}
+  else if(lk.hair==='shaved'){ctx.fillStyle=hc;ctx.globalAlpha=.35;ctx.beginPath();ctx.ellipse(x,hy+.07,.083,.055,0,Math.PI*.05,Math.PI*.95);ctx.fill();ctx.globalAlpha=1;ctx.fillStyle='rgba(255,255,255,.14)';ctx.beginPath();ctx.ellipse(x-.02,hy+.09,.035,.014,-.2,0,7);ctx.fill()}
   else{ctx.fillStyle=hc;ctx.beginPath();ctx.moveTo(x-.086,hy+.02);ctx.bezierCurveTo(x-.09,hy+.1,x-.05,hy+.125,x,hy+.127);ctx.bezierCurveTo(x+.05,hy+.125,x+.09,hy+.1,x+.086,hy+.02);
     if(lk.hair==='buzz'){ctx.lineTo(x+.08,hy+.05);ctx.bezierCurveTo(x+.06,hy+.09,x-.06,hy+.09,x-.08,hy+.05)}else if(lk.hair==='side'){ctx.lineTo(x+.082,hy+.06);ctx.bezierCurveTo(x+.04,hy+.075,x-.01,hy+.1,x-.07,hy+.06)}else{ctx.lineTo(x+.08,hy+.065);ctx.bezierCurveTo(x+.05,hy+.08,x-.05,hy+.08,x-.08,hy+.065)}
     ctx.closePath();ctx.fill();if(lk.hair==='buzz'){ctx.globalAlpha=.55}ctx.globalAlpha=1}
   /* face */
   const look=(r.d||1)*.006;ctx.fillStyle='#f4efe8';ctx.beginPath();ctx.ellipse(x-.032,hy+.012,.014,.008,0,0,7);ctx.ellipse(x+.032,hy+.012,.014,.008,0,0,7);ctx.fill();
   ctx.fillStyle='#1a120d';ctx.beginPath();ctx.arc(x-.032+look,hy+.012,.0065,0,7);ctx.arc(x+.032+look,hy+.012,.0065,0,7);ctx.fill();
-  ctx.fillStyle=lk.hair==='bald'?skD:shade(hc,-.1);ctx.fillRect(x-.05,hy+.03,.034,.008);ctx.fillRect(x+.016,hy+.03,.034,.008);
+  const bt=.008*(lk.brow||1);ctx.fillStyle=lk.hair==='bald'||lk.hair==='shaved'?shade(lk.bc||skD,.05):shade(hc,-.1);ctx.fillRect(x-.05,hy+.03,.034,bt);ctx.fillRect(x+.016,hy+.03,.034,bt);
   ctx.fillStyle=skD;ctx.beginPath();ctx.moveTo(x,hy+.008);ctx.lineTo(x+.017,hy-.035);ctx.lineTo(x-.012,hy-.038);ctx.closePath();ctx.fill();
   ctx.strokeStyle=shade(skin,-.4);ctx.lineWidth=.007;ctx.beginPath();ctx.moveTo(x-.025,hy-.062);ctx.quadraticCurveTo(x,hy-.068,x+.025,hy-.062);ctx.stroke();
-  ctx.fillStyle='rgba(0,0,0,.12)';ctx.beginPath();ctx.ellipse(x,hy-.1,.05,.016,0,0,7);ctx.fill();
+  /* beard */
+  if(lk.beard){ctx.fillStyle=lk.bc;ctx.globalAlpha=lk.beard==='full'?.95:.4;ctx.beginPath();ctx.moveTo(x-.083,hy-.005);ctx.bezierCurveTo(x-.086,hy-.07,x-.05,hy-.122,x,hy-.128);ctx.bezierCurveTo(x+.05,hy-.122,x+.086,hy-.07,x+.083,hy-.005);ctx.lineTo(x+.07,hy-.01);ctx.bezierCurveTo(x+.06,hy-.06,x+.035,hy-.075,x,hy-.078);ctx.bezierCurveTo(x-.035,hy-.075,x-.06,hy-.06,x-.07,hy-.01);ctx.closePath();ctx.fill();
+    ctx.beginPath();ctx.moveTo(x-.035,hy-.05);ctx.quadraticCurveTo(x,hy-.04,x+.035,hy-.05);ctx.lineTo(x+.03,hy-.058);ctx.quadraticCurveTo(x,hy-.05,x-.03,hy-.058);ctx.closePath();ctx.fill();
+    ctx.beginPath();ctx.ellipse(x,hy-.1,.02,.022,0,0,7);ctx.fill();ctx.globalAlpha=1;ctx.strokeStyle=shade(skin,-.45);ctx.lineWidth=.006;ctx.beginPath();ctx.moveTo(x-.022,hy-.064);ctx.quadraticCurveTo(x,hy-.07,x+.022,hy-.064);ctx.stroke()}
   ctx.restore();ctx.restore()}

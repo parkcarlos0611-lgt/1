@@ -29,8 +29,8 @@ function blot(ctx,x,y,r,col,a){if(a<=.01)return;const g=ctx.createRadialGradient
 function paintFighterFX(ctx,f){const B=f.body,J=B.J,H=B.H,d=B.d||1;if(!J.hd)return;const mix=(a,b,t)=>({x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t});
   ctx.save();ctx.globalCompositeOperation='source-atop';
   /* key light: warm top, cool bottom */
-  if(GFX.shade){const g=ctx.createLinearGradient(0,J.hd.y+.1*H,0,0);g.addColorStop(0,'rgba(255,236,205,.13)');g.addColorStop(.55,'rgba(0,0,0,0)');g.addColorStop(1,'rgba(8,10,30,.26)');ctx.fillStyle=g;ctx.fillRect(J.hip.x-H,-.1,H*2,H*1.5);
-    const lit='rgba(255,240,220,.20)',dark='rgba(10,8,25,.34)';
+  if(GFX.shade){const g=ctx.createLinearGradient(0,J.hd.y+.1*H,0,0);g.addColorStop(0,'rgba(255,236,205,.13)');g.addColorStop(.55,'rgba(0,0,0,0)');g.addColorStop(1,GFX.noDark?'rgba(0,0,0,0)':'rgba(8,10,30,.26)');ctx.fillStyle=g;ctx.fillRect(J.hip.x-H,-.1,H*2,H*1.5);
+    const lit='rgba(255,240,220,.20)',dark=GFX.noDark?'rgba(0,0,0,0)':'rgba(10,8,25,.34)';
     seg2(ctx,J.hip,J.sh,.1*H*(B.W||1),lit,dark);seg2(ctx,J.sh,J.hd,.055*H,lit,dark);
     for(const s of['l','r']){seg2(ctx,J[s+'S'],J[s+'E'],.042*H,lit,dark);seg2(ctx,J[s+'E'],J[s+'W'],.036*H,lit,dark);seg2(ctx,J[s+'H'],J[s+'K'],.06*H,lit,dark);seg2(ctx,J[s+'K'],J[s+'A'],.042*H,lit,dark)}}
   /* damage */

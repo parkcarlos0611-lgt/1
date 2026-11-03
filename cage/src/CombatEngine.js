@@ -27,7 +27,7 @@ const CombatEngine={
     if(ph==='startup')m=CE.startupSpeed;
     else if(ph==='active'){m=a.dragT>0?CE.hitDrag:1}
     else if(ph==='recovery'){m=a.outcome==='hit'?CE.recoverySpeed:a.outcome==='block'||a.outcome==='parried'?CE.blockRecoil:a.missed?CE.whiffRecovery:1}
-    return m},
+    return m*(a.pmul||1)},   /* pmul: external multiplier (CombatPacingEngine: gassed / heavy-whiff recovery) */
   /* called once per sim step for each fighter before F2.update advances the clip */
   tick(f,dt){const a=f.act;if(!a||!a.c)return;if(a.base==null)a.base=a.speed;if(a.dragT>0)a.dragT-=dt;a.speed=a.base*this.mul(a)},
   canCancel(f){const a=f.act;if(!a||!a.c||!a.c.hit||a.hit||a.cancelled)return false;return a.t<a.c.hit.t0*CE.cancelFrac},
@@ -67,3 +67,9 @@ const CombatEngine={
 {const ad=Match.prototype.applyDmg;Match.prototype.applyDmg=function(att,def,o){const a=att.act;if(a&&a.c&&a.c.hit&&!a.outcome2){a.outcome2=1;a.outcome=o.blocked?'block':'hit';if(!o.blocked)a.dragT=CE.hitDragT}return ad.call(this,att,def,o)}}
 /* knock(): pass struck zone, impulse scale and cage wall to the ragdoll */
 {const kn=Match.prototype.knock;Match.prototype.knock=function(def,att,ko,kind){def.body._hit={zone:kind==='leg'?'leg':kind==='body'?'body':'head',power:clamp(.75+ATT(att,'punchPow')*.5,.6,1.3),wall:this.stage.R+TUNING.ragdoll.cageInset};return kn.call(this,def,att,ko,kind)}}
+/* ---- game clock: Match.t2() runs on simulation time, not wall time ----
+   Combo windows, concussion decay delay, whiff/spam/setup windows and cooldowns all read t2(). On wall
+   time they kept running during hitstop / slow-motion, so presentation (freeze length) changed balance.
+   Simulation time stops when the simulation stops. */
+{const st=Match.prototype.step;Match.prototype.step=function(dt){this.simT=(this.simT||0)+dt;return st.call(this,dt)}}
+Match.prototype.t2=function(){return this.simT||0};

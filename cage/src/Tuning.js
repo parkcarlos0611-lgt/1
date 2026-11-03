@@ -14,7 +14,7 @@ const TUNING_DEFAULT={
     friction:.62,          // tangential velocity removed on floor contact
     restitution:.08,       // bounce off floor / cage (low = no jitter)
     maxSpeed:9,            // velocity clamp per particle (units/s)
-    sleepSpeed:.08,        // below this for sleepTime → frozen
+    sleepSpeed:.11,        // below this for sleepTime → frozen
     sleepTime:.35,
     blendKO:{w0:.55,tau:.11},       // kinematic drive at the moment of a KO (fades fast → limp)
     blendKD:{w0:.6,tau:.18},        // knockdown: stays "controlled" longer

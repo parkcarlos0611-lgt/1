@@ -23,9 +23,9 @@
      judges with different leanings and noise → 10-10 / 10-9 / 10-8 / 10-7 under the
      Unified Rules order (impact first; aggression, then cage control only when even). */
 const KO=tuneSection('ko',{
-  concussMul:1, comboWindow:1.3, comboStep:.2, comboMax:1.9, counterMul:1.6, cleanMul:1.35, groundMul:.5,
-  threshBase:15, threshChin:17, exhaustedMul:.82,
-  decay:5.5, decayDelay:1.2, permShare:.22, roundRecover:.55,
+  concussMul:1, comboWindow:1.05, comboStep:.2, comboMax:1.9, counterMul:1.6, cleanMul:1.35, groundMul:.5,
+  threshBase:10, threshChin:14, exhaustedMul:.82,
+  decay:5.5, decayDelay:.95, permShare:.22, roundRecover:.55,
   rockAt:.62, kdAt:1, koAt:1.6, kdReset:.45, rockTime:[1.2,2.6],
   koOnKd:{over:.8,impFrom:5,impSpan:10,impMax:.35,secondKd:.35},   // KO chance when the knockdown threshold is crossed
   flash:{minImpact:7,base:10,chin:7,concBonus:3,slope:6,max:.5},
@@ -36,7 +36,7 @@ const REF=tuneSection('referee',{
   stopAt:30, groundHurt:.62, groundStopMul:1.5, stopHeart:.35, decay:4.5, defendMul:.3, defendT:1.1, stopDelay:.5, waveT:1.4,
   separateSpeed:.9
 });
-const GRAP=tuneSection('grappling',{subBias:.006,subHurtBonus:.03,subHurtFrom:.5});
+const GRAP=tuneSection('grappling',{subBias:.01,subHurtBonus:.03,subHurtFrom:.5});
 const DOC=tuneSection('doctor',{base:.3,perSev:.28,swellStop:1.75,swellChance:.45});
 const JUDGE=tuneSection('judging',{
   w:{edmg:1,sig:.3,kd:20,td:4.5,ctrl:.075,subNear:7,subAtt:1.2,agg:.5,oc:.04},

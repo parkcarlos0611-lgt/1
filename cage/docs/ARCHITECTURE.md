@@ -14,7 +14,13 @@ index.html  (inline core: Body, F2, MV, Stage, In2, AI2, Match, World, Career, U
   └─ src/Arena.js               real cage sizes (30 ft / 25 ft / 20 ft ring) + responsive camera
   └─ src/Ragdoll2D.js           Ragdoll2D — PBD ragdoll; replaces Body.startRag/stepRag
   └─ src/JudgeRefereeSystem.js  StunModel, RefereeAI, doctor, ScoringEngine (3 judges)
-  └─ src/CombatEngine.js        InputBuffer, playback speed, cancel windows, weave/sway/parry
+  └─ src/CombatEngine.js        InputBuffer, playback speed, cancel windows, weave/sway/parry, sim-time game clock
+  └─ src/CombatPacingEngine.js  spacing / tempo / mind games: stamina penalty, whiff windows, sweet spot,
+                                quick step, feints, jab setups, reactive takedown & clinch, AI in-out rhythm
+  └─ src/ImpactFeedbackManager.js  tiered hitstop (1–5 f), micro shake / zoom, shock rings, sweat & blood bursts
+  └─ src/GraphicsRenderer.js    per-fighter lighting layer (normal shading, key light, rim light), bruises,
+                                swelling, blood streaks, sweat sheen; octagon spotlight, texture, haze, vignette
+  └─ src/UIManager.js           touch step/feint/weave/sway cluster, GASSED HUD, combat labels, help tables
   └─ src/DebugLayer.js          F9 overlay: hitboxes, ragdoll joints, buffer, ref path, conc gauge
   └─ src/CareerManager.js       InjuryModel, Matchmaker, coaching staff, scheduler / fight-card tab
   tools/careerbench.js          multi-year career bench (injuries, weeks lost, fights, rematches)
@@ -180,6 +186,54 @@ week whenever projected fatigue passes 62. Below: coaching staff cards, the matc
 | Hard camp every fight | 3.90 → 2.72 | 13.0 → 5.8 | 0.8 → 0.3 | 2.5 → 3.0 |
 | Auto-periodised schedule | 0.13 → 0.14 | 0.7 → 0.4 | 0 → 0 | 3.3 → 3.3 |
 Rematches over 50 career-years: 23–29 → 7–15. Run: `node tools/careerbench.js index.html [old]`.
+
+## Phase 4 — Spacing, tempo, mind games + impact feel + graphics/UI
+
+### Anti-slugfest rules (CombatPacingEngine)
+| Rule | Mechanism |
+|---|---|
+| Stamina penalty | > 4 throws inside 2 s → each extra throw costs +45 % × n stamina. Stamina < 28 = **GASSED**: deals ×0.8, takes ×1.2 (also feeds concussion → more KDs / flash KOs), strikes ×0.86 speed, guard refills ×0.55. |
+| Whiff punishment | a miss opens a window of 0.16 + 0.3 × strike weight s (jab ≈ 0.22 s, overhand ≈ 0.46 s) and slows its recovery ×0.85. Anything landing in it is a **counter** (×1.25, counts as counter for concussion). The AI punishes heavy whiffs. |
+| Sweet spot | at contact, distance ÷ (strike REACH × body size): 0.86–1.06 = sweet spot ×1.18, < 0.66 = jammed ×0.75, > 1.12 = over-reaching ×0.85. Hooks, uppercuts, knees and elbows are close tools (exempt). |
+| Quick step | Shift+A/D, double-tap, touch ⇄. Forward 2.5 / back 3.0 units·s⁻¹ burst for 0.17 s, 3.5 stamina, 0.42 s cooldown; cancels strike startup. |
+| Feint | B / touch 🎭. Plays the start of a cross / hook / overhand / body kick and stops at 62 % of startup. An opponent who reacts (guard, head movement, counter swing) is **bitten**: open as if he had whiffed for 0.5 s. |
+| Jab tempo | a jab / body jab / teep that lands or is blocked makes the next power shot within 1.3 s ×1.12. |
+| Reactive grappling | shooting on an opponent who is mid-strike, just whiffed or bursting forward: no sprawl, TD defence −5. Clinching him: clinch control −5. |
+| AI pacing | waits just outside the opponent's reach and only closes to attack range when about to strike (in-out rhythm), steps out of heavy shots to make them whiff, steps in to attack, feints, leads with the jab, holds fire when spamming or gassed. |
+
+### Impact feel (ImpactFeedbackManager)
+Tiers replace the engine's freeze of up to 0.26 s (≈ 15 frames) and shake of up to 0.3 units:
+blocked 1 f · light 2 f · medium 3 f · heavy 4 f · crit (counter / whiff punish / sweet-spot heavy) 5 f +
+shock ring and sparks. Shake 0.010–0.065, zoom 0.01–0.06. Head and torso reaction springs are scaled per tier
+(×0.5–1.15); knockback distance is not (it is gameplay).
+
+**Game clock:** `Match.t2()` now runs on simulation time. It used to be wall time, so every window
+(combo, concussion decay, whiff, spam, setup, cooldowns) kept running during hitstop. Shortening the freeze
+changed balance (KO/TKO 36 % → 15 % in A/B tests); now presentation can't change balance.
+
+### Graphics / UI
+- Each fighter is drawn into an offscreen layer (bounding box only). Shading is painted with
+  `source-atop`, so it stays on the fighter's pixels: a cylinder gradient on every segment (procedural
+  normal shading), a warm-top / cool-bottom key light, bruises (face / ribs / lead leg) scaled by zone damage,
+  swelling, blood streaking from cuts, and sweat glints that grow with fight time and fatigue. The rim
+  light (silhouette minus a shifted silhouette, half resolution) is added with `lighter`.
+- Octagon: canvas texture on the mat, spotlight pool, drifting haze in the light, vignette.
+- Cost (CPU-only headless 1280×720, worst case): low 6 ms/frame, high 20 ms/frame. `gfx.quality:'auto'`
+  turns the layer passes off when frames run slow.
+- Touch: ⇄ step (direction from the stick, neutral = backstep), 🎭 feint, ⤵ weave, ↶ sway beside the
+  action pad; no overlap with the pad at 844×390 or 1180×820. Fires on touchstart.
+- HUD: stamina bar turns red with GASSED, amber over the spam limit; floating COUNTER / WHIFF PUNISH /
+  SWEET SPOT / JAMMED / PARRY / BIT ON FEINT labels for the player's exchanges.
+
+### Results (simbench, AI vs AI, 3 × 5 min)
+| | before (LW / HW) | after (LW / HW) |
+|---|---|---|
+| strikes thrown / min / fighter | 17.4 / 12.2 | 7–11 / 5–7 |
+| time in the pocket (< 0.95 apart) | 52 % / 47 % | 33 % / 30–32 % |
+| average distance | 1.25 / 1.26 | 1.9–2.1 |
+| KO/TKO · SUB · DEC (LW, 80 fights) | 25 · 20 · 55 % | 30 · 16 · 53 % |
+| knockdowns / fight (LW) | 0.07 | 0.24 |
+| whiff punishes · feints · reactive TDs / fight | 0 · 0 · 0 | ~1 · 2–3 · ~1 |
 
 ## Delivery phases
 1. ✅ Architecture + hitboxes + 2D ragdoll + combat feel + debug layer

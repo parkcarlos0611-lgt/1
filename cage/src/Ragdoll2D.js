@@ -14,7 +14,7 @@ const RAG_BONES=[['hip','mid'],['mid','sh'],['sh','nk'],['nk','hd'],['sh','lS'],
 const RAG_SHAPE=[['hip','sh',.6],['mid','nk',.5],['sh','hd',.35],['lS','mid',.4],['rS','mid',.4],['lH','mid',.6],['rH','mid',.6],['lH','rH',1],['lS','rS',1]];
 /* angle limits on chain a-b-c. sign: +1 = flexes toward facing (elbow), -1 = flexes away (knee), 0 = symmetric */
 const RAG_LIMITS=[['lH','lK','lA',-1,-.05,2.55],['rH','rK','rA',-1,-.05,2.55],['lS','lE','lW',1,-.05,2.65],['rS','rE','rW',1,-.05,2.65],
-  ['hip','mid','sh',0,-.7,.7],['mid','sh','nk',0,-.55,.55],['sh','nk','hd',0,-.9,.9],['lK','lA','lT',0,-1.3,1.3],['rK','rA','rT',0,-1.3,1.3]];
+  ['hip','mid','sh',0,-.7,.7],['mid','sh','nk',0,-.55,.55],['sh','nk','hd',0,-.9,.9],['lK','lA','lT',0,-2.4,2.4],['rK','rA','rT',0,-2.4,2.4]]  /* ankle: shin→foot turn is ~90° (1.57) when the foot is flat */;
 const RAG_STRUCK={head:'hd',body:'mid',leg:'lK'};
 class Ragdoll2D{
   constructor(body,o){const T=TUNING.ragdoll,J=body.J,H=body.H;this.body=body;this.T=T;this.d=body.d||1;this.t=0;this.ko=!!o.ko;this.asleep=false;this.still=0;this.wall=o.wall||4;this.contacts=new Set();

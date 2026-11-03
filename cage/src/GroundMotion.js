@@ -179,4 +179,31 @@ if(typeof IFX!=='undefined'){const T=IFX.tiers;for(const k in T){T[k].hs+=1;T[k]
     const r=oh.call(this,att,def,act,zone,p);
     const dmg=(h.dmg||5);if(typeof hitJiggle==='function'&&def.body)hitJiggle(def.body,zone,Math.min(.035,.008+dmg*.0018)*def.H,att.d,(h.pt||'')[0]==='r'?'r':'l');
     return r}}
+
+/* ---------- the cage: clinch against the fence, back take on a fighter gripping the fence, back control
+   seated against the cage. The fence is at ±stage.R; bodies are placed so backs / hands actually touch it. ---------- */
+const CAGE={pinGap:.27,backGap:.24,reach:.75};
+{const ug=Match.prototype.updGrapple;Match.prototype.updGrapple=function(dt){const r=ug.call(this,dt);const g=this.g;if(!g||g.type!=='clinch')return r;
+    const R=this.stage.R,a=g.att,d=g.def;const wall=Math.sign(d.x-a.x)||1;const near=Math.abs(d.x)>R-CAGE.reach&&Math.sign(d.x)===wall;
+    if(near){if(!g.cage){g.cage=1;g._pa=a.gpose;g._pd=d.gpose;this.ev(`🧱 ${a.name} 케이지로 밀어붙입니다`)}
+      if(!g.cageBack&&g.t>2&&Math.random()<dt*.12*(.6+ATT(a,'clinchCtl')-ATT(d,'clinchCtl')*.5)){g.cageBack=1;this.ev(`🔙 ${a.name} 케이지에서 백을 잡습니다`)}
+      const AJ=a.body.J,DJ=d.body.J,t=g.t;const PA=Object.assign({},BASE_POSE),PD=Object.assign({},BASE_POSE);const wob=Math.sin(t*7)*.03;
+      if(g.cageBack){/* defender faces the fence and grips it, attacker locks the body from behind */d.d=wall;a.d=wall;d.x=wall*(R-CAGE.backGap);a.x=d.x-wall*.3;
+        Object.assign(PD,{lean:.32+wob,chest:.1,head:-.1,ll_h:.25,ll_k:.45,rl_h:-.2,rl_k:.4});Object.assign(PA,{lean:.3,chest:.08,head:.05,ll_h:.3,ll_k:.5,rl_h:-.25,rl_k:.45});
+        if(DJ.mid){armIK(d,PD,'la',{x:wall*(R-.02),y:1.32+wob*.3});armIK(d,PD,'ra',{x:wall*(R-.02),y:1.05})}
+        if(AJ.sh&&DJ.mid){armIK(a,PA,'la',{x:DJ.mid.x+wall*.1,y:DJ.mid.y+.02});armIK(a,PA,'ra',{x:DJ.mid.x+wall*.08,y:DJ.mid.y-.06})}}
+      else{/* defender's back flat on the fence, one hand gripping the fence overhead, attacker head on the chest driving in */d.d=-wall;a.d=wall;d.x=wall*(R-CAGE.pinGap);a.x=d.x-wall*.42;
+        Object.assign(PD,{lean:-.14,chest:-.05,head:.15,ll_h:.2,ll_k:.25,rl_h:-.15,rl_k:.3});Object.assign(PA,{lean:.45+wob,chest:.12,head:.25,ll_h:.15,ll_k:.55,rl_h:-.45,rl_k:.35,rl_a:.5});
+        if(DJ.sh&&AJ.sh){armIK(d,PD,'la',{x:wall*(R-.03),y:1.5});armIK(d,PD,'ra',{x:AJ.sh.x,y:AJ.sh.y-.05});armIK(a,PA,'la',{x:DJ.hip.x-wall*.02,y:DJ.hip.y+.08});armIK(a,PA,'ra',{x:DJ.mid.x-wall*.04,y:DJ.mid.y})}}
+      a.gpose=PA;d.gpose=PD;a.gRate=d.gRate=12}
+    else if(g.cage){g.cage=0;g.cageBack=0;if(g._pa)a.gpose=g._pa;if(g._pd)d.gpose=g._pd}
+    return r}}
+/* a takedown from the cage back take ends in back control */
+{const sg=Match.prototype.startGround;Match.prototype.startGround=function(top,bot,pos,ax){if(this.g&&this.g.cageBack)pos='back';else if(this._tdFromCageBack){pos='back';this._tdFromCageBack=0}return sg.call(this,top,bot,pos,ax)}}
+{const sa=Match.prototype.startTdAnim;Match.prototype.startTdAnim=function(f,o,k){if(this.g&&this.g.type==='clinch'&&this.g.cageBack)this._tdFromCageBack=1;return sa.apply(this,arguments)}}
+/* back control near the fence: the attacker sits with his back against the cage, the opponent between his legs */
+{const sp=Match.prototype.setGPose;Match.prototype.setGPose=function(){const g=this.g;let cage=0;if(g&&g.type==='ground'&&g.pos==='back'){const R=this.stage.R;if(Math.abs(g.ax)>R-1.4){const wall=Math.sign(g.ax)||1;g.ax=wall*(R-.33);g.d=-wall;cage=wall}}
+    const r=sp.apply(this,arguments);if(cage&&!g.sub){const T=g.top.gpose,B=g.bot.gpose;if(T&&B){T.lean=-.5;T.chest=-.05;T.head=.15;T.y=.15;B.lean=-.3;B.head=.05}g.cageSit=1}else if(g)g.cageSit=0;return r}}
+/* fighters never pass through the fence */
+{const st=Match.prototype.step;Match.prototype.step=function(dt){const r=st.call(this,dt);const R=this.stage&&this.stage.R;if(R&&!(this.cfg&&this.cfg.training==='bag'))for(const f of this.f){const lim=R-.2;if(f.x>lim)f.x=lim;if(f.x<-lim)f.x=-lim}return r}}
 })();

@@ -44,7 +44,7 @@ const T=M=>M&&M.cfg&&M.cfg.training;
 {const st=Match.prototype.step;Match.prototype.step=function(dt){const tr=T(this);if(!tr)return st.call(this,dt);
     const[a,b]=this.f;this.trn=this.trn||{hits:0,pow:0,best:0,pts:0,td:0,sw:0,sub:0,kd:0,stops:0};
     if(tr==='bag'){if(!this.bag){this.bag=new HeavyBag(.9);b.hidden=1;if(b.ai)b.ai.update=function(){this.f.mvIn=0};b.noAct=1}
-      this.bag.step(dt);const c=this.bag.center();b.x=c.x;b.d=-1;b.vx=0;b.mvIn=0;b.act=null;b.guard=null;b.state='stand';b.hp={head:100,body:100,legs:100};b.sta=b.staMax;b.stun=0;b.rock=0;b.conc=0;b.down=null;b.body.rag=null}
+      this.bag.step(dt);this.clock=this.rules.len;/* no time limit: the session ends with the button */const c=this.bag.center();b.x=c.x;b.d=-1;b.vx=0;b.mvIn=0;b.act=null;b.guard=null;b.state='stand';b.hp={head:100,body:100,legs:100};b.sta=b.staMax;b.stun=0;b.rock=0;b.conc=0;b.down=null;b.body.rag=null}
     if(tr==='wrestle'&&this.phase==='fight'){const ai=this.f[this.pi==null?1:1-this.pi];if(ai&&!this.g&&ai.state==='stand'){const dd=ai.opp.x-ai.x,dist=Math.abs(dd);
         if(dist>1.15)ai.x+=Math.sign(dd)*dt*.9;/* the partner keeps coming forward */
         else if(Math.random()<dt*.9){if(dist<.95&&Math.random()<.45)this.clinch(ai);else{ai.act=null;this.shoot(ai)}}}}
@@ -81,19 +81,19 @@ Match.prototype.trnEnd=function(){if(this._trnShown)return;this._trnShown=1;this
   const lines=tr==='bag'?[['타격 수',t.hits],['총 파워',Math.round(t.pow)],['최고 파워',Math.round(t.best)],['평균',t.hits?Math.round(t.pow/t.hits):0]]
     :tr==='wrestle'?[['포인트',t.pts],['테이크다운',t.td],['스윕',t.sw],['탭 받아냄',t.sub]]
     :[['유효타',P.st?P.st.sigL||0:0],['녹다운',t.kd],['스톱',t.stops],['포인트',(P.st?P.st.sigL||0:0)+t.kd*5]];
-  const score=tr==='bag'?t.pow/Math.max(1,TRN.bag.len)*2:tr==='wrestle'?t.pts*3:(P.st?P.st.sigL||0:0)*.8+t.kd*6;
+  const score=tr==='bag'?Math.min(120,t.pow/2):tr==='wrestle'?t.pts*3:(P.st?P.st.sigL||0:0)*.8+t.kd*6;
   const gain=this.cfg.onTrain?this.cfg.onTrain(tr,score):null;
   const ov=document.createElement('div');ov.className='trnov';ov.innerHTML=`<div class="trnc"><h2 class="H">${TRN[tr].n} 완료</h2><table>${lines.map(([k,v])=>`<tr><th>${k}</th><td>${v}</td></tr>`).join('')}</table>${gain?`<p class="gain">${gain}</p>`:''}<button class="btn" data-ok>확인</button></div>`;
   this.root.appendChild(ov);ov.querySelector('[data-ok]').onclick=()=>{this.destroy();this.onEnd&&this.onEnd({training:tr,score,stats:t})}};
 /* live counter */
 {const bh=Match.prototype.buildHUD;Match.prototype.buildHUD=function(){const r=bh.apply(this,arguments);const tr=T(this);if(tr){const d=document.createElement('div');d.className='trnhud';this.root.appendChild(d);
-    this.trnUI=()=>{const t=this.trn||{};d.innerHTML=`<b>${TRN[tr].n}</b> `+(tr==='bag'?`타격 ${t.hits||0} · 파워 ${Math.round(t.pow||0)} · 최고 ${Math.round(t.best||0)}`:tr==='wrestle'?`포인트 ${t.pts||0} · TD ${t.td||0} · 스윕 ${t.sw||0} · 탭 ${t.sub||0}`:`녹다운 ${t.kd||0} · 스톱 ${t.stops||0}`)};this.trnUI()}return r}}
-{const css=document.createElement('style');css.textContent=`.trnhud{position:absolute;left:50%;top:84px;transform:translateX(-50%);background:rgba(20,20,24,.78);color:#fff;padding:6px 14px;border-radius:999px;font:600 13px 'Noto Sans KR',sans-serif;z-index:30;pointer-events:none;white-space:nowrap}
+    this.trnUI=()=>{const t=this.trn||{};d.innerHTML=`<b>${TRN[tr].n}</b> `+(tr==='bag'?`시간 제한 없음 · 타격 ${t.hits||0} · 파워 ${Math.round(t.pow||0)} · 최고 ${Math.round(t.best||0)} <button class="trnend">종료</button>`:tr==='wrestle'?`포인트 ${t.pts||0} · TD ${t.td||0} · 스윕 ${t.sw||0} · 탭 ${t.sub||0}`:`녹다운 ${t.kd||0} · 스톱 ${t.stops||0}`)};this.trnUI();d.addEventListener('click',e=>{if(e.target.classList.contains('trnend'))this.trnEnd()})}return r}}
+{const css=document.createElement('style');css.textContent=`.trnhud{position:absolute;left:50%;top:84px;transform:translateX(-50%);background:rgba(20,20,24,.78);color:#fff;padding:6px 14px;border-radius:999px;font:600 13px 'Noto Sans KR',sans-serif;z-index:30;white-space:nowrap}.trnhud .trnend{margin-left:8px;background:#d33;color:#fff;border:0;border-radius:999px;padding:3px 12px;font:700 12px sans-serif;cursor:pointer}
 .trnov{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(10,10,14,.55);z-index:60}.trnc{background:#16171c;color:#fff;border-radius:18px;padding:24px 28px;min-width:280px;text-align:center}
 .trnc table{margin:12px auto;border-collapse:collapse}.trnc th{text-align:left;padding:4px 18px 4px 0;color:#aaa;font-weight:500}.trnc td{text-align:right;font-weight:700}.trnc .gain{color:#7fe08a;font-size:13px}`;document.head.appendChild(css)}
 
 /* ---------- launching a session ---------- */
-window.startTraining=function(kind,fA,fB,opts){opts=opts||{};const C=TRN[kind];const rules=Object.assign({},orgRules('UFC',2020,true),{rounds:C.rounds,len:C.len,firstLen:0,venue:'cage8',standup:30});
+window.startTraining=function(kind,fA,fB,opts){opts=opts||{};const C=TRN[kind];if(kind!=='bag'){/* headgear for wrestling and sparring */fA=Object.assign({},fA,{look:Object.assign({},fA.look,{headgear:'#b3261e'})});fB=Object.assign({},fB,{look:Object.assign({},fB.look,{headgear:'#1f4fa6'})})}const rules=Object.assign({},orgRules('UFC',2020,true),{rounds:C.rounds,len:C.len,firstLen:0,venue:'cage8',standup:30});
   const root=document.createElement('div');document.body.appendChild(root);
   new Match(root,{level:.3,org:{short:'GYM',col:'#3a7bd5'},title:C.n,wcName:'TRAINING',rules,player:0,diff:opts.diff||.8,training:kind,onTrain:opts.onTrain,red:fA,blue:fB},res=>{root.remove();opts.done&&opts.done(res)})};
 
@@ -104,7 +104,7 @@ window.trainingMenu=function(){const st={kind:'bag',y:2020,wc:'LW',a:null,b:null
     const opt=(f,sel)=>`<option value="${f.id}" ${f===sel?'selected':''}>${flag(f.nat)} ${dn(f)}</option>`;
     app().innerHTML=`<div class="page"><div class="ph"><button class="back" data-bk>←</button><h2 class="H">훈련</h2></div>
       <div class="card"><div class="row wrap">${Object.entries(TRN).map(([k,c])=>`<button class="chip ${st.kind===k?'on':''}" data-k="${k}">${c.n}</button>`).join('')}</div>
-      <p class="sm mu">${st.kind==='bag'?'끈에 매달린 샌드백을 60초 동안 칩니다. 타격 위치와 파워에 따라 흔들립니다.':st.kind==='wrestle'?'타격 없이 2분 동안 테이크다운·스윕·포지션·서브미션으로 포인트를 땁니다.':'16온스 글러브로 2분 2라운드. KO 없이 리셋됩니다.'}</p>
+      <p class="sm mu">${st.kind==='bag'?'트레이닝 센터에서 끈에 매달린 샌드백을 시간 제한 없이 칩니다 (종료 버튼). 타격 위치와 파워에 따라 흔들립니다.':st.kind==='wrestle'?'타격 없이 2분 동안 테이크다운·스윕·포지션·서브미션으로 포인트를 땁니다.':'16온스 글러브로 2분 2라운드. KO 없이 리셋됩니다.'}</p>
       <div class="row wrap">${WCK.map(k=>`<button class="chip ${k===st.wc?'on':''}" data-wc="${k}">${WC[k].n}</button>`).join('')}</div>
       <label>내 선수</label><select data-a>${L.map(f=>opt(f,st.a)).join('')}</select>${st.kind==='bag'?'':`<label>파트너</label><select data-b>${L.map(f=>opt(f,st.b)).join('')}</select>`}</div>
       <button class="btn big full" data-go>시작</button></div>`;

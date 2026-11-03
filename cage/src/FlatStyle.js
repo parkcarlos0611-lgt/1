@@ -216,6 +216,11 @@ function headFlat(ctx,hd,nk,H,B,skin,d,ang){const lk=B.look,r=.066*H;ctx.save();
     if(B.ko)P([[.84,-.41],[.97,-.41],[.95,-.5],[.86,-.5]],'#2a0d0d');else P([[.97,-.425],[.8,-.415],[.8,-.44],[.95,-.445]],shade(sk,-.5))}
   /* hair + beard */
   const hc=lk.hair||'#16100b';hairFlat(ctx,r,lk,B,hc,P);beardFlat(lk,hc,P);
+  /* training headgear: padded crown, forehead band, ear / cheek pad, chin strap */
+  if(lk.headgear){const g=lk.headgear,gd=shade(g,-.22),gl=shade(g,.12);P([[-1.08,.22],[-.98,.86],[-.5,1.24],[.3,1.26],[.74,.98],[.9,.62],[.62,.5],[.1,.58],[-.45,.5],[-.7,.2]],g,.35);
+    P([[.92,.66],[.6,.5],[.62,.4],[.94,.52]],gd,.3);P([[-.5,1.16],[.25,1.2],[.2,1.08],[-.45,1.05]],gl,.3);
+    P([[-.55,.42],[.08,.46],[.2,-.4],[-.05,-.62],[-.5,-.5],[-.66,.0]],g,.4);P([[-.4,.25],[-.05,.27],[0,-.22],[-.32,-.3]],gd,.3);
+    P([[.12,-.38],[.24,-.44],[.82,-.86],[.74,-.96]],gd,.2)}
   /* cuts & blood (positions shared with the game's damage system) */
   if(typeof CUTPOS!=='undefined')for(const c of B.cuts||[]){const p=CUTPOS[c.at];if(!p)continue;P([[p[0]-.1,p[1]+.06],[p[0]+.12,p[1]-.03],[p[0]+.12,p[1]-.06],[p[0]-.1,p[1]+.03]],'#5a0303');
     if(c.sev>.25){const L=.3+Math.min(2.2,c.sev*1.1);ctx.globalAlpha=.85;P([[p[0]-.07,p[1]],[p[0]+.08,p[1]],[p[0]+.03,p[1]-L],[p[0]-.02,p[1]-L*.9]],'#960808');ctx.globalAlpha=1}}
@@ -248,9 +253,10 @@ if(typeof GFX!=='undefined'){GFX.octagon=false}
 if(typeof GPU!=='undefined'){Object.assign(GPU,{dof:0,bloom:0,rim:0,contrast:1,saturation:1,vignette:0})}
 /* rounded rectangle helper for props */
 function rr(ctx,x,y,w,h,r){r=Math.min(r,Math.abs(w)/2,Math.abs(h)/2);ctx.beginPath();if(ctx.roundRect)ctx.roundRect(x,y,w,h,r);else ctx.rect(x,y,w,h);ctx.fill()}
-const BG={wall:'#ece9e3',wallLow:'#e2ded6',fence:'#cfcac1',post:'#b9b3a8',rail:'#b1ab9f',mat:'#dedad3',matEdge:'#d2cdc4',ring:'#c9473f'};
+const BG={wall:'#ece9e3',wallLow:'#e2ded6',fence:'#2a2b30',post:'#18191c',rail:'#101113',mesh:'#3a3b42',mat:'#dedad3',matEdge:'#d2cdc4',ring:'#c9473f'};
 if(typeof Stage!=='undefined'){
   Stage.prototype.drawBack0=function(){const G=this.gpu;const near=this.ctx,dpr=this.dpr,W=this.W,H=this.Hh,s=this.sc();
+    if(this._match&&this._match.cfg&&this._match.cfg.training==='bag')return drawGym(this);
     if(G){G.farX.setTransform(1,0,0,1,0,0);G.farX.fillStyle=BG.wall;G.farX.fillRect(0,0,G.far.width,G.far.height)}
     near.setTransform(dpr,0,0,dpr,0,0);const ctx=near;const gy=H*this.cam.gy;const dp=.62;const fy=gy-.95*s;this.fy=fy;
     ctx.fillStyle=BG.wall;ctx.fillRect(0,0,W,fy);ctx.fillStyle=BG.wallLow;ctx.fillRect(0,fy-.9*s*dp,W,.9*s*dp);
@@ -259,10 +265,14 @@ if(typeof Stage!=='undefined'){
       for(let i=0;i<4;i++){const y=fy-(.42+i*.32)*s*dp;ctx.fillStyle=i%2?this.col:BG.rail;rr(ctx,x0,y-.02*s*dp,x1-x0,.04*s*dp,.02*s*dp)}}
     else{/* fence: flat panel, thin mesh lines, flat posts, top rail, bottom pad */
       ctx.fillStyle=BG.fence;ctx.globalAlpha=.35;ctx.fillRect(0,top,W,fy-top);ctx.globalAlpha=1;
-      ctx.strokeStyle=BG.post;ctx.globalAlpha=.25;ctx.lineWidth=1;const step=.18*s*dp,off=-(this.cam.x*s*dp)%step;ctx.beginPath();for(let x=off-step;x<W+step;x+=step){ctx.moveTo(x,top);ctx.lineTo(x+(fy-top)*.5,fy);ctx.moveTo(x+(fy-top)*.5,top);ctx.lineTo(x,fy)}ctx.stroke();ctx.globalAlpha=1;
+      ctx.strokeStyle=BG.mesh;ctx.globalAlpha=.5;ctx.lineWidth=1;const step=.18*s*dp,off=-(this.cam.x*s*dp)%step;ctx.beginPath();for(let x=off-step;x<W+step;x+=step){ctx.moveTo(x,top);ctx.lineTo(x+(fy-top)*.5,fy);ctx.moveTo(x+(fy-top)*.5,top);ctx.lineTo(x,fy)}ctx.stroke();ctx.globalAlpha=1;
       ctx.fillStyle=BG.rail;rr(ctx,-20,top-.05*s*dp,W+40,.07*s*dp,.035*s*dp);ctx.fillStyle=BG.post;rr(ctx,-20,fy-.28*s*dp,W+40,.28*s*dp,.07*s*dp);
       const po=Math.floor(this.rot/2.3);for(let i=-5+po;i<=5+po;i++){const x=this.px(i*2.3,dp);ctx.fillStyle=BG.post;rr(ctx,x-.07*s*dp,top-.09*s*dp,.14*s*dp,fy-top+.09*s*dp,.07*s*dp);ctx.fillStyle=BG.rail;rr(ctx,x+.02*s*dp,top-.06*s*dp,.05*s*dp,fy-top+.06*s*dp,.025*s*dp)}}
     {const C=this.cam,cx=C.x;C.x-=this.rot;this.drawMat(fy,gy,s);C.x=cx}
+    /* the cage ends: black fence walls at the edge of the fighting area (same depth as the fighters) */
+    if(!ring){const cx=this.cam.x-(this.rot||0);for(const sg of[-1,1]){const x=(sg*this.R-cx)*s+W/2;if(x<-80||x>W+80)continue;const wd=.24*s,ht=1.85*s;const x0=sg>0?x:x-wd;
+      ctx.fillStyle='rgba(16,17,20,.82)';rr(ctx,x0,fy+.05*s-ht,wd,ht,.05*s);ctx.strokeStyle='rgba(80,82,92,.55)';ctx.lineWidth=1;ctx.beginPath();for(let k=1;k<12;k++){const y=fy+.05*s-ht+ht*k/12;ctx.moveTo(x0,y);ctx.lineTo(x0+wd,y+(sg>0?6:-6))}ctx.stroke();
+      ctx.fillStyle='#0b0b0d';rr(ctx,x-.05*s,fy+.08*s-ht-.06*s,.1*s,ht+.06*s,.05*s);ctx.fillStyle='#16171a';rr(ctx,x0,fy+.05*s-.3*s,wd,.32*s,.06*s)}}
     /* camera-pan motion blur on the backdrop (fighters stay sharp) */
     {const cx=this.cam.x+(this.rot||0);const v=this._pcx==null?0:(cx-this._pcx)*s;this._pcx=cx;this._bv=(this._bv||0)*.6+v*.4;const px=Math.min(14,Math.abs(this._bv)*1.7);
       if(px>1.2){const cv=ctx.canvas;const dir=Math.sign(this._bv);ctx.save();ctx.setTransform(1,0,0,1,0,0);const n=4;for(let i=1;i<=n;i++){ctx.globalAlpha=.2*(1-i/(n+1));ctx.drawImage(cv,dir*px*dpr*i/n,0)}ctx.restore()}}};
@@ -407,4 +417,21 @@ const JIG_K={head:['hd','nk'],body:['sh','mid','lS','rS','nk'],legL:['lK','lA','
     keys.forEach((n,i)=>{const q=J[n];if(!q)return;save[n]=q;const w=n==='nk'||n==='mid'?.55:1;J[n]={x:q.x+k*g.dx*w,y:q.y+k*.35*w}});
     try{return D.call(this,ctx,o)}finally{for(const n in save)J[n]=save[n]}}}
 window.hitJiggle=function(body,zone,amp,dir,leg){body._jig={z:zone==='head'?'head':zone==='leg'?(leg==='r'?'legR':'legL'):'body',t0:performance.now(),a:amp,dx:dir||1}};
+
+/* ---------- training centre backdrop (heavy-bag session) ---------- */
+function drawGym(S){const ctx=S.ctx,dpr=S.dpr,W=S.W,H=S.Hh,s=S.sc();ctx.setTransform(dpr,0,0,dpr,0,0);const gy=H*S.cam.gy;const fy=gy-.95*s;S.fy=fy;const dp=.7;const px=x=>S.px(x,dp);
+  ctx.fillStyle='#e7e1d6';ctx.fillRect(0,0,W,H);ctx.fillStyle='#d9d1c3';ctx.fillRect(0,fy-.55*s*dp,W,.55*s*dp);/* wall + wainscot */
+  /* windows / mirrors */for(let i=-6;i<=6;i++){const x=px(i*2.6);ctx.fillStyle='#cfd8dc';rr(ctx,x-.9*s*dp,fy-2.2*s*dp,1.8*s*dp,1.25*s*dp,.08*s*dp);ctx.fillStyle='rgba(255,255,255,.35)';rr(ctx,x-.75*s*dp,fy-2.1*s*dp,.35*s*dp,1.05*s*dp,.05*s*dp)}
+  /* banners */for(let i=-4;i<=4;i++){const x=px(i*3.9+1.3);ctx.fillStyle=i%2?'#b33a2e':'#2c3e66';rr(ctx,x-.25*s*dp,fy-2.55*s*dp,.5*s*dp,.9*s*dp,.06*s*dp);ctx.fillStyle='rgba(255,255,255,.75)';rr(ctx,x-.15*s*dp,fy-2.3*s*dp,.3*s*dp,.06*s*dp,.03*s*dp)}
+  /* equipment along the wall: dumbbell racks, kettlebells, a speed-bag platform, more heavy bags, a boxing-ring corner */
+  for(let i=-5;i<=5;i++){const x=px(i*3.2-1.1);const k=((i%4)+4)%4;
+    if(k===0){/* dumbbell rack */ctx.fillStyle='#5a5148';rr(ctx,x-.6*s*dp,fy-.6*s*dp,1.2*s*dp,.08*s*dp,.04*s*dp);rr(ctx,x-.55*s*dp,fy-.6*s*dp,.07*s*dp,.6*s*dp,.03*s*dp);rr(ctx,x+.48*s*dp,fy-.6*s*dp,.07*s*dp,.6*s*dp,.03*s*dp);
+      for(let j=0;j<5;j++){const bx=x-.45*s*dp+j*.22*s*dp;ctx.fillStyle='#2b2b2e';rr(ctx,bx,fy-.72*s*dp,.09*s*dp,.14*s*dp,.04*s*dp);rr(ctx,bx+.11*s*dp,fy-.72*s*dp,.09*s*dp,.14*s*dp,.04*s*dp);ctx.fillStyle='#8a8f96';rr(ctx,bx+.05*s*dp,fy-.67*s*dp,.1*s*dp,.04*s*dp,.02*s*dp)}}
+    else if(k===1){/* kettlebells */for(let j=0;j<4;j++){const bx=x-.4*s*dp+j*.27*s*dp,r=(.08+j*.012)*s*dp;ctx.fillStyle='#2b2b2e';ctx.beginPath();ctx.arc(bx,fy-r,r,0,7);ctx.fill();ctx.strokeStyle='#2b2b2e';ctx.lineWidth=.025*s*dp;ctx.beginPath();ctx.arc(bx,fy-r*2,r*.6,Math.PI,0);ctx.stroke()}}
+    else if(k===2){/* speed-bag platform */ctx.fillStyle='#6d5a44';rr(ctx,x-.45*s*dp,fy-2.0*s*dp,.9*s*dp,.1*s*dp,.05*s*dp);ctx.fillStyle='#4b3e30';rr(ctx,x-.05*s*dp,fy-1.9*s*dp,.1*s*dp,1.9*s*dp,.04*s*dp);ctx.fillStyle='#8a2c26';ctx.beginPath();ctx.ellipse(x+.22*s*dp,fy-1.72*s*dp,.09*s*dp,.13*s*dp,0,0,7);ctx.fill()}
+    else{/* hanging heavy bag (background) */ctx.strokeStyle='#5a5148';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(x,fy-2.7*s*dp);ctx.lineTo(x,fy-1.95*s*dp);ctx.stroke();ctx.fillStyle='#3a3d44';rr(ctx,x-.17*s*dp,fy-1.95*s*dp,.34*s*dp,1.3*s*dp,.15*s*dp);ctx.fillStyle='#2a2c31';rr(ctx,x-.17*s*dp,fy-1.9*s*dp,.12*s*dp,1.2*s*dp,.06*s*dp)}}
+  /* wooden floor with planks + a rubber training mat under the bag */
+  ctx.fillStyle='#c79f72';ctx.fillRect(0,fy,W,H-fy);ctx.strokeStyle='rgba(120,84,48,.35)';ctx.lineWidth=1;ctx.beginPath();for(let k=1;k<9;k++){const y=fy+(H-fy)*k/9*k/9*1.0;ctx.moveTo(0,y);ctx.lineTo(W,y)}ctx.stroke();
+  {const k=.86;const cx=(0-S.cam.x*k)*s*k+W/2,cy=fy+(H-fy)*.45;ctx.fillStyle='#3b3f46';ctx.save();ctx.translate(cx,cy);ctx.scale(1,.28);ctx.beginPath();if(ctx.roundRect)ctx.roundRect(-2.6*s,-1.6*s,5.2*s,3.2*s,.6*s);ctx.fill();ctx.restore()}
+  S.decals=S.decals||[]}
 })();

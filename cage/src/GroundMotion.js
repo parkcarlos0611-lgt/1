@@ -271,4 +271,8 @@ if(typeof In2!=='undefined'){const bt=In2.prototype.buildTouch;In2.prototype.bui
     const h=a.c.hit,t=a.t;const w=t<h.t0*.45?0:t<h.t0?(t-h.t0*.45)/(h.t0*.55):t<=h.t1+.05?1:Math.max(0,1-(t-h.t1-.05)/.12);if(w<=0)return;
     const OJ=this.opp.body.J;/* land on the side / top of the head, coming over the guard */const T={x:OJ.hd.x-this.d*.04,y:OJ.hd.y+.03};const side=a.c.hand==='l'?'la':'ra';
     const tmp=Object.assign({},p);armIK(this,tmp,side,T);p[side+'_s']+=(tmp[side+'_s']-p[side+'_s'])*w;p[side+'_e']+=(tmp[side+'_e']-p[side+'_e'])*w}}
+
+/* ---------- the old quick-step: button removed, no player quick steps (weave and step-bounce remain) ---------- */
+if(typeof In2!=='undefined'){const bt=In2.prototype.buildTouch;In2.prototype.buildTouch=function(){bt.call(this);const tc=this.tc;if(tc){const st=tc.querySelector('.tr4 .stp');if(st)st.remove()}}}
+if(typeof Pacing!=='undefined'){const qs=Pacing.quickStep;Pacing.quickStep=function(M,f,dir){if(f&&f.isPlayer===true)return false;return qs.apply(this,arguments)}}
 })();

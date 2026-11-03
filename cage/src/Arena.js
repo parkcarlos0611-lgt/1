@@ -12,7 +12,7 @@ const ARENA=tuneSection('arena',{
   unit:.9,                 // world units per metre (matches the F2 height scale)
   octagonFt:30, apexFt:25, ringFt:20,
   apexBelowLevel:1,        // promotions with production level below this fight in the 25 ft cage
-  cam:{stand:{pad:6.4,min:9.0,max:11.4},ground:{pad:5.4,min:7.8,max:9.2},minVisH:3.9,maxVisH:5.6,floorY:{stand:.86,ground:.82}}
+  cam:{stand:{pad:3.5,min:5.0,max:7.6},ground:{pad:3.4,min:4.9,max:6.8},minVisH:2.6,maxVisH:3.1,floorY:{stand:.88,ground:.84}}   /* broadcast framing: fighter ≈ half the screen height */
 });
 const ftToR=ft=>ft*.3048*ARENA.unit/2;
 function arenaFor(venue,level){if(String(venue||'').startsWith('ring'))return{kind:'ring',ft:ARENA.ringFt};const big=(level==null?1:level)>=ARENA.apexBelowLevel;return big?{kind:'octagon',ft:ARENA.octagonFt}:{kind:'apex',ft:ARENA.apexFt}}

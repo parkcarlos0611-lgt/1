@@ -12,7 +12,7 @@
    the back/top, added with 'lighter' (back-lights over the cage).
    Octagon: spotlight pool on the mat, canvas texture, drifting haze in the light, edge vignette.
    Quality: TUNING.gfx.quality 'high' | 'low' | 'auto' ('auto' drops the layer passes if frames get slow). */
-const GFX=tuneSection('gfx',{on:true,quality:'auto',rim:.4,shade:1,bruise:1,sweat:.7,octagon:true,autoSlowMs:26});
+const GFX=tuneSection('gfx',{on:true,quality:'high',   /* no automatic effect cut-offs: GPURenderer keeps 60 fps with dynamic resolution */rim:.4,shade:1,bruise:1,sweat:.7,octagon:true,autoSlowMs:26});
 const GR={layer:null,rim:null,slow:0,off:false,
   ensure(cv){for(const k of['layer','rim']){let c=this[k];if(!c){c=this[k]=document.createElement('canvas');this[k+'X']=c.getContext('2d')}const sc=k==='rim'?.5:1;const w=Math.ceil(cv.width*sc),h=Math.ceil(cv.height*sc);if(c.width!==w||c.height!==h){c.width=w;c.height=h}}},   /* rim runs at half resolution: it is a soft glow */
   active(){return GFX.on&&GFX.quality!=='low'&&!this.off},
@@ -71,8 +71,8 @@ const ArenaFX={tex:null,motes:null,
     /* haze motes drifting in the light */
     if(!this.motes)this.motes=Array.from({length:36},()=>({x:Math.random(),y:Math.random(),v:.004+Math.random()*.01,r:.6+Math.random()*1.6}));const t=S.t||0;
     for(const m of this.motes){const x=((m.x+Math.sin(t*.2+m.y*9)*.02)%1)*W,y=((m.y-t*m.v)%1+1)%1*fy;ctx.fillStyle=`rgba(255,240,220,${.05+.05*Math.sin(t+m.x*20)})`;ctx.beginPath();ctx.arc(x,y,m.r*dpr,0,7);ctx.fill()}
-    /* vignette */
-    ctx.globalCompositeOperation='source-over';const v=ctx.createRadialGradient(W/2,Hh*.55,Math.min(W,Hh)*.35,W/2,Hh*.55,Math.max(W,Hh)*.75);v.addColorStop(0,'rgba(0,0,0,0)');v.addColorStop(1,'rgba(0,0,0,.42)');ctx.fillStyle=v;ctx.fillRect(0,0,W,Hh);
+    /* vignette (the GPU compositor does its own) */
+    if(!S.gpu){ctx.globalCompositeOperation='source-over';const v=ctx.createRadialGradient(W/2,Hh*.55,Math.min(W,Hh)*.35,W/2,Hh*.55,Math.max(W,Hh)*.75);v.addColorStop(0,'rgba(0,0,0,0)');v.addColorStop(1,'rgba(0,0,0,.42)');ctx.fillStyle=v;ctx.fillRect(0,0,W,Hh)}
     ctx.restore()}
 };
 {const db=Stage.prototype.drawBack;Stage.prototype.drawBack=function(){const r=db.apply(this,arguments);try{ArenaFX.draw(this)}catch(e){}return r}}

@@ -21,6 +21,9 @@ index.html  (inline core: Body, F2, MV, Stage, In2, AI2, Match, World, Career, U
   └─ src/GraphicsRenderer.js    per-fighter lighting layer (normal shading, key light, rim light), bruises,
                                 swelling, blood streaks, sweat sheen; octagon spotlight, texture, haze, vignette
   └─ src/UIManager.js           touch step/feint/weave/sway cluster, GASSED HUD, combat labels, help tables
+  └─ src/ArenaRenderer.js      arena backdrop (red ambient, LED screens, truss + beams, crowd tiers), padded cage, sprite-cached mat
+  └─ src/RefereeModel.js       new referee figure (generic looks, state poses)
+  └─ src/GPURenderer.js        WebGL compositor (DoF, bloom, rim, grade, vignette) + dynamic resolution
   └─ src/DebugLayer.js          F9 overlay: hitboxes, ragdoll joints, buffer, ref path, conc gauge
   └─ src/CareerManager.js       InjuryModel, Matchmaker, coaching staff, scheduler / fight-card tab
   tools/careerbench.js          multi-year career bench (injuries, weeks lost, fights, rematches)
@@ -234,6 +237,48 @@ changed balance (KO/TKO 36 % → 15 % in A/B tests); now presentation can't chan
 | KO/TKO · SUB · DEC (LW, 80 fights) | 25 · 20 · 55 % | 30 · 16 · 53 % |
 | knockdowns / fight (LW) | 0.07 | 0.24 |
 | whiff punishes · feints · reactive TDs / fight | 0 · 0 · 0 | ~1 · 2–3 · ~1 |
+
+## Phase 5 — GPU compositing, 60 fps, broadcast camera, arena and referee
+
+### Render pipeline
+```
+Canvas 2D (draw calls)                         WebGL (one full-screen pass, ~8 texture reads / pixel)
+  far  : arena + crowd   (0.35 × res)  ──┐     far: bilinear upscale + 4 taps   → depth of field
+  bloom: far ↓ 1/16                    ──┤     bloom: bright-pass of 1 tap      → glow of lights / screens
+  near : cage, mat, referee            ──┼──►  near over far
+  fig  : fighters, particles, labels   ──┘     fighters over that + rim light from alpha edges (3 taps)
+                                                colour grade, vignette, damage tint, impact flash
+```
+- No more CPU per-pixel work: the 2D rim passes and `ctx.filter` (hit flash) are gone. The hit flash is a
+  `source-atop` wash and flash/vignette are shader uniforms.
+- **No quality cut-offs**: `gfx.quality` stays 'high'. **Dynamic resolution** holds 60 fps instead: render scale
+  0.5–1 × DPR (cap 2), down 0.1 when frames average > 16.9 ms, up 0.05 when < 14.5 ms (1.2 s hold).
+  Large high-DPR screens start at ≤ 2.2 Mpx.
+- Canvas 2D fallback if WebGL is unavailable.
+- Floor logos, sponsor boards, post pads and LED screen text are pre-rendered sprites (re-rendering text
+  every frame was ~40 % of the frame).
+
+Frame cost (headless, WebGL on SwiftShader, so the GPU stage also runs on the CPU), 1280×720:
+| | median ms |
+|---|---|
+| before (2D high) | 9.2 (p90 19.1) |
+| GPU path, before sprite caching | 8.3 |
+| GPU path, final | 2.7–4.7 (mat 3.3 → 0.06, composite ≈ 0.5–0.9) |
+
+### Camera
+Broadcast framing like a TV feed: fighter ≈ 45–50 % of screen height (was 34 %), camera floor line 0.88.
+Narrow screens frame by height.
+
+### Arena
+Dark arena with red ambient wash, lighting truss with fixtures and soft beams, a row of blue LED screens,
+upper crowd tier and the lower crowd behind the cage (both defocused), padded posts and top rail, fine
+chain-link, black fence skirt with sponsor boards. Branding is generic (promotion short name, parody
+sponsors).
+
+### Referee
+New front-view official: black polo (collar, buttons, sleeve hems, chest patch), slacks with belt and
+crease, polished shoes, blue gloves; generic look picked per fight (6 skin / hair presets). Poses blend
+between watch, ground (crouched), break (arms out), wave-off and raise, driven by RefereeAI's `r.mode`.
 
 ## Delivery phases
 1. ✅ Architecture + hitboxes + 2D ragdoll + combat feel + debug layer

@@ -101,6 +101,7 @@ const RefereeAI={
   const gap=tgt-r.x;r.mvIn=Math.abs(gap)<.06?0:clamp(gap*1.6,-1,1)*(rush?REF.rush:REF.speed);const mid=(this.f[0].x+this.f[1].x)/2;r.d=Math.sign(mid-r.x)||1;
   r.update(dt,{checkHit(){},onMiss(){}});r.x=clamp(r.x,-this.stage.R,this.stage.R);
   r._dbgPath=[r.x];{let x=r.x;for(let i=0;i<12;i++){x+=clamp((tgt-x)*1.6,-1,1)*.08;r._dbgPath.push(x)}}
+  r.mode=r.wave>0?'wave':this.phase==='end'&&this.winner?'raise':this.phase==='break'?'break':this.g&&this.g.type==='ground'?'ground':'watch';   /* drives RefereeModel */
   /* poses: watching crouch, waving off, arms raised for the winner */
   if(r.wave>0){r.wave-=dt;const w=Math.sin(this.stage.t*14)*.35;r.gpose=poseCopy(Object.assign({},BASE_POSE,{lean:.18,chest:.05,head:.05,la_s:1.55+w,la_e:.15,ra_s:1.45-w,ra_e:.15,ll_h:.25,ll_k:.25,rl_h:-.2,rl_k:.25}))}
   else if(this.phase==='end'&&this.winner){r.gpose=poseCopy(Object.assign({},BASE_POSE,{la_s:2.9,la_e:.2,ra_s:.2,ra_e:.3,lean:0,head:0}))}

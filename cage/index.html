@@ -910,7 +910,8 @@ class Stage{
       if(f.pow>1.2){ctx.strokeStyle=`rgba(255,200,120,${(1-k)*.6})`;ctx.lineWidth=.03*(1-k);ctx.beginPath();ctx.ellipse(f.x,f.y,(.08+k*.4)*f.pow,(.05+k*.25)*f.pow,0,0,7);ctx.stroke()}ctx.strokeStyle=`rgba(255,255,255,${(1-k)*.9})`;ctx.lineWidth=.02*(1-k)+.004;ctx.beginPath();ctx.arc(f.x,f.y,.04+k*.22*f.pow,0,7);ctx.stroke();
       ctx.fillStyle=`rgba(255,240,200,${(1-k)*.55})`;ctx.beginPath();ctx.arc(f.x,f.y,.05*f.pow*(1-k*.5),0,7);ctx.fill();
       ctx.strokeStyle=`rgba(255,255,255,${(1-k)*.6})`;ctx.lineWidth=.008;for(let i=0;i<7;i++){const a=i/7*Math.PI*2+f.x;ctx.beginPath();ctx.moveTo(f.x+Math.cos(a)*(.06+k*.1)*f.pow,f.y+Math.sin(a)*(.06+k*.1)*f.pow);ctx.lineTo(f.x+Math.cos(a)*(.12+k*.25)*f.pow,f.y+Math.sin(a)*(.12+k*.25)*f.pow);ctx.stroke()}}
-    // screen overlays
+    // screen overlays (GPU path: flash / vignette are done in the compositor shader)
+    if(this.gpu){this.gpuFlash=this.scrFlash;this.scrFlash=Math.max(0,this.scrFlash-dt*3);return}
     ctx.setTransform(this.dpr,0,0,this.dpr,0,0);if(this.scrFlash>0){ctx.fillStyle=`rgba(255,255,255,${this.scrFlash})`;ctx.fillRect(0,0,this.W,this.Hh);this.scrFlash=Math.max(0,this.scrFlash-dt*3)}
     {ctx.save();ctx.globalCompositeOperation='lighter';const W=this.W,H=this.Hh,cx=W/2;const lg=ctx.createLinearGradient(0,0,0,H*.9);lg.addColorStop(0,`rgba(255,240,210,${.08+(this.lv==null?1:this.lv)*.07})`);lg.addColorStop(1,'rgba(255,240,210,0)');ctx.fillStyle=lg;ctx.beginPath();ctx.moveTo(cx-W*.12,0);ctx.lineTo(cx+W*.12,0);ctx.lineTo(cx+W*.42,H*.92);ctx.lineTo(cx-W*.42,H*.92);ctx.closePath();ctx.fill();
      const fl=ctx.createRadialGradient(cx,H*.86,10,cx,H*.86,W*.45);fl.addColorStop(0,'rgba(255,250,235,.10)');fl.addColorStop(1,'rgba(255,250,235,0)');ctx.fillStyle=fl;ctx.fillRect(0,H*.5,W,H*.5);ctx.restore()}
@@ -2456,5 +2457,5 @@ function fightWeek(){const P=GG.P,nx=P.next;if(!nx)return;const o=GG.F[nx.opp];c
   step0()}
 if(document.readyState==='loading')window.addEventListener('DOMContentLoaded',titleScreen);else titleScreen();
 </script>
-<script src="src/Tuning.js"></script><script src="src/FootPlant.js"></script><script src="src/Arena.js"></script><script src="src/Ragdoll2D.js"></script><script src="src/JudgeRefereeSystem.js"></script><script src="src/CombatEngine.js"></script><script src="src/CombatPacingEngine.js"></script><script src="src/ImpactFeedbackManager.js"></script><script src="src/GraphicsRenderer.js"></script><script src="src/UIManager.js"></script><script src="src/DebugLayer.js"></script><script src="src/CareerManager.js"></script>
+<script src="src/Tuning.js"></script><script src="src/FootPlant.js"></script><script src="src/Arena.js"></script><script src="src/Ragdoll2D.js"></script><script src="src/JudgeRefereeSystem.js"></script><script src="src/CombatEngine.js"></script><script src="src/CombatPacingEngine.js"></script><script src="src/ImpactFeedbackManager.js"></script><script src="src/GraphicsRenderer.js"></script><script src="src/UIManager.js"></script><script src="src/ArenaRenderer.js"></script><script src="src/RefereeModel.js"></script><script src="src/DebugLayer.js"></script><script src="src/GPURenderer.js"></script><script src="src/CareerManager.js"></script>
 </body></html>

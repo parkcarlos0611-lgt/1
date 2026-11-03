@@ -263,20 +263,13 @@ if(typeof Stage!=='undefined'){
     const ring=this.venue.startsWith('ring');const top=fy-1.75*s*dp;
     if(ring){const R=this.R,x0=this.px(-R,dp),x1=this.px(R,dp);for(const x of[x0,x1]){ctx.fillStyle=BG.post;rr(ctx,x-.06*s*dp,fy-1.45*s*dp,.12*s*dp,1.45*s*dp,.06*s*dp)}
       for(let i=0;i<4;i++){const y=fy-(.42+i*.32)*s*dp;ctx.fillStyle=i%2?this.col:BG.rail;rr(ctx,x0,y-.02*s*dp,x1-x0,.04*s*dp,.02*s*dp)}}
-    else{/* fence: flat panel, thin mesh lines, flat posts, top rail, bottom pad */
-      ctx.fillStyle=BG.fence;ctx.globalAlpha=.35;ctx.fillRect(0,top,W,fy-top);ctx.globalAlpha=1;
-      ctx.strokeStyle=BG.mesh;ctx.globalAlpha=.5;ctx.lineWidth=1;const step=.18*s*dp,off=-(this.cam.x*s*dp)%step;ctx.beginPath();for(let x=off-step;x<W+step;x+=step){ctx.moveTo(x,top);ctx.lineTo(x+(fy-top)*.5,fy);ctx.moveTo(x+(fy-top)*.5,top);ctx.lineTo(x,fy)}ctx.stroke();ctx.globalAlpha=1;
-      ctx.fillStyle=BG.rail;rr(ctx,-20,top-.05*s*dp,W+40,.07*s*dp,.035*s*dp);ctx.fillStyle=BG.post;rr(ctx,-20,fy-.28*s*dp,W+40,.28*s*dp,.07*s*dp);
-      const po=Math.floor(this.rot/2.3);for(let i=-5+po;i<=5+po;i++){const x=this.px(i*2.3,dp);ctx.fillStyle=BG.post;rr(ctx,x-.07*s*dp,top-.09*s*dp,.14*s*dp,fy-top+.09*s*dp,.07*s*dp);ctx.fillStyle=BG.rail;rr(ctx,x+.02*s*dp,top-.06*s*dp,.05*s*dp,fy-top+.06*s*dp,.025*s*dp)}}
+    else{this._oct=1}
     {const C=this.cam,cx=C.x;C.x-=this.rot;this.drawMat(fy,gy,s);C.x=cx}
-    /* the cage ends: black fence walls at the edge of the fighting area (same depth as the fighters) */
-    if(!ring){const cx=this.cam.x-(this.rot||0);for(const sg of[-1,1]){const x=(sg*this.R-cx)*s+W/2;if(x<-80||x>W+80)continue;const wd=.24*s,ht=1.85*s;const x0=sg>0?x:x-wd;
-      ctx.fillStyle='rgba(16,17,20,.82)';rr(ctx,x0,fy+.05*s-ht,wd,ht,.05*s);ctx.strokeStyle='rgba(80,82,92,.55)';ctx.lineWidth=1;ctx.beginPath();for(let k=1;k<12;k++){const y=fy+.05*s-ht+ht*k/12;ctx.moveTo(x0,y);ctx.lineTo(x0+wd,y+(sg>0?6:-6))}ctx.stroke();
-      ctx.fillStyle='#0b0b0d';rr(ctx,x-.05*s,fy+.08*s-ht-.06*s,.1*s,ht+.06*s,.05*s);ctx.fillStyle='#16171a';rr(ctx,x0,fy+.05*s-.3*s,wd,.32*s,.06*s)}}
+    if(!ring)drawOctagon(this,ctx,W,H,s,gy,fy);
     /* camera-pan motion blur on the backdrop (fighters stay sharp) */
     {const cx=this.cam.x+(this.rot||0);const v=this._pcx==null?0:(cx-this._pcx)*s;this._pcx=cx;this._bv=(this._bv||0)*.6+v*.4;const px=Math.min(14,Math.abs(this._bv)*1.7);
       if(px>1.2){const cv=ctx.canvas;const dir=Math.sign(this._bv);ctx.save();ctx.setTransform(1,0,0,1,0,0);const n=4;for(let i=1;i<=n;i++){ctx.globalAlpha=.2*(1-i/(n+1));ctx.drawImage(cv,dir*px*dpr*i/n,0)}ctx.restore()}}};
-  Stage.prototype.drawMat=function(fy,gy,s){const ctx=this.ctx,W=this.W,H=this.Hh;ctx.fillStyle=BG.mat;ctx.fillRect(0,fy,W,H-fy);ctx.fillStyle=BG.matEdge;ctx.fillRect(0,fy,W,.06*s);
+  Stage.prototype.drawMat=function(fy,gy,s){const ctx=this.ctx,W=this.W,H=this.Hh;if(this.venue.startsWith('ring')){ctx.fillStyle=BG.mat;ctx.fillRect(0,fy,W,H-fy);ctx.fillStyle=BG.matEdge;ctx.fillRect(0,fy,W,.06*s)}else drawOctFloor(this,ctx,W,H,s,gy,fy);
     if(!this.venue.startsWith('ring')){const k=.86;const cx=(0-this.cam.x*k)*s*k+W/2,cy=fy+(H-fy)*.45;ctx.strokeStyle=this.col||BG.ring;ctx.globalAlpha=.55;ctx.lineWidth=.035*s;ctx.beginPath();ctx.ellipse(cx,cy,2.2*s*k*this.R/4.3,.55*s,0,0,7);ctx.stroke();ctx.globalAlpha=1}
     for(const d of this.decals){d.age=(d.age||0)+1/60;const k=.72+.28*d.z;const sy=fy+(H-fy)*d.z*.95;const x=(d.x-this.cam.x*k)*s*k+W/2;const dk=Math.min(1,d.age/25);const rr=Math.round((130+d.c*30)*(1-dk*.4));
       ctx.fillStyle=`rgba(${rr},10,10,${d.a})`;ctx.beginPath();ctx.ellipse(x,sy,d.r*s*k*(d.str||1),d.r*s*.3,0,0,7);if(d.sat)for(const q of d.sat){ctx.moveTo(x+q[0]*s*k+q[2]*s*k,sy+q[1]*s*.3);ctx.ellipse(x+q[0]*s*k,sy+q[1]*s*.3,q[2]*s*k,q[2]*s*.3,0,0,7)}ctx.fill()}}}
@@ -434,4 +427,33 @@ function drawGym(S){const ctx=S.ctx,dpr=S.dpr,W=S.W,H=S.Hh,s=S.sc();ctx.setTrans
   ctx.fillStyle='#c79f72';ctx.fillRect(0,fy,W,H-fy);ctx.strokeStyle='rgba(120,84,48,.35)';ctx.lineWidth=1;ctx.beginPath();for(let k=1;k<9;k++){const y=fy+(H-fy)*k/9*k/9*1.0;ctx.moveTo(0,y);ctx.lineTo(W,y)}ctx.stroke();
   {const k=.86;const cx=(0-S.cam.x*k)*s*k+W/2,cy=fy+(H-fy)*.45;ctx.fillStyle='#3b3f46';ctx.save();ctx.translate(cx,cy);ctx.scale(1,.28);ctx.beginPath();if(ctx.roundRect)ctx.roundRect(-2.6*s,-1.6*s,5.2*s,3.2*s,.6*s);ctx.fill();ctx.restore()}
   S.decals=S.decals||[]}
+
+/* ---------- the octagon as a 2.5D object: floor polygon + fence panels on the far half, rotating as the
+   fighters circle (stage.rot). The fighters stand on the plane through the centre (depth 0); the fence meets
+   that plane at ±stage.R, which is updated every frame so collisions match the drawn fence exactly. ---------- */
+function octGeom(S,W,H,s,gy,fy){if(S.R0==null)S.R0=S.R;const R0=S.R0,Rc=R0/Math.cos(Math.PI/8);const ang=(S.rot||0)/R0;const camx=S.cam.x-(S.rot||0);
+  const V=[];for(let i=0;i<8;i++){const t=ang+(i+.5)*Math.PI/4;V.push({X:Rc*Math.cos(t),Z:Rc*Math.sin(t)})}
+  const yz=z=>z>=0?gy-(z/Rc)*(gy-fy):gy+(-z/Rc)*(H*1.25-gy);const kz=z=>z>=0?1-.38*z/Rc:1+.55*(-z/Rc);
+  const P=(X,Z)=>({x:W/2+(X-camx)*s*kz(Z),y:yz(Z),k:kz(Z)});
+  /* where the fence crosses the fighters' plane (the octagon is centrally symmetric, so ±xc) */
+  let xc=R0;for(let i=0;i<8;i++){const a=V[i],b=V[(i+1)%8];if((a.Z>=0)!==(b.Z>=0)){const u=a.Z/(a.Z-b.Z);const x=a.X+(b.X-a.X)*u;if(x>0)xc=x}}
+  return{V,P,Rc,xc}}
+function drawOctFloor(S,ctx,W,H,s,gy,fy){S.cam.x+=(S.rot||0);/* drawMat runs with the rotation offset removed */const G=octGeom(S,W,H,s,gy,fy);S.cam.x-=(S.rot||0);S.R=G.xc;/* collision boundary = drawn fence */
+  ctx.fillStyle='#c9c5bd';ctx.fillRect(0,fy-4,W,H-fy+4);/* apron outside the cage */
+  const pts=G.V.map(v=>G.P(v.X,v.Z));ctx.fillStyle=BG.mat;ctx.beginPath();pts.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.closePath();ctx.fill();
+  /* canvas edge pad */ctx.strokeStyle=BG.matEdge;ctx.lineWidth=.05*s;ctx.stroke()}
+function drawOctagon(S,ctx,W,H,s,gy,fy){const G=octGeom(S,W,H,s,gy,fy);const FH=1.75;
+  /* far half only (z >= 0), clipped where an edge crosses the fighters' plane */
+  const segs=[];for(let i=0;i<8;i++){let a=G.V[i],b=G.V[(i+1)%8];if(a.Z<0&&b.Z<0)continue;if(a.Z<0||b.Z<0){const u=a.Z/(a.Z-b.Z);const c={X:a.X+(b.X-a.X)*u,Z:0};if(a.Z<0)a=c;else b=c}segs.push([a,b])}
+  /* draw back-to-front: farthest panels first */segs.sort((p,q)=>(q[0].Z+q[1].Z)-(p[0].Z+p[1].Z));
+  for(const[a,b]of segs){const A=G.P(a.X,a.Z),B=G.P(b.X,b.Z);const At={x:A.x,y:A.y-FH*s*A.k},Bt={x:B.x,y:B.y-FH*s*B.k};
+    ctx.fillStyle='rgba(28,29,33,.38)';ctx.beginPath();ctx.moveTo(A.x,A.y);ctx.lineTo(B.x,B.y);ctx.lineTo(Bt.x,Bt.y);ctx.lineTo(At.x,At.y);ctx.closePath();ctx.fill();
+    /* chain-link mesh */ctx.strokeStyle='rgba(60,62,70,.5)';ctx.lineWidth=1;ctx.beginPath();const n=Math.max(4,Math.round(Math.hypot(B.x-A.x,B.y-A.y)/(.16*s*A.k)));
+    for(let k=0;k<=n;k++){const u=k/n,u2=Math.min(1,(k+.5*n/ n*0+.5)/n);const x0=A.x+(B.x-A.x)*u,y0=A.y+(B.y-A.y)*u,x1=At.x+(Bt.x-At.x)*u,y1=At.y+(Bt.y-At.y)*u;ctx.moveTo(x0,y0);ctx.lineTo(x1,y1)}
+    for(let k=1;k<10;k++){const v=k/10;ctx.moveTo(A.x+(At.x-A.x)*v,A.y+(At.y-A.y)*v);ctx.lineTo(B.x+(Bt.x-B.x)*v,B.y+(Bt.y-B.y)*v)}ctx.stroke();
+    /* bottom pad and top rail along the panel */ctx.strokeStyle='#17181b';ctx.lineCap='round';ctx.lineWidth=.16*s*Math.min(A.k,B.k);ctx.beginPath();ctx.moveTo(A.x,A.y-.08*s*A.k);ctx.lineTo(B.x,B.y-.08*s*B.k);ctx.stroke();
+    ctx.strokeStyle='#0e0f11';ctx.lineWidth=.07*s*Math.min(A.k,B.k);ctx.beginPath();ctx.moveTo(At.x,At.y);ctx.lineTo(Bt.x,Bt.y);ctx.stroke()}
+  /* posts at the octagon corners (and the two end posts where the fence meets the fighters' plane) */
+  const posts=G.V.filter(v=>v.Z>=0).concat([{X:G.xc,Z:0},{X:-G.xc,Z:0}]).sort((p,q)=>q.Z-p.Z);
+  for(const v of posts){const P=G.P(v.X,v.Z);const w=.14*s*P.k,h=(FH+.08)*s*P.k;ctx.fillStyle='#0b0b0d';rr(ctx,P.x-w/2,P.y-h,w,h+.02*s,w/2);ctx.fillStyle='#1d1e22';rr(ctx,P.x-w*.15,P.y-h+.05*s*P.k,w*.3,h-.1*s*P.k,w*.15)}}
 })();

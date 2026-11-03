@@ -269,7 +269,7 @@ if(typeof In2!=='undefined'){const bt=In2.prototype.buildTouch;In2.prototype.bui
 /* ---------- overhand: the looping right hand is aimed at the head over its active frames ---------- */
 {const fw=F2.prototype.footwork;F2.prototype.footwork=function(p,dt){fw.call(this,p,dt);const a=this.act;if(!a||!a.c||!a.c.hit||this.state!=='stand'||a.key!=='ovh'||!this.opp||!this.opp.body.J.hd)return;
     const h=a.c.hit,t=a.t;const w=t<h.t0*.45?0:t<h.t0?(t-h.t0*.45)/(h.t0*.55):t<=h.t1+.05?1:Math.max(0,1-(t-h.t1-.05)/.12);if(w<=0)return;
-    const OJ=this.opp.body.J;/* land on the side / top of the head, coming over the guard */const T={x:OJ.hd.x-this.d*.04,y:OJ.hd.y+.03};const side=a.c.hand==='l'?'la':'ra';
+    const OJ=this.opp.body.J;/* drive down onto the jaw / chin, coming over the guard */const T={x:OJ.hd.x-this.d*.02,y:OJ.hd.y-.07};const side=a.c.hand==='l'?'la':'ra';
     const tmp=Object.assign({},p);armIK(this,tmp,side,T);p[side+'_s']+=(tmp[side+'_s']-p[side+'_s'])*w;p[side+'_e']+=(tmp[side+'_e']-p[side+'_e'])*w}}
 
 /* ---------- the old quick-step: button removed, no player quick steps (weave and step-bounce remain) ---------- */
@@ -297,4 +297,27 @@ if(typeof paintFighterFX==='function'){const pf=paintFighterFX;window.paintFight
     const OJ=this.opp.body.J;/* the calf: the back of the lower leg, a third of the way down from the knee */const c={x:OJ.lK.x+(OJ.lA.x-OJ.lK.x)*.5,y:OJ.lK.y+(OJ.lA.y-OJ.lK.y)*.5};
     const thru=t<h.t0?0:.1;/* the ankle swings slightly past the calf and a little downward */const T={x:c.x+this.d*thru,y:Math.max(.1,c.y-.1-thru*.3)};/* low path: the shin comes in under the knee */
     const tmp=Object.assign({},p);legIK(this,tmp,'ll',T);p.ll_h+=(tmp.ll_h-p.ll_h)*w;p.ll_k+=(tmp.ll_k-p.ll_k)*w;p.ll_a+=(.55-p.ll_a)*w*.6;/* foot turned over */p.tw-=.15*w;p.lean-=.05*w}}
+
+/* ---------- overhand: a big, committed punch — deep forward bend, slower and costlier, harder-hitting ---------- */
+if(typeof MV!=='undefined'&&MV.ovh){const o=MV.ovh;const k=1.32;o.dur=+(o.dur*k).toFixed(3);o.keys=o.keys.map(([t,p,e])=>e?[+(t*k).toFixed(3),p,e]:[+(t*k).toFixed(3),p]);
+  /* bend the torso far forward at the strike, the head following the fist down */
+  for(const kf of o.keys){const p=kf[1];if(p.lean!=null&&p.lean>=.4){p.lean=1.05;p.chest=.25;p.head=.35;p.ll_k=.75;p.x=.16}else if(p.lean!=null&&p.lean>.3){p.lean=.7;p.chest=.15}}
+  o.hit=Object.assign({},o.hit,{t0:+(o.hit.t0*k).toFixed(3),t1:+(o.hit.t1*k).toFixed(3),dmg:+(o.hit.dmg*1.4).toFixed(1),sta:+(o.hit.sta*1.7).toFixed(1)});o.lunge=.2}
+
+/* ---------- knee: standing knee from the kick button (swipe down) and the clinch knee aimed at the chin ----------
+   In the clinch the torso stays upright and the knee drives up to the chin when the strike is accurate
+   (otherwise the chest); a knee to the chin is only stopped by the upper (uppercut) guard. */
+{const sk=F2.prototype.strike;F2.prototype.strike=function(key,M){const ok=sk.call(this,key,M);if(ok&&key==='knee'&&this.act){const acc=ATT(this,'accuracy');this.act.kTgt=Math.random()<.3+acc*.5?'chin':'chest'}return ok}}
+{const fw=F2.prototype.footwork;F2.prototype.footwork=function(p,dt){fw.call(this,p,dt);const a=this.act;if(!a||a.key!=='knee'||!a.c||!a.c.hit||!this.opp||!this.opp.body.J.hd)return;
+    const h=a.c.hit,t=a.t;const w=t<h.t0*.4?0:t<h.t0?(t-h.t0*.4)/(h.t0*.6):t<=h.t1+.04?1:Math.max(0,1-(t-h.t1-.04)/.14);if(w<=0)return;
+    const OJ=this.opp.body.J,J=this.body.J,d=this.d||1;const chin=a.kTgt==='chin';const T=chin?{x:OJ.hd.x-d*.02,y:OJ.hd.y-.1}:{x:OJ.sh.x+(OJ.mid.x-OJ.sh.x)*.4,y:OJ.sh.y+(OJ.mid.y-OJ.sh.y)*.4};
+    const Hp=J.rH;if(!Hp)return;/* thigh points the knee at the target, shin folded tight */const hA=Math.atan2((T.x-Hp.x)*d,-(T.y-Hp.y))+(p.rot||0);
+    p.rl_h+=(hA-p.rl_h)*w;p.rl_k+=(2.35-p.rl_k)*w;p.rl_a+=(.6-p.rl_a)*w*.5;
+    if(this.state==='clinch'||chin){p.lean+=(-.04-p.lean)*w*.8;p.head+=(.05-p.head)*w*.5}/* upright: hips drive up, not the head down */}}
+{const oh=Match.prototype.onHit;Match.prototype.onHit=function(att,def,act,zone,p){if(act&&act.key==='knee'&&act.kTgt==='chin'){
+      if(def.guard==='upp'){SFXI.play('block',.7);def.sta-=4;att.st&&att.st.thr++;this.hitstop=.04;if(typeof hitJiggle==='function')hitJiggle(def.body,'body',.01*def.H,att.d);this.ev&&this.ev(`🛡️ ${def.name} 어퍼 가드로 니킥을 막습니다`);return}
+      /* any other guard does not stop a knee coming up the middle */const g0=def.guard;def.guard=null;try{return oh.call(this,att,def,act,'head',p)}finally{def.guard=g0}}
+    return oh.call(this,att,def,act,zone,p)}}
+
+{const fd=F2.prototype.draw;F2.prototype.draw=function(ctx,o){if(this.body)this.body._striking=!!(this.act&&this.act.c&&this.act.c.hit);return fd.call(this,ctx,o)}}
 })();

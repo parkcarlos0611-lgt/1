@@ -191,7 +191,7 @@ table.rk{width:100%;border-collapse:collapse;font-size:13.5px}.rk td,.rk th{padd
 .btd{right:178px;bottom:300px;width:112px;height:50px;border-radius:25px}.bcl{right:46px;bottom:300px;width:112px;height:50px;border-radius:25px;border-color:rgba(190,150,255,.9);background:linear-gradient(180deg,rgba(170,130,255,.35),rgba(30,18,60,.7))}.bcl b{font-size:18px}.btd small,.bcl small{font-size:11px}
 .btd,.bcl{flex-direction:row;gap:6px}
 .b3 .sw{position:absolute;font-style:normal;font:700 10.5px 'Noto Sans KR',sans-serif;color:#ffe08a;background:rgba(0,0,0,.55);padding:1px 5px;border-radius:7px;white-space:nowrap;pointer-events:none;transition:opacity .2s}
-.b3 .sl{left:-4px;top:50%;transform:translate(-50%,-50%)}.b3 .sr{right:-4px;top:50%;transform:translate(50%,-50%)}.b3 .su{top:-4px;left:50%;transform:translate(-50%,-50%)}.b3 .sd{bottom:-4px;left:50%;transform:translate(-50%,50%)}
+.b3 .sl{left:-4px;top:50%;transform:translate(-50%,-50%)}.b3 .sr{right:-4px;top:50%;transform:translate(50%,-50%)}.b3 .su{top:-4px;left:50%;transform:translate(-50%,-50%)}.b3 .sd{bottom:-4px;left:50%;transform:translate(-50%,50%)}.b3 .sd{bottom:-4px;left:50%;transform:translate(-50%,50%)}
 .bpu .pswipe,.bki .pswipe,.bbl .pswipe{display:none}
 .mcl .bja,.mcl .bpu,.mcl .btd{opacity:.25;pointer-events:none}
 @media (max-height:420px){.tr3{transform:scale(.78)}}
@@ -821,9 +821,9 @@ class F2{
     if(leg)return;
     /* step-bounce mode (toggle button): legs keep their stance, the fighter bounces on knees and ankles —
        in place and while moving with the stick pushed (>= 40 %); small slow moves still walk */
-    if(this.bounce&&this.state==='stand'&&!a){const stk=this.stick||0;const moving=Math.abs(this.mv)>.15||!!this.circ;const fast=stk>=.4||Math.abs(this.mv)>.9;
+    if(a)this._actEndT=this.t;if(this.bounce&&this.state==='stand'&&!a&&this.t-(this._actEndT||-9)>.15){const stk=this.stick||0;const moving=Math.abs(this.mv)>.15||!!this.circ;const fast=stk>=.4||Math.abs(this.mv)>.9;
       if(!moving||fast){const lt=(this.body.W||1)<=.965;/* lightweight and below keep the quicker rhythm */this.bnph=(this.bnph||0)+dt*Math.PI*2*(lt?(moving?2.9:2.3):(moving?2.5:2.0));const up=.5-.5*Math.cos(this.bnph),land=1-up;/* smooth rise and settle, no snap at landing */
-        p.y=(p.y||0)+.02*this.H*up;p.ll_k+=.17*land+.06;p.rl_k+=.17*land+.06;p.ll_a+=.24*up;p.rl_a+=.26*up;p.lean-=.09;p.chest-=.04;/* a bit more upright */p.head+=.01*land;p.la_s+=.03*land;p.ra_s+=.03*land;
+        p.y=(p.y||0)+.03*this.H*up;p.ll_k+=.17*land+.06;p.rl_k+=.17*land+.06;p.ll_a+=.24*up;p.rl_a+=.26*up;p.lean-=.09;p.chest-=.04;/* a bit more upright */p.head+=.01*land;p.la_s+=.03*land;p.ra_s+=.03*land;
         if(moving)p.lean+=clamp(this.mv*this.d,-1.5,1.5)*.015;this.body._swing=up>.3?{l:up,r:up}:null;return}}
     const sp=Math.max(Math.abs(this.mv),this.circ?1.1:0,this.clMv?.9:0),m=Math.min(1,sp/1.1)*(a?.35:1)*(this.guard==='low'?0:1);if(m<.03){return}
     /* bipedal walk: the legs pass each other (stance leg sweeps back under the hips while the swing leg lifts
@@ -969,7 +969,7 @@ class In2{
   destroy(){window.removeEventListener('keydown',this._kd);window.removeEventListener('keyup',this._ku);if(this.tc)this.tc.remove()}
   key(e,dn){const c=e.code;if(['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(c)&&e.target.tagName!=='INPUT')e.preventDefault();if(e.repeat)return;this.k[c]=dn;if(!dn)return;
     const k=this.k;const m={KeyJ:'jab',KeyT:'td',KeyC:'clinch',KeyX:'escape',KeyP:'pause',Escape:'pause',KeyL:'blockp',KeyF:'blockp'};if(m[c])this.ev.push(m[c]);
-    if(c==='KeyK')this.ev.push('kick:'+(k.KeyQ?'high':k.KeyE?'low':k.KeyR?'calf':'mid'));
+    if(c==='KeyK')this.ev.push('kick:'+(k.KeyQ?'high':k.KeyE?'low':k.KeyR?'calf':'mid'));if(c==='KeyX')this.ev.push('kick:knee');
     if(c==='KeyI')this.ev.push('punch:'+(k.KeyQ?'hook':k.KeyE?'upper':'straight'));if(c==='KeyU')this.ev.push('punch:hook');if(c==='KeyO')this.ev.push('punch:upper');if(c==='KeyY')this.ev.push('punch:over');if(c==='KeyH')this.ev.push('punch:body')}
   poll(){const k=this.k;let mx=((k.KeyD||k.ArrowRight)?1:0)-((k.KeyA||k.ArrowLeft)?1:0),my=((k.KeyW||k.ArrowUp)?1:0)-((k.KeyS||k.ArrowDown)?1:0);let block=!!(k.KeyL||k.KeyF||k.Space);let gtype=block?(k.KeyQ?'upp':k.KeyE?'hook':'high'):null;
     const gps=navigator.getGamepads?navigator.getGamepads():[];const gp=gps&&[...gps].find(g=>g);
@@ -989,7 +989,7 @@ class In2{
       <button data-a="clinch" class="b3 bcl"><b>🔗</b><small>클린치</small></button>
       <button data-a="punch" class="b3 bpu"><b>💥</b><small>펀치</small><i class="sw sl">훅</i><i class="sw sr">어퍼</i><i class="sw su">오버</i><i class="sw sd">바디</i></button>
       <button data-a="jab" class="b3 bja"><b>👊</b><small>잽</small></button>
-      <button data-a="kick" class="b3 bki"><b>🦵</b><small>킥</small><i class="sw sl">하이</i><i class="sw sr">로우</i><i class="sw su">카프</i></button>
+      <button data-a="kick" class="b3 bki"><b>🦵</b><small>킥</small><i class="sw sl">하이</i><i class="sw sr">로우</i><i class="sw su">카프</i><i class="sw sd">니킥</i></button>
       <button data-a="block" class="b3 bbl"><b>🛡</b><small>블록</small><i class="sw sl">어퍼</i><i class="sw sr">훅·하이</i><i class="sw sd">체크</i></button>
     </div>`;
     this.root.appendChild(tc);
@@ -1005,7 +1005,7 @@ class In2{
       b.addEventListener('touchmove',e=>{e.preventDefault();if(!sw())return;for(const t of e.changedTouches){if(t.identifier!==sid)continue;const dx=t.clientX-sx,dy=t.clientY-sy;
         if(a==='block'){if(Math.max(Math.abs(dx),Math.abs(dy))>18){const h=Math.abs(dx)>=Math.abs(dy);this.tgtype=h?(dx<0?'upp':'hook'):(dy>0?'low':'high');b.classList.toggle('swl',h&&dx<0);b.classList.toggle('swr',h&&dx>0);b.classList.toggle('swd',!h&&dy>0)}continue}
         if(fired||Math.max(Math.abs(dx),Math.abs(dy))<22)continue;fired=true;const h=Math.abs(dx)>=Math.abs(dy);
-        if(a==='punch')this.ev.push('punch:'+(h?(dx<0?'hook':'upper'):(dy<0?'over':'body')));else this.ev.push('kick:'+(h?(dx<0?'high':'low'):(dy<0?'calf':'mid')));
+        if(a==='punch')this.ev.push('punch:'+(h?(dx<0?'hook':'upper'):(dy<0?'over':'body')));else this.ev.push('kick:'+(h?(dx<0?'high':'low'):(dy<0?'calf':'knee')));
         b.classList.add(h?(dx<0?'swl':'swr'):(dy<0?'swu':'swd'))}},{passive:false});
       const up=e=>{e.preventDefault();if(a==='block'){this.tblock=false;this.tgtype=null}if((a==='punch'||a==='kick')&&sw()&&!fired)this.ev.push(a==='punch'?'punch:straight':'kick:mid');b.classList.remove('on','swl','swr','swu','swd')};b.addEventListener('touchend',up);b.addEventListener('touchcancel',up)}}
 }
@@ -1142,7 +1142,7 @@ class Match{
       if(e==='jab')key='jab';
       else if(e.startsWith('punch:')){const t=e.slice(6);const lead=['jab','lhook','lupp','bjab','blhook'].includes(f.lastKey);
         key=t==='hook'?(lead?'rhook':'lhook'):t==='upper'?(lead?'rupp':'lupp'):t==='over'?'ovh':t==='body'?(f.lastKey==='bcross'?'blhook':'bcross'):'cross'}
-      else if(e.startsWith('kick')){const t=e.slice(5)||'mid';key=t==='high'?'rhk':t==='low'?'rlk':t==='calf'?'calf':'rbk'}
+      else if(e.startsWith('kick')){const t=e.slice(5)||'mid';key=t==='high'?'rhk':t==='low'?'rlk':t==='calf'?'calf':t==='knee'?'knee':'rbk'}
       if(key)this.doStrike2(f,key)}}
   doStrike2(f,key){if(f.act&&f.act.c.hit&&f.act.t>f.act.c.hit.t0&&f.queue.length<2){f.queue.push(key);f.lastKey=key;return}if(f.strike(key,this))f.lastKey=key}
   doStrike(f,b,M){const g=this.g;M=M||{};

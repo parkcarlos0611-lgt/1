@@ -89,31 +89,32 @@ Body.prototype.draw=function(ctx,o){o=o||{};const lk=this.look;if(!FS.on)return 
 const REF_LOOK=[{skin:'#6e4630',hair:'#141110',hs:'long',bd:'full',beard:true},{skin:'#e7bc9c',hair:'#8a7462',hs:'bald',bd:null,beard:false},{skin:'#e4b593',hair:'#2b211b',hs:'short',bd:null,beard:false},{skin:'#8a5a3e',hair:'#2a1d15',hs:'bald',bd:'stub',beard:false}];
 /* soft airbrushed contact shadow on the canvas under the body */
 function floorShadow(ctx,B){const J=B.J,H=B.H;const low=J.hip.y<.45*H;const xs=[J.lA.x,J.rA.x,J.hip.x];if(low)xs.push(J.hd.x,J.sh.x);const x0=Math.min(...xs),x1=Math.max(...xs);const cx=(x0+x1)/2,rx=(x1-x0)/2+.22*H;const ry=.05*H;
-  const lift=Math.max(0,Math.min(J.lA.y,J.rA.y,J.hip.y)-.05);const a=.3*Math.max(.25,1-lift/(.5*H));
+  const lift=Math.max(0,Math.min(J.lA.y,J.rA.y,J.hip.y)-.05);const a=.5*Math.max(.25,1-lift/(.5*H));
   ctx.save();ctx.translate(cx,0);ctx.scale(1,ry/rx);const g=ctx.createRadialGradient(0,0,0,0,0,rx);g.addColorStop(0,`rgba(40,30,22,${a.toFixed(3)})`);g.addColorStop(.55,`rgba(40,30,22,${(a*.45).toFixed(3)})`);g.addColorStop(1,'rgba(40,30,22,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(0,0,rx,0,Math.PI*2);ctx.fill();ctx.restore()}
 /* motion blur: fast hands / feet leave a short translucent smear along their path (last 3 frames) */
-const MB_K=[['lG',.034,'g'],['rG',.034,'g'],['lT',.026,'s'],['rT',.026,'s'],['lA',.026,'s'],['rA',.026,'s']];
+const MB_K=[['lG',.04,'g'],['rG',.04,'g'],['lW',.026,'s'],['rW',.026,'s'],['lT',.03,'s'],['rT',.03,'s'],['lA',.03,'s'],['rA',.03,'s'],['lK',.035,'s'],['rK',.035,'s']];
 function motionBlur(ctx,B,lk){const J=B.J,H=B.H;const h=B._mbH||(B._mbH=[]);const snap={};for(const[k]of MB_K)if(J[k])snap[k]={x:J[k].x,y:J[k].y};
-  const last=h[h.length-1];const same=last&&MB_K.every(([k])=>!snap[k]||last[k]&&last[k].x===snap[k].x&&last[k].y===snap[k].y);if(!same){h.push(snap);if(h.length>4)h.shift()}
+  const last=h[h.length-1];const same=last&&MB_K.every(([k])=>!snap[k]||last[k]&&last[k].x===snap[k].x&&last[k].y===snap[k].y);if(!same){h.push(snap);if(h.length>6)h.shift()}
   if(h.length<3)return;const glove=lk.ref?'#151517':lk.glove||'#141414',skin=lk.ref?'#151517':lk.skin||'#d39b74';
-  for(const[k,w0,c]of MB_K){const cur=snap[k];if(!cur)continue;const pts=h.map(f=>f[k]).filter(Boolean);if(pts.length<3)continue;const p0=pts[0];const dist=Math.hypot(cur.x-p0.x,cur.y-p0.y);if(dist<.09*H||dist>.55*H)continue;let jump=false;for(let i=1;i<pts.length;i++)if(Math.hypot(pts[i].x-pts[i-1].x,pts[i].y-pts[i-1].y)>.28*H)jump=true;if(jump)continue;/* a teleport / reset is not motion */
-    const w=w0*H;const col=c==='g'?glove:skin;const al=Math.min(.22,(dist/H-.09)*1.2);ctx.save();ctx.globalAlpha=al;ctx.fillStyle=col;
-    for(let i=0;i<pts.length-1;i++){const a=pts[i],b=i+1<pts.length?pts[i+1]:cur;const dx=b.x-a.x,dy=b.y-a.y,L=Math.hypot(dx,dy)||1e-5;const nx=-dy/L,ny=dx/L;const wa=w*(.35+.65*i/(pts.length-1)),wb=w*(.35+.65*(i+1)/(pts.length-1));
+  for(const[k,w0,c]of MB_K){const cur=snap[k];if(!cur)continue;const pts=h.map(f=>f[k]).filter(Boolean);if(pts.length<3)continue;const p0=pts[0];const dist=Math.hypot(cur.x-p0.x,cur.y-p0.y);if(dist<.055*H||dist>.8*H)continue;let jump=false;for(let i=1;i<pts.length;i++)if(Math.hypot(pts[i].x-pts[i-1].x,pts[i].y-pts[i-1].y)>.3*H)jump=true;if(jump)continue;/* a teleport / reset is not motion */
+    const w=w0*H;const col=c==='g'?glove:skin;const al=Math.min(.45,.12+(dist/H-.055)*1.6);ctx.save();ctx.globalAlpha=al;ctx.fillStyle=col;
+    for(let i=0;i<pts.length-1;i++){const a=pts[i],b=i+1<pts.length?pts[i+1]:cur;const dx=b.x-a.x,dy=b.y-a.y,L=Math.hypot(dx,dy)||1e-5;const nx=-dy/L,ny=dx/L;const wa=w*(.25+.85*i/(pts.length-1)),wb=w*(.25+.85*(i+1)/(pts.length-1));ctx.globalAlpha=al*(.35+.65*(i+1)/(pts.length-1));
       ctx.beginPath();ctx.moveTo(a.x+nx*wa,a.y+ny*wa);ctx.lineTo(b.x+nx*wb,b.y+ny*wb);ctx.lineTo(b.x-nx*wb,b.y-ny*wb);ctx.lineTo(a.x-nx*wa,a.y-ny*wa);ctx.closePath();ctx.fill()}
     ctx.restore()}}
 /* ---------- foot: ankle bones, heel, arch, ball, toes ---------- */
 function footFlat(ctx,A,He,T,M,C,d){const ux0=T.x-He.x,uy0=T.y-He.y,Lf=Math.hypot(ux0,uy0)||1e-5;const ux=ux0/Lf,uy=uy0/Lf;let nx=-uy,ny=ux;if((A.x-He.x)*nx+(A.y-He.y)*ny<0){nx=-nx;ny=-ny}
   const Q=(u,v)=>({x:He.x+ux*u*Lf+nx*v*Lf,y:He.y+uy*u*Lf+ny*v*Lf});
   /* toes: break at the ball; when the ball is on the canvas the toes lie flat on it */
-  const ball=Q(.72,.02);let tx=ux,ty=uy;if(ball.y<.05&&ty<-.05){tx=Math.sign(ux)||d;ty=0}
-  const tl=.3*Lf;const toeTip={x:ball.x+tx*tl,y:ball.y+ty*tl};let tnx=-ty,tny=tx;if(tnx*nx+tny*ny<0){tnx=-tnx;tny=-tny}
-  const sole=[Q(-.06,.16),Q(-.05,.03),Q(.04,-.01),Q(.4,.0),Q(.72,-.005)];
-  poly(ctx,[Q(.1,.42),Q(-.02,.3)].concat(sole,[{x:ball.x+tnx*.0,y:ball.y},{x:ball.x+tnx*.11*Lf,y:ball.y+tny*.11*Lf},Q(.52,.22),Q(.3,.32)]),C.b);
-  poly(ctx,[{x:ball.x-tnx*.005*Lf,y:ball.y-tny*.005*Lf},{x:toeTip.x,y:toeTip.y},{x:toeTip.x+tnx*.06*Lf-tx*.02*Lf,y:toeTip.y+tny*.06*Lf-ty*.02*Lf},{x:ball.x+tnx*.1*Lf,y:ball.y+tny*.1*Lf}],C.b);
-  /* planes: sole edge + inner arch shadow, Achilles / heel facet, ankle bone */
-  poly(ctx,[Q(-.05,.03),Q(.04,-.01),Q(.72,-.005),Q(.62,.07),Q(.2,.08)],C.s);
-  poly(ctx,[Q(-.06,.16),Q(-.02,.3),Q(.1,.42),Q(.08,.22)],C.s);
-  circ(ctx,Q(.16,.34),.015*M,C.s)}
+  const ball=Q(.7,.02);let tx=ux,ty=uy;if(ball.y<.05&&ty<-.05){tx=Math.sign(ux)||d;ty=0}
+  const tl=.27*Lf;let tnx=-ty,tny=tx;if(tnx*nx+tny*ny<0){tnx=-tnx;tny=-tny}const TP=(u,v)=>({x:ball.x+tx*u*Lf+tnx*v*Lf,y:ball.y+ty*u*Lf+tny*v*Lf});
+  /* a fuller foot: high instep, thick heel pad, rounded heel and rounded toe block */
+  poly(ctx,[Q(.14,.5),Q(-.02,.36),Q(-.08,.2),Q(-.06,.05),Q(.04,-.01),Q(.4,0),Q(.7,-.005),TP(0,.17),Q(.5,.3),Q(.3,.4)],C.b);
+  circ(ctx,Q(.05,.12),.13*Lf,C.b);/* heel */
+  const tr=.085*Lf;poly(ctx,[TP(-.02,-.005),TP(tl/Lf-tr/Lf,-.005),TP(tl/Lf-tr/Lf,.17),TP(-.02,.18)],C.b);circ(ctx,TP(tl/Lf-tr/Lf,tr/Lf),tr,C.b);/* toes, round tip */
+  /* planes: sole edge, inner arch shadow, heel facet, ankle bone */
+  poly(ctx,[Q(-.04,.03),Q(.06,-.01),Q(.7,-.005),Q(.6,.07),Q(.2,.085)],C.s);
+  poly(ctx,[Q(-.08,.2),Q(-.02,.36),Q(.14,.5),Q(.1,.24)],C.s);
+  circ(ctx,Q(.18,.38),.016*M,C.s)}
 
 /* ---------- torso: lats, pecs, abs, obliques ---------- */
 function torsoFlat(ctx,J,H,M,sk,d,lk,B){const sp=[J.hip,J.mid,J.sh,J.nk];const segL=[0];for(let i=1;i<4;i++)segL.push(segL[i-1]+Math.hypot(sp[i].x-sp[i-1].x,sp[i].y-sp[i-1].y));const TL=segL[3]||1;

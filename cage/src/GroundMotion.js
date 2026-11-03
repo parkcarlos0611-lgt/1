@@ -161,4 +161,8 @@ if(typeof RefereeAI!=='undefined'){const tg=RefereeAI.target;RefereeAI.target=fu
     const tgtX=W?(W.x+(W.opp?W.opp.x:0))/2:0;r.mvIn=clamp((tgtX-r.x)*2,-1,1)*.6;r.d=W?(Math.sign(W.x-r.x)||1):1;
     const up=r.raise&&W;r.gpose=poseCopy(Object.assign({},BASE_POSE,{lean:.02,chest:0,head:.02,tw:0,ll_h:.12,ll_k:.06,rl_h:-.1,rl_k:.06,la_s:up?2.75:.25,la_e:up?.25:.35,ra_s:.15,ra_e:.3}));r.gRate=6;
     r.update(dt,{checkHit(){},onMiss(){}});return r0}}
+
+/* calmer overall movement: slower drift, quieter idle life and reaction springs */
+if(typeof MP!=='undefined'){MP.speedMul=Math.min(MP.speedMul,.48)}
+if(typeof MR!=='undefined'){MR.idle=.55;MR.variety=.75}
 })();

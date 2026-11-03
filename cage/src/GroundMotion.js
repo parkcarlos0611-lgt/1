@@ -266,11 +266,20 @@ if(typeof In2!=='undefined'){const bt=In2.prototype.buildTouch;In2.prototype.bui
 {const st=Match.prototype.step;Match.prototype.step=function(dt){window.__curMatch=this;return st.call(this,dt)}}
 {const css=document.createElement('style');css.textContent='.b4.bnc{border-color:rgba(255,200,90,.9)}.b4.bnc.on{transform:none;background:radial-gradient(circle at 35% 30%,rgba(255,255,255,.4),rgba(242,181,68,.75) 62%)}';document.head.appendChild(css)}
 
-/* ---------- overhand: the looping right hand is aimed at the head over its active frames ---------- */
-{const fw=F2.prototype.footwork;F2.prototype.footwork=function(p,dt){fw.call(this,p,dt);const a=this.act;if(!a||!a.c||!a.c.hit||this.state!=='stand'||a.key!=='ovh'||!this.opp||!this.opp.body.J.hd)return;
-    const h=a.c.hit,t=a.t;const w=t<h.t0*.45?0:t<h.t0?(t-h.t0*.45)/(h.t0*.55):t<=h.t1+.05?1:Math.max(0,1-(t-h.t1-.05)/.12);if(w<=0)return;
-    const OJ=this.opp.body.J;/* drive down onto the jaw / chin, coming over the guard */const T={x:OJ.hd.x-this.d*.02,y:OJ.hd.y-.07};const side=a.c.hand==='l'?'la':'ra';
-    const tmp=Object.assign({},p);armIK(this,tmp,side,T);p[side+'_s']+=(tmp[side+'_s']-p[side+'_s'])*w;p[side+'_e']+=(tmp[side+'_e']-p[side+'_e'])*w}}
+/* ---------- overhand: the elbow folds up toward the ceiling and the forearm comes down onto the chin;
+   the lead hand stays glued to the face ---------- */
+function armIKUp(F,P,side,T){const J=F.body.J,S=J[side==='la'?'lS':'rS'];if(!S||!T)return;const L=F.body.L,L1=L.uarm,L2=L.farm+L.glove*.8,d=F.d||1;
+  const vx=(T.x-S.x)*d,vy=T.y-S.y;const D0=Math.hypot(vx,vy);const Dm=(L1+L2)*.74;/* keep the arm bent: the elbow stays high */let D=clamp(D0,(L1+L2)*.3,Dm);const th=Math.atan2(vx,-vy);
+  const a=Math.acos(clamp((L1*L1+D*D-L2*L2)/(2*L1*D),-1,1)),b=Math.acos(clamp((L1*L1+L2*L2-D*D)/(2*L1*L2),-1,1));const ta=(P.lean||0)+(P.chest||0)-(P.rot||0);
+  /* the elbow on the upper side of the shoulder–target line: upper arm raised, forearm angled down to the target */
+  P[side+'_s']=th+a-ta;P[side+'_e']=-(Math.PI-b);return Math.max(0,D0-Dm)/* how far the body still has to come in */}
+{const fw=F2.prototype.footwork;F2.prototype.footwork=function(p,dt){fw.call(this,p,dt);const a=this.act;this.body._eMinL=this.body._eMinR=null;if(!a||!a.c||!a.c.hit||this.state!=='stand'||a.key!=='ovh'||!this.opp||!this.opp.body.J.hd)return;if(a.c.hand==='l')this.body._eMinL=-2.6;else this.body._eMinR=-2.6;
+    const h=a.c.hit,t=a.t;const J=this.body.J,OJ=this.opp.body.J,d=this.d||1;const side=a.c.hand==='l'?'la':'ra',off=side==='la'?'ra':'la';
+    /* lead hand tight to the face for the whole punch */const g=Math.min(1,t/.08)*(t<=a.c.dur-.08?1:Math.max(0,(a.c.dur-t)/.08));if(J.hd){const tmp=Object.assign({},p);armIK(this,tmp,off,{x:J.hd.x+d*.07,y:J.hd.y-.04});p[off+'_s']+=(tmp[off+'_s']-p[off+'_s'])*g;p[off+'_e']+=(tmp[off+'_e']-p[off+'_e'])*g}
+    const w=t<h.t0*.35?0:t<h.t0?(t-h.t0*.35)/(h.t0*.65):t<=h.t1+.05?1:Math.max(0,1-(t-h.t1-.05)/.14);if(w<=0)return;
+    /* the fist arrives from above, angled down through the jaw */const chin={x:OJ.hd.x-d*.02,y:OJ.hd.y-.07};const pre=t<h.t0?(1-(t-h.t0*.35)/(h.t0*.65)):0;
+    const T={x:chin.x+d*(.04-.1*pre),y:chin.y+.18*pre+.02*(1-pre)};const tmp=Object.assign({},p);const gap=armIKUp(this,tmp,side,T);
+    p[side+'_s']+=(tmp[side+'_s']-p[side+'_s'])*w;p[side+'_e']+=(tmp[side+'_e']-p[side+'_e'])*w;/* step the body in so the bent arm still lands */p.x=(p.x||0)+Math.min(.18,gap)*w*(1-pre)}}
 
 /* ---------- the old quick-step: button removed, no player quick steps (weave and step-bounce remain) ---------- */
 if(typeof In2!=='undefined'){const bt=In2.prototype.buildTouch;In2.prototype.buildTouch=function(){bt.call(this);const tc=this.tc;if(tc){const st=tc.querySelector('.tr4 .stp');if(st)st.remove()}}}
@@ -301,7 +310,7 @@ if(typeof paintFighterFX==='function'){const pf=paintFighterFX;window.paintFight
 /* ---------- overhand: a big, committed punch — deep forward bend, slower and costlier, harder-hitting ---------- */
 if(typeof MV!=='undefined'&&MV.ovh){const o=MV.ovh;const k=1.32;o.dur=+(o.dur*k).toFixed(3);o.keys=o.keys.map(([t,p,e])=>e?[+(t*k).toFixed(3),p,e]:[+(t*k).toFixed(3),p]);
   /* bend the torso far forward at the strike, the head following the fist down */
-  for(const kf of o.keys){const p=kf[1];if(p.lean!=null&&p.lean>=.4){p.lean=1.05;p.chest=.25;p.head=.35;p.ll_k=.75;p.x=.16}else if(p.lean!=null&&p.lean>.3){p.lean=.7;p.chest=.15}}
+  for(const kf of o.keys){const p=kf[1];if(p.lean!=null&&p.lean>=.4){p.lean=.68;p.chest=.14;p.head=.22;p.ll_k=.7;p.x=.15}else if(p.lean!=null&&p.lean>.3){p.lean=.5;p.chest=.1}}/* bent forward, but not folded over */
   o.hit=Object.assign({},o.hit,{t0:+(o.hit.t0*k).toFixed(3),t1:+(o.hit.t1*k).toFixed(3),dmg:+(o.hit.dmg*1.4).toFixed(1),sta:+(o.hit.sta*1.7).toFixed(1)});o.lunge=.2}
 
 /* ---------- knee: standing knee from the kick button (swipe down) and the clinch knee aimed at the chin ----------

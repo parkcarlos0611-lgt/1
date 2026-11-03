@@ -43,11 +43,15 @@ function limb(ctx,a,b,d,rows,col,shCol,extra){const F=frame(a,b,d);const P=(t,w)
 
 /* ---------- body ---------- */
 const BD=Body.prototype.draw;
-Body.prototype.draw=function(ctx,o){o=o||{};const lk=this.look;if(!FS.on||lk.ref)return BD.call(this,ctx,o);
+Body.prototype.draw=function(ctx,o){o=o||{};const lk=this.look;if(!FS.on)return BD.call(this,ctx,o);
   const J=this.J,H=this.H,W=this.W,d=this.d;if(!J.hd)return;
+  /* the referee is the same figure in a different outfit (black polo, trousers, boots, gloves) */
+  const R=!!lk.ref;if(R&&!lk._flat){Object.assign(lk,REF_LOOK[Math.floor(Math.random()*REF_LOOK.length)]);lk._flat=1;this.hs=null}
+  const CL=R?{shirt:'#222327',shirtS:'#18191c',pants:'#1e1f23',pantsS:'#151619',boot:'#0f0f11',glove:'#151517'}:null;
+  if(!o.onlyArm){floorShadow(ctx,this);motionBlur(ctx,this,lk)}
   const M=H*W*.94;/* muscle scale */
   const skin=lk.skin||'#d39b74';const sk={base:skin,sh:shade(skin,FS.shadowK),far:shade(skin,FS.farK),farSh:shade(skin,FS.farK+FS.shadowK),lt:shade(skin,FS.lightK)};
-  const shorts=calm(lk.shorts||'#111');const glove=lk.glove||'#141414';const strap=o.corner||'#c21818';
+  const shorts=calm(lk.shorts||'#111');const glove=R?CL.glove:lk.glove||'#141414';const strap=o.corner||'#c21818';
   const nearLead=(d>0)===(this.stance>0);const lead={S:'lS',E:'lE',W:'lW',G:'lG',H:'lH',K:'lK',A:'lA',He:'lHe',T:'lT',o:'lo'},rear={S:'rS',E:'rE',W:'rW',G:'rG',H:'rH',K:'rK',A:'rA',He:'rHe',T:'rT',o:'ro'};
   const nearS=nearLead?lead:rear,farS=nearLead?rear:lead;
   const self=this;
@@ -56,31 +60,47 @@ Body.prototype.draw=function(ctx,o){o=o||{};const lk=this.look;if(!FS.on||lk.ref
     /* upper arm: deltoid cap → biceps (front) / triceps (back) → elbow */
     limb(ctx,a,e,d,[[-.1,.05*M,.055*M],[.12,.062*M,.064*M],[.3,.052*M,.058*M],[.5,.05*M,.05*M],[.78,.04*M,.04*M],[1,.031*M,.033*M]],C.b,C.s);
     /* deltoid plate: a lighter facet over the shoulder */
-    {limb(ctx,a,e,d,[[-.12,.046*M,.04*M],[.08,.058*M,.05*M],[.3,.034*M,.02*M]],isFar?C.b:sk.lt,null,{noCaps:true})}
+    if(R)limb(ctx,a,e,d,[[-.14,.07*M,.072*M],[.25,.07*M,.072*M],[.56,.064*M,.066*M]],isFar?CL.shirtS:CL.shirt,null);
+    else{limb(ctx,a,e,d,[[-.12,.046*M,.04*M],[.08,.058*M,.05*M],[.3,.034*M,.02*M]],isFar?C.b:sk.lt,null,{noCaps:true})}
     /* forearm: flexor bulge near the elbow, narrow wrist */
     limb(ctx,e,w,d,[[-.06,.032*M,.032*M],[.2,.038*M,.036*M],[.45,.033*M,.031*M],[.8,.025*M,.024*M],[1,.022*M,.022*M]],C.b,C.s);
     circ(ctx,e,.031*M,C.b);/* elbow joint */
     /* elbow point (olecranon) facet */{const F=frame(e,w,d);circ(ctx,{x:e.x-F.nx*.016*M,y:e.y-F.ny*.016*M},.014*M,C.s)}
-    drawGloveFlat(ctx,e,w,J[S.G],H,isFar?shade(glove,-.2):glove,strap,self.ang[S.o],self.gloveBlood,d,C.b)};
+    drawGloveFlat(ctx,e,w,J[S.G],H,isFar?shade(glove,-.2):glove,R?glove:strap,self.ang[S.o],R?0:self.gloveBlood,d,R?glove:C.b,R)};
   /* ---- leg: quad/hamstring, knee cap, calf, ankle, foot with toes ---- */
-  const leg=(S,isFar,sleeveCol)=>{const h=J[S.H],k=J[S.K],a=J[S.A],he=J[S.He],to=J[S.T];const C=isFar?{b:sk.far,s:sk.farSh}:{b:sk.base,s:sk.sh};
+  const leg=(S,isFar,sleeveCol)=>{const h=J[S.H],k=J[S.K],a=J[S.A],he=J[S.He],to=J[S.T];const C=R?(isFar?{b:CL.pantsS,s:shade(CL.pantsS,-.2)}:{b:CL.pants,s:CL.pantsS}):isFar?{b:sk.far,s:sk.farSh}:{b:sk.base,s:sk.sh};
     limb(ctx,h,k,d,[[-.06,.07*M,.07*M],[.18,.074*M,.07*M],[.45,.066*M,.062*M],[.75,.052*M,.05*M],[1,.042*M,.043*M]],C.b,C.s);
     /* shin / calf: calf bulge on the back, straight shin bone on the front */
     limb(ctx,k,a,d,[[-.04,.04*M,.042*M],[.22,.036*M,.054*M],[.42,.033*M,.05*M],[.7,.026*M,.032*M],[.92,.022*M,.023*M],[1.02,.022*M,.024*M]],C.b,C.s,{shadowFrom:.0});
     /* knee: joint block + a single knee-cap facet */{const F=frame(h,k,d);circ(ctx,k,.041*M,C.b);poly(ctx,[{x:k.x+F.nx*.042*M-F.ux*.03*M,y:k.y+F.ny*.042*M-F.uy*.03*M},{x:k.x+F.nx*.046*M+F.ux*.02*M,y:k.y+F.ny*.046*M+F.uy*.02*M},{x:k.x+F.nx*.02*M+F.ux*.04*M,y:k.y+F.ny*.02*M+F.uy*.04*M},{x:k.x+F.nx*.012*M,y:k.y+F.ny*.012*M}],C.s)}
-    circ(ctx,a,.024*M,C.b);footFlat(ctx,a,he,to,M,C,d);
+    circ(ctx,a,.024*M,C.b);footFlat(ctx,a,he,to,M,R?{b:CL.boot,s:'#070708'}:C,d);
     if(sleeveCol)shortsLeg(ctx,h,k,d,M,sleeveCol,lk,isFar)};
   if(o.onlyArm){arm(nearS,false);return}
   /* far side first */
-  arm(farS,true);leg(farS,true,shade(shorts,-.22));
-  torsoFlat(ctx,J,H,M,sk,d,lk,this);
+  arm(farS,true);leg(farS,true,R?null:shade(shorts,-.22));
+  torsoFlat(ctx,J,H,M,R?{base:CL.shirt,sh:CL.shirtS,lt:shade(CL.shirt,.07)}:sk,d,lk,this);
   /* shorts go on top in 4 pieces so the hip, where many joints meet, reads as one garment:
      far leg (drawn with the far leg) → seat panel over the hips and both thigh tops → near leg → waistband + hip fold */
-  leg(nearS,false,null);shortsSeat(ctx,J,H,M,shorts,d,this.ang.ta,nearS,farS);shortsLeg(ctx,J[nearS.H],J[nearS.K],d,M,shorts,lk,false);shortsWaist(ctx,J,H,M,shorts,d,lk,this.ang.ta);shortsFold(ctx,J,M,shorts,d,nearS)
+  leg(nearS,false,null);if(R){shortsWaist(ctx,J,H,M,'#101012',d,lk,this.ang.ta)}else{shortsSeat(ctx,J,H,M,shorts,d,this.ang.ta,nearS,farS);shortsLeg(ctx,J[nearS.H],J[nearS.K],d,M,shorts,lk,false);shortsWaist(ctx,J,H,M,shorts,d,lk,this.ang.ta);shortsFold(ctx,J,M,shorts,d,nearS)}
   headFlat(ctx,J.hd,J.nk,H,this,skin,d,this.ang.hd);
   arm(nearS,false);
   if(o.highlight){ctx.save();ctx.globalAlpha=o.highlight;ctx.globalCompositeOperation='lighter';ngon(ctx,J.hd,.1*H,'#fff',12);ctx.restore()}};
 
+const REF_LOOK=[{skin:'#6e4630',hair:'#141110',hs:'long',bd:'full',beard:true},{skin:'#e7bc9c',hair:'#8a7462',hs:'bald',bd:null,beard:false},{skin:'#e4b593',hair:'#2b211b',hs:'short',bd:null,beard:false},{skin:'#8a5a3e',hair:'#2a1d15',hs:'bald',bd:'stub',beard:false}];
+/* soft airbrushed contact shadow on the canvas under the body */
+function floorShadow(ctx,B){const J=B.J,H=B.H;const low=J.hip.y<.45*H;const xs=[J.lA.x,J.rA.x,J.hip.x];if(low)xs.push(J.hd.x,J.sh.x);const x0=Math.min(...xs),x1=Math.max(...xs);const cx=(x0+x1)/2,rx=(x1-x0)/2+.22*H;const ry=.05*H;
+  const lift=Math.max(0,Math.min(J.lA.y,J.rA.y,J.hip.y)-.05);const a=.3*Math.max(.25,1-lift/(.5*H));
+  ctx.save();ctx.translate(cx,0);ctx.scale(1,ry/rx);const g=ctx.createRadialGradient(0,0,0,0,0,rx);g.addColorStop(0,`rgba(40,30,22,${a.toFixed(3)})`);g.addColorStop(.55,`rgba(40,30,22,${(a*.45).toFixed(3)})`);g.addColorStop(1,'rgba(40,30,22,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(0,0,rx,0,Math.PI*2);ctx.fill();ctx.restore()}
+/* motion blur: fast hands / feet leave a short translucent smear along their path (last 3 frames) */
+const MB_K=[['lG',.034,'g'],['rG',.034,'g'],['lT',.026,'s'],['rT',.026,'s'],['lA',.026,'s'],['rA',.026,'s']];
+function motionBlur(ctx,B,lk){const J=B.J,H=B.H;const h=B._mbH||(B._mbH=[]);const snap={};for(const[k]of MB_K)if(J[k])snap[k]={x:J[k].x,y:J[k].y};
+  const last=h[h.length-1];const same=last&&MB_K.every(([k])=>!snap[k]||last[k]&&last[k].x===snap[k].x&&last[k].y===snap[k].y);if(!same){h.push(snap);if(h.length>4)h.shift()}
+  if(h.length<3)return;const glove=lk.ref?'#151517':lk.glove||'#141414',skin=lk.ref?'#151517':lk.skin||'#d39b74';
+  for(const[k,w0,c]of MB_K){const cur=snap[k];if(!cur)continue;const pts=h.map(f=>f[k]).filter(Boolean);if(pts.length<3)continue;const p0=pts[0];const dist=Math.hypot(cur.x-p0.x,cur.y-p0.y);if(dist<.09*H||dist>.55*H)continue;let jump=false;for(let i=1;i<pts.length;i++)if(Math.hypot(pts[i].x-pts[i-1].x,pts[i].y-pts[i-1].y)>.28*H)jump=true;if(jump)continue;/* a teleport / reset is not motion */
+    const w=w0*H;const col=c==='g'?glove:skin;const al=Math.min(.22,(dist/H-.09)*1.2);ctx.save();ctx.globalAlpha=al;ctx.fillStyle=col;
+    for(let i=0;i<pts.length-1;i++){const a=pts[i],b=i+1<pts.length?pts[i+1]:cur;const dx=b.x-a.x,dy=b.y-a.y,L=Math.hypot(dx,dy)||1e-5;const nx=-dy/L,ny=dx/L;const wa=w*(.35+.65*i/(pts.length-1)),wb=w*(.35+.65*(i+1)/(pts.length-1));
+      ctx.beginPath();ctx.moveTo(a.x+nx*wa,a.y+ny*wa);ctx.lineTo(b.x+nx*wb,b.y+ny*wb);ctx.lineTo(b.x-nx*wb,b.y-ny*wb);ctx.lineTo(a.x-nx*wa,a.y-ny*wa);ctx.closePath();ctx.fill()}
+    ctx.restore()}}
 /* ---------- foot: ankle bones, heel, arch, ball, toes ---------- */
 function footFlat(ctx,A,He,T,M,C,d){const ux0=T.x-He.x,uy0=T.y-He.y,Lf=Math.hypot(ux0,uy0)||1e-5;const ux=ux0/Lf,uy=uy0/Lf;let nx=-uy,ny=ux;if((A.x-He.x)*nx+(A.y-He.y)*ny<0){nx=-nx;ny=-ny}
   const Q=(u,v)=>({x:He.x+ux*u*Lf+nx*v*Lf,y:He.y+uy*u*Lf+ny*v*Lf});
@@ -138,7 +158,7 @@ function shortsSeat(ctx,J,H,M,col,d,ta,nS,fS){const hip=J.hip,mid=J.mid;const n=
   poly(ctx,hull2(pts),col)}
 function shortsFold(ctx,J,M,col,d,nS){/* the fold where the thigh bends against the hip */const h=J[nS.H],k=J[nS.K];const F=frame(h,k,d);const P=(t,w)=>({x:h.x+F.ux*F.L*t+F.nx*w*M,y:h.y+F.uy*F.L*t+F.ny*w*M});
   poly(ctx,[P(-.04,.078),P(.14,.08),P(.05,.05)],shade(col,-.2))}
-function drawGloveFlat(ctx,E,Wr,G,H,col,strap,open,blood,d,skinC){const a=Math.atan2(G.y-Wr.y,G.x-Wr.x);ctx.save();ctx.translate(Wr.x,Wr.y);ctx.rotate(a);
+function drawGloveFlat(ctx,E,Wr,G,H,col,strap,open,blood,d,skinC,plain){const a=Math.atan2(G.y-Wr.y,G.x-Wr.x);ctx.save();ctx.translate(Wr.x,Wr.y);ctx.rotate(a);
   /* local frame: +x toward the knuckles; flip so the thumb sits on the top / facing side */
   const flip=(Math.cos(a)*d>=0)?1:-1;ctx.scale(1,flip);const r=.036*H;const P=(pts,c)=>{ctx.fillStyle=c;ctx.beginPath();ctx.moveTo(pts[0][0]*r,pts[0][1]*r);for(let i=1;i<pts.length;i++)ctx.lineTo(pts[i][0]*r,pts[i][1]*r);ctx.closePath();ctx.fill()};
   P([[-.95,-.62],[-.95,.62],[.15,.7],[.15,-.7]],col);/* cuff */
@@ -149,7 +169,7 @@ function drawGloveFlat(ctx,E,Wr,G,H,col,strap,open,blood,d,skinC){const a=Math.a
   for(const y of[-.42,-.02,.38])P([[1.44,y-.025],[1.74,y-.025],[1.74,y+.02],[1.44,y+.02]],shade(sc,-.28));/* finger splits */
   P([[1.3,-.98],[1.44,-.55],[1.42,.66],[1.3,.8],[1.25,-.9]],col);/* padding edge over the knuckles */
   P([[.35,.85],[.95,1.15],[1.25,1.0],[1.0,.82]],col);P([[1.0,1.0],[1.3,1.08],[1.32,.9],[1.1,.84]],sc);/* thumb: padded base, bare tip */
-  P([[.52,-.28],[1.0,-.32],[1.0,.24],[.52,.28]],'#e4e2de');P([[.62,-.04],[.9,-.18],[.9,-.08],[.62,.06]],col);/* white patch with a simple mark */
+  if(!plain)P([[.52,-.28],[1.0,-.32],[1.0,.24],[.52,.28]],'#e4e2de');P([[.62,-.04],[.9,-.18],[.9,-.08],[.62,.06]],col);/* white patch with a simple mark */
   if(open>.5){for(let i=0;i<3;i++)P([[1.6,(i-1)*.5-.15],[2.2,(i-1)*.5-.1],[2.2,(i-1)*.5+.12],[1.6,(i-1)*.5+.15]],col)}
   if(blood>0){ctx.globalAlpha=Math.min(.85,blood);P([[.9,-.3],[1.6,-.1],[1.5,.5],[.9,.4]],'#7a0606');ctx.globalAlpha=1}
   ctx.restore()}

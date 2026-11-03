@@ -261,7 +261,8 @@ function simFight(a,b,rules,o){o=o||{};const A=(f,k)=>((f.A||f)[k]||10)/20;const
 const PK=['x','y','rot','lean','chest','head','tw','la_s','la_e','ra_s','ra_e','ll_h','ll_k','ll_a','rl_h','rl_k','rl_a'];
 const BASE_POSE={x:0,y:0,rot:0,lean:.1,chest:.06,head:.06,tw:0,la_s:.95,la_e:1.75,ra_s:.55,ra_e:2.35,ll_h:.3,ll_k:.3,ll_a:.12,rl_h:-.24,rl_k:.34,rl_a:.4};
 function poseCopy(p){const o={};for(const k of PK)o[k]=p[k]||0;o.free=p.free||0;o.lo=p.lo||0;o.ro=p.ro||0;return o}
-function poseLerp(a,b,t,out){out=out||{};for(const k of PK)out[k]=(a[k]||0)+((b[k]||0)-(a[k]||0))*t;out.free=t<.5?a.free:b.free;out.lo=lerp(a.lo||0,b.lo||0,t);out.ro=lerp(a.ro||0,b.ro||0,t);return out}
+const WRAPK={la_s:1,ra_s:1,ll_h:1,rl_h:1};const wrapA=v=>v-Math.PI*2*Math.round(v/(Math.PI*2));
+function poseLerp(a,b,t,out){out=out||{};for(const k of PK){const a0=a[k]||0;let dv=(b[k]||0)-a0;if(WRAPK[k])dv=wrapA(dv);/* shortest way round: a limb never spins a full turn */out[k]=a0+dv*t}out.free=t<.5?a.free:b.free;out.lo=lerp(a.lo||0,b.lo||0,t);out.ro=lerp(a.ro||0,b.ro||0,t);return out}
 /* clip sampling: keys = [[t,{fields}],...]; missing fields fall back to base pose */
 function sampleClip(clip,time,base,out){const K=clip.keys;let i=0;while(i<K.length-2&&time>K[i+1][0])i++;const k0=K[i],k1=K[Math.min(i+1,K.length-1)];
   const span=Math.max(1e-4,k1[0]-k0[0]);let t=clamp((time-k0[0])/span,0,1);const e=k1[2]||clip.ease||'io';t=e==='o'?easeO(t):e==='i'?easeI(t):e==='l'?t:ease(t);
@@ -417,7 +418,7 @@ function mixHex(a,b,t){const A=rgbOf(a),B=rgbOf(b);return`rgb(${A.map((x,i)=>Mat
 function armIK(F,P,side,T){const J=F.body.J,S=J[side==='la'?'lS':'rS'];if(!S||!T)return;const L=F.body.L,L1=L.uarm,L2=L.farm+L.glove*.8,d=F.d||1;
   const vx=(T.x-S.x)*d,vy=T.y-S.y;let D=Math.hypot(vx,vy);D=clamp(D,(L1+L2)*.25,(L1+L2)*.985);const th=Math.atan2(vx,-vy);
   const a=Math.acos(clamp((L1*L1+D*D-L2*L2)/(2*L1*D),-1,1)),b=Math.acos(clamp((L1*L1+L2*L2-D*D)/(2*L1*L2),-1,1));const ta=(P.lean||0)+(P.chest||0)-(P.rot||0);/* solve() rotates the finished skeleton by -rot: local = world + rot */
-  P[side+'_s']=th-a-ta;P[side+'_e']=Math.PI-b;P[side==='la'?'lo':'ro']=1}
+  {const prev=P[side+'_s']||0;const ns=th-a-ta;P[side+'_s']=prev+(ns-prev-Math.PI*2*Math.round((ns-prev)/(Math.PI*2)))}/* stay on the same turn as the current pose */P[side+'_e']=clamp(Math.PI-b,0,2.7);P[side==='la'?'lo':'ro']=1}
 /* ---- referee drawn facing the camera (front view, flat style) ---- */
 function drawRefFront(ctx,r,t){const H=1.62,x=r.x,mv=Math.min(1,Math.abs(r.vx||0)*2),ph=(r.stepPh||0);const skin='#d9a882',dk='#1c1c1e',shirt='#f2f2f2';
   const hipY=.5*H+Math.abs(Math.sin(ph))*.01*mv;const sw=Math.sin(ph)*.06*mv;
@@ -1347,7 +1348,7 @@ class Match{
     const cx=g&&g.type==='ground'?g.ax+g.d*.3:(a.x+b.x)/2;S.follow(dt,cx,Math.abs(a.x-b.x),!!ground);if(this.cer){S.cam.w+=(4.4-S.cam.w)*Math.min(1,dt*1.5);S.cam.x+=(.1-S.cam.x)*Math.min(1,dt*2);S.cam.gy=.9}else if(this.outro&&this.outro.stage==='fall'){const L=this.winner&&this.winner.opp;if(L){S.cam.w+=(6-S.cam.w)*Math.min(1,dt*1.2)}}
     ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,S.cv.width,S.cv.height);S.drawBack();
     // referee in back plane
-    S.worldT(ctx);if(this.cer)drawRefFront2(ctx,this.ref,S.t);else if(typeof drawRefSide==='function')drawRefSide(ctx,this.ref,S.t);else drawRefFront2(ctx,this.ref,S.t);
+    S.worldT(ctx);this.ref.draw(ctx,{});/* referee: the fighter figure in a referee outfit, side view (also at the result) */
     // fighters: bottom/defender first
     let order=[a,b];if(g&&g.type==='ground'&&g.sub)order=g.sub.cat==='rnc'?[g.sub.att,g.sub.def]:[g.sub.def,g.sub.att];else if(g&&g.type==='ground')order=GPOS[g.pos].same?[g.top,g.bot]:[g.bot,g.top];else if(g&&g.type==='clinch')order=[g.def,g.att];else if(this.pi!=null)order=[this.f[1-this.pi],this.f[this.pi]];
     for(const f of order){if(f.hitF>0){ctx.filter=`brightness(${(1+f.hitF*5).toFixed(2)}) saturate(.7)`;f.hitF-=dt}f.draw(ctx,{corner:f.corner});ctx.filter='none';this.drawTrail(ctx,f)}if(g&&g.sub&&/초크/.test(g.sub.name))g.sub.att.draw(ctx,{corner:g.sub.att.corner,onlyArm:1});/* choking arm drawn over the defender's neck */if(this.showBoxes)this.drawBoxes(ctx);

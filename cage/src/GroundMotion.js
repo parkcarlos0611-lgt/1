@@ -137,4 +137,28 @@ if(typeof RefereeAI!=='undefined'){const tg=RefereeAI.target;RefereeAI.target=fu
     if(M.phase==='fight'&&!M.stopping&&!(g&&g.type==='ground')){const hurt=[a,b].find(f=>f.down||f.rock>0);if(hurt){const att=hurt.opp;const hx=hurt.body.J.hip?hurt.body.J.hip.x:hurt.x;let side=Math.sign(hx-att.x)||1;let t=hx+side*1.3;if(Math.abs(t)>lim){t=hx-side*1.3}M.ref.hurtWatch=1;return clamp(t,-lim,lim)}}
     M.ref.hurtWatch=0;return tg.call(this,M)}}
 {const ur=Match.prototype.updRef;Match.prototype.updRef=function(dt){if(typeof REF!=='undefined'){const hw=this.ref&&this.ref.hurtWatch;REF.speed=hw?1.3:.75}return ur.call(this,dt)}}
+
+/* ---------- hands meet the mat: the arm bends at the shoulder and elbow separately and the open hand
+   is planted on the canvas instead of the arm swinging through the floor ---------- */
+{const sv=Body.prototype.solve;Body.prototype.solve=function(p,X,d){const J=sv.call(this,p,X,d);if(this.rag||!J.lS)return J;const L=this.L,Lg=L.glove*.8,FLOOR=.035;
+  for(const s of['l','r']){const S=J[s+'S'],E=J[s+'E'],W=J[s+'W'],G=J[s+'G'];if(!G||Math.min(G.y,W.y)>=FLOOR)continue;
+    /* palm flat on the mat, fingers pointing the way the hand was going */const dir=Math.sign(G.x-W.x)||(d||1);const tw={x:G.x-dir*Lg*.6,y:FLOOR+.012};
+    const L1=L.uarm,L2=L.farm;let dx=tw.x-S.x,dy=tw.y-S.y;let D=Math.hypot(dx,dy)||1e-6;const mx=(L1+L2)*.995;if(D>mx){dx*=mx/D;dy*=mx/D;D=mx}const tx=S.x+dx,ty=S.y+dy;
+    const ca=clamp((L1*L1+D*D-L2*L2)/(2*L1*D),-1,1),an=Math.acos(ca);const bx=dx/D,by=dy/D;
+    const k1={x:S.x+(bx*Math.cos(an)-by*Math.sin(an))*L1,y:S.y+(bx*Math.sin(an)+by*Math.cos(an))*L1},k2={x:S.x+(bx*Math.cos(-an)-by*Math.sin(-an))*L1,y:S.y+(bx*Math.sin(-an)+by*Math.cos(-an))*L1};
+    /* keep the elbow on the side it was already bending to (no flip), and above the mat */let el=Math.hypot(k1.x-E.x,k1.y-E.y)<Math.hypot(k2.x-E.x,k2.y-E.y)?k1:k2;if(el.y<FLOOR){const o2=el===k1?k2:k1;if(o2.y>el.y)el=o2}
+    J[s+'E']=el;J[s+'W']={x:tx,y:Math.max(FLOOR,ty)};J[s+'G']={x:tx+dir*Lg,y:Math.max(FLOOR*.8,ty-.004)};
+    this.ang=this.ang||{};this.ang[s+'o']=1/* open hand: fingers spread on the canvas */}
+  return J}}
+
+/* ---------- referee at the result: stays in side view, faces the winner and raises his arm ---------- */
+{const ur=Match.prototype.updRef;Match.prototype.updRef=function(dt){if(!this.cer){const r0=ur.call(this,dt);const r=this.ref,P=r.gpose;
+      /* side-view referee poses: relaxed and upright while watching, hands on the knees when crouched in close */
+      if(P&&!(r.wave>0)&&this.phase==='fight'){const crouch=(this.g&&this.g.type==='ground'||r.hurtWatch)&&Math.abs(r.vx||0)<.35;const RJ=r.body.J;
+        if(crouch&&RJ.lK){Object.assign(P,{lean:.5,chest:.12,head:-.3,ll_h:.8,ll_k:1.25,ll_a:.1,rl_h:.4,rl_k:1.15,rl_a:.2});armIK(r,P,'la',{x:RJ.lK.x+(r.d||1)*.03,y:RJ.lK.y+.04});armIK(r,P,'ra',{x:RJ.rK.x+(r.d||1)*.03,y:RJ.rK.y+.04})}
+        else Object.assign(P,{lean:.05,chest:.02,head:.04,tw:0,ll_h:.16,ll_k:.12,ll_a:.05,rl_h:-.14,rl_k:.14,rl_a:.1,la_s:.18,la_e:.4,ra_s:.05,ra_e:.45})}
+      return r0}const r0=ur.call(this,dt);const r=this.ref,W=this.winner;
+    const tgtX=W?(W.x+(W.opp?W.opp.x:0))/2:0;r.mvIn=clamp((tgtX-r.x)*2,-1,1)*.6;r.d=W?(Math.sign(W.x-r.x)||1):1;
+    const up=r.raise&&W;r.gpose=poseCopy(Object.assign({},BASE_POSE,{lean:.02,chest:0,head:.02,tw:0,ll_h:.12,ll_k:.06,rl_h:-.1,rl_k:.06,la_s:up?2.75:.25,la_e:up?.25:.35,ra_s:.15,ra_e:.3}));r.gRate=6;
+    r.update(dt,{checkHit(){},onMiss(){}});return r0}}
 })();

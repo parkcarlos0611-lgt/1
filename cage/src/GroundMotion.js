@@ -230,10 +230,11 @@ function fenceClamp(B){const Wl=window.__cageWall;if(!Wl||!B.J.hd||B.look&&B.loo
    neutral instead of being cranked */
 function fenceLeg(J,s,sg,Wl){const o=s==='l'?'r':'l';const H=J[s+'H'],K=J[s+'K'],A=J[s+'A'],He=J[s+'He'],T=J[s+'T'],OA=J[o+'A'];if(!H||!A||!He||!T)return;
   const Lf=Math.hypot(T.x-He.x,T.y-He.y)||.2;const dir=Math.sign(T.x-He.x)||sg;const aH=Math.hypot(A.x-He.x,A.y-He.y);const L1=Math.hypot(K.x-H.x,K.y-H.y),L2=Math.hypot(A.x-K.x,A.y-K.y);
-  let ax=OA?A.x+(OA.x-A.x)*.35:A.x;const ay=Math.min(A.y,Math.max(.05,aH*.55));
+  let ax=OA?A.x+(OA.x-A.x)*.8:A.x;/* almost beside the other foot */const ay=Math.min(A.y,Math.max(.05,aH*.55));
   /* keep the whole foot (heel and toes) inside the fence */const reachOut=x=>Math.max(x+dir*Lf*.78,x-dir*Lf*.22)*sg;if(reachOut(ax)>Wl)ax-=sg*(reachOut(ax)-Wl);
   const r=fenceIK(H,{x:ax,y:ay},L1,L2,{x:H.x-sg*.3,y:K.y});/* pick the inward knee */const k2={x:2*((H.x+r.end.x)/2)-r.mid.x,y:r.mid.y};
-  let knee=r.mid;{const mx=(H.x+r.end.x)/2,my=(H.y+r.end.y)/2,ux=r.end.x-H.x,uy=r.end.y-H.y,ul=Math.hypot(ux,uy)||1;const px=-uy/ul,py=ux/ul;const off=(r.mid.x-mx)*px+(r.mid.y-my)*py;const alt={x:r.mid.x-2*off*px,y:r.mid.y-2*off*py};if(alt.x*sg<r.mid.x*sg)knee=alt}
+  let knee=r.mid;{const mx=(H.x+r.end.x)/2,my=(H.y+r.end.y)/2,ux=r.end.x-H.x,uy=r.end.y-H.y,ul=Math.hypot(ux,uy)||1;const px=-uy/ul,py=ux/ul;const off=(r.mid.x-mx)*px+(r.mid.y-my)*py;const alt={x:r.mid.x-2*off*px,y:r.mid.y-2*off*py};
+    /* the knee goes to the side of the other knee (they nearly overlap) */const OK=J[o+'K'];if(OK){if(Math.hypot(alt.x-OK.x,alt.y-OK.y)<Math.hypot(r.mid.x-OK.x,r.mid.y-OK.y))knee=alt}else if(alt.x*sg<r.mid.x*sg)knee=alt}
   J[s+'K']=knee;J[s+'A']=r.end;const A2=r.end;J[s+'He']={x:A2.x-dir*Lf*.22,y:Math.max(0,A2.y-aH*.8)};J[s+'T']={x:A2.x+dir*Lf*.78,y:0};
   for(const n of[s+'He',s+'T',s+'K',s+'A'])if(J[n].x*sg>Wl)J[n]={x:sg*Wl,y:J[n].y};if(J[s+'Sn'])J[s+'Sn']={x:J[s+'K'].x+(J[s+'A'].x-J[s+'K'].x)*.7,y:J[s+'K'].y+(J[s+'A'].y-J[s+'K'].y)*.7}}
 /* the foot that met the fence turns down at the ankle: flat on the mat when it is low, toes pointing down

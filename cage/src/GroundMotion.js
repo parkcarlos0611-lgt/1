@@ -230,11 +230,14 @@ function fenceClamp(B){const Wl=window.__cageWall;if(!Wl||!B.J.hd||B.look&&B.loo
    neutral instead of being cranked */
 function fenceLeg(J,s,sg,Wl){const o=s==='l'?'r':'l';const H=J[s+'H'],K=J[s+'K'],A=J[s+'A'],He=J[s+'He'],T=J[s+'T'],OA=J[o+'A'];if(!H||!A||!He||!T)return;
   const Lf=Math.hypot(T.x-He.x,T.y-He.y)||.2;const dir=Math.sign(T.x-He.x)||sg;const aH=Math.hypot(A.x-He.x,A.y-He.y);const L1=Math.hypot(K.x-H.x,K.y-H.y),L2=Math.hypot(A.x-K.x,A.y-K.y);
-  let ax=OA?A.x+(OA.x-A.x)*.8:A.x;/* almost beside the other foot */const ay=Math.min(A.y,Math.max(.05,aH*.55));
+  let ax=OA?A.x+(OA.x-A.x)*.95:A.x;/* right beside the other foot */const ay=OA?Math.max(.05,OA.y):Math.min(A.y,Math.max(.05,aH*.55));
   /* keep the whole foot (heel and toes) inside the fence */const reachOut=x=>Math.max(x+dir*Lf*.78,x-dir*Lf*.22)*sg;if(reachOut(ax)>Wl)ax-=sg*(reachOut(ax)-Wl);
   const r=fenceIK(H,{x:ax,y:ay},L1,L2,{x:H.x-sg*.3,y:K.y});/* pick the inward knee */const k2={x:2*((H.x+r.end.x)/2)-r.mid.x,y:r.mid.y};
   let knee=r.mid;{const mx=(H.x+r.end.x)/2,my=(H.y+r.end.y)/2,ux=r.end.x-H.x,uy=r.end.y-H.y,ul=Math.hypot(ux,uy)||1;const px=-uy/ul,py=ux/ul;const off=(r.mid.x-mx)*px+(r.mid.y-my)*py;const alt={x:r.mid.x-2*off*px,y:r.mid.y-2*off*py};
     /* the knee goes to the side of the other knee (they nearly overlap) */const OK=J[o+'K'];if(OK){if(Math.hypot(alt.x-OK.x,alt.y-OK.y)<Math.hypot(r.mid.x-OK.x,r.mid.y-OK.y))knee=alt}else if(alt.x*sg<r.mid.x*sg)knee=alt}
+  /* knee and thigh follow the other leg almost exactly: aim the knee at a point just beside the other knee, keep bone lengths */
+  {const OK=J[o+'K'];if(OK){const tk={x:OK.x+(knee.x-OK.x)*.12,y:OK.y+(knee.y-OK.y)*.12};const v={x:tk.x-H.x,y:tk.y-H.y},vl=Math.hypot(v.x,v.y)||1;const kk={x:H.x+v.x/vl*L1,y:H.y+v.y/vl*L1};
+      const w={x:r.end.x-kk.x,y:r.end.y-kk.y},wl=Math.hypot(w.x,w.y)||1;const ae={x:kk.x+w.x/wl*L2,y:Math.max(.05,kk.y+w.y/wl*L2)};knee=kk;r.end=ae;if(r.end.x*sg>Wl)r.end={x:sg*Wl,y:r.end.y}}}
   J[s+'K']=knee;J[s+'A']=r.end;const A2=r.end;J[s+'He']={x:A2.x-dir*Lf*.22,y:Math.max(0,A2.y-aH*.8)};J[s+'T']={x:A2.x+dir*Lf*.78,y:0};
   for(const n of[s+'He',s+'T',s+'K',s+'A'])if(J[n].x*sg>Wl)J[n]={x:sg*Wl,y:J[n].y};if(J[s+'Sn'])J[s+'Sn']={x:J[s+'K'].x+(J[s+'A'].x-J[s+'K'].x)*.7,y:J[s+'K'].y+(J[s+'A'].y-J[s+'K'].y)*.7}}
 /* the foot that met the fence turns down at the ankle: flat on the mat when it is low, toes pointing down

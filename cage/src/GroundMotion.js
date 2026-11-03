@@ -132,11 +132,11 @@ function subOverlay(M,dt){const g=M.g,s=g.sub;const A=s.att,D=s.def;const aJ=A.b
 {const st=Match.prototype.standUp;Match.prototype.standUp=function(){for(const f of this.f)f.gAtk=null;return st.apply(this,arguments)}}
 
 /* ---------- referee: keep a distance, jog in to watch a hurt fighter ---------- */
-if(typeof REF!=='undefined'){REF.dist={min:1.55,max:2.35,pad:1.1};REF.speed=.75;REF.rush=1.9;REF.groundDist=1.45}
+if(typeof REF!=='undefined'){REF.dist={min:1.55,max:2.35,pad:1.1};REF.speed=.55;REF.rush=1.5;REF.groundDist=1.45}
 if(typeof RefereeAI!=='undefined'){const tg=RefereeAI.target;RefereeAI.target=function(M){const[a,b]=M.f;const g=M.g;const lim=M.stage.R-REF.wallMargin;
     if(M.phase==='fight'&&!M.stopping&&!(g&&g.type==='ground')){const hurt=[a,b].find(f=>f.down||f.rock>0);if(hurt){const att=hurt.opp;const hx=hurt.body.J.hip?hurt.body.J.hip.x:hurt.x;let side=Math.sign(hx-att.x)||1;let t=hx+side*1.3;if(Math.abs(t)>lim){t=hx-side*1.3}M.ref.hurtWatch=1;return clamp(t,-lim,lim)}}
     M.ref.hurtWatch=0;return tg.call(this,M)}}
-{const ur=Match.prototype.updRef;Match.prototype.updRef=function(dt){if(typeof REF!=='undefined'){const hw=this.ref&&this.ref.hurtWatch;REF.speed=hw?1.3:.75}return ur.call(this,dt)}}
+{const ur=Match.prototype.updRef;Match.prototype.updRef=function(dt){if(typeof REF!=='undefined'){const hw=this.ref&&this.ref.hurtWatch;REF.speed=hw?.95:.55}return ur.call(this,dt)}}
 
 /* ---------- hands meet the mat: the arm bends at the shoulder and elbow separately and the open hand
    is planted on the canvas instead of the arm swinging through the floor ---------- */
@@ -163,6 +163,9 @@ if(typeof RefereeAI!=='undefined'){const tg=RefereeAI.target;RefereeAI.target=fu
     r.update(dt,{checkHit(){},onMiss(){}});return r0}}
 
 /* calmer overall movement: slower drift, quieter idle life and reaction springs */
-if(typeof MP!=='undefined'){MP.speedMul=Math.min(MP.speedMul,.48)}
+if(typeof MP!=='undefined'){MP.speedMul=Math.min(MP.speedMul,.43)}
 if(typeof MR!=='undefined'){MR.idle=.55;MR.variety=.75}
+
+/* stronger hit feel: longer hitstop, more shake / zoom on every tier */
+if(typeof IFX!=='undefined'){const T=IFX.tiers;for(const k in T){T[k].hs+=1;T[k].shake*=1.4;T[k].zoom*=1.35}}
 })();

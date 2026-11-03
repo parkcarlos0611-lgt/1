@@ -830,8 +830,9 @@ class F2{
         const q=ph-Math.PI;const sq=Math.sin(q);return{h:c-A*Math.cos(q),k:.18+1.0*Math.pow(Math.max(0,sq),.55),a:-.1+.2*sq}};
       const Lg=leg(this.gph),Rg=leg(this.gph+Math.PI);{const sw=ph=>{ph=((ph%(2*Math.PI))+2*Math.PI)%(2*Math.PI);return ph<Math.PI?0:Math.min(1,Math.sin(ph-Math.PI)*4)*w};this.body._swing={l:sw(this.gph),r:sw(this.gph+Math.PI)}}
       p.ll_h+=(Lg.h-p.ll_h)*w;p.ll_k+=(Lg.k-p.ll_k)*w;p.ll_a+=(Lg.a-p.ll_a)*w;p.rl_h+=(Rg.h-p.rl_h)*w;p.rl_k+=(Rg.k-p.rl_k)*w;p.rl_a+=(Rg.a-p.rl_a)*w;
-      const bob=Math.abs(Math.sin(this.gph));p.y=(p.y||0)-.008*this.H*(1-bob)*w;p.lean+=clamp(vf,-1.5,1.5)*.02;p.tw+=Math.sin(this.gph)*.06*w;p.chest+=Math.sin(this.gph*2)*.008*w;
-      p.la_s+=Math.sin(this.gph)*.04*w;p.ra_s-=Math.sin(this.gph)*.04*w;return}
+      const bob=Math.abs(Math.sin(this.gph));p.y=(p.y||0)-.008*this.H*(1-bob)*w;p.lean+=clamp(vf,-1.5,1.5)*.025;/* torso counter-rotates against the hips, shoulders roll with each step, guard bobs lightly, head stays level */
+      const sg=Math.sin(this.gph),s2=Math.sin(this.gph*2);p.tw+=sg*.09*w;p.chest+=s2*.012*w;p.head-=s2*.01*w+clamp(vf,-1.5,1.5)*.015;
+      p.la_s+=sg*.05*w;p.ra_s-=sg*.05*w;p.la_e+=s2*.03*w;p.ra_e-=s2*.03*w;return}
     /* step-drag (circling / slow drift) */
     this.fph=(this.fph||0)+dt*(5.2+sp*3.6);const ph=(this.fph/(Math.PI*2))%1;
     const s1=ph<.46?Math.sin(Math.PI*ph/.46):0,s2=ph>.54?Math.sin(Math.PI*(ph-.54)/.46):0;

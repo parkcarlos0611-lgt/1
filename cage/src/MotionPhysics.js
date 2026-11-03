@@ -18,7 +18,7 @@
    Stamina — every decrease of stamina (and of max stamina) is scaled by `staminaDrain`. */
 const MP=tuneSection('motion',{
   speedMul:1.22, bounce:{amp:.016,hz:2.3,moveHz:3.3,strikeDamp:.25},
-  springs:{head:[140,9,.9],chest:[95,8,.5],lean:[85,8.5,.45],tw:[75,7,.7],la_s:[55,4.5,1],la_e:[50,4,1.1],ra_s:[55,4.5,1],ra_e:[50,4,1.1],ll_h:[105,10,.7],ll_k:[105,10,.8],rl_h:[105,10,.7],rl_k:[105,10,.8],x:[45,9,.12]},
+  springs:{head:[140,9,.9],chest:[95,8,.5],lean:[85,8.5,.45],tw:[75,7,.7],la_s:[55,8.5,.8],la_e:[50,8,.9],ra_s:[55,8.5,.8],ra_e:[50,8,.9],   /* arms: damping ratio ≈ .6 (no flailing overshoot) */ll_h:[105,10,.7],ll_k:[105,10,.8],rl_h:[105,10,.7],rl_k:[105,10,.8],x:[45,9,.12]},
   hit:{head:1,body:1,leg:1,kickRecoil:1}, inertia:{lean:.03,arms:.05},
   staminaDrain:.6, noShadows:true
 });

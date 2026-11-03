@@ -26,6 +26,7 @@ index.html  (inline core: Body, F2, MV, Stage, In2, AI2, Match, World, Career, U
   └─ src/GPURenderer.js        WebGL compositor (DoF, bloom, rim, grade, vignette) + dynamic resolution
   └─ src/MotionPhysics.js      joint spring physics, bouncy footwork, no shadows, stamina drain ×0.6
   └─ src/MotionRealism.js      game pace, limb shading in draw order, strike variety, blend-in, idle life
+  └─ src/AttackMotions.js      rebuilt strike animation set (22 moves, 31 variants)
   └─ src/DebugLayer.js          F9 overlay: hitboxes, ragdoll joints, buffer, ref path, conc gauge
   └─ src/CareerManager.js       InjuryModel, Matchmaker, coaching staff, scheduler / fight-card tab
   tools/careerbench.js          multi-year career bench (injuries, weeks lost, fights, rematches)
@@ -308,7 +309,8 @@ between watch, ground (crouched), break (arms out), wave-off and raise, driven b
 
 - **Pace**: GAME_SPEED 0.8 → 0.72; walking speed multiplier 1.22 → 0.55 (the hips moved 5 units/s,
   about 3 body heights per second; now ≈ 3 units/s); the second bounce layer is off.
-- **Legs (FootPlant stepping)**: a planted foot never slides (measured 0.000 while walking). When the
+- ~~Legs (FootPlant stepping)~~ — **reverted in phase 8** (legs could stretch). Original text:
+  a planted foot never slides (measured 0.000 while walking). When the
   body moves the foot steps along an arc (heel peels first, ≤ 12 cm lift, 0.09–0.2 s), aiming ahead by
   velocity × step time; the lead foot leads going forward, the rear foot going back; the next foot may
   start once the first is 55 % through. Both legs count as support unless that leg is kicking. During
@@ -322,6 +324,24 @@ between watch, ground (crouched), break (arms out), wave-off and raise, driven b
 - **Blend-in**: a move starts from the pose the fighter is actually in and blends into the clip over 70 ms.
 - **Idle life**: hands paw, head bobs, shoulders roll in stance.
 - Balance after the changes (50 fights): LW 24 · 22 · 54 %, HW 42 · 14 · 44 %; time in the pocket 28–29 %.
+
+## Phase 8 — Leg rollback, no-stretch guarantee, attack motion rebuild
+
+- **Rolled back** every leg change from phase 7 (procedural stepping, walk-cycle suppression,
+  support-leg override). FootPlant is back to the phase-2 plant-in-place version.
+- **No-stretch guarantee**: the plant-in-place IK could still force an out-of-reach ankle onto its target
+  (rear leg stretched up to 1.83× in AI-vs-AI fights). Now an out-of-reach foot is pulled back to full reach,
+  the hips may sink up to 10 % H, and the knee is solved with exact bone lengths. Measured over ~46 000 frames
+  (6 fights): max thigh / shin length ratio 1.0000.
+- **AttackMotions**: all 22 strikes re-authored with one structure generated from each clip's own hit
+  window (active frames, duration, damage and reach unchanged): guard → load → [chamber] → drive → impact
+  (overshoot) → hold → retract. Hips and shoulders turn, rear heel pivots on rear-hand shots, chin tucks,
+  non-striking hand guards the face, kicks counter-balance and swing the kicking-side arm. Arm angles are
+  torso-relative, so leaning shots use smaller shoulder angles (body shots land at belly height).
+  31 variants: jab ×3, cross ×3, hooks ×2, uppercuts ×2, low / body / high rear kicks ×2, others ×1;
+  picked per throw, never the same twice in a row. Random per-throw jitter reduced to half.
+- Arm springs in the joint physics are better damped (ζ ≈ 0.6): arms no longer fly up after body shots.
+- Balance (50 fights): LW 36 · 20 · 44 %, HW 38 · 8 · 54 %.
 
 ## Delivery phases
 1. ✅ Architecture + hitboxes + 2D ragdoll + combat feel + debug layer

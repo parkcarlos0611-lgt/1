@@ -31,12 +31,8 @@ const rr=(a,b)=>a+Math.random()*(b-a);
 {const sk=F2.prototype.strike;F2.prototype.strike=function(key,M){const ok=sk.call(this,key,M);if(ok&&this.act&&this.name!=='ref'){const a=this.act,V=MR.variety;
     a.var={lean:rr(-.06,.03)*V,chest:rr(-.05,.04)*V,head:rr(-.09,.07)*V,tw:rr(-.1,.1)*V,dip:rr(0,.035)*V,ext:rr(-.14,.06)*V,kick:rr(-.16,.12)*V,guard:rr(-.2,.12)*V,gel:rr(-.16,.14)*V};
     a.speed*=1+rr(-.07,.07)*V;if(this._lastP)a.from=poseCopy(this._lastP)}return ok}}
-{const fw=F2.prototype.footwork;F2.prototype.footwork=function(p,dt){this.body._dt=dt;const A=this.act,lh=A&&A.c&&A.c.leg?((A.c.hit&&A.c.hit.pt||'r')[0]==='l'?'l':'r'):null;this.body._standCtl=this.state==='stand'&&!this.down&&this.name!=='ref';this.body._legFree=lh;
-    /* the engine's walk cycle swings hip / ankle angles, which lifts feet off the mat and fights the planted-foot
-       stepping in FootPlant. Keep those channels as they were (plus joint-physics springs such as a stumble). */
-    const keep=this.name!=='ref'&&this.state==='stand'&&!(this.act&&this.act.c&&this.act.c.leg)&&typeof FP!=='undefined'&&FP.step;const snap=keep?{ll_h:p.ll_h,rl_h:p.rl_h,ll_a:p.ll_a,rl_a:p.rl_a}:null;
+{const fw=F2.prototype.footwork;F2.prototype.footwork=function(p,dt){
     fw.call(this,p,dt);if(this.name==='ref')return;
-    if(snap){const js=this._js||{};for(const ch in snap)p[ch]=snap[ch]+(js[ch]?js[ch].x:0)}
     const a=this.act;
     if(a&&a.c&&a.var&&this.state==='stand'){const v=a.var,dur=a.c.dur||.4;const e=Math.sin(Math.PI*clamp(a.t/dur,0,1));const h=a.c.hit;const act=h?clamp((a.t-h.t0*.6)/Math.max(.04,(h.t1-h.t0*.6)),0,1)*(a.t<=h.t1+.06?1:0):0;
       p.lean+=v.lean*e;p.chest+=v.chest*e;p.head+=v.head*e;p.tw+=v.tw*e;p.y=(p.y||0)-v.dip*e*this.H*.4;p.ll_k+=v.dip*e*2;p.rl_k+=v.dip*e*2;

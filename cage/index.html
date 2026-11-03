@@ -812,16 +812,22 @@ class F2{
   footwork(p,dt){if(!(dt>0))return;const px=this._fx==null?this.x:this._fx;this._fx=this.x;const v=(this.x-px)/dt;this.mv=(this.mv||0)+(v-(this.mv||0))*Math.min(1,dt*14);
     const st=this.state==='stand'||this.state==='clinch';if(!st)return;const a=this.act,leg=a&&a.c.leg;const t=this.t;
     // idle bounce on the balls of the feet
-    if(this.state==='stand'&&!leg&&this.rock<=0){const fr=6.0+ATT(this,'footwork')*1.6;this.bph=(this.bph||0)+dt*fr;const ab=Math.abs(Math.sin(this.bph)),land=Math.pow(1-ab,3);const amp=(this.noBounce?0:1)*(a?.35:1)*(.75+ATT(this,'footwork')*.5)*(.6+.4*this.sta/this.staMax);p.ll_k+=(.2*land+.04*ab)*amp;p.rl_k+=(.22*land+.04*ab)*amp;p.ll_a+=.28*ab*amp;p.rl_a+=.36*ab*amp;p.lean+=.03*land*amp;p.head+=.025*land*amp;p.la_s+=.04*land*amp;p.ra_s+=.05*land*amp;p.la_e-=.06*land*amp;p.ra_e-=.05*land*amp;p.chest+=Math.sin(this.bph*.5)*.02*amp;p.tw+=Math.sin(this.bph*.5)*.04*amp}
+    if(this.state==='stand'&&!leg&&this.rock<=0){const fr=6.0+ATT(this,'footwork')*1.6;this.bph=(this.bph||0)+dt*fr;const ab=Math.abs(Math.sin(this.bph)),land=Math.pow(1-ab,3);const amp=(this.noBounce?0:.72)*(a?.35:1)*(.75+ATT(this,'footwork')*.5)*(.6+.4*this.sta/this.staMax);p.ll_k+=(.2*land+.04*ab)*amp;p.rl_k+=(.22*land+.04*ab)*amp;p.ll_a+=.28*ab*amp;p.rl_a+=.36*ab*amp;p.lean+=.03*land*amp;p.head+=.025*land*amp;p.la_s+=.04*land*amp;p.ra_s+=.05*land*amp;p.la_e-=.06*land*amp;p.ra_e-=.05*land*amp;p.chest+=Math.sin(this.bph*.5)*.02*amp;p.tw+=Math.sin(this.bph*.5)*.04*amp}
     // strike step-in (lead foot steps, rear foot drags after impact)
     if(a&&a.c.hit&&!leg&&a.c.lunge){const h=a.c.hit,L=Math.min(1.4,a.c.lunge*8);const u=clamp(a.t/h.t1,0,1),w=clamp((a.t-h.t1)/Math.max(.05,(a.c.dur||.4)-h.t1),0,1);
       const s1=Math.sin(Math.PI*u),s2=Math.sin(Math.PI*w);p.ll_h+=.2*s1*L;p.ll_k+=.22*s1*L;p.ll_a+=.15*s1*L;p.rl_h+=.16*s2*L;p.rl_k+=.2*s2*L;p.rl_a+=.2*s2*L}
     if(leg)return;
     const sp=Math.max(Math.abs(this.mv),this.circ?1.1:0,this.clMv?.9:0),m=Math.min(1,sp/1.1)*(a?.35:1)*(this.guard==='low'?0:1);if(m<.03){return}
-    this.fph=(this.fph||0)+dt*(6+sp*4.5);const s=Math.sin(this.fph),up=Math.max(0,s),dn=Math.max(0,-s);const fw=(this.mv*this.d>=0||this.circ)?1:-1;
-    if(fw>0){p.ll_h+=(.3*up-.08*dn)*m;p.ll_k+=.42*up*m;p.ll_a+=.18*up*m;p.rl_h+=(.24*dn-.06*up)*m;p.rl_k+=.34*dn*m;p.rl_a+=.3*dn*m}
-    else{p.rl_h-=(.28*up-.06*dn)*m;p.rl_k+=.4*up*m;p.rl_a+=.2*up*m;p.ll_h-=(.22*dn-.06*up)*m;p.ll_k+=.32*dn*m;p.ll_a+=.15*dn*m}
-    p.lean+=clamp(this.mv*this.d,-1.5,1.5)*.03;p.chest+=s*.015*m;p.la_s-=s*.05*m;p.ra_s+=s*.05*m;p.head-=s*.02*m}
+    /* MMA step-drag: moving forward the lead foot steps first and the rear foot drags up after it; moving back
+       the rear foot steps first and the lead foot follows. A short planted beat between the two keeps the stance.
+       Hips dip slightly as each foot travels, the rear heel lifts when it pushes, the guard stays quiet. */
+    this.fph=(this.fph||0)+dt*(5.2+sp*3.6);const ph=(this.fph/(Math.PI*2))%1;const fw=(this.mv*this.d>=0||this.circ)?1:-1;
+    const s1=ph<.46?Math.sin(Math.PI*ph/.46):0,s2=ph>.54?Math.sin(Math.PI*(ph-.54)/.46):0;
+    if(fw>0){p.ll_h+=.3*s1*m;p.ll_k+=.3*s1*m;p.ll_a+=.08*s1*m;p.rl_a+=.22*s1*m;p.rl_k+=.06*s1*m;   /* lead steps, rear pushes off the ball */
+      p.rl_h+=.2*s2*m;p.rl_k+=.34*s2*m;p.rl_a+=.3*s2*m;p.ll_k+=.05*s2*m}                          /* rear drags up */
+    else{p.rl_h-=.26*s1*m;p.rl_k+=.3*s1*m;p.rl_a+=.12*s1*m;p.ll_a+=.1*s1*m;                         /* rear steps back */
+      p.ll_h-=.2*s2*m;p.ll_k+=.28*s2*m;p.ll_a+=.14*s2*m;p.rl_k+=.05*s2*m}                         /* lead slides back */
+    const dip=(s1+s2)*m;p.y=(p.y||0)-.006*this.H*dip;p.lean+=clamp(this.mv*this.d,-1.5,1.5)*.025+(fw>0?.012:-.012)*dip;p.chest+=(s1-s2)*.01*m;p.la_s-=(s1-s2)*.02*m;p.ra_s+=(s1-s2)*.02*m;p.head-=.012*dip}
   draw(ctx,o){this.body.draw(ctx,o)}
 }
 
@@ -1336,7 +1342,7 @@ class Match{
     // fighters: bottom/defender first
     let order=[a,b];if(g&&g.type==='ground')order=GPOS[g.pos].same?[g.top,g.bot]:[g.bot,g.top];else if(g&&g.type==='clinch')order=[g.def,g.att];else if(this.pi!=null)order=[this.f[1-this.pi],this.f[this.pi]];
     for(const f of order){if(f.hitF>0){ctx.filter=`brightness(${(1+f.hitF*5).toFixed(2)}) saturate(.7)`;f.hitF-=dt}f.draw(ctx,{corner:f.corner});ctx.filter='none';this.drawTrail(ctx,f)}if(this.showBoxes)this.drawBoxes(ctx);
-    S.drawFx(dt);S.vig=this.pi!=null&&this.f[this.pi].rock>0?1:0;
+    S.drawFx(dt);S.vig=this.pi!=null&&this.f[this.pi].rock>0?.35:0;
     const O=this.outro;if(O){let al=0;if(O.stage==='fade')al=Math.min(1,O.t/(O.dec?1.4:1.0));else if(O.stage==='cer')al=Math.max(0,1-O.t/.9);else if(O.stage==='fall')al=0;if(al>0){ctx.setTransform(1,0,0,1,0,0);ctx.fillStyle=`rgba(0,0,0,${al})`;ctx.fillRect(0,0,S.cv.width,S.cv.height)}
       if(O.stage==='fall'){ctx.setTransform(1,0,0,1,0,0);const k=Math.min(1,O.t/.4)*.35;ctx.fillStyle=`rgba(0,0,0,${k})`;const h=S.cv.height*.11;ctx.fillRect(0,0,S.cv.width,h);ctx.fillRect(0,S.cv.height-h,S.cv.width,h)}}}
   drawTrail(ctx,f){const a=f.act;if(!a||!a.c.hit||!a.c.hit.pt){f.trail=null;return}const h=a.c.hit,p=f.body.J[h.pt];if(!p)return;f.trail=f.trail&&f.trail.k===a?f.trail:{k:a,pts:[]};const T=f.trail.pts;

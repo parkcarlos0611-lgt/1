@@ -831,15 +831,27 @@ class F2{
         const q=ph-Math.PI;const sq=Math.sin(q);return{h:c-A*Math.cos(q),k:.18+1.0*Math.pow(Math.max(0,sq),.55),a:-.1+.2*sq}};
       const Lg=leg(this.gph),Rg=leg(this.gph+Math.PI);
       /* faster: a bouncing step — hips and knees lifted and bent, a lower stance, a small hop on every step */
-      const rf=clamp((Math.abs(this.mv)-1.05)/.7,0,1)*w;this._rf=(this._rf||0)+(rf-(this._rf||0))*Math.min(1,dt*6);const RF=this._rf;
+      const rf=(this.stick!=null&&this.isPlayer===true&&this.stick>0?clamp((this.stick-.65)/.22,0,1):clamp((Math.abs(this.mv)-1.05)/.7,0,1))*w;this._rf=(this._rf||0)+(rf-(this._rf||0))*Math.min(1,dt*6);const RF=this._rf;
       if(RF>.01){for(const[g,ph]of[[Lg,this.gph],[Rg,this.gph+Math.PI]]){const q=((ph%(2*Math.PI))+2*Math.PI)%(2*Math.PI);const sw=q>=Math.PI;
           g.h+=(.12+(sw?.32*Math.sin(q-Math.PI):0))*RF;g.k+=(.28+(sw?.55*Math.sin(q-Math.PI):0))*RF;g.a+=.18*RF}
-        const hop=RF*Math.pow(Math.max(0,Math.sin(2*this.gph)),2);p.y=(p.y||0)+.03*this.H*hop;p.lean+=.08*RF;p.head-=.04*RF;
+        const hop=RF*Math.pow(Math.max(0,Math.sin(2*this.gph)),2);p.y=(p.y||0)+.03*this.H*hop;/* upright torso, light bounce */p.lean-=.07*RF;p.chest-=.03*RF;p.head+=.02*RF;
         this._hopS=hop>.15?hop:0;/* airborne: both feet free */}else this._hopS=0;{const sw=ph=>{ph=((ph%(2*Math.PI))+2*Math.PI)%(2*Math.PI);return ph<Math.PI?0:Math.min(1,Math.sin(ph-Math.PI)*4)*w};this.body._swing={l:Math.max(sw(this.gph),this._hopS||0),r:Math.max(sw(this.gph+Math.PI),this._hopS||0)}}
       p.ll_h+=(Lg.h-p.ll_h)*w;p.ll_k+=(Lg.k-p.ll_k)*w;p.ll_a+=(Lg.a-p.ll_a)*w;p.rl_h+=(Rg.h-p.rl_h)*w;p.rl_k+=(Rg.k-p.rl_k)*w;p.rl_a+=(Rg.a-p.rl_a)*w;
       const bob=Math.abs(Math.sin(this.gph));p.y=(p.y||0)-.008*this.H*(1-bob)*w;p.lean+=clamp(vf,-1.5,1.5)*.025;/* torso counter-rotates against the hips, shoulders roll with each step, guard bobs lightly, head stays level */
       const sg=Math.sin(this.gph),s2=Math.sin(this.gph*2);p.tw+=sg*.09*w;p.chest+=s2*.012*w;p.head-=s2*.01*w+clamp(vf,-1.5,1.5)*.015;
       p.la_s+=sg*.05*w;p.ra_s-=sg*.05*w;p.la_e+=s2*.03*w;p.ra_e-=s2*.03*w;return}
+    /* circling the octagon (stick up / down): crossover steps — the legs pass each other on a diagonal, the
+       stepping foot lifts and lands across the planted one; from 65 % stick the steps become light hops with an
+       upright torso and a little vertical bounce */
+    if(this.circ){const mag=Math.abs(this.circ);this.cph=(this.cph||0)+dt*(5.2+mag*4.2);const q=this.cph,sn=Math.sin(q),up1=Math.max(0,sn),up2=Math.max(0,-sn);const cw=Math.min(1,(this._cw=(this._cw||0)+(1-(this._cw||0))*Math.min(1,dt*6)));
+      const c0=(p.ll_h+p.rl_h)/2;/* lead foot crosses back past the rear foot, then the rear foot crosses forward */
+      /* each foot travels past the other's line: a real crossover */const xL=p.rl_h-.14,xR=p.ll_h+.14;/* past the other leg */
+      p.ll_h+=(xL-p.ll_h)*up1*cw;p.ll_k+=.55*up1*cw;p.ll_a+=.15*up1*cw;
+      p.rl_h+=(xR-p.rl_h)*up2*cw;p.rl_k+=.55*up2*cw;p.rl_a+=.15*up2*cw;
+      p.tw+=sn*.16*cw*Math.sign(this.circ);p.chest+=Math.cos(2*q)*.012*cw;p.y=(p.y||0)-.008*this.H*(up1+up2)*cw;
+      const hk=this.isPlayer===true&&this.stick?clamp((this.stick-.65)/.22,0,1):0;if(hk>0){const hop=hk*Math.pow(Math.abs(Math.sin(q)),2);p.y+=.026*this.H*hop;p.lean-=.07*hk;p.ll_k+=.2*hk;p.rl_k+=.2*hk;this._hopS=hop>.2?hop:0}else this._hopS=0;
+      this.body._swing={l:Math.max(Math.min(1,up1*3)*cw,this._hopS||0),r:Math.max(Math.min(1,up2*3)*cw,this._hopS||0)};return}
+    this._cw=0;
     /* step-drag (circling / slow drift) */
     this.fph=(this.fph||0)+dt*(5.2+sp*3.6);const ph=(this.fph/(Math.PI*2))%1;
     const s1=ph<.46?Math.sin(Math.PI*ph/.46):0,s2=ph>.54?Math.sin(Math.PI*(ph-.54)/.46):0;
@@ -1104,7 +1116,7 @@ class Match{
     this.hud(dt)}
   playerInput(dt){const f=this.f[this.pi],I=this.inp;const ev=I.poll();const g=this.g;const gm=g&&g.type==='ground';
     if(I.setMode)I.setMode(gm?'ground':f.state==='clinch'?'clinch':'stand');const fwd=I.mx*f.d;
-    f.mvIn=(f.state==='stand')?clamp(I.mx,-1,1):0;f.circ=(f.state==='stand'&&!I.block&&Math.abs(I.my)>.5&&Math.abs(I.my)>Math.abs(I.mx)*.6)?Math.sign(I.my):0;f.clMv=f.state==='clinch'&&Math.abs(I.mx)>.4?Math.sign(I.mx):0;
+    f.mvIn=(f.state==='stand')?clamp(I.mx,-1,1):0;f.circ=(f.state==='stand'&&!I.block&&Math.abs(I.my)>.3&&Math.abs(I.my)>Math.abs(I.mx)*.6)?Math.sign(I.my)*clamp((Math.abs(I.my)-.3)/.55+.35,.35,1):0;f.stick=f.state==='stand'?Math.min(1,Math.hypot(I.mx,I.my)):0;/* analog: circling speed and step style follow how far the stick is pushed */f.clMv=f.state==='clinch'&&Math.abs(I.mx)>.4?Math.sign(I.mx):0;
     if(f.state==='stand')f.guard=I.block&&!(f.gBreak>0)?(I.my<-.5?'low':I.gtype||'high'):null;else if(gm)f.guard=I.block?'high':null;else f.guard=null;
     f.wantSprawl=I.block;
     const sdir=()=>I.my>.5?'up':I.my<-.5?'down':fwd>.5?'fwd':fwd<-.5?'back':null;

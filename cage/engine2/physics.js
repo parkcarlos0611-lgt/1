@@ -13,7 +13,7 @@
 (function(){const V=E2.V,B=E2.BONES,IDX=E2.IDX;
 const PH=E2.PH={substeps:3,iters:6,gravity:9.81,damp:.25,
   freq:{core:7,arm:8,finger:6,leg:9,toe:7},zeta:.55,
-  floorFric:.85,impactScale:1,strikeBoost:1.8,maxDv:3.5,strikerMass:{hand:3.2,foot:5.5,knee:7,elbow:3.5},minImpactSpeed:1.2,
+  floorFric:.85,walkSpeed:1.5,turnRate:7,arenaR:3.55,minGap:.62,impactScale:1,strikeBoost:1.8,maxDv:3.5,strikerMass:{hand:3.2,foot:5.5,knee:7,elbow:3.5},minImpactSpeed:1.2,
   toneRecover:2.0,koTone:.025};
 const CAPS=[['pelvis','spine3',.15,'body'],['spine3','spine5',.15,'body'],['spine5','neck1',.085,'body'],['neck1','head',.06,'head'],['head','headTop',.1,'head'],
   ['shoulderL','elbowL',.055,'arm'],['elbowL','wristL',.045,'arm'],['wristL','handL',.05,'arm'],['shoulderR','elbowR',.055,'arm'],['elbowR','wristR',.045,'arm'],['wristR','handR',.05,'arm'],
@@ -25,7 +25,7 @@ class Body{
     const F=k=>new Float32Array(n);this.x=F();this.y=F();this.z=F();this.vx=F();this.vy=F();this.vz=F();this.ox=F();this.oy=F();this.oz=F();
     this.tx=F();this.ty=F();this.tz=F();this.tvx=F();this.tvy=F();this.tvz=F();this.tone=F();this.fm=F();this.inv=F();this.r=F();this.grp=[];
     for(let i=0;i<n;i++){const b=B[i];this.inv[i]=1/b.m;this.r[i]=b.g==='finger'||b.g==='toe'?.008:Math.min(.045,b.r*.5);this.tone[i]=1;this.fm[i]=1;this.grp[i]=b.g}
-    this.t=0;this.clip=null;this.ko=false;this.base=this.lowGuard?E2.lowGuard():E2.guard();this.hits=[];
+    this.t=0;this.clip=null;this.mv={x:0,z:0};this.vxr=0;this.vzr=0;this.gph=0;this.ko=false;this.base=this.lowGuard?E2.lowGuard():E2.guard();this.hits=[];
     this.computeTarget(0,true);for(let i=0;i<n;i++){this.x[i]=this.tx[i];this.y[i]=this.ty[i];this.z[i]=this.tz[i]}
     this.buildConstraints();if(E2.skinInit)E2.skinInit(this)}
   /* ---- animation target ---- */
@@ -33,6 +33,11 @@ class Body{
   pose(dt){let p=this.base;const t=this.t;
     /* idle life: breathing, light bounce, hands circling a little */
     const br=Math.sin(t*1.6),bo=Math.sin(t*4.2);p=E2.blend(p,{spine3:[0,0,.012],spine5:[0,0,.012],shoulderL:[0,0,.04],shoulderR:[0,0,-.03],kneeL:[0,0,-.06],kneeR:[0,0,-.05],head:[0,0,-.02]},br*.5+bo*.5);
+    /* footwork: alternating steps from the root velocity, split into forward/back and lateral components so a
+       fighter can advance, retreat and circle (the steps follow the body's own facing) */
+    const sp=Math.hypot(this.vxr,this.vzr);if(sp>.05){this.gph+=sp*dt*7.5;const amp=Math.min(1,sp/1.1),Fx=Math.cos(this.yaw),Fz=-Math.sin(this.yaw);
+      const fv=(this.vxr*Fx+this.vzr*Fz)/sp,lv=(this.vxr*-Fz+this.vzr*Fx)*-1/sp;const sn=Math.sin(this.gph),cs=Math.cos(this.gph);
+      p=E2.blend(p,{hipL:E2.side('L',.16*lv*sn,0,.32*fv*sn),hipR:E2.side('R',-.16*lv*sn,0,-.32*fv*sn),kneeL:[0,0,-.55*Math.max(0,cs)],kneeR:[0,0,-.55*Math.max(0,-cs)],ankleL:[0,0,.25*Math.max(0,cs)],ankleR:[0,0,.25*Math.max(0,-cs)],spine3:[0,.05*fv*sn,0]},amp)}
     if(this.clip){const C=this.clip;C.t+=dt;if(C.t>=C.c.dur)this.clip=null;else p=E2.sampleClip(C.c,C.t,p)}return p}
   computeTarget(dt,init){const pose=this.pose(dt);const rt=pose.root||[0,0,0];/* root step along the facing direction */const fx=Math.cos(this.yaw),fz=-Math.sin(this.yaw);let fk=E2.fk(pose,{pos:V.n(this.cx+fx*rt[0],1.0+rt[1],this.cz+fz*rt[0]),yaw:this.yaw});
     /* stand on the mat: lowest foot point at floor level; keep the planted foot where it is during kicks */
@@ -75,7 +80,13 @@ class Body{
   /* forward direction of the body (from the pelvis / chest particles) */
   fwd(){const x=this.x,z=this.z;const a=IDX.hipL,b=IDX.hipR;const lx=x[a]-x[b],lz=z[a]-z[b];/* left → forward is a +90° turn about y */return V.norm(V.n(-lz,0,lx))}
   /* ---- simulation step ---- */
-  step(dt){this.t+=dt;this.computeTarget(dt);const S=PH.substeps,h=dt/S;for(let s=0;s<S;s++)this.sub(h);
+  /* root motion: input → velocity (accelerated), face the opponent, stay inside the cage, no overlap */
+  move(dt){const O=this.opp;let tx=0,tz=0;if(!this.ko){const m=Math.hypot(this.mv.x,this.mv.z);const k=m>1?1/m:1;const slow=this.clip?(this.clip.c.plant?0:.35):1;tx=this.mv.x*k*PH.walkSpeed*slow;tz=this.mv.z*k*PH.walkSpeed*slow}
+    const a=Math.min(1,dt*9);this.vxr+=(tx-this.vxr)*a;this.vzr+=(tz-this.vzr)*a;this.cx+=this.vxr*dt;this.cz+=this.vzr*dt;
+    const r=Math.hypot(this.cx,this.cz);if(r>PH.arenaR){this.cx*=PH.arenaR/r;this.cz*=PH.arenaR/r}
+    if(O&&!this.ko){const dx=O.cx-this.cx,dz=O.cz-this.cz,d=Math.hypot(dx,dz);if(d<PH.minGap&&d>1e-4&&!O.ko){const push=(PH.minGap-d)*.5;this.cx-=dx/d*push;this.cz-=dz/d*push;O.cx+=dx/d*push;O.cz+=dz/d*push}
+      if(!(this.clip&&this.clip.c.plant)){const want=Math.atan2(-dz,dx);let dy=want-this.yaw;dy=Math.atan2(Math.sin(dy),Math.cos(dy));this.yaw+=Math.max(-PH.turnRate*dt,Math.min(PH.turnRate*dt,dy))}}}
+  step(dt){this.t+=dt;this.move(dt);this.computeTarget(dt);const S=PH.substeps,h=dt/S;for(let s=0;s<S;s++)this.sub(h);
     for(let i=0;i<this.n;i++){const tn=this.ko?PH.koTone:1;this.tone[i]+=(tn-this.tone[i])*Math.min(1,PH.toneRecover*dt)}
     if(E2.skinStep)E2.skinStep(this,dt)}
   sub(h){const n=this.n,x=this.x,y=this.y,z=this.z,vx=this.vx,vy=this.vy,vz=this.vz;const g=PH.gravity,Z=PH.zeta;

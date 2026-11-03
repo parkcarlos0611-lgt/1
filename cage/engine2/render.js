@@ -79,6 +79,7 @@ E2.Camera=class{constructor(){this.yaw=-.62;this.pitch=.1;this.dist=3.1;this.tar
 /* ---- materials & lighting ---- */
 const hex=h=>{const c=parseInt(h.slice(1),16);return[(c>>16)&255,(c>>8)&255,c&255]};
 function matColor(b,m){const L=b.look||{};return m==='skin'?L.skin||[196,140,104]:m==='shorts'?L.shorts||[40,40,46]:m==='band'?L.band||[230,230,230]:m==='glove'?[24,24,28]:m==='strap'?hex(b.corner||'#c41010'):[200,200,200]}
+E2.buildSurface=buildSurface;
 E2.draw=function(ctx,cam,bodies,o){o=o||{};const quads=[];const camPos=cam.pos;const keyL=V.norm(V.add(V.add(V.sc(cam.r,-.45),V.n(0,.85,0)),V.sc(cam.f,-.4)));const rimL=V.norm(V.add(V.sc(cam.f,.85),V.n(0,.35,0)));
   for(const b of bodies){if(!b._skinReady)buildSurface(b);const X=b.vx3,N=b.vn3;const P=new Array(b.nv);for(let i=0;i<b.nv;i++)P[i]=cam.proj(V.n(X[i*3],X[i*3+1],X[i*3+2]));
     const shade=new Float32Array(b.nv);const spec=new Float32Array(b.nv);

@@ -329,4 +329,12 @@ if(typeof MV!=='undefined'&&MV.ovh){const o=MV.ovh;const k=1.32;o.dur=+(o.dur*k)
     return oh.call(this,att,def,act,zone,p)}}
 
 {const fd=F2.prototype.draw;F2.prototype.draw=function(ctx,o){if(this.body)this.body._striking=!!(this.act&&this.act.c&&this.act.c.hit);return fd.call(this,ctx,o)}}
+
+/* ---------- lead-hand attacks: 10 % less damage and 5 % quicker than the matching rear-hand attack;
+   a lead power straight for the jab button's right swipe ---------- */
+if(typeof MV!=='undefined'){const timeK=(c,k)=>{c.dur=+(c.dur*k).toFixed(3);c.keys=c.keys.map(([t,p,e])=>e?[+(t*k).toFixed(3),p,e]:[+(t*k).toFixed(3),p]);if(c.hit)c.hit=Object.assign({},c.hit,{t0:+(c.hit.t0*k).toFixed(3),t1:+(c.hit.t1*k).toFixed(3)})};
+  const lead=(L,R)=>{const a=MV[L],b=MV[R];if(!a||!b||!a.hit||!b.hit)return;timeK(a,(b.dur/1.05)/a.dur);a.hit=Object.assign({},a.hit,{dmg:+(b.hit.dmg*.9).toFixed(2)})};
+  if(MV.jab&&MV.cross&&!MV.lstr){const j=JSON.parse(JSON.stringify(MV.jab));j.n='앞손 스트레이트';j.keys=j.keys.map(k=>{const p=k[1];if(p&&(p.la_s!=null&&p.la_s>1.2)){p.tw=(p.tw||0)-.25;p.lean=(p.lean||0)+.08;p.x=(p.x||0)+.05}return k});
+    j.hit=Object.assign({},j.hit,{dmg:+(MV.cross.hit.dmg*.9).toFixed(2),sta:+((MV.cross.hit.sta||4)*.9).toFixed(2)});j.lunge=Math.max(j.lunge||0,.08);MV.lstr=j;timeK(MV.lstr,(MV.cross.dur/1.05)/MV.lstr.dur)}
+  lead('lhook','rhook');lead('lupp','rupp');lead('blhook','brhook');if(typeof KEYN!=='undefined')KEYN.lstr='앞손 스트레이트'}
 })();

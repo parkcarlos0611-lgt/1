@@ -988,7 +988,7 @@ class In2{
       <button data-a="td" class="b3 btd"><b>🤼</b><small>테이크다운</small></button>
       <button data-a="clinch" class="b3 bcl"><b>🔗</b><small>클린치</small></button>
       <button data-a="punch" class="b3 bpu"><b>💥</b><small>펀치</small><i class="sw sl">훅</i><i class="sw sr">어퍼</i><i class="sw su">오버</i><i class="sw sd">바디</i></button>
-      <button data-a="jab" class="b3 bja"><b>👊</b><small>잽</small></button>
+      <button data-a="jab" class="b3 bja"><b>👊</b><small>잽</small><i class="sw sl">앞손 훅</i><i class="sw sr">앞손 스트</i></button>
       <button data-a="kick" class="b3 bki"><b>🦵</b><small>킥</small><i class="sw sl">하이</i><i class="sw sr">로우</i><i class="sw su">카프</i><i class="sw sd">니킥</i></button>
       <button data-a="block" class="b3 bbl"><b>🛡</b><small>블록</small><i class="sw sl">어퍼</i><i class="sw sr">훅·하이</i><i class="sw sd">체크</i></button>
     </div>`;
@@ -999,15 +999,15 @@ class In2{
       const ux=L?dx/L*m:0,uy=L?-dy/L*m:0;this.tmx=Math.abs(ux)>.2?ux:0;this.tmy=Math.abs(uy)>.35?uy:0}},{passive:false});
     const end=e=>{for(const t of e.changedTouches){if(t.identifier!==id)continue;id=null;this.tmx=null;knob.style.transform='';base.classList.remove('on')}};z.addEventListener('touchend',end);z.addEventListener('touchcancel',end);
     const vib=()=>{if(navigator.vibrate)try{navigator.vibrate(8)}catch(_){}};
-    for(const b of tc.querySelectorAll('[data-a]')){const a=b.dataset.a;let sx=0,sy=0,sid=null,fired=false;const sw=()=>(a==='punch'||a==='kick'||a==='block')&&this.mode!=='ground'&&this.mode!=='clinch';
+    for(const b of tc.querySelectorAll('[data-a]')){const a=b.dataset.a;let sx=0,sy=0,sid=null,fired=false;const sw=()=>(a==='punch'||a==='kick'||a==='block'||a==='jab')&&this.mode!=='ground'&&this.mode!=='clinch';
       b.addEventListener('touchstart',e=>{e.preventDefault();const t=e.changedTouches[0];sid=t.identifier;sx=t.clientX;sy=t.clientY;fired=false;b.classList.add('on');vib();
-        if(a==='block'){this.tblock=true;this.tgtype='high';this.ev.push('blockp')}else if((a==='punch'||a==='kick')&&sw()){/* decided on move / release */}else this.ev.push(a==='punch'?'punch:straight':a)},{passive:false});
+        if(a==='block'){this.tblock=true;this.tgtype='high';this.ev.push('blockp')}else if((a==='punch'||a==='kick'||a==='jab')&&sw()){/* decided on move / release */}else this.ev.push(a==='punch'?'punch:straight':a)},{passive:false});
       b.addEventListener('touchmove',e=>{e.preventDefault();if(!sw())return;for(const t of e.changedTouches){if(t.identifier!==sid)continue;const dx=t.clientX-sx,dy=t.clientY-sy;
         if(a==='block'){if(Math.max(Math.abs(dx),Math.abs(dy))>18){const h=Math.abs(dx)>=Math.abs(dy);this.tgtype=h?(dx<0?'upp':'hook'):(dy>0?'low':'high');b.classList.toggle('swl',h&&dx<0);b.classList.toggle('swr',h&&dx>0);b.classList.toggle('swd',!h&&dy>0)}continue}
         if(fired||Math.max(Math.abs(dx),Math.abs(dy))<22)continue;fired=true;const h=Math.abs(dx)>=Math.abs(dy);
-        if(a==='punch')this.ev.push('punch:'+(h?(dx<0?'hook':'upper'):(dy<0?'over':'body')));else this.ev.push('kick:'+(h?(dx<0?'high':'low'):(dy<0?'calf':'knee')));
+        if(a==='jab')this.ev.push(h?(dx<0?'jab:hook':'jab:str'):'jab');else if(a==='punch')this.ev.push('punch:'+(h?(dx<0?'hook':'upper'):(dy<0?'over':'body')));else this.ev.push('kick:'+(h?(dx<0?'high':'low'):(dy<0?'calf':'knee')));
         b.classList.add(h?(dx<0?'swl':'swr'):(dy<0?'swu':'swd'))}},{passive:false});
-      const up=e=>{e.preventDefault();if(a==='block'){this.tblock=false;this.tgtype=null}if((a==='punch'||a==='kick')&&sw()&&!fired)this.ev.push(a==='punch'?'punch:straight':'kick:mid');b.classList.remove('on','swl','swr','swu','swd')};b.addEventListener('touchend',up);b.addEventListener('touchcancel',up)}}
+      const up=e=>{e.preventDefault();if(a==='block'){this.tblock=false;this.tgtype=null}if((a==='punch'||a==='kick'||a==='jab')&&sw()&&!fired)this.ev.push(a==='punch'?'punch:straight':a==='jab'?'jab':'kick:mid');b.classList.remove('on','swl','swr','swu','swd')};b.addEventListener('touchend',up);b.addEventListener('touchcancel',up)}}
 }
 
 /* ===== m_ai.js : CPU fighter (style-based range control, reactions, combos, grappling, submissions) ===== */
@@ -1139,7 +1139,7 @@ class Match{
       if(e==='clinch'){if(f.state==='stand')this.clinch(f);continue}if(e==='escape')continue;
       if(e==='td'){if(f.opp.down&&!f.opp.down.ko)this.pounce(f);else if(f.state==='stand')this.shoot(f);continue}
       const low=I.my<-.5,high=I.my>.5;let key=null;
-      if(e==='jab')key='jab';
+      if(e==='jab')key='jab';else if(e==='jab:hook')key='lhook';else if(e==='jab:str')key='lstr';
       else if(e.startsWith('punch:')){const t=e.slice(6);const lead=['jab','lhook','lupp','bjab','blhook'].includes(f.lastKey);
         key=t==='hook'?(lead?'rhook':'lhook'):t==='upper'?(lead?'rupp':'lupp'):t==='over'?'ovh':t==='body'?(f.lastKey==='bcross'?'blhook':'bcross'):'cross'}
       else if(e.startsWith('kick')){const t=e.slice(5)||'mid';key=t==='high'?'rhk':t==='low'?'rlk':t==='calf'?'calf':t==='knee'?'knee':'rbk'}

@@ -27,7 +27,7 @@ if(typeof MR!=='undefined')MR.limbShade=0;
 /* calm a saturated colour a little toward neutral so kit colours sit with the soft palette */
 const calm=c=>{try{const[r,g,b]=rgbOf(c);const m=(r+g+b)/3;const k=.18;return`rgb(${Math.round(r+(m-r)*k)},${Math.round(g+(m-g)*k)},${Math.round(b+(m-b)*k)})`}catch(e){return c}};
 /* every flat shape gets softly rounded corners (radius in world metres, limited by the adjacent edges) */
-let ROUND=.08;/* as round as the shape allows: corners are no longer visible */
+let ROUND=.12;/* as round as the shape allows: corners are no longer visible */
 function rpath(ctx,P,R){const n=P.length;if(n<3||R<=0){ctx.moveTo(P[0].x,P[0].y);for(let i=1;i<n;i++)ctx.lineTo(P[i].x,P[i].y);ctx.closePath();return}
   const m=(a,b)=>({x:(a.x+b.x)/2,y:(a.y+b.y)/2});const s0=m(P[n-1],P[0]);ctx.moveTo(s0.x,s0.y);
   for(let i=0;i<n;i++){const a=P[(i+n-1)%n],b=P[i],c=P[(i+1)%n];const r=Math.min(R,.5*Math.hypot(b.x-a.x,b.y-a.y),.5*Math.hypot(c.x-b.x,c.y-b.y));const e=m(b,c);if(r>1e-5)ctx.arcTo(b.x,b.y,e.x,e.y,r);else ctx.lineTo(b.x,b.y)}ctx.closePath()}
@@ -40,7 +40,7 @@ const ngon=(ctx,c,r,col,n)=>{n=n||8;ctx.fillStyle=col;ctx.beginPath();for(let i=
 function frame(a,b,d){const dx=b.x-a.x,dy=b.y-a.y,L=Math.hypot(dx,dy)||1e-5;const ux=dx/L,uy=dy/L;let nx=-uy,ny=ux;const f=nx*d+ny*.35;if(f<0){nx=-nx;ny=-ny}return{ux,uy,nx,ny,L}}
 /* angular limb: profile rows [t, frontHalfWidth, backHalfWidth] → one flat polygon + a back/underside shadow plane */
 function limb(ctx,a,b,d,rows,col,shCol,extra){const F=frame(a,b,d);const P=(t,w)=>({x:a.x+F.ux*F.L*t+F.nx*w,y:a.y+F.uy*F.L*t+F.ny*w});
-  const front=rows.map(r=>P(r[0],r[1])),back=rows.map(r=>P(r[0],-r[2]));poly(ctx,front.concat(back.slice().reverse()),col,ROUND*1.6);/* outline of the limb: extra round */
+  const front=rows.map(r=>P(r[0],r[1])),back=rows.map(r=>P(r[0],-r[2]));poly(ctx,front.concat(back.slice().reverse()),col,ROUND*2.2);/* outline of the limb: extra round */
   /* rounded joint ends: the limb meets its neighbour with a smooth round cap instead of a hard corner */
   if(!(extra&&extra.noCaps)){const r0=rows[0],r1=rows[rows.length-1];circ(ctx,P(r0[0],(r0[1]-r0[2])/2),(r0[1]+r0[2])/2,col);circ(ctx,P(r1[0],(r1[1]-r1[2])/2),(r1[1]+r1[2])/2,col)}
   if(shCol){const mid=rows.map(r=>P(r[0],-r[2]*(extra&&extra.shadowFrom!=null?extra.shadowFrom:.12)));poly(ctx,mid.concat(back.slice().reverse()),shCol)}
@@ -129,7 +129,7 @@ function torsoFlat(ctx,J,H,M,sk,d,lk,B){const sp=[J.hip,J.mid,J.sh,J.nk];const s
   const FR=[[0,.074+bel*.3],[.16,.073+bel*.8],[.32,.071+bel],[.48,.07+bel*.7],[.6,.08],[.7,.096*shb],[.79,.099*shb],[.87,.088*shb],[.94,.062],[1,.036]];
   const BK=[[0,.09],[.1,.086],[.24,.066+bel*.3],[.38,.061+bel*.2],[.52,.071],[.66,.085*shb],[.78,.093*shb],[.88,.087*shb],[.95,.066],[1,.045]];
   const F=FR.map(([s,w])=>pt(s,w)),Bk=BK.map(([s,w])=>pt(s,-w));
-  poly(ctx,F.concat(Bk.slice().reverse()),sk.base,ROUND*1.6);
+  poly(ctx,F.concat(Bk.slice().reverse()),sk.base,ROUND*2.2);
   /* lats / spine side: shadow plane on the back */
   poly(ctx,BK.map(([s,w])=>pt(s,-w*.32)).concat(Bk.slice().reverse()),sk.sh);
   /* trapezius slope + clavicle line */poly(ctx,[pt(.9,-.08),pt(1,-.045),pt(1,.0),pt(.93,-.02)],sk.sh);
@@ -169,7 +169,7 @@ function shortsFold(ctx,J,M,col,d,nS){/* the fold where the thigh bends against 
   poly(ctx,[P(-.04,.078),P(.14,.08),P(.05,.05)],shade(col,-.2))}
 function drawGloveFlat(ctx,E,Wr,G,H,col,strap,open,blood,d,skinC,plain){const a=Math.atan2(G.y-Wr.y,G.x-Wr.x);ctx.save();ctx.translate(Wr.x,Wr.y);ctx.rotate(a);
   /* local frame: +x toward the knuckles; flip so the thumb sits on the top / facing side */
-  const flip=(Math.cos(a)*d>=0)?1:-1;ctx.scale(1,flip);const r=.036*H;const P=(pts,c)=>{ctx.fillStyle=c;ctx.beginPath();rpath(ctx,pts.map(q=>({x:q[0]*r,y:q[1]*r})),r*.7);ctx.fill()};
+  const flip=(Math.cos(a)*d>=0)?1:-1;ctx.scale(1,flip);const r=.036*H;const P=(pts,c)=>{ctx.fillStyle=c;ctx.beginPath();rpath(ctx,pts.map(q=>({x:q[0]*r,y:q[1]*r})),r*.95);ctx.fill()};
   P([[-.95,-.62],[-.95,.62],[.15,.7],[.15,-.7]],col);/* cuff */
   P([[-.92,.62],[-.92,.36],[.12,.42],[.12,.68]],strap);/* cuff strap in corner colour */
   P([[.05,-.92],[.05,.9],[1.05,1.0],[1.55,.78],[1.72,.25],[1.68,-.55],[1.35,-.95]],col);/* knuckle block */
@@ -195,7 +195,7 @@ function headFlat(ctx,hd,nk,H,B,skin,d,ang){const lk=B.look,r=.066*H;ctx.save();
   /* cranium + face profile (straight facets) */
   const nl=F.n||.5,jw=F.jw||.5,ch=F.ch||.5,br=F.br||.5,nf=F.nf||0,lp=F.lp||.5;const tip=[1.12+nl*.1-nf*.06,-.13-nl*.03];
   const prof=[[-.6,-.48],[-.92,-.2],[-1.0,.3],[-.88,.78],[-.5,1.08],[.1,1.16],[.56,1.04],[.82,.74],[.9,.5],[.94+br*.05,.32],[.86,.19],[.9+(F.nh||0)*.06,.08],[.95+(F.nh||0)*.1,-.02],tip,[tip[0]-.12,-.25],[.96,-.28],[1.0+lp*.05,-.35],[.94,-.43],[.99+lp*.05,-.5],[.92,-.58],[.96+ch*.07,-.7],[.93+ch*.05,-.86],[.7,-.94-jw*.03],[.3,-.9-jw*.05],[-.08-jw*.1,-.86],[-.3-jw*.08,-.62]];
-  P(prof,sk,.16);
+  P(prof,sk,.22);
   /* face planes: cheek / temple shadow, jaw underside, lit cheekbone + brow */
   P([[.25,-.05],[.62,-.2],[.68,-.55],[.45,-.82],[.08,-.62]],sh);
   P([[-.34,-.6],[-.12,-.8],[.25,-.92],[.6,-.98],[.9,-.88],[.7,-.82],[.2,-.78],[-.15,-.6]],shade(sk,-.2));
@@ -291,17 +291,8 @@ Stage.prototype.drawFx=function(dt){const ctx=this.ctx;this.worldT(ctx);ctx.save
     if(p.kind==='blood')shard(ctx,p.x,p.y,a,p.r*(1.4+sp*.25),p.r*.8,FX.blood);
     else{ctx.globalAlpha=Math.min(1,p.life*2)*.85;shard(ctx,p.x,p.y,a,p.r*(1.2+sp*.15),p.r*.6,FX.sweat);ctx.globalAlpha=1}}
   this.parts=this.parts.filter(p=>p.life>0&&p.y>-0.2);
-  /* impact: a quick solid burst (scaled by power), a few flat shards flying out, speed streaks along the punch */
-  this.fx=(this.fx||[]).filter(f=>(f.t+=dt)<.32);for(const f of this.fx){const k=Math.max(0,Math.min(1,f.t/.32)),e=1-k;const P=Math.max(.7,f.pow)*1.4;
-    /* pop: a solid white disc for the first frames */if(f.t<.05){ctx.globalAlpha=1-f.t/.05;ctx.fillStyle='#ffffff';ctx.beginPath();ctx.arc(f.x,f.y,.06*P,0,7);ctx.fill();ctx.globalAlpha=1}
-    /* expanding flat ring */{const r=(.05+k*.32)*P;ctx.globalAlpha=e*.9;ctx.strokeStyle=FX.sparkSh;ctx.lineWidth=.022*P*e+.003;ctx.beginPath();ctx.ellipse(f.x,f.y,r,r*.85,0,0,7);ctx.stroke();ctx.globalAlpha=1}
-    if(f.t<.17){const q=Math.max(0,f.t)/.17;burstPoly(ctx,f.x,f.y,(.028+q*.035)*P,(.085+q*.07)*P*(1-q*.35),8,f.sp,FX.sparkSh);burstPoly(ctx,f.x,f.y,(.018+q*.024)*P,(.06+q*.05)*P*(1-q*.4),8,f.sp+.2,FX.spark)}
-    ctx.globalAlpha=e;for(let i=0;i<9;i++){const a=f.sp*1.7+i/9*Math.PI*2;const r=(.07+k*.24)*P*(.8+.4*((i*7)%3)/2);shard(ctx,f.x+Math.cos(a)*r,f.y+Math.sin(a)*r,a,.04*P*e+.008,.007*P,i%2?FX.spark:FX.sparkSh)}
-    if(f.dir)for(let i=-2;i<=2;i++){const y=f.y+i*.03*P,x0=f.x+f.dir*(.03+k*.1);ctx.fillStyle=FX.spark;ctx.beginPath();ctx.moveTo(x0,y-.005);ctx.lineTo(x0+f.dir*(.18+.08*P)*(1-Math.abs(i)*.22),y+i*.012);ctx.lineTo(x0,y+.005);ctx.closePath();ctx.fill()}
-    ctx.globalAlpha=1}
-  /* crit shock (from the impact manager): flat expanding octagon outline + shards, drawn here so no glow pass runs */
-  if(this.ifx&&this.ifx.length){this._cfx=(this._cfx||[]).concat(this.ifx);this.ifx=[]}const L=this._cfx=(this._cfx||[]).filter(e=>e.t<.4);if(L.length){for(const e of L){e.t+=dt;const k=e.t/.4;if(k>=1)continue;const r=.08+k*.65;ctx.globalAlpha=1-k;ctx.strokeStyle=FX.spark;ctx.lineWidth=.03*(1-k)+.005;ctx.beginPath();for(let i=0;i<=8;i++){const a=i/8*Math.PI*2+.39;const px=e.x+Math.cos(a)*r,py=e.y+Math.sin(a)*r*.8;i?ctx.lineTo(px,py):ctx.moveTo(px,py)}ctx.stroke();
-      for(const s of e.sp)shard(ctx,e.x+Math.cos(s.a)*r*.9*s.v,e.y+Math.sin(s.a)*r*.9*s.v,s.a,.07*(1-k)+.01,.01,FX.spark);ctx.globalAlpha=1}}
+  /* strike flashes removed: the struck body part jiggles instead (see Body draw) */
+  this.fx=[];this.ifx=[];this._cfx=[];this.scrFlash=0;this.gpuFlash=0;
   ctx.restore()};
 if(typeof IFX!=='undefined'){IFX.ring.life=.28}
 
@@ -408,4 +399,12 @@ window.drawRefSide=function(ctx0,r,t){let ctx=ctx0;if(window.__gpuFig&&ctx0.canv
    Q([Hp(.33,-.25),Hp(.41,-.245),Hp(.41,-.26),Hp(.33,-.265)],shade(skin,-.45))}
   drawArm(false);
   ctx.restore()};
+
+/* ---------- hit jiggle: the struck part shakes briefly (damped, ~22 Hz) ---------- */
+const JIG_K={head:['hd','nk'],body:['sh','mid','lS','rS','nk'],legL:['lK','lA','lHe','lT','lSn'],legR:['rK','rA','rHe','rT','rSn']};
+{const D=Body.prototype.draw;Body.prototype.draw=function(ctx,o){const g=this._jig;if(!g||!this.J.hd)return D.call(this,ctx,o);const age=(performance.now()-g.t0)/1000;if(age>.4){this._jig=null;return D.call(this,ctx,o)}
+    const k=g.a*Math.exp(-age*9)*Math.sin(age*2*Math.PI*22),J=this.J,save={};const keys=JIG_K[g.z]||JIG_K.body;
+    keys.forEach((n,i)=>{const q=J[n];if(!q)return;save[n]=q;const w=n==='nk'||n==='mid'?.55:1;J[n]={x:q.x+k*g.dx*w,y:q.y+k*.35*w}});
+    try{return D.call(this,ctx,o)}finally{for(const n in save)J[n]=save[n]}}}
+window.hitJiggle=function(body,zone,amp,dir,leg){body._jig={z:zone==='head'?'head':zone==='leg'?(leg==='r'?'legR':'legL'):'body',t0:performance.now(),a:amp,dx:dir||1}};
 })();

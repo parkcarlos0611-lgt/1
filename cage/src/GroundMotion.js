@@ -168,4 +168,15 @@ if(typeof MR!=='undefined'){MR.idle=.55;MR.variety=.75}
 
 /* stronger hit feel: longer hitstop, more shake / zoom on every tier */
 if(typeof IFX!=='undefined'){const T=IFX.tiers;for(const k in T){T[k].hs+=1;T[k].shake*=1.4;T[k].zoom*=1.35}}
+
+/* ---------- hits: jiggle the struck part; kicks land where the leg visibly meets the body ---------- */
+{const oh=Match.prototype.onHit;Match.prototype.onHit=function(att,def,act,zone,p){const h=act.c.hit;const kick=h.kind==='kick'||h.kind==='knee';
+    if(kick&&def.body.J.hd&&this.strikeBox&&this.hurtBoxes){const sb=this.strikeBox(att,act);if(sb){let best=null;
+        const cp=(a,b,q)=>{const dx=b.x-a.x,dy=b.y-a.y,L=dx*dx+dy*dy||1e-9;const t=clamp(((q.x-a.x)*dx+(q.y-a.y)*dy)/L,0,1);return{x:a.x+dx*t,y:a.y+dy*t}};
+        for(const hb of this.hurtBoxes(def)){if(zone&&hb.z!==zone&&best)continue;for(let i=0;i<=8;i++){const s0={x:sb.a.x+(sb.b.x-sb.a.x)*i/8,y:sb.a.y+(sb.b.y-sb.a.y)*i/8};const c=cp(hb.a,hb.b,s0);const dd=Math.hypot(s0.x-c.x,s0.y-c.y)-hb.r*.8;if(!best||dd<best.dd)best={dd,s:s0,c,hb}}}
+        if(best){/* contact point on the body surface; close a visible gap by stepping the kicker in a little */const nx=(best.s.x-best.c.x),ny=(best.s.y-best.c.y),nl=Math.hypot(nx,ny)||1;p={x:best.c.x+nx/nl*best.hb.r*.8,y:best.c.y+ny/nl*best.hb.r*.8};
+          if(best.dd>0)att.x+=att.d*Math.min(.1,best.dd);}}}
+    const r=oh.call(this,att,def,act,zone,p);
+    const dmg=(h.dmg||5);if(typeof hitJiggle==='function'&&def.body)hitJiggle(def.body,zone,Math.min(.035,.008+dmg*.0018)*def.H,att.d,(h.pt||'')[0]==='r'?'r':'l');
+    return r}}
 })();

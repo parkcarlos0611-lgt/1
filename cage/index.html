@@ -416,7 +416,7 @@ function mixHex(a,b,t){const A=rgbOf(a),B=rgbOf(b);return`rgb(${A.map((x,i)=>Mat
 /* ---- 2-bone arm IK: put fighter F's hand (side 'la'|'ra') on world point T by editing pose P ---- */
 function armIK(F,P,side,T){const J=F.body.J,S=J[side==='la'?'lS':'rS'];if(!S||!T)return;const L=F.body.L,L1=L.uarm,L2=L.farm+L.glove*.8,d=F.d||1;
   const vx=(T.x-S.x)*d,vy=T.y-S.y;let D=Math.hypot(vx,vy);D=clamp(D,(L1+L2)*.25,(L1+L2)*.985);const th=Math.atan2(vx,-vy);
-  const a=Math.acos(clamp((L1*L1+D*D-L2*L2)/(2*L1*D),-1,1)),b=Math.acos(clamp((L1*L1+L2*L2-D*D)/(2*L1*L2),-1,1));const ta=(P.lean||0)+(P.chest||0)+(P.rot||0);
+  const a=Math.acos(clamp((L1*L1+D*D-L2*L2)/(2*L1*D),-1,1)),b=Math.acos(clamp((L1*L1+L2*L2-D*D)/(2*L1*L2),-1,1));const ta=(P.lean||0)+(P.chest||0)-(P.rot||0);/* solve() rotates the finished skeleton by -rot: local = world + rot */
   P[side+'_s']=th-a-ta;P[side+'_e']=Math.PI-b;P[side==='la'?'lo':'ro']=1}
 /* ---- referee drawn facing the camera (front view, flat style) ---- */
 function drawRefFront(ctx,r,t){const H=1.62,x=r.x,mv=Math.min(1,Math.abs(r.vx||0)*2),ph=(r.stepPh||0);const skin='#d9a882',dk='#1c1c1e',shirt='#f2f2f2';
@@ -1347,10 +1347,10 @@ class Match{
     const cx=g&&g.type==='ground'?g.ax+g.d*.3:(a.x+b.x)/2;S.follow(dt,cx,Math.abs(a.x-b.x),!!ground);if(this.cer){S.cam.w+=(4.4-S.cam.w)*Math.min(1,dt*1.5);S.cam.x+=(.1-S.cam.x)*Math.min(1,dt*2);S.cam.gy=.9}else if(this.outro&&this.outro.stage==='fall'){const L=this.winner&&this.winner.opp;if(L){S.cam.w+=(6-S.cam.w)*Math.min(1,dt*1.2)}}
     ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,S.cv.width,S.cv.height);S.drawBack();
     // referee in back plane
-    S.worldT(ctx);if(this.cer){ctx.save();ctx.translate(this.ref.x,0);ctx.scale(.9,.9);ctx.translate(-this.ref.x,0);drawRefFront2(ctx,this.ref,S.t);ctx.restore()}else{ctx.save();ctx.translate(this.ref.x,.12);ctx.scale(.87,.87);ctx.translate(-this.ref.x,0);ctx.filter='brightness(.86)';drawRefFront2(ctx,this.ref,S.t);ctx.restore();ctx.filter='none'}
+    S.worldT(ctx);if(this.cer)drawRefFront2(ctx,this.ref,S.t);else if(typeof drawRefSide==='function')drawRefSide(ctx,this.ref,S.t);else drawRefFront2(ctx,this.ref,S.t);
     // fighters: bottom/defender first
-    let order=[a,b];if(g&&g.type==='ground')order=GPOS[g.pos].same?[g.top,g.bot]:[g.bot,g.top];else if(g&&g.type==='clinch')order=[g.def,g.att];else if(this.pi!=null)order=[this.f[1-this.pi],this.f[this.pi]];
-    for(const f of order){if(f.hitF>0){ctx.filter=`brightness(${(1+f.hitF*5).toFixed(2)}) saturate(.7)`;f.hitF-=dt}f.draw(ctx,{corner:f.corner});ctx.filter='none';this.drawTrail(ctx,f)}if(this.showBoxes)this.drawBoxes(ctx);
+    let order=[a,b];if(g&&g.type==='ground'&&g.sub)order=g.sub.cat==='rnc'?[g.sub.att,g.sub.def]:[g.sub.def,g.sub.att];else if(g&&g.type==='ground')order=GPOS[g.pos].same?[g.top,g.bot]:[g.bot,g.top];else if(g&&g.type==='clinch')order=[g.def,g.att];else if(this.pi!=null)order=[this.f[1-this.pi],this.f[this.pi]];
+    for(const f of order){if(f.hitF>0){ctx.filter=`brightness(${(1+f.hitF*5).toFixed(2)}) saturate(.7)`;f.hitF-=dt}f.draw(ctx,{corner:f.corner});ctx.filter='none';this.drawTrail(ctx,f)}if(g&&g.sub&&/초크/.test(g.sub.name))g.sub.att.draw(ctx,{corner:g.sub.att.corner,onlyArm:1});/* choking arm drawn over the defender's neck */if(this.showBoxes)this.drawBoxes(ctx);
     S.drawFx(dt);S.vig=this.pi!=null&&this.f[this.pi].rock>0?.35:0;
     const O=this.outro;if(O){let al=0;if(O.stage==='fade')al=Math.min(1,O.t/(O.dec?1.4:1.0));else if(O.stage==='cer')al=Math.max(0,1-O.t/.9);else if(O.stage==='fall')al=0;if(al>0){ctx.setTransform(1,0,0,1,0,0);ctx.fillStyle=`rgba(0,0,0,${al})`;ctx.fillRect(0,0,S.cv.width,S.cv.height)}
       if(O.stage==='fall'){ctx.setTransform(1,0,0,1,0,0);const k=Math.min(1,O.t/.4)*.35;ctx.fillStyle=`rgba(0,0,0,${k})`;const h=S.cv.height*.11;ctx.fillRect(0,0,S.cv.width,h);ctx.fillRect(0,S.cv.height-h,S.cv.width,h)}}}
@@ -2472,5 +2472,5 @@ function fightWeek(){const P=GG.P,nx=P.next;if(!nx)return;const o=GG.F[nx.opp];c
   step0()}
 if(document.readyState==='loading')window.addEventListener('DOMContentLoaded',titleScreen);else titleScreen();
 </script>
-<script src="src/Tuning.js"></script><script src="src/FootPlant.js"></script><script src="src/Arena.js"></script><script src="src/Ragdoll2D.js"></script><script src="src/JudgeRefereeSystem.js"></script><script src="src/CombatEngine.js"></script><script src="src/CombatPacingEngine.js"></script><script src="src/ImpactFeedbackManager.js"></script><script src="src/GraphicsRenderer.js"></script><script src="src/UIManager.js"></script><script src="src/ArenaRenderer.js"></script><script src="src/RefereeModel.js"></script><script src="src/MotionPhysics.js"></script><script src="src/MotionRealism.js"></script><script src="src/AttackMotions.js"></script><script src="src/DebugLayer.js"></script><script src="src/GPURenderer.js"></script><script src="src/CareerManager.js"></script><script src="src/FlatStyle.js"></script>
+<script src="src/Tuning.js"></script><script src="src/FootPlant.js"></script><script src="src/Arena.js"></script><script src="src/Ragdoll2D.js"></script><script src="src/JudgeRefereeSystem.js"></script><script src="src/CombatEngine.js"></script><script src="src/CombatPacingEngine.js"></script><script src="src/ImpactFeedbackManager.js"></script><script src="src/GraphicsRenderer.js"></script><script src="src/UIManager.js"></script><script src="src/ArenaRenderer.js"></script><script src="src/RefereeModel.js"></script><script src="src/MotionPhysics.js"></script><script src="src/MotionRealism.js"></script><script src="src/AttackMotions.js"></script><script src="src/DebugLayer.js"></script><script src="src/GPURenderer.js"></script><script src="src/CareerManager.js"></script><script src="src/FlatStyle.js"></script><script src="src/GroundMotion.js"></script>
 </body></html>

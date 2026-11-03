@@ -26,7 +26,7 @@ function ik2(h,a,L1,L2,kd){/* knee position for hip h, ankle a; kd = preferred s
   return((k1.x-k2.x)*kd>=0?k1:k2)}
 Body.prototype.plantFeet=function(p){if(!FP.on||this.rag||p.free)return;const J=this.J,L=this.L,H=this.H,d=this.d||1;if(!J.hip||J.hip.y<FP.minHip*H)return;
   const legs=[['l','lH','lK','lA','lHe','lT'],['r','rH','rK','rA','rHe','rT']];const leadSide='l';/* l* joints are always the lead leg (see Body.draw) */
-  const info=legs.map(([s,h,k,a,he,t])=>{const lo=Math.min(J[he].y,J[t].y);const w=clamp((FP.releaseDist*H-lo)/((FP.releaseDist-FP.plantDist)*H),0,1);return{s,h,k,a,he,t,w,lo}});
+  const info=legs.map(([s,h,k,a,he,t])=>{const lo=Math.min(J[he].y,J[t].y);const sw=this._swing&&this._swing[s]||0;/* a leg in the swing phase of a walk is not a support leg */const w=clamp((FP.releaseDist*H-lo)/((FP.releaseDist-FP.plantDist)*H),0,1)*(1-sw);return{s,h,k,a,he,t,w,lo}});
   /* targets: toe keeps its x; sole flat-ish on the mat */
   const Lf=L.foot;for(const g of info){if(g.w<=0)continue;const hl=(g.s===leadSide?FP.leadHeel:FP.rearHeel)*H;const tx=J[g.t].x;const hx=tx-d*Math.sqrt(Math.max(1e-6,Lf*Lf-hl*hl));
     g.toe={x:tx,y:0};g.heel={x:hx,y:hl};const fx=(g.toe.x-g.heel.x)/Lf,fy=(g.toe.y-g.heel.y)/Lf;g.ank={x:g.heel.x+fx*.25*Lf-fy*d*L.ank,y:g.heel.y+fy*.25*Lf+fx*d*L.ank}}

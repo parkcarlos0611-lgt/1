@@ -809,7 +809,7 @@ class F2{
     if(this.hm){const g=MV[this.hm].keys[0][1];for(const k in g)b[k]=g[k]}
     return b}
   /* boxer footwork: step-drag driven by the real body speed (walking, lunges, knock-back), strike step-ins, idle bounce */
-  footwork(p,dt){if(!(dt>0))return;const px=this._fx==null?this.x:this._fx;this._fx=this.x;const v=(this.x-px)/dt;this.mv=(this.mv||0)+(v-(this.mv||0))*Math.min(1,dt*14);
+  footwork(p,dt){if(!(dt>0))return;this.body._swing=null;const px=this._fx==null?this.x:this._fx;this._fx=this.x;const v=(this.x-px)/dt;this.mv=(this.mv||0)+(v-(this.mv||0))*Math.min(1,dt*14);
     const st=this.state==='stand'||this.state==='clinch';if(!st)return;const a=this.act,leg=a&&a.c.leg;const t=this.t;
     // idle bounce on the balls of the feet
     if(this.state==='stand'&&!leg&&this.rock<=0){const fr=6.0+ATT(this,'footwork')*1.6;this.bph=(this.bph||0)+dt*fr;const ab=Math.abs(Math.sin(this.bph)),land=Math.pow(1-ab,3);const amp=(this.noBounce?0:.72)*(a?.35:1)*(.75+ATT(this,'footwork')*.5)*(.6+.4*this.sta/this.staMax);p.ll_k+=(.2*land+.04*ab)*amp;p.rl_k+=(.22*land+.04*ab)*amp;p.ll_a+=.28*ab*amp;p.rl_a+=.36*ab*amp;p.lean+=.03*land*amp;p.head+=.025*land*amp;p.la_s+=.04*land*amp;p.ra_s+=.05*land*amp;p.la_e-=.06*land*amp;p.ra_e-=.05*land*amp;p.chest+=Math.sin(this.bph*.5)*.02*amp;p.tw+=Math.sin(this.bph*.5)*.04*amp}
@@ -818,15 +818,24 @@ class F2{
       const s1=Math.sin(Math.PI*u),s2=Math.sin(Math.PI*w);p.ll_h+=.2*s1*L;p.ll_k+=.22*s1*L;p.ll_a+=.15*s1*L;p.rl_h+=.16*s2*L;p.rl_k+=.2*s2*L;p.rl_a+=.2*s2*L}
     if(leg)return;
     const sp=Math.max(Math.abs(this.mv),this.circ?1.1:0,this.clMv?.9:0),m=Math.min(1,sp/1.1)*(a?.35:1)*(this.guard==='low'?0:1);if(m<.03){return}
-    /* MMA step-drag: moving forward the lead foot steps first and the rear foot drags up after it; moving back
-       the rear foot steps first and the lead foot follows. A short planted beat between the two keeps the stance.
-       Hips dip slightly as each foot travels, the rear heel lifts when it pushes, the guard stays quiet. */
-    this.fph=(this.fph||0)+dt*(5.2+sp*3.6);const ph=(this.fph/(Math.PI*2))%1;const fw=(this.mv*this.d>=0||this.circ)?1:-1;
+    /* bipedal walk: the legs pass each other (stance leg sweeps back under the hips while the swing leg lifts
+       and reaches past it). The gait phase is driven by the distance actually travelled, so a stance foot
+       moves backward relative to the hips exactly as fast as the body moves forward — it stays put on the
+       canvas. Circling in place and very slow drift use the short step-drag instead. */
+    const fw=(this.mv*this.d>=0||this.circ)?1:-1;const vf=this.mv*this.d;
+    if(!this.circ&&Math.abs(this.mv)>.25){const L=(this.body.L.thigh+this.body.L.shin)*1.14,A=.3;const stride=2*L*Math.sin(A);
+      this.gph=(this.gph||0)+(this.x-px)*this.d/stride*Math.PI;/* actual distance moved this frame */const c=(p.ll_h+p.rl_h)/2;const w=Math.min(1,(Math.abs(this.mv)-.25)/.35)*(a?.4:1);
+      const leg=(ph)=>{ph=((ph%(2*Math.PI))+2*Math.PI)%(2*Math.PI);if(ph<Math.PI){/* stance: foot moves back under the hip at constant speed (= body speed) */const th=Math.asin(Math.sin(A)*(1-2*ph/Math.PI));const push=Math.max(0,(ph-Math.PI*.75)/(Math.PI*.25));return{h:c+th,k:.16,a:.12+.3*push}}
+        const q=ph-Math.PI;const sq=Math.sin(q);return{h:c-A*Math.cos(q),k:.18+1.0*Math.pow(Math.max(0,sq),.55),a:-.1+.2*sq}};
+      const Lg=leg(this.gph),Rg=leg(this.gph+Math.PI);{const sw=ph=>{ph=((ph%(2*Math.PI))+2*Math.PI)%(2*Math.PI);return ph<Math.PI?0:Math.min(1,Math.sin(ph-Math.PI)*4)*w};this.body._swing={l:sw(this.gph),r:sw(this.gph+Math.PI)}}
+      p.ll_h+=(Lg.h-p.ll_h)*w;p.ll_k+=(Lg.k-p.ll_k)*w;p.ll_a+=(Lg.a-p.ll_a)*w;p.rl_h+=(Rg.h-p.rl_h)*w;p.rl_k+=(Rg.k-p.rl_k)*w;p.rl_a+=(Rg.a-p.rl_a)*w;
+      const bob=Math.abs(Math.sin(this.gph));p.y=(p.y||0)-.008*this.H*(1-bob)*w;p.lean+=clamp(vf,-1.5,1.5)*.02;p.tw+=Math.sin(this.gph)*.06*w;p.chest+=Math.sin(this.gph*2)*.008*w;
+      p.la_s+=Math.sin(this.gph)*.04*w;p.ra_s-=Math.sin(this.gph)*.04*w;return}
+    /* step-drag (circling / slow drift) */
+    this.fph=(this.fph||0)+dt*(5.2+sp*3.6);const ph=(this.fph/(Math.PI*2))%1;
     const s1=ph<.46?Math.sin(Math.PI*ph/.46):0,s2=ph>.54?Math.sin(Math.PI*(ph-.54)/.46):0;
-    if(fw>0){p.ll_h+=.3*s1*m;p.ll_k+=.3*s1*m;p.ll_a+=.08*s1*m;p.rl_a+=.22*s1*m;p.rl_k+=.06*s1*m;   /* lead steps, rear pushes off the ball */
-      p.rl_h+=.2*s2*m;p.rl_k+=.34*s2*m;p.rl_a+=.3*s2*m;p.ll_k+=.05*s2*m}                          /* rear drags up */
-    else{p.rl_h-=.26*s1*m;p.rl_k+=.3*s1*m;p.rl_a+=.12*s1*m;p.ll_a+=.1*s1*m;                         /* rear steps back */
-      p.ll_h-=.2*s2*m;p.ll_k+=.28*s2*m;p.ll_a+=.14*s2*m;p.rl_k+=.05*s2*m}                         /* lead slides back */
+    if(fw>0){p.ll_h+=.3*s1*m;p.ll_k+=.3*s1*m;p.ll_a+=.08*s1*m;p.rl_a+=.22*s1*m;p.rl_k+=.06*s1*m;p.rl_h+=.2*s2*m;p.rl_k+=.34*s2*m;p.rl_a+=.3*s2*m;p.ll_k+=.05*s2*m}
+    else{p.rl_h-=.26*s1*m;p.rl_k+=.3*s1*m;p.rl_a+=.12*s1*m;p.ll_a+=.1*s1*m;p.ll_h-=.2*s2*m;p.ll_k+=.28*s2*m;p.ll_a+=.14*s2*m;p.rl_k+=.05*s2*m}
     const dip=(s1+s2)*m;p.y=(p.y||0)-.006*this.H*dip;p.lean+=clamp(this.mv*this.d,-1.5,1.5)*.025+(fw>0?.012:-.012)*dip;p.chest+=(s1-s2)*.01*m;p.la_s-=(s1-s2)*.02*m;p.ra_s+=(s1-s2)*.02*m;p.head-=.012*dip}
   draw(ctx,o){this.body.draw(ctx,o)}
 }

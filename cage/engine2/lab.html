@@ -23,7 +23,10 @@ label{display:block;font-size:12px;color:var(--mu);margin-top:8px}input[type=ran
   <div class="g">
     <button data-s="jab">잽</button><button data-s="cross">스트레이트</button><button data-s="hookL">리드 훅</button>
     <button data-s="hookR">리어 훅</button><button data-s="upper">어퍼컷</button><button data-s="bodyHook">바디 훅</button>
-    <button data-s="lowKick">로킥</button><button data-s="midKick">미들킥</button><button data-s="highKick">하이킥</button>
+    <button data-s="leadUpper">리드 어퍼</button><button data-s="overhand">오버핸드</button><button data-s="bodyJab">바디 잽</button>
+    <button data-s="elbow">엘보</button><button data-s="knee">니킥</button><button data-s="teep">프런트 킥</button>
+    <button data-s="lowKick">로킥</button><button data-s="calfKick">카프킥</button><button data-s="midKick">미들킥</button>
+    <button data-s="leadKick">리드 미들킥</button><button data-s="highKick">하이킥</button><button data-s="leadHigh">리드 하이킥</button>
   </div>
   <label>파랑 선수</label>
   <div class="g"><button id="guard" class="on">가드 올림</button><button id="ko">KO (힘 풀기)</button><button id="reset">리셋</button></div>
@@ -42,7 +45,7 @@ const st=new E2.Stage();let circ=false;let A,B,slow=false,debug=false,auto=false
 function make(){const d=.45;
   A=new E2.Body({cx:-d,yaw:0,side:0,name:'RED',corner:'#c41010',look:{skin:[200,146,108],shorts:[150,22,26],band:[235,235,235]}});
   B=new E2.Body({cx:d,yaw:Math.PI,side:1,name:'BLUE',corner:'#1f5fd6',look:{skin:[176,120,88],shorts:[28,52,120],band:[230,230,230]},lowGuard:!document.getElementById('guard').classList.contains('on')});
-  A.opp=B;B.opp=A;for(let i=0;i<30;i++){A.step(1/60);B.step(1/60)}}
+  B.onHit=(p,J)=>{if(J>3){freeze=Math.max(freeze,Math.min(.1,.025+J*.004));shake=Math.min(1,J/25)}};A.opp=B;B.opp=A;for(let i=0;i<30;i++){A.step(1/60);B.step(1/60)}}
 make();
 document.querySelectorAll('[data-s]').forEach(b=>b.onclick=()=>A.play(b.dataset.s));
 const tg=(id,fn)=>{const e=document.getElementById(id);e.onclick=()=>{e.classList.toggle('on');fn(e.classList.contains('on'))}};
@@ -60,12 +63,12 @@ function mvStick(e){const r=sk.getBoundingClientRect();let dx=(e.clientX-r.left-
 function hitAt(sx,sy){let best=null,bd=.2*st.s;for(let i=0;i<B.n;i++){const p=st.proj(V.n(B.x[i],B.y[i],B.z[i]));const d=Math.hypot(p.x-sx,p.y-sy)-p.z*.001;if(d<bd){bd=d;best=i}}
   if(best==null)return;const q=V.n(B.x[best],B.y[best],B.z[best]);B.poke(q,V.sc(st.view(),-1),+document.getElementById('pow').value)}
 let circT=0,circDir=1;
-/* loop */let last=performance.now(),acc=0,fps=60,quads=0;const strikes=['jab','cross','hookL','hookR','upper','bodyHook','lowKick','midKick','highKick'];
-function frame(now){requestAnimationFrame(frame);let dt=Math.min(.05,(now-last)/1000);last=now;fps=fps*.95+(1/Math.max(.001,dt))*.05;acc+=dt*(slow?.25:1);
+/* loop */let last=performance.now(),acc=0,fps=60,quads=0;const strikes=Object.keys(E2.CLIPS);let freeze=0,shake=0;
+function frame(now){requestAnimationFrame(frame);let dt=Math.min(.05,(now-last)/1000);last=now;fps=fps*.95+(1/Math.max(.001,dt))*.05;if(freeze>0){freeze-=dt;dt=0}acc+=dt*(slow?.25:1);
   while(acc>=1/60){acc-=1/60;{let mx=(keys.d||keys.arrowright?1:0)-(keys.a||keys.arrowleft?1:0)+stick.x,mz=(keys.s||keys.arrowdown?1:0)-(keys.w||keys.arrowup?1:0)+stick.y;A.mv.x=mx;A.mv.z=mz;}
     if(circ&&!B.ko){circT-=1/60;if(circT<=0){circT=1+Math.random()*1.6;circDir=Math.random()<.5?-1:1}const dx=A.cx-B.cx,dz=A.cz-B.cz,d=Math.hypot(dx,dz)||1;const ux=dx/d,uz=dz/d;const keep=(d-.95)*1.4;B.mv.x=-uz*circDir*.8+ux*keep;B.mv.z=ux*circDir*.8+uz*keep}else B.mv.x=B.mv.z=0;
     A.step(1/60);B.step(1/60);if(auto&&!B.ko){autoT-=1/60;if(autoT<=0&&!A.clip){A.play(strikes[Math.random()*strikes.length|0]);autoT=.5+Math.random()*.8}}}
-  ctx.setTransform(dpr,0,0,dpr,0,0);st.setup(W,H,[A,B]);E2.drawArena2d(ctx,st,W,H,'back');quads=E2.draw2d(ctx,st,[A,B],{debug});E2.drawArena2d(ctx,st,W,H,'front');
+  shake*=.85;const sx=(Math.random()-.5)*shake*14,sy=(Math.random()-.5)*shake*10;ctx.setTransform(dpr,0,0,dpr,sx*dpr,sy*dpr);ctx.fillStyle='#0d0f15';ctx.fillRect(-20,-20,W+40,H+40);st.setup(W,H,[A,B]);E2.drawArena2d(ctx,st,W,H,'back');quads=E2.draw2d(ctx,st,[A,B],{debug});E2.drawArena2d(ctx,st,W,H,'front');
   /* recent impacts */for(const h of B.hits){const age=B.t-h.t;if(age>.35)continue;const p=st.proj(h.p);const s=st.s;ctx.strokeStyle=`rgba(255,240,200,${1-age/.35})`;ctx.lineWidth=2;ctx.beginPath();ctx.arc(p.x,p.y,(.03+age*.5)*s,0,7);ctx.stroke()}
   const c=E2.physCount(B);document.getElementById('st').textContent=`관절(물리 입자) ${c.joints} /선수\n살·근육 관성 노드 ${c.flesh} /선수\n피부 표면 노드 ${c.skin} /선수\n물리 노드 합계 ${c.total} /선수\n구속 조건 ${c.constraints}\n벡터 도형 ${quads}  ·  ${fps.toFixed(0)} fps`+(B.hits.length?`\n최근 충격량 ${B.hits[B.hits.length-1].J.toFixed(1)} N·s (${B.hits[B.hits.length-1].zone})`:'')}
 requestAnimationFrame(frame);window.__lab={st,get A(){return A},get B(){return B}};})();

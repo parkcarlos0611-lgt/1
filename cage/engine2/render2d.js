@@ -14,12 +14,12 @@
    decals placed by the head's facing: full face from the front, profile from the side, hair only from behind.
    Skin dents and flesh wobble move the outline vertices, so impacts visibly deform the flat shapes. */
 (function(){const V=E2.V,IDX=E2.IDX;
-const ST=E2.ST={tilt:.36,outline:'#141418',ow:.012,farDark:.8,shadowK:.78,lightDir:V.norm(V.n(-.55,.75,.45))};
+const ST=E2.ST={tilt:.36,outline:'#141418',ow:.012,edgeK:.62,farDark:.84,shadowK:.8,lightDir:V.norm(V.n(-.55,.75,.45))};
 /* ---- stage camera: orthographic, fixed angle, follows and zooms on the fighters ---- */
 E2.Stage=class{constructor(){this.tx=0;this.tz=0;this.ty=.8;this.s=200;this.W=800;this.H=600}
   setup(W,H,bodies){this.W=W;this.H=H;const c=Math.cos(ST.tilt),sn=Math.sin(ST.tilt);this.c=c;this.sn=sn;
     if(bodies&&bodies.length){let mx=0,mz=0;for(const b of bodies){mx+=b.cx;mz+=b.cz}mx/=bodies.length;mz/=bodies.length;const sep=bodies.length>1?Math.hypot(bodies[0].cx-bodies[1].cx,(bodies[0].cz-bodies[1].cz)*sn):0;
-      this.tx+=(mx-this.tx)*.08;this.tz+=(mz-this.tz)*.08;const want=Math.min(H/3.1,W/(sep+3));this.s+=(want-this.s)*.06}
+      this.tx+=(mx-this.tx)*.08;this.tz+=(mz-this.tz)*.08;const want=Math.min(H/2.55,W/(sep+2.6));this.s+=(want-this.s)*.06}
     else this.s=Math.min(H/2.7,W/3)}
   view(){return V.n(0,this.sn,this.c)}/* direction from the scene toward the viewer */
   depth(x,y,z){return z*this.c+y*this.sn}
@@ -36,37 +36,46 @@ const jp=(b,n)=>{const i=IDX[n];return V.n(b.x[i],b.y[i],b.z[i])};
 /* ---- one body → list of drawable parts ---- */
 function bodyParts(b,st){if(!b._skinReady)E2.buildSurface(b);const X=b.vx3,N=b.vn3,view=st.view(),Ld=ST.lightDir;
   const P2=new Array(b.nv);for(let i=0;i<b.nv;i++){const p=st.proj(V.n(X[i*3],X[i*3+1],X[i*3+2]));P2[i]=[p.x,p.y,p.z]}
-  const cDepth=st.depth(b.x[IDX.spine3],b.y[IDX.spine3],b.z[IDX.spine3]);const parts=[];
+  const cDepth=st.depth(b.x[IDX.spine3],b.y[IDX.spine3],b.z[IDX.spine3]),pDepth=st.depth(b.x[IDX.pelvis],b.y[IDX.pelvis],b.z[IDX.pelvis]);const parts=[];
   E2.SEGS.forEach((S,si)=>{const inf=b.segInfo[si],m=S.m;const bands=[];let dsum=0,dn=0;
     for(let r=0;r<S.rings-1;r++){const pts=[],sh=[];const a0=inf.off+r*m;for(let k=0;k<2*m;k++){const vi=a0+k;const p=P2[vi];pts.push(p);dsum+=p[2];dn++;
         const nl=N[vi*3]*Ld.x+N[vi*3+1]*Ld.y+N[vi*3+2]*Ld.z;const nv=N[vi*3]*view.x+N[vi*3+1]*view.y+N[vi*3+2]*view.z;if(nl<-.12&&nv>-.35)sh.push(p)}
       bands.push({H:hull(pts),S:sh.length>=3?hull(sh):null,mat:b.mat[a0]})}
-    const d=dsum/dn;const lat=S.n.endsWith('L')||S.n.endsWith('R');parts.push({b,S,bands,z:d+(S.n==='head'?.02:S.n.startsWith('glove')?.01:0),far:lat&&d<cDepth-.035})});
+    const d=dsum/dn;const lat=S.n.endsWith('L')||S.n.endsWith('R');
+    /* 2D layer order inside one fighter (like a cut-out puppet): limbs behind the torso → torso → limbs in
+       front. A limb part counts as "in front" when it is nearer to the viewer than the torso's centre line —
+       this works from every side: the near arm in profile, both guard hands from the front, neither from behind. */
+    let layer;const isArm=/^(uarm|farm|glove)/.test(S.n),isLeg=/^(thigh|shin|foot)/.test(S.n);
+    if(S.n==='torso')layer=3;else if(S.n==='neck')layer=4;else if(S.head)layer=5;
+    else if(isLeg)layer=d>pDepth+.01?3.5:1;else if(isArm){const front=d>cDepth+.015;layer=front?6:0}
+    parts.push({b,S,bands,z:d,layer,far:lat&&d<cDepth-.035})});
   return parts}
 /* ---- face, ears, hair (vector decals by facing) ---- */
 function drawHead(ctx,b,st,far){const view=st.view(),F=b._F;if(!F)return;const s=st.s,ow=ST.ow*s;const hd=jp(b,'head'),ht=jp(b,'headTop');const hc=V.lerp(hd,ht,.45);
   const vis=n=>V.dot(V.norm(V.sub(jp(b,n),hc)),view);const P=n=>st.proj(jp(b,n));const skin=(b.look&&b.look.skin)||[196,140,104];const k=far?ST.farDark:1;
   const hair=(b.look&&b.look.hair)||[28,22,18];
   /* hair: short crop cap over the top and back of the skull */
-  {const inf=b.segInfo[E2.SEGS.findIndex(S=>S.head)],m=E2.SEGS.find(S=>S.head).m;const pts=[];for(let r=6;r<13;r++)for(let j=0;j<m;j++){const th=j/m*Math.PI*2;if(r<10&&Math.cos(th)>-.15)continue;const vi=inf.off+r*m+j;const p=st.proj(V.n(b.vx3[vi*3],b.vx3[vi*3+1],b.vx3[vi*3+2]));pts.push([p.x,p.y])}
+  {const inf=b.segInfo[E2.SEGS.findIndex(S=>S.head)],m=E2.SEGS.find(S=>S.head).m;const pts=[];for(let r=6;r<13;r++)for(let j=0;j<m;j++){const th=j/m*Math.PI*2;if(r<10&&Math.cos(th)>-.15)continue;const vi=inf.off+r*m+j;/* only hair the viewer can actually see — never the back of the skull through the face */if(r<12&&b.vn3[vi*3]*view.x+b.vn3[vi*3+1]*view.y+b.vn3[vi*3+2]*view.z<-.05)continue;const p=st.proj(V.n(b.vx3[vi*3],b.vx3[vi*3+1],b.vx3[vi*3+2]));pts.push([p.x,p.y])}
     const H=hull(pts);if(H.length>2){ctx.fillStyle=rgb(hair,k);ctx.beginPath();poly(ctx,H);ctx.fill()}}
-  /* ears */for(const S of['L','R']){const v=vis('ear'+S);if(v<-.25)continue;const e=P('ear'+S);ctx.fillStyle=rgb(skin,k*.92);ctx.strokeStyle=ST.outline;ctx.lineWidth=ow*.7;ctx.beginPath();ctx.ellipse(e.x,e.y,.016*s,.026*s,0,0,7);ctx.fill();ctx.stroke()}
+  /* ears */for(const S of['L','R']){const v=vis('ear'+S);if(v<-.25)continue;const e=P('ear'+S);ctx.fillStyle=rgb(skin,k*.8);ctx.beginPath();ctx.ellipse(e.x,e.y,.013*s,.024*s,0,0,7);ctx.fill()}
   const fv=V.dot(F.head,view);if(fv<-.3)return;
   /* nose: a small outlined wedge pointing along the head's facing (a profile nose from the side) */
   {const no=jp(b,'nose');const tip=st.proj(V.madd(no,F.head,.022)),base=st.proj(V.madd(V.madd(no,F.headUp,.03),F.head,-.01)),bot=st.proj(V.madd(no,F.headUp,-.012));
-    ctx.fillStyle=rgb(skin,k*.94);ctx.strokeStyle=ST.outline;ctx.lineWidth=ow*.6;ctx.beginPath();ctx.moveTo(base.x,base.y);ctx.quadraticCurveTo(tip.x,tip.y-.004*s,tip.x,tip.y);ctx.lineTo(bot.x,bot.y);ctx.stroke();ctx.fill()}
+    ctx.fillStyle=rgb(skin,k*.86);ctx.beginPath();ctx.moveTo(base.x,base.y);ctx.quadraticCurveTo(tip.x,tip.y-.004*s,tip.x,tip.y);ctx.lineTo(bot.x,bot.y);ctx.closePath();ctx.fill()}
   /* eyes + brows (each only when it faces the viewer) */
   for(const S of['L','R']){const v=vis('eye'+S);if(v<.05)continue;const e=P('eye'+S),br=P('brow'+S);const look=st.proj(V.madd(jp(b,'eye'+S),F.head,.02));const dx=(look.x-e.x)*.35,dy=(look.y-e.y)*.35;
-    const w=.011*s*Math.min(1,v*1.6+.25);ctx.fillStyle='#f4efe8';ctx.beginPath();ctx.ellipse(e.x,e.y,w,.0065*s,0,0,7);ctx.fill();
-    ctx.fillStyle='#1d140e';ctx.beginPath();ctx.arc(e.x+dx,e.y+dy,.0055*s,0,7);ctx.fill();
-    ctx.strokeStyle=ST.outline;ctx.lineWidth=ow*.75;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(br.x-w*1.3,br.y+.002*s);ctx.lineTo(br.x+w*1.3,br.y-.001*s);ctx.stroke()}
+    const w=.0095*s*Math.min(1,v*1.6+.25);ctx.fillStyle='#e9e2d8';ctx.beginPath();ctx.ellipse(e.x,e.y,w,.0045*s,0,0,7);ctx.fill();
+    ctx.fillStyle='#2a1c12';ctx.beginPath();ctx.ellipse(e.x+dx,e.y+dy,.0042*s,.0045*s,0,0,7);ctx.fill();
+    /* brow ridge: a flat darker band, eyebrow hair on top */ctx.fillStyle=rgb(hair,k);ctx.beginPath();ctx.moveTo(br.x-w*1.35,br.y+.003*s);ctx.lineTo(br.x+w*1.35,br.y-.001*s);ctx.lineTo(br.x+w*1.3,br.y+.004*s);ctx.lineTo(br.x-w*1.3,br.y+.0075*s);ctx.closePath();ctx.fill()}
   /* mouth */if(fv>.05){const no=jp(b,'nose'),ch=jp(b,'chin');const mo=st.proj(V.madd(V.lerp(no,ch,.55),F.head,.004));const sideW=V.norm(V.cross(F.headUp,F.head));const a=st.proj(V.madd(V.madd(V.lerp(no,ch,.55),F.head,.0),sideW,.02)),c=st.proj(V.madd(V.lerp(no,ch,.55),sideW,-.02));
-    ctx.strokeStyle=ST.outline;ctx.lineWidth=ow*.55;ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.quadraticCurveTo(mo.x,mo.y+.004*s,c.x,c.y);ctx.stroke()}}
+    ctx.strokeStyle=rgb(skin,k*.55);ctx.lineWidth=.004*s;ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.quadraticCurveTo(mo.x,mo.y+.002*s,c.x,c.y);ctx.stroke()}}
 /* ---- draw a list of bodies ---- */
-E2.draw2d=function(ctx,st,bodies,o){o=o||{};let parts=[];for(const b of bodies)parts=parts.concat(bodyParts(b,st));parts.sort((a,b)=>a.z-b.z);
+E2.draw2d=function(ctx,st,bodies,o){o=o||{};const order=bodies.slice().sort((a,b)=>st.depth(a.x[IDX.spine3],0,a.z[IDX.spine3])-st.depth(b.x[IDX.spine3],0,b.z[IDX.spine3]));
+  let parts=[];for(const b of order){const P=bodyParts(b,st);P.sort((a,b)=>a.layer-b.layer||a.z-b.z);parts=parts.concat(P)}
   const ow=ST.ow*st.s;ctx.lineJoin='round';ctx.lineCap='round';let shapes=0;
   for(const p of parts){const{b,bands}=p;const k=p.far?ST.farDark:1;
-    /* outline pass */ctx.strokeStyle=ST.outline;ctx.fillStyle=ST.outline;ctx.lineWidth=ow*2;ctx.beginPath();for(const B of bands)if(B.H.length>2)poly(ctx,B.H);ctx.stroke();ctx.fill();
+    /* thin edge in a darker tone of the part's own colour (no black cartoon line) — separates overlapping skin */
+    {const ec=rgb(matColor(b,bands[bands.length>>1].mat),k*ST.edgeK);ctx.strokeStyle=ec;ctx.fillStyle=ec;ctx.lineWidth=ow*.75;ctx.beginPath();for(const B of bands)if(B.H.length>2)poly(ctx,B.H);ctx.stroke();ctx.fill()}
     /* flat fill per material */let cur=null;for(const B of bands){if(B.H.length<3)continue;const c=rgb(matColor(b,B.mat),k);if(c!==cur){if(cur)ctx.fill();ctx.fillStyle=c;ctx.beginPath();cur=c}poly(ctx,B.H);shapes++}if(cur)ctx.fill();
     /* cel shadow */cur=null;for(const B of bands){if(!B.S)continue;const c=rgb(matColor(b,B.mat),k*ST.shadowK);if(c!==cur){if(cur)ctx.fill();ctx.fillStyle=c;ctx.beginPath();cur=c}poly(ctx,B.S)}if(cur)ctx.fill();
     if(p.S.n==='torso')drawTorsoLines(ctx,b,st,k);
@@ -77,7 +86,7 @@ E2.draw2d=function(ctx,st,bodies,o){o=o||{};let parts=[];for(const b of bodies)p
 /* simple vector anatomy lines on the front of the torso (pec line, ab line) when the chest faces the viewer */
 function drawTorsoLines(ctx,b,st,k){const F=b._F;if(!F)return;const view=st.view();const fv=V.dot(F.chest,view);if(fv<.15)return;const s=st.s;
   const s4=jp(b,'spine4'),s2=jp(b,'spine2'),s3=jp(b,'spine3');const left=V.norm(V.sub(jp(b,'shoulderL'),jp(b,'shoulderR')));const fr=F.chest;
-  ctx.strokeStyle=`rgba(20,16,14,${.35*Math.min(1,fv*1.5)})`;ctx.lineWidth=ST.ow*s*.55;
+  ctx.strokeStyle=`rgba(40,20,10,${.22*Math.min(1,fv*1.5)})`;ctx.lineWidth=ST.ow*s*.55;
   const P=q=>st.proj(q);const pc=V.madd(s4,fr,.14);/* pecs */for(const sg of[1,-1]){const a=P(V.madd(pc,left,.005*sg)),c=P(V.madd(V.madd(pc,left,.12*sg),V.n(0,1,0),-.05)),m=P(V.madd(V.madd(pc,left,.07*sg),V.n(0,1,0),-.065));ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.quadraticCurveTo(m.x,m.y,c.x,c.y);ctx.stroke()}
   const top=P(V.madd(s3,fr,.15)),bot=P(V.madd(s2,fr,.13));ctx.beginPath();ctx.moveTo(top.x,top.y);ctx.lineTo(bot.x,bot.y);ctx.stroke()}
 /* ---- arena: flat vector octagon, crowd silhouettes, lights ---- */
@@ -91,7 +100,7 @@ E2.drawArena2d=function(ctx,st,W,H,layer){const s=st.s;const P=(x,y,z)=>st.proj(
     /* canvas markings */ctx.strokeStyle='#c8141c';ctx.lineWidth=ST.ow*s*1.2;ctx.beginPath();for(let i=0;i<=48;i++){const a=i/48*Math.PI*2;const p=P(Math.cos(a)*1.6,0,Math.sin(a)*1.6);i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y)}ctx.stroke();
     const c=P(0,0,0);ctx.save();ctx.translate(c.x,c.y);ctx.scale(1,st.sn);ctx.fillStyle='rgba(200,20,28,.85)';ctx.font=`900 ${.34*s|0}px Oswald,Impact,sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('CAGE LEGENDS',0,0);ctx.restore();
     /* back half of the fence */fence(ctx,st,oct,FH,true)}
-  else fence(ctx,st,oct,FH,false)};
+  /* the near fence is behind the camera in this view — nothing is drawn over the fighters */};
 function fence(ctx,st,oct,FH,back){const s=st.s;for(let i=0;i<8;i++){const a=oct[i],b=oct[(i+1)%8];const mz=(a[1]+b[1])/2;if((mz<-.2)!==back)continue;
     const a0=st.proj(V.n(a[0],0,a[1])),a1=st.proj(V.n(a[0],FH,a[1])),b0=st.proj(V.n(b[0],0,b[1])),b1=st.proj(V.n(b[0],FH,b[1]));
     if(back){ctx.fillStyle='rgba(8,9,12,.55)';ctx.beginPath();ctx.moveTo(a0.x,a0.y);ctx.lineTo(b0.x,b0.y);ctx.lineTo(b1.x,b1.y);ctx.lineTo(a1.x,a1.y);ctx.closePath();ctx.fill()}

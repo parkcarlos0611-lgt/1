@@ -10,7 +10,7 @@
    (painter's algorithm — nearer parts always cover farther ones), flat-fill each quad with Lambert key light +
    fill + rim light + a little specular. */
 (function(){const V=E2.V,IDX=E2.IDX;
-const R=E2.R={rimK:.55,spec:.18,key:.7,amb:.3,flesh:{k:(2*Math.PI*4.5)**2,c:7},skin:{k:900,c:22,couple:140}};
+const R=E2.R={rimK:.55,spec:.18,key:.7,amb:.3,flesh:{k:(2*Math.PI*7)**2,c:26},skin:{k:1400,c:48,couple:140}};
 /* ---- surface definition ---- */
 const torsoProf=t=>{/* [front-back radius, side radius, front bulge, back bulge] along pelvis → neck */
   const P=[[0,.112,.168,0,.038],[.12,.106,.162,0,.042],[.25,.1,.152,.016,.016],[.4,.106,.162,.014,.02],[.55,.116,.178,.022,.026],[.7,.122,.198,.036,.032],[.82,.112,.208,.026,.036],[.9,.092,.194,0,.032],[.95,.072,.125,0,.022],[1,.062,.072,0,0]];   /* glutes, abs, lats, pecs, traps */
@@ -52,7 +52,7 @@ function buildSurface(b){const F=frames(b);const X=b.vx3,N=b.vn3;let ri=0;
     if(S.head){const hd=jp(b,'head'),hu=F.headUp;const base=V.madd(hd,hu,-.06);samp=t=>({p:V.madd(base,hu,.25*t),a:hu});ref=F.head;prof=t=>{const r=headProf(t);/* face: flatter sides, jaw forward */return[r[0],r[1],t<.3?.012:t>.45&&t<.75?.006:0,t>.5?.012:0]}}
     else{samp=pathPts(b,S);ref=F[S.ref];prof=S.prof}
     for(let r=0;r<S.rings;r++){const t=r/(S.rings-1);const{p,a}=samp(t);let nrm=V.sub(ref,V.sc(a,V.dot(ref,a)));if(V.len(nrm)<1e-4)nrm=V.cross(a,V.n(0,0,1));nrm=V.norm(nrm);const bin=V.cross(a,nrm);
-      const pr=prof(t);const bw=S.head?1:((b.look&&b.look.build)||1.1);/* build: muscle mass multiplier */const rx=pr[0]*bw,rz=pr[1]*bw,fb=(pr[2]||0)*bw,bb=(pr[3]||0)*bw;const yo=S.yOff?S.yOff(t):0;
+      const pr=prof(t);const bw=S.head?1:((b.look&&b.look.build)||1.0);/* build: muscle mass multiplier */const rx=pr[0]*bw,rz=pr[1]*bw,fb=(pr[2]||0)*bw,bb=(pr[3]||0)*bw;const yo=S.yOff?S.yOff(t):0;
       /* flesh: ring centre history (for inertia) */const k3=ri*3;let c=V.add(p,V.n(0,yo,0));b.rcpp[k3]=b.rcp[k3];b.rcpp[k3+1]=b.rcp[k3+1];b.rcpp[k3+2]=b.rcp[k3+2];b.rcp[k3]=b.rc[k3];b.rcp[k3+1]=b.rc[k3+1];b.rcp[k3+2]=b.rc[k3+2];b.rc[k3]=c.x;b.rc[k3+1]=c.y;b.rc[k3+2]=c.z;
       const fl=S.flesh?S.flesh(t):0;c=V.add(c,V.n(b.rj[k3]*fl,b.rj[k3+1]*fl,b.rj[k3+2]*fl));
       for(let j=0;j<S.m;j++){const th=j/S.m*Math.PI*2,ct=Math.cos(th),st=Math.sin(th);const rr=rx+fb*Math.max(0,ct)**2+bb*Math.max(0,-ct)**2;
@@ -63,13 +63,13 @@ function buildSurface(b){const F=frames(b);const X=b.vx3,N=b.vn3;let ri=0;
 /* physics of the surface layers */
 E2.skinStep=function(b,dt){if(!b.nv)return;buildSurface(b);const K=R.flesh;
   /* flesh: rings lag behind the acceleration of their centre */
-  if(dt>0)for(let r=0;r<b.nr;r++){const k=r*3;for(let a=0;a<3;a++){const acc=(b.rc[k+a]-2*b.rcp[k+a]+b.rcpp[k+a])/(dt*dt);const ac=Math.max(-60,Math.min(60,acc));b.rjv[k+a]+=(-K.k*b.rj[k+a]-K.c*b.rjv[k+a]-ac)*dt;b.rj[k+a]+=b.rjv[k+a]*dt;b.rj[k+a]=Math.max(-.025,Math.min(.025,b.rj[k+a]))}}
+  if(dt>0)for(let r=0;r<b.nr;r++){const k=r*3;for(let a=0;a<3;a++){const acc=(b.rc[k+a]-2*b.rcp[k+a]+b.rcpp[k+a])/(dt*dt);const ac=Math.max(-60,Math.min(60,acc));b.rjv[k+a]+=(-K.k*b.rj[k+a]-K.c*b.rjv[k+a]-ac)*dt;b.rj[k+a]+=b.rjv[k+a]*dt;b.rj[k+a]=Math.max(-.012,Math.min(.012,b.rj[k+a]))}}
   /* skin dents: spring back, spread to ring neighbours */
   const S=R.skin,D=b.dent,DV=b.dentV;let off=0;for(const s of SEGS){const m=s.m;for(let r=0;r<s.rings;r++)for(let j=0;j<m;j++){const i=off+r*m+j;const nb=(D[off+r*m+(j+1)%m]+D[off+r*m+(j+m-1)%m]+(r>0?D[i-m]:D[i])+(r<s.rings-1?D[i+m]:D[i]))*.25;
       DV[i]+=(-S.k*D[i]-S.c*DV[i]+S.couple*(nb-D[i]))*dt}off+=s.rings*m}
   for(let i=0;i<b.nv;i++){D[i]+=DV[i]*dt;if(D[i]>.04)D[i]=.04;else if(D[i]<-.015)D[i]=-.015}};
 E2.skinImpact=function(b,p,nrm,J){if(!b._skinReady)return;const X=b.vx3;const rad=.13;const s=Math.min(1.2,J/10);
-  for(let i=0;i<b.nv;i++){const dx=X[i*3]-p.x,dy=X[i*3+1]-p.y,dz=X[i*3+2]-p.z;const d=Math.hypot(dx,dy,dz);if(d<rad){const f=1-d/rad;b.dentV[i]+=1.6*s*f*f}}
+  for(let i=0;i<b.nv;i++){const dx=X[i*3]-p.x,dy=X[i*3+1]-p.y,dz=X[i*3+2]-p.z;const d=Math.hypot(dx,dy,dz);if(d<rad){const f=1-d/rad;b.dentV[i]+=1.0*s*f*f}}
   /* the flesh around the impact gets a shove too */let off=0;for(let r=0;r<b.nr;r++){const k=r*3;const d=Math.hypot(b.rc[k]-p.x,b.rc[k+1]-p.y,b.rc[k+2]-p.z);if(d<.35){const f=(1-d/.35)*s*.6;b.rjv[k]+=nrm.x*f;b.rjv[k+1]+=nrm.y*f;b.rjv[k+2]+=nrm.z*f}}};
 /* ---- camera ---- */
 E2.Camera=class{constructor(){this.yaw=-.62;this.pitch=.1;this.dist=3.1;this.target=V.n(0,1.05,0);this.fov=1.05}

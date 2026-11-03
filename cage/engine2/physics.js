@@ -11,10 +11,10 @@
    Impacts also lower muscle tone around the contact (it recovers over ~0.5 s) and feed the skin layer
    (render.js) with a dent. KO sets tone to ~0 so the body falls as a pure ragdoll. */
 (function(){const V=E2.V,B=E2.BONES,IDX=E2.IDX;
-const PH=E2.PH={substeps:3,iters:6,gravity:9.81,damp:.25,
-  freq:{core:7,arm:8,finger:6,leg:9,toe:7},zeta:.55,
-  floorFric:.85,walkSpeed:1.5,turnRate:7,arenaR:3.55,minGap:.62,impactScale:1,strikeBoost:1.8,maxDv:3.5,strikerMass:{hand:3.2,foot:5.5,knee:7,elbow:3.5},minImpactSpeed:1.2,
-  toneRecover:2.0,koTone:.025};
+const PH=E2.PH={substeps:3,iters:6,gravity:9.81,damp:1.1,jointFric:4,koJointFric:14,stepDist:.11,stepDur:.15,stepLead:.16,stepLift:.055,
+  freq:{core:7,arm:8,finger:6,leg:9,toe:7},zeta:.92,
+  floorFric:.85,walkSpeed:1.1,turnRate:7,arenaR:3.55,minGap:.62,impactScale:1,strikeBoost:1.8,maxDv:3.5,strikerMass:{hand:3.2,foot:5.5,knee:7,elbow:3.5},minImpactSpeed:1.2,
+  toneRecover:2.0,koTone:.07};
 const CAPS=[['pelvis','spine3',.15,'body'],['spine3','spine5',.15,'body'],['spine5','neck1',.085,'body'],['neck1','head',.06,'head'],['head','headTop',.1,'head'],
   ['shoulderL','elbowL',.055,'arm'],['elbowL','wristL',.045,'arm'],['wristL','handL',.05,'arm'],['shoulderR','elbowR',.055,'arm'],['elbowR','wristR',.045,'arm'],['wristR','handR',.05,'arm'],
   ['hipL','kneeL',.08,'leg'],['kneeL','ankleL',.055,'leg'],['heelL','ballL',.04,'leg'],['hipR','kneeR',.08,'leg'],['kneeR','ankleR',.055,'leg'],['heelR','ballR',.04,'leg']].map(([a,b,r,z])=>({a:IDX[a],b:IDX[b],r,z}));
@@ -32,12 +32,7 @@ class Body{
   play(name){const c=E2.CLIPS[name];if(!c||this.ko)return false;this.clip={c,t:0,name,hit:false};return true}
   pose(dt){let p=this.base;const t=this.t;
     /* idle life: breathing, light bounce, hands circling a little */
-    const br=Math.sin(t*1.6),bo=Math.sin(t*4.2);p=E2.blend(p,{spine3:[0,0,.012],spine5:[0,0,.012],shoulderL:[0,0,.04],shoulderR:[0,0,-.03],kneeL:[0,0,-.06],kneeR:[0,0,-.05],head:[0,0,-.02]},br*.5+bo*.5);
-    /* footwork: alternating steps from the root velocity, split into forward/back and lateral components so a
-       fighter can advance, retreat and circle (the steps follow the body's own facing) */
-    const sp=Math.hypot(this.vxr,this.vzr);if(sp>.05){this.gph+=sp*dt*7.5;const amp=Math.min(1,sp/1.1),Fx=Math.cos(this.yaw),Fz=-Math.sin(this.yaw);
-      const fv=(this.vxr*Fx+this.vzr*Fz)/sp,lv=(this.vxr*-Fz+this.vzr*Fx)*-1/sp;const sn=Math.sin(this.gph),cs=Math.cos(this.gph);
-      p=E2.blend(p,{hipL:E2.side('L',.16*lv*sn,0,.32*fv*sn),hipR:E2.side('R',-.16*lv*sn,0,-.32*fv*sn),kneeL:[0,0,-.55*Math.max(0,cs)],kneeR:[0,0,-.55*Math.max(0,-cs)],ankleL:[0,0,.25*Math.max(0,cs)],ankleR:[0,0,.25*Math.max(0,-cs)],spine3:[0,.05*fv*sn,0]},amp)}
+    const br=Math.sin(t*1.6),bo=Math.sin(t*4.2);p=E2.blend(p,{spine3:[0,0,.012],spine5:[0,0,.012],shoulderL:[0,0,.04],shoulderR:[0,0,-.03],kneeL:[0,0,-.06],kneeR:[0,0,-.05],head:[0,0,-.02]},br*.35+bo*.1);/* restrained: calm breathing, small rhythm */
     if(this.clip){const C=this.clip;C.t+=dt;if(C.t>=C.c.dur)this.clip=null;else p=E2.sampleClip(C.c,C.t,p)}return p}
   computeTarget(dt,init){const pose=this.pose(dt);const rt=pose.root||[0,0,0];/* root step along the facing direction */const fx=Math.cos(this.yaw),fz=-Math.sin(this.yaw);let fk=E2.fk(pose,{pos:V.n(this.cx+fx*rt[0],1.0+rt[1],this.cz+fz*rt[0]),yaw:this.yaw});
     /* stand on the mat: lowest foot point at floor level; keep the planted foot where it is during kicks */
@@ -45,13 +40,14 @@ class Body{
     let dx=0,dz=0;const plant=this.clip&&this.clip.c.plant;if(plant){const a=fk.P[IDX['ankle'+plant]];if(!this.plantAt)this.plantAt={x:a.x,z:a.z};dx=this.plantAt.x-a.x;dz=this.plantAt.z-a.z}else this.plantAt=null;
     /* to world: floor alignment + planted foot */
     const n=this.n,h=Math.max(dt,1e-4);const P=fk.P;for(let i=0;i<n;i++){const q=P[i];P[i]={x:q.x+dx,y:q.y-lo,z:q.z+dz}}
+    this.footLock(P,dt,init);
     /* strike aiming: the striking limb is solved with IK toward the opponent's real body (this is what makes a
        jab land on the head wherever it is), passing a little through the target so contact happens */
     /* the striking limb fires faster (stiffer drive) while a strike is on */
     this.fm.fill(1);const C=this.clip;if(C){const root=C.c.hand?IDX['shoulder'+C.c.hand]:C.c.foot?IDX['hip'+C.c.foot]:-1;if(root>=0){this.fm[root]=PH.strikeBoost;for(const k of E2.DESC[root])this.fm[k]=PH.strikeBoost}}
     if(C&&C.c.aim&&this.opp){const A=C.c.aim,t=C.t;/* extension accelerates into the target (ease-in), so the fist / shin is still fast at contact */const w=t<A.on?0:t<A.hit[0]?Math.pow((t-A.on)/(A.hit[0]-A.on),1.8):t<=A.hit[1]?1:t<A.off?1-E2.ease((t-A.hit[1])/(A.off-A.hit[1])):0;
       if(w>0){const O=this.opp,oi=n=>V.n(O.x[IDX[n]],O.y[IDX[n]],O.z[IDX[n]]);let T;const tg=A.tgt;
-        if(tg==='head')T=V.lerp(oi('head'),oi('headTop'),.35);else if(tg==='chin')T=V.lerp(oi('chin'),oi('neck2'),.3);else if(tg==='liver')T=V.lerp(oi('spine1'),oi('spine2'),.5);else if(tg==='ribs')T=oi('spine3');else T=V.lerp(oi('hipL'),oi('kneeL'),.45);
+        if(tg==='head')T=V.lerp(oi('head'),oi('headTop'),.35);else if(tg==='chin')T=V.lerp(oi('chin'),oi('neck2'),.3);else if(tg==='liver')T=V.lerp(oi('spine1'),oi('spine2'),.5);else if(tg==='ribs')T=oi('spine3');else if(tg==='calf')T=V.lerp(oi('kneeL'),oi('ankleL'),.4);else T=V.lerp(oi('hipL'),oi('kneeL'),.45);
         const F=V.n(Math.cos(this.yaw),0,-Math.sin(this.yaw));
         if(C.c.hand){const S=C.c.hand,sh=P[IDX['shoulder'+S]];const dir=V.norm(V.sub(T,sh));T=V.madd(T,dir,A.through);
           if(A.arc){const out=V.norm(V.cross(V.n(0,1,0),dir));const sgn=S==='L'?1:-1;T=V.madd(T,out,-A.arc*Math.sin(Math.PI*Math.min(1,w))*(1-w)*sgn)}
@@ -64,6 +60,16 @@ class Body{
           E2.aimLimb(P,IDX['hip'+S],IDX['knee'+S],IDX['ankle'+S],goal,pole,k)}}}
     for(let i=0;i<n;i++){const q=P[i];if(!init){this.tvx[i]=(q.x-this.tx[i])/h;this.tvy[i]=(q.y-this.ty[i])/h;this.tvz[i]=(q.z-this.tz[i])/h}this.tx[i]=q.x;this.ty[i]=q.y;this.tz[i]=q.z}
     this.fk=fk}
+  /* ---- feet: planted feet stay where they are on the canvas; a foot steps only when the body has moved
+     away from it (stride > stepDist), one foot at a time, in a short low arc — no sliding ---- */
+  footLock(P,dt,init){const C=this.clip;this.pinned=[];const F=V.n(Math.cos(this.yaw),0,-Math.sin(this.yaw));if(!this.fl)this.fl={};
+    for(const S of['L','R']){const ai=IDX['ankle'+S];const home=P[ai];let L=this.fl[S];
+      const free=init||this.ko||(C&&(C.c.foot===S||C.c.plant))||!L;if(free){this.fl[S]={x:home.x,z:home.z,sw:null};continue}
+      const other=this.fl[S==='L'?'R':'L'];let tgt;
+      if(L.sw){const w=L.sw;w.u+=dt/PH.stepDur;w.ex=home.x+this.vxr*PH.stepLead;w.ez=home.z+this.vzr*PH.stepLead;const u=Math.min(1,w.u),e=u*u*(3-2*u);
+        const x=w.sx+(w.ex-w.sx)*e,z=w.sz+(w.ez-w.sz)*e;tgt=V.n(x,home.y+PH.stepLift*Math.sin(Math.PI*u),z);if(w.u>=1){L.x=w.ex;L.z=w.ez;L.sw=null}}
+      else{const d=Math.hypot(home.x-L.x,home.z-L.z);if(d>PH.stepDist&&!(other&&other.sw&&other.sw.u<.55)){L.sw={u:0,sx:L.x,sz:L.z,ex:home.x,ez:home.z}}else{/* stance foot: static friction pins it */this.pinned.push(ai,...E2.DESC[ai])}tgt=V.n(L.x,home.y,L.z)}
+      const pole=V.add(F,V.n(0,.15,0));E2.aimLimb(P,IDX['hip'+S],IDX['knee'+S],ai,tgt,pole,1)}}
   /* ---- constraints from the rest (guard) shape ---- */
   buildConstraints(){const C=[],x=this.x,y=this.y,z=this.z;const d=(a,b)=>Math.hypot(x[a]-x[b],y[a]-y[b],z[a]-z[b]);const add=(a,b,st,range)=>{const L=d(a,b);C.push([a,b,L,st||1,range?L*(1-range):L,range?L*(1+range):L])};
     for(const b of B)if(b.pi>=0)add(b.i,b.pi,1);
@@ -76,7 +82,10 @@ class Body{
     this.C=C;
     /* hinge limits: [proximal, joint, distal, sign] — the joint must stay on the anatomical side of the line */
     this.hinges=['L','R'].flatMap(S=>[[I('hip'+S),I('knee'+S),I('ankle'+S),1],[I('shoulder'+S),I('elbow'+S),I('wrist'+S),-1]]);
-    this.minFold=['L','R'].flatMap(S=>[[I('hip'+S),I('ankle'+S),.12],[I('shoulder'+S),I('wrist'+S),.1]])}
+    this.minFold=['L','R'].flatMap(S=>[[I('hip'+S),I('ankle'+S),.12],[I('shoulder'+S),I('wrist'+S),.1]]);
+    /* anatomical range of motion: the bend between (a→b) and (b→c) may not exceed max (radians) */
+    this.cones=[['pelvis','spine2','spine4',.45],['spine2','spine4','neck1',.45],['spine4','neck1','head',.6],['neck1','head','headTop',.55],['spine5','neck2','headTop',.75],
+      ...['L','R'].flatMap(S=>[['elbow'+S,'wrist'+S,'hand'+S,.8],['hip'+S,'knee'+S,'ankle'+S,2.45],['shoulder'+S,'elbow'+S,'wrist'+S,2.55],['knee'+S,'ankle'+S,'ball'+S,2.25],['clav'+S,'shoulder'+S,'elbow'+S,2.7]])].map(([a,b,c,m])=>[I(a),I(b),I(c),m])}
   /* forward direction of the body (from the pelvis / chest particles) */
   fwd(){const x=this.x,z=this.z;const a=IDX.hipL,b=IDX.hipR;const lx=x[a]-x[b],lz=z[a]-z[b];/* left → forward is a +90° turn about y */return V.norm(V.n(-lz,0,lx))}
   /* ---- simulation step ---- */
@@ -95,13 +104,22 @@ class Body{
       const dmp=Math.exp(-PH.damp*h);vx[i]=(vx[i]+ax*h)*dmp;vy[i]=(vy[i]+ay*h)*dmp;vz[i]=(vz[i]+az*h)*dmp;
       this.ox[i]=x[i];this.oy[i]=y[i];this.oz[i]=z[i];x[i]+=vx[i]*h;y[i]+=vy[i]*h;z[i]+=vz[i]*h}
     for(let it=0;it<PH.iters;it++){this.solve();if(this.opp&&this.side===0)collide(this,this.opp,it===0,h);this.floor()}
+    if(this.pinned&&!this.ko)for(const i of this.pinned){if(y[i]<.12){x[i]=this.ox[i];z[i]=this.oz[i]}}
     for(let i=0;i<n;i++){vx[i]=(x[i]-this.ox[i])/h;vy[i]=(y[i]-this.oy[i])/h;vz[i]=(z[i]-this.oz[i])/h;
-      if(y[i]<=this.r[i]+1e-4){vx[i]*=1-PH.floorFric;vz[i]*=1-PH.floorFric;if(vy[i]<0)vy[i]=0}}}
+      if(y[i]<=this.r[i]+1e-4){vx[i]*=1-PH.floorFric;vz[i]*=1-PH.floorFric;if(vy[i]<0)vy[i]=0}}
+    /* constraint fights on the ground must not inject energy: cap speeds of a limp body */
+    if(this.ko)for(let i=0;i<n;i++){const v=Math.hypot(vx[i],vy[i],vz[i]);if(v>6){const k=6/v;vx[i]*=k;vy[i]*=k;vz[i]*=k}}
+    /* joint friction: connected parts lose relative velocity (stronger when unconscious) — limbs fall heavy and settle instead of floating */
+    const jf=Math.min(.9,(this.ko?PH.koJointFric:PH.jointFric)*h);for(const b of B){if(b.pi<0)continue;const i=b.i,j=b.pi;const mi=1/this.inv[i],mj=1/this.inv[j],M=mi+mj;
+      const cx=(vx[i]*mi+vx[j]*mj)/M,cy=(vy[i]*mi+vy[j]*mj)/M,cz=(vz[i]*mi+vz[j]*mj)/M;vx[i]+=(cx-vx[i])*jf;vy[i]+=(cy-vy[i])*jf;vz[i]+=(cz-vz[i])*jf;vx[j]+=(cx-vx[j])*jf;vy[j]+=(cy-vy[j])*jf;vz[j]+=(cz-vz[j])*jf}}
   solve(){const x=this.x,y=this.y,z=this.z,iv=this.inv;
     for(const c of this.C){const a=c[0],b=c[1];const dx=x[b]-x[a],dy=y[b]-y[a],dz=z[b]-z[a];const D=Math.hypot(dx,dy,dz)||1e-9;let L=D<c[4]?c[4]:D>c[5]?c[5]:D;if(L===D)continue;
       const w=iv[a]+iv[b];const f=(D-L)/D/w*c[3];x[a]+=dx*f*iv[a];y[a]+=dy*f*iv[a];z[a]+=dz*f*iv[a];x[b]-=dx*f*iv[b];y[b]-=dy*f*iv[b];z[b]-=dz*f*iv[b]}
     /* hinges: knee in front of the hip–ankle line, elbow behind the shoulder–wrist line (body forward) */
     const F=this.fwd();for(const[a,j,b,sg]of this.hinges){const mx=(x[a]+x[b])/2,my=(y[a]+y[b])/2,mz=(z[a]+z[b])/2;const off=((x[j]-mx)*F.x+(z[j]-mz)*F.z)*sg;if(off<-.005){const k=(-off-.005)*.5;x[j]+=F.x*k*sg;z[j]+=F.z*k*sg}}
+    for(const[a,b,c,mx]of this.cones){const ux=x[b]-x[a],uy=y[b]-y[a],uz=z[b]-z[a];const ul=Math.hypot(ux,uy,uz)||1e-9;const vx=x[c]-x[b],vy=y[c]-y[b],vz=z[c]-z[b];const vl=Math.hypot(vx,vy,vz)||1e-9;
+      const cs=(ux*vx+uy*vy+uz*vz)/(ul*vl);if(cs>=Math.cos(mx))continue;const dux=ux/ul,duy=uy/ul,duz=uz/ul;let wx=vx/vl-dux*cs,wy=vy/vl-duy*cs,wz=vz/vl-duz*cs;const wl=Math.hypot(wx,wy,wz);if(wl<1e-6)continue;wx/=wl;wy/=wl;wz/=wl;
+      const cm=Math.cos(mx),sm=Math.sin(mx);const tx=x[b]+(dux*cm+wx*sm)*vl,ty=y[b]+(duy*cm+wy*sm)*vl,tz=z[b]+(duz*cm+wz*sm)*vl;x[c]+=(tx-x[c])*.35;y[c]+=(ty-y[c])*.35;z[c]+=(tz-z[c])*.35}
     for(const[a,b,mf]of this.minFold){const dx=x[b]-x[a],dy=y[b]-y[a],dz=z[b]-z[a];const D=Math.hypot(dx,dy,dz)||1e-9;if(D<mf){const f=(D-mf)/D*.5;x[a]+=dx*f;y[a]+=dy*f;z[a]+=dz*f;x[b]-=dx*f;y[b]-=dy*f;z[b]-=dz*f}}}
   floor(){const y=this.y;for(let i=0;i<this.n;i++){const r=this.r[i];if(y[i]<r)y[i]=r}}
   /* ---- impacts ---- */
@@ -114,7 +132,7 @@ class Body{
     for(let i=0;i<this.n;i++){const d=Math.hypot(x[i]-p.x,y[i]-p.y,z[i]-p.z);const f=Math.max(0,1-d/.3);if(f>0){const dv=J*f*this.inv[i]*PH.impactScale*.6;this.vx[i]+=dir.x*dv;this.vy[i]+=dir.y*dv;this.vz[i]+=dir.z*dv}}
     this.impact(p,dir,J,zone)}
   setGuard(up){this.lowGuard=!up;this.base=up?E2.guard():E2.lowGuard()}
-  setKO(v){this.ko=v;if(v){this.clip=null;for(let i=0;i<this.n;i++)this.tone[i]=Math.min(this.tone[i],.3)}}
+  setKO(v){this.ko=v;if(v){this.clip=null;/* lights out: legs and neck go at once, the rest within a few frames */for(let i=0;i<this.n;i++){const g=this.grp[i];this.tone[i]=Math.min(this.tone[i],g==='leg'||g==='toe'?.05:.15)}}}
 }
 E2.Body=Body;
 /* closest point on segment ab to p */

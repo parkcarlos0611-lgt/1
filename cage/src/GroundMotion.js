@@ -257,4 +257,18 @@ window.fenceClamp=fenceClamp;
 /* ragdoll: particles cannot pass the fence either */
 {const sr=Body.prototype.stepRag;Body.prototype.stepRag=function(dt){const r=sr.call(this,dt);const Wl=window.__cageWall;if(Wl&&this.rag){for(const k in this.rag.P){const q=this.rag.P[k];if(q.x>Wl){q.x=Wl;q.px=Math.max(q.px,Wl)}else if(q.x<-Wl){q.x=-Wl;q.px=Math.min(q.px,-Wl)}}
     const J=this.J;for(const k in J){if(J[k].x>Wl)J[k]={x:Wl,y:J[k].y};else if(J[k].x<-Wl)J[k]={x:-Wl,y:J[k].y}}}return r}}
+
+/* ---------- step-bounce toggle: touch button above the strike buttons, Q on the keyboard ---------- */
+if(typeof In2!=='undefined'){const bt=In2.prototype.buildTouch;In2.prototype.buildTouch=function(){bt.call(this);const tc=this.tc;if(!tc)return;const box=tc.querySelector('.tr4');if(!box)return;
+    const b=document.createElement('button');b.className='b4 bnc';b.innerHTML='<b>⤒</b><small>스탭 밟기</small>';box.insertBefore(b,box.firstChild);
+    const sync=()=>b.classList.toggle('on',!!this.bounceOn);b.addEventListener('touchstart',e=>{e.preventDefault();this.bounceOn=!this.bounceOn;sync();if(navigator.vibrate)try{navigator.vibrate(8)}catch(_){}},{passive:false});b.addEventListener('click',()=>{this.bounceOn=!this.bounceOn;sync()});this._bncSync=sync}
+  addEventListener('keydown',e=>{if((e.key==='q'||e.key==='Q')&&!/INPUT|SELECT|TEXTAREA/.test((e.target||{}).tagName||'')){const M=window.__curMatch;if(M&&M.inp){M.inp.bounceOn=!M.inp.bounceOn;if(M.inp._bncSync)M.inp._bncSync();M.ev&&M.ev(M.inp.bounceOn?'⤒ 스탭 밟기 ON':'스탭 밟기 OFF')}}})}
+{const st=Match.prototype.step;Match.prototype.step=function(dt){window.__curMatch=this;return st.call(this,dt)}}
+{const css=document.createElement('style');css.textContent='.b4.bnc{border-color:rgba(255,200,90,.9)}.b4.bnc.on{transform:none;background:radial-gradient(circle at 35% 30%,rgba(255,255,255,.4),rgba(242,181,68,.75) 62%)}';document.head.appendChild(css)}
+
+/* ---------- overhand: the looping right hand is aimed at the head over its active frames ---------- */
+{const fw=F2.prototype.footwork;F2.prototype.footwork=function(p,dt){fw.call(this,p,dt);const a=this.act;if(!a||!a.c||!a.c.hit||this.state!=='stand'||a.key!=='ovh'||!this.opp||!this.opp.body.J.hd)return;
+    const h=a.c.hit,t=a.t;const w=t<h.t0*.45?0:t<h.t0?(t-h.t0*.45)/(h.t0*.55):t<=h.t1+.05?1:Math.max(0,1-(t-h.t1-.05)/.12);if(w<=0)return;
+    const OJ=this.opp.body.J;/* land on the side / top of the head, coming over the guard */const T={x:OJ.hd.x-this.d*.04,y:OJ.hd.y+.03};const side=a.c.hand==='l'?'la':'ra';
+    const tmp=Object.assign({},p);armIK(this,tmp,side,T);p[side+'_s']+=(tmp[side+'_s']-p[side+'_s'])*w;p[side+'_e']+=(tmp[side+'_e']-p[side+'_e'])*w}}
 })();

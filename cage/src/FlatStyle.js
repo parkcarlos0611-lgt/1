@@ -438,7 +438,7 @@ function octGeom(S,W,H,s,gy,fy){if(S.R0==null)S.R0=S.R;const R0=S.R0,Rc=R0/Math.
   /* where the fence crosses the fighters' plane (the octagon is centrally symmetric, so ±xc) */
   let xc=R0;for(let i=0;i<8;i++){const a=V[i],b=V[(i+1)%8];if((a.Z>=0)!==(b.Z>=0)){const u=a.Z/(a.Z-b.Z);const x=a.X+(b.X-a.X)*u;if(x>0)xc=x}}
   return{V,P,Rc,xc}}
-function drawOctFloor(S,ctx,W,H,s,gy,fy){S.cam.x+=(S.rot||0);/* drawMat runs with the rotation offset removed */const G=octGeom(S,W,H,s,gy,fy);S.cam.x-=(S.rot||0);S.R=G.xc;/* collision boundary = drawn fence */
+function drawOctFloor(S,ctx,W,H,s,gy,fy){S.cam.x+=(S.rot||0);/* drawMat runs with the rotation offset removed */const G=octGeom(S,W,H,s,gy,fy);S.cam.x-=(S.rot||0);S.R=G.xc;window.__cageWall=G.xc-.07;/* inner face of the fence at the fighters' plane *//* collision boundary = drawn fence */
   ctx.fillStyle='#c9c5bd';ctx.fillRect(0,fy-4,W,H-fy+4);/* apron outside the cage */
   const pts=G.V.map(v=>G.P(v.X,v.Z));ctx.fillStyle=BG.mat;ctx.beginPath();pts.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.closePath();ctx.fill();
   /* canvas edge pad */ctx.strokeStyle=BG.matEdge;ctx.lineWidth=.05*s;ctx.stroke()}

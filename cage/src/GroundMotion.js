@@ -206,4 +206,36 @@ const CAGE={pinGap:.27,backGap:.24,reach:.75};
     const r=sp.apply(this,arguments);if(cage&&!g.sub){const T=g.top.gpose,B=g.bot.gpose;if(T&&B){T.lean=-.5;T.chest=-.05;T.head=.15;T.y=.15;B.lean=-.3;B.head=.05}g.cageSit=1}else if(g)g.cageSit=0;return r}}
 /* fighters never pass through the fence */
 {const st=Match.prototype.step;Match.prototype.step=function(dt){const r=st.call(this,dt);const R=this.stage&&this.stage.R;if(R&&!(this.cfg&&this.cfg.training==='bag'))for(const f of this.f){const lim=R-.2;if(f.x>lim)f.x=lim;if(f.x<-lim)f.x=-lim}return r}}
+
+/* ---------- nothing crosses the fence: torso / head push the whole body back; a foot or hand that reaches
+   the fence is pulled onto it by bending the knee / elbow (two-bone IK, joint stays on its own side) ---------- */
+function fenceIK(R,T,L1,L2,E0){let dx=T.x-R.x,dy=T.y-R.y;let D=Math.hypot(dx,dy)||1e-6;const mx=(L1+L2)*.995;if(D>mx){dx*=mx/D;dy*=mx/D;D=mx}
+  const an=Math.acos(clamp((L1*L1+D*D-L2*L2)/(2*L1*D),-1,1));const bx=dx/D,by=dy/D;
+  const k1={x:R.x+(bx*Math.cos(an)-by*Math.sin(an))*L1,y:R.y+(bx*Math.sin(an)+by*Math.cos(an))*L1},k2={x:R.x+(bx*Math.cos(-an)-by*Math.sin(-an))*L1,y:R.y+(bx*Math.sin(-an)+by*Math.cos(-an))*L1};
+  const mid=Math.hypot(k1.x-E0.x,k1.y-E0.y)<Math.hypot(k2.x-E0.x,k2.y-E0.y)?k1:k2;return{mid,end:{x:R.x+dx,y:R.y+dy}}}
+/* rotate bone a→b about a so b sits on the fence (x = sg*Wl), keeping its length; carry the joints below along */
+function lim2(J,a,b,L,sg,Wl,kids){const A=J[a],B=J[b];if(!A||!B||B.x*sg<=Wl)return;const dx=sg*Wl-A.x;if(Math.abs(dx)>=L){/* cannot reach: point the bone at the fence */const nb={x:A.x+Math.sign(dx)*L*.999,y:A.y};const mx=nb.x-B.x,my=nb.y-B.y;J[b]=nb;for(const k of kids)if(J[k])J[k]={x:J[k].x+mx,y:J[k].y+my};return}
+  const h=Math.sqrt(L*L-dx*dx);const c1={x:A.x+dx,y:A.y-h},c2={x:A.x+dx,y:A.y+h};const nb=Math.hypot(c1.x-B.x,c1.y-B.y)<Math.hypot(c2.x-B.x,c2.y-B.y)?c1:c2;
+  /* rotate the children rigidly with the bone */const a0=Math.atan2(B.y-A.y,B.x-A.x),a1=Math.atan2(nb.y-A.y,nb.x-A.x),da=a1-a0,cs=Math.cos(da),sn=Math.sin(da);
+  for(const k of kids)if(J[k]){const q=J[k];const rx=q.x-A.x,ry=q.y-A.y;J[k]={x:A.x+rx*cs-ry*sn,y:A.y+rx*sn+ry*cs}}J[b]=nb}
+function fenceClamp(B){const Wl=window.__cageWall;if(!Wl||!B.J.hd||B.look&&B.look.ref&&false)return;const J=B.J,L=B.L;
+  for(const sg of[1,-1]){const over=k=>J[k]?J[k].x*sg-Wl:-1;
+    /* torso / head: move the whole figure */let ov=0;for(const k of['hip','mid','sh','nk','hd','lS','rS','lH','rH'])ov=Math.max(ov,over(k));
+    if(ov>0){for(const k in J)J[k]={x:J[k].x-sg*ov,y:J[k].y}}
+    /* legs: the foot stops at the fence, the knee bends */
+    for(const s of['l','r']){const H=J[s+'H'],K=J[s+'K'],A=J[s+'A'],He=J[s+'He'],T=J[s+'T'];if(!A)continue;const o=Math.max(over(s+'A'),over(s+'He'),over(s+'T'),over(s+'K'));if(o<=0)continue;
+      const shift=sg*Math.max(0,o);const nA={x:A.x-shift,y:A.y};const r=fenceIK(H,nA,L.thigh,L.shin,K);J[s+'K']=r.mid;const dx=r.end.x-A.x,dy=r.end.y-A.y;J[s+'A']=r.end;J[s+'He']={x:He.x+dx,y:He.y+dy};J[s+'T']={x:T.x+dx,y:T.y+dy};
+      /* knee still past the fence: swing the thigh about the hip so the knee rests on the fence, then the shin about the knee */
+      lim2(J,s+'H',s+'K',L.thigh,sg,Wl,[s+'A',s+'He',s+'T']);lim2(J,s+'K',s+'A',L.shin,sg,Wl,[s+'He',s+'T']);
+      /* the foot itself still past the fence (pointing into it): flatten it against the fence */for(const k of[s+'He',s+'T'])if(J[k].x*sg>Wl)J[k]={x:sg*Wl,y:J[k].y};
+      if(J[s+'Sn'])J[s+'Sn']={x:J[s+'K'].x+(J[s+'A'].x-J[s+'K'].x)*.7,y:J[s+'K'].y+(J[s+'A'].y-J[s+'K'].y)*.7}}
+    /* arms: the glove stops on the fence, the elbow bends */
+    for(const s of['l','r']){const S=J[s+'S'],E=J[s+'E'],W=J[s+'W'],G=J[s+'G'];if(!G)continue;const o=Math.max(over(s+'G'),over(s+'W'),over(s+'E'));if(o<=0)continue;
+      const shift=sg*Math.max(0,o);const nW={x:W.x-shift,y:W.y};const r=fenceIK(S,nW,L.uarm,L.farm,E);J[s+'E']=r.mid;const dx=r.end.x-W.x,dy=r.end.y-W.y;J[s+'W']=r.end;J[s+'G']={x:G.x+dx,y:G.y+dy};
+      lim2(J,s+'S',s+'E',L.uarm,sg,Wl,[s+'W',s+'G']);lim2(J,s+'E',s+'W',L.farm,sg,Wl,[s+'G']);if(J[s+'G'].x*sg>Wl)J[s+'G']={x:sg*Wl,y:J[s+'G'].y}}}}
+window.fenceClamp=fenceClamp;
+{const sv=Body.prototype.solve;Body.prototype.solve=function(p,X,d){const J=sv.call(this,p,X,d);if(!this.rag)fenceClamp(this);return J}}
+/* ragdoll: particles cannot pass the fence either */
+{const sr=Body.prototype.stepRag;Body.prototype.stepRag=function(dt){const r=sr.call(this,dt);const Wl=window.__cageWall;if(Wl&&this.rag){for(const k in this.rag.P){const q=this.rag.P[k];if(q.x>Wl){q.x=Wl;q.px=Math.max(q.px,Wl)}else if(q.x<-Wl){q.x=-Wl;q.px=Math.min(q.px,-Wl)}}
+    const J=this.J;for(const k in J){if(J[k].x>Wl)J[k]={x:Wl,y:J[k].y};else if(J[k].x<-Wl)J[k]={x:-Wl,y:J[k].y}}}return r}}
 })();

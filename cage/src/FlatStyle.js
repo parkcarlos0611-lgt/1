@@ -53,7 +53,7 @@ Body.prototype.draw=function(ctx,o){o=o||{};const lk=this.look;if(!FS.on)return 
   /* the referee is the same figure in a different outfit (black polo, trousers, boots, gloves) */
   const R=!!lk.ref;if(R&&!lk._flat){Object.assign(lk,REF_LOOK[Math.floor(Math.random()*REF_LOOK.length)]);lk._flat=1;this.hs=null}
   const CL=R?{shirt:'#222327',shirtS:'#18191c',pants:'#1e1f23',pantsS:'#151619',boot:'#0f0f11',glove:'#151517'}:null;
-  if(!o.onlyArm){floorShadow(ctx,this);motionBlur(ctx,this,lk)}
+  if(!o.onlyArm&&o.part!=='far'){floorShadow(ctx,this);motionBlur(ctx,this,lk)}
   const M=H*W*.86;/* muscle scale: leaner frames, heavier classes still carry more mass through bw */const SHB=lk.body==='broad'?1.12:1;
   const skin=lk.skin||'#d39b74';const sk={base:skin,sh:shade(skin,FS.shadowK),far:shade(skin,FS.farK),farSh:shade(skin,FS.farK+FS.shadowK),lt:shade(skin,FS.lightK)};
   const shorts=calm(lk.shorts||'#111');const glove=R?CL.glove:lk.glove||'#141414';const strap=o.corner||'#c21818';
@@ -80,15 +80,15 @@ Body.prototype.draw=function(ctx,o){o=o||{};const lk=this.look;if(!FS.on)return 
     /* knee: joint block + a single knee-cap facet */{const F=frame(h,k,d);circ(ctx,k,.041*M,C.b);poly(ctx,[{x:k.x+F.nx*.042*M-F.ux*.03*M,y:k.y+F.ny*.042*M-F.uy*.03*M},{x:k.x+F.nx*.046*M+F.ux*.02*M,y:k.y+F.ny*.046*M+F.uy*.02*M},{x:k.x+F.nx*.02*M+F.ux*.04*M,y:k.y+F.ny*.02*M+F.uy*.04*M},{x:k.x+F.nx*.012*M,y:k.y+F.ny*.012*M}],C.s)}
     circ(ctx,a,.024*M,C.b);footFlat(ctx,a,he,to,M,R?{b:CL.boot,s:'#070708'}:C,d);
     if(sleeveCol)shortsLeg(ctx,h,k,d,M,sleeveCol,lk,isFar)};
-  if(o.onlyArm){arm(nearS,false);return}
+  if(o.onlyArm){arm(nearS,false);return}if(o.part==='far'){arm(farS,true);return}
   /* far side first */
-  arm(farS,true);leg(farS,true,R?null:shade(shorts,-.22));
+  if(o.part!=='body')arm(farS,true);leg(farS,true,R?null:shade(shorts,-.22));
   torsoFlat(ctx,J,H,M*(SHB>1?1.02:1),R?{base:CL.shirt,sh:CL.shirtS,lt:shade(CL.shirt,.07)}:sk,d,lk,this);
   /* shorts go on top in 4 pieces so the hip, where many joints meet, reads as one garment:
      far leg (drawn with the far leg) → seat panel over the hips and both thigh tops → near leg → waistband + hip fold */
   leg(nearS,false,null);if(R){shortsWaist(ctx,J,H,M,'#101012',d,lk,this.ang.ta)}else{shortsSeat(ctx,J,H,M,shorts,d,this.ang.ta,nearS,farS);shortsLeg(ctx,J[nearS.H],J[nearS.K],d,M,shorts,lk,false);shortsWaist(ctx,J,H,M,shorts,d,lk,this.ang.ta)}
   headFlat(ctx,J.hd,J.nk,H,this,skin,d,this.ang.hd);
-  arm(nearS,false);
+  if(o.part!=='body')arm(nearS,false);
   if(o.highlight){ctx.save();ctx.globalAlpha=o.highlight;ctx.globalCompositeOperation='lighter';ngon(ctx,J.hd,.1*H,'#fff',12);ctx.restore()}};
 
 const REF_LOOK=[{skin:'#6e4630',hair:'#141110',hs:'long',bd:'full',beard:true},{skin:'#e7bc9c',hair:'#8a7462',hs:'bald',bd:null,beard:false},{skin:'#e4b593',hair:'#2b211b',hs:'short',bd:null,beard:false},{skin:'#8a5a3e',hair:'#2a1d15',hs:'bald',bd:'stub',beard:false}];

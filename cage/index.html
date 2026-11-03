@@ -822,7 +822,7 @@ class F2{
     /* step-bounce mode (toggle button): legs keep their stance, the fighter bounces on knees and ankles —
        in place and while moving with the stick pushed (>= 40 %); small slow moves still walk */
     if(this.bounce&&this.state==='stand'&&!a){const stk=this.stick||0;const moving=Math.abs(this.mv)>.15||!!this.circ;const fast=stk>=.4||Math.abs(this.mv)>.9;
-      if(!moving||fast){this.bnph=(this.bnph||0)+dt*Math.PI*2*(moving?1.75:1.45);const up=.5-.5*Math.cos(this.bnph),land=1-up;/* smooth rise and settle, no snap at landing */
+      if(!moving||fast){const lt=(this.body.W||1)<=.965;/* lightweight and below keep the quicker rhythm */this.bnph=(this.bnph||0)+dt*Math.PI*2*(lt?(moving?2.9:2.3):(moving?2.5:2.0));const up=.5-.5*Math.cos(this.bnph),land=1-up;/* smooth rise and settle, no snap at landing */
         p.y=(p.y||0)+.02*this.H*up;p.ll_k+=.17*land+.06;p.rl_k+=.17*land+.06;p.ll_a+=.24*up;p.rl_a+=.26*up;p.lean-=.03;p.head+=.01*land;p.la_s+=.03*land;p.ra_s+=.03*land;
         if(moving)p.lean+=clamp(this.mv*this.d,-1.5,1.5)*.015;this.body._swing=up>.3?{l:up,r:up}:null;return}}
     const sp=Math.max(Math.abs(this.mv),this.circ?1.1:0,this.clMv?.9:0),m=Math.min(1,sp/1.1)*(a?.35:1)*(this.guard==='low'?0:1);if(m<.03){return}
@@ -1377,7 +1377,8 @@ class Match{
     S.worldT(ctx);this.ref.draw(ctx,{});/* referee: the fighter figure in a referee outfit, side view (also at the result) */
     // fighters: bottom/defender first
     let order=[a,b];if(g&&g.type==='ground'&&g.sub)order=g.sub.cat==='rnc'?[g.sub.att,g.sub.def]:[g.sub.def,g.sub.att];else if(g&&g.type==='ground')order=GPOS[g.pos].same?[g.top,g.bot]:[g.bot,g.top];else if(g&&g.type==='clinch')order=[g.def,g.att];else if(this.pi!=null)order=[this.f[1-this.pi],this.f[this.pi]];
-    for(const f of order){if(f.hitF>0){ctx.filter=`brightness(${(1+f.hitF*5).toFixed(2)}) saturate(.7)`;f.hitF-=dt}f.draw(ctx,{corner:f.corner});ctx.filter='none';this.drawTrail(ctx,f)}if(g&&g.sub&&/초크/.test(g.sub.name))g.sub.att.draw(ctx,{corner:g.sub.att.corner,onlyArm:1});/* choking arm drawn over the defender's neck */if(this.showBoxes)this.drawBoxes(ctx);
+    const clDraw=g&&g.type==='clinch'&&!g.cage;if(clDraw)for(const f of order){f._noFx=1;f.draw(ctx,{corner:f.corner,part:'far'});f._noFx=0}
+    for(const f of order){if(f.hitF>0){ctx.filter=`brightness(${(1+f.hitF*5).toFixed(2)}) saturate(.7)`;f.hitF-=dt}f.draw(ctx,clDraw?{corner:f.corner,part:'body'}:{corner:f.corner});ctx.filter='none';this.drawTrail(ctx,f)}if(clDraw)for(const f of order){f._noFx=1;f.draw(ctx,{corner:f.corner,onlyArm:1});f._noFx=0}if(g&&g.sub&&/초크/.test(g.sub.name))g.sub.att.draw(ctx,{corner:g.sub.att.corner,onlyArm:1});/* choking arm drawn over the defender's neck */if(this.showBoxes)this.drawBoxes(ctx);
     S.drawFx(dt);S.vig=this.pi!=null&&this.f[this.pi].rock>0?.35:0;
     const O=this.outro;if(O){let al=0;if(O.stage==='fade')al=Math.min(1,O.t/(O.dec?1.4:1.0));else if(O.stage==='cer')al=Math.max(0,1-O.t/.9);else if(O.stage==='fall')al=0;if(al>0){ctx.setTransform(1,0,0,1,0,0);ctx.fillStyle=`rgba(0,0,0,${al})`;ctx.fillRect(0,0,S.cv.width,S.cv.height)}
       if(O.stage==='fall'){ctx.setTransform(1,0,0,1,0,0);const k=Math.min(1,O.t/.4)*.35;ctx.fillStyle=`rgba(0,0,0,${k})`;const h=S.cv.height*.11;ctx.fillRect(0,0,S.cv.width,h);ctx.fillRect(0,S.cv.height-h,S.cv.width,h)}}}

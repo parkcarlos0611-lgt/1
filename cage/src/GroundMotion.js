@@ -275,4 +275,19 @@ if(typeof In2!=='undefined'){const bt=In2.prototype.buildTouch;In2.prototype.bui
 /* ---------- the old quick-step: button removed, no player quick steps (weave and step-bounce remain) ---------- */
 if(typeof In2!=='undefined'){const bt=In2.prototype.buildTouch;In2.prototype.buildTouch=function(){bt.call(this);const tc=this.tc;if(tc){const st=tc.querySelector('.tr4 .stp');if(st)st.remove()}}}
 if(typeof Pacing!=='undefined'){const qs=Pacing.quickStep;Pacing.quickStep=function(M,f,dir){if(f&&f.isPlayer===true)return false;return qs.apply(this,arguments)}}
+
+/* ---------- no quick steps for anyone ---------- */
+if(typeof Pacing!=='undefined')Pacing.quickStep=function(){return false};
+/* bruise / sweat paint only once per fighter per frame (the clinch draws arms in separate passes) */
+if(typeof paintFighterFX==='function'){const pf=paintFighterFX;window.paintFighterFX=function(ctx,f){if(f&&f._noFx)return;return pf(ctx,f)}}
+/* ---------- clinch grips: the far arm wraps the opponent's back (hidden behind the bodies), the near arm comes
+   up over the shoulder to the neck (collar tie, visible); both bent in tight toward the opponent ---------- */
+{const ug=Match.prototype.updGrapple;Match.prototype.updGrapple=function(dt){const r=ug.call(this,dt);const g=this.g;if(!g||g.type!=='clinch'||g.cage)return r;
+    for(const f of[g.att,g.def]){const o=f.opp,P=f.gpose,OJ=o.body.J;if(!P||!OJ.sh)continue;const nearLead=((f.d||1)>0)===((f.stance||1)>0);const near=nearLead?'la':'ra',far=nearLead?'ra':'la';const od=o.d||-f.d;
+      const wob=Math.sin((g.t||0)*6+(f===g.att?0:1.7))*.012;
+      armIK(f,P,far,{x:OJ.sh.x-od*.07,y:(OJ.sh.y+OJ.mid.y)/2+wob});/* hand on the far side of his back */
+      armIK(f,P,near,{x:OJ.nk.x-od*.03,y:OJ.nk.y+.03+wob});/* collar tie behind the head */
+      P[near+'_e']=Math.max(P[near+'_e'],1.15);P[far+'_e']=Math.max(P[far+'_e'],1.25);/* bent in tight */
+      P.lean=Math.max(P.lean||0,.22);P.head=(P.head||0)+.05}
+    return r}}
 })();

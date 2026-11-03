@@ -825,8 +825,8 @@ class F2{
        canvas. Circling in place and very slow drift use the short step-drag instead. */
     const fw=(this.mv*this.d>=0||this.circ)?1:-1;const vf=this.mv*this.d;
     if(!this.circ&&Math.abs(this.mv)>.25){const L=(this.body.L.thigh+this.body.L.shin)*1.14,A=.3;const stride=2*L*Math.sin(A);
-      this.gph=(this.gph||0)+(this.x-px)*this.d/stride*Math.PI;/* actual distance moved this frame */const c=(p.ll_h+p.rl_h)/2;const w=Math.min(1,(Math.abs(this.mv)-.25)/.35)*(a?.4:1);
-      const leg=(ph)=>{ph=((ph%(2*Math.PI))+2*Math.PI)%(2*Math.PI);if(ph<Math.PI){/* stance: foot moves back under the hip at constant speed (= body speed) */const th=Math.asin(Math.sin(A)*(1-2*ph/Math.PI));const push=Math.max(0,(ph-Math.PI*.75)/(Math.PI*.25));return{h:c+th,k:.16,a:.12+.3*push}}
+      this.gph=(this.gph||0)+(this.x-px)*this.d/stride*Math.PI;/* actual distance moved this frame */const c=(p.ll_h+p.rl_h)/2;const w0=Math.min(1,(Math.abs(this.mv)-.25)/.35)*(a?.4:1);this._gw=(this._gw||0)+(w0-(this._gw||0))*Math.min(1,dt*5);const w=this._gw;/* eases in and out of the walk */
+      const leg=(ph)=>{ph=((ph%(2*Math.PI))+2*Math.PI)%(2*Math.PI);if(ph<Math.PI){/* stance: heel strike (toes up) → flat foot → roll onto the ball and push off; the foot moves back under the hip at body speed */const th=Math.asin(Math.sin(A)*(1-2*ph/Math.PI));const u=ph/Math.PI;const push=Math.max(0,(u-.7)/.3),heel=Math.max(0,1-u/.2);return{h:c+th,k:.16,a:.12-.08*heel+.32*push}}
         const q=ph-Math.PI;const sq=Math.sin(q);return{h:c-A*Math.cos(q),k:.18+1.0*Math.pow(Math.max(0,sq),.55),a:-.1+.2*sq}};
       const Lg=leg(this.gph),Rg=leg(this.gph+Math.PI);{const sw=ph=>{ph=((ph%(2*Math.PI))+2*Math.PI)%(2*Math.PI);return ph<Math.PI?0:Math.min(1,Math.sin(ph-Math.PI)*4)*w};this.body._swing={l:sw(this.gph),r:sw(this.gph+Math.PI)}}
       p.ll_h+=(Lg.h-p.ll_h)*w;p.ll_k+=(Lg.k-p.ll_k)*w;p.ll_a+=(Lg.a-p.ll_a)*w;p.rl_h+=(Rg.h-p.rl_h)*w;p.rl_k+=(Rg.k-p.rl_k)*w;p.rl_a+=(Rg.a-p.rl_a)*w;
@@ -1057,7 +1057,7 @@ class Match{
     root.innerHTML='';root.classList.add('mroot2');this.stage=new Stage(root,{venue:R.venue||'cage8',org:cfg.org,level:cfg.level==null?1:cfg.level});SFXI.setLevel(cfg.level==null?1:cfg.level);
     const mk=(c,side)=>{const f=new F2(Object.assign({},c,{side,x:side?1.15:-1.15}));return f};this.f=[mk(cfg.red,0),mk(cfg.blue,1)];this.f[0].opp=this.f[1];this.f[1].opp=this.f[0];
     this.f[0].corner='#c21818';this.f[1].corner='#1f5fd6';
-    this.ref=new F2({side:0,name:'ref',look:{h:1.8,bw:.95,skin:'#d9a882',hair:'#2a2420',ref:1,name:'ref'},x:0});this.ref.d=1;
+    this.ref=new F2({side:0,name:'ref',look:{h:1.88*.9,bw:1.1,skin:'#d9a882',hair:'#2a2420',ref:1,name:'ref'}/* light-heavyweight size */,x:0});this.ref.d=1;
     this.pi=cfg.player==null?null:cfg.player;this.diff=cfg.diff||1;
     this.f.forEach((f,i)=>{if(i!==this.pi)f.ai=new AI2(f,this,this.diff);else f.isPlayer=true});
     this.g=null;this.round=1;this.clock=R.firstLen||R.len;this.phase='intro';this.hitstop=0;this.slow=0;this.cards=[[],[],[]];this.rsAll=[];this.newRS();this.logs=[];

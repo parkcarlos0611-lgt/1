@@ -26,7 +26,12 @@ if(typeof MR!=='undefined')MR.limbShade=0;
 /* ---------- helpers (world units, y up) ---------- */
 /* calm a saturated colour a little toward neutral so kit colours sit with the soft palette */
 const calm=c=>{try{const[r,g,b]=rgbOf(c);const m=(r+g+b)/3;const k=.18;return`rgb(${Math.round(r+(m-r)*k)},${Math.round(g+(m-g)*k)},${Math.round(b+(m-b)*k)})`}catch(e){return c}};
-const poly=(ctx,P,col)=>{if(!P.length)return;ctx.fillStyle=col;ctx.beginPath();ctx.moveTo(P[0].x,P[0].y);for(let i=1;i<P.length;i++)ctx.lineTo(P[i].x,P[i].y);ctx.closePath();ctx.fill()};
+/* every flat shape gets softly rounded corners (radius in world metres, limited by the adjacent edges) */
+let ROUND=.014;
+function rpath(ctx,P,R){const n=P.length;if(n<3||R<=0){ctx.moveTo(P[0].x,P[0].y);for(let i=1;i<n;i++)ctx.lineTo(P[i].x,P[i].y);ctx.closePath();return}
+  const m=(a,b)=>({x:(a.x+b.x)/2,y:(a.y+b.y)/2});const s0=m(P[n-1],P[0]);ctx.moveTo(s0.x,s0.y);
+  for(let i=0;i<n;i++){const a=P[(i+n-1)%n],b=P[i],c=P[(i+1)%n];const r=Math.min(R,.45*Math.hypot(b.x-a.x,b.y-a.y),.45*Math.hypot(c.x-b.x,c.y-b.y));const e=m(b,c);if(r>1e-5)ctx.arcTo(b.x,b.y,e.x,e.y,r);else ctx.lineTo(b.x,b.y)}ctx.closePath()}
+const poly=(ctx,P,col,R)=>{if(!P.length)return;ctx.fillStyle=col;ctx.beginPath();rpath(ctx,P,R==null?ROUND:R);ctx.fill()};
 const lerp=(a,b,t)=>({x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t});
 const circ=(ctx,c,r,col)=>{ctx.fillStyle=col;ctx.beginPath();ctx.arc(c.x,c.y,r,0,Math.PI*2);ctx.fill()};
 const ngon=(ctx,c,r,col,n)=>{n=n||8;ctx.fillStyle=col;ctx.beginPath();for(let i=0;i<n;i++){const a=(i+.5)/n*Math.PI*2;const x=c.x+Math.cos(a)*r,y=c.y+Math.sin(a)*r;i?ctx.lineTo(x,y):ctx.moveTo(x,y)}ctx.closePath();ctx.fill()};
@@ -81,7 +86,7 @@ Body.prototype.draw=function(ctx,o){o=o||{};const lk=this.look;if(!FS.on)return 
   torsoFlat(ctx,J,H,M,R?{base:CL.shirt,sh:CL.shirtS,lt:shade(CL.shirt,.07)}:sk,d,lk,this);
   /* shorts go on top in 4 pieces so the hip, where many joints meet, reads as one garment:
      far leg (drawn with the far leg) → seat panel over the hips and both thigh tops → near leg → waistband + hip fold */
-  leg(nearS,false,null);if(R){shortsWaist(ctx,J,H,M,'#101012',d,lk,this.ang.ta)}else{shortsSeat(ctx,J,H,M,shorts,d,this.ang.ta,nearS,farS);shortsLeg(ctx,J[nearS.H],J[nearS.K],d,M,shorts,lk,false);shortsWaist(ctx,J,H,M,shorts,d,lk,this.ang.ta);shortsFold(ctx,J,M,shorts,d,nearS)}
+  leg(nearS,false,null);if(R){shortsWaist(ctx,J,H,M,'#101012',d,lk,this.ang.ta)}else{shortsSeat(ctx,J,H,M,shorts,d,this.ang.ta,nearS,farS);shortsLeg(ctx,J[nearS.H],J[nearS.K],d,M,shorts,lk,false);shortsWaist(ctx,J,H,M,shorts,d,lk,this.ang.ta)}
   headFlat(ctx,J.hd,J.nk,H,this,skin,d,this.ang.hd);
   arm(nearS,false);
   if(o.highlight){ctx.save();ctx.globalAlpha=o.highlight;ctx.globalCompositeOperation='lighter';ngon(ctx,J.hd,.1*H,'#fff',12);ctx.restore()}};
@@ -93,11 +98,11 @@ function floorShadow(ctx,B){const J=B.J,H=B.H;const low=J.hip.y<.45*H;const xs=[
   ctx.save();ctx.translate(cx,0);ctx.scale(1,ry/rx);const g=ctx.createRadialGradient(0,0,0,0,0,rx);g.addColorStop(0,`rgba(40,30,22,${a.toFixed(3)})`);g.addColorStop(.55,`rgba(40,30,22,${(a*.45).toFixed(3)})`);g.addColorStop(1,'rgba(40,30,22,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(0,0,rx,0,Math.PI*2);ctx.fill();ctx.restore()}
 /* motion blur: fast hands / feet leave a short translucent smear along their path (last 3 frames) */
 const MB_K=[['lG',.04,'g'],['rG',.04,'g'],['lW',.026,'s'],['rW',.026,'s'],['lT',.03,'s'],['rT',.03,'s'],['lA',.03,'s'],['rA',.03,'s'],['lK',.035,'s'],['rK',.035,'s']];
-function motionBlur(ctx,B,lk){const J=B.J,H=B.H;const h=B._mbH||(B._mbH=[]);const snap={};for(const[k]of MB_K)if(J[k])snap[k]={x:J[k].x,y:J[k].y};
+function motionBlur(ctx,B,lk){if(lk.ref)return;const J=B.J,H=B.H;const h=B._mbH||(B._mbH=[]);const snap={};for(const[k]of MB_K)if(J[k])snap[k]={x:J[k].x,y:J[k].y};
   const last=h[h.length-1];const same=last&&MB_K.every(([k])=>!snap[k]||last[k]&&last[k].x===snap[k].x&&last[k].y===snap[k].y);if(!same){h.push(snap);if(h.length>6)h.shift()}
   if(h.length<3)return;const glove=lk.ref?'#151517':lk.glove||'#141414',skin=lk.ref?'#151517':lk.skin||'#d39b74';
-  for(const[k,w0,c]of MB_K){const cur=snap[k];if(!cur)continue;const pts=h.map(f=>f[k]).filter(Boolean);if(pts.length<3)continue;const p0=pts[0];const dist=Math.hypot(cur.x-p0.x,cur.y-p0.y);if(dist<.055*H||dist>.8*H)continue;let jump=false;for(let i=1;i<pts.length;i++)if(Math.hypot(pts[i].x-pts[i-1].x,pts[i].y-pts[i-1].y)>.3*H)jump=true;if(jump)continue;/* a teleport / reset is not motion */
-    const w=w0*H;const col=c==='g'?glove:skin;const al=Math.min(.45,.12+(dist/H-.055)*1.6);ctx.save();ctx.globalAlpha=al;ctx.fillStyle=col;
+  for(const[k,w0,c]of MB_K){const cur=snap[k];if(!cur)continue;const pts=h.map(f=>f[k]).filter(Boolean);if(pts.length<3)continue;const p0=pts[0];const dist=Math.hypot(cur.x-p0.x,cur.y-p0.y);if(dist<(c==='g'?.055:.13)*H||dist>.8*H)continue;/* feet / knees only smear on kicks, not on ordinary steps */let jump=false;for(let i=1;i<pts.length;i++)if(Math.hypot(pts[i].x-pts[i-1].x,pts[i].y-pts[i-1].y)>.3*H)jump=true;if(jump)continue;/* a teleport / reset is not motion */
+    const w=w0*H;const col=c==='g'?glove:skin;const al=Math.min(c==='g'?.45:.22,.12+(dist/H-.055)*1.6);ctx.save();ctx.globalAlpha=al;ctx.fillStyle=col;
     for(let i=0;i<pts.length-1;i++){const a=pts[i],b=i+1<pts.length?pts[i+1]:cur;const dx=b.x-a.x,dy=b.y-a.y,L=Math.hypot(dx,dy)||1e-5;const nx=-dy/L,ny=dx/L;const wa=w*(.25+.85*i/(pts.length-1)),wb=w*(.25+.85*(i+1)/(pts.length-1));ctx.globalAlpha=al*(.35+.65*(i+1)/(pts.length-1));
       ctx.beginPath();ctx.moveTo(a.x+nx*wa,a.y+ny*wa);ctx.lineTo(b.x+nx*wb,b.y+ny*wb);ctx.lineTo(b.x-nx*wb,b.y-ny*wb);ctx.lineTo(a.x-nx*wa,a.y-ny*wa);ctx.closePath();ctx.fill()}
     ctx.restore()}}
@@ -143,25 +148,28 @@ function torsoFlat(ctx,J,H,M,sk,d,lk,B){const sp=[J.hip,J.mid,J.sh,J.nk];const s
 
 /* ---------- shorts: waistband + one leg sleeve per thigh, side slit, panels, accent stripes ---------- */
 function accentOf(col){const[r,g,b]=rgbOf(col);const l=(r*299+g*587+b*114)/1000;return l<70?'#b8975a':l>190?'#3a3a3a':shade(col,.3)}
+const polyRshortsLeg=(ctx,P,c)=>poly(ctx,P,c,.032);
 function shortsLeg(ctx,h,k,d,M,col,lk,isFar){const F=frame(h,k,d);const P=(t,w)=>({x:h.x+F.ux*F.L*t+F.nx*w,y:h.y+F.uy*F.L*t+F.ny*w});
   /* one leg piece: angled hem, short side slit at the front */
-  poly(ctx,[P(-.15,.084*M),P(.5,.08*M),P(.55,.077*M),P(.5,.045*M),P(.6,-.01*M),P(.62,-.082*M),P(-.15,-.084*M)],col);
+  polyRshortsLeg(ctx,[P(-.15,.084*M),P(.5,.08*M),P(.55,.077*M),P(.5,.045*M),P(.6,-.01*M),P(.62,-.082*M),P(-.15,-.084*M)],col);
   if(isFar)return;
   /* one broad panel on the back half + two long accent stripes */
-  poly(ctx,[P(-.05,-.084*M),P(.62,-.082*M),P(.6,-.01*M),P(.3,-.02*M)],shade(col,-.12));
-  const ac=accentOf(lk.shorts||'#111');poly(ctx,[P(.08,.08*M),P(.13,.08*M),P(.42,-.03*M),P(.37,-.03*M)],ac);poly(ctx,[P(.22,.08*M),P(.26,.08*M),P(.48,-.0*M),P(.44,-.0*M)],ac)}
+  polyRshortsLeg(ctx,[P(-.05,-.084*M),P(.62,-.082*M),P(.6,-.01*M),P(.3,-.02*M)],shade(col,-.12));
+  const ac=accentOf(lk.shorts||'#111');polyRshortsLeg(ctx,[P(.08,.08*M),P(.13,.08*M),P(.42,-.03*M),P(.37,-.03*M)],ac);polyRshortsLeg(ctx,[P(.22,.08*M),P(.26,.08*M),P(.48,-.0*M),P(.44,-.0*M)],ac)}
+const polyRshortsWaist=(ctx,P,c)=>poly(ctx,P,c,.018);
 function shortsWaist(ctx,J,H,M,col,d,lk,ta){const hip=J.hip,mid=J.mid;const n={x:d*Math.cos(ta),y:-Math.sin(ta)};const Pp=(c,f)=>({x:c.x+n.x*f,y:c.y+n.y*f});const hw=.082*M/.94;
-  const top=lerp(hip,mid,.38),t2=lerp(hip,mid,.3);poly(ctx,[Pp(top,hw*1.0),Pp(top,-hw*1.04),Pp(t2,-hw*1.07),Pp(t2,hw*1.03)],shade(col,-.25))}
+  const top=lerp(hip,mid,.38),t2=lerp(hip,mid,.3);polyRshortsWaist(ctx,[Pp(top,hw*1.0),Pp(top,-hw*1.04),Pp(t2,-hw*1.07),Pp(t2,hw*1.03)],shade(col,-.25))}
 function hull2(P){P=P.slice().sort((a,b)=>a.x-b.x||a.y-b.y);const cr=(o,a,b)=>(a.x-o.x)*(b.y-o.y)-(a.y-o.y)*(b.x-o.x);const lo=[],up=[];for(const p of P){while(lo.length>=2&&cr(lo[lo.length-2],lo[lo.length-1],p)<=0)lo.pop();lo.push(p)}for(let i=P.length-1;i>=0;i--){const p=P[i];while(up.length>=2&&cr(up[up.length-2],up[up.length-1],p)<=0)up.pop();up.push(p)}lo.pop();up.pop();return lo.concat(up)}
+const polyRshortsSeat=(ctx,P,c)=>poly(ctx,P,c,.05);
 function shortsSeat(ctx,J,H,M,col,d,ta,nS,fS){const hip=J.hip,mid=J.mid;const n={x:d*Math.cos(ta),y:-Math.sin(ta)};const Pp=(c,f)=>({x:c.x+n.x*f,y:c.y+n.y*f});const hw=.08*M/.94;const top=lerp(hip,mid,.36);
   const pts=[Pp(top,hw),Pp(top,-hw*1.04),Pp(hip,-hw*1.1),Pp(hip,hw*1.04)];
-  for(const S of[nS,fS]){const h=J[S.H],k=J[S.K];const F=frame(h,k,d);for(const[t,w]of[[.3,.08],[.3,-.082]])pts.push({x:h.x+F.ux*F.L*t+F.nx*w*M,y:h.y+F.uy*F.L*t+F.ny*w*M})}
-  poly(ctx,hull2(pts),col)}
+  for(const S of[nS,fS]){const h=J[S.H],k=J[S.K];const F=frame(h,k,d);for(const[t,w]of[[.34,.082],[.34,-.084],[.18,.09],[.18,-.09]])pts.push({x:h.x+F.ux*F.L*t+F.nx*w*M,y:h.y+F.uy*F.L*t+F.ny*w*M})}
+  polyRshortsSeat(ctx,hull2(pts),col)}
 function shortsFold(ctx,J,M,col,d,nS){/* the fold where the thigh bends against the hip */const h=J[nS.H],k=J[nS.K];const F=frame(h,k,d);const P=(t,w)=>({x:h.x+F.ux*F.L*t+F.nx*w*M,y:h.y+F.uy*F.L*t+F.ny*w*M});
   poly(ctx,[P(-.04,.078),P(.14,.08),P(.05,.05)],shade(col,-.2))}
 function drawGloveFlat(ctx,E,Wr,G,H,col,strap,open,blood,d,skinC,plain){const a=Math.atan2(G.y-Wr.y,G.x-Wr.x);ctx.save();ctx.translate(Wr.x,Wr.y);ctx.rotate(a);
   /* local frame: +x toward the knuckles; flip so the thumb sits on the top / facing side */
-  const flip=(Math.cos(a)*d>=0)?1:-1;ctx.scale(1,flip);const r=.036*H;const P=(pts,c)=>{ctx.fillStyle=c;ctx.beginPath();ctx.moveTo(pts[0][0]*r,pts[0][1]*r);for(let i=1;i<pts.length;i++)ctx.lineTo(pts[i][0]*r,pts[i][1]*r);ctx.closePath();ctx.fill()};
+  const flip=(Math.cos(a)*d>=0)?1:-1;ctx.scale(1,flip);const r=.036*H;const P=(pts,c)=>{ctx.fillStyle=c;ctx.beginPath();rpath(ctx,pts.map(q=>({x:q[0]*r,y:q[1]*r})),r*.28);ctx.fill()};
   P([[-.95,-.62],[-.95,.62],[.15,.7],[.15,-.7]],col);/* cuff */
   P([[-.92,.62],[-.92,.36],[.12,.42],[.12,.68]],strap);/* cuff strap in corner colour */
   P([[.05,-.92],[.05,.9],[1.05,1.0],[1.55,.78],[1.72,.25],[1.68,-.55],[1.35,-.95]],col);/* knuckle block */
@@ -179,15 +187,15 @@ function drawGloveFlat(ctx,E,Wr,G,H,col,strap,open,blood,d,skinC,plain){const a=
 function headFlat(ctx,hd,nk,H,B,skin,d,ang){const lk=B.look,r=.066*H;ctx.save();ctx.translate(hd.x,hd.y);ctx.scale(d,1);ctx.rotate(-ang*.9);
   const F=(typeof faceOf==='function')?faceOf(B):{n:.5,br:.5,jw:.5,ch:.5,lp:.5,nf:0,nh:0};
   const red=B.redness||0;const sk=red>0&&typeof mixHex==='function'?mixHex(skin,'#b8433a',Math.min(.4,red*.45)):skin;const sh=shade(sk,FS.shadowK),lt=shade(sk,FS.lightK),dk=shade(sk,-.3);
-  const P=(pts,c)=>{ctx.fillStyle=c;ctx.beginPath();ctx.moveTo(pts[0][0]*r,pts[0][1]*r);for(let i=1;i<pts.length;i++)ctx.lineTo(pts[i][0]*r,pts[i][1]*r);ctx.closePath();ctx.fill()};
+  const P=(pts,c,rr)=>{ctx.fillStyle=c;ctx.beginPath();rpath(ctx,pts.map(q=>({x:q[0]*r,y:q[1]*r})),(rr==null?.07:rr)*r);ctx.fill()};
   /* neck: nape, throat, sternocleidomastoid */
   P([[-.66,-.3],[-.88,-1.0],[-1.0,-1.6],[.5,-1.62],[.42,-1.05],[.3,-.8],[.05,-.6]],shade(skin,-.06));
   P([[.05,-.6],[.3,-.8],[.42,-1.05],[.5,-1.62],[.28,-1.62],[.18,-.9]],shade(skin,-.16));
   P([[-.3,-.62],[-.05,-.68],[.32,-1.5],[.18,-1.52]],shade(skin,-.12));
   /* cranium + face profile (straight facets) */
   const nl=F.n||.5,jw=F.jw||.5,ch=F.ch||.5,br=F.br||.5,nf=F.nf||0,lp=F.lp||.5;const tip=[1.12+nl*.1-nf*.06,-.13-nl*.03];
-  const prof=[[-.62,-.5],[-1.0,-.18],[-1.02,.42],[-.78,.9],[-.3,1.12],[.32,1.12],[.72,.9],[.88,.55],[.93+br*.05,.33],[.86,.2],[.9,.08],tip,[tip[0]-.12,-.25],[.96,-.28],[1.0+lp*.05,-.35],[.94,-.43],[.99+lp*.05,-.5],[.92,-.58],[.97+ch*.07,-.72],[.9+ch*.05,-.88],[.6,-.98-jw*.04],[.25,-.92-jw*.05],[-.12-jw*.12,-.8],[-.34-jw*.08,-.6]];
-  P(prof,sk);
+  const prof=[[-.6,-.48],[-.92,-.2],[-1.0,.3],[-.88,.78],[-.5,1.08],[.1,1.16],[.56,1.04],[.82,.74],[.9,.5],[.94+br*.05,.32],[.86,.19],[.9,.08],tip,[tip[0]-.12,-.25],[.96,-.28],[1.0+lp*.05,-.35],[.94,-.43],[.99+lp*.05,-.5],[.92,-.58],[.96+ch*.07,-.7],[.93+ch*.05,-.86],[.7,-.94-jw*.03],[.3,-.9-jw*.05],[-.08-jw*.1,-.86],[-.3-jw*.08,-.62]];
+  P(prof,sk,.05);
   /* face planes: cheek / temple shadow, jaw underside, lit cheekbone + brow */
   P([[.25,-.05],[.62,-.2],[.68,-.55],[.45,-.82],[.08,-.62]],sh);
   P([[-.34,-.6],[-.12,-.8],[.25,-.92],[.6,-.98],[.9,-.88],[.7,-.82],[.2,-.78],[-.15,-.6]],shade(sk,-.2));

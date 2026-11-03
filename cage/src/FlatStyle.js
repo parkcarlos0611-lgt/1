@@ -40,7 +40,7 @@ const ngon=(ctx,c,r,col,n)=>{n=n||8;ctx.fillStyle=col;ctx.beginPath();for(let i=
 function frame(a,b,d){const dx=b.x-a.x,dy=b.y-a.y,L=Math.hypot(dx,dy)||1e-5;const ux=dx/L,uy=dy/L;let nx=-uy,ny=ux;const f=nx*d+ny*.35;if(f<0){nx=-nx;ny=-ny}return{ux,uy,nx,ny,L}}
 /* angular limb: profile rows [t, frontHalfWidth, backHalfWidth] → one flat polygon + a back/underside shadow plane */
 function limb(ctx,a,b,d,rows,col,shCol,extra){const F=frame(a,b,d);const P=(t,w)=>({x:a.x+F.ux*F.L*t+F.nx*w,y:a.y+F.uy*F.L*t+F.ny*w});
-  const front=rows.map(r=>P(r[0],r[1])),back=rows.map(r=>P(r[0],-r[2]));poly(ctx,front.concat(back.slice().reverse()),col);
+  const front=rows.map(r=>P(r[0],r[1])),back=rows.map(r=>P(r[0],-r[2]));poly(ctx,front.concat(back.slice().reverse()),col,ROUND*1.6);/* outline of the limb: extra round */
   /* rounded joint ends: the limb meets its neighbour with a smooth round cap instead of a hard corner */
   if(!(extra&&extra.noCaps)){const r0=rows[0],r1=rows[rows.length-1];circ(ctx,P(r0[0],(r0[1]-r0[2])/2),(r0[1]+r0[2])/2,col);circ(ctx,P(r1[0],(r1[1]-r1[2])/2),(r1[1]+r1[2])/2,col)}
   if(shCol){const mid=rows.map(r=>P(r[0],-r[2]*(extra&&extra.shadowFrom!=null?extra.shadowFrom:.12)));poly(ctx,mid.concat(back.slice().reverse()),shCol)}
@@ -54,7 +54,7 @@ Body.prototype.draw=function(ctx,o){o=o||{};const lk=this.look;if(!FS.on)return 
   const R=!!lk.ref;if(R&&!lk._flat){Object.assign(lk,REF_LOOK[Math.floor(Math.random()*REF_LOOK.length)]);lk._flat=1;this.hs=null}
   const CL=R?{shirt:'#222327',shirtS:'#18191c',pants:'#1e1f23',pantsS:'#151619',boot:'#0f0f11',glove:'#151517'}:null;
   if(!o.onlyArm){floorShadow(ctx,this);motionBlur(ctx,this,lk)}
-  const M=H*W*.94;/* muscle scale */
+  const M=H*W*.86;/* muscle scale: leaner frames, heavier classes still carry more mass through bw */const SHB=lk.body==='broad'?1.12:1;
   const skin=lk.skin||'#d39b74';const sk={base:skin,sh:shade(skin,FS.shadowK),far:shade(skin,FS.farK),farSh:shade(skin,FS.farK+FS.shadowK),lt:shade(skin,FS.lightK)};
   const shorts=calm(lk.shorts||'#111');const glove=R?CL.glove:lk.glove||'#141414';const strap=o.corner||'#c21818';
   const nearLead=(d>0)===(this.stance>0);const lead={S:'lS',E:'lE',W:'lW',G:'lG',H:'lH',K:'lK',A:'lA',He:'lHe',T:'lT',o:'lo'},rear={S:'rS',E:'rE',W:'rW',G:'rG',H:'rH',K:'rK',A:'rA',He:'rHe',T:'rT',o:'ro'};
@@ -63,7 +63,7 @@ Body.prototype.draw=function(ctx,o){o=o||{};const lk=this.look;if(!FS.on)return 
   /* ---- arm: deltoid, biceps/triceps, elbow, forearm, wrist, glove ---- */
   const arm=(S,isFar)=>{const a=J[S.S],e=J[S.E],w=J[S.W];const C=isFar?{b:sk.far,s:sk.farSh}:{b:sk.base,s:sk.sh};
     /* upper arm: deltoid cap → biceps (front) / triceps (back) → elbow */
-    limb(ctx,a,e,d,[[-.1,.05*M,.055*M],[.12,.062*M,.064*M],[.3,.052*M,.058*M],[.5,.05*M,.05*M],[.78,.04*M,.04*M],[1,.031*M,.033*M]],C.b,C.s);
+    limb(ctx,a,e,d,[[-.1,.05*M*SHB,.055*M*SHB],[.12,.062*M*SHB,.064*M*SHB],[.3,.052*M,.058*M],[.5,.05*M,.05*M],[.78,.04*M,.04*M],[1,.031*M,.033*M]],C.b,C.s);
     /* deltoid plate: a lighter facet over the shoulder */
     if(R)limb(ctx,a,e,d,[[-.14,.07*M,.072*M],[.25,.07*M,.072*M],[.56,.064*M,.066*M]],isFar?CL.shirtS:CL.shirt,null);
     else{limb(ctx,a,e,d,[[-.12,.046*M,.04*M],[.08,.058*M,.05*M],[.3,.034*M,.02*M]],isFar?C.b:sk.lt,null,{noCaps:true})}
@@ -83,7 +83,7 @@ Body.prototype.draw=function(ctx,o){o=o||{};const lk=this.look;if(!FS.on)return 
   if(o.onlyArm){arm(nearS,false);return}
   /* far side first */
   arm(farS,true);leg(farS,true,R?null:shade(shorts,-.22));
-  torsoFlat(ctx,J,H,M,R?{base:CL.shirt,sh:CL.shirtS,lt:shade(CL.shirt,.07)}:sk,d,lk,this);
+  torsoFlat(ctx,J,H,M*(SHB>1?1.02:1),R?{base:CL.shirt,sh:CL.shirtS,lt:shade(CL.shirt,.07)}:sk,d,lk,this);
   /* shorts go on top in 4 pieces so the hip, where many joints meet, reads as one garment:
      far leg (drawn with the far leg) → seat panel over the hips and both thigh tops → near leg → waistband + hip fold */
   leg(nearS,false,null);if(R){shortsWaist(ctx,J,H,M,'#101012',d,lk,this.ang.ta)}else{shortsSeat(ctx,J,H,M,shorts,d,this.ang.ta,nearS,farS);shortsLeg(ctx,J[nearS.H],J[nearS.K],d,M,shorts,lk,false);shortsWaist(ctx,J,H,M,shorts,d,lk,this.ang.ta)}
@@ -125,11 +125,11 @@ function footFlat(ctx,A,He,T,M,C,d){const ux0=T.x-He.x,uy0=T.y-He.y,Lf=Math.hypo
 function torsoFlat(ctx,J,H,M,sk,d,lk,B){const sp=[J.hip,J.mid,J.sh,J.nk];const segL=[0];for(let i=1;i<4;i++)segL.push(segL[i-1]+Math.hypot(sp[i].x-sp[i-1].x,sp[i].y-sp[i-1].y));const TL=segL[3]||1;
   const at=s=>{const L=s*TL;let i=1;while(i<3&&segL[i]<L)i++;const a=sp[i-1],b=sp[i],k=(L-segL[i-1])/((segL[i]-segL[i-1])||1);const tx=b.x-a.x,ty=b.y-a.y,l=Math.hypot(tx,ty)||1;return{x:a.x+tx*k,y:a.y+ty*k,nx:ty/l*d,ny:-tx/l*d}};
   const pt=(s,w)=>{const c=at(s);return{x:c.x+c.nx*w*M/.94/1,y:c.y+c.ny*w*M/.94}};
-  const bel=lk.belly?.024:0;
-  const FR=[[0,.074],[.16,.073+bel*.6],[.32,.071+bel],[.48,.07+bel*.7],[.6,.08],[.7,.096],[.79,.099],[.87,.088],[.94,.062],[1,.036]];
-  const BK=[[0,.09],[.1,.086],[.24,.066],[.38,.061],[.52,.071],[.66,.085],[.78,.093],[.88,.087],[.95,.066],[1,.045]];
+  const bel=lk.belly||lk.body==='belly'?.042:0;const shb=lk.body==='broad'?1.14:1;/* broad: wider chest and upper back */
+  const FR=[[0,.074+bel*.3],[.16,.073+bel*.8],[.32,.071+bel],[.48,.07+bel*.7],[.6,.08],[.7,.096*shb],[.79,.099*shb],[.87,.088*shb],[.94,.062],[1,.036]];
+  const BK=[[0,.09],[.1,.086],[.24,.066+bel*.3],[.38,.061+bel*.2],[.52,.071],[.66,.085*shb],[.78,.093*shb],[.88,.087*shb],[.95,.066],[1,.045]];
   const F=FR.map(([s,w])=>pt(s,w)),Bk=BK.map(([s,w])=>pt(s,-w));
-  poly(ctx,F.concat(Bk.slice().reverse()),sk.base);
+  poly(ctx,F.concat(Bk.slice().reverse()),sk.base,ROUND*1.6);
   /* lats / spine side: shadow plane on the back */
   poly(ctx,BK.map(([s,w])=>pt(s,-w*.32)).concat(Bk.slice().reverse()),sk.sh);
   /* trapezius slope + clavicle line */poly(ctx,[pt(.9,-.08),pt(1,-.045),pt(1,.0),pt(.93,-.02)],sk.sh);
@@ -138,7 +138,7 @@ function torsoFlat(ctx,J,H,M,sk,d,lk,B){const sp=[J.hip,J.mid,J.sh,J.nk];const s
   poly(ctx,[pt(.7,.098),pt(.67,.08),pt(.66,.015),pt(.69,.0),pt(.71,.03)],sk.sh);
 
   /* abs: flat blocks along the front edge */
-  if(!lk.belly){poly(ctx,[pt(.6,.08),pt(.22,.072),pt(.22,.05),pt(.6,.055)],sk.lt)}
+  if(!lk.belly&&lk.body!=='belly'){poly(ctx,[pt(.6,.08),pt(.22,.072),pt(.22,.05),pt(.6,.055)],sk.lt)}
   /* tattoos (flat ink shapes) */
   if(lk.tat&&/c/.test(lk.tat)){ctx.globalAlpha=.55;poly(ctx,[pt(.86,.06),pt(.8,.09),pt(.72,.07),pt(.74,.03),pt(.82,.02)],'#1c2230');ctx.globalAlpha=1}
   if(lk.tat&&/b/.test(lk.tat)){ctx.globalAlpha=.5;poly(ctx,[pt(.85,-.08),pt(.7,-.09),pt(.6,-.06),pt(.72,-.03),pt(.84,-.04)],'#1c2230');ctx.globalAlpha=1}
@@ -246,6 +246,8 @@ function beardFlat(lk,hc,P){let bd=lk.bd;if(!bd&&lk.beard)bd='full';if(!bd)retur
 /* ---------- flat arena: plain backdrop, simple cage, clean mat — no crowd, lights, logos or effects ---------- */
 if(typeof GFX!=='undefined'){GFX.octagon=false}
 if(typeof GPU!=='undefined'){Object.assign(GPU,{dof:0,bloom:0,rim:0,contrast:1,saturation:1,vignette:0})}
+/* rounded rectangle helper for props */
+function rr(ctx,x,y,w,h,r){r=Math.min(r,Math.abs(w)/2,Math.abs(h)/2);ctx.beginPath();if(ctx.roundRect)ctx.roundRect(x,y,w,h,r);else ctx.rect(x,y,w,h);ctx.fill()}
 const BG={wall:'#ece9e3',wallLow:'#e2ded6',fence:'#cfcac1',post:'#b9b3a8',rail:'#b1ab9f',mat:'#dedad3',matEdge:'#d2cdc4',ring:'#c9473f'};
 if(typeof Stage!=='undefined'){
   Stage.prototype.drawBack0=function(){const G=this.gpu;const near=this.ctx,dpr=this.dpr,W=this.W,H=this.Hh,s=this.sc();
@@ -253,17 +255,17 @@ if(typeof Stage!=='undefined'){
     near.setTransform(dpr,0,0,dpr,0,0);const ctx=near;const gy=H*this.cam.gy;const dp=.62;const fy=gy-.95*s;this.fy=fy;
     ctx.fillStyle=BG.wall;ctx.fillRect(0,0,W,fy);ctx.fillStyle=BG.wallLow;ctx.fillRect(0,fy-.9*s*dp,W,.9*s*dp);
     const ring=this.venue.startsWith('ring');const top=fy-1.75*s*dp;
-    if(ring){const R=this.R,x0=this.px(-R,dp),x1=this.px(R,dp);for(const x of[x0,x1]){ctx.fillStyle=BG.post;ctx.fillRect(x-.06*s*dp,fy-1.45*s*dp,.12*s*dp,1.45*s*dp)}
-      for(let i=0;i<4;i++){const y=fy-(.42+i*.32)*s*dp;ctx.fillStyle=i%2?this.col:BG.rail;ctx.fillRect(x0,y-.02*s*dp,x1-x0,.04*s*dp)}}
+    if(ring){const R=this.R,x0=this.px(-R,dp),x1=this.px(R,dp);for(const x of[x0,x1]){ctx.fillStyle=BG.post;rr(ctx,x-.06*s*dp,fy-1.45*s*dp,.12*s*dp,1.45*s*dp,.06*s*dp)}
+      for(let i=0;i<4;i++){const y=fy-(.42+i*.32)*s*dp;ctx.fillStyle=i%2?this.col:BG.rail;rr(ctx,x0,y-.02*s*dp,x1-x0,.04*s*dp,.02*s*dp)}}
     else{/* fence: flat panel, thin mesh lines, flat posts, top rail, bottom pad */
       ctx.fillStyle=BG.fence;ctx.globalAlpha=.35;ctx.fillRect(0,top,W,fy-top);ctx.globalAlpha=1;
       ctx.strokeStyle=BG.post;ctx.globalAlpha=.25;ctx.lineWidth=1;const step=.18*s*dp,off=-(this.cam.x*s*dp)%step;ctx.beginPath();for(let x=off-step;x<W+step;x+=step){ctx.moveTo(x,top);ctx.lineTo(x+(fy-top)*.5,fy);ctx.moveTo(x+(fy-top)*.5,top);ctx.lineTo(x,fy)}ctx.stroke();ctx.globalAlpha=1;
-      ctx.fillStyle=BG.rail;ctx.fillRect(0,top-.05*s*dp,W,.07*s*dp);ctx.fillStyle=BG.post;ctx.fillRect(0,fy-.28*s*dp,W,.28*s*dp);
-      const po=Math.floor(this.rot/2.3);for(let i=-5+po;i<=5+po;i++){const x=this.px(i*2.3,dp);ctx.fillStyle=BG.post;ctx.fillRect(x-.07*s*dp,top-.06*s*dp,.14*s*dp,fy-top+.06*s*dp);ctx.fillStyle=BG.rail;ctx.fillRect(x+.02*s*dp,top-.06*s*dp,.05*s*dp,fy-top+.06*s*dp)}}
+      ctx.fillStyle=BG.rail;rr(ctx,-20,top-.05*s*dp,W+40,.07*s*dp,.035*s*dp);ctx.fillStyle=BG.post;rr(ctx,-20,fy-.28*s*dp,W+40,.28*s*dp,.07*s*dp);
+      const po=Math.floor(this.rot/2.3);for(let i=-5+po;i<=5+po;i++){const x=this.px(i*2.3,dp);ctx.fillStyle=BG.post;rr(ctx,x-.07*s*dp,top-.09*s*dp,.14*s*dp,fy-top+.09*s*dp,.07*s*dp);ctx.fillStyle=BG.rail;rr(ctx,x+.02*s*dp,top-.06*s*dp,.05*s*dp,fy-top+.06*s*dp,.025*s*dp)}}
     {const C=this.cam,cx=C.x;C.x-=this.rot;this.drawMat(fy,gy,s);C.x=cx}
     /* camera-pan motion blur on the backdrop (fighters stay sharp) */
-    {const cx=this.cam.x+(this.rot||0);const v=this._pcx==null?0:(cx-this._pcx)*s;this._pcx=cx;this._bv=(this._bv||0)*.6+v*.4;const px=Math.min(28,Math.abs(this._bv)*3.2);
-      if(px>1.2){const cv=ctx.canvas;const dir=Math.sign(this._bv);ctx.save();ctx.setTransform(1,0,0,1,0,0);const n=4;for(let i=1;i<=n;i++){ctx.globalAlpha=.32*(1-i/(n+1));ctx.drawImage(cv,dir*px*dpr*i/n,0)}ctx.restore()}}};
+    {const cx=this.cam.x+(this.rot||0);const v=this._pcx==null?0:(cx-this._pcx)*s;this._pcx=cx;this._bv=(this._bv||0)*.6+v*.4;const px=Math.min(14,Math.abs(this._bv)*1.7);
+      if(px>1.2){const cv=ctx.canvas;const dir=Math.sign(this._bv);ctx.save();ctx.setTransform(1,0,0,1,0,0);const n=4;for(let i=1;i<=n;i++){ctx.globalAlpha=.2*(1-i/(n+1));ctx.drawImage(cv,dir*px*dpr*i/n,0)}ctx.restore()}}};
   Stage.prototype.drawMat=function(fy,gy,s){const ctx=this.ctx,W=this.W,H=this.Hh;ctx.fillStyle=BG.mat;ctx.fillRect(0,fy,W,H-fy);ctx.fillStyle=BG.matEdge;ctx.fillRect(0,fy,W,.06*s);
     if(!this.venue.startsWith('ring')){const k=.86;const cx=(0-this.cam.x*k)*s*k+W/2,cy=fy+(H-fy)*.45;ctx.strokeStyle=this.col||BG.ring;ctx.globalAlpha=.55;ctx.lineWidth=.035*s;ctx.beginPath();ctx.ellipse(cx,cy,2.2*s*k*this.R/4.3,.55*s,0,0,7);ctx.stroke();ctx.globalAlpha=1}
     for(const d of this.decals){d.age=(d.age||0)+1/60;const k=.72+.28*d.z;const sy=fy+(H-fy)*d.z*.95;const x=(d.x-this.cam.x*k)*s*k+W/2;const dk=Math.min(1,d.age/25);const rr=Math.round((130+d.c*30)*(1-dk*.4));

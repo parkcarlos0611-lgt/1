@@ -1978,7 +1978,7 @@ class Career{
     if(!P.inj&&P.plan!=='rest'&&P.plan!=='media')this.train(gym,plan);
     P.fat=clamp(P.fat+(P.inj?-10:plan[2])-(this.hasAsset('prop')?2:0)-(this.hasAsset('boat')?1:0),0,100);
     if(P.plan==='media'){P.followers=Math.round(P.followers*(1.01+P.A.charisma/1000))+50;P.hype=clamp(P.hype+2,0,100)}
-    if(P.fat>75&&!P.inj&&Math.random()<(P.fat-70)/260){const inj=pick([['무릎 염좌',4],['갈비뼈 타박상',3],['손 골절',6],['어깨 탈구',7],['허리 통증',2],['안와 부상',5]]);P.inj={d:inj[0],wk:inj[1]};msgs.push(`🚑 훈련 중 부상: ${inj[0]} (${inj[1]}주)`);if(P.next&&P.next.wk-absW(G.y,G.w)<inj[1]+1){msgs.push(`❌ 부상으로 ${dn(G.F[P.next.opp]||{n:'상대'})}전 취소`);P.next=null;P.hype-=10}}
+    if(this.trainInjury)this.trainInjury(msgs);else if(P.fat>75&&!P.inj&&Math.random()<(P.fat-70)/260){const inj=pick([['무릎 염좌',4],['갈비뼈 타박상',3],['손 골절',6],['어깨 탈구',7],['허리 통증',2],['안와 부상',5]]);P.inj={d:inj[0],wk:inj[1]};msgs.push(`🚑 훈련 중 부상: ${inj[0]} (${inj[1]}주)`);if(P.next&&P.next.wk-absW(G.y,G.w)<inj[1]+1){msgs.push(`❌ 부상으로 ${dn(G.F[P.next.opp]||{n:'상대'})}전 취소`);P.next=null;P.hype-=10}}
     // aging decline
     const ag=this.age();if(ag>31){const d=(ag-31)*.004;['speed','handSpd','chin','recovery','cardio'].forEach(k=>P.A[k]=Math.max(1,P.A[k]-d*(k==='chin'?1.4:1)))}
     // money
@@ -2076,7 +2076,7 @@ class Career{
     // damage → injury & suspension
     const st=res.stats&&res.stats[0];const hp=st&&st.hp||{head:80,body:80,legs:80};const dmg=300-hp.head-hp.body-hp.legs;
     if(!won&&(m==='KO'||m==='TKO')){P.susp=Math.max(P.susp,pick([6,8,9,12]))}else if(dmg>140)P.susp=Math.max(P.susp,4);
-    if(dmg>120&&Math.random()<.4){const inj=pick([['코뼈 골절',5],['안와 골절',8],['손 골절',6],['무릎 인대',10],['갈비뼈 골절',6]]);P.inj={d:inj[0],wk:inj[1]}}
+    if(this.fightInjury)this.fightInjury(res,dmg,won);else if(dmg>120&&Math.random()<.4){const inj=pick([['코뼈 골절',5],['안와 골절',8],['손 골절',6],['무릎 인대',10],['갈비뼈 골절',6]]);P.inj={d:inj[0],wk:inj[1]}}
     if(P.contract){P.contract.left--;if(P.contract.left<=0){this.addFeed(`📜 ${orgName(P.org,G.y)} 계약 종료 — 재계약 또는 이적 가능`,1);P.contract=null}}
     if(nx.tuf){if(won){P.tuf.stage++;if(P.tuf.stage>=4){this.sign('UFC',{n:4,show:this.basePurse('UFC'),win:this.basePurse('UFC')});P.fame+=12;W.news(`🏆 ${P.name}, TUF 우승! UFC 계약 획득`,'me');delete P.tuf}
         else{P.next={kind:'tuf',org:'UFC',opp:this.tufOpp().id,wk:now+2,show:0,win:0,ev:['','TUF 하우스 · 8강','TUF 하우스 · 준결승','TUF 시즌 피날레 · 결승'][P.tuf.stage],tuf:1,main:P.tuf.stage===3};P.hist.unshift(this.histRow(nx,o,res,won,draw,pay,bonus,ppv,belt));P.lastFight=now;return{won,pay,bonus,ppv,belt}}}else{W.news(`TUF 탈락: ${P.name}`,'me');delete P.tuf}}
@@ -2456,5 +2456,5 @@ function fightWeek(){const P=GG.P,nx=P.next;if(!nx)return;const o=GG.F[nx.opp];c
   step0()}
 if(document.readyState==='loading')window.addEventListener('DOMContentLoaded',titleScreen);else titleScreen();
 </script>
-<script src="src/Tuning.js"></script><script src="src/FootPlant.js"></script><script src="src/Arena.js"></script><script src="src/Ragdoll2D.js"></script><script src="src/JudgeRefereeSystem.js"></script><script src="src/CombatEngine.js"></script><script src="src/DebugLayer.js"></script>
+<script src="src/Tuning.js"></script><script src="src/FootPlant.js"></script><script src="src/Arena.js"></script><script src="src/Ragdoll2D.js"></script><script src="src/JudgeRefereeSystem.js"></script><script src="src/CombatEngine.js"></script><script src="src/DebugLayer.js"></script><script src="src/CareerManager.js"></script>
 </body></html>

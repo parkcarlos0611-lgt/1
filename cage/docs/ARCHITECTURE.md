@@ -16,7 +16,8 @@ index.html  (inline core: Body, F2, MV, Stage, In2, AI2, Match, World, Career, U
   └─ src/JudgeRefereeSystem.js  StunModel, RefereeAI, doctor, ScoringEngine (3 judges)
   └─ src/CombatEngine.js        InputBuffer, playback speed, cancel windows, weave/sway/parry
   └─ src/DebugLayer.js          F9 overlay: hitboxes, ragdoll joints, buffer, ref path, conc gauge
-  └─ src/CareerManager.js       (phase 3) Matchmaker, InjuryModel, scheduler UI
+  └─ src/CareerManager.js       InjuryModel, Matchmaker, coaching staff, scheduler / fight-card tab
+  tools/careerbench.js          multi-year career bench (injuries, weeks lost, fights, rematches)
   tools/simbench.js             fast-forward balance bench (virtual clock, real engine, N fights)
 ```
 
@@ -139,11 +140,52 @@ Run it yourself: `node tools/simbench.js index.html 80 LW 3` (add `?tune={...}` 
   25 ft cage (smaller promotions) → R 3.43, 20 ft ring → R 2.74 (was a fixed 3.15). Camera framing is
   wider (fighter ≈ 34 % of screen height at 16:9, was 40 %) and narrow screens are framed by height.
 
+## Phase 3 — CareerManager
+
+### InjuryModel (one model instead of three separate rolls)
+`weekly risk = base 0.008 × fatigue curve × plan load × age (+7 %/yr after 31) × conditioning
+(cardio + recovery + strength) × (1 − 0.12 × S&C coach level)`; fatigue curve 0→0.06, 55→0.35,
+65→0.9, 75→1.9, 90→3.6, 100→5. Severity tiers: minor 1–2 wk (62 %), moderate 3–5 wk (30 %),
+serious 6–10 wk (8 %), shifting toward serious with fatigue. A minor knock that heals before fight
+week no longer cancels the fight. Hard camp risk 3 + 0.32 × fatigue % (cap 35, was 8 + 0.5 × fatigue,
+cap 55). Fight injuries scale with damage taken (from 125) plus a KO-loss bonus.
+
+### Matchmaker
+Score per available opponent: rank distance to a target (one or two spots up when on a run, down
+after a loss), ELO and OVR closeness, form (winners meet winners), style clash (striker vs grappler),
+rivalry, star power, minus a penalty per previous meeting (larger for the last 3). Pick = best score +
+small noise. The reasons travel with the offer ("🧭 랭킹 #11 (나 #14) · 연승자끼리") and the booked fight.
+Event cards pair NPCs the same way (close ranks, close ELO/OVR, style clash).
+
+### Coaching staff
+| Role | Effect per level (1–3) | Weekly salary (2005 $) |
+|---|---|---|
+| 타격 코치 / 그래플링 코치 | training quality +14 % in that area | 350 / 900 / 2,200 |
+| S&C 코치 | conditioning quality +14 %, injury risk −12 % | 300 / 800 / 1,900 |
+| 영양사 | weight cut +0.012/wk, fatigue −0.8/wk | 200 / 550 / 1,300 |
+| 컷맨 | skin +1.2 in fights | 100 / 300 / 800 |
+
+### Scheduler tab (📅 스케줄)
+10 week cards: training plan per week (applied automatically when that week is played), fight / camp
+countdown / injury / contract markers, projected fatigue and injury risk. "자동 주기화" builds a
+plan from the fight date: camp in the camp focus, taper the last 3 weeks, rest around the fight, and a rest
+week whenever projected fatigue passes 62. Below: coaching staff cards, the matchmaking shortlist
+(OVR, ELO, style, reasons; "요청" asks the promotion for that fight), and the upcoming event's fight card.
+
+### Career bench (10 careers × 5 years per scenario)
+| Scenario | Injuries / yr old → new | Weeks lost / yr | Fight cancellations / yr | Fights / yr |
+|---|---|---|---|---|
+| Train every week, never rest | 2.97 → 1.72 | 14.6 → 6.7 | 1.1 → 0.46 | 2.2 → 3.0 |
+| Sparring-heavy | 3.83 → 2.28 | 18.6 → 9.1 | 1.6 → 0.7 | 1.8 → 2.7 |
+| Hard camp every fight | 3.90 → 2.72 | 13.0 → 5.8 | 0.8 → 0.3 | 2.5 → 3.0 |
+| Auto-periodised schedule | 0.13 → 0.14 | 0.7 → 0.4 | 0 → 0 | 3.3 → 3.3 |
+Rematches over 50 career-years: 23–29 → 7–15. Run: `node tools/careerbench.js index.html [old]`.
+
 ## Delivery phases
 1. ✅ Architecture + hitboxes + 2D ragdoll + combat feel + debug layer
 2. ✅ FootPlant, real arena scale, JudgeRefereeSystem (stun gauge, flash KO / TKO / doctor,
    3-judge 10-point must with octagon control, referee positioning and stoppage AI)
-3. CareerManager: matchmaking (rank, form, style), injury model tied to conditioning
+3. ✅ CareerManager: matchmaking (rank, form, style), injury model tied to conditioning
    and rest, scheduler/card UI, arena scale (Standard 30 ft / Apex 25 ft) and responsive camera
 
 ## Tuning (JSON, no code edits)

@@ -25,6 +25,7 @@ index.html  (inline core: Body, F2, MV, Stage, In2, AI2, Match, World, Career, U
   └─ src/RefereeModel.js       new referee figure (generic looks, state poses)
   └─ src/GPURenderer.js        WebGL compositor (DoF, bloom, rim, grade, vignette) + dynamic resolution
   └─ src/MotionPhysics.js      joint spring physics, bouncy footwork, no shadows, stamina drain ×0.6
+  └─ src/MotionRealism.js      game pace, limb shading in draw order, strike variety, blend-in, idle life
   └─ src/DebugLayer.js          F9 overlay: hitboxes, ragdoll joints, buffer, ref path, conc gauge
   └─ src/CareerManager.js       InjuryModel, Matchmaker, coaching staff, scheduler / fight-card tab
   tools/careerbench.js          multi-year career bench (injuries, weeks lost, fights, rematches)
@@ -302,6 +303,25 @@ between watch, ground (crouched), break (arms out), wave-off and raise, driven b
 - **Referees**: stylised likenesses of two well-known referees, picked per fight — Herb Dean style (tall,
   dark skin, bald, full beard) and Marc Goddard style (stocky, light skin, shaved head, stubble, heavy
   brows); black polo, slacks, blue gloves.
+
+## Phase 7 — Pace, legs, depth order, motion variety
+
+- **Pace**: GAME_SPEED 0.8 → 0.72; walking speed multiplier 1.22 → 0.55 (the hips moved 5 units/s,
+  about 3 body heights per second; now ≈ 3 units/s); the second bounce layer is off.
+- **Legs (FootPlant stepping)**: a planted foot never slides (measured 0.000 while walking). When the
+  body moves the foot steps along an arc (heel peels first, ≤ 12 cm lift, 0.09–0.2 s), aiming ahead by
+  velocity × step time; the lead foot leads going forward, the rear foot going back; the next foot may
+  start once the first is 55 % through. Both legs count as support unless that leg is kicking. During
+  kicks the support foot is the pivot and stays put. The engine's walk cycle no longer swings hip / ankle
+  angles (that lifted feet and fought the IK).
+- **See-through fix**: the lighting layer stroked shading over every limb after the fighter was drawn, so
+  far-limb outlines showed on top of near limbs. Shading is now applied inside `limbM` per segment,
+  clipped to that segment and drawn in depth order; sweat glints only on near-side limbs.
+- **Strike variety**: every strike gets its own lean, chest, chin, shoulder twist, level change, arm
+  extension, kick height, guard-hand position and ±7 % speed, shaped by an envelope over the move.
+- **Blend-in**: a move starts from the pose the fighter is actually in and blends into the clip over 70 ms.
+- **Idle life**: hands paw, head bobs, shoulders roll in stance.
+- Balance after the changes (50 fights): LW 24 · 22 · 54 %, HW 42 · 14 · 44 %; time in the pocket 28–29 %.
 
 ## Delivery phases
 1. ✅ Architecture + hitboxes + 2D ragdoll + combat feel + debug layer

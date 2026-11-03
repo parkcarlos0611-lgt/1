@@ -1034,7 +1034,7 @@ class AI2{
 }
 
 /* ===== m_match.js : 2D fight orchestration (hits, damage, cuts/blood, KO/TKO/SUB, grappling, rounds, HUD) ===== */
-const BLEED_RATE=3.0,GAME_SPEED=.8,CLOCK_RATE=7.5;/* sim runs at 80% speed; a 5:00 round on the clock lasts ~50 s of real time */
+const BLEED_RATE=3.0,GAME_SPEED=.72,CLOCK_RATE=7.5;/* sim runs at 80% speed; a 5:00 round on the clock lasts ~50 s of real time */
 const KEYN={ovh:'오버핸드',calf:'카프킥',jab:'잽',cross:'스트레이트',lhook:'리드 훅',rhook:'리어 훅',lupp:'어퍼컷',rupp:'어퍼컷',bjab:'바디 잽',bcross:'바디 스트레이트',blhook:'리버 훅',brhook:'바디 훅',rlk:'로킥',llk:'로킥',rbk:'미들킥',lbk:'미들킥',rhk:'하이킥',lhk:'하이킥',teep:'앞차기',knee:'니킥',kneeH:'플라잉 니',elbow:'엘보',sbf:'스피닝 백피스트',gp:'파운딩',ge:'그라운드 엘보'};
 class Match{
   constructor(root,cfg,onEnd){try{this.showBoxes=/[?&]hb=1/.test(location.search)||localStorage.getItem('cl_hb')==='1'}catch(e){}this.root=root;this.cfg=cfg;this.onEnd=onEnd;const R=this.rules=Object.assign({rounds:3,len:300,firstLen:0,gElbow:1,soccer:0,judging:'ten',standup:22,venue:'cage8'},cfg.rules||{});
@@ -2457,5 +2457,5 @@ function fightWeek(){const P=GG.P,nx=P.next;if(!nx)return;const o=GG.F[nx.opp];c
   step0()}
 if(document.readyState==='loading')window.addEventListener('DOMContentLoaded',titleScreen);else titleScreen();
 </script>
-<script src="src/Tuning.js"></script><script src="src/FootPlant.js"></script><script src="src/Arena.js"></script><script src="src/Ragdoll2D.js"></script><script src="src/JudgeRefereeSystem.js"></script><script src="src/CombatEngine.js"></script><script src="src/CombatPacingEngine.js"></script><script src="src/ImpactFeedbackManager.js"></script><script src="src/GraphicsRenderer.js"></script><script src="src/UIManager.js"></script><script src="src/ArenaRenderer.js"></script><script src="src/RefereeModel.js"></script><script src="src/MotionPhysics.js"></script><script src="src/DebugLayer.js"></script><script src="src/GPURenderer.js"></script><script src="src/CareerManager.js"></script>
+<script src="src/Tuning.js"></script><script src="src/FootPlant.js"></script><script src="src/Arena.js"></script><script src="src/Ragdoll2D.js"></script><script src="src/JudgeRefereeSystem.js"></script><script src="src/CombatEngine.js"></script><script src="src/CombatPacingEngine.js"></script><script src="src/ImpactFeedbackManager.js"></script><script src="src/GraphicsRenderer.js"></script><script src="src/UIManager.js"></script><script src="src/ArenaRenderer.js"></script><script src="src/RefereeModel.js"></script><script src="src/MotionPhysics.js"></script><script src="src/MotionRealism.js"></script><script src="src/DebugLayer.js"></script><script src="src/GPURenderer.js"></script><script src="src/CareerManager.js"></script>
 </body></html>

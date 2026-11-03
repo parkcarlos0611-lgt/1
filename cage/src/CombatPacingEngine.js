@@ -68,7 +68,7 @@ const Pacing={
 {const fw=F2.prototype.footwork;F2.prototype.footwork=function(p,dt){fw.call(this,p,dt);const a=this.act;
     if(a&&a.c&&a.c.hit&&this.state==='stand'&&!a.feint){const w=Pacing.weight(a.key),h=a.c.hit;const u=a.t/Math.max(.04,h.t0);let s;
       if(u<1)s=-.45*Math.sin(Math.PI*u);else if(a.t<=h.t1+.04)s=1;else s=Math.max(0,1-(a.t-h.t1)/Math.max(.08,(a.c.dur||.4)-h.t1));
-      p.x=(p.x||0)+s*w*.045*this.H;p.lean+=s*w*.07;if(a.c.hand==='r'||a.c.leg)this.body._heelLift=Math.max(0,s)*w*.05}else this.body._heelLift=0;
+      p.x=(p.x||0)+s*w*.05*this.H;p.lean+=s*w*.035;if(a.c.hand==='r'||a.c.leg)this.body._heelLift=Math.max(0,s)*w*.05}else this.body._heelLift=0;
     if(this.feint&&a&&a.feint){p.lean+=.04}
     if(this.dash){const k=this.dash.t/this.dash.T;p.lean+=(this.dash.fwd?.08:-.1)*k;p.ll_k+=.12*k;p.rl_k+=.12*k}}}
 /* FootPlant: rear heel comes up as the hips drive through a rear-hand / kick */

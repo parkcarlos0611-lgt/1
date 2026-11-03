@@ -31,8 +31,9 @@ function paintFighterFX(ctx,f){const B=f.body,J=B.J,H=B.H,d=B.d||1;if(!J.hd)retu
   /* key light: warm top, cool bottom */
   if(GFX.shade){const g=ctx.createLinearGradient(0,J.hd.y+.1*H,0,0);g.addColorStop(0,'rgba(255,236,205,.13)');g.addColorStop(.55,'rgba(0,0,0,0)');g.addColorStop(1,GFX.noDark?'rgba(0,0,0,0)':'rgba(8,10,30,.26)');ctx.fillStyle=g;ctx.fillRect(J.hip.x-H,-.1,H*2,H*1.5);
     const lit='rgba(255,240,220,.20)',dark=GFX.noDark?'rgba(0,0,0,0)':'rgba(10,8,25,.34)';
+    if(GFX.segShade!==false){/* per-segment strokes over the finished fighter (off: shading now happens per limb in draw order) */
     seg2(ctx,J.hip,J.sh,.1*H*(B.W||1),lit,dark);seg2(ctx,J.sh,J.hd,.055*H,lit,dark);
-    for(const s of['l','r']){seg2(ctx,J[s+'S'],J[s+'E'],.042*H,lit,dark);seg2(ctx,J[s+'E'],J[s+'W'],.036*H,lit,dark);seg2(ctx,J[s+'H'],J[s+'K'],.06*H,lit,dark);seg2(ctx,J[s+'K'],J[s+'A'],.042*H,lit,dark)}}
+    for(const s of['l','r']){seg2(ctx,J[s+'S'],J[s+'E'],.042*H,lit,dark);seg2(ctx,J[s+'E'],J[s+'W'],.036*H,lit,dark);seg2(ctx,J[s+'H'],J[s+'K'],.06*H,lit,dark);seg2(ctx,J[s+'K'],J[s+'A'],.042*H,lit,dark)}}}
   /* damage */
   if(GFX.bruise){const hd=1-f.hp.head/100,bd=1-f.hp.body/100,lg=1-f.hp.legs/100;const face={x:J.hd.x+d*.035*H,y:J.hd.y};
     blot(ctx,face.x,face.y-.005*H,.055*H,'rgba(110,25,60,A)',hd*.5);blot(ctx,face.x+d*.01*H,face.y+.018*H,.03*H,'rgba(70,10,40,A)',Math.min(1,B.swell||0)*.55);
@@ -41,7 +42,7 @@ function paintFighterFX(ctx,f){const B=f.body,J=B.J,H=B.H,d=B.d||1;if(!J.hd)retu
     const th=mix(J.lH,J.lK,.8),cf=mix(J.lK,J.lA,.35);blot(ctx,th.x,th.y,.06*H,'rgba(120,30,70,A)',lg*.55);blot(ctx,cf.x,cf.y,.045*H,'rgba(110,30,60,A)',lg*.45);
     const sev=B.cuts.reduce((s,c)=>s+c.sev,0);if(sev>.05){ctx.strokeStyle=`rgba(140,0,6,${Math.min(.7,sev*.35)})`;ctx.lineWidth=.012*H;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(face.x,J.hd.y+.03*H);ctx.quadraticCurveTo(face.x+d*.01*H,J.nk.y,J.sh.x+d*.05*H,J.sh.y-.06*H*Math.min(2,sev));ctx.stroke()}}
   /* sweat glints */
-  const sw=(B.sweat||0)*GFX.sweat;if(sw>.08){ctx.fillStyle=`rgba(255,255,255,${(.06+sw*.2).toFixed(3)})`;const pts=[[J.hd,0,.05,.012],[mix(J.sh,J.mid,.25),.05,.02,.016],[mix(J.sh,J.mid,.6),.06,0,.012],[mix(J.lS,J.lE,.35),0,.02,.011],[mix(J.rS,J.rE,.35),0,.02,.011],[mix(J.lH,J.lK,.4),0,.03,.01]];
+  const sw=(B.sweat||0)*GFX.sweat;if(sw>.08){ctx.fillStyle=`rgba(255,255,255,${(.06+sw*.2).toFixed(3)})`;const nr=((B.d||1)>0)===((f.stance||1)>0)?'l':'r';/* near-side limbs only: glints must not land on top of nearer parts */const pts=[[J.hd,0,.05,.012],[mix(J.sh,J.mid,.25),.05,.02,.016],[mix(J.sh,J.mid,.6),.06,0,.012],[mix(J[nr+'S'],J[nr+'E'],.35),0,.02,.011],[mix(J[nr+'H'],J[nr+'K'],.4),0,.03,.01]];
     for(const[p,ox,oy,r]of pts){ctx.beginPath();ctx.ellipse(p.x+d*ox*H,p.y+oy*H,r*H*(1+sw),r*H*.45,0,0,7);ctx.fill()}}
   ctx.restore()}
 /* fighter draw → layer → shading → rim → composite */

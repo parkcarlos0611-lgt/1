@@ -823,7 +823,7 @@ class F2{
        in place and while moving with the stick pushed (>= 40 %); small slow moves still walk */
     if(this.bounce&&this.state==='stand'&&!a){const stk=this.stick||0;const moving=Math.abs(this.mv)>.15||!!this.circ;const fast=stk>=.4||Math.abs(this.mv)>.9;
       if(!moving||fast){const lt=(this.body.W||1)<=.965;/* lightweight and below keep the quicker rhythm */this.bnph=(this.bnph||0)+dt*Math.PI*2*(lt?(moving?2.9:2.3):(moving?2.5:2.0));const up=.5-.5*Math.cos(this.bnph),land=1-up;/* smooth rise and settle, no snap at landing */
-        p.y=(p.y||0)+.02*this.H*up;p.ll_k+=.17*land+.06;p.rl_k+=.17*land+.06;p.ll_a+=.24*up;p.rl_a+=.26*up;p.lean-=.03;p.head+=.01*land;p.la_s+=.03*land;p.ra_s+=.03*land;
+        p.y=(p.y||0)+.02*this.H*up;p.ll_k+=.17*land+.06;p.rl_k+=.17*land+.06;p.ll_a+=.24*up;p.rl_a+=.26*up;p.lean-=.09;p.chest-=.04;/* a bit more upright */p.head+=.01*land;p.la_s+=.03*land;p.ra_s+=.03*land;
         if(moving)p.lean+=clamp(this.mv*this.d,-1.5,1.5)*.015;this.body._swing=up>.3?{l:up,r:up}:null;return}}
     const sp=Math.max(Math.abs(this.mv),this.circ?1.1:0,this.clMv?.9:0),m=Math.min(1,sp/1.1)*(a?.35:1)*(this.guard==='low'?0:1);if(m<.03){return}
     /* bipedal walk: the legs pass each other (stance leg sweeps back under the hips while the swing leg lifts

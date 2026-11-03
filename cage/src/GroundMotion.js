@@ -290,4 +290,11 @@ if(typeof paintFighterFX==='function'){const pf=paintFighterFX;window.paintFight
       P[near+'_e']=Math.max(P[near+'_e'],1.15);P[far+'_e']=Math.max(P[far+'_e'],1.25);/* bent in tight */
       P.lean=Math.max(P.lean||0,.22);P.head=(P.head||0)+.05}
     return r}}
+
+/* ---------- calf kick: the lead shin chops down across the opponent's lead calf ---------- */
+{const fw=F2.prototype.footwork;F2.prototype.footwork=function(p,dt){fw.call(this,p,dt);const a=this.act;if(!a||!a.c||!a.c.hit||this.state!=='stand'||a.key!=='calf'||!this.opp||!this.opp.body.J.lK)return;
+    const h=a.c.hit,t=a.t;const w=t<h.t0*.25?0:t<h.t0?(t-h.t0*.25)/(h.t0*.75):t<=h.t1+.04?1:Math.max(0,1-(t-h.t1-.04)/.14);if(w<=0)return;
+    const OJ=this.opp.body.J;/* the calf: the back of the lower leg, a third of the way down from the knee */const c={x:OJ.lK.x+(OJ.lA.x-OJ.lK.x)*.5,y:OJ.lK.y+(OJ.lA.y-OJ.lK.y)*.5};
+    const thru=t<h.t0?0:.1;/* the ankle swings slightly past the calf and a little downward */const T={x:c.x+this.d*thru,y:Math.max(.1,c.y-.1-thru*.3)};/* low path: the shin comes in under the knee */
+    const tmp=Object.assign({},p);legIK(this,tmp,'ll',T);p.ll_h+=(tmp.ll_h-p.ll_h)*w;p.ll_k+=(tmp.ll_k-p.ll_k)*w;p.ll_a+=(.55-p.ll_a)*w*.6;/* foot turned over */p.tw-=.15*w;p.lean-=.05*w}}
 })();

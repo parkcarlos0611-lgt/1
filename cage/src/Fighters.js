@@ -135,6 +135,25 @@ const PUN={jab:'str',cross:'str',lstr:'str',lhook:'hook',rhook:'hook',lupp:'upp'
 {const sv=Body.prototype.solve;Body.prototype.solve=function(p,X,d){const J=sv.call(this,p,X,d);if(!this.rag&&window.ankleROM)ankleROM(this);return J}}
 
 /* ---------- impact feel: a frame more hitstop on solid shots, stronger shake / zoom, and a camera kick along the blow ---------- */
-if(typeof IFX!=='undefined'){const T=IFX.tiers;T.light.hs=2;T.medium.hs=4;T.heavy.hs=5;T.crit.hs=7;for(const k of['light','medium','heavy','crit']){T[k].shake*=1.35;T[k].zoom*=1.3;T[k].react*=1.12}}
-if(typeof ImpactFeedback!=='undefined'){const ap=ImpactFeedback.apply;ImpactFeedback.apply=function(M,h,p,r0){const r=ap.apply(this,arguments);const tier=this.tier(h);const C=M.stage.cam;const k={blocked:.08,light:.18,medium:.38,heavy:.62,crit:.95}[tier]||0;C.kvx=(C.kvx||0)+(h.att.d||1)*k;C.kvy=(C.kvy||0)-k*.35;return r}}
+if(typeof IFX!=='undefined'){const T=IFX.tiers;T.light.hs=2;T.medium.hs=4;T.heavy.hs=5;T.crit.hs=7;for(const k of['light','medium','heavy','crit']){T[k].shake*=1.35;T[k].zoom*=1.3}}
+if(typeof ImpactFeedback!=='undefined'){const ap=ImpactFeedback.apply;ImpactFeedback.apply=function(M,h,p,r0){const r=ap.apply(this,arguments);const tier=this.tier(h);const C=M.stage.cam;const k={blocked:.04,light:.08,medium:.18,heavy:.3,crit:.45}[tier]||0;C.kvx=(C.kvx||0)+(h.att.d||1)*k;C.kvy=(C.kvy||0)-k*.25;return r}}
+
+/* ---------- weight instead of springs: joint springs critically damped and slower, smaller hit impulses,
+   almost no idle bounce, lighter engine reactions ---------- */
+if(typeof MP!=='undefined'){for(const ch in MP.springs){const sp=MP.springs[ch];const k=sp[0]*.7;sp[0]=k;sp[1]=2.1*Math.sqrt(k)}MP.hit.head=.6;MP.hit.body=.6;MP.hit.leg=.65;MP.hit.kickRecoil=.65;MP.bounce.amp=.006;MP.inertia.lean=.02;MP.inertia.arms=.03}
+if(typeof IFX!=='undefined'){const T=IFX.tiers;T.blocked.react=.3;T.light.react=.32;T.medium.react=.45;T.heavy.react=.55;T.crit.react=.62}
+
+/* ---------- full guard: the top man kneels INSIDE the legs — bottom man's legs wrap his waist, ankles crossed behind
+   his back; the near leg is drawn in front of him, the far leg behind ---------- */
+{const sg=Match.prototype.setGPose;Match.prototype.setGPose=function(){const r=sg.apply(this,arguments);const g=this.g;if(!g||g.type!=='ground')return r;
+  if(g.sub||(g.pos!=='guard'&&g.pos!=='half')){g.layers=null;return r}
+  const top=g.top,bot=g.bot,TJ=top.body.J,B=bot.gpose;if(!TJ.mid||!B)return r;const e=g.d||1;
+  bot.x=g.ax+e*(g.pos==='guard'?.4:.34);
+  const nl=((bot.d||1)>0)===(((bot.body&&bot.body.stance)||bot.stance||1)>0);const nLeg=nl?'ll':'rl',fLeg=nl?'rl':'ll';
+  if(g.pos==='guard'){legIK(bot,B,nLeg,{x:TJ.mid.x-e*.14,y:TJ.mid.y-.02});legIK(bot,B,fLeg,{x:TJ.mid.x-e*.18,y:TJ.mid.y-.07})}
+  else{legIK(bot,B,nLeg,{x:TJ.hip.x-e*.05,y:TJ.hip.y-.12})/* half guard: the top man's leg is trapped between the bottom man's legs */}
+  g.layers=[[bot,['farArm','farLeg','torso','shorts','head']],[top,['farArm','farLeg','torso','nearLeg','shorts','head','nearArm']],[bot,['nearLeg','nearArm']]];return r}}
+
+/* ---------- result screen: step-bounce switched off automatically ---------- */
+{const fin=Match.prototype.finish;Match.prototype.finish=function(){const r=fin.apply(this,arguments);if(this.phase==='end'){const I=this.inp;if(I&&I.bounceOn){I.bounceOn=false;if(I._bncSync)I._bncSync()}for(const f of this.f)f.bounce=false}return r}}
 })();

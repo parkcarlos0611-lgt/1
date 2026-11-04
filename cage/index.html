@@ -762,7 +762,7 @@ class F2{
   /* ---- per-frame ---- */
   update(dt,M){this.t+=dt;const R=this.react;
     // springs
-    R.hv+=(-R.h*90-R.hv*11)*dt;R.h+=R.hv*dt;R.tw=(R.tw||0)*Math.exp(-dt*7);R.arm=(R.arm||0)*Math.exp(-dt*6);R.lv+=(-R.l*70-R.lv*10)*dt;R.l+=R.lv*dt;R.kv+=(-R.k*60-R.kv*9)*dt;R.k+=R.kv*dt;
+    /* critically damped: the head and torso are pushed and come back with weight, no spring-back */R.hv+=(-R.h*70-R.hv*17)*dt;R.h+=R.hv*dt;R.tw=(R.tw||0)*Math.exp(-dt*6);R.arm=(R.arm||0)*Math.exp(-dt*6);R.lv+=(-R.l*55-R.lv*15)*dt;R.l+=R.lv*dt;R.kv+=(-R.k*50-R.kv*14)*dt;R.k+=R.kv*dt;
     if(R.x){const m=R.x*dt*6;this.x+=m;R.x-=m}
     this.body.daze=this.down&&!this.down.ko?.65:this.rock>0?.45:this.cerLose?.35:0;this.stun=Math.max(0,this.stun-dt*(1.6+ATT(this,'recovery')*1.6));if(this.rock>0)this.rock-=dt;
     if(this.hm){this.hmT-=dt;if(this.hmT<=0)this.hm=null}
@@ -779,9 +779,9 @@ class F2{
     else this.vx=0}
   /* pose composition */
   pose(dt,M){if(this.body.rag){this.body.stepRag(Math.min(dt,1/30));this.x=this.body.J.hip.x;return this.cur}const tgt=this.targetPose(M);let out;
-    if(this.act){out=sampleClip(this.act.c,this.act.t,tgt,{});this.cur=poseCopy(out)}
+    if(this.act){out=sampleClip(this.act.c,this.act.t,tgt,{});/* blend in from wherever the body was (no snap at the start of a move) */if(!this.act._from)this.act._from=poseCopy(this.cur);const bt=Math.min(1,this.act.t/.075);if(bt<1)out=poseLerp(this.act._from,out,ease(bt));this.cur=poseCopy(out)}
     else if(this.gpose){out=tgt;if(!!tgt.free!==!!this.cur.free){this.cur.free=tgt.free?1:0;this.cur.y=tgt.free&&this.body.J.hip?this.body.J.hip.y:0}this.cur=poseLerp(this.cur,tgt,1-Math.exp(-dt*(this.gRate||9)));this.cur.free=tgt.free?1:0}
-    else{if(this.cur.free&&!tgt.free){this.cur.free=0;this.cur.y=0}this.cur=poseLerp(this.cur,tgt,1-Math.exp(-dt*26))}
+    else{if(this.cur.free&&!tgt.free){this.cur.free=0;this.cur.y=0}this.cur=poseLerp(this.cur,tgt,1-Math.exp(-dt*15))}/* settle back with weight */
     const p=poseCopy(this.cur);const R=this.react;p.head+=R.h;p.lean+=R.l;p.ll_k+=R.k;p.rl_k+=R.k*.8;if(R.tw)p.tw+=R.tw;if(R.arm&&!this.act){p.la_s-=R.arm*.35;p.la_e-=R.arm*.3;p.ra_s-=R.arm*.25;p.ra_e-=R.arm*.35;p.chest-=R.arm*.05}
     this.footwork(p,dt);
     /* fighting-game timing: anticipation (pull-back) during startup, overshoot on the active frames, settle in recovery */
@@ -1096,7 +1096,7 @@ class Match{
   destroy(){this.running=false;SFXI.musicDuck(false);if(this.inp)this.inp.destroy();this.stage.destroy();this.root.innerHTML='';this.root.classList.remove('mroot2')}
   loop(now){if(!this.running)return;requestAnimationFrame(this.loop);let dt=Math.min(.05,(now-this.last)/1000);this.last=now;
     if(this.paused){this.render(0);return}
-    let sdt=dt;if(this.hitstop>0){this.hitstop-=dt;sdt=dt*.04}else if(this.slow>0){this.slow-=dt;sdt=dt*.25}
+    let sdt=dt;if(this.hitstop>0){this.hitstop-=dt;sdt=dt*.04}else if(this.slow>0){this.slow-=dt;sdt=dt*(this.slowK||.25);if(this.slow<=0)this.slowK=null}
     if(this.outro){this.updOutro(dt);if(this.outro&&this.outro.stage==='fall')sdt=Math.min(sdt,dt*.32)}
     this.step(sdt*GAME_SPEED);this.render(dt)}
   /* ---------- simulation ---------- */
@@ -1378,7 +1378,7 @@ class Match{
     // fighters: bottom/defender first
     let order=[a,b];if(g&&g.type==='ground'&&g.sub)order=g.sub.cat==='rnc'?[g.sub.att,g.sub.def]:[g.sub.def,g.sub.att];else if(g&&g.type==='ground')order=GPOS[g.pos].same?[g.top,g.bot]:[g.bot,g.top];else if(g&&g.type==='clinch')order=[g.def,g.att];else if(g&&g.type==='kcatch')order=[g.def,g.att];else if(this.pi!=null)order=[this.f[1-this.pi],this.f[this.pi]];
     const clDraw=g&&g.type==='clinch'&&!g.cage;if(clDraw)for(const f of order){f._noFx=1;f.draw(ctx,{corner:f.corner,part:'far'});f._noFx=0}
-    if(g&&g.sub&&g.sub.layers){for(const[f,parts]of g.sub.layers){f._noFx=parts.indexOf("head")>=0?0:1;f.draw(ctx,{corner:f.corner,only:parts});f._noFx=0}}else for(const f of order){if(f.hitF>0){ctx.filter=`brightness(${(1+f.hitF*5).toFixed(2)}) saturate(.7)`;f.hitF-=dt}f.draw(ctx,clDraw?{corner:f.corner,part:'body'}:{corner:f.corner});ctx.filter='none';this.drawTrail(ctx,f)}if(clDraw)for(const f of order){f._noFx=1;f.draw(ctx,{corner:f.corner,onlyArm:1});f._noFx=0}if(g&&g.sub&&!g.sub.layers&&/초크/.test(g.sub.name))g.sub.att.draw(ctx,{corner:g.sub.att.corner,onlyArm:1});/* choking arm drawn over the defender's neck */if(this.showBoxes)this.drawBoxes(ctx);
+    const LY=g&&(g.sub&&g.sub.layers||g.type==='ground'&&!g.sub&&g.layers);if(LY){for(const[f,parts]of LY){f._noFx=parts.indexOf("head")>=0?0:1;f.draw(ctx,{corner:f.corner,only:parts});f._noFx=0}}else for(const f of order){if(f.hitF>0){ctx.filter=`brightness(${(1+f.hitF*5).toFixed(2)}) saturate(.7)`;f.hitF-=dt}f.draw(ctx,clDraw?{corner:f.corner,part:'body'}:{corner:f.corner});ctx.filter='none';this.drawTrail(ctx,f)}if(clDraw)for(const f of order){f._noFx=1;f.draw(ctx,{corner:f.corner,onlyArm:1});f._noFx=0}if(g&&g.sub&&!g.sub.layers&&/초크/.test(g.sub.name))g.sub.att.draw(ctx,{corner:g.sub.att.corner,onlyArm:1});/* choking arm drawn over the defender's neck */if(this.showBoxes)this.drawBoxes(ctx);
     S.drawFx(dt);S.vig=this.pi!=null&&this.f[this.pi].rock>0?.35:0;
     const O=this.outro;if(O){let al=0;if(O.stage==='fade')al=Math.min(1,O.t/(O.dec?1.4:1.0));else if(O.stage==='cer')al=Math.max(0,1-O.t/.9);else if(O.stage==='fall')al=0;if(al>0){ctx.setTransform(1,0,0,1,0,0);ctx.fillStyle=`rgba(0,0,0,${al})`;ctx.fillRect(0,0,S.cv.width,S.cv.height)}
       if(O.stage==='fall'){ctx.setTransform(1,0,0,1,0,0);const k=Math.min(1,O.t/.4)*.35;ctx.fillStyle=`rgba(0,0,0,${k})`;const h=S.cv.height*.11;ctx.fillRect(0,0,S.cv.width,h);ctx.fillRect(0,S.cv.height-h,S.cv.width,h)}}}
@@ -2544,5 +2544,5 @@ function fightWeek(){const P=GG.P,nx=P.next;if(!nx)return;const o=GG.F[nx.opp];c
   step0()}
 if(document.readyState==='loading')window.addEventListener('DOMContentLoaded',titleScreen);else titleScreen();
 </script>
-<script src="src/Tuning.js"></script><script src="src/FootPlant.js"></script><script src="src/Arena.js"></script><script src="src/Ragdoll2D.js"></script><script src="src/JudgeRefereeSystem.js"></script><script src="src/CombatEngine.js"></script><script src="src/CombatPacingEngine.js"></script><script src="src/ImpactFeedbackManager.js"></script><script src="src/GraphicsRenderer.js"></script><script src="src/UIManager.js"></script><script src="src/ArenaRenderer.js"></script><script src="src/RefereeModel.js"></script><script src="src/MotionPhysics.js"></script><script src="src/MotionRealism.js"></script><script src="src/AttackMotions.js"></script><script src="src/DebugLayer.js"></script><script src="src/GPURenderer.js"></script><script src="src/CareerManager.js"></script><script src="src/FlatStyle.js"></script><script src="src/GroundMotion.js"></script><script src="src/Training.js"></script><script src="src/Fighters.js"></script><script src="src/Grappling2.js"></script>
+<script src="src/Tuning.js"></script><script src="src/FootPlant.js"></script><script src="src/Arena.js"></script><script src="src/Ragdoll2D.js"></script><script src="src/JudgeRefereeSystem.js"></script><script src="src/CombatEngine.js"></script><script src="src/CombatPacingEngine.js"></script><script src="src/ImpactFeedbackManager.js"></script><script src="src/GraphicsRenderer.js"></script><script src="src/UIManager.js"></script><script src="src/ArenaRenderer.js"></script><script src="src/RefereeModel.js"></script><script src="src/MotionPhysics.js"></script><script src="src/MotionRealism.js"></script><script src="src/AttackMotions.js"></script><script src="src/DebugLayer.js"></script><script src="src/GPURenderer.js"></script><script src="src/CareerManager.js"></script><script src="src/FlatStyle.js"></script><script src="src/GroundMotion.js"></script><script src="src/Training.js"></script><script src="src/Fighters.js"></script><script src="src/Grappling2.js"></script><script src="src/KOReplay.js"></script>
 </body></html>

@@ -57,7 +57,7 @@ Match.prototype.catchPunch=function(){const g=this.g;if(g.pun){g.q=1;return}if(g
 
 /* ---------- the held-leg position and the free-hand punches ---------- */
 Match.prototype.updCatch=function(dt){const g=this.g,C=g.att,K=g.def,d=g.d;g.t+=dt;
-  C.x=g.ax;C.d=d;K.d=-d;K.x+=(C.x+d*.95-K.x)*Math.min(1,dt*10);
+  C.x=g.ax;C.d=d;K.d=-d;K.x+=(C.x+d*.82-K.x)*Math.min(1,dt*10);/* close enough that the free hand reaches the jaw */
   const CJ=C.body.J,KJ=K.body.J;const hop=Math.max(0,Math.sin(g.t*10.5))*.035;
   const pc=Object.assign({},BASE_POSE,{lean:.16,chest:.05,head:.04,ll_h:.38,ll_k:.4,rl_h:-.32,rl_k:.42,rl_a:.35,la_s:.95,la_e:1.6,ra_s:.6,ra_e:2.3});
   const pk=Object.assign({},BASE_POSE,{y:hop,lean:-.18+Math.sin(g.t*9)*.05,chest:-.05,head:.12,la_s:1.7+Math.sin(g.t*8)*.25,la_e:.6,ra_s:.9,ra_e:1.9});
@@ -67,10 +67,10 @@ Match.prototype.updCatch=function(dt){const g=this.g,C=g.att,K=g.def,d=g.d;g.t+=
   if(KJ.lK&&KJ.lA){const kn=held==='ll'?KJ.lK:KJ.rK,an=held==='ll'?KJ.lA:KJ.rA;armIK(C,pc,'la',L(kn,an,.6))}
   /* free (rear) hand: guard, or a punch to the jaw */
   if(g.pun&&KJ.hd){const P=g.pun;P.t+=dt;const u=P.t/.3;const w=u<.45?u/.45:Math.max(0,1-(u-.45)/.55);const tmp=Object.assign({},pc);armIK(C,tmp,'ra',{x:KJ.hd.x-d*.06,y:KJ.hd.y-.05});
-    pc.ra_s+=(tmp.ra_s-pc.ra_s)*w;pc.ra_e+=(tmp.ra_e-pc.ra_e)*w;pc.tw=(pc.tw||0)+.25*w;pc.lean+=.06*w;
+    pc.ra_s+=(tmp.ra_s-pc.ra_s)*w;pc.ra_e+=(tmp.ra_e-pc.ra_e)*w;pc.tw=(pc.tw||0)+.22*w;pc.lean+=.14*w;
     if(u>=.45&&!P.hit){P.hit=1;const dmg=.26*MV.cross.hit.dmg*1.15*(.55+ATT(C,'punchPow')*.75+ATT(C,'strength')*.15)*(.55+.45*C.sta/C.staMax);
-      const hp={x:KJ.hd.x-d*.05,y:KJ.hd.y-.04};this.applyDmg(C,K,{zone:'head',dmg,kind:'punch',p:hp,chin:Math.random()<.22});K.react.h=(K.react.h||0)-.3;K.react.x+=d*.04;C.st&&C.st.land++;
-      SFXI.play('hit',.95);this.stage.impact(hp.x,hp.y,.9,'#fff',d);this.hitstop=.06;this.stage.shake=Math.max(this.stage.shake||0,.05);if(window.hitJiggle)try{hitJiggle(K.body,'head',1,d)}catch(e){}}
+      const hp={x:KJ.hd.x-d*.05,y:KJ.hd.y-.04};this.applyDmg(C,K,{zone:'head',dmg,kind:'punch',p:hp,chin:Math.random()<.22});K.react.h=(K.react.h||0)-.12;K.react.x+=d*.04;C.st&&C.st.land++;
+      SFXI.play('hit',.95);this.stage.impact(hp.x,hp.y,.9,'#fff',d);this.hitstop=.06;this.stage.shake=Math.max(this.stage.shake||0,.05);if(window.hitJiggle)try{hitJiggle(K.body,'head',.02*K.H,d)}catch(e){}}
     if(u>=1){g.pun=null;if(g.q){g.q=0;this.catchPunch()}}}
   C.gpose=pc;K.gpose=pk;
   /* AI on either side */

@@ -110,8 +110,8 @@ function motionBlur(ctx,B,lk){if(lk.ref)return;const J=B.J,H=B.H;const h=B._mbH|
   const last=h[h.length-1];const same=last&&MB_K.every(([k])=>!snap[k]||last[k]&&last[k].x===snap[k].x&&last[k].y===snap[k].y);if(!same){h.push(snap);if(h.length>6)h.shift()}
   if(h.length<3)return;const glove=lk.ref?'#151517':lk.glove||'#141414',skin=lk.ref?'#151517':lk.skin||'#d39b74';
   for(const[k,w0,c]of MB_K){const cur=snap[k];if(!cur)continue;const pts=h.map(f=>f[k]).filter(Boolean);if(pts.length<3)continue;const p0=pts[0];const dist=Math.hypot(cur.x-p0.x,cur.y-p0.y);if(dist<(c==='g'?.055:c==='u'?.08:.13)*H||dist>.8*H)continue;/* feet / knees only smear on kicks, not on ordinary steps */let jump=false;for(let i=1;i<pts.length;i++)if(Math.hypot(pts[i].x-pts[i-1].x,pts[i].y-pts[i-1].y)>.3*H)jump=true;if(jump)continue;/* a teleport / reset is not motion */
-    if(c==='u'&&!B._striking)continue;/* upper-limb smear only during punches / kicks */const w=w0*H;const col=c==='g'?glove:skin;const al=Math.min(c==='g'?.45:c==='u'?.16:.22,(c==='u'?.06:.12)+(dist/H-.055)*(c==='u'?.9:1.6));ctx.save();ctx.globalAlpha=al;ctx.fillStyle=col;
-    for(let i=0;i<pts.length-1;i++){const a=pts[i],b=i+1<pts.length?pts[i+1]:cur;const dx=b.x-a.x,dy=b.y-a.y,L=Math.hypot(dx,dy)||1e-5;const nx=-dy/L,ny=dx/L;const wa=w*(.25+.85*i/(pts.length-1)),wb=w*(.25+.85*(i+1)/(pts.length-1));ctx.globalAlpha=al*(.35+.65*(i+1)/(pts.length-1));
+    if(c==='u'&&!B._striking)continue;/* upper-limb smear only during punches / kicks */const w=w0*H;const col=c==='g'?glove:skin;const al=Math.min(c==='g'?.28:c==='u'?.1:.14,(c==='u'?.035:.07)+(dist/H-.055)*(c==='u'?.6:1.1));/* a soft trail, not a solid ghost */ctx.save();ctx.globalAlpha=al;ctx.fillStyle=col;
+    for(let i=0;i<pts.length-1;i++){const a=pts[i],b=i+1<pts.length?pts[i+1]:cur;const dx=b.x-a.x,dy=b.y-a.y,L=Math.hypot(dx,dy)||1e-5;const nx=-dy/L,ny=dx/L;const wa=w*(.25+.85*i/(pts.length-1)),wb=w*(.25+.85*(i+1)/(pts.length-1));ctx.globalAlpha=al*Math.pow((i+1)/(pts.length-1),1.6);
       ctx.beginPath();ctx.moveTo(a.x+nx*wa,a.y+ny*wa);ctx.lineTo(b.x+nx*wb,b.y+ny*wb);ctx.lineTo(b.x-nx*wb,b.y-ny*wb);ctx.lineTo(a.x-nx*wa,a.y-ny*wa);ctx.closePath();ctx.fill()}
     ctx.restore()}}
 /* ---------- foot: ankle bones, heel, arch, ball, toes ---------- */
@@ -284,11 +284,7 @@ if(typeof Stage!=='undefined'){
     {const C=this.cam,cx=C.x;C.x-=this.rot;this.drawMat(fy,gy,s);C.x=cx}
     if(!ring)drawOctagon(this,ctx,W,H,s,gy,fy);
     /* camera-pan motion blur on the backdrop (fighters stay sharp) */
-    {const cx=this.cam.x;const v=this._pcx==null?0:(cx-this._pcx)*s;this._pcx=cx;this._bv=(this._bv||0)*.6+v*.4;
-      /* circling the cage (stick up/down turns the octagon): a much stronger sideways streak */
-      const r=this.rot||0;const vr=this._prot==null?0:(r-this._prot)*s;this._prot=r;this._rv=(this._rv||0)*.55+vr*.45;
-      const pan=Math.min(10,Math.abs(this._bv)*1.3),rotp=Math.min(20,Math.abs(this._rv)*3);const px=Math.max(pan,rotp),strong=rotp>pan;
-      if(px>1.2){const cv=ctx.canvas;const dir=Math.sign(strong?this._rv:this._bv)||1;ctx.save();ctx.setTransform(1,0,0,1,0,0);const n=strong?5:4,a0=strong?.22:.16;for(let i=1;i<=n;i++){ctx.globalAlpha=a0*(1-i/(n+1));ctx.drawImage(cv,dir*px*dpr*i/n,0)}ctx.restore()}}};
+    /* no background motion blur */};
   Stage.prototype.drawMat=function(fy,gy,s){const ctx=this.ctx,W=this.W,H=this.Hh;if(this.venue.startsWith('ring')){ctx.fillStyle=BG.mat;ctx.fillRect(0,fy,W,H-fy);ctx.fillStyle=BG.matEdge;ctx.fillRect(0,fy,W,.06*s)}else drawOctFloor(this,ctx,W,H,s,gy,fy);
     for(const d of this.decals){d.age=(d.age||0)+1/60;const k=.72+.28*d.z;const sy=fy+(H-fy)*d.z*.95;const x=(d.x-this.cam.x*k)*s*k+W/2;const dk=Math.min(1,d.age/25);const rr=Math.round((130+d.c*30)*(1-dk*.4));
       ctx.fillStyle=`rgba(${rr},10,10,${d.a})`;ctx.beginPath();ctx.ellipse(x,sy,d.r*s*k*(d.str||1),d.r*s*.3,0,0,7);if(d.sat)for(const q of d.sat){ctx.moveTo(x+q[0]*s*k+q[2]*s*k,sy+q[1]*s*.3);ctx.ellipse(x+q[0]*s*k,sy+q[1]*s*.3,q[2]*s*k,q[2]*s*.3,0,0,7)}ctx.fill()}}}
@@ -425,7 +421,7 @@ window.drawRefSide=function(ctx0,r,t){let ctx=ctx0;if(window.__gpuFig&&ctx0.canv
 /* ---------- hit jiggle: the struck part shakes briefly (damped, ~22 Hz) ---------- */
 const JIG_K={head:['hd','nk'],body:['sh','mid','lS','rS','nk'],legL:['lK','lA','lHe','lT','lSn'],legR:['rK','rA','rHe','rT','rSn']};
 {const D=Body.prototype.draw;Body.prototype.draw=function(ctx,o){const g=this._jig;if(!g||!this.J.hd)return D.call(this,ctx,o);const age=(performance.now()-g.t0)/1000;if(age>.4){this._jig=null;return D.call(this,ctx,o)}
-    const k=g.a*Math.exp(-age*9)*Math.sin(age*2*Math.PI*22),J=this.J,save={};const keys=JIG_K[g.z]||JIG_K.body;
+    /* one heavy push along the blow that eases back — no vibration */const k=g.a*.8*(age<.045?Math.sin(age/.045*Math.PI/2):Math.exp(-(age-.045)*9)),J=this.J,save={};const keys=JIG_K[g.z]||JIG_K.body;
     keys.forEach((n,i)=>{const q=J[n];if(!q)return;save[n]=q;const w=n==='nk'||n==='mid'?.55:1;J[n]={x:q.x+k*g.dx*w,y:q.y+k*.35*w}});
     try{return D.call(this,ctx,o)}finally{for(const n in save)J[n]=save[n]}}}
 window.hitJiggle=function(body,zone,amp,dir,leg){body._jig={z:zone==='head'?'head':zone==='leg'?(leg==='r'?'legR':'legL'):'body',t0:performance.now(),a:amp,dx:dir||1}};

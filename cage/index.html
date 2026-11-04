@@ -1820,9 +1820,9 @@ const ST_TPL={box:{punchPow:3,handSpd:3,accuracy:3,footwork:2,strDef:3,chin:1},k
  sambo:{takedown:4,topCtl:3,subOff:2,clinchCtl:2,cardio:2,tdd:2},catch:{subOff:4,topCtl:2,subDef:3,bottom:1},wushu:{kicking:4,speed:3,takedown:2,footwork:2},sanda:{kicking:4,takedown:2,footwork:2},str:{strength:7,punchPow:2,chin:1}};
 const TAG_TPL={power:{punchPow:4},chin:{chin:4,heart:2},glass:{chin:-5},cardio:{cardio:4,work:2},iq:{fightIQ:4,composure:3},trash:{charisma:5,composure:1},wr:{takedown:2,tdd:2,topCtl:2},sub:{subOff:3,subDef:2},kick:{kicking:3},speed:{speed:3,handSpd:2},
  elbow:{clinchStr:3},clinch:{clinchStr:3,clinchCtl:2},unorth:{fightIQ:2,footwork:2,kicking:1},judo:{clinchCtl:2},event:{charisma:4}};
-const AKEYS=['punchPow','handSpd','accuracy','kicking','clinchStr','footwork','strDef','takedown','tdd','clinchCtl','topCtl','bottom','subOff','subDef','getup','strength','speed','cardio','chin','skin','bodyT','recovery','weightCut','fightIQ','composure','aggression','heart','work','charisma'];
-const AGRP=[['타격',['punchPow','handSpd','accuracy','kicking','clinchStr','footwork','strDef']],['그래플링',['takedown','tdd','clinchCtl','topCtl','bottom','subOff','subDef','getup']],['신체',['strength','speed','cardio','chin','skin','bodyT','recovery','weightCut']],['정신',['fightIQ','composure','aggression','heart','work','charisma']]];
-const ANAME={punchPow:'펀치력',handSpd:'핸드 스피드',accuracy:'정확도',kicking:'킥',clinchStr:'클린치 타격',footwork:'풋워크',strDef:'타격 방어',takedown:'테이크다운',tdd:'TD 방어',clinchCtl:'클린치 컨트롤',topCtl:'탑 컨트롤',bottom:'하위 포지션',subOff:'서브미션',subDef:'서브 방어',getup:'일어나기',
+const AKEYS=['punchPow','handSpd','accuracy','kicking','clinchStr','footwork','switch','strDef','takedown','tdd','clinchCtl','topCtl','bottom','subOff','subDef','getup','strength','speed','cardio','chin','skin','bodyT','recovery','weightCut','fightIQ','composure','aggression','heart','work','charisma'];
+const AGRP=[['타격',['punchPow','handSpd','accuracy','kicking','clinchStr','footwork','switch','strDef']],['그래플링',['takedown','tdd','clinchCtl','topCtl','bottom','subOff','subDef','getup']],['신체',['strength','speed','cardio','chin','skin','bodyT','recovery','weightCut']],['정신',['fightIQ','composure','aggression','heart','work','charisma']]];
+const ANAME={switch:'반대 스탠스',punchPow:'펀치력',handSpd:'핸드 스피드',accuracy:'정확도',kicking:'킥',clinchStr:'클린치 타격',footwork:'풋워크',strDef:'타격 방어',takedown:'테이크다운',tdd:'TD 방어',clinchCtl:'클린치 컨트롤',topCtl:'탑 컨트롤',bottom:'하위 포지션',subOff:'서브미션',subDef:'서브 방어',getup:'일어나기',
  strength:'근력',speed:'순발력',cardio:'지구력',chin:'맷집(턱)',skin:'피부 내구성',bodyT:'바디 내구',recovery:'회복력',weightCut:'감량',fightIQ:'경기 IQ',composure:'침착성',aggression:'공격성',heart:'투지',work:'성실성',charisma:'쇼맨십'};
 function hsh(s){let h=2166136261;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619)}return(h>>>0)/4294967296}
 function parseFDB(){const out=[];FDB_RAW.trim().split('\n').forEach((l,i)=>{const a=l.split('|');if(a.length<11)return;const car=a[9].split(',').filter(Boolean).map(x=>{const[o,r]=x.split(':');const[f,t]=r.split('-').map(Number);return{o,f,t}});
@@ -1837,6 +1837,7 @@ function attrsFor(f,r){const A={};const base=3+(r-40)/59*13.5;AKEYS.forEach(k=>A
   const isStr=f.st.every(s=>['box','kb','mt','kar','tkd','str'].includes(s)),isGr=f.st.every(s=>['wr','bjj','judo','sambo','catch'].includes(s));
   if(isStr){['takedown','topCtl','subOff'].forEach(k=>A[k]-=3)}if(isGr){['kicking','accuracy','handSpd'].forEach(k=>A[k]-=2.5)}
   if(f.wc==='HW'){A.speed-=1.5;A.cardio-=1.5;A.punchPow+=1.5;A.strength+=1.5}if(f.wc==='FLY'||f.wc==='BW'){A.speed+=1.5;A.cardio+=1;A.punchPow-=1}
+  if(window.SWITCH_SK)A.switch=window.SWITCH_SK(f,A);
   AKEYS.forEach(k=>A[k]=Math.round(clamp(A[k],1,20)));return A}
 const FDB=parseFDB();
 
@@ -1952,7 +1953,7 @@ class World{
   eraNews(y,first){const H=ERA_NEWS.filter(e=>first?e[0]===y&&e[1]<=2:e[0]===y);return H.map(e=>({s:e[2],k:'era',y:e[0],w:e[1]*4}))}
 }
 function dn(f){return f.ko&&f.nat==='KR'?f.ko:f.n}
-function pRating(P){const A=P.A;let s=0;AKEYS.forEach(k=>{if(k!=='charisma'&&k!=='work'&&k!=='weightCut')s+=A[k]});return clamp(40+(s/25-3)/14*59,40,99)}
+function pRating(P){const A=P.A;let s=0;AKEYS.forEach(k=>{if(k!=='charisma'&&k!=='work'&&k!=='weightCut')s+=A[k]});return clamp(40+(s/26-3)/14*59,40,99)}
 const ERA_NEWS=[[2005,1,'📺 TUF 시즌1 결승 포레스트 그리핀 vs 스테판 보너 — 케이블 시청률 폭발, UFC 붐 시작'],[2005,2,'🇯🇵 PRIDE 전성기: 표도르·크로캅·노게이라의 헤비급 3강 시대'],[2005,3,"🥋 K-1 HERO'S 출범, 일본 격투기 시장 양강 체제"],
  [2006,4,'🏟️ PRIDE 미국 라스베이거스 진출'],[2006,12,'💼 주파(UFC 모회사) WEC 인수 — 경량급 전용 무대로'],[2006,11,'🇰🇷 스피릿MC 국내 인기 정점'],[2007,3,'💥 주파, PRIDE 인수 발표'],[2007,10,'⚰️ PRIDE 일본 사무소 폐쇄 — 선수 대거 UFC 이적'],
  [2007,5,'🇺🇸 EliteXC, 지상파 CBS 중계 계약'],[2008,1,'🎌 DREAM 출범 (HERO\'S·PRIDE 출신 결집)'],[2008,7,'💸 어플릭션: 표도르에 거액 대전료'],[2008,10,'💣 EliteXC 도산'],[2009,4,'⚖️ 벨라토르 첫 시즌 토너먼트 시작'],
@@ -2291,7 +2292,7 @@ function modal(html,cls){const m=document.createElement('div');m.className='moda
 function ask(msg,fn){const m=modal(`<p>${msg}</p><div class="row end"><button class="btn ghost" data-n>취소</button><button class="btn" data-y>확인</button></div>`);m.querySelector('[data-n]').onclick=()=>m.remove();m.querySelector('[data-y]').onclick=()=>{m.remove();fn()}}
 /* ---------- save ---------- */
 function save(){try{const F={};for(const id in GG.F){const f=Object.assign({},GG.F[id]);delete f.A;F[id]=f}localStorage.setItem('cage_save',JSON.stringify(Object.assign({},GG,{F})));}catch(e){console.warn(e)}}
-function load(){try{const s=localStorage.getItem('cage_save');if(!s)return false;GG=JSON.parse(s);if(GG.P&&GG.P.A&&GG.P.A.skin==null)GG.P.A.skin=10;for(const id in GG.F){const f=GG.F[id];f.A=attrsFor(f,f.r||50)}WW=new World(GG);CC=new Career(GG,WW);return true}catch(e){return false}}
+function load(){try{const s=localStorage.getItem('cage_save');if(!s)return false;GG=JSON.parse(s);if(GG.P&&GG.P.A&&GG.P.A.skin==null)GG.P.A.skin=10;if(GG.P&&GG.P.A&&GG.P.A.switch==null)GG.P.A.switch=8;for(const id in GG.F){const f=GG.F[id];f.A=attrsFor(f,f.r||50)}WW=new World(GG);CC=new Career(GG,WW);return true}catch(e){return false}}
 /* ---------- title ---------- */
 function titleScreen(){const has=!!(()=>{try{return localStorage.getItem('cage_save')}catch(e){}})();
   app().innerHTML=`<div class="title"><div class="tbg"></div><div class="tin"><div class="tsub">FIGHTER LIFE SIMULATOR</div><h1 class="H">격투가로 인생살기<br><span>CAGE LEGENDS</span></h1>
@@ -2417,7 +2418,7 @@ function careerTrain(kind){const P=GG.P;const wc=WC[P.wc];const me={name:P.name,
   const pool=Object.values(GG.F).filter(f=>f.act&&f.wc===P.wc&&f.id!==P.id);const o=pool[Math.floor(Math.random()*pool.length)]||pool[0];
   const partner=o?{name:dn(o),flag:flag(o.nat),rec:'',A:Object.assign({},o.A,{aggression:Math.min(o.A.aggression||10,10)}),stance:1,look:lookFor(o)}:me;
   const KEYS={bag:['punchPow','kicking','handSpd','cardio'],wrestle:['takedown','tdd','topCtl','bottom'],spar:['strDef','accuracy','fightIQ','composure']};
-  startTraining(kind,me,partner,{diff:.85,onTrain:(tr,score)=>{const g=clamp(score/120,.05,.35);const ks=KEYS[tr].filter(k=>P.A[k]!=null);const up=[];for(const k of ks){const pot=(P.pot||14);if(P.A[k]<pot+2){P.A[k]=clamp(P.A[k]+g,1,20);up.push(`${ANAME[k]||k} +${g.toFixed(2)}`)}}P.fat=clamp((P.fat||0)+8,0,100);save();return up.length?`능력치 상승: ${up.join(' · ')} · 피로도 +8`:'피로도 +8'},done:()=>{hub()}})}
+  startTraining(kind,me,partner,{diff:.85,gymQ:clamp((((GYMS[P.gym]||GYMS[0])[5])-60)/640,0,1),onTrain:(tr,score)=>{const g=clamp(score/120,.05,.35);const ks=KEYS[tr].filter(k=>P.A[k]!=null);const up=[];for(const k of ks){const pot=(P.pot||14);if(P.A[k]<pot+2){P.A[k]=clamp(P.A[k]+g,1,20);up.push(`${ANAME[k]||k} +${g.toFixed(2)}`)}}P.fat=clamp((P.fat||0)+8,0,100);save();return up.length?`능력치 상승: ${up.join(' · ')} · 피로도 +8`:'피로도 +8'},done:()=>{hub()}})}
 function tabTrain(){const P=GG.P,el=$('#tabc');const gyms=GYMS.map((g,i)=>[g,i]).filter(([g])=>g[2]<=GG.y&&g[3]>=GG.y);
   el.innerHTML=`<div class="card"><h3>🥊 직접 훈련하기</h3><p class="sm mu">세션마다 피로도 +8 · 성과에 따라 관련 능력치가 조금 오릅니다.</p><div class="row wrap">${Object.entries(TRN).map(([k,c])=>`<button class="btn ghost" data-ts="${k}" ${P.fat>85?'disabled':''}>${c.n}</button>`).join('')}</div></div>
    <div class="card"><h3>🏋️ 훈련 계획</h3><div class="row wrap">${Object.entries(PLANS).map(([k,p])=>`<button class="chip ${P.plan===k?'on':''}" data-pl="${k}">${p[0]}</button>`).join('')}</div>

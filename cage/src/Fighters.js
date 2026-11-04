@@ -67,4 +67,22 @@ Object.assign(FACES,{
  'Paddy Pimblett':{n:.55,nf:.35,br:.45,jw:.6,ch:.45,lp:.5,ey:0,ck:.5,eb:.45},'Renato Moicano':{n:.6,br:.55,jw:.7,ch:.6,lp:.45,ey:1,ck:.6,eb:.6},
  'Beneil Dariush':{n:.65,nh:.35,br:.55,jw:.65,ch:.55,lp:.45,ey:1,ck:.6,eb:.65},'Mateusz Gamrot':{n:.55,br:.5,jw:.7,ch:.55,lp:.4,ey:0,ck:.55,eb:.5},
  'Calvin Kattar':{n:.6,br:.55,jw:.75,ch:.6,lp:.45,ey:1,ck:.6,eb:.6},'Movsar Evloev':{n:.62,nh:.3,br:.6,jw:.7,ch:.55,lp:.4,ey:1,ck:.7,eb:.75}});
+
+/* ---------- off-stance skill (반대 스탠스): known switch hitters high, one-stance fighters low ---------- */
+const SWITCH={'Anderson Silva':19,'Dominick Cruz':19,'TJ Dillashaw':18,'Max Holloway':17,'Petr Yan':18,'Israel Adesanya':18,'Cory Sandhagen':18,"Sean O'Malley":18,'Stephen Thompson':17,'Jon Jones':17,'Marlon Vera':16,
+ 'Aljamain Sterling':16,'Merab Dvalishvili':13,'Henry Cejudo':14,'Conor McGregor':14,'Robert Whittaker':15,'Kai Kara-France':14,'Brandon Moreno':15,'Alexandre Pantoja':13,'Demetrious Johnson':17,'Georges St-Pierre':15,
+ 'Lyoto Machida':15,'Alex Pereira':12,'Jiri Prochazka':16,'Yair Rodriguez':16,'Tony Ferguson':15,'Justin Gaethje':9,'Dustin Poirier':12,'Charles Oliveira':11,'Islam Makhachev':12,'Khabib Nurmagomedov':9,
+ 'Brock Lesnar':3,'Mark Hunt':4,'Derrick Lewis':4,'Roy Nelson':4,'Francis Ngannou':5,'Ben Askren':4,'Colby Covington':7,'Cain Velasquez':7,'Daniel Cormier':7,'Stipe Miocic':10,'Jose Aldo':8,'Chuck Liddell':6,'Quinton Jackson':5,
+ 'Wanderlei Silva':6,'Mirko Cro Cop':5,'Fedor Emelianenko':8,'Matt Hughes':5,'Chael Sonnen':5,'Tito Ortiz':5,'Paulo Costa':6,'Nate Diaz':8,'Nick Diaz':8,'Kamaru Usman':11,'Leon Edwards':13,'Belal Muhammad':10};
+window.SWITCH_SK=(f,A)=>SWITCH[f.n]!=null?SWITCH[f.n]:clamp((A.footwork||10)*.55+4+(hsh(f.n+'sw')-.5)*5,3,17);
+const swSkill=f=>(f.A&&f.A.switch)||10;
+window.offStanceMul=f=>{if(f.natStance==null)f.natStance=f.stance||1;if((f.stance||1)===f.natStance)return 1;const sk=clamp(swSkill(f),1,20);return 1-(.05+.25*(1-(sk-1)/19))};
+/* ---------- weight-class scaling (welterweight = current numbers): damage dealt 60 % -> 200 %, durability 60 % -> 150 % ---------- */
+const lbOf=f=>{const kg=f.look&&f.look.kg;if(kg)return kg*2.2046;const bw=(f.look&&f.look.bw)||1;return 170*Math.pow(bw,2)};
+const lerpC=(a,b,t)=>a+(b-a)*clamp(t,0,1);
+window.wcDmgMul=f=>{const lb=lbOf(f);return lb<=170?lerpC(.6,1,(lb-125)/45):lerpC(1,2,(lb-170)/95)};
+window.wcHpMul=f=>{const lb=lbOf(f);return lb<=170?lerpC(.6,1,(lb-125)/45):lerpC(1,1.5,(lb-170)/95)};
+{const ad=Match.prototype.applyDmg;Match.prototype.applyDmg=function(att,def,o){if(o&&o.dmg!=null&&!(this.cfg&&this.cfg.training==="bag")){o.dmg*=wcDmgMul(att)/wcHpMul(def)*(att.state==="stand"?offStanceMul(att):1)}return ad.call(this,att,def,o)}}
+/* natural stance remembered at the start of a match */
+{const st=Match.prototype.step;Match.prototype.step=function(dt){for(const f of this.f)if(f.natStance==null)f.natStance=f.stance||1;return st.call(this,dt)}}
 })();

@@ -26,15 +26,24 @@ class HeavyBag{constructor(x){this.ax=x;this.ay=2.5;this.L1=.55;this.L2=1.35;thi
   center(){return{x:(this.p1.x+this.p2.x)/2,y:(this.p1.y+this.p2.y)/2}}
   draw(ctx){const p1=this.p1,p2=this.p2;const dx=p2.x-p1.x,dy=p2.y-p1.y,L=Math.hypot(dx,dy)||1e-6,ux=dx/L,uy=dy/L,nx=-uy,ny=ux;
     /* shadow on the canvas */{const cx=p2.x,rx=.5;ctx.save();ctx.translate(cx,0);ctx.scale(1,.12);const g=ctx.createRadialGradient(0,0,0,0,0,rx);g.addColorStop(0,'rgba(40,30,22,.32)');g.addColorStop(1,'rgba(40,30,22,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(0,0,rx,0,7);ctx.fill();ctx.restore()}
-    /* ceiling mount + rope / chains */ctx.strokeStyle='#5a5148';ctx.lineCap='round';ctx.lineWidth=.025;ctx.beginPath();ctx.moveTo(this.ax,this.ay);ctx.lineTo(p1.x,p1.y);ctx.stroke();
-    ctx.fillStyle='#6d645a';ctx.beginPath();ctx.ellipse(this.ax,this.ay,.07,.03,0,0,7);ctx.fill();
-    for(const s of[-1,1]){ctx.lineWidth=.012;ctx.beginPath();ctx.moveTo(p1.x,p1.y);ctx.lineTo(p1.x+nx*.15*s-ux*.0,p1.y+ny*.15*s+.0+uy*.06);ctx.stroke()}
+    const Q=this.q==null?.5:this.q,T=Q<.34?0:Q<.7?1:2;const w=.17*(1+this.sq*.18),Lb=L*(1-this.sq*.05);const tw=clamp(this.tw,-.5,.5);
+    /* ceiling mount bolted to the underside of the front beam, a main chain to a swivel, then 3-4 chains to the bag's top rim */
+    ctx.lineCap='round';const ax=this.ax,ay=this.ay;ctx.fillStyle=T===2?'#9aa0aa':'#55504a';ctx.beginPath();if(ctx.roundRect)ctx.roundRect(ax-.12,ay-.035,.24,.05,.02);ctx.fill();ctx.fillStyle='#2b2b2e';ctx.beginPath();ctx.arc(ax,ay-.045,.025,0,7);ctx.fill();
+    const sw={x:p1.x-ux*.24,y:p1.y-uy*.24};const chainCol=T===0?'#8a7a62':T===1?'#6f737b':'#b9bec7';
+    const chain=(a,b,wd)=>{const d=Math.hypot(b.x-a.x,b.y-a.y),n=Math.max(2,Math.round(d/.045));if(T===0){ctx.strokeStyle=chainCol;ctx.lineWidth=wd*1.2;ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();return}
+      ctx.strokeStyle=chainCol;ctx.lineWidth=wd*.55;const an=Math.atan2(b.y-a.y,b.x-a.x);for(let i=0;i<n;i++){const t=(i+.5)/n;ctx.beginPath();ctx.ellipse(a.x+(b.x-a.x)*t,a.y+(b.y-a.y)*t,d/n*.62,i%2?wd*.35:wd*.9,an,0,7);ctx.stroke()}};
+    chain({x:ax,y:ay-.05},sw,.026);
+    if(T===2){/* spring + swivel for the pro bag */ctx.strokeStyle='#d0d4da';ctx.lineWidth=.008;ctx.beginPath();for(let i=0;i<=10;i++){const t=i/10,yy=ay-.06-t*.12;ctx.lineTo(ax+(i%2?.02:-.02),yy)}ctx.stroke()}
+    ctx.fillStyle=T===2?'#d7dbe1':'#7a7064';ctx.beginPath();ctx.arc(sw.x,sw.y,.028,0,7);ctx.fill();
+    const nCh=T===0?3:4;for(let i=0;i<nCh;i++){const f=nCh===3?[-1,0,1][i]:[-1,-.35,.35,1][i];const rim={x:p1.x+nx*w*.9*f,y:p1.y+ny*w*.9*f};chain(sw,rim,.016)}
     /* bag body: a rounded capsule, squashed on impact, with a darker side plane, straps and a seam */
-    const w=.17*(1+this.sq*.18),Lb=L*(1-this.sq*.05);const tw=clamp(this.tw,-.5,.5);
     ctx.save();ctx.translate(p1.x,p1.y);ctx.rotate(Math.atan2(uy,ux)+Math.PI/2);
     const body=(x0,w0,col)=>{ctx.fillStyle=col;ctx.beginPath();if(ctx.roundRect)ctx.roundRect(x0-w0,-Lb,w0*2,Lb+.02,[w0*.55,w0*.55,w0*.8,w0*.8]);else ctx.rect(x0-w0,-Lb,w0*2,Lb);ctx.fill()};
-    body(0,w,'#7a2626');body(-w*.42+tw*.05,w*.58,'#5f1c1c');ctx.fillStyle='#8f3030';ctx.beginPath();if(ctx.roundRect)ctx.roundRect(w*.25+tw*.04,-Lb*.92,w*.32,Lb*.82,w*.16);ctx.fill();
-    ctx.fillStyle='#2a2422';for(const y of[-.06,-Lb+.1]){ctx.beginPath();if(ctx.roundRect)ctx.roundRect(-w-.005,y-.03,w*2+.01,.05,.025);ctx.fill()}
+    const BC=[['#9b7b52','#7d613f','#ad8c62'],['#7a2626','#5f1c1c','#8f3030'],['#1d1e22','#121316','#2c2e34']][T];
+    body(0,w,BC[0]);body(-w*.42+tw*.05,w*.58,BC[1]);ctx.fillStyle=BC[2];ctx.beginPath();if(ctx.roundRect)ctx.roundRect(w*.25+tw*.04,-Lb*.92,w*.32,Lb*.82,w*.16);ctx.fill();
+    if(T===0){/* worn canvas: duct-tape patches */ctx.fillStyle='#8d9094';for(const[y,x0]of[[-Lb*.35,-.06],[-Lb*.7,.02]]){ctx.beginPath();if(ctx.roundRect)ctx.roundRect(x0,y,.11,.07,.015);ctx.fill()}}
+    if(T===2){/* leather with a colour band and a logo plate */ctx.fillStyle=this.col||'#3a7bd5';ctx.beginPath();if(ctx.roundRect)ctx.roundRect(-w,-Lb*.56,w*2,.07,.02);ctx.fill();ctx.fillStyle='rgba(255,255,255,.85)';ctx.beginPath();if(ctx.roundRect)ctx.roundRect(-w*.55,-Lb*.42,w*1.1,.1,.03);ctx.fill()}
+    ctx.fillStyle=T===2?'#3a3c42':'#2a2422';for(const y of[-.06,-Lb+.1]){ctx.beginPath();if(ctx.roundRect)ctx.roundRect(-w-.005,y-.03,w*2+.01,.05,.025);ctx.fill()}
     ctx.fillStyle='rgba(0,0,0,.18)';ctx.beginPath();if(ctx.roundRect)ctx.roundRect(-.004+tw*.06,-Lb+.12,.008,Lb-.2,.004);ctx.fill();
     ctx.restore()}}
 window.HeavyBag=HeavyBag;
@@ -43,7 +52,7 @@ window.HeavyBag=HeavyBag;
 const T=M=>M&&M.cfg&&M.cfg.training;
 {const st=Match.prototype.step;Match.prototype.step=function(dt){const tr=T(this);if(!tr)return st.call(this,dt);
     const[a,b]=this.f;this.trn=this.trn||{hits:0,pow:0,best:0,pts:0,td:0,sw:0,sub:0,kd:0,stops:0};
-    if(tr==='bag'){if(!this.bag){this.bag=new HeavyBag(.9);b.hidden=1;if(b.ai)b.ai.update=function(){this.f.mvIn=0};b.noAct=1}
+    if(tr==='bag'){if(!this.bag){this.bag=new HeavyBag(.9);this.bag.q=this.cfg.gymQ!=null?this.cfg.gymQ:.5;this.bag.col=this.cfg.org&&this.cfg.org.col;b.hidden=1;if(b.ai)b.ai.update=function(){this.f.mvIn=0};b.noAct=1}
       this.bag.step(dt);this.clock=this.rules.len;/* no time limit: the session ends with the button */const c=this.bag.center();b.x=c.x;b.d=-1;b.vx=0;b.mvIn=0;b.act=null;b.guard=null;b.state='stand';b.hp={head:100,body:100,legs:100};b.sta=b.staMax;b.stun=0;b.rock=0;b.conc=0;b.down=null;b.body.rag=null}
     if(tr==='wrestle'&&this.phase==='fight'){const ai=this.f[this.pi==null?1:1-this.pi];if(ai&&!this.g&&ai.state==='stand'){const dd=ai.opp.x-ai.x,dist=Math.abs(dd);
         if(dist>1.15)ai.x+=Math.sign(dd)*dt*.9;/* the partner keeps coming forward */
@@ -95,22 +104,25 @@ Match.prototype.trnEnd=function(){if(this._trnShown)return;this._trnShown=1;this
 /* ---------- launching a session ---------- */
 window.startTraining=function(kind,fA,fB,opts){opts=opts||{};const C=TRN[kind];if(kind!=='bag'){/* headgear for wrestling and sparring */fA=Object.assign({},fA,{look:Object.assign({},fA.look,{headgear:'#b3261e'})});fB=Object.assign({},fB,{look:Object.assign({},fB.look,{headgear:'#1f4fa6'})})}const rules=Object.assign({},orgRules('UFC',2020,true),{rounds:C.rounds,len:C.len,firstLen:0,venue:'cage8',standup:30});
   const root=document.createElement('div');document.body.appendChild(root);
-  new Match(root,{level:.3,org:{short:'GYM',col:'#3a7bd5'},title:C.n,wcName:'TRAINING',rules,player:0,diff:opts.diff||.8,training:kind,onTrain:opts.onTrain,red:fA,blue:fB},res=>{root.remove();opts.done&&opts.done(res)})};
+  new Match(root,{level:.3,org:{short:'GYM',col:'#3a7bd5'},title:C.n,wcName:'TRAINING',rules,player:0,diff:opts.diff||.8,training:kind,gymQ:opts.gymQ!=null?opts.gymQ:.5,onTrain:opts.onTrain,red:fA,blue:fB},res=>{root.remove();opts.done&&opts.done(res)})};
 
 /* title screen: training menu (pick any roster fighter) */
-window.trainingMenu=function(){const st={kind:'bag',y:2020,wc:'LW',a:null,b:null};
+window.trainingMenu=function(){const st={kind:'bag',y:2020,wc:'LW',a:null,b:null,gq:.5};
   const render=()=>{if(!GG||GG.quick!==st.y){GG={P:null,opt:{diff:1},quick:st.y};WW=new World(GG);WW.init(st.y)}
     const L=Object.values(GG.F).filter(f=>f.act&&f.wc===st.wc&&(f.real||f.r>70)).sort((a,b)=>b.r-a.r).slice(0,40);if(!st.a||!L.includes(st.a))st.a=L[0];if(!st.b||!L.includes(st.b)||st.b===st.a)st.b=L[1];
     const opt=(f,sel)=>`<option value="${f.id}" ${f===sel?'selected':''}>${flag(f.nat)} ${dn(f)}</option>`;
     app().innerHTML=`<div class="page"><div class="ph"><button class="back" data-bk>←</button><h2 class="H">훈련</h2></div>
       <div class="card"><div class="row wrap">${Object.entries(TRN).map(([k,c])=>`<button class="chip ${st.kind===k?'on':''}" data-k="${k}">${c.n}</button>`).join('')}</div>
       <p class="sm mu">${st.kind==='bag'?'트레이닝 센터에서 끈에 매달린 샌드백을 시간 제한 없이 칩니다 (종료 버튼). 타격 위치와 파워에 따라 흔들립니다.':st.kind==='wrestle'?'타격 없이 2분 동안 테이크다운·스윕·포지션·서브미션으로 포인트를 땁니다.':'16온스 글러브로 2분 2라운드. KO 없이 리셋됩니다.'}</p>
+      ${st.kind==='bag'?`<div class="row wrap">${[[0,'동네 체육관'],[.5,'프로 짐'],[1,'엘리트 센터']].map(([v,n])=>`<button class="chip ${st.gq===v?'on':''}" data-gq="${v}">${n}</button>`).join('')}</div>`:''}
       <div class="row wrap">${WCK.map(k=>`<button class="chip ${k===st.wc?'on':''}" data-wc="${k}">${WC[k].n}</button>`).join('')}</div>
       <label>내 선수</label><select data-a>${L.map(f=>opt(f,st.a)).join('')}</select>${st.kind==='bag'?'':`<label>파트너</label><select data-b>${L.map(f=>opt(f,st.b)).join('')}</select>`}</div>
       <button class="btn big full" data-go>시작</button></div>`;
-    const A=app();A.querySelector('[data-bk]').onclick=titleScreen;A.querySelectorAll('[data-k]').forEach(b=>b.onclick=()=>{st.kind=b.dataset.k;render()});A.querySelectorAll('[data-wc]').forEach(b=>b.onclick=()=>{st.wc=b.dataset.wc;st.a=st.b=null;render()});
+    const A=app();A.querySelector('[data-bk]').onclick=titleScreen;A.querySelectorAll('[data-k]').forEach(b=>b.onclick=()=>{st.kind=b.dataset.k;render()});A.querySelectorAll('[data-gq]').forEach(b=>b.onclick=()=>{st.gq=+b.dataset.gq;render()});A.querySelectorAll('[data-wc]').forEach(b=>b.onclick=()=>{st.wc=b.dataset.wc;st.a=st.b=null;render()});
     A.querySelector('[data-a]').onchange=e=>{st.a=GG.F[e.target.value];render()};const sb=A.querySelector('[data-b]');if(sb)sb.onchange=e=>{st.b=GG.F[e.target.value];render()};
     const fx=f=>({name:dn(f),flag:flag(f.nat),rec:`${f.rec.w}-${f.rec.l}`,A:f.A,stance:hsh(f.n+'st')<.22?-1:1,look:lookFor(f)});
-    A.querySelector('[data-go]').onclick=()=>startTraining(st.kind,fx(st.a),fx(st.b),{done:render})};
+    A.querySelector('[data-go]').onclick=()=>startTraining(st.kind,fx(st.a),fx(st.b),{gymQ:st.gq,done:render})};
   render()};
 })();
+/* bag session: frame the whole training room so the ceiling, beams and bag mount are visible */
+{const fo=Stage.prototype.follow;Stage.prototype.follow=function(dt,cx,span,ground){const r=fo.apply(this,arguments);const M=this._match;if(M&&M.cfg&&M.cfg.training==='bag'){const C=this.cam;const asp=(this.W||16)/(this.Hh||9);const k=Math.min(1,dt*3);C.w+=(3.75*asp-C.w)*k;C.gy+=(.9-C.gy)*k}return r}}

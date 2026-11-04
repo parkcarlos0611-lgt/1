@@ -145,11 +145,11 @@ function subOverlay(M,dt){const g=M.g,s=g.sub;const A=s.att,D=s.def;const aJ=A.b
   else if(cat==='kimuraB'){/* from guard: sits up on the far hip, grabs the wrist, reaches over the shoulder to grip his own wrist
       (figure four) and turns the bent arm behind the defender's back */
     da=e;dd=-e;xa=ax;xd=ax+e*.52;
-    pa=mk({y:.14,rot:-1.0,lean:.4,chest:.12,head:.25,ll_h:1.6,ll_k:1.7,rl_h:1.5,rl_k:1.8});
+    pa=mk({y:.14,rot:-1.0-tight*.3,lean:.45-tight*.3,chest:.12,head:.3,ll_h:1.6,ll_k:1.7,rl_h:1.5,rl_k:1.8});/* sits up to grip, falls back to finish */
     pd=mk({y:.42,lean:.55+str*.04,chest:.1,head:.15,ll_h:.35,ll_k:2.1,ll_a:-.3,rl_h:.1,rl_k:2.0,rl_a:-.3});
     A.d=da;D.d=dd;const An=nearOf(A,da),Dn=nearOf(D,dd);
     legIK(A,pa,An.leg,{x:hip.x+e*.14,y:hip.y+.12});legIK(A,pa,An.fLeg,{x:hip.x+e*.18,y:hip.y+.08});/* closed guard, ankles crossed behind */
-    const E2={x:sh.x-e*.24,y:sh.y-.14},W2={x:E2.x+e*(.04+.14*tight),y:E2.y+.25};arm2pt(D,pd,Dn.arm,E2,W2);armIK(D,pd,Dn.fArm,aJ.hip?{x:aJ.hip.x-e*.18,y:.04}:{x:ax,y:.04});
+    /* elbow bent ~90° in front of his shoulder; the hand is turned up and BEHIND his own back (internal rotation) */const E2={x:sh.x-e*.17,y:sh.y-.2},W2={x:E2.x+e*(.06+.3*tight),y:E2.y+.12+.12*tight};arm2pt(D,pd,Dn.arm,E2,W2);armIK(D,pd,Dn.fArm,aJ.hip?{x:aJ.hip.x-e*.18,y:.04}:{x:ax,y:.04});
     const dw=dJ[Dn.W]||W2,de=dJ[Dn.E]||E2;armIK(A,pa,An.arm,dw);armIK(A,pa,An.fArm,{x:de.x+e*.04,y:de.y+.05});
     layers=[[D,['farArm','farLeg']],[A,['farLeg','torso','shorts','head']],[D,['torso','nearLeg','shorts','head']],[D,['nearArm']],[A,['farArm']],[A,['nearLeg']],[A,['nearArm']]]}
   else if(cat==='kimuraT'||cat==='americana'){/* top: kneeling on the far side, chest over the defender; figure-four on the bent arm.
@@ -158,7 +158,7 @@ function subOverlay(M,dt){const g=M.g,s=g.sub;const A=s.att,D=s.def;const aJ=A.b
     pd=mk({y:.14,rot:-1.57,lean:0,head:.05+str*.05,ll_h:.3+str*.1,ll_k:.6,rl_h:.7,rl_k:1.2,rl_a:.2});
     pa=mk({y:.42,lean:.8+tight*.1,chest:.1,head:-.05,ll_h:.25,ll_k:2.05,ll_a:-.3,rl_h:-.05,rl_k:1.95,rl_a:-.3});
     A.d=da;D.d=dd;const An=nearOf(A,da),Dn=nearOf(D,dd);let E2,W2;
-    if(cat==='americana'){E2={x:sh.x-e*.12,y:.08+tight*.08};W2={x:E2.x-e*(.26-.08*tight),y:.06}}else{E2={x:sh.x+e*.06,y:sh.y+.1};W2={x:E2.x-e*(.04+.16*tight),y:E2.y+.24}}
+    if(cat==='americana'){E2={x:sh.x-e*.12,y:.08+tight*.08};W2={x:E2.x-e*(.26-.08*tight),y:.06}}else{/* kimura: elbow by the shoulder, forearm cranked from upright toward his hips and down (hand behind the back) */const an=.25+1.0*tight;E2={x:sh.x+e*.04,y:sh.y+.08};W2={x:E2.x+e*Math.sin(an)*.27,y:E2.y+Math.cos(an)*.27}}
     arm2pt(D,pd,Dn.arm,E2,W2);armIK(D,pd,Dn.fArm,aJ.hip?{x:aJ.hip.x,y:aJ.hip.y}:{x:ax,y:.3});
     const dw=dJ[Dn.W]||W2,de=dJ[Dn.E]||E2;armIK(A,pa,An.arm,{x:dw.x,y:dw.y+.02});armIK(A,pa,An.fArm,{x:de.x,y:de.y-.02});
     layers=[[A,['farLeg','nearLeg','farArm','torso','shorts','head']],[D,['farArm','farLeg','torso','nearLeg','shorts','head']],[D,['nearArm']],[A,['nearArm']]]}

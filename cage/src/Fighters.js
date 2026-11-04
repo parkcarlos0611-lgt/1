@@ -101,16 +101,18 @@ window.COMBO_GAP=.4;window.COMBO_SPD=1.35;
     else if(B&&performance.now()/1000-B.t>1.5)this._boost=null;return ok}}
 {const st=document.createElement('style');st.textContent='.cmbpop{position:absolute;left:50%;top:26%;transform:translate(-50%,0);font:900 22px/1 system-ui,sans-serif;color:#ffd166;text-shadow:0 2px 0 #000,0 0 12px rgba(0,0,0,.6);pointer-events:none;z-index:40;animation:cmbp .9s ease-out forwards}@keyframes cmbp{0%{opacity:0;transform:translate(-50%,8px) scale(.85)}15%{opacity:1;transform:translate(-50%,0) scale(1.08)}70%{opacity:1}100%{opacity:0;transform:translate(-50%,-14px) scale(1)}}';document.head.appendChild(st)}
 
+const L2p=(a,b,u)=>({x:a.x+(b.x-a.x)*u,y:a.y+(b.y-a.y)*u});
 /* ---------- high kick aimed at the chin: the shin's striking point is steered onto the jaw whatever the distance
    (close → the leg goes up at a steeper angle with more knee bend; far → flatter and straighter) ---------- */
-{const fw=F2.prototype.footwork;F2.prototype.footwork=function(p,dt){fw.call(this,p,dt);const a=this.act;if(!a||!a.c||!a.c.hit||this.state!=='stand'||(a.key!=='rhk'&&a.key!=='lhk')||!this.opp||!this.opp.body.J.hd)return;
+{const fw=F2.prototype.footwork;F2.prototype.footwork=function(p,dt){fw.call(this,p,dt);const a=this.act;const KZ={rhk:'head',lhk:'head',rbk:'body',lbk:'body',rlk:'thigh',llk:'thigh'}[a&&a.key];if(!a||!a.c||!a.c.hit||this.state!=='stand'||!KZ||!this.opp||!this.opp.body.J.hd)return;
     const h=a.c.hit,t=a.t;/* fully aimed a little before the hit window opens (the shin's capsule makes contact early) */
     const t0=h.t0*.25,t1=h.t0*.78;const w=t<t0?0:t<t1?(t-t0)/(t1-t0):t<=h.t1+.04?1:Math.max(0,1-(t-h.t1-.04)/.16);if(w<=0)return;
-    const side=a.key==='rhk'?'rl':'ll',J=this.body.J,OJ=this.opp.body.J,d=this.d||1;const Hp=J[side==='rl'?'rH':'lH'],Sn=J[side==='rl'?'rSn':'lSn'];if(!Hp||!Sn)return;
-    if(a.hit&&!a.hkLock)a.hkLock={x:OJ.hd.x-d*.03,y:OJ.hd.y-.08};/* after contact keep the line through the jaw (the head snaps away) */
-    const chin=a.hkLock||{x:OJ.hd.x-d*.03,y:OJ.hd.y-.08};const L=this.body.L,L1=L.thigh,L2=L.shin;
+    const side=a.c.leg==='r'?'rl':'ll',J=this.body.J,OJ=this.opp.body.J,d=this.d||1;const Hp=J[side==='rl'?'rH':'lH'],Sn=J[side==='rl'?'rSn':'lSn'];if(!Hp||!Sn)return;
+    const tgt=()=>KZ==='head'?{x:OJ.hd.x-d*.03,y:OJ.hd.y-.08}:KZ==='body'?{x:L2p(OJ.mid,OJ.sh,.25).x-d*.07,y:L2p(OJ.mid,OJ.sh,.25).y}:{x:L2p(OJ.lH,OJ.lK,.55).x-d*.06,y:L2p(OJ.lH,OJ.lK,.55).y};
+    if(a.hit&&!a.hkLock)a.hkLock=tgt();/* after contact keep the line through the jaw (the head snaps away) */
+    const chin=a.hkLock||tgt();const L=this.body.L,L1=L.thigh,L2=L.shin;
     const ux=chin.x-Hp.x,uy=chin.y-Hp.y,D=Math.hypot(ux,uy)||1;a.hkO=a.hkO||{x:0,y:0};
-    if(!a.hit&&t>=t0){a.hkO.x+=(chin.x-Sn.x)*.3*w;a.hkO.y+=(chin.y-Sn.y)*.3*w;a.hkO.x=clamp(a.hkO.x,-.2,.2);a.hkO.y=clamp(a.hkO.y,-.2,.25)}
+    if(!a.hit&&t>=t1){/* correct only once the leg is fully aimed (not while it is still rising) */a.hkO.x+=(chin.x-Sn.x)*.3*w;a.hkO.y+=(chin.y-Sn.y)*.3*w;a.hkO.x=clamp(a.hkO.x,-.2,.2);a.hkO.y=clamp(a.hkO.y,-.2,.25)}
     const rise=t<t1?1-w:0;/* the foot comes up from below on the way in */const thru=a.hit?.12:0;
     const T={x:chin.x+ux/D*(L2*.3+thru)+a.hkO.x,y:chin.y+uy/D*(L2*.3)+a.hkO.y-rise*.3};const tmp=Object.assign({},p);legIK(this,tmp,side,T);
     p[side+'_h']+=(tmp[side+'_h']-p[side+'_h'])*w;p[side+'_k']+=(tmp[side+'_k']-p[side+'_k'])*w;
@@ -121,7 +123,7 @@ window.COMBO_GAP=.4;window.COMBO_SPD=1.35;
    with the fist instead of the forearm passing through the head; the elbow folds more the closer they are ---------- */
 const PUN={jab:'str',cross:'str',lstr:'str',lhook:'hook',rhook:'hook',lupp:'upp',rupp:'upp',bjab:'body',bcross:'body',blhook:'body',brhook:'body'};
 {const fw=F2.prototype.footwork;F2.prototype.footwork=function(p,dt){fw.call(this,p,dt);const a=this.act;if(!a||!a.c||!a.c.hit||this.state!=='stand'||!PUN[a.key]||!this.opp||!this.opp.body.J.hd||this.name==='ref')return;
-    const h=a.c.hit,t=a.t,d=this.d||1;const gap=Math.abs(this.opp.x-this.x)*1.8/(this.H||1.8);const ck=clamp((1.02-gap)/.4,0,1);if(ck<=0&&!a.pkLock)return;
+    const h=a.c.hit,t=a.t,d=this.d||1;const gap=Math.abs(this.opp.x-this.x)*1.8/(this.H||1.8);const ck=clamp((1.25-gap)/.35,0,1);/* full steering inside ~0.9, fading out at the edge of reach */if(ck<=0&&!a.pkLock)return;
     const w0=t<h.t0*.35?0:t<h.t0*.9?(t-h.t0*.35)/(h.t0*.55):t<=h.t1+.03?1:Math.max(0,1-(t-h.t1-.03)/.12);const w=w0*Math.max(ck,a.pkLock?a.pkLock.ck:0);if(w<=0)return;
     const side=h.pt==='lG'?'la':'ra';const OJ=this.opp.body.J,ty=PUN[a.key];
     let T;if(ty==='str')T={x:OJ.hd.x-d*.075,y:OJ.hd.y-.04};else if(ty==='hook')T={x:OJ.hd.x-d*.03,y:OJ.hd.y-.06};else if(ty==='upp')T={x:OJ.hd.x-d*.06,y:OJ.hd.y-.1};
@@ -131,4 +133,8 @@ const PUN={jab:'str',cross:'str',lstr:'str',lhook:'hook',rhook:'hook',lupp:'upp'
 
 /* ---------- ankle range of motion as the very last solve pass ---------- */
 {const sv=Body.prototype.solve;Body.prototype.solve=function(p,X,d){const J=sv.call(this,p,X,d);if(!this.rag&&window.ankleROM)ankleROM(this);return J}}
+
+/* ---------- impact feel: a frame more hitstop on solid shots, stronger shake / zoom, and a camera kick along the blow ---------- */
+if(typeof IFX!=='undefined'){const T=IFX.tiers;T.light.hs=2;T.medium.hs=4;T.heavy.hs=5;T.crit.hs=7;for(const k of['light','medium','heavy','crit']){T[k].shake*=1.35;T[k].zoom*=1.3;T[k].react*=1.12}}
+if(typeof ImpactFeedback!=='undefined'){const ap=ImpactFeedback.apply;ImpactFeedback.apply=function(M,h,p,r0){const r=ap.apply(this,arguments);const tier=this.tier(h);const C=M.stage.cam;const k={blocked:.08,light:.18,medium:.38,heavy:.62,crit:.95}[tier]||0;C.kvx=(C.kvx||0)+(h.att.d||1)*k;C.kvy=(C.kvy||0)-k*.35;return r}}
 })();

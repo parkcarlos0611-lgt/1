@@ -128,4 +128,7 @@ const PUN={jab:'str',cross:'str',lstr:'str',lhook:'hook',rhook:'hook',lupp:'upp'
     else T={x:(OJ.mid.x+OJ.sh.x)/2-d*.09,y:(OJ.mid.y*.6+OJ.sh.y*.4)};
     if(a.hit&&!a.pkLock)a.pkLock={x:T.x,y:T.y,ck};if(a.pkLock)T={x:a.pkLock.x,y:a.pkLock.y};/* after contact the fist stays where it landed while the head snaps away */
     const tmp=Object.assign({},p);armIK(this,tmp,side,T);p[side+'_s']+=(tmp[side+'_s']-p[side+'_s'])*w;p[side+'_e']+=(tmp[side+'_e']-p[side+'_e'])*w;a.pkAim=1}}
+
+/* ---------- ankle range of motion as the very last solve pass ---------- */
+{const sv=Body.prototype.solve;Body.prototype.solve=function(p,X,d){const J=sv.call(this,p,X,d);if(!this.rag&&window.ankleROM)ankleROM(this);return J}}
 })();

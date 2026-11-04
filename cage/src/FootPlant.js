@@ -16,7 +16,9 @@ const FP=tuneSection('feet',{
   leadHeel:.004,      // ×H heel height of the lead foot
   rearHeel:.03,       // ×H heel height of the rear foot (on the ball of the foot)
   maxSink:.1,         // ×H the body may lower this much so both feet reach the mat
-  minHip:.32          // ×H below this hip height the pose is not "standing" (sit-ups, getups)
+  minHip:.32,         // ×H below this hip height the pose is not "standing" (sit-ups, getups)
+  dorsiMax:.45,       // rad: ankle dorsiflexion limit (beyond it the heel lifts)
+  plantarMax:.8       // rad: plantar flexion limit
 });
 function ik2(h,a,L1,L2,kd){/* knee position for hip h, ankle a; kd = preferred side (+1 forward) */
   let dx=a.x-h.x,dy=a.y-h.y;let D=Math.hypot(dx,dy)||1e-6;const mx=(L1+L2)*.999;if(D>mx){dx*=mx/D;dy*=mx/D;D=mx}
@@ -44,4 +46,16 @@ Body.prototype.plantFeet=function(p){if(!FP.on||this.rag||p.free)return;const J=
   /* nothing below the mat */
   let lo=0;for(const k of['lHe','lT','rHe','rT'])lo=Math.min(lo,J[k].y);if(lo<0)for(const k in J)J[k]={x:J[k].x,y:J[k].y-lo};
   const m=(a,b,t)=>({x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t});J.lSn=m(J.lK,J.lA,.7);J.rSn=m(J.rK,J.rA,.7);this.planted=info.map(g=>+g.w.toFixed(2))};
+/* ankle range of motion, applied to the finished skeleton (after every other solve pass): past ~26° dorsiflexion the
+   heel comes off the mat (foot rotates about the toe), past ~46° plantar flexion the toes lift (about the heel); a foot in
+   the air just turns about the ankle. The knee is re-solved so bone lengths hold. */
+window.ankleROM=function(B){const J=B.J,L=B.L,H=B.H,d=B.d||1;if(!J.lHe||!J.hip)return;
+  for(const s of["l","r"]){const h=s+"H",k=s+"K",a=s+"A",he=s+"He",t=s+"T";for(let it=0;it<6;it++){const K=J[k],A=J[a],He=J[he],T=J[t];
+    const th=v=>Math.atan2(v.x*d,-v.y);let dl=th({x:T.x-He.x,y:T.y-He.y})-th({x:A.x-K.x,y:A.y-K.y})-Math.PI/2;dl=Math.atan2(Math.sin(dl),Math.cos(dl));
+    let r=0;if(dl>FP.dorsiMax)r=-(dl-FP.dorsiMax);else if(dl<-FP.plantarMax)r=-FP.plantarMax-dl;if(Math.abs(r)<1e-3)break;
+    const onMat=Math.min(He.y,T.y)<.03*H&&J.hip.y>FP.minHip*H;/* lying / kneeling bodies: just turn the foot */const piv=!onMat?A:(r<0?T:He);const c=Math.cos(r*d),sn=Math.sin(r*d);const R=q=>({x:piv.x+(q.x-piv.x)*c-(q.y-piv.y)*sn,y:piv.y+(q.x-piv.x)*sn+(q.y-piv.y)*c});
+    J[he]=R(He);J[t]=R(T);if(!onMat)continue;J[a]=R(A);
+    const hp=J[h],Rr=(L.thigh+L.shin)*.995,dx=J[a].x-hp.x,dy=J[a].y-hp.y,D=Math.hypot(dx,dy);if(D>Rr){const kk=Rr/D,ox=hp.x+dx*kk-J[a].x,oy=hp.y+dy*kk-J[a].y;for(const q of[a,he,t])J[q]={x:J[q].x+ox,y:J[q].y+oy}}
+    J[k]=ik2(J[h],J[a],L.thigh,L.shin,d)}}
+  const m=(p,q,u)=>({x:p.x+(q.x-p.x)*u,y:p.y+(q.y-p.y)*u});J.lSn=m(J.lK,J.lA,.7);J.rSn=m(J.rK,J.rA,.7)};
 {const sv=Body.prototype.solve;Body.prototype.solve=function(p,X,d){const J=sv.call(this,p,X,d);if(!this.rag)this.plantFeet(p||{});return J}}

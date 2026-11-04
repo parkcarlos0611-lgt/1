@@ -57,7 +57,8 @@ Body.prototype.draw=function(ctx,o){o=o||{};const lk=this.look;if(!FS.on)return 
   /* the referee is the same figure in a different outfit (black polo, trousers, boots, gloves) */
   const R=!!lk.ref;if(R&&!lk._flat){Object.assign(lk,REF_LOOK[Math.floor(Math.random()*REF_LOOK.length)]);lk._flat=1;this.hs=null}
   const CL=R?{shirt:'#222327',shirtS:'#18191c',pants:'#1e1f23',pantsS:'#151619',boot:'#0f0f11',glove:'#151517'}:null;
-  if(!o.onlyArm&&o.part!=='far'){floorShadow(ctx,this);motionBlur(ctx,this,lk)}
+  const ON=o.only?(k=>o.only.indexOf(k)>=0):null;/* layered draw (submissions): only these parts, in canonical order */
+  if(!o.onlyArm&&o.part!=='far'&&(!ON||ON('torso'))){floorShadow(ctx,this);motionBlur(ctx,this,lk)}
   const M=H*W*.86;/* muscle scale: leaner frames, heavier classes still carry more mass through bw */const SHB=lk.body==='broad'?1.12:1;
   const skin=lk.skin||'#d39b74';const sk={base:skin,sh:shade(skin,FS.shadowK),far:shade(skin,FS.farK),farSh:shade(skin,FS.farK+FS.shadowK),lt:shade(skin,FS.lightK)};
   const shorts=calm(lk.shorts||'#111');const glove=R?CL.glove:lk.glove||'#141414';const strap=o.corner||'#c21818';
@@ -85,6 +86,9 @@ Body.prototype.draw=function(ctx,o){o=o||{};const lk=this.look;if(!FS.on)return 
     circ(ctx,a,.024*M,C.b);footFlat(ctx,a,he,to,M,R?{b:CL.boot,s:'#070708'}:C,d);
     if(sleeveCol)shortsLeg(ctx,h,k,d,M,sleeveCol,lk,isFar)};
   if(o.onlyArm){arm(nearS,false);return}if(o.part==='far'){arm(farS,true);return}
+  if(ON){if(ON('farArm'))arm(farS,true);if(ON('farLeg'))leg(farS,true,R?null:shade(shorts,-.22));if(ON('torso'))torsoFlat(ctx,J,H,M*(SHB>1?1.02:1),R?{base:CL.shirt,sh:CL.shirtS,lt:shade(CL.shirt,.07)}:sk,d,lk,this);
+    if(ON('nearLeg'))leg(nearS,false,ON('shorts')?null:shorts);if(ON('shorts')){shortsSeat(ctx,J,H,M,shorts,d,this.ang.ta,nearS,farS,lk);if(ON('nearLeg'))shortsLeg(ctx,J[nearS.H],J[nearS.K],d,M,shorts,lk,false);shortsWaist(ctx,J,H,M,shorts,d,lk,this.ang.ta)}
+    if(ON('head'))headFlat(ctx,J.hd,J.nk,H,this,skin,d,this.ang.hd);if(ON('nearArm'))arm(nearS,false);return}
   /* far side first */
   if(o.part!=='body')arm(farS,true);leg(farS,true,R?null:shade(shorts,-.22));
   torsoFlat(ctx,J,H,M*(SHB>1?1.02:1),R?{base:CL.shirt,sh:CL.shirtS,lt:shade(CL.shirt,.07)}:sk,d,lk,this);

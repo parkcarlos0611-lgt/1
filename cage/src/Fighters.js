@@ -116,4 +116,16 @@ window.COMBO_GAP=.4;window.COMBO_SPD=1.35;
     p[side+'_h']+=(tmp[side+'_h']-p[side+'_h'])*w;p[side+'_k']+=(tmp[side+'_k']-p[side+'_k'])*w;
     /* chin out of reach of the straight leg: the hips travel in on the standing foot */const need=D+L2*.3-(L1+L2)*.9;if(need>0&&!a.hit){a.hkStep=Math.min(.34,Math.max(a.hkStep||0,need*1.15))}if(a.hkStep)p.x=(p.x||0)+a.hkStep*w;
     a.hkAim=1}}
+
+/* ---------- close range: the glove is steered onto the surface of the target (jaw / temple / body) so the punch lands
+   with the fist instead of the forearm passing through the head; the elbow folds more the closer they are ---------- */
+const PUN={jab:'str',cross:'str',lstr:'str',lhook:'hook',rhook:'hook',lupp:'upp',rupp:'upp',bjab:'body',bcross:'body',blhook:'body',brhook:'body'};
+{const fw=F2.prototype.footwork;F2.prototype.footwork=function(p,dt){fw.call(this,p,dt);const a=this.act;if(!a||!a.c||!a.c.hit||this.state!=='stand'||!PUN[a.key]||!this.opp||!this.opp.body.J.hd||this.name==='ref')return;
+    const h=a.c.hit,t=a.t,d=this.d||1;const gap=Math.abs(this.opp.x-this.x)*1.8/(this.H||1.8);const ck=clamp((1.02-gap)/.4,0,1);if(ck<=0&&!a.pkLock)return;
+    const w0=t<h.t0*.35?0:t<h.t0*.9?(t-h.t0*.35)/(h.t0*.55):t<=h.t1+.03?1:Math.max(0,1-(t-h.t1-.03)/.12);const w=w0*Math.max(ck,a.pkLock?a.pkLock.ck:0);if(w<=0)return;
+    const side=h.pt==='lG'?'la':'ra';const OJ=this.opp.body.J,ty=PUN[a.key];
+    let T;if(ty==='str')T={x:OJ.hd.x-d*.075,y:OJ.hd.y-.04};else if(ty==='hook')T={x:OJ.hd.x-d*.03,y:OJ.hd.y-.06};else if(ty==='upp')T={x:OJ.hd.x-d*.06,y:OJ.hd.y-.1};
+    else T={x:(OJ.mid.x+OJ.sh.x)/2-d*.09,y:(OJ.mid.y*.6+OJ.sh.y*.4)};
+    if(a.hit&&!a.pkLock)a.pkLock={x:T.x,y:T.y,ck};if(a.pkLock)T={x:a.pkLock.x,y:a.pkLock.y};/* after contact the fist stays where it landed while the head snaps away */
+    const tmp=Object.assign({},p);armIK(this,tmp,side,T);p[side+'_s']+=(tmp[side+'_s']-p[side+'_s'])*w;p[side+'_e']+=(tmp[side+'_e']-p[side+'_e'])*w;a.pkAim=1}}
 })();

@@ -85,4 +85,35 @@ window.wcHpMul=f=>{const lb=lbOf(f);return lb<=170?lerpC(.6,1,(lb-125)/45):lerpC
 {const ad=Match.prototype.applyDmg;Match.prototype.applyDmg=function(att,def,o){if(o&&o.dmg!=null&&!(this.cfg&&this.cfg.training==="bag")){o.dmg*=wcDmgMul(att)/wcHpMul(def)*(att.state==="stand"?offStanceMul(att):1)}return ad.call(this,att,def,o)}}
 /* natural stance remembered at the start of a match */
 {const st=Match.prototype.step;Match.prototype.step=function(dt){for(const f of this.f)if(f.natStance==null)f.natStance=f.stance||1;return st.call(this,dt)}}
+
+/* ---------- combos: each press within 0.4 s of the previous one; the finishing strike comes out 35 % faster ----------
+   jab-cross · jab-cross-lead hook · jab-cross-rear hook / overhand · jab-lead hook-cross · jab-body-high kick */
+const COMBO=[['jab','cross'],['jab','cross','lhook'],['jab','cross','rhook'],['jab','cross','ovh'],['jab','lhook','cross'],['jab','B','H']];
+const CMB_N={'jab,cross':'원투','jab,cross,lhook':'원투 + 훅','jab,cross,rhook':'원투 + 뒷손 훅','jab,cross,ovh':'원투 + 오버핸드','jab,lhook,cross':'잽-훅-스트레이트','jab,B,H':'잽-바디-하이킥'};
+const cCls=k=>['bjab','bcross','blhook','brhook'].includes(k)?'B':(k==='rhk'||k==='lhk')?'H':k;
+window.COMBO_GAP=.4;window.COMBO_SPD=1.35;
+{const ds=Match.prototype.doStrike2;Match.prototype.doStrike2=function(f,key){if(this.pi==null||f!==this.f[this.pi])return ds.call(this,f,key);const now=performance.now()/1000;let h=f._cmb||[];if(h.length&&now-h[h.length-1].t>COMBO_GAP)h=[];h=h.concat([{k:cCls(key),t:now}]).slice(-3);f._cmb=h;
+    let best=null;for(const P of COMBO){if(P.length>h.length)continue;const tail=h.slice(-P.length).map(e=>e.k);if(tail.join()===P.join()&&(!best||P.length>best.length))best=P}
+    if(best)f._boost={key,t:now,name:CMB_N[best.join()]};return ds.call(this,f,key)}}
+{const sk=F2.prototype.strike;F2.prototype.strike=function(key,M){const ok=sk.call(this,key,M);const B=this._boost;
+    if(ok&&B&&this.act&&B.key===key&&performance.now()/1000-B.t<1.5){this.act.speed*=COMBO_SPD;this.act.combo=1;this._boost=null;
+      const MM=M||window.__curMatch;if(MM&&MM.root){const e=document.createElement('div');e.className='cmbpop';e.textContent=`🔥 콤보 · ${B.name}`;MM.root.appendChild(e);setTimeout(()=>e.remove(),900)}}
+    else if(B&&performance.now()/1000-B.t>1.5)this._boost=null;return ok}}
+{const st=document.createElement('style');st.textContent='.cmbpop{position:absolute;left:50%;top:26%;transform:translate(-50%,0);font:900 22px/1 system-ui,sans-serif;color:#ffd166;text-shadow:0 2px 0 #000,0 0 12px rgba(0,0,0,.6);pointer-events:none;z-index:40;animation:cmbp .9s ease-out forwards}@keyframes cmbp{0%{opacity:0;transform:translate(-50%,8px) scale(.85)}15%{opacity:1;transform:translate(-50%,0) scale(1.08)}70%{opacity:1}100%{opacity:0;transform:translate(-50%,-14px) scale(1)}}';document.head.appendChild(st)}
+
+/* ---------- high kick aimed at the chin: the shin's striking point is steered onto the jaw whatever the distance
+   (close → the leg goes up at a steeper angle with more knee bend; far → flatter and straighter) ---------- */
+{const fw=F2.prototype.footwork;F2.prototype.footwork=function(p,dt){fw.call(this,p,dt);const a=this.act;if(!a||!a.c||!a.c.hit||this.state!=='stand'||(a.key!=='rhk'&&a.key!=='lhk')||!this.opp||!this.opp.body.J.hd)return;
+    const h=a.c.hit,t=a.t;/* fully aimed a little before the hit window opens (the shin's capsule makes contact early) */
+    const t0=h.t0*.25,t1=h.t0*.78;const w=t<t0?0:t<t1?(t-t0)/(t1-t0):t<=h.t1+.04?1:Math.max(0,1-(t-h.t1-.04)/.16);if(w<=0)return;
+    const side=a.key==='rhk'?'rl':'ll',J=this.body.J,OJ=this.opp.body.J,d=this.d||1;const Hp=J[side==='rl'?'rH':'lH'],Sn=J[side==='rl'?'rSn':'lSn'];if(!Hp||!Sn)return;
+    if(a.hit&&!a.hkLock)a.hkLock={x:OJ.hd.x-d*.03,y:OJ.hd.y-.08};/* after contact keep the line through the jaw (the head snaps away) */
+    const chin=a.hkLock||{x:OJ.hd.x-d*.03,y:OJ.hd.y-.08};const L=this.body.L,L1=L.thigh,L2=L.shin;
+    const ux=chin.x-Hp.x,uy=chin.y-Hp.y,D=Math.hypot(ux,uy)||1;a.hkO=a.hkO||{x:0,y:0};
+    if(!a.hit&&t>=t0){a.hkO.x+=(chin.x-Sn.x)*.3*w;a.hkO.y+=(chin.y-Sn.y)*.3*w;a.hkO.x=clamp(a.hkO.x,-.2,.2);a.hkO.y=clamp(a.hkO.y,-.2,.25)}
+    const rise=t<t1?1-w:0;/* the foot comes up from below on the way in */const thru=a.hit?.12:0;
+    const T={x:chin.x+ux/D*(L2*.3+thru)+a.hkO.x,y:chin.y+uy/D*(L2*.3)+a.hkO.y-rise*.3};const tmp=Object.assign({},p);legIK(this,tmp,side,T);
+    p[side+'_h']+=(tmp[side+'_h']-p[side+'_h'])*w;p[side+'_k']+=(tmp[side+'_k']-p[side+'_k'])*w;
+    /* chin out of reach of the straight leg: the hips travel in on the standing foot */const need=D+L2*.3-(L1+L2)*.9;if(need>0&&!a.hit){a.hkStep=Math.min(.34,Math.max(a.hkStep||0,need*1.15))}if(a.hkStep)p.x=(p.x||0)+a.hkStep*w;
+    a.hkAim=1}}
 })();

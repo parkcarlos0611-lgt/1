@@ -280,8 +280,8 @@ if(typeof Stage!=='undefined'){
     {const cx=this.cam.x;const v=this._pcx==null?0:(cx-this._pcx)*s;this._pcx=cx;this._bv=(this._bv||0)*.6+v*.4;
       /* circling the cage (stick up/down turns the octagon): a much stronger sideways streak */
       const r=this.rot||0;const vr=this._prot==null?0:(r-this._prot)*s;this._prot=r;this._rv=(this._rv||0)*.55+vr*.45;
-      const pan=Math.min(14,Math.abs(this._bv)*1.7),rotp=Math.min(46,Math.abs(this._rv)*6.5);const px=Math.max(pan,rotp),strong=rotp>pan;
-      if(px>1.2){const cv=ctx.canvas;const dir=Math.sign(strong?this._rv:this._bv)||1;ctx.save();ctx.setTransform(1,0,0,1,0,0);const n=strong?7:4,a0=strong?.34:.2;for(let i=1;i<=n;i++){ctx.globalAlpha=a0*(1-i/(n+1));ctx.drawImage(cv,dir*px*dpr*i/n,0)}ctx.restore()}}};
+      const pan=Math.min(10,Math.abs(this._bv)*1.3),rotp=Math.min(20,Math.abs(this._rv)*3);const px=Math.max(pan,rotp),strong=rotp>pan;
+      if(px>1.2){const cv=ctx.canvas;const dir=Math.sign(strong?this._rv:this._bv)||1;ctx.save();ctx.setTransform(1,0,0,1,0,0);const n=strong?5:4,a0=strong?.22:.16;for(let i=1;i<=n;i++){ctx.globalAlpha=a0*(1-i/(n+1));ctx.drawImage(cv,dir*px*dpr*i/n,0)}ctx.restore()}}};
   Stage.prototype.drawMat=function(fy,gy,s){const ctx=this.ctx,W=this.W,H=this.Hh;if(this.venue.startsWith('ring')){ctx.fillStyle=BG.mat;ctx.fillRect(0,fy,W,H-fy);ctx.fillStyle=BG.matEdge;ctx.fillRect(0,fy,W,.06*s)}else drawOctFloor(this,ctx,W,H,s,gy,fy);
     if(!this.venue.startsWith('ring')){const k=.86;const cx=(0-this.cam.x*k)*s*k+W/2,cy=fy+(H-fy)*.45;ctx.strokeStyle=this.col||BG.ring;ctx.globalAlpha=.55;ctx.lineWidth=.035*s;ctx.beginPath();ctx.ellipse(cx,cy,2.2*s*k*this.R/4.3,.55*s,0,0,7);ctx.stroke();ctx.globalAlpha=1}
     for(const d of this.decals){d.age=(d.age||0)+1/60;const k=.72+.28*d.z;const sy=fy+(H-fy)*d.z*.95;const x=(d.x-this.cam.x*k)*s*k+W/2;const dk=Math.min(1,d.age/25);const rr=Math.round((130+d.c*30)*(1-dk*.4));

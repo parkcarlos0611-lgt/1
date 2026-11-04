@@ -1141,7 +1141,7 @@ class Match{
       const low=I.my<-.5,high=I.my>.5;let key=null;
       if(e==='jab')key='jab';else if(e==='jab:hook')key='lhook';else if(e==='jab:str')key='lstr';
       else if(e.startsWith('punch:')){const t=e.slice(6);const lead=['jab','lhook','lupp','bjab','blhook'].includes(f.lastKey);
-        key=t==='hook'?(lead?'rhook':'lhook'):t==='upper'?(lead?'rupp':'lupp'):t==='over'?'ovh':t==='body'?(f.lastKey==='bcross'?'blhook':'bcross'):'cross'}
+        key=t==='hook'?'rhook':t==='upper'?(lead?'rupp':'lupp'):t==='over'?'ovh':t==='body'?(f.lastKey==='bcross'?'blhook':'bcross'):'cross'}
       else if(e.startsWith('kick')){const t=e.slice(5)||'mid';key=t==='high'?'rhk':t==='low'?'rlk':t==='calf'?'calf':t==='knee'?'knee':'rbk'}
       if(key)this.doStrike2(f,key)}}
   doStrike2(f,key){if(f.act&&f.act.c.hit&&f.act.t>f.act.c.hit.t0&&f.queue.length<2){f.queue.push(key);f.lastKey=key;return}if(f.strike(key,this))f.lastKey=key}

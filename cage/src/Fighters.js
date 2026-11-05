@@ -156,4 +156,22 @@ if(typeof IFX!=='undefined'){const T=IFX.tiers;T.blocked.react=.3;T.light.react=
 
 /* ---------- result screen: step-bounce switched off automatically ---------- */
 {const fin=Match.prototype.finish;Match.prototype.finish=function(){const r=fin.apply(this,arguments);if(this.phase==='end'){const I=this.inp;if(I&&I.bounceOn){I.bounceOn=false;if(I._bncSync)I._bncSync()}for(const f of this.f)f.bounce=false}return r}}
+
+/* ---------- durability: everyone takes 20 % less damage ---------- */
+window.DURABILITY=.8;
+{const ad=Match.prototype.applyDmg;Match.prototype.applyDmg=function(att,def,o){if(o&&o.dmg!=null&&!(this.cfg&&this.cfg.training==='bag'))o.dmg*=DURABILITY;return ad.call(this,att,def,o)}}
+
+/* ---------- drawing filter: joints are drawn through a very short low-pass (≈18 ms) so frame-to-frame jitter
+   between simulation steps is smoothed out; hitboxes still use the exact skeleton. Jumps (resets, replays) snap. ---------- */
+{const st=Match.prototype.step;Match.prototype.step=function(dt){const r=st.call(this,dt);const k=1-Math.exp(-Math.max(0,dt)/.018);
+  for(const f of this.f.concat(this.ref?[this.ref]:[])){const B=f.body,J=B.J;if(!J||!J.hip)continue;let S=B._sJ;if(!S||B._sJsrc!==J){S=B._sJ={};B._sJsrc=J}
+    const big=S.hip&&Math.hypot(S.hip.x-J.hip.x,S.hip.y-J.hip.y)>.45;for(const n in J){const q=J[n],o=S[n];S[n]=!o||big?{x:q.x,y:q.y}:{x:o.x+(q.x-o.x)*k,y:o.y+(q.y-o.y)*k}}}return r}}
+{const D=Body.prototype.draw;Body.prototype.draw=function(ctx,o){const S=this._sJ;if(!S||this._sJsrc!==this.J||this.rag)return D.call(this,ctx,o);const J=this.J;this.J=S;try{return D.call(this,ctx,o)}finally{this.J=J}}}
+
+/* ---------- a slightly wider view ---------- */
+if(typeof ARENA!=='undefined'&&ARENA.cam){const C=ARENA.cam;C.stand.min*=1.1;C.stand.max*=1.1;C.stand.pad*=1.1;C.ground.min*=1.08;C.ground.max*=1.08;C.minVisH*=1.08;C.maxVisH*=1.1}
+
+/* ---------- stronger hit particles: more and bigger sweat / blood droplets, and a spray on every solid impact ---------- */
+if(typeof Stage!=='undefined'){const bu=Stage.prototype.burst;Stage.prototype.burst=function(x,y,dir,n,kind,pow){const n0=this.parts?this.parts.length:0;const r=bu.call(this,x,y,dir,Math.round(n*1.8)+2,kind,(pow||1)*1.2);if(this.parts)for(let i=n0;i<this.parts.length;i++)this.parts[i].r*=1.25;return r};
+  const im=Stage.prototype.impact;Stage.prototype.impact=function(x,y,pow,col,dir){const r=im.apply(this,arguments);if((pow||0)>=.55&&dir)bu.call(this,x,y,dir,Math.round(3+pow*6),'sweat',.8+pow*.5);return r}}
 })();

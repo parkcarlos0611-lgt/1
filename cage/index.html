@@ -981,7 +981,7 @@ class In2{
   /* change button captions (standing ↔ ground) */
   setMode(mode){if(!this.tc||this.mode===mode)return;this.mode=mode;const L=mode==='ground'?{kick:['파운딩','👊'],jab:['서브미션','🔒'],punch:['포지션 이동','⇧'],block:['방어','🛡']}:mode==='clinch'?{kick:['니킥','🦵'],jab:['잽','👊'],punch:['펀치','💥'],block:['탈출','🏃'],clinch:['탈출','🏃']}:mode==='td'?{kick:['킥','🦵'],jab:['잽','👊'],punch:['펀치','💥'],block:['블록','🛡']}:{kick:['킥','🦵'],jab:['잽','👊'],punch:['펀치','💥'],block:['블록','🛡'],clinch:['클린치','🔗']};
     for(const b of this.tc.querySelectorAll("[data-a]")){const l=L[b.dataset.a];if(!l)continue;b.querySelector('b').textContent=l[1];b.querySelector('small').textContent=l[0]}
-    this.tc.querySelectorAll('.sw').forEach(s=>s.style.opacity=mode==='stand'?1:0);this.tc.classList.toggle('mcl',mode==='clinch');this.tc.classList.toggle('mgr',mode==='ground');const t=this.tc.querySelector('[data-a=td] small');if(t)t.textContent=mode==='ground'?'연타':'테이크다운'}
+    this.tc.querySelectorAll('.sw').forEach(s=>s.style.opacity=mode==='stand'?1:0);this.tc.classList.toggle('mcl',mode==='clinch');this.tc.classList.toggle('mgr',mode==='ground');const t=this.tc.querySelector('[data-a=td] small');if(t)t.textContent=mode==='ground'?'연타':mode==='clinch'?'길로틴':'테이크다운'}
   buildTouch(){const tc=document.createElement('div');tc.className='tc2';this.tc=tc;
     tc.innerHTML=`<div class="tz" data-z><div class="tbase"><div class="tknob"></div></div></div>
     <div class="tr3">
@@ -1029,7 +1029,7 @@ class AI2{
     if(act)this.react={act,t:this.rt(),dur:.45+Math.random()*.2}}
   onOppShoot(){const f=this.f;const p=clamp((.2+ATT(f,'tdd')*.55+this.iq*.2)*this.diff,.05,.9);if(Math.random()<p)this.sprawlT=this.rt()*.8}
   onOppTrans(dir){const M=this.M,g=M.g;if(!g)return;const p=clamp((.1+ATT(this.f,this.f===g.top?'topCtl':'bottom')*.4)*this.diff,.05,.7);if(Math.random()<p)setTimeout(()=>{if(M.g===g)M.deny(this.f,dir)},this.rt()*900)}
-  subAI(dt,s){const f=this.f;const rate=(f===s.att?2+ATT(f,'subOff')*3:2+ATT(f,'subDef')*3.2)*this.diff*(.6+.4*f.sta/f.staMax);if(Math.random()<dt*rate*1.6)this.M.subPress(f)}
+  subAI(dt,s){const f=this.f;const rate=(f===s.att?2+ATT(f,'subOff')*3:2+ATT(f,'subDef')*3.2)*this.diff*(.6+.4*f.sta/f.staMax);if(Math.random()<dt*rate*1.0)this.M.subPress(f)}
   tdAI(dt,g){const f=this.f;const rate=(f===g.att?3+ATT(f,'takedown')*4:3+ATT(f,'tdd')*4)*this.diff*(.6+.4*f.sta/f.staMax);if(Math.random()<dt*rate)this.M.tdMash(f)}
   update(dt){const f=this.f,o=f.opp,M=this.M;this.t+=dt;f.wantSprawl=false;
     if(this.sprawlT!=null){this.sprawlT-=dt;if(this.sprawlT<=0){f.wantSprawl=true;if(this.sprawlT<-.4)this.sprawlT=null}}
@@ -1129,6 +1129,7 @@ class Match{
     const sdir=()=>I.my>.5?'up':I.my<-.5?'down':fwd>.5?'fwd':fwd<-.5?'back':null;
     for(let e of ev){if(e==='pause'){this.pause();continue}if(e.startsWith('td:')){f._tdKind=e.slice(3);e='td'}if(this.phase!=='fight')continue;
       if(g&&g.type==='tdfight'){this.tdMash(f);continue}
+      if(g&&g.type==='sprawl'&&f===g.def&&(e==='jab'||e==='td'||e.startsWith('jab:'))){this.startGuillotine(f,g.att);continue}
       if(gm){if(g.sub){this.subPress(f);continue}
         if(e==='blockp'){if(g.trans&&g.trans.f!==f)this.deny(f,g.trans.dir);continue}
         if(e.startsWith('kick'))this.gStrike(f,this.rules.gElbow&&I.my>.5?'elbow':'punch',(f._gh=!f._gh)?'l':'r');
@@ -1136,7 +1137,7 @@ class Match{
         else if(e.startsWith('punch')){const t=e.slice(6);const sw=t==='over'?'up':t==='body'?'down':t==='hook'?(f.d>0?'back':'fwd'):t==='upper'?(f.d>0?'fwd':'back'):null;this.trans(f,sw||sdir()||'up')}
         continue}
       if(e==='blockp'&&f.state!=='clinch')continue;
-      if(f.state==='clinch'){if(e.startsWith('kick'))this.doStrike(f,'rk',{});else if(e==='blockp'||e==='clinch'||e==='escape')this.breakClinch(f,1);continue}
+      if(f.state==='clinch'){if(e.startsWith('kick'))this.doStrike(f,'rk',{});else if(e==='td'||e==='jab')this.startGuillotine(f,f.opp);else if(e==='blockp'||e==='clinch'||e==='escape')this.breakClinch(f,1);continue}
       if(e==='clinch'){if(f.state==='stand')this.clinch(f);continue}if(e==='escape')continue;
       if(e==='td'){if(f.opp.down&&!f.opp.down.ko)this.pounce(f);else if(f.state==='stand')this.shoot(f);continue}
       const low=I.my<-.5,high=I.my>.5;let key=null;
@@ -1379,7 +1380,7 @@ class Match{
     // fighters: bottom/defender first
     let order=[a,b];if(g&&g.type==='ground'&&g.sub)order=g.sub.cat==='rnc'?[g.sub.att,g.sub.def]:[g.sub.def,g.sub.att];else if(g&&g.type==='ground')order=GPOS[g.pos].same?[g.top,g.bot]:[g.bot,g.top];else if(g&&g.type==='clinch')order=[g.def,g.att];else if(g&&g.type==='kcatch')order=[g.def,g.att];else if(this.pi!=null)order=[this.f[1-this.pi],this.f[this.pi]];
     const clDraw=g&&g.type==='clinch'&&!g.cage;if(clDraw)for(const f of order){f._noFx=1;f.draw(ctx,{corner:f.corner,part:'far'});f._noFx=0}
-    const LY=g&&(g.sub&&g.sub.layers||g.type==='ground'&&!g.sub&&g.layers);if(LY){for(const[f,parts]of LY){f._noFx=parts.indexOf("head")>=0?0:1;f.draw(ctx,{corner:f.corner,only:parts});f._noFx=0}}else for(const f of order){if(f.hitF>0){ctx.filter=`brightness(${(1+f.hitF*5).toFixed(2)}) saturate(.7)`;f.hitF-=dt}f.draw(ctx,clDraw?{corner:f.corner,part:'body'}:{corner:f.corner});ctx.filter='none';this.drawTrail(ctx,f)}if(clDraw)for(const f of order){f._noFx=1;f.draw(ctx,{corner:f.corner,onlyArm:1});f._noFx=0}if(g&&g.sub&&!g.sub.layers&&/초크/.test(g.sub.name))g.sub.att.draw(ctx,{corner:g.sub.att.corner,onlyArm:1});/* choking arm drawn over the defender's neck */if(this.showBoxes)this.drawBoxes(ctx);
+    const LY=g&&(g.sub&&g.sub.layers||!g.sub&&g.layers);if(LY){for(const[f,parts]of LY){f._noFx=parts.indexOf("head")>=0?0:1;f.draw(ctx,{corner:f.corner,only:parts});f._noFx=0}}else for(const f of order){if(f.hitF>0){ctx.filter=`brightness(${(1+f.hitF*5).toFixed(2)}) saturate(.7)`;f.hitF-=dt}f.draw(ctx,clDraw?{corner:f.corner,part:'body'}:{corner:f.corner});ctx.filter='none';this.drawTrail(ctx,f)}if(clDraw)for(const f of order){f._noFx=1;f.draw(ctx,{corner:f.corner,onlyArm:1});f._noFx=0}if(g&&g.sub&&!g.sub.layers&&/초크/.test(g.sub.name))g.sub.att.draw(ctx,{corner:g.sub.att.corner,onlyArm:1});/* choking arm drawn over the defender's neck */if(this.showBoxes)this.drawBoxes(ctx);
     S.drawFx(dt);S.vig=this.pi!=null&&this.f[this.pi].rock>0?.35:0;
     const O=this.outro;if(O){let al=0;if(O.stage==='fade')al=Math.min(1,O.t/(O.dec?1.4:1.0));else if(O.stage==='cer')al=Math.max(0,1-O.t/.9);else if(O.stage==='fall')al=0;if(al>0){ctx.setTransform(1,0,0,1,0,0);ctx.fillStyle=`rgba(0,0,0,${al})`;ctx.fillRect(0,0,S.cv.width,S.cv.height)}
       if(O.stage==='fall'){ctx.setTransform(1,0,0,1,0,0);const k=Math.min(1,O.t/.4)*.35;ctx.fillStyle=`rgba(0,0,0,${k})`;const h=S.cv.height*.11;ctx.fillRect(0,0,S.cv.width,h);ctx.fillRect(0,S.cv.height-h,S.cv.width,h)}}}
@@ -1404,11 +1405,11 @@ class Match{
     // ground wheel for player
     const g=this.g;const P=this.pi!=null?this.f[this.pi]:null;
     if(P&&g&&g.type==='ground'&&!g.sub){const role=P===g.top?'top':'bot';const tr=GTR[role][g.pos]||{};const nm=k=>k==='stand'?'일어서기':k==='getup'?'겟업':k==='sweep'?'스윕':k==='escape'?'탈출':GPOS[k]?GPOS[k].n:'';
-      const html=`<div class="gwt">${GPOS[g.pos].n} · ${role==='top'?'상위':'하위'}</div><div class="gwc"><span class="u">${nm(tr.up)||'—'}</span><span class="l">${nm(tr.left)||'—'}</span><span class="r">${nm(tr.right)||'—'}</span><span class="d">${nm(tr.down)||'—'}</span><b>⇧</b></div><div class="gwm"><em>⇧ 버튼을 방향으로 스와이프(또는 스틱+탭) = 포지션 이동 · ↓ = 일어서기</em><em>🔒 서브미션 · 👊 파운딩</em><em>🛡 상대 전환 순간 방어 = 차단</em></div>`;
+      const html=`<div class="gwt">${GPOS[g.pos].n} · ${role==='top'?'상위':'하위'}</div><div class="gwc"><span class="u">${nm(tr.up)||'—'}</span><span class="l">${nm(tr.left)||'—'}</span><span class="r">${nm(tr.right)||'—'}</span><span class="d">${nm(tr.down)||'—'}</span><b>⇧</b>${g.tr2?`<i class="gr ${({up:'u',down:'d',fwd:'r',back:'l'})[g.tr2.dir]||'u'}" style="--a:${Math.round(clamp(g.tr2.p,0,1)*100)};--b:${Math.round(clamp(g.tr2.q,0,1)*100)}"></i>`:''}</div><div class="gwm"><em>스틱을 방향으로 밀기 = 포지션 이동 시도 (🔴 시도 / 🔵 방어, 먼저 링을 채우는 쪽이 이김)</em><em>🔒 서브미션 · 👊 파운딩</em></div>`;
       if(H.gw._h!==html){H.gw.innerHTML=html;H.gw._h=html}H.gw.classList.add('show')}else H.gw.classList.remove('show');
-    if(g&&g.type==='tdfight'){H.sub.innerHTML=`<div class="sbt">테이크다운 싸움</div><div class="sbb"><s style="width:${clamp(g.p,0,1)*100}%"></s><i style="left:50%"></i></div><div class="sba">${P?'👆':''}</div><div class="sbh">${P?(P===g.att?'버튼 연타로 넘어뜨리세요!':'버튼 연타로 버티세요!'):''}</div>`;this.subUI(1)}
-    else if(!(g&&g.sub)&&this._tdui)this.subUI(0);this._tdui=g&&g.type==='tdfight'?1:0;
-    if(g&&g.sub){const s=g.sub;H.sub.innerHTML=`<div class="sbt">${esc2(s.name)}</div><div class="sbb"><s style="width:${clamp(s.p,0,1)*100}%"></s><i style="left:33%"></i><i style="left:66%"></i></div><div class="sba">${P?'👆':''}</div><div class="sbh">${P?(P===s.att?'버튼 연타로 조이세요!':'버튼 연타로 빠져나오세요!'):''}</div>`;this.subUI(1)}
+    if(g&&(g.type==='tdfight'||g.type==='gentry')){const ge=g.type==='gentry';H.sub.innerHTML=`<div class="sbt">${ge?'가드 진입':'테이크다운 싸움'}</div><div class="sbb sbtug"><s class="r" style="width:${clamp(g.p,0,1)*100}%"></s><s class="b" style="width:${(1-clamp(g.p,0,1))*100}%"></s></div><div class="sba">${P?'👆':''}</div><div class="sbh">${P?(P===g.att?(ge?'🔴 연타로 다리 사이로 파고드세요!':'🔴 버튼 연타로 넘어뜨리세요!'):(ge?'🔵 연타로 발로 밀어내세요!':'🔵 버튼 연타로 버티세요!')):''}</div>`;this.subUI(1)}
+    else if(!(g&&g.sub)&&this._tdui)this.subUI(0);this._tdui=g&&(g.type==='tdfight'||g.type==='gentry')?1:0;
+    if(g&&g.sub){const s=g.sub;H.sub.innerHTML=`<div class="sbt">${esc2(s.name)}</div><div class="sbb sbtug"><s class="r" style="width:${clamp(s.p,0,1)*100}%"></s><s class="b" style="width:${(1-clamp(s.p,0,1))*100}%"></s></div><div class="sbs"><span class="r">🔴 ${esc2(s.att.name.split(' ').pop())} · 스태미나 ${Math.round(s.att.sta/s.att.staMax*100)}%</span><span class="b">🔵 ${esc2(s.def.name.split(' ').pop())} · ${Math.round(s.def.sta/s.def.staMax*100)}%</span></div><div class="sba">${P?'👆':''}</div><div class="sbh">${P?(P===s.att?'🔴 버튼 연타로 조이세요! (연타마다 스태미나 소모)':'🔵 버튼 연타로 빠져나오세요! (연타마다 스태미나 소모)'):''}</div>`;this.subUI(1)}
     const cuts=i=>this.f[i].body.cuts.length?`🩸 컷 ${this.f[i].body.cuts.length}`:'';this.root.querySelectorAll('[data-cut]').forEach(e=>e.textContent=cuts(+e.dataset.cut))}
   subUI(on){if(this.H)this.H.sub.classList.toggle('show',!!on)}
   showOv(html){this.H.ov.innerHTML=`<div class="ovb">${html}</div>`;this.H.ov.classList.add('show')}
@@ -2545,5 +2546,5 @@ function fightWeek(){const P=GG.P,nx=P.next;if(!nx)return;const o=GG.F[nx.opp];c
   step0()}
 if(document.readyState==='loading')window.addEventListener('DOMContentLoaded',titleScreen);else titleScreen();
 </script>
-<script src="src/Tuning.js"></script><script src="src/FootPlant.js"></script><script src="src/Arena.js"></script><script src="src/Ragdoll2D.js"></script><script src="src/JudgeRefereeSystem.js"></script><script src="src/CombatEngine.js"></script><script src="src/CombatPacingEngine.js"></script><script src="src/ImpactFeedbackManager.js"></script><script src="src/GraphicsRenderer.js"></script><script src="src/UIManager.js"></script><script src="src/ArenaRenderer.js"></script><script src="src/RefereeModel.js"></script><script src="src/MotionPhysics.js"></script><script src="src/MotionRealism.js"></script><script src="src/AttackMotions.js"></script><script src="src/DebugLayer.js"></script><script src="src/GPURenderer.js"></script><script src="src/CareerManager.js"></script><script src="src/FlatStyle.js"></script><script src="src/GroundMotion.js"></script><script src="src/Training.js"></script><script src="src/Fighters.js"></script><script src="src/Grappling2.js"></script><script src="src/KOReplay.js"></script>
+<script src="src/Tuning.js"></script><script src="src/FootPlant.js"></script><script src="src/Arena.js"></script><script src="src/Ragdoll2D.js"></script><script src="src/JudgeRefereeSystem.js"></script><script src="src/CombatEngine.js"></script><script src="src/CombatPacingEngine.js"></script><script src="src/ImpactFeedbackManager.js"></script><script src="src/GraphicsRenderer.js"></script><script src="src/UIManager.js"></script><script src="src/ArenaRenderer.js"></script><script src="src/RefereeModel.js"></script><script src="src/MotionPhysics.js"></script><script src="src/MotionRealism.js"></script><script src="src/AttackMotions.js"></script><script src="src/DebugLayer.js"></script><script src="src/GPURenderer.js"></script><script src="src/CareerManager.js"></script><script src="src/FlatStyle.js"></script><script src="src/GroundMotion.js"></script><script src="src/Training.js"></script><script src="src/Fighters.js"></script><script src="src/Grappling2.js"></script><script src="src/KOReplay.js"></script><script src="src/Ground2.js"></script>
 </body></html>

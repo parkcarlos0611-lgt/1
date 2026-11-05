@@ -57,23 +57,24 @@ Match.prototype.catchPunch=function(){const g=this.g;if(g.pun){g.q=1;return}if(g
 
 /* ---------- the held-leg position and the free-hand punches ---------- */
 Match.prototype.updCatch=function(dt){const g=this.g,C=g.att,K=g.def,d=g.d;g.t+=dt;
-  C.x=g.ax;C.d=d;K.d=-d;K.x+=(C.x+d*.82-K.x)*Math.min(1,dt*10);/* close enough that the free hand reaches the jaw */
-  const CJ=C.body.J,KJ=K.body.J;const hop=Math.max(0,Math.sin(g.t*10.5))*.035;
-  const pc=Object.assign({},BASE_POSE,{lean:.16,chest:.05,head:.04,ll_h:.38,ll_k:.4,rl_h:-.32,rl_k:.42,rl_a:.35,la_s:.95,la_e:1.6,ra_s:.6,ra_e:2.3});
+  /* the catcher can walk while holding (2/3 of his normal speed); the held fighter hops after him on one leg */
+  if(g.mv){const lim=this.stage.R-.9;const step=g.mv*C.spd()*.72*dt;g.ax=clamp(g.ax+step,-lim,lim);g.walk=(g.walk||0)+Math.abs(step)*7}
+  C.x=g.ax;C.d=d;K.d=-d;K.x+=(C.x+d*.82-K.x)*Math.min(1,dt*10);
+  const CJ=C.body.J,KJ=K.body.J;const hop=(Math.abs(g.mv||0)>.05?Math.abs(Math.sin(g.walk*1.0))*.07:Math.max(0,Math.sin(g.t*10.5))*.02);const bob=Math.abs(Math.sin((g.walk||0)*1.0))*.012;
+  const pc=Object.assign({},BASE_POSE,{lean:.16,chest:.05,head:.04,ll_h:.38+Math.sin(g.walk||0)*.12*Math.abs(g.mv||0),ll_k:.4,rl_h:-.32-Math.sin(g.walk||0)*.12*Math.abs(g.mv||0),rl_k:.42,rl_a:.35,la_s:.95,la_e:1.6,ra_s:.6,ra_e:2.3,y:0});
   const pk=Object.assign({},BASE_POSE,{y:hop,lean:-.18+Math.sin(g.t*9)*.05,chest:-.05,head:.12,la_s:1.7+Math.sin(g.t*8)*.25,la_e:.6,ra_s:.9,ra_e:1.9});
-  const held=g.leg,sup=held==='ll'?'rl':'ll';pk[sup+'_h']=.05;pk[sup+'_k']=.18;pk[sup+'_a']=.15;
+  const held=g.leg,sup=held==='ll'?'rl':'ll';pk[sup+'_h']=.05;pk[sup+'_k']=.18+hop*2.2;pk[sup+'_a']=.15;
   /* the caught leg is pinned at the catcher's hip under his lead arm */
   if(CJ.mid){legIK(K,pk,held,{x:CJ.hip.x+d*.02,y:CJ.mid.y-.08});pk[held+'_a']=.55}else{pk[held+'_h']=1.45;pk[held+'_k']=.3}
   if(KJ.lK&&KJ.lA){const kn=held==='ll'?KJ.lK:KJ.rK,an=held==='ll'?KJ.lA:KJ.rA;armIK(C,pc,'la',L(kn,an,.6))}
-  /* free (rear) hand: guard, or one of the usual punches at 40 % power (str = straight, hook, upp, body) */
-  if(g.pun&&KJ.hd){const P=g.pun;P.t+=dt;const u=P.t/.3;const w=u<.45?u/.45:Math.max(0,1-(u-.45)/.55);const tmp=Object.assign({},pc);const kd=P.kind||'str';
-    const tg=kd==='hook'?{x:KJ.hd.x-d*.01,y:KJ.hd.y-.02}:kd==='upp'?{x:KJ.hd.x-d*.05,y:KJ.hd.y-.14}:kd==='body'?{x:KJ.mid.x-d*.08,y:(KJ.mid.y+KJ.sh.y)/2}:{x:KJ.hd.x-d*.06,y:KJ.hd.y-.05};
-    if(kd==='hook'&&typeof armIKUp==='function'){const pre=1-w;armIKUp(C,tmp,'ra',{x:tg.x-d*.35*pre,y:tg.y-.06*pre})}else armIK(C,tmp,'ra',tg);
-    pc.ra_s+=(tmp.ra_s-pc.ra_s)*w;pc.ra_e+=(tmp.ra_e-pc.ra_e)*w;pc.tw=(pc.tw||0)+(kd==='hook'?.4:.22)*w;pc.lean+=(kd==='body'?.22:.14)*w;
-    if(u>=.45&&!P.hit){P.hit=1;const base=({str:'cross',hook:'rhook',upp:'rupp',body:'bcross'})[kd]||'cross';const dmg=.26*MV[base].hit.dmg*.4*(.55+ATT(C,'punchPow')*.75+ATT(C,'strength')*.15)*(.55+.45*C.sta/C.staMax);
-      const hp=kd==='body'?tg:{x:KJ.hd.x-d*.05,y:KJ.hd.y-.04};this.applyDmg(C,K,{zone:kd==='body'?'body':'head',dmg,kind:'punch',p:hp,chin:kd!=='body'&&Math.random()<.2});K.react.h=(K.react.h||0)-.1;K.react.x+=d*.03;C.st&&C.st.land++;
-      SFXI.play('hit',.85);this.stage.impact(hp.x,hp.y,.7,'#fff',d);this.hitstop=.05;this.stage.shake=Math.max(this.stage.shake||0,.04);if(window.hitJiggle)try{hitJiggle(K.body,kd==='body'?'body':'head',.016*K.H,d)}catch(e){}}
-    if(u>=1){g.pun=null;if(g.q){const k=g.q;g.q=0;this.catchPunch(k)}}}
+  g.hold={la_s:pc.la_s,la_e:pc.la_e,lo:pc.lo};
+  /* free (rear) hand: the REAL standing punch clip (cross / rear hook / rear upper / body cross); damage 40 % at the contact frame */
+  {const P=g.pun;if(P&&!P.started){P.started=1;const key=({str:'cross',hook:'rhook',upp:'rupp',body:'bcross'})[P.kind||'str']||'cross';P.key=key;C.act={key,c:MV[key],t:0,speed:1,hit:true,catch:1};C.queue=[]}
+    if(P&&P.started){const a=C.act;if(!a||a.key!==P.key){g.pun=null;if(g.q){const k=g.q;g.q=0;this.catchPunch(k)}}
+      else if(!P.hit&&a.t>=a.c.hit.t0&&KJ.hd){P.hit=1;const kd=P.kind||'str';const tg=kd==='body'?{x:KJ.mid.x-d*.08,y:(KJ.mid.y+KJ.sh.y)/2}:{x:KJ.hd.x-d*.05,y:KJ.hd.y-.04};
+        const dmg=.26*a.c.hit.dmg*.4*(.55+ATT(C,'punchPow')*.75+ATT(C,'strength')*.15)*(.55+.45*C.sta/C.staMax);
+        this.applyDmg(C,K,{zone:kd==='body'?'body':'head',dmg,kind:'punch',p:tg,chin:kd!=='body'&&Math.random()<.2});K.react.h=(K.react.h||0)-.1;K.react.x+=d*.03;C.st&&C.st.land++;
+        SFXI.play('hit',.85);this.stage.impact(tg.x,tg.y,.7,'#fff',d);this.hitstop=.05;this.stage.shake=Math.max(this.stage.shake||0,.04);if(window.hitJiggle)try{hitJiggle(K.body,kd==='body'?'body':'head',.016*K.H,d)}catch(e){}}}}
   C.gpose=pc;K.gpose=pk;
   /* AI on either side */
   if(g.ai){g.ai.t-=dt;if(g.ai.t<=0){if(g.ai.plan==='td'){this.catchTD();return}if(!g.pun){if(g.n<2||Math.random()<.5)this.catchPunch();else if(Math.random()<.5){this.catchTD();return}else{this.endCatch();return}}g.ai.t=.3+Math.random()*.25}}

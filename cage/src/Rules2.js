@@ -40,23 +40,4 @@ F2.prototype.headMove=function(){return false};
 {const poll=In2.prototype.poll;In2.prototype.poll=function(){const ev=poll.call(this);const out=[];for(const e of ev){if(e==='evade'||e==='weave'||e==='sway')this.evReq=1;else if(typeof e==='string'&&e.startsWith('tac:'))this.tacReq=e.slice(4);else if(typeof e==='string'&&(e==='step'||e.startsWith('step:')))continue;else out.push(e)}return out}}
 {const fw=F2.prototype.footwork;F2.prototype.footwork=function(p,dt){this.bounce=false;return fw.call(this,p,dt)}}
 
-/* ---------- touch controls ---------- */
-{const bt=In2.prototype.buildTouch;In2.prototype.buildTouch=function(){bt.call(this);const tc=this.tc;if(!tc)return;
-  const box=tc.querySelector('.tr4');if(box){for(const b of[...box.children]){if(!b.classList.contains('stc'))b.remove()}
-    box.insertAdjacentHTML('afterbegin','<button class="b4 tac" data-tac="in"><small>인파이트</small></button><button class="b4 tac" data-tac="out"><small>아웃파이트</small></button><button class="b4 tac" data-tac="no"><small>노가드</small></button>');
-    for(const b of box.querySelectorAll('[data-tac]')){b.addEventListener('touchstart',e=>{e.preventDefault();this.ev.push('tac:'+b.dataset.tac)},{passive:false});b.addEventListener('click',()=>{if(!('ontouchstart' in window))this.ev.push('tac:'+b.dataset.tac)})}}
-  const ev=document.createElement('div');ev.className='evw';ev.innerHTML='<div class="dots"><i data-d="0"></i><i data-d="1"></i></div><button class="evb" data-evade><span class="fill"></span><small>회피</small></button>';tc.appendChild(ev);
-  const b=ev.querySelector('[data-evade]');b.addEventListener('touchstart',e=>{e.preventDefault();this.ev.push('evade')},{passive:false});b.addEventListener('click',()=>{if(!('ontouchstart' in window))this.ev.push('evade')})}}
-{const css=document.createElement('style');css.textContent=
- '.b4.tac{width:84px;height:46px;border-radius:12px}.b4.tac small{margin:0;font-size:12px;letter-spacing:.04em}.b4.tac.on{border-color:#e9c45a;background:rgba(233,196,90,.28)}'+
- '.evw{position:absolute;left:max(18px,calc(env(safe-area-inset-left) + 14px));bottom:calc(max(10px,env(safe-area-inset-bottom)) + var(--padH,372px) + 40px);display:flex;flex-direction:column;align-items:center;gap:8px;pointer-events:auto;z-index:3}'+
- '.evw .dots{display:flex;gap:10px}.evw .dots i{width:14px;height:14px;border-radius:50%;border:2px solid rgba(255,255,255,.55);background:rgba(255,255,255,.12)}.evw .dots i.on{background:#7fd8ff;border-color:#d8f3ff;box-shadow:0 0 8px #7fd8ff}'+
- '.evw .evb{position:relative;overflow:hidden;width:84px;height:84px;border-radius:50%;border:2px solid rgba(255,255,255,.55);background:rgba(14,16,22,.66);color:#fff;display:flex;align-items:center;justify-content:center;touch-action:none}'+
- '.evw .evb .fill{position:absolute;left:0;right:0;bottom:0;height:0;background:linear-gradient(0deg,rgba(127,216,255,.55),rgba(127,216,255,.18));transition:height .1s linear}.evw .evb small{position:relative;font:500 13px "Noto Sans KR",sans-serif;letter-spacing:.12em}.evw .evb:active{border-color:#fff}'+
- '.mgr .evw,.mcl .evw{opacity:.3;pointer-events:none}';document.head.appendChild(css)}
-/* HUD: charge dots and the cooldown fill follow the player's evade state */
-{const hd=Match.prototype.hud;Match.prototype.hud=function(dt){const r=hd.call(this,dt);if(this.pi==null||!this.inp||!this.inp.tc)return r;const f=this.f[this.pi],ev=this.inp.tc.querySelector('.evw');if(!ev||!f.evCh)return r;
-  const now=this.t2();const ready=f.evCh.map(t=>t<=now);ev.querySelectorAll('.dots i').forEach((d,i)=>d.classList.toggle('on',!!ready[i]));
-  const next=Math.min(...f.evCh.filter(t=>t>now),Infinity);const fill=ev.querySelector('.fill');if(fill)fill.style.height=(ready.every(x=>x)?100:ready.some(x=>x)?100:(1-clamp((next-now)/4.5,0,1))*100)+'%';
-  const bs=this.inp.tc.querySelectorAll('[data-tac]');bs.forEach(b=>b.classList.toggle('on',f.tactic===b.dataset.tac));return r}}
 })();

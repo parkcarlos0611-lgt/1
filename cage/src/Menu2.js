@@ -64,5 +64,23 @@ window.quickFight=function(){const st={wc:'HW',a:0,b:1,side:0,diff:1,rule:'ufc'}
       const root=document.createElement('div');document.body.appendChild(root);
       new Match(root,{level:kick?1.2:1.6,org:{short:kick?'KICK':'UFC',col:kick?'#c8a24a':'#d20a0a'},title:kick?'입식 올스타 파이트':'올스타 파이트',wcName:WC[st.wc].en+(kick?' KICKBOXING':' BOUT'),rules,ruleset:kick?'kick':'ufc',player:st.side===2?null:st.side,diff:st.diff,allowSim:false,red:fx(fa),blue:fx(fb)},()=>{root.remove();render()})}};
   render()};
+/* ---------- practice: same plain style ---------- */
+window.trainingMenu=function(){const st={kind:'bag',wc:'HW',a:0,b:1,gq:.5};
+  const KN=[['bag','샌드백'],['wrestle','레슬링'],['spar','스파링']];
+  const render=()=>{const L=poolFor(st.wc);if(st.a>=L.length)st.a=0;if(st.b>=L.length||st.b===st.a)st.b=st.a===0?1:0;const fa=L[st.a],fb=L[st.b];
+    const opt=sel=>L.map((f,i)=>`<option value="${i}" ${i===sel?'selected':''}>${dn2(f)}  ·  ${(Math.round(f.stars*2)/2).toFixed(1)}</option>`).join('');
+    const note={bag:'트레이닝 센터에서 끈에 매달린 샌드백을 시간 제한 없이 칩니다. 타격 위치와 파워에 따라 흔들립니다.',wrestle:'타격 없이 2분 동안 테이크다운·스윕·포지션·서브미션으로 포인트를 땁니다.',spar:'헤드기어를 쓰고 2분 2라운드. KO 없이 리셋됩니다.'}[st.kind];
+    app().innerHTML=`<div class="q2"><button class="back2" data-bk>← 뒤로</button><h2>연습</h2>
+      <div class="row"><span class="lb">종류</span>${KN.map(([k,n])=>`<button class="chip ${st.kind===k?'on':''}" data-k="${k}">${n}</button>`).join('')}</div>
+      <p class="mt" style="color:#8f8f99;margin:6px 0 12px">${note}</p>
+      ${st.kind==='bag'?`<div class="row"><span class="lb">체육관</span>${[[0,'동네 체육관'],[.5,'프로 짐'],[1,'엘리트 센터']].map(([v,n])=>`<button class="chip ${st.gq===v?'on':''}" data-gq="${v}">${n}</button>`).join('')}</div>`:''}
+      <div class="row"><span class="lb">체급</span>${WCK.map(k=>`<button class="chip ${k===st.wc?'on':''}" data-wc="${k}">${WC[k].n}</button>`).join('')}</div>
+      <div class="vs2" style="grid-template-columns:${st.kind==='bag'?'1fr':'1fr auto 1fr'}"><div class="pc"><div class="side r">내 선수</div><select data-a>${opt(st.a)}</select>${card(fa)}</div>${st.kind==='bag'?'':`<div class="vsx">VS</div><div class="pc"><div class="side b">파트너</div><select data-b>${opt(st.b)}</select>${card(fb)}</div>`}</div>
+      <button class="go" data-go>시작</button></div>`;
+    const A=app();A.querySelector('[data-bk]').onclick=titleScreen;A.querySelectorAll('[data-k]').forEach(b=>b.onclick=()=>{st.kind=b.dataset.k;render()});A.querySelectorAll('[data-gq]').forEach(b=>b.onclick=()=>{st.gq=+b.dataset.gq;render()});
+    A.querySelectorAll('[data-wc]').forEach(b=>b.onclick=()=>{st.wc=b.dataset.wc;st.a=0;st.b=1;render()});A.querySelector('[data-a]').onchange=e=>{st.a=+e.target.value;render()};const sb=A.querySelector('[data-b]');if(sb)sb.onchange=e=>{st.b=+e.target.value;render()};
+    A.querySelector('[data-go]').onclick=()=>{const fx=f=>({name:dn2(f),flag:'',rec:'',A:f.A,stance:hsh(f.n+'st')<.22?-1:1,look:lookFor(f.rr)});startTraining(st.kind,fx(fa),fx(fb),{gymQ:st.gq,done:render})}};
+  render()};
+{const css=document.createElement('style');css.textContent='.trnhud{background:rgba(8,8,10,.85)!important;border:1px solid rgba(255,255,255,.28);border-radius:3px!important;font:500 13px "Noto Sans KR",sans-serif!important;letter-spacing:.05em}.trnhud .trnend{background:transparent!important;border:1px solid rgba(255,255,255,.5)!important;border-radius:3px!important;color:#fff;font:500 12px "Noto Sans KR",sans-serif!important;padding:3px 12px!important}.trnov{background:rgba(0,0,0,.7)!important}.trnc{background:#0b0b0d!important;border:1px solid rgba(255,255,255,.2);border-radius:3px!important;font-family:"Noto Sans KR",sans-serif}.trnc h2{font-weight:400!important;letter-spacing:.3em}.trnc .btn,.trnc button{background:transparent!important;border:1px solid rgba(255,255,255,.5)!important;color:#fff!important;border-radius:3px!important;padding:9px 22px;letter-spacing:.3em}.trnc .gain{color:#e9c45a!important}';document.head.appendChild(css)}
 /* the old title may already be on screen */try{if(document.querySelector('#app .title'))window.titleScreen()}catch(e){}
 })();

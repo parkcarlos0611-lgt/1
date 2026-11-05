@@ -13,6 +13,7 @@ const rnd=Math.random;const now=M=>M.t2();
 const isKick=M=>!!(M.cfg&&M.cfg.ruleset==='kick');
 const LOWK=k=>k==='rlk'||k==='llk'||k==='calf';
 
+if(typeof IFX!=='undefined'){Object.assign(IFX.tiers.blocked,{hs:3,shake:.035,zoom:.02})}
 /* ================= 1. guard ================= */
 Object.assign(GMATCH,{mid:{straight:1,hook:1,upper:1,body:.85,leg:0},top:{hook:1,straight:.3,upper:.2,body:.2,leg:0}});
 {const up=F2.prototype.update;F2.prototype.update=function(dt,M){
@@ -28,15 +29,21 @@ Object.assign(GMATCH,{mid:{straight:1,hook:1,upper:1,body:.85,leg:0},top:{hook:1
   r=pi.call(this,dt);
   if(f&&this.phase==='fight'&&f.state==='stand'){
     if(I.evReq){I.evReq=0;this.evade(f)}if(I.tacReq){const t=I.tacReq;I.tacReq=null;this.setTactic(f,t)}
-    if(f.guard||f.guardHeld){const up=I.my>.5||I.tgtype==='tdd',dn=I.my<-.5||I.tgtype==='low';const want=f.tactic==='no'?null:up?'top':dn?'low':'mid';if(this._gBrokenFor(f)){f.guardHeld=!!want;f.guard=null}else f.guard=want}}
+    if(f.guard||f.guardHeld){const up=I.my>.5||I.tgtype==='top'||I.tgtype==='tdd',dn=I.my<-.5||I.tgtype==='low';const want=f.tactic==='no'?null:up?'top':dn?'low':'mid';if(this._gBrokenFor(f)){f.guardHeld=!!want;f.guard=null}else f.guard=want}}
   return r}}
 Match.prototype._gBrokenFor=function(f){return !!f._gBroken};
 /* a guard that is down (broken): the hands drop a little below the normal middle guard */
 {const fw=F2.prototype.footwork;F2.prototype.footwork=function(p,dt){fw.call(this,p,dt);if(this.state!=='stand'||this.act||this.gpose)return;
     if(this.guardHeld&&this._gBroken){p.la_s-=.28;p.ra_s-=.28;p.la_e+=.18;p.ra_e+=.18;p.lean+=.02}
     /* a slightly more upright fighting stance */p.lean-=.07;p.chest-=.02;
-    const tc=this.tactic;if(tc==='in'){p.la_s+=.1;p.ra_s+=.12;p.la_e+=.35;p.ra_e+=.3;p.head+=.06;p.lean+=.04}
-    else if(tc==='out'){p.la_s+=.65;p.la_e-=1.05;p.lean-=.04}else if(tc==='no'){p.la_s-=.55;p.ra_s-=.5;p.la_e-=.5;p.ra_e-=.55;p.head-=.04}}}
+    }}
+/* tactic stances change the BASE pose, so every strike starts from (and returns to) those hands: no guard = arms hanging and strikes leave from the hips */
+{const tp=F2.prototype.targetPose;F2.prototype.targetPose=function(M){const b=tp.call(this,M);if(this.gpose||this.state!=='stand')return b;const tc=this.tactic;
+    if(tc==='no'){b.la_s=.14;b.la_e=.32;b.ra_s=.06;b.ra_e=.28;b.head-=.04;b.lean-=.02;b.ll_k+=.04}
+    else if(tc==='in'){b.la_s=.72;b.la_e=2.25;b.ra_s=.58;b.ra_e=2.55;b.head+=.07;b.lean+=.05;b.ll_k+=.08;b.rl_k+=.08}
+    else if(tc==='out'){b.la_s=1.42;b.la_e=.42;b.ra_s=.62;b.ra_e=2.45;b.lean-=.03}
+    if(this.guardHeld&&this._gBroken){b.la_s=Math.min(b.la_s,.75);b.ra_s=Math.min(b.ra_s,.6);b.la_e=Math.min(b.la_e,1.35);b.ra_e=Math.min(b.ra_e,1.7)}
+    return b}}
 /* the engine's guard checks: legacy names around the old branches */
 {const oh=Match.prototype.onHit;Match.prototype.onHit=function(att,def,act,zone,p){
   /* groggy attackers miss more */
@@ -55,6 +62,7 @@ Match.prototype._gBrokenFor=function(f){return !!f._gBroken};
     if(att.rock>0&&a&&a.key==='knee'&&att.state==='clinch')o.dmg*=.7;
     if(def.evT>0&&!o.blocked)o.dmg*=.7;/* weaving takes the sting out */
     if(this._free&&def.down&&def.down.ko)o.dmg*=.2}
+  if(o&&o.blocked&&def.body&&def.body.J.lG&&!o._bfx){o._bfx=1;const J=def.body.J,x=(J.lG.x+J.rG.x)/2+att.d*.0,y=(J.lG.y+J.rG.y)/2;const S=this.stage,pw=clamp((o.dmg||2)/2.4,.7,2);S.impact(x,y,1.3+pw*.7,'#bfe0ff',att.d);if(S.burst)S.burst(x,y,att.d,8+Math.round(pw*5),'spark',1.1+pw*.3);S.shake=Math.max(S.shake||0,.035+.02*pw);this.hitstop=Math.max(this.hitstop||0,.055+.015*pw);def.react.x-=att.d*.1*pw;try{JointPhys.kick(def,'lean',-2.2*pw);JointPhys.kick(def,'la_s',-1.6*pw);JointPhys.kick(def,'ra_s',-1.6*pw);JointPhys.kick(att,'chest',.9)}catch(e){}}
   const r0=def.rock>0,had=!!def.down;const r=ad.call(this,att,def,o);
   /* groggy lasts 1-3 s depending on the blow */
   if(!r0&&def.rock>0&&def._ko)def.rock=clamp(1+(def._ko.imp||4)/7,1,3);
@@ -83,14 +91,16 @@ Match.prototype.cutCheck=function(){};
 /* ================= 3. evade ================= */
 Match.prototype.evade=function(f){if(f.state!=='stand'||f.evT>0||f.act&&f.act.c.hit&&f.act.t<f.act.c.hit.t1||this.phase!=='fight')return false;const t=now(this);f.evCh=f.evCh||[0,0];const i=f.evCh.findIndex(x=>x<=t);if(i<0)return false;f.evCh[i]=t+4.5;f.evT=2.0;f.guard=null;return true};
 /* the dodge itself: slip aside when they are close, lean back when they are far */
-Match.prototype.startEvade=function(f,att,act){const gap=Math.abs(att.x-f.x)/(f.H||1.8);f.evA={t:0,dur:.52,kind:gap<.5?'slip':'back',sd:rnd()<.5?1:-1};SFXI.play('whiff',.6)};
+Match.prototype.startEvade=function(f,att,act){const gap=Math.abs(att.x-f.x)/(f.H||1.8);f.evA={t:0,dur:.9,kind:gap<.5?'slip':'back',sd:rnd()<.5?1:-1};SFXI.play('whiff',.6)};
 {const up=F2.prototype.update;F2.prototype.update=function(dt,M){if(this.evT>0)this.evT=Math.max(0,this.evT-dt);if(this.evA){this.evA.t+=dt;if(this.evA.t>=this.evA.dur)this.evA=null}
   if(!this.evCh)this.evCh=[0,0];
+  /* an incoming blow is judged while it is still winding up, so the dodge starts BEFORE contact */
+  if(this.evT>0&&M&&this.state==='stand'){const q=this.opp,a=q.act;if(a&&a.c.hit&&a._evRoll==null&&!LOWK(a.key)&&a.t<a.c.hit.t0&&a.t>a.c.hit.t0*.12&&Math.abs(q.x-this.x)<(REACH[a.key]||1)*(q.H/1.6)+.2){a._evRoll=rnd()<.7?1:0;if(a._evRoll){a._dodged=1;M.startEvade(this,q,a)}}}
   /* the AI weaves against incoming strikes now and then */
   if(this.ai&&M&&M.phase==='fight'&&this.state==='stand'&&this.evT<=0){const o=this.opp;if(o.act&&o.act.c.hit&&o.act.t<o.act.c.hit.t0*.8&&Math.abs(o.x-this.x)<1.6&&rnd()<dt*.9*this.ai.diff*(.3+ATT(this,'strDef')))M.evade(this)}
   return up.call(this,dt,M)}}
 {const sp=F2.prototype.spd;F2.prototype.spd=function(){return sp.call(this)*(this.evT>0?.82:1)}}
-{const fw=F2.prototype.footwork;F2.prototype.footwork=function(p,dt){fw.call(this,p,dt);const e=this.evA;if(!e||this.state!=='stand')return;const k=Math.sin(Math.PI*clamp(e.t/e.dur,0,1));
+{const fw=F2.prototype.footwork;F2.prototype.footwork=function(p,dt){fw.call(this,p,dt);const e=this.evA;if(!e||this.state!=='stand')return;const u0=clamp(e.t/e.dur,0,1),k=Math.pow(Math.sin(Math.PI*u0),.7);
   if(e.kind==='slip'){p.lean+=.5*k;p.head+=.22*k;p.tw+=.55*k*e.sd;p.ll_k+=.4*k;p.rl_k+=.4*k;p.ll_h+=.18*k;p.y=(p.y||0)-.05*this.H*k;p.la_s+=.1*k;p.ra_s+=.1*k;this._zt=-.55*k}
   else{p.lean-=.55*k;p.head-=.12*k;p.chest-=.1*k;p.x=(p.x||0)-.08*k;p.la_s+=.25*k;p.ra_s+=.25*k;this._zt=.15*k}}}
 /* a fighter who is weaving cannot run: forward speed is capped */
@@ -107,9 +117,12 @@ const OUT={reach:f=>{const L=f.body.L;return L.uarm+L.farm+L.glove*.8+.05*f.H}};
     if(this.outT){this.outT.t+=dt;const k=Math.min(1,this.outT.t/.15);this.outT.x=(this.x+this.d*R)+(o.x-(this.x+this.d*R))*k;
       if(this.outT.t>=.5){if(this.canStrike()){this.strike('jab',M);if(this.act&&this.act.key==='jab')this.act.speed*=1.5;this.tactic=null;this.outT=null}else this.outT.t=.5}}}
   else this.outT=null;return r}}
-{const rd=Match.prototype.render;Match.prototype.render=function(dt){window.__curMatch=this;rd.call(this,dt);const S=this.stage;const f=this.pi!=null?this.f[this.pi]:null;if(!f||f.tactic!=='out')return;
-  const ctx=S.ctx;ctx.save();S.worldT(ctx);const R=OUT.reach(f),x=f.x+f.d*R;const line=(xx,col,w,blur)=>{ctx.strokeStyle=col;ctx.lineWidth=w;ctx.shadowColor=col;ctx.shadowBlur=blur;ctx.beginPath();ctx.moveTo(xx,-.2);ctx.lineTo(xx,3);ctx.stroke()};
-  if(f.outT){/* the white line parts from the red one and rides over the opponent */line(x,'rgba(255,50,60,.28)',.02,14);line(f.outT.x,'rgba(255,255,255,.7)',.026,20)}else line(x,'rgba(255,50,60,.5)',.026,18);ctx.restore()}}
+{const rd=Match.prototype.render;Match.prototype.render=function(dt){window.__curMatch=this;rd.call(this,dt);const S=this.stage;const f=this.pi!=null?this.f[this.pi]:null;
+  let box=this._ofl;if(!box){box=this._ofl=document.createElement('div');box.className='ofl';box.innerHTML='<i class="red"></i><i class="wht"></i>';this.root.appendChild(box)}
+  const red=box.firstChild,wht=box.lastChild;if(!f||f.tactic!=='out'||this.phase!=='fight'){box.style.display='none';return}
+  box.style.display='block';const sx=x=>(x-S.cam.x)*S.sc()+S.W/2;const R=OUT.reach(f),x=f.x+f.d*R;red.style.left=sx(x)+'px';red.classList.toggle('dim',!!f.outT);
+  if(f.outT){wht.style.display='block';wht.style.left=sx(f.outT.x)+'px'}else wht.style.display='none'}}
+{const css=document.createElement('style');css.textContent='.ofl{position:absolute;inset:0;pointer-events:none;z-index:6;display:none}.ofl i{position:absolute;top:0;bottom:0;width:5px;margin-left:-2.5px;border-radius:3px}.ofl .red{background:linear-gradient(180deg,rgba(255,40,55,.15),rgba(255,50,64,.95) 16%,rgba(255,50,64,.95) 84%,rgba(255,40,55,.15));box-shadow:0 0 8px 2px rgba(255,40,55,.95),0 0 30px 10px rgba(255,40,55,.5)}.ofl .red.dim{opacity:.55}.ofl .wht{display:none;background:linear-gradient(180deg,rgba(255,255,255,.2),rgba(255,255,255,.98) 16%,rgba(255,255,255,.98) 84%,rgba(255,255,255,.2));box-shadow:0 0 8px 2px rgba(255,255,255,.95),0 0 30px 10px rgba(170,205,255,.6);width:6px;margin-left:-3px}';document.head.appendChild(css)}
 
 /* ================= 4. strikes ================= */
 /* hooks: the fist arcs in from the side (elbow high, forearm level) and lands on the temple */
@@ -140,21 +153,38 @@ if(MV.check)MV.check.keys[0][1]=Object.assign({},MV.check.keys[0][1],{ll_h:1.15,
 if(MV.rlk&&!MV.rlk._v2){MV.rlk._v2=1;for(const kf of MV.rlk.keys){const p=kf[1];if(p.rl_h&&p.rl_h>.8){p.rl_h=.8;p.lean=-.22;p.tw=.95}}}
 
 /* ================= 6. kick catch: the free hand uses the usual punches at 40 % ================= */
-Match.prototype.catchPunch=function(kind){const g=this.g;if(!g||g.type!=='kcatch'||kind==='over')return;if(g.pun){g.q=kind;return}if(g.n>=5)return;g.pun={t:0,hit:0,kind};g.n++};
-{const pi=Match.prototype.playerInput;Match.prototype.playerInput=function(dt){const g=this.g;if(g&&g.type==='kcatch'&&this.pi!=null){const f=this.f[this.pi],I=this.inp;if(f===g.att){const ev=I.poll();f.mvIn=0;f.circ=0;for(const e of ev){if(e==='pause'){this.pause();continue}if(this.phase!=='fight'||this.g!==g)continue;
+Match.prototype.catchPunch=function(kind){const g=this.g;if(!g||g.type!=='kcatch'||kind==='over')return;if(g.pun){g.q=kind;return}if(g.n>=8)return;g.pun={t:0,hit:0,kind:kind||'str'};g.n++};
+{const pi=Match.prototype.playerInput;Match.prototype.playerInput=function(dt){const g=this.g;if(g&&g.type==='kcatch'&&this.pi!=null){const f=this.f[this.pi],I=this.inp;if(f===g.att){const ev=I.poll();f.mvIn=0;f.circ=0;g.mv=Math.abs(I.mx)>.25?Math.sign(I.mx)*clamp(Math.abs(I.mx),0,1):0;for(const e of ev){if(e==='pause'){this.pause();continue}if(this.phase!=='fight'||this.g!==g)continue;
         if(e.startsWith('td'))this.catchTD();else if(e==='clinch'||e==='escape')this.endCatch();else if(e.startsWith('punch:'))this.catchPunch({straight:'str',hook:'hook',upper:'upp',body:'body',over:'over'}[e.slice(6)]||'str')}return}}return pi.call(this,dt)}}
 {const uc=Match.prototype.updCatch;Match.prototype.updCatch=function(dt){const g=this.g;const P=g&&g.pun;if(P&&!P._p){P._p=1;P.kind=P.kind||'str'}
   const r=uc.call(this,dt);return r}}
 
-/* ================= 7. wounds: the skin flushes red, slowly, as much as the skin lets it ================= */
-{const ad=Match.prototype.applyDmg;Match.prototype.applyDmg=function(att,def,o){const r=ad.call(this,att,def,o);if(o&&!o.blocked&&o.dmg!=null&&def.body){const z=o.zone==='head'?'head':o.zone==='body'?'body':'legs';const F=def.body._flush||(def.body._flush={head:{v:0,t:0},body:{v:0,t:0},legs:{v:0,t:0}});const soft=1.4-ATT(def,'skin')*.95;F[z].t=Math.min(1.2,F[z].t+o.dmg*.06*soft);
-    /* a little blood on hard head blows to a thin skin (spray only: nothing to bleed out) */
-    if(z==='head'&&o.dmg>5&&rnd()<.35*soft&&def.body.J.hd)this.stage.burst(def.body.J.hd.x,def.body.J.hd.y,att.d,3+Math.round(soft*3),'blood',.8)}return r}}
-{const up=F2.prototype.update;F2.prototype.update=function(dt,M){const F=this.body&&this.body._flush;if(F)for(const k in F){const q=F[k];q.v+=(q.t-q.v)*Math.min(1,dt*.35)}return up.call(this,dt,M)}}
-{const D=Body.prototype.draw;Body.prototype.draw=function(ctx,o){const r=D.call(this,ctx,o);const F=this._flush,J=this.J;if(!F||!J.hd||this.look&&this.look.ref||o&&(o.onlyArm||o.part==='far'))return r;const H=this.H;
-    const spot=(q,v,R,al)=>{if(!q||v<.04)return;const rad=R*(.6+.8*Math.min(1.2,v)),a=Math.min(.5,al*v);const g=ctx.createRadialGradient(q.x,q.y,0,q.x,q.y,rad);g.addColorStop(0,`rgba(190,35,35,${a})`);g.addColorStop(1,'rgba(190,35,35,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(q.x,q.y,rad,0,7);ctx.fill()};
-    ctx.save();spot({x:J.hd.x+this.d*.035*H,y:J.hd.y-.01*H},F.head.v,.06*H,.5);spot({x:(J.mid.x+J.sh.x)/2,y:(J.mid.y+J.sh.y)/2},F.body.v,.09*H,.38);if(J.lK)spot({x:(J.lH.x+J.lK.x)/2,y:(J.lH.y+J.lK.y)/2},F.legs.v,.07*H,.3);ctx.restore();return r}}
-
+/* ================= 7. wounds: bruises, swelling, abrasions and cuts appear where a blow landed, slowly, as much as the skin lets them ================= */
+const HEADSPOT={straight:[[.074,-.002],[.062,-.04],[.05,.032]],hook:[[.012,.026],[.044,-.012],[.052,.034]],upper:[[.05,-.068],[.07,-.045],[.03,-.07]],kick:[[.015,.02],[.045,-.05],[.01,-.03]]};
+function woundSpot(key){const k=/upp/.test(key)?'upper':/hook|ovh/.test(key)?'hook':/hk|bk|lk|knee|teep|calf/.test(key)?'kick':'straight';const L=HEADSPOT[k];const p=L[Math.floor(rnd()*L.length)];return{w:p[0]+(rnd()-.5)*.012,h:p[1]+(rnd()-.5)*.012}}
+{const ad=Match.prototype.applyDmg;Match.prototype.applyDmg=function(att,def,o){const r=ad.call(this,att,def,o);if(o&&!o.blocked&&o.dmg!=null&&def.body&&o.dmg>1.2){const key=att.act&&att.act.key||'jab';const soft=1.45-ATT(def,'skin')*1.0;const sev=clamp(o.dmg*soft/7,.18,1.3);const W=def.body._wounds||(def.body._wounds=[]);const t=performance.now()/1000;
+    if(o.zone==='head'){const sp=woundSpot(key);const w={t0:t+.35,zone:'head',w:sp.w,h:sp.h,sev,ang:rnd()*3.1,kind:'bruise'};W.push(w);
+      if(sev>.5)W.push({t0:t+1.2,zone:'head',w:sp.w,h:sp.h,sev:sev*.9,ang:w.ang,kind:'swell'});
+      if(o.dmg>6&&rnd()<.55*soft&&sp.h>-.05)W.push({t0:t+.8,zone:'head',w:sp.w+.004,h:sp.h+.004,sev:Math.min(1.2,sev),ang:rnd()*1.2-.6,kind:'cut'});
+      else if(rnd()<.5*soft)W.push({t0:t+.6,zone:'head',w:sp.w,h:sp.h,sev:sev*.8,ang:rnd()*3,kind:'scrape'});
+      if(o.dmg>5&&rnd()<.4*soft&&def.body.J.hd)this.stage.burst(def.body.J.hd.x,def.body.J.hd.y,att.d,3+Math.round(soft*3),'blood',.8)}
+    else if(o.zone==='body')W.push({t0:t+.5,zone:'body',w:.0+(rnd()-.5)*.03,h:(rnd()-.4)*.08,sev,ang:rnd()*3,kind:'bruise'});
+    else W.push({t0:t+.5,zone:'legs',w:(rnd()-.5)*.02,h:.2+rnd()*.5,sev:sev*.8,ang:rnd()*3,kind:'bruise'});
+    while(W.length>14)W.shift()}return r}}
+{const nr=Match.prototype.nextRound;if(nr)Match.prototype.nextRound=function(){for(const f of this.f)if(f.body._wounds)for(const w of f.body._wounds)w.sev*=.72;return nr.apply(this,arguments)}}
+{const D=Body.prototype.draw;Body.prototype.draw=function(ctx,o){const r=D.call(this,ctx,o);const Wd=this._wounds,J=this.J;if(!Wd||!Wd.length||!J.hd||this.look&&this.look.ref||o&&(o.onlyArm||o.part==='far'))return r;
+    const H=this.H,d=this.d,a=this.ang.hd||0,now=performance.now()/1000;const up={x:d*Math.sin(a),y:Math.cos(a)},fw={x:d*Math.cos(a),y:-Math.sin(a)};
+    const at=(wd)=>{if(wd.zone==='head')return{x:J.hd.x+up.x*wd.h*H+fw.x*wd.w*H,y:J.hd.y+up.y*wd.h*H+fw.y*wd.w*H};
+      if(wd.zone==='body'){const m={x:(J.mid.x+J.sh.x)/2,y:(J.mid.y+J.sh.y)/2};return{x:m.x+d*(.05+wd.w)*H,y:m.y+wd.h*H}}
+      const k=J.lK&&J.lH?wd.h:.5;const A=J.lH,B=J.lK;return A?{x:A.x+(B.x-A.x)*k+d*.01*H,y:A.y+(B.y-A.y)*k}:null};
+    ctx.save();for(const wd of Wd){const v0=clamp((now-wd.t0)/4.5,0,1);if(v0<=0)continue;const v=v0*v0*(3-2*v0);const P=at(wd);if(!P)continue;const R=(wd.zone==='head'?.034:wd.zone==='body'?.05:.04)*H*(.6+.7*Math.min(1.2,wd.sev))*(.65+.45*v);const al=Math.min(1,wd.sev+.15)*v;if(R>.15){(window.__dbgW=window.__dbgW||[]).length<6&&window.__dbgW.push([wd.kind,wd.zone,+R.toFixed(3),+(P.x).toFixed(2),+(P.y).toFixed(2),+H.toFixed(2),+v.toFixed(2),+wd.sev.toFixed(2),wd.w,wd.h]);}
+      if(wd.kind==='bruise'){const g=ctx.createRadialGradient(P.x,P.y,0,P.x,P.y,R*1.35);g.addColorStop(0,`rgba(112,36,72,${.5*al})`);g.addColorStop(.45,`rgba(176,48,56,${.42*al})`);g.addColorStop(1,'rgba(190,50,50,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(P.x,P.y,R*1.35,0,7);ctx.fill()}
+      else if(wd.kind==='swell'){ctx.fillStyle=`rgba(208,78,70,${.32*al})`;ctx.beginPath();ctx.ellipse(P.x,P.y,R*.8,R*.64,wd.ang*.3,0,7);ctx.fill();ctx.strokeStyle=`rgba(110,24,32,${.45*al})`;ctx.lineWidth=.0045*H;ctx.beginPath();ctx.ellipse(P.x,P.y,R*.8,R*.64,wd.ang*.3,.15,Math.PI-.15);ctx.stroke();ctx.fillStyle=`rgba(255,235,225,${.3*al})`;ctx.beginPath();ctx.ellipse(P.x-R*.22,P.y+R*.2,R*.26,R*.14,-.5,0,7);ctx.fill()}
+      else if(wd.kind==='scrape'){ctx.strokeStyle=`rgba(168,38,44,${.7*al})`;ctx.lineWidth=.004*H;ctx.lineCap='round';for(let i=-1;i<=1;i++){ctx.beginPath();ctx.moveTo(P.x+Math.cos(wd.ang)*R*.5+i*R*.22,P.y+Math.sin(wd.ang)*R*.5-i*R*.12);ctx.lineTo(P.x-Math.cos(wd.ang)*R*.5+i*R*.22,P.y-Math.sin(wd.ang)*R*.5-i*R*.12);ctx.stroke()}}
+      else{/* cut: a dark split, a brighter wet line inside and a blood run down the skin */const cx=Math.cos(wd.ang)*R*.62,cy=Math.sin(wd.ang)*R*.62;ctx.lineCap='round';ctx.strokeStyle=`rgba(86,6,12,${.95*al})`;ctx.lineWidth=.0075*H;ctx.beginPath();ctx.moveTo(P.x-cx,P.y-cy);ctx.lineTo(P.x+cx,P.y+cy);ctx.stroke();
+        ctx.strokeStyle=`rgba(214,30,40,${.85*al})`;ctx.lineWidth=.0034*H;ctx.beginPath();ctx.moveTo(P.x-cx*.8,P.y-cy*.8);ctx.lineTo(P.x+cx*.8,P.y+cy*.8);ctx.stroke();
+        const run=R*(.9+1.6*v)*wd.sev;ctx.strokeStyle=`rgba(150,12,20,${.75*al})`;ctx.lineWidth=.0055*H;ctx.beginPath();ctx.moveTo(P.x+cx*.3,P.y+cy*.3);ctx.quadraticCurveTo(P.x+cx*.2+d*R*.1,P.y-run*.5,P.x+cx*.1,P.y-run);ctx.stroke();ctx.fillStyle=`rgba(150,12,20,${.8*al})`;ctx.beginPath();ctx.arc(P.x+cx*.1,P.y-run,.0042*H,0,7);ctx.fill()}}
+    ctx.restore();return r}}
 /* ---------- the referee stands further back and runs in to a fallen fighter ---------- */
 {const sp=F2.prototype.spd;F2.prototype.spd=function(){const b=sp.call(this);if(this.name==='ref'){const M=window.__curMatch;if(M&&M.phase==='end'&&M.f.some(f=>f.down&&f.down.ko))return b*2.7}return b}}
 /* ---------- a shorter recovery after the blow (the wind-up and the blow itself stay slower) ---------- */
@@ -162,4 +192,7 @@ Match.prototype.catchPunch=function(kind){const g=this.g;if(!g||g.type!=='kcatch
 /* ---------- a groggy fighter's takedown shot often fails ---------- */
 {const sh=Match.prototype.shoot;Match.prototype.shoot=function(f){if(f.rock>0&&Math.random()<.4){f.sta-=5;f.react.x-=f.d*.25;return}return sh.apply(this,arguments)}}
 /* the clinch knee loses 30 % while groggy (handled in applyDmg) */
+
+/* kick catch: whatever the punch clip does, the lead arm keeps holding the leg */
+{const fw=F2.prototype.footwork;F2.prototype.footwork=function(p,dt){fw.call(this,p,dt);const M=window.__curMatch,g=M&&M.g;if(g&&g.type==='kcatch'&&this===g.att&&g.hold){p.la_s=g.hold.la_s;p.la_e=g.hold.la_e;p.lo=g.hold.lo}}}
 })();

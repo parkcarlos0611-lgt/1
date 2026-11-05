@@ -83,9 +83,8 @@ Match.prototype._gBrokenFor=function(f){return !!f._gBroken};
 {const st=Match.prototype.step;Match.prototype.step=function(dt){if(this.phase==='end'&&this._free&&this.pi!=null&&performance.now()<(this._freeT||0))this.playerInput(dt);return st.call(this,dt)}}
 {const fin=Match.prototype.finish;Match.prototype.finish=function(w,method){const was=this.phase;const r=fin.apply(this,arguments);if(was!=='end'&&/KO/.test(method||'')){this._free=1;this._freeT=performance.now()+3000;setTimeout(()=>{this._free=0},3200)}return r}}
 {const ch=Match.prototype.checkHit;Match.prototype.checkHit=function(att,act){const def=att.opp;if(this._free&&def.down&&def.down.ko&&performance.now()<(this._freeT||0)){const s=def.state;def.state='stand';try{return ch.call(this,att,act)}finally{def.state=s}}return ch.call(this,att,act)}}
-/* no bleeding system: no cuts, no doctor, no bleed meter */
-Match.prototype.cutCheck=function(){};
-{const up=F2.prototype.update;F2.prototype.update=function(dt,M){this.bleed=0;if(this.body&&this.body.cuts&&this.body.cuts.length)this.body.cuts.length=0;return up.call(this,dt,M)}}
+/* no bleed meter / doctor stoppage (the cuts themselves are only drawn on the skin) */
+{const up=F2.prototype.update;F2.prototype.update=function(dt,M){this.bleed=0;return up.call(this,dt,M)}}
 {const st=document.createElement('style');st.textContent='.hbx.bl,[data-bl],.bleed,.bleedbar{display:none!important}';document.head.appendChild(st)}
 
 /* ================= 3. evade ================= */
@@ -159,32 +158,12 @@ Match.prototype.catchPunch=function(kind){const g=this.g;if(!g||g.type!=='kcatch
 {const uc=Match.prototype.updCatch;Match.prototype.updCatch=function(dt){const g=this.g;const P=g&&g.pun;if(P&&!P._p){P._p=1;P.kind=P.kind||'str'}
   const r=uc.call(this,dt);return r}}
 
-/* ================= 7. wounds: bruises, swelling, abrasions and cuts appear where a blow landed, slowly, as much as the skin lets them ================= */
-const HEADSPOT={straight:[[.074,-.002],[.062,-.04],[.05,.032]],hook:[[.012,.026],[.044,-.012],[.052,.034]],upper:[[.05,-.068],[.07,-.045],[.03,-.07]],kick:[[.015,.02],[.045,-.05],[.01,-.03]]};
-function woundSpot(key){const k=/upp/.test(key)?'upper':/hook|ovh/.test(key)?'hook':/hk|bk|lk|knee|teep|calf/.test(key)?'kick':'straight';const L=HEADSPOT[k];const p=L[Math.floor(rnd()*L.length)];return{w:p[0]+(rnd()-.5)*.012,h:p[1]+(rnd()-.5)*.012}}
-{const ad=Match.prototype.applyDmg;Match.prototype.applyDmg=function(att,def,o){const r=ad.call(this,att,def,o);if(o&&!o.blocked&&o.dmg!=null&&def.body&&o.dmg>1.2){const key=att.act&&att.act.key||'jab';const soft=1.45-ATT(def,'skin')*1.0;const sev=clamp(o.dmg*soft/7,.18,1.3);const W=def.body._wounds||(def.body._wounds=[]);const t=performance.now()/1000;
-    if(o.zone==='head'){const sp=woundSpot(key);const w={t0:t+.35,zone:'head',w:sp.w,h:sp.h,sev,ang:rnd()*3.1,kind:'bruise'};W.push(w);
-      if(sev>.5)W.push({t0:t+1.2,zone:'head',w:sp.w,h:sp.h,sev:sev*.9,ang:w.ang,kind:'swell'});
-      if(o.dmg>6&&rnd()<.55*soft&&sp.h>-.05)W.push({t0:t+.8,zone:'head',w:sp.w+.004,h:sp.h+.004,sev:Math.min(1.2,sev),ang:rnd()*1.2-.6,kind:'cut'});
-      else if(rnd()<.5*soft)W.push({t0:t+.6,zone:'head',w:sp.w,h:sp.h,sev:sev*.8,ang:rnd()*3,kind:'scrape'});
-      if(o.dmg>5&&rnd()<.4*soft&&def.body.J.hd)this.stage.burst(def.body.J.hd.x,def.body.J.hd.y,att.d,3+Math.round(soft*3),'blood',.8)}
-    else if(o.zone==='body')W.push({t0:t+.5,zone:'body',w:.0+(rnd()-.5)*.03,h:(rnd()-.4)*.08,sev,ang:rnd()*3,kind:'bruise'});
-    else W.push({t0:t+.5,zone:'legs',w:(rnd()-.5)*.02,h:.2+rnd()*.5,sev:sev*.8,ang:rnd()*3,kind:'bruise'});
-    while(W.length>14)W.shift()}return r}}
-{const nr=Match.prototype.nextRound;if(nr)Match.prototype.nextRound=function(){for(const f of this.f)if(f.body._wounds)for(const w of f.body._wounds)w.sev*=.72;return nr.apply(this,arguments)}}
-{const D=Body.prototype.draw;Body.prototype.draw=function(ctx,o){const r=D.call(this,ctx,o);const Wd=this._wounds,J=this.J;if(!Wd||!Wd.length||!J.hd||this.look&&this.look.ref||o&&(o.onlyArm||o.part==='far'))return r;
-    const H=this.H,d=this.d,a=this.ang.hd||0,now=performance.now()/1000;const up={x:d*Math.sin(a),y:Math.cos(a)},fw={x:d*Math.cos(a),y:-Math.sin(a)};
-    const at=(wd)=>{if(wd.zone==='head')return{x:J.hd.x+up.x*wd.h*H+fw.x*wd.w*H,y:J.hd.y+up.y*wd.h*H+fw.y*wd.w*H};
-      if(wd.zone==='body'){const m={x:(J.mid.x+J.sh.x)/2,y:(J.mid.y+J.sh.y)/2};return{x:m.x+d*(.05+wd.w)*H,y:m.y+wd.h*H}}
-      const k=J.lK&&J.lH?wd.h:.5;const A=J.lH,B=J.lK;return A?{x:A.x+(B.x-A.x)*k+d*.01*H,y:A.y+(B.y-A.y)*k}:null};
-    ctx.save();for(const wd of Wd){const v0=clamp((now-wd.t0)/4.5,0,1);if(v0<=0)continue;const v=v0*v0*(3-2*v0);const P=at(wd);if(!P)continue;const R=(wd.zone==='head'?.034:wd.zone==='body'?.05:.04)*H*(.6+.7*Math.min(1.2,wd.sev))*(.65+.45*v);const al=Math.min(1,wd.sev+.15)*v;if(R>.15){(window.__dbgW=window.__dbgW||[]).length<6&&window.__dbgW.push([wd.kind,wd.zone,+R.toFixed(3),+(P.x).toFixed(2),+(P.y).toFixed(2),+H.toFixed(2),+v.toFixed(2),+wd.sev.toFixed(2),wd.w,wd.h]);}
-      if(wd.kind==='bruise'){const g=ctx.createRadialGradient(P.x,P.y,0,P.x,P.y,R*1.35);g.addColorStop(0,`rgba(112,36,72,${.5*al})`);g.addColorStop(.45,`rgba(176,48,56,${.42*al})`);g.addColorStop(1,'rgba(190,50,50,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(P.x,P.y,R*1.35,0,7);ctx.fill()}
-      else if(wd.kind==='swell'){ctx.fillStyle=`rgba(208,78,70,${.32*al})`;ctx.beginPath();ctx.ellipse(P.x,P.y,R*.8,R*.64,wd.ang*.3,0,7);ctx.fill();ctx.strokeStyle=`rgba(110,24,32,${.45*al})`;ctx.lineWidth=.0045*H;ctx.beginPath();ctx.ellipse(P.x,P.y,R*.8,R*.64,wd.ang*.3,.15,Math.PI-.15);ctx.stroke();ctx.fillStyle=`rgba(255,235,225,${.3*al})`;ctx.beginPath();ctx.ellipse(P.x-R*.22,P.y+R*.2,R*.26,R*.14,-.5,0,7);ctx.fill()}
-      else if(wd.kind==='scrape'){ctx.strokeStyle=`rgba(168,38,44,${.7*al})`;ctx.lineWidth=.004*H;ctx.lineCap='round';for(let i=-1;i<=1;i++){ctx.beginPath();ctx.moveTo(P.x+Math.cos(wd.ang)*R*.5+i*R*.22,P.y+Math.sin(wd.ang)*R*.5-i*R*.12);ctx.lineTo(P.x-Math.cos(wd.ang)*R*.5+i*R*.22,P.y-Math.sin(wd.ang)*R*.5-i*R*.12);ctx.stroke()}}
-      else{/* cut: a dark split, a brighter wet line inside and a blood run down the skin */const cx=Math.cos(wd.ang)*R*.62,cy=Math.sin(wd.ang)*R*.62;ctx.lineCap='round';ctx.strokeStyle=`rgba(86,6,12,${.95*al})`;ctx.lineWidth=.0075*H;ctx.beginPath();ctx.moveTo(P.x-cx,P.y-cy);ctx.lineTo(P.x+cx,P.y+cy);ctx.stroke();
-        ctx.strokeStyle=`rgba(214,30,40,${.85*al})`;ctx.lineWidth=.0034*H;ctx.beginPath();ctx.moveTo(P.x-cx*.8,P.y-cy*.8);ctx.lineTo(P.x+cx*.8,P.y+cy*.8);ctx.stroke();
-        const run=R*(.9+1.6*v)*wd.sev;ctx.strokeStyle=`rgba(150,12,20,${.75*al})`;ctx.lineWidth=.0055*H;ctx.beginPath();ctx.moveTo(P.x+cx*.3,P.y+cy*.3);ctx.quadraticCurveTo(P.x+cx*.2+d*R*.1,P.y-run*.5,P.x+cx*.1,P.y-run);ctx.stroke();ctx.fillStyle=`rgba(150,12,20,${.8*al})`;ctx.beginPath();ctx.arc(P.x+cx*.1,P.y-run,.0042*H,0,7);ctx.fill()}}
-    ctx.restore();return r}}
+/* ================= 7. wounds: the skin itself changes (the engine's own redness / swelling / cuts drawn into the face and body);
+   there is no bleed meter or doctor stoppage — only the look is kept ================= */
+{const ad=Match.prototype.applyDmg;Match.prototype.applyDmg=function(att,def,o){const r=ad.call(this,att,def,o);
+  if(o&&!o.blocked&&o.zone==='head'&&o.dmg>5&&def.body&&def.body.J.hd){const soft=1.45-ATT(def,'skin')*1.0;if(rnd()<.4*soft)this.stage.burst(def.body.J.hd.x,def.body.J.hd.y,att.d,3+Math.round(soft*3),'blood',.8)}return r}}
+Match.prototype.doctor=function(){this.docCheck=0};
+if(typeof DOC!=='undefined'){DOC.swellChance=0;DOC.base=0;DOC.perSev=0}
 /* ---------- the referee stands further back and runs in to a fallen fighter ---------- */
 {const sp=F2.prototype.spd;F2.prototype.spd=function(){const b=sp.call(this);if(this.name==='ref'){const M=window.__curMatch;if(M&&M.phase==='end'&&M.f.some(f=>f.down&&f.down.ko))return b*2.7}return b}}
 /* ---------- a shorter recovery after the blow (the wind-up and the blow itself stay slower) ---------- */

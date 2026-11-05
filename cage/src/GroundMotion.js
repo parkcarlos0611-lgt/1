@@ -312,7 +312,7 @@ if(typeof In2!=='undefined'){const bt=In2.prototype.buildTouch;In2.prototype.bui
 
 /* ---------- overhand: the elbow folds up toward the ceiling and the forearm comes down onto the chin;
    the lead hand stays glued to the face ---------- */
-function armIKUp(F,P,side,T){const J=F.body.J,S=J[side==='la'?'lS':'rS'];if(!S||!T)return;const L=F.body.L,L1=L.uarm,L2=L.farm+L.glove*.8,d=F.d||1;
+window.armIKUp=armIKUp;function armIKUp(F,P,side,T){const J=F.body.J,S=J[side==='la'?'lS':'rS'];if(!S||!T)return;const L=F.body.L,L1=L.uarm,L2=L.farm+L.glove*.8,d=F.d||1;
   const vx=(T.x-S.x)*d,vy=T.y-S.y;const D0=Math.hypot(vx,vy);const Dm=(L1+L2)*.8;/* keep the arm bent: the elbow stays high */let D=clamp(D0,(L1+L2)*.3,Dm);const th=Math.atan2(vx,-vy);
   const a=Math.acos(clamp((L1*L1+D*D-L2*L2)/(2*L1*D),-1,1)),b=Math.acos(clamp((L1*L1+L2*L2-D*D)/(2*L1*L2),-1,1));const ta=(P.lean||0)+(P.chest||0)-(P.rot||0);
   /* the elbow on the upper side of the shoulder–target line: upper arm raised, forearm angled down to the target */

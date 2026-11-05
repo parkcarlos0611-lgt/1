@@ -19,7 +19,8 @@ const keyPose=(K,t)=>{let i=0;while(i<K.length-2&&t>K[i+1][0])i++;const a=K[i],b
 const nearOf=(F,d)=>{const nl=(d>0)===(((F.body&&F.body.stance)||F.stance||1)>0);return nl?{arm:'la',fArm:'ra',leg:'ll',fLeg:'rl'}:{arm:'ra',fArm:'la',leg:'rl',fLeg:'ll'}};
 
 /* ---------- floating grunt / label near a fighter ---------- */
-function popText(M,f,txt,cls){const S=M.stage,J=f.body.J;if(!J.hd||!M.root)return;const s=S.sc();const x=((J.hd.x-S.cam.x)*s+S.W/2),y=S.Hh*S.cam.gy-J.hd.y*s-36;
+function popText(){/* text effects are gone */}
+function popText_old(M,f,txt,cls){const S=M.stage,J=f.body.J;if(!J.hd||!M.root)return;const s=S.sc();const x=((J.hd.x-S.cam.x)*s+S.W/2),y=S.Hh*S.cam.gy-J.hd.y*s-36;
   const el=document.createElement('div');el.className='g2pop '+(cls||'');el.textContent=txt;el.style.left=x+'px';el.style.top=y+'px';M.root.appendChild(el);setTimeout(()=>el.remove(),1000)}
 {const css=document.createElement('style');css.textContent='.g2pop{position:absolute;z-index:42;pointer-events:none;transform:translate(-50%,0);font:900 17px/1 system-ui,sans-serif;color:#fff;text-shadow:0 2px 0 #000,0 0 8px rgba(0,0,0,.7);animation:g2p 1s ease-out forwards}.g2pop.r{color:#ff6a62}.g2pop.b{color:#6aa8ff}@keyframes g2p{0%{opacity:0;margin-top:6px}20%{opacity:1}100%{opacity:0;margin-top:-26px}}'+
   '.gwc .gr{position:absolute;width:46px;height:46px;border-radius:50%;pointer-events:none;background:conic-gradient(#e8332f calc(var(--a)*1%),transparent 0),conic-gradient(from calc(360deg - var(--b)*3.6deg),#2f7be8 calc(var(--b)*1%),transparent 0);-webkit-mask:radial-gradient(circle,transparent 56%,#000 60%);mask:radial-gradient(circle,transparent 56%,#000 60%)}'+

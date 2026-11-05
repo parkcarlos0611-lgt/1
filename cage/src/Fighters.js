@@ -97,7 +97,7 @@ window.COMBO_GAP=.4;window.COMBO_SPD=1.35;
     if(best)f._boost={key,t:now,name:CMB_N[best.join()]};return ds.call(this,f,key)}}
 {const sk=F2.prototype.strike;F2.prototype.strike=function(key,M){const ok=sk.call(this,key,M);const B=this._boost;
     if(ok&&B&&this.act&&B.key===key&&performance.now()/1000-B.t<1.5){this.act.speed*=COMBO_SPD;this.act.combo=1;this._boost=null;
-      const MM=M||window.__curMatch;if(MM&&MM.root){const e=document.createElement('div');e.className='cmbpop';e.textContent=`🔥 콤보 · ${B.name}`;MM.root.appendChild(e);setTimeout(()=>e.remove(),900)}}
+      /* (no floating combo label) */}
     else if(B&&performance.now()/1000-B.t>1.5)this._boost=null;return ok}}
 {const st=document.createElement('style');st.textContent='.cmbpop{position:absolute;left:50%;top:26%;transform:translate(-50%,0);font:900 22px/1 system-ui,sans-serif;color:#ffd166;text-shadow:0 2px 0 #000,0 0 12px rgba(0,0,0,.6);pointer-events:none;z-index:40;animation:cmbp .9s ease-out forwards}@keyframes cmbp{0%{opacity:0;transform:translate(-50%,8px) scale(.85)}15%{opacity:1;transform:translate(-50%,0) scale(1.08)}70%{opacity:1}100%{opacity:0;transform:translate(-50%,-14px) scale(1)}}';document.head.appendChild(st)}
 

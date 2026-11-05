@@ -10,13 +10,13 @@
    so tall/narrow viewports still show enough height and wide ones don't crop the fighters. */
 const ARENA=tuneSection('arena',{
   unit:.9,                 // world units per metre (matches the F2 height scale)
-  octagonFt:30, apexFt:25, ringFt:20,
+  octagonFt:30, apexFt:25, ringFt:27,
   apexBelowLevel:1,        // promotions with production level below this fight in the 25 ft cage
   cam:{stand:{pad:3.5,min:5.0,max:7.6},ground:{pad:3.4,min:4.9,max:6.8},minVisH:2.6,maxVisH:3.1,floorY:{stand:.88,ground:.84}}   /* broadcast framing: fighter ≈ half the screen height */
 });
 const ftToR=ft=>ft*.3048*ARENA.unit/2;
 function arenaFor(venue,level){if(String(venue||'').startsWith('ring'))return{kind:'ring',ft:ARENA.ringFt};const big=(level==null?1:level)>=ARENA.apexBelowLevel;return big?{kind:'octagon',ft:ARENA.octagonFt}:{kind:'apex',ft:ARENA.apexFt}}
-{const _Stage=Stage;Stage=class extends _Stage{constructor(root,o){super(root,o);const a=arenaFor(this.venue,o&&o.level);this.arena=a;this.R=+ftToR(a.ft).toFixed(2)}}}
+{const _Stage=Stage;Stage=class extends _Stage{constructor(root,o){super(root,o);const a=arenaFor(this.venue,o&&o.level);this.arena=a;this.R=+ftToR(a.ft).toFixed(2);this.sides=a.kind==='ring'?4:8}}}
 Stage.prototype.follow=function(dt,cx,span,ground){const C=this.cam,K=ARENA.cam,g=ground?K.ground:K.stand;
   let want=clamp(span+g.pad,g.min,g.max);const asp=(this.W||16)/(this.Hh||9);want=Math.max(want,K.minVisH*asp*(ground?.85:1));want=Math.max(Math.min(want,K.maxVisH*asp),span+1.6);/* narrow screens: frame by height */want/=(1+C.zoom);
   C.w+=(want-C.w)*Math.min(1,dt*3);C.x+=(clamp(cx,Math.min(0,-this.R+C.w*.3),Math.max(0,this.R-C.w*.3))-C.x)*Math.min(1,dt*4);

@@ -805,7 +805,7 @@ class F2{
       const pw=Math.max(0,Math.sin(t*2.3+this.side))**6;b.la_s+=pw*.28;b.la_e-=pw*.65;b.head+=Math.sin(t*3.7+1.3)*.03;b.chest+=Math.sin(t*1.9)*.02;
       const o=M&&this.opp;if(o&&o.act&&o.act.c.hit&&o.act.c.hit.zone==='head'&&o.act.t<o.act.c.hit.t1+.05){const k=(.4+ATT(this,'strDef')*.8)*Math.min(1,o.act.t/Math.max(.05,o.act.c.hit.t0));b.lean-=.1*k;b.head-=.16*k;b.chest-=.05*k;b.la_s+=.1*k;b.ra_s+=.12*k}}
     if(this.rock>0){const r=MV.rocked.keys[0][1];const w=Math.min(1,this.rock);for(const k in r)b[k]=lerp(b[k],r[k],w*.8);b.lean+=Math.sin(t*3.1)*.08*w;b.head+=Math.sin(t*4.3)*.12*w}
-    if(this.guard){const g=MV[this.guard==='low'?'check':this.guard==='body'?'blockB':this.guard==='upp'?'blockU':this.guard==='hook'?'blockK':'blockH'].keys[0][1];for(const k in g)b[k]=g[k]+(k==='ll_k'||k==='rl_k'?bob:0)}
+    if(this.guard){const g=MV[this.guard==='low'?'check':this.guard==='body'?'blockB':this.guard==='upp'?'blockU':(this.guard==='hook'||this.guard==='top')?'blockK':'blockH'].keys[0][1];for(const k in g)b[k]=g[k]+(k==='ll_k'||k==='rl_k'?bob:0)}
     // stepping: real alternating stride (step-drag), amplitude by speed
     /* stepping is applied in pose() from the measured body speed (footwork) */
     if(this.hm){const g=MV[this.hm].keys[0][1];for(const k in g)b[k]=g[k]}
@@ -988,7 +988,7 @@ class In2{
       <button data-a="td" class="b3 btd"><b>🤼</b><small>테이크다운</small><i class="sw su">싱글렉</i><i class="sw sd">더블렉</i></button>
       <button data-a="clinch" class="b3 bcl"><b>🔗</b><small>클린치</small></button>
       <button data-a="punch" class="b3 bpu"><b>💥</b><small>펀치</small><i class="sw sl">훅</i><i class="sw sr">어퍼</i><i class="sw su">오버</i><i class="sw sd">바디</i></button>
-      <button data-a="jab" class="b3 bja"><b>👊</b><small>잽</small><i class="sw sl">앞손 훅</i><i class="sw sr">앞손 스트</i></button>
+      <button data-a="jab" class="b3 bja"><b>👊</b><small>잽</small><i class="sw sl">앞손 훅</i><i class="sw sr">앞손 어퍼</i><i class="sw sd">앞손 바디</i></button>
       <button data-a="kick" class="b3 bki"><b>🦵</b><small>킥</small><i class="sw sl">하이</i><i class="sw sr">로우</i><i class="sw su">카프</i><i class="sw sd">니킥</i></button>
       <button data-a="block" class="b3 bbl"><b>🛡</b><small>블록</small><i class="sw sl">어퍼</i><i class="sw sr">훅·하이</i><i class="sw su">태클방어</i><i class="sw sd">체크</i></button>
     </div>`;
@@ -1005,7 +1005,7 @@ class In2{
       b.addEventListener('touchmove',e=>{e.preventDefault();if(!sw())return;for(const t of e.changedTouches){if(t.identifier!==sid)continue;const dx=t.clientX-sx,dy=t.clientY-sy;
         if(a==='block'){if(Math.max(Math.abs(dx),Math.abs(dy))>18){const h=Math.abs(dx)>=Math.abs(dy);this.tgtype=h?(dx<0?'upp':'hook'):(dy>0?'low':'tdd');b.classList.toggle('swl',h&&dx<0);b.classList.toggle('swr',h&&dx>0);b.classList.toggle('swd',!h&&dy>0);b.classList.toggle('swu',!h&&dy<0)}continue}
         if(fired||Math.max(Math.abs(dx),Math.abs(dy))<22)continue;fired=true;const h=Math.abs(dx)>=Math.abs(dy);
-        if(a==='td')this.ev.push(h?'td':(dy<0?'td:single':'td:double'));else if(a==='jab')this.ev.push(h?(dx<0?'jab:hook':'jab:str'):'jab');else if(a==='punch')this.ev.push('punch:'+(h?(dx<0?'hook':'upper'):(dy<0?'over':'body')));else this.ev.push('kick:'+(h?(dx<0?'high':'low'):(dy<0?'calf':'knee')));
+        if(a==='td')this.ev.push(h?'td':(dy<0?'td:single':'td:double'));else if(a==='jab')this.ev.push(h?(dx<0?'jab:hook':'jab:upper'):(dy>0?'jab:body':'jab'));else if(a==='punch')this.ev.push('punch:'+(h?(dx<0?'hook':'upper'):(dy<0?'over':'body')));else this.ev.push('kick:'+(h?(dx<0?'high':'low'):(dy<0?'calf':'knee')));
         b.classList.add(h?(dx<0?'swl':'swr'):(dy<0?'swu':'swd'))}},{passive:false});
       const up=e=>{e.preventDefault();if(a==='block'){this.tblock=false;this.tgtype=null}if((a==='punch'||a==='kick'||a==='jab'||a==='td')&&sw()&&!fired)this.ev.push(a==='punch'?'punch:straight':a==='jab'?'jab':a==='td'?'td':'kick:mid');b.classList.remove('on','swl','swr','swu','swd')};b.addEventListener('touchend',up);b.addEventListener('touchcancel',up)}}
 }
@@ -1141,7 +1141,7 @@ class Match{
       if(e==='clinch'){if(f.state==='stand')this.clinch(f);continue}if(e==='escape')continue;
       if(e==='td'){if(f.opp.down&&!f.opp.down.ko)this.pounce(f);else if(f.state==='stand')this.shoot(f);continue}
       const low=I.my<-.5,high=I.my>.5;let key=null;
-      if(e==='jab')key='jab';else if(e==='jab:hook')key='lhook';else if(e==='jab:str')key='lstr';
+      if(e==='jab')key='jab';else if(e==='jab:hook')key='lhook';else if(e==='jab:upper')key='lupp';else if(e==='jab:body')key='bjab';
       else if(e.startsWith('punch:')){const t=e.slice(6);const lead=['jab','lhook','lupp','bjab','blhook'].includes(f.lastKey);
         key=t==='hook'?'rhook':t==='upper'?(lead?'rupp':'lupp'):t==='over'?'ovh':t==='body'?(f.lastKey==='bcross'?'blhook':'bcross'):'cross'}
       else if(e.startsWith('kick')){const t=e.slice(5)||'mid';key=t==='high'?'rhk':t==='low'?'rlk':t==='calf'?'calf':t==='knee'?'knee':'rbk'}
@@ -1171,7 +1171,7 @@ class Match{
     const caps=[sb];if(act.lsb)caps.push({a:act.lsb.b,b:sb.b,r:sb.r});act.lsb={a:{...sb.a},b:{...sb.b}};
     const hits=new Set();let pHit=null;for(const hb of this.hurtBoxes(def))for(const c of caps){if(segSeg(c.a,c.b,hb.a,hb.b)<c.r+hb.r){hits.add(hb.z);if(!pHit||hb.z===h.zone)pHit={x:c.b.x,y:c.b.y}}}
     if(!hits.size)return;const g=def.guard||'';let zone=null;
-    if(h.zone==='head'){if(hits.has('head'))zone=hits.has('arm')&&/high|upp|hook/.test(g)?'headblock':'head';else if(hits.has('arm')&&/high|upp|hook/.test(g))zone='headblock'}
+    if(h.zone==='head'){if(hits.has('head'))zone=hits.has('arm')&&/high|upp|hook|mid|top/.test(g)?'headblock':'head';else if(hits.has('arm')&&/high|upp|hook|mid|top/.test(g))zone='headblock'}
     else if(h.zone==='body'){if(hits.has('body'))zone='body';else if(hits.has('head')&&h.kind==='kick')zone='head';else if(hits.has('arm')&&g)zone='body'}
     else if(h.zone==='leg'){if(hits.has('leg'))zone='leg'}
     if(!zone)return;act.hit=true;this.onHit(att,def,act,zone,pHit||sb.b)}
@@ -1180,8 +1180,8 @@ class Match{
   onMiss(att,act){SFXI.play('whiff');if(att.opp.ai&&att.opp.ai.onOppMiss)att.opp.ai.onOppMiss();att.sta-=act.c.hit.sta*.3;if(act.c.leg&&act.c.hit.zone==='head'&&Math.random()<.05*(1.3-ATT(att,'footwork'))){this.ev(`${att.name} 헛발질에 균형을 잃습니다`)}}
   onHit(att,def,act,zone,p){const h=act.c.hit,kind=h.kind;const kick=kind==='kick'||kind==='knee';const rs=this.rs[att.side];
     let blocked=false,checked=false;const cat=GCAT(act.key);let gb=0;if(zone==='headblock'){zone='head';gb=.15}
-    if(zone==='leg'&&def.guard==='low'){checked=!h.calf||Math.random()<.6+ATT(def,'strDef')*.35}
-    else if(def.guard==='low'&&kick&&h.zone!=='head'&&zone!=='head'){checked=Math.random()<.75+ATT(def,'strDef')*.22;if(checked){def.gst-=h.dmg*.6*(1.3-ATT(def,'strength')*.5)}}
+    if(zone==='leg'&&def.guard==='low'){checked=Math.random()<(h.calf?.38:.5)+ATT(def,'strDef')*.22}
+    else if(def.guard==='low'&&kick&&h.zone!=='head'&&zone!=='head'){checked=Math.random()<.5+ATT(def,'strDef')*.2;if(checked){def.gst-=h.dmg*.6*(1.3-ATT(def,'strength')*.5)}}
     else if(def.guard==='hook'&&kick&&h.zone==='head'&&zone==='head'&&def.gst>0){blocked=Math.random()<.82+ATT(def,'strDef')*.16;if(blocked){def.gst-=h.dmg*(1.6-ATT(def,'strength')*.6);if(def.gst<=0){def.gst=0;def.gBreak=1.2;def.guard=null;blocked=false;this.ev(`💢 ${def.name} 하이킥에 가드가 무너집니다!`)}}}
     else if(def.guard&&def.gst>0){const q=((GMATCH[def.guard]||{})[zone==='body'?'body':cat])||0;if(q>0&&Math.random()<Math.min(.97,q*(.55+ATT(def,'strDef')*.4)+gb)){blocked=true;
       def.gst-=h.dmg*(1.5-ATT(def,'strength')*.5)*(q<1?1.6:1)*(kick?1.4:1)*(.7+ATT(att,kick?'kicking':'punchPow')*.6);if(def.gst<=0){def.gst=0;def.gBreak=1.2+(1-ATT(def,'strDef'))*.8;def.guard=null;blocked=q>=1&&Math.random()<.5;this.ev(`💢 ${def.name} 가드가 무너집니다!`);SFXI.play('hit',.9)}}}
@@ -1191,7 +1191,7 @@ class Match{
     let dmg=.26*h.dmg*(def.ai?clamp(1.18-.3*this.diff,.6,1.05):1)*(.55+ATT(att,kick?'kicking':'punchPow')*.75+ATT(att,'strength')*.15)*(.55+.45*att.sta/att.staMax)*(counter?1.45:1)*(chin?1.3:1)*(def.rock>0?1.2:1)*(act.c.close&&Math.abs(att.x-def.x)>.85?.55:1);
     att.st.land++;this.rs[att.side].sigL+=blocked?0:1;const pw=dmg/9;
     if(checked){SFXI.play('block',1);att.hp.legs-=dmg*.55;def.hp.legs-=dmg*.08;this.stage.impact(p.x,p.y,.8);this.hitstop=.05;this.ev(`🛡️ ${def.name} ${zone==='leg'?'로킥':'미들킥'} 체크!`);return}
-    if(blocked){SFXI.play('block',.9);dmg*=.18;def.sta-=h.dmg*.4;def.react.lv-=.8*att.d*def.d;def.react.x+=att.d*.05;this.stage.impact(p.x,p.y,.5);this.hitstop=.03;this.applyDmg(att,def,{zone,dmg,kind,blocked:1});return}
+    if(blocked){SFXI.play('block',.9);dmg*=(def.rock>0?.6:.36);def.sta-=h.dmg*.4;def.react.lv-=.8*att.d*def.d;def.react.x+=att.d*.05;this.stage.impact(p.x,p.y,.5);this.hitstop=.03;this.applyDmg(att,def,{zone,dmg,kind,blocked:1});return}
     att.st.sigL++;att.st[zone==='leg'?'leg':zone]++;
     // reactions, FX
     const J0=def.body.J.hd||p;if(zone==='head'){def.react.hv+=-(9.5+pw*14)*(kind==='punch'&&act.key.includes('upp')?-.3:1);def.react.lv+=-(3+pw*5.5);def.react.x+=att.d*(.1+pw*.13)}
@@ -1369,7 +1369,7 @@ class Match{
     this.stage.rot=0;this.ref.x=0;this.ref.vx=0;this.ref.raise=0;this.cer=1;const a=W||this.f[0],b=L||this.f[1];a.x=-.42;a.d=1;b.x=.62;b.d=-1;
     const idle={lean:0,head:.08,chest:0,la_s:.2,la_e:.35,ra_s:.12,ra_e:.3,ll_h:.06,ll_k:.06,rl_h:-.06,rl_k:.06,tw:0};a.gpose=Object.assign({},BASE_POSE,idle);b.gpose=Object.assign({},BASE_POSE,idle,W?{head:-.3,lean:.12}:{});a.gRate=b.gRate=5;a.cur=poseCopy(a.gpose);b.cur=poseCopy(b.gpose)}
   /* ---------- referee ---------- */
-  updRef(dt){if(this.cer){const W=this.winner;if(W&&W.cerWin){W.gpose=Object.assign({},W.gpose,{la_s:3.05,la_e:.05,head:-.1,chest:-.05})}return}const r=this.ref,[a,b]=this.f;const mid=(a.x+b.x)/2;let want=mid+(mid>0?-1:1)*1.3;if(this.phase==='end'||this.g&&this.g.type==='ground')want=mid+.9;r.mvIn=clamp((want-r.x)*1.5,-1,1);r.A={footwork:14,speed:12};r.d=Math.sign(mid-r.x)||1;r.update(dt,{checkHit(){},onMiss(){}});
+  updRef(dt){if(this.cer){const W=this.winner;if(W&&W.cerWin){W.gpose=Object.assign({},W.gpose,{la_s:3.05,la_e:.05,head:-.1,chest:-.05})}return}const r=this.ref,[a,b]=this.f;const mid=(a.x+b.x)/2;let want=mid+(mid>0?-1:1)*2.3;if(this.phase==='end'||this.g&&this.g.type==='ground')want=mid+.9;{const L=this.phase==='end'&&this.f.find(f=>f.down&&f.down.ko);if(L)want=L.x+(r.x<L.x?-.85:.85)}r.mvIn=clamp((want-r.x)*1.5,-1,1);r.A={footwork:14,speed:12};r.d=Math.sign(mid-r.x)||1;r.update(dt,{checkHit(){},onMiss(){}});
     r.gpose=null;if(this.phase==='end'&&this.winner){r.gpose=poseCopy(Object.assign({},BASE_POSE,{la_s:2.9,la_e:.2,ra_s:.2,ra_e:.3,lean:0,head:0}))}}
   /* ---------- render ---------- */
   render(dt){const S=this.stage,ctx=S.ctx,[a,b]=this.f;S.t+=dt;const g=this.g;const ground=g&&g.type==='ground'||a.down||b.down;
@@ -2544,7 +2544,7 @@ function fightWeek(){const P=GG.P,nx=P.next;if(!nx)return;const o=GG.F[nx.opp];c
         A.innerHTML=`<div class="page fw"><div class="fwh ${c.inj?'loss':'win'}"><span class="H" style="font-size:22px">${c.inj?'CAMP INJURY':'CAMP COMPLETE'}</span><b>${c.label}</b><em>${CAMP_INT[int][0]} · 비용 $${fmtM(c.cost)}</em></div><div class="card"><p>${c.inj?'🚑 스파링 중 부상을 입었어요. 효과가 절반으로 줄고 체력·맷집이 떨어진 채로 싸웁니다.<br>':''}이번 경기 보정: <b>${txt}</b></p><button class="btn full" data-n>기자회견으로 ▶</button></div></div>`;
         A.querySelector('[data-n]').onclick=step1}};draw()};
   step0()}
-if(document.readyState==='loading')window.addEventListener('DOMContentLoaded',titleScreen);else titleScreen();
+if(document.readyState==='loading')window.addEventListener('DOMContentLoaded',()=>titleScreen());else titleScreen();
 </script>
-<script src="src/Tuning.js"></script><script src="src/FootPlant.js"></script><script src="src/Arena.js"></script><script src="src/Ragdoll2D.js"></script><script src="src/JudgeRefereeSystem.js"></script><script src="src/CombatEngine.js"></script><script src="src/CombatPacingEngine.js"></script><script src="src/ImpactFeedbackManager.js"></script><script src="src/GraphicsRenderer.js"></script><script src="src/UIManager.js"></script><script src="src/ArenaRenderer.js"></script><script src="src/RefereeModel.js"></script><script src="src/MotionPhysics.js"></script><script src="src/MotionRealism.js"></script><script src="src/AttackMotions.js"></script><script src="src/DebugLayer.js"></script><script src="src/GPURenderer.js"></script><script src="src/CareerManager.js"></script><script src="src/FlatStyle.js"></script><script src="src/GroundMotion.js"></script><script src="src/Training.js"></script><script src="src/Fighters.js"></script><script src="src/Grappling2.js"></script><script src="src/KOReplay.js"></script><script src="src/Ground2.js"></script>
+<script src="src/Tuning.js"></script><script src="src/FootPlant.js"></script><script src="src/Arena.js"></script><script src="src/Ragdoll2D.js"></script><script src="src/JudgeRefereeSystem.js"></script><script src="src/CombatEngine.js"></script><script src="src/CombatPacingEngine.js"></script><script src="src/ImpactFeedbackManager.js"></script><script src="src/GraphicsRenderer.js"></script><script src="src/UIManager.js"></script><script src="src/ArenaRenderer.js"></script><script src="src/RefereeModel.js"></script><script src="src/MotionPhysics.js"></script><script src="src/MotionRealism.js"></script><script src="src/AttackMotions.js"></script><script src="src/DebugLayer.js"></script><script src="src/GPURenderer.js"></script><script src="src/CareerManager.js"></script><script src="src/FlatStyle.js"></script><script src="src/GroundMotion.js"></script><script src="src/Training.js"></script><script src="src/Fighters.js"></script><script src="src/Grappling2.js"></script><script src="src/KOReplay.js"></script><script src="src/Ground2.js"></script><script src="src/Menu2.js"></script><script src="src/Rules2.js"></script><script src="src/Combat2.js"></script>
 </body></html>

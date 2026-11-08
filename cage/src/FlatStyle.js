@@ -241,7 +241,7 @@ function headFlat(ctx,hd,nk,H,B,skin,d,ang){if(window.CUTOUT&&B.look&&B.look.cut
   if(typeof CUTPOS!=='undefined')for(const c of B.cuts||[]){const p=CUTPOS[c.at];if(!p)continue;P([[p[0]-.1,p[1]+.06],[p[0]+.12,p[1]-.03],[p[0]+.12,p[1]-.06],[p[0]-.1,p[1]+.03]],'#5a0303');
     if(c.sev>.25){const L=.3+Math.min(2.2,c.sev*1.1);ctx.globalAlpha=.85;P([[p[0]-.07,p[1]],[p[0]+.08,p[1]],[p[0]+.03,p[1]-L],[p[0]-.02,p[1]-L*.9]],'#960808');ctx.globalAlpha=1}}
   if((B.cuts||[]).some(c=>c.at==='nose')||(B.redness||0)>.72){ctx.globalAlpha=.85;P([[.95,-.24],[1.01,-.26],[.94,-.7],[.88,-.7]],'#8c0608');ctx.globalAlpha=1}
-  if(window.FACEFX){ctx.save();ctx.scale(r,r);FACEFX.wounds(ctx,B,{eye:[.74,.14],brow:[.66,.42],brow2:[.52,.5],nose:[.98,-.05],cheek:[.55,-.05],fore:[.55,.7],lip:[.85,-.5],u:.32,down:-1},{cuts:false});ctx.restore()}
+  if(window.FACEFX){ctx.save();ctx.scale(r,r);FACEFX.wounds(ctx,B,{eye:[.74,.14],brow:[.66,.42],brow2:[.52,.5],nose:[.98,-.05],cheek:[.55,-.05],fore:[.55,.7],lip:[.85,-.5],u:.32,down:-1},{cuts:false});FACEFX.mouth(ctx,[.9,-.44],.2,.16,-1,B);ctx.restore()}
   ctx.restore()}
 function hairFlat(ctx,r,lk,B,hc,P){const hs=B.hs||(B.hs=(typeof hairStyleOf==='function'?hairStyleOf(B):'short'));if(hs==='bald'){ctx.globalAlpha=.12;P([[-.3,.98],[.3,1.06],[.4,.95],[-.2,.9]],'#fff');ctx.globalAlpha=1;return}
   /* block cap: hairline at the forehead, over the crown, down the back to the nape; sideburn in front of the ear */

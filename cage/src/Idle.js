@@ -37,7 +37,10 @@ FX.blink=function(B){if(!FX.on)return 0;const o=B._owner,name=(B.look&&B.look.na
   if(t>=k.next){k.t0=t;k.next=t+2.4+Math.random()*3.8;if(Math.random()<.15)k.next=t+.35}/* sometimes a double blink */
   const u=(t-k.t0)/k.dur;let a=0;if(u>=0&&u<=1)a=u<.4?u/.4:1-(u-.4)/.6;
   const sw=clamp((B.swell||0)*.35,0,.45);/* a swollen eye never opens fully */const hp=o&&o.hp?o.hp.head:100;const heavy=clamp((50-hp)/50,0,1)*.22;
-  return clamp(Math.max(a,sw+heavy),0,1)};
+  return clamp(Math.max(a,sw+heavy,FX.hurt(B)*.97),0,1)};
+/* being hit: the eyes squeeze shut and the mouth opens a little (black inside: a mouthpiece). Eases in fast, out slowly. */
+FX.hurt=function(B){const o=B._owner;let h=0;if(o){if(o.hitF>0)h=Math.max(h,clamp(o.hitF/.14,0,1));if(o.flinch>0)h=Math.max(h,.7);if(o.rock>0)h=Math.max(h,.55)}if(B.ko)h=1;const c=B._hurt||0;B._hurt=c+(h-c)*(h>c?.6:.1);return B._hurt};
+FX.mouth=function(ctx,P,w,hh,down,B){const h=FX.hurt(B);if(h<.08)return;ctx.save();ctx.fillStyle='#0b0708';ctx.beginPath();ctx.ellipse(P[0],P[1],w*.5,Math.max(w*.08,hh*h*.5),0,0,7);ctx.fill();ctx.restore()};
 
 /* ---------- face damage ---------- */
 const CUT_AT={brow:'brow',brow2:'brow2',nose:'nose',cheek:'cheek',fore:'fore',lip:'lip'};
@@ -45,19 +48,20 @@ const CUT_AT={brow:'brow',brow2:'brow2',nose:'nose',cheek:'cheek',fore:'fore',li
 FX.wounds=function(ctx,B,G,opt){if(!FX.on)return;opt=opt||{};const o=B._owner,hp=o&&o.hp?o.hp.head:100,d=clamp(1-hp/100,0,1),light=clamp(d/.5,0,1),s=clamp((50-hp)/50,0,1);
   const swell=clamp(B.swell||0,0,1.5),u=G.u,dn=G.down;if(d<.02&&swell<.05&&!(B.cuts&&B.cuts.length))return;
   ctx.save();
-  /* cheek redness */
-  {const a=.07*light+.2*s;if(a>.01){const c=G.cheek,gr=ctx.createRadialGradient(c[0],c[1],0,c[0],c[1],u*1.7);gr.addColorStop(0,`rgba(170,55,45,${a})`);gr.addColorStop(1,'rgba(170,55,45,0)');ctx.fillStyle=gr;ctx.beginPath();ctx.arc(c[0],c[1],u*1.7,0,7);ctx.fill()}}
   /* eye bruise: a dark purple ring that gets a yellow-green edge once it is old / heavy */
   {const a=.12*light+.5*s+swell*.18;if(a>.02){const e=G.eye,cx=e[0]-u*.05,cy=e[1]-dn*u*.1;ctx.save();ctx.translate(cx,cy);ctx.scale(1,.78);
     if(s>.25){const g2=ctx.createRadialGradient(0,0,u*.5,0,0,u*1.5);g2.addColorStop(0,`rgba(120,105,40,${.3*s})`);g2.addColorStop(1,'rgba(120,105,40,0)');ctx.fillStyle=g2;ctx.beginPath();ctx.arc(0,0,u*1.5,0,7);ctx.fill()}
     const g=ctx.createRadialGradient(0,0,u*.15,0,0,u*1.05);g.addColorStop(0,`rgba(62,22,58,${Math.min(.85,a)})`);g.addColorStop(.7,`rgba(78,32,70,${Math.min(.6,a*.7)})`);g.addColorStop(1,'rgba(78,32,70,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(0,0,u*1.05,0,7);ctx.fill();ctx.restore()}}
-  /* scrapes once the head is under 50 % */
-  if(s>.25){ctx.strokeStyle=`rgba(150,40,35,${.55*s})`;ctx.lineWidth=u*.05;ctx.lineCap='round';const c=G.cheek,f=G.fore;for(const[p,dx,dy]of[[c,-.5,.1],[c,.1,.35],[f,-.2,0],[f,.3,.2]]){ctx.beginPath();ctx.moveTo(p[0]+u*dx,p[1]+dn*u*dy);ctx.lineTo(p[0]+u*(dx+.45),p[1]+dn*u*(dy-.06));ctx.stroke()}}
-  /* the engine's cuts with blood runs */
-  if(opt.cuts!==false&&B.cuts)for(const c of B.cuts){const P=G[CUT_AT[c.at]||'brow'];if(!P)continue;const sev=c.sev,len=u*(.7+Math.min(.5,sev*.25));
-    ctx.save();ctx.translate(P[0],P[1]);ctx.rotate(-.2*dn);ctx.strokeStyle='#4a0508';ctx.lineWidth=u*(.07+Math.min(.07,sev*.04));ctx.lineCap='round';ctx.beginPath();ctx.moveTo(-len/2,0);ctx.lineTo(len/2,-dn*u*.06);ctx.stroke();ctx.strokeStyle='#b01016';ctx.lineWidth=u*.035;ctx.beginPath();ctx.moveTo(-len*.45,0);ctx.lineTo(len*.45,-dn*u*.06);ctx.stroke();ctx.restore();
-    if(sev>.25){const L=u*(.8+Math.min(3,sev*1.5));const g=ctx.createLinearGradient(0,P[1],0,P[1]+dn*L);g.addColorStop(0,'rgba(150,8,12,.85)');g.addColorStop(1,'rgba(150,8,12,0)');ctx.strokeStyle=g;ctx.lineWidth=u*.11;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(P[0]+u*.08,P[1]);ctx.quadraticCurveTo(P[0]+u*.2,P[1]+dn*L*.5,P[0]+u*.1,P[1]+dn*L);ctx.stroke()}}
+  /* the engine's cuts with blood runs (the earlier look): a dark cut, a blood streak running down, a nose bleed when it is cut or the face is very red */
+  if(opt.cuts!==false&&B.cuts){for(const c of B.cuts){const P=G[CUT_AT[c.at]||'brow'];if(!P)continue;const sev=c.sev;
+      ctx.fillStyle='#5a0303';ctx.save();ctx.translate(P[0],P[1]);ctx.rotate(-.25*dn);ctx.fillRect(-u*.45,-u*.05,u*.9,u*.1);ctx.restore();
+      if(sev>.25){const L=u*(1+Math.min(7,sev*3.4));ctx.globalAlpha=.85;ctx.fillStyle='#960808';ctx.beginPath();ctx.moveTo(P[0]-u*.22,P[1]);ctx.lineTo(P[0]+u*.25,P[1]);ctx.lineTo(P[0]+u*.1,P[1]+dn*L);ctx.lineTo(P[0]-u*.06,P[1]+dn*L*.9);ctx.closePath();ctx.fill();ctx.globalAlpha=1}}
+    if(B.cuts.some(c=>c.at==='nose')||(B.redness||0)>.72){const n=G.nose;ctx.globalAlpha=.85;ctx.fillStyle='#8c0608';ctx.beginPath();ctx.moveTo(n[0]-u*.1,n[1]);ctx.lineTo(n[0]+u*.2,n[1]);ctx.lineTo(n[0]+u*.1,n[1]+dn*u*2.6);ctx.lineTo(n[0]-u*.2,n[1]+dn*u*2.6);ctx.closePath();ctx.fill();ctx.globalAlpha=1}}
   ctx.restore()};
+FX.redOverlay=function(img,B){const red=B.redness||0,a=Math.min(.4,red*.45);if(a<.03)return null;const k=Math.round(a*25);const C=FX._rc||(FX._rc={});const key=img.src+k;if(C[key])return C[key];
+  const c=document.createElement('canvas');c.width=img.width;c.height=img.height;const g=c.getContext('2d');g.drawImage(img,0,0);let id;try{id=g.getImageData(0,0,c.width,c.height)}catch(e){return null}const D=id.data,al=k/25;
+  for(let i=0;i<D.length;i+=4){const r=D[i],gg=D[i+1],b=D[i+2];const skin=D[i+3]>8&&r>gg&&gg>=b&&r-b>22&&(r+gg+b)/3>70;if(!skin){D[i+3]=0;continue}D[i]=184;D[i+1]=67;D[i+2]=58;D[i+3]=Math.round(255*al)}
+  g.putImageData(id,0,0);return C[key]=c};
 /* the eyelid for sprite faces: a skin-coloured lid sliding down over the eye, with a lash line when nearly closed */
 FX.lid=function(ctx,G,a,skin){if(a<.03)return;const e=G.eye,u=G.u,w=u*1.25,h=u*.7*a;ctx.save();ctx.fillStyle=skin;ctx.beginPath();const top=e[1]-G.down*u*.42;ctx.ellipse(e[0],top+G.down*(h*.5),w*.5,Math.max(1,h*.55),0,0,7);ctx.fill();
   if(a>.35){ctx.strokeStyle='rgba(30,18,14,.85)';ctx.lineWidth=u*.07;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(e[0]-w*.42,top+G.down*h*.95);ctx.quadraticCurveTo(e[0],top+G.down*(h*1.15),e[0]+w*.42,top+G.down*h*.9);ctx.stroke()}ctx.restore()};

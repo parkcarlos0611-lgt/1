@@ -60,8 +60,8 @@ const strip=(ctx,P,t0,t1,a0,b0,a1,b1,col,al)=>fac(ctx,[P(t0,a0),P(t1,a1),P(t1,b1
 function detailIn(ctx,out,front,back,base,lw,fn){ctx.save();ctx.beginPath();rpath(ctx,out,ROUND*2.2);ctx.clip();
   fn(shade(base,.1),shade(base,-.2));
   ctx.lineJoin='round';ctx.lineCap='round';
-  ctx.globalAlpha=.34;ctx.strokeStyle=shade(base,-.34);ctx.lineWidth=lw*2.2;ctx.beginPath();back.forEach((q,i)=>i?ctx.lineTo(q.x,q.y):ctx.moveTo(q.x,q.y));ctx.stroke();
-  ctx.globalAlpha=.4;ctx.strokeStyle=shade(base,.16);ctx.lineWidth=lw*1.3;ctx.beginPath();front.forEach((q,i)=>i?ctx.lineTo(q.x,q.y):ctx.moveTo(q.x,q.y));ctx.stroke();
+  ctx.globalAlpha=.55;ctx.strokeStyle=shade(base,-.38);ctx.lineWidth=lw*2.8;ctx.beginPath();back.forEach((q,i)=>i?ctx.lineTo(q.x,q.y):ctx.moveTo(q.x,q.y));ctx.stroke();
+  ctx.globalAlpha=.55;ctx.strokeStyle=shade(base,.2);ctx.lineWidth=lw*1.8;ctx.beginPath();front.forEach((q,i)=>i?ctx.lineTo(q.x,q.y):ctx.moveTo(q.x,q.y));ctx.stroke();
   ctx.globalAlpha=1;ctx.restore()}
 const BD=Body.prototype.draw;
 Body.prototype.draw=function(ctx,o){o=o||{};const lk=this.look;if(window.CUTOUT&&CUTOUT.ok(this))return CUTOUT.draw(this,ctx,o);if(!FS.on)return BD.call(this,ctx,o);

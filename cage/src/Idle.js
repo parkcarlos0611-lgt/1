@@ -21,9 +21,9 @@ const T=()=>performance.now()/1000;
   const mv=Math.min(1,Math.abs(this.mvIn||0)*1.4),calm=(1-.65*mv)*(this.rock>0?.35:1)*1.85;/* idle amplitude (bigger, livelier) */const t=T()*tp+ph;
   const b1=Math.sin(t*3.6),b2=Math.sin(t*3.6+Math.PI),sw=Math.sin(t*1.25+1.3),br=Math.sin(t*.9),s2=Math.sin(t*2.1+.6);
   /* upper body: breathing, shoulder turn, head bob */
-  p.lean+=.016*br*calm+.012*b1*calm;p.chest+=.012*Math.sin(t*.9+.5)*calm;p.tw+=.07*sw*calm;p.head+=.022*Math.sin(t*3.6+.7)*calm-.01*sw*calm;
+  p.lean+=.028*br*calm+.022*b1*calm;p.chest+=.026*Math.sin(t*.9+.5)*calm+.012*b2*calm;/* no shoulder turn: the shoulders stay square */p.head+=.04*Math.sin(t*3.6+.7)*calm-.015*sw*calm;
   /* fists circle a little, one after the other */
-  p.la_s+=.06*b1*calm+.02*s2*calm;p.la_e+=.09*b2*calm;p.ra_s+=.06*b2*calm+.02*s2*calm;p.ra_e+=.09*b1*calm;
+  p.la_s+=.1*b1*calm+.035*s2*calm;p.la_e+=.16*b2*calm;p.ra_s+=.1*b2*calm+.035*s2*calm;p.ra_e+=.16*b1*calm;
   /* legs: knee bounce (opposite phases), heel lift, weight shift */
   p.ll_k+=(.05+.05*b1)*calm;p.rl_k+=(.05+.05*b2)*calm;p.ll_h+=.035*sw*calm;p.rl_h-=.03*sw*calm;p.ll_a+=.05*b1*calm;p.rl_a+=.05*b2*calm;
   /* up and down also moves the legs toward / away from the camera, alternately */

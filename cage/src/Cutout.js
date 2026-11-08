@@ -1,4 +1,6 @@
-/* ===== Cutout.js : fighters drawn from a flat-colour reference picture cut into rigged parts =====
+/* ===== Cutout.js : a fighter's FACE (head, hair, beard) taken from a flat-colour reference picture =====
+   Only the head part is used: it replaces the vector head on the normal vector body (whose skin tone is matched to the picture).
+   (The full body rig below is kept in the file but is not used: CO.body = false.)
    assets/cutout/<name>/parts.png + parts.json come from tools/cutout_rig.py: the picture is flattened to solid colours, split into
    body parts (head, torso, trunks, upper / fore arms with gloves, thighs, shins, feet), and the areas each part hides behind the
    parts in front of it are filled in. Here each part is bound to the physics skeleton by its two bone points: rotated, mirrored
@@ -8,11 +10,13 @@
 if(typeof Body==='undefined')return;
 const CO=window.CUTOUT={on:!/[?&]cutout=0/.test(location.search),sets:{}};
 const clamp=(v,a,b)=>v<a?a:v>b?b:v;
-const CURATED={'Jon Jones':{cutout:'jones',tk:.8}};
+const CURATED={'Jon Jones':{cutout:'jones',skin:'#7d5033',shorts:'#232326',glove:'#17171a'}};
 if(typeof lookFor==='function'){const lf=lookFor;window.lookFor=function(f){const L=lf.apply(this,arguments);const C=CURATED[f&&f.n];if(C)Object.assign(L,C);return L}}
 function load(name){let S=CO.sets[name];if(S)return S;S=CO.sets[name]={ready:false};
   fetch('assets/cutout/'+name+'/parts.json').then(r=>r.json()).then(m=>{S.meta=m;const im=new Image();im.onload=()=>{S.img=im;S.ready=true};im.src='assets/cutout/'+name+'/'+m.image}).catch(()=>{S.failed=true});return S}
-CO.ok=function(B){const lk=B&&B.look;if(!CO.on||!lk||!lk.cutout)return false;const S=load(lk.cutout);return !!(S.ready&&B.J&&B.J.hd)};
+CO.body=false;
+CO.head=function(ctx,hd,nk,H,B,d){const lk=B.look;if(!CO.on||!lk||!lk.cutout)return false;const S=load(lk.cutout);if(!S.ready)return false;const ku=H*1.03/(S.meta.h*.935)*1.08;ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';put(ctx,S,'head',nk,hd,d,ku,1,1,true);return true};
+CO.ok=function(B){if(!CO.body)return false;const lk=B&&B.look;if(!CO.on||!lk||!lk.cutout)return false;const S=load(lk.cutout);return !!(S.ready&&B.J&&B.J.hd)};
 /* map the sprite so that its bone p0->p1 lies on the world segment A->B (mirrored for d = -1); the sprite is stretched along the bone, clamped */
 function put(ctx,S,name,A,Bp,d,ku,lo,hi,uniform){const P=S.meta.parts[name];if(!P)return;
   const m=d,vx=m*(P.p1[0]-P.p0[0]),vy=-(P.p1[1]-P.p0[1]),vl=Math.hypot(vx,vy)||1;let ux=Bp.x-A.x,uy=Bp.y-A.y;const ul=Math.hypot(ux,uy)||1e-6;ux/=ul;uy/=ul;

@@ -20,7 +20,7 @@ if(typeof Body==='undefined')return;
 const FS=window.FLAT_STYLE=(typeof tuneSection==='function'?tuneSection('flat',{on:true,shadowK:-.09,farK:-.1,lightK:.035}):{on:true,shadowK:-.09,farK:-.1,lightK:.035});
 /* the flat look has its own light: switch off the gradient / rim light layers painted on top of fighters */
 if(typeof GFX!=='undefined'){GFX.shade=0;GFX.rim=0;GFX.sweat=Math.min(GFX.sweat,.35)}
-if(typeof GPU!=='undefined'){GPU.rim=.12;/* (add ?gpu=1 to the URL to bring the compositor back) the flat look has no depth of field / bloom / grade: the WebGL compositor only re-uploaded three full-size canvases every frame (about a third of the frame time) — draw straight to the 2D canvas */GPU.on=/[?&]gpu=1/.test(location.search)}
+if(typeof GPU!=='undefined')GPU.rim=.12;
 if(typeof MR!=='undefined')MR.limbShade=0;
 
 /* ---------- helpers (world units, y up) ---------- */
@@ -52,7 +52,7 @@ function limb(ctx,a,b,d,rows,col,shCol,extra){const F=frame(a,b,d);const P=(t,w)
 
 /* ---------- body ---------- */
 const BD=Body.prototype.draw;
-Body.prototype.draw=function(ctx,o){o=o||{};const lk=this.look;if(window.FLAT2&&FLAT2.on&&!lk.ref)return FLAT2.draw(this,ctx,o);if(window.FRAME&&FRAME.on&&!lk.ref)return FRAME.draw(this,ctx,o);if(!FS.on)return BD.call(this,ctx,o);
+Body.prototype.draw=function(ctx,o){o=o||{};const lk=this.look;if(!FS.on)return BD.call(this,ctx,o);
   const J=this.J,H=this.H,W=this.W,d=this.d;if(!J.hd)return;
   /* the referee is the same figure in a different outfit (black polo, trousers, boots, gloves) */
   const R=!!lk.ref;if(R&&!lk._flat){Object.assign(lk,REF_LOOK[Math.floor(Math.random()*REF_LOOK.length)]);lk._flat=1;this.hs=null}

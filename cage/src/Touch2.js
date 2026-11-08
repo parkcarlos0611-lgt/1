@@ -8,7 +8,7 @@ const EMO=/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{23E9}-\u{23F
 const REPL={'🎵':'음악','🔇':'음소거','⛶':'전체화면','⏩':'','▶':''};
 const clean=s=>s.replace(EMO,m=>REPL[m]!=null?REPL[m]:'');
 function sweep(root){const w=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);const L=[];let n;while(n=w.nextNode())if(EMO.test(n.nodeValue)){EMO.lastIndex=0;L.push(n)}EMO.lastIndex=0;for(const t of L){const v=clean(t.nodeValue);if(v!==t.nodeValue)t.nodeValue=v}}
-{let pend=0;const mo=new MutationObserver(()=>{if(pend)return;pend=1;setTimeout(()=>{pend=0;try{sweep(document.body)}catch(e){}},250)});/* throttled: the HUD mutates every frame */mo.observe(document.body,{childList:true,subtree:true,characterData:true})}
+{let pend=0;const mo=new MutationObserver(()=>{if(pend)return;pend=1;requestAnimationFrame(()=>{pend=0;try{sweep(document.body)}catch(e){}})});mo.observe(document.body,{childList:true,subtree:true,characterData:true})}
 
 const LABELS={stand:{td:'테이크다운',clinch:'클린치',punch:'펀치',jab:'잽',kick:'킥',block:'가드'},ground:{td:'연타',clinch:'클린치',punch:'전환',jab:'서브미션',kick:'파운딩',block:'방어'},clinch:{td:'길로틴',clinch:'탈출',punch:'펀치',jab:'잽',kick:'니킥',block:'탈출'}};
 In2.prototype.setMode=function(mode){if(!this.tc||this.mode===mode)return;this.mode=mode;const L=LABELS[mode]||LABELS.stand;

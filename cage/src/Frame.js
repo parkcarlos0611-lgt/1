@@ -20,8 +20,9 @@ function spl(c,pts){const n=pts.length;c.moveTo(pts[0].x,pts[0].y);for(let i=0;i
 function splOpen(c,pts){const n=pts.length;c.moveTo(pts[0].x,pts[0].y);for(let i=0;i<n-1;i++){const p0=pts[Math.max(0,i-1)],p1=pts[i],p2=pts[i+1],p3=pts[Math.min(n-1,i+2)];c.bezierCurveTo(p1.x+(p2.x-p0.x)/6,p1.y+(p2.y-p0.y)/6,p2.x-(p3.x-p1.x)/6,p2.y-(p3.y-p1.y)/6,p2.x,p2.y)}}
 function body(ctx,pts,fill,lw){ctx.beginPath();spl(ctx,pts);ctx.lineJoin='round';ctx.lineWidth=lw*2;ctx.strokeStyle=LINE;ctx.stroke();ctx.fillStyle=fill;ctx.fill()}
 const P2=(a,b,t)=>({x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t});
-function line(ctx,pts,w,col,al){ctx.save();ctx.lineCap='round';ctx.lineJoin='round';ctx.strokeStyle=col||DET;ctx.lineWidth=w;if(al!=null)ctx.globalAlpha=al;ctx.beginPath();splOpen(ctx,pts);ctx.stroke();ctx.restore()}
-function plane(ctx,pts,col){ctx.fillStyle=col;ctx.beginPath();spl(ctx,pts);ctx.fill()}
+const DETAIL=false;/* muscle / bone lines and planes are off: the skin layer goes on top of the plain silhouette */
+function line(ctx,pts,w,col,al){if(!DETAIL)return;ctx.save();ctx.lineCap='round';ctx.lineJoin='round';ctx.strokeStyle=col||DET;ctx.lineWidth=w;if(al!=null)ctx.globalAlpha=al;ctx.beginPath();splOpen(ctx,pts);ctx.stroke();ctx.restore()}
+function plane(ctx,pts,col){if(!DETAIL)return;ctx.fillStyle=col;ctx.beginPath();spl(ctx,pts);ctx.fill()}
 /* frame of a segment: n points to the front (facing side, or up when level) */
 function frame(a,b,d){const dx=b.x-a.x,dy=b.y-a.y,L=Math.hypot(dx,dy)||1e-5,ux=dx/L,uy=dy/L;let nx=-uy,ny=ux;if(nx*d+ny*.35<0){nx=-nx;ny=-ny}return{ux,uy,nx,ny,L}}
 
@@ -48,14 +49,9 @@ function armDraw(ctx,B,S,J,d,M,T,far,zs,lw){const f=far?FARF:FILL,a=J[S.S],e=J[S
   /* deltoid cap, biceps / triceps, forearm flexors */
   const Q=U.Q;L(ctx,[Q(-.05,.06),Q(.14,.05),Q(.3,.022)],lw*.9,.7);L(ctx,[Q(.1,-.05),Q(.3,-.02),Q(.5,-.016)],lw*.8,.5);plane(ctx,[Q(.22,.052),Q(.4,.054),Q(.56,.04),Q(.3,.0)],HILITE);L(ctx,[Q(.48,.03),Q(.72,.026),Q(.9,.02)],lw*.7,.4);
   L(ctx,[Fo.Q(.1,.03),Fo.Q(.4,.026),Fo.Q(.8,.016)],lw*.8,.45*T.def+.25);L(ctx,[Fo.Q(.06,-.02),Fo.Q(.4,-.02),Fo.Q(.9,-.01)],lw*.7,.3);
-  fist(ctx,w,g,d,B.H*.4*T.hand,f,lw,zs(S.G),(S.S==='lS')===((B.stance||1)>0))}
-/* clenched fist: back of the hand, four curled fingers (knuckle row + finger lines) and the thumb across them */
-function fist(ctx,w,g,d,M,f,lw,zs,isLeft){const sg=isLeft?1:-1;const F=frame(w,g,d);const Q=(u,v)=>({x:w.x+F.ux*u*M*zs+F.nx*v*sg*M*zs,y:w.y+F.uy*u*M*zs+F.ny*v*sg*M*zs});
-  const hand=[Q(-.02,.026),Q(.04,.036),Q(.1,.044),Q(.15,.04),Q(.17,.02),Q(.175,-.005),Q(.165,-.03),Q(.14,-.043),Q(.09,-.046),Q(.03,-.036),Q(-.02,-.024)];
-  group(ctx,[hand],f,lw*.9);
-  for(let i=0;i<3;i++){const v=.024-i*.02;line(ctx,[Q(.1,v),Q(.165,v-.002)],lw*.9,DET,.8)}/* finger separations */
-  line(ctx,[Q(.1,.04),Q(.1,-.04)],lw*.8,DET,.5);/* first knuckle line */
-  const th=[Q(.03,.03),Q(.08,.056),Q(.13,.054),Q(.14,.036),Q(.1,.03),Q(.06,.022)];group(ctx,[th],f,lw*.8);line(ctx,[Q(.1,.044),Q(.13,.04)],lw*.7,DET,.6)}
+  ball(ctx,w,g,B.H*T.hand,f,lw,zs(S.G))}
+/* clenched fist = a plain ball just past the wrist */
+function ball(ctx,w,g,H,f,lw,zs){const c={x:w.x+(g.x-w.x)*.55,y:w.y+(g.y-w.y)*.55},r=.034*H*zs;ctx.lineWidth=lw*2.2;ctx.strokeStyle=LINE;ctx.beginPath();ctx.arc(c.x,c.y,r,0,7);ctx.stroke();ctx.fillStyle=f;ctx.fill()}
 function legDraw(ctx,B,S,J,d,M,T,far,zs,lw){const f=far?FARF:FILL,h=J[S.H],k=J[S.K],a=J[S.A],he=J[S.He],t=J[S.T];const Mq=M*T.leg,Mc=M*T.calf,zH=zs(S.H),zK=zs(S.K),zA=zs(S.A);
   const rt=[[-.12,.074*zH,.082*zH],[.12,.082*zH,.088*zH],[.4,.072,.074],[.7,.056*zK,.056*zK],[.92,.046*zK,.046*zK],[1,.044*zK,.046*zK]];
   const rs=[[-.06,.044*zK,.046*zK],[.14,.04,.056],[.32,.036,.06],[.55,.03,.042],[.78,.025*zA,.03*zA],[.94,.022*zA,.024*zA],[1.02,.022*zA,.026*zA]];
@@ -111,7 +107,7 @@ FR.draw=function(B,ctx,o){o=o||{};const J=B.J,H=B.H,lk=B.look,d=B.d||1;if(!J.hd)
   const Z=B._zJ||{},zs=k=>clamp(1+(Z[k]||0)*2,.65,1.7);
   const own=B._owner,ac=own&&own.act&&own.act.c&&own.act.c.hit?own.act.c:null;/* only the limb that is delivering the strike is smeared */
   const arm=(S,far)=>{if(!lk.ref&&ac&&ac.hand&&S.S[0]===ac.hand)blur(ctx,B,J,S,[S.S,S.E,S.W,S.G],S.G,H,d,M);armDraw(ctx,B,S,J,d,M,T,far,zs,lw)},leg=(S,far)=>{if(!lk.ref&&ac&&ac.leg&&S.H[0]===ac.leg)blur(ctx,B,J,S,[S.H,S.K,S.A,S.T],S.T,H,d,M);legDraw(ctx,B,S,J,d,M,T,far,zs,lw)};
-  const torso=()=>{const tr=trunkDraw(ctx,B,J,H,d,M,T,lw);group(ctx,[tr.pts],FILL,lw);trunkLines(ctx,B,T,tr,lw,M)},head=()=>headDraw(ctx,B,J,H,d,T,lw,zs);
+  const torso=()=>{const tr=trunkDraw(ctx,B,J,H,d,M,T,lw);group(ctx,[tr.pts],FILL,lw);if(DETAIL)trunkLines(ctx,B,T,tr,lw,M)},head=()=>headDraw(ctx,B,J,H,d,T,lw,zs);
   if(!o.noShadow&&!o.onlyArm&&o.part!=='far'&&(!ON||ON('torso'))){ctx.save();ctx.fillStyle='rgba(0,0,0,.25)';ctx.beginPath();{let x0=1e9,x1=-1e9;for(const k in J){x0=Math.min(x0,J[k].x);x1=Math.max(x1,J[k].x)}const sh=Math.min(Math.max(.16*H,(x1-x0)/2+.05*H),.42*H);ctx.ellipse((x0+x1)/2,0,sh,.032*H,0,0,Math.PI*2)}ctx.fill();ctx.restore()}
   ctx.save();
   if(o.onlyArm)arm(N,false);else if(o.part==='far')arm(F,true);

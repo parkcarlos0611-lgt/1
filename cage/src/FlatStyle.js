@@ -52,7 +52,7 @@ function limb(ctx,a,b,d,rows,col,shCol,extra){const F=frame(a,b,d);const P=(t,w)
 
 /* ---------- body ---------- */
 const BD=Body.prototype.draw;
-Body.prototype.draw=function(ctx,o){o=o||{};const lk=this.look;if(window.FRAME&&FRAME.on&&!lk.ref)return FRAME.draw(this,ctx,o);if(!FS.on)return BD.call(this,ctx,o);
+Body.prototype.draw=function(ctx,o){o=o||{};const lk=this.look;if(window.FLAT2&&FLAT2.on&&!lk.ref)return FLAT2.draw(this,ctx,o);if(window.FRAME&&FRAME.on&&!lk.ref)return FRAME.draw(this,ctx,o);if(!FS.on)return BD.call(this,ctx,o);
   const J=this.J,H=this.H,W=this.W,d=this.d;if(!J.hd)return;
   /* the referee is the same figure in a different outfit (black polo, trousers, boots, gloves) */
   const R=!!lk.ref;if(R&&!lk._flat){Object.assign(lk,REF_LOOK[Math.floor(Math.random()*REF_LOOK.length)]);lk._flat=1;this.hs=null}

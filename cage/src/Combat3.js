@@ -13,14 +13,18 @@ const clamp=(v,a,b)=>v<a?a:v>b?b:v,ss=u=>{u=clamp(u,0,1);return u*u*(3-2*u)};
 const now=M=>M.t2?M.t2():performance.now()/1000;
 
 /* ---------- 1. arcs (amplitude in body heights; leg kicks swing wider) ---------- */
-const ARC={lhook:.17,rhook:.17,blhook:.15,brhook:.15,lupp:.07,rupp:.07,ovh:.2,sbf:.05,elbow:.12,lstr:.04,
-  rlk:.22,llk:.18,rbk:.24,lbk:.2,rhk:.25,lhk:.22,calf:.2,knee:.09,kneeH:.09,teep:.04};
+const ARC={jab:.03,cross:.04,bjab:.03,bcross:.04,lhook:.22,rhook:.22,blhook:.19,brhook:.19,lupp:.09,rupp:.09,ovh:.26,sbf:.07,elbow:.15,lstr:.05,
+  rlk:.27,llk:.22,rbk:.3,lbk:.25,rhk:.3,lhk:.27,calf:.25,knee:.11,kneeH:.11,teep:.05};
 const HAND_J={S:0,E:.5,W:.85,G:1},LEG_J={H:0,K:.55,A:.9,He:1,T:1};
 function arcZ(f){const a=f.act;if(!a||!a.c||!a.c.hit||f.state!=='stand'||f.body.rag)return null;const A=ARC[a.key];if(!A)return null;const h=a.c.hit,H=f.body.H,t=a.t;
   const tm=(h.t0+h.t1)/2;let s;if(t<tm)s=Math.cos(clamp(t/tm,0,1)*Math.PI/2)*ss(t/(h.t0*.55));else s=-.22*Math.sin(clamp((t-tm)/(h.t1+.1-tm),0,1)*Math.PI);
   const nearLead=(f.d>0)===(f.stance>0);const side=a.c.hand?((a.c.hand==='l')===nearLead?1:-1):((a.c.leg==='l')===nearLead?1:-1);const z=s*A*H*side;if(Math.abs(z)<.002)return null;
   const m={};if(a.c.hand){const p=a.c.hand;for(const k in HAND_J)m[p+k]=z*HAND_J[k]}else if(a.c.leg){const p=a.c.leg;for(const k in LEG_J)m[p+k]=z*LEG_J[k];m[p+'Sn']=z*.75}return m}
-{const po=F2.prototype.pose;F2.prototype.pose=function(dt,M){this.body._zmap=arcZ(this);return po.call(this,dt,M)}}
+/* the trunk turns about the vertical axis: near shoulder / hip swing toward the camera, far ones away (hips lead the opposite way) */
+function twistZ(f,m){const tw=f.cur&&f.cur.tw||0;if(Math.abs(tw)<.01)return m;const H=f.body.H,c=.11*H*Math.sin(tw*1.4),nearLead=(f.d>0)===(f.stance>0);const np=nearLead?'l':'r',fp=nearLead?'r':'l';m=m||{};
+  const add=(pre,sgn,list)=>{for(const[k,w]of list)m[pre+k]=(m[pre+k]||0)+sgn*c*w};
+  add(np,1,[['S',1],['E',.9],['W',.8],['G',.75],['H',-.5],['K',-.4],['A',-.3]]);add(fp,-1,[['S',1],['E',.9],['W',.8],['G',.75],['H',-.5],['K',-.4],['A',-.3]]);return m}
+{const po=F2.prototype.pose;F2.prototype.pose=function(dt,M){this.body._zmap=twistZ(this,arcZ(this));return po.call(this,dt,M)}}
 
 /* ---------- 2. kick balance (leg / body kicks hit harder) ---------- */
 if(typeof MV!=='undefined')for(const k of['rlk','llk','rbk','lbk','calf']){const c=MV[k];if(c&&c.hit)c.hit.dmg*=1.3}

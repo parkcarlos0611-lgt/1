@@ -52,7 +52,7 @@ function limb(ctx,a,b,d,rows,col,shCol,extra){const F=frame(a,b,d);const P=(t,w)
 
 /* ---------- body ---------- */
 const BD=Body.prototype.draw;
-Body.prototype.draw=function(ctx,o){o=o||{};const lk=this.look;if(window.FRAME&&FRAME.on&&!lk.ref)return FRAME.draw(this,ctx,o);if(!FS.on)return BD.call(this,ctx,o);
+Body.prototype.draw=function(ctx,o){o=o||{};const lk=this.look;if(window.FRAME&&FRAME.on)return FRAME.draw(this,ctx,o);if(!FS.on)return BD.call(this,ctx,o);
   const J=this.J,H=this.H,W=this.W,d=this.d;if(!J.hd)return;
   /* the referee is the same figure in a different outfit (black polo, trousers, boots, gloves) */
   const R=!!lk.ref;if(R&&!lk._flat){Object.assign(lk,REF_LOOK[Math.floor(Math.random()*REF_LOOK.length)]);lk._flat=1;this.hs=null}
@@ -430,6 +430,11 @@ window.hitJiggle=function(body,zone,amp,dir,leg){body._jig={z:zone==='head'?'hea
 /* ---------- arena by promotion tier (stage.o.level: regional .3 ... UFC 1.6): bigger shows get a darker
    arena bowl, more and denser crowd rows, lighting truss, LED boards and a better padded cage ---------- */
 const FAN_C=['#3b4252','#5b6478','#7a5c4f','#a23b33','#2f5d8a','#d0c6b5','#4a6b45','#8b8f99','#c48a3a','#e2ded6','#232428','#6e3f6b'];
+/* an LED video wall: dark panel, pixel grid, slow moving colour glow and a soft sheen — no text */
+function ledWall(ctx,x,y,w,h,now,col){const g=ctx.createLinearGradient(x,y,x+w,y+h);g.addColorStop(0,'#10131c');g.addColorStop(1,'#1b2133');ctx.fillStyle=g;rr(ctx,x,y,w,h,Math.min(w,h)*.05);
+  ctx.save();ctx.beginPath();ctx.rect(x,y,w,h);ctx.clip();const bx=x+w*(.5+.38*Math.sin(now*.35)),gr=ctx.createRadialGradient(bx,y+h*.55,0,bx,y+h*.55,Math.max(w,h)*.7);gr.addColorStop(0,col+'');ctx.globalAlpha=.5;try{gr.addColorStop(0,col);gr.addColorStop(1,'rgba(0,0,0,0)')}catch(e){}ctx.fillStyle=gr;ctx.fillRect(x,y,w,h);ctx.globalAlpha=1;
+  ctx.fillStyle='rgba(0,0,0,.28)';const st=Math.max(3,h/22);for(let yy=y;yy<y+h;yy+=st)ctx.fillRect(x,yy,w,st*.38);for(let xx=x;xx<x+w;xx+=st)ctx.fillRect(xx,y,st*.3,h);
+  const sh=ctx.createLinearGradient(x,y,x,y+h);sh.addColorStop(0,'rgba(255,255,255,.1)');sh.addColorStop(.4,'rgba(255,255,255,0)');ctx.fillStyle=sh;ctx.fillRect(x,y,w,h);ctx.restore()}
 function drawArena(S,ctx,W,H,s,fy,dp){const t=S._tier||0;const wy=fy-.9*s*dp;const now=performance.now()/1000;const col=S.col||'#d20a0a';
   /* bowl: light hall for regional shows, dark arena for the big ones */
   const g=ctx.createLinearGradient(0,0,0,wy);const top=t<.3?'#e4e0d8':t<.65?'#8d8f97':'#1b1d24',bot=t<.3?'#d8d3ca':t<.65?'#6d7079':'#2a2d36';g.addColorStop(0,top);g.addColorStop(1,bot);ctx.fillStyle=g;ctx.fillRect(0,0,W,wy);
@@ -447,13 +452,16 @@ function drawArena(S,ctx,W,H,s,fy,dp){const t=S._tier||0;const wy=fy-.9*s*dp;con
     const n=Math.round(4+8*t);for(let i=0;i<n;i++){const x=W*(i+.5)/n;ctx.fillStyle='#14161b';rr(ctx,x-.09*s*par,ty,.18*s*par,.14*s*par,.06*s*par);ctx.fillStyle='rgba(255,247,220,.95)';ctx.beginPath();ctx.ellipse(x,ty+.14*s*par,.06*s*par,.03*s*par,0,0,7);ctx.fill();
       if(t>.6){const cg=ctx.createLinearGradient(0,ty,0,fy);cg.addColorStop(0,'rgba(255,248,225,.16)');cg.addColorStop(1,'rgba(255,248,225,0)');ctx.fillStyle=cg;ctx.beginPath();ctx.moveTo(x-.05*s*par,ty+.14*s*par);ctx.lineTo(x+.05*s*par,ty+.14*s*par);ctx.lineTo(x+.9*s*par,fy);ctx.lineTo(x-.9*s*par,fy);ctx.closePath();ctx.fill()}}}
   if(t>.8){/* centre screen above the cage */const sw=3*s*par,sh=1.2*s*par,sx=W/2-sw/2+(-(S.cam.x-(S.rot||0))*.15)*s*par,sy=12;ctx.fillStyle='#0d0e12';rr(ctx,sx-6,sy-6,sw+12,sh+12,10);const sg=ctx.createLinearGradient(sx,sy,sx+sw,sy+sh);sg.addColorStop(0,'#1f2a44');sg.addColorStop(1,col);ctx.fillStyle=sg;rr(ctx,sx,sy,sw,sh,6);
-    ctx.fillStyle='rgba(255,255,255,.9)';ctx.font=`900 ${Math.round(sh*.3)}px system-ui,sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText((S.org&&S.org.short)||'FIGHT NIGHT',sx+sw/2,sy+sh/2);ctx.textAlign='left';ctx.textBaseline='alphabetic'}
+    ledWall(ctx,sx,sy,sw,sh,now,col)}
+  /* atmosphere: haze between the crowd and the camera, soft bokeh from the lights */
+  {const hz=ctx.createLinearGradient(0,0,0,wy);hz.addColorStop(0,'rgba(8,10,16,.55)');hz.addColorStop(.6,'rgba(20,22,30,.18)');hz.addColorStop(1,'rgba(30,32,40,.02)');ctx.fillStyle=hz;ctx.fillRect(0,0,W,wy);
+   if(t>.3){ctx.save();ctx.globalCompositeOperation='lighter';for(let i=0;i<14;i++){const h=hsh('bk'+i),x=((h*W*1.7+(S.cam.x*s*.12))%W+W)%W,y=wy*(.1+.65*hsh('by'+i)),r=(.03+.05*hsh('br'+i))*s*par;const bg=ctx.createRadialGradient(x,y,0,x,y,r);bg.addColorStop(0,'rgba(255,240,210,.10)');bg.addColorStop(1,'rgba(255,240,210,0)');ctx.fillStyle=bg;ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fill()}ctx.restore()}}
   /* barrier / LED boards between the stands and the cage floor */
   const by=wy,bh=.9*s*dp;if(t<.3){ctx.fillStyle=BG.wallLow;ctx.fillRect(0,by,W,bh)}
   else{ctx.fillStyle='#16171b';ctx.fillRect(0,by,W,bh);const bp=.6;const seg=3.2;const xw0=S.cam.x*bp-(W/2)/(s*bp);const i0=Math.floor(xw0/seg)-1;
     for(let i=i0;i<i0+Math.ceil(W/(seg*s*bp))+3;i++){const x=(i*seg-S.cam.x*bp)*s*bp+W/2;const w=seg*s*bp-6;const lit=t>.55;
       ctx.fillStyle=lit?(i%2?col:'#20283c'):'#3a3c44';rr(ctx,x+3,by+.12*bh,w,.42*bh,.06*bh);
-      ctx.fillStyle=lit?'rgba(255,255,255,.92)':'rgba(255,255,255,.55)';ctx.font=`800 ${Math.round(.2*bh)}px system-ui,sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(i%3?((S.org&&S.org.short)||'MMA'):'FIGHT',x+3+w/2,by+.33*bh);ctx.textAlign='left';ctx.textBaseline='alphabetic'}
+      ledWall(ctx,x+3,by+.12*bh,w,.42*bh,now+i,lit?(i%2?col:'#4a6fd0'):'#555a66')}
     ctx.fillStyle='rgba(0,0,0,.25)';ctx.fillRect(0,by+.62*bh,W,.38*bh)}}
 /* ---------- training centre as a 2.5D room: floor, back wall, side walls and a ceiling with beams, projected
    like the octagon (depth 0 = the fighters' plane). The heavy bag hangs from the front ceiling beam at depth 0, whose
@@ -481,7 +489,7 @@ function drawGym(S){const ctx=S.ctx,dpr=S.dpr,W=S.W,H=S.Hh,s=S.sc();ctx.setTrans
   /* training mat under the bag (pro / elite) */if(T>0){const m=[P(-1.4,.75),P(3.4,.75),P(3.4,-.55),P(-1.4,-.55)];quad(m,T===2?'#1d4f8f':'#3b3f46');ctx.strokeStyle=T===2?'#8fb3e0':'#2b2e33';ctx.lineWidth=.03*s;ctx.beginPath();m.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.closePath();ctx.stroke()}
   /* room edges */const ed=T===2?'rgba(255,255,255,.08)':'rgba(0,0,0,.14)';for(const X of[-Wr,Wr]){line(P(X,1,0),P(X,1,HC),ed,2);line(P(X,1,0),P(X,ZN,0),ed,2);line(P(X,1,HC),P(X,ZN,HC),ed,2)}line(P(-Wr,1,HC),P(Wr,1,HC),ed,2);line(P(-Wr,1,0),P(Wr,1,0),ed,2);
   /* back-wall kit (scaled by the back-wall depth) */const bw=(X,Y)=>P(X,1,Y),u=s*kb;
-  if(T===2){/* LED strip, logo wall, glass + mirrors */const a=bw(-Wr,HC-.25),b=bw(Wr,HC-.25);line(a,b,S.col||'#3a7bd5',.04*u);const c=bw(0,2.16);ctx.fillStyle='rgba(255,255,255,.9)';ctx.font=`900 ${Math.round(.24*u)}px system-ui,sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('PERFORMANCE INSTITUTE',c.x,c.y);ctx.fillStyle=S.col||'#3a7bd5';rr(ctx,c.x-1.7*u,c.y+.17*u,3.4*u,.04*u,.02*u);ctx.textAlign='left';ctx.textBaseline='alphabetic';
+  if(T===2){/* LED strip, logo wall, glass + mirrors */const a=bw(-Wr,HC-.25),b=bw(Wr,HC-.25);line(a,b,S.col||'#3a7bd5',.04*u);const c=bw(0,2.16);ctx.textAlign='left';ctx.textBaseline='alphabetic';ctx.fillStyle=S.col||'#3a7bd5';rr(ctx,c.x-1.7*u,c.y+.17*u,3.4*u,.04*u,.02*u);ctx.textAlign='left';ctx.textBaseline='alphabetic';
     for(const X of[-3.6,2.4]){const p=bw(X,.65);ctx.fillStyle='#4b5566';rr(ctx,p.x,p.y-1.35*u,1.4*u,1.35*u,.06*u);ctx.fillStyle='rgba(255,255,255,.14)';rr(ctx,p.x+.12*u,p.y-1.25*u,.25*u,1.15*u,.05*u)}}
   else{/* windows (local) or mirrors + banners (pro) */const n=T?4:3;for(let i=0;i<n;i++){const X=-Wr+.8+i*(2*Wr-1.6)/(n-1)-.6;const p=bw(X,.75);ctx.fillStyle=T?'#cfd8dc':'#aab7bd';rr(ctx,p.x,p.y-1.15*u,1.2*u,1.15*u,.06*u);ctx.fillStyle='rgba(255,255,255,.35)';rr(ctx,p.x+.12*u,p.y-1.05*u,.22*u,.95*u,.04*u);if(!T){ctx.strokeStyle='#7d725f';ctx.lineWidth=.04*u;ctx.beginPath();ctx.moveTo(p.x+.6*u,p.y-1.15*u);ctx.lineTo(p.x+.6*u,p.y);ctx.stroke()}}
     if(T)for(let i=0;i<3;i++){const p=bw(-2.8+i*2.8,2.05);ctx.fillStyle=i%2?'#b33a2e':'#2c3e66';rr(ctx,p.x-.3*u,p.y-.35*u,.6*u,.55*u,.05*u);ctx.fillStyle='rgba(255,255,255,.75)';rr(ctx,p.x-.18*u,p.y-.2*u,.36*u,.06*u,.03*u)}
@@ -547,7 +555,12 @@ function octGeom(S,W,H,s,gy,fy){if(S.R0==null)S.R0=S.R;const N=S.sides||8,R0=S.R
 function drawOctFloor(S,ctx,W,H,s,gy,fy){S.cam.x+=(S.rot||0);/* drawMat runs with the rotation offset removed */const G=octGeom(S,W,H,s,gy,fy);S.cam.x-=(S.rot||0);S.xc=G.xc;S.R=G.xc+(S.sides===4&&S._rp?Math.max(S._rp.L.x,S._rp.R.x)*.9:0);window.__cageWall=(S.sides===4?G.xc+.5:G.xc-.07);/* inner face of the fence at the fighters' plane *//* collision boundary = drawn fence */
   ctx.fillStyle='#202127';ctx.fillRect(0,fy-4,W,H-fy+4);/* dark apron outside the cage */
   const pts=G.V.map(v=>G.P(v.X,v.Z));ctx.fillStyle=BG.mat;ctx.beginPath();pts.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.closePath();ctx.fill();
-  /* canvas edge pad */ctx.strokeStyle=BG.matEdge;ctx.lineWidth=.05*s;ctx.stroke()}
+  ctx.save();ctx.clip();/* the mat: spotlight pool, perspective seams, darker rim */
+  const cx=W/2,cy=(gy+fy)/2,rx=Math.max(W*.55,s*5);const pool=ctx.createRadialGradient(cx,cy,s*.2,cx,cy,rx);pool.addColorStop(0,'rgba(255,252,240,.30)');pool.addColorStop(.45,'rgba(255,250,235,.08)');pool.addColorStop(1,'rgba(0,0,0,.34)');ctx.fillStyle=pool;ctx.fillRect(0,fy-4,W,H-fy+4);
+  ctx.strokeStyle='rgba(90,86,80,.10)';ctx.lineWidth=1;for(let k=-6;k<=6;k++){const x0=cx+k*s*.7,x1=cx+k*s*1.9;ctx.beginPath();ctx.moveTo(x0,fy);ctx.lineTo(x1,H);ctx.stroke()}
+  const gl=ctx.createLinearGradient(0,fy,0,H);gl.addColorStop(0,'rgba(0,0,0,.18)');gl.addColorStop(.35,'rgba(0,0,0,0)');gl.addColorStop(1,'rgba(0,0,0,.12)');ctx.fillStyle=gl;ctx.fillRect(0,fy-4,W,H-fy+4);
+  ctx.restore();
+  /* canvas edge pad */ctx.strokeStyle=BG.matEdge;ctx.lineWidth=.05*s;ctx.stroke();ctx.strokeStyle='rgba(0,0,0,.25)';ctx.lineWidth=.012*s;ctx.stroke()}
 function drawOctagon(S,ctx,W,H,s,gy,fy){const G=octGeom(S,W,H,s,gy,fy);if((S.sides||8)===4)return drawRing(S,ctx,W,H,s,fy,G);const FH=1.75;const T=S._tier||0;
   /* far half only (z >= 0), clipped where an edge crosses the fighters' plane */
   const segs=[];for(let i=0;i<8;i++){let a=G.V[i],b=G.V[(i+1)%8];if(a.Z<0&&b.Z<0)continue;if(a.Z<0||b.Z<0){const u=a.Z/(a.Z-b.Z);const c={X:a.X+(b.X-a.X)*u,Z:0};if(a.Z<0)a=c;else b=c}segs.push([a,b])}

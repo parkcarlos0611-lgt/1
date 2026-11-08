@@ -1,1 +1,1 @@
-{"image": "head2.png", "w": 484, "h": 503, "off": [33, 60], "p0": [297, 240], "p1": [297, 503], "headH": 480}
+{"image": "head3.png", "w": 484, "h": 503, "off": [33, 60], "p0": [297, 240], "p1": [297, 503], "headH": 480, "neck": "neck3.png", "neckTop": 288, "neckBot": 503, "neckPivot": [150, 503]}

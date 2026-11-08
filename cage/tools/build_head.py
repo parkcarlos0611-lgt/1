@@ -25,7 +25,7 @@ jaw=[(100,178),(122,197),(145,222),(167,247),(172,259),(172,270)]
 def jx(y):
     ys=[Y(p[1]) for p in jaw];xs=[X(p[0]) for p in jaw];return np.interp(y,ys,xs)
 # head keeps: everything above neckTop, and below it only what is right of the jaw line
-headm=(yy<neckTop)|(xx>jx(yy)-4)
+headm=(yy<neckTop+10)|(xx>jx(yy)-4)   # the head piece overlaps the neck's top edge: no seam line
 # neck piece: from neckTop down, between the back-of-neck line and a few px past the jaw line
 bx=lambda y:np.interp(y,[Y(178),Y(215),CH],[X(62),X(62),X(74)])
 fx=lambda y:np.interp(y,[Y(178),Y(247),CH],[X(104),X(170),X(160)])

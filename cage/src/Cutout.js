@@ -10,7 +10,8 @@
 if(typeof Body==='undefined')return;
 const CO=window.CUTOUT={on:!/[?&]cutout=0/.test(location.search),sets:{}};
 const clamp=(v,a,b)=>v<a?a:v>b?b:v;
-const CURATED={'Jon Jones':{cutout:'jones',skin:'#6b4a34',shorts:'#232326',glove:'#17171a'},'Anderson Silva':{cutout:'silva',skin:'#8d5c34',shorts:'#1b1b1e',glove:'#17171a',headK:.134}};
+const CURATED={'Jon Jones':{cutout:'jones',skin:'#6b4a34',shorts:'#232326',glove:'#17171a'},'Anderson Silva':{cutout:'silva',skin:'#8d5c34',shorts:'#1b1b1e',glove:'#17171a',headK:.134},
+  'Alex Pereira':{cutout:'pereira',skin:'#c68d5a',shorts:'#1b1b1e',glove:'#17171a',headK:.148,tat:''},'Israel Adesanya':{cutout:'adesanya',skin:'#80502c',shorts:'#1b1b1e',glove:'#17171a',headK:.157,tat:''}};
 if(typeof lookFor==='function'){const lf=lookFor;window.lookFor=function(f){const L=lf.apply(this,arguments);const C=CURATED[f&&f.n];if(C)Object.assign(L,C);return L}}
 function load(name){let S=CO.sets[name];if(S)return S;S=CO.sets[name]={ready:false};
   fetch('assets/cutout/'+name+'/parts.json').then(r=>r.json()).then(m=>{S.meta=m;const im=new Image();im.onload=()=>{S.img=im;S.ready=true};im.src='assets/cutout/'+name+'/'+m.image}).catch(()=>{S.failed=true});

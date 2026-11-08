@@ -606,6 +606,22 @@ function drawOctFloor(S,ctx,W,H,s,gy,fy){S.cam.x+=(S.rot||0);/* drawMat runs wit
   const gl=ctx.createLinearGradient(0,fy,0,H);gl.addColorStop(0,'rgba(0,0,0,.18)');gl.addColorStop(.35,'rgba(0,0,0,0)');gl.addColorStop(1,'rgba(0,0,0,.12)');ctx.fillStyle=gl;ctx.fillRect(0,fy-4,W,H-fy+4);
   ctx.restore();
   /* canvas edge pad */ctx.strokeStyle=BG.matEdge;ctx.lineWidth=.05*s;ctx.stroke();ctx.strokeStyle='rgba(0,0,0,.25)';ctx.lineWidth=.012*s;ctx.stroke()}
+
+/* ---------- sponsor boards on the cage padding (invented brands, no real logos) ---------- */
+const SPON=[['NOVA','#e8c13a','hex'],['KRAKEN','#e5513f','bar'],['ZENITH','#4fb0e6','tri'],['PULSE+','#7ad36a','dot'],['VANTA','#d7d9de','cut'],['ORBIT','#b07be0','ring']];
+function sponsorStrip(ctx,A,B,s,S){if(A.x>B.x){const t=A;A=B;B=t}const L=Math.hypot(B.x-A.x,B.y-A.y);if(L<20)return;const k=(A.k+B.k)/2,ang=Math.atan2(B.y-A.y,B.x-A.x),bh=.15*s*k,bw=.95*s*k,n=Math.max(1,Math.floor(L/bw));
+  ctx.save();ctx.translate(A.x,A.y-.08*s*A.k);ctx.rotate(ang);ctx.textAlign='center';ctx.textBaseline='middle';
+  for(let i=0;i<n;i++){const sp=SPON[(((i+Math.round(A.x*.01))%SPON.length)+SPON.length)%SPON.length],w=L/n,cx=(i+.5)*w;
+    ctx.fillStyle='#0d0e11';ctx.fillRect(cx-w*.46,-bh*.46,w*.92,bh*.92);
+    const u=bh*.34,mx=cx-w*.24;ctx.fillStyle=sp[1];ctx.beginPath();
+    if(sp[2]==='hex'){for(let j=0;j<6;j++){const a=j*Math.PI/3;ctx.lineTo(mx+Math.cos(a)*u,Math.sin(a)*u)}ctx.closePath();ctx.fill()}
+    else if(sp[2]==='bar'){ctx.fillRect(mx-u,-u,u*.5,u*2);ctx.fillRect(mx-u*.3,-u,u*.5,u*2);ctx.fillRect(mx+u*.4,-u,u*.5,u*2)}
+    else if(sp[2]==='tri'){ctx.moveTo(mx,-u);ctx.lineTo(mx+u,u);ctx.lineTo(mx-u,u);ctx.closePath();ctx.fill()}
+    else if(sp[2]==='dot'){ctx.arc(mx,0,u,0,7);ctx.fill();ctx.fillStyle='#0d0e11';ctx.beginPath();ctx.arc(mx,0,u*.45,0,7);ctx.fill()}
+    else if(sp[2]==='cut'){ctx.moveTo(mx-u,-u);ctx.lineTo(mx+u,-u);ctx.lineTo(mx,u);ctx.closePath();ctx.fill()}
+    else{ctx.arc(mx,0,u,0,7);ctx.arc(mx,0,u*.55,0,7,true);ctx.fill('evenodd')}
+    ctx.fillStyle='#f1f2f5';ctx.font=`700 ${Math.max(6,bh*.46)}px Oswald,Impact,sans-serif`;ctx.fillText(sp[0],cx+w*.12,0)}
+  ctx.restore()}
 function drawOctagon(S,ctx,W,H,s,gy,fy){const G=octGeom(S,W,H,s,gy,fy);if((S.sides||8)===4)return drawRing(S,ctx,W,H,s,fy,G);const FH=1.75;const T=S._tier||0;
   /* far half only (z >= 0), clipped where an edge crosses the fighters' plane */
   const segs=[];for(let i=0;i<8;i++){let a=G.V[i],b=G.V[(i+1)%8];if(a.Z<0&&b.Z<0)continue;if(a.Z<0||b.Z<0){const u=a.Z/(a.Z-b.Z);const c={X:a.X+(b.X-a.X)*u,Z:0};if(a.Z<0)a=c;else b=c}segs.push([a,b])}
@@ -615,7 +631,7 @@ function drawOctagon(S,ctx,W,H,s,gy,fy){const G=octGeom(S,W,H,s,gy,fy);if((S.sid
     /* chain-link mesh */ctx.strokeStyle='rgba(60,62,70,.5)';ctx.lineWidth=1;ctx.beginPath();const n=Math.max(4,Math.round(Math.hypot(B.x-A.x,B.y-A.y)/(.16*s*A.k)));
     for(let k=0;k<=n;k++){const u=k/n,u2=Math.min(1,(k+.5*n/ n*0+.5)/n);const x0=A.x+(B.x-A.x)*u,y0=A.y+(B.y-A.y)*u,x1=At.x+(Bt.x-At.x)*u,y1=At.y+(Bt.y-At.y)*u;ctx.moveTo(x0,y0);ctx.lineTo(x1,y1)}
     for(let k=1;k<10;k++){const v=k/10;ctx.moveTo(A.x+(At.x-A.x)*v,A.y+(At.y-A.y)*v);ctx.lineTo(B.x+(Bt.x-B.x)*v,B.y+(Bt.y-B.y)*v)}ctx.stroke();
-    /* bottom pad and top rail along the panel */ctx.strokeStyle='#17181b';ctx.lineCap='round';ctx.lineWidth=.16*s*Math.min(A.k,B.k);ctx.beginPath();ctx.moveTo(A.x,A.y-.08*s*A.k);ctx.lineTo(B.x,B.y-.08*s*B.k);ctx.stroke();
+    /* bottom pad and top rail along the panel */ctx.strokeStyle='#17181b';ctx.lineCap='round';ctx.lineWidth=.16*s*Math.min(A.k,B.k);ctx.beginPath();ctx.moveTo(A.x,A.y-.08*s*A.k);ctx.lineTo(B.x,B.y-.08*s*B.k);ctx.stroke();sponsorStrip(ctx,A,B,s,S);
     ctx.strokeStyle='#0e0f11';ctx.lineWidth=(.07+.06*T)*s*Math.min(A.k,B.k);ctx.beginPath();ctx.moveTo(At.x,At.y);ctx.lineTo(Bt.x,Bt.y);ctx.stroke();
     if(T>.5){/* light catch on the mesh and the padded top rail of a premium cage */ctx.strokeStyle='rgba(205,210,220,.16)';ctx.lineWidth=1;ctx.beginPath();for(let k=1;k<10;k+=2){const v=k/10;ctx.moveTo(A.x+(At.x-A.x)*v,A.y+(At.y-A.y)*v-1);ctx.lineTo(B.x+(Bt.x-B.x)*v,B.y+(Bt.y-B.y)*v-1)}ctx.stroke();
       ctx.strokeStyle='rgba(255,255,255,.14)';ctx.lineWidth=.02*s*Math.min(A.k,B.k);ctx.beginPath();ctx.moveTo(At.x,At.y-.03*s*A.k);ctx.lineTo(Bt.x,Bt.y-.03*s*B.k);ctx.stroke()}

@@ -65,7 +65,7 @@ Match.prototype.applyDmg=function(att,def,o){const{zone,kind}=o;let dmg=o.dmg;co
   if(!o.blocked){rs.edmg=(rs.edmg||0)+dmg*(zone==='head'?1:zone==='body'?.8:.62)*(o.counter?1.15:1);RefereeAI.onDamage(this,att,def,dmg,zone)}
   if(zone==='head'){def.hp.head=Math.max(0,def.hp.head-dmg*(1.25-ATT(def,'chin')*.55));def.stun+=dmg*(2.6-ATT(def,'chin')*1.6)*(o.blocked?.25:1);if(!o.blocked)this.cutCheck(att,def,dmg,o)}
   else if(zone==='body'){def.hp.body=Math.max(0,def.hp.body-dmg*(1.15-ATT(def,'bodyT')*.45));def.sta-=dmg*(o.blocked?.6:1.6);if(!o.blocked&&def.state==='stand'&&def.hp.body<30&&dmg>7&&Math.random()<.35+(30-def.hp.body)/60){this.knock(def,att,def.hp.body<8,'body');return}}
-  else{def.hp.legs=Math.max(0,def.hp.legs-dmg*(1.1-ATT(def,'strength')*.3));def.sta-=dmg*.4;if(def.state==='stand'&&def.hp.legs<25&&dmg>5&&Math.random()<.25+(25-def.hp.legs)/50){this.knock(def,att,false,'leg');return}if(def.hp.legs<=2){this.finish(att,'TKO','레그킥');return}}
+  else{def.hp.legs=Math.max(0,def.hp.legs-dmg*(1.1-ATT(def,'strength')*.3));def.sta-=dmg*.4;if(def.state==='stand'&&def.hp.legs<45&&dmg>4&&Math.random()<.2+(45-def.hp.legs)/55){this.knock(def,att,false,'leg');return}if(def.hp.legs<=2){this.finish(att,'TKO','레그킥');return}}
   if(o.blocked||zone!=='head')return;
   const out=StunModel.hit(this,att,def,dmg,o);
   if(out==='flash'){this.ev(`⚡ ${att.name} 일격! 원펀치 KO`);this.knock(def,att,true,'head');return}

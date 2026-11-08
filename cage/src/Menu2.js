@@ -36,7 +36,7 @@ const grp=(A,keys)=>keys.reduce((s,k)=>s+(A[k]||10),0)/keys.length;
 const GS=[['타격',['punchPow','handSpd','accuracy','kicking','strDef']],['그래플링',['takedown','tdd','clinchCtl','topCtl','bottom','subOff','subDef']],['체력',['cardio','speed','strength','recovery']],['맷집',['chin','skin','bodyT','heart']]];
 const gstar=(A,keys)=>clamp(Math.round(grp(A,keys)/20*5*2)/2,.5,5);
 const card=f=>`<div class="nm">${dn2(f)}</div><div class="mt"><span>종합</span>${stars(f.stars,1)}</div>${GS.map(([n,k])=>`<div class="mt"><span>${n}</span>${stars(gstar(f.A,k))}</div>`).join('')}`;
-const dn2=f=>(typeof KO_NAMES!=='undefined'&&0)?f.n:(f.ko||f.n);
+window.poolFor=poolFor;const dn2=f=>(typeof KO_NAMES!=='undefined'&&0)?f.n:(f.ko||f.n);
 
 /* ---------- title ---------- */
 window.flag=function(){return''};

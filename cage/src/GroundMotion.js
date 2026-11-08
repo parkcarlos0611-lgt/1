@@ -176,11 +176,11 @@ function subOverlay(M,dt){const g=M.g,s=g.sub;const A=s.att,D=s.def;const aJ=A.b
 {const st=Match.prototype.standUp;Match.prototype.standUp=function(){for(const f of this.f)f.gAtk=null;return st.apply(this,arguments)}}
 
 /* ---------- referee: keep a distance, jog in to watch a hurt fighter ---------- */
-if(typeof REF!=='undefined'){REF.dist={min:2.4,max:3.2,pad:1.5};REF.speed=.36;REF.rush=.95;REF.groundDist=2.2}
+if(typeof REF!=='undefined'){REF.dist={min:2.4,max:3.2,pad:1.5};REF.speed=.26;REF.rush=.7;REF.groundDist=2.2}
 if(typeof RefereeAI!=='undefined'){const tg=RefereeAI.target;RefereeAI.target=function(M){const[a,b]=M.f;const g=M.g;const lim=M.stage.R-REF.wallMargin;
     if(M.phase==='fight'&&!M.stopping&&!(g&&g.type==='ground')){const hurt=[a,b].find(f=>f.down||f.rock>0);if(hurt){const att=hurt.opp;const hx=hurt.body.J.hip?hurt.body.J.hip.x:hurt.x;let side=Math.sign(hx-att.x)||1;let t=hx+side*1.3;if(Math.abs(t)>lim){t=hx-side*1.3}M.ref.hurtWatch=1;return clamp(t,-lim,lim)}}
     M.ref.hurtWatch=0;return tg.call(this,M)}}
-{const ur=Match.prototype.updRef;Match.prototype.updRef=function(dt){if(typeof REF!=='undefined'){const hw=this.ref&&this.ref.hurtWatch;REF.speed=hw?.6:.36}return ur.call(this,dt)}}
+{const ur=Match.prototype.updRef;Match.prototype.updRef=function(dt){if(typeof REF!=='undefined'){const hw=this.ref&&this.ref.hurtWatch;REF.speed=hw?.45:.26}return ur.call(this,dt)}}
 
 /* ---------- hands meet the mat: the arm bends at the shoulder and elbow separately and the open hand
    is planted on the canvas instead of the arm swinging through the floor ---------- */

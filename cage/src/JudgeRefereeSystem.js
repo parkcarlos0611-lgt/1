@@ -105,10 +105,10 @@ const RefereeAI={
   /* poses: watching crouch, waving off, arms raised for the winner */
   if(r.wave>0){r.wave-=dt;const w=Math.sin(this.stage.t*14)*.35;r.gpose=poseCopy(Object.assign({},BASE_POSE,{lean:.18,chest:.05,head:.05,la_s:1.55+w,la_e:.15,ra_s:.08,ra_e:.2,ll_h:.25,ll_k:.25,rl_h:-.2,rl_k:.25}))}
   else if(this.phase==='end'&&this.winner){r.gpose=poseCopy(Object.assign({},BASE_POSE,{la_s:2.9,la_e:.2,ra_s:.2,ra_e:.3,lean:0,head:0}))}
-  else if(this.phase==='break'){r.gpose=poseCopy(Object.assign({},BASE_POSE,{lean:.02,la_s:1.5,la_e:.1,ra_s:.08,ra_e:.2}))}
+  else if(this.phase==='break'){r.gpose=poseCopy(Object.assign({},BASE_POSE,{lean:.02,la_s:1.5,la_e:.1,ra_s:.08,ra_e:.2,ll_h:.08,ll_k:.12,rl_h:-.04,rl_k:.14}))}
   else{const g=this.g;r.gpose=poseCopy(Object.assign({},BASE_POSE,g&&g.type==='ground'?{lean:.45,chest:.2,head:-.15,ll_h:.7,ll_k:1.1,rl_h:.2,rl_k:1,la_s:.5,la_e:.6,ra_s:.08,ra_e:.2}:{lean:.12,chest:.05,head:.02,la_s:.45,la_e:.9,ra_s:.08,ra_e:.2,ll_h:.22,ll_k:.3,rl_h:-.2,rl_k:.32}))}
   /* bell: walk the fighters back toward their corners */
-  if(this.phase==='break'){for(const f of this.f){if(f.state!=='stand')continue;const want=f.side?1.15:-1.15;f.x+=clamp(want-f.x,-dt*REF.separateSpeed,dt*REF.separateSpeed)}}
+  if(this.phase==='break'){for(const f of this.f){if(f.state!=='stand')continue;const want=(f.side?1:-1)*(this.cornerX||1.15);f.x+=clamp(want-f.x,-dt*REF.separateSpeed,dt*REF.separateSpeed)}}
   /* stoppage in progress */
   const S=this.stopping;if(S&&this.phase==='fight'){S.t+=dt;if(S.t>=REF.stopDelay||Math.abs(r.x-S.def.x)<.45){this.stopping=null;S.att.act=null;S.att.queue=[];this.finish(S.att,'TKO',S.detail,.9)}}}}
 /* ---------- per-step bookkeeping: concussion decay, danger decay, aggression, octagon control ---------- */

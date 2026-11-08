@@ -112,9 +112,9 @@ Match.prototype.setTactic=function(f,t){f.tactic=f.tactic===t?null:t;f.outT=null
 const OUT={reach:f=>{const L=f.body.L;return L.uarm+L.farm+L.glove*.8+.05*f.H}};
 {const up=F2.prototype.update;F2.prototype.update=function(dt,M){const r=up.call(this,dt,M);
   if(this.tactic==='out'&&M&&M.phase==='fight'&&this.state==='stand'){const o=this.opp,gap=(o.x-this.x)*this.d,R=OUT.reach(this);
-    if(!this.outT&&gap>0&&gap<=R+.05&&!this.act)this.outT={t:0,x:this.x+this.d*R};
+    this._outCd=Math.max(0,(this._outCd||0)-dt);if(!this.outT&&gap>0&&gap<=R+.05&&!this.act&&!(this._outCd>0))this.outT={t:0,x:this.x+this.d*R};
     if(this.outT){this.outT.t+=dt;const k=Math.min(1,this.outT.t/.15);this.outT.x=(this.x+this.d*R)+(o.x-(this.x+this.d*R))*k;
-      if(this.outT.t>=.5){if(this.canStrike()){this.strike('jab',M);if(this.act&&this.act.key==='jab')this.act.speed*=1.5;this.tactic=null;this.outT=null}else this.outT.t=.5}}}
+      if(this.outT.t>=.2){if(this.canStrike()){this.strike('jab',M);if(this.act&&this.act.key==='jab')this.act.speed*=1.5;this._outCd=.45;this.outT=null/* the tactic stays on after the jab */}else this.outT.t=.2}}}
   else this.outT=null;return r}}
 {const rd=Match.prototype.render;Match.prototype.render=function(dt){window.__curMatch=this;rd.call(this,dt);const S=this.stage;const f=this.pi!=null?this.f[this.pi]:null;
   let box=this._ofl;if(!box){box=this._ofl=document.createElement('div');box.className='ofl';box.innerHTML='<i class="red"></i><i class="wht"></i>';this.root.appendChild(box)}

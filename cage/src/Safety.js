@@ -13,6 +13,8 @@ const TORSO=['hd','nk','sh','mid','hip'];
 
 /* ---- (1) floor contact, applied to the solved joints ---- */
 {const solve=Body.prototype.solve;Body.prototype.solve=function(p,X,d){const J=solve.call(this,p,X,d);if(!SF.floor||this.rag||!J.hip)return J;const H=this.H;
+  /* depth arcs (Combat3): a joint swung toward the camera drops a little on screen */
+  this._zJ=this._zmap||null;if(this._zmap)for(const k in this._zmap)if(J[k])J[k]={x:J[k].x-(this.d||1)*Math.abs(this._zmap[k])*.35,y:J[k].y-this._zmap[k]*.45};
   /* settled ground position: rest the lowest point on the mat (limited, so slams / lifts in a transition keep their height) */
   {let low=0;if(this._snap){let m=1e9;for(const k in R){const q=J[k];if(q)m=Math.min(m,q.y-R[k]*H)}if(m>.004*H&&m<.45*H)low=m}
    this._sn=(this._sn||0)+(low-(this._sn||0))*.3;/* eased, so entering / leaving a position never pops */

@@ -202,7 +202,7 @@ function drawGloveFlat(ctx,E,Wr,G,H,col,strap,open,blood,d,skinC,plain){const a=
 /* ---------- head: angular cranium, face planes, block hair and beard ---------- */
 function headFlat(ctx,hd,nk,H,B,skin,d,ang){if(window.CUTOUT&&B.look&&B.look.cutout&&CUTOUT.head(ctx,hd,nk,H,B,d))return;const lk=B.look,r=.066*H;ctx.save();ctx.translate(hd.x,hd.y);ctx.scale(d,1);ctx.rotate(-ang*.9);
   const F=(typeof faceOf==='function')?faceOf(B):{n:.5,br:.5,jw:.5,ch:.5,lp:.5,nf:0,nh:0};
-  const red=B.redness||0;const sk=red>0&&typeof mixHex==='function'?mixHex(skin,'#b8433a',Math.min(.4,red*.45)):skin;const sh=shade(sk,FS.shadowK),lt=shade(sk,FS.lightK),dk=shade(sk,-.3);
+  const sk=skin;const sh=shade(sk,FS.shadowK),lt=shade(sk,FS.lightK),dk=shade(sk,-.3);
   const P=(pts,c,rr)=>{ctx.fillStyle=c;ctx.beginPath();rpath(ctx,pts.map(q=>({x:q[0]*r,y:q[1]*r})),(rr==null?.3:rr)*r);ctx.fill()};
   /* neck: nape, throat, sternocleidomastoid */
   P([[-.66,-.3],[-.88,-1.0],[-1.0,-1.6],[.5,-1.62],[.42,-1.05],[.3,-.8],[.05,-.6]],shade(skin,-.06));
@@ -237,11 +237,13 @@ function headFlat(ctx,hd,nk,H,B,skin,d,ang){if(window.CUTOUT&&B.look&&B.look.cut
     P([[.92,.66],[.6,.5],[.62,.4],[.94,.52]],gd,.3);P([[-.5,1.16],[.25,1.2],[.2,1.08],[-.45,1.05]],gl,.3);
     P([[-.55,.42],[.08,.46],[.2,-.4],[-.05,-.62],[-.5,-.5],[-.66,.0]],g,.4);P([[-.4,.25],[-.05,.27],[0,-.22],[-.32,-.3]],gd,.3);
     P([[.12,-.38],[.24,-.44],[.82,-.86],[.74,-.96]],gd,.2)}
-  /* cuts & blood (positions shared with the game's damage system) */
+  /* cuts & blood (positions shared with the game's damage system): clipped to the face, so nothing runs outside it */
+  ctx.save();ctx.beginPath();rpath(ctx,prof.map(q=>({x:q[0]*r,y:q[1]*r})),.22*r);ctx.clip();
   if(typeof CUTPOS!=='undefined')for(const c of B.cuts||[]){const p=CUTPOS[c.at];if(!p)continue;P([[p[0]-.1,p[1]+.06],[p[0]+.12,p[1]-.03],[p[0]+.12,p[1]-.06],[p[0]-.1,p[1]+.03]],'#5a0303');
     if(c.sev>.25){const L=.3+Math.min(2.2,c.sev*1.1);ctx.globalAlpha=.85;P([[p[0]-.07,p[1]],[p[0]+.08,p[1]],[p[0]+.03,p[1]-L],[p[0]-.02,p[1]-L*.9]],'#960808');ctx.globalAlpha=1}}
   if((B.cuts||[]).some(c=>c.at==='nose')||(B.redness||0)>.72){ctx.globalAlpha=.85;P([[.95,-.24],[1.01,-.26],[.94,-.7],[.88,-.7]],'#8c0608');ctx.globalAlpha=1}
   if(window.FACEFX){ctx.save();ctx.scale(r,r);FACEFX.wounds(ctx,B,{eye:[.74,.14],brow:[.66,.42],brow2:[.52,.5],nose:[.98,-.05],cheek:[.55,-.05],fore:[.55,.7],lip:[.85,-.5],u:.32,down:-1},{cuts:false});FACEFX.mouth(ctx,[.9,-.44],.2,.16,-1,B);ctx.restore()}
+  ctx.restore();/* end of the face clip */
   ctx.restore()}
 function hairFlat(ctx,r,lk,B,hc,P){const hs=B.hs||(B.hs=(typeof hairStyleOf==='function'?hairStyleOf(B):'short'));if(hs==='bald'){ctx.globalAlpha=.12;P([[-.3,.98],[.3,1.06],[.4,.95],[-.2,.9]],'#fff');ctx.globalAlpha=1;return}
   /* block cap: hairline at the forehead, over the crown, down the back to the nape; sideburn in front of the ear */

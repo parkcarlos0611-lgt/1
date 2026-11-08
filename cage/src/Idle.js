@@ -47,21 +47,42 @@ const CUT_AT={brow:'brow',brow2:'brow2',nose:'nose',cheek:'cheek',fore:'fore',li
 /* G: geometry in the current drawing space: eye / brow / brow2 / nose / cheek / fore / lip points, u = eye width, down = +1 if y grows downward (sprite px), -1 if it grows upward (world) */
 FX.wounds=function(ctx,B,G,opt){if(!FX.on)return;opt=opt||{};const o=B._owner,hp=o&&o.hp?o.hp.head:100,d=clamp(1-hp/100,0,1),light=clamp(d/.5,0,1),s=clamp((50-hp)/50,0,1);
   const swell=clamp(B.swell||0,0,1.5),u=G.u,dn=G.down;if(d<.02&&swell<.05&&!(B.cuts&&B.cuts.length))return;
-  ctx.save();
-  /* eye bruise: a dark purple ring that gets a yellow-green edge once it is old / heavy */
-  {const a=.12*light+.5*s+swell*.18;if(a>.02){const e=G.eye,cx=e[0]-u*.05,cy=e[1]-dn*u*.1;ctx.save();ctx.translate(cx,cy);ctx.scale(1,.78);
-    if(s>.25){const g2=ctx.createRadialGradient(0,0,u*.5,0,0,u*1.5);g2.addColorStop(0,`rgba(120,105,40,${.3*s})`);g2.addColorStop(1,'rgba(120,105,40,0)');ctx.fillStyle=g2;ctx.beginPath();ctx.arc(0,0,u*1.5,0,7);ctx.fill()}
-    const g=ctx.createRadialGradient(0,0,u*.15,0,0,u*1.05);g.addColorStop(0,`rgba(62,22,58,${Math.min(.85,a)})`);g.addColorStop(.7,`rgba(78,32,70,${Math.min(.6,a*.7)})`);g.addColorStop(1,'rgba(78,32,70,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(0,0,u*1.05,0,7);ctx.fill();ctx.restore()}}
-  /* the engine's cuts with blood runs (the earlier look): a dark cut, a blood streak running down, a nose bleed when it is cut or the face is very red */
+  const rg=rngOf((B.look&&B.look.name)||'x');ctx.save();
+  /* soft irregular blotch: a stack of offset ellipses of one colour, so the edge is uneven like a real bruise */
+  const blotch=(x,y,rx,ry,rot,col,a,n)=>{ctx.save();ctx.translate(x,y);ctx.rotate(rot);for(let i=0;i<n;i++){const ox=(rg(i*3+1)-.5)*rx*.5,oy=(rg(i*3+2)-.5)*ry*.5,k=.72+rg(i*3+3)*.4;const g=ctx.createRadialGradient(ox,oy,0,ox,oy,Math.max(rx,ry)*k);g.addColorStop(0,`rgba(${col},${a/n*1.7})`);g.addColorStop(.6,`rgba(${col},${a/n})`);g.addColorStop(1,`rgba(${col},0)`);ctx.fillStyle=g;ctx.save();ctx.scale(1,ry/rx);ctx.beginPath();ctx.arc(ox,oy*rx/ry,rx*k,0,7);ctx.fill();ctx.restore()}ctx.restore()};
+  let dark=1;try{const sk=rgbOf((B.look&&B.look.skin)||'#c08360');if((sk[0]+sk[1]+sk[2])/3<115)dark=1.45}catch(e){}/* a bruise shows less on dark skin: stronger there */
+  const e=G.eye,A=(.1*light+.55*s+swell*.2)*dark;/* strength: faint until 50 %, then fast */
+  if(A>.02){
+    /* 1 ageing ring: yellow-green outer edge and blue-grey middle appear on a heavy bruise */
+    if(s>.2)blotch(e[0]-u*.1,e[1]+dn*u*.12,u*1.55,u*1.15,-.1*dn,'112,112,50',.32*s,3);
+    if(s>.1)blotch(e[0]-u*.08,e[1]+dn*u*.1,u*1.25,u*.95,-.1*dn,'70,70,110',.4*Math.min(1,s*1.4),3);
+    /* 2 the orbit: dark purple, thickest under the eye and over the brow bone */
+    blotch(e[0]-u*.05,e[1]+dn*u*.14,u*1.0,u*.74,-.08*dn,'66,24,62',Math.min(.85,A),4);
+    blotch(e[0]-u*.05,e[1]+dn*u*.38,u*.8,u*.32,-.05*dn,'44,14,40',Math.min(.75,A*.9),2);/* under-eye crescent */
+    blotch(e[0]+u*.02,e[1]-dn*u*.34,u*.8,u*.26,-.12*dn,'50,18,52',Math.min(.6,A*.7),2);/* the swollen upper lid */
+    /* 3 fine detail: broken vessels, a dark core, a swollen sheen */
+    if(A>.3){ctx.strokeStyle=`rgba(120,20,40,${Math.min(.5,A*.55)})`;ctx.lineWidth=u*.025;ctx.lineCap='round';for(let i=0;i<7;i++){const a=rg(40+i)*Math.PI*2,r0=u*(.55+rg(60+i)*.35);ctx.beginPath();ctx.moveTo(e[0]+Math.cos(a)*r0,e[1]+dn*Math.sin(a)*r0*.7);ctx.lineTo(e[0]+Math.cos(a)*(r0+u*.16),e[1]+dn*Math.sin(a)*(r0+u*.16)*.7);ctx.stroke()}}
+    if(swell>.25||s>.4){ctx.fillStyle=`rgba(255,235,225,${.08+.06*s})`;ctx.beginPath();ctx.ellipse(e[0]-u*.1,e[1]-dn*u*.36,u*.38,u*.1,-.1*dn,0,7);ctx.fill()}}
+  /* the other places a punch lands: cheekbone, jaw / mouth corner, brow bone — later and lighter */
+  const b2=clamp((d-.25)/.5,0,1)*.45+s*.3;
+  if(b2>.04){const c=G.cheek;blotch(c[0],c[1],u*.9,u*.6,.2*dn,'80,40,70',b2,3);const l=G.lip;blotch(l[0]-u*.1,l[1]-dn*u*.15,u*.7,u*.5,0,'76,30,52',b2*.7,2)}
+  if(s>.35){const f=G.brow;blotch(f[0]-u*.1,f[1]-dn*u*.15,u*.8,u*.35,-.1*dn,'70,28,64',s*.55,2)}
+  /* the engine's cuts with a blood run (the earlier look) — detail added: a wavering run that thickens, a bright wet edge, drops, side runs */
   if(opt.cuts!==false&&B.cuts){for(const c of B.cuts){const P=G[CUT_AT[c.at]||'brow'];if(!P)continue;const sev=c.sev;
-      ctx.fillStyle='#5a0303';ctx.save();ctx.translate(P[0],P[1]);ctx.rotate(-.25*dn);ctx.fillRect(-u*.45,-u*.05,u*.9,u*.1);ctx.restore();
-      if(sev>.25){const L=u*(1+Math.min(7,sev*3.4));ctx.globalAlpha=.85;ctx.fillStyle='#960808';ctx.beginPath();ctx.moveTo(P[0]-u*.22,P[1]);ctx.lineTo(P[0]+u*.25,P[1]);ctx.lineTo(P[0]+u*.1,P[1]+dn*L);ctx.lineTo(P[0]-u*.06,P[1]+dn*L*.9);ctx.closePath();ctx.fill();ctx.globalAlpha=1}}
+      ctx.save();ctx.translate(P[0],P[1]);ctx.rotate(-.25*dn);ctx.fillStyle='#4a0407';ctx.fillRect(-u*.45,-u*.05,u*.9,u*.1);ctx.fillStyle='#8a0a10';ctx.fillRect(-u*.38,-u*.02,u*.76,u*.04);ctx.restore();
+      if(sev>.2){const L=u*(1+Math.min(3.6,sev*1.5)),w0=u*(.1+Math.min(.06,sev*.03));
+        const run=(x0,L2,w,wob,al)=>{const g=ctx.createLinearGradient(0,P[1],0,P[1]+dn*L2);g.addColorStop(0,`rgba(168,10,16,${al})`);g.addColorStop(.7,`rgba(130,6,12,${al*.9})`);g.addColorStop(1,`rgba(110,5,10,${al*.6})`);ctx.fillStyle=g;ctx.beginPath();ctx.moveTo(x0-w,P[1]);ctx.bezierCurveTo(x0-w*.8+wob,P[1]+dn*L2*.35,x0-w*1.2-wob,P[1]+dn*L2*.7,x0-w*.5,P[1]+dn*L2);ctx.lineTo(x0+w*.5,P[1]+dn*L2*.98);ctx.bezierCurveTo(x0+w*1.2-wob,P[1]+dn*L2*.7,x0+w*.8+wob,P[1]+dn*L2*.35,x0+w,P[1]);ctx.closePath();ctx.fill();
+          ctx.fillStyle=`rgba(255,120,110,${al*.18})`;ctx.fillRect(x0-w*.25,P[1],w*.3,dn*L2*.8);/* wet highlight */
+          ctx.fillStyle=`rgba(120,6,12,${al})`;ctx.beginPath();ctx.ellipse(x0-w*.5,P[1]+dn*L2,w*.65,w*.9,0,0,7);ctx.fill()};/* the drop at the end */
+        run(P[0],L,w0,u*.06*Math.sin(P[0]),.9);if(sev>.8)run(P[0]+u*.34,L*.62,w0*.6,-u*.05,.8);if(sev>1.4)run(P[0]-u*.3,L*.45,w0*.5,u*.04,.75)}}
     if(B.cuts.some(c=>c.at==='nose')||(B.redness||0)>.72){const n=G.nose;ctx.globalAlpha=.85;ctx.fillStyle='#8c0608';ctx.beginPath();ctx.moveTo(n[0]-u*.1,n[1]);ctx.lineTo(n[0]+u*.2,n[1]);ctx.lineTo(n[0]+u*.1,n[1]+dn*u*2.6);ctx.lineTo(n[0]-u*.2,n[1]+dn*u*2.6);ctx.closePath();ctx.fill();ctx.globalAlpha=1}}
   ctx.restore()};
-FX.redOverlay=function(img,B){const red=B.redness||0,a=Math.min(.4,red*.45);if(a<.03)return null;const k=Math.round(a*25);const C=FX._rc||(FX._rc={});const key=img.src+k;if(C[key])return C[key];
-  const c=document.createElement('canvas');c.width=img.width;c.height=img.height;const g=c.getContext('2d');g.drawImage(img,0,0);let id;try{id=g.getImageData(0,0,c.width,c.height)}catch(e){return null}const D=id.data,al=k/25;
-  for(let i=0;i<D.length;i+=4){const r=D[i],gg=D[i+1],b=D[i+2];const skin=D[i+3]>8&&r>gg&&gg>=b&&r-b>22&&(r+gg+b)/3>70;if(!skin){D[i+3]=0;continue}D[i]=184;D[i+1]=67;D[i+2]=58;D[i+3]=Math.round(255*al)}
-  g.putImageData(id,0,0);return C[key]=c};
+/* skin-only mask of a sprite (white where it is skin): wounds are clipped to it, so blood and bruises stay on the face layer and turn with the head */
+FX.skinMask=function(img){const C=FX._sm||(FX._sm={});if(C[img.src])return C[img.src];const c=document.createElement('canvas');c.width=img.width;c.height=img.height;const g=c.getContext('2d');g.drawImage(img,0,0);let id;try{id=g.getImageData(0,0,c.width,c.height)}catch(e){return null}const D=id.data;
+  for(let i=0;i<D.length;i+=4){const r=D[i],gg=D[i+1],b=D[i+2];const skin=D[i+3]>120&&r>gg&&gg>=b&&r-b>18&&(r+gg+b)/3>55;D[i]=D[i+1]=D[i+2]=255;D[i+3]=skin?255:0}g.putImageData(id,0,0);return C[img.src]=c};
+FX.layer=function(w,h){let c=FX._ly;if(!c||c.width!==w||c.height!==h){c=FX._ly=document.createElement('canvas');c.width=w;c.height=h}return c};
+FX.hasWounds=function(B){const o=B._owner,hp=o&&o.hp?o.hp.head:100;return hp<98||(B.swell||0)>.05||!!(B.cuts&&B.cuts.length)};
+function rngOf(name){let h=2166136261;for(let i=0;i<name.length;i++){h^=name.charCodeAt(i);h=Math.imul(h,16777619)}return k=>{let a=(h^Math.imul(k+1,0x9E3779B1))>>>0;a=Math.imul(a^a>>>15,0x85ebca6b);a=Math.imul(a^a>>>13,0xc2b2ae35);return((a^a>>>16)>>>0)/4294967296}}
 /* the eyelid for sprite faces: a skin-coloured lid sliding down over the eye, with a lash line when nearly closed */
 FX.lid=function(ctx,G,a,skin){if(a<.03)return;const e=G.eye,u=G.u,w=u*1.25,h=u*.7*a;ctx.save();ctx.fillStyle=skin;ctx.beginPath();const top=e[1]-G.down*u*.42;ctx.ellipse(e[0],top+G.down*(h*.5),w*.5,Math.max(1,h*.55),0,0,7);ctx.fill();
   if(a>.35){ctx.strokeStyle='rgba(30,18,14,.85)';ctx.lineWidth=u*.07;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(e[0]-w*.42,top+G.down*h*.95);ctx.quadraticCurveTo(e[0],top+G.down*(h*1.15),e[0]+w*.42,top+G.down*h*.9);ctx.stroke()}ctx.restore()};

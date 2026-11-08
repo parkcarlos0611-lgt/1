@@ -173,7 +173,7 @@ function torsoFlat(ctx,J,H,M,sk,d,lk,B){const sp=[J.hip,J.mid,J.sh,J.nk];const s
   poly(ctx,[pt(.7,.098),pt(.67,.08),pt(.66,.015),pt(.69,.0),pt(.71,.03)],sk.sh);
 
   /* abs: flat blocks along the front edge */
-  if(!lk.belly&&lk.body!=='belly'&&lk.body!=='soft'){poly(ctx,[pt(.6,.08),pt(.22,.072),pt(.22,.05),pt(.6,.055)],sk.lt)}
+
   if(TD)detailIn(ctx,F.concat(Bk.slice().reverse()),F,Bk,sk.base,.012*M,(hi,lo)=>{const dk=shade(sk.base,-.3);
     fac(ctx,[pt(.5,.1),pt(.12,.1),pt(.12,.05),pt(.5,.05)],hi,.3,0);/* front: lit */
     fac(ctx,[pt(.7,-.1),pt(.2,-.1),pt(.2,-.045),pt(.7,-.05)],lo,.35,0);/* back: core shadow */
@@ -182,8 +182,6 @@ function torsoFlat(ctx,J,H,M,sk,d,lk,B){const sp=[J.hip,J.mid,J.sh,J.nk];const s
     for(let i=0;i<3;i++){const s0=.64-i*.05;fac(ctx,[pt(s0,.02),pt(s0-.012,.0),pt(s0-.02,.06),pt(s0-.006,.062)],dk,.35,0)}/* serratus teeth */
     fac(ctx,[pt(.74,.0),pt(.72,.1),pt(.67,.1),pt(.68,.0)],dk,.28,0);/* lower pec edge */
     fac(ctx,[pt(.97,-.06),pt(1,-.06),pt(1,.06),pt(.97,.06)],lo,.35,0);/* base of the neck */
-    if(!lk.belly&&lk.body!=='belly'&&lk.body!=='soft'){for(let i=0;i<3;i++){const s0=.56-i*.115,s1=s0-.095;fac(ctx,[pt(s0,.1),pt(s1,.1),pt(s1,.014),pt(s0,.014)],hi,.38,ROUND*.5);fac(ctx,[pt(s1,.1),pt(s1-.012,.1),pt(s1-.012,.014),pt(s1,.014)],dk,.3,0)}
-      fac(ctx,[pt(.58,.008),pt(.2,.008),pt(.2,-.002),pt(.58,-.002)],dk,.3,0)}/* six-pack blocks, the gaps and the linea alba */
     ctx.fillStyle=dk;ctx.beginPath();ctx.arc(pt(.2,.04).x,pt(.2,.04).y,.0065*H,0,7);ctx.fill()});/* navel */
   /* tattoos (flat ink shapes) */
   if(lk.tat&&/c/.test(lk.tat)){ctx.globalAlpha=.55;poly(ctx,[pt(.86,.06),pt(.8,.09),pt(.72,.07),pt(.74,.03),pt(.82,.02)],'#1c2230');ctx.globalAlpha=1}

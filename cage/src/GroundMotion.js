@@ -135,11 +135,11 @@ function subOverlay(M,dt){const g=M.g,s=g.sub;const A=s.att,D=s.def;const aJ=A.b
       defender's neck (forearm under the chin), the other hand clasping it, pulling UP; the defender folded at the hips, head under the armpit */
     da=e;dd=-e;xa=ax-e*.05;xd=ax+e*.34;
     pa=mk({y:.84,rot:0,lean:-.14-tight*.1,chest:-.04,head:.12,ll_h:.5,ll_k:.55,ll_a:.1,rl_h:-.3,rl_k:.15,rl_a:.4});
-    pd=mk({y:.8,rot:0,lean:1.2+tight*.12,chest:.2,head:-.45,ll_h:.4,ll_k:.6,ll_a:.1,rl_h:-.3,rl_k:.1,rl_a:.4});
+    pd=mk({y:.8,rot:0,lean:1.2+tight*.12,chest:.2,head:-.45,ll_h:.4,ll_k:.45,ll_a:.1,rl_h:-.3,rl_k:.2,rl_a:.4});
     A.d=da;D.d=dd;const An=nearOf(A,da),Dn=nearOf(D,dd);
     /* choke arm: elbow under the chin, forearm across the throat, the hand coming round behind the neck */
     arm2pt(A,pa,An.arm,{x:nk.x-e*.02,y:nk.y-.1},{x:nk.x+e*.1+q,y:nk.y+.0});armIK(A,pa,An.fArm,{x:nk.x+e*.08,y:nk.y+.02});
-    armIK(D,pd,Dn.arm,{x:aJ.mid.x+e*.1,y:aJ.mid.y-.05});armIK(D,pd,Dn.fArm,{x:aJ.hip.x+e*.08,y:aJ.hip.y+.1});/* pushing against the attacker's body */
+    armIK(D,pd,Dn.arm,{x:nk.x+e*.07,y:nk.y-.03});armIK(D,pd,Dn.fArm,{x:nk.x+e*.12,y:nk.y-.08});/* both hands up at his own neck, gripping the choking arm */
     layers=[[A,['farArm','farLeg','torso','nearLeg','shorts','head']],[D,['farArm','farLeg','torso','nearLeg','shorts','head']],[D,['nearArm']],[A,['nearArm']]]}
   else if(cat==='armtriM'){/* mount: attacker sits high on the chest, leaning over; one arm squeezed against the defender's own neck by his head and
       shoulder, the choking arm across the far side of the neck, hands clasped; defender flat on his back */
@@ -160,7 +160,7 @@ function subOverlay(M,dt){const g=M.g,s=g.sub;const A=s.att,D=s.def;const aJ=A.b
     layers=[[D,['farArm','farLeg','torso','nearLeg','shorts']],[A,['farArm','farLeg','torso','shorts','nearLeg','head']],[D,['head']],[D,['nearArm']],[A,['nearArm']]]}
   /* place + face (positions kept on the hold: the base ground pose resets x every frame) */if(s._xa==null){s._xa=A.x;s._xd=D.x}const k=Math.min(1,(dt||0)*7);s._xa+=(xa-s._xa)*k;s._xd+=(xd-s._xd)*k;A.x=s._xa;D.x=s._xd;A.d=da;D.d=dd;
   /* struggle */pd.lean+=Math.sin(t*11)*.03;pd.head+=Math.sin(t*15)*.05;
-  /* rest both bodies on the mat (feedback on last frame's skeleton) *//* each hold sets the real contact height; this only lifts a body that would sink into the mat */const legsA=/^(armtriM|armtriS)$/.test(cat)?GR_ALL:GR_TORSO;/* legs that are wrapped round the opponent (IK) don't decide the height */if(cat==='guillotine'){/* standing hold: both on their feet, so the height may go down as well as up */const FT=['lHe','rHe','lT','rT'];s._ga=clamp((s._ga||0)-groundGap(A,FT)*.5,-.6,.6);s._gd=clamp((s._gd||0)-groundGap(D,FT)*.5,-.6,.6)}else{s._ga=clamp((s._ga||0)-groundGap(A,legsA)*.6,0,.4);s._gd=clamp((s._gd||0)-groundGap(D,GR_ALL)*.6,0,.4)}pa.y+=s._ga;pd.y+=s._gd;
+  /* rest both bodies on the mat (feedback on last frame's skeleton) *//* each hold sets the real contact height; this only lifts a body that would sink into the mat */const legsA=/^(armtriM|armtriS)$/.test(cat)?GR_ALL:GR_TORSO;/* legs that are wrapped round the opponent (IK) don't decide the height */if(cat==='guillotine'){/* standing hold: both on their feet, so the height may go down as well as up */const FT=['lHe','rHe','lT','rT'];s._ga=clamp((s._ga||0)-groundGap(A,FT)*.25,-.12,.12);s._gd=clamp((s._gd||0)-groundGap(D,FT)*.25,-.12,.12)/* small, slow height correction: the legs no longer give way */}else{s._ga=clamp((s._ga||0)-groundGap(A,legsA)*.6,0,.4);s._gd=clamp((s._gd||0)-groundGap(D,GR_ALL)*.6,0,.4)}pa.y+=s._ga;pd.y+=s._gd;
   s.layers=layers;A.gpose=pa;D.gpose=pd;A.gRate=D.gRate=14;
   /* the defender goes red as the hold tightens */D.body.redness=Math.max(D.body.redness||0,tight*.6)}
 

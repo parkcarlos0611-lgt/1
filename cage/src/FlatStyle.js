@@ -76,7 +76,7 @@ Body.prototype.draw=function(ctx,o){o=o||{};const lk=this.look;if(window.CUTOUT&
     limb(ctx,e,w,d,[[-.06,.032*M,.032*M],[.2,.038*M,.036*M],[.45,.033*M,.031*M],[.8,.025*M,.024*M],[1,.022*M,.022*M]],C.b,C.s);
     circ(ctx,e,.031*M,C.b);/* elbow joint */
     /* elbow point (olecranon) facet */{const F=frame(e,w,d);circ(ctx,{x:e.x-F.nx*.016*M,y:e.y-F.ny*.016*M},.014*M,C.s)}
-    drawGloveFlat(ctx,e,w,J[S.G],H,isFar?shade(glove,-.2):glove,R?glove:strap,self.ang[S.o],R?0:self.gloveBlood,d,R?glove:C.b,R)};
+    drawGloveFlat(ctx,e,w,J[S.G],H,isFar?shade(glove,-.2):glove,R?glove:strap,self.ang[S.o],R?0:self.gloveBlood,d,R?glove:C.b,R,isFar)};
   /* ---- leg: quad/hamstring, knee cap, calf, ankle, foot with toes ---- */
   const leg=(S,isFar,sleeveCol)=>{const h=J[S.H],k=J[S.K],a=J[S.A],he=J[S.He],to=J[S.T];const C=R?(isFar?{b:CL.pantsS,s:shade(CL.pantsS,-.2)}:{b:CL.pants,s:CL.pantsS}):isFar?{b:sk.far,s:sk.farSh}:{b:sk.base,s:sk.sh};
     limb(ctx,h,k,d,[[-.06,.07*M,.07*M],[.18,.074*M,.07*M],[.45,.066*M,.062*M],[.75,.052*M,.05*M],[1,.042*M,.043*M]],C.b,C.s);
@@ -183,9 +183,9 @@ function shortsSeat(ctx,J,H,M,col,d,ta,nS,fS,lk){const hip=J.hip,mid=J.mid;const
   poly(ctx,[Pp(tp,wf),Pp(tp,-wb),Pp(hip,-wb*1.06),Pp(hip,wf*1.02)],col,0)}
 function shortsFold(ctx,J,M,col,d,nS){/* the fold where the thigh bends against the hip */const h=J[nS.H],k=J[nS.K];const F=frame(h,k,d);const P=(t,w)=>({x:h.x+F.ux*F.L*t+F.nx*w*M,y:h.y+F.uy*F.L*t+F.ny*w*M});
   poly(ctx,[P(-.04,.078),P(.14,.08),P(.05,.05)],shade(col,-.2))}
-function drawGloveFlat(ctx,E,Wr,G,H,col,strap,open,blood,d,skinC,plain){const a=Math.atan2(G.y-Wr.y,G.x-Wr.x);ctx.save();ctx.translate(Wr.x,Wr.y);ctx.rotate(a);
+function drawGloveFlat(ctx,E,Wr,G,H,col,strap,open,blood,d,skinC,plain,far){const a=Math.atan2(G.y-Wr.y,G.x-Wr.x);ctx.save();ctx.translate(Wr.x,Wr.y);ctx.rotate(a);
   /* local frame: +x toward the knuckles; flip so the thumb sits on the top / facing side */
-  const flip=(Math.cos(a)*d>=0)?1:-1;ctx.scale(1,flip);const r=.036*H;const P=(pts,c)=>{ctx.fillStyle=c;ctx.beginPath();rpath(ctx,pts.map(q=>({x:q[0]*r,y:q[1]*r})),r*.95);ctx.fill()};
+  const flip=((Math.cos(a)*d>=0)?1:-1)*(far?-1:1);/* the far hand is the other hand: its thumb sits on the opposite side */ctx.scale(1,flip);const r=.036*H;const P=(pts,c)=>{ctx.fillStyle=c;ctx.beginPath();rpath(ctx,pts.map(q=>({x:q[0]*r,y:q[1]*r})),r*.95);ctx.fill()};
   P([[-.95,-.62],[-.95,.62],[.15,.7],[.15,-.7]],col);/* cuff */
   P([[-.92,.62],[-.92,.36],[.12,.42],[.12,.68]],strap);/* cuff strap in corner colour */
   P([[.05,-.92],[.05,.9],[1.05,1.0],[1.55,.78],[1.72,.25],[1.68,-.55],[1.35,-.95]],col);/* knuckle block */

@@ -18,7 +18,7 @@ const T=()=>performance.now()/1000;
 {const fw=F2.prototype.footwork;F2.prototype.footwork=function(p,dt){fw.call(this,p,dt);this.body._zIdle=null;
   if(!IDLE.on||this.body.rag||this.state!=='stand'||this.act||this.gpose||this.evA||this.down)return;
   const ph=this._iph||(this._iph=hash((this.name||'x')+'idle')*6.28),tp=.9+hash((this.name||'x')+'tempo')*.25;/* tempo 0.9..1.15 */
-  const mv=Math.min(1,Math.abs(this.mvIn||0)*1.4),calm=(1-.65*mv)*(this.rock>0?.35:1);const t=T()*tp+ph;
+  const mv=Math.min(1,Math.abs(this.mvIn||0)*1.4),calm=(1-.65*mv)*(this.rock>0?.35:1)*1.85;/* idle amplitude (bigger, livelier) */const t=T()*tp+ph;
   const b1=Math.sin(t*3.6),b2=Math.sin(t*3.6+Math.PI),sw=Math.sin(t*1.25+1.3),br=Math.sin(t*.9),s2=Math.sin(t*2.1+.6);
   /* upper body: breathing, shoulder turn, head bob */
   p.lean+=.016*br*calm+.012*b1*calm;p.chest+=.012*Math.sin(t*.9+.5)*calm;p.tw+=.07*sw*calm;p.head+=.022*Math.sin(t*3.6+.7)*calm-.01*sw*calm;
@@ -27,7 +27,7 @@ const T=()=>performance.now()/1000;
   /* legs: knee bounce (opposite phases), heel lift, weight shift */
   p.ll_k+=(.05+.05*b1)*calm;p.rl_k+=(.05+.05*b2)*calm;p.ll_h+=.035*sw*calm;p.rl_h-=.03*sw*calm;p.ll_a+=.05*b1*calm;p.rl_a+=.05*b2*calm;
   /* up and down also moves the legs toward / away from the camera, alternately */
-  const A=.04*this.body.H*calm,z=A*Math.sin(t*1.8+.4),zl={};const w={H:0,K:.5,A:1,He:1,T:1};
+  const A=.05*this.body.H*calm,z=A*Math.sin(t*1.8+.4),zl={};const w={H:0,K:.5,A:1,He:1,T:1};
   for(const k in w){zl['l'+k]=z*w[k];zl['r'+k]=-z*w[k]}
   zl.lS=-z*.35;zl.lE=-z*.4;zl.lW=-z*.45;zl.lG=-z*.5;zl.rS=z*.35;zl.rE=z*.4;zl.rW=z*.45;zl.rG=z*.5;
   this.body._zIdle=zl}}

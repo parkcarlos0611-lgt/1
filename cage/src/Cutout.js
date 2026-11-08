@@ -10,12 +10,14 @@
 if(typeof Body==='undefined')return;
 const CO=window.CUTOUT={on:!/[?&]cutout=0/.test(location.search),sets:{}};
 const clamp=(v,a,b)=>v<a?a:v>b?b:v;
-const CURATED={'Jon Jones':{cutout:'jones',skin:'#7d5033',shorts:'#232326',glove:'#17171a'}};
+const CURATED={'Jon Jones':{cutout:'jones',skin:'#6e4c35',shorts:'#232326',glove:'#17171a'}};
 if(typeof lookFor==='function'){const lf=lookFor;window.lookFor=function(f){const L=lf.apply(this,arguments);const C=CURATED[f&&f.n];if(C)Object.assign(L,C);return L}}
 function load(name){let S=CO.sets[name];if(S)return S;S=CO.sets[name]={ready:false};
-  fetch('assets/cutout/'+name+'/parts.json').then(r=>r.json()).then(m=>{S.meta=m;const im=new Image();im.onload=()=>{S.img=im;S.ready=true};im.src='assets/cutout/'+name+'/'+m.image}).catch(()=>{S.failed=true});return S}
+  fetch('assets/cutout/'+name+'/parts.json').then(r=>r.json()).then(m=>{S.meta=m;const im=new Image();im.onload=()=>{S.img=im;S.ready=true};im.src='assets/cutout/'+name+'/'+m.image}).catch(()=>{S.failed=true});
+  /* the close-up of the head with neck and shoulder slope (used for the face when present) */
+  fetch('assets/cutout/'+name+'/head2.json').then(r=>r.json()).then(m=>{const im=new Image();im.onload=()=>{S.h2={img:im,headH:m.headH,meta:{parts:{head2:{x:0,y:0,w:m.w,h:m.h,p0:m.p0,p1:m.p1}}}}};im.src='assets/cutout/'+name+'/'+m.image}).catch(()=>{});return S}
 CO.body=false;
-CO.head=function(ctx,hd,nk,H,B,d){const lk=B.look;if(!CO.on||!lk||!lk.cutout)return false;const S=load(lk.cutout);if(!S.ready)return false;const ku=H*1.03/(S.meta.h*.935)*1.08;ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';/* the neck: a solid column from the shoulders up under the jaw (the picture's head part carries only a stub of it) */
+CO.head=function(ctx,hd,nk,H,B,d){const lk=B.look;if(!CO.on||!lk||!lk.cutout)return false;const S=load(lk.cutout);if(S.h2){/* anchored on the head centre, hanging down along the neck line */ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';put(ctx,S.h2,'head2',hd,nk,d,H*(lk.headK||.19)/S.h2.headH,1,1,true);return true}if(!S.ready)return false;const ku=H*1.03/(S.meta.h*.935)*1.08;ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';/* the neck: a solid column from the shoulders up under the jaw (the picture's head part carries only a stub of it) */
   {const L=Math.hypot(hd.x-nk.x,hd.y-nk.y)||1e-5,ux=(hd.x-nk.x)/L,uy=(hd.y-nk.y)/L;let nx=-uy,ny=ux;if(nx*d<0){nx=-nx;ny=-ny}const skin=lk.skin||'#7d5033';
    const Q=(aa,bb)=>({x:nk.x+ux*aa+nx*bb,y:nk.y+uy*aa+ny*bb});
    const poly=[Q(-.05*H,.05*H),Q(.04*H,.042*H),Q(L*.9,.036*H),Q(L*1.0,-.04*H),Q(.03*H,-.075*H),Q(-.05*H,-.1*H)];

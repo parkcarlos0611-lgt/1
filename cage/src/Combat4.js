@@ -4,7 +4,7 @@
      a hurt leg takes more from every following kick and goes down more easily (see the knock threshold in Match.applyDmg).
    • Guard damage: every blocked hit adds to the guarding arms' damage (slowly healing) — drawn as bruises on the forearms
      and a flash where the block landed.
-   • Without a guard, only the arm that strikes stays up: the other arm drops while a punch is thrown.
+   • With NO guard available (guard broken / guard stamina empty / body at 0), only the arm that strikes stays up: the other arm stays down while a punch is thrown. Normal stance keeps both hands up.
    • Walking is calmer: movement speed x0.78. */
 (function(){
 if(typeof F2==='undefined'||typeof Match==='undefined')return;
@@ -22,7 +22,7 @@ if(typeof REACH!=='undefined'){REACH.rlk*=1.1;REACH.llk*=1.1;REACH.calf*=1.1}
 {const up=F2.prototype.update;F2.prototype.update=function(dt,M){const r=up.call(this,dt,M);if(this._armD>0)this._armD=Math.max(0,this._armD-dt*.35);if(this._armFlash>0)this._armFlash-=dt;return r}}
 /* only the striking arm stays up when there is no guard */
 if(typeof Body!=='undefined'){const sv=Body.prototype.solve;Body.prototype.solve=function(p,x,d){const f=this._owner;
-  if(p&&f&&f.body===this&&f.act&&f.act.c&&f.act.c.hand&&!f.guard&&!f.gpose&&f.state==='stand'&&!this.rag){const a=f.act,o=a.c.hand==='l'?'r':'l',dur=a.c.dur||.4;const w=clamp(a.t/.1,0,1)*clamp((dur-a.t)/.16,0,1);
+  if(p&&f&&f.body===this&&f.act&&f.act.c&&f.act.c.hand&&!f.guard&&(f.gBreak>0||!(f.gst>0)||(f.hp&&f.hp.body<=0))&&!f.gpose&&f.state==='stand'&&!this.rag){const a=f.act,o=a.c.hand==='l'?'r':'l',dur=a.c.dur||.4;const w=clamp(a.t/.1,0,1)*clamp((dur-a.t)/.16,0,1);
     const tg=o==='l'?{la_s:.2,la_e:.45}:{ra_s:.16,ra_e:.4};for(const k in tg)p[k]+=(tg[k]-p[k])*w*.92}
   return sv.call(this,p,x,d)}}
 })();

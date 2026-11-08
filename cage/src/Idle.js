@@ -20,17 +20,17 @@ const T=()=>performance.now()/1000;
   const ph=this._iph||(this._iph=hash((this.name||'x')+'idle')*6.28),tp=.9+hash((this.name||'x')+'tempo')*.25;/* tempo 0.9..1.15 */
   const mv=Math.min(1,Math.abs(this.mvIn||0)*1.4),calm=(1-.65*mv)*(this.rock>0?.35:1)*1.85;/* idle amplitude (bigger, livelier) */const t=T()*tp+ph;
   const b1=Math.sin(t*3.6),b2=Math.sin(t*3.6+Math.PI),sw=Math.sin(t*1.25+1.3),br=Math.sin(t*.9),s2=Math.sin(t*2.1+.6);
-  /* upper body: breathing, shoulder turn, head bob */
-  p.lean+=.028*br*calm+.022*b1*calm;p.chest+=.026*Math.sin(t*.9+.5)*calm+.012*b2*calm;/* no shoulder turn: the shoulders stay square */p.head+=.04*Math.sin(t*3.6+.7)*calm-.015*sw*calm;
-  /* fists circle a little, one after the other */
+  /* only: the upper body rocking forward / back, breathing, and the fists circling */
+  p.lean+=.028*br*calm+.022*b1*calm;p.chest+=.026*Math.sin(t*.9+.5)*calm+.012*b2*calm;
   p.la_s+=.1*b1*calm+.035*s2*calm;p.la_e+=.16*b2*calm;p.ra_s+=.1*b2*calm+.035*s2*calm;p.ra_e+=.16*b1*calm;
-  /* legs: knee bounce (opposite phases), heel lift, weight shift */
-  p.ll_k+=(.05+.05*b1)*calm;p.rl_k+=(.05+.05*b2)*calm;p.ll_h+=.035*sw*calm;p.rl_h-=.03*sw*calm;p.ll_a+=.05*b1*calm;p.rl_a+=.05*b2*calm;
-  /* up and down also moves the legs toward / away from the camera, alternately */
-  const A=.05*this.body.H*calm,z=A*Math.sin(t*1.8+.4),zl={};const w={H:0,K:.5,A:1,He:1,T:1};
-  for(const k in w){zl['l'+k]=z*w[k];zl['r'+k]=-z*w[k]}
-  zl.lS=-z*.35;zl.lE=-z*.4;zl.lW=-z*.45;zl.lG=-z*.5;zl.rS=z*.35;zl.rE=z*.4;zl.rW=z*.45;zl.rG=z*.5;
-  this.body._zIdle=zl}}
+  /* circling the cage (stick up / down): the feet travel sideways in depth, alternately, thighs and shins together */
+  if(this.circ&&this._cw>.02){const q=this.cph||0,dir=Math.sign(this.circ),cw=this._cw,mag=Math.abs(this.circ);const A=(.05+.03*mag)*this.body.H*cw,zl={};const wgt={H:.45,K:.75,A:1,He:1,T:1};
+    const zL=A*Math.sin(q),zR=-zL;for(const k in wgt){zl['l'+k]=zL*wgt[k]*dir;zl['r'+k]=zR*wgt[k]*dir}
+    zl.lS=-zL*.2*dir;zl.lE=-zL*.25*dir;zl.lW=-zL*.3*dir;zl.lG=-zL*.3*dir;zl.rS=zL*.2*dir;zl.rE=zL*.25*dir;zl.rW=zL*.3*dir;zl.rG=zL*.3*dir;
+    const upL=Math.max(0,Math.cos(q)),upR=Math.max(0,-Math.cos(q));/* the stepping foot is the one travelling along the direction */
+    p.ll_k+=.34*upL*cw;p.rl_k+=.34*upR*cw;p.ll_h+=.14*upL*cw;p.rl_h+=.14*upR*cw;p.ll_a+=.12*upL*cw;p.rl_a+=.12*upR*cw;p.y=(p.y||0)-.01*this.body.H*cw;
+    this.body._swing={l:Math.min(1,upL*2.5)*cw,r:Math.min(1,upR*2.5)*cw};this.body._zIdle=zl;return}}}
+
 
 /* ---------- blink ---------- */
 FX.blink=function(B){if(!FX.on)return 0;const o=B._owner,name=(B.look&&B.look.name)||'x';let k=B._bk;const t=T();if(!k)k=B._bk={next:t+1+hash(name+'b')*3,t0:-9,dur:.15+hash(name+'d')*.05};

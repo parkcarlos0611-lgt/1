@@ -798,11 +798,11 @@ class F2{
     const wr=ATT(this,'takedown')>ATT(this,'kicking')+.1;if(wr){b.lean+=.08;b.ll_k+=.12;b.rl_k+=.1;b.la_s-=.1}
     const tired=1-this.sta/this.staMax;b.la_s-=tired*.35;b.ra_s-=tired*.25;b.head+=tired*.05;
     // bounce & breathing
-    const bob=Math.sin(t*5.5)*.009;b.ll_k+=bob+.02;b.rl_k+=bob*.9+.02;b.chest+=Math.sin(t*2.2)*.012;if(!this.act&&this.state==='stand'){b.lean+=Math.sin(t*1.1)*.03;b.head+=Math.sin(t*1.4+.5)*.035;b.la_s+=Math.sin(t*2.6+1)*.05;b.ra_s+=Math.sin(t*2.6)*.04;b.x=(b.x||0)+Math.sin(t*1.1)*.012}
+    const bob=0;b.ll_k+=.02;b.rl_k+=.02;b.chest+=Math.sin(t*2.2)*.012;if(!this.act&&this.state==='stand'){b.lean+=Math.sin(t*1.1)*.03;b.la_s+=Math.sin(t*2.6+1)*.05;b.ra_s+=Math.sin(t*2.6)*.04}
     // stepping
     // live stance: weight shifts between feet, lead hand pawing / range-finding, head never still; reactive flinch from incoming head strikes
-    if(!this.act&&this.state==='stand'&&this.rock<=0){const ws=Math.sin(t*1.1+this.side*2)*.5+Math.sin(t*.47)*.5;b.ll_k+=ws*.06;b.rl_k-=ws*.06;b.lean+=ws*.035;b.x=(b.x||0)+ws*.015;
-      const pw=Math.max(0,Math.sin(t*2.3+this.side))**6;b.la_s+=pw*.28;b.la_e-=pw*.65;b.head+=Math.sin(t*3.7+1.3)*.03;b.chest+=Math.sin(t*1.9)*.02;
+    if(!this.act&&this.state==='stand'&&this.rock<=0){const ws=Math.sin(t*1.1+this.side*2)*.5+Math.sin(t*.47)*.5;b.lean+=ws*.035;
+      const pw=Math.max(0,Math.sin(t*2.3+this.side))**6;b.la_s+=pw*.28;b.la_e-=pw*.65;b.chest+=Math.sin(t*1.9)*.02;
       const o=M&&this.opp;if(o&&o.act&&o.act.c.hit&&o.act.c.hit.zone==='head'&&o.act.t<o.act.c.hit.t1+.05){const k=(.4+ATT(this,'strDef')*.8)*Math.min(1,o.act.t/Math.max(.05,o.act.c.hit.t0));b.lean-=.1*k;b.head-=.16*k;b.chest-=.05*k;b.la_s+=.1*k;b.ra_s+=.12*k}}
     if(this.rock>0){const r=MV.rocked.keys[0][1];const w=Math.min(1,this.rock);for(const k in r)b[k]=lerp(b[k],r[k],w*.8);b.lean+=Math.sin(t*3.1)*.08*w;b.head+=Math.sin(t*4.3)*.12*w}
     if(this.guard){const g=MV[this.guard==='low'?'check':this.guard==='body'?'blockB':this.guard==='upp'?'blockU':(this.guard==='hook'||this.guard==='top')?'blockK':'blockH'].keys[0][1];for(const k in g)b[k]=g[k]+(k==='ll_k'||k==='rl_k'?bob:0)}
@@ -814,15 +814,15 @@ class F2{
   footwork(p,dt){if(!(dt>0))return;this.body._swing=null;const px=this._fx==null?this.x:this._fx;this._fx=this.x;const v=(this.x-px)/dt;this.mv=(this.mv||0)+(v-(this.mv||0))*Math.min(1,dt*14);
     const st=this.state==='stand'||this.state==='clinch';if(!st)return;const a=this.act,leg=a&&a.c.leg;const t=this.t;
     // idle bounce on the balls of the feet
-    if(this.state==='stand'&&!leg&&this.rock<=0){const fr=4.8+ATT(this,'footwork')*1.2;this.bph=(this.bph||0)+dt*fr;const ab=Math.abs(Math.sin(this.bph)),land=Math.pow(1-ab,3);const amp=(this.noBounce?0:.45)*(a?.3:1)*(.75+ATT(this,'footwork')*.5)*(.6+.4*this.sta/this.staMax);p.ll_k+=(.2*land+.04*ab)*amp;p.rl_k+=(.22*land+.04*ab)*amp;p.ll_a+=.28*ab*amp;p.rl_a+=.36*ab*amp;p.lean+=.03*land*amp;p.head+=.025*land*amp;p.la_s+=.04*land*amp;p.ra_s+=.05*land*amp;p.la_e-=.06*land*amp;p.ra_e-=.05*land*amp;p.chest+=Math.sin(this.bph*.5)*.02*amp;p.tw+=Math.sin(this.bph*.5)*.04*amp}
+    if(this.state==='stand'&&!leg&&this.rock<=0){const fr=4.8+ATT(this,'footwork')*1.2;this.bph=(this.bph||0)+dt*fr;const ab=Math.abs(Math.sin(this.bph)),land=Math.pow(1-ab,3);const amp=0*(a?.3:1)*(.75+ATT(this,'footwork')*.5)*(.6+.4*this.sta/this.staMax);p.ll_k+=(.2*land+.04*ab)*amp;p.rl_k+=(.22*land+.04*ab)*amp;p.ll_a+=.28*ab*amp;p.rl_a+=.36*ab*amp;p.lean+=.03*land*amp;p.head+=.025*land*amp;p.la_s+=.04*land*amp;p.ra_s+=.05*land*amp;p.la_e-=.06*land*amp;p.ra_e-=.05*land*amp;p.chest+=Math.sin(this.bph*.5)*.02*amp;p.tw+=Math.sin(this.bph*.5)*.04*amp}
     // strike step-in (lead foot steps, rear foot drags after impact)
     if(a&&a.c.hit&&!leg&&a.c.lunge){const h=a.c.hit,L=Math.min(1.4,a.c.lunge*8);const u=clamp(a.t/h.t1,0,1),w=clamp((a.t-h.t1)/Math.max(.05,(a.c.dur||.4)-h.t1),0,1);
       const s1=Math.sin(Math.PI*u),s2=Math.sin(Math.PI*w);p.ll_h+=.2*s1*L;p.ll_k+=.22*s1*L;p.ll_a+=.15*s1*L;p.rl_h+=.16*s2*L;p.rl_k+=.2*s2*L;p.rl_a+=.2*s2*L}
     if(leg)return;
     /* step-bounce mode (toggle button): legs keep their stance, the fighter bounces on knees and ankles —
        in place and while moving with the stick pushed (>= 40 %); small slow moves still walk */
-    if(a)this._actEndT=this.t;if((this.bounce||this.circ)&&this.state==='stand'&&!a&&this.t-(this._actEndT||-9)>.15){/* circling the cage always uses the step-bounce */const stk=this.stick||0;const moving=Math.abs(this.mv)>.15||!!this.circ;const fast=stk>=.4||Math.abs(this.mv)>.9;
-      if(!moving||fast||this.circ){const lt=(this.body.W||1)<=.965;/* lightweight and below keep the quicker rhythm */this.bnph=(this.bnph||0)+dt*Math.PI*2*(lt?(moving?2.9:2.3):(moving?2.5:2.0));const up=.5-.5*Math.cos(this.bnph),land=1-up;/* smooth rise and settle, no snap at landing */
+    if(a)this._actEndT=this.t;if(this.bounce&&!this.circ&&this.state==='stand'&&!a&&this.t-(this._actEndT||-9)>.15){/* circling the cage always uses the step-bounce */const stk=this.stick||0;const moving=Math.abs(this.mv)>.15||!!this.circ;const fast=stk>=.4||Math.abs(this.mv)>.9;
+      if(!moving){const lt=(this.body.W||1)<=.965;/* lightweight and below keep the quicker rhythm */this.bnph=(this.bnph||0)+dt*Math.PI*2*(lt?(moving?2.9:2.3):(moving?2.5:2.0));const up=.5-.5*Math.cos(this.bnph),land=1-up;/* smooth rise and settle, no snap at landing */
         p.y=(p.y||0)+.03*this.H*up;p.ll_k+=.17*land+.06;p.rl_k+=.17*land+.06;p.ll_a+=.24*up;p.rl_a+=.26*up;p.lean-=.09;p.chest-=.04;/* a bit more upright */p.head+=.01*land;p.la_s+=.03*land;p.ra_s+=.03*land;
         if(moving)p.lean+=clamp(this.mv*this.d,-1.5,1.5)*.015;this.body._swing=up>.3?{l:up,r:up}:null;return}}
     const sp=Math.max(Math.abs(this.mv),this.circ?1.1:0,this.clMv?.9:0),m=Math.min(1,sp/1.1)*(a?.35:1)*(this.guard==='low'?0:1);if(m<.03){return}
@@ -837,7 +837,7 @@ class F2{
         const q=ph-Math.PI;const sq=Math.sin(q);return{h:c-A*Math.cos(q),k:.22+.82*Math.pow(Math.max(0,sq),.7),a:-.06-.14*sq}};/* low, gliding swing — no high knee */
       const Lg=leg(this.gph),Rg=leg(this.gph+Math.PI);
       /* faster: a bouncing step — hips and knees lifted and bent, a lower stance, a small hop on every step */
-      const rf=(this.isPlayer===true?0:clamp((Math.abs(this.mv)-1.05)/.7,0,1))*w;this._rf=(this._rf||0)+(rf-(this._rf||0))*Math.min(1,dt*6);const RF=this._rf;
+      const rf=(this.isPlayer===true?.75:1)*clamp((Math.abs(this.mv)-.8)/.6,0,1)*w;this._rf=(this._rf||0)+(rf-(this._rf||0))*Math.min(1,dt*6);const RF=this._rf;
       if(RF>.01){for(const[g,ph]of[[Lg,this.gph],[Rg,this.gph+Math.PI]]){const q=((ph%(2*Math.PI))+2*Math.PI)%(2*Math.PI);const sw=q>=Math.PI;
           g.h+=(.12+(sw?.32*Math.sin(q-Math.PI):0))*RF;g.k+=(.28+(sw?.55*Math.sin(q-Math.PI):0))*RF;g.a+=.18*RF}
         const hop=RF*Math.pow(Math.max(0,Math.sin(2*this.gph)),2);p.y=(p.y||0)+.03*this.H*hop;/* upright torso, light bounce */p.lean-=.07*RF;p.chest-=.03*RF;p.head+=.02*RF;
@@ -849,14 +849,7 @@ class F2{
     /* circling the octagon (stick up / down): crossover steps — the legs pass each other on a diagonal, the
        stepping foot lifts and lands across the planted one; from 65 % stick the steps become light hops with an
        upright torso and a little vertical bounce */
-    if(this.circ){const mag=Math.abs(this.circ);this.cph=(this.cph||0)+dt*(3.8+mag*3);const q=this.cph,sn=Math.sin(q),up1=Math.max(0,sn),up2=Math.max(0,-sn);const cw=Math.min(1,(this._cw=(this._cw||0)+(1-(this._cw||0))*Math.min(1,dt*6)));
-      const c0=(p.ll_h+p.rl_h)/2;/* lead foot crosses back past the rear foot, then the rear foot crosses forward */
-      /* each foot travels past the other's line: a real crossover */const xL=p.rl_h-.14,xR=p.ll_h+.14;/* past the other leg */
-      p.ll_h+=(xL-p.ll_h)*up1*cw;p.ll_k+=.55*up1*cw;p.ll_a+=.15*up1*cw;
-      p.rl_h+=(xR-p.rl_h)*up2*cw;p.rl_k+=.55*up2*cw;p.rl_a+=.15*up2*cw;
-      p.tw+=sn*.16*cw*Math.sign(this.circ);p.chest+=Math.cos(2*q)*.012*cw;p.y=(p.y||0)-.008*this.H*(up1+up2)*cw;
-      const hk=0;if(hk>0){const hop=hk*Math.pow(Math.abs(Math.sin(q)),2);p.y+=.026*this.H*hop;p.lean-=.07*hk;p.ll_k+=.2*hk;p.rl_k+=.2*hk;this._hopS=hop>.2?hop:0}else this._hopS=0;
-      this.body._swing={l:Math.max(Math.min(1,up1*3)*cw,this._hopS||0),r:Math.max(Math.min(1,up2*3)*cw,this._hopS||0)};return}
+    if(this.circ){/* circling (stick up / down): no stepping in the legs here — Idle.js moves the legs and feet sideways in depth */const mag=Math.abs(this.circ);this.cph=(this.cph||0)+dt*(3.2+mag*2.6);this._cw=Math.min(1,(this._cw||0)+(1-(this._cw||0))*Math.min(1,dt*6));p.ll_k+=.1*this._cw;p.rl_k+=.1*this._cw;p.lean-=.04*this._cw;this._hopS=0;return}
     this._cw=0;
     /* step-drag (circling / slow drift) */
     this.fph=(this.fph||0)+dt*(3.9+sp*2.6);const ph=(this.fph/(Math.PI*2))%1;

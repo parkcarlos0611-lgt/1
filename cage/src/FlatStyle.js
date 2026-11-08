@@ -20,7 +20,7 @@ if(typeof Body==='undefined')return;
 const FS=window.FLAT_STYLE=(typeof tuneSection==='function'?tuneSection('flat',{on:true,shadowK:-.09,farK:-.1,lightK:.035}):{on:true,shadowK:-.09,farK:-.1,lightK:.035});
 /* the flat look has its own light: switch off the gradient / rim light layers painted on top of fighters */
 if(typeof GFX!=='undefined'){GFX.shade=0;GFX.rim=0;GFX.sweat=Math.min(GFX.sweat,.35)}
-if(typeof GPU!=='undefined')GPU.rim=.12;
+if(typeof GPU!=='undefined'){GPU.rim=.12;/* (add ?gpu=1 to the URL to bring the compositor back) the flat look has no depth of field / bloom / grade: the WebGL compositor only re-uploaded three full-size canvases every frame (about a third of the frame time) — draw straight to the 2D canvas */GPU.on=/[?&]gpu=1/.test(location.search)}
 if(typeof MR!=='undefined')MR.limbShade=0;
 
 /* ---------- helpers (world units, y up) ---------- */

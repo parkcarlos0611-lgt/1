@@ -15,7 +15,8 @@ if(typeof lookFor==='function'){const lf=lookFor;window.lookFor=function(f){cons
 function load(name){let S=CO.sets[name];if(S)return S;S=CO.sets[name]={ready:false};
   fetch('assets/cutout/'+name+'/parts.json').then(r=>r.json()).then(m=>{S.meta=m;const im=new Image();im.onload=()=>{S.img=im;S.ready=true};im.src='assets/cutout/'+name+'/'+m.image}).catch(()=>{S.failed=true});
   /* the close-up of the head with neck and shoulder slope (used for the face when present) */
-  fetch('assets/cutout/'+name+'/head2.json').then(r=>r.json()).then(m=>{const im=new Image();im.onload=()=>{S.h2={img:im,headH:m.headH,m,meta:{parts:{head2:{x:0,y:0,w:m.w,h:m.h,p0:m.p0,p1:m.p1}}}};if(m.neck){const n=new Image();n.onload=()=>{S.h2.neck=n};n.src='assets/cutout/'+name+'/'+m.neck}};im.src='assets/cutout/'+name+'/'+m.image}).catch(()=>{});return S}
+  S.pending=1;fetch('assets/cutout/'+name+'/head2.json').then(r=>r.json()).then(m=>{const base='assets/cutout/'+name+'/',im=new Image(),n=m.neck?new Image():null;const ld=i=>new Promise(res=>{i.onload=()=>{(i.decode?i.decode():Promise.resolve()).then(res,res)};i.onerror=res;});const ps=[ld(im)];im.src=base+m.image;if(n){ps.push(ld(n));n.src=base+m.neck}
+    Promise.all(ps).then(()=>{/* published only when head AND neck are decoded, so the face never appears piece by piece */const h2={img:im,headH:m.headH,m,meta:{parts:{head2:{x:0,y:0,w:m.w,h:m.h,p0:m.p0,p1:m.p1}}}};if(n)h2.neck=n;S.h2=h2;try{if(window.FACEFX){FACEFX.skinMask(im);FACEFX.layer(im.width,im.height)}}catch(e){}/* warm the caches */S.pending=0;CO.warm=(CO.warm||0)+1})}).catch(()=>{S.pending=0});return S}
 CO.body=false;
 /* the neck as a bending strip: horizontal slices from the skull down to the shoulders, each turned by an angle between the head's and the trunk's, so the back of the neck folds when the head tips forward or back */
 function neck(ctx,S2,hd,nk,B,d,ku,H,skin){const m=S2.m,P=S2.meta.parts.head2,p0=P.p0,qb=m.neckPivot,y0=m.neckTop,y1=m.neckBot,W=m.w;const J=B.J,mm=d;
@@ -59,4 +60,6 @@ CO.draw=function(B,ctx,o){o=o||{};const S=CO.sets[B.look.cutout],J=B.J,H=B.H,d=B
   else if(ON){if(ON('farArm'))arm(F,'f');if(ON('farLeg'))leg(F,'f');if(ON('torso'))torso();if(ON('nearLeg'))leg(N,'n');if(ON('shorts'))trunks();if(ON('head'))head();if(ON('nearArm'))arm(N,'n')}
   else{if(o.part!=='body')arm(F,'f');leg(F,'f');torso();leg(N,'n');trunks();head();if(o.part!=='body')arm(N,'n')}
   ctx.restore()};
+/* load every curated face while the menus are showing, so the first fight has them already */
+for(const k in CURATED){const nm=CURATED[k].cutout;if(nm)load(nm)}
 })();

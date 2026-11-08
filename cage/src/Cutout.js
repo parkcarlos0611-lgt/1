@@ -15,7 +15,13 @@ if(typeof lookFor==='function'){const lf=lookFor;window.lookFor=function(f){cons
 function load(name){let S=CO.sets[name];if(S)return S;S=CO.sets[name]={ready:false};
   fetch('assets/cutout/'+name+'/parts.json').then(r=>r.json()).then(m=>{S.meta=m;const im=new Image();im.onload=()=>{S.img=im;S.ready=true};im.src='assets/cutout/'+name+'/'+m.image}).catch(()=>{S.failed=true});return S}
 CO.body=false;
-CO.head=function(ctx,hd,nk,H,B,d){const lk=B.look;if(!CO.on||!lk||!lk.cutout)return false;const S=load(lk.cutout);if(!S.ready)return false;const ku=H*1.03/(S.meta.h*.935)*1.08;ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';put(ctx,S,'head',nk,hd,d,ku,1,1,true);return true};
+CO.head=function(ctx,hd,nk,H,B,d){const lk=B.look;if(!CO.on||!lk||!lk.cutout)return false;const S=load(lk.cutout);if(!S.ready)return false;const ku=H*1.03/(S.meta.h*.935)*1.08;ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';/* the neck: a solid column from the shoulders up under the jaw (the picture's head part carries only a stub of it) */
+  {const L=Math.hypot(hd.x-nk.x,hd.y-nk.y)||1e-5,ux=(hd.x-nk.x)/L,uy=(hd.y-nk.y)/L;let nx=-uy,ny=ux;if(nx*d<0){nx=-nx;ny=-ny}const skin=lk.skin||'#7d5033';
+   const Q=(aa,bb)=>({x:nk.x+ux*aa+nx*bb,y:nk.y+uy*aa+ny*bb});
+   const poly=[Q(-.05*H,.05*H),Q(.04*H,.042*H),Q(L*.9,.036*H),Q(L*1.0,-.04*H),Q(.03*H,-.075*H),Q(-.05*H,-.1*H)];
+   ctx.fillStyle=shade(skin,-.04);ctx.beginPath();poly.forEach((q,i)=>i?ctx.lineTo(q.x,q.y):ctx.moveTo(q.x,q.y));ctx.closePath();ctx.fill();
+   ctx.fillStyle=shade(skin,-.16);ctx.beginPath();[Q(-.05*H,.05*H),Q(.04*H,.042*H),Q(L*.9,.036*H),Q(L*.95,.0),Q(.04*H,-.012*H),Q(-.05*H,.01*H)].forEach((q,i)=>i?ctx.lineTo(q.x,q.y):ctx.moveTo(q.x,q.y));ctx.closePath();ctx.fill()}
+  put(ctx,S,'head',nk,hd,d,ku,1,1,true);return true};
 CO.ok=function(B){if(!CO.body)return false;const lk=B&&B.look;if(!CO.on||!lk||!lk.cutout)return false;const S=load(lk.cutout);return !!(S.ready&&B.J&&B.J.hd)};
 /* map the sprite so that its bone p0->p1 lies on the world segment A->B (mirrored for d = -1); the sprite is stretched along the bone, clamped */
 function put(ctx,S,name,A,Bp,d,ku,lo,hi,uniform){const P=S.meta.parts[name];if(!P)return;

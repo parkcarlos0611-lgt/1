@@ -221,7 +221,7 @@ function headFlat(ctx,hd,nk,H,B,skin,d,ang){if(window.CUTOUT&&B.look&&B.look.cut
   P([[-.42,.22],[-.12,.26],[-.04,.0],[-.12,-.3],[-.34,-.3],[-.46,-.05]],shade(sk,-.08));P([[-.33,.12],[-.14,.14],[-.12,-.12],[-.3,-.16]],dk);if(lk.cauli)P([[-.44,.1],[-.1,.2],[-.06,-.1],[-.4,-.12]],shade(sk,-.15));
   /* eye: sclera, iris, upper lid line; swelling; KO / daze */
   {const sw=B.swell||0;const ex=.74,ey=.14;if(sw>.15){ctx.globalAlpha=Math.min(.75,sw*.6);P([[ex-.22,ey+.14],[ex+.2,ey+.14],[ex+.24,ey-.12],[ex-.2,ey-.14]],typeof mixHex==='function'?mixHex(skin,'#6a2a4a',.55):'#7a3a50');ctx.globalAlpha=1}
-    const lid=B.ko?1:Math.max(B.daze||0,sw>.7?.55:0);
+    const lid=B.ko?1:Math.max(B.daze||0,sw>.7?.55:0,window.FACEFX?FACEFX.blink(B):0);
     const eyT=F.ey||0;if(eyT===2)P([[ex-.2,ey+.17],[ex+.2,ey+.17],[ex+.18,ey+.06],[ex-.16,ey+.08]],sh);/* deep-set: shadowed socket */
     if(lid<1){const h=.09*(1-lid*.8)*(sw>.5?.6:1)*(eyT===1?.62:1);P([[ex-.13,ey],[ex-.02,ey+h],[ex+.14,ey+h*.4],[ex+.15,ey-.01],[ex+.02,ey-h*.8]],'#efe9df');P([[ex+.02,ey+h*.8],[ex+.12,ey+h*.6],[ex+.12,ey-h*.7],[ex+.02,ey-h*.7]],'#2a1a10');P([[ex-.14,ey+.005],[ex-.02,ey+h+.025],[ex+.16,ey+h*.45],[ex+.15,ey+h*.3],[ex-.02,ey+h],[ex-.12,ey-.01]],dk)}
     else P([[ex-.13,ey+.01],[ex+.15,ey+.005],[ex+.15,ey-.03],[ex-.13,ey-.02]],dk);
@@ -241,6 +241,7 @@ function headFlat(ctx,hd,nk,H,B,skin,d,ang){if(window.CUTOUT&&B.look&&B.look.cut
   if(typeof CUTPOS!=='undefined')for(const c of B.cuts||[]){const p=CUTPOS[c.at];if(!p)continue;P([[p[0]-.1,p[1]+.06],[p[0]+.12,p[1]-.03],[p[0]+.12,p[1]-.06],[p[0]-.1,p[1]+.03]],'#5a0303');
     if(c.sev>.25){const L=.3+Math.min(2.2,c.sev*1.1);ctx.globalAlpha=.85;P([[p[0]-.07,p[1]],[p[0]+.08,p[1]],[p[0]+.03,p[1]-L],[p[0]-.02,p[1]-L*.9]],'#960808');ctx.globalAlpha=1}}
   if((B.cuts||[]).some(c=>c.at==='nose')||(B.redness||0)>.72){ctx.globalAlpha=.85;P([[.95,-.24],[1.01,-.26],[.94,-.7],[.88,-.7]],'#8c0608');ctx.globalAlpha=1}
+  if(window.FACEFX){ctx.save();ctx.scale(r,r);FACEFX.wounds(ctx,B,{eye:[.74,.14],brow:[.66,.42],brow2:[.52,.5],nose:[.98,-.05],cheek:[.55,-.05],fore:[.55,.7],lip:[.85,-.5],u:.32,down:-1},{cuts:false});ctx.restore()}
   ctx.restore()}
 function hairFlat(ctx,r,lk,B,hc,P){const hs=B.hs||(B.hs=(typeof hairStyleOf==='function'?hairStyleOf(B):'short'));if(hs==='bald'){ctx.globalAlpha=.12;P([[-.3,.98],[.3,1.06],[.4,.95],[-.2,.9]],'#fff');ctx.globalAlpha=1;return}
   /* block cap: hairline at the forehead, over the crown, down the back to the nape; sideburn in front of the ear */

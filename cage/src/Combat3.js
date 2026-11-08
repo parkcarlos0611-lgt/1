@@ -20,7 +20,7 @@ function arcZ(f){const a=f.act;if(!a||!a.c||!a.c.hit||f.state!=='stand'||f.body.
   const tm=(h.t0+h.t1)/2;let s;if(t<tm)s=Math.cos(clamp(t/tm,0,1)*Math.PI/2)*ss(t/(h.t0*.55));else s=-.22*Math.sin(clamp((t-tm)/(h.t1+.1-tm),0,1)*Math.PI);
   const nearLead=(f.d>0)===(f.stance>0);const side=a.c.hand?((a.c.hand==='l')===nearLead?1:-1):((a.c.leg==='l')===nearLead?1:-1);const z=s*A*H*side;if(Math.abs(z)<.002)return null;
   const m={};if(a.c.hand){const p=a.c.hand;for(const k in HAND_J)m[p+k]=z*HAND_J[k]}else if(a.c.leg){const p=a.c.leg;for(const k in LEG_J)m[p+k]=z*LEG_J[k];m[p+'Sn']=z*.75}return m}
-{const po=F2.prototype.pose;F2.prototype.pose=function(dt,M){this.body._zmap=arcZ(this);return po.call(this,dt,M)}}
+{const po=F2.prototype.pose;F2.prototype.pose=function(dt,M){const z=arcZ(this),zi=this.body._zIdle;this.body._zmap=z&&zi?Object.assign({},zi,z):(z||zi||null);return po.call(this,dt,M)}}
 
 /* ---------- 2. kick balance (leg / body kicks hit harder) ---------- */
 if(typeof MV!=='undefined')for(const k of['rlk','llk','rbk','lbk','calf']){const c=MV[k];if(c&&c.hit)c.hit.dmg*=1.3}

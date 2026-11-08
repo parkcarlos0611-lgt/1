@@ -29,7 +29,7 @@ function neck(ctx,S2,hd,nk,B,d,ku,H,skin){const m=S2.m,P=S2.meta.parts.head2,p0=
   if(L.length>2){ctx.fillStyle=skin?shade(skin,-.02):'#6b4a34';ctx.beginPath();L.forEach((q,i)=>i?ctx.lineTo(q.x,q.y):ctx.moveTo(q.x,q.y));R.slice().reverse().forEach(q=>ctx.lineTo(q.x,q.y));ctx.closePath();ctx.fill()}
   for(let i=0;i<N;i++){const ya=y0+i*step,yb=ya+step,yc=(ya+yb)/2,t=(i+.5)/N,sm=t*t*(3-2*t),xc=150;const A=wh(xc,yc),Bt=wt(xc,yc);const px=A.x+(Bt.x-A.x)*sm,py=A.y+(Bt.y-A.y)*sm,al=aH+da*sm;
     const ex=1.5;ctx.save();ctx.translate(px,py);ctx.rotate(al);ctx.scale(mm*ku,-ku);ctx.drawImage(S2.neck,0,ya-ex,W,step+2*ex,-xc,(ya-ex)-yc,W,step+2*ex);ctx.restore()}}
-CO.head=function(ctx,hd,nk,H,B,d){const lk=B.look;if(!CO.on||!lk||!lk.cutout)return false;const S=load(lk.cutout);if(S.h2){/* anchored on the head centre, hanging down along the neck line */ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';const ku=H*(lk.headK||.145)/S.h2.headH;const Lh=Math.hypot(hd.x-nk.x,hd.y-nk.y)||1,dn=H*(lk.headDown!=null?lk.headDown:.007);const hd2={x:hd.x-(hd.x-nk.x)/Lh*dn,y:hd.y-(hd.y-nk.y)/Lh*dn};/* head a little lower */if(S.h2.neck)neck(ctx,S.h2,hd2,nk,B,d,ku,H,lk.skin);put(ctx,S.h2,'head2',hd2,nk,d,ku,1,1,true);return true}if(!S.ready)return false;const ku=H*1.03/(S.meta.h*.935)*1.08;ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';/* the neck: a solid column from the shoulders up under the jaw (the picture's head part carries only a stub of it) */
+CO.head=function(ctx,hd,nk,H,B,d){const lk=B.look;if(!CO.on||!lk||!lk.cutout)return false;const S=load(lk.cutout);if(S.h2){/* anchored on the head centre, hanging down along the neck line */ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';const ku=H*(lk.headK||.145)/S.h2.headH;const Lh=Math.hypot(hd.x-nk.x,hd.y-nk.y)||1,dn=H*(lk.headDown!=null?lk.headDown:.007);const hd2={x:hd.x-(hd.x-nk.x)/Lh*dn,y:hd.y-(hd.y-nk.y)/Lh*dn};/* head a little lower */if(S.h2.neck)neck(ctx,S.h2,hd2,nk,B,d,ku,H,lk.skin);put(ctx,S.h2,'head2',hd2,nk,d,ku,1,1,true,c=>{if(!window.FACEFX)return;const G={eye:[395,222],brow:[400,190],brow2:[352,205],nose:[470,268],cheek:[372,292],fore:[360,110],lip:[432,358],u:44,down:1};FACEFX.lid(c,G,FACEFX.blink(B),'#745239');FACEFX.wounds(c,B,G,{cuts:true})});return true}if(!S.ready)return false;const ku=H*1.03/(S.meta.h*.935)*1.08;ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';/* the neck: a solid column from the shoulders up under the jaw (the picture's head part carries only a stub of it) */
   {const L=Math.hypot(hd.x-nk.x,hd.y-nk.y)||1e-5,ux=(hd.x-nk.x)/L,uy=(hd.y-nk.y)/L;let nx=-uy,ny=ux;if(nx*d<0){nx=-nx;ny=-ny}const skin=lk.skin||'#7d5033';
    const Q=(aa,bb)=>({x:nk.x+ux*aa+nx*bb,y:nk.y+uy*aa+ny*bb});
    const poly=[Q(-.05*H,.05*H),Q(.04*H,.042*H),Q(L*.9,.036*H),Q(L*1.0,-.04*H),Q(.03*H,-.075*H),Q(-.05*H,-.1*H)];
@@ -38,12 +38,12 @@ CO.head=function(ctx,hd,nk,H,B,d){const lk=B.look;if(!CO.on||!lk||!lk.cutout)ret
   put(ctx,S,'head',nk,hd,d,ku,1,1,true);return true};
 CO.ok=function(B){if(!CO.body)return false;const lk=B&&B.look;if(!CO.on||!lk||!lk.cutout)return false;const S=load(lk.cutout);return !!(S.ready&&B.J&&B.J.hd)};
 /* map the sprite so that its bone p0->p1 lies on the world segment A->B (mirrored for d = -1); the sprite is stretched along the bone, clamped */
-function put(ctx,S,name,A,Bp,d,ku,lo,hi,uniform){const P=S.meta.parts[name];if(!P)return;
+function put(ctx,S,name,A,Bp,d,ku,lo,hi,uniform,cb){const P=S.meta.parts[name];if(!P)return;
   const m=d,vx=m*(P.p1[0]-P.p0[0]),vy=-(P.p1[1]-P.p0[1]),vl=Math.hypot(vx,vy)||1;let ux=Bp.x-A.x,uy=Bp.y-A.y;const ul=Math.hypot(ux,uy)||1e-6;ux/=ul;uy/=ul;
   const kl=uniform?ku:ku*clamp(ul/(vl*ku),lo,hi),kw=ku;
   const w=(dx,dy)=>{const sx=m*dx,sy=-dy,al=(sx*vx+sy*vy)/vl,pe=(-sx*vy+sy*vx)/vl;return[kl*al*ux-kw*pe*uy,kl*al*uy+kw*pe*ux]};
   const [a,b]=w(1,0),[c,e]=w(0,1);const tx=A.x-(a*P.p0[0]+c*P.p0[1]),ty=A.y-(b*P.p0[0]+e*P.p0[1]);
-  ctx.save();ctx.transform(a,b,c,e,tx,ty);ctx.drawImage(S.img,P.x,P.y,P.w,P.h,0,0,P.w,P.h);ctx.restore()}
+  ctx.save();ctx.transform(a,b,c,e,tx,ty);ctx.drawImage(S.img,P.x,P.y,P.w,P.h,0,0,P.w,P.h);if(cb)cb(ctx);ctx.restore()}
 CO.draw=function(B,ctx,o){o=o||{};const S=CO.sets[B.look.cutout],J=B.J,H=B.H,d=B.d||1;const ku=H*1.03/(S.meta.h*.935);/* the figure is ~841 px tall in a 900 px picture */
   ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';
   const nearLead=(d>0)===(B.stance>0);const lead={S:'lS',E:'lE',W:'lW',H:'lH',K:'lK',A:'lA',T:'lT'},rear={S:'rS',E:'rE',W:'rW',H:'rH',K:'rK',A:'rA',T:'rT'};const N=nearLead?lead:rear,F=nearLead?rear:lead;

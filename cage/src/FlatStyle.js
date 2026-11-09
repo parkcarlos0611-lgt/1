@@ -173,11 +173,11 @@ function footFlat(ctx,A,He,T,M,C,d){const ux0=T.x-He.x,uy0=T.y-He.y,Lf=Math.hypo
 
 /* ---------- torso: lats, pecs, abs, obliques ---------- */
 function torsoFlat(ctx,J,H,M,sk,d,lk,B){const sp=[J.hip,J.mid,J.sh,J.nk];const segL=[0];for(let i=1;i<4;i++)segL.push(segL[i-1]+Math.hypot(sp[i].x-sp[i-1].x,sp[i].y-sp[i-1].y));const TL=segL[3]||1;
-  const at=s=>{const L=s*TL*.92;/* the torso stops below the chin: the neck is visible between chin and shoulders */let i=1;while(i<3&&segL[i]<L)i++;const a=sp[i-1],b=sp[i],k=(L-segL[i-1])/((segL[i]-segL[i-1])||1);const tx=b.x-a.x,ty=b.y-a.y,l=Math.hypot(tx,ty)||1;return{x:a.x+tx*k,y:a.y+ty*k,nx:ty/l*d,ny:-tx/l*d}};
+  const at=s=>{const L=s*TL;let i=1;while(i<3&&segL[i]<L)i++;const a=sp[i-1],b=sp[i],k=(L-segL[i-1])/((segL[i]-segL[i-1])||1);const tx=b.x-a.x,ty=b.y-a.y,l=Math.hypot(tx,ty)||1;return{x:a.x+tx*k,y:a.y+ty*k,nx:ty/l*d,ny:-tx/l*d}};
   const pt=(s,w)=>{const c=at(s);return{x:c.x+c.nx*w*M/.94/1,y:c.y+c.ny*w*M/.94}};
   const bel=lk.belly||lk.body==='belly'?.042:lk.body==='soft'?.017:0;const shb=lk.body==='broad'?1.14:1;/* broad: wider chest and upper back */
-  const FR=[[0,.074+bel*.3],[.16,.068+bel*.8],[.32,.066+bel],[.48,.067+bel*.7],[.6,.078],[.7,.088*shb],[.79,.088*shb],[.87,.07*shb],[.94,.046],[1,.03]];
-  const BK=[[0,.09],[.1,.086],[.24,.066+bel*.3],[.38,.061+bel*.2],[.52,.071],[.66,.085*shb],[.78,.093*shb],[.88,.09*shb],[.95,.082],[1,.074]];/* the back runs up into the nape without a step */
+  const FR=[[0,.072+bel*.3],[.16,.066+bel*.8],[.32,.064+bel],[.48,.065+bel*.7],[.6,.068],[.7,.072*shb],[.8,.066*shb],[.88,.052*shb],[.94,.04],[1,.036]];/* side view of the proportion chart: flat chest, no pec bulge */
+  const BK=[[0,.088],[.1,.082],[.24,.064+bel*.3],[.38,.06+bel*.2],[.52,.068],[.64,.078*shb],[.74,.084*shb],[.84,.078*shb],[.92,.062],[1,.046]];/* the back climbs smoothly from the lumbar curve over the shoulder blades into the trapezius and the neck */
   const F=FR.map(([s,w])=>pt(s,w)),Bk=BK.map(([s,w])=>pt(s,-w));
   poly(ctx,F.concat(Bk.slice().reverse()),sk.base,ROUND*2.2);
   if(FS.outline)thinLine(ctx,F.concat(Bk.slice().reverse()),sk.base);
@@ -247,6 +247,14 @@ function drawGloveFlat(ctx,E,Wr,G,H,col,strap,open,blood,d,skinC,plain,far){open
   ctx.restore()}
 
 /* ---------- head: angular cranium, face planes, block hair and beard ---------- */
+
+/* a vector neck drawn from the torso top up under the head: front line near vertical (throat), back line sweeping down into the trapezius */
+function vecNeck(ctx,nk,hd,H,skin,d){const ux=hd.x-nk.x,uy=hd.y-nk.y,L=Math.hypot(ux,uy)||1,u={x:ux/L,y:uy/L},n={x:u.y*d,y:-u.x*d};/* n: toward the face */
+  const P=(t,w)=>({x:nk.x+u.x*L*t+n.x*w*H,y:nk.y+u.y*L*t+n.y*w*H});
+  const f=[P(-.1,.04),P(.2,.037),P(.4,.036)],b=[P(.4,-.034),P(.15,-.04),P(-.1,-.044)];
+  ctx.save();ctx.fillStyle=skin;ctx.beginPath();f.concat(b).forEach((q,i)=>i?ctx.lineTo(q.x,q.y):ctx.moveTo(q.x,q.y));ctx.closePath();ctx.fill();
+  ctx.clip();const g=ctx.createLinearGradient(P(0,.04).x,P(0,.04).y,P(0,-.06).x,P(0,-.06).y);const lo=rgbOf(shade(skin,-.28)),hi=rgbOf(shade(skin,.1));g.addColorStop(0,`rgba(${hi[0]},${hi[1]},${hi[2]},.45)`);g.addColorStop(.45,'rgba(0,0,0,0)');g.addColorStop(1,`rgba(${lo[0]},${lo[1]},${lo[2]},.6)`);ctx.fillStyle=g;ctx.fillRect(nk.x-H,nk.y-H,2*H,2*H);
+  const lo2=rgbOf(shade(skin,-.3));const g2=ctx.createLinearGradient(P(.7,0).x,P(.7,0).y,P(-.1,0).x,P(-.1,0).y);g2.addColorStop(0,'rgba(0,0,0,0)');g2.addColorStop(1,`rgba(${lo2[0]},${lo2[1]},${lo2[2]},.5)`);ctx.fillStyle=g2;ctx.fillRect(nk.x-H,nk.y-H,2*H,2*H);/* the neck darkens toward the collar */ctx.restore()}
 function headFlat(ctx,hd,nk,H,B,skin,d,ang){if(window.CUTOUT&&B.look&&B.look.cutout&&CUTOUT.head(ctx,hd,nk,H,B,d))return;const lk=B.look,r=.066*H;ctx.save();ctx.translate(hd.x,hd.y);ctx.scale(d,1);ctx.rotate(-ang*.9);
   const F=(typeof faceOf==='function')?faceOf(B):{n:.5,br:.5,jw:.5,ch:.5,lp:.5,nf:0,nh:0};
   const sk=skin;const sh=shade(sk,FS.shadowK),lt=shade(sk,FS.lightK),dk=shade(sk,-.3);
@@ -645,4 +653,5 @@ function drawOctagon(S,ctx,W,H,s,gy,fy){const G=octGeom(S,W,H,s,gy,fy);if((S.sid
   const posts=G.V.filter(v=>v.Z>=0).concat([{X:G.xc,Z:0},{X:-G.xc,Z:0}]).sort((p,q)=>q.Z-p.Z);
   for(const v of posts){const P=G.P(v.X,v.Z);const w=.14*s*P.k,h=(FH+.08)*s*P.k;const pw=T>.35?w*1.35:w;ctx.fillStyle='#0b0b0d';rr(ctx,P.x-pw/2,P.y-h,pw,h+.02*s,pw/2);ctx.fillStyle='#1d1e22';rr(ctx,P.x-pw*.15,P.y-h+.05*s*P.k,pw*.3,h-.1*s*P.k,pw*.15);
     if(T>.35){/* padded post wrap in the promotion colour + a cap */ctx.fillStyle=S.col||'#d20a0a';rr(ctx,P.x-pw/2,P.y-h*.62,pw,h*.18,pw*.3);ctx.fillStyle='rgba(255,255,255,.18)';rr(ctx,P.x-pw*.32,P.y-h*.6,pw*.16,h*.14,pw*.08);ctx.fillStyle='#1f2025';ctx.beginPath();ctx.ellipse(P.x,P.y-h,pw*.62,pw*.3,0,0,7);ctx.fill()}}}
+window.FS_NECK=vecNeck;
 })();

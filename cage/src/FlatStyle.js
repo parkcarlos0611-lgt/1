@@ -185,9 +185,6 @@ function torsoFlat(ctx,J,H,M,sk,d,lk,B){const sp=[J.hip,J.mid,J.sh,J.nk];const s
   /* lats / spine side: shadow plane on the back */
   poly(ctx,BK.map(([s,w])=>pt(s,-w*.32)).concat(Bk.slice().reverse()),sk.sh);
   /* trapezius slope + clavicle line */poly(ctx,[pt(.9,-.08),pt(1,-.045),pt(1,.0),pt(.93,-.02)],sk.sh);
-  /* pec plate: lighter facet, then the hard under-pec shadow */
-  poly(ctx,[pt(.93,.06),pt(.87,.088),pt(.79,.099),pt(.7,.096),pt(.69,.03),pt(.8,.0),pt(.9,.02)],sk.lt);
-  poly(ctx,[pt(.7,.098),pt(.67,.08),pt(.66,.015),pt(.69,.0),pt(.71,.03)],sk.sh);
 
   /* abs: flat blocks along the front edge */
 
@@ -250,8 +247,8 @@ function drawGloveFlat(ctx,E,Wr,G,H,col,strap,open,blood,d,skinC,plain,far){open
 
 /* a vector neck drawn from the torso top up under the head: front line near vertical (throat), back line sweeping down into the trapezius */
 function vecNeck(ctx,nk,hd,H,skin,d){const ux=hd.x-nk.x,uy=hd.y-nk.y,L=Math.hypot(ux,uy)||1,u={x:ux/L,y:uy/L},n={x:u.y*d,y:-u.x*d};/* n: toward the face */
-  const P=(t,w)=>({x:nk.x+u.x*L*t+n.x*w*H,y:nk.y+u.y*L*t+n.y*w*H});
-  const f=[P(-.1,.04),P(.2,.037),P(.4,.036)],b=[P(.4,-.034),P(.15,-.04),P(-.1,-.044)];
+  const P=(t,w)=>({x:nk.x+u.x*H*t+n.x*w*H,y:nk.y+u.y*H*t+n.y*w*H});/* t in body heights along the neck axis */
+  const f=[P(-.02,.044),P(.01,.039),P(.03,.036),P(.045,.035)],b=[P(.045,-.03),P(.03,-.034),P(.01,-.039),P(-.02,-.044)];
   ctx.save();ctx.fillStyle=skin;ctx.beginPath();f.concat(b).forEach((q,i)=>i?ctx.lineTo(q.x,q.y):ctx.moveTo(q.x,q.y));ctx.closePath();ctx.fill();
   ctx.clip();const g=ctx.createLinearGradient(P(0,.04).x,P(0,.04).y,P(0,-.06).x,P(0,-.06).y);const lo=rgbOf(shade(skin,-.28)),hi=rgbOf(shade(skin,.1));g.addColorStop(0,`rgba(${hi[0]},${hi[1]},${hi[2]},.45)`);g.addColorStop(.45,'rgba(0,0,0,0)');g.addColorStop(1,`rgba(${lo[0]},${lo[1]},${lo[2]},.6)`);ctx.fillStyle=g;ctx.fillRect(nk.x-H,nk.y-H,2*H,2*H);
   const lo2=rgbOf(shade(skin,-.3));const g2=ctx.createLinearGradient(P(.7,0).x,P(.7,0).y,P(-.1,0).x,P(-.1,0).y);g2.addColorStop(0,'rgba(0,0,0,0)');g2.addColorStop(1,`rgba(${lo2[0]},${lo2[1]},${lo2[2]},.5)`);ctx.fillStyle=g2;ctx.fillRect(nk.x-H,nk.y-H,2*H,2*H);/* the neck darkens toward the collar */ctx.restore()}

@@ -91,7 +91,7 @@ const TMAP={
   obl:[-.11,[[520,898],[600,920],[675,930],[682,960],[700,1020],[740,1100],[782,1220],[762,1342],[700,1325],[600,1275],[500,1215],[400,1150],[350,1112],[355,1090],[385,1040],[412,1010],[418,960]]]},
  delt:[480,450]};
 const tmS=y=>1.16*(1345-y)/1250,tmW=x=>(x-560)/600*.17;
-/* weight class scale: heavyweight is the reference; the lightest classes are up to 10 % slimmer in the torso */
+/* weight class scale: heavyweight is the reference; the lightest classes are up to 3 % slimmer in the torso */
 window.CLASS_T=function(W){return Math.max(0,Math.min(1,((W||1)-.86)/(1.2-.86)))};
 /* a fold at a bent joint: the inside of the bend darkens, the outside catches light */
 function foldAt(ctx,j,dirIn,dirOut,r,base){const cr=dirIn.x*dirOut.y-dirIn.y*dirOut.x,dt=dirIn.x*dirOut.x+dirIn.y*dirOut.y,ang=Math.acos(Math.max(-1,Math.min(1,dt)));if(ang<.35)return;
@@ -227,7 +227,7 @@ function torsoFlat(ctx,J,H,M,sk,d,lk,B){const sp=[J.hip,J.mid,J.sh,J.nk];const s
   const bel=lk.belly||lk.body==='belly'?.042:lk.body==='soft'?.017:0;const shb=lk.body==='broad'?1.14:1;/* broad: wider chest and upper back */
   const FR=[[0,.07+bel*.3],[.14,.064+bel*.8],[.3,.062+bel],[.46,.064+bel*.7],[.6,.066],[.7,.068*shb],[.8,.062*shb],[.88,.05*shb],[.94,.04],[1,.036]];/* side view of the proportion wireframe: straight chest, no pec bulge */
   const BK=[[0,.086],[.1,.078],[.22,.062+bel*.3],[.36,.058+bel*.2],[.5,.066],[.62,.072*shb],[.72,.078*shb],[.82,.076*shb],[.9,.07],[.96,.062],[1,.056]];/* lumbar curve in, shoulder blades out, then a long slope up the trapezius into the nape */
-  const tk=1-.10*(1-CLASS_T(B.W));/* torso width by weight class */let F,Bk;if(sk.far){F=TMAP.R.map(([x,y])=>pt(tmS(y),tmW(x)*tk));Bk=TMAP.L.slice().reverse().map(([x,y])=>pt(tmS(y),tmW(x)*tk));B._dl=pt(tmS(TMAP.delt[1]),tmW(TMAP.delt[0])*tk)}else{F=FR.map(([s,w])=>pt(s,w));Bk=BK.map(([s,w])=>pt(s,-w))}
+  const tk=1.03*(1-.03*(1-CLASS_T(B.W)));/* heavyweight torso 3 % thicker than before; lighter classes down to 3 % under the heavyweight */let F,Bk;if(sk.far){F=TMAP.R.map(([x,y])=>pt(tmS(y),tmW(x)*tk));Bk=TMAP.L.slice().reverse().map(([x,y])=>pt(tmS(y),tmW(x)*tk));B._dl=pt(tmS(TMAP.delt[1]),tmW(TMAP.delt[0])*tk)}else{F=FR.map(([s,w])=>pt(s,w));Bk=BK.map(([s,w])=>pt(s,-w))}
   if(sk.far)B._tt={f:F[F.length-1],b:Bk[Bk.length-1]};/* top corners: the nape bridge is joined here */
   poly(ctx,F.concat(Bk.slice().reverse()),sk.base,ROUND*2.2);
   if(FS.outline)thinLine(ctx,F.concat(Bk.slice().reverse()),sk.base);

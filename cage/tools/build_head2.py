@@ -99,6 +99,20 @@ if C.get('darkcut'):
     lum=neck[...,:3].astype(float).mean(2);mx=neck[...,:3].max(2).astype(float);mn=neck[...,:3].min(2).astype(float)
     neckm=neckm&~((lum<95)&((mx-mn)<40)&(yy>=neckTop+Y(C.get('darkFrom',0))))
 neck[...,3]=(neck[...,3]*neckm).astype(np.uint8)
+def keep_main(rgba_):   # drop loose fragments (stray bits of beard / glove): keep only the biggest connected piece
+    from collections import deque
+    m=rgba_[...,3]>40;lab=np.zeros(m.shape,np.int32);best=(0,0);k=0;H_,W_=m.shape
+    for y0 in range(H_):
+        for x0 in np.nonzero(m[y0]&(lab[y0]==0))[0]:
+            if lab[y0,x0]:continue
+            k+=1;q=deque([(y0,x0)]);lab[y0,x0]=k;n=0
+            while q:
+                y,x=q.popleft();n+=1
+                for yy_,xx_ in((y+1,x),(y-1,x),(y,x+1),(y,x-1)):
+                    if 0<=yy_<H_ and 0<=xx_<W_ and m[yy_,xx_] and not lab[yy_,xx_]:lab[yy_,xx_]=k;q.append((yy_,xx_))
+            if n>best[0]:best=(n,k)
+    rgba_[...,3]=np.where(lab==best[1],rgba_[...,3],0);return rgba_
+head=keep_main(head)
 Image.fromarray(head).save(out+'/head.png');Image.fromarray(neck).save(out+'/neck.png')
 rows=[None]*CH;na=neck[...,3]
 for y in range(neckTop,CH):

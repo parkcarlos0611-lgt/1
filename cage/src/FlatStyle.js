@@ -195,6 +195,7 @@ function torsoFlat(ctx,J,H,M,sk,d,lk,B){const sp=[J.hip,J.mid,J.sh,J.nk];const s
     if(!TD){fac(ctx,[pt(.7,-.1),pt(.3,-.1),pt(.3,-.04),pt(.7,-.05)],lo,.3,0);fac(ctx,[pt(.5,.1),pt(.15,.1),pt(.15,.05),pt(.5,.05)],hi,.25,0);fac(ctx,[pt(.66,.0),pt(.62,.1),pt(.58,.1),pt(.62,.0)],dk,.2,0);return}
     {const ow=B&&B._owner,sevB=ow&&ow.hp?clamp((100-ow.hp.body)/100*1.25-.1,0,1):0;bruises(ctx,(s,w)=>pt(s,w/M),[[.5,.035,.06],[.38,.03,.055],[.6,.0,.05],[.28,.04,.05],[.7,.03,.045]].map(q=>[q[0],q[1],q[2]]),sevB,111,M,0)}
     fac(ctx,[pt(.5,.1),pt(.12,.1),pt(.12,.05),pt(.5,.05)],hi,.3,0);/* front: lit */
+    ctx.save();ctx.strokeStyle=lo;ctx.globalAlpha=.55;ctx.lineWidth=.009*M;ctx.lineCap='round';ctx.beginPath();{const q=[pt(1,.026),pt(.96,.04),pt(.91,.062),pt(.85,.074)];ctx.moveTo(q[0].x,q[0].y);ctx.quadraticCurveTo(q[1].x,q[1].y,q[2].x,q[2].y);ctx.lineTo(q[3].x,q[3].y)}ctx.stroke();ctx.restore();/* neck-to-chest contour */
     fac(ctx,[pt(.7,-.1),pt(.2,-.1),pt(.2,-.045),pt(.7,-.05)],lo,.35,0);/* back: core shadow */
     });
   /* blood streaming down the chest */

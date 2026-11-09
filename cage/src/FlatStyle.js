@@ -638,7 +638,7 @@ function drawOctagon(S,ctx,W,H,s,gy,fy){const G=octGeom(S,W,H,s,gy,fy);if((S.sid
     /* chain-link mesh */ctx.strokeStyle='rgba(60,62,70,.5)';ctx.lineWidth=1;ctx.beginPath();const n=Math.max(4,Math.round(Math.hypot(B.x-A.x,B.y-A.y)/(.16*s*A.k)));
     for(let k=0;k<=n;k++){const u=k/n,u2=Math.min(1,(k+.5*n/ n*0+.5)/n);const x0=A.x+(B.x-A.x)*u,y0=A.y+(B.y-A.y)*u,x1=At.x+(Bt.x-At.x)*u,y1=At.y+(Bt.y-At.y)*u;ctx.moveTo(x0,y0);ctx.lineTo(x1,y1)}
     for(let k=1;k<10;k++){const v=k/10;ctx.moveTo(A.x+(At.x-A.x)*v,A.y+(At.y-A.y)*v);ctx.lineTo(B.x+(Bt.x-B.x)*v,B.y+(Bt.y-B.y)*v)}ctx.stroke();
-    /* bottom pad and top rail along the panel */ctx.strokeStyle='#17181b';ctx.lineCap='round';ctx.lineWidth=.16*s*Math.min(A.k,B.k);ctx.beginPath();ctx.moveTo(A.x,A.y-.08*s*A.k);ctx.lineTo(B.x,B.y-.08*s*B.k);ctx.stroke();sponsorStrip(ctx,A,B,s,sid);
+    /* bottom pad and top rail along the panel */ctx.strokeStyle='#17181b';ctx.lineCap='round';ctx.lineWidth=.16*s*Math.min(A.k,B.k);ctx.beginPath();ctx.moveTo(A.x,A.y-.08*s*A.k);ctx.lineTo(B.x,B.y-.08*s*B.k);ctx.stroke();
     ctx.strokeStyle='#0e0f11';ctx.lineWidth=(.07+.06*T)*s*Math.min(A.k,B.k);ctx.beginPath();ctx.moveTo(At.x,At.y);ctx.lineTo(Bt.x,Bt.y);ctx.stroke();
     if(T>.5){/* light catch on the mesh and the padded top rail of a premium cage */ctx.strokeStyle='rgba(205,210,220,.16)';ctx.lineWidth=1;ctx.beginPath();for(let k=1;k<10;k+=2){const v=k/10;ctx.moveTo(A.x+(At.x-A.x)*v,A.y+(At.y-A.y)*v-1);ctx.lineTo(B.x+(Bt.x-B.x)*v,B.y+(Bt.y-B.y)*v-1)}ctx.stroke();
       ctx.strokeStyle='rgba(255,255,255,.14)';ctx.lineWidth=.02*s*Math.min(A.k,B.k);ctx.beginPath();ctx.moveTo(At.x,At.y-.03*s*A.k);ctx.lineTo(Bt.x,Bt.y-.03*s*B.k);ctx.stroke()}

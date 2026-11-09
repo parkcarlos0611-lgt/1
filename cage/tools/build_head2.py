@@ -46,7 +46,7 @@ CFG={
    jaw=[(358,64),(366,76),(380,85),(396,86),(407,87)],
    backN=[(64,345),(84,341),(109,341)],frontN=[(64,383),(84,387),(109,391)],
    eye=(392,52),brow=(0,0),brow2=(0,0),nosef=(0,0),cheek=(0,0),fore=(0,0),lip=(403,70),lid='#c08060',blinkonly=1),
- 'ref2':dict(top=13,chin=88,back=618,nose=680,neckTop=59,cut=3,clipX=684,darkcut=1,padL=50,
+ 'ref2':dict(darkFrom=16,top=13,chin=88,back=618,nose=680,neckTop=59,cut=3,clipX=684,darkcut=1,padL=50,
    jaw=[(629,59),(637,71),(651,80),(667,88),(680,89)],
    backN=[(59,616),(79,612),(104,612)],frontN=[(59,654),(79,658),(104,662)],
    eye=(665,49),brow=(0,0),brow2=(0,0),nosef=(0,0),cheek=(0,0),fore=(0,0),lip=(676,72),lid='#c08060',blinkonly=1),
@@ -97,7 +97,7 @@ if 'neckEnd' in C:   # below this source row the picture shows a tattoo / the bo
     for yy_ in range(ne,CH):neck[yy_]=rgba[ne-3]
 if C.get('darkcut'):
     lum=neck[...,:3].astype(float).mean(2);mx=neck[...,:3].max(2).astype(float);mn=neck[...,:3].min(2).astype(float)
-    neckm=neckm&~((lum<95)&((mx-mn)<40)&(yy>=neckTop))
+    neckm=neckm&~((lum<95)&((mx-mn)<40)&(yy>=neckTop+Y(C.get('darkFrom',0))))
 neck[...,3]=(neck[...,3]*neckm).astype(np.uint8)
 Image.fromarray(head).save(out+'/head.png');Image.fromarray(neck).save(out+'/neck.png')
 rows=[None]*CH;na=neck[...,3]

@@ -257,16 +257,16 @@ function shortsLeg(ctx,h,k,d,M,col,lk,isFar){const F=frame(h,k,d);const P=(t,w)=
   polyRshortsLeg(ctx,[P(-.05,-.084*M),P(.62,-.082*M),P(.6,-.01*M),P(.3,-.02*M)],shade(col,-.12));
   const ac=accentOf(lk.shorts||'#111');polyRshortsLeg(ctx,[P(.08,.08*M),P(.13,.08*M),P(.42,-.03*M),P(.37,-.03*M)],ac);polyRshortsLeg(ctx,[P(.22,.08*M),P(.26,.08*M),P(.48,-.0*M),P(.44,-.0*M)],ac)}
 const polyRshortsWaist=(ctx,P,c)=>poly(ctx,P,c,.04);
-function shortsWaist(ctx,J,H,M,col,d,lk,ta){const hip=J.hip,mid=J.mid;const n={x:d*Math.cos(ta),y:-Math.sin(ta)};const Pp=(c,f)=>({x:c.x+n.x*f,y:c.y+n.y*f});const bel=lk&&(lk.belly||lk.body==='belly')?.042:lk&&lk.body==='soft'?.017:0;const wf=(.081+bel*.85)*M/.94,wb=.094*M/.94;
+function shortsWaist(ctx,J,H,M,col,d,lk,ta){const hip=J.hip,mid=J.mid;const n={x:d*Math.cos(ta),y:-Math.sin(ta)};const Pp=(c,f)=>({x:c.x+n.x*f,y:c.y+n.y*f});const bel=lk&&(lk.belly||lk.body==='belly')?.042:lk&&lk.body==='soft'?.017:0;const wf=(.074+bel*.85)*M/.94,wb=.062*M/.94;
   const top=lerp(hip,mid,.38),t2=lerp(hip,mid,.3);poly(ctx,[Pp(top,wf),Pp(top,-wb),Pp(t2,-wb*1.02),Pp(t2,wf*1.01)],shade(col,-.25),0)}
 function hull2(P){P=P.slice().sort((a,b)=>a.x-b.x||a.y-b.y);const cr=(o,a,b)=>(a.x-o.x)*(b.y-o.y)-(a.y-o.y)*(b.x-o.x);const lo=[],up=[];for(const p of P){while(lo.length>=2&&cr(lo[lo.length-2],lo[lo.length-1],p)<=0)lo.pop();lo.push(p)}for(let i=P.length-1;i>=0;i--){const p=P[i];while(up.length>=2&&cr(up[up.length-2],up[up.length-1],p)<=0)up.pop();up.push(p)}lo.pop();up.pop();return lo.concat(up)}
 const polyRshortsSeat=(ctx,P,c)=>poly(ctx,P,c,.13);
-function shortsSeat(ctx,J,H,M,col,d,ta,nS,fS,lk){const hip=J.hip,mid=J.mid;const n={x:d*Math.cos(ta),y:-Math.sin(ta)};const Pp=(c,f)=>({x:c.x+n.x*f,y:c.y+n.y*f});const hw=.08*M/.94;const top=lerp(hip,mid,.36);
+function shortsSeat(ctx,J,H,M,col,d,ta,nS,fS,lk){const hip=J.hip,mid=J.mid;const n={x:d*Math.cos(ta),y:-Math.sin(ta)};const Pp=(c,f)=>({x:c.x+n.x*f,y:c.y+n.y*f});const hw=.066*M/.94;const top=lerp(hip,mid,.36);
   const pts=[Pp(top,hw),Pp(top,-hw*1.04),Pp(hip,-hw*1.1),Pp(hip,hw*1.04)];
-  for(const S of[nS,fS]){const h=J[S.H],k=J[S.K];const F=frame(h,k,d);for(const[t,w]of[[.46,.074],[.46,-.076],[.34,.082],[.34,-.084],[.18,.09],[.18,-.09],[.02,.092],[.02,-.092]])pts.push({x:h.x+F.ux*F.L*t+F.nx*w*M,y:h.y+F.uy*F.L*t+F.ny*w*M})}
+  for(const S of[nS,fS]){const h=J[S.H],k=J[S.K];const F=frame(h,k,d);for(const[t,w]of[[.46,.066],[.46,-.062],[.34,.074],[.34,-.07],[.18,.084],[.18,-.08],[.02,.088],[.02,-.084]])pts.push({x:h.x+F.ux*F.L*t+F.nx*w*M,y:h.y+F.uy*F.L*t+F.ny*w*M})}
   polyRshortsSeat(ctx,hull2(pts),col);
   /* top of the shorts: square corners, as wide as the torso at the waist (belly included) so no skin shows at the band */
-  const bel=lk&&(lk.belly||lk.body==='belly')?.042:lk&&lk.body==='soft'?.017:0;const wf=(.08+bel*.85)*M/.94,wb=.093*M/.94;const tp=lerp(hip,mid,.38);
+  const bel=lk&&(lk.belly||lk.body==='belly')?.042:lk&&lk.body==='soft'?.017:0;const wf=(.074+bel*.85)*M/.94,wb=.062*M/.94;const tp=lerp(hip,mid,.38);
   poly(ctx,[Pp(tp,wf),Pp(tp,-wb),Pp(hip,-wb*1.06),Pp(hip,wf*1.02)],col,0)}
 function shortsFold(ctx,J,M,col,d,nS){/* the fold where the thigh bends against the hip */const h=J[nS.H],k=J[nS.K];const F=frame(h,k,d);const P=(t,w)=>({x:h.x+F.ux*F.L*t+F.nx*w*M,y:h.y+F.uy*F.L*t+F.ny*w*M});
   poly(ctx,[P(-.04,.078),P(.14,.08),P(.05,.05)],shade(col,-.2))}

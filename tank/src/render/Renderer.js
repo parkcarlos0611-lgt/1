@@ -219,10 +219,37 @@ DS.Renderer = class Renderer {
     // crisp surface line
     ctx.beginPath();
     for (let x = x0; x <= x1 + step; x += step) { const y = T.height(x); if (x === x0) ctx.moveTo(x, y); else ctx.lineTo(x, y); }
+    this.shadows(ctx, cam);
     // thin ink edge on the ground surface (matches the outlined art), with a sunlit lip just under it
     ctx.save(); ctx.translate(0, -1.6 / cam.zoom);
     ctx.strokeStyle = 'rgba(250,232,195,0.55)'; ctx.lineWidth = 1.2 / cam.zoom; ctx.stroke(); ctx.restore();
     ctx.strokeStyle = 'rgba(64,46,26,0.85)'; ctx.lineWidth = Math.max(0.012, 1.3 / cam.zoom); ctx.lineJoin = 'round'; ctx.stroke();
+  }
+
+  // Contact shadow on the ground under each hull and thrown turret. In side view the ground plane runs
+  // toward the viewer below the surface line, so the shadow is a soft band just under it, offset away from
+  // the sun (upper right) and fading out to the sides.
+  shadows(ctx, cam) {
+    const env = this.w.env || {}, T = this.w.terrain;
+    const k = (1 - 0.85 * (env.night || 0)) * (env.visibility ? 0.6 : 1);
+    if (k <= 0.02) return;
+    const band = (cx, half, depth, a) => {
+      const x0 = cx - half, x1 = cx + half, n = 24;
+      const g = ctx.createLinearGradient(x0, 0, x1, 0);
+      g.addColorStop(0, 'rgba(60,40,20,0)'); g.addColorStop(0.18, `rgba(60,40,20,${a})`);
+      g.addColorStop(0.85, `rgba(60,40,20,${a})`); g.addColorStop(1, 'rgba(60,40,20,0)');
+      ctx.fillStyle = g; ctx.beginPath();
+      for (let i = 0; i <= n; i++) { const x = x0 + (x1 - x0) * i / n; ctx.lineTo(x, T.height(x) + 0.02); }
+      for (let i = n; i >= 0; i--) { const x = x0 + (x1 - x0) * i / n, t = Math.sin(Math.PI * i / n); ctx.lineTo(x, T.height(x) - depth * (0.35 + 0.65 * t)); }
+      ctx.closePath(); ctx.fill();
+    };
+    for (const v of this.w.vehicles) {
+      if (!cam.visible(v.pos.x, v.pos.y, 12)) continue;
+      const L = (v.g.idler.x - v.g.sprocket.x) * v.dir;            // track length on the ground
+      band(v.pos.x - 0.9, Math.abs(L) / 2 + 1.4, 0.55, 0.34 * k);
+      band(v.pos.x - 0.5, Math.abs(L) / 2 + 0.3, 0.22, 0.30 * k);   // darker core right under the tracks
+      if (v.turretBody && v.turretBody.rest) band(v.turretBody.x - 0.4, 2.2, 0.3, 0.3 * k);
+    }
   }
 
   vehicle(ctx, v, cam) {
@@ -275,7 +302,9 @@ DS.Renderer = class Renderer {
     ctx.save(); ctx.translate(v.pos.x, v.pos.y); ctx.rotate(v.ang); ctx.scale(dir, 1);
     const U = D.underside;
     ctx.fillStyle = '#2b251d'; ctx.beginPath();
-    ctx.moveTo(U.x0, U.y0); ctx.lineTo(U.x1, U.y0); ctx.lineTo(U.x1 - 0.2, U.y1); ctx.lineTo(U.x0 + 0.3, U.y1); ctx.closePath(); ctx.fill();
+    if (U.poly) { U.poly.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); }
+    else { ctx.moveTo(U.x0, U.y0); ctx.lineTo(U.x1, U.y0); ctx.lineTo(U.x1 - 0.2, U.y1); ctx.lineTo(U.x0 + 0.3, U.y1); }
+    ctx.closePath(); ctx.fill();
     if (D.rearFill) { const R = D.rearFill; ctx.fillRect(R.x0, R.y0, R.x1 - R.x0, R.y1 - R.y0); }
     if (D.sprocketHole) { ctx.beginPath(); ctx.arc(D.sprocket.x, D.sprocket.y, D.sprocketHole, 0, 7); ctx.fill(); }
     ctx.restore();

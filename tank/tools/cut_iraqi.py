@@ -16,11 +16,14 @@ CFG = {
         box=(960, 0, 1752, 300), seam=164, skirt=200, gun_x=1432, bore=(124, 147),
         sprocket=(1067, 222, 1), rear_cut=(0, 999), nose=[(1750, 298), (1751, 298), (1751, 299)],
         antennas=[(1185, 96)], flag=(1274, 119, 1331, 153), shadow=281,
+        # fender tips curve down past the cut line: keep their tan pixels (+outline), not idler/sprocket
+        fenders=[(1500, 1565), (990, 1045)], gear_holes=[(1507, 220, 26), (1067, 222, 26)],
     ),
     't62': dict(
         box=(960, 290, 1752, 600), seam=463, skirt=501, gun_x=1412, bore=(427, 451),
         sprocket=(1055, 525, 1), rear_cut=(0, 999), nose=[(1750, 598), (1751, 598), (1751, 599)],
         antennas=[(1184, 398)], flag=(1246, 418, 1303, 453), shadow=584,
+        fenders=[(1495, 1565), (975, 1035)], gear_holes=[(1500, 522, 26), (1055, 525, 26)],
     ),
     't72': dict(
         box=(960, 590, 1752, 897),
@@ -92,6 +95,19 @@ def cut(vid):
     nm = Image.new('L', (x1 - x0, y1 - y0), 0)
     ImageDraw.Draw(nm).polygon([(px - x0, py - y0) for px, py in c['nose']], fill=1)
     keep &= ~np.asarray(nm).astype(bool)
+    if 'fenders' in c:
+        rgb = rgba[..., :3].astype(np.int16)
+        tan = (rgb[..., 0] - rgb[..., 2] > 35) & (rgb[..., 0] > 90) & (rgba[..., 3] > 0)
+        band = (yy >= c['skirt']) & (yy < c['skirt'] + 24)
+        reg = np.zeros_like(band)
+        for fx0, fx1 in c['fenders']: reg |= (xx >= fx0) & (xx <= fx1)
+        for gx, gy, gr in c['gear_holes']: reg &= ((xx - gx) ** 2 + (yy - gy) ** 2) > gr ** 2
+        fm = tan & band & reg
+        grow = fm.copy()                      # take the ink outline round the fender too
+        for _ in range(3):
+            g2 = grow.copy(); g2[1:] |= grow[:-1]; g2[:-1] |= grow[1:]; g2[:, 1:] |= grow[:, :-1]; g2[:, :-1] |= grow[:, 1:]
+            grow = g2
+        keep |= grow & band & reg & (rgba[..., 3] > 0) & ((rgb.max(axis=2) < 80) | tan)
     h[~keep] = 0
     save('hull', h)
 

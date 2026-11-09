@@ -26,7 +26,8 @@ DS.VEHICLES = DS.VEHICLES || {};
     track: { pitch: 0.1545, thick: 0.075, width: 0.58, mass: 3000 },
     belly: { y: -0.683, x0: -3.0, x1: 3.2 },
     contactArea: 0.87,
-    underside: { x0: -2.46, x1: 2.5, y0: -0.116, y1: -0.77 },
+    underside: { x0: -2.46, x1: 2.5, y0: -0.116, y1: -0.77,   // dark lower hull, wrapped round the idler and sprocket
+      poly: [[-3.15, -0.12], [3.22, -0.12], [3.18, -0.3], [2.95, -0.55], [2.4, -0.8], [-2.2, -0.8], [-2.8, -0.62], [-3.18, -0.32]] },
     engine: { type: 'diesel', power: 4.32e5, eff: 0.70, maxTractive: 2.4e5, spool: 0.4,
       vmaxF: 50 / 3.6, vmaxR: 8 / 3.6, brake: 3.6e5, engineBrake: 2.6e4 },
     exhaust: { x: -2.8, y: -0.145 },

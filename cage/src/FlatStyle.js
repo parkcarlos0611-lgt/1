@@ -56,7 +56,7 @@ function limb(ctx,a,b,d,rows,col,shCol,extra){const F=frame(a,b,d);const P=(t,w)
 /* ---------- body ---------- */
 
 /* ---------- body detail: low-poly muscle planes, core shadows and rim light — everything is clipped to the part's own outline, so nothing leaves the body ---------- */
-FS.detail=1;FS.outline=true;FS.blur=false;/* the white motion-blur trails are off */
+FS.detail=1;FS.outline=false;FS.floorShadow=floorShadow;FS.blur=false;/* the white motion-blur trails are off */
 const fac=(ctx,pts,col,al,R)=>{ctx.globalAlpha=Math.min(1,al*1.4);poly(ctx,pts,col,R==null?0:R);ctx.globalAlpha=1};
 const strip=(ctx,P,t0,t1,a0,b0,a1,b1,col,al)=>fac(ctx,[P(t0,a0),P(t1,a1),P(t1,b1),P(t0,b0)],col,al,ROUND*.5);
 /* run fn(hi,lo) with the part's outline as a clip; then shade the edges: dark core shadow along the back, light rim along the front */
@@ -80,10 +80,10 @@ const BD=Body.prototype.draw;
 Body.prototype.draw=function(ctx,o){o=o||{};const lk=this.look;if(window.CUTOUT&&CUTOUT.ok(this))return CUTOUT.draw(this,ctx,o);if(!FS.on)return BD.call(this,ctx,o);
   const J=this.J,H=this.H,W=this.W,d=this.d;if(!J.hd)return;
   /* the referee is the same figure in a different outfit (black polo, trousers, boots, gloves) */
-  const R=!!lk.ref;if(R&&!lk._flat){Object.assign(lk,REF_LOOK[Math.floor(Math.random()*REF_LOOK.length)]);lk._flat=1;this.hs=null}
+  const R=!!lk.ref;if(R&&!lk._flat){Object.assign(lk,REF_LOOK[Math.floor(Math.random()*REF_LOOK.length)]);lk._flat=1;this.hs=null;if(window.CUTOUT&&CUTOUT.pickRef&&!lk.coach)CUTOUT.pickRef(lk,'ref')}
   const CL=R?Object.assign({shirt:'#222327',shirtS:'#18191c',pants:'#1e1f23',pantsS:'#151619',boot:'#0f0f11',glove:'#151517'},lk.cl||{}):null;const RP=R&&!lk.cshort;/* a coach may wear fighter shorts instead of trousers */
   const ON=o.only?(k=>o.only.indexOf(k)>=0):null;/* layered draw (submissions): only these parts, in canonical order */
-  if(!o.onlyArm&&o.part!=='far'&&(!ON||ON('torso'))){floorShadow(ctx,this);if(FS.blur)motionBlur(ctx,this,lk)}
+  if(!o.onlyArm&&o.part!=='far'&&(!ON||ON('torso'))){if(!o.noFloorShadow)floorShadow(ctx,this);if(FS.blur)motionBlur(ctx,this,lk)}
   const M=H*W*.86;/* muscle scale: leaner frames, heavier classes still carry more mass through bw */const SHB=lk.body==='broad'?1.12:1;
   const skin=lk.skin||'#d39b74';const sk={base:skin,sh:shade(skin,FS.shadowK),far:shade(skin,FS.farK),farSh:shade(skin,FS.farK+FS.shadowK),lt:shade(skin,FS.lightK)};
   const shorts=calm(lk.shorts||'#111');const glove=R?CL.glove:lk.glove||'#141414';const strap=o.corner||'#c21818';
@@ -94,7 +94,7 @@ Body.prototype.draw=function(ctx,o){o=o||{};const lk=this.look;if(window.CUTOUT&
   /* ---- arm: deltoid, biceps/triceps, elbow, forearm, wrist, glove ---- */
   const arm=(S,isFar)=>{const e=J[S.E],w=J[S.W],a=lerp(J[S.S],J.mid,R?.12:.22);/* the drawn shoulder sits well below the neck, so it never covers the face */const C=isFar?{b:sk.far,s:sk.farSh}:{b:sk.base,s:sk.sh};
     /* upper arm: deltoid cap → biceps (front) / triceps (back) → elbow */
-    const Pa=limb(ctx,a,e,d,[[-.04,.05*M*SHB,.055*M*SHB],[.12,.062*M*SHB,.064*M*SHB],[.3,.052*M,.058*M],[.5,.05*M,.05*M],[.78,.04*M,.04*M],[1,.031*M,.033*M]],C.b,C.s,isFar?{noCaps:true}:null);/* the far shoulder gets no round cap: it would poke out above the back */
+    const Pa=limb(ctx,a,e,d,R?[[.5,.05*M,.05*M],[.78,.04*M,.04*M],[1,.031*M,.033*M]]:[[-.04,.05*M*SHB,.055*M*SHB],[.12,.062*M*SHB,.064*M*SHB],[.3,.052*M,.058*M],[.5,.05*M,.05*M],[.78,.04*M,.04*M],[1,.031*M,.033*M]],C.b,C.s,isFar||R?{noCaps:true}:null);/* a sleeve covers the shoulder of the referee / coach: no skin up there *//* the far shoulder gets no round cap: it would poke out above the back */
     if(!R&&FS.detail)detailIn(ctx,Pa.out,Pa.front,Pa.back,C.b,.012*M,(hi,lo)=>{const Pu=Pa.P;
       {const[r_,g_,b_]=rgbOf(lo),gr=ctx.createLinearGradient(a.x,a.y+.065*M,a.x,a.y-.012*M);gr.addColorStop(0,`rgba(${r_},${g_},${b_},.62)`);gr.addColorStop(1,`rgba(${r_},${g_},${b_},0)`);ctx.fillStyle=gr;ctx.beginPath();ctx.arc(a.x,a.y,.085*M,0,7);ctx.fill()}/* only the top of the shoulder is shaded */
       strip(ctx,Pu,.18,.64,.0,.05*M,.0,.058*M,hi,.5);/* biceps: lit belly */
@@ -110,7 +110,8 @@ Body.prototype.draw=function(ctx,o){o=o||{};const lk=this.look;if(window.CUTOUT&
     if(FS.detail)detailIn(ctx,Pf.out,Pf.front,Pf.back,C.b,.009*M,(hi,lo)=>{const Q=Pf.P;strip(ctx,Q,.06,.5,.0,.04*M,.0,.034*M,hi,.5);strip(ctx,Q,.1,.82,-.01*M,-.05*M,-.01*M,-.04*M,lo,.45);fac(ctx,[Q(.0,.0),Q(.16,.04*M),Q(.16,-.04*M)],lo,.3,0);strip(ctx,Q,.7,1,-.04*M,.04*M,-.04*M,.04*M,lo,.2);bruises(ctx,Q,[[.3,.01,.05],[.55,-.012,.045],[.15,-.015,.04],[.72,.012,.04]],sevA,53+(isFar?7:0),M,Math.atan2(Pf.F.uy,Pf.F.ux));glowAt(ctx,Q(.4,0),.085*M,flA*.8)});
     circ(ctx,e,.031*M,C.b);/* elbow joint */
     /* elbow point (olecranon) facet */{const F=frame(e,w,d);circ(ctx,{x:e.x-F.nx*.016*M,y:e.y-F.ny*.016*M},.014*M,C.s)}
-    drawGloveFlat(ctx,e,w,J[S.G],H,isFar?shade(glove,-.2):glove,R?glove:strap,self.ang[S.o],R?0:self.gloveBlood,d,R?glove:C.b,R,isFar)};
+    const Gk=(this.rag||(this._owner&&this._owner.down))?(()=>{const dx=w.x-e.x,dy=w.y-e.y,L=Math.hypot(dx,dy)||1,g=J[S.G],gl=Math.hypot(g.x-w.x,g.y-w.y);return{x:w.x+dx/L*gl,y:w.y+dy/L*gl}})():J[S.G];/* knocked out: the wrist does not bend */
+    drawGloveFlat(ctx,e,w,Gk,H,isFar?shade(glove,-.2):glove,R?glove:strap,self.ang[S.o],R?0:self.gloveBlood,d,R?glove:C.b,R,isFar)};
   /* ---- leg: quad/hamstring, knee cap, calf, ankle, foot with toes ---- */
   const leg=(S,isFar,sleeveCol)=>{const h=J[S.H],k=J[S.K],a=J[S.A],he=J[S.He],to=J[S.T];const C=RP?(isFar?{b:CL.pantsS,s:shade(CL.pantsS,-.2)}:{b:CL.pants,s:CL.pantsS}):isFar?{b:sk.far,s:sk.farSh}:{b:sk.base,s:sk.sh};
     const Pt=limb(ctx,h,k,d,[[-.06,.07*M,.07*M],[.18,.074*M,.07*M],[.45,.066*M,.062*M],[.75,.052*M,.05*M],[1,.042*M,.043*M]],C.b,C.s);
@@ -238,7 +239,11 @@ function drawGloveFlat(ctx,E,Wr,G,H,col,strap,open,blood,d,skinC,plain,far){cons
   for(const y of[-.42,-.02,.38])P([[1.44,y-.025],[1.74,y-.025],[1.74,y+.02],[1.44,y+.02]],shade(sc,-.28));/* finger splits */
   P([[1.3,-.98],[1.44,-.55],[1.42,.66],[1.3,.8],[1.25,-.9]],col);/* padding edge over the knuckles */
   P([[.35,.85],[.95,1.15],[1.25,1.0],[1.0,.82]],col);P([[1.0,1.0],[1.3,1.08],[1.32,.9],[1.1,.84]],sc);/* thumb: padded base, bare tip */
-  if(!plain)P([[.52,-.28],[1.0,-.32],[1.0,.24],[.52,.28]],'#e4e2de');P([[.62,-.04],[.9,-.18],[.9,-.08],[.62,.06]],col);/* white patch with a simple mark */
+  if(far){/* the far hand shows its inside: the curled fingers and the thumb over them */
+    P([[.15,-.86],[.15,.86],[1.0,.96],[1.0,-.92]],shade(col,.08));
+    for(let i=0;i<4;i++){const y0=-.86+i*.4;P([[.9,y0],[1.62,y0+.02],[1.72,y0+.2],[1.62,y0+.38],[.9,y0+.38]],sc);P([[.9,y0+.36],[1.64,y0+.34],[1.64,y0+.4],[.9,y0+.42]],shade(sc,-.38))}
+    P([[.4,.12],[1.05,.2],[1.12,.52],[.5,.5]],sc);P([[.4,.48],[1.1,.5],[1.1,.55],[.4,.55]],shade(sc,-.35))}
+  else if(!plain)P([[.52,-.28],[1.0,-.32],[1.0,.24],[.52,.28]],'#e4e2de');P([[.62,-.04],[.9,-.18],[.9,-.08],[.62,.06]],col);/* white patch with a simple mark */
   if(open>.5){for(let i=0;i<3;i++)P([[1.6,(i-1)*.5-.15],[2.2,(i-1)*.5-.1],[2.2,(i-1)*.5+.12],[1.6,(i-1)*.5+.15]],col)}
   if(blood>0){ctx.globalAlpha=Math.min(.85,blood);P([[.9,-.3],[1.6,-.1],[1.5,.5],[.9,.4]],'#7a0606');ctx.globalAlpha=1}
   ctx.restore()}

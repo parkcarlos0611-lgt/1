@@ -6,7 +6,7 @@
 (function(){
 if(typeof Match==='undefined'||typeof F2==='undefined')return;
 const clamp=(v,a,b)=>v<a?a:v>b?b:v;
-const DUR=12,STOOL_X=3.2;
+const DUR=12,STOOL_X=3.8;
 function armTo(F,P,side,T,w){if(w<=0)return;const tmp=Object.assign({},P);armIK(F,tmp,side,T);P[side+'_s']+=(tmp[side+'_s']-P[side+'_s'])*w;P[side+'_e']+=(tmp[side+'_e']-P[side+'_e'])*w;P[side==='la'?'lo':'ro']=tmp[side==='la'?'lo':'ro']}
 const COACH_LOOKS=[
   {skin:'#d9a882',hair:'#2a2420',hs:'short',bd:'stub',cshort:0},
@@ -14,12 +14,12 @@ const COACH_LOOKS=[
   {skin:'#e4b593',hair:'#8a7462',hs:'short',bd:null,cshort:1},
   {skin:'#6e4630',hair:'#141110',hs:'buzz',bd:'full',cshort:0}];
 function mkCoach(M,side){const base=COACH_LOOKS[(side+Math.floor(Math.random()*2)*2)%COACH_LOOKS.length];const col=side?'#1f5fd6':'#c21818';
-  const look=Object.assign({h:1.8*.9,bw:1.05,ref:1,_flat:1,name:'coach'+side,shorts:'#1d1e22',beard:!!base.bd},base,{cl:{shirt:col,shirtS:'#0000',boot:'#17171a',pants:'#26272c',pantsS:'#1c1d21'}});
-  look.cl.shirtS=col==='#c21818'?'#8f1111':'#1646a0';
+  const look=Object.assign({h:1.8*.9,bw:1.05,ref:1,_flat:1,coach:1,name:'coach'+side,shorts:'#1d1e22',beard:!!base.bd},base,{cl:{shirt:'#efeff2',shirtS:'#c5c8d1',boot:'#17171a',pants:'#26272c',pantsS:'#1c1d21'}});if(window.CUTOUT&&CUTOUT.pickRef)CUTOUT.pickRef(look,'coach',side*3+Math.floor(Math.random()*3));
+  
   const c=new F2({side,name:'coach'+side,look,x:0});c.A={footwork:14,speed:12};c.coachSide=side;return c}
 const SEAT={free:1,y:.5,rot:0,lean:-.1,chest:.02,head:.1,tw:0,ll_h:1.5,ll_k:1.5,ll_a:.12,rl_h:1.38,rl_k:1.55,rl_a:.12,la_s:.42,la_e:.7,ra_s:.34,ra_e:.82};
 
-function start(M){if(M.corner)return;M.cornerX=Math.min(STOOL_X,(M.stage.R||3)-.3);try{M._sepSpd=REF.separateSpeed;REF.separateSpeed=0}catch(e){}M.cornerPick='rest';
+function start(M){if(M.corner)return;M.cornerX=Math.min(STOOL_X,(M.stage.R||3)-.12);try{M._sepSpd=REF.separateSpeed;REF.separateSpeed=0}catch(e){}M.cornerPick='rest';
   const fd=document.createElement('div');fd.className='cnrfade';M.root.appendChild(fd);M.corner={t:0,dur:DUR,seated:[0,0],fade:fd,placed:0,coaches:[mkCoach(M,0),mkCoach(M,1)]};
   /* a slim, non-blocking bar: round stats and a skip button */
   const rs=M.rs,esc=n=>n;const bar=document.createElement('div');bar.className='cnrbar';

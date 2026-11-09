@@ -21,6 +21,27 @@ CFG={
    jaw=[(573,150),(587,173),(613,192),(633,200),(655,203)],
    backN=[(150,510),(180,500),(285,505)],frontN=[(150,580),(205,615),(285,600)],
    eye=(640,112),brow=(643,103),brow2=(630,107),nosef=(663,143),cheek=(633,140),fore=(633,57),lip=(653,165),mouth=(655,168,38,16),lid='#e09a70'),
+
+ 'conor1':dict(top=23,chin=228,back=518,nose=693,neckTop=152,cut=3,clipX=703,neckEnd=206,taper=(40,10),ntaper=(40,10),
+   jaw=[(595,152),(593,175),(595,190),(603,200),(627,217),(653,228),(680,231)],
+   backN=[(152,530),(185,520),(290,522)],frontN=[(152,600),(200,610),(232,625),(290,612)],
+   eye=(663,118),brow=(672,108),brow2=(653,113),nosef=(683,150),cheek=(657,140),fore=(643,73),lip=(678,168)),
+ 'conor2':dict(top=33,chin=247,back=515,nose=693,neckTop=173,cut=3,clipX=672,clipFrom=28,neckEnd=212,padL=62,taper=(40,10),ntaper=(40,10),
+   jaw=[(585,173),(580,190),(585,205),(610,222),(640,237),(665,246),(690,248)],
+   backN=[(173,530),(200,520),(290,515)],frontN=[(173,590),(215,605),(250,615),(290,610)],
+   eye=(658,135),brow=(667,123),brow2=(648,128),nosef=(683,167),cheek=(653,153),fore=(643,75),lip=(673,188)),
+ 'aldo':dict(top=43,chin=237,back=543,nose=718,neckTop=173,cut=2,clipX=703,neckEnd=232,
+   jaw=[(613,173),(618,193),(633,213),(653,227),(683,235),(700,233)],
+   backN=[(173,548),(200,540),(280,545)],frontN=[(173,640),(215,625),(250,622),(285,625)],
+   eye=(683,132),brow=(688,117),brow2=(670,120),nosef=(710,165),cheek=(667,157),fore=(663,70),lip=(700,185)),
+ 'jds':dict(top=27,chin=205,back=538,nose=700,neckTop=155,cut=3,clipX=695,
+   jaw=[(603,155),(610,173),(633,188),(657,200),(677,205),(690,208)],
+   backN=[(155,543),(185,535),(285,535)],frontN=[(155,605),(215,625),(285,615)],
+   eye=(670,115),brow=(677,105),brow2=(660,108),nosef=(690,147),cheek=(660,140),fore=(647,57),lip=(682,165)),
+ 'cain':dict(top=29,chin=217,back=522,nose=693,neckTop=157,cut=3,clipX=700,neckEnd=242,
+   jaw=[(592,157),(592,177),(607,197),(630,210),(657,217),(673,215)],
+   backN=[(157,527),(190,518),(285,520)],frontN=[(157,590),(215,608),(285,610)],
+   eye=(658,118),brow=(662,112),brow2=(645,115),nosef=(678,152),cheek=(647,147),fore=(640,63),lip=(675,170)),
  'adesanya':dict(top=23,chin=213,back=513,nose=680,neckTop=153,
    jaw=[(570,152),(593,173),(613,197),(633,208),(650,216),(660,222),(660,270)],
    backN=[(153,537),(180,527),(200,520),(270,524)],frontN=[(153,590),(203,618),(270,610)],
@@ -30,7 +51,7 @@ key,src,out=sys.argv[1],sys.argv[2],sys.argv[3];C=CFG[key]
 im=Image.open(src).convert('RGB')
 y1=C['neckTop']+120                                   # source rows kept below the ear
 S=484/(C['chin']-C['top'])
-x0=C['back']-40;x1=C['nose']+40
+x0=C['back']-C.get('padL',40);x1=C['nose']+40
 crop=im.crop((x0,0,x1,y1))
 W0,H0=crop.size
 big=crop.resize((round(W0*S),round(H0*S)),Image.LANCZOS).filter(ImageFilter.UnsharpMask(1.2,60,2))
@@ -45,7 +66,7 @@ if big.size[1]<CH:rgba[big.size[1]:,:,:]=rgba[big.size[1]-3:big.size[1]-2,:,:]
 yy,xx=np.mgrid[0:CH,0:CW]
 jy=[Y(p[1]) for p in C['jaw']];jx=[X(p[0]) for p in C['jaw']]
 jline=lambda y:np.interp(y,jy,jx)
-headm=((yy<neckTop+10)|(xx>jline(yy)-4))&(yy<Y(C['chin'])+C.get('cut',12))&((xx<X(C.get('clipX',9999)))|(yy<Y(C['chin'])-10))   # nothing below the chin: the glove / shoulder of the full-body art stays out
+headm=((yy<neckTop+10)|(xx>jline(yy)-4))&(yy<Y(C['chin'])+C.get('cut',12))&((xx<X(C.get('clipX',9999)))|(yy<Y(C['chin'])-C.get('clipFrom',10)))   # nothing below the chin: the glove / shoulder of the full-body art stays out
 by=[Y(p[0]) for p in C['backN']];bx=[X(p[1]) for p in C['backN']];fy=[Y(p[0]) for p in C['frontN']];fx=[X(p[1]) for p in C['frontN']]
 neckm=(yy>=neckTop)&(xx>=np.interp(yy,by,bx))&(xx<=np.interp(yy,fy,fx))
 if 'taper' in C:   # round off the skull's lower-back corner so no spur sticks out behind the neck when it bends
@@ -54,7 +75,11 @@ if 'taper' in C:   # round off the skull's lower-back corner so no spur sticks o
 head=rgba.copy();head[...,3]=(rgba[...,3]*headm).astype(np.uint8)
 if 'ntaper' in C:   # the neck piece's top-back corner is rounded off too
     nl,nd=C['ntaper'];b0=np.interp(neckTop,by,bx);neckm=neckm&(xx>=np.interp(yy,[neckTop,neckTop+Y(nl)],[b0+Y(nd),b0]))
-neck=rgba.copy();neck[...,3]=(rgba[...,3]*neckm).astype(np.uint8)
+neck=rgba.copy()
+if 'neckEnd' in C:   # below this source row the picture shows a tattoo / the body: repeat the last clean row for the neck piece
+    ne=Y(C['neckEnd'])
+    for yy_ in range(ne,CH):neck[yy_]=rgba[ne-3]
+neck[...,3]=(neck[...,3]*neckm).astype(np.uint8)
 Image.fromarray(head).save(out+'/head.png');Image.fromarray(neck).save(out+'/neck.png')
 rows=[None]*CH;na=neck[...,3]
 for y in range(neckTop,CH):

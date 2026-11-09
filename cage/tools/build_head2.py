@@ -62,6 +62,10 @@ for y in range(neckTop,CH):
     if len(xs):rows[y]=[int(xs[0]),int(xs[-1])]
 top=Y(C['top']);bot=Y(C['chin']);last=rows[CH-1] or rows[CH-5]
 P=lambda p:[X(p[0]),Y(p[1])]
+# lid colour: the skin just under the eye (so the closed-eyelid patch always matches this face)
+ex,ey=P(C['eye']);reg=a[max(0,ey+14):ey+30,max(0,ex-26):ex+6].reshape(-1,3);reg=reg[reg.sum(1)>200]
+lid='#%02x%02x%02x'%tuple(int(v*.98) for v in (reg.mean(0) if len(reg) else (180,120,80)))
+lp=P(C['lip']);C['mouth']=(0,0,36,16);mouth_xy=[lp[0]-8,lp[1]+6]
 meta=dict(image='head.png',w=CW,h=CH,off=[0,0],p0=[X((C['back']+C['nose'])/2),(top+bot)//2],p1=[X((C['back']+C['nose'])/2),CH],headH=bot-top,neck='neck.png',neckTop=neckTop,neckBot=CH,neckPivot=[(last[0]+last[1])//2,CH],neckRows=rows,
- fx=dict(G=dict(eye=P(C['eye']),brow=P(C['brow']),brow2=P(C['brow2']),nose=P(C['nosef']),cheek=P(C['cheek']),fore=P(C['fore']),lip=P(C['lip']),u=44,down=1),mouth=[X(C['mouth'][0]),Y(C['mouth'][1]),C['mouth'][2],C['mouth'][3]],lid=C['lid']))
+ fx=dict(G=dict(eye=P(C['eye']),brow=P(C['brow']),brow2=P(C['brow2']),nose=P(C['nosef']),cheek=P(C['cheek']),fore=P(C['fore']),lip=P(C['lip']),u=44,down=1),mouth=[mouth_xy[0],mouth_xy[1],36,16],lid=lid))
 json.dump(meta,open(out+'/head2.json','w'));print(key,meta['headH'],meta['p0'],neckTop,CW,CH)

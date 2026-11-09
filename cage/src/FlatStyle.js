@@ -43,8 +43,11 @@ const ngon=(ctx,c,r,col,n)=>{n=n||8;ctx.fillStyle=col;ctx.beginPath();for(let i=
    segment is level with the facing direction) */
 function frame(a,b,d){const dx=b.x-a.x,dy=b.y-a.y,L=Math.hypot(dx,dy)||1e-5;const ux=dx/L,uy=dy/L;let nx=-uy,ny=ux;const f=nx*d+ny*.35;if(f<0){nx=-nx;ny=-ny}return{ux,uy,nx,ny,L}}
 /* angular limb: profile rows [t, frontHalfWidth, backHalfWidth] → one flat polygon + a back/underside shadow plane */
+/* a very thin darker rim around a body part */
+function thinLine(ctx,pts,col){ctx.save();ctx.globalAlpha=.5;ctx.strokeStyle=shade(col,-.4);ctx.lineWidth=.0034;ctx.lineJoin='round';ctx.beginPath();rpath(ctx,pts,ROUND*2.2);ctx.stroke();ctx.restore()}
 function limb(ctx,a,b,d,rows,col,shCol,extra){const F=frame(a,b,d);const P=(t,w)=>({x:a.x+F.ux*F.L*t+F.nx*w,y:a.y+F.uy*F.L*t+F.ny*w});
   const front=rows.map(r=>P(r[0],r[1])),back=rows.map(r=>P(r[0],-r[2]));poly(ctx,front.concat(back.slice().reverse()),col,ROUND*2.2);/* outline of the limb: extra round */
+  if(FS.outline)thinLine(ctx,front.concat(back.slice().reverse()),col);
   /* rounded joint ends: the limb meets its neighbour with a smooth round cap instead of a hard corner */
   if(!(extra&&extra.noCaps)){const r0=rows[0],r1=rows[rows.length-1];circ(ctx,P(r0[0],(r0[1]-r0[2])/2),(r0[1]+r0[2])/2,col);circ(ctx,P(r1[0],(r1[1]-r1[2])/2),(r1[1]+r1[2])/2,col)}
   if(shCol){const mid=rows.map(r=>P(r[0],-r[2]*(extra&&extra.shadowFrom!=null?extra.shadowFrom:.12)));poly(ctx,mid.concat(back.slice().reverse()),shCol)}
@@ -53,7 +56,7 @@ function limb(ctx,a,b,d,rows,col,shCol,extra){const F=frame(a,b,d);const P=(t,w)
 /* ---------- body ---------- */
 
 /* ---------- body detail: low-poly muscle planes, core shadows and rim light — everything is clipped to the part's own outline, so nothing leaves the body ---------- */
-FS.detail=1;FS.blur=false;/* the white motion-blur trails are off */
+FS.detail=1;FS.outline=true;FS.blur=false;/* the white motion-blur trails are off */
 const fac=(ctx,pts,col,al,R)=>{ctx.globalAlpha=al;poly(ctx,pts,col,R==null?0:R);ctx.globalAlpha=1};
 const strip=(ctx,P,t0,t1,a0,b0,a1,b1,col,al)=>fac(ctx,[P(t0,a0),P(t1,a1),P(t1,b1),P(t0,b0)],col,al,ROUND*.5);
 /* run fn(hi,lo) with the part's outline as a clip; then shade the edges: dark core shadow along the back, light rim along the front */
@@ -175,6 +178,7 @@ function torsoFlat(ctx,J,H,M,sk,d,lk,B){const sp=[J.hip,J.mid,J.sh,J.nk];const s
   const BK=[[0,.09],[.1,.086],[.24,.066+bel*.3],[.38,.061+bel*.2],[.52,.071],[.66,.085*shb],[.78,.093*shb],[.88,.087*shb],[.95,.066],[1,.045]];
   const F=FR.map(([s,w])=>pt(s,w)),Bk=BK.map(([s,w])=>pt(s,-w));
   poly(ctx,F.concat(Bk.slice().reverse()),sk.base,ROUND*2.2);
+  if(FS.outline)thinLine(ctx,F.concat(Bk.slice().reverse()),sk.base);
   const TD=sk.far&&FS.detail;
   /* lats / spine side: shadow plane on the back */
   poly(ctx,BK.map(([s,w])=>pt(s,-w*.32)).concat(Bk.slice().reverse()),sk.sh);

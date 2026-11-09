@@ -6,7 +6,7 @@
 (function(){
 if(typeof Match==='undefined'||typeof F2==='undefined')return;
 const clamp=(v,a,b)=>v<a?a:v>b?b:v;
-const DUR=12,STOOL_X=2.45;
+const DUR=12,STOOL_X=2.75;
 function armTo(F,P,side,T,w){if(w<=0)return;const tmp=Object.assign({},P);armIK(F,tmp,side,T);P[side+'_s']+=(tmp[side+'_s']-P[side+'_s'])*w;P[side+'_e']+=(tmp[side+'_e']-P[side+'_e'])*w;P[side==='la'?'lo':'ro']=tmp[side==='la'?'lo':'ro']}
 const COACH_LOOKS=[
   {skin:'#d9a882',hair:'#2a2420',hs:'short',bd:'stub',cshort:0},
@@ -19,14 +19,14 @@ function mkCoach(M,side){const base=COACH_LOOKS[(side+Math.floor(Math.random()*2
   const c=new F2({side,name:'coach'+side,look,x:0});c.A={footwork:14,speed:12};c.coachSide=side;return c}
 const SEAT={free:1,y:.5,rot:0,lean:-.1,chest:.02,head:.1,tw:0,ll_h:1.5,ll_k:1.5,ll_a:.12,rl_h:1.38,rl_k:1.55,rl_a:.12,la_s:.42,la_e:.7,ra_s:.34,ra_e:.82};
 
-function start(M){if(M.corner)return;M.cornerX=Math.min(STOOL_X,(M.stage.R||3)-.55);M.cornerPick='rest';
+function start(M){if(M.corner)return;M.cornerX=Math.min(STOOL_X,(M.stage.R||3)-.4);try{M._sepSpd=REF.separateSpeed;REF.separateSpeed=2.8}catch(e){}M.cornerPick='rest';
   M.corner={t:0,dur:DUR,seated:[0,0],coaches:[mkCoach(M,0),mkCoach(M,1)]};
   /* a slim, non-blocking bar: round stats and a skip button */
   const rs=M.rs,esc=n=>n;const bar=document.createElement('div');bar.className='cnrbar';
   bar.innerHTML=`<b>ROUND ${M.round} 종료</b><span>코너 휴식 · 코치가 처치 중</span><span class="cnrst">유효타 ${rs[0].sigL} : ${rs[1].sigL} · 다운 ${rs[0].kd} : ${rs[1].kd}</span><i class="cnrt"></i><button data-skip>SKIP ▶</button>`;
   M.root.appendChild(bar);M.corner.bar=bar;bar.querySelector('[data-skip]').onclick=()=>finish(M);
   if(!document.getElementById('cnrcss')){const st=document.createElement('style');st.id='cnrcss';st.textContent='.cnrbar{position:absolute;left:50%;bottom:44px;transform:translateX(-50%);display:flex;gap:14px;align-items:center;background:rgba(8,9,12,.82);border:1px solid rgba(255,255,255,.18);padding:8px 16px;border-radius:4px;color:#eceef2;font:500 13px "Noto Sans KR",sans-serif;z-index:30;white-space:nowrap}.cnrbar b{letter-spacing:.08em}.cnrbar .cnrt{display:block;width:90px;height:4px;background:rgba(255,255,255,.18);position:relative}.cnrbar .cnrt:after{content:"";position:absolute;left:0;top:0;bottom:0;width:var(--p,0%);background:#5fa8ff}.cnrbar button{background:rgba(255,255,255,.1);color:#fff;border:1px solid rgba(255,255,255,.3);padding:4px 10px;font:inherit;cursor:pointer}';document.head.appendChild(st)}}
-function finish(M){const C=M.corner;if(!C)return;M.corner=null;if(C.bar)C.bar.remove();for(const f of M.f){f.gpose=null;f.seated=0}M.cornerX=null;if(M.phase==='break')M.nextRound()}
+function finish(M){const C=M.corner;if(!C)return;M.corner=null;if(C.bar)C.bar.remove();for(const f of M.f){f.gpose=null;f.seated=0}M.cornerX=null;try{if(M._sepSpd!=null)REF.separateSpeed=M._sepSpd}catch(e){}if(M.phase==='break')M.nextRound()}
 {const sb=Match.prototype.showBreak;Match.prototype.showBreak=function(){start(this)}}
 Match.prototype.cpuCorner=function(){return'rest'};
 /* every frame of the break */

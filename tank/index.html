@@ -9,7 +9,7 @@
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; overflow: hidden; background: #c9b48a; color: var(--tx);
     font: 13px/1.35 system-ui, -apple-system, 'Noto Sans KR', sans-serif; -webkit-tap-highlight-color: transparent; }
-  canvas#view { position: fixed; inset: 0; display: block; touch-action: none; }
+  canvas#view { position: fixed; inset: 0; display: block; touch-action: none; cursor: crosshair; }
   #loading { position: fixed; inset: 0; display: grid; place-items: center; font-size: 18px; background: #2a2116; z-index: 10; }
   .panel { position: fixed; background: var(--bg); backdrop-filter: blur(3px); border-radius: 8px; padding: 8px 10px; pointer-events: none; }
   #hud { top: 10px; left: 10px; min-width: 230px; }
@@ -31,6 +31,9 @@
   #log .e i { font-style: normal; color: var(--mu); margin-left: 6px; }
   #log .tag { display: inline-block; padding: 0 6px; border-radius: 3px; font-weight: 800; font-size: 11px; color: #111; }
   #log .tag.pen { background: #ff6a55; } #log .tag.ric { background: #ffd34a; } #log .tag.non { background: #e8e2d6; } #log .tag.trk { background: #ffa04a; }
+  #toast { position: fixed; top: 40%; left: 50%; transform: translate(-50%, -50%); background: rgba(20,14,8,.75); padding: 8px 16px; border-radius: 8px;
+    font-weight: 700; opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 6; }
+  #toast.on { opacity: 1; }
   #hurt { position: fixed; inset: 0; pointer-events: none; opacity: 0; box-shadow: inset 0 0 160px 40px rgba(200,30,10,.75); }
   #foes { top: 10px; left: 50%; transform: translateX(-50%); display: flex; gap: 12px; font-size: 12px; padding: 5px 10px; flex-wrap: wrap; justify-content: center; max-width: 60vw; }
   #foes .up b { color: #ff8a7a; } #foes .down { opacity: .55; text-decoration: line-through; } #foes span { color: var(--mu); }
@@ -81,6 +84,7 @@
   <div class="r"><span>포 앙각</span><b id="h-elev">0</b></div>
   <div class="r"><span>탄종</span><b id="h-ammo">-</b></div>
   <div class="r"><span>장전</span><b id="h-load">-</b></div>
+  <div class="r"><span>기관총 잔탄</span><b id="h-mg">-</b></div>
   <div class="r"><span>레이저 거리</span><b id="h-rng">—</b></div>
   <div class="r"><span>사격통제 보정</span><b id="h-se">—</b></div>
   <div class="r"><span>적 전차</span><b id="h-foe">—</b></div>
@@ -93,13 +97,16 @@
   <div><kbd>W</kbd><kbd>S</kbd> 포 앙각: 탭 0.1° · 누르면 점점 빠르게 · <kbd>Shift</kbd> 미세(0.02°)</div>
   <div><kbd>Space</kbd> / 좌클릭 사격 · <kbd>Q</kbd> 탄종 전환</div>
   <div><kbd>E</kbd> 레이저 거리측정 (탄도컴퓨터 자동 보정)</div>
+  <div><kbd>F</kbd> 동축 M240 · 우클릭 유지: 전차장 M2 (마우스로 조준)</div>
   <div><kbd>V</kbd> 조준경 3× / 10× · <kbd>T</kbd> 열상</div>
   <div><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> 근접 / 전투 / 전술 줌 · 휠 연속 줌</div>
   <div><kbd>C</kbd> 마우스 위치에 크레이터 · <kbd>R</kbd> 차량 리셋</div>
+  <div><kbd>M</kbd> 소리 켜기/끄기</div>
   <div><kbd>F9</kbd> 물리 디버그 · <kbd>H</kbd> 도움말 숨김</div>
 </div>
 
 <div id="hurt"></div>
+<div id="toast" role="status"></div>
 <div id="foes" class="panel"></div>
 <div id="over" hidden><div><div id="over-t"></div><button id="again" class="btn" type="button">다시 시작</button> <button id="tomenu" class="btn ghost" type="button">작전 선택</button></div></div>
 <div id="menu" hidden>
@@ -115,7 +122,7 @@
 <div id="zoombar"><button data-z="0">근접</button><button data-z="1">전투</button><button data-z="2">전술</button></div>
 <div id="touch">
   <div class="g"><button data-t="drive:-1">◀</button><button data-t="drive:1">▶</button></div>
-  <div class="g"><button data-act="lase">LRF</button><button data-act="ammo">탄</button><button data-t="elev:1">▲</button><button data-t="elev:-1">▼</button><button class="fire" data-t="fire">사격</button></div>
+  <div class="g"><button data-act="lase">LRF</button><button data-act="ammo">탄</button><button data-t="elev:1">▲</button><button data-t="elev:-1">▼</button><button data-t="coax">MG</button><button class="fire" data-t="fire">사격</button></div>
 </div>
 
 <script src="src/core/Tuning.js"></script>
@@ -137,6 +144,7 @@
 <script src="src/render/Renderer.js"></script>
 <script src="src/debug/DebugLayer.js"></script>
 <script src="src/ai/TankAI.js"></script>
+<script src="src/audio/Audio.js"></script>
 <script src="src/core/World.js"></script>
 <script src="src/core/Game.js"></script>
 </body>

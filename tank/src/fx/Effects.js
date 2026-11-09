@@ -61,7 +61,7 @@ DS.Effects = class Effects {
         { grow: 2, drag: 2, grav: 0, alpha: 0.9, col: 0xffa040 });
       if (Math.random() < 0.5) P.add(K.DARK, p.x, p.y + 2, this.rnd(-1, 1), this.rnd(3, 6), this.rnd(5, 9), 0.8, { grow: 1.1, drag: 0.8, grav: -0.03, alpha: 0.4, col: 0x2a2724 });
     }
-    for (const e of v.events) { if (e.type === 'fire') this.muzzle(v, e); else if (e.type === 'explode') this.explode(v); }
+    for (const e of v.events) { if (e.type === 'fire') this.muzzle(v, e); else if (e.type === 'mg') this.mgFire(v, e); else if (e.type === 'explode') this.explode(v); }
     v.events.length = 0;
   }
 
@@ -123,6 +123,7 @@ DS.Effects = class Effects {
   }
 
   explode(v) {
+    { const q = v.local(v.g.ring.x, v.g.ring.y); DS.Audio.explode(q.x, q.y); }
     const P = this.P, K = DS.P;
     const p = v.local(v.g.ring.x, v.g.ring.y);
     this.flashes.push({ x: p.x, y: p.y + 1, dx: 0, dy: 1, t: 0, ttl: 0.18, boom: true, big: true });
@@ -143,8 +144,32 @@ DS.Effects = class Effects {
     this.shake = Math.max(this.shake, Math.max(0.2, 1.2 - Math.abs(p.x - this.w.cam.x) / 400));
   }
 
+  // machine-gun round leaving the muzzle: small flash, a wisp of smoke, brass thrown clear of the receiver
+  mgFire(v, e) {
+    const P = this.P, K = DS.P;
+    DS.Audio.mg(e.x, e.y, e.heavy);
+    this.flashes.push({ x: e.x, y: e.y, dx: e.dx, dy: e.dy, t: 0, ttl: 0.035, small: e.heavy ? 0.9 : 0.6 });
+    for (let i = 0; i < 2; i++) P.add(K.SMOKE, e.x + e.dx * 0.3, e.y + e.dy * 0.3, e.dx * this.rnd(3, 8), e.dy * this.rnd(3, 8) + this.rnd(0, 1), this.rnd(0.8, 1.6), 0.12,
+      { grow: 0.35, drag: 3, grav: -0.02, alpha: 0.25, col: 0xd9d6cf });
+    const bx = e.x - e.dx * (e.heavy ? 1.5 : 0.8), by = e.y - e.dy * (e.heavy ? 1.5 : 0.8);
+    P.add(K.GRAIN, bx, by, -e.dy * this.rnd(1.5, 3) + v.vel.x, this.rnd(2, 4), this.rnd(1.5, 2.5), e.heavy ? 0.06 : 0.04, { drag: 0.1, grav: 1, col: 0xd9a63c });
+  }
+  bulletGround(h) {
+    const P = this.P, K = DS.P, T = this.w.terrain, sc = this.hex(T.soilAt(h.x).col[1]);
+    DS.Audio.bullet(h.x, h.y);
+    for (let i = 0; i < 5; i++) P.add(K.GRAIN, h.x, h.y + 0.05, this.rnd(-1.5, 1.5) + h.vx * 0.003, this.rnd(1.5, 4), this.rnd(0.3, 0.7), 0.035, { drag: 0.5, col: sc });
+    P.add(K.DUST, h.x, h.y + 0.15, this.rnd(-0.5, 0.5), this.rnd(0.3, 1), this.rnd(1, 2), 0.18, { grow: 0.5, drag: 1.5, grav: 0, alpha: 0.35, col: sc });
+  }
+  bulletArmor(r) {
+    const P = this.P, K = DS.P;
+    DS.Audio.bullet(r.x, r.y);
+    for (let i = 0; i < 6; i++) { const a = this.rnd(0, 6.28), sp = this.rnd(3, 14);
+      P.add(K.FIRE, r.x, r.y, Math.cos(a) * sp, Math.sin(a) * sp, this.rnd(0.05, 0.15), 0.04, { grow: 0, drag: 2, grav: 0.6, alpha: 1, col: 0xffe2a0 }); }
+  }
+
   // armour strike visuals: sparks for ricochet / non-penetration, flash + smoke for penetration
   armor(r) {
+    DS.Audio.armor(r, r.vehicle === this.w.vehicles[0]);
     const P = this.P, K = DS.P, x = r.x, y = r.y;
     const n = r.result === 'pen' ? 30 : 45;
     for (let i = 0; i < n; i++) {
@@ -164,6 +189,7 @@ DS.Effects = class Effects {
 
   muzzle(v, e) {
     const P = this.P, K = DS.P, T = this.w.terrain;
+    DS.Audio.gun(e.x, e.y, parseInt((v.def.gun.name.match(/(\d+)mm/) || [0, 120])[1]));
     this.flashes.push({ x: e.x, y: e.y, dx: e.dx, dy: e.dy, t: 0, ttl: 0.085 });
     this.shake = Math.max(this.shake, 0.6);
     // muzzle fireball (secondary flash)
@@ -203,6 +229,7 @@ DS.Effects = class Effects {
   }
 
   impact(hit) {
+    if (!hit.onArmor) DS.Audio.ground(hit.x, hit.y, hit.ammo.type === 'HEAT');
     const P = this.P, K = DS.P, T = this.w.terrain, A = hit.ammo;
     const heat = A.type === 'HEAT';
     const sc = this.hex(T.soilAt(hit.x).col[1]), sc2 = this.hex(T.soilAt(hit.x).col[0]);
@@ -269,14 +296,14 @@ DS.Effects = class Effects {
       const k = 1 - f.t / f.ttl, a = Math.atan2(f.dy, f.dx);
       ctx.save(); ctx.translate(f.x, f.y); ctx.rotate(a);
       // primary/intermediate flash: elongated along the bore, secondary: fat ball ahead of the muzzle
-      const L = f.big ? 7 : f.boom ? 2.5 : 3.6 * (0.7 + 0.3 * k);
+      const L = f.small ? f.small : f.big ? 7 : f.boom ? 2.5 : 3.6 * (0.7 + 0.3 * k);
       let g = ctx.createRadialGradient(L * 0.45, 0, 0, L * 0.45, 0, L);
       g.addColorStop(0, `rgba(255,250,220,${0.95 * k})`); g.addColorStop(0.25, `rgba(255,200,90,${0.85 * k})`);
       g.addColorStop(0.6, `rgba(255,120,30,${0.45 * k})`); g.addColorStop(1, 'rgba(255,80,0,0)');
       ctx.fillStyle = g; ctx.scale(1, f.boom ? 1 : 0.55); ctx.beginPath(); ctx.arc(L * 0.45, 0, L, 0, Math.PI * 2); ctx.fill();
       ctx.restore();
       // ambient light splash
-      const R = f.big ? 40 : 14;
+      const R = f.small ? 3 : f.big ? 40 : 14;
       g = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, R);
       g.addColorStop(0, `rgba(255,180,90,${0.35 * k})`); g.addColorStop(1, 'rgba(255,150,60,0)');
       ctx.fillStyle = g; ctx.fillRect(f.x - R, f.y - R, R * 2, R * 2);

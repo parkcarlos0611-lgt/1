@@ -16,7 +16,8 @@ DS.VEHICLES = DS.VEHICLES || {};
     src: { ppm: PPM, ox: OX, oy: OY, dir: 'assets/sprites/m1a1/' },
     sprites: {                       // top-left px in the source drawing
       hull:   { x: 14,  y: 838 },
-      turret: { x: 38,  y: 626 },
+      turret: { x: 38,  y: 665 },
+      m2: { x: 594, y: 626, file: 'm2' },   // commander's M2HB, cut off the turret so it can pivot
       barrel: { x: 952, y: 766 },
       // running gear sheet (tools/cut_wheels.py): 512 px squares, radius 256 px
       roadwheel: { r: 256, file: 'roadwheel' }, roadwheelFront: { r: 256, file: 'roadwheel_front' },  // front art = idler
@@ -58,6 +59,11 @@ DS.VEHICLES = DS.VEHICLES || {};
       stabilized: true,
     },
     turretRing: L(600, 840),
+    // secondary armament (the loader's M240 is not modelled)
+    mg: { name: 'M2HB 12.7mm', ammo: 'M2_50', pivotPx: [634, 685], pivot: L(634, 685),
+      muzzle: [(884 - 634) / PPM, -(648 - 685) / PPM],          // from the pivot, at 0° elevation
+      elevMin: -10, elevMax: 65, rate: 550 / 60, rounds: 900, spread: 1.2 },
+    coax: { name: 'M240 7.62mm 동축', ammo: 'M240_762', muzzle: L(948, 806), rate: 750 / 60, rounds: 10000, spread: 0.7 },
     sight: { laser: true, rangeErr: 0.005, aimErr: 0.15, layTime: 2 },         // turret pivot (also where a tossed turret rotates about)
 
     // Armour (user data, docs/DATA_SOURCES.md). a/b: plate ends (px in the drawing),

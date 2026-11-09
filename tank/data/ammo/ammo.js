@@ -26,6 +26,13 @@ DS.AMMO = {
     pen: { ce: 490 },                                 // 480–500 mm at any range
     crit: 80,                                         // fuze graze angle
   },
+  // ---- machine-gun rounds (game values) ----
+  M2_50: { name: '12.7mm M8 API / M33', short: '12.7mm', type: 'MG', v0: 887, mass: 0.046, d: 0.0127,
+    cd: [[0, 0.22], [1, 0.48], [2, 0.40], [3, 0.35]], launchMass: 0.046, sabot: false, tracer: '#ff6040', tracerEvery: 5,
+    pen: { ke: 25, at: 100, s: 1.0e6 }, crit: 60 },
+  M240_762: { name: '7.62mm M80 / M62', short: '7.62mm', type: 'MG', v0: 853, mass: 0.0095, d: 0.00762,
+    cd: [[0, 0.24], [1, 0.5], [2, 0.42], [3, 0.37]], launchMass: 0.0095, sabot: false, tracer: '#ff6040', tracerEvery: 5,
+    pen: { ke: 8, at: 100, s: 1.0e6 }, crit: 55 },
   // ---- Iraqi rounds: PROVISIONAL (typical published figures; replace with supplied data) ----
   '3BM9': { name: '3BM9 APFSDS', short: '3BM9', type: 'APFSDS', v0: 1800, mass: 3.6, d: 0.04,
     cd: [[0, 0.35], [1, 0.62], [2, 0.6], [3, 0.57], [5, 0.54]], launchMass: 5.7, sabot: true, tracer: '#ffe08a',

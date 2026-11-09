@@ -11,6 +11,7 @@ DS.Renderer = class Renderer {
     this.img[id] = this.img[id] || {};
     const names = new Set(['hull', 'turret', 'barrel', Sp.roadwheel.file, Sp.idler.file]);
     if (Sp.flag) names.add(Sp.flag.file);
+    if (Sp.m2) names.add(Sp.m2.file);
     if (!Sp.sprocket.procedural) names.add('sprocket');
     else { const c = this.makeSprocket(def); this.img[id].sprocket = c; this.mips[id + '/sprocket'] = this.buildMips(c); }
     return Promise.all([...names].map(n => new Promise((res, rej) => {
@@ -215,11 +216,14 @@ DS.Renderer = class Renderer {
       const di = T.disturb[i];
       if (di > 0.02) { ctx.globalAlpha = di * 0.5; ctx.fillStyle = '#9b7547'; ctx.fillRect(x, h - 0.6, cs + 0.01, 0.6); }
     }
-    ctx.globalAlpha = 1; ctx.restore();
+    ctx.globalAlpha = 1;
+    // shadows go inside the ground clip: their top edge is exactly the surface, and they must not
+    // touch the surface-line path built below (they used to replace it, outlining the shadow instead)
+    this.shadows(ctx, cam);
+    ctx.restore();
     // crisp surface line
     ctx.beginPath();
     for (let x = x0; x <= x1 + step; x += step) { const y = T.height(x); if (x === x0) ctx.moveTo(x, y); else ctx.lineTo(x, y); }
-    this.shadows(ctx, cam);
     // thin ink edge on the ground surface (matches the outlined art), with a sunlit lip just under it
     ctx.save(); ctx.translate(0, -1.6 / cam.zoom);
     ctx.strokeStyle = 'rgba(250,232,195,0.55)'; ctx.lineWidth = 1.2 / cam.zoom; ctx.stroke(); ctx.restore();
@@ -239,7 +243,7 @@ DS.Renderer = class Renderer {
       g.addColorStop(0, 'rgba(60,40,20,0)'); g.addColorStop(0.18, `rgba(60,40,20,${a})`);
       g.addColorStop(0.85, `rgba(60,40,20,${a})`); g.addColorStop(1, 'rgba(60,40,20,0)');
       ctx.fillStyle = g; ctx.beginPath();
-      for (let i = 0; i <= n; i++) { const x = x0 + (x1 - x0) * i / n; ctx.lineTo(x, T.height(x) + 0.02); }
+      for (let i = 0; i <= n; i++) { const x = x0 + (x1 - x0) * i / n; ctx.lineTo(x, T.height(x) + 0.5); }   // clipped to the ground
       for (let i = n; i >= 0; i--) { const x = x0 + (x1 - x0) * i / n, t = Math.sin(Math.PI * i / n); ctx.lineTo(x, T.height(x) - depth * (0.35 + 0.65 * t)); }
       ctx.closePath(); ctx.fill();
     };
@@ -376,6 +380,11 @@ DS.Renderer = class Renderer {
     ctx.drawImage(I.barrel, Sp.barrel.x - tpx, Sp.barrel.y - tpy);
     ctx.restore();
     ctx.save(); ctx.scale(px, -px); ctx.drawImage(I.turret, Sp.turret.x - S.ox, Sp.turret.y - S.oy);
+    if (Sp.m2 && v.mg) {                    // commander's M2 on its mount, at its own elevation / arc
+      const m = v.mg, pv = D.mg.pivotPx; ctx.save(); ctx.translate(pv[0] - S.ox, pv[1] - S.oy);
+      if (m.side < 0) ctx.scale(-1, 1); ctx.rotate(-m.el);
+      ctx.drawImage(I[Sp.m2.file], Sp.m2.x - pv[0], Sp.m2.y - pv[1]); ctx.restore();
+    }
     if (Sp.flag && v.dir < 0) {             // un-mirror the national flag decal
       const f = I[Sp.flag.file], fx = Sp.flag.x - S.ox + f.width / 2;
       ctx.translate(fx, 0); ctx.scale(-1, 1); ctx.translate(-fx, 0); ctx.drawImage(f, Sp.flag.x - S.ox, Sp.flag.y - S.oy);
@@ -394,7 +403,8 @@ DS.Renderer = class Renderer {
   projectiles(ctx, cam) {
     ctx.lineCap = 'round';
     for (const p of this.w.projectiles) {
-      const v = Math.hypot(p.vx, p.vy), L = Math.min(v * 0.025, 40);
+      if (p.ammo.type === 'MG' && !p.tracer) continue;          // only every 5th round is a tracer
+      const v = Math.hypot(p.vx, p.vy), L = p.ammo.type === 'MG' ? Math.min(v * 0.012, 12) : Math.min(v * 0.025, 40);
       const g = ctx.createLinearGradient(p.x, p.y, p.x - p.vx / v * L, p.y - p.vy / v * L);
       g.addColorStop(0, p.ammo.tracer); g.addColorStop(1, 'rgba(255,200,120,0)');
       ctx.strokeStyle = g; ctx.lineWidth = Math.max(0.06, 2 / cam.zoom);

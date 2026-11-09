@@ -57,5 +57,10 @@ DS.FireControl = {
     const ang = this.solve(v, v.gun.ammo, tx, ty);
     const d = ang - v.gun.aimW;
     fc.se = Math.atan2(Math.sin(d), Math.cos(d));
+    // coaxial MG: the computer also solves its (much steeper) trajectory for the same range
+    if (v.def.coax) {
+      const Rc = Math.min(fc.range || 800, 1800), cx = o.x + Math.cos(a) * Rc, cy = o.y + Math.sin(a) * Rc;
+      const dc = this.solve(v, v.def.coax.ammo, cx, cy) - v.gun.aimW; fc.seCoax = Math.atan2(Math.sin(dc), Math.cos(dc));
+    }
   },
 };

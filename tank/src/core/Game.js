@@ -26,7 +26,7 @@ DS.Game = class Game {
     list.innerHTML = DS.MISSIONS.map((m, i) => `<button class="mcard" type="button" data-i="${i}">
       <span class="mno">작전 ${i + 1}</span><b>${m.name}</b><span class="mdate">${m.date}</span>
       <span class="mbrief">${m.brief}</span><span class="mcond">${m.cond} · 적 전차 ${m.enemies.length}대</span></button>`).join('');
-    list.querySelectorAll('.mcard').forEach(b => b.addEventListener('click', () => { el.hidden = true; location.hash = 'm' + (+b.dataset.i + 1); this.begin(+b.dataset.i); }));
+    list.querySelectorAll('.mcard').forEach(b => b.addEventListener('click', () => { DS.Audio.init(); el.hidden = true; location.hash = 'm' + (+b.dataset.i + 1); this.begin(+b.dataset.i); }));
     el.hidden = false;
   }
   begin(i) {
@@ -56,8 +56,12 @@ DS.Game = class Game {
   }
   bindInput() {
     const cam = this.world.cam, P = DS.T.camera.presets;
+    // browsers only start audio after a user gesture
+    const wake = () => DS.Audio.init();
+    addEventListener('pointerdown', wake); addEventListener('keydown', wake);
     addEventListener('keydown', e => {
       if (e.repeat) return;
+      if (e.code === 'KeyM') { const on = DS.Audio.toggle(); this.toast(on ? '소리 켬' : '소리 끔'); }
       this.keys.add(e.code);
       if (e.code === 'F9') { this.world.debug = !this.world.debug; e.preventDefault(); }
       if (e.code === 'Digit1') cam.tzoom = P[0];
@@ -79,12 +83,13 @@ DS.Game = class Game {
       cam.tzoom = Math.max(DS.T.camera.zoomMin, Math.min(DS.T.camera.zoomMax, cam.tzoom * Math.exp(-e.deltaY * 0.0012)));
       e.preventDefault();
     }, { passive: false });
-    this.cv.addEventListener('mousedown', e => { if (e.button === 0) this.mouseFire = true; });
-    addEventListener('mouseup', () => this.mouseFire = false);
+    this.cv.addEventListener('mousedown', e => { if (e.button === 0) this.mouseFire = true; if (e.button === 2) this.mgDown = true; });
+    addEventListener('mouseup', e => { if (e.button === 0) this.mouseFire = false; if (e.button === 2) this.mgDown = false; });
+    this.cv.addEventListener('contextmenu', e => e.preventDefault());
     // touch buttons
     document.querySelectorAll('[data-t]').forEach(b => {
-      const [k, val] = b.dataset.t.split(':'), on = ev => { ev.preventDefault(); if (k === 'fire') this.touch.fire = true; else this.touch[k] = +val; b.classList.add('on'); };
-      const off = ev => { ev.preventDefault(); if (k === 'fire') this.touch.fire = false; else this.touch[k] = 0; b.classList.remove('on'); };
+      const [k, val] = b.dataset.t.split(':'), on = ev => { ev.preventDefault(); if (k === 'fire' || k === 'coax') this.touch[k] = true; else this.touch[k] = +val; b.classList.add('on'); };
+      const off = ev => { ev.preventDefault(); if (k === 'fire' || k === 'coax') this.touch[k] = false; else this.touch[k] = 0; b.classList.remove('on'); };
       b.addEventListener('pointerdown', on); b.addEventListener('pointerup', off); b.addEventListener('pointerleave', off); b.addEventListener('pointercancel', off);
     });
     document.querySelectorAll('[data-z]').forEach(b => b.addEventListener('click', () => cam.tzoom = P[+b.dataset.z]));
@@ -92,6 +97,10 @@ DS.Game = class Game {
       ev.preventDefault(); const a = b.dataset.act;
       if (a === 'lase') this.lase(); else if (a === 'ammo') this.cycleAmmo(); else if (a === 'mag') this.sightMag = this.sightMag === 10 ? 3 : 10;
     }));
+  }
+  toast(msg) {
+    const el = document.getElementById('toast'); el.textContent = msg; el.classList.add('on');
+    clearTimeout(this._toastT); this._toastT = setTimeout(() => el.classList.remove('on'), 1200);
   }
   lase() { DS.FireControl.update(this.world, this.player, true); }
   cycleAmmo() {
@@ -114,12 +123,16 @@ DS.Game = class Game {
       i.elevRate = dir * r * d2r;
     } else i.elevRate = 0;
     i.fire = k.has('Space') || !!this.mouseFire || this.touch.fire;
+    i.coaxFire = k.has('KeyF') || !!this.touch.coax;
+    i.mgFire = !!this.mgDown;
+    i.mgAim = this.mouse ? this.world.cam.toWorld(this.mouse.x, this.mouse.y) : null;
   }
   loop(t) {
     const dt = Math.min(0.05, (t - this.last) / 1000); this.last = t;
     if (dt > 0) this.fps += (1 / dt - this.fps) * 0.05;
     this.readInput(dt);
     this.world.update(dt);
+    DS.Audio.update(this.world, dt);
     this.rend.frame();
     this.sight();
     this.hud();
@@ -141,6 +154,7 @@ DS.Game = class Game {
       set('h-pitch', (v.ang * 180 / Math.PI).toFixed(1) + '°');
       set('h-elev', (g.e * 180 / Math.PI).toFixed(2) + '°');
       set('h-ammo', A.name);
+      if (v.mg) set('h-mg', `M2 ${v.mg.rounds} · 동축 ${v.coax.rounds}`);
       const fc = v.fc;
       set('h-rng', fc.range ? Math.round(fc.range) + ' m' : `— (전투조준 ${fc.bs} m)`);
       set('h-se', (fc.se * 1000).toFixed(2) + ' mil · ' + (fc.se * 180 / Math.PI).toFixed(2) + '°');

@@ -17,7 +17,9 @@ DS.Vehicle = class Vehicle {
     this.vt = 0;            // track speed relative to hull (m/s, + = moving toward +x)
     this.s = 0;             // track travel (link offset)
     this.spool = 0;
-    this.input = { drive: 0, elevRate: 0, elevStep: 0, fire: false };
+    this.input = { drive: 0, elevRate: 0, elevStep: 0, fire: false, mgFire: false, mgAim: null, coaxFire: false };
+    this.mg = def.mg ? { el: 0, side: 1, cool: 0, rounds: def.mg.rounds, n: 0, flip: 0 } : null;
+    this.coax = def.coax ? { cool: 0, rounds: def.coax.rounds, n: 0 } : null;
     this.st = this.g.wheels.map(p => ({ lx: p.x, ly: p.y, d: 0, dPrev: 0, ang: Math.random() * 6, N: 0, wx: 0, wy: 0, contact: false, slip: 0, Ft: 0, sink: 0 }));
     this.sprAng = 0; this.idlAng = 0;
     this.F0 = D.mass * DS.T.g / D.roadWheels.length;
@@ -167,6 +169,7 @@ DS.Vehicle = class Vehicle {
     this.idlAng -= this.vt / (D.idler.r + D.track.thick / 2) * dt;
 
     this.stepGun(dt, world);
+    this.stepMG(dt, world);
     this.stepAntennas(dt);
     this.stepDamage(dt, world);
     if (this.turretBody) this.stepTurretBody(dt);
@@ -201,6 +204,52 @@ DS.Vehicle = class Vehicle {
     const m = this.muzzle();
     world.spawnProjectile(m.x, m.y, m.dx * A.v0 + this.vel.x, m.dy * A.v0 + this.vel.y, A, this);
     this.events.push({ type: 'fire', x: m.x, y: m.y, dx: m.dx, dy: m.dy, ammo: A });
+  }
+
+  // ---- machine guns ----
+  // commander's M2HB: aims at a world point (forward or rear arc), elevation −10…+65° on its own mount
+  mgWorldAng() { const m = this.mg, s = m.side * this.dir; return s > 0 ? this.ang + m.el : Math.PI + this.ang - m.el; }
+  mgMuzzle() {
+    const D = this.def.mg, m = this.mg, a = this.mgWorldAng(), p = this.local(this.dir * D.pivot[0], D.pivot[1]);
+    const L = Math.hypot(D.muzzle[0], D.muzzle[1]), off = Math.atan2(D.muzzle[1], D.muzzle[0]) * (m.side * this.dir > 0 ? 1 : -1);
+    return { x: p.x + Math.cos(a + off) * L, y: p.y + Math.sin(a + off) * L, a };
+  }
+  stepMG(dt, world) {
+    const d2r = Math.PI / 180;
+    if (this.mg && !this.turretGone) {
+      const D = this.def.mg, m = this.mg, aim = this.input.mgAim;
+      if (aim && this.alive) {
+        const p = this.local(this.dir * D.pivot[0], D.pivot[1]), dx = aim.x - p.x, dy = aim.y - p.y;
+        const side = Math.sign(dx * this.dir) || 1;
+        if (side !== m.side) { m.flip += dt; if (m.flip > 0.6) { m.side = side; m.flip = 0; } } else m.flip = 0;   // slewing round
+        const base = m.side * this.dir > 0 ? this.ang : Math.PI + this.ang;
+        let want = Math.atan2(dy, dx) - base; want = Math.atan2(Math.sin(want), Math.cos(want)) * (m.side * this.dir > 0 ? 1 : -1);
+        want = Math.max(D.elevMin * d2r, Math.min(D.elevMax * d2r, want));
+        const mx = 1.6 * dt; m.el += Math.max(-mx, Math.min(mx, want - m.el));
+      }
+      m.cool -= dt;
+      if (this.input.mgFire && this.alive && m.rounds > 0 && m.flip === 0 && m.cool <= 0) {
+        m.cool += 1 / D.rate; if (m.cool < 0) m.cool = 0; m.rounds--; m.n++;
+        const q = this.mgMuzzle(); this.shootBullet(world, q.x, q.y, q.a, DS.AMMO[D.ammo], D.spread, m.n, true);
+      }
+    }
+    if (this.coax && !this.turretGone) {
+      const D = this.def.coax, c = this.coax;
+      c.cool -= dt;
+      if (this.input.coaxFire && this.alive && this.firepower && c.rounds > 0 && c.cool <= 0) {
+        c.cool += 1 / D.rate; if (c.cool < 0) c.cool = 0; c.rounds--; c.n++;
+        const p = this.local(this.dir * D.muzzle[0], D.muzzle[1]);
+        this.shootBullet(world, p.x, p.y, this.gun.aimW + (this.fc.seCoax || 0), DS.AMMO[D.ammo], D.spread, c.n, false);
+      }
+    }
+  }
+  shootBullet(world, x, y, a, A, spreadMil, n, heavy) {
+    const j = ((Math.random() + Math.random() + Math.random()) / 3 - 0.5) * 2 * spreadMil / 1000;
+    const dx = Math.cos(a + j), dy = Math.sin(a + j);
+    const p = world.spawnProjectile(x, y, dx * A.v0 + this.vel.x, dy * A.v0 + this.vel.y, A, this);
+    p.tracer = n % (A.tracerEvery || 1) === 0;
+    this.events.push({ type: 'mg', x, y, dx, dy, heavy });
+    this.lastFired = world.time;
   }
 
   muzzle() {

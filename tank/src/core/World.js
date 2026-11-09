@@ -10,9 +10,10 @@ DS.World = class World {
     this.rng = DS.rng(1991);
     this.env = { visibility: 0, night: 0, wind: 2.5 };
   }
-  spawnProjectile(x, y, vx, vy, ammo, owner) { this.projectiles.push(new DS.Projectile(x, y, vx, vy, ammo, owner)); }
+  spawnProjectile(x, y, vx, vy, ammo, owner) { const p = new DS.Projectile(x, y, vx, vy, ammo, owner); this.projectiles.push(p); return p; }
 
   onProjectileHit(p, h) {
+    if (p.ammo.type === 'MG') return this.onBulletHit(p, h);
     const ai = p.owner && p.owner.ai;
     if (h.kind === 'ground') {
       this.fx.impact(h); this.hits.push(h); if (this.hits.length > 20) this.hits.shift();
@@ -34,6 +35,14 @@ DS.World = class World {
       p.alive = false;
       if (p.ammo.type === 'HEAT') this.fx.impact({ x: h.hit.x, y: h.hit.y, vx: p.vx, vy: p.vy, ammo: p.ammo, onArmor: true });
     }
+  }
+  // small-arms rounds: same armour test, but only sparks / sand — no log entries or hit labels
+  onBulletHit(p, h) {
+    if (h.kind === 'ground') { this.fx.bulletGround(h); return; }
+    const r = DS.Armor.resolve(this, p, h.hit);
+    this.fx.bulletArmor(r);
+    if (r.result === 'ricochet') { p.x = r.reflect.x; p.y = r.reflect.y; p.vx = r.reflect.vx; p.vy = r.reflect.vy; p.ignore = h.hit.v; p.ignoreT = 0.05; }
+    else p.alive = false;
   }
   addLog(r) { this.log.unshift({ ...r, at: this.time }); if (this.log.length > 6) this.log.pop(); }
 

@@ -61,6 +61,13 @@ for ax in (217, 397):
     m = (xx >= ax - 5) & (xx <= ax + 5) & (yy < 722)
     rgba[m, 3] = 0
 
+# --- commander's M2HB: cut off the turret so it can pivot on its mount (post stays on the turret) ---
+MG_PIVOT = (634, 685)
+mg_mask = (xx >= 588) & (xx <= 892) & (yy >= 620) & ((yy < 686) | ((xx >= 664) & (xx <= 709) & (yy < 694)))
+mg = rgba.copy(); mg[~mg_mask] = 0
+info['m2'] = save('m2', mg, 0, Y0)
+rgba[mg_mask, 3] = 0
+
 # --- split lines ---
 SEAM = 838              # hull roof / turret ring line
 SKIRT = 982             # side-skirt bottom edge

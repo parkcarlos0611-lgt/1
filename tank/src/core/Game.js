@@ -4,6 +4,7 @@ DS.Game = class Game {
     this.cv = document.getElementById('view');
     this.world = new DS.World();
     this.rend = new DS.Renderer(this.cv, this.world);
+    this.elevDir = 0; this.elevHold = 0;
     this.keys = new Set(); this.touch = { drive: 0, elev: 0, fire: false };
     this.fps = 60; this.last = performance.now();
     this.mini = document.getElementById('mini'); this.mctx = this.mini.getContext('2d');
@@ -58,16 +59,26 @@ DS.Game = class Game {
     });
     document.querySelectorAll('[data-z]').forEach(b => b.addEventListener('click', () => cam.tzoom = P[+b.dataset.z]));
   }
-  readInput() {
+  readInput(dt) {
     const k = this.keys, i = this.player.input;
     i.drive = ((k.has('KeyD') || k.has('ArrowRight')) ? 1 : 0) - ((k.has('KeyA') || k.has('ArrowLeft')) ? 1 : 0) || this.touch.drive;
-    i.elev = ((k.has('KeyW') || k.has('ArrowUp')) ? 1 : 0) - ((k.has('KeyS') || k.has('ArrowDown')) ? 1 : 0) || this.touch.elev;
+    // gun elevation: a tap moves 0.1° (Shift: 0.02°); holding starts slow after 0.3 s and ramps
+    // up to 6°/s (Shift: 1°/s) so small corrections and big swings both work
+    const dir = ((k.has('KeyW') || k.has('ArrowUp')) ? 1 : 0) - ((k.has('KeyS') || k.has('ArrowDown')) ? 1 : 0) || this.touch.elev;
+    const fine = k.has('ShiftLeft') || k.has('ShiftRight'), d2r = Math.PI / 180;
+    if (dir !== 0 && dir !== this.elevDir) { i.elevStep += dir * (fine ? 0.02 : 0.1) * d2r; this.elevHold = 0; }
+    this.elevDir = dir;
+    if (dir !== 0) {
+      this.elevHold += dt;
+      const r = this.elevHold < 0.3 ? 0 : Math.min(fine ? 1 : 6, 0.5 + (this.elevHold - 0.3) * (fine ? 1 : 4));
+      i.elevRate = dir * r * d2r;
+    } else i.elevRate = 0;
     i.fire = k.has('Space') || !!this.mouseFire || this.touch.fire;
   }
   loop(t) {
     const dt = Math.min(0.05, (t - this.last) / 1000); this.last = t;
     if (dt > 0) this.fps += (1 / dt - this.fps) * 0.05;
-    this.readInput();
+    this.readInput(dt);
     this.world.update(dt);
     this.rend.frame();
     this.hud();
@@ -85,7 +96,7 @@ DS.Game = class Game {
       set('h-sink', (v.stats.sink * 100).toFixed(1) + ' cm');
       set('h-soil', T.soilAt(v.pos.x).name);
       set('h-pitch', (v.ang * 180 / Math.PI).toFixed(1) + '°');
-      set('h-elev', (g.e * 180 / Math.PI).toFixed(1) + '°');
+      set('h-elev', (g.e * 180 / Math.PI).toFixed(2) + '°');
       set('h-ammo', A.name);
       set('h-load', g.reload > 0 ? '장전 중 ' + g.reload.toFixed(1) + ' s' : '장전 완료');
       set('h-pos', (v.pos.x / 1000).toFixed(2) + ' km');

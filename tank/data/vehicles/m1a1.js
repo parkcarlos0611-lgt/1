@@ -18,7 +18,7 @@ DS.VEHICLES = DS.VEHICLES || {};
       turret: { x: 38,  y: 626 },
       barrel: { x: 952, y: 766 },
       // running gear sheet (tools/cut_wheels.py): 512 px squares, radius 256 px
-      roadwheel: { r: 256, file: 'roadwheel' }, roadwheelFront: { r: 256, file: 'roadwheel_front' },
+      roadwheel: { r: 256, file: 'roadwheel' }, roadwheelFront: { r: 256, file: 'roadwheel_front' },  // front art = idler
       sprocket: { r: 256, R: 0.38, tooth0: 0 },   // R: tooth-tip radius (m), tooth0: first tooth angle (deg)
     },
     // running gear (per side; physics treats each road-wheel station as the left+right pair)
@@ -36,7 +36,7 @@ DS.VEHICLES = DS.VEHICLES || {};
     track: { pitch: 0.181, thick: 0.09, width: 0.635, mass: 7600 },
     belly: { y: -0.70, x0: -3.6, x1: 3.9 },
     contactArea: 0.978,              // m² of track pad per wheel station (both tracks)
-    underside: { x0: -3.05, x1: 3.35, y0: -0.52, y1: -0.98 },  // dark hull side behind the wheels
+    underside: { x0: -3.05, x1: 3.35, y0: -0.52, y1: -0.93 },  // hull side shadow behind the wheels; open gap above the track below it
     rearFill: { x0: -3.42, x1: -2.75, y0: -0.47, y1: -0.06 },  // behind the sprocket (hull art is cut out there)
 
     engine: {                        // AGT1500 gas turbine

@@ -128,10 +128,6 @@ DS.Renderer = class Renderer {
     v._trackPath = path;
     const info = DS.Track.links(path, D.track.pitch, v.s, this.linkBuf);
     const L = info.pitch, th = D.track.thick;
-    // inside of the loop: far-side track / hull shadow
-    ctx.fillStyle = '#2b251d'; ctx.beginPath(); ctx.moveTo(path[0], path[1]);
-    for (let i = 2; i < path.length; i += 2) ctx.lineTo(path[i], path[i + 1]);
-    ctx.closePath(); ctx.fill();
     for (const [x, y, a] of this.linkBuf) {
       ctx.save(); ctx.translate(x, y); ctx.rotate(a);
       ctx.fillStyle = '#26231f'; ctx.fillRect(-L * 0.5, -th * 0.5, L * 0.93, th);          // pad + shoe
@@ -150,10 +146,9 @@ DS.Renderer = class Renderer {
       if (tint) { ctx.globalAlpha = tint; ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(0, 0, imr, 0, 7); ctx.fill(); }
       ctx.restore();
     };
-    const nW = v.st.length;
-    v.st.forEach((w, i) => wheel(w.wx, w.wy, w.ang, D.wheelR + 0.006, i === nW - 1 ? 'roadwheel_front' : 'roadwheel'));
+    v.st.forEach((w, i) => wheel(w.wx, w.wy, w.ang, D.wheelR + 0.006, 'roadwheel'));
     const ip = v.local(D.idler.x, D.idler.y);
-    wheel(ip.x, ip.y, v.idlAng, D.idler.r + 0.02, 'roadwheel', 0.18);
+    wheel(ip.x, ip.y, v.idlAng, D.idler.r + 0.02, 'roadwheel_front');           // idler: front-wheel art
     // sprocket: lock tooth phase to the links on its arc (teeth sit in the link joints)
     const sp = v.local(D.sprocket.x, D.sprocket.y), rc = v.sprR(), pitchA = 2 * Math.PI / D.sprocket.teeth;
     let best = null, bd = 1e9;

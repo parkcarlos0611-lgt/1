@@ -8,7 +8,7 @@ DS.Vehicle = class Vehicle {
     this.vt = 0;            // track speed relative to hull (m/s, + forward)
     this.s = 0;             // track travel (link offset)
     this.spool = 0;         // engine power fraction (turbine spools up/down)
-    this.input = { drive: 0, elev: 0, fire: false };
+    this.input = { drive: 0, elevRate: 0, elevStep: 0, fire: false };   // elev in rad/s and one-shot rad
     this.st = g.map(p => ({ lx: p.x, ly: p.y, d: 0, dPrev: 0, ang: Math.random() * 6, N: 0, wx: 0, wy: 0, contact: false, slip: 0, Ft: 0, sink: 0 }));
     this.sprAng = 0; this.idlAng = 0; this.rollAng = 0;
     this.F0 = def.mass * DS.T.g / g.length;
@@ -164,10 +164,11 @@ DS.Vehicle = class Vehicle {
 
   stepGun(dt, world) {
     const G = this.def.gun, gs = this.gun, d2r = Math.PI / 180;
-    gs.aimW += this.input.elev * 0.35 * dt;
-    gs.aimW = Math.max(-0.6, Math.min(0.9, gs.aimW));
-    let want = G.stabilized ? gs.aimW - this.ang : gs.aimW;
-    want = Math.max(G.elevMin * d2r, Math.min(G.elevMax * d2r, want));
+    gs.aimW += this.input.elevRate * dt + this.input.elevStep; this.input.elevStep = 0;
+    // keep the aim inside the mount limits so reversing direction responds at once
+    const base = G.stabilized ? this.ang : 0;
+    gs.aimW = Math.max(base + G.elevMin * d2r, Math.min(base + G.elevMax * d2r, gs.aimW));
+    const want = gs.aimW - base;
     const de = want - gs.e, mx = G.rate * dt;
     gs.e += Math.max(-mx, Math.min(mx, de));
     if (!G.stabilized) gs.aimW = gs.e;

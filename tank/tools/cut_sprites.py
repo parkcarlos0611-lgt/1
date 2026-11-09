@@ -84,6 +84,12 @@ keep = (yy >= SEAM) & (yy < np.minimum(SKIRT, front))
 keep &= ~(((xx - SPR[0]) ** 2 + (yy - SPR[1]) ** 2) < SPR[2] ** 2)
 keep &= ~((xx < 205) & (yy > 935))
 keep &= xx < 1215
+# nose: drop the drawing's own track/idler wedge (and the mud-flap tip) under the glacis —
+# the simulated track wraps the idler there
+from PIL import ImageDraw
+nm = Image.new('L', (W, H - Y0), 0)
+ImageDraw.Draw(nm).polygon([(x, y - Y0) for x, y in [(1159, 921), (1186, 930), (1197, 942), (1215, 982), (1124, 982), (1131, 966)]], fill=1)
+keep &= ~np.asarray(nm).astype(bool)
 h[~keep] = 0
 info['hull'] = save('hull', h, 0, Y0)
 

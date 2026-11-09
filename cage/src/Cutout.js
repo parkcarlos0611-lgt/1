@@ -34,7 +34,7 @@ function neck(ctx,S2,hd,nk,B,d,ku,H,skin){const m=S2.m,P=S2.meta.parts.head2,p0=
   const N=24,step=(y1-y0)/N,rows=m.neckRows;
   /* opaque backing: a solid skin column under the slices so no seam ever shows the background through the neck */
   const L=[],R=[];for(let i=0;i<=N;i++){const y=Math.min(y1-1,y0+i*step),t=i/N,sm=t*t*(3-2*t),r=rows&&rows[Math.round(y)];if(!r)continue;const cx=qb[0];
-    for(const[side,x]of[[L,r[0]+4],[R,r[1]-4]]){const A=wh(x,y),Bt=wt(x,y);side.push({x:A.x+(Bt.x-A.x)*sm,y:A.y+(Bt.y-A.y)*sm})}}
+    for(const[side,x]of[[L,r[0]-1],[R,r[1]-1]]){const A=wh(x,y),Bt=wt(x,y);side.push({x:A.x+(Bt.x-A.x)*sm,y:A.y+(Bt.y-A.y)*sm})}}
   if(L.length>2){ctx.fillStyle=skin?shade(skin,-.02):'#6b4a34';ctx.beginPath();L.forEach((q,i)=>i?ctx.lineTo(q.x,q.y):ctx.moveTo(q.x,q.y));R.slice().reverse().forEach(q=>ctx.lineTo(q.x,q.y));ctx.closePath();ctx.fill()}
   for(let i=0;i<N;i++){const ya=y0+i*step,yb=ya+step,yc=(ya+yb)/2,t=(i+.5)/N,sm=t*t*(3-2*t),xc=qb[0];const A=wh(xc,yc),Bt=wt(xc,yc);const px=A.x+(Bt.x-A.x)*sm,py=A.y+(Bt.y-A.y)*sm,al=aH+da*sm;
     const ex=1.5;ctx.save();ctx.translate(px,py);ctx.rotate(al);ctx.scale(mm*ku,-ku);ctx.drawImage(S2.neck,0,ya-ex,W,step+2*ex,-xc,(ya-ex)-yc,W,step+2*ex);ctx.restore()}}

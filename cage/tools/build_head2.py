@@ -46,7 +46,7 @@ CFG={
    jaw=[(358,64),(366,76),(380,85),(396,86),(407,87)],
    backN=[(64,345),(84,341),(109,341)],frontN=[(64,383),(84,387),(109,391)],
    eye=(392,52),brow=(0,0),brow2=(0,0),nosef=(0,0),cheek=(0,0),fore=(0,0),lip=(403,70),lid='#c08060',blinkonly=1),
- 'ref2':dict(darkFrom=16,top=13,chin=88,back=618,nose=680,neckTop=59,cut=3,clipX=684,darkcut=1,padL=50,
+ 'ref2':dict(darkFrom=16,ntaper=(30,16),top=13,chin=88,back=618,nose=680,neckTop=59,cut=3,clipX=684,darkcut=1,padL=50,
    jaw=[(629,59),(637,71),(651,80),(667,88),(680,89)],
    backN=[(59,616),(79,612),(104,612)],frontN=[(59,654),(79,658),(104,662)],
    eye=(665,49),brow=(0,0),brow2=(0,0),nosef=(0,0),cheek=(0,0),fore=(0,0),lip=(676,72),lid='#c08060',blinkonly=1),

@@ -44,6 +44,27 @@ const ngon=(ctx,c,r,col,n)=>{n=n||8;ctx.fillStyle=col;ctx.beginPath();for(let i=
 function frame(a,b,d){const dx=b.x-a.x,dy=b.y-a.y,L=Math.hypot(dx,dy)||1e-5;const ux=dx/L,uy=dy/L;let nx=-uy,ny=ux;const f=nx*d+ny*.35;if(f<0){nx=-nx;ny=-ny}return{ux,uy,nx,ny,L}}
 /* angular limb: profile rows [t, frontHalfWidth, backHalfWidth] → one flat polygon + a back/underside shadow plane */
 function joint(ctx,c,r,col){ctx.fillStyle=col;ctx.beginPath();ctx.arc(c.x,c.y,r,0,7);ctx.fill();const g=ctx.createRadialGradient(c.x-r*.25,c.y+r*.25,r*.1,c.x,c.y,r);g.addColorStop(0,'rgba(255,240,220,.05)');g.addColorStop(.6,'rgba(0,0,0,0)');g.addColorStop(1,'rgba(40,18,8,.10)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(c.x,c.y,r,0,7);ctx.fill()}
+
+/* ---------- baked part textures: ONE picture per body part (muscle facets of the reference illustration), laid on the bone ----------
+   u runs along the bone (0 = proximal joint, 1 = distal joint), v across it (+1 = front side, -1 = back side). Tones are shade() offsets. */
+const TEX={
+ uarm:[[-.15,[[.12,-1],[1,-1],[1,-.15],[.55,-.05],[.2,-.3]]],[.1,[[.1,.95],[.72,1],[.95,.45],[.55,.12],[.18,.3]]],[.1,[[0,.95],[.28,.95],[.34,.25],[0,.1]]],[-.1,[[.3,.2],[.38,.9],[.44,.9],[.4,.12]]],[-.08,[[.8,-1],[1,-1],[1,1],[.85,1]]]],
+ farm:[[-.15,[[.04,-1],[.95,-.9],[1,-.12],[.3,-.05]]],[.09,[[.04,.9],[.8,.78],[.95,.22],[.2,.1]]],[-.07,[[.0,-1],[.12,-1],[.12,1],[0,1]]],[.05,[[.4,.1],[.95,.1],[.95,-.1],[.4,-.05]]]],
+ thigh:[[-.16,[[.04,-1],[.92,-.78],[1,-.18],[.3,-.08]]],[.09,[[.04,.98],[.86,.78],[.92,.12],[.3,.22]]],[.07,[[.55,.2],[.97,.4],[.97,-.08]]],[-.1,[[.18,.04],[.92,0],[.92,-.1],[.18,-.04]]],[-.08,[[.9,-1],[1,-1],[1,1],[.9,1]]]],
+ shin:[[.08,[[.04,-.95],[.5,-.88],[.58,-.2],[.1,-.1]]],[-.15,[[.1,-1],[.72,-1],[.82,-.55],[.2,-.65]]],[.1,[[.04,.82],[.92,.56],[.92,.38],[.04,.6]]],[-.09,[[.15,-.1],[.82,-.26],[.82,-.36],[.15,-.2]]],[-.07,[[.92,-1],[1,-1],[1,1],[.92,1]]]]
+};
+const _tx={};
+function bakeTex(kind,base){const key=kind+base;if(_tx[key])return _tx[key];const W=96,Hh=64,c=document.createElement('canvas');c.width=W;c.height=Hh;const g=c.getContext('2d');g.fillStyle=base;g.fillRect(0,0,W,Hh);
+  for(const[k,pts]of TEX[kind]){g.fillStyle=shade(base,k);g.beginPath();pts.forEach(([u,v],i)=>{const x=u*W,y=(v+1)/2*Hh;i?g.lineTo(x,y):g.moveTo(x,y)});g.closePath();g.fill()}
+  return _tx[key]=c}
+/* lay the baked picture of a part over the part's own outline */
+function laySkin(ctx,PX,kind,base){if(!TEX[kind])return;const F=PX.F,rows=PX.rows,L=F.L;let mf=0,mb=0;for(const r of rows){mf=Math.max(mf,r[1]);mb=Math.max(mb,r[2])}const img=bakeTex(kind,base),W=img.width,Hh=img.height;
+  const t0=rows[0][0],t1=rows[rows.length-1][0],Lu=L*(t1-t0);const ox=PX.a.x+F.ux*L*t0-F.nx*mb,oy=PX.a.y+F.uy*L*t0-F.ny*mb;
+  ctx.save();ctx.transform(Lu*F.ux/W,Lu*F.uy/W,(mf+mb)*F.nx/Hh,(mf+mb)*F.ny/Hh,ox,oy);ctx.imageSmoothingEnabled=true;ctx.drawImage(img,0,0);ctx.restore()}
+/* a fold at a bent joint: the inside of the bend darkens, the outside catches light */
+function foldAt(ctx,j,dirIn,dirOut,r,base){const cr=dirIn.x*dirOut.y-dirIn.y*dirOut.x,dt=dirIn.x*dirOut.x+dirIn.y*dirOut.y,ang=Math.acos(Math.max(-1,Math.min(1,dt)));if(ang<.35)return;
+  const k=Math.min(1,(ang-.35)/1.4),lo=rgbOf(shade(base,-.34));ctx.save();ctx.fillStyle=`rgba(${lo[0]},${lo[1]},${lo[2]},${.62*k})`;ctx.beginPath();ctx.moveTo(j.x,j.y);
+  ctx.lineTo(j.x-dirIn.x*r*1.1,j.y-dirIn.y*r*1.1);ctx.lineTo(j.x+(dirOut.x-dirIn.x)*r*.5*(cr>0?1:-1)*0+dirOut.x*r*1.1,j.y+dirOut.y*r*1.1);ctx.closePath();ctx.fill();ctx.restore()}
 /* a very thin darker rim around a body part */
 function thinLine(ctx,pts,col){ctx.save();ctx.globalAlpha=.5;ctx.strokeStyle=shade(col,-.4);ctx.lineWidth=.0034;ctx.lineJoin='round';ctx.beginPath();rpath(ctx,pts,ROUND*2.2);ctx.stroke();ctx.restore()}
 function limb(ctx,a,b,d,rows,col,shCol,extra){const F=frame(a,b,d);const P=(t,w)=>({x:a.x+F.ux*F.L*t+F.nx*w,y:a.y+F.uy*F.L*t+F.ny*w});
@@ -52,7 +73,7 @@ function limb(ctx,a,b,d,rows,col,shCol,extra){const F=frame(a,b,d);const P=(t,w)
   /* rounded joint ends: the limb meets its neighbour with a smooth round cap instead of a hard corner */
   if(!(extra&&extra.noCaps)){const r0=rows[0],r1=rows[rows.length-1];circ(ctx,P(r0[0],(r0[1]-r0[2])/2),(r0[1]+r0[2])/2,col);circ(ctx,P(r1[0],(r1[1]-r1[2])/2),(r1[1]+r1[2])/2,col)}
   if(shCol){const mid=rows.map(r=>P(r[0],-r[2]*(extra&&extra.shadowFrom!=null?extra.shadowFrom:.12)));poly(ctx,mid.concat(back.slice().reverse()),shCol)}
-  return{F,P,out:front.concat(back.slice().reverse()),front,back}}
+  return{F,P,out:front.concat(back.slice().reverse()),front,back,a,rows}}
 
 /* ---------- body ---------- */
 
@@ -97,29 +118,25 @@ Body.prototype.draw=function(ctx,o){o=o||{};const lk=this.look;if(window.CUTOUT&
     joint(ctx,e,.031*M,C.b);/* the elbow sits behind both segments so the shading runs through it */
     /* upper arm: deltoid cap → biceps (front) / triceps (back) → elbow */
     const Pa=limb(ctx,a,e,d,R?[[.5,.05*M,.05*M],[.78,.04*M,.04*M],[1,.031*M,.033*M]]:[[-.04,.05*M*SHB,.055*M*SHB],[.12,.062*M*SHB,.064*M*SHB],[.3,.052*M,.058*M],[.5,.05*M,.05*M],[.78,.04*M,.04*M],[1,.031*M,.033*M]],C.b,C.s,{noCaps:isFar||R,armLine:!isFar});/* a sleeve covers the shoulder of the referee / coach: no skin up there *//* the far shoulder gets no round cap: it would poke out above the back */
-    if(!R&&FS.detail)detailIn(ctx,Pa.out,Pa.front,Pa.back,C.b,.012*M,(hi,lo)=>{const Pu=Pa.P;
-      {const[r_,g_,b_]=rgbOf(lo),gr=ctx.createLinearGradient(a.x,a.y+.065*M,a.x,a.y-.012*M);gr.addColorStop(0,`rgba(${r_},${g_},${b_},.62)`);gr.addColorStop(1,`rgba(${r_},${g_},${b_},0)`);ctx.fillStyle=gr;ctx.beginPath();ctx.arc(a.x,a.y,.085*M,0,7);ctx.fill()}/* only the top of the shoulder is shaded */
-      strip(ctx,Pu,-.02,.64,.0,.05*M,.0,.058*M,hi,.5);/* biceps: lit belly, running up into the shoulder */
-      strip(ctx,Pu,-.02,.76,-.016*M,-.07*M,-.02*M,-.07*M,lo,.5);/* triceps: shadow side */
-      strip(ctx,Pu,.6,1.02,-.07*M,.07*M,-.07*M,.07*M,lo,.18);/* the arm darkens toward the elbow */
-      bruises(ctx,Pu,[[.45,.02,.04],[.7,-.02,.035]],sevA*.8,31+(isFar?7:0),M,Math.atan2(Pa.F.uy,Pa.F.ux))});
+    if(!R&&FS.detail)detailIn(ctx,Pa.out,Pa.front,Pa.back,C.b,.012*M,()=>{laySkin(ctx,Pa,'uarm',C.b);bruises(ctx,Pa.P,[[.45,.02,.04],[.7,-.02,.035]],sevA*.8,31+(isFar?7:0),M,Math.atan2(Pa.F.uy,Pa.F.ux))});
     /* deltoid plate: a lighter facet over the shoulder */
     if(R){const shc=isFar?CL.shirtS:CL.shirt,Ps=limb(ctx,a,e,d,[[-.02,.062*M,.064*M],[.25,.07*M,.072*M],[.56,.064*M,.066*M]],shc,null,{noCaps:true});if(FS.detail)detailIn(ctx,Ps.out,Ps.front,Ps.back,shc,.012*M,(hi,lo)=>{const[r_,g_,b_]=rgbOf(lo),gr=ctx.createLinearGradient(a.x,a.y+.06*M,a.x,a.y-.012*M);gr.addColorStop(0,`rgba(${r_},${g_},${b_},.6)`);gr.addColorStop(1,`rgba(${r_},${g_},${b_},0)`);ctx.fillStyle=gr;ctx.beginPath();ctx.arc(a.x,a.y,.08*M,0,7);ctx.fill();strip(ctx,Ps.P,.1,.9,-.02*M,-.07*M,-.02*M,-.066*M,lo,.5);strip(ctx,Ps.P,.1,.8,.02*M,.06*M,.02*M,.056*M,hi,.45)})}
-    else{limb(ctx,a,e,d,[[.04,.034*M,.02*M],[.12,.05*M,.04*M],[.3,.034*M,.02*M]],isFar?C.b:shade(C.b,.05),null,{noCaps:true,noLine:true})}/* the deltoid facet stays inside the arm: no bump above the shoulder */
     /* forearm: flexor bulge near the elbow, narrow wrist */
     const Pf=limb(ctx,e,w,d,[[-.06,.032*M,.032*M],[.2,.038*M,.036*M],[.45,.033*M,.031*M],[.8,.025*M,.024*M],[1,.022*M,.022*M]],C.b,C.s,{armLine:!isFar});
-    if(FS.detail)detailIn(ctx,Pf.out,Pf.front,Pf.back,C.b,.009*M,(hi,lo)=>{const Q=Pf.P;strip(ctx,Q,.06,.5,.0,.04*M,.0,.034*M,hi,.5);strip(ctx,Q,.1,.82,-.01*M,-.05*M,-.01*M,-.04*M,lo,.45);fac(ctx,[Q(.0,.0),Q(.16,.04*M),Q(.16,-.04*M)],lo,.3,0);strip(ctx,Q,.7,1,-.04*M,.04*M,-.04*M,.04*M,lo,.2);bruises(ctx,Q,[[.3,.01,.05],[.55,-.012,.045],[.15,-.015,.04],[.72,.012,.04]],sevA,53+(isFar?7:0),M,Math.atan2(Pf.F.uy,Pf.F.ux));glowAt(ctx,Q(.4,0),.085*M,flA*.8)});
+    if(FS.detail)detailIn(ctx,Pf.out,Pf.front,Pf.back,C.b,.009*M,()=>{laySkin(ctx,Pf,'farm',C.b);bruises(ctx,Pf.P,[[.3,.01,.05],[.55,-.012,.045],[.15,-.015,.04],[.72,.012,.04]],sevA,53+(isFar?7:0),M,Math.atan2(Pf.F.uy,Pf.F.ux));glowAt(ctx,Pf.P(.4,0),.085*M,flA*.8)});
+    if(!R)foldAt(ctx,e,{x:Pa.F.ux,y:Pa.F.uy},{x:Pf.F.ux,y:Pf.F.uy},.03*M,C.b);
     const Gk=(this.rag||(this._owner&&this._owner.down))?(()=>{const dx=w.x-e.x,dy=w.y-e.y,L=Math.hypot(dx,dy)||1,g=J[S.G],gl=Math.hypot(g.x-w.x,g.y-w.y);return{x:w.x+dx/L*gl,y:w.y+dy/L*gl}})():J[S.G];/* knocked out: the wrist does not bend */
     drawGloveFlat(ctx,e,w,Gk,H,isFar?shade(glove,-.2):glove,R?glove:strap,self.ang[S.o],R?0:self.gloveBlood,d,R?glove:C.b,R,isFar)};
   /* ---- leg: quad/hamstring, knee cap, calf, ankle, foot with toes ---- */
   const leg=(S,isFar,sleeveCol)=>{const h=J[S.H],k=J[S.K],a=J[S.A],he=J[S.He],to=J[S.T];const C=RP?(isFar?{b:CL.pantsS,s:shade(CL.pantsS,-.2)}:{b:CL.pants,s:CL.pantsS}):isFar?{b:sk.far,s:sk.farSh}:{b:sk.base,s:sk.sh};
     joint(ctx,k,.041*M,C.b);/* knee behind the thigh and shin */
     const Pt=limb(ctx,h,k,d,[[-.06,.07*M,.07*M],[.18,.074*M,.07*M],[.45,.066*M,.062*M],[.75,.052*M,.05*M],[1,.042*M,.043*M]],C.b,C.s);
-    if(FS.detail)detailIn(ctx,Pt.out,Pt.front,Pt.back,C.b,.014*M,(hi,lo)=>{const Q=Pt.P;strip(ctx,Q,.08,.72,.0,.09*M,.0,.07*M,hi,.5);/* quad sweep */fac(ctx,[Q(.5,.0),Q(.96,.05*M),Q(.92,-.01*M)],hi,.4,0);/* inner quad teardrop */strip(ctx,Q,.1,.86,-.02*M,-.09*M,-.016*M,-.07*M,lo,.5);/* hamstring */strip(ctx,Q,.0,.18,-.09*M,.09*M,-.09*M,.09*M,lo,.3);/* hip crease */fac(ctx,[Q(.3,.02*M),Q(.7,.0),Q(.62,-.02*M),Q(.28,-.0)],lo,.3,0);/* the seam between quad and hamstring */bruises(ctx,Q,[[.4,.035,.055],[.6,.045,.06],[.25,.03,.045],[.75,.03,.05],[.5,-.01,.045]],sevL*LS(S.H),71+(isFar?5:0),M,Math.atan2(Pt.F.uy,Pt.F.ux))});
+    if(FS.detail)detailIn(ctx,Pt.out,Pt.front,Pt.back,C.b,.014*M,()=>{laySkin(ctx,Pt,'thigh',C.b);bruises(ctx,Pt.P,[[.4,.035,.055],[.6,.045,.06],[.25,.03,.045],[.75,.03,.05],[.5,-.01,.045]],sevL*LS(S.H),71+(isFar?5:0),M,Math.atan2(Pt.F.uy,Pt.F.ux))});
     /* shin / calf: calf bulge on the back, straight shin bone on the front */
     const Pc=limb(ctx,k,a,d,[[-.04,.04*M,.042*M],[.22,.036*M,.054*M],[.42,.033*M,.05*M],[.7,.026*M,.032*M],[.92,.022*M,.023*M],[1.02,.022*M,.024*M]],C.b,C.s,{shadowFrom:.0});
-    if(FS.detail)detailIn(ctx,Pc.out,Pc.front,Pc.back,C.b,.011*M,(hi,lo)=>{const Q=Pc.P;strip(ctx,Q,.06,.5,-.0,-.06*M,-.0,-.054*M,hi,.5);/* calf: lit head */strip(ctx,Q,.12,.66,-.004*M,-.02*M,.0,-.014*M,lo,.55);/* groove between the calf heads */strip(ctx,Q,.12,.86,.024*M,.05*M,.018*M,.04*M,hi,.4);/* shin edge */strip(ctx,Q,.5,1,-.03*M,-.06*M,-.02*M,-.04*M,lo,.4);fac(ctx,[Q(-.04,.0),Q(.14,.05*M),Q(.14,-.05*M)],lo,.3,0);/* under the knee */bruises(ctx,Q,[[.3,.01,.04],[.55,.02,.04],[.2,-.015,.035]],sevL*LS(S.H)*.8,91+(isFar?5:0),M,Math.atan2(Pc.F.uy,Pc.F.ux))});
-    /* knee: joint block + a single knee-cap facet */{const F=frame(h,k,d);poly(ctx,[{x:k.x+F.nx*.042*M-F.ux*.03*M,y:k.y+F.ny*.042*M-F.uy*.03*M},{x:k.x+F.nx*.046*M+F.ux*.02*M,y:k.y+F.ny*.046*M+F.uy*.02*M},{x:k.x+F.nx*.02*M+F.ux*.04*M,y:k.y+F.ny*.02*M+F.uy*.04*M},{x:k.x+F.nx*.012*M,y:k.y+F.ny*.012*M}],C.s)}
+    if(FS.detail)detailIn(ctx,Pc.out,Pc.front,Pc.back,C.b,.011*M,()=>{laySkin(ctx,Pc,'shin',C.b);bruises(ctx,Pc.P,[[.3,.01,.04],[.55,.02,.04],[.2,-.015,.035]],sevL*LS(S.H)*.8,91+(isFar?5:0),M,Math.atan2(Pc.F.uy,Pc.F.ux))});
+    if(!RP)foldAt(ctx,k,{x:Pt.F.ux,y:Pt.F.uy},{x:Pc.F.ux,y:Pc.F.uy},.04*M,C.b);
+
     circ(ctx,a,.024*M,C.b);footFlat(ctx,a,he,to,M,R?{b:CL.boot,s:'#070708'}:C,d);
     if(sleeveCol)shortsLeg(ctx,h,k,d,M,sleeveCol,lk,isFar)};
   if(o.onlyArm){arm(nearS,false);return}if(o.part==='far'){arm(farS,true);return}

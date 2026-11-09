@@ -1,0 +1,31 @@
+{
+ "turret": {
+  "name": "turret",
+  "x": 38,
+  "y": 626,
+  "w": 918,
+  "h": 212
+ },
+ "barrel": {
+  "name": "barrel",
+  "x": 952,
+  "y": 766,
+  "w": 464,
+  "h": 56
+ },
+ "hull": {
+  "name": "hull",
+  "x": 14,
+  "y": 838,
+  "w": 1188,
+  "h": 144
+ },
+ "roadwheel": {
+  "name": "roadwheel",
+  "r": 47
+ },
+ "sprocket": {
+  "name": "sprocket",
+  "r": 52
+ }
+}

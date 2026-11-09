@@ -93,7 +93,7 @@ Body.prototype.draw=function(ctx,o){o=o||{};const lk=this.look;if(window.CUTOUT&
   const ow=this._owner,hpo=ow&&ow.hp,sevL=hpo?clamp((100-hpo.legs)/100*1.25-.1,0,1):0,sevA=ow?clamp((ow._armD||0)/32,0,1):0,LS=H0=>{const D=LD;if(!D)return 1;const sd=H0==='lH'?'l':'r',tot=D.l+D.r;return tot<1?1:clamp(.5+.9*D[sd]/tot,.45,1.25)},flA=ow&&ow._armFlash>0?ow._armFlash/.32:0,LD=ow&&ow._legD;
   const self=this;
   /* ---- arm: deltoid, biceps/triceps, elbow, forearm, wrist, glove ---- */
-  const arm=(S,isFar)=>{const e=J[S.E],w=J[S.W],a=lerp(J[S.S],J.mid,R?.2:.32);/* the drawn shoulder sits well below the neck, so it never covers the face */const C=isFar?{b:sk.far,s:sk.farSh}:{b:sk.base,s:sk.sh};
+  const arm=(S,isFar)=>{const e=J[S.E],w=J[S.W],a=lerp(J[S.S],J.mid,R?.12:.22);/* the drawn shoulder sits well below the neck, so it never covers the face */const C=isFar?{b:sk.far,s:sk.farSh}:{b:sk.base,s:sk.sh};
     joint(ctx,e,.031*M,C.b);/* the elbow sits behind both segments so the shading runs through it */
     /* upper arm: deltoid cap → biceps (front) / triceps (back) → elbow */
     const Pa=limb(ctx,a,e,d,R?[[.5,.05*M,.05*M],[.78,.04*M,.04*M],[1,.031*M,.033*M]]:[[-.04,.05*M*SHB,.055*M*SHB],[.12,.062*M*SHB,.064*M*SHB],[.3,.052*M,.058*M],[.5,.05*M,.05*M],[.78,.04*M,.04*M],[1,.031*M,.033*M]],C.b,C.s,{noCaps:isFar||R,armLine:!isFar});/* a sleeve covers the shoulder of the referee / coach: no skin up there *//* the far shoulder gets no round cap: it would poke out above the back */
@@ -173,7 +173,7 @@ function footFlat(ctx,A,He,T,M,C,d){const ux0=T.x-He.x,uy0=T.y-He.y,Lf=Math.hypo
 
 /* ---------- torso: lats, pecs, abs, obliques ---------- */
 function torsoFlat(ctx,J,H,M,sk,d,lk,B){const sp=[J.hip,J.mid,J.sh,J.nk];const segL=[0];for(let i=1;i<4;i++)segL.push(segL[i-1]+Math.hypot(sp[i].x-sp[i-1].x,sp[i].y-sp[i-1].y));const TL=segL[3]||1;
-  const at=s=>{const L=s*TL*.975;/* the torso stops below the chin: the neck is visible between chin and shoulders */let i=1;while(i<3&&segL[i]<L)i++;const a=sp[i-1],b=sp[i],k=(L-segL[i-1])/((segL[i]-segL[i-1])||1);const tx=b.x-a.x,ty=b.y-a.y,l=Math.hypot(tx,ty)||1;return{x:a.x+tx*k,y:a.y+ty*k,nx:ty/l*d,ny:-tx/l*d}};
+  const at=s=>{const L=s*TL;let i=1;while(i<3&&segL[i]<L)i++;const a=sp[i-1],b=sp[i],k=(L-segL[i-1])/((segL[i]-segL[i-1])||1);const tx=b.x-a.x,ty=b.y-a.y,l=Math.hypot(tx,ty)||1;return{x:a.x+tx*k,y:a.y+ty*k,nx:ty/l*d,ny:-tx/l*d}};
   const pt=(s,w)=>{const c=at(s);return{x:c.x+c.nx*w*M/.94/1,y:c.y+c.ny*w*M/.94}};
   const bel=lk.belly||lk.body==='belly'?.042:lk.body==='soft'?.017:0;const shb=lk.body==='broad'?1.14:1;/* broad: wider chest and upper back */
   const FR=[[0,.074+bel*.3],[.16,.068+bel*.8],[.32,.066+bel],[.48,.067+bel*.7],[.6,.078],[.7,.088*shb],[.79,.088*shb],[.87,.07*shb],[.94,.046],[1,.03]];

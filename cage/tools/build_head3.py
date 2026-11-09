@@ -4,10 +4,10 @@ import sys,json,os
 from PIL import Image,ImageFilter
 import numpy as np
 SPEC={ # key: back-of-skull x, nose x, top y, chin y, collar polyline (cut everything below), skin
- 'ref1':dict(back=347,nose=407,top=18,chin=86,collar=[(325,66),(335,70),(395,98),(420,110)],skin='#e9b28b'),
- 'ref2':dict(back=618,nose=680,top=13,chin=88,collar=[(560,52),(570,58),(617,75),(657,96),(700,112)],skin='#7a5236',left=568),
- 'ref3':dict(back=892,nose=953,top=17,chin=90,collar=[(880,70),(897,76),(937,101),(975,115)],skin='#d9a07a'),
- 'ref4':dict(back=1163,nose=1225,top=18,chin=88,collar=[(1145,74),(1163,78),(1210,103),(1250,118)],skin='#dca883'),
+ 'ref1':dict(eye=(392, 52),back=347,nose=407,top=18,chin=86,collar=[(325,66),(335,70),(395,98),(420,110)],skin='#e9b28b'),
+ 'ref2':dict(eye=(665, 49),back=618,nose=680,top=13,chin=88,collar=[(560,52),(570,58),(617,75),(657,96),(700,112)],skin='#7a5236',left=568),
+ 'ref3':dict(eye=(942, 53),back=892,nose=953,top=17,chin=90,collar=[(880,70),(897,76),(937,101),(975,115)],skin='#d9a07a'),
+ 'ref4':dict(eye=(1210, 53),back=1163,nose=1225,top=18,chin=88,collar=[(1145,74),(1163,78),(1210,103),(1250,118)],skin='#dca883'),
  'coach1':dict(back=200,nose=262,top=533,chin=603,collar=[(180,575),(205,586),(250,614),(285,625)],skin='#e6b08c'),
  'coach2':dict(back=392,nose=447,top=542,chin=620,collar=[(365,585),(395,598),(440,628),(475,640)],skin='#d99f78',left=383),
  'coach3':dict(back=547,nose=605,top=533,chin=602,collar=[(528,568),(552,584),(588,612),(640,626)],skin='#8a5a3c'),
@@ -30,4 +30,5 @@ for key,C in SPEC.items():
     rgba=np.zeros((h,w,4),np.uint8);rgba[...,:3]=a.astype(np.uint8);rgba[...,3]=(al*keep*255).astype(np.uint8)
     out=os.path.join(root,key);os.makedirs(out,exist_ok=True);Image.fromarray(rgba).save(out+'/head.png')
     meta=dict(image='head.png',w=w,h=h,off=[0,0],p0=[round(((C['back']+C['nose'])/2-x0)*S),round(((C['top']+C['chin'])/2-y0)*S)],p1=[0,h],headH=420,nofx=True,skin=C['skin'])
+    if 'eye' in C:meta['fx']=dict(G=dict(eye=[round((C['eye'][0]-x0)*S),round((C['eye'][1]-y0)*S)],u=30,down=1),lid=C['skin'],blinkOnly=True)
     json.dump(meta,open(out+'/head2.json','w'));print(key,w,h,meta['p0'])

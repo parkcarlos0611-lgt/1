@@ -1,1 +1,1 @@
-{"image": "head.png", "w": 516, "h": 672, "off": [0, 0], "p0": [270, 258], "p1": [0, 672], "headH": 420, "nofx": true, "skin": "#dca883", "fx": {"G": {"eye": [366, 258], "u": 30, "down": 1}, "lid": "#dca883", "blinkOnly": true}}
+{"image": "head.png", "w": 516, "h": 672, "off": [0, 0], "p0": [270, 258], "p1": [270, 672], "headH": 420, "nofx": true, "skin": "#dca883", "fx": {"G": {"eye": [366, 258], "u": 30, "down": 1}, "lid": "#dca883", "blinkOnly": true}}

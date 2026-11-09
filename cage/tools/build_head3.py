@@ -29,6 +29,6 @@ for key,C in SPEC.items():
     if 'clipX' in C:keep&=(xx<(C['clipX']-x0)*S)|(yy<(C['clipFrom']-y0)*S)
     rgba=np.zeros((h,w,4),np.uint8);rgba[...,:3]=a.astype(np.uint8);rgba[...,3]=(al*keep*255).astype(np.uint8)
     out=os.path.join(root,key);os.makedirs(out,exist_ok=True);Image.fromarray(rgba).save(out+'/head.png')
-    meta=dict(image='head.png',w=w,h=h,off=[0,0],p0=[round(((C['back']+C['nose'])/2-x0)*S),round(((C['top']+C['chin'])/2-y0)*S)],p1=[0,h],headH=420,nofx=True,skin=C['skin'])
+    meta=dict(image='head.png',w=w,h=h,off=[0,0],p0=[round(((C['back']+C['nose'])/2-x0)*S),round(((C['top']+C['chin'])/2-y0)*S)],p1=[round(((C['back']+C['nose'])/2-x0)*S),h],headH=420,nofx=True,skin=C['skin'])
     if 'eye' in C:meta['fx']=dict(G=dict(eye=[round((C['eye'][0]-x0)*S),round((C['eye'][1]-y0)*S)],u=30,down=1),lid=C['skin'],blinkOnly=True)
     json.dump(meta,open(out+'/head2.json','w'));print(key,w,h,meta['p0'])

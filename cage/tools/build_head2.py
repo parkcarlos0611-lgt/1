@@ -63,7 +63,10 @@ CFG={
    backN=[(153,537),(180,527),(200,520),(270,524)],frontN=[(153,590),(203,618),(270,610)],
    eye=(650,118),brow=(657,107),brow2=(637,112),nosef=(669,147),cheek=(640,138),fore=(633,67),lip=(667,173),mouth=(667,177,38,16),lid='#7d4a26'),
 }
-key,src,out=sys.argv[1],sys.argv[2],sys.argv[3];C=CFG[key]
+key,src,out=sys.argv[1],sys.argv[2],sys.argv[3]
+if key not in CFG:   # auto geometry from a full-body flat-colour illustration (see tools/add_fighter.py)
+    sys.path.insert(0,__import__('os').path.dirname(__file__));from auto_geom import auto_cfg;CFG[key]=auto_cfg(src)
+C=CFG[key]
 im=Image.open(src).convert('RGB')
 y1=C['neckTop']+120                                   # source rows kept below the ear
 S=484/(C['chin']-C['top'])

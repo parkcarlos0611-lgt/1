@@ -53,6 +53,8 @@ DS.Effects = class Effects {
     }
     // damage: burning hull, bustle blow-out panels venting
     if (v.burning) this.burning(v, dt);
+    if (v.jet > 0) this.flameJet(v, dt);
+    for (const h of v.holes) this.holeFlame(v, h, dt);
     if (v.vent > 0) {
       const p = v.local(v.g.ring.x - v.dir * 2.1, v.g.ring.y + 0.6);
       for (let i = 0; i < 40 * dt * 10; i++) P.add(K.FIRE, p.x + this.rnd(-0.6, 0.6), p.y, this.rnd(-1, 1), this.rnd(10, 22), this.rnd(0.15, 0.35), this.rnd(0.3, 0.6),
@@ -65,19 +67,59 @@ DS.Effects = class Effects {
 
   burning(v, dt) {
     const P = this.P, K = DS.P;
-    const age = v.burning, f = Math.min(1, age / 3) * (v.wreck ? 1.3 : 1);
-    const p = v.turretGone ? v.local(v.g.ring.x, v.g.ring.y) : v.local(v.g.ring.x - v.dir * 0.6, v.g.ring.y + 0.9);
-    let n = 30 * f * dt + Math.random() * 0.5;
-    while (n-- >= 1) P.add(K.FIRE, p.x + this.rnd(-0.7, 0.7), p.y + this.rnd(-0.1, 0.3), this.rnd(-0.6, 0.6) + this.w.wind * 0.2, this.rnd(1.5, 4.5), this.rnd(0.2, 0.55), this.rnd(0.25, 0.6),
-      { grow: 0.6, drag: 1.5, grav: -0.08, alpha: 0.85, col: Math.random() < 0.5 ? 0xff8a30 : 0xffc060 });
+    const age = v.burning, f = Math.min(1, age / 2.5) * (v.wreck ? 1.4 : 1);
+    // flare-ups: the fire breathes, with occasional surges
+    v._flare = Math.max(0, (v._flare || 0) - dt);
+    if (Math.random() < dt * 0.35) v._flare = this.rnd(0.6, 1.6);
+    const surge = 1 + (v._flare > 0 ? 1.8 : 0) + 0.35 * Math.sin(age * 7.3) * Math.sin(age * 3.1);
+    const p = v.fireSource(), wide = v.turretGone ? 1.0 : 0.6;
+    let n = 70 * f * surge * dt + Math.random() * 0.5;
+    while (n-- >= 1) P.add(K.FIRE, p.x + this.rnd(-wide, wide), p.y + this.rnd(-0.1, 0.3), this.rnd(-0.8, 0.8) + this.w.wind * 0.25, this.rnd(2.5, 6.5) * (0.8 + 0.3 * surge),
+      this.rnd(0.25, 0.7), this.rnd(0.3, 0.8) * (0.85 + 0.2 * surge), { grow: 0.8, drag: 1.4, grav: -0.1, alpha: 0.9, col: Math.random() < 0.4 ? 0xff7a28 : Math.random() < 0.6 ? 0xffb050 : 0xffe08a });
+    // licking flames from the engine deck once the fire has spread
+    if (age > 6) {
+      const e = v.local(v.g.exhaust.x + v.dir * 0.8, 0.2);
+      let m = 22 * f * dt;
+      while (m-- >= 0 && Math.random() < 0.9) P.add(K.FIRE, e.x + this.rnd(-0.8, 0.8), e.y, this.rnd(-0.5, 0.5), this.rnd(1.5, 4), this.rnd(0.2, 0.5), this.rnd(0.25, 0.5),
+        { grow: 0.6, drag: 1.5, grav: -0.1, alpha: 0.8, col: 0xff8a30 });
+    }
     let m = 9 * f * dt + Math.random() * 0.4;
-    while (m-- >= 1) P.add(K.DARK, p.x + this.rnd(-0.5, 0.5), p.y + 0.8, this.rnd(-0.4, 0.4), this.rnd(2.5, 5), this.rnd(9, 18), this.rnd(0.6, 1.1),
-      { grow: this.rnd(0.6, 1.1), drag: 0.35, grav: -0.02, alpha: 0.42, col: Math.random() < 0.5 ? 0x24211e : 0x3b3631 });
-    // occasional small cook-off pops
+    while (m-- >= 1) P.add(K.DARK, p.x + this.rnd(-0.6, 0.6), p.y + 1.0, this.rnd(-0.4, 0.4), this.rnd(3, 6), this.rnd(10, 18), this.rnd(0.6, 1.0),
+      { grow: this.rnd(0.45, 0.9), drag: 0.35, grav: -0.02, alpha: 0.42, col: Math.random() < 0.5 ? 0x201d1a : 0x37322d });
     if (v.wreck && Math.random() < dt * 0.6) {
-      for (let i = 0; i < 12; i++) { const a = this.rnd(0.3, 2.8), sp = this.rnd(4, 16);
+      for (let i = 0; i < 16; i++) { const a = this.rnd(0.3, 2.8), sp = this.rnd(5, 20);
         P.add(K.FIRE, p.x, p.y + 0.5, Math.cos(a) * sp, Math.sin(a) * sp, this.rnd(0.1, 0.3), this.rnd(0.2, 0.5), { grow: 2, drag: 4, grav: 0.2, alpha: 1, col: 0xffb050 }); }
     }
+  }
+
+  // cook-off: propellant venting through the turret ring as a roaring vertical jet
+  flameJet(v, dt) {
+    const P = this.P, K = DS.P, p = v.local(v.g.ring.x, v.g.ring.y + 0.1);
+    const k = Math.min(1, v.jet / 2) * (0.75 + 0.25 * Math.sin(v.jet * 23));
+    let n = 170 * k * dt;
+    while (n-- >= 0) {
+      const a = Math.PI / 2 + v.ang + this.rnd(-0.16, 0.16), sp = this.rnd(14, 34) * (0.6 + 0.4 * k);
+      const hot = Math.random() < 0.2;
+      P.add(K.FIRE, p.x + this.rnd(-0.45, 0.45), p.y, Math.cos(a) * sp, Math.sin(a) * sp, this.rnd(0.25, 0.6), this.rnd(0.35, 0.9),
+        { grow: 1.8, drag: 1.6, grav: -0.05, alpha: hot ? 0.75 : 0.5, col: hot ? 0xffe6a0 : Math.random() < 0.55 ? 0xff9a30 : 0xe8561a });
+    }
+    if (Math.random() < 9 * dt) P.add(K.DARK, p.x, p.y + this.rnd(5, 10), this.rnd(-1, 1), this.rnd(4, 8), this.rnd(9, 15), this.rnd(0.9, 1.4),
+      { grow: 0.7, drag: 0.5, grav: -0.03, alpha: 0.42, col: 0x1e1b18 });
+    if (Math.random() < 20 * dt) { const a = Math.PI / 2 + this.rnd(-0.6, 0.6), sp = this.rnd(15, 40);
+      P.add(K.DEBRIS, p.x, p.y, Math.cos(a) * sp, Math.sin(a) * sp, this.rnd(1.5, 3), this.rnd(0.05, 0.12), { drag: 0.2, grav: 1 }); }
+  }
+
+  // flame and spall blowing back out of a penetration hole
+  holeFlame(v, h, dt) {
+    if (h.t <= 0) return;
+    const P = this.P, K = DS.P, p = v.spotWorld(h), k = Math.min(1, h.t);
+    let n = 90 * k * dt;
+    while (n-- >= 0) {
+      const sp = this.rnd(4, 16) * k;
+      P.add(K.FIRE, p.x, p.y, h.nx * sp + this.rnd(-2, 2), h.ny * sp + this.rnd(0, 3), this.rnd(0.12, 0.35), this.rnd(0.2, 0.5),
+        { grow: 1.5, drag: 2.5, grav: -0.1, alpha: 1, col: Math.random() < 0.5 ? 0xffc060 : 0xff8030 });
+    }
+    if (Math.random() < 10 * dt) P.add(K.DARK, p.x, p.y + 0.3, h.nx * 2, this.rnd(1, 3), this.rnd(4, 8), 0.5, { grow: 0.8, drag: 0.8, grav: -0.03, alpha: 0.4, col: 0x2a2622 });
   }
 
   explode(v) {
@@ -89,10 +131,10 @@ DS.Effects = class Effects {
       P.add(K.FIRE, p.x + this.rnd(-1, 1), p.y + this.rnd(0, 1.5), Math.cos(a) * sp * 0.7, Math.sin(a) * sp, this.rnd(0.2, 0.9), this.rnd(0.6, 1.6),
         { grow: 3, drag: 3, grav: -0.05, alpha: 1, col: Math.random() < 0.5 ? 0xff9a3c : 0xffd27a });
     }
-    for (let i = 0; i < 60; i++) {
+    for (let i = 0; i < 40; i++) {
       const a = this.rnd(0.2, Math.PI - 0.2), sp = this.rnd(3, 14);
-      P.add(K.DARK, p.x + this.rnd(-1, 1), p.y + this.rnd(0.5, 3), Math.cos(a) * sp * 0.6, Math.sin(a) * sp, this.rnd(8, 16), this.rnd(1, 2.2),
-        { grow: 1.2, drag: 0.7, grav: -0.03, alpha: 0.55, col: 0x24201c });
+      P.add(K.DARK, p.x + this.rnd(-1, 1), p.y + this.rnd(0.5, 3), Math.cos(a) * sp * 0.6, Math.sin(a) * sp, this.rnd(7, 13), this.rnd(1, 1.8),
+        { grow: 0.8, drag: 0.7, grav: -0.03, alpha: 0.45, col: 0x24201c });
     }
     for (let i = 0; i < 45; i++) {
       const a = this.rnd(0.2, Math.PI - 0.2), sp = this.rnd(8, 35);
@@ -195,6 +237,16 @@ DS.Effects = class Effects {
 
   drawFlashes(ctx) {
     ctx.globalCompositeOperation = 'lighter';
+    // flickering light cast by fires on the hull and the sand around them
+    for (const v of this.w.vehicles) {
+      if (!v.burning && !(v.jet > 0)) continue;
+      const p = v.fireSource(), t = this.w.time;
+      const k = Math.min(1, v.burning / 2 + (v.jet > 0 ? 1 : 0)) * (0.75 + 0.25 * Math.sin(t * 13) * Math.sin(t * 5.7));
+      const R = v.jet > 0 ? 16 : 9;
+      const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, R);
+      g.addColorStop(0, `rgba(255,150,60,${0.32 * k})`); g.addColorStop(1, 'rgba(255,120,40,0)');
+      ctx.fillStyle = g; ctx.fillRect(p.x - R, p.y - R, R * 2, R * 2);
+    }
     for (const f of this.flashes) {
       const k = 1 - f.t / f.ttl, a = Math.atan2(f.dy, f.dx);
       ctx.save(); ctx.translate(f.x, f.y); ctx.rotate(a);

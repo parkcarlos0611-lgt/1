@@ -3,7 +3,7 @@
 DS.Renderer = class Renderer {
   constructor(canvas, world) {
     this.cv = canvas; this.ctx = canvas.getContext('2d'); this.w = world;
-    this.img = {}; this.mips = {}; this.linkBuf = []; this.pathBuf = [];
+    this.img = {}; this.mips = {}; this.linkBuf = []; this.pathBuf = []; this.offs = new Map();
     this.noise = this.makeNoise();
   }
   load(def) {
@@ -163,13 +163,58 @@ DS.Renderer = class Renderer {
     // crisp surface line
     ctx.beginPath();
     for (let x = x0; x <= x1 + step; x += step) { const y = T.height(x); if (x === x0) ctx.moveTo(x, y); else ctx.lineTo(x, y); }
-    ctx.strokeStyle = 'rgba(245,225,185,0.8)'; ctx.lineWidth = Math.max(0.03, 1.2 / cam.zoom); ctx.stroke();
+    // thin ink edge on the ground surface (matches the outlined art), with a sunlit lip just under it
+    ctx.save(); ctx.translate(0, -1.6 / cam.zoom);
+    ctx.strokeStyle = 'rgba(250,232,195,0.55)'; ctx.lineWidth = 1.2 / cam.zoom; ctx.stroke(); ctx.restore();
+    ctx.strokeStyle = 'rgba(64,46,26,0.85)'; ctx.lineWidth = Math.max(0.012, 1.3 / cam.zoom); ctx.lineJoin = 'round'; ctx.stroke();
   }
 
   vehicle(ctx, v, cam) {
+    if (v.scorch.length || v.burning) this.charred(ctx, v, cam);
+    else this.drawVehicle(ctx, v, cam);
+  }
+
+  // Damaged vehicle: drawn to an offscreen layer, then char marks are painted 'source-atop' so they
+  // stay inside the vehicle's own silhouette and spread outward from where they started.
+  charred(ctx, v, cam) {
+    const cv = ctx.canvas;
+    let off = this.offs.get(cv);
+    if (!off || off.width !== cv.width || off.height !== cv.height) { off = document.createElement('canvas'); off.width = cv.width; off.height = cv.height; this.offs.set(cv, off); }
+    const o = off.getContext('2d'), m = ctx.getTransform(), z = Math.hypot(m.a, m.b);
+    const pts = [v.pos]; if (v.turretBody) pts.push(v.turretBody);
+    let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+    for (const p of pts) {
+      const sx = m.a * p.x + m.c * p.y + m.e, sy = m.b * p.x + m.d * p.y + m.f, h = 7.5 * z;
+      x0 = Math.min(x0, sx - h); y0 = Math.min(y0, sy - h); x1 = Math.max(x1, sx + h); y1 = Math.max(y1, sy + h);
+    }
+    x0 = Math.max(0, Math.floor(x0)); y0 = Math.max(0, Math.floor(y0)); x1 = Math.min(cv.width, Math.ceil(x1)); y1 = Math.min(cv.height, Math.ceil(y1));
+    if (x1 <= x0 || y1 <= y0) return;
+    o.setTransform(1, 0, 0, 1, 0, 0); o.clearRect(x0, y0, x1 - x0, y1 - y0);
+    o.setTransform(m);
+    this.drawVehicle(o, v, cam);
+    o.globalCompositeOperation = 'source-atop';
+    // overall soot builds up slowly the longer it burns
+    const all = Math.min(0.55, (v.burning || 0) / 50 + (v.wreck ? 0.12 : 0));
+    if (all > 0) { o.save(); o.setTransform(1, 0, 0, 1, 0, 0); o.fillStyle = `rgba(16,12,9,${all})`; o.fillRect(x0, y0, x1 - x0, y1 - y0); o.restore(); }
+    const t = this.w.time;
+    for (const sp of v.scorch) {
+      const p = v.spotWorld(sp), r = Math.min(sp.max, 0.3 + sp.t * 0.085), a = Math.min(0.93, 0.3 + sp.t * 0.035);
+      const g = o.createRadialGradient(p.x, p.y, 0, p.x, p.y, r * 1.5);
+      g.addColorStop(0, `rgba(12,9,7,${a})`); g.addColorStop(0.55, `rgba(22,16,11,${a * 0.85})`); g.addColorStop(1, 'rgba(30,22,14,0)');
+      o.fillStyle = g; o.fillRect(p.x - r * 1.5, p.y - r * 1.5, r * 3, r * 3);
+      if (v.burning) {                       // glowing paint and metal at the edge of the burn
+        const k = 0.18 + 0.12 * Math.sin(t * 9 + sp.lx * 3);
+        const e = o.createRadialGradient(p.x, p.y, r * 0.2, p.x, p.y, r * 0.9);
+        e.addColorStop(0, `rgba(255,120,40,${k})`); e.addColorStop(1, 'rgba(255,90,20,0)');
+        o.fillStyle = e; o.fillRect(p.x - r, p.y - r, r * 2, r * 2);
+      }
+    }
+    o.globalCompositeOperation = 'source-over';
+    ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(off, x0, y0, x1 - x0, y1 - y0, x0, y0, x1 - x0, y1 - y0); ctx.restore();
+  }
+
+  drawVehicle(ctx, v, cam) {
     const D = v.def, S = D.src, I = this.img[D.id], px = 1 / S.ppm, dir = v.dir, id = D.id, Sp = D.sprites;
-    const charred = v.burning > 0.6 || v.wreck;
-    if (charred) ctx.filter = 'brightness(0.32) saturate(0.35)';
     // ---- hull frame: underside shadow ----
     ctx.save(); ctx.translate(v.pos.x, v.pos.y); ctx.rotate(v.ang); ctx.scale(dir, 1);
     const U = D.underside;
@@ -231,7 +276,6 @@ DS.Renderer = class Renderer {
       this.turret(ctx, v, b.e, 0, false);
       ctx.restore();
     }
-    ctx.filter = 'none';
   }
 
   // barrel + turret + antennas in the vehicle's unmirrored hull frame (metres)

@@ -103,6 +103,10 @@ DS.Armor = {
 
     r.result = 'pen';
     const resid = pen - prot;
+    // char spreads from the entry hole; flame and debris blow back out of it for a moment
+    v.addScorch(hit.x, hit.y, heat ? 1.0 : 0.8);
+    const hl = v.toLocal(hit.x, hit.y);
+    v.holes.push({ lx: hl.x, ly: hl.y, nx: pl.nx, ny: pl.ny, t: heat ? 1.4 : 0.9, part: hl.y > v.g.ring.y - 0.05 ? 'turret' : 'hull' });
     r.resid = resid;
     // behind-armour debris / jet: a cone of rays from the entry point
     const len = heat ? Math.min(3.5, 1.2 + resid / 250) : Math.min(4.5, 0.9 + resid / 120);

@@ -13,13 +13,17 @@ DS.Game = class Game {
   }
   async start() {
     const def = DS.VEHICLES.m1a1, W = this.world;
-    await Promise.all([this.rend.load(def), this.rend.load(DS.VEHICLES.t72)]);
+    await Promise.all(['m1a1', 't55', 't62', 't72'].map(id => this.rend.load(DS.VEHICLES[id])));
     DS.Armor.calibrate();
     const v = new DS.Vehicle(def, 60, W.terrain, { label: 'M1A1 (아군)' });
     W.vehicles.push(v); this.player = v;
     // Iraqi T-72M1 positions: one dug in behind the berm, one in the open, one hidden behind the dunes
-    [[911, 'T-72 #1 (진지)'], [975, 'T-72 #2'], [2150, 'T-72 #3 (사구 뒤)']].forEach(([x, label]) =>
-      W.vehicles.push(new DS.Vehicle(DS.VEHICLES.t72, x, W.terrain, { dir: -1, label })));
+    // Iraqi platoon: a T-55 in the open, a T-72 dug in behind the berm, a T-62 on the rise behind it,
+    // and a T-72 out of sight behind the dunes that moves up when it hears firing
+    [['t55', 700, 'T-55'], ['t72', 911, 'T-72 #1 (진지)'], ['t62', 975, 'T-62'], ['t72', 2150, 'T-72 #2 (사구 뒤)']].forEach(([id, x, label]) => {
+      const e = new DS.Vehicle(DS.VEHICLES[id], x, W.terrain, { dir: -1, label });
+      W.vehicles.push(e); new DS.TankAI(e, W);
+    });
     DS.FireControl.update(W, v, false);
     this.world.cam.x = v.pos.x; this.world.cam.y = v.pos.y;
     this.resize(); addEventListener('resize', () => this.resize());
@@ -107,6 +111,8 @@ DS.Game = class Game {
   }
   hud() {
     const v = this.player, w = this.world, T = w.terrain, g = v.gun, A = DS.AMMO[g.ammo];
+    const hurt = w.playerHitAt != null ? Math.max(0, 1 - (w.time - w.playerHitAt) / 0.6) : 0;
+    document.getElementById('hurt').style.opacity = hurt.toFixed(2);
     if (!this._hudT || performance.now() - this._hudT > 100) {
       this._hudT = performance.now();
       const set = (id, s) => { const e = document.getElementById(id); if (e.textContent !== s) e.textContent = s; };
@@ -125,6 +131,11 @@ DS.Game = class Game {
       const foes = w.vehicles.filter(x => x !== v), up = foes.filter(x => x.alive).length;
       set('h-foe', `${up} / ${foes.length} 대 전투 가능`);
       this.logPanel();
+      document.getElementById('foes').innerHTML = foes.map(e =>
+        `<div class="${e.alive ? 'up' : 'down'}"><b>${e.label}</b> <span>${e.alive ? (e.ai ? e.ai.state : '') : e.status}</span></div>`).join('');
+      const over = document.getElementById('over');
+      if (!v.alive && over.hidden) { over.hidden = false; document.getElementById('over-t').textContent = `격파됨 — ${v.status}`; }
+      if (up === 0 && foes.length && over.hidden && !this._won) { this._won = true; over.hidden = false; document.getElementById('over-t').textContent = '적 소대 전멸 — 임무 완료'; }
       set('h-load', g.reload > 0 ? '장전 중 ' + g.reload.toFixed(1) + ' s' : '장전 완료');
       set('h-pos', (v.pos.x / 1000).toFixed(2) + ' km');
       set('h-zoom', w.cam.zoom.toFixed(0) + ' px/m');
@@ -165,7 +176,8 @@ DS.Game = class Game {
       const [t, c] = RES[l.result];
       const nums = l.result === 'ricochet' ? `경사 ${l.obl.toFixed(0)}°` : `${Math.round(l.pen)} / ${Math.round(l.prot)} mm · 경사 ${l.obl.toFixed(0)}°`;
       const fx = l.effects && l.effects.length ? ' → ' + l.effects.join(', ') : '';
-      return `<div class="e"><span class="tag ${c}">${t}</span> <b>${l.vehicle.label}</b> · ${Math.round(l.range)} m · ${l.plate} · ${l.ammo.short} ${nums}${fx}` +
+      const who = l.vehicle === this.player ? `<b class="me">피격</b> ${l.shooter ? l.shooter.label + ' → ' : ''}` : '';
+      return `<div class="e"><span class="tag ${c}">${t}</span> ${who}<b>${l.vehicle.label}</b> · ${Math.round(l.range)} m · ${l.plate} · ${l.ammo.short} ${nums}${fx}` +
         `<i>${l.vehicle.status}</i></div>`;
     }).join('');
   }

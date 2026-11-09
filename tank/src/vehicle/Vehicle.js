@@ -30,6 +30,7 @@ DS.Vehicle = class Vehicle {
     // damage
     this.alive = true; this.mobile = true; this.firepower = true; this.status = '정상';
     this.modState = {}; this.burning = 0; this.cookT = 0; this.wreck = false; this.turretGone = false; this.turretBody = null;
+    this.scorch = []; this.jet = 0; this.holes = [];
     this.simT = 0;
     this.place(x);
   }
@@ -196,7 +197,7 @@ DS.Vehicle = class Vehicle {
     const G = this.def.gun, gs = this.gun, A = DS.AMMO[gs.ammo];
     const v0r = A.launchMass * A.v0 * 1.75 / G.recoilMass;     // projectile + propellant gas momentum
     gs.rv = -v0r; gs.aB = v0r * v0r / (2 * G.recoilLen);
-    gs.reload = G.reload; gs.fired++;
+    gs.reload = G.reload; gs.fired++; this.lastFired = world.time;
     const m = this.muzzle();
     world.spawnProjectile(m.x, m.y, m.dx * A.v0 + this.vel.x, m.dy * A.v0 + this.vel.y, A, this);
     this.events.push({ type: 'fire', x: m.x, y: m.y, dx: m.dx, dy: m.dy, ammo: A });
@@ -218,6 +219,27 @@ DS.Vehicle = class Vehicle {
       a.dphi += (-90 * a.phi - 1.6 * a.dphi - (alx + recoil) * 0.9) * dt; a.phi += a.dphi * dt;
       a.phi = Math.max(-0.9, Math.min(0.9, a.phi));
     }
+  }
+
+  // ---------------- char marks / flame sources ----------------
+  // store a world point in the hull frame (or the turret frame when it sits on the turret)
+  toLocal(x, y) { const c = Math.cos(this.ang), s = Math.sin(this.ang), dx = x - this.pos.x, dy = y - this.pos.y; return { x: c * dx + s * dy, y: -s * dx + c * dy }; }
+  addScorch(x, y, max, part) {
+    const l = this.toLocal(x, y);
+    if (!part) part = !this.turretGone && l.y > this.g.ring.y - 0.05 ? 'turret' : 'hull';
+    if (this.scorch.length > 10) this.scorch.shift();
+    this.scorch.push({ lx: l.x, ly: l.y, part, t: 0, max });
+  }
+  // world position of a char mark / flame source (follows a thrown turret)
+  spotWorld(sp) {
+    if (sp.part === 'turret' && this.turretBody) {
+      const b = this.turretBody, dx = sp.lx - this.g.ring.x, dy = sp.ly - this.g.ring.y, c = Math.cos(b.a), s = Math.sin(b.a);
+      return { x: b.x + c * dx - s * dy, y: b.y + s * dx + c * dy };
+    }
+    return this.local(sp.lx, sp.ly);
+  }
+  fireSource() {             // where the fire vents: open turret ring, else the turret roof hatches
+    return this.turretGone ? this.local(this.g.ring.x, this.g.ring.y) : this.local(this.g.ring.x - this.dir * 0.5, this.g.ring.y + 0.85);
   }
 
   // ---------------- damage model ----------------
@@ -263,6 +285,7 @@ DS.Vehicle = class Vehicle {
   ignite() {
     if (this.burning || this.wreck) return;
     this.burning = 0.01; this.alive = false; this.koReason = '화재';
+    const f = this.fireSource(); this.addScorch(f.x, f.y - 0.3, 2.2);
     // a fire reaching stowed charges cooks them off after a while
     const hasAmmo = this.def.modules.some(m => /ammo/.test(m.type) && m.type !== 'ammo_bustle' && !this.modState[m.id]);
     this.cookT = hasAmmo && Math.random() < 0.65 ? 6 + Math.random() * 20 : -1;
@@ -273,6 +296,9 @@ DS.Vehicle = class Vehicle {
     this.wreck = true; this.alive = false; this.burning = Math.max(this.burning, 0.01); this.cookT = -1;
     this.mobile = false; this.firepower = false;
     this.events.push({ type: 'explode' });
+    this.jet = 4 + Math.random() * 4;            // charges keep venting through the ring as a flame jet
+    const rg = this.local(this.g.ring.x, this.g.ring.y);
+    this.addScorch(rg.x, rg.y, 2.6, 'hull'); this.addScorch(rg.x, rg.y + 0.1, 2.0, 'turret');
     // turret thrown by the blast (always for the T-72 carousel, often otherwise)
     if (this.def.modules.some(m => m.type === 'ammo_carousel') || Math.random() < 0.5) this.tossTurret();
     const p = this.local(this.g.ring.x, this.g.ring.y - 0.4);
@@ -283,7 +309,8 @@ DS.Vehicle = class Vehicle {
     const r = this.local(this.g.ring.x, this.g.ring.y);
     const up = 9 + Math.random() * 9;
     this.turretGone = true;
-    this.turretBody = { x: r.x, y: r.y, a: this.ang, e: this.gun.e, vx: this.vel.x + (Math.random() - 0.5) * 6, vy: up,
+    const side = (Math.random() < 0.5 ? -1 : 1) * (3.5 + Math.random() * 4);   // thrown clear of the hull
+    this.turretBody = { x: r.x, y: r.y, a: this.ang, e: this.gun.e, vx: this.vel.x + side, vy: up,
       w: (Math.random() - 0.5) * 5, rest: false };
   }
   stepTurretBody(dt) {
@@ -305,6 +332,10 @@ DS.Vehicle = class Vehicle {
       if (this.cookT > 0 && this.burning > this.cookT) { this.cookT = -1; this.cookoff(); }
     }
     if (this.vent > 0) this.vent -= dt;
+    if (this.jet > 0) this.jet -= dt;
+    for (const sp of this.scorch) sp.t += dt;
+    for (const h of this.holes) h.t -= dt;
+    if (this.holes.length && this.holes[0].t <= 0) this.holes.shift();
   }
 
   // world-space running gear for rendering/track: circles in clockwise loop order
@@ -313,6 +344,8 @@ DS.Vehicle = class Vehicle {
     const P = (p, r, fixed) => { const q = this.local(p.x, p.y); return { x: q.x, y: q.y, r, fixed }; };
     out.push(P(G.sprocket, this.sprR(), true));
     for (const r of G.rollers) out.push(P(r, r.r + h, false));
+    // T-55 / T-62: no return rollers — the top run rests on the road wheels (rear → front)
+    if (D.topRunOnWheels) for (const w of this.st) out.push({ x: w.wx, y: w.wy, r: D.wheelR + h, fixed: false });
     out.push(P(G.idler, D.idler.r + h, true));
     for (let i = this.st.length - 1; i >= 0; i--) { const w = this.st[i]; out.push({ x: w.wx, y: w.wy, r: D.wheelR + h, fixed: false }); }
     if (this.dir < 0) out.reverse();       // mirrored order would run counter-clockwise

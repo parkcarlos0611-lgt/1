@@ -12,13 +12,17 @@ DS.World = class World {
   spawnProjectile(x, y, vx, vy, ammo, owner) { this.projectiles.push(new DS.Projectile(x, y, vx, vy, ammo, owner)); }
 
   onProjectileHit(p, h) {
+    const ai = p.owner && p.owner.ai;
     if (h.kind === 'ground') {
       this.fx.impact(h); this.hits.push(h); if (this.hits.length > 20) this.hits.shift();
-      this.addLog({ ground: true, range: h.range, ammo: h.ammo, t: h.t });
+      if (!ai) this.addLog({ ground: true, range: h.range, ammo: h.ammo, t: h.t });
+      if (ai) ai.observe({ x: h.x });
       return;
     }
+    if (ai) ai.observe({ x: h.hit.x, hitVehicle: h.hit.v });
+    if (h.hit.v === this.vehicles[0]) this.playerHitAt = this.time;
     const r = DS.Armor.resolve(this, p, h.hit);
-    r.t = p.t;
+    r.t = p.t; r.shooter = p.owner;
     this.fx.armor(r);
     this.addLog(r);
     if (r.result === 'ricochet') {
@@ -35,6 +39,7 @@ DS.World = class World {
   update(frameDt) {
     const h = 1 / DS.T.physicsHz;
     this.acc = Math.min(this.acc + frameDt, h * DS.T.maxSubsteps);
+    for (const v of this.vehicles) if (v.ai) v.ai.update(frameDt);
     while (this.acc >= h) {
       for (const v of this.vehicles) v.step(h, this);
       for (const p of this.projectiles) {

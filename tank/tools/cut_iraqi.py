@@ -12,6 +12,16 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC = os.path.join(ROOT, 'assets/ref/iraqi_t55_t62_t72_side.png')
 
 CFG = {
+    't55': dict(
+        box=(960, 0, 1752, 300), seam=164, skirt=200, gun_x=1432, bore=(124, 147),
+        sprocket=(1067, 222, 1), rear_cut=(0, 999), nose=[(1750, 298), (1751, 298), (1751, 299)],
+        antennas=[(1185, 96)], flag=(1274, 119, 1331, 153), shadow=281,
+    ),
+    't62': dict(
+        box=(960, 290, 1752, 600), seam=463, skirt=501, gun_x=1412, bore=(427, 451),
+        sprocket=(1055, 525, 1), rear_cut=(0, 999), nose=[(1750, 598), (1751, 598), (1751, 599)],
+        antennas=[(1184, 398)], flag=(1246, 418, 1303, 453), shadow=584,
+    ),
     't72': dict(
         box=(960, 590, 1752, 897),
         seam=741,              # turret / hull split

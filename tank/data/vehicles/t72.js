@@ -1,6 +1,6 @@
 // T-72M1 (Iraqi "Asad Babil" class) rig. Geometry from assets/ref/iraqi_t55_t62_t72_side.png
 // (right-hand drawing, facing right) at 82 px/m, origin px (1288, 760). tools/cut_iraqi.py cuts the layers.
-// ARMOUR VALUES ARE PROVISIONAL (not yet supplied) — see docs/DATA_SOURCES.md.
+// Armour: user data — early Ural, effective RHA hull front KE 335 / CE 450, turret front KE 380 / CE 410.
 window.DS = window.DS || {};
 DS.VEHICLES = DS.VEHICLES || {};
 (function () {
@@ -10,7 +10,7 @@ DS.VEHICLES = DS.VEHICLES || {};
   for (let i = 0; i < 6; i++) wheels.push(L(1121 + 67 * i, 832));
 
   DS.VEHICLES.t72 = {
-    id: 't72', name: 'T-72M1', side: 'IQ', ammo: [],
+    id: 't72', name: 'T-72M1', side: 'IQ', ammo: ['3BM9', '3BK12'],
     mass: 41500, inertia: 1.8e5,
     src: { ppm: PPM, ox: OX, oy: OY, dir: 'assets/sprites/t72/' },
     sprites: {
@@ -48,7 +48,8 @@ DS.VEHICLES = DS.VEHICLES || {};
     turretRing: L(1250, 741),
     antennas: [{ x: L(1152, 683)[0], y: L(1152, 683)[1], len: 1.0 }],
 
-    // Provisional armour (typical published T-72M1 figures; replace with supplied data)
+    // physical t × material factor reproduces the supplied effective values on the line of sight
+    sight: { laser: true, rangeErr: 0.02, aimErr: 0.35, layTime: 3.5 },   // TPD-K1 laser rangefinder
     armor: [
       { name: '포탑 전면', part: 'turret', a: L(1372, 690), b: L(1392, 722), t: 500, mat: 't72_turret', n: 10, h: 30 },
       { name: '포탑 전면 하단', part: 'turret', a: L(1392, 722), b: L(1362, 741), t: 500, mat: 't72_turret', n: -30, h: 30 },

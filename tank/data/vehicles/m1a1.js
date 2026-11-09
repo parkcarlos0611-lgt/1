@@ -56,7 +56,8 @@ DS.VEHICLES = DS.VEHICLES || {};
       recoilLen: 0.30, recoilMass: 2900, reload: 6.5,
       stabilized: true,
     },
-    turretRing: L(600, 840),         // turret pivot (also where a tossed turret rotates about)
+    turretRing: L(600, 840),
+    sight: { laser: true, rangeErr: 0.005, aimErr: 0.15, layTime: 2 },         // turret pivot (also where a tossed turret rotates about)
 
     // Armour (user data, docs/DATA_SOURCES.md). a/b: plate ends (px in the drawing),
     // t: physical thickness mm, n: outward normal angle in hull frame (deg, 0 = forward, 90 = up),

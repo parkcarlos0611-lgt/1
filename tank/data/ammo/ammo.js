@@ -26,6 +26,25 @@ DS.AMMO = {
     pen: { ce: 490 },                                 // 480–500 mm at any range
     crit: 80,                                         // fuze graze angle
   },
+  // ---- Iraqi rounds: PROVISIONAL (typical published figures; replace with supplied data) ----
+  '3BM9': { name: '3BM9 APFSDS', short: '3BM9', type: 'APFSDS', v0: 1800, mass: 3.6, d: 0.04,
+    cd: [[0, 0.35], [1, 0.62], [2, 0.6], [3, 0.57], [5, 0.54]], launchMass: 5.7, sabot: true, tracer: '#ffe08a',
+    pen: { ke: 245, at: 2000, s: 1.36e6 }, crit: 74 },
+  '3BK12': { name: '3BK12 HEAT', short: '3BK12', type: 'HEAT', v0: 905, mass: 19, d: 0.125,
+    cd: [[0, 0.2], [1, 0.45], [2, 0.38], [3, 0.33], [5, 0.29]], launchMass: 19, sabot: false, tracer: '#ffb070',
+    pen: { ce: 420 }, crit: 80 },
+  '3BM4': { name: '3BM4 APFSDS', short: '3BM4', type: 'APFSDS', v0: 1615, mass: 4.0, d: 0.04,
+    cd: [[0, 0.35], [1, 0.62], [2, 0.6], [3, 0.57], [5, 0.54]], launchMass: 5.5, sabot: true, tracer: '#ffe08a',
+    pen: { ke: 240, at: 2000, s: 1.36e6 }, crit: 74 },
+  '3BK4': { name: '3BK4 HEAT', short: '3BK4', type: 'HEAT', v0: 950, mass: 12, d: 0.115,
+    cd: [[0, 0.2], [1, 0.45], [2, 0.38], [3, 0.33], [5, 0.29]], launchMass: 12, sabot: false, tracer: '#ffb070',
+    pen: { ce: 420 }, crit: 80 },
+  '3BM8': { name: '3BM8 APDS', short: '3BM8', type: 'APDS', v0: 1415, mass: 3.5, d: 0.045,
+    cd: [[0, 0.3], [1, 0.55], [2, 0.5], [3, 0.47], [5, 0.44]], launchMass: 5.7, sabot: true, tracer: '#ffe08a',
+    pen: { ke: 260, at: 2000, s: 1.36e6 }, crit: 70 },
+  BR412D: { name: 'BR-412D APHE', short: 'BR-412D', type: 'APHE', v0: 887, mass: 15.9, d: 0.1,
+    cd: [[0, 0.22], [1, 0.48], [2, 0.42], [3, 0.38], [5, 0.33]], launchMass: 15.9, sabot: false, tracer: '#ffc080',
+    pen: { ke: 150, at: 1000, s: 1.0e6 }, crit: 64 },
 };
 DS.AMMO_ORDER = ['M829A1', 'M829', 'M830'];
 
@@ -34,7 +53,7 @@ DS.MATERIALS = {
   rha:        { name: '압연강(RHA)', ke: 1.00, ce: 1.00 },
   cast:       { name: '주조강', ke: 0.92, ce: 0.92 },
   m1_comp:    { name: '복합장갑(HA·DU)', ke: 0.70, ce: 1.40 },   // turret/hull front special armour
-  t72_turret: { name: '주조강+충전재', ke: 0.72, ce: 0.85 },     // T-72M1 sand-bar filler (provisional)
-  t72_glacis: { name: '적층 경사판', ke: 0.75, ce: 0.85 },       // steel/textolite/steel (provisional)
+  t72_turret: { name: '주조강 포탑', ke: 0.65, ce: 0.70 },       // → turret front KE ≈380 / CE ≈410 on the LOS (user data)
+  t72_glacis: { name: '적층 경사판', ke: 0.61, ce: 0.82 },       // → hull front KE ≈335 / CE ≈450 on the LOS (user data)
   track:      { name: '궤도·주행장치', ke: 1.00, ce: 1.00 },
 };

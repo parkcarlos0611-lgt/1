@@ -91,6 +91,8 @@ const TMAP={
   obl:[-.11,[[520,898],[600,920],[675,930],[682,960],[700,1020],[740,1100],[782,1220],[762,1342],[700,1325],[600,1275],[500,1215],[400,1150],[350,1112],[355,1090],[385,1040],[412,1010],[418,960]]]},
  delt:[480,450]};
 const tmS=y=>1.16*(1345-y)/1250,tmW=x=>(x-560)/600*.17;
+/* weight class scale: heavyweight is the reference; the lightest classes are up to 10 % slimmer in the torso */
+window.CLASS_T=function(W){return Math.max(0,Math.min(1,((W||1)-.86)/(1.2-.86)))};
 /* a fold at a bent joint: the inside of the bend darkens, the outside catches light */
 function foldAt(ctx,j,dirIn,dirOut,r,base){const cr=dirIn.x*dirOut.y-dirIn.y*dirOut.x,dt=dirIn.x*dirOut.x+dirIn.y*dirOut.y,ang=Math.acos(Math.max(-1,Math.min(1,dt)));if(ang<.35)return;
   const k=Math.min(1,(ang-.35)/1.4),lo=rgbOf(shade(base,-.34));ctx.save();ctx.fillStyle=`rgba(${lo[0]},${lo[1]},${lo[2]},${.62*k})`;ctx.beginPath();ctx.moveTo(j.x,j.y);
@@ -225,7 +227,7 @@ function torsoFlat(ctx,J,H,M,sk,d,lk,B){const sp=[J.hip,J.mid,J.sh,J.nk];const s
   const bel=lk.belly||lk.body==='belly'?.042:lk.body==='soft'?.017:0;const shb=lk.body==='broad'?1.14:1;/* broad: wider chest and upper back */
   const FR=[[0,.07+bel*.3],[.14,.064+bel*.8],[.3,.062+bel],[.46,.064+bel*.7],[.6,.066],[.7,.068*shb],[.8,.062*shb],[.88,.05*shb],[.94,.04],[1,.036]];/* side view of the proportion wireframe: straight chest, no pec bulge */
   const BK=[[0,.086],[.1,.078],[.22,.062+bel*.3],[.36,.058+bel*.2],[.5,.066],[.62,.072*shb],[.72,.078*shb],[.82,.076*shb],[.9,.07],[.96,.062],[1,.056]];/* lumbar curve in, shoulder blades out, then a long slope up the trapezius into the nape */
-  let F,Bk;if(sk.far){F=TMAP.R.map(([x,y])=>pt(tmS(y),tmW(x)));Bk=TMAP.L.slice().reverse().map(([x,y])=>pt(tmS(y),tmW(x)));B._dl=pt(tmS(TMAP.delt[1]),tmW(TMAP.delt[0]))}else{F=FR.map(([s,w])=>pt(s,w));Bk=BK.map(([s,w])=>pt(s,-w))}
+  const tk=1-.10*(1-CLASS_T(B.W));/* torso width by weight class */let F,Bk;if(sk.far){F=TMAP.R.map(([x,y])=>pt(tmS(y),tmW(x)*tk));Bk=TMAP.L.slice().reverse().map(([x,y])=>pt(tmS(y),tmW(x)*tk));B._dl=pt(tmS(TMAP.delt[1]),tmW(TMAP.delt[0])*tk)}else{F=FR.map(([s,w])=>pt(s,w));Bk=BK.map(([s,w])=>pt(s,-w))}
   if(sk.far)B._tt={f:F[F.length-1],b:Bk[Bk.length-1]};/* top corners: the nape bridge is joined here */
   poly(ctx,F.concat(Bk.slice().reverse()),sk.base,ROUND*2.2);
   if(FS.outline)thinLine(ctx,F.concat(Bk.slice().reverse()),sk.base);
@@ -237,7 +239,7 @@ function torsoFlat(ctx,J,H,M,sk,d,lk,B){const sp=[J.hip,J.mid,J.sh,J.nk];const s
   /* abs: flat blocks along the front edge */
 
   if(FS.detail)detailIn(ctx,F.concat(Bk.slice().reverse()),F,Bk,sk.base,.012*M,(hi,lo)=>{const dk=shade(sk.base,-.3);
-    if(TD){for(const k in TMAP.reg){const[t,pts]=TMAP.reg[k];ctx.fillStyle=shade(sk.base,t);ctx.beginPath();pts.forEach(([x,y],i)=>{const q=pt(tmS(y),tmW(x));i?ctx.lineTo(q.x,q.y):ctx.moveTo(q.x,q.y)});ctx.closePath();ctx.fill();
+    if(TD){for(const k in TMAP.reg){const[t,pts]=TMAP.reg[k];ctx.fillStyle=shade(sk.base,t);ctx.beginPath();pts.forEach(([x,y],i)=>{const q=pt(tmS(y),tmW(x)*tk);i?ctx.lineTo(q.x,q.y):ctx.moveTo(q.x,q.y)});ctx.closePath();ctx.fill();
         ctx.save();ctx.strokeStyle=shade(sk.base,-.34);ctx.globalAlpha=.55;ctx.lineWidth=.004*M;ctx.lineJoin='round';ctx.stroke();ctx.restore()}}
     else{fac(ctx,[pt(.7,-.1),pt(.3,-.1),pt(.3,-.04),pt(.7,-.05)],lo,.3,0);fac(ctx,[pt(.5,.1),pt(.15,.1),pt(.15,.05),pt(.5,.05)],hi,.25,0)}
     {const ow=B&&B._owner,sevB=ow&&ow.hp?clamp((100-ow.hp.body)/100*1.25-.1,0,1):0;bruises(ctx,(s,w)=>pt(s,w/M),[[.5,.035,.06],[.38,.03,.055],[.6,.0,.05],[.28,.04,.05],[.7,.03,.045]],sevB,111,M,0)}

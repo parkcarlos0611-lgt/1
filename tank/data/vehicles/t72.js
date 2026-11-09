@@ -16,20 +16,21 @@ DS.VEHICLES = DS.VEHICLES || {};
     sprites: {
       hull: { x: 969, y: 741 }, turret: { x: 1020, y: 623 }, barrel: { x: 1386, y: 702 },
       flag: { x: 1199, y: 696, file: 'flag' },   // drawn unmirrored on left-facing tanks so the script reads correctly
-      roadwheel: { r: 128, file: 'roadwheel' }, idler: { file: 'roadwheel', tint: 0.15 },
-      sprocket: { procedural: true, R: 0.36, tooth0: 0 },
+      // running gear sheet (tools/cut_wheels_iraqi.py, assets/ref/iraqi_wheels.png): first road wheel + sprocket
+      roadwheel: { r: 256, file: 'roadwheel' }, idler: { file: 'roadwheel', tint: 0.15 },
+      sprocket: { file: 'sprocket', R: 0.30, tooth0: 4.5 },   // 12 teeth; root (74 % of tip) sits on the link inner face
     },
     roadWheels: wheels.map(p => ({ x: p[0], y: p[1] })),
     wheelR: 0.366,
     suspension: { k: 2.6e5, c: 2.2e4, bump: 0.24, droop: 0.10, bumpK: 4e6, bumpC: 1.0e5 },
-    sprocket: { x: L(1052, 812)[0], y: L(1052, 812)[1], teeth: 14 },
+    sprocket: { x: L(1052, 812)[0], y: L(1052, 812)[1], teeth: 12 },
     idler: { x: L(1525, 815)[0], y: L(1525, 815)[1], r: 0.29 },
     returnRollers: [{ x: -1.6, y: -0.40, r: 0.1 }, { x: -0.2, y: -0.40, r: 0.1 }, { x: 1.2, y: -0.40, r: 0.1 }],
     track: { pitch: 0.137, thick: 0.08, width: 0.58, mass: 3400 },
     belly: { y: -0.83, x0: -3.1, x1: 3.2 },
     contactArea: 0.95,
     underside: { x0: -2.65, x1: 2.85, y0: -0.52, y1: -1.0 },
-    rearFill: { x0: -3.25, x1: -2.5, y0: -0.66, y1: -0.3 },
+    sprocketHole: 0.32,              // hull art is cut out round the sprocket (r 26 px); filled dark behind it
 
     engine: {                        // V-46 diesel, 780 hp
       type: 'diesel', power: 5.82e5, eff: 0.70, maxTractive: 2.9e5, spool: 0.35,

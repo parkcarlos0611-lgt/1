@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Cut Iraqi tank drawings (assets/ref/iraqi_t55_t62_t72_side.png, right-hand column, facing right)
 into rig layers. Coordinates are source-image pixels; each entry lists the split lines measured on
-a 10 px grid. Output: assets/sprites/<id>/{hull,turret,barrel,roadwheel}.png + cut.json.
+a 10 px grid. Output: assets/sprites/<id>/{hull,turret,barrel,flag}.png + cut.json.
 usage: python3 tools/cut_iraqi.py [t72 ...]
 """
 import os, sys, json, math
@@ -18,13 +18,12 @@ CFG = {
         skirt=805,             # lowest hull line kept (rubber skirt bottom)
         gun_x=1386,            # barrel starts in front of the mantlet
         bore=(700, 724),       # barrel rows
-        sprocket=(1052, 812, 31),
+        sprocket=(1052, 812, 26),   # cut-out sized to the sprocket art (r 0.30 m)
         rear_cut=(1085, 796),  # x < this and y > that: running gear at the rear
         nose=[(1500, 800), (1580, 778), (1600, 900), (1490, 900)],
         antennas=[(1152, 683)],
         flag=(1199, 696, 1259, 733),   # national flag decal: redrawn unmirrored on left-facing tanks
         shadow=858,            # rows below this: drop the light-grey ground shadow
-        wheel=(1188, 832, 30),
     ),
 }
 
@@ -98,7 +97,7 @@ def cut(vid):
         big.save(os.path.join(out, name + '.png'))
         return np.asarray(big)
 
-    disc('roadwheel', *c['wheel'])
+    # road wheels + sprocket come from the dedicated sheet: tools/cut_wheels_iraqi.py
     if 'flag' in c:
         fx0, fy0, fx1, fy1 = c['flag']
         Image.fromarray(rgba[fy0 - y0:fy1 - y0, fx0 - x0:fx1 - x0]).save(os.path.join(out, 'flag.png'))

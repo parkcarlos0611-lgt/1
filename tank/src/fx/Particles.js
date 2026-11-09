@@ -62,12 +62,13 @@ DS.Particles = class Particles {
   }
 
   // layer: 0 = behind vehicles, 1 = front
-  draw(ctx, cam, layer) {
+  draw(ctx, cam, layer, only) {
     const P = DS.P;
     for (let pass = 0; pass < 2; pass++) {
       if (pass === 1) ctx.globalCompositeOperation = 'lighter';
       for (let i = 0; i < this.n; i++) {
         const k = this.kind[i];
+        if (only != null && k !== only) continue;
         const add = k === P.FIRE;
         if (add !== (pass === 1)) continue;
         const front = k === P.GRAIN || k === P.DEBRIS || k === P.FIRE || (this.rot[i] > 3.14);

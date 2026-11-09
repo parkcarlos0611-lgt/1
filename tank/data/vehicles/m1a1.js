@@ -1,10 +1,11 @@
 // M1A1 rig + specs. Units: metres, kg, N, s. Local frame: origin = hull reference (≈ centre of mass),
-// x forward, y up. Geometry measured from assets/ref/m1a1_side.png at 149 px/m, origin px (604,900)
+// x forward, y up. Geometry measured from assets/ref/m1a1_side.png at 143 px/m (scale set from the real
+// length 9.80 m incl. gun and height 2.44 m), origin px (604,900)
 // (tools/cut_sprites.py). Spec values are game starting points — see docs/PLAN.md §4.
 window.DS = window.DS || {};
 DS.VEHICLES = DS.VEHICLES || {};
 (function () {
-  const PPM = 149, OX = 604, OY = 900;
+  const PPM = 143, OX = 604, OY = 900;
   const L = (px, py) => [(px - OX) / PPM, -(py - OY) / PPM];
   const wheels = [];
   for (let i = 0; i < 7; i++) wheels.push(L(259 + 115 * i, 1020));
@@ -20,11 +21,11 @@ DS.VEHICLES = DS.VEHICLES || {};
       // running gear sheet (tools/cut_wheels.py): 512 px squares, radius 256 px
       roadwheel: { r: 256, file: 'roadwheel' }, roadwheelFront: { r: 256, file: 'roadwheel_front' },  // front art = idler
       idler: { file: 'roadwheel_front' },
-      sprocket: { r: 256, R: 0.38, tooth0: 0 },   // R: tooth-tip radius (m), tooth0: first tooth angle (deg)
+      sprocket: { r: 256, R: 0.396, tooth0: 0 },   // R: tooth-tip radius (m), tooth0: first tooth angle (deg)
     },
     // running gear (per side; physics treats each road-wheel station as the left+right pair)
     roadWheels: wheels.map(p => ({ x: p[0], y: p[1] })),
-    wheelR: 0.309,
+    wheelR: 0.322,
     suspension: {                    // torsion bar per station (pair of wheels)
       k: 4.0e5,                      // N/m
       c: 3.2e4,                      // N·s/m (rotary dampers)
@@ -32,13 +33,13 @@ DS.VEHICLES = DS.VEHICLES || {};
       bumpK: 6e6, bumpC: 1.5e5,      // bump stop
     },
     sprocket: { x: L(135, 970)[0], y: L(135, 970)[1], teeth: 12 },
-    idler: { x: L(1100, 965)[0], y: L(1100, 965)[1], r: 0.28 },
-    returnRollers: [{ x: -1.75, y: -0.29, r: 0.1 }, { x: 0.55, y: -0.29, r: 0.1 }],
-    track: { pitch: 0.181, thick: 0.09, width: 0.635, mass: 7600 },
-    belly: { y: -0.70, x0: -3.6, x1: 3.9 },
+    idler: { x: L(1100, 965)[0], y: L(1100, 965)[1], r: 0.292 },
+    returnRollers: [{ x: -1.823, y: -0.302, r: 0.1 }, { x: 0.573, y: -0.302, r: 0.1 }],
+    track: { pitch: 0.1886, thick: 0.094, width: 0.635, mass: 7600 },
+    belly: { y: -0.729, x0: -3.751, x1: 4.064 },
     contactArea: 0.978,              // m² of track pad per wheel station (both tracks)
-    underside: { x0: -3.05, x1: 3.35, y0: -0.52, y1: -0.93 },  // hull side shadow behind the wheels; open gap above the track below it
-    rearFill: { x0: -3.42, x1: -2.75, y0: -0.47, y1: -0.06 },  // behind the sprocket (hull art is cut out there)
+    underside: { x0: -3.178, x1: 3.491, y0: -0.542, y1: -0.969 },  // hull side shadow behind the wheels; open gap above the track below it
+    rearFill: { x0: -3.563, x1: -2.865, y0: -0.49, y1: -0.063 },  // behind the sprocket (hull art is cut out there)
 
     engine: {                        // AGT1500 gas turbine
       type: 'turbine', power: 1.119e6, eff: 0.74,
@@ -47,7 +48,7 @@ DS.VEHICLES = DS.VEHICLES || {};
       vmaxF: 67 / 3.6, vmaxR: 40 / 3.6,
       brake: 6.0e5, engineBrake: 2.5e4,
     },
-    exhaust: { x: -3.98, y: 0.22 },
+    exhaust: { x: -4.147, y: 0.229 },
 
     gun: {                           // M256 120 mm L/44
       name: 'M256 120mm', trunnion: L(890, 792), boreY: 792,
@@ -90,7 +91,7 @@ DS.VEHICLES = DS.VEHICLES || {};
       { id: 'engine', name: '엔진', type: 'engine', p: L(260, 925), r: 0.70 },
       { id: 'trans', name: '변속기', type: 'engine', p: L(100, 935), r: 0.40 },
     ],
-    antennas: [{ px: 217, py: 724, len: 1.15 }, { px: 397, py: 727, len: 1.10 }].map(a =>
+    antennas: [{ px: 217, py: 724, len: 1.198 }, { px: 397, py: 727, len: 1.146 }].map(a =>
       ({ x: L(a.px, a.py)[0], y: L(a.px, a.py)[1], len: a.len })),
   };
 })();

@@ -8,6 +8,7 @@ DS.World = class World {
     this.vehicles = []; this.projectiles = []; this.hits = []; this.log = [];
     this.wind = 2.5; this.time = 0; this.acc = 0; this.debug = false;
     this.rng = DS.rng(1991);
+    this.env = { visibility: 0, night: 0, wind: 2.5 };
   }
   spawnProjectile(x, y, vx, vy, ammo, owner) { this.projectiles.push(new DS.Projectile(x, y, vx, vy, ammo, owner)); }
 
@@ -51,6 +52,7 @@ DS.World = class World {
     }
     this.terrain.relax(undefined, undefined, 1);
     for (const v of this.vehicles) this.fx.vehicle(v, frameDt);
+    this.fx.ambient(frameDt);
     this.particles.update(frameDt, this.terrain, this.wind);
     this.fx.update(frameDt);
     if (this.vehicles[0]) this.cam.follow(this.vehicles[0], frameDt);

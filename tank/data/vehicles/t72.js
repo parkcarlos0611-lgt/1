@@ -1,10 +1,10 @@
 // T-72M1 (Iraqi "Asad Babil" class) rig. Geometry from assets/ref/iraqi_t55_t62_t72_side.png
-// (right-hand drawing, facing right) at 82 px/m, origin px (1288, 760). tools/cut_iraqi.py cuts the layers.
+// (right-hand drawing, facing right) at 83 px/m (hull 6.95 m, 9.53 m with gun), origin px (1288, 760). tools/cut_iraqi.py cuts the layers.
 // Armour: user data — early Ural, effective RHA hull front KE 335 / CE 450, turret front KE 380 / CE 410.
 window.DS = window.DS || {};
 DS.VEHICLES = DS.VEHICLES || {};
 (function () {
-  const PPM = 82, OX = 1288, OY = 760;
+  const PPM = 83, OX = 1288, OY = 760;
   const L = (px, py) => [(px - OX) / PPM, -(py - OY) / PPM];
   const wheels = [];
   for (let i = 0; i < 6; i++) wheels.push(L(1121 + 67 * i, 832));
@@ -18,30 +18,31 @@ DS.VEHICLES = DS.VEHICLES || {};
       flag: { x: 1199, y: 696, file: 'flag' },   // drawn unmirrored on left-facing tanks so the script reads correctly
       // running gear sheet (tools/cut_wheels_iraqi.py, assets/ref/iraqi_wheels.png): first road wheel + sprocket
       roadwheel: { r: 256, file: 'roadwheel' }, idler: { file: 'roadwheel', tint: 0.15 },
-      sprocket: { file: 'sprocket', R: 0.34, tooth0: 4.5 },   // 12 teeth; sized to the art (sprocket 234 px : road wheel 252 px)
+      sprocket: { file: 'sprocket', R: 0.336, tooth0: 4.5 },   // 12 teeth; sized to the art (sprocket 234 px : road wheel 252 px)
     },
     roadWheels: wheels.map(p => ({ x: p[0], y: p[1] })),
-    wheelR: 0.366,
+    wheelR: 0.362,                   // tyre r 30 px
     suspension: { k: 2.6e5, c: 2.2e4, bump: 0.24, droop: 0.10, bumpK: 4e6, bumpC: 1.0e5 },
     sprocket: { x: L(1052, 812)[0], y: L(1052, 812)[1], teeth: 12 },
-    idler: { x: L(1525, 815)[0], y: L(1525, 815)[1], r: 0.29 },
+    idler: { x: L(1525, 815)[0], y: L(1525, 815)[1], r: 0.287 },
     returnRollers: [{ x: -1.6, y: -0.40, r: 0.1 }, { x: -0.2, y: -0.40, r: 0.1 }, { x: 1.2, y: -0.40, r: 0.1 }],
-    track: { pitch: 0.1526, thick: 0.08, width: 0.58, mass: 3400 },
-    belly: { y: -0.83, x0: -3.1, x1: 3.2 },
+    track: { pitch: 0.1508, thick: 0.08, width: 0.58, mass: 3400 },
+    belly: { y: -0.82, x0: -3.063, x1: 3.161 },
     contactArea: 0.95,
-    underside: { x0: -2.65, x1: 2.85, y0: -0.52, y1: -1.0 },
-    sprocketHole: 0.355,             // hull art is cut out round the sprocket (r 29 px); filled dark behind it
+    underside: { x0: -2.618, x1: 2.816, y0: -0.514, y1: -0.988 },
+    sprocketHole: 0.351,             // hull art is cut out round the sprocket (r 29 px); filled dark behind it
 
     engine: {                        // V-46 diesel, 780 hp
       type: 'diesel', power: 5.82e5, eff: 0.70, maxTractive: 2.9e5, spool: 0.35,
       vmaxF: 60 / 3.6, vmaxR: 4.2 / 3.6,   // the T-72's single 4.2 km/h reverse gear
       brake: 4.2e5, engineBrake: 3.0e4,
     },
-    exhaust: { x: -2.4, y: -0.25 },
+    exhaust: { x: -2.371, y: -0.247 },
 
     gun: {                           // 2A46 125 mm smoothbore, carousel autoloader
       name: '2A46 125mm', trunnion: L(1366, 712),
-      muzzle: (1742 - 1366) / PPM,
+      muzzle: (1742 - 1366) / PPM * 1.051 + (1386 - 1366) / PPM * -0.051,
+      barrelScale: 1.051,            // drawing's barrel is ~0.22 m short of the real 9.53 m overall length
       elevMax: 14, elevMin: -6, rate: 0.30,
       recoilLen: 0.30, recoilMass: 2400, reload: 7.5, stabilized: true,
     },

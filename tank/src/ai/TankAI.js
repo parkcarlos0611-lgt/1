@@ -42,7 +42,10 @@ DS.TankAI = class TankAI {
     if (this.los) {
       const flash = tgt.lastFired && W.time - tgt.lastFired < 5 ? 3 : 1;
       const moving = Math.abs(tgt.vt) > 1.5 ? 1.5 : 1;
-      const vis = Math.max(0.12, Math.min(1, 1.5 - range / 2200));
+      let vis = Math.max(0.12, Math.min(1, 1.5 - range / 2200));
+      const env = W.env || {};
+      if (env.visibility) vis *= Math.max(0.03, Math.exp(-range / env.visibility) * 2.2);   // no thermal: dust blinds them
+      if (env.night && range > 800) vis *= flash > 1 ? 0.6 : 0.02;                         // IR sights reach ~800 m
       this.detect = Math.min(1.2, this.detect + dt * vis * flash * moving / 3.5);
     } else this.detect = Math.max(0, this.detect - dt * 0.05);
 

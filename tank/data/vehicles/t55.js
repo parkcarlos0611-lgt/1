@@ -1,10 +1,10 @@
 // T-55 (Iraqi) rig. Geometry from assets/ref/iraqi_t55_t62_t72_side.png (right-hand drawing, facing right)
-// at 80 px/m, origin px (1277, 190). Layers: tools/cut_iraqi.py; wheels: tools/cut_wheels_iraqi.py.
+// at 83 px/m (9.00 m with gun), origin px (1277, 190). Road wheel tyre r = 33.5 px. Layers: tools/cut_iraqi.py; wheels: tools/cut_wheels_iraqi.py.
 // Armour: user data (docs/DATA_SOURCES.md). No side skirts, no return rollers: the top run rests on the wheels.
 window.DS = window.DS || {};
 DS.VEHICLES = DS.VEHICLES || {};
 (function () {
-  const PPM = 80, OX = 1277, OY = 190;
+  const PPM = 83, OX = 1277, OY = 190;
   const L = (px, py) => [(px - OX) / PPM, -(py - OY) / PPM];
   const wheels = [1123.5, 1196, 1266, 1338.5, 1430].map(x => L(x, 242.5));
   DS.VEHICLES.t55 = {
@@ -15,25 +15,25 @@ DS.VEHICLES = DS.VEHICLES || {};
       hull: { x: 994, y: 164 }, turret: { x: 1001, y: 30 }, barrel: { x: 1432, y: 125 },
       flag: { x: 1274, y: 119, file: 'flag' },
       roadwheel: { r: 256, file: 'roadwheel' }, idler: { file: 'roadwheel', tint: 0.15 },
-      sprocket: { file: 'sprocket', R: 0.337, tooth0: 24 },        // 14 teeth (art: 240 : 258 of the road wheel)
+      sprocket: { file: 'sprocket', R: 0.376, tooth0: 24 },        // 14 teeth (art: 240 : 258 of the road wheel)
     },
     roadWheels: wheels.map(p => ({ x: p[0], y: p[1] })),
-    wheelR: 0.3625, topRunOnWheels: true,
+    wheelR: 0.404, topRunOnWheels: true,
     suspension: { k: 2.4e5, c: 1.8e4, bump: 0.16, droop: 0.08, bumpK: 4e6, bumpC: 1.0e5 },
     sprocket: { x: L(1067.5, 222.5)[0], y: L(1067.5, 222.5)[1], teeth: 14 },
-    idler: { x: L(1507.5, 220)[0], y: L(1507.5, 220)[1], r: 0.275 },
+    idler: { x: L(1507.5, 220)[0], y: L(1507.5, 220)[1], r: 0.265 },
     returnRollers: [],
-    track: { pitch: 0.1405, thick: 0.08, width: 0.58, mass: 3000 },
-    belly: { y: -0.70, x0: -3.1, x1: 3.3 },
+    track: { pitch: 0.1545, thick: 0.075, width: 0.58, mass: 3000 },
+    belly: { y: -0.683, x0: -3.0, x1: 3.2 },
     contactArea: 0.87,
-    underside: { x0: -2.55, x1: 2.6, y0: -0.12, y1: -0.80 },
+    underside: { x0: -2.46, x1: 2.5, y0: -0.116, y1: -0.77 },
     engine: { type: 'diesel', power: 4.32e5, eff: 0.70, maxTractive: 2.4e5, spool: 0.4,
       vmaxF: 50 / 3.6, vmaxR: 8 / 3.6, brake: 3.6e5, engineBrake: 2.6e4 },
-    exhaust: { x: -2.9, y: -0.15 },
+    exhaust: { x: -2.8, y: -0.145 },
     gun: { name: 'D-10T2S 100mm', trunnion: L(1410, 135), muzzle: (1740 - 1410) / PPM,
       elevMax: 17, elevMin: -5, rate: 0.20, recoilLen: 0.55, recoilMass: 1950, reload: 8.5, stabilized: true },
     turretRing: L(1300, 164),
-    antennas: [{ x: L(1185, 96)[0], y: L(1185, 96)[1], len: 1.18 }],
+    antennas: [{ x: L(1185, 96)[0], y: L(1185, 96)[1], len: 1.14 }],
     sight: { laser: false, rangeErr: 0.10, aimErr: 0.6, layTime: 5.5 },
     armor: [
       { name: '포탑 전면 상부', part: 'turret', a: L(1380, 100), b: L(1432, 128), t: 200, mat: 'cast', n: 65, h: 0 },

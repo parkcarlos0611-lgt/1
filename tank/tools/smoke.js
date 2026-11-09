@@ -8,7 +8,7 @@ const path = require('path');
   const p = await b.newPage({ viewport: { width: 1280, height: 720 } });
   const errs = [];
   p.on('pageerror', e => errs.push(e.message)); p.on('console', m => { if (m.type() === 'error') errs.push(m.text()); });
-  await p.goto('file://' + path.resolve(__dirname, '../index.html'));
+  await p.goto('file://' + path.resolve(__dirname, '../index.html') + '#m1');
   await p.waitForFunction(() => window.__game && __game.player, null, { timeout: 10000 });
   await p.waitForTimeout(2500);
   const st = () => p.evaluate(() => { const v = __game.player; return {

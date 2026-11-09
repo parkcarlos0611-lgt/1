@@ -232,6 +232,24 @@ DS.Effects = class Effects {
     this.shake = Math.max(this.shake, Math.max(0, 0.5 - d / 300));
   }
 
+  // sandstorm: dust sheets and sand streaks blowing through the view
+  ambient(dt) {
+    const env = this.w.env || {}, cam = this.w.cam, P = this.P, K = DS.P;
+    if (!env.visibility) return;
+    const span = cam.right - cam.left, wind = this.w.wind;
+    let n = 0.6 * span * dt;
+    while (n-- >= 0 && Math.random() < 0.95) {
+      const x = cam.left - 5 + Math.random() * (span + 10), y = cam.bottom + Math.random() * (cam.top - cam.bottom);
+      P.add(K.DUST, x, y, wind * this.rnd(0.7, 1.2), this.rnd(-0.5, 0.8), this.rnd(3, 6), this.rnd(1.5, 4) * Math.max(1, span / 60),
+        { grow: 0.3, drag: 0.6, grav: 0, alpha: 0.12, col: 0xc89a62 });
+    }
+    let g = 3 * span * dt;
+    while (g-- >= 0) {
+      const x = cam.left + Math.random() * span, h = this.w.terrain.height(x);
+      P.add(K.GRAIN, x, h + this.rnd(0, 3), wind * this.rnd(1, 1.6), this.rnd(0, 1.5), this.rnd(0.6, 1.4), this.rnd(0.03, 0.06), { drag: 0.8, grav: 0.3, col: 0xd6b07a });
+    }
+  }
+
   update(dt) { for (const f of this.flashes) f.t += dt; this.flashes = this.flashes.filter(f => f.t < f.ttl);
     for (const l of this.labels) l.t += dt; this.labels = this.labels.filter(l => l.t < 4); this.shake = Math.max(0, this.shake - dt * 2.5); }
 

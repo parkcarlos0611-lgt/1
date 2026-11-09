@@ -23,7 +23,8 @@
   #help kbd { display: inline-block; min-width: 18px; padding: 0 4px; border: 1px solid #8a7b60; border-radius: 3px; font: 11px monospace; text-align: center; }
   #sight { position: fixed; right: 10px; bottom: 56px; width: min(34vw, 330px); aspect-ratio: 1; border-radius: 50%;
     border: 3px solid #1b1610; box-shadow: 0 0 0 2px rgba(255,255,255,.15), 0 6px 24px rgba(0,0,0,.4); background: #000; pointer-events: none; }
-  #sight.thermal { filter: grayscale(1) contrast(1.9) brightness(.95); }
+  #sight.thermal { filter: grayscale(1) brightness(.5) contrast(1.9); }
+  body:not(.playing) :is(#hud, #help, #sight, #mini, #zoombar, #foes, #log, #touch) { display: none !important; }
   #log { left: 10px; bottom: 64px; max-width: min(56vw, 640px); font-size: 12px; display: grid; gap: 3px; }
   #log:empty { display: none; }
   #log .e { line-height: 1.35; }
@@ -38,6 +39,20 @@
   #over[hidden] { display: none; }
   #over-t { font-size: clamp(22px, 4vw, 40px); font-weight: 800; margin-bottom: 14px; text-shadow: 0 2px 10px #000; }
   #over .btn { font: inherit; font-size: 16px; font-weight: 700; padding: 10px 22px; border-radius: 8px; border: 0; background: #ffcc66; color: #1b1308; cursor: pointer; }
+  #over .btn.ghost { background: transparent; color: var(--tx); border: 1px solid #c9b48a; }
+  #menu { position: fixed; inset: 0; z-index: 8; overflow-y: auto; background: linear-gradient(180deg, #2a1f11, #120d07);
+    padding-block: 32px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  #menu[hidden] { display: none; }
+  .mwrap { max-width: 1040px; margin: 0 auto; display: grid; gap: 20px; }
+  .mhead h1 { margin: 0; font-size: clamp(34px, 6vw, 64px); letter-spacing: .12em; font-weight: 900; color: #f2d79c; text-shadow: 0 3px 0 #5a3f1c; }
+  .mhead p { margin: 6px 0 0; color: var(--mu); }
+  #missions { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+  .mcard { text-align: left; font: inherit; color: var(--tx); background: rgba(60,45,25,.55); border: 1px solid #6b5a3c; border-radius: 10px;
+    padding: 16px; display: grid; gap: 6px; cursor: pointer; align-content: start; }
+  .mcard:hover, .mcard:focus-visible { border-color: #ffcc66; background: rgba(90,66,32,.6); outline: none; }
+  .mcard b { font-size: 20px; } .mno { color: #ffcc66; font-size: 12px; letter-spacing: .12em; font-weight: 800; }
+  .mdate { color: var(--mu); font-size: 12px; } .mbrief { line-height: 1.5; } .mcond { color: #e8c98e; font-size: 12px; }
+  .mfoot { color: var(--mu); font-size: 12px; margin: 0; }
   #mini { position: fixed; left: 50%; transform: translateX(-50%); bottom: 10px; width: min(60vw, 520px); height: 46px; border-radius: 6px; pointer-events: none; }
   #touch { position: fixed; inset: auto 0 64px 0; display: none; justify-content: space-between; padding: 0 14px; pointer-events: none; }
   #touch .g { display: flex; gap: 10px; pointer-events: auto; }
@@ -55,7 +70,7 @@
 <div id="loading">불러오는 중…</div>
 
 <div id="hud" class="panel">
-  <div class="t">M1A1 · DESERT STEEL — M6 교전 데모</div>
+  <div class="t" id="h-title">M1A1 · DESERT STEEL</div>
   <div class="r"><span>속도</span><b id="h-spd">0</b></div>
   <div class="r"><span>궤도 속도</span><b id="h-trk">0</b></div>
   <div class="r"><span>엔진 출력</span><b id="h-pwr">0</b></div>
@@ -86,7 +101,14 @@
 
 <div id="hurt"></div>
 <div id="foes" class="panel"></div>
-<div id="over" hidden><div><div id="over-t"></div><button id="again" class="btn" type="button" onclick="location.reload()">다시 시작</button></div></div>
+<div id="over" hidden><div><div id="over-t"></div><button id="again" class="btn" type="button">다시 시작</button> <button id="tomenu" class="btn ghost" type="button">작전 선택</button></div></div>
+<div id="menu" hidden>
+  <div class="mwrap">
+    <div class="mhead"><h1>DESERT STEEL</h1><p>1991년 2월 · 사막의 폭풍 작전 지상전 · M1A1 전차장</p></div>
+    <div id="missions"></div>
+    <p class="mfoot">A/D 기동 · W/S 포 앙각 · E 레이저 거리측정 · Space 사격 · Q 탄종 · T 열상 · V 조준경 배율</p>
+  </div>
+</div>
 <canvas id="mini"></canvas>
 <canvas id="sight" aria-label="포수 조준경"></canvas>
 <div id="log" class="panel"></div>
@@ -97,6 +119,7 @@
 </div>
 
 <script src="src/core/Tuning.js"></script>
+<script src="data/missions.js"></script>
 <script src="data/vehicles/m1a1.js"></script>
 <script src="data/vehicles/t72.js"></script>
 <script src="data/vehicles/t55.js"></script>

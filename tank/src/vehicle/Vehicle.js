@@ -281,7 +281,7 @@ DS.Vehicle = class Vehicle {
     else if (!this.firepower) this.status = '화력 불능';
     else this.status = this.crewAlive() < this.def.modules.filter(m => m.type === 'crew').length ? '승무원 부상' : '정상';
   }
-  knockOut(reason) { this.alive = false; this.koReason = reason; this.input.drive = 0; this.input.fire = false; this.setStatus(); }
+  knockOut(reason) { this.diedAt = this.diedAt || this.simT; this.alive = false; this.koReason = reason; this.input.drive = 0; this.input.fire = false; this.setStatus(); }
   ignite() {
     if (this.burning || this.wreck) return;
     this.burning = 0.01; this.alive = false; this.koReason = '화재';

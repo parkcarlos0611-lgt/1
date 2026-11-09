@@ -12,25 +12,41 @@ DS.Game = class Game {
     this.sightCam = new DS.Camera(); this.sightMag = 10; this.thermal = false; this.sightR = 2000; this._sightT = 0;
   }
   async start() {
-    const def = DS.VEHICLES.m1a1, W = this.world;
     await Promise.all(['m1a1', 't55', 't62', 't72'].map(id => this.rend.load(DS.VEHICLES[id])));
     DS.Armor.calibrate();
-    const v = new DS.Vehicle(def, 60, W.terrain, { label: 'M1A1 (아군)' });
+    this.resize(); addEventListener('resize', () => this.resize());
+    document.getElementById('loading').remove();
+    window.__game = this;
+    // #m1 / #m2 / #m3 starts that mission directly (used by "다시 시작"); otherwise show the menu
+    const m = /^#m(\d)$/.exec(location.hash), i = m ? +m[1] - 1 : -1;
+    if (DS.MISSIONS[i]) this.begin(i); else this.menu();
+  }
+  menu() {
+    const el = document.getElementById('menu'), list = document.getElementById('missions');
+    list.innerHTML = DS.MISSIONS.map((m, i) => `<button class="mcard" type="button" data-i="${i}">
+      <span class="mno">작전 ${i + 1}</span><b>${m.name}</b><span class="mdate">${m.date}</span>
+      <span class="mbrief">${m.brief}</span><span class="mcond">${m.cond} · 적 전차 ${m.enemies.length}대</span></button>`).join('');
+    list.querySelectorAll('.mcard').forEach(b => b.addEventListener('click', () => { el.hidden = true; location.hash = 'm' + (+b.dataset.i + 1); this.begin(+b.dataset.i); }));
+    el.hidden = false;
+  }
+  begin(i) {
+    const M = this.mission = DS.MISSIONS[i], W = this.world;
+    document.getElementById('menu').hidden = true; document.body.classList.add('playing');
+    W.env = { ...M.env }; W.wind = M.env.wind;
+    const v = new DS.Vehicle(DS.VEHICLES.m1a1, M.start, W.terrain, { label: 'M1A1 (아군)' });
     W.vehicles.push(v); this.player = v;
-    // Iraqi T-72M1 positions: one dug in behind the berm, one in the open, one hidden behind the dunes
-    // Iraqi platoon: a T-55 in the open, a T-72 dug in behind the berm, a T-62 on the rise behind it,
-    // and a T-72 out of sight behind the dunes that moves up when it hears firing
-    [['t55', 700, 'T-55'], ['t72', 911, 'T-72 #1 (진지)'], ['t62', 975, 'T-62'], ['t72', 2150, 'T-72 #2 (사구 뒤)']].forEach(([id, x, label]) => {
+    for (const [id, x, label] of M.enemies) {
       const e = new DS.Vehicle(DS.VEHICLES[id], x, W.terrain, { dir: -1, label });
       W.vehicles.push(e); new DS.TankAI(e, W);
-    });
+    }
     DS.FireControl.update(W, v, false);
-    this.world.cam.x = v.pos.x; this.world.cam.y = v.pos.y;
-    this.resize(); addEventListener('resize', () => this.resize());
+    W.cam.x = v.pos.x; W.cam.y = v.pos.y;
+    if (M.env.night) { this.thermal = true; this.sightCv.classList.add('thermal'); }
+    document.getElementById('h-title').textContent = `M1A1 · 작전 ${i + 1} ${M.name}`;
+    document.getElementById('again').onclick = () => { location.hash = 'm' + (i + 1); location.reload(); };
+    document.getElementById('tomenu').onclick = () => { location.hash = ''; location.reload(); };
     this.bindInput();
-    document.getElementById('loading').remove();
-    requestAnimationFrame(t => this.loop(t));
-    window.__game = this;
+    requestAnimationFrame(t => { this.last = t; this.loop(t); });
   }
   resize() {
     const dpr = Math.min(2, devicePixelRatio || 1), W = innerWidth, H = innerHeight;
@@ -199,7 +215,7 @@ DS.Game = class Game {
     const o = v.sightOrigin(), a = v.gun.aimW;
     cam.x = o.x + Math.cos(a) * R; cam.y = o.y + Math.sin(a) * R;
     cam.zoom = W / (this.sightMag === 10 ? 60 : 200);
-    this.rend.frame(this.sctx, cam, { main: false });
+    this.rend.frame(this.sctx, cam, { main: false, thermal: this.thermal });
     // reticle
     const c = this.sctx; c.setTransform(dpr, 0, 0, dpr, 0, 0);
     const cx = W / 2, cy = H / 2;

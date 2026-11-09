@@ -67,7 +67,7 @@ DS.Renderer = class Renderer {
   // draw the world with camera `cam` into ctx. opt.main: the main view (labels, debug, sight line)
   frame(ctx = this.ctx, cam = this.w.cam, opt = { main: true }) {
     const w = this.w;
-    this.cam = cam;
+    this.cam = cam; this.opt = opt;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     this.sky(ctx, cam);
     cam.apply(ctx);
@@ -76,6 +76,7 @@ DS.Renderer = class Renderer {
     this.terrain(ctx, cam);
     this.projectiles(ctx, cam);
     w.particles.draw(ctx, cam, 1);
+    this.atmosphere(ctx, cam, opt);
     w.fx.drawFlashes(ctx);
     if (opt.main) {
       this.sightLine(ctx, cam);
@@ -109,11 +110,66 @@ DS.Renderer = class Renderer {
     ctx.globalAlpha = 1;
   }
 
+  // night darkness, blowing dust thickening with distance from our tank, thermal sight
+  atmosphere(ctx, cam, opt) {
+    const env = this.w.env || {}, W = cam.W * cam.dpr, H = cam.H * cam.dpr, me = this.w.vehicles[0];
+    const night = (env.night || 0) * (opt.thermal ? 0 : 1);
+    if (!night && !env.visibility && !opt.thermal) return;
+    ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);
+    if (env.visibility && me) {
+      const V = env.visibility * (opt.thermal ? 4 : 1), base = opt.thermal ? 0.05 : 0.2;
+      const a = d => 1 - (1 - base) * Math.exp(-Math.abs(d) / V), col = night ? '40,34,28' : '200,164,112';
+      if (opt.main) {
+        const xs = cam.left, xe = cam.right, px = Math.max(xs, Math.min(xe, me.pos.x));
+        const gr = ctx.createLinearGradient(0, 0, W, 0);
+        gr.addColorStop(0, `rgba(${col},${a(xs - me.pos.x)})`);
+        gr.addColorStop((px - xs) / (xe - xs), `rgba(${col},${a(0)})`);
+        gr.addColorStop(1, `rgba(${col},${a(xe - me.pos.x)})`);
+        ctx.fillStyle = gr;
+      } else ctx.fillStyle = `rgba(${col},${a(cam.x - me.pos.x)})`;
+      ctx.fillRect(0, 0, W, H);
+    }
+    if (night) { ctx.fillStyle = `rgba(4,8,22,${0.86 * night})`; ctx.fillRect(0, 0, W, H); }
+    ctx.restore();
+    if (night) {                                   // light sources stay bright in the dark
+      ctx.globalCompositeOperation = 'lighter';
+      this.w.particles.draw(ctx, cam, 1, DS.P.FIRE);
+      ctx.globalCompositeOperation = 'source-over';
+      this.projectiles(ctx, cam);
+    }
+    if (opt.thermal) {                             // running engines and fires show hot
+      ctx.globalCompositeOperation = 'lighter';
+      for (const v of this.w.vehicles) {
+        const hot = v.alive ? 1 : v.burning ? 1.4 : Math.max(0, 0.6 - (this.w.time - (v.diedAt || 0)) / 300);
+        if (hot <= 0 || !cam.visible(v.pos.x, v.pos.y, 12)) continue;
+        for (const [lx, ly, r, k] of [[v.g.exhaust.x + v.dir * 0.6, v.g.exhaust.y - 0.2, 2.2, 0.55], [0, -0.2, 3.4, 0.22], [v.g.sprocket.x, v.g.sprocket.y, 0.8, 0.3]]) {
+          const p = v.local(lx, ly), gr = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r);
+          gr.addColorStop(0, `rgba(255,255,255,${k * hot})`); gr.addColorStop(1, 'rgba(255,255,255,0)');
+          ctx.fillStyle = gr; ctx.fillRect(p.x - r, p.y - r, r * 2, r * 2);
+        }
+      }
+      ctx.globalCompositeOperation = 'source-over';
+    }
+  }
+
   sky(ctx, cam) {
     const W = cam.W * cam.dpr, H = cam.H * cam.dpr;
-    const g = ctx.createLinearGradient(0, 0, 0, H);
-    g.addColorStop(0, '#7fa6cc'); g.addColorStop(0.5, '#c9d3d4'); g.addColorStop(0.75, '#ecdcbc'); g.addColorStop(1, '#e8cf9f');
+    const env = this.w.env || {}, g = ctx.createLinearGradient(0, 0, 0, H);
+    if (this.opt && this.opt.thermal) {             // thermal: the sky is cold and featureless
+      g.addColorStop(0, '#1a1a1a'); g.addColorStop(1, '#3a3a3a'); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H); return;
+    }
+    if (env.visibility) { g.addColorStop(0, '#b98d5a'); g.addColorStop(0.55, '#d8b07a'); g.addColorStop(1, '#e2c08c'); }
+    else { g.addColorStop(0, '#7fa6cc'); g.addColorStop(0.5, '#c9d3d4'); g.addColorStop(0.75, '#ecdcbc'); g.addColorStop(1, '#e8cf9f'); }
     ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    if (env.night) {
+      const n = ctx.createLinearGradient(0, 0, 0, H); n.addColorStop(0, '#05070f'); n.addColorStop(1, '#141826');
+      ctx.globalAlpha = env.night; ctx.fillStyle = n; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1;
+      if (!this.stars) { const r = DS.rng(9); this.stars = Array.from({ length: 160 }, () => [r(), r() * 0.6, r()]); }
+      ctx.fillStyle = '#dfe6ff';
+      for (const [x, y, b] of this.stars) { ctx.globalAlpha = 0.3 + 0.6 * b; ctx.fillRect(((x * W - cam.x * cam.dpr * 0.02) % W + W) % W, y * H, 1.5 * cam.dpr, 1.5 * cam.dpr); }
+      ctx.globalAlpha = 1;
+      return;
+    }
     // sun haze
     const sx = W * 0.78, sy = H * 0.18, sg = ctx.createRadialGradient(sx, sy, 0, sx, sy, H * 0.5);
     sg.addColorStop(0, 'rgba(255,250,230,0.95)'); sg.addColorStop(0.05, 'rgba(255,245,215,0.7)'); sg.addColorStop(1, 'rgba(255,240,210,0)');
@@ -285,6 +341,9 @@ DS.Renderer = class Renderer {
     ctx.scale(px, -px);
     const tpx = G.trunnion[0] * S.ppm + S.ox, tpy = S.oy - G.trunnion[1] * S.ppm;
     ctx.fillStyle = '#b89464'; ctx.fillRect(-40 * S.ppm / 149, -11 * S.ppm / 149, 110 * S.ppm / 149, 22 * S.ppm / 149);
+    if (G.barrelScale) {                      // stretch the tube from its root to the real overall length
+      const x0 = Sp.barrel.x - tpx; ctx.translate(x0, 0); ctx.scale(G.barrelScale, 1); ctx.translate(-x0, 0);
+    }
     ctx.drawImage(I.barrel, Sp.barrel.x - tpx, Sp.barrel.y - tpy);
     ctx.restore();
     ctx.save(); ctx.scale(px, -px); ctx.drawImage(I.turret, Sp.turret.x - S.ox, Sp.turret.y - S.oy);

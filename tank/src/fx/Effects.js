@@ -1,17 +1,19 @@
 // Effect emitters driven by simulation state: track sand / rooster tail, turbine exhaust,
 // muzzle flash + blast dust + gun smoke + sabot petals, ground impacts.
 DS.Effects = class Effects {
-  constructor(world) { this.w = world; this.P = world.particles; this.flashes = []; this.acc = 0; this.shake = 0; }
+  constructor(world) { this.w = world; this.P = world.particles; this.flashes = []; this.labels = []; this.acc = 0; this.shake = 0; }
   rnd(a, b) { return a + Math.random() * (b - a); }
   hex(s) { return parseInt(s.slice(1), 16); }
 
   vehicle(v, dt) {
-    const P = this.P, K = DS.P, T = this.w.terrain, D = v.def;
+    const P = this.P, K = DS.P, T = this.w.terrain, D = v.def, G = v.g;
     const c = Math.cos(v.ang), s = Math.sin(v.ang);
     const speed = Math.hypot(v.vel.x, v.vel.y), soil = T.soilAt(v.pos.x), sc = this.hex(soil.col[1]);
-    // rooster tail from the trailing end (rear when moving forward)
+    // rooster tail from the trailing end of the track
     const fwd = v.vt >= 0;
-    const end = fwd ? { lx: D.sprocket.x - 0.1, ly: D.sprocket.y - 0.4 } : { lx: D.idler.x + 0.1, ly: D.idler.y - 0.4 };
+    const ends = [G.sprocket, G.idler].sort((a, b) => a.x - b.x);
+    const e0 = fwd ? ends[0] : ends[1];
+    const end = { lx: e0.x + (fwd ? -0.1 : 0.1), ly: e0.y - 0.4 };
     const ex = v.pos.x + c * end.lx - s * end.ly, ey = v.pos.y + s * end.lx + c * end.ly;
     const rate = (Math.abs(v.vt) * 9 + v.stats.slip * 70) * soil.dust;
     let n = rate * dt + Math.random();
@@ -21,26 +23,101 @@ DS.Effects = class Effects {
       P.add(K.GRAIN, ex + this.rnd(-0.3, 0.3), ey + this.rnd(0, 0.4), v.vel.x * 0.4 + dir * vv * 0.6, this.rnd(0.8, 2.2) + vv * 0.45,
         this.rnd(0.5, 1.4), this.rnd(0.025, 0.06), { drag: 0.6, grav: 1, col: Math.random() < 0.5 ? sc : this.hex(soil.col[0]) });
     }
-    // dust wake (bigger when dry soft sand, scales with speed)
-    let nd = (speed * 2.2 + v.stats.slip * 14) * soil.dust * dt + Math.random() * 0.6;
+    let nd = (speed * 2.2 + v.stats.slip * 14) * soil.dust * dt + Math.random() * 0.6 * Math.min(1, speed);
     while (nd-- >= 1) {
       const lx = this.rnd(-3.6, 3.4) * 0.6 + (fwd ? -1.4 : 1.4);
       P.add(K.DUST, v.pos.x + c * lx, T.height(v.pos.x + c * lx) + this.rnd(0.1, 0.8), v.vel.x * 0.3 + dir * this.rnd(0, 1.5), this.rnd(0.2, 1),
         this.rnd(2.5, 6), this.rnd(0.4, 0.9), { grow: this.rnd(0.35, 0.8), drag: 1.2, grav: 0.0, alpha: 0.22 * Math.min(1, speed / 6 + 0.15), col: sc });
     }
-    // AGT1500 exhaust: almost smokeless, hot shimmer blowing rearward + dust kicked behind the hull
-    const xh = v.pos.x + c * D.exhaust.x - s * D.exhaust.y, yh = v.pos.y + s * D.exhaust.x + c * D.exhaust.y;
-    const pw = 0.25 + v.spool;
-    let nh = 26 * pw * dt + Math.random() * 0.5;
-    while (nh-- >= 1) P.add(K.HEAT, xh, yh + this.rnd(-0.2, 0.2), v.vel.x - c * this.rnd(4, 9) * pw, this.rnd(-0.5, 1.2), this.rnd(0.4, 0.9), this.rnd(0.25, 0.5),
-      { grow: 1.2, drag: 2.5, grav: -0.05, alpha: 0.10, col: 0xe8e4dc });
-    if (v.spool > 0.4 && Math.random() < v.spool * dt * 8) {
-      const gx = xh - c * this.rnd(1, 3);
-      P.add(K.DUST, gx, T.height(gx) + 0.2, v.vel.x - c * this.rnd(2, 5), this.rnd(0.2, 0.8), this.rnd(1.5, 3), 0.5,
-        { grow: 0.9, drag: 1.4, grav: 0, alpha: 0.16, col: sc });
+    // exhaust: AGT1500 turbine = hot shimmer blowing rearward; diesel = dark puffs under load
+    const xh = v.pos.x + c * G.exhaust.x - s * G.exhaust.y, yh = v.pos.y + s * G.exhaust.x + c * G.exhaust.y;
+    const back = -v.dir;
+    if (v.alive) {
+      const pw = 0.25 + v.spool;
+      if (D.engine.type === 'turbine') {
+        let nh = 26 * pw * dt + Math.random() * 0.5;
+        while (nh-- >= 1) P.add(K.HEAT, xh, yh + this.rnd(-0.2, 0.2), v.vel.x + back * c * this.rnd(4, 9) * pw, this.rnd(-0.5, 1.2), this.rnd(0.4, 0.9), this.rnd(0.25, 0.5),
+          { grow: 1.2, drag: 2.5, grav: -0.05, alpha: 0.10, col: 0xe8e4dc });
+        if (v.spool > 0.4 && Math.random() < v.spool * dt * 8) {
+          const gx = xh + back * c * this.rnd(1, 3);
+          P.add(K.DUST, gx, T.height(gx) + 0.2, v.vel.x + back * c * this.rnd(2, 5), this.rnd(0.2, 0.8), this.rnd(1.5, 3), 0.5,
+            { grow: 0.9, drag: 1.4, grav: 0, alpha: 0.16, col: sc });
+        }
+      } else {
+        const dsp = Math.max(0, v.spool - (v._lastSpool || 0)) / dt;  // black puff when the throttle opens
+        v._lastSpool = v.spool;
+        let nh = (3 + 14 * v.spool + dsp * 20) * dt + Math.random() * 0.3;
+        while (nh-- >= 1) P.add(K.DARK, xh, yh, v.vel.x + back * this.rnd(0.5, 2), this.rnd(0.5, 1.5), this.rnd(2, 4), this.rnd(0.15, 0.3),
+          { grow: 0.5, drag: 1.5, grav: -0.03, alpha: 0.18 + 0.25 * v.spool, col: 0x3a3631 });
+      }
     }
-    for (const e of v.events) if (e.type === 'fire') this.muzzle(v, e);
+    // damage: burning hull, bustle blow-out panels venting
+    if (v.burning) this.burning(v, dt);
+    if (v.vent > 0) {
+      const p = v.local(v.g.ring.x - v.dir * 2.1, v.g.ring.y + 0.6);
+      for (let i = 0; i < 40 * dt * 10; i++) P.add(K.FIRE, p.x + this.rnd(-0.6, 0.6), p.y, this.rnd(-1, 1), this.rnd(10, 22), this.rnd(0.15, 0.35), this.rnd(0.3, 0.6),
+        { grow: 2, drag: 2, grav: 0, alpha: 0.9, col: 0xffa040 });
+      if (Math.random() < 0.5) P.add(K.DARK, p.x, p.y + 2, this.rnd(-1, 1), this.rnd(3, 6), this.rnd(5, 9), 0.8, { grow: 1.1, drag: 0.8, grav: -0.03, alpha: 0.4, col: 0x2a2724 });
+    }
+    for (const e of v.events) { if (e.type === 'fire') this.muzzle(v, e); else if (e.type === 'explode') this.explode(v); }
     v.events.length = 0;
+  }
+
+  burning(v, dt) {
+    const P = this.P, K = DS.P;
+    const age = v.burning, f = Math.min(1, age / 3) * (v.wreck ? 1.3 : 1);
+    const p = v.turretGone ? v.local(v.g.ring.x, v.g.ring.y) : v.local(v.g.ring.x - v.dir * 0.6, v.g.ring.y + 0.9);
+    let n = 30 * f * dt + Math.random() * 0.5;
+    while (n-- >= 1) P.add(K.FIRE, p.x + this.rnd(-0.7, 0.7), p.y + this.rnd(-0.1, 0.3), this.rnd(-0.6, 0.6) + this.w.wind * 0.2, this.rnd(1.5, 4.5), this.rnd(0.2, 0.55), this.rnd(0.25, 0.6),
+      { grow: 0.6, drag: 1.5, grav: -0.08, alpha: 0.85, col: Math.random() < 0.5 ? 0xff8a30 : 0xffc060 });
+    let m = 9 * f * dt + Math.random() * 0.4;
+    while (m-- >= 1) P.add(K.DARK, p.x + this.rnd(-0.5, 0.5), p.y + 0.8, this.rnd(-0.4, 0.4), this.rnd(2.5, 5), this.rnd(9, 18), this.rnd(0.6, 1.1),
+      { grow: this.rnd(0.6, 1.1), drag: 0.35, grav: -0.02, alpha: 0.42, col: Math.random() < 0.5 ? 0x24211e : 0x3b3631 });
+    // occasional small cook-off pops
+    if (v.wreck && Math.random() < dt * 0.6) {
+      for (let i = 0; i < 12; i++) { const a = this.rnd(0.3, 2.8), sp = this.rnd(4, 16);
+        P.add(K.FIRE, p.x, p.y + 0.5, Math.cos(a) * sp, Math.sin(a) * sp, this.rnd(0.1, 0.3), this.rnd(0.2, 0.5), { grow: 2, drag: 4, grav: 0.2, alpha: 1, col: 0xffb050 }); }
+    }
+  }
+
+  explode(v) {
+    const P = this.P, K = DS.P;
+    const p = v.local(v.g.ring.x, v.g.ring.y);
+    this.flashes.push({ x: p.x, y: p.y + 1, dx: 0, dy: 1, t: 0, ttl: 0.18, boom: true, big: true });
+    for (let i = 0; i < 140; i++) {
+      const a = this.rnd(0, Math.PI), sp = this.rnd(4, 30);
+      P.add(K.FIRE, p.x + this.rnd(-1, 1), p.y + this.rnd(0, 1.5), Math.cos(a) * sp * 0.7, Math.sin(a) * sp, this.rnd(0.2, 0.9), this.rnd(0.6, 1.6),
+        { grow: 3, drag: 3, grav: -0.05, alpha: 1, col: Math.random() < 0.5 ? 0xff9a3c : 0xffd27a });
+    }
+    for (let i = 0; i < 60; i++) {
+      const a = this.rnd(0.2, Math.PI - 0.2), sp = this.rnd(3, 14);
+      P.add(K.DARK, p.x + this.rnd(-1, 1), p.y + this.rnd(0.5, 3), Math.cos(a) * sp * 0.6, Math.sin(a) * sp, this.rnd(8, 16), this.rnd(1, 2.2),
+        { grow: 1.2, drag: 0.7, grav: -0.03, alpha: 0.55, col: 0x24201c });
+    }
+    for (let i = 0; i < 45; i++) {
+      const a = this.rnd(0.2, Math.PI - 0.2), sp = this.rnd(8, 35);
+      P.add(K.DEBRIS, p.x, p.y + 0.5, Math.cos(a) * sp, Math.sin(a) * sp, this.rnd(2, 5), this.rnd(0.06, 0.25), { drag: 0.15, grav: 1 });
+    }
+    this.shake = Math.max(this.shake, Math.max(0.2, 1.2 - Math.abs(p.x - this.w.cam.x) / 400));
+  }
+
+  // armour strike visuals: sparks for ricochet / non-penetration, flash + smoke for penetration
+  armor(r) {
+    const P = this.P, K = DS.P, x = r.x, y = r.y;
+    const n = r.result === 'pen' ? 30 : 45;
+    for (let i = 0; i < n; i++) {
+      const a = this.rnd(0, Math.PI * 2), sp = this.rnd(5, 40);
+      P.add(K.FIRE, x, y, Math.cos(a) * sp, Math.sin(a) * sp, this.rnd(0.05, 0.25), this.rnd(0.05, 0.15), { grow: 0, drag: 2, grav: 0.6, alpha: 1, col: 0xffe2a0 });
+    }
+    if (r.ammo.type === 'HEAT' && r.result !== 'ricochet') {
+      this.flashes.push({ x, y, dx: 0, dy: 1, t: 0, ttl: 0.08, boom: true });
+      for (let i = 0; i < 16; i++) P.add(K.DARK, x + this.rnd(-0.5, 0.5), y + this.rnd(0, 1), this.rnd(-1, 1), this.rnd(0.5, 3), this.rnd(3, 6), 0.6, { grow: 0.8, drag: 1, grav: -0.02, alpha: 0.4, col: 0x35302b });
+    }
+    if (r.result === 'pen') {
+      this.flashes.push({ x, y, dx: 0, dy: 1, t: 0, ttl: 0.06, boom: true });
+      for (let i = 0; i < 10; i++) P.add(K.SMOKE, x, y, this.rnd(-2, 2), this.rnd(0, 3), this.rnd(2, 4), 0.4, { grow: 0.6, drag: 1, grav: -0.02, alpha: 0.35, col: 0x8a857c });
+    }
+    this.labels.push({ x, y: y + 1.2, t: 0, r });
   }
 
   muzzle(v, e) {
@@ -88,10 +165,9 @@ DS.Effects = class Effects {
     const heat = A.type === 'HEAT';
     const sc = this.hex(T.soilAt(hit.x).col[1]), sc2 = this.hex(T.soilAt(hit.x).col[0]);
     const v = Math.hypot(hit.vx, hit.vy), ang = Math.atan2(hit.vy, hit.vx);
-    T.crater(hit.x + Math.cos(ang) * 0.4, heat ? 1.3 : 0.8, heat ? 0.55 : 0.3);
-    T.relax(undefined, undefined, 4);
+    if (!hit.onArmor) { T.crater(hit.x + Math.cos(ang) * 0.4, heat ? 1.3 : 0.8, heat ? 0.55 : 0.3); T.relax(undefined, undefined, 4); }
     // plume: KE → tall narrow column thrown along the ricochet direction; HE/HEAT → radial
-    const n = heat ? 160 : 120;
+    const n = hit.onArmor ? 20 : heat ? 160 : 120;
     for (let i = 0; i < n; i++) {
       let a, sp;
       if (heat) { a = Math.PI / 2 + this.rnd(-1.1, 1.1); sp = this.rnd(5, 30); }
@@ -114,7 +190,8 @@ DS.Effects = class Effects {
     this.shake = Math.max(this.shake, Math.max(0, 0.5 - d / 300));
   }
 
-  update(dt) { for (const f of this.flashes) f.t += dt; this.flashes = this.flashes.filter(f => f.t < f.ttl); this.shake = Math.max(0, this.shake - dt * 2.5); }
+  update(dt) { for (const f of this.flashes) f.t += dt; this.flashes = this.flashes.filter(f => f.t < f.ttl);
+    for (const l of this.labels) l.t += dt; this.labels = this.labels.filter(l => l.t < 4); this.shake = Math.max(0, this.shake - dt * 2.5); }
 
   drawFlashes(ctx) {
     ctx.globalCompositeOperation = 'lighter';
@@ -122,14 +199,14 @@ DS.Effects = class Effects {
       const k = 1 - f.t / f.ttl, a = Math.atan2(f.dy, f.dx);
       ctx.save(); ctx.translate(f.x, f.y); ctx.rotate(a);
       // primary/intermediate flash: elongated along the bore, secondary: fat ball ahead of the muzzle
-      const L = f.boom ? 2.5 : 3.6 * (0.7 + 0.3 * k);
+      const L = f.big ? 7 : f.boom ? 2.5 : 3.6 * (0.7 + 0.3 * k);
       let g = ctx.createRadialGradient(L * 0.45, 0, 0, L * 0.45, 0, L);
       g.addColorStop(0, `rgba(255,250,220,${0.95 * k})`); g.addColorStop(0.25, `rgba(255,200,90,${0.85 * k})`);
       g.addColorStop(0.6, `rgba(255,120,30,${0.45 * k})`); g.addColorStop(1, 'rgba(255,80,0,0)');
       ctx.fillStyle = g; ctx.scale(1, f.boom ? 1 : 0.55); ctx.beginPath(); ctx.arc(L * 0.45, 0, L, 0, Math.PI * 2); ctx.fill();
       ctx.restore();
       // ambient light splash
-      const R = 14;
+      const R = f.big ? 40 : 14;
       g = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, R);
       g.addColorStop(0, `rgba(255,180,90,${0.35 * k})`); g.addColorStop(1, 'rgba(255,150,60,0)');
       ctx.fillStyle = g; ctx.fillRect(f.x - R, f.y - R, R * 2, R * 2);

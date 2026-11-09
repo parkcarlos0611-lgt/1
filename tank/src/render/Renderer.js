@@ -7,11 +7,37 @@ DS.Renderer = class Renderer {
     this.noise = this.makeNoise();
   }
   load(def) {
-    const names = ['hull', 'turret', 'barrel', 'roadwheel', 'roadwheel_front', 'sprocket'];
-    return Promise.all(names.map(n => new Promise((res, rej) => {
-      const im = new Image(); im.onload = () => { this.img[n] = im; this.mips[n] = this.buildMips(im); res(); }; im.onerror = () => rej(new Error('sprite ' + n));
+    const id = def.id, Sp = def.sprites;
+    this.img[id] = this.img[id] || {};
+    const names = new Set(['hull', 'turret', 'barrel', Sp.roadwheel.file, Sp.idler.file]);
+    if (Sp.flag) names.add(Sp.flag.file);
+    if (!Sp.sprocket.procedural) names.add('sprocket');
+    else { const c = this.makeSprocket(def); this.img[id].sprocket = c; this.mips[id + '/sprocket'] = this.buildMips(c); }
+    return Promise.all([...names].map(n => new Promise((res, rej) => {
+      const im = new Image();
+      im.onload = () => { this.img[id][n] = im; this.mips[id + '/' + n] = this.buildMips(im); res(); };
+      im.onerror = () => rej(new Error('sprite ' + id + '/' + n));
       im.src = def.src.dir + n + '.png';
     })));
+  }
+  // drive sprocket drawn from its tooth count (used where the drawing's sprocket is hidden by track)
+  makeSprocket(def) {
+    const N = def.sprocket.teeth, S = 256, c = document.createElement('canvas'); c.width = c.height = S;
+    const x = c.getContext('2d'), R = S / 2 - 2, root = R * 0.8;
+    x.translate(S / 2, S / 2);
+    x.beginPath();
+    for (let i = 0; i < N; i++) {
+      const a0 = i / N * Math.PI * 2, w = Math.PI * 2 / N;
+      x.lineTo(Math.cos(a0 - w * 0.5) * root, Math.sin(a0 - w * 0.5) * root);
+      x.lineTo(Math.cos(a0 - w * 0.2) * R, Math.sin(a0 - w * 0.2) * R);
+      x.lineTo(Math.cos(a0 + w * 0.2) * R, Math.sin(a0 + w * 0.2) * R);
+      x.lineTo(Math.cos(a0 + w * 0.5) * root, Math.sin(a0 + w * 0.5) * root);
+    }
+    x.closePath(); x.fillStyle = '#c9a56c'; x.fill(); x.lineWidth = 5; x.strokeStyle = '#2a241c'; x.stroke();
+    x.beginPath(); x.arc(0, 0, root * 0.78, 0, 7); x.fillStyle = '#b8945d'; x.fill(); x.stroke();
+    for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2; x.beginPath(); x.ellipse(Math.cos(a) * root * 0.5, Math.sin(a) * root * 0.5, root * 0.17, root * 0.11, a, 0, 7); x.fillStyle = '#2b251d'; x.fill(); }
+    x.beginPath(); x.arc(0, 0, root * 0.28, 0, 7); x.fillStyle = '#d3b07a'; x.fill(); x.stroke();
+    return c;
   }
   // halving chain so heavily minified sprites (wheels at battle zoom) stay smooth
   buildMips(im) {
@@ -24,8 +50,8 @@ DS.Renderer = class Renderer {
     }
     return out;
   }
-  pick(name, screenW) {               // smallest level still >= on-screen width
-    const m = this.mips[name]; let i = 0;
+  pick(key, screenW) {                // smallest level still >= on-screen width
+    const m = this.mips[key]; let i = 0;
     while (i + 1 < m.length && m[i + 1].width >= screenW) i++;
     return m[i];
   }
@@ -38,19 +64,49 @@ DS.Renderer = class Renderer {
     x.putImageData(d, 0, 0); return c;
   }
 
-  frame() {
-    const { ctx, w } = this, cam = w.cam, dpr = cam.dpr;
+  // draw the world with camera `cam` into ctx. opt.main: the main view (labels, debug, sight line)
+  frame(ctx = this.ctx, cam = this.w.cam, opt = { main: true }) {
+    const w = this.w;
+    this.cam = cam;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     this.sky(ctx, cam);
     cam.apply(ctx);
     w.particles.draw(ctx, cam, 0);
-    for (const v of w.vehicles) this.vehicle(ctx, v);
+    for (const v of w.vehicles) if (cam.visible(v.pos.x, v.pos.y, 14)) this.vehicle(ctx, v, cam);
     this.terrain(ctx, cam);
-    this.projectiles(ctx);
+    this.projectiles(ctx, cam);
     w.particles.draw(ctx, cam, 1);
     w.fx.drawFlashes(ctx);
-    if (w.debug) DS.Debug.draw(ctx, w);
+    if (opt.main) {
+      this.sightLine(ctx, cam);
+      if (w.debug) DS.Debug.draw(ctx, w);
+      this.labels(ctx, cam);
+    }
     ctx.setTransform(1, 0, 0, 1, 0, 0);
+  }
+
+  sightLine(ctx, cam) {
+    const v = this.w.vehicles[0]; if (!v || !v.alive) return;
+    const o = v.sightOrigin(), a = v.gun.aimW, L = 400;
+    ctx.save(); ctx.setLineDash([6 / cam.zoom, 6 / cam.zoom]); ctx.lineWidth = 1.2 / cam.zoom; ctx.strokeStyle = 'rgba(255,60,40,0.55)';
+    ctx.beginPath(); ctx.moveTo(o.x, o.y); ctx.lineTo(o.x + Math.cos(a) * L, o.y + Math.sin(a) * L); ctx.stroke(); ctx.restore();
+    const p = v.fc.point;
+    if (p && this.w.time - v.fc.lasedAt < 3) { ctx.strokeStyle = 'rgba(255,60,40,0.9)'; ctx.lineWidth = 2 / cam.zoom; ctx.beginPath(); ctx.arc(p.x, p.y, 8 / cam.zoom, 0, 7); ctx.stroke(); }
+  }
+
+  labels(ctx, cam) {
+    const dpr = cam.dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.textAlign = 'center'; ctx.font = '700 13px system-ui, sans-serif';
+    const tag = { pen: ['관통', '#ff5a4a'], ricochet: ['도탄', '#ffd34a'], nonpen: ['비관통', '#f2f2f2'], track: ['궤도 피격', '#ffa04a'] };
+    for (const l of this.w.fx.labels) {
+      const [txt, col] = tag[l.r.result] || ['', '#fff'];
+      const sx = (l.x - cam.x - cam.sx) * cam.zoom + cam.W / 2, sy = -(l.y + l.t * 0.6 - cam.y - cam.sy) * cam.zoom + cam.H / 2 - 18;
+      if (sx < -50 || sx > cam.W + 50 || sy < -20 || sy > cam.H + 20) continue;
+      ctx.globalAlpha = Math.min(1, 4 - l.t);
+      ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,0.6)'; ctx.strokeText(txt, sx, sy); ctx.fillStyle = col; ctx.fillText(txt, sx, sy);
+    }
+    ctx.globalAlpha = 1;
   }
 
   sky(ctx, cam) {
@@ -110,10 +166,12 @@ DS.Renderer = class Renderer {
     ctx.strokeStyle = 'rgba(245,225,185,0.8)'; ctx.lineWidth = Math.max(0.03, 1.2 / cam.zoom); ctx.stroke();
   }
 
-  vehicle(ctx, v) {
-    const D = v.def, S = D.src, I = this.img, px = 1 / S.ppm;
+  vehicle(ctx, v, cam) {
+    const D = v.def, S = D.src, I = this.img[D.id], px = 1 / S.ppm, dir = v.dir, id = D.id, Sp = D.sprites;
+    const charred = v.burning > 0.6 || v.wreck;
+    if (charred) ctx.filter = 'brightness(0.32) saturate(0.35)';
     // ---- hull frame: underside shadow ----
-    ctx.save(); ctx.translate(v.pos.x, v.pos.y); ctx.rotate(v.ang);
+    ctx.save(); ctx.translate(v.pos.x, v.pos.y); ctx.rotate(v.ang); ctx.scale(dir, 1);
     const U = D.underside;
     ctx.fillStyle = '#2b251d'; ctx.beginPath();
     ctx.moveTo(U.x0, U.y0); ctx.lineTo(U.x1, U.y0); ctx.lineTo(U.x1 - 0.2, U.y1); ctx.lineTo(U.x0 + 0.3, U.y1); ctx.closePath(); ctx.fill();
@@ -122,75 +180,91 @@ DS.Renderer = class Renderer {
 
     // ---- track ----
     const circles = v.gearCircles();
-    const fixed = circles.map((c, i) => i === 0 || i === 1 + D.returnRollers.length);
-    let path = DS.Track.buildPath(circles, this.pathBuf, fixed);
+    let path = DS.Track.buildPath(circles, this.pathBuf, circles.map(c => c.fixed));
     path = DS.Track.conformBottom(path, this.w.terrain, D.track.thick / 2, 0.25);
     v._trackPath = path;
     const info = DS.Track.links(path, D.track.pitch, v.s, this.linkBuf);
-    const L = info.pitch, th = D.track.thick;
-    for (const [x, y, a] of this.linkBuf) {
+    const L = info.pitch, th = D.track.thick, nl = this.linkBuf.length;
+    this.linkBuf.forEach(([x, y, a], i) => {
+      if (v.trackBroken && i > nl * 0.32 && i < nl * 0.42) return;      // severed run
       ctx.save(); ctx.translate(x, y); ctx.rotate(a);
-      ctx.fillStyle = '#26231f'; ctx.fillRect(-L * 0.5, -th * 0.5, L * 0.93, th);          // pad + shoe
-      ctx.fillStyle = '#4a4540'; ctx.fillRect(-L * 0.5, -th * 0.5, L * 0.18, th);          // end connector
-      ctx.fillStyle = '#3a3631'; ctx.fillRect(-L * 0.25, th * 0.12, L * 0.6, th * 0.22);   // pad face highlight
-      ctx.fillStyle = '#1d1b18'; ctx.fillRect(-L * 0.12, -th * 0.5 - 0.065, L * 0.28, 0.07); // guide horn (inner side, -y = inside the loop)
+      ctx.fillStyle = '#26231f'; ctx.fillRect(-L * 0.5, -th * 0.5, L * 0.93, th);
+      ctx.fillStyle = '#4a4540'; ctx.fillRect(-L * 0.5, -th * 0.5, L * 0.18, th);
+      ctx.fillStyle = '#3a3631'; ctx.fillRect(-L * 0.25, th * 0.12, L * 0.6, th * 0.22);
+      ctx.fillStyle = '#1d1b18'; ctx.fillRect(-L * 0.12, -th * 0.5 - 0.065, L * 0.28, 0.07);
       ctx.restore();
-    }
+    });
 
     // ---- wheels ----
-    const zpx = this.w.cam.zoom * this.w.cam.dpr;
+    const zpx = cam.zoom * cam.dpr;
     const wheel = (x, y, ang, r, name, tint) => {
-      const im = this.pick(name, r * 2 * zpx), imr = im.width / 2;
+      const im = this.pick(id + '/' + name, r * 2 * zpx), imr = im.width / 2;
       ctx.save(); ctx.translate(x, y); ctx.rotate(ang); const k = r / imr; ctx.scale(k, -k);
       ctx.drawImage(im, -imr, -imr, imr * 2, imr * 2);
       if (tint) { ctx.globalAlpha = tint; ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(0, 0, imr, 0, 7); ctx.fill(); }
       ctx.restore();
     };
-    v.st.forEach((w, i) => wheel(w.wx, w.wy, w.ang, D.wheelR + 0.006, 'roadwheel'));
-    const ip = v.local(D.idler.x, D.idler.y);
-    wheel(ip.x, ip.y, v.idlAng, D.idler.r + 0.02, 'roadwheel_front');           // idler: front-wheel art
+    for (const w of v.st) wheel(w.wx, w.wy, w.ang, D.wheelR + 0.006, Sp.roadwheel.file);
+    const ip = v.local(v.g.idler.x, v.g.idler.y);
+    wheel(ip.x, ip.y, v.idlAng, D.idler.r + 0.02, Sp.idler.file, Sp.idler.tint);
     // sprocket: lock tooth phase to the links on its arc (teeth sit in the link joints)
-    const sp = v.local(D.sprocket.x, D.sprocket.y), rc = v.sprR(), pitchA = 2 * Math.PI / D.sprocket.teeth;
+    const sp = v.local(v.g.sprocket.x, v.g.sprocket.y), rc = v.sprR(), pitchA = 2 * Math.PI / D.sprocket.teeth;
     let best = null, bd = 1e9;
     for (const l of this.linkBuf) { const e = Math.abs(Math.hypot(l[0] - sp.x, l[1] - sp.y) - rc); if (e < bd) { bd = e; best = l; } }
     let sa = v.sprAng;
     if (best && bd < 0.05) {
       const joint = Math.atan2(best[1] - sp.y, best[0] - sp.x) + (L / 2) / rc;
-      sa = joint - D.sprites.sprocket.tooth0 * Math.PI / 180;
-      sa -= Math.round((sa - v.sprAng) / pitchA) * pitchA;    // stay near the integrated angle (no visual jumps)
+      sa = joint - (Sp.sprocket.tooth0 || 0) * Math.PI / 180;
+      sa -= Math.round((sa - v.sprAng) / pitchA) * pitchA;
     }
-    wheel(sp.x, sp.y, sa, D.sprites.sprocket.R, 'sprocket');
+    wheel(sp.x, sp.y, sa, Sp.sprocket.R, 'sprocket');
 
-    // ---- hull, gun, turret (hull-local, source pixel frame) ----
-    ctx.save(); ctx.translate(v.pos.x, v.pos.y); ctx.rotate(v.ang);
-    const blit = (im, sx, sy) => { ctx.save(); ctx.scale(px, -px); ctx.drawImage(im, sx - S.ox, sy - S.oy); ctx.restore(); };
-    blit(I.hull, D.sprites.hull.x, D.sprites.hull.y);
-    const G = D.gun;
-    ctx.save(); ctx.translate(G.trunnion[0], G.trunnion[1]); ctx.rotate(v.gun.e); ctx.translate(v.gun.rx, 0);
+    // ---- hull, then gun + turret (hull-local, source pixel frame, mirrored by dir) ----
+    ctx.save(); ctx.translate(v.pos.x, v.pos.y); ctx.rotate(v.ang); ctx.scale(dir, 1);
+    ctx.save(); ctx.scale(px, -px); ctx.drawImage(I.hull, Sp.hull.x - S.ox, Sp.hull.y - S.oy); ctx.restore();
+    if (!v.turretGone) this.turret(ctx, v, v.gun.e, v.gun.rx, true);
+    ctx.restore();
+    if (v.turretBody) {
+      const b = v.turretBody, r = D.turretRing;
+      ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(b.a); ctx.scale(dir, 1); ctx.translate(-r[0], -r[1]);
+      this.turret(ctx, v, b.e, 0, false);
+      ctx.restore();
+    }
+    ctx.filter = 'none';
+  }
+
+  // barrel + turret + antennas in the vehicle's unmirrored hull frame (metres)
+  turret(ctx, v, e, rx, antennas) {
+    const D = v.def, S = D.src, I = this.img[D.id], px = 1 / S.ppm, Sp = D.sprites, G = D.gun;
+    ctx.save(); ctx.translate(G.trunnion[0], G.trunnion[1]); ctx.rotate(e); ctx.translate(rx, 0);
     ctx.scale(px, -px);
     const tpx = G.trunnion[0] * S.ppm + S.ox, tpy = S.oy - G.trunnion[1] * S.ppm;
-    ctx.fillStyle = '#b89464'; ctx.fillRect(-40, -11, 110, 22);                   // breech end / barrel root (hidden by mantlet at rest)
-    ctx.drawImage(I.barrel, D.sprites.barrel.x - tpx, D.sprites.barrel.y - tpy);
+    ctx.fillStyle = '#b89464'; ctx.fillRect(-40 * S.ppm / 149, -11 * S.ppm / 149, 110 * S.ppm / 149, 22 * S.ppm / 149);
+    ctx.drawImage(I.barrel, Sp.barrel.x - tpx, Sp.barrel.y - tpy);
     ctx.restore();
-    blit(I.turret, D.sprites.turret.x, D.sprites.turret.y);
-    // antennas: spring masts
+    ctx.save(); ctx.scale(px, -px); ctx.drawImage(I.turret, Sp.turret.x - S.ox, Sp.turret.y - S.oy);
+    if (Sp.flag && v.dir < 0) {             // un-mirror the national flag decal
+      const f = I[Sp.flag.file], fx = Sp.flag.x - S.ox + f.width / 2;
+      ctx.translate(fx, 0); ctx.scale(-1, 1); ctx.translate(-fx, 0); ctx.drawImage(f, Sp.flag.x - S.ox, Sp.flag.y - S.oy);
+    }
+    ctx.restore();
+    if (!antennas) return;
     ctx.strokeStyle = '#2e2c29'; ctx.lineCap = 'round';
-    D.antennas.forEach((a, i) => {
-      const phi = v.antennas[i].phi, tx = a.x + Math.sin(phi) * a.len, ty = a.y + Math.cos(phi) * a.len;
+    (D.antennas || []).forEach((a, i) => {
+      const phi = v.antennas[i].phi * v.dir, tx = a.x + Math.sin(phi) * a.len, ty = a.y + Math.cos(phi) * a.len;
       ctx.lineWidth = 0.028; ctx.beginPath(); ctx.moveTo(a.x, a.y);
       ctx.quadraticCurveTo(a.x + Math.sin(phi) * a.len * 0.25, a.y + a.len * 0.55, tx, ty); ctx.stroke();
       ctx.lineWidth = 0.05; ctx.beginPath(); ctx.moveTo(a.x, a.y - 0.02); ctx.lineTo(a.x + Math.sin(phi) * 0.12, a.y + 0.16); ctx.stroke();
     });
-    ctx.restore();
   }
 
-  projectiles(ctx) {
+  projectiles(ctx, cam) {
     ctx.lineCap = 'round';
     for (const p of this.w.projectiles) {
       const v = Math.hypot(p.vx, p.vy), L = Math.min(v * 0.025, 40);
       const g = ctx.createLinearGradient(p.x, p.y, p.x - p.vx / v * L, p.y - p.vy / v * L);
       g.addColorStop(0, p.ammo.tracer); g.addColorStop(1, 'rgba(255,200,120,0)');
-      ctx.strokeStyle = g; ctx.lineWidth = Math.max(0.06, 2 / this.w.cam.zoom);
+      ctx.strokeStyle = g; ctx.lineWidth = Math.max(0.06, 2 / cam.zoom);
       ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x - p.vx / v * L, p.y - p.vy / v * L); ctx.stroke();
     }
   }

@@ -8,12 +8,19 @@ DS.Game = class Game {
     this.keys = new Set(); this.touch = { drive: 0, elev: 0, fire: false };
     this.fps = 60; this.last = performance.now();
     this.mini = document.getElementById('mini'); this.mctx = this.mini.getContext('2d');
+    this.sightCv = document.getElementById('sight'); this.sctx = this.sightCv.getContext('2d');
+    this.sightCam = new DS.Camera(); this.sightMag = 10; this.thermal = false; this.sightR = 2000; this._sightT = 0;
   }
   async start() {
-    const def = DS.VEHICLES.m1a1;
-    await this.rend.load(def);
-    const v = new DS.Vehicle(def, 60, this.world.terrain);
-    this.world.vehicles.push(v); this.player = v;
+    const def = DS.VEHICLES.m1a1, W = this.world;
+    await Promise.all([this.rend.load(def), this.rend.load(DS.VEHICLES.t72)]);
+    DS.Armor.calibrate();
+    const v = new DS.Vehicle(def, 60, W.terrain, { label: 'M1A1 (아군)' });
+    W.vehicles.push(v); this.player = v;
+    // Iraqi T-72M1 positions: one dug in behind the berm, one in the open, one hidden behind the dunes
+    [[911, 'T-72 #1 (진지)'], [975, 'T-72 #2'], [2150, 'T-72 #3 (사구 뒤)']].forEach(([x, label]) =>
+      W.vehicles.push(new DS.Vehicle(DS.VEHICLES.t72, x, W.terrain, { dir: -1, label })));
+    DS.FireControl.update(W, v, false);
     this.world.cam.x = v.pos.x; this.world.cam.y = v.pos.y;
     this.resize(); addEventListener('resize', () => this.resize());
     this.bindInput();
@@ -36,7 +43,10 @@ DS.Game = class Game {
       if (e.code === 'Digit1') cam.tzoom = P[0];
       if (e.code === 'Digit2') cam.tzoom = P[1];
       if (e.code === 'Digit3') cam.tzoom = P[2];
-      if (e.code === 'KeyQ') { const g = this.player.gun; g.ammo = g.ammo === 'M829A1' ? 'M830' : 'M829A1'; }
+      if (e.code === 'KeyQ') this.cycleAmmo();
+      if (e.code === 'KeyE') this.lase();
+      if (e.code === 'KeyV') this.sightMag = this.sightMag === 10 ? 3 : 10;
+      if (e.code === 'KeyT') { this.thermal = !this.thermal; this.sightCv.classList.toggle('thermal', this.thermal); }
       if (e.code === 'KeyR') this.player.place(this.player.pos.x);
       if (e.code === 'KeyC' && this.mouse) { const m = cam.toWorld(this.mouse.x, this.mouse.y); this.world.terrain.crater(m.x, 1.6, 0.7); this.world.terrain.relax(undefined, undefined, 8); }
       if (e.code === 'KeyH') document.getElementById('help').classList.toggle('hide');
@@ -58,6 +68,16 @@ DS.Game = class Game {
       b.addEventListener('pointerdown', on); b.addEventListener('pointerup', off); b.addEventListener('pointerleave', off); b.addEventListener('pointercancel', off);
     });
     document.querySelectorAll('[data-z]').forEach(b => b.addEventListener('click', () => cam.tzoom = P[+b.dataset.z]));
+    document.querySelectorAll('[data-act]').forEach(b => b.addEventListener('pointerdown', ev => {
+      ev.preventDefault(); const a = b.dataset.act;
+      if (a === 'lase') this.lase(); else if (a === 'ammo') this.cycleAmmo(); else if (a === 'mag') this.sightMag = this.sightMag === 10 ? 3 : 10;
+    }));
+  }
+  lase() { DS.FireControl.update(this.world, this.player, true); }
+  cycleAmmo() {
+    const v = this.player, list = v.def.ammo, i = list.indexOf(v.gun.ammo);
+    v.gun.ammo = list[(i + 1) % list.length];
+    DS.FireControl.update(this.world, v, false);           // computer re-solves for the new round
   }
   readInput(dt) {
     const k = this.keys, i = this.player.input;
@@ -81,6 +101,7 @@ DS.Game = class Game {
     this.readInput(dt);
     this.world.update(dt);
     this.rend.frame();
+    this.sight();
     this.hud();
     requestAnimationFrame(t2 => this.loop(t2));
   }
@@ -98,12 +119,16 @@ DS.Game = class Game {
       set('h-pitch', (v.ang * 180 / Math.PI).toFixed(1) + '°');
       set('h-elev', (g.e * 180 / Math.PI).toFixed(2) + '°');
       set('h-ammo', A.name);
+      const fc = v.fc;
+      set('h-rng', fc.range ? Math.round(fc.range) + ' m' : `— (전투조준 ${fc.bs} m)`);
+      set('h-se', (fc.se * 1000).toFixed(2) + ' mil · ' + (fc.se * 180 / Math.PI).toFixed(2) + '°');
+      const foes = w.vehicles.filter(x => x !== v), up = foes.filter(x => x.alive).length;
+      set('h-foe', `${up} / ${foes.length} 대 전투 가능`);
+      this.logPanel();
       set('h-load', g.reload > 0 ? '장전 중 ' + g.reload.toFixed(1) + ' s' : '장전 완료');
       set('h-pos', (v.pos.x / 1000).toFixed(2) + ' km');
       set('h-zoom', w.cam.zoom.toFixed(0) + ' px/m');
       set('h-fps', Math.round(this.fps) + ' fps');
-      const last = w.hits[w.hits.length - 1];
-      set('h-hit', last ? `${Math.round(last.range)} m · ${last.t.toFixed(2)} s · ${Math.round(Math.hypot(last.vx, last.vy))} m/s` : '—');
       document.getElementById('h-load').classList.toggle('ready', g.reload <= 0);
       this.minimap();
     }
@@ -123,6 +148,58 @@ DS.Game = class Game {
     c.fillStyle = 'rgba(255,255,255,0.7)'; c.font = `${10 * this.world.cam.dpr}px sans-serif`;
     for (let k = Math.ceil(x0 / 500) * 500; k < x1; k += 500) { const xx = (k - x0) / span * W; c.fillRect(xx, H - 4, 1, 4); }
     for (const p of this.world.projectiles) { c.fillStyle = '#ffcc66'; c.fillRect((p.x - x0) / span * W - 1, sy(p.y) - 1, 3, 3); }
+    for (const e of this.world.vehicles) if (e !== v) {
+      c.fillStyle = e.alive ? '#ff5a4a' : '#6b5f52'; c.fillRect((e.pos.x - x0) / span * W - 3, sy(e.pos.y) - 6, 6, 6);
+    }
+  }
+
+  // hit log: newest first
+  logPanel() {
+    const el = document.getElementById('log'), w = this.world;
+    const key = w.log.map(l => l.at).join(',');
+    if (el.dataset.k === key) return;
+    el.dataset.k = key;
+    const RES = { pen: ['관통', 'pen'], ricochet: ['도탄', 'ric'], nonpen: ['비관통', 'non'], track: ['궤도 피격', 'trk'] };
+    el.innerHTML = w.log.map(l => {
+      if (l.ground) return `<div class="e"><b>지면 착탄</b> ${Math.round(l.range)} m · ${l.ammo.short}</div>`;
+      const [t, c] = RES[l.result];
+      const nums = l.result === 'ricochet' ? `경사 ${l.obl.toFixed(0)}°` : `${Math.round(l.pen)} / ${Math.round(l.prot)} mm · 경사 ${l.obl.toFixed(0)}°`;
+      const fx = l.effects && l.effects.length ? ' → ' + l.effects.join(', ') : '';
+      return `<div class="e"><span class="tag ${c}">${t}</span> <b>${l.vehicle.label}</b> · ${Math.round(l.range)} m · ${l.plate} · ${l.ammo.short} ${nums}${fx}` +
+        `<i>${l.vehicle.status}</i></div>`;
+    }).join('');
+  }
+
+  // gunner's primary sight: second render of the world along the sight line
+  sight() {
+    const v = this.player, w = this.world, cv = this.sightCv, cam = this.sightCam;
+    const W = cv.clientWidth, H = cv.clientHeight, dpr = w.cam.dpr;
+    if (!W) return;
+    if (cv.width !== Math.round(W * dpr)) { cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
+    cam.resize(W, H, dpr);
+    // where the sight line meets something (refreshed a few times a second)
+    if (performance.now() - this._sightT > 150) {
+      this._sightT = performance.now();
+      const r = DS.FireControl.lase(w, v, 6000);
+      this.sightR = r ? r.range : 3000;
+    }
+    const R = v.fc.range && w.time - v.fc.lasedAt < 30 ? v.fc.range : this.sightR;
+    const o = v.sightOrigin(), a = v.gun.aimW;
+    cam.x = o.x + Math.cos(a) * R; cam.y = o.y + Math.sin(a) * R;
+    cam.zoom = W / (this.sightMag === 10 ? 60 : 200);
+    this.rend.frame(this.sctx, cam, { main: false });
+    // reticle
+    const c = this.sctx; c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const cx = W / 2, cy = H / 2;
+    c.strokeStyle = this.thermal ? '#fff' : '#111'; c.lineWidth = 1.5;
+    c.beginPath(); c.moveTo(cx - W * 0.42, cy); c.lineTo(cx - 10, cy); c.moveTo(cx + 10, cy); c.lineTo(cx + W * 0.42, cy);
+    c.moveTo(cx, cy + 10); c.lineTo(cx, cy + H * 0.42); c.moveTo(cx, cy - 10); c.lineTo(cx, cy - H * 0.2); c.stroke();
+    c.strokeRect(cx - 3, cy - 3, 6, 6);
+    c.font = '600 12px ui-monospace, monospace'; c.fillStyle = this.thermal ? '#fff' : '#ffd34a'; c.textAlign = 'left';
+    const g = v.gun, A = DS.AMMO[g.ammo];
+    c.fillText(v.fc.range ? String(Math.round(v.fc.range)).padStart(4, '0') : '----', 10, H - 12);
+    c.textAlign = 'right'; c.fillText(`${A.type === 'HEAT' ? 'HEAT' : 'SABOT'} ${g.reload > 0 ? '' : 'READY'}`, W - 10, H - 12);
+    c.textAlign = 'center'; c.fillText(`GPS ${this.sightMag}× ${this.thermal ? 'TIS' : 'DAY'}`, cx, 18);
   }
 };
 addEventListener('load', () => new DS.Game().start().catch(e => { document.getElementById('loading').textContent = '로딩 실패: ' + e.message; console.error(e); }));

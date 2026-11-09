@@ -5,10 +5,32 @@ DS.World = class World {
     this.cam = new DS.Camera();
     this.particles = new DS.Particles(DS.T.particles.max);
     this.fx = new DS.Effects(this);
-    this.vehicles = []; this.projectiles = []; this.hits = [];
+    this.vehicles = []; this.projectiles = []; this.hits = []; this.log = [];
     this.wind = 2.5; this.time = 0; this.acc = 0; this.debug = false;
+    this.rng = DS.rng(1991);
   }
   spawnProjectile(x, y, vx, vy, ammo, owner) { this.projectiles.push(new DS.Projectile(x, y, vx, vy, ammo, owner)); }
+
+  onProjectileHit(p, h) {
+    if (h.kind === 'ground') {
+      this.fx.impact(h); this.hits.push(h); if (this.hits.length > 20) this.hits.shift();
+      this.addLog({ ground: true, range: h.range, ammo: h.ammo, t: h.t });
+      return;
+    }
+    const r = DS.Armor.resolve(this, p, h.hit);
+    r.t = p.t;
+    this.fx.armor(r);
+    this.addLog(r);
+    if (r.result === 'ricochet') {
+      p.x = r.reflect.x; p.y = r.reflect.y; p.vx = r.reflect.vx; p.vy = r.reflect.vy;
+      p.ignore = h.hit.v; p.ignoreT = 0.05;
+      if (p.ammo.type === 'HEAT') { /* fuze graze: keeps flying, detonates on the next surface */ }
+    } else {
+      p.alive = false;
+      if (p.ammo.type === 'HEAT') this.fx.impact({ x: h.hit.x, y: h.hit.y, vx: p.vx, vy: p.vy, ammo: p.ammo, onArmor: true });
+    }
+  }
+  addLog(r) { this.log.unshift({ ...r, at: this.time }); if (this.log.length > 6) this.log.pop(); }
 
   update(frameDt) {
     const h = 1 / DS.T.physicsHz;
@@ -16,8 +38,8 @@ DS.World = class World {
     while (this.acc >= h) {
       for (const v of this.vehicles) v.step(h, this);
       for (const p of this.projectiles) {
-        const hit = p.step(h, this.terrain);
-        if (hit) { this.fx.impact(hit); this.hits.push(hit); if (this.hits.length > 20) this.hits.shift(); }
+        const hit = p.step(h, this.terrain, this);
+        if (hit) this.onProjectileHit(p, hit);
       }
       this.projectiles = this.projectiles.filter(p => p.alive);
       this.acc -= h; this.time += h;

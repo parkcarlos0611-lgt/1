@@ -1,26 +1,41 @@
 // Tracked vehicle: 2D rigid hull on torsion-bar stations, track drive with soil shear traction,
-// terrain sinkage, stabilised gun with recoil/counter-recoil, antenna springs.
+// terrain sinkage, stabilised gun with fire control + recoil, antenna springs, damage states.
+// dir = +1 faces right, −1 faces left (all hull-local x geometry is mirrored at construction).
 DS.Vehicle = class Vehicle {
-  constructor(def, x, terrain) {
+  constructor(def, x, terrain, opt = {}) {
     this.def = def; this.terrain = terrain;
-    const g = def.roadWheels;
+    this.dir = opt.dir || 1; this.label = opt.label || def.name; this.team = opt.team || def.side;
+    const d = this.dir, D = def;
+    const M = p => ({ x: p.x * d, y: p.y });
+    this.g = {
+      wheels: D.roadWheels.map(M), sprocket: M(D.sprocket), idler: M(D.idler), rollers: D.returnRollers.map(r => ({ ...M(r), r: r.r })),
+      trunnion: { x: D.gun.trunnion[0] * d, y: D.gun.trunnion[1] }, exhaust: M(D.exhaust),
+      ring: { x: D.turretRing[0] * d, y: D.turretRing[1] },
+      belly: { y: D.belly.y, x0: Math.min(D.belly.x0 * d, D.belly.x1 * d), x1: Math.max(D.belly.x0 * d, D.belly.x1 * d) },
+    };
     this.pos = { x, y: 0 }; this.ang = 0; this.vel = { x: 0, y: 0 }; this.w = 0;
-    this.vt = 0;            // track speed relative to hull (m/s, + forward)
+    this.vt = 0;            // track speed relative to hull (m/s, + = moving toward +x)
     this.s = 0;             // track travel (link offset)
-    this.spool = 0;         // engine power fraction (turbine spools up/down)
-    this.input = { drive: 0, elevRate: 0, elevStep: 0, fire: false };   // elev in rad/s and one-shot rad
-    this.st = g.map(p => ({ lx: p.x, ly: p.y, d: 0, dPrev: 0, ang: Math.random() * 6, N: 0, wx: 0, wy: 0, contact: false, slip: 0, Ft: 0, sink: 0 }));
-    this.sprAng = 0; this.idlAng = 0; this.rollAng = 0;
-    this.F0 = def.mass * DS.T.g / g.length;
-    // gun
-    const G = def.gun;
-    this.gun = { e: 0, aimW: 0, rx: 0, rv: 0, aB: 0, reload: 0, ammo: 'M829A1', fired: 0 };
-    this.antennas = def.antennas.map(a => ({ phi: 0, dphi: 0 }));
+    this.spool = 0;
+    this.input = { drive: 0, elevRate: 0, elevStep: 0, fire: false };
+    this.st = this.g.wheels.map(p => ({ lx: p.x, ly: p.y, d: 0, dPrev: 0, ang: Math.random() * 6, N: 0, wx: 0, wy: 0, contact: false, slip: 0, Ft: 0, sink: 0 }));
+    this.sprAng = 0; this.idlAng = 0;
+    this.F0 = D.mass * DS.T.g / D.roadWheels.length;
+    this.gun = { e: 0, aimW: this.baseAng(), rx: 0, rv: 0, aB: 0, reload: 0, ammo: D.ammo[0], fired: 0 };
+    this.fc = { range: null, se: 0, bs: 1200, lasedAt: -1, point: null };   // fire control
+    this.antennas = (D.antennas || []).map(() => ({ phi: 0, dphi: 0 }));
     this.prevBaseV = { x: 0, y: 0 };
     this.stats = { slip: 0, sink: 0, Fdrive: 0, power: 0, contact: 0 };
-    this.events = [];       // fx events for this frame (fire, etc.)
+    this.events = [];
+    // damage
+    this.alive = true; this.mobile = true; this.firepower = true; this.status = '정상';
+    this.modState = {}; this.burning = 0; this.cookT = 0; this.wreck = false; this.turretGone = false; this.turretBody = null;
+    this.simT = 0;
     this.place(x);
   }
+
+  baseAng() { return this.dir > 0 ? this.ang : Math.PI + this.ang; }
+  gunWorld() { return this.baseAng() + this.dir * this.gun.e; }
 
   place(x) {
     const R = this.def.wheelR + this.def.track.thick;
@@ -28,12 +43,14 @@ DS.Vehicle = class Vehicle {
     this.pos.x = x; this.pos.y = yb - this.def.roadWheels[0].y + 0.02;
     this.ang = Math.atan2(this.terrain.circleRest(x + 2, R) - this.terrain.circleRest(x - 2, R), 4);
     this.vel.x = this.vel.y = this.w = this.vt = 0;
+    this.gun.aimW = this.baseAng() + this.dir * this.gun.e - this.fc.se;
   }
 
   local(lx, ly) { const c = Math.cos(this.ang), s = Math.sin(this.ang); return { x: this.pos.x + c * lx - s * ly, y: this.pos.y + s * lx + c * ly }; }
 
   step(dt, world) {
-    const D = this.def, S = D.suspension, E = D.engine, T = this.terrain, g = DS.T.g;
+    const D = this.def, S = D.suspension, E = D.engine, T = this.terrain, g = DS.T.g, G = this.g;
+    this.simT += dt;
     const c = Math.cos(this.ang), s = Math.sin(this.ang);
     const ex = { x: c, y: s }, ey = { x: -s, y: c };
     let Fx = 0, Fy = -D.mass * g, tau = 0;
@@ -42,7 +59,7 @@ DS.Vehicle = class Vehicle {
     const R = D.wheelR + D.track.thick;
 
     // ---- suspension stations ----
-    let contacts = 0, sumFmax = 0;
+    let contacts = 0;
     const trac = [];
     for (const w of this.st) {
       const ax = this.pos.x + c * w.lx - s * w.ly, ay = this.pos.y + s * w.lx + c * w.ly;
@@ -65,53 +82,46 @@ DS.Vehicle = class Vehicle {
         const soil = T.soilAt(w.wx);
         const Fmax = D.contactArea * soil.c + F * Math.tan(soil.phi * Math.PI / 180);
         const v = pv(w.wx, w.wy - R), vp = v.x * ex.x + v.y * ex.y;
-        trac.push({ w, Fmax, vp, soil, px: w.wx, py: w.wy - R });
-        sumFmax += Fmax;
-        // rolling / compaction resistance
+        trac.push({ w, Fmax, vp, px: w.wx, py: w.wy - R });
         const rr = (soil.crr + Math.min(0.08, w.sink * 0.6)) * F * Math.tanh(vp / 0.25);
         apply(w.wx, w.wy - R, -ex.x * rr, -ex.y * rr);
       }
     }
 
     // ---- drive: engine → sprocket → track, implicit in track speed ----
-    const u = this.input.drive;
-    this.spool += (Math.abs(u) - this.spool) * Math.min(1, dt / E.spool);
+    const u = this.mobile ? this.input.drive : 0;
+    this.spool += ((this.alive ? Math.abs(u) : 0) - this.spool) * Math.min(1, dt / E.spool);
     let Fd = 0, B = 0;
     const vt = this.vt;
     if (u !== 0 && (Math.sign(u) === Math.sign(vt) || Math.abs(vt) < 0.4)) {
-      const vmax = u > 0 ? E.vmaxF : E.vmaxR;
+      const vmax = Math.sign(u) === this.dir ? E.vmaxF : E.vmaxR;
       const gov = Math.max(0, Math.min(1, (vmax - Math.abs(vt)) / 1.0));
       Fd = Math.sign(u) * Math.min(E.maxTractive, E.power * E.eff * this.spool / Math.max(Math.abs(vt), 0.6)) * gov;
     } else if (u !== 0) B = E.brake * Math.abs(u);
-    else B = E.engineBrake + E.brake * 0.18;
+    else B = E.engineBrake + E.brake * (this.trackBroken ? 1 : 0.18);
     this.stats.Fdrive = Fd; this.stats.power = this.spool;
     const vb = 0.05, th = Math.tanh(vt / vb);
     const Fint = (3000 + 900 * Math.abs(vt)) * Math.tanh(vt / 0.2);
-    let Ft = 0, dFt = 0;
+    let dFt = 0, Ft = 0;
     for (const t of trac) {
       t.vref = DS.T.traction.vref + DS.T.traction.vrefSlip * Math.abs(vt);
-      const x = (vt - t.vp) / t.vref, tx = Math.tanh(x);
+      const tx = Math.tanh((vt - t.vp) / t.vref);
       Ft += t.Fmax * tx; dFt += t.Fmax / t.vref * (1 - tx * tx);
     }
     const mt = D.track.mass + 2500;
-    const num = Fd - Fint - B * th - Ft, den = mt + dt * (dFt + B / vb * (1 - th * th));
-    this.vt = vt + dt * num / den;
+    this.vt = vt + dt * (Fd - Fint - B * th - Ft) / (mt + dt * (dFt + B / vb * (1 - th * th)));
     let slipSum = 0;
     for (const t of trac) {
       const sv = this.vt - t.vp, F = t.Fmax * Math.tanh(sv / t.vref);
-      t.w.Ft = F; t.w.slip = sv;
-      slipSum += Math.abs(sv);
+      t.w.Ft = F; t.w.slip = sv; slipSum += Math.abs(sv);
       apply(t.px, t.py, ex.x * F, ex.y * F);
     }
     this.stats.slip = trac.length ? slipSum / trac.length : 0;
     this.stats.contact = contacts;
 
-    // ---- rigid contacts: sprocket, idler, belly ----
-    const rig = [
-      [D.sprocket.x, D.sprocket.y, 0.36], [D.idler.x, D.idler.y, D.idler.r + D.track.thick],
-    ];
-    for (let k = 0; k <= 6; k++) rig.push([D.belly.x0 + (D.belly.x1 - D.belly.x0) * k / 6, D.belly.y + 0.05, 0.05]);
-    // turret/hull top (for rolling over)
+    // ---- rigid contacts: sprocket, idler, belly, hull/turret top ----
+    const rig = [[G.sprocket.x, G.sprocket.y, 0.36], [G.idler.x, G.idler.y, D.idler.r + D.track.thick]];
+    for (let k = 0; k <= 6; k++) rig.push([G.belly.x0 + (G.belly.x1 - G.belly.x0) * k / 6, G.belly.y + 0.05, 0.05]);
     rig.push([-3.9, 0.5, 0.1], [3.8, 0.0, 0.1], [0, 1.4, 0.3]);
     for (const [lx, ly, r] of rig) {
       const px = this.pos.x + c * lx - s * ly, py = this.pos.y + s * lx + c * ly;
@@ -126,13 +136,13 @@ DS.Vehicle = class Vehicle {
     }
 
     // ---- gun recoil reaction ----
-    const G = D.gun, gs = this.gun;
-    const ga = this.ang + gs.e, gdx = Math.cos(ga), gdy = Math.sin(ga);
+    const gs = this.gun;
     if (gs.rv < 0) {
-      const tp = this.local(G.trunnion[0], G.trunnion[1]);
-      const F = G.recoilMass * gs.aB;
-      apply(tp.x, tp.y, -gdx * F, -gdy * F);
+      const ga = this.gunWorld(), tp = this.local(G.trunnion.x, G.trunnion.y), F = D.gun.recoilMass * gs.aB;
+      apply(tp.x, tp.y, -Math.cos(ga) * F, -Math.sin(ga) * F);
     }
+    // ---- explosion impulse (one step) ----
+    if (this.kick) { apply(this.kick.x, this.kick.y, this.kick.fx, this.kick.fy); this.kick = null; }
 
     // ---- integrate hull ----
     this.vel.x += Fx / D.mass * dt; this.vel.y += Fy / D.mass * dt;
@@ -140,7 +150,7 @@ DS.Vehicle = class Vehicle {
     this.w *= 1 - 0.02 * dt;
     this.pos.x += this.vel.x * dt; this.pos.y += this.vel.y * dt; this.ang += this.w * dt;
 
-    // ---- terrain sinkage under each loaded station ----
+    // ---- terrain sinkage ----
     const half = 0.385;
     let sinkMax = 0;
     for (const w of this.st) {
@@ -150,39 +160,41 @@ DS.Vehicle = class Vehicle {
     this.stats.sink = sinkMax;
 
     // ---- running gear rotation ----
-    this.s += this.vt * dt;
+    if (!this.trackBroken) this.s += this.vt * dt;
     for (const w of this.st) w.ang -= this.vt / D.wheelR * dt;
     this.sprAng -= this.vt / this.sprR() * dt;
     this.idlAng -= this.vt / (D.idler.r + D.track.thick / 2) * dt;
-    this.rollAng -= this.vt / 0.145 * dt;
 
     this.stepGun(dt, world);
     this.stepAntennas(dt);
+    this.stepDamage(dt, world);
+    if (this.turretBody) this.stepTurretBody(dt);
   }
 
   sprR() { return this.def.track.pitch * this.def.sprocket.teeth / (2 * Math.PI); }
 
   stepGun(dt, world) {
     const G = this.def.gun, gs = this.gun, d2r = Math.PI / 180;
-    gs.aimW += this.input.elevRate * dt + this.input.elevStep; this.input.elevStep = 0;
-    // keep the aim inside the mount limits so reversing direction responds at once
-    const base = G.stabilized ? this.ang : 0;
-    gs.aimW = Math.max(base + G.elevMin * d2r, Math.min(base + G.elevMax * d2r, gs.aimW));
-    const want = gs.aimW - base;
-    const de = want - gs.e, mx = G.rate * dt;
+    if (this.turretGone) return;
+    if (this.alive && this.firepower) gs.aimW += this.input.elevRate * dt + this.input.elevStep;
+    this.input.elevStep = 0;
+    // gun target = sight line + superelevation from the fire-control computer; clamp the sight so
+    // the gun stays inside its mount limits (reversing direction then responds at once)
+    const base = this.baseAng(), wrap = a => Math.atan2(Math.sin(a), Math.cos(a));
+    let et = wrap(this.dir * (gs.aimW + this.fc.se - base));
+    et = Math.max(G.elevMin * d2r, Math.min(G.elevMax * d2r, et));
+    gs.aimW = base + this.dir * et - this.fc.se;
+    const de = et - gs.e, mx = G.rate * dt;
     gs.e += Math.max(-mx, Math.min(mx, de));
-    if (!G.stabilized) gs.aimW = gs.e;
     gs.reload = Math.max(0, gs.reload - dt);
-    // recoil: constant brake force stops the gun at recoilLen, then spring-damper counter-recoil
     if (gs.rv < 0) { gs.rv += gs.aB * dt; gs.rx += gs.rv * dt; if (gs.rv >= 0) gs.rv = 0.0001; }
     else if (gs.rx < 0) { const a = -64 * gs.rx - 15 * gs.rv; gs.rv += a * dt; gs.rx += gs.rv * dt; if (gs.rx > 0) { gs.rx = 0; gs.rv = 0; } }
-    if (this.input.fire && gs.reload <= 0 && gs.rx === 0) { this.fire(world); }
+    if (this.input.fire && this.alive && this.firepower && gs.ammo && gs.reload <= 0 && gs.rx === 0) this.fire(world);
   }
 
   fire(world) {
     const G = this.def.gun, gs = this.gun, A = DS.AMMO[gs.ammo];
-    const J = A.launchMass * A.v0 * 1.75;          // projectile + propellant gas momentum
-    const v0r = J / G.recoilMass;
+    const v0r = A.launchMass * A.v0 * 1.75 / G.recoilMass;     // projectile + propellant gas momentum
     gs.rv = -v0r; gs.aB = v0r * v0r / (2 * G.recoilLen);
     gs.reload = G.reload; gs.fired++;
     const m = this.muzzle();
@@ -191,35 +203,121 @@ DS.Vehicle = class Vehicle {
   }
 
   muzzle() {
-    const G = this.def.gun, gs = this.gun, a = this.ang + gs.e, dx = Math.cos(a), dy = Math.sin(a);
-    const tp = this.local(G.trunnion[0], G.trunnion[1]), L = G.muzzle + gs.rx;
+    const a = this.gunWorld(), dx = Math.cos(a), dy = Math.sin(a);
+    const tp = this.local(this.g.trunnion.x, this.g.trunnion.y), L = this.def.gun.muzzle + this.gun.rx;
     return { x: tp.x + dx * L, y: tp.y + dy * L, dx, dy };
   }
+  sightOrigin() { return this.local(this.g.trunnion.x - this.dir * 0.4, this.g.trunnion.y + 0.35); }
 
   stepAntennas(dt) {
-    // base acceleration in hull frame drives a damped spring (whippy masts)
     const ax = (this.vel.x - this.prevBaseV.x) / dt, ay = (this.vel.y - this.prevBaseV.y) / dt;
     this.prevBaseV.x = this.vel.x; this.prevBaseV.y = this.vel.y;
-    const c = Math.cos(this.ang), s = Math.sin(this.ang);
-    const alx = ax * c + ay * s;
-    const recoilKick = this.gun.rv < 0 ? -this.gun.aB * this.def.gun.recoilMass / this.def.mass : 0;
+    const alx = ax * Math.cos(this.ang) + ay * Math.sin(this.ang);
+    const recoil = this.gun.rv < 0 ? -this.dir * this.gun.aB * this.def.gun.recoilMass / this.def.mass : 0;
     for (const a of this.antennas) {
-      const acc = -90 * a.phi - 1.6 * a.dphi - (alx + recoilKick) * 0.9 - this.w * 0;
-      a.dphi += acc * dt + (-this.w) * 0; a.phi += a.dphi * dt;
+      a.dphi += (-90 * a.phi - 1.6 * a.dphi - (alx + recoil) * 0.9) * dt; a.phi += a.dphi * dt;
       a.phi = Math.max(-0.9, Math.min(0.9, a.phi));
     }
   }
 
-  // world-space running gear for rendering/track: circles in loop order (clockwise)
+  // ---------------- damage model ----------------
+  mod(id) { return this.def.modules.find(m => m.id === id); }
+  crewAlive() { return this.def.modules.filter(m => m.type === 'crew' && !this.modState[m.id]).length; }
+
+  // apply damage to a module (or 'track'); returns a short description for the hit log
+  damage(id) {
+    const rnd = Math.random;
+    if (id === 'track') { this.trackBroken = true; this.mobile = false; this.setStatus(); return '궤도 절단 → 기동 불능'; }
+    const m = this.mod(id);
+    if (!m || this.modState[id]) return m ? m.name + ' (이미 손상)' : '';
+    this.modState[id] = true;
+    let out = m.name + ' 피해';
+    switch (m.type) {
+      case 'crew':
+        out = m.name + ' 전사';
+        if (id === 'driver') this.mobile = false;
+        if (id === 'gunner' && this.modState.commander) this.firepower = false;
+        if (this.crewAlive() <= 1 || (this.modState.gunner && this.modState.commander)) { this.knockOut('승무원 전투 불능'); out += ' → 승무원 전투 불능'; }
+        break;
+      case 'gun': case 'optics': this.firepower = false; out += ' → 화력 불능'; break;
+      case 'engine': this.mobile = false; out += ' → 기동 불능'; if (rnd() < 0.2) { this.ignite(); out += ', 화재'; } break;
+      case 'fuel': if (rnd() < 0.45) { this.ignite(); out += ' → 화재'; } break;
+      case 'ammo': if (rnd() < 0.5) { this.cookoff(); out += ' → 탄약 유폭'; } else { this.ignite(); out += ' → 장약 화재'; } break;
+      case 'fuel_ammo': if (rnd() < 0.6) { this.cookoff(); out += ' → 탄약 유폭'; } else { this.ignite(); out += ' → 화재'; } break;
+      case 'ammo_carousel': if (rnd() < 0.8) { this.cookoff(); out += ' → 탄약 유폭, 포탑 이탈'; } else { this.ignite(); out += ' → 장약 화재'; } break;
+      case 'ammo_bustle': this.firepower = false; this.vent = 3.5; out += ' → 방폭 패널 배출 (승무원 생존)'; break;
+    }
+    this.setStatus();
+    return out;
+  }
+  setStatus() {
+    if (this.wreck) this.status = '유폭 격파';
+    else if (this.burning) this.status = '화재';
+    else if (!this.alive) this.status = this.koReason || '격파';
+    else if (!this.mobile && !this.firepower) this.status = '기동·화력 불능';
+    else if (!this.mobile) this.status = '기동 불능';
+    else if (!this.firepower) this.status = '화력 불능';
+    else this.status = this.crewAlive() < this.def.modules.filter(m => m.type === 'crew').length ? '승무원 부상' : '정상';
+  }
+  knockOut(reason) { this.alive = false; this.koReason = reason; this.input.drive = 0; this.input.fire = false; this.setStatus(); }
+  ignite() {
+    if (this.burning || this.wreck) return;
+    this.burning = 0.01; this.alive = false; this.koReason = '화재';
+    // a fire reaching stowed charges cooks them off after a while
+    const hasAmmo = this.def.modules.some(m => /ammo/.test(m.type) && m.type !== 'ammo_bustle' && !this.modState[m.id]);
+    this.cookT = hasAmmo && Math.random() < 0.65 ? 6 + Math.random() * 20 : -1;
+    this.setStatus();
+  }
+  cookoff() {
+    if (this.wreck) return;
+    this.wreck = true; this.alive = false; this.burning = Math.max(this.burning, 0.01); this.cookT = -1;
+    this.mobile = false; this.firepower = false;
+    this.events.push({ type: 'explode' });
+    // turret thrown by the blast (always for the T-72 carousel, often otherwise)
+    if (this.def.modules.some(m => m.type === 'ammo_carousel') || Math.random() < 0.5) this.tossTurret();
+    const p = this.local(this.g.ring.x, this.g.ring.y - 0.4);
+    this.kick = { x: p.x + (Math.random() - 0.5), y: p.y, fx: (Math.random() - 0.5) * 2e6, fy: 6e6 };
+    this.setStatus();
+  }
+  tossTurret() {
+    const r = this.local(this.g.ring.x, this.g.ring.y);
+    const up = 9 + Math.random() * 9;
+    this.turretGone = true;
+    this.turretBody = { x: r.x, y: r.y, a: this.ang, e: this.gun.e, vx: this.vel.x + (Math.random() - 0.5) * 6, vy: up,
+      w: (Math.random() - 0.5) * 5, rest: false };
+  }
+  stepTurretBody(dt) {
+    const b = this.turretBody;
+    if (b.rest) return;
+    b.vy -= DS.T.g * dt; b.x += b.vx * dt; b.y += b.vy * dt; b.a += b.w * dt;
+    const h = this.terrain.height(b.x);
+    if (b.y < h + 0.25 && b.vy < 0) {
+      b.y = h + 0.25; b.vy *= -0.25; b.vx *= 0.5; b.w *= 0.4;
+      const gnd = Math.atan(this.terrain.slope(b.x));
+      // settle roughly upright or upside down, whichever is closer
+      let t = b.a - gnd; t = Math.atan2(Math.sin(t), Math.cos(t));
+      if (Math.abs(b.vy) < 1.2) { b.rest = true; b.vy = b.vx = b.w = 0; b.a = gnd + (Math.abs(t) > Math.PI / 2 ? Math.PI : 0); this.terrain.crater(b.x, 1.2, 0.25, 0.4); }
+    }
+  }
+  stepDamage(dt, world) {
+    if (this.burning) {
+      this.burning += dt;
+      if (this.cookT > 0 && this.burning > this.cookT) { this.cookT = -1; this.cookoff(); }
+    }
+    if (this.vent > 0) this.vent -= dt;
+  }
+
+  // world-space running gear for rendering/track: circles in clockwise loop order
   gearCircles() {
-    const D = this.def, h = D.track.thick / 2, out = [];
-    const P = (lx, ly, r) => { const p = this.local(lx, ly); return { x: p.x, y: p.y, r }; };
-    out.push(P(D.sprocket.x, D.sprocket.y, this.sprR()));
-    for (const r of D.returnRollers) out.push(P(r.x, r.y, r.r + h));
-    out.push(P(D.idler.x, D.idler.y, D.idler.r + h));
-    for (let i = this.st.length - 1; i >= 0; i--) { const w = this.st[i]; out.push({ x: w.wx, y: w.wy, r: D.wheelR + h }); }
+    const D = this.def, G = this.g, h = D.track.thick / 2, out = [];
+    const P = (p, r, fixed) => { const q = this.local(p.x, p.y); return { x: q.x, y: q.y, r, fixed }; };
+    out.push(P(G.sprocket, this.sprR(), true));
+    for (const r of G.rollers) out.push(P(r, r.r + h, false));
+    out.push(P(G.idler, D.idler.r + h, true));
+    for (let i = this.st.length - 1; i >= 0; i--) { const w = this.st[i]; out.push({ x: w.wx, y: w.wy, r: D.wheelR + h, fixed: false }); }
+    if (this.dir < 0) out.reverse();       // mirrored order would run counter-clockwise
     return out;
   }
 
-  speedKmh() { return (this.vel.x * Math.cos(this.ang) + this.vel.y * Math.sin(this.ang)) * 3.6; }
+  speedKmh() { return (this.vel.x * Math.cos(this.ang) + this.vel.y * Math.sin(this.ang)) * 3.6 * this.dir; }
 };

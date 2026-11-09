@@ -53,8 +53,8 @@ const TEX={
  thigh:[[-.16,[[.04,-1],[.92,-.78],[1,-.18],[.3,-.08]]],[.09,[[.04,.98],[.86,.78],[.92,.12],[.3,.22]]],[.07,[[.55,.2],[.97,.4],[.97,-.08]]],[-.1,[[.18,.04],[.92,0],[.92,-.1],[.18,-.04]]],[-.08,[[.9,-1],[1,-1],[1,1],[.9,1]]]],
  shin:[[.08,[[.04,-.95],[.5,-.88],[.58,-.2],[.1,-.1]]],[-.15,[[.1,-1],[.72,-1],[.82,-.55],[.2,-.65]]],[.1,[[.04,.82],[.92,.56],[.92,.38],[.04,.6]]],[-.09,[[.15,-.1],[.82,-.26],[.82,-.36],[.15,-.2]]],[-.07,[[.92,-1],[1,-1],[1,1],[.92,1]]]]
 };
-const _tx={},_pimg={},PFLIP={uarm:0,farm:0,thigh:0,shin:0};
-for(const k of['uarm','farm','thigh','shin']){const im=new Image();im.onload=()=>{_pimg[k]=im;for(const key in _tx)if(key.indexOf(k)===0)delete _tx[key]};im.src='assets/parts/'+k+'.png'}
+const _tx={},_pimg={},PFLIP={uarm:0,farm:0,thigh:0,shin:0,torso:0};
+for(const k of['uarm','farm','thigh','shin','torso']){const im=new Image();im.onload=()=>{_pimg[k]=im;for(const key in _tx)if(key.indexOf(k)===0)delete _tx[key]};im.src='assets/parts/'+k+'.png'}
 /* the sheet's skin tone is recoloured to the fighter's skin: every pixel keeps its light / dark relation to the sheet's base tone */
 function bakeTex(kind,base){const key=kind+base+(_pimg[kind]?1:0);if(_tx[key])return _tx[key];const im=_pimg[kind];
   if(im){const c=document.createElement('canvas');c.width=im.width;c.height=im.height;const g=c.getContext('2d');g.drawImage(im,0,0);let id;try{id=g.getImageData(0,0,c.width,c.height)}catch(e){id=null}
@@ -70,6 +70,12 @@ function laySkin(ctx,PX,kind,base){const F=PX.F,rows=PX.rows,L=F.L;let mf=0,mb=0
     const fx=sgn>0?-mb:mf;ctx.transform((mf+mb)*F.nx*sgn/W,(mf+mb)*F.ny*sgn/W,Lu*F.ux/Hh,Lu*F.uy/Hh,PX.a.x+F.ux*L*t0+F.nx*fx,PX.a.y+F.uy*L*t0+F.ny*fx)}
   else{const ox=PX.a.x+F.ux*L*t0-F.nx*mb,oy=PX.a.y+F.uy*L*t0-F.ny*mb;ctx.transform(Lu*F.ux/W,Lu*F.uy/W,(mf+mb)*F.nx/Hh,(mf+mb)*F.ny/Hh,ox,oy)}
   ctx.drawImage(img,0,0);ctx.restore()}
+
+/* the torso (neck included) is one picture of the sheet, laid in slices along the curved spine so it bends with the body */
+function layTorso(ctx,pt,base,S1){const img=bakeTex('torso',base);if(!img._img)return false;const W=img.width,Hh=img.height,N=8,wF=.085,wB=.1;
+  for(let k=0;k<N;k++){const y0=k*Hh/N,y1=(k+1)*Hh/N,s0=(1-y1/Hh)*S1,s1=(1-y0/Hh)*S1,A=pt(s0,0),B=pt(s1,0),n0=pt(s1,1),nv={x:n0.x-B.x,y:n0.y-B.y},hh=y1-y0;
+    const cx=(wF+wB)/W,c=(A.x-B.x)/hh,d=(A.y-B.y)/hh;ctx.save();ctx.transform(cx*nv.x,cx*nv.y,c,d,B.x-wB*nv.x-c*y0,B.y-wB*nv.y-d*y0);ctx.imageSmoothingEnabled=true;ctx.drawImage(img,0,y0,W,Math.min(hh+1.5,Hh-y0),0,y0,W,Math.min(hh+1.5,Hh-y0));ctx.restore()}
+  return true}
 /* a fold at a bent joint: the inside of the bend darkens, the outside catches light */
 function foldAt(ctx,j,dirIn,dirOut,r,base){const cr=dirIn.x*dirOut.y-dirIn.y*dirOut.x,dt=dirIn.x*dirOut.x+dirIn.y*dirOut.y,ang=Math.acos(Math.max(-1,Math.min(1,dt)));if(ang<.35)return;
   const k=Math.min(1,(ang-.35)/1.4),lo=rgbOf(shade(base,-.34));ctx.save();ctx.fillStyle=`rgba(${lo[0]},${lo[1]},${lo[2]},${.62*k})`;ctx.beginPath();ctx.moveTo(j.x,j.y);
@@ -115,7 +121,7 @@ Body.prototype.draw=function(ctx,o){o=o||{};const lk=this.look;if(window.CUTOUT&
   const CL=R?Object.assign({shirt:'#222327',shirtS:'#18191c',pants:'#1e1f23',pantsS:'#151619',boot:'#0f0f11',glove:'#151517'},lk.cl||{}):null;const RP=R&&!lk.cshort;/* a coach may wear fighter shorts instead of trousers */
   const ON=o.only?(k=>o.only.indexOf(k)>=0):null;/* layered draw (submissions): only these parts, in canonical order */
   if(!o.onlyArm&&o.part!=='far'&&(!ON||ON('torso'))){if(!o.noFloorShadow)floorShadow(ctx,this);if(FS.blur)motionBlur(ctx,this,lk)}
-  const M=H*W*.86;/* muscle scale: leaner frames, heavier classes still carry more mass through bw */const SHB=lk.body==='broad'?1.12:1;
+  const M=H*W*.82;/* muscle scale: leaner frames, heavier classes still carry more mass through bw */const SHB=lk.body==='broad'?1.12:1;
   const skin=lk.skin||'#d39b74';const sk={base:skin,sh:shade(skin,FS.shadowK),far:shade(skin,FS.farK),farSh:shade(skin,FS.farK+FS.shadowK),lt:shade(skin,FS.lightK)};
   const shorts=calm(lk.shorts||'#111');const glove=R?CL.glove:lk.glove||'#141414';const strap=o.corner||'#c21818';
   const nearLead=(d>0)===(this.stance>0);const lead={S:'lS',E:'lE',W:'lW',G:'lG',H:'lH',K:'lK',A:'lA',He:'lHe',T:'lT',o:'lo'},rear={S:'rS',E:'rE',W:'rW',G:'rG',H:'rH',K:'rK',A:'rA',He:'rHe',T:'rT',o:'ro'};
@@ -205,6 +211,7 @@ function torsoFlat(ctx,J,H,M,sk,d,lk,B){const sp=[J.hip,J.mid,J.sh,J.nk];const s
   const FR=[[0,.072+bel*.3],[.16,.066+bel*.8],[.32,.064+bel],[.48,.065+bel*.7],[.6,.068],[.7,.072*shb],[.8,.066*shb],[.88,.052*shb],[.94,.04],[1,.036]];/* side view of the proportion chart: flat chest, no pec bulge */
   const BK=[[0,.088],[.1,.082],[.24,.064+bel*.3],[.38,.06+bel*.2],[.52,.068],[.64,.078*shb],[.74,.084*shb],[.84,.078*shb],[.92,.062],[1,.046]];/* the back climbs smoothly from the lumbar curve over the shoulder blades into the trapezius and the neck */
   const F=FR.map(([s,w])=>pt(s,w)),Bk=BK.map(([s,w])=>pt(s,-w));
+  if(sk.far){/* the neck is part of the torso picture: the outline runs on up to the skull */F.push(pt(1.05,.04),pt(1.13,.036));Bk.push(pt(1.05,-.052),pt(1.13,-.044))}
   poly(ctx,F.concat(Bk.slice().reverse()),sk.base,ROUND*2.2);
   if(FS.outline)thinLine(ctx,F.concat(Bk.slice().reverse()),sk.base);
   const TD=sk.far&&FS.detail;
@@ -215,11 +222,8 @@ function torsoFlat(ctx,J,H,M,sk,d,lk,B){const sp=[J.hip,J.mid,J.sh,J.nk];const s
   /* abs: flat blocks along the front edge */
 
   if(FS.detail)detailIn(ctx,F.concat(Bk.slice().reverse()),F,Bk,sk.base,.012*M,(hi,lo)=>{const dk=shade(sk.base,-.3);
-    if(!TD){fac(ctx,[pt(.7,-.1),pt(.3,-.1),pt(.3,-.04),pt(.7,-.05)],lo,.3,0);fac(ctx,[pt(.5,.1),pt(.15,.1),pt(.15,.05),pt(.5,.05)],hi,.25,0);fac(ctx,[pt(.66,.0),pt(.62,.1),pt(.58,.1),pt(.62,.0)],dk,.2,0);return}
-    {const ow=B&&B._owner,sevB=ow&&ow.hp?clamp((100-ow.hp.body)/100*1.25-.1,0,1):0;bruises(ctx,(s,w)=>pt(s,w/M),[[.5,.035,.06],[.38,.03,.055],[.6,.0,.05],[.28,.04,.05],[.7,.03,.045]].map(q=>[q[0],q[1],q[2]]),sevB,111,M,0)}
-    fac(ctx,[pt(.5,.1),pt(.12,.1),pt(.12,.05),pt(.5,.05)],hi,.3,0);/* front: lit */
-    ctx.save();ctx.strokeStyle=lo;ctx.globalAlpha=.55;ctx.lineWidth=.009*M;ctx.lineCap='round';ctx.beginPath();{const q=[pt(1,.026),pt(.96,.04),pt(.91,.062),pt(.85,.074)];ctx.moveTo(q[0].x,q[0].y);ctx.quadraticCurveTo(q[1].x,q[1].y,q[2].x,q[2].y);ctx.lineTo(q[3].x,q[3].y)}ctx.stroke();ctx.restore();/* neck-to-chest contour */
-    fac(ctx,[pt(.7,-.1),pt(.2,-.1),pt(.2,-.045),pt(.7,-.05)],lo,.35,0);/* back: core shadow */
+    if(!(TD&&layTorso(ctx,pt,sk.base,1.13))){fac(ctx,[pt(.7,-.1),pt(.3,-.1),pt(.3,-.04),pt(.7,-.05)],lo,.3,0);fac(ctx,[pt(.5,.1),pt(.15,.1),pt(.15,.05),pt(.5,.05)],hi,.25,0)}
+    {const ow=B&&B._owner,sevB=ow&&ow.hp?clamp((100-ow.hp.body)/100*1.25-.1,0,1):0;bruises(ctx,(s,w)=>pt(s,w/M),[[.5,.035,.06],[.38,.03,.055],[.6,.0,.05],[.28,.04,.05],[.7,.03,.045]],sevB,111,M,0)}
     });
   /* blood streaming down the chest */
   if(B.blood>.9&&J.mid){const al=Math.min(.7,(B.blood-.9)*.6);for(let i=0;i<3;i++){const L=Math.min(1,(B.blood-.9)*.7*(1-i*.3));if(L<=0)continue;const a={x:J.nk.x+d*(.035+i*.018)*H,y:J.nk.y-.02*H},b={x:J.mid.x+d*(.05+i*.02)*H,y:J.mid.y};const e=lerp(a,b,L);const w=(.006-i*.0014)*H;
@@ -676,5 +680,4 @@ function drawOctagon(S,ctx,W,H,s,gy,fy){const G=octGeom(S,W,H,s,gy,fy);if((S.sid
   const posts=G.V.filter(v=>v.Z>=0).concat([{X:G.xc,Z:0},{X:-G.xc,Z:0}]).sort((p,q)=>q.Z-p.Z);
   for(const v of posts){const P=G.P(v.X,v.Z);const w=.14*s*P.k,h=(FH+.08)*s*P.k;const pw=T>.35?w*1.35:w;ctx.fillStyle='#0b0b0d';rr(ctx,P.x-pw/2,P.y-h,pw,h+.02*s,pw/2);ctx.fillStyle='#1d1e22';rr(ctx,P.x-pw*.15,P.y-h+.05*s*P.k,pw*.3,h-.1*s*P.k,pw*.15);
     if(T>.35){/* padded post wrap in the promotion colour + a cap */ctx.fillStyle=S.col||'#d20a0a';rr(ctx,P.x-pw/2,P.y-h*.62,pw,h*.18,pw*.3);ctx.fillStyle='rgba(255,255,255,.18)';rr(ctx,P.x-pw*.32,P.y-h*.6,pw*.16,h*.14,pw*.08);ctx.fillStyle='#1f2025';ctx.beginPath();ctx.ellipse(P.x,P.y-h,pw*.62,pw*.3,0,0,7);ctx.fill()}}}
-window.FS_NECK=vecNeck;
 })();

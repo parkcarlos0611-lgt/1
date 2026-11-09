@@ -42,6 +42,22 @@ CFG={
    jaw=[(592,157),(592,177),(607,197),(630,210),(657,217),(673,215)],
    backN=[(157,527),(190,518),(285,520)],frontN=[(157,590),(215,608),(285,610)],
    eye=(658,118),brow=(662,112),brow2=(645,115),nosef=(678,152),cheek=(647,147),fore=(640,63),lip=(675,170)),
+ 'ref1':dict(top=18,chin=86,back=347,nose=407,neckTop=64,cut=3,clipX=411,darkcut=1,taper=(20,6),
+   jaw=[(358,64),(366,76),(380,85),(396,86),(407,87)],
+   backN=[(64,345),(84,341),(109,341)],frontN=[(64,383),(84,387),(109,391)],
+   eye=(392,52),brow=(0,0),brow2=(0,0),nosef=(0,0),cheek=(0,0),fore=(0,0),lip=(403,70),lid='#c08060',blinkonly=1),
+ 'ref2':dict(top=13,chin=88,back=618,nose=680,neckTop=59,cut=3,clipX=684,darkcut=1,padL=50,
+   jaw=[(629,59),(637,71),(651,80),(667,88),(680,89)],
+   backN=[(59,616),(79,612),(104,612)],frontN=[(59,654),(79,658),(104,662)],
+   eye=(665,49),brow=(0,0),brow2=(0,0),nosef=(0,0),cheek=(0,0),fore=(0,0),lip=(676,72),lid='#c08060',blinkonly=1),
+ 'ref3':dict(top=17,chin=90,back=892,nose=953,neckTop=63,cut=3,clipX=957,darkcut=1,taper=(20,6),
+   jaw=[(903,63),(911,75),(925,84),(941,90),(953,91)],
+   backN=[(63,890),(83,886),(108,886)],frontN=[(63,928),(83,932),(108,936)],
+   eye=(942,53),brow=(0,0),brow2=(0,0),nosef=(0,0),cheek=(0,0),fore=(0,0),lip=(949,74),lid='#c08060',blinkonly=1),
+ 'ref4':dict(top=18,chin=88,back=1163,nose=1225,neckTop=64,cut=3,clipX=1229,darkcut=1,taper=(20,6),
+   jaw=[(1174,64),(1182,76),(1196,85),(1212,88),(1225,89)],
+   backN=[(64,1161),(84,1157),(109,1157)],frontN=[(64,1199),(84,1203),(109,1207)],
+   eye=(1210,53),brow=(0,0),brow2=(0,0),nosef=(0,0),cheek=(0,0),fore=(0,0),lip=(1221,72),lid='#c08060',blinkonly=1),
  'adesanya':dict(top=23,chin=213,back=513,nose=680,neckTop=153,
    jaw=[(570,152),(593,173),(613,197),(633,208),(650,216),(660,222),(660,270)],
    backN=[(153,537),(180,527),(200,520),(270,524)],frontN=[(153,590),(203,618),(270,610)],
@@ -79,6 +95,9 @@ neck=rgba.copy()
 if 'neckEnd' in C:   # below this source row the picture shows a tattoo / the body: repeat the last clean row for the neck piece
     ne=Y(C['neckEnd'])
     for yy_ in range(ne,CH):neck[yy_]=rgba[ne-3]
+if C.get('darkcut'):
+    lum=neck[...,:3].astype(float).mean(2);mx=neck[...,:3].max(2).astype(float);mn=neck[...,:3].min(2).astype(float)
+    neckm=neckm&~((lum<95)&((mx-mn)<40)&(yy>=neckTop))
 neck[...,3]=(neck[...,3]*neckm).astype(np.uint8)
 Image.fromarray(head).save(out+'/head.png');Image.fromarray(neck).save(out+'/neck.png')
 rows=[None]*CH;na=neck[...,3]
@@ -93,4 +112,5 @@ lid='#%02x%02x%02x'%tuple(int(v*.98) for v in (reg.mean(0) if len(reg) else (180
 lp=P(C['lip']);C['mouth']=(0,0,36,16);mouth_xy=[lp[0]-8,lp[1]+6]
 meta=dict(image='head.png',w=CW,h=CH,off=[0,0],p0=[X((C['back']+C['nose'])/2),(top+bot)//2],p1=[X((C['back']+C['nose'])/2),CH],headH=bot-top,neck='neck.png',neckTop=neckTop,neckBot=CH,neckPivot=[(last[0]+last[1])//2,CH],neckRows=rows,
  fx=dict(G=dict(eye=P(C['eye']),brow=P(C['brow']),brow2=P(C['brow2']),nose=P(C['nosef']),cheek=P(C['cheek']),fore=P(C['fore']),lip=P(C['lip']),u=44,down=1),mouth=[mouth_xy[0],mouth_xy[1],36,16],lid=lid))
+if C.get('blinkonly'):meta['fx']['blinkOnly']=True
 json.dump(meta,open(out+'/head2.json','w'));print(key,meta['headH'],meta['p0'],neckTop,CW,CH)

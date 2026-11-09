@@ -17,7 +17,9 @@ DS.VEHICLES = DS.VEHICLES || {};
       hull:   { x: 14,  y: 838 },
       turret: { x: 38,  y: 626 },
       barrel: { x: 952, y: 766 },
-      roadwheel: { r: 47 }, sprocket: { r: 52 },
+      // running gear sheet (tools/cut_wheels.py): 512 px squares, radius 256 px
+      roadwheel: { r: 256, file: 'roadwheel' }, roadwheelFront: { r: 256, file: 'roadwheel_front' },
+      sprocket: { r: 256, R: 0.38, tooth0: 0 },   // R: tooth-tip radius (m), tooth0: first tooth angle (deg)
     },
     // running gear (per side; physics treats each road-wheel station as the left+right pair)
     roadWheels: wheels.map(p => ({ x: p[0], y: p[1] })),
@@ -28,13 +30,14 @@ DS.VEHICLES = DS.VEHICLES || {};
       bump: 0.30, droop: 0.12,       // jounce / rebound travel from static position (m)
       bumpK: 6e6, bumpC: 1.5e5,      // bump stop
     },
-    sprocket: { x: L(135, 970)[0], y: L(135, 970)[1], teeth: 10 },
+    sprocket: { x: L(135, 970)[0], y: L(135, 970)[1], teeth: 12 },
     idler: { x: L(1100, 965)[0], y: L(1100, 965)[1], r: 0.28 },
     returnRollers: [{ x: -1.75, y: -0.29, r: 0.1 }, { x: 0.55, y: -0.29, r: 0.1 }],
-    track: { pitch: 0.195, thick: 0.09, width: 0.635, mass: 7600 },
+    track: { pitch: 0.181, thick: 0.09, width: 0.635, mass: 7600 },
     belly: { y: -0.70, x0: -3.6, x1: 3.9 },
     contactArea: 0.978,              // m² of track pad per wheel station (both tracks)
-    underside: { x0: -3.05, x1: 3.35, y0: -0.52, y1: -0.98 },
+    underside: { x0: -3.05, x1: 3.35, y0: -0.52, y1: -0.98 },  // dark hull side behind the wheels
+    rearFill: { x0: -3.42, x1: -2.75, y0: -0.47, y1: -0.06 },  // behind the sprocket (hull art is cut out there)
 
     engine: {                        // AGT1500 gas turbine
       type: 'turbine', power: 1.119e6, eff: 0.74,

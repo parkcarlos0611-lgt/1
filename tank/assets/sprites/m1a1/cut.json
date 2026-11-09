@@ -19,13 +19,5 @@
   "y": 838,
   "w": 1188,
   "h": 144
- },
- "roadwheel": {
-  "name": "roadwheel",
-  "r": 47
- },
- "sprocket": {
-  "name": "sprocket",
-  "r": 52
  }
 }

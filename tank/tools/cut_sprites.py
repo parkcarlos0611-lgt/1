@@ -5,7 +5,7 @@ Source: assets/ref/m1a1_side.png (1430x1100). Scale of that drawing: ~149 px per
 (hull length 7.92 m = 1180 px). All rig numbers in data/vehicles/m1a1.js use this frame:
 origin px (604, 900), x forward, y up, metres = px / 149.
 
-Outputs (assets/sprites/m1a1/): hull.png turret.png barrel.png roadwheel.png sprocket.png
+Outputs (assets/sprites/m1a1/): hull.png turret.png barrel.png (wheels: tools/cut_wheels.py)
 plus offsets printed for the rig file.
 usage: python3 tools/cut_sprites.py
 """
@@ -64,7 +64,7 @@ for ax in (217, 397):
 # --- split lines ---
 SEAM = 838              # hull roof / turret ring line
 SKIRT = 982             # side-skirt bottom edge
-SPR = (135, 970, 56)    # sprocket centre + cut radius
+SPR = (135, 970, 59)    # sprocket centre + cut radius (sprocket art: assets/ref/m1a1_wheels.png, r 0.38 m)
 GUN_X = 952             # barrel starts in front of the mantlet
 
 # turret: above seam, behind gun start
@@ -87,25 +87,7 @@ keep &= xx < 1215
 h[~keep] = 0
 info['hull'] = save('hull', h, 0, Y0)
 
-# road wheel 1 (centre 259,1020, r 47) -> circular sprite
-def disc(name, cx, cy, r, keepfn=None):
-    s = rgba[Y(cy - r):Y(cy + r) + 1, cx - r:cx + r + 1].copy()
-    gy, gx = np.mgrid[-r:r + 1, -r:r + 1]
-    rr = np.sqrt(gx ** 2 + gy ** 2)
-    a = np.clip((r + 0.5 - rr) * 255, 0, 255)
-    if keepfn is not None:
-        a = np.where(keepfn(s, rr), a, 0)
-    s[..., 3] = np.minimum(s[..., 3], a).astype(np.uint8)
-    Image.fromarray(s).save(os.path.join(OUT, name + '.png'))
-    return {'name': name, 'r': r}
-
-info['roadwheel'] = disc('roadwheel', 259, 1020, 47)
-# sprocket: keep the tan teeth/hub, drop dark track links wrapped around it
-def spk(s, rr):
-    rgb = s[..., :3].astype(np.int16)
-    tan = (rgb[..., 0] - rgb[..., 2] > 35) & (rgb[..., 0] > 90)
-    return (rr < 38) | tan
-info['sprocket'] = disc('sprocket', 135, 970, 52, spk)
+# road wheels and sprocket come from the dedicated sheet: tools/cut_wheels.py
 
 print(json.dumps(info, indent=1))
 with open(os.path.join(OUT, 'cut.json'), 'w') as f:

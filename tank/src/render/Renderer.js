@@ -3,15 +3,31 @@
 DS.Renderer = class Renderer {
   constructor(canvas, world) {
     this.cv = canvas; this.ctx = canvas.getContext('2d'); this.w = world;
-    this.img = {}; this.linkBuf = []; this.pathBuf = [];
+    this.img = {}; this.mips = {}; this.linkBuf = []; this.pathBuf = [];
     this.noise = this.makeNoise();
   }
   load(def) {
-    const names = ['hull', 'turret', 'barrel', 'roadwheel', 'sprocket'];
+    const names = ['hull', 'turret', 'barrel', 'roadwheel', 'roadwheel_front', 'sprocket'];
     return Promise.all(names.map(n => new Promise((res, rej) => {
-      const im = new Image(); im.onload = () => { this.img[n] = im; res(); }; im.onerror = () => rej(new Error('sprite ' + n));
+      const im = new Image(); im.onload = () => { this.img[n] = im; this.mips[n] = this.buildMips(im); res(); }; im.onerror = () => rej(new Error('sprite ' + n));
       im.src = def.src.dir + n + '.png';
     })));
+  }
+  // halving chain so heavily minified sprites (wheels at battle zoom) stay smooth
+  buildMips(im) {
+    const out = [im]; let src = im, w = im.width, h = im.height;
+    while (w > 24 && h > 24) {
+      w = Math.ceil(w / 2); h = Math.ceil(h / 2);
+      const c = document.createElement('canvas'); c.width = w; c.height = h;
+      const x = c.getContext('2d'); x.imageSmoothingQuality = 'high'; x.drawImage(src, 0, 0, w, h);
+      out.push(c); src = c;
+    }
+    return out;
+  }
+  pick(name, screenW) {               // smallest level still >= on-screen width
+    const m = this.mips[name]; let i = 0;
+    while (i + 1 < m.length && m[i + 1].width >= screenW) i++;
+    return m[i];
   }
   makeNoise() {
     const c = document.createElement('canvas'); c.width = c.height = 128; const x = c.getContext('2d');
@@ -101,6 +117,7 @@ DS.Renderer = class Renderer {
     const U = D.underside;
     ctx.fillStyle = '#2b251d'; ctx.beginPath();
     ctx.moveTo(U.x0, U.y0); ctx.lineTo(U.x1, U.y0); ctx.lineTo(U.x1 - 0.2, U.y1); ctx.lineTo(U.x0 + 0.3, U.y1); ctx.closePath(); ctx.fill();
+    if (D.rearFill) { const R = D.rearFill; ctx.fillRect(R.x0, R.y0, R.x1 - R.x0, R.y1 - R.y0); }
     ctx.restore();
 
     // ---- track ----
@@ -111,6 +128,10 @@ DS.Renderer = class Renderer {
     v._trackPath = path;
     const info = DS.Track.links(path, D.track.pitch, v.s, this.linkBuf);
     const L = info.pitch, th = D.track.thick;
+    // inside of the loop: far-side track / hull shadow
+    ctx.fillStyle = '#2b251d'; ctx.beginPath(); ctx.moveTo(path[0], path[1]);
+    for (let i = 2; i < path.length; i += 2) ctx.lineTo(path[i], path[i + 1]);
+    ctx.closePath(); ctx.fill();
     for (const [x, y, a] of this.linkBuf) {
       ctx.save(); ctx.translate(x, y); ctx.rotate(a);
       ctx.fillStyle = '#26231f'; ctx.fillRect(-L * 0.5, -th * 0.5, L * 0.93, th);          // pad + shoe
@@ -121,17 +142,29 @@ DS.Renderer = class Renderer {
     }
 
     // ---- wheels ----
-    const wheel = (x, y, ang, r, im, imr, tint) => {
+    const zpx = this.w.cam.zoom * this.w.cam.dpr;
+    const wheel = (x, y, ang, r, name, tint) => {
+      const im = this.pick(name, r * 2 * zpx), imr = im.width / 2;
       ctx.save(); ctx.translate(x, y); ctx.rotate(ang); const k = r / imr; ctx.scale(k, -k);
-      ctx.drawImage(im, -imr, -imr, imr * 2 + 1, imr * 2 + 1);
+      ctx.drawImage(im, -imr, -imr, imr * 2, imr * 2);
       if (tint) { ctx.globalAlpha = tint; ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(0, 0, imr, 0, 7); ctx.fill(); }
       ctx.restore();
     };
-    for (const w of v.st) wheel(w.wx, w.wy, w.ang, D.wheelR + 0.006, I.roadwheel, D.sprites.roadwheel.r);
+    const nW = v.st.length;
+    v.st.forEach((w, i) => wheel(w.wx, w.wy, w.ang, D.wheelR + 0.006, i === nW - 1 ? 'roadwheel_front' : 'roadwheel'));
     const ip = v.local(D.idler.x, D.idler.y);
-    wheel(ip.x, ip.y, v.idlAng, D.idler.r + 0.02, I.roadwheel, D.sprites.roadwheel.r, 0.18);
-    const sp = v.local(D.sprocket.x, D.sprocket.y);
-    wheel(sp.x, sp.y, v.sprAng, 52 / S.ppm, I.sprocket, D.sprites.sprocket.r);
+    wheel(ip.x, ip.y, v.idlAng, D.idler.r + 0.02, 'roadwheel', 0.18);
+    // sprocket: lock tooth phase to the links on its arc (teeth sit in the link joints)
+    const sp = v.local(D.sprocket.x, D.sprocket.y), rc = v.sprR(), pitchA = 2 * Math.PI / D.sprocket.teeth;
+    let best = null, bd = 1e9;
+    for (const l of this.linkBuf) { const e = Math.abs(Math.hypot(l[0] - sp.x, l[1] - sp.y) - rc); if (e < bd) { bd = e; best = l; } }
+    let sa = v.sprAng;
+    if (best && bd < 0.05) {
+      const joint = Math.atan2(best[1] - sp.y, best[0] - sp.x) + (L / 2) / rc;
+      sa = joint - D.sprites.sprocket.tooth0 * Math.PI / 180;
+      sa -= Math.round((sa - v.sprAng) / pitchA) * pitchA;    // stay near the integrated angle (no visual jumps)
+    }
+    wheel(sp.x, sp.y, sa, D.sprites.sprocket.R, 'sprocket');
 
     // ---- hull, gun, turret (hull-local, source pixel frame) ----
     ctx.save(); ctx.translate(v.pos.x, v.pos.y); ctx.rotate(v.ang);

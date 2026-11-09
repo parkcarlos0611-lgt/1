@@ -1,0 +1,14 @@
+{
+ "roadwheel_front": {
+  "size": 512
+ },
+ "roadwheel": {
+  "size": 512
+ },
+ "sprocket": {
+  "size": 512,
+  "teeth": 12,
+  "tooth0": 0.0,
+  "root": 0.79
+ }
+}

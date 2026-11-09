@@ -190,9 +190,6 @@ function torsoFlat(ctx,J,H,M,sk,d,lk,B){const sp=[J.hip,J.mid,J.sh,J.nk];const s
   /* lats / spine side: shadow plane on the back */
 
   /* trapezius slope + clavicle line */poly(ctx,[pt(.9,-.08),pt(1,-.045),pt(1,.0),pt(.93,-.02)],sk.sh);
-  /* pec plate: lighter facet, then the hard under-pec shadow */
-  poly(ctx,[pt(.93,.06),pt(.87,.088),pt(.79,.099),pt(.7,.096),pt(.69,.03),pt(.8,.0),pt(.9,.02)],sk.lt);
-  poly(ctx,[pt(.7,.098),pt(.67,.08),pt(.66,.015),pt(.69,.0),pt(.71,.03)],sk.sh);
 
   /* abs: flat blocks along the front edge */
 

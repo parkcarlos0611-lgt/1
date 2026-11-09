@@ -194,9 +194,6 @@ function torsoFlat(ctx,J,H,M,sk,d,lk,B){const sp=[J.hip,J.mid,J.sh,J.nk];const s
     fac(ctx,[pt(.74,.0),pt(.72,.1),pt(.67,.1),pt(.68,.0)],dk,.28,0);/* lower pec edge */
     fac(ctx,[pt(.97,-.06),pt(1,-.06),pt(1,.06),pt(.97,.06)],lo,.35,0);/* base of the neck */
     ctx.fillStyle=dk;ctx.beginPath();ctx.arc(pt(.2,.04).x,pt(.2,.04).y,.0065*H,0,7);ctx.fill()});/* navel */
-  /* tattoos (flat ink shapes) */
-  if(lk.tat&&/c/.test(lk.tat)){ctx.globalAlpha=.55;poly(ctx,[pt(.86,.06),pt(.8,.09),pt(.72,.07),pt(.74,.03),pt(.82,.02)],'#1c2230');ctx.globalAlpha=1}
-  if(lk.tat&&/b/.test(lk.tat)){ctx.globalAlpha=.5;poly(ctx,[pt(.85,-.08),pt(.7,-.09),pt(.6,-.06),pt(.72,-.03),pt(.84,-.04)],'#1c2230');ctx.globalAlpha=1}
   /* blood streaming down the chest */
   if(B.blood>.9&&J.mid){const al=Math.min(.7,(B.blood-.9)*.6);for(let i=0;i<3;i++){const L=Math.min(1,(B.blood-.9)*.7*(1-i*.3));if(L<=0)continue;const a={x:J.nk.x+d*(.035+i*.018)*H,y:J.nk.y-.02*H},b={x:J.mid.x+d*(.05+i*.02)*H,y:J.mid.y};const e=lerp(a,b,L);const w=(.006-i*.0014)*H;
     ctx.globalAlpha=al*(1-i*.2);poly(ctx,[{x:a.x-w,y:a.y},{x:a.x+w,y:a.y},{x:e.x+w*.6,y:e.y},{x:e.x,y:e.y-w*1.4},{x:e.x-w*.6,y:e.y}],`rgb(${128-i*15},6,8)`);ctx.globalAlpha=1}}}
@@ -609,9 +606,9 @@ function drawOctFloor(S,ctx,W,H,s,gy,fy){S.cam.x+=(S.rot||0);/* drawMat runs wit
 
 /* ---------- sponsor boards on the cage padding (invented brands, no real logos) ---------- */
 const SPON=[['NOVA','#e8c13a','hex'],['KRAKEN','#e5513f','bar'],['ZENITH','#4fb0e6','tri'],['PULSE+','#7ad36a','dot'],['VANTA','#d7d9de','cut'],['ORBIT','#b07be0','ring']];
-function sponsorStrip(ctx,A,B,s,S){if(A.x>B.x){const t=A;A=B;B=t}const L=Math.hypot(B.x-A.x,B.y-A.y);if(L<20)return;const k=(A.k+B.k)/2,ang=Math.atan2(B.y-A.y,B.x-A.x),bh=.15*s*k,bw=.95*s*k,n=Math.max(1,Math.floor(L/bw));
+function sponsorStrip(ctx,A,B,s,sid){if(A.x>B.x){const t=A;A=B;B=t}const L=Math.hypot(B.x-A.x,B.y-A.y);if(L<20)return;const k=(A.k+B.k)/2,ang=Math.atan2(B.y-A.y,B.x-A.x),bh=.15*s*k,bw=.95*s*k,n=Math.max(1,Math.floor(L/bw));
   ctx.save();ctx.translate(A.x,A.y-.08*s*A.k);ctx.rotate(ang);ctx.textAlign='center';ctx.textBaseline='middle';
-  for(let i=0;i<n;i++){const sp=SPON[(((i+Math.round(A.x*.01))%SPON.length)+SPON.length)%SPON.length],w=L/n,cx=(i+.5)*w;
+  for(let i=0;i<n;i++){const sp=SPON[(sid*2+i)%SPON.length],w=L/n,cx=(i+.5)*w;
     ctx.fillStyle='#0d0e11';ctx.fillRect(cx-w*.46,-bh*.46,w*.92,bh*.92);
     const u=bh*.34,mx=cx-w*.24;ctx.fillStyle=sp[1];ctx.beginPath();
     if(sp[2]==='hex'){for(let j=0;j<6;j++){const a=j*Math.PI/3;ctx.lineTo(mx+Math.cos(a)*u,Math.sin(a)*u)}ctx.closePath();ctx.fill()}
@@ -624,14 +621,14 @@ function sponsorStrip(ctx,A,B,s,S){if(A.x>B.x){const t=A;A=B;B=t}const L=Math.hy
   ctx.restore()}
 function drawOctagon(S,ctx,W,H,s,gy,fy){const G=octGeom(S,W,H,s,gy,fy);if((S.sides||8)===4)return drawRing(S,ctx,W,H,s,fy,G);const FH=1.75;const T=S._tier||0;
   /* far half only (z >= 0), clipped where an edge crosses the fighters' plane */
-  const segs=[];for(let i=0;i<8;i++){let a=G.V[i],b=G.V[(i+1)%8];if(a.Z<0&&b.Z<0)continue;if(a.Z<0||b.Z<0){const u=a.Z/(a.Z-b.Z);const c={X:a.X+(b.X-a.X)*u,Z:0};if(a.Z<0)a=c;else b=c}segs.push([a,b])}
+  const segs=[];for(let i=0;i<8;i++){let a=G.V[i],b=G.V[(i+1)%8];if(a.Z<0&&b.Z<0)continue;if(a.Z<0||b.Z<0){const u=a.Z/(a.Z-b.Z);const c={X:a.X+(b.X-a.X)*u,Z:0};if(a.Z<0)a=c;else b=c}segs.push([a,b,i])}
   /* draw back-to-front: farthest panels first */segs.sort((p,q)=>(q[0].Z+q[1].Z)-(p[0].Z+p[1].Z));
-  for(const[a,b]of segs){const A=G.P(a.X,a.Z),B=G.P(b.X,b.Z);const At={x:A.x,y:A.y-FH*s*A.k},Bt={x:B.x,y:B.y-FH*s*B.k};
+  for(const[a,b,sid]of segs){const A=G.P(a.X,a.Z),B=G.P(b.X,b.Z);const At={x:A.x,y:A.y-FH*s*A.k},Bt={x:B.x,y:B.y-FH*s*B.k};
     ctx.fillStyle='rgba(28,29,33,.38)';ctx.beginPath();ctx.moveTo(A.x,A.y);ctx.lineTo(B.x,B.y);ctx.lineTo(Bt.x,Bt.y);ctx.lineTo(At.x,At.y);ctx.closePath();ctx.fill();
     /* chain-link mesh */ctx.strokeStyle='rgba(60,62,70,.5)';ctx.lineWidth=1;ctx.beginPath();const n=Math.max(4,Math.round(Math.hypot(B.x-A.x,B.y-A.y)/(.16*s*A.k)));
     for(let k=0;k<=n;k++){const u=k/n,u2=Math.min(1,(k+.5*n/ n*0+.5)/n);const x0=A.x+(B.x-A.x)*u,y0=A.y+(B.y-A.y)*u,x1=At.x+(Bt.x-At.x)*u,y1=At.y+(Bt.y-At.y)*u;ctx.moveTo(x0,y0);ctx.lineTo(x1,y1)}
     for(let k=1;k<10;k++){const v=k/10;ctx.moveTo(A.x+(At.x-A.x)*v,A.y+(At.y-A.y)*v);ctx.lineTo(B.x+(Bt.x-B.x)*v,B.y+(Bt.y-B.y)*v)}ctx.stroke();
-    /* bottom pad and top rail along the panel */ctx.strokeStyle='#17181b';ctx.lineCap='round';ctx.lineWidth=.16*s*Math.min(A.k,B.k);ctx.beginPath();ctx.moveTo(A.x,A.y-.08*s*A.k);ctx.lineTo(B.x,B.y-.08*s*B.k);ctx.stroke();sponsorStrip(ctx,A,B,s,S);
+    /* bottom pad and top rail along the panel */ctx.strokeStyle='#17181b';ctx.lineCap='round';ctx.lineWidth=.16*s*Math.min(A.k,B.k);ctx.beginPath();ctx.moveTo(A.x,A.y-.08*s*A.k);ctx.lineTo(B.x,B.y-.08*s*B.k);ctx.stroke();sponsorStrip(ctx,A,B,s,sid);
     ctx.strokeStyle='#0e0f11';ctx.lineWidth=(.07+.06*T)*s*Math.min(A.k,B.k);ctx.beginPath();ctx.moveTo(At.x,At.y);ctx.lineTo(Bt.x,Bt.y);ctx.stroke();
     if(T>.5){/* light catch on the mesh and the padded top rail of a premium cage */ctx.strokeStyle='rgba(205,210,220,.16)';ctx.lineWidth=1;ctx.beginPath();for(let k=1;k<10;k+=2){const v=k/10;ctx.moveTo(A.x+(At.x-A.x)*v,A.y+(At.y-A.y)*v-1);ctx.lineTo(B.x+(Bt.x-B.x)*v,B.y+(Bt.y-B.y)*v-1)}ctx.stroke();
       ctx.strokeStyle='rgba(255,255,255,.14)';ctx.lineWidth=.02*s*Math.min(A.k,B.k);ctx.beginPath();ctx.moveTo(At.x,At.y-.03*s*A.k);ctx.lineTo(Bt.x,Bt.y-.03*s*B.k);ctx.stroke()}

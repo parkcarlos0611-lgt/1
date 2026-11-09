@@ -35,6 +35,7 @@ function poolFor(wc){if(POOL[wc])return POOL[wc];const L=FDB.filter(r=>r.wc===wc
 const grp=(A,keys)=>keys.reduce((s,k)=>s+(A[k]||10),0)/keys.length;
 const GS=[['타격',['punchPow','handSpd','accuracy','kicking','strDef']],['그래플링',['takedown','tdd','clinchCtl','topCtl','bottom','subOff','subDef']],['체력',['cardio','speed','strength','recovery']],['맷집',['chin','skin','bodyT','heart']]];
 const gstar=(A,keys)=>clamp(Math.round(grp(A,keys)/20*5*2)/2,.5,5);
+const varUI=f=>{const V=window.CUTOUT&&CUTOUT.variants&&CUTOUT.variants(f.n);if(!V)return'';const cur=CUTOUT.getVar(f.n);return`<div class="row" style="margin-top:10px"><span class="lb">외형</span>${V.map((v,i)=>`<button class="chip ${cur===i?'on':''}" data-var="${f.n}|${i}">${v[1]}</button>`).join('')}</div>`};
 const card=f=>`<div class="nm">${dn2(f)}</div><div class="mt"><span>종합</span>${stars(f.stars,1)}</div>${GS.map(([n,k])=>`<div class="mt"><span>${n}</span>${stars(gstar(f.A,k))}</div>`).join('')}`;
 window.poolFor=poolFor;const dn2=f=>(typeof KO_NAMES!=='undefined'&&0)?f.n:(f.ko||f.n);
 
@@ -50,11 +51,11 @@ window.quickFight=function(){const st={wc:'HW',a:0,b:1,side:0,diff:1,rule:'ufc'}
     app().innerHTML=`<div class="q2"><button class="back2" data-bk>← 뒤로</button><h2>올스타 파이트</h2>
       <div class="row"><span class="lb">룰</span>${[['ufc','UFC 룰'],['kick','입식 룰']].map(([k,n])=>`<button class="chip ${st.rule===k?'on':''}" data-rule="${k}">${n}</button>`).join('')}</div>
       <div class="row"><span class="lb">체급</span>${WCK.map(k=>`<button class="chip ${k===st.wc?'on':''}" data-wc="${k}">${WC[k].n}</button>`).join('')}</div>
-      <div class="vs2"><div class="pc"><div class="side r">RED</div><select data-a>${opt(st.a)}</select>${card(fa)}</div><div class="vsx">VS</div><div class="pc"><div class="side b">BLUE</div><select data-b>${opt(st.b)}</select>${card(fb)}</div></div>
+      <div class="vs2"><div class="pc"><div class="side r">RED</div><select data-a>${opt(st.a)}</select>${card(fa)}${varUI(fa)}</div><div class="vsx">VS</div><div class="pc"><div class="side b">BLUE</div><select data-b>${opt(st.b)}</select>${card(fb)}${varUI(fb)}</div></div>
       <div class="row" style="margin-top:16px"><span class="lb">조종</span>${['RED','BLUE','관전'].map((x,i)=>`<button class="chip ${st.side===i?'on':''}" data-side="${i}">${x}</button>`).join('')}</div>
       <div class="row"><span class="lb">난이도</span>${[['쉬움',.7],['보통',1],['어려움',1.3],['레전드',1.6]].map(([n,v])=>`<button class="chip ${st.diff===v?'on':''}" data-df="${v}">${n}</button>`).join('')}</div>
       <button class="go" data-go>시작</button></div>`;
-    const A=app();A.querySelector('[data-bk]').onclick=titleScreen;
+    const A=app();A.querySelector('[data-bk]').onclick=titleScreen;A.querySelectorAll('[data-var]').forEach(b=>b.onclick=()=>{const[n,i]=b.dataset.var.split('|');CUTOUT.setVar(n,+i);render()});
     A.querySelectorAll('[data-rule]').forEach(b=>b.onclick=()=>{st.rule=b.dataset.rule;render()});A.querySelectorAll('[data-wc]').forEach(b=>b.onclick=()=>{st.wc=b.dataset.wc;st.a=0;st.b=1;render()});
     A.querySelector('[data-a]').onchange=e=>{st.a=+e.target.value;render()};A.querySelector('[data-b]').onchange=e=>{st.b=+e.target.value;render()};
     A.querySelectorAll('[data-side]').forEach(b=>b.onclick=()=>{st.side=+b.dataset.side;render()});A.querySelectorAll('[data-df]').forEach(b=>b.onclick=()=>{st.diff=+b.dataset.df;render()});
@@ -75,9 +76,9 @@ window.trainingMenu=function(){const st={kind:'bag',wc:'HW',a:0,b:1,gq:.5};
       <p class="mt" style="color:#8f8f99;margin:6px 0 12px">${note}</p>
       ${st.kind==='bag'?`<div class="row"><span class="lb">체육관</span>${[[0,'동네 체육관'],[.5,'프로 짐'],[1,'엘리트 센터']].map(([v,n])=>`<button class="chip ${st.gq===v?'on':''}" data-gq="${v}">${n}</button>`).join('')}</div>`:''}
       <div class="row"><span class="lb">체급</span>${WCK.map(k=>`<button class="chip ${k===st.wc?'on':''}" data-wc="${k}">${WC[k].n}</button>`).join('')}</div>
-      <div class="vs2" style="grid-template-columns:${st.kind==='bag'?'1fr':'1fr auto 1fr'}"><div class="pc"><div class="side r">내 선수</div><select data-a>${opt(st.a)}</select>${card(fa)}</div>${st.kind==='bag'?'':`<div class="vsx">VS</div><div class="pc"><div class="side b">파트너</div><select data-b>${opt(st.b)}</select>${card(fb)}</div>`}</div>
+      <div class="vs2" style="grid-template-columns:${st.kind==='bag'?'1fr':'1fr auto 1fr'}"><div class="pc"><div class="side r">내 선수</div><select data-a>${opt(st.a)}</select>${card(fa)}${varUI(fa)}</div>${st.kind==='bag'?'':`<div class="vsx">VS</div><div class="pc"><div class="side b">파트너</div><select data-b>${opt(st.b)}</select>${card(fb)}${varUI(fb)}</div>`}</div>
       <button class="go" data-go>시작</button></div>`;
-    const A=app();A.querySelector('[data-bk]').onclick=titleScreen;A.querySelectorAll('[data-k]').forEach(b=>b.onclick=()=>{st.kind=b.dataset.k;render()});A.querySelectorAll('[data-gq]').forEach(b=>b.onclick=()=>{st.gq=+b.dataset.gq;render()});
+    const A=app();A.querySelector('[data-bk]').onclick=titleScreen;A.querySelectorAll('[data-var]').forEach(b=>b.onclick=()=>{const[n,i]=b.dataset.var.split('|');CUTOUT.setVar(n,+i);render()});A.querySelectorAll('[data-k]').forEach(b=>b.onclick=()=>{st.kind=b.dataset.k;render()});A.querySelectorAll('[data-gq]').forEach(b=>b.onclick=()=>{st.gq=+b.dataset.gq;render()});
     A.querySelectorAll('[data-wc]').forEach(b=>b.onclick=()=>{st.wc=b.dataset.wc;st.a=0;st.b=1;render()});A.querySelector('[data-a]').onchange=e=>{st.a=+e.target.value;render()};const sb=A.querySelector('[data-b]');if(sb)sb.onchange=e=>{st.b=+e.target.value;render()};
     A.querySelector('[data-go]').onclick=()=>{const fx=f=>({name:dn2(f),flag:'',rec:'',A:f.A,stance:hsh(f.n+'st')<.22?-1:1,look:lookFor(f.rr)});startTraining(st.kind,fx(fa),fx(fb),{gymQ:st.gq,done:render})}};
   render()};

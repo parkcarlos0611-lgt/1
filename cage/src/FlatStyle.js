@@ -211,7 +211,7 @@ function torsoFlat(ctx,J,H,M,sk,d,lk,B){const sp=[J.hip,J.mid,J.sh,J.nk];const s
   const FR=[[0,.07+bel*.3],[.14,.064+bel*.8],[.3,.062+bel],[.46,.064+bel*.7],[.6,.066],[.7,.068*shb],[.8,.062*shb],[.88,.05*shb],[.94,.04],[1,.036]];/* side view of the proportion wireframe: straight chest, no pec bulge */
   const BK=[[0,.086],[.1,.078],[.22,.062+bel*.3],[.36,.058+bel*.2],[.5,.066],[.62,.078*shb],[.72,.088*shb],[.82,.084*shb],[.9,.07],[.96,.056],[1,.05]];/* lumbar curve in, shoulder blades out, then a long slope up the trapezius into the nape */
   const F=FR.map(([s,w])=>pt(s,w)),Bk=BK.map(([s,w])=>pt(s,-w));
-  if(sk.far){/* the neck belongs to the torso: it rises from the trapezius and leans slightly forward under the skull */F.push(pt(1.06,.04),pt(1.14,.04));Bk.push(pt(1.04,-.046),pt(1.14,-.036))}
+  if(sk.far){/* the neck belongs to the torso: it rises from the trapezius and leans slightly forward under the skull */F.push(pt(1.07,.04),pt(1.16,.039),pt(1.26,.038));Bk.push(pt(1.05,-.046),pt(1.16,-.04),pt(1.26,-.036))}
   poly(ctx,F.concat(Bk.slice().reverse()),sk.base,ROUND*2.2);
   if(FS.outline)thinLine(ctx,F.concat(Bk.slice().reverse()),sk.base);
   const TD=sk.far&&FS.detail;

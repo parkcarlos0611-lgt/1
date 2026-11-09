@@ -12,7 +12,7 @@ const CO=window.CUTOUT={on:!/[?&]cutout=0/.test(location.search),sets:{}};
 const clamp=(v,a,b)=>v<a?a:v>b?b:v;
 /* faces for the referee and the coaches (character sheet): rigid head + neck down to the collar */
 const REFS={ref:[['ref1','#e9b28b'],['ref2','#7a5236'],['ref3','#d9a07a'],['ref4','#dca883']],coach:[['coach3','#8a5a3c'],['coach5','#e0b090'],['coach7','#e3a982']]};
-CO.pickRef=(lk,kind,idx)=>{const L=REFS[kind];if(!L)return;const c=L[idx!=null?idx%L.length:Math.floor(Math.random()*L.length)];lk.cutout=c[0];lk.skin=c[1];lk.headK=.14;lk.headDown=kind==='ref'?.075:.05};
+CO.pickRef=(lk,kind,idx)=>{const L=REFS[kind];if(!L)return;const c=L[idx!=null?idx%L.length:Math.floor(Math.random()*L.length)];lk.cutout=c[0];lk.skin=c[1];lk.headK=.14;lk.headDown=kind==='ref'?.03:.03};
 for(const k in REFS)REFS[k].forEach(c=>{try{load(c[0])}catch(e){}});
 CO.variants=n=>{const c=CURATED[n];return c&&c.variants||null};CO.getVar=n=>{try{const v=+localStorage.getItem('cl_skin_'+n)||0;const c=CURATED[n];return c&&c.variants&&v<c.variants.length?v:0}catch(e){return 0}};CO.setVar=(n,v)=>{try{localStorage.setItem('cl_skin_'+n,String(v))}catch(e){}};
 const CURATED={'Jon Jones':{cutout:'jones',skin:'#6b4a34',shorts:'#232326',glove:'#17171a',headK:.136,headDown:.036},'Anderson Silva':{cutout:'silva',skin:'#8d5c34',shorts:'#1b1b1e',glove:'#17171a',headK:.127,headDown:.022},

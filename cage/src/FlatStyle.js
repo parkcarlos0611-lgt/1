@@ -46,11 +46,13 @@ function frame(a,b,d){const dx=b.x-a.x,dy=b.y-a.y,L=Math.hypot(dx,dy)||1e-5;cons
 function joint(ctx,c,r,col){ctx.fillStyle=col;ctx.beginPath();ctx.arc(c.x,c.y,r,0,7);ctx.fill();const g=ctx.createRadialGradient(c.x-r*.25,c.y+r*.25,r*.1,c.x,c.y,r);g.addColorStop(0,'rgba(255,240,220,.05)');g.addColorStop(.6,'rgba(0,0,0,0)');g.addColorStop(1,'rgba(40,18,8,.10)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(c.x,c.y,r,0,7);ctx.fill()}
 /* a very thin darker rim around a body part */
 function thinLine(ctx,pts,col){ctx.save();ctx.globalAlpha=.5;ctx.strokeStyle=shade(col,-.4);ctx.lineWidth=.0034;ctx.lineJoin='round';ctx.beginPath();rpath(ctx,pts,ROUND*2.2);ctx.stroke();ctx.restore()}
+/* shading for a round joint cap: lit on the front side, dark on the back side, so it continues the limb's own shading */
+function capShade(ctx,c,r,n,base){ctx.save();ctx.beginPath();ctx.arc(c.x,c.y,r,0,7);ctx.clip();const g=ctx.createLinearGradient(c.x+n.x*r,c.y+n.y*r,c.x-n.x*r,c.y-n.y*r);const hi=rgbOf(shade(base,.14)),lo=rgbOf(shade(base,-.3));g.addColorStop(0,`rgba(${hi[0]},${hi[1]},${hi[2]},.3)`);g.addColorStop(.45,'rgba(0,0,0,0)');g.addColorStop(.6,`rgba(${lo[0]},${lo[1]},${lo[2]},.0)`);g.addColorStop(1,`rgba(${lo[0]},${lo[1]},${lo[2]},.42)`);ctx.fillStyle=g;ctx.fillRect(c.x-r,c.y-r,r*2,r*2);ctx.restore()}
 function limb(ctx,a,b,d,rows,col,shCol,extra){const F=frame(a,b,d);const P=(t,w)=>({x:a.x+F.ux*F.L*t+F.nx*w,y:a.y+F.uy*F.L*t+F.ny*w});
   const front=rows.map(r=>P(r[0],r[1])),back=rows.map(r=>P(r[0],-r[2]));poly(ctx,front.concat(back.slice().reverse()),col,ROUND*2.2);/* outline of the limb: extra round */
   if((FS.outline||(extra&&extra.armLine))&&!(extra&&extra.noLine))thinLine(ctx,front.concat(back.slice().reverse()),col);
   /* rounded joint ends: the limb meets its neighbour with a smooth round cap instead of a hard corner */
-  if(!(extra&&extra.noCaps)){const r0=rows[0],r1=rows[rows.length-1];circ(ctx,P(r0[0],(r0[1]-r0[2])/2),(r0[1]+r0[2])/2,col);circ(ctx,P(r1[0],(r1[1]-r1[2])/2),(r1[1]+r1[2])/2,col)}
+  if(!(extra&&extra.noCaps)){const r0=rows[0],r1=rows[rows.length-1];circ(ctx,P(r0[0],(r0[1]-r0[2])/2),(r0[1]+r0[2])/2,col);circ(ctx,P(r1[0],(r1[1]-r1[2])/2),(r1[1]+r1[2])/2,col);if(extra&&extra.armLine){capShade(ctx,P(r0[0],(r0[1]-r0[2])/2),(r0[1]+r0[2])/2,{x:F.nx,y:F.ny},col)}}
   if(shCol){const mid=rows.map(r=>P(r[0],-r[2]*(extra&&extra.shadowFrom!=null?extra.shadowFrom:.12)));poly(ctx,mid.concat(back.slice().reverse()),shCol)}
   return{F,P,out:front.concat(back.slice().reverse()),front,back}}
 
@@ -94,7 +96,7 @@ Body.prototype.draw=function(ctx,o){o=o||{};const lk=this.look;if(window.CUTOUT&
   const self=this;
   /* ---- arm: deltoid, biceps/triceps, elbow, forearm, wrist, glove ---- */
   const arm=(S,isFar)=>{const e=J[S.E],w=J[S.W],a=lerp(J[S.S],J.mid,R?.12:.22);/* the drawn shoulder sits well below the neck, so it never covers the face */const C=isFar?{b:sk.far,s:sk.farSh}:{b:sk.base,s:sk.sh};
-    joint(ctx,e,.031*M,C.b);/* the elbow sits behind both segments so the shading runs through it */
+    joint(ctx,e,.031*M,C.b);capShade(ctx,e,.031*M,(()=>{const F=frame(e,w,d);return{x:F.nx,y:F.ny}})(),C.b);/* the elbow sits behind both segments; its own shading continues the arm's */
     /* upper arm: deltoid cap → biceps (front) / triceps (back) → elbow */
     const Pa=limb(ctx,a,e,d,R?[[.5,.05*M,.05*M],[.78,.04*M,.04*M],[1,.031*M,.033*M]]:[[-.04,.05*M*SHB,.055*M*SHB],[.12,.062*M*SHB,.064*M*SHB],[.3,.052*M,.058*M],[.5,.05*M,.05*M],[.78,.04*M,.04*M],[1,.031*M,.033*M]],C.b,C.s,{noCaps:isFar||R,armLine:!isFar});/* a sleeve covers the shoulder of the referee / coach: no skin up there *//* the far shoulder gets no round cap: it would poke out above the back */
     if(!R&&FS.detail)detailIn(ctx,Pa.out,Pa.front,Pa.back,C.b,.012*M,(hi,lo)=>{const Pu=Pa.P;
@@ -179,6 +181,7 @@ function torsoFlat(ctx,J,H,M,sk,d,lk,B){const sp=[J.hip,J.mid,J.sh,J.nk];const s
   const FR=[[0,.074+bel*.3],[.16,.068+bel*.8],[.32,.066+bel],[.48,.067+bel*.7],[.6,.078],[.7,.088*shb],[.79,.088*shb],[.87,.07*shb],[.94,.046],[1,.03]];
   const BK=[[0,.09],[.1,.086],[.24,.066+bel*.3],[.38,.061+bel*.2],[.52,.071],[.66,.085*shb],[.78,.093*shb],[.88,.09*shb],[.95,.082],[1,.074]];/* the back runs up into the nape without a step */
   const F=FR.map(([s,w])=>pt(s,w)),Bk=BK.map(([s,w])=>pt(s,-w));
+  B._tt={f:F[F.length-1],b:Bk[Bk.length-1]};/* the flat top of the torso: the neck is pinned exactly onto it */
   poly(ctx,F.concat(Bk.slice().reverse()),sk.base,ROUND*2.2);
   if(FS.outline)thinLine(ctx,F.concat(Bk.slice().reverse()),sk.base);
   const TD=sk.far&&FS.detail;

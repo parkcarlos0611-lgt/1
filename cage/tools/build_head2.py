@@ -9,7 +9,7 @@ CFG={
    jaw=[(577,143),(598,152),(610,170),(625,190),(640,205),(660,215),(660,260)],
    backN=[(143,537),(180,527),(200,527),(260,530)],frontN=[(143,600),(200,620),(260,610)],
    eye=(658,108),brow=(663,97),brow2=(643,100),nosef=(678,135),cheek=(637,128),fore=(637,67),lip=(675,160),mouth=(673,165,38,16),lid='#b97d4a'),
- 'fedor':dict(top=36,chin=213,back=535,nose=703,neckTop=162,cut=3,clipX=690,
+ 'fedor':dict(taper=(40,13),ntaper=(40,12),top=36,chin=213,back=535,nose=703,neckTop=162,cut=3,clipX=690,
    jaw=[(597,162),(605,187),(633,203),(657,218),(690,222)],
    backN=[(162,537),(200,528),(285,530)],frontN=[(162,605),(220,628),(285,610)],
    eye=(670,123),brow=(680,115),brow2=(660,119),nosef=(693,155),cheek=(663,143),fore=(653,77),lip=(685,175),mouth=(687,180,38,16),lid='#d99a6d'),
@@ -17,7 +17,7 @@ CFG={
    jaw=[(597,150),(607,173),(633,193),(653,203),(677,208),(690,212)],
    backN=[(150,537),(180,528),(285,530)],frontN=[(150,600),(210,625),(285,610)],
    eye=(663,110),brow=(667,98),brow2=(650,100),nosef=(683,143),cheek=(653,130),fore=(657,63),lip=(673,163),mouth=(675,167,38,16),lid='#b97d4a'),
- 'cropcop':dict(top=15,chin=203,back=508,nose=673,neckTop=150,cut=2,clipX=655,
+ 'cropcop':dict(taper=(40,13),ntaper=(40,12),top=15,chin=203,back=508,nose=673,neckTop=150,cut=2,clipX=655,
    jaw=[(573,150),(587,173),(613,192),(633,200),(655,203)],
    backN=[(150,510),(180,500),(285,505)],frontN=[(150,580),(205,615),(285,600)],
    eye=(640,112),brow=(643,103),brow2=(630,107),nosef=(663,143),cheek=(633,140),fore=(633,57),lip=(653,165),mouth=(655,168,38,16),lid='#e09a70'),
@@ -48,7 +48,12 @@ jline=lambda y:np.interp(y,jy,jx)
 headm=((yy<neckTop+10)|(xx>jline(yy)-4))&(yy<Y(C['chin'])+C.get('cut',12))&((xx<X(C.get('clipX',9999)))|(yy<Y(C['chin'])-10))   # nothing below the chin: the glove / shoulder of the full-body art stays out
 by=[Y(p[0]) for p in C['backN']];bx=[X(p[1]) for p in C['backN']];fy=[Y(p[0]) for p in C['frontN']];fx=[X(p[1]) for p in C['frontN']]
 neckm=(yy>=neckTop)&(xx>=np.interp(yy,by,bx))&(xx<=np.interp(yy,fy,fx))
+if 'taper' in C:   # round off the skull's lower-back corner so no spur sticks out behind the neck when it bends
+    ta,dx=C['taper'];xs=np.interp(yy,[neckTop-Y(ta),neckTop+10],[X(C['back'])-6,X(C['back'])+Y(dx)])
+    headm=headm&(xx>=xs)
 head=rgba.copy();head[...,3]=(rgba[...,3]*headm).astype(np.uint8)
+if 'ntaper' in C:   # the neck piece's top-back corner is rounded off too
+    nl,nd=C['ntaper'];b0=np.interp(neckTop,by,bx);neckm=neckm&(xx>=np.interp(yy,[neckTop,neckTop+Y(nl)],[b0+Y(nd),b0]))
 neck=rgba.copy();neck[...,3]=(rgba[...,3]*neckm).astype(np.uint8)
 Image.fromarray(head).save(out+'/head.png');Image.fromarray(neck).save(out+'/neck.png')
 rows=[None]*CH;na=neck[...,3]

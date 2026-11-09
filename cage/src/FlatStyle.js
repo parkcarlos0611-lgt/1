@@ -54,7 +54,7 @@ const TEX={
  shin:[[.08,[[.04,-.95],[.5,-.88],[.58,-.2],[.1,-.1]]],[-.15,[[.1,-1],[.72,-1],[.82,-.55],[.2,-.65]]],[.1,[[.04,.82],[.92,.56],[.92,.38],[.04,.6]]],[-.09,[[.15,-.1],[.82,-.26],[.82,-.36],[.15,-.2]]],[-.07,[[.92,-1],[1,-1],[1,1],[.92,1]]]]
 };
 const _tx={},_pimg={},PFLIP={uarm:0,farm:0,thigh:0,shin:0,torso:0};
-for(const k of['uarm','farm','thigh','shin','torso']){const im=new Image();im.onload=()=>{_pimg[k]=im;for(const key in _tx)if(key.indexOf(k)===0)delete _tx[key]};im.src='assets/parts/'+k+'.png'}
+for(const k of[]){const im=new Image();im.onload=()=>{_pimg[k]=im;for(const key in _tx)if(key.indexOf(k)===0)delete _tx[key]};im.src='assets/parts/'+k+'.png'}
 /* the sheet's skin tone is recoloured to the fighter's skin: every pixel keeps its light / dark relation to the sheet's base tone */
 function bakeTex(kind,base){const key=kind+base+(_pimg[kind]?1:0);if(_tx[key])return _tx[key];const im=_pimg[kind];
   if(im){const c=document.createElement('canvas');c.width=im.width;c.height=im.height;const g=c.getContext('2d');g.drawImage(im,0,0);let id;try{id=g.getImageData(0,0,c.width,c.height)}catch(e){id=null}
@@ -208,10 +208,10 @@ function torsoFlat(ctx,J,H,M,sk,d,lk,B){const sp=[J.hip,J.mid,J.sh,J.nk];const s
   const at=s=>{const L=s*TL;let i=1;while(i<3&&segL[i]<L)i++;const a=sp[i-1],b=sp[i],k=(L-segL[i-1])/((segL[i]-segL[i-1])||1);const tx=b.x-a.x,ty=b.y-a.y,l=Math.hypot(tx,ty)||1;return{x:a.x+tx*k,y:a.y+ty*k,nx:ty/l*d,ny:-tx/l*d}};
   const pt=(s,w)=>{const c=at(s);return{x:c.x+c.nx*w*M/.94/1,y:c.y+c.ny*w*M/.94}};
   const bel=lk.belly||lk.body==='belly'?.042:lk.body==='soft'?.017:0;const shb=lk.body==='broad'?1.14:1;/* broad: wider chest and upper back */
-  const FR=[[0,.072+bel*.3],[.16,.066+bel*.8],[.32,.064+bel],[.48,.065+bel*.7],[.6,.068],[.7,.072*shb],[.8,.066*shb],[.88,.052*shb],[.94,.04],[1,.036]];/* side view of the proportion chart: flat chest, no pec bulge */
-  const BK=[[0,.088],[.1,.082],[.24,.064+bel*.3],[.38,.06+bel*.2],[.52,.068],[.64,.078*shb],[.74,.084*shb],[.84,.078*shb],[.92,.062],[1,.046]];/* the back climbs smoothly from the lumbar curve over the shoulder blades into the trapezius and the neck */
+  const FR=[[0,.07+bel*.3],[.14,.064+bel*.8],[.3,.062+bel],[.46,.064+bel*.7],[.6,.066],[.7,.068*shb],[.8,.062*shb],[.88,.05*shb],[.94,.04],[1,.036]];/* side view of the proportion wireframe: straight chest, no pec bulge */
+  const BK=[[0,.086],[.1,.078],[.22,.062+bel*.3],[.36,.058+bel*.2],[.5,.066],[.62,.078*shb],[.72,.088*shb],[.82,.084*shb],[.9,.07],[.96,.056],[1,.05]];/* lumbar curve in, shoulder blades out, then a long slope up the trapezius into the nape */
   const F=FR.map(([s,w])=>pt(s,w)),Bk=BK.map(([s,w])=>pt(s,-w));
-  if(sk.far){/* the neck is part of the torso picture: the outline runs on up to the skull */F.push(pt(1.05,.04),pt(1.13,.036));Bk.push(pt(1.05,-.052),pt(1.13,-.044))}
+  if(sk.far){/* the neck belongs to the torso: it rises from the trapezius and leans slightly forward under the skull */F.push(pt(1.06,.04),pt(1.14,.04));Bk.push(pt(1.04,-.046),pt(1.14,-.036))}
   poly(ctx,F.concat(Bk.slice().reverse()),sk.base,ROUND*2.2);
   if(FS.outline)thinLine(ctx,F.concat(Bk.slice().reverse()),sk.base);
   const TD=sk.far&&FS.detail;
@@ -222,7 +222,11 @@ function torsoFlat(ctx,J,H,M,sk,d,lk,B){const sp=[J.hip,J.mid,J.sh,J.nk];const s
   /* abs: flat blocks along the front edge */
 
   if(FS.detail)detailIn(ctx,F.concat(Bk.slice().reverse()),F,Bk,sk.base,.012*M,(hi,lo)=>{const dk=shade(sk.base,-.3);
-    if(!(TD&&layTorso(ctx,pt,sk.base,1.13))){fac(ctx,[pt(.7,-.1),pt(.3,-.1),pt(.3,-.04),pt(.7,-.05)],lo,.3,0);fac(ctx,[pt(.5,.1),pt(.15,.1),pt(.15,.05),pt(.5,.05)],hi,.25,0)}
+    if(TD){const T=1.14;/* trapezius slope from the neck down to the shoulder */fac(ctx,[pt(.98,-.05),pt(.86,-.09),pt(.82,-.02),pt(.97,.0)],lo,.32,0);
+      /* sternocleidomastoid: the cord running from behind the ear down to the collar */fac(ctx,[pt(1.1,.02),pt(1.14,.028),pt(.99,.034),pt(.97,.02)],hi,.38,0);
+      /* shoulder blade plane and the lat below it */fac(ctx,[pt(.8,-.09),pt(.66,-.082),pt(.58,-.03),pt(.74,-.02)],hi,.34,0);fac(ctx,[pt(.56,-.07),pt(.34,-.06),pt(.34,-.01),pt(.52,-.02)],lo,.32,0);
+      /* ribs / serratus and the side of the abdomen */fac(ctx,[pt(.6,.02),pt(.46,.04),pt(.44,.0),pt(.56,-.01)],lo,.3,0);fac(ctx,[pt(.36,.06),pt(.14,.06),pt(.14,.03),pt(.36,.034)],hi,.3,0)}
+    else{fac(ctx,[pt(.7,-.1),pt(.3,-.1),pt(.3,-.04),pt(.7,-.05)],lo,.3,0);fac(ctx,[pt(.5,.1),pt(.15,.1),pt(.15,.05),pt(.5,.05)],hi,.25,0)}
     {const ow=B&&B._owner,sevB=ow&&ow.hp?clamp((100-ow.hp.body)/100*1.25-.1,0,1):0;bruises(ctx,(s,w)=>pt(s,w/M),[[.5,.035,.06],[.38,.03,.055],[.6,.0,.05],[.28,.04,.05],[.7,.03,.045]],sevB,111,M,0)}
     });
   /* blood streaming down the chest */

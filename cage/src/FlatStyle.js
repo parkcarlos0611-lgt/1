@@ -177,7 +177,7 @@ function footFlat(ctx,A,He,T,M,C,d){const ux0=T.x-He.x,uy0=T.y-He.y,Lf=Math.hypo
 
 /* ---------- torso: lats, pecs, abs, obliques ---------- */
 function torsoFlat(ctx,J,H,M,sk,d,lk,B){const sp=[J.hip,J.mid,J.sh,J.nk];const segL=[0];for(let i=1;i<4;i++)segL.push(segL[i-1]+Math.hypot(sp[i].x-sp[i-1].x,sp[i].y-sp[i-1].y));const TL=segL[3]||1;
-  const at=s=>{const L=s*TL;let i=1;while(i<3&&segL[i]<L)i++;const a=sp[i-1],b=sp[i],k=(L-segL[i-1])/((segL[i]-segL[i-1])||1);const tx=b.x-a.x,ty=b.y-a.y,l=Math.hypot(tx,ty)||1;return{x:a.x+tx*k,y:a.y+ty*k,nx:ty/l*d,ny:-tx/l*d}};
+  const at=s=>{const L=s*TL*.962;/* the torso stops lower, under the neck line */let i=1;while(i<3&&segL[i]<L)i++;const a=sp[i-1],b=sp[i],k=(L-segL[i-1])/((segL[i]-segL[i-1])||1);const tx=b.x-a.x,ty=b.y-a.y,l=Math.hypot(tx,ty)||1;return{x:a.x+tx*k,y:a.y+ty*k,nx:ty/l*d,ny:-tx/l*d}};
   const pt=(s,w)=>{const c=at(s);return{x:c.x+c.nx*w*M/.94/1,y:c.y+c.ny*w*M/.94}};
   const bel=lk.belly||lk.body==='belly'?.042:lk.body==='soft'?.017:0;const shb=lk.body==='broad'?1.14:1;/* broad: wider chest and upper back */
   const FR=[[0,.074+bel*.3],[.16,.068+bel*.8],[.32,.066+bel],[.48,.067+bel*.7],[.6,.074],[.7,.074*shb],[.79,.066*shb],[.87,.052*shb],[.94,.038],[1,.028]];

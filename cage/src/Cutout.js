@@ -28,9 +28,9 @@ function load(name){let S=CO.sets[name];if(S)return S;S=CO.sets[name]={ready:fal
 CO.body=false;
 /* the neck as a bending strip: horizontal slices from the skull down to the shoulders, each turned by an angle between the head's and the trunk's, so the back of the neck folds when the head tips forward or back */
 function neck(ctx,S2,hd,nk,B,d,ku,H,skin){const m=S2.m,P=S2.meta.parts.head2,p0=P.p0,qb=m.neckPivot,y0=m.neckTop,y1=m.neckBot,W=m.w;const J=B.J,mm=d;
-  const nrm=(x,y)=>{const l=Math.hypot(x,y)||1;return[x/l,y/l]};const uH=nrm(hd.x-nk.x,hd.y-nk.y),uT=nrm(nk.x-J.sh.x,nk.y-J.sh.y);const aH=Math.atan2(uH[1],uH[0])-Math.PI/2,aT=Math.atan2(uT[1],uT[0])-Math.PI/2;let da=aT-aH;while(da>Math.PI)da-=2*Math.PI;while(da<-Math.PI)da+=2*Math.PI;
+  const nrm=(x,y)=>{const l=Math.hypot(x,y)||1;return[x/l,y/l]};const uH=nrm(hd.x-nk.x,hd.y-nk.y),uT=nrm(nk.x-J.sh.x,nk.y-J.sh.y);const aH=Math.atan2(uH[1],uH[0])-Math.PI/2,aT=Math.atan2(uT[1],uT[0])-Math.PI/2;let da=(aT-aH)*.25;/* nearly straight: only a slight bend */while(da>Math.PI)da-=2*Math.PI;while(da<-Math.PI)da+=2*Math.PI;
   const wh=(qx,qy)=>{const x=mm*(qx-p0[0])*ku,y=-(qy-p0[1])*ku,c=Math.cos(aH),s=Math.sin(aH);return{x:hd.x+c*x-s*y,y:hd.y+s*x+c*y}};
-  const Wb=wh(qb[0],qb[1]);Wb.x+=(hd.x-Wb.x)*.2;Wb.y+=(hd.y-Wb.y)*.2;/* the neck texture ends higher: shorter */Wb.x+=d*.04*H;Wb.y-=.004*H;/* and sits further forward (right) *//* the base of the neck sits further toward the chest */const wt=(qx,qy)=>{const x=mm*(qx-qb[0])*ku,y=-(qy-qb[1])*ku,c=Math.cos(aT),s=Math.sin(aT);return{x:Wb.x+c*x-s*y,y:Wb.y+s*x+c*y}};
+  const Wb=wh(qb[0],qb[1]);Wb.x+=(hd.x-Wb.x)*.2;Wb.y+=(hd.y-Wb.y)*.2;/* shorter; straight down the head's own axis, no sideways pull *//* the base of the neck sits further toward the chest */const wt=(qx,qy)=>{const x=mm*(qx-qb[0])*ku,y=-(qy-qb[1])*ku,c=Math.cos(aT),s=Math.sin(aT);return{x:Wb.x+c*x-s*y,y:Wb.y+s*x+c*y}};
   const N=24,step=(y1-y0)/N,rows=m.neckRows;
   /* opaque backing: a solid skin column under the slices so no seam ever shows the background through the neck */
   const L=[],R=[];for(let i=0;i<=N;i++){const y=Math.min(y1-1,y0+i*step),t=i/N,sm=t*t*(3-2*t),r=rows&&rows[Math.round(y)];if(!r)continue;const cx=qb[0];

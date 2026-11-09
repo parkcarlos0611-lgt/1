@@ -146,7 +146,7 @@ Body.prototype.draw=function(ctx,o){o=o||{};const lk=this.look;if(window.CUTOUT&
   const ow=this._owner,hpo=ow&&ow.hp,sevL=hpo?clamp((100-hpo.legs)/100*1.25-.1,0,1):0,sevA=ow?clamp((ow._armD||0)/32,0,1):0,LS=H0=>{const D=LD;if(!D)return 1;const sd=H0==='lH'?'l':'r',tot=D.l+D.r;return tot<1?1:clamp(.5+.9*D[sd]/tot,.45,1.25)},flA=ow&&ow._armFlash>0?ow._armFlash/.32:0,LD=ow&&ow._legD;
   const self=this;
   /* ---- arm: deltoid, biceps/triceps, elbow, forearm, wrist, glove ---- */
-  const arm=(S,isFar)=>{const e=J[S.E],w=J[S.W],a=(!isFar&&!R&&this._dl)?this._dl:lerp(J[S.S],J.mid,R?.2:.32);/* the near upper arm starts at the centre of the deltoid region of the torso *//* the drawn shoulder sits well below the neck, so it never covers the face */const C=isFar?{b:sk.far,s:sk.farSh}:{b:sk.base,s:sk.sh};
+  const arm=(S,isFar)=>{const e=J[S.E],w=J[S.W],a=(!isFar&&this._dl)?this._dl:lerp(J[S.S],J.mid,R?.2:.32);/* the near upper arm starts at the centre of the deltoid region of the torso *//* the drawn shoulder sits well below the neck, so it never covers the face */const C=isFar?{b:sk.far,s:sk.farSh}:{b:sk.base,s:sk.sh};
     joint(ctx,e,.031*M,C.b);/* the elbow sits behind both segments so the shading runs through it */
     /* upper arm: deltoid cap → biceps (front) / triceps (back) → elbow */
     const Pa=limb(ctx,a,e,d,R?[[.5,.05*M,.05*M],[.78,.04*M,.04*M],[1,.031*M,.033*M]]:[[-.04,.05*M*SHB,.055*M*SHB],[.12,.062*M*SHB,.064*M*SHB],[.3,.052*M,.058*M],[.5,.05*M,.05*M],[.78,.04*M,.04*M],[1,.031*M,.033*M]],C.b,C.s,{noCaps:isFar||R,armLine:!isFar});/* a sleeve covers the shoulder of the referee / coach: no skin up there *//* the far shoulder gets no round cap: it would poke out above the back */
@@ -227,11 +227,11 @@ function torsoFlat(ctx,J,H,M,sk,d,lk,B){const sp=[J.hip,J.mid,J.sh,J.nk];const s
   const bel=lk.belly||lk.body==='belly'?.042:lk.body==='soft'?.017:0;const shb=lk.body==='broad'?1.14:1;/* broad: wider chest and upper back */
   const FR=[[0,.07+bel*.3],[.14,.064+bel*.8],[.3,.062+bel],[.46,.064+bel*.7],[.6,.066],[.7,.068*shb],[.8,.062*shb],[.88,.05*shb],[.94,.04],[1,.036]];/* side view of the proportion wireframe: straight chest, no pec bulge */
   const BK=[[0,.086],[.1,.078],[.22,.062+bel*.3],[.36,.058+bel*.2],[.5,.066],[.62,.072*shb],[.72,.078*shb],[.82,.076*shb],[.9,.07],[.96,.062],[1,.056]];/* lumbar curve in, shoulder blades out, then a long slope up the trapezius into the nape */
-  const tk=1.03*(1-.03*(1-CLASS_T(B.W)));/* heavyweight torso 3 % thicker than before; lighter classes down to 3 % under the heavyweight */let F,Bk;if(sk.far){F=TMAP.R.map(([x,y])=>pt(tmS(y),tmW(x)*tk));Bk=TMAP.L.slice().reverse().map(([x,y])=>pt(tmS(y),tmW(x)*tk));B._dl=pt(tmS(TMAP.delt[1]),tmW(TMAP.delt[0])*tk)}else{F=FR.map(([s,w])=>pt(s,w));Bk=BK.map(([s,w])=>pt(s,-w))}
-  if(sk.far)B._tt={f:F[F.length-1],b:Bk[Bk.length-1]};/* top corners: the nape bridge is joined here */
+  const tk=1.03*(1-.03*(1-CLASS_T(B.W)));/* heavyweight torso 3 % thicker than before; lighter classes down to 3 % under the heavyweight */let F,Bk;if(sk.far||lk.ref){F=TMAP.R.map(([x,y])=>pt(tmS(y),tmW(x)*tk));Bk=TMAP.L.slice().reverse().map(([x,y])=>pt(tmS(y),tmW(x)*tk));B._dl=pt(tmS(TMAP.delt[1]),tmW(TMAP.delt[0])*tk)}else{F=FR.map(([s,w])=>pt(s,w));Bk=BK.map(([s,w])=>pt(s,-w))}
+  if(sk.far||lk.ref)B._tt={f:F[F.length-1],b:Bk[Bk.length-1]};/* top corners: the nape bridge is joined here */
   poly(ctx,F.concat(Bk.slice().reverse()),sk.base,ROUND*2.2);
   if(FS.outline)thinLine(ctx,F.concat(Bk.slice().reverse()),sk.base);
-  const TD=sk.far&&FS.detail;
+  const TD=(sk.far||lk.ref)&&FS.detail;
   /* lats / spine side: shadow plane on the back */
   poly(ctx,BK.map(([s,w])=>pt(s,-w*.32)).concat(Bk.slice().reverse()),sk.sh);
   /* trapezius slope + clavicle line */poly(ctx,[pt(.9,-.08),pt(1,-.045),pt(1,.0),pt(.93,-.02)],sk.sh);
@@ -239,7 +239,7 @@ function torsoFlat(ctx,J,H,M,sk,d,lk,B){const sp=[J.hip,J.mid,J.sh,J.nk];const s
   /* abs: flat blocks along the front edge */
 
   if(FS.detail)detailIn(ctx,F.concat(Bk.slice().reverse()),F,Bk,sk.base,.012*M,(hi,lo)=>{const dk=shade(sk.base,-.3);
-    if(TD){for(const k in TMAP.reg){const[t,pts]=TMAP.reg[k];ctx.fillStyle=shade(sk.base,t);ctx.beginPath();pts.forEach(([x,y],i)=>{const q=pt(tmS(y),tmW(x)*tk);i?ctx.lineTo(q.x,q.y):ctx.moveTo(q.x,q.y)});ctx.closePath();ctx.fill();
+    if(TD){for(const k in TMAP.reg){const[t,pts]=TMAP.reg[k];ctx.fillStyle=(lk.ref&&k==='neck'&&lk.skin)?lk.skin:shade(sk.base,t);ctx.beginPath();pts.forEach(([x,y],i)=>{const q=pt(tmS(y),tmW(x)*tk);i?ctx.lineTo(q.x,q.y):ctx.moveTo(q.x,q.y)});ctx.closePath();ctx.fill();
         ctx.save();ctx.strokeStyle=shade(sk.base,-.34);ctx.globalAlpha=.55;ctx.lineWidth=.004*M;ctx.lineJoin='round';ctx.stroke();ctx.restore()}}
     else{fac(ctx,[pt(.7,-.1),pt(.3,-.1),pt(.3,-.04),pt(.7,-.05)],lo,.3,0);fac(ctx,[pt(.5,.1),pt(.15,.1),pt(.15,.05),pt(.5,.05)],hi,.25,0)}
     {const ow=B&&B._owner,sevB=ow&&ow.hp?clamp((100-ow.hp.body)/100*1.25-.1,0,1):0;bruises(ctx,(s,w)=>pt(s,w/M),[[.5,.035,.06],[.38,.03,.055],[.6,.0,.05],[.28,.04,.05],[.7,.03,.045]],sevB,111,M,0)}

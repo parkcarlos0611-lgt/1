@@ -53,14 +53,23 @@ const TEX={
  thigh:[[-.16,[[.04,-1],[.92,-.78],[1,-.18],[.3,-.08]]],[.09,[[.04,.98],[.86,.78],[.92,.12],[.3,.22]]],[.07,[[.55,.2],[.97,.4],[.97,-.08]]],[-.1,[[.18,.04],[.92,0],[.92,-.1],[.18,-.04]]],[-.08,[[.9,-1],[1,-1],[1,1],[.9,1]]]],
  shin:[[.08,[[.04,-.95],[.5,-.88],[.58,-.2],[.1,-.1]]],[-.15,[[.1,-1],[.72,-1],[.82,-.55],[.2,-.65]]],[.1,[[.04,.82],[.92,.56],[.92,.38],[.04,.6]]],[-.09,[[.15,-.1],[.82,-.26],[.82,-.36],[.15,-.2]]],[-.07,[[.92,-1],[1,-1],[1,1],[.92,1]]]]
 };
-const _tx={};
-function bakeTex(kind,base){const key=kind+base;if(_tx[key])return _tx[key];const W=96,Hh=64,c=document.createElement('canvas');c.width=W;c.height=Hh;const g=c.getContext('2d');g.fillStyle=base;g.fillRect(0,0,W,Hh);
+const _tx={},_pimg={},PFLIP={uarm:0,farm:0,thigh:0,shin:0};
+for(const k of['uarm','farm','thigh','shin']){const im=new Image();im.onload=()=>{_pimg[k]=im;for(const key in _tx)if(key.indexOf(k)===0)delete _tx[key]};im.src='assets/parts/'+k+'.png'}
+/* the sheet's skin tone is recoloured to the fighter's skin: every pixel keeps its light / dark relation to the sheet's base tone */
+function bakeTex(kind,base){const key=kind+base+(_pimg[kind]?1:0);if(_tx[key])return _tx[key];const im=_pimg[kind];
+  if(im){const c=document.createElement('canvas');c.width=im.width;c.height=im.height;const g=c.getContext('2d');g.drawImage(im,0,0);let id;try{id=g.getImageData(0,0,c.width,c.height)}catch(e){id=null}
+    if(id){const D=id.data,b=rgbOf(base),R=[247,176,125];for(let i=0;i<D.length;i+=4){for(let q=0;q<3;q++)D[i+q]=Math.max(0,Math.min(255,b[q]*D[i+q]/R[q]))}g.putImageData(id,0,0);c._img=1;return _tx[key]=c}}
+  const W=96,Hh=64,c=document.createElement('canvas');c.width=W;c.height=Hh;const g=c.getContext('2d');g.fillStyle=base;g.fillRect(0,0,W,Hh);
   for(const[k,pts]of TEX[kind]){g.fillStyle=shade(base,k);g.beginPath();pts.forEach(([u,v],i)=>{const x=u*W,y=(v+1)/2*Hh;i?g.lineTo(x,y):g.moveTo(x,y)});g.closePath();g.fill()}
   return _tx[key]=c}
 /* lay the baked picture of a part over the part's own outline */
-function laySkin(ctx,PX,kind,base){if(!TEX[kind])return;const F=PX.F,rows=PX.rows,L=F.L;let mf=0,mb=0;for(const r of rows){mf=Math.max(mf,r[1]);mb=Math.max(mb,r[2])}const img=bakeTex(kind,base),W=img.width,Hh=img.height;
-  const t0=rows[0][0],t1=rows[rows.length-1][0],Lu=L*(t1-t0);const ox=PX.a.x+F.ux*L*t0-F.nx*mb,oy=PX.a.y+F.uy*L*t0-F.ny*mb;
-  ctx.save();ctx.transform(Lu*F.ux/W,Lu*F.uy/W,(mf+mb)*F.nx/Hh,(mf+mb)*F.ny/Hh,ox,oy);ctx.imageSmoothingEnabled=true;ctx.drawImage(img,0,0);ctx.restore()}
+function laySkin(ctx,PX,kind,base){const F=PX.F,rows=PX.rows,L=F.L;let mf=0,mb=0;for(const r of rows){mf=Math.max(mf,r[1]);mb=Math.max(mb,r[2])}const img=bakeTex(kind,base),W=img.width,Hh=img.height;
+  const t0=rows[0][0],t1=rows[rows.length-1][0],Lu=L*(t1-t0);const sgn=PFLIP[kind]?-1:1;
+  ctx.save();ctx.imageSmoothingEnabled=true;
+  if(img._img){/* sheet picture: image y runs along the bone, image x across it */const ox=PX.a.x+F.ux*L*t0-F.nx*mb*sgn+(sgn<0?F.nx*(mf+mb):0)*0,oy=PX.a.y+F.uy*L*t0-F.ny*mb*sgn;
+    const fx=sgn>0?-mb:mf;ctx.transform((mf+mb)*F.nx*sgn/W,(mf+mb)*F.ny*sgn/W,Lu*F.ux/Hh,Lu*F.uy/Hh,PX.a.x+F.ux*L*t0+F.nx*fx,PX.a.y+F.uy*L*t0+F.ny*fx)}
+  else{const ox=PX.a.x+F.ux*L*t0-F.nx*mb,oy=PX.a.y+F.uy*L*t0-F.ny*mb;ctx.transform(Lu*F.ux/W,Lu*F.uy/W,(mf+mb)*F.nx/Hh,(mf+mb)*F.ny/Hh,ox,oy)}
+  ctx.drawImage(img,0,0);ctx.restore()}
 /* a fold at a bent joint: the inside of the bend darkens, the outside catches light */
 function foldAt(ctx,j,dirIn,dirOut,r,base){const cr=dirIn.x*dirOut.y-dirIn.y*dirOut.x,dt=dirIn.x*dirOut.x+dirIn.y*dirOut.y,ang=Math.acos(Math.max(-1,Math.min(1,dt)));if(ang<.35)return;
   const k=Math.min(1,(ang-.35)/1.4),lo=rgbOf(shade(base,-.34));ctx.save();ctx.fillStyle=`rgba(${lo[0]},${lo[1]},${lo[2]},${.62*k})`;ctx.beginPath();ctx.moveTo(j.x,j.y);

@@ -6,7 +6,7 @@
 (function(){
 if(typeof Match==='undefined'||typeof F2==='undefined')return;
 const clamp=(v,a,b)=>v<a?a:v>b?b:v;
-const DUR=12,STOOL_X=2.75;
+const DUR=12,STOOL_X=3.2;
 function armTo(F,P,side,T,w){if(w<=0)return;const tmp=Object.assign({},P);armIK(F,tmp,side,T);P[side+'_s']+=(tmp[side+'_s']-P[side+'_s'])*w;P[side+'_e']+=(tmp[side+'_e']-P[side+'_e'])*w;P[side==='la'?'lo':'ro']=tmp[side==='la'?'lo':'ro']}
 const COACH_LOOKS=[
   {skin:'#d9a882',hair:'#2a2420',hs:'short',bd:'stub',cshort:0},
@@ -19,20 +19,23 @@ function mkCoach(M,side){const base=COACH_LOOKS[(side+Math.floor(Math.random()*2
   const c=new F2({side,name:'coach'+side,look,x:0});c.A={footwork:14,speed:12};c.coachSide=side;return c}
 const SEAT={free:1,y:.5,rot:0,lean:-.1,chest:.02,head:.1,tw:0,ll_h:1.5,ll_k:1.5,ll_a:.12,rl_h:1.38,rl_k:1.55,rl_a:.12,la_s:.42,la_e:.7,ra_s:.34,ra_e:.82};
 
-function start(M){if(M.corner)return;M.cornerX=Math.min(STOOL_X,(M.stage.R||3)-.4);try{M._sepSpd=REF.separateSpeed;REF.separateSpeed=2.8}catch(e){}M.cornerPick='rest';
-  M.corner={t:0,dur:DUR,seated:[0,0],coaches:[mkCoach(M,0),mkCoach(M,1)]};
+function start(M){if(M.corner)return;M.cornerX=Math.min(STOOL_X,(M.stage.R||3)-.3);try{M._sepSpd=REF.separateSpeed;REF.separateSpeed=0}catch(e){}M.cornerPick='rest';
+  const fd=document.createElement('div');fd.className='cnrfade';M.root.appendChild(fd);M.corner={t:0,dur:DUR,seated:[0,0],fade:fd,placed:0,coaches:[mkCoach(M,0),mkCoach(M,1)]};
   /* a slim, non-blocking bar: round stats and a skip button */
   const rs=M.rs,esc=n=>n;const bar=document.createElement('div');bar.className='cnrbar';
   bar.innerHTML=`<b>ROUND ${M.round} 종료</b><span>코너 휴식 · 코치가 처치 중</span><span class="cnrst">유효타 ${rs[0].sigL} : ${rs[1].sigL} · 다운 ${rs[0].kd} : ${rs[1].kd}</span><i class="cnrt"></i><button data-skip>SKIP ▶</button>`;
   M.root.appendChild(bar);M.corner.bar=bar;bar.querySelector('[data-skip]').onclick=()=>finish(M);
-  if(!document.getElementById('cnrcss')){const st=document.createElement('style');st.id='cnrcss';st.textContent='.cnrbar{position:absolute;left:50%;bottom:44px;transform:translateX(-50%);display:flex;gap:14px;align-items:center;background:rgba(8,9,12,.82);border:1px solid rgba(255,255,255,.18);padding:8px 16px;border-radius:4px;color:#eceef2;font:500 13px "Noto Sans KR",sans-serif;z-index:30;white-space:nowrap}.cnrbar b{letter-spacing:.08em}.cnrbar .cnrt{display:block;width:90px;height:4px;background:rgba(255,255,255,.18);position:relative}.cnrbar .cnrt:after{content:"";position:absolute;left:0;top:0;bottom:0;width:var(--p,0%);background:#5fa8ff}.cnrbar button{background:rgba(255,255,255,.1);color:#fff;border:1px solid rgba(255,255,255,.3);padding:4px 10px;font:inherit;cursor:pointer}';document.head.appendChild(st)}}
-function finish(M){const C=M.corner;if(!C)return;M.corner=null;if(C.bar)C.bar.remove();for(const f of M.f){f.gpose=null;f.seated=0}M.cornerX=null;try{if(M._sepSpd!=null)REF.separateSpeed=M._sepSpd}catch(e){}if(M.phase==='break')M.nextRound()}
+  if(!document.getElementById('cnrcss')){const st=document.createElement('style');st.id='cnrcss';st.textContent='.cnrfade{position:absolute;inset:0;background:#000;opacity:0;pointer-events:none;z-index:70}.cnrbar{position:absolute;left:50%;bottom:44px;transform:translateX(-50%);display:flex;gap:14px;align-items:center;background:rgba(8,9,12,.82);border:1px solid rgba(255,255,255,.18);padding:8px 16px;border-radius:4px;color:#eceef2;font:500 13px "Noto Sans KR",sans-serif;z-index:30;white-space:nowrap}.cnrbar b{letter-spacing:.08em}.cnrbar .cnrt{display:block;width:90px;height:4px;background:rgba(255,255,255,.18);position:relative}.cnrbar .cnrt:after{content:"";position:absolute;left:0;top:0;bottom:0;width:var(--p,0%);background:#5fa8ff}.cnrbar button{background:rgba(255,255,255,.1);color:#fff;border:1px solid rgba(255,255,255,.3);padding:4px 10px;font:inherit;cursor:pointer}';document.head.appendChild(st)}}
+function finish(M){const C=M.corner;if(!C)return;M.corner=null;if(C.bar)C.bar.remove();if(C.fade){C.fade.style.opacity=1;M._fx={el:C.fade,t:0}}for(const f of M.f){f.gpose=null;f.seated=0}M.cornerX=null;try{if(M._sepSpd!=null)REF.separateSpeed=M._sepSpd}catch(e){}if(M.phase==='break')M.nextRound()}
 {const sb=Match.prototype.showBreak;Match.prototype.showBreak=function(){start(this)}}
 Match.prototype.cpuCorner=function(){return'rest'};
 /* every frame of the break */
-{const st=Match.prototype.step;Match.prototype.step=function(dt){const r=st.call(this,dt);const C=this.corner;if(!C||this.phase!=='break')return r;
+{const st=Match.prototype.step;Match.prototype.step=function(dt){const r=st.call(this,dt);if(this._fx){this._fx.t+=dt;this._fx.el.style.opacity=Math.max(0,1-this._fx.t/.5).toFixed(3);if(this._fx.t>=.5){this._fx.el.remove();this._fx=null}}const C=this.corner;if(!C||this.phase!=='break')return r;
   C.t+=dt;const X=this.cornerX||STOOL_X;
-  this.f.forEach((f,i)=>{const sx=i?X:-X,arrived=Math.abs(f.x-sx)<.08&&f.state==='stand';
+  /* a short blackout after the bell, the move to the corners happens in the dark, then the picture fades back in */
+  {const t=C.t,T1=.45,T2=.8,T3=1.5,end=C.dur-.5;let op=t<T1?t/T1:t<T2?1:t<T3?1-(t-T2)/(T3-T2):0;if(t>end)op=Math.max(op,(t-end)/.5);if(C.fade)C.fade.style.opacity=op.toFixed(3);
+    if(t>=T1&&!C.placed){C.placed=1;this.f.forEach((f,i)=>{f.x=i?X:-X;f.vx=0;f.act=null;f.queue=[];f.state='stand';C.seated[i]=1});this.stage.cam.x=0}}
+  this.f.forEach((f,i)=>{const sx=i?X:-X,arrived=C.placed&&Math.abs(f.x-sx)<.08&&f.state==='stand';
     if(arrived){C.seated[i]=Math.min(1,C.seated[i]+dt*2.2);f.x=sx;const p=Object.assign({},BASE_POSE,SEAT);f.gpose=p;f.gRate=7;f.seated=C.seated[i];
       /* recovery: slow and automatic */
       f.sta=Math.min(f.staMax,f.sta+dt*3.6);f.hp.head=Math.min(100,f.hp.head+dt*.45);f.hp.body=Math.min(100,f.hp.body+dt*.55);f.hp.legs=Math.min(100,f.hp.legs+dt*.6);f.stun=0;f.rock=0;

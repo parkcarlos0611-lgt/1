@@ -57,14 +57,14 @@ function limb(ctx,a,b,d,rows,col,shCol,extra){const F=frame(a,b,d);const P=(t,w)
 
 /* ---------- body detail: low-poly muscle planes, core shadows and rim light — everything is clipped to the part's own outline, so nothing leaves the body ---------- */
 FS.detail=1;FS.outline=true;FS.blur=false;/* the white motion-blur trails are off */
-const fac=(ctx,pts,col,al,R)=>{ctx.globalAlpha=al;poly(ctx,pts,col,R==null?0:R);ctx.globalAlpha=1};
+const fac=(ctx,pts,col,al,R)=>{ctx.globalAlpha=Math.min(1,al*1.4);poly(ctx,pts,col,R==null?0:R);ctx.globalAlpha=1};
 const strip=(ctx,P,t0,t1,a0,b0,a1,b1,col,al)=>fac(ctx,[P(t0,a0),P(t1,a1),P(t1,b1),P(t0,b0)],col,al,ROUND*.5);
 /* run fn(hi,lo) with the part's outline as a clip; then shade the edges: dark core shadow along the back, light rim along the front */
 function detailIn(ctx,out,front,back,base,lw,fn){ctx.save();ctx.beginPath();rpath(ctx,out,ROUND*2.2);ctx.clip();
-  fn(shade(base,.1),shade(base,-.2));
+  fn(shade(base,.14),shade(base,-.27));
   ctx.lineJoin='round';ctx.lineCap='round';
-  ctx.globalAlpha=.55;ctx.strokeStyle=shade(base,-.38);ctx.lineWidth=lw*2.8;ctx.beginPath();back.forEach((q,i)=>i?ctx.lineTo(q.x,q.y):ctx.moveTo(q.x,q.y));ctx.stroke();
-  ctx.globalAlpha=.55;ctx.strokeStyle=shade(base,.2);ctx.lineWidth=lw*1.8;ctx.beginPath();front.forEach((q,i)=>i?ctx.lineTo(q.x,q.y):ctx.moveTo(q.x,q.y));ctx.stroke();
+  ctx.globalAlpha=.72;ctx.strokeStyle=shade(base,-.42);ctx.lineWidth=lw*3.2;ctx.beginPath();back.forEach((q,i)=>i?ctx.lineTo(q.x,q.y):ctx.moveTo(q.x,q.y));ctx.stroke();
+  ctx.globalAlpha=.65;ctx.strokeStyle=shade(base,.24);ctx.lineWidth=lw*2;ctx.beginPath();front.forEach((q,i)=>i?ctx.lineTo(q.x,q.y):ctx.moveTo(q.x,q.y));ctx.stroke();
   ctx.globalAlpha=1;ctx.restore()}
 
 /* ---------- damage marks: bruises that follow the part's hp (body / legs) and the guard damage (arms); clipped by detailIn ---------- */
@@ -92,17 +92,18 @@ Body.prototype.draw=function(ctx,o){o=o||{};const lk=this.look;if(window.CUTOUT&
   const ow=this._owner,hpo=ow&&ow.hp,sevL=hpo?clamp((100-hpo.legs)/100*1.25-.1,0,1):0,sevA=ow?clamp((ow._armD||0)/32,0,1):0,LS=H0=>{const D=LD;if(!D)return 1;const sd=H0==='lH'?'l':'r',tot=D.l+D.r;return tot<1?1:clamp(.5+.9*D[sd]/tot,.45,1.25)},flA=ow&&ow._armFlash>0?ow._armFlash/.32:0,LD=ow&&ow._legD;
   const self=this;
   /* ---- arm: deltoid, biceps/triceps, elbow, forearm, wrist, glove ---- */
-  const arm=(S,isFar)=>{const a=J[S.S],e=J[S.E],w=J[S.W];const C=isFar?{b:sk.far,s:sk.farSh}:{b:sk.base,s:sk.sh};
+  const arm=(S,isFar)=>{const e=J[S.E],w=J[S.W],a=lerp(J[S.S],J.mid,R?.12:.22);/* the drawn shoulder sits well below the neck, so it never covers the face */const C=isFar?{b:sk.far,s:sk.farSh}:{b:sk.base,s:sk.sh};
     /* upper arm: deltoid cap → biceps (front) / triceps (back) → elbow */
     const Pa=limb(ctx,a,e,d,[[-.04,.05*M*SHB,.055*M*SHB],[.12,.062*M*SHB,.064*M*SHB],[.3,.052*M,.058*M],[.5,.05*M,.05*M],[.78,.04*M,.04*M],[1,.031*M,.033*M]],C.b,C.s,isFar?{noCaps:true}:null);/* the far shoulder gets no round cap: it would poke out above the back */
     if(!R&&FS.detail)detailIn(ctx,Pa.out,Pa.front,Pa.back,C.b,.012*M,(hi,lo)=>{const Pu=Pa.P;
+      {const[r_,g_,b_]=rgbOf(lo),gr=ctx.createLinearGradient(a.x,a.y+.065*M,a.x,a.y-.012*M);gr.addColorStop(0,`rgba(${r_},${g_},${b_},.62)`);gr.addColorStop(1,`rgba(${r_},${g_},${b_},0)`);ctx.fillStyle=gr;ctx.beginPath();ctx.arc(a.x,a.y,.085*M,0,7);ctx.fill()}/* only the top of the shoulder is shaded */
       strip(ctx,Pu,.18,.64,.0,.05*M,.0,.058*M,hi,.5);/* biceps: lit belly */
       strip(ctx,Pu,.1,.76,-.016*M,-.07*M,-.02*M,-.07*M,lo,.5);/* triceps: shadow side */
       fac(ctx,[Pu(.06,-.01*M),Pu(.2,.07*M),Pu(.2,-.07*M)],lo,.4,0);/* under the deltoid */
       strip(ctx,Pu,.6,1.02,-.07*M,.07*M,-.07*M,.07*M,lo,.18);/* the arm darkens toward the elbow */
       fac(ctx,[Pu(.62,.0),Pu(.98,.0),Pu(.8,.05*M)],hi,.3,0);bruises(ctx,Pu,[[.45,.02,.04],[.7,-.02,.035]],sevA*.8,31+(isFar?7:0),M,Math.atan2(Pa.F.uy,Pa.F.ux))});
     /* deltoid plate: a lighter facet over the shoulder */
-    if(R)limb(ctx,a,e,d,[[-.14,.07*M,.072*M],[.25,.07*M,.072*M],[.56,.064*M,.066*M]],isFar?CL.shirtS:CL.shirt,null);
+    if(R){const shc=isFar?CL.shirtS:CL.shirt,Ps=limb(ctx,a,e,d,[[-.02,.062*M,.064*M],[.25,.07*M,.072*M],[.56,.064*M,.066*M]],shc,null,{noCaps:true});if(FS.detail)detailIn(ctx,Ps.out,Ps.front,Ps.back,shc,.012*M,(hi,lo)=>{const[r_,g_,b_]=rgbOf(lo),gr=ctx.createLinearGradient(a.x,a.y+.06*M,a.x,a.y-.012*M);gr.addColorStop(0,`rgba(${r_},${g_},${b_},.6)`);gr.addColorStop(1,`rgba(${r_},${g_},${b_},0)`);ctx.fillStyle=gr;ctx.beginPath();ctx.arc(a.x,a.y,.08*M,0,7);ctx.fill();strip(ctx,Ps.P,.1,.9,-.02*M,-.07*M,-.02*M,-.066*M,lo,.5);strip(ctx,Ps.P,.1,.8,.02*M,.06*M,.02*M,.056*M,hi,.45)})}
     else{limb(ctx,a,e,d,[[.04,.034*M,.02*M],[.12,.05*M,.04*M],[.3,.034*M,.02*M]],isFar?C.b:sk.lt,null,{noCaps:true,noLine:true})}/* the deltoid facet stays inside the arm: no bump above the shoulder */
     /* forearm: flexor bulge near the elbow, narrow wrist */
     const Pf=limb(ctx,e,w,d,[[-.06,.032*M,.032*M],[.2,.038*M,.036*M],[.45,.033*M,.031*M],[.8,.025*M,.024*M],[1,.022*M,.022*M]],C.b,C.s);

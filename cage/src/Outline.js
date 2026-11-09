@@ -3,7 +3,7 @@
    is drawn on the real canvas and the body on top of it. Parts, layers and partial draws (ground, clinch) are left alone. */
 (function(){
 if(typeof Body==='undefined'||!window.FLAT_STYLE)return;
-const OL=window.BODY_OUTLINE={on:true,w:1,col:'rgba(18,10,6,.92)'};
+const OL=window.BODY_OUTLINE={on:true,w:1.5,col:'rgba(18,10,6,.92)'};
 let off=null,sil=null;
 const d0=Body.prototype.draw;
 Body.prototype.draw=function(ctx,o){o=o||{};

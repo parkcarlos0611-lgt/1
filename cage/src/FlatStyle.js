@@ -76,6 +76,21 @@ function layTorso(ctx,pt,base,S1){const img=bakeTex('torso',base);if(!img._img)r
   for(let k=0;k<N;k++){const y0=k*Hh/N,y1=(k+1)*Hh/N,s0=(1-y1/Hh)*S1,s1=(1-y0/Hh)*S1,A=pt(s0,0),B=pt(s1,0),n0=pt(s1,1),nv={x:n0.x-B.x,y:n0.y-B.y},hh=y1-y0;
     const cx=(wF+wB)/W,c=(A.x-B.x)/hh,d=(A.y-B.y)/hh;ctx.save();ctx.transform(cx*nv.x,cx*nv.y,c,d,B.x-wB*nv.x-c*y0,B.y-wB*nv.y-d*y0);ctx.imageSmoothingEnabled=true;ctx.drawImage(img,0,y0,W,Math.min(hh+1.5,Hh-y0),0,y0,W,Math.min(hh+1.5,Hh-y0));ctx.restore()}
   return true}
+
+/* ---------- torso built from the muscle-group map (side view, chest to the right): silhouette + 7 regions, coordinates of the map image ---------- */
+const TMAP={
+ L:[[360,95],[358,150],[330,180],[290,235],[262,285],[240,350],[236,420],[255,480],[272,520],[295,560],[300,600],[312,650],[340,720],[370,790],[392,850],[408,910],[418,960],[412,1010],[385,1040],[355,1090],[350,1112],[400,1150],[500,1215],[600,1275],[700,1325],[762,1342]],
+ R:[[770,1345],[790,1290],[815,1250],[828,1200],[835,1130],[830,1050],[835,980],[822,900],[828,830],[812,780],[805,700],[795,625],[800,560],[790,490],[765,415],[730,350],[680,305],[620,272],[598,275],[595,200],[587,100]],
+ reg:{
+  neck:[.0,[[360,95],[587,100],[597,275],[520,262],[484,245],[470,190],[440,135],[400,125],[358,150]]],
+  back:[-.075,[[358,150],[330,180],[290,235],[262,285],[240,350],[236,420],[255,480],[272,520],[295,560],[300,600],[312,650],[340,720],[370,790],[392,850],[408,910],[418,960],[520,898],[470,820],[448,735],[470,690],[490,650],[400,640],[375,620],[368,560],[358,520],[320,420],[335,335],[375,290],[430,262],[484,245],[470,190],[440,135],[400,125]]],
+  delt:[.05,[[480,250],[520,265],[570,300],[610,350],[625,420],[618,500],[605,550],[612,590],[580,625],[520,640],[490,650],[400,640],[375,620],[368,560],[358,520],[320,420],[335,335],[375,290],[430,262]]],
+  thorax:[.085,[[520,262],[598,275],[620,272],[680,305],[730,350],[765,415],[790,490],[800,560],[795,625],[740,640],[720,650],[610,620],[605,550],[618,500],[625,420],[610,350],[570,300]]],
+  serr:[-.05,[[490,650],[580,625],[612,617],[720,650],[700,720],[685,820],[675,930],[600,920],[520,898],[470,820],[448,735],[470,690]]],
+  abs:[.05,[[720,650],[795,625],[805,700],[812,780],[828,830],[822,900],[835,980],[830,1050],[835,1130],[828,1200],[815,1250],[790,1290],[770,1345],[762,1342],[782,1220],[740,1100],[700,1020],[682,960],[675,930],[685,820],[700,720]]],
+  obl:[-.11,[[520,898],[600,920],[675,930],[682,960],[700,1020],[740,1100],[782,1220],[762,1342],[700,1325],[600,1275],[500,1215],[400,1150],[350,1112],[355,1090],[385,1040],[412,1010],[418,960]]]},
+ delt:[480,450]};
+const tmS=y=>1.16*(1345-y)/1250,tmW=x=>(x-560)/600*.17;
 /* a fold at a bent joint: the inside of the bend darkens, the outside catches light */
 function foldAt(ctx,j,dirIn,dirOut,r,base){const cr=dirIn.x*dirOut.y-dirIn.y*dirOut.x,dt=dirIn.x*dirOut.x+dirIn.y*dirOut.y,ang=Math.acos(Math.max(-1,Math.min(1,dt)));if(ang<.35)return;
   const k=Math.min(1,(ang-.35)/1.4),lo=rgbOf(shade(base,-.34));ctx.save();ctx.fillStyle=`rgba(${lo[0]},${lo[1]},${lo[2]},${.62*k})`;ctx.beginPath();ctx.moveTo(j.x,j.y);
@@ -129,7 +144,7 @@ Body.prototype.draw=function(ctx,o){o=o||{};const lk=this.look;if(window.CUTOUT&
   const ow=this._owner,hpo=ow&&ow.hp,sevL=hpo?clamp((100-hpo.legs)/100*1.25-.1,0,1):0,sevA=ow?clamp((ow._armD||0)/32,0,1):0,LS=H0=>{const D=LD;if(!D)return 1;const sd=H0==='lH'?'l':'r',tot=D.l+D.r;return tot<1?1:clamp(.5+.9*D[sd]/tot,.45,1.25)},flA=ow&&ow._armFlash>0?ow._armFlash/.32:0,LD=ow&&ow._legD;
   const self=this;
   /* ---- arm: deltoid, biceps/triceps, elbow, forearm, wrist, glove ---- */
-  const arm=(S,isFar)=>{const e=J[S.E],w=J[S.W],a=lerp(J[S.S],J.mid,R?.2:.32);/* the drawn shoulder sits well below the neck, so it never covers the face */const C=isFar?{b:sk.far,s:sk.farSh}:{b:sk.base,s:sk.sh};
+  const arm=(S,isFar)=>{const e=J[S.E],w=J[S.W],a=(!isFar&&!R&&this._dl)?this._dl:lerp(J[S.S],J.mid,R?.2:.32);/* the near upper arm starts at the centre of the deltoid region of the torso *//* the drawn shoulder sits well below the neck, so it never covers the face */const C=isFar?{b:sk.far,s:sk.farSh}:{b:sk.base,s:sk.sh};
     joint(ctx,e,.031*M,C.b);/* the elbow sits behind both segments so the shading runs through it */
     /* upper arm: deltoid cap → biceps (front) / triceps (back) → elbow */
     const Pa=limb(ctx,a,e,d,R?[[.5,.05*M,.05*M],[.78,.04*M,.04*M],[1,.031*M,.033*M]]:[[-.04,.05*M*SHB,.055*M*SHB],[.12,.062*M*SHB,.064*M*SHB],[.3,.052*M,.058*M],[.5,.05*M,.05*M],[.78,.04*M,.04*M],[1,.031*M,.033*M]],C.b,C.s,{noCaps:isFar||R,armLine:!isFar});/* a sleeve covers the shoulder of the referee / coach: no skin up there *//* the far shoulder gets no round cap: it would poke out above the back */
@@ -210,8 +225,8 @@ function torsoFlat(ctx,J,H,M,sk,d,lk,B){const sp=[J.hip,J.mid,J.sh,J.nk];const s
   const bel=lk.belly||lk.body==='belly'?.042:lk.body==='soft'?.017:0;const shb=lk.body==='broad'?1.14:1;/* broad: wider chest and upper back */
   const FR=[[0,.07+bel*.3],[.14,.064+bel*.8],[.3,.062+bel],[.46,.064+bel*.7],[.6,.066],[.7,.068*shb],[.8,.062*shb],[.88,.05*shb],[.94,.04],[1,.036]];/* side view of the proportion wireframe: straight chest, no pec bulge */
   const BK=[[0,.086],[.1,.078],[.22,.062+bel*.3],[.36,.058+bel*.2],[.5,.066],[.62,.072*shb],[.72,.078*shb],[.82,.076*shb],[.9,.07],[.96,.062],[1,.056]];/* lumbar curve in, shoulder blades out, then a long slope up the trapezius into the nape */
-  const F=FR.map(([s,w])=>pt(s,w)),Bk=BK.map(([s,w])=>pt(s,-w));
-  if(sk.far)B._tt={f:F[F.length-1],b:Bk[Bk.length-1]};/* the flat top of the torso: the nape bridge is joined exactly to it */
+  let F,Bk;if(sk.far){F=TMAP.R.map(([x,y])=>pt(tmS(y),tmW(x)));Bk=TMAP.L.slice().reverse().map(([x,y])=>pt(tmS(y),tmW(x)));B._dl=pt(tmS(TMAP.delt[1]),tmW(TMAP.delt[0]))}else{F=FR.map(([s,w])=>pt(s,w));Bk=BK.map(([s,w])=>pt(s,-w))}
+  if(sk.far)B._tt={f:F[F.length-1],b:Bk[Bk.length-1]};/* top corners: the nape bridge is joined here */
   poly(ctx,F.concat(Bk.slice().reverse()),sk.base,ROUND*2.2);
   if(FS.outline)thinLine(ctx,F.concat(Bk.slice().reverse()),sk.base);
   const TD=sk.far&&FS.detail;
@@ -222,10 +237,8 @@ function torsoFlat(ctx,J,H,M,sk,d,lk,B){const sp=[J.hip,J.mid,J.sh,J.nk];const s
   /* abs: flat blocks along the front edge */
 
   if(FS.detail)detailIn(ctx,F.concat(Bk.slice().reverse()),F,Bk,sk.base,.012*M,(hi,lo)=>{const dk=shade(sk.base,-.3);
-    if(TD){const T=1.14;/* trapezius slope from the neck down to the shoulder */fac(ctx,[pt(.98,-.05),pt(.86,-.09),pt(.82,-.02),pt(.97,.0)],lo,.32,0);
-      /* sternocleidomastoid: the cord running from behind the ear down to the collar */fac(ctx,[pt(1.1,.02),pt(1.14,.028),pt(.99,.034),pt(.97,.02)],hi,.38,0);
-      /* shoulder blade plane and the lat below it */fac(ctx,[pt(.8,-.09),pt(.66,-.082),pt(.58,-.03),pt(.74,-.02)],hi,.34,0);fac(ctx,[pt(.56,-.07),pt(.34,-.06),pt(.34,-.01),pt(.52,-.02)],lo,.32,0);
-      /* ribs / serratus and the side of the abdomen */fac(ctx,[pt(.6,.02),pt(.46,.04),pt(.44,.0),pt(.56,-.01)],lo,.3,0);fac(ctx,[pt(.36,.06),pt(.14,.06),pt(.14,.03),pt(.36,.034)],hi,.3,0)}
+    if(TD){for(const k in TMAP.reg){const[t,pts]=TMAP.reg[k];ctx.fillStyle=shade(sk.base,t);ctx.beginPath();pts.forEach(([x,y],i)=>{const q=pt(tmS(y),tmW(x));i?ctx.lineTo(q.x,q.y):ctx.moveTo(q.x,q.y)});ctx.closePath();ctx.fill();
+        ctx.save();ctx.strokeStyle=shade(sk.base,-.34);ctx.globalAlpha=.55;ctx.lineWidth=.004*M;ctx.lineJoin='round';ctx.stroke();ctx.restore()}}
     else{fac(ctx,[pt(.7,-.1),pt(.3,-.1),pt(.3,-.04),pt(.7,-.05)],lo,.3,0);fac(ctx,[pt(.5,.1),pt(.15,.1),pt(.15,.05),pt(.5,.05)],hi,.25,0)}
     {const ow=B&&B._owner,sevB=ow&&ow.hp?clamp((100-ow.hp.body)/100*1.25-.1,0,1):0;bruises(ctx,(s,w)=>pt(s,w/M),[[.5,.035,.06],[.38,.03,.055],[.6,.0,.05],[.28,.04,.05],[.7,.03,.045]],sevB,111,M,0)}
     });

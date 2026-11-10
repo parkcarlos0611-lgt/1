@@ -31,9 +31,7 @@ DS.VEHICLES = DS.VEHICLES || {};
     contactArea: 0.95,
     underside: { x0: -3.2, x1: 3.4, y0: -0.08, y1: -0.85,
       poly: [[L(938, 0)[0], -0.06], [L(1576, 0)[0], -0.06], [L(1572, 0)[0], -0.36], [L(1515, 0)[0], -0.82], [L(1005, 0)[0], -0.82], [L(944, 0)[0], -0.42]] },
-    // no side skirts: the hull side is painted and carries the visible suspension (arm pivot and shock top
-    // relative to each wheel's rest position, forward / up, m)
-    openSide: { col: '#8e7338', dark: '#6e5a2c', lit: '#c8a652', ink: '#2a2110', arm: [0.40, 0.33], shock: [-0.12, 0.62], shocks: [0, 1, 5] },
+    // hull side behind the wheels: filled dark like the M1A1 (the renderer's optional openSide suspension is not used)
     engine: { type: 'diesel', power: 5.59e5, eff: 0.72, maxTractive: 3.4e5, spool: 0.45,    // AVDS-1790-2C, 750 hp
       vmaxF: 48 / 3.6, vmaxR: 12 / 3.6, brake: 5.2e5, engineBrake: 2.8e4 },
     exhaust: { x: L(936, 256)[0], y: L(936, 256)[1] },

@@ -75,8 +75,12 @@ SPR = (135, 970, 59)    # sprocket centre + cut radius (sprocket art: assets/ref
 GUN_X = 952             # barrel starts in front of the mantlet
 
 # turret: above seam, behind gun start
+import sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from sprite_split import split_turret
+tmask, to_hull = split_turret((yy < SEAM) & (xx < GUN_X + 4), rgba[..., 3], yy, SEAM)
 t = rgba.copy()
-t[~((yy < SEAM) & (xx < GUN_X + 4))] = 0
+t[~tmask] = 0
 info['turret'] = save('turret', t, 0, Y0)
 
 # barrel: in front of mantlet, around the bore line
@@ -87,7 +91,7 @@ info['barrel'] = save('barrel', b, 0, Y0)
 # hull: below seam, above skirt line, sprocket cut out, front lower ramp cut
 h = rgba.copy()
 front = 982 - np.clip((xx - 1100) * 0.45, 0, 999)          # skirt lip rises toward the nose
-keep = (yy >= SEAM) & (yy < np.minimum(SKIRT, front))
+keep = ((yy >= SEAM) | to_hull) & (yy < np.minimum(SKIRT, front))
 keep &= ~(((xx - SPR[0]) ** 2 + (yy - SPR[1]) ** 2) < SPR[2] ** 2)
 keep &= ~((xx < 205) & (yy > 935))
 keep &= xx < 1215

@@ -16,8 +16,8 @@ DS.VEHICLES = DS.VEHICLES || {};
     signature: 1,
     src: { ppm: PPM, ox: OX, oy: OY, dir: 'assets/sprites/m1a1/' },
     sprites: {                       // top-left px in the source drawing
-      hull:   { x: 14,  y: 838 },
-      turret: { x: 38,  y: 665 },
+      hull:   { x: 14,  y: 834 },
+      turret: { x: 102,  y: 665 },
       m2: { x: 594, y: 626, file: 'm2' },   // commander's M2HB, cut off the turret so it can pivot
       barrel: { x: 952, y: 766 },
       // running gear sheet (tools/cut_wheels.py): 512 px squares, radius 256 px

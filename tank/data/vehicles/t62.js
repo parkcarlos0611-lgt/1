@@ -11,7 +11,7 @@ DS.VEHICLES = DS.VEHICLES || {};
     mass: 37500, inertia: 1.45e5,
     src: { ppm: PPM, ox: OX, oy: OY, dir: 'assets/sprites/t62/' },
     sprites: {
-      hull: { x: 987, y: 463 }, turret: { x: 988, y: 338 }, barrel: { x: 1412, y: 428 },
+      hull: { x: 987, y: 443 }, turret: { x: 1146, y: 338 }, barrel: { x: 1412, y: 428 },
       flag: { x: 1246, y: 418, file: 'flag' },
       roadwheel: { r: 256, file: 'roadwheel' }, idler: { file: 'roadwheel', tint: 0.15 },
       sprocket: { file: 'sprocket', R: 0.367, tooth0: 10 },         // 16 teeth

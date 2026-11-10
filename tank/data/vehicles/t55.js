@@ -12,7 +12,7 @@ DS.VEHICLES = DS.VEHICLES || {};
     mass: 36000, inertia: 1.35e5,
     src: { ppm: PPM, ox: OX, oy: OY, dir: 'assets/sprites/t55/' },
     sprites: {
-      hull: { x: 994, y: 164 }, turret: { x: 1001, y: 30 }, barrel: { x: 1432, y: 125 },
+      hull: { x: 994, y: 145 }, turret: { x: 1158, y: 30 }, barrel: { x: 1432, y: 125 },
       flag: { x: 1274, y: 119, file: 'flag' },
       roadwheel: { r: 256, file: 'roadwheel' }, idler: { file: 'roadwheel', tint: 0.15 },
       sprocket: { file: 'sprocket', R: 0.376, tooth0: 24 },        // 14 teeth (art: 240 : 258 of the road wheel)

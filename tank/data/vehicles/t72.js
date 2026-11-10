@@ -14,7 +14,7 @@ DS.VEHICLES = DS.VEHICLES || {};
     mass: 41500, inertia: 1.8e5,
     src: { ppm: PPM, ox: OX, oy: OY, dir: 'assets/sprites/t72/' },
     sprites: {
-      hull: { x: 969, y: 741 }, turret: { x: 1020, y: 623 }, barrel: { x: 1386, y: 702 },
+      hull: { x: 969, y: 724 }, turret: { x: 1123, y: 623 }, barrel: { x: 1386, y: 702 },
       flag: { x: 1199, y: 696, file: 'flag' },   // drawn unmirrored on left-facing tanks so the script reads correctly
       // running gear sheet (tools/cut_wheels_iraqi.py, assets/ref/iraqi_wheels.png): first road wheel + sprocket
       roadwheel: { r: 256, file: 'roadwheel' }, idler: { file: 'roadwheel', tint: 0.15 },

@@ -6,6 +6,8 @@ usage: python3 tools/cut_iraqi.py [t72 ...]
 """
 import os, sys, json, math
 import numpy as np
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from sprite_split import split_turret
 from PIL import Image, ImageDraw
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -84,12 +86,14 @@ def cut(vid):
     for ax, ay in c['antennas']:
         rgba[(xx >= ax - 4) & (xx <= ax + 4) & (yy < ay), 3] = 0
 
-    t = rgba.copy(); t[~((yy < c['seam']) & (xx < c['gun_x'] + 3))] = 0; save('turret', t)
+    tmask = (yy < c['seam']) & (xx < c['gun_x'] + 3) & ~((xx >= c['gun_x']) & (yy > c['bore'][0]) & (yy < c['bore'][1]))
+    tmask, to_hull = split_turret(tmask, rgba[..., 3], yy, c['seam'])
+    t = rgba.copy(); t[~tmask] = 0; save('turret', t)
     b = rgba.copy(); b[~((xx >= c['gun_x']) & (yy > c['bore'][0]) & (yy < c['bore'][1]))] = 0; save('barrel', b)
 
     h = rgba.copy()
     sx, sy, sr = c['sprocket']
-    keep = (yy >= c['seam']) & (yy < c['skirt'])
+    keep = ((yy >= c['seam']) | to_hull) & (yy < c['skirt'])
     keep &= ~(((xx - sx) ** 2 + (yy - sy) ** 2) < sr ** 2)
     keep &= ~((xx < c['rear_cut'][0]) & (yy > c['rear_cut'][1]))
     nm = Image.new('L', (x1 - x0, y1 - y0), 0)

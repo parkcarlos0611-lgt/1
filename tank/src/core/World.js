@@ -59,6 +59,7 @@ DS.World = class World {
   update(frameDt) {
     const h = 1 / DS.T.physicsHz;
     this.acc = Math.min(this.acc + frameDt, h * DS.T.maxSubsteps);
+    DS.Sensor.update(this, frameDt);
     for (const v of this.vehicles) if (v.ai) v.ai.update(frameDt);
     while (this.acc >= h) {
       for (const v of this.vehicles) v.step(h, this);

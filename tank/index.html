@@ -86,6 +86,7 @@
   .mbrief b { display: block; font: 13px var(--mono); color: var(--amber); letter-spacing: .2em; margin-bottom: 4px; font-weight: 400; }
   @media (max-width: 560px) { .mcard { grid-template-columns: auto 1fr; } .mbtns { grid-row: auto; grid-column: 1 / -1; } .mbtn { flex: 1; } }
   #foes .pal b { color: #8cc8ff; }
+  #foes .sel b, #foes .sel span { color: #ffd0a0; } #foes .sel { outline: 1px solid #ff7a5c; outline-offset: 2px; } #foes .lost { opacity: .6; }
   #helpbtn { position: fixed; top: 10px; right: 10px; z-index: 3; width: 30px; height: 30px; border-radius: 50%; border: 1px solid #8a7b60;
     background: rgba(24,19,12,.7); color: var(--tx); font: 700 15px var(--mono); cursor: pointer; }
   #helpbtn.on { background: var(--warn); color: #1b1308; }
@@ -125,7 +126,7 @@
   <div class="r" id="row-tow" hidden><span>TOW</span><b id="h-tow">-</b></div>
   <div class="r"><span>레이저 거리</span><b id="h-rng">—</b></div>
   <div class="r"><span>사격통제 보정</span><b id="h-se">—</b></div>
-  <div class="r"><span>적 전차</span><b id="h-foe">—</b></div>
+  <div class="r"><span>적</span><b id="h-foe">—</b></div>
   <div class="r"><span>위치</span><b id="h-pos">0</b></div>
   <div class="r"><span>줌 / 프레임</span><b><span id="h-zoom"></span> · <span id="h-fps"></span></b></div>
 </div>
@@ -135,6 +136,7 @@
   <div><kbd>A</kbd><kbd>D</kbd> 후진 / 전진 (놓으면 제동)</div>
   <div><kbd>W</kbd><kbd>S</kbd> 포 앙각: 탭 0.1° · 누르면 점점 빠르게 · <kbd>Shift</kbd> 미세(0.02°)</div>
   <div><kbd>Space</kbd> / 좌클릭 사격 · <kbd>Q</kbd> 탄종 전환</div>
+  <div><kbd>Backspace</kbd> 다음 표적 · <kbd>Shift</kbd>+<kbd>Backspace</kbd> 이전 표적 (포가 표적으로 이동)</div>
   <div><kbd>E</kbd> 레이저 거리측정 (탄도컴퓨터 자동 보정)</div>
   <div><kbd>F</kbd> 동축 M240 · 우클릭 유지: 전차장 M2 (마우스로 조준)</div>
   <div><kbd>V</kbd> 조준경 3× / 10× · <kbd>T</kbd> 열상 · <kbd>B</kbd> 백열/흑열</div>
@@ -178,7 +180,7 @@
 <div id="zoombar"><button data-z="0">근접</button><button data-z="1">전투</button><button data-z="2">전술</button></div>
 <div id="touch">
   <div class="g"><button data-t="drive:-1">◀</button><button data-t="drive:1">▶</button></div>
-  <div class="g"><button data-act="lase">LRF</button><button data-act="mcam">M캠</button><button data-act="ammo">탄</button><button data-t="elev:1">▲</button><button data-t="elev:-1">▼</button><button data-t="coax">MG</button><button class="fire" data-t="fire">사격</button></div>
+  <div class="g"><button data-act="tgt">표적</button><button data-act="lase">LRF</button><button data-act="mcam">M캠</button><button data-act="ammo">탄</button><button data-t="elev:1">▲</button><button data-t="elev:-1">▼</button><button data-t="coax">MG</button><button class="fire" data-t="fire">사격</button></div>
 </div>
 
 <script src="src/core/Tuning.js"></script>
@@ -202,6 +204,7 @@
 <script src="src/render/Renderer.js"></script>
 <script src="src/debug/DebugLayer.js"></script>
 <script src="src/ai/TankAI.js"></script>
+<script src="src/ai/Sensor.js"></script>
 <script src="src/audio/Audio.js"></script>
 <script src="src/core/World.js"></script>
 <script src="src/core/Game.js"></script>

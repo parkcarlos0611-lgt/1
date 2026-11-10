@@ -96,6 +96,7 @@ DS.Game = class Game {
       if (e.code === 'KeyT') { this.thermal = !this.thermal; this.sightCv.classList.toggle('thermal', this.thermal); }
       if (e.code === 'KeyB') { this.blackHot = !this.blackHot; this.sightCv.classList.toggle('bh', this.blackHot); }
       if (e.code === 'KeyG') this.sightCv.classList.toggle('big');
+      if (e.code === 'Backspace') { e.preventDefault(); this.cycleTarget(e.shiftKey ? -1 : 1); }
       if (e.code === 'Tab') {
         e.preventDefault();
         if (!this.player.tow) this.toast('미사일 시점은 브래들리 전용');
@@ -127,7 +128,7 @@ DS.Game = class Game {
     document.querySelectorAll('[data-z]').forEach(b => b.addEventListener('click', () => cam.tzoom = P[+b.dataset.z]));
     document.querySelectorAll('[data-act]').forEach(b => b.addEventListener('pointerdown', ev => {
       ev.preventDefault(); const a = b.dataset.act;
-      if (a === 'lase') this.lase(); else if (a === 'mcam') { if (this.player.tow) { this.mcam = !this.mcam; this.toast(this.mcam ? '미사일 시점 켬' : '미사일 시점 끔'); } } else if (a === 'ammo') this.cycleAmmo(); else if (a === 'mag') this.sightMag = this.sightMag === 10 ? 3 : 10;
+      if (a === 'lase') this.lase(); else if (a === 'tgt') this.cycleTarget(1); else if (a === 'mcam') { if (this.player.tow) { this.mcam = !this.mcam; this.toast(this.mcam ? '미사일 시점 켬' : '미사일 시점 끔'); } } else if (a === 'ammo') this.cycleAmmo(); else if (a === 'mag') this.sightMag = this.sightMag === 10 ? 3 : 10;
     }));
   }
   toast(msg) {
@@ -154,6 +155,31 @@ DS.Game = class Game {
       } else if (this.mcamZoom) { cam.tzoom = this.mcamZoom; this.mcamZoom = null; }
     }
     tag.hidden = !on;
+  }
+  // ---- target selection: Backspace cycles through enemies in sight (nearest first), Shift+Backspace back.
+  // The gunner then lays the sight onto it at the turret's own speed; ranging and firing stay manual.
+  cycleTarget(step) {
+    const v = this.player, list = DS.Sensor.list(v, true);
+    if (!list.length) { this.target = null; this.toast('탐지된 표적 없음'); return; }
+    let i = list.indexOf(this.target);
+    i = i < 0 ? (step > 0 ? 0 : list.length - 1) : (i + step + list.length) % list.length;
+    this.target = list[i]; this.slew = { t: 0 };
+    const c = v.contacts.get(this.target);
+    this.toast(`표적 ${i + 1}/${list.length} · ${c.d >= 2 ? this.target.def.name : '미식별'} · ${Math.round(c.range)} m`);
+  }
+  trackTarget(dt) {
+    const v = this.player, t = this.target;
+    if (!t) return;
+    if (!t.alive || !DS.Sensor.seenNow(v, t)) { this.target = null; this.slew = null; this.toast(t.alive ? '표적 상실' : '표적 격파'); return; }
+    if (!this.slew) return;
+    if (this.elevDir) { this.slew = null; return; }          // the gunner takes over with W/S
+    this.slew.t += dt;
+    if (this.slew.t < 0.45) return;                          // hand-off: the gunner finds it in the sight first
+    const o = v.sightOrigin(), q = t.local(t.g.ring.x, t.g.ring.y + 0.3);
+    const want = Math.atan2(q.y - o.y, q.x - o.x), d = Math.atan2(Math.sin(want - v.gun.aimW), Math.cos(want - v.gun.aimW));
+    const mx = Math.max(0.05, v.def.gun.rate) * dt;
+    v.gun.aimW += Math.max(-mx, Math.min(mx, d));
+    if (Math.abs(d) < 0.0002) this.slew = null;
   }
   lase() { DS.FireControl.update(this.world, this.player, true); }
   cycleAmmo() {
@@ -184,6 +210,7 @@ DS.Game = class Game {
     const dt = Math.min(0.05, (t - this.last) / 1000); this.last = t;
     if (dt > 0) this.fps += (1 / dt - this.fps) * 0.05;
     this.readInput(dt);
+    this.trackTarget(dt);
     this.world.update(dt);
     this.missileCam(dt);
     DS.Audio.update(this.world, dt);
@@ -216,10 +243,13 @@ DS.Game = class Game {
       set('h-se', (fc.se * 1000).toFixed(2) + ' mil · ' + (fc.se * 180 / Math.PI).toFixed(2) + '°');
       const foes = w.vehicles.filter(x => x.team !== v.team), up = foes.filter(x => x.alive).length;
       const pals = w.vehicles.filter(x => x.team === v.team && x !== v);
-      set('h-foe', `${up} / ${foes.length} 대 전투 가능`);
+      const found = DS.Sensor.list(v, false), inSight = found.filter(e => DS.Sensor.seenNow(v, e)).length;
+      set('h-foe', `탐지 ${inSight}` + (found.length > inSight ? ` (+${found.length - inSight} 상실)` : '') + ` · 격파 ${foes.length - up}`);
       this.logPanel();
-      document.getElementById('foes').innerHTML = pals.map(e => `<div class="pal${e.alive ? '' : ' down'}"><b>${e.label}</b> <span>${e.alive ? e.ai.state : e.status}</span></div>`).join('') + foes.map(e =>
-        `<div class="${e.alive ? 'up' : 'down'}"><b>${e.label}</b> <span>${e.alive ? (e.ai ? e.ai.state : '') : e.status}</span></div>`).join('');
+      document.getElementById('foes').innerHTML = pals.map(e => `<div class="pal${e.alive ? '' : ' down'}"><b>${e.label}</b> <span>${e.alive ? e.ai.state : e.status}</span></div>`).join('') + found.map(e => {
+          const c = v.contacts.get(e), now = DS.Sensor.seenNow(v, e), id = c.d >= 2;
+          return `<div class="up${e === this.target ? ' sel' : ''}${now ? '' : ' lost'}"><b>${id ? e.def.name : '미식별'}</b> <span>${now ? Math.round(c.range) + ' m' : '상실'}</span></div>`;
+        }).join('') + foes.filter(e => !e.alive).map(e => `<div class="down"><b>${e.def.name}</b> <span>격파</span></div>`).join('');
       const over = document.getElementById('over');
       if (!v.alive && over.hidden) { over.hidden = false; document.getElementById('over-t').textContent = `격파됨 — ${v.status}`; }
       if (up === 0 && foes.length && over.hidden && !this._won) { this._won = true; over.hidden = false; document.getElementById('over-t').textContent = '적 소대 전멸 — 임무 완료'; }
@@ -247,7 +277,13 @@ DS.Game = class Game {
     for (let k = Math.ceil(x0 / 500) * 500; k < x1; k += 500) { const xx = (k - x0) / span * W; c.fillRect(xx, H - 4, 1, 4); }
     for (const p of this.world.projectiles) { c.fillStyle = '#ffcc66'; c.fillRect((p.x - x0) / span * W - 1, sy(p.y) - 1, 3, 3); }
     for (const e of this.world.vehicles) if (e !== v) {
-      c.fillStyle = !e.alive ? '#6b5f52' : e.team === v.team ? '#5ab0ff' : '#ff5a4a'; c.fillRect((e.pos.x - x0) / span * W - 3, sy(e.pos.y) - 6, 6, 6);
+      let ex = e.pos.x, ey = e.pos.y;
+      if (e.team !== v.team && e.alive) {                       // enemies: only what we have found, where we last saw them
+        const ct = v.contacts && v.contacts.get(e);
+        if (!ct || ct.seen < -1e8) continue;
+        ex = ct.x; ey = ct.y; c.fillStyle = DS.Sensor.seenNow(v, e) ? (e === this.target ? '#ffd0a0' : '#ff5a4a') : '#9a8f80';
+      } else c.fillStyle = !e.alive ? '#6b5f52' : '#5ab0ff';
+      c.fillRect((ex - x0) / span * W - 3, sy(ey) - 6, 6, 6);
     }
   }
 

@@ -74,8 +74,9 @@ DS.Renderer = class Renderer {
     this.sky(ctx, cam);
     cam.apply(ctx);
     w.particles.draw(ctx, cam, 0);
-    for (const v of w.vehicles) if (cam.visible(v.pos.x, v.pos.y, 14)) this.vehicle(ctx, v, cam);
+    for (const v of w.vehicles) if (cam.visible(v.pos.x, v.pos.y, 14) && this.shown(v)) this.vehicle(ctx, v, cam);
     this.terrain(ctx, cam);
+    this.fog(ctx, cam);
     this.projectiles(ctx, cam);
     w.particles.draw(ctx, cam, 1);
     this.atmosphere(ctx, cam, opt);
@@ -85,7 +86,75 @@ DS.Renderer = class Renderer {
       if (w.debug) DS.Debug.draw(ctx, w);
       this.labels(ctx, cam);
     }
+    this.markers(ctx, cam, !!opt.main);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
+  }
+
+  // ---- what the player's crew has found (src/ai/Sensor.js) ----
+  // enemies are drawn only while in sight and detected; wrecks always
+  shown(v) {
+    const me = this.w.vehicles[0];
+    if (!me || v.team === me.team || !v.alive) return true;
+    return DS.Sensor.seenNow(me, v);
+  }
+
+  // Ground the player cannot search: beyond the sights' reach, and the dead ground behind crests (from the
+  // sight down to the line of sight grazing the highest crest so far). Night / dust bring it closer.
+  fog(ctx, cam) {
+    const me = this.w.vehicles[0], T = this.w.terrain;
+    if (!me || !me.alive || !me.contacts) return;
+    const env = this.w.env || {}, reach = DS.Sensor.reach(this.w, me), o = me.sightOrigin();
+    const col = env.night ? '6,8,14' : env.visibility ? '120,92,58' : '62,50,34', A = env.night ? 0.55 : 0.5;
+    const step = Math.max(0.5, 5 / cam.zoom), top = cam.top + 2, bot = cam.bottom - 2;
+    ctx.save();
+    for (const side of [1, -1]) {
+      const xs = side > 0 ? Math.max(o.x, cam.left) : Math.min(o.x, cam.right), xe = side > 0 ? cam.right + step : cam.left - step;
+      if ((xe - o.x) * side <= 0) continue;
+      let slope = -1e9, x = o.x + side * 2;
+      // crests between us and the screen edge, sampled coarsely
+      for (; (xs - x) * side > 0; x += side * Math.max(2, step)) slope = Math.max(slope, (T.height(x) - o.y) / Math.abs(x - o.x));
+      for (; (xe - x) * side > 0; x += side * step) {
+        const dx = Math.abs(x - o.x), h = T.height(x);
+        const a = Math.max(0, Math.min(1, (dx - reach * 0.85) / (reach * 0.15)));
+        const yl = o.y + slope * dx;                            // grazing line of sight over the crests
+        if (a > 0) { ctx.fillStyle = `rgba(${col},${A * a})`; ctx.fillRect(Math.min(x, x + side * step), bot, step, top - bot); }
+        // dead ground: the air pocket under the grazing line plus the hidden surface skin (not the soil section)
+        if (a < 1 && yl > h + 0.05) { ctx.fillStyle = `rgba(${col},${A * (1 - a)})`; ctx.fillRect(Math.min(x, x + side * step), h - 0.8, step, yl - h + 0.8); }
+        slope = Math.max(slope, (h - o.y) / dx);
+      }
+    }
+    ctx.restore();
+  }
+
+  // contact markers above detected enemies, last-known positions, and brackets on the selected target.
+  // Main view: everything. Gunner's sight: only the brackets.
+  markers(ctx, cam, main) {
+    const me = this.w.vehicles[0], g = window.__game;
+    if (!me || !me.contacts) return;
+    const sel = g && g.target, dpr = cam.dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const S = (x, y) => [(x - cam.x - cam.sx) * cam.zoom + cam.W / 2, -(y - cam.y - cam.sy) * cam.zoom + cam.H / 2];
+    ctx.textAlign = 'center'; ctx.lineWidth = 2;
+    for (const [b, c] of me.contacts) {
+      if (!b.alive || c.seen < -1e8) continue;
+      const now = c.los && c.d >= 1, lvl = c.d >= 2 ? 2 : 1;
+      const px = now ? b.pos.x : c.x, py = now ? b.pos.y : c.y;
+      const [sx, sy] = S(px, py + 3.6);
+      if (sx < -80 || sx > cam.W + 80 || sy < -40 || sy > cam.H + 40) continue;
+      const isSel = b === sel;
+      if (isSel && now) {                                      // corner brackets round the vehicle
+        const [x0, y0] = S(px - 4.4, py + 2.9), [x1, y1] = S(px + 4.4, py - 1.6), k = Math.max(6, (x1 - x0) * 0.22);
+        ctx.strokeStyle = '#ff5a3c'; ctx.beginPath();
+        for (const [cx, cy, dx, dy] of [[x0, y0, 1, 1], [x1, y0, -1, 1], [x0, y1, 1, -1], [x1, y1, -1, -1]]) { ctx.moveTo(cx + dx * k, cy); ctx.lineTo(cx, cy); ctx.lineTo(cx, cy + dy * k); }
+        ctx.stroke();
+      }
+      if (!main) continue;
+      const txt = now ? (lvl === 2 ? `${b.def.name}  ${Math.round(c.range)} m` : `?  ${Math.round(c.range)} m`) : '?  마지막 위치';
+      ctx.font = `${isSel ? 700 : 600} 12px 'Share Tech Mono', ui-monospace, monospace`;
+      ctx.fillStyle = !now ? 'rgba(200,200,200,0.75)' : isSel ? '#ff7a5c' : lvl === 2 ? '#ffd27a' : '#e8e2d0';
+      ctx.strokeStyle = 'rgba(0,0,0,0.65)'; ctx.strokeText(txt, sx, sy); ctx.fillText(txt, sx, sy);
+      ctx.beginPath(); ctx.moveTo(sx - 5, sy + 4); ctx.lineTo(sx + 5, sy + 4); ctx.lineTo(sx, sy + 10); ctx.closePath(); ctx.fill();
+    }
   }
 
   sightLine(ctx, cam) {
@@ -249,7 +318,7 @@ DS.Renderer = class Renderer {
       ctx.closePath(); ctx.fill();
     };
     for (const v of this.w.vehicles) {
-      if (!cam.visible(v.pos.x, v.pos.y, 12)) continue;
+      if (!cam.visible(v.pos.x, v.pos.y, 12) || !this.shown(v)) continue;
       const L = (v.g.idler.x - v.g.sprocket.x) * v.dir;            // track length on the ground
       band(v.pos.x - 0.9, Math.abs(L) / 2 + 1.4, 0.55, 0.34 * k);
       band(v.pos.x - 0.5, Math.abs(L) / 2 + 0.3, 0.22, 0.30 * k);   // darker core right under the tracks
@@ -258,13 +327,15 @@ DS.Renderer = class Renderer {
   }
 
   vehicle(ctx, v, cam) {
-    if (v.scorch.length || v.burning) this.charred(ctx, v, cam);
+    const me = this.w.vehicles[0];
+    const faint = me && v.alive && v.team !== me.team && DS.Sensor.level(me, v) < 2;   // contact, not yet identified
+    if (v.scorch.length || v.burning || faint) this.charred(ctx, v, cam, faint ? 0.38 : 1);
     else this.drawVehicle(ctx, v, cam);
   }
 
   // Damaged vehicle: drawn to an offscreen layer, then char marks are painted 'source-atop' so they
   // stay inside the vehicle's own silhouette and spread outward from where they started.
-  charred(ctx, v, cam) {
+  charred(ctx, v, cam, alpha = 1) {
     const cv = ctx.canvas;
     let off = this.offs.get(cv);
     if (!off || off.width !== cv.width || off.height !== cv.height) { off = document.createElement('canvas'); off.width = cv.width; off.height = cv.height; this.offs.set(cv, off); }
@@ -298,7 +369,8 @@ DS.Renderer = class Renderer {
       }
     }
     o.globalCompositeOperation = 'source-over';
-    ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(off, x0, y0, x1 - x0, y1 - y0, x0, y0, x1 - x0, y1 - y0); ctx.restore();
+    ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = alpha; if (alpha < 1) ctx.filter = 'grayscale(0.7) blur(1px)';
+    ctx.drawImage(off, x0, y0, x1 - x0, y1 - y0, x0, y0, x1 - x0, y1 - y0); ctx.restore();
   }
 
   drawVehicle(ctx, v, cam) {

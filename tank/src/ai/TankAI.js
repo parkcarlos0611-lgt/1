@@ -25,10 +25,11 @@ DS.TankAI = class TankAI {
     this.ammo = v.def.ammo[0];
     v.fc.se = 0;
   }
-  target() {                                  // nearest live enemy
-    let best = null, bd = 1e9;
-    for (const x of this.w.vehicles) { if (x.team === this.v.team || !x.alive) continue; const d = Math.abs(x.pos.x - this.v.pos.x); if (d < bd) { bd = d; best = x; } }
-    if (best !== this.tgt) { this.tgt = best; this.detect = 0; this.rangeEst = null; this.sol = null; this.lay = 0; }
+  // nearest enemy this crew has actually found (src/ai/Sensor.js); keeps the current one while it is in sight
+  target() {
+    const seen = DS.Sensor.list(this.v, true);
+    let best = this.tgt && seen.includes(this.tgt) ? this.tgt : seen[0] || null;
+    if (best !== this.tgt) { this.tgt = best; this.rangeEst = null; this.sol = null; this.lay = 0; }
     return best;
   }
   // wingman: hold station behind the leader
@@ -43,40 +44,19 @@ DS.TankAI = class TankAI {
     const v = this.v, W = this.w, S = v.def.sight, r = W.rng;
     v.input.fire = false;
     if (!v.alive || !v.firepower) { v.input.drive = 0; this.state = v.status; return; }
-    const tgt = this.target();
-    if (!tgt) { v.input.drive = this.station(); this.state = this.follow ? '대형 유지' : '대기'; return; }
-    const range = Math.hypot(tgt.pos.x - v.pos.x, tgt.pos.y - v.pos.y);
-    this.tick -= dt;
-    if (this.tick <= 0) { this.tick = 0.25; this.los = range < 4000 && DS.AI.los(W, v, tgt); }
     // gunfire is heard across the battlefield
-    if (tgt.lastFired && W.time - tgt.lastFired < 0.5 && range < 4000) this.alerted = true;
-
-    if (this.los) {
-      const flash = tgt.lastFired && W.time - tgt.lastFired < 5 ? 2 : 1;
-      const moving = Math.abs(tgt.vt) > 1.5 ? 1.5 : 1;
-      // optical sights: nothing can be identified beyond detectMax (user data: 0 % hits past 2.5 km),
-      // easy inside ~700 m, falling off steeply in between
-      const dm = S.detectMax || 2500;
-      let vis = range >= dm ? 0 : Math.pow(Math.max(0, Math.min(1, (dm - range) / (dm - 700))), 1.5);
-      const env = W.env || {};
-      if (!S.thermal) {
-        vis *= DS.T.ai.detect;                                              // Iraqi crews overall: poor optics and training
-        vis *= tgt.def.signature || 1;                                      // smaller / lower targets (Bradley) are harder to pick out
-        // sandstorm: visibility falls away fast; a muzzle flash shows only close in
-        if (env.visibility) vis *= Math.max(0, Math.exp(-range / (env.visibility * 0.45)) * 1.6 - 0.02);
-        // night: passive / IR sights only, ~400 m; beyond that only a muzzle flash gives a fleeting bearing
-        if (env.night) vis *= range < 400 ? 0.5 : range < 800 ? 0.08 : (flash > 1 ? 0.05 : 0);
-      }
-      this.detect = Math.min(1.2, this.detect + dt * vis * flash * moving / 5);
-    } else this.detect = Math.max(0, this.detect - dt * 0.08);
-
-    if (this.detect < 1) {
-      // no target yet: advance toward the sound of the guns until something is in sight
+    for (const e of W.vehicles) if (e.team !== v.team && e.lastFired && W.time - e.lastFired < 0.5 && Math.abs(e.pos.x - v.pos.x) < 4000) this.alerted = true;
+    const tgt = this.target();
+    this.los = !!tgt;
+    if (!tgt) {
+      // nothing found yet: a wingman keeps station; others advance toward the sound of the guns
       if (this.follow) { v.input.drive = this.station(); this.state = '대형 유지'; return; }
-      v.input.drive = this.alerted && !this.los && v.mobile ? v.dir : 0;
-      this.state = this.alerted ? (this.los ? '탐색' : '전진') : '대기';
+      const mem = DS.Sensor.list(v, false)[0];
+      v.input.drive = (this.alerted || mem) && v.mobile ? v.dir : 0;
+      this.state = mem ? '탐색' : this.alerted ? '전진' : '대기';
       return;
     }
+    const range = Math.hypot(tgt.pos.x - v.pos.x, tgt.pos.y - v.pos.y);
     // seen but beyond the gun's effective range: close in (firing on the move is useless for them)
     if (range > (S.engageMax || 2000)) { v.input.drive = v.mobile ? v.dir : 0; this.state = '접근'; this.lay = 0; return; }
     v.input.drive = 0;                                   // halt to shoot

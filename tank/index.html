@@ -21,9 +21,11 @@
   #help { top: 10px; right: 10px; max-width: 300px; }
   #help.hide { display: none; }
   #help kbd { display: inline-block; min-width: 18px; padding: 0 4px; border: 1px solid #8a7b60; border-radius: 3px; font: 11px monospace; text-align: center; }
-  #sight { position: fixed; right: 10px; bottom: 56px; width: min(34vw, 330px); aspect-ratio: 1; border-radius: 50%;
-    border: 3px solid #1b1610; box-shadow: 0 0 0 2px rgba(255,255,255,.15), 0 6px 24px rgba(0,0,0,.4); background: #000; pointer-events: none; }
-  #sight.thermal { filter: grayscale(1) brightness(.5) contrast(1.9); }
+  #sight { position: fixed; right: 10px; bottom: 56px; width: min(38vw, 54vh, 500px); aspect-ratio: 1; border-radius: 50%;
+    border: 7px solid #0e0c09; box-shadow: 0 0 0 2px rgba(255,255,255,.15), 0 6px 24px rgba(0,0,0,.4); background: #000; pointer-events: none; }
+  #sight.big { right: auto; bottom: auto; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(92vh, 92vw); z-index: 4; }
+  #sight.thermal { filter: grayscale(1) brightness(.68) contrast(1.8) sepia(1) hue-rotate(70deg) saturate(2.4); }
+  #sight.thermal.bh { filter: grayscale(1) invert(1) brightness(.62) contrast(1.7) sepia(1) hue-rotate(70deg) saturate(2.4); }
   body:not(.playing) :is(#hud, #help, #sight, #mini, #zoombar, #foes, #log, #touch) { display: none !important; }
   #log { left: 10px; bottom: 64px; max-width: min(56vw, 640px); font-size: 12px; display: grid; gap: 3px; }
   #log:empty { display: none; }
@@ -64,7 +66,7 @@
   #touch button.fire { width: 78px; height: 78px; background: rgba(160,40,20,.6); font-size: 15px; font-weight: 800; }
   #zoombar { position: fixed; right: 10px; bottom: 10px; display: flex; gap: 6px; }
   #zoombar button { background: var(--bg); color: var(--tx); border: 1px solid #6b5d45; border-radius: 6px; padding: 6px 10px; font: inherit; cursor: pointer; }
-  @media (pointer: coarse) { #touch { display: flex; } #help { display: none; } #sight { top: 10px; bottom: auto; width: min(30vw, 200px); } #log { display: none; } }
+  @media (pointer: coarse) { #touch { display: flex; } #help { display: none; } #sight { top: 10px; bottom: auto; width: min(38vw, 260px); } #log { display: none; } }
   @media (max-width: 640px) { #hud { min-width: 0; font-size: 11px; } #mini { bottom: 150px; } }
 </style>
 </head>
@@ -98,7 +100,8 @@
   <div><kbd>Space</kbd> / 좌클릭 사격 · <kbd>Q</kbd> 탄종 전환</div>
   <div><kbd>E</kbd> 레이저 거리측정 (탄도컴퓨터 자동 보정)</div>
   <div><kbd>F</kbd> 동축 M240 · 우클릭 유지: 전차장 M2 (마우스로 조준)</div>
-  <div><kbd>V</kbd> 조준경 3× / 10× · <kbd>T</kbd> 열상</div>
+  <div><kbd>V</kbd> 조준경 3× / 10× · <kbd>T</kbd> 열상 · <kbd>B</kbd> 백열/흑열</div>
+  <div><kbd>G</kbd> 조준경 크게 보기</div>
   <div><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> 근접 / 전투 / 전술 줌 · 휠 연속 줌</div>
   <div><kbd>C</kbd> 마우스 위치에 크레이터 · <kbd>R</kbd> 차량 리셋</div>
   <div><kbd>M</kbd> 소리 켜기/끄기</div>

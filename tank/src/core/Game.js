@@ -71,6 +71,8 @@ DS.Game = class Game {
       if (e.code === 'KeyE') this.lase();
       if (e.code === 'KeyV') this.sightMag = this.sightMag === 10 ? 3 : 10;
       if (e.code === 'KeyT') { this.thermal = !this.thermal; this.sightCv.classList.toggle('thermal', this.thermal); }
+      if (e.code === 'KeyB') { this.blackHot = !this.blackHot; this.sightCv.classList.toggle('bh', this.blackHot); }
+      if (e.code === 'KeyG') this.sightCv.classList.toggle('big');
       if (e.code === 'KeyR') this.player.place(this.player.pos.x);
       if (e.code === 'KeyC' && this.mouse) { const m = cam.toWorld(this.mouse.x, this.mouse.y); this.world.terrain.crater(m.x, 1.6, 0.7); this.world.terrain.relax(undefined, undefined, 8); }
       if (e.code === 'KeyH') document.getElementById('help').classList.toggle('hide');
@@ -134,7 +136,7 @@ DS.Game = class Game {
     this.world.update(dt);
     DS.Audio.update(this.world, dt);
     this.rend.frame();
-    this.sight();
+    this.sight(dt);
     this.hud();
     requestAnimationFrame(t2 => this.loop(t2));
   }
@@ -212,36 +214,70 @@ DS.Game = class Game {
     }).join('');
   }
 
-  // gunner's primary sight: second render of the world along the sight line
-  sight() {
+  // Gunner's primary sight: a second render of the world along the sight line with a fixed angular
+  // field of view (×10 = 6.5°, ×3 = 21°), so distant targets look small as they do through the real GPS.
+  sight(dt) {
     const v = this.player, w = this.world, cv = this.sightCv, cam = this.sightCam;
     const W = cv.clientWidth, H = cv.clientHeight, dpr = w.cam.dpr;
     if (!W) return;
     if (cv.width !== Math.round(W * dpr)) { cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
     cam.resize(W, H, dpr);
-    // where the sight line meets something (refreshed a few times a second)
+    // where the sight line meets something (refreshed a few times a second), eased so the picture
+    // does not jump when the line slides off a hull onto the ground behind it
     if (performance.now() - this._sightT > 150) {
       this._sightT = performance.now();
       const r = DS.FireControl.lase(w, v, 6000);
       this.sightR = r ? r.range : 3000;
     }
-    const R = v.fc.range && w.time - v.fc.lasedAt < 30 ? v.fc.range : this.sightR;
+    const Rt = v.fc.range && w.time - v.fc.lasedAt < 30 ? v.fc.range : this.sightR;
+    this.sightRs = this.sightRs ? this.sightRs + (Rt - this.sightRs) * Math.min(1, dt * 7) : Rt;
+    const R = Math.max(25, this.sightRs);
+    const fov = (this.sightMag === 10 ? 6.5 : 21) * Math.PI / 180, mil = W / (fov * 1000);   // px per mil
+    // recoil kick + muzzle blast obscuration after our own shot; hull vibration on the move
+    if (v.gun.fired !== this._fired) { if (this._fired != null) this.kick = 1; this._fired = v.gun.fired; }
+    this.kick = Math.max(0, (this.kick || 0) - dt / 1.6);
+    const k2 = this.kick * this.kick, shake = (k2 * 6 + Math.min(1, Math.abs(v.vt) / 12) * 0.35) / mil / 1000 * R;
     const o = v.sightOrigin(), a = v.gun.aimW;
-    cam.x = o.x + Math.cos(a) * R; cam.y = o.y + Math.sin(a) * R;
-    cam.zoom = W / (this.sightMag === 10 ? 60 : 200);
+    cam.x = o.x + Math.cos(a) * R + (Math.random() - 0.5) * shake; cam.y = o.y + Math.sin(a) * R + (Math.random() - 0.5) * shake - k2 * 14 / mil / 1000 * R;
+    cam.zoom = W / (2 * R * Math.tan(fov / 2));
     this.rend.frame(this.sctx, cam, { main: false, thermal: this.thermal });
-    // reticle
-    const c = this.sctx; c.setTransform(dpr, 0, 0, dpr, 0, 0);
-    const cx = W / 2, cy = H / 2;
-    c.strokeStyle = this.thermal ? '#fff' : '#111'; c.lineWidth = 1.5;
-    c.beginPath(); c.moveTo(cx - W * 0.42, cy); c.lineTo(cx - 10, cy); c.moveTo(cx + 10, cy); c.lineTo(cx + W * 0.42, cy);
-    c.moveTo(cx, cy + 10); c.lineTo(cx, cy + H * 0.42); c.moveTo(cx, cy - 10); c.lineTo(cx, cy - H * 0.2); c.stroke();
-    c.strokeRect(cx - 3, cy - 3, 6, 6);
-    c.font = '600 12px ui-monospace, monospace'; c.fillStyle = this.thermal ? '#fff' : '#ffd34a'; c.textAlign = 'left';
-    const g = v.gun, A = DS.AMMO[g.ammo];
-    c.fillText(v.fc.range ? String(Math.round(v.fc.range)).padStart(4, '0') : '----', 10, H - 12);
-    c.textAlign = 'right'; c.fillText(`${A.type === 'HEAT' ? 'HEAT' : 'SABOT'} ${g.reload > 0 ? '' : 'READY'}`, W - 10, H - 12);
-    c.textAlign = 'center'; c.fillText(`GPS ${this.sightMag}× ${this.thermal ? 'TIS' : 'DAY'}`, cx, 18);
+    const c = this.sctx, cx = W / 2, cy = H / 2, env = w.env || {};
+    // heat shimmer over long ranges in daylight: rows of the picture wobble sideways
+    if (!this.thermal && !env.night && R > 500) {
+      const amp = Math.min(1.8, R / 1500) * dpr, t = w.time, hpx = cv.height, st = Math.max(2, Math.round(2 * dpr));
+      c.setTransform(1, 0, 0, 1, 0, 0);
+      for (let y = Math.round(hpx * 0.25); y < hpx * 0.85; y += st) c.drawImage(cv, 0, y, cv.width, st, Math.sin(y * 0.11 / dpr + t * 9) * amp * (0.5 + 0.5 * Math.sin(y * 0.031 / dpr - t * 3)), y, cv.width, st);
+    }
+    c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    // our own muzzle blast and dust blind the sight for a moment (less in thermal)
+    if (this.kick > 0) { c.fillStyle = `rgba(${this.thermal ? '150,150,150' : '205,180,140'},${Math.min(0.92, this.kick * (this.thermal ? 0.45 : 1.1))})`; c.fillRect(0, 0, W, H); }
+    if (this.thermal) { c.fillStyle = 'rgba(0,0,0,0.13)'; for (let y = 0; y < H; y += 3) c.fillRect(0, y, W, 1); }   // scan lines
+    // eyepiece vignette
+    const vg = c.createRadialGradient(cx, cy, W * 0.42, cx, cy, W * 0.51);
+    vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,0.88)'); c.fillStyle = vg; c.fillRect(0, 0, W, H);
+    // reticle: broken cross with mil ticks, aiming dot; range, round and ready symbols under it
+    const ink = this.thermal ? 'rgba(235,255,235,0.95)' : 'rgba(10,10,10,0.9)';
+    c.strokeStyle = ink; c.fillStyle = ink; c.lineWidth = 1.2;
+    const gap = Math.max(6, 2 * mil), L = W * 0.36, tick = this.sightMag === 10 ? 5 : 20;
+    c.beginPath();
+    c.moveTo(cx - L, cy); c.lineTo(cx - gap, cy); c.moveTo(cx + gap, cy); c.lineTo(cx + L, cy);
+    c.moveTo(cx, cy + gap); c.lineTo(cx, cy + L); c.moveTo(cx, cy - gap); c.lineTo(cx, cy - L * 0.35);
+    for (let m = tick; m * mil < L; m += tick) {
+      const d = m * mil, h = (m / tick) % 2 ? 3 : 6;
+      c.moveTo(cx - d, cy - h); c.lineTo(cx - d, cy + h); c.moveTo(cx + d, cy - h); c.lineTo(cx + d, cy + h);
+      c.moveTo(cx - h, cy + d); c.lineTo(cx + h, cy + d);
+    }
+    c.stroke();
+    c.beginPath(); c.arc(cx, cy, 1.4, 0, 7); c.fill();
+    const g = v.gun, A = DS.AMMO[g.ammo], lasing = w.time - v.fc.lasedAt < 0.35;
+    c.font = `600 ${Math.max(12, Math.round(W / 30))}px ui-monospace, monospace`; c.textAlign = 'center';
+    const sym = this.thermal ? 'rgba(235,255,235,0.95)' : '#ffd34a', by = cy + L + Math.max(16, W / 22);
+    c.fillStyle = sym;
+    c.fillText(v.fc.range ? String(Math.round(v.fc.range)).padStart(4, '0') : '----', cx, by);
+    c.textAlign = 'right'; c.fillText(g.reload > 0 ? '' : '▮ READY', cx - W * 0.1, by);
+    c.textAlign = 'left'; c.fillText((A.type === 'HEAT' ? 'HEAT' : 'SABOT') + (lasing ? '  ✱' : ''), cx + W * 0.1, by);
+    c.textAlign = 'center'; c.font = `600 ${Math.max(10, Math.round(W / 40))}px ui-monospace, monospace`;
+    c.fillText(`GPS ×${this.sightMag}  ${this.thermal ? 'TIS ' + (this.blackHot ? 'BH' : 'WH') : 'DAY'}`, cx, cy - L - 6);
   }
 };
 addEventListener('load', () => new DS.Game().start().catch(e => { document.getElementById('loading').textContent = '로딩 실패: ' + e.message; console.error(e); }));

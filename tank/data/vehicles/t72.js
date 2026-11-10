@@ -50,7 +50,7 @@ DS.VEHICLES = DS.VEHICLES || {};
     antennas: [{ x: L(1152, 683)[0], y: L(1152, 683)[1], len: 1.0 }],
 
     // physical t × material factor reproduces the supplied effective values on the line of sight
-    sight: { laser: true, rangeErr: 0.02, aimErr: 0.35, layTime: 3.5 },   // TPD-K1 laser rangefinder
+    sight: { laser: true, rangeErr: 0.02, aimErr: 0.35, layTime: 3.5, detectMax: 2500, engageMax: 2000 },   // TPD-K1 laser rangefinder
     armor: [
       { name: '포탑 전면', part: 'turret', a: L(1372, 690), b: L(1392, 722), t: 500, mat: 't72_turret', n: 10, h: 30 },
       { name: '포탑 전면 하단', part: 'turret', a: L(1392, 722), b: L(1362, 741), t: 500, mat: 't72_turret', n: -30, h: 30 },

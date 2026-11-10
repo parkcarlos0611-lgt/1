@@ -42,7 +42,10 @@ DS.TankAI = class TankAI {
     if (this.los) {
       const flash = tgt.lastFired && W.time - tgt.lastFired < 5 ? 3 : 1;
       const moving = Math.abs(tgt.vt) > 1.5 ? 1.5 : 1;
-      let vis = Math.max(0.12, Math.min(1, 1.5 - range / 2200));
+      // optical sights: nothing can be identified beyond detectMax (user data: 0 % hits past 2.5 km),
+      // easy inside ~700 m, falling off steeply in between
+      const dm = S.detectMax || 2500;
+      let vis = range >= dm ? 0 : Math.pow(Math.max(0, Math.min(1, (dm - range) / (dm - 700))), 1.5);
       const env = W.env || {};
       if (env.visibility) vis *= Math.max(0.03, Math.exp(-range / env.visibility) * 2.2);   // no thermal: dust blinds them
       if (env.night && range > 800) vis *= flash > 1 ? 0.6 : 0.02;                         // IR sights reach ~800 m
@@ -55,6 +58,8 @@ DS.TankAI = class TankAI {
       this.state = this.alerted ? (this.los ? '탐색' : '전진') : '대기';
       return;
     }
+    // seen but beyond the gun's effective range: close in (firing on the move is useless for them)
+    if (range > (S.engageMax || 2000)) { v.input.drive = v.mobile ? v.dir : 0; this.state = '접근'; this.lay = 0; return; }
     v.input.drive = 0;                                   // halt to shoot
     this.state = '조준';
     if (!this.rangeEst) this.rangeEst = range * (1 + DS.AI.gauss(r) * S.rangeErr);
@@ -66,7 +71,7 @@ DS.TankAI = class TankAI {
       const px = o.x + (t.x - o.x) / d * this.rangeEst, py = o.y + (t.y - o.y) / d * this.rangeEst;
       if (v.gun.ammo !== this.ammo) v.gun.ammo = this.ammo;
       this.sol = DS.FireControl.solve(v, this.ammo, px, py);
-      this.jit = DS.AI.gauss(r) * S.aimErr / 1000;
+      this.jit = DS.AI.gauss(r) * S.aimErr / 1000 * (1 + Math.pow(range / 1000, 2));   // lay error grows quickly with range
     }
     v.fc.se = 0;
     v.gun.aimW = this.sol + this.jit;

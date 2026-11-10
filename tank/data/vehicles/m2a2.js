@@ -11,6 +11,7 @@ DS.VEHICLES = DS.VEHICLES || {};
   DS.VEHICLES.m2a2 = {
     id: 'm2a2', name: 'M2A2 브래들리', side: 'US', ammo: ['M791', 'M792'],
     mass: 29000, inertia: 1.0e5, frontDrive: true,
+    signature: 0.5,                  // half as easy to pick out as a tank: smaller, lower, kept behind the M1A1
     src: { ppm: PPM, ox: OX, oy: OY, dir: 'assets/sprites/m2a2/' },
     sprites: {
       hull: { x: 12, y: 188 }, turret: { x: 173, y: 92 }, barrel: { x: 447, y: 159 },

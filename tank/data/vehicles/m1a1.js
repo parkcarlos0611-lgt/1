@@ -13,6 +13,7 @@ DS.VEHICLES = DS.VEHICLES || {};
   DS.VEHICLES.m1a1 = {
     id: 'm1a1', name: 'M1A1', side: 'US', ammo: ['M829A1', 'M829', 'M830'],
     mass: 57200, inertia: 3.3e5,
+    signature: 1,
     src: { ppm: PPM, ox: OX, oy: OY, dir: 'assets/sprites/m1a1/' },
     sprites: {                       // top-left px in the source drawing
       hull:   { x: 14,  y: 838 },

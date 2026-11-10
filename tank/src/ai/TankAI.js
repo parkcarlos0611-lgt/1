@@ -52,18 +52,23 @@ DS.TankAI = class TankAI {
     if (tgt.lastFired && W.time - tgt.lastFired < 0.5 && range < 4000) this.alerted = true;
 
     if (this.los) {
-      const flash = tgt.lastFired && W.time - tgt.lastFired < 5 ? 3 : 1;
+      const flash = tgt.lastFired && W.time - tgt.lastFired < 5 ? 2 : 1;
       const moving = Math.abs(tgt.vt) > 1.5 ? 1.5 : 1;
       // optical sights: nothing can be identified beyond detectMax (user data: 0 % hits past 2.5 km),
       // easy inside ~700 m, falling off steeply in between
       const dm = S.detectMax || 2500;
       let vis = range >= dm ? 0 : Math.pow(Math.max(0, Math.min(1, (dm - range) / (dm - 700))), 1.5);
       const env = W.env || {};
-      if (S.thermal) { /* thermal sights see through dust and darkness */ }
-      else if (env.visibility) vis *= Math.max(0.03, Math.exp(-range / env.visibility) * 2.2);   // no thermal: dust blinds them
-      if (!S.thermal && env.night && range > 800) vis *= flash > 1 ? 0.6 : 0.02;                         // IR sights reach ~800 m
-      this.detect = Math.min(1.2, this.detect + dt * vis * flash * moving / 3.5);
-    } else this.detect = Math.max(0, this.detect - dt * 0.05);
+      if (!S.thermal) {
+        vis *= DS.T.ai.detect;                                              // Iraqi crews overall: poor optics and training
+        vis *= tgt.def.signature || 1;                                      // smaller / lower targets (Bradley) are harder to pick out
+        // sandstorm: visibility falls away fast; a muzzle flash shows only close in
+        if (env.visibility) vis *= Math.max(0, Math.exp(-range / (env.visibility * 0.45)) * 1.6 - 0.02);
+        // night: passive / IR sights only, ~400 m; beyond that only a muzzle flash gives a fleeting bearing
+        if (env.night) vis *= range < 400 ? 0.5 : range < 800 ? 0.08 : (flash > 1 ? 0.05 : 0);
+      }
+      this.detect = Math.min(1.2, this.detect + dt * vis * flash * moving / 5);
+    } else this.detect = Math.max(0, this.detect - dt * 0.08);
 
     if (this.detect < 1) {
       // no target yet: advance toward the sound of the guns until something is in sight

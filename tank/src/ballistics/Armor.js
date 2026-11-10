@@ -9,7 +9,10 @@ DS.Armor = {
     const c = Math.cos(v.ang), s = Math.sin(v.ang), dir = v.dir;
     for (const P of v.def.armor) {
       if (P.part === 'turret' && v.turretGone) continue;
-      const ax = P.a[0] * dir, ay = P.a[1], bx = P.b[0] * dir, by = P.b[1];
+      let ax = P.a[0] * dir, ay = P.a[1], bx = P.b[0] * dir, by = P.b[1];
+      // plates overlap their neighbours by 6 cm at each end, so no ray slips through the seam between two
+      // plates (e.g. under the turret front, over the hull roof, at turret-ring height)
+      { const L = Math.hypot(bx - ax, by - ay) || 1, ux = (bx - ax) / L * 0.06, uy = (by - ay) / L * 0.06; ax -= ux; ay -= uy; bx += ux; by += uy; }
       const na = P.n * Math.PI / 180, nlx = Math.cos(na) * dir, nly = Math.sin(na);
       out.push({
         P, ax: v.pos.x + c * ax - s * ay, ay: v.pos.y + s * ax + c * ay,

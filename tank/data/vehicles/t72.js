@@ -57,7 +57,8 @@ DS.VEHICLES = DS.VEHICLES || {};
       { name: '포탑 상면', part: 'turret', a: L(1130, 668), b: L(1372, 690), t: 45, mat: 'rha', n: 90, h: 0 },
       { name: '포탑 후면', part: 'turret', a: L(1122, 672), b: L(1112, 741), t: 70, mat: 'cast', n: 180, h: 0 },
       { name: '차체 상부 경사판', part: 'hull', a: L(1460, 755), b: L(1557, 782), t: 205, mat: 't72_glacis', n: 68, h: 0 },
-      { name: '차체 하부 전면', part: 'hull', a: L(1557, 790), b: L(1520, 818), t: 85, mat: 'rha', n: -60, h: 0 },
+      { name: '차체 하부 전면', part: 'hull', a: L(1557, 782), b: L(1520, 818), t: 85, mat: 'rha', n: -60, h: 0 },
+      { name: '포탑 링 전면', part: 'hull', a: L(1362, 741), b: L(1366, 757), t: 80, mat: 'rha', n: 5, h: 0 },   // ring collar between turret and hull roof
       { name: '차체 상면', part: 'hull', a: L(990, 745), b: L(1460, 755), t: 20, mat: 'rha', n: 90, h: 0 },
       { name: '차체 후면', part: 'hull', a: L(985, 745), b: L(985, 805), t: 40, mat: 'rha', n: 180, h: 0 },
       { name: '전방 궤도', part: 'hull', a: L(1520, 818), b: L(1500, 867), t: 20, mat: 'track', n: -45, h: 0, track: true },

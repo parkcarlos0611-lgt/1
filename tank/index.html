@@ -27,8 +27,8 @@
   #sight { position: fixed; right: 10px; bottom: 56px; width: min(38vw, 54vh, 500px); aspect-ratio: 1; border-radius: 50%;
     border: 7px solid #0e0c09; box-shadow: 0 0 0 2px rgba(255,255,255,.15), 0 6px 24px rgba(0,0,0,.4); background: #000; pointer-events: none; }
   #sight.big { right: auto; bottom: auto; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(92vh, 92vw); z-index: 4; }
-  #sight.thermal { filter: grayscale(1) brightness(.68) contrast(1.8) sepia(1) hue-rotate(70deg) saturate(2.4); }
-  #sight.thermal.bh { filter: grayscale(1) invert(1) brightness(.62) contrast(1.7) sepia(1) hue-rotate(70deg) saturate(2.4); }
+  #sight.thermal { filter: grayscale(1) sepia(1) hue-rotate(68deg) saturate(2.6) brightness(.95); }
+  #sight.thermal.bh { filter: grayscale(1) invert(1) sepia(1) hue-rotate(68deg) saturate(2.6) brightness(.95); }
   body:not(.playing) :is(#hud, #help, #sight, #mini, #zoombar, #foes, #log, #touch) { display: none !important; }
   #log { left: 10px; bottom: 64px; max-width: min(56vw, 640px); font-size: 12px; display: grid; gap: 3px; }
   #log:empty { display: none; }
@@ -140,6 +140,7 @@
   <div><kbd>E</kbd> 레이저 거리측정 (탄도컴퓨터 자동 보정)</div>
   <div><kbd>F</kbd> 동축 M240 · 우클릭 유지: 전차장 M2 (마우스로 조준)</div>
   <div><kbd>V</kbd> 조준경 3× / 10× · <kbd>T</kbd> 열상 · <kbd>B</kbd> 백열/흑열</div>
+  <div><kbd>[</kbd><kbd>]</kbd> 열상 밝기 · <kbd>Shift</kbd>+<kbd>[</kbd><kbd>]</kbd> 열상 대비</div>
   <div><kbd>G</kbd> 조준경 크게 보기 · <kbd>Z</kbd> TOW 발사관 투시 끄기/켜기</div>
   <div><kbd>X</kbd> TOW 발사 (브래들리, 정지 상태 · 명중까지 조준선 유지)</div>
   <div><kbd>Tab</kbd> 미사일 시점 켜기/끄기 (날아가는 TOW를 따라감)</div>
@@ -194,6 +195,7 @@
 <script src="src/world/Terrain.js"></script>
 <script src="src/vehicle/Track.js"></script>
 <script src="src/vehicle/Vehicle.js"></script>
+<script src="src/vehicle/Thermal.js"></script>
 <script src="src/ballistics/Projectile.js"></script>
 <script src="src/ballistics/Armor.js"></script>
 <script src="src/ballistics/Missile.js"></script>

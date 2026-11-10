@@ -99,9 +99,14 @@ DS.Game = class Game {
       if (e.code === 'Digit3') cam.tzoom = P[2];
       if (e.code === 'KeyQ') this.cycleAmmo();
       if (e.code === 'KeyE') this.lase();
-      if (e.code === 'KeyV') this.sightMag = this.sightMag === 10 ? 3 : 10;
+      if (e.code === 'KeyV') { this.sightMag = this.sightMag === 10 ? 3 : 10; if (this.tis) this.tis.blur = 0.45; }
       if (e.code === 'KeyT') { this.thermal = !this.thermal; this.sightCv.classList.toggle('thermal', this.thermal); }
-      if (e.code === 'KeyB') { this.blackHot = !this.blackHot; this.sightCv.classList.toggle('bh', this.blackHot); }
+      if (e.code === 'KeyB') { this.blackHot = !this.blackHot; this.sightCv.classList.toggle('bh', this.blackHot); if (this.tis) this.tis.cal = 0.3; }
+      if (e.code === 'BracketLeft' || e.code === 'BracketRight') {
+        const a = this.world.tisAdj || (this.world.tisAdj = { level: 0, gain: 1 }), up = e.code === 'BracketRight';
+        if (e.shiftKey) a.gain = Math.max(0.5, Math.min(3, a.gain * (up ? 1.12 : 1 / 1.12))); else a.level = Math.max(-0.2, Math.min(0.3, a.level + (up ? -0.02 : 0.02)));
+        this.toast(`열상 밝기 ${Math.round(-a.level * 50)} · 대비 ${a.gain.toFixed(2)}`);
+      }
       if (e.code === 'KeyG') this.sightCv.classList.toggle('big');
       if (e.code === 'Backspace') { e.preventDefault(); this.cycleTarget(e.shiftKey ? -1 : 1); }
       if (e.code === 'Tab') {
@@ -226,6 +231,36 @@ DS.Game = class Game {
       haze: night ? 0 : sun ? (storm ? 0.25 : 0.35 + 0.65 * (1 - low)) : 0.3, horizon: hz, hot, waves, hit,
       grain: night ? 0.045 : 0.022, vig: 0.38, lift, gain, sat, contrast,
     });
+  }
+  // First-generation scanning thermal imager: the scene is rendered at the detector's ~180 lines and scaled up
+  // (soft, blocky), the previous frame lingers (lag), each scan line has its own slight offset (fixed-pattern
+  // noise), grain shimmers; refocus blur after a magnification change, re-calibration flash after polarity.
+  tisRender(cam, dt) {
+    const cv = this.sightCv, c = this.sctx, rows = this.sightMag === 10 ? 180 : 150;
+    const t = this.tis || (this.tis = { lo: document.createElement('canvas'), prev: document.createElement('canvas'), cam: new DS.Camera(), blur: 0, cal: 0, fpn: null, grain: null });
+    const k = rows / cam.H, lw = Math.max(1, Math.round(cam.W * k));
+    for (const x of [t.lo, t.prev]) if (x.width !== lw || x.height !== rows) { x.width = lw; x.height = rows; }
+    Object.assign(t.cam, cam); t.cam.dpr = k;
+    const lc = t.lo.getContext('2d');
+    this.rend.frame(lc, t.cam, { main: false, thermal: true });
+    lc.setTransform(1, 0, 0, 1, 0, 0); lc.globalAlpha = 0.35; lc.drawImage(t.prev, 0, 0); lc.globalAlpha = 1;
+    t.prev.getContext('2d').drawImage(t.lo, 0, 0);
+    if (!t.fpn || t.fpn.height !== rows) {
+      t.fpn = document.createElement('canvas'); t.fpn.width = 1; t.fpn.height = rows; const f = t.fpn.getContext('2d'), r = DS.rng(rows);
+      for (let y = 0; y < rows; y++) { const v = (r() - 0.5) * 0.08; f.fillStyle = v > 0 ? `rgba(255,255,255,${v})` : `rgba(0,0,0,${-v})`; f.fillRect(0, y, 1, 1); }
+      t.grain = document.createElement('canvas'); t.grain.width = t.grain.height = 128; const g = t.grain.getContext('2d'), d = g.createImageData(128, 128);
+      for (let i = 0; i < d.data.length; i += 4) { const v = r() * 255; d.data[i] = d.data[i + 1] = d.data[i + 2] = v; d.data[i + 3] = 18; }
+      g.putImageData(d, 0, 0);
+    }
+    lc.drawImage(t.fpn, 0, 0, lw, rows);
+    c.setTransform(1, 0, 0, 1, 0, 0); c.imageSmoothingEnabled = true;
+    t.blur = Math.max(0, t.blur - dt);
+    if (t.blur > 0) c.filter = `blur(${(t.blur * 10 * cam.dpr).toFixed(1)}px)`;
+    c.drawImage(t.lo, 0, 0, cv.width, cv.height); c.filter = 'none';
+    c.globalAlpha = 0.6; c.drawImage(t.grain, (Math.random() * 128) | 0, (Math.random() * 128) | 0, 64, 64, 0, 0, cv.width, cv.height); c.globalAlpha = 1;
+    t.cal = Math.max(0, t.cal - dt);
+    if (t.cal > 0) { c.fillStyle = `rgba(255,255,255,${(t.cal / 0.3 * 0.8).toFixed(2)})`; c.fillRect(0, 0, cv.width, cv.height); }
+    this.rend.markers(c, cam, false);
   }
   lase() { DS.FireControl.update(this.world, this.player, true); }
   cycleAmmo() {
@@ -378,7 +413,7 @@ DS.Game = class Game {
     const o = v.sightOrigin(), a = v.gun.aimW;
     cam.x = o.x + Math.cos(a) * R + (Math.random() - 0.5) * shake; cam.y = o.y + Math.sin(a) * R + (Math.random() - 0.5) * shake - k2 * 14 / mil / 1000 * R;
     cam.zoom = W / (2 * R * Math.tan(fov / 2));
-    this.rend.frame(this.sctx, cam, { main: false, thermal: this.thermal });
+    if (this.thermal) this.tisRender(cam, dt); else this.rend.frame(this.sctx, cam, { main: false });
     const c = this.sctx, cx = W / 2, cy = H / 2, env = w.env || {};
     // heat shimmer over long ranges in daylight: rows of the picture wobble sideways
     if (!this.thermal && !env.night && R > 500) {

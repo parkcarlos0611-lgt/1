@@ -47,6 +47,7 @@ DS.VEHICLES = DS.VEHICLES || {};
       { name: '포탑 전면', part: 'turret', a: L(447, 148), b: L(450, 197), t: 55, mat: 'rha', n: 0, h: 20 },
       { name: '포탑 상면', part: 'turret', a: L(176, 132), b: L(447, 146), t: 20, mat: 'rha', n: 90, h: 0 },
       { name: '포탑 후면', part: 'turret', a: L(176, 132), b: L(176, 198), t: 30, mat: 'rha', n: 180, h: 0 },
+      { name: '포탑 링 전면', part: 'hull', a: L(450, 197), b: L(470, 216), t: 30, mat: 'rha', n: 40, h: 0 },
       { name: '차체 상부 경사판', part: 'hull', a: L(470, 214), b: L(757, 306), t: 30, mat: 'rha', n: 72, h: 0 },
       { name: '차체 하부 전면', part: 'hull', a: L(757, 306), b: L(705, 360), t: 45, mat: 'rha', n: -40, h: 0 },
       { name: '차체 상면', part: 'hull', a: L(16, 196), b: L(470, 214), t: 20, mat: 'rha', n: 90, h: 0 },

@@ -18,6 +18,7 @@ DS.Sensor = {
       vis = range >= dm ? 0 : Math.min(1, (dm - range) / (dm - 1200));
       if (env.visibility) vis *= Math.min(1, Math.exp(-range / (env.visibility * 2.6)) * 1.4);   // dust scatters even IR
       vis *= b.def.signature || 1;
+      vis *= Math.min(1.3, 0.45 + 0.8 * DS.Thermal.sig(b));          // running engines, hot tubes, fires show up
       return vis * flash * moving / 1.5;
     }
     vis = range >= dm ? 0 : Math.pow(Math.max(0, Math.min(1, (dm - range) / (dm - 700))), 1.5);

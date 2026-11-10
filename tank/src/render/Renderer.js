@@ -120,6 +120,7 @@ DS.Renderer = class Renderer {
   frame(ctx = this.ctx, cam = this.w.cam, opt = { main: true }) {
     const w = this.w;
     this.cam = cam; this.opt = opt;
+    if (opt.thermal) return this.thermalFrame(ctx, cam, opt);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     this.sky(ctx, cam);
     cam.apply(ctx);
@@ -138,6 +139,103 @@ DS.Renderer = class Renderer {
     }
     this.markers(ctx, cam, !!opt.main);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
+  }
+
+  // ---- thermal picture (gunner's sight only): drawn from temperatures, not colours — paint, markings and
+  // flags vanish; hulls are flat grey at their own temperature with engines, exhausts, running gear, hot gun
+  // tubes and fires glowing. Automatic gain follows the hottest thing in view, so a fire darkens the rest. ----
+  thermalFrame(ctx, cam, opt) {
+    const w = this.w, T = w.terrain, th = DS.Thermal, amb = th.ambient(w), me = w.vehicles[0];
+    const vis = w.vehicles.filter(v => cam.visible(v.pos.x, v.pos.y, 14) && this.shown(v));
+    let peak = 0.7; for (const v of vis) peak = Math.max(peak, th.peak(v));
+    this.agc = this.agc ? this.agc + (peak - this.agc) * 0.08 : peak;
+    const adj = w.tisAdj || { level: 0, gain: 1 };
+    // automatic gain: the window sits on the ground temperature and stretches up to the hottest thing in view
+    const lo = Math.max(amb.sky + 0.03, amb.ground - 0.2) + adj.level, hi = lo + (Math.max(amb.ground + 0.3, this.agc * 0.95) - lo) / adj.gain;
+    const lum = t => Math.round(255 * Math.pow(Math.max(0, Math.min(1, (t - lo) / (hi - lo))), 0.8));
+    const tg = (t, a = 1) => { const c = lum(t); return `rgba(${c},${c},${c},${a})`; };
+    const W = cam.W * cam.dpr, H = cam.H * cam.dpr;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    const sg = ctx.createLinearGradient(0, 0, 0, H); sg.addColorStop(0, tg(amb.sky)); sg.addColorStop(1, tg(amb.sky + 0.06));
+    ctx.fillStyle = sg; ctx.fillRect(0, 0, W, H);
+    cam.apply(ctx);
+    // ground: one temperature, sun-facing slopes a little warmer by day, fresh craters warm
+    const x0 = cam.left - 1, x1 = cam.right + 1, bot = cam.bottom - 1, step = Math.max(T.dx, 1.5 / cam.zoom);
+    ctx.beginPath(); ctx.moveTo(x0, bot);
+    for (let x = x0; x <= x1 + step; x += step) ctx.lineTo(x, T.height(x));
+    ctx.lineTo(x1 + step, bot); ctx.closePath(); ctx.fillStyle = tg(amb.ground); ctx.fill();
+    ctx.save(); ctx.clip();
+    const cs = Math.max(T.dx, 2 / cam.zoom), sun = (w.env || {}).sun;
+    for (let x = x0; x <= x1; x += cs) {
+      const i = T.idx(x), h = T.h[i];
+      let d = 0.1 * Math.max(0, T.disturb[i] - 0.3);           // fresh crater earth (not crust breaks)
+      if (sun && !(w.env || {}).night) d += Math.max(-0.03, Math.min(0.03, (T.height(x + 0.6) - T.height(x - 0.6)) / 1.2 * sun.side * 0.06));
+      if (Math.abs(d) > 0.004) { ctx.fillStyle = tg(amb.ground + d); ctx.fillRect(x, h - 0.7, cs + 0.01, 0.7); }
+    }
+    ctx.restore();
+    for (const v of vis) this.thermalVehicle(ctx, v, cam, amb, tg);
+    this.thermalParticles(ctx, cam, amb, lum);
+    this.projectiles(ctx, cam);
+    w.fx.drawFlashes(ctx);
+    // fires bloom out the detector
+    ctx.globalCompositeOperation = 'lighter';
+    for (const v of vis) if (v.burning) {
+      const f = v.fireSource(), R = 7, g = ctx.createRadialGradient(f.x, f.y + 1, 0, f.x, f.y + 1, R);
+      g.addColorStop(0, 'rgba(255,255,255,0.55)'); g.addColorStop(1, 'rgba(255,255,255,0)'); ctx.fillStyle = g; ctx.fillRect(f.x - R, f.y + 1 - R, R * 2, R * 2);
+    }
+    ctx.globalCompositeOperation = 'source-over';
+    // the air between us and the view: contrast fades with range (dust shortens it)
+    if (me) {
+      const R = Math.abs(cam.x - me.pos.x), a = 1 - Math.exp(-R / amb.att);
+      ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = tg(amb.ground - 0.02, a * 0.85); ctx.fillRect(0, 0, W, H);
+    }
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+  }
+  thermalVehicle(ctx, v, cam, amb, tg) {
+    const cv = ctx.canvas, store = this.tOffs || (this.tOffs = new Map());
+    let off = store.get(cv);
+    if (!off || off.width !== cv.width || off.height !== cv.height) { off = document.createElement('canvas'); off.width = cv.width; off.height = cv.height; store.set(cv, off); }
+    const o = off.getContext('2d'), m = ctx.getTransform(), z = Math.hypot(m.a, m.b);
+    const pts = [v.pos]; if (v.turretBody) pts.push(v.turretBody);
+    let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+    for (const p of pts) { const sx = m.a * p.x + m.c * p.y + m.e, sy = m.b * p.x + m.d * p.y + m.f, h = 7.5 * z; x0 = Math.min(x0, sx - h); y0 = Math.min(y0, sy - h); x1 = Math.max(x1, sx + h); y1 = Math.max(y1, sy + h); }
+    x0 = Math.max(0, Math.floor(x0)); y0 = Math.max(0, Math.floor(y0)); x1 = Math.min(cv.width, Math.ceil(x1)); y1 = Math.min(cv.height, Math.ceil(y1));
+    if (x1 <= x0 || y1 <= y0) return;
+    const hull = DS.Thermal.hull(v, amb);
+    o.setTransform(1, 0, 0, 1, 0, 0); o.globalCompositeOperation = 'source-over'; o.clearRect(x0, y0, x1 - x0, y1 - y0);
+    o.setTransform(m); this.drawVehicle(o, v, cam);
+    o.setTransform(1, 0, 0, 1, 0, 0); o.globalCompositeOperation = 'source-in'; o.fillStyle = tg(hull); o.fillRect(x0, y0, x1 - x0, y1 - y0);
+    o.globalCompositeOperation = 'source-atop';
+    o.setTransform(m); o.globalAlpha = 0.12; this.drawVehicle(o, v, cam); o.globalAlpha = 1;   // faint panel structure (emissivity)
+    for (const [x, y, r, t] of DS.Thermal.spots(v)) {
+      const g = o.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, tg(hull + t)); g.addColorStop(1, tg(hull + t, 0));
+      o.fillStyle = g; o.fillRect(x - r, y - r, r * 2, r * 2);
+    }
+    const gh = v.heat ? v.heat.gun : 0;
+    if (gh > 0.03 && !v.turretGone) {
+      const tp = v.local(v.g.trunnion.x, v.g.trunnion.y), mz = v.muzzle();
+      o.strokeStyle = tg(hull + gh * 0.65, 0.9); o.lineWidth = 0.22; o.beginPath(); o.moveTo(tp.x, tp.y); o.lineTo(mz.x, mz.y); o.stroke();
+    }
+    o.globalCompositeOperation = 'source-over';
+    ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(off, x0, y0, x1 - x0, y1 - y0, x0, y0, x1 - x0, y1 - y0); ctx.restore();
+  }
+  thermalParticles(ctx, cam, amb, lum) {
+    const P = this.w.particles, K = DS.P, spr = c => P.sprite((c << 16) | (c << 8) | c);
+    for (let i = 0; i < P.n; i++) {
+      const k = P.kind[i];
+      if (k === K.GRAIN || k === K.HEAT) continue;
+      const sz = P.size[i]; if (!cam.visible(P.x[i], P.y[i], sz)) continue;
+      const t = P.life[i] / P.ttl[i];
+      if (k === K.DEBRIS) { const c = lum(0.9 * (1 - t) + amb.ground * t); ctx.globalAlpha = 1 - t; ctx.fillStyle = `rgb(${c},${c},${c})`; ctx.fillRect(P.x[i] - sz / 2, P.y[i] - sz / 2, sz, sz); continue; }
+      let T, a;
+      if (k === K.FIRE) { T = 1.4; a = P.alpha[i] * (1 - t) * (1 - t); }
+      else if (k === K.DARK) { T = amb.ground + 0.14 * (1 - t); a = P.alpha[i] * 0.7 * Math.min(1, t * 8) * (1 - t); }
+      else if (k === K.SMOKE) { T = amb.ground + 0.07 * (1 - t); a = P.alpha[i] * 0.5 * Math.min(1, t * 8) * (1 - t); }
+      else { T = amb.ground - 0.02; a = P.alpha[i] * 0.45 * Math.min(1, t * 8) * (1 - t); }   // dust: thermal sees through most of it
+      if (a < 0.004) continue;
+      ctx.globalAlpha = a; ctx.drawImage(spr(lum(T)), P.x[i] - sz, P.y[i] - sz, sz * 2, sz * 2);
+    }
+    ctx.globalAlpha = 1;
   }
 
   // ---- what the player's crew has found (src/ai/Sensor.js) ----

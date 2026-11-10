@@ -1,7 +1,7 @@
 // Effect emitters driven by simulation state: track sand / rooster tail, turbine exhaust,
 // muzzle flash + blast dust + gun smoke + sabot petals, ground impacts.
 DS.Effects = class Effects {
-  constructor(world) { this.w = world; this.P = world.particles; this.flashes = []; this.labels = []; this.blasts = []; this.acc = 0; this.shake = 0; }
+  constructor(world) { this.w = world; this.P = world.particles; this.flashes = []; this.labels = []; this.blasts = []; this.waves = []; this.acc = 0; this.shake = 0; }
   rnd(a, b) { return a + Math.random() * (b - a); }
   hex(s) { return parseInt(s.slice(1), 16); }
 
@@ -127,11 +127,11 @@ DS.Effects = class Effects {
     const P = this.P, K = DS.P;
     const p = v.local(v.g.ring.x, v.g.ring.y);
     this.blast(p.x, p.y, 2.2, null, null);
-    this.flashes.push({ x: p.x, y: p.y + 1, dx: 0, dy: 1, t: 0, ttl: 0.18, boom: true, big: true });
+    this.flashes.push({ x: p.x, y: p.y + 1, dx: 0, dy: 1, t: 0, ttl: 0.14, boom: true, big: true });
     for (let i = 0; i < 140; i++) {
       const a = this.rnd(0, Math.PI), sp = this.rnd(4, 30);
-      P.add(K.FIRE, p.x + this.rnd(-1, 1), p.y + this.rnd(0, 1.5), Math.cos(a) * sp * 0.7, Math.sin(a) * sp, this.rnd(0.2, 0.9), this.rnd(0.6, 1.6),
-        { grow: 3, drag: 3, grav: -0.05, alpha: 1, col: Math.random() < 0.5 ? 0xff9a3c : 0xffd27a });
+      P.add(K.FIRE, p.x + this.rnd(-1, 1), p.y + this.rnd(0, 1.5), Math.cos(a) * sp * 0.7, Math.sin(a) * sp, this.rnd(0.2, 0.8), this.rnd(0.5, 1.3),
+        { grow: 2.4, drag: 3, grav: -0.05, alpha: 0.7, col: Math.random() < 0.55 ? 0xff7a28 : 0xffc060 });
     }
     for (let i = 0; i < 40; i++) {
       const a = this.rnd(0.2, Math.PI - 0.2), sp = this.rnd(3, 14);
@@ -318,6 +318,7 @@ DS.Effects = class Effects {
   // Strong blasts also scour the surface and drop the sand a little further out (sand is conserved).
   blast(x, y, str, dx, dy) {
     this.blasts.push({ x, y, str, dx: dx || 0, dy: dy || 0, dir: dx != null && dx !== 0, r: 0, max: 22 * Math.sqrt(str) + 6 });
+    if (str >= 0.2) this.waves.push({ x, y, str, t: 0, max: 22 * Math.sqrt(str) + 6 });   // visible air ripple (post-processing)
   }
   stepBlasts(dt) {
     const T = this.w.terrain, P = this.P, K = DS.P, cell = 0.5;
@@ -349,7 +350,7 @@ DS.Effects = class Effects {
     this.blasts = this.blasts.filter(b => b.r < b.max);
   }
 
-  update(dt) { this.stepBlasts(dt); for (const f of this.flashes) f.t += dt; this.flashes = this.flashes.filter(f => f.t < f.ttl);
+  update(dt) { this.stepBlasts(dt); for (const w of this.waves) w.t += dt; this.waves = this.waves.filter(w => w.t < 0.4); for (const f of this.flashes) f.t += dt; this.flashes = this.flashes.filter(f => f.t < f.ttl);
     for (const l of this.labels) l.t += dt; this.labels = this.labels.filter(l => l.t < 4); this.shake = Math.max(0, this.shake - dt * 2.5); }
 
   drawFlashes(ctx) {

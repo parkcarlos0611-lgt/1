@@ -12,6 +12,9 @@ DS.Game = class Game {
     this.sightCam = new DS.Camera(); this.sightMag = 10; this.thermal = false; this.sightR = 2000; this._sightT = 0;
   }
   async start() {
+    this.post = new DS.Post(this.cv);
+    let q = 2; try { const s = localStorage.getItem('ds.post'); if (s != null) q = +s; } catch (e) {}
+    this.post.setQuality(this.post.ok ? q : 0); this.lowFps = 0;
     await Promise.all(['m1a1', 'm2a2', 't55', 't62', 't72'].map(id => this.rend.load(DS.VEHICLES[id])));
     DS.Armor.calibrate();
     this.resize(); addEventListener('resize', () => this.resize());
@@ -84,6 +87,10 @@ DS.Game = class Game {
     addEventListener('pointerdown', wake); addEventListener('keydown', wake);
     addEventListener('keydown', e => {
       if (e.repeat) return;
+      if (e.code === 'KeyP') {
+        if (!this.post.ok) this.toast('이 브라우저는 화면 효과(WebGL2)를 지원하지 않음');
+        else { const q = (this.post.q + 2) % 3; this.post.setQuality(q); try { localStorage.setItem('ds.post', q); } catch (er) {} this.toast('화면 효과: ' + ['끔', '낮음', '높음'][q]); }
+      }
       if (e.code === 'KeyM') { const on = DS.Audio.toggle(); this.toast(on ? '소리 켬' : '소리 끔'); }
       this.keys.add(e.code);
       if (e.code === 'F9') { this.world.debug = !this.world.debug; e.preventDefault(); }
@@ -181,6 +188,45 @@ DS.Game = class Game {
     v.gun.aimW += Math.max(-mx, Math.min(mx, d));
     if (Math.abs(d) < 0.0002) this.slew = null;
   }
+  // ---- post-processing inputs, all in device pixels of the main canvas ----
+  postFrame(dt) {
+    const P = this.post, w = this.world, cam = w.cam, env = w.env || {}, dpr = cam.dpr;
+    if (!P.ok || !P.q) { document.getElementById('hurt').style.display = ''; return; }
+    document.getElementById('hurt').style.display = 'none';
+    // drop a level when the frame rate stays low (DS.T.postAuto = false turns this off)
+    if (DS.T.postAuto !== false) {
+      this.lowFps = this.fps < 40 ? this.lowFps + dt : 0;
+      if (this.lowFps > 3) { this.lowFps = 0; P.setQuality(P.q - 1); this.toast('프레임 저하 — 화면 효과 ' + ['끔', '낮음'][P.q]); }
+    }
+    const z = cam.zoom * dpr, S = (x, y) => [(x - cam.x - cam.sx) * z + cam.W * dpr / 2, -(y - cam.y - cam.sy) * z + cam.H * dpr / 2];
+    const hot = [], night = env.night || 0, storm = env.visibility ? 1 : 0, sun = env.sun;
+    for (const v of w.vehicles) {
+      if (!cam.visible(v.pos.x, v.pos.y, 20) || !this.rend.shown(v)) continue;
+      if (v.alive) {
+        const e = v.local(v.g.exhaust.x, v.g.exhaust.y), k = (0.18 + 0.5 * v.spool) * (v.def.engine.type === 'turbine' ? 1.3 : 0.8);
+        hot.push([...S(e.x - v.dir * 1.2, e.y + 0.4), 2.2 * z, k]);
+      }
+      if (v.burning) { const f = v.fireSource(); hot.push([...S(f.x, f.y + 1.5), 4.5 * z, Math.min(1.3, v.burning / 2)]); }
+      if (v.jet > 0) { const f = v.local(v.g.ring.x, v.g.ring.y); hot.push([...S(f.x, f.y + 4), 6 * z, 1.8]); }
+      if (v.lastFired != null && w.time - v.lastFired < 0.6) { const m = v.muzzle(); hot.push([...S(m.x + m.dx * 1.5, m.y + 0.5), 3 * z, (0.6 - (w.time - v.lastFired)) * 2.2]); }
+    }
+    for (const m of w.missiles) hot.push([...S(m.x - Math.cos(m.ang) * 1.5, m.y), 1.2 * z, 0.5]);
+    hot.sort((a, b) => b[3] - a[3]);
+    const waves = w.fx.waves.map(b => { const f = b.t / 0.4, r = Math.min(b.max, 4 + 110 * b.t); return [...S(b.x, b.y), r * z, b.str * 0.5 * (1 - f) * (1 - f)]; });
+    const hz = cam.H * dpr * 0.5 + (cam.y - 14) * cam.zoom * dpr * 0.04 + cam.H * dpr * 0.03;
+    const hit = w.playerHitAt != null ? Math.max(0, 1 - (w.time - w.playerHitAt) / 0.6) : 0;
+    // grade by conditions: low morning sun warm, sandstorm ochre and flat, night cool and desaturated
+    const low = sun ? Math.max(0, Math.min(1, (25 - sun.el) / 15)) : 0;
+    let lift = [0.0, 0.0, 0.01], gain = [1.0, 1.0, 1.0], sat = 1.05, contrast = 1.05;
+    if (night) { lift = [0.0, 0.004, 0.02]; gain = [0.92, 0.97, 1.1]; sat = 0.75; contrast = 1.08; }
+    else if (storm) { lift = [0.03, 0.015, 0.0]; gain = [1.04, 0.98, 0.86]; sat = 0.85; contrast = 0.92; }
+    else if (low) { lift = [0.0, 0.0, 0.025 * low]; gain = [1.0 + 0.06 * low, 1.0, 1.0 - 0.08 * low]; sat = 1.05; contrast = 1.06; }
+    P.render({
+      time: w.time, threshold: night ? 0.62 : storm ? 0.88 : 0.86, bloom: night ? 0.75 : storm ? 0.4 : 0.55,
+      haze: night ? 0 : sun ? (storm ? 0.25 : 0.35 + 0.65 * (1 - low)) : 0.3, horizon: hz, hot, waves, hit,
+      grain: night ? 0.045 : 0.022, vig: 0.38, lift, gain, sat, contrast,
+    });
+  }
   lase() { DS.FireControl.update(this.world, this.player, true); }
   cycleAmmo() {
     const v = this.player, list = v.def.ammo, i = list.indexOf(v.gun.ammo);
@@ -215,6 +261,7 @@ DS.Game = class Game {
     this.missileCam(dt);
     DS.Audio.update(this.world, dt);
     this.rend.frame();
+    this.postFrame(dt);
     this.sight(dt);
     this.hud();
     requestAnimationFrame(t2 => this.loop(t2));

@@ -29,8 +29,9 @@ DS.VEHICLES = DS.VEHICLES || {};
     track: { pitch: 0.168, thick: 0.075, width: 0.71, mass: 4300 },
     belly: { y: -0.85, x0: L(955, 0)[0], x1: L(1555, 0)[0] },
     contactArea: 0.95,
-    underside: { x0: -3.2, x1: 3.4, y0: -0.08, y1: -0.85,
-      poly: [[L(938, 0)[0], -0.06], [L(1576, 0)[0], -0.06], [L(1572, 0)[0], -0.36], [L(1515, 0)[0], -0.82], [L(1005, 0)[0], -0.82], [L(944, 0)[0], -0.42]] },
+    // dark hull side behind the running gear: reaches down to the road-wheel axles (wheel centres at y = -1.087)
+    underside: { x0: -3.2, x1: 3.4, y0: -0.08, y1: -1.12,
+      poly: [[L(938, 0)[0], -0.06], [L(1576, 0)[0], -0.06], [L(1572, 0)[0], -0.40], [L(1488, 0)[0], -1.12], [L(1018, 0)[0], -1.12], [L(944, 0)[0], -0.46]] },
     // hull side behind the wheels: filled dark like the M1A1 (the renderer's optional openSide suspension is not used)
     engine: { type: 'diesel', power: 5.59e5, eff: 0.72, maxTractive: 3.4e5, spool: 0.45,    // AVDS-1790-2C, 750 hp
       vmaxF: 48 / 3.6, vmaxR: 12 / 3.6, brake: 5.2e5, engineBrake: 2.8e4 },

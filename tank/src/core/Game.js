@@ -81,6 +81,11 @@ DS.Game = class Game {
       if (e.code === 'KeyT') { this.thermal = !this.thermal; this.sightCv.classList.toggle('thermal', this.thermal); }
       if (e.code === 'KeyB') { this.blackHot = !this.blackHot; this.sightCv.classList.toggle('bh', this.blackHot); }
       if (e.code === 'KeyG') this.sightCv.classList.toggle('big');
+      if (e.code === 'Tab') {
+        e.preventDefault();
+        if (!this.player.tow) this.toast('미사일 시점은 브래들리 전용');
+        else { this.mcam = !this.mcam; this.mcamHold = null; this.toast(this.mcam ? (this.player.tow.missile ? '미사일 시점' : '미사일 시점 켬 — 다음 발사부터 따라감') : '미사일 시점 끔'); }
+      }
       if (e.code === 'KeyX') { if (this.player.tow) this.player.input.tow = true; else this.toast('TOW 미사일은 브래들리 전용'); }
       if (e.code === 'KeyZ') { this.world.xray = this.world.xray === false; this.toast(this.world.xray ? 'TOW 발사관 투시 켬' : 'TOW 발사관 투시 끔'); }
       if (e.code === 'KeyR') this.player.place(this.player.pos.x);
@@ -107,12 +112,33 @@ DS.Game = class Game {
     document.querySelectorAll('[data-z]').forEach(b => b.addEventListener('click', () => cam.tzoom = P[+b.dataset.z]));
     document.querySelectorAll('[data-act]').forEach(b => b.addEventListener('pointerdown', ev => {
       ev.preventDefault(); const a = b.dataset.act;
-      if (a === 'lase') this.lase(); else if (a === 'ammo') this.cycleAmmo(); else if (a === 'mag') this.sightMag = this.sightMag === 10 ? 3 : 10;
+      if (a === 'lase') this.lase(); else if (a === 'mcam') { if (this.player.tow) { this.mcam = !this.mcam; this.toast(this.mcam ? '미사일 시점 켬' : '미사일 시점 끔'); } } else if (a === 'ammo') this.cycleAmmo(); else if (a === 'mag') this.sightMag = this.sightMag === 10 ? 3 : 10;
     }));
   }
   toast(msg) {
     const el = document.getElementById('toast'); el.textContent = msg; el.classList.add('on');
     clearTimeout(this._toastT); this._toastT = setTimeout(() => el.classList.remove('on'), 1200);
+  }
+  // Missile camera (Tab): rides alongside the player's TOW in flight, holds on the impact for a moment,
+  // then hands back to the tank. Off by default; when on it picks up every launch.
+  missileCam(dt) {
+    const cam = this.world.cam, t = this.player.tow, tag = document.getElementById('mcam');
+    let on = false;
+    if (this.mcam && t) {
+      const m = t.missile;
+      if (m) {
+        if (!this.mcamZoom) this.mcamZoom = cam.tzoom;
+        const lead = Math.min(30, m.speed * 0.06);
+        cam.x = m.x + Math.cos(m.ang) * lead; cam.y = m.y + Math.sin(m.ang) * lead + 1.5;
+        cam.tzoom = 22; on = true;
+        this.mcamHold = { x: m.x, y: m.y, t: 2.2 };
+        tag.textContent = `미사일 시점 · ${Math.round(Math.hypot(m.x - m.x0, m.y - m.y0))} m · ${Math.round(m.speed)} m/s` + (m.guided ? ' · 유도 중' : ' · 유선 끊김');
+      } else if (this.mcamHold && this.mcamHold.t > 0) {            // watch the impact
+        this.mcamHold.t -= dt; cam.x = this.mcamHold.x; cam.y = this.mcamHold.y + 2; on = true;
+        tag.textContent = '미사일 시점 · 착탄';
+      } else if (this.mcamZoom) { cam.tzoom = this.mcamZoom; this.mcamZoom = null; }
+    }
+    tag.hidden = !on;
   }
   lase() { DS.FireControl.update(this.world, this.player, true); }
   cycleAmmo() {
@@ -144,6 +170,7 @@ DS.Game = class Game {
     if (dt > 0) this.fps += (1 / dt - this.fps) * 0.05;
     this.readInput(dt);
     this.world.update(dt);
+    this.missileCam(dt);
     DS.Audio.update(this.world, dt);
     this.rend.frame();
     this.sight(dt);

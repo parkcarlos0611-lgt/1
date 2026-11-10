@@ -34,6 +34,8 @@
   #log .e i { font-style: normal; color: var(--mu); margin-left: 6px; }
   #log .tag { display: inline-block; padding: 0 6px; border-radius: 3px; font-weight: 800; font-size: 11px; color: #111; }
   #log .tag.pen { background: #ff6a55; } #log .tag.ric { background: #ffd34a; } #log .tag.non { background: #e8e2d6; } #log .tag.trk { background: #ffa04a; }
+  #mcam { position: fixed; top: 52px; left: 50%; transform: translateX(-50%); background: rgba(10,30,40,.75); color: #8ff0ff; border: 1px solid #3fb6d6;
+    padding: 4px 12px; border-radius: 6px; font: 700 13px ui-monospace, monospace; pointer-events: none; z-index: 3; }
   #toast { position: fixed; top: 40%; left: 50%; transform: translate(-50%, -50%); background: rgba(20,14,8,.75); padding: 8px 16px; border-radius: 8px;
     font-weight: 700; opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 6; }
   #toast.on { opacity: 1; }
@@ -109,6 +111,7 @@
   <div><kbd>V</kbd> 조준경 3× / 10× · <kbd>T</kbd> 열상 · <kbd>B</kbd> 백열/흑열</div>
   <div><kbd>G</kbd> 조준경 크게 보기 · <kbd>Z</kbd> TOW 발사관 투시 끄기/켜기</div>
   <div><kbd>X</kbd> TOW 발사 (브래들리, 정지 상태 · 명중까지 조준선 유지)</div>
+  <div><kbd>Tab</kbd> 미사일 시점 켜기/끄기 (날아가는 TOW를 따라감)</div>
   <div><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> 근접 / 전투 / 전술 줌 · 휠 연속 줌</div>
   <div><kbd>C</kbd> 마우스 위치에 크레이터 · <kbd>R</kbd> 차량 리셋</div>
   <div><kbd>M</kbd> 소리 켜기/끄기</div>
@@ -117,6 +120,7 @@
 
 <div id="hurt"></div>
 <div id="toast" role="status"></div>
+<div id="mcam" hidden></div>
 <div id="foes" class="panel"></div>
 <div id="over" hidden><div><div id="over-t"></div><button id="again" class="btn" type="button">다시 시작</button> <button id="tomenu" class="btn ghost" type="button">작전 선택</button></div></div>
 <div id="menu" hidden>
@@ -135,7 +139,7 @@
 <div id="zoombar"><button data-z="0">근접</button><button data-z="1">전투</button><button data-z="2">전술</button></div>
 <div id="touch">
   <div class="g"><button data-t="drive:-1">◀</button><button data-t="drive:1">▶</button></div>
-  <div class="g"><button data-act="lase">LRF</button><button data-act="ammo">탄</button><button data-t="elev:1">▲</button><button data-t="elev:-1">▼</button><button data-t="coax">MG</button><button class="fire" data-t="fire">사격</button></div>
+  <div class="g"><button data-act="lase">LRF</button><button data-act="mcam">M캠</button><button data-act="ammo">탄</button><button data-t="elev:1">▲</button><button data-t="elev:-1">▼</button><button data-t="coax">MG</button><button class="fire" data-t="fire">사격</button></div>
 </div>
 
 <script src="src/core/Tuning.js"></script>

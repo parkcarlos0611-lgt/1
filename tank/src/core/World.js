@@ -75,6 +75,11 @@ DS.World = class World {
     this.terrain.relax(undefined, undefined, 1);
     for (const v of this.vehicles) this.fx.vehicle(v, frameDt);
     this.fx.ambient(frameDt);
+    // wind moves sand around the vehicles (strong winds only: the sandstorm)
+    if (Math.abs(this.wind) > 4 && this.vehicles.length) {
+      let a = 1e9, b = -1e9; for (const v of this.vehicles) { a = Math.min(a, v.pos.x); b = Math.max(b, v.pos.x); }
+      this.terrain.windStep(frameDt, this.wind, a - 120, b + 120);
+    }
     for (const m of this.missiles) this.fx.missile(m, frameDt);
     this.particles.update(frameDt, this.terrain, this.wind);
     this.fx.update(frameDt);

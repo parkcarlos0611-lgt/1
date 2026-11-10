@@ -7,23 +7,24 @@ DS.Particles = class Particles {
     const F = () => new Float32Array(max);
     this.x = F(); this.y = F(); this.vx = F(); this.vy = F(); this.life = F(); this.ttl = F();
     this.size = F(); this.grow = F(); this.drag = F(); this.grav = F(); this.alpha = F(); this.rot = F();
-    this.kind = new Uint8Array(max); this.col = new Uint32Array(max);
+    this.kind = new Uint8Array(max); this.col = new Uint32Array(max); this.mass = new Float32Array(max);   // sand volume carried (m²)
     this.sprites = {};
   }
   add(kind, x, y, vx, vy, ttl, size, o = {}) {
     let i = this.n;
     if (i >= this.max) { i = (Math.random() * this.max) | 0; } else this.n++;
+    // (a recycled slot loses its sand: negligible, and keeps the pool bounded)
     this.kind[i] = kind; this.x[i] = x; this.y[i] = y; this.vx[i] = vx; this.vy[i] = vy;
     this.life[i] = 0; this.ttl[i] = ttl; this.size[i] = size; this.grow[i] = o.grow || 0;
     this.drag[i] = o.drag != null ? o.drag : 0.5; this.grav[i] = o.grav != null ? o.grav : 1;
     this.alpha[i] = o.alpha != null ? o.alpha : 1; this.col[i] = o.col != null ? o.col : 0xd8b67c;
-    this.rot[i] = Math.random() * 6.28;
+    this.rot[i] = Math.random() * 6.28; this.mass[i] = o.mass || 0;
   }
   update(dt, terrain, wind) {
     const g = DS.T.g;
     for (let i = 0; i < this.n; i++) {
       this.life[i] += dt;
-      if (this.life[i] >= this.ttl[i]) { this.kill(i); i--; continue; }
+      if (this.life[i] >= this.ttl[i]) { if (this.mass[i]) terrain.deposit(this.x[i], this.mass[i]); this.kill(i); i--; continue; }
       const k = this.kind[i], dr = this.drag[i];
       // drag toward wind velocity
       const f = Math.min(1, dr * dt);
@@ -35,7 +36,7 @@ DS.Particles = class Particles {
         const h = terrain.height(this.x[i]);
         if (this.y[i] < h) {
           if (k === DS.P.DEBRIS && this.vy[i] < -2) { this.vy[i] *= -0.25; this.vx[i] *= 0.5; this.y[i] = h; }
-          else { this.kill(i); i--; continue; }
+          else { if (this.mass[i]) terrain.deposit(this.x[i], this.mass[i]); this.kill(i); i--; continue; }
         }
       } else if (k === DS.P.DUST || k === DS.P.SMOKE || k === DS.P.DARK) {
         const h = terrain.height(this.x[i]) + this.size[i] * 0.3;
@@ -46,7 +47,7 @@ DS.Particles = class Particles {
   kill(i) {
     const j = --this.n;
     if (i === j) return;
-    for (const a of ['x', 'y', 'vx', 'vy', 'life', 'ttl', 'size', 'grow', 'drag', 'grav', 'alpha', 'rot', 'kind', 'col']) this[a][i] = this[a][j];
+    for (const a of ['x', 'y', 'vx', 'vy', 'life', 'ttl', 'size', 'grow', 'drag', 'grav', 'alpha', 'rot', 'kind', 'col', 'mass']) this[a][i] = this[a][j];
   }
 
   sprite(col) {

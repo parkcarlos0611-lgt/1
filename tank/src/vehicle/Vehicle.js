@@ -92,6 +92,21 @@ DS.Vehicle = class Vehicle {
       }
     }
 
+    // ---- track belt between the road wheels: the belt bridges crests instead of letting the hull drop
+    // into the gap between two wheels (soft spring, so the stations still carry the load on flat ground) ----
+    const byX = this.st.slice().sort((p, q) => p.lx - q.lx);
+    for (let i = 1; i < byX.length; i++) {
+      const a = byX[i - 1], b = byX[i];
+      const bx = (a.wx + b.wx) / 2, by = (a.wy + b.wy) / 2 - R;
+      const pen = T.height(bx) - by;
+      if (pen > 0.005) {
+        const sl = T.slope(bx), nl = Math.hypot(sl, 1), nx = -sl / nl, ny = 1 / nl;
+        const v = pv(bx, by), vn = v.x * nx + v.y * ny;
+        const Fn = Math.max(0, 1.6e6 * (pen - 0.005) - 1.2e5 * vn);
+        apply(bx, by, nx * Fn, ny * Fn);
+      }
+    }
+
     // ---- drive: engine → sprocket → track, implicit in track speed ----
     const u = this.mobile ? this.input.drive : 0;
     this.spool += ((this.alive ? Math.abs(u) : 0) - this.spool) * Math.min(1, dt / E.spool);
@@ -162,6 +177,29 @@ DS.Vehicle = class Vehicle {
       else w.sink = 0;
     }
     this.stats.sink = sinkMax;
+
+    // ---- the tracks work the sand: slipping grousers dig and throw it out behind; the leading wheel pushes
+    // a small bow wave of sand ahead of it in soft going (both conserve sand) ----
+    this.digAcc = this.digAcc || new Float32Array(this.st.length);
+    const lead = this.st.reduce((m, w) => (w.lx * Math.sign(this.vt || 1) > m.lx * Math.sign(this.vt || 1) ? w : m), this.st[0]);
+    this.st.forEach((w, k) => {
+      if (!(w.N > 0)) return;
+      const soil = T.soilAt(w.wx), slip = Math.abs(w.slip);
+      if (slip > 0.35) {
+        this.digAcc[k] += Math.min(0.02, (slip - 0.35) * 0.0035 * soil.dust) * dt;
+        if (this.digAcc[k] > 0.0012) {
+          const vol = this.digAcc[k]; this.digAcc[k] = 0;
+          T.deposit(w.wx, -vol);
+          const back = -Math.sign(w.slip) || -1;
+          world.particles.add(DS.P.GRAIN, w.wx + back * 0.3, w.wy - R + 0.12, this.vel.x + back * (1.5 + Math.random() * 3), 1.5 + Math.random() * 2.5, 2, 0.06,
+            { drag: 0.3, mass: vol, col: parseInt(soil.col[1].slice(1), 16) });
+        }
+      }
+      if (w === lead && w.sink > 0.025 && Math.abs(this.vt) > 0.5) {
+        const dirn = Math.sign(this.vt), vol = Math.min(0.0006, (w.sink - 0.025) * Math.abs(this.vt) * 0.003 * soil.dust) * dt * 60;
+        T.shift(w.wx + dirn * 0.35, w.wx + dirn * (0.9 + Math.random() * 0.4), vol);
+      }
+    });
 
     // ---- running gear rotation ----
     if (!this.trackBroken) this.s += this.vt * dt;
@@ -401,7 +439,7 @@ DS.Vehicle = class Vehicle {
       const gnd = Math.atan(this.terrain.slope(b.x));
       // settle roughly upright or upside down, whichever is closer
       let t = b.a - gnd; t = Math.atan2(Math.sin(t), Math.cos(t));
-      if (Math.abs(b.vy) < 1.2) { b.rest = true; b.vy = b.vx = b.w = 0; b.a = gnd + (Math.abs(t) > Math.PI / 2 ? Math.PI : 0); this.terrain.crater(b.x, 1.2, 0.25, 0.4); }
+      if (Math.abs(b.vy) < 1.2) { b.rest = true; b.vy = b.vx = b.w = 0; b.a = gnd + (Math.abs(t) > Math.PI / 2 ? Math.PI : 0); this.terrain.crater(b.x, 1.2, 0.25, 0.4, 0); }
     }
   }
   stepDamage(dt, world) {

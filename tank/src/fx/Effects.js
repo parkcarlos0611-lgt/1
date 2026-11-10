@@ -204,7 +204,7 @@ DS.Effects = class Effects {
     this.flashes.push({ x, y, dx: 0, dy: 1, t: 0, ttl: 0.05, small: 0.9 });
     for (let i = 0; i < 7; i++) { const a = this.rnd(0, Math.PI), sp = this.rnd(2, 9); P.add(K.FIRE, x, y, Math.cos(a) * sp, Math.sin(a) * sp, this.rnd(0.05, 0.14), 0.18, { grow: 2, drag: 6, grav: 0, alpha: 0.9, col: 0xffb050 }); }
     P.add(K.DARK, x, y + 0.2, this.rnd(-0.5, 0.5), this.rnd(0.5, 1.5), this.rnd(1.2, 2.2), 0.3, { grow: 0.6, drag: 1.2, grav: -0.02, alpha: 0.35, col: 0x3a3631 });
-    if (ground) { this.w.terrain.crater(x, 0.3, 0.06, 0.3); DS.Audio.ground(x, y, false); }
+    if (ground) { this.w.terrain.crater(x, 0.3, 0.06, 0.3, 0); DS.Audio.ground(x, y, false); }
   }
 
   // armour strike visuals: sparks for ricochet / non-penetration, flash + smoke for penetration
@@ -267,14 +267,15 @@ DS.Effects = class Effects {
     const sc = this.hex(T.soilAt(hit.x).col[1]), sc2 = this.hex(T.soilAt(hit.x).col[0]);
     const v = Math.hypot(hit.vx, hit.vy), ang = Math.atan2(hit.vy, hit.vx);
     this.blast(hit.x, hit.y + 0.2, heat ? 0.9 : 0.45, null, null);
-    if (!hit.onArmor) { T.crater(hit.x + Math.cos(ang) * 0.4, heat ? 1.3 : 0.8, heat ? 0.55 : 0.3); T.relax(undefined, undefined, 4); }
+    let ej = 0;
+    if (!hit.onArmor) { ej = T.crater(hit.x + Math.cos(ang) * 0.4, heat ? 1.3 : 0.8, heat ? 0.55 : 0.3); T.relax(undefined, undefined, 4); }
     // plume: KE → tall narrow column thrown along the ricochet direction; HE/HEAT → radial
     const n = hit.onArmor ? 20 : heat ? 160 : 120;
     for (let i = 0; i < n; i++) {
       let a, sp;
       if (heat) { a = Math.PI / 2 + this.rnd(-1.1, 1.1); sp = this.rnd(5, 30); }
       else { a = Math.PI / 2 + Math.sign(hit.vx) * this.rnd(-0.15, 0.55); sp = this.rnd(8, 45) * Math.min(1.3, v / 1200); }
-      P.add(K.GRAIN, hit.x, hit.y + 0.1, Math.cos(a) * sp, Math.sin(a) * sp, this.rnd(1, 3.2), this.rnd(0.04, 0.12), { drag: 0.25, col: Math.random() < 0.5 ? sc : sc2 });
+      P.add(K.GRAIN, hit.x, hit.y + 0.1, Math.cos(a) * sp, Math.sin(a) * sp, this.rnd(1, 3.2), this.rnd(0.04, 0.12), { drag: 0.25, col: Math.random() < 0.5 ? sc : sc2, mass: ej / n });   // ejecta lands as sand
     }
     for (let i = 0; i < 30; i++) {
       const a = Math.PI / 2 + this.rnd(-0.9, 0.9), sp = this.rnd(1, heat ? 12 : 9);

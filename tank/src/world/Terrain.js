@@ -9,6 +9,7 @@ DS.Terrain = class Terrain {
     this.sink = new Float32Array(this.n);   // accumulated pressed depth (compaction memory)
     this.disturb = new Float32Array(this.n);// visual: dug / thrown material (craters), fades never
     this.soil = new Uint8Array(this.n);
+    this.crust = new Uint8Array(this.n);    // 1 = surface crust intact (breaks under a heavy load)
     this.rng = DS.rng(seed);
     this.dirty0 = Infinity; this.dirty1 = -Infinity;
     this.version = 0;
@@ -46,6 +47,9 @@ DS.Terrain = class Terrain {
       const x = i * dx, z = zn(x);
       this.soil[i] = x < 300 ? 0 : z > 0.35 ? 2 : z > -0.15 ? 1 : 0;
     }
+    // desert crust: on firm desert and salt flats, patchy
+    const cz = vn(60, 1, 31);
+    for (let i = 0; i < n; i++) this.crust[i] = this.soil[i] !== 1 && cz(i * dx) > -0.2 ? 1 : 0;
     // a wadi (dry channel) and a dug-in revetment berm for testing
     this.addProfile(620, 18, -1.6);
     this.addBerm(900, 1.8, 6);
@@ -84,6 +88,9 @@ DS.Terrain = class Terrain {
   }
 
   // Press the surface under a track footprint. N in newtons, area in m², footprint [x0, x1].
+  // Press the surface under a track footprint. N in newtons, area in m², footprint [x0, x1].
+  // Bekker sinkage with compaction memory; an intact crust carries more until the pressure breaks it, then
+  // the track drops through at once into the soft sand beneath (returns the breakthrough depth too).
   press(x0, x1, N, area, dt) {
     if (N <= 0) return 0;
     const pk = N / area / 1000;                 // kPa
@@ -91,9 +98,14 @@ DS.Terrain = class Terrain {
     const i0 = this.idx(x0), i1 = this.idx(x1), mid = (x0 + x1) / 2, half = (x1 - x0) / 2;
     for (let i = i0; i <= i1; i++) {
       const s = DS.SOILS[this.soil[i]];
-      const k = s.kc / 0.635 + s.kphi;
       const prof = 1 - 0.45 * Math.pow(Math.abs(i * this.dx - mid) / half, 2); // peak under the wheel
-      const zt = Math.pow(pk * prof / k, 1 / s.n);
+      const p = pk * prof;
+      if (this.crust[i] && p > (s.crust || 95)) {                             // crust gives way
+        this.crust[i] = 0; const drop = 0.04 + 0.03 * Math.random();
+        this.h[i] -= drop; this.sink[i] += drop; this.disturb[i] = Math.min(1, this.disturb[i] + 0.25); this.mark(i);
+      }
+      const k = (s.kc / 0.635 + s.kphi) * (this.crust[i] ? 2.6 : 1);
+      const zt = Math.pow(p / k, 1 / s.n);
       if (zt > zmax) zmax = zt;
       const d = zt - this.sink[i];
       if (d > 0) {
@@ -104,15 +116,58 @@ DS.Terrain = class Terrain {
     return zmax;
   }
 
-  crater(x, R, depth, rim = 0.35) {
+  // add (or with vol < 0 remove) sand volume per metre of width, spread over a few cells
+  deposit(x, vol) {
+    const i = this.idx(x), w = [0.25, 0.5, 0.25];
+    for (let k = -1; k <= 1; k++) { const j = Math.max(0, Math.min(this.n - 1, i + k)); this.h[j] += vol * w[k + 1] / this.dx; this.mark(j); }
+  }
+  // move sand from one spot to another (conserved)
+  shift(xFrom, xTo, vol) { this.deposit(xFrom, -vol); this.deposit(xTo, vol); }
+
+  // Dig a crater; the dug sand is conserved: (1 − eject) of it builds the rim, the rest is returned as
+  // ejecta volume for the caller to throw (it lands as sand particles and is deposited where they fall).
+  crater(x, R, depth, rim = 0.35, eject = 0.35) {
     const i0 = this.idx(x - R * 1.8), i1 = this.idx(x + R * 1.8);
+    let dug = 0, rimShape = 0;
+    for (let i = i0; i <= i1; i++) {
+      const t = Math.abs(i * this.dx - x) / R;
+      if (t < 1) dug += depth * (1 - t * t) * this.dx;
+      else if (t < 1.8) { const u = (t - 1) / 0.8; rimShape += Math.sin(Math.PI * u) * (1 - u * 0.4) * this.dx; }
+    }
+    const rimH = rimShape > 0 ? dug * (1 - eject) / rimShape : 0;
     for (let i = i0; i <= i1; i++) {
       const t = Math.abs(i * this.dx - x) / R;
       let d = 0;
       if (t < 1) d = -depth * (1 - t * t);
-      else if (t < 1.8) { const u = (t - 1) / 0.8; d = depth * rim * Math.sin(Math.PI * u) * (1 - u * 0.4); }
+      else if (t < 1.8) { const u = (t - 1) / 0.8; d = rimH * Math.sin(Math.PI * u) * (1 - u * 0.4); }
       this.h[i] += d; this.disturb[i] = Math.min(1, this.disturb[i] + (t < 1.8 ? 0.8 * (1 - t / 1.8) + 0.2 : 0));
-      if (t < 1.2) this.sink[i] = 0;
+      if (t < 1.2) { this.sink[i] = 0; this.crust[i] = 0; }
+    }
+    this.mark(i0); this.mark(i1);
+    return dug * eject;
+  }
+
+  // Wind (sandstorm): sand creeps downwind off exposed crests and drifts into hollows and ruts, so tracks
+  // slowly fill in. Only the stretch around the vehicles is worked, a slice at a time.
+  windStep(dt, wind, x0, x1) {
+    const q = Math.max(0, Math.abs(wind) - 4) * 0.0004 * dt, dir = Math.sign(wind) || 1;
+    if (q <= 0) return;
+    const W = 12, i0 = Math.max(W, this.idx(x0)), i1 = Math.min(this.n - W - 1, this.idx(x1)), h = this.h;
+    for (let i = i0; i < i1; i++) {
+      const dn = i + dir;
+      const curv = (h[i - W] + h[i + W]) / 2 - h[i];                           // > 0: below its surroundings — a hollow / rut
+      // crests lose more; hollows and ruts trap what blows in (sheltered from the wind)
+      const m = q * (1 + Math.max(0, -curv) * 8) * (curv > 0.01 ? 0.1 : 1) * (this.soil[i] === 2 ? 0.2 : 1);
+      h[i] -= m; h[dn] += m;
+      if (curv > 0 && this.sink[i] > 0) this.sink[i] = Math.max(0, this.sink[i] - m * 2);
+    }
+    // saltating sand evens out small hollows (ruts, crater pits): conservative diffusion, cell to cell.
+    // Rate ~ wind; a 2 m rut fills in about a minute in a storm, dunes (hundreds of metres) are untouched
+    const k = Math.min(0.2, (Math.abs(wind) - 4) * 0.004 * dt / (this.dx * this.dx));
+    for (let i = i0; i < i1; i++) {
+      const f = k * (h[i] - h[i + 1]);
+      h[i] -= f; h[i + 1] += f;
+      if (this.sink[i] > 0) this.sink[i] = Math.max(0, this.sink[i] - Math.abs(f));
     }
     this.mark(i0); this.mark(i1);
   }

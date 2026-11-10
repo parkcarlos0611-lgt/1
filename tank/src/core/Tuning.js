@@ -16,10 +16,10 @@ DS.T = {
 // Soil types. Bekker: z = (p / (kc/b + kphi))^(1/n), p in kPa → z in m.
 // Mohr–Coulomb shear: Fmax = A·c + N·tanφ.
 DS.SOILS = [
-  { id: 0, name: '다져진 사막', n: 0.80, kc: 30, kphi: 5000, c: 5.0e3, phi: 34, crr: 0.035,
+  { id: 0, name: '다져진 사막', n: 0.80, kc: 30, kphi: 5000, c: 5.0e3, phi: 34, crr: 0.035, crust: 95,
     col: ['#d9b77f', '#c49a5e'], dust: 0.5 },
   { id: 1, name: '연사 (부드러운 모래)', n: 1.10, kc: 1, kphi: 1530, c: 1.0e3, phi: 30, crr: 0.070,
     col: ['#e6c48c', '#cfa66c'], dust: 1.0 },
-  { id: 2, name: '사브카 (염습지)', n: 0.90, kc: 10, kphi: 900, c: 3.0e3, phi: 24, crr: 0.080,
+  { id: 2, name: '사브카 (염습지)', n: 0.90, kc: 10, kphi: 900, c: 3.0e3, phi: 24, crr: 0.080, crust: 75,
     col: ['#cbb592', '#a8916d'], dust: 0.35 },
 ];

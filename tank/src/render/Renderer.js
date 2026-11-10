@@ -267,7 +267,8 @@ DS.Renderer = class Renderer {
         const yl = o.y + slope * dx;                            // grazing line of sight over the crests
         if (a > 0) { ctx.fillStyle = `rgba(${col},${A * a})`; ctx.fillRect(Math.min(x, x + side * step), bot, step, top - bot); }
         // dead ground: the air pocket under the grazing line plus the hidden surface skin (not the soil section)
-        if (a < 1 && yl > h + 0.35) {                           // only real dead ground, not every crater pit ctx.fillStyle = `rgba(${col},${A * (1 - a)})`; ctx.fillRect(Math.min(x, x + side * step), h - 0.8, step, yl - h + 0.8); }
+        // only real dead ground, not every crater pit
+        if (a < 1 && yl > h + 0.35) { ctx.fillStyle = `rgba(${col},${A * (1 - a)})`; ctx.fillRect(Math.min(x, x + side * step), h - 0.8, step, yl - h + 0.8); }
         slope = Math.max(slope, (h - o.y) / dx);
       }
     }

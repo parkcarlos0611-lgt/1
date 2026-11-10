@@ -263,7 +263,7 @@ DS.Effects = class Effects {
       for (let i = 0; i < 10; i++) P.add(K.SMOKE, x, y, this.rnd(-2, 2), this.rnd(0, 3), this.rnd(2, 4), 0.4, { grow: 0.6, drag: 1, grav: -0.02, alpha: 0.35, col: 0x8a857c });
     }
     this.labels.push({ x, y: y + 1.2, t: 0, r });
-    this.mark(r);
+    // this.mark(r);   // armour marks: switched off for now (user request); code kept below
     // shaped-charge warhead (HEAT shell, TOW): it bursts on the plate whatever the result — fireball, black
     // smoke, and a blast wave that throws sand and rocks the vehicles around it
     if (r.ammo.pen.ce && r.result !== 'ricochet') {

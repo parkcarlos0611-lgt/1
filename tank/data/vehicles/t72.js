@@ -48,7 +48,7 @@ DS.VEHICLES = DS.VEHICLES || {};
       // carousel autoloader: the gun goes to the loading angle and is locked there for the cycle, then
       // released for the last `out` seconds to come back onto the lay. The stub of the semi-combustible case
       // (a 125 mm steel pan) is thrown out of the port in the turret roof rear `eject.at` seconds after firing.
-      autoloader: { angle: 3.5, out: 1.2 },
+      autoloader: { angle: 8, out: 1.3 },        // raised well clear of the lay so the lock is plain to see (real index angle: 3°30')
       eject: { at: 1.5, port: L(1215, 668), dia: 0.125, len: 0.11, v: 4.5 },
     },
     coax: { name: 'PKT 7.62mm 동축', ammo: 'M240_762', muzzle: [L(1366, 712)[0] + 0.45, L(1366, 712)[1] - 0.09], rate: 700 / 60, rounds: 2000, spread: 0.8 },

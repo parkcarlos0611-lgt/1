@@ -234,7 +234,7 @@ DS.Vehicle = class Vehicle {
     // autoloader (T-72): from the shot until `out` seconds before the round is home the gun sits locked at the
     // loading angle; the sight line (aimW) stays free, so the gunner can keep it on the target meanwhile
     const AL = G.autoloader; gs.locked = !!(AL && gs.reload > AL.out && this.alive && this.firepower && gs.fired > 0);
-    const eg = gs.locked ? AL.angle * d2r : et, mx = (AL ? Math.max(G.rate, 0.35) : G.rate) * dt;
+    const eg = gs.locked ? AL.angle * d2r : et, mx = (AL ? 0.26 : G.rate) * dt;
     gs.e += Math.max(-mx, Math.min(mx, eg - gs.e));
     gs.reload = Math.max(0, gs.reload - dt);
     // spent case / case stub thrown out of the turret rear a moment after the shot
@@ -249,6 +249,7 @@ DS.Vehicle = class Vehicle {
     const v0r = A.launchMass * A.v0 * 1.75 / G.recoilMass;     // projectile + propellant gas momentum
     gs.rv = -v0r; gs.aB = v0r * v0r / (2 * G.recoilLen);
     gs.reload = G.reload; gs.fired++; this.lastFired = world.time; if (G.eject) gs.ejectT = G.eject.at;
+    if (G.autoloader) this.events.push({ type: 'autoload' });
     const m = this.muzzle();
     world.spawnProjectile(m.x, m.y, m.dx * A.v0 + this.vel.x, m.dy * A.v0 + this.vel.y, A, this).tracer = true;
     this.events.push({ type: 'fire', x: m.x, y: m.y, dx: m.dx, dy: m.dy, ammo: A });

@@ -85,6 +85,27 @@ DS.Audio = {
     this.clang(p.t, 0.8 * p.g, p.cut, 380); this.burst(p.t, 0.08, 'highpass', 2500, 0.8, 0.8 * p.g, p.cut);
     for (let i = 0; i < 7; i++) this.clang(p.t + 0.15 + i * (0.06 + Math.random() * 0.07), 0.25 * p.g, p.cut, 200 + Math.random() * 150);
   },
+  // T-72 autoloader cycle, timed to the gun's reload: the elevation drive hauls the gun up to the loading
+  // angle (much louder than ordinary laying) and locks it, the carousel turns, the hoist lifts the cassette,
+  // the rammer goes in twice (projectile, then charge), the breech closes, the lock lets go and the gun
+  // drives back onto the lay.
+  autoload(v) {
+    if (!this.ok()) return;
+    const p = this.place(v.pos.x, v.pos.y); if (p.d > 600) return;
+    const G = v.def.gun, T = G.reload, g = p.g * (this.world && v === this.world.vehicles[0] ? 1 : 0.7), cut = p.cut, t = p.t;
+    const whine = (at, dur, f0, f1, k) => { this.tone(t + at, f0, f1, dur, 0.16 * k * g, cut, 'sawtooth', 0.04); this.tone(t + at, f0 * 2.02, f1 * 2.02, dur, 0.07 * k * g, cut, 'square', 0.04); this.burst(t + at, dur, 'bandpass', 1500, 1.2, 0.2 * k * g, cut, 0.05); };
+    const clunk = (at, k, f = 170) => { this.clang(t + at, 0.5 * k * g, cut, f); this.tone(t + at, 95, 55, 0.12, 0.5 * k * g, cut); };
+    whine(0.12, 0.75, 380, 620, 1.5); clunk(0.9, 1.1);                          // gun up, lock
+    this.tone(t + 1.1, 150, 135, 1.5, 0.12 * g, cut, 'sawtooth', 0.1);           // carousel turning
+    for (let i = 0; i < 11; i++) this.burst(t + 1.15 + i * 0.13, 0.025, 'highpass', 2200, 0.8, 0.22 * g, cut);   // ratchet
+    clunk(2.65, 0.7, 240);                                                       // carousel stops
+    whine(2.8, 0.55, 300, 520, 0.9); clunk(3.4, 0.6, 300);                       // hoist up
+    this.burst(t + 3.55, 0.35, 'bandpass', 900, 0.8, 0.55 * g, cut, 0.02); clunk(3.9, 1.0, 140);                 // rammer: projectile
+    whine(4.15, 0.3, 420, 330, 0.6);                                             // cassette to the charge
+    this.burst(t + 4.6, 0.3, 'bandpass', 900, 0.8, 0.5 * g, cut, 0.02); clunk(4.9, 0.9, 150);                    // rammer: charge
+    whine(5.1, 0.5, 520, 300, 0.8); clunk(5.7, 1.2, 110);                        // hoist down, breech closes
+    clunk(T - G.autoloader.out, 0.9, 200); whine(T - G.autoloader.out + 0.05, 0.8, 600, 400, 1.3);                // unlock, gun back to the lay
+  },
   thud(x, y, k) {                           // a heavy object (thrown turret) landing in sand
     if (!this.ok()) return;
     const p = this.place(x, y); this.tone(p.t, 70, 30, 0.4, 1.2 * k * p.g, p.cut); this.burst(p.t, 0.4, 'lowpass', 500, 0.6, 0.8 * k * p.g, p.cut);

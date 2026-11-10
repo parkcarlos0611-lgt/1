@@ -49,7 +49,7 @@ DS.Game = class Game {
   }
   begin(i, veh = 'm1a1') {
     const range = i === 'range', M = this.mission = range ? DS.RANGE : DS.MISSIONS[i], W = this.world;
-    if (range) { W.terrain = new DS.Terrain(7, 'range'); W.props = DS.RANGE.layout(); }
+    if (range) { W.terrain = new DS.Terrain(7, 'range'); W.props = DS.RANGE.layout(); this.rend.makeParked(W); }
     document.getElementById('menu').hidden = true; document.body.classList.add('playing');
     let help = true; try { help = localStorage.getItem('ds.help') !== '0'; } catch (e) {}
     this.setHelp(help);

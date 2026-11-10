@@ -12,7 +12,7 @@ DS.Camera = class Camera {
     const halfW = this.W / 2 / this.zoom;
     const lead = Math.max(-1, Math.min(1, v.vel.x / 12)) * halfW * 0.35 * T.lookAhead + halfW * 0.25;
     const tx = v.pos.x + lead;
-    const ty = v.pos.y + this.H / this.zoom * DS.T.camera.ground + 1.0;
+    const ty = v.pos.y - 1.5 + this.H / this.zoom * (0.5 - DS.T.camera.ground);     // ground line sits `ground` of the screen height above the bottom edge, at every zoom
     const k = Math.min(1, dt * 3);
     this.x += (tx - this.x) * k; this.y += (ty - this.y) * Math.min(1, dt * 2.5);
   }

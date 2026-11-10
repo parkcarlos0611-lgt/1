@@ -11,7 +11,7 @@ DS.Sandbox = class Sandbox {
     this.bind();
   }
   static MODES = { dummy: '무인 표적', watch: '정지 관측', hold: '정지 사격', combat: '기동 전투', patrol: '왕복 주행' };
-  static NAMES = { m1a1: 'M1A1', m2a2: 'M2A2', t55: 'T-55', t62: 'T-62', t72: 'T-72' };
+  static NAMES = { m1a1: 'M1A1', m2a2: 'M2A2', m60a1: 'M60A1', t55: 'T-55', t62: 'T-62', t72: 'T-72' };
 
   // ---- vehicles ----
   spawn(it) {
@@ -34,6 +34,7 @@ DS.Sandbox = class Sandbox {
     for (const it of items) if (!it.player) { it.label = null; this.spawn(it); }
     this.sel = null; g.target = null; g.mcam = false; g.mcamHold = null;
     DS.FireControl.update(W, g.player, false);
+    g.ranging = null; g.nightSight(!!W.env.night || (g.thermal && !!g.player.def.sight.thermal));
     document.getElementById('h-title').textContent = `${Sandbox.NAMES[me.id]} · 사격장`;
     this.refresh();
   }
@@ -47,7 +48,7 @@ DS.Sandbox = class Sandbox {
     if (e.time) { env.time = e.time; env.night = e.time === 'night' ? 1 : 0; env.sun = e.time === 'night' ? null : e.time === 'dusk' ? { el: 7, side: -1 } : { el: 35, side: 1 }; }
     if (e.visibility != null) env.visibility = +e.visibility;
     if (e.wind != null) { env.wind = +e.wind; W.wind = +e.wind; }
-    const g = this.g; if (env.night && !g.thermal) { g.thermal = true; g.sightCv.classList.add('thermal'); }
+    const g = this.g; if (e.time && g.player) g.nightSight(!!env.night);
   }
 
   // ---- layouts ----
@@ -79,7 +80,7 @@ DS.Sandbox = class Sandbox {
     cam.zoom += (cam.tzoom - cam.zoom) * Math.min(1, dt * 6);
     const pan = ((k.has('KeyD') || k.has('ArrowRight')) ? 1 : 0) - ((k.has('KeyA') || k.has('ArrowLeft')) ? 1 : 0);
     cam.x = Math.max(0, Math.min(DS.T.terrain.length, cam.x + pan * dt * cam.W / cam.zoom * (k.has('ShiftLeft') ? 2.5 : 0.9)));
-    cam.y += (T.height(cam.x) + cam.H / cam.zoom * DS.T.camera.ground + 1 - cam.y) * Math.min(1, dt * 6);
+    cam.y += (T.height(cam.x) + cam.H / cam.zoom * (0.5 - DS.T.camera.ground) - cam.y) * Math.min(1, dt * 6);
     cam.sx = cam.sy = 0;
   }
   // while playing: test aids

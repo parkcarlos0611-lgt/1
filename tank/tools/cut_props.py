@@ -87,3 +87,11 @@ for k, t in enumerate(tiles):
 road = np.concatenate(out, axis=1)
 Image.fromarray(road.clip(0, 255).astype(np.uint8)).save(os.path.join(OUT, 'road.png'))
 print('road', road.shape)
+
+# the flag itself is used as it is
+Image.open(os.path.join(ROOT, 'assets/ref/us_flag.png')).convert('RGB').save(os.path.join(OUT, 'usflag.png'))
+# the flagpole drawing already has its own transparency; only the colour under the clear pixels is cleaned
+pole = np.asarray(Image.open(os.path.join(ROOT, 'assets/ref/flagpole.png')).convert('RGBA')).copy()
+pole[pole[..., 3] < 8] = 0
+ys, xs = np.nonzero(pole[..., 3] > 40)
+Image.fromarray(pole[ys.min():ys.max() + 1, xs.min():xs.max() + 1]).save(os.path.join(OUT, 'pole.png'))

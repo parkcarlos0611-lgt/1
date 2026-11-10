@@ -24,25 +24,26 @@ DS.Sensor = {
       return vis * flash * moving / 1.5;
     }
     vis = range >= dm ? 0 : Math.pow(Math.max(0, Math.min(1, (dm - range) / (dm - 700))), 1.5);
-    vis *= DS.T.ai.detect;                                       // Iraqi crews overall: poor optics and training
+    vis *= S.crew || DS.T.ai.detect;                                       // Iraqi crews overall: poor optics and training
     vis *= 1 - DS.AI.smoke(world, a, b);                          // smoke blocks optical sights
     vis *= b.def.signature || 1;                                 // smaller / lower targets (Bradley) are harder to pick out
     if (env.visibility) vis *= Math.max(0, Math.exp(-range / (env.visibility * 0.45)) * 1.6 - 0.02);
-    if (env.night) vis *= range < 400 ? 0.5 : range < 800 ? 0.08 : (flash > 1 ? 0.05 : 0);
+    if (env.night) vis *= S.passive ? (range < 900 ? 0.6 : range < 1600 ? 0.2 : (flash > 1 ? 0.1 : 0))      // image intensifier
+      : range < 400 ? 0.5 : range < 800 ? 0.08 : (flash > 1 ? 0.05 : 0);
     return vis * flash * moving / 5;
   },
   // how far this observer can identify (type) a target under the current conditions
   identRange(world, a) {
     const S = a.def.sight, env = world.env || {}, base = S.identMax || (S.detectMax || 2500) * 0.6;
     if (S.thermal) return env.visibility ? Math.min(base, env.visibility * 2.2) : base;
-    if (env.night) return 300;
+    if (env.night) return S.passive ? 800 : 300;
     return env.visibility ? Math.min(base, env.visibility * 0.4) : base;
   },
   // how far the observer's sights reach at all (used to grey out ground it cannot search)
   reach(world, a) {
     const S = a.def.sight, env = world.env || {}, dm = S.detectMax || 2500;
     if (S.thermal) return env.visibility ? Math.min(dm, env.visibility * 2.6) : dm;
-    if (env.night) return 800;
+    if (env.night) return S.passive ? 1600 : 800;
     return env.visibility ? Math.min(dm, env.visibility * 0.9) : dm;
   },
 

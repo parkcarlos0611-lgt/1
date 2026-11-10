@@ -11,6 +11,7 @@ DS.Renderer = class Renderer {
     this.img[id] = this.img[id] || {};
     const names = new Set(['hull', 'turret', 'barrel', Sp.roadwheel.file, Sp.idler.file]);
     if (Sp.flag) names.add(Sp.flag.file);
+    if (Sp.lower) names.add('lower');
     if (Sp.m2) names.add(Sp.m2.file);
     if (Sp.tow) { names.add(Sp.tow.file); names.add(Sp.tow.file + '_xray'); }   // outline made by tools/cut_bradley.py
     if (!Sp.sprocket.procedural) names.add('sprocket');
@@ -739,6 +740,7 @@ DS.Renderer = class Renderer {
     ctx.closePath(); ctx.fill();
     if (D.rearFill) { const R = D.rearFill; ctx.fillRect(R.x0, R.y0, R.x1 - R.x0, R.y1 - R.y0); }
     if (D.sprocketHole) { ctx.beginPath(); ctx.arc(D.sprocket.x, D.sprocket.y, D.sprocketHole, 0, 7); ctx.fill(); }
+    if (Sp.lower) { ctx.save(); ctx.scale(px, -px); ctx.drawImage(I.lower, Sp.lower.x - S.ox, Sp.lower.y - S.oy); ctx.restore(); }   // open hull side (no skirts)
     ctx.restore();
 
     // ---- track ----

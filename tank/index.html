@@ -28,6 +28,7 @@
     border: 7px solid #0e0c09; box-shadow: 0 0 0 2px rgba(255,255,255,.15), 0 6px 24px rgba(0,0,0,.4); background: #000; pointer-events: none; }
   #sight.big { right: auto; bottom: auto; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(92vh, 92vw); z-index: 4; }
   #sight.thermal { filter: grayscale(1) sepia(1) hue-rotate(68deg) saturate(2.6) brightness(.95); }
+  #sight.nv { filter: grayscale(1) brightness(2.4) contrast(1.2) sepia(1) hue-rotate(58deg) saturate(3); }
   #sight.thermal.bh { filter: grayscale(1) invert(1) sepia(1) hue-rotate(68deg) saturate(2.6) brightness(.95); }
   body:not(.playing) :is(#hud, #help, #sight, #mini, #zoombar, #foes, #log, #touch) { display: none !important; }
   /* under the HUD, clear of the vehicle (which now sits low on the screen) */
@@ -160,7 +161,7 @@
   <div><kbd>W</kbd><kbd>S</kbd> 포 앙각: 탭 0.1° · 누르면 점점 빠르게 · <kbd>Shift</kbd> 미세(0.02°)</div>
   <div><kbd>Space</kbd> / 좌클릭 사격 · <kbd>Q</kbd> 탄종 전환</div>
   <div><kbd>Backspace</kbd> 다음 표적 · <kbd>Shift</kbd>+<kbd>Backspace</kbd> 이전 표적 (포가 표적으로 이동)</div>
-  <div><kbd>E</kbd> 레이저 거리측정 (탄도컴퓨터 자동 보정)</div>
+  <div><kbd>E</kbd> 거리측정 (탄도컴퓨터 자동 보정 · M60A1은 광학식: 2초, 오차 있음)</div>
   <div><kbd>F</kbd> 동축 M240 · 우클릭 유지: 전차장 M2 (마우스로 조준)</div>
   <div><kbd>V</kbd> 조준경 3× / 10× · <kbd>T</kbd> 열상 · <kbd>B</kbd> 백열/흑열</div>
   <div><kbd>[</kbd><kbd>]</kbd> 열상 밝기 · <kbd>Shift</kbd>+<kbd>[</kbd><kbd>]</kbd> 열상 대비</div>
@@ -177,9 +178,9 @@
 <button id="editbtn" type="button" hidden title="편집 모드 (L)">편집 L</button>
 <aside id="sbx" hidden aria-label="사격장 편집">
   <h3>내 장비 <small id="sb-count"></small></h3>
-  <div class="row"><button type="button" data-me="m1a1">M1A1</button><button type="button" data-me="m2a2">M2A2 브래들리</button><button type="button" data-go="me">내 위치로</button></div>
+  <div class="row"><button type="button" data-me="m1a1">M1A1</button><button type="button" data-me="m2a2">M2A2 브래들리</button><button type="button" data-me="m60a1">M60A1</button><button type="button" data-go="me">내 위치로</button></div>
   <h3>표적 배치</h3>
-  <div class="row"><button type="button" data-tool="t55">T-55</button><button type="button" data-tool="t62">T-62</button><button type="button" data-tool="t72">T-72</button><button type="button" data-tool="m1a1">M1A1</button><button type="button" data-tool="m2a2">M2A2</button></div>
+  <div class="row"><button type="button" data-tool="t55">T-55</button><button type="button" data-tool="t62">T-62</button><button type="button" data-tool="t72">T-72</button><button type="button" data-tool="m1a1">M1A1</button><button type="button" data-tool="m2a2">M2A2</button><button type="button" data-tool="m60a1">M60A1</button></div>
   <p id="sb-selname"></p>
   <div class="row"><label for="sb-mode">행동</label><select id="sb-mode"><option value="dummy">무인 표적 (움직이지도 쏘지도 않음)</option><option value="watch">정지 관측 (탐지만)</option><option value="hold">정지 사격 (제자리에서 응사)</option><option value="combat">기동 전투</option><option value="patrol">왕복 주행 (이동 표적)</option></select></div>
   <div class="row" id="sb-pat" hidden><label for="sb-span">구간</label><input id="sb-span" type="number" min="20" max="2000" step="10"> m <label for="sb-speed">속도</label><input id="sb-speed" type="number" min="1" max="15" step="1"> m/s</div>
@@ -249,6 +250,7 @@
 <script src="data/vehicles/t55.js"></script>
 <script src="data/vehicles/t62.js"></script>
 <script src="data/vehicles/m2a2.js"></script>
+<script src="data/vehicles/m60a1.js"></script>
 <script src="data/ammo/ammo.js"></script>
 <script src="src/world/Terrain.js"></script>
 <script src="src/vehicle/Track.js"></script>

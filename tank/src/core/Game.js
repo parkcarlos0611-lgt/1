@@ -15,7 +15,7 @@ DS.Game = class Game {
     this.post = new DS.Post(this.cv);
     let q = 2; try { const s = localStorage.getItem('ds.post'); if (s != null) q = +s; } catch (e) {}
     this.post.setQuality(this.post.ok ? q : 0); this.lowFps = 0;
-    await Promise.all(['m1a1', 'm2a2', 't55', 't62', 't72'].map(id => this.rend.load(DS.VEHICLES[id])).concat(this.rend.loadProps()));
+    await Promise.all(['m1a1', 'm2a2', 'm60a1', 't55', 't62', 't72'].map(id => this.rend.load(DS.VEHICLES[id])).concat(this.rend.loadProps()));
     DS.Armor.calibrate();
     this.resize(); addEventListener('resize', () => this.resize());
     document.getElementById('loading').remove();
@@ -80,7 +80,7 @@ DS.Game = class Game {
     }
     DS.FireControl.update(W, v, false);
     W.cam.x = v.pos.x; W.cam.y = v.pos.y;
-    if (M.env.night) { this.thermal = true; this.sightCv.classList.add('thermal'); }
+    if (M.env.night) this.nightSight(true);
     document.getElementById('h-title').textContent = range ? `${nm[veh] === '브래들리' ? 'M2A2' : nm[veh]} · 사격장` : `${nm[veh]} · 작전 ${i + 1} ${M.name}`;
     document.getElementById('again').onclick = () => { location.hash = range ? 'range' : 'm' + (i + 1) + (veh === 'm2a2' ? 'b' : ''); location.reload(); };
     document.getElementById('tomenu').onclick = () => { location.hash = ''; location.reload(); };
@@ -118,7 +118,7 @@ DS.Game = class Game {
       if (e.code === 'KeyQ') this.cycleAmmo();
       if (e.code === 'KeyE') this.lase();
       if (e.code === 'KeyV') { this.sightMag = this.sightMag === 10 ? 3 : 10; if (this.tis) this.tis.blur = 0.45; }
-      if (e.code === 'KeyT') { this.thermal = !this.thermal; this.sightCv.classList.toggle('thermal', this.thermal); }
+      if (e.code === 'KeyT') this.nightSight(!(this.thermal || this.nv));
       if (e.code === 'KeyB') { this.blackHot = !this.blackHot; this.sightCv.classList.toggle('bh', this.blackHot); if (this.tis) this.tis.cal = 0.3; }
       if (e.code === 'BracketLeft' || e.code === 'BracketRight') {
         const a = this.world.tisAdj || (this.world.tisAdj = { level: 0, gain: 1 }), up = e.code === 'BracketRight';
@@ -280,7 +280,34 @@ DS.Game = class Game {
     if (t.cal > 0) { c.fillStyle = `rgba(255,255,255,${(t.cal / 0.3 * 0.8).toFixed(2)})`; c.fillRect(0, 0, cv.width, cv.height); }
     this.rend.markers(c, cam, false);
   }
-  lase() { DS.FireControl.update(this.world, this.player, true); }
+  // range to the aiming point. Laser: at once. Optical coincidence rangefinder (M60A1): the gunner needs a
+  // couple of seconds to bring the two images together and the reading is off by a few per cent at long range
+  lase() {
+    const v = this.player, S = v.def.sight;
+    if (!S.optical) return DS.FireControl.update(this.world, v, true);
+    if (this.ranging) return;
+    this.ranging = { t: 2.2 }; this.toast('광학 거리 측정 중…');
+  }
+  rangingStep(dt) {
+    const R = this.ranging, v = this.player, w = this.world; if (!R) return;
+    if (!v.def.sight.optical || !v.alive) { this.ranging = null; return; }
+    R.t -= dt; if (R.t > 0) return;
+    this.ranging = null;
+    DS.FireControl.update(w, v, true);
+    if (v.fc.range) {
+      const err = 0.006 + 0.011 * v.fc.range / 1000;                      // ≈ ±0.6 % up close, ±3 % at 2 km
+      v.fc.range *= 1 + DS.AI.gauss(w.rng) * err;
+      DS.FireControl.update(w, v, false);
+      this.toast(`거리 ${Math.round(v.fc.range / 10) * 10} m (광학 측정)`);
+    } else this.toast('측정 실패 — 조준점에 물체 없음');
+  }
+  // gunner's night sight: thermal imager where fitted, otherwise the passive image intensifier
+  nightSight(on) {
+    const th = !!this.player.def.sight.thermal;
+    this.thermal = on && th; this.nv = on && !th;
+    this.sightCv.classList.toggle('thermal', this.thermal); this.sightCv.classList.toggle('nv', this.nv);
+    if (!th && on) this.toast('미광증폭 야간 조준경 (열상 없음)');
+  }
   cycleAmmo() {
     const v = this.player, list = v.def.ammo, i = list.indexOf(v.gun.ammo);
     v.gun.ammo = list[(i + 1) % list.length];
@@ -311,7 +338,7 @@ DS.Game = class Game {
     const ed = this.sbx && this.sbx.edit;
     this.readInput(dt);
     if (ed) this.sbx.frame(dt);
-    else { this.trackTarget(dt); this.world.update(dt); this.missileCam(dt); if (this.sbx) this.sbx.tick(); }
+    else { this.trackTarget(dt); this.rangingStep(dt); this.world.update(dt); this.missileCam(dt); if (this.sbx) this.sbx.tick(); }
     DS.Audio.update(this.world, dt);
     this.rend.frame();
     if (ed) this.sbx.overlay(this.rend.ctx);
@@ -471,7 +498,7 @@ DS.Game = class Game {
     c.textAlign = 'right'; c.fillText(g.reload > 0 ? '' : '▮ READY', cx - W * 0.1, by);
     c.textAlign = 'left'; c.fillText((v.tow && (v.tow.missile || v.tow.up >= 1) ? 'TOW' : A.sight || (A.type === 'HEAT' ? 'HEAT' : 'SABOT')) + (lasing ? '  ✱' : ''), cx + W * 0.1, by);
     c.textAlign = 'center'; c.font = `600 ${Math.max(10, Math.round(W / 40))}px ui-monospace, monospace`;
-    c.fillText(`GPS ×${this.sightMag}  ${this.thermal ? 'TIS ' + (this.blackHot ? 'BH' : 'WH') : 'DAY'}`, cx, cy - L - 6);
+    c.fillText(`${v.def.sight.optical ? 'M32' : 'GPS'} ×${this.sightMag}  ${this.thermal ? 'TIS ' + (this.blackHot ? 'BH' : 'WH') : this.nv ? 'PASSIVE' : 'DAY'}${this.ranging ? '  RANGING' : ''}`, cx, cy - L - 6);
   }
 };
 addEventListener('load', () => new DS.Game().start().catch(e => { document.getElementById('loading').textContent = '로딩 실패: ' + e.message; console.error(e); }));

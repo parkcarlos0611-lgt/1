@@ -26,6 +26,21 @@ DS.AMMO = {
     pen: { ce: 490 },                                 // 480–500 mm at any range
     crit: 80,                                         // fuze graze angle
   },
+  // ---- M60A1 RISE, 105 mm M68 (user data: M833 420–450 mm, M456 about 400 mm) ----
+  M833: {
+    name: 'M833 APFSDS-T', short: 'M833', type: 'APFSDS', v0: 1493, mass: 3.7, d: 0.024,
+    cd: [[0, 0.35], [1, 0.60], [2, 0.58], [3, 0.55], [5, 0.52]],
+    launchMass: 5.8, sabot: true, tracer: '#ffcc66',
+    pen: { ke: 435, at: 2000, s: 1.36e6 },
+    crit: 76,
+  },
+  M456A2: {
+    name: 'M456A2 HEAT-T', short: 'M456A2', type: 'HEAT', v0: 1173, mass: 10.2, d: 0.105,
+    cd: [[0, 0.18], [1, 0.42], [2, 0.36], [3, 0.31], [5, 0.27]],
+    launchMass: 10.2, sabot: false, tracer: '#ff9a4a',
+    pen: { ce: 400 },
+    crit: 80,
+  },
   // ---- M2A2 Bradley (user data): 25 mm M242 and TOW 2 ----
   M791: { name: 'M791 APDS-T', short: 'M791', sight: 'AP', type: 'APDS', small: true, v0: 1345, mass: 0.134, d: 0.0115,
     cd: [[0, 0.3], [1, 0.55], [2, 0.5], [3, 0.46], [5, 0.43]], launchMass: 0.46, sabot: false, tracer: '#ff7848', tracerEvery: 1,

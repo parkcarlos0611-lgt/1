@@ -223,6 +223,8 @@ DS.Vehicle = class Vehicle {
     if (this.turretGone) return;
     if (this.alive && this.firepower) gs.aimW += this.input.elevRate * dt + this.input.elevStep;
     this.input.elevStep = 0;
+    // an older stabiliser lets part of the hull's pitching through into the lay (gun.stab: share it holds out)
+    if (G.stab != null && !this.ai) gs.aimW += this.w * dt * (1 - G.stab);
     // gun target = sight line + superelevation from the fire-control computer; clamp the sight so
     // the gun stays inside its mount limits (reversing direction then responds at once)
     const base = this.baseAng(), wrap = a => Math.atan2(Math.sin(a), Math.cos(a));

@@ -4,7 +4,7 @@
 Object.assign(DS.Renderer.prototype, {
   loadProps() {
     this.propImg = {}; this.propTint = {};
-    return Promise.all(Object.keys(DS.RANGE.sprites).concat('road').map(k => new Promise((res, rej) => {
+    return Promise.all(Object.keys(DS.RANGE.sprites).concat('road', 'pole', 'usflag').map(k => new Promise((res, rej) => {
       const im = new Image();
       im.onload = () => { this.propImg[k] = im; res(); };
       im.onerror = () => rej(new Error('sprite props/' + k));
@@ -26,36 +26,57 @@ Object.assign(DS.Renderer.prototype, {
     this.propImg.m1a1 = c; DS.RANGE.sprites.m1a1 = W;
     for (const p of world.props) if (p.k === 'm1a1') p.w = W;
   },
-  // Stars and Stripes on a pole: the cloth is a chain of strips. In still air it hangs down the pole; as the
-  // wind rises it lifts, streams downwind and ripples faster.
-  flag(ctx, x, y, hgt, s, grey) {
-    const w = this.w, wind = w.wind || 0, k = Math.min(1, Math.pow(Math.abs(wind) / 8, 0.7)), sg = wind < 0 ? -1 : 1, t = w.time;
-    ctx.fillStyle = grey != null ? `rgb(${grey(0.2)})` : '#c9c5b8'; ctx.fillRect(x - 0.05 * s, y, 0.1 * s, hgt * s);
-    ctx.fillStyle = grey != null ? `rgb(${grey(0.3)})` : '#e2c25a'; ctx.beginPath(); ctx.arc(x, y + hgt * s, 0.11 * s, 0, 7); ctx.fill();
+  // Stars and Stripes on a pole. The cloth is one mesh (13 x 7 points) held along the hoist by the halyard
+  // clips and simulated as a net of links: weight pulls it down the pole, wind drags it out downwind and a
+  // travelling gust makes it ripple. The flag picture is laid over the mesh cell by cell, so the top and
+  // bottom edges are single continuous curves. State is kept per flagpole.
+  flag(ctx, p, x, y, s, grey) {
+    const w = this.w, hgt = p.f, pole = this.propImg.pole, fim = this.propImg.usflag;
+    const pw = hgt * pole.width / pole.height * s;
+    const src = grey != null ? this.propTinted('pole', 't', grey(0.15), 1) : pole;
+    ctx.save(); ctx.translate(x, y); ctx.scale(1, -1); ctx.drawImage(src, -pw / 2, -hgt * s, pw, hgt * s); ctx.restore();
     if (grey != null) return;
-    const N = 9, L = 2.6 * s, H = 1.45 * s, top = [], bot = [];
-    let px = x + 0.05 * s * sg, py = y + (hgt - 0.15) * s;
-    for (let i = 0; i <= N; i++) {
-      const u = i / N, rip = Math.sin(t * (2.5 + 5 * k) - i * 0.95 + x) * (0.12 + 0.3 * k) * u;
-      // direction of this strip: straight down in calm air, toward the wind's lee when it blows
-      const a = (1 - k) * (-1.25 - 0.2 * Math.sin(t * 0.7 + x)) + k * (-0.12 * (1 - u)) + rip;
-      const dx = Math.cos(a) * sg, dy = Math.sin(a);
-      top.push([px, py]); bot.push([px + dy * sg * H * 1, py - dx * sg * H]);
-      px += dx * L / N; py += dy * L / N;
+    const NX = 12, NY = 6, FL = 2.9, FH = 1.5, cw = FL / NX, ch = FH / NY, N = (NX + 1) * (NY + 1);
+    // Shape (not a free cloth simulation, which tangles in a flat view): the hoist is fixed down the pole and
+    // every row of the mesh follows the same curve from it, so the top and bottom edges are parallel,
+    // unbroken lines. Calm: the rows fall away steeply and the flag drapes beside the pole. Wind: they lift
+    // toward the horizontal and a wave runs out to the fly. Strength and side are eased, so a change of wind
+    // swings the flag round instead of snapping it.
+    let c = p.cloth;
+    const wind = w.wind || 0, kT = Math.min(1, Math.pow(Math.abs(wind) / 9, 0.75)), sT = wind < -0.3 ? -1 : 1;
+    if (!c) c = p.cloth = { x: new Float32Array(N), y: new Float32Array(N), t: w.time, k: kT, s: sT, ph: 0 };
+    const dt = Math.max(0, Math.min(0.1, w.time - c.t)); c.t = w.time;
+    c.k += (kT - c.k) * Math.min(1, dt * 0.9); c.s += (sT - c.s) * Math.min(1, dt * 1.5);
+    c.ph += dt * (1.6 + 7.5 * c.k);
+    const k = c.k, droop = (1 - k) * 1.45 + k * 0.1;
+    for (let j = 0; j <= NY; j++) {
+      let px = 0, py = -j * ch;
+      for (let i = 0; i <= NX; i++) {
+        const n = j * (NX + 1) + i, u = i / NX;
+        c.x[n] = px * c.s; c.y[n] = py;
+        const a = -droop * (1 - Math.exp(-u * 5 - 0.25)) - 0.05 * (j / NY) * (1 - k)
+          + Math.sin(c.ph - u * 6.5 + j * 0.22 + p.x) * (0.05 + 0.3 * k) * (0.25 + u)
+          + Math.sin(c.ph * 0.37 + p.x * 1.7) * 0.06 * (1 - k);
+        px += Math.cos(a) * cw; py += Math.sin(a) * cw;
+      }
     }
-    const quad = (i, v0, v1, col) => {
-      const a = top[i], b = top[i + 1], c = bot[i + 1], d = bot[i], m = (p, q, v) => [p[0] + (q[0] - p[0]) * v, p[1] + (q[1] - p[1]) * v];
-      const p0 = m(a, d, v0), p1 = m(b, c, v0), p2 = m(b, c, v1), p3 = m(a, d, v1);
-      ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(p0[0], p0[1]); ctx.lineTo(p1[0], p1[1]); ctx.lineTo(p2[0], p2[1]); ctx.lineTo(p3[0], p3[1]); ctx.closePath(); ctx.fill();
-    };
-    for (let i = 0; i < N; i++) {
-      const sh = Math.round(18 * Math.sin(t * (2.5 + 5 * k) - i * 0.95 + x + 1));      // light and shade on the folds
-      quad(i, 0, 1, `rgb(${236 + sh},${232 + sh},${224 + sh})`);
-      for (let r = 0; r < 13; r += 2) quad(i, r / 13, (r + 1) / 13, `rgb(${178 + sh},${42 + sh / 2},${48 + sh / 2})`);
-      if (i < 4) quad(i, 0, 7 / 13, `rgb(${44 + sh / 2},${58 + sh / 2},${112 + sh})`);
+    // draw: each cell of the picture mapped onto its quad (affine from three corners, slightly overlapped)
+    const ox = x + 0.05 * s * c.s, oy = y + (hgt * 0.955) * s, iw = fim.width / NX, ih = fim.height / NY;
+    ctx.imageSmoothingQuality = 'high';
+    for (let j = 0; j < NY; j++) for (let i = 0; i < NX; i++) {
+      const k = j * (NX + 1) + i, a = k, b = k + 1, d = k + NX + 1, e = k + NX + 2;
+      const ax = ox + c.x[a] * s, ay = oy + c.y[a] * s, bx = ox + c.x[b] * s, by = oy + c.y[b] * s, dx = ox + c.x[d] * s, dy = oy + c.y[d] * s;
+      ctx.save();
+      ctx.transform((bx - ax) / iw, (by - ay) / iw, (dx - ax) / ih, (dy - ay) / ih, ax, ay);
+      ctx.drawImage(fim, i * iw, j * ih, iw, ih, -0.02 * iw, -0.02 * ih, iw * 1.06, ih * 1.06);
+      ctx.restore();
+      // light and shade on the folds: from how far the cell is turned and squeezed
+      const sq = Math.hypot(bx - ax, by - ay) / (cw * s), tilt = (by - ay) / (cw * s), sh = Math.max(-0.3, Math.min(0.3, tilt * 0.35 - (1 - sq) * 0.6));
+      if (Math.abs(sh) > 0.03) {
+        ctx.fillStyle = sh > 0 ? `rgba(255,250,235,${sh.toFixed(2)})` : `rgba(20,16,30,${(-sh).toFixed(2)})`;
+        ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.lineTo(ox + c.x[e] * s, oy + c.y[e] * s); ctx.lineTo(dx, dy); ctx.closePath(); ctx.fill();
+      }
     }
-    ctx.fillStyle = 'rgba(255,255,255,0.85)';
-    for (let i = 0; i < 4; i++) for (let r = 0; r < 3; r++) { const a = top[i], b = top[i + 1], d = bot[i], cx = (a[0] + b[0]) / 2 + (d[0] - a[0]) * (0.1 + r * 0.17), cy = (a[1] + b[1]) / 2 + (d[1] - a[1]) * (0.1 + r * 0.17); ctx.fillRect(cx - 0.04 * s, cy - 0.04 * s, 0.08 * s, 0.08 * s); }
   },
   // the sprite washed toward a flat colour (haze by day, a grey level in the thermal picture)
   propTinted(k, key, rgb, a) {
@@ -92,7 +113,7 @@ Object.assign(DS.Renderer.prototype, {
       if ((p.z < 0) !== front) continue;
       const [par, haze] = front ? [1 + 0.45 * R.front, 0] : R.layers[p.z];
       const x = cam.x + (p.x - cam.x) * par;
-      if (p.k === 'flag') { if (x > cam.left - 4 && x < cam.right + 4) this.flag(ctx, x, T.height(p.x) + LIFT[p.z] * lift(x), p.f, par, grey); continue; }
+      if (p.k === 'flag') { if (x > cam.left - 5 && x < cam.right + 5) this.flag(ctx, p, x, T.height(p.x) + LIFT[p.z] * lift(x) - 0.05, par, grey); continue; }
       const wd = p.w * par, im = this.propImg[p.k]; if (!im) continue;
       const ht = wd * im.height / im.width;
       if (x + wd / 2 < cam.left - 6 || x - wd / 2 > cam.right + 6) continue;

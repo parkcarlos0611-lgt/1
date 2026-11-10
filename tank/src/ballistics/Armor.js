@@ -80,7 +80,8 @@ DS.Armor = {
     const M = DS.MATERIALS[P.mat];
     const los = P.t / cosT;
     const heat = !!A.pen.ce;
-    const prot = los * (heat ? M.ce : M.ke);
+    // reactive tiles: a flat bonus against shaped-charge jets, next to nothing against long rods
+    const prot = los * (heat ? M.ce : M.ke) + (P.era ? P.era * (heat ? 1 : 0.06) : 0);
     const pen = this.penetration(A, sp);
     const range = Math.abs(hit.x - proj.x0);
     const r = { vehicle: v, plate: P.name, part: P.part, ammo: A, range, speed: sp, obl, los, prot, pen, x: hit.x, y: hit.y, effects: [] };

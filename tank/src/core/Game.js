@@ -322,15 +322,15 @@ DS.Game = class Game {
   readInput(dt) {
     const k = this.keys, i = this.player.input;
     i.drive = ((k.has('KeyD') || k.has('ArrowRight')) ? 1 : 0) - ((k.has('KeyA') || k.has('ArrowLeft')) ? 1 : 0) || this.touch.drive;
-    // gun elevation: a tap moves 0.1° (Shift: 0.02°); holding starts slow after 0.3 s and ramps
-    // up to 6°/s (Shift: 1°/s) so small corrections and big swings both work
+    // gun elevation: a tap moves 0.05° (about 1 mil; Shift: 0.01°); holding starts very slowly after 0.35 s
+    // and ramps up to 6°/s (Shift: 0.5°/s) so fine corrections and big swings both work
     const dir = ((k.has('KeyW') || k.has('ArrowUp')) ? 1 : 0) - ((k.has('KeyS') || k.has('ArrowDown')) ? 1 : 0) || this.touch.elev;
     const fine = k.has('ShiftLeft') || k.has('ShiftRight'), d2r = Math.PI / 180;
-    if (dir !== 0 && dir !== this.elevDir) { i.elevStep += dir * (fine ? 0.02 : 0.1) * d2r; this.elevHold = 0; }
+    if (dir !== 0 && dir !== this.elevDir) { i.elevStep += dir * (fine ? 0.01 : 0.05) * d2r; this.elevHold = 0; }
     this.elevDir = dir;
     if (dir !== 0) {
       this.elevHold += dt;
-      const r = this.elevHold < 0.3 ? 0 : Math.min(fine ? 1 : 6, 0.5 + (this.elevHold - 0.3) * (fine ? 1 : 4));
+      const h = this.elevHold - 0.35, r = h < 0 ? 0 : fine ? Math.min(0.5, 0.05 + h * 0.25) : Math.min(6, 0.15 + h * h * 3);
       i.elevRate = dir * r * d2r;
     } else i.elevRate = 0;
     i.fire = k.has('Space') || !!this.mouseFire || this.touch.fire;

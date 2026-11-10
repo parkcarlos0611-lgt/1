@@ -60,7 +60,7 @@ DS.Vehicle = class Vehicle {
     let Fx = 0, Fy = -D.mass * g, tau = 0;
     const apply = (px, py, fx, fy) => { Fx += fx; Fy += fy; tau += (px - this.pos.x) * fy - (py - this.pos.y) * fx; };
     const pv = (px, py) => ({ x: this.vel.x - this.w * (py - this.pos.y), y: this.vel.y + this.w * (px - this.pos.x) });
-    const R = D.wheelR + D.track.thick;
+    const R = D.wheelR + (this.trackBroken ? 0.02 : D.track.thick);   // a cut track no longer runs under the wheels
 
     // ---- suspension stations ----
     let contacts = 0;
@@ -207,6 +207,7 @@ DS.Vehicle = class Vehicle {
     this.sprAng -= this.vt / this.sprR() * dt;
     this.idlAng -= this.vt / (D.idler.r + D.track.thick / 2) * dt;
 
+    if (this.chain) DS.TrackChain.step(this, dt);
     this.stepGun(dt, world);
     this.stepMG(dt, world);
     this.stepTow(dt, world);
@@ -362,9 +363,12 @@ DS.Vehicle = class Vehicle {
   crewAlive() { return this.def.modules.filter(m => m.type === 'crew' && !this.modState[m.id]).length; }
 
   // apply damage to a module (or 'track'); returns a short description for the hit log
-  damage(id) {
+  damage(id, at) {
     const rnd = Math.random;
-    if (id === 'track') { this.trackBroken = true; this.mobile = false; this.setStatus(); return '궤도 절단 → 기동 불능'; }
+    if (id === 'track') {
+      if (!this.trackBroken) { this.trackBroken = true; this.chain = DS.TrackChain.create(this, at ? at.x : this.pos.x, at ? at.y : this.pos.y - 1); this.events.push({ type: 'trackSnap', x: at ? at.x : this.pos.x, y: at ? at.y : this.pos.y - 1 }); }
+      this.mobile = false; this.setStatus(); return '궤도 절단 → 기동 불능';
+    }
     const m = this.mod(id);
     if (!m || this.modState[id]) return m ? m.name + ' (이미 손상)' : '';
     this.modState[id] = true;

@@ -740,9 +740,13 @@ DS.Renderer = class Renderer {
     path = DS.Track.conformBottom(path, this.w.terrain, D.track.thick / 2, 0.25);
     v._trackPath = path;
     const info = DS.Track.links(path, D.track.pitch, v.s, this.linkBuf);
-    const L = info.pitch, th = D.track.thick, nl = this.linkBuf.length;
-    this.linkBuf.forEach(([x, y, a], i) => {
-      if (v.trackBroken && i > nl * 0.32 && i < nl * 0.42) return;      // severed run
+    const L = v.chain ? v.chain.L : info.pitch, th = D.track.thick, nl = this.linkBuf.length;
+    let links = this.linkBuf;
+    if (v.chain) {                                                   // cut track: draw the chain's links
+      const P = v.chain.p; links = [];
+      for (let i = 1; i < P.length; i++) links.push([(P[i].x + P[i - 1].x) / 2, (P[i].y + P[i - 1].y) / 2, Math.atan2(P[i - 1].y - P[i].y, P[i - 1].x - P[i].x)]);
+    }
+    links.forEach(([x, y, a], i) => {
       ctx.save(); ctx.translate(x, y); ctx.rotate(a);
       ctx.fillStyle = '#26231f'; ctx.fillRect(-L * 0.5, -th * 0.5, L * 0.93, th);
       ctx.fillStyle = '#4a4540'; ctx.fillRect(-L * 0.5, -th * 0.5, L * 0.18, th);

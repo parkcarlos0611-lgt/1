@@ -91,6 +91,7 @@ DS.Game = class Game {
         if (!this.post.ok) this.toast('이 브라우저는 화면 효과(WebGL2)를 지원하지 않음');
         else { const q = (this.post.q + 2) % 3; this.post.setQuality(q); try { localStorage.setItem('ds.post', q); } catch (er) {} this.toast('화면 효과: ' + ['끔', '낮음', '높음'][q]); }
       }
+      if (e.code === 'KeyU') { DS.Audio.hatch = !DS.Audio.hatch; this.toast(DS.Audio.hatch ? '해치 열림 — 바깥 소리 그대로' : '해치 닫힘 — 바깥 소리가 장갑 너머로'); }
       if (e.code === 'KeyM') { const on = DS.Audio.toggle(); this.toast(on ? '소리 켬' : '소리 끔'); }
       this.keys.add(e.code);
       if (e.code === 'F9') { this.world.debug = !this.world.debug; e.preventDefault(); }

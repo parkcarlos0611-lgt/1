@@ -2,7 +2,7 @@
 // arrives after distance / 343 m/s, quieter and duller with distance (air absorbs the highs).
 // Continuous layers: turbine engine, track clatter at the link rate, gun-laying hydraulics, fire bed.
 DS.Audio = {
-  ctx: null, on: true, vol: 0.8,
+  ctx: null, on: true, vol: 0.8, hatch: true,
 
   init() {
     if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
@@ -31,7 +31,9 @@ DS.Audio = {
   place(x, y) {
     const me = this.world && this.world.vehicles[0];
     const d = me ? Math.hypot(x - me.pos.x, y - me.pos.y) : 0;
-    return { d, t: this.ctx.currentTime + d / DS.T.sound, g: 30 / (d + 30), cut: Math.max(300, 16000 / (1 + d / 250)) };
+    const p = { d, t: this.ctx.currentTime + d / DS.T.sound, g: 30 / (d + 30), cut: Math.max(300, 16000 / (1 + d / 250)) };
+    if (!this.hatch && d > 8) { p.cut = Math.min(p.cut, 900); p.g *= 0.55; }      // hatch closed: the outside comes through the armour
+    return p;
   },
   out(node, cut) {                         // route through an air-absorption filter to the compressor
     const f = this.ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = cut;
@@ -59,7 +61,43 @@ DS.Audio = {
     this.tone(p.t, 75, 32, 0.6, 1.6 * k, p.cut);
     const f = this.burst(p.t, 0.9, 'lowpass', 4000, 0.7, 1.4 * k, p.cut);
     f.frequency.setValueAtTime(Math.min(4000, p.cut), p.t); f.frequency.exponentialRampToValueAtTime(260, p.t + 0.7);
-    this.burst(p.t + 0.05, 2.6, 'lowpass', 180, 0.5, 0.5 * k, p.cut, 0.08);          // echo off the dunes
+    this.burst(p.t + 0.05, 2.6, 'lowpass', 180, 0.5, 0.5 * k, p.cut, 0.08);
+    if (!this.hatch && p.d < 8) this.clang(p.t, 0.6, 3000, 70);             // inside: the whole hull rings
+    this.echoes(x, y, 0.5 * k);
+  },
+  // echoes off the dune crests on either side: delay = there and back at 343 m/s, louder off higher crests
+  echoes(x, y, k) {
+    const T = this.world && this.world.terrain; if (!T) return;
+    const me = this.world.vehicles[0], lx = me ? me.pos.x : x, ly = me ? me.pos.y : y;
+    for (const side of [-1, 1]) {
+      let best = null;
+      for (let d = 60; d < 900; d += 20) { const h = T.height(x + side * d) - y; if (h > 2 && (!best || h > best.h)) best = { d, h }; }
+      if (!best) continue;
+      const cx = x + side * best.d, path = best.d + Math.hypot(cx - lx, T.height(cx) - ly);
+      const t = this.ctx.currentTime + path / DS.T.sound, g = k * Math.min(1, best.h / 12) * 60 / (path + 60);
+      if (g < 0.01) continue;
+      const f = this.burst(t, 1.4, 'lowpass', 600, 0.6, g, this.hatch ? 2000 : 700, 0.04); f.frequency.exponentialRampToValueAtTime(180, t + 1.2);
+    }
+  },
+  trackSnap(x, y) {                         // a link pin shears: metallic crack, then the run slapping down
+    if (!this.ok()) return;
+    const p = this.place(x, y);
+    this.clang(p.t, 0.8 * p.g, p.cut, 380); this.burst(p.t, 0.08, 'highpass', 2500, 0.8, 0.8 * p.g, p.cut);
+    for (let i = 0; i < 7; i++) this.clang(p.t + 0.15 + i * (0.06 + Math.random() * 0.07), 0.25 * p.g, p.cut, 200 + Math.random() * 150);
+  },
+  thud(x, y, k) {                           // a heavy object (thrown turret) landing in sand
+    if (!this.ok()) return;
+    const p = this.place(x, y); this.tone(p.t, 70, 30, 0.4, 1.2 * k * p.g, p.cut); this.burst(p.t, 0.4, 'lowpass', 500, 0.6, 0.8 * k * p.g, p.cut);
+    this.clang(p.t + 0.02, 0.4 * k * p.g, p.cut, 120);
+  },
+  tick(x, y, k) {                           // small metal debris hitting the ground
+    if (!this.ok()) return;
+    const p = this.place(x, y); if (p.d > 250) return;
+    this.tone(p.t, 900 + Math.random() * 900, 600, 0.06, 0.15 * k * p.g, p.cut, 'triangle', 0.001);
+  },
+  blastRoll(x, y, k) {                      // the low roll of a blast wave going past
+    if (!this.ok()) return;
+    const p = this.place(x, y); this.burst(p.t + 0.05, 1.8, 'lowpass', 90, 0.5, 0.7 * k * p.g, p.cut, 0.12);
   },
   mg(x, y, heavy) {                        // one round of machine-gun fire
     if (!this.ok()) return;
@@ -136,7 +174,11 @@ DS.Audio = {
     // gun-laying hydraulics and the fire bed (burning wrecks, cook-off jets)
     this.hyd = c.createOscillator(); this.hyd.type = 'triangle'; this.hydL = mk(this.hyd, 'bandpass', 700, 3);
     const n4 = this.noise(true); this.fire = mk(n4, 'lowpass', 500, 0.6);
-    for (const s of [this.wh1, this.wh2, n1, n2, n3, this.lfo, this.hyd, n4]) s.start();
+    const n5 = this.noise(true); this.wind = mk(n5, 'bandpass', 500, 0.4);
+    const n6 = this.noise(true); this.squeal = mk(n6, 'bandpass', 3200, 18);
+    this.dsl = c.createOscillator(); this.dsl.type = 'square'; this.dslL = mk(this.dsl, 'lowpass', 220, 1);   // diesel firing pulses
+    for (const s of [this.wh1, this.wh2, n1, n2, n3, this.lfo, this.hyd, n4, n5, n6, this.dsl]) s.start();
+    this.battleT = 3;
   },
 
   // called every frame with the world
@@ -168,6 +210,23 @@ DS.Audio = {
       }
     }
     set(this.fire.g.gain, Math.min(0.9, fire));
+    // diesel firing pulses (Bradley, Iraqi tanks): 8 cylinders at idle to full revs
+    set(this.dsl.frequency, 25 + 60 * rpm); set(this.dslL.g.gain, alive && turb < 1 ? 0.05 + 0.08 * me.spool : 0);
+    // track: idler and sprocket squeal at walking pace, some irregular link knocks
+    set(this.squeal.g.gain, v > 0.5 && v < 5 ? 0.025 * Math.sin(t * 2.3) ** 2 * (this.hatch ? 1 : 0.4) : 0);
+    set(this.squeal.f.frequency, 2800 + 600 * Math.sin(t * 0.7));
+    if (v > 1 && Math.random() < dt * v * 0.8) { const q = me.local(0, -1); this.tick(q.x, q.y, 0.6); }
+    // wind over the sand: a hiss that swells and dies away; the sandstorm roars
+    const env = world.env || {}, wv = Math.abs(world.wind || 0), gust = 0.6 + 0.4 * Math.sin(t * 0.37) * Math.sin(t * 0.13 + 1);
+    set(this.wind.g.gain, Math.min(0.5, (0.01 + wv * wv * 0.0035) * gust * (this.hatch ? 1 : 0.3))); set(this.wind.f.frequency, env.visibility ? 900 : 450);
+    // the rest of the war: distant guns and artillery somewhere over the horizon
+    this.battleT -= dt;
+    if (this.battleT <= 0) {
+      this.battleT = 2 + Math.random() * 9;
+      const tt = c.currentTime, g = (0.08 + Math.random() * 0.18) * (this.hatch ? 1 : 0.5);
+      const f = this.burst(tt, 2.5 + Math.random() * 2, 'lowpass', 160, 0.6, g, 400, 0.08); f.frequency.exponentialRampToValueAtTime(70, tt + 2);
+      if (Math.random() < 0.3) for (let i = 1; i < 4; i++) this.burst(tt + i * (0.4 + Math.random() * 0.5), 1.5, 'lowpass', 140, 0.6, g * 0.6, 400, 0.05);
+    }
     // round loaded
     if (me.gun.reload > 0) this._loading = true;
     else if (this._loading && me.alive) { this._loading = false; this.breech(); }

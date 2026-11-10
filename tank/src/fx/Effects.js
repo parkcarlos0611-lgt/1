@@ -80,7 +80,7 @@ DS.Effects = class Effects {
         { grow: 2, drag: 2, grav: 0, alpha: 0.9, col: 0xffa040 });
       if (Math.random() < 0.5) P.add(K.DARK, p.x, p.y + 2, this.rnd(-1, 1), this.rnd(3, 6), this.rnd(5, 9), 0.8, { grow: 1.1, drag: 0.8, grav: -0.03, alpha: 0.4, col: 0x2a2724 });
     }
-    for (const e of v.events) { if (e.type === 'fire') this.muzzle(v, e); else if (e.type === 'mg') this.mgFire(v, e); else if (e.type === 'tow') this.towLaunch(v, e); else if (e.type === 'explode') this.explode(v); else if (e.type === 'pillar') this.pillar(v); else if (e.type === 'turretLand') this.turretLand(e); }
+    for (const e of v.events) { if (e.type === 'fire') this.muzzle(v, e); else if (e.type === 'mg') this.mgFire(v, e); else if (e.type === 'tow') this.towLaunch(v, e); else if (e.type === 'explode') this.explode(v); else if (e.type === 'pillar') this.pillar(v); else if (e.type === 'trackSnap') this.trackSnap(e); else if (e.type === 'turretLand') this.turretLand(e); }
     v.events.length = 0;
   }
 
@@ -391,6 +391,13 @@ DS.Effects = class Effects {
     }
   }
 
+  // a track parting: sparks and a couple of link fragments
+  trackSnap(e) {
+    const P = this.P, K = DS.P;
+    DS.Audio.trackSnap(e.x, e.y);
+    for (let i = 0; i < 26; i++) { const a = this.rnd(0, Math.PI * 2), sp = this.rnd(4, 18); P.add(K.FIRE, e.x, e.y, Math.cos(a) * sp, Math.sin(a) * sp, this.rnd(0.05, 0.2), 0.05, { grow: 0, drag: 2, grav: 0.6, alpha: 1, col: 0xffe2a0 }); }
+    for (let i = 0; i < 3; i++) P.add(K.DEBRIS, e.x, e.y, this.rnd(-6, 6), this.rnd(3, 8), 3, 0.12, { drag: 0.2, grav: 1 });
+  }
   // flame pillar straight up out of the open turret ring as the turret leaves
   pillar(v) {
     const P = this.P, K = DS.P, p = v.local(v.g.ring.x, v.g.ring.y);
@@ -403,7 +410,7 @@ DS.Effects = class Effects {
   // a thrown turret hitting the ground: sand thrown up, a dust cloud, a dull thud
   turretLand(e) {
     const P = this.P, K = DS.P, T = this.w.terrain, sc = this.hex(T.soilAt(e.x).col[1]), k = Math.min(1.5, e.v / 10);
-    DS.Audio.ground(e.x, e.y, false);
+    DS.Audio.thud(e.x, e.y, k);
     for (let i = 0; i < 50 * k; i++) { const a = Math.PI / 2 + this.rnd(-1.1, 1.1), sp = this.rnd(2, 9) * k;
       P.add(K.GRAIN, e.x + this.rnd(-1, 1), e.y + 0.1, Math.cos(a) * sp, Math.sin(a) * sp, this.rnd(0.6, 1.4), this.rnd(0.04, 0.09), { drag: 0.4, col: sc }); }
     for (let i = 0; i < 14 * k; i++) P.add(K.DUST, e.x + this.rnd(-1.5, 1.5), e.y + this.rnd(0.2, 1), this.rnd(-3, 3), this.rnd(0.5, 2.5), this.rnd(4, 8), this.rnd(0.8, 1.5),
@@ -414,6 +421,7 @@ DS.Effects = class Effects {
   landed(x, y, sz, vx, vy) {
     const P = this.P, K = DS.P, sc = this.hex(this.w.terrain.soilAt(x).col[1]), e = Math.min(1, Math.abs(vy) / 15) * Math.min(2, sz * 6);
     if (e < 0.05) return;
+    if (sz > 0.08) DS.Audio.tick(x, y, Math.min(1, e));
     for (let i = 0; i < 6 * e; i++) P.add(K.GRAIN, x, y + 0.05, vx * 0.2 + this.rnd(-2, 2), this.rnd(1, 4) * e, this.rnd(0.4, 0.9), 0.04, { drag: 0.5, col: sc });
     P.add(K.DUST, x, y + 0.2, vx * 0.1, this.rnd(0.3, 1), this.rnd(2, 4), 0.35 + 0.4 * e, { grow: 0.6, drag: 1.5, grav: 0, alpha: 0.3, col: sc });
   }
@@ -426,6 +434,7 @@ DS.Effects = class Effects {
   blast(x, y, str, dx, dy) {
     this.blasts.push({ x, y, str, dx: dx || 0, dy: dy || 0, dir: dx != null && dx !== 0, r: 0, max: 22 * Math.sqrt(str) + 6 });
     if (str >= 0.2) this.waves.push({ x, y, str, t: 0, max: 22 * Math.sqrt(str) + 6 });   // visible air ripple (post-processing)
+    if (str >= 0.8) DS.Audio.blastRoll(x, y, Math.min(1.5, str));
     // the overpressure shoves nearby vehicles: hull rocks on its springs, antennas whip
     if (str >= 0.5) for (const v of this.w.vehicles) {
       const d = Math.hypot(v.pos.x - x, v.pos.y - y);

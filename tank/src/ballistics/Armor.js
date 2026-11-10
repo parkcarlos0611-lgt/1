@@ -99,7 +99,7 @@ DS.Armor = {
     }
     if (P.track) {
       r.result = pen > prot ? 'track' : 'nonpen';
-      if (pen > prot && v.alive && rnd() < 0.75) { v.damage('track'); r.effects.push('궤도 절단 → 기동 불능'); }
+      if (pen > prot && v.alive && rnd() < 0.75) { v.damage('track', { x: hit.x, y: hit.y }); r.effects.push('궤도 절단 → 기동 불능'); }
       return r;
     }
     if (pen < prot) { r.result = 'nonpen'; return r; }

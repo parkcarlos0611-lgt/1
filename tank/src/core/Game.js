@@ -38,9 +38,11 @@ DS.Game = class Game {
     const other = veh === 'm2a2' ? 'm1a1' : 'm2a2', nm = { m1a1: 'M1A1', m2a2: '브래들리' };
     const v = new DS.Vehicle(DS.VEHICLES[veh], M.start, W.terrain, { label: nm[veh] + ' (나)' });
     W.vehicles.push(v); this.player = v;
-    // the other vehicle rides along as an AI wingman, 45 m behind
-    const wm = new DS.Vehicle(DS.VEHICLES[other], Math.max(12, M.start - 45), W.terrain, { label: nm[other] + ' (아군)' });
-    W.vehicles.push(wm); new DS.TankAI(wm, W, { follow: v, offset: -45 });
+    // the other vehicle is an AI wingman. The tank always leads: with the Bradley, the M1A1 moves 45 m ahead
+    // and takes the first contact; with the M1A1, the Bradley follows 45 m behind
+    const off = veh === 'm2a2' ? 45 : -45;
+    const wm = new DS.Vehicle(DS.VEHICLES[other], Math.max(12, M.start + off), W.terrain, { label: nm[other] + (veh === 'm2a2' ? ' (아군 선두)' : ' (아군)') });
+    W.vehicles.push(wm); new DS.TankAI(wm, W, { follow: v, offset: off });
     for (const [id, x, label] of M.enemies) {
       const e = new DS.Vehicle(DS.VEHICLES[id], x, W.terrain, { dir: -1, label });
       W.vehicles.push(e); new DS.TankAI(e, W);

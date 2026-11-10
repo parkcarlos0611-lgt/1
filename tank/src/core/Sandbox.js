@@ -11,13 +11,15 @@ DS.Sandbox = class Sandbox {
     this.bind();
   }
   static MODES = { dummy: '무인 표적', watch: '정지 관측', hold: '정지 사격', combat: '기동 전투', patrol: '왕복 주행' };
-  static NAMES = { m1a1: 'M1A1', m2a2: 'M2A2', m60a1: 'M60A1', t55: 'T-55', t62: 'T-62', t72: 'T-72' };
+  static NAMES = { m1a1: 'M1A1', m2a2: 'M2A2', m60a1: 'M60A1',  t55: 'T-55', t62: 'T-62', t72: 'T-72' };
 
   // ---- vehicles ----
   spawn(it) {
     const W = this.w, def = DS.VEHICLES[it.id], N = Sandbox.NAMES[it.id];
     if (!it.label) it.label = it.player ? N + ' (나)' : `${N} #${++this.n}`;
-    const v = new DS.Vehicle(def, it.x, W.terrain, { dir: it.dir || 1, team: it.team || def.side, label: it.label });
+    // sides are relative to my vehicle: a target marked 'IQ' is a foe, 'US' a friend, whatever I am driving
+    const mine = it.player ? def.side : this.g.player.team, foe = mine === 'US' ? 'IQ' : 'US';
+    const v = new DS.Vehicle(def, it.x, W.terrain, { dir: it.dir || 1, team: it.player ? mine : it.team === 'US' ? mine : foe, label: it.label });
     v.sb = it;
     if (it.player) { W.vehicles.unshift(v); this.g.player = v; }
     else { W.vehicles.push(v); if (it.mode !== 'dummy') new DS.TankAI(v, W, { mode: it.mode, patrol: it.mode === 'patrol' ? { a: it.x - (it.span || 150) / 2, b: it.x + (it.span || 150) / 2, speed: it.speed || 5 } : null }); }
@@ -29,7 +31,7 @@ DS.Sandbox = class Sandbox {
     const W = this.w, g = this.g;
     const me = items.find(i => i.player) || { player: true, id: 'm1a1', x: DS.RANGE.start, dir: 1 };
     if (keepPlayerX && g.player) me.x = g.player.pos.x;
-    W.vehicles.length = 0; W.projectiles.length = 0; W.missiles.length = 0; W.traces.length = 0; W.log.length = 0; this.n = 0;
+    W.vehicles.length = 0; W.projectiles.length = 0; W.missiles.length = 0; W.traces.length = 0; W.log.length = 0; this.n = 0; W.fx.cases = [];
     this.spawn(me);
     for (const it of items) if (!it.player) { it.label = null; this.spawn(it); }
     this.sel = null; g.target = null; g.mcam = false; g.mcamHold = null;

@@ -31,10 +31,13 @@ DS.VEHICLES = DS.VEHICLES || {};
       vmaxF: 50 / 3.6, vmaxR: 8 / 3.6, brake: 3.7e5, engineBrake: 2.6e4 },
     exhaust: { x: -2.96, y: -0.15 },
     gun: { name: 'U-5TS 115mm', trunnion: L(1395, 438), muzzle: (1740 - 1395) / PPM,
-      elevMax: 16, elevMin: -6, rate: 0.22, recoilLen: 0.42, recoilMass: 2100, reload: 8.0, stabilized: true },
+      elevMax: 16, elevMin: -6, rate: 0.22, recoilLen: 0.42, recoilMass: 2100, reload: 8.0, stabilized: true, stab: 0.5,
+      // the spent 115 mm steel case is thrown out of the hatch in the turret rear as the breech opens
+      eject: { at: 0.9, port: L(1168, 418), dia: 0.115, len: 0.72, v: 5.5 } },
+    coax: { name: 'PKT 7.62mm 동축', ammo: 'M240_762', muzzle: [L(1395, 438)[0] + 0.4, L(1395, 438)[1] - 0.08], rate: 700 / 60, rounds: 2500, spread: 0.8 },
     turretRing: L(1280, 463),
     antennas: [{ x: L(1184, 398)[0], y: L(1184, 398)[1], len: 1.2 }],
-    sight: { laser: false, rangeErr: 0.13, aimErr: 4.8, layTime: 7, detectMax: 2200, engageMax: 1500 },
+    sight: { laser: false, manual: true, name: 'TSh2B-41', rangeErr: 0.13, aimErr: 4.8, layTime: 7, detectMax: 2200, engageMax: 1500 },
     armor: [
       { name: '포탑 전면 상부', part: 'turret', a: L(1370, 400), b: L(1412, 422), t: 230, mat: 'cast', n: 60, h: 0 },
       { name: '포 방패', part: 'turret', a: L(1412, 422), b: L(1412, 450), t: 230, mat: 'cast', n: 0, h: 0 },

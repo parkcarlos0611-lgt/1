@@ -126,6 +126,11 @@ DS.Game = class Game {
         this.toast(`열상 밝기 ${Math.round(-a.level * 50)} · 대비 ${a.gain.toFixed(2)}`);
       }
       if (e.code === 'KeyG') this.sightCv.classList.toggle('big');
+      // sights without a rangefinder (T-55 / T-62): the gunner sets the range on the sight scale by hand
+      if ((e.code === 'Minus' || e.code === 'Equal') && this.player.def.sight.manual) {
+        const fc = this.player.fc; fc.range = null; fc.bs = Math.max(200, Math.min(3000, fc.bs + (e.code === 'Equal' ? 100 : -100) * (e.shiftKey ? 5 : 1)));
+        DS.FireControl.update(this.world, this.player, false); this.toast(`조준경 거리 눈금 ${fc.bs} m`);
+      }
       if (e.code === 'Backspace') { e.preventDefault(); this.cycleTarget(e.shiftKey ? -1 : 1); }
       if (e.code === 'Tab') {
         e.preventDefault();
@@ -284,6 +289,7 @@ DS.Game = class Game {
   // couple of seconds to bring the two images together and the reading is off by a few per cent at long range
   lase() {
     const v = this.player, S = v.def.sight;
+    if (S.manual) return this.toast('거리측정기 없음 — − / = 로 조준경 거리 눈금 설정');
     if (!S.optical) return DS.FireControl.update(this.world, v, true);
     if (this.ranging) return;
     this.ranging = { t: 2.2 }; this.toast('광학 거리 측정 중…');
@@ -367,7 +373,7 @@ DS.Game = class Game {
       if (v.tow) { const t = v.tow; set('h-tow', t.missile ? (t.missile.guided ? '유도 중 — 조준선 유지' : '유선 끊김') : t.loaded ? `장전 ${t.loaded} · 예비 ${t.reserve}` + (t.up > 0 && t.up < 1 ? ' · 발사관 작동' : t.up >= 1 ? ' · 발사 준비' : '') : t.reserve ? `재장전 ${(v.def.tow.reloadTime - t.reload).toFixed(0)} s · 예비 ${t.reserve}` : '소진'); }
       document.getElementById('row-tow').hidden = !v.tow;
       const fc = v.fc;
-      set('h-rng', fc.range ? Math.round(fc.range) + ' m' : `— (전투조준 ${fc.bs} m)`);
+      set('h-rng', fc.range ? Math.round(fc.range) + ' m' : v.def.sight.manual ? `눈금 ${fc.bs} m` : `— (전투조준 ${fc.bs} m)`);
       set('h-se', (fc.se * 1000).toFixed(2) + ' mil · ' + (fc.se * 180 / Math.PI).toFixed(2) + '°');
       const foes = w.vehicles.filter(x => x.team !== v.team), up = foes.filter(x => x.alive).length;
       const pals = w.vehicles.filter(x => x.team === v.team && x !== v);
@@ -382,7 +388,7 @@ DS.Game = class Game {
       if (this.sbx) { if (!v.alive && !this._dead) this.toast('격파됨 — L 편집 모드에서 「모두 수리」'); this._dead = !v.alive; }
       else if (!v.alive && over.hidden) { over.hidden = false; document.getElementById('over-t').textContent = `격파됨 — ${v.status}`; }
       if (!this.sbx && up === 0 && foes.length && over.hidden && !this._won) { this._won = true; over.hidden = false; document.getElementById('over-t').textContent = '적 소대 전멸 — 임무 완료'; }
-      set('h-load', g.reload > 0 ? '장전 중 ' + g.reload.toFixed(1) + ' s' : '장전 완료');
+      set('h-load', g.reload > 0 ? (g.locked ? '자동장전 — 포 고정 ' : '장전 중 ') + g.reload.toFixed(1) + ' s' : '장전 완료');
       set('h-pos', (v.pos.x / 1000).toFixed(2) + ' km');
       set('h-zoom', w.cam.zoom.toFixed(0) + ' px/m');
       set('h-fps', Math.round(this.fps) + ' fps');
@@ -498,7 +504,7 @@ DS.Game = class Game {
     c.textAlign = 'right'; c.fillText(g.reload > 0 ? '' : '▮ READY', cx - W * 0.1, by);
     c.textAlign = 'left'; c.fillText((v.tow && (v.tow.missile || v.tow.up >= 1) ? 'TOW' : A.sight || (A.type === 'HEAT' ? 'HEAT' : 'SABOT')) + (lasing ? '  ✱' : ''), cx + W * 0.1, by);
     c.textAlign = 'center'; c.font = `600 ${Math.max(10, Math.round(W / 40))}px ui-monospace, monospace`;
-    c.fillText(`${v.def.sight.optical ? 'M32' : 'GPS'} ×${this.sightMag}  ${this.thermal ? 'TIS ' + (this.blackHot ? 'BH' : 'WH') : this.nv ? 'PASSIVE' : 'DAY'}${this.ranging ? '  RANGING' : ''}`, cx, cy - L - 6);
+    c.fillText(`${v.def.sight.name || (v.def.sight.optical ? 'M32' : 'GPS')} ×${this.sightMag}  ${this.thermal ? 'TIS ' + (this.blackHot ? 'BH' : 'WH') : this.nv ? 'PASSIVE' : 'DAY'}${this.ranging ? '  RANGING' : ''}`, cx, cy - L - 6);
   }
 };
 addEventListener('load', () => new DS.Game().start().catch(e => { document.getElementById('loading').textContent = '로딩 실패: ' + e.message; console.error(e); }));

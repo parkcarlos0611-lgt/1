@@ -32,10 +32,11 @@ DS.VEHICLES = DS.VEHICLES || {};
       vmaxF: 50 / 3.6, vmaxR: 8 / 3.6, brake: 3.6e5, engineBrake: 2.6e4 },
     exhaust: { x: -2.8, y: -0.145 },
     gun: { name: 'D-10T2S 100mm', trunnion: L(1410, 135), muzzle: (1740 - 1410) / PPM,
-      elevMax: 17, elevMin: -5, rate: 0.20, recoilLen: 0.55, recoilMass: 1950, reload: 8.5, stabilized: true },
+      elevMax: 17, elevMin: -5, rate: 0.20, recoilLen: 0.55, recoilMass: 1950, reload: 8.5, stabilized: true, stab: 0.45 },
+    coax: { name: 'SGMT 7.62mm 동축', ammo: 'M240_762', muzzle: [L(1410, 135)[0] + 0.4, L(1410, 135)[1] - 0.08], rate: 650 / 60, rounds: 3000, spread: 0.8 },
     turretRing: L(1300, 164),
     antennas: [{ x: L(1185, 96)[0], y: L(1185, 96)[1], len: 1.14 }],
-    sight: { laser: false, rangeErr: 0.15, aimErr: 5.0, layTime: 7.5, detectMax: 2000, engageMax: 1500 },
+    sight: { laser: false, manual: true, name: 'TSh2B-32', rangeErr: 0.15, aimErr: 5.0, layTime: 7.5, detectMax: 2000, engageMax: 1500 },
     armor: [
       { name: '포탑 전면 상부', part: 'turret', a: L(1380, 100), b: L(1432, 128), t: 200, mat: 'cast', n: 65, h: 0 },
       { name: '포 방패', part: 'turret', a: L(1432, 128), b: L(1432, 148), t: 200, mat: 'cast', n: 0, h: 0 },

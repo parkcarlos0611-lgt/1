@@ -80,7 +80,7 @@ DS.Effects = class Effects {
         { grow: 2, drag: 2, grav: 0, alpha: 0.9, col: 0xffa040 });
       if (Math.random() < 0.5) P.add(K.DARK, p.x, p.y + 2, this.rnd(-1, 1), this.rnd(3, 6), this.rnd(5, 9), 0.8, { grow: 1.1, drag: 0.8, grav: -0.03, alpha: 0.4, col: 0x2a2724 });
     }
-    for (const e of v.events) { if (e.type === 'fire') this.muzzle(v, e); else if (e.type === 'mg') this.mgFire(v, e); else if (e.type === 'tow') this.towLaunch(v, e); else if (e.type === 'explode') this.explode(v); else if (e.type === 'pillar') this.pillar(v); else if (e.type === 'trackSnap') this.trackSnap(e); else if (e.type === 'turretLand') this.turretLand(e); }
+    for (const e of v.events) { if (e.type === 'fire') this.muzzle(v, e); else if (e.type === 'mg') this.mgFire(v, e); else if (e.type === 'tow') this.towLaunch(v, e); else if (e.type === 'explode') this.explode(v); else if (e.type === 'pillar') this.pillar(v); else if (e.type === 'case') this.ejectCase(v, e); else if (e.type === 'trackSnap') this.trackSnap(e); else if (e.type === 'turretLand') this.turretLand(e); }
     v.events.length = 0;
   }
 
@@ -392,6 +392,48 @@ DS.Effects = class Effects {
   }
 
   // a track parting: sparks and a couple of link fragments
+  // spent case (T-62) or case stub (T-72): a dull steel cylinder of the gun's calibre tossed up and back out of
+  // the turret, tumbling, with a wisp of propellant smoke; it clatters once on the ground and lies there a while
+  ejectCase(v, e) {
+    const E = e.E, a = (112 + Math.random() * 16) * Math.PI / 180;          // up and to the rear
+    (this.cases || (this.cases = [])).push({ x: e.x, y: e.y, vx: v.vel.x + v.dir * Math.cos(a) * E.v, vy: Math.sin(a) * E.v, a: Math.random() * 6, w: (Math.random() - 0.5) * 14, dia: E.dia, len: E.len, t: 0, rest: 0 });
+    if (this.cases.length > 24) this.cases.shift();
+    for (let i = 0; i < 5; i++) this.P.add(DS.P.SMOKE, e.x, e.y, v.vel.x + (Math.random() - 0.5) * 0.8, 0.6 + Math.random() * 0.9, 0.8 + Math.random() * 0.8, 0.12 + Math.random() * 0.1, { col: 0xb9b3a8, alpha: 0.28, grow: 0.5 });
+    DS.Audio.tick(e.x, e.y, 0.5);
+  }
+  stepCases(dt) {
+    const L = this.cases; if (!L || !L.length) return;
+    const T = this.w.terrain;
+    for (const c of L) {
+      c.t += dt;
+      if (c.rest) { c.rest += dt; continue; }
+      c.vy -= DS.T.g * dt; c.x += c.vx * dt; c.y += c.vy * dt; c.a += c.w * dt;
+      const h = T.height(c.x) + c.dia / 2;
+      if (c.y < h) {
+        c.y = h;
+        if (c.vy < -1.5) { DS.Audio.tick(c.x, c.y, Math.min(1.2, 0.4 + c.len)); c.vy = -c.vy * 0.22; c.vx *= 0.45; c.w *= 0.4; }
+        else { c.rest = 0.001; c.a = Math.atan(T.slope(c.x)); }
+      }
+    }
+    this.cases = L.filter(c => c.rest < 25);
+  }
+  drawCases(ctx, grey) {
+    const L = this.cases; if (!L) return;
+    for (const c of L) {
+      const al = c.rest > 22 ? (25 - c.rest) / 3 : 1;
+      ctx.save(); ctx.translate(c.x, c.y); ctx.rotate(c.a); ctx.globalAlpha = al;
+      // dull steel: dark underside, a soft highlight along the top, darker open end
+      ctx.fillStyle = grey || '#8d9092'; ctx.fillRect(-c.len / 2, -c.dia / 2, c.len, c.dia);
+      if (!grey) {
+        ctx.fillStyle = 'rgba(210,214,216,0.55)'; ctx.fillRect(-c.len / 2, c.dia * 0.12, c.len, c.dia * 0.22);
+        ctx.fillStyle = 'rgba(40,42,46,0.45)'; ctx.fillRect(-c.len / 2, -c.dia / 2, c.len, c.dia * 0.3);
+        ctx.fillStyle = '#5c5f62'; ctx.fillRect(-c.len / 2, -c.dia / 2, Math.min(c.len * 0.18, 0.03), c.dia);
+        ctx.fillStyle = '#3b3d40'; ctx.fillRect(c.len / 2 - Math.min(c.len * 0.1, 0.02), -c.dia / 2, Math.min(c.len * 0.1, 0.02), c.dia);
+      }
+      ctx.restore();
+    }
+    ctx.globalAlpha = 1;
+  }
   trackSnap(e) {
     const P = this.P, K = DS.P;
     DS.Audio.trackSnap(e.x, e.y);
@@ -473,7 +515,7 @@ DS.Effects = class Effects {
     this.blasts = this.blasts.filter(b => b.r < b.max);
   }
 
-  update(dt) { this.stepBlasts(dt); for (const w of this.waves) w.t += dt; this.waves = this.waves.filter(w => w.t < 0.4); for (const f of this.flashes) f.t += dt; this.flashes = this.flashes.filter(f => f.t < f.ttl);
+  update(dt) { this.stepBlasts(dt); this.stepCases(dt); for (const w of this.waves) w.t += dt; this.waves = this.waves.filter(w => w.t < 0.4); for (const f of this.flashes) f.t += dt; this.flashes = this.flashes.filter(f => f.t < f.ttl);
     for (const l of this.labels) l.t += dt; this.labels = this.labels.filter(l => l.t < 4); this.shake = Math.max(0, this.shake - dt * 2.5); }
 
   drawFlashes(ctx) {

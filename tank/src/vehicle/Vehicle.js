@@ -231,9 +231,14 @@ DS.Vehicle = class Vehicle {
     let et = wrap(this.dir * (gs.aimW + this.fc.se - base));
     et = Math.max(G.elevMin * d2r, Math.min(G.elevMax * d2r, et));
     gs.aimW = base + this.dir * et - this.fc.se;
-    const de = et - gs.e, mx = G.rate * dt;
-    gs.e += Math.max(-mx, Math.min(mx, de));
+    // autoloader (T-72): from the shot until `out` seconds before the round is home the gun sits locked at the
+    // loading angle; the sight line (aimW) stays free, so the gunner can keep it on the target meanwhile
+    const AL = G.autoloader; gs.locked = !!(AL && gs.reload > AL.out && this.alive && this.firepower && gs.fired > 0);
+    const eg = gs.locked ? AL.angle * d2r : et, mx = (AL ? Math.max(G.rate, 0.35) : G.rate) * dt;
+    gs.e += Math.max(-mx, Math.min(mx, eg - gs.e));
     gs.reload = Math.max(0, gs.reload - dt);
+    // spent case / case stub thrown out of the turret rear a moment after the shot
+    if (G.eject && gs.ejectT > 0) { gs.ejectT -= dt; if (gs.ejectT <= 0 && this.alive) { const q = this.local(this.dir * G.eject.port[0], G.eject.port[1]); this.events.push({ type: 'case', x: q.x, y: q.y, E: G.eject }); } }
     if (gs.rv < 0) { gs.rv += gs.aB * dt; gs.rx += gs.rv * dt; if (gs.rv >= 0) gs.rv = 0.0001; }
     else if (gs.rx < 0) { const a = -(G.recoilK || 64) * gs.rx - (G.recoilC || 15) * gs.rv; gs.rv += a * dt; gs.rx += gs.rv * dt; if (gs.rx > -1e-4) { gs.rx = 0; gs.rv = 0; } }
     if (this.input.fire && this.alive && this.firepower && gs.ammo && gs.reload <= 0 && gs.rx === 0) this.fire(world);
@@ -243,7 +248,7 @@ DS.Vehicle = class Vehicle {
     const G = this.def.gun, gs = this.gun, A = DS.AMMO[gs.ammo];
     const v0r = A.launchMass * A.v0 * 1.75 / G.recoilMass;     // projectile + propellant gas momentum
     gs.rv = -v0r; gs.aB = v0r * v0r / (2 * G.recoilLen);
-    gs.reload = G.reload; gs.fired++; this.lastFired = world.time;
+    gs.reload = G.reload; gs.fired++; this.lastFired = world.time; if (G.eject) gs.ejectT = G.eject.at;
     const m = this.muzzle();
     world.spawnProjectile(m.x, m.y, m.dx * A.v0 + this.vel.x, m.dy * A.v0 + this.vel.y, A, this).tracer = true;
     this.events.push({ type: 'fire', x: m.x, y: m.y, dx: m.dx, dy: m.dy, ammo: A });

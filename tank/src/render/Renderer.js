@@ -132,6 +132,7 @@ DS.Renderer = class Renderer {
     this.props(ctx, cam, true);
     this.fog(ctx, cam);
     this.traces(ctx, cam);
+    w.fx.drawCases(ctx);
     this.projectiles(ctx, cam);
     w.particles.draw(ctx, cam, 1);
     this.atmosphere(ctx, cam, opt);

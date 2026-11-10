@@ -44,13 +44,19 @@ DS.VEHICLES = DS.VEHICLES || {};
       muzzle: (1742 - 1366) / PPM * 1.051 + (1386 - 1366) / PPM * -0.051,
       barrelScale: 1.051,            // drawing's barrel is ~0.22 m short of the real 9.53 m overall length
       elevMax: 14, elevMin: -6, rate: 0.30,
-      recoilLen: 0.30, recoilMass: 2400, reload: 7.5, stabilized: true,
+      recoilLen: 0.30, recoilMass: 2400, reload: 7.5, stabilized: true, stab: 0.75,
+      // carousel autoloader: the gun goes to the loading angle and is locked there for the cycle, then
+      // released for the last `out` seconds to come back onto the lay. The stub of the semi-combustible case
+      // (a 125 mm steel pan) is thrown out of the port in the turret roof rear `eject.at` seconds after firing.
+      autoloader: { angle: 3.5, out: 1.2 },
+      eject: { at: 1.5, port: L(1215, 668), dia: 0.125, len: 0.11, v: 4.5 },
     },
+    coax: { name: 'PKT 7.62mm 동축', ammo: 'M240_762', muzzle: [L(1366, 712)[0] + 0.45, L(1366, 712)[1] - 0.09], rate: 700 / 60, rounds: 2000, spread: 0.8 },
     turretRing: L(1250, 741),
     antennas: [{ x: L(1152, 683)[0], y: L(1152, 683)[1], len: 1.0 }],
 
     // physical t × material factor reproduces the supplied effective values on the line of sight
-    sight: { laser: true, rangeErr: 0.04, aimErr: 2.5, layTime: 5, detectMax: 2500, engageMax: 2000 },   // TPD-K1 laser rangefinder
+    sight: { laser: true, name: 'TPD-K1', rangeErr: 0.04, aimErr: 2.5, layTime: 5, detectMax: 2500, engageMax: 2000 },   // TPD-K1 laser rangefinder
     armor: [
       { name: '포탑 전면', part: 'turret', a: L(1372, 690), b: L(1392, 722), t: 500, mat: 't72_turret', n: 10, h: 30 },
       { name: '포탑 전면 하단', part: 'turret', a: L(1392, 722), b: L(1362, 741), t: 500, mat: 't72_turret', n: -30, h: 30 },

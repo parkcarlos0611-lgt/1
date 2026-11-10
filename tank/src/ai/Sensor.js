@@ -11,7 +11,8 @@ DS.Sensor = {
   rate(world, a, b, range) {
     const S = a.def.sight, env = world.env || {};
     const flash = b.lastFired && world.time - b.lastFired < 5 ? 2 : 1;
-    const moving = Math.abs(b.vt) > 1.5 ? 1.5 : 1;
+    // a moving vehicle's dust tail gives it away, more over soft sand
+    const moving = Math.abs(b.vt) > 1.5 ? 1 + Math.min(1.3, Math.abs(b.vt) / 8 * world.terrain.soilAt(b.pos.x).dust) : 1;
     const dm = S.detectMax || 2500;
     let vis;
     if (S.thermal) {
@@ -19,10 +20,12 @@ DS.Sensor = {
       if (env.visibility) vis *= Math.min(1, Math.exp(-range / (env.visibility * 2.6)) * 1.4);   // dust scatters even IR
       vis *= b.def.signature || 1;
       vis *= Math.min(1.3, 0.45 + 0.8 * DS.Thermal.sig(b));          // running engines, hot tubes, fires show up
+      vis *= 1 - 0.5 * DS.AI.smoke(world, a, b);                     // smoke cools and scatters the image
       return vis * flash * moving / 1.5;
     }
     vis = range >= dm ? 0 : Math.pow(Math.max(0, Math.min(1, (dm - range) / (dm - 700))), 1.5);
     vis *= DS.T.ai.detect;                                       // Iraqi crews overall: poor optics and training
+    vis *= 1 - DS.AI.smoke(world, a, b);                          // smoke blocks optical sights
     vis *= b.def.signature || 1;                                 // smaller / lower targets (Bradley) are harder to pick out
     if (env.visibility) vis *= Math.max(0, Math.exp(-range / (env.visibility * 0.45)) * 1.6 - 0.02);
     if (env.night) vis *= range < 400 ? 0.5 : range < 800 ? 0.08 : (flash > 1 ? 0.05 : 0);

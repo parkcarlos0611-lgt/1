@@ -267,7 +267,7 @@ DS.Renderer = class Renderer {
         const yl = o.y + slope * dx;                            // grazing line of sight over the crests
         if (a > 0) { ctx.fillStyle = `rgba(${col},${A * a})`; ctx.fillRect(Math.min(x, x + side * step), bot, step, top - bot); }
         // dead ground: the air pocket under the grazing line plus the hidden surface skin (not the soil section)
-        if (a < 1 && yl > h + 0.05) { ctx.fillStyle = `rgba(${col},${A * (1 - a)})`; ctx.fillRect(Math.min(x, x + side * step), h - 0.8, step, yl - h + 0.8); }
+        if (a < 1 && yl > h + 0.35) {                           // only real dead ground, not every crater pit ctx.fillStyle = `rgba(${col},${A * (1 - a)})`; ctx.fillRect(Math.min(x, x + side * step), h - 0.8, step, yl - h + 0.8); }
         slope = Math.max(slope, (h - o.y) / dx);
       }
     }
@@ -744,6 +744,12 @@ DS.Renderer = class Renderer {
     ctx.save(); ctx.translate(v.pos.x, v.pos.y); ctx.rotate(v.ang); ctx.scale(dir, 1);
     ctx.save(); ctx.scale(px, -px); ctx.drawImage(I.hull, Sp.hull.x - S.ox, Sp.hull.y - S.oy); ctx.restore();
     if (!v.turretGone) this.turret(ctx, v, v.gun.e, v.gun.rx, true);
+    else {                                                        // open turret ring: blackened, glowing while it burns
+      const r = D.turretRing, w2 = D.track.width * 1.9;
+      ctx.fillStyle = '#120e0b'; ctx.beginPath(); ctx.ellipse(r[0], r[1] + 0.02, w2, 0.16, 0, 0, Math.PI * 2); ctx.fill();
+      if (v.burning) { const g = ctx.createRadialGradient(r[0], r[1], 0, r[0], r[1], w2); g.addColorStop(0, `rgba(255,120,40,${0.5 + 0.2 * Math.sin(this.w.time * 9)})`); g.addColorStop(1, 'rgba(255,90,20,0)');
+        ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(r[0], r[1] + 0.05, w2, 0.14, 0, 0, Math.PI * 2); ctx.fill(); }
+    }
     ctx.restore();
     if (v.turretBody) {
       const b = v.turretBody, r = D.turretRing;

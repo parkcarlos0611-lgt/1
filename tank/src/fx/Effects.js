@@ -1,7 +1,9 @@
 // Effect emitters driven by simulation state: track sand / rooster tail, turbine exhaust,
 // muzzle flash + blast dust + gun smoke + sabot petals, ground impacts.
 DS.Effects = class Effects {
-  constructor(world) { this.w = world; this.P = world.particles; this.flashes = []; this.labels = []; this.blasts = []; this.waves = []; this.acc = 0; this.shake = 0; }
+  constructor(world) {
+    world.particles.onLand = (x, y, sz, vx, vy) => this.landed(x, y, sz, vx, vy);
+    this.w = world; this.P = world.particles; this.flashes = []; this.labels = []; this.blasts = []; this.waves = []; this.acc = 0; this.shake = 0; }
   rnd(a, b) { return a + Math.random() * (b - a); }
   hex(s) { return parseInt(s.slice(1), 16); }
 
@@ -15,19 +17,36 @@ DS.Effects = class Effects {
     const e0 = fwd ? ends[0] : ends[1];
     const end = { lx: e0.x + (fwd ? -0.1 : 0.1), ly: e0.y - 0.4 };
     const ex = v.pos.x + c * end.lx - s * end.ly, ey = v.pos.y + s * end.lx + c * end.ly;
-    const rate = (Math.abs(v.vt) * 9 + v.stats.slip * 70) * soil.dust;
+    const vt = Math.abs(v.vt), rate = (vt * 16 + v.stats.slip * 90) * soil.dust;
     let n = rate * dt + Math.random();
-    const dir = fwd ? -1 : 1;
+    const dir = fwd ? -1 : 1, sc0 = this.hex(soil.col[0]);
+    // rooster tail: grains flung up and back off the trailing end, higher with speed
     while (n-- >= 1) {
-      const vv = Math.abs(v.vt) * this.rnd(0.2, 0.75) + v.stats.slip * 1.5;
-      P.add(K.GRAIN, ex + this.rnd(-0.3, 0.3), ey + this.rnd(0, 0.4), v.vel.x * 0.4 + dir * vv * 0.6, this.rnd(0.8, 2.2) + vv * 0.45,
-        this.rnd(0.5, 1.4), this.rnd(0.025, 0.06), { drag: 0.6, grav: 1, col: Math.random() < 0.5 ? sc : this.hex(soil.col[0]) });
+      const vv = vt * this.rnd(0.25, 0.8) + v.stats.slip * 1.6;
+      P.add(K.GRAIN, ex + this.rnd(-0.3, 0.3), ey + this.rnd(0, 0.5), v.vel.x * 0.35 + dir * vv * 0.55, this.rnd(1.2, 3) + vv * 0.6,
+        this.rnd(0.6, 1.6), this.rnd(0.03, 0.07), { drag: 0.55, grav: 1, col: Math.random() < 0.5 ? sc : sc0 });
     }
-    let nd = (speed * 2.2 + v.stats.slip * 14) * soil.dust * dt + Math.random() * 0.6 * Math.min(1, speed);
+    // dust tail: billows off the trailing end and along the hull; at speed it swallows the back of the vehicle
+    let nd = (speed * 7 + v.stats.slip * 20) * (0.4 + soil.dust) * dt + Math.random() * 0.6 * Math.min(1, speed);
     while (nd-- >= 1) {
-      const lx = this.rnd(-3.6, 3.4) * 0.6 + (fwd ? -1.4 : 1.4);
-      P.add(K.DUST, v.pos.x + c * lx, T.height(v.pos.x + c * lx) + this.rnd(0.1, 0.8), v.vel.x * 0.3 + dir * this.rnd(0, 1.5), this.rnd(0.2, 1),
-        this.rnd(2.5, 6), this.rnd(0.4, 0.9), { grow: this.rnd(0.35, 0.8), drag: 1.2, grav: 0.0, alpha: 0.22 * Math.min(1, speed / 6 + 0.15), col: sc });
+      const lx = (fwd ? -1 : 1) * this.rnd(1.2, 4.2) * (speed > 8 ? 1 : 0.7) + (fwd ? end.lx * 0.4 : end.lx * 0.4);
+      const x = v.pos.x + c * lx;
+      P.add(K.DUST, x, T.height(x) + this.rnd(0.2, 1.4) * (0.6 + speed / 15), v.vel.x * 0.25 + dir * this.rnd(0.5, 2.5), this.rnd(0.3, 1.4),
+        this.rnd(4, 9), this.rnd(0.9, 1.8) * (0.7 + speed / 20), { grow: this.rnd(0.7, 1.4), drag: 1.1, grav: 0, alpha: 0.55 * Math.min(1, speed / 6 + 0.1), col: Math.random() < 0.5 ? 0xeadcbf : sc0 });   // airborne dust reads paler than the sand
+    }
+    // hard braking or a sudden reversal: a lump of sand spills off the leading end
+    const dv = (v.vt - (v._vtPrev ?? v.vt)) / Math.max(1e-3, dt); v._vtPrev = v.vt;
+    if (Math.abs(dv) > 4 && vt > 1.5) {
+      const lead = fwd ? ends[1] : ends[0], q = v.local(lead.x + (fwd ? 0.2 : -0.2), lead.y - 0.3);
+      for (let i = 0; i < Math.min(14, Math.abs(dv)); i++) P.add(K.GRAIN, q.x, q.y, v.vel.x + (fwd ? 1 : -1) * this.rnd(1, 4), this.rnd(0.5, 2.5), this.rnd(0.5, 1.2), this.rnd(0.04, 0.08), { drag: 0.5, col: sc });
+      if (Math.random() < 0.5) P.add(K.DUST, q.x, q.y, v.vel.x * 0.5, this.rnd(0.3, 1), this.rnd(3, 6), 0.8, { grow: 0.8, drag: 1.2, grav: 0, alpha: 0.3, col: sc });
+    }
+    // cresting: when an end of the track lifts off the sand, what clung to it pours off
+    for (const k of [0, v.st.length - 1]) {
+      const w = v.st[k];
+      if (!w.contact && vt > 1 && Math.random() < dt * 25) {
+        P.add(K.GRAIN, w.wx + this.rnd(-0.3, 0.3), w.wy - D.wheelR, v.vel.x * 0.8, this.rnd(-0.5, 0.5), this.rnd(0.6, 1.2), this.rnd(0.03, 0.06), { drag: 0.3, col: sc });
+      }
     }
     // exhaust: AGT1500 turbine = hot shimmer blowing rearward; diesel = dark puffs under load
     const xh = v.pos.x + c * G.exhaust.x - s * G.exhaust.y, yh = v.pos.y + s * G.exhaust.x + c * G.exhaust.y;
@@ -61,7 +80,7 @@ DS.Effects = class Effects {
         { grow: 2, drag: 2, grav: 0, alpha: 0.9, col: 0xffa040 });
       if (Math.random() < 0.5) P.add(K.DARK, p.x, p.y + 2, this.rnd(-1, 1), this.rnd(3, 6), this.rnd(5, 9), 0.8, { grow: 1.1, drag: 0.8, grav: -0.03, alpha: 0.4, col: 0x2a2724 });
     }
-    for (const e of v.events) { if (e.type === 'fire') this.muzzle(v, e); else if (e.type === 'mg') this.mgFire(v, e); else if (e.type === 'tow') this.towLaunch(v, e); else if (e.type === 'explode') this.explode(v); }
+    for (const e of v.events) { if (e.type === 'fire') this.muzzle(v, e); else if (e.type === 'mg') this.mgFire(v, e); else if (e.type === 'tow') this.towLaunch(v, e); else if (e.type === 'explode') this.explode(v); else if (e.type === 'pillar') this.pillar(v); else if (e.type === 'turretLand') this.turretLand(e); }
     v.events.length = 0;
   }
 
@@ -83,9 +102,28 @@ DS.Effects = class Effects {
       while (m-- >= 0 && Math.random() < 0.9) P.add(K.FIRE, e.x + this.rnd(-0.8, 0.8), e.y, this.rnd(-0.5, 0.5), this.rnd(1.5, 4), this.rnd(0.2, 0.5), this.rnd(0.25, 0.5),
         { grow: 0.6, drag: 1.5, grav: -0.1, alpha: 0.8, col: 0xff8a30 });
     }
-    let m = 9 * f * dt + Math.random() * 0.4;
-    while (m-- >= 1) P.add(K.DARK, p.x + this.rnd(-0.6, 0.6), p.y + 1.0, this.rnd(-0.4, 0.4), this.rnd(3, 6), this.rnd(10, 18), this.rnd(0.6, 1.0),
-      { grow: this.rnd(0.45, 0.9), drag: 0.35, grav: -0.02, alpha: 0.42, col: Math.random() < 0.5 ? 0x201d1a : 0x37322d });
+    // thick black smoke: big rolling lumps that keep coming, leaning over in the wind as they climb
+    let m = 14 * f * surge * dt + Math.random() * 0.4;
+    while (m-- >= 1) P.add(K.DARK, p.x + this.rnd(-0.8, 0.8), p.y + this.rnd(0.6, 1.6), this.rnd(-0.4, 0.4), this.rnd(2.5, 5.5), this.rnd(14, 26), this.rnd(0.9, 1.7),
+      { grow: this.rnd(0.7, 1.3), drag: 0.32, grav: -0.03, alpha: 0.58, col: Math.random() < 0.45 ? 0x1a1816 : Math.random() < 0.6 ? 0x2c2825 : 0x45403a });
+    // fuel and rubber burning low down: flames lick out between the road wheels
+    if (age > 3) {
+      let r = 10 * f * dt;
+      while (r-- >= 0 && Math.random() < 0.9) {
+        const w = v.st[(Math.random() * v.st.length) | 0];
+        P.add(K.FIRE, w.wx + this.rnd(-0.4, 0.4), w.wy + this.rnd(-0.1, 0.3), this.rnd(-0.4, 0.4), this.rnd(1, 3), this.rnd(0.2, 0.45), this.rnd(0.25, 0.5),
+          { grow: 0.7, drag: 1.5, grav: -0.1, alpha: 0.75, col: Math.random() < 0.5 ? 0xff7a28 : 0xffb050 });
+        if (Math.random() < 0.3) P.add(K.DARK, w.wx, w.wy + 0.6, this.rnd(-0.3, 0.3), this.rnd(1.5, 3), this.rnd(8, 14), 0.6, { grow: 0.7, drag: 0.4, grav: -0.03, alpha: 0.45, col: 0x221f1c });
+      }
+    }
+    // the thrown turret burns too
+    const tb = v.turretBody;
+    if (tb && v.burning < 90) {
+      const k2 = Math.max(0, 1 - v.burning / 90);
+      if (Math.random() < 14 * k2 * dt) P.add(K.FIRE, tb.x + this.rnd(-0.6, 0.6), tb.y + this.rnd(0, 0.4), this.rnd(-0.4, 0.4), this.rnd(1, 3), this.rnd(0.2, 0.5), this.rnd(0.25, 0.5),
+        { grow: 0.6, drag: 1.5, grav: -0.1, alpha: 0.75, col: 0xff8a30 });
+      if (Math.random() < 6 * k2 * dt) P.add(K.DARK, tb.x, tb.y + 0.8, this.rnd(-0.3, 0.3), this.rnd(2, 4), this.rnd(10, 18), this.rnd(0.6, 1.1), { grow: 0.8, drag: 0.35, grav: -0.03, alpha: 0.5, col: 0x26221f });
+    }
     if (v.wreck && Math.random() < dt * 0.6) {
       for (let i = 0; i < 16; i++) { const a = this.rnd(0.3, 2.8), sp = this.rnd(5, 20);
         P.add(K.FIRE, p.x, p.y + 0.5, Math.cos(a) * sp, Math.sin(a) * sp, this.rnd(0.1, 0.3), this.rnd(0.2, 0.5), { grow: 2, drag: 4, grav: 0.2, alpha: 1, col: 0xffb050 }); }
@@ -233,30 +271,41 @@ DS.Effects = class Effects {
     DS.Audio.gun(e.x, e.y, parseInt((v.def.gun.name.match(/(\d+)mm/) || [0, 120])[1]));
     this.flashes.push({ x: e.x, y: e.y, dx: e.dx, dy: e.dy, t: 0, ttl: 0.085 });
     this.shake = Math.max(this.shake, 0.6);
-    // muzzle fireball (secondary flash)
-    for (let i = 0; i < 18; i++) {
-      const sp = this.rnd(4, 40), a = Math.atan2(e.dy, e.dx) + this.rnd(-0.6, 0.6);
-      P.add(K.FIRE, e.x + e.dx * this.rnd(0, 1.5), e.y + e.dy * this.rnd(0, 1.5), Math.cos(a) * sp, Math.sin(a) * sp, this.rnd(0.05, 0.14), this.rnd(0.4, 1.1),
-        { grow: 4, drag: 14, grav: 0, alpha: 0.9, col: 0xffa040 });
+    const big = v.def.gun.recoilMass > 1500 ? 1 : 0.55, ang = Math.atan2(e.dy, e.dx), sc = this.hex(T.soilAt(e.x).col[1]), sc2 = this.hex(T.soilAt(e.x).col[0]);
+    // secondary flash: the propellant gases re-ignite a few metres ahead as a big round fireball
+    this.flashes.push({ x: e.x + e.dx * 3.5 * big, y: e.y + e.dy * 3.5 * big, dx: 0, dy: 1, t: 0, ttl: 0.16, boom: true, big: big > 0.9 });
+    for (let i = 0; i < 46 * big; i++) {
+      const d = this.rnd(0.5, 6.5) * big, a = this.rnd(0, Math.PI * 2), r = this.rnd(0, 1.6) * big, sp = this.rnd(2, 9);
+      P.add(K.FIRE, e.x + e.dx * d + Math.cos(a) * r, e.y + e.dy * d + Math.sin(a) * r, Math.cos(a) * sp + e.dx * 12, Math.sin(a) * sp + e.dy * 12,
+        this.rnd(0.14, 0.32), this.rnd(0.9, 2.0) * big, { grow: 5, drag: 9, grav: 0, alpha: 0.42, col: Math.random() < 0.3 ? 0xffd890 : Math.random() < 0.6 ? 0xffa548 : 0xe8702a });
     }
-    // gun smoke: forward jet decelerating, then drifting
-    for (let i = 0; i < 46; i++) {
-      const f = this.rnd(0, 1), sp = 4 + 55 * f * f, a = Math.atan2(e.dy, e.dx) + this.rnd(-0.35, 0.35) * (1.2 - f);
-      P.add(K.SMOKE, e.x, e.y, Math.cos(a) * sp + this.rnd(-2, 2), Math.sin(a) * sp + this.rnd(-2, 2), this.rnd(3, 7), this.rnd(0.3, 0.7),
-        { grow: this.rnd(0.5, 1.1), drag: 3.2, grav: -0.015, alpha: 0.38, col: 0xd9d6cf });
+    // the fireball turns into a big pale cloud of gun smoke ahead of the muzzle that lingers and drifts
+    for (let i = 0; i < 70 * big; i++) {
+      const d = this.rnd(0, 11) * big, a = this.rnd(0, Math.PI * 2), r = this.rnd(0, 2.2) * big * Math.min(1, 0.3 + d / 6), sp = this.rnd(1, 7);
+      P.add(K.SMOKE, e.x + e.dx * d + Math.cos(a) * r, e.y + e.dy * d + Math.sin(a) * r, Math.cos(a) * sp + e.dx * (14 - d), Math.sin(a) * sp + this.rnd(0, 1.5),
+        this.rnd(5, 11), this.rnd(0.7, 1.6) * big, { grow: this.rnd(0.6, 1.3), drag: 2.4, grav: -0.02, alpha: 0.42, col: Math.random() < 0.5 ? 0xe2ddd2 : 0xd6c8ae });
     }
-    // side blast ring (ring-shaped muzzle brake-less 120 mm still throws a radial cloud)
-    for (let i = 0; i < 20; i++) {
+    // side blast: a ring of smoke pushed out around the muzzle
+    for (let i = 0; i < 26 * big; i++) {
       const a = this.rnd(0, Math.PI * 2), sp = this.rnd(8, 22);
-      P.add(K.SMOKE, e.x, e.y, Math.cos(a) * sp, Math.sin(a) * sp, this.rnd(1.5, 3), 0.35, { grow: 0.7, drag: 4, grav: 0, alpha: 0.25, col: 0xcfc9bf });
+      P.add(K.SMOKE, e.x, e.y, Math.cos(a) * sp, Math.sin(a) * sp, this.rnd(2, 4), 0.45 * big, { grow: 0.9, drag: 4, grav: 0, alpha: 0.3, col: 0xcfc9bf });
     }
-    // blast wave: overpressure runs out at the speed of sound and lifts the sand it passes over —
-    // mostly ahead of the muzzle, so the shooter's own dust screen rises in front of the sight
-    this.blast(e.x, e.y, (v.def.gun.recoilMass > 1500 ? 1 : 0.35), e.dx, e.dy);
+    // overpressure sweeps the sand under and ahead of the gun: a ring of dust 2-4 m high running outward
+    const gy = T.height(e.x), hgt = e.y - gy;
+    if (hgt < 6) {
+      const k = (6 - hgt) / 6 * big;
+      for (let i = 0; i < 90 * k; i++) {
+        const x = e.x + this.rnd(-5, 16) * big, away = Math.sign(x - e.x + 0.5), near = 1 - Math.min(1, Math.abs(x - e.x - 4) / 14);
+        P.add(K.DUST, x, T.height(x) + this.rnd(0, 0.5), away * this.rnd(3, 14) * (0.5 + near), this.rnd(1.5, 5) * (0.4 + near),
+          this.rnd(4, 9), this.rnd(0.7, 1.6), { grow: this.rnd(0.7, 1.4), drag: 1.4, grav: 0, alpha: 0.32 + 0.12 * near, col: Math.random() < 0.6 ? sc : sc2 });
+        if (i % 2 === 0) P.add(K.GRAIN, x, T.height(x) + 0.05, away * this.rnd(3, 10), this.rnd(2.5, 7) * (0.4 + near), this.rnd(0.5, 1.2), 0.05, { drag: 0.4, col: sc });
+      }
+    }
+    this.blast(e.x, e.y, big > 0.9 ? 1.6 : 0.35, e.dx, e.dy);
     // sabot petals peel off in the first metres
     if (e.ammo.sabot) for (let i = 0; i < 3; i++) {
       const a = Math.atan2(e.dy, e.dx) + (i - 1) * 0.06 + this.rnd(-0.02, 0.02), sp = this.rnd(250, 600);
-      P.add(K.DEBRIS, e.x + e.dx * 3, e.y + e.dy * 3, Math.cos(a) * sp, Math.sin(a) * sp, 3, 0.12, { drag: 0.9, grav: 1 });
+      P.add(K.DEBRIS, e.x + e.dx * 3, e.y + e.dy * 3, Math.cos(a) * sp, Math.sin(a) * sp + this.rnd(2, 8), 4, 0.25, { drag: 1.6, grav: 1, sabot: 1 });
     }
   }
 
@@ -309,6 +358,33 @@ DS.Effects = class Effects {
       const x = cam.left + Math.random() * span, h = this.w.terrain.height(x);
       P.add(K.GRAIN, x, h + this.rnd(0, 3), wind * this.rnd(1, 1.6), this.rnd(0, 1.5), this.rnd(0.6, 1.4), this.rnd(0.03, 0.06), { drag: 0.8, grav: 0.3, col: 0xd6b07a });
     }
+  }
+
+  // flame pillar straight up out of the open turret ring as the turret leaves
+  pillar(v) {
+    const P = this.P, K = DS.P, p = v.local(v.g.ring.x, v.g.ring.y);
+    for (let i = 0; i < 90; i++) { const sp = this.rnd(10, 32), a = Math.PI / 2 + v.ang + this.rnd(-0.12, 0.12);
+      P.add(K.FIRE, p.x + this.rnd(-0.6, 0.6), p.y + this.rnd(0, 2), Math.cos(a) * sp, Math.sin(a) * sp, this.rnd(0.3, 0.8), this.rnd(0.7, 1.5),
+        { grow: 2.2, drag: 1.4, grav: -0.05, alpha: 0.7, col: Math.random() < 0.4 ? 0xffd890 : 0xff8a30 }); }
+    for (let i = 0; i < 25; i++) P.add(K.DARK, p.x + this.rnd(-1, 1), p.y + this.rnd(4, 14), this.rnd(-1, 1), this.rnd(3, 7), this.rnd(12, 20), this.rnd(1.2, 2.2),
+      { grow: 1, drag: 0.4, grav: -0.03, alpha: 0.55, col: 0x1e1b18 });
+  }
+  // a thrown turret hitting the ground: sand thrown up, a dust cloud, a dull thud
+  turretLand(e) {
+    const P = this.P, K = DS.P, T = this.w.terrain, sc = this.hex(T.soilAt(e.x).col[1]), k = Math.min(1.5, e.v / 10);
+    DS.Audio.ground(e.x, e.y, false);
+    for (let i = 0; i < 50 * k; i++) { const a = Math.PI / 2 + this.rnd(-1.1, 1.1), sp = this.rnd(2, 9) * k;
+      P.add(K.GRAIN, e.x + this.rnd(-1, 1), e.y + 0.1, Math.cos(a) * sp, Math.sin(a) * sp, this.rnd(0.6, 1.4), this.rnd(0.04, 0.09), { drag: 0.4, col: sc }); }
+    for (let i = 0; i < 14 * k; i++) P.add(K.DUST, e.x + this.rnd(-1.5, 1.5), e.y + this.rnd(0.2, 1), this.rnd(-3, 3), this.rnd(0.5, 2.5), this.rnd(4, 8), this.rnd(0.8, 1.5),
+      { grow: 0.9, drag: 1.2, grav: 0, alpha: 0.4, col: 0xe2d3b4 });
+    this.shake = Math.max(this.shake, Math.max(0, 0.4 - Math.abs(e.x - this.w.cam.x) / 200));
+  }
+  // debris (sabot petals, fragments, a thrown turret's bits) hitting the sand: a small puff and spray
+  landed(x, y, sz, vx, vy) {
+    const P = this.P, K = DS.P, sc = this.hex(this.w.terrain.soilAt(x).col[1]), e = Math.min(1, Math.abs(vy) / 15) * Math.min(2, sz * 6);
+    if (e < 0.05) return;
+    for (let i = 0; i < 6 * e; i++) P.add(K.GRAIN, x, y + 0.05, vx * 0.2 + this.rnd(-2, 2), this.rnd(1, 4) * e, this.rnd(0.4, 0.9), 0.04, { drag: 0.5, col: sc });
+    P.add(K.DUST, x, y + 0.2, vx * 0.1, this.rnd(0.3, 1), this.rnd(2, 4), 0.35 + 0.4 * e, { grow: 0.6, drag: 1.5, grav: 0, alpha: 0.3, col: sc });
   }
 
   // ---- blast waves (E7) ----

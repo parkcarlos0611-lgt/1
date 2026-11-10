@@ -421,25 +421,41 @@ DS.Vehicle = class Vehicle {
     this.kick = { x: p.x + (Math.random() - 0.5), y: p.y, fx: (Math.random() - 0.5) * 2e6, fy: 6e6 };
     this.setStatus();
   }
-  tossTurret() {
+  // Turret thrown by the cook-off: the more charges go up at once (carousel autoloader), the higher it flies and
+  // the harder it spins. It lands with a thump, digs a scar, bounces, tumbles or slides to rest; a gun tube that
+  // ends up pointing at the ground is left stuck in the sand.
+  tossTurret(world) {
     const r = this.local(this.g.ring.x, this.g.ring.y);
-    const up = 9 + Math.random() * 9;
+    const carousel = this.def.modules.some(m => m.type === 'ammo_carousel');
+    const up = (carousel ? 13 : 8) + Math.random() * (carousel ? 9 : 6);
     this.turretGone = true;
-    const side = (Math.random() < 0.5 ? -1 : 1) * (3.5 + Math.random() * 4);   // thrown clear of the hull
+    const side = (Math.random() < 0.5 ? -1 : 1) * (3 + Math.random() * 5);
     this.turretBody = { x: r.x, y: r.y, a: this.ang, e: this.gun.e, vx: this.vel.x + side, vy: up,
-      w: (Math.random() - 0.5) * 5, rest: false };
+      w: (Math.random() - 0.5) * (carousel ? 9 : 5), rest: false, bounces: 0 };
+    this.events.push({ type: 'pillar' });                         // flame pillar out of the open ring
   }
   stepTurretBody(dt) {
-    const b = this.turretBody;
+    const b = this.turretBody, T = this.terrain;
     if (b.rest) return;
     b.vy -= DS.T.g * dt; b.x += b.vx * dt; b.y += b.vy * dt; b.a += b.w * dt;
-    const h = this.terrain.height(b.x);
-    if (b.y < h + 0.25 && b.vy < 0) {
-      b.y = h + 0.25; b.vy *= -0.25; b.vx *= 0.5; b.w *= 0.4;
-      const gnd = Math.atan(this.terrain.slope(b.x));
-      // settle roughly upright or upside down, whichever is closer
-      let t = b.a - gnd; t = Math.atan2(Math.sin(t), Math.cos(t));
-      if (Math.abs(b.vy) < 1.2) { b.rest = true; b.vy = b.vx = b.w = 0; b.a = gnd + (Math.abs(t) > Math.PI / 2 ? Math.PI : 0); this.terrain.crater(b.x, 1.2, 0.25, 0.4, 0); }
+    const h = T.height(b.x);
+    if (b.y < h + 0.35 && b.vy < 0) {
+      const impact = -b.vy;
+      b.y = h + 0.35; b.bounces++;
+      if (impact > 3) this.events.push({ type: 'turretLand', x: b.x, y: h, v: impact });
+      if (impact > 4) T.crater(b.x, 0.8 + impact * 0.04, Math.min(0.35, impact * 0.02), 0.5, 0.3);
+      b.vy = impact * 0.22; b.vx *= 0.55; b.w = b.w * 0.5 + b.vx * 0.25;     // tumbles along the way it slides
+      const gnd = Math.atan(T.slope(b.x));
+      if (impact < 2.2 || b.bounces > 4) {
+        b.rest = true; b.vy = b.vx = b.w = 0;
+        let t = b.a - gnd; t = Math.atan2(Math.sin(t), Math.cos(t));
+        const flip = Math.abs(t) > Math.PI / 2 ? Math.PI : 0;
+        b.a = gnd + flip + (Math.random() - 0.5) * 0.3;            // resting on its roof or its ring, a little canted
+        // muzzle end pointing down into the sand: the tube digs in
+        const tip = this.dir * Math.cos(b.a) * 4, tipY = Math.sin(b.a) * this.dir * 4;
+        if (tipY < -0.6) T.crater(b.x + tip, 0.4, 0.3, 0.4, 0);
+        T.relax(undefined, undefined, 6);
+      }
     }
   }
   stepDamage(dt, world) {

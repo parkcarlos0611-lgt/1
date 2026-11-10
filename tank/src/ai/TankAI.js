@@ -14,6 +14,25 @@ DS.AI = {
     }
     return true;
   },
+  // how much of the line from a to b passes through burning wrecks' smoke plumes (0 clear … 1 solid).
+  // A plume rises from the fire and leans downwind; it is modelled as a slanted band a few metres wide.
+  smoke(world, a, b) {
+    const o = a.sightOrigin(), t = b.local(b.g.ring.x, b.g.ring.y + 0.4);
+    let ob = 0;
+    for (const v of world.vehicles) {
+      if (!(v.burning > 1) || v === a || v === b) continue;
+      const f = v.fireSource(), lean = world.wind * 0.6;
+      const x0 = Math.min(o.x, t.x), x1 = Math.max(o.x, t.x);
+      for (let hgt = 1; hgt < 40; hgt += 3) {                       // plume centre at each height
+        const px = f.x + lean * hgt * 0.5, py = f.y + hgt;
+        if (px < x0 || px > x1) continue;
+        const ly = o.y + (t.y - o.y) * (px - o.x) / ((t.x - o.x) || 1e-6);
+        const half = 1.5 + hgt * 0.15;
+        if (Math.abs(ly - py) < half) { ob += Math.min(1, v.burning / 6) * 0.8 * (1 - hgt / 50); break; }
+      }
+    }
+    return Math.min(1, ob);
+  },
   gauss(r) { return (r() + r() + r() + r() - 2) * 1.22; },
 };
 

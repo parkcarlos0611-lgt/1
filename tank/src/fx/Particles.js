@@ -28,14 +28,16 @@ DS.Particles = class Particles {
       const k = this.kind[i], dr = this.drag[i];
       // drag toward wind velocity
       const f = Math.min(1, dr * dt);
-      this.vx[i] += (wind - this.vx[i]) * f; this.vy[i] += (0 - this.vy[i]) * f;
+      // wind picks up with height: smoke columns lean over as they rise
+      const wk = (k === DS.P.DARK || k === DS.P.SMOKE) ? 1 + Math.max(0, this.y[i] - terrain.height(this.x[i])) / 12 : 1;
+      this.vx[i] += (wind * wk - this.vx[i]) * f; this.vy[i] += (0 - this.vy[i]) * f;
       this.vy[i] -= g * this.grav[i] * dt;
       this.x[i] += this.vx[i] * dt; this.y[i] += this.vy[i] * dt;
       this.size[i] += this.grow[i] * dt;
       if (k === DS.P.GRAIN || k === DS.P.DEBRIS) {
         const h = terrain.height(this.x[i]);
         if (this.y[i] < h) {
-          if (k === DS.P.DEBRIS && this.vy[i] < -2) { this.vy[i] *= -0.25; this.vx[i] *= 0.5; this.y[i] = h; }
+          if (k === DS.P.DEBRIS && this.vy[i] < -2) { if (this.onLand) this.onLand(this.x[i], h, this.size[i], this.vx[i], this.vy[i]); this.vy[i] *= -0.25; this.vx[i] *= 0.5; this.y[i] = h; }
           else { if (this.mass[i]) terrain.deposit(this.x[i], this.mass[i]); this.kill(i); i--; continue; }
         }
       } else if (k === DS.P.DUST || k === DS.P.SMOKE || k === DS.P.DARK) {

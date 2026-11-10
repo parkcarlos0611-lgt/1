@@ -46,6 +46,28 @@ hull &= ~poly([(702, 362), (752, 322), (790, 322), (790, 362)])      # front: tr
 hull &= ~poly([(0, 328), (52, 328), (68, 362), (0, 362)])            # rear: track under the ramp
 save('hull', hull)
 
+# TOW launcher: from the LEFT-side drawing, mirrored and aligned onto this frame (offset found by matching
+# the wheel band). Seen from the right it sits behind the turret; the game draws it behind the turret sprite
+# so only the part raised above the roof shows, plus an X-ray outline of the hidden part.
+srcL = ImageOps.mirror(Image.open(os.path.join(ROOT, 'assets/ref/m2a2_views.png')).convert('RGB').crop((77, 0, 867, 450)))
+imL = np.asarray(srcL).astype(np.int16)
+rgbaL = np.dstack([imL.astype(np.uint8), flood(imL)])
+tm = (xx >= 259) & (xx <= 389) & (yy >= 144) & (yy < 200)
+a = rgbaL.copy(); a[~tm] = 0
+ys, xs = np.nonzero(a[..., 3]); x0, x1, y0, y1 = xs.min(), xs.max() + 1, ys.min(), ys.max() + 1
+Image.fromarray(a[y0:y1, x0:x1]).save(os.path.join(OUT, 'tow.png'))
+info['tow'] = {'x': int(x0), 'y': int(y0), 'w': int(x1 - x0), 'h': int(y1 - y0)}
+# X-ray version: silhouette edge (2 px) + the drawing's own ink lines, cyan on clear
+t = a[y0:y1, x0:x1]; al = t[..., 3] >= 128
+inside = al.copy()
+for _ in range(3):
+    e = inside.copy(); e[1:] &= inside[:-1]; e[:-1] &= inside[1:]; e[:, 1:] &= inside[:, :-1]; e[:, :-1] &= inside[:, 1:]; inside = e
+edge = al & ~inside
+ink = al & (t[..., :3].astype(int).sum(axis=2) < 260)
+xr = np.zeros_like(t); xr[..., 0], xr[..., 1], xr[..., 2] = 40, 225, 255
+xr[..., 3] = np.where(edge, 255, np.where(ink, 170, 0))
+Image.fromarray(xr).save(os.path.join(OUT, 'tow_xray.png'))
+
 # running gear sheet: three groups (road wheel, idler, sprocket); the first (face-on) view of each
 ws = np.asarray(Image.open(os.path.join(ROOT, 'assets/ref/m2a2_wheels.png')).convert('RGB')).astype(np.int16)
 wa = np.dstack([ws.astype(np.uint8), flood(ws)])

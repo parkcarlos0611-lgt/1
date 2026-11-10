@@ -14,6 +14,7 @@ DS.VEHICLES = DS.VEHICLES || {};
     src: { ppm: PPM, ox: OX, oy: OY, dir: 'assets/sprites/m2a2/' },
     sprites: {
       hull: { x: 12, y: 188 }, turret: { x: 173, y: 92 }, barrel: { x: 447, y: 159 },
+      tow: { x: 259, y: 144, file: 'tow' },   // from the left-side drawing; sits behind the turret in this view
       roadwheel: { r: 256, file: 'roadwheel' }, idler: { file: 'idler' },
       sprocket: { file: 'sprocket', R: 0.30, tooth0: 7 },          // 13 teeth
     },
@@ -35,8 +36,9 @@ DS.VEHICLES = DS.VEHICLES || {};
       elevMax: 60, elevMin: -10, rate: 1.0, recoilLen: 0.04, recoilMass: 110, reload: 0.3,   // 200 rounds/min
       recoilK: 6400, recoilC: 140, stabilized: true },
     coax: { name: 'M240C 7.62mm 동축', ammo: 'M240_762', muzzle: L(452, 178), rate: 750 / 60, rounds: 2200, spread: 0.7 },
-    // twin TOW launcher on the far (left) side of the turret: hidden in this view, drawn as an X-ray overlay
-    tow: { ammo: 'TOW2', c: L(322, 172), len: 1.25, h: 0.46, lift: 0.42, loaded: 2, reserve: 5, reloadTime: 25, raise: 1.2, range: 3750 },
+    // twin TOW launcher on the far (left) side of the turret: hidden behind it when stowed; raised, its top
+    // shows over the roof and the hidden part is drawn as an X-ray outline. Pivots at its rear lower corner.
+    tow: { ammo: 'TOW2', c: L(324, 172), pivotPx: [259, 200], len: 1.25, h: 0.46, lift: 0.42, loaded: 2, reserve: 5, reloadTime: 25, raise: 1.2, range: 3750 },
     turretRing: L(310, 200),
     antennas: [{ x: L(189, 140)[0], y: L(189, 140)[1], len: 1.15 }, { x: L(93, 188)[0], y: L(93, 188)[1], len: 1.3 }],
     sight: { laser: true, thermal: true, rangeErr: 0.005, aimErr: 0.15, layTime: 2.5, detectMax: 4000, engageMax: 3500 },

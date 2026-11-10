@@ -12,6 +12,7 @@ DS.Renderer = class Renderer {
     const names = new Set(['hull', 'turret', 'barrel', Sp.roadwheel.file, Sp.idler.file]);
     if (Sp.flag) names.add(Sp.flag.file);
     if (Sp.m2) names.add(Sp.m2.file);
+    if (Sp.tow) { names.add(Sp.tow.file); names.add(Sp.tow.file + '_xray'); }   // outline made by tools/cut_bradley.py
     if (!Sp.sprocket.procedural) names.add('sprocket');
     else { const c = this.makeSprocket(def); this.img[id].sprocket = c; this.mips[id + '/sprocket'] = this.buildMips(c); }
     return Promise.all([...names].map(n => new Promise((res, rej) => {
@@ -259,39 +260,6 @@ DS.Renderer = class Renderer {
   vehicle(ctx, v, cam) {
     if (v.scorch.length || v.burning) this.charred(ctx, v, cam);
     else this.drawVehicle(ctx, v, cam);
-    const t = v.tow;
-    if (!v.turretGone && ((this.w.xray && v === this.w.vehicles[0]) || (t && t.up > 0 && t.up < 1) || (t && t.missile))) this.xray(ctx, v, cam, this.w.xray && v === this.w.vehicles[0]);
-  }
-
-  // X-ray overlay: what the side view hides — the TOW launcher on the far side of the turret (it rises and
-  // follows the gun), and with the view switched on, the crew, ammunition, fuel and engine
-  xray(ctx, v, cam, full) {
-    const D = v.def, lw = Math.max(0.02, 1.4 / cam.zoom);
-    ctx.save(); ctx.translate(v.pos.x, v.pos.y); ctx.rotate(v.ang); ctx.scale(v.dir, 1);
-    ctx.lineWidth = lw; ctx.lineJoin = 'round';
-    if (full) {
-      const col = { crew: '120,220,255', ammo: '255,120,90', ammo_bustle: '255,120,90', ammo_carousel: '255,120,90', fuel_ammo: '255,150,80', fuel: '255,200,90', engine: '190,190,200', gun: '200,255,160', optics: '200,255,160' };
-      for (const m of D.modules) {
-        const c = col[m.type] || '255,255,255', dead = v.modState[m.id];
-        ctx.fillStyle = `rgba(${dead ? '90,90,90' : c},0.28)`; ctx.strokeStyle = `rgba(${dead ? '90,90,90' : c},0.95)`;
-        ctx.beginPath(); ctx.arc(m.p[0], m.p[1], m.r, 0, 7); ctx.fill(); ctx.stroke();
-        if (m.type === 'crew') { ctx.beginPath(); ctx.arc(m.p[0], m.p[1] + m.r * 0.35, m.r * 0.3, 0, 7); ctx.stroke(); }
-      }
-    }
-    if (D.tow) {
-      const T = D.tow, t = v.tow, w = T.len, h = T.h;
-      ctx.translate(T.c[0], T.c[1] + T.lift * t.up); ctx.rotate(v.gun.e * t.up);
-      ctx.fillStyle = 'rgba(120,230,255,0.22)'; ctx.strokeStyle = 'rgba(140,235,255,0.95)';
-      ctx.beginPath(); ctx.rect(-w / 2, -h / 2, w, h); ctx.fill(); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(-w / 2, 0); ctx.lineTo(w / 2, 0); ctx.stroke();                 // two tubes, one above the other
-      for (const k of [-1, 1]) {
-        const loaded = t.loaded >= (k < 0 ? 2 : 1);
-        if (loaded) { ctx.fillStyle = 'rgba(255,190,90,0.55)'; ctx.fillRect(-w / 2 + 0.08, k * h / 4 - 0.06, w - 0.25, 0.12); }
-        ctx.beginPath(); ctx.ellipse(w / 2, k * h / 4, 0.04, h / 4 - 0.02, 0, 0, 7); ctx.stroke();
-      }
-      ctx.beginPath(); ctx.moveTo(-w * 0.2, -h / 2); ctx.lineTo(-w * 0.2, -h / 2 - T.lift * t.up); ctx.stroke();   // lift arm
-    }
-    ctx.restore();
   }
 
   // Damaged vehicle: drawn to an offscreen layer, then char marks are painted 'source-atop' so they
@@ -412,7 +380,27 @@ DS.Renderer = class Renderer {
     }
     ctx.drawImage(I.barrel, Sp.barrel.x - tpx, Sp.barrel.y - tpy);
     ctx.restore();
-    ctx.save(); ctx.scale(px, -px); ctx.drawImage(I.turret, Sp.turret.x - S.ox, Sp.turret.y - S.oy);
+    ctx.save(); ctx.scale(px, -px);
+    const tw = Sp.tow && v.tow, tt = Sp.turret;
+    // TOW launcher on the far side: drawn first, so the turret hides all of it but what rises above the roof
+    const towPose = c => {             // raise on the lift arm, then follow the gun's elevation (pivot: rear lower corner)
+      const T = D.tow, up = v.tow.up, pv = T.pivotPx;
+      c.translate(pv[0], pv[1] - T.lift * S.ppm * up); c.rotate(-e * up); c.translate(-pv[0], -pv[1]);
+    };
+    if (tw) { ctx.save(); ctx.translate(-S.ox, -S.oy); towPose(ctx); ctx.drawImage(I[Sp.tow.file], Sp.tow.x, Sp.tow.y); ctx.restore(); }
+    ctx.drawImage(I.turret, tt.x - S.ox, tt.y - S.oy);
+    // X-ray: the launcher's outline where the turret covers it (raised, moving, guiding, or Z held on)
+    if (tw && I[Sp.tow.file + '_xray'] && (v.tow.up > 0 || v.tow.missile || (this.w.xray && v === this.w.vehicles[0]))) {
+      const im = I.turret, oc = this.xo || (this.xo = document.createElement('canvas'));
+      if (oc.width !== im.width || oc.height !== im.height) { oc.width = im.width; oc.height = im.height; }
+      const o = oc.getContext('2d');
+      o.setTransform(1, 0, 0, 1, 0, 0); o.globalCompositeOperation = 'source-over'; o.clearRect(0, 0, oc.width, oc.height);
+      o.translate(-tt.x, -tt.y); towPose(o); o.drawImage(I[Sp.tow.file + '_xray'], Sp.tow.x, Sp.tow.y);
+      o.setTransform(1, 0, 0, 1, 0, 0); o.globalCompositeOperation = 'destination-in'; o.drawImage(im, 0, 0);
+      o.globalCompositeOperation = 'source-over';
+      const pulse = 0.85 + 0.15 * Math.sin(this.w.time * 6);
+      ctx.globalAlpha = pulse; ctx.drawImage(oc, tt.x - S.ox, tt.y - S.oy); ctx.drawImage(oc, tt.x - S.ox, tt.y - S.oy); ctx.globalAlpha = 1;
+    }
     if (Sp.m2 && v.mg) {                    // commander's M2 on its mount, at its own elevation / arc
       const m = v.mg, pv = D.mg.pivotPx; ctx.save(); ctx.translate(pv[0] - S.ox, pv[1] - S.oy);
       if (m.side < 0) ctx.scale(-1, 1); ctx.rotate(-m.el);

@@ -57,6 +57,56 @@ DS.Renderer = class Renderer {
     while (i + 1 < m.length && m[i + 1].width >= screenW) i++;
     return m[i];
   }
+  makeStreaks() {                      // horizontal wind streaks, light and dark, laid flat (screen-space texture)
+    const c = document.createElement('canvas'); c.width = 512; c.height = 64; const x = c.getContext('2d'), r = DS.rng(17);
+    for (let i = 0; i < 140; i++) {
+      const y = Math.floor(r() * 64), w = 30 + r() * 220, px = r() * 512, l = r() < 0.5;
+      x.fillStyle = l ? `rgba(255,236,200,${0.10 + r() * 0.14})` : `rgba(90,60,30,${0.08 + r() * 0.12})`;
+      for (const o of [0, -512]) x.fillRect(px + o, y, w, 1);
+    }
+    return c;
+  }
+  // pebbles, stones and dry scrub lying on the ground plane. Each has a depth d (0 = at the surface line, far;
+  // 1 = close to us): closer ones sit lower on screen, are bigger, and slide past faster (parallax).
+  groundProps(ctx, cam, low, storm) {
+    const T = this.w.terrain, H = (n) => { const v = Math.sin(n * 127.1 + 311.7) * 43758.5453; return v - Math.floor(v); };
+    const D = 7, cell = 0.9, spread = 1 + 0.45;
+    const u0 = cam.x + (cam.left - cam.x) * 1.0 - 4, u1 = cam.x + (cam.right - cam.x) * 1.0 + 4;
+    const i0 = Math.floor((cam.x - (cam.x - u0)) / cell), i1 = Math.ceil(u1 / cell);
+    const pz = Math.max(0.5, 2.2 / cam.zoom);
+    // gravel pans and paler drift patches lying flat on the plane
+    for (let j = Math.floor((cam.left - 20) / 9); j <= (cam.right + 20) / 9; j++) {
+      if (H(j + 5.5) > 0.55) continue;
+      const d = H(j + 6.1), par = 1 + 0.45 * d, u = (j + H(j + 6.7)) * 9, x = cam.x + (u - cam.x) * par;
+      const w = (2 + 7 * H(j + 7.3)) * (0.6 + d), hh = (0.12 + 0.3 * H(j + 7.9)) * (0.5 + d * 1.6), y = T.height(x) - 0.4 - d * D;
+      const pg = ctx.createRadialGradient(x, y, 0, x, y, w);
+      const dark = H(j + 8.3) < 0.6;
+      pg.addColorStop(0, dark ? 'rgba(112,82,50,0.16)' : 'rgba(255,240,210,0.14)'); pg.addColorStop(1, 'rgba(112,82,50,0)');
+      ctx.save(); ctx.translate(x, y); ctx.scale(1, hh / w); ctx.translate(-x, -y); ctx.fillStyle = pg; ctx.fillRect(x - w, y - w, w * 2, w * 2); ctx.restore();
+    }
+    for (let i = i0; i <= i1; i++) {
+      const r = H(i);
+      if (r > 0.42) continue;
+      const d = H(i + 0.37), par = 1 + 0.45 * d, u = (i + H(i + 0.71)) * cell;
+      const x = cam.x + (u - cam.x) * par;
+      if (x < cam.left - 2 || x > cam.right + 2) continue;
+      if (T.sink[T.idx(x)] > 0.02 && d < 0.15) continue;           // pressed into the ruts
+      const y = T.height(x) - 0.25 - d * D, sz = (0.06 + 0.3 * H(i + 0.13) * H(i + 0.29)) * (0.6 + d * 1.8);
+      if (sz < pz * 0.5) continue;
+      const kind = H(i + 0.91);
+      if (kind < 0.16) {                                          // dry desert scrub
+        ctx.strokeStyle = storm ? 'rgba(110,86,58,0.6)' : 'rgba(110,92,64,0.7)'; ctx.lineWidth = Math.max(pz * 0.5, sz * 0.07);
+        ctx.beginPath(); const hh = sz * 2.6;
+        for (let k = 0; k < 9; k++) { const a = -1.1 + k * 0.275 + Math.sin(i + k) * 0.12, l = hh * (0.6 + 0.4 * H(i + k)); ctx.moveTo(x + Math.sin(a) * l * 0.2, y); ctx.quadraticCurveTo(x + Math.sin(a) * l * 0.5, y + l * 0.7, x + Math.sin(a) * l, y + Math.cos(a) * l); }
+        ctx.stroke();
+      } else {                                                    // stone: dark body, sunlit top, small shadow
+        const w = sz * (1 + H(i + 0.53)), hgt = sz * 0.55;
+        ctx.fillStyle = 'rgba(70,50,30,0.35)'; ctx.beginPath(); ctx.ellipse(x - 0.4 * w * (low + 0.3), y - hgt * 0.2, w * 1.2, hgt * 0.35, 0, 0, 7); ctx.fill();
+        ctx.fillStyle = kind < 0.5 ? '#8a6c4a' : '#9b8264'; ctx.beginPath(); ctx.ellipse(x, y + hgt * 0.3, w, hgt, 0, 0, 7); ctx.fill();
+        ctx.fillStyle = 'rgba(255,236,200,0.35)'; ctx.beginPath(); ctx.ellipse(x + w * 0.15, y + hgt * 0.65, w * 0.6, hgt * 0.35, 0, 0, 7); ctx.fill();
+      }
+    }
+  }
   makeNoise() {
     const c = document.createElement('canvas'); c.width = c.height = 128; const x = c.getContext('2d');
     const d = x.createImageData(128, 128), r = DS.rng(3);
@@ -223,7 +273,22 @@ DS.Renderer = class Renderer {
     }
   }
 
+  // Background (sky, sun, clouds, far dunes): soft by nature, so it is painted at half resolution into a cached
+  // canvas and only repainted when the view has moved (or clouds have drifted) since the last paint.
   sky(ctx, cam) {
+    const W = cam.W * cam.dpr, H = cam.H * cam.dpr, env = this.w.env || {}, th = this.opt && this.opt.thermal;
+    const key = [Math.round(cam.x * 10), Math.round(cam.y * 10), Math.round(cam.zoom), Math.floor(this.w.time * 2), W, H, th ? 1 : 0, env.night, env.visibility].join();
+    const store = this.bgs || (this.bgs = new Map());
+    let bg = store.get(ctx.canvas);
+    if (!bg) { bg = { c: document.createElement('canvas'), key: '' }; store.set(ctx.canvas, bg); }
+    if (bg.key !== key) {
+      bg.key = key; bg.c.width = Math.max(1, Math.round(W / 2)); bg.c.height = Math.max(1, Math.round(H / 2));
+      const half = Object.assign({}, cam); half.dpr = cam.dpr / 2;
+      this.skyPaint(bg.c.getContext('2d'), half);
+    }
+    ctx.imageSmoothingQuality = 'low'; ctx.drawImage(bg.c, 0, 0, W, H);
+  }
+  skyPaint(ctx, cam) {
     const W = cam.W * cam.dpr, H = cam.H * cam.dpr;
     const env = this.w.env || {}, g = ctx.createLinearGradient(0, 0, 0, H);
     if (this.opt && this.opt.thermal) {             // thermal: the sky is cold and featureless
@@ -241,23 +306,91 @@ DS.Renderer = class Renderer {
       ctx.globalAlpha = 1;
       return;
     }
-    // sun haze
-    const sun = env.sun || { el: 35, side: 1 }, sx = W * (0.5 + 0.32 * sun.side), sy = H * Math.max(0.08, 0.47 - sun.el / 75), sg = ctx.createRadialGradient(sx, sy, 0, sx, sy, H * 0.5);
-    sg.addColorStop(0, 'rgba(255,250,230,0.95)'); sg.addColorStop(0.05, 'rgba(255,245,215,0.7)'); sg.addColorStop(1, 'rgba(255,240,210,0)');
+    // ---- daylight sky: palette from the sun's height, sun disc and glow, high cirrus ----
+    const sun = env.sun || { el: 35, side: 1 }, low = Math.max(0, Math.min(1, (25 - sun.el) / 15)), storm = env.visibility ? 1 : 0;
+    const sx = W * (0.5 + 0.32 * sun.side), sy = H * Math.max(0.08, 0.47 - sun.el / 75);
+    if (!storm && low > 0) {                       // low morning sun: warm band along the horizon
+      const wg = ctx.createLinearGradient(0, H * 0.25, 0, H * 0.62);
+      wg.addColorStop(0, 'rgba(255,200,140,0)'); wg.addColorStop(1, `rgba(255,196,140,${0.45 * low})`);
+      ctx.fillStyle = wg; ctx.fillRect(0, 0, W, H);
+    }
+    let sg = ctx.createRadialGradient(sx, sy, 0, sx, sy, H * 0.55);
+    sg.addColorStop(0, storm ? 'rgba(255,235,200,0.75)' : 'rgba(255,250,232,1)'); sg.addColorStop(0.035, storm ? 'rgba(255,225,180,0.45)' : `rgba(255,${238 - 30 * low},${200 - 60 * low},0.75)`);
+    sg.addColorStop(0.25, `rgba(255,${225 - 40 * low},${180 - 70 * low},${storm ? 0.18 : 0.22})`); sg.addColorStop(1, 'rgba(255,220,180,0)');
     ctx.fillStyle = sg; ctx.fillRect(0, 0, W, H);
-    // parallax dune silhouettes (far → near)
-    const hz = H * 0.5 + (cam.y - 14) * cam.zoom * cam.dpr * 0.04;
-    const layers = [[0.03, '#d9c9a6', 0.05, 40], [0.08, '#d6bf93', 0.09, 70], [0.18, '#cfb282', 0.14, 110]];
-    for (const [f, col, amp, base] of layers) {
-      ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(0, H);
-      for (let x = 0; x <= W; x += 8) {
-        const wx = (x - W / 2) / (cam.zoom * cam.dpr) * f * 30 + cam.x * f;
-        const y = hz + base * cam.dpr * 0.4 - amp * H * (0.5 + 0.35 * Math.sin(wx * 0.011 + f * 40) + 0.2 * Math.sin(wx * 0.037 + f * 9) + 0.08 * Math.sin(wx * 0.13));
-        ctx.lineTo(x, y);
+    if (!storm) {                                  // thin cirrus, drifting very slowly with the view
+      if (!this.clouds) { const r = DS.rng(5); this.clouds = Array.from({ length: 9 }, () => ({ x: r(), y: 0.06 + r() * 0.22, w: 0.12 + r() * 0.22, h: 0.006 + r() * 0.01, a: 0.12 + r() * 0.18 })); }
+      ctx.save();
+      for (const c of this.clouds) {
+        const cx = ((c.x * W * 1.6 - cam.x * cam.dpr * 0.01 + this.w.time * 3) % (W * 1.6) + W * 1.6) % (W * 1.6) - W * 0.3;
+        const cg = ctx.createRadialGradient(cx, c.y * H, 0, cx, c.y * H, c.w * W);
+        cg.addColorStop(0, `rgba(255,${246 - 30 * low},${236 - 50 * low},${c.a})`); cg.addColorStop(1, 'rgba(255,245,235,0)');
+        ctx.setTransform(1, 0, 0, c.h / c.w * 6, 0, c.y * H * (1 - c.h / c.w * 6)); ctx.fillStyle = cg; ctx.fillRect(cx - c.w * W, c.y * H - c.w * W, c.w * W * 2, c.w * W * 2);
       }
-      ctx.lineTo(W, H); ctx.fill();
+      ctx.restore();
+    }
+    // ---- parallax dunes: asymmetric (long windward slope, short slip face), far layers fade into the haze,
+    // faces turned to the sun lit, faces turned away shaded ----
+    const hz = H * 0.5 + (cam.y - 14) * cam.zoom * cam.dpr * 0.04;
+    const haze = storm ? [214, 176, 122] : [236 - 10 * low, 222 - 12 * low, 196 - 10 * low], sand = storm ? [196, 156, 104] : [204, 170, 116];
+    const dune = (t) => { t = ((t % 1) + 1) % 1; const u = t < 0.72 ? t / 0.72 : 1 - (t - 0.72) / 0.28; return u * u * (3 - 2 * u); };
+    const layers = [[0.02, 0.85, 0.03, 30, 3200], [0.05, 0.68, 0.05, 55, 2300], [0.10, 0.5, 0.07, 80, 1700], [0.18, 0.32, 0.085, 105, 1300], [0.30, 0.16, 0.1, 125, 1000]];
+    for (const [f, fog, amp, base, lam] of layers) {
+      const fogK = storm ? Math.min(1, fog * 1.25 + 0.15) : fog;
+      const col = sand.map((c, i) => Math.round(c + (haze[i] - c) * fogK));
+      const pts = [], px = 1 / cam.dpr;
+      for (let x = -8; x <= W + 8; x += 6) {
+        // far layers keep their shape whatever the zoom: x is in screen pixels, only the pan moves them
+        const wx = (x - W / 2) * px * (0.6 + f * 2) + cam.x * f * 8;
+        const y = hz + base * cam.dpr * 0.4 - amp * H * (0.25 + 0.55 * dune(wx / lam + f * 7) + 0.25 * dune(wx / (lam * 0.43) + f * 3) + 0.04 * Math.sin(wx * 0.05));
+        pts.push([x, y]);
+      }
+      ctx.fillStyle = `rgb(${col})`; ctx.beginPath(); ctx.moveTo(-8, H);
+      for (const [x, y] of pts) ctx.lineTo(x, y);
+      ctx.lineTo(W + 8, H); ctx.closePath(); ctx.fill();
+      // sun / shade on each facet as one horizontal gradient over a band under the crest line
+      const kk = (1 - fogK) * (storm ? 0.4 : 1);
+      if (kk > 0.05) {
+        const sg2 = ctx.createLinearGradient(-8, 0, W + 8, 0), d = (16 + 46 * (1 - fogK)) * cam.dpr;
+        for (let i = 1; i < pts.length; i += 2) {
+          const [xa, ya] = pts[i - 1], [, yb] = pts[i], sl = (ya - yb) / 6 * sun.side, a = Math.max(-1, Math.min(1, sl * 1.4)) * kk;
+          sg2.addColorStop((xa + 8) / (W + 16), a > 0 ? `rgba(255,${238 - 30 * low},${205 - 50 * low},${(0.34 * a).toFixed(3)})` : `rgba(96,66,36,${(-0.3 * a).toFixed(3)})`);
+        }
+        ctx.fillStyle = sg2; ctx.beginPath();
+        pts.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y));
+        for (let i = pts.length - 1; i >= 0; i--) ctx.lineTo(pts[i][0], pts[i][1] + d);
+        ctx.closePath(); ctx.fill();
+      }
+      if (f >= 0.1) {                              // crest highlight line on the nearer layers
+        ctx.strokeStyle = `rgba(255,240,210,${0.25 * kk})`; ctx.lineWidth = cam.dpr; ctx.beginPath();
+        pts.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.stroke();
+      }
+      if (f === 0.05 && !storm) this.farProps(ctx, cam, pts, f, col, px);
+    }
+    // haze where the land meets the sky
+    const hg = ctx.createLinearGradient(0, hz - H * 0.1, 0, hz + H * 0.05);
+    hg.addColorStop(0, `rgba(${haze},0)`); hg.addColorStop(0.7, `rgba(${haze},${storm ? 0.35 : 0.22})`); hg.addColorStop(1, `rgba(${haze},0)`);
+    ctx.fillStyle = hg; ctx.fillRect(0, hz - H * 0.1, W, H * 0.15);
+  }
+
+  // far silhouettes on a mid layer: a line of telegraph poles and the odd burnt-out hulk
+  farProps(ctx, cam, pts, f, col, px) {
+    const W = cam.W * cam.dpr, dk = `rgba(${col.map(c => Math.round(c * 0.72))})`;
+    ctx.fillStyle = dk; ctx.strokeStyle = dk; ctx.lineWidth = Math.max(1, cam.dpr);
+    const sc = px * (0.6 + f * 2), span = 40, wx0 = (-W / 2) * sc + cam.x * f * 8, wx1 = (W / 2) * sc + cam.x * f * 8;
+    const toX = wx => (wx - cam.x * f * 8) / sc + W / 2;
+    const yAt = x => { const i = Math.max(0, Math.min(pts.length - 1, Math.round((x + 8) / 6))); return pts[i][1]; };
+    let prev = null;
+    for (let k = Math.floor(wx0 / span) - 1; k <= wx1 / span + 1; k++) {
+      const x = toX(k * span), y = yAt(x), hgt = 9 * cam.dpr;
+      ctx.fillRect(x - 0.5 * cam.dpr, y - hgt, cam.dpr, hgt); ctx.fillRect(x - 2.5 * cam.dpr, y - hgt, 5 * cam.dpr, 0.8 * cam.dpr);
+      if (prev) { ctx.beginPath(); ctx.moveTo(prev[0], prev[1]); ctx.quadraticCurveTo((prev[0] + x) / 2, (prev[1] + y - hgt) / 2 + 3 * cam.dpr, x, y - hgt); ctx.stroke(); }
+      prev = [x, y - hgt];
+      const r = Math.abs(Math.sin(k * 91.7) * 43758.5) % 1;
+      if (r < 0.12) { const hx = toX(k * span + 17); const hy = yAt(hx); ctx.beginPath(); ctx.moveTo(hx - 7 * cam.dpr, hy); ctx.lineTo(hx - 5 * cam.dpr, hy - 3 * cam.dpr); ctx.lineTo(hx + 2 * cam.dpr, hy - 3.5 * cam.dpr); ctx.lineTo(hx + 6 * cam.dpr, hy); ctx.fill(); }
     }
   }
+
 
   terrain(ctx, cam) {
     const T = this.w.terrain, x0 = cam.left - 1, x1 = cam.right + 1, bot = cam.bottom - 1;
@@ -265,21 +398,34 @@ DS.Renderer = class Renderer {
     ctx.beginPath(); ctx.moveTo(x0, bot);
     for (let x = x0; x <= x1 + step; x += step) ctx.lineTo(x, T.height(x));
     ctx.lineTo(x1 + step, bot); ctx.closePath();
-    const gy = T.height(cam.x);
-    const g = ctx.createLinearGradient(0, gy + 2, 0, gy - 14);
-    g.addColorStop(0, '#dcb983'); g.addColorStop(0.3, '#c99f68'); g.addColorStop(1, '#a87c4c');
+    const gy = T.height(cam.x), env = this.w.env || {}, sun = env.sun || { el: 35, side: 1 };
+    const low = Math.max(0, Math.min(1, (25 - sun.el) / 15)), storm = env.visibility ? 1 : 0;
+    // ground plane receding toward the viewer: hazed and pale at the far edge (the surface line), warmer and
+    // more saturated close to us
+    const g = ctx.createLinearGradient(0, gy + 0.5, 0, gy - 16);
+    g.addColorStop(0, storm ? '#d9b886' : `rgb(${226 + 6 * low},${196 - 4 * low},${150 - 14 * low})`);
+    g.addColorStop(0.25, storm ? '#c9a274' : '#d0a670'); g.addColorStop(1, storm ? '#a8814f' : '#ab7d4a');
     ctx.fillStyle = g; ctx.fill();
     ctx.save(); ctx.clip();
-    // grain texture
-    ctx.globalAlpha = 0.8; ctx.fillStyle = ctx.createPattern(this.noise, 'repeat');
-    ctx.save(); ctx.scale(0.02, 0.02); ctx.fillRect(x0 / 0.02, bot / 0.02, (x1 - x0) / 0.02, (gy + 30 - bot) / 0.02); ctx.restore();
-    ctx.globalAlpha = 1;
-    // soil band + ruts + disturbed earth along the surface
+    // wind streaks and grain on the plane: textures laid in screen space (no resampling) and scrolled with the
+    // camera, so they cost a plain pattern fill
+    if (!this.streaks) this.streaks = this.makeStreaks();
+    {
+      const m = ctx.getTransform(), ox = -(cam.x + cam.sx) * cam.zoom * cam.dpr, oy = (cam.y + cam.sy) * cam.zoom * cam.dpr;
+      ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);
+      const ps = ctx.createPattern(this.streaks, 'repeat'), pn = ctx.createPattern(this.noise, 'repeat');
+      ps.setTransform(new DOMMatrix([1, 0, 0, 1, ox % 512, oy % 64])); pn.setTransform(new DOMMatrix([1, 0, 0, 1, ox % 128, oy % 128]));
+      const sy = Math.max(0, m.d * (gy + 1) + m.f);                // screen y of the surface, roughly
+      ctx.globalAlpha = 0.35; ctx.fillStyle = ps; ctx.fillRect(0, sy, ctx.canvas.width, ctx.canvas.height - sy);
+      ctx.globalAlpha = 0.6; ctx.fillStyle = pn; ctx.fillRect(0, sy, ctx.canvas.width, ctx.canvas.height - sy);
+      ctx.restore(); ctx.globalAlpha = 1;
+    }
+    // soil band + ruts + disturbed earth along the surface, and sun / shade by slope
     const cs = Math.max(T.dx, 2 / cam.zoom);
     const band = 0.35;
     for (let x = x0; x <= x1; x += cs) {
       const i = T.idx(x), h = T.h[i], s = DS.SOILS[T.soil[i]];
-      ctx.fillStyle = s.col[0]; ctx.globalAlpha = 0.55; ctx.fillRect(x, h - band, cs + 0.01, band);
+      ctx.fillStyle = s.col[0]; ctx.globalAlpha = 0.5; ctx.fillRect(x, h - band, cs + 0.01, band);
       const sk = T.sink[i];
       if (sk > 0.003) { ctx.globalAlpha = Math.min(0.55, sk * 7); ctx.fillStyle = '#6e5232'; ctx.fillRect(x, h - 0.16, cs + 0.01, 0.16);
         ctx.globalAlpha = Math.min(0.5, sk * 5); ctx.fillStyle = '#4a3820'; for (let k = 0; k < 2; k++) ctx.fillRect(x, h - 0.05 - k * 0.07, cs * 0.45, 0.025); }
@@ -287,13 +433,31 @@ DS.Renderer = class Renderer {
       if (di > 0.02) { ctx.globalAlpha = di * 0.5; ctx.fillStyle = '#9b7547'; ctx.fillRect(x, h - 0.6, cs + 0.01, 0.6); }
     }
     ctx.globalAlpha = 1;
+    // sun / shade by slope: one gradient across the screen over a band under the surface line
+    {
+      const sg = ctx.createLinearGradient(x0, 0, x1, 0), n = Math.min(160, Math.ceil((x1 - x0) * cam.zoom / 8));
+      for (let k = 0; k <= n; k++) {
+        const x = x0 + (x1 - x0) * k / n, sl = (T.height(x + 0.6) - T.height(x - 0.6)) / 1.2 * sun.side;
+        const lit = Math.max(-1, Math.min(1, sl * 2.2)) * (storm ? 0.35 : 1);
+        sg.addColorStop(k / n, lit >= 0 ? `rgba(255,${236 - 20 * low},${196 - 40 * low},${(0.34 * lit).toFixed(3)})` : `rgba(100,70,38,${(-0.34 * lit).toFixed(3)})`);
+      }
+      ctx.fillStyle = sg; ctx.beginPath();
+      for (let x = x0; x <= x1 + step; x += step) ctx.lineTo(x, T.height(x) + 0.02);
+      for (let x = x1 + step; x >= x0 - step; x -= step * 2) ctx.lineTo(x, T.height(x) - 1.1);
+      ctx.closePath(); ctx.fill();
+    }
+    this.groundProps(ctx, cam, low, storm);
     // shadows go inside the ground clip: their top edge is exactly the surface, and they must not
     // touch the surface-line path built below (they used to replace it, outlining the shadow instead)
     this.shadows(ctx, cam);
     ctx.restore();
-    // crisp surface line
+    // crisp surface line, with wind ripples (a few cm, drawn only — the physics surface is unchanged)
+    const rip = cam.zoom > 18 ? 0.018 : 0, rs = rip ? Math.min(step, 0.05) : step;
     ctx.beginPath();
-    for (let x = x0; x <= x1 + step; x += step) { const y = T.height(x); if (x === x0) ctx.moveTo(x, y); else ctx.lineTo(x, y); }
+    for (let x = x0; x <= x1 + rs; x += rs) {
+      const y = T.height(x) + (rip && T.soil[T.idx(x)] !== 2 && T.sink[T.idx(x)] < 0.004 ? rip * (Math.sin(x * 21) * 0.7 + Math.sin(x * 47 + 1.3) * 0.3) : 0);
+      if (x === x0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
     // thin ink edge on the ground surface (matches the outlined art), with a sunlit lip just under it
     ctx.save(); ctx.translate(0, -1.6 / cam.zoom);
     ctx.strokeStyle = 'rgba(250,232,195,0.55)'; ctx.lineWidth = 1.2 / cam.zoom; ctx.stroke(); ctx.restore();

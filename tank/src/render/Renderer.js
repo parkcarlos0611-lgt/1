@@ -124,10 +124,13 @@ DS.Renderer = class Renderer {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     this.sky(ctx, cam);
     cam.apply(ctx);
+    this.props(ctx, cam, false);
     w.particles.draw(ctx, cam, 0);
     for (const v of w.vehicles) if (cam.visible(v.pos.x, v.pos.y, 14) && this.shown(v)) this.vehicle(ctx, v, cam);
     this.terrain(ctx, cam);
+    this.props(ctx, cam, true);
     this.fog(ctx, cam);
+    this.traces(ctx, cam);
     this.projectiles(ctx, cam);
     w.particles.draw(ctx, cam, 1);
     this.atmosphere(ctx, cam, opt);
@@ -159,6 +162,8 @@ DS.Renderer = class Renderer {
     const sg = ctx.createLinearGradient(0, 0, 0, H); sg.addColorStop(0, tg(amb.sky)); sg.addColorStop(1, tg(amb.sky + 0.06));
     ctx.fillStyle = sg; ctx.fillRect(0, 0, W, H);
     cam.apply(ctx);
+    const pg = k => { const c = lum(amb.ground - 0.05 + k * 0.08); return `${c},${c},${c}`; };   // buildings: a little cooler than the sand
+    this.props(ctx, cam, false, pg);
     // ground: one temperature, sun-facing slopes a little warmer by day, fresh craters warm
     const x0 = cam.left - 1, x1 = cam.right + 1, bot = cam.bottom - 1, step = Math.max(T.dx, 1.5 / cam.zoom);
     ctx.beginPath(); ctx.moveTo(x0, bot);
@@ -173,6 +178,7 @@ DS.Renderer = class Renderer {
       if (Math.abs(d) > 0.004) { ctx.fillStyle = tg(amb.ground + d); ctx.fillRect(x, h - 0.7, cs + 0.01, 0.7); }
     }
     ctx.restore();
+    this.props(ctx, cam, true, pg);
     for (const v of vis) this.thermalVehicle(ctx, v, cam, amb, tg);
     this.thermalParticles(ctx, cam, amb, lum);
     this.projectiles(ctx, cam);
@@ -276,7 +282,7 @@ DS.Renderer = class Renderer {
   // enemies are drawn only while in sight and detected; wrecks always
   shown(v) {
     const me = this.w.vehicles[0];
-    if (!me || v.team === me.team || !v.alive) return true;
+    if (!me || v.team === me.team || !v.alive || this.w.showAll) return true;
     return DS.Sensor.seenNow(me, v);
   }
 
@@ -410,7 +416,7 @@ DS.Renderer = class Renderer {
   // canvas and only repainted when the view has moved (or clouds have drifted) since the last paint.
   sky(ctx, cam) {
     const W = cam.W * cam.dpr, H = cam.H * cam.dpr, env = this.w.env || {}, th = this.opt && this.opt.thermal;
-    const key = [Math.round(cam.x * 10), Math.round(cam.y * 10), Math.round(cam.zoom), Math.floor(this.w.time * 2), W, H, th ? 1 : 0, env.night, env.visibility].join();
+    const key = [Math.round(cam.x * 10), Math.round(cam.y * 10), Math.round(cam.zoom), Math.floor(this.w.time * 2), W, H, th ? 1 : 0, env.night, env.visibility, env.sun ? env.sun.el * env.sun.side : 0].join();
     const store = this.bgs || (this.bgs = new Map());
     let bg = store.get(ctx.canvas);
     if (!bg) { bg = { c: document.createElement('canvas'), key: '' }; store.set(ctx.canvas, bg); }
@@ -540,6 +546,7 @@ DS.Renderer = class Renderer {
     g.addColorStop(0.25, storm ? '#c9a274' : '#d0a670'); g.addColorStop(1, storm ? '#a8814f' : '#ab7d4a');
     ctx.fillStyle = g; ctx.fill();
     ctx.save(); ctx.clip();
+    this.road(ctx, cam, x0, x1);
     // wind streaks and grain on the plane: textures laid in screen space (no resampling) and scrolled with the
     // camera, so they cost a plain pattern fill
     if (!this.streaks) this.streaks = this.makeStreaks();
@@ -588,7 +595,7 @@ DS.Renderer = class Renderer {
     const rip = cam.zoom > 18 ? 0.018 : 0, rs = rip ? Math.min(step, 0.05) : step;
     ctx.beginPath();
     for (let x = x0; x <= x1 + rs; x += rs) {
-      const y = T.height(x) + (rip && T.soil[T.idx(x)] !== 2 && T.sink[T.idx(x)] < 0.004 ? rip * (Math.sin(x * 21) * 0.7 + Math.sin(x * 47 + 1.3) * 0.3) : 0);
+      const y = T.height(x) + (rip && T.soil[T.idx(x)] < 2 && T.sink[T.idx(x)] < 0.004 ? rip * (Math.sin(x * 21) * 0.7 + Math.sin(x * 47 + 1.3) * 0.3) : 0);
       if (x === x0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
     }
     // thin ink edge on the ground surface (matches the outlined art), with a sunlit lip just under it

@@ -30,7 +30,9 @@
   #sight.thermal { filter: grayscale(1) sepia(1) hue-rotate(68deg) saturate(2.6) brightness(.95); }
   #sight.thermal.bh { filter: grayscale(1) invert(1) sepia(1) hue-rotate(68deg) saturate(2.6) brightness(.95); }
   body:not(.playing) :is(#hud, #help, #sight, #mini, #zoombar, #foes, #log, #touch) { display: none !important; }
-  #log { left: 10px; bottom: 64px; max-width: min(56vw, 640px); font-size: 12px; display: grid; gap: 3px; }
+  /* under the HUD, clear of the vehicle (which now sits low on the screen) */
+  #log { left: 10px; top: 356px; max-width: min(40vw, 360px); font-size: 12px; display: grid; gap: 3px; }
+  #log .e:nth-child(n+5) { display: none; }
   #log:empty { display: none; }
   #log .e { line-height: 1.35; }
   #log .e i { font-style: normal; color: var(--mu); margin-left: 6px; }
@@ -102,6 +104,27 @@
   #touch button.fire { width: 78px; height: 78px; background: rgba(160,40,20,.6); font-size: 15px; font-weight: 800; }
   #zoombar { position: fixed; right: 10px; bottom: 10px; display: flex; gap: 6px; }
   #zoombar button { background: var(--bg); color: var(--tx); border: 1px solid #6b5d45; border-radius: 6px; padding: 6px 10px; font: inherit; cursor: pointer; }
+  /* firing-range editor */
+  #editbtn { position: fixed; top: 10px; right: 48px; z-index: 3; height: 30px; padding: 0 12px; border-radius: 15px; border: 1px solid #8a7b60;
+    background: rgba(24,19,12,.7); color: var(--tx); font: 14px var(--kor); letter-spacing: .06em; cursor: pointer; }
+  body.editing #editbtn { background: var(--warn); color: #1b1308; }
+  body.editing :is(#help, #sight, #foes, #log, #touch) { display: none !important; }
+  body.editing canvas#view { cursor: default; }
+  #sbx { position: fixed; top: 48px; right: 10px; bottom: 10px; width: min(330px, 92vw); z-index: 4; overflow-y: auto; background: rgba(28,27,17,.93);
+    border: 1px solid #5d5a3c; border-left: 5px solid var(--warn); padding: 10px 12px 14px; font-size: 13px; }
+  #sbx h3 { font: 15px var(--kor); letter-spacing: .08em; color: var(--warn); margin: 12px 0 6px; font-weight: 400; display: flex; justify-content: space-between; align-items: baseline; }
+  #sbx h3:first-child { margin-top: 0; } #sbx h3 small { font: 11px var(--mono); color: var(--mu); letter-spacing: 0; }
+  #sbx .row { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 5px; align-items: center; }
+  #sbx button { font: inherit; color: var(--tx); background: #3a3823; border: 1px solid #5d5a3c; padding: 5px 9px; cursor: pointer; border-radius: 3px; }
+  #sbx button:hover:not(:disabled), #sbx button:focus-visible { border-color: var(--warn); outline: none; }
+  #sbx button.on { background: var(--warn); border-color: var(--warn); color: #1b1308; font-weight: 700; }
+  #sbx button:disabled { opacity: .4; cursor: default; }
+  #sbx select, #sbx input[type=text], #sbx input[type=number] { font: inherit; color: var(--tx); background: #1c1b12; border: 1px solid #5d5a3c; padding: 4px 6px; border-radius: 3px; min-width: 0; }
+  #sbx input[type=number] { width: 64px; } #sbx input[type=text] { flex: 1; } #sbx select { flex: 1; }
+  #sbx input[type=range] { flex: 1; min-width: 80px; accent-color: #ffcc66; }
+  #sbx label { color: var(--mu); } #sbx .v { font-family: var(--mono); min-width: 96px; text-align: right; }
+  #sb-selname { color: #f0e6c8; margin: 0 0 6px; line-height: 1.4; min-height: 2.8em; }
+  #sbx .hint { color: var(--mu); font-size: 12px; line-height: 1.5; margin: 6px 0 0; }
   @media (pointer: coarse) { #touch { display: flex; } #help { display: none; } #sight { top: 10px; bottom: auto; width: min(38vw, 260px); } #log { display: none; } }
   @media (max-width: 640px) { #hud { min-width: 0; font-size: 11px; } #mini { bottom: 150px; } }
 </style>
@@ -147,9 +170,35 @@
   <div><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> 근접 / 전투 / 전술 줌 · 휠 연속 줌</div>
   <div><kbd>C</kbd> 마우스 위치에 크레이터 · <kbd>R</kbd> 차량 리셋</div>
   <div><kbd>M</kbd> 소리 켜기/끄기 · <kbd>U</kbd> 해치 열기/닫기 · <kbd>P</kbd> 화면 효과 높음/낮음/끔</div>
+  <div><kbd>L</kbd> 사격장: 편집 모드 (표적 배치 · 장비 교체 · 환경)</div>
   <div><kbd>F9</kbd> 물리 디버그 · <kbd>H</kbd> 키 가이드 끄기/켜기</div>
 </div>
 
+<button id="editbtn" type="button" hidden title="편집 모드 (L)">편집 L</button>
+<aside id="sbx" hidden aria-label="사격장 편집">
+  <h3>내 장비 <small id="sb-count"></small></h3>
+  <div class="row"><button type="button" data-me="m1a1">M1A1</button><button type="button" data-me="m2a2">M2A2 브래들리</button><button type="button" data-go="me">내 위치로</button></div>
+  <h3>표적 배치</h3>
+  <div class="row"><button type="button" data-tool="t55">T-55</button><button type="button" data-tool="t62">T-62</button><button type="button" data-tool="t72">T-72</button><button type="button" data-tool="m1a1">M1A1</button><button type="button" data-tool="m2a2">M2A2</button></div>
+  <p id="sb-selname"></p>
+  <div class="row"><label for="sb-mode">행동</label><select id="sb-mode"><option value="dummy">무인 표적 (움직이지도 쏘지도 않음)</option><option value="watch">정지 관측 (탐지만)</option><option value="hold">정지 사격 (제자리에서 응사)</option><option value="combat">기동 전투</option><option value="patrol">왕복 주행 (이동 표적)</option></select></div>
+  <div class="row" id="sb-pat" hidden><label for="sb-span">구간</label><input id="sb-span" type="number" min="20" max="2000" step="10"> m <label for="sb-speed">속도</label><input id="sb-speed" type="number" min="1" max="15" step="1"> m/s</div>
+  <div class="row"><button type="button" data-act="flip" data-need="any">방향 ◀▶</button><button type="button" data-act="team" data-need="tgt">적군 / 아군</button><button type="button" data-act="fix" data-need="any">수리</button><button type="button" data-act="del" data-need="tgt">삭제</button></div>
+  <div class="row"><button type="button" data-act="reset">모두 수리 · 원위치</button><button type="button" data-act="clear">표적 모두 삭제</button><button type="button" data-act="ground">지형 복구</button></div>
+  <h3>이동</h3>
+  <div class="row"><button type="button" data-go="base">기지</button><button type="button" data-go="0">사격선</button><button type="button" data-go="1000">1 km</button><button type="button" data-go="2000">2 km</button><button type="button" data-go="3000">3 km</button><button type="button" data-go="4000">4 km</button></div>
+  <h3>환경</h3>
+  <div class="row"><button type="button" data-time="day">주간</button><button type="button" data-time="dusk">해질녘</button><button type="button" data-time="night">야간</button></div>
+  <div class="row"><label for="sb-vis">시정</label><input id="sb-vis" type="range" min="0" max="2000" step="100"><span class="v" id="sb-visv"></span></div>
+  <div class="row"><label for="sb-wind">바람</label><input id="sb-wind" type="range" min="-12" max="12" step="1"><span class="v" id="sb-windv"></span></div>
+  <h3>시험 보조</h3>
+  <div class="row"><button type="button" data-opt="god">무적</button><button type="button" data-opt="ammo">무한 탄약</button><button type="button" data-opt="reload">즉시 장전</button><button type="button" data-opt="trace">탄도 궤적</button><button type="button" data-opt="show">표적 항상 표시</button></div>
+  <h3>배치 저장</h3>
+  <div class="row"><select id="sb-lay" aria-label="배치 목록"></select><button type="button" data-act="load">불러오기</button><button type="button" data-act="drop">삭제</button></div>
+  <div class="row"><input id="sb-name" type="text" placeholder="새 배치 이름" aria-label="새 배치 이름" maxlength="24"><button type="button" data-act="save">저장</button></div>
+  <p class="hint">A / D 화면 이동 (Shift 빠르게) · 휠 줌 · 끌어서 이동 · , . 1 m씩 (Shift 10 m) · Del 삭제 · Esc 선택 해제</p>
+  <div class="row"><button type="button" data-act="close" class="on">편집 종료 (L)</button></div>
+</aside>
 <div id="hurt"></div>
 <div id="toast" role="status"></div>
 <div id="mcam" hidden></div>
@@ -173,6 +222,14 @@
       <h2>작전 선택</h2>
       <div id="missions"></div>
     </section>
+    <section class="msec">
+      <h2>사격장</h2>
+      <article class="mcard">
+        <span class="mno">R</span><span class="mname">사격장 · 샌드박스</span>
+        <span class="mmeta"><span>미군 기지 → 사격선 → 사격 레인 4.5 km → 피탄지</span><span>표적 자유 배치 · 장비 교체 · 환경 조절</span></span>
+        <span class="mbtns"><button class="mbtn go" type="button" id="gorange">입장</button></span>
+      </article>
+    </section>
   </div>
 </div>
 <canvas id="mini"></canvas>
@@ -186,6 +243,7 @@
 
 <script src="src/core/Tuning.js"></script>
 <script src="data/missions.js"></script>
+<script src="data/range.js"></script>
 <script src="data/vehicles/m1a1.js"></script>
 <script src="data/vehicles/t72.js"></script>
 <script src="data/vehicles/t55.js"></script>
@@ -205,12 +263,14 @@
 <script src="src/fx/Effects.js"></script>
 <script src="src/core/Camera.js"></script>
 <script src="src/render/Renderer.js"></script>
+<script src="src/render/Props.js"></script>
 <script src="src/render/Post.js"></script>
 <script src="src/debug/DebugLayer.js"></script>
 <script src="src/ai/TankAI.js"></script>
 <script src="src/ai/Sensor.js"></script>
 <script src="src/audio/Audio.js"></script>
 <script src="src/core/World.js"></script>
+<script src="src/core/Sandbox.js"></script>
 <script src="src/core/Game.js"></script>
 </body>
 </html>

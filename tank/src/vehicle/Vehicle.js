@@ -365,6 +365,7 @@ DS.Vehicle = class Vehicle {
   // apply damage to a module (or 'track'); returns a short description for the hit log
   damage(id, at) {
     const rnd = Math.random;
+    if (this.god) return '피해 없음 (무적)';
     if (id === 'track') {
       if (!this.trackBroken) { this.trackBroken = true; this.chain = DS.TrackChain.create(this, at ? at.x : this.pos.x, at ? at.y : this.pos.y - 1); this.events.push({ type: 'trackSnap', x: at ? at.x : this.pos.x, y: at ? at.y : this.pos.y - 1 }); }
       this.mobile = false; this.setStatus(); return '궤도 절단 → 기동 불능';

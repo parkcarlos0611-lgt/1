@@ -8,7 +8,7 @@ DS.T = {
   physicsHz: 240,
   maxSubsteps: 16,
   terrain: { dx: 0.1, length: 10000, repose: 33 },
-  camera: { zoomMin: 1.5, zoomMax: 90, presets: [40, 14, 3], lookAhead: 0.9 },
+  camera: { zoomMin: 1.5, zoomMax: 90, presets: [40, 14, 3], lookAhead: 0.9, ground: 0.27 },
   traction: { vref: 0.06, vrefSlip: 0.035 },     // slip-velocity scale for tanh traction curve
   particles: { max: 9000 },
   ai: { detect: 0.55 },                          // Iraqi detection multiplier (1 = earlier behaviour)
@@ -22,4 +22,6 @@ DS.SOILS = [
     col: ['#e6c48c', '#cfa66c'], dust: 1.0 },
   { id: 2, name: '사브카 (염습지)', n: 0.90, kc: 10, kphi: 900, c: 3.0e3, phi: 24, crr: 0.080, crust: 75,
     col: ['#cbb592', '#a8916d'], dust: 0.35 },
+  { id: 3, name: '도로 (다진 자갈 포장)', n: 1.0, kc: 100, kphi: 60000, c: 3.0e4, phi: 38, crr: 0.020,
+    col: ['#a89d88', '#8b816e'], dust: 0.12, road: true },
 ];

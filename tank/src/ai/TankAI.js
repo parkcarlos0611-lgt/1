@@ -39,6 +39,7 @@ DS.AI = {
 DS.TankAI = class TankAI {
   constructor(v, world, opt = {}) {
     this.v = v; this.w = world; v.ai = this; this.follow = opt.follow || null; this.offset = opt.offset || 0;
+    this.mode = opt.mode || 'combat'; this.patrol = opt.patrol || null;       // sandbox behaviours: watch / hold / combat / patrol
     this.detect = 0; this.alerted = false; this.los = false; this.tick = Math.random() * 0.3;
     this.lay = 0; this.rangeEst = null; this.sol = null; this.solT = 0; this.shots = 0; this.state = '대기';
     this.ammo = v.def.ammo[0];
@@ -60,6 +61,24 @@ DS.TankAI = class TankAI {
   }
 
   update(dt) {
+    const v = this.v;
+    if (this.mode === 'patrol') return this.shuttle();
+    this.think(dt);
+    if (this.mode === 'hold' || this.mode === 'watch') v.input.drive = 0;                 // stays where it was put
+    if (this.mode === 'watch') { v.input.fire = false; v.input.tow = false; if (this.state === '사격') this.state = '조준'; }
+  }
+  // moving target: runs back and forth between two points at a set speed, never fires
+  shuttle() {
+    const v = this.v, P = this.patrol;
+    v.input.fire = false;
+    if (!v.alive || !v.mobile) { v.input.drive = 0; this.state = v.status; return; }
+    if (P.to == null) P.to = v.dir > 0 ? P.b : P.a;            // sets off forward; the leg back is in reverse gear (slower)
+    if (Math.abs(P.to - v.pos.x) < 4) P.to = P.to === P.b ? P.a : P.b;
+    const want = Math.sign(P.to - v.pos.x) * P.speed, err = want - v.vel.x;
+    v.input.drive = Math.max(-1, Math.min(1, err / 2));
+    this.state = '왕복 주행';
+  }
+  think(dt) {
     const v = this.v, W = this.w, S = v.def.sight, r = W.rng;
     v.input.fire = false;
     if (!v.alive || !v.firepower) { v.input.drive = 0; this.state = v.status; return; }

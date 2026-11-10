@@ -15,14 +15,14 @@ DS.Game = class Game {
     this.post = new DS.Post(this.cv);
     let q = 2; try { const s = localStorage.getItem('ds.post'); if (s != null) q = +s; } catch (e) {}
     this.post.setQuality(this.post.ok ? q : 0); this.lowFps = 0;
-    await Promise.all(['m1a1', 'm2a2', 't55', 't62', 't72'].map(id => this.rend.load(DS.VEHICLES[id])));
+    await Promise.all(['m1a1', 'm2a2', 't55', 't62', 't72'].map(id => this.rend.load(DS.VEHICLES[id])).concat(this.rend.loadProps()));
     DS.Armor.calibrate();
     this.resize(); addEventListener('resize', () => this.resize());
     document.getElementById('loading').remove();
     window.__game = this;
     // #m1 / #m2 / #m3 starts that mission directly (used by "다시 시작"); otherwise show the menu
-    const m = /^#m(\d)(b?)$/.exec(location.hash), i = m ? +m[1] - 1 : -1;
-    if (DS.MISSIONS[i]) this.begin(i, m[2] ? 'm2a2' : 'm1a1'); else this.menu();
+    const m = /^#m(\d)(b?)$/.exec(location.hash), i = m ? +m[1] - 1 : -1, rg = /^#range(b?)$/.exec(location.hash);
+    if (rg) this.begin('range', rg[1] ? 'm2a2' : 'm1a1'); else if (DS.MISSIONS[i]) this.begin(i, m[2] ? 'm2a2' : 'm1a1'); else this.menu();
   }
   menu() {
     const el = document.getElementById('menu'), list = document.getElementById('missions');
@@ -38,6 +38,7 @@ DS.Game = class Game {
       p.hidden = !open; b.setAttribute('aria-expanded', open); b.textContent = open ? '브리핑 ▴' : '브리핑 ▾';
     }));
     list.querySelectorAll('[data-go]').forEach(b => b.addEventListener('click', () => { DS.Audio.init(); el.hidden = true; location.hash = 'm' + (+b.dataset.go + 1) + (veh === 'm2a2' ? 'b' : ''); this.begin(+b.dataset.go, veh); }));
+    document.getElementById('gorange').onclick = () => { DS.Audio.init(); el.hidden = true; location.hash = 'range' + (veh === 'm2a2' ? 'b' : ''); this.begin('range', veh); };
     el.hidden = false;
   }
   // key guide: H or the ? button; the choice is remembered on this device
@@ -47,31 +48,44 @@ DS.Game = class Game {
     try { localStorage.setItem('ds.help', on ? '1' : '0'); } catch (e) {}
   }
   begin(i, veh = 'm1a1') {
-    const M = this.mission = DS.MISSIONS[i], W = this.world;
+    const range = i === 'range', M = this.mission = range ? DS.RANGE : DS.MISSIONS[i], W = this.world;
+    if (range) { W.terrain = new DS.Terrain(7, 'range'); W.props = DS.RANGE.layout(); }
     document.getElementById('menu').hidden = true; document.body.classList.add('playing');
     let help = true; try { help = localStorage.getItem('ds.help') !== '0'; } catch (e) {}
     this.setHelp(help);
     document.getElementById('helpbtn').onclick = () => this.setHelp(document.getElementById('help').classList.contains('hide'));
     W.env = { ...M.env }; W.wind = M.env.wind;
     const other = veh === 'm2a2' ? 'm1a1' : 'm2a2', nm = { m1a1: 'M1A1', m2a2: '브래들리' };
-    const v = new DS.Vehicle(DS.VEHICLES[veh], M.start, W.terrain, { label: nm[veh] + ' (나)' });
-    W.vehicles.push(v); this.player = v;
+    if (range) {
+      // sandbox: my vehicle alone on the range, the first preset's targets down the lanes
+      this.sbx = new DS.Sandbox(this);
+      this.sbx.setEnv({ time: 'day' });
+      this.player = this.sbx.spawn({ player: true, id: veh, x: M.start, dir: 1 });
+      this.sbx.layN = '거리별 표적'; this.sbx.apply(DS.RANGE.presets['거리별 표적']);
+      document.getElementById('editbtn').hidden = false;
+      document.getElementById('editbtn').onclick = () => this.sbx.toggle();
+    }
+    const v = range ? this.player : new DS.Vehicle(DS.VEHICLES[veh], M.start, W.terrain, { label: nm[veh] + ' (나)' });
+    if (!range) { W.vehicles.push(v); this.player = v; }
     // the other vehicle is an AI wingman. The tank always leads: with the Bradley, the M1A1 moves 45 m ahead
     // and takes the first contact; with the M1A1, the Bradley follows 45 m behind
     const off = veh === 'm2a2' ? 45 : -45;
+    if (!range) {
     const wm = new DS.Vehicle(DS.VEHICLES[other], Math.max(12, M.start + off), W.terrain, { label: nm[other] + (veh === 'm2a2' ? ' (아군 선두)' : ' (아군)') });
     W.vehicles.push(wm); new DS.TankAI(wm, W, { follow: v, offset: off });
     for (const [id, x, label] of M.enemies) {
       const e = new DS.Vehicle(DS.VEHICLES[id], x, W.terrain, { dir: -1, label });
       W.vehicles.push(e); new DS.TankAI(e, W);
     }
+    }
     DS.FireControl.update(W, v, false);
     W.cam.x = v.pos.x; W.cam.y = v.pos.y;
     if (M.env.night) { this.thermal = true; this.sightCv.classList.add('thermal'); }
-    document.getElementById('h-title').textContent = `${nm[veh]} · 작전 ${i + 1} ${M.name}`;
-    document.getElementById('again').onclick = () => { location.hash = 'm' + (i + 1) + (veh === 'm2a2' ? 'b' : ''); location.reload(); };
+    document.getElementById('h-title').textContent = range ? `${nm[veh] === '브래들리' ? 'M2A2' : nm[veh]} · 사격장` : `${nm[veh]} · 작전 ${i + 1} ${M.name}`;
+    document.getElementById('again').onclick = () => { location.hash = range ? 'range' : 'm' + (i + 1) + (veh === 'm2a2' ? 'b' : ''); location.reload(); };
     document.getElementById('tomenu').onclick = () => { location.hash = ''; location.reload(); };
     this.bindInput();
+    this.resize();                       // the minimap has no size until the HUD is shown
     requestAnimationFrame(t => { this.last = t; this.loop(t); });
   }
   resize() {
@@ -87,6 +101,9 @@ DS.Game = class Game {
     addEventListener('pointerdown', wake); addEventListener('keydown', wake);
     addEventListener('keydown', e => {
       if (e.repeat) return;
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+      if (e.code === 'KeyL' && this.sbx) return this.sbx.toggle();
+      if (this.sbx && this.sbx.edit && !['KeyA', 'KeyD', 'ArrowLeft', 'ArrowRight', 'ShiftLeft', 'Digit1', 'Digit2', 'Digit3', 'KeyM', 'KeyP', 'KeyH'].includes(e.code)) return;
       if (e.code === 'KeyP') {
         if (!this.post.ok) this.toast('이 브라우저는 화면 효과(WebGL2)를 지원하지 않음');
         else { const q = (this.post.q + 2) % 3; this.post.setQuality(q); try { localStorage.setItem('ds.post', q); } catch (er) {} this.toast('화면 효과: ' + ['끔', '낮음', '높음'][q]); }
@@ -129,7 +146,7 @@ DS.Game = class Game {
       cam.tzoom = Math.max(DS.T.camera.zoomMin, Math.min(DS.T.camera.zoomMax, cam.tzoom * Math.exp(-e.deltaY * 0.0012)));
       e.preventDefault();
     }, { passive: false });
-    this.cv.addEventListener('mousedown', e => { if (e.button === 0) this.mouseFire = true; if (e.button === 2) this.mgDown = true; });
+    this.cv.addEventListener('mousedown', e => { if (this.sbx && this.sbx.edit) return; if (e.button === 0) this.mouseFire = true; if (e.button === 2) this.mgDown = true; });
     addEventListener('mouseup', e => { if (e.button === 0) this.mouseFire = false; if (e.button === 2) this.mgDown = false; });
     this.cv.addEventListener('contextmenu', e => e.preventDefault());
     // touch buttons
@@ -291,12 +308,13 @@ DS.Game = class Game {
   loop(t) {
     const dt = Math.min(0.05, (t - this.last) / 1000); this.last = t;
     if (dt > 0) this.fps += (1 / dt - this.fps) * 0.05;
+    const ed = this.sbx && this.sbx.edit;
     this.readInput(dt);
-    this.trackTarget(dt);
-    this.world.update(dt);
-    this.missileCam(dt);
+    if (ed) this.sbx.frame(dt);
+    else { this.trackTarget(dt); this.world.update(dt); this.missileCam(dt); if (this.sbx) this.sbx.tick(); }
     DS.Audio.update(this.world, dt);
     this.rend.frame();
+    if (ed) this.sbx.overlay(this.rend.ctx);
     this.postFrame(dt);
     this.sight(dt);
     this.hud();
@@ -329,13 +347,14 @@ DS.Game = class Game {
       const found = DS.Sensor.list(v, false), inSight = found.filter(e => DS.Sensor.seenNow(v, e)).length;
       set('h-foe', `탐지 ${inSight}` + (found.length > inSight ? ` (+${found.length - inSight} 상실)` : '') + ` · 격파 ${foes.length - up}`);
       this.logPanel();
-      document.getElementById('foes').innerHTML = pals.map(e => `<div class="pal${e.alive ? '' : ' down'}"><b>${e.label}</b> <span>${e.alive ? e.ai.state : e.status}</span></div>`).join('') + found.map(e => {
+      document.getElementById('foes').innerHTML = pals.map(e => `<div class="pal${e.alive ? '' : ' down'}"><b>${e.label}</b> <span>${e.alive ? (e.ai ? e.ai.state : '무인') : e.status}</span></div>`).join('') + found.map(e => {
           const c = v.contacts.get(e), now = DS.Sensor.seenNow(v, e), id = c.d >= 2;
           return `<div class="up${e === this.target ? ' sel' : ''}${now ? '' : ' lost'}"><b>${id ? e.def.name : '미식별'}</b> <span>${now ? Math.round(c.range) + ' m' : '상실'}</span></div>`;
         }).join('') + foes.filter(e => !e.alive).map(e => `<div class="down"><b>${e.def.name}</b> <span>격파</span></div>`).join('');
       const over = document.getElementById('over');
-      if (!v.alive && over.hidden) { over.hidden = false; document.getElementById('over-t').textContent = `격파됨 — ${v.status}`; }
-      if (up === 0 && foes.length && over.hidden && !this._won) { this._won = true; over.hidden = false; document.getElementById('over-t').textContent = '적 소대 전멸 — 임무 완료'; }
+      if (this.sbx) { if (!v.alive && !this._dead) this.toast('격파됨 — L 편집 모드에서 「모두 수리」'); this._dead = !v.alive; }
+      else if (!v.alive && over.hidden) { over.hidden = false; document.getElementById('over-t').textContent = `격파됨 — ${v.status}`; }
+      if (!this.sbx && up === 0 && foes.length && over.hidden && !this._won) { this._won = true; over.hidden = false; document.getElementById('over-t').textContent = '적 소대 전멸 — 임무 완료'; }
       set('h-load', g.reload > 0 ? '장전 중 ' + g.reload.toFixed(1) + ' s' : '장전 완료');
       set('h-pos', (v.pos.x / 1000).toFixed(2) + ' km');
       set('h-zoom', w.cam.zoom.toFixed(0) + ' px/m');
@@ -380,7 +399,8 @@ DS.Game = class Game {
     el.innerHTML = w.log.map(l => {
       if (l.ground) return `<div class="e"><b>지면 착탄</b> ${Math.round(l.range)} m · ${l.ammo.short}</div>`;
       const [t, c] = RES[l.result];
-      const nums = l.result === 'ricochet' ? `경사 ${l.obl.toFixed(0)}°` : `${Math.round(l.pen)} / ${Math.round(l.prot)} mm · 경사 ${l.obl.toFixed(0)}°`;
+      let nums = l.result === 'ricochet' ? `경사 ${l.obl.toFixed(0)}°` : `${Math.round(l.pen)} / ${Math.round(l.prot)} mm · 경사 ${l.obl.toFixed(0)}°`;
+      if (this.sbx) nums += ` · 착탄 ${Math.round(l.speed)} m/s · 실효 두께 ${Math.round(l.los)} mm` + (l.resid != null ? ` · 잔여 ${Math.round(l.resid)} mm` : '');   // range: full numbers
       const fx = l.effects && l.effects.length ? ' → ' + l.effects.join(', ') : '';
       const who = l.vehicle === this.player ? `<b class="me">피격</b> ${l.shooter ? l.shooter.label + ' → ' : ''}` : '';
       return `<div class="e"><span class="tag ${c}">${t}</span> ${who}<b>${l.vehicle.label}</b> · ${Math.round(l.range)} m · ${l.plate} · ${l.ammo.short} ${nums}${fx}` +

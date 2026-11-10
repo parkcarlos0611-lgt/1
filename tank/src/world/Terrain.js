@@ -1,7 +1,8 @@
 // 1D heightfield terrain with soil model: Bekker sinkage, compaction memory, angle-of-repose slumping,
 // craters. Cells every dx metres. World y up, x along the drive line.
 DS.Terrain = class Terrain {
-  constructor(seed = 7) {
+  constructor(seed = 7, kind = null) {
+    this.kind = kind;
     const T = DS.T.terrain;
     this.dx = T.dx;
     this.n = Math.round(T.length / this.dx) + 1;
@@ -53,7 +54,23 @@ DS.Terrain = class Terrain {
     // a wadi (dry channel) and a dug-in revetment berm for testing
     this.addProfile(620, 18, -1.6);
     this.addBerm(900, 1.8, 6);
+    if (this.kind === 'range') this.shapeRange();
     this.relax(0, n - 1, 6);
+  }
+
+  // Firing range (data/range.js): the base and the firing line are graded level with a gravel road along
+  // them, the lanes roll only gently, and past the lanes the natural desert returns (the impact area).
+  shapeRange() {
+    const R = DS.RANGE, n = this.n, dx = this.dx, sm = t => { t = Math.max(0, Math.min(1, t)); return t * t * (3 - 2 * t); };
+    for (let i = 0; i < n; i++) {
+      const x = i * dx;
+      const k = 0.015 + 0.2 * sm((x - R.line - 120) / 500) + 0.785 * sm((x - R.laneEnd) / 900);
+      this.h[i] = 10 + (this.h[i] - 10) * k;
+      if (x < R.line + 120) this.sink[i] = 0;
+      if (x >= R.road[0] && x <= R.road[1]) { this.soil[i] = 3; this.crust[i] = 0; }
+      else if (x < R.laneEnd && this.soil[i] === 2) this.soil[i] = 0;          // no salt flats on the lanes
+    }
+    for (const [x, hgt, w] of R.berms) this.addBerm(x, hgt, w);
   }
 
   addProfile(x, w, depth) {

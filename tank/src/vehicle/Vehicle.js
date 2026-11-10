@@ -19,6 +19,7 @@ DS.Vehicle = class Vehicle {
     this.spool = 0;
     this.input = { drive: 0, elevRate: 0, elevStep: 0, fire: false, mgFire: false, mgAim: null, coaxFire: false };
     this.mg = def.mg ? { el: 0, side: 1, cool: 0, rounds: def.mg.rounds, n: 0, flip: 0 } : null;
+    this.tow = def.tow ? { up: 0, armed: false, req: false, loaded: def.tow.loaded, reserve: def.tow.reserve, reload: 0, cool: 0, idle: 0, missile: null } : null;
     this.coax = def.coax ? { cool: 0, rounds: def.coax.rounds, n: 0 } : null;
     this.st = this.g.wheels.map(p => ({ lx: p.x, ly: p.y, d: 0, dPrev: 0, ang: Math.random() * 6, N: 0, wx: 0, wy: 0, contact: false, slip: 0, Ft: 0, sink: 0 }));
     this.sprAng = 0; this.idlAng = 0;
@@ -170,6 +171,7 @@ DS.Vehicle = class Vehicle {
 
     this.stepGun(dt, world);
     this.stepMG(dt, world);
+    this.stepTow(dt, world);
     this.stepAntennas(dt);
     this.stepDamage(dt, world);
     if (this.turretBody) this.stepTurretBody(dt);
@@ -192,7 +194,7 @@ DS.Vehicle = class Vehicle {
     gs.e += Math.max(-mx, Math.min(mx, de));
     gs.reload = Math.max(0, gs.reload - dt);
     if (gs.rv < 0) { gs.rv += gs.aB * dt; gs.rx += gs.rv * dt; if (gs.rv >= 0) gs.rv = 0.0001; }
-    else if (gs.rx < 0) { const a = -64 * gs.rx - 15 * gs.rv; gs.rv += a * dt; gs.rx += gs.rv * dt; if (gs.rx > 0) { gs.rx = 0; gs.rv = 0; } }
+    else if (gs.rx < 0) { const a = -(G.recoilK || 64) * gs.rx - (G.recoilC || 15) * gs.rv; gs.rv += a * dt; gs.rx += gs.rv * dt; if (gs.rx > -1e-4) { gs.rx = 0; gs.rv = 0; } }
     if (this.input.fire && this.alive && this.firepower && gs.ammo && gs.reload <= 0 && gs.rx === 0) this.fire(world);
   }
 
@@ -202,8 +204,34 @@ DS.Vehicle = class Vehicle {
     gs.rv = -v0r; gs.aB = v0r * v0r / (2 * G.recoilLen);
     gs.reload = G.reload; gs.fired++; this.lastFired = world.time;
     const m = this.muzzle();
-    world.spawnProjectile(m.x, m.y, m.dx * A.v0 + this.vel.x, m.dy * A.v0 + this.vel.y, A, this);
+    world.spawnProjectile(m.x, m.y, m.dx * A.v0 + this.vel.x, m.dy * A.v0 + this.vel.y, A, this).tracer = true;
     this.events.push({ type: 'fire', x: m.x, y: m.y, dx: m.dx, dy: m.dy, ammo: A });
+  }
+
+  // ---- TOW launcher: raise (vehicle halted) → launch → wire guidance along the sight line ----
+  towPos() {
+    const T = this.def.tow, t = this.tow, a = this.gunWorld() , p = this.local(this.dir * T.c[0], T.c[1] + T.lift * t.up);
+    return { x: p.x + Math.cos(a) * T.len * 0.5, y: p.y + Math.sin(a) * T.len * 0.5, a, cx: p.x, cy: p.y };
+  }
+  stepTow(dt, world) {
+    const t = this.tow; if (!t) return;
+    const T = this.def.tow, halted = Math.abs(this.vt) < 0.6, ok = this.alive && this.firepower && !this.turretGone;
+    if (this.input.tow) { this.input.tow = false; if (ok) { t.armed = true; t.req = true; t.idle = 0; } }
+    if (t.missile && !t.missile.alive) { t.missile = null; t.idle = 0; }
+    if (!t.missile) t.idle += dt;
+    if (Math.abs(this.vt) > 2.5 || !ok || (t.idle > 8 && !t.req)) { t.armed = false; t.req = false; }   // stowed for travel
+    t.up = Math.max(0, Math.min(1, t.up + (t.armed && halted ? dt : -dt) / T.raise));
+    t.cool -= dt;
+    if (t.req && t.up >= 1 && halted && t.loaded > 0 && !t.missile && t.cool <= 0) {
+      const p = this.towPos();
+      t.missile = world.spawnMissile(p.x, p.y, p.a, this, DS.AMMO[T.ammo]);
+      t.loaded--; t.req = false; t.cool = 1.5; this.lastFired = world.time;
+      this.events.push({ type: 'tow', x: p.x, y: p.y, a: p.a });
+    }
+    if (t.loaded === 0 && t.reserve > 0 && !t.missile) {
+      t.reload += dt;
+      if (t.reload >= T.reloadTime) { const n = Math.min(2, t.reserve); t.loaded = n; t.reserve -= n; t.reload = 0; }
+    }
   }
 
   // ---- machine guns ----
@@ -391,11 +419,13 @@ DS.Vehicle = class Vehicle {
   gearCircles() {
     const D = this.def, G = this.g, h = D.track.thick / 2, out = [];
     const P = (p, r, fixed) => { const q = this.local(p.x, p.y); return { x: q.x, y: q.y, r, fixed }; };
-    out.push(P(G.sprocket, this.sprR(), true));
+    const rear = D.frontDrive ? P(G.idler, D.idler.r + h, true) : P(G.sprocket, this.sprR(), true);
+    const front = D.frontDrive ? P(G.sprocket, this.sprR(), true) : P(G.idler, D.idler.r + h, true);
+    out.push(rear);
     for (const r of G.rollers) out.push(P(r, r.r + h, false));
     // T-55 / T-62: no return rollers — the top run rests on the road wheels (rear → front)
     if (D.topRunOnWheels) for (const w of this.st) out.push({ x: w.wx, y: w.wy, r: D.wheelR + h, fixed: false });
-    out.push(P(G.idler, D.idler.r + h, true));
+    out.push(front);
     for (let i = this.st.length - 1; i >= 0; i--) { const w = this.st[i]; out.push({ x: w.wx, y: w.wy, r: D.wheelR + h, fixed: false }); }
     if (this.dir < 0) out.reverse();       // mirrored order would run counter-clockwise
     return out;

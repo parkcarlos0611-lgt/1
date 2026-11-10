@@ -12,29 +12,35 @@ DS.Game = class Game {
     this.sightCam = new DS.Camera(); this.sightMag = 10; this.thermal = false; this.sightR = 2000; this._sightT = 0;
   }
   async start() {
-    await Promise.all(['m1a1', 't55', 't62', 't72'].map(id => this.rend.load(DS.VEHICLES[id])));
+    await Promise.all(['m1a1', 'm2a2', 't55', 't62', 't72'].map(id => this.rend.load(DS.VEHICLES[id])));
     DS.Armor.calibrate();
     this.resize(); addEventListener('resize', () => this.resize());
     document.getElementById('loading').remove();
     window.__game = this;
     // #m1 / #m2 / #m3 starts that mission directly (used by "다시 시작"); otherwise show the menu
-    const m = /^#m(\d)$/.exec(location.hash), i = m ? +m[1] - 1 : -1;
-    if (DS.MISSIONS[i]) this.begin(i); else this.menu();
+    const m = /^#m(\d)(b?)$/.exec(location.hash), i = m ? +m[1] - 1 : -1;
+    if (DS.MISSIONS[i]) this.begin(i, m[2] ? 'm2a2' : 'm1a1'); else this.menu();
   }
   menu() {
     const el = document.getElementById('menu'), list = document.getElementById('missions');
     list.innerHTML = DS.MISSIONS.map((m, i) => `<button class="mcard" type="button" data-i="${i}">
       <span class="mno">작전 ${i + 1}</span><b>${m.name}</b><span class="mdate">${m.date}</span>
       <span class="mbrief">${m.brief}</span><span class="mcond">${m.cond} · 적 전차 ${m.enemies.length}대</span></button>`).join('');
-    list.querySelectorAll('.mcard').forEach(b => b.addEventListener('click', () => { DS.Audio.init(); el.hidden = true; location.hash = 'm' + (+b.dataset.i + 1); this.begin(+b.dataset.i); }));
+    let veh = 'm1a1';
+    document.querySelectorAll('.vpick').forEach(b => b.addEventListener('click', () => { veh = b.dataset.v; document.querySelectorAll('.vpick').forEach(x => x.classList.toggle('on', x === b)); }));
+    list.querySelectorAll('.mcard').forEach(b => b.addEventListener('click', () => { DS.Audio.init(); el.hidden = true; location.hash = 'm' + (+b.dataset.i + 1) + (veh === 'm2a2' ? 'b' : ''); this.begin(+b.dataset.i, veh); }));
     el.hidden = false;
   }
-  begin(i) {
+  begin(i, veh = 'm1a1') {
     const M = this.mission = DS.MISSIONS[i], W = this.world;
     document.getElementById('menu').hidden = true; document.body.classList.add('playing');
     W.env = { ...M.env }; W.wind = M.env.wind;
-    const v = new DS.Vehicle(DS.VEHICLES.m1a1, M.start, W.terrain, { label: 'M1A1 (아군)' });
+    const other = veh === 'm2a2' ? 'm1a1' : 'm2a2', nm = { m1a1: 'M1A1', m2a2: '브래들리' };
+    const v = new DS.Vehicle(DS.VEHICLES[veh], M.start, W.terrain, { label: nm[veh] + ' (나)' });
     W.vehicles.push(v); this.player = v;
+    // the other vehicle rides along as an AI wingman, 45 m behind
+    const wm = new DS.Vehicle(DS.VEHICLES[other], Math.max(12, M.start - 45), W.terrain, { label: nm[other] + ' (아군)' });
+    W.vehicles.push(wm); new DS.TankAI(wm, W, { follow: v, offset: -45 });
     for (const [id, x, label] of M.enemies) {
       const e = new DS.Vehicle(DS.VEHICLES[id], x, W.terrain, { dir: -1, label });
       W.vehicles.push(e); new DS.TankAI(e, W);
@@ -42,8 +48,8 @@ DS.Game = class Game {
     DS.FireControl.update(W, v, false);
     W.cam.x = v.pos.x; W.cam.y = v.pos.y;
     if (M.env.night) { this.thermal = true; this.sightCv.classList.add('thermal'); }
-    document.getElementById('h-title').textContent = `M1A1 · 작전 ${i + 1} ${M.name}`;
-    document.getElementById('again').onclick = () => { location.hash = 'm' + (i + 1); location.reload(); };
+    document.getElementById('h-title').textContent = `${nm[veh]} · 작전 ${i + 1} ${M.name}`;
+    document.getElementById('again').onclick = () => { location.hash = 'm' + (i + 1) + (veh === 'm2a2' ? 'b' : ''); location.reload(); };
     document.getElementById('tomenu').onclick = () => { location.hash = ''; location.reload(); };
     this.bindInput();
     requestAnimationFrame(t => { this.last = t; this.loop(t); });
@@ -73,6 +79,8 @@ DS.Game = class Game {
       if (e.code === 'KeyT') { this.thermal = !this.thermal; this.sightCv.classList.toggle('thermal', this.thermal); }
       if (e.code === 'KeyB') { this.blackHot = !this.blackHot; this.sightCv.classList.toggle('bh', this.blackHot); }
       if (e.code === 'KeyG') this.sightCv.classList.toggle('big');
+      if (e.code === 'KeyX') { if (this.player.tow) this.player.input.tow = true; else this.toast('TOW 미사일은 브래들리 전용'); }
+      if (e.code === 'KeyZ') { this.world.xray = !this.world.xray; this.toast(this.world.xray ? '엑스레이 뷰 켬' : '엑스레이 뷰 끔'); }
       if (e.code === 'KeyR') this.player.place(this.player.pos.x);
       if (e.code === 'KeyC' && this.mouse) { const m = cam.toWorld(this.mouse.x, this.mouse.y); this.world.terrain.crater(m.x, 1.6, 0.7); this.world.terrain.relax(undefined, undefined, 8); }
       if (e.code === 'KeyH') document.getElementById('help').classList.toggle('hide');
@@ -156,14 +164,17 @@ DS.Game = class Game {
       set('h-pitch', (v.ang * 180 / Math.PI).toFixed(1) + '°');
       set('h-elev', (g.e * 180 / Math.PI).toFixed(2) + '°');
       set('h-ammo', A.name);
-      if (v.mg) set('h-mg', `M2 ${v.mg.rounds} · 동축 ${v.coax.rounds}`);
+      set('h-mg', [v.mg && `M2 ${v.mg.rounds}`, v.coax && `동축 ${v.coax.rounds}`].filter(Boolean).join(' · '));
+      if (v.tow) { const t = v.tow; set('h-tow', t.missile ? (t.missile.guided ? '유도 중 — 조준선 유지' : '유선 끊김') : t.loaded ? `장전 ${t.loaded} · 예비 ${t.reserve}` + (t.up > 0 && t.up < 1 ? ' · 발사관 작동' : t.up >= 1 ? ' · 발사 준비' : '') : t.reserve ? `재장전 ${(v.def.tow.reloadTime - t.reload).toFixed(0)} s · 예비 ${t.reserve}` : '소진'); }
+      document.getElementById('row-tow').hidden = !v.tow;
       const fc = v.fc;
       set('h-rng', fc.range ? Math.round(fc.range) + ' m' : `— (전투조준 ${fc.bs} m)`);
       set('h-se', (fc.se * 1000).toFixed(2) + ' mil · ' + (fc.se * 180 / Math.PI).toFixed(2) + '°');
-      const foes = w.vehicles.filter(x => x !== v), up = foes.filter(x => x.alive).length;
+      const foes = w.vehicles.filter(x => x.team !== v.team), up = foes.filter(x => x.alive).length;
+      const pals = w.vehicles.filter(x => x.team === v.team && x !== v);
       set('h-foe', `${up} / ${foes.length} 대 전투 가능`);
       this.logPanel();
-      document.getElementById('foes').innerHTML = foes.map(e =>
+      document.getElementById('foes').innerHTML = pals.map(e => `<div class="pal${e.alive ? '' : ' down'}"><b>${e.label}</b> <span>${e.alive ? e.ai.state : e.status}</span></div>`).join('') + foes.map(e =>
         `<div class="${e.alive ? 'up' : 'down'}"><b>${e.label}</b> <span>${e.alive ? (e.ai ? e.ai.state : '') : e.status}</span></div>`).join('');
       const over = document.getElementById('over');
       if (!v.alive && over.hidden) { over.hidden = false; document.getElementById('over-t').textContent = `격파됨 — ${v.status}`; }
@@ -192,7 +203,7 @@ DS.Game = class Game {
     for (let k = Math.ceil(x0 / 500) * 500; k < x1; k += 500) { const xx = (k - x0) / span * W; c.fillRect(xx, H - 4, 1, 4); }
     for (const p of this.world.projectiles) { c.fillStyle = '#ffcc66'; c.fillRect((p.x - x0) / span * W - 1, sy(p.y) - 1, 3, 3); }
     for (const e of this.world.vehicles) if (e !== v) {
-      c.fillStyle = e.alive ? '#ff5a4a' : '#6b5f52'; c.fillRect((e.pos.x - x0) / span * W - 3, sy(e.pos.y) - 6, 6, 6);
+      c.fillStyle = !e.alive ? '#6b5f52' : e.team === v.team ? '#5ab0ff' : '#ff5a4a'; c.fillRect((e.pos.x - x0) / span * W - 3, sy(e.pos.y) - 6, 6, 6);
     }
   }
 
@@ -234,7 +245,7 @@ DS.Game = class Game {
     const R = Math.max(25, this.sightRs);
     const fov = (this.sightMag === 10 ? 6.5 : 21) * Math.PI / 180, mil = W / (fov * 1000);   // px per mil
     // recoil kick + muzzle blast obscuration after our own shot; hull vibration on the move
-    if (v.gun.fired !== this._fired) { if (this._fired != null) this.kick = 1; this._fired = v.gun.fired; }
+    if (v.gun.fired !== this._fired) { if (this._fired != null) this.kick = Math.max(this.kick || 0, DS.AMMO[v.gun.ammo].d >= 0.1 ? 1 : 0.16); this._fired = v.gun.fired; }
     this.kick = Math.max(0, (this.kick || 0) - dt / 1.6);
     const k2 = this.kick * this.kick, shake = (k2 * 6 + Math.min(1, Math.abs(v.vt) / 12) * 0.35) / mil / 1000 * R;
     const o = v.sightOrigin(), a = v.gun.aimW;
@@ -275,7 +286,7 @@ DS.Game = class Game {
     c.fillStyle = sym;
     c.fillText(v.fc.range ? String(Math.round(v.fc.range)).padStart(4, '0') : '----', cx, by);
     c.textAlign = 'right'; c.fillText(g.reload > 0 ? '' : '▮ READY', cx - W * 0.1, by);
-    c.textAlign = 'left'; c.fillText((A.type === 'HEAT' ? 'HEAT' : 'SABOT') + (lasing ? '  ✱' : ''), cx + W * 0.1, by);
+    c.textAlign = 'left'; c.fillText((v.tow && (v.tow.missile || v.tow.up >= 1) ? 'TOW' : A.sight || (A.type === 'HEAT' ? 'HEAT' : 'SABOT')) + (lasing ? '  ✱' : ''), cx + W * 0.1, by);
     c.textAlign = 'center'; c.font = `600 ${Math.max(10, Math.round(W / 40))}px ui-monospace, monospace`;
     c.fillText(`GPS ×${this.sightMag}  ${this.thermal ? 'TIS ' + (this.blackHot ? 'BH' : 'WH') : 'DAY'}`, cx, cy - L - 6);
   }

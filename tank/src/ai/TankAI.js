@@ -9,7 +9,7 @@ DS.AI = {
     const dx = t.x - o.x, dy = t.y - o.y, L = Math.hypot(dx, dy), n = Math.ceil(L / 3);
     for (let i = 1; i < n; i++) { const f = i / n; if (o.y + dy * f < T.height(o.x + dx * f)) return false; }
     for (const v of world.vehicles) {
-      if (v === a || v === b) continue;
+      if (v === a || v === b || v.team === a.team) continue;
       if (DS.Armor.raycast({ vehicles: [v] }, o.x, o.y, t.x, t.y, null)) return false;
     }
     return true;
@@ -18,21 +18,33 @@ DS.AI = {
 };
 
 DS.TankAI = class TankAI {
-  constructor(v, world) {
-    this.v = v; this.w = world; v.ai = this;
+  constructor(v, world, opt = {}) {
+    this.v = v; this.w = world; v.ai = this; this.follow = opt.follow || null; this.offset = opt.offset || 0;
     this.detect = 0; this.alerted = false; this.los = false; this.tick = Math.random() * 0.3;
     this.lay = 0; this.rangeEst = null; this.sol = null; this.solT = 0; this.shots = 0; this.state = '대기';
     this.ammo = v.def.ammo[0];
     v.fc.se = 0;
   }
-  target() { return this.w.vehicles.find(x => x.team !== this.v.team && x.alive); }
+  target() {                                  // nearest live enemy
+    let best = null, bd = 1e9;
+    for (const x of this.w.vehicles) { if (x.team === this.v.team || !x.alive) continue; const d = Math.abs(x.pos.x - this.v.pos.x); if (d < bd) { bd = d; best = x; } }
+    if (best !== this.tgt) { this.tgt = best; this.detect = 0; this.rangeEst = null; this.sol = null; this.lay = 0; }
+    return best;
+  }
+  // wingman: hold station behind the leader
+  station() {
+    const v = this.v, L = this.follow;
+    if (!L || !v.mobile) return 0;
+    const dx = L.pos.x + this.offset * L.dir - v.pos.x;
+    return Math.abs(dx) < 6 ? 0 : Math.max(-1, Math.min(1, dx / 25));
+  }
 
   update(dt) {
     const v = this.v, W = this.w, S = v.def.sight, r = W.rng;
     v.input.fire = false;
     if (!v.alive || !v.firepower) { v.input.drive = 0; this.state = v.status; return; }
     const tgt = this.target();
-    if (!tgt) { v.input.drive = 0; this.state = '대기'; return; }
+    if (!tgt) { v.input.drive = this.station(); this.state = this.follow ? '대형 유지' : '대기'; return; }
     const range = Math.hypot(tgt.pos.x - v.pos.x, tgt.pos.y - v.pos.y);
     this.tick -= dt;
     if (this.tick <= 0) { this.tick = 0.25; this.los = range < 4000 && DS.AI.los(W, v, tgt); }
@@ -47,13 +59,15 @@ DS.TankAI = class TankAI {
       const dm = S.detectMax || 2500;
       let vis = range >= dm ? 0 : Math.pow(Math.max(0, Math.min(1, (dm - range) / (dm - 700))), 1.5);
       const env = W.env || {};
-      if (env.visibility) vis *= Math.max(0.03, Math.exp(-range / env.visibility) * 2.2);   // no thermal: dust blinds them
-      if (env.night && range > 800) vis *= flash > 1 ? 0.6 : 0.02;                         // IR sights reach ~800 m
+      if (S.thermal) { /* thermal sights see through dust and darkness */ }
+      else if (env.visibility) vis *= Math.max(0.03, Math.exp(-range / env.visibility) * 2.2);   // no thermal: dust blinds them
+      if (!S.thermal && env.night && range > 800) vis *= flash > 1 ? 0.6 : 0.02;                         // IR sights reach ~800 m
       this.detect = Math.min(1.2, this.detect + dt * vis * flash * moving / 3.5);
     } else this.detect = Math.max(0, this.detect - dt * 0.05);
 
     if (this.detect < 1) {
       // no target yet: advance toward the sound of the guns until something is in sight
+      if (this.follow) { v.input.drive = this.station(); this.state = '대형 유지'; return; }
       v.input.drive = this.alerted && !this.los && v.mobile ? v.dir : 0;
       this.state = this.alerted ? (this.los ? '탐색' : '전진') : '대기';
       return;
@@ -61,6 +75,15 @@ DS.TankAI = class TankAI {
     // seen but beyond the gun's effective range: close in (firing on the move is useless for them)
     if (range > (S.engageMax || 2000)) { v.input.drive = v.mobile ? v.dir : 0; this.state = '접근'; this.lay = 0; return; }
     v.input.drive = 0;                                   // halt to shoot
+    if (v.tow) {                                         // Bradley: TOW, guided by keeping the sight on the target
+      const o = v.sightOrigin(), q = tgt.local(tgt.g.ring.x, tgt.g.ring.y + 0.35);     // the turret: the same point the line-of-sight check uses
+      v.fc.se = 0; v.gun.aimW = Math.atan2(q.y - o.y, q.x - o.x);
+      this.lay += dt;
+      if (v.tow.missile) this.state = 'TOW 유도';
+      else if (v.tow.loaded === 0) this.state = v.tow.reserve ? 'TOW 재장전' : 'TOW 소진';
+      else { this.state = 'TOW 조준'; if (this.lay > S.layTime && this.los) { v.input.tow = true; this.lay = 0; this.shots++; } }
+      return;
+    }
     this.state = '조준';
     if (!this.rangeEst) this.rangeEst = range * (1 + DS.AI.gauss(r) * S.rangeErr);
     // re-solve the lay a few times a second (target and own hull move)

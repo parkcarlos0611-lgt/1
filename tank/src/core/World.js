@@ -5,15 +5,24 @@ DS.World = class World {
     this.cam = new DS.Camera();
     this.particles = new DS.Particles(DS.T.particles.max);
     this.fx = new DS.Effects(this);
-    this.vehicles = []; this.projectiles = []; this.hits = []; this.log = [];
+    this.vehicles = []; this.missiles = []; this.projectiles = []; this.hits = []; this.log = [];
     this.wind = 2.5; this.time = 0; this.acc = 0; this.debug = false;
     this.rng = DS.rng(1991);
     this.env = { visibility: 0, night: 0, wind: 2.5 };
   }
   spawnProjectile(x, y, vx, vy, ammo, owner) { const p = new DS.Projectile(x, y, vx, vy, ammo, owner); this.projectiles.push(p); return p; }
 
+  spawnMissile(x, y, ang, owner, ammo) { const m = new DS.Missile(x, y, ang, owner, ammo); this.missiles.push(m); return m; }
+  onMissileHit(m, h) {
+    if (h.kind === 'armor') {
+      const log0 = this.log[0];
+      this.onProjectileHit(m, h);
+      if (this.log[0] !== log0 && this.log[0].result === 'ricochet') this.fx.impact({ x: h.hit.x, y: h.hit.y, vx: m.vx, vy: m.vy, ammo: m.ammo, onArmor: true });   // fuze grazed: still bursts
+      m.alive = false;
+    } else { this.fx.impact(h); if (!m.owner.ai) this.addLog({ ground: true, range: h.range, ammo: h.ammo, t: h.t }); }
+  }
   onProjectileHit(p, h) {
-    if (p.ammo.type === 'MG') return this.onBulletHit(p, h);
+    if (p.ammo.small) return this.onBulletHit(p, h);
     const ai = p.owner && p.owner.ai;
     if (h.kind === 'ground') {
       this.fx.impact(h); this.hits.push(h); if (this.hits.length > 20) this.hits.shift();
@@ -41,6 +50,7 @@ DS.World = class World {
     if (h.kind === 'ground') { this.fx.bulletGround(h); return; }
     const r = DS.Armor.resolve(this, p, h.hit);
     this.fx.bulletArmor(r);
+    if (r.result === 'pen' && r.effects.some(e => e !== '파편 피해 경미')) { r.t = p.t; r.shooter = p.owner; this.addLog(r); }
     if (r.result === 'ricochet') { p.x = r.reflect.x; p.y = r.reflect.y; p.vx = r.reflect.vx; p.vy = r.reflect.vy; p.ignore = h.hit.v; p.ignoreT = 0.05; }
     else p.alive = false;
   }
@@ -57,11 +67,14 @@ DS.World = class World {
         if (hit) this.onProjectileHit(p, hit);
       }
       this.projectiles = this.projectiles.filter(p => p.alive);
+      for (const m of this.missiles) { const hit = m.step(h, this); if (hit) this.onMissileHit(m, hit); }
+      this.missiles = this.missiles.filter(m => m.alive);
       this.acc -= h; this.time += h;
     }
     this.terrain.relax(undefined, undefined, 1);
     for (const v of this.vehicles) this.fx.vehicle(v, frameDt);
     this.fx.ambient(frameDt);
+    for (const m of this.missiles) this.fx.missile(m, frameDt);
     this.particles.update(frameDt, this.terrain, this.wind);
     this.fx.update(frameDt);
     if (this.vehicles[0]) this.cam.follow(this.vehicles[0], frameDt);

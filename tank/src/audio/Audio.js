@@ -67,6 +67,17 @@ DS.Audio = {
     if (heavy) { this.tone(p.t, 140, 60, 0.09, 0.55 * k, p.cut); this.burst(p.t, 0.07, 'bandpass', 900, 0.8, 0.7 * k, p.cut); }
     else { this.tone(p.t, 220, 110, 0.05, 0.25 * k, p.cut); this.burst(p.t, 0.045, 'bandpass', 1700, 0.9, 0.5 * k, p.cut); }
   },
+  cannon(x, y) {                           // 25 mm chain gun
+    if (!this.ok()) return;
+    const p = this.place(x, y), k = p.g;
+    this.tone(p.t, 110, 45, 0.14, 0.9 * k, p.cut); this.burst(p.t, 0.12, 'lowpass', 2600, 0.7, 0.9 * k, p.cut);
+  },
+  tow(x, y) {                              // launch motor bang, then the flight motor's hiss
+    if (!this.ok()) return;
+    const p = this.place(x, y);
+    this.tone(p.t, 150, 60, 0.2, 0.9 * p.g, p.cut); this.burst(p.t, 0.25, 'lowpass', 3000, 0.7, 1.0 * p.g, p.cut);
+    const f = this.burst(p.t + 0.1, 1.6, 'bandpass', 2400, 0.8, 0.5 * p.g, p.cut, 0.15); f.frequency.exponentialRampToValueAtTime(900, p.t + 1.6);
+  },
   ground(x, y, heat) {                     // shell striking sand
     if (!this.ok()) return;
     const p = this.place(x, y);
@@ -136,10 +147,11 @@ DS.Audio = {
     if (!me) return;
     const alive = me.alive || me.burning < 2;
     const rpm = alive ? Math.min(1, 0.25 + 0.75 * me.spool + Math.abs(me.vt) / 40) : 0;
+    const turb = me.def.engine.type === 'turbine' ? 1 : 0.12, dz = turb === 1 ? 1 : 1.9;     // diesel: little whine, more rumble
     set(this.wh1.frequency, 420 + 900 * rpm); set(this.wh2.frequency, (420 + 900 * rpm) * 1.507);
-    set(this.whine.f.frequency, (420 + 900 * rpm) * 2); set(this.whine.g.gain, alive ? 0.02 + 0.05 * rpm : 0);
+    set(this.whine.f.frequency, (420 + 900 * rpm) * 2); set(this.whine.g.gain, alive ? (0.02 + 0.05 * rpm) * turb : 0);
     set(this.rush.g.gain, alive ? 0.03 + 0.09 * rpm : 0); set(this.rush.f.frequency, 1600 + 1600 * rpm);
-    set(this.rumble.g.gain, alive ? 0.12 + 0.25 * me.spool : 0);
+    set(this.rumble.g.gain, alive ? (0.12 + 0.25 * me.spool) * dz : 0); set(this.rumble.f.frequency, turb === 1 ? 140 : 95 + 80 * rpm);
     const v = Math.abs(me.vt), rate = v / me.def.track.pitch / 4;          // audible clank: every 4th link
     set(this.lfo.frequency, Math.max(2, Math.min(120, rate)));
     set(this.trk.g.gain, Math.min(0.5, v / 6) * 0.55);

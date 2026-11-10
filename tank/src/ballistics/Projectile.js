@@ -28,7 +28,7 @@ DS.Projectile = class Projectile {
       const nvx = this.vx + ax * h, nvy = this.vy + ay * h;
       if (world) {
         if (this.ignoreT > 0) { this.ignoreT -= h; if (this.ignoreT <= 0) this.ignore = this.owner; }
-        const hit = DS.Armor.raycast(world, this.x, this.y, nx, ny, this.ignore);
+        const hit = DS.Armor.raycast(world, this.x, this.y, nx, ny, this.ignore, this.owner && this.owner.team);
         if (hit) {
           this.x = hit.x; this.y = hit.y; this.vx = nvx; this.vy = nvy; this.t += h * hit.t;
           return { kind: 'armor', hit };

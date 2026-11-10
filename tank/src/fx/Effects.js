@@ -61,7 +61,7 @@ DS.Effects = class Effects {
         { grow: 2, drag: 2, grav: 0, alpha: 0.9, col: 0xffa040 });
       if (Math.random() < 0.5) P.add(K.DARK, p.x, p.y + 2, this.rnd(-1, 1), this.rnd(3, 6), this.rnd(5, 9), 0.8, { grow: 1.1, drag: 0.8, grav: -0.03, alpha: 0.4, col: 0x2a2724 });
     }
-    for (const e of v.events) { if (e.type === 'fire') this.muzzle(v, e); else if (e.type === 'mg') this.mgFire(v, e); else if (e.type === 'explode') this.explode(v); }
+    for (const e of v.events) { if (e.type === 'fire') this.muzzle(v, e); else if (e.type === 'mg') this.mgFire(v, e); else if (e.type === 'tow') this.towLaunch(v, e); else if (e.type === 'explode') this.explode(v); }
     v.events.length = 0;
   }
 
@@ -154,17 +154,53 @@ DS.Effects = class Effects {
     const bx = e.x - e.dx * (e.heavy ? 1.5 : 0.8), by = e.y - e.dy * (e.heavy ? 1.5 : 0.8);
     P.add(K.GRAIN, bx, by, -e.dy * this.rnd(1.5, 3) + v.vel.x, this.rnd(2, 4), this.rnd(1.5, 2.5), e.heavy ? 0.06 : 0.04, { drag: 0.1, grav: 1, col: 0xd9a63c });
   }
+  // 25 mm chain gun: sharp flash, smoke puff, link/case thrown out
+  cannon(v, e) {
+    const P = this.P, K = DS.P;
+    DS.Audio.cannon(e.x, e.y);
+    this.flashes.push({ x: e.x, y: e.y, dx: e.dx, dy: e.dy, t: 0, ttl: 0.05, small: 1.5 });
+    for (let i = 0; i < 5; i++) P.add(K.SMOKE, e.x, e.y, e.dx * this.rnd(4, 18) + this.rnd(-1, 1), e.dy * this.rnd(4, 18) + this.rnd(-1, 1), this.rnd(1, 2.2), 0.18,
+      { grow: 0.5, drag: 3, grav: -0.02, alpha: 0.28, col: 0xd9d6cf });
+    P.add(K.GRAIN, e.x - e.dx * 1.6, e.y - e.dy * 1.6 + 0.1, -e.dx * this.rnd(1, 2) + v.vel.x, this.rnd(2, 4), 2, 0.07, { drag: 0.1, grav: 1, col: 0xd9a63c });
+    this.shake = Math.max(this.shake, 0.08);
+  }
+  towLaunch(v, e) {
+    const P = this.P, K = DS.P, dx = Math.cos(e.a), dy = Math.sin(e.a);
+    DS.Audio.tow(e.x, e.y);
+    this.flashes.push({ x: e.x, y: e.y, dx, dy, t: 0, ttl: 0.09, small: 2.2 });
+    for (let i = 0; i < 40; i++) { const back = Math.random() < 0.6 ? -1 : 1, sp = this.rnd(3, 22);       // back-blast and front puff
+      P.add(K.SMOKE, e.x - dx * (back < 0 ? 1.2 : 0), e.y - dy * (back < 0 ? 1.2 : 0), dx * sp * back + this.rnd(-2, 2), dy * sp * back + this.rnd(-1, 2), this.rnd(2, 4.5), 0.35,
+        { grow: 0.9, drag: 2.5, grav: -0.02, alpha: 0.35, col: 0xdedad2 }); }
+    this.shake = Math.max(this.shake, 0.25);
+  }
+  missile(m, dt) {
+    const P = this.P, K = DS.P, bx = m.x - Math.cos(m.ang) * 0.6, by = m.y - Math.sin(m.ang) * 0.6;
+    if (m.t < 1.7) for (let i = 0; i < 3; i++) P.add(K.FIRE, bx, by, -m.vx * 0.1 + this.rnd(-1, 1), -m.vy * 0.1 + this.rnd(-1, 1), this.rnd(0.06, 0.14), 0.22, { grow: 1, drag: 3, grav: 0, alpha: 0.9, col: 0xffc070 });
+    if (Math.random() < dt * 60) P.add(K.SMOKE, bx, by, this.rnd(-0.5, 0.5), this.rnd(-0.2, 0.6), this.rnd(1.2, 2.4), 0.14, { grow: 0.35, drag: 1.5, grav: -0.01, alpha: m.t < 1.7 ? 0.3 : 0.1, col: 0xdedad2 });
+  }
   bulletGround(h) {
     const P = this.P, K = DS.P, T = this.w.terrain, sc = this.hex(T.soilAt(h.x).col[1]);
+    if (h.ammo.pen.ce) this.smallHE(h.x, h.y + 0.1, true);
     DS.Audio.bullet(h.x, h.y);
     for (let i = 0; i < 5; i++) P.add(K.GRAIN, h.x, h.y + 0.05, this.rnd(-1.5, 1.5) + h.vx * 0.003, this.rnd(1.5, 4), this.rnd(0.3, 0.7), 0.035, { drag: 0.5, col: sc });
     P.add(K.DUST, h.x, h.y + 0.15, this.rnd(-0.5, 0.5), this.rnd(0.3, 1), this.rnd(1, 2), 0.18, { grow: 0.5, drag: 1.5, grav: 0, alpha: 0.35, col: sc });
   }
   bulletArmor(r) {
     const P = this.P, K = DS.P;
+    if (r.ammo.pen.ce && r.result !== 'ricochet') this.smallHE(r.x, r.y, false);
+    if (r.ammo.d > 0.01 && r.result === 'pen') this.labels.push({ x: r.x, y: r.y + 1, t: 2.6, r });
     DS.Audio.bullet(r.x, r.y);
     for (let i = 0; i < 6; i++) { const a = this.rnd(0, 6.28), sp = this.rnd(3, 14);
       P.add(K.FIRE, r.x, r.y, Math.cos(a) * sp, Math.sin(a) * sp, this.rnd(0.05, 0.15), 0.04, { grow: 0, drag: 2, grav: 0.6, alpha: 1, col: 0xffe2a0 }); }
+  }
+
+  // 25 mm HEI burst
+  smallHE(x, y, ground) {
+    const P = this.P, K = DS.P;
+    this.flashes.push({ x, y, dx: 0, dy: 1, t: 0, ttl: 0.05, small: 0.9 });
+    for (let i = 0; i < 7; i++) { const a = this.rnd(0, Math.PI), sp = this.rnd(2, 9); P.add(K.FIRE, x, y, Math.cos(a) * sp, Math.sin(a) * sp, this.rnd(0.05, 0.14), 0.18, { grow: 2, drag: 6, grav: 0, alpha: 0.9, col: 0xffb050 }); }
+    P.add(K.DARK, x, y + 0.2, this.rnd(-0.5, 0.5), this.rnd(0.5, 1.5), this.rnd(1.2, 2.2), 0.3, { grow: 0.6, drag: 1.2, grav: -0.02, alpha: 0.35, col: 0x3a3631 });
+    if (ground) { this.w.terrain.crater(x, 0.3, 0.06, 0.3); DS.Audio.ground(x, y, false); }
   }
 
   // armour strike visuals: sparks for ricochet / non-penetration, flash + smoke for penetration
@@ -188,6 +224,7 @@ DS.Effects = class Effects {
   }
 
   muzzle(v, e) {
+    if (e.ammo.d < 0.05) return this.cannon(v, e);
     const P = this.P, K = DS.P, T = this.w.terrain;
     DS.Audio.gun(e.x, e.y, parseInt((v.def.gun.name.match(/(\d+)mm/) || [0, 120])[1]));
     this.flashes.push({ x: e.x, y: e.y, dx: e.dx, dy: e.dy, t: 0, ttl: 0.085 });

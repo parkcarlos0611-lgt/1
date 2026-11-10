@@ -259,6 +259,39 @@ DS.Renderer = class Renderer {
   vehicle(ctx, v, cam) {
     if (v.scorch.length || v.burning) this.charred(ctx, v, cam);
     else this.drawVehicle(ctx, v, cam);
+    const t = v.tow;
+    if (!v.turretGone && ((this.w.xray && v === this.w.vehicles[0]) || (t && t.up > 0 && t.up < 1) || (t && t.missile))) this.xray(ctx, v, cam, this.w.xray && v === this.w.vehicles[0]);
+  }
+
+  // X-ray overlay: what the side view hides — the TOW launcher on the far side of the turret (it rises and
+  // follows the gun), and with the view switched on, the crew, ammunition, fuel and engine
+  xray(ctx, v, cam, full) {
+    const D = v.def, lw = Math.max(0.02, 1.4 / cam.zoom);
+    ctx.save(); ctx.translate(v.pos.x, v.pos.y); ctx.rotate(v.ang); ctx.scale(v.dir, 1);
+    ctx.lineWidth = lw; ctx.lineJoin = 'round';
+    if (full) {
+      const col = { crew: '120,220,255', ammo: '255,120,90', ammo_bustle: '255,120,90', ammo_carousel: '255,120,90', fuel_ammo: '255,150,80', fuel: '255,200,90', engine: '190,190,200', gun: '200,255,160', optics: '200,255,160' };
+      for (const m of D.modules) {
+        const c = col[m.type] || '255,255,255', dead = v.modState[m.id];
+        ctx.fillStyle = `rgba(${dead ? '90,90,90' : c},0.28)`; ctx.strokeStyle = `rgba(${dead ? '90,90,90' : c},0.95)`;
+        ctx.beginPath(); ctx.arc(m.p[0], m.p[1], m.r, 0, 7); ctx.fill(); ctx.stroke();
+        if (m.type === 'crew') { ctx.beginPath(); ctx.arc(m.p[0], m.p[1] + m.r * 0.35, m.r * 0.3, 0, 7); ctx.stroke(); }
+      }
+    }
+    if (D.tow) {
+      const T = D.tow, t = v.tow, w = T.len, h = T.h;
+      ctx.translate(T.c[0], T.c[1] + T.lift * t.up); ctx.rotate(v.gun.e * t.up);
+      ctx.fillStyle = 'rgba(120,230,255,0.22)'; ctx.strokeStyle = 'rgba(140,235,255,0.95)';
+      ctx.beginPath(); ctx.rect(-w / 2, -h / 2, w, h); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-w / 2, 0); ctx.lineTo(w / 2, 0); ctx.stroke();                 // two tubes, one above the other
+      for (const k of [-1, 1]) {
+        const loaded = t.loaded >= (k < 0 ? 2 : 1);
+        if (loaded) { ctx.fillStyle = 'rgba(255,190,90,0.55)'; ctx.fillRect(-w / 2 + 0.08, k * h / 4 - 0.06, w - 0.25, 0.12); }
+        ctx.beginPath(); ctx.ellipse(w / 2, k * h / 4, 0.04, h / 4 - 0.02, 0, 0, 7); ctx.stroke();
+      }
+      ctx.beginPath(); ctx.moveTo(-w * 0.2, -h / 2); ctx.lineTo(-w * 0.2, -h / 2 - T.lift * t.up); ctx.stroke();   // lift arm
+    }
+    ctx.restore();
   }
 
   // Damaged vehicle: drawn to an offscreen layer, then char marks are painted 'source-atop' so they
@@ -402,9 +435,18 @@ DS.Renderer = class Renderer {
 
   projectiles(ctx, cam) {
     ctx.lineCap = 'round';
+    for (const m of this.w.missiles) {                            // missile body + tail flare (always ≥ 2 px)
+      ctx.save(); ctx.translate(m.x, m.y); ctx.rotate(m.ang);
+      ctx.fillStyle = '#3a3d34'; ctx.fillRect(-0.6, -0.076, 1.2, 0.152); ctx.fillStyle = '#22241f'; ctx.fillRect(-0.55, -0.2, 0.25, 0.4);
+      ctx.restore();
+      const r = Math.max(0.22, 2.2 / cam.zoom), bx = m.x - Math.cos(m.ang) * 0.6, by = m.y - Math.sin(m.ang) * 0.6;
+      const g = ctx.createRadialGradient(bx, by, 0, bx, by, r * 2.2);
+      g.addColorStop(0, 'rgba(255,245,210,1)'); g.addColorStop(0.4, 'rgba(255,170,70,0.8)'); g.addColorStop(1, 'rgba(255,120,30,0)');
+      ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = g; ctx.fillRect(bx - r * 2.2, by - r * 2.2, r * 4.4, r * 4.4); ctx.globalCompositeOperation = 'source-over';
+    }
     for (const p of this.w.projectiles) {
-      if (p.ammo.type === 'MG' && !p.tracer) continue;          // only every 5th round is a tracer
-      const v = Math.hypot(p.vx, p.vy), L = p.ammo.type === 'MG' ? Math.min(v * 0.012, 12) : Math.min(v * 0.025, 40);
+      if (p.ammo.small && !p.tracer) continue;                  // only tracer rounds are visible
+      const v = Math.hypot(p.vx, p.vy), L = p.ammo.small ? Math.min(v * 0.012, 12) : Math.min(v * 0.025, 40);
       const g = ctx.createLinearGradient(p.x, p.y, p.x - p.vx / v * L, p.y - p.vy / v * L);
       g.addColorStop(0, p.ammo.tracer); g.addColorStop(1, 'rgba(255,200,120,0)');
       ctx.strokeStyle = g; ctx.lineWidth = Math.max(0.06, 2 / cam.zoom);

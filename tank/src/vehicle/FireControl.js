@@ -8,7 +8,7 @@ DS.FireControl = {
     let px = o.x, py = o.y;
     for (let d = 2; d <= maxR; d += 2) {
       const x = o.x + dx * d, y = o.y + dy * d;
-      const hit = DS.Armor.raycast(world, px, py, x, y, v);
+      const hit = DS.Armor.raycast(world, px, py, x, y, v, v.team);
       if (hit) return { range: Math.hypot(hit.x - o.x, hit.y - o.y), x: hit.x, y: hit.y, vehicle: hit.v };
       if (y < T.height(x)) {
         let lo = d - 2, hi = d;

@@ -26,11 +26,19 @@ DS.AMMO = {
     pen: { ce: 490 },                                 // 480–500 mm at any range
     crit: 80,                                         // fuze graze angle
   },
+  // ---- M2A2 Bradley (user data): 25 mm M242 and TOW 2 ----
+  M791: { name: 'M791 APDS-T', short: 'M791', sight: 'AP', type: 'APDS', small: true, v0: 1345, mass: 0.134, d: 0.0115,
+    cd: [[0, 0.3], [1, 0.55], [2, 0.5], [3, 0.46], [5, 0.43]], launchMass: 0.46, sabot: false, tracer: '#ff7848', tracerEvery: 1,
+    pen: { ke: 62, at: 1000, s: 1.0e6 }, crit: 68 },                // ≥ 60 mm RHA @ 1,000 m
+  M792: { name: 'M792 HEI-T', short: 'M792', sight: 'HE', type: 'HEI', small: true, v0: 1100, mass: 0.184, d: 0.025,
+    cd: [[0, 0.25], [1, 0.5], [2, 0.44], [3, 0.4]], launchMass: 0.5, sabot: false, tracer: '#ff7848', tracerEvery: 1,
+    pen: { ce: 12 }, crit: 75 },
+  TOW2: { name: 'BGM-71D TOW 2', short: 'TOW 2', type: 'HEAT', d: 0.152, tracer: '#ffb060', pen: { ce: 900 }, crit: 84 },   // ≈ 900 mm RHA
   // ---- machine-gun rounds (game values) ----
-  M2_50: { name: '12.7mm M8 API / M33', short: '12.7mm', type: 'MG', v0: 887, mass: 0.046, d: 0.0127,
+  M2_50: { name: '12.7mm M8 API / M33', short: '12.7mm', type: 'MG', small: true, v0: 887, mass: 0.046, d: 0.0127,
     cd: [[0, 0.22], [1, 0.48], [2, 0.40], [3, 0.35]], launchMass: 0.046, sabot: false, tracer: '#ff6040', tracerEvery: 5,
     pen: { ke: 25, at: 100, s: 1.0e6 }, crit: 60 },
-  M240_762: { name: '7.62mm M80 / M62', short: '7.62mm', type: 'MG', v0: 853, mass: 0.0095, d: 0.00762,
+  M240_762: { name: '7.62mm M80 / M62', short: '7.62mm', type: 'MG', small: true, v0: 853, mass: 0.0095, d: 0.00762,
     cd: [[0, 0.24], [1, 0.5], [2, 0.42], [3, 0.37]], launchMass: 0.0095, sabot: false, tracer: '#ff6040', tracerEvery: 5,
     pen: { ke: 8, at: 100, s: 1.0e6 }, crit: 55 },
   // ---- Iraqi rounds: PROVISIONAL (typical published figures; replace with supplied data) ----

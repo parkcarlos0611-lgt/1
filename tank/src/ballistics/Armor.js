@@ -22,11 +22,11 @@ DS.Armor = {
   },
 
   // nearest plate hit along segment p0→p1 (only plates facing the ray). returns {v, pl, t, x, y} or null
-  raycast(world, x0, y0, x1, y1, ignore) {
+  raycast(world, x0, y0, x1, y1, ignore, team) {
     let best = null;
     const dx = x1 - x0, dy = y1 - y0;
     for (const v of world.vehicles) {
-      if (v === ignore) continue;
+      if (v === ignore || (team && v.team === team)) continue;   // friends are in another lane of the 2D line
       // broad phase: distance from vehicle centre to the segment
       const L2 = dx * dx + dy * dy || 1e-9;
       let u = ((v.pos.x - x0) * dx + (v.pos.y - y0) * dy) / L2; u = Math.max(0, Math.min(1, u));
@@ -76,7 +76,7 @@ DS.Armor = {
     const obl = Math.acos(cosT) * 180 / Math.PI;
     const M = DS.MATERIALS[P.mat];
     const los = P.t / cosT;
-    const heat = A.type === 'HEAT';
+    const heat = !!A.pen.ce;
     const prot = los * (heat ? M.ce : M.ke);
     const pen = this.penetration(A, sp);
     const range = Math.abs(hit.x - proj.x0);

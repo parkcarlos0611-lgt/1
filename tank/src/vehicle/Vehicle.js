@@ -215,7 +215,7 @@ DS.Vehicle = class Vehicle {
   }
   stepTow(dt, world) {
     const t = this.tow; if (!t) return;
-    const T = this.def.tow, halted = Math.abs(this.vt) < 0.6, ok = this.alive && this.firepower && !this.turretGone;
+    const T = this.def.tow, halted = Math.abs(this.vt) < 0.6, ok = this.alive && this.firepower && !this.turretGone && !this.towBroken;
     if (this.input.tow) { this.input.tow = false; if (ok) { t.armed = true; t.req = true; t.idle = 0; } }
     if (t.missile && !t.missile.alive) { t.missile = null; t.idle = 0; }
     if (!t.missile) t.idle += dt;
@@ -338,6 +338,7 @@ DS.Vehicle = class Vehicle {
         if (id === 'gunner' && this.modState.commander) this.firepower = false;
         if (this.crewAlive() <= 1 || (this.modState.gunner && this.modState.commander)) { this.knockOut('승무원 전투 불능'); out += ' → 승무원 전투 불능'; }
         break;
+      case 'tow': this.towBroken = true; out += ' → TOW 사용 불가'; break;
       case 'gun': case 'optics': this.firepower = false; out += ' → 화력 불능'; break;
       case 'engine': this.mobile = false; out += ' → 기동 불능'; if (rnd() < 0.2) { this.ignite(); out += ', 화재'; } break;
       case 'fuel': if (rnd() < 0.45) { this.ignite(); out += ' → 화재'; } break;

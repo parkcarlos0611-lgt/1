@@ -80,7 +80,7 @@ DS.Game = class Game {
       if (e.code === 'KeyB') { this.blackHot = !this.blackHot; this.sightCv.classList.toggle('bh', this.blackHot); }
       if (e.code === 'KeyG') this.sightCv.classList.toggle('big');
       if (e.code === 'KeyX') { if (this.player.tow) this.player.input.tow = true; else this.toast('TOW 미사일은 브래들리 전용'); }
-      if (e.code === 'KeyZ') { this.world.xray = !this.world.xray; this.toast(this.world.xray ? 'TOW 발사관 엑스레이 켬' : 'TOW 발사관 엑스레이 끔'); }
+      if (e.code === 'KeyZ') { this.world.xray = this.world.xray === false; this.toast(this.world.xray ? 'TOW 발사관 투시 켬' : 'TOW 발사관 투시 끔'); }
       if (e.code === 'KeyR') this.player.place(this.player.pos.x);
       if (e.code === 'KeyC' && this.mouse) { const m = cam.toWorld(this.mouse.x, this.mouse.y); this.world.terrain.crater(m.x, 1.6, 0.7); this.world.terrain.relax(undefined, undefined, 8); }
       if (e.code === 'KeyH') document.getElementById('help').classList.toggle('hide');

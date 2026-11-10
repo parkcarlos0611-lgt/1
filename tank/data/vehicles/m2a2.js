@@ -59,6 +59,7 @@ DS.VEHICLES = DS.VEHICLES || {};
       { id: 'gunner', name: '포수', type: 'crew', p: L(345, 188), r: 0.30 },
       { id: 'commander', name: '차장', type: 'crew', p: L(285, 178), r: 0.30 },
       { id: 'gun', name: '기관포', type: 'gun', p: L(410, 172), r: 0.22 },
+      { id: 'towl', name: 'TOW 발사관', type: 'tow', p: L(324, 172), r: 0.32 },
       { id: 'ammo25', name: '25 mm 탄약', type: 'ammo', p: L(320, 255), r: 0.35 },
       { id: 'towstow', name: 'TOW 예비탄', type: 'ammo', p: L(150, 285), r: 0.35 },
       { id: 'fuel', name: '연료탱크', type: 'fuel', p: L(240, 315), r: 0.32 },

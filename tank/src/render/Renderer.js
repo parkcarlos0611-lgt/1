@@ -389,8 +389,8 @@ DS.Renderer = class Renderer {
     };
     if (tw) { ctx.save(); ctx.translate(-S.ox, -S.oy); towPose(ctx); ctx.drawImage(I[Sp.tow.file], Sp.tow.x, Sp.tow.y); ctx.restore(); }
     ctx.drawImage(I.turret, tt.x - S.ox, tt.y - S.oy);
-    // X-ray: the launcher's outline where the turret covers it (raised, moving, guiding, or Z held on)
-    if (tw && I[Sp.tow.file + '_xray'] && (v.tow.up > 0 || v.tow.missile || (this.w.xray && v === this.w.vehicles[0]))) {
+    // X-ray: the launcher is always there on the far side — its outline shows through the turret (Z hides it)
+    if (tw && I[Sp.tow.file + '_xray'] && this.w.xray !== false && !v.towBroken) {
       const im = I.turret, oc = this.xo || (this.xo = document.createElement('canvas'));
       if (oc.width !== im.width || oc.height !== im.height) { oc.width = im.width; oc.height = im.height; }
       const o = oc.getContext('2d');

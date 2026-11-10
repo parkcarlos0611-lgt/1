@@ -7,6 +7,7 @@
 <style>
   :root { color-scheme: dark; --tx: #f3ead8; --mu: #b9ab90; --bg: rgba(24,19,12,.62); --ok: #7fe08f; --warn: #ffcc66; }
   * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
   html, body { margin: 0; height: 100%; overflow: hidden; background: #c9b48a; color: var(--tx);
     font: 13px/1.35 system-ui, -apple-system, 'Noto Sans KR', sans-serif; -webkit-tap-highlight-color: transparent; }
   canvas#view { position: fixed; inset: 0; display: block; touch-action: none; cursor: crosshair; }
@@ -106,7 +107,7 @@
   <div><kbd>E</kbd> 레이저 거리측정 (탄도컴퓨터 자동 보정)</div>
   <div><kbd>F</kbd> 동축 M240 · 우클릭 유지: 전차장 M2 (마우스로 조준)</div>
   <div><kbd>V</kbd> 조준경 3× / 10× · <kbd>T</kbd> 열상 · <kbd>B</kbd> 백열/흑열</div>
-  <div><kbd>G</kbd> 조준경 크게 보기 · <kbd>Z</kbd> TOW 발사관 엑스레이</div>
+  <div><kbd>G</kbd> 조준경 크게 보기 · <kbd>Z</kbd> TOW 발사관 투시 끄기/켜기</div>
   <div><kbd>X</kbd> TOW 발사 (브래들리, 정지 상태 · 명중까지 조준선 유지)</div>
   <div><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> 근접 / 전투 / 전술 줌 · 휠 연속 줌</div>
   <div><kbd>C</kbd> 마우스 위치에 크레이터 · <kbd>R</kbd> 차량 리셋</div>

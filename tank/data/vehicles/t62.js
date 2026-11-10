@@ -34,7 +34,7 @@ DS.VEHICLES = DS.VEHICLES || {};
       elevMax: 16, elevMin: -6, rate: 0.22, recoilLen: 0.42, recoilMass: 2100, reload: 8.0, stabilized: true },
     turretRing: L(1280, 463),
     antennas: [{ x: L(1184, 398)[0], y: L(1184, 398)[1], len: 1.2 }],
-    sight: { laser: false, rangeErr: 0.09, aimErr: 0.55, layTime: 5, detectMax: 2200, engageMax: 1500 },
+    sight: { laser: false, rangeErr: 0.13, aimErr: 4.8, layTime: 7, detectMax: 2200, engageMax: 1500 },
     armor: [
       { name: '포탑 전면 상부', part: 'turret', a: L(1370, 400), b: L(1412, 422), t: 230, mat: 'cast', n: 60, h: 0 },
       { name: '포 방패', part: 'turret', a: L(1412, 422), b: L(1412, 450), t: 230, mat: 'cast', n: 0, h: 0 },

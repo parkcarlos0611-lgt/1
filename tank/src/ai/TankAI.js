@@ -99,7 +99,7 @@ DS.TankAI = class TankAI {
       const px = o.x + (t.x - o.x) / d * this.rangeEst, py = o.y + (t.y - o.y) / d * this.rangeEst;
       if (v.gun.ammo !== this.ammo) v.gun.ammo = this.ammo;
       this.sol = DS.FireControl.solve(v, this.ammo, px, py);
-      this.jit = DS.AI.gauss(r) * S.aimErr / 1000 * (1 + Math.pow(range / 1000, 2));   // lay error grows quickly with range
+      this.jit = DS.AI.gauss(r) * S.aimErr / 1000 * (1 + Math.pow(range / 800, 2));   // lay error grows quickly with range (tools/hitbench.js)
     }
     v.fc.se = 0;
     v.gun.aimW = this.sol + this.jit;
@@ -117,7 +117,8 @@ DS.TankAI = class TankAI {
     if (end.hitVehicle && end.hitVehicle.team !== this.v.team) return;          // on target: keep the lay
     if (!this.rangeEst || end.x == null) return;
     const toward = Math.sign(this.tgtX - this.v.pos.x), d = (end.x - this.tgtX) * toward;
-    if (d < -3) this.rangeEst += Math.min(-d, this.rangeEst * 0.3) * 0.85;        // short
-    else if (d > 3) this.rangeEst -= Math.min(d, this.rangeEst * 0.12) * 0.6;     // over
+    // poorly drilled crews only partly correct from the fall of shot
+    if (d < -3) this.rangeEst += Math.min(-d, this.rangeEst * 0.3) * 0.45;        // short
+    else if (d > 3) this.rangeEst -= Math.min(d, this.rangeEst * 0.12) * 0.35;    // over
   }
 };

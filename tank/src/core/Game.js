@@ -23,17 +23,32 @@ DS.Game = class Game {
   }
   menu() {
     const el = document.getElementById('menu'), list = document.getElementById('missions');
-    list.innerHTML = DS.MISSIONS.map((m, i) => `<button class="mcard" type="button" data-i="${i}">
-      <span class="mno">작전 ${i + 1}</span><b>${m.name}</b><span class="mdate">${m.date}</span>
-      <span class="mbrief">${m.brief}</span><span class="mcond">${m.cond} · 적 전차 ${m.enemies.length}대</span></button>`).join('');
+    list.innerHTML = DS.MISSIONS.map((m, i) => `<article class="mcard">
+      <span class="mno">${String(i + 1).padStart(2, '0')}</span><span class="mname">${m.name}</span>
+      <span class="mmeta"><span>${m.date}</span><span>${m.cond}</span><span>적 전차 ${m.enemies.length}대</span></span>
+      <span class="mbtns"><button class="mbtn" type="button" data-brief="${i}" aria-expanded="false">브리핑 ▾</button><button class="mbtn go" type="button" data-go="${i}">출격</button></span>
+      <p class="mbrief" id="brief-${i}" hidden><b>BRIEFING</b>${m.brief}</p></article>`).join('');
     let veh = 'm1a1';
     document.querySelectorAll('.vpick').forEach(b => b.addEventListener('click', () => { veh = b.dataset.v; document.querySelectorAll('.vpick').forEach(x => x.classList.toggle('on', x === b)); }));
-    list.querySelectorAll('.mcard').forEach(b => b.addEventListener('click', () => { DS.Audio.init(); el.hidden = true; location.hash = 'm' + (+b.dataset.i + 1) + (veh === 'm2a2' ? 'b' : ''); this.begin(+b.dataset.i, veh); }));
+    list.querySelectorAll('[data-brief]').forEach(b => b.addEventListener('click', () => {
+      const p = document.getElementById('brief-' + b.dataset.brief), open = p.hidden;
+      p.hidden = !open; b.setAttribute('aria-expanded', open); b.textContent = open ? '브리핑 ▴' : '브리핑 ▾';
+    }));
+    list.querySelectorAll('[data-go]').forEach(b => b.addEventListener('click', () => { DS.Audio.init(); el.hidden = true; location.hash = 'm' + (+b.dataset.go + 1) + (veh === 'm2a2' ? 'b' : ''); this.begin(+b.dataset.go, veh); }));
     el.hidden = false;
+  }
+  // key guide: H or the ? button; the choice is remembered on this device
+  setHelp(on) {
+    document.getElementById('help').classList.toggle('hide', !on);
+    document.getElementById('helpbtn').classList.toggle('on', on);
+    try { localStorage.setItem('ds.help', on ? '1' : '0'); } catch (e) {}
   }
   begin(i, veh = 'm1a1') {
     const M = this.mission = DS.MISSIONS[i], W = this.world;
     document.getElementById('menu').hidden = true; document.body.classList.add('playing');
+    let help = true; try { help = localStorage.getItem('ds.help') !== '0'; } catch (e) {}
+    this.setHelp(help);
+    document.getElementById('helpbtn').onclick = () => this.setHelp(document.getElementById('help').classList.contains('hide'));
     W.env = { ...M.env }; W.wind = M.env.wind;
     const other = veh === 'm2a2' ? 'm1a1' : 'm2a2', nm = { m1a1: 'M1A1', m2a2: '브래들리' };
     const v = new DS.Vehicle(DS.VEHICLES[veh], M.start, W.terrain, { label: nm[veh] + ' (나)' });
@@ -90,7 +105,7 @@ DS.Game = class Game {
       if (e.code === 'KeyZ') { this.world.xray = this.world.xray === false; this.toast(this.world.xray ? 'TOW 발사관 투시 켬' : 'TOW 발사관 투시 끔'); }
       if (e.code === 'KeyR') this.player.place(this.player.pos.x);
       if (e.code === 'KeyC' && this.mouse) { const m = cam.toWorld(this.mouse.x, this.mouse.y); this.world.terrain.crater(m.x, 1.6, 0.7); this.world.terrain.relax(undefined, undefined, 8); }
-      if (e.code === 'KeyH') document.getElementById('help').classList.toggle('hide');
+      if (e.code === 'KeyH') this.setHelp(document.getElementById('help').classList.contains('hide'));
       if (['Space', 'ArrowUp', 'ArrowDown'].includes(e.code)) e.preventDefault();
     });
     addEventListener('keyup', e => this.keys.delete(e.code));

@@ -11,7 +11,7 @@ DS.Renderer = class Renderer {
     this.img[id] = this.img[id] || {};
     const names = new Set(['hull', 'turret', 'barrel', Sp.roadwheel.file, Sp.idler.file]);
     if (Sp.flag) names.add(Sp.flag.file);
-    if (Sp.lower) names.add('lower');
+    if (Sp.roller) names.add(Sp.roller.file);
     if (Sp.m2) names.add(Sp.m2.file);
     if (Sp.tow) { names.add(Sp.tow.file); names.add(Sp.tow.file + '_xray'); }   // outline made by tools/cut_bradley.py
     if (!Sp.sprocket.procedural) names.add('sprocket');
@@ -734,14 +734,44 @@ DS.Renderer = class Renderer {
     // ---- hull frame: underside shadow ----
     ctx.save(); ctx.translate(v.pos.x, v.pos.y); ctx.rotate(v.ang); ctx.scale(dir, 1);
     const U = D.underside;
-    ctx.fillStyle = '#2b251d'; ctx.beginPath();
+    const OS = D.openSide;                 // no skirts: the hull side shows, painted, with the suspension on it
+    ctx.fillStyle = OS ? OS.col : '#2b251d'; ctx.beginPath();
     if (U.poly) { U.poly.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); }
     else { ctx.moveTo(U.x0, U.y0); ctx.lineTo(U.x1, U.y0); ctx.lineTo(U.x1 - 0.2, U.y1); ctx.lineTo(U.x0 + 0.3, U.y1); }
     ctx.closePath(); ctx.fill();
     if (D.rearFill) { const R = D.rearFill; ctx.fillRect(R.x0, R.y0, R.x1 - R.x0, R.y1 - R.y0); }
     if (D.sprocketHole) { ctx.beginPath(); ctx.arc(D.sprocket.x, D.sprocket.y, D.sprocketHole, 0, 7); ctx.fill(); }
-    if (Sp.lower) { ctx.save(); ctx.scale(px, -px); ctx.drawImage(I.lower, Sp.lower.x - S.ox, Sp.lower.y - S.oy); ctx.restore(); }   // open hull side (no skirts)
+    if (OS) {
+      // shade under the fender, darker toward the belly, a weld seam and the bolted final-drive housing
+      const g = ctx.createLinearGradient(0, U.y0, 0, U.y1);
+      g.addColorStop(0, 'rgba(20,14,6,0.55)'); g.addColorStop(0.22, 'rgba(20,14,6,0.12)'); g.addColorStop(0.7, 'rgba(20,14,6,0.18)'); g.addColorStop(1, 'rgba(20,14,6,0.5)');
+      ctx.fillStyle = g; ctx.fill();
+      ctx.strokeStyle = 'rgba(30,22,10,0.55)'; ctx.lineWidth = 0.02; ctx.beginPath(); ctx.moveTo(U.x0 + 0.5, U.y0 - 0.34); ctx.lineTo(U.x1 - 0.5, U.y0 - 0.34); ctx.stroke();
+      ctx.fillStyle = OS.dark; ctx.strokeStyle = OS.ink; ctx.lineWidth = 0.025;
+      ctx.beginPath(); ctx.arc(D.sprocket.x, D.sprocket.y, 0.26, 0, 7); ctx.fill(); ctx.stroke();
+      // return-roller brackets
+      for (const r of D.returnRollers) { ctx.beginPath(); ctx.moveTo(r.x - 0.07, r.y + 0.02); ctx.lineTo(r.x + 0.07, r.y + 0.02); ctx.lineTo(r.x + 0.16, r.y - 0.3); ctx.lineTo(r.x - 0.16, r.y - 0.3); ctx.closePath(); ctx.fill(); ctx.stroke(); }
+    }
     ctx.restore();
+    if (OS) {
+      // suspension in world space: each road-wheel arm swings on its hull pivot and follows the wheel's travel;
+      // shock absorbers on the end stations; bump stops above the arms
+      const P = (lx, ly) => v.local(lx, ly), line = (a, b, w, col) => { ctx.strokeStyle = col; ctx.lineWidth = w; ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke(); };
+      ctx.lineCap = 'round';
+      v.st.forEach((w, i) => {
+        const pv = P(w.lx + dir * OS.arm[0], w.ly + OS.arm[1]), hub = { x: w.wx, y: w.wy };
+        if (OS.shocks.includes(i)) {
+          const top = P(w.lx + dir * OS.shock[0], w.ly + OS.shock[1]), mid = { x: hub.x + (pv.x - hub.x) * 0.25, y: hub.y + (pv.y - hub.y) * 0.25 };
+          line(top, mid, 0.085, OS.ink); line(top, mid, 0.055, OS.dark);
+          line({ x: (top.x + mid.x) / 2, y: (top.y + mid.y) / 2 }, mid, 0.035, '#b9b2a0');
+        }
+        line(pv, hub, 0.17, OS.ink); line(pv, hub, 0.125, OS.lit);
+        ctx.fillStyle = OS.lit; ctx.strokeStyle = OS.ink; ctx.lineWidth = 0.025;
+        ctx.beginPath(); ctx.arc(pv.x, pv.y, 0.115, 0, 7); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = OS.ink; ctx.beginPath(); ctx.arc(pv.x, pv.y, 0.04, 0, 7); ctx.fill();
+      });
+      ctx.lineCap = 'butt';
+    }
 
     // ---- track ----
     const circles = v.gearCircles();
@@ -773,6 +803,8 @@ DS.Renderer = class Renderer {
       if (tint) { ctx.globalAlpha = tint; ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(0, 0, imr, 0, 7); ctx.fill(); }
       ctx.restore();
     };
+    // return rollers turn with the track running over them
+    if (Sp.roller) for (const r of v.g.rollers) { const q = v.local(r.x, r.y); wheel(q.x, q.y, -v.s / r.r, r.r, Sp.roller.file); }
     for (const w of v.st) wheel(w.wx, w.wy, w.ang, D.wheelR + 0.006, Sp.roadwheel.file);
     const ip = v.local(v.g.idler.x, v.g.idler.y);
     wheel(ip.x, ip.y, v.idlAng, D.idler.r + 0.02, Sp.idler.file, Sp.idler.tint);

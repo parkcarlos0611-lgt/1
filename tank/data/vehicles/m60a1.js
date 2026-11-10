@@ -9,14 +9,14 @@ DS.VEHICLES = DS.VEHICLES || {};
   const PPM = 92, OX = 1250, OY = 262;
   const L = (px, py) => [(px - OX) / PPM, -(py - OY) / PPM];
   const wheels = [1052, 1132, 1212, 1292, 1370, 1449].map(x => L(x, 362));
-  const RR = (x, y) => ({ x: L(x, y)[0], y: L(x, y)[1], r: 0.1 });
+  const RR = (x, y) => ({ x: L(x, y)[0], y: L(x, y)[1], r: 0.155 });
   DS.VEHICLES.m60a1 = {
     id: 'm60a1', name: 'M60A1 RISE', side: 'US', ammo: ['M833', 'M456A2'],
     mass: 52600, inertia: 2.7e5,
     signature: 1.1,                  // tall (3.27 m): a little easier to pick out than an M1A1
     src: { ppm: PPM, ox: OX, oy: OY, dir: 'assets/sprites/m60a1/' },
     sprites: {
-      hull: { x: 934, y: 238 }, lower: { x: 1014, y: 284 }, turret: { x: 989, y: 85 }, barrel: { x: 1424, y: 175 },
+      hull: { x: 934, y: 238 }, roller: { file: 'roller' }, turret: { x: 989, y: 85 }, barrel: { x: 1424, y: 175 },
       roadwheel: { r: 256, file: 'roadwheel' }, idler: { file: 'idler' },
       sprocket: { file: 'sprocket', R: 0.36, tooth0: 7.75 },        // 12 teeth in the drawing
     },
@@ -31,6 +31,9 @@ DS.VEHICLES = DS.VEHICLES || {};
     contactArea: 0.95,
     underside: { x0: -3.2, x1: 3.4, y0: -0.08, y1: -0.85,
       poly: [[L(938, 0)[0], -0.06], [L(1576, 0)[0], -0.06], [L(1572, 0)[0], -0.36], [L(1515, 0)[0], -0.82], [L(1005, 0)[0], -0.82], [L(944, 0)[0], -0.42]] },
+    // no side skirts: the hull side is painted and carries the visible suspension (arm pivot and shock top
+    // relative to each wheel's rest position, forward / up, m)
+    openSide: { col: '#8e7338', dark: '#6e5a2c', lit: '#c8a652', ink: '#2a2110', arm: [0.40, 0.33], shock: [-0.12, 0.62], shocks: [0, 1, 5] },
     engine: { type: 'diesel', power: 5.59e5, eff: 0.72, maxTractive: 3.4e5, spool: 0.45,    // AVDS-1790-2C, 750 hp
       vmaxF: 48 / 3.6, vmaxR: 12 / 3.6, brake: 5.2e5, engineBrake: 2.8e4 },
     exhaust: { x: L(936, 256)[0], y: L(936, 256)[1] },

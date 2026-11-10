@@ -62,9 +62,6 @@ hull = (yy >= SEAM) & (yy < SKIRT)
 hull |= poly([(1500, 274), (1578, 262), (1580, 286), (1560, 296), (1520, 282)])      # nose plate ahead of the idler
 hull |= poly([(930, 274), (960, 274), (952, 292), (934, 290)])                        # tail plate
 save('hull', hull)
-# hull side below the fender (no skirts on an M60): suspension arms, return rollers, shock absorbers — drawn
-# behind the game's own wheels and track
-save('lower', (yy >= 284) & (yy < 332) & (xx >= 1014) & (xx < 1498))
 
 # running gear sheet
 ws = np.asarray(Image.open(os.path.join(ROOT, 'assets/ref/m60a1_wheels.jpg')).convert('RGB')).astype(np.int16)
@@ -95,4 +92,12 @@ for name, (a, b) in zip(('roadwheel', 'idler', 'sprocket'), (rw, runs[1], runs[4
         st = [k for k in range(720) if prof[k] and not prof[k - 1]]; en = [k for k in range(720) if not prof[k] and prof[k - 1]]
         mids = [(((s0 + next(e for e in en + [x + 720 for x in en] if e > s0)) / 2) % 720) / 2 for s0 in st]
         info['teeth'] = len(st); info['tooth0'] = round(min(mids), 2)
+# return roller: face-on view (left third) of assets/ref/m60a1_roller.png
+rs = np.asarray(Image.open(os.path.join(ROOT, 'assets/ref/m60a1_roller.png')).convert('RGB')).astype(np.int16)
+ra = np.dstack([rs.astype(np.uint8), flood(rs, 215)])[100:, 20:320]
+fg = ra[..., 3] > 0; rows = np.nonzero(fg.sum(axis=1) > 4)[0]; cs = np.nonzero(fg.sum(axis=0) > 4)[0]
+arr = np.asarray(Image.fromarray(ra[rows[0]:rows[-1] + 1, cs[0]:cs[-1] + 1]).resize((256, 256), Image.LANCZOS)).copy()
+gy, gx = np.mgrid[0:256, 0:256] + 0.5 - 128
+arr[..., 3] = np.minimum(arr[..., 3], np.clip((128 - np.hypot(gx, gy)) * 255, 0, 255)).astype(np.uint8)
+Image.fromarray(arr).save(os.path.join(OUT, 'roller.png'))
 json.dump(info, open(os.path.join(OUT, 'cut.json'), 'w'), indent=1); print(info)

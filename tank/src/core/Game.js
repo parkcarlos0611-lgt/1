@@ -325,7 +325,7 @@ DS.Game = class Game {
     const R = Math.max(25, this.sightRs);
     const fov = (this.sightMag === 10 ? 6.5 : 21) * Math.PI / 180, mil = W / (fov * 1000);   // px per mil
     // recoil kick + muzzle blast obscuration after our own shot; hull vibration on the move
-    if (v.gun.fired !== this._fired) { if (this._fired != null) this.kick = Math.max(this.kick || 0, DS.AMMO[v.gun.ammo].d >= 0.1 ? 1 : 0.16); this._fired = v.gun.fired; }
+    if (v.gun.fired !== this._fired) { if (this._fired != null) this.kick = Math.max(this.kick || 0, DS.AMMO[v.gun.ammo].small ? 0.16 : 1); this._fired = v.gun.fired; }
     this.kick = Math.max(0, (this.kick || 0) - dt / 1.6);
     const k2 = this.kick * this.kick, shake = (k2 * 6 + Math.min(1, Math.abs(v.vt) / 12) * 0.35) / mil / 1000 * R;
     const o = v.sightOrigin(), a = v.gun.aimW;

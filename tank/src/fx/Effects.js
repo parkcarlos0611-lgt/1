@@ -1,7 +1,7 @@
 // Effect emitters driven by simulation state: track sand / rooster tail, turbine exhaust,
 // muzzle flash + blast dust + gun smoke + sabot petals, ground impacts.
 DS.Effects = class Effects {
-  constructor(world) { this.w = world; this.P = world.particles; this.flashes = []; this.labels = []; this.acc = 0; this.shake = 0; }
+  constructor(world) { this.w = world; this.P = world.particles; this.flashes = []; this.labels = []; this.blasts = []; this.acc = 0; this.shake = 0; }
   rnd(a, b) { return a + Math.random() * (b - a); }
   hex(s) { return parseInt(s.slice(1), 16); }
 
@@ -126,6 +126,7 @@ DS.Effects = class Effects {
     { const q = v.local(v.g.ring.x, v.g.ring.y); DS.Audio.explode(q.x, q.y); }
     const P = this.P, K = DS.P;
     const p = v.local(v.g.ring.x, v.g.ring.y);
+    this.blast(p.x, p.y, 2.2, null, null);
     this.flashes.push({ x: p.x, y: p.y + 1, dx: 0, dy: 1, t: 0, ttl: 0.18, boom: true, big: true });
     for (let i = 0; i < 140; i++) {
       const a = this.rnd(0, Math.PI), sp = this.rnd(4, 30);
@@ -157,6 +158,7 @@ DS.Effects = class Effects {
   // 25 mm chain gun: sharp flash, smoke puff, link/case thrown out
   cannon(v, e) {
     const P = this.P, K = DS.P;
+    this.blast(e.x, e.y, 0.06, e.dx, e.dy);
     DS.Audio.cannon(e.x, e.y);
     this.flashes.push({ x: e.x, y: e.y, dx: e.dx, dy: e.dy, t: 0, ttl: 0.05, small: 1.5 });
     for (let i = 0; i < 5; i++) P.add(K.SMOKE, e.x, e.y, e.dx * this.rnd(4, 18) + this.rnd(-1, 1), e.dy * this.rnd(4, 18) + this.rnd(-1, 1), this.rnd(1, 2.2), 0.18,
@@ -166,6 +168,7 @@ DS.Effects = class Effects {
   }
   towLaunch(v, e) {
     const P = this.P, K = DS.P, dx = Math.cos(e.a), dy = Math.sin(e.a);
+    this.blast(e.x - dx * 1.2, e.y, 0.25, -dx, -dy);                 // back-blast scours behind the launcher
     DS.Audio.tow(e.x, e.y);
     this.flashes.push({ x: e.x, y: e.y, dx, dy, t: 0, ttl: 0.09, small: 2.2 });
     for (let i = 0; i < 40; i++) { const back = Math.random() < 0.6 ? -1 : 1, sp = this.rnd(3, 22);       // back-blast and front puff
@@ -197,6 +200,7 @@ DS.Effects = class Effects {
   // 25 mm HEI burst
   smallHE(x, y, ground) {
     const P = this.P, K = DS.P;
+    if (ground) this.blast(x, y + 0.1, 0.08, null, null);
     this.flashes.push({ x, y, dx: 0, dy: 1, t: 0, ttl: 0.05, small: 0.9 });
     for (let i = 0; i < 7; i++) { const a = this.rnd(0, Math.PI), sp = this.rnd(2, 9); P.add(K.FIRE, x, y, Math.cos(a) * sp, Math.sin(a) * sp, this.rnd(0.05, 0.14), 0.18, { grow: 2, drag: 6, grav: 0, alpha: 0.9, col: 0xffb050 }); }
     P.add(K.DARK, x, y + 0.2, this.rnd(-0.5, 0.5), this.rnd(0.5, 1.5), this.rnd(1.2, 2.2), 0.3, { grow: 0.6, drag: 1.2, grav: -0.02, alpha: 0.35, col: 0x3a3631 });
@@ -224,7 +228,7 @@ DS.Effects = class Effects {
   }
 
   muzzle(v, e) {
-    if (e.ammo.d < 0.05) return this.cannon(v, e);
+    if (e.ammo.small) return this.cannon(v, e);                     // 25 mm chain gun (not the M1A1's narrow APFSDS rod)
     const P = this.P, K = DS.P, T = this.w.terrain;
     DS.Audio.gun(e.x, e.y, parseInt((v.def.gun.name.match(/(\d+)mm/) || [0, 120])[1]));
     this.flashes.push({ x: e.x, y: e.y, dx: e.dx, dy: e.dy, t: 0, ttl: 0.085 });
@@ -246,18 +250,9 @@ DS.Effects = class Effects {
       const a = this.rnd(0, Math.PI * 2), sp = this.rnd(8, 22);
       P.add(K.SMOKE, e.x, e.y, Math.cos(a) * sp, Math.sin(a) * sp, this.rnd(1.5, 3), 0.35, { grow: 0.7, drag: 4, grav: 0, alpha: 0.25, col: 0xcfc9bf });
     }
-    // blast obscuration: overpressure lifts sand under and ahead of the muzzle
-    const gy = T.height(e.x), hgt = e.y - gy;
-    if (hgt < 6) {
-      const sc = this.hex(T.soilAt(e.x).col[1]), str = (6 - hgt) / 6;
-      for (let i = 0; i < 70 * str; i++) {
-        const x = e.x + this.rnd(-3, 9) + e.dx * 2;
-        const away = Math.sign(x - e.x + 0.001);
-        P.add(K.DUST, x, T.height(x) + this.rnd(0, 0.6), away * this.rnd(2, 10), this.rnd(0.5, 4), this.rnd(3, 7), this.rnd(0.4, 1),
-          { grow: this.rnd(0.6, 1.2), drag: 1.5, grav: 0, alpha: 0.3, col: sc });
-        if (i % 2 === 0) P.add(K.GRAIN, x, T.height(x) + 0.05, away * this.rnd(2, 8), this.rnd(2, 6), this.rnd(0.4, 1), 0.04, { drag: 0.4, col: sc });
-      }
-    }
+    // blast wave: overpressure runs out at the speed of sound and lifts the sand it passes over —
+    // mostly ahead of the muzzle, so the shooter's own dust screen rises in front of the sight
+    this.blast(e.x, e.y, (v.def.gun.recoilMass > 1500 ? 1 : 0.35), e.dx, e.dy);
     // sabot petals peel off in the first metres
     if (e.ammo.sabot) for (let i = 0; i < 3; i++) {
       const a = Math.atan2(e.dy, e.dx) + (i - 1) * 0.06 + this.rnd(-0.02, 0.02), sp = this.rnd(250, 600);
@@ -271,6 +266,7 @@ DS.Effects = class Effects {
     const heat = A.type === 'HEAT';
     const sc = this.hex(T.soilAt(hit.x).col[1]), sc2 = this.hex(T.soilAt(hit.x).col[0]);
     const v = Math.hypot(hit.vx, hit.vy), ang = Math.atan2(hit.vy, hit.vx);
+    this.blast(hit.x, hit.y + 0.2, heat ? 0.9 : 0.45, null, null);
     if (!hit.onArmor) { T.crater(hit.x + Math.cos(ang) * 0.4, heat ? 1.3 : 0.8, heat ? 0.55 : 0.3); T.relax(undefined, undefined, 4); }
     // plume: KE → tall narrow column thrown along the ricochet direction; HE/HEAT → radial
     const n = hit.onArmor ? 20 : heat ? 160 : 120;
@@ -314,7 +310,45 @@ DS.Effects = class Effects {
     }
   }
 
-  update(dt) { for (const f of this.flashes) f.t += dt; this.flashes = this.flashes.filter(f => f.t < f.ttl);
+  // ---- blast waves (E7) ----
+  // str: 1 ≈ a 120 mm muzzle blast. dx, dy: direction of a muzzle (null = all round). The front advances at
+  // 343 m/s; each ground cell it crosses throws up sand in proportion to the overpressure there (falling off
+  // with distance), to the soil (soft sand most, salt flat least) and to how squarely the slope faces the blast.
+  // Strong blasts also scour the surface and drop the sand a little further out (sand is conserved).
+  blast(x, y, str, dx, dy) {
+    this.blasts.push({ x, y, str, dx: dx || 0, dy: dy || 0, dir: dx != null && dx !== 0, r: 0, max: 22 * Math.sqrt(str) + 6 });
+  }
+  stepBlasts(dt) {
+    const T = this.w.terrain, P = this.P, K = DS.P, cell = 0.5;
+    for (const b of this.blasts) {
+      const r0 = b.r, r1 = Math.min(b.max, b.r + DS.T.sound * dt);
+      b.r = r1;
+      for (const side of [-1, 1]) {
+        for (let d = Math.ceil(r0 / cell) * cell; d < r1; d += cell) {
+          const x = b.x + side * d, gy = T.height(x), dist = Math.hypot(d, b.y - gy) + 0.6;
+          let p = b.str * 40 / Math.pow(dist, 1.4);                         // overpressure, arbitrary units
+          if (b.dir) { const c = (side * d * b.dx + (gy - b.y) * b.dy) / dist; p *= 0.25 + 0.75 * Math.max(0, c); }
+          const n = -(T.height(x + 0.3) - T.height(x - 0.3)) / 0.6, face = Math.max(0.3, 1 + side * n * 1.5);  // slope facing the source
+          const soil = T.soilAt(x), q = p * soil.dust * face;
+          if (q < 0.05) continue;
+          const sc = this.hex(soil.col[Math.random() < 0.5 ? 0 : 1]), out = side * Math.min(14, 3 + q * 6);
+          // fine dust: lifted high, hangs; coarse grains: low, fall back
+          let nd = Math.min(3, q * 1.6) + Math.random() - 0.5;
+          while (nd-- > 0) P.add(K.DUST, x + this.rnd(-0.25, 0.25), gy + this.rnd(0.05, 0.4), out * this.rnd(0.4, 1), this.rnd(0.6, 2.5) * Math.min(2, 0.6 + q),
+            this.rnd(3, 8), this.rnd(0.35, 0.8), { grow: this.rnd(0.5, 1.1), drag: 1.3, grav: 0, alpha: Math.min(0.42, 0.14 + q * 0.12), col: sc });
+          let ng = Math.min(4, q * 2.5) + Math.random() - 0.5;
+          while (ng-- > 0) P.add(K.GRAIN, x, gy + 0.03, out * this.rnd(0.3, 1), this.rnd(1.5, 5) * Math.min(1.6, 0.5 + q), this.rnd(0.5, 1.2), this.rnd(0.025, 0.05), { drag: 0.45, col: sc });
+          if (q > 1.2) {                                                    // scour and redeposit a few cm further out
+            const i = T.idx(x), j = T.idx(x + side * this.rnd(1, 3)), e = Math.min(0.03, (q - 1.2) * 0.008);
+            T.h[i] -= e; T.h[j] += e; T.disturb[i] = Math.min(1, T.disturb[i] + 0.05); T.mark(i); T.mark(j);
+          }
+        }
+      }
+    }
+    this.blasts = this.blasts.filter(b => b.r < b.max);
+  }
+
+  update(dt) { this.stepBlasts(dt); for (const f of this.flashes) f.t += dt; this.flashes = this.flashes.filter(f => f.t < f.ttl);
     for (const l of this.labels) l.t += dt; this.labels = this.labels.filter(l => l.t < 4); this.shake = Math.max(0, this.shake - dt * 2.5); }
 
   drawFlashes(ctx) {

@@ -242,7 +242,7 @@ DS.Renderer = class Renderer {
       return;
     }
     // sun haze
-    const sx = W * 0.78, sy = H * 0.18, sg = ctx.createRadialGradient(sx, sy, 0, sx, sy, H * 0.5);
+    const sun = env.sun || { el: 35, side: 1 }, sx = W * (0.5 + 0.32 * sun.side), sy = H * Math.max(0.08, 0.47 - sun.el / 75), sg = ctx.createRadialGradient(sx, sy, 0, sx, sy, H * 0.5);
     sg.addColorStop(0, 'rgba(255,250,230,0.95)'); sg.addColorStop(0.05, 'rgba(255,245,215,0.7)'); sg.addColorStop(1, 'rgba(255,240,210,0)');
     ctx.fillStyle = sg; ctx.fillRect(0, 0, W, H);
     // parallax dune silhouettes (far → near)
@@ -303,28 +303,79 @@ DS.Renderer = class Renderer {
   // Contact shadow on the ground under each hull and thrown turret. In side view the ground plane runs
   // toward the viewer below the surface line, so the shadow is a soft band just under it, offset away from
   // the sun (upper right) and fading out to the sides.
+  // Cast shadows. In the side view the ground plane runs toward the viewer below the surface line, so each
+  // vehicle's real silhouette (hull, wheels, turret, gun, antennas, thrown turret) is sheared onto that strip:
+  // a point h metres up lands kx·h along the line (away from the sun) and ky·h down onto the near ground.
+  // Low parts stay sharp, high parts spread (two passes with different blur); a dark contact band under the
+  // tracks gives the occlusion where hull meets sand. Low morning sun: long shadows; dust: faint and diffuse.
   shadows(ctx, cam) {
-    const env = this.w.env || {}, T = this.w.terrain;
-    const k = (1 - 0.85 * (env.night || 0)) * (env.visibility ? 0.6 : 1);
-    if (k <= 0.02) return;
+    const env = this.w.env || {}, T = this.w.terrain, sun = (env.night || 0) > 0.5 ? null : env.sun;
+    // light sources: the sun, or at night every fire (burning wreck) lighting vehicles near it
+    const lights = [];
+    if (sun) lights.push({ el: sun.el, side: sun.side, k: env.visibility ? 0.32 : 1, diffuse: env.visibility ? 1 : 0 });
+    else for (const f of this.w.vehicles) if (f.burning > 0.5) lights.push({ fire: f, el: 18, diffuse: 0 });
+    if (!lights.length) return;
+    for (const L of lights) this.castShadows(ctx, cam, L);
+  }
+  castShadows(ctx, cam, Lt) {
+    const T = this.w.terrain, diffuse = Lt.diffuse;
+    const cot = 1 / Math.tan(Math.max(8, Lt.el) * Math.PI / 180);
+    const ky = 0.33;
+    const m = ctx.getTransform(), cv = ctx.canvas, zpx = Math.hypot(m.a, m.b);
+    let off = this.shOff && this.shOff.get(cv);
+    if (!this.shOff) this.shOff = new Map();
+    if (!off || off.width !== cv.width || off.height !== cv.height) { off = document.createElement('canvas'); off.width = cv.width; off.height = cv.height; this.shOff.set(cv, off); }
+    const o = off.getContext('2d');
     const band = (cx, half, depth, a) => {
-      const x0 = cx - half, x1 = cx + half, n = 24;
+      const x0 = cx - half, x1 = cx + half, n = 20;
       const g = ctx.createLinearGradient(x0, 0, x1, 0);
-      g.addColorStop(0, 'rgba(60,40,20,0)'); g.addColorStop(0.18, `rgba(60,40,20,${a})`);
-      g.addColorStop(0.85, `rgba(60,40,20,${a})`); g.addColorStop(1, 'rgba(60,40,20,0)');
+      g.addColorStop(0, 'rgba(40,26,12,0)'); g.addColorStop(0.12, `rgba(40,26,12,${a})`);
+      g.addColorStop(0.88, `rgba(40,26,12,${a})`); g.addColorStop(1, 'rgba(40,26,12,0)');
       ctx.fillStyle = g; ctx.beginPath();
-      for (let i = 0; i <= n; i++) { const x = x0 + (x1 - x0) * i / n; ctx.lineTo(x, T.height(x) + 0.5); }   // clipped to the ground
-      for (let i = n; i >= 0; i--) { const x = x0 + (x1 - x0) * i / n, t = Math.sin(Math.PI * i / n); ctx.lineTo(x, T.height(x) - depth * (0.35 + 0.65 * t)); }
+      for (let i = 0; i <= n; i++) { const x = x0 + (x1 - x0) * i / n; ctx.lineTo(x, T.height(x) + 0.5); }
+      for (let i = n; i >= 0; i--) { const x = x0 + (x1 - x0) * i / n, t = Math.sin(Math.PI * i / n); ctx.lineTo(x, T.height(x) - depth * (0.4 + 0.6 * t)); }
       ctx.closePath(); ctx.fill();
     };
     for (const v of this.w.vehicles) {
-      if (!cam.visible(v.pos.x, v.pos.y, 12) || !this.shown(v)) continue;
-      const L = (v.g.idler.x - v.g.sprocket.x) * v.dir;            // track length on the ground
-      band(v.pos.x - 0.9, Math.abs(L) / 2 + 1.4, 0.55, 0.34 * k);
-      band(v.pos.x - 0.5, Math.abs(L) / 2 + 0.3, 0.22, 0.30 * k);   // darker core right under the tracks
-      if (v.turretBody && v.turretBody.rest) band(v.turretBody.x - 0.4, 2.2, 0.3, 0.3 * k);
+      if (!cam.visible(v.pos.x, v.pos.y, 18) || !this.shown(v)) continue;
+      let side = Lt.side, k = Lt.k;
+      if (Lt.fire) {                                            // firelight: falls off with distance, flickers
+        if (Lt.fire === v) continue;
+        const d = Math.abs(v.pos.x - Lt.fire.pos.x);
+        if (d > 45) continue;
+        side = Math.sign(Lt.fire.pos.x - v.pos.x) || 1;
+        k = Math.min(1, Lt.fire.burning / 3) * (1 - d / 45) * (0.8 + 0.2 * Math.sin(this.w.time * 11 + d));
+      }
+      const kx = -side * Math.min(3, cot * 0.55);
+      const y0 = T.height(v.pos.x);
+      // screen-space box that holds the sheared silhouette
+      const reach = Math.abs(kx) * 4.5 + 7, pts = [[v.pos.x - reach, y0 + 1], [v.pos.x + reach, y0 + 1], [v.pos.x - reach, y0 - ky * 5 - 1], [v.pos.x + reach, y0 - ky * 5 - 1]];
+      if (v.turretBody) pts.push([v.turretBody.x - reach, y0 + 1], [v.turretBody.x + reach, y0 - ky * 5 - 1]);
+      let x0 = 1e9, y0s = 1e9, x1 = -1e9, y1 = -1e9;
+      for (const [x, y] of pts) { const sx = m.a * x + m.c * y + m.e, sy = m.b * x + m.d * y + m.f; x0 = Math.min(x0, sx); x1 = Math.max(x1, sx); y0s = Math.min(y0s, sy); y1 = Math.max(y1, sy); }
+      x0 = Math.max(0, Math.floor(x0)); y0s = Math.max(0, Math.floor(y0s)); x1 = Math.min(cv.width, Math.ceil(x1)); y1 = Math.min(cv.height, Math.ceil(y1));
+      if (x1 <= x0 || y1 <= y0s) continue;
+      o.setTransform(1, 0, 0, 1, 0, 0); o.globalCompositeOperation = 'source-over'; o.clearRect(x0, y0s, x1 - x0, y1 - y0s);
+      o.setTransform(m); o.transform(1, 0, kx, -ky, -kx * y0, y0 * (1 + ky));
+      this.drawVehicle(o, v, cam);
+      o.setTransform(1, 0, 0, 1, 0, 0); o.globalCompositeOperation = 'source-in'; o.fillStyle = '#281a0c'; o.fillRect(x0, y0s, x1 - x0, y1 - y0s);
+      o.globalCompositeOperation = 'source-over';
+      // soft pass: shrink then stretch back (bilinear filtering does the blur, far cheaper than a filter);
+      // sharp pass on top keeps the contact edge crisp
+      const w = x1 - x0, h = y1 - y0s, ds = diffuse ? 10 : Math.max(3, Math.round(0.22 * zpx));
+      const sm = this.shSmall || (this.shSmall = document.createElement('canvas')), sw = Math.max(1, Math.ceil(w / ds)), shh = Math.max(1, Math.ceil(h / ds));
+      if (sm.width < sw || sm.height < shh) { sm.width = Math.max(sm.width, sw); sm.height = Math.max(sm.height, shh); }
+      const sc = sm.getContext('2d'); sc.imageSmoothingQuality = 'high';
+      sc.clearRect(0, 0, sw + 1, shh + 1); sc.drawImage(off, x0, y0s, w, h, 0, 0, sw, shh);
+      ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.imageSmoothingQuality = 'high';
+      ctx.globalAlpha = 0.30 * k; ctx.drawImage(sm, 0, 0, sw, shh, x0, y0s, w, h);
+      if (!diffuse) { ctx.globalAlpha = 0.26 * k; ctx.drawImage(off, x0, y0s, w, h, x0, y0s, w, h); }
+      ctx.restore();
+      const L = Math.abs((v.g.idler.x - v.g.sprocket.x) * v.dir);
+      if (!Lt.fire) band(v.pos.x, L / 2 + 0.25, 0.16, 0.42 * (diffuse ? 0.6 : 1));          // contact occlusion right under the tracks
     }
   }
+
 
   vehicle(ctx, v, cam) {
     const me = this.w.vehicles[0];

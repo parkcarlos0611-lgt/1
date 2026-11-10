@@ -238,6 +238,40 @@ DS.Renderer = class Renderer {
     ctx.globalAlpha = 1;
   }
 
+  // armour marks (Effects.mark), in the vehicle's unmirrored hull frame, metres
+  marks(ctx, v, part) {
+    if (!v.marks) return;
+    for (const m of v.marks) {
+      if (m.part !== part) continue;
+      const r = m.size, rnd = k => { const s = Math.sin(m.seed * 12.9898 + k * 78.233) * 43758.5453; return s - Math.floor(s); };
+      ctx.save(); ctx.translate(m.x, m.y);
+      // soot around the strike (wide for a shaped charge)
+      const sr = r * (m.heat ? 5 : 2.5), sg = ctx.createRadialGradient(0, 0, 0, 0, 0, sr);
+      sg.addColorStop(0, `rgba(18,13,9,${m.heat ? 0.75 : 0.45})`); sg.addColorStop(1, 'rgba(18,13,9,0)');
+      ctx.fillStyle = sg; ctx.beginPath();
+      for (let k = 0; k < 14; k++) { const a = k / 14 * Math.PI * 2, rr = sr * (0.55 + 0.45 * rnd(k)); ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr); }   // ragged star
+      ctx.closePath(); ctx.fill();
+      if (m.kind === 'hole') {
+        ctx.fillStyle = '#0a0806'; ctx.beginPath();
+        for (let k = 0; k < 9; k++) { const a = k / 9 * Math.PI * 2, rr = r * (0.8 + 0.4 * rnd(k + 20)); ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr); }
+        ctx.closePath(); ctx.fill();
+        ctx.strokeStyle = 'rgba(190,160,120,0.85)'; ctx.lineWidth = r * 0.18;          // torn edges curling in
+        for (let k = 0; k < 6; k++) { const a = rnd(k + 40) * Math.PI * 2; ctx.beginPath(); ctx.moveTo(Math.cos(a) * r * 1.15, Math.sin(a) * r * 1.15); ctx.lineTo(Math.cos(a + 0.25) * r * 0.55, Math.sin(a + 0.25) * r * 0.55); ctx.stroke(); }
+      } else if (m.kind === 'dent') {
+        const g = ctx.createRadialGradient(-r * 0.3, r * 0.3, r * 0.1, 0, 0, r * 1.4);       // dished in: dark bowl, lit rim
+        g.addColorStop(0, 'rgba(40,30,22,0.9)'); g.addColorStop(0.7, 'rgba(70,55,40,0.7)'); g.addColorStop(0.9, 'rgba(230,205,160,0.7)'); g.addColorStop(1, 'rgba(230,205,160,0)');
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, r * 1.4, 0, Math.PI * 2); ctx.fill();
+      } else {
+        ctx.rotate(m.ang + (rnd(60) - 0.5) * 0.5);
+        const L = m.kind === 'scrape' ? r * 7 : r * 3.5;
+        ctx.strokeStyle = m.kind === 'scrape' ? 'rgba(235,225,205,0.9)' : 'rgba(30,22,16,0.9)'; ctx.lineWidth = m.kind === 'scrape' ? r * 0.25 : r * 0.55;
+        ctx.beginPath(); ctx.moveTo(-L * 0.2, 0); ctx.lineTo(L, 0); ctx.stroke();
+        if (m.kind === 'gouge') { ctx.strokeStyle = 'rgba(225,215,195,0.8)'; ctx.lineWidth = r * 0.15; ctx.beginPath(); ctx.moveTo(-L * 0.2, r * 0.3); ctx.lineTo(L, r * 0.3); ctx.stroke(); }
+      }
+      ctx.restore();
+    }
+  }
+
   // ---- what the player's crew has found (src/ai/Sensor.js) ----
   // enemies are drawn only while in sight and detected; wrecks always
   shown(v) {
@@ -744,6 +778,7 @@ DS.Renderer = class Renderer {
     // ---- hull, then gun + turret (hull-local, source pixel frame, mirrored by dir) ----
     ctx.save(); ctx.translate(v.pos.x, v.pos.y); ctx.rotate(v.ang); ctx.scale(dir, 1);
     ctx.save(); ctx.scale(px, -px); ctx.drawImage(I.hull, Sp.hull.x - S.ox, Sp.hull.y - S.oy); ctx.restore();
+    this.marks(ctx, v, 'hull');
     if (!v.turretGone) this.turret(ctx, v, v.gun.e, v.gun.rx, true);
     else {                                                        // open turret ring: blackened, glowing while it burns
       const r = D.turretRing, w2 = D.track.width * 1.9;
@@ -803,6 +838,7 @@ DS.Renderer = class Renderer {
       ctx.translate(fx, 0); ctx.scale(-1, 1); ctx.translate(-fx, 0); ctx.drawImage(f, Sp.flag.x - S.ox, Sp.flag.y - S.oy);
     }
     ctx.restore();
+    this.marks(ctx, v, 'turret');
     if (!antennas) return;
     ctx.strokeStyle = '#2e2c29'; ctx.lineCap = 'round';
     (D.antennas || []).forEach((a, i) => {

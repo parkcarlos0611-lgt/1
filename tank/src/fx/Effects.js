@@ -263,6 +263,37 @@ DS.Effects = class Effects {
       for (let i = 0; i < 10; i++) P.add(K.SMOKE, x, y, this.rnd(-2, 2), this.rnd(0, 3), this.rnd(2, 4), 0.4, { grow: 0.6, drag: 1, grav: -0.02, alpha: 0.35, col: 0x8a857c });
     }
     this.labels.push({ x, y: y + 1.2, t: 0, r });
+    this.mark(r);
+    // shaped-charge warhead (HEAT shell, TOW): it bursts on the plate whatever the result — fireball, black
+    // smoke, and a blast wave that throws sand and rocks the vehicles around it
+    if (r.ammo.pen.ce && r.result !== 'ricochet') {
+      const tow = r.ammo.d > 0.13, k = tow ? 1.4 : 1;
+      this.blast(x, y, tow ? 1.3 : 0.8, null, null);
+      this.flashes.push({ x, y, dx: 0, dy: 1, t: 0, ttl: 0.12, boom: true, big: tow });
+      for (let i = 0; i < 40 * k; i++) { const a = this.rnd(0, Math.PI * 2), rr = this.rnd(0, 1.2) * k, sp = this.rnd(2, 10) * k;
+        P.add(K.FIRE, x + Math.cos(a) * rr, y + Math.sin(a) * rr, Math.cos(a) * sp, Math.sin(a) * sp, this.rnd(0.1, 0.3), this.rnd(0.5, 1.2) * k,
+          { grow: 4, drag: 8, grav: -0.05, alpha: 0.55, col: Math.random() < 0.4 ? 0xffd890 : 0xff8a30 }); }
+      for (let i = 0; i < 18 * k; i++) P.add(K.DARK, x + this.rnd(-1, 1), y + this.rnd(0, 1.5), this.rnd(-2, 2), this.rnd(1, 4), this.rnd(5, 10), this.rnd(0.7, 1.3) * k,
+        { grow: 0.9, drag: 1, grav: -0.02, alpha: 0.5, col: 0x2a2622 });
+      if (r.result === 'pen') {                                  // the jet and spall carry on into the hull
+        const v = r.vehicle, dx = Math.sign(v.pos.x - x) || 1;
+        for (let i = 0; i < 24; i++) P.add(K.FIRE, x, y, dx * this.rnd(20, 60), this.rnd(-6, 6), this.rnd(0.03, 0.08), this.rnd(0.06, 0.16), { grow: 0, drag: 3, grav: 0, alpha: 1, col: 0xfff0c0 });
+      }
+    }
+  }
+
+  // Lasting marks on the armour, carried with the hull or the turret (also when the turret is thrown):
+  // a shaped charge leaves a scorched star with a dished centre or a burnt-through hole with petals turned
+  // inward; a long-rod round leaves a gouge or a clean round hole; a ricochet a bright scrape.
+  mark(r) {
+    const v = r.vehicle; if (!v || !v.def) return;
+    const l = v.toLocal(r.x, r.y), heat = !!r.ammo.pen.ce, small = r.ammo.small;
+    if (small && r.result !== 'pen') return;
+    const kind = r.result === 'ricochet' ? 'scrape' : r.result === 'pen' ? 'hole' : heat ? 'dent' : 'gouge';
+    const size = small ? 0.04 : heat ? (r.ammo.d > 0.13 ? 0.24 : 0.17) : kind === 'hole' ? 0.07 : 0.12;
+    const ang = Math.atan2(-Math.sin(v.ang), -Math.cos(v.ang) * v.dir);   // shot travels against the plate, roughly along the hull
+    (v.marks || (v.marks = [])).push({ x: l.x * v.dir, y: l.y, part: r.part, kind, size, heat, ang, seed: Math.random() * 100 });
+    if (v.marks.length > 30) v.marks.shift();
   }
 
   muzzle(v, e) {
@@ -395,6 +426,13 @@ DS.Effects = class Effects {
   blast(x, y, str, dx, dy) {
     this.blasts.push({ x, y, str, dx: dx || 0, dy: dy || 0, dir: dx != null && dx !== 0, r: 0, max: 22 * Math.sqrt(str) + 6 });
     if (str >= 0.2) this.waves.push({ x, y, str, t: 0, max: 22 * Math.sqrt(str) + 6 });   // visible air ripple (post-processing)
+    // the overpressure shoves nearby vehicles: hull rocks on its springs, antennas whip
+    if (str >= 0.5) for (const v of this.w.vehicles) {
+      const d = Math.hypot(v.pos.x - x, v.pos.y - y);
+      if (d > 25 * Math.sqrt(str) || d < 0.5) continue;
+      const F = str * 2.5e7 / Math.pow(1 + d / 3, 2), ux = (v.pos.x - x) / d;   // one physics step: ~0.1 m/s at 8 m from a TOW
+      v.kick = { x: v.pos.x - ux * 2.5, y: v.pos.y + 1.8, fx: ux * F, fy: F * 0.3 };   // high on the near side: the hull rocks away
+    }
   }
   stepBlasts(dt) {
     const T = this.w.terrain, P = this.P, K = DS.P, cell = 0.5;

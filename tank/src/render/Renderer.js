@@ -678,23 +678,6 @@ DS.Renderer = class Renderer {
       if (di > 0.02) { ctx.globalAlpha = di * 0.5; ctx.fillStyle = '#9b7547'; ctx.fillRect(x, h - 0.6, cs + 0.01, 0.6); }
     }
     ctx.globalAlpha = 1;
-    // track marks on the plane where vehicles have driven: two pressed bands with the cross-bars of the links
-    if (cam.zoom > 9) {
-      const bar = 0.17, n0 = Math.floor(x0 / bar);
-      for (const [d0, d1] of [[0.12, 0.5], [0.95, 1.4]]) {
-        let run = null;
-        ctx.fillStyle = 'rgba(92,66,38,0.14)';
-        for (let x = x0; x <= x1 + cs; x += cs) {                     // the pressed band itself
-          const i = T.idx(x), on = T.sink[i] > 0.006 && T.soil[i] !== 3;
-          if (on && run == null) run = x;
-          if ((!on || x > x1) && run != null) { ctx.beginPath(); ctx.moveTo(run, T.height(run) - d0); ctx.lineTo(x, T.height(x) - d0); ctx.lineTo(x, T.height(x) - d1); ctx.lineTo(run, T.height(run) - d1); ctx.closePath(); ctx.fill(); run = null; }
-        }
-        if (cam.zoom > 16) {
-          ctx.fillStyle = 'rgba(70,48,24,0.16)';
-          for (let k = n0; k * bar <= x1; k++) { const x = k * bar, i = T.idx(x); if (T.sink[i] > 0.006 && T.soil[i] !== 3) ctx.fillRect(x, T.h[i] - d1, bar * 0.4, d1 - d0); }
-        }
-      }
-    }
     // sun / shade by slope: one gradient across the screen over a band under the surface line
     {
       const sg = ctx.createLinearGradient(x0, 0, x1, 0), n = Math.min(160, Math.ceil((x1 - x0) * cam.zoom / 8));

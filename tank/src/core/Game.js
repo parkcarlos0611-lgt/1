@@ -164,6 +164,11 @@ DS.Game = class Game {
     this.cv.addEventListener('mousedown', e => { if (this.sbx && this.sbx.edit) return; if (e.button === 0) this.mouseFire = true; if (e.button === 2) this.mgDown = true; });
     addEventListener('mouseup', e => { if (e.button === 0) this.mouseFire = false; if (e.button === 2) this.mgDown = false; });
     this.cv.addEventListener('contextmenu', e => e.preventDefault());
+    // touch: no selection, no long-press menu, no double-tap or pinch zoom of the page while playing
+    addEventListener('selectstart', e => { if (!/^(INPUT|TEXTAREA)$/.test(e.target.tagName)) e.preventDefault(); });
+    addEventListener('contextmenu', e => { if (!/^(INPUT|TEXTAREA)$/.test(e.target.tagName)) e.preventDefault(); });
+    addEventListener('gesturestart', e => e.preventDefault());
+    addEventListener('dblclick', e => e.preventDefault());
     // touch buttons
     document.querySelectorAll('[data-t]').forEach(b => {
       const [k, val] = b.dataset.t.split(':'), on = ev => { ev.preventDefault(); if (k === 'fire' || k === 'coax') this.touch[k] = true; else this.touch[k] = +val; b.classList.add('on'); };

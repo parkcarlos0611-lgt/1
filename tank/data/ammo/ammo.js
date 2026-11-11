@@ -58,6 +58,17 @@ DS.AMMO = {
     rocket: { at: 7, burn: 3, acc: 73.3 },
     pen: { ce: 45 }, crit: 85, blast: { r: 9, kill: 3, tnt: 6.8 },
   },
+  // ---- M270 MLRS: M26 rocket, 227 mm, 644 M77 dual-purpose bomblets. Launched slow, the motor burns 1.9 s
+  // (thrust set so the longest shot is 32 km); the warhead opens over the target and the bomblets fall over a
+  // strip about 200 m long. Bomblets pierce about 100 mm of top armour.
+  M26: {
+    name: 'M26 로켓 (M77 자탄 644발)', short: 'M26', sight: 'M26', type: 'ROCKET', v0: 45, mass: 250, d: 0.227,
+    cd: [[0, 0.3], [0.9, 0.32], [1.1, 0.5], [2, 0.4], [3, 0.33]],
+    launchMass: 0, sabot: false, tracer: '#ffd9a0',
+    rocket: { at: 0, burn: 1.9, acc: 520 },
+    cluster: { n: 644, alt: 550, half: 100, pen: 100, r: 2.5 },
+    pen: { ce: 100 }, crit: 85, blast: { r: 4, kill: 1.5, tnt: 20 },
+  },
   // ---- M2A2 Bradley (user data): 25 mm M242 and TOW 2 ----
   M791: { name: 'M791 APDS-T', short: 'M791', sight: 'AP', type: 'APDS', small: true, v0: 1345, mass: 0.134, d: 0.0115,
     cd: [[0, 0.3], [1, 0.55], [2, 0.5], [3, 0.46], [5, 0.43]], launchMass: 0.46, sabot: false, tracer: '#ff7848', tracerEvery: 1,

@@ -252,9 +252,10 @@ DS.Vehicle = class Vehicle {
     gs.rv = -v0r; gs.aB = v0r * v0r / (2 * G.recoilLen);
     gs.reload = G.reload; gs.fired++; this.lastFired = world.time; if (G.eject) gs.ejectT = G.eject.at;
     if (G.autoloader) this.events.push({ type: 'autoload' });
+    if (G.pod) { gs.pod = (gs.pod == null ? G.pod : gs.pod) - 1; if (gs.pod <= 0) { gs.pod = G.pod; gs.reload = G.podReload; gs.podChange = true; } else gs.podChange = false; }
     const m = this.muzzle();
     world.spawnProjectile(m.x, m.y, m.dx * v0 + this.vel.x, m.dy * v0 + this.vel.y, A, this).tracer = true;
-    this.events.push({ type: 'fire', x: m.x, y: m.y, dx: m.dx, dy: m.dy, ammo: A });
+    this.events.push({ type: G.launcher ? 'rocket' : 'fire', x: m.x, y: m.y, dx: m.dx, dy: m.dy, ammo: A });
   }
 
   // ---- TOW launcher: raise (vehicle halted) → launch → wire guidance along the sight line ----

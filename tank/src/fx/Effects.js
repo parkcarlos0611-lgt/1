@@ -80,7 +80,7 @@ DS.Effects = class Effects {
         { grow: 2, drag: 2, grav: 0, alpha: 0.9, col: 0xffa040 });
       if (Math.random() < 0.5) P.add(K.DARK, p.x, p.y + 2, this.rnd(-1, 1), this.rnd(3, 6), this.rnd(5, 9), 0.8, { grow: 1.1, drag: 0.8, grav: -0.03, alpha: 0.4, col: 0x2a2724 });
     }
-    for (const e of v.events) { if (e.type === 'fire') this.muzzle(v, e); else if (e.type === 'mg') this.mgFire(v, e); else if (e.type === 'tow') this.towLaunch(v, e); else if (e.type === 'explode') this.explode(v); else if (e.type === 'pillar') this.pillar(v); else if (e.type === 'case') this.ejectCase(v, e); else if (e.type === 'autoload') DS.Audio.autoload(v); else if (e.type === 'trackSnap') this.trackSnap(e); else if (e.type === 'turretLand') this.turretLand(e); }
+    for (const e of v.events) { if (e.type === 'fire') this.muzzle(v, e); else if (e.type === 'mg') this.mgFire(v, e); else if (e.type === 'tow') this.towLaunch(v, e); else if (e.type === 'explode') this.explode(v); else if (e.type === 'pillar') this.pillar(v); else if (e.type === 'rocket') this.rocketLaunch(v, e); else if (e.type === 'case') this.ejectCase(v, e); else if (e.type === 'autoload') DS.Audio.autoload(v); else if (e.type === 'trackSnap') this.trackSnap(e); else if (e.type === 'turretLand') this.turretLand(e); }
     v.events.length = 0;
   }
 
@@ -446,6 +446,34 @@ DS.Effects = class Effects {
   }
 
   // a track parting: sparks and a couple of link fragments
+  // rocket leaving the launcher: flame and a long jet of smoke out of the back of the box, dust blown off the
+  // ground behind the vehicle
+  rocketLaunch(v, e) {
+    const P = this.P, K = DS.P, T = this.w.terrain, r = (a, b) => this.rnd(a, b), bx = e.x - e.dx * 3.4, by = e.y - e.dy * 3.4 + 0.6;
+    DS.Audio.rocket(e.x, e.y);
+    for (let i = 0; i < 26; i++) { const sp = r(8, 45); P.add(K.SMOKE, bx, by, -e.dx * sp + r(-3, 3), -e.dy * sp + r(-2, 3), r(2.5, 6), r(0.7, 1.6), { grow: r(1.2, 2.4), drag: 1.6, grav: -0.02, alpha: 0.5, col: 0xe6e0d6 }); }
+    for (let i = 0; i < 12; i++) { const sp = r(10, 40); P.add(K.FIRE, bx, by, -e.dx * sp, -e.dy * sp, r(0.08, 0.2), r(0.5, 1.1), { grow: 5, drag: 8, grav: 0, alpha: 1, col: 0xffc060 }); }
+    const gx = bx - e.dx * 5, gy = T.height(gx), sc = this.hex(T.soilAt(gx).col[1]);
+    for (let i = 0; i < 16; i++) P.add(K.DUST, gx + r(-3, 3), gy + r(0.2, 1.2), -Math.sign(e.dx) * r(3, 16), r(0.5, 4), r(4, 8), r(1.2, 2.4), { grow: r(1, 2), drag: 1, grav: 0, alpha: 0.34, col: sc });
+    this.flashes.push({ x: bx, y: by, dx: -e.dx, dy: -e.dy, t: 0, ttl: 0.08, boom: true });
+    this.blast(bx, by, 0.6, null, null);
+  }
+  // smoke trail of a burning rocket motor (MLRS rocket, rocket-assisted shell)
+  rocketTrail(p, dt) {
+    if (!this.w.cam.visible(p.x, p.y, 60)) return;
+    const P = this.P, K = DS.P, sp = Math.hypot(p.vx, p.vy), n = Math.min(6, Math.ceil(sp * dt / 6));
+    for (let i = 0; i < n; i++) { const f = i / n; P.add(K.SMOKE, p.x - p.vx * dt * f, p.y - p.vy * dt * f, this.rnd(-1, 1), this.rnd(-1, 1), this.rnd(3, 6), this.rnd(0.6, 1.1), { grow: 0.9, drag: 1.5, grav: -0.01, alpha: 0.42, col: 0xe8e2d8 }); }
+    P.add(K.FIRE, p.x - p.vx * dt, p.y - p.vy * dt, -p.vx * 0.05, -p.vy * 0.05, 0.08, 0.9, { grow: 3, drag: 4, grav: 0, alpha: 1, col: 0xffd080 });
+  }
+  // one bomblet going off on the ground: a sharp little burst
+  bomblet(x, y, lite) {
+    const P = this.P, K = DS.P, sc = this.hex(this.w.terrain.soilAt(x).col[1]);
+    if (!this.w.cam.visible(x, y, 30)) return;
+    this.flashes.push({ x, y: y + 0.3, dx: 0, dy: 1, t: 0, ttl: 0.05, boom: true });
+    for (let i = 0; i < (lite ? 2 : 5); i++) P.add(K.GRAIN, x, y + 0.1, this.rnd(-5, 5), this.rnd(4, 14), this.rnd(0.6, 1.4), this.rnd(0.04, 0.1), { drag: 0.4, col: sc });
+    P.add(K.DUST, x, y + 0.5, this.rnd(-1.5, 1.5), this.rnd(1, 4), this.rnd(2.5, 5), this.rnd(0.7, 1.3), { grow: 1, drag: 1, grav: 0, alpha: 0.3, col: sc });
+    if (!lite) P.add(K.DARK, x, y + 0.6, this.rnd(-1, 1), this.rnd(1, 3), this.rnd(2, 4), this.rnd(0.5, 0.9), { grow: 0.8, drag: 1, grav: -0.02, alpha: 0.3, col: 0x3a352f });
+  }
   // spent case (T-62) or case stub (T-72): a dull steel cylinder of the gun's calibre tossed up and back out of
   // the turret, tumbling, with a wisp of propellant smoke; it clatters once on the ground and lies there a while
   ejectCase(v, e) {

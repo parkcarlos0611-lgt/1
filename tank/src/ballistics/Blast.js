@@ -34,4 +34,44 @@ DS.Blast = {
     if (owner && !owner.ai) W.lastBurst = { x, y, t: W.time, tof: p.t };
     if (owner && owner.ai) owner.ai.observe({ x });
   },
+  // Cluster warhead (M26): opens at `alt` above the ground; the bomblets carry on along the rocket's path and
+  // come down over a strip ±half metres long. A few dozen are shown bursting; hits on vehicles are drawn from
+  // the density of the pattern (docs/PLAN.md): the real footprint is an ellipse about 200 x 100 m, so a
+  // vehicle 7 x 3.5 m at its centre collects about one and a half of the 644 bomblets, fewer toward the edge.
+  cluster(W, p) {
+    const C = p.ammo.cluster, T = W.terrain, rnd = W.rng, g = DS.T.g;
+    // pattern centre: where the rocket itself would have come down (the fire-control solution is computed for
+    // that point); the bomblets take a few seconds longer to fall from the opening height
+    const q = new DS.Projectile(p.x, p.y, p.vx, p.vy, p.ammo, null); q.t = p.t;
+    let land = null; for (let i = 0; i < 4000 && !land && q.alive; i++) land = q.step(1 / 60, T, null);
+    const cx = land ? land.x : p.x, tf = (q.t - p.t) + 2.5;
+    W.fx.flashes.push({ x: p.x, y: p.y, dx: 0, dy: 1, t: 0, ttl: 0.08, boom: true });
+    for (let i = 0; i < 10; i++) W.particles.add(DS.P.SMOKE, p.x, p.y, (Math.random() - 0.5) * 20, (Math.random() - 0.5) * 20, 3 + Math.random() * 3, 1.5, { grow: 2, drag: 1, grav: 0, alpha: 0.4, col: 0xdad4c8 });
+    const t0 = W.time + tf, shown = 44;
+    for (let i = 0; i < shown; i++) {
+      const x = cx + DS.AI.gauss(rnd) * C.half * 0.5, at = t0 + Math.random() * 2.2 + Math.abs(x - cx) / C.half * 0.4;
+      W.sched.push({ t: at, fn: () => { const y = T.height(x); W.fx.bomblet(x, y, i % 3 !== 0); if (i % 4 === 0) T.crater(x, 0.5, 0.12, 0.3, 0); for (const b of W.buildings) b.blast(W, x, y, 1.2); } });
+    }
+    W.sched.push({ t: t0, fn: () => DS.Audio.crackle(cx, T.height(cx), 40, 2.6) });
+    for (const v of W.vehicles) {
+      if (v.god) continue;
+      const u = (v.pos.x - cx) / (C.half * 0.5); if (Math.abs(u) > 2.4) continue;
+      const mean = 1.5 * Math.exp(-u * u / 2);
+      let n = 0, L = Math.exp(-mean), q = rnd(); while (q > L && n < 6) { n++; q *= rnd(); }      // Poisson draw
+      if (!n) continue;
+      W.sched.push({ t: t0 + Math.random() * 2, fn: () => {
+        if (!v.alive) return;
+        const fx = [], top = v.def.armor.filter(a => a.n === 90), roof = top.length ? Math.min(...top.map(a => a.t * (DS.MATERIALS[a.mat].ce || 1))) : 30;
+        for (let k = 0; k < n; k++) {
+          const hx = v.pos.x + (rnd() - 0.5) * 5, hy = v.pos.y + 1.2;
+          W.fx.bomblet(hx, hy, false); v.addScorch(hx, hy, 0.5);
+          if (C.pen > roof) { const m = v.def.modules[Math.floor(rnd() * v.def.modules.length)]; fx.push(v.damage(m.id)); }
+          else fx.push('상면 비관통');
+        }
+        W.addLog({ blast: true, vehicle: v, dist: Math.abs(v.pos.x - cx), direct: false, ammo: p.ammo, effects: [`자탄 ${n}발 명중`, ...fx.filter(Boolean)], range: Math.abs(cx - p.x0), shooter: p.owner, t: p.t });
+        if (v === W.vehicles[0]) W.playerHitAt = W.time;
+      } });
+    }
+    if (p.owner && !p.owner.ai) W.sched.push({ t: t0, fn: () => { W.lastBurst = { x: cx, y: T.height(cx), t: W.time, tof: p.t + tf }; } });
+  },
 };

@@ -15,7 +15,7 @@ DS.Game = class Game {
     this.post = new DS.Post(this.cv);
     let q = 2; try { const s = localStorage.getItem('ds.post'); if (s != null) q = +s; } catch (e) {}
     this.post.setQuality(this.post.ok ? q : 0); this.lowFps = 0;
-    await Promise.all(['m1a1', 'm2a2', 'm60a1', 'm109a3', 't55', 't62', 't72'].map(id => this.rend.load(DS.VEHICLES[id])).concat(this.rend.loadProps()));
+    await Promise.all(['m1a1', 'm2a2', 'm60a1', 'm109a3', 'm270', 't55', 't62', 't72'].map(id => this.rend.load(DS.VEHICLES[id])).concat(this.rend.loadProps()));
     await this.rend.loadBuildings();
     DS.Armor.calibrate();
     this.resize(); addEventListener('resize', () => this.resize());

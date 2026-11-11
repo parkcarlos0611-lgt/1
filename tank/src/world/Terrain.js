@@ -57,6 +57,9 @@ DS.Terrain = class Terrain {
     this.addBerm(900, 1.8, 6);
     if (this.kind === 'range') this.shapeRange();
     this.relax(0, n - 1, 6);
+    // the ground as it was made, never touched by the physics: drawn as a strip of land just behind the drive
+    // line, so a crater shows earth behind it instead of the far dunes
+    this.h0 = Float32Array.from(this.h);
   }
 
   // Firing range (data/range.js): the base and the firing line are graded level with a gravel road along
@@ -93,6 +96,7 @@ DS.Terrain = class Terrain {
     if (i < 0) return this.h[0]; if (i >= this.n - 1) return this.h[this.n - 1];
     const f = t - i; return this.h[i] + (this.h[i + 1] - this.h[i]) * f;
   }
+  height0(x) { const t = x / this.dx, i = Math.floor(t); if (i < 0) return this.h0[0]; if (i >= this.n - 1) return this.h0[this.n - 1]; const f = t - i; return this.h0[i] + (this.h0[i + 1] - this.h0[i]) * f; }
   slope(x) { return (this.height(x + 0.25) - this.height(x - 0.25)) / 0.5; }
   soilAt(x) { return DS.SOILS[this.soil[this.idx(x)]]; }
 

@@ -5,7 +5,7 @@ DS.World = class World {
     this.cam = new DS.Camera();
     this.particles = new DS.Particles(DS.T.particles.max);
     this.fx = new DS.Effects(this);
-    this.buildings = [];
+    this.buildings = []; this.sched = [];          // sched: things due later [{ t, fn }] (bomblet bursts)
     this.vehicles = []; this.missiles = []; this.projectiles = []; this.hits = []; this.log = [];
     this.wind = 2.5; this.time = 0; this.acc = 0; this.debug = false;
     this.rng = DS.rng(1991);
@@ -75,6 +75,7 @@ DS.World = class World {
         const ox = p.x, oy = p.y;
         let hit = p.step(h, this.terrain, this);
         if (this.buildings.length) { const b = DS.Building.ray(this, ox, oy, p.x, p.y); if (b) { p.x = b.x; p.y = b.y; hit = { kind: 'building', x: b.x, y: b.y, b: b.b }; } }
+        if (!hit && p.ammo.cluster && p.vy < 0 && p.y - this.terrain.height(p.x) < p.ammo.cluster.alt) { p.alive = false; DS.Blast.cluster(this, p); continue; }
         if (hit) this.onProjectileHit(p, hit);
       }
       this.projectiles = this.projectiles.filter(p => p.alive);
@@ -88,6 +89,8 @@ DS.World = class World {
       this.acc -= h; this.time += h;
     }
     for (const b of this.buildings) b.step(frameDt, this);
+    for (const p of this.projectiles) if (p.burning) this.fx.rocketTrail(p, frameDt);
+    if (this.sched.length) { const due = this.sched.filter(s => s.t <= this.time); if (due.length) { this.sched = this.sched.filter(s => s.t > this.time); for (const s of due) s.fn(); } }
     this.terrain.relax(undefined, undefined, 1);
     for (const v of this.vehicles) this.fx.vehicle(v, frameDt);
     this.fx.ambient(frameDt);

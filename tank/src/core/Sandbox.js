@@ -11,7 +11,7 @@ DS.Sandbox = class Sandbox {
     this.bind();
   }
   static MODES = { dummy: '무인 표적', watch: '정지 관측', hold: '정지 사격', combat: '기동 전투', patrol: '왕복 주행' };
-  static NAMES = { m1a1: 'M1A1', m2a2: 'M2A2', m60a1: 'M60A1', m109a3: 'M109A3',  t55: 'T-55', t62: 'T-62', t72: 'T-72' };
+  static NAMES = { m1a1: 'M1A1', m2a2: 'M2A2', m60a1: 'M60A1', m109a3: 'M109A3', m270: 'MLRS',  t55: 'T-55', t62: 'T-62', t72: 'T-72' };
 
   // ---- vehicles ----
   spawn(it) {

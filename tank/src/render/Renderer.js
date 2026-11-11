@@ -125,6 +125,7 @@ DS.Renderer = class Renderer {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     this.sky(ctx, cam);
     cam.apply(ctx);
+    this.backGround(ctx, cam);
     this.props(ctx, cam, false);
     this.buildings(ctx, cam);
     w.particles.draw(ctx, cam, 0);
@@ -166,6 +167,7 @@ DS.Renderer = class Renderer {
     ctx.fillStyle = sg; ctx.fillRect(0, 0, W, H);
     cam.apply(ctx);
     const pg = k => { const c = lum(amb.ground - 0.05 + k * 0.08); return `${c},${c},${c}`; };   // buildings: a little cooler than the sand
+    this.backGround(ctx, cam, tg(amb.ground - 0.015));
     this.props(ctx, cam, false, pg);
     this.buildings(ctx, cam, pg);
     // ground: one temperature, sun-facing slopes a little warmer by day, fresh craters warm
@@ -551,6 +553,23 @@ DS.Renderer = class Renderer {
     }
   }
 
+
+  // Land behind the drive line (no physics): the original surface, a little higher and paler as it recedes.
+  // Craters and ruts cut into the playing surface reveal it as their far wall.
+  backGround(ctx, cam, flat) {
+    const T = this.w.terrain, x0 = cam.left - 1, x1 = cam.right + 1, bot = cam.bottom - 1, step = Math.max(0.4, 3 / cam.zoom), up = 0.32;
+    const env = this.w.env || {}, storm = env.visibility ? 1 : 0, gy = T.height0(cam.x);
+    ctx.beginPath(); ctx.moveTo(x0, bot);
+    for (let x = x0; x <= x1 + step; x += step) ctx.lineTo(x, T.height0(x) + up);
+    ctx.lineTo(x1 + step, bot); ctx.closePath();
+    if (flat) { ctx.fillStyle = flat; ctx.fill(); return; }
+    const g = ctx.createLinearGradient(0, gy + up, 0, gy - 5);
+    g.addColorStop(0, storm ? '#dcbd8d' : '#e6cc9f'); g.addColorStop(0.2, storm ? '#cfa878' : '#d6b07a'); g.addColorStop(1, storm ? '#b08a58' : '#b88c58');
+    ctx.fillStyle = g; ctx.fill();
+    ctx.strokeStyle = 'rgba(120,92,58,0.35)'; ctx.lineWidth = Math.max(0.01, 1 / cam.zoom); ctx.beginPath();
+    for (let x = x0; x <= x1 + step; x += step) ctx.lineTo(x, T.height0(x) + up);
+    ctx.stroke();
+  }
 
   terrain(ctx, cam) {
     const T = this.w.terrain, x0 = cam.left - 1, x1 = cam.right + 1, bot = cam.bottom - 1;

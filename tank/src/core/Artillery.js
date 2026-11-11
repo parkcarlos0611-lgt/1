@@ -25,8 +25,8 @@ Object.assign(DS.Game.prototype, {
   artyKey(e) {
     const v = this.player, A = this.arty;
     if (!v.def.howitzer) { if (e.code === 'KeyI') this.toast('곡사 모드는 자주포 전용'); return false; }
-    if (e.code === 'KeyI') { this.artySet(!A.on); return true; }
-    if (e.code === 'KeyK') { const C = v.def.gun.charges; v.gun.charge = ((v.gun.charge == null ? C.length - 1 : v.gun.charge) + (e.shiftKey ? C.length - 1 : 1)) % C.length; A.autoCharge = false; this.artySolve(); this.toast(`장약 ${C[v.gun.charge].n} · 포구속도 ${C[v.gun.charge].v0} m/s`); if (!A.on) DS.FireControl.update(this.world, v, false); return true; }
+    if (e.code === 'KeyI') { if (v.def.indirectOnly) this.toast('MLRS는 곡사 전용'); else this.artySet(!A.on); return true; }
+    if (e.code === 'KeyK') { const C = v.def.gun.charges; if (!C) { this.toast('로켓은 장약 선택 없음'); return true; } v.gun.charge = ((v.gun.charge == null ? C.length - 1 : v.gun.charge) + (e.shiftKey ? C.length - 1 : 1)) % C.length; A.autoCharge = false; this.artySolve(); this.toast(`장약 ${C[v.gun.charge].n} · 포구속도 ${C[v.gun.charge].v0} m/s`); if (!A.on) DS.FireControl.update(this.world, v, false); return true; }
     if (!A.on) return false;
     if (e.code === 'KeyO') { A.high = !A.high; this.toast(A.high ? '고각 사격' : '저각 사격'); return true; }
     if (e.code === 'KeyJ') { A.auto = !A.auto; this.toast(A.auto ? '자동 정렬' : '수동 정렬 — W / S로 요구 앙각에 맞춤'); return true; }
@@ -37,7 +37,7 @@ Object.assign(DS.Game.prototype, {
     A.on = on && !!v.def.howitzer; document.body.classList.toggle('arty', A.on);
     v.fc.indirect = A.on;
     if (A.on) { v.fc.se = 0; A.span = null; if (A.tgt) this.artySolve(); this.toast('곡사 모드 — 지도에서 표적 지점을 클릭'); }
-    else { v.gun.charge = v.def.gun.directCharge; v.gun.aimW = v.baseAng(); DS.FireControl.update(this.world, v, false); this.toast('직사 모드 — 포를 수평으로'); }
+    else { v.gun.charge = v.def.gun.directCharge || 0; v.gun.aimW = v.baseAng(); DS.FireControl.update(this.world, v, false); this.toast('직사 모드 — 포를 수평으로'); }
   },
   // where a shell fired at elevation `el` (rad above horizontal, toward the target) comes down to height ty
   artyShot(el, ty, keep) {
@@ -47,7 +47,9 @@ Object.assign(DS.Game.prototype, {
     const p = new DS.Projectile(tp.x + s * Math.cos(el) * L, tp.y + Math.sin(el) * L, s * Math.cos(el) * v0, Math.sin(el) * v0, A, null);
     const path = keep ? [p.x, p.y] : null; let px = p.x, py = p.y, n = 0;
     while (p.t < 160) {
-      px = p.x; py = p.y; p.step(1 / 20, flat);
+      px = p.x; py = p.y;
+      // while a rocket motor burns the game's own step is used, so the prediction matches the real flight
+      if (A.rocket && p.t < A.rocket.at + A.rocket.burn + 0.05 && p.t >= A.rocket.at - 0.05) { for (let k = 0; k < 12; k++) p.step(1 / 240, flat); } else p.step(1 / 20, flat);
       if (keep && ++n % 8 === 0) path.push(p.x, p.y);
       if (p.vy < 0 && p.y <= ty) break;
     }
@@ -62,14 +64,14 @@ Object.assign(DS.Game.prototype, {
   },
   artySolve() {
     const v = this.player, A = this.arty; if (!A.tgt || !v.def.howitzer) { A.sol = null; return; }
-    const C = v.def.gun.charges, G = v.def.gun, d2r = Math.PI / 180, ty = A.tgt.y;
+    const C = v.def.gun.charges || [{ n: '—', v0: 0 }], G = v.def.gun, d2r = Math.PI / 180, ty = A.tgt.y;
     const tp = v.local(v.g.trunnion.x, v.g.trunnion.y), D = Math.abs(A.tgt.x - tp.x);
     A.dir = Math.sign(A.tgt.x - tp.x) || 1; A.at = v.pos.x;
     if (A.dir !== v.dir) { A.sol = { err: '표적이 차량 뒤쪽 — 포를 돌릴 수 없음 (차량 방향 고정)' }; return; }
     const peak = () => { let a = 25 * d2r, b = 58 * d2r; for (let i = 0; i < 16; i++) { const m1 = a + (b - a) * 0.382, m2 = a + (b - a) * 0.618; if (this.artyShot(m1, ty).r < this.artyShot(m2, ty).r) a = m1; else b = m2; } return (a + b) / 2; };
     if (v.gun.charge == null) v.gun.charge = C.length - 1;
     let pk = peak(), max = this.artyShot(pk, ty).r;
-    if (A.autoCharge) {                               // smallest charge that reaches with a little to spare
+    if (A.autoCharge && v.def.gun.charges) {                               // smallest charge that reaches with a little to spare
       for (let c = 0; c < C.length; c++) { v.gun.charge = c; pk = peak(); max = this.artyShot(pk, ty).r; if (max >= D * 1.04) break; }
     }
     const lo = G.elevMin * d2r, hi = G.elevMax * d2r, sol = { D, max, charge: v.gun.charge };
@@ -89,6 +91,7 @@ Object.assign(DS.Game.prototype, {
     if (S && A.auto && v.alive) v.gun.aimW = v.dir > 0 ? S.el + v.ang * 0 : Math.PI - S.el;
     // shells in flight (for the map) and their bursts
     A.live = W.projectiles.filter(p => p.owner === v && p.ammo.blast);
+    if (v.def.indirectOnly && !A.on) this.artySet(true);
     for (const p of A.live) { if (!p._tr2) p._tr2 = []; if ((p._n = (p._n || 0) + 1) % 6 === 0) p._tr2.push(p.x, p.y); A.lastShell = p; }
     if (W.lastBurst && W.lastBurst !== A.seen) {
       A.seen = W.lastBurst;
@@ -117,7 +120,7 @@ Object.assign(DS.Game.prototype, {
     const w = cv.clientWidth, h = cv.clientHeight; if (!w) return;
     if (cv.width !== Math.round(w * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
     const c = cv.getContext('2d'); c.setTransform(dpr, 0, 0, dpr, 0, 0); c.clearRect(0, 0, w, h);
-    const G = v.def.gun, C = G.charges, Am = DS.AMMO[v.gun.ammo], S = A.cur, sol = A.sol;
+    const G = v.def.gun, C = G.charges || [{ n: '—', v0: 0 }], Am = DS.AMMO[v.gun.ammo], S = A.cur, sol = A.sol;
     // window: from behind the gun to past the target (or the charge's reach), unless zoomed by hand
     let x0, x1;
     if (A.span) ({ x0, x1 } = A.span);
@@ -157,14 +160,15 @@ Object.assign(DS.Game.prototype, {
     // read-out
     const d2 = r => (r * 180 / Math.PI).toFixed(2) + '°', cur = v.gun.e, el = document.getElementById('artyinfo');
     const ch = C[v.gun.charge == null ? C.length - 1 : v.gun.charge];
-    let s = `<b>곡사 모드</b> · ${Am.short} · 장약 ${ch.n} (${ch.v0} m/s)${A.autoCharge ? ' 자동' : ''} · ${A.high ? '고각' : '저각'} · ${A.auto ? '자동 정렬' : '수동 정렬'}<br>`;
+    let s = `<b>곡사 모드</b> · ${Am.short} · ` + (G.charges ? `장약 ${ch.n} (${ch.v0} m/s)${A.autoCharge ? ' 자동' : ''}` : `로켓 ${v.gun.pod == null ? G.pod : v.gun.pod} / ${G.pod}`) + ` · `;
+    s += `${A.high ? '고각' : '저각'} · ${A.auto ? '자동 정렬' : '수동 정렬'}<br>`;
     if (!A.tgt) s += '지도를 클릭해 표적 지점을 지정';
     else if (sol && sol.err) s += `<span class="bad">${sol.err}</span>`;
     else if (sol) {
       const f = k => sol[k] ? `${d2(sol[k].el)} · 비행 ${sol[k].tof.toFixed(0)} 초` : '불가';
       const need = S ? S.el - (v.dir > 0 ? v.ang : -v.ang) : null, off = need != null ? cur - need : null;
       s += `표적 거리 <b>${(sol.D / 1000).toFixed(2)} km</b> (이 장약 최대 ${(sol.max / 1000).toFixed(1)} km) · 저각 ${f('low')} · 고각 ${f('high')}<br>`;
-      s += `요구 앙각 <b>${need != null ? d2(need) : '—'}</b> · 현재 <b>${d2(cur)}</b> · ` + (off == null ? '' : Math.abs(off) < 0.0009 ? '<span class="ok">정렬됨</span>' : `<span class="bad">${off > 0 ? '내리기' : '올리기'} ${d2(Math.abs(off))}</span>`) + ` · ${v.gun.reload > 0 ? '장전 ' + v.gun.reload.toFixed(0) + ' 초' : '<span class="ok">발사 준비</span>'}`;
+      s += `요구 앙각 <b>${need != null ? d2(need) : '—'}</b> · 현재 <b>${d2(cur)}</b> · ` + (off == null ? '' : Math.abs(off) < 0.0009 ? '<span class="ok">정렬됨</span>' : `<span class="bad">${off > 0 ? '내리기' : '올리기'} ${d2(Math.abs(off))}</span>`) + ` · ${v.gun.reload > 0 ? (v.gun.podChange ? '포드 교체 ' : '장전 ') + v.gun.reload.toFixed(0) + ' 초' : '<span class="ok">발사 준비</span>'}`;
     }
     s += '<br><span class="k">I 직사/곡사 · K 장약 · O 저각/고각 · J 자동/수동 정렬 · Q 탄종 · Tab 포탄 시점 · 휠 지도 확대</span>';
     if (el.innerHTML !== s) el.innerHTML = s;

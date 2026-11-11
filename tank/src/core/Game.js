@@ -355,7 +355,12 @@ DS.Game = class Game {
     i.mgFire = !!this.mgDown;
     i.mgAim = this.mouse ? this.world.cam.toWorld(this.mouse.x, this.mouse.y) : null;
     if (this.player.heli) {                 // helicopter: W / S climb and descend, the mouse lays sight and gun
-      i.climb = dir; i.aim = i.mgAim; i.elevRate = 0; i.elevStep = 0; this.player.lock = this.target && this.target.alive ? this.target : null;
+      i.climb = dir; i.elevRate = 0; i.elevStep = 0;
+      // a selected target (Backspace) locks the sight and gun onto it; the right mouse button lets go and
+      // hands the sight back to the mouse
+      if (this.mgDown && this.target) { this.target = null; this.toast('표적 고정 해제 — 마우스 조준'); }
+      const L = this.player.lock = this.target && this.target.alive && DS.Sensor.seenNow(this.player, this.target) ? this.target : null;
+      i.aim = L ? (L.heli ? { x: L.pos.x, y: L.pos.y } : L.local(L.g.ring.x, L.g.ring.y + 0.3)) : i.mgAim;
     }
   }
   loop(t) {
@@ -535,7 +540,7 @@ DS.Game = class Game {
     c.textAlign = 'right'; c.fillText(g.reload > 0 ? '' : '▮ READY', cx - W * 0.1, by);
     c.textAlign = 'left'; c.fillText((v.tow && (v.tow.missile || v.tow.up >= 1) ? 'TOW' : A.sight || (A.type === 'HEAT' ? 'HEAT' : 'SABOT')) + (lasing ? '  ✱' : ''), cx + W * 0.1, by);
     c.textAlign = 'center'; c.font = `600 ${Math.max(10, Math.round(W / 40))}px ui-monospace, monospace`;
-    c.fillText(`${v.def.sight.name || (v.def.sight.optical ? 'M32' : 'GPS')} ${fld.n ? fld.n + ' ' : ''}×${fld.mag}  ${this.thermal ? (v.heli ? 'FLIR ' : 'TIS ') + (this.blackHot ? 'BH' : 'WH') : this.nv ? 'PASSIVE' : 'DAY'}${this.ranging ? '  RANGING' : ''}`, cx, cy - L - 6);
+    c.fillText(`${v.def.sight.name || (v.def.sight.optical ? 'M32' : 'GPS')} ${fld.n ? fld.n + ' ' : ''}×${fld.mag}  ${this.thermal ? (v.heli ? 'FLIR ' : 'TIS ') + (this.blackHot ? 'BH' : 'WH') : this.nv ? 'PASSIVE' : 'DAY'}${v.heli && v.lock ? '  LOCK' : ''}${this.ranging ? '  RANGING' : ''}`, cx, cy - L - 6);
   }
 };
 addEventListener('load', () => new DS.Game().start().catch(e => { document.getElementById('loading').textContent = '로딩 실패: ' + e.message; console.error(e); }));

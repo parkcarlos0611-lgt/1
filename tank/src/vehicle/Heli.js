@@ -12,7 +12,7 @@ DS.Heli = class Heli extends DS.Vehicle {
     this.rearm(); this.hfState = { missile: null, cool: 0 }; this.rkCool = 0;
     this.gun.ammo = def.ammo[0]; this.gun.charge = undefined;
   }
-  rearm() { const D = this.def; this.cannon = D.gun.rounds; this.rk = D.rockets.n; this.hf = D.hellfire.n; }
+  rearm() { const D = this.def; this.cannon = D.gun.rounds; this.rk = D.rockets.n; this.hf = D.hellfire.n; this.hfSide = [D.hellfire.n / 2, D.hellfire.n / 2]; this.hfNext = 0; }
   place(x) {
     this.pos.x = x; this.pos.y = this.terrain.height(x) + this.def.flight.gearH + (this.hoverAlt || 0);
     this.ang = 0; this.vel.x = this.vel.y = this.w = this.vt = 0; this.lean = 0;
@@ -127,8 +127,12 @@ DS.Heli = class Heli extends DS.Vehicle {
     if (I.hf) {
       I.hf = false;
       if (ok && this.hf > 0 && H.cool <= 0) {
-        this.hf--; H.cool = D.hellfire.interval; this.lastFired = world.time;
-        const p = this.local(this.dir * D.hellfire.at[0], D.hellfire.at[1]);
+        // launched from the two stub wings in turn (near side, far side); the far pylon sits a little behind
+        // and above in this view
+        let sd = this.hfNext; if (this.hfSide[sd] <= 0) sd = 1 - sd;
+        this.hfSide[sd]--; this.hfNext = 1 - sd; this.hf = this.hfSide[0] + this.hfSide[1];
+        H.cool = D.hellfire.interval; this.lastFired = world.time;
+        const p = this.local(this.dir * (D.hellfire.at[0] - (sd ? 0.35 : 0)), D.hellfire.at[1] + (sd ? 0.22 : 0));
         let tgt = this.lock && this.lock.alive ? { v: this.lock } : null;
         if (!tgt) { const r = DS.FireControl.lase(world, this, D.hellfire.range); tgt = r ? (r.vehicle ? { v: r.vehicle } : { x: r.x, y: r.y }) : { x: o.x + Math.cos(gs.aimW) * 3000, y: o.y + Math.sin(gs.aimW) * 3000 }; }
         H.missile = new DS.Hellfire(p.x, p.y, base, this, DS.AMMO[D.hellfire.ammo], tgt); world.missiles.push(H.missile);
@@ -136,7 +140,7 @@ DS.Heli = class Heli extends DS.Vehicle {
       }
     }
   }
-  hudLine() { return `고도 ${Math.max(0, Math.round(this.alt()))} m · 30mm ${this.cannon} · 로켓 ${this.rk} · 헬파이어 ${this.hf}` + (this.hfState.missile ? ' · 유도 중' : ''); }
+  hudLine() { return `고도 ${Math.max(0, Math.round(this.alt()))} m · 30mm ${this.cannon} · 로켓 ${this.rk} · 헬파이어 ${this.hfSide[0]}+${this.hfSide[1]}` + (this.hfState.missile ? ' · 유도 중' : '') + (this.lock ? ' · 표적 고정' : ''); }
 };
 
 // AGM-114 Hellfire: accelerates to about 425 m/s and homes on the designated vehicle or point, flying above the

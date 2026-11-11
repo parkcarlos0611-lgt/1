@@ -49,6 +49,7 @@ DS.Game = class Game {
     document.getElementById('help').classList.toggle('hide', !on);
     document.getElementById('helpbtn').classList.toggle('on', on);
     try { localStorage.setItem('ds.help', on ? '1' : '0'); } catch (e) {}
+    if (this.ui && this.ui.help !== on) { this.ui.help = on; DS.UI.save(this.ui); }
   }
   begin(i, veh = 'm1a1') {
     const range = i === 'range', M = this.mission = range ? DS.RANGE : DS.MISSIONS[i], W = this.world;
@@ -88,6 +89,7 @@ DS.Game = class Game {
     document.getElementById('again').onclick = () => { location.hash = range ? 'range' : 'm' + (i + 1) + (veh === 'm2a2' ? 'b' : ''); location.reload(); };
     document.getElementById('tomenu').onclick = () => { location.hash = ''; location.reload(); };
     this.artyInit();
+    this.uiInit();
     this.bindInput();
     this.resize();                       // the minimap has no size until the HUD is shown
     requestAnimationFrame(t => { this.last = t; this.loop(t); });
@@ -386,6 +388,7 @@ DS.Game = class Game {
     const ed = this.sbx && this.sbx.edit;
     this.readInput(dt);
     if (ed) this.sbx.frame(dt);
+    else if (this.paused) { /* frozen */ }
     else { this.trackTarget(dt); this.rangingStep(dt); this.world.update(dt); this.missileCam(dt); this.artyStep(dt); if (this.sbx) this.sbx.tick(); }
     DS.Audio.update(this.world, dt);
     this.rend.frame();
@@ -415,6 +418,7 @@ DS.Game = class Game {
       set('h-ammo', A.name);
       set('h-mg', [v.mg && `${v.def.mg.short || 'M2'} ${v.mg.rounds}`, v.coax && `동축 ${v.coax.rounds}`].filter(Boolean).join(' · '));
       if (v.tow && !v.heli) { const t = v.tow; set('h-tow', t.missile ? (t.missile.guided ? '유도 중 — 조준선 유지' : '유선 끊김') : t.loaded ? `장전 ${t.loaded} · 예비 ${t.reserve}` + (t.up > 0 && t.up < 1 ? ' · 발사관 작동' : t.up >= 1 ? ' · 발사 준비' : '') : t.reserve ? `재장전 ${(v.def.tow.reloadTime - t.reload).toFixed(0)} s · 예비 ${t.reserve}` : '소진'); }
+      this.touchLayout();
       if (v.heli) set('h-tow', v.hudLine());
       { const lb = document.querySelector('#row-tow span'), t = v.heli ? '비행·무장' : 'TOW'; if (lb.textContent !== t) lb.textContent = t; }
       document.getElementById('row-tow').hidden = !v.tow && !v.heli;

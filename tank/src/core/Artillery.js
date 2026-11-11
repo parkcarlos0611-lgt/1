@@ -7,7 +7,8 @@ Object.assign(DS.Game.prototype, {
   artyInit() {
     this.arty = { on: false, tgt: null, high: false, auto: true, sol: null, imp: [], span: null, t: 0, live: [] };
     const cv = this.amap = document.getElementById('artymap');
-    cv.addEventListener('mousedown', e => {
+    cv.addEventListener('pointerdown', e => {
+      if (e.pointerType === 'touch' && !e.isPrimary) return;
       const A = this.arty; if (!A.on || !A.view) return;
       const r = cv.getBoundingClientRect(), u = (e.clientX - r.left) / r.width;
       const x = A.view.x0 + u * (A.view.x1 - A.view.x0);

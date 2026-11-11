@@ -40,6 +40,7 @@
   #sight.nv { filter: grayscale(1) brightness(2.4) contrast(1.2) sepia(1) hue-rotate(58deg) saturate(3); }
   #sight.thermal.bh { filter: grayscale(1) invert(1) sepia(1) hue-rotate(68deg) saturate(2.6) brightness(.95); }
   body:not(.playing) :is(#hud, #help, #sight, #mini, #zoombar, #foes, #log, #touch) { display: none !important; }
+  body.paused #touch { display: none !important; }
   /* under the HUD, clear of the vehicle (which now sits low on the screen) */
   #log { left: 10px; top: 356px; max-width: min(40vw, 360px); font-size: 12px; display: grid; gap: 3px; }
   #log .e:nth-child(n+5) { display: none; }
@@ -99,7 +100,7 @@
   @media (max-width: 560px) { .mcard { grid-template-columns: auto 1fr; } .mbtns { grid-row: auto; grid-column: 1 / -1; } .mbtn { flex: 1; } }
   #foes .pal b { color: #8cc8ff; }
   #foes .sel b, #foes .sel span { color: #ffd0a0; } #foes .sel { outline: 1px solid #ff7a5c; outline-offset: 2px; } #foes .lost { opacity: .6; }
-  #helpbtn { position: fixed; top: 10px; right: 10px; z-index: 3; width: 30px; height: 30px; border-radius: 50%; border: 1px solid #8a7b60;
+  #helpbtn { position: fixed; top: 10px; right: 48px; z-index: 3; width: 30px; height: 30px; border-radius: 50%; border: 1px solid #8a7b60;
     background: rgba(24,19,12,.7); color: var(--tx); font: 700 15px var(--mono); cursor: pointer; }
   #helpbtn.on { background: var(--warn); color: #1b1308; }
   #help { top: 46px !important; }
@@ -107,15 +108,47 @@
   #hud .t, #over-t { font-family: var(--kor); letter-spacing: .04em; font-weight: 400; }
   #hud .r b, #mcam, #h-zoom, #h-fps { font-family: var(--mono); }
   #mini { position: fixed; left: 50%; transform: translateX(-50%); bottom: 10px; width: min(60vw, 520px); height: 46px; border-radius: 6px; pointer-events: none; }
-  #touch { position: fixed; inset: auto 0 64px 0; display: none; justify-content: space-between; padding: 0 14px; pointer-events: none; }
-  #touch .g { display: flex; gap: 10px; pointer-events: auto; }
-  #touch button { width: 64px; height: 64px; border-radius: 50%; border: 2px solid rgba(255,255,255,.4); background: rgba(30,24,16,.5); color: #fff; font-size: 20px; touch-action: none; }
-  #touch button.on { background: rgba(255,204,102,.55); }
-  #touch button.fire { width: 78px; height: 78px; background: rgba(160,40,20,.6); font-size: 15px; font-weight: 800; }
+  /* touch controls (body.touchui): thumb joystick on the left, vehicle buttons on the right */
+  :root { --tb: 64px; }
+  #touch { display: none; }
+  body.touchui #touch { display: block; }
+  body.touchui.playing:not(.editing):not(.paused) #touch { display: block; }
+  #joy { position: fixed; left: 22px; bottom: 26px; width: calc(var(--tb) * 2.3); height: calc(var(--tb) * 2.3); border-radius: 50%; touch-action: none; z-index: 2;
+    background: radial-gradient(circle, rgba(30,24,16,.25), rgba(30,24,16,.55)); border: 2px solid rgba(255,255,255,.35); }
+  #joy i { position: absolute; left: 50%; top: 50%; width: 42%; height: 42%; margin: -21% 0 0 -21%; border-radius: 50%; background: rgba(255,230,180,.55); border: 2px solid rgba(255,255,255,.6); pointer-events: none; }
+  #joy::after { content: attr(data-mode); position: absolute; left: 0; right: 0; top: -20px; text-align: center; font-size: 11px; color: rgba(255,245,220,.8); text-shadow: 0 1px 2px #000; pointer-events: none; }
+  #tpad { position: fixed; right: 14px; bottom: 20px; display: grid; grid-template-columns: calc(var(--tb) * 1.45) repeat(4, var(--tb)); grid-auto-rows: var(--tb); align-items: center; gap: 10px; direction: rtl; z-index: 2; }
+  #tpad button { direction: ltr; border-radius: 50%; border: 2px solid rgba(255,255,255,.4); background: rgba(30,24,16,.55); color: #fff; font: 600 calc(var(--tb) * 0.24) var(--kor); touch-action: none; padding: 0; }
+  #tpad button.on { background: rgba(255,204,102,.6); }
+  #tpad button.fire { background: rgba(160,40,20,.75); font-size: calc(var(--tb) * 0.3); grid-column: 1; grid-row: 1 / span 2; width: calc(var(--tb) * 1.45); height: calc(var(--tb) * 1.45); }
+  #tpad button { width: var(--tb); height: var(--tb); }
+  #tpad button.wide { border-radius: calc(var(--tb) / 2); }
+  body.touchui :is(#help, #log, #zoombar) { display: none !important; }
+  body.touchui #sight { top: 10px; bottom: auto; right: 54px; width: min(30vw, 280px); }
+  body.touchui #mini { bottom: auto; top: 8px; width: min(36vw, 360px); height: 34px; left: 50%; }
+  body.touchui #foes { top: 48px; }
+  body.touchui #arty { left: 12px; right: 130px; top: 8px; }
+  body.arty #hud { display: none; }      /* the artillery read-out under the map carries what is needed */
+  body.touchui #artymap { height: min(38vh, 340px); }
+  /* compact HUD */
+  #hudmore { pointer-events: auto; position: absolute; top: 6px; right: 8px; font: 11px var(--kor); color: var(--mu); background: transparent; border: 1px solid #6b5d45; border-radius: 10px; padding: 1px 7px; cursor: pointer; }
+  #hud.compact { min-width: 190px; } #hud.compact .r.x { display: none; } #hud .t { padding-right: 64px; }
+  /* pause / settings */
+  #pausebtn { position: fixed; top: 10px; right: 10px; z-index: 6; width: 30px; height: 30px; border-radius: 50%; border: 1px solid #8a7b60; background: rgba(24,19,12,.7); color: var(--tx); font: 700 13px var(--mono); cursor: pointer; }
+  body:not(.playing) #pausebtn { display: none; }
+  #pause { position: fixed; inset: 0; z-index: 7; display: grid; place-items: center; background: rgba(12,10,6,.6); }
+  #pause .pbox { background: #2a2c1e; border: 1px solid #5d5a3c; border-left: 6px solid var(--warn); padding: 18px 22px; width: min(560px, 94vw); max-height: 90vh; overflow-y: auto; }
+  #pause h2 { margin: 0 0 12px; font: 26px var(--kor); color: #ffcc66; font-weight: 400; } #pause h3 { margin: 16px 0 8px; font: 16px var(--kor); color: #d8cfae; font-weight: 400; letter-spacing: .1em; }
+  #pause .prow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 9px; }
+  #pause .prow span { min-width: 120px; color: var(--mu); }
+  #pause button { font: 15px var(--kor); color: var(--tx); background: #3a3823; border: 1px solid #5d5a3c; padding: 9px 16px; border-radius: 4px; cursor: pointer; min-height: 42px; }
+  #pause button.on { background: var(--warn); border-color: var(--warn); color: #1b1308; }
+  #pause button.big { background: var(--amber); color: #1a1408; border-color: var(--amber); padding: 9px 30px; }
+  #pause input[type=range] { flex: 1; min-width: 140px; accent-color: #ffcc66; } #pause b { font: 14px var(--mono); min-width: 48px; }
   #zoombar { position: fixed; right: 10px; bottom: 10px; display: flex; gap: 6px; }
   #zoombar button { background: var(--bg); color: var(--tx); border: 1px solid #6b5d45; border-radius: 6px; padding: 6px 10px; font: inherit; cursor: pointer; }
   /* howitzer, indirect fire: large terrain map and firing data */
-  #arty { display: none; position: fixed; left: 256px; right: 124px; top: 8px; z-index: 3; }
+  #arty { display: none; position: fixed; left: 12px; right: 130px; top: 8px; z-index: 3; }
   @media (max-width: 900px) { #arty { left: 8px; right: 8px; top: 46px; } }
   body.arty #mcam { top: auto; bottom: 70px; z-index: 5; }
   body.scam #artymap { height: 130px; }
@@ -124,7 +157,7 @@
   #artyinfo { margin-top: 4px; padding: 6px 10px; background: rgba(24,19,12,.78); border-left: 4px solid var(--warn); font: 13px/1.6 var(--mono); }
   #artyinfo b { color: #ffe0a0; } #artyinfo .ok { color: var(--ok); } #artyinfo .bad { color: #ff9a7a; } #artyinfo .k { color: var(--mu); font-size: 12px; }
   /* firing-range editor */
-  #editbtn { position: fixed; top: 10px; right: 48px; z-index: 3; height: 30px; padding: 0 12px; border-radius: 15px; border: 1px solid #8a7b60;
+  #editbtn { position: fixed; top: 10px; right: 86px; z-index: 3; height: 30px; padding: 0 12px; border-radius: 15px; border: 1px solid #8a7b60;
     background: rgba(24,19,12,.7); color: var(--tx); font: 14px var(--kor); letter-spacing: .06em; cursor: pointer; }
   body.editing #editbtn { background: var(--warn); color: #1b1308; }
   body.editing :is(#help, #sight, #foes, #log, #touch) { display: none !important; }
@@ -144,7 +177,6 @@
   #sbx label { color: var(--mu); } #sbx .v { font-family: var(--mono); min-width: 96px; text-align: right; }
   #sb-selname { color: #f0e6c8; margin: 0 0 6px; line-height: 1.4; min-height: 2.8em; }
   #sbx .hint { color: var(--mu); font-size: 12px; line-height: 1.5; margin: 6px 0 0; }
-  @media (pointer: coarse) { #touch { display: flex; } #help { display: none; } #sight { top: 10px; bottom: auto; width: min(38vw, 260px); } #log { display: none; } }
   @media (max-width: 640px) { #hud { min-width: 0; font-size: 11px; } #mini { bottom: 150px; } }
 </style>
 </head>
@@ -154,6 +186,7 @@
 
 <div id="hud" class="panel">
   <div class="t" id="h-title">M1A1 · DESERT STEEL</div>
+  <button id="hudmore" type="button">자세히 ▾</button>
   <div class="r"><span>속도</span><b id="h-spd">0</b></div>
   <div class="r"><span>궤도 속도</span><b id="h-trk">0</b></div>
   <div class="r"><span>엔진 출력</span><b id="h-pwr">0</b></div>
@@ -263,8 +296,22 @@
 <div id="log" class="panel"></div>
 <div id="zoombar"><button data-z="0">근접</button><button data-z="1">전투</button><button data-z="2">광역</button></div>
 <div id="touch">
-  <div class="g"><button data-t="drive:-1">◀</button><button data-t="drive:1">▶</button></div>
-  <div class="g"><button data-act="tgt">표적</button><button data-act="lase">LRF</button><button data-act="mcam">M캠</button><button data-act="ammo">탄</button><button data-t="elev:1">▲</button><button data-t="elev:-1">▼</button><button data-t="coax">MG</button><button class="fire" data-t="fire">사격</button></div>
+  <div id="joy" data-mode="이동"><i></i></div>
+  <div id="tpad"></div>
+</div>
+<button id="pausebtn" type="button" title="일시정지 · 설정 (Esc)" aria-label="일시정지와 설정">Ⅱ</button>
+<div id="pause" hidden>
+  <div class="pbox">
+    <h2>일시정지</h2>
+    <div class="prow"><button type="button" data-p="resume" class="big">계속</button><button type="button" data-p="restart">다시 시작</button><button type="button" data-p="menu">작전 선택</button></div>
+    <h3>설정</h3>
+    <div class="prow"><span>화면 효과</span><button type="button" data-p="post" data-v="0">끔</button><button type="button" data-p="post" data-v="1">낮음</button><button type="button" data-p="post" data-v="2">높음</button></div>
+    <div class="prow"><span>해상도 자동 조절</span><button type="button" data-p="res">켬</button></div>
+    <div class="prow"><span>소리 크기</span><input id="p-vol" type="range" min="0" max="100" step="5" aria-label="소리 크기"><b id="p-volv"></b></div>
+    <div class="prow"><span>터치 조작</span><button type="button" data-p="touch" data-v="auto">자동</button><button type="button" data-p="touch" data-v="on">항상</button><button type="button" data-p="touch" data-v="off">끔</button></div>
+    <div class="prow"><span>버튼 크기</span><button type="button" data-p="btn" data-v="0.85">작게</button><button type="button" data-p="btn" data-v="1">보통</button><button type="button" data-p="btn" data-v="1.2">크게</button></div>
+    <div class="prow"><span>계기판 자세히</span><button type="button" data-p="hud">켬</button><span>키 가이드</span><button type="button" data-p="help">켬</button></div>
+  </div>
 </div>
 
 <script src="src/core/Tuning.js"></script>
@@ -308,5 +355,6 @@
 <script src="src/core/Sandbox.js"></script>
 <script src="src/core/Game.js"></script>
 <script src="src/core/Artillery.js"></script>
+<script src="src/core/UI.js"></script>
 </body>
 </html>

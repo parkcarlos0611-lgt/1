@@ -114,7 +114,7 @@ DS.Game = class Game {
       if (e.code === 'F9') { this.world.debug = !this.world.debug; e.preventDefault(); }
       if (e.code === 'Digit1') cam.tzoom = P[0];
       if (e.code === 'Digit2') cam.tzoom = P[1];
-      if (e.code === 'Digit3') cam.tzoom = P[2];
+      if (e.code === 'Digit3') cam.tzoom = this.zoomMin();
       if (e.code === 'KeyQ') this.cycleAmmo();
       if (e.code === 'KeyE') this.lase();
       if (e.code === 'KeyV') { this.sightMag = this.sightMag === 10 ? 3 : 10; if (this.tis) this.tis.blur = 0.45; }
@@ -148,7 +148,7 @@ DS.Game = class Game {
     addEventListener('blur', () => this.keys.clear());
     this.cv.addEventListener('mousemove', e => this.mouse = { x: e.clientX, y: e.clientY });
     this.cv.addEventListener('wheel', e => {
-      cam.tzoom = Math.max(DS.T.camera.zoomMin, Math.min(DS.T.camera.zoomMax, cam.tzoom * Math.exp(-e.deltaY * 0.0012)));
+      cam.tzoom = Math.max(this.zoomMin(), Math.min(DS.T.camera.zoomMax, cam.tzoom * Math.exp(-e.deltaY * 0.0012)));
       e.preventDefault();
     }, { passive: false });
     this.cv.addEventListener('mousedown', e => { if (this.sbx && this.sbx.edit) return; if (e.button === 0) this.mouseFire = true; if (e.button === 2) this.mgDown = true; });
@@ -160,12 +160,14 @@ DS.Game = class Game {
       const off = ev => { ev.preventDefault(); if (k === 'fire' || k === 'coax') this.touch[k] = false; else this.touch[k] = 0; b.classList.remove('on'); };
       b.addEventListener('pointerdown', on); b.addEventListener('pointerup', off); b.addEventListener('pointerleave', off); b.addEventListener('pointercancel', off);
     });
-    document.querySelectorAll('[data-z]').forEach(b => b.addEventListener('click', () => cam.tzoom = P[+b.dataset.z]));
+    document.querySelectorAll('[data-z]').forEach(b => b.addEventListener('click', () => cam.tzoom = +b.dataset.z === 2 ? this.zoomMin() : P[+b.dataset.z]));
     document.querySelectorAll('[data-act]').forEach(b => b.addEventListener('pointerdown', ev => {
       ev.preventDefault(); const a = b.dataset.act;
       if (a === 'lase') this.lase(); else if (a === 'tgt') this.cycleTarget(1); else if (a === 'mcam') { if (this.player.tow) { this.mcam = !this.mcam; this.toast(this.mcam ? '미사일 시점 켬' : '미사일 시점 끔'); } } else if (a === 'ammo') this.cycleAmmo(); else if (a === 'mag') this.sightMag = this.sightMag === 10 ? 3 : 10;
     }));
   }
+  // widest view: the screen never shows more than camera.maxWidth metres (far ground is for the sights and maps)
+  zoomMin() { return Math.max(DS.T.camera.zoomMin, this.world.cam.W / DS.T.camera.maxWidth); }
   toast(msg) {
     const el = document.getElementById('toast'); el.textContent = msg; el.classList.add('on');
     clearTimeout(this._toastT); this._toastT = setTimeout(() => el.classList.remove('on'), 1200);
@@ -349,7 +351,9 @@ DS.Game = class Game {
     this.rend.frame();
     if (ed) this.sbx.overlay(this.rend.ctx);
     this.postFrame(dt);
-    this.sight(dt);
+    // the gunner's sight is a second render of the world: refreshed every other frame unless it is enlarged
+    this._sdt = (this._sdt || 0) + dt;
+    if (this.sightCv.classList.contains('big') || (this._sf = !this._sf)) { this.sight(this._sdt); this._sdt = 0; }
     this.hud();
     requestAnimationFrame(t2 => this.loop(t2));
   }

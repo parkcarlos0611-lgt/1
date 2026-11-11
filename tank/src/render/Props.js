@@ -172,9 +172,10 @@ Object.assign(DS.Renderer.prototype, {
     // asphalt texture laid flat on the plane (the photo strip squeezed to the road's depth), then the haze
     // gradient over it so the far edge stays pale
     if (this.propImg.road && cam.zoom > 4) {
-      const im = this.propImg.road, pat = ctx.createPattern(im, 'repeat'), per = 30;      // one strip = 30 m of road
-      pat.setTransform(new DOMMatrix([per / im.width, 0, 0, -(D + 0.1) / im.height, 0, gy + 0.08]));
-      ctx.save(); ctx.clip(); ctx.fillStyle = pat; ctx.globalAlpha = 0.9; ctx.fillRect(a - 1, gy - D - 1, b - a + 6, D + 2);
+      // drawn as plain scaled images, one per 30 m of road (a transformed pattern fill is very slow)
+      const im = this.propImg.road, per = 30, y0 = gy + 0.08, hh = D + 0.1;
+      ctx.save(); ctx.clip(); ctx.globalAlpha = 0.9; ctx.imageSmoothingQuality = 'low';
+      for (let k = Math.floor(a / per); k * per < b + 4; k++) { ctx.save(); ctx.translate(k * per, y0); ctx.scale(1, -1); ctx.drawImage(im, 0, 0, per + 0.02, hh); ctx.restore(); }
       const hg = ctx.createLinearGradient(0, gy, 0, gy - D); hg.addColorStop(0, storm ? 'rgba(200,172,130,0.6)' : 'rgba(214,196,164,0.55)'); hg.addColorStop(1, storm ? 'rgba(190,160,118,0.3)' : 'rgba(190,165,125,0.12)');
       ctx.globalAlpha = 1; ctx.fillStyle = hg; ctx.fillRect(a - 1, gy - D - 1, b - a + 6, D + 2); ctx.restore();
     }

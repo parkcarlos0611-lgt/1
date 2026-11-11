@@ -294,26 +294,43 @@ DS.Renderer = class Renderer {
     const me = this.w.vehicles[0], T = this.w.terrain;
     if (!me || !me.alive || !me.contacts) return;
     const env = this.w.env || {}, reach = DS.Sensor.reach(this.w, me), o = me.sightOrigin();
-    const col = env.night ? '6,8,14' : env.visibility ? '120,92,58' : '62,50,34', A = env.night ? 0.55 : 0.5;
-    const step = Math.max(0.5, 5 / cam.zoom), top = cam.top + 2, bot = cam.bottom - 2;
-    ctx.save();
+    // drawn into a layer at 1/10 of the screen and stretched back: the edges melt into the view, and the
+    // hidden ground looks veiled in pale haze (dark at night) instead of painted over
+    const DS_ = 10, cv = ctx.canvas, fw = Math.ceil(cv.width / DS_) + 2, fh = Math.ceil(cv.height / DS_) + 2;
+    let L = this.fogL && this.fogL.get(cv);
+    if (!this.fogL) this.fogL = new Map();
+    if (!L || L.width !== fw || L.height !== fh) { L = document.createElement('canvas'); L.width = fw; L.height = fh; this.fogL.set(cv, L); }
+    const f = L.getContext('2d'), m = ctx.getTransform();
+    f.setTransform(1, 0, 0, 1, 0, 0); f.clearRect(0, 0, fw, fh);
+    f.setTransform(m.a / DS_, m.b / DS_, m.c / DS_, m.d / DS_, m.e / DS_ + 1, m.f / DS_ + 1);
+    const step = Math.max(1, 12 / cam.zoom), top = cam.top + 4, bot = cam.bottom - 4;
+    let any = false;
+    f.fillStyle = '#fff';
     for (const side of [1, -1]) {
-      const xs = side > 0 ? Math.max(o.x, cam.left) : Math.min(o.x, cam.right), xe = side > 0 ? cam.right + step : cam.left - step;
+      const xs = side > 0 ? Math.max(o.x, cam.left) : Math.min(o.x, cam.right), xe = side > 0 ? cam.right + step * 2 : cam.left - step * 2;
       if ((xe - o.x) * side <= 0) continue;
       let slope = -1e9, x = o.x + side * 2;
       // crests between us and the screen edge, sampled coarsely
       for (; (xs - x) * side > 0; x += side * Math.max(2, step)) slope = Math.max(slope, (T.height(x) - o.y) / Math.abs(x - o.x));
       for (; (xe - x) * side > 0; x += side * step) {
         const dx = Math.abs(x - o.x), h = T.height(x);
-        const a = Math.max(0, Math.min(1, (dx - reach * 0.85) / (reach * 0.15)));
+        const a = Math.max(0, Math.min(1, (dx - reach * 0.8) / (reach * 0.2)));
         const yl = o.y + slope * dx;                            // grazing line of sight over the crests
-        if (a > 0) { ctx.fillStyle = `rgba(${col},${A * a})`; ctx.fillRect(Math.min(x, x + side * step), bot, step, top - bot); }
-        // dead ground: the air pocket under the grazing line plus the hidden surface skin (not the soil section)
-        // only real dead ground, not every crater pit
-        if (a < 1 && yl > h + 0.35) { ctx.fillStyle = `rgba(${col},${A * (1 - a)})`; ctx.fillRect(Math.min(x, x + side * step), h - 0.8, step, yl - h + 0.8); }
+        if (a > 0) { f.globalAlpha = a; f.fillRect(Math.min(x, x + side * step), bot, step * 1.02, top - bot); any = true; }
+        // dead ground behind a crest: the pocket under the grazing line (not every crater pit)
+        if (a < 1 && yl > h + 0.35) { f.globalAlpha = 1 - a; f.fillRect(Math.min(x, x + side * step), h - 1.2, step * 1.02, yl - h + 1.6); any = true; }
         slope = Math.max(slope, (h - o.y) / dx);
       }
     }
+    if (!any) return;
+    // tint the mask, then lay it over the picture twice: a wide soft veil and a denser core, drifting slowly
+    f.setTransform(1, 0, 0, 1, 0, 0); f.globalAlpha = 1; f.globalCompositeOperation = 'source-in';
+    f.fillStyle = env.night ? 'rgb(14,18,30)' : env.visibility ? 'rgb(176,146,104)' : 'rgb(214,203,182)';
+    f.fillRect(0, 0, fw, fh); f.globalCompositeOperation = 'source-over';
+    const dr = Math.sin(this.w.time * 0.23) * 6 * cam.dpr;
+    ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+    ctx.globalAlpha = env.night ? 0.6 : 0.5; ctx.drawImage(L, -DS_ + dr, -DS_, fw * DS_, fh * DS_);
+    ctx.globalAlpha = env.night ? 0.35 : 0.3; ctx.drawImage(L, -DS_ * 1.6 - dr, -DS_ * 1.3, fw * DS_ * 1.012, fh * DS_ * 1.012);
     ctx.restore();
   }
 
@@ -565,9 +582,18 @@ DS.Renderer = class Renderer {
     // soil band + ruts + disturbed earth along the surface, and sun / shade by slope
     const cs = Math.max(T.dx, 2 / cam.zoom);
     const band = 0.35;
+    // soil colour band under the surface: one stroked line per run of the same soil
+    {
+      let run = -1; ctx.globalAlpha = 0.5; ctx.lineWidth = band; ctx.lineCap = 'butt'; ctx.lineJoin = 'round';
+      for (let x = x0; x <= x1 + cs; x += cs * 2) {
+        const i = T.idx(x), so = T.soil[i];
+        if (so !== run) { if (run >= 0) { ctx.lineTo(x, T.h[i] - band / 2); ctx.stroke(); } run = so; ctx.strokeStyle = DS.SOILS[so].col[0]; ctx.beginPath(); ctx.moveTo(x, T.h[i] - band / 2); }
+        else ctx.lineTo(x, T.h[i] - band / 2);
+      }
+      if (run >= 0) ctx.stroke();
+    }
     for (let x = x0; x <= x1; x += cs) {
-      const i = T.idx(x), h = T.h[i], s = DS.SOILS[T.soil[i]];
-      ctx.fillStyle = s.col[0]; ctx.globalAlpha = 0.5; ctx.fillRect(x, h - band, cs + 0.01, band);
+      const i = T.idx(x), h = T.h[i];
       const sk = T.sink[i];
       if (sk > 0.003) { ctx.globalAlpha = Math.min(0.55, sk * 7); ctx.fillStyle = '#6e5232'; ctx.fillRect(x, h - 0.16, cs + 0.01, 0.16);
         ctx.globalAlpha = Math.min(0.5, sk * 5); ctx.fillStyle = '#4a3820'; for (let k = 0; k < 2; k++) ctx.fillRect(x, h - 0.05 - k * 0.07, cs * 0.45, 0.025); }
@@ -627,21 +653,20 @@ DS.Renderer = class Renderer {
     const T = this.w.terrain, diffuse = Lt.diffuse;
     const cot = 1 / Math.tan(Math.max(8, Lt.el) * Math.PI / 180);
     const ky = 0.33;
-    const m = ctx.getTransform(), cv = ctx.canvas, zpx = Math.hypot(m.a, m.b);
-    let off = this.shOff && this.shOff.get(cv);
+    // every silhouette of this light goes, sheared onto the ground plane, into one layer at 1/3 of the screen
+    // (1/8 in dust); the layer is tinted once and stretched back, which is what softens the edges
+    const m = ctx.getTransform(), cv = ctx.canvas, q = diffuse ? 8 : 2.5;
+    const lw = Math.ceil(cv.width / q), lh = Math.ceil(cv.height / q);
     if (!this.shOff) this.shOff = new Map();
-    if (!off || off.width !== cv.width || off.height !== cv.height) { off = document.createElement('canvas'); off.width = cv.width; off.height = cv.height; this.shOff.set(cv, off); }
+    let off = this.shOff.get(cv);
+    if (!off) { off = document.createElement('canvas'); this.shOff.set(cv, off); }
+    if (off.width !== lw || off.height !== lh) { off.width = lw; off.height = lh; }
     const o = off.getContext('2d');
-    const band = (cx, half, depth, a) => {
-      const x0 = cx - half, x1 = cx + half, n = 20;
-      const g = ctx.createLinearGradient(x0, 0, x1, 0);
-      g.addColorStop(0, 'rgba(40,26,12,0)'); g.addColorStop(0.12, `rgba(40,26,12,${a})`);
-      g.addColorStop(0.88, `rgba(40,26,12,${a})`); g.addColorStop(1, 'rgba(40,26,12,0)');
-      ctx.fillStyle = g; ctx.beginPath();
-      for (let i = 0; i <= n; i++) { const x = x0 + (x1 - x0) * i / n; ctx.lineTo(x, T.height(x) + 0.5); }
-      for (let i = n; i >= 0; i--) { const x = x0 + (x1 - x0) * i / n, t = Math.sin(Math.PI * i / n); ctx.lineTo(x, T.height(x) - depth * (0.4 + 0.6 * t)); }
-      ctx.closePath(); ctx.fill();
-    };
+    o.setTransform(1, 0, 0, 1, 0, 0); o.globalCompositeOperation = 'source-over'; o.clearRect(0, 0, lw, lh);
+    o.imageSmoothingEnabled = true; o.imageSmoothingQuality = 'high';
+    const lcam = Object.assign(Object.create(Object.getPrototypeOf(cam)), cam); lcam.zoom = cam.zoom / 1.5;    // sprite levels a step down are enough for a silhouette
+    const bands = [];
+    let n = 0;
     for (const v of this.w.vehicles) {
       if (!cam.visible(v.pos.x, v.pos.y, 18) || !this.shown(v)) continue;
       let side = Lt.side, k = Lt.k;
@@ -652,36 +677,34 @@ DS.Renderer = class Renderer {
         side = Math.sign(Lt.fire.pos.x - v.pos.x) || 1;
         k = Math.min(1, Lt.fire.burning / 3) * (1 - d / 45) * (0.8 + 0.2 * Math.sin(this.w.time * 11 + d));
       }
-      const kx = -side * Math.min(3, cot * 0.55);
-      const y0 = T.height(v.pos.x);
-      // screen-space box that holds the sheared silhouette
-      const reach = Math.abs(kx) * 4.5 + 7, pts = [[v.pos.x - reach, y0 + 1], [v.pos.x + reach, y0 + 1], [v.pos.x - reach, y0 - ky * 5 - 1], [v.pos.x + reach, y0 - ky * 5 - 1]];
-      if (v.turretBody) pts.push([v.turretBody.x - reach, y0 + 1], [v.turretBody.x + reach, y0 - ky * 5 - 1]);
-      let x0 = 1e9, y0s = 1e9, x1 = -1e9, y1 = -1e9;
-      for (const [x, y] of pts) { const sx = m.a * x + m.c * y + m.e, sy = m.b * x + m.d * y + m.f; x0 = Math.min(x0, sx); x1 = Math.max(x1, sx); y0s = Math.min(y0s, sy); y1 = Math.max(y1, sy); }
-      x0 = Math.max(0, Math.floor(x0)); y0s = Math.max(0, Math.floor(y0s)); x1 = Math.min(cv.width, Math.ceil(x1)); y1 = Math.min(cv.height, Math.ceil(y1));
-      if (x1 <= x0 || y1 <= y0s) continue;
-      o.setTransform(1, 0, 0, 1, 0, 0); o.globalCompositeOperation = 'source-over'; o.clearRect(x0, y0s, x1 - x0, y1 - y0s);
-      o.setTransform(m); o.transform(1, 0, kx, -ky, -kx * y0, y0 * (1 + ky));
-      this.drawVehicle(o, v, cam);
-      o.setTransform(1, 0, 0, 1, 0, 0); o.globalCompositeOperation = 'source-in'; o.fillStyle = '#281a0c'; o.fillRect(x0, y0s, x1 - x0, y1 - y0s);
-      o.globalCompositeOperation = 'source-over';
-      // soft pass: shrink then stretch back (bilinear filtering does the blur, far cheaper than a filter);
-      // sharp pass on top keeps the contact edge crisp
-      const w = x1 - x0, h = y1 - y0s, ds = diffuse ? 10 : Math.max(3, Math.round(0.22 * zpx));
-      const sm = this.shSmall || (this.shSmall = document.createElement('canvas')), sw = Math.max(1, Math.ceil(w / ds)), shh = Math.max(1, Math.ceil(h / ds));
-      if (sm.width < sw || sm.height < shh) { sm.width = Math.max(sm.width, sw); sm.height = Math.max(sm.height, shh); }
-      const sc = sm.getContext('2d'); sc.imageSmoothingQuality = 'high';
-      sc.clearRect(0, 0, sw + 1, shh + 1); sc.drawImage(off, x0, y0s, w, h, 0, 0, sw, shh);
-      ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.imageSmoothingQuality = 'high';
-      ctx.globalAlpha = 0.30 * k; ctx.drawImage(sm, 0, 0, sw, shh, x0, y0s, w, h);
-      if (!diffuse) { ctx.globalAlpha = 0.26 * k; ctx.drawImage(off, x0, y0s, w, h, x0, y0s, w, h); }
-      ctx.restore();
-      const L = Math.abs((v.g.idler.x - v.g.sprocket.x) * v.dir);
-      if (!Lt.fire) band(v.pos.x, L / 2 + 0.25, 0.16, 0.42 * (diffuse ? 0.6 : 1));          // contact occlusion right under the tracks
+      const kx = -side * Math.min(3, cot * 0.55), y0 = T.height(v.pos.x);
+      o.setTransform(m.a / q, m.b / q, m.c / q, m.d / q, m.e / q, m.f / q); o.transform(1, 0, kx, -ky, -kx * y0, y0 * (1 + ky));
+      o.globalAlpha = Math.max(0, Math.min(1, k));
+      this.drawVehicle(o, v, lcam); n++;
+      if (!Lt.fire) bands.push([v.pos.x, Math.abs((v.g.idler.x - v.g.sprocket.x) * v.dir) / 2 + 0.25]);
+    }
+    if (this.shadowExtra) n += this.shadowExtra(o, m, q, Lt, cam) || 0;      // scenery that casts into the same layer
+    if (!n) return;
+    o.setTransform(1, 0, 0, 1, 0, 0); o.globalAlpha = 1; o.globalCompositeOperation = 'source-in'; o.fillStyle = '#281a0c'; o.fillRect(0, 0, lw, lh);
+    o.globalCompositeOperation = 'source-over';
+    ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+    // two half-strength copies a little apart: a soft penumbra without a blur filter
+    const a = diffuse ? 0.34 : 0.46, d = q * 0.9;
+    ctx.globalAlpha = a * 0.62; ctx.drawImage(off, 0, 0, lw, lh, -d, 0, lw * q, lh * q);
+    ctx.globalAlpha = a * 0.62; ctx.drawImage(off, 0, 0, lw, lh, d, d * 0.5, lw * q, lh * q);
+    ctx.restore();
+    // contact occlusion right under the tracks keeps the foot of the shadow dark and crisp
+    for (const [cx, half] of bands) {
+      const x0 = cx - half, x1 = cx + half, nn = 14, a = 0.42 * (diffuse ? 0.6 : 1);
+      const g = ctx.createLinearGradient(x0, 0, x1, 0);
+      g.addColorStop(0, 'rgba(40,26,12,0)'); g.addColorStop(0.12, `rgba(40,26,12,${a})`);
+      g.addColorStop(0.88, `rgba(40,26,12,${a})`); g.addColorStop(1, 'rgba(40,26,12,0)');
+      ctx.fillStyle = g; ctx.beginPath();
+      for (let i = 0; i <= nn; i++) { const x = x0 + (x1 - x0) * i / nn; ctx.lineTo(x, T.height(x) + 0.5); }
+      for (let i = nn; i >= 0; i--) { const x = x0 + (x1 - x0) * i / nn, t = Math.sin(Math.PI * i / nn); ctx.lineTo(x, T.height(x) - 0.16 * (0.4 + 0.6 * t)); }
+      ctx.closePath(); ctx.fill();
     }
   }
-
 
   vehicle(ctx, v, cam) {
     const me = this.w.vehicles[0];

@@ -24,7 +24,7 @@ DS.Vehicle = class Vehicle {
     this.st = this.g.wheels.map(p => ({ lx: p.x, ly: p.y, d: 0, dPrev: 0, ang: Math.random() * 6, N: 0, wx: 0, wy: 0, contact: false, slip: 0, Ft: 0, sink: 0 }));
     this.sprAng = 0; this.idlAng = 0;
     this.F0 = D.mass * DS.T.g / D.roadWheels.length;
-    this.gun = { e: 0, aimW: this.baseAng(), rx: 0, rv: 0, aB: 0, reload: 0, ammo: D.ammo[0], fired: 0 };
+    this.gun = { e: 0, aimW: this.baseAng(), rx: 0, rv: 0, aB: 0, reload: 0, ammo: D.ammo[0], fired: 0, charge: D.gun.directCharge };
     this.fc = { range: null, se: 0, bs: 1200, lasedAt: -1, point: null };   // fire control
     this.antennas = (D.antennas || []).map(() => ({ phi: 0, dphi: 0 }));
     this.prevBaseV = { x: 0, y: 0 };

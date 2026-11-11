@@ -15,7 +15,7 @@ DS.Game = class Game {
     this.post = new DS.Post(this.cv);
     let q = 2; try { const s = localStorage.getItem('ds.post'); if (s != null) q = +s; } catch (e) {}
     this.post.setQuality(this.post.ok ? q : 0); this.lowFps = 0;
-    await Promise.all(['m1a1', 'm2a2', 'm60a1', 't55', 't62', 't72'].map(id => this.rend.load(DS.VEHICLES[id])).concat(this.rend.loadProps()));
+    await Promise.all(['m1a1', 'm2a2', 'm60a1', 'm109a3', 't55', 't62', 't72'].map(id => this.rend.load(DS.VEHICLES[id])).concat(this.rend.loadProps()));
     await this.rend.loadBuildings();
     DS.Armor.calibrate();
     this.resize(); addEventListener('resize', () => this.resize());
@@ -85,6 +85,7 @@ DS.Game = class Game {
     document.getElementById('h-title').textContent = range ? `${nm[veh] === '브래들리' ? 'M2A2' : nm[veh]} · 사격장` : `${nm[veh]} · 작전 ${i + 1} ${M.name}`;
     document.getElementById('again').onclick = () => { location.hash = range ? 'range' : 'm' + (i + 1) + (veh === 'm2a2' ? 'b' : ''); location.reload(); };
     document.getElementById('tomenu').onclick = () => { location.hash = ''; location.reload(); };
+    this.artyInit();
     this.bindInput();
     this.resize();                       // the minimap has no size until the HUD is shown
     requestAnimationFrame(t => { this.last = t; this.loop(t); });
@@ -133,9 +134,11 @@ DS.Game = class Game {
         DS.FireControl.update(this.world, this.player, false); this.toast(`조준경 거리 눈금 ${fc.bs} m`);
       }
       if (e.code === 'Backspace') { e.preventDefault(); this.cycleTarget(e.shiftKey ? -1 : 1); }
+      if (['KeyI', 'KeyK', 'KeyO', 'KeyJ'].includes(e.code) && this.artyKey(e)) return;
       if (e.code === 'Tab') {
         e.preventDefault();
-        if (!this.player.tow) this.toast('미사일 시점은 브래들리 전용');
+        if (this.player.def.howitzer) { this.scam = !this.scam; this.toast(this.scam ? '포탄 시점 켬 — 발사한 포탄을 따라감' : '포탄 시점 끔'); }
+        else if (!this.player.tow) this.toast('미사일 시점은 브래들리 · 포탄 시점은 자주포 전용');
         else { this.mcam = !this.mcam; this.mcamHold = null; this.toast(this.mcam ? (this.player.tow.missile ? '미사일 시점' : '미사일 시점 켬 — 다음 발사부터 따라감') : '미사일 시점 끔'); }
       }
       if (e.code === 'KeyX') { if (this.player.tow) this.player.input.tow = true; else this.toast('TOW 미사일은 브래들리 전용'); }
@@ -320,6 +323,7 @@ DS.Game = class Game {
   cycleAmmo() {
     const v = this.player, list = v.def.ammo, i = list.indexOf(v.gun.ammo);
     v.gun.ammo = list[(i + 1) % list.length];
+    if (this.arty && this.arty.on) this.artySolve();
     DS.FireControl.update(this.world, v, false);           // computer re-solves for the new round
   }
   readInput(dt) {
@@ -347,7 +351,7 @@ DS.Game = class Game {
     const ed = this.sbx && this.sbx.edit;
     this.readInput(dt);
     if (ed) this.sbx.frame(dt);
-    else { this.trackTarget(dt); this.rangingStep(dt); this.world.update(dt); this.missileCam(dt); if (this.sbx) this.sbx.tick(); }
+    else { this.trackTarget(dt); this.rangingStep(dt); this.world.update(dt); this.missileCam(dt); this.artyStep(dt); if (this.sbx) this.sbx.tick(); }
     DS.Audio.update(this.world, dt);
     this.rend.frame();
     if (ed) this.sbx.overlay(this.rend.ctx);

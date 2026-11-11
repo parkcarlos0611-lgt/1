@@ -102,5 +102,6 @@ DS.MATERIALS = {
   m1_comp:    { name: '복합장갑(HA·DU)', ke: 0.70, ce: 1.40 },   // turret/hull front special armour
   t72_turret: { name: '주조강 포탑', ke: 0.65, ce: 0.70 },       // → turret front KE ≈380 / CE ≈410 on the LOS (user data)
   t72_glacis: { name: '적층 경사판', ke: 0.61, ce: 0.82 },       // → hull front KE ≈335 / CE ≈450 on the LOS (user data)
+  alu:        { name: '알루미늄 장갑', ke: 0.38, ce: 0.40 },
   track:      { name: '궤도·주행장치', ke: 1.00, ce: 1.00 },
 };

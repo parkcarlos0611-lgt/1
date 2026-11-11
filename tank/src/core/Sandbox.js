@@ -219,7 +219,7 @@ DS.Sandbox = class Sandbox {
     this.el.querySelectorAll('[data-opt]').forEach(b => on(b, this.opt[b.dataset.opt]));
     $('#sb-vis').value = env.visibility || 0; $('#sb-wind').value = env.wind || 0; this.labels();
     const it = v && v.sb, tgt = it && !it.player;
-    $('#sb-selname').textContent = this.selB ? `${this.selB.name} · 사격선에서 ${Math.round(this.selB.x - DS.RANGE.line)} m · ${this.selB.state === 'ok' ? '온전' : '붕괴'}` : v ? `${v.label} · 사격선에서 ${Math.round(v.pos.x - DS.RANGE.line)} m · ${v.status}` : this.tool ? `${Sandbox.NAMES[this.tool] || DS.BUILDINGS[this.tool].name}: 지면을 클릭해 배치 (우클릭 취소)` : '표적을 고르고 지면을 클릭 · 놓인 차량은 끌어서 이동';
+    $('#sb-selname').textContent = this.selB ? `${this.selB.name} · 사격선에서 ${Math.round(this.selB.x - DS.RANGE.line)} m · ${this.selB.state === 'ok' ? '온전' : this.selB.state === 'rubble' ? '완전 붕괴' : `피격 ${this.selB.hits}회`}` : v ? `${v.label} · 사격선에서 ${Math.round(v.pos.x - DS.RANGE.line)} m · ${v.status}` : this.tool ? `${Sandbox.NAMES[this.tool] || DS.BUILDINGS[this.tool].name}: 지면을 클릭해 배치 (우클릭 취소)` : '표적을 고르고 지면을 클릭 · 놓인 차량은 끌어서 이동';
     $('#sb-mode').value = tgt ? it.mode : this.mode || 'dummy';
     $('#sb-pat').hidden = !(tgt && it.mode === 'patrol');
     if (tgt) { $('#sb-span').value = it.span || 150; $('#sb-speed').value = it.speed || 5; }

@@ -1,5 +1,6 @@
 // M109A3 155 mm self-propelled howitzer. Geometry from assets/ref/m109a3_sheet.jpg (right-facing side drawing)
-// at 98 px/m (hull 6.19 m), origin px (2100, 262) (tools/cut_m109.py). The drawing shows six road wheels.
+// at 98 px/m (hull 6.19 m), origin px (2100, 262) (tools/cut_m109.py). Running gear as on the real vehicle:
+// seven small road wheels (0.61 m) a side, no return rollers — the drawing's six larger wheels are not used.
 // Ranges and shell data: user data (docs/DATA_SOURCES.md); the rest are public estimates, provisional.
 // Two ways to shoot: direct (telescope, range scale set by hand) and indirect (src/core/Artillery.js: target
 // picked on the map, charge and elevation computed, gun laid by hand or automatically).
@@ -8,7 +9,7 @@ DS.VEHICLES = DS.VEHICLES || {};
 (function () {
   const PPM = 98, OX = 2100, OY = 262;
   const L = (px, py) => [(px - OX) / PPM, -(py - OY) / PPM];
-  const wheels = [1910, 1987, 2063, 2137, 2215, 2290].map(x => L(x, 362));
+  const wheels = [1902, 1967, 2032, 2097, 2162, 2227, 2292].map(x => L(x, 362.5));
   DS.VEHICLES.m109a3 = {
     id: 'm109a3', name: 'M109A3', side: 'US', ammo: ['M107', 'M549A1'], howitzer: true,
     mass: 24900, inertia: 9.0e4, frontDrive: true,
@@ -17,17 +18,17 @@ DS.VEHICLES = DS.VEHICLES || {};
     sprites: {
       hull: { x: 1798, y: 228 }, turret: { x: 1789, y: 64 }, barrel: { x: 2169, y: 149 },
       roadwheel: { r: 256, file: 'roadwheel' }, idler: { file: 'idler' },
-      sprocket: { file: 'sprocket', R: 0.285, tooth0: 24 },         // 14 teeth
+      sprocket: { file: 'sprocket', R: 0.27, tooth0: 24 },         // 14 teeth
     },
     roadWheels: wheels.map(p => ({ x: p[0], y: p[1] })),
-    wheelR: 0.335, topRunOnWheels: true,                             // no return rollers: the top run rides on the wheels
-    suspension: { k: 2.6e5, c: 2.0e4, bump: 0.20, droop: 0.10, bumpK: 4e6, bumpC: 1.0e5 },
+    wheelR: 0.305, topRunOnWheels: true,                             // no return rollers: the top run rides on the wheels
+    suspension: { k: 2.3e5, c: 1.8e4, bump: 0.20, droop: 0.10, bumpK: 4e6, bumpC: 1.0e5 },
     sprocket: { x: L(2365, 330)[0], y: L(2365, 330)[1], teeth: 14 },
-    idler: { x: L(1842, 338)[0], y: L(1842, 338)[1], r: 0.29 },
+    idler: { x: L(1840, 336)[0], y: L(1840, 336)[1], r: 0.25 },
     returnRollers: [],
     track: { pitch: 0.118, thick: 0.065, width: 0.38, mass: 1700 },
     belly: { y: -0.8, x0: L(1840, 0)[0], x1: L(2380, 0)[0] },
-    contactArea: 0.55,
+    contactArea: 0.47,
     underside: { x0: -3.0, x1: 3.1, y0: -0.38, y1: -1.1,
       poly: [[L(1800, 0)[0], -0.38], [L(2408, 0)[0], -0.38], [L(2402, 0)[0], -0.62], [L(2330, 0)[0], -1.1], [L(1880, 0)[0], -1.1], [L(1806, 0)[0], -0.72]] },
     engine: { type: 'diesel', power: 3.02e5, eff: 0.72, maxTractive: 1.7e5, spool: 0.4,       // 8V71T, 405 hp

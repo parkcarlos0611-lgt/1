@@ -33,7 +33,7 @@ DS.Particles = class Particles {
       this.vx[i] += (wind * wk - this.vx[i]) * f; this.vy[i] += (0 - this.vy[i]) * f;
       this.vy[i] -= g * this.grav[i] * dt;
       this.x[i] += this.vx[i] * dt; this.y[i] += this.vy[i] * dt;
-      this.size[i] += this.grow[i] * dt;
+      if (this.size[i] < 13) this.size[i] += this.grow[i] * dt;     // puffs stop spreading at 13 m: beyond that they only cost fill rate
       if (k === DS.P.GRAIN || k === DS.P.DEBRIS) {
         const h = terrain.height(this.x[i]);
         if (this.y[i] < h) {

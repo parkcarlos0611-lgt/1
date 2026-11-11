@@ -170,16 +170,12 @@ DS.Effects = class Effects {
     const p = v.local(v.g.ring.x, v.g.ring.y);
     this.blast(p.x, p.y, 2.2, null, null);
     this.flashes.push({ x: p.x, y: p.y + 1, dx: 0, dy: 1, t: 0, ttl: 0.14, boom: true, big: true });
-    for (let i = 0; i < 140; i++) {
-      const a = this.rnd(0, Math.PI), sp = this.rnd(4, 30);
-      P.add(K.FIRE, p.x + this.rnd(-1, 1), p.y + this.rnd(0, 1.5), Math.cos(a) * sp * 0.7, Math.sin(a) * sp, this.rnd(0.2, 0.8), this.rnd(0.5, 1.3),
-        { grow: 2.4, drag: 3, grav: -0.05, alpha: 0.7, col: Math.random() < 0.55 ? 0xff7a28 : 0xffc060 });
-    }
-    for (let i = 0; i < 40; i++) {
-      const a = this.rnd(0.2, Math.PI - 0.2), sp = this.rnd(3, 14);
-      P.add(K.DARK, p.x + this.rnd(-1, 1), p.y + this.rnd(0.5, 3), Math.cos(a) * sp * 0.6, Math.sin(a) * sp, this.rnd(7, 13), this.rnd(1, 1.8),
-        { grow: 0.8, drag: 0.7, grav: -0.03, alpha: 0.45, col: 0x24201c });
-    }
+    // ammunition going up: a rolling fireball that climbs into a mushroom of black smoke, a fountain of sparks
+    // (burning propellant), fragments arcing away on smoke trails
+    this.fireball(p.x, p.y + 1, 22, 2.4, 15, 0x1f1b18, 7, 0.9);
+    this.fireball(p.x, p.y + 3, 12, 2.0, 8, 0x2a2420, 10, 2.0);
+    this.sparks(p.x, p.y + 0.8, 150, 62, Math.PI / 2, 2.2); this.sparks(p.x, p.y + 0.8, 60, 30, Math.PI / 2, 1.0, 0xffe9b0);
+    this.comets(p.x, p.y + 1, 12, 36);
     for (let i = 0; i < 45; i++) {
       const a = this.rnd(0.2, Math.PI - 0.2), sp = this.rnd(8, 35);
       P.add(K.DEBRIS, p.x, p.y + 0.5, Math.cos(a) * sp, Math.sin(a) * sp, this.rnd(2, 5), this.rnd(0.06, 0.25), { drag: 0.15, grav: 1 });
@@ -253,11 +249,11 @@ DS.Effects = class Effects {
   armor(r) {
     DS.Audio.armor(r, r.vehicle === this.w.vehicles[0]);
     const P = this.P, K = DS.P, x = r.x, y = r.y;
-    const n = r.result === 'pen' ? 30 : 45;
-    for (let i = 0; i < n; i++) {
-      const a = this.rnd(0, Math.PI * 2), sp = this.rnd(5, 40);
-      P.add(K.FIRE, x, y, Math.cos(a) * sp, Math.sin(a) * sp, this.rnd(0.05, 0.25), this.rnd(0.05, 0.15), { grow: 0, drag: 2, grav: 0.6, alpha: 1, col: 0xffe2a0 });
-    }
+    // sparks: a tight cone back along the shot for a hit that holds or glances off, a fuller burst for a penetration
+    const back = Math.atan2(-(r.shotDy || 0), -(r.shotDx || -1));
+    if (r.result === 'pen') { this.sparks(x, y, 55, 48); this.sparks(x, y, 25, 30, back, 1.2, 0xfff0c0); }
+    else this.sparks(x, y, r.result === 'ricochet' ? 60 : 75, 55, back, r.result === 'ricochet' ? 1.2 : 2.2);
+    this.flashes.push({ x, y, dx: 0, dy: 1, t: 0, ttl: 0.05, boom: true });
     if (r.ammo.type === 'HEAT' && r.result !== 'ricochet') {
       this.flashes.push({ x, y, dx: 0, dy: 1, t: 0, ttl: 0.08, boom: true });
       for (let i = 0; i < 16; i++) P.add(K.DARK, x + this.rnd(-0.5, 0.5), y + this.rnd(0, 1), this.rnd(-1, 1), this.rnd(0.5, 3), this.rnd(3, 6), 0.6, { grow: 0.8, drag: 1, grav: -0.02, alpha: 0.4, col: 0x35302b });
@@ -274,11 +270,7 @@ DS.Effects = class Effects {
       const tow = r.ammo.d > 0.13, k = tow ? 1.4 : 1;
       this.blast(x, y, tow ? 1.3 : 0.8, null, null);
       this.flashes.push({ x, y, dx: 0, dy: 1, t: 0, ttl: 0.12, boom: true, big: tow });
-      for (let i = 0; i < 40 * k; i++) { const a = this.rnd(0, Math.PI * 2), rr = this.rnd(0, 1.2) * k, sp = this.rnd(2, 10) * k;
-        P.add(K.FIRE, x + Math.cos(a) * rr, y + Math.sin(a) * rr, Math.cos(a) * sp, Math.sin(a) * sp, this.rnd(0.1, 0.3), this.rnd(0.5, 1.2) * k,
-          { grow: 4, drag: 8, grav: -0.05, alpha: 0.55, col: Math.random() < 0.4 ? 0xffd890 : 0xff8a30 }); }
-      for (let i = 0; i < 18 * k; i++) P.add(K.DARK, x + this.rnd(-1, 1), y + this.rnd(0, 1.5), this.rnd(-2, 2), this.rnd(1, 4), this.rnd(5, 10), this.rnd(0.7, 1.3) * k,
-        { grow: 0.9, drag: 1, grav: -0.02, alpha: 0.5, col: 0x2a2622 });
+      this.fireball(x, y + 0.3, Math.round(10 * k), 1.3 * k, 10 * k, 0x2a2622, 5, 0.6); this.comets(x, y, tow ? 5 : 2, 22);
       if (r.result === 'pen') {                                  // the jet and spall carry on into the hull
         const v = r.vehicle, dx = Math.sign(v.pos.x - x) || 1;
         for (let i = 0; i < 24; i++) P.add(K.FIRE, x, y, dx * this.rnd(20, 60), this.rnd(-6, 6), this.rnd(0.03, 0.08), this.rnd(0.06, 0.16), { grow: 0, drag: 3, grav: 0, alpha: 1, col: 0xfff0c0 });
@@ -309,13 +301,19 @@ DS.Effects = class Effects {
     const big = v.def.gun.recoilMass > 1500 ? 1 : 0.55, ang = Math.atan2(e.dy, e.dx), sc = this.hex(T.soilAt(e.x).col[1]), sc2 = this.hex(T.soilAt(e.x).col[0]);
     // secondary flash: the propellant gases re-ignite a few metres ahead as a big round fireball
     this.flashes.push({ x: e.x + e.dx * 3.5 * big, y: e.y + e.dy * 3.5 * big, dx: 0, dy: 1, t: 0, ttl: 0.16, boom: true, big: big > 0.9 });
-    for (let i = 0; i < 46 * big; i++) {
-      const d = this.rnd(0.5, 6.5) * big, a = this.rnd(0, Math.PI * 2), r = this.rnd(0, 1.6) * big, sp = this.rnd(2, 9);
-      P.add(K.FIRE, e.x + e.dx * d + Math.cos(a) * r, e.y + e.dy * d + Math.sin(a) * r, Math.cos(a) * sp + e.dx * 12, Math.sin(a) * sp + e.dy * 12,
-        this.rnd(0.14, 0.32), this.rnd(0.9, 2.0) * big, { grow: 5, drag: 9, grav: 0, alpha: 0.42, col: Math.random() < 0.3 ? 0xffd890 : Math.random() < 0.6 ? 0xffa548 : 0xe8702a });
+    // muzzle fireball: a jet of flame along the bore that balloons a few metres out and cools into grey-brown smoke
+    for (let i = 0; i < 16 * big; i++) {
+      const d = this.rnd(0.6, 7) * big, sd = this.rnd(-1, 1) * 0.5 * d * 0.25;
+      P.add(K.FLAME, e.x + e.dx * d - e.dy * sd, e.y + e.dy * d + e.dx * sd, e.dx * this.rnd(6, 20) + this.rnd(-3, 3), e.dy * this.rnd(6, 20) + this.rnd(-2, 4),
+        this.rnd(2.2, 4.5), this.rnd(0.7, 1.7) * big * (0.5 + d / 8), { grow: this.rnd(1.2, 2.6) * big, drag: 3.2, grav: -0.03, alpha: 0.5, col: Math.random() < 0.5 ? 0x8f8679 : 0x6e665b });
     }
+    for (let i = 0; i < 10 * big; i++) {              // muzzle-brake side jets
+      const s2 = i % 2 ? 1 : -1, sp = this.rnd(6, 16);
+      P.add(K.FLAME, e.x - e.dx * 0.3, e.y - e.dy * 0.3, -e.dy * s2 * sp + e.dx * 3, e.dx * s2 * sp + e.dy * 3, this.rnd(1.2, 2.4), this.rnd(0.4, 0.8) * big, { grow: 1.4, drag: 4, grav: -0.02, alpha: 0.4, col: 0x9a9184 });
+    }
+    this.sparks(e.x + e.dx * 1.5, e.y + e.dy * 1.5, Math.round(26 * big), 55, ang, 0.5, 0xffc878);
     // the fireball turns into a big pale cloud of gun smoke ahead of the muzzle that lingers and drifts
-    for (let i = 0; i < 70 * big; i++) {
+    for (let i = 0; i < 44 * big; i++) {
       const d = this.rnd(0, 11) * big, a = this.rnd(0, Math.PI * 2), r = this.rnd(0, 2.2) * big * Math.min(1, 0.3 + d / 6), sp = this.rnd(1, 7);
       P.add(K.SMOKE, e.x + e.dx * d + Math.cos(a) * r, e.y + e.dy * d + Math.sin(a) * r, Math.cos(a) * sp + e.dx * (14 - d), Math.sin(a) * sp + this.rnd(0, 1.5),
         this.rnd(5, 11), this.rnd(0.7, 1.6) * big, { grow: this.rnd(0.6, 1.3), drag: 2.4, grav: -0.02, alpha: 0.42, col: Math.random() < 0.5 ? 0xe2ddd2 : 0xd6c8ae });
@@ -367,14 +365,48 @@ DS.Effects = class Effects {
         { grow: this.rnd(0.6, 1.3), drag: 0.9, grav: 0, alpha: 0.32, col: sc });
     }
     if (heat) {
-      for (let i = 0; i < 24; i++) { const a = this.rnd(0, 6.28), sp = this.rnd(3, 20);
-        P.add(K.FIRE, hit.x, hit.y + 0.5, Math.cos(a) * sp, Math.abs(Math.sin(a)) * sp, this.rnd(0.06, 0.18), this.rnd(0.5, 1.2), { grow: 5, drag: 10, grav: 0, alpha: 1, col: 0xffa040 }); }
-      for (let i = 0; i < 14; i++) P.add(K.DARK, hit.x + this.rnd(-1, 1), hit.y + this.rnd(0.5, 2.5), this.rnd(-1, 1), this.rnd(1, 4), this.rnd(4, 8), this.rnd(0.6, 1.2),
-        { grow: 0.9, drag: 1, grav: -0.02, alpha: 0.4, col: 0x2e2a26 });
+      this.fireball(hit.x, hit.y + 0.6, 9, 1.2, 9, 0x2e2a26, 4.5, 0.6); this.sparks(hit.x, hit.y + 0.3, 30, 40, Math.PI / 2, 2.4); this.comets(hit.x, hit.y + 0.3, 3, 20);
       this.flashes.push({ x: hit.x, y: hit.y + 0.5, dx: 0, dy: 1, t: 0, ttl: 0.07, boom: true });
     }
     const d = Math.abs(hit.x - this.w.cam.x);
     this.shake = Math.max(this.shake, Math.max(0, 0.5 - d / 300));
+  }
+
+  // ---- building blocks for explosions ----
+  // fireball that boils up and cools into smoke: n balls, radius r0, thrown outward at up to sp m/s
+  fireball(x, y, n, r0, sp, smoke = 0x2b2622, ttl = 4, up = 0.5) {
+    const P = this.P, K = DS.P;
+    for (let i = 0; i < n; i++) {
+      const a = this.rnd(0, 6.283), v = this.rnd(0.15, 1) * sp, d = this.rnd(0, r0 * 0.5);
+      P.add(K.FLAME, x + Math.cos(a) * d, y + Math.sin(a) * d * 0.7, Math.cos(a) * v, Math.sin(a) * v * 0.8 + sp * up * this.rnd(0.2, 1),
+        ttl * this.rnd(0.7, 1.3), r0 * this.rnd(0.55, 1.1), { grow: r0 * this.rnd(0.5, 1.1), drag: 2.2, grav: -0.035, alpha: 0.62, col: smoke });
+    }
+  }
+  // shower of glowing sparks (hot metal): fast, heavy, short-lived streaks
+  sparks(x, y, n, sp, dir = null, spread = 6.283, col = 0xffd27a) {
+    const P = this.P, K = DS.P;
+    for (let i = 0; i < n; i++) {
+      const a = dir == null ? this.rnd(0, 6.283) : dir + this.rnd(-0.5, 0.5) * spread, v = this.rnd(0.25, 1) * sp;
+      P.add(K.SPARK, x, y, Math.cos(a) * v, Math.sin(a) * v, this.rnd(0.35, 1.3), this.rnd(0.02, 0.05), { drag: 0.9, grav: 1, alpha: 1, col: Math.random() < 0.3 ? 0xfff0c0 : col });
+    }
+  }
+  // burning fragments that arc away trailing smoke
+  comets(x, y, n, sp, col = 0x2e2924) {
+    const L = this.cm || (this.cm = []);
+    for (let i = 0; i < n && L.length < 40; i++) { const a = Math.PI / 2 + this.rnd(-1.25, 1.25), v = this.rnd(0.45, 1) * sp; L.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, t: 0, ttl: this.rnd(1.6, 3.4), col, acc: 0 }); }
+  }
+  stepComets(dt) {
+    const L = this.cm; if (!L || !L.length) return;
+    const P = this.P, K = DS.P, T = this.w.terrain;
+    for (const c of L) {
+      c.t += dt; c.vy -= DS.T.g * dt; c.vx *= 1 - 0.25 * dt; c.x += c.vx * dt; c.y += c.vy * dt;
+      c.acc += dt * 38;
+      while (c.acc >= 1) { c.acc -= 1; const f = 1 - c.t / c.ttl;
+        P.add(K.DARK, c.x + this.rnd(-0.1, 0.1), c.y + this.rnd(-0.1, 0.1), this.rnd(-0.4, 0.4), this.rnd(-0.2, 0.6), this.rnd(1.6, 3), 0.28 + 0.3 * f, { grow: 0.5, drag: 1.2, grav: -0.01, alpha: 0.5 * f + 0.12, col: c.col }); }
+      if (Math.random() < dt * 20) P.add(K.FIRE, c.x, c.y, 0, 0, 0.12, 0.3, { grow: 0, drag: 1, grav: 0, alpha: 0.9, col: 0xffb050 });
+      if (c.y < T.height(c.x)) c.t = c.ttl;
+    }
+    this.cm = L.filter(c => c.t < c.ttl);
   }
 
   // 155 mm high-explosive burst: a fireball, a tall column of sand thrown straight up with a wide low skirt,
@@ -412,10 +444,10 @@ DS.Effects = class Effects {
       const s = Math.random() < 0.5 ? 1 : -1;
       P.add(K.DUST, x + s * r(0, 3), gy + r(0.3, 1.8), s * r(8, 30), r(0.2, 3), r(7, 14), r(2, 4), { grow: r(1.4, 2.8), drag: 1.0, grav: 0, alpha: 0.36, col: sc });
     }
-    for (let i = 0; i < Math.round(36 * k) + 6; i++) { const a = r(0, 6.28), sp = r(4, 34);
-      P.add(K.FIRE, x, y + 0.8, Math.cos(a) * sp, Math.abs(Math.sin(a)) * sp + 2, r(0.08, 0.26), r(0.9, 2.4), { grow: 7, drag: 9, grav: 0, alpha: 1, col: 0xffa848 }); }
-    for (let i = 0; i < Math.round(air ? 8 : 20 * k) + 3; i++)
-      P.add(K.DARK, x + r(-2, 2), y + r(0.5, 4), r(-2.5, 2.5), r(3, 11), r(5, 10), r(1.2, 2.4), { grow: r(1.0, 1.8), drag: 0.9, grav: -0.02, alpha: 0.26, col: 0x3a352f });
+    // fireball boiling up into black-brown smoke, burning fragments trailing smoke, a shower of sparks
+    this.fireball(x, y + 1, Math.round(16 * k) + 5, 2.6, 16, 0x2a2521, 6, 0.7);
+    this.fireball(x, y + 2.5, Math.round(8 * k) + 2, 1.8, 9, 0x4a3f33, 8, 1.4);
+    if (near) { this.comets(x, y + 0.5, 9, 34); this.sparks(x, y + 0.6, 70, 60, Math.PI / 2, 2.6); }
     for (let i = 0; i < Math.round(18 * k); i++) { const a = Math.PI / 2 + r(-1.2, 1.2), sp = r(12, 45);
       P.add(K.DEBRIS, x, y + 0.5, Math.cos(a) * sp, Math.sin(a) * sp, r(2, 5), r(0.06, 0.2), { drag: 0.2, col: 0x3a342c }); }
     this.flashes.push({ x, y: y + 1, dx: 0, dy: 1, t: 0, ttl: 0.1, boom: true });
@@ -475,6 +507,7 @@ DS.Effects = class Effects {
     const P = this.P, K = DS.P, sc = this.hex(this.w.terrain.soilAt(x).col[1]);
     if (!this.w.cam.visible(x, y, 30)) return;
     this.flashes.push({ x, y: y + 0.3, dx: 0, dy: 1, t: 0, ttl: 0.05, boom: true });
+    if (!lite) this.sparks(x, y + 0.2, 10, 26, Math.PI / 2, 2.4);
     for (let i = 0; i < (lite ? 2 : 5); i++) P.add(K.GRAIN, x, y + 0.1, this.rnd(-5, 5), this.rnd(4, 14), this.rnd(0.6, 1.4), this.rnd(0.04, 0.1), { drag: 0.4, col: sc });
     P.add(K.DUST, x, y + 0.5, this.rnd(-1.5, 1.5), this.rnd(1, 4), this.rnd(2.5, 5), this.rnd(0.7, 1.3), { grow: 1, drag: 1, grav: 0, alpha: 0.3, col: sc });
     if (!lite) P.add(K.DARK, x, y + 0.6, this.rnd(-1, 1), this.rnd(1, 3), this.rnd(2, 4), this.rnd(0.5, 0.9), { grow: 0.8, drag: 1, grav: -0.02, alpha: 0.3, col: 0x3a352f });
@@ -602,7 +635,7 @@ DS.Effects = class Effects {
     this.blasts = this.blasts.filter(b => b.r < b.max);
   }
 
-  update(dt) { this.stepBlasts(dt); this.stepCases(dt); for (const w of this.waves) w.t += dt; this.waves = this.waves.filter(w => w.t < 0.4); for (const f of this.flashes) f.t += dt; this.flashes = this.flashes.filter(f => f.t < f.ttl);
+  update(dt) { this.stepBlasts(dt); this.stepCases(dt); this.stepComets(dt); for (const w of this.waves) w.t += dt; this.waves = this.waves.filter(w => w.t < 0.4); for (const f of this.flashes) f.t += dt; this.flashes = this.flashes.filter(f => f.t < f.ttl);
     for (const l of this.labels) l.t += dt; this.labels = this.labels.filter(l => l.t < 4); this.shake = Math.max(0, this.shake - dt * 2.5); }
 
   drawFlashes(ctx) {

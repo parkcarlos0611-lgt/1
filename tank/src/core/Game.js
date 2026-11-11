@@ -92,7 +92,11 @@ DS.Game = class Game {
     requestAnimationFrame(t => { this.last = t; this.loop(t); });
   }
   resize() {
-    const dpr = Math.min(2, devicePixelRatio || 1), W = innerWidth, H = innerHeight;
+    // render resolution: the device's pixel ratio (at most 2), capped at about 3.4 million pixels and then
+    // scaled by `rs`, which the frame-rate governor in loop() moves between 0.5 and 1
+    const d0 = Math.min(2, devicePixelRatio || 1), W = innerWidth, H = innerHeight, auto = DS.T.resAuto !== false && !navigator.webdriver;
+    if (this.rs == null) this.rs = 1;
+    const cap = auto ? Math.min(1, Math.sqrt(3.4e6 / (W * H * d0 * d0))) : 1, dpr = d0 * cap * this.rs;
     this.cv.width = W * dpr; this.cv.height = H * dpr; this.cv.style.width = W + 'px'; this.cv.style.height = H + 'px';
     this.world.cam.resize(W, H, dpr);
     this.mini.width = this.mini.clientWidth * dpr; this.mini.height = this.mini.clientHeight * dpr;
@@ -231,7 +235,7 @@ DS.Game = class Game {
     document.getElementById('hurt').style.display = 'none';
     // drop a level when the frame rate stays low (DS.T.postAuto = false turns this off)
     if (DS.T.postAuto !== false) {
-      this.lowFps = this.fps < 40 ? this.lowFps + dt : 0;
+      this.lowFps = this.fps < 40 && !(this.rs > 0.5 && !navigator.webdriver) ? this.lowFps + dt : 0;      // resolution is lowered first
       if (this.lowFps > 3) { this.lowFps = 0; P.setQuality(P.q - 1); this.toast('프레임 저하 — 화면 효과 ' + ['끔', '낮음'][P.q]); }
     }
     const z = cam.zoom * dpr, S = (x, y) => [(x - cam.x - cam.sx) * z + cam.W * dpr / 2, -(y - cam.y - cam.sy) * z + cam.H * dpr / 2];
@@ -366,6 +370,13 @@ DS.Game = class Game {
   loop(t) {
     const dt = Math.min(0.05, (t - this.last) / 1000); this.last = t;
     if (dt > 0) this.fps += (1 / dt - this.fps) * 0.05;
+    // frame-rate governor: below 50 fps for a second and a half the picture is rendered smaller (it is stretched
+    // back to the screen); with headroom for six seconds it creeps back up. Never touched while editing.
+    if (DS.T.resAuto !== false && !navigator.webdriver && this.player) {
+      this._slow = this.fps < 50 ? (this._slow || 0) + dt : 0; this._fast = this.fps > 57.5 ? (this._fast || 0) + dt : 0;
+      if (this._slow > 1.5 && this.rs > 0.5) { this.rs = Math.max(0.5, this.rs * 0.86); this._slow = 0; this._fast = -4; this.resize(); }
+      else if (this._fast > 6 && this.rs < 1) { this.rs = Math.min(1, this.rs * 1.07); this._fast = 0; this.resize(); }
+    }
     const ed = this.sbx && this.sbx.edit;
     this.readInput(dt);
     if (ed) this.sbx.frame(dt);
@@ -420,7 +431,7 @@ DS.Game = class Game {
       set('h-load', g.reload > 0 ? (g.locked ? '자동장전 — 포 고정 ' : '장전 중 ') + g.reload.toFixed(1) + ' s' : '장전 완료');
       set('h-pos', (v.pos.x / 1000).toFixed(2) + ' km');
       set('h-zoom', w.cam.zoom.toFixed(0) + ' px/m');
-      set('h-fps', Math.round(this.fps) + ' fps');
+      set('h-fps', Math.round(this.fps) + ' fps' + ` · ${this.cv.width}×${this.cv.height}`);
       document.getElementById('h-load').classList.toggle('ready', g.reload <= 0);
       this.minimap();
     }

@@ -240,7 +240,9 @@ DS.Renderer = class Renderer {
       const t = P.life[i] / P.ttl[i];
       if (k === K.DEBRIS) { const c = lum(0.9 * (1 - t) + amb.ground * t); ctx.globalAlpha = 1 - t; ctx.fillStyle = `rgb(${c},${c},${c})`; ctx.fillRect(P.x[i] - sz / 2, P.y[i] - sz / 2, sz, sz); continue; }
       let T, a;
+      if (k === K.SPARK) continue;
       if (k === K.FIRE) { T = 1.4; a = P.alpha[i] * (1 - t) * (1 - t); }
+      else if (k === K.FLAME) { T = amb.ground + 0.2 + 1.2 * Math.max(0, 1 - t / 0.34); a = P.alpha[i] * (1 - t); }
       else if (k === K.DARK) { T = amb.ground + 0.14 * (1 - t); a = P.alpha[i] * 0.7 * Math.min(1, t * 8) * (1 - t); }
       else if (k === K.SMOKE) { T = amb.ground + 0.07 * (1 - t); a = P.alpha[i] * 0.5 * Math.min(1, t * 8) * (1 - t); }
       else { T = amb.ground - 0.02; a = P.alpha[i] * 0.45 * Math.min(1, t * 8) * (1 - t); }   // dust: thermal sees through most of it

@@ -40,7 +40,7 @@ DS.World = class World {
     if (ai) ai.observe({ x: h.hit.x, hitVehicle: h.hit.v });
     if (h.hit.v === this.vehicles[0]) this.playerHitAt = this.time;
     const r = DS.Armor.resolve(this, p, h.hit);
-    r.t = p.t; r.shooter = p.owner;
+    r.t = p.t; r.shooter = p.owner; { const sp = Math.hypot(p.vx, p.vy) || 1; r.shotDx = p.vx / sp; r.shotDy = p.vy / sp; }
     this.fx.armor(r);
     this.addLog(r);
     if (r.result === 'ricochet') {

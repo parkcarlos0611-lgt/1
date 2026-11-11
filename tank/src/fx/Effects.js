@@ -23,6 +23,7 @@ DS.Effects = class Effects {
     const end = { lx: e0.x + (fwd ? -0.1 : 0.1), ly: e0.y - 0.4 };
     const ex = v.pos.x + c * end.lx - s * end.ly, ey = v.pos.y + s * end.lx + c * end.ly;
     const vt = Math.abs(v.vt), rate = (vt * 16 + v.stats.slip * 90) * soil.dust;
+    v.dust = Math.min(1, (v.dust || 0) + (vt + v.stats.slip * 3) * dt * soil.dust / 120);       // fully dusty after about half a kilometre of soft sand
     let n = rate * dt + Math.random();
     const dir = fwd ? -1 : 1, sc0 = this.hex(soil.col[0]);
     // rooster tail: grains flung up and back off the trailing end, higher with speed

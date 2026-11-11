@@ -108,6 +108,19 @@ DS.Renderer = class Renderer {
       }
     }
   }
+  // wind ripples on the sand plane: wavy, branching crests, lit on one side and shaded on the other
+  makeRipples() {
+    const c = document.createElement('canvas'); c.width = 512; c.height = 256; const x = c.getContext('2d'), r = DS.rng(23);
+    for (let row = 0; row < 26; row++) {
+      const y0 = row * (256 / 26) + r() * 4, ph = r() * 6.28, amp = 2 + r() * 3, f = 2 + Math.floor(r() * 3);
+      for (const [dy, col, lw] of [[0, 'rgba(96,66,34,0.20)', 1.6], [-1.8, 'rgba(255,238,205,0.20)', 1.3]]) {
+        x.strokeStyle = col; x.lineWidth = lw; x.beginPath();
+        for (let px = 0; px <= 512; px += 8) { const y = y0 + dy + Math.sin(px / 512 * 6.283 * f + ph) * amp + Math.sin(px / 512 * 6.283 * (f * 3 + 1) + ph * 2) * amp * 0.25; px ? x.lineTo(px, y) : x.moveTo(px, y); }
+        x.stroke();
+      }
+    }
+    return c;
+  }
   makeNoise() {
     const c = document.createElement('canvas'); c.width = c.height = 128; const x = c.getContext('2d');
     const d = x.createImageData(128, 128), r = DS.rng(3);
@@ -459,7 +472,7 @@ DS.Renderer = class Renderer {
       g.addColorStop(0, '#1a1a1a'); g.addColorStop(1, '#3a3a3a'); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H); return;
     }
     if (env.visibility) { g.addColorStop(0, '#b98d5a'); g.addColorStop(0.55, '#d8b07a'); g.addColorStop(1, '#e2c08c'); }
-    else { g.addColorStop(0, '#7fa6cc'); g.addColorStop(0.5, '#c9d3d4'); g.addColorStop(0.75, '#ecdcbc'); g.addColorStop(1, '#e8cf9f'); }
+    else { g.addColorStop(0, '#3f78bd'); g.addColorStop(0.3, '#7da9d6'); g.addColorStop(0.52, '#c3d6e2'); g.addColorStop(0.75, '#ecdcbc'); g.addColorStop(1, '#e8cf9f'); }
     ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
     if (env.night) {
       const n = ctx.createLinearGradient(0, 0, 0, H); n.addColorStop(0, '#05070f'); n.addColorStop(1, '#141826');
@@ -493,11 +506,50 @@ DS.Renderer = class Renderer {
       }
       ctx.restore();
     }
+    if (!storm) {
+      // cumulus: heaps of lumpy puffs with flat bases, lit from the sun's side, drifting slowly; a few faint
+      // shafts of light fan down from the sun through the haze
+      const PS = this.w.particles, R5 = n => { const v = Math.sin(n * 91.7 + 13.3) * 43758.5453; return v - Math.floor(v); };
+      const span = W * 1.8, warm = low > 0.3 ? 0xffe2c0 : 0xfdfbf6;
+      // a soft glare spreading below the sun rather than hard shafts
+      { const cg = ctx.createRadialGradient(sx, sy, 0, sx, sy + H * 0.25, H * 0.55); cg.addColorStop(0, 'rgba(255,240,215,0.10)'); cg.addColorStop(1, 'rgba(255,240,215,0)'); ctx.fillStyle = cg; ctx.fillRect(0, 0, W, H); }
+      for (let i = 0; i < 8; i++) {
+        // each cloud: a flat-bottomed heap of many small puffs, densest and tallest in the middle, the top lit and
+        // the underside greyer; far ones smaller, paler and slower
+        const far = 0.4 + 0.6 * R5(i + 20), cw = W * (0.1 + 0.2 * R5(i)) * far, by = H * (0.12 + 0.24 * R5(i + 10));
+        const cx = ((R5(i + 30) * span - cam.x * cam.dpr * 0.012 * far + this.w.time * 2.2 * far) % span + span) % span - W * 0.4;
+        if (cx + cw < 0 || cx - cw > W) continue;
+        for (let k = 0; k < 26; k++) {
+          const u = R5(i * 31 + k), e = Math.sqrt(Math.max(0, 1 - (u * 2 - 1) ** 2)), r = cw * (0.05 + 0.1 * e) * (0.7 + 0.6 * R5(i * 5 + k * 3));
+          const px = cx + (u - 0.5) * cw * 1.6, py = by - r * 0.3 - e * cw * 0.16 * R5(i * 7 + k);
+          const lit = py < by - cw * 0.06;
+          ctx.globalAlpha = (0.32 + 0.4 * far) * (lit ? 1 : 0.8);
+          ctx.drawImage(PS.puff(lit ? warm : 0xc9cdd6, k & 3), px - r, py - r * 0.62, r * 2, r * 1.24);
+        }
+      }
+      ctx.globalAlpha = 1;
+    }
     // ---- parallax dunes: asymmetric (long windward slope, short slip face), far layers fade into the haze,
     // faces turned to the sun lit, faces turned away shaded ----
     const hz = H * 0.5 + (cam.y - 14) * cam.zoom * cam.dpr * 0.04;
     const haze = storm ? [214, 176, 122] : [236 - 10 * low, 222 - 12 * low, 196 - 10 * low], sand = storm ? [196, 156, 104] : [204, 170, 116];
     const dune = (t) => { t = ((t % 1) + 1) % 1; const u = t < 0.72 ? t / 0.72 : 1 - (t - 0.72) / 0.28; return u * u * (3 - 2 * u); };
+    // far rocky range behind the dunes: a jagged ridge, blue-violet with distance, sunlit flanks
+    if (!storm) {
+      const N1 = n => { const v = Math.sin(n * 127.1 + 311.7) * 43758.5453; return v - Math.floor(v); };
+      const vn = x => { const i = Math.floor(x), f = x - i, s = f * f * (3 - 2 * f); return N1(i) + (N1(i + 1) - N1(i)) * s; };
+      const ridge = (wx, k) => 0.55 * vn(wx / 900 + k) + 0.3 * vn(wx / 260 + k * 3) + 0.15 * vn(wx / 70 + k * 7);
+      for (const [f, hgt, col, lit] of [[0.006, 0.17, [150, 152, 176], 0.25], [0.012, 0.11, [176, 160, 158], 0.35]]) {
+        const pts = [];
+        for (let x = -8; x <= W + 8; x += 8) { const wx = (x - W / 2) / cam.dpr * 1.6 + cam.x * f * 8 + 4000; const r = ridge(wx, f * 1000); pts.push([x, hz + H * 0.02 - H * hgt * Math.max(0, r - 0.32) * 1.9]); }
+        ctx.fillStyle = `rgb(${col})`; ctx.beginPath(); ctx.moveTo(-8, H);
+        for (const [x, y] of pts) ctx.lineTo(x, y);
+        ctx.lineTo(W + 8, H); ctx.closePath(); ctx.fill();
+        const sg3 = ctx.createLinearGradient(-8, 0, W + 8, 0);
+        for (let i = 2; i < pts.length; i += 2) { const sl = (pts[i - 2][1] - pts[i][1]) / 16 * sun.side, a = Math.max(-1, Math.min(1, sl * 1.2)); sg3.addColorStop((pts[i][0] + 8) / (W + 16), a > 0 ? `rgba(255,232,200,${(lit * a).toFixed(3)})` : `rgba(60,56,90,${(-lit * a).toFixed(3)})`); }
+        ctx.fillStyle = sg3; ctx.beginPath(); ctx.moveTo(-8, H); for (const [x, y] of pts) ctx.lineTo(x, y); ctx.lineTo(W + 8, H); ctx.closePath(); ctx.fill();
+      }
+    }
     const layers = [[0.02, 0.85, 0.03, 30, 3200], [0.05, 0.68, 0.05, 55, 2300], [0.10, 0.5, 0.07, 80, 1700], [0.18, 0.32, 0.085, 105, 1300], [0.30, 0.16, 0.1, 125, 1000]];
     for (const [f, fog, amp, base, lam] of layers) {
       const fogK = storm ? Math.min(1, fog * 1.25 + 0.15) : fog;
@@ -592,6 +644,7 @@ DS.Renderer = class Renderer {
     // wind streaks and grain on the plane: textures laid in screen space (no resampling) and scrolled with the
     // camera, so they cost a plain pattern fill
     if (!this.streaks) this.streaks = this.makeStreaks();
+    if (!this.ripples) this.ripples = this.makeRipples();
     {
       const m = ctx.getTransform(), ox = -(cam.x + cam.sx) * cam.zoom * cam.dpr, oy = (cam.y + cam.sy) * cam.zoom * cam.dpr;
       ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -599,6 +652,7 @@ DS.Renderer = class Renderer {
       ps.setTransform(new DOMMatrix([1, 0, 0, 1, ox % 512, oy % 64])); pn.setTransform(new DOMMatrix([1, 0, 0, 1, ox % 128, oy % 128]));
       const sy = Math.max(0, m.d * (gy + 1) + m.f);                // screen y of the surface, roughly
       ctx.globalAlpha = 0.35; ctx.fillStyle = ps; ctx.fillRect(0, sy, ctx.canvas.width, ctx.canvas.height - sy);
+      if (!storm) { const pr = ctx.createPattern(this.ripples, 'repeat'); pr.setTransform(new DOMMatrix([1, 0, 0, 1, ox % 512, oy % 256])); ctx.globalAlpha = 0.5; ctx.fillStyle = pr; ctx.fillRect(0, sy, ctx.canvas.width, ctx.canvas.height - sy); }
       ctx.globalAlpha = 0.6; ctx.fillStyle = pn; ctx.fillRect(0, sy, ctx.canvas.width, ctx.canvas.height - sy);
       ctx.restore(); ctx.globalAlpha = 1;
     }
@@ -624,6 +678,23 @@ DS.Renderer = class Renderer {
       if (di > 0.02) { ctx.globalAlpha = di * 0.5; ctx.fillStyle = '#9b7547'; ctx.fillRect(x, h - 0.6, cs + 0.01, 0.6); }
     }
     ctx.globalAlpha = 1;
+    // track marks on the plane where vehicles have driven: two pressed bands with the cross-bars of the links
+    if (cam.zoom > 9) {
+      const bar = 0.17, n0 = Math.floor(x0 / bar);
+      for (const [d0, d1] of [[0.12, 0.5], [0.95, 1.4]]) {
+        let run = null;
+        ctx.fillStyle = 'rgba(92,66,38,0.14)';
+        for (let x = x0; x <= x1 + cs; x += cs) {                     // the pressed band itself
+          const i = T.idx(x), on = T.sink[i] > 0.006 && T.soil[i] !== 3;
+          if (on && run == null) run = x;
+          if ((!on || x > x1) && run != null) { ctx.beginPath(); ctx.moveTo(run, T.height(run) - d0); ctx.lineTo(x, T.height(x) - d0); ctx.lineTo(x, T.height(x) - d1); ctx.lineTo(run, T.height(run) - d1); ctx.closePath(); ctx.fill(); run = null; }
+        }
+        if (cam.zoom > 16) {
+          ctx.fillStyle = 'rgba(70,48,24,0.16)';
+          for (let k = n0; k * bar <= x1; k++) { const x = k * bar, i = T.idx(x); if (T.sink[i] > 0.006 && T.soil[i] !== 3) ctx.fillRect(x, T.h[i] - d1, bar * 0.4, d1 - d0); }
+        }
+      }
+    }
     // sun / shade by slope: one gradient across the screen over a band under the surface line
     {
       const sg = ctx.createLinearGradient(x0, 0, x1, 0), n = Math.min(160, Math.ceil((x1 - x0) * cam.zoom / 8));
@@ -788,6 +859,7 @@ DS.Renderer = class Renderer {
     else { ctx.moveTo(U.x0, U.y0); ctx.lineTo(U.x1, U.y0); ctx.lineTo(U.x1 - 0.2, U.y1); ctx.lineTo(U.x0 + 0.3, U.y1); }
     ctx.closePath(); ctx.fill();
     if (D.rearFill) { const R = D.rearFill; ctx.fillRect(R.x0, R.y0, R.x1 - R.x0, R.y1 - R.y0); }
+    if ((v.dust || 0) > 0.03) { ctx.fillStyle = `rgba(205,172,122,${(Math.min(1, v.dust) * 0.4).toFixed(2)})`; ctx.fill(); }
     if (D.sprocketHole) { ctx.beginPath(); ctx.arc(D.sprocket.x, D.sprocket.y, D.sprocketHole, 0, 7); ctx.fill(); }
     if (OS) {
       // shade under the fender, darker toward the belly, a weld seam and the bolted final-drive housing
@@ -833,9 +905,12 @@ DS.Renderer = class Renderer {
       const P = v.chain.p; links = [];
       for (let i = 1; i < P.length; i++) links.push([(P[i].x + P[i - 1].x) / 2, (P[i].y + P[i - 1].y) / 2, Math.atan2(P[i - 1].y - P[i].y, P[i - 1].x - P[i].x)]);
     }
+    // sand and dust picked up while driving: lightens the track, the wheels and the lower hull side
+    const dustA = Math.min(1, v.dust || 0) * 0.6, dustC = '205,172,122';
     links.forEach(([x, y, a], i) => {
       ctx.save(); ctx.translate(x, y); ctx.rotate(a);
       ctx.fillStyle = '#26231f'; ctx.fillRect(-L * 0.5, -th * 0.5, L * 0.93, th);
+      if (dustA > 0.02) { ctx.fillStyle = `rgba(${dustC},${(dustA * 0.75).toFixed(2)})`; ctx.fillRect(-L * 0.5, -th * 0.5, L * 0.93, th); }
       ctx.fillStyle = '#4a4540'; ctx.fillRect(-L * 0.5, -th * 0.5, L * 0.18, th);
       ctx.fillStyle = '#3a3631'; ctx.fillRect(-L * 0.25, th * 0.12, L * 0.6, th * 0.22);
       ctx.fillStyle = '#1d1b18'; ctx.fillRect(-L * 0.12, -th * 0.5 - 0.065, L * 0.28, 0.07);
@@ -849,6 +924,7 @@ DS.Renderer = class Renderer {
       ctx.save(); ctx.translate(x, y); ctx.rotate(ang); const k = r / imr; ctx.scale(k, -k);
       ctx.drawImage(im, -imr, -imr, imr * 2, imr * 2);
       if (tint) { ctx.globalAlpha = tint; ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(0, 0, imr, 0, 7); ctx.fill(); }
+      if (dustA > 0.02) { ctx.globalAlpha = dustA; const dg = ctx.createRadialGradient(0, 0, imr * 0.2, 0, 0, imr * 0.98); dg.addColorStop(0, `rgba(${dustC},0.35)`); dg.addColorStop(0.75, `rgba(${dustC},0.8)`); dg.addColorStop(1, `rgba(${dustC},1)`); ctx.fillStyle = dg; ctx.beginPath(); ctx.arc(0, 0, imr * 0.98, 0, 7); ctx.fill(); ctx.globalAlpha = 1; }
       ctx.restore();
     };
     // return rollers turn with the track running over them

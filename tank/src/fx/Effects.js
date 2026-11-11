@@ -7,7 +7,12 @@ DS.Effects = class Effects {
   rnd(a, b) { return a + Math.random() * (b - a); }
   hex(s) { return parseInt(s.slice(1), 16); }
 
+  dispatch(v) {
+    for (const e of v.events) { if (e.type === 'fire') this.muzzle(v, e); else if (e.type === 'mg') this.mgFire(v, e); else if (e.type === 'tow') this.towLaunch(v, e); else if (e.type === 'explode') this.explode(v); else if (e.type === 'pillar') this.pillar(v); else if (e.type === 'rocket') this.rocketLaunch(v, e); else if (e.type === 'case') this.ejectCase(v, e); else if (e.type === 'autoload') DS.Audio.autoload(v); else if (e.type === 'trackSnap') this.trackSnap(e); else if (e.type === 'turretLand') this.turretLand(e); }
+    v.events.length = 0;
+  }
   vehicle(v, dt) {
+    if (v.heli) return this.heliFx(v, dt);
     const P = this.P, K = DS.P, T = this.w.terrain, D = v.def, G = v.g;
     const c = Math.cos(v.ang), s = Math.sin(v.ang);
     const speed = Math.hypot(v.vel.x, v.vel.y), soil = T.soilAt(v.pos.x), sc = this.hex(soil.col[1]);
@@ -80,8 +85,7 @@ DS.Effects = class Effects {
         { grow: 2, drag: 2, grav: 0, alpha: 0.9, col: 0xffa040 });
       if (Math.random() < 0.5) P.add(K.DARK, p.x, p.y + 2, this.rnd(-1, 1), this.rnd(3, 6), this.rnd(5, 9), 0.8, { grow: 1.1, drag: 0.8, grav: -0.03, alpha: 0.4, col: 0x2a2724 });
     }
-    for (const e of v.events) { if (e.type === 'fire') this.muzzle(v, e); else if (e.type === 'mg') this.mgFire(v, e); else if (e.type === 'tow') this.towLaunch(v, e); else if (e.type === 'explode') this.explode(v); else if (e.type === 'pillar') this.pillar(v); else if (e.type === 'rocket') this.rocketLaunch(v, e); else if (e.type === 'case') this.ejectCase(v, e); else if (e.type === 'autoload') DS.Audio.autoload(v); else if (e.type === 'trackSnap') this.trackSnap(e); else if (e.type === 'turretLand') this.turretLand(e); }
-    v.events.length = 0;
+    this.dispatch(v);
   }
 
   burning(v, dt) {
@@ -450,7 +454,8 @@ DS.Effects = class Effects {
   // ground behind the vehicle
   rocketLaunch(v, e) {
     const P = this.P, K = DS.P, T = this.w.terrain, r = (a, b) => this.rnd(a, b), bx = e.x - e.dx * 3.4, by = e.y - e.dy * 3.4 + 0.6;
-    DS.Audio.rocket(e.x, e.y);
+    DS.Audio.rocket(e.x, e.y, e.light);
+    if (e.light) { for (let i = 0; i < 6; i++) P.add(K.SMOKE, e.x - e.dx * 3, e.y - e.dy * 3, -e.dx * r(4, 16), -e.dy * r(4, 16) + r(-1, 1), r(1, 2.2), r(0.3, 0.6), { grow: 0.8, drag: 1.6, grav: 0, alpha: 0.4, col: 0xe6e0d6 }); return; }
     for (let i = 0; i < 26; i++) { const sp = r(8, 45); P.add(K.SMOKE, bx, by, -e.dx * sp + r(-3, 3), -e.dy * sp + r(-2, 3), r(2.5, 6), r(0.7, 1.6), { grow: r(1.2, 2.4), drag: 1.6, grav: -0.02, alpha: 0.5, col: 0xe6e0d6 }); }
     for (let i = 0; i < 12; i++) { const sp = r(10, 40); P.add(K.FIRE, bx, by, -e.dx * sp, -e.dy * sp, r(0.08, 0.2), r(0.5, 1.1), { grow: 5, drag: 8, grav: 0, alpha: 1, col: 0xffc060 }); }
     const gx = bx - e.dx * 5, gy = T.height(gx), sc = this.hex(T.soilAt(gx).col[1]);

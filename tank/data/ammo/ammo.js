@@ -69,6 +69,15 @@ DS.AMMO = {
     cluster: { n: 644, alt: 550, half: 100, pen: 100, r: 2.5 },
     pen: { ce: 100 }, crit: 85, blast: { r: 4, kill: 1.5, tnt: 20 },
   },
+  // ---- AH-64A: 30 mm M789 HEDP (chain gun), Hydra 70 rocket with M151 warhead, AGM-114 Hellfire ----
+  M789: { name: 'M789 HEDP 30mm', short: 'M789', sight: 'HEDP', type: 'HEDP', small: true, v0: 805, mass: 0.236, d: 0.03,
+    cd: [[0, 0.25], [1, 0.5], [2, 0.44], [3, 0.4]], launchMass: 0.35, sabot: false, tracer: '#ffb060', tracerEvery: 3,
+    pen: { ce: 50 }, crit: 75 },
+  HYDRA: { name: 'Hydra 70 (M151 고폭)', short: 'Hydra 70', type: 'HEAT', v0: 45, mass: 10, d: 0.07,
+    cd: [[0, 0.3], [0.9, 0.32], [1.1, 0.5], [2, 0.4], [3, 0.33]], launchMass: 0, sabot: false, tracer: '#ffd9a0',
+    rocket: { at: 0, burn: 1.1, acc: 620 },
+    pen: { ce: 20 }, crit: 85, blast: { r: 5, kill: 1, tnt: 1, small: true, tank: 0.06 } },
+  HELLFIRE: { name: 'AGM-114 헬파이어', short: 'Hellfire', type: 'HEAT', d: 0.178, tracer: '#ffb060', pen: { ce: 1000 }, crit: 86 },
   // ---- M2A2 Bradley (user data): 25 mm M242 and TOW 2 ----
   M791: { name: 'M791 APDS-T', short: 'M791', sight: 'AP', type: 'APDS', small: true, v0: 1345, mass: 0.134, d: 0.0115,
     cd: [[0, 0.3], [1, 0.55], [2, 0.5], [3, 0.46], [5, 0.43]], launchMass: 0.46, sabot: false, tracer: '#ff7848', tracerEvery: 1,

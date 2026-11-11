@@ -182,6 +182,7 @@
   <div><kbd>M</kbd> 소리 켜기/끄기 · <kbd>U</kbd> 해치 열기/닫기 · <kbd>P</kbd> 화면 효과 높음/낮음/끔</div>
   <div><kbd>−</kbd><kbd>=</kbd> 조준경 거리 눈금 ±100 m (T-55 / T-62: 거리측정기 없음)</div>
   <div><kbd>I</kbd> 자주포: 직사 / 곡사 · <kbd>K</kbd> 장약 · <kbd>O</kbd> 저각/고각 · <kbd>J</kbd> 자동/수동 정렬</div>
+  <div>헬기: <kbd>W</kbd><kbd>S</kbd> 상승/하강 · <kbd>A</kbd><kbd>D</kbd> 기울여 가속 · <kbd>C</kbd> 방향 전환 · 마우스 조준 · <kbd>Space</kbd> 기관포 · <kbd>F</kbd> 로켓 · <kbd>X</kbd> 헬파이어</div>
   <div><kbd>L</kbd> 사격장: 편집 모드 (표적 배치 · 장비 교체 · 환경)</div>
   <div><kbd>F9</kbd> 물리 디버그 · <kbd>H</kbd> 키 가이드 끄기/켜기</div>
 </div>
@@ -189,9 +190,9 @@
 <button id="editbtn" type="button" hidden title="편집 모드 (L)">편집 L</button>
 <aside id="sbx" hidden aria-label="사격장 편집">
   <h3>내 장비 <small id="sb-count"></small></h3>
-  <div class="row"><button type="button" data-me="m1a1">M1A1</button><button type="button" data-me="m2a2">M2A2 브래들리</button><button type="button" data-me="m60a1">M60A1</button><button type="button" data-me="m109a3">M109A3</button><button type="button" data-me="m270">MLRS</button><button type="button" data-me="t55">T-55</button><button type="button" data-me="t62">T-62</button><button type="button" data-me="t72">T-72</button><button type="button" data-go="me">내 위치로</button></div>
+  <div class="row"><button type="button" data-me="m1a1">M1A1</button><button type="button" data-me="m2a2">M2A2 브래들리</button><button type="button" data-me="m60a1">M60A1</button><button type="button" data-me="m109a3">M109A3</button><button type="button" data-me="m270">MLRS</button><button type="button" data-me="ah64a">AH-64A</button><button type="button" data-me="t55">T-55</button><button type="button" data-me="t62">T-62</button><button type="button" data-me="t72">T-72</button><button type="button" data-go="me">내 위치로</button></div>
   <h3>표적 배치</h3>
-  <div class="row"><button type="button" data-tool="t55">T-55</button><button type="button" data-tool="t62">T-62</button><button type="button" data-tool="t72">T-72</button><button type="button" data-tool="m1a1">M1A1</button><button type="button" data-tool="m2a2">M2A2</button><button type="button" data-tool="m60a1">M60A1</button><button type="button" data-tool="m109a3">M109A3</button><button type="button" data-tool="m270">MLRS</button></div>
+  <div class="row"><button type="button" data-tool="t55">T-55</button><button type="button" data-tool="t62">T-62</button><button type="button" data-tool="t72">T-72</button><button type="button" data-tool="m1a1">M1A1</button><button type="button" data-tool="m2a2">M2A2</button><button type="button" data-tool="m60a1">M60A1</button><button type="button" data-tool="m109a3">M109A3</button><button type="button" data-tool="m270">MLRS</button><button type="button" data-tool="ah64a">AH-64A</button></div>
   <div class="row"><button type="button" data-tool="b1">아파트 A</button><button type="button" data-tool="b2">아파트 B</button><button type="button" data-tool="b3">업무 빌딩</button><button type="button" data-tool="b4">곡면 아파트</button><button type="button" data-act="clearb">건물 모두 삭제</button></div>
   <p id="sb-selname"></p>
   <div class="row"><label for="sb-mode">행동</label><select id="sb-mode"><option value="dummy">무인 표적 (움직이지도 쏘지도 않음)</option><option value="watch">정지 관측 (탐지만)</option><option value="hold">정지 사격 (제자리에서 응사)</option><option value="combat">기동 전투</option><option value="patrol">왕복 주행 (이동 표적)</option></select></div>
@@ -266,6 +267,7 @@
 <script src="data/vehicles/m60a1.js"></script>
 <script src="data/vehicles/m109a3.js"></script>
 <script src="data/vehicles/m270.js"></script>
+<script src="data/vehicles/ah64a.js"></script>
 <script src="data/ammo/ammo.js"></script>
 <script src="src/world/Terrain.js"></script>
 <script src="src/vehicle/Track.js"></script>
@@ -282,6 +284,7 @@
 <script src="src/core/Camera.js"></script>
 <script src="src/render/Renderer.js"></script>
 <script src="src/render/Props.js"></script>
+<script src="src/vehicle/Heli.js"></script>
 <script src="src/world/Buildings.js"></script>
 <script src="src/render/Post.js"></script>
 <script src="src/debug/DebugLayer.js"></script>

@@ -106,9 +106,15 @@ DS.Audio = {
     whine(5.1, 0.5, 520, 300, 0.8); clunk(5.7, 1.2, 110);                        // hoist down, breech closes
     clunk(T - G.autoloader.out, 0.9, 200); whine(T - G.autoloader.out + 0.05, 0.8, 600, 400, 1.3);                // unlock, gun back to the lay
   },
-  rocket(x, y) {                            // rocket motor: a hard crack, then a tearing roar that climbs away
+  rotorBeat(x, y, k) {                      // one blade pass: a soft thump
+    if (!this.ok()) return;
+    const p = this.place(x, y); if (p.d > 2500) return;
+    this.tone(p.t, 62, 40, 0.09, 0.5 * k * p.g, Math.min(p.cut, 900)); this.burst(p.t, 0.05, 'bandpass', 420, 0.8, 0.22 * k * p.g, p.cut);
+  },
+  rocket(x, y, light) {                     // rocket motor: a hard crack, then a tearing roar that climbs away
     if (!this.ok()) return;
     const p = this.place(x, y);
+    if (light) { this.burst(p.t, 0.6, 'bandpass', 1100, 0.6, 0.8 * p.g, p.cut, 0.01); return; }
     this.burst(p.t, 0.12, 'highpass', 1200, 0.7, 1.4 * p.g, p.cut);
     const f = this.burst(p.t, 3.2, 'bandpass', 700, 0.5, 1.5 * p.g, p.cut, 0.03); f.frequency.exponentialRampToValueAtTime(240, p.t + 3);
     this.burst(p.t, 2.6, 'lowpass', 160, 0.6, 1.0 * p.g, p.cut, 0.05);

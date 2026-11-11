@@ -48,7 +48,7 @@ DS.TankAI = class TankAI {
   }
   // nearest enemy this crew has actually found (src/ai/Sensor.js); keeps the current one while it is in sight
   target() {
-    const seen = DS.Sensor.list(this.v, true);
+    const seen = DS.Sensor.list(this.v, true).filter(e => !e.heli);       // the main gun is not used on aircraft
     let best = this.tgt && seen.includes(this.tgt) ? this.tgt : seen[0] || null;
     if (best !== this.tgt) { this.tgt = best; this.rangeEst = null; this.sol = null; this.lay = 0; }
     return best;
@@ -63,10 +63,26 @@ DS.TankAI = class TankAI {
 
   update(dt) {
     const v = this.v;
+    this.aa(dt);
     if (this.mode === 'patrol') return this.shuttle();
     this.think(dt);
     if (this.mode === 'hold' || this.mode === 'watch') v.input.drive = 0;                 // stays where it was put
     if (this.mode === 'watch') { v.input.fire = false; v.input.tow = false; if (this.state === '사격') this.state = '조준'; }
+  }
+  // anti-aircraft machine gun (DShK / M2): the commander engages a helicopter in sight within 1.8 km in bursts,
+  // leading it by its speed and holding over for the bullet drop
+  aa(dt) {
+    const v = this.v, W = this.w, I = v.input;
+    I.mgFire = false;
+    if (!v.mg || !v.alive || this.mode === 'watch' || v.mg.rounds <= 0) { I.mgAim = null; return; }
+    let best = null, bd = 1800;
+    for (const e of W.vehicles) if (e.heli && e.alive && e.team !== v.team && DS.Sensor.seenNow(v, e)) { const d = Math.hypot(e.pos.x - v.pos.x, e.pos.y - v.pos.y); if (d < bd) { bd = d; best = e; } }
+    if (!best) { I.mgAim = null; this.aaT = 0; return; }
+    const tof = bd / 760, S = v.def.sight, j = (S.aimErr || 3) * 0.004 * bd;
+    this.aaT = (this.aaT || 0) + dt;
+    if (!this.aaJ || this.aaT % 2 < dt) this.aaJ = [DS.AI.gauss(W.rng) * j, DS.AI.gauss(W.rng) * j * 0.6];
+    I.mgAim = { x: best.pos.x + best.vel.x * tof + this.aaJ[0], y: best.pos.y + best.vel.y * tof + 0.5 * DS.T.g * tof * tof + this.aaJ[1] };
+    I.mgFire = this.aaT > 1.5 && this.aaT % 2 < 1.2;                 // lays on for a moment, then 1.2 s bursts
   }
   // moving target: runs back and forth between two points at a set speed, never fires
   shuttle() {

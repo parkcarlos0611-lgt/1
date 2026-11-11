@@ -113,7 +113,8 @@ DS.Armor = {
     v.holes.push({ lx: hl.x, ly: hl.y, nx: pl.nx, ny: pl.ny, t: heat ? 1.4 : 0.9, part: hl.y > v.g.ring.y - 0.05 ? 'turret' : 'hull' });
     r.resid = resid;
     // behind-armour debris / jet: a cone of rays from the entry point
-    const len = heat ? Math.min(3.5, 1.2 + resid / 250) : Math.min(4.5, 0.9 + resid / 120);
+    // thin-skinned aircraft: whatever gets through the skin carries on through the airframe
+    const len = (heat ? Math.min(3.5, 1.2 + resid / 250) : Math.min(4.5, 0.9 + resid / 120)) * (v.def.thin || 1);
     const half = (heat ? 8 : 20) * Math.PI / 180, n = 11;
     const pk = heat ? 0.55 : 0.45;
     const c = Math.cos(v.ang), s = Math.sin(v.ang);

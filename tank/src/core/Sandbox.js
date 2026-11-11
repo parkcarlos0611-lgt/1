@@ -11,7 +11,7 @@ DS.Sandbox = class Sandbox {
     this.bind();
   }
   static MODES = { dummy: '무인 표적', watch: '정지 관측', hold: '정지 사격', combat: '기동 전투', patrol: '왕복 주행' };
-  static NAMES = { m1a1: 'M1A1', m2a2: 'M2A2', m60a1: 'M60A1', m109a3: 'M109A3', m270: 'MLRS',  t55: 'T-55', t62: 'T-62', t72: 'T-72' };
+  static NAMES = { m1a1: 'M1A1', m2a2: 'M2A2', m60a1: 'M60A1', m109a3: 'M109A3', m270: 'MLRS', ah64a: 'AH-64A',  t55: 'T-55', t62: 'T-62', t72: 'T-72' };
 
   // ---- vehicles ----
   spawn(it) {
@@ -19,10 +19,11 @@ DS.Sandbox = class Sandbox {
     if (!it.label) it.label = it.player ? N + ' (나)' : `${N} #${++this.n}`;
     // sides are relative to my vehicle: a target marked 'IQ' is a foe, 'US' a friend, whatever I am driving
     const mine = it.player ? def.side : this.g.player.team, foe = mine === 'US' ? 'IQ' : 'US';
-    const v = new DS.Vehicle(def, it.x, W.terrain, { dir: it.dir || 1, team: it.player ? mine : it.team === 'US' ? mine : foe, label: it.label });
+    const v = new (def.heli ? DS.Heli : DS.Vehicle)(def, it.x, W.terrain, { dir: it.dir || 1, team: it.player ? mine : it.team === 'US' ? mine : foe, label: it.label });
     v.sb = it;
+    if (def.heli && !it.player) { v.hoverAlt = 40; v.rpm = 1; v.place(it.x); it.mode = 'dummy'; }       // target helicopters hover at 40 m
     if (it.player) { W.vehicles.unshift(v); this.g.player = v; }
-    else { W.vehicles.push(v); if (it.mode !== 'dummy') new DS.TankAI(v, W, { mode: it.mode, patrol: it.mode === 'patrol' ? { a: it.x - (it.span || 150) / 2, b: it.x + (it.span || 150) / 2, speed: it.speed || 5 } : null }); }
+    else { W.vehicles.push(v); if (it.mode !== 'dummy' && !def.heli) new DS.TankAI(v, W, { mode: it.mode, patrol: it.mode === 'patrol' ? { a: it.x - (it.span || 150) / 2, b: it.x + (it.span || 150) / 2, speed: it.speed || 5 } : null }); }
     return v;
   }
   items() { return this.w.vehicles.map(v => v.sb).filter(Boolean); }
@@ -97,7 +98,8 @@ DS.Sandbox = class Sandbox {
   tick() {
     const g = this.g, v = g.player, o = this.opt, W = this.w;
     v.god = o.god;
-    if (o.ammo) { if (v.mg) v.mg.rounds = v.def.mg.rounds; if (v.coax) v.coax.rounds = v.def.coax.rounds; if (v.tow && v.tow.loaded + v.tow.reserve < 2 && !v.tow.missile) v.tow.reserve = v.def.tow.reserve; }
+    if (o.ammo) { if (v.heli && (v.cannon < 200 || v.rk + v.hf === 0)) v.rearm();
+      if (v.mg) v.mg.rounds = v.def.mg.rounds; if (v.coax) v.coax.rounds = v.def.coax.rounds; if (v.tow && v.tow.loaded + v.tow.reserve < 2 && !v.tow.missile) v.tow.reserve = v.def.tow.reserve; }
     if (o.reload) { v.gun.reload = Math.min(v.gun.reload, 0.4); if (v.tow && v.tow.loaded === 0 && v.tow.reserve) v.tow.reload = Math.max(v.tow.reload, v.def.tow.reloadTime - 1); }
     W.showAll = o.show;
     if (o.trace) {

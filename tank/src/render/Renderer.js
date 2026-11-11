@@ -702,7 +702,7 @@ DS.Renderer = class Renderer {
       o.setTransform(m.a / q, m.b / q, m.c / q, m.d / q, m.e / q, m.f / q); o.transform(1, 0, kx, -ky, -kx * y0, y0 * (1 + ky));
       o.globalAlpha = Math.max(0, Math.min(1, k));
       this.drawVehicle(o, v, lcam); n++;
-      if (!Lt.fire) bands.push([v.pos.x, Math.abs((v.g.idler.x - v.g.sprocket.x) * v.dir) / 2 + 0.25]);
+      if (!Lt.fire && !v.heli) bands.push([v.pos.x, Math.abs((v.g.idler.x - v.g.sprocket.x) * v.dir) / 2 + 0.25]);
     }
     if (this.shadowExtra) n += this.shadowExtra(o, m, q, Lt, cam) || 0;      // scenery that casts into the same layer
     if (!n) return;
@@ -775,6 +775,7 @@ DS.Renderer = class Renderer {
   }
 
   drawVehicle(ctx, v, cam) {
+    if (v.heli) return this.drawHeli(ctx, v, cam);
     const D = v.def, S = D.src, I = this.img[D.id], px = 1 / S.ppm, dir = v.dir, id = D.id, Sp = D.sprites;
     // ---- hull frame: underside shadow ----
     ctx.save(); ctx.translate(v.pos.x, v.pos.y); ctx.rotate(v.ang); ctx.scale(dir, 1);

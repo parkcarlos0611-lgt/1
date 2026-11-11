@@ -17,6 +17,7 @@ DS.Game = class Game {
     this.post.setQuality(this.post.ok ? q : 0); this.lowFps = 0;
     await Promise.all(['m1a1', 'm2a2', 'm60a1', 'm109a3', 'm270', 't55', 't62', 't72'].map(id => this.rend.load(DS.VEHICLES[id])).concat(this.rend.loadProps()));
     await this.rend.loadBuildings();
+    await this.rend.loadHeli(DS.VEHICLES.ah64a);
     DS.Armor.calibrate();
     this.resize(); addEventListener('resize', () => this.resize());
     document.getElementById('loading').remove();
@@ -138,10 +139,11 @@ DS.Game = class Game {
       if (e.code === 'Tab') {
         e.preventDefault();
         if (this.player.def.howitzer) { this.scam = !this.scam; this.toast(this.scam ? '포탄 시점 켬 — 발사한 포탄을 따라감' : '포탄 시점 끔'); }
-        else if (!this.player.tow) this.toast('미사일 시점은 브래들리 · 포탄 시점은 자주포 전용');
-        else { this.mcam = !this.mcam; this.mcamHold = null; this.toast(this.mcam ? (this.player.tow.missile ? '미사일 시점' : '미사일 시점 켬 — 다음 발사부터 따라감') : '미사일 시점 끔'); }
+        else if (!this.player.tow && !this.player.heli) this.toast('미사일 시점은 브래들리 · 포탄 시점은 자주포 전용');
+        else { this.mcam = !this.mcam; this.mcamHold = null; this.toast(this.mcam ? ((this.player.tow || this.player.hfState).missile ? '미사일 시점' : '미사일 시점 켬 — 다음 발사부터 따라감') : '미사일 시점 끔'); }
       }
-      if (e.code === 'KeyX') { if (this.player.tow) this.player.input.tow = true; else this.toast('TOW 미사일은 브래들리 전용'); }
+      if (e.code === 'KeyX') { if (this.player.heli) this.player.input.hf = true; else if (this.player.tow) this.player.input.tow = true; else this.toast('미사일은 브래들리(TOW) · 아파치(헬파이어) 전용'); }
+      if (e.code === 'KeyC' && this.player.heli) { this.player.turn(); return; }
       if (e.code === 'KeyZ') { this.world.xray = this.world.xray === false; this.toast(this.world.xray ? 'TOW 발사관 투시 켬' : 'TOW 발사관 투시 끔'); }
       if (e.code === 'KeyR') this.player.place(this.player.pos.x);
       if (e.code === 'KeyC' && this.mouse) { const m = cam.toWorld(this.mouse.x, this.mouse.y); this.world.terrain.crater(m.x, 1.6, 0.7, 0.35, 0); this.world.terrain.relax(undefined, undefined, 8); }
@@ -171,7 +173,7 @@ DS.Game = class Game {
     }));
   }
   // widest view: the screen never shows more than camera.maxWidth metres (far ground is for the sights and maps)
-  zoomMin() { return Math.max(DS.T.camera.zoomMin, this.world.cam.W / DS.T.camera.maxWidth); }
+  zoomMin() { return Math.max(DS.T.camera.zoomMin, this.world.cam.W / (this.player && this.player.heli ? 700 : DS.T.camera.maxWidth)); }
   toast(msg) {
     const el = document.getElementById('toast'); el.textContent = msg; el.classList.add('on');
     clearTimeout(this._toastT); this._toastT = setTimeout(() => el.classList.remove('on'), 1200);
@@ -179,7 +181,7 @@ DS.Game = class Game {
   // Missile camera (Tab): rides alongside the player's TOW in flight, holds on the impact for a moment,
   // then hands back to the tank. Off by default; when on it picks up every launch.
   missileCam(dt) {
-    const cam = this.world.cam, t = this.player.tow, tag = document.getElementById('mcam');
+    const cam = this.world.cam, t = this.player.tow || this.player.hfState, tag = document.getElementById('mcam');
     let on = false;
     if (this.mcam && t) {
       const m = t.missile;
@@ -344,6 +346,9 @@ DS.Game = class Game {
     i.coaxFire = k.has('KeyF') || !!this.touch.coax;
     i.mgFire = !!this.mgDown;
     i.mgAim = this.mouse ? this.world.cam.toWorld(this.mouse.x, this.mouse.y) : null;
+    if (this.player.heli) {                 // helicopter: W / S climb and descend, the mouse lays sight and gun
+      i.climb = dir; i.aim = i.mgAim; i.elevRate = 0; i.elevStep = 0; this.player.lock = this.target && this.target.alive ? this.target : null;
+    }
   }
   loop(t) {
     const dt = Math.min(0.05, (t - this.last) / 1000); this.last = t;
@@ -379,8 +384,10 @@ DS.Game = class Game {
       set('h-elev', (g.e * 180 / Math.PI).toFixed(2) + '°');
       set('h-ammo', A.name);
       set('h-mg', [v.mg && `${v.def.mg.short || 'M2'} ${v.mg.rounds}`, v.coax && `동축 ${v.coax.rounds}`].filter(Boolean).join(' · '));
-      if (v.tow) { const t = v.tow; set('h-tow', t.missile ? (t.missile.guided ? '유도 중 — 조준선 유지' : '유선 끊김') : t.loaded ? `장전 ${t.loaded} · 예비 ${t.reserve}` + (t.up > 0 && t.up < 1 ? ' · 발사관 작동' : t.up >= 1 ? ' · 발사 준비' : '') : t.reserve ? `재장전 ${(v.def.tow.reloadTime - t.reload).toFixed(0)} s · 예비 ${t.reserve}` : '소진'); }
-      document.getElementById('row-tow').hidden = !v.tow;
+      if (v.tow && !v.heli) { const t = v.tow; set('h-tow', t.missile ? (t.missile.guided ? '유도 중 — 조준선 유지' : '유선 끊김') : t.loaded ? `장전 ${t.loaded} · 예비 ${t.reserve}` + (t.up > 0 && t.up < 1 ? ' · 발사관 작동' : t.up >= 1 ? ' · 발사 준비' : '') : t.reserve ? `재장전 ${(v.def.tow.reloadTime - t.reload).toFixed(0)} s · 예비 ${t.reserve}` : '소진'); }
+      if (v.heli) set('h-tow', v.hudLine());
+      { const lb = document.querySelector('#row-tow span'), t = v.heli ? '비행·무장' : 'TOW'; if (lb.textContent !== t) lb.textContent = t; }
+      document.getElementById('row-tow').hidden = !v.tow && !v.heli;
       const fc = v.fc;
       set('h-rng', fc.range ? Math.round(fc.range) + ' m' : v.def.sight.manual ? `눈금 ${fc.bs} m` : `— (전투조준 ${fc.bs} m)`);
       set('h-se', (fc.se * 1000).toFixed(2) + ' mil · ' + (fc.se * 180 / Math.PI).toFixed(2) + '°');

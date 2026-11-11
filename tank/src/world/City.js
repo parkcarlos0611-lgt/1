@@ -35,6 +35,8 @@ DS.Structure = class Structure {
   }
   cell(i, c) { return i >= 0 && i < this.R && c >= 0 && c < this.C ? this.cells[i * this.C + c] : null; }
   stand(cl) { return cl && cl.ex && cl.st === 'ok' && !cl.chunk; }
+  // still in place and carrying load: intact bays and gutted rooms (their piers and slabs are still there)
+  carry(cl) { return cl && cl.ex && !cl.chunk && (cl.st === 'ok' || cl.st === 'gut'); }
   get top() { let t = 0; for (const cl of this.cells) if (this.stand(cl)) t = Math.max(t, cl.y1); return this.base + t; }
   get bottomY() { return this.base; }
 
@@ -98,17 +100,17 @@ DS.Structure = class Structure {
     for (let f = 0; f < R; f++) {
       const i = R - 1 - f;
       const base = [];
-      for (let c = 0; c < C; c++) { const cl = this.cell(i, c); base[c] = this.stand(cl) && (f === 0 || sup[(i + 1) * C + c] === 1); }
+      for (let c = 0; c < C; c++) { const cl = this.cell(i, c); base[c] = this.carry(cl) && (f === 0 || sup[(i + 1) * C + c] === 1); }
       // runs of standing cells: held where they stand on something, spanning between such cells (up to 4 bays)
       // or cantilevered one bay past the outermost
       let c = 0;
       while (c < C) {
-        if (!this.stand(this.cell(i, c))) { c++; continue; }
-        let e = c; while (e + 1 < C && this.stand(this.cell(i, e + 1))) e++;
+        if (!this.carry(this.cell(i, c))) { c++; continue; }
+        let e = c; while (e + 1 < C && this.carry(this.cell(i, e + 1))) e++;
         const bs = []; for (let k = c; k <= e; k++) if (base[k]) bs.push(k);
         if (bs.length) for (let k = c; k <= e; k++) {
           let ok = base[k];
-          if (!ok) {
+          if (!ok && this.cell(i, k).st !== 'gut') {           // a gutted room has no wall to hang from: it needs the storey under it
             const l = bs.filter(b => b < k).pop(), r = bs.find(b => b > k);
             ok = (l != null && r != null && r - l <= 5) || (l != null && r == null && k - l <= 1) || (r != null && l == null && r - k <= 1);
           }
@@ -120,7 +122,7 @@ DS.Structure = class Structure {
       if (!block && f < R - 1) {
         let ex = 0, held = 0, above = 0;
         for (let c2 = 0; c2 < C; c2++) { const cl = this.cell(i, c2); if (cl.ex) { ex++; if (sup[i * C + c2]) held++; } }
-        for (let i2 = 0; i2 < i; i2++) for (let c2 = 0; c2 < C; c2++) if (this.stand(this.cell(i2, c2))) above++;
+        for (let i2 = 0; i2 < i; i2++) for (let c2 = 0; c2 < C; c2++) if (this.carry(this.cell(i2, c2))) above++;
         if (above && ex && held < ex * 0.56) block = { i, f };
       }
     }
@@ -128,7 +130,7 @@ DS.Structure = class Structure {
     if (block) {
       // everything above the failed storey goes as one block; it pivots on the last standing edge if its
       // weight is off to one side of what still stands in that storey
-      const cells = this.cells.filter(cl => cl.i < block.i && this.stand(cl));
+      const cells = this.cells.filter(cl => cl.i < block.i && this.carry(cl));
       let mx = 0; for (const cl of cells) mx += (cl.x0 + cl.x1) / 2; mx /= cells.length;
       let smin = 1e9, smax = -1e9;
       for (let c = 0; c < C; c++) if (sup[block.i * C + c]) { const cl = this.cell(block.i, c); smin = Math.min(smin, cl.x0); smax = Math.max(smax, cl.x1); }
@@ -137,7 +139,7 @@ DS.Structure = class Structure {
       if (smax > smin) { if (mx < smin + 0.3) piv = { x: smin, y: yb, s: 1 }; else if (mx > smax - 0.3) piv = { x: smax, y: yb, s: -1 }; }
       falling.push({ cells, piv, mx });
     }
-    const loose = this.cells.filter(cl => this.stand(cl) && !sup[cl.i * C + cl.c] && !(block && cl.i < block.i));
+    const loose = this.cells.filter(cl => this.carry(cl) && !sup[cl.i * C + cl.c] && !(block && cl.i < block.i));
     // group loose cells into connected pieces
     const seen = new Set();
     for (const cl of loose) {
@@ -148,11 +150,14 @@ DS.Structure = class Structure {
     }
     for (const F of falling) this.drop(W, F.cells, F.piv);
     // a gutted room needs a standing bay beside it to hold its slabs; one left hanging in the air comes down
+    let again = false;
     for (let it = 0; it < 3; it++) for (const cl of this.cells) {
       if (cl.st !== 'gut' || cl.chunk) continue;
-      if (!this.stand(this.cell(cl.i, cl.c - 1)) && !this.stand(this.cell(cl.i, cl.c + 1))) { cl.st = 'gone'; this.spill(W, cl, 0.5, null); this.touched = true; }
+      if (!this.stand(this.cell(cl.i, cl.c - 1)) && !this.stand(this.cell(cl.i, cl.c + 1))) { cl.st = 'gone'; this.spill(W, cl, 0.5, null); this.touched = true; again = true; }
     }
     if (falling.length) { this.touched = true; DS.Audio.collapse(this.x, this.base, Math.min(6, 1.5 + falling.reduce((s, F) => s + F.cells.length, 0) * 0.08)); }
+    this.gutKey = null;
+    if (again) return this.settle(W);
     if (!this.cells.some(cl => cl.ex && (cl.st === 'ok' || cl.st === 'gut'))) this.state = 'rubble';
     else if (this.cells.some(cl => cl.ex && cl.st !== 'ok')) this.state = 'damaged';
   }
@@ -318,7 +323,7 @@ DS.Structure = class Structure {
     pts.brk = brk; return pts;
   }
   openSides(cl, ch) {
-    const nb = (di, dc) => { const b = this.cell(cl.i + di, cl.c + dc); return b && b.ex && (ch ? b.chunk !== ch : (b.st !== 'ok' || b.chunk)); };
+    const nb = (di, dc) => { const b = this.cell(cl.i + di, cl.c + dc); return b && b.ex && (ch ? b.chunk !== ch : !this.carry(b)); };
     return { t: nb(-1, 0), b: nb(1, 0), l: nb(0, -1), r: nb(0, 1) };
   }
   drawCell(ctx, im, cl, ch, grey) {
@@ -344,36 +349,45 @@ DS.Structure = class Structure {
     });
     ctx.stroke();
   }
-  // gutted bay: the facade blown in, the room behind it dark and burnt, slabs top and bottom, a ragged frame of
-  // what is left of the wall
-  drawGut(ctx, im, cl, grey) {
-    const { x0, x1, y0, y1 } = cl, w = x1 - x0, h = y1 - y0, H = n => { const v = Math.sin(n * 127.1 + 311.7) * 43758.5453; return v - Math.floor(v); };
-    if (grey != null) { ctx.fillStyle = `rgb(${grey(-0.1)})`; ctx.fillRect(x0, y0, w, h); return; }
-    const g = ctx.createLinearGradient(0, y1, 0, y0); g.addColorStop(0, '#1d1814'); g.addColorStop(0.7, '#2c241d'); g.addColorStop(1, '#3a3027');
-    ctx.fillStyle = g; ctx.fillRect(x0, y0, w, h);
-    const slab = Math.min(0.32, h * 0.12);
-    ctx.fillStyle = '#8f887a'; ctx.fillRect(x0, y1 - slab, w, slab); ctx.fillRect(x0, y0, w, slab * 0.8);
-    ctx.fillStyle = 'rgba(30,25,20,0.7)'; ctx.fillRect(x0, y1 - slab - 0.06, w, 0.06);
-    // a back wall door and a bit of rubble on the floor
-    ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(x0 + w * (0.25 + 0.4 * H(cl.seed)), y0 + slab, w * 0.14, h * 0.55);
-    const DI = this.world.rend && this.world.rend.debImg;
-    if (DI) { const key = ['pile1', 'pile2', 'grit2'][cl.seed % 3], im2 = DI[key]; if (im2) { const ww = w * 0.6, hh = ww * im2.height / im2.width; ctx.save(); ctx.translate(x0 + w * 0.5, y0 + slab * 0.6); ctx.scale(1, -1); ctx.drawImage(im2, -ww / 2, -hh, ww, hh); ctx.restore(); } }
-    // ragged frame of facade left round the hole
-    const nb = (di, dc) => this.stand(this.cell(cl.i + di, cl.c + dc));
-    const inset = [nb(0, -1) ? 0.18 : 0.06, nb(1, 0) ? 0.14 : 0.04, nb(0, 1) ? 0.18 : 0.06, nb(-1, 0) ? 0.16 : 0.05];
-    const hole = []; const N = 7;
-    for (let j = 0; j < N; j++) hole.push([x0 + w * (inset[0] + (1 - inset[0] - inset[2]) * j / N), y0 + h * (inset[1] * (0.5 + H(cl.seed + j)))]);
-    for (let j = 0; j < N; j++) hole.push([x1 - w * (inset[2] * (0.5 + H(cl.seed + 20 + j))), y0 + h * (inset[1] + (1 - inset[1] - inset[3]) * j / N)]);
-    for (let j = 0; j < N; j++) hole.push([x1 - w * (inset[2] + (1 - inset[0] - inset[2]) * j / N), y1 - h * (inset[3] * (0.5 + H(cl.seed + 40 + j)))]);
-    for (let j = 0; j < N; j++) hole.push([x0 + w * (inset[0] * (0.5 + H(cl.seed + 60 + j))), y1 - h * (inset[3] + (1 - inset[1] - inset[3]) * j / N)]);
-    ctx.save(); ctx.beginPath(); ctx.rect(x0, y0, w, h); hole.forEach(([x, y], j) => j ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.closePath(); ctx.clip('evenodd');
-    ctx.save(); ctx.scale(1, -1); ctx.drawImage(im, cl.sx, cl.sy, cl.sw, cl.sh, x0, -y1, w, h); ctx.restore();
-    ctx.restore();
-    ctx.strokeStyle = '#8d8676'; ctx.lineWidth = 0.1; ctx.beginPath(); hole.forEach(([x, y], j) => j ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.closePath(); ctx.stroke();
-    ctx.strokeStyle = '#6e3f22'; ctx.lineWidth = 0.03; ctx.beginPath();
-    for (let j = 0; j < 3; j++) { const hx = x0 + w * (0.2 + 0.3 * j + 0.1 * H(cl.seed + j)); ctx.moveTo(hx, y1 - slab); ctx.quadraticCurveTo(hx + 0.1, y1 - slab - 0.3, hx + (H(cl.seed + 9 + j) - 0.5) * 0.4, y1 - slab - 0.4 - 0.4 * H(cl.seed + j * 3)); }
-    ctx.stroke();
-    ctx.fillStyle = 'rgba(15,12,9,0.35)'; ctx.fillRect(x0, y0, w, h);
+  // gutted bays, painted into a copy of the building's drawing ('source-atop': only where the drawing has
+  // wall, so a room can never be bigger than the building or show where there was sky). Each one: the facade
+  // blown in, the burnt-out room behind it, the slab above and the floor below, a ragged rim of facade left
+  // round the hole, a little rubble on the floor and rebar hanging from the slab.
+  gutTex(im, R) {
+    const key = (im === R.cityBroken[this.k] ? 'b' : 'a') + this.cells.filter(cl => cl.st === 'gut').map(cl => cl.i * this.C + cl.c).join(',');
+    if (this.gutKey === key && this.gutC) return this.gutC;
+    const c = this.gutC || (this.gutC = document.createElement('canvas')); c.width = im.width; c.height = im.height; this.gutKey = key;
+    const x = c.getContext('2d'), H = n => { const v = Math.sin(n * 127.1 + 311.7) * 43758.5453; return v - Math.floor(v); };
+    x.drawImage(im, 0, 0); x.globalCompositeOperation = 'source-atop';
+    const DI = R.debImg;
+    for (const cl of this.cells) {
+      if (cl.st !== 'gut') continue;
+      const { sx, sy, sw, sh } = cl, slab = Math.max(3, sh * 0.11);
+      // ragged opening: inset more where the neighbour still stands (the wall carries on past it)
+      const nb = (di, dc) => this.carry(this.cell(cl.i + di, cl.c + dc));
+      const L = sx + sw * (nb(0, -1) ? 0.14 : 0.04), Rr = sx + sw * (1 - (nb(0, 1) ? 0.14 : 0.04)), T = sy + slab * 1.1, B = sy + sh - slab * 0.9;
+      const hole = [], N = 6, j = (k, a) => (H(cl.seed * 7 + k) - 0.5) * a;
+      for (let k = 0; k <= N; k++) hole.push([L + (Rr - L) * k / N, T + Math.abs(j(k, sh * 0.16))]);
+      for (let k = 1; k <= N; k++) hole.push([Rr - Math.abs(j(k + 10, sw * 0.12)), T + (B - T) * k / N]);
+      for (let k = 1; k <= N; k++) hole.push([Rr - (Rr - L) * k / N, B - Math.abs(j(k + 20, sh * 0.12))]);
+      for (let k = 1; k < N; k++) hole.push([L + Math.abs(j(k + 30, sw * 0.12)), B - (B - T) * k / N]);
+      x.save(); x.beginPath(); hole.forEach(([px, py], k) => k ? x.lineTo(px, py) : x.moveTo(px, py)); x.closePath(); x.clip();
+      const g = x.createLinearGradient(0, sy, 0, sy + sh); g.addColorStop(0, '#3b3128'); g.addColorStop(0.35, '#2a221b'); g.addColorStop(1, '#1b1612');
+      x.fillStyle = g; x.fillRect(sx, sy, sw, sh);
+      x.fillStyle = 'rgba(0,0,0,0.4)'; x.fillRect(sx + sw * (0.3 + 0.35 * H(cl.seed)), T, sw * 0.12, (B - T) * 0.8);      // a doorway at the back
+      x.fillStyle = '#7d766a'; x.fillRect(sx, T - slab * 0.2, sw, slab * 0.55);                                            // underside of the slab above
+      x.fillStyle = '#5f594f'; x.fillRect(sx, B - slab * 0.25, sw, slab * 0.6);                                             // floor
+      const pile = DI && DI[['pile1', 'pile2', 'grit2'][cl.seed % 3]];
+      if (pile) { const pw = sw * (0.4 + 0.3 * H(cl.seed + 3)), ph = pw * pile.height / pile.width; x.drawImage(pile, sx + (sw - pw) * H(cl.seed + 5), B - ph * 0.92, pw, ph); }
+      x.strokeStyle = '#6e3f22'; x.lineWidth = Math.max(1.2, sw * 0.012); x.beginPath();
+      for (let k = 0; k < 3; k++) { const hx = sx + sw * (0.2 + 0.3 * k + 0.1 * H(cl.seed + k)), len = sh * (0.12 + 0.18 * H(cl.seed + k * 3)); x.moveTo(hx, T); x.quadraticCurveTo(hx + sw * 0.03, T + len * 0.6, hx + (H(cl.seed + 9 + k) - 0.5) * sw * 0.1, T + len); }
+      x.stroke();
+      x.restore();
+      // broken concrete round the rim
+      x.strokeStyle = '#9a9283'; x.lineWidth = Math.max(1.5, sw * 0.018); x.beginPath(); hole.forEach(([px, py], k) => k ? x.lineTo(px, py) : x.moveTo(px, py)); x.closePath(); x.stroke();
+      x.strokeStyle = 'rgba(35,28,22,0.7)'; x.lineWidth = Math.max(0.8, sw * 0.006); x.stroke();
+    }
+    return c;
   }
   draw(ctx, cam, grey, R) {
     const D = this.D, k = this.k, im0 = R.cityImg[k]; if (!im0) return;
@@ -391,18 +405,18 @@ DS.Structure = class Structure {
     ctx.save(); ctx.translate(this.x, this.base);
     if (!this.touched) { ctx.save(); ctx.scale(1, -1); ctx.drawImage(im, -this.w / 2, -this.h, this.w, this.h); ctx.restore(); }
     else {
-      for (const cl of this.cells) if (cl.ex && cl.st === 'gut' && !cl.chunk) this.drawGut(ctx, im, cl, grey);
-      for (const cl of this.cells) if (this.stand(cl)) this.drawCell(ctx, im, cl, null, grey);
+      if (grey == null && this.cells.some(cl => cl.st === 'gut')) im = this.gutTex(im, R);
+      for (const cl of this.cells) if (this.carry(cl)) this.drawCell(ctx, im, cl, null, grey);
       // soot where shells burst, kept on the standing wall
       if (grey == null && this.scorch.length) {
-        ctx.save(); ctx.beginPath(); for (const cl of this.cells) if (this.stand(cl)) ctx.rect(cl.x0, cl.y0, cl.x1 - cl.x0, cl.y1 - cl.y0); ctx.clip();
+        ctx.save(); ctx.beginPath(); for (const cl of this.cells) if (this.carry(cl)) ctx.rect(cl.x0, cl.y0, cl.x1 - cl.x0, cl.y1 - cl.y0); ctx.clip();
         for (const s of this.scorch) { const gr = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, s.r * 1.6); gr.addColorStop(0, 'rgba(18,14,10,0.8)'); gr.addColorStop(0.4, 'rgba(28,22,15,0.45)'); gr.addColorStop(1, 'rgba(30,24,16,0)'); ctx.fillStyle = gr; ctx.fillRect(s.x - s.r * 1.6, s.y - s.r * 1.6, s.r * 3.2, s.r * 3.2); }
         ctx.restore();
       }
       // falling blocks
       for (const ch of this.chunks) {
         ctx.save(); ctx.translate(ch.ax + ch.ox, ch.ay + ch.oy); ctx.rotate(ch.ang); ctx.translate(-ch.ax, -ch.ay);
-        for (const cl of ch.cells) this.drawCell(ctx, im, cl, ch, grey);
+        for (const cl of ch.cells) this.drawCell(ctx, im, cl, ch, grey);       // (gutted rooms ride along in the composite texture)
         ctx.restore();
       }
     }

@@ -120,7 +120,7 @@ DS.Game = class Game {
       if (e.code === 'Digit3') cam.tzoom = this.zoomMin();
       if (e.code === 'KeyQ') this.cycleAmmo();
       if (e.code === 'KeyE') this.lase();
-      if (e.code === 'KeyV') { this.sightMag = this.sightMag === 10 ? 3 : 10; if (this.tis) this.tis.blur = 0.45; }
+      if (e.code === 'KeyV') { this.sightMag = this.sightMag === 10 ? 3 : 10; this.fovI = (this.fovI || 0) + (e.shiftKey ? -1 : 1); if (this.tis) this.tis.blur = 0.45; const f = this.sightField(); if (f.n) this.toast(`${this.player.def.sight.name} ${f.n} · 시야각 ${f.fov}° · ×${f.mag}`); }
       if (e.code === 'KeyT') this.nightSight(!(this.thermal || this.nv));
       if (e.code === 'KeyB') { this.blackHot = !this.blackHot; this.sightCv.classList.toggle('bh', this.blackHot); if (this.tis) this.tis.cal = 0.3; }
       if (e.code === 'BracketLeft' || e.code === 'BracketRight') {
@@ -263,11 +263,19 @@ DS.Game = class Game {
       grain: night ? 0.045 : 0.022, vig: 0.38, lift, gain, sat, contrast,
     });
   }
+  // field of view of the gunner's sight: tanks have ×3 / ×10; a sight with its own list (TADS) steps through it,
+  // with separate lists for the day TV and the FLIR
+  sightField() {
+    const F = this.player.def.sightFov;
+    if (!F) return this.sightMag === 10 ? { fov: 6.5, mag: 10 } : { fov: 21, mag: 3 };
+    const L = this.thermal ? F.flir : F.day, i = (((this.fovI == null ? 1 : this.fovI) % L.length) + L.length) % L.length;
+    return L[i];
+  }
   // First-generation scanning thermal imager: the scene is rendered at the detector's ~180 lines and scaled up
   // (soft, blocky), the previous frame lingers (lag), each scan line has its own slight offset (fixed-pattern
   // noise), grain shimmers; refocus blur after a magnification change, re-calibration flash after polarity.
   tisRender(cam, dt) {
-    const cv = this.sightCv, c = this.sctx, rows = this.sightMag === 10 ? 180 : 150;
+    const cv = this.sightCv, c = this.sctx, rows = this.sightField().fov < 12 ? 180 : 150;
     const t = this.tis || (this.tis = { lo: document.createElement('canvas'), prev: document.createElement('canvas'), cam: new DS.Camera(), blur: 0, cal: 0, fpn: null, grain: null });
     const k = rows / cam.H, lw = Math.max(1, Math.round(cam.W * k));
     for (const x of [t.lo, t.prev]) if (x.width !== lw || x.height !== rows) { x.width = lw; x.height = rows; }
@@ -476,7 +484,7 @@ DS.Game = class Game {
     const Rt = v.fc.range && w.time - v.fc.lasedAt < 30 ? v.fc.range : this.sightR;
     this.sightRs = this.sightRs ? this.sightRs + (Rt - this.sightRs) * Math.min(1, dt * 7) : Rt;
     const R = Math.max(25, this.sightRs);
-    const fov = (this.sightMag === 10 ? 6.5 : 21) * Math.PI / 180, mil = W / (fov * 1000);   // px per mil
+    const fld = this.sightField(), fov = fld.fov * Math.PI / 180, mil = W / (fov * 1000);   // px per mil
     // recoil kick + muzzle blast obscuration after our own shot; hull vibration on the move
     if (v.gun.fired !== this._fired) { if (this._fired != null) this.kick = Math.max(this.kick || 0, DS.AMMO[v.gun.ammo].small ? 0.16 : 1); this._fired = v.gun.fired; }
     this.kick = Math.max(0, (this.kick || 0) - dt / 1.6);
@@ -502,7 +510,7 @@ DS.Game = class Game {
     // reticle: broken cross with mil ticks, aiming dot; range, round and ready symbols under it
     const ink = this.thermal ? 'rgba(235,255,235,0.95)' : 'rgba(10,10,10,0.9)';
     c.strokeStyle = ink; c.fillStyle = ink; c.lineWidth = 1.2;
-    const gap = Math.max(6, 2 * mil), L = W * 0.36, tick = this.sightMag === 10 ? 5 : 20;
+    const gap = Math.min(W * 0.05, Math.max(6, 2 * mil)), L = W * 0.36, tick = fld.fov < 1.5 ? 1 : fld.fov < 5 ? 2 : fld.fov < 8 ? 5 : fld.fov < 25 ? 20 : 100;
     c.beginPath();
     c.moveTo(cx - L, cy); c.lineTo(cx - gap, cy); c.moveTo(cx + gap, cy); c.lineTo(cx + L, cy);
     c.moveTo(cx, cy + gap); c.lineTo(cx, cy + L); c.moveTo(cx, cy - gap); c.lineTo(cx, cy - L * 0.35);
@@ -527,7 +535,7 @@ DS.Game = class Game {
     c.textAlign = 'right'; c.fillText(g.reload > 0 ? '' : '▮ READY', cx - W * 0.1, by);
     c.textAlign = 'left'; c.fillText((v.tow && (v.tow.missile || v.tow.up >= 1) ? 'TOW' : A.sight || (A.type === 'HEAT' ? 'HEAT' : 'SABOT')) + (lasing ? '  ✱' : ''), cx + W * 0.1, by);
     c.textAlign = 'center'; c.font = `600 ${Math.max(10, Math.round(W / 40))}px ui-monospace, monospace`;
-    c.fillText(`${v.def.sight.name || (v.def.sight.optical ? 'M32' : 'GPS')} ×${this.sightMag}  ${this.thermal ? 'TIS ' + (this.blackHot ? 'BH' : 'WH') : this.nv ? 'PASSIVE' : 'DAY'}${this.ranging ? '  RANGING' : ''}`, cx, cy - L - 6);
+    c.fillText(`${v.def.sight.name || (v.def.sight.optical ? 'M32' : 'GPS')} ${fld.n ? fld.n + ' ' : ''}×${fld.mag}  ${this.thermal ? (v.heli ? 'FLIR ' : 'TIS ') + (this.blackHot ? 'BH' : 'WH') : this.nv ? 'PASSIVE' : 'DAY'}${this.ranging ? '  RANGING' : ''}`, cx, cy - L - 6);
   }
 };
 addEventListener('load', () => new DS.Game().start().catch(e => { document.getElementById('loading').textContent = '로딩 실패: ' + e.message; console.error(e); }));

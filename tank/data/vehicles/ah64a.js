@@ -16,7 +16,7 @@ DS.VEHICLES = DS.VEHICLES || {};
     // against most hits up to 20 mm.
     proofD: 0.0135,
     // boxes of the cut pieces in the sheet [x, y, w, h] (tools/cut_ah64.py → cut.json)
-    src: { ppm: PPM, ox: 316, oy: 59, w: 1061, h: 237, dir: 'assets/sprites/ah64a/', rotor: [413, 16, 745, 81], rotorAxis: 673, tailrotor: [1243, 8, 188, 201] },
+    src: { ppm: PPM, ox: 316, oy: 59, w: 1061, h: 237, dir: 'assets/sprites/ah64a/', rotor: [259, 15, 900, 81], rotorAxis: 673, tailrotor: [1243, 8, 188, 201] },
     flight: {
       vmax: 81, tilt: 26, climb: 12, sink: 9, gearH: 1.66,          // 293 km/h; max lean (deg); rates m/s; origin above the wheels
       hub: L(673, 66), rotorR: 7.3, tail: L(1336, 100), tailR: 1.4,
@@ -29,6 +29,11 @@ DS.VEHICLES = DS.VEHICLES || {};
     hellfire: { ammo: 'HELLFIRE', n: 16, at: L(700, 262), interval: 1.2, range: 8000 },
     sightAt: L(332, 214),                                                         // TADS turret in the nose
     turretRing: L(640, 150), exhaust: { x: L(905, 150)[0], y: L(905, 150)[1] },
+    // TADS fields of view (user data): day TV 50° / 4.0° / 0.9°, FLIR 50° / 10° / 3.1° / 0.45° — V steps through
+    sightFov: {
+      day: [{ n: 'W', fov: 50, mag: 0.9 }, { n: 'N', fov: 4.0, mag: 4.5 }, { n: 'Z', fov: 0.9, mag: 125 }],
+      flir: [{ n: 'W', fov: 50, mag: 0.9 }, { n: 'M', fov: 10, mag: 4.5 }, { n: 'N', fov: 3.1, mag: 14.3 }, { n: 'Z', fov: 0.45, mag: 143 }],
+    },
     sight: { laser: true, thermal: true, name: 'TADS', rangeErr: 0.005, aimErr: 0.15, layTime: 2, detectMax: 6000, identMax: 4000, engageMax: 6000 },
     armor: [
       { name: '기수', part: 'hull', a: L(318, 170), b: L(318, 250), t: 12, mat: 'alu', n: 0, h: 0 },

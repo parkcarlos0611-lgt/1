@@ -208,7 +208,7 @@ Object.assign(DS.Renderer.prototype, {
       for (let i = 0; i < n; i++) {
         let c = Math.cos(v.rot - i * sweep / n); if (Math.abs(c) < 0.06) c = c < 0 ? -0.06 : 0.06;
         // the drawing shows the blades fore and aft at full span; widen it to the true radius
-        const wide = F.rotorR / ((S.rotorAxis - R[0]) * px);
+        const wide = F.rotorR / (Math.max(S.rotorAxis - R[0], R[0] + R[2] - S.rotorAxis) * px);
         ctx.save(); ctx.translate(ax, 0); ctx.scale(-c * wide, -1); ctx.drawImage(im2, -x0, y0, w, h); ctx.restore();
       }
       ctx.globalAlpha = 1;

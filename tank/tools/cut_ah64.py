@@ -55,10 +55,17 @@ a[yy >= 296] = 0
 rgb = im.astype(np.uint8).copy(); rgb[grey] = (196, 158, 98)       # blades crossing the fin painted over
 save('body_l', a, rgb, mirror=True)
 save('body', a, rgb, mirror=True, patches=((1038, 213, 1142, 247), (1244, 178, 1314, 202)))
-# ---- main rotor: head and blades above the cabin roof ----
-r = base.copy(); r[yy >= 97] = 0; r[xx >= 1175] = 0; r[xx < 413] = 0
-r[(yy < 44) & ((xx < 600) | (xx > 750))] = 0; r[yy < 16] = 0       # title lettering
-save('rotor', r)
+# ---- main rotor: head and blades, from the clean drawing (second row) where the left blade is not hidden by
+# the caption box; that row sits 297 px lower, so its box is stored in the top row's coordinates ----
+DY = 297
+im2 = np.asarray(Image.open(os.path.join(ROOT, 'assets/ref/ah64a_sheet.png')).convert('RGB').crop((250, 305, 1175, 393))).astype(np.int16)
+y2, x2 = np.mgrid[0:im2.shape[0], 0:im2.shape[1]]; x2 = x2 + 250; y2 = y2 + 305
+ra = np.where((im2.min(axis=2) > 222) & ((im2.max(axis=2) - im2.min(axis=2)) < 24), 0, 255).astype(np.uint8)
+ra[(y2 < 324) & ((x2 < 640) | (x2 > 720))] = 0                      # caption box, the upper drawing's ground shadow
+ra[y2 < 310] = 0
+ys, xs = np.nonzero(ra); bx0, bx1, by0, by1 = xs.min(), xs.max() + 1, ys.min(), ys.max() + 1
+Image.fromarray(np.dstack([im2.astype(np.uint8), ra])[by0:by1, bx0:bx1]).save(os.path.join(OUT, 'rotor.png'))
+info['rotor'] = [int(bx0 + 250), int(by0 + 305 - DY), int(bx1 - bx0), int(by1 - by0)]
 # ---- tail rotor blades ----
 t = np.zeros_like(base); sel = disc & (base > 0) & ((~fin & (chroma < 40)) | grey)
 t[sel] = 255

@@ -439,7 +439,20 @@ DS.Structure = class Structure {
     ctx.beginPath(); ctx.moveTo(x0, T.height(x0));
     for (let j = 0; j < H.length; j++) ctx.lineTo(x0 + j + 0.5, T.height(x0 + j) + H[j] * 0.8);
     ctx.lineTo(x0 + H.length, T.height(x0 + H.length)); ctx.closePath();
-    ctx.fillStyle = grey != null ? `rgb(${grey(0.05)})` : '#a39276'; ctx.fill();
+    if (grey != null) { ctx.fillStyle = `rgb(${grey(0.05)})`; ctx.fill(); }
+    else {
+      // the mound is filled with a rubble texture (pieces of the debris sheet packed together), shaded darker
+      // toward the foot, so no plain colour shows between the heap sprites
+      const pat = R.rubblePattern(), m = ctx.getTransform();
+      if (pat) {
+        const z = Math.hypot(m.a, m.b), k = 7 / 256 * z;                     // one tile = 7 m
+        pat.setTransform(new DOMMatrix([k, 0, 0, k, (m.e % (256 * k)), (m.f % (256 * k))]));
+        ctx.save(); ctx.clip(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = pat; ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height); ctx.restore();
+        ctx.save(); ctx.clip();
+        const gy = T.height(this.x), sh = ctx.createLinearGradient(0, gy + 4, 0, gy);
+        sh.addColorStop(0, 'rgba(60,48,34,0)'); sh.addColorStop(1, 'rgba(60,48,34,0.35)'); ctx.fillStyle = sh; ctx.fillRect(x0, gy - 1, H.length, 8); ctx.restore();
+      } else { ctx.fillStyle = '#a39276'; ctx.fill(); }
+    }
     const DI = R.debImg;
     for (const s of this.heapDraw.L) { const im = DI[s.key]; if (!im) continue; const y = T.height(s.x) - 0.1; ctx.save(); ctx.translate(s.x, y); ctx.scale(1, -1);
       if (grey != null) { ctx.fillStyle = `rgb(${grey(0.05)})`; ctx.fillRect(-s.w / 2, -s.h, s.w, s.h * 0.6); } else ctx.drawImage(im, -s.w / 2, -s.h, s.w, s.h); ctx.restore(); }
@@ -448,6 +461,21 @@ DS.Structure = class Structure {
 
 // images: buildings, their broken-glass versions, and the debris pieces
 Object.assign(DS.Renderer.prototype, {
+  // a 256 px tile of packed rubble cut from the debris pieces (built once the pieces have loaded)
+  rubblePattern() {
+    if (this._rubPat !== undefined) return this._rubPat;
+    const DI = this.debImg, keys = ['conc1', 'conc2', 'conc3', 'conc4', 'conc5', 'conc6', 'conc7', 'brick1', 'brick3', 'block1', 'block2', 'grit1', 'grit2', 'gravel', 'rebar3', 'slab1'];
+    if (!keys.every(k => DI[k] && DI[k].complete)) return null;
+    const c = document.createElement('canvas'); c.width = c.height = 256; const x = c.getContext('2d'), r = DS.rng(19);
+    x.fillStyle = '#8c7d66'; x.fillRect(0, 0, 256, 256);
+    for (let i = 0; i < 260; i++) {
+      const im = DI[keys[Math.floor(r() * keys.length)]], s = 18 + r() * 46, w = s, h = s * im.height / im.width, px = r() * 256, py = r() * 256, a = (r() - 0.5) * 1.2;
+      for (const ox of [-256, 0, 256]) for (const oy of [-256, 0, 256]) { if (px + ox < -s || px + ox > 256 + s || py + oy < -s || py + oy > 256 + s) continue;
+        x.save(); x.translate(px + ox, py + oy); x.rotate(a); x.drawImage(im, -w / 2, -h / 2, w, h); x.restore(); }
+    }
+    this._rubPat = this.ctx.createPattern(c, 'repeat');
+    return this._rubPat;
+  },
   loadCity() {
     this.cityImg = {}; this.cityBroken = {}; this.debImg = {}; this.w.rend = this;
     const one = (src, cb) => new Promise(res => { const im = new Image(); im.onload = () => { cb(im); res(); }; im.onerror = () => res(); im.src = src; });

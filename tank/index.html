@@ -203,7 +203,8 @@
   <div class="row"><button type="button" data-me="m1a1">M1A1</button><button type="button" data-me="m2a2">M2A2 브래들리</button><button type="button" data-me="m60a1">M60A1</button><button type="button" data-me="m109a3">M109A3</button><button type="button" data-me="m270">MLRS</button><button type="button" data-me="ah64a">AH-64A</button><button type="button" data-me="t55">T-55</button><button type="button" data-me="t62">T-62</button><button type="button" data-me="t72">T-72</button><button type="button" data-go="me">내 위치로</button></div>
   <h3>표적 배치</h3>
   <div class="row"><button type="button" data-tool="t55">T-55</button><button type="button" data-tool="t62">T-62</button><button type="button" data-tool="t72">T-72</button><button type="button" data-tool="m1a1">M1A1</button><button type="button" data-tool="m2a2">M2A2</button><button type="button" data-tool="m60a1">M60A1</button><button type="button" data-tool="m109a3">M109A3</button><button type="button" data-tool="m270">MLRS</button><button type="button" data-tool="ah64a">AH-64A</button></div>
-  <div class="row"><button type="button" data-tool="b1">아파트 A</button><button type="button" data-tool="b2">아파트 B</button><button type="button" data-tool="b3">업무 빌딩</button><button type="button" data-tool="b4">곡면 아파트</button><button type="button" data-act="clearb">건물 모두 삭제</button></div>
+  <div class="row"><label for="sb-bld">건물</label><select id="sb-bld"><option value="h1">고층 아파트 A</option><option value="h2">유리 업무 빌딩</option><option value="h3">고층 아파트 B</option><option value="h4">아치 기단 빌딩</option><option value="h5">업무 빌딩</option><option value="h6">원통형 빌딩</option><option value="hd1">파손된 고층 A</option><option value="hd2">파손된 고층 B</option><option value="m1">중층 건물 1</option><option value="m2">중층 건물 2</option><option value="m3">중층 건물 3</option><option value="m4">중층 건물 4</option><option value="m5">중층 건물 5</option><option value="m6">중층 건물 6</option><option value="m7">중층 건물 7</option><option value="l1">단층 연립</option><option value="l2">아치 건물</option><option value="l3">2층 상가주택</option><option value="l4">돔 건물</option><option value="l5">상점 건물</option><option value="l6">창고</option><option value="l7">차양 시장</option></select><button type="button" data-bld="1">배치</button><button type="button" data-act="clearb">건물 모두 삭제</button></div>
+
   <p id="sb-selname"></p>
   <div class="row"><label for="sb-mode">행동</label><select id="sb-mode"><option value="dummy">무인 표적 (움직이지도 쏘지도 않음)</option><option value="watch">정지 관측 (탐지만)</option><option value="hold">정지 사격 (제자리에서 응사)</option><option value="combat">기동 전투</option><option value="patrol">왕복 주행 (이동 표적)</option></select></div>
   <div class="row" id="sb-pat" hidden><label for="sb-span">구간</label><input id="sb-span" type="number" min="20" max="2000" step="10"> m <label for="sb-speed">속도</label><input id="sb-speed" type="number" min="1" max="15" step="1"> m/s</div>
@@ -269,6 +270,7 @@
 <script src="src/core/Tuning.js"></script>
 <script src="data/missions.js"></script>
 <script src="data/range.js"></script>
+<script src="data/city.js"></script>
 <script src="data/vehicles/m1a1.js"></script>
 <script src="data/vehicles/t72.js"></script>
 <script src="data/vehicles/t55.js"></script>
@@ -296,6 +298,7 @@
 <script src="src/render/Props.js"></script>
 <script src="src/vehicle/Heli.js"></script>
 <script src="src/world/Buildings.js"></script>
+<script src="src/world/City.js"></script>
 <script src="src/render/Post.js"></script>
 <script src="src/debug/DebugLayer.js"></script>
 <script src="src/ai/TankAI.js"></script>

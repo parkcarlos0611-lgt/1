@@ -28,7 +28,7 @@ DS.World = class World {
       p.alive = false; this.hits.push({ x: q.x, y: q.y }); if (this.hits.length > 20) this.hits.shift();
       return DS.Blast.burst(this, q.x, q.y, p, h.kind === 'armor' ? h.hit : null, h.kind === 'building' ? h.b : null);
     }
-    if (h.kind === 'building') { p.alive = false; return this.fx.wallHit(h, p); }
+    if (h.kind === 'building') { p.alive = false; if (h.b.hit) h.b.hit(this, h.x, h.y, p); return this.fx.wallHit(h, p); }
     if (p.ammo.small) return this.onBulletHit(p, h);
     const ai = p.owner && p.owner.ai;
     if (h.kind === 'ground') {

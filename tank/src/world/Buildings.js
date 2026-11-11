@@ -27,6 +27,7 @@ DS.Building = class Building {
   static ray(world, x0, y0, x1, y1) {
     let best = null;
     for (const b of world.buildings) {
+      if (b.rayHit) { const h = b.rayHit(x0, y0, x1, y1); if (h && (!best || h.t < best.t)) best = { b, t: h.t, x: h.x, y: h.y }; continue; }
       if (b.state === 'rubble') continue;
       const xa = b.x - b.w / 2, xb = b.x + b.w / 2, ya = b.base, yb = b.top;
       if (Math.max(x0, x1) < xa || Math.min(x0, x1) > xb || Math.max(y0, y1) < ya || Math.min(y0, y1) > yb) continue;
@@ -147,6 +148,7 @@ Object.assign(DS.Renderer.prototype, {
     const env = w.env || {}, sun = env.night ? null : env.sun, storm = env.visibility ? 1 : 0, H = n => { const v = Math.sin(n * 127.1 + 311.7) * 43758.5453; return v - Math.floor(v); };
     ctx.imageSmoothingQuality = 'high';
     for (const b of L) {
+      if (b.draw) { b.draw(ctx, cam, grey, this); continue; }
       if (b.x + b.w * 0.9 + 30 < cam.left || b.x - b.w * 0.9 - 30 > cam.right) continue;
       const key = b.k + (b.glass ? '_broken' : ''), im = grey != null ? this.propTinted(key, 't', grey(0.2), 1) : storm ? this.propTinted(key, 's', '205,176,134', 0.22) : this.bldImg[key];
       const left = b.h - b.sink;

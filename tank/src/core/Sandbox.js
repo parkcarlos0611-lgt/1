@@ -28,14 +28,15 @@ DS.Sandbox = class Sandbox {
   }
   items() { return this.w.vehicles.map(v => v.sb).filter(Boolean); }
   // ---- buildings (demolition targets): placed, dragged, deleted and rebuilt like vehicles ----
-  addBuilding(k, x) { const b = new DS.Building(k, Math.max(40, Math.min(DS.RANGE.length - 40, x)), this.w); this.w.buildings.push(b); return b; }
+  isB(k) { return !!(k && (DS.CITY[k] || DS.BUILDINGS[k])); }
+  addBuilding(k, x) { if (DS.CITY[k]) { const b = new DS.Structure(k, Math.max(40, Math.min(DS.RANGE.length - 40, x)), this.w); this.w.buildings.push(b); return b; } const b = new DS.Building(k, Math.max(40, Math.min(DS.RANGE.length - 40, x)), this.w); this.w.buildings.push(b); return b; }
   pickB(m) { for (const b of this.w.buildings) if (Math.abs(m.x - b.x) < b.w / 2 && m.y > b.base - 2 && m.y < b.base + Math.max(6, b.h - b.sink)) return b; return null; }
   // rebuild every vehicle from its record: repairs, re-arms and puts the targets back (the player stays put)
   rebuild(items = this.items(), keepPlayerX = true) {
     const W = this.w, g = this.g;
     const me = items.find(i => i.player) || { player: true, id: 'm1a1', x: DS.RANGE.start, dir: 1 };
     if (keepPlayerX && g.player) me.x = g.player.pos.x;
-    for (const b of W.buildings) { b.base = W.terrain.height(b.x) - 0.15; b.reset(); }       // buildings stand again
+    for (const b of W.buildings) { b.base = W.terrain.height(b.x) - (b.D ? 0.12 : 0.15); b.reset(); }       // buildings stand again
     this.selB = null;
     W.vehicles.length = 0; W.projectiles.length = 0; W.missiles.length = 0; W.traces.length = 0; W.log.length = 0; this.n = 0; W.fx.cases = [];
     this.spawn(me);
@@ -72,7 +73,7 @@ DS.Sandbox = class Sandbox {
     const items = lay.items.map(i => ({ ...i, x: Math.max(15, Math.min(DS.RANGE.length - 50, L + i.d)) }));
     if (!items.some(i => i.player)) items.unshift({ ...this.g.player.sb });           // presets keep my vehicle where it is
     if (lay.env) this.setEnv(lay.env);
-    this.w.buildings.length = 0; for (const b of lay.blds || []) this.addBuilding(b.k, L + b.d);
+    this.w.buildings.length = 0; for (const b of lay.blds || []) if (DS.CITY[b.k]) this.addBuilding(b.k, L + b.d);
     this.rebuild(items, !lay.items.some(i => i.player));
   }
   saved() { try { return JSON.parse(localStorage.getItem('ds.range.layouts') || '{}'); } catch (e) { return {}; } }
@@ -136,7 +137,7 @@ DS.Sandbox = class Sandbox {
       const m = cam.toWorld(this.mouse.x, this.mouse.y), x = sx(m.x), y = sy(T.height(m.x));
       ctx.strokeStyle = ctx.fillStyle = '#ffd34a'; ctx.setLineDash([4 * dpr, 4 * dpr]);
       ctx.beginPath(); ctx.moveTo(x, y - 60 * dpr); ctx.lineTo(x, y); ctx.stroke(); ctx.setLineDash([]);
-      ctx.fillText(`${Sandbox.NAMES[this.tool] || DS.BUILDINGS[this.tool].name} 배치 · ${Math.round(m.x - DS.RANGE.line)} m`, x, y - 66 * dpr);
+      ctx.fillText(`${Sandbox.NAMES[this.tool] || (DS.CITY[this.tool] || DS.BUILDINGS[this.tool]).name} 배치 · ${Math.round(m.x - DS.RANGE.line)} m`, x, y - 66 * dpr);
     }
   }
 
@@ -149,10 +150,10 @@ DS.Sandbox = class Sandbox {
       if (!this.edit) return;
       const m = cam.toWorld(e.clientX, e.clientY);
       if (e.button === 2) { this.tool = null; this.refresh(); return; }
-      const v = this.pick(m), bld = !v && !(this.tool && !DS.BUILDINGS[this.tool]) ? this.pickB(m) : null;
+      const v = this.pick(m), bld = !v && !(this.tool && !this.isB(this.tool)) ? this.pickB(m) : null;
       this.selB = null;
       if (bld) { this.sel = null; this.selB = bld; this.dragB = { b: bld, dx: bld.x - m.x }; }
-      else if (!v && this.tool && DS.BUILDINGS[this.tool]) { this.sel = null; this.selB = this.addBuilding(this.tool, m.x); }
+      else if (!v && this.tool && this.isB(this.tool)) { this.sel = null; this.selB = this.addBuilding(this.tool, m.x); }
       else if (v) { this.sel = v; this.drag = { v, dx: v.pos.x - m.x }; }
       else if (this.tool) { this.sel = this.spawn({ id: this.tool, x: Math.max(15, Math.min(DS.RANGE.length - 50, m.x)), dir: this.dir || -1, team: this.team || 'IQ', mode: this.mode || 'dummy', span: 150, speed: 5 }); }
       else this.sel = null;
@@ -161,7 +162,7 @@ DS.Sandbox = class Sandbox {
     addEventListener('mousemove', e => {
       this.mouse = { x: e.clientX, y: e.clientY };
       if (this.edit && this.drag) this.moveTo(this.drag.v, cam.toWorld(e.clientX, e.clientY).x + this.drag.dx);
-      if (this.edit && this.dragB) { const b = this.dragB.b; b.x = Math.max(40, Math.min(DS.RANGE.length - 40, cam.toWorld(e.clientX, e.clientY).x + this.dragB.dx)); b.base = this.w.terrain.height(b.x) - 0.15; b.reset(); }
+      if (this.edit && this.dragB) { const b = this.dragB.b; b.x = Math.max(40, Math.min(DS.RANGE.length - 40, cam.toWorld(e.clientX, e.clientY).x + this.dragB.dx)); b.base = this.w.terrain.height(b.x) - (b.D ? 0.12 : 0.15); b.reset(); }
     });
     addEventListener('mouseup', () => { this.dragB = null; if (this.drag) { this.drag = null; this.refresh(); } });
     addEventListener('keydown', e => {
@@ -176,6 +177,7 @@ DS.Sandbox = class Sandbox {
       const b = e.target.closest('button'); if (!b) return;
       const d = b.dataset, v = this.sel;
       if (d.tool) this.tool = this.tool === d.tool ? null : d.tool;
+      if (d.bld) { const k = this.el.querySelector('#sb-bld').value; this.tool = this.tool === k ? null : k; }
       if (d.me) this.setPlayer(d.me);
       if (d.go) { const x = d.go === 'me' ? this.g.player.pos.x : d.go === 'base' ? 420 : DS.RANGE.line + +d.go; cam.x = x; cam.y = this.w.terrain.height(x) + 3; }
       if (d.time) this.setEnv({ time: d.time });
@@ -204,6 +206,7 @@ DS.Sandbox = class Sandbox {
       if (t.id === 'sb-span' && v) { v.sb.span = Math.max(20, +t.value || 150); this.respawn(v); }
       if (t.id === 'sb-speed' && v) { v.sb.speed = Math.max(1, Math.min(15, +t.value || 5)); this.respawn(v); }
       if (t.id === 'sb-lay') this.layN = t.value;
+      if (t.id === 'sb-bld') { this.tool = t.value; }
       this.refresh();
     });
     this.el.addEventListener('input', e => { if (e.target.id === 'sb-vis' || e.target.id === 'sb-wind') this.labels(); });
@@ -215,13 +218,13 @@ DS.Sandbox = class Sandbox {
   }
   refresh() {
     const $ = s => this.el.querySelector(s), on = (b, k) => b.classList.toggle('on', !!k), v = this.sel, env = this.w.env;
-    this.el.querySelectorAll('[data-tool]').forEach(b => on(b, this.tool === b.dataset.tool));
+    this.el.querySelectorAll('[data-tool]').forEach(b => on(b, this.tool === b.dataset.tool)); { const bb = this.el.querySelector('[data-bld]'); if (bb) on(bb, !!(this.tool && DS.CITY[this.tool])); }
     this.el.querySelectorAll('[data-me]').forEach(b => on(b, this.g.player.sb.id === b.dataset.me));
     this.el.querySelectorAll('[data-time]').forEach(b => on(b, (env.time || 'day') === b.dataset.time));
     this.el.querySelectorAll('[data-opt]').forEach(b => on(b, this.opt[b.dataset.opt]));
     $('#sb-vis').value = env.visibility || 0; $('#sb-wind').value = env.wind || 0; this.labels();
     const it = v && v.sb, tgt = it && !it.player;
-    $('#sb-selname').textContent = this.selB ? `${this.selB.name} · 사격선에서 ${Math.round(this.selB.x - DS.RANGE.line)} m · ${this.selB.state === 'ok' ? '온전' : this.selB.state === 'rubble' ? '완전 붕괴' : `피격 ${this.selB.hits}회`}` : v ? `${v.label} · 사격선에서 ${Math.round(v.pos.x - DS.RANGE.line)} m · ${v.status}` : this.tool ? `${Sandbox.NAMES[this.tool] || DS.BUILDINGS[this.tool].name}: 지면을 클릭해 배치 (우클릭 취소)` : '표적을 고르고 지면을 클릭 · 놓인 차량은 끌어서 이동';
+    $('#sb-selname').textContent = this.selB ? `${this.selB.name} · 사격선에서 ${Math.round(this.selB.x - DS.RANGE.line)} m · ${this.selB.state === 'ok' ? '온전' : this.selB.state === 'rubble' ? '완전 붕괴' : `피격 ${this.selB.hits}회`}` : v ? `${v.label} · 사격선에서 ${Math.round(v.pos.x - DS.RANGE.line)} m · ${v.status}` : this.tool ? `${Sandbox.NAMES[this.tool] || (DS.CITY[this.tool] || DS.BUILDINGS[this.tool]).name}: 지면을 클릭해 배치 (우클릭 취소)` : '표적을 고르고 지면을 클릭 · 놓인 차량은 끌어서 이동';
     $('#sb-mode').value = tgt ? it.mode : this.mode || 'dummy';
     $('#sb-pat').hidden = !(tgt && it.mode === 'patrol');
     if (tgt) { $('#sb-span').value = it.span || 150; $('#sb-speed').value = it.speed || 5; }

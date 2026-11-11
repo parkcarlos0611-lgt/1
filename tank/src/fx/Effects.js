@@ -373,6 +373,60 @@ DS.Effects = class Effects {
     this.shake = Math.max(this.shake, Math.max(0, 0.5 - d / 300));
   }
 
+  // 155 mm high-explosive burst: a fireball, a tall column of sand thrown straight up with a wide low skirt,
+  // heavy dust that boils up and drifts, dark smoke, a deep crater. Big soft puffs carry the bulk of the cloud
+  // so the particle count stays modest.
+  heBurst(x, y, A, onHard) {
+    const P = this.P, K = DS.P, T = this.w.terrain, r = (a, b) => this.rnd(a, b);
+    const gy = T.height(x), sc = this.hex(T.soilAt(x).col[1]), sc2 = this.hex(T.soilAt(x).col[0]);
+    const air = y - gy > 3;                                        // burst on a wall high above the ground
+    DS.Audio.ground(x, y, true);
+    this.blast(x, y + 0.3, 3.5, null, null);
+    let ej = 0;
+    if (!air) { ej = T.crater(x, 3.1, 1.25, 0.4, 0.5); T.relax(undefined, undefined, 6); }
+    const near = Math.abs(x - this.w.cam.x) < 700, k = near ? 1 : 0.35;            // far bursts: a lighter version
+    if (!air) {
+      const n = Math.round(230 * k);
+      for (let i = 0; i < n; i++) {                                 // column: narrow, fast, high
+        const a = Math.PI / 2 + r(-0.42, 0.42) * r(0.3, 1), sp = r(14, 78);
+        P.add(K.GRAIN, x + r(-1, 1), gy + 0.1, Math.cos(a) * sp, Math.sin(a) * sp, r(1.6, 5.5), r(0.08, 0.3), { drag: 0.32, col: Math.random() < 0.5 ? sc : sc2, mass: ej * 0.7 / n });
+      }
+      const n2 = Math.round(90 * k);
+      for (let i = 0; i < n2; i++) {                                // skirt: flat and wide
+        const a = r(0.12, 0.55) * (Math.random() < 0.5 ? 1 : -1), sp = r(10, 42);
+        P.add(K.GRAIN, x, gy + 0.2, Math.sin(a > 0 ? Math.PI / 2 - a : -Math.PI / 2 - a) * sp, Math.abs(Math.cos(Math.PI / 2 - Math.abs(a))) * sp * 0.9 + 2, r(1, 3), r(0.05, 0.14), { drag: 0.3, col: sc, mass: ej * 0.3 / n2 });
+      }
+    }
+    const dustCol = air ? 0xc9b79a : sc;
+    if (!air) for (let i = 0; i < Math.round(30 * k) + 6; i++) {    // the sand column itself: dense, narrow, 30–40 m high
+      const u = Math.random();
+      P.add(K.DUST, x + r(-1.2, 1.2), gy + r(0, 2), r(-2.5, 2.5), 12 + u * 52, r(5, 11), r(1.8, 3.4), { grow: r(0.9, 1.9), drag: 1.25, grav: 0.25, alpha: 0.55, col: Math.random() < 0.5 ? sc : sc2 });
+    }
+    for (let i = 0; i < Math.round(40 * k) + 8; i++)                // rising cloud
+      P.add(K.DUST, x + r(-3.5, 3.5), y + r(0, 4), r(-7, 7), r(3, 20), r(9, 18), r(2.4, 5), { grow: r(1.6, 3.4), drag: 0.8, grav: 0, alpha: 0.4, col: dustCol });
+    if (!air) for (let i = 0; i < Math.round(26 * k) + 4; i++) {    // ground surge rolling out both ways
+      const s = Math.random() < 0.5 ? 1 : -1;
+      P.add(K.DUST, x + s * r(0, 3), gy + r(0.3, 1.8), s * r(8, 30), r(0.2, 3), r(7, 14), r(2, 4), { grow: r(1.4, 2.8), drag: 1.0, grav: 0, alpha: 0.36, col: sc });
+    }
+    for (let i = 0; i < Math.round(36 * k) + 6; i++) { const a = r(0, 6.28), sp = r(4, 34);
+      P.add(K.FIRE, x, y + 0.8, Math.cos(a) * sp, Math.abs(Math.sin(a)) * sp + 2, r(0.08, 0.26), r(0.9, 2.4), { grow: 7, drag: 9, grav: 0, alpha: 1, col: 0xffa848 }); }
+    for (let i = 0; i < Math.round(air ? 8 : 20 * k) + 3; i++)
+      P.add(K.DARK, x + r(-2, 2), y + r(0.5, 4), r(-2.5, 2.5), r(3, 11), r(5, 10), r(1.2, 2.4), { grow: r(1.0, 1.8), drag: 0.9, grav: -0.02, alpha: 0.26, col: 0x3a352f });
+    for (let i = 0; i < Math.round(18 * k); i++) { const a = Math.PI / 2 + r(-1.2, 1.2), sp = r(12, 45);
+      P.add(K.DEBRIS, x, y + 0.5, Math.cos(a) * sp, Math.sin(a) * sp, r(2, 5), r(0.06, 0.2), { drag: 0.2, col: 0x3a342c }); }
+    this.flashes.push({ x, y: y + 1, dx: 0, dy: 1, t: 0, ttl: 0.1, boom: true });
+    this.flashes.push({ x, y: y + 3, dx: 0, dy: 1, t: 0, ttl: 0.07, boom: true });
+    const d = Math.abs(x - this.w.cam.x);
+    this.shake = Math.max(this.shake, Math.max(0, 1.4 - d / 500));
+  }
+  // a solid shot or small round stopping in a building wall: chips of concrete and a puff of dust
+  wallHit(h, p) {
+    const P = this.P, K = DS.P, small = p.ammo.small, n = small ? 3 : 26, sx = -Math.sign(p.vx || 1);
+    if (!small) DS.Audio.ground(h.x, h.y, false);
+    for (let i = 0; i < n; i++) P.add(K.DEBRIS, h.x, h.y, sx * this.rnd(1, small ? 6 : 18), this.rnd(-2, small ? 4 : 10), this.rnd(0.8, 2.2), this.rnd(0.04, small ? 0.08 : 0.2), { drag: 0.4, col: 0xb8a888 });
+    for (let i = 0; i < (small ? 1 : 8); i++) P.add(K.DUST, h.x, h.y, sx * this.rnd(1, 5), this.rnd(0, 3), this.rnd(1.5, small ? 2.5 : 6), this.rnd(0.3, small ? 0.6 : 1.6), { grow: 1.2, drag: 1.2, grav: 0, alpha: 0.3, col: 0xc9b79a });
+  }
+
   // sandstorm: dust sheets and sand streaks blowing through the view
   ambient(dt) {
     const env = this.w.env || {}, cam = this.w.cam, P = this.P, K = DS.P;

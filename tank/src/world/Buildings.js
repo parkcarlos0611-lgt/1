@@ -1,0 +1,158 @@
+// Buildings for demolition tests (firing range). They stand just behind the drive line: vehicles pass in
+// front of them, but shells, missiles, bullets, sight lines and blast meet them. A high-explosive burst within
+// its radius brings the building down: every window pane goes at once, the hit corner is blown out, then the
+// block sinks into its own footprint, leaning toward the damaged side, shedding slabs and pouring dust out
+// along the ground and up over itself; a rubble heap is left.
+DS.BUILDINGS = {
+  b1: { name: '아파트 A (12층)', w: 26, ar: 890 / 596 },
+  b2: { name: '아파트 B (13층)', w: 27, ar: 892 / 602 },
+  b3: { name: '업무용 빌딩', w: 25, ar: 886 / 574 },
+  b4: { name: '곡면 아파트', w: 26, ar: 868 / 580 },
+};
+DS.Building = class Building {
+  constructor(k, x, world) {
+    const B = DS.BUILDINGS[k];
+    this.k = k; this.x = x; this.w = B.w; this.h = B.w * B.ar; this.name = B.name;
+    this.base = world.terrain.height(x) - 0.15;
+    this.reset();
+  }
+  reset() { this.state = 'ok'; this.glass = false; this.sink = 0; this.vs = 0; this.tilt = 0; this.side = 1; this.t = 0; this.holes = []; this.slabs = []; this.acc = 0; this.rub = 0; }
+  get top() { return this.base + this.h - this.sink; }
+  // first building met by the segment a→b (entry point), or null
+  static ray(world, x0, y0, x1, y1) {
+    let best = null;
+    for (const b of world.buildings) {
+      if (b.state === 'rubble') continue;
+      const xa = b.x - b.w / 2, xb = b.x + b.w / 2, ya = b.base, yb = b.top;
+      if (Math.max(x0, x1) < xa || Math.min(x0, x1) > xb || Math.max(y0, y1) < ya || Math.min(y0, y1) > yb) continue;
+      // Liang–Barsky clip of the segment against the block
+      const dx = x1 - x0, dy = y1 - y0; let t0 = 0, t1 = 1, ok = true;
+      for (const [p, q] of [[-dx, x0 - xa], [dx, xb - x0], [-dy, y0 - ya], [dy, yb - y0]]) {
+        if (p === 0) { if (q < 0) { ok = false; break; } }
+        else { const r = q / p; if (p < 0) { if (r > t1) { ok = false; break; } if (r > t0) t0 = r; } else { if (r < t0) { ok = false; break; } if (r < t1) t1 = r; } }
+      }
+      if (ok && (!best || t0 < best.t)) best = { b, t: t0, x: x0 + dx * t0, y: y0 + dy * t0 };
+    }
+    return best;
+  }
+  dist(x, y) { return Math.hypot(Math.max(0, Math.abs(x - this.x) - this.w / 2), Math.max(0, this.base - y, y - this.top)); }
+  // blast of radius r at (x, y): inside it the building comes down; out to a few radii only the glass goes
+  blast(W, x, y, r) {
+    if (this.state === 'rubble') return;
+    const d = this.dist(x, y);
+    if (d <= r * 4.5 && !this.glass) this.shatter(W);
+    if (d <= r && this.state === 'ok') this.collapse(W, x, y);
+  }
+  shatter(W) {
+    this.glass = true;
+    const P = W.particles, r = (a, b) => a + Math.random() * (b - a);
+    for (let i = 0; i < 170; i++)                                   // shards burst out of every floor and rain down
+      P.add(DS.P.DEBRIS, this.x + r(-0.5, 0.5) * this.w, this.base + r(0.06, 0.97) * (this.h - this.sink), r(-5, 5), r(-1, 4), r(2.5, 6), r(0.04, 0.11), { drag: 0.9, col: Math.random() < 0.6 ? 0xcfe2ec : 0x9db8c6 });
+    for (let i = 0; i < 12; i++)
+      P.add(DS.P.DUST, this.x + r(-0.5, 0.5) * this.w, this.base + r(0.1, 0.9) * this.h, r(-2, 2), r(-0.5, 1), r(2, 4), r(0.8, 1.6), { grow: 0.8, drag: 1.2, grav: 0, alpha: 0.18, col: 0xd9d2c4 });
+    DS.Audio.glass(this.x, this.base + this.h / 2);
+  }
+  collapse(W, hx, hy) {
+    this.state = 'falling'; this.t = 0; this.side = Math.sign(hx - this.x) || 1;
+    this.holes.push({ x: Math.max(-this.w / 2, Math.min(this.w / 2, hx - this.x)), y: Math.max(1, Math.min(this.h - 1, hy - this.base)), r: 4.6 });
+    DS.Audio.collapse(this.x, this.base, Math.sqrt(2 * this.h / (0.42 * DS.T.g)) + 0.6);
+    // the blown-out corner: big facade pieces thrown clear at once
+    for (let i = 0; i < 9; i++) this.slab(W, hx + (Math.random() - 0.5) * 6, hy + (Math.random() - 0.5) * 6, -this.side * (4 + Math.random() * 16) * (Math.random() < 0.75 ? -1 : 1), 2 + Math.random() * 12);
+  }
+  slab(W, x, y, vx, vy) {
+    if (this.slabs.length > 46) return;
+    const sw = 1.6 + Math.random() * 3.4, sh = 1.2 + Math.random() * 2.4;
+    this.slabs.push({ x, y, vx, vy, a: 0, w: (Math.random() - 0.5) * 5, sw, sh, u: Math.random() * (1 - sw / this.w), v: Math.random() * (1 - sh / this.h), rest: 0 });
+  }
+  step(dt, W) {
+    const P = W.particles, r = (a, b) => a + Math.random() * (b - a), T = W.terrain;
+    for (const s of this.slabs) {
+      if (s.rest) { s.rest += dt; continue; }
+      s.vy -= DS.T.g * dt; s.x += s.vx * dt; s.y += s.vy * dt; s.a += s.w * dt;
+      const g = T.height(s.x) + s.sh * 0.3;
+      if (s.y < g) { s.y = g; s.rest = 0.001; s.a = Math.round(s.a / (Math.PI / 2)) * (Math.PI / 2) + r(-0.25, 0.25);
+        for (let i = 0; i < 2; i++) P.add(DS.P.DUST, s.x, g, r(-3, 3), r(0.5, 3), r(3, 6), r(1, 2), { grow: 1.2, drag: 1, grav: 0, alpha: 0.3, col: 0xc9b79a }); }
+    }
+    if (this.state !== 'falling') return;
+    this.t += dt;
+    const near = Math.abs(this.x - W.cam.x) < 600;
+    if (this.t > 0.45) {                                            // the structure lets go after the first shock
+      this.vs = Math.min(30, this.vs + 0.42 * DS.T.g * dt); this.sink += this.vs * dt;
+      this.tilt = Math.min(0.17, 0.02 + 0.36 * this.sink / this.h);
+    }
+    const left = this.h - this.sink, rate = 16 + this.vs * 8;
+    this.acc += dt * rate * (near ? 1 : 0.3);
+    while (this.acc >= 1) {
+      this.acc -= 1;
+      const s = Math.random() < 0.5 ? 1 : -1, sp = 5 + this.vs * 0.9;
+      // dust squeezed out along the ground on both sides, and boiling up the face of the falling block
+      P.add(DS.P.DUST, this.x + s * r(0.2, 0.6) * this.w, this.base + r(0.5, 4), s * r(0.6, 2.0) * sp, r(0.3, 4.5), r(11, 20), r(3.5, 7.5), { grow: r(2, 4), drag: 0.85, grav: 0, alpha: 0.48, col: Math.random() < 0.7 ? 0xcbb99c : 0xb8a888 });
+      if (Math.random() < 0.6) P.add(DS.P.DUST, this.x + r(-0.55, 0.55) * this.w, this.base + r(0, Math.min(left, 14)), r(-5, 5), r(2, 8 + this.vs * 0.6), r(10, 18), r(3.2, 6.5), { grow: r(1.8, 3.4), drag: 0.8, grav: 0, alpha: 0.44, col: 0xd2c2a6 });
+      if (Math.random() < 0.3) P.add(DS.P.DEBRIS, this.x + r(-0.5, 0.5) * this.w, this.base + r(0, Math.min(left, 10)), r(-14, 14), r(2, 14), r(1.5, 3.5), r(0.08, 0.24), { drag: 0.3, col: 0x8f8472 });
+      if (Math.random() < 0.09 && left > 6) this.slab(W, this.x + s * this.w * 0.5, this.base + r(1, Math.min(left, 16)), s * r(3, 13), r(1, 9));
+    }
+    if (near) W.fx.shake = Math.max(W.fx.shake, 0.5 * Math.min(1, this.vs / 12) * Math.max(0, 1 - Math.abs(this.x - W.cam.x) / 400));
+    if (left < this.h * 0.07) {                                     // down: a last surge of dust, and the heap
+      this.state = 'rubble'; this.rub = 0.001;
+      for (let i = 0; i < (near ? 64 : 14); i++) { const s = Math.random() < 0.5 ? 1 : -1;
+        P.add(DS.P.DUST, this.x + r(-0.6, 0.6) * this.w, this.base + r(0.5, 7), s * r(5, 36), r(0.5, 12), r(12, 24), r(4, 9), { grow: r(2, 4), drag: 0.85, grav: 0, alpha: 0.5, col: 0xcbb99c }); }
+      DS.Audio.thud(this.x, this.base, 1.6);
+    }
+  }
+};
+
+// ---- drawing (called from the frame before the vehicles) ----
+Object.assign(DS.Renderer.prototype, {
+  loadBuildings() {
+    this.bldImg = {};
+    const names = []; for (const k in DS.BUILDINGS) names.push(k, k + '_broken');
+    return Promise.all(names.map(n => new Promise((res, rej) => { const im = new Image(); im.onload = () => { this.bldImg[n] = im; this.propImg[n] = im; res(); }; im.onerror = () => rej(new Error('sprite buildings/' + n)); im.src = 'assets/sprites/buildings/' + n + '.png'; })));
+  },
+  buildings(ctx, cam, grey) {
+    const w = this.w, L = w.buildings; if (!L || !L.length || !this.bldImg) return;
+    const env = w.env || {}, sun = env.night ? null : env.sun, storm = env.visibility ? 1 : 0, H = n => { const v = Math.sin(n * 127.1 + 311.7) * 43758.5453; return v - Math.floor(v); };
+    ctx.imageSmoothingQuality = 'high';
+    for (const b of L) {
+      if (b.x + b.w * 0.9 + 30 < cam.left || b.x - b.w * 0.9 - 30 > cam.right) continue;
+      const key = b.k + (b.glass ? '_broken' : ''), im = grey != null ? this.propTinted(key, 't', grey(0.2), 1) : storm ? this.propTinted(key, 's', '205,176,134', 0.22) : this.bldImg[key];
+      const left = b.h - b.sink;
+      if (b.state !== 'rubble') {
+        if (sun && grey == null) {                                  // shadow of what still stands
+          const run = -sun.side * Math.min(3.2, 1 / Math.tan(sun.el * Math.PI / 180)) * left * 0.55, e = b.w * 0.48;
+          ctx.fillStyle = storm ? 'rgba(52,36,18,0.12)' : 'rgba(52,36,18,0.26)';
+          ctx.beginPath(); ctx.moveTo(b.x - e, b.base + 0.2); ctx.lineTo(b.x + e, b.base + 0.2); ctx.lineTo(b.x + e + run, b.base - 2.6); ctx.lineTo(b.x - e + run, b.base - 2.6); ctx.closePath(); ctx.fill();
+        }
+        ctx.save(); ctx.translate(b.x + b.side * b.w * 0.5 * (b.tilt > 0 ? 0.6 : 0), b.base - b.sink); ctx.rotate(-b.side * b.tilt);
+        const ox = -b.side * b.w * 0.5 * (b.tilt > 0 ? 0.6 : 0);
+        ctx.save(); ctx.translate(ox, 0); ctx.scale(1, -1); ctx.drawImage(im, -b.w / 2, -b.h, b.w, b.h); ctx.restore();
+        for (const h of b.holes) {                                 // blown-out corner: a ragged dark breach
+          ctx.fillStyle = grey != null ? `rgb(${grey(0)})` : '#1b1712'; ctx.beginPath();
+          for (let i = 0; i < 16; i++) { const a = i / 16 * 6.283, rr = h.r * (0.7 + 0.45 * H(i * 3.1 + h.x)); ctx.lineTo(ox + h.x + Math.cos(a) * rr, h.y + Math.sin(a) * rr * 0.8); }
+          ctx.closePath(); ctx.fill();
+          if (grey == null) { ctx.strokeStyle = 'rgba(70,58,44,0.8)'; ctx.lineWidth = 0.5; ctx.stroke(); }
+        }
+        ctx.restore();
+      }
+      if (b.state === 'rubble' || b.sink > b.h * 0.5) {             // the heap: broken floor slabs over a mound
+        const k = b.state === 'rubble' ? 1 : (b.sink / b.h - 0.5) * 2, hw = b.w * 0.72, hh = b.h * 0.085 * k;
+        ctx.fillStyle = grey != null ? `rgb(${grey(0.1)})` : '#8f8370'; ctx.beginPath(); ctx.moveTo(b.x - hw, b.base);
+        for (let i = 0; i <= 18; i++) { const u = i / 18, e = Math.sin(Math.PI * u); ctx.lineTo(b.x - hw + u * hw * 2, b.base + hh * e * (0.55 + 0.6 * H(i * 1.7 + b.x))); }
+        ctx.lineTo(b.x + hw, b.base); ctx.closePath(); ctx.fill();
+        if (grey == null) for (let i = 0; i < 16; i++) {
+          const u = H(i + b.x * 0.3), e = Math.sin(Math.PI * u), px = b.x - hw + u * hw * 2, py = b.base + hh * e * H(i * 2.3 + 1) * 0.9, sw = 2 + 4 * H(i * 5.1), a = (H(i * 7.7) - 0.5) * 1.1;
+          ctx.save(); ctx.translate(px, py); ctx.rotate(a); ctx.fillStyle = ['#b9aa8c', '#a39478', '#c6b89c', '#7d7262'][i % 4]; ctx.fillRect(-sw / 2, -0.25, sw, 0.5 + 0.5 * H(i));
+          ctx.fillStyle = 'rgba(40,32,22,0.35)'; ctx.fillRect(-sw / 2, -0.25, sw, 0.14); ctx.restore();
+        }
+      }
+      // flying and fallen facade pieces: cut-outs of the building's own drawing
+      const sim = this.bldImg[b.k + '_broken'];
+      for (const s of b.slabs) {
+        if (s.rest > 40) continue;
+        ctx.save(); ctx.translate(s.x, s.y); ctx.rotate(s.a); ctx.scale(1, -1);
+        if (grey != null) { ctx.fillStyle = `rgb(${grey(0.15)})`; ctx.fillRect(-s.sw / 2, -s.sh / 2, s.sw, s.sh); }
+        else ctx.drawImage(sim, s.u * sim.width, s.v * sim.height, s.sw / b.w * sim.width, s.sh / b.h * sim.height, -s.sw / 2, -s.sh / 2, s.sw, s.sh);
+        ctx.restore();
+      }
+    }
+  },
+});

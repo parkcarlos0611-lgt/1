@@ -182,6 +182,7 @@
   <div class="row"><button type="button" data-me="m1a1">M1A1</button><button type="button" data-me="m2a2">M2A2 브래들리</button><button type="button" data-me="m60a1">M60A1</button><button type="button" data-me="t55">T-55</button><button type="button" data-me="t62">T-62</button><button type="button" data-me="t72">T-72</button><button type="button" data-go="me">내 위치로</button></div>
   <h3>표적 배치</h3>
   <div class="row"><button type="button" data-tool="t55">T-55</button><button type="button" data-tool="t62">T-62</button><button type="button" data-tool="t72">T-72</button><button type="button" data-tool="m1a1">M1A1</button><button type="button" data-tool="m2a2">M2A2</button><button type="button" data-tool="m60a1">M60A1</button></div>
+  <div class="row"><button type="button" data-tool="b1">아파트 A</button><button type="button" data-tool="b2">아파트 B</button><button type="button" data-tool="b3">업무 빌딩</button><button type="button" data-tool="b4">곡면 아파트</button><button type="button" data-act="clearb">건물 모두 삭제</button></div>
   <p id="sb-selname"></p>
   <div class="row"><label for="sb-mode">행동</label><select id="sb-mode"><option value="dummy">무인 표적 (움직이지도 쏘지도 않음)</option><option value="watch">정지 관측 (탐지만)</option><option value="hold">정지 사격 (제자리에서 응사)</option><option value="combat">기동 전투</option><option value="patrol">왕복 주행 (이동 표적)</option></select></div>
   <div class="row" id="sb-pat" hidden><label for="sb-span">구간</label><input id="sb-span" type="number" min="20" max="2000" step="10"> m <label for="sb-speed">속도</label><input id="sb-speed" type="number" min="1" max="15" step="1"> m/s</div>
@@ -260,6 +261,7 @@
 <script src="src/vehicle/TrackChain.js"></script>
 <script src="src/ballistics/Projectile.js"></script>
 <script src="src/ballistics/Armor.js"></script>
+<script src="src/ballistics/Blast.js"></script>
 <script src="src/ballistics/Missile.js"></script>
 <script src="src/vehicle/FireControl.js"></script>
 <script src="src/fx/Particles.js"></script>
@@ -267,6 +269,7 @@
 <script src="src/core/Camera.js"></script>
 <script src="src/render/Renderer.js"></script>
 <script src="src/render/Props.js"></script>
+<script src="src/world/Buildings.js"></script>
 <script src="src/render/Post.js"></script>
 <script src="src/debug/DebugLayer.js"></script>
 <script src="src/ai/TankAI.js"></script>

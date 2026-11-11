@@ -106,6 +106,19 @@ DS.Audio = {
     whine(5.1, 0.5, 520, 300, 0.8); clunk(5.7, 1.2, 110);                        // hoist down, breech closes
     clunk(T - G.autoloader.out, 0.9, 200); whine(T - G.autoloader.out + 0.05, 0.8, 600, 400, 1.3);                // unlock, gun back to the lay
   },
+  glass(x, y) {                             // every pane of a building going at once, then the fall of shards
+    if (!this.ok()) return;
+    const p = this.place(x, y); if (p.d > 1500) return;
+    this.burst(p.t, 0.5, 'highpass', 3500, 0.7, 1.1 * p.g, p.cut, 0.005);
+    for (let i = 0; i < 26; i++) this.tone(p.t + 0.1 + Math.random() * 1.9, 2200 + Math.random() * 3800, 1500, 0.05 + Math.random() * 0.06, 0.12 * p.g * (1 - i / 34), p.cut, 'triangle', 0.001);
+  },
+  collapse(x, y, dur) {                     // a building coming down: long rumble with cracks and thumps in it
+    if (!this.ok()) return;
+    const p = this.place(x, y); if (p.d > 4000) return;
+    const f = this.burst(p.t, dur + 1.5, 'lowpass', 260, 0.6, 1.6 * p.g, p.cut, 0.3); f.frequency.exponentialRampToValueAtTime(90, p.t + dur + 1.5);
+    for (let i = 0; i < 16; i++) { const t = p.t + Math.random() * dur; this.tone(t, 60 + Math.random() * 50, 30, 0.3, 0.9 * p.g, p.cut); this.burst(t, 0.2, 'lowpass', 900, 0.7, 0.6 * p.g, p.cut); }
+    for (let i = 0; i < 10; i++) this.clang(p.t + Math.random() * dur, 0.35 * p.g, p.cut, 100 + Math.random() * 160);
+  },
   thud(x, y, k) {                           // a heavy object (thrown turret) landing in sand
     if (!this.ok()) return;
     const p = this.place(x, y); this.tone(p.t, 70, 30, 0.4, 1.2 * k * p.g, p.cut); this.burst(p.t, 0.4, 'lowpass', 500, 0.6, 0.8 * k * p.g, p.cut);

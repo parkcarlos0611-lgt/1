@@ -126,6 +126,7 @@ DS.Renderer = class Renderer {
     this.sky(ctx, cam);
     cam.apply(ctx);
     this.props(ctx, cam, false);
+    this.buildings(ctx, cam);
     w.particles.draw(ctx, cam, 0);
     for (const v of w.vehicles) if (cam.visible(v.pos.x, v.pos.y, 14) && this.shown(v)) this.vehicle(ctx, v, cam);
     this.terrain(ctx, cam);
@@ -166,6 +167,7 @@ DS.Renderer = class Renderer {
     cam.apply(ctx);
     const pg = k => { const c = lum(amb.ground - 0.05 + k * 0.08); return `${c},${c},${c}`; };   // buildings: a little cooler than the sand
     this.props(ctx, cam, false, pg);
+    this.buildings(ctx, cam, pg);
     // ground: one temperature, sun-facing slopes a little warmer by day, fresh craters warm
     const x0 = cam.left - 1, x1 = cam.right + 1, bot = cam.bottom - 1, step = Math.max(T.dx, 1.5 / cam.zoom);
     ctx.beginPath(); ctx.moveTo(x0, bot);

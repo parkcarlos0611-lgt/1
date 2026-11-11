@@ -8,8 +8,8 @@ DS.FireControl = {
     let px = o.x, py = o.y;
     for (let d = 2; d <= maxR; d += 2) {
       const x = o.x + dx * d, y = o.y + dy * d;
-      const hit = DS.Armor.raycast(world, px, py, x, y, v, v.team);
-      if (hit) return { range: Math.hypot(hit.x - o.x, hit.y - o.y), x: hit.x, y: hit.y, vehicle: hit.v };
+      const hit = DS.Armor.raycast(world, px, py, x, y, v, v.team) || (world.buildings && DS.Building.ray(world, px, py, x, y));
+      if (hit) return { range: Math.hypot(hit.x - o.x, hit.y - o.y), x: hit.x, y: hit.y, vehicle: hit.v || null };
       if (y < T.height(x)) {
         let lo = d - 2, hi = d;
         for (let i = 0; i < 12; i++) { const m = (lo + hi) / 2; if (o.y + dy * m < T.height(o.x + dx * m)) hi = m; else lo = m; }
@@ -23,10 +23,10 @@ DS.FireControl = {
 
   // elevation (world angle) that puts the shell through (tx, ty) from the muzzle
   solve(v, ammo, tx, ty) {
-    const m = v.muzzle(), A = DS.AMMO[ammo];
+    const m = v.muzzle(), A = DS.AMMO[ammo], v0 = v.muzzleV(A);
     const flat = { height: () => -1e9, n: 1e9, dx: 1 };
     const yAt = ang => {
-      const p = new DS.Projectile(m.x, m.y, Math.cos(ang) * A.v0 + v.vel.x, Math.sin(ang) * A.v0 + v.vel.y, A, null);
+      const p = new DS.Projectile(m.x, m.y, Math.cos(ang) * v0 + v.vel.x, Math.sin(ang) * v0 + v.vel.y, A, null);
       const sx = Math.sign(tx - m.x) || 1;
       let px = p.x, py = p.y;
       while (p.alive && (p.x - tx) * sx < 0 && p.t < 60) { px = p.x; py = p.y; p.step(1 / 240, flat); }
@@ -45,6 +45,7 @@ DS.FireControl = {
   // lase and update superelevation (relative to the sight line)
   update(world, v, doLase) {
     const fc = v.fc;
+    if (fc.indirect) { fc.se = 0; return; }           // howitzer laid by elevation: no sight-line correction
     if (doLase) {
       const r = this.lase(world, v);
       fc.lasedAt = world.time;

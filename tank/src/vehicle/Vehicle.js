@@ -244,14 +244,16 @@ DS.Vehicle = class Vehicle {
     if (this.input.fire && this.alive && this.firepower && gs.ammo && gs.reload <= 0 && gs.rx === 0) this.fire(world);
   }
 
+  // muzzle velocity: fixed ammunition has its own; bagged charges (howitzer) set it by the charge chosen
+  muzzleV(A) { const C = this.def.gun.charges; return A.bag && C ? C[Math.min(C.length - 1, this.gun.charge == null ? C.length - 1 : this.gun.charge)].v0 : A.v0; }
   fire(world) {
     const G = this.def.gun, gs = this.gun, A = DS.AMMO[gs.ammo];
-    const v0r = A.launchMass * A.v0 * 1.75 / G.recoilMass;     // projectile + propellant gas momentum
+    const v0 = this.muzzleV(A), v0r = A.launchMass * v0 * 1.75 / G.recoilMass;     // projectile + propellant gas momentum
     gs.rv = -v0r; gs.aB = v0r * v0r / (2 * G.recoilLen);
     gs.reload = G.reload; gs.fired++; this.lastFired = world.time; if (G.eject) gs.ejectT = G.eject.at;
     if (G.autoloader) this.events.push({ type: 'autoload' });
     const m = this.muzzle();
-    world.spawnProjectile(m.x, m.y, m.dx * A.v0 + this.vel.x, m.dy * A.v0 + this.vel.y, A, this).tracer = true;
+    world.spawnProjectile(m.x, m.y, m.dx * v0 + this.vel.x, m.dy * v0 + this.vel.y, A, this).tracer = true;
     this.events.push({ type: 'fire', x: m.x, y: m.y, dx: m.dx, dy: m.dy, ammo: A });
   }
 

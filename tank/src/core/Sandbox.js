@@ -26,11 +26,16 @@ DS.Sandbox = class Sandbox {
     return v;
   }
   items() { return this.w.vehicles.map(v => v.sb).filter(Boolean); }
+  // ---- buildings (demolition targets): placed, dragged, deleted and rebuilt like vehicles ----
+  addBuilding(k, x) { const b = new DS.Building(k, Math.max(40, Math.min(DS.RANGE.length - 40, x)), this.w); this.w.buildings.push(b); return b; }
+  pickB(m) { for (const b of this.w.buildings) if (Math.abs(m.x - b.x) < b.w / 2 && m.y > b.base - 2 && m.y < b.base + Math.max(6, b.h - b.sink)) return b; return null; }
   // rebuild every vehicle from its record: repairs, re-arms and puts the targets back (the player stays put)
   rebuild(items = this.items(), keepPlayerX = true) {
     const W = this.w, g = this.g;
     const me = items.find(i => i.player) || { player: true, id: 'm1a1', x: DS.RANGE.start, dir: 1 };
     if (keepPlayerX && g.player) me.x = g.player.pos.x;
+    for (const b of W.buildings) { b.base = W.terrain.height(b.x) - 0.15; b.reset(); }       // buildings stand again
+    this.selB = null;
     W.vehicles.length = 0; W.projectiles.length = 0; W.missiles.length = 0; W.traces.length = 0; W.log.length = 0; this.n = 0; W.fx.cases = [];
     this.spawn(me);
     for (const it of items) if (!it.player) { it.label = null; this.spawn(it); }
@@ -57,6 +62,7 @@ DS.Sandbox = class Sandbox {
   layout() {
     const L = DS.RANGE.line, e = this.w.env;
     return { v: 1, env: { time: e.time || 'day', visibility: e.visibility || 0, wind: e.wind || 0 },
+      blds: this.w.buildings.map(b => ({ k: b.k, d: Math.round(b.x - L) })),
       items: this.items().map(i => ({ id: i.id, d: Math.round(((i.player ? this.g.player.pos.x : i.x) - L) * 10) / 10, dir: i.dir, team: i.team, mode: i.mode, span: i.span, speed: i.speed, player: i.player || undefined })) };
   }
   apply(lay) {
@@ -64,6 +70,7 @@ DS.Sandbox = class Sandbox {
     const items = lay.items.map(i => ({ ...i, x: Math.max(15, Math.min(DS.RANGE.length - 50, L + i.d)) }));
     if (!items.some(i => i.player)) items.unshift({ ...this.g.player.sb });           // presets keep my vehicle where it is
     if (lay.env) this.setEnv(lay.env);
+    this.w.buildings.length = 0; for (const b of lay.blds || []) this.addBuilding(b.k, L + b.d);
     this.rebuild(items, !lay.items.some(i => i.player));
   }
   saved() { try { return JSON.parse(localStorage.getItem('ds.range.layouts') || '{}'); } catch (e) { return {}; } }
@@ -116,11 +123,17 @@ DS.Sandbox = class Sandbox {
       ctx.fillText(v.dir > 0 ? '▶' : '◀', x + v.dir * (r + 10 * dpr), y + 4 * dpr);
       if (it.mode === 'patrol') { const a = sx(it.x - it.span / 2), b = sx(it.x + it.span / 2), yy = y + r * 0.7; ctx.beginPath(); ctx.moveTo(a, yy); ctx.lineTo(b, yy); ctx.moveTo(a, yy - 6 * dpr); ctx.lineTo(a, yy + 6 * dpr); ctx.moveTo(b, yy - 6 * dpr); ctx.lineTo(b, yy + 6 * dpr); ctx.stroke(); }
     }
+    for (const b of this.w.buildings) {
+      const x0 = sx(b.x - b.w / 2), x1 = sx(b.x + b.w / 2); if (x1 < 0 || x0 > cam.W * dpr) continue;
+      ctx.strokeStyle = ctx.fillStyle = '#ffd34a'; ctx.globalAlpha = b === this.selB ? 1 : 0.5; ctx.setLineDash(b === this.selB ? [] : [6 * dpr, 5 * dpr]);
+      ctx.strokeRect(x0, sy(b.base + Math.max(4, b.h - b.sink)), x1 - x0, sy(b.base) - sy(b.base + Math.max(4, b.h - b.sink))); ctx.setLineDash([]); ctx.globalAlpha = 1;
+      ctx.fillText(`${b.name} · ${Math.round(b.x - DS.RANGE.line)} m` + (b.state !== 'ok' ? ' · 붕괴' : ''), (x0 + x1) / 2, sy(b.base) + 16 * dpr);
+    }
     if (this.tool && this.mouse && !this.drag) {
       const m = cam.toWorld(this.mouse.x, this.mouse.y), x = sx(m.x), y = sy(T.height(m.x));
       ctx.strokeStyle = ctx.fillStyle = '#ffd34a'; ctx.setLineDash([4 * dpr, 4 * dpr]);
       ctx.beginPath(); ctx.moveTo(x, y - 60 * dpr); ctx.lineTo(x, y); ctx.stroke(); ctx.setLineDash([]);
-      ctx.fillText(`${Sandbox.NAMES[this.tool]} 배치 · ${Math.round(m.x - DS.RANGE.line)} m`, x, y - 66 * dpr);
+      ctx.fillText(`${Sandbox.NAMES[this.tool] || DS.BUILDINGS[this.tool].name} 배치 · ${Math.round(m.x - DS.RANGE.line)} m`, x, y - 66 * dpr);
     }
   }
 
@@ -133,8 +146,11 @@ DS.Sandbox = class Sandbox {
       if (!this.edit) return;
       const m = cam.toWorld(e.clientX, e.clientY);
       if (e.button === 2) { this.tool = null; this.refresh(); return; }
-      const v = this.pick(m);
-      if (v) { this.sel = v; this.drag = { v, dx: v.pos.x - m.x }; }
+      const v = this.pick(m), bld = !v && !(this.tool && !DS.BUILDINGS[this.tool]) ? this.pickB(m) : null;
+      this.selB = null;
+      if (bld) { this.sel = null; this.selB = bld; this.dragB = { b: bld, dx: bld.x - m.x }; }
+      else if (!v && this.tool && DS.BUILDINGS[this.tool]) { this.sel = null; this.selB = this.addBuilding(this.tool, m.x); }
+      else if (v) { this.sel = v; this.drag = { v, dx: v.pos.x - m.x }; }
       else if (this.tool) { this.sel = this.spawn({ id: this.tool, x: Math.max(15, Math.min(DS.RANGE.length - 50, m.x)), dir: this.dir || -1, team: this.team || 'IQ', mode: this.mode || 'dummy', span: 150, speed: 5 }); }
       else this.sel = null;
       this.refresh();
@@ -142,12 +158,14 @@ DS.Sandbox = class Sandbox {
     addEventListener('mousemove', e => {
       this.mouse = { x: e.clientX, y: e.clientY };
       if (this.edit && this.drag) this.moveTo(this.drag.v, cam.toWorld(e.clientX, e.clientY).x + this.drag.dx);
+      if (this.edit && this.dragB) { const b = this.dragB.b; b.x = Math.max(40, Math.min(DS.RANGE.length - 40, cam.toWorld(e.clientX, e.clientY).x + this.dragB.dx)); b.base = this.w.terrain.height(b.x) - 0.15; b.reset(); }
     });
-    addEventListener('mouseup', () => { if (this.drag) { this.drag = null; this.refresh(); } });
+    addEventListener('mouseup', () => { this.dragB = null; if (this.drag) { this.drag = null; this.refresh(); } });
     addEventListener('keydown', e => {
       if (!this.edit || e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
       const v = this.sel;
       if ((e.code === 'Delete' || e.code === 'KeyX') && v && !v.sb.player) { this.remove(v); this.refresh(); }
+      if ((e.code === 'Delete' || e.code === 'KeyX') && this.selB) { this.w.buildings.splice(this.w.buildings.indexOf(this.selB), 1); this.selB = null; this.refresh(); }
       if (e.code === 'Escape') { this.tool = null; this.sel = null; this.refresh(); }
       if (v && (e.code === 'Comma' || e.code === 'Period')) { this.moveTo(v, v.sb.x + (e.code === 'Comma' ? -1 : 1) * (e.shiftKey ? 10 : 1)); this.refresh(); }
     });
@@ -162,6 +180,9 @@ DS.Sandbox = class Sandbox {
       if (d.act === 'flip' && v) { v.sb.dir = -v.sb.dir; this.respawn(v); }
       if (d.act === 'team' && v && !v.sb.player) { v.sb.team = v.sb.team === 'US' ? 'IQ' : 'US'; this.respawn(v); }
       if (d.act === 'del' && v && !v.sb.player) this.remove(v);
+      if (d.act === 'del' && this.selB) { this.w.buildings.splice(this.w.buildings.indexOf(this.selB), 1); this.selB = null; }
+      if (d.act === 'fix' && this.selB) this.selB.reset();
+      if (d.act === 'clearb') { this.w.buildings.length = 0; this.selB = null; }
       if (d.act === 'fix' && v) { if (v.sb.player) this.rebuild(); else this.respawn(v); }
       if (d.act === 'reset') { this.rebuild(); this.g.toast('모두 수리 · 원위치'); }
       if (d.act === 'clear') { this.rebuild(this.items().filter(i => i.player)); }
@@ -197,14 +218,14 @@ DS.Sandbox = class Sandbox {
     this.el.querySelectorAll('[data-opt]').forEach(b => on(b, this.opt[b.dataset.opt]));
     $('#sb-vis').value = env.visibility || 0; $('#sb-wind').value = env.wind || 0; this.labels();
     const it = v && v.sb, tgt = it && !it.player;
-    $('#sb-selname').textContent = v ? `${v.label} · 사격선에서 ${Math.round(v.pos.x - DS.RANGE.line)} m · ${v.status}` : this.tool ? `${Sandbox.NAMES[this.tool]}: 지면을 클릭해 배치 (우클릭 취소)` : '표적을 고르고 지면을 클릭 · 놓인 차량은 끌어서 이동';
+    $('#sb-selname').textContent = this.selB ? `${this.selB.name} · 사격선에서 ${Math.round(this.selB.x - DS.RANGE.line)} m · ${this.selB.state === 'ok' ? '온전' : '붕괴'}` : v ? `${v.label} · 사격선에서 ${Math.round(v.pos.x - DS.RANGE.line)} m · ${v.status}` : this.tool ? `${Sandbox.NAMES[this.tool] || DS.BUILDINGS[this.tool].name}: 지면을 클릭해 배치 (우클릭 취소)` : '표적을 고르고 지면을 클릭 · 놓인 차량은 끌어서 이동';
     $('#sb-mode').value = tgt ? it.mode : this.mode || 'dummy';
     $('#sb-pat').hidden = !(tgt && it.mode === 'patrol');
     if (tgt) { $('#sb-span').value = it.span || 150; $('#sb-speed').value = it.speed || 5; }
-    this.el.querySelectorAll('[data-need]').forEach(b => b.disabled = !v || (b.dataset.need === 'tgt' && !tgt));
+    this.el.querySelectorAll('[data-need]').forEach(b => b.disabled = this.selB ? !['fix', 'del'].includes(b.dataset.act) : (!v || (b.dataset.need === 'tgt' && !tgt)));
     $('[data-act=team]').textContent = tgt ? (it.team === 'US' ? '아군 (피격 안 됨)' : '적군 (표적)') : '적군 / 아군';
     const sel = $('#sb-lay'), names = Object.keys(DS.RANGE.presets).concat(Object.keys(this.saved()));
     sel.innerHTML = names.map(n => `<option${n === this.layN ? ' selected' : ''}>${n.replace(/[<&]/g, '')}</option>`).join('');
-    $('#sb-count').textContent = `표적 ${this.w.vehicles.length - 1}대`;
+    $('#sb-count').textContent = `표적 ${this.w.vehicles.length - 1}대 · 건물 ${this.w.buildings.length}동`;
   }
 };

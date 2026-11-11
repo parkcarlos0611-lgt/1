@@ -16,6 +16,7 @@ DS.Game = class Game {
     let q = 2; try { const s = localStorage.getItem('ds.post'); if (s != null) q = +s; } catch (e) {}
     this.post.setQuality(this.post.ok ? q : 0); this.lowFps = 0;
     await Promise.all(['m1a1', 'm2a2', 'm60a1', 't55', 't62', 't72'].map(id => this.rend.load(DS.VEHICLES[id])).concat(this.rend.loadProps()));
+    await this.rend.loadBuildings();
     DS.Armor.calibrate();
     this.resize(); addEventListener('resize', () => this.resize());
     document.getElementById('loading').remove();
@@ -435,6 +436,7 @@ DS.Game = class Game {
     const RES = { pen: ['관통', 'pen'], ricochet: ['도탄', 'ric'], nonpen: ['비관통', 'non'], track: ['궤도 피격', 'trk'] };
     el.innerHTML = w.log.map(l => {
       if (l.ground) return `<div class="e"><b>지면 착탄</b> ${Math.round(l.range)} m · ${l.ammo.short}</div>`;
+      if (l.blast) return `<div class="e"><span class="tag trk">폭압</span> ${l.vehicle === this.player ? '<b class="me">피격</b> ' : ''}<b>${l.vehicle.label}</b> · ${l.direct ? '직격' : '폭발 중심에서 ' + l.dist.toFixed(1) + ' m'} · ${l.ammo.short} → ${l.effects.join(', ')}<i>${l.vehicle.status}</i></div>`;
       const [t, c] = RES[l.result];
       let nums = l.result === 'ricochet' ? `경사 ${l.obl.toFixed(0)}°` : `${Math.round(l.pen)} / ${Math.round(l.prot)} mm · 경사 ${l.obl.toFixed(0)}°`;
       if (this.sbx) nums += ` · 착탄 ${Math.round(l.speed)} m/s · 실효 두께 ${Math.round(l.los)} mm` + (l.resid != null ? ` · 잔여 ${Math.round(l.resid)} mm` : '');   // range: full numbers

@@ -41,6 +41,23 @@ DS.AMMO = {
     pen: { ce: 400 },
     crit: 80,
   },
+  // ---- M109A3, 155 mm M185 (user data): bagged charges set the muzzle velocity (data/vehicles/m109a3.js);
+  // drag scaled so charge 8 reaches 18.1 km, rocket thrust so the M549A1 reaches 23.5 km (tools/artybench.js).
+  // blast: r = radius of the overpressure / fragment zone against vehicles (m), kill = inside this even a tank
+  // is likely knocked out. Direct penetration is only a few tens of mm.
+  M107: {
+    name: 'M107 HE', short: 'M107', sight: 'HE', type: 'HE', bag: true, v0: 684, mass: 43.2, d: 0.155,
+    cd: [[0, 0.129], [0.8, 0.135], [0.95, 0.193], [1.05, 0.27], [1.3, 0.257], [2, 0.212], [3, 0.18]],
+    launchMass: 50, sabot: false, tracer: '#ffb060',
+    pen: { ce: 45 }, crit: 85, blast: { r: 9, kill: 3, tnt: 6.8 },
+  },
+  M549A1: {
+    name: 'M549A1 HERA (로켓보조)', short: 'M549A1', sight: 'RAP', type: 'HE', bag: true, v0: 684, mass: 43.6, d: 0.155,
+    cd: [[0, 0.129], [0.8, 0.135], [0.95, 0.193], [1.05, 0.27], [1.3, 0.257], [2, 0.212], [3, 0.18]],
+    launchMass: 50, sabot: false, tracer: '#ffb060',
+    rocket: { at: 7, burn: 3, acc: 73.3 },
+    pen: { ce: 45 }, crit: 85, blast: { r: 9, kill: 3, tnt: 6.8 },
+  },
   // ---- M2A2 Bradley (user data): 25 mm M242 and TOW 2 ----
   M791: { name: 'M791 APDS-T', short: 'M791', sight: 'AP', type: 'APDS', small: true, v0: 1345, mass: 0.134, d: 0.0115,
     cd: [[0, 0.3], [1, 0.55], [2, 0.5], [3, 0.46], [5, 0.43]], launchMass: 0.46, sabot: false, tracer: '#ff7848', tracerEvery: 1,

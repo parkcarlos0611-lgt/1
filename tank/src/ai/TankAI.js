@@ -8,6 +8,7 @@ DS.AI = {
     const o = a.sightOrigin(), t = b.local(b.g.ring.x, b.g.ring.y + 0.4), T = world.terrain;
     const dx = t.x - o.x, dy = t.y - o.y, L = Math.hypot(dx, dy), n = Math.ceil(L / 3);
     for (let i = 1; i < n; i++) { const f = i / n; if (o.y + dy * f < T.height(o.x + dx * f)) return false; }
+    if (world.buildings && world.buildings.length && DS.Building.ray(world, o.x, o.y, t.x, t.y)) return false;      // a building stands in the way
     for (const v of world.vehicles) {
       if (v === a || v === b || v.team === a.team) continue;
       if (DS.Armor.raycast({ vehicles: [v] }, o.x, o.y, t.x, t.y, null)) return false;

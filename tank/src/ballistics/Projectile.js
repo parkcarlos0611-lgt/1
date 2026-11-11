@@ -23,7 +23,9 @@ DS.Projectile = class Projectile {
     for (let k = 0; k < sub; k++) {
       const v = Math.hypot(this.vx, this.vy), M = v / DS.T.sound;
       const kd = 0.5 * rho * DS.cdAt(A.cd, M) * this.area / A.mass;
-      const ax = -kd * v * this.vx, ay = -kd * v * this.vy - g;
+      let ax = -kd * v * this.vx, ay = -kd * v * this.vy - g;
+      // rocket-assisted shell: the motor lights a few seconds into the flight and pushes along the velocity
+      const RK = A.rocket; if (RK && this.t >= RK.at && this.t < RK.at + RK.burn) { ax += RK.acc * this.vx / v; ay += RK.acc * this.vy / v; this.burning = true; } else if (RK) this.burning = false;
       const nx = this.x + (this.vx + ax * h * 0.5) * h, ny = this.y + (this.vy + ay * h * 0.5) * h;
       const nvx = this.vx + ax * h, nvy = this.vy + ay * h;
       if (world) {
@@ -43,7 +45,7 @@ DS.Projectile = class Projectile {
       }
       this.x = nx; this.y = ny; this.vx = nvx; this.vy = nvy; this.t += h;
     }
-    if (this.x < 0 || this.x > terrain.n * terrain.dx || this.t > 90) this.alive = false;
+    if (this.x < 0 || this.x > terrain.n * terrain.dx || this.t > 160) this.alive = false;
     return null;
   }
 };

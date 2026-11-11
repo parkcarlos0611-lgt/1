@@ -11,16 +11,22 @@ DS.VEHICLES = DS.VEHICLES || {};
   DS.VEHICLES.ah64a = {
     id: 'ah64a', name: 'AH-64A 아파치', side: 'US', heli: true, ammo: ['M789'],
     mass: 8000, inertia: 6e4, signature: 1.2, thin: 3,
-    src: { ppm: PPM, ox: 316, oy: 30, w: 1061, h: 271, dir: 'assets/sprites/ah64a/' },     // box of body.png in the sheet
+    // protection: rounds up to this calibre (m) do no damage — 12.7 mm anti-aircraft machine guns cannot hurt it.
+    // Planned for when such weapons exist: 14.5 mm slight damage from the side and rear only; the front proof
+    // against most hits up to 20 mm.
+    proofD: 0.0135,
+    // boxes of the cut pieces in the sheet [x, y, w, h] (tools/cut_ah64.py → cut.json)
+    src: { ppm: PPM, ox: 316, oy: 59, w: 1061, h: 237, dir: 'assets/sprites/ah64a/', rotor: [413, 16, 745, 81], rotorAxis: 673, tailrotor: [1243, 8, 188, 201] },
     flight: {
-      vmax: 81, tilt: 26, climb: 12, sink: 9, gearH: 1.59,          // 293 km/h; max lean (deg); rates m/s; origin above the wheels
-      hub: L(678, 66), rotorR: 7.3, tail: L(1336, 100), tailR: 1.4,
+      vmax: 81, tilt: 26, climb: 12, sink: 9, gearH: 1.66,          // 293 km/h; max lean (deg); rates m/s; origin above the wheels
+      hub: L(673, 66), rotorR: 7.3, tail: L(1336, 100), tailR: 1.4,
+      wheels: [[L(590, 283), 0.345], [L(1336, 284), 0.2]],          // main and tail wheel: centre, radius (m)
     },
     // chin gun M230 30 mm: follows the sight within its arc (deg relative to the nose)
     gun: { name: 'M230 30mm', trunnion: L(470, 268), muzzle: 1.25, elevMax: 11, elevMin: -60, rate: 1.4, reload: 60 / 625,
       recoilLen: 0.05, recoilMass: 60, rounds: 1200, spread: 2.2 },
     rockets: { ammo: 'HYDRA', n: 38, at: L(640, 236), interval: 0.16 },          // two M261 pods
-    hellfire: { ammo: 'HELLFIRE', n: 8, at: L(700, 262), interval: 1.2, range: 8000 },
+    hellfire: { ammo: 'HELLFIRE', n: 16, at: L(700, 262), interval: 1.2, range: 8000 },
     sightAt: L(332, 214),                                                         // TADS turret in the nose
     turretRing: L(640, 150), exhaust: { x: L(905, 150)[0], y: L(905, 150)[1] },
     sight: { laser: true, thermal: true, name: 'TADS', rangeErr: 0.005, aimErr: 0.15, layTime: 2, detectMax: 6000, identMax: 4000, engageMax: 6000 },

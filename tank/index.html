@@ -28,6 +28,9 @@
     border: 7px solid #0e0c09; box-shadow: 0 0 0 2px rgba(255,255,255,.15), 0 6px 24px rgba(0,0,0,.4); background: #000; pointer-events: none; }
   #sight.big { right: auto; bottom: auto; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(92vh, 92vw); z-index: 4; }
   #sight.thermal { filter: grayscale(1) sepia(1) hue-rotate(68deg) saturate(2.6) brightness(.95); }
+  /* helicopter sight (TADS FLIR): the same first-generation imager, shown in grey rather than green */
+  #sight.thermal.mono { filter: grayscale(1) contrast(1.15) brightness(.95); }
+  #sight.thermal.mono.bh { filter: grayscale(1) invert(1) contrast(1.15); }
   #sight.nv { filter: grayscale(1) brightness(2.4) contrast(1.2) sepia(1) hue-rotate(58deg) saturate(3); }
   #sight.thermal.bh { filter: grayscale(1) invert(1) sepia(1) hue-rotate(68deg) saturate(2.6) brightness(.95); }
   body:not(.playing) :is(#hud, #help, #sight, #mini, #zoombar, #foes, #log, #touch) { display: none !important; }

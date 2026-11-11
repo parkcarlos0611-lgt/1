@@ -86,6 +86,7 @@ DS.Armor = {
     const range = Math.abs(hit.x - proj.x0);
     const r = { vehicle: v, plate: P.name, part: P.part, ammo: A, range, speed: sp, obl, los, prot, pen, x: hit.x, y: hit.y, effects: [] };
 
+    if (v.def.proofD && A.small && A.d <= v.def.proofD) { r.result = 'nonpen'; return r; }     // armoured aircraft: small arms do nothing
     // ricochet / fuze graze
     const pr = Math.max(0, Math.min(1, (obl - (A.crit - 5)) / 10));
     if (rnd() < pr) {

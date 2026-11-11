@@ -513,6 +513,12 @@ DS.Game = class Game {
     }
     c.stroke();
     c.beginPath(); c.arc(cx, cy, 1.4, 0, 7); c.fill();
+    if (v.heli) {                             // TADS: corner brackets round the aiming point
+      const q = W * 0.2, e = W * 0.05; c.beginPath();
+      for (const [sx2, sy2] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) { c.moveTo(cx + sx2 * q, cy + sy2 * (q - e)); c.lineTo(cx + sx2 * q, cy + sy2 * q); c.lineTo(cx + sx2 * (q - e), cy + sy2 * q); }
+      c.stroke();
+    }
+    cv.classList.toggle('mono', !!v.heli);
     const g = v.gun, A = DS.AMMO[g.ammo], lasing = w.time - v.fc.lasedAt < 0.35;
     c.font = `600 ${Math.max(12, Math.round(W / 30))}px ui-monospace, monospace`; c.textAlign = 'center';
     const sym = this.thermal ? 'rgba(235,255,235,0.95)' : '#ffd34a', by = cy + L + Math.max(16, W / 22);

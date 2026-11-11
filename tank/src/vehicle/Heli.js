@@ -178,33 +178,51 @@ DS.Hellfire = class Hellfire {
 Object.assign(DS.Renderer.prototype, {
   loadHeli(def) {
     this.img[def.id] = this.img[def.id] || {};
-    return new Promise((res, rej) => { const im = new Image(); im.onload = () => { this.img[def.id].body = im; this.mips[def.id + '/body'] = this.buildMips(im); res(); }; im.onerror = () => rej(new Error('sprite ' + def.id + '/body')); im.src = def.src.dir + 'body.png'; });
+    return Promise.all(['body', 'body_l', 'rotor', 'tailrotor', 'wheel'].map(n => new Promise((res, rej) => { const im = new Image(); im.onload = () => { this.img[def.id][n] = im; this.mips[def.id + '/' + n] = this.buildMips(im); res(); }; im.onerror = () => rej(new Error('sprite ' + def.id + '/' + n)); im.src = def.src.dir + n + '.png'; })));
   },
   drawHeli(ctx, v, cam) {
-    const D = v.def, S = D.src, F = D.flight, px = 1 / S.ppm;
+    const D = v.def, S = D.src, F = D.flight, px = 1 / S.ppm, zp = cam.zoom * cam.dpr;
     // turning round: the airframe is seen end-on halfway through
     const tk = v.turnT > 0 ? Math.abs(v.turnT - 0.45) / 0.45 : 1, sx = v.dir * Math.max(0.08, tk);
     ctx.save(); ctx.translate(v.pos.x, v.pos.y); ctx.rotate(v.ang); ctx.scale(sx, 1);
-    // body.png: the sheet box mirrored; its right edge (the nose) is box x0, the origin sits at sheet x 680
-    const im = this.pick(D.id + '/body', S.w * px * cam.zoom * cam.dpr), w = S.w * px, h = S.h * px;
-    const left = -(S.ox + S.w - 680) * px, top = (190 - S.oy) * px;
-    ctx.save(); ctx.scale(1, -1); ctx.imageSmoothingQuality = 'high'; ctx.drawImage(im, left, -top, w, h); ctx.restore();
+    ctx.imageSmoothingQuality = 'high';
+    // local frame: x forward, y up; a sheet pixel (X, Y) sits at (-(X - 680), -(Y - 190)) / ppm.
+    // Facing left the mirrored-as-drawn sprite is used, so lettering and tail number read correctly.
+    const im = this.pick(D.id + (v.dir < 0 ? '/body_l' : '/body'), S.w * px * zp);
+    ctx.save(); ctx.scale(1, -1); ctx.drawImage(im, -(S.ox + S.w - 680) * px, (S.oy - 190) * px, S.w * px, S.h * px); ctx.restore();
+    // wheels (their own art; the drawn ones are cut out of the airframe)
+    for (const [c, r] of F.wheels) { const w = this.pick(D.id + '/wheel', r * 2 * zp); ctx.save(); ctx.translate(c[0], c[1]); ctx.scale(1, -1); ctx.drawImage(w, -r, -r, r * 2, r * 2); ctx.restore(); }
     // chin gun barrel at its own elevation
     const gp = D.gun.trunnion; ctx.save(); ctx.translate(gp[0], gp[1]); ctx.rotate(v.gun.e);
     ctx.fillStyle = '#2b2b2b'; ctx.fillRect(-0.1, -0.05, D.gun.muzzle + 0.1, 0.1); ctx.fillRect(D.gun.muzzle - 0.18, -0.07, 0.18, 0.14); ctx.restore();
-    // main rotor: a blurred disc with two blade streaks sweeping across it; still blades once it has stopped
-    const hub = F.hub, R = F.rotorR, k = Math.min(1, v.rpm);
-    ctx.save(); ctx.translate(hub[0], hub[1]);
-    if (k > 0.25) { ctx.fillStyle = `rgba(40,40,44,${0.1 + 0.1 * k})`; ctx.beginPath(); ctx.ellipse(0, 0, R, 0.16, 0, 0, 7); ctx.fill(); }
-    ctx.strokeStyle = `rgba(30,30,34,${k > 0.25 ? 0.4 : 0.95})`; ctx.lineWidth = 0.09; ctx.lineCap = 'round'; ctx.beginPath();
-    for (let i = 0; i < 4; i++) { const c = Math.cos(v.rot + i * Math.PI / 2); ctx.moveTo(0, 0); ctx.lineTo(c * R, -0.012 * R * Math.abs(c) + (k < 0.25 ? -0.25 * Math.abs(c) : 0)); }
-    ctx.stroke(); ctx.restore();
-    // tail rotor
-    const tr = F.tail; ctx.save(); ctx.translate(tr[0], tr[1]);
-    if (k > 0.25) { ctx.fillStyle = `rgba(40,40,44,${0.16 * k})`; ctx.beginPath(); ctx.arc(0, 0, F.tailR, 0, 7); ctx.fill(); }
-    ctx.strokeStyle = `rgba(30,30,34,${k > 0.25 ? 0.35 : 0.95})`; ctx.lineWidth = 0.1; ctx.beginPath();
-    for (let i = 0; i < 4; i++) { const a = v.rot * 2.3 + i * Math.PI / 2 + (i % 2) * 0.35; ctx.moveTo(0, 0); ctx.lineTo(Math.cos(a) * F.tailR, Math.sin(a) * F.tailR); }
-    ctx.stroke(); ctx.restore();
+    const k = Math.min(1, v.rpm);
+    // Main rotor: the drawn head and blades turn as one about the mast — seen from the side that is the
+    // drawing squeezed by cos(angle), flipping as it passes end-on. At speed several positions along the arc
+    // swept during one frame are laid over each other (motion blur) with a faint disc.
+    {
+      const R = S.rotor, im2 = this.pick(D.id + '/rotor', R[2] * px * zp), ax = -(S.rotorAxis - 680) * px;
+      const x0 = (S.rotorAxis - R[0]) * px, y0 = (R[1] - 190) * px, w = R[2] * px, h = R[3] * px;
+      const n = k > 0.15 ? 2 + Math.round(6 * k) : 1, sweep = 0.75 * k, al = n === 1 ? 1 : Math.min(1, 1.9 / n + 0.12);
+      if (k > 0.3) { ctx.fillStyle = `rgba(36,36,40,${0.1 * k})`; ctx.beginPath(); ctx.ellipse(ax, F.hub[1], F.rotorR, 0.13, 0, 0, 7); ctx.fill(); }
+      ctx.globalAlpha = al;
+      for (let i = 0; i < n; i++) {
+        let c = Math.cos(v.rot - i * sweep / n); if (Math.abs(c) < 0.06) c = c < 0 ? -0.06 : 0.06;
+        // the drawing shows the blades fore and aft at full span; widen it to the true radius
+        const wide = F.rotorR / ((S.rotorAxis - R[0]) * px);
+        ctx.save(); ctx.translate(ax, 0); ctx.scale(-c * wide, -1); ctx.drawImage(im2, -x0, y0, w, h); ctx.restore();
+      }
+      ctx.globalAlpha = 1;
+    }
+    // tail rotor: faces the viewer, so the drawn blades simply spin about their hub, blurred the same way
+    {
+      const R = S.tailrotor, im3 = this.pick(D.id + '/tailrotor', R[2] * px * zp), tr = F.tail;
+      const cx = (1336 - R[0]) * px, cy = (100 - R[1]) * px, w = R[2] * px, h = R[3] * px;
+      const n = k > 0.15 ? 2 + Math.round(12 * k) : 1, al = n === 1 ? 1 : Math.min(1, 1.5 / n + 0.05);
+      if (k > 0.3) { ctx.fillStyle = `rgba(36,36,40,${0.12 * k})`; ctx.beginPath(); ctx.arc(tr[0], tr[1], F.tailR, 0, 7); ctx.fill(); }
+      ctx.globalAlpha = al;
+      for (let i = 0; i < n; i++) { ctx.save(); ctx.translate(tr[0], tr[1]); ctx.rotate(v.rot * 2.3 - i * 1.57 * k / n); ctx.scale(-1, -1); ctx.drawImage(im3, -cx, -cy, w, h); ctx.restore(); }
+      ctx.globalAlpha = 1;
+    }
     ctx.restore();
   },
 });

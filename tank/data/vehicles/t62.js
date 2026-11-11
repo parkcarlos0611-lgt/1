@@ -12,6 +12,7 @@ DS.VEHICLES = DS.VEHICLES || {};
     src: { ppm: PPM, ox: OX, oy: OY, dir: 'assets/sprites/t62/' },
     sprites: {
       hull: { x: 987, y: 443 }, turret: { x: 1146, y: 338 }, barrel: { x: 1412, y: 428 },
+      m2: { x: 1229, y: 338, file: 'dshk' },      // anti-aircraft machine gun, cut off the turret (tools/cut_dshk.py)
       flag: { x: 1246, y: 418, file: 'flag' },
       roadwheel: { r: 256, file: 'roadwheel' }, idler: { file: 'roadwheel', tint: 0.15 },
       sprocket: { file: 'sprocket', R: 0.367, tooth0: 10 },         // 16 teeth
@@ -34,6 +35,9 @@ DS.VEHICLES = DS.VEHICLES || {};
       elevMax: 16, elevMin: -6, rate: 0.22, recoilLen: 0.42, recoilMass: 2100, reload: 8.0, stabilized: true, stab: 0.5,
       // the spent 115 mm steel case is thrown out of the hatch in the turret rear as the breech opens
       eject: { at: 0.9, port: L(1168, 418), dia: 0.115, len: 0.72, v: 5.5 } },
+    // anti-aircraft DShKM on the cupola: fired by hand (right mouse button), wide elevation for air targets
+    mg: { name: 'DShKM 12.7mm', short: 'DShK', ammo: 'DSHK', pivotPx: [1262, 356], pivot: L(1262, 356), muzzle: [(1325 - 1262) / PPM, -(351 - 356) / PPM],
+      elevMin: -5, elevMax: 80, rate: 600 / 60, rounds: 300, spread: 1.6 },
     coax: { name: 'PKT 7.62mm 동축', ammo: 'M240_762', muzzle: [L(1395, 438)[0] + 0.4, L(1395, 438)[1] - 0.08], rate: 700 / 60, rounds: 2500, spread: 0.8 },
     turretRing: L(1280, 463),
     antennas: [{ x: L(1184, 398)[0], y: L(1184, 398)[1], len: 1.2 }],

@@ -15,6 +15,7 @@ DS.VEHICLES = DS.VEHICLES || {};
     src: { ppm: PPM, ox: OX, oy: OY, dir: 'assets/sprites/t72/' },
     sprites: {
       hull: { x: 969, y: 724 }, turret: { x: 1123, y: 623 }, barrel: { x: 1386, y: 702 },
+      m2: { x: 1203, y: 623, file: 'dshk' },      // anti-aircraft machine gun, cut off the turret (tools/cut_dshk.py)
       flag: { x: 1199, y: 696, file: 'flag' },   // drawn unmirrored on left-facing tanks so the script reads correctly
       // running gear sheet (tools/cut_wheels_iraqi.py, assets/ref/iraqi_wheels.png): first road wheel + sprocket
       roadwheel: { r: 256, file: 'roadwheel' }, idler: { file: 'roadwheel', tint: 0.15 },
@@ -51,6 +52,9 @@ DS.VEHICLES = DS.VEHICLES || {};
       autoloader: { angle: 8, out: 1.3 },        // raised well clear of the lay so the lock is plain to see (real index angle: 3°30')
       eject: { at: 1.5, port: L(1215, 668), dia: 0.125, len: 0.11, v: 4.5 },
     },
+    // anti-aircraft DShKM on the cupola: fired by hand (right mouse button), wide elevation for air targets
+    mg: { name: 'DShKM 12.7mm', short: 'DShK', ammo: 'DSHK', pivotPx: [1228, 655], pivot: L(1228, 655), muzzle: [(1323 - 1228) / PPM, -(651 - 655) / PPM],
+      elevMin: -5, elevMax: 80, rate: 600 / 60, rounds: 300, spread: 1.6 },
     coax: { name: 'PKT 7.62mm 동축', ammo: 'M240_762', muzzle: [L(1366, 712)[0] + 0.45, L(1366, 712)[1] - 0.09], rate: 700 / 60, rounds: 2000, spread: 0.8 },
     turretRing: L(1250, 741),
     antennas: [{ x: L(1152, 683)[0], y: L(1152, 683)[1], len: 1.0 }],

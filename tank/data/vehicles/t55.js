@@ -13,6 +13,7 @@ DS.VEHICLES = DS.VEHICLES || {};
     src: { ppm: PPM, ox: OX, oy: OY, dir: 'assets/sprites/t55/' },
     sprites: {
       hull: { x: 994, y: 145 }, turret: { x: 1158, y: 30 }, barrel: { x: 1432, y: 125 },
+      m2: { x: 1238, y: 30, file: 'dshk' },      // anti-aircraft machine gun, cut off the turret (tools/cut_dshk.py)
       flag: { x: 1274, y: 119, file: 'flag' },
       roadwheel: { r: 256, file: 'roadwheel' }, idler: { file: 'roadwheel', tint: 0.15 },
       sprocket: { file: 'sprocket', R: 0.376, tooth0: 24 },        // 14 teeth (art: 240 : 258 of the road wheel)
@@ -33,6 +34,9 @@ DS.VEHICLES = DS.VEHICLES || {};
     exhaust: { x: -2.8, y: -0.145 },
     gun: { name: 'D-10T2S 100mm', trunnion: L(1410, 135), muzzle: (1740 - 1410) / PPM,
       elevMax: 17, elevMin: -5, rate: 0.20, recoilLen: 0.55, recoilMass: 1950, reload: 8.5, stabilized: true, stab: 0.45 },
+    // anti-aircraft DShKM on the cupola: fired by hand (right mouse button), wide elevation for air targets
+    mg: { name: 'DShKM 12.7mm', short: 'DShK', ammo: 'DSHK', pivotPx: [1270, 52], pivot: L(1270, 52), muzzle: [(1354 - 1270) / PPM, -(42 - 52) / PPM],
+      elevMin: -5, elevMax: 80, rate: 600 / 60, rounds: 300, spread: 1.6 },
     coax: { name: 'SGMT 7.62mm 동축', ammo: 'M240_762', muzzle: [L(1410, 135)[0] + 0.4, L(1410, 135)[1] - 0.08], rate: 650 / 60, rounds: 3000, spread: 0.8 },
     turretRing: L(1300, 164),
     antennas: [{ x: L(1185, 96)[0], y: L(1185, 96)[1], len: 1.14 }],

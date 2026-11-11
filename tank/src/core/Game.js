@@ -378,7 +378,7 @@ DS.Game = class Game {
       set('h-pitch', (v.ang * 180 / Math.PI).toFixed(1) + '°');
       set('h-elev', (g.e * 180 / Math.PI).toFixed(2) + '°');
       set('h-ammo', A.name);
-      set('h-mg', [v.mg && `M2 ${v.mg.rounds}`, v.coax && `동축 ${v.coax.rounds}`].filter(Boolean).join(' · '));
+      set('h-mg', [v.mg && `${v.def.mg.short || 'M2'} ${v.mg.rounds}`, v.coax && `동축 ${v.coax.rounds}`].filter(Boolean).join(' · '));
       if (v.tow) { const t = v.tow; set('h-tow', t.missile ? (t.missile.guided ? '유도 중 — 조준선 유지' : '유선 끊김') : t.loaded ? `장전 ${t.loaded} · 예비 ${t.reserve}` + (t.up > 0 && t.up < 1 ? ' · 발사관 작동' : t.up >= 1 ? ' · 발사 준비' : '') : t.reserve ? `재장전 ${(v.def.tow.reloadTime - t.reload).toFixed(0)} s · 예비 ${t.reserve}` : '소진'); }
       document.getElementById('row-tow').hidden = !v.tow;
       const fc = v.fc;

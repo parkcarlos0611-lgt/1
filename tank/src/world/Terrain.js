@@ -5,7 +5,8 @@ DS.Terrain = class Terrain {
     this.kind = kind;
     const T = DS.T.terrain;
     this.dx = T.dx;
-    this.n = Math.round(T.length / this.dx) + 1;
+    this.length = kind === 'range' ? DS.RANGE.length : T.length;      // the firing range is longer than the mission map
+    this.n = Math.round(this.length / this.dx) + 1;
     this.h = new Float32Array(this.n);      // surface height
     this.sink = new Float32Array(this.n);   // accumulated pressed depth (compaction memory)
     this.disturb = new Float32Array(this.n);// visual: dug / thrown material (craters), fades never
@@ -64,11 +65,13 @@ DS.Terrain = class Terrain {
     const R = DS.RANGE, n = this.n, dx = this.dx, sm = t => { t = Math.max(0, Math.min(1, t)); return t * t * (3 - 2 * t); };
     for (let i = 0; i < n; i++) {
       const x = i * dx;
-      const k = 0.015 + 0.2 * sm((x - R.line - 120) / 500) + 0.785 * sm((x - R.laneEnd) / 900);
+      // lanes roll gently, the impact area is natural desert, and past it the far range is level again
+      const k = 0.015 + (0.2 * sm((x - R.line - 120) / 500) + 0.785 * sm((x - R.laneEnd) / 900)) * (1 - 0.985 * sm((x - R.far + 700) / 700));
       this.h[i] = 10 + (this.h[i] - 10) * k;
       if (x < R.line + 120) this.sink[i] = 0;
       if (x >= R.road[0] && x <= R.road[1]) { this.soil[i] = 3; this.crust[i] = 0; }
-      else if (x < R.laneEnd && this.soil[i] === 2) this.soil[i] = 0;          // no salt flats on the lanes
+      else if ((x < R.laneEnd || x > R.far) && this.soil[i] === 2) this.soil[i] = 0;          // no salt flats on the lanes or the far range
+      if (x > R.far) this.crust[i] = 0;
     }
     for (const [x, hgt, w] of R.berms) this.addBerm(x, hgt, w);
   }

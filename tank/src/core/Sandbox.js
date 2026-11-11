@@ -61,7 +61,7 @@ DS.Sandbox = class Sandbox {
   }
   apply(lay) {
     const L = DS.RANGE.line;
-    const items = lay.items.map(i => ({ ...i, x: Math.max(15, Math.min(9950, L + i.d)) }));
+    const items = lay.items.map(i => ({ ...i, x: Math.max(15, Math.min(DS.RANGE.length - 50, L + i.d)) }));
     if (!items.some(i => i.player)) items.unshift({ ...this.g.player.sb });           // presets keep my vehicle where it is
     if (lay.env) this.setEnv(lay.env);
     this.rebuild(items, !lay.items.some(i => i.player));
@@ -81,7 +81,7 @@ DS.Sandbox = class Sandbox {
     const g = this.g, cam = this.w.cam, k = g.keys, T = this.w.terrain;
     cam.zoom += (cam.tzoom - cam.zoom) * Math.min(1, dt * 6);
     const pan = ((k.has('KeyD') || k.has('ArrowRight')) ? 1 : 0) - ((k.has('KeyA') || k.has('ArrowLeft')) ? 1 : 0);
-    cam.x = Math.max(0, Math.min(DS.T.terrain.length, cam.x + pan * dt * cam.W / cam.zoom * (k.has('ShiftLeft') ? 2.5 : 0.9)));
+    cam.x = Math.max(0, Math.min(DS.RANGE.length, cam.x + pan * dt * cam.W / cam.zoom * (k.has('ShiftLeft') ? 2.5 : 0.9)));
     cam.y += (T.height(cam.x) + cam.H / cam.zoom * (0.5 - DS.T.camera.ground) - cam.y) * Math.min(1, dt * 6);
     cam.sx = cam.sy = 0;
   }
@@ -126,7 +126,7 @@ DS.Sandbox = class Sandbox {
 
   // ---- input ----
   pick(m) { let best = null, bd = 5; for (const v of this.w.vehicles) { const d = Math.abs(v.pos.x - m.x); if (d < bd && Math.abs(v.pos.y + 1 - m.y) < 4) { bd = d; best = v; } } return best; }
-  moveTo(v, x) { x = Math.max(15, Math.min(9950, x)); v.sb.x = x; v.place(x); if (v.ai && v.ai.patrol) { v.ai.patrol.a = x - v.sb.span / 2; v.ai.patrol.b = x + v.sb.span / 2; } }
+  moveTo(v, x) { x = Math.max(15, Math.min(DS.RANGE.length - 50, x)); v.sb.x = x; v.place(x); if (v.ai && v.ai.patrol) { v.ai.patrol.a = x - v.sb.span / 2; v.ai.patrol.b = x + v.sb.span / 2; } }
   bind() {
     const cv = this.g.cv, cam = this.w.cam, $ = s => this.el.querySelector(s);
     cv.addEventListener('mousedown', e => {
@@ -135,7 +135,7 @@ DS.Sandbox = class Sandbox {
       if (e.button === 2) { this.tool = null; this.refresh(); return; }
       const v = this.pick(m);
       if (v) { this.sel = v; this.drag = { v, dx: v.pos.x - m.x }; }
-      else if (this.tool) { this.sel = this.spawn({ id: this.tool, x: Math.max(15, Math.min(9950, m.x)), dir: this.dir || -1, team: this.team || 'IQ', mode: this.mode || 'dummy', span: 150, speed: 5 }); }
+      else if (this.tool) { this.sel = this.spawn({ id: this.tool, x: Math.max(15, Math.min(DS.RANGE.length - 50, m.x)), dir: this.dir || -1, team: this.team || 'IQ', mode: this.mode || 'dummy', span: 150, speed: 5 }); }
       else this.sel = null;
       this.refresh();
     });

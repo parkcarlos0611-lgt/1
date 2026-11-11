@@ -11,6 +11,8 @@ DS.RANGE = {
   roadW: 1.5,                 // how far the road reaches toward the viewer on the ground plane (m of plane depth)
   cross: [150, 470, 760],     // side roads running off toward the viewer
   laneEnd: 5600,
+  far: 10000,                 // from here to the end: empty level desert (far range for long shots and demolition tests)
+  length: 20000,              // total length of the range map (m)
   berms: [[1215, 1.1, 5], [2080, 1.5, 6], [3085, 1.6, 6], [4090, 1.6, 7]],     // hull-down berm, target berms
   env: { visibility: 0, night: 0, wind: 2, sun: { el: 35, side: 1 } },
   // sprite: [file, width m]

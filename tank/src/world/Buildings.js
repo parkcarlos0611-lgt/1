@@ -21,7 +21,7 @@ DS.Building = class Building {
     this.base = world.terrain.height(x) - 0.15;
     this.reset();
   }
-  reset() { this.state = 'ok'; this.hits = 0; this.goal = 0; this.glass = false; this.sink = 0; this.vs = 0; this.tilt = 0; this.side = 1; this.t = 0; this.holes = []; this.slabs = []; this.acc = 0; this.rub = 0; }
+  reset() { this.state = 'ok'; this.hits = 0; this.goal = 0; this.glass = false; this.sink = 0; this.vs = 0; this.tilt = 0; this.side = 1; this.t = 0; this.holes = []; this.slabs = []; this.acc = 0; this.rub = 0; this.texKey = null; }
   get top() { return this.base + this.h - this.sink; }
   // first building met by the segment a→b (entry point), or null
   static ray(world, x0, y0, x1, y1) {
@@ -62,7 +62,7 @@ DS.Building = class Building {
     this.hits++; this.goal = H[this.hits] * this.h * 0.93;
     if (this.state !== 'falling') { this.t = 0; this.vs = 0; }
     this.state = 'falling'; if (this.hits === 1) this.side = Math.sign(hx - this.x) || 1;
-    // breach where it was hit (in the building's own frame, so it rides down with the wall)
+    // scorch mark where it was hit (in the building's own frame, so it rides down with the wall)
     this.holes.push({ x: Math.max(-this.w / 2, Math.min(this.w / 2, hx - this.x)), y: Math.max(1, Math.min(this.h - 1, hy - this.base + this.sink)), r: 3.2 + Math.random() * 1.2 });
     DS.Audio.collapse(this.x, this.base, 2 + (this.goal - this.sink) / 2.2);
     for (let i = 0; i < 7; i++) this.slab(W, hx + (Math.random() - 0.5) * 5, hy + (Math.random() - 0.5) * 5, (Math.random() < 0.75 ? 1 : -1) * this.side * (3 + Math.random() * 13), 2 + Math.random() * 10);
@@ -119,6 +119,29 @@ Object.assign(DS.Renderer.prototype, {
     const names = []; for (const k in DS.BUILDINGS) names.push(k, k + '_broken');
     return Promise.all(names.map(n => new Promise((res, rej) => { const im = new Image(); im.onload = () => { this.bldImg[n] = im; this.propImg[n] = im; res(); }; im.onerror = () => rej(new Error('sprite buildings/' + n)); im.src = 'assets/sprites/buildings/' + n + '.png'; })));
   },
+  // the building's drawing with soot burnt on where shells struck — painted 'source-atop', so it stays inside
+  // the building's own outline; rebuilt only when a new hit arrives
+  scorched(b) {
+    const key = b.holes.length + (b.glass ? 'g' : '');
+    if (b.tex && b.texKey === key) return b.tex;
+    const im = this.bldImg[b.k + (b.glass ? '_broken' : '')], c = b.tex || (b.tex = document.createElement('canvas')), k = im.width / b.w;
+    c.width = im.width; c.height = im.height; b.texKey = key;
+    const x = c.getContext('2d'), H = n => { const v = Math.sin(n * 127.1 + 311.7) * 43758.5453; return v - Math.floor(v); };
+    x.drawImage(im, 0, 0); x.globalCompositeOperation = 'source-atop';
+    for (const h of b.holes) {
+      // centre pulled a little into the wall from the face that was hit
+      const R = h.r * 2.1 * k, cx = (h.x + b.w / 2) * k + (h.x < 0 ? 1 : -1) * R * 0.35, cy = (b.h - h.y) * k;
+      const g = x.createRadialGradient(cx, cy, 0, cx, cy, R);
+      g.addColorStop(0, 'rgba(18,14,10,0.9)'); g.addColorStop(0.3, 'rgba(26,20,14,0.72)'); g.addColorStop(0.65, 'rgba(38,29,20,0.34)'); g.addColorStop(1, 'rgba(40,30,20,0)');
+      x.fillStyle = g; x.fillRect(cx - R, cy - R, R * 2, R * 2);
+      // soot drawn upward by the heat, and blotches for an uneven edge
+      const up = x.createLinearGradient(0, cy, 0, cy - R * 2.4); up.addColorStop(0, 'rgba(22,16,11,0.5)'); up.addColorStop(1, 'rgba(22,16,11,0)');
+      x.fillStyle = up; x.beginPath(); x.moveTo(cx - R * 0.6, cy); x.quadraticCurveTo(cx - R * 0.55, cy - R * 1.4, cx + (H(h.x) - 0.5) * R, cy - R * 2.4); x.quadraticCurveTo(cx + R * 0.55, cy - R * 1.4, cx + R * 0.6, cy); x.closePath(); x.fill();
+      for (let i = 0; i < 9; i++) { const a = H(i * 2.7 + h.x) * 6.283, d = R * (0.4 + 0.5 * H(i * 5.3 + h.y)), rr = R * (0.14 + 0.2 * H(i + h.x * 3)), px = cx + Math.cos(a) * d, py = cy + Math.sin(a) * d;
+        const bg = x.createRadialGradient(px, py, 0, px, py, rr); bg.addColorStop(0, 'rgba(16,12,8,0.45)'); bg.addColorStop(1, 'rgba(16,12,8,0)'); x.fillStyle = bg; x.fillRect(px - rr, py - rr, rr * 2, rr * 2); }
+    }
+    return c;
+  },
   buildings(ctx, cam, grey) {
     const w = this.w, L = w.buildings; if (!L || !L.length || !this.bldImg) return;
     const env = w.env || {}, sun = env.night ? null : env.sun, storm = env.visibility ? 1 : 0, H = n => { const v = Math.sin(n * 127.1 + 311.7) * 43758.5453; return v - Math.floor(v); };
@@ -135,13 +158,8 @@ Object.assign(DS.Renderer.prototype, {
         }
         ctx.save(); ctx.translate(b.x + b.side * b.w * 0.5 * (b.tilt > 0 ? 0.6 : 0), b.base - b.sink); ctx.rotate(-b.side * b.tilt);
         const ox = -b.side * b.w * 0.5 * (b.tilt > 0 ? 0.6 : 0);
-        ctx.save(); ctx.translate(ox, 0); ctx.scale(1, -1); ctx.drawImage(im, -b.w / 2, -b.h, b.w, b.h); ctx.restore();
-        for (const h of b.holes) {                                 // blown-out corner: a ragged dark breach
-          ctx.fillStyle = grey != null ? `rgb(${grey(0)})` : '#1b1712'; ctx.beginPath();
-          for (let i = 0; i < 16; i++) { const a = i / 16 * 6.283, rr = h.r * (0.7 + 0.45 * H(i * 3.1 + h.x)); ctx.lineTo(ox + h.x + Math.cos(a) * rr, h.y + Math.sin(a) * rr * 0.8); }
-          ctx.closePath(); ctx.fill();
-          if (grey == null) { ctx.strokeStyle = 'rgba(70,58,44,0.8)'; ctx.lineWidth = 0.5; ctx.stroke(); }
-        }
+        const tex = b.holes.length && grey == null && !storm ? this.scorched(b) : im;
+        ctx.save(); ctx.translate(ox, 0); ctx.scale(1, -1); ctx.drawImage(tex, -b.w / 2, -b.h, b.w, b.h); ctx.restore();
         ctx.restore();
       }
       if (b.state === 'rubble' || b.sink > b.h * 0.08) {             // the heap: broken floor slabs over a mound

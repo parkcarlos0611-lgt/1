@@ -12,6 +12,7 @@ DS.Terrain = class Terrain {
     this.disturb = new Float32Array(this.n);// visual: dug / thrown material (craters), fades never
     this.soil = new Uint8Array(this.n);
     this.crust = new Uint8Array(this.n);    // 1 = surface crust intact (breaks under a heavy load)
+    this.hard = new Float32Array(this.n);   // top of the hard layer under the loose sand (caliche / bedrock): nothing digs below it
     this.rng = DS.rng(seed);
     this.dirty0 = Infinity; this.dirty1 = -Infinity;
     this.version = 0;
@@ -49,6 +50,9 @@ DS.Terrain = class Terrain {
       const x = i * dx, z = zn(x);
       this.soil[i] = x < 300 ? 0 : z > 0.35 ? 2 : z > -0.15 ? 1 : 0;
     }
+    // gravel plains (reg) in patches of the firm desert; damp sand in the bed of the wadi
+    const gz = vn(170, 1, 41);
+    for (let i = 0; i < n; i++) { const x = i * dx; if (this.soil[i] === 0 && x > 300 && gz(x) > 0.45) this.soil[i] = 4; if (this.kind !== 'range' && Math.abs(x - 620) < 9) this.soil[i] = 5; }
     // desert crust: on firm desert and salt flats, patchy
     const cz = vn(60, 1, 31);
     for (let i = 0; i < n; i++) this.crust[i] = this.soil[i] !== 1 && cz(i * dx) > -0.2 ? 1 : 0;
@@ -60,6 +64,9 @@ DS.Terrain = class Terrain {
     // the ground as it was made, never touched by the physics: drawn as a strip of land just behind the drive
     // line, so a crater shows earth behind it instead of the far dunes
     this.h0 = Float32Array.from(this.h);
+    // hard layer: 0.7–2.4 m under the sand (shallower under gravel, deeper in soft sand)
+    const hz = vn(140, 1, 51);
+    for (let i = 0; i < n; i++) { const s = this.soil[i]; this.hard[i] = this.h[i] - (1.55 + 0.85 * hz(i * dx)) * (s === 4 ? 0.55 : s === 1 ? 1.25 : s === 3 ? 0.4 : 1); }
   }
 
   // Firing range (data/range.js): the base and the firing line are graded level with a gravel road along
@@ -133,7 +140,7 @@ DS.Terrain = class Terrain {
       if (zt > zmax) zmax = zt;
       const d = zt - this.sink[i];
       if (d > 0) {
-        const step = Math.min(d, 0.6 * dt);      // soil yields at a finite rate
+        const step = Math.max(0, Math.min(d, 0.6 * dt, this.h[i] - this.hard[i]));      // soil yields at a finite rate, down to the hard layer
         this.h[i] -= step; this.sink[i] += step; this.mark(i);
       }
     }
@@ -162,7 +169,7 @@ DS.Terrain = class Terrain {
     for (let i = i0; i <= i1; i++) {
       const t = Math.abs(i * this.dx - x) / R;
       let d = 0;
-      if (t < 1) d = -depth * (1 - t * t);
+      if (t < 1) d = Math.max(-depth * (1 - t * t), Math.min(0, this.hard[i] - this.h[i]));      // stops at the hard layer
       else if (t < 1.8) { const u = (t - 1) / 0.8; d = rimH * Math.sin(Math.PI * u) * (1 - u * 0.4); }
       this.h[i] += d; this.disturb[i] = Math.min(1, this.disturb[i] + (t < 1.8 ? 0.8 * (1 - t / 1.8) + 0.2 : 0));
       if (t < 1.2) { this.sink[i] = 0; this.crust[i] = 0; }
@@ -181,7 +188,7 @@ DS.Terrain = class Terrain {
       const dn = i + dir;
       const curv = (h[i - W] + h[i + W]) / 2 - h[i];                           // > 0: below its surroundings — a hollow / rut
       // crests lose more; hollows and ruts trap what blows in (sheltered from the wind)
-      const m = q * (1 + Math.max(0, -curv) * 8) * (curv > 0.01 ? 0.1 : 1) * (this.soil[i] === 2 ? 0.2 : 1);
+      const m = q * (1 + Math.max(0, -curv) * 8) * (curv > 0.01 ? 0.1 : 1) * ((DS.SOILS[this.soil[i]].mobile ?? (this.soil[i] === 2 ? 0.2 : 1)));
       h[i] -= m; h[dn] += m;
       if (curv > 0 && this.sink[i] > 0) this.sink[i] = Math.max(0, this.sink[i] - m * 2);
     }

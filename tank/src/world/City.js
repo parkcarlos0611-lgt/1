@@ -226,7 +226,11 @@ DS.Structure = class Structure {
     for (const p of this.pieces) {
       if (p.rest) continue;
       p.vy -= g * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.a += p.w * dt;
-      const gy = T.height(p.x) + p.h * 0.35;              // the heap is part of the ground
+      let gy = T.height(p.x) + p.h * 0.35;                // the heap is part of the ground
+      for (const q of this.pieces) {                      // and pieces already lying there carry the ones that land on them
+        if (!q.rest || q === p || Math.abs(q.x - p.x) > (q.wd + p.wd) * 0.38) continue;
+        const top = q.y + q.h * 0.42 + p.h * 0.4; if (top > gy) gy = top;
+      }
       if (p.y < gy) {
         p.y = gy;
         if (p.vy < -2.5) { p.vy *= -0.25; p.vx *= 0.55; p.w *= 0.5; if (p.big && Math.random() < 0.5) W.particles.add(DS.P.DUST, p.x, gy, (Math.random() - 0.5) * 3, Math.random() * 2, 3 + Math.random() * 3, 0.8 + p.w0, { grow: 1, drag: 1, grav: 0, alpha: 0.32, col: 0xc9b79a }); }

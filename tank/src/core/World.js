@@ -61,7 +61,7 @@ DS.World = class World {
     if (r.result === 'ricochet') { p.x = r.reflect.x; p.y = r.reflect.y; p.vx = r.reflect.vx; p.vy = r.reflect.vy; p.ignore = h.hit.v; p.ignoreT = 0.05; }
     else p.alive = false;
   }
-  // Hulls in contact along the drive line push each other apart: overlap is resolved in proportion to mass and
+  // Hulls of opposing sides in contact along the drive line push each other apart: overlap is resolved in proportion to mass and
   // the closing speed is shared out as in an inelastic collision (a little bounce). A hard knock rocks the hulls,
   // throws dust and clangs; above 5 m/s the lighter vehicle can lose a track. Aircraft are not included.
   contacts(h) {
@@ -69,7 +69,7 @@ DS.World = class World {
     for (let a = 0; a < V.length; a++) for (let b = a + 1; b < V.length; b++) {
       const A = V[a], B = V[b], hl = v => Math.max(Math.abs(v.def.belly.x0), Math.abs(v.def.belly.x1)) + 0.15;
       const dx = B.pos.x - A.pos.x, gap = Math.abs(dx) - (hl(A) + hl(B));
-      if (gap >= 0 || Math.abs(B.pos.y - A.pos.y) > 3) continue;
+      if (gap >= 0 || Math.abs(B.pos.y - A.pos.y) > 3 || A.team === B.team) continue;      // friends drive in another lane
       const s = Math.sign(dx) || 1, mA = A.def.mass, mB = B.def.mass, k = -gap;
       A.pos.x -= s * k * mB / (mA + mB); B.pos.x += s * k * mA / (mA + mB);
       const rel = (B.vel.x - A.vel.x) * s;                               // < 0: closing

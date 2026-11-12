@@ -680,6 +680,8 @@ DS.Renderer = class Renderer {
       const sk = T.sink[i];
       if (sk > 0.003) { ctx.globalAlpha = Math.min(0.55, sk * 7); ctx.fillStyle = '#6e5232'; ctx.fillRect(x, h - 0.16, cs + 0.01, 0.16);
         ctx.globalAlpha = Math.min(0.5, sk * 5); ctx.fillStyle = '#4a3820'; for (let k = 0; k < 2; k++) ctx.fillRect(x, h - 0.05 - k * 0.07, cs * 0.45, 0.025); }
+      const hl = T.h[i] - T.hard[i];                          // hard layer laid bare at the bottom of a crater
+      if (hl < 0.12) { ctx.globalAlpha = 0.75 * (1 - hl / 0.12); ctx.fillStyle = '#8c7a62'; ctx.fillRect(x, h - 0.5, cs + 0.01, 0.5); }
       const di = T.disturb[i];
       if (di > 0.02) { ctx.globalAlpha = di * 0.5; ctx.fillStyle = '#9b7547'; ctx.fillRect(x, h - 0.6, cs + 0.01, 0.6); }
     }
@@ -706,7 +708,7 @@ DS.Renderer = class Renderer {
     const rip = cam.zoom > 18 ? 0.018 : 0, rs = rip ? Math.min(step, 0.05) : step;
     ctx.beginPath();
     for (let x = x0; x <= x1 + rs; x += rs) {
-      const y = T.height(x) + (rip && T.soil[T.idx(x)] < 2 && T.sink[T.idx(x)] < 0.004 ? rip * (Math.sin(x * 21) * 0.7 + Math.sin(x * 47 + 1.3) * 0.3) : 0);
+      const y = T.height(x) + (rip && T.soil[T.idx(x)] <= 1 && T.sink[T.idx(x)] < 0.004 ? rip * (Math.sin(x * 21) * 0.7 + Math.sin(x * 47 + 1.3) * 0.3) : 0);
       if (x === x0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
     }
     // thin ink edge on the ground surface (matches the outlined art), with a sunlit lip just under it

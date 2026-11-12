@@ -26,7 +26,8 @@ DS.TOWN = {
   ],
   env: { visibility: 0, wind: 2, time: '10:00' },
   berms: [], signs: [], flags: [], parked: [], sprites: {},
-  layers: { 5: [0.47, 0.48], 4: [0.58, 0.34], 3: [0.70, 0.24], 2: [0.82, 0.13], 1: [0.93, 0.04] },        // 5: the far town, hazy
+  layers: { 0.5: [1, 0], 5: [0.47, 0.48],        // 0.5: street lamps at the kerb, on the drive line's own plane
+            4: [0.58, 0.34], 3: [0.70, 0.24], 2: [0.82, 0.13], 1: [0.93, 0.04] },        // 5: the far town, hazy
   front: 0.34,
   district(x) { for (const d of this.districts) if (x >= d[0] && x < d[1]) return d; return this.districts[this.districts.length - 1]; },
   urban(x) { const d = this.district(x)[2]; return d !== 'highway_w' && d !== 'highway_e'; },
@@ -45,7 +46,7 @@ DS.TOWN = {
   layout() {
     const r = DS.rng(1991), P = [], TS = DS.TOWN_SPRITES;
     const width = k => { if (k.startsWith('city:')) { const d = DS.CITY[k.slice(5)], ppm = (d.h - d.roof) / d.hb; return d.w / ppm; } return TS[k.replace(/^t:/, '')].w; };
-    const flip = k => /sedan|pickup|van|taxi|drum|tires|barrier|sandbags|crates|sacks|pots|basket|table|pallet|ibc|water_tank|tent|quonset|hedgehog|lamp/.test(k) && r() < 0.5 ? -1 : 1;
+    const flip = k => /sedan|pickup|van|taxi|drum|tires|barrier|sandbags|crates|sacks|pots|basket|table|pallet|ibc|water_tank|tent|quonset|hedgehog|lamp_bent|lamp_down/.test(k) && r() < 0.5 ? -1 : 1;
     const key = k => k.startsWith('city:') ? k : 't:' + k;
     // the same building is never placed close to itself: in its own row it keeps three of its widths plus 30 m
     // from its twin; in another row (other depth, other scale) at least one and a half widths plus 12 m, so twins
@@ -85,7 +86,6 @@ DS.TOWN = {
     // ③ low housing: one- and two-storey houses, mid-rise behind; lamps, bins and parked cars on the street
     fill(4, 5000, 8000, ['city:m3', 'city:m6', 'city:m2', 'city:m4'].concat(L), 1, 14);
     fill(3, 5000, 8000, L, 2, 10); fill(2, 5000, 8000, L.concat('shop_garage', 'shop_awning'), 3, 12);
-    every('lamp', 1, 5020, 8000, 36, 3);
     fill(1, 5000, 8000, bins.concat(cars, cars), 6, 28);
     fill(-1, 5000, 8000, ['sedan', 'wheelie_bin', 'trash_can', 'taxi'], 55, 130);
     // ④ market quarter (the middle of the map): market blocks and alleys, shopfronts, stalls and goods
@@ -105,11 +105,10 @@ DS.TOWN = {
     put('market_a', 3, 10500); putAt(Mm, 3, 10130); putAt(Mm, 3, 10880);
     put('market_gate', 2, 10500); putAt(Mm, 2, 10170); putAt(Mm, 2, 10840); fill(2, 10560, 10700, shops, 1, 5); fill(2, 10300, 10440, shops, 1, 5);
     for (const x of [10233, 10267, 10733, 10767]) put('traffic_light', 1, x);
-    put('poster_board', 1, 10420); put('poster_board', 1, 10580); every('lamp', 1, 10020, 11000, 40, 2);
+    put('poster_board', 1, 10420); put('poster_board', 1, 10580);
     fill(1, 10020, 10220, bins.concat(cars), 8, 30); fill(1, 10780, 10990, bins.concat(cars), 8, 30);
     // ⑥ centre: high-rise skyline, mid-rise blocks, a busy street
     fill(4, 11000, 14000, H.concat(Mm), 0, 8); fill(3, 11000, 14000, Mm.concat(H), 0, 6); fill(2, 11000, 14000, Mm.concat('city:l3', 'shop_grocery', 'shop_elec', 'shop_clothes'), 2, 10);
-    every('lamp', 1, 11020, 14000, 34, 2);
     fill(1, 11000, 14000, cars.concat(cars, bins, ['poster_board', 'billboard', 'direction_sign']), 5, 24);
     fill(-1, 11000, 14000, ['sedan', 'taxi', 'van', 'wheelie_bin'], 50, 120);
     // ⑦ the battered district: broken towers, ruins, wrecks, bent lamps
@@ -123,6 +122,11 @@ DS.TOWN = {
     for (const x of [17400, 17418, 17436, 17454]) put('hedgehog', 1, x);
     for (const x of [17410, 17446]) put('hedgehog', -1, x);
     put('barrier1', 1, 18700); put('billboard_dmg', 1, 19050); put('direction_sign', 1, 19620);
+    // street lamps along the road every 30 m through town; bent or down ones in the battered district
+    for (let x = 2015; x < 17000; x += 30) {
+      const ruin = x >= 14000;
+      put(ruin ? (r() < 0.45 ? 'lamp' : r() < 0.6 ? 'lamp_bent' : 'lamp_down') : 'lamp', 0.5, x + (r() - 0.5) * 1.5);
+    }
     P.sort((a, b) => b.z - a.z || a.x - b.x);
     return P;
   },

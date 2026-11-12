@@ -72,6 +72,12 @@ Object.assign(DS.Game.prototype, {
     pm.querySelector('#p-vol').addEventListener('input', e => { S.vol = +e.target.value / 100; DS.UI.save(S); this.uiApply(); });
     addEventListener('keydown', e => { if (e.code === 'Escape' && !(this.sbx && this.sbx.edit)) this.setPause(!this.paused); });
     this.touchInit();
+    // tapping a friendly vehicle in the list at the top rides it (missions and the town)
+    document.getElementById('foes').addEventListener('pointerdown', e => {
+      const el = e.target.closest('[data-ride]'); if (!el || (this.mission && this.mission.range)) return;
+      e.stopPropagation(); e.preventDefault();
+      const v = this.world.vehicles[+el.dataset.ride]; if (v && v.alive && v.team === this.player.team) this.switchTo(v);
+    });
   },
   timeUi() {
     const pm = document.getElementById('pause'), env = this.world.env; if (!pm || env.clock == null) return;

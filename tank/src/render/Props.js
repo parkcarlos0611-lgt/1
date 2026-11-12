@@ -15,6 +15,7 @@ Object.assign(DS.Renderer.prototype, {
   // as 't:<id>' (city buildings are already loaded as 'city:<k>')
   loadTown() {
     if (this._town) return this._town;
+    for (const g of ['lot1', 'lot2', 'alley1', 'alley2', 'road']) { const im = new Image(); im.onload = () => { this.propImg['g:' + g] = im; }; im.src = 'assets/sprites/ground/' + g + '.jpg'; }
     return (this._town = Promise.all(Object.keys(DS.TOWN_SPRITES).map(k => new Promise(res => { const im = new Image(); im.onload = () => { this.propImg['t:' + k] = im; res(); }; im.onerror = () => res(); im.src = 'assets/sprites/town/' + k + '.png'; }))));
   },
   // a parked M1A1 drawn once into a sprite (the vehicle renderer at 48 px/m), used as scenery in the base
@@ -116,7 +117,7 @@ Object.assign(DS.Renderer.prototype, {
       else { const g = ctx.createLinearGradient(0, gy, 0, gy + 1.02); g.addColorStop(0, storm ? '#d2b080' : '#dcbf90'); g.addColorStop(1, `rgb(${hz})`); ctx.fillStyle = g; }
       ctx.fill();
     }
-    const LIFT = { 1: 0.1, 2: 0.4, 3: 0.7, 4: 0.94, 5: 1.2 };
+    const LIFT = { 0.5: 0.12, 1: 0.1, 2: 0.4, 3: 0.7, 4: 0.94, 5: 1.2 };
     for (const p of L) {
       if ((p.z < 0) !== front) continue;
       const [par, haze] = front ? [1 + 0.45 * R.front, 0] : R.layers[p.z];
@@ -182,7 +183,10 @@ Object.assign(DS.Renderer.prototype, {
     ctx.lineTo(a, T.height(a) - D); ctx.closePath(); ctx.fillStyle = g; ctx.fill();
     // asphalt texture laid flat on the plane (the photo strip squeezed to the road's depth), then the haze
     // gradient over it so the far edge stays pale
-    if (this.propImg.road && cam.zoom > 4) {
+    if (town && this.propImg['g:road']) {
+      // the user's asphalt, laid flat on the road (a tile is 7 m square on the ground; the road is about 9 m deep)
+      ctx.save(); ctx.clip(); this.groundTex(ctx, cam, this.propImg['g:road'], a, b, 0.05, -D, 7, D * 7 / 9); ctx.restore();
+    } else if (this.propImg.road && cam.zoom > 4) {
       // drawn as plain scaled images, one per 30 m of road (a transformed pattern fill is very slow)
       const im = this.propImg.road, per = 30, y0 = gy + 0.08, hh = D + 0.1;
       ctx.save(); ctx.clip(); ctx.globalAlpha = 0.9; ctx.imageSmoothingQuality = 'low';
@@ -199,18 +203,37 @@ Object.assign(DS.Renderer.prototype, {
       ctx.lineTo(b, T.height(b) - dy); ctx.stroke();
     }
   },
-  // town road: dashed centre line, worn wheel paths, the kerb and gutter on the near side; sand drifts over
+  // A ground texture laid flat on the ground plane between dyTop and dyBot below/above the surface line (m),
+  // pressed to the plane's depth: tiles tileW metres wide and tileH tall on screen, each sheared to follow the
+  // slope of the ground under it. Drawn as plain images (a transformed pattern fill is slow).
+  groundTex(ctx, cam, im, a, b, dyTop, dyBot, tileW, tileH, ox = 0) {
+    const T = this.w.terrain, k0 = Math.floor((a - ox) / tileW), H = dyTop - dyBot, rows = Math.max(1, Math.ceil(H / tileH - 0.01));
+    ctx.imageSmoothingQuality = 'low';
+    for (let k = k0; ox + k * tileW < b; k++) {
+      const x = ox + k * tileW, h0 = T.height(x), h1 = T.height(x + tileW), sl = (h1 - h0) / tileW;
+      for (let r = 0; r < rows; r++) {
+        ctx.save(); ctx.translate(x, h0 + dyTop - r * tileH); ctx.transform(1, sl, 0, 1, 0, 0); ctx.scale(1, -1);
+        ctx.drawImage(im, 0, 0, tileW + 0.03, tileH + 0.02); ctx.restore();
+      }
+    }
+  },
+  // town road: worn wheel paths (no lane markings), the kerb and gutter on the near side; sand drifts over
   // the edges out on the highway
   roadMarks(ctx, cam, a, b, D, st) {
     const T = this.w.terrain, R = DS.TOWN, line = (dy) => { ctx.beginPath(); for (let x = a; x < b; x += st) ctx.lineTo(x, T.height(x) - dy); ctx.lineTo(b, T.height(b) - dy); ctx.stroke(); };
     ctx.lineCap = 'butt';
     ctx.strokeStyle = 'rgba(40,38,34,0.22)'; ctx.lineWidth = 0.35; line(D * 0.28); line(D * 0.72);
-    ctx.strokeStyle = 'rgba(232,226,210,0.75)'; ctx.lineWidth = 0.07; ctx.setLineDash([3, 6]); ctx.lineDashOffset = 0; line(D * 0.5); ctx.setLineDash([]);
     // the far-side sidewalk in front of the road (toward the viewer) in town
     for (let x = a; x < b;) {
       let e = x; const u = R.urban(x); while (e < b && R.urban(e) === u) e += 2; e = Math.min(e, b);
-      if (u) { ctx.beginPath(); for (let q = x; q <= e; q += st) ctx.lineTo(q, T.height(q) - D - 0.02); ctx.lineTo(e, T.height(e) - D - 0.02);
-        for (let q = e; q >= x; q -= st) ctx.lineTo(q, T.height(q) - D - 0.75); ctx.closePath(); ctx.fillStyle = '#b3a791'; ctx.fill(); }
+      // near side: a paved sidewalk in town, open ground beyond it down to the bottom of the view; sand outside
+      ctx.save(); ctx.beginPath(); for (let q = x; q <= e; q += st) ctx.lineTo(q, T.height(q) - D - 0.02); ctx.lineTo(e, T.height(e) - D - 0.02);
+      ctx.lineTo(e, cam.bottom - 2); ctx.lineTo(x, cam.bottom - 2); ctx.closePath(); ctx.clip();
+      const lot = this.propImg['g:lot1'], pav = this.propImg['g:alley2'];
+      if (lot) this.groundTex(ctx, cam, lot, x, e, -D - (u ? 0.75 : 0.02), -D - 9, 6, 1.6, 3);
+      if (u && pav) this.groundTex(ctx, cam, pav, x, e, -D - 0.02, -D - 0.75, 3.5, 0.75);
+      else if (u) { ctx.fillStyle = '#b3a791'; ctx.fillRect(x, T.height(x) - D - 0.75, e - x, 0.73); }
+      ctx.restore();
       x = e;
     }
     // near edge: kerb in town, drifted sand out in the desert
@@ -235,11 +258,15 @@ Object.assign(DS.Renderer.prototype, {
       e = Math.min(e, b);
       if (u) {
         strip(x, e, grey != null ? `rgb(${grey(-0.3)})` : '#b7ab95', Wk);
+        if (grey == null && this.propImg['g:alley1']) { ctx.save(); ctx.beginPath(); ctx.moveTo(x, T.height(x) - 0.05); for (let q = x; q <= e; q += st) ctx.lineTo(q, T.height(q) + Wk); ctx.lineTo(e, T.height(e) - 0.05); ctx.closePath(); ctx.clip();
+          this.groundTex(ctx, cam, this.propImg['g:alley1'], x, e, Wk + 0.02, -0.05, 3, Wk * 0.6); ctx.restore(); }
         ctx.strokeStyle = grey != null ? `rgb(${grey(-0.1)})` : '#d2c8b6'; ctx.lineWidth = 0.1; ctx.beginPath();
         for (let q = x; q <= e; q += st) ctx.lineTo(q, T.height(q) + 0.05); ctx.stroke();                 // kerb top
         if (cam.zoom > 6) { ctx.strokeStyle = 'rgba(90,80,64,0.25)'; ctx.lineWidth = 0.03; ctx.beginPath();        // paving joints
           for (let q = Math.ceil(x / 1.5) * 1.5; q < e; q += 1.5) { const h = T.height(q); ctx.moveTo(q, h + 0.07); ctx.lineTo(q + 0.25, h + Wk); } ctx.stroke(); }
-      } else strip(x, e, grey != null ? `rgb(${grey(-0.4)})` : '#d6b986', Wk * 0.6);
+      } else { strip(x, e, grey != null ? `rgb(${grey(-0.4)})` : '#d6b986', Wk * 0.6);
+        if (grey == null && this.propImg['g:lot2']) { ctx.save(); ctx.beginPath(); ctx.moveTo(x, T.height(x) - 0.05); for (let q = x; q <= e; q += st) ctx.lineTo(q, T.height(q) + Wk * 0.6); ctx.lineTo(e, T.height(e) - 0.05); ctx.closePath(); ctx.clip();
+          this.groundTex(ctx, cam, this.propImg['g:lot2'], x, e, Wk * 0.6 + 0.02, -0.05, 6, Wk * 0.6); ctx.restore(); } }
       x = e;
     }
   },

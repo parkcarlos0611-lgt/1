@@ -499,13 +499,25 @@ DS.Game = class Game {
       const found = DS.Sensor.list(v, false), inSight = found.filter(e => DS.Sensor.seenNow(v, e)).length;
       set('h-foe', `탐지 ${inSight}` + (found.length > inSight ? ` (+${found.length - inSight} 상실)` : '') + ` · 격파 ${foes.length - up}`);
       this.logPanel();
-      document.getElementById('foes').innerHTML = pals.map(e => `<div class="pal${e.alive ? '' : ' down'}"><b>${e.label}</b> <span>${e.alive ? (e.ai ? e.ai.state : '무인') : e.status}</span></div>`).join('') + found.map(e => {
+      const W0 = w.vehicles;
+      document.getElementById('foes').innerHTML = pals.map(e => `<div class="pal${e.alive ? '' : ' down'}" data-ride="${W0.indexOf(e)}"><b>${e.label}</b> <span>${e.alive ? (e.ai ? e.ai.state : '무인') : e.status}</span></div>`).join('') + found.map(e => {
           const c = v.contacts.get(e), now = DS.Sensor.seenNow(v, e), id = c.d >= 2;
           return `<div class="up${e === this.target ? ' sel' : ''}${now ? '' : ' lost'}"><b>${id ? e.def.name : '미식별'}</b> <span>${now ? Math.round(c.range) + ' m' : '상실'}</span></div>`;
         }).join('') + foes.filter(e => !e.alive).map(e => `<div class="down"><b>${e.def.name}</b> <span>격파</span></div>`).join('');
       const over = document.getElementById('over');
       if (this.sbx) { if (!v.alive && !this._dead) this.toast('격파됨 — L 편집 모드에서 「모두 수리」'); this._dead = !v.alive; }
-      else if (!v.alive && over.hidden) { over.hidden = false; document.getElementById('over-t').textContent = `격파됨 — ${v.status}`; }
+      else if (!v.alive && over.hidden) {
+        // destroyed: after two seconds on the wreck, into the nearest surviving tank (a helicopter only when no
+        // tank is left); the mission is lost only when every friendly vehicle is
+        const alive = W0.filter(e => e.team === v.team && e.alive && e !== v);
+        if (!alive.length) { over.hidden = false; document.getElementById('over-t').textContent = `아군 전멸 — ${v.status}`; }
+        else if (this._autoSw == null) { this._autoSw = w.time + 2; this.toast(`격파됨 — ${v.status} · 2초 후 가까운 아군 전차로 전환`); }
+        else if (w.time >= this._autoSw) {
+          this._autoSw = null;
+          const d = e => Math.abs(e.pos.x - v.pos.x), tanks = alive.filter(e => !e.heli).sort((a, b) => d(a) - d(b)), helis = alive.filter(e => e.heli).sort((a, b) => d(a) - d(b));
+          this.switchTo(tanks[0] || helis[0]);
+        }
+      }
       if (!this.sbx && up === 0 && foes.length && over.hidden && !this._won) { this._won = true; over.hidden = false; document.getElementById('over-t').textContent = '적 소대 전멸 — 임무 완료'; }
       set('h-load', g.reload > 0 ? (g.locked ? '자동장전 — 포 고정 ' : '장전 중 ') + g.reload.toFixed(1) + ' s' : '장전 완료');
       set('h-pos', (v.pos.x / 1000).toFixed(2) + ' km');

@@ -25,7 +25,7 @@ DS.HeliAI = class HeliAI {
     const d = tgt ? Math.hypot(tgt.pos.x - v.pos.x, tgt.pos.y - v.pos.y) : 1e9;
     // station: behind the lead (behind = away from the enemy), farther back when they come close
     const L = this.lead(), back = (this.opt.back || 600) + (d < 800 ? 500 : 0);       // pulls back only from enemies very close
-    const tx = L ? L.pos.x - face * back : v.pos.x, dx = tx - v.pos.x;
+    const ML = W.terrain.length || 1e9, tx = Math.max(60, Math.min(ML - 60, L ? L.pos.x - face * back : v.pos.x)), dx = tx - v.pos.x;     // never past the map's ends
     // it keeps its nose to the enemy and slides back and forth to its station (backing up slowly)
     I.drive = Math.abs(dx) < 50 ? 0 : Math.max(-0.4, Math.min(0.7, dx / 300 * face)) * face;
     if (v.dir !== face && v.turnT <= 0) v.turn();

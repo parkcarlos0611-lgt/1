@@ -10,7 +10,9 @@ DS.Missile = class Missile {
   step(dt, world) {
     const o = this.owner, T = o.def.tow, terrain = world.terrain;
     this.t += dt;
-    this.speed = this.t < 1.6 ? Math.min(300, this.speed + 150 * dt) : Math.max(110, this.speed - 6 * dt);
+    const M = this.ammo.missile;                  // (a slow first-generation missile carries its own speeds)
+    this.speed = M ? Math.min(M.vmax, this.speed + M.accel * dt) - (this.t > 4 ? Math.min(M.vmax - M.vmin, (this.t - 4) * 2) : 0)
+      : this.t < 1.6 ? Math.min(300, this.speed + 150 * dt) : Math.max(110, this.speed - 6 * dt);
     const flown = Math.hypot(this.x - this.x0, this.y - this.y0);
     this.guided = this.guided && o.alive && o.firepower && !o.turretGone && flown < T.range;
     if (this.guided) {

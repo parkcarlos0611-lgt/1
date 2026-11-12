@@ -32,7 +32,7 @@ DS.Blast = {
     }
     for (const b of W.buildings) b.blast(W, x, y, B.r);
     if (owner && !owner.ai) W.lastBurst = { x, y, t: W.time, tof: p.t };
-    if (owner && owner.ai) owner.ai.observe({ x });
+    if (owner && owner.ai && owner.ai.observe) owner.ai.observe({ x });
   },
   // Cluster warhead (M26): opens at `alt` above the ground; the bomblets carry on along the rocket's path and
   // come down over a strip ±half metres long. A few dozen are shown bursting; hits on vehicles are drawn from

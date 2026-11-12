@@ -73,6 +73,37 @@ DS.AMMO = {
   M789: { name: 'M789 HEDP 30mm', short: 'M789', sight: 'HEDP', type: 'HEDP', small: true, v0: 805, mass: 0.236, d: 0.03,
     cd: [[0, 0.25], [1, 0.5], [2, 0.44], [3, 0.4]], launchMass: 0.35, sabot: false, tracer: '#ffb060', tracerEvery: 3,
     pen: { ce: 50 }, crit: 75 },
+  // ---- Challenger 1 (L11A5 120 mm rifled): L26 DU APFSDS, L31 HESH ----
+  L26: { name: 'L26 APFSDS (열화우라늄)', short: 'L26', type: 'APFSDS', v0: 1534, mass: 4.6, d: 0.026,
+    cd: [[0, 0.35], [1, 0.60], [2, 0.58], [3, 0.55], [5, 0.52]], launchMass: 8.5, sabot: true, tracer: '#ffcc66',
+    pen: { ke: 520, at: 2000, s: 1.36e6 }, crit: 76 },
+  // HESH (squash head): the plastic charge flattens on the plate and blasts a scab off its inside. Modelled as a
+  // weak shaped charge against the plate's CE value (poor against composite and reactive armour, deadly to
+  // thin steel), plus a small burst.
+  L31: { name: 'L31 HESH (점착유탄)', short: 'L31', sight: 'HESH', type: 'HESH', v0: 670, mass: 17.1, d: 0.12,
+    cd: [[0, 0.2], [1, 0.45], [2, 0.38], [3, 0.33], [5, 0.29]], launchMass: 17.1, sabot: false, tracer: '#ff9a4a',
+    pen: { ce: 160, hesh: true }, crit: 82 },
+  // ---- AMX-30B2 (CN-105-F1): OFL 105 F1 APFSDS, OCC 105 F1 HEAT (spin-stabilised on a ball-bearing band); M693 20 mm ----
+  OFL105: { name: 'OFL 105 F1 APFSDS', short: 'OFL F1', type: 'APFSDS', v0: 1525, mass: 3.8, d: 0.026,
+    cd: [[0, 0.35], [1, 0.60], [2, 0.58], [3, 0.55], [5, 0.52]], launchMass: 5.8, sabot: true, tracer: '#ffcc66',
+    pen: { ke: 380, at: 2000, s: 1.36e6 }, crit: 76 },
+  OCC105: { name: 'OCC 105 F1 HEAT', short: 'OCC F1', type: 'HEAT', v0: 1000, mass: 10.95, d: 0.105,
+    cd: [[0, 0.18], [1, 0.42], [2, 0.36], [3, 0.31], [5, 0.27]], launchMass: 10.95, sabot: false, tracer: '#ff9a4a',
+    pen: { ce: 360 }, crit: 80 },
+  M693: { name: 'M693 20mm HEI', short: '20mm', sight: 'HE', type: 'HEI', small: true, v0: 1050, mass: 0.1, d: 0.02,
+    cd: [[0, 0.25], [1, 0.5], [2, 0.44], [3, 0.4]], launchMass: 0.14, sabot: false, tracer: '#ffb060', tracerEvery: 4,
+    pen: { ce: 25 }, crit: 75 },
+  // ---- BMP-1: PG-15V (73 mm, leaves the low-pressure gun at 400 m/s, a rocket takes it to about 665 m/s; drifts
+  // in wind), 9M14 Malyutka (manual command guidance, ~115 m/s) ----
+  PG15V: { name: 'PG-15V 대전차고폭 (로켓보조)', short: 'PG-15V', sight: 'HEAT', type: 'HEAT', v0: 400, mass: 2.6, d: 0.073,
+    cd: [[0, 0.3], [0.9, 0.32], [1.1, 0.5], [2, 0.4], [3, 0.33]], launchMass: 2.6, sabot: false, tracer: '#ffb060',
+    rocket: { at: 0.05, burn: 0.5, acc: 530 }, pen: { ce: 300 }, crit: 84 },
+  AT3: { name: '9M14 말륫카', short: 'AT-3', type: 'HEAT', d: 0.125, tracer: '#ffb060', pen: { ce: 400 }, crit: 84,
+    missile: { vmax: 120, vmin: 105, accel: 90 } },
+  // ---- 2S1 (2A31 122 mm): OF-462 HE, charges set the muzzle velocity ----
+  OF462: { name: 'OF-462 고폭탄', short: 'OF-462', sight: 'HE', type: 'HE', bag: true, v0: 690, mass: 21.76, d: 0.122,
+    cd: [[0, 0.152], [0.8, 0.159], [0.95, 0.228], [1.05, 0.319], [1.3, 0.303], [2, 0.25], [3, 0.212]],     // scaled: 15.3 km at full charge
+    launchMass: 26, sabot: false, tracer: '#ffb060', pen: { ce: 35 }, crit: 85, blast: { r: 7, kill: 2.4, tnt: 3.6 } },
   // ---- AH-1W: 20 mm M197 (M56 HEI / M53 API mixed belt) ----
   M56: { name: 'M56A3 HEI 20mm', short: 'M56', sight: 'HEI', type: 'HEI', small: true, v0: 1030, mass: 0.1, d: 0.02,
     cd: [[0, 0.25], [1, 0.5], [2, 0.44], [3, 0.4]], launchMass: 0.14, sabot: false, tracer: '#ffb060', tracerEvery: 4,
@@ -146,6 +177,12 @@ DS.AMMO_ORDER = ['M829A1', 'M829', 'M830'];
   M549A1: { spr: 'munitions/s155', len: 0.87, dia: 0.155, notr: true, whistle: true },
   M26:    { spr: 'munitions/m26', len: 3.94, dia: 0.30, notr: true },
   HYDRA:  { k: 'rocket', len: 1.06, dia: 0.070, fin: 0.17, col: '#4b5236', notr: true },
+  L26:    { k: 'dart', len: 0.6, dia: 0.026, fin: 0.08, col: '#4b4a46' },
+  OFL105: { k: 'dart', len: 0.55, dia: 0.026, fin: 0.075, col: '#4b4a46' },
+  L31:    { k: 'shell', len: 0.5, dia: 0.120, col: '#3a3f2f' },
+  OCC105: { k: 'shell', len: 0.62, dia: 0.105, col: '#2f3324' },
+  PG15V:  { k: 'heat', len: 0.38, dia: 0.073, fin: 0.12, col: '#3b3f2c' },
+  OF462:  { k: 'shell', len: 0.55, dia: 0.122, col: '#3d3f37', notr: true, whistle: true },
 });
 
 // Armour materials: RHA-equivalence multipliers on line-of-sight thickness, vs KE and vs CE (HEAT).

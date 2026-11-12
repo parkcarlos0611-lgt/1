@@ -35,10 +35,10 @@ DS.World = class World {
     if (h.kind === 'ground') {
       this.fx.impact(h); this.hits.push(h); if (this.hits.length > 20) this.hits.shift();
       if (!ai) this.addLog({ ground: true, range: h.range, ammo: h.ammo, t: h.t });
-      if (ai) ai.observe({ x: h.x });
+      if (ai && ai.observe) ai.observe({ x: h.x });
       return;
     }
-    if (ai) ai.observe({ x: h.hit.x, hitVehicle: h.hit.v });
+    if (ai && ai.observe) ai.observe({ x: h.hit.x, hitVehicle: h.hit.v });
     if (h.hit.v === this.vehicles[0]) this.playerHitAt = this.time;
     const r = DS.Armor.resolve(this, p, h.hit);
     r.t = p.t; r.shooter = p.owner; { const sp = Math.hypot(p.vx, p.vy) || 1; r.shotDx = p.vx / sp; r.shotDy = p.vy / sp; }
@@ -102,7 +102,7 @@ DS.World = class World {
       // With twenty-odd vehicles on a map this is most of the physics. Any input, target, nearby round or the
       // player's seat wakes them at once.
       for (const v of this.vehicles) {
-        if (v.heli || v === this.vehicles[0] || v.input.drive || v.input.fire || v.input.tow || (v.ai && v.ai.tgt) || Math.abs(v.vt) > 0.03 || Math.abs(v.vel.x) + Math.abs(v.vel.y) > 0.08 || this.time - (v.lastFired == null ? -99 : v.lastFired) < 4) v._quiet = 0;
+        if (v.heli || v === this.vehicles[0] || v.input.drive || v.input.fire || v.input.tow || (v.ai && (v.ai.tgt || v.ai.busy)) || Math.abs(v.vt) > 0.03 || Math.abs(v.vel.x) + Math.abs(v.vel.y) > 0.08 || this.time - (v.lastFired == null ? -99 : v.lastFired) < 4) v._quiet = 0;
         else if (v._quiet > 1.5) { let near = false; for (const p of this.projectiles) if (Math.abs(p.x - v.pos.x) < 40 && Math.abs(p.y - v.pos.y) < 40) { near = true; break; } if (near) v._quiet = 0; }
         v._quiet = (v._quiet || 0) + h;
         if (v._quiet > 1.5) continue;

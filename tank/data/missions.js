@@ -31,7 +31,7 @@ DS.MISSIONS.push(
   //   friends: [vehicle, x, label, ai options]  (the first is the player's)   enemies: [vehicle, x, label, mode]
   {
     id: 'kuwait', name: '쿠웨이트 진격', date: '1991년 2월 25일 05:30', map: 'town',
-    brief: '미 해병 전차대대가 국경 장애물 지대를 넘어 쿠웨이트시 외곽으로 들어선다. M60A1 2개 소대가 전진하고 AH-1W 코브라 2기가 뒤에서 엄호한다. 외곽 검문소와 창고 지대에 T-55 3개 소대, 도심 교차로에 T-62 2개 소대와 T-72가 있다. (시나리오 추후)',
+    brief: '미 해병 전차대대가 국경 장애물 지대를 넘어 쿠웨이트시 외곽으로 들어선다. M60A1 2개 소대가 전진하고 AH-1W 코브라 2기가 뒤에서 엄호한다. 외곽 검문소와 창고 지대에 T-55 3개 소대와 BMP-1 2개 소대, 도심 교차로에 T-62 2개 소대와 T-72가 있다. 동쪽 폐허 너머에 2S1 자주포 포대가 있어, 전방 부대가 우리를 발견하면 포격이 날아온다. (시나리오 추후)',
     cond: '새벽 · 맑음 · 바람 3 m/s', start: 520,
     env: { visibility: 0, wind: 3, time: '05:30' },
     player: 'm60a1',
@@ -42,11 +42,16 @@ DS.MISSIONS.push(
     ],
     enemies: [
       ['t55', 2300, 'T-55 1소대 1호', 'hold'], ['t55', 2328, 'T-55 1소대 2호', 'hold'], ['t55', 2356, 'T-55 1소대 3호', 'hold'],
+      ['bmp1', 2900, 'BMP-1 1소대 1호', 'hold'], ['bmp1', 2925, 'BMP-1 1소대 2호', 'hold'], ['bmp1', 2950, 'BMP-1 1소대 3호', 'hold'],
       ['t55', 3400, 'T-55 2소대 1호', 'hold'], ['t55', 3426, 'T-55 2소대 2호', 'hold'], ['t55', 3452, 'T-55 2소대 3호', 'hold'],
+      ['bmp1', 3950, 'BMP-1 2소대 1호', 'hold'], ['bmp1', 3975, 'BMP-1 2소대 2호', 'hold'], ['bmp1', 4000, 'BMP-1 2소대 3호', 'hold'],
       ['t55', 4500, 'T-55 3소대 1호', 'hold'], ['t55', 4526, 'T-55 3소대 2호', 'hold'], ['t55', 4552, 'T-55 3소대 3호', 'hold'],
       ['t62', 11500, 'T-62 1소대 1호', 'hold'], ['t62', 11528, 'T-62 1소대 2호', 'hold'], ['t62', 11556, 'T-62 1소대 3호', 'hold'],
       ['t62', 12800, 'T-62 2소대 1호', 'hold'], ['t62', 12828, 'T-62 2소대 2호', 'hold'], ['t62', 12856, 'T-62 2소대 3호', 'hold'],
       ['t72', 13500, 'T-72 1호', 'combat'], ['t72', 13530, 'T-72 2호', 'combat'],
+      // 2S1 battery at the east edge of the ruins (~14–15 km from the outskirts): fires on what the crews up
+      // front report (src/ai/ArtyAI.js). Out of reach of the start line; the outskirts are inside it
+      ['2s1', 16900, '2S1 포대 1문', 'arty'], ['2s1', 16935, '2S1 포대 2문', 'arty'], ['2s1', 16970, '2S1 포대 3문', 'arty'], ['2s1', 17005, '2S1 포대 4문', 'arty'],
     ],
   }
 );

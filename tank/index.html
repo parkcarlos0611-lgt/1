@@ -244,9 +244,9 @@
 <button id="editbtn" type="button" hidden title="편집 모드 (L)">편집 L</button>
 <aside id="sbx" hidden aria-label="사격장 편집">
   <h3>내 장비 <small id="sb-count"></small></h3>
-  <div class="row"><button type="button" data-me="m1a1">M1A1</button><button type="button" data-me="m2a2">M2A2 브래들리</button><button type="button" data-me="m60a1">M60A1</button><button type="button" data-me="m109a3">M109A3</button><button type="button" data-me="m270">MLRS</button><button type="button" data-me="ah64a">AH-64A</button><button type="button" data-me="ah1w">AH-1W</button><button type="button" data-me="t55">T-55</button><button type="button" data-me="t62">T-62</button><button type="button" data-me="t72">T-72</button><button type="button" data-go="me">내 위치로</button></div>
+  <div class="row"><button type="button" data-me="m1a1">M1A1</button><button type="button" data-me="m2a2">M2A2 브래들리</button><button type="button" data-me="m60a1">M60A1</button><button type="button" data-me="m109a3">M109A3</button><button type="button" data-me="m270">MLRS</button><button type="button" data-me="ah64a">AH-64A</button><button type="button" data-me="ah1w">AH-1W</button><button type="button" data-me="t55">T-55</button><button type="button" data-me="t62">T-62</button><button type="button" data-me="t72">T-72</button><button type="button" data-me="challenger1">챌린저 1</button><button type="button" data-me="amx30b2">AMX-30B2</button><button type="button" data-me="bmp1">BMP-1</button><button type="button" data-me="2s1">2S1</button><button type="button" data-go="me">내 위치로</button></div>
   <h3>표적 배치</h3>
-  <div class="row"><button type="button" data-tool="t55">T-55</button><button type="button" data-tool="t62">T-62</button><button type="button" data-tool="t72">T-72</button><button type="button" data-tool="m1a1">M1A1</button><button type="button" data-tool="m2a2">M2A2</button><button type="button" data-tool="m60a1">M60A1</button><button type="button" data-tool="m109a3">M109A3</button><button type="button" data-tool="m270">MLRS</button><button type="button" data-tool="ah64a">AH-64A</button><button type="button" data-tool="ah1w">AH-1W</button></div>
+  <div class="row"><button type="button" data-tool="t55">T-55</button><button type="button" data-tool="t62">T-62</button><button type="button" data-tool="t72">T-72</button><button type="button" data-tool="m1a1">M1A1</button><button type="button" data-tool="m2a2">M2A2</button><button type="button" data-tool="m60a1">M60A1</button><button type="button" data-tool="m109a3">M109A3</button><button type="button" data-tool="m270">MLRS</button><button type="button" data-tool="ah64a">AH-64A</button><button type="button" data-tool="ah1w">AH-1W</button><button type="button" data-tool="challenger1">챌린저 1</button><button type="button" data-tool="amx30b2">AMX-30B2</button><button type="button" data-tool="bmp1">BMP-1</button><button type="button" data-tool="2s1">2S1</button></div>
   <div class="row"><label for="sb-bld">건물</label><select id="sb-bld"><option value="h1">고층 아파트 A</option><option value="h2">유리 업무 빌딩</option><option value="h3">고층 아파트 B</option><option value="h4">아치 기단 빌딩</option><option value="h5">업무 빌딩</option><option value="h6">원통형 빌딩</option><option value="hd1">파손된 고층 A</option><option value="hd2">파손된 고층 B</option><option value="m1">중층 건물 1</option><option value="m2">중층 건물 2</option><option value="m3">중층 건물 3</option><option value="m4">중층 건물 4</option><option value="m5">중층 건물 5</option><option value="m6">중층 건물 6</option><option value="m7">중층 건물 7</option><option value="l1">단층 연립</option><option value="l2">아치 건물</option><option value="l3">2층 상가주택</option><option value="l4">돔 건물</option><option value="l5">상점 건물</option><option value="l6">창고</option><option value="l7">차양 시장</option></select><button type="button" data-bld="1">배치</button><button type="button" data-act="clearb">건물 모두 삭제</button></div>
 
   <p id="sb-selname"></p>
@@ -344,6 +344,10 @@
 <script src="data/vehicles/m270.js"></script>
 <script src="data/vehicles/ah64a.js"></script>
 <script src="data/vehicles/ah1w.js"></script>
+<script src="data/vehicles/challenger1.js"></script>
+<script src="data/vehicles/amx30b2.js"></script>
+<script src="data/vehicles/bmp1.js"></script>
+<script src="data/vehicles/2s1.js"></script>
 <script src="data/ammo/ammo.js"></script>
 <script src="src/world/Terrain.js"></script>
 <script src="src/world/Sky.js"></script>
@@ -371,6 +375,7 @@
 <script src="src/render/Post.js"></script>
 <script src="src/debug/DebugLayer.js"></script>
 <script src="src/ai/TankAI.js"></script>
+<script src="src/ai/ArtyAI.js"></script>
 <script src="src/ai/HeliAI.js"></script>
 <script src="src/ai/Sensor.js"></script>
 <script src="src/audio/Audio.js"></script>

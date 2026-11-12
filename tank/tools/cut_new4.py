@@ -1,0 +1,91 @@
+#!/usr/bin/env python3
+"""Cut the Challenger 1 Mk.3, AMX-30B2, BMP-1 and 2S1 art (background-free sheets assets/ref/<id>_sheet.png,
+right-side profile, facing right) into hull / turret / barrel, and their running gear from
+assets/ref/wheels_new4.png (rows: Challenger, AMX-30B2, BMP-1, 2S1; columns: road wheel, idler, sprocket).
+The sheets' alpha is near-opaque on the art with a faint halo: alpha < 120 dropped, edges coloured from inside.
+Coordinates are sheet pixels (measured on a 10 px grid).   usage: python3 tools/cut_new4.py
+"""
+import os, json, math
+import numpy as np
+from PIL import Image, ImageDraw
+from scipy import ndimage
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+CFG = {
+  'challenger1': dict(tspan=(45, 605), tcut=[(30, 470, 160, 492)], box=(30, 380, 925, 615), seam=487, gun_x=572, bore=(448, 486), clear=[],
+      bottom=[(30, 530), (148, 560), (620, 566), (700, 548), (720, 540)]),
+  'amx30b2': dict(tspan=(55, 578), tcut=[(30, 486, 120, 496)], box=(30, 392, 930, 630), seam=494, gun_x=548, bore=(452, 488), clear=[(440, 360, 590, 396)],
+      bottom=[(30, 548), (90, 548), (150, 556), (620, 556), (700, 548)], holes=[(113, 564, 36), (645, 566, 34)]),
+  'bmp1': dict(tspan=(312, 562), box=(60, 380, 880, 610), seam=448, gun_x=470, bore=(422, 438), clear=[],
+      bottom=[(60, 528), (880, 528)], holes=[(155, 542, 34), (745, 542, 34)]),
+  '2s1': dict(tspan=(150, 522), box=(75, 390, 885, 640), seam=494, gun_x=518, bore=(452, 488), clear=[],
+      bottom=[(75, 558), (885, 558)], holes=[(140, 570, 36), (717, 567, 34)]),
+}
+
+def load(path):
+    a = np.asarray(Image.open(os.path.join(ROOT, path)).convert('RGBA')).astype(np.float32)
+    al = np.clip((a[..., 3] - 120) / 80, 0, 1); core = al >= 0.99
+    _, (iy, ix) = ndimage.distance_transform_edt(~core, return_indices=True)
+    rgb = np.where(core[..., None], a[..., :3], a[iy, ix, :3])
+    return np.dstack([rgb, al * 255]).astype(np.uint8)
+
+def bottom_at(pts, xs):
+    px = [p[0] for p in pts]; py = [p[1] for p in pts]
+    return np.interp(xs, px, py)
+
+for vid, c in CFG.items():
+    out = os.path.join(ROOT, 'assets/sprites', vid); os.makedirs(out, exist_ok=True)
+    sheet = load(f'assets/ref/{vid}_sheet.png')
+    x0, y0, x1, y1 = c['box']; A = sheet[y0:y1, x0:x1].copy()
+    yy, xx = np.mgrid[y0:y1, x0:x1]
+    for cx0, cy0, cx1, cy1 in c['clear']: A[(xx >= cx0) & (xx < cx1) & (yy >= cy0) & (yy < cy1), 3] = 0
+    # keep only the vehicle (largest blob) and what touches it
+    lab, n = ndimage.label(A[..., 3] > 60); big = np.bincount(lab.ravel())[1:].argmax() + 1
+    A[(lab != big) & (lab > 0), 3] = 0
+    info = {}
+    def save(name, mask):
+        a = A.copy(); a[~mask] = 0
+        ys, xs = np.nonzero(a[..., 3] > 0); bx0, bx1, by0, by1 = xs.min(), xs.max() + 1, ys.min(), ys.max() + 1
+        Image.fromarray(a[by0:by1, bx0:bx1]).save(os.path.join(out, name + '.png'))
+        info[name] = {'x': int(x0 + bx0), 'y': int(y0 + by0), 'w': int(bx1 - bx0), 'h': int(by1 - by0)}
+    bore = (xx >= c['gun_x']) & (yy >= c['bore'][0]) & (yy < c['bore'][1])
+    save('barrel', bore)
+    tsp = (xx >= c['tspan'][0]) & (xx < c['tspan'][1])
+    for a0, b0, a1, b1 in c.get('tcut', []): tsp &= ~((xx >= a0) & (xx < a1) & (yy >= b0) & (yy < b1))      # hull deck under the turret's overhang
+    save('turret', (yy < c['seam']) & tsp & ~bore)
+    hull = ((yy >= c['seam']) | ~tsp) & (yy < bottom_at(c['bottom'], xx)) & ~bore
+    for hx, hy, hr in c.get('holes', []): hull &= ((xx - hx) ** 2 + (yy - hy) ** 2) > hr * hr
+    save('hull', hull)
+    json.dump(info, open(os.path.join(out, 'cut.json'), 'w'), indent=1)
+    print(vid, info)
+
+# ---- running gear ----
+W = load('assets/ref/wheels_new4.png')
+lab, n = ndimage.label(W[..., 3] > 100)
+objs = [(s, i + 1) for i, s in enumerate(ndimage.find_objects(lab))]
+objs = [(s, k) for s, k in objs if (s[0].stop - s[0].start) > 150 and (s[1].stop - s[1].start) > 150]
+objs.sort(key=lambda o: (o[0][0].start // 150, o[0][1].start))
+objs.sort(key=lambda o: (o[0][0].start + o[0][0].stop) / 2)
+rows, cur, last = [], [], None
+for o in objs:
+    cy = (o[0][0].start + o[0][0].stop) / 2
+    if last is not None and cy - last > 120: rows.append(cur); cur = []
+    cur.append(o); last = cy
+rows.append(cur)
+order = ['challenger1', 'amx30b2', 'bmp1', '2s1']
+for items, vid in zip(rows, order):
+    items.sort(key=lambda o: o[0][1].start)
+    for (s, k), name in zip(items[-3:], ['roadwheel', 'idler', 'sprocket']):
+        wdt = s[1].stop - s[1].start; s = (slice(s[0].start, s[0].start + wdt), s[1])      # the wheel is round: square from the top (drops a caption below)
+        a = W[s].copy(); a[lab[s] != k, 3] = 0
+        im = Image.fromarray(a).resize((512, 512), Image.LANCZOS)
+        arr = np.asarray(im).copy()
+        if name != 'sprocket':
+            gy, gx = np.mgrid[0:512, 0:512] + 0.5 - 256
+            arr[..., 3] = np.minimum(arr[..., 3], np.clip((256 - np.hypot(gx, gy)) * 255, 0, 255)).astype(np.uint8)
+        Image.fromarray(arr).save(os.path.join(ROOT, 'assets/sprites', vid, name + '.png'))
+        if name == 'sprocket':
+            r = 256; prof = [arr[int(r - 0.93 * r * math.sin(t / 720 * 2 * math.pi)), int(r + 0.93 * r * math.cos(t / 720 * 2 * math.pi)), 3] > 128 for t in range(720)]
+            st = [t for t in range(720) if prof[t] and not prof[t - 1]]
+            print(vid, 'sprocket teeth', len(st))
+    print(vid, 'gear', [ (s[1].start, s[0].start) for s, k in items[-3:]])

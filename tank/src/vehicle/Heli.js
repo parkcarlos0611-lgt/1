@@ -83,6 +83,7 @@ DS.Heli = class Heli extends DS.Vehicle {
       if (!this.wreck && Math.abs(this.w) < 0.2) this.w = (Math.random() < 0.5 ? -1 : 1) * (0.5 + Math.random());
     }
     this.pos.x = Math.max(20, Math.min(T.length ? T.length - 20 : T.n * T.dx - 20, this.pos.x + this.vel.x * dt));
+    if ((this.pos.x <= 20 && this.vel.x < 0) || (this.pos.x >= (T.length ? T.length - 20 : T.n * T.dx - 20) && this.vel.x > 0)) this.vel.x = 0;     // the map's end stops it
     this.pos.y += this.vel.y * dt; this.vt = this.vel.x;
     alt = this.alt();
     if (alt <= 0) {
@@ -99,6 +100,22 @@ DS.Heli = class Heli extends DS.Vehicle {
     this.alive = false; this.wreck = true; this.koReason = this.koReason || '추락'; this.burning = Math.max(this.burning, 0.01); this.rpm = 0;
     this.ang = (Math.random() - 0.5) * 0.5; this.setStatus();
     this.events.push({ type: 'explode' });
+  }
+  // the pod's lay for a locked target: the rocket's own flight (motor, drag, drop) is flown ahead a few times and
+  // the angle corrected until it passes through the target; re-solved twice a second
+  rocketAim(p, L, A, world) {
+    const C = this._rkSol, tx = L.pos.x, ty = L.pos.y + 1.2;
+    if (C && C.L === L && world.time - C.t < 0.5) return C.a;
+    const flat = { height: () => -1e9, n: 1e9, dx: 1 }, R = A.rocket;
+    let a = Math.atan2(ty - p.y, tx - p.x);
+    for (let k = 0; k < 4; k++) {
+      const q = new DS.Projectile(p.x, p.y, Math.cos(a) * A.v0 + this.vel.x, Math.sin(a) * A.v0 + this.vel.y, A, null);
+      let px = q.x, py = q.y;
+      while (q.t < 30 && (q.x - tx) * Math.sign(tx - p.x) < 0) { px = q.x; py = q.y; const h = R && q.t < R.at + R.burn + 0.05 ? 1 / 240 : 1 / 30; q.step(h, flat); }
+      const f = (tx - px) / ((q.x - px) || 1e-9), y = py + (q.y - py) * f, D = Math.hypot(tx - p.x, ty - p.y);
+      a += Math.atan2(ty - y, D) ;
+    }
+    this._rkSol = { L, t: world.time, a }; return a;
   }
   stepWeapons(dt, world) {
     const D = this.def, G = D.gun, gs = this.gun, I = this.input, d2r = Math.PI / 180, wrap = a => Math.atan2(Math.sin(a), Math.cos(a));
@@ -121,7 +138,7 @@ DS.Heli = class Heli extends DS.Vehicle {
       this.rkCool = D.rockets.interval; this.rk--; this.lastFired = world.time;
       // with a target locked the pod is laid on it (a little above, for the drop); the ripple keeps its spread
       const A = DS.AMMO[D.rockets.ammo], p = this.local(this.dir * D.rockets.at[0], D.rockets.at[1]), L = this.lock && this.lock.alive ? this.lock : null;
-      const aim = L ? Math.atan2(L.pos.y + 1.2 - p.y + Math.hypot(L.pos.x - p.x, L.pos.y - p.y) * 0.0035, L.pos.x - p.x) : base, a = aim + (Math.random() - 0.5) * 0.012;
+      const aim = L ? this.rocketAim(p, L, A, world) : base, a = aim + (Math.random() - 0.5) * 0.012;
       const pr = world.spawnProjectile(p.x, p.y, Math.cos(a) * A.v0 + this.vel.x, Math.sin(a) * A.v0 + this.vel.y, A, this); pr.tracer = true; pr.locked = !!L;
       this.events.push({ type: 'rocket', x: p.x + Math.cos(a) * 3, y: p.y + Math.sin(a) * 3, dx: Math.cos(a), dy: Math.sin(a), ammo: A, light: true });
     }

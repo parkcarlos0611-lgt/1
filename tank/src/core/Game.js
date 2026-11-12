@@ -15,7 +15,7 @@ DS.Game = class Game {
     this.post = new DS.Post(this.cv);
     let q = 2; try { const s = localStorage.getItem('ds.post'); if (s != null) q = +s; } catch (e) {}
     this.post.setQuality(this.post.ok ? q : 0); this.lowFps = 0;
-    await Promise.all(['m1a1', 'm2a2', 'm60a1', 'm109a3', 'm270', 't55', 't62', 't72'].map(id => this.rend.load(DS.VEHICLES[id])).concat(this.rend.loadProps()));
+    await Promise.all(['m1a1', 'm2a2', 'm60a1', 'm109a3', 'm270', 't55', 't62', 't72', 'challenger1', 'amx30b2', 'bmp1', '2s1'].map(id => this.rend.load(DS.VEHICLES[id])).concat(this.rend.loadProps()));
     await this.rend.loadBuildings();
     await this.rend.loadCity();
     await this.rend.loadFlora();
@@ -135,7 +135,7 @@ DS.Game = class Game {
         if (def.heli) { new DS.HeliAI(f, W, { lead, back: o.back, alt: o.alt, face: 1 }); f.place(lead.pos.x - (o.back || 600)); }
         else new DS.TankAI(f, W, { follow: lead, offset: x - M.start });
       });
-      for (const [id, x, label, mode] of M.enemies) { const e = new DS.Vehicle(DS.VEHICLES[id], x, W.terrain, { dir: -1, label }); W.vehicles.push(e); new DS.TankAI(e, W, { mode: mode || 'combat' }); }
+      for (const [id, x, label, mode] of M.enemies) { const e = new DS.Vehicle(DS.VEHICLES[id], x, W.terrain, { dir: -1, label }); W.vehicles.push(e); if (mode === 'arty') new DS.ArtyAI(e, W); else new DS.TankAI(e, W, { mode: mode || 'combat' }); }
     }
     if (!range && !town && !M.friends) {
     const wm = new DS.Vehicle(DS.VEHICLES[other], Math.max(12, M.start + off), W.terrain, { label: nm[other] + (veh === 'm2a2' ? ' (아군 선두)' : ' (아군)') });

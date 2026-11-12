@@ -116,15 +116,18 @@ DS.TankAI = class TankAI {
     }
     const range = Math.hypot(tgt.pos.x - v.pos.x, tgt.pos.y - v.pos.y);
     // seen but beyond the gun's effective range: close in (firing on the move is useless for them)
-    if (range > (S.engageMax || 2000)) { v.input.drive = v.mobile ? v.dir : 0; this.state = '접근'; this.lay = 0; return; }
+    // a missile carrier that can also use its gun (BMP-1) fires the missile out past its minimum range while one
+    // is on the rail, the gun otherwise
+    const T = v.def.tow, useTow = v.tow && (!T.gunFallback || v.tow.missile || (v.tow.loaded > 0 && range >= (T.minRange || 0)));
+    if (range > (useTow && T.gunFallback ? T.range * 0.85 : S.engageMax || 2000)) { v.input.drive = v.mobile ? v.dir : 0; this.state = '접근'; this.lay = 0; return; }
     v.input.drive = 0;                                   // halt to shoot
-    if (v.tow) {                                         // Bradley: TOW, guided by keeping the sight on the target
+    if (useTow) {                                        // Bradley: TOW, guided by keeping the sight on the target
       const o = v.sightOrigin(), q = tgt.local(tgt.g.ring.x, tgt.g.ring.y + 0.35);     // the turret: the same point the line-of-sight check uses
       v.fc.se = 0; v.gun.aimW = Math.atan2(q.y - o.y, q.x - o.x);
       this.lay += dt;
-      if (v.tow.missile) this.state = 'TOW 유도';
-      else if (v.tow.loaded === 0) this.state = v.tow.reserve ? 'TOW 재장전' : 'TOW 소진';
-      else { this.state = 'TOW 조준'; if (this.lay > S.layTime && this.los) { v.input.tow = true; this.lay = 0; this.shots++; } }
+      if (v.tow.missile) this.state = (T.label || 'TOW') + ' 유도';
+      else if (v.tow.loaded === 0) this.state = (T.label || 'TOW') + (v.tow.reserve ? ' 재장전' : ' 소진');
+      else { this.state = (T.label || 'TOW') + ' 조준'; if (this.lay > S.layTime && this.los) { v.input.tow = true; this.lay = 0; this.shots++; } }
       return;
     }
     this.state = '조준';

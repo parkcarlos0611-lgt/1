@@ -53,7 +53,7 @@ Object.assign(DS.Renderer.prototype, {
       const glass = col => { const o = new ImageData(w, h), od = o.data; for (let j = 0; j < w * h; j++) if (G[j]) { const q = j * 4, v = 0.6 + 0.4 * (1 - L[j] / 120); od[q] = col[0] * v; od[q + 1] = col[1] * v; od[q + 2] = col[2] * v; od[q + 3] = 255; }
         const cv = document.createElement('canvas'); cv.width = w; cv.height = h; cv.getContext('2d').putImageData(o, 0, 0); return cv; };
       info = { w, h, westLit: mk(1, [255, 226, 180], 0.9), eastLit: mk(-1, [255, 226, 180], 0.9), westDark: mk(1, [24, 18, 12], 0.8), eastDark: mk(-1, [24, 18, 12], 0.8),
-        panes, glass: [glass([230, 160, 80]), glass([190, 190, 170]), glass([110, 150, 210])], lit: new Map() };
+        panes, glass: [glass([255, 190, 100]), glass([225, 225, 205]), glass([135, 180, 245])], lit: new Map() };
     } catch (e) { info = null; }                  // a page opened from disk cannot read its own pixels: no extra light
     C.set(key, info); return info;
   },
@@ -93,40 +93,48 @@ Object.assign(DS.Renderer.prototype, {
     ctx = lay.getContext('2d'); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1; ctx.clearRect(0, 0, lw, lh);
     ctx.setTransform(m.a / 2, m.b / 2, m.c / 2, m.d / 2, m.e / 2, m.f / 2);
     ctx.save(); ctx.globalCompositeOperation = 'lighter';
-    // buildings on the drive line
+    // Drawn back to front: before each building's own lights go in, its silhouette erases whatever light from
+    // farther back lies behind it, so no window or lamp shows through a nearer building.
+    const cut = (im, x, y, w, h, f, ox = 0) => { ctx.save(); ctx.globalCompositeOperation = 'destination-out'; ctx.globalAlpha = 1; ctx.translate(x, y); ctx.scale(f === -1 ? -1 : 1, -1); ctx.drawImage(im, -w / 2, -h * ox, w, h); ctx.restore(); };
+    const list = this._litList || [], back = list.filter(L => L.z > 0), front = list.filter(L => !(L.z > 0));
+    const rowsPass = items => { for (const L of items) {
+      if (!L.lamp) cut(L.im, L.x, L.y, L.w, L.h, L.f, 0.985);
+      if (L.lamp) {
+        const hx = L.x + L.hx, hy = L.y + L.hy, r = 0.9 * L.s, g1 = ctx.createRadialGradient(hx, hy, 0, hx, hy, r * 3);
+        g1.addColorStop(0, 'rgba(255,240,200,1)'); g1.addColorStop(0.25, 'rgba(255,205,125,0.45)'); g1.addColorStop(1, 'rgba(255,190,110,0)');
+        ctx.globalAlpha = k * (1 - L.haze); ctx.fillStyle = g1; ctx.fillRect(hx - r * 3, hy - r * 3, r * 6, r * 6);
+        // the pool of light on the ground under it (and on whatever stands there)
+        const gy = L.y, R = 4.2 * L.s, g2 = ctx.createRadialGradient(hx, gy, 0, hx, gy, R);
+        g2.addColorStop(0, 'rgba(255,214,150,0.42)'); g2.addColorStop(1, 'rgba(255,200,130,0)');
+        ctx.save(); ctx.translate(hx, gy); ctx.scale(1, 0.55); ctx.translate(-hx, -gy); ctx.fillStyle = g2; ctx.fillRect(hx - R, gy - R, R * 2, R * 2); ctx.restore();
+        continue;
+      }
+      const info = this.lightInfo(L.key, L.im); if (!info || !info.panes.length) continue;
+      const lit = this.litPanes(L.key, info, L.variant, share);
+      ctx.globalAlpha = Math.min(1, k * 1.1 * (1 - L.haze * 0.5));
+      ctx.save(); ctx.translate(L.x, L.y); ctx.scale(L.f === -1 ? -1 : 1, -1); ctx.drawImage(lit, -L.w / 2, -L.h * 0.985, L.w, L.h); ctx.restore();
+    }
+    };
+    rowsPass(back);
+    // buildings on the drive line (in front of the rows behind it)
     for (const b of this.w.buildings) {
       if (!b.D || b.state === 'rubble' || b.x + b.w + 20 < cam.left || b.x - b.w - 20 > cam.right) continue;
       const im = this.cityImg[b.k]; if (!im) continue;
+      cut((b.touched && b.face) || im, b.x, b.base, b.w, b.h, 1, 1);
       const info = this.lightInfo('city:' + b.k, im); if (!info || !info.panes.length) continue;
       // power: a building that has lost a quarter of its bays is dark
       let ex = 0, ok = 0; for (const c of b.cells) if (c.ex) { ex++; if (c.st === 'ok' && !c.chunk) ok++; }
       const power = Math.max(0, Math.min(1, (ok / ex - 0.75) * 4)); if (power > 0) {
         let lit = this.litPanes('city:' + b.k, info, Math.round(b.x) % 7, share);
         if (b.ops && b.ops.length) lit = this.litDamaged(b, lit);
-        ctx.globalAlpha = k * power * 0.95; ctx.save(); ctx.translate(b.x, b.base); ctx.scale(1, -1); ctx.drawImage(lit, -b.w / 2, -b.h, b.w, b.h); ctx.restore();
+        ctx.globalAlpha = Math.min(1, k * power * 1.15); ctx.save(); ctx.translate(b.x, b.base); ctx.scale(1, -1); ctx.drawImage(lit, -b.w / 2, -b.h, b.w, b.h); ctx.restore();
       }
       for (const f of b.fires || []) {                         // burning floors glow
         const fx = b.x + f.lx, fy = b.base + f.ly, r = 4 + Math.sin(this.w.time * 9 + f.lx) * 0.4, gr = ctx.createRadialGradient(fx, fy, 0, fx, fy, r);
         gr.addColorStop(0, 'rgba(255,140,50,0.5)'); gr.addColorStop(1, 'rgba(255,90,20,0)'); ctx.globalAlpha = k; ctx.fillStyle = gr; ctx.fillRect(fx - r, fy - r, r * 2, r * 2);
       }
     }
-    // scenery rows (recorded while they were drawn, with their parallax position and haze)
-    for (const L of this._litList || []) {
-      if (L.lamp) {
-        const hx = L.x + L.hx, hy = L.y + L.hy, r = 0.9 * L.s, g1 = ctx.createRadialGradient(hx, hy, 0, hx, hy, r * 3);
-        g1.addColorStop(0, 'rgba(255,236,190,0.95)'); g1.addColorStop(0.25, 'rgba(255,200,120,0.35)'); g1.addColorStop(1, 'rgba(255,190,110,0)');
-        ctx.globalAlpha = k * (1 - L.haze); ctx.fillStyle = g1; ctx.fillRect(hx - r * 3, hy - r * 3, r * 6, r * 6);
-        // the pool of light on the ground under it (and on whatever stands there)
-        const gy = L.y, R = 4.2 * L.s, g2 = ctx.createRadialGradient(hx, gy, 0, hx, gy, R);
-        g2.addColorStop(0, 'rgba(255,214,150,0.32)'); g2.addColorStop(1, 'rgba(255,200,130,0)');
-        ctx.save(); ctx.translate(hx, gy); ctx.scale(1, 0.55); ctx.translate(-hx, -gy); ctx.fillStyle = g2; ctx.fillRect(hx - R, gy - R, R * 2, R * 2); ctx.restore();
-        continue;
-      }
-      const info = this.lightInfo(L.key, L.im); if (!info || !info.panes.length) continue;
-      const lit = this.litPanes(L.key, info, L.variant, share);
-      ctx.globalAlpha = k * 0.9 * (1 - L.haze * 0.6);
-      ctx.save(); ctx.translate(L.x, L.y); ctx.scale(L.f === -1 ? -1 : 1, -1); ctx.drawImage(lit, -L.w / 2, -L.h * 0.985, L.w, L.h); ctx.restore();
-    }
+    rowsPass(front);
     ctx.restore(); this._litList = null;
     // cut out what stands in front: the vehicles
     ctx.save(); ctx.globalCompositeOperation = 'destination-out'; ctx.globalAlpha = 1;
@@ -153,11 +161,11 @@ Object.assign(DS.Renderer.prototype, {
     if (k === 't:lamp' || k === 't:lane_lamp') {
       if (DS.MAP && DS.MAP.town && DS.MAP.district(p.x)[2] === 'ruins') return;
       const lamp = k === 't:lamp', s = wd / (lamp ? 3.47 : 1.87);
-      L.push({ lamp: true, x, y, hx: lamp ? (p.f === -1 ? -1 : 1) * wd * 0.36 : 0, hy: ht * (lamp ? 0.93 : 0.82), s, haze }); return;
+      L.push({ lamp: true, z: p.z, x, y, hx: lamp ? (p.f === -1 ? -1 : 1) * wd * 0.36 : 0, hy: ht * (lamp ? 0.93 : 0.82), s, haze }); return;
     }
     const bld = k.startsWith('city:') || /^t:(market_|shop_|shed_pair|container|tin_shed)/.test(k);
     if (!bld) return;
     if (DS.MAP && DS.MAP.town && DS.MAP.district(p.x)[2] === 'ruins') return;
-    L.push({ key: k, im, x, y, w: wd, h: ht, f: p.f, haze, variant: Math.abs(Math.round(p.x * 7.3)) % 9 });
+    L.push({ key: k, z: p.z, im, x, y, w: wd, h: ht, f: p.f, haze, variant: Math.abs(Math.round(p.x * 7.3)) % 9 });
   },
 });

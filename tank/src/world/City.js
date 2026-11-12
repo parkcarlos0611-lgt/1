@@ -34,12 +34,12 @@ DS.Structure = class Structure {
       this.cells.push({ i, c, f: R - 1 - i, ex: !!D.occ[i][c], st: D.occ[i][c] ? 'ok' : 'none', hp: this.hpMax, chunk: null,
         sx, sy, sw, sh, x0: sx / p - this.w / 2, x1: (sx + sw) / p - this.w / 2, y0: (D.h - sy - sh) / p, y1: (D.h - sy) / p, seed: i * 37 + c * 11 + 5 });
     }
-    this.chunks = []; this.pieces = []; this.scorch = []; this.glass = false; this.touched = false;
+    this.chunks = []; this.pieces = []; this.fires = []; this.glass = false; this.touched = false;
     this.heap = new Float32Array(Math.ceil(this.w * 2.6) + 8); this.heapX0 = -this.w * 1.3 - 4; this.heapVer = 0; this.heapDraw = null;
     this.state = 'ok'; this.hits = 0; this.sink = 0; this.crackT = 0;
     // 0.75 m blocks (sprite px): built on first damage, once the drawing is loaded (its alpha says where there is wall)
     this.bs = 0.75 * p; this.GX = Math.ceil(D.w / this.bs); this.GY = Math.ceil(D.h / this.bs);
-    this.blk = null; this.face = null; this.faceKey = null; this.holes = [];
+    this.blk = null; this.face = null; this.faceKey = null; this.ops = []; this.faceVer = 0;
   }
   ensureBlocks() {
     if (this.blk) return;
@@ -57,6 +57,8 @@ DS.Structure = class Structure {
       this.blk[k] = this.hpMax / 100; this.blkCell[k] = i * this.C + c; cl.nb++; cl.left++;
     }
     for (const cl of this.cells) if (cl.ex && !cl.nb) { cl.nb = cl.left = 1; }       // (a cell with no sampled wall still counts)
+    this.cleared = new Uint8Array(n); this.holed = new Uint8Array(n);                                 // block taken off the face (fell, or rides a falling block)
+    this.faceImg();
   }
   // building-local metres → block index (or -1)
   blockAt(lx, ly) {
@@ -96,16 +98,20 @@ DS.Structure = class Structure {
     const d0 = this.dist(x, y);
     if (d0 <= r * 4.5 && !this.glass) this.shatter(W);
     const R = Math.max(0.8, r * 0.65);
-    if (d0 > R) return;
-    if (this.damageAt(W, x - this.x, y - this.base, R, 2.6, x)) { this.hits++; this.scorch.push({ x: x - this.x, y: y - this.base, r: 2.2 + r * 0.45 }); }
+    if (d0 > R * 1.6) return;
+    const lx = x - this.x, ly = y - this.base;
+    this.ensureBlocks(); this.touched = true;
+    this.soot(lx, ly, R * 1.6, 0.8);
+    if (d0 <= R && this.damageAt(W, lx, ly, R, 2.6, x)) this.hits++;
+    if (r >= 3 && Math.random() < 0.7 && this.cellAt(lx, ly)) this.fires.push({ lx, ly, t: 0, dur: 15 + Math.random() * 20, next: 0 });
   }
   // armour-piercing shot, shaped charge or cannon shell striking the wall
   hit(W, x, y, p) {
     const A = p.ammo, lx = x - this.x, ly = y - this.base;
-    if (A.small) this.damageAt(W, lx, ly, A.d >= 0.02 ? 0.25 : 0.12, A.d >= 0.02 ? 0.4 : 0.05, x);
-    else if (A.pen && A.pen.ce) this.damageAt(W, lx, ly, 0.85, 2.2, x);          // shaped charge: a round hole and a ring of cracked wall
-    else this.damageAt(W, lx, ly, 0.5, 2.4, x);                                    // AP shot: a small hole punched through
-    if (!A.small) this.scorch.push({ x: lx, y: ly, r: 1.1 });
+    this.ensureBlocks(); this.touched = true;
+    if (A.small) { if (A.d >= 0.02) this.soot(lx, ly, 0.3, 0.5); this.damageAt(W, lx, ly, A.d >= 0.02 ? 0.25 : 0.12, A.d >= 0.02 ? 0.4 : 0.05, x); }
+    else if (A.pen && A.pen.ce) { this.soot(lx, ly, 1.6, 0.8); this.damageAt(W, lx, ly, 0.85, 2.2, x); }     // shaped charge: a round hole, scorched round
+    else { this.soot(lx, ly, 0.9, 0.55); this.damageAt(W, lx, ly, 0.5, 2.4, x); }                               // AP shot: a small hole punched through
   }
   // knock blocks out round (lx, ly): damage dmg at the centre, falling off to nothing at r + one block, with a
   // little randomness so the hole is ragged. Cells that lose half their blocks fail. Returns true if anything broke.
@@ -118,15 +124,16 @@ DS.Structure = class Structure {
     const out = [];
     for (let gy = gy0; gy <= gy1; gy++) for (let gx = gx0; gx <= gx1; gx++) {
       const k = gy * GX + gx; if (B[k] <= 0) continue;
-      const cl = this.cells[this.blkCell[k]]; if (!cl || cl.st !== 'ok') continue;
+      const cl = this.cells[this.blkCell[k]]; if (!cl || cl.st !== 'ok' || cl.chunk || this.cleared[k]) continue;
       const d = Math.hypot((gx + 0.5) * bs - sx, (gy + 0.5) * bs - sy) / p;
       if (d > reach) continue;
       B[k] -= dmg * (1 - d / reach) * (0.6 + Math.random() * 0.8);
-      if (B[k] <= 0) { B[k] = 0; cl.left--; out.push(k); this.holes.push(k); }
+      if (B[k] <= 0) { B[k] = 0; cl.left--; out.push(k); }
     }
     if (!out.length) return false;
-    this.touched = true; this.faceDirty = true;
-    this.spillBlocks(W, out, fromX);
+    this.touched = true;
+    this.spillBlocks(W, out, fromX);                                 // (cut from the face before the holes are painted)
+    for (const k of out) { this.holed[k] = 1; this.op({ t: 'hole', k }); this.op({ t: 'soot', x: (k % GX + 0.5) * bs, y: ((k / GX | 0) + 0.5) * bs, r: bs * 1.7, a: 0.4 }); }
     let failed = false;
     for (const cl of this.cells) if (cl.ex && cl.st === 'ok' && !cl.chunk && cl.left < cl.nb * 0.5) { this.failCell(W, cl, fromX); failed = true; }
     this.settle(W);
@@ -134,7 +141,42 @@ DS.Structure = class Structure {
   }
   // a bay that has lost too much wall to carry anything: what is left of it comes down
   failCell(W, cl, fromX) { cl.st = 'gone'; this.spillCell(W, cl, fromX); this.clearBlocks(cl); }
-  clearBlocks(cl) { if (!this.blk) return; const j = cl.i * this.C + cl.c; for (let k = 0; k < this.blk.length; k++) if (this.blkCell[k] === j && this.blk[k] > 0) this.blk[k] = 0; cl.left = 0; }
+  clearBlocks(cl) {
+    if (!this.blk) return;
+    const j = cl.i * this.C + cl.c, set = new Set();
+    for (let k = 0; k < this.blk.length; k++) if (this.blkCell[k] === j && !this.cleared[k] && this.blk[k] !== -1) set.add(k);
+    this.clearSet(set); cl.left = 0;
+  }
+  // take a set of blocks off the face: their outline is jagged only where a block still on the face borders
+  // them; toward empty space it reaches past the block edge, so nothing is ever left hanging between clearings
+  present(k) { return k >= 0 && this.blk[k] !== -1 && !this.cleared[k]; }
+  clearSet(set) {
+    if (!set.size) return;
+    const pts = this.blockPolys(set, k2 => this.present(k2) && !set.has(k2));
+    for (const k of set) { this.cleared[k] = 1; this.blk[k] = 0; }
+    this.op({ t: 'clr', pts });
+  }
+  // outline polygons (sprite px) of the blocks in set; open(k) says a neighbour edge must be jagged
+  blockPolys(set, open, ox = 0, oy = 0) {
+    const bs = this.bs, GX = this.GX, GY = this.GY, e = bs * 0.4, out = [];
+    const H = n => { const v = Math.sin(n * 127.1 + 311.7) * 43758.5453; return v - Math.floor(v); };
+    const nb = (gx, gy) => gx < 0 || gy < 0 || gx >= GX || gy >= GY ? -1 : gy * GX + gx;
+    for (const k of set) {
+      const gx = k % GX, gy = (k / GX) | 0;
+      const oT = open(nb(gx, gy - 1)), oR = open(nb(gx + 1, gy)), oB = open(nb(gx, gy + 1)), oL = open(nb(gx - 1, gy));
+      const x0 = gx * bs - (oL ? 0 : e) - ox, x1 = (gx + 1) * bs + (oR ? 0 : e) - ox, y0 = gy * bs - (oT ? 0 : e) - oy, y1 = (gy + 1) * bs + (oB ? 0 : e) - oy;
+      // jag on a shared edge is seeded by the edge itself, so both sides of it cut the same line
+      const jag = (ax, ay, bx, by, seed, P) => { for (const t of [0.33, 0.67]) { const d = (H(seed + t * 7) - 0.5) * bs * 0.5; P.push(ax + (bx - ax) * t + (ay === by ? 0 : d), ay + (by - ay) * t + (ay === by ? d : 0)); } };
+      const hE = (gx, gy) => gy * 7919 + gx * 31 + 1, vE = (gx, gy) => gy * 7919 + gx * 31 + 5;
+      const P = [x0, y0];
+      if (oT) jag(x0, y0, x1, y0, hE(gx, gy), P); P.push(x1, y0);
+      if (oR) jag(x1, y0, x1, y1, vE(gx + 1, gy), P); P.push(x1, y1);
+      if (oB) jag(x1, y1, x0, y1, hE(gx, gy + 1), P); P.push(x0, y1);
+      if (oL) jag(x0, y1, x0, y0, vE(gx, gy), P);
+      out.push(P);
+    }
+    return out;
+  }
   // (used by falling blocks crushing what they land on)
   damageCell(W, cl, dmg, fromX, lx, ly) {
     if (cl.st !== 'ok') return;
@@ -210,7 +252,46 @@ DS.Structure = class Structure {
     ch.ax = piv ? piv.x : ax / cells.length; ch.ay = piv ? piv.y : ay; ch.Lh = top - ay;
     if (!piv) ch.w = (Math.random() - 0.5) * 0.04;
     ch.x0 = Math.min(...cells.map(c => c.x0)); ch.x1 = Math.max(...cells.map(c => c.x1));
+    this.chunkArt(ch);
     this.chunks.push(ch);
+  }
+  // what the falling block looks like: its blocks lifted off the face into a canvas of its own. Where it
+  // breaks away from a standing bay below, the break runs along a slanting, ragged crack a couple of blocks
+  // either side of the floor line instead of the straight slab edge.
+  chunkArt(ch) {
+    if (!this.blk) return;
+    const GX = this.GX, bs = this.bs, H = n => { const v = Math.sin(n * 91.7 + 17.3) * 43758.5453; return v - Math.floor(v); };
+    const idx = new Map(ch.cells.map(cl => [cl.i * this.C + cl.c, cl])), S = new Set();
+    for (let k = 0; k < this.blk.length; k++) if (idx.has(this.blkCell[k]) && this.present(k)) S.add(k);
+    const slope = (Math.random() - 0.5) * 0.9, seed = Math.random() * 1000;
+    for (const cl of ch.cells) {
+      const below = this.cell(cl.i + 1, cl.c); if (!this.stand(below)) continue;
+      const gyB = Math.round((cl.sy + cl.sh) / bs), gx0 = Math.floor(cl.sx / bs), gx1 = Math.ceil((cl.sx + cl.sw) / bs), gxc = (gx0 + gx1) / 2;
+      for (let gx = gx0; gx < gx1; gx++) {
+        const cutY = gyB + Math.max(-2, Math.min(2, Math.round(slope * (gx - gxc) + (H(seed + gx) - 0.5) * 2.6)));
+        for (let gy = gyB - 2; gy < gyB + 2; gy++) {
+          const k = gy * GX + gx; if (gy < 0 || gy >= this.GY || !this.present(k)) continue;
+          const own = this.blkCell[k];
+          if (gy >= cutY && idx.has(own)) { S.delete(k); this.blkCell[k] = below.i * this.C + below.c; }        // stays as a stump on the bay below
+          else if (gy < cutY && own === below.i * this.C + below.c) { S.add(k); this.blkCell[k] = cl.i * this.C + cl.c; }   // torn off with the block
+        }
+      }
+    }
+    if (!S.size) return;
+    let a = 1e9, b = 1e9, c = -1e9, d = -1e9;
+    for (const k of S) { const gx = k % GX, gy = (k / GX) | 0; a = Math.min(a, gx); b = Math.min(b, gy); c = Math.max(c, gx); d = Math.max(d, gy); }
+    const ox = Math.max(0, (a - 1) * bs), oy = Math.max(0, (b - 1) * bs), w = Math.ceil((c + 2) * bs - ox), h = Math.ceil((d + 2) * bs - oy);
+    const cv = document.createElement('canvas'); cv.width = Math.max(1, w); cv.height = Math.max(1, h); const x = cv.getContext('2d');
+    x.drawImage(this.face, ox, oy, w, h, 0, 0, w, h);
+    const open = k2 => this.present(k2) && !S.has(k2);
+    x.globalCompositeOperation = 'destination-in'; this.fillPolys(x, this.blockPolys(S, open, ox, oy));
+    ch.S = S; ch.cv = cv; ch.box = [ox, oy, w, h];
+    this.clearSet(S);
+  }
+  fillPolys(x, polys) {
+    x.beginPath();
+    for (const P of polys) { x.moveTo(P[0], P[1]); for (let j = 2; j < P.length; j += 2) x.lineTo(P[j], P[j + 1]); x.closePath(); }
+    x.fillStyle = '#000'; x.fill();
   }
   // highest standing wall (building-local y) under building-local x, ignoring chunk ch; ground is 0
   standTop(lx, ch) {
@@ -227,6 +308,17 @@ DS.Structure = class Structure {
   // ---- per frame ----
   step(dt, W) {
     const g = DS.T.g;
+    // fires inside the building: smoke out of the opening and soot climbing the wall above it
+    for (const f of this.fires) {
+      f.t += dt; f.next -= dt;
+      if (!this.cellAt(f.lx, f.ly) || f.t > f.dur) { f.done = true; continue; }
+      const wx = this.x + f.lx, wy = this.base + f.ly, k = Math.min(1, f.t / 4) * Math.min(1, (f.dur - f.t) / 5);
+      if (Math.random() < dt * 4 * k) W.particles.add(DS.P.DARK, wx + (Math.random() - 0.5), wy + 0.5, (Math.random() - 0.5) * 0.6, 1 + Math.random(), 6 + Math.random() * 5, 0.8 + Math.random() * 0.8, { grow: 0.7, drag: 0.6, grav: -0.03, alpha: 0.45 * k, col: 0x2a2623 });
+      if (f.t < f.dur * 0.6 && Math.random() < dt * 6 * k) W.particles.add(DS.P.FLAME, wx + (Math.random() - 0.5) * 0.8, wy + Math.random() * 0.4, 0, 0.8 + Math.random(), 0.8 + Math.random() * 0.6, 0.5 + Math.random() * 0.4, { grow: 0.3, drag: 1, grav: -0.05, alpha: 0.8, col: 0x3a3430 });
+      if (f.next <= 0) { f.next = 0.7; const sx = (f.lx + this.w / 2) * this.ppm, sy = this.D.h - f.ly * this.ppm, u = Math.min(1, f.t / 12);
+        this.op({ t: 'streak', x: sx + (Math.random() - 0.5) * this.bs * 0.4, y: sy - this.bs * 0.3, w: this.bs * (0.9 + 0.8 * u), h: this.bs * (2 + 4 * u), a: 0.12 }); }
+    }
+    if (this.fires.length) this.fires = this.fires.filter(f => !f.done);
     for (const ch of this.chunks) {
       if (ch.hold > 0) {                                  // creaking: dust sifting out along the failing floor
         ch.hold -= dt; ch.held += dt;
@@ -276,14 +368,19 @@ DS.Structure = class Structure {
     this.chunks = this.chunks.filter(ch => ch.cells.length);
     // tumbling fragments
     const T = W.terrain;
+    const supp = p => {                                   // ground (heap included) or a resting fragment under it
+      let gy = T.height(p.x) + p.h * 0.35;
+      for (const q of this.pieces) { if (!q.rest || q === p || q.gone || Math.abs(q.x - p.x) > (q.wd + p.wd) * 0.38) continue; const top = q.y + q.h * 0.42 + p.h * 0.4; if (top > gy && top < p.y + 0.3) gy = top; }
+      return gy;
+    };
     for (const p of this.pieces) {
-      if (p.rest) continue;
-      p.vy -= g * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.a += p.w * dt;
-      let gy = T.height(p.x) + p.h * 0.35;                // the heap is part of the ground
-      for (const q of this.pieces) {                      // and pieces already lying there carry the ones that land on them
-        if (!q.rest || q === p || Math.abs(q.x - p.x) > (q.wd + p.wd) * 0.38) continue;
-        const top = q.y + q.h * 0.42 + p.h * 0.4; if (top > gy) gy = top;
+      if (p.rest) {                                       // what it was lying on may have gone: then it falls again
+        p.chk = (p.chk || Math.random() * 0.25) - dt;
+        if (p.chk <= 0) { p.chk = 0.25; if (p.y > supp(p) + 0.12) { p.rest = 0; p.vy = 0; } }
+        continue;
       }
+      p.vy -= g * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.a += p.w * dt;
+      const gy = supp(p);
       if (p.y < gy) {
         p.y = gy;
         if (p.src === 'shard' && p.vy < -9 && p.wd > 0.6 && this.budget()) { this.breakShard(W, p, gy); continue; }     // a hard landing breaks a big shard again
@@ -296,10 +393,10 @@ DS.Structure = class Structure {
   }
   breakShard(W, p, gy) {
     p.gone = true;
-    const [sx, sy, sw, sh] = p.box, r = (a, b) => a + Math.random() * (b - a), n = 2 + Math.floor(Math.random() * 2), sp = Math.min(6, -p.vy * 0.25);
+    const sw = p.img.width, sh = p.img.height, src = { cv: p.img, ox: 0, oy: 0, m: p.wd / sw }, r = (a, b) => a + Math.random() * (b - a), n = 2 + Math.floor(Math.random() * 2), sp = Math.min(6, -p.vy * 0.25);
     for (let j = 0; j < n; j++) {
-      const f = r(0.35, 0.65), w = sw * f, h = sh * r(0.4, 0.75);
-      this.addShard(W, this.shard(sx + r(0, sw - w), sy + r(0, sh - h), w, h), p.x + r(-0.3, 0.3) * p.wd, gy + 0.2, p.vx * 0.5 + r(-sp, sp), r(0.5, sp));
+      const f = r(0.4, 0.7), w = sw * f, h = sh * r(0.45, 0.8);
+      this.addShard(W, this.shard(r(0, sw - w), r(0, sh - h), w, h, src), p.x + r(-0.3, 0.3) * p.wd, gy + 0.2, p.vx * 0.5 + r(-sp, sp), r(0.5, sp));
     }
     W.particles.add(DS.P.DUST, p.x, gy, r(-1.5, 1.5), r(0.5, 2), r(4, 7), 0.8 + p.wd * 0.6, { grow: 1, drag: 1, grav: 0, alpha: 0.35, col: 0xc9b79a });
     for (let j = 0; j < 5; j++) W.particles.add(DS.P.DEBRIS, p.x, gy + 0.1, r(-5, 5), r(1, 5), r(1, 2), r(0.04, 0.1), { drag: 0.3, col: 0x8f8472 });
@@ -317,14 +414,23 @@ DS.Structure = class Structure {
   crushCell(W, ch, cl) {
     const i = ch.cells.indexOf(cl); if (i >= 0) ch.cells.splice(i, 1);
     cl.chunk = null; cl.st = 'gone';
-    this.spillCell(W, cl, null, ch); this.clearBlocks(cl);
+    this.spillCell(W, cl, null, ch);
+    if (ch.S) {
+      // the crushed bay's blocks come off the block, and some of the row above it with them (a ragged front)
+      const j = cl.i * this.C + cl.c, GX = this.GX, bs = this.bs, R = new Set(), top = Math.floor(cl.sy / bs);
+      for (const k of ch.S) { const own = this.blkCell[k]; if (own === j) R.add(k); else if (((k / GX) | 0) === top - 1 && Math.random() < 0.45 && ch.cells.some(c => c.i * this.C + c.c === own)) R.add(k); }
+      for (const k of R) ch.S.delete(k);
+      if (R.size) { const x = ch.cv.getContext('2d'); x.save(); x.globalCompositeOperation = 'destination-out'; this.fillPolys(x, this.blockPolys(R, k2 => ch.S.has(k2), ch.box[0], ch.box[1])); x.restore(); }
+    }
+    this.clearBlocks(cl);
   }
 
   // ---- what comes off ----
   // An irregular shard of the drawing: the sprite-px box (sx, sy, sw, sh) clipped to a jagged polygon and kept
   // in its own little canvas, so drawing it later is a single image (no clipping per frame).
-  shard(sx, sy, sw, sh) {
-    const R = this.world.rend, im = (this.glass && R.cityBroken[this.k]) || R.cityImg[this.k]; if (!im) return null;
+  shard(sx, sy, sw, sh, src) {
+    const S = src || { cv: this.skin || ((this.glass && this.world.rend.cityBroken[this.k]) || this.world.rend.cityImg[this.k]), ox: 0, oy: 0, m: 1 / this.ppm };
+    if (!S.cv || sw < 1 || sh < 1) return null;
     const s = Math.min(1, 72 / Math.max(sw, sh)), w = Math.max(2, Math.ceil(sw * s)), h = Math.max(2, Math.ceil(sh * s));
     const c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d');
     const n = 5 + Math.floor(Math.random() * 3), a0 = Math.random() * 6.28;
@@ -334,12 +440,14 @@ DS.Structure = class Structure {
       const px = w / 2 + Math.cos(a) * w / 2 * rr * 1.25, py = h / 2 + Math.sin(a) * h / 2 * rr * 1.25;
       x[j ? 'lineTo' : 'moveTo'](Math.max(0, Math.min(w, px)), Math.max(0, Math.min(h, py)));
     }
-    x.closePath(); x.clip(); x.drawImage(im, sx, sy, sw, sh, 0, 0, w, h);
-    return { img: c, src: [sx, sy, sw, sh], wd: sw / this.ppm, h: sh / this.ppm };
+    x.closePath(); x.clip(); x.drawImage(S.cv, sx - S.ox, sy - S.oy, sw, sh, 0, 0, w, h);
+    // an empty cut (the part was already gone) makes no shard
+    try { const d = x.getImageData(0, 0, w, h).data; let o = 0; for (let i = 3; i < d.length; i += 16) if (d[i] > 40) o++; if (o * 4 < w * h * 0.12) return null; } catch (e) { /* unreadable: keep it */ }
+    return { img: c, wd: sw * S.m, h: sh * S.m };
   }
   addShard(W, sh, x, y, vx, vy) {
     if (!sh) return;
-    this.pieces.push({ src: 'shard', img: sh.img, box: sh.src, x, y, vx, vy, a: (Math.random() - 0.5) * 0.4, w: (Math.random() - 0.5) * (8 - Math.min(6, sh.wd * 3)),
+    this.pieces.push({ src: 'shard', img: sh.img, x, y, vx, vy, a: (Math.random() - 0.5) * 0.4, w: (Math.random() - 0.5) * (8 - Math.min(6, sh.wd * 3)),
       wd: sh.wd, h: sh.h, big: sh.wd > 0.9, w0: sh.wd * 0.3, rest: 0 });
   }
   // budget: with many fragments about, new ones are made bigger (fewer), and past the cap only dust and grit
@@ -382,8 +490,8 @@ DS.Structure = class Structure {
       }
       for (const b of parts) {
         const lx = (b[0] + b[2] / 2) / p - this.w / 2, ly = (this.D.h - b[1] - b[3] / 2) / p;
-        if (!this.solidAt(lx, ly)) continue;                       // that part had already been shot away
         const q = at(lx, ly), dir = out || Math.sign(lx - (cl.x0 + cl.x1) / 2) || 1, big = b[2] / p > 1.2;
+        if (this.holed) { const kb = this.blockAt(lx, ly); if (kb >= 0 && this.holed[kb]) continue; }      // shot away already: nothing there to fall
         this.addShard(W, this.shard(b[0], b[1], b[2], b[3]), q.x, q.y, dir * r(0.3, big ? 3 : 7) + vx0, r(-1, big ? 2 : 5) + vy0);
       }
     }
@@ -470,34 +578,52 @@ DS.Structure = class Structure {
   }
 
   // ---- drawing ----
-  // The building's face: its drawing with every knocked-out block painted as the dark inside of the building
-  // (a jagged patch slightly bigger than the block, so neighbouring holes run together), only where the drawing
-  // has wall. Painted as holes are made; rebuilt only when the glass breaks (another base image).
-  faceImg(im) {
-    const key = im === this.world.rend.cityBroken[this.k] ? 'b' : 'a';
+  // The building's face: its drawing with everything that has happened to it painted straight into it — the
+  // dark inside showing through knocked-out blocks, soot, and blocks taken off (cleared). All of it is painted
+  // 'source-atop' or erased from the drawing itself, so it can never reach past the building's outline. The
+  // operations are kept so the face can be rebuilt when the glass breaks (another base image).
+  faceImg() {
+    const R = this.world.rend; if (!R) return null;
+    const im = (this.glass && R.cityBroken[this.k]) || R.cityImg[this.k]; if (!im) return null;
+    const key = this.glass ? 'b' : 'a';
     if (!this.face || this.faceKey !== key) {
       const c = this.face || (this.face = document.createElement('canvas')); c.width = im.width; c.height = im.height;
-      const x = c.getContext('2d'); x.drawImage(im, 0, 0); this.faceKey = key; this.painted = 0;
-    }
-    if (this.painted < this.holes.length) {
-      const x = this.face.getContext('2d'), bs = this.bs, H = n => { const v = Math.sin(n * 127.1 + 311.7) * 43758.5453; return v - Math.floor(v); };
-      x.save(); x.globalCompositeOperation = 'source-atop';
-      for (; this.painted < this.holes.length; this.painted++) {
-        const k = this.holes[this.painted], cx = (k % this.GX + 0.5) * bs, cy = (((k / this.GX) | 0) + 0.5) * bs;
-        x.beginPath();
-        for (let j = 0; j < 8; j++) { const a = j / 8 * 6.283 + H(k * 3 + j) * 0.5, rr = bs * (0.55 + 0.32 * H(k * 7 + j)); x[j ? 'lineTo' : 'moveTo'](cx + Math.cos(a) * rr, cy + Math.sin(a) * rr); }
-        x.closePath();
-        const v = 20 + Math.floor(H(k) * 14); x.fillStyle = `rgb(${v + 8},${v + 2},${v - 3})`; x.fill();
-      }
-      x.restore();
+      const x = c.getContext('2d'); x.drawImage(im, 0, 0); this.faceKey = key;
+      for (const o of this.ops) this.paint(x, o);
+      const sk = this.skin || (this.skin = document.createElement('canvas')); sk.width = im.width; sk.height = im.height;
+      const y = sk.getContext('2d'); y.drawImage(im, 0, 0); for (const o of this.ops) if (o.t === 'soot' || o.t === 'streak') this.paint(y, o);
+      this.faceVer++;
     }
     return this.face;
   }
-  drawCell(ctx, im, cl) {
-    const e = 0.02;
-    ctx.save(); ctx.scale(1, -1);
-    ctx.drawImage(im, cl.sx, cl.sy, cl.sw, cl.sh, cl.x0 - e, -cl.y1 - e, cl.x1 - cl.x0 + 2 * e, cl.y1 - cl.y0 + 2 * e);
-    ctx.restore();
+  op(o) { this.ops.push(o); if (this.face) { this.paint(this.face.getContext('2d'), o); if (o.t === 'soot' || o.t === 'streak') this.paint(this.skin.getContext('2d'), o); this.faceVer++; } }
+  soot(lx, ly, r, a) { this.op({ t: 'soot', x: (lx + this.w / 2) * this.ppm, y: this.D.h - ly * this.ppm, r: r * this.ppm, a }); }
+  paint(x, o) {
+    x.save();
+    if (o.t === 'clr') { x.globalCompositeOperation = 'destination-out'; this.fillPolys(x, o.pts); }
+    else if (o.t === 'hole') {
+      const H = n => { const v = Math.sin(n * 127.1 + 311.7) * 43758.5453; return v - Math.floor(v); }, k = o.k, bs = this.bs;
+      const cx = (k % this.GX + 0.5) * bs, cy = (((k / this.GX) | 0) + 0.5) * bs;
+      x.globalCompositeOperation = 'source-atop'; x.beginPath();
+      for (let j = 0; j < 8; j++) { const a = j / 8 * 6.283 + H(k * 3 + j) * 0.5, rr = bs * (0.55 + 0.32 * H(k * 7 + j)); x[j ? 'lineTo' : 'moveTo'](cx + Math.cos(a) * rr, cy + Math.sin(a) * rr); }
+      x.closePath(); const v = 20 + Math.floor(H(k) * 14); x.fillStyle = `rgb(${v + 8},${v + 2},${v - 3})`; x.fill();
+    } else if (o.t === 'soot') {                          // blackened round a burst: dark at the centre, fading out
+      x.globalCompositeOperation = 'source-atop';
+      const g = x.createRadialGradient(o.x, o.y, 0, o.x, o.y, o.r); g.addColorStop(0, `rgba(14,11,8,${o.a})`); g.addColorStop(0.55, `rgba(20,15,10,${o.a * 0.75})`); g.addColorStop(0.8, `rgba(26,19,12,${o.a * 0.35})`); g.addColorStop(1, 'rgba(30,22,14,0)');
+      x.fillStyle = g; x.fillRect(o.x - o.r, o.y - o.r, o.r * 2, o.r * 2);
+    } else if (o.t === 'streak') {                        // soot carried up the wall by the smoke of a fire
+      x.globalCompositeOperation = 'source-atop'; x.translate(o.x, o.y - o.h * 0.45); x.scale(1, o.h / o.w);
+      const g = x.createRadialGradient(0, 0, 0, 0, 0, o.w); g.addColorStop(0, `rgba(14,11,8,${o.a})`); g.addColorStop(1, 'rgba(14,11,8,0)');
+      x.fillStyle = g; x.fillRect(-o.w, -o.w, o.w * 2, o.w * 2);
+    }
+    x.restore();
+  }
+  // a canvas drawn in one flat colour (thermal picture), cached until the canvas changes
+  tinted(cv, col, ver) {
+    if (cv._tk === col + ver) return cv._t;
+    const c = cv._t || (cv._t = document.createElement('canvas')); c.width = cv.width; c.height = cv.height;
+    const x = c.getContext('2d'); x.drawImage(cv, 0, 0); x.globalCompositeOperation = 'source-atop'; x.fillStyle = `rgb(${col})`; x.fillRect(0, 0, c.width, c.height);
+    cv._tk = col + ver; return c;
   }
   draw(ctx, cam, grey, R) {
     const D = this.D, k = this.k, im0 = R.cityImg[k]; if (!im0) return;
@@ -513,30 +639,25 @@ DS.Structure = class Structure {
       if (t > 0.5) { ctx.fillStyle = storm ? 'rgba(52,36,18,0.12)' : 'rgba(52,36,18,0.24)'; ctx.beginPath(); ctx.moveTo(this.x - e, this.base + 0.2); ctx.lineTo(this.x + e, this.base + 0.2); ctx.lineTo(this.x + e + run, this.base - 2.6); ctx.lineTo(this.x - e + run, this.base - 2.6); ctx.closePath(); ctx.fill(); }
     }
     ctx.save(); ctx.translate(this.x, this.base);
-    if (!this.touched) { ctx.save(); ctx.scale(1, -1); ctx.drawImage(im, -this.w / 2, -this.h, this.w, this.h); ctx.restore(); }
+    const face = this.touched && this.faceImg();
+    if (!face) { ctx.save(); ctx.scale(1, -1); ctx.drawImage(im, -this.w / 2, -this.h, this.w, this.h); ctx.restore(); }
     else {
-      if (grey == null && this.blk && this.holes.length) im = this.faceImg(im);
-      for (const cl of this.cells) if (this.carry(cl)) this.drawCell(ctx, im, cl);
-      // soot where shells burst, kept on the standing wall
-      if (grey == null && this.scorch.length) {
-        ctx.save(); ctx.beginPath(); for (const cl of this.cells) if (this.carry(cl)) ctx.rect(cl.x0, cl.y0, cl.x1 - cl.x0, cl.y1 - cl.y0); ctx.clip();
-        for (const s of this.scorch) { const gr = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, s.r * 1.6); gr.addColorStop(0, 'rgba(18,14,10,0.8)'); gr.addColorStop(0.4, 'rgba(28,22,15,0.45)'); gr.addColorStop(1, 'rgba(30,24,16,0)'); ctx.fillStyle = gr; ctx.fillRect(s.x - s.r * 1.6, s.y - s.r * 1.6, s.r * 3.2, s.r * 3.2); }
-        ctx.restore();
-      }
-      // falling blocks
+      const p = this.ppm, col = grey != null ? grey(0.2) : null;
+      ctx.save(); ctx.scale(1, -1); ctx.drawImage(col ? this.tinted(face, col, this.faceVer) : face, -this.w / 2, -this.h, this.w, this.h); ctx.restore();
+      // falling blocks, each its own canvas
       for (const ch of this.chunks) {
-        ctx.save(); ctx.translate(ch.ax + ch.ox, ch.ay + ch.oy); ctx.rotate(ch.ang); ctx.translate(-ch.ax, -ch.ay);
-        for (const cl of ch.cells) this.drawCell(ctx, im, cl);
+        if (!ch.cv) continue;
+        ctx.save(); ctx.translate(ch.ax + ch.ox, ch.ay + ch.oy); ctx.rotate(ch.ang); ctx.translate(-ch.ax, -ch.ay); ctx.scale(1, -1);
+        const [bx, by, bw, bh] = ch.box;
+        ctx.drawImage(col ? this.tinted(ch.cv, col, 0) : ch.cv, bx / p - this.w / 2, (by - this.D.h) / p, bw / p, bh / p);
         ctx.restore();
       }
     }
     ctx.restore();
-    this._im = im;
   }
   // after the ground: the heap (it is part of the ground now) and the fragments lying on it
   drawFront(ctx, cam, grey, R) {
     if (this.x + this.w + 40 < cam.left || this.x - this.w - 40 > cam.right) return;
-    const im = this._im || R.cityImg[this.k];
     this.drawHeap(ctx, cam, grey, R);
     const DI = R.debImg;
     for (const p of this.pieces) {

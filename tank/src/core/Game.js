@@ -283,7 +283,7 @@ DS.Game = class Game {
     if (!list.length) { this.target = null; this.toast('탐지된 표적 없음'); return; }
     let i = list.indexOf(this.target);
     i = i < 0 ? (step > 0 ? 0 : list.length - 1) : (i + step + list.length) % list.length;
-    this.target = list[i]; this.slew = { t: 0 };
+    this.target = list[i]; this.slew = { t: 0 }; this.manualLay = false;
     const c = v.contacts.get(this.target);
     this.toast(`표적 ${i + 1}/${list.length} · ${c.d >= 2 ? this.target.def.name : '미식별'} · ${Math.round(c.range)} m`);
   }
@@ -292,15 +292,16 @@ DS.Game = class Game {
     if (!t) return;
     const mem = v.contacts && v.contacts.get(t);                  // (a target that slips behind a building stays selected while remembered)
     if (!t.alive || (!DS.Sensor.seenNow(v, t) && !(mem && !mem.dead && mem.d >= 1))) { this.target = null; this.slew = null; this.toast(t.alive ? '표적 상실' : '표적 격파'); return; }
-    if (!this.slew) return;
-    if (this.elevDir) { this.slew = null; return; }          // the gunner takes over with W/S
-    this.slew.t += dt;
-    if (this.slew.t < 0.45) return;                          // hand-off: the gunner finds it in the sight first
+    if (this.elevDir) { this.slew = null; this.manualLay = true; return; }   // the gunner takes over with W/S
+    if (!this.slew && this.manualLay) return;                // ...and keeps it until a target is selected again
+    // the first lay onto a newly selected target after a short hand-off, then the gunner keeps the sight on it
+    // (re-laying against the hull's rocking that an older stabiliser lets through, and a moving target)
+    if (this.slew) { this.slew.t += dt; if (this.slew.t < 0.45) return; }
     const o = v.sightOrigin(), q = t.local(t.g.ring.x, t.g.ring.y + 0.3);
     const want = Math.atan2(q.y - o.y, q.x - o.x), d = Math.atan2(Math.sin(want - v.gun.aimW), Math.cos(want - v.gun.aimW));
-    const mx = Math.max(0.05, v.def.gun.rate) * dt;
+    const mx = Math.max(0.05, v.def.gun.rate) * dt * (this.slew ? 1 : 0.7);
     v.gun.aimW += Math.max(-mx, Math.min(mx, d));
-    if (Math.abs(d) < 0.0002) this.slew = null;
+    if (this.slew && Math.abs(d) < 0.0002) this.slew = null;
   }
   // ---- post-processing inputs, all in device pixels of the main canvas ----
   postFrame(dt) {
@@ -570,13 +571,20 @@ DS.Game = class Game {
     cam.resize(W, H, dpr);
     // where the sight line meets something (refreshed a few times a second), eased so the picture
     // does not jump when the line slides off a hull onto the ground behind it
+    // The picture is the world round the point at that range along the sight line, so the range must not jump:
+    // a jump slides the whole view sideways. With a target selected the range is the target's; otherwise a new
+    // reading (the line slipping off a hull onto ground far behind, or onto something nearer) is taken only
+    // once it has held for 0.4 s, and eased in.
     if (performance.now() - this._sightT > 150) {
       this._sightT = performance.now();
-      const r = DS.FireControl.lase(w, v, 6000);
-      this.sightR = r ? r.range : 3000;
+      const r = DS.FireControl.lase(w, v, 6000), nr = r ? r.range : 3000;
+      if (this.sightR == null || Math.abs(nr - this.sightR) < this.sightR * 0.12) { this.sightR = nr; this._pendR = null; }
+      else if (!this._pendR || Math.abs(nr - this._pendR.r) > this._pendR.r * 0.12) this._pendR = { r: nr, t: performance.now() };
+      else if (performance.now() - this._pendR.t > 400) { this.sightR = this._pendR.r; this._pendR = null; }
     }
-    const Rt = v.fc.range && w.time - v.fc.lasedAt < 30 ? v.fc.range : this.sightR;
-    this.sightRs = this.sightRs ? this.sightRs + (Rt - this.sightRs) * Math.min(1, dt * 7) : Rt;
+    const tg = this.target && this.target.alive ? this.target : null, o0 = v.sightOrigin();
+    const Rt = tg ? Math.hypot(tg.pos.x - o0.x, tg.pos.y - o0.y) : v.fc.range && w.time - v.fc.lasedAt < 30 ? v.fc.range : this.sightR;
+    this.sightRs = this.sightRs ? this.sightRs + (Rt - this.sightRs) * Math.min(1, dt * 2.5) : Rt;
     const R = Math.max(25, this.sightRs);
     const fld = this.sightField(), fov = fld.fov * Math.PI / 180, mil = W / (fov * 1000);   // px per mil
     // recoil kick + muzzle blast obscuration after our own shot; hull vibration on the move

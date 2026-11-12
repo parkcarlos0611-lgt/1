@@ -37,7 +37,7 @@ DS.Game = class Game {
       <span class="mbtns"><button class="mbtn" type="button" data-brief="${i}" aria-expanded="false">브리핑 ▾</button><button class="mbtn go" type="button" data-go="${i}">출격</button></span>
       <p class="mbrief" id="brief-${i}" hidden><b>BRIEFING</b>${m.brief}</p></article>`).join('');
     let veh = 'm1a1';
-    document.querySelectorAll('.vpick').forEach(b => b.addEventListener('click', () => { veh = b.dataset.v; document.querySelectorAll('.vpick').forEach(x => x.classList.toggle('on', x === b)); }));
+    // (the vehicle is the mission's own; another one is taken in the game with N or the 전환 button)
     list.querySelectorAll('[data-brief]').forEach(b => b.addEventListener('click', () => {
       const p = document.getElementById('brief-' + b.dataset.brief), open = p.hidden;
       p.hidden = !open; b.setAttribute('aria-expanded', open); b.textContent = open ? '브리핑 ▴' : '브리핑 ▾';
@@ -46,6 +46,32 @@ DS.Game = class Game {
     document.getElementById('gorange').onclick = () => { DS.Audio.init(); el.hidden = true; location.hash = 'range' + (veh === 'm2a2' ? 'b' : ''); this.begin('range', veh); };
     document.getElementById('gotown').onclick = () => { DS.Audio.init(); el.hidden = true; location.hash = 'town' + (veh === 'm2a2' ? 'b' : ''); this.begin('town', veh); };
     el.hidden = false;
+  }
+  // Ride another friendly vehicle (missions and the town; the range changes its vehicle in the editor). The one
+  // left behind is driven by its crew again (its own AI, or a crew that holds and fights); the new one is moved
+  // to the front of the list, which is what the camera, sound and HUD follow.
+  cycleVehicle(d = 1) {
+    const W = this.world, me = this.player, L = W.vehicles.filter(v => v.team === me.team && v.alive && v !== me);
+    if (!L.length) { this.toast('탈 수 있는 아군 차량 없음'); return; }
+    L.sort((a, b) => a.pos.x - b.pos.x);
+    const next = d > 0 ? L.find(v => v.pos.x > me.pos.x) || L[0] : [...L].reverse().find(v => v.pos.x < me.pos.x) || L[L.length - 1];
+    this.switchTo(next);
+  }
+  switchTo(v) {
+    const W = this.world, prev = this.player; if (!v || v === prev) return;
+    if (prev && prev.alive) {
+      if (prev._aiBak) { prev.ai = prev._aiBak; prev._aiBak = null; }
+      else if (!prev.heli && !prev.ai) new DS.TankAI(prev, W, { mode: 'combat' });
+      for (const k of ['drive', 'fire', 'coaxFire', 'climb']) if (k in prev.input) prev.input[k] = typeof prev.input[k] === 'number' ? 0 : false;
+    }
+    if (v.ai) { v._aiBak = v.ai; v.ai = null; }
+    W.vehicles.splice(W.vehicles.indexOf(v), 1); W.vehicles.unshift(v);
+    this.player = v; this.target = null; this.thermal = false; this.nv = false;
+    this.nightSight((W.env.night || 0) > 0.5);
+    DS.FireControl.update(W, v, false);
+    document.getElementById('h-title').textContent = `${v.label || v.def.name} · ${this.mission ? this.mission.name : ''}`;
+    if (this.touchLayout) { this._tl = null; this.touchLayout(); }
+    this.toast(`전환: ${v.label || v.def.name}`);
   }
   // town: the district's name when the player drives into it
   districtStep() {
@@ -165,6 +191,7 @@ DS.Game = class Game {
         else { this.mcam = !this.mcam; this.mcamHold = null; this.toast(this.mcam ? ((this.player.tow || this.player.hfState).missile ? '미사일 시점' : '미사일 시점 켬 — 다음 발사부터 따라감') : '미사일 시점 끔'); }
       }
       if (e.code === 'KeyX') { if (this.player.heli) this.player.input.hf = true; else if (this.player.tow) this.player.input.tow = true; else this.toast('미사일은 브래들리(TOW) · 공격헬기(헬파이어) 전용'); }
+      if (e.code === 'KeyN' && !(this.mission && this.mission.range)) { this.cycleVehicle(e.shiftKey ? -1 : 1); return; }
       if (e.code === 'KeyC' && this.player.heli) { this.player.turn(); return; }
       if (e.code === 'KeyZ') { this.world.xray = this.world.xray === false; this.toast(this.world.xray ? 'TOW 발사관 투시 켬' : 'TOW 발사관 투시 끔'); }
       if (e.code === 'KeyR') this.player.place(this.player.pos.x);

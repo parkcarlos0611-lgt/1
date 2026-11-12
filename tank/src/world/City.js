@@ -1,16 +1,20 @@
-// Town buildings that come down cell by cell (firing range). Each building is the drawing cut into a grid of
-// cells on its floor slabs and piers (data/city.js). Every cell holds wall and carries what stands on it:
-//   - shells wear cells down; a cell that fails is either gutted (its facade blown in, the floor slabs still
-//     spanning between the cells beside it — drawn as an exposed, burnt-out room) or knocked out altogether
-//   - load paths: a cell stands on the cell under it; a slab can span a gap of up to four bays between two
-//     standing cells and cantilever one bay past the last one. Cells that lose every path fall.
-//   - when a storey has lost more than half its cells, everything above it goes as one block: straight down
-//     onto the storeys below (each impact crushes the lowest storey of the block and the top of what it lands
-//     on — the floors pancake) or, if the block's weight is off to one side of what is left, it pivots on the
-//     last standing edge, tips over and breaks up where it lands
-// Crushed cells turn into tumbling facade fragments cut from the building's own drawing, chunks of concrete,
-// bricks, blocks and rebar from the debris sheet, and dust; the material piles up at the foot as a rubble heap
-// drawn from the heap sprites. Vehicles pass in front of the buildings; shells, sight lines and blast meet them.
+// Town buildings that break up and come down (firing range). Each building is its drawing on two grids
+// (data/city.js):
+//   - blocks of 0.75 m: what a hit takes out. Shells, shaped charges and blast knock blocks out round the point
+//     of impact (falling off with distance, a little at random, so holes are irregular); where the wall is
+//     gone but the bay still stands the dark inside of the building shows through. Shots pass through holes.
+//   - cells (bays between floor slabs and piers): what carries load. A cell that has lost half its blocks
+//     fails; a cell stands on the cell under it, a slab can span a gap of up to four bays between two standing
+//     cells and cantilever one bay past the last one. Cells that lose every path fall.
+//   - when a storey has lost more than half its cells, everything above it goes as one block, after a moment
+//     of creaking and dust: straight down onto the storeys below (each impact crushes the lowest storey of the
+//     block and the top of what it lands on — the floors pancake, dust jets out at every floor) or, if its
+//     weight is off to one side, it pivots on the last standing edge, tips over and breaks up where it lands.
+//     Where it reaches the ground a dust cloud rolls out along it and hangs for half a minute.
+// Everything that comes off is cut from the building's own drawing into irregular shards — a few big slab
+// pieces, more mid-sized chunks and many small ones; hard landings break big shards again — plus a little
+// concrete and rebar from the debris sheet, grit and dust. The material piles up at the foot as a rubble heap
+// that is part of the ground. Vehicles pass in front of the buildings; shells, sight lines and blast meet them.
 DS.Structure = class Structure {
   constructor(k, x, world) {
     const D = DS.CITY[k];
@@ -33,11 +37,37 @@ DS.Structure = class Structure {
     this.chunks = []; this.pieces = []; this.scorch = []; this.glass = false; this.touched = false;
     this.heap = new Float32Array(Math.ceil(this.w * 2.6) + 8); this.heapX0 = -this.w * 1.3 - 4; this.heapVer = 0; this.heapDraw = null;
     this.state = 'ok'; this.hits = 0; this.sink = 0; this.crackT = 0;
+    // 0.75 m blocks (sprite px): built on first damage, once the drawing is loaded (its alpha says where there is wall)
+    this.bs = 0.75 * p; this.GX = Math.ceil(D.w / this.bs); this.GY = Math.ceil(D.h / this.bs);
+    this.blk = null; this.face = null; this.faceKey = null; this.holes = [];
   }
+  ensureBlocks() {
+    if (this.blk) return;
+    const D = this.D, GX = this.GX, GY = this.GY, bs = this.bs, n = GX * GY;
+    this.blk = new Float32Array(n).fill(-1); this.blkCell = new Int32Array(n).fill(-1);
+    let alpha = null; const im = this.world.rend && this.world.rend.cityImg[this.k];
+    if (im) try { const c = document.createElement('canvas'); c.width = GX; c.height = GY; const x = c.getContext('2d'); x.drawImage(im, 0, 0, GX * bs, GY * bs, 0, 0, GX, GY); alpha = x.getImageData(0, 0, GX, GY).data; } catch (e) { alpha = null; }
+    for (const cl of this.cells) cl.nb = cl.left = 0;
+    for (let gy = 0; gy < GY; gy++) for (let gx = 0; gx < GX; gx++) {
+      const k = gy * GX + gx, sx = (gx + 0.5) * bs, sy = (gy + 0.5) * bs;
+      if (sx >= D.w || sy >= D.h || (alpha && alpha[k * 4 + 3] < 60)) continue;
+      let c = 0; while (c < this.C - 1 && sx >= D.cols[c + 1]) c++;
+      let i = 0; while (i < this.R - 1 && sy >= D.rows[i + 1]) i++;
+      const cl = this.cell(i, c); if (!cl || !cl.ex) continue;
+      this.blk[k] = this.hpMax / 100; this.blkCell[k] = i * this.C + c; cl.nb++; cl.left++;
+    }
+    for (const cl of this.cells) if (cl.ex && !cl.nb) { cl.nb = cl.left = 1; }       // (a cell with no sampled wall still counts)
+  }
+  // building-local metres → block index (or -1)
+  blockAt(lx, ly) {
+    const sx = (lx + this.w / 2) * this.ppm, sy = this.D.h - ly * this.ppm, gx = Math.floor(sx / this.bs), gy = Math.floor(sy / this.bs);
+    return gx >= 0 && gx < this.GX && gy >= 0 && gy < this.GY ? gy * this.GX + gx : -1;
+  }
+  solidAt(lx, ly) { if (!this.blk) return true; const k = this.blockAt(lx, ly); return k < 0 || this.blk[k] !== 0; }
   cell(i, c) { return i >= 0 && i < this.R && c >= 0 && c < this.C ? this.cells[i * this.C + c] : null; }
   stand(cl) { return cl && cl.ex && cl.st === 'ok' && !cl.chunk; }
-  // still in place and carrying load: intact bays and gutted rooms (their piers and slabs are still there)
-  carry(cl) { return cl && cl.ex && !cl.chunk && (cl.st === 'ok' || cl.st === 'gut'); }
+  // still in place and carrying load
+  carry(cl) { return cl && cl.ex && !cl.chunk && cl.st === 'ok'; }
   get top() { let t = 0; for (const cl of this.cells) if (this.stand(cl)) t = Math.max(t, cl.y1); return this.base + t; }
   get bottomY() { return this.base; }
 
@@ -48,7 +78,7 @@ DS.Structure = class Structure {
     const L = Math.hypot(x1 - x0, y1 - y0), n = Math.max(1, Math.ceil(L / 0.3));
     for (let k = 0; k <= n; k++) {
       const t = k / n, x = x0 + (x1 - x0) * t, y = y0 + (y1 - y0) * t, cl = this.cellAt(x - this.x, y - this.base);
-      if (cl && (cl.st === 'ok' || cl.st === 'gut')) return { t, x, y, cl };
+      if (cl && cl.st === 'ok' && this.solidAt(x - this.x, y - this.base)) return { t, x, y, cl };     // holes let shots through
     }
     return null;
   }
@@ -65,33 +95,50 @@ DS.Structure = class Structure {
     if (this.state === 'rubble') return;
     const d0 = this.dist(x, y);
     if (d0 <= r * 4.5 && !this.glass) this.shatter(W);
-    const R = Math.max(0.8, r * 0.65), D0 = 120 + 20 * r;
+    const R = Math.max(0.8, r * 0.65);
     if (d0 > R) return;
-    let any = false;
-    for (const cl of this.cells) {
-      if (!cl.ex || cl.chunk || (cl.st !== 'ok' && cl.st !== 'gut')) continue;
-      const cx = this.x + (cl.x0 + cl.x1) / 2, cy = this.base + (cl.y0 + cl.y1) / 2;
-      const d = Math.hypot(Math.max(0, Math.abs(x - cx) - (cl.x1 - cl.x0) / 2), Math.max(0, Math.abs(y - cy) - (cl.y1 - cl.y0) / 2));
-      if (d < R) { this.damageCell(W, cl, D0 * (1 - d / R), x); any = true; }
-    }
-    if (any) { this.hits++; this.scorch.push({ x: x - this.x, y: y - this.base, r: 2.2 + r * 0.45 }); this.touched = true; this.settle(W); }
+    if (this.damageAt(W, x - this.x, y - this.base, R, 2.6, x)) { this.hits++; this.scorch.push({ x: x - this.x, y: y - this.base, r: 2.2 + r * 0.45 }); }
   }
   // armour-piercing shot, shaped charge or cannon shell striking the wall
   hit(W, x, y, p) {
-    const A = p.ammo, cl = this.cellAt(x - this.x, y - this.base); if (!cl) return;
-    const dmg = A.small ? (A.d >= 0.02 ? 5 : 0.4) : A.pen && A.pen.ce ? 75 : 45;
-    this.damageCell(W, cl, dmg, x); this.touched = true;
-    if (!A.small) { this.scorch.push({ x: x - this.x, y: y - this.base, r: 1.1 }); this.settle(W); }
+    const A = p.ammo, lx = x - this.x, ly = y - this.base;
+    if (A.small) this.damageAt(W, lx, ly, A.d >= 0.02 ? 0.25 : 0.12, A.d >= 0.02 ? 0.4 : 0.05, x);
+    else if (A.pen && A.pen.ce) this.damageAt(W, lx, ly, 0.85, 2.2, x);          // shaped charge: a round hole and a ring of cracked wall
+    else this.damageAt(W, lx, ly, 0.5, 2.4, x);                                    // AP shot: a small hole punched through
+    if (!A.small) this.scorch.push({ x: lx, y: ly, r: 1.1 });
   }
-  damageCell(W, cl, dmg, fromX) {
-    cl.hp -= dmg;
-    if (cl.hp > 0) return;
-    if (cl.st === 'ok') {
-      // blown in where the cells round it still hold: a gutted room; otherwise the bay is gone
-      let n = 0; for (const [di, dc] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (this.stand(this.cell(cl.i + di, cl.c + dc))) n++;
-      if (n >= 2 && cl.hp > -this.hpMax * 1.2) { cl.st = 'gut'; cl.hp = this.hpMax * 0.6; this.spill(W, cl, 0.45, fromX); }
-      else { cl.st = 'gone'; this.spill(W, cl, 1, fromX); }
-    } else if (cl.st === 'gut') { cl.st = 'gone'; this.spill(W, cl, 0.6, fromX); }
+  // knock blocks out round (lx, ly): damage dmg at the centre, falling off to nothing at r + one block, with a
+  // little randomness so the hole is ragged. Cells that lose half their blocks fail. Returns true if anything broke.
+  damageAt(W, lx, ly, r, dmg, fromX) {
+    this.ensureBlocks();
+    const p = this.ppm, bs = this.bs, B = this.blk, GX = this.GX, reach = r + 0.75;
+    const sx = (lx + this.w / 2) * p, sy = this.D.h - ly * p, rr = reach * p;
+    const gx0 = Math.max(0, Math.floor((sx - rr) / bs)), gx1 = Math.min(GX - 1, Math.floor((sx + rr) / bs));
+    const gy0 = Math.max(0, Math.floor((sy - rr) / bs)), gy1 = Math.min(this.GY - 1, Math.floor((sy + rr) / bs));
+    const out = [];
+    for (let gy = gy0; gy <= gy1; gy++) for (let gx = gx0; gx <= gx1; gx++) {
+      const k = gy * GX + gx; if (B[k] <= 0) continue;
+      const cl = this.cells[this.blkCell[k]]; if (!cl || cl.st !== 'ok') continue;
+      const d = Math.hypot((gx + 0.5) * bs - sx, (gy + 0.5) * bs - sy) / p;
+      if (d > reach) continue;
+      B[k] -= dmg * (1 - d / reach) * (0.6 + Math.random() * 0.8);
+      if (B[k] <= 0) { B[k] = 0; cl.left--; out.push(k); this.holes.push(k); }
+    }
+    if (!out.length) return false;
+    this.touched = true; this.faceDirty = true;
+    this.spillBlocks(W, out, fromX);
+    let failed = false;
+    for (const cl of this.cells) if (cl.ex && cl.st === 'ok' && !cl.chunk && cl.left < cl.nb * 0.5) { this.failCell(W, cl, fromX); failed = true; }
+    this.settle(W);
+    return true;
+  }
+  // a bay that has lost too much wall to carry anything: what is left of it comes down
+  failCell(W, cl, fromX) { cl.st = 'gone'; this.spillCell(W, cl, fromX); this.clearBlocks(cl); }
+  clearBlocks(cl) { if (!this.blk) return; const j = cl.i * this.C + cl.c; for (let k = 0; k < this.blk.length; k++) if (this.blkCell[k] === j && this.blk[k] > 0) this.blk[k] = 0; cl.left = 0; }
+  // (used by falling blocks crushing what they land on)
+  damageCell(W, cl, dmg, fromX, lx, ly) {
+    if (cl.st !== 'ok') return;
+    this.damageAt(W, lx != null ? lx : (cl.x0 + cl.x1) / 2, ly != null ? ly : cl.y1, 1.2 + dmg / 120, 2 + dmg / 60, fromX);
   }
 
   // ---- load paths ----
@@ -111,7 +158,7 @@ DS.Structure = class Structure {
         const bs = []; for (let k = c; k <= e; k++) if (base[k]) bs.push(k);
         if (bs.length) for (let k = c; k <= e; k++) {
           let ok = base[k];
-          if (!ok && this.cell(i, k).st !== 'gut') {           // a gutted room has no wall to hang from: it needs the storey under it
+          if (!ok) {
             const l = bs.filter(b => b < k).pop(), r = bs.find(b => b > k);
             ok = (l != null && r != null && r - l <= 5) || (l != null && r == null && k - l <= 1) || (r != null && l == null && r - k <= 1);
           }
@@ -149,24 +196,20 @@ DS.Structure = class Structure {
       while (st.length) { const a = st.pop(); g.push(a); for (const [di, dc] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const b = this.cell(a.i + di, a.c + dc); if (b && loose.includes(b) && !seen.has(b)) { seen.add(b); st.push(b); } } }
       falling.push({ cells: g, piv: null });
     }
-    for (const F of falling) this.drop(W, F.cells, F.piv);
-    // a gutted room needs a standing bay beside it to hold its slabs; one left hanging in the air comes down
-    let again = false;
-    for (let it = 0; it < 3; it++) for (const cl of this.cells) {
-      if (cl.st !== 'gut' || cl.chunk) continue;
-      if (!this.stand(this.cell(cl.i, cl.c - 1)) && !this.stand(this.cell(cl.i, cl.c + 1))) { cl.st = 'gone'; this.spill(W, cl, 0.5, null); this.touched = true; again = true; }
-    }
-    if (falling.length) { this.touched = true; DS.Audio.collapse(this.x, this.base, Math.min(6, 1.5 + falling.reduce((s, F) => s + F.cells.length, 0) * 0.08)); }
-    this.gutKey = null;
-    if (again) return this.settle(W);
-    if (!this.cells.some(cl => cl.ex && (cl.st === 'ok' || cl.st === 'gut'))) this.state = 'rubble';
-    else if (this.cells.some(cl => cl.ex && cl.st !== 'ok')) this.state = 'damaged';
+    for (const F of falling) this.drop(W, F.cells, F.piv, F === falling[0] && !!block);
+    if (falling.length) this.touched = true;
+    if (!this.cells.some(cl => cl.ex && cl.st === 'ok')) this.state = 'rubble';
+    else if (this.touched) this.state = 'damaged';
   }
-  drop(W, cells, piv) {
-    const ch = { cells, ang: 0, w: 0, ox: 0, oy: 0, vx: 0, vy: 0, t: 0, piv, crumble: 0 };
+  // big: a storey has given way under everything above it. It creaks and sheds dust for a moment first.
+  drop(W, cells, piv, big) {
+    const n = cells.length, hold = big || piv ? 0.6 + Math.random() * 1.2 : n > 4 ? 0.25 + Math.random() * 0.35 : 0.05;
+    const ch = { cells, ang: 0, w: 0, ox: 0, oy: 0, vx: 0, vy: 0, t: 0, piv, crumble: 0, hold, held: 0, n0: n, cloudT: 0 };
+    if (hold > 0.2) DS.Audio.creak(this.x, this.base + this.h / 2, Math.min(1.5, 0.4 + n * 0.03), hold);
     let ax = 0, ay = 1e9, top = 0; for (const cl of cells) { cl.chunk = ch; ax += (cl.x0 + cl.x1) / 2; ay = Math.min(ay, cl.y0); top = Math.max(top, cl.y1); }
     ch.ax = piv ? piv.x : ax / cells.length; ch.ay = piv ? piv.y : ay; ch.Lh = top - ay;
     if (!piv) ch.w = (Math.random() - 0.5) * 0.04;
+    ch.x0 = Math.min(...cells.map(c => c.x0)); ch.x1 = Math.max(...cells.map(c => c.x1));
     this.chunks.push(ch);
   }
   // highest standing wall (building-local y) under building-local x, ignoring chunk ch; ground is 0
@@ -185,7 +228,15 @@ DS.Structure = class Structure {
   step(dt, W) {
     const g = DS.T.g;
     for (const ch of this.chunks) {
-      ch.t += dt;
+      if (ch.hold > 0) {                                  // creaking: dust sifting out along the failing floor
+        ch.hold -= dt; ch.held += dt;
+        if (Math.random() < dt * 30) W.particles.add(DS.P.DUST, this.x + ch.x0 + Math.random() * (ch.x1 - ch.x0), this.base + ch.ay + (Math.random() - 0.3) * 1.5, (Math.random() - 0.5) * 2, -0.3 - Math.random(), 4 + Math.random() * 4, 0.6 + Math.random() * 1.2, { grow: 0.6, drag: 0.8, grav: 0.02, alpha: 0.35, col: 0xc6b597 });
+        if (Math.random() < dt * 14) W.particles.add(DS.P.DEBRIS, this.x + ch.x0 + Math.random() * (ch.x1 - ch.x0), this.base + ch.ay, (Math.random() - 0.5) * 2, 0, 3, 0.05 + Math.random() * 0.08, { drag: 0.2, col: 0x8f8472 });
+        ch.ang = (Math.random() - 0.5) * 0.004 * ch.held;      // a tremor
+        if (ch.hold <= 0) { ch.ang = 0; DS.Audio.collapse(this.x, this.base, Math.min(6, 1.5 + ch.n0 * 0.08)); }
+        continue;
+      }
+      ch.t += dt; ch.cloudT -= dt; ch.jetT = (ch.jetT || 0) - dt;
       if (ch.piv && ch.t > 0.35) {
         // pivoting on the standing edge: gravity's torque about the pivot over the block's moment of inertia
         let cx = 0, cy = 0; for (const cl of ch.cells) { const q = this.toWorld(ch, (cl.x0 + cl.x1) / 2, (cl.y0 + cl.y1) / 2); cx += q.x; cy += q.y; }
@@ -211,7 +262,9 @@ DS.Structure = class Structure {
         const crush = ch.cells.filter(cl => { const a = this.toWorld(ch, (cl.x0 + cl.x1) / 2, cl.y0); return a.y < low.s + (cl.y1 - cl.y0) * 0.75; });
         const k = Math.max(1, Math.min(crush.length, ch.crumble ? 2 : crush.length));
         for (const cl of crush.slice(0, k)) this.crushCell(W, ch, cl);
-        if (low.s > 0.3 && speed > 4) { const under = this.cellAt(low.x, low.s - 0.2); if (under && !under.chunk) { this.damageCell(W, under, speed * 14, this.x + low.x); this.settle(W); } }
+        if (crush.length && speed > 3 && ch.jetT <= 0) { ch.jetT = 0.18; this.floorJets(W, ch, low, speed); }
+        if (low.s > 0.3 && speed > 4) { const under = this.cellAt(low.x, low.s - 0.2); if (under && !under.chunk) this.damageCell(W, under, speed * 14, this.x + low.x, low.x, low.s - 0.4); }
+        if (speed > 4 && ch.cloudT <= 0 && low.s < 2.5) { ch.cloudT = 0.6; this.dustCloud(W, this.x + low.x, Math.min(1.4, (ch.cells.length + 2) / 14 * speed / 12)); }
         ch.vy = speed > 3 ? -speed * 0.55 : 0; ch.vx *= 0.7; ch.w *= 0.75;
         if (speed < 3) ch.crumble += dt;
         if (ch.crumble > 0.3) { ch.crumble = 0.001; const cl = ch.cells.slice().sort((a, b) => a.y0 - b.y0)[0]; if (cl) this.crushCell(W, ch, cl); }
@@ -233,11 +286,23 @@ DS.Structure = class Structure {
       }
       if (p.y < gy) {
         p.y = gy;
+        if (p.src === 'shard' && p.vy < -9 && p.wd > 0.6 && this.budget()) { this.breakShard(W, p, gy); continue; }     // a hard landing breaks a big shard again
         if (p.vy < -2.5) { p.vy *= -0.25; p.vx *= 0.55; p.w *= 0.5; if (p.big && Math.random() < 0.5) W.particles.add(DS.P.DUST, p.x, gy, (Math.random() - 0.5) * 3, Math.random() * 2, 3 + Math.random() * 3, 0.8 + p.w0, { grow: 1, drag: 1, grav: 0, alpha: 0.32, col: 0xc9b79a }); }
         else { p.rest = 1; p.vx = p.vy = 0; p.a = Math.round(p.a / Math.PI) * Math.PI + (Math.random() - 0.5) * 0.5; }
       }
     }
-    if (this.pieces.length > 240) { const keep = this.pieces.filter(p => !p.rest).concat(this.pieces.filter(p => p.rest).slice(-160)); this.pieces = keep; }
+    this.pieces = this.pieces.filter(p => !p.gone);
+    if (this.pieces.length > 460) { const rest = this.pieces.filter(p => p.rest); rest.sort((a, b) => b.wd - a.wd); const keep = new Set(rest.slice(0, 300)); this.pieces = this.pieces.filter(p => !p.rest || keep.has(p)); }
+  }
+  breakShard(W, p, gy) {
+    p.gone = true;
+    const [sx, sy, sw, sh] = p.box, r = (a, b) => a + Math.random() * (b - a), n = 2 + Math.floor(Math.random() * 2), sp = Math.min(6, -p.vy * 0.25);
+    for (let j = 0; j < n; j++) {
+      const f = r(0.35, 0.65), w = sw * f, h = sh * r(0.4, 0.75);
+      this.addShard(W, this.shard(sx + r(0, sw - w), sy + r(0, sh - h), w, h), p.x + r(-0.3, 0.3) * p.wd, gy + 0.2, p.vx * 0.5 + r(-sp, sp), r(0.5, sp));
+    }
+    W.particles.add(DS.P.DUST, p.x, gy, r(-1.5, 1.5), r(0.5, 2), r(4, 7), 0.8 + p.wd * 0.6, { grow: 1, drag: 1, grav: 0, alpha: 0.35, col: 0xc9b79a });
+    for (let j = 0; j < 5; j++) W.particles.add(DS.P.DEBRIS, p.x, gy + 0.1, r(-5, 5), r(1, 5), r(1, 2), r(0.04, 0.1), { drag: 0.3, col: 0x8f8472 });
   }
   hurtVehicles(W, lx, speed) {
     if (speed < 6) return;
@@ -252,38 +317,105 @@ DS.Structure = class Structure {
   crushCell(W, ch, cl) {
     const i = ch.cells.indexOf(cl); if (i >= 0) ch.cells.splice(i, 1);
     cl.chunk = null; cl.st = 'gone';
-    const q = this.toWorld(ch, (cl.x0 + cl.x1) / 2, (cl.y0 + cl.y1) / 2);
-    this.spill(W, cl, 1, null, { x: this.x + q.x, y: this.base + q.y }, ch);
+    this.spillCell(W, cl, null, ch); this.clearBlocks(cl);
   }
 
-  // ---- what comes out of a broken cell ----
-  // k: share of the cell that comes down (1 = the whole bay, less for a gutted room); at: world position (cells of
-  // a falling block are no longer where the grid says)
-  spill(W, cl, k, fromX, at, ch) {
-    const P = W.particles, r = (a, b) => a + Math.random() * (b - a);
-    const cx = at ? at.x : this.x + (cl.x0 + cl.x1) / 2, cy = at ? at.y : this.base + (cl.y0 + cl.y1) / 2;
-    const cw = cl.x1 - cl.x0, chh = cl.y1 - cl.y0, out = fromX == null ? 0 : Math.sign(cx - fromX), vy0 = ch ? Math.min(0, ch.vy) * 0.4 : 0;
-    // facade fragments: pieces of the cell's own drawing
-    const nf = Math.round((k >= 1 ? 3 : 2) * (0.6 + Math.random() * 0.8));
-    for (let n = 0; n < nf; n++) {
-      const fw = cw * r(0.28, 0.55), fh = chh * r(0.3, 0.6);
-      this.pieces.push({ src: 'cell', sx: cl.sx + (cl.sw * (1 - fw / cw)) * Math.random(), sy: cl.sy + (cl.sh * (1 - fh / chh)) * Math.random(), sw: cl.sw * fw / cw, sh: cl.sh * fh / chh,
-        x: cx + r(-0.4, 0.4) * cw, y: cy + r(-0.3, 0.3) * chh, vx: (out || (Math.random() < 0.5 ? -1 : 1)) * r(1, 7) + (ch ? ch.vx : 0), vy: r(-1, 4) + vy0, a: r(-0.4, 0.4), w: r(-3, 3), wd: fw, h: fh, big: true, w0: fw * 0.3, rest: 0 });
+  // ---- what comes off ----
+  // An irregular shard of the drawing: the sprite-px box (sx, sy, sw, sh) clipped to a jagged polygon and kept
+  // in its own little canvas, so drawing it later is a single image (no clipping per frame).
+  shard(sx, sy, sw, sh) {
+    const R = this.world.rend, im = (this.glass && R.cityBroken[this.k]) || R.cityImg[this.k]; if (!im) return null;
+    const s = Math.min(1, 72 / Math.max(sw, sh)), w = Math.max(2, Math.ceil(sw * s)), h = Math.max(2, Math.ceil(sh * s));
+    const c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d');
+    const n = 5 + Math.floor(Math.random() * 3), a0 = Math.random() * 6.28;
+    x.beginPath();
+    for (let j = 0; j < n; j++) {
+      const a = a0 + j / n * 6.283 + (Math.random() - 0.5) * 0.6, rr = 0.72 + Math.random() * 0.28;
+      const px = w / 2 + Math.cos(a) * w / 2 * rr * 1.25, py = h / 2 + Math.sin(a) * h / 2 * rr * 1.25;
+      x[j ? 'lineTo' : 'moveTo'](Math.max(0, Math.min(w, px)), Math.max(0, Math.min(h, py)));
     }
-    // loose material from the debris sheet
-    const kinds = ['conc1', 'conc2', 'conc3', 'conc4', 'conc5', 'conc6', 'conc7', 'conc2', 'conc4', 'block1', 'block2', 'brick1', 'brick3', 'rebar2', 'rebar3', 'slab1', 'grit1', 'grit2', 'beam2'];
-    const nd = Math.round((k >= 1 ? 7 : 4) * (0.7 + Math.random() * 0.6));
-    for (let n = 0; n < nd; n++) {
-      const key = kinds[Math.floor(Math.random() * kinds.length)], I = DS.DEBRIS[key], sz = key.startsWith('grit') ? r(0.6, 1.1) : key === 'slab1' || key === 'beam2' ? r(1.2, 2.2) : r(0.35, 1.0);
-      this.pieces.push({ src: key, x: cx + r(-0.5, 0.5) * cw, y: cy + r(-0.5, 0.5) * chh, vx: (out || (Math.random() < 0.5 ? -1 : 1)) * r(0.5, 9) + (ch ? ch.vx : 0), vy: r(-2, 6) + vy0, a: r(-0.5, 0.5), w: r(-5, 5), wd: sz, h: sz * I.h / I.w, big: sz > 1, w0: sz * 0.3, rest: 0 });
+    x.closePath(); x.clip(); x.drawImage(im, sx, sy, sw, sh, 0, 0, w, h);
+    return { img: c, src: [sx, sy, sw, sh], wd: sw / this.ppm, h: sh / this.ppm };
+  }
+  addShard(W, sh, x, y, vx, vy) {
+    if (!sh) return;
+    this.pieces.push({ src: 'shard', img: sh.img, box: sh.src, x, y, vx, vy, a: (Math.random() - 0.5) * 0.4, w: (Math.random() - 0.5) * (8 - Math.min(6, sh.wd * 3)),
+      wd: sh.wd, h: sh.h, big: sh.wd > 0.9, w0: sh.wd * 0.3, rest: 0 });
+  }
+  // budget: with many fragments about, new ones are made bigger (fewer), and past the cap only dust and grit
+  budget() { const n = this.pieces.length; return n > 420 ? 0 : 1 + n / 140; }
+  // blocks knocked out of a standing wall: each leaves as a few small shards blown away from the shot
+  spillBlocks(W, ks, fromX) {
+    const P = W.particles, r = (a, b) => a + Math.random() * (b - a), bs = this.bs, GX = this.GX, bud = this.budget();
+    for (const k of ks) {
+      const gx = k % GX, gy = (k / GX) | 0, sx = gx * bs, sy = gy * bs;
+      const x = this.x + (sx + bs / 2) / this.ppm - this.w / 2, y = this.base + (this.D.h - sy - bs / 2) / this.ppm;
+      const out = fromX == null ? (Math.random() < 0.5 ? -1 : 1) : Math.sign(x - fromX) || 1;
+      const n = bud ? Math.max(1, Math.round((1 + Math.random() * 2.5) / bud)) : 0;
+      for (let j = 0; j < n; j++) {
+        const f = r(0.3, 0.75), w = bs * f, h = bs * f * r(0.6, 1.2);
+        this.addShard(W, this.shard(sx + r(0, bs - w), sy + r(0, Math.max(0, bs - h)), w, h), x + r(-0.3, 0.3), y + r(-0.3, 0.3), out * r(1, 9), r(-1, 5));
+      }
+      for (let j = 0; j < 3; j++) P.add(DS.P.DEBRIS, x, y, out * r(1, 10), r(-2, 7), r(1, 2.5), r(0.04, 0.12), { drag: 0.3, col: 0x8f8472 });
+      if (k & 1) P.add(DS.P.DUST, x, y, out * r(0.5, 3), r(-0.5, 1), r(5, 10), r(1, 2), { grow: r(0.6, 1.2), drag: 0.9, grav: 0, alpha: 0.38, col: Math.random() < 0.6 ? 0xcbb99c : 0xb8a888 });
     }
-    // dust bursting out of the bay and down the face
-    for (let n = 0; n < Math.round(7 * k) + 2; n++)
-      P.add(DS.P.DUST, cx + r(-0.5, 0.5) * cw, cy + r(-0.4, 0.4) * chh, (out || (Math.random() < 0.5 ? -1 : 1)) * r(1, 5), r(-1, 2), r(6, 12), r(1.2, 2.6), { grow: r(1, 2), drag: 0.9, grav: 0, alpha: 0.42, col: Math.random() < 0.6 ? 0xcbb99c : 0xb8a888 });
-    for (let n = 0; n < 6; n++) P.add(DS.P.DEBRIS, cx, cy, r(-8, 8), r(-2, 8), r(1, 2.5), r(0.06, 0.16), { drag: 0.3, col: 0x8f8472 });
-    // the material ends up in the heap at the foot
-    const vol = cw * chh * 0.2 * k;
-    this.addHeap(cx - this.x + (out || 0) * cw * 0.4, vol);
+    this.addHeap((fromX == null ? 0 : Math.sign(this.x - fromX) * 1.5) + (this.blockLx(ks[0]) || 0), ks.length * 0.75 * 0.75 * 0.2);
+  }
+  blockLx(k) { return ((k % this.GX) + 0.5) * this.bs / this.ppm - this.w / 2; }
+  // a whole bay coming down (failed in place, or crushed in a falling block ch): what is left of its wall is
+  // split into irregular shards — a few big slab pieces, more mid-sized chunks, many small ones
+  spillCell(W, cl, fromX, ch) {
+    const P = W.particles, r = (a, b) => a + Math.random() * (b - a), p = this.ppm, bud = this.budget();
+    const left = this.blk ? cl.left / cl.nb : 1;
+    const at = (lx, ly) => ch ? (q => ({ x: this.x + q.x, y: this.base + q.y }))(this.toWorld(ch, lx, ly)) : { x: this.x + lx, y: this.base + ly };
+    const c0 = at((cl.x0 + cl.x1) / 2, (cl.y0 + cl.y1) / 2), out = fromX == null ? 0 : Math.sign(c0.x - fromX);
+    const vx0 = ch ? ch.vx : 0, vy0 = ch ? Math.min(0, ch.vy) * 0.4 : 0;
+    if (bud) {
+      // split the bay's box at random until each part is down to its drawn target size
+      const parts = [], stack = [[cl.sx, cl.sy, cl.sw, cl.sh]];
+      const target = () => { const u = Math.random(); return (u < 0.1 ? r(1.5, 2.5) : u < 0.4 ? r(0.6, 1.2) : r(0.25, 0.6)) * p * bud; };
+      while (stack.length && parts.length < 60) {
+        const b = stack.pop(), t = target();
+        if (b[2] <= t && b[3] <= t) { parts.push(b); continue; }
+        if (b[2] >= b[3]) { const f = r(0.3, 0.7); stack.push([b[0], b[1], b[2] * f, b[3]], [b[0] + b[2] * f, b[1], b[2] * (1 - f), b[3]]); }
+        else { const f = r(0.3, 0.7); stack.push([b[0], b[1], b[2], b[3] * f], [b[0], b[1] + b[3] * f, b[2], b[3] * (1 - f)]); }
+      }
+      for (const b of parts) {
+        const lx = (b[0] + b[2] / 2) / p - this.w / 2, ly = (this.D.h - b[1] - b[3] / 2) / p;
+        if (!this.solidAt(lx, ly)) continue;                       // that part had already been shot away
+        const q = at(lx, ly), dir = out || Math.sign(lx - (cl.x0 + cl.x1) / 2) || 1, big = b[2] / p > 1.2;
+        this.addShard(W, this.shard(b[0], b[1], b[2], b[3]), q.x, q.y, dir * r(0.3, big ? 3 : 7) + vx0, r(-1, big ? 2 : 5) + vy0);
+      }
+    }
+    // a little concrete, rebar and grit from the debris sheet
+    const kinds = ['conc2', 'conc4', 'conc6', 'rebar2', 'rebar3', 'grit1', 'grit2'];
+    for (let n = 0; n < Math.round(3 * left); n++) {
+      const key = kinds[Math.floor(Math.random() * kinds.length)], I = DS.DEBRIS[key], sz = key.startsWith('grit') ? r(0.5, 0.9) : r(0.3, 0.8), q = at(r(cl.x0, cl.x1), r(cl.y0, cl.y1));
+      this.pieces.push({ src: key, x: q.x, y: q.y, vx: (out || (Math.random() < 0.5 ? -1 : 1)) * r(0.5, 7) + vx0, vy: r(-2, 5) + vy0, a: r(-0.5, 0.5), w: r(-5, 5), wd: sz, h: sz * I.h / I.w, big: false, w0: sz * 0.3, rest: 0 });
+    }
+    const cw = cl.x1 - cl.x0, chh = cl.y1 - cl.y0;
+    for (let n = 0; n < Math.round(4 * left) + 2; n++) { const q = at(r(cl.x0, cl.x1), r(cl.y0, cl.y1));
+      P.add(DS.P.DUST, q.x, q.y, (out || (Math.random() < 0.5 ? -1 : 1)) * r(1, 5), r(-1, 2), r(7, 14), r(1.8, 3.6), { grow: r(1, 2), drag: 0.9, grav: 0, alpha: 0.42, col: Math.random() < 0.6 ? 0xcbb99c : 0xb8a888 }); }
+    for (let n = 0; n < 12; n++) { const q = at(r(cl.x0, cl.x1), r(cl.y0, cl.y1)); P.add(DS.P.DEBRIS, q.x, q.y, r(-8, 8), r(-2, 8), r(1, 2.5), r(0.04, 0.14), { drag: 0.3, col: 0x8f8472 }); }
+    this.addHeap(c0.x - this.x + (out || 0) * cw * 0.4, cw * chh * 0.2 * Math.max(0.2, left));
+  }
+  // a floor of a falling block slamming down: dust jets out sideways along that floor
+  floorJets(W, ch, low, speed) {
+    const P = W.particles, r = (a, b) => a + Math.random() * (b - a), y = this.base + low.s + 0.5, k = Math.min(1.5, speed / 10);
+    for (let n = 0; n < 8 * k; n++) for (const s of [-1, 1]) {
+      const x = this.x + (s < 0 ? ch.x0 : ch.x1) + ch.ox;
+      P.add(DS.P.DUST, x, y + r(-0.5, 1), s * r(4, 14) * k, r(-0.5, 1.5), r(8, 16), r(1.5, 3.5), { grow: r(0.8, 1.6), drag: 0.6, grav: 0, alpha: 0.45, col: Math.random() < 0.6 ? 0xc9b89b : 0xb3a284 });
+    }
+  }
+  // the collapse reaching the ground: a heavy cloud rolls out both ways along the ground, climbs and hangs
+  dustCloud(W, x, k) {
+    const P = W.particles, r = (a, b) => a + Math.random() * (b - a), gy = W.terrain.height(x);
+    for (let n = 0; n < 8 + 22 * k; n++) {
+      const s = Math.random() < 0.5 ? -1 : 1;
+      P.add(DS.P.DUST, x + r(-this.w / 2, this.w / 2), gy + r(0.5, 3 + 4 * k), s * r(2, 11) * (0.5 + k), r(0.1, 2.2), r(20, 40), r(3, 6) * (0.6 + k * 0.5),
+        { grow: r(0.15, 0.4), drag: r(0.12, 0.3), grav: 0, alpha: r(0.35, 0.55), col: Math.random() < 0.5 ? 0xc8b698 : 0xb7a587 });
+    }
+    W.fx.shake = Math.max(W.fx.shake, Math.min(0.8, 0.3 * k) * Math.max(0, 1 - Math.abs(x - W.cam.x) / 600));
   }
   // The rubble heap is real ground: its mound is added to the terrain, so vehicles climb it and shells and
   // fragments land on it. heapT keeps what was added (per terrain cell) so a rebuild takes it out again.
@@ -338,89 +470,34 @@ DS.Structure = class Structure {
   }
 
   // ---- drawing ----
-  // ragged outline of a cell: edges that border a missing or gutted neighbour are broken back irregularly
-  outline(cl, open) {
-    const H = n => { const v = Math.sin(n * 127.1 + 311.7) * 43758.5453; return v - Math.floor(v); };
-    const { x0, x1, y0, y1 } = cl, w = x1 - x0, h = y1 - y0, pts = [], s = cl.seed, brk = [];
-    const edge = (ax, ay, bx, by, nx, ny, b, k) => {
-      const n = b ? 7 : 1, d = Math.min(w, h);
-      for (let j = 0; j < n; j++) {
-        const t = j / n, inset = b && j > 0 ? d * (0.04 + 0.22 * H(s * 3 + k * 17 + j)) : 0;
-        const q = [ax + (bx - ax) * t + nx * inset, ay + (by - ay) * t + ny * inset];
-        if (b && j > 0) brk.push([pts[pts.length - 1], q]);
-        pts.push(q);
-      }
-      if (b) brk.push([pts[pts.length - 1], [bx, by]]);
-    };
-    edge(x0, y0, x1, y0, 0, 1, open.b, 1); edge(x1, y0, x1, y1, -1, 0, open.r, 2); edge(x1, y1, x0, y1, 0, -1, open.t, 3); edge(x0, y1, x0, y0, 1, 0, open.l, 4);
-    pts.brk = brk; return pts;
-  }
-  openSides(cl, ch) {
-    const nb = (di, dc) => { const b = this.cell(cl.i + di, cl.c + dc); return b && b.ex && (ch ? b.chunk !== ch : !this.carry(b)); };
-    return { t: nb(-1, 0), b: nb(1, 0), l: nb(0, -1), r: nb(0, 1) };
-  }
-  drawCell(ctx, im, cl, ch, grey) {
-    const p = this.ppm, open = this.openSides(cl, ch), pts = this.outline(cl, open), e = 0.03;
-    ctx.save(); ctx.beginPath(); pts.forEach(([x, y], j) => j ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.closePath(); ctx.clip();
-    ctx.save(); ctx.scale(1, -1);
-    ctx.drawImage(im, cl.sx - 1, cl.sy - 1, cl.sw + 2, cl.sh + 2, cl.x0 - e, -cl.y1 - e, cl.x1 - cl.x0 + 2 * e, cl.y1 - cl.y0 + 2 * e);
-    ctx.restore(); ctx.restore();
-    if (grey != null || !(open.t || open.b || open.l || open.r)) return;
-    // broken concrete along the torn edges: the grey core of the slab and wall, cracks, rebar sticking out
-    const H = n => { const v = Math.sin(n * 127.1 + 311.7) * 43758.5453; return v - Math.floor(v); };
-    ctx.lineJoin = 'round';
-    const segs = pts.brk;
-    ctx.strokeStyle = '#8d8676'; ctx.lineWidth = 0.16; ctx.beginPath(); for (const [a, b] of segs) { ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); } ctx.stroke();
-    ctx.strokeStyle = 'rgba(40,34,28,0.75)'; ctx.lineWidth = 0.05; ctx.stroke();
-    ctx.strokeStyle = '#6e3f22'; ctx.lineWidth = 0.035; ctx.beginPath();
-    segs.forEach(([a, b], j) => {
-      if (H(cl.seed + j * 7) > 0.55) return;
-      const mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2, cx = (cl.x0 + cl.x1) / 2, cy = (cl.y0 + cl.y1) / 2;
-      let nx = mx - cx, ny = my - cy; const L = Math.hypot(nx, ny) || 1; nx /= L; ny /= L;
-      const len = 0.25 + 0.5 * H(cl.seed + j * 13), bend = (H(cl.seed + j * 5) - 0.5) * 0.6;
-      ctx.moveTo(mx, my); ctx.quadraticCurveTo(mx + nx * len * 0.6, my + ny * len * 0.6, mx + nx * len - ny * bend, my + ny * len + nx * bend);
-    });
-    ctx.stroke();
-  }
-  // gutted bays, painted into a copy of the building's drawing ('source-atop': only where the drawing has
-  // wall, so a room can never be bigger than the building or show where there was sky). Each one: the facade
-  // blown in, the burnt-out room behind it, the slab above and the floor below, a ragged rim of facade left
-  // round the hole, a little rubble on the floor and rebar hanging from the slab.
-  gutTex(im, R) {
-    const key = (im === R.cityBroken[this.k] ? 'b' : 'a') + this.cells.filter(cl => cl.st === 'gut').map(cl => cl.i * this.C + cl.c).join(',');
-    if (this.gutKey === key && this.gutC) return this.gutC;
-    const c = this.gutC || (this.gutC = document.createElement('canvas')); c.width = im.width; c.height = im.height; this.gutKey = key;
-    const x = c.getContext('2d'), H = n => { const v = Math.sin(n * 127.1 + 311.7) * 43758.5453; return v - Math.floor(v); };
-    x.drawImage(im, 0, 0); x.globalCompositeOperation = 'source-atop';
-    const DI = R.debImg;
-    for (const cl of this.cells) {
-      if (cl.st !== 'gut') continue;
-      const { sx, sy, sw, sh } = cl, slab = Math.max(3, sh * 0.11);
-      // ragged opening: inset more where the neighbour still stands (the wall carries on past it)
-      const nb = (di, dc) => this.carry(this.cell(cl.i + di, cl.c + dc));
-      const L = sx + sw * (nb(0, -1) ? 0.14 : 0.04), Rr = sx + sw * (1 - (nb(0, 1) ? 0.14 : 0.04)), T = sy + slab * 1.1, B = sy + sh - slab * 0.9;
-      const hole = [], N = 6, j = (k, a) => (H(cl.seed * 7 + k) - 0.5) * a;
-      for (let k = 0; k <= N; k++) hole.push([L + (Rr - L) * k / N, T + Math.abs(j(k, sh * 0.16))]);
-      for (let k = 1; k <= N; k++) hole.push([Rr - Math.abs(j(k + 10, sw * 0.12)), T + (B - T) * k / N]);
-      for (let k = 1; k <= N; k++) hole.push([Rr - (Rr - L) * k / N, B - Math.abs(j(k + 20, sh * 0.12))]);
-      for (let k = 1; k < N; k++) hole.push([L + Math.abs(j(k + 30, sw * 0.12)), B - (B - T) * k / N]);
-      x.save(); x.beginPath(); hole.forEach(([px, py], k) => k ? x.lineTo(px, py) : x.moveTo(px, py)); x.closePath(); x.clip();
-      const g = x.createLinearGradient(0, sy, 0, sy + sh); g.addColorStop(0, '#3b3128'); g.addColorStop(0.35, '#2a221b'); g.addColorStop(1, '#1b1612');
-      x.fillStyle = g; x.fillRect(sx, sy, sw, sh);
-      x.fillStyle = 'rgba(0,0,0,0.4)'; x.fillRect(sx + sw * (0.3 + 0.35 * H(cl.seed)), T, sw * 0.12, (B - T) * 0.8);      // a doorway at the back
-      x.fillStyle = '#7d766a'; x.fillRect(sx, T - slab * 0.2, sw, slab * 0.55);                                            // underside of the slab above
-      x.fillStyle = '#5f594f'; x.fillRect(sx, B - slab * 0.25, sw, slab * 0.6);                                             // floor
-      const pile = DI && DI[['pile1', 'pile2', 'grit2'][cl.seed % 3]];
-      if (pile) { const pw = sw * (0.4 + 0.3 * H(cl.seed + 3)), ph = pw * pile.height / pile.width; x.drawImage(pile, sx + (sw - pw) * H(cl.seed + 5), B - ph * 0.92, pw, ph); }
-      x.strokeStyle = '#6e3f22'; x.lineWidth = Math.max(1.2, sw * 0.012); x.beginPath();
-      for (let k = 0; k < 3; k++) { const hx = sx + sw * (0.2 + 0.3 * k + 0.1 * H(cl.seed + k)), len = sh * (0.12 + 0.18 * H(cl.seed + k * 3)); x.moveTo(hx, T); x.quadraticCurveTo(hx + sw * 0.03, T + len * 0.6, hx + (H(cl.seed + 9 + k) - 0.5) * sw * 0.1, T + len); }
-      x.stroke();
-      x.restore();
-      // broken concrete round the rim
-      x.strokeStyle = '#9a9283'; x.lineWidth = Math.max(1.5, sw * 0.018); x.beginPath(); hole.forEach(([px, py], k) => k ? x.lineTo(px, py) : x.moveTo(px, py)); x.closePath(); x.stroke();
-      x.strokeStyle = 'rgba(35,28,22,0.7)'; x.lineWidth = Math.max(0.8, sw * 0.006); x.stroke();
+  // The building's face: its drawing with every knocked-out block painted as the dark inside of the building
+  // (a jagged patch slightly bigger than the block, so neighbouring holes run together), only where the drawing
+  // has wall. Painted as holes are made; rebuilt only when the glass breaks (another base image).
+  faceImg(im) {
+    const key = im === this.world.rend.cityBroken[this.k] ? 'b' : 'a';
+    if (!this.face || this.faceKey !== key) {
+      const c = this.face || (this.face = document.createElement('canvas')); c.width = im.width; c.height = im.height;
+      const x = c.getContext('2d'); x.drawImage(im, 0, 0); this.faceKey = key; this.painted = 0;
     }
-    return c;
+    if (this.painted < this.holes.length) {
+      const x = this.face.getContext('2d'), bs = this.bs, H = n => { const v = Math.sin(n * 127.1 + 311.7) * 43758.5453; return v - Math.floor(v); };
+      x.save(); x.globalCompositeOperation = 'source-atop';
+      for (; this.painted < this.holes.length; this.painted++) {
+        const k = this.holes[this.painted], cx = (k % this.GX + 0.5) * bs, cy = (((k / this.GX) | 0) + 0.5) * bs;
+        x.beginPath();
+        for (let j = 0; j < 8; j++) { const a = j / 8 * 6.283 + H(k * 3 + j) * 0.5, rr = bs * (0.55 + 0.32 * H(k * 7 + j)); x[j ? 'lineTo' : 'moveTo'](cx + Math.cos(a) * rr, cy + Math.sin(a) * rr); }
+        x.closePath();
+        const v = 20 + Math.floor(H(k) * 14); x.fillStyle = `rgb(${v + 8},${v + 2},${v - 3})`; x.fill();
+      }
+      x.restore();
+    }
+    return this.face;
+  }
+  drawCell(ctx, im, cl) {
+    const e = 0.02;
+    ctx.save(); ctx.scale(1, -1);
+    ctx.drawImage(im, cl.sx, cl.sy, cl.sw, cl.sh, cl.x0 - e, -cl.y1 - e, cl.x1 - cl.x0 + 2 * e, cl.y1 - cl.y0 + 2 * e);
+    ctx.restore();
   }
   draw(ctx, cam, grey, R) {
     const D = this.D, k = this.k, im0 = R.cityImg[k]; if (!im0) return;
@@ -438,8 +515,8 @@ DS.Structure = class Structure {
     ctx.save(); ctx.translate(this.x, this.base);
     if (!this.touched) { ctx.save(); ctx.scale(1, -1); ctx.drawImage(im, -this.w / 2, -this.h, this.w, this.h); ctx.restore(); }
     else {
-      if (grey == null && this.cells.some(cl => cl.st === 'gut')) im = this.gutTex(im, R);
-      for (const cl of this.cells) if (this.carry(cl)) this.drawCell(ctx, im, cl, null, grey);
+      if (grey == null && this.blk && this.holes.length) im = this.faceImg(im);
+      for (const cl of this.cells) if (this.carry(cl)) this.drawCell(ctx, im, cl);
       // soot where shells burst, kept on the standing wall
       if (grey == null && this.scorch.length) {
         ctx.save(); ctx.beginPath(); for (const cl of this.cells) if (this.carry(cl)) ctx.rect(cl.x0, cl.y0, cl.x1 - cl.x0, cl.y1 - cl.y0); ctx.clip();
@@ -449,7 +526,7 @@ DS.Structure = class Structure {
       // falling blocks
       for (const ch of this.chunks) {
         ctx.save(); ctx.translate(ch.ax + ch.ox, ch.ay + ch.oy); ctx.rotate(ch.ang); ctx.translate(-ch.ax, -ch.ay);
-        for (const cl of ch.cells) this.drawCell(ctx, im, cl, ch, grey);       // (gutted rooms ride along in the composite texture)
+        for (const cl of ch.cells) this.drawCell(ctx, im, cl);
         ctx.restore();
       }
     }
@@ -463,10 +540,10 @@ DS.Structure = class Structure {
     this.drawHeap(ctx, cam, grey, R);
     const DI = R.debImg;
     for (const p of this.pieces) {
-      const img = p.src === 'cell' ? im : DI[p.src]; if (!img) continue;
+      if (p.x < cam.left - 3 || p.x > cam.right + 3) continue;
+      const img = p.src === 'shard' ? p.img : DI[p.src]; if (!img) continue;
       ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.a); ctx.scale(1, -1);
-      if (p.src === 'cell') ctx.drawImage(img, p.sx, p.sy, p.sw, p.sh, -p.wd / 2, -p.h / 2, p.wd, p.h);
-      else if (grey != null) { ctx.fillStyle = `rgb(${grey(0.1)})`; ctx.fillRect(-p.wd / 2, -p.h / 2, p.wd, p.h); }
+      if (grey != null) { ctx.fillStyle = `rgb(${grey(0.1)})`; ctx.fillRect(-p.wd * 0.35, -p.h * 0.35, p.wd * 0.7, p.h * 0.7); }
       else ctx.drawImage(img, -p.wd / 2, -p.h / 2, p.wd, p.h);
       ctx.restore();
     }

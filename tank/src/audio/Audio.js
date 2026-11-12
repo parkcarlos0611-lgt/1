@@ -146,6 +146,12 @@ DS.Audio = {
     this.burst(p.t, 0.5, 'highpass', 3500, 0.7, 1.1 * p.g, p.cut, 0.005);
     for (let i = 0; i < 26; i++) this.tone(p.t + 0.1 + Math.random() * 1.9, 2200 + Math.random() * 3800, 1500, 0.05 + Math.random() * 0.06, 0.12 * p.g * (1 - i / 34), p.cut, 'triangle', 0.001);
   },
+  creak(x, y, k, dur) {                     // a storey giving way: groaning steel and concrete cracking, for dur seconds
+    if (!this.ok()) return;
+    const p = this.place(x, y); if (p.d > 3000) return;
+    for (let i = 0; i < 3; i++) { const t = p.t + Math.random() * dur * 0.7; this.tone(t, 90 + Math.random() * 60, 45 + Math.random() * 20, 0.5 + Math.random() * 0.5, 0.35 * k * p.g, Math.min(p.cut, 1200), 'sawtooth', 0.15); }
+    for (let i = 0; i < 6 + 6 * k; i++) this.burst(p.t + Math.random() * dur, 0.04, 'highpass', 1800, 0.8, 0.5 * k * p.g, p.cut, 0.001);
+  },
   collapse(x, y, dur) {                     // a building coming down: long rumble with cracks and thumps in it
     if (!this.ok()) return;
     const p = this.place(x, y); if (p.d > 4000) return;

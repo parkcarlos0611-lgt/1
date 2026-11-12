@@ -12,7 +12,7 @@ DS.TOWN_SCALE = {
   street_lamp: { h: 5.5 }, billboard: { h: 5 }, traffic_light: { h: 5.5 }, direction_sign: { h: 4.6 },
   lane_lamp: { h: 3.8 }, poster_board: { h: 3.6 }, stall: { h: 2 },
   // props and civilian vehicles
-  sedan: { L: 4.4 }, old_sedan: { L: 4.7 }, pickup: { L: 5.0 }, van: { L: 4.7 }, taxi: { L: 4.4 },
+  sedan: { L: 4.4 }, old_sedan: { L: 4.7 }, pickup: { L: 5.0 }, van: { h: 1.85 }, taxi: { L: 4.4 },
   water_tank: { L: 2.4 }, dumpster: { h: 1.5 }, ibc: { h: 1.15 }, jersey_barrier: { L: 3.0 },
   wheelie_bin: { h: 1.1 }, trash_can: { h: 0.9 }, drum: { h: 0.9 },
 };

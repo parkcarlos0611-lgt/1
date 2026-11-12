@@ -57,11 +57,24 @@ rgb = im.astype(np.uint8).copy(); rgb[grey] = (196, 158, 98)       # blades cros
 # ---- Hellfire missiles on the near launcher (upper and lower rail), cut out as their own sprites so each
 # one can leave the rail when fired; the rails themselves stay on the airframe ----
 HF = {'hf_up': (649, 243, 782, 262), 'hf_lo': (645, 267, 782, 291)}
+# Behind the upper rail runs the M261 rocket pod (its 19-tube face shows at x 622-648): once the missile is
+# gone its body must show there, not sky. It comes from the sheet's M261 detail panel (px 717-946 x 978-1039),
+# scaled onto the drawn pod (face at x 622, diameter y 224-266, body running back to the pylon at x 784) and
+# shaded a little for the shadow under the stub wing.
+PX0, PY0, PX1, PY1 = 717, 978, 946, 1039
+pod = Image.open(os.path.join(ROOT, 'assets/ref/ah64a_sheet.png')).convert('RGB').crop((PX0, PY0, PX1, PY1))
+DX0, DY0, DX1, DY1 = 622, 224, 784, 266
+pod = np.asarray(pod.resize((DX1 - DX0, DY1 - DY0), Image.LANCZOS)).astype(np.float32)
+pa = np.clip((228 - pod.min(axis=2)) / 30, 0, 1)
+podl = np.zeros((H, W, 3), np.float32); poda = np.zeros((H, W), np.float32)
+podl[DY0 - Y0:DY1 - Y0, DX0 - X0:DX1 - X0] = pod * 0.8; poda[DY0 - Y0:DY1 - Y0, DX0 - X0:DX1 - X0] = pa
 for name, (hx0, hy0, hx1, hy1) in HF.items():
     sel = (xx >= hx0) & (xx < hx1) & (yy >= hy0) & (yy < hy1)
     ma = np.where(sel, a, 0).astype(np.uint8)
     save(name, ma, rgb, mirror=True)
     a[sel] = 0
+    fill = sel & (poda > 0.5)
+    a[fill] = 255; rgb[fill] = podl[fill].astype(np.uint8)
 save('body_l', a, rgb, mirror=True)
 save('body', a, rgb, mirror=True, patches=((1038, 213, 1142, 247), (1244, 178, 1314, 202)))
 # ---- main rotor: head and blades, from the clean drawing (second row) where the left blade is not hidden by

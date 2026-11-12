@@ -26,8 +26,9 @@ DS.TOWN = {
   ],
   env: { visibility: 0, wind: 2, time: '10:00' },
   berms: [], signs: [], flags: [], parked: [], sprites: {},
-  layers: { 0.5: [1, 0], 5: [0.47, 0.48],        // 0.5: street lamps at the kerb, on the drive line's own plane
-            4: [0.58, 0.34], 3: [0.70, 0.24], 2: [0.82, 0.13], 1: [0.93, 0.04] },        // 5: the far town, hazy
+  // depth rows: [parallax and scale, haze]. Each row farther back is clearly smaller, paler and bluer, so the
+  // town reads in depth rather than as one sheet of cut-outs. 0.5: street lamps at the kerb (the drive line's plane)
+  layers: { 0.5: [1, 0], 5: [0.42, 0.58], 4: [0.54, 0.44], 3: [0.68, 0.3], 2: [0.84, 0.15], 1: [0.95, 0.05] },
   front: 0.34,
   district(x) { for (const d of this.districts) if (x >= d[0] && x < d[1]) return d; return this.districts[this.districts.length - 1]; },
   urban(x) { const d = this.district(x)[2]; return d !== 'highway_w' && d !== 'highway_e'; },
@@ -79,21 +80,21 @@ DS.TOWN = {
     put('barrier2', -1, 1958); put('roadblock1', -1, 1984);
     // ② outskirts: sheds, containers and lean-tos, junk by the road
     fill(4, 2400, 5000, L.concat('city:m3'), 10, 60);
-    fill(3, 2000, 5000, ['tin_shed', 'shed_pair', 'quonset', 'container', 'tent', 'city:l6', 'city:l2'], 4, 26);
-    fill(2, 2000, 5000, ['canopy', 'shelter_tin', 'shelter_wood', 'shelter_cloth', 'ruin_small', 'container', 'tin_shed', 'city:l5'], 6, 32);
+    fill(3, 2000, 5000, ['tin_shed', 'shed_pair', 'quonset', 'container', 'tent', 'city:l6', 'city:l2'], 6, 30);
+    fill(2, 2000, 5000, ['canopy', 'shelter_tin', 'shelter_wood', 'shelter_cloth', 'ruin_small', 'container', 'city:l5'], 8, 36);
     fill(1, 2000, 5000, ['drum_red', 'drum_blue', 'tires1', 'tires2', 'pallets', 'water_tank', 'ibc', 'crates', 'sacks', 'burn_drum', 'pickup', 'sedan_dmg'], 6, 34);
     fill(-1, 2000, 5000, ['barrier1', 'tires1', 'drum_red', 'pickup'], 70, 170);
     // ③ low housing: one- and two-storey houses, mid-rise behind; lamps, bins and parked cars on the street
     fill(4, 5000, 8000, ['city:m3', 'city:m6', 'city:m2', 'city:m4'].concat(L), 1, 14);
-    fill(3, 5000, 8000, L, 2, 10); fill(2, 5000, 8000, L.concat('shop_garage', 'shop_awning'), 3, 12);
+    fill(3, 5000, 8000, L, 3, 14); fill(2, 5000, 8000, L.concat('shop_garage', 'shop_awning'), 4, 15);
     fill(1, 5000, 8000, bins.concat(cars, cars), 6, 28);
     fill(-1, 5000, 8000, ['sedan', 'wheelie_bin', 'trash_can', 'taxi'], 55, 130);
     // ④ market quarter (the middle of the map): market blocks and alleys, shopfronts, stalls and goods
     // (the two big market panoramas appear once each; the rest is built from single buildings)
     fill(4, 8000, 10000, Mm.concat('city:h5', 'city:m1'), 0, 10);
-    fill(3, 8000, 8960, ['market_arcade', 'market_alley', 'city:l1', 'city:l3', 'market_2storey', 'city:m3'], 0, 4);
+    fill(3, 8000, 8960, ['market_arcade', 'city:l1', 'city:l3', 'market_2storey', 'city:m3'], 1, 6);
     put('market_a', 3, 9000 + width('t:market_a') / 2 + 4);
-    fill(3, 9090, 10000, ['market_arcade', 'market_alley', 'city:l1', 'city:l3', 'market_2storey', 'city:m3'], 0, 4);
+    fill(3, 9090, 10000, ['market_arcade', 'city:l1', 'city:l3', 'market_2storey', 'city:m3'], 1, 6);
     put('market_b', 2, 8420); put('market_gate', 2, 8860); put('market_gate', 2, 9620);
     for (const [a, b] of [[8000, 8395], [8445, 8850], [8870, 9610], [9630, 10000]]) {
       for (let x = a; x < b;) { const k = pickAt(['market_2storey', 'market_arcade', 'market_2storey'].concat(shops), x, 2); if (!k) { x += 4; continue; } const w = width(key(k)); if (x + w > b) break; put(k, 2, x + w / 2); x += w + r() * 3; }
@@ -108,13 +109,13 @@ DS.TOWN = {
     put('poster_board', 1, 10420); put('poster_board', 1, 10580);
     fill(1, 10020, 10220, bins.concat(cars), 8, 30); fill(1, 10780, 10990, bins.concat(cars), 8, 30);
     // ⑥ centre: high-rise skyline, mid-rise blocks, a busy street
-    fill(4, 11000, 14000, H.concat(Mm), 0, 8); fill(3, 11000, 14000, Mm.concat(H), 0, 6); fill(2, 11000, 14000, Mm.concat('city:l3', 'shop_grocery', 'shop_elec', 'shop_clothes'), 2, 10);
+    fill(4, 11000, 14000, H.concat(Mm), 0, 8); fill(3, 11000, 14000, Mm.concat(H), 0, 6); fill(2, 11000, 14000, Mm.concat('city:l3', 'shop_grocery', 'shop_elec', 'shop_clothes'), 3, 15);
     fill(1, 11000, 14000, cars.concat(cars, bins, ['poster_board', 'billboard', 'direction_sign']), 5, 24);
     fill(-1, 11000, 14000, ['sedan', 'taxi', 'van', 'wheelie_bin'], 50, 120);
     // ⑦ the battered district: broken towers, ruins, wrecks, bent lamps
     fill(4, 14000, 17000, ['city:hd1', 'city:hd2', 'city:h3', 'city:h4', 'city:m2', 'city:m6', 'city:m5', 'city:m3'], 2, 22);
     fill(3, 14000, 17000, ['ruin_wall', 'city:m2', 'city:m6', 'city:m7', 'city:m4', 'ruin_small', 'city:hd2', 'city:hd1'], 4, 20);
-    fill(2, 14000, 17000, ['ruin_small', 'ruin_wall', 'sign_frame', 'billboard_dmg', 'city:l4'], 6, 26);
+    fill(2, 14000, 17000, ['ruin_small', 'ruin_wall', 'sign_frame', 'billboard_dmg', 'city:l4'], 8, 30);
     fill(1, 14000, 17000, ['lamp_bent', 'lamp_down', 'bin_burnt', 'bin_tipped', 'burn_drum', 'tires1', 'barrier1', 'hedgehog'].concat(wrecks, wrecks), 3, 20);
     fill(-1, 14000, 17000, ['taxi_burnt', 'sedan_dmg', 'lamp_down', 'barrier2'], 45, 120);
     // ⑧ desert highway (east): Iraqi positions under nets, obstacles, a last board

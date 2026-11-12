@@ -107,7 +107,7 @@ Object.assign(DS.Renderer.prototype, {
     // the base's ground behind the line: a low strip of sand rising toward the far wall, so the rows stand
     // one behind the other instead of all on the same line
     const lift = R.town ? () => 1 : x => { const t = Math.max(0, Math.min(1, (R.road[1] + 70 - x) / 60)); return t * t * (3 - 2 * t); };
-    if (!front && R.town) this.sidewalk(ctx, cam, grey);
+    if (!front && R.town) { this.backLot(ctx, cam, grey); this.sidewalk(ctx, cam, grey); }
     else if (!front && cam.left < R.road[1] + 70) {
       const st = Math.max(1, 4 / cam.zoom), a = cam.left - 1, b = Math.min(cam.right + 1, R.road[1] + 72), gy = T.height(Math.min(cam.x, R.road[1]));
       ctx.beginPath(); ctx.moveTo(a, T.height(a) - 0.3);
@@ -126,10 +126,15 @@ Object.assign(DS.Renderer.prototype, {
       const wd = p.w * par, im = this.propImg[p.k]; if (!im) continue;
       const ht = wd * im.height / im.width;
       if (x + wd / 2 < cam.left - 6 || x - wd / 2 > cam.right + 6) continue;
-      const y = T.height(front ? x : p.x) + (front ? -0.25 - R.front * 7 : LIFT[p.z] * lift(x));
+      const y = T.height(front ? x : p.x) + (front ? (R.town ? -R.roadW - 0.42 : -0.25 - R.front * 7) : LIFT[p.z] * lift(x));      // (town: on the near sidewalk)
       let src = im;
       if (grey != null) src = this.propTinted(p.k, 't' + p.z, grey(front ? 0 : haze), 1);
-      else if (haze || storm) src = this.propTinted(p.k, p.z, hz, Math.min(0.85, haze + storm * 0.25));
+      else if (haze || storm) src = this.propTinted(p.k, p.z, R.town && !storm ? '198,206,212' : hz, Math.min(0.85, haze + storm * 0.25));      // town: the far rows go blue-grey
+      // contact shade: the ground darkens under a building's foot (it sits on the ground, not in front of it)
+      if (grey == null && (p.k.startsWith('city:') || /^t:(market|shop|tin|shed|container|quonset|tent|canopy|shelter|ruin|watch)/.test(p.k))) {
+        const sh = ctx.createLinearGradient(0, y + 0.05, 0, y - 0.35 * par); sh.addColorStop(0, `rgba(40,30,20,${0.32 * (1 - haze)})`); sh.addColorStop(1, 'rgba(40,30,20,0)');
+        ctx.fillStyle = sh; ctx.fillRect(x - wd * 0.53, y - 0.35 * par, wd * 1.06, 0.4 * par);
+      }
       // cast shadow: the building's outline laid on the ground away from the sun, toward the viewer
       if (sun && grey == null) {
         const run = -sun.side * Math.min(3.2, sun.cot != null ? sun.cot : 1 / Math.tan(sun.el * Math.PI / 180)) * ht * 0.55, drop = (front ? 0.5 : 0.16 + 0.1 * par) * Math.min(1.6, 0.6 + ht / 4);
@@ -243,6 +248,28 @@ Object.assign(DS.Renderer.prototype, {
     ctx.strokeStyle = 'rgba(226,200,150,0.75)'; ctx.lineWidth = 0.22; ctx.beginPath(); on = false;
     for (let x = a; x < b; x += st) { const u = !R.urban(x); if (u && !on) { ctx.moveTo(x, T.height(x) - D); on = true; } else if (u) ctx.lineTo(x, T.height(x) - D); else on = false; }
     ctx.stroke();
+  },
+  // the ground behind the sidewalk in town: open ground rising toward the back rows (the plane seen at a slant),
+  // paler with distance, so the buildings stand on ground and the gaps between them show land, not the dunes
+  backLot(ctx, cam, grey) {
+    const T = this.w.terrain, R = DS.TOWN, st = Math.max(0.5, 3 / cam.zoom), a = cam.left - 1, b = cam.right + 1, top = 1.45;
+    let x = a;
+    while (x < b) {
+      const u = R.urban(x); let e = x; while (e < b && R.urban(e) === u) e += 2; e = Math.min(e, b);
+      if (u) {
+        ctx.save(); ctx.beginPath(); ctx.moveTo(x, T.height(x)); for (let q = x; q <= e; q += st) ctx.lineTo(q, T.height(q) + top); ctx.lineTo(e, T.height(e)); ctx.closePath(); ctx.clip();
+        if (grey != null) { ctx.fillStyle = `rgb(${grey(-0.4)})`; ctx.fillRect(x, T.height(x) - 1, e - x, top + 3); }
+        else {
+          const im = this.propImg['g:lot1'], im2 = this.propImg['g:alley1'];
+          if (im) this.groundTex(ctx, cam, im, x, e, top + 0.02, 0, 9, 0.38, 0); else { ctx.fillStyle = '#c9b08a'; ctx.fillRect(x, T.height(x) - 1, e - x, top + 3); }
+          if (im2) { ctx.globalAlpha = 0.45; this.groundTex(ctx, cam, im2, x, e, 0.75, 0, 5, 0.35, 2); ctx.globalAlpha = 1; }      // worn paving near the street
+          const gy = T.height((x + e) / 2), g = ctx.createLinearGradient(0, gy, 0, gy + top);
+          g.addColorStop(0, 'rgba(198,206,212,0)'); g.addColorStop(1, 'rgba(198,206,212,0.55)'); ctx.fillStyle = g; ctx.fillRect(x, gy - 1, e - x, top + 3);
+        }
+        ctx.restore();
+      }
+      x = e;
+    }
   },
   // sidewalk behind the road in town (a strip of the ground plane rising toward the building rows), kerb at its
   // front; out on the highway the desert shoulder instead

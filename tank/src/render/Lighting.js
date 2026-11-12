@@ -172,8 +172,9 @@ Object.assign(DS.Renderer.prototype, {
       const lamp = k === 't:lamp', s = wd / (lamp ? 3.47 : 1.87);
       L.push({ lamp: true, z: p.z, x, y, hx: lamp ? (p.f === -1 ? -1 : 1) * wd * 0.36 : 0, hy: ht * (lamp ? 0.93 : 0.82), s, haze }); return;
     }
-    // lit: houses, blocks and towers and the big market buildings; small shops, stalls and sheds stay dark
-    const bld = (k.startsWith('city:') && !/^city:(l5|l7)$/.test(k)) || /^t:(market_a|market_b|market_2storey|market_alley)$/.test(k);
+    // lit: houses, blocks and towers; the market (its buildings and everything standing in the market quarter),
+    // small shops, stalls and sheds stay dark
+    const bld = k.startsWith('city:') && !/^city:(l5|l7)$/.test(k) && !(DS.MAP && DS.MAP.town && DS.MAP.district(p.x)[2] === 'market');
     if (!bld) return;
     if (DS.MAP && DS.MAP.town && DS.MAP.district(p.x)[2] === 'ruins') return;
     L.push({ key: k, z: p.z, im, x, y, w: wd, h: ht, f: p.f, haze, variant: Math.abs(Math.round(p.x * 7.3)) % 9 });

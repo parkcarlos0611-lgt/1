@@ -65,6 +65,7 @@ DS.Game = class Game {
       for (const k of ['drive', 'fire', 'coaxFire', 'climb']) if (k in prev.input) prev.input[k] = typeof prev.input[k] === 'number' ? 0 : false;
     }
     if (v.ai) { v._aiBak = v.ai; v.ai = null; }
+    if (v.heli) { v.hoverAlt = null; v.lock = null; }                 // the pilot holds his own height
     W.vehicles.splice(W.vehicles.indexOf(v), 1); W.vehicles.unshift(v);
     this.player = v; this.target = null; this.thermal = false; this.nv = false;
     this.nightSight((W.env.night || 0) > 0.5);
@@ -92,7 +93,8 @@ DS.Game = class Game {
     const town = i === 'town', range = i === 'range', M = this.mission = town ? DS.TOWN : range ? DS.RANGE : DS.MISSIONS[i], W = this.world;
     if (range || town) { DS.MAP = M; W.terrain = new DS.Terrain(7, M.id); W.props = M.layout(); }
     if (range) this.rend.makeParked(W);
-    if (town) this.rend.loadTown();
+    if (town || M.map === 'town') this.rend.loadTown();
+    if (M.map === 'town') { DS.MAP = DS.TOWN; W.terrain = new DS.Terrain(7, 'town'); W.props = DS.TOWN.layout(); }
     document.getElementById('menu').hidden = true; document.body.classList.add('playing');
     let help = true; try { help = localStorage.getItem('ds.help') !== '0'; } catch (e) {}
     this.setHelp(help);
@@ -109,13 +111,26 @@ DS.Game = class Game {
       document.getElementById('editbtn').hidden = false;
       document.getElementById('editbtn').onclick = () => this.sbx.toggle();
     }
-    const v = range ? this.player : new DS.Vehicle(DS.VEHICLES[veh], M.start, W.terrain, { label: nm[veh] + ' (나)' });
+    if (M.player) veh = M.player;
+    const v = range ? this.player : new DS.Vehicle(DS.VEHICLES[veh], M.start, W.terrain, { label: M.friends ? M.friends[0][2] : nm[veh] + ' (나)' });
     if (town) { W.vehicles.push(v); this.player = v; }
     if (!range && !town) { W.vehicles.push(v); this.player = v; }
     // the other vehicle is an AI wingman. The tank always leads: with the Bradley, the M1A1 moves 45 m ahead
     // and takes the first contact; with the M1A1, the Bradley follows 45 m behind
     const off = veh === 'm2a2' ? 45 : -45;
-    if (!range && !town) {
+    if (M.friends) {
+      // a mission with its own order of battle: the player's vehicle is the first friend; the others follow it
+      // in file (tanks) or fly overwatch behind the platoons (helicopters)
+      const lead = v;
+      M.friends.slice(1).forEach(([id, x, label, o = {}]) => {
+        const def = DS.VEHICLES[id], f = new (def.heli ? DS.Heli : DS.Vehicle)(def, x, W.terrain, { dir: 1, label });
+        W.vehicles.push(f);
+        if (def.heli) { new DS.HeliAI(f, W, { lead, back: o.back, alt: o.alt, face: 1 }); f.place(lead.pos.x - (o.back || 600)); }
+        else new DS.TankAI(f, W, { follow: lead, offset: x - M.start });
+      });
+      for (const [id, x, label, mode] of M.enemies) { const e = new DS.Vehicle(DS.VEHICLES[id], x, W.terrain, { dir: -1, label }); W.vehicles.push(e); new DS.TankAI(e, W, { mode: mode || 'combat' }); }
+    }
+    if (!range && !town && !M.friends) {
     const wm = new DS.Vehicle(DS.VEHICLES[other], Math.max(12, M.start + off), W.terrain, { label: nm[other] + (veh === 'm2a2' ? ' (아군 선두)' : ' (아군)') });
     W.vehicles.push(wm); new DS.TankAI(wm, W, { follow: v, offset: off });
     for (const [id, x, label] of M.enemies) {
@@ -126,7 +141,7 @@ DS.Game = class Game {
     DS.FireControl.update(W, v, false);
     W.cam.x = v.pos.x; W.cam.y = v.pos.y;
     if ((W.env.night || 0) > 0.5) this.nightSight(true);
-    document.getElementById('h-title').textContent = range || town ? `${nm[veh] === '브래들리' ? 'M2A2' : nm[veh]} · ${M.name}` : `${nm[veh]} · 작전 ${i + 1} ${M.name}`;
+    document.getElementById('h-title').textContent = range || town ? `${nm[veh] === '브래들리' ? 'M2A2' : nm[veh] || DS.VEHICLES[veh].name} · ${M.name}` : `${nm[veh] || DS.VEHICLES[veh].name} · 작전 ${i + 1} ${M.name}`;
     document.getElementById('again').onclick = () => { location.hash = range || town ? M.id : 'm' + (i + 1) + (veh === 'm2a2' ? 'b' : ''); location.reload(); };
     document.getElementById('tomenu').onclick = () => { location.hash = ''; location.reload(); };
     this.artyInit();

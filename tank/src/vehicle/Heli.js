@@ -61,7 +61,7 @@ DS.Heli = class Heli extends DS.Vehicle {
     if (this.turnT > 0) { const before = this.turnT; this.turnT -= dt; if (before > 0.45 && this.turnT <= 0.45) this.setDir(-this.dir); }
     // stick held against the facing (on the ground or in the air): after a moment it pedal-turns round to fly
     // that way, rather than flying backwards (C still turns it at will)
-    if (this.alive && this.turnT <= 0 && (I.drive || 0) * this.dir < -0.3 && this.vel.x * this.dir < 12) { this._back = (this._back || 0) + dt; if (this._back > 0.3) { this._back = 0; this.turn(); } }
+    if (this.alive && !this.ai && this.turnT <= 0 && (I.drive || 0) * this.dir < -0.3 && this.vel.x * this.dir < 12) { this._back = (this._back || 0) + dt; if (this._back > 0.3) { this._back = 0; this.turn(); } }
     else this._back = 0;
     const lift = this.rpm > 0.85;
     let alt = this.alt();

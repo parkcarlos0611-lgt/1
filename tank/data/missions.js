@@ -24,3 +24,29 @@ DS.MISSIONS = [
     enemies: [['t55', 3500, 'T-55'], ['t62', 3660, 'T-62'], ['t72', 4250, 'T-72 #1'], ['t72', 4380, 'T-72 #2']],
   },
 ];
+// the last mission
+DS.MISSIONS.push(
+  // Kuwait: the advance on the town map (data/town.js) from its west end. Forces as the user set them; the
+  // scenario (phases, objectives) comes later. Iraqi platoons of three, Soviet fashion.
+  //   friends: [vehicle, x, label, ai options]  (the first is the player's)   enemies: [vehicle, x, label, mode]
+  {
+    id: 'kuwait', name: '쿠웨이트 진격', date: '1991년 2월 25일 05:30', map: 'town',
+    brief: '미 해병 전차대대가 국경 장애물 지대를 넘어 쿠웨이트시 외곽으로 들어선다. M60A1 2개 소대가 전진하고 AH-1W 코브라 2기가 뒤에서 엄호한다. 외곽 검문소와 창고 지대에 T-55 3개 소대, 도심 교차로에 T-62 2개 소대와 T-72가 있다. (시나리오 추후)',
+    cond: '새벽 · 맑음 · 바람 3 m/s', start: 520,
+    env: { visibility: 0, wind: 3, time: '05:30' },
+    player: 'm60a1',
+    friends: [
+      ['m60a1', 520, '1소대 1호 (나)'], ['m60a1', 495, '1소대 2호'], ['m60a1', 470, '1소대 3호'], ['m60a1', 445, '1소대 4호'],
+      ['m60a1', 400, '2소대 1호'], ['m60a1', 375, '2소대 2호'], ['m60a1', 350, '2소대 3호'], ['m60a1', 325, '2소대 4호'],
+      ['ah1w', 0, '코브라 1', { heli: true, back: 600, alt: 45 }], ['ah1w', 0, '코브라 2', { heli: true, back: 850, alt: 35 }],
+    ],
+    enemies: [
+      ['t55', 2300, 'T-55 1소대 1호', 'hold'], ['t55', 2328, 'T-55 1소대 2호', 'hold'], ['t55', 2356, 'T-55 1소대 3호', 'hold'],
+      ['t55', 3400, 'T-55 2소대 1호', 'hold'], ['t55', 3426, 'T-55 2소대 2호', 'hold'], ['t55', 3452, 'T-55 2소대 3호', 'hold'],
+      ['t55', 4500, 'T-55 3소대 1호', 'hold'], ['t55', 4526, 'T-55 3소대 2호', 'hold'], ['t55', 4552, 'T-55 3소대 3호', 'hold'],
+      ['t62', 11500, 'T-62 1소대 1호', 'hold'], ['t62', 11528, 'T-62 1소대 2호', 'hold'], ['t62', 11556, 'T-62 1소대 3호', 'hold'],
+      ['t62', 12800, 'T-62 2소대 1호', 'hold'], ['t62', 12828, 'T-62 2소대 2호', 'hold'], ['t62', 12856, 'T-62 2소대 3호', 'hold'],
+      ['t72', 13500, 'T-72 1호', 'combat'], ['t72', 13530, 'T-72 2호', 'combat'],
+    ],
+  }
+);

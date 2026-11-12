@@ -25,7 +25,8 @@ DS.Heli = class Heli extends DS.Vehicle {
     this.g.exhaust = { x: D.exhaust.x * d, y: D.exhaust.y }; this.g.sprocket.x = -4.5 * d; this.g.idler.x = 4.5 * d;
     this._platesT = -1;
   }
-  turn() { if (this.alive && this.turnT <= 0) this.turnT = 0.9; }
+  // turning round (C only): a short pause for the pedal turn, then it faces the other way at once
+  turn() { if (this.alive && this.turnT <= 0) this.turnT = 0.35; }
   alt() { return this.pos.y - this.def.flight.gearH - this.terrain.height(this.pos.x); }
   sightOrigin() { const S = this.def.sightAt; return this.local(this.dir * S[0], S[1]); }
   gunWorld() { return this.baseAng() + this.dir * this.gun.e; }
@@ -57,12 +58,8 @@ DS.Heli = class Heli extends DS.Vehicle {
     const want = this.alive ? (this.parked ? 0 : 1) : 0;
     this.rpm += (want - this.rpm) * Math.min(1, dt / (want > this.rpm ? 6 : 12)); this.rot += this.rpm * 30 * dt;
     this.spool += ((this.alive ? 0.45 + 0.4 * Math.abs(I.climb || 0) + 0.3 * Math.abs(I.drive || 0) : 0) - this.spool) * Math.min(1, dt / 1.2);
-    // turning round: half a second each way, the facing flips in the middle
-    if (this.turnT > 0) { const before = this.turnT; this.turnT -= dt; if (before > 0.45 && this.turnT <= 0.45) this.setDir(-this.dir); }
-    // stick held against the facing (on the ground or in the air): after a moment it pedal-turns round to fly
-    // that way, rather than flying backwards (C still turns it at will)
-    if (this.alive && !this.ai && this.turnT <= 0 && (I.drive || 0) * this.dir < -0.3 && this.vel.x * this.dir < 12) { this._back = (this._back || 0) + dt; if (this._back > 0.3) { this._back = 0; this.turn(); } }
-    else this._back = 0;
+    // turning round (C): after a short pause the facing flips
+    if (this.turnT > 0) { this.turnT -= dt; if (this.turnT <= 0) { this.turnT = 0; this.setDir(-this.dir); } }
     const lift = this.rpm > 0.85;
     let alt = this.alt();
     if (this.alive) {
@@ -202,7 +199,7 @@ Object.assign(DS.Renderer.prototype, {
   drawHeli(ctx, v, cam) {
     const D = v.def, S = D.src, F = D.flight, px = 1 / S.ppm, zp = cam.zoom * cam.dpr, [OX, OY] = S.origin || [680, 190], TH = S.tailHub || [1336, 100];
     // turning round: the airframe is seen end-on halfway through
-    const tk = v.turnT > 0 ? Math.abs(v.turnT - 0.45) / 0.45 : 1, sx = v.dir * Math.max(0.08, tk);
+    const sx = v.dir;                                  // (no squeeze: the turn is a straight flip after a pause)
     // a far-side Hellfire just off its rail is still behind the fuselage
     for (const m of this.w.missiles) if (m.owner === v && m.far && m.t < 0.45) this.drawMissile(ctx, m, cam);
     ctx.save(); ctx.translate(v.pos.x, v.pos.y); ctx.rotate(v.ang); ctx.scale(sx, 1);

@@ -733,9 +733,9 @@ DS.Renderer = class Renderer {
       if (x === x0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
     }
     // thin ink edge on the ground surface (matches the outlined art), with a sunlit lip just under it
-    ctx.save(); ctx.translate(0, -1.6 / cam.zoom);
-    ctx.strokeStyle = 'rgba(250,232,195,0.55)'; ctx.lineWidth = 1.2 / cam.zoom; ctx.stroke(); ctx.restore();
-    ctx.strokeStyle = 'rgba(64,46,26,0.85)'; ctx.lineWidth = Math.max(0.012, 1.3 / cam.zoom); ctx.lineJoin = 'round'; ctx.stroke();
+    ctx.save(); ctx.translate(0, -0.9 / cam.zoom);
+    ctx.strokeStyle = 'rgba(250,232,195,0.4)'; ctx.lineWidth = 0.6 / cam.zoom; ctx.stroke(); ctx.restore();
+    ctx.strokeStyle = 'rgba(64,46,26,0.7)'; ctx.lineWidth = 0.5 / cam.zoom; ctx.lineJoin = 'round'; ctx.stroke();      // about one device pixel at any zoom
   }
 
   // Contact shadow on the ground under each hull and thrown turret. In side view the ground plane runs

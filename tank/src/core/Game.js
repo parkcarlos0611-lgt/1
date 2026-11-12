@@ -546,39 +546,14 @@ DS.Game = class Game {
     c.setTransform(dpr, 0, 0, dpr, 0, 0);
     // our own muzzle blast and dust blind the sight for a moment (less in thermal)
     if (this.kick > 0) { c.fillStyle = `rgba(${this.thermal ? '150,150,150' : '205,180,140'},${Math.min(0.92, this.kick * (this.thermal ? 0.45 : 1.1))})`; c.fillRect(0, 0, W, H); }
-    if (this.thermal) { c.fillStyle = 'rgba(0,0,0,0.13)'; for (let y = 0; y < H; y += 3) c.fillRect(0, y, W, 1); }   // scan lines
-    // eyepiece vignette
-    const vg = c.createRadialGradient(cx, cy, W * 0.42, cx, cy, W * 0.51);
-    vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,0.88)'); c.fillStyle = vg; c.fillRect(0, 0, W, H);
-    // reticle: broken cross with mil ticks, aiming dot; range, round and ready symbols under it
-    const ink = this.thermal ? 'rgba(235,255,235,0.95)' : 'rgba(10,10,10,0.9)';
-    c.strokeStyle = ink; c.fillStyle = ink; c.lineWidth = 1.2;
-    const gap = Math.min(W * 0.05, Math.max(6, 2 * mil)), L = W * 0.36, tick = fld.fov < 1.5 ? 1 : fld.fov < 5 ? 2 : fld.fov < 8 ? 5 : fld.fov < 25 ? 20 : 100;
-    c.beginPath();
-    c.moveTo(cx - L, cy); c.lineTo(cx - gap, cy); c.moveTo(cx + gap, cy); c.lineTo(cx + L, cy);
-    c.moveTo(cx, cy + gap); c.lineTo(cx, cy + L); c.moveTo(cx, cy - gap); c.lineTo(cx, cy - L * 0.35);
-    for (let m = tick; m * mil < L; m += tick) {
-      const d = m * mil, h = (m / tick) % 2 ? 3 : 6;
-      c.moveTo(cx - d, cy - h); c.lineTo(cx - d, cy + h); c.moveTo(cx + d, cy - h); c.lineTo(cx + d, cy + h);
-      c.moveTo(cx - h, cy + d); c.lineTo(cx + h, cy + d);
-    }
-    c.stroke();
-    c.beginPath(); c.arc(cx, cy, 1.4, 0, 7); c.fill();
-    if (v.heli) {                             // TADS: corner brackets round the aiming point
-      const q = W * 0.2, e = W * 0.05; c.beginPath();
-      for (const [sx2, sy2] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) { c.moveTo(cx + sx2 * q, cy + sy2 * (q - e)); c.lineTo(cx + sx2 * q, cy + sy2 * q); c.lineTo(cx + sx2 * (q - e), cy + sy2 * q); }
-      c.stroke();
-    }
+    // reticle, the sight's own display and the eyepiece (src/render/SightHud.js)
     cv.classList.toggle('mono', !!v.heli);
     const g = v.gun, A = DS.AMMO[g.ammo], lasing = w.time - v.fc.lasedAt < 0.35;
-    c.font = `600 ${Math.max(12, Math.round(W / 30))}px ui-monospace, monospace`; c.textAlign = 'center';
-    const sym = this.thermal ? 'rgba(235,255,235,0.95)' : '#ffd34a', by = cy + L + Math.max(16, W / 22);
-    c.fillStyle = sym;
-    c.fillText(v.fc.range ? String(Math.round(v.fc.range)).padStart(4, '0') : '----', cx, by);
-    c.textAlign = 'right'; c.fillText(g.reload > 0 ? '' : '▮ READY', cx - W * 0.1, by);
-    c.textAlign = 'left'; c.fillText((v.tow && (v.tow.missile || v.tow.up >= 1) ? 'TOW' : A.sight || (A.type === 'HEAT' ? 'HEAT' : 'SABOT')) + (lasing ? '  ✱' : ''), cx + W * 0.1, by);
-    c.textAlign = 'center'; c.font = `600 ${Math.max(10, Math.round(W / 40))}px ui-monospace, monospace`;
-    c.fillText(`${v.def.sight.name || (v.def.sight.optical ? 'M32' : 'GPS')} ${fld.n ? fld.n + ' ' : ''}×${fld.mag}  ${this.thermal ? (v.heli ? 'FLIR ' : 'TIS ') + (this.blackHot ? 'BH' : 'WH') : this.nv ? 'PASSIVE' : 'DAY'}${v.heli && v.lock ? '  LOCK' : ''}${this.ranging ? '  RANGING' : ''}`, cx, cy - L - 6);
+    const mode = this.thermal ? (v.heli ? 'FLIR ' : 'TIS ') + (this.blackHot ? 'BH' : 'WH') : this.nv ? 'PASSIVE' : 'DAY';
+    DS.SightHud.draw(c, { v, W, H, mil, fld, thermal: this.thermal, nv: this.nv, lasing, ready: g.reload <= 0, bs: v.fc.bs,
+      range: v.fc.range, round: (v.tow && (v.tow.missile || v.tow.up >= 1) ? 'TOW' : A.sight || (A.type === 'HEAT' ? 'HEAT' : 'SABOT')),
+      title: `${v.def.sight.name || (v.def.sight.optical ? 'M32' : 'GPS')} ${fld.n ? fld.n + ' ' : ''}×${fld.mag}  ${mode}${v.heli && v.lock ? '  LOCK' : ''}${this.ranging ? '  RANGING' : ''}` });
+    if (this.thermal) { c.fillStyle = 'rgba(0,0,0,0.13)'; for (let y = 0; y < H; y += 3) c.fillRect(0, y, W, 1); }   // scan lines (over the symbols too)
   }
 };
 addEventListener('load', () => new DS.Game().start().catch(e => { document.getElementById('loading').textContent = '로딩 실패: ' + e.message; console.error(e); }));

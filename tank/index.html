@@ -31,7 +31,7 @@
   #help.hide { display: none; }
   #help kbd { display: inline-block; min-width: 18px; padding: 0 4px; border: 1px solid #8a7b60; border-radius: 3px; font: 11px monospace; text-align: center; }
   #sight { position: fixed; right: 10px; bottom: 56px; width: min(38vw, 54vh, 500px); aspect-ratio: 1; border-radius: 50%;
-    border: 7px solid #0e0c09; box-shadow: 0 0 0 2px rgba(255,255,255,.15), 0 6px 24px rgba(0,0,0,.4); background: #000; pointer-events: none; }
+    border: 2px solid #0b0a08; box-shadow: 0 0 0 1px rgba(255,255,255,.08), 0 0 0 5px rgba(10,9,7,.85), 0 6px 24px rgba(0,0,0,.45); background: #000; pointer-events: none; }
   #sight.big { right: auto; bottom: auto; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(92vh, 92vw); z-index: 4; }
   #sight.thermal { filter: grayscale(1) sepia(1) hue-rotate(68deg) saturate(2.6) brightness(.95); }
   /* helicopter sight (TADS FLIR): the same first-generation imager, shown in grey rather than green */
@@ -373,6 +373,7 @@
 <script src="src/world/Buildings.js"></script>
 <script src="src/world/City.js"></script>
 <script src="src/render/Lighting.js"></script>
+<script src="src/render/SightHud.js"></script>
 <script src="src/render/Post.js"></script>
 <script src="src/debug/DebugLayer.js"></script>
 <script src="src/ai/TankAI.js"></script>

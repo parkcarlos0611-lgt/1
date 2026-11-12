@@ -38,7 +38,7 @@ DS.VEHICLES = DS.VEHICLES || {};
     exhaust: { x: L(936, 256)[0], y: L(936, 256)[1] },
     gun: { name: 'M68 105mm', trunnion: L(1405, 193), muzzle: (1735 - 1405) / PPM,
       elevMax: 20, elevMin: -10, rate: 0.30, recoilLen: 0.30, recoilMass: 1900, reload: 7.5,
-      stabilized: true, stab: 0.6 },           // add-on stabiliser: holds 60 % of the hull's pitching out of the lay
+      stabilized: true, stab: 0.75 },          // add-on stabiliser: holds 75 % of the hull's pitching out of the lay
     coax: { name: 'M240 7.62mm 동축', ammo: 'M240_762', muzzle: L(1426, 203), rate: 750 / 60, rounds: 5950, spread: 0.7 },
     turretRing: L(1235, 238),
     antennas: [{ x: L(1085, 143)[0], y: L(1085, 143)[1], len: 1.25 }, { x: L(1118, 150)[0], y: L(1118, 150)[1], len: 1.7 }],

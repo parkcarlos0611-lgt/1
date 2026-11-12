@@ -224,7 +224,9 @@ DS.Vehicle = class Vehicle {
     if (this.alive && this.firepower) gs.aimW += this.input.elevRate * dt + this.input.elevStep;
     this.input.elevStep = 0;
     // an older stabiliser lets part of the hull's pitching through into the lay (gun.stab: share it holds out)
-    if (G.stab != null && !this.ai) gs.aimW += this.w * dt * (1 - G.stab);
+    // (an AI crew lays its gun afresh each frame, so for it the leak is kept as a drift it works off at its
+    // gunner's pace: src/ai/TankAI.js)
+    if (G.stab != null) { const leak = this.w * dt * (1 - G.stab); gs.aimW += leak; gs.drift = Math.max(-0.05, Math.min(0.05, (gs.drift || 0) + leak)); }
     // gun target = sight line + superelevation from the fire-control computer; clamp the sight so
     // the gun stays inside its mount limits (reversing direction then responds at once)
     const base = this.baseAng(), wrap = a => Math.atan2(Math.sin(a), Math.cos(a));

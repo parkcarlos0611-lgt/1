@@ -32,7 +32,7 @@ DS.VEHICLES = DS.VEHICLES || {};
       vmaxF: 50 / 3.6, vmaxR: 8 / 3.6, brake: 3.7e5, engineBrake: 2.6e4 },
     exhaust: { x: -2.96, y: -0.15 },
     gun: { name: 'U-5TS 115mm', trunnion: L(1395, 438), muzzle: (1740 - 1395) / PPM,
-      elevMax: 16, elevMin: -6, rate: 0.22, recoilLen: 0.42, recoilMass: 2100, reload: 8.0, stabilized: true, stab: 0.5,
+      elevMax: 16, elevMin: -6, rate: 0.22, recoilLen: 0.42, recoilMass: 2100, reload: 8.0, stabilized: true, stab: 0.45,
       // the spent 115 mm steel case is thrown out of the hatch in the turret rear as the breech opens
       eject: { at: 0.9, port: L(1168, 418), dia: 0.115, len: 0.72, v: 5.5 } },
     // anti-aircraft DShKM on the cupola: fired by hand (right mouse button), wide elevation for air targets

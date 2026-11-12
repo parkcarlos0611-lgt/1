@@ -33,7 +33,7 @@ DS.VEHICLES = DS.VEHICLES || {};
       vmaxF: 50 / 3.6, vmaxR: 8 / 3.6, brake: 3.6e5, engineBrake: 2.6e4 },
     exhaust: { x: -2.8, y: -0.145 },
     gun: { name: 'D-10T2S 100mm', trunnion: L(1410, 135), muzzle: (1740 - 1410) / PPM,
-      elevMax: 17, elevMin: -5, rate: 0.20, recoilLen: 0.55, recoilMass: 1950, reload: 8.5, stabilized: true, stab: 0.45 },
+      elevMax: 17, elevMin: -5, rate: 0.20, recoilLen: 0.55, recoilMass: 1950, reload: 8.5, stabilized: true, stab: 0.30 },
     // anti-aircraft DShKM on the cupola: fired by hand (right mouse button), wide elevation for air targets
     mg: { name: 'DShKM 12.7mm', short: 'DShK', ammo: 'DSHK', pivotPx: [1270, 52], pivot: L(1270, 52), muzzle: [(1354 - 1270) / PPM, -(42 - 52) / PPM],
       elevMin: -5, elevMax: 80, rate: 600 / 60, rounds: 300, spread: 1.6 },

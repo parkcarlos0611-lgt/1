@@ -138,10 +138,14 @@ DS.TankAI = class TankAI {
       const px = o.x + (t.x - o.x) / d * this.rangeEst, py = o.y + (t.y - o.y) / d * this.rangeEst;
       if (v.gun.ammo !== this.ammo) v.gun.ammo = this.ammo;
       this.sol = DS.FireControl.solve(v, this.ammo, px, py);
-      this.jit = DS.AI.gauss(r) * S.aimErr * K.aim / 1000 * (1 + Math.pow(range / 800, 2)) * (v.vt && Math.abs(v.vt) > 1 ? 1.8 : 1);   // lay error grows quickly with range (tools/hitbench.js); worse on the move
+      this.jit = DS.AI.gauss(r) * S.aimErr * K.aim / 1000 * (1 + Math.pow(range / 800, 2)) * (v.vt && Math.abs(v.vt) > 1 ? 1.3 : 1);   // lay error grows quickly with range (tools/hitbench.js); a little worse on the move (the stabiliser's leak comes on top)
     }
     v.fc.se = 0;
-    v.gun.aimW = this.sol + this.jit;
+    // the hull's rocking the stabiliser lets through throws the lay off; the gunner works it back at about
+    // 15 mrad/s (Iraqi crews: 10)
+    const gs = v.gun, back = (K.aim > 1 ? 0.010 : 0.015) * dt;
+    gs.drift = Math.sign(gs.drift || 0) * Math.max(0, Math.abs(gs.drift || 0) - back);
+    v.gun.aimW = this.sol + this.jit + gs.drift;
     this.lay += dt;
     const err = Math.abs(Math.atan2(Math.sin(v.gunWorld() - v.gun.aimW), Math.cos(v.gunWorld() - v.gun.aimW)));
     const need = this.shots ? S.layTime * 0.6 + K.lay * 0.5 : S.layTime + K.lay;

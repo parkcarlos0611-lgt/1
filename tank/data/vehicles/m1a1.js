@@ -57,7 +57,7 @@ DS.VEHICLES = DS.VEHICLES || {};
       muzzle: (1416 - 890) / PPM,    // trunnion → muzzle (m)
       elevMax: 20, elevMin: -10, rate: 0.40,   // deg, deg, rad/s
       recoilLen: 0.30, recoilMass: 2900, reload: 6.5,
-      stabilized: true,
+      stabilized: true, stab: 0.96,        // two-axis stabiliser: holds 96 % of the hull's pitching out of the lay
     },
     turretRing: L(600, 840),
     // secondary armament (the loader's M240 is not modelled)

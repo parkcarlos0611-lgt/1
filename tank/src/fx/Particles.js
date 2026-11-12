@@ -20,6 +20,7 @@ DS.Particles = class Particles {
     this.drag[i] = o.drag != null ? o.drag : 0.5; this.grav[i] = o.grav != null ? o.grav : 1;
     this.alpha[i] = o.alpha != null ? o.alpha : 1; this.col[i] = o.col != null ? o.col : 0xd8b67c;
     this.rot[i] = Math.random() * 6.28; this.mass[i] = o.mass || 0;
+    if (o.age) this.life[i] = o.age * ttl;          // born part-way into its life: no fade-in (a jet's trail is dense at once)
   }
   update(dt, terrain, wind) {
     const g = DS.T.g;

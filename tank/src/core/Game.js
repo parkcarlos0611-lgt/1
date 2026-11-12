@@ -20,6 +20,7 @@ DS.Game = class Game {
     await this.rend.loadCity();
     await this.rend.loadFlora();
     await this.rend.loadHeli(DS.VEHICLES.ah64a);
+    await this.rend.loadMunitions();
     DS.Armor.calibrate();
     this.resize(); addEventListener('resize', () => this.resize());
     document.getElementById('loading').remove();

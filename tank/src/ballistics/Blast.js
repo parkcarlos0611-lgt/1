@@ -47,9 +47,12 @@ DS.Blast = {
     const cx = land ? land.x : p.x, tf = (q.t - p.t) + 2.5;
     W.fx.flashes.push({ x: p.x, y: p.y, dx: 0, dy: 1, t: 0, ttl: 0.08, boom: true });
     for (let i = 0; i < 10; i++) W.particles.add(DS.P.SMOKE, p.x, p.y, (Math.random() - 0.5) * 20, (Math.random() - 0.5) * 20, 3 + Math.random() * 3, 1.5, { grow: 2, drag: 1, grav: 0, alpha: 0.4, col: 0xdad4c8 });
-    const t0 = W.time + tf, shown = 44;
+    const t0 = W.time + tf, shown = 44, F = W.fx.falling || (W.fx.falling = []);
+    for (let i = F.length - 1; i >= 0; i--) if (W.time - F[i].t0 > F[i].T) F.splice(i, 1);
     for (let i = 0; i < shown; i++) {
       const x = cx + DS.AI.gauss(rnd) * C.half * 0.5, at = t0 + Math.random() * 2.2 + Math.abs(x - cx) / C.half * 0.4;
+      // seen on the way down: thrown out of the opening warhead, landing where and when its burst is scheduled
+      { const Tf = at - W.time, yg = T.height(x); F.push({ x0: p.x, y0: p.y, t0: W.time, T: Tf, vx: (x - p.x) / Tf, vy: (yg - p.y + g / 2 * Tf * Tf) / Tf, ph: i }); }
       W.sched.push({ t: at, fn: () => { const y = T.height(x); W.fx.bomblet(x, y, i % 3 !== 0); if (i % 4 === 0) T.crater(x, 0.5, 0.12, 0.3, 0); for (const b of W.buildings) b.blast(W, x, y, 1.2); } });
     }
     W.sched.push({ t: t0, fn: () => DS.Audio.crackle(cx, T.height(cx), 40, 2.6) });

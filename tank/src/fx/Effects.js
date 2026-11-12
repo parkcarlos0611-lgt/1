@@ -223,7 +223,7 @@ DS.Effects = class Effects {
     const lx = m._sx === undefined ? bx : m._sx, ly = m._sy === undefined ? by : m._sy, d = Math.hypot(bx - lx, by - ly);
     const on = m.t < burn, n = Math.min(40, Math.floor(d / (on ? 0.8 : 2.5)));
     for (let i = 0; i < n; i++) { const f = (i + Math.random()) / n;
-      P.add(K.SMOKE, lx + (bx - lx) * f, ly + (by - ly) * f, this.rnd(-0.4, 0.4), this.rnd(-0.1, 0.4), this.rnd(2.5, 5), on ? this.rnd(0.12, 0.2) : 0.12, { grow: on ? 0.55 : 0.3, drag: 1.5, grav: -0.01, alpha: on ? 0.32 : 0.1, col: 0xdedad2 }); }
+      P.add(K.SMOKE, lx + (bx - lx) * f, ly + (by - ly) * f, this.rnd(-0.4, 0.4), this.rnd(-0.1, 0.4), this.rnd(2.5, 5), on ? this.rnd(0.12, 0.2) : 0.12, { grow: on ? 0.55 : 0.3, drag: 1.5, grav: -0.01, alpha: on ? 0.32 : 0.1, col: 0xdedad2, age: 0.1 }); }
     if (n > 0 || m._sx === undefined) { m._sx = bx; m._sy = by; }
   }
   bulletGround(h) {
@@ -505,8 +505,11 @@ DS.Effects = class Effects {
   // smoke trail of a burning rocket motor (MLRS rocket, rocket-assisted shell)
   rocketTrail(p, dt) {
     if (!this.w.cam.visible(p.x, p.y, 60)) return;
-    const P = this.P, K = DS.P, sp = Math.hypot(p.vx, p.vy), n = Math.min(6, Math.ceil(sp * dt / 6));
-    for (let i = 0; i < n; i++) { const f = i / n; P.add(K.SMOKE, p.x - p.vx * dt * f, p.y - p.vy * dt * f, this.rnd(-1, 1), this.rnd(-1, 1), this.rnd(3, 6), this.rnd(0.6, 1.1), { grow: 0.9, drag: 1.5, grav: -0.01, alpha: 0.42, col: 0xe8e2d8 }); }
+    const P = this.P, K = DS.P, sp = Math.hypot(p.vx, p.vy), big = p.ammo.d > 0.15, n = Math.min(big ? 30 : 6, Math.ceil(sp * dt / (big ? 0.8 : 6)));
+    // the motor's nozzle is at the rocket's tail (once it has left the tube)
+    const lk = p.ammo.look, off = lk ? Math.min(lk.len, Math.hypot(p.x - p.x0, p.y - p.y0)) / Math.max(sp, 1) : 0;
+    p = { x: p.x - p.vx * off, y: p.y - p.vy * off, vx: p.vx, vy: p.vy };
+    for (let i = 0; i < n; i++) { const f = i / n; P.add(K.SMOKE, p.x - p.vx * dt * f, p.y - p.vy * dt * f, this.rnd(-1, 1), this.rnd(-1, 1), this.rnd(3, 6) * (big ? 2 : 1), this.rnd(0.6, 1.1) * (big ? 1.5 : 1), { grow: big ? 1.1 : 0.9, drag: 1.5, grav: -0.01, alpha: big ? 0.5 : 0.42, col: 0xe8e2d8, age: 0.1 }); }
     P.add(K.FIRE, p.x - p.vx * dt, p.y - p.vy * dt, -p.vx * 0.05, -p.vy * 0.05, 0.08, 0.9, { grow: 3, drag: 4, grav: 0, alpha: 1, col: 0xffd080 });
   }
   // one bomblet going off on the ground: a sharp little burst

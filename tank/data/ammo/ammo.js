@@ -118,6 +118,31 @@ DS.AMMO = {
 };
 DS.AMMO_ORDER = ['M829A1', 'M829', 'M830'];
 
+// What each round looks like in flight (src/render/Renderer.js, projectiles): drawn at its true size at the
+// head of its streak. spr = a sprite cut from a photo (tools/cut_munitions.py), else drawn in code:
+//   dart   long-rod penetrator with tail fins (APFSDS)        shell   ogive body with a driving band
+//   heat   fin-stabilised HEAT: thin nose probe, body, fins     rocket  small rocket with tail fins
+// len, dia in metres; fin = fin span; col = body paint.
+(function (L) {
+  for (const [id, v] of Object.entries(L)) if (DS.AMMO[id]) DS.AMMO[id].look = v;
+})({
+  M829A1: { k: 'dart', len: 0.78, dia: 0.027, fin: 0.085, col: '#4b4a46' },
+  M829:   { k: 'dart', len: 0.78, dia: 0.027, fin: 0.085, col: '#4b4a46' },
+  M833:   { k: 'dart', len: 0.60, dia: 0.024, fin: 0.075, col: '#4b4a46' },
+  '3BM9': { k: 'dart', len: 0.55, dia: 0.040, fin: 0.12, col: '#55534c' },
+  '3BM4': { k: 'dart', len: 0.50, dia: 0.040, fin: 0.11, col: '#55534c' },
+  M830:   { k: 'heat', len: 0.98, dia: 0.120, fin: 0.12, col: '#2f3324', band: '#e0c000' },
+  M456A2: { k: 'heat', len: 0.62, dia: 0.105, fin: 0.105, col: '#2f3324', band: '#e0c000' },
+  '3BK12':{ k: 'heat', len: 0.68, dia: 0.125, fin: 0.36, col: '#3b3f2c' },
+  '3BK4': { k: 'heat', len: 0.66, dia: 0.115, fin: 0.33, col: '#3b3f2c' },
+  '3BM8': { k: 'dart', len: 0.32, dia: 0.045, fin: 0, col: '#3d3d3a' },
+  BR412D: { k: 'shell', len: 0.42, dia: 0.100, col: '#3d3f37' },
+  M107:   { spr: 'munitions/s155', len: 0.70, dia: 0.155 },
+  M549A1: { spr: 'munitions/s155', len: 0.87, dia: 0.155 },
+  M26:    { spr: 'munitions/m26', len: 3.94, dia: 0.30 },
+  HYDRA:  { k: 'rocket', len: 1.06, dia: 0.070, fin: 0.17, col: '#4b5236' },
+});
+
 // Armour materials: RHA-equivalence multipliers on line-of-sight thickness, vs KE and vs CE (HEAT).
 DS.MATERIALS = {
   rha:        { name: '압연강(RHA)', ke: 1.00, ce: 1.00 },

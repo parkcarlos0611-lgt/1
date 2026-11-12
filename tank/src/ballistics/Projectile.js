@@ -11,7 +11,7 @@ DS.cdAt = function (tab, M) {
 DS.Projectile = class Projectile {
   constructor(x, y, vx, vy, ammo, owner) {
     this.x = x; this.y = y; this.vx = vx; this.vy = vy; this.ammo = ammo; this.owner = owner;
-    this.t = 0; this.alive = true; this.x0 = x;
+    this.t = 0; this.alive = true; this.x0 = x; this.y0 = y;
     this.area = Math.PI * ammo.d * ammo.d / 4;
     this.ignore = owner; this.ignoreT = 0;
   }

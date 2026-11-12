@@ -1037,10 +1037,80 @@ DS.Renderer = class Renderer {
     for (const p of this.w.projectiles) {
       if (p.ammo.small && !p.tracer) continue;                  // only tracer rounds are visible
       const v = Math.hypot(p.vx, p.vy), L = p.ammo.small ? Math.min(v * 0.012, 12) : Math.min(v * 0.025, 40);
-      const g = ctx.createLinearGradient(p.x, p.y, p.x - p.vx / v * L, p.y - p.vy / v * L);
+      const lk = p.ammo.look, off = lk ? Math.min(lk.len, Math.hypot(p.x - p.x0, p.y - p.y0)) : 0;
+      // streak: the tracer burning at the base and the eye's smear of a body crossing the view in a frame
+      const sx = p.x - p.vx / v * off, sy = p.y - p.vy / v * off;
+      const g = ctx.createLinearGradient(sx, sy, sx - p.vx / v * L, sy - p.vy / v * L);
       g.addColorStop(0, p.ammo.tracer); g.addColorStop(1, 'rgba(255,200,120,0)');
       ctx.strokeStyle = g; ctx.lineWidth = Math.max(0.06, 2 / cam.zoom);
-      ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x - p.vx / v * L, p.y - p.vy / v * L); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(sx - p.vx / v * L, sy - p.vy / v * L); ctx.stroke();
+      if (lk && lk.len * cam.zoom > 2) this.drawRound(ctx, p, lk, off, cam);
+    }
+    this.drawFalling(ctx, cam);
+  }
+
+  loadMunitions() {
+    return Promise.all(['m26', 's155'].map(n => new Promise(res => { const im = new Image(); im.onload = () => { this.mips['munitions/' + n] = this.buildMips(im); res(); }; im.onerror = () => res(); im.src = 'assets/sprites/munitions/' + n + '.png'; })));
+  }
+  // a round in flight at its true size, nose at the projectile's point; only what has cleared the muzzle or the
+  // launcher tube (`vis` metres) is drawn. Sprites come from photos, the rest is drawn here.
+  drawRound(ctx, p, lk, vis, cam) {
+    if (vis <= 0.01) return;
+    const a = Math.atan2(p.vy, p.vx), len = lk.len, d = lk.dia;
+    ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(a); if (Math.cos(a) < 0) ctx.scale(1, -1);
+    if (p.burning && vis >= len * 0.98) {          // rocket motor plume out of the nozzle
+      const fl = len * (0.7 + Math.random() * 0.25), w = d * 0.55, x0 = -len;
+      const fg = ctx.createLinearGradient(x0, 0, x0 - fl, 0);
+      fg.addColorStop(0, 'rgba(255,252,235,1)'); fg.addColorStop(0.25, 'rgba(255,205,110,0.9)'); fg.addColorStop(1, 'rgba(255,120,40,0)');
+      ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = fg; ctx.beginPath();
+      ctx.moveTo(x0, -w); ctx.quadraticCurveTo(x0 - fl * 0.3, -w * 1.5, x0 - fl, 0); ctx.quadraticCurveTo(x0 - fl * 0.3, w * 1.5, x0, w); ctx.fill();
+      ctx.globalCompositeOperation = 'source-over';
+    }
+    if (lk.spr) {
+      const m = this.mips[lk.spr];
+      if (m) { const im = this.pick(lk.spr, len * cam.zoom * cam.dpr), f = vis / len;
+        ctx.scale(1, -1); ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(im, im.width * (1 - f), 0, im.width * f, im.height, -vis, -d / 2, vis, d); }
+      ctx.restore(); return;
+    }
+    ctx.beginPath(); ctx.rect(-vis, -1, vis + 0.01, 2); ctx.clip();
+    const fins = (x0, span, w, col) => { if (!span) return; ctx.fillStyle = col; ctx.beginPath();
+      ctx.moveTo(x0, -span / 2); ctx.lineTo(x0 + w * 0.6, -span / 2); ctx.lineTo(x0 + w, -d / 2); ctx.lineTo(x0 + w, d / 2); ctx.lineTo(x0 + w * 0.6, span / 2); ctx.lineTo(x0, span / 2); ctx.closePath(); ctx.fill(); };
+    if (lk.k === 'dart') {                       // rod, ballistic tip, fin can
+      fins(-len, lk.fin, Math.min(0.13, len * 0.2), '#77756c');
+      ctx.fillStyle = lk.col; ctx.beginPath(); ctx.moveTo(-len, -d / 2); ctx.lineTo(-0.07, -d / 2); ctx.lineTo(0, 0); ctx.lineTo(-0.07, d / 2); ctx.lineTo(-len, d / 2); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.18)'; ctx.fillRect(-len, -d / 2, len - 0.07, d * 0.3);
+    } else if (lk.k === 'heat') {                 // spike nose, ogive body, tail boom, fins
+      const b0 = -len * 0.78, b1 = -len * 0.2;
+      ctx.fillStyle = '#2a2a26'; ctx.fillRect(-len, -d * 0.18, len * 0.24, d * 0.36);
+      fins(-len, lk.fin, len * 0.16, '#3a3d30');
+      ctx.fillStyle = lk.col; ctx.beginPath(); ctx.moveTo(b0, -d / 2); ctx.lineTo(b1 - d * 0.6, -d / 2); ctx.quadraticCurveTo(b1, -d / 2, b1 + 0.01, -d * 0.12);
+      ctx.lineTo(b1 + 0.01, d * 0.12); ctx.quadraticCurveTo(b1, d / 2, b1 - d * 0.6, d / 2); ctx.lineTo(b0, d / 2); ctx.fill();
+      ctx.fillStyle = '#2a2a26'; ctx.fillRect(b1, -0.012, -b1, 0.024);
+      if (lk.band) { ctx.fillStyle = lk.band; ctx.fillRect(b0 + len * 0.12, -d / 2, 0.02, d); }
+      ctx.fillStyle = 'rgba(255,255,255,0.14)'; ctx.fillRect(b0, -d / 2, b1 - b0 - d * 0.6, d * 0.25);
+    } else if (lk.k === 'shell') {               // full-calibre shell: ogive, body, copper band
+      ctx.fillStyle = lk.col; ctx.beginPath(); ctx.moveTo(-len, -d / 2); ctx.lineTo(-len * 0.45, -d / 2); ctx.quadraticCurveTo(-len * 0.05, -d / 2, 0, 0);
+      ctx.quadraticCurveTo(-len * 0.05, d / 2, -len * 0.45, d / 2); ctx.lineTo(-len, d / 2); ctx.fill();
+      ctx.fillStyle = '#b07a3c'; ctx.fillRect(-len * 0.88, -d / 2, len * 0.07, d);
+      ctx.fillStyle = 'rgba(255,255,255,0.15)'; ctx.fillRect(-len, -d / 2, len * 0.55, d * 0.25);
+    } else if (lk.k === 'rocket') {              // Hydra: tube, nose cone, wrap-around fins
+      fins(-len, lk.fin, len * 0.1, '#3a3d30');
+      ctx.fillStyle = lk.col; ctx.beginPath(); ctx.moveTo(-len, -d / 2); ctx.lineTo(-len * 0.22, -d / 2); ctx.lineTo(0, 0); ctx.lineTo(-len * 0.22, d / 2); ctx.lineTo(-len, d / 2); ctx.fill();
+      ctx.fillStyle = '#c9b44a'; ctx.fillRect(-len * 0.3, -d / 2, 0.015, d);
+    }
+    ctx.restore();
+  }
+  // M77 bomblets on their way down from the opened M26 warhead: small dark cylinders under a white ribbon
+  drawFalling(ctx, cam) {
+    const F = this.w.fx.falling; if (!F || !F.length) return;
+    const t = this.w.time, g = DS.T.g, r = Math.max(0.04, 1 / cam.zoom);
+    for (const b of F) {
+      const u = t - b.t0; if (u < 0 || u > b.T) continue;
+      const x = b.x0 + b.vx * u, y = b.y0 + b.vy * u - g / 2 * u * u, vy = b.vy - g * u, a = Math.atan2(vy, b.vx);
+      ctx.strokeStyle = 'rgba(238,236,228,0.85)'; ctx.lineWidth = Math.max(0.02, 0.8 / cam.zoom);
+      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - Math.cos(a) * 0.35 + Math.sin(u * 30 + b.ph) * 0.05, y - Math.sin(a) * 0.35); ctx.stroke();
+      ctx.save(); ctx.translate(x, y); ctx.rotate(a); ctx.fillStyle = '#3c4030'; ctx.fillRect(-Math.max(0.08, 2 * r), -Math.max(0.02, r) , Math.max(0.08, 2 * r), Math.max(0.04, 2 * r)); ctx.restore();
     }
   }
 };

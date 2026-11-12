@@ -233,6 +233,7 @@
   <div><kbd>−</kbd><kbd>=</kbd> 조준경 거리 눈금 ±100 m (T-55 / T-62: 거리측정기 없음)</div>
   <div><kbd>I</kbd> 자주포: 직사 / 곡사 · <kbd>K</kbd> 장약 · <kbd>O</kbd> 저각/고각 · <kbd>J</kbd> 자동/수동 정렬</div>
   <div>아파치 조준경: <kbd>V</kbd> 시야 단계 (주간 50° / 4° / 0.9° · 열상 50° / 10° / 3.1° / 0.45°), <kbd>Shift</kbd>+<kbd>V</kbd> 반대로</div>
+  <div>코브라 조준경(TSU): <kbd>V</kbd> ×2 / ×13 — 주간 광학만, 야간 조준 장비 없음</div>
   <div>헬기: <kbd>W</kbd><kbd>S</kbd> 상승/하강 · <kbd>A</kbd><kbd>D</kbd> 기울여 가속 · <kbd>C</kbd> 방향 전환 · 마우스 조준 · <kbd>Space</kbd> 기관포 · <kbd>F</kbd> 로켓 · <kbd>X</kbd> 헬파이어 · <kbd>Backspace</kbd> 표적 고정(조준경이 따라감) · 우클릭 해제</div>
   <div><kbd>L</kbd> 사격장: 편집 모드 (표적 배치 · 장비 교체 · 환경)</div>
   <div><kbd>F9</kbd> 물리 디버그 · <kbd>H</kbd> 키 가이드 끄기/켜기</div>
@@ -241,9 +242,9 @@
 <button id="editbtn" type="button" hidden title="편집 모드 (L)">편집 L</button>
 <aside id="sbx" hidden aria-label="사격장 편집">
   <h3>내 장비 <small id="sb-count"></small></h3>
-  <div class="row"><button type="button" data-me="m1a1">M1A1</button><button type="button" data-me="m2a2">M2A2 브래들리</button><button type="button" data-me="m60a1">M60A1</button><button type="button" data-me="m109a3">M109A3</button><button type="button" data-me="m270">MLRS</button><button type="button" data-me="ah64a">AH-64A</button><button type="button" data-me="t55">T-55</button><button type="button" data-me="t62">T-62</button><button type="button" data-me="t72">T-72</button><button type="button" data-go="me">내 위치로</button></div>
+  <div class="row"><button type="button" data-me="m1a1">M1A1</button><button type="button" data-me="m2a2">M2A2 브래들리</button><button type="button" data-me="m60a1">M60A1</button><button type="button" data-me="m109a3">M109A3</button><button type="button" data-me="m270">MLRS</button><button type="button" data-me="ah64a">AH-64A</button><button type="button" data-me="ah1w">AH-1W</button><button type="button" data-me="t55">T-55</button><button type="button" data-me="t62">T-62</button><button type="button" data-me="t72">T-72</button><button type="button" data-go="me">내 위치로</button></div>
   <h3>표적 배치</h3>
-  <div class="row"><button type="button" data-tool="t55">T-55</button><button type="button" data-tool="t62">T-62</button><button type="button" data-tool="t72">T-72</button><button type="button" data-tool="m1a1">M1A1</button><button type="button" data-tool="m2a2">M2A2</button><button type="button" data-tool="m60a1">M60A1</button><button type="button" data-tool="m109a3">M109A3</button><button type="button" data-tool="m270">MLRS</button><button type="button" data-tool="ah64a">AH-64A</button></div>
+  <div class="row"><button type="button" data-tool="t55">T-55</button><button type="button" data-tool="t62">T-62</button><button type="button" data-tool="t72">T-72</button><button type="button" data-tool="m1a1">M1A1</button><button type="button" data-tool="m2a2">M2A2</button><button type="button" data-tool="m60a1">M60A1</button><button type="button" data-tool="m109a3">M109A3</button><button type="button" data-tool="m270">MLRS</button><button type="button" data-tool="ah64a">AH-64A</button><button type="button" data-tool="ah1w">AH-1W</button></div>
   <div class="row"><label for="sb-bld">건물</label><select id="sb-bld"><option value="h1">고층 아파트 A</option><option value="h2">유리 업무 빌딩</option><option value="h3">고층 아파트 B</option><option value="h4">아치 기단 빌딩</option><option value="h5">업무 빌딩</option><option value="h6">원통형 빌딩</option><option value="hd1">파손된 고층 A</option><option value="hd2">파손된 고층 B</option><option value="m1">중층 건물 1</option><option value="m2">중층 건물 2</option><option value="m3">중층 건물 3</option><option value="m4">중층 건물 4</option><option value="m5">중층 건물 5</option><option value="m6">중층 건물 6</option><option value="m7">중층 건물 7</option><option value="l1">단층 연립</option><option value="l2">아치 건물</option><option value="l3">2층 상가주택</option><option value="l4">돔 건물</option><option value="l5">상점 건물</option><option value="l6">창고</option><option value="l7">차양 시장</option></select><button type="button" data-bld="1">배치</button><button type="button" data-act="clearb">건물 모두 삭제</button></div>
 
   <p id="sb-selname"></p>
@@ -337,6 +338,7 @@
 <script src="data/vehicles/m109a3.js"></script>
 <script src="data/vehicles/m270.js"></script>
 <script src="data/vehicles/ah64a.js"></script>
+<script src="data/vehicles/ah1w.js"></script>
 <script src="data/ammo/ammo.js"></script>
 <script src="src/world/Terrain.js"></script>
 <script src="src/vehicle/Track.js"></script>

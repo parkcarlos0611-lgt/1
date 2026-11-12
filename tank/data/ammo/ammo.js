@@ -73,6 +73,10 @@ DS.AMMO = {
   M789: { name: 'M789 HEDP 30mm', short: 'M789', sight: 'HEDP', type: 'HEDP', small: true, v0: 805, mass: 0.236, d: 0.03,
     cd: [[0, 0.25], [1, 0.5], [2, 0.44], [3, 0.4]], launchMass: 0.35, sabot: false, tracer: '#ffb060', tracerEvery: 3,
     pen: { ce: 50 }, crit: 75 },
+  // ---- AH-1W: 20 mm M197 (M56 HEI / M53 API mixed belt) ----
+  M56: { name: 'M56A3 HEI 20mm', short: 'M56', sight: 'HEI', type: 'HEI', small: true, v0: 1030, mass: 0.1, d: 0.02,
+    cd: [[0, 0.25], [1, 0.5], [2, 0.44], [3, 0.4]], launchMass: 0.14, sabot: false, tracer: '#ffb060', tracerEvery: 4,
+    pen: { ce: 30 }, crit: 75 },
   HYDRA: { name: 'Hydra 70 (M151 고폭)', short: 'Hydra 70', type: 'HEAT', v0: 45, mass: 10, d: 0.07,
     cd: [[0, 0.3], [0.9, 0.32], [1.1, 0.5], [2, 0.4], [3, 0.33]], launchMass: 0, sabot: false, tracer: '#ffd9a0',
     rocket: { at: 0, burn: 1.1, acc: 620 },

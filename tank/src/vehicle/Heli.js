@@ -1,4 +1,4 @@
-// Attack helicopter (AH-64A). A Vehicle subclass so sensors, armour, damage, fire and the HUD work unchanged,
+// Attack helicopter (AH-64A, AH-1W). A Vehicle subclass so sensors, armour, damage, fire and the HUD work unchanged,
 // but it flies: side-view flight model, a chin gun that follows the mouse, unguided rockets fired along the
 // nose, Hellfire missiles that fly a lofted path onto the designated target, and it can turn round at will.
 //   input.drive  −1…+1  lean toward −x / +x (accelerate that way; drag limits the speed)
@@ -139,7 +139,7 @@ DS.Heli = class Heli extends DS.Vehicle {
         // each side carries 8: the upper rail empties first, then the lower. On the near side the drawn missile
         // leaves its rail; the far side's come out from behind the fuselage, a little behind and above.
         const slot = this.hfSide[sd] > D.hellfire.n / 4 ? 'up' : 'lo', R = D.src.hf && D.src.hf[slot];
-        const sc = R ? [-(R[0] + R[2] / 2 - 680) / D.src.ppm, -(R[1] + R[3] / 2 - 190) / D.src.ppm] : D.hellfire.at;
+        const [OX, OY] = D.src.origin || [680, 190], sc = R ? [-(R[0] + R[2] / 2 - OX) / D.src.ppm, -(R[1] + R[3] / 2 - OY) / D.src.ppm] : D.hellfire.at;
         const p = this.local(this.dir * (sc[0] - (sd ? 0.35 : 0)), sc[1] + (sd ? 0.22 : 0));
         let tgt = this.lock && this.lock.alive ? { v: this.lock } : null;
         if (!tgt) { const r = DS.FireControl.lase(world, this, D.hellfire.range); tgt = r ? (r.vehicle ? { v: r.vehicle } : { x: r.x, y: r.y }) : { x: o.x + Math.cos(gs.aimW) * 3000, y: o.y + Math.sin(gs.aimW) * 3000 }; }
@@ -153,7 +153,7 @@ DS.Heli = class Heli extends DS.Vehicle {
       }
     }
   }
-  hudLine() { return `고도 ${Math.max(0, Math.round(this.alt()))} m · 30mm ${this.cannon} · 로켓 ${this.rk} · 헬파이어 ${this.hfSide[0]}+${this.hfSide[1]}` + (this.hfState.missile ? ' · 유도 중' : '') + (this.lock ? ' · 표적 고정' : ''); }
+  hudLine() { return `고도 ${Math.max(0, Math.round(this.alt()))} m · ${this.def.gun.short || '30mm'} ${this.cannon} · 로켓 ${this.rk} · 헬파이어 ${this.hfSide[0]}+${this.hfSide[1]}` + (this.hfState.missile ? ' · 유도 중' : '') + (this.lock ? ' · 표적 고정' : ''); }
 };
 
 // AGM-114 Hellfire: accelerates to about 425 m/s and homes on the designated vehicle or point, flying above the
@@ -195,10 +195,10 @@ DS.Hellfire = class Hellfire {
 Object.assign(DS.Renderer.prototype, {
   loadHeli(def) {
     this.img[def.id] = this.img[def.id] || {};
-    return Promise.all(['body', 'body_l', 'rotor', 'tailrotor', 'wheel'].concat(def.src.hf ? ['hf_up', 'hf_lo'] : []).map(n => new Promise((res, rej) => { const im = new Image(); im.onload = () => { this.img[def.id][n] = im; this.mips[def.id + '/' + n] = this.buildMips(im); res(); }; im.onerror = () => rej(new Error('sprite ' + def.id + '/' + n)); im.src = def.src.dir + n + '.png'; })));
+    return Promise.all(['body', 'body_l', 'rotor', 'tailrotor'].concat(def.flight.wheels.length ? ['wheel'] : [], def.src.hf ? ['hf_up', 'hf_lo'] : [], def.src.gun ? ['gun'] : []).map(n => new Promise((res, rej) => { const im = new Image(); im.onload = () => { this.img[def.id][n] = im; this.mips[def.id + '/' + n] = this.buildMips(im); res(); }; im.onerror = () => rej(new Error('sprite ' + def.id + '/' + n)); im.src = def.src.dir + n + '.png'; })));
   },
   drawHeli(ctx, v, cam) {
-    const D = v.def, S = D.src, F = D.flight, px = 1 / S.ppm, zp = cam.zoom * cam.dpr;
+    const D = v.def, S = D.src, F = D.flight, px = 1 / S.ppm, zp = cam.zoom * cam.dpr, [OX, OY] = S.origin || [680, 190], TH = S.tailHub || [1336, 100];
     // turning round: the airframe is seen end-on halfway through
     const tk = v.turnT > 0 ? Math.abs(v.turnT - 0.45) / 0.45 : 1, sx = v.dir * Math.max(0.08, tk);
     // a far-side Hellfire just off its rail is still behind the fuselage
@@ -208,11 +208,11 @@ Object.assign(DS.Renderer.prototype, {
     // local frame: x forward, y up; a sheet pixel (X, Y) sits at (-(X - 680), -(Y - 190)) / ppm.
     // Facing left the mirrored-as-drawn sprite is used, so lettering and tail number read correctly.
     const im = this.pick(D.id + (v.dir < 0 ? '/body_l' : '/body'), S.w * px * zp);
-    ctx.save(); ctx.scale(1, -1); ctx.drawImage(im, -(S.ox + S.w - 680) * px, (S.oy - 190) * px, S.w * px, S.h * px); ctx.restore();
+    ctx.save(); ctx.scale(1, -1); ctx.drawImage(im, -(S.ox + S.w - OX) * px, (S.oy - OY) * px, S.w * px, S.h * px); ctx.restore();
     // the near launcher's Hellfires still on their rails (upper rail fires first)
     // (an emptied rail shows the bare launcher channel with its two hold-back shoes)
     if (S.hf) for (const [slot, need] of [['up', D.hellfire.n / 4], ['lo', 0]]) {
-      const R = S.hf[slot], x0 = -(R[0] + R[2] - 680) * px, y0 = (R[1] - 190) * px, w = R[2] * px;
+      const R = S.hf[slot], x0 = -(R[0] + R[2] - OX) * px, y0 = (R[1] - OY) * px, w = R[2] * px;
       ctx.save(); ctx.scale(1, -1);
       if (v.hfSide[0] > need) ctx.drawImage(this.pick(D.id + '/hf_' + slot, R[2] * px * zp), x0, y0, w, R[3] * px);
       else {
@@ -226,14 +226,18 @@ Object.assign(DS.Renderer.prototype, {
     for (const [c, r] of F.wheels) { const w = this.pick(D.id + '/wheel', r * 2 * zp); ctx.save(); ctx.translate(c[0], c[1]); ctx.scale(1, -1); ctx.drawImage(w, -r, -r, r * 2, r * 2); ctx.restore(); }
     // chin gun barrel at its own elevation
     const gp = D.gun.trunnion; ctx.save(); ctx.translate(gp[0], gp[1]); ctx.rotate(v.gun.e);
-    ctx.fillStyle = '#2b2b2b'; ctx.fillRect(-0.1, -0.05, D.gun.muzzle + 0.1, 0.1); ctx.fillRect(D.gun.muzzle - 0.18, -0.07, 0.18, 0.14); ctx.restore();
+    if (S.gun) {                        // the drawn barrels, laid about the turret pivot
+      const R = S.gun, P = S.gunPivot; ctx.scale(1, -1);
+      ctx.drawImage(this.pick(D.id + '/gun', R[2] * px * zp), -(R[0] + R[2] - P[0]) * px, (R[1] - P[1]) * px, R[2] * px, R[3] * px);
+    } else { ctx.fillStyle = '#2b2b2b'; ctx.fillRect(-0.1, -0.05, D.gun.muzzle + 0.1, 0.1); ctx.fillRect(D.gun.muzzle - 0.18, -0.07, 0.18, 0.14); }
+    ctx.restore();
     const k = Math.min(1, v.rpm);
     // Main rotor: the drawn head and blades turn as one about the mast — seen from the side that is the
     // drawing squeezed by cos(angle), flipping as it passes end-on. At speed several positions along the arc
     // swept during one frame are laid over each other (motion blur) with a faint disc.
     {
-      const R = S.rotor, im2 = this.pick(D.id + '/rotor', R[2] * px * zp), ax = -(S.rotorAxis - 680) * px;
-      const x0 = (S.rotorAxis - R[0]) * px, y0 = (R[1] - 190) * px, w = R[2] * px, h = R[3] * px;
+      const R = S.rotor, im2 = this.pick(D.id + '/rotor', R[2] * px * zp), ax = -(S.rotorAxis - OX) * px;
+      const x0 = (S.rotorAxis - R[0]) * px, y0 = (R[1] - OY) * px, w = R[2] * px, h = R[3] * px;
       const n = k > 0.15 ? 2 + Math.round(6 * k) : 1, sweep = 0.75 * k, al = n === 1 ? 1 : Math.min(1, 1.9 / n + 0.12);
       if (k > 0.3) { ctx.fillStyle = `rgba(36,36,40,${0.1 * k})`; ctx.beginPath(); ctx.ellipse(ax, F.hub[1], F.rotorR, 0.13, 0, 0, 7); ctx.fill(); }
       ctx.globalAlpha = al;
@@ -248,7 +252,7 @@ Object.assign(DS.Renderer.prototype, {
     // tail rotor: faces the viewer, so the drawn blades simply spin about their hub, blurred the same way
     {
       const R = S.tailrotor, im3 = this.pick(D.id + '/tailrotor', R[2] * px * zp), tr = F.tail;
-      const cx = (1336 - R[0]) * px, cy = (100 - R[1]) * px, w = R[2] * px, h = R[3] * px;
+      const cx = (TH[0] - R[0]) * px, cy = (TH[1] - R[1]) * px, w = R[2] * px, h = R[3] * px;
       const n = k > 0.15 ? 2 + Math.round(12 * k) : 1, al = n === 1 ? 1 : Math.min(1, 1.5 / n + 0.05);
       if (k > 0.3) { ctx.fillStyle = `rgba(36,36,40,${0.12 * k})`; ctx.beginPath(); ctx.arc(tr[0], tr[1], F.tailR, 0, 7); ctx.fill(); }
       ctx.globalAlpha = al;
@@ -277,7 +281,7 @@ Object.assign(DS.Effects.prototype, {
     if (v.burning) this.burning(v, dt);
     // blade beat
     v._beat = (v._beat || 0) - dt * v.rpm;
-    if (v._beat <= 0 && v.rpm > 0.2) { v._beat = 0.105; DS.Audio.rotorBeat(v.pos.x, v.pos.y, v.rpm); }
+    if (v._beat <= 0 && v.rpm > 0.2) { v._beat = v.def.flight.beat || 0.105; DS.Audio.rotorBeat(v.pos.x, v.pos.y, v.rpm, v.def.flight.blades === 2); }
     this.dispatch(v);
   },
 });

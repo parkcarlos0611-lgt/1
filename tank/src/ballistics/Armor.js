@@ -87,6 +87,14 @@ DS.Armor = {
     const r = { vehicle: v, plate: P.name, part: P.part, ammo: A, range, speed: sp, obl, los, prot, pen, x: hit.x, y: hit.y, effects: [] };
 
     if (v.def.proofD && A.small && A.d <= v.def.proofD) { r.result = 'nonpen'; return r; }     // armoured aircraft: small arms do nothing
+    // protection that depends on the side hit (AH-1W): from ahead, rounds up to `front` calibre do nothing and up
+    // to `frontPart` get through half the time; from behind or below, up to `rearPart` get through half the time
+    const PR = v.def.proof;
+    if (PR && A.small) {
+      const ahead = dx * v.dir < -0.3;
+      if (ahead && A.d <= PR.front) { r.result = 'nonpen'; return r; }
+      if ((ahead ? A.d <= PR.frontPart : A.d <= PR.rearPart) && rnd() < 0.5) { r.result = 'nonpen'; return r; }
+    }
     // ricochet / fuze graze
     const pr = Math.max(0, Math.min(1, (obl - (A.crit - 5)) / 10));
     if (rnd() < pr) {

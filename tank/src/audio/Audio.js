@@ -106,9 +106,10 @@ DS.Audio = {
     whine(5.1, 0.5, 520, 300, 0.8); clunk(5.7, 1.2, 110);                        // hoist down, breech closes
     clunk(T - G.autoloader.out, 0.9, 200); whine(T - G.autoloader.out + 0.05, 0.8, 600, 400, 1.3);                // unlock, gun back to the lay
   },
-  rotorBeat(x, y, k) {                      // one blade pass: a soft thump
+  rotorBeat(x, y, k, two) {                 // one blade pass: a soft thump (two-blade rotor: a deeper, heavier whop)
     if (!this.ok()) return;
-    const p = this.place(x, y); if (p.d > 2500) return;
+    const p = this.place(x, y); if (p.d > (two ? 3500 : 2500)) return;
+    if (two) { this.tone(p.t, 52, 30, 0.15, 0.85 * k * p.g, Math.min(p.cut, 700)); this.burst(p.t, 0.09, 'bandpass', 300, 0.7, 0.3 * k * p.g, p.cut, 0.01); return; }
     this.tone(p.t, 62, 40, 0.09, 0.5 * k * p.g, Math.min(p.cut, 900)); this.burst(p.t, 0.05, 'bandpass', 420, 0.8, 0.22 * k * p.g, p.cut);
   },
   rocket(x, y, light) {                     // rocket motor: a hard crack, then a tearing roar that climbs away

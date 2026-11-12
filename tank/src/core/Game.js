@@ -19,7 +19,7 @@ DS.Game = class Game {
     await this.rend.loadBuildings();
     await this.rend.loadCity();
     await this.rend.loadFlora();
-    await this.rend.loadHeli(DS.VEHICLES.ah64a);
+    for (const d of Object.values(DS.VEHICLES)) if (d.heli) await this.rend.loadHeli(d);
     await this.rend.loadMunitions();
     DS.Armor.calibrate();
     this.resize(); addEventListener('resize', () => this.resize());
@@ -151,7 +151,7 @@ DS.Game = class Game {
         else if (!this.player.tow && !this.player.heli) this.toast('미사일 시점은 브래들리 · 포탄 시점은 자주포 전용');
         else { this.mcam = !this.mcam; this.mcamHold = null; this.toast(this.mcam ? ((this.player.tow || this.player.hfState).missile ? '미사일 시점' : '미사일 시점 켬 — 다음 발사부터 따라감') : '미사일 시점 끔'); }
       }
-      if (e.code === 'KeyX') { if (this.player.heli) this.player.input.hf = true; else if (this.player.tow) this.player.input.tow = true; else this.toast('미사일은 브래들리(TOW) · 아파치(헬파이어) 전용'); }
+      if (e.code === 'KeyX') { if (this.player.heli) this.player.input.hf = true; else if (this.player.tow) this.player.input.tow = true; else this.toast('미사일은 브래들리(TOW) · 공격헬기(헬파이어) 전용'); }
       if (e.code === 'KeyC' && this.player.heli) { this.player.turn(); return; }
       if (e.code === 'KeyZ') { this.world.xray = this.world.xray === false; this.toast(this.world.xray ? 'TOW 발사관 투시 켬' : 'TOW 발사관 투시 끔'); }
       if (e.code === 'KeyR') this.player.place(this.player.pos.x);
@@ -340,6 +340,7 @@ DS.Game = class Game {
   // gunner's night sight: thermal imager where fitted, otherwise the passive image intensifier
   nightSight(on) {
     const th = !!this.player.def.sight.thermal;
+    if (on && this.player.def.sight.night === false) { this.toast(`${this.player.def.sight.name}: 주간 광학 조준경 — 야간 조준 장비 없음`); on = false; }
     this.thermal = on && th; this.nv = on && !th;
     this.sightCv.classList.toggle('thermal', this.thermal); this.sightCv.classList.toggle('nv', this.nv);
     if (!th && on) this.toast('미광증폭 야간 조준경 (열상 없음)');

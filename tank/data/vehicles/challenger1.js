@@ -25,8 +25,9 @@ DS.VEHICLES = DS.VEHICLES || {};
     track: { pitch: 0.16, thick: 0.08, width: 0.65, mass: 5500 },
     belly: { y: -1.0, x0: L(70, 0)[0], x1: L(690, 0)[0] },
     contactArea: 1.0,
-    underside: { x0: -3.9, x1: 3.9, y0: -0.6, y1: -1.15,
-      poly: [[L(60, 0)[0], -0.55], [L(700, 0)[0], -0.55], [L(690, 0)[0], -0.85], [L(640, 0)[0], -1.15], [L(160, 0)[0], -1.15], [L(80, 0)[0], -0.85]] },
+    // dark hull side behind the running gear, down to the bottom track run (as on the sheet)
+    underside: { x0: -3.9, x1: 3.9, y0: -0.6, y1: -1.41,
+      poly: [[L(60, 0)[0], -0.55], [L(700, 0)[0], -0.55], [L(695, 0)[0], -0.8], [L(670, 0)[0], -1.1], [L(625, 0)[0], -1.41], [L(175, 0)[0], -1.41], [L(115, 0)[0], -1.1], [L(70, 0)[0], -0.8]] },
     engine: { type: 'diesel', power: 8.95e5, eff: 0.72, maxTractive: 4.6e5, spool: 0.5,     // Rolls-Royce CV12, 1,200 hp
       vmaxF: 56 / 3.6, vmaxR: 13 / 3.6, brake: 6.4e5, engineBrake: 3.2e4 },
     exhaust: { x: L(60, 500)[0], y: L(60, 500)[1] },

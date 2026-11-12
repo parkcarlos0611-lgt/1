@@ -26,8 +26,9 @@ DS.VEHICLES = DS.VEHICLES || {};
     track: { pitch: 0.14, thick: 0.06, width: 0.4, mass: 1900 },
     belly: { y: -0.95, x0: L(110, 0)[0], x1: L(780, 0)[0] },
     contactArea: 0.65,
-    underside: { x0: -3.6, x1: 3.6, y0: -0.6, y1: -1.02,
-      poly: [[L(85, 0)[0], -0.62], [L(800, 0)[0], -0.62], [L(770, 0)[0], -0.85], [L(700, 0)[0], -1.02], [L(160, 0)[0], -1.02], [L(95, 0)[0], -0.85]] },
+    // dark hull side behind the running gear, down to the bottom track run (as on the sheet)
+    underside: { x0: -3.6, x1: 3.6, y0: -0.6, y1: -1.26,
+      poly: [[L(85, 0)[0], -0.62], [L(800, 0)[0], -0.62], [L(770, 0)[0], -0.85], [L(735, 0)[0], -1.05], [L(680, 0)[0], -1.26], [L(180, 0)[0], -1.26], [L(120, 0)[0], -1.05], [L(95, 0)[0], -0.85]] },
     engine: { type: 'diesel', power: 2.24e5, eff: 0.7, maxTractive: 1.2e5, spool: 0.4,       // YaMZ-238N, 300 hp
       vmaxF: 60 / 3.6, vmaxR: 10 / 3.6, brake: 1.7e5, engineBrake: 1.3e4 },
     exhaust: { x: L(720, 500)[0], y: L(720, 500)[1] },

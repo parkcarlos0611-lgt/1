@@ -26,8 +26,9 @@ DS.VEHICLES = DS.VEHICLES || {};
     track: { pitch: 0.14, thick: 0.07, width: 0.57, mass: 3200 },
     belly: { y: -0.97, x0: L(80, 0)[0], x1: L(680, 0)[0] },
     contactArea: 0.85,
-    underside: { x0: -3.2, x1: 3.3, y0: -0.6, y1: -1.04,
-      poly: [[L(60, 0)[0], -0.6], [L(690, 0)[0], -0.6], [L(680, 0)[0], -0.8], [L(620, 0)[0], -1.04], [L(140, 0)[0], -1.04], [L(70, 0)[0], -0.8]] },
+    // dark hull side behind the running gear, down to the bottom track run (as on the sheet)
+    underside: { x0: -3.2, x1: 3.3, y0: -0.6, y1: -1.32,
+      poly: [[L(60, 0)[0], -0.6], [L(690, 0)[0], -0.6], [L(682, 0)[0], -0.8], [L(655, 0)[0], -1.05], [L(595, 0)[0], -1.32], [L(150, 0)[0], -1.32], [L(100, 0)[0], -1.05], [L(70, 0)[0], -0.8]] },
     engine: { type: 'diesel', power: 5.37e5, eff: 0.72, maxTractive: 2.9e5, spool: 0.45,     // Hispano-Suiza HS-110, 720 hp
       vmaxF: 65 / 3.6, vmaxR: 12 / 3.6, brake: 4.0e5, engineBrake: 2.6e4 },
     exhaust: { x: L(60, 505)[0], y: L(60, 505)[1] },

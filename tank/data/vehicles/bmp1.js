@@ -27,8 +27,9 @@ DS.VEHICLES = DS.VEHICLES || {};
     track: { pitch: 0.14, thick: 0.06, width: 0.3, mass: 1600 },
     belly: { y: -0.88, x0: L(110, 0)[0], x1: L(820, 0)[0] },
     contactArea: 0.6,
-    underside: { x0: -3.3, x1: 3.3, y0: -0.6, y1: -0.99,
-      poly: [[L(85, 0)[0], -0.6], [L(840, 0)[0], -0.6], [L(800, 0)[0], -0.8], [L(740, 0)[0], -0.99], [L(170, 0)[0], -0.99], [L(100, 0)[0], -0.8]] },
+    // dark hull side behind the running gear, down to the bottom track run (as on the sheet)
+    underside: { x0: -3.3, x1: 3.3, y0: -0.6, y1: -1.19,
+      poly: [[L(85, 0)[0], -0.6], [L(840, 0)[0], -0.6], [L(800, 0)[0], -0.8], [L(760, 0)[0], -1.0], [L(700, 0)[0], -1.19], [L(205, 0)[0], -1.19], [L(145, 0)[0], -1.0], [L(100, 0)[0], -0.8]] },
     engine: { type: 'diesel', power: 2.24e5, eff: 0.7, maxTractive: 1.1e5, spool: 0.4,       // UTD-20, 300 hp
       vmaxF: 65 / 3.6, vmaxR: 10 / 3.6, brake: 1.5e5, engineBrake: 1.2e4 },
     exhaust: { x: L(760, 470)[0], y: L(760, 470)[1] },

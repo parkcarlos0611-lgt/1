@@ -61,6 +61,31 @@ DS.World = class World {
     if (r.result === 'ricochet') { p.x = r.reflect.x; p.y = r.reflect.y; p.vx = r.reflect.vx; p.vy = r.reflect.vy; p.ignore = h.hit.v; p.ignoreT = 0.05; }
     else p.alive = false;
   }
+  // Hulls in contact along the drive line push each other apart: overlap is resolved in proportion to mass and
+  // the closing speed is shared out as in an inelastic collision (a little bounce). A hard knock rocks the hulls,
+  // throws dust and clangs; above 5 m/s the lighter vehicle can lose a track. Aircraft are not included.
+  contacts(h) {
+    const V = this.vehicles.filter(v => !v.heli);
+    for (let a = 0; a < V.length; a++) for (let b = a + 1; b < V.length; b++) {
+      const A = V[a], B = V[b], hl = v => Math.max(Math.abs(v.def.belly.x0), Math.abs(v.def.belly.x1)) + 0.15;
+      const dx = B.pos.x - A.pos.x, gap = Math.abs(dx) - (hl(A) + hl(B));
+      if (gap >= 0 || Math.abs(B.pos.y - A.pos.y) > 3) continue;
+      const s = Math.sign(dx) || 1, mA = A.def.mass, mB = B.def.mass, k = -gap;
+      A.pos.x -= s * k * mB / (mA + mB); B.pos.x += s * k * mA / (mA + mB);
+      const rel = (B.vel.x - A.vel.x) * s;                               // < 0: closing
+      if (rel < 0) {
+        const J = -(1 + 0.15) * rel / (1 / mA + 1 / mB);
+        A.vel.x -= s * J / mA; B.vel.x += s * J / mB;
+        if (-rel > 1.2 && this.time - (A._bump || 0) > 0.4) {
+          A._bump = this.time; const px = A.pos.x + s * hl(A), py = Math.max(A.pos.y, B.pos.y) - 0.3;
+          A.w += s * Math.min(0.15, -rel * 0.02) * mB / (mA + mB); B.w -= s * Math.min(0.15, -rel * 0.02) * mA / (mA + mB);
+          DS.Audio.thud(px, py, Math.min(1.3, -rel / 6)); DS.Audio.tick(px, py, 1);
+          for (let i = 0; i < 8; i++) this.particles.add(DS.P.DUST, px, this.terrain.height(px) + 0.5, (Math.random() - 0.5) * 4, Math.random() * 2, 3 + Math.random() * 3, 0.8 + Math.random() * 0.6, { grow: 1, drag: 1.1, grav: 0, alpha: 0.32, col: 0xcbb38a });
+          if (-rel > 5) { const L = mA < mB ? A : B; if (L.alive && !L.trackBroken && !L.god && Math.random() < 0.5) L.damage('track', { x: px, y: py - 1 }); }
+        }
+      }
+    }
+  }
   addLog(r) { this.log.unshift({ ...r, at: this.time }); if (this.log.length > 6) this.log.pop(); }
 
   update(frameDt) {
@@ -71,6 +96,7 @@ DS.World = class World {
     for (const v of this.vehicles) if (v.ai) v.ai.update(frameDt);
     while (this.acc >= h) {
       for (const v of this.vehicles) v.step(h, this);
+      this.contacts(h);
       for (const p of this.projectiles) {
         const ox = p.x, oy = p.y;
         let hit = p.step(h, this.terrain, this);

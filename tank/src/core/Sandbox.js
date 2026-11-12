@@ -73,7 +73,7 @@ DS.Sandbox = class Sandbox {
     const items = lay.items.map(i => ({ ...i, x: Math.max(15, Math.min(DS.RANGE.length - 50, L + i.d)) }));
     if (!items.some(i => i.player)) items.unshift({ ...this.g.player.sb });           // presets keep my vehicle where it is
     if (lay.env) this.setEnv(lay.env);
-    this.w.buildings.length = 0; for (const b of lay.blds || []) if (DS.CITY[b.k]) this.addBuilding(b.k, L + b.d);
+    for (const b of this.w.buildings) b.unheap && b.unheap(); this.w.buildings.length = 0; for (const b of lay.blds || []) if (DS.CITY[b.k]) this.addBuilding(b.k, L + b.d);
     this.rebuild(items, !lay.items.some(i => i.player));
   }
   saved() { try { return JSON.parse(localStorage.getItem('ds.range.layouts') || '{}'); } catch (e) { return {}; } }
@@ -162,14 +162,14 @@ DS.Sandbox = class Sandbox {
     addEventListener('mousemove', e => {
       this.mouse = { x: e.clientX, y: e.clientY };
       if (this.edit && this.drag) this.moveTo(this.drag.v, cam.toWorld(e.clientX, e.clientY).x + this.drag.dx);
-      if (this.edit && this.dragB) { const b = this.dragB.b; b.x = Math.max(40, Math.min(DS.RANGE.length - 40, cam.toWorld(e.clientX, e.clientY).x + this.dragB.dx)); b.base = this.w.terrain.height(b.x) - (b.D ? 0.12 : 0.15); b.reset(); }
+      if (this.edit && this.dragB) { const b = this.dragB.b; b.unheap && b.unheap(); b.x = Math.max(40, Math.min(DS.RANGE.length - 40, cam.toWorld(e.clientX, e.clientY).x + this.dragB.dx)); b.base = this.w.terrain.height(b.x) - (b.D ? 0.12 : 0.15); b.reset(); }
     });
     addEventListener('mouseup', () => { this.dragB = null; if (this.drag) { this.drag = null; this.refresh(); } });
     addEventListener('keydown', e => {
       if (!this.edit || e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
       const v = this.sel;
       if ((e.code === 'Delete' || e.code === 'KeyX') && v && !v.sb.player) { this.remove(v); this.refresh(); }
-      if ((e.code === 'Delete' || e.code === 'KeyX') && this.selB) { this.w.buildings.splice(this.w.buildings.indexOf(this.selB), 1); this.selB = null; this.refresh(); }
+      if ((e.code === 'Delete' || e.code === 'KeyX') && this.selB) { this.selB.unheap && this.selB.unheap(); this.w.buildings.splice(this.w.buildings.indexOf(this.selB), 1); this.selB = null; this.refresh(); }
       if (e.code === 'Escape') { this.tool = null; this.sel = null; this.refresh(); }
       if (v && (e.code === 'Comma' || e.code === 'Period')) { this.moveTo(v, v.sb.x + (e.code === 'Comma' ? -1 : 1) * (e.shiftKey ? 10 : 1)); this.refresh(); }
     });
@@ -185,9 +185,9 @@ DS.Sandbox = class Sandbox {
       if (d.act === 'flip' && v) { v.sb.dir = -v.sb.dir; this.respawn(v); }
       if (d.act === 'team' && v && !v.sb.player) { v.sb.team = v.sb.team === 'US' ? 'IQ' : 'US'; this.respawn(v); }
       if (d.act === 'del' && v && !v.sb.player) this.remove(v);
-      if (d.act === 'del' && this.selB) { this.w.buildings.splice(this.w.buildings.indexOf(this.selB), 1); this.selB = null; }
+      if (d.act === 'del' && this.selB) { this.selB.unheap && this.selB.unheap(); this.w.buildings.splice(this.w.buildings.indexOf(this.selB), 1); this.selB = null; }
       if (d.act === 'fix' && this.selB) this.selB.reset();
-      if (d.act === 'clearb') { this.w.buildings.length = 0; this.selB = null; }
+      if (d.act === 'clearb') { for (const b of this.w.buildings) b.unheap && b.unheap(); this.w.buildings.length = 0; this.selB = null; }
       if (d.act === 'fix' && v) { if (v.sb.player) this.rebuild(); else this.respawn(v); }
       if (d.act === 'reset') { this.rebuild(); this.g.toast('모두 수리 · 원위치'); }
       if (d.act === 'clear') { this.rebuild(this.items().filter(i => i.player)); }

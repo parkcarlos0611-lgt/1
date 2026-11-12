@@ -22,6 +22,7 @@ DS.Structure = class Structure {
     this.reset();
   }
   reset() {
+    this.unheap();
     const D = this.D, p = this.ppm, R = D.rows.length - 1, C = D.cols.length - 1;
     this.R = R; this.C = C; this.cells = [];
     for (let i = 0; i < R; i++) for (let c = 0; c < C; c++) {
@@ -200,7 +201,7 @@ DS.Structure = class Structure {
       // lowest corner of the block against what is under it
       let low = null;
       for (const cl of ch.cells) for (const [px, py] of [[cl.x0, cl.y0], [cl.x1, cl.y0], [cl.x0, cl.y1], [cl.x1, cl.y1]]) {
-        const q = this.toWorld(ch, px, py), s = Math.max(this.standTop(q.x, ch), this.heapAt(q.x) * 0.8);
+        const q = this.toWorld(ch, px, py), s = Math.max(this.standTop(q.x, ch), this.world.terrain.height(this.x + q.x) - this.base);
         if (q.y - s < (low ? low.pen : 0)) low = { pen: q.y - s, x: q.x, s };
       }
       if (low) {
@@ -225,7 +226,7 @@ DS.Structure = class Structure {
     for (const p of this.pieces) {
       if (p.rest) continue;
       p.vy -= g * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.a += p.w * dt;
-      const gy = T.height(p.x) + this.heapAt(p.x - this.x) * 0.85 + p.h * 0.35;
+      const gy = T.height(p.x) + p.h * 0.35;              // the heap is part of the ground
       if (p.y < gy) {
         p.y = gy;
         if (p.vy < -2.5) { p.vy *= -0.25; p.vx *= 0.55; p.w *= 0.5; if (p.big && Math.random() < 0.5) W.particles.add(DS.P.DUST, p.x, gy, (Math.random() - 0.5) * 3, Math.random() * 2, 3 + Math.random() * 3, 0.8 + p.w0, { grow: 1, drag: 1, grav: 0, alpha: 0.32, col: 0xc9b79a }); }
@@ -277,17 +278,45 @@ DS.Structure = class Structure {
       P.add(DS.P.DUST, cx + r(-0.5, 0.5) * cw, cy + r(-0.4, 0.4) * chh, (out || (Math.random() < 0.5 ? -1 : 1)) * r(1, 5), r(-1, 2), r(6, 12), r(1.2, 2.6), { grow: r(1, 2), drag: 0.9, grav: 0, alpha: 0.42, col: Math.random() < 0.6 ? 0xcbb99c : 0xb8a888 });
     for (let n = 0; n < 6; n++) P.add(DS.P.DEBRIS, cx, cy, r(-8, 8), r(-2, 8), r(1, 2.5), r(0.06, 0.16), { drag: 0.3, col: 0x8f8472 });
     // the material ends up in the heap at the foot
-    const vol = cw * chh * 0.32 * k;
+    const vol = cw * chh * 0.2 * k;
     this.addHeap(cx - this.x + (out || 0) * cw * 0.4, vol);
   }
+  // The rubble heap is real ground: its mound is added to the terrain, so vehicles climb it and shells and
+  // fragments land on it. heapT keeps what was added (per terrain cell) so a rebuild takes it out again.
+  syncHeap() {
+    const T = this.world.terrain, H = this.heap, dx = T.dx, x0 = this.x + this.heapX0;
+    const n = Math.round(H.length / dx), i0 = T.idx(x0);
+    if (!this.heapT || this.heapT.length !== n) this.heapT = new Float32Array(n);
+    let lo = 1e9, hi = -1;
+    for (let k = 0; k < n; k++) {
+      const u = k * dx - 0.5, j = Math.floor(u), f = u - j, a = j >= 0 && j < H.length ? H[j] : 0, b = j + 1 >= 0 && j + 1 < H.length ? H[j + 1] : 0;
+      const want = (a + (b - a) * f) * 0.8, d = want - this.heapT[k], i = i0 + k;
+      if (Math.abs(d) < 1e-4 || i < 0 || i >= T.n) continue;
+      T.h[i] += d; this.heapT[k] = want; T.soil[i] = 0; T.crust[i] = 0; T.sink[i] = 0; lo = Math.min(lo, i); hi = Math.max(hi, i);
+    }
+    if (hi >= 0) { T.mark(lo); T.mark(hi); T.version++; }
+  }
+  unheap() {
+    if (!this.heapT || !this.world) return;
+    const T = this.world.terrain, i0 = T.idx(this.x + this.heapX0);
+    for (let k = 0; k < this.heapT.length; k++) { const i = i0 + k; if (i >= 0 && i < T.n) T.h[i] -= this.heapT[k]; }
+    this.heapT.fill(0); T.mark(Math.max(0, i0)); T.mark(Math.min(T.n - 1, i0 + this.heapT.length)); T.version++;
+  }
+  heapUnder(x) { if (!this.heapT) return 0; const k = Math.round((x - this.x - this.heapX0) / this.world.terrain.dx); return k >= 0 && k < this.heapT.length ? this.heapT[k] : 0; }
   addHeap(lx, vol) {
     const H = this.heap, j0 = Math.floor(lx - this.heapX0), sp = 3;
     let wsum = 0; for (let d = -sp; d <= sp; d++) wsum += sp + 1 - Math.abs(d);
     for (let d = -sp; d <= sp; d++) { const j = j0 + d; if (j >= 0 && j < H.length) H[j] += vol * (sp + 1 - Math.abs(d)) / wsum; }
     for (let it = 0; it < 6; it++) for (let j = 1; j < H.length; j++) {          // slump to the angle of repose
-      const d = H[j] - H[j - 1]; if (Math.abs(d) > 0.7) { const m = (Math.abs(d) - 0.7) / 2 * Math.sign(d); H[j] -= m; H[j - 1] += m; }
+      const d = H[j] - H[j - 1]; if (Math.abs(d) > 0.5) { const m = (Math.abs(d) - 0.5) / 2 * Math.sign(d); H[j] -= m; H[j - 1] += m; }
     }
+    // the ends of the heap taper to the ground (no wall at the edge of the array)
+    for (let it = 0; it < 30; it++) { let moved = false; for (const j of [0, H.length - 1]) { const n = j ? j - 1 : 1; if (H[j] > 0.5) { const m = H[j] - 0.5; H[j] = 0.5; H[n] += m; moved = true; } } for (let j = 1; j < H.length; j++) { const d = H[j] - H[j - 1]; if (Math.abs(d) > 0.5) { const m = (Math.abs(d) - 0.5) / 2 * Math.sign(d); H[j] -= m; H[j - 1] += m; } } if (!moved) break; }
+    // a collapsed block spreads: the heap rises to about a fifth of the building's height and then widens
+    const cap = Math.max(1.2, this.h * 0.2) / 0.8;
+    for (let it = 0; it < 4; it++) for (let j = 1; j < H.length - 1; j++) if (H[j] > cap) { const m = (H[j] - cap) / 2; H[j] = cap; H[j - 1] += m; H[j + 1] += m; }
     this.heapVer++;
+    this.syncHeap();
   }
   shatter(W) {
     this.glass = true;
@@ -421,8 +450,13 @@ DS.Structure = class Structure {
       }
     }
     ctx.restore();
+    this._im = im;
+  }
+  // after the ground: the heap (it is part of the ground now) and the fragments lying on it
+  drawFront(ctx, cam, grey, R) {
+    if (this.x + this.w + 40 < cam.left || this.x - this.w - 40 > cam.right) return;
+    const im = this._im || R.cityImg[this.k];
     this.drawHeap(ctx, cam, grey, R);
-    // fragments
     const DI = R.debImg;
     for (const p of this.pieces) {
       const img = p.src === 'cell' ? im : DI[p.src]; if (!img) continue;
@@ -451,8 +485,9 @@ DS.Structure = class Structure {
     }
     // mound under the sprites so no gaps show
     ctx.beginPath(); ctx.moveTo(x0, T.height(x0));
-    for (let j = 0; j < H.length; j++) ctx.lineTo(x0 + j + 0.5, T.height(x0 + j) + H[j] * 0.8);
-    ctx.lineTo(x0 + H.length, T.height(x0 + H.length)); ctx.closePath();
+    for (let j = 0; j <= H.length * 4; j++) { const x = x0 + j / 4; ctx.lineTo(x, T.height(x)); }
+    for (let j = H.length * 4; j >= 0; j--) { const x = x0 + j / 4; ctx.lineTo(x, T.height(x) - this.heapUnder(x) - 0.02); }
+    ctx.closePath();
     if (grey != null) { ctx.fillStyle = `rgb(${grey(0.05)})`; ctx.fill(); }
     else {
       // the mound is filled with a rubble texture (pieces of the debris sheet packed together), shaded darker
@@ -468,7 +503,7 @@ DS.Structure = class Structure {
       } else { ctx.fillStyle = '#a39276'; ctx.fill(); }
     }
     const DI = R.debImg;
-    for (const s of this.heapDraw.L) { const im = DI[s.key]; if (!im) continue; const y = T.height(s.x) - 0.1; ctx.save(); ctx.translate(s.x, y); ctx.scale(1, -1);
+    for (const s of this.heapDraw.L) { const im = DI[s.key]; if (!im) continue; const y = T.height(s.x) - this.heapUnder(s.x) - 0.1; ctx.save(); ctx.translate(s.x, y); ctx.scale(1, -1);
       if (grey != null) { ctx.fillStyle = `rgb(${grey(0.05)})`; ctx.fillRect(-s.w / 2, -s.h, s.w, s.h * 0.6); } else ctx.drawImage(im, -s.w / 2, -s.h, s.w, s.h); ctx.restore(); }
   }
 };

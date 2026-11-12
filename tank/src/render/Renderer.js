@@ -145,6 +145,7 @@ DS.Renderer = class Renderer {
     w.particles.draw(ctx, cam, 0);
     for (const v of w.vehicles) if (cam.visible(v.pos.x, v.pos.y, 14) && this.shown(v)) this.vehicle(ctx, v, cam);
     this.terrain(ctx, cam);
+    for (const b of w.buildings) if (b.drawFront) b.drawFront(ctx, cam, null, this);
     this.flora(ctx, cam, 'line'); this.flora(ctx, cam, 'near');
     this.props(ctx, cam, true);
     this.fog(ctx, cam);
@@ -200,6 +201,7 @@ DS.Renderer = class Renderer {
       if (Math.abs(d) > 0.004) { ctx.fillStyle = tg(amb.ground + d); ctx.fillRect(x, h - 0.7, cs + 0.01, 0.7); }
     }
     ctx.restore();
+    for (const b of w.buildings) if (b.drawFront) b.drawFront(ctx, cam, pg, this);
     this.flora(ctx, cam, 'line', this._fg); this.flora(ctx, cam, 'near', this._fg);
     this.props(ctx, cam, true, pg);
     for (const v of vis) this.thermalVehicle(ctx, v, cam, amb, tg);

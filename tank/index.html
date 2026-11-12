@@ -148,6 +148,19 @@
   #pause details.pkeys { margin: 6px 0 12px; } #pause summary { cursor: pointer; color: #d8cfae; font: 15px var(--kor); padding: 6px 0; }
   #pause .krow { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 3px 0; border-bottom: 1px solid rgba(255,255,255,.06); }
   #pause .krow span { color: var(--mu); } #pause .krow button { min-width: 120px; padding: 6px 12px; min-height: 36px; font-family: var(--mono); }
+  /* performance overlay and benchmark (src/core/Perf.js, src/core/Bench.js) */
+  #perf { position: fixed; top: 48px; right: 10px; z-index: 6; pointer-events: none; border-radius: 4px; }
+  #benchtag { position: fixed; top: 10px; left: 50%; transform: translateX(-50%); z-index: 8; background: rgba(20,16,10,.82); color: #ffcc66; font: 600 15px var(--kor); padding: 7px 16px; border: 1px solid #8a7b60; border-radius: 4px; pointer-events: none; }
+  #benchres { position: fixed; inset: 0; z-index: 9; display: grid; place-items: center; background: rgba(12,10,6,.7); }
+  #benchres .pbox { background: #2a2c1e; border: 1px solid #5d5a3c; border-left: 6px solid var(--warn); padding: 18px 22px; width: min(760px, 96vw); max-height: 92vh; overflow: auto; color: var(--tx); }
+  #benchres h2 { margin: 0 0 12px; font: 24px var(--kor); color: #ffcc66; font-weight: 400; }
+  #benchres .ok { color: #7fe07f; margin-left: 10px; } #benchres .ng { color: #ff7a60; margin-left: 10px; }
+  #benchres table { width: 100%; border-collapse: collapse; font: 14px var(--mono); }
+  #benchres th, #benchres td { padding: 6px 8px; border-bottom: 1px solid rgba(255,255,255,.08); text-align: right; } #benchres th:first-child, #benchres td:first-child { text-align: left; font-family: var(--kor); }
+  #benchres th { color: var(--mu); font: 12px var(--kor); }
+  #benchres .bmeta { color: var(--mu); font: 12px var(--mono); line-height: 1.6; margin: 12px 0; word-break: break-all; }
+  #benchres .prow { display: flex; gap: 8px; } #benchres button { font: 15px var(--kor); color: var(--tx); background: #3a3823; border: 1px solid #5d5a3c; padding: 9px 16px; border-radius: 4px; min-height: 42px; }
+  #benchres button.big { background: var(--amber); color: #1a1408; border-color: var(--amber); }
   /* range editor on touch screens: wider panel, bigger targets */
   body.touchui #sbx { width: min(420px, 94vw); font-size: 15px; }
   body.touchui #sbx button { min-height: 44px; padding: 8px 12px; font-size: 15px; }
@@ -297,6 +310,11 @@
         <span class="mmeta"><span>사막 간선 → 외곽 → 저층 주거 → 시장 지구 → 광장 → 중·고층 도심 → 파괴된 구역 → 사막 간선, 약 20 km</span><span>맵만 둘러보기 · 편집 기능 없음</span></span>
         <span class="mbtns"><button class="mbtn go" type="button" id="gotown">입장</button></span>
       </article>
+      <article class="mcard">
+        <span class="mno">B</span><span class="mname">성능 벤치마크</span>
+        <span class="mmeta"><span>쿠웨이트 작전 무거운 장면 4개 × 20초: 새벽 교전 · 야간 다수 광원 · 모래폭풍 · 건물 붕괴</span><span>결과표(평균 fps · 1% 저점 · p99 프레임 시간)를 캡처해서 보내 주세요</span></span>
+        <span class="mbtns"><button class="mbtn go" type="button" id="gobench">실행</button></span>
+      </article>
     </section>
   </div>
 </div>
@@ -318,6 +336,8 @@
     <div class="prow" id="p-speedrow"><span>시간 흐름</span><button type="button" data-p="spd" data-v="0">정지</button><button type="button" data-p="spd" data-v="1">실제</button><button type="button" data-p="spd" data-v="10">×10</button><button type="button" data-p="spd" data-v="60">1분=1시간</button></div>
     <div class="prow"><span>화면 효과</span><button type="button" data-p="post" data-v="0">끔</button><button type="button" data-p="post" data-v="1">낮음</button><button type="button" data-p="post" data-v="2">높음</button></div>
     <div class="prow"><span>해상도 자동 조절</span><button type="button" data-p="res">켬</button></div>
+    <div class="prow"><span>프레임 제한</span><button type="button" data-p="fps" data-v="60">60 고정</button><button type="button" data-p="fps" data-v="120">120 고정</button><button type="button" data-p="fps" data-v="free">자유</button></div>
+    <div class="prow"><span>성능 표시 (F8)</span><button type="button" data-p="perf">켬</button></div>
     <div class="prow"><span>탄 비행 효과 (저공 충격파 먼지·초음속 파열음·포탄 휘파람)</span><button type="button" data-p="flyfx">켬</button></div>
     <div class="prow"><span>소리 크기</span><input id="p-vol" type="range" min="0" max="100" step="5" aria-label="소리 크기"><b id="p-volv"></b></div>
     <div class="prow"><span>터치 조작</span><button type="button" data-p="touch" data-v="auto">자동</button><button type="button" data-p="touch" data-v="on">항상</button><button type="button" data-p="touch" data-v="off">끔</button></div>
@@ -381,6 +401,8 @@
 <script src="src/audio/Audio.js"></script>
 <script src="src/core/World.js"></script>
 <script src="src/core/Sandbox.js"></script>
+<script src="src/core/Perf.js"></script>
+<script src="src/core/Bench.js"></script>
 <script src="src/core/Game.js"></script>
 <script src="src/core/Artillery.js"></script>
 <script src="src/core/UI.js"></script>

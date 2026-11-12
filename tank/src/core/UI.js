@@ -5,7 +5,7 @@
 // two fingers zoom; on the artillery map one finger picks the target and two fingers zoom the map.
 DS.UI = {
   KEY: 'ds.ui',
-  defaults: { post: 2, resAuto: true, flyFx: true, vol: 0.8, btn: 1, hudFull: false, help: true, touch: 'auto', keys: {} },
+  defaults: { post: 2, resAuto: true, flyFx: true, vol: 0.8, btn: 1, hudFull: false, help: true, touch: 'auto', keys: {}, fpsMode: '60', perf: false },
   // remappable actions: [name, the key the game listens for]
   ACTIONS: [['전진', 'KeyD'], ['후진', 'KeyA'], ['포 올림 · 상승', 'KeyW'], ['포 내림 · 하강', 'KeyS'], ['사격', 'Space'], ['탄종', 'KeyQ'], ['거리측정', 'KeyE'],
     ['표적 선택', 'Backspace'], ['동축 기관총 · 로켓', 'KeyF'], ['미사일 (TOW · 헬파이어)', 'KeyX'], ['조준경 배율', 'KeyV'], ['열상 · 야간 조준경', 'KeyT'],
@@ -39,6 +39,8 @@ Object.assign(DS.Game.prototype, {
       if (a === 'hud') S.hudFull = !S.hudFull;
       if (a === 'help') S.help = !S.help;
       if (a === 'touch') S.touch = b.dataset.v;
+      if (a === 'fps') S.fpsMode = b.dataset.v;
+      if (a === 'perf') S.perf = !S.perf;
       if (a === 'spd') { this.world.env.speed = +b.dataset.v; this.timeUi(); return; }
       DS.UI.save(S); this.uiApply();
     });
@@ -87,6 +89,7 @@ Object.assign(DS.Game.prototype, {
   uiApply() {
     const S = this.ui, $ = s => document.querySelector(s);
     if (this.post && this.post.ok) { this.post.setQuality(S.post); try { localStorage.setItem('ds.post', S.post); } catch (e) {} }
+    DS.Perf.mode = S.fpsMode || '60'; if (!!S.perf !== DS.Perf.on) DS.Perf.toggle(!!S.perf);
     DS.T.resAuto = S.resAuto; DS.T.flyFx = S.flyFx !== false; if (!S.resAuto && this.rs !== 1) { this.rs = 1; this.resize(); }
     DS.Audio.vol = S.vol; if (DS.Audio.master && DS.Audio.on) DS.Audio.master.gain.value = S.vol;
     document.documentElement.style.setProperty('--tb', (64 * S.btn).toFixed(0) + 'px');
@@ -97,7 +100,7 @@ Object.assign(DS.Game.prototype, {
     // reflect in the menu
     const pm = $('#pause'), on = (sel, v) => pm.querySelectorAll(sel).forEach(b => b.classList.toggle('on', v(b)));
     on('[data-p=post]', b => +b.dataset.v === S.post); on('[data-p=btn]', b => +b.dataset.v === S.btn); on('[data-p=touch]', b => b.dataset.v === S.touch);
-    on('[data-p=res]', () => S.resAuto); on('[data-p=flyfx]', () => S.flyFx !== false); on('[data-p=hud]', () => S.hudFull); on('[data-p=help]', () => S.help);
+    on('[data-p=res]', () => S.resAuto); on('[data-p=fps]', b => b.dataset.v === (S.fpsMode || '60')); on('[data-p=perf]', () => !!S.perf); on('[data-p=flyfx]', () => S.flyFx !== false); on('[data-p=hud]', () => S.hudFull); on('[data-p=help]', () => S.help);
     pm.querySelector('#p-vol').value = Math.round(S.vol * 100); pm.querySelector('#p-volv').textContent = Math.round(S.vol * 100) + ' %';
   },
   keyList() {

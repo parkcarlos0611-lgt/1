@@ -27,7 +27,8 @@ DS.Game = class Game {
     window.__game = this;
     // #m1 / #m2 / #m3 starts that mission directly (used by "다시 시작"); otherwise show the menu
     const m = /^#m(\d)(b?)$/.exec(location.hash), i = m ? +m[1] - 1 : -1, rg = /^#(range|town)(b?)$/.exec(location.hash);
-    if (rg) this.begin(rg[1], rg[2] ? 'm2a2' : 'm1a1'); else if (DS.MISSIONS[i]) this.begin(i, m[2] ? 'm2a2' : 'm1a1'); else this.menu();
+    if (location.hash === '#bench') { this.begin(DS.MISSIONS.findIndex(M => M.id === 'kuwait'), 'm1a1'); this.bench = new DS.Bench(this); }
+    else if (rg) this.begin(rg[1], rg[2] ? 'm2a2' : 'm1a1'); else if (DS.MISSIONS[i]) this.begin(i, m[2] ? 'm2a2' : 'm1a1'); else this.menu();
   }
   menu() {
     const el = document.getElementById('menu'), list = document.getElementById('missions');
@@ -44,6 +45,7 @@ DS.Game = class Game {
     }));
     list.querySelectorAll('[data-go]').forEach(b => b.addEventListener('click', () => { DS.Audio.init(); el.hidden = true; location.hash = 'm' + (+b.dataset.go + 1) + (veh === 'm2a2' ? 'b' : ''); this.begin(+b.dataset.go, veh); }));
     document.getElementById('gorange').onclick = () => { DS.Audio.init(); el.hidden = true; location.hash = 'range' + (veh === 'm2a2' ? 'b' : ''); this.begin('range', veh); };
+    document.getElementById('gobench').onclick = () => { DS.Audio.init(); location.hash = 'bench'; location.reload(); };
     document.getElementById('gotown').onclick = () => { DS.Audio.init(); el.hidden = true; location.hash = 'town' + (veh === 'm2a2' ? 'b' : ''); this.begin('town', veh); };
     el.hidden = false;
   }
@@ -185,6 +187,7 @@ DS.Game = class Game {
       if (e.code === 'KeyM') { const on = DS.Audio.toggle(); this.toast(on ? '소리 켬' : '소리 끔'); }
       this.keys.add(e.code);
       if (e.code === 'F9') { this.world.debug = !this.world.debug; e.preventDefault(); }
+      if (e.code === 'F8') { this.ui.perf = !DS.Perf.on; DS.UI.save(this.ui); this.uiApply(); e.preventDefault(); }
       if (e.code === 'Digit1') cam.tzoom = P[0];
       if (e.code === 'Digit2') cam.tzoom = P[1];
       if (e.code === 'Digit3') cam.tzoom = this.zoomMin();
@@ -444,6 +447,9 @@ DS.Game = class Game {
     }
   }
   loop(t) {
+    const Pf = DS.Perf;
+    if (!Pf.due(t)) { requestAnimationFrame(t2 => this.loop(t2)); return; }      // frame pacing (60 / 120 / free)
+    Pf.begin(t, t - this.last);
     const dt = Math.min(0.05, (t - this.last) / 1000); this.last = t;
     if (dt > 0) this.fps += (1 / dt - this.fps) * 0.05;
     // frame-rate governor: below 50 fps for a second and a half the picture is rendered smaller (it is stretched
@@ -457,15 +463,22 @@ DS.Game = class Game {
     this.readInput(dt);
     if (ed) this.sbx.frame(dt);
     else if (this.paused) { /* frozen */ }
-    else { this.lockStep(); this.districtStep(); this.trackTarget(dt); this.rangingStep(dt); this.world.update(dt); this.missileCam(dt); this.artyStep(dt); if (this.sbx) this.sbx.tick(); }
+    else { if (this.bench) this.bench.step(dt); this.lockStep(); this.districtStep(); this.trackTarget(dt); this.rangingStep(dt); this.world.update(dt); this.missileCam(dt); this.artyStep(dt); if (this.sbx) this.sbx.tick(); }
     DS.Audio.update(this.world, dt);
+    Pf.lap('sim');
     this.rend.frame();
     if (ed) this.sbx.overlay(this.rend.ctx);
+    Pf.lap('render');
     this.postFrame(dt);
+    Pf.lap('post');
     // the gunner's sight is a second render of the world: refreshed every other frame unless it is enlarged
     this._sdt = (this._sdt || 0) + dt;
     if (this.sightCv.classList.contains('big') || (this._sf = !this._sf)) { this.sight(this._sdt); this._sdt = 0; }
+    Pf.lap('sight');
     this.hud();
+    Pf.lap('hud');
+    Pf.end(); Pf.draw(this);
+    if (this.bench) this.bench.record();
     requestAnimationFrame(t2 => this.loop(t2));
   }
   hud() {

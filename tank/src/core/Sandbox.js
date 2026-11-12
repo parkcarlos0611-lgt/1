@@ -44,7 +44,7 @@ DS.Sandbox = class Sandbox {
     this.sel = null; g.target = null; g.mcam = false; g.mcamHold = null;
     DS.FireControl.update(W, g.player, false);
     g.ranging = null; if (g.arty) { g.arty.tgt = null; g.arty.sol = null; g.arty.imp.length = 0; g.artySet(false); g.scam = false; }
-    g.nightSight(!!W.env.night || (g.thermal && !!g.player.def.sight.thermal));
+    g.nightSight((W.env.night || 0) > 0.5 || (g.thermal && !!g.player.def.sight.thermal));
     document.getElementById('h-title').textContent = `${Sandbox.NAMES[me.id]} · 사격장`;
     this.refresh();
   }
@@ -55,10 +55,10 @@ DS.Sandbox = class Sandbox {
   // ---- environment ----
   setEnv(e) {
     const W = this.w, env = W.env;
-    if (e.time) { env.time = e.time; env.night = e.time === 'night' ? 1 : 0; env.sun = e.time === 'night' ? null : e.time === 'dusk' ? { el: 7, side: -1 } : { el: 35, side: 1 }; }
+    if (e.time) { env.time = e.time; env.clock = DS.Sky.parse({ day: '10:00', dusk: '17:30', night: '23:00' }[e.time] || e.time); DS.Sky.update(W, 0); }
     if (e.visibility != null) env.visibility = +e.visibility;
     if (e.wind != null) { env.wind = +e.wind; W.wind = +e.wind; }
-    const g = this.g; if (e.time && g.player) g.nightSight(!!env.night);
+    const g = this.g; if (e.time && g.player) g.nightSight((env.night || 0) > 0.5);
   }
 
   // ---- layouts ----

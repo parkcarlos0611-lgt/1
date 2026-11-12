@@ -14,7 +14,7 @@ DS.RANGE = {
   far: 10000,                 // from here to the end: empty level desert (far range for long shots and demolition tests)
   length: 20000,              // total length of the range map (m)
   berms: [[1215, 1.1, 5], [2080, 1.5, 6], [3085, 1.6, 6], [4090, 1.6, 7]],     // hull-down berm, target berms
-  env: { visibility: 0, night: 0, wind: 2, sun: { el: 35, side: 1 } },
+  env: { visibility: 0, wind: 2, time: '10:00' },
   // sprite: [file, width m]
   sprites: { barracks: 12.5, tent: 9.8, sandbag: 6.4, hesco: 6.6, twall: 6.6, supply: 13,
     s_range: 5.2, s_danger: 3.3, s_warning: 2.8, s_lane: 2.6,

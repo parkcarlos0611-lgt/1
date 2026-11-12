@@ -20,7 +20,7 @@ Object.assign(DS.Game.prototype, {
     const S = this.ui = DS.UI.load();
     this.uiApply();
     // HUD: the rows a driver needs at a glance; the rest behind 'details'
-    const core = ['h-spd', 'h-ammo', 'h-load', 'h-rng', 'h-foe', 'h-tow', 'h-zoom'];
+    const core = ['h-clock', 'h-spd', 'h-ammo', 'h-load', 'h-rng', 'h-foe', 'h-tow', 'h-zoom'];
     document.querySelectorAll('#hud .r').forEach(r => { const b = r.querySelector('b'); if (!b || !core.some(id => r.querySelector('#' + id))) r.classList.add('x'); });
     document.getElementById('hudmore').onclick = () => { S.hudFull = !S.hudFull; this.uiApply(); DS.UI.save(S); };
     // pause menu
@@ -39,6 +39,7 @@ Object.assign(DS.Game.prototype, {
       if (a === 'hud') S.hudFull = !S.hudFull;
       if (a === 'help') S.help = !S.help;
       if (a === 'touch') S.touch = b.dataset.v;
+      if (a === 'spd') { this.world.env.speed = +b.dataset.v; this.timeUi(); return; }
       DS.UI.save(S); this.uiApply();
     });
     // key bindings: S.keys maps a physical key to the key the game listens for. Pressed keys are translated before
@@ -63,9 +64,19 @@ Object.assign(DS.Game.prototype, {
       this.keyList();
     });
     this.keyList();
+    // time of day (firing range and town; a mission keeps its own clock): slider and speed
+    const free = this.mission && (this.mission.range || this.mission.town);
+    pm.querySelector('#p-timerow').hidden = pm.querySelector('#p-speedrow').hidden = !free;
+    pm.querySelector('#p-clock').addEventListener('input', e => { this.world.env.clock = +e.target.value / 60; DS.Sky.update(this.world, 0); this.nightSight((this.world.env.night || 0) > 0.5 || this.thermal); this.timeUi(); });
+    this.timeUi();
     pm.querySelector('#p-vol').addEventListener('input', e => { S.vol = +e.target.value / 100; DS.UI.save(S); this.uiApply(); });
     addEventListener('keydown', e => { if (e.code === 'Escape' && !(this.sbx && this.sbx.edit)) this.setPause(!this.paused); });
     this.touchInit();
+  },
+  timeUi() {
+    const pm = document.getElementById('pause'), env = this.world.env; if (!pm || env.clock == null) return;
+    pm.querySelector('#p-clock').value = Math.round(env.clock * 60); pm.querySelector('#p-clockv').textContent = DS.Sky.fmt(env.clock);
+    pm.querySelectorAll('[data-p=spd]').forEach(b => b.classList.toggle('on', +b.dataset.v === env.speed));
   },
   uiApply() {
     const S = this.ui, $ = s => document.querySelector(s);

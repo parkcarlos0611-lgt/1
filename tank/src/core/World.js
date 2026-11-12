@@ -89,6 +89,7 @@ DS.World = class World {
   addLog(r) { this.log.unshift({ ...r, at: this.time }); if (this.log.length > 6) this.log.pop(); }
 
   update(frameDt) {
+    DS.Sky.update(this, frameDt);
     const h = 1 / DS.T.physicsHz;
     this.acc = Math.min(this.acc + frameDt, h * DS.T.maxSubsteps);
     DS.Thermal.update(this, frameDt);

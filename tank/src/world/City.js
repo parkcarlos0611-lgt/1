@@ -628,19 +628,15 @@ DS.Structure = class Structure {
   draw(ctx, cam, grey, R) {
     const D = this.D, k = this.k, im0 = R.cityImg[k]; if (!im0) return;
     if (this.x + this.w + 40 < cam.left || this.x - this.w - 40 > cam.right) return;
-    const env = this.world.env || {}, sun = env.night ? null : env.sun, storm = env.visibility ? 1 : 0;
+    const env = this.world.env || {}, sun = env.sun && env.sun.el > 0 && (env.night || 0) < 0.5 ? env.sun : null, storm = env.visibility ? 1 : 0;
     let im = this.glass && R.cityBroken[k] ? R.cityBroken[k] : im0;
     if (grey != null) im = R.propTinted('city:' + k + (this.glass ? 'b' : ''), 't', grey(0.2), 1);
     else if (storm) im = R.propTinted('city:' + k + (this.glass ? 'b' : ''), 's', '205,176,134', 0.22);
     ctx.imageSmoothingQuality = 'high';
-    // shadow of what stands
-    if (sun && grey == null) {
-      const t = this.top - this.base, run = -sun.side * Math.min(3.2, 1 / Math.tan(sun.el * Math.PI / 180)) * t * 0.5, e = this.w * 0.46;
-      if (t > 0.5) { ctx.fillStyle = storm ? 'rgba(52,36,18,0.12)' : 'rgba(52,36,18,0.24)'; ctx.beginPath(); ctx.moveTo(this.x - e, this.base + 0.2); ctx.lineTo(this.x + e, this.base + 0.2); ctx.lineTo(this.x + e + run, this.base - 2.6); ctx.lineTo(this.x - e + run, this.base - 2.6); ctx.closePath(); ctx.fill(); }
-    }
+    // (its shadow is cast with the vehicles' into the shared shadow layer: Renderer.shadowExtra below)
     ctx.save(); ctx.translate(this.x, this.base);
     const face = this.touched && this.faceImg();
-    if (!face) { ctx.save(); ctx.scale(1, -1); ctx.drawImage(im, -this.w / 2, -this.h, this.w, this.h); ctx.restore(); }
+    if (!face) { ctx.save(); ctx.scale(1, -1); ctx.drawImage(im, -this.w / 2, -this.h, this.w, this.h); if (grey == null) R.relief(ctx, 'city:' + k, im0, -this.w / 2, -this.h, this.w, this.h, 1); ctx.restore(); }
     else {
       const p = this.ppm, col = grey != null ? grey(0.2) : null;
       ctx.save(); ctx.scale(1, -1); ctx.drawImage(col ? this.tinted(face, col, this.faceVer) : face, -this.w / 2, -this.h, this.w, this.h); ctx.restore();
@@ -712,6 +708,25 @@ DS.Structure = class Structure {
 
 // images: buildings, their broken-glass versions, and the debris pieces
 Object.assign(DS.Renderer.prototype, {
+  // Buildings cast their real silhouette (what is left of them, falling blocks included) into the shadow layer
+  // the vehicles use, sheared away from the light the same way; a building's shadow reaches less far toward
+  // the viewer (most of it falls on the ground behind the row) so a tower does not black out the road.
+  shadowExtra(o, m, q, Lt, cam) {
+    if (Lt.fire) return 0;
+    let n = 0;
+    for (const b of this.w.buildings) {
+      if (!b.D || b.state === 'rubble' || b.x + b.w + 60 < cam.left || b.x - b.w - 60 > cam.right) continue;
+      const im = (b.touched && b.face) || (b.glass && this.cityBroken[b.k]) || this.cityImg[b.k]; if (!im) continue;
+      const cot = Lt.cot != null ? Lt.cot : 1 / Math.tan(Math.max(8, Lt.el) * Math.PI / 180), kx = -Lt.side * Math.min(3.5, cot * 0.55), ky = 0.12, y0 = b.base + 0.1;
+      o.setTransform(m.a / q, m.b / q, m.c / q, m.d / q, m.e / q, m.f / q); o.transform(1, 0, kx, -ky, -kx * y0, y0 * (1 + ky));
+      o.globalAlpha = Math.max(0, Math.min(1, Lt.k));
+      o.save(); o.translate(b.x, b.base); o.scale(1, -1); o.drawImage(im, -b.w / 2, -b.h, b.w, b.h); o.restore();
+      for (const ch of b.chunks) if (ch.cv) { const p = b.ppm, [bx, by, bw, bh] = ch.box;
+        o.save(); o.translate(b.x + ch.ax + ch.ox, b.base + ch.ay + ch.oy); o.rotate(ch.ang); o.translate(-ch.ax, -ch.ay); o.scale(1, -1); o.drawImage(ch.cv, bx / p - b.w / 2, (by - b.D.h) / p, bw / p, bh / p); o.restore(); }
+      n++;
+    }
+    return n;
+  },
   // a 256 px tile of packed rubble cut from the debris pieces (built once the pieces have loaded)
   rubblePattern() {
     if (this._rubPat !== undefined) return this._rubPat;

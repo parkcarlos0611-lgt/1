@@ -72,6 +72,7 @@ DS.Game = class Game {
     this.setHelp(help);
     document.getElementById('helpbtn').onclick = () => this.setHelp(document.getElementById('help').classList.contains('hide'));
     W.env = { ...M.env }; W.wind = M.env.wind;
+    DS.Sky.init(W, M);
     const other = veh === 'm2a2' ? 'm1a1' : 'm2a2', nm = { m1a1: 'M1A1', m2a2: '브래들리' };
     if (range) {
       // sandbox: my vehicle alone on the range, the first preset's targets down the lanes
@@ -98,7 +99,7 @@ DS.Game = class Game {
     }
     DS.FireControl.update(W, v, false);
     W.cam.x = v.pos.x; W.cam.y = v.pos.y;
-    if (M.env.night) this.nightSight(true);
+    if ((W.env.night || 0) > 0.5) this.nightSight(true);
     document.getElementById('h-title').textContent = range || town ? `${nm[veh] === '브래들리' ? 'M2A2' : nm[veh]} · ${M.name}` : `${nm[veh]} · 작전 ${i + 1} ${M.name}`;
     document.getElementById('again').onclick = () => { location.hash = range || town ? M.id : 'm' + (i + 1) + (veh === 'm2a2' ? 'b' : ''); location.reload(); };
     document.getElementById('tomenu').onclick = () => { location.hash = ''; location.reload(); };
@@ -280,13 +281,13 @@ DS.Game = class Game {
     // grade by conditions: low morning sun warm, sandstorm ochre and flat, night cool and desaturated
     const low = sun ? Math.max(0, Math.min(1, (25 - sun.el) / 15)) : 0;
     let lift = [0.0, 0.0, 0.01], gain = [1.0, 1.0, 1.0], sat = 1.05, contrast = 1.05;
-    if (night) { lift = [0.0, 0.004, 0.02]; gain = [0.92, 0.97, 1.1]; sat = 0.75; contrast = 1.08; }
+    if (night > 0.4) { lift = [0.0, 0.004, 0.02]; gain = [0.92, 0.97, 1.1]; sat = 0.75; contrast = 1.08; }
     else if (storm) { lift = [0.03, 0.015, 0.0]; gain = [1.04, 0.98, 0.86]; sat = 0.85; contrast = 0.92; }
     else if (low) { lift = [0.0, 0.0, 0.025 * low]; gain = [1.0 + 0.06 * low, 1.0, 1.0 - 0.08 * low]; sat = 1.05; contrast = 1.06; }
     P.render({
-      time: w.time, threshold: night ? 0.62 : storm ? 0.88 : 0.86, bloom: night ? 0.75 : storm ? 0.4 : 0.55,
-      haze: night ? 0 : sun ? (storm ? 0.25 : 0.35 + 0.65 * (1 - low)) : 0.3, horizon: hz, hot, waves, hit,
-      grain: night ? 0.045 : 0.022, vig: 0.38, lift, gain, sat, contrast,
+      time: w.time, threshold: night > 0.4 ? 0.62 : storm ? 0.88 : 0.86, bloom: night > 0.4 ? 0.75 : storm ? 0.4 : 0.55,
+      haze: night > 0.4 ? 0 : sun ? (storm ? 0.25 : 0.35 + 0.65 * (1 - low)) : 0.3, horizon: hz, hot, waves, hit,
+      grain: night > 0.4 ? 0.045 : 0.022, vig: 0.38, lift, gain, sat, contrast,
     });
   }
   // field of view of the gunner's sight: tanks have ×3 / ×10; a sight with its own list (TADS) steps through it,
@@ -438,6 +439,7 @@ DS.Game = class Game {
       { const lb = document.querySelector('#row-tow span'), t = v.heli ? '비행·무장' : 'TOW'; if (lb.textContent !== t) lb.textContent = t; }
       document.getElementById('row-tow').hidden = !v.tow && !v.heli;
       const fc = v.fc;
+      if (w.env.clock != null) set('h-clock', DS.Sky.fmt(w.env.clock) + (w.env.speed > 1 ? ` (×${w.env.speed})` : ''));
       set('h-rng', fc.range ? Math.round(fc.range) + ' m' : v.def.sight.manual ? `눈금 ${fc.bs} m` : `— (전투조준 ${fc.bs} m)`);
       set('h-se', (fc.se * 1000).toFixed(2) + ' mil · ' + (fc.se * 180 / Math.PI).toFixed(2) + '°');
       const foes = w.vehicles.filter(x => x.team !== v.team), up = foes.filter(x => x.alive).length;
@@ -536,7 +538,7 @@ DS.Game = class Game {
     if (this.thermal) this.tisRender(cam, dt); else this.rend.frame(this.sctx, cam, { main: false });
     const c = this.sctx, cx = W / 2, cy = H / 2, env = w.env || {};
     // heat shimmer over long ranges in daylight: rows of the picture wobble sideways
-    if (!this.thermal && !env.night && R > 500) {
+    if (!this.thermal && (env.night || 0) < 0.5 && R > 500) {
       const amp = Math.min(1.8, R / 1500) * dpr, t = w.time, hpx = cv.height, st = Math.max(2, Math.round(2 * dpr));
       c.setTransform(1, 0, 0, 1, 0, 0);
       for (let y = Math.round(hpx * 0.25); y < hpx * 0.85; y += st) c.drawImage(cv, 0, y, cv.width, st, Math.sin(y * 0.11 / dpr + t * 9) * amp * (0.5 + 0.5 * Math.sin(y * 0.031 / dpr - t * 3)), y, cv.width, st);

@@ -145,7 +145,7 @@ Object.assign(DS.Renderer.prototype, {
   },
   buildings(ctx, cam, grey) {
     const w = this.w, L = w.buildings; if (!L || !L.length || !this.bldImg) return;
-    const env = w.env || {}, sun = env.night ? null : env.sun, storm = env.visibility ? 1 : 0, H = n => { const v = Math.sin(n * 127.1 + 311.7) * 43758.5453; return v - Math.floor(v); };
+    const env = w.env || {}, sun = env.sun && env.sun.el > 0 && (env.night || 0) < 0.5 ? env.sun : null, storm = env.visibility ? 1 : 0, H = n => { const v = Math.sin(n * 127.1 + 311.7) * 43758.5453; return v - Math.floor(v); };
     ctx.imageSmoothingQuality = 'high';
     for (const b of L) {
       if (b.draw) { b.draw(ctx, cam, grey, this); continue; }
@@ -154,7 +154,7 @@ Object.assign(DS.Renderer.prototype, {
       const left = b.h - b.sink;
       if (b.state !== 'rubble') {
         if (sun && grey == null) {                                  // shadow of what still stands
-          const run = -sun.side * Math.min(3.2, 1 / Math.tan(sun.el * Math.PI / 180)) * left * 0.55, e = b.w * 0.48;
+          const run = -sun.side * Math.min(3.2, sun.cot != null ? sun.cot : 1 / Math.tan(sun.el * Math.PI / 180)) * left * 0.55, e = b.w * 0.48;
           ctx.fillStyle = storm ? 'rgba(52,36,18,0.12)' : 'rgba(52,36,18,0.26)';
           ctx.beginPath(); ctx.moveTo(b.x - e, b.base + 0.2); ctx.lineTo(b.x + e, b.base + 0.2); ctx.lineTo(b.x + e + run, b.base - 2.6); ctx.lineTo(b.x - e + run, b.base - 2.6); ctx.closePath(); ctx.fill();
         }

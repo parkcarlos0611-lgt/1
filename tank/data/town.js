@@ -24,7 +24,7 @@ DS.TOWN = {
     [14000, 17000, 'ruins', '파괴된 구역'],
     [17000, 20000, 'highway_e', '사막 간선 (동)'],
   ],
-  env: { visibility: 0, night: 0, wind: 2, sun: { el: 38, side: 1 } },
+  env: { visibility: 0, wind: 2, time: '10:00' },
   berms: [], signs: [], flags: [], parked: [], sprites: {},
   layers: { 5: [0.47, 0.48], 4: [0.58, 0.34], 3: [0.70, 0.24], 2: [0.82, 0.13], 1: [0.93, 0.04] },        // 5: the far town, hazy
   front: 0.34,

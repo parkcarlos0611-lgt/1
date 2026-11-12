@@ -23,10 +23,13 @@ DS.Thermal = {
 
   ambient(w) {
     const env = w.env || {}, sun = env.sun, night = env.night || 0;
-    let ground = night ? 0.08 : 0.30 + 0.25 * Math.min(1, (sun ? sun.el : 30) / 45);
+    // the ground warms through the day and cools through the night (lagging the sun a couple of hours)
+    const h = env.clock != null ? env.clock : null, heat = h == null ? null : Math.max(0, Math.sin((h - 8) / 12 * Math.PI));
+    let ground = h != null ? 0.08 + (0.30 + 0.25 * heat - 0.08) * Math.min(1, heat * 1.6 + (1 - night) * 0.2)
+      : night ? 0.08 : 0.30 + 0.25 * Math.min(1, (sun ? sun.el : 30) / 45);
     if (env.visibility) ground -= 0.03;
-    const hullDelta = night ? 0.2 : sun && sun.el < 20 ? Math.max(0, (sun.el - 14) / 6) * 0.08 : 0.09;
-    return { ground, hullDelta, sky: night ? 0.0 : 0.05, att: env.visibility ? env.visibility * 2.6 : 7000 };
+    const hullDelta = 0.2 * night + (1 - night) * (sun && sun.el < 20 ? Math.max(0, (sun.el - 14) / 6) * 0.08 : 0.09);
+    return { ground, hullDelta, sky: 0.05 * (1 - night), att: env.visibility ? env.visibility * 2.6 : 7000 };
   },
   hull(v, amb) { const H = v.heat || { eng: 0.3, fire: 0 }; return amb.ground + amb.hullDelta + 0.12 * H.eng + 0.3 * Math.min(1, H.fire); },
   // hot spots in world coordinates: [x, y, radius m, extra temperature over the hull]

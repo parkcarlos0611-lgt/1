@@ -98,9 +98,10 @@ Object.assign(DS.Renderer.prototype, {
   },
   // front = false: the layers behind the line (drawn before the vehicles); true: the near row (after the ground)
   props(ctx, cam, front, grey) {
+    if (!front) this._litList = null;                // (night lights recorded afresh for this picture)
     const w = this.w, L = w.props; if (!L || !this.propImg) return;
     const T = w.terrain, R = DS.MAP, env = w.env || {}, storm = env.visibility ? 1 : 0;
-    const hz = storm ? '205,176,134' : '222,204,172', sun = env.night ? null : env.sun;
+    const hz = storm ? '205,176,134' : '222,204,172', sun = env.sun && env.sun.el > 0 && (env.night || 0) < 0.5 ? env.sun : null;
     ctx.imageSmoothingQuality = 'high';
     // the base's ground behind the line: a low strip of sand rising toward the far wall, so the rows stand
     // one behind the other instead of all on the same line
@@ -130,12 +131,15 @@ Object.assign(DS.Renderer.prototype, {
       else if (haze || storm) src = this.propTinted(p.k, p.z, hz, Math.min(0.85, haze + storm * 0.25));
       // cast shadow: the building's outline laid on the ground away from the sun, toward the viewer
       if (sun && grey == null) {
-        const run = -sun.side * Math.min(3.2, 1 / Math.tan(sun.el * Math.PI / 180)) * ht * 0.55, drop = (front ? 0.5 : 0.16 + 0.1 * par) * Math.min(1.6, 0.6 + ht / 4);
+        const run = -sun.side * Math.min(3.2, sun.cot != null ? sun.cot : 1 / Math.tan(sun.el * Math.PI / 180)) * ht * 0.55, drop = (front ? 0.5 : 0.16 + 0.1 * par) * Math.min(1.6, 0.6 + ht / 4);
         const tall = p.k === 'supply' || p.k === 'sandbag' ? 0.82 : 0.94, e = wd * 0.47 * tall;
         ctx.fillStyle = `rgba(52,36,18,${(storm ? 0.12 : 0.3) * (1 - haze)})`;
         ctx.beginPath(); ctx.moveTo(x - e, y + 0.03); ctx.lineTo(x + e, y + 0.03); ctx.lineTo(x + e + run, y - drop); ctx.lineTo(x - e + run, y - drop); ctx.closePath(); ctx.fill();
       }
-      ctx.save(); ctx.translate(x, y); ctx.scale(p.f === -1 ? -1 : 1, -1); ctx.drawImage(src, -wd / 2, -ht * (p.k === 'm1a1' ? 1 : 0.985), wd, ht); ctx.restore();
+      ctx.save(); ctx.translate(x, y); ctx.scale(p.f === -1 ? -1 : 1, -1); ctx.drawImage(src, -wd / 2, -ht * (p.k === 'm1a1' ? 1 : 0.985), wd, ht);
+      if (grey == null && haze < 0.3 && (p.k.startsWith('city:') || /^t:(market|shop)/.test(p.k))) this.relief(ctx, p.k, im, -wd / 2, -ht * 0.985, wd, ht, p.f);
+      ctx.restore();
+      if (grey == null) this.litRecord(p, im, x, y, wd, ht, haze);
       // shaded side: the wall facing away from the sun is darker (a gradient across the sprite's own shape is
       // too costly per frame, so a narrow band at the lee end of the base)
     }
@@ -143,7 +147,7 @@ Object.assign(DS.Renderer.prototype, {
   },
   // boards right behind the line at their true position (no parallax): range entrance, warnings, distances
   rangeSigns(ctx, cam, grey) {
-    const T = this.w.terrain, R = DS.MAP, env = this.w.env || {}, sun = env.night ? null : env.sun;
+    const T = this.w.terrain, R = DS.MAP, env = this.w.env || {}, sun = env.sun && env.sun.el > 0 && (env.night || 0) < 0.5 ? env.sun : null;
     for (const [k, d] of R.signs) {
       const x = R.line + d, wd = R.sprites[k], im = this.propImg[k];
       if (x < cam.left - 4 || x > cam.right + 4 || !im) continue;

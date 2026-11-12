@@ -197,7 +197,7 @@ DS.Renderer = class Renderer {
     for (let x = x0; x <= x1; x += cs) {
       const i = T.idx(x), h = T.h[i];
       let d = 0.1 * Math.max(0, T.disturb[i] - 0.3);           // fresh crater earth (not crust breaks)
-      if (sun && !(w.env || {}).night) d += Math.max(-0.03, Math.min(0.03, (T.height(x + 0.6) - T.height(x - 0.6)) / 1.2 * sun.side * 0.06));
+      if (sun && sun.ex != null ? sun.el > 0 : sun && !(w.env || {}).night) d += Math.max(-0.03, Math.min(0.03, (T.height(x + 0.6) - T.height(x - 0.6)) / 1.2 * sun.side * 0.06));
       if (Math.abs(d) > 0.004) { ctx.fillStyle = tg(amb.ground + d); ctx.fillRect(x, h - 0.7, cs + 0.01, 0.7); }
     }
     ctx.restore();
@@ -350,12 +350,12 @@ DS.Renderer = class Renderer {
     if (!any) return;
     // tint the mask, then lay it over the picture twice: a wide soft veil and a denser core, drifting slowly
     f.setTransform(1, 0, 0, 1, 0, 0); f.globalAlpha = 1; f.globalCompositeOperation = 'source-in';
-    f.fillStyle = env.night ? 'rgb(14,18,30)' : env.visibility ? 'rgb(176,146,104)' : 'rgb(214,203,182)';
+    f.fillStyle = (env.night || 0) > 0.5 ? 'rgb(14,18,30)' : env.visibility ? 'rgb(176,146,104)' : 'rgb(214,203,182)';
     f.fillRect(0, 0, fw, fh); f.globalCompositeOperation = 'source-over';
     const dr = Math.sin(this.w.time * 0.23) * 6 * cam.dpr;
     ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
-    ctx.globalAlpha = env.night ? 0.6 : 0.5; ctx.drawImage(L, -DS_ + dr, -DS_, fw * DS_, fh * DS_);
-    ctx.globalAlpha = env.night ? 0.35 : 0.3; ctx.drawImage(L, -DS_ * 1.6 - dr, -DS_ * 1.3, fw * DS_ * 1.012, fh * DS_ * 1.012);
+    ctx.globalAlpha = (env.night || 0) > 0.5 ? 0.6 : 0.5; ctx.drawImage(L, -DS_ + dr, -DS_, fw * DS_, fh * DS_);
+    ctx.globalAlpha = (env.night || 0) > 0.5 ? 0.35 : 0.3; ctx.drawImage(L, -DS_ * 1.6 - dr, -DS_ * 1.3, fw * DS_ * 1.012, fh * DS_ * 1.012);
     ctx.restore();
   }
 
@@ -433,8 +433,9 @@ DS.Renderer = class Renderer {
       } else ctx.fillStyle = `rgba(${col},${a(cam.x - me.pos.x)})`;
       ctx.fillRect(0, 0, W, H);
     }
-    if (night) { ctx.fillStyle = `rgba(4,8,22,${0.86 * night})`; ctx.fillRect(0, 0, W, H); }
+    if (night) { ctx.fillStyle = `rgba(4,8,22,${DS.Sky.STARLIGHT * night})`; ctx.fillRect(0, 0, W, H); }      // starlight: never quite black
     ctx.restore();
+    if (night && opt.main !== false) this.nightLights(ctx, cam);         // windows, street lamps, burning floors
     if (night) {                                   // light sources stay bright in the dark
       ctx.globalCompositeOperation = 'lighter';
       this.w.particles.draw(ctx, cam, 1, DS.P.FIRE);
@@ -460,7 +461,7 @@ DS.Renderer = class Renderer {
   // canvas and only repainted when the view has moved (or clouds have drifted) since the last paint.
   sky(ctx, cam) {
     const W = cam.W * cam.dpr, H = cam.H * cam.dpr, env = this.w.env || {}, th = this.opt && this.opt.thermal;
-    const key = [Math.round(cam.x * 10), Math.round(cam.y * 10), Math.round(cam.zoom), Math.floor(this.w.time * 2), W, H, th ? 1 : 0, env.night, env.visibility, env.sun ? env.sun.el * env.sun.side : 0].join();
+    const key = [Math.round(cam.x * 10), Math.round(cam.y * 10), Math.round(cam.zoom), Math.floor(this.w.time * 2), W, H, th ? 1 : 0, Math.round((env.dark || 0) * 40), env.visibility, env.sun ? Math.round(env.sun.el * 2) + '/' + Math.round(env.sun.ex * 40) : 0, env.moon ? Math.round(env.moon.el) : 0].join();
     const store = this.bgs || (this.bgs = new Map());
     let bg = store.get(ctx.canvas);
     if (!bg) { bg = { c: document.createElement('canvas'), key: '' }; store.set(ctx.canvas, bg); }
@@ -480,18 +481,17 @@ DS.Renderer = class Renderer {
     if (env.visibility) { g.addColorStop(0, '#b98d5a'); g.addColorStop(0.55, '#d8b07a'); g.addColorStop(1, '#e2c08c'); }
     else { g.addColorStop(0, '#3f78bd'); g.addColorStop(0.3, '#7da9d6'); g.addColorStop(0.52, '#c3d6e2'); g.addColorStop(0.75, '#ecdcbc'); g.addColorStop(1, '#e8cf9f'); }
     ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
-    if (env.night) {
-      const n = ctx.createLinearGradient(0, 0, 0, H); n.addColorStop(0, '#05070f'); n.addColorStop(1, '#141826');
-      ctx.globalAlpha = env.night; ctx.fillStyle = n; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1;
-      if (!this.stars) { const r = DS.rng(9); this.stars = Array.from({ length: 160 }, () => [r(), r() * 0.6, r()]); }
-      ctx.fillStyle = '#dfe6ff';
-      for (const [x, y, b] of this.stars) { ctx.globalAlpha = 0.3 + 0.6 * b; ctx.fillRect(((x * W - cam.x * cam.dpr * 0.02) % W + W) % W, y * H, 1.5 * cam.dpr, 1.5 * cam.dpr); }
-      ctx.globalAlpha = 1;
-      return;
+    // ---- daylight sky: palette from the sun's height, sun disc and glow, high cirrus (all of it is painted at
+    // any hour; dusk colours and the night sky are laid over it by how far the sun is down) ----
+    const sun = env.sun || { el: -6, ex: env.clock != null && env.clock < 12 ? 0.9 : -0.9, side: 1 }, low = Math.max(0, Math.min(1, (25 - sun.el) / 15)), storm = env.visibility ? 1 : 0;
+    const sex = sun.ex != null ? sun.ex : sun.side * 0.8, sx = W * (0.5 + 0.4 * sex), sy = H * Math.max(0.08, 0.47 - sun.el / 75);
+    const dusk = env.clock != null ? Math.max(0, Math.min(1, (10 - sun.el) / 14)) * (1 - (env.dark || 0) * 0.6) : 0;
+    if (dusk > 0.02 && !storm) {                   // sunrise / sunset: purple overhead, red-orange glow low on the sun's side
+      const dg = ctx.createLinearGradient(0, 0, 0, H * 0.6); dg.addColorStop(0, `rgba(70,50,110,${0.45 * dusk})`); dg.addColorStop(0.6, `rgba(220,120,110,${0.3 * dusk})`); dg.addColorStop(1, `rgba(255,140,70,${0.55 * dusk})`);
+      ctx.fillStyle = dg; ctx.fillRect(0, 0, W, H);
+      const rg = ctx.createRadialGradient(sx, H * 0.5, 0, sx, H * 0.5, W * 0.7); rg.addColorStop(0, `rgba(255,120,40,${0.5 * dusk})`); rg.addColorStop(1, 'rgba(255,120,40,0)');
+      ctx.fillStyle = rg; ctx.fillRect(0, 0, W, H);
     }
-    // ---- daylight sky: palette from the sun's height, sun disc and glow, high cirrus ----
-    const sun = env.sun || { el: 35, side: 1 }, low = Math.max(0, Math.min(1, (25 - sun.el) / 15)), storm = env.visibility ? 1 : 0;
-    const sx = W * (0.5 + 0.32 * sun.side), sy = H * Math.max(0.08, 0.47 - sun.el / 75);
     if (!storm && low > 0) {                       // low morning sun: warm band along the horizon
       const wg = ctx.createLinearGradient(0, H * 0.25, 0, H * 0.62);
       wg.addColorStop(0, 'rgba(255,200,140,0)'); wg.addColorStop(1, `rgba(255,196,140,${0.45 * low})`);
@@ -533,6 +533,27 @@ DS.Renderer = class Renderer {
           ctx.drawImage(PS.puff(lit ? warm : 0xc9cdd6, k & 3), px - r, py - r * 0.62, r * 2, r * 1.24);
         }
       }
+      ctx.globalAlpha = 1;
+    }
+    // ---- night sky over it: deep blue to black, stars coming out, the moon ----
+    const dk = env.dark != null ? env.dark : env.night || 0;
+    if (dk > 0.01) {
+      const n = ctx.createLinearGradient(0, 0, 0, H); n.addColorStop(0, '#05070f'); n.addColorStop(0.7, '#101626'); n.addColorStop(1, '#1d2232');
+      ctx.globalAlpha = Math.min(1, dk * 1.05); ctx.fillStyle = n; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1;
+      if (!this.stars) { const r = DS.rng(9); this.stars = Array.from({ length: 220 }, () => [r(), r() * 0.62, r()]); }
+      const ml = env.moon ? env.moon.light : 0;
+      ctx.fillStyle = '#dfe6ff';
+      for (const [x, y, b] of this.stars) { const a = (0.25 + 0.65 * b) * Math.max(0, dk * 1.4 - 0.4) * (1 - 0.5 * ml * (1 - b)); if (a < 0.03) continue; ctx.globalAlpha = Math.min(1, a); ctx.fillRect(((x * W - cam.x * cam.dpr * 0.02) % W + W) % W, y * H, 1.4 * cam.dpr, 1.4 * cam.dpr); }
+      ctx.globalAlpha = 1;
+    }
+    if (env.moon && env.moon.el > -1 && !storm) {
+      const M = env.moon, mx = W * (0.5 + 0.4 * M.ex), my = H * Math.max(0.07, 0.47 - M.el / 75), mr = H * 0.016;
+      const glow = ctx.createRadialGradient(mx, my, 0, mx, my, mr * 9); glow.addColorStop(0, `rgba(210,220,240,${0.22 * M.light + 0.04})`); glow.addColorStop(1, 'rgba(210,220,240,0)');
+      ctx.fillStyle = glow; ctx.fillRect(mx - mr * 9, my - mr * 9, mr * 18, mr * 18);
+      ctx.globalAlpha = Math.max(0.15, dk); ctx.fillStyle = '#eef0e6'; ctx.beginPath(); ctx.arc(mx, my, mr, 0, 7); ctx.fill();
+      // the dark part of a waxing moon (lit on the sun's side)
+      const ph = M.illum, sh = (1 - 2 * ph) * mr; ctx.fillStyle = dk > 0.5 ? '#0b0f1c' : '#9fb6d4';
+      ctx.beginPath(); ctx.arc(mx, my, mr, Math.PI / 2, -Math.PI / 2, sex > M.ex); ctx.ellipse(mx, my, Math.abs(sh), mr, 0, -Math.PI / 2, Math.PI / 2, (sh > 0) === (sex > M.ex)); ctx.fill();
       ctx.globalAlpha = 1;
     }
     // ---- parallax dunes: asymmetric (long windward slope, short slip face), far layers fade into the haze,
@@ -726,11 +747,12 @@ DS.Renderer = class Renderer {
   // Low parts stay sharp, high parts spread (two passes with different blur); a dark contact band under the
   // tracks gives the occlusion where hull meets sand. Low morning sun: long shadows; dust: faint and diffuse.
   shadows(ctx, cam) {
-    const env = this.w.env || {}, T = this.w.terrain, sun = (env.night || 0) > 0.5 ? null : env.sun;
-    // light sources: the sun, or at night every fire (burning wreck) lighting vehicles near it
-    const lights = [];
-    if (sun) lights.push({ el: sun.el, side: sun.side, k: env.visibility ? 0.32 : 1, diffuse: env.visibility ? 1 : 0 });
-    else for (const f of this.w.vehicles) if (f.burning > 0.5) lights.push({ fire: f, el: 18, diffuse: 0 });
+    const env = this.w.env || {}, T = this.w.terrain, sun = env.sun && env.sun.el > 0 ? env.sun : null;
+    // light sources: the sun (fading out as it sets), a bright moon, or at night every fire lighting vehicles near it
+    const lights = [], rise = sun ? Math.min(1, sun.el / 3) : 0;
+    if (sun) lights.push({ el: sun.el, side: sun.side, cot: sun.cot, k: (env.visibility ? 0.32 : 1) * rise, diffuse: env.visibility ? 1 : 0 });
+    else if (env.moon && env.moon.light > 0.4 && env.moon.el > 8) { const M = env.moon, r = Math.PI / 180; lights.push({ el: M.el, side: M.ex >= 0 ? 1 : -1, cot: Math.min(8, Math.abs(M.ex) / Math.sin(M.el * r)), k: 0.3 * M.light, diffuse: 1 }); }
+    if (!sun) for (const f of this.w.vehicles) if (f.burning > 0.5) lights.push({ fire: f, el: 18, diffuse: 0 });
     if (!lights.length) return;
     for (const L of lights) this.castShadows(ctx, cam, L);
   }
@@ -762,7 +784,7 @@ DS.Renderer = class Renderer {
         side = Math.sign(Lt.fire.pos.x - v.pos.x) || 1;
         k = Math.min(1, Lt.fire.burning / 3) * (1 - d / 45) * (0.8 + 0.2 * Math.sin(this.w.time * 11 + d));
       }
-      const kx = -side * Math.min(3, cot * 0.55), y0 = T.height(v.pos.x);
+      const kx = -side * Math.min(3.5, (Lt.cot != null ? Lt.cot : cot) * 0.55), y0 = T.height(v.pos.x);
       o.setTransform(m.a / q, m.b / q, m.c / q, m.d / q, m.e / q, m.f / q); o.transform(1, 0, kx, -ky, -kx * y0, y0 * (1 + ky));
       o.globalAlpha = Math.max(0, Math.min(1, k));
       this.drawVehicle(o, v, lcam); n++;

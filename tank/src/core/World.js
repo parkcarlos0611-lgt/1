@@ -96,7 +96,17 @@ DS.World = class World {
     DS.Sensor.update(this, frameDt);
     for (const v of this.vehicles) if (v.ai) v.ai.update(frameDt);
     while (this.acc >= h) {
-      for (const v of this.vehicles) v.step(h, this);
+      // Vehicles standing still with nothing to do (no orders, no target, no shot fired or round landing near
+      // them for a while) are put to sleep: their suspension has settled and stepping them changes nothing.
+      // With twenty-odd vehicles on a map this is most of the physics. Any input, target, nearby round or the
+      // player's seat wakes them at once.
+      for (const v of this.vehicles) {
+        if (v.heli || v === this.vehicles[0] || v.input.drive || v.input.fire || v.input.tow || (v.ai && v.ai.tgt) || Math.abs(v.vt) > 0.03 || Math.abs(v.vel.x) + Math.abs(v.vel.y) > 0.08 || this.time - (v.lastFired == null ? -99 : v.lastFired) < 4) v._quiet = 0;
+        else if (v._quiet > 1.5) { let near = false; for (const p of this.projectiles) if (Math.abs(p.x - v.pos.x) < 40 && Math.abs(p.y - v.pos.y) < 40) { near = true; break; } if (near) v._quiet = 0; }
+        v._quiet = (v._quiet || 0) + h;
+        if (v._quiet > 1.5) continue;
+        v.step(h, this);
+      }
       this.contacts(h);
       for (const p of this.projectiles) {
         const ox = p.x, oy = p.y;

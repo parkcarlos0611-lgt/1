@@ -435,7 +435,8 @@ DS.Renderer = class Renderer {
     }
     if (night) { ctx.fillStyle = `rgba(4,8,22,${DS.Sky.STARLIGHT * night})`; ctx.fillRect(0, 0, W, H); }      // starlight: never quite black
     ctx.restore();
-    if (night && opt.main !== false) this.nightLights(ctx, cam);         // windows, street lamps, burning floors
+    if (night && opt.main !== false) this.nightLights(ctx, cam);         // windows, street lamps, burning floors, white searchlights
+    if (opt.nv) DS.Searchlight.draw(ctx, cam, this.w, true);              // every searchlight beam, infrared too, in a night-vision sight
     if (night) {                                   // light sources stay bright in the dark
       ctx.globalCompositeOperation = 'lighter';
       this.w.particles.draw(ctx, cam, 1, DS.P.FIRE);

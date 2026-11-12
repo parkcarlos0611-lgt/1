@@ -206,6 +206,7 @@ DS.Game = class Game {
         else { this.mcam = !this.mcam; this.mcamHold = null; this.toast(this.mcam ? ((this.player.tow || this.player.hfState).missile ? '미사일 시점' : '미사일 시점 켬 — 다음 발사부터 따라감') : '미사일 시점 끔'); }
       }
       if (e.code === 'KeyX') { if (this.player.heli) this.player.input.hf = true; else if (this.player.tow) this.player.input.tow = true; else this.toast('미사일은 브래들리(TOW) · 공격헬기(헬파이어) 전용'); }
+      if (e.code === 'KeyY') { const t = DS.Searchlight.cycle(this.player); this.toast(t || '이 차량에는 탐조등이 없음'); return; }
       if (e.code === 'KeyN' && !(this.mission && this.mission.range)) { this.cycleVehicle(e.shiftKey ? -1 : 1); return; }
       if (e.code === 'KeyC' && this.player.heli) { this.player.turn(); return; }
       if (e.code === 'KeyZ') { this.world.xray = this.world.xray === false; this.toast(this.world.xray ? 'TOW 발사관 투시 켬' : 'TOW 발사관 투시 끔'); }
@@ -577,7 +578,7 @@ DS.Game = class Game {
     const o = v.sightOrigin(), a = v.gun.aimW;
     cam.x = o.x + Math.cos(a) * R + (Math.random() - 0.5) * shake; cam.y = o.y + Math.sin(a) * R + (Math.random() - 0.5) * shake - k2 * 14 / mil / 1000 * R;
     cam.zoom = W / (2 * R * Math.tan(fov / 2));
-    if (this.thermal) this.tisRender(cam, dt); else this.rend.frame(this.sctx, cam, { main: false });
+    if (this.thermal) this.tisRender(cam, dt); else this.rend.frame(this.sctx, cam, { main: false, nv: this.nv });
     const c = this.sctx, cx = W / 2, cy = H / 2, env = w.env || {};
     // heat shimmer over long ranges in daylight: rows of the picture wobble sideways
     if (!this.thermal && (env.night || 0) < 0.5 && R > 500) {

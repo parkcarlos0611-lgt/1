@@ -9,7 +9,7 @@ DS.UI = {
   // remappable actions: [name, the key the game listens for]
   ACTIONS: [['전진', 'KeyD'], ['후진', 'KeyA'], ['포 올림 · 상승', 'KeyW'], ['포 내림 · 하강', 'KeyS'], ['사격', 'Space'], ['탄종', 'KeyQ'], ['거리측정', 'KeyE'],
     ['표적 선택', 'Backspace'], ['동축 기관총 · 로켓', 'KeyF'], ['미사일 (TOW · 헬파이어)', 'KeyX'], ['조준경 배율', 'KeyV'], ['열상 · 야간 조준경', 'KeyT'],
-    ['미사일 · 포탄 시점', 'Tab'], ['해치', 'KeyU'], ['헬기 방향 전환', 'KeyC'], ['곡사 모드', 'KeyI'], ['조준경 크게', 'KeyG'], ['다른 아군 차량으로 전환', 'KeyN']],
+    ['미사일 · 포탄 시점', 'Tab'], ['해치', 'KeyU'], ['헬기 방향 전환', 'KeyC'], ['곡사 모드', 'KeyI'], ['조준경 크게', 'KeyG'], ['다른 아군 차량으로 전환', 'KeyN'], ['탐조등 (끔 · 적외선 · 백색광)', 'KeyY']],
   keyName(c) { return c.replace(/^Key/, '').replace(/^Digit/, '').replace('Space', 'Space').replace('Backspace', '⌫').replace('Arrow', '').replace('Left', '◀').replace('Right', '▶').replace('Up', '▲').replace('Down', '▼'); },
   load() { let s = {}; try { s = JSON.parse(localStorage.getItem(this.KEY) || '{}'); } catch (e) {} return Object.assign({}, this.defaults, s); },
   save(s) { try { localStorage.setItem(this.KEY, JSON.stringify(s)); } catch (e) {} },
@@ -178,6 +178,7 @@ Object.assign(DS.Game.prototype, {
       if (v.def.mg) B.push([v.def.mg.short || 'M2', 'm2', 1]);       // commander's gun: aim with a finger on the view
       B.push(['사격', 'Space', 1, 'fire']);
     }
+    if (DS.Searchlight.has(v)) B.push(['탐조등', 'KeyY']);
     if (this.mission && !this.mission.range) B.push(['전환', 'KeyN']);     // ride another friendly vehicle
     B.sort((a, b) => (b[3] === 'fire') - (a[3] === 'fire'));        // the trigger first: it takes the corner
     document.getElementById('tpad').innerHTML = B.map(([t, k, h, c]) => `<button type="button" data-k="${k}"${k === 'm2' ? ' data-m2="1"' : ''}${h ? ' data-hold="1"' : ''}${c ? ` class="${c}"` : ''}>${t}</button>`).join('');

@@ -145,6 +145,7 @@ Object.assign(DS.Renderer.prototype, {
     }
     rowsPass(front);
     ctx.restore(); this._litList = null;
+    DS.Searchlight.draw(ctx, cam, this.w, false);          // white searchlight beams
     // cut out what stands in front: the vehicles
     ctx.save(); ctx.globalCompositeOperation = 'destination-out'; ctx.globalAlpha = 1;
     const lcam = Object.assign(Object.create(Object.getPrototypeOf(cam)), cam); lcam.zoom = cam.zoom / 2;

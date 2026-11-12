@@ -116,7 +116,7 @@ DS.SightHud = {
       const y = cy - L * 0.6 + Math.min(1, Math.max(0, (o.bs || 1000) / 3000)) * L * 1.2; ln(x0 - 6, y, x0 + 12, y);
     }
     c.stroke(); c.beginPath(); c.arc(cx, cy, Math.max(1, W / 360), 0, 7); c.fill(); c.restore();
-    if (!elec && !o.thermal && !o.nv) return;            // an optical sight has only its etched reticle
+    if (!elec) return;                                  // an optical sight (its night channel too) has only its etched reticle
     // ---- the display: LED / phosphor characters in a low-resolution layer, bloomed ----
     const x = this.layer(W, H), green = o.thermal || o.nv, col = green ? 'rgb(150,255,150)' : 'rgb(255,52,30)', dim = green ? 'rgb(90,200,90)' : 'rgb(255,120,40)';
     const by = cy + L + Math.max(16, W / 20), dh = Math.max(13, W / 22), px = Math.max(1.6, W / 210);

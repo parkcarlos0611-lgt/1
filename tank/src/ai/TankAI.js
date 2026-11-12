@@ -63,6 +63,7 @@ DS.TankAI = class TankAI {
 
   update(dt) {
     const v = this.v;
+    DS.Searchlight.ai(v, this.w);
     this.aa(dt);
     if (this.mode === 'patrol') return this.shuttle();
     this.think(dt);

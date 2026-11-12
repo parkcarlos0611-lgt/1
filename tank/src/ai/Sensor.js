@@ -21,6 +21,7 @@ DS.Sensor = {
       vis *= b.def.signature || 1;
       vis *= Math.min(1.3, 0.45 + 0.8 * DS.Thermal.sig(b));          // running engines, hot tubes, fires show up
       vis *= 1 - 0.5 * DS.AI.smoke(world, a, b);                     // smoke cools and scatters the image
+      if ((env.night || 0) > 0.5 && b.light) vis = Math.max(vis, range < 3500 ? 0.5 : vis);        // a lamp burning shows hot and bright
       return vis * flash * moving / 1.5;
     }
     vis = range >= dm ? 0 : Math.pow(Math.max(0, Math.min(1, (dm - range) / (dm - 700))), 1.5);
@@ -30,6 +31,7 @@ DS.Sensor = {
     if (env.visibility) vis *= Math.max(0, Math.exp(-range / (env.visibility * 0.45)) * 1.6 - 0.02);
     if ((env.night || 0) > 0.5) vis *= S.passive ? (range < 900 ? 0.6 : range < 1600 ? 0.2 : (flash > 1 ? 0.1 : 0))      // image intensifier
       : range < 400 ? 0.5 : range < 800 ? 0.08 : (flash > 1 ? 0.05 : 0);
+    if ((env.night || 0) > 0.5) vis = DS.Searchlight.night(world, a, b, range, vis, flash);     // searchlights (src/vehicle/Searchlight.js)
     return vis * flash * moving / 5;
   },
   // how far this observer can identify (type) a target under the current conditions
@@ -43,7 +45,7 @@ DS.Sensor = {
   reach(world, a) {
     const S = a.def.sight, env = world.env || {}, dm = S.detectMax || 2500;
     if (S.thermal) return env.visibility ? Math.min(dm, env.visibility * 2.6) : dm;
-    if ((env.night || 0) > 0.5) return S.passive ? 1600 : 800;
+    if ((env.night || 0) > 0.5) return Math.max(S.passive ? 1600 : 800, a.light ? (a.light === 2 ? 1400 : 1100) : 0);
     return env.visibility ? Math.min(dm, env.visibility * 0.9) : dm;
   },
 

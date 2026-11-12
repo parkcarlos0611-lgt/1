@@ -1042,7 +1042,7 @@ DS.Renderer = class Renderer {
       const sx = p.x - p.vx / v * off, sy = p.y - p.vy / v * off;
       const g = ctx.createLinearGradient(sx, sy, sx - p.vx / v * L, sy - p.vy / v * L);
       g.addColorStop(0, p.ammo.tracer); g.addColorStop(1, 'rgba(255,200,120,0)');
-      ctx.strokeStyle = g; ctx.lineWidth = Math.max(0.06, 2 / cam.zoom);
+      ctx.strokeStyle = g; ctx.lineWidth = Math.max(lk ? Math.min(0.06, lk.dia * 0.4) : 0.06, 2 / cam.zoom);
       ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(sx - p.vx / v * L, sy - p.vy / v * L); ctx.stroke();
       if (lk && lk.len * cam.zoom > 2) this.drawRound(ctx, p, lk, off, cam);
     }
@@ -1074,8 +1074,11 @@ DS.Renderer = class Renderer {
       ctx.restore(); return;
     }
     ctx.beginPath(); ctx.rect(-vis, -1, vis + 0.01, 2); ctx.clip();
-    const fins = (x0, span, w, col) => { if (!span) return; ctx.fillStyle = col; ctx.beginPath();
-      ctx.moveTo(x0, -span / 2); ctx.lineTo(x0 + w * 0.6, -span / 2); ctx.lineTo(x0 + w, -d / 2); ctx.lineTo(x0 + w, d / 2); ctx.lineTo(x0 + w * 0.6, span / 2); ctx.lineTo(x0, span / 2); ctx.closePath(); ctx.fill(); };
+    // tail fins seen side on: a swept blade above and below the root, a thinner one edge-on through the middle
+    const fins = (x0, span, w, col) => { if (!span) return; ctx.fillStyle = col;
+      for (const s of [-1, 1]) { ctx.beginPath(); ctx.moveTo(x0, s * d * 0.2); ctx.lineTo(x0 + w * 0.12, s * span / 2); ctx.lineTo(x0 + w * 0.5, s * span / 2);
+        ctx.lineTo(x0 + w, s * d * 0.2); ctx.closePath(); ctx.fill(); }
+      ctx.fillRect(x0, -Math.max(0.004, span * 0.03), w * 0.9, Math.max(0.008, span * 0.06)); };
     if (lk.k === 'dart') {                       // rod, ballistic tip, fin can
       fins(-len, lk.fin, Math.min(0.13, len * 0.2), '#77756c');
       ctx.fillStyle = lk.col; ctx.beginPath(); ctx.moveTo(-len, -d / 2); ctx.lineTo(-0.07, -d / 2); ctx.lineTo(0, 0); ctx.lineTo(-0.07, d / 2); ctx.lineTo(-len, d / 2); ctx.fill();

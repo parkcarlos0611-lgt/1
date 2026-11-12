@@ -29,4 +29,6 @@ DS.SOILS = [
     col: ['#b8a58a', '#9a876b'], dust: 0.25, mobile: 0.3 },
   { id: 5, name: '젖은 모래 (와디 바닥)', n: 0.80, kc: 15, kphi: 700, c: 6.0e3, phi: 27, crr: 0.095,
     col: ['#a8875a', '#8a6c44'], dust: 0.05, mobile: 0.05 },
+  { id: 6, name: '아스팔트 포장', n: 1.0, kc: 200, kphi: 2.0e5, c: 8.0e4, phi: 40, crr: 0.015,
+    col: ['#5f5c57', '#4b4945'], dust: 0.03, road: true, mobile: 0 },
 ];

@@ -5,7 +5,7 @@ DS.Terrain = class Terrain {
     this.kind = kind;
     const T = DS.T.terrain;
     this.dx = T.dx;
-    this.length = kind === 'range' ? DS.RANGE.length : T.length;      // the firing range is longer than the mission map
+    this.length = kind === 'range' ? DS.RANGE.length : kind === 'town' ? DS.TOWN.length : T.length;      // range and town are longer than the mission map
     this.n = Math.round(this.length / this.dx) + 1;
     this.h = new Float32Array(this.n);      // surface height
     this.sink = new Float32Array(this.n);   // accumulated pressed depth (compaction memory)
@@ -52,21 +52,21 @@ DS.Terrain = class Terrain {
     }
     // gravel plains (reg) in patches of the firm desert; damp sand in the bed of the wadi
     const gz = vn(170, 1, 41);
-    for (let i = 0; i < n; i++) { const x = i * dx; if (this.soil[i] === 0 && x > 300 && gz(x) > 0.45) this.soil[i] = 4; if (this.kind !== 'range' && Math.abs(x - 620) < 9) this.soil[i] = 5; }
+    for (let i = 0; i < n; i++) { const x = i * dx; if (this.soil[i] === 0 && x > 300 && gz(x) > 0.45) this.soil[i] = 4; if (!this.kind && Math.abs(x - 620) < 9) this.soil[i] = 5; }
     // desert crust: on firm desert and salt flats, patchy
     const cz = vn(60, 1, 31);
     for (let i = 0; i < n; i++) this.crust[i] = this.soil[i] !== 1 && cz(i * dx) > -0.2 ? 1 : 0;
     // a wadi (dry channel) and a dug-in revetment berm for testing
-    this.addProfile(620, 18, -1.6);
-    this.addBerm(900, 1.8, 6);
+    if (!this.kind) { this.addProfile(620, 18, -1.6); this.addBerm(900, 1.8, 6); }
     if (this.kind === 'range') this.shapeRange();
+    if (this.kind === 'town') this.shapeTown();
     this.relax(0, n - 1, 6);
     // the ground as it was made, never touched by the physics: drawn as a strip of land just behind the drive
     // line, so a crater shows earth behind it instead of the far dunes
     this.h0 = Float32Array.from(this.h);
     // hard layer: 0.7–2.4 m under the sand (shallower under gravel, deeper in soft sand)
     const hz = vn(140, 1, 51);
-    for (let i = 0; i < n; i++) { const s = this.soil[i]; this.hard[i] = this.h[i] - (1.55 + 0.85 * hz(i * dx)) * (s === 4 ? 0.55 : s === 1 ? 1.25 : s === 3 ? 0.4 : 1); }
+    for (let i = 0; i < n; i++) { const s = this.soil[i]; this.hard[i] = this.h[i] - (s === 6 ? 0.35 : (1.55 + 0.85 * hz(i * dx)) * (s === 4 ? 0.55 : s === 1 ? 1.25 : s === 3 ? 0.4 : 1)); }      // asphalt: base course under it, shells only scar it
   }
 
   // Firing range (data/range.js): the base and the firing line are graded level with a gravel road along
@@ -86,6 +86,17 @@ DS.Terrain = class Terrain {
     for (const [x, hgt, w] of R.berms) this.addBerm(x, hgt, w);
   }
 
+  // Town (data/town.js): an asphalt road the whole way; in town the ground is graded nearly level with a slow
+  // long grade, on the highway stretches the desert rolls a little more
+  shapeTown() {
+    const R = DS.TOWN, n = this.n, dx = this.dx, sm = t => { t = Math.max(0, Math.min(1, t)); return t * t * (3 - 2 * t); };
+    for (let i = 0; i < n; i++) {
+      const x = i * dx, city = sm((x - 1600) / 600) * (1 - sm((x - 17000) / 600));
+      const grade = 10 + 2.2 * Math.sin(x / 2600) + 0.9 * Math.sin(x / 830 + 1.3);
+      this.h[i] = grade + (this.h[i] - 10) * (0.12 * (1 - city) + 0.012 * city);
+      this.soil[i] = 6; this.crust[i] = 0; this.sink[i] = 0;
+    }
+  }
   addProfile(x, w, depth) {
     for (let i = this.idx(x - w); i <= this.idx(x + w); i++) {
       const t = (i * this.dx - x) / w; if (Math.abs(t) < 1) this.h[i] += depth * 0.5 * (1 + Math.cos(Math.PI * t));

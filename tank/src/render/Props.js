@@ -93,13 +93,14 @@ Object.assign(DS.Renderer.prototype, {
   // front = false: the layers behind the line (drawn before the vehicles); true: the near row (after the ground)
   props(ctx, cam, front, grey) {
     const w = this.w, L = w.props; if (!L || !this.propImg) return;
-    const T = w.terrain, R = DS.RANGE, env = w.env || {}, storm = env.visibility ? 1 : 0;
+    const T = w.terrain, R = DS.MAP, env = w.env || {}, storm = env.visibility ? 1 : 0;
     const hz = storm ? '205,176,134' : '222,204,172', sun = env.night ? null : env.sun;
     ctx.imageSmoothingQuality = 'high';
     // the base's ground behind the line: a low strip of sand rising toward the far wall, so the rows stand
     // one behind the other instead of all on the same line
-    const lift = x => { const t = Math.max(0, Math.min(1, (R.road[1] + 70 - x) / 60)); return t * t * (3 - 2 * t); };
-    if (!front && cam.left < R.road[1] + 70) {
+    const lift = R.town ? () => 1 : x => { const t = Math.max(0, Math.min(1, (R.road[1] + 70 - x) / 60)); return t * t * (3 - 2 * t); };
+    if (!front && R.town) this.sidewalk(ctx, cam, grey);
+    else if (!front && cam.left < R.road[1] + 70) {
       const st = Math.max(1, 4 / cam.zoom), a = cam.left - 1, b = Math.min(cam.right + 1, R.road[1] + 72), gy = T.height(Math.min(cam.x, R.road[1]));
       ctx.beginPath(); ctx.moveTo(a, T.height(a) - 0.3);
       for (let x = a; x <= b; x += st) ctx.lineTo(x, T.height(x) + 1.02 * lift(x));
@@ -136,7 +137,7 @@ Object.assign(DS.Renderer.prototype, {
   },
   // boards right behind the line at their true position (no parallax): range entrance, warnings, distances
   rangeSigns(ctx, cam, grey) {
-    const T = this.w.terrain, R = DS.RANGE, env = this.w.env || {}, sun = env.night ? null : env.sun;
+    const T = this.w.terrain, R = DS.MAP, env = this.w.env || {}, sun = env.night ? null : env.sun;
     for (const [k, d] of R.signs) {
       const x = R.line + d, wd = R.sprites[k], im = this.propImg[k];
       if (x < cam.left - 4 || x > cam.right + 4 || !im) continue;
@@ -147,14 +148,14 @@ Object.assign(DS.Renderer.prototype, {
   },
   // gravel road along the line (a strip of the ground plane) with side roads running off toward the viewer
   road(ctx, cam, x0, x1) {
-    const T = this.w.terrain, R = DS.RANGE; if (T.kind !== 'range' || x0 > R.road[1] + 10) return;
-    const D = R.roadW, a = Math.max(x0, R.road[0]), b = Math.min(x1, R.road[1]), bot = cam.bottom - 1;
-    const storm = (this.w.env || {}).visibility ? 1 : 0, c0 = storm ? '#b3a184' : '#b9ad96', c1 = storm ? '#9a8a70' : '#9c917c';
+    const T = this.w.terrain, R = DS.MAP; if ((T.kind !== 'range' && T.kind !== 'town') || x0 > R.road[1] + 10) return;
+    const D = R.roadW, a = Math.max(x0, R.road[0]), b = Math.min(x1, R.road[1]), bot = cam.bottom - 1, town = !!R.town;
+    const storm = (this.w.env || {}).visibility ? 1 : 0, c0 = town ? '#6c6862' : storm ? '#b3a184' : '#b9ad96', c1 = town ? '#7d786f' : storm ? '#9a8a70' : '#9c917c';
     for (const c of R.cross) {                         // side roads first (the main road covers their far end)
       const h = T.height(c), pt = 1 + 0.45 * (D / 7), pb = 1 + 0.45 * Math.min(1.6, (h - bot) / 7);
       const xt = cam.x + (c - cam.x) * pt, xb = cam.x + (c - cam.x) * pb;
       if (Math.max(xt, xb) + 12 < x0 || Math.min(xt, xb) - 12 > x1) continue;
-      const g = ctx.createLinearGradient(0, h - D, 0, bot); g.addColorStop(0, c1); g.addColorStop(1, storm ? '#8d7c62' : '#8f8370');
+      const g = ctx.createLinearGradient(0, h - D, 0, bot); g.addColorStop(0, c1); g.addColorStop(1, town ? '#5e5a54' : storm ? '#8d7c62' : '#8f8370');
       ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(xt - 3.6 * pt, h - D + 0.3); ctx.lineTo(xt + 3.6 * pt, h - D + 0.3); ctx.lineTo(xb + 3.6 * pb, bot); ctx.lineTo(xb - 3.6 * pb, bot); ctx.closePath(); ctx.fill();
       ctx.strokeStyle = 'rgba(232,208,160,0.7)'; ctx.lineWidth = 0.1;
       ctx.beginPath(); ctx.moveTo(xt - 3.6 * pt, h - D); ctx.lineTo(xb - 3.6 * pb, bot); ctx.moveTo(xt + 3.6 * pt, h - D); ctx.lineTo(xb + 3.6 * pb, bot); ctx.stroke();
@@ -162,7 +163,7 @@ Object.assign(DS.Renderer.prototype, {
     if (b <= a) return;
     const st = Math.max(0.5, 3 / cam.zoom), gy = T.height((a + b) / 2);
     const g = ctx.createLinearGradient(0, gy, 0, gy - D); g.addColorStop(0, c0); g.addColorStop(1, c1);
-    const end = b >= R.road[1] - 0.01;
+    const end = !town && b >= R.road[1] - 0.01;
     ctx.beginPath();
     for (let x = a; x < b; x += st) ctx.lineTo(x, T.height(x) + 0.05);
     ctx.lineTo(b, T.height(b) + 0.05);
@@ -179,12 +180,57 @@ Object.assign(DS.Renderer.prototype, {
       const hg = ctx.createLinearGradient(0, gy, 0, gy - D); hg.addColorStop(0, storm ? 'rgba(200,172,130,0.6)' : 'rgba(214,196,164,0.55)'); hg.addColorStop(1, storm ? 'rgba(190,160,118,0.3)' : 'rgba(190,165,125,0.12)');
       ctx.globalAlpha = 1; ctx.fillStyle = hg; ctx.fillRect(a - 1, gy - D - 1, b - a + 6, D + 2); ctx.restore();
     }
+    if (town) { this.roadMarks(ctx, cam, a, b, D, st); return; }
     // wheel-worn lanes and the sand-drifted near edge
     ctx.lineCap = 'butt';
     for (const [dy, lw, col] of [[D * 0.3, 0.5, 'rgba(70,60,46,0.16)'], [D * 0.7, 0.6, 'rgba(70,60,46,0.16)'], [D, 0.14, 'rgba(236,212,166,0.8)']]) {
       ctx.strokeStyle = col; ctx.lineWidth = lw; ctx.beginPath();
       for (let x = a; x < b; x += st) ctx.lineTo(x, T.height(x) - dy);
       ctx.lineTo(b, T.height(b) - dy); ctx.stroke();
+    }
+  },
+  // town road: dashed centre line, worn wheel paths, the kerb and gutter on the near side; sand drifts over
+  // the edges out on the highway
+  roadMarks(ctx, cam, a, b, D, st) {
+    const T = this.w.terrain, R = DS.TOWN, line = (dy) => { ctx.beginPath(); for (let x = a; x < b; x += st) ctx.lineTo(x, T.height(x) - dy); ctx.lineTo(b, T.height(b) - dy); ctx.stroke(); };
+    ctx.lineCap = 'butt';
+    ctx.strokeStyle = 'rgba(40,38,34,0.22)'; ctx.lineWidth = 0.35; line(D * 0.28); line(D * 0.72);
+    ctx.strokeStyle = 'rgba(232,226,210,0.75)'; ctx.lineWidth = 0.07; ctx.setLineDash([3, 6]); ctx.lineDashOffset = 0; line(D * 0.5); ctx.setLineDash([]);
+    // the far-side sidewalk in front of the road (toward the viewer) in town
+    for (let x = a; x < b;) {
+      let e = x; const u = R.urban(x); while (e < b && R.urban(e) === u) e += 2; e = Math.min(e, b);
+      if (u) { ctx.beginPath(); for (let q = x; q <= e; q += st) ctx.lineTo(q, T.height(q) - D - 0.02); ctx.lineTo(e, T.height(e) - D - 0.02);
+        for (let q = e; q >= x; q -= st) ctx.lineTo(q, T.height(q) - D - 0.75); ctx.closePath(); ctx.fillStyle = '#b3a791'; ctx.fill(); }
+      x = e;
+    }
+    // near edge: kerb in town, drifted sand out in the desert
+    ctx.strokeStyle = '#bdb6a8'; ctx.lineWidth = 0.12; ctx.beginPath(); let on = false;
+    for (let x = a; x < b; x += st) { const u = R.urban(x); if (u && !on) { ctx.moveTo(x, T.height(x) - D); on = true; } else if (u) ctx.lineTo(x, T.height(x) - D); else on = false; }
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(226,200,150,0.75)'; ctx.lineWidth = 0.22; ctx.beginPath(); on = false;
+    for (let x = a; x < b; x += st) { const u = !R.urban(x); if (u && !on) { ctx.moveTo(x, T.height(x) - D); on = true; } else if (u) ctx.lineTo(x, T.height(x) - D); else on = false; }
+    ctx.stroke();
+  },
+  // sidewalk behind the road in town (a strip of the ground plane rising toward the building rows), kerb at its
+  // front; out on the highway the desert shoulder instead
+  sidewalk(ctx, cam, grey) {
+    const T = this.w.terrain, R = DS.TOWN, st = Math.max(0.5, 3 / cam.zoom), a = cam.left - 1, b = cam.right + 1, Wk = R.walk;
+    const strip = (x0, x1, col, top) => { if (x1 <= x0) return; ctx.beginPath(); ctx.moveTo(x0, T.height(x0) - 0.05);
+      for (let x = x0; x <= x1; x += st) ctx.lineTo(x, T.height(x) + top); ctx.lineTo(x1, T.height(x1) + top); ctx.lineTo(x1, T.height(x1) - 0.05);
+      for (let x = x1; x >= x0; x -= st) ctx.lineTo(x, T.height(x) - 0.05); ctx.closePath(); ctx.fillStyle = col; ctx.fill(); };
+    // split the view into town / highway runs
+    let x = a;
+    while (x < b) {
+      const u = R.urban(x); let e = x; while (e < b && R.urban(e) === u) e += 2;
+      e = Math.min(e, b);
+      if (u) {
+        strip(x, e, grey != null ? `rgb(${grey(-0.3)})` : '#b7ab95', Wk);
+        ctx.strokeStyle = grey != null ? `rgb(${grey(-0.1)})` : '#d2c8b6'; ctx.lineWidth = 0.1; ctx.beginPath();
+        for (let q = x; q <= e; q += st) ctx.lineTo(q, T.height(q) + 0.05); ctx.stroke();                 // kerb top
+        if (cam.zoom > 6) { ctx.strokeStyle = 'rgba(90,80,64,0.25)'; ctx.lineWidth = 0.03; ctx.beginPath();        // paving joints
+          for (let q = Math.ceil(x / 1.5) * 1.5; q < e; q += 1.5) { const h = T.height(q); ctx.moveTo(q, h + 0.07); ctx.lineTo(q + 0.25, h + Wk); } ctx.stroke(); }
+      } else strip(x, e, grey != null ? `rgb(${grey(-0.4)})` : '#d6b986', Wk * 0.6);
+      x = e;
     }
   },
   // flight paths of the player's last rounds (sandbox option)

@@ -26,8 +26,8 @@ DS.Game = class Game {
     document.getElementById('loading').remove();
     window.__game = this;
     // #m1 / #m2 / #m3 starts that mission directly (used by "다시 시작"); otherwise show the menu
-    const m = /^#m(\d)(b?)$/.exec(location.hash), i = m ? +m[1] - 1 : -1, rg = /^#range(b?)$/.exec(location.hash);
-    if (rg) this.begin('range', rg[1] ? 'm2a2' : 'm1a1'); else if (DS.MISSIONS[i]) this.begin(i, m[2] ? 'm2a2' : 'm1a1'); else this.menu();
+    const m = /^#m(\d)(b?)$/.exec(location.hash), i = m ? +m[1] - 1 : -1, rg = /^#(range|town)(b?)$/.exec(location.hash);
+    if (rg) this.begin(rg[1], rg[2] ? 'm2a2' : 'm1a1'); else if (DS.MISSIONS[i]) this.begin(i, m[2] ? 'm2a2' : 'm1a1'); else this.menu();
   }
   menu() {
     const el = document.getElementById('menu'), list = document.getElementById('missions');
@@ -44,7 +44,15 @@ DS.Game = class Game {
     }));
     list.querySelectorAll('[data-go]').forEach(b => b.addEventListener('click', () => { DS.Audio.init(); el.hidden = true; location.hash = 'm' + (+b.dataset.go + 1) + (veh === 'm2a2' ? 'b' : ''); this.begin(+b.dataset.go, veh); }));
     document.getElementById('gorange').onclick = () => { DS.Audio.init(); el.hidden = true; location.hash = 'range' + (veh === 'm2a2' ? 'b' : ''); this.begin('range', veh); };
+    document.getElementById('gotown').onclick = () => { DS.Audio.init(); el.hidden = true; location.hash = 'town' + (veh === 'm2a2' ? 'b' : ''); this.begin('town', veh); };
     el.hidden = false;
+  }
+  // town: the district's name when the player drives into it
+  districtStep() {
+    const M = this.mission; if (!M || !M.town || !this.player) return;
+    const d = M.district(this.player.pos.x); if (d === this._dist) return;
+    if (this._dist !== undefined) this.toast(`${d[3]} · ${(d[0] / 1000).toFixed(0)}–${(d[1] / 1000).toFixed(0)} km`);
+    this._dist = d;
   }
   // key guide: H or the ? button; the choice is remembered on this device
   setHelp(on) {
@@ -54,8 +62,8 @@ DS.Game = class Game {
     if (this.ui && this.ui.help !== on) { this.ui.help = on; DS.UI.save(this.ui); }
   }
   begin(i, veh = 'm1a1') {
-    const range = i === 'range', M = this.mission = range ? DS.RANGE : DS.MISSIONS[i], W = this.world;
-    if (range) { W.terrain = new DS.Terrain(7, 'range'); W.props = DS.RANGE.layout(); this.rend.makeParked(W); }
+    const town = i === 'town', range = i === 'range' || town, M = this.mission = town ? DS.TOWN : range ? DS.RANGE : DS.MISSIONS[i], W = this.world;
+    if (range) { DS.MAP = M; W.terrain = new DS.Terrain(7, M.id); W.props = M.layout(); if (!town) this.rend.makeParked(W); }
     document.getElementById('menu').hidden = true; document.body.classList.add('playing');
     let help = true; try { help = localStorage.getItem('ds.help') !== '0'; } catch (e) {}
     this.setHelp(help);
@@ -67,7 +75,7 @@ DS.Game = class Game {
       this.sbx = new DS.Sandbox(this);
       this.sbx.setEnv({ time: 'day' });
       this.player = this.sbx.spawn({ player: true, id: veh, x: M.start, dir: 1 });
-      this.sbx.layN = '거리별 표적'; this.sbx.apply(DS.RANGE.presets['거리별 표적']);
+      this.sbx.layN = Object.keys(M.presets)[0]; this.sbx.apply(M.presets[this.sbx.layN]);
       document.getElementById('editbtn').hidden = false;
       document.getElementById('editbtn').onclick = () => this.sbx.toggle();
     }
@@ -87,8 +95,8 @@ DS.Game = class Game {
     DS.FireControl.update(W, v, false);
     W.cam.x = v.pos.x; W.cam.y = v.pos.y;
     if (M.env.night) this.nightSight(true);
-    document.getElementById('h-title').textContent = range ? `${nm[veh] === '브래들리' ? 'M2A2' : nm[veh]} · 사격장` : `${nm[veh]} · 작전 ${i + 1} ${M.name}`;
-    document.getElementById('again').onclick = () => { location.hash = range ? 'range' : 'm' + (i + 1) + (veh === 'm2a2' ? 'b' : ''); location.reload(); };
+    document.getElementById('h-title').textContent = range ? `${nm[veh] === '브래들리' ? 'M2A2' : nm[veh]} · ${M.name}` : `${nm[veh]} · 작전 ${i + 1} ${M.name}`;
+    document.getElementById('again').onclick = () => { location.hash = range ? M.id : 'm' + (i + 1) + (veh === 'm2a2' ? 'b' : ''); location.reload(); };
     document.getElementById('tomenu').onclick = () => { location.hash = ''; location.reload(); };
     this.artyInit();
     this.uiInit();
@@ -392,7 +400,7 @@ DS.Game = class Game {
     this.readInput(dt);
     if (ed) this.sbx.frame(dt);
     else if (this.paused) { /* frozen */ }
-    else { this.trackTarget(dt); this.rangingStep(dt); this.world.update(dt); this.missileCam(dt); this.artyStep(dt); if (this.sbx) this.sbx.tick(); }
+    else { this.districtStep(); this.trackTarget(dt); this.rangingStep(dt); this.world.update(dt); this.missileCam(dt); this.artyStep(dt); if (this.sbx) this.sbx.tick(); }
     DS.Audio.update(this.world, dt);
     this.rend.frame();
     if (ed) this.sbx.overlay(this.rend.ctx);

@@ -6,6 +6,7 @@
   body.png     the same for facing right, with the lettering patches un-mirrored
   rotor.png    main rotor head and blades (turned in game about the mast, px x = 673)
   tailrotor.png  tail rotor blades (turned in game about px (1336, 100))
+  hf_up.png, hf_lo.png  the near launcher's upper and lower Hellfire, cut off the airframe (fired in turn)
   wheel.png    landing-gear wheel, face-on, from assets/ref/ah64a_wheel.png (the drawn wheels are removed)
 The ground shadow under the drawing is removed.   usage: python3 tools/cut_ah64.py
 """
@@ -53,6 +54,14 @@ a[disc & ~fin] = 0
 a[np.hypot(xx - 590, yy - 283) < 27] = 0; a[np.hypot(xx - 1336, yy - 284) < 16.5] = 0
 a[yy >= 296] = 0
 rgb = im.astype(np.uint8).copy(); rgb[grey] = (196, 158, 98)       # blades crossing the fin painted over
+# ---- Hellfire missiles on the near launcher (upper and lower rail), cut out as their own sprites so each
+# one can leave the rail when fired; the rails themselves stay on the airframe ----
+HF = {'hf_up': (649, 243, 782, 262), 'hf_lo': (645, 267, 782, 291)}
+for name, (hx0, hy0, hx1, hy1) in HF.items():
+    sel = (xx >= hx0) & (xx < hx1) & (yy >= hy0) & (yy < hy1)
+    ma = np.where(sel, a, 0).astype(np.uint8)
+    save(name, ma, rgb, mirror=True)
+    a[sel] = 0
 save('body_l', a, rgb, mirror=True)
 save('body', a, rgb, mirror=True, patches=((1038, 213, 1142, 247), (1244, 178, 1314, 202)))
 # ---- main rotor: head and blades, from the clean drawing (second row) where the left blade is not hidden by

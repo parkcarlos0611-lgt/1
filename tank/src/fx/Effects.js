@@ -216,9 +216,15 @@ DS.Effects = class Effects {
     this.shake = Math.max(this.shake, 0.25);
   }
   missile(m, dt) {
-    const P = this.P, K = DS.P, bx = m.x - Math.cos(m.ang) * 0.6, by = m.y - Math.sin(m.ang) * 0.6;
-    if (m.t < 1.7) for (let i = 0; i < 3; i++) P.add(K.FIRE, bx, by, -m.vx * 0.1 + this.rnd(-1, 1), -m.vy * 0.1 + this.rnd(-1, 1), this.rnd(0.06, 0.14), 0.22, { grow: 1, drag: 3, grav: 0, alpha: 0.9, col: 0xffc070 });
-    if (Math.random() < dt * 60) P.add(K.SMOKE, bx, by, this.rnd(-0.5, 0.5), this.rnd(-0.2, 0.6), this.rnd(1.2, 2.4), 0.14, { grow: 0.35, drag: 1.5, grav: -0.01, alpha: m.t < 1.7 ? 0.3 : 0.1, col: 0xdedad2 });
+    const P = this.P, K = DS.P, h = (m.len || 1.2) / 2, bx = m.x - Math.cos(m.ang) * h, by = m.y - Math.sin(m.ang) * h, burn = m.burn || 1.7;
+    if (m.t < burn) for (let i = 0; i < 3; i++) P.add(K.FIRE, bx, by, -m.vx * 0.1 + this.rnd(-1, 1), -m.vy * 0.1 + this.rnd(-1, 1), this.rnd(0.06, 0.14), 0.22, { grow: 1, drag: 3, grav: 0, alpha: 0.9, col: 0xffc070 });
+    // smoke laid along the path flown since last frame (a puff every ~0.8 m), so a fast missile still leaves
+    // an unbroken trail; thin once the motor is out
+    const lx = m._sx === undefined ? bx : m._sx, ly = m._sy === undefined ? by : m._sy, d = Math.hypot(bx - lx, by - ly);
+    const on = m.t < burn, n = Math.min(40, Math.floor(d / (on ? 0.8 : 2.5)));
+    for (let i = 0; i < n; i++) { const f = (i + Math.random()) / n;
+      P.add(K.SMOKE, lx + (bx - lx) * f, ly + (by - ly) * f, this.rnd(-0.4, 0.4), this.rnd(-0.1, 0.4), this.rnd(2.5, 5), on ? this.rnd(0.12, 0.2) : 0.12, { grow: on ? 0.55 : 0.3, drag: 1.5, grav: -0.01, alpha: on ? 0.32 : 0.1, col: 0xdedad2 }); }
+    if (n > 0 || m._sx === undefined) { m._sx = bx; m._sy = by; }
   }
   bulletGround(h) {
     const P = this.P, K = DS.P, T = this.w.terrain, sc = this.hex(T.soilAt(h.x).col[1]);

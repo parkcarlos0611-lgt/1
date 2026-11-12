@@ -1009,17 +1009,31 @@ DS.Renderer = class Renderer {
     });
   }
 
+  // missile body (its drawing when it has one, kept upright whichever way it flies) and, while the motor
+  // burns, the flame at its tail (always at least a couple of pixels)
+  drawMissile(ctx, m, cam) {
+    const half = (m.len || 1.2) / 2;
+    ctx.save(); ctx.translate(m.x, m.y); ctx.rotate(m.ang);
+    if (m.spr) {
+      const im = this.pick(m.spr, m.len * cam.zoom * cam.dpr);
+      ctx.scale(1, Math.cos(m.ang) < 0 ? 1 : -1); ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(im, -half, -m.wid / 2, m.len, m.wid);
+    } else { ctx.fillStyle = '#3a3d34'; ctx.fillRect(-0.6, -0.076, 1.2, 0.152); ctx.fillStyle = '#22241f'; ctx.fillRect(-0.55, -0.2, 0.25, 0.4); }
+    ctx.restore();
+    if (m.t > (m.burn || 1e9)) return;
+    const r = Math.max(0.22, 2.2 / cam.zoom), bx = m.x - Math.cos(m.ang) * half, by = m.y - Math.sin(m.ang) * half;
+    const g = ctx.createRadialGradient(bx, by, 0, bx, by, r * 2.2);
+    g.addColorStop(0, 'rgba(255,245,210,1)'); g.addColorStop(0.4, 'rgba(255,170,70,0.8)'); g.addColorStop(1, 'rgba(255,120,30,0)');
+    ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = g; ctx.fillRect(bx - r * 2.2, by - r * 2.2, r * 4.4, r * 4.4); ctx.globalCompositeOperation = 'source-over';
+    // the motor's flame, a short cone streaming from the nozzle
+    ctx.save(); ctx.translate(bx, by); ctx.rotate(m.ang); const fl = 0.5 + Math.random() * 0.35;
+    const fg = ctx.createLinearGradient(0, 0, -fl, 0); fg.addColorStop(0, 'rgba(255,250,225,0.95)'); fg.addColorStop(0.5, 'rgba(255,175,80,0.7)'); fg.addColorStop(1, 'rgba(255,120,40,0)');
+    ctx.fillStyle = fg; ctx.globalCompositeOperation = 'lighter'; ctx.beginPath(); ctx.moveTo(0, -0.07); ctx.lineTo(-fl, 0); ctx.lineTo(0, 0.07); ctx.fill(); ctx.restore();
+  }
+
   projectiles(ctx, cam) {
     ctx.lineCap = 'round';
-    for (const m of this.w.missiles) {                            // missile body + tail flare (always ≥ 2 px)
-      ctx.save(); ctx.translate(m.x, m.y); ctx.rotate(m.ang);
-      ctx.fillStyle = '#3a3d34'; ctx.fillRect(-0.6, -0.076, 1.2, 0.152); ctx.fillStyle = '#22241f'; ctx.fillRect(-0.55, -0.2, 0.25, 0.4);
-      ctx.restore();
-      const r = Math.max(0.22, 2.2 / cam.zoom), bx = m.x - Math.cos(m.ang) * 0.6, by = m.y - Math.sin(m.ang) * 0.6;
-      const g = ctx.createRadialGradient(bx, by, 0, bx, by, r * 2.2);
-      g.addColorStop(0, 'rgba(255,245,210,1)'); g.addColorStop(0.4, 'rgba(255,170,70,0.8)'); g.addColorStop(1, 'rgba(255,120,30,0)');
-      ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = g; ctx.fillRect(bx - r * 2.2, by - r * 2.2, r * 4.4, r * 4.4); ctx.globalCompositeOperation = 'source-over';
-    }
+    for (const m of this.w.missiles) if (!(m.far && m.t < 0.45 && m.owner.alive)) this.drawMissile(ctx, m, cam);
     for (const p of this.w.projectiles) {
       if (p.ammo.small && !p.tracer) continue;                  // only tracer rounds are visible
       const v = Math.hypot(p.vx, p.vy), L = p.ammo.small ? Math.min(v * 0.012, 12) : Math.min(v * 0.025, 40);

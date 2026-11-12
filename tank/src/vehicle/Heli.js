@@ -130,13 +130,22 @@ DS.Heli = class Heli extends DS.Vehicle {
         // launched from the two stub wings in turn (near side, far side); the far pylon sits a little behind
         // and above in this view
         let sd = this.hfNext; if (this.hfSide[sd] <= 0) sd = 1 - sd;
-        this.hfSide[sd]--; this.hfNext = 1 - sd; this.hf = this.hfSide[0] + this.hfSide[1];
+        this.hfNext = 1 - sd;
         H.cool = D.hellfire.interval; this.lastFired = world.time;
-        const p = this.local(this.dir * (D.hellfire.at[0] - (sd ? 0.35 : 0)), D.hellfire.at[1] + (sd ? 0.22 : 0));
+        // each side carries 8: the upper rail empties first, then the lower. On the near side the drawn missile
+        // leaves its rail; the far side's come out from behind the fuselage, a little behind and above.
+        const slot = this.hfSide[sd] > D.hellfire.n / 4 ? 'up' : 'lo', R = D.src.hf && D.src.hf[slot];
+        const sc = R ? [-(R[0] + R[2] / 2 - 680) / D.src.ppm, -(R[1] + R[3] / 2 - 190) / D.src.ppm] : D.hellfire.at;
+        const p = this.local(this.dir * (sc[0] - (sd ? 0.35 : 0)), sc[1] + (sd ? 0.22 : 0));
         let tgt = this.lock && this.lock.alive ? { v: this.lock } : null;
         if (!tgt) { const r = DS.FireControl.lase(world, this, D.hellfire.range); tgt = r ? (r.vehicle ? { v: r.vehicle } : { x: r.x, y: r.y }) : { x: o.x + Math.cos(gs.aimW) * 3000, y: o.y + Math.sin(gs.aimW) * 3000 }; }
-        H.missile = new DS.Hellfire(p.x, p.y, base, this, DS.AMMO[D.hellfire.ammo], tgt); world.missiles.push(H.missile);
-        this.events.push({ type: 'rocket', x: p.x + Math.cos(base) * 3, y: p.y + Math.sin(base) * 3, dx: Math.cos(base), dy: Math.sin(base), light: true });
+        this.hfSide[sd]--; this.hf = this.hfSide[0] + this.hfSide[1];
+        const q = this.local(this.dir * (sc[0] + 1), sc[1]), p0 = this.local(this.dir * sc[0], sc[1]), rail = Math.atan2(q.y - p0.y, q.x - p0.x);
+        const m = H.missile = new DS.Hellfire(p.x, p.y, rail, this, DS.AMMO[D.hellfire.ammo], tgt); world.missiles.push(m);
+        if (R) { m.spr = D.id + '/hf_' + slot; m.len = R[2] / D.src.ppm; m.wid = R[3] / D.src.ppm; }
+        m.far = sd === 1; m.burn = 2.6;
+        const bx = p.x - Math.cos(rail) * 1, by = p.y - Math.sin(rail) * 1;
+        this.events.push({ type: 'rocket', x: bx, y: by, dx: Math.cos(rail), dy: Math.sin(rail), light: true });
       }
     }
   }
@@ -182,18 +191,33 @@ DS.Hellfire = class Hellfire {
 Object.assign(DS.Renderer.prototype, {
   loadHeli(def) {
     this.img[def.id] = this.img[def.id] || {};
-    return Promise.all(['body', 'body_l', 'rotor', 'tailrotor', 'wheel'].map(n => new Promise((res, rej) => { const im = new Image(); im.onload = () => { this.img[def.id][n] = im; this.mips[def.id + '/' + n] = this.buildMips(im); res(); }; im.onerror = () => rej(new Error('sprite ' + def.id + '/' + n)); im.src = def.src.dir + n + '.png'; })));
+    return Promise.all(['body', 'body_l', 'rotor', 'tailrotor', 'wheel'].concat(def.src.hf ? ['hf_up', 'hf_lo'] : []).map(n => new Promise((res, rej) => { const im = new Image(); im.onload = () => { this.img[def.id][n] = im; this.mips[def.id + '/' + n] = this.buildMips(im); res(); }; im.onerror = () => rej(new Error('sprite ' + def.id + '/' + n)); im.src = def.src.dir + n + '.png'; })));
   },
   drawHeli(ctx, v, cam) {
     const D = v.def, S = D.src, F = D.flight, px = 1 / S.ppm, zp = cam.zoom * cam.dpr;
     // turning round: the airframe is seen end-on halfway through
     const tk = v.turnT > 0 ? Math.abs(v.turnT - 0.45) / 0.45 : 1, sx = v.dir * Math.max(0.08, tk);
+    // a far-side Hellfire just off its rail is still behind the fuselage
+    for (const m of this.w.missiles) if (m.owner === v && m.far && m.t < 0.45) this.drawMissile(ctx, m, cam);
     ctx.save(); ctx.translate(v.pos.x, v.pos.y); ctx.rotate(v.ang); ctx.scale(sx, 1);
     ctx.imageSmoothingQuality = 'high';
     // local frame: x forward, y up; a sheet pixel (X, Y) sits at (-(X - 680), -(Y - 190)) / ppm.
     // Facing left the mirrored-as-drawn sprite is used, so lettering and tail number read correctly.
     const im = this.pick(D.id + (v.dir < 0 ? '/body_l' : '/body'), S.w * px * zp);
     ctx.save(); ctx.scale(1, -1); ctx.drawImage(im, -(S.ox + S.w - 680) * px, (S.oy - 190) * px, S.w * px, S.h * px); ctx.restore();
+    // the near launcher's Hellfires still on their rails (upper rail fires first)
+    // (an emptied rail shows the bare launcher channel with its two hold-back shoes)
+    if (S.hf) for (const [slot, need] of [['up', D.hellfire.n / 4], ['lo', 0]]) {
+      const R = S.hf[slot], x0 = -(R[0] + R[2] - 680) * px, y0 = (R[1] - 190) * px, w = R[2] * px;
+      ctx.save(); ctx.scale(1, -1);
+      if (v.hfSide[0] > need) ctx.drawImage(this.pick(D.id + '/hf_' + slot, R[2] * px * zp), x0, y0, w, R[3] * px);
+      else {
+        ctx.fillStyle = '#232321'; ctx.fillRect(x0 + 0.04, y0 - 0.02, w - 0.08, 0.075);
+        ctx.fillStyle = '#4a4a45'; ctx.fillRect(x0 + 0.06, y0 - 0.015, w - 0.12, 0.018);
+        ctx.fillStyle = '#1a1a19'; for (const f of [0.3, 0.68]) ctx.fillRect(x0 + w * f, y0 + 0.04, 0.09, 0.06);
+      }
+      ctx.restore();
+    }
     // wheels (their own art; the drawn ones are cut out of the airframe)
     for (const [c, r] of F.wheels) { const w = this.pick(D.id + '/wheel', r * 2 * zp); ctx.save(); ctx.translate(c[0], c[1]); ctx.scale(1, -1); ctx.drawImage(w, -r, -r, r * 2, r * 2); ctx.restore(); }
     // chin gun barrel at its own elevation

@@ -16,7 +16,10 @@ DS.VEHICLES = DS.VEHICLES || {};
     // against most hits up to 20 mm.
     proofD: 0.0135,
     // boxes of the cut pieces in the sheet [x, y, w, h] (tools/cut_ah64.py → cut.json)
-    src: { ppm: PPM, ox: 316, oy: 59, w: 1061, h: 237, dir: 'assets/sprites/ah64a/', rotor: [259, 15, 900, 81], rotorAxis: 673, tailrotor: [1243, 8, 188, 201] },
+    src: { ppm: PPM, ox: 316, oy: 59, w: 1061, h: 237, dir: 'assets/sprites/ah64a/', rotor: [259, 15, 900, 81], rotorAxis: 673, tailrotor: [1243, 8, 188, 201],
+      // the near launcher's two visible Hellfires (upper, lower rail), cut off the airframe: each is drawn on its
+      // rail until fired and then flies as that drawing
+      hf: { up: [649, 243, 133, 19], lo: [645, 267, 137, 24] } },
     flight: {
       vmax: 81, tilt: 26, climb: 12, sink: 9, gearH: 1.66,          // 293 km/h; max lean (deg); rates m/s; origin above the wheels
       hub: L(673, 66), rotorR: 7.3, tail: L(1336, 100), tailR: 1.4,

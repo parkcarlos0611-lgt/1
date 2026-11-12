@@ -47,7 +47,7 @@ info = {'ppm': 81.7, 'origin': [652, 690]}
 rgb = im.astype(np.uint8).copy()
 
 # ---- main rotor: everything above the airframe's top line (blades, head); the mast stays on the body ----
-top = np.where(xx < 528, 600, np.where(xx < 562, 545, np.where(xx < 760, 529, 560)))
+top = np.where(xx < 528, 600, np.where(xx < 562, 545, np.where((xx >= 604) & (xx < 702), 553, np.where(xx < 760, 529, 560))))   # whole head with its links
 rot = (yy < top) & (xx < 1268) & (base > 0)
 # ---- tail rotor: the blades lie along one line through the hub; a strip round it plus the hub ----
 HX, HY = 1350, 545
@@ -66,16 +66,26 @@ known = (base > 0) & ~((np.abs(along) < 130) & (perp < 24))           # airframe
 _, (iy, ix) = ndimage.distance_transform_edt(~known, return_indices=True)
 # the lower blade lies wholly over the fin: its strip is fin, coloured from the nearest fin pixel
 rgb[under] = im[iy[under], ix[under]]; body_a[under] = 255
-rgb_s = ndimage.uniform_filter(rgb.astype(np.float32), size=(5, 5, 1))      # soften the copied seam
-rgb[under] = (0.5 * rgb[under] + 0.5 * rgb_s[under]).astype(np.uint8)
+# fill the strip by blending the fin paint round it (normalised convolution), plus a little grain
+kn = (known & (mn < 200) & (chroma > 25)).astype(np.float32)
+num = ndimage.gaussian_filter(im.astype(np.float32) * kn[..., None], sigma=(9, 9, 0)); den = ndimage.gaussian_filter(kn, 9)[..., None]
+fill = num / np.maximum(den, 1e-3)
+grain = ndimage.gaussian_filter(np.random.default_rng(3).normal(0, 3, (H, W)), 0.7)[..., None]
+rgb[under] = np.clip(fill[under] + grain[under], 0, 255).astype(np.uint8)
+# feather the strip's border into the fin round it
+band = ndimage.binary_dilation(under, iterations=3) & ~ndimage.binary_erosion(under, iterations=3) & finfill
+soft = ndimage.gaussian_filter(rgb.astype(np.float32), sigma=(1.6, 1.6, 0))
+rgb[band] = soft[band].astype(np.uint8)
 body_a[(np.abs(along) < 135) & (perp < 21) & (along > 18)] = 0             # upper blade, in the air: all of it
 tr = tr | ((np.abs(along) < 135) & (perp < 21) & (along > 18) & (base > 0) & (((chroma < 45) & (lum < 200)) | (mn > 200) | yellow))
 body_a[tr & ~under] = 0
 body_a[hub] = base[hub]                                              # the gearbox stays on the fin
 
 # ---- M197 barrels: off the airframe, laid in elevation in game ----
-gun = (xx >= 168) & (xx < 292) & (yy >= 755) & (yy < 782) & (base > 0) & (chroma < 40)
-body_a[gun] = 0
+gbox = (xx >= 166) & (xx < 286) & (yy >= 757) & (yy < 788)        # the barrels, ahead of the turret housing
+tan = (chroma >= 40) & (lum > 110)                                  # the fuselage's paint, which stays
+gun = gbox & (base > 0) & ~tan
+body_a[gbox & ~tan] = 0
 
 def save(name, alpha, col, mirror=False):
     ys, xs = np.nonzero(alpha); x0, x1, y0, y1 = xs.min(), xs.max() + 1, ys.min(), ys.max() + 1
@@ -98,15 +108,13 @@ for name, (hx0, hy0, hx1, hy1) in HF.items():
     body_a[sel] = ca[sel]; rgb[sel] = clean.astype(np.uint8)[sel]
 # the empty launcher: what was the frame between and above the missiles stays (drawn in game when empty)
 
-# ---- markings (USMC low-visibility black): star and bars, MARINES, 23, TV, 162544 ----
+# ---- markings (USMC low-visibility black), placed as on the user's marked-up sheet
+# (assets/ref/ah1w_sheet_decals.png): star and bars ahead of the stub wing, MARINES on the tail boom ----
 _mk = Image.open(os.path.join(ROOT, 'assets/ref/ah1w_markings.png')).convert('RGBA'); _w = Image.new('RGBA', _mk.size, (255, 255, 255, 255)); _w.alpha_composite(_mk)
 MK = np.asarray(_w.convert('RGB')).astype(np.int16)           # (transparent background → white)
 MARKS = {   # piece in the marking sheet -> centre in the drawing (px) and width (px)
-    'star': ((70, 205, 565, 495), (925, 716), 92),
-    'marines': ((635, 255, 1465, 455), (1098, 712), 120),
-    '23': ((1580, 55, 1885, 265), (722, 662), 40),
-    'tv': ((1595, 295, 1865, 465), (1290, 683), 32),
-    'serial': ((1525, 495, 1925, 600), (1270, 708), 48),
+    'star': ((70, 205, 565, 495), (514, 712), 76),
+    'marines': ((635, 255, 1465, 455), (975, 723), 152),
 }
 def mark_layer():
     lay = np.zeros((H, W, 4), np.float32)

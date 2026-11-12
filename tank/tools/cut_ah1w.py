@@ -94,9 +94,9 @@ def save(name, alpha, col, mirror=False):
     Image.fromarray(np.ascontiguousarray(out)).save(os.path.join(OUT, name + '.png'))
     info[name] = [int(x0 + X0), int(y0 + Y0), int(x1 - x0), int(y1 - y0)]
 
-save('rotor', np.where(rot, base, 0).astype(np.uint8), im.astype(np.uint8), mirror=True)
+save('rotor', np.where(rot, base, 0).astype(np.uint8), im.astype(np.uint8))      # as drawn: the game mirrors it about the mast
 _l, _n = ndimage.label(ndimage.binary_dilation(tr, iterations=1)); tr &= _l == (np.bincount(_l.ravel())[1:].argmax() + 1)   # stray specks off
-save('tailrotor', np.where(tr, 255, 0).astype(np.uint8), im.astype(np.uint8), mirror=True)
+save('tailrotor', np.where(tr, 255, 0).astype(np.uint8), im.astype(np.uint8))
 save('gun', np.where(gun, base, 0).astype(np.uint8), im.astype(np.uint8), mirror=True)
 
 # ---- Hellfires: cut out; behind them the clean drawing (fuselage underside, skid strut) shows ----

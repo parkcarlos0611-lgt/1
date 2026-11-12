@@ -16,12 +16,12 @@ DS.VEHICLES = DS.VEHICLES || {};
     proof: { front: 0.0135, frontPart: 0.0205, rearPart: 0.0135 },
     // boxes of the cut pieces in the sheet [x, y, w, h] (tools/cut_ah1w.py → cut.json)
     src: { ppm: PPM, origin: [OX, OY], ox: 222, oy: 529, w: 1160, h: 312, dir: 'assets/sprites/ah1w/',
-      rotor: [52, 490, 1198, 82], rotorAxis: 652, tailrotor: [1269, 432, 157, 225], tailHub: [1350, 545],
+      rotor: [52, 490, 1198, 82], rotorAxis: 657, tailrotor: [1269, 432, 157, 225], tailHub: [1350, 545],
       gun: [176, 757, 110, 29], gunPivot: [296, 768],
       hf: { up: [659, 748, 123, 23], lo: [657, 776, 126, 20] } },
     flight: {
       vmax: 78, tilt: 26, climb: 11, sink: 9, gearH: 1.66,          // 282 km/h; origin above the skids
-      hub: L(652, 512), rotorR: 7.32, tail: L(1350, 545), tailR: 1.49,
+      hub: L(657, 512), rotorR: 7.32, tail: L(1350, 545), tailR: 1.49,
       wheels: [], blades: 2, beat: 0.12,                            // two-blade rotor: the slower, heavier "whop"
     },
     gun: { name: 'M197 20mm', short: '20mm', trunnion: L(296, 768), muzzle: 1.47, elevMax: 18, elevMin: -50, rate: 1.4, reload: 60 / 650,

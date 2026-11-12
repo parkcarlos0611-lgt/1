@@ -35,6 +35,8 @@ DS.AI = {
     return Math.min(1, ob);
   },
   gauss(r) { return (r() + r() + r() + r() - 2) * 1.22; },
+  // gunnery skill of a vehicle's crew (Iraqi crews: DS.T.ai.skill; others as their sights allow)
+  skill(v) { return v.team === 'IQ' || (v.def.side === 'IQ' && v.team !== 'US') ? DS.T.ai.skill : { aim: 1, range: 1, lay: 0, correct: 1 }; },
 };
 
 DS.TankAI = class TankAI {
@@ -126,7 +128,8 @@ DS.TankAI = class TankAI {
       return;
     }
     this.state = '조준';
-    if (!this.rangeEst) this.rangeEst = range * (1 + DS.AI.gauss(r) * S.rangeErr);
+    const K = DS.AI.skill(v);
+    if (!this.rangeEst) this.rangeEst = range * (1 + DS.AI.gauss(r) * S.rangeErr * K.range);
     // re-solve the lay a few times a second (target and own hull move)
     this.solT -= dt;
     if (this.solT <= 0 || this.sol == null) {
@@ -135,13 +138,13 @@ DS.TankAI = class TankAI {
       const px = o.x + (t.x - o.x) / d * this.rangeEst, py = o.y + (t.y - o.y) / d * this.rangeEst;
       if (v.gun.ammo !== this.ammo) v.gun.ammo = this.ammo;
       this.sol = DS.FireControl.solve(v, this.ammo, px, py);
-      this.jit = DS.AI.gauss(r) * S.aimErr / 1000 * (1 + Math.pow(range / 800, 2));   // lay error grows quickly with range (tools/hitbench.js)
+      this.jit = DS.AI.gauss(r) * S.aimErr * K.aim / 1000 * (1 + Math.pow(range / 800, 2)) * (v.vt && Math.abs(v.vt) > 1 ? 1.8 : 1);   // lay error grows quickly with range (tools/hitbench.js); worse on the move
     }
     v.fc.se = 0;
     v.gun.aimW = this.sol + this.jit;
     this.lay += dt;
     const err = Math.abs(Math.atan2(Math.sin(v.gunWorld() - v.gun.aimW), Math.cos(v.gunWorld() - v.gun.aimW)));
-    const need = this.shots ? S.layTime * 0.6 : S.layTime;
+    const need = this.shots ? S.layTime * 0.6 + K.lay * 0.5 : S.layTime + K.lay;
     if (this.lay > need && v.gun.reload <= 0 && v.gun.rx === 0 && err < 0.0015) {
       v.input.fire = true; this.lay = 0; this.shots++; this.state = '사격';
       this.tgtX = tgt.pos.x; this.sol = null;
@@ -154,7 +157,8 @@ DS.TankAI = class TankAI {
     if (!this.rangeEst || end.x == null) return;
     const toward = Math.sign(this.tgtX - this.v.pos.x), d = (end.x - this.tgtX) * toward;
     // poorly drilled crews only partly correct from the fall of shot
-    if (d < -3) this.rangeEst += Math.min(-d, this.rangeEst * 0.3) * 0.45;        // short
-    else if (d > 3) this.rangeEst -= Math.min(d, this.rangeEst * 0.12) * 0.35;    // over
+    const c = DS.AI.skill(this.v).correct;
+    if (d < -3) this.rangeEst += Math.min(-d, this.rangeEst * 0.3) * 0.45 * c;        // short
+    else if (d > 3) this.rangeEst -= Math.min(d, this.rangeEst * 0.12) * 0.35 * c;    // over
   }
 };

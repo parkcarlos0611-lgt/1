@@ -23,6 +23,7 @@ DS.World = class World {
     } else { this.fx.impact(h); if (!m.owner.ai) this.addLog({ ground: true, range: h.range, ammo: h.ammo, t: h.t }); }
   }
   onProjectileHit(p, h) {
+    if (h.kind === 'armor' && h.hit && h.hit.v) DS.Searchlight.hit(h.hit.v, h.hit.x, h.hit.y);       // a round near a searchlight breaks it
     if (p.ammo.blast) {                                   // high explosive: bursts on whatever it meets
       const q = h.kind === 'ground' ? h : h.kind === 'building' ? h : h.hit;
       p.alive = false; this.hits.push({ x: q.x, y: q.y }); if (this.hits.length > 20) this.hits.shift();

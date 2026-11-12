@@ -79,7 +79,7 @@ Object.assign(DS.Renderer.prototype, {
   },
   // ---- day: relief on one drawn building (call right after drawing it, same transform: image box at x0,y0,w,h) ----
   relief(ctx, key, im, x0, y0, w, h, flip) {
-    const env = this.w.env || {}, sun = env.sun; if (!sun || sun.el <= 0 || env.visibility) return;
+    const env = this.w.env || {}, sun = env.sun; if (DS.T.buildingLights === false || !sun || sun.el <= 0 || env.visibility) return;
     const side = Math.abs(sun.ex) * Math.min(1, sun.el / 4) * (1 - (env.night || 0)) * (0.55 + 0.45 * (env.low || 0)); if (side < 0.06) return;
     const info = this.lightInfo(key, im); if (!info) return;
     const west = (sun.ex < 0) !== (flip === -1);             // the sun on the west (left): west faces lit
@@ -130,6 +130,7 @@ Object.assign(DS.Renderer.prototype, {
       if (!b.D || b.state === 'rubble' || b.x + b.w + 20 < cam.left || b.x - b.w - 20 > cam.right) continue;
       const im = this.cityImg[b.k]; if (!im) continue;
       cut((b.touched && b.face) || im, b.x, b.base, b.w, b.h, 1, 1);
+      if (DS.T.buildingLights === false) continue;           // (it still hides the lamps behind it)
       const info = this.lightInfo('city:' + b.k, im); if (!info || !info.panes.length) continue;
       // power: a building that has lost a quarter of its bays is dark
       let ex = 0, ok = 0; for (const c of b.cells) if (c.ex) { ex++; if (c.st === 'ok' && !c.chunk) ok++; }
@@ -145,13 +146,13 @@ Object.assign(DS.Renderer.prototype, {
     }
     rowsPass(front);
     ctx.restore(); this._litList = null;
-    DS.Searchlight.draw(ctx, cam, this.w, false);          // white searchlight beams
     // cut out what stands in front: the vehicles
     ctx.save(); ctx.globalCompositeOperation = 'destination-out'; ctx.globalAlpha = 1;
     const lcam = Object.assign(Object.create(Object.getPrototypeOf(cam)), cam); lcam.zoom = cam.zoom / 2;
     for (const v of this.w.vehicles) if (cam.visible(v.pos.x, v.pos.y, 14) && this.shown(v)) this.drawVehicle(ctx, v, lcam);
     ctx.restore();
     main.save(); main.setTransform(1, 0, 0, 1, 0, 0); main.globalCompositeOperation = 'lighter'; main.globalAlpha = 1; main.drawImage(lay, 0, 0, lw, lh, 0, 0, cv.width, cv.height); main.restore();
+    DS.Searchlight.draw(main, cam, this.w, false);         // searchlights over everything (the lamp sits on the turret)
   },
   // lit panes of a damaged drive-line building: what has been knocked out or taken off is dark
   litDamaged(b, lit) {
@@ -175,7 +176,7 @@ Object.assign(DS.Renderer.prototype, {
     }
     // lit: houses, blocks and towers; the market (its buildings and everything standing in the market quarter),
     // small shops, stalls and sheds stay dark
-    const bld = k.startsWith('city:') && !/^city:(l5|l7)$/.test(k) && !(DS.MAP && DS.MAP.town && DS.MAP.district(p.x)[2] === 'market');
+    const bld = DS.T.buildingLights !== false && k.startsWith('city:') && !/^city:(l5|l7)$/.test(k) && !(DS.MAP && DS.MAP.town && DS.MAP.district(p.x)[2] === 'market');
     if (!bld) return;
     if (DS.MAP && DS.MAP.town && DS.MAP.district(p.x)[2] === 'ruins') return;
     L.push({ key: k, z: p.z, im, x, y, w: wd, h: ht, f: p.f, haze, variant: Math.abs(Math.round(p.x * 7.3)) % 9 });

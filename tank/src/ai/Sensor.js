@@ -45,7 +45,7 @@ DS.Sensor = {
   reach(world, a) {
     const S = a.def.sight, env = world.env || {}, dm = S.detectMax || 2500;
     if (S.thermal) return env.visibility ? Math.min(dm, env.visibility * 2.6) : dm;
-    if ((env.night || 0) > 0.5) return Math.max(S.passive ? 1600 : 800, a.light ? (a.light === 2 ? 1400 : 1100) : 0);
+    if ((env.night || 0) > 0.5) return Math.max(S.passive ? 1600 : 800, a.light ? DS.Searchlight.spec(a).L * 0.9 : 0);
     return env.visibility ? Math.min(dm, env.visibility * 0.9) : dm;
   },
 

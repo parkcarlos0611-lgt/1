@@ -22,10 +22,10 @@ for (const id of ['t72', 't62', 't55']) {
     let hits = 0;
     for (let n = 0; n < N; n++) {
       const range = Math.hypot(tgt.pos.x - sh.pos.x, tgt.pos.y - sh.pos.y);
-      const est = range * (1 + DS.AI.gauss(rng) * S.rangeErr);
+      const K = DS.T.ai.skill, est = range * (1 + DS.AI.gauss(rng) * S.rangeErr * K.range);
       const o = sh.sightOrigin(), t = tgt.local(tgt.g.ring.x, tgt.g.ring.y + 0.1), d = Math.hypot(t.x - o.x, t.y - o.y);
       const sol = DS.FireControl.solve(sh, sh.def.ammo[0], o.x + (t.x - o.x) / d * est, o.y + (t.y - o.y) / d * est);
-      const ang = sol + DS.AI.gauss(rng) * S.aimErr / 1000 * (1 + Math.pow(range / 800, 2));
+      const ang = sol + DS.AI.gauss(rng) * S.aimErr * K.aim / 1000 * (1 + Math.pow(range / 800, 2));
       const m = sh.muzzle(), L = Math.hypot(m.x - sh.local(sh.g.trunnion.x, sh.g.trunnion.y).x, m.y - sh.local(sh.g.trunnion.x, sh.g.trunnion.y).y);
       const tp = sh.local(sh.g.trunnion.x, sh.g.trunnion.y);
       const p = new DS.Projectile(tp.x + Math.cos(ang) * L, tp.y + Math.sin(ang) * L, Math.cos(ang) * A.v0, Math.sin(ang) * A.v0, A, sh);

@@ -74,6 +74,13 @@ DS.Game = class Game {
     if (this.touchLayout) { this._tl = null; this.touchLayout(); }
     this.toast(`전환: ${v.label || v.def.name}`);
   }
+  // what the player's rounds count as locked on to: the selected target (Backspace), a helicopter's lock, or an
+  // indirect-fire target laid on the fire-control map
+  lockStep() {
+    const v = this.player; if (!v) return;
+    v.lockTarget = v.heli ? v.lock : this.target;
+    v.indirectLock = !!(this.arty && this.arty.on && this.arty.tgt);
+  }
   // town: the district's name when the player drives into it
   districtStep() {
     const M = this.mission; if (!M || !M.town || !this.player) return;
@@ -283,7 +290,8 @@ DS.Game = class Game {
   trackTarget(dt) {
     const v = this.player, t = this.target;
     if (!t) return;
-    if (!t.alive || !DS.Sensor.seenNow(v, t)) { this.target = null; this.slew = null; this.toast(t.alive ? '표적 상실' : '표적 격파'); return; }
+    const mem = v.contacts && v.contacts.get(t);                  // (a target that slips behind a building stays selected while remembered)
+    if (!t.alive || (!DS.Sensor.seenNow(v, t) && !(mem && !mem.dead && mem.d >= 1))) { this.target = null; this.slew = null; this.toast(t.alive ? '표적 상실' : '표적 격파'); return; }
     if (!this.slew) return;
     if (this.elevDir) { this.slew = null; return; }          // the gunner takes over with W/S
     this.slew.t += dt;
@@ -430,7 +438,7 @@ DS.Game = class Game {
       // a selected target (Backspace) locks the sight and gun onto it; the right mouse button lets go and
       // hands the sight back to the mouse
       if (this.mgDown && this.target) { this.target = null; this.toast('표적 고정 해제 — 마우스 조준'); }
-      const L = this.player.lock = this.target && this.target.alive && DS.Sensor.seenNow(this.player, this.target) ? this.target : null;
+      const c = this.target && this.player.contacts && this.player.contacts.get(this.target), L = this.player.lock = this.target && this.target.alive && (DS.Sensor.seenNow(this.player, this.target) || (this.player.lock === this.target && c && !c.dead)) ? this.target : null;      // a lock holds while the target is remembered (it may go behind a building)
       i.aim = L ? (L.heli ? { x: L.pos.x, y: L.pos.y } : L.local(L.g.ring.x, L.g.ring.y + 0.3)) : i.mgAim;
     }
   }
@@ -448,7 +456,7 @@ DS.Game = class Game {
     this.readInput(dt);
     if (ed) this.sbx.frame(dt);
     else if (this.paused) { /* frozen */ }
-    else { this.districtStep(); this.trackTarget(dt); this.rangingStep(dt); this.world.update(dt); this.missileCam(dt); this.artyStep(dt); if (this.sbx) this.sbx.tick(); }
+    else { this.lockStep(); this.districtStep(); this.trackTarget(dt); this.rangingStep(dt); this.world.update(dt); this.missileCam(dt); this.artyStep(dt); if (this.sbx) this.sbx.tick(); }
     DS.Audio.update(this.world, dt);
     this.rend.frame();
     if (ed) this.sbx.overlay(this.rend.ctx);

@@ -122,8 +122,10 @@ DS.Heli = class Heli extends DS.Vehicle {
     this.rkCool -= dt;
     if (I.coaxFire && ok && this.rk > 0 && this.rkCool <= 0) {
       this.rkCool = D.rockets.interval; this.rk--; this.lastFired = world.time;
-      const A = DS.AMMO[D.rockets.ammo], p = this.local(this.dir * D.rockets.at[0], D.rockets.at[1]), a = base + (Math.random() - 0.5) * 0.012;
-      world.spawnProjectile(p.x, p.y, Math.cos(a) * A.v0 + this.vel.x, Math.sin(a) * A.v0 + this.vel.y, A, this).tracer = true;
+      // with a target locked the pod is laid on it (a little above, for the drop); the ripple keeps its spread
+      const A = DS.AMMO[D.rockets.ammo], p = this.local(this.dir * D.rockets.at[0], D.rockets.at[1]), L = this.lock && this.lock.alive ? this.lock : null;
+      const aim = L ? Math.atan2(L.pos.y + 1.2 - p.y + Math.hypot(L.pos.x - p.x, L.pos.y - p.y) * 0.0035, L.pos.x - p.x) : base, a = aim + (Math.random() - 0.5) * 0.012;
+      const pr = world.spawnProjectile(p.x, p.y, Math.cos(a) * A.v0 + this.vel.x, Math.sin(a) * A.v0 + this.vel.y, A, this); pr.tracer = true; pr.locked = !!L;
       this.events.push({ type: 'rocket', x: p.x + Math.cos(a) * 3, y: p.y + Math.sin(a) * 3, dx: Math.cos(a), dy: Math.sin(a), ammo: A, light: true });
     }
     // Hellfire
@@ -145,7 +147,7 @@ DS.Heli = class Heli extends DS.Vehicle {
         if (!tgt) { const r = DS.FireControl.lase(world, this, D.hellfire.range); tgt = r ? (r.vehicle ? { v: r.vehicle } : { x: r.x, y: r.y }) : { x: o.x + Math.cos(gs.aimW) * 3000, y: o.y + Math.sin(gs.aimW) * 3000 }; }
         this.hfSide[sd]--; this.hf = this.hfSide[0] + this.hfSide[1];
         const q = this.local(this.dir * (sc[0] + 1), sc[1]), p0 = this.local(this.dir * sc[0], sc[1]), rail = Math.atan2(q.y - p0.y, q.x - p0.x);
-        const m = H.missile = new DS.Hellfire(p.x, p.y, rail, this, DS.AMMO[D.hellfire.ammo], tgt); world.missiles.push(m);
+        const m = H.missile = new DS.Hellfire(p.x, p.y, rail, this, DS.AMMO[D.hellfire.ammo], tgt); world.missiles.push(m); m.locked = !!tgt.v;
         if (R) { m.spr = D.id + '/hf_' + slot; m.len = R[2] / D.src.ppm; m.wid = R[3] / D.src.ppm; }
         m.far = sd === 1; m.burn = 2.6;
         const bx = p.x - Math.cos(rail) * 1, by = p.y - Math.sin(rail) * 1;

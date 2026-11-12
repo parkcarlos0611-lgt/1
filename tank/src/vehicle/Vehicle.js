@@ -254,7 +254,9 @@ DS.Vehicle = class Vehicle {
     if (G.autoloader) this.events.push({ type: 'autoload' });
     if (G.pod) { gs.pod = (gs.pod == null ? G.pod : gs.pod) - 1; if (gs.pod <= 0) { gs.pod = G.pod; gs.reload = G.podReload; gs.podChange = true; } else gs.podChange = false; }
     const m = this.muzzle();
-    world.spawnProjectile(m.x, m.y, m.dx * v0 + this.vel.x, m.dy * v0 + this.vel.y, A, this).tracer = true;
+    const pr = world.spawnProjectile(m.x, m.y, m.dx * v0 + this.vel.x, m.dy * v0 + this.vel.y, A, this); pr.tracer = true;
+    // indirect fire laid on a target (the fire-control map) and rockets count as locked on: through buildings
+    pr.locked = !!this.indirectLock || (!!A.rocket && !!(this.lockTarget && this.lockTarget.alive));
     this.events.push({ type: G.launcher ? 'rocket' : 'fire', x: m.x, y: m.y, dx: m.dx, dy: m.dy, ammo: A });
   }
 
@@ -274,7 +276,7 @@ DS.Vehicle = class Vehicle {
     t.cool -= dt;
     if (t.req && t.up >= 1 && halted && t.loaded > 0 && !t.missile && t.cool <= 0) {
       const p = this.towPos();
-      t.missile = world.spawnMissile(p.x, p.y, p.a, this, DS.AMMO[T.ammo]);
+      t.missile = world.spawnMissile(p.x, p.y, p.a, this, DS.AMMO[T.ammo]); t.missile.locked = !!(this.lockTarget && this.lockTarget.alive);
       t.loaded--; t.req = false; t.cool = 1.5; this.lastFired = world.time;
       this.events.push({ type: 'tow', x: p.x, y: p.y, a: p.a });
     }

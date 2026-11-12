@@ -111,14 +111,16 @@ DS.World = class World {
       for (const p of this.projectiles) {
         const ox = p.x, oy = p.y;
         let hit = p.step(h, this.terrain, this);
-        if (this.buildings.length) { const b = DS.Building.ray(this, ox, oy, p.x, p.y); if (b) { p.x = b.x; p.y = b.y; hit = { kind: 'building', x: b.x, y: b.y, b: b.b }; } }
+        // a round fired at a locked-on target (missiles, rockets, indirect fire) is let through buildings to it — a
+        // rule for play, not physics: the buildings are scenery in depth, the target is on the drive line
+        if (this.buildings.length && !p.locked) { const b = DS.Building.ray(this, ox, oy, p.x, p.y); if (b) { p.x = b.x; p.y = b.y; hit = { kind: 'building', x: b.x, y: b.y, b: b.b }; } }
         if (!hit && p.ammo.cluster && p.vy < 0 && p.y - this.terrain.height(p.x) < p.ammo.cluster.alt) { p.alive = false; DS.Blast.cluster(this, p); continue; }
         if (hit) this.onProjectileHit(p, hit);
       }
       this.projectiles = this.projectiles.filter(p => p.alive);
       for (const m of this.missiles) {
         const ox = m.x, oy = m.y, hit = m.step(h, this);
-        const b = m.alive && this.buildings.length ? DS.Building.ray(this, ox, oy, m.x, m.y) : null;
+        const b = m.alive && this.buildings.length && !m.locked ? DS.Building.ray(this, ox, oy, m.x, m.y) : null;
         if (b) { m.alive = false; this.fx.impact({ x: b.x, y: b.y, vx: m.vx, vy: m.vy, ammo: m.ammo, onArmor: true }); b.b.blast(this, b.x, b.y, 3); }
         else if (hit) this.onMissileHit(m, hit);
       }

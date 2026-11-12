@@ -15,15 +15,15 @@ DS.VEHICLES = DS.VEHICLES || {};
     sprites: {
       hull: { x: 49, y: 486 }, turret: { x: 95, y: 392 }, barrel: { x: 548, y: 452 },
       roadwheel: { r: 256, file: 'roadwheel' }, idler: { file: 'idler' },
-      sprocket: { file: 'sprocket', R: 0.39, tooth0: 0 },
+      sprocket: { file: 'sprocket', R: 0.33, tooth0: 0 },
     },
     roadWheels: wheels.map(p => ({ x: p[0], y: p[1] })),
     wheelR: 0.376, topRunOnWheels: true,
     suspension: { k: 2.6e5, c: 2.0e4, bump: 0.22, droop: 0.10, bumpK: 4e6, bumpC: 1.0e5 },     // torsion bars
-    sprocket: { x: L(113, 564)[0], y: L(113, 564)[1], teeth: 14 },
-    idler: { x: L(645, 566)[0], y: L(645, 566)[1], r: 0.36 },
+    sprocket: { x: L(110, 571)[0], y: L(110, 571)[1], teeth: 14 },
+    idler: { x: L(650, 568)[0], y: L(650, 568)[1], r: 0.31 },
     returnRollers: [],
-    track: { pitch: 0.14, thick: 0.07, width: 0.57, mass: 3200 },
+    track: { pitch: 0.135, thick: 0.07, width: 0.57, mass: 3200 },
     belly: { y: -0.97, x0: L(80, 0)[0], x1: L(680, 0)[0] },
     contactArea: 0.85,
     // dark hull side behind the running gear, down to the bottom track run (as on the sheet)

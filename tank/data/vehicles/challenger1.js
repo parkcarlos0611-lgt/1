@@ -14,13 +14,13 @@ DS.VEHICLES = DS.VEHICLES || {};
     sprites: {
       hull: { x: 36, y: 470 }, turret: { x: 118, y: 380 }, barrel: { x: 572, y: 448 },
       roadwheel: { r: 256, file: 'roadwheel' }, idler: { file: 'idler' },
-      sprocket: { file: 'sprocket', R: 0.41, tooth0: 0 },
+      sprocket: { file: 'sprocket', R: 0.3, tooth0: 0 },
     },
     roadWheels: wheels.map(p => ({ x: p[0], y: p[1] })),
     wheelR: 0.38, topRunOnWheels: true,
     suspension: { k: 4.6e5, c: 3.6e4, bump: 0.25, droop: 0.12, bumpK: 6e6, bumpC: 1.5e5 },     // hydrogas
-    sprocket: { x: L(125, 549)[0], y: L(125, 549)[1], teeth: 11 },
-    idler: { x: L(686, 549)[0], y: L(686, 549)[1], r: 0.36 },
+    sprocket: { x: L(125, 552)[0], y: L(125, 552)[1], teeth: 11 },
+    idler: { x: L(690, 551)[0], y: L(690, 551)[1], r: 0.27 },
     returnRollers: [],
     track: { pitch: 0.16, thick: 0.08, width: 0.65, mass: 5500 },
     belly: { y: -1.0, x0: L(70, 0)[0], x1: L(690, 0)[0] },

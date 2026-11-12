@@ -4,6 +4,8 @@ right-side profile, facing right) into hull / turret / barrel, and their running
 assets/ref/wheels_new4.png (rows: Challenger, AMX-30B2, BMP-1, 2S1; columns: road wheel, idler, sprocket).
 The sheets' alpha is near-opaque on the art with a faint halo: alpha < 120 dropped, edges coloured from inside.
 Coordinates are sheet pixels (measured on a 10 px grid).   usage: python3 tools/cut_new4.py
+The hull is cut along its own lower edge (fenders, skirts, lower plates), traced on the sheet, so it covers the
+tops of the sprocket and idler as drawn; no holes are punched for them.
 """
 import os, json, math
 import numpy as np
@@ -13,13 +15,13 @@ from scipy import ndimage
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CFG = {
   'challenger1': dict(tspan=(45, 605), tcut=[(30, 470, 160, 492)], box=(30, 380, 925, 615), seam=487, gun_x=572, bore=(448, 486), clear=[],
-      bottom=[(30, 530), (148, 560), (620, 566), (700, 548), (720, 540)]),
+      bottom=[(30, 530), (95, 531), (135, 544), (162, 554), (182, 562), (200, 566), (660, 566), (699, 554), (735, 544), (760, 544)]),
   'amx30b2': dict(tspan=(55, 578), tcut=[(30, 486, 120, 496)], box=(30, 392, 930, 630), seam=494, gun_x=548, bore=(452, 488), clear=[(440, 360, 590, 396)],
-      bottom=[(30, 548), (90, 548), (150, 556), (620, 556), (700, 548)], holes=[(113, 564, 36), (645, 566, 34)]),
+      bottom=[(30, 567), (62, 567), (70, 552), (600, 552), (615, 545), (690, 545), (705, 550), (930, 550)]),
   'bmp1': dict(tspan=(312, 562), box=(60, 380, 880, 610), seam=448, gun_x=470, bore=(422, 438), clear=[],
-      bottom=[(60, 528), (880, 528)], holes=[(155, 542, 34), (745, 542, 34)]),
+      bottom=[(60, 560), (92, 560), (100, 521), (740, 521), (770, 527), (795, 545), (880, 545)]),
   '2s1': dict(tspan=(150, 522), box=(75, 390, 885, 640), seam=494, gun_x=518, bore=(452, 488), clear=[],
-      bottom=[(75, 558), (885, 558)], holes=[(140, 570, 36), (717, 567, 34)]),
+      bottom=[(75, 563), (98, 563), (102, 550), (720, 553), (745, 555), (790, 580), (885, 580)]),
 }
 
 def load(path):

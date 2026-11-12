@@ -62,8 +62,11 @@ DS.Game = class Game {
     if (this.ui && this.ui.help !== on) { this.ui.help = on; DS.UI.save(this.ui); }
   }
   begin(i, veh = 'm1a1') {
-    const town = i === 'town', range = i === 'range' || town, M = this.mission = town ? DS.TOWN : range ? DS.RANGE : DS.MISSIONS[i], W = this.world;
-    if (range) { DS.MAP = M; W.terrain = new DS.Terrain(7, M.id); W.props = M.layout(); if (!town) this.rend.makeParked(W); }
+    // range: the sandbox. town: the town map seen as it is (a map for missions to come; no editor)
+    const town = i === 'town', range = i === 'range', M = this.mission = town ? DS.TOWN : range ? DS.RANGE : DS.MISSIONS[i], W = this.world;
+    if (range || town) { DS.MAP = M; W.terrain = new DS.Terrain(7, M.id); W.props = M.layout(); }
+    if (range) this.rend.makeParked(W);
+    if (town) this.rend.loadTown();
     document.getElementById('menu').hidden = true; document.body.classList.add('playing');
     let help = true; try { help = localStorage.getItem('ds.help') !== '0'; } catch (e) {}
     this.setHelp(help);
@@ -80,11 +83,12 @@ DS.Game = class Game {
       document.getElementById('editbtn').onclick = () => this.sbx.toggle();
     }
     const v = range ? this.player : new DS.Vehicle(DS.VEHICLES[veh], M.start, W.terrain, { label: nm[veh] + ' (나)' });
-    if (!range) { W.vehicles.push(v); this.player = v; }
+    if (town) { W.vehicles.push(v); this.player = v; }
+    if (!range && !town) { W.vehicles.push(v); this.player = v; }
     // the other vehicle is an AI wingman. The tank always leads: with the Bradley, the M1A1 moves 45 m ahead
     // and takes the first contact; with the M1A1, the Bradley follows 45 m behind
     const off = veh === 'm2a2' ? 45 : -45;
-    if (!range) {
+    if (!range && !town) {
     const wm = new DS.Vehicle(DS.VEHICLES[other], Math.max(12, M.start + off), W.terrain, { label: nm[other] + (veh === 'm2a2' ? ' (아군 선두)' : ' (아군)') });
     W.vehicles.push(wm); new DS.TankAI(wm, W, { follow: v, offset: off });
     for (const [id, x, label] of M.enemies) {
@@ -95,8 +99,8 @@ DS.Game = class Game {
     DS.FireControl.update(W, v, false);
     W.cam.x = v.pos.x; W.cam.y = v.pos.y;
     if (M.env.night) this.nightSight(true);
-    document.getElementById('h-title').textContent = range ? `${nm[veh] === '브래들리' ? 'M2A2' : nm[veh]} · ${M.name}` : `${nm[veh]} · 작전 ${i + 1} ${M.name}`;
-    document.getElementById('again').onclick = () => { location.hash = range ? M.id : 'm' + (i + 1) + (veh === 'm2a2' ? 'b' : ''); location.reload(); };
+    document.getElementById('h-title').textContent = range || town ? `${nm[veh] === '브래들리' ? 'M2A2' : nm[veh]} · ${M.name}` : `${nm[veh]} · 작전 ${i + 1} ${M.name}`;
+    document.getElementById('again').onclick = () => { location.hash = range || town ? M.id : 'm' + (i + 1) + (veh === 'm2a2' ? 'b' : ''); location.reload(); };
     document.getElementById('tomenu').onclick = () => { location.hash = ''; location.reload(); };
     this.artyInit();
     this.uiInit();

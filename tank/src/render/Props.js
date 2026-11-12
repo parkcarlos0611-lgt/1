@@ -11,6 +11,12 @@ Object.assign(DS.Renderer.prototype, {
       im.src = 'assets/sprites/props/' + k + '.png';
     })));
   },
+  // town art (data/town_sprites.js), loaded only when the town map is entered; drawn by the scenery rows
+  // as 't:<id>' (city buildings are already loaded as 'city:<k>')
+  loadTown() {
+    if (this._town) return this._town;
+    return (this._town = Promise.all(Object.keys(DS.TOWN_SPRITES).map(k => new Promise(res => { const im = new Image(); im.onload = () => { this.propImg['t:' + k] = im; res(); }; im.onerror = () => res(); im.src = 'assets/sprites/town/' + k + '.png'; }))));
+  },
   // a parked M1A1 drawn once into a sprite (the vehicle renderer at 48 px/m), used as scenery in the base
   makeParked(world) {
     if (this.propImg.m1a1) return;
@@ -109,7 +115,7 @@ Object.assign(DS.Renderer.prototype, {
       else { const g = ctx.createLinearGradient(0, gy, 0, gy + 1.02); g.addColorStop(0, storm ? '#d2b080' : '#dcbf90'); g.addColorStop(1, `rgb(${hz})`); ctx.fillStyle = g; }
       ctx.fill();
     }
-    const LIFT = { 1: 0.1, 2: 0.4, 3: 0.7, 4: 0.94 };
+    const LIFT = { 1: 0.1, 2: 0.4, 3: 0.7, 4: 0.94, 5: 1.2 };
     for (const p of L) {
       if ((p.z < 0) !== front) continue;
       const [par, haze] = front ? [1 + 0.45 * R.front, 0] : R.layers[p.z];

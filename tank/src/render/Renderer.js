@@ -440,6 +440,8 @@ DS.Renderer = class Renderer {
     if (night) {                                   // light sources stay bright in the dark
       ctx.globalCompositeOperation = 'lighter';
       this.w.particles.draw(ctx, cam, 1, DS.P.FIRE);
+      this.w.particles.draw(ctx, cam, 1, DS.P.FLAME, true);      // muzzle fireballs and flames: their fire, not their smoke
+      this.w.particles.draw(ctx, cam, 1, DS.P.SPARK);
       ctx.globalCompositeOperation = 'source-over';
       this.projectiles(ctx, cam);
     }

@@ -107,7 +107,8 @@ DS.Particles = class Particles {
   hex(col) { return this.hexC[col] || (this.hexC[col] = '#' + col.toString(16).padStart(6, '0')); }
 
   // layer: 0 = behind vehicles, 1 = front
-  draw(ctx, cam, layer, only) {
+  // only: one kind; glowOnly: just the light-emitting part (a FLAME's fire, not the smoke it turns into)
+  draw(ctx, cam, layer, only, glowOnly) {
     const P = DS.P, pz = 1.2 / cam.zoom;
     for (let pass = 0; pass < 2; pass++) {
       if (pass === 1) { ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round'; }
@@ -116,6 +117,7 @@ DS.Particles = class Particles {
         if (only != null && k !== only) continue;
         const add = k === P.FIRE || k === P.SPARK;
         if (k !== P.FLAME && add !== (pass === 1)) continue;
+        if (glowOnly && pass === 0) continue;
         const front = k === P.GRAIN || k === P.DEBRIS || add || k === P.FLAME || (this.rot[i] > 3.14);
         if ((layer === 1) !== front) continue;
         const t = this.life[i] / this.ttl[i], sz = this.size[i], x = this.x[i], y = this.y[i];

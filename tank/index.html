@@ -144,6 +144,14 @@
   #pause button { font: 15px var(--kor); color: var(--tx); background: #3a3823; border: 1px solid #5d5a3c; padding: 9px 16px; border-radius: 4px; cursor: pointer; min-height: 42px; }
   #pause button.on { background: var(--warn); border-color: var(--warn); color: #1b1308; }
   #pause button.big { background: var(--amber); color: #1a1408; border-color: var(--amber); padding: 9px 30px; }
+  #pause details.pkeys { margin: 6px 0 12px; } #pause summary { cursor: pointer; color: #d8cfae; font: 15px var(--kor); padding: 6px 0; }
+  #pause .krow { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 3px 0; border-bottom: 1px solid rgba(255,255,255,.06); }
+  #pause .krow span { color: var(--mu); } #pause .krow button { min-width: 120px; padding: 6px 12px; min-height: 36px; font-family: var(--mono); }
+  /* range editor on touch screens: wider panel, bigger targets */
+  body.touchui #sbx { width: min(420px, 94vw); font-size: 15px; }
+  body.touchui #sbx button { min-height: 44px; padding: 8px 12px; font-size: 15px; }
+  body.touchui #sbx select, body.touchui #sbx input[type=text], body.touchui #sbx input[type=number] { min-height: 40px; font-size: 15px; }
+  body.touchui #sbx input[type=range] { height: 32px; }
   #pause input[type=range] { flex: 1; min-width: 140px; accent-color: #ffcc66; } #pause b { font: 14px var(--mono); min-width: 48px; }
   #zoombar { position: fixed; right: 10px; bottom: 10px; display: flex; gap: 6px; }
   #zoombar button { background: var(--bg); color: var(--tx); border: 1px solid #6b5d45; border-radius: 6px; padding: 6px 10px; font: inherit; cursor: pointer; }
@@ -310,6 +318,7 @@
     <div class="prow"><span>소리 크기</span><input id="p-vol" type="range" min="0" max="100" step="5" aria-label="소리 크기"><b id="p-volv"></b></div>
     <div class="prow"><span>터치 조작</span><button type="button" data-p="touch" data-v="auto">자동</button><button type="button" data-p="touch" data-v="on">항상</button><button type="button" data-p="touch" data-v="off">끔</button></div>
     <div class="prow"><span>버튼 크기</span><button type="button" data-p="btn" data-v="0.85">작게</button><button type="button" data-p="btn" data-v="1">보통</button><button type="button" data-p="btn" data-v="1.2">크게</button></div>
+    <details class="pkeys"><summary>키 설정</summary><div id="p-keys"></div></details>
     <div class="prow"><span>계기판 자세히</span><button type="button" data-p="hud">켬</button><span>키 가이드</span><button type="button" data-p="help">켬</button></div>
   </div>
 </div>

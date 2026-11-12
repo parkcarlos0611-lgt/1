@@ -5,7 +5,12 @@
 // two fingers zoom; on the artillery map one finger picks the target and two fingers zoom the map.
 DS.UI = {
   KEY: 'ds.ui',
-  defaults: { post: 2, resAuto: true, vol: 0.8, btn: 1, hudFull: false, help: true, touch: 'auto' },
+  defaults: { post: 2, resAuto: true, vol: 0.8, btn: 1, hudFull: false, help: true, touch: 'auto', keys: {} },
+  // remappable actions: [name, the key the game listens for]
+  ACTIONS: [['전진', 'KeyD'], ['후진', 'KeyA'], ['포 올림 · 상승', 'KeyW'], ['포 내림 · 하강', 'KeyS'], ['사격', 'Space'], ['탄종', 'KeyQ'], ['거리측정', 'KeyE'],
+    ['표적 선택', 'Backspace'], ['동축 기관총 · 로켓', 'KeyF'], ['미사일 (TOW · 헬파이어)', 'KeyX'], ['조준경 배율', 'KeyV'], ['열상 · 야간 조준경', 'KeyT'],
+    ['미사일 · 포탄 시점', 'Tab'], ['해치', 'KeyU'], ['헬기 방향 전환', 'KeyC'], ['곡사 모드', 'KeyI'], ['조준경 크게', 'KeyG']],
+  keyName(c) { return c.replace(/^Key/, '').replace(/^Digit/, '').replace('Space', 'Space').replace('Backspace', '⌫').replace('Arrow', '').replace('Left', '◀').replace('Right', '▶').replace('Up', '▲').replace('Down', '▼'); },
   load() { let s = {}; try { s = JSON.parse(localStorage.getItem(this.KEY) || '{}'); } catch (e) {} return Object.assign({}, this.defaults, s); },
   save(s) { try { localStorage.setItem(this.KEY, JSON.stringify(s)); } catch (e) {} },
 };
@@ -35,6 +40,28 @@ Object.assign(DS.Game.prototype, {
       if (a === 'touch') S.touch = b.dataset.v;
       DS.UI.save(S); this.uiApply();
     });
+    // key bindings: S.keys maps a physical key to the key the game listens for. Pressed keys are translated before
+    // anything else sees them (capture phase), so every handler keeps reading the original codes.
+    const remap = e => {
+      if (!e.isTrusted || this.binding) return;
+      const to = S.keys[e.code]; if (!to || to === e.code) return;
+      e.stopImmediatePropagation(); e.preventDefault();
+      dispatchEvent(new KeyboardEvent(e.type, { code: to, shiftKey: e.shiftKey, repeat: e.repeat, bubbles: true }));
+    };
+    addEventListener('keydown', remap, true); addEventListener('keyup', remap, true);
+    addEventListener('keydown', e => {
+      if (!this.binding || !e.isTrusted) return;
+      e.stopImmediatePropagation(); e.preventDefault();
+      if (e.code !== 'Escape') { const to = this.binding; for (const k in S.keys) if (S.keys[k] === to || k === e.code) delete S.keys[k]; if (e.code !== to) S.keys[e.code] = to; DS.UI.save(S); }
+      this.binding = null; this.keyList();
+    }, true);
+    pm.querySelector('#p-keys').addEventListener('click', e => {
+      const b = e.target.closest('button'); if (!b) return;
+      if (b.dataset.reset) { S.keys = {}; DS.UI.save(S); this.binding = null; }
+      else this.binding = b.dataset.to;
+      this.keyList();
+    });
+    this.keyList();
     pm.querySelector('#p-vol').addEventListener('input', e => { S.vol = +e.target.value / 100; DS.UI.save(S); this.uiApply(); });
     addEventListener('keydown', e => { if (e.code === 'Escape' && !(this.sbx && this.sbx.edit)) this.setPause(!this.paused); });
     this.touchInit();
@@ -54,6 +81,12 @@ Object.assign(DS.Game.prototype, {
     on('[data-p=post]', b => +b.dataset.v === S.post); on('[data-p=btn]', b => +b.dataset.v === S.btn); on('[data-p=touch]', b => b.dataset.v === S.touch);
     on('[data-p=res]', () => S.resAuto); on('[data-p=hud]', () => S.hudFull); on('[data-p=help]', () => S.help);
     pm.querySelector('#p-vol').value = Math.round(S.vol * 100); pm.querySelector('#p-volv').textContent = Math.round(S.vol * 100) + ' %';
+  },
+  keyList() {
+    const S = this.ui, el = document.getElementById('p-keys');
+    const phys = to => { for (const k in S.keys) if (S.keys[k] === to) return k; return to; };
+    el.innerHTML = DS.UI.ACTIONS.map(([n, to]) => `<div class="krow"><span>${n}</span><button type="button" data-to="${to}" class="${this.binding === to ? 'on' : ''}">${this.binding === to ? '키를 누르세요… (Esc 취소)' : DS.UI.keyName(phys(to))}</button></div>`).join('') +
+      '<div class="krow"><span></span><button type="button" data-reset="1">기본값으로</button></div>';
   },
   setPause(on) {
     this.paused = on; document.getElementById('pause').hidden = !on; document.body.classList.toggle('paused', on);
@@ -83,9 +116,10 @@ Object.assign(DS.Game.prototype, {
     const pad = document.getElementById('tpad');
     pad.addEventListener('pointerdown', e => {
       const b = e.target.closest('button'); if (!b) return; e.preventDefault(); b.setPointerCapture(e.pointerId); b.classList.add('on');
+      if (b.dataset.m2) { this.mgDown = true; return; }
       if (b.dataset.hold) key(b.dataset.k, true); else { key(b.dataset.k, true); key(b.dataset.k, false); }
     });
-    const up = e => { const b = e.target.closest('button'); if (!b) return; b.classList.remove('on'); if (b.dataset.hold) key(b.dataset.k, false); };
+    const up = e => { const b = e.target.closest('button'); if (!b) return; b.classList.remove('on'); if (b.dataset.m2) { this.mgDown = false; return; } if (b.dataset.hold) key(b.dataset.k, false); };
     pad.addEventListener('pointerup', up); pad.addEventListener('pointercancel', up);
     // the main view: one finger aims, two fingers zoom
     const pts = new Map(), cv = this.cv, cam = this.world.cam;
@@ -128,10 +162,12 @@ Object.assign(DS.Game.prototype, {
     else {
       B.push(['표적', 'Backspace'], [v.def.sight.manual ? '눈금+' : '거리', v.def.sight.manual ? 'Equal' : 'KeyE'], ...(v.def.sight.manual ? [['눈금−', 'Minus']] : []), ['탄', 'KeyQ'], ['배율', 'KeyV'], ['열상', 'KeyT']);
       if (v.tow) B.push(['M캠', 'Tab'], ['TOW', 'KeyX', 0, 'wide']);
-      B.push(['MG', 'KeyF', 1], ['사격', 'Space', 1, 'fire']);
+      B.push(['동축', 'KeyF', 1]);
+      if (v.def.mg) B.push([v.def.mg.short || 'M2', 'm2', 1]);       // commander's gun: aim with a finger on the view
+      B.push(['사격', 'Space', 1, 'fire']);
     }
     B.sort((a, b) => (b[3] === 'fire') - (a[3] === 'fire'));        // the trigger first: it takes the corner
-    document.getElementById('tpad').innerHTML = B.map(([t, k, h, c]) => `<button type="button" data-k="${k}"${h ? ' data-hold="1"' : ''}${c ? ` class="${c}"` : ''}>${t}</button>`).join('');
+    document.getElementById('tpad').innerHTML = B.map(([t, k, h, c]) => `<button type="button" data-k="${k}"${k === 'm2' ? ' data-m2="1"' : ''}${h ? ' data-hold="1"' : ''}${c ? ` class="${c}"` : ''}>${t}</button>`).join('');
     document.getElementById('joy').dataset.mode = v.heli ? '이동 · 상승/하강' : v.def.indirectOnly || v.def.howitzer ? '이동' : '이동 · 포 앙각';
   },
 });

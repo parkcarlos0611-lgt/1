@@ -146,8 +146,9 @@ DS.Sandbox = class Sandbox {
   moveTo(v, x) { x = Math.max(15, Math.min(DS.RANGE.length - 50, x)); v.sb.x = x; v.place(x); if (v.ai && v.ai.patrol) { v.ai.patrol.a = x - v.sb.span / 2; v.ai.patrol.b = x + v.sb.span / 2; } }
   bind() {
     const cv = this.g.cv, cam = this.w.cam, $ = s => this.el.querySelector(s);
-    cv.addEventListener('mousedown', e => {
-      if (!this.edit) return;
+    // pointer events: the same handlers serve the mouse and a finger on a tablet
+    cv.addEventListener('pointerdown', e => {
+      if (!this.edit || (e.pointerType === 'touch' && !e.isPrimary)) return;
       const m = cam.toWorld(e.clientX, e.clientY);
       if (e.button === 2) { this.tool = null; this.refresh(); return; }
       const v = this.pick(m), bld = !v && !(this.tool && !this.isB(this.tool)) ? this.pickB(m) : null;
@@ -159,12 +160,12 @@ DS.Sandbox = class Sandbox {
       else this.sel = null;
       this.refresh();
     });
-    addEventListener('mousemove', e => {
+    addEventListener('pointermove', e => {
       this.mouse = { x: e.clientX, y: e.clientY };
       if (this.edit && this.drag) this.moveTo(this.drag.v, cam.toWorld(e.clientX, e.clientY).x + this.drag.dx);
       if (this.edit && this.dragB) { const b = this.dragB.b; b.unheap && b.unheap(); b.x = Math.max(40, Math.min(DS.RANGE.length - 40, cam.toWorld(e.clientX, e.clientY).x + this.dragB.dx)); b.base = this.w.terrain.height(b.x) - (b.D ? 0.12 : 0.15); b.reset(); }
     });
-    addEventListener('mouseup', () => { this.dragB = null; if (this.drag) { this.drag = null; this.refresh(); } });
+    addEventListener('pointerup', () => { this.dragB = null; if (this.drag) { this.drag = null; this.refresh(); } });
     addEventListener('keydown', e => {
       if (!this.edit || e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
       const v = this.sel;

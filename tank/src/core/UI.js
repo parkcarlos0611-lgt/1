@@ -179,11 +179,12 @@ Object.assign(DS.Game.prototype, {
     else if (v.def.howitzer) B.push(['곡사', 'KeyI'], ['장약', 'KeyK'], ['고/저각', 'KeyO'], ['정렬', 'KeyJ'], ['탄', 'KeyQ'], ['탄시점', 'Tab'], ['사격', 'Space', 1, 'fire']);
     else {
       B.push(['표적', 'Backspace'], [v.def.sight.manual ? '눈금+' : '거리', v.def.sight.manual ? 'Equal' : 'KeyE'], ...(v.def.sight.manual ? [['눈금−', 'Minus']] : []), ['탄', 'KeyQ'], ['배율', 'KeyV'], ['열상', 'KeyT']);
-      if (v.tow) B.push(['M캠', 'Tab'], ['TOW', 'KeyX', 0, 'wide']);
+      if (v.tow) B.push(['M캠', 'Tab'], [v.def.tow.label || 'TOW', 'KeyX', 0, 'wide']);
       B.push(['동축', 'KeyF', 1]);
       if (v.def.mg) B.push([v.def.mg.short || 'M2', 'm2', 1]);       // commander's gun: aim with a finger on the view
       B.push(['사격', 'Space', 1, 'fire']);
     }
+    if (!v.def.indirectOnly) B.push(['확대', 'KeyG']);           // sight view enlarged (G)
     if (DS.Searchlight.has(v)) B.push(['탐조등', 'KeyY']);
     if (this.mission && !this.mission.range) B.push(['전환', 'KeyN']);     // ride another friendly vehicle
     B.sort((a, b) => (b[3] === 'fire') - (a[3] === 'fire'));        // the trigger first: it takes the corner

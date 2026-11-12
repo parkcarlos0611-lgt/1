@@ -12,6 +12,7 @@ DS.Renderer = class Renderer {
     const names = new Set(['hull', 'turret', 'barrel', Sp.roadwheel.file, Sp.idler.file]);
     if (Sp.flag) names.add(Sp.flag.file);
     if (Sp.roller) names.add(Sp.roller.file);
+    if (Sp.under) names.add('under');                     // shadowed hull side behind the running gear (tools/cut_new4.py)
     if (Sp.m2) names.add(Sp.m2.file);
     if (Sp.tow) { names.add(Sp.tow.file); names.add(Sp.tow.file + '_xray'); }   // outline made by tools/cut_bradley.py
     if (!Sp.sprocket.procedural) names.add('sprocket');
@@ -877,6 +878,7 @@ DS.Renderer = class Renderer {
     if (D.rearFill) { const R = D.rearFill; ctx.fillRect(R.x0, R.y0, R.x1 - R.x0, R.y1 - R.y0); }
     if ((v.dust || 0) > 0.03) { ctx.fillStyle = `rgba(205,172,122,${(Math.min(1, v.dust) * 0.4).toFixed(2)})`; ctx.fill(); }
     if (D.sprocketHole) { ctx.beginPath(); ctx.arc(D.sprocket.x, D.sprocket.y, D.sprocketHole, 0, 7); ctx.fill(); }
+    if (Sp.under && I.under) { ctx.save(); ctx.scale(px, -px); ctx.drawImage(I.under, Sp.under.x - S.ox, Sp.under.y - S.oy); ctx.restore(); }
     if (OS) {
       // shade under the fender, darker toward the belly, a weld seam and the bolted final-drive housing
       const g = ctx.createLinearGradient(0, U.y0, 0, U.y1);

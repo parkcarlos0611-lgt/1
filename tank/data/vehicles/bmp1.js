@@ -14,7 +14,7 @@ DS.VEHICLES = DS.VEHICLES || {};
     mass: 13300, inertia: 4.6e4, signature: 0.8,
     src: { ppm: PPM, ox: OX, oy: OY, dir: 'assets/sprites/bmp1/' },
     sprites: {
-      hull: { x: 76, y: 380 }, turret: { x: 312, y: 387 }, barrel: { x: 470, y: 422 },
+      hull: { x: 76, y: 380 }, turret: { x: 312, y: 387 }, barrel: { x: 470, y: 422 }, under: { x: 156, y: 521 },
       roadwheel: { r: 256, file: 'roadwheel' }, idler: { file: 'idler' },
       sprocket: { file: 'sprocket', R: 0.23, tooth0: 0 },
     },
@@ -37,7 +37,7 @@ DS.VEHICLES = DS.VEHICLES || {};
       elevMax: 33, elevMin: -4, rate: 0.3, recoilLen: 0.2, recoilMass: 450, reload: 8, stabilized: false, stab: 0 },
     coax: { name: 'PKT 7.62mm 동축', ammo: 'M240_762', muzzle: L(480, 438), rate: 700 / 60, rounds: 2000, spread: 0.8 },
     // 9M14 Malyutka: one on the rail, three more inside (loaded through a hatch, so slowly)
-    tow: { ammo: 'AT3', label: '말류트카', c: L(440, 397), pivotPx: [440, 397], len: 0.86, h: 0.12, lift: 0, loaded: 1, reserve: 3, reloadTime: 50, raise: 0.4, range: 3000, minRange: 500, gunFallback: true },
+    tow: { ammo: 'AT3', label: '말류트카', short: 'AT-3', c: L(440, 397), pivotPx: [440, 397], len: 0.86, h: 0.12, lift: 0, loaded: 1, reserve: 3, reloadTime: 50, raise: 0.4, range: 3000, minRange: 500, gunFallback: true },
     turretRing: L(390, 448),
     sight: { laser: false, manual: true, name: '1PN22M1', rangeErr: 0.15, aimErr: 5.0, layTime: 7, detectMax: 2000, engageMax: 1300 },
     armor: [

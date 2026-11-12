@@ -13,7 +13,7 @@ DS.VEHICLES = DS.VEHICLES || {};
     mass: 16000, inertia: 6.5e4, signature: 0.9,
     src: { ppm: PPM, ox: OX, oy: OY, dir: 'assets/sprites/2s1/' },
     sprites: {
-      hull: { x: 77, y: 486 }, turret: { x: 150, y: 390 }, barrel: { x: 518, y: 452 },
+      hull: { x: 77, y: 486 }, turret: { x: 150, y: 390 }, barrel: { x: 518, y: 452 }, under: { x: 136, y: 550 },
       roadwheel: { r: 256, file: 'roadwheel' }, idler: { file: 'idler' },
       sprocket: { file: 'sprocket', R: 0.24, tooth0: 0 },
     },

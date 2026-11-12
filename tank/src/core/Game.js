@@ -488,7 +488,7 @@ DS.Game = class Game {
       if (v.tow && !v.heli) { const t = v.tow; set('h-tow', t.missile ? (t.missile.guided ? '유도 중 — 조준선 유지' : '유선 끊김') : t.loaded ? `장전 ${t.loaded} · 예비 ${t.reserve}` + (t.up > 0 && t.up < 1 ? ' · 발사관 작동' : t.up >= 1 ? ' · 발사 준비' : '') : t.reserve ? `재장전 ${(v.def.tow.reloadTime - t.reload).toFixed(0)} s · 예비 ${t.reserve}` : '소진'); }
       this.touchLayout();
       if (v.heli) set('h-tow', v.hudLine());
-      { const lb = document.querySelector('#row-tow span'), t = v.heli ? '비행·무장' : 'TOW'; if (lb.textContent !== t) lb.textContent = t; }
+      { const lb = document.querySelector('#row-tow span'), t = v.heli ? '비행·무장' : (v.def.tow && v.def.tow.label) || 'TOW'; if (lb.textContent !== t) lb.textContent = t; }
       document.getElementById('row-tow').hidden = !v.tow && !v.heli;
       const fc = v.fc;
       if (w.env.clock != null) set('h-clock', DS.Sky.fmt(w.env.clock) + (w.env.speed > 1 ? ` (×${w.env.speed})` : ''));
@@ -622,7 +622,7 @@ DS.Game = class Game {
     const g = v.gun, A = DS.AMMO[g.ammo], lasing = w.time - v.fc.lasedAt < 0.35;
     const mode = this.thermal ? (v.heli ? 'FLIR ' : 'TIS ') + (this.blackHot ? 'BH' : 'WH') : this.nv ? 'PASSIVE' : 'DAY';
     DS.SightHud.draw(c, { v, W, H, mil, fld, thermal: this.thermal, nv: this.nv, lasing, ready: g.reload <= 0, bs: v.fc.bs,
-      range: v.fc.range, round: (v.tow && (v.tow.missile || v.tow.up >= 1) ? 'TOW' : A.sight || (A.type === 'HEAT' ? 'HEAT' : 'SABOT')),
+      range: v.fc.range, round: (v.tow && (v.tow.missile || v.tow.up >= 1) ? (v.def.tow.short || 'TOW') : A.sight || (A.type === 'HEAT' ? 'HEAT' : 'SABOT')),
       title: `${v.def.sight.name || (v.def.sight.optical ? 'M32' : 'GPS')} ${fld.n ? fld.n + ' ' : ''}×${fld.mag}  ${mode}${v.heli && v.lock ? '  LOCK' : ''}${this.ranging ? '  RANGING' : ''}` });
     if (this.thermal) { c.fillStyle = 'rgba(0,0,0,0.13)'; for (let y = 0; y < H; y += 3) c.fillRect(0, y, W, 1); }   // scan lines (over the symbols too)
   }

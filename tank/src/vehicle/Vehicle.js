@@ -170,7 +170,7 @@ DS.Vehicle = class Vehicle {
     this.pos.x += this.vel.x * dt; this.pos.y += this.vel.y * dt; this.ang += this.w * dt;
 
     // ---- terrain sinkage ----
-    const half = 0.385;
+    const half = D.footHalf || 0.385;            // half the ground each road wheel presses (wider for widely spaced wheels)
     let sinkMax = 0;
     for (const w of this.st) {
       if (w.N > 0) { w.sink = T.press(w.wx - half, w.wx + half, w.N, D.contactArea, dt); sinkMax = Math.max(sinkMax, w.sink); }

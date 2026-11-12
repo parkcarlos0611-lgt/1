@@ -13,7 +13,7 @@ DS.VEHICLES = DS.VEHICLES || {};
     mass: 37000, inertia: 1.5e5, signature: 1.0,
     src: { ppm: PPM, ox: OX, oy: OY, dir: 'assets/sprites/amx30b2/' },
     sprites: {
-      hull: { x: 49, y: 486 }, turret: { x: 95, y: 392 }, barrel: { x: 548, y: 452 },
+      hull: { x: 49, y: 486 }, turret: { x: 95, y: 392 }, barrel: { x: 548, y: 452 }, under: { x: 122, y: 545 },
       roadwheel: { r: 256, file: 'roadwheel' }, idler: { file: 'idler' },
       sprocket: { file: 'sprocket', R: 0.33, tooth0: 0 },
     },
@@ -25,7 +25,7 @@ DS.VEHICLES = DS.VEHICLES || {};
     returnRollers: [],
     track: { pitch: 0.135, thick: 0.07, width: 0.57, mass: 3200 },
     belly: { y: -0.97, x0: L(80, 0)[0], x1: L(680, 0)[0] },
-    contactArea: 0.85,
+    contactArea: 0.85, footHalf: 0.5,          // wheels about 1.0 m apart: each presses the ground to the next
     // dark hull side behind the running gear, down to the bottom track run (as on the sheet)
     underside: { x0: -3.2, x1: 3.3, y0: -0.6, y1: -1.32,
       poly: [[L(60, 0)[0], -0.6], [L(690, 0)[0], -0.6], [L(682, 0)[0], -0.8], [L(655, 0)[0], -1.05], [L(595, 0)[0], -1.32], [L(150, 0)[0], -1.32], [L(100, 0)[0], -1.05], [L(70, 0)[0], -0.8]] },

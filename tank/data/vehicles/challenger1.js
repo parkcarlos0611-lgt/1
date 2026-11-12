@@ -12,7 +12,7 @@ DS.VEHICLES = DS.VEHICLES || {};
     mass: 62500, inertia: 3.3e5, signature: 1.15,
     src: { ppm: PPM, ox: OX, oy: OY, dir: 'assets/sprites/challenger1/' },
     sprites: {
-      hull: { x: 36, y: 470 }, turret: { x: 118, y: 380 }, barrel: { x: 572, y: 448 },
+      hull: { x: 36, y: 470 }, turret: { x: 118, y: 380 }, barrel: { x: 572, y: 448 }, under: { x: 126, y: 551 },
       roadwheel: { r: 256, file: 'roadwheel' }, idler: { file: 'idler' },
       sprocket: { file: 'sprocket', R: 0.3, tooth0: 0 },
     },
@@ -24,7 +24,7 @@ DS.VEHICLES = DS.VEHICLES || {};
     returnRollers: [],
     track: { pitch: 0.16, thick: 0.08, width: 0.65, mass: 5500 },
     belly: { y: -1.0, x0: L(70, 0)[0], x1: L(690, 0)[0] },
-    contactArea: 1.0,
+    contactArea: 1.0, footHalf: 0.53,          // wheels about 1.1 m apart: each presses the ground to the next
     // dark hull side behind the running gear, down to the bottom track run (as on the sheet)
     underside: { x0: -3.9, x1: 3.9, y0: -0.6, y1: -1.41,
       poly: [[L(60, 0)[0], -0.55], [L(700, 0)[0], -0.55], [L(695, 0)[0], -0.8], [L(670, 0)[0], -1.1], [L(625, 0)[0], -1.41], [L(175, 0)[0], -1.41], [L(115, 0)[0], -1.1], [L(70, 0)[0], -0.8]] },

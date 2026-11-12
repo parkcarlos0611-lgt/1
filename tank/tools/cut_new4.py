@@ -4,8 +4,8 @@ right-side profile, facing right) into hull / turret / barrel, and their running
 assets/ref/wheels_new4.png (rows: Challenger, AMX-30B2, BMP-1, 2S1; columns: road wheel, idler, sprocket).
 The sheets' alpha is near-opaque on the art with a faint halo: alpha < 120 dropped, edges coloured from inside.
 Coordinates are sheet pixels (measured on a 10 px grid).   usage: python3 tools/cut_new4.py
-The hull is cut along its own lower edge (fenders, skirts, lower plates), traced on the sheet, so it covers the
-tops of the sprocket and idler as drawn; no holes are punched for them.
+The hull is cut down to the road-wheel tops (the shadowed side, suspension and the track's top run come with it);
+round the sprocket and idler it follows the traced fender edge, so it covers their tops as drawn; no holes.
 """
 import os, json, math
 import numpy as np
@@ -13,15 +13,21 @@ from PIL import Image, ImageDraw
 from scipy import ndimage
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+GEAR = {
+  'challenger1': ([211.7, 291.7, 371.7, 451.3, 531.3, 606], 576, 30, (125, 552, 24), (690, 551, 22)),
+  'amx30b2': ([189.6, 280.4, 369, 458.9, 550], 593, 36, (110, 571, 31), (650, 568, 30)),
+  'bmp1': ([245, 327.5, 412.5, 495, 580, 662.5], 565, 32, (752, 541, 27), (155, 541, 24)),
+  '2s1': ([220, 292.5, 365, 437.5, 509, 579, 650], 595, 33, (714, 574, 24), (135, 575, 24)),
+}
 CFG = {
   'challenger1': dict(tspan=(45, 605), tcut=[(30, 470, 160, 492)], box=(30, 380, 925, 615), seam=487, gun_x=572, bore=(448, 486), clear=[],
       bottom=[(30, 530), (95, 531), (135, 544), (162, 554), (182, 562), (200, 566), (660, 566), (699, 554), (735, 544), (760, 544)]),
   'amx30b2': dict(tspan=(55, 578), tcut=[(30, 486, 120, 496)], box=(30, 392, 930, 630), seam=494, gun_x=548, bore=(452, 488), clear=[(440, 360, 590, 396)],
-      bottom=[(30, 567), (62, 567), (70, 552), (600, 552), (615, 545), (690, 545), (705, 550), (930, 550)]),
+      bottom=[(30, 567), (62, 567), (70, 552), (145, 552), (160, 559), (590, 559), (605, 550), (615, 545), (690, 545), (705, 550), (930, 550)]),
   'bmp1': dict(tspan=(312, 562), box=(60, 380, 880, 610), seam=448, gun_x=470, bore=(422, 438), clear=[],
-      bottom=[(60, 560), (92, 560), (100, 521), (740, 521), (770, 527), (795, 545), (880, 545)]),
+      bottom=[(60, 560), (92, 560), (100, 521), (190, 521), (207, 535), (698, 535), (715, 522), (740, 521), (770, 527), (795, 545), (880, 545)]),
   '2s1': dict(tspan=(150, 522), box=(75, 390, 885, 640), seam=494, gun_x=518, bore=(452, 488), clear=[],
-      bottom=[(75, 563), (98, 563), (102, 550), (720, 553), (745, 555), (790, 580), (885, 580)]),
+      bottom=[(75, 563), (98, 563), (102, 550), (163, 550), (180, 563), (681, 563), (690, 553), (720, 553), (745, 555), (790, 580), (885, 580)]),
 }
 
 def load(path):
@@ -58,6 +64,13 @@ for vid, c in CFG.items():
     hull = ((yy >= c['seam']) | ~tsp) & (yy < bottom_at(c['bottom'], xx)) & ~bore
     for hx, hy, hr in c.get('holes', []): hull &= ((xx - hx) ** 2 + (yy - hy) ** 2) > hr * hr
     save('hull', hull)
+    # the shadowed side under the hull: suspension arms, hubs, shock absorbers and the track's top run, with the
+    # road wheels, sprocket and idler taken out (the game draws its own, turning); drawn behind the running gear
+    xs_, wy, wr, spk, idl = GEAR[vid]
+    und = (yy >= bottom_at(c['bottom'], xx)) & (yy < wy + wr * 0.3) & (xx > min(spk[0], idl[0])) & (xx < max(spk[0], idl[0]))
+    for wx in xs_: und &= ((xx - wx) ** 2 + (yy - wy) ** 2) > (wr + 2) ** 2
+    for gx, gy, gr in (spk, idl): und &= ((xx - gx) ** 2 + (yy - gy) ** 2) > (gr + 3) ** 2
+    save('under', und)
     json.dump(info, open(os.path.join(out, 'cut.json'), 'w'), indent=1)
     print(vid, info)
 

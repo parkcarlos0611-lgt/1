@@ -69,7 +69,7 @@ DS.World = class World {
     for (let a = 0; a < V.length; a++) for (let b = a + 1; b < V.length; b++) {
       const A = V[a], B = V[b], hl = v => Math.max(Math.abs(v.def.belly.x0), Math.abs(v.def.belly.x1)) + 0.15;
       const dx = B.pos.x - A.pos.x, gap = Math.abs(dx) - (hl(A) + hl(B));
-      if (gap >= 0 || Math.abs(B.pos.y - A.pos.y) > 3 || A.team === B.team) continue;      // friends drive in another lane
+      if (gap >= 0 || Math.abs(B.pos.y - A.pos.y) > 3 || A.team === B.team || !A.alive || !B.alive) continue;      // friends drive in another lane; wrecks are driven past
       const s = Math.sign(dx) || 1, mA = A.def.mass, mB = B.def.mass, k = -gap;
       A.pos.x -= s * k * mB / (mA + mB); B.pos.x += s * k * mA / (mA + mB);
       const rel = (B.vel.x - A.vel.x) * s;                               // < 0: closing

@@ -8,6 +8,7 @@ DS.T = {
   physicsHz: 240,
   maxSubsteps: 16,
   terrain: { dx: 0.1, length: 10000, repose: 33 },
+  flora: false,          // vegetation sprites (src/render/Flora.js) switched off for now
   camera: { zoomMin: 1.5, zoomMax: 90, presets: [40, 14, 3], lookAhead: 0.9, ground: 0.12, maxWidth: 250 },
   traction: { vref: 0.06, vrefSlip: 0.035 },     // slip-velocity scale for tanh traction curve
   particles: { max: 9000 },

@@ -41,7 +41,7 @@ Object.assign(DS.Renderer.prototype, {
   },
   // band 'back' is drawn before the vehicles; 'line' and 'near' after the ground
   flora(ctx, cam, band, grey) {
-    if (!this.flImg) return;
+    if (!this.flImg || DS.T.flora === false) return;
     const F = DS.Flora, w = this.w, T = w.terrain, [cell, , depth, par0, haze0] = F.BANDS[band];
     const st = w.flora || (w.flora = { crushed: new Map(), gone: new Set() });
     const env = w.env || {}, storm = env.visibility ? 1 : 0, wind = w.wind || 0, t = w.time, zp = cam.zoom * cam.dpr;

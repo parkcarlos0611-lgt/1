@@ -5,7 +5,7 @@
 // two fingers zoom; on the artillery map one finger picks the target and two fingers zoom the map.
 DS.UI = {
   KEY: 'ds.ui',
-  defaults: { post: 2, resAuto: true, vol: 0.8, btn: 1, hudFull: false, help: true, touch: 'auto', keys: {} },
+  defaults: { post: 2, resAuto: true, flyFx: true, vol: 0.8, btn: 1, hudFull: false, help: true, touch: 'auto', keys: {} },
   // remappable actions: [name, the key the game listens for]
   ACTIONS: [['전진', 'KeyD'], ['후진', 'KeyA'], ['포 올림 · 상승', 'KeyW'], ['포 내림 · 하강', 'KeyS'], ['사격', 'Space'], ['탄종', 'KeyQ'], ['거리측정', 'KeyE'],
     ['표적 선택', 'Backspace'], ['동축 기관총 · 로켓', 'KeyF'], ['미사일 (TOW · 헬파이어)', 'KeyX'], ['조준경 배율', 'KeyV'], ['열상 · 야간 조준경', 'KeyT'],
@@ -34,6 +34,7 @@ Object.assign(DS.Game.prototype, {
       if (a === 'menu') document.getElementById('tomenu').click();
       if (a === 'post') { S.post = +b.dataset.v; }
       if (a === 'res') S.resAuto = !S.resAuto;
+      if (a === 'flyfx') S.flyFx = !S.flyFx;
       if (a === 'btn') S.btn = +b.dataset.v;
       if (a === 'hud') S.hudFull = !S.hudFull;
       if (a === 'help') S.help = !S.help;
@@ -69,7 +70,7 @@ Object.assign(DS.Game.prototype, {
   uiApply() {
     const S = this.ui, $ = s => document.querySelector(s);
     if (this.post && this.post.ok) { this.post.setQuality(S.post); try { localStorage.setItem('ds.post', S.post); } catch (e) {} }
-    DS.T.resAuto = S.resAuto; if (!S.resAuto && this.rs !== 1) { this.rs = 1; this.resize(); }
+    DS.T.resAuto = S.resAuto; DS.T.flyFx = S.flyFx !== false; if (!S.resAuto && this.rs !== 1) { this.rs = 1; this.resize(); }
     DS.Audio.vol = S.vol; if (DS.Audio.master && DS.Audio.on) DS.Audio.master.gain.value = S.vol;
     document.documentElement.style.setProperty('--tb', (64 * S.btn).toFixed(0) + 'px');
     $('#hud').classList.toggle('compact', !S.hudFull); $('#hudmore').textContent = S.hudFull ? '간단히 ▴' : '자세히 ▾';
@@ -79,7 +80,7 @@ Object.assign(DS.Game.prototype, {
     // reflect in the menu
     const pm = $('#pause'), on = (sel, v) => pm.querySelectorAll(sel).forEach(b => b.classList.toggle('on', v(b)));
     on('[data-p=post]', b => +b.dataset.v === S.post); on('[data-p=btn]', b => +b.dataset.v === S.btn); on('[data-p=touch]', b => b.dataset.v === S.touch);
-    on('[data-p=res]', () => S.resAuto); on('[data-p=hud]', () => S.hudFull); on('[data-p=help]', () => S.help);
+    on('[data-p=res]', () => S.resAuto); on('[data-p=flyfx]', () => S.flyFx !== false); on('[data-p=hud]', () => S.hudFull); on('[data-p=help]', () => S.help);
     pm.querySelector('#p-vol').value = Math.round(S.vol * 100); pm.querySelector('#p-volv').textContent = Math.round(S.vol * 100) + ' %';
   },
   keyList() {

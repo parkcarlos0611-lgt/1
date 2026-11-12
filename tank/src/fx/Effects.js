@@ -512,6 +512,37 @@ DS.Effects = class Effects {
     for (let i = 0; i < n; i++) { const f = i / n; P.add(K.SMOKE, p.x - p.vx * dt * f, p.y - p.vy * dt * f, this.rnd(-1, 1), this.rnd(-1, 1), this.rnd(3, 6) * (big ? 2 : 1), this.rnd(0.6, 1.1) * (big ? 1.5 : 1), { grow: big ? 1.1 : 0.9, drag: 1.5, grav: -0.01, alpha: big ? 0.5 : 0.42, col: 0xe8e2d8, age: 0.1 }); }
     P.add(K.FIRE, p.x - p.vx * dt, p.y - p.vy * dt, -p.vx * 0.05, -p.vy * 0.05, 0.08, 0.9, { grow: 3, drag: 4, grav: 0, alpha: 1, col: 0xffd080 });
   }
+  // what a round does on its way, besides being seen: a supersonic round skimming low raises a line of dust
+  // under its shock wave; passing the listener it cracks; an artillery shell is heard coming down.
+  flight(p, dt) {
+    const T = this.w.terrain, v = Math.hypot(p.vx, p.vy), x0 = p._fx === undefined ? p.x0 : p._fx, y0 = p._fy === undefined ? p.y0 : p._fy;
+    p._fx = p.x; p._fy = p.y;
+    if (v < 340) return;
+    const me = this.w.vehicles[0];
+    // low pass: the shock's footprint scours the surface within ~3 m below the path (fades with height and calibre)
+    const h = p.y - T.height(p.x), dd = p.ammo.d;
+    if (h < 3 && h > -0.5 && dd >= 0.02 && this.w.cam.visible(p.x, p.y, 40)) {
+      const seg = Math.hypot(p.x - x0, p.y - y0), n = Math.min(14, Math.floor(seg / 1.6)), sc = this.hex(T.soilAt(p.x).col[1]), soil = T.soilAt(p.x);
+      const k = (1 - Math.max(0, h) / 3.5) * Math.min(1, 0.35 + dd * 6) * (0.4 + soil.dust);
+      for (let i = 0; i < n; i++) { const x = x0 + (p.x - x0) * (i + Math.random()) / n, gy = T.height(x);
+        if (y0 + (p.y - y0) * (i / n) - gy > 3) continue;
+        this.P.add(DS.P.DUST, x, gy + this.rnd(0, 0.3), p.vx * 0.004 + this.rnd(-0.6, 0.6), this.rnd(0.8, 3.5) * k, this.rnd(1.2, 2.6), this.rnd(0.3, 0.8) * (0.6 + k), { grow: 0.9, drag: 1.4, grav: 0.05, alpha: 0.5 * Math.min(1, k), col: sc, age: 0.08 });
+        if (Math.random() < 0.4 * k) this.P.add(DS.P.GRAIN, x, gy + 0.05, p.vx * 0.006, this.rnd(1, 4), this.rnd(0.4, 0.9), 0.04, { drag: 0.5, col: sc }); }
+    }
+    if (!me) return;
+    // supersonic crack: the closest point of this frame's path to the listener
+    if (!p.cracked && p.owner !== me) {
+      const ex = p.x - x0, ey = p.y - y0, L2 = ex * ex + ey * ey || 1, u = Math.max(0, Math.min(1, ((me.pos.x - x0) * ex + (me.pos.y + 1.5 - y0) * ey) / L2));
+      const d = Math.hypot(x0 + ex * u - me.pos.x, y0 + ey * u - me.pos.y - 1.5);
+      if (d < (p.ammo.small ? 30 : 80) && u < 1) { p.cracked = true; DS.Audio.crack(d, p.ammo.d); }
+    }
+    // incoming artillery: a falling whistle in the last seconds when it is coming down near the listener
+    const lk = p.ammo.look;
+    if (lk && lk.whistle && !p.whistled && p.vy < 0 && h / -p.vy < 3.2) {
+      const tl = h / -p.vy, ix = p.x + p.vx * tl;
+      if (Math.abs(ix - me.pos.x) < 900) { p.whistled = true; DS.Audio.whistle(ix, T.height(ix), tl); }
+    }
+  }
   // one bomblet going off on the ground: a sharp little burst
   bomblet(x, y, lite) {
     const P = this.P, K = DS.P, sc = this.hex(this.w.terrain.soilAt(x).col[1]);

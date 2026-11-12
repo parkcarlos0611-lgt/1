@@ -119,6 +119,21 @@ DS.Audio = {
     const f = this.burst(p.t, 3.2, 'bandpass', 700, 0.5, 1.5 * p.g, p.cut, 0.03); f.frequency.exponentialRampToValueAtTime(240, p.t + 3);
     this.burst(p.t, 2.6, 'lowpass', 160, 0.6, 1.0 * p.g, p.cut, 0.05);
   },
+  crack(d, cal) {                           // a supersonic round passing close: the sharp N-wave of its shock
+    if (!this.ok()) return;
+    const t = this.ctx.currentTime, g = Math.min(1.6, 40 / (d + 8)) * (cal > 0.02 ? 1 : 0.45);
+    this.burst(t, 0.022, 'highpass', 2200, 0.7, g, 16000, 0.0008);
+    this.burst(t + 0.004, 0.05, 'bandpass', 900, 0.9, g * 0.45, 9000, 0.001);
+  },
+  whistle(x, y, dur) {                      // an artillery shell coming down: a falling whistle that swells to impact
+    if (!this.ok()) return;
+    const p = this.place(x, y), c = this.ctx, t = c.currentTime, peak = Math.min(0.5, 0.5 * p.g * 3);
+    const o = c.createOscillator(), g = c.createGain(); o.type = 'sine';
+    o.frequency.setValueAtTime(1500 + Math.random() * 300, t); o.frequency.exponentialRampToValueAtTime(420, t + dur);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(peak, t + dur * 0.97); g.gain.exponentialRampToValueAtTime(0.0001, t + dur + 0.04);
+    o.connect(g); this.out(g, p.cut); o.start(t); o.stop(t + dur + 0.1);
+    const f = this.burst(t, dur, 'bandpass', 2400, 3, peak * 0.5, p.cut, dur * 0.9); f.frequency.exponentialRampToValueAtTime(700, t + dur);
+  },
   crackle(x, y, n, dur) {                   // a bomblet strip going off: dozens of small sharp bursts
     if (!this.ok()) return;
     const p = this.place(x, y); if (p.d > 6000) return;

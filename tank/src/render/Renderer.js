@@ -1040,10 +1040,17 @@ DS.Renderer = class Renderer {
       const lk = p.ammo.look, off = lk ? Math.min(lk.len, Math.hypot(p.x - p.x0, p.y - p.y0)) : 0;
       // streak: the tracer burning at the base and the eye's smear of a body crossing the view in a frame
       const sx = p.x - p.vx / v * off, sy = p.y - p.vy / v * off;
-      const g = ctx.createLinearGradient(sx, sy, sx - p.vx / v * L, sy - p.vy / v * L);
-      g.addColorStop(0, p.ammo.tracer); g.addColorStop(1, 'rgba(255,200,120,0)');
-      ctx.strokeStyle = g; ctx.lineWidth = Math.max(lk ? Math.min(0.06, lk.dia * 0.4) : 0.06, 2 / cam.zoom);
-      ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(sx - p.vx / v * L, sy - p.vy / v * L); ctx.stroke();
+      if (lk && lk.notr) {                         // no tracer: only the eye's smear of the body over one frame
+        if (DS.T.flyFx !== false) { const Lb = Math.min(v / 60, 30), g = ctx.createLinearGradient(sx, sy, sx - p.vx / v * Lb, sy - p.vy / v * Lb);
+          g.addColorStop(0, 'rgba(70,70,60,0.35)'); g.addColorStop(1, 'rgba(70,70,60,0)');
+          ctx.strokeStyle = g; ctx.lineWidth = Math.max(lk.dia * 0.8, 1 / cam.zoom);
+          ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(sx - p.vx / v * Lb, sy - p.vy / v * Lb); ctx.stroke(); }
+      } else {
+        const g = ctx.createLinearGradient(sx, sy, sx - p.vx / v * L, sy - p.vy / v * L);
+        g.addColorStop(0, p.ammo.tracer); g.addColorStop(1, 'rgba(255,200,120,0)');
+        ctx.strokeStyle = g; ctx.lineWidth = Math.max(lk ? Math.min(0.06, lk.dia * 0.4) : 0.06, 2 / cam.zoom);
+        ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(sx - p.vx / v * L, sy - p.vy / v * L); ctx.stroke();
+      }
       if (lk && lk.len * cam.zoom > 2) this.drawRound(ctx, p, lk, off, cam);
     }
     this.drawFalling(ctx, cam);

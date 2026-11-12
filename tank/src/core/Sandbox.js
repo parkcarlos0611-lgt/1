@@ -38,7 +38,7 @@ DS.Sandbox = class Sandbox {
     if (keepPlayerX && g.player) me.x = g.player.pos.x;
     for (const b of W.buildings) { b.base = W.terrain.height(b.x) - (b.D ? 0.12 : 0.15); b.reset(); }       // buildings stand again
     this.selB = null;
-    W.vehicles.length = 0; W.projectiles.length = 0; W.missiles.length = 0; W.traces.length = 0; W.log.length = 0; this.n = 0; W.fx.cases = [];
+    W.vehicles.length = 0; W.projectiles.length = 0; W.missiles.length = 0; W.traces.length = 0; W.log.length = 0; this.n = 0; W.fx.cases = []; W.flora = null;
     this.spawn(me);
     for (const it of items) if (!it.player) { it.label = null; this.spawn(it); }
     this.sel = null; g.target = null; g.mcam = false; g.mcamHold = null;

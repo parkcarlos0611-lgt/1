@@ -595,6 +595,16 @@ DS.Effects = class Effects {
   // with distance), to the soil (soft sand most, salt flat least) and to how squarely the slope faces the blast.
   // Strong blasts also scour the surface and drop the sand a little further out (sand is conserved).
   blast(x, y, str, dx, dy) {
+    // plants on the drive line inside the blast are torn out and thrown
+    if (str >= 0.4 && this.w.flora) {
+      const F = DS.Flora, T = this.w.terrain, cell = F.BANDS.line[0], r = 2 + 4 * Math.sqrt(str);
+      for (let j = Math.floor((x - r) / cell); j <= Math.ceil((x + r) / cell); j++) {
+        const it = F.item(T, 'line', j); if (!it || this.w.flora.gone.has(it.id) || Math.abs(it.x - x) > r) continue;
+        this.w.flora.gone.add(it.id);
+        const col = it.k.startsWith('rock') ? 0x8a7a62 : 0x7c6a3a;
+        for (let i = 0; i < 10; i++) this.P.add(DS.P.DEBRIS, it.x, T.height(it.x) + 0.3, Math.sign(it.x - x || 1) * this.rnd(2, 12), this.rnd(3, 12), this.rnd(1, 2.5), this.rnd(0.05, 0.14), { drag: 0.6, col });
+      }
+    }
     this.blasts.push({ x, y, str, dx: dx || 0, dy: dy || 0, dir: dx != null && dx !== 0, r: 0, max: 22 * Math.sqrt(str) + 6 });
     if (str >= 0.2) this.waves.push({ x, y, str, t: 0, max: 22 * Math.sqrt(str) + 6 });   // visible air ripple (post-processing)
     if (str >= 0.8) DS.Audio.blastRoll(x, y, Math.min(1.5, str));

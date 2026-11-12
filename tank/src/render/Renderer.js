@@ -95,7 +95,7 @@ DS.Renderer = class Renderer {
       const y = T.height(x) - 0.25 - d * D, sz = (0.06 + 0.3 * H(i + 0.13) * H(i + 0.29)) * (0.6 + d * 1.8);
       if (sz < pz * 0.5) continue;
       const kind = H(i + 0.91);
-      if (kind < 0.16) {                                          // dry desert scrub
+      if (kind < 0.16) { continue;                                // dry desert scrub: replaced by the plant sprites (src/render/Flora.js)
         ctx.strokeStyle = storm ? 'rgba(110,86,58,0.6)' : 'rgba(110,92,64,0.7)'; ctx.lineWidth = Math.max(pz * 0.5, sz * 0.07);
         ctx.beginPath(); const hh = sz * 2.6;
         for (let k = 0; k < 9; k++) { const a = -1.1 + k * 0.275 + Math.sin(i + k) * 0.12, l = hh * (0.6 + 0.4 * H(i + k)); ctx.moveTo(x + Math.sin(a) * l * 0.2, y); ctx.quadraticCurveTo(x + Math.sin(a) * l * 0.5, y + l * 0.7, x + Math.sin(a) * l, y + Math.cos(a) * l); }
@@ -139,11 +139,13 @@ DS.Renderer = class Renderer {
     this.sky(ctx, cam);
     cam.apply(ctx);
     this.backGround(ctx, cam);
+    this.flora(ctx, cam, 'back');
     this.props(ctx, cam, false);
     this.buildings(ctx, cam);
     w.particles.draw(ctx, cam, 0);
     for (const v of w.vehicles) if (cam.visible(v.pos.x, v.pos.y, 14) && this.shown(v)) this.vehicle(ctx, v, cam);
     this.terrain(ctx, cam);
+    this.flora(ctx, cam, 'line'); this.flora(ctx, cam, 'near');
     this.props(ctx, cam, true);
     this.fog(ctx, cam);
     this.traces(ctx, cam);
@@ -181,6 +183,7 @@ DS.Renderer = class Renderer {
     cam.apply(ctx);
     const pg = k => { const c = lum(amb.ground - 0.05 + k * 0.08); return `${c},${c},${c}`; };   // buildings: a little cooler than the sand
     this.backGround(ctx, cam, tg(amb.ground - 0.015));
+    { const fg = k => { const c = lum(amb.ground + k); return `${c},${c},${c}`; }; this.flora(ctx, cam, 'back', fg); this._fg = fg; }
     this.props(ctx, cam, false, pg);
     this.buildings(ctx, cam, pg);
     // ground: one temperature, sun-facing slopes a little warmer by day, fresh craters warm
@@ -197,6 +200,7 @@ DS.Renderer = class Renderer {
       if (Math.abs(d) > 0.004) { ctx.fillStyle = tg(amb.ground + d); ctx.fillRect(x, h - 0.7, cs + 0.01, 0.7); }
     }
     ctx.restore();
+    this.flora(ctx, cam, 'line', this._fg); this.flora(ctx, cam, 'near', this._fg);
     this.props(ctx, cam, true, pg);
     for (const v of vis) this.thermalVehicle(ctx, v, cam, amb, tg);
     this.thermalParticles(ctx, cam, amb, lum);

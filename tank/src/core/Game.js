@@ -18,6 +18,7 @@ DS.Game = class Game {
     await Promise.all(['m1a1', 'm2a2', 'm60a1', 'm109a3', 'm270', 't55', 't62', 't72'].map(id => this.rend.load(DS.VEHICLES[id])).concat(this.rend.loadProps()));
     await this.rend.loadBuildings();
     await this.rend.loadCity();
+    await this.rend.loadFlora();
     await this.rend.loadHeli(DS.VEHICLES.ah64a);
     DS.Armor.calibrate();
     this.resize(); addEventListener('resize', () => this.resize());

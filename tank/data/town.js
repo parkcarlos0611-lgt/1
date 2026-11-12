@@ -47,10 +47,23 @@ DS.TOWN = {
     const width = k => { if (k.startsWith('city:')) { const d = DS.CITY[k.slice(5)], ppm = (d.h - d.roof) / d.hb; return d.w / ppm; } return TS[k.replace(/^t:/, '')].w; };
     const flip = k => /sedan|pickup|van|taxi|drum|tires|barrier|sandbags|crates|sacks|pots|basket|table|pallet|ibc|water_tank|tent|quonset|hedgehog|lamp/.test(k) && r() < 0.5 ? -1 : 1;
     const key = k => k.startsWith('city:') ? k : 't:' + k;
-    const put = (k, z, x) => { k = key(k); P.push({ k, z, x, w: width(k), f: flip(k) }); };
+    // the same building is never placed close to itself: in its own row it keeps three of its widths plus 30 m
+    // from its twin; in another row (other depth, other scale) at least one and a half widths plus 12 m, so twins
+    // never stand side by side or one behind the other. Props, vehicles and street furniture may repeat.
+    const seen = new Map(), bld = k => k.startsWith('city:') || /^t:(market_|shop_|tin_shed|shed_pair|container|tent|quonset|canopy|shelter_|ruin_|camo_net|watchtower)/.test(k);
+    const room = (k, x, z) => { let m = 1e9; const w = width(k); for (const [q, zq] of seen.get(k) || []) m = Math.min(m, Math.abs(q - x) / (zq === z ? w * 3 + 30 : w * 1.5 + 12)); return m; };
+    const clear = (k, x, z) => !bld(k) || room(k, x, z) >= 1;
+    const mark = (k, x, z) => { if (bld(k)) { if (!seen.has(k)) seen.set(k, []); seen.get(k).push([x, z]); } };
+    const put = (k, z, x) => { k = key(k); P.push({ k, z, x, w: width(k), f: flip(k) }); mark(k, x, z); };
     const pick = pool => pool[Math.floor(r() * pool.length)];
+    // a pool item that may stand at x: random among the allowed ones; if none is, the one whose twin is farthest
+    const pickAt = (pool, x, z) => {
+      const ok = pool.filter(k => clear(key(k), x + width(key(k)) / 2, z));
+      return ok.length ? pick(ok) : null;          // none may stand here: the caller leaves a gap
+    };
+    const putAt = (pool, z, x) => { const k = pickAt(pool, x - 8, z); if (k) put(k, z, x); };
     // fill [x0, x1] in row z with items from pool, gaps g0…g1 between them
-    const fill = (z, x0, x1, pool, g0, g1) => { let x = x0 + r() * g1; for (;;) { const k = key(pick(pool)), w = width(k); if (x + w > x1) break; P.push({ k, z, x: x + w / 2, w, f: flip(k) }); x += w + g0 + r() * (g1 - g0); } };
+    const fill = (z, x0, x1, pool, g0, g1) => { let x = x0 + r() * g1; for (;;) { const k0 = pickAt(pool, x, z); if (!k0) { x += 6; if (x > x1) break; continue; } const k = key(k0), w = width(k); if (x + w > x1) break; P.push({ k, z, x: x + w / 2, w, f: flip(k) }); mark(k, x + w / 2, z); x += w + g0 + r() * (g1 - g0); } };
     const every = (k, z, x0, x1, step, jit = 0) => { for (let x = x0; x < x1; x += step) put(k, z, x + (r() - 0.5) * jit); };
     const L = ['city:l1', 'city:l2', 'city:l3', 'city:l4', 'city:l5', 'city:l6', 'city:l7'], Mm = ['city:m1', 'city:m2', 'city:m3', 'city:m4', 'city:m5', 'city:m6', 'city:m7'], H = ['city:h1', 'city:h2', 'city:h3', 'city:h4', 'city:h5', 'city:h6'];
     const cars = ['sedan', 'old_sedan', 'taxi', 'pickup', 'van'], wrecks = ['sedan_dmg', 'old_sedan_dmg', 'pickup_dmg', 'van_dmg', 'taxi_burnt'];
@@ -83,14 +96,14 @@ DS.TOWN = {
     fill(3, 9090, 10000, ['market_arcade', 'market_alley', 'city:l1', 'city:l3', 'market_2storey', 'city:m3'], 0, 4);
     put('market_b', 2, 8420); put('market_gate', 2, 8860); put('market_gate', 2, 9620);
     for (const [a, b] of [[8000, 8395], [8445, 8850], [8870, 9610], [9630, 10000]]) {
-      for (let x = a; x < b;) { const k = r() < 0.3 ? 'market_2storey' : r() < 0.2 ? 'market_arcade' : pick(shops); const w = width(key(k)); if (x + w > b) break; put(k, 2, x + w / 2); x += w + r() * 3; }
+      for (let x = a; x < b;) { const k = pickAt(['market_2storey', 'market_arcade', 'market_2storey'].concat(shops), x, 2); if (!k) { x += 4; continue; } const w = width(key(k)); if (x + w > b) break; put(k, 2, x + w / 2); x += w + r() * 3; }
     }
     fill(1, 8000, 10000, stalls.concat(stalls, market, market, market), 0.4, 3.5);
     fill(-1, 8000, 10000, ['stall_fruit', 'stall_red', 'crates', 'pots', 'fruit_crate1', 'sacks'], 22, 70);
     // ⑤ the square: the gate in the middle, traffic lights at the two avenues, posters
     fill(4, 10000, 11000, ['city:h2', 'city:h6', 'city:h1'].concat(Mm), 0, 12);
-    put('market_a', 3, 10500); put('city:m4', 3, 10130); put('city:m4', 3, 10880);
-    put('market_gate', 2, 10500); put('city:m7', 2, 10170); put('city:m1', 2, 10840); fill(2, 10560, 10700, shops, 1, 5); fill(2, 10300, 10440, shops, 1, 5);
+    put('market_a', 3, 10500); putAt(Mm, 3, 10130); putAt(Mm, 3, 10880);
+    put('market_gate', 2, 10500); putAt(Mm, 2, 10170); putAt(Mm, 2, 10840); fill(2, 10560, 10700, shops, 1, 5); fill(2, 10300, 10440, shops, 1, 5);
     for (const x of [10233, 10267, 10733, 10767]) put('traffic_light', 1, x);
     put('poster_board', 1, 10420); put('poster_board', 1, 10580); every('lamp', 1, 10020, 11000, 40, 2);
     fill(1, 10020, 10220, bins.concat(cars), 8, 30); fill(1, 10780, 10990, bins.concat(cars), 8, 30);
@@ -100,8 +113,8 @@ DS.TOWN = {
     fill(1, 11000, 14000, cars.concat(cars, bins, ['poster_board', 'billboard', 'direction_sign']), 5, 24);
     fill(-1, 11000, 14000, ['sedan', 'taxi', 'van', 'wheelie_bin'], 50, 120);
     // ⑦ the battered district: broken towers, ruins, wrecks, bent lamps
-    fill(4, 14000, 17000, ['city:hd1', 'city:hd2', 'city:h3', 'city:m2', 'city:m6'], 2, 22);
-    fill(3, 14000, 17000, ['ruin_wall', 'city:m2', 'city:m6', 'ruin_small', 'city:hd2'], 4, 20);
+    fill(4, 14000, 17000, ['city:hd1', 'city:hd2', 'city:h3', 'city:h4', 'city:m2', 'city:m6', 'city:m5', 'city:m3'], 2, 22);
+    fill(3, 14000, 17000, ['ruin_wall', 'city:m2', 'city:m6', 'city:m7', 'city:m4', 'ruin_small', 'city:hd2', 'city:hd1'], 4, 20);
     fill(2, 14000, 17000, ['ruin_small', 'ruin_wall', 'sign_frame', 'billboard_dmg', 'city:l4'], 6, 26);
     fill(1, 14000, 17000, ['lamp_bent', 'lamp_down', 'bin_burnt', 'bin_tipped', 'burn_drum', 'tires1', 'barrier1', 'hedgehog'].concat(wrecks, wrecks), 3, 20);
     fill(-1, 14000, 17000, ['taxi_burnt', 'sedan_dmg', 'lamp_down', 'barrier2'], 45, 120);

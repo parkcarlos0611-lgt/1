@@ -52,7 +52,7 @@ Object.assign(DS.Renderer.prototype, {
       // the glass in three light colours
       const glass = col => { const o = new ImageData(w, h), od = o.data; for (let j = 0; j < w * h; j++) if (G[j]) { const q = j * 4, v = 0.6 + 0.4 * (1 - L[j] / 120); od[q] = col[0] * v; od[q + 1] = col[1] * v; od[q + 2] = col[2] * v; od[q + 3] = 255; }
         const cv = document.createElement('canvas'); cv.width = w; cv.height = h; cv.getContext('2d').putImageData(o, 0, 0); return cv; };
-      info = { w, h, westLit: mk(1, [255, 226, 180], 0.9), eastLit: mk(-1, [255, 226, 180], 0.9), westDark: mk(1, [24, 18, 12], 0.8), eastDark: mk(-1, [24, 18, 12], 0.8),
+      info = { w, h, im, westLit: mk(1, [255, 226, 180], 0.9), eastLit: mk(-1, [255, 226, 180], 0.9), westDark: mk(1, [24, 18, 12], 0.8), eastDark: mk(-1, [24, 18, 12], 0.8),
         panes, glass: [glass([255, 190, 100]), glass([225, 225, 205]), glass([135, 180, 245])], lit: new Map() };
     } catch (e) { info = null; }                  // a page opened from disk cannot read its own pixels: no extra light
     C.set(key, info); return info;
@@ -62,9 +62,18 @@ Object.assign(DS.Renderer.prototype, {
     const q = Math.round(s * 40) / 40, id = variant + ':' + q; if (info.lit.has(id)) return info.lit.get(id);
     const H = n => { const v = Math.sin(n * 127.1 + 311.7) * 43758.5453; return v - Math.floor(v); };
     const c = document.createElement('canvas'); c.width = info.w; c.height = info.h; const x = c.getContext('2d');
+    // each lit window is airbrushed like the street lamps: a soft glow filling the pane and a wide faint halo
+    // bleeding onto the wall round it (kept inside the building's outline below), no hard pane edges
+    const COLS = [[255, 186, 96], [236, 232, 206], [140, 182, 250]];
+    const blob = (cx, cy, rx, ry, c, a) => { x.save(); x.translate(cx, cy); x.scale(1, ry / rx);
+      const g = x.createRadialGradient(0, 0, 0, 0, 0, rx); g.addColorStop(0, `rgba(${c},${a})`); g.addColorStop(0.45, `rgba(${c},${a * 0.6})`); g.addColorStop(1, `rgba(${c},0)`);
+      x.fillStyle = g; x.fillRect(-rx, -rx, rx * 2, rx * 2); x.restore(); };
+    x.globalCompositeOperation = 'lighter';
     info.panes.forEach((p, i) => { const u = H(i * 13.7 + variant * 101.3); if (u >= q) return;
-      const col = H(i * 3.1 + variant * 7.7), src = info.glass[col < 0.62 ? 0 : col < 0.9 ? 1 : 2];
-      x.drawImage(src, p[0], p[1], p[2] - p[0], p[3] - p[1], p[0], p[1], p[2] - p[0], p[3] - p[1]); });
+      const t = H(i * 3.1 + variant * 7.7), c = COLS[t < 0.62 ? 0 : t < 0.9 ? 1 : 2].join(','), cx = (p[0] + p[2]) / 2, cy = (p[1] + p[3]) / 2, pw = p[2] - p[0], ph = p[3] - p[1];
+      blob(cx, cy, pw * 0.75, ph * 0.72, c, 0.8);
+      blob(cx, cy + ph * 0.05, pw * 1.7, ph * 1.4, c, 0.16); });
+    x.globalCompositeOperation = 'destination-in'; x.drawImage(info.im, 0, 0);
     if (info.lit.size > 60) info.lit.clear();
     info.lit.set(id, c); return c;
   },
@@ -163,7 +172,8 @@ Object.assign(DS.Renderer.prototype, {
       const lamp = k === 't:lamp', s = wd / (lamp ? 3.47 : 1.87);
       L.push({ lamp: true, z: p.z, x, y, hx: lamp ? (p.f === -1 ? -1 : 1) * wd * 0.36 : 0, hy: ht * (lamp ? 0.93 : 0.82), s, haze }); return;
     }
-    const bld = k.startsWith('city:') || /^t:(market_|shop_|shed_pair|container|tin_shed)/.test(k);
+    // lit: houses, blocks and towers and the big market buildings; small shops, stalls and sheds stay dark
+    const bld = (k.startsWith('city:') && !/^city:(l5|l7)$/.test(k)) || /^t:(market_a|market_b|market_2storey|market_alley)$/.test(k);
     if (!bld) return;
     if (DS.MAP && DS.MAP.town && DS.MAP.district(p.x)[2] === 'ruins') return;
     L.push({ key: k, z: p.z, im, x, y, w: wd, h: ht, f: p.f, haze, variant: Math.abs(Math.round(p.x * 7.3)) % 9 });

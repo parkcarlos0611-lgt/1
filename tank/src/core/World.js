@@ -135,9 +135,18 @@ DS.World = class World {
     for (const v of this.vehicles) this.fx.vehicle(v, frameDt);
     this.fx.ambient(frameDt);
     // wind moves sand around the vehicles (strong winds only: the sandstorm)
+    // — only where it can be seen or felt: the view, and round vehicles that are moving (it used to run over the
+    // whole span between the farthest vehicles, kilometres of ground nobody was looking at)
     if (Math.abs(this.wind) > 4 && this.vehicles.length) {
-      let a = 1e9, b = -1e9; for (const v of this.vehicles) { a = Math.min(a, v.pos.x); b = Math.max(b, v.pos.x); }
-      this.terrain.windStep(frameDt, this.wind, a - 120, b + 120);
+      const iv = [[this.cam.left - 150, this.cam.right + 150]];
+      for (const v of this.vehicles) if (!v.heli && Math.abs(v.vt) > 0.3) iv.push([v.pos.x - 120, v.pos.x + 120]);
+      iv.sort((p, q) => p[0] - q[0]);
+      let cur = iv[0];
+      for (let k = 1; k <= iv.length; k++) {
+        const nx = iv[k];
+        if (nx && nx[0] <= cur[1]) { cur[1] = Math.max(cur[1], nx[1]); continue; }
+        this.terrain.windStep(frameDt, this.wind, cur[0], cur[1]); cur = nx;
+      }
     }
     for (const m of this.missiles) this.fx.missile(m, frameDt);
     this.particles.update(frameDt, this.terrain, this.wind);

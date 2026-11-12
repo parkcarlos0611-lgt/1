@@ -9,6 +9,7 @@ DS.Camera = class Camera {
   follow(v, dt) {
     const T = DS.T.camera;
     this.zoom += (this.tzoom - this.zoom) * Math.min(1, dt * 6);
+    if (Math.abs(this.tzoom - this.zoom) < this.tzoom * 0.001) this.zoom = this.tzoom;      // settle exactly (caches key on it)
     const halfW = this.W / 2 / this.zoom;
     const lead = Math.max(-1, Math.min(1, v.vel.x / 12)) * halfW * 0.35 * T.lookAhead + halfW * 0.25;
     const tx = v.pos.x + lead;

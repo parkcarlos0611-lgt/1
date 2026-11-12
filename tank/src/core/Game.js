@@ -343,6 +343,7 @@ DS.Game = class Game {
       time: w.time, threshold: night > 0.4 ? 0.62 : storm ? 0.88 : 0.86, bloom: night > 0.4 ? 0.75 : storm ? 0.4 : 0.55,
       haze: night > 0.4 ? 0 : sun ? (storm ? 0.25 : 0.35 + 0.65 * (1 - low)) : 0.3, horizon: hz, hot, waves, hit,
       grain: night > 0.4 ? 0.045 : 0.022, vig: 0.38, lift, gain, sat, contrast,
+      sharp: (() => { const k = this.cv.width / Math.max(1, innerWidth * Math.min(2, devicePixelRatio || 1)); return k < 0.97 ? Math.min(0.6, (1 - k) * 1.6) : 0; })(),
     });
   }
   // field of view of the gunner's sight: tanks have ×3 / ×10; a sight with its own list (TADS) steps through it,
@@ -446,6 +447,21 @@ DS.Game = class Game {
       i.aim = L ? (L.heli ? { x: L.pos.x, y: L.pos.y } : L.local(L.g.ring.x, L.g.ring.y + 0.3)) : i.mgAim;
     }
   }
+  // Resolution governor, from frame times (the frame-rate limit sets the budget): when more than one frame in
+  // ten over the last second misses the budget by a quarter, the picture steps down a size (1 · 0.9 · 0.8 · 0.7
+  // · 0.6 · 0.5 of the screen); after six seconds with almost no misses and the script using little of the
+  // budget it steps back up. Twenty seconds without stepping up after a step down keeps it from see-sawing.
+  governor(t) {
+    const P = DS.Perf, budget = P.mode === '120' ? 1000 / 120 : 1000 / 60, steps = [1, 0.9, 0.8, 0.7, 0.6, 0.5];
+    if ((this._gv = (this._gv || 0) + 1) % 30 || P.n < 60) return;
+    let miss = 0, n = 0;
+    for (let k = 1; k <= 60; k++) { const j = (P.i - k + P.N) % P.N; if (P.iv[j] > 0) { n++; if (P.iv[j] > budget * 1.25) miss++; } }
+    let i = steps.findIndex(v => v <= this.rs + 1e-6); if (i < 0) i = steps.length - 1;
+    if (n && miss / n > 0.1 && i < steps.length - 1) { this.rs = steps[i + 1]; this._gvHold = t + 20000; this._gvGood = 0; this.resize(); return; }
+    const s = P.stats(60);
+    if (s && miss === 0 && s.workP99 < budget * 0.55) this._gvGood = (this._gvGood || 0) + 1; else this._gvGood = 0;
+    if (this._gvGood >= 12 && i > 0 && t > (this._gvHold || 0)) { this.rs = steps[i - 1]; this._gvGood = 0; this.resize(); }
+  }
   loop(t) {
     const Pf = DS.Perf;
     if (!Pf.due(t)) { requestAnimationFrame(t2 => this.loop(t2)); return; }      // frame pacing (60 / 120 / free)
@@ -454,11 +470,7 @@ DS.Game = class Game {
     if (dt > 0) this.fps += (1 / dt - this.fps) * 0.05;
     // frame-rate governor: below 50 fps for a second and a half the picture is rendered smaller (it is stretched
     // back to the screen); with headroom for six seconds it creeps back up. Never touched while editing.
-    if (DS.T.resAuto !== false && !navigator.webdriver && this.player) {
-      this._slow = this.fps < 50 ? (this._slow || 0) + dt : 0; this._fast = this.fps > 57.5 ? (this._fast || 0) + dt : 0;
-      if (this._slow > 1.5 && this.rs > 0.5) { this.rs = Math.max(0.5, this.rs * 0.86); this._slow = 0; this._fast = -4; this.resize(); }
-      else if (this._fast > 6 && this.rs < 1) { this.rs = Math.min(1, this.rs * 1.07); this._fast = 0; this.resize(); }
-    }
+    if (DS.T.resAuto !== false && !navigator.webdriver && this.player && !this.paused) this.governor(t);
     const ed = this.sbx && this.sbx.edit;
     this.readInput(dt);
     if (ed) this.sbx.frame(dt);

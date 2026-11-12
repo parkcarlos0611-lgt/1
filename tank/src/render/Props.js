@@ -211,7 +211,34 @@ Object.assign(DS.Renderer.prototype, {
   // A ground texture laid flat on the ground plane between dyTop and dyBot below/above the surface line (m),
   // pressed to the plane's depth: tiles tileW metres wide and tileH tall on screen, each sheared to follow the
   // slope of the ground under it. Drawn as plain images (a transformed pattern fill is slow).
+  // Cached: the band is painted once, at the screen's resolution, into a strip wider than the view and drawn
+  // from there as one image per call (the tile-aligned slice the tiles would have covered); the strip is
+  // repainted when the zoom changes, the view runs off its end or the ground under it changes shape.
   groundTex(ctx, cam, im, a, b, dyTop, dyBot, tileW, tileH, ox = 0) {
+    if (!im) return;
+    const T = this.w.terrain, z = cam.zoom * cam.dpr, H = dyTop - dyBot, rows = Math.max(1, Math.ceil(H / tileH - 0.01));
+    const k0 = Math.floor((a - ox) / tileW), k1 = Math.ceil((b - ox) / tileW), xa = ox + k0 * tileW, xb = ox + Math.max(k0 + 1, k1) * tileW;
+    const byCv = this.gtx || (this.gtx = new Map()); let M = byCv.get(ctx.canvas); if (!M) byCv.set(ctx.canvas, M = new Map());
+    const key = (im.src || im.width) + '|' + dyTop + '|' + dyBot + '|' + tileW + '|' + tileH + '|' + ox;
+    let C = M.get(key);
+    const hk = (sa, sb) => { let h = 0; for (let x = sa; x <= sb + 1e-6; x += tileW) h = (h * 31 + Math.round(T.height(x) * 100)) | 0; return h; };
+    if (!C || Math.abs(C.z - z) > z * 0.015 || xa < C.sa || xb > C.sb || C.hk !== hk(C.sa, C.sb)) {
+      const span = cam.right - cam.left, sa = ox + Math.floor((Math.min(a, cam.left - span * 0.3) - ox) / tileW) * tileW, sb = ox + Math.ceil((Math.max(b, cam.right + span * 0.3) - ox) / tileW) * tileW;
+      let lo = 1e9, hi = -1e9; for (let x = sa; x <= sb + 1e-6; x += tileW) { const h = T.height(x); lo = Math.min(lo, h); hi = Math.max(hi, h); }
+      const ymax = hi + dyTop + 0.05, ymin = lo + dyTop - rows * tileH - 0.05, cw = Math.ceil((sb - sa) * z), ch = Math.ceil((ymax - ymin) * z);
+      if (cw * ch > 6e6 || cw < 1 || ch < 1) { M.delete(key); return this.groundTiles(ctx, im, a, b, dyTop, dyBot, tileW, tileH, ox); }   // very close zoom: tiles as before
+      C = C || { c: document.createElement('canvas') };
+      if (C.c.width !== cw || C.c.height !== ch) { C.c.width = cw; C.c.height = ch; }
+      Object.assign(C, { z, sa, sb, ymax, hk: hk(sa, sb) }); M.set(key, C);
+      const o = C.c.getContext('2d'); o.setTransform(1, 0, 0, 1, 0, 0); o.clearRect(0, 0, cw, ch);
+      o.setTransform(z, 0, 0, -z, -sa * z, ymax * z);
+      this.groundTiles(o, im, sa, sb, dyTop, dyBot, tileW, tileH, ox);
+    }
+    ctx.save(); ctx.translate(xa, C.ymax); ctx.scale(1, -1); ctx.imageSmoothingQuality = 'low';
+    ctx.drawImage(C.c, (xa - C.sa) * C.z, 0, (xb - xa) * C.z, C.c.height, 0, 0, xb - xa, C.c.height / C.z);
+    ctx.restore();
+  },
+  groundTiles(ctx, im, a, b, dyTop, dyBot, tileW, tileH, ox = 0) {
     const T = this.w.terrain, k0 = Math.floor((a - ox) / tileW), H = dyTop - dyBot, rows = Math.max(1, Math.ceil(H / tileH - 0.01));
     ctx.imageSmoothingQuality = 'low';
     for (let k = k0; ox + k * tileW < b; k++) {

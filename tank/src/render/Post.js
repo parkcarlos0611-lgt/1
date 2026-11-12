@@ -40,7 +40,7 @@ DS.Post = class Post {
     this.pComp = prog(`in vec2 uv; out vec4 o;
       uniform sampler2D scene, bloom; uniform vec2 res; uniform float time, bloomK, hazeK, horizon, hit, grain;
       uniform vec4 hot[16]; uniform int nHot; uniform vec4 wave[8]; uniform int nWave;
-      uniform vec3 lift, gain; uniform float sat, contrast, vig;
+      uniform vec3 lift, gain; uniform float sat, contrast, vig; uniform float sharp;
       float h21(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
       float vn(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
         return mix(mix(h21(i), h21(i + vec2(1, 0)), f.x), mix(h21(i + vec2(0, 1)), h21(i + vec2(1, 1)), f.x), f.y); }
@@ -65,6 +65,12 @@ DS.Post = class Post {
           vec2 ca = (suv - 0.5) * 0.012 * hit;
           c = vec3(texture(scene, suv + ca).r, texture(scene, suv).g, texture(scene, suv - ca).b);
         } else c = texture(scene, suv).rgb;
+        // the picture is rendered below the screen's resolution: a contrast-limited sharpen restores the edges
+        // (never past the brightest / darkest neighbour, so no halos)
+        if (sharp > 0.001) { vec2 t = 1.0 / res;
+          vec3 n0 = texture(scene, suv + vec2(t.x, 0.0)).rgb, n1 = texture(scene, suv - vec2(t.x, 0.0)).rgb, n2 = texture(scene, suv + vec2(0.0, t.y)).rgb, n3 = texture(scene, suv - vec2(0.0, t.y)).rgb;
+          vec3 mn = min(min(min(n0, n1), min(n2, n3)), c), mx = max(max(max(n0, n1), max(n2, n3)), c);
+          c = clamp(c + sharp * 2.0 * (c - (n0 + n1 + n2 + n3) * 0.25), mn, mx); }
         vec3 bl = texture(bloom, suv).rgb * bloomK;
         c = 1.0 - (1.0 - c) * (1.0 - min(bl, vec3(1.0)));                // screen blend: glows, never clips flat
         // grade: lift / gain, contrast, saturation
@@ -132,11 +138,11 @@ DS.Post = class Post {
     this.pass(this.pComp, null, W, H, u => {
       this.bind(0, this.sceneTex, u.scene); this.bind(1, A.t, u.bloom);
       gl.uniform2f(u.res, W, H); gl.uniform1f(u.time, P.time); gl.uniform1f(u.bloomK, P.bloom);
-      gl.uniform1f(u.hazeK, P.haze); gl.uniform1f(u.horizon, H - P.horizon); gl.uniform1f(u.hit, P.hit); gl.uniform1f(u.grain, P.grain);
-      const hot = new Float32Array(64), nh = Math.min(16, P.hot.length);
+      gl.uniform1f(u.hazeK, P.haze); gl.uniform1f(u.horizon, H - P.horizon); gl.uniform1f(u.hit, P.hit); gl.uniform1f(u.grain, P.grain); gl.uniform1f(u.sharp, P.sharp || 0);
+      const hot = this._hot || (this._hot = new Float32Array(64)), nh = Math.min(16, P.hot.length);
       for (let i = 0; i < nh; i++) { const h = P.hot[i]; hot.set([h[0], H - h[1], h[2], h[3]], i * 4); }
       gl.uniform4fv(u.hot, hot); gl.uniform1i(u.nHot, nh);
-      const wv = new Float32Array(32), nw = Math.min(8, P.waves.length);
+      const wv = this._wv || (this._wv = new Float32Array(32)), nw = Math.min(8, P.waves.length);
       for (let i = 0; i < nw; i++) { const w = P.waves[i]; wv.set([w[0], H - w[1], w[2], w[3]], i * 4); }
       gl.uniform4fv(u.wave, wv); gl.uniform1i(u.nWave, nw);
       gl.uniform3fv(u.lift, P.lift); gl.uniform3fv(u.gain, P.gain); gl.uniform1f(u.sat, P.sat); gl.uniform1f(u.contrast, P.contrast); gl.uniform1f(u.vig, P.vig);

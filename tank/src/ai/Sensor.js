@@ -62,7 +62,10 @@ DS.Sensor = {
         if (!b.alive) { if (c) c.dead = true; continue; }
         const range = Math.hypot(b.pos.x - a.pos.x, b.pos.y - a.pos.y);
         if (tick) {
-          const los = range < 4500 && DS.AI.los(world, a, b);
+          // past the longest range anything can matter (sights' reach, detection limit, a lamp seen at 3.5 km) the
+          // line of sight is not traced at all
+          if (a.sensCut == null || tick && a._sensCutT !== world.time) { const S = a.def.sight; a.sensCut = Math.max(this.reach(world, a), S.detectMax || 2500) + 200; a._sensCutT = world.time; }
+          const los = range < Math.min(4500, b.light ? Math.max(a.sensCut, 3700) : a.sensCut) && DS.AI.los(world, a, b);
           if (!c && !los) continue;
           if (!c) { c = { d: 0, los: false, x: b.pos.x, y: b.pos.y, seen: -1e9 }; a.contacts.set(b, c); }
           c.los = los;

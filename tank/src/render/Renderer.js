@@ -463,18 +463,53 @@ DS.Renderer = class Renderer {
 
   // Background (sky, sun, clouds, far dunes): soft by nature, so it is painted at half resolution into a cached
   // canvas and only repainted when the view has moved (or clouds have drifted) since the last paint.
+  // Sky and far land, at half resolution. The dome (gradients, sun, clouds, stars, moon) is cached and repainted
+  // only when the light changes, the clouds have drifted or the view has panned far enough to move them; the
+  // seven horizon layers (two rocky ranges, five dune rows) are each painted once into a wide strip and slid
+  // sideways at their own parallax speed, repainted only when the view runs off a strip's end.
   sky(ctx, cam) {
     const W = cam.W * cam.dpr, H = cam.H * cam.dpr, env = this.w.env || {}, th = this.opt && this.opt.thermal;
-    const key = [Math.round(cam.x * 10), Math.round(cam.y * 10), Math.round(cam.zoom), Math.floor(this.w.time * 2), W, H, th ? 1 : 0, Math.round((env.dark || 0) * 40), env.visibility, env.sun ? Math.round(env.sun.el * 2) + '/' + Math.round(env.sun.ex * 40) : 0, env.moon ? Math.round(env.moon.el) : 0].join();
     const store = this.bgs || (this.bgs = new Map());
-    let bg = store.get(ctx.canvas);
-    if (!bg) { bg = { c: document.createElement('canvas'), key: '' }; store.set(ctx.canvas, bg); }
-    if (bg.key !== key) {
-      bg.key = key; bg.c.width = Math.max(1, Math.round(W / 2)); bg.c.height = Math.max(1, Math.round(H / 2));
-      const half = Object.assign({}, cam); half.dpr = cam.dpr / 2;
-      this.skyPaint(bg.c.getContext('2d'), half);
+    let S = store.get(ctx.canvas);
+    if (!S) { S = { dome: { c: document.createElement('canvas'), key: '' }, land: [] }; store.set(ctx.canvas, S); }
+    const dh = cam.dpr / 2, Wh = Math.max(1, Math.round(W / 2)), Hh = Math.max(1, Math.round(H / 2)), sx = W / Wh, sy = H / Hh;
+    const sun = env.sun, moon = env.moon;
+    const key = [Wh, Hh, th ? 1 : 0, Math.round((env.dark || 0) * 40), env.visibility || 0, sun ? Math.round(sun.el * 2) + '/' + Math.round(sun.ex * 40) : 0,
+      moon ? Math.round(moon.el) + '/' + Math.round(moon.ex * 20) + '/' + Math.round(moon.light * 20) : 0, env.moonless ? 1 : 0,
+      Math.round(cam.x * dh * 0.02 / 1.5), Math.floor(this.w.time * 2)].join();
+    const D = S.dome;
+    if (D.key !== key) {
+      D.key = key; if (D.c.width !== Wh || D.c.height !== Hh) { D.c.width = Wh; D.c.height = Hh; }
+      const half = Object.assign({}, cam); half.dpr = dh;
+      this.skyPaint(D.c.getContext('2d'), half);
     }
-    ctx.imageSmoothingQuality = 'low'; ctx.drawImage(bg.c, 0, 0, W, H);
+    ctx.imageSmoothingQuality = 'low'; ctx.drawImage(D.c, 0, 0, W, H);
+    if (th) return;
+    // ---- horizon layers ----
+    const storm = env.visibility ? 1 : 0, sn = sun || { el: -6, side: 1 }, low = Math.max(0, Math.min(1, (25 - sn.el) / 15));
+    const lkey = [Wh, Hh, dh, storm, Math.round(low * 20), sn.side].join();
+    const hzH = Hh * 0.5 + (cam.y - 14) * cam.zoom * dh * 0.04;                      // horizon in the half-size frame
+    const top = Math.round(Hh * 0.25 + 14 * dh), bot = Math.round(124 * dh), Ws = Math.ceil(Wh * 1.6);
+    const F = [0.006, 0.012, 0.02, 0.05, 0.10, 0.18, 0.30];
+    let near = null;
+    for (let li = storm ? 2 : 0; li < 7; li++) {
+      const f = F[li], s = li < 2 ? 1.6 / dh : (0.6 + f * 2) / dh;                  // layer units per half-size pixel
+      let L = S.land[li]; if (!L) L = S.land[li] = { c: document.createElement('canvas'), key: '', camx: 0 };
+      let X0 = Wh / 2 - Ws / 2 - (cam.x - L.camx) * f * 8 / s;
+      if (L.key !== lkey || X0 > 0 || X0 + Ws < Wh) {
+        L.key = lkey; L.camx = cam.x; X0 = (Wh - Ws) / 2;
+        if (L.c.width !== Ws || L.c.height !== top + bot) { L.c.width = Ws; L.c.height = top + bot; }
+        const o = L.c.getContext('2d'); o.setTransform(1, 0, 0, 1, 0, 0); o.clearRect(0, 0, Ws, top + bot);
+        o.setTransform(1, 0, 0, 1, 0, top - Hh * 0.5);
+        const lc = Object.assign({}, cam, { x: cam.x, y: 14, W: Ws / dh, dpr: dh });
+        this.skyLand(o, lc, li); L.col = this._landCol;
+      }
+      ctx.drawImage(L.c, X0 * sx, (hzH - top) * sy, Ws * sx, (top + bot) * sy);
+      near = L;
+    }
+    // below the strips every layer is solid: the nearest one's colour
+    if (near && near.col) { ctx.fillStyle = `rgb(${near.col})`; ctx.fillRect(0, Math.floor((hzH + bot) * sy) - 1, W, H); }
+    this.skyHaze(ctx, cam);
   }
   skyPaint(ctx, cam) {
     const W = cam.W * cam.dpr, H = cam.H * cam.dpr;
@@ -529,13 +564,24 @@ DS.Renderer = class Renderer {
         const far = 0.4 + 0.6 * R5(i + 20), cw = W * (0.1 + 0.2 * R5(i)) * far, by = H * (0.12 + 0.24 * R5(i + 10));
         const cx = ((R5(i + 30) * span - cam.x * cam.dpr * 0.012 * far + this.w.time * 2.2 * far) % span + span) % span - W * 0.4;
         if (cx + cw < 0 || cx - cw > W) continue;
-        for (let k = 0; k < 26; k++) {
-          const u = R5(i * 31 + k), e = Math.sqrt(Math.max(0, 1 - (u * 2 - 1) ** 2)), r = cw * (0.05 + 0.1 * e) * (0.7 + 0.6 * R5(i * 5 + k * 3));
-          const px = cx + (u - 0.5) * cw * 1.6, py = by - r * 0.3 - e * cw * 0.16 * R5(i * 7 + k);
-          const lit = py < by - cw * 0.06;
-          ctx.globalAlpha = (0.32 + 0.4 * far) * (lit ? 1 : 0.8);
-          ctx.drawImage(PS.puff(lit ? warm : 0xc9cdd6, k & 3), px - r, py - r * 0.62, r * 2, r * 1.24);
+        // each heap is painted once into its own image (its shape never changes) and placed where it has drifted
+        const ck = i + '|' + Math.round(cw) + '|' + warm, cc = this.cloudC || (this.cloudC = new Map());
+        let im = cc.get(ck);
+        if (!im) {
+          const cwd = Math.ceil(cw * 2.2), cht = Math.ceil(cw * 0.75);
+          im = document.createElement('canvas'); im.width = Math.max(1, cwd); im.height = Math.max(1, cht);
+          const o = im.getContext('2d'), ox = cwd / 2, oy = cht * 0.78;              // heap centre and base inside the image
+          for (let k = 0; k < 26; k++) {
+            const u = R5(i * 31 + k), e = Math.sqrt(Math.max(0, 1 - (u * 2 - 1) ** 2)), r = cw * (0.05 + 0.1 * e) * (0.7 + 0.6 * R5(i * 5 + k * 3));
+            const px = ox + (u - 0.5) * cw * 1.6, py = oy - r * 0.3 - e * cw * 0.16 * R5(i * 7 + k);
+            const lit = py < oy - cw * 0.06;
+            o.globalAlpha = (0.32 + 0.4 * far) * (lit ? 1 : 0.8);
+            o.drawImage(PS.puff(lit ? warm : 0xc9cdd6, k & 3), px - r, py - r * 0.62, r * 2, r * 1.24);
+          }
+          if (cc.size > 64) cc.clear();
+          cc.set(ck, im); im.ox = ox; im.oy = oy;
         }
+        ctx.drawImage(im, cx - im.ox, by - im.oy);
       }
       ctx.globalAlpha = 1;
     }
@@ -547,7 +593,10 @@ DS.Renderer = class Renderer {
       if (!this.stars) { const r = DS.rng(9); this.stars = Array.from({ length: 220 }, () => [r(), r() * 0.62, r()]); }
       const ml = env.moon ? env.moon.light : 0;
       ctx.fillStyle = '#dfe6ff';
-      for (const [x, y, b] of this.stars) { const a = (0.25 + 0.65 * b) * Math.max(0, dk * 1.4 - 0.4) * (1 - 0.5 * ml * (1 - b)); if (a < 0.03) continue; ctx.globalAlpha = Math.min(1, a); ctx.fillRect(((x * W - cam.x * cam.dpr * 0.02) % W + W) % W, y * H, 1.4 * cam.dpr, 1.4 * cam.dpr); }
+      // stars gathered into a few brightness steps, each filled as one path
+      const sb = [[], [], [], [], [], [], [], [], [], [], []], sz = 1.4 * cam.dpr;
+      for (const [x, y, b] of this.stars) { const a = (0.25 + 0.65 * b) * Math.max(0, dk * 1.4 - 0.4) * (1 - 0.5 * ml * (1 - b)); if (a < 0.03) continue; sb[Math.min(10, Math.round(a * 10))].push(((x * W - cam.x * cam.dpr * 0.02) % W + W) % W, y * H); }
+      sb.forEach((q, k) => { if (!q.length) return; ctx.globalAlpha = Math.max(0.03, k / 10); ctx.beginPath(); for (let j = 0; j < q.length; j += 2) ctx.rect(q[j], q[j + 1], sz, sz); ctx.fill(); });
       ctx.globalAlpha = 1;
     }
     if (env.moon && env.moon.el > -1 && !storm) {
@@ -560,6 +609,13 @@ DS.Renderer = class Renderer {
       ctx.beginPath(); ctx.arc(mx, my, mr, Math.PI / 2, -Math.PI / 2, sex > M.ex); ctx.ellipse(mx, my, Math.abs(sh), mr, 0, -Math.PI / 2, Math.PI / 2, (sh > 0) === (sex > M.ex)); ctx.fill();
       ctx.globalAlpha = 1;
     }
+  }
+
+  // ---- the land on the horizon, one parallax layer at a time (li: 0–1 rocky ranges, 2–6 dune rows), drawn
+  // into a strip that the frame slides sideways (sky()) instead of repainting it as the view pans ----
+  skyLand(ctx, cam, li) {
+    const W = cam.W * cam.dpr, H = cam.H * cam.dpr, env = this.w.env || {}, storm = env.visibility ? 1 : 0;
+    const sun = env.sun || { el: -6, ex: env.clock != null && env.clock < 12 ? 0.9 : -0.9, side: 1 }, low = Math.max(0, Math.min(1, (25 - sun.el) / 15));
     // ---- parallax dunes: asymmetric (long windward slope, short slip face), far layers fade into the haze,
     // faces turned to the sun lit, faces turned away shaded ----
     const hz = H * 0.5 + (cam.y - 14) * cam.zoom * cam.dpr * 0.04;
@@ -570,7 +626,8 @@ DS.Renderer = class Renderer {
       const N1 = n => { const v = Math.sin(n * 127.1 + 311.7) * 43758.5453; return v - Math.floor(v); };
       const vn = x => { const i = Math.floor(x), f = x - i, s = f * f * (3 - 2 * f); return N1(i) + (N1(i + 1) - N1(i)) * s; };
       const ridge = (wx, k) => 0.55 * vn(wx / 900 + k) + 0.3 * vn(wx / 260 + k * 3) + 0.15 * vn(wx / 70 + k * 7);
-      for (const [f, hgt, col, lit] of [[0.006, 0.17, [150, 152, 176], 0.25], [0.012, 0.11, [176, 160, 158], 0.35]]) {
+      for (const [mi, [f, hgt, col, lit]] of [[0.006, 0.17, [150, 152, 176], 0.25], [0.012, 0.11, [176, 160, 158], 0.35]].entries()) {
+        if (li !== mi) continue;
         const pts = [];
         for (let x = -8; x <= W + 8; x += 8) { const wx = (x - W / 2) / cam.dpr * 1.6 + cam.x * f * 8 + 4000; const r = ridge(wx, f * 1000); pts.push([x, hz + H * 0.02 - H * hgt * Math.max(0, r - 0.32) * 1.9]); }
         ctx.fillStyle = `rgb(${col})`; ctx.beginPath(); ctx.moveTo(-8, H);
@@ -582,9 +639,10 @@ DS.Renderer = class Renderer {
       }
     }
     const layers = [[0.02, 0.85, 0.03, 30, 3200], [0.05, 0.68, 0.05, 55, 2300], [0.10, 0.5, 0.07, 80, 1700], [0.18, 0.32, 0.085, 105, 1300], [0.30, 0.16, 0.1, 125, 1000]];
-    for (const [f, fog, amp, base, lam] of layers) {
+    for (const [di, [f, fog, amp, base, lam]] of layers.entries()) {
+      if (li !== 2 + di) continue;
       const fogK = storm ? Math.min(1, fog * 1.25 + 0.15) : fog;
-      const col = sand.map((c, i) => Math.round(c + (haze[i] - c) * fogK));
+      const col = sand.map((c, i) => Math.round(c + (haze[i] - c) * fogK)); this._landCol = col;
       const pts = [], px = 1 / cam.dpr;
       for (let x = -8; x <= W + 8; x += 6) {
         // far layers keep their shape whatever the zoom: x is in screen pixels, only the pan moves them
@@ -614,7 +672,13 @@ DS.Renderer = class Renderer {
       }
       if (f === 0.05 && !storm) this.farProps(ctx, cam, pts, f, col, px);
     }
-    // haze where the land meets the sky
+  }
+  // haze where the land meets the sky (every frame: it follows the horizon)
+  skyHaze(ctx, cam) {
+    const W = cam.W * cam.dpr, H = cam.H * cam.dpr, env = this.w.env || {}, storm = env.visibility ? 1 : 0;
+    const sun = env.sun || { el: -6 }, low = Math.max(0, Math.min(1, (25 - sun.el) / 15));
+    const hz = H * 0.5 + (cam.y - 14) * cam.zoom * cam.dpr * 0.04;
+    const haze = storm ? [214, 176, 122] : [236 - 10 * low, 222 - 12 * low, 196 - 10 * low];
     const hg = ctx.createLinearGradient(0, hz - H * 0.1, 0, hz + H * 0.05);
     hg.addColorStop(0, `rgba(${haze},0)`); hg.addColorStop(0.7, `rgba(${haze},${storm ? 0.35 : 0.22})`); hg.addColorStop(1, `rgba(${haze},0)`);
     ctx.fillStyle = hg; ctx.fillRect(0, hz - H * 0.1, W, H * 0.15);
@@ -791,7 +855,7 @@ DS.Renderer = class Renderer {
       const kx = -side * Math.min(3.5, (Lt.cot != null ? Lt.cot : cot) * 0.55), y0 = T.height(v.pos.x);
       o.setTransform(m.a / q, m.b / q, m.c / q, m.d / q, m.e / q, m.f / q); o.transform(1, 0, kx, -ky, -kx * y0, y0 * (1 + ky));
       o.globalAlpha = Math.max(0, Math.min(1, k));
-      this.drawVehicle(o, v, lcam); n++;
+      this._sil = true; this.drawVehicle(o, v, lcam); this._sil = false; n++;
       if (!Lt.fire && !v.heli) bands.push([v.pos.x, Math.abs((v.g.idler.x - v.g.sprocket.x) * v.dir) / 2 + 0.25]);
     }
     if (this.shadowExtra) n += this.shadowExtra(o, m, q, Lt, cam) || 0;      // scenery that casts into the same layer
@@ -916,6 +980,11 @@ DS.Renderer = class Renderer {
     let path = DS.Track.buildPath(circles, this.pathBuf, circles.map(c => c.fixed));
     path = DS.Track.conformBottom(path, this.w.terrain, D.track.thick / 2, 0.25);
     v._trackPath = path;
+    if (this._sil) {
+      // silhouette only (shadow layer): the belt as one outline, no links, wheels, sprocket or idler
+      ctx.fillStyle = ctx.strokeStyle = '#000'; ctx.lineWidth = D.track.thick; ctx.lineJoin = 'round'; ctx.beginPath();
+      ctx.moveTo(path[0], path[1]); for (let i = 2; i < path.length; i += 2) ctx.lineTo(path[i], path[i + 1]); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.lineJoin = 'miter';
+    } else {
     const info = DS.Track.links(path, D.track.pitch, v.s, this.linkBuf);
     const L = v.chain ? v.chain.L : info.pitch, th = D.track.thick, nl = this.linkBuf.length;
     let links = this.linkBuf;
@@ -925,15 +994,25 @@ DS.Renderer = class Renderer {
     }
     // sand and dust picked up while driving: lightens the track, the wheels and the lower hull side
     const dustA = Math.min(1, v.dust || 0) * 0.6, dustC = '205,172,122';
-    links.forEach(([x, y, a], i) => {
-      ctx.save(); ctx.translate(x, y); ctx.rotate(a);
-      ctx.fillStyle = '#26231f'; ctx.fillRect(-L * 0.5, -th * 0.5, L * 0.93, th);
-      if (dustA > 0.02) { ctx.fillStyle = `rgba(${dustC},${(dustA * 0.75).toFixed(2)})`; ctx.fillRect(-L * 0.5, -th * 0.5, L * 0.93, th); }
-      ctx.fillStyle = '#4a4540'; ctx.fillRect(-L * 0.5, -th * 0.5, L * 0.18, th);
-      ctx.fillStyle = '#3a3631'; ctx.fillRect(-L * 0.25, th * 0.12, L * 0.6, th * 0.22);
-      ctx.fillStyle = '#1d1b18'; ctx.fillRect(-L * 0.12, -th * 0.5 - 0.065, L * 0.28, 0.07);
-      ctx.restore();
-    });
+    // every link is the same few rectangles turned to its own angle: each colour goes into one path for the whole
+    // track (five fills a vehicle instead of four fills, a save and a restore per link)
+    const quad = (x, y, c, s, x0, y0, w, h) => {
+      const x1 = x0 + w, y1 = y0 + h;
+      ctx.moveTo(x + c * x0 - s * y0, y + s * x0 + c * y0); ctx.lineTo(x + c * x1 - s * y0, y + s * x1 + c * y0);
+      ctx.lineTo(x + c * x1 - s * y1, y + s * x1 + c * y1); ctx.lineTo(x + c * x0 - s * y1, y + s * x0 + c * y1); ctx.closePath();
+    };
+    const nk = links.length, cs = this._linkCS && this._linkCS.length >= nk * 2 ? this._linkCS : (this._linkCS = new Float32Array(nk * 2 + 64));
+    for (let i = 0; i < nk; i++) { cs[2 * i] = Math.cos(links[i][2]); cs[2 * i + 1] = Math.sin(links[i][2]); }
+    const layer = (col, x0, y0, w, h) => {
+      ctx.fillStyle = col; ctx.beginPath();
+      for (let i = 0; i < nk; i++) { const l = links[i]; quad(l[0], l[1], cs[2 * i], cs[2 * i + 1], x0, y0, w, h); }
+      ctx.fill();
+    };
+    layer('#26231f', -L * 0.5, -th * 0.5, L * 0.93, th);
+    if (dustA > 0.02) layer(`rgba(${dustC},${(dustA * 0.75).toFixed(2)})`, -L * 0.5, -th * 0.5, L * 0.93, th);
+    layer('#4a4540', -L * 0.5, -th * 0.5, L * 0.18, th);
+    layer('#3a3631', -L * 0.25, th * 0.12, L * 0.6, th * 0.22);
+    layer('#1d1b18', -L * 0.12, -th * 0.5 - 0.065, L * 0.28, 0.07);
 
     // ---- wheels ----
     const zpx = cam.zoom * cam.dpr;
@@ -962,6 +1041,7 @@ DS.Renderer = class Renderer {
     }
     wheel(sp.x, sp.y, sa, Sp.sprocket.R, 'sprocket');
 
+    }
     // ---- hull, then gun + turret (hull-local, source pixel frame, mirrored by dir) ----
     ctx.save(); ctx.translate(v.pos.x, v.pos.y); ctx.rotate(v.ang); ctx.scale(dir, 1);
     ctx.save(); ctx.scale(px, -px); ctx.drawImage(I.hull, Sp.hull.x - S.ox, Sp.hull.y - S.oy); ctx.restore();

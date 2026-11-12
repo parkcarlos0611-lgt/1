@@ -110,8 +110,17 @@ DS.Particles = class Particles {
   // only: one kind; glowOnly: just the light-emitting part (a FLAME's fire, not the smoke it turns into)
   draw(ctx, cam, layer, only, glowOnly) {
     const P = DS.P, pz = 1.2 / cam.zoom;
+    if (!this.bk) this.bk = new Map();
     for (let pass = 0; pass < 2; pass++) {
-      if (pass === 1) { ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round'; }
+      if (pass === 1) {
+        for (const b of this.bk.values()) {
+          if (!b.xy.length) continue;
+          ctx.globalAlpha = b.a; ctx.fillStyle = this.hex(b.col); ctx.beginPath();
+          const q = b.xy; for (let j = 0; j < q.length; j += 3) ctx.rect(q[j], q[j + 1], q[j + 2], q[j + 2]);
+          ctx.fill(); q.length = 0;
+        }
+        ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round';
+      }
       for (let i = 0; i < this.n; i++) {
         const k = this.kind[i];
         if (only != null && k !== only) continue;
@@ -123,10 +132,11 @@ DS.Particles = class Particles {
         const t = this.life[i] / this.ttl[i], sz = this.size[i], x = this.x[i], y = this.y[i];
         if (!cam.visible(x, y, sz + 2)) continue;
         if (k === P.GRAIN || k === P.DEBRIS) {
-          ctx.globalAlpha = this.alpha[i] * (1 - t * t);
-          ctx.fillStyle = k === P.DEBRIS ? '#3b342b' : this.hex(this.col[i]);
-          const m = Math.max(sz, pz);
-          ctx.fillRect(x - m / 2, y - m / 2, m, m);
+          // specks: gathered by colour and (stepped) opacity, each group filled as one path after this pass
+          const al = this.alpha[i] * (1 - t * t), ab = Math.round(al * 12); if (ab <= 0) continue;
+          const key = (k === P.DEBRIS ? 0x3b342b : this.col[i]) * 16 + ab, m = Math.max(sz, pz);
+          let b = this.bk.get(key); if (!b) { b = { col: k === P.DEBRIS ? 0x3b342b : this.col[i], a: ab / 12, xy: [] }; this.bk.set(key, b); }
+          b.xy.push(x - m / 2, y - m / 2, m);
         } else if (k === P.SPARK) {
           const a = this.alpha[i] * (1 - t * t * t); if (a < 0.02) continue;
           ctx.globalAlpha = a; ctx.strokeStyle = this.hex(this.col[i]); ctx.lineWidth = Math.max(sz, pz * 1.1);

@@ -65,7 +65,7 @@ DS.VEHICLES = DS.VEHICLES || {};
       muzzle: [(884 - 634) / PPM, -(648 - 685) / PPM],          // from the pivot, at 0° elevation
       elevMin: -10, elevMax: 65, rate: 550 / 60, rounds: 900, spread: 1.2 },
     coax: { name: 'M240 7.62mm 동축', ammo: 'M240_762', muzzle: L(948, 806), rate: 750 / 60, rounds: 10000, spread: 0.7 },
-    sight: { laser: true, thermal: true, rangeErr: 0.005, aimErr: 0.15, layTime: 2, detectMax: 4000, engageMax: 3000 },         // turret pivot (also where a tossed turret rotates about)
+    sight: { laser: true, thermal: true, tis: [500, 300], rangeErr: 0.005, aimErr: 0.15, layTime: 2, detectMax: 4000, engageMax: 3000 },         // turret pivot (also where a tossed turret rotates about)
 
     // Armour (user data, docs/DATA_SOURCES.md). a/b: plate ends (px in the drawing),
     // t: physical thickness mm, n: outward normal angle in hull frame (deg, 0 = forward, 90 = up),

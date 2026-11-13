@@ -35,7 +35,7 @@ DS.VEHICLES = DS.VEHICLES || {};
       elevMax: 20, elevMin: -10, rate: 0.32, recoilLen: 0.37, recoilMass: 2600, reload: 7.5, stabilized: true, stab: 0.9 },
     coax: { name: 'L8A2 7.62mm 동축', ammo: 'M240_762', muzzle: L(560, 476), rate: 750 / 60, rounds: 4000, spread: 0.7 },
     turretRing: L(380, 487),
-    sight: { laser: true, thermal: true, name: 'TOGS', crew: 1.0, rangeErr: 0.006, aimErr: 0.2, layTime: 2.5, detectMax: 4000, identMax: 2800, engageMax: 3000 },
+    sight: { laser: true, thermal: true, tis: [500, 300], name: 'TOGS', crew: 1.0, rangeErr: 0.006, aimErr: 0.2, layTime: 2.5, detectMax: 4000, identMax: 2800, engageMax: 3000 },
     armor: [
       { name: '포탑 전면 상부 (초밤)', part: 'turret', a: L(470, 412), b: L(548, 440), t: 600, mat: 'm1_comp', n: 65, h: 0 },
       { name: '포탑 전면 (포 방패)', part: 'turret', a: L(548, 440), b: L(548, 487), t: 600, mat: 'm1_comp', n: 0, h: 0 },

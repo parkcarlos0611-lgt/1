@@ -1,6 +1,7 @@
 // AMX-30B2 (French Army, Op Daguet). Geometry from assets/ref/amx30b2_sheet.png (right-side profile, facing
 // right) at 95 px/m (hull 6.8 m), origin px (374, 494) at the turret ring (tools/cut_new4.py). COTAC fire
-// control with laser rangefinder, low-light TV night sight (no thermal), 20 mm M693 coaxial cannon.
+// control with laser rangefinder, first-generation thermal sight (500 × 300, the class of the M1A1's and
+// Challenger's), 20 mm M693 coaxial cannon.
 // Figures are public estimates, provisional.
 window.DS = window.DS || {};
 DS.VEHICLES = DS.VEHICLES || {};
@@ -37,7 +38,7 @@ DS.VEHICLES = DS.VEHICLES || {};
     // 20 mm M693 dual-feed cannon, left of the main gun: light armour, soft targets and helicopters
     coax: { name: 'M693 20mm 동축 기관포', ammo: 'M693', muzzle: L(540, 478), rate: 740 / 60, rounds: 480, spread: 1.0 },
     turretRing: L(370, 494),
-    sight: { laser: true, passive: true, name: 'COTAC', crew: 1.0, rangeErr: 0.008, aimErr: 0.35, layTime: 3, detectMax: 3200, identMax: 2200, engageMax: 2500 },
+    sight: { laser: true, thermal: true, tis: [500, 300], name: 'COTAC', crew: 1.0, rangeErr: 0.008, aimErr: 0.35, layTime: 3, detectMax: 4000, identMax: 2800, engageMax: 2500 },
     armor: [
       { name: '포탑 전면 상부', part: 'turret', a: L(480, 440), b: L(545, 455), t: 80, mat: 'cast', n: 60, h: 0 },
       { name: '포탑 전면 (포 방패)', part: 'turret', a: L(545, 455), b: L(545, 494), t: 80, mat: 'cast', n: 0, h: 0 },

@@ -42,7 +42,7 @@ DS.VEHICLES = DS.VEHICLES || {};
     tow: { ammo: 'TOW2', c: L(324, 172), pivotPx: [259, 200], len: 1.25, h: 0.46, lift: 0.42, loaded: 2, reserve: 5, reloadTime: 25, raise: 1.2, range: 3750 },
     turretRing: L(310, 200),
     antennas: [{ x: L(189, 140)[0], y: L(189, 140)[1], len: 1.15 }, { x: L(93, 188)[0], y: L(93, 188)[1], len: 1.3 }],
-    sight: { laser: true, thermal: true, rangeErr: 0.005, aimErr: 0.15, layTime: 2.5, detectMax: 4000, engageMax: 3500 },
+    sight: { laser: true, thermal: true, tis: [500, 300], rangeErr: 0.005, aimErr: 0.15, layTime: 2.5, detectMax: 4000, engageMax: 3500 },
     armor: [
       { name: '포탑 전면', part: 'turret', a: L(447, 148), b: L(450, 197), t: 55, mat: 'rha', n: 0, h: 20 },
       { name: '포탑 상면', part: 'turret', a: L(176, 132), b: L(447, 146), t: 20, mat: 'rha', n: 90, h: 0 },

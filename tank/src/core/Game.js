@@ -354,18 +354,22 @@ DS.Game = class Game {
     const L = this.thermal ? F.flir : F.day, i = (((this.fovI == null ? 1 : this.fovI) % L.length) + L.length) % L.length;
     return L[i];
   }
-  // First-generation scanning thermal imager: the scene is rendered at the detector's ~180 lines and scaled up
-  // (soft, blocky), the previous frame lingers (lag), each scan line has its own slight offset (fixed-pattern
-  // noise), grain shimmers; refocus blur after a magnification change, re-calibration flash after polarity.
+  // First-generation scanning thermal imager (M1A1, Challenger TOGS, AMX-30B2, Bradley): the detector's picture
+  // is 500 × 300 (sight.tis) — the scene is drawn at 500 across, pressed into 300 scan lines and stretched to the
+  // sight (soft, with more detail across than up and down); the previous frame lingers (lag), each scan line
+  // has its own slight offset (fixed-pattern noise), grain shimmers; refocus blur after a magnification change,
+  // re-calibration flash after polarity.
   tisRender(cam, dt) {
-    const cv = this.sightCv, c = this.sctx, rows = this.sightField().fov < 12 ? 180 : 150;
-    const t = this.tis || (this.tis = { lo: document.createElement('canvas'), prev: document.createElement('canvas'), cam: new DS.Camera(), blur: 0, cal: 0, fpn: null, grain: null });
-    const k = rows / cam.H, lw = Math.max(1, Math.round(cam.W * k));
+    const cv = this.sightCv, c = this.sctx, R = this.player.def.sight.tis || [500, 300], lw = R[0], rows = R[1];
+    const t = this.tis || (this.tis = { hi: document.createElement('canvas'), lo: document.createElement('canvas'), prev: document.createElement('canvas'), cam: new DS.Camera(), blur: 0, cal: 0, fpn: null, grain: null });
+    const k = Math.max(lw / cam.W, rows / cam.H), hw = Math.max(1, Math.round(cam.W * k)), hh = Math.max(1, Math.round(cam.H * k));
+    if (t.hi.width !== hw || t.hi.height !== hh) { t.hi.width = hw; t.hi.height = hh; }
     for (const x of [t.lo, t.prev]) if (x.width !== lw || x.height !== rows) { x.width = lw; x.height = rows; }
     Object.assign(t.cam, cam); t.cam.dpr = k;
+    this.rend.frame(t.hi.getContext('2d'), t.cam, { main: false, thermal: true });
     const lc = t.lo.getContext('2d');
-    this.rend.frame(lc, t.cam, { main: false, thermal: true });
-    lc.setTransform(1, 0, 0, 1, 0, 0); lc.globalAlpha = 0.35; lc.drawImage(t.prev, 0, 0); lc.globalAlpha = 1;
+    lc.setTransform(1, 0, 0, 1, 0, 0); lc.imageSmoothingEnabled = true; lc.drawImage(t.hi, 0, 0, lw, rows);       // into the detector's lines
+    lc.globalAlpha = 0.35; lc.drawImage(t.prev, 0, 0); lc.globalAlpha = 1;
     t.prev.getContext('2d').drawImage(t.lo, 0, 0);
     if (!t.fpn || t.fpn.height !== rows) {
       t.fpn = document.createElement('canvas'); t.fpn.width = 1; t.fpn.height = rows; const f = t.fpn.getContext('2d'), r = DS.rng(rows);

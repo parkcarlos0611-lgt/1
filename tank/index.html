@@ -1,0 +1,418 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Desert Steel</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Black+Ops+One&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+  :root { color-scheme: dark; --tx: #f3ead8; --mu: #b9ab90; --bg: rgba(24,19,12,.62); --ok: #7fe08f; --warn: #ffcc66; }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  /* touch devices: a long press or double tap on a button must not start text selection, the copy / look-up
+     bubble or page zoom. Text fields stay selectable so layout names can be typed and edited. */
+  html, body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; touch-action: manipulation; overscroll-behavior: none; }
+  input, textarea { -webkit-user-select: text; user-select: text; }
+  button, canvas, #touch, #zoombar, #sbx, #menu { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+  #touch button, #zoombar button { touch-action: none; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #c9b48a; color: var(--tx);
+    font: 13px/1.35 system-ui, -apple-system, 'Noto Sans KR', sans-serif; -webkit-tap-highlight-color: transparent; }
+  canvas#view { position: fixed; inset: 0; display: block; touch-action: none; cursor: crosshair; }
+  #loading { position: fixed; inset: 0; display: grid; place-items: center; font-size: 18px; background: #2a2116; z-index: 10; }
+  .panel { position: fixed; background: var(--bg); backdrop-filter: blur(3px); border-radius: 8px; padding: 8px 10px; pointer-events: none; }
+  #hud { top: 10px; left: 10px; min-width: 230px; }
+  #hud .t { font-weight: 800; letter-spacing: .08em; font-size: 12px; color: var(--warn); margin-bottom: 4px; }
+  #hud .r { display: flex; justify-content: space-between; gap: 14px; }
+  #hud .r span:first-child { color: var(--mu); }
+  #hud .r b { font-variant-numeric: tabular-nums; font-weight: 600; }
+  #h-load.ready { color: var(--ok); }
+  #help { top: 10px; right: 10px; max-width: 300px; }
+  #help.hide { display: none; }
+  #help kbd { display: inline-block; min-width: 18px; padding: 0 4px; border: 1px solid #8a7b60; border-radius: 3px; font: 11px monospace; text-align: center; }
+  #sight { position: fixed; right: 10px; bottom: 56px; width: min(38vw, 54vh, 500px); aspect-ratio: 1; border-radius: 50%;
+    border: 2px solid #0b0a08; box-shadow: 0 0 0 1px rgba(255,255,255,.08), 0 0 0 5px rgba(10,9,7,.85), 0 6px 24px rgba(0,0,0,.45); background: #000; pointer-events: none; }
+  #sight.big { right: auto; bottom: auto; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(92vh, 92vw); z-index: 4; }
+  #sight.thermal { filter: grayscale(1) sepia(1) hue-rotate(68deg) saturate(2.6) brightness(.95); }
+  /* helicopter sight (TADS FLIR): the same first-generation imager, shown in grey rather than green */
+  #sight.thermal.mono { filter: grayscale(1) contrast(1.15) brightness(.95); }
+  #sight.thermal.mono.bh { filter: grayscale(1) invert(1) contrast(1.15); }
+  #sight.nv { filter: grayscale(1) brightness(2.4) contrast(1.2) sepia(1) hue-rotate(58deg) saturate(3); }
+  #sight.thermal.bh { filter: grayscale(1) invert(1) sepia(1) hue-rotate(68deg) saturate(2.6) brightness(.95); }
+  body:not(.playing) :is(#hud, #help, #sight, #mini, #zoombar, #foes, #log, #touch) { display: none !important; }
+  body.paused #touch { display: none !important; }
+  /* under the HUD, clear of the vehicle (which now sits low on the screen) */
+  #log { left: 10px; top: 356px; max-width: min(40vw, 360px); font-size: 12px; display: grid; gap: 3px; }
+  #log .e:nth-child(n+5) { display: none; }
+  #log:empty { display: none; }
+  #log .e { line-height: 1.35; }
+  #log .e i { font-style: normal; color: var(--mu); margin-left: 6px; }
+  #log .tag { display: inline-block; padding: 0 6px; border-radius: 3px; font-weight: 800; font-size: 11px; color: #111; }
+  #log .tag.pen { background: #ff6a55; } #log .tag.ric { background: #ffd34a; } #log .tag.non { background: #e8e2d6; } #log .tag.trk { background: #ffa04a; }
+  #mcam { position: fixed; top: 52px; left: 50%; transform: translateX(-50%); background: rgba(10,30,40,.75); color: #8ff0ff; border: 1px solid #3fb6d6;
+    padding: 4px 12px; border-radius: 6px; font: 700 13px ui-monospace, monospace; pointer-events: none; z-index: 3; }
+  #toast { position: fixed; top: 40%; left: 50%; transform: translate(-50%, -50%); background: rgba(20,14,8,.75); padding: 8px 16px; border-radius: 8px;
+    font-weight: 700; opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 6; }
+  #toast.on { opacity: 1; }
+  #hurt { position: fixed; inset: 0; pointer-events: none; opacity: 0; box-shadow: inset 0 0 160px 40px rgba(200,30,10,.75); }
+  #foes { top: 10px; left: 50%; transform: translateX(-50%); display: flex; gap: 12px; font-size: 12px; padding: 5px 10px; flex-wrap: wrap; justify-content: center; max-width: 60vw; }
+  #foes .up b { color: #ff8a7a; } #foes .down { opacity: .55; text-decoration: line-through; } #foes span { color: var(--mu); }
+  #log .me { color: #ff8a7a; }
+  #over { position: fixed; inset: 0; display: grid; place-items: center; background: rgba(20,14,8,.55); z-index: 5; text-align: center; }
+  #over[hidden] { display: none; }
+  #over-t { font-size: clamp(22px, 4vw, 40px); font-weight: 800; margin-bottom: 14px; text-shadow: 0 2px 10px #000; }
+  #over .btn { font: inherit; font-size: 16px; font-weight: 700; padding: 10px 22px; border-radius: 8px; border: 0; background: #ffcc66; color: #1b1308; cursor: pointer; }
+  #over .btn.ghost { background: transparent; color: var(--tx); border: 1px solid #c9b48a; }
+  /* main menu: briefing-room look — olive drab board, stencil headings, khaki accents */
+  :root { --stencil: 'Black Ops One', Impact, sans-serif; --kor: 'Black Han Sans', 'Noto Sans KR', sans-serif; --mono: 'Share Tech Mono', ui-monospace, monospace;
+    --od: #1c1e14; --od2: #2a2c1e; --line: #4d4a32; --khaki: #e3c983; --amber: #ffb43a; }
+  #menu { position: fixed; inset: 0; z-index: 8; overflow-y: auto; color: #eae2c8;
+    background: repeating-linear-gradient(0deg, rgba(255,255,255,.025) 0 1px, transparent 1px 32px),
+                repeating-linear-gradient(90deg, rgba(255,255,255,.025) 0 1px, transparent 1px 32px),
+                radial-gradient(ellipse at 50% 0%, #34361f, var(--od) 70%);
+    padding-block: 40px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  .mwrap { max-width: 980px; margin: 0 auto; display: grid; gap: 30px; }
+  .mhead { border-bottom: 2px solid var(--line); padding-bottom: 18px; }
+  .mtag { margin: 0; font: 14px var(--mono); letter-spacing: .25em; color: var(--amber); }
+  .mhead h1 { margin: 4px 0 0; font: clamp(40px, 8vw, 84px)/1 var(--stencil); letter-spacing: .06em; color: var(--khaki); text-shadow: 0 3px 0 #000; }
+  .msub { margin: 8px 0 0; font: 16px var(--kor); color: #b8b08f; letter-spacing: .04em; }
+  .msec { display: grid; gap: 12px; }
+  .msec h2 { margin: 0; font: 15px var(--kor); letter-spacing: .3em; color: #a8a080; }
+  .vrow { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+  .vpick { font: inherit; color: inherit; text-align: left; background: var(--od2); border: 1px solid var(--line); border-left: 6px solid var(--line);
+    padding: 12px 16px; cursor: pointer; display: grid; gap: 3px; }
+  .vpick:hover, .vpick:focus-visible { border-color: #77704c; outline: none; }
+  .vpick.on { border-color: var(--khaki); border-left-color: var(--amber); background: #34351f; }
+  .vname { font: 22px var(--stencil); letter-spacing: .06em; color: var(--khaki); }
+  .vko { font: 14px var(--kor); color: #d8cfae; } .vpick small { color: #9b9476; font-size: 12px; }
+  #missions { display: grid; gap: 10px; }
+  .mcard { background: var(--od2); border: 1px solid var(--line); display: grid; grid-template-columns: auto 1fr auto; gap: 4px 18px; align-items: center; padding: 14px 16px; }
+  .mno { font: 34px/1 var(--stencil); color: var(--amber); grid-row: span 2; min-width: 48px; }
+  .mname { font: 22px var(--kor); color: #f0e6c8; letter-spacing: .03em; }
+  .mmeta { font: 13px var(--mono); color: #a8a080; display: flex; flex-wrap: wrap; gap: 4px 14px; grid-column: 2; }
+  .mbtns { grid-row: 1 / span 2; grid-column: 3; display: flex; gap: 8px; }
+  .mbtn { font: 15px var(--kor); letter-spacing: .1em; padding: 9px 16px; cursor: pointer; border: 1px solid var(--line); background: transparent; color: #d8cfae; }
+  .mbtn:hover, .mbtn:focus-visible { border-color: var(--khaki); color: #fff; outline: none; }
+  .mbtn.go { background: var(--amber); border-color: var(--amber); color: #1a1408; }
+  .mbtn.go:hover, .mbtn.go:focus-visible { background: #ffc965; }
+  .mbrief { grid-column: 1 / -1; margin: 10px 0 0; padding: 12px 14px; border-left: 3px solid var(--amber); background: rgba(0,0,0,.25); line-height: 1.6; font-size: 14px; }
+  .mbrief b { display: block; font: 13px var(--mono); color: var(--amber); letter-spacing: .2em; margin-bottom: 4px; font-weight: 400; }
+  @media (max-width: 560px) { .mcard { grid-template-columns: auto 1fr; } .mbtns { grid-row: auto; grid-column: 1 / -1; } .mbtn { flex: 1; } }
+  #foes .pal b { color: #8cc8ff; } #foes .pal:not(.down) { pointer-events: auto; cursor: pointer; } #foes .pal:not(.down):hover b { text-decoration: underline; }
+  #foes .sel b, #foes .sel span { color: #ffd0a0; } #foes .sel { outline: 1px solid #ff7a5c; outline-offset: 2px; } #foes .lost { opacity: .6; }
+  #helpbtn { position: fixed; top: 10px; right: 48px; z-index: 3; width: 30px; height: 30px; border-radius: 50%; border: 1px solid #8a7b60;
+    background: rgba(24,19,12,.7); color: var(--tx); font: 700 15px var(--mono); cursor: pointer; }
+  #helpbtn.on { background: var(--warn); color: #1b1308; }
+  #fsbtn { position: fixed; top: 10px; right: 86px; z-index: 3; width: 30px; height: 30px; border-radius: 50%; border: 1px solid #8a7b60;
+    background: rgba(24,19,12,.7); color: var(--tx); font: 700 15px var(--mono); cursor: pointer; padding: 0; line-height: 28px; }
+  #fsbtn.on { background: var(--warn); color: #1b1308; }
+  body:not(.playing) #fsbtn { display: none; }
+  .mfs { margin-top: 10px; font: 14px var(--kor); color: var(--tx); background: #3a3823; border: 1px solid #5d5a3c; padding: 8px 16px; border-radius: 4px; cursor: pointer; min-height: 40px; }
+  #help { top: 46px !important; }
+  body:not(.playing) #helpbtn { display: none; }
+  #hud .t, #over-t { font-family: var(--kor); letter-spacing: .04em; font-weight: 400; }
+  #hud .r b, #mcam, #h-zoom, #h-fps { font-family: var(--mono); }
+  #mini { position: fixed; left: 50%; transform: translateX(-50%); bottom: 10px; width: min(60vw, 520px); height: 46px; border-radius: 6px; pointer-events: none; }
+  /* touch controls (body.touchui): thumb joystick on the left, vehicle buttons on the right */
+  :root { --tb: 64px; }
+  #touch { display: none; }
+  body.touchui #touch { display: block; }
+  body.touchui.playing:not(.editing):not(.paused) #touch { display: block; }
+  #joy { position: fixed; left: 22px; bottom: 26px; width: calc(var(--tb) * 2.3); height: calc(var(--tb) * 2.3); border-radius: 50%; touch-action: none; z-index: 2;
+    background: radial-gradient(circle, rgba(30,24,16,.25), rgba(30,24,16,.55)); border: 2px solid rgba(255,255,255,.35); }
+  #joy i { position: absolute; left: 50%; top: 50%; width: 42%; height: 42%; margin: -21% 0 0 -21%; border-radius: 50%; background: rgba(255,230,180,.55); border: 2px solid rgba(255,255,255,.6); pointer-events: none; }
+  #joy::after { content: attr(data-mode); position: absolute; left: 0; right: 0; top: -20px; text-align: center; font-size: 11px; color: rgba(255,245,220,.8); text-shadow: 0 1px 2px #000; pointer-events: none; }
+  #tpad { position: fixed; right: 14px; bottom: 20px; display: grid; grid-template-columns: calc(var(--tb) * 1.45) repeat(4, var(--tb)); grid-auto-rows: var(--tb); align-items: center; gap: 10px; direction: rtl; z-index: 2; }
+  #tpad button { direction: ltr; border-radius: 50%; border: 2px solid rgba(255,255,255,.4); background: rgba(30,24,16,.55); color: #fff; font: 600 calc(var(--tb) * 0.24) var(--kor); touch-action: none; padding: 0; }
+  #tpad button.on { background: rgba(255,204,102,.6); }
+  #tpad button.fire { background: rgba(160,40,20,.75); font-size: calc(var(--tb) * 0.3); grid-column: 1; grid-row: 1 / span 2; width: calc(var(--tb) * 1.45); height: calc(var(--tb) * 1.45); }
+  #tpad button { width: var(--tb); height: var(--tb); }
+  #tpad button.wide { border-radius: calc(var(--tb) / 2); }
+  body.touchui :is(#help, #log, #zoombar) { display: none !important; }
+  body.touchui #sight { top: 10px; bottom: auto; right: 54px; width: min(30vw, 280px); }
+  body.touchui #sight.big { top: 50%; right: auto; left: 50%; width: min(88vh, 88vw); }   /* enlarged: centred, not pinned to the top */
+  body.touchui #mini { bottom: auto; top: 8px; width: min(36vw, 360px); height: 34px; left: 50%; }
+  body.touchui #foes { top: 48px; }
+  body.touchui #arty { left: 12px; right: 130px; top: 8px; }
+  body.arty #hud { display: none; }      /* the artillery read-out under the map carries what is needed */
+  body.touchui #artymap { height: min(38vh, 340px); }
+  /* compact HUD */
+  #hudmore { pointer-events: auto; position: absolute; top: 6px; right: 8px; font: 11px var(--kor); color: var(--mu); background: transparent; border: 1px solid #6b5d45; border-radius: 10px; padding: 1px 7px; cursor: pointer; }
+  #hud.compact { min-width: 190px; } #hud.compact .r.x { display: none; } #hud .t { padding-right: 64px; }
+  /* pause / settings */
+  #pausebtn { position: fixed; top: 10px; right: 10px; z-index: 6; width: 30px; height: 30px; border-radius: 50%; border: 1px solid #8a7b60; background: rgba(24,19,12,.7); color: var(--tx); font: 700 13px var(--mono); cursor: pointer; }
+  body:not(.playing) #pausebtn { display: none; }
+  #pause { position: fixed; inset: 0; z-index: 7; display: grid; place-items: center; background: rgba(12,10,6,.6); }
+  #pause .pbox { background: #2a2c1e; border: 1px solid #5d5a3c; border-left: 6px solid var(--warn); padding: 18px 22px; width: min(560px, 94vw); max-height: 90vh; overflow-y: auto; }
+  #pause h2 { margin: 0 0 12px; font: 26px var(--kor); color: #ffcc66; font-weight: 400; } #pause h3 { margin: 16px 0 8px; font: 16px var(--kor); color: #d8cfae; font-weight: 400; letter-spacing: .1em; }
+  #pause .prow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 9px; }
+  #pause .prow span { min-width: 120px; color: var(--mu); }
+  #pause button { font: 15px var(--kor); color: var(--tx); background: #3a3823; border: 1px solid #5d5a3c; padding: 9px 16px; border-radius: 4px; cursor: pointer; min-height: 42px; }
+  #pause button.on { background: var(--warn); border-color: var(--warn); color: #1b1308; }
+  #pause button.big { background: var(--amber); color: #1a1408; border-color: var(--amber); padding: 9px 30px; }
+  #pause details.pkeys { margin: 6px 0 12px; } #pause summary { cursor: pointer; color: #d8cfae; font: 15px var(--kor); padding: 6px 0; }
+  #pause .krow { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 3px 0; border-bottom: 1px solid rgba(255,255,255,.06); }
+  #pause .krow span { color: var(--mu); } #pause .krow button { min-width: 120px; padding: 6px 12px; min-height: 36px; font-family: var(--mono); }
+  /* performance overlay and benchmark (src/core/Perf.js, src/core/Bench.js) */
+  #perf { position: fixed; top: 48px; right: 10px; z-index: 6; pointer-events: none; border-radius: 4px; }
+  #benchtag { position: fixed; top: 10px; left: 50%; transform: translateX(-50%); z-index: 8; background: rgba(20,16,10,.82); color: #ffcc66; font: 600 15px var(--kor); padding: 7px 16px; border: 1px solid #8a7b60; border-radius: 4px; pointer-events: none; }
+  #benchres { position: fixed; inset: 0; z-index: 9; display: grid; place-items: center; background: rgba(12,10,6,.7); }
+  #benchres .pbox { background: #2a2c1e; border: 1px solid #5d5a3c; border-left: 6px solid var(--warn); padding: 18px 22px; width: min(760px, 96vw); max-height: 92vh; overflow: auto; color: var(--tx); }
+  #benchres h2 { margin: 0 0 12px; font: 24px var(--kor); color: #ffcc66; font-weight: 400; }
+  #benchres .ok { color: #7fe07f; margin-left: 10px; } #benchres .ng { color: #ff7a60; margin-left: 10px; }
+  #benchres table { width: 100%; border-collapse: collapse; font: 14px var(--mono); }
+  #benchres th, #benchres td { padding: 6px 8px; border-bottom: 1px solid rgba(255,255,255,.08); text-align: right; } #benchres th:first-child, #benchres td:first-child { text-align: left; font-family: var(--kor); }
+  #benchres th { color: var(--mu); font: 12px var(--kor); }
+  #benchres .bmeta { color: var(--mu); font: 12px var(--mono); line-height: 1.6; margin: 12px 0; word-break: break-all; }
+  #benchres .prow { display: flex; gap: 8px; } #benchres button { font: 15px var(--kor); color: var(--tx); background: #3a3823; border: 1px solid #5d5a3c; padding: 9px 16px; border-radius: 4px; min-height: 42px; }
+  #benchres button.big { background: var(--amber); color: #1a1408; border-color: var(--amber); }
+  /* range editor on touch screens: wider panel, bigger targets */
+  body.touchui #sbx { width: min(420px, 94vw); font-size: 15px; }
+  body.touchui #sbx button { min-height: 44px; padding: 8px 12px; font-size: 15px; }
+  body.touchui #sbx select, body.touchui #sbx input[type=text], body.touchui #sbx input[type=number] { min-height: 40px; font-size: 15px; }
+  body.touchui #sbx input[type=range] { height: 32px; }
+  #pause input[type=range] { flex: 1; min-width: 140px; accent-color: #ffcc66; } #pause b { font: 14px var(--mono); min-width: 48px; }
+  #zoombar { position: fixed; right: 10px; bottom: 10px; display: flex; gap: 6px; }
+  #zoombar button { background: var(--bg); color: var(--tx); border: 1px solid #6b5d45; border-radius: 6px; padding: 6px 10px; font: inherit; cursor: pointer; }
+  /* howitzer, indirect fire: large terrain map and firing data */
+  #arty { display: none; position: fixed; left: 12px; right: 130px; top: 8px; z-index: 3; }
+  @media (max-width: 900px) { #arty { left: 8px; right: 8px; top: 46px; } }
+  body.arty #mcam { top: auto; bottom: 70px; z-index: 5; }
+  body.scam #artymap { height: 130px; }
+  body.arty #arty { display: block; } body.arty #sight, body.arty #foes, body.editing #arty { display: none !important; }
+  #artymap { display: block; width: 100%; height: min(44vh, 420px); cursor: crosshair; border-radius: 4px; }
+  #artyinfo { margin-top: 4px; padding: 6px 10px; background: rgba(24,19,12,.78); border-left: 4px solid var(--warn); font: 13px/1.6 var(--mono); }
+  #artyinfo b { color: #ffe0a0; } #artyinfo .ok { color: var(--ok); } #artyinfo .bad { color: #ff9a7a; } #artyinfo .k { color: var(--mu); font-size: 12px; }
+  /* firing-range editor */
+  #editbtn { position: fixed; top: 10px; right: 124px; z-index: 3; height: 30px; padding: 0 12px; border-radius: 15px; border: 1px solid #8a7b60;
+    background: rgba(24,19,12,.7); color: var(--tx); font: 14px var(--kor); letter-spacing: .06em; cursor: pointer; }
+  body.editing #editbtn { background: var(--warn); color: #1b1308; }
+  body.editing :is(#help, #sight, #foes, #log, #touch) { display: none !important; }
+  body.editing canvas#view { cursor: default; }
+  #sbx { position: fixed; top: 48px; right: 10px; bottom: 10px; width: min(330px, 92vw); z-index: 4; overflow-y: auto; background: rgba(28,27,17,.93);
+    border: 1px solid #5d5a3c; border-left: 5px solid var(--warn); padding: 10px 12px 14px; font-size: 13px; }
+  #sbx h3 { font: 15px var(--kor); letter-spacing: .08em; color: var(--warn); margin: 12px 0 6px; font-weight: 400; display: flex; justify-content: space-between; align-items: baseline; }
+  #sbx h3:first-child { margin-top: 0; } #sbx h3 small { font: 11px var(--mono); color: var(--mu); letter-spacing: 0; }
+  #sbx .row { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 5px; align-items: center; }
+  #sbx button { font: inherit; color: var(--tx); background: #3a3823; border: 1px solid #5d5a3c; padding: 5px 9px; cursor: pointer; border-radius: 3px; }
+  #sbx button:hover:not(:disabled), #sbx button:focus-visible { border-color: var(--warn); outline: none; }
+  #sbx button.on { background: var(--warn); border-color: var(--warn); color: #1b1308; font-weight: 700; }
+  #sbx button:disabled { opacity: .4; cursor: default; }
+  #sbx select, #sbx input[type=text], #sbx input[type=number] { font: inherit; color: var(--tx); background: #1c1b12; border: 1px solid #5d5a3c; padding: 4px 6px; border-radius: 3px; min-width: 0; }
+  #sbx input[type=number] { width: 64px; } #sbx input[type=text] { flex: 1; } #sbx select { flex: 1; }
+  #sbx input[type=range] { flex: 1; min-width: 80px; accent-color: #ffcc66; }
+  #sbx label { color: var(--mu); } #sbx .v { font-family: var(--mono); min-width: 96px; text-align: right; }
+  #sb-selname { color: #f0e6c8; margin: 0 0 6px; line-height: 1.4; min-height: 2.8em; }
+  #sbx .hint { color: var(--mu); font-size: 12px; line-height: 1.5; margin: 6px 0 0; }
+  @media (max-width: 640px) { #hud { min-width: 0; font-size: 11px; } #mini { bottom: 150px; } }
+</style>
+</head>
+<body>
+<canvas id="view"></canvas>
+<div id="loading">불러오는 중…</div>
+
+<div id="hud" class="panel">
+  <div class="t" id="h-title">M1A1 · DESERT STEEL</div>
+  <button id="hudmore" type="button">자세히 ▾</button>
+  <div class="r"><span>시각</span><b id="h-clock">-</b></div>
+  <div class="r"><span>속도</span><b id="h-spd">0</b></div>
+  <div class="r"><span>궤도 속도</span><b id="h-trk">0</b></div>
+  <div class="r"><span>엔진 출력</span><b id="h-pwr">0</b></div>
+  <div class="r"><span>슬립</span><b id="h-slip">0</b></div>
+  <div class="r"><span>침하</span><b id="h-sink">0</b></div>
+  <div class="r"><span>토양</span><b id="h-soil">-</b></div>
+  <div class="r"><span>차체 경사</span><b id="h-pitch">0</b></div>
+  <div class="r"><span>포 앙각</span><b id="h-elev">0</b></div>
+  <div class="r"><span>탄종</span><b id="h-ammo">-</b></div>
+  <div class="r"><span>장전</span><b id="h-load">-</b></div>
+  <div class="r"><span>기관총 잔탄</span><b id="h-mg">-</b></div>
+  <div class="r" id="row-tow" hidden><span>TOW</span><b id="h-tow">-</b></div>
+  <div class="r"><span>레이저 거리</span><b id="h-rng">—</b></div>
+  <div class="r"><span>사격통제 보정</span><b id="h-se">—</b></div>
+  <div class="r"><span>적</span><b id="h-foe">—</b></div>
+  <div class="r"><span>위치</span><b id="h-pos">0</b></div>
+  <div class="r"><span>줌 / 프레임</span><b><span id="h-zoom"></span> · <span id="h-fps"></span></b></div>
+</div>
+
+<button id="helpbtn" type="button" title="키 가이드 (H)" aria-label="키 가이드 켜기/끄기">?</button>
+<button id="fsbtn" type="button" title="전체 화면 (F10)" aria-label="전체 화면 켜기/끄기">⛶</button>
+<div id="help" class="panel">
+  <div><kbd>A</kbd><kbd>D</kbd> 후진 / 전진 (놓으면 제동)</div>
+  <div><kbd>W</kbd><kbd>S</kbd> 포 앙각: 탭 0.05° · 누르면 점점 빠르게 · <kbd>Shift</kbd> 미세(탭 0.01°, 최대 0.5°/초)</div>
+  <div><kbd>Space</kbd> / 좌클릭 사격 · <kbd>Q</kbd> 탄종 전환</div>
+  <div><kbd>Backspace</kbd> 다음 표적 · <kbd>Shift</kbd>+<kbd>Backspace</kbd> 이전 표적 (포가 표적으로 이동)</div>
+  <div><kbd>E</kbd> 거리측정 (탄도컴퓨터 자동 보정 · M60A1은 광학식: 2초, 오차 있음)</div>
+  <div><kbd>F</kbd> 동축 M240 · 우클릭 유지: 포탑 위 기관총 — M2 / DShK (마우스로 조준)</div>
+  <div><kbd>V</kbd> 조준경 3× / 10× · <kbd>T</kbd> 열상 · <kbd>B</kbd> 백열/흑열</div>
+  <div><kbd>[</kbd><kbd>]</kbd> 열상 밝기 · <kbd>Shift</kbd>+<kbd>[</kbd><kbd>]</kbd> 열상 대비</div>
+  <div><kbd>G</kbd> 조준경 크게 보기 · <kbd>Z</kbd> TOW 발사관 투시 끄기/켜기</div>
+  <div><kbd>X</kbd> TOW 발사 (브래들리, 정지 상태 · 명중까지 조준선 유지)</div>
+  <div><kbd>Tab</kbd> 미사일 시점 켜기/끄기 (날아가는 TOW를 따라감)</div>
+  <div><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> 근접 / 전투 / 광역(화면 폭 250 m) 줌 · 휠 연속 줌</div>
+  <div><kbd>C</kbd> 마우스 위치에 크레이터 · <kbd>R</kbd> 차량 리셋</div>
+  <div><kbd>M</kbd> 소리 켜기/끄기 · <kbd>U</kbd> 해치 열기/닫기 · <kbd>P</kbd> 화면 효과 높음/낮음/끔</div>
+  <div><kbd>−</kbd><kbd>=</kbd> 조준경 거리 눈금 ±100 m (T-55 / T-62: 거리측정기 없음)</div>
+  <div><kbd>I</kbd> 자주포: 직사 / 곡사 · <kbd>K</kbd> 장약 · <kbd>O</kbd> 저각/고각 · <kbd>J</kbd> 자동/수동 정렬</div>
+  <div>아파치 조준경: <kbd>V</kbd> 시야 단계 (주간 50° / 4° / 0.9° · 열상 50° / 10° / 3.1° / 0.45°), <kbd>Shift</kbd>+<kbd>V</kbd> 반대로</div>
+  <div>코브라 조준경(TSU): <kbd>V</kbd> ×2 / ×13 — 주간 광학만, 야간 조준 장비 없음</div>
+  <div>헬기: <kbd>W</kbd><kbd>S</kbd> 상승/하강 · <kbd>A</kbd><kbd>D</kbd> 기울여 가속 · <kbd>C</kbd> 방향 전환 · 마우스 조준 · <kbd>Space</kbd> 기관포 · <kbd>F</kbd> 로켓 · <kbd>X</kbd> 헬파이어 · <kbd>Backspace</kbd> 표적 고정(조준경이 따라감) · 우클릭 해제</div>
+  <div><kbd>L</kbd> 사격장: 편집 모드 (표적 배치 · 장비 교체 · 환경)</div>
+  <div><kbd>F9</kbd> 물리 디버그 · <kbd>H</kbd> 키 가이드 끄기/켜기</div>
+</div>
+
+<button id="editbtn" type="button" hidden title="편집 모드 (L)">편집 L</button>
+<aside id="sbx" hidden aria-label="사격장 편집">
+  <h3>내 장비 <small id="sb-count"></small></h3>
+  <div class="row"><button type="button" data-me="m1a1">M1A1</button><button type="button" data-me="m2a2">M2A2 브래들리</button><button type="button" data-me="m60a1">M60A1</button><button type="button" data-me="m109a3">M109A3</button><button type="button" data-me="m270">MLRS</button><button type="button" data-me="ah64a">AH-64A</button><button type="button" data-me="ah1w">AH-1W</button><button type="button" data-me="t55">T-55</button><button type="button" data-me="t62">T-62</button><button type="button" data-me="t72">T-72</button><button type="button" data-me="challenger1">챌린저 1</button><button type="button" data-me="amx30b2">AMX-30B2</button><button type="button" data-me="bmp1">BMP-1</button><button type="button" data-me="2s1">2S1</button><button type="button" data-go="me">내 위치로</button></div>
+  <h3>표적 배치</h3>
+  <div class="row"><button type="button" data-tool="t55">T-55</button><button type="button" data-tool="t62">T-62</button><button type="button" data-tool="t72">T-72</button><button type="button" data-tool="m1a1">M1A1</button><button type="button" data-tool="m2a2">M2A2</button><button type="button" data-tool="m60a1">M60A1</button><button type="button" data-tool="m109a3">M109A3</button><button type="button" data-tool="m270">MLRS</button><button type="button" data-tool="ah64a">AH-64A</button><button type="button" data-tool="ah1w">AH-1W</button><button type="button" data-tool="challenger1">챌린저 1</button><button type="button" data-tool="amx30b2">AMX-30B2</button><button type="button" data-tool="bmp1">BMP-1</button><button type="button" data-tool="2s1">2S1</button></div>
+  <div class="row"><label for="sb-bld">건물</label><select id="sb-bld"><option value="h1">고층 아파트 A</option><option value="h2">유리 업무 빌딩</option><option value="h3">고층 아파트 B</option><option value="h4">아치 기단 빌딩</option><option value="h5">업무 빌딩</option><option value="h6">원통형 빌딩</option><option value="hd1">파손된 고층 A</option><option value="hd2">파손된 고층 B</option><option value="m1">중층 건물 1</option><option value="m2">중층 건물 2</option><option value="m3">중층 건물 3</option><option value="m4">중층 건물 4</option><option value="m5">중층 건물 5</option><option value="m6">중층 건물 6</option><option value="m7">중층 건물 7</option><option value="l1">단층 연립</option><option value="l2">아치 건물</option><option value="l3">2층 상가주택</option><option value="l4">돔 건물</option><option value="l5">상점 건물</option><option value="l6">창고</option><option value="l7">차양 시장</option></select><button type="button" data-bld="1">배치</button><button type="button" data-act="clearb">건물 모두 삭제</button></div>
+
+  <p id="sb-selname"></p>
+  <div class="row"><label for="sb-mode">행동</label><select id="sb-mode"><option value="dummy">무인 표적 (움직이지도 쏘지도 않음)</option><option value="watch">정지 관측 (탐지만)</option><option value="hold">정지 사격 (제자리에서 응사)</option><option value="combat">기동 전투</option><option value="patrol">왕복 주행 (이동 표적)</option></select></div>
+  <div class="row" id="sb-pat" hidden><label for="sb-span">구간</label><input id="sb-span" type="number" min="20" max="2000" step="10"> m <label for="sb-speed">속도</label><input id="sb-speed" type="number" min="1" max="15" step="1"> m/s</div>
+  <div class="row"><button type="button" data-act="flip" data-need="any">방향 ◀▶</button><button type="button" data-act="team" data-need="tgt">적군 / 아군</button><button type="button" data-act="fix" data-need="any">수리</button><button type="button" data-act="del" data-need="tgt">삭제</button></div>
+  <div class="row"><button type="button" data-act="reset">모두 수리 · 원위치</button><button type="button" data-act="clear">표적 모두 삭제</button><button type="button" data-act="ground">지형 복구</button></div>
+  <h3>이동</h3>
+  <div class="row"><button type="button" data-go="base">기지</button><button type="button" data-go="0">사격선</button><button type="button" data-go="1000">1 km</button><button type="button" data-go="2000">2 km</button><button type="button" data-go="3000">3 km</button><button type="button" data-go="4000">4 km</button><button type="button" data-go="9500">먼 사격장 시작</button><button type="button" data-go="14000">14 km</button><button type="button" data-go="18500">끝 (18.5 km)</button></div>
+  <h3>환경</h3>
+  <div class="row"><button type="button" data-time="day">주간</button><button type="button" data-time="dusk">해질녘</button><button type="button" data-time="night">야간</button></div>
+  <div class="row"><label for="sb-vis">시정</label><input id="sb-vis" type="range" min="0" max="2000" step="100"><span class="v" id="sb-visv"></span></div>
+  <div class="row"><label for="sb-wind">바람</label><input id="sb-wind" type="range" min="-12" max="12" step="1"><span class="v" id="sb-windv"></span></div>
+  <h3>시험 보조</h3>
+  <div class="row"><button type="button" data-opt="god">무적</button><button type="button" data-opt="ammo">무한 탄약</button><button type="button" data-opt="reload">즉시 장전</button><button type="button" data-opt="trace">탄도 궤적</button><button type="button" data-opt="show">표적 항상 표시</button></div>
+  <h3>배치 저장</h3>
+  <div class="row"><select id="sb-lay" aria-label="배치 목록"></select><button type="button" data-act="load">불러오기</button><button type="button" data-act="drop">삭제</button></div>
+  <div class="row"><input id="sb-name" type="text" placeholder="새 배치 이름" aria-label="새 배치 이름" maxlength="24"><button type="button" data-act="save">저장</button></div>
+  <p class="hint">A / D 화면 이동 (Shift 빠르게) · 휠 줌 · 끌어서 이동 · , . 1 m씩 (Shift 10 m) · Del 삭제 · Esc 선택 해제</p>
+  <div class="row"><button type="button" data-act="close" class="on">편집 종료 (L)</button></div>
+</aside>
+<div id="hurt"></div>
+<div id="toast" role="status"></div>
+<div id="mcam" hidden></div>
+<div id="arty"><canvas id="artymap" aria-label="곡사 지도"></canvas><div id="artyinfo"></div></div>
+<div id="foes" class="panel"></div>
+<div id="over" hidden><div><div id="over-t"></div><button id="again" class="btn" type="button">다시 시작</button> <button id="tomenu" class="btn ghost" type="button">작전 선택</button></div></div>
+<div id="menu" hidden>
+  <div class="mwrap">
+    <header class="mhead">
+      <p class="mtag">OPERATION DESERT STORM · 1991</p>
+      <h1>DESERT STEEL</h1>
+      <p class="msub">사막의 폭풍 작전 지상전 · 기갑부대 전차장</p>
+      <button type="button" class="mfs" id="menufs">⛶ 전체 화면</button>
+    </header>
+    <section class="msec">
+      <h2>작전 선택</h2>
+      <div id="missions"></div>
+    </section>
+    <section class="msec">
+      <h2>사격장</h2>
+      <article class="mcard">
+        <span class="mno">R</span><span class="mname">사격장 · 샌드박스</span>
+        <span class="mmeta"><span>미군 기지 → 사격선 → 사격 레인 4.5 km → 피탄지 → 평탄한 먼 사격장 10 km</span><span>표적 자유 배치 · 장비 교체 · 환경 조절</span></span>
+        <span class="mbtns"><button class="mbtn go" type="button" id="gorange">입장</button></span>
+      </article>
+      <article class="mcard">
+        <span class="mno">T</span><span class="mname">시내 둘러보기 (미션용 맵 · 제작 중)</span>
+        <span class="mmeta"><span>사막 간선 → 외곽 → 저층 주거 → 시장 지구 → 광장 → 중·고층 도심 → 파괴된 구역 → 사막 간선, 약 20 km</span><span>맵만 둘러보기 · 편집 기능 없음</span></span>
+        <span class="mbtns"><button class="mbtn go" type="button" id="gotown">입장</button></span>
+      </article>
+      <article class="mcard">
+        <span class="mno">B</span><span class="mname">성능 벤치마크</span>
+        <span class="mmeta"><span>쿠웨이트 작전 무거운 장면 4개 × 20초: 새벽 교전 · 야간 다수 광원 · 모래폭풍 · 건물 붕괴</span><span>결과표(평균 fps · 1% 저점 · p99 프레임 시간)를 캡처해서 보내 주세요</span></span>
+        <span class="mbtns"><button class="mbtn go" type="button" id="gobench">실행</button></span>
+      </article>
+    </section>
+  </div>
+</div>
+<canvas id="mini"></canvas>
+<canvas id="sight" aria-label="포수 조준경"></canvas>
+<div id="log" class="panel"></div>
+<div id="zoombar"><button data-z="0">근접</button><button data-z="1">전투</button><button data-z="2">광역</button></div>
+<div id="touch">
+  <div id="joy" data-mode="이동"><i></i></div>
+  <div id="tpad"></div>
+</div>
+<button id="pausebtn" type="button" title="일시정지 · 설정 (Esc)" aria-label="일시정지와 설정">Ⅱ</button>
+<div id="pause" hidden>
+  <div class="pbox">
+    <h2>일시정지</h2>
+    <div class="prow"><button type="button" data-p="resume" class="big">계속</button><button type="button" data-p="restart">다시 시작</button><button type="button" data-p="menu">작전 선택</button></div>
+    <h3>설정</h3>
+    <div class="prow" id="p-timerow"><span>시각</span><input id="p-clock" type="range" min="0" max="1439" step="5" aria-label="시각"><b id="p-clockv"></b></div>
+    <div class="prow" id="p-speedrow"><span>시간 흐름</span><button type="button" data-p="spd" data-v="0">정지</button><button type="button" data-p="spd" data-v="1">실제</button><button type="button" data-p="spd" data-v="10">×10</button><button type="button" data-p="spd" data-v="60">1분=1시간</button></div>
+    <div class="prow"><span>화면 효과</span><button type="button" data-p="post" data-v="0">끔</button><button type="button" data-p="post" data-v="1">낮음</button><button type="button" data-p="post" data-v="2">높음</button></div>
+    <div class="prow"><span>해상도 자동 조절</span><button type="button" data-p="res">켬</button></div>
+    <div class="prow"><span>프레임 제한</span><button type="button" data-p="fps" data-v="60">60 고정</button><button type="button" data-p="fps" data-v="120">120 고정</button><button type="button" data-p="fps" data-v="free">자유</button></div>
+    <div class="prow"><span>성능 표시 (F8)</span><button type="button" data-p="perf">켬</button></div>
+    <div class="prow"><span>전체 화면 (F10)</span><button type="button" data-p="fs">켬</button></div>
+    <div class="prow"><span>탄 비행 효과 (저공 충격파 먼지·초음속 파열음·포탄 휘파람)</span><button type="button" data-p="flyfx">켬</button></div>
+    <div class="prow"><span>소리 크기</span><input id="p-vol" type="range" min="0" max="100" step="5" aria-label="소리 크기"><b id="p-volv"></b></div>
+    <div class="prow"><span>터치 조작</span><button type="button" data-p="touch" data-v="auto">자동</button><button type="button" data-p="touch" data-v="on">항상</button><button type="button" data-p="touch" data-v="off">끔</button></div>
+    <div class="prow"><span>버튼 크기</span><button type="button" data-p="btn" data-v="0.85">작게</button><button type="button" data-p="btn" data-v="1">보통</button><button type="button" data-p="btn" data-v="1.2">크게</button></div>
+    <details class="pkeys"><summary>키 설정</summary><div id="p-keys"></div></details>
+    <div class="prow"><span>계기판 자세히</span><button type="button" data-p="hud">켬</button><span>키 가이드</span><button type="button" data-p="help">켬</button></div>
+  </div>
+</div>
+
+<script src="src/core/Tuning.js"></script>
+<script src="data/missions.js"></script>
+<script src="data/range.js"></script>
+<script src="data/town.js"></script>
+<script src="data/town_scale.js"></script>
+<script src="data/town_sprites.js"></script>
+<script src="data/city.js"></script>
+<script src="data/vehicles/m1a1.js"></script>
+<script src="data/vehicles/t72.js"></script>
+<script src="data/vehicles/t55.js"></script>
+<script src="data/vehicles/t62.js"></script>
+<script src="data/vehicles/m2a2.js"></script>
+<script src="data/vehicles/m60a1.js"></script>
+<script src="data/vehicles/m109a3.js"></script>
+<script src="data/vehicles/m270.js"></script>
+<script src="data/vehicles/ah64a.js"></script>
+<script src="data/vehicles/ah1w.js"></script>
+<script src="data/vehicles/challenger1.js"></script>
+<script src="data/vehicles/amx30b2.js"></script>
+<script src="data/vehicles/bmp1.js"></script>
+<script src="data/vehicles/2s1.js"></script>
+<script src="data/ammo/ammo.js"></script>
+<script src="src/world/Terrain.js"></script>
+<script src="src/world/Sky.js"></script>
+<script src="src/vehicle/Track.js"></script>
+<script src="src/vehicle/Vehicle.js"></script>
+<script src="src/vehicle/Thermal.js"></script>
+<script src="src/vehicle/TrackChain.js"></script>
+<script src="src/ballistics/Projectile.js"></script>
+<script src="src/ballistics/Armor.js"></script>
+<script src="src/ballistics/Blast.js"></script>
+<script src="src/ballistics/Missile.js"></script>
+<script src="src/vehicle/FireControl.js"></script>
+<script src="src/fx/Particles.js"></script>
+<script src="src/fx/Effects.js"></script>
+<script src="src/core/Camera.js"></script>
+<script src="src/render/Renderer.js"></script>
+<script src="src/render/Props.js"></script>
+<script src="src/render/Flora.js"></script>
+<script src="src/vehicle/Heli.js"></script>
+<script src="src/vehicle/Searchlight.js"></script>
+<script src="src/world/Buildings.js"></script>
+<script src="src/world/City.js"></script>
+<script src="src/render/Lighting.js"></script>
+<script src="src/render/SightHud.js"></script>
+<script src="src/render/Post.js"></script>
+<script src="src/debug/DebugLayer.js"></script>
+<script src="src/ai/TankAI.js"></script>
+<script src="src/ai/ArtyAI.js"></script>
+<script src="src/ai/HeliAI.js"></script>
+<script src="src/ai/Sensor.js"></script>
+<script src="src/audio/Audio.js"></script>
+<script src="src/core/World.js"></script>
+<script src="src/core/Sandbox.js"></script>
+<script src="src/core/Perf.js"></script>
+<script src="src/core/Bench.js"></script>
+<script src="src/core/Game.js"></script>
+<script src="src/core/Artillery.js"></script>
+<script src="src/core/UI.js"></script>
+</body>
+</html>

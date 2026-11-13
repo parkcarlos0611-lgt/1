@@ -1,0 +1,111 @@
+#!/usr/bin/env python3
+"""Cut the M1A1 reference art (bottom, facing-right drawing) into rig layers.
+
+Source: assets/ref/m1a1_side.png (1430x1100). Scale of that drawing: ~149 px per metre
+(hull length 7.92 m = 1180 px). All rig numbers in data/vehicles/m1a1.js use this frame:
+origin px (604, 900), x forward, y up, metres = px / 149.
+
+Outputs (assets/sprites/m1a1/): hull.png turret.png barrel.png (wheels: tools/cut_wheels.py)
+plus offsets printed for the rig file.
+usage: python3 tools/cut_sprites.py
+"""
+import os, json
+import numpy as np
+from PIL import Image
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SRC = os.path.join(ROOT, 'assets/ref/m1a1_side.png')
+OUT = os.path.join(ROOT, 'assets/sprites/m1a1')
+os.makedirs(OUT, exist_ok=True)
+
+im = np.asarray(Image.open(SRC).convert('RGB')).astype(np.int16)
+H, W, _ = im.shape
+Y0 = 540  # bottom drawing starts here
+sub = im[Y0:]
+
+# --- background removal: flood the near-white region connected to the border ---
+white = (sub.min(axis=2) > 232) & ((sub.max(axis=2) - sub.min(axis=2)) < 22)
+reg = np.zeros_like(white)
+reg[0, :] = white[0, :]; reg[-1, :] = white[-1, :]; reg[:, 0] = white[:, 0]; reg[:, -1] = white[:, -1]
+while True:
+    d = reg.copy()
+    d[1:] |= reg[:-1]; d[:-1] |= reg[1:]; d[:, 1:] |= reg[:, :-1]; d[:, :-1] |= reg[:, 1:]
+    d &= white
+    if (d == reg).all():
+        break
+    reg = d
+alpha = np.where(reg, 0, 255).astype(np.uint8)
+# soften the fringe: light pixels touching the background get partial alpha
+edge = np.zeros_like(reg)
+edge[1:] |= reg[:-1]; edge[:-1] |= reg[1:]; edge[:, 1:] |= reg[:, :-1]; edge[:, :-1] |= reg[:, 1:]
+edge &= ~reg
+lum = sub.mean(axis=2)
+alpha[edge] = np.clip((255 - lum[edge]) * 4, 60, 255).astype(np.uint8)
+rgba = np.dstack([sub.astype(np.uint8), alpha])
+
+def Y(y):  # original y -> sub row
+    return y - Y0
+
+def save(name, arr, x0, y0):
+    a = arr[..., 3]
+    ys, xs = np.nonzero(a)
+    bx0, bx1, by0, by1 = xs.min(), xs.max() + 1, ys.min(), ys.max() + 1
+    Image.fromarray(arr[by0:by1, bx0:bx1]).save(os.path.join(OUT, name + '.png'))
+    return {'name': name, 'x': int(x0 + bx0), 'y': int(y0 + by0), 'w': int(bx1 - bx0), 'h': int(by1 - by0)}
+
+info = {}
+yy, xx = np.mgrid[Y0:H, 0:W]
+
+# --- antennas: erase thin masts, they are drawn as spring chains in game ---
+for ax in (217, 397):
+    m = (xx >= ax - 5) & (xx <= ax + 5) & (yy < 722)
+    rgba[m, 3] = 0
+
+# --- commander's M2HB: cut off the turret so it can pivot on its mount (post stays on the turret) ---
+MG_PIVOT = (634, 685)
+mg_mask = (xx >= 588) & (xx <= 892) & (yy >= 620) & ((yy < 686) | ((xx >= 664) & (xx <= 709) & (yy < 694)))
+mg = rgba.copy(); mg[~mg_mask] = 0
+info['m2'] = save('m2', mg, 0, Y0)
+rgba[mg_mask, 3] = 0
+
+# --- split lines ---
+SEAM = 838              # hull roof / turret ring line
+SKIRT = 982             # side-skirt bottom edge
+SPR = (135, 970, 59)    # sprocket centre + cut radius (sprocket art: assets/ref/m1a1_wheels.png, r 0.38 m)
+GUN_X = 952             # barrel starts in front of the mantlet
+
+# turret: above seam, behind gun start
+import sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from sprite_split import split_turret
+tmask, to_hull = split_turret((yy < SEAM) & (xx < GUN_X + 4), rgba[..., 3], yy, SEAM)
+t = rgba.copy()
+t[~tmask] = 0
+info['turret'] = save('turret', t, 0, Y0)
+
+# barrel: in front of mantlet, around the bore line
+b = rgba.copy()
+b[~((xx >= GUN_X) & (yy > 760) & (yy < 822))] = 0
+info['barrel'] = save('barrel', b, 0, Y0)
+
+# hull: below seam, above skirt line, sprocket cut out, front lower ramp cut
+h = rgba.copy()
+front = 982 - np.clip((xx - 1100) * 0.45, 0, 999)          # skirt lip rises toward the nose
+keep = ((yy >= SEAM) | to_hull) & (yy < np.minimum(SKIRT, front))
+keep &= ~(((xx - SPR[0]) ** 2 + (yy - SPR[1]) ** 2) < SPR[2] ** 2)
+keep &= ~((xx < 205) & (yy > 935))
+keep &= xx < 1215
+# nose: drop the drawing's own track/idler wedge (and the mud-flap tip) under the glacis —
+# the simulated track wraps the idler there
+from PIL import ImageDraw
+nm = Image.new('L', (W, H - Y0), 0)
+ImageDraw.Draw(nm).polygon([(x, y - Y0) for x, y in [(1159, 921), (1186, 930), (1197, 942), (1215, 982), (1124, 982), (1131, 966)]], fill=1)
+keep &= ~np.asarray(nm).astype(bool)
+h[~keep] = 0
+info['hull'] = save('hull', h, 0, Y0)
+
+# road wheels and sprocket come from the dedicated sheet: tools/cut_wheels.py
+
+print(json.dumps(info, indent=1))
+with open(os.path.join(OUT, 'cut.json'), 'w') as f:
+    json.dump(info, f, indent=1)

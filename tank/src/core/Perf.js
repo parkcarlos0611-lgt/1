@@ -55,6 +55,31 @@ DS.Perf = {
     return { fps: m ? 1000 / m : 0, low1: low ? 1000 / low : 0, p99, worst, work: mean(wk), workP99: pct(ws, 0.99), n: iv.length,
       over: iv.filter(x => x > (this.mode === '120' ? 9.5 : 18)).length };
   },
+  // Is the hardware doing the drawing? The WebGL renderer's name (the post-processing layer runs there), and a
+  // 2D fill test: 120 full draws on a 1024² canvas (126 megapixels), timed to the end with one pixel read back.
+  // A GPU-backed canvas does that in a few milliseconds, software takes a hundred or more.
+  gpu(g) {
+    if (this._gpu) return this._gpu;
+    let name = '없음 (WebGL 불가)';
+    try {
+      let gl = g && g.post && g.post.ok ? g.post.gl : null;
+      if (!gl) { const c = document.createElement('canvas'); gl = c.getContext('webgl2') || c.getContext('webgl'); }
+      if (gl) { const e = gl.getExtension('WEBGL_debug_renderer_info'); name = String(e ? gl.getParameter(e.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER)); }
+    } catch (e) {}
+    let ms = 0;
+    try {
+      const src = document.createElement('canvas'); src.width = src.height = 256; const sx = src.getContext('2d');
+      const gr = sx.createLinearGradient(0, 0, 256, 256); gr.addColorStop(0, '#c8a070'); gr.addColorStop(1, '#3060a0'); sx.fillStyle = gr; sx.fillRect(0, 0, 256, 256);
+      const c = document.createElement('canvas'); c.width = c.height = 1024; const x = c.getContext('2d');
+      for (let i = 0; i < 4; i++) x.drawImage(src, 0, 0, 1024, 1024);
+      const t = performance.now(); x.globalAlpha = 0.5;
+      for (let i = 0; i < 120; i++) x.drawImage(src, (i & 3) - 2, 0, 1024, 1024);
+      x.getImageData(512, 512, 1, 1); ms = performance.now() - t;
+    } catch (e) { ms = -1; }
+    const sw = /swiftshader|llvmpipe|software|basic render/i.test(name);
+    return (this._gpu = { name: name.replace(/^ANGLE \(|\)$/g, ''), ms, accel: ms >= 0 && ms < 40 && !sw });
+  },
+  gpuLine(g) { const G = this.gpu(g); return `GPU ${G.name.slice(0, 40)} · 2D ${G.accel ? '가속' : '소프트웨어 추정'} (126MP ${G.ms.toFixed(1)}ms)`; },
   // draw-call counting (wraps the 2D context once; counts only while the overlay is open)
   hook() {
     if (this._hooked) return; this._hooked = true;
@@ -64,7 +89,7 @@ DS.Perf = {
     }
   },
   toggle(on = !this.on) {
-    this.on = on; if (on) this.hook();
+    this.on = on; if (on) { this.hook(); this._gpuTxt = null; }
     let el = document.getElementById('perf');
     if (!el) { el = document.createElement('canvas'); el.id = 'perf'; document.body.appendChild(el); }
     el.hidden = !on;
@@ -75,12 +100,12 @@ DS.Perf = {
     if (!this.on) return;
     if ((this._dr = (this._dr || 0) + 1) % 4) return;           // 15 times a second is plenty
     const el = document.getElementById('perf'); if (!el) return;
-    const dpr = Math.min(2, devicePixelRatio || 1), W = 300, H = 196;
+    const dpr = Math.min(2, devicePixelRatio || 1), W = 300, H = 212;
     if (el.width !== W * dpr) { el.width = W * dpr; el.height = H * dpr; el.style.width = W + 'px'; el.style.height = H + 'px'; }
     const c = el.getContext('2d'); c.setTransform(dpr, 0, 0, dpr, 0, 0);
     c.clearRect(0, 0, W, H); c.fillStyle = 'rgba(12,14,16,0.78)'; c.fillRect(0, 0, W, H);
     // graph: 0–40 ms, lines at the 60 and 120 Hz budgets
-    const gy = 64, gh = 56, ms = v => gy + gh - Math.min(1, v / 40) * gh;
+    const gy = 80, gh = 56, ms = v => gy + gh - Math.min(1, v / 40) * gh;
     c.strokeStyle = 'rgba(255,255,255,0.18)'; c.lineWidth = 1;
     for (const [v, col] of [[16.67, 'rgba(120,220,120,0.6)'], [8.33, 'rgba(120,180,255,0.45)'], [33.3, 'rgba(255,120,100,0.45)']]) { c.strokeStyle = col; c.beginPath(); c.moveTo(4, ms(v)); c.lineTo(W - 4, ms(v)); c.stroke(); }
     const n = this.n, bw = (W - 8) / this.N;
@@ -98,6 +123,8 @@ DS.Perf = {
     c.fillText(`작업 ${(s.work || 0).toFixed(1)}ms (p99 ${(s.workP99 || 0).toFixed(1)}) · 화면 ${hz || '?'}Hz · 제한 ${this.mode === 'free' ? '자유' : this.mode}`, 6, 22);
     c.fillText(`${cv.width}×${cv.height} (×${(g.rs || 1).toFixed(2)}) · 효과 ${['끔', '낮음', '높음'][g.post && g.post.ok ? g.post.q : 0]} · 그리기 ${this.callsAvg}`, 6, 37);
     c.fillText(`파티클 ${g.world.particles.n} · 차량 ${g.world.vehicles.length} · 줌 ${cam.zoom.toFixed(0)}`, 6, 50);
+    if (!this._gpuTxt) this._gpuTxt = this.gpuLine(g);
+    c.fillStyle = this.gpu(g).accel ? '#8fe08f' : '#ff8a70'; c.fillText(this._gpuTxt, 6, 64); c.fillStyle = '#b8c0c8';
     const A = this.secAvg, keys = Object.keys(A);
     c.fillStyle = '#d8d0b8';
     keys.forEach((k, i) => c.fillText(`${k} ${A[k].toFixed(2)}`, 6 + (i % 3) * 98, gy + gh + 6 + Math.floor(i / 3) * 14));

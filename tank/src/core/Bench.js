@@ -89,7 +89,7 @@ DS.Bench = class Bench {
     el.innerHTML = `<div class="pbox"><h2>벤치마크 결과 ${ok ? '<span class="ok">합격</span>' : '<span class="ng">미달</span>'}</h2>
       <table><thead><tr><th>장면</th><th>평균 fps</th><th>1% 저점</th><th>p99 ms</th><th>최악 ms</th><th>작업 ms 평균/p99</th><th>18ms 초과</th></tr></thead><tbody>${rows}</tbody></table>
       <p class="bmeta">기준: 평균 ≥ 59 · 1% 저점 ≥ 55 · p99 ≤ 18 ms<br>
-      화면 ${screen.width}×${screen.height} @${devicePixelRatio} · 렌더 ${cv.width}×${cv.height} (×${f(g.rs || 1, 2)}) · 주사율 ${P.hz() || '?'} Hz · 제한 ${P.mode === 'free' ? '자유' : P.mode} · 화면 효과 ${['끔', '낮음', '높음'][g.post && g.post.ok ? g.post.q : 0]} · 자동 조절 끔(측정 중 고정)<br>${ua}</p>
+      화면 ${screen.width}×${screen.height} @${devicePixelRatio} · 렌더 ${cv.width}×${cv.height} (×${f(g.rs || 1, 2)}) · 주사율 ${P.hz() || '?'} Hz · 제한 ${P.mode === 'free' ? '자유' : P.mode} · 화면 효과 ${['끔', '낮음', '높음'][g.post && g.post.ok ? g.post.q : 0]} · 자동 조절 끔(측정 중 고정)<br>${P.gpuLine(g)}<br>${ua}</p>
       <div class="prow"><button type="button" class="big" id="b-again">다시 실행</button><button type="button" id="b-menu">작전 선택</button></div></div>`;
     document.body.appendChild(el);
     el.querySelector('#b-again').onclick = () => { location.hash = 'bench'; location.reload(); };

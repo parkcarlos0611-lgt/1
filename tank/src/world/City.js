@@ -429,6 +429,17 @@ DS.Structure = class Structure {
   // An irregular shard of the drawing: the sprite-px box (sx, sy, sw, sh) clipped to a jagged polygon and kept
   // in its own little canvas, so drawing it later is a single image (no clipping per frame).
   shard(sx, sy, sw, sh, src) {
+    // an empty cut (the part was already gone) makes no shard. Judged without reading pixels back (that stalls the
+    // GPU): on the face, from the 0.75 m blocks that still hold wall; inside a shard, from its rough outline
+    if (!src && this.blk) {
+      const bs = this.bs, g0 = Math.max(0, Math.floor(sx / bs)), g1 = Math.min(this.GX - 1, Math.floor((sx + sw - 0.01) / bs));
+      const r0 = Math.max(0, Math.floor(sy / bs)), r1 = Math.min(this.GY - 1, Math.floor((sy + sh - 0.01) / bs));
+      let n = 0, on = 0; for (let gy = r0; gy <= r1; gy++) for (let gx = g0; gx <= g1; gx++) { n++; if (this.present(gy * this.GX + gx)) on++; }
+      if (!n || on / n < 0.12) return null;
+    } else if (src && src.cv) {
+      const u = ((sx + sw / 2) / src.cv.width - 0.5) * 2, v = ((sy + sh / 2) / src.cv.height - 0.5) * 2;
+      if (u * u + v * v > 0.9) return null;
+    }
     const S = src || { cv: this.skin || ((this.glass && this.world.rend.cityBroken[this.k]) || this.world.rend.cityImg[this.k]), ox: 0, oy: 0, m: 1 / this.ppm };
     if (!S.cv || sw < 1 || sh < 1) return null;
     const s = Math.min(1, 72 / Math.max(sw, sh)), w = Math.max(2, Math.ceil(sw * s)), h = Math.max(2, Math.ceil(sh * s));
@@ -441,8 +452,6 @@ DS.Structure = class Structure {
       x[j ? 'lineTo' : 'moveTo'](Math.max(0, Math.min(w, px)), Math.max(0, Math.min(h, py)));
     }
     x.closePath(); x.clip(); x.drawImage(S.cv, sx - S.ox, sy - S.oy, sw, sh, 0, 0, w, h);
-    // an empty cut (the part was already gone) makes no shard
-    try { const d = x.getImageData(0, 0, w, h).data; let o = 0; for (let i = 3; i < d.length; i += 16) if (d[i] > 40) o++; if (o * 4 < w * h * 0.12) return null; } catch (e) { /* unreadable: keep it */ }
     return { img: c, wd: sw * S.m, h: sh * S.m };
   }
   addShard(W, sh, x, y, vx, vy) {

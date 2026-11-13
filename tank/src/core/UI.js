@@ -4,6 +4,17 @@
 // every control has one implementation. On the main view one finger aims (helicopter sight, machine gun) and
 // two fingers zoom; on the artillery map one finger picks the target and two fingers zoom the map.
 DS.UI = {
+  // full screen (iPad Safari: the webkit-prefixed calls). Inside a page that does not allow it (an embedding
+  // frame without permission) the request fails and says so.
+  fsOn() { const d = document; return !!(d.fullscreenElement || d.webkitFullscreenElement); },
+  fsToggle(toast) {
+    const d = document, el = d.documentElement;
+    if (this.fsOn()) { (d.exitFullscreen || d.webkitExitFullscreen || (() => {})).call(d); return; }
+    const req = el.requestFullscreen || el.webkitRequestFullscreen;
+    const no = () => toast && toast('이 화면에서는 전체 화면이 막혀 있음 — 페이지를 새 탭(Safari)에서 직접 열면 됩니다');
+    if (!req || d.fullscreenEnabled === false || (d.fullscreenEnabled == null && d.webkitFullscreenEnabled === false)) return no();
+    try { const r = req.call(el, { navigationUI: 'hide' }); if (r && r.catch) r.catch(no); } catch (e) { no(); }
+  },
   KEY: 'ds.ui',
   defaults: { post: 2, resAuto: true, flyFx: true, vol: 0.8, btn: 1, hudFull: false, help: true, touch: 'auto', keys: {}, fpsMode: '60', perf: false },
   // remappable actions: [name, the key the game listens for]
@@ -23,6 +34,11 @@ Object.assign(DS.Game.prototype, {
     const core = ['h-clock', 'h-spd', 'h-ammo', 'h-load', 'h-rng', 'h-foe', 'h-tow', 'h-zoom'];
     document.querySelectorAll('#hud .r').forEach(r => { const b = r.querySelector('b'); if (!b || !core.some(id => r.querySelector('#' + id))) r.classList.add('x'); });
     document.getElementById('hudmore').onclick = () => { S.hudFull = !S.hudFull; this.uiApply(); DS.UI.save(S); };
+    // full screen: the round button, the pause menu, F10
+    const fsSync = () => { const on = DS.UI.fsOn(); document.getElementById('fsbtn').classList.toggle('on', on); document.querySelectorAll('[data-p=fs]').forEach(b => b.classList.toggle('on', on)); this.resize(); };
+    document.getElementById('fsbtn').onclick = () => DS.UI.fsToggle(m => this.toast(m));
+    addEventListener('keydown', e => { if (e.code === 'F10') { e.preventDefault(); DS.UI.fsToggle(m => this.toast(m)); } });
+    document.addEventListener('fullscreenchange', fsSync); document.addEventListener('webkitfullscreenchange', fsSync); fsSync();
     // pause menu
     const pm = document.getElementById('pause');
     document.getElementById('pausebtn').onclick = () => this.setPause(!this.paused);
@@ -41,6 +57,7 @@ Object.assign(DS.Game.prototype, {
       if (a === 'touch') S.touch = b.dataset.v;
       if (a === 'fps') S.fpsMode = b.dataset.v;
       if (a === 'perf') S.perf = !S.perf;
+      if (a === 'fs') { DS.UI.fsToggle(m => this.toast(m)); return; }
       if (a === 'spd') { this.world.env.speed = +b.dataset.v; this.timeUi(); return; }
       DS.UI.save(S); this.uiApply();
     });

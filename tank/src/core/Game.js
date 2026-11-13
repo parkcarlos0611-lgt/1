@@ -45,6 +45,8 @@ DS.Game = class Game {
     }));
     list.querySelectorAll('[data-go]').forEach(b => b.addEventListener('click', () => { DS.Audio.init(); el.hidden = true; location.hash = 'm' + (+b.dataset.go + 1) + (veh === 'm2a2' ? 'b' : ''); this.begin(+b.dataset.go, veh); }));
     document.getElementById('gorange').onclick = () => { DS.Audio.init(); el.hidden = true; location.hash = 'range' + (veh === 'm2a2' ? 'b' : ''); this.begin('range', veh); };
+    document.getElementById('menufs').onclick = () => DS.UI.fsToggle(m => { const el = document.getElementById('menufs'); el.textContent = m; });
+    { const mf = document.getElementById('menufs'), sync = () => { if (!mf.isConnected) return; mf.textContent = DS.UI.fsOn() ? '⛶ 전체 화면 끄기' : '⛶ 전체 화면'; }; document.addEventListener('fullscreenchange', sync); document.addEventListener('webkitfullscreenchange', sync); }
     document.getElementById('gobench').onclick = () => { DS.Audio.init(); location.hash = 'bench'; location.reload(); };
     document.getElementById('gotown').onclick = () => { DS.Audio.init(); el.hidden = true; location.hash = 'town' + (veh === 'm2a2' ? 'b' : ''); this.begin('town', veh); };
     el.hidden = false;

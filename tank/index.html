@@ -103,6 +103,11 @@
   #helpbtn { position: fixed; top: 10px; right: 48px; z-index: 3; width: 30px; height: 30px; border-radius: 50%; border: 1px solid #8a7b60;
     background: rgba(24,19,12,.7); color: var(--tx); font: 700 15px var(--mono); cursor: pointer; }
   #helpbtn.on { background: var(--warn); color: #1b1308; }
+  #fsbtn { position: fixed; top: 10px; right: 86px; z-index: 3; width: 30px; height: 30px; border-radius: 50%; border: 1px solid #8a7b60;
+    background: rgba(24,19,12,.7); color: var(--tx); font: 700 15px var(--mono); cursor: pointer; padding: 0; line-height: 28px; }
+  #fsbtn.on { background: var(--warn); color: #1b1308; }
+  body:not(.playing) #fsbtn { display: none; }
+  .mfs { margin-top: 10px; font: 14px var(--kor); color: var(--tx); background: #3a3823; border: 1px solid #5d5a3c; padding: 8px 16px; border-radius: 4px; cursor: pointer; min-height: 40px; }
   #help { top: 46px !important; }
   body:not(.playing) #helpbtn { display: none; }
   #hud .t, #over-t { font-family: var(--kor); letter-spacing: .04em; font-weight: 400; }
@@ -179,7 +184,7 @@
   #artyinfo { margin-top: 4px; padding: 6px 10px; background: rgba(24,19,12,.78); border-left: 4px solid var(--warn); font: 13px/1.6 var(--mono); }
   #artyinfo b { color: #ffe0a0; } #artyinfo .ok { color: var(--ok); } #artyinfo .bad { color: #ff9a7a; } #artyinfo .k { color: var(--mu); font-size: 12px; }
   /* firing-range editor */
-  #editbtn { position: fixed; top: 10px; right: 86px; z-index: 3; height: 30px; padding: 0 12px; border-radius: 15px; border: 1px solid #8a7b60;
+  #editbtn { position: fixed; top: 10px; right: 124px; z-index: 3; height: 30px; padding: 0 12px; border-radius: 15px; border: 1px solid #8a7b60;
     background: rgba(24,19,12,.7); color: var(--tx); font: 14px var(--kor); letter-spacing: .06em; cursor: pointer; }
   body.editing #editbtn { background: var(--warn); color: #1b1308; }
   body.editing :is(#help, #sight, #foes, #log, #touch) { display: none !important; }
@@ -230,6 +235,7 @@
 </div>
 
 <button id="helpbtn" type="button" title="키 가이드 (H)" aria-label="키 가이드 켜기/끄기">?</button>
+<button id="fsbtn" type="button" title="전체 화면 (F10)" aria-label="전체 화면 켜기/끄기">⛶</button>
 <div id="help" class="panel">
   <div><kbd>A</kbd><kbd>D</kbd> 후진 / 전진 (놓으면 제동)</div>
   <div><kbd>W</kbd><kbd>S</kbd> 포 앙각: 탭 0.05° · 누르면 점점 빠르게 · <kbd>Shift</kbd> 미세(탭 0.01°, 최대 0.5°/초)</div>
@@ -293,6 +299,7 @@
       <p class="mtag">OPERATION DESERT STORM · 1991</p>
       <h1>DESERT STEEL</h1>
       <p class="msub">사막의 폭풍 작전 지상전 · 기갑부대 전차장</p>
+      <button type="button" class="mfs" id="menufs">⛶ 전체 화면</button>
     </header>
     <section class="msec">
       <h2>작전 선택</h2>
@@ -338,6 +345,7 @@
     <div class="prow"><span>해상도 자동 조절</span><button type="button" data-p="res">켬</button></div>
     <div class="prow"><span>프레임 제한</span><button type="button" data-p="fps" data-v="60">60 고정</button><button type="button" data-p="fps" data-v="120">120 고정</button><button type="button" data-p="fps" data-v="free">자유</button></div>
     <div class="prow"><span>성능 표시 (F8)</span><button type="button" data-p="perf">켬</button></div>
+    <div class="prow"><span>전체 화면 (F10)</span><button type="button" data-p="fs">켬</button></div>
     <div class="prow"><span>탄 비행 효과 (저공 충격파 먼지·초음속 파열음·포탄 휘파람)</span><button type="button" data-p="flyfx">켬</button></div>
     <div class="prow"><span>소리 크기</span><input id="p-vol" type="range" min="0" max="100" step="5" aria-label="소리 크기"><b id="p-volv"></b></div>
     <div class="prow"><span>터치 조작</span><button type="button" data-p="touch" data-v="auto">자동</button><button type="button" data-p="touch" data-v="on">항상</button><button type="button" data-p="touch" data-v="off">끔</button></div>

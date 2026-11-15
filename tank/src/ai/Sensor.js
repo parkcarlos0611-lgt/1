@@ -9,6 +9,18 @@ DS.Sensor = {
 
   // detection rate (contact levels per second) of observer a against b at range, with line of sight
   rate(world, a, b, range) {
+    // close in, a tank cannot be missed whatever the sight or the hour (its bulk against the sky, engine noise,
+    // movement): contact within about a second at 100 m, two or three at 300 m; smoke and dust still hide it
+    const near = this.near(world, a, b, range);
+    return Math.max(near, this.rateSight(world, a, b, range));
+  },
+  near(world, a, b, range) {
+    const env = world.env || {}, f = range <= 100 ? 1.2 : 1.2 * Math.exp(-(range - 100) / 170);
+    if (f < 0.01) return 0;
+    const dust = env.visibility ? Math.exp(-range / env.visibility) : 1;
+    return f * dust * (1 - DS.AI.smoke(world, a, b)) * Math.min(1.1, b.def.signature || 1);
+  },
+  rateSight(world, a, b, range) {
     const S = a.def.sight, env = world.env || {};
     const flash = b.lastFired && world.time - b.lastFired < 5 ? 2 : 1;
     // a moving vehicle's dust tail gives it away, more over soft sand

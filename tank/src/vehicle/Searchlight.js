@@ -15,7 +15,10 @@
 // Iraqi crews run them at night while searching; once they are fighting, half of them put theirs out. The
 // Marines' M60A1s run dark unless the player switches one on (Y / 탐조등 steps through the modes).
 DS.Searchlight = {
-  KIT: { m60a1: { name: 'AN/VSS-1', white: true }, t55: { name: 'L-2' }, t62: { name: 'L-2G' }, t72: { name: 'L-4' } },
+  // mount: the lamp's face in the vehicle's sprite (sheet px). gun: true = carried on the gun mantlet (turns with
+  // the gun about the trunnions); otherwise fixed on the turret and laid by its linkage along the gun
+  KIT: { m60a1: { name: 'AN/VSS-1', white: true, mount: [1400, 168], gun: true }, t55: { name: 'L-2', mount: [1376, 92] },
+    t62: { name: 'L-2G', mount: [1368, 384] }, t72: { name: 'L-4', mount: [1356, 682] } },
   MODES: ['끔', '적외선 집광', '적외선 산광', '백색 집광', '백색 산광'],
   has(v) { return !v.heli && !!this.KIT[v.def.id]; },
   white(v) { return v.light >= 3; },
@@ -30,8 +33,15 @@ DS.Searchlight = {
   },
   // the lamp's position and the direction it points (along the gun)
   beam(v) {
-    const m = v.muzzle(), G = v.def.gun, tr = v.local(v.dir * G.trunnion[0], G.trunnion[1] + 0.55);
-    return { x: tr.x + m.dx * 0.4, y: tr.y + m.dy * 0.4, dx: m.dx, dy: m.dy };
+    const m = v.muzzle(), K = this.KIT[v.def.id], S = v.def.src, G = v.def.gun;
+    if (!K || !K.mount || !S) { const tr = v.local(v.dir * G.trunnion[0], G.trunnion[1] + 0.55); return { x: tr.x + m.dx * 0.4, y: tr.y + m.dy * 0.4, dx: m.dx, dy: m.dy }; }
+    let lx = (K.mount[0] - S.ox) / S.ppm, ly = -(K.mount[1] - S.oy) / S.ppm;
+    if (K.gun) {                                  // on the mantlet: swings with the gun's elevation about the trunnions
+      const e = v.gun.e || 0, c = Math.cos(e), sn = Math.sin(e), dx = lx - G.trunnion[0], dy = ly - G.trunnion[1];
+      lx = G.trunnion[0] + dx * c - dy * sn; ly = G.trunnion[1] + dx * sn + dy * c;
+    }
+    const p = v.local(v.dir * lx, ly);
+    return { x: p.x, y: p.y, dx: m.dx, dy: m.dy };
   },
   // where the beam stops: ground, a building or a vehicle (cached a few times a second)
   reachOf(v, world) {
@@ -93,7 +103,7 @@ DS.Searchlight = {
       for (const [wk, ak] of [[1, 1], [1.8, 0.45], [3, 0.18]]) {
         const w0 = 0.12 * wk, w1 = Math.max(w0, D * S.half * wk);
         const g = ctx.createLinearGradient(B.x, B.y, ex, ey);
-        g.addColorStop(0, `rgba(${c},${Math.min(1, air * 3.5 * ak)})`); g.addColorStop(0.05, `rgba(${c},${air * 1.6 * ak})`);
+        g.addColorStop(0, `rgba(${c},${Math.min(1, air * 2.2 * ak)})`); g.addColorStop(0.06, `rgba(${c},${air * 1.4 * ak})`);
         g.addColorStop(0.3, `rgba(${c},${air * 0.45 * ak})`); g.addColorStop(1, `rgba(${c},${air * 0.06 * ak})`);
         ctx.fillStyle = g; ctx.beginPath();
         ctx.moveTo(B.x + nx * w0, B.y + ny * w0); ctx.lineTo(ex + nx * w1, ey + ny * w1); ctx.lineTo(ex - nx * w1, ey - ny * w1); ctx.lineTo(B.x - nx * w0, B.y - ny * w0); ctx.closePath(); ctx.fill();
@@ -108,13 +118,13 @@ DS.Searchlight = {
       this.lampGlow(ctx, cam, v, c, 1);
     }
   },
-  // the lamp itself: a glaring point with a short four-ray flare
+  // the lamp itself: a soft glow on its face, a little wider bloom round it (no hard flare)
   lampGlow(ctx, cam, v, c, k) {
-    const B = this.beam(v), r = 0.35 + 3 / cam.zoom;
+    const B = this.beam(v), r = 0.22 + 2 / cam.zoom;
     ctx.save(); ctx.globalCompositeOperation = 'lighter';
-    const g = ctx.createRadialGradient(B.x, B.y, 0, B.x, B.y, r * 2.5); g.addColorStop(0, `rgba(${c},${k})`); g.addColorStop(0.2, `rgba(${c},${0.5 * k})`); g.addColorStop(1, `rgba(${c},0)`);
-    ctx.fillStyle = g; ctx.fillRect(B.x - r * 2.5, B.y - r * 2.5, r * 5, r * 5);
-    if (k > 0.5) { ctx.strokeStyle = `rgba(${c},0.35)`; ctx.lineWidth = 0.6 / cam.zoom; ctx.beginPath(); ctx.moveTo(B.x - r * 4, B.y); ctx.lineTo(B.x + r * 4, B.y); ctx.moveTo(B.x, B.y - r * 3); ctx.lineTo(B.x, B.y + r * 3); ctx.stroke(); }
+    const g = ctx.createRadialGradient(B.x, B.y, 0, B.x, B.y, r * 3);
+    g.addColorStop(0, `rgba(${c},${0.75 * k})`); g.addColorStop(0.12, `rgba(${c},${0.45 * k})`); g.addColorStop(0.4, `rgba(${c},${0.12 * k})`); g.addColorStop(1, `rgba(${c},0)`);
+    ctx.fillStyle = g; ctx.fillRect(B.x - r * 3, B.y - r * 3, r * 6, r * 6);
     ctx.restore();
   },
 };

@@ -103,9 +103,20 @@ DS.World = class World {
       // player's seat wakes them at once.
       for (const v of this.vehicles) {
         if (v.heli || v === this.vehicles[0] || v.input.drive || v.input.fire || v.input.tow || (v.ai && (v.ai.tgt || v.ai.busy)) || Math.abs(v.vt) > 0.03 || Math.abs(v.vel.x) + Math.abs(v.vel.y) > 0.08 || this.time - (v.lastFired == null ? -99 : v.lastFired) < 4) v._quiet = 0;
-        else if (v._quiet > 1.5) { let near = false; for (const p of this.projectiles) if (Math.abs(p.x - v.pos.x) < 40 && Math.abs(p.y - v.pos.y) < 40) { near = true; break; } if (near) v._quiet = 0; }
+        else if (v._quiet > 1.5) {
+          let near = false; for (const p of this.projectiles) if (Math.abs(p.x - v.pos.x) < 40 && Math.abs(p.y - v.pos.y) < 40) { near = true; break; } if (near) v._quiet = 0;
+          // asleep: if the ground it rests on has changed (a crater, drifting sand, another track) it wakes and
+          // settles again — wrecks no longer hang in the air over a fresh shell hole
+          else if (this.time - (v._gT || 0) > 0.2) {
+            v._gT = this.time; const T = this.terrain; let g = 0;
+            for (const w of v.st) g += T.height(w.wx); if (v.turretBody) g += T.height(v.turretBody.x) * 3;
+            if (v._gSig != null && Math.abs(g - v._gSig) > 0.03) v._quiet = 0;
+            v._gSig = g;
+          }
+        }
         v._quiet = (v._quiet || 0) + h;
         if (v._quiet > 1.5) continue;
+        v._gSig = null;
         v.step(h, this);
       }
       this.contacts(h);

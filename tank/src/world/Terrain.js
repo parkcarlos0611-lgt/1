@@ -9,6 +9,7 @@ DS.Terrain = class Terrain {
     this.n = Math.round(this.length / this.dx) + 1;
     this.h = new Float32Array(this.n);      // surface height
     this.sink = new Float32Array(this.n);   // accumulated pressed depth (compaction memory)
+    this.comp = new Float32Array(this.n);   // compaction 0 (loose) … 1 (packed by tracks): bears more, no bow wave, little slip-dig
     this.disturb = new Float32Array(this.n);// visual: dug / thrown material (craters), fades never
     this.soil = new Uint8Array(this.n);
     this.crust = new Uint8Array(this.n);    // 1 = surface crust intact (breaks under a heavy load)
@@ -146,7 +147,8 @@ DS.Terrain = class Terrain {
         this.crust[i] = 0; const drop = 0.04 + 0.03 * Math.random();
         this.h[i] -= drop; this.sink[i] += drop; this.disturb[i] = Math.min(1, this.disturb[i] + 0.25); this.mark(i);
       }
-      const k = (s.kc / 0.635 + s.kphi) * (this.crust[i] ? 2.6 : 1);
+      const k = (s.kc / 0.635 + s.kphi) * (this.crust[i] ? 2.6 : 1) * (1 + 2.5 * this.comp[i]);      // packed ground bears more
+      this.comp[i] = Math.min(1, this.comp[i] + dt * 2.2 * prof);                               // pressed: packs (about one tank's pass)
       const zt = Math.pow(p / k, 1 / s.n);
       if (zt > zmax) zmax = zt;
       const d = zt - this.sink[i];
@@ -158,10 +160,11 @@ DS.Terrain = class Terrain {
     return zmax;
   }
 
-  // add (or with vol < 0 remove) sand volume per metre of width, spread over a few cells
+  compAt(x) { return this.comp[this.idx(x)] || 0; }
+  // add (or with vol < 0 remove) sand volume per metre of width, spread over a few cells (fresh sand is loose)
   deposit(x, vol) {
     const i = this.idx(x), w = [0.25, 0.5, 0.25];
-    for (let k = -1; k <= 1; k++) { const j = Math.max(0, Math.min(this.n - 1, i + k)); this.h[j] += vol * w[k + 1] / this.dx; this.mark(j); }
+    for (let k = -1; k <= 1; k++) { const j = Math.max(0, Math.min(this.n - 1, i + k)); this.h[j] += vol * w[k + 1] / this.dx; if (vol > 0) this.comp[j] *= 0.7; this.mark(j); }
   }
   // move sand from one spot to another (conserved)
   shift(xFrom, xTo, vol) { this.deposit(xFrom, -vol); this.deposit(xTo, vol); }
@@ -183,6 +186,7 @@ DS.Terrain = class Terrain {
       if (t < 1) d = Math.max(-depth * (1 - t * t), Math.min(0, this.hard[i] - this.h[i]));      // stops at the hard layer
       else if (t < 1.8) { const u = (t - 1) / 0.8; d = rimH * Math.sin(Math.PI * u) * (1 - u * 0.4); }
       this.h[i] += d; this.disturb[i] = Math.min(1, this.disturb[i] + (t < 1.8 ? 0.8 * (1 - t / 1.8) + 0.2 : 0));
+      if (t < 1.8) this.comp[i] = 0;                                                              // blown loose
       if (t < 1.2) { this.sink[i] = 0; this.crust[i] = 0; }
     }
     this.mark(i0); this.mark(i1);

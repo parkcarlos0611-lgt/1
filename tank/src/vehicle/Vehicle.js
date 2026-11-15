@@ -85,8 +85,10 @@ DS.Vehicle = class Vehicle {
         contacts++;
         const soil = T.soilAt(w.wx);
         const Fmax = D.contactArea * soil.c + F * Math.tan(soil.phi * Math.PI / 180);
+        // grip along the ground under the wheel (on a crater wall that is up the wall, not into it)
+        const gs = T.slope(w.wx), gl = Math.hypot(1, gs), tdx = 1 / gl, tdy = gs / gl;
         const v = pv(w.wx, w.wy - R), vp = v.x * ex.x + v.y * ex.y;
-        trac.push({ w, Fmax, vp, px: w.wx, py: w.wy - R });
+        trac.push({ w, Fmax, vp: v.x * tdx + v.y * tdy, px: w.wx, py: w.wy - R, dx: tdx, dy: tdy });
         const rr = (soil.crr + Math.min(0.08, w.sink * 0.6)) * F * Math.tanh(vp / 0.25);
         apply(w.wx, w.wy - R, -ex.x * rr, -ex.y * rr);
       }
@@ -97,14 +99,41 @@ DS.Vehicle = class Vehicle {
     const byX = this.st.slice().sort((p, q) => p.lx - q.lx);
     for (let i = 1; i < byX.length; i++) {
       const a = byX[i - 1], b = byX[i];
-      const bx = (a.wx + b.wx) / 2, by = (a.wy + b.wy) / 2 - R;
-      const pen = T.height(bx) - by;
-      if (pen > 0.005) {
+      // three points along each span (a ridge off the middle still meets the belt, not the belly)
+      for (let q = 0; q < 3; q++) {
+        const f = 0.25 + 0.25 * q, bx = a.wx + (b.wx - a.wx) * f, by = a.wy + (b.wy - a.wy) * f - R;
+        const pen = T.height(bx) - by;
+        if (pen <= 0.005) continue;
         const sl = T.slope(bx), nl = Math.hypot(sl, 1), nx = -sl / nl, ny = 1 / nl;
         const v = pv(bx, by), vn = v.x * nx + v.y * ny;
-        const Fn = Math.max(0, 1.6e6 * (pen - 0.005) - 1.2e5 * vn);
+        const Fn = Math.max(0, (1.6e6 * (pen - 0.005) - 1.2e5 * vn) / 3 * (q === 1 ? 1.4 : 0.8));
+        if (Fn <= 0) continue;
         apply(bx, by, nx * Fn, ny * Fn);
+        // the belt's grousers grip wherever its bottom run bears on the ground (a tank high-centred on a ridge
+        // between two shell holes still drives on the track pressed against the ridge), along the ground
+        const k = (i - 1) * 3 + q, bw = (this._beltW || (this._beltW = []))[k] || (this._beltW[k] = { slip: 0, Ft: 0 }), soil = T.soilAt(bx);
+        trac.push({ w: bw, Fmax: D.contactArea * 0.17 * soil.c + Fn * Math.tan(soil.phi * Math.PI / 180), vp: v.x * ny - v.y * nx, px: bx, py: by, dx: ny, dy: -nx });
       }
+    }
+
+    // ---- sprocket and idler against the ground (a crater wall, a step): the track wrapped round them grips
+    // there too. Its drive direction at a contact is along the gear's rim, turning with the track's circulation
+    // (forward on the bottom run, upward on the leading face), so a tank whose nose meets a wall climbs it ----
+    this._gearC = 0;
+    if (!this.trackBroken) for (const [gx, gy, r] of [[G.sprocket.x, G.sprocket.y, 0.36], [G.idler.x, G.idler.y, D.idler.r + D.track.thick]]) {
+      const px = this.pos.x + c * gx - s * gy, py = this.pos.y + s * gx + c * gy;
+      const pen = T.circleRest(px, r) - py;
+      if (pen <= 0) continue;
+      const sl = T.slope(px), nl = Math.hypot(sl, 1), nx = -sl / nl, ny = 1 / nl, qx = px - nx * r, qy = py - ny * r;
+      const v = pv(qx, qy), vn = v.x * nx + v.y * ny;
+      const Fn = Math.max(0, 4e6 * pen - 2.5e5 * vn);
+      apply(qx, qy, nx * Fn, ny * Fn); this._gearC++;
+      const dx = ny, dy = -nx, soil = T.soilAt(qx);                                    // drive direction at the contact
+      const gw = (this._gearW || (this._gearW = [{ slip: 0, Ft: 0 }, { slip: 0, Ft: 0 }]))[this._gearC - 1];
+      trac.push({ w: gw, Fmax: D.contactArea * 0.3 * soil.c + Fn * Math.tan(soil.phi * Math.PI / 180), vp: v.x * dx + v.y * dy, px: qx, py: qy, dx, dy });
+      // spinning against the wall with the hull held: the track tears the wall down into the hole below it
+      const sg = Math.sign(qx - px) || 1, spin = Math.abs(this.vt - (v.x * dx + v.y * dy));
+      if (spin > 0.5 && Math.abs(this.vel.x) < 0.6 && Math.abs(nx) > 0.3) T.shift(qx + sg * 0.5, qx - sg * 0.9, Math.min(0.02, spin * 0.008 * (0.5 + soil.dust)) * dt * 30);
     }
 
     // ---- drive: engine → sprocket → track, implicit in track speed ----
@@ -133,15 +162,23 @@ DS.Vehicle = class Vehicle {
     for (const t of trac) {
       const sv = this.vt - t.vp, F = t.Fmax * Math.tanh(sv / t.vref);
       t.w.Ft = F; t.w.slip = sv; slipSum += Math.abs(sv);
-      apply(t.px, t.py, ex.x * F, ex.y * F);
+      if (t.dx != null) apply(t.px, t.py, t.dx * F, t.dy * F); else apply(t.px, t.py, ex.x * F, ex.y * F);
     }
     this.stats.slip = trac.length ? slipSum / trac.length : 0;
     this.stats.contact = contacts;
 
     // ---- rigid contacts: sprocket, idler, belly, hull/turret top ----
-    const rig = [[G.sprocket.x, G.sprocket.y, 0.36], [G.idler.x, G.idler.y, D.idler.r + D.track.thick]];
-    for (let k = 0; k <= 6; k++) rig.push([G.belly.x0 + (G.belly.x1 - G.belly.x0) * k / 6, G.belly.y + 0.05, 0.05]);
-    rig.push([-3.9, 0.5, 0.1], [3.8, 0.0, 0.1], [0, 1.4, 0.3]);
+    const rig = this.trackBroken ? [[G.sprocket.x, G.sprocket.y, 0.36], [G.idler.x, G.idler.y, D.idler.r + D.track.thick]] : [];      // (whole track: above, with traction)
+    // belly: between the outermost road wheels (past them the sprocket and idler, with the track round them, are
+    // what meets the ground; a belly corner out there ploughed into crater walls beside the idler)
+    { let w0 = 1e9, w1 = -1e9; for (const w of G.wheels) { w0 = Math.min(w0, w.x); w1 = Math.max(w1, w.x); }
+      const b0 = Math.max(G.belly.x0, w0), b1 = Math.min(G.belly.x1, w1);
+      for (let k = 0; k <= 6; k++) rig.push([b0 + (b1 - b0) * k / 6, G.belly.y + 0.05, 0.05]); }
+    // bow and stern: the vehicle's own underside outline (they were fixed points sized for the M1A1, which put a
+    // T-55's "bow" 0.7 m ahead of its real one, catching crater walls)
+    const ends = this._ends || (this._ends = (() => { const P = D.underside && D.underside.poly; if (!P) return [[-3.9, 0.5], [3.8, 0.0]];
+      const f = P.reduce((m, q) => q[0] > m[0] ? q : m, P[0]), r = P.reduce((m, q) => q[0] < m[0] ? q : m, P[0]); return [[r[0], r[1]], [f[0], f[1]]]; })());
+    rig.push([ends[0][0] * this.dir, ends[0][1], 0.1], [ends[1][0] * this.dir, ends[1][1], 0.1], [0, 1.4, 0.3]);
     for (const [lx, ly, r] of rig) {
       const px = this.pos.x + c * lx - s * ly, py = this.pos.y + s * lx + c * ly;
       const pen = T.circleRest(px, r) - py;
@@ -184,9 +221,14 @@ DS.Vehicle = class Vehicle {
     const lead = this.st.reduce((m, w) => (w.lx * Math.sign(this.vt || 1) > m.lx * Math.sign(this.vt || 1) ? w : m), this.st[0]);
     this.st.forEach((w, k) => {
       if (!(w.N > 0)) return;
-      const soil = T.soilAt(w.wx), slip = Math.abs(w.slip);
-      if (slip > 0.35) {
-        this.digAcc[k] += Math.min(0.02, (slip - 0.35) * 0.0035 * soil.dust) * dt;
+      const soil = T.soilAt(w.wx), slip = Math.abs(w.slip), cp = T.compAt(w.wx);
+      // spinning against a steep wall (a crater side, a deep rut's end): the grousers claw the wall down into the
+      // hole instead of digging deeper, so a tank works its way out
+      const dir = Math.sign(this.input.drive || w.slip) || 1, ahead = w.wx + dir * 0.9, wall = (T.height(ahead) - T.height(w.wx)) / 0.9;
+      if (slip > 0.35 && wall > 0.3 && Math.abs(this.vel.x) < 1) {
+        T.shift(ahead, w.wx - dir * 0.2, Math.min(0.016, (slip - 0.35) * 0.008 * (0.5 + soil.dust)) * dt * 60 / this.st.length);
+      } else if (slip > 0.35) {
+        this.digAcc[k] += Math.min(0.02, (slip - 0.35) * 0.0035 * soil.dust) * (1 - 0.85 * cp) * dt;     // packed ground hardly digs
         if (this.digAcc[k] > 0.0012) {
           const vol = this.digAcc[k]; this.digAcc[k] = 0;
           T.deposit(w.wx, -vol);
@@ -195,8 +237,8 @@ DS.Vehicle = class Vehicle {
             { drag: 0.3, mass: vol, col: parseInt(soil.col[1].slice(1), 16) });
         }
       }
-      if (w === lead && w.sink > 0.025 && Math.abs(this.vt) > 0.5) {
-        const dirn = Math.sign(this.vt), vol = Math.min(0.0006, (w.sink - 0.025) * Math.abs(this.vt) * 0.003 * soil.dust) * dt * 60;
+      if (w === lead && w.sink > 0.025 && Math.abs(this.vt) > 0.5 && cp < 0.6) {
+        const dirn = Math.sign(this.vt), vol = Math.min(0.0006, (w.sink - 0.025) * Math.abs(this.vt) * 0.003 * soil.dust) * (1 - cp / 0.6) * dt * 60;   // no bow wave on packed ground
         T.shift(w.wx + dirn * 0.35, w.wx + dirn * (0.9 + Math.random() * 0.4), vol);
       }
     });

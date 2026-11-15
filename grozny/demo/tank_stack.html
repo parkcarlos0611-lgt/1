@@ -1,0 +1,256 @@
+<title>전차 스프라이트 입체화</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500&family=Noto+Sans+KR:wght@400;700&display=swap">
+<style>
+/* Layout: one large viewport beside a narrow instrument panel; method notes below. Stacks to one column on phones. */
+:root{
+  --bg:#15171a; --surf:#1d2024; --line:#353a41; --tx:#e6e3dc; --mu:#9a9c9e;
+  --acc:#d8a24a; --ok:#8fb07a;
+  --f-body:'Noto Sans KR',system-ui,-apple-system,sans-serif;
+  --f-mono:'IBM Plex Mono',ui-monospace,Menlo,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--tx);font-family:var(--f-body)}
+.wrap{max-width:1180px;margin:0 auto;padding-block:20px 40px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:16px}
+.eyebrow{font-family:var(--f-mono);font-size:11px;letter-spacing:.1em;color:var(--acc);text-transform:uppercase}
+h1{margin:4px 0 6px;font-size:24px;text-wrap:balance}
+.lead{margin:0;color:var(--mu);font-size:14px;line-height:1.6;max-width:68ch}
+.main{display:grid;grid-template-columns:minmax(0,1fr) 270px;gap:12px}
+.view{position:relative;background:#0f1113;border:1px solid var(--line);border-radius:4px;overflow:hidden;min-height:420px}
+#cv{display:block;width:100%;height:100%;min-height:420px;touch-action:none;cursor:grab}
+#cv:active{cursor:grabbing}
+.hint{position:absolute;left:10px;bottom:10px;font-size:12px;color:var(--mu);background:rgba(15,17,19,.75);padding:4px 8px;border-radius:3px;pointer-events:none}
+.badge{position:absolute;right:10px;top:10px;font-family:var(--f-mono);font-size:11px;color:var(--mu);background:rgba(15,17,19,.75);padding:4px 8px;border-radius:3px;font-variant-numeric:tabular-nums}
+.panel{background:var(--surf);border:1px solid var(--line);border-radius:4px;padding:12px;display:flex;flex-direction:column;gap:12px;font-size:13px}
+.lab{font-family:var(--f-mono);font-size:11px;letter-spacing:.08em;color:var(--mu);text-transform:uppercase}
+.seg{display:grid;grid-template-columns:repeat(3,1fr);gap:4px}
+button,.file{font:inherit;color:var(--tx);background:#262a2f;border:1px solid var(--line);border-radius:3px;padding:6px 6px;cursor:pointer;font-size:12.5px;text-align:center}
+button:hover,.file:hover{border-color:#5d646d}
+button:focus-visible,input:focus-visible+span,input:focus-visible{outline:2px solid var(--acc);outline-offset:1px}
+.seg button.on{background:var(--acc);border-color:var(--acc);color:#17130b;font-weight:700}
+.sl{display:grid;grid-template-columns:76px 1fr 44px;gap:8px;align-items:center}
+.sl output{font-family:var(--f-mono);font-size:11.5px;text-align:right;font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;accent-color:var(--acc)}
+.ck{display:flex;gap:6px;align-items:center;cursor:pointer}
+input[type=checkbox]{accent-color:var(--acc)}
+.files{display:grid;gap:6px}
+.file{display:block;position:relative}
+.file input{position:absolute;inset:0;opacity:0;cursor:pointer}
+.note{font-size:12px;color:var(--mu);line-height:1.55;margin:0}
+.note b{color:var(--tx);font-weight:700}
+.how{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.how section{border-top:2px solid var(--line);padding-top:10px;min-width:0}
+.how h2{font-size:14px;margin:0 0 6px}
+.how p{margin:0;font-size:13px;color:var(--mu);line-height:1.6}
+.how .k{font-family:var(--f-mono);font-size:11px;color:var(--acc)}
+@media (max-width:820px){.main{grid-template-columns:1fr}.how{grid-template-columns:1fr}.view,#cv{min-height:360px}}
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Sprite stacking · Canvas 2D · 3D 엔진 없음</div>
+    <h1>전차 스프라이트 입체화</h1>
+    <p class="lead">탑뷰 이미지 한 장과 높이맵으로 단면 40장을 만들어 쌓아 그립니다. 회전, 카메라 기울기, 조명, 담 넘기 자세를 2D 캔버스만으로 표현합니다. 직접 그린 전차 이미지를 올려 볼 수도 있습니다.</p>
+  </header>
+
+  <div class="main">
+    <div class="view">
+      <canvas id="cv" aria-label="입체화된 전차"></canvas>
+      <div class="hint">드래그: 좌우 회전 · 위아래 기울기</div>
+      <div class="badge" id="badge"></div>
+    </div>
+    <aside class="panel">
+      <div>
+        <div class="lab">표현 방식</div>
+        <div class="seg" role="group" aria-label="표현 방식" style="margin-top:6px">
+          <button data-m="flat">원본 2D</button><button data-m="lit">조명만</button><button data-m="stack" class="on">입체</button>
+        </div>
+      </div>
+      <label class="sl" for="tilt">카메라<input type="range" id="tilt" min="0" max="65" value="45"><output id="oTilt"></output></label>
+      <label class="sl" for="rot">방향<input type="range" id="rot" min="0" max="359" value="330"><output id="oRot"></output></label>
+      <label class="sl" for="light">조명<input type="range" id="light" min="0" max="359" value="220"><output id="oLight"></output></label>
+      <label class="sl" for="pitch">앞뒤 경사<input type="range" id="pitch" min="-25" max="25" value="0"><output id="oPitch"></output></label>
+      <label class="sl" for="hs">높이 배율<input type="range" id="hs" min="50" max="200" value="100"><output id="oHs"></output></label>
+      <label class="ck"><input type="checkbox" id="auto">자동 회전</label>
+      <div class="files">
+        <div class="lab">내 이미지로 보기</div>
+        <label class="file">스프라이트 PNG 올리기<input type="file" id="fImg" accept="image/*"></label>
+        <label class="file">높이맵 올리기 (선택)<input type="file" id="fH" accept="image/*"></label>
+        <button id="reset">샘플 전차로 되돌리기</button>
+        <p class="note" id="srcNote">지금: <b>내장 샘플</b> (높이맵을 정확히 알고 있는 이미지)</p>
+      </div>
+    </aside>
+  </div>
+
+  <div class="how">
+    <section><div class="k">1 · 높이맵</div><h2>픽셀마다 높이를 정함</h2><p>궤도 0.85m, 차체 1.45m, 포탑 최대 2.3m처럼 픽셀마다 높이를 둡니다. 이미지를 올리면 윤곽선에서 안쪽으로 갈수록 높아지게 자동으로 추정하고, 회색조 높이맵을 함께 올리면 그 값을 그대로 씁니다.</p></section>
+    <section><div class="k">2 · 단면 굽기</div><h2>높이를 40층으로 자름</h2><p>층마다 그 높이에 걸린 픽셀만 남긴 이미지를 만들고, 높이맵의 기울기로 윗면과 옆면에 명암을 넣습니다. 조명 방향이 바뀔 때만 다시 굽기 때문에 매 프레임 비용은 이미지 40장을 그리는 정도입니다.</p></section>
+    <section><div class="k">3 · 쌓아 그리기</div><h2>층을 위로 밀어 그림</h2><p>아래층부터 화면 위쪽으로 조금씩 밀어 그리면 입체로 보입니다. 앞뒤 경사는 층마다 기울어진 변환을 적용해 담 넘는 자세를 만듭니다. 프레임은 30fps로 제한하고, 화면이 바뀔 때만 다시 그립니다.</p></section>
+  </div>
+</div>
+
+<script>
+(()=>{
+const $=id=>document.getElementById(id);
+const S=256,C=S/2,L=40,PPM=27; // image size, layers, pixels per metre in the sample
+const cv=$('cv'),ctx=cv.getContext('2d');
+
+/* ---------- source data: albedo (RGBA) + height (metres) ---------- */
+let alb=new Uint8ClampedArray(S*S*4),hgt=new Float32Array(S*S),low=new Float32Array(S*S),HMAX=2.6; /* low = underside height (overhangs such as the gun barrel) */
+
+function vnoise(x,y,sc){const h=(i,j)=>{let n=(i*374761393+j*668265263)|0;n=(n^(n>>>13))*1274126177|0;return((n^(n>>>16))>>>0)/4294967296};
+  const X=x/sc,Y=y/sc,i=Math.floor(X),j=Math.floor(Y),fx=X-i,fy=Y-j,u=fx*fx*(3-2*fx),v=fy*fy*(3-2*fy);
+  return (h(i,j)*(1-u)+h(i+1,j)*u)*(1-v)+(h(i,j+1)*(1-u)+h(i+1,j+1)*u)*v}
+function makeSample(){
+  low.fill(0);
+  for(let y=0;y<S;y++)for(let x=0;x<S;x++){let h=0,c=null,lo=0;
+    const trk=x>=18&&x<=214&&((y>=72&&y<=92)||(y>=164&&y<=184));
+    if(trk){h=(x<26||x>206)?.7:.85;const t=(x%6)<2;c=t?[46,45,41]:[34,33,30]}
+    if(x>=22&&x<=210&&y>=90&&y<=166){h=1.45;c=[76,81,62];if(x>182){h=1.45-(x-182)/28*.55;c=[72,77,59]}
+      if(x<70){h=1.5;c=[70,74,58];if(x<64&&y>100&&y<156&&y%5==0)c=[44,46,38]}
+      if(x==70||y==91||y==165)c=[52,55,44]}
+    if(x>=120&&x<=170&&((y>=74&&y<=86)||(y>=170&&y<=182))){h=Math.max(h,1.15);c=[66,70,54]}
+    const dx=(x-112)/42,dy=(y-128)/38,r2=dx*dx+dy*dy;
+    if(r2<1){const th=1.45+.85*Math.sqrt(1-r2);if(th>h){h=th;c=[80,86,65]}}
+    if((x-100)**2+(y-110)**2<81){h=Math.max(h,2.42);c=[58,61,48];if((x-100)**2+(y-110)**2<25)c=[40,42,34]}
+    if(x>=148&&x<=160&&Math.abs(y-128)<12){h=Math.max(h,2.0);c=[64,68,52]}
+    if(x>=150&&x<=250&&Math.abs(y-128)<3.5){h=Math.max(h,1.98+.06*Math.cos((y-128)/3.5*1.5));c=[60,64,49];if(x>182)lo=1.86}
+    if(x>=196&&x<=210&&Math.abs(y-128)<5.5){h=Math.max(h,2.06);c=[54,58,45];lo=1.8}
+    const k=4*(y*S+x);
+    if(h>0&&c){const n=vnoise(x,y,9)*.6+vnoise(x,y,3)*.4;let r=c[0],g=c[1],b=c[2];
+      r*=.85+n*.3;g*=.85+n*.3;b*=.85+n*.3;
+      const snow=vnoise(x+50,y,14);if(!trk&&snow>.72&&h>1.3&&h<2.2){const m=Math.min(.75,(snow-.72)*4);r+=(205-r)*m;g+=(208-g)*m;b+=(206-b)*m}
+      const mud=vnoise(x,y+90,7);if(trk||(y<96||y>160))if(mud>.6){r*=.8;g*=.76;b*=.7}
+      alb[k]=r;alb[k+1]=g;alb[k+2]=b;alb[k+3]=255}
+    else{alb[k+3]=0}
+    hgt[y*S+x]=h;low[y*S+x]=lo}
+  HMAX=2.6}
+
+/* ---------- auto height for uploaded images ---------- */
+function fromImage(img,hImg){const c=document.createElement('canvas');c.width=c.height=S;const g=c.getContext('2d',{willReadFrequently:true});
+  const sc=Math.min(236/img.width,236/img.height);const w=img.width*sc,h=img.height*sc;g.drawImage(img,(S-w)/2,(S-h)/2,w,h);
+  const d=g.getImageData(0,0,S,S).data;
+  let opaque=true;for(let i=3;i<d.length;i+=4)if(d[i]<250){opaque=false;break}
+  if(opaque){const bx=(S-w)/2|0,by=(S-h)/2|0,k0=4*((by+1)*S+bx+1),br=d[k0],bg=d[k0+1],bb=d[k0+2];
+    for(let i=0;i<d.length;i+=4){const inside=true;if(Math.abs(d[i]-br)+Math.abs(d[i+1]-bg)+Math.abs(d[i+2]-bb)<45)d[i+3]=0}}
+  alb=new Uint8ClampedArray(d);low.fill(0);
+  const m=new Float32Array(S*S);for(let i=0;i<S*S;i++)m[i]=alb[i*4+3]>100?1e4:0;
+  for(let y=0;y<S;y++)for(let x=0;x<S;x++){const i=y*S+x;if(!m[i])continue;let v=m[i];
+    if(x>0)v=Math.min(v,m[i-1]+1);if(y>0)v=Math.min(v,m[i-S]+1);if(x>0&&y>0)v=Math.min(v,m[i-S-1]+1.41);if(x<S-1&&y>0)v=Math.min(v,m[i-S+1]+1.41);m[i]=v}
+  for(let y=S-1;y>=0;y--)for(let x=S-1;x>=0;x--){const i=y*S+x;if(!m[i])continue;let v=m[i];
+    if(x<S-1)v=Math.min(v,m[i+1]+1);if(y<S-1)v=Math.min(v,m[i+S]+1);if(x<S-1&&y<S-1)v=Math.min(v,m[i+S+1]+1.41);if(x>0&&y<S-1)v=Math.min(v,m[i+S-1]+1.41);m[i]=v}
+  let hd=null;if(hImg){const c2=document.createElement('canvas');c2.width=c2.height=S;const g2=c2.getContext('2d',{willReadFrequently:true});g2.drawImage(hImg,(S-w)/2,(S-h)/2,w,h);hd=g2.getImageData(0,0,S,S).data}
+  for(let i=0;i<S*S;i++){if(!m[i]){hgt[i]=0;continue}
+    if(hd){hgt[i]=.05+2.5*(hd[i*4]*.3+hd[i*4+1]*.59+hd[i*4+2]*.11)/255;continue}
+    const lum=(alb[i*4]*.3+alb[i*4+1]*.59+alb[i*4+2]*.11)/255;
+    hgt[i]=Math.max(.1,Math.min(2.6,.55+.95*Math.min(1,m[i]/16)+(lum-.45)*.6))}
+  HMAX=2.6}
+
+/* ---------- bake 40 layers with lighting ---------- */
+const layers=[...Array(L)].map(()=>{const c=document.createElement('canvas');c.width=c.height=S;return c});
+const lctx=layers.map(c=>c.getContext('2d'));const lbuf=layers.map(()=>new ImageData(S,S));
+const mask=document.createElement('canvas');mask.width=mask.height=S;
+let nrm=null,minN=null,bakedKey='';
+function prep(){const hs=+$('hs').value/100;nrm=new Float32Array(S*S*3);minN=new Float32Array(S*S);
+  const H=i=>hgt[i]*hs;
+  for(let y=0;y<S;y++)for(let x=0;x<S;x++){const i=y*S+x;
+    const hl=x>0?H(i-1):0,hr=x<S-1?H(i+1):0,hu=y>0?H(i-S):0,hd=y<S-1?H(i+S):0;
+    let nx=-(hr-hl)*PPM/2,ny=-(hd-hu)*PPM/2,nz=1;const l=Math.hypot(nx,ny,nz);nrm[i*3]=nx/l;nrm[i*3+1]=ny/l;nrm[i*3+2]=nz/l;
+    minN[i]=Math.min(hl,hr,hu,hd)}
+  const mc=mask.getContext('2d'),md=mc.createImageData(S,S);for(let i=0;i<S*S;i++)md.data[i*4+3]=hgt[i]>0?255:0;mc.putImageData(md,0,0);bakedKey=''}
+function bake(lx,ly,lz,lit){const hs=+$('hs').value/100,step=HMAX*hs/L;
+  for(const b of lbuf)b.data.fill(0);
+  const sl=Math.hypot(lx,ly)||1;
+  for(let i=0;i<S*S;i++){const h=hgt[i]*hs;if(h<=0)continue;
+    const kt=Math.min(L-1,Math.floor(h/step)),a=i*4,nx=nrm[i*3],ny=nrm[i*3+1],nz=nrm[i*3+2];
+    let top=1,side=.62;
+    if(lit){top=.34+.86*Math.max(0,nx*lx+ny*ly+nz*lz);
+      const sn=Math.hypot(nx,ny);side=sn>.05?.26+.7*Math.max(0,(nx*lx+ny*ly)/sn/sl)*Math.hypot(lx,ly):.45}
+    let d=lbuf[kt].data;d[a]=alb[a]*top;d[a+1]=alb[a+1]*top;d[a+2]=alb[a+2]*top;d[a+3]=255;
+    const k0=Math.max(0,Math.floor(Math.max(minN[i],low[i]*hs)/step)),steep=h-minN[i]>2.5*step;
+    for(let k=k0;k<kt;k++){const ao=.62+.38*(k+1)/(kt+1),f=steep?side*ao:top;d=lbuf[k].data;d[a]=alb[a]*f;d[a+1]=alb[a+1]*f;d[a+2]=alb[a+2]*f;d[a+3]=255}}
+  for(let k=0;k<L;k++)lctx[k].putImageData(lbuf[k],0,0)}
+
+/* ---------- ground + wall ---------- */
+const groundTile=(()=>{const c=document.createElement('canvas');c.width=c.height=256;const g=c.getContext('2d'),d=g.createImageData(256,256);
+  const pn=(x,y,sc)=>{const P=256/sc,h=(i,j)=>{i=((i%P)+P)%P;j=((j%P)+P)%P;let n=(i*374761393+j*668265263)|0;n=(n^(n>>>13))*1274126177|0;return((n^(n>>>16))>>>0)/4294967296};
+    const X=x/sc,Y=y/sc,i=Math.floor(X),j=Math.floor(Y),fx=X-i,fy=Y-j,u=fx*fx*(3-2*fx),v=fy*fy*(3-2*fy);return(h(i,j)*(1-u)+h(i+1,j)*u)*(1-v)+(h(i,j+1)*(1-u)+h(i+1,j+1)*u)*v};
+  for(let y=0;y<256;y++)for(let x=0;x<256;x++){const n=pn(x,y,32)*.5+pn(x,y,8)*.3+pn(x,y,2)*.2,k=4*(y*256+x),m=Math.max(0,Math.min(1,(pn(x+64,y,64)-.55)*4))*.6;
+    const v=165+n*55;d.data[k]=v-(v-96)*m;d.data[k+1]=v+2-(v+2-90)*m;d.data[k+2]=v+6-(v+6-80)*m;d.data[k+3]=255}
+  g.putImageData(d,0,0);return c})();
+let pattern=null;
+
+/* ---------- render ---------- */
+let mode='stack',dpr=Math.min(devicePixelRatio||1,1.5),W=0,Hh=0,dirty=true,lastDraw=0,auto=false,bakeMs=0;
+function resize(){const r=cv.getBoundingClientRect();W=r.width;Hh=r.height;cv.width=Math.round(W*dpr);cv.height=Math.round(Hh*dpr);dirty=true}
+new ResizeObserver(resize).observe(cv);
+const deg=v=>v*Math.PI/180;
+function frame(){
+  const tilt=mode==='stack'?deg(+$('tilt').value):0,a=deg(+$('rot').value),pitch=mode==='stack'?deg(+$('pitch').value):0,th=deg(+$('light').value),el=deg(42);
+  const hs=+$('hs').value/100,step=HMAX*hs/L;
+  /* light in object space: undo yaw, then undo pitch */
+  const Lu=Math.cos(th)*Math.cos(el),Lv=Math.sin(th)*Math.cos(el),Lz=Math.sin(el);
+  const lx0=Lu*Math.cos(-a)-Lv*Math.sin(-a),ly=Lu*Math.sin(-a)+Lv*Math.cos(-a);
+  const cp=Math.cos(pitch),sp=Math.sin(pitch),lx=lx0*cp+Lz*sp,lz=-lx0*sp+Lz*cp;
+  const key=[mode,hs,Math.round(Math.atan2(ly,lx)*40),Math.round(pitch*60)].join();
+  if(key!==bakedKey){const t0=performance.now();bake(lx,ly,lz,mode!=='flat');bakeMs=performance.now()-t0;bakedKey=key}
+
+  const s=Math.min(W,Hh)/(S*1.35),cx=W/2,cy=Hh/2+(mode==='stack'?s*HMAX*hs*PPM*Math.sin(tilt)*.45:0);
+  const cT=Math.cos(tilt),sT=Math.sin(tilt),ca=Math.cos(a),sa=Math.sin(a);
+  ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,W,Hh);
+  if(!pattern)pattern=ctx.createPattern(groundTile,'repeat');
+  ctx.save();ctx.translate(cx,cy);ctx.scale(s,s*cT);ctx.fillStyle=pattern;ctx.globalAlpha=.9;ctx.fillRect(-W/s*2,-Hh/s*4,W/s*4,Hh/s*8);ctx.restore();
+
+  /* affine for a slice at height h (px): object (x,y) -> screen */
+  const lift=Math.abs(sp)*94;
+  const M=h=>{const Z0=h*cp+lift;return[dpr*s*cp*ca,dpr*s*(cp*sa*cT-sp*sT),dpr*-s*sa,dpr*s*ca*cT,dpr*(cx-s*h*sp*ca),dpr*(cy-s*(h*sp*sa*cT+Z0*sT))]};
+
+  /* wall under the tank when pitched */
+  if(mode==='stack'&&Math.abs(pitch)>deg(1)){const wh=1.0*PPM,n=12;
+    for(let k=0;k<=n;k++){const h=wh*k/n;ctx.setTransform(dpr*s*ca,dpr*s*sa*cT,dpr*-s*sa,dpr*s*ca*cT,dpr*cx,dpr*(cy-s*h*sT));
+      ctx.fillStyle=k==n?'#a9a49a':`rgb(${110+k*3},${106+k*3},${99+k*3})`;ctx.fillRect(-6,-150,12,300)}}
+
+  /* shadow: footprint smeared away from the light */
+  if(mode!=='flat'){const len=HMAX*hs*PPM/Math.tan(el)*.8,du=-Math.cos(th),dv=-Math.sin(th);ctx.globalAlpha=.075;
+    for(let j=0;j<=10;j++){const o=len*j/10;ctx.setTransform(dpr*s*cp*ca,dpr*s*cp*sa*cT,dpr*-s*sa,dpr*s*ca*cT,dpr*(cx+s*o*du),dpr*(cy+s*o*dv*cT));ctx.drawImage(mask,-C,-C)}
+    ctx.globalAlpha=1}
+
+  if(mode==='stack'){const px=s*step*PPM*Math.max(sT,Math.abs(sp)),rep=Math.max(1,Math.ceil(px));
+    for(let k=0;k<L;k++)for(let r=0;r<rep;r++){const m=M((k+r/rep)*step*PPM);ctx.setTransform(m[0],m[1],m[2],m[3],m[4],m[5]);ctx.drawImage(layers[k],-C,-C)}}
+  else{ctx.setTransform(dpr*s*ca,dpr*s*sa,dpr*-s*sa,dpr*s*ca,dpr*cx,dpr*cy);for(let k=0;k<L;k++)ctx.drawImage(layers[k],-C,-C)}
+  ctx.setTransform(1,0,0,1,0,0);
+  const per=mode==='stack'?L*Math.max(1,Math.ceil(s*step*PPM*Math.max(sT,Math.abs(sp)))):L;
+  $('badge').textContent=`그리기 ${per}회/프레임 · 굽기 ${bakeMs.toFixed(0)}ms`}
+
+function loop(t){requestAnimationFrame(loop);if(document.hidden)return;
+  if(auto){if(t-lastDraw<33)return;const r=$('rot');r.value=(+r.value+1)%360;syncOut();dirty=true}
+  if(!dirty)return;lastDraw=t;dirty=false;frame()}
+requestAnimationFrame(loop);
+
+/* ---------- UI ---------- */
+function syncOut(){$('oTilt').textContent=$('tilt').value+'°';$('oRot').textContent=$('rot').value+'°';$('oLight').textContent=$('light').value+'°';
+  $('oPitch').textContent=(+$('pitch').value>0?'+':'')+$('pitch').value+'°';$('oHs').textContent=(+$('hs').value/100).toFixed(1)+'×'}
+['tilt','rot','light','pitch'].forEach(id=>$(id).addEventListener('input',()=>{syncOut();dirty=true}));
+$('hs').addEventListener('input',()=>{syncOut();prep();dirty=true});
+$('auto').addEventListener('change',e=>{auto=e.target.checked;dirty=true});
+document.querySelectorAll('.seg button').forEach(b=>b.addEventListener('click',()=>{mode=b.dataset.m;document.querySelectorAll('.seg button').forEach(x=>x.classList.toggle('on',x===b));
+  ['tilt','pitch'].forEach(id=>$(id).disabled=mode!=='stack');dirty=true}));
+let drag=null;
+cv.addEventListener('pointerdown',e=>{drag={x:e.clientX,y:e.clientY,r:+$('rot').value,t:+$('tilt').value};cv.setPointerCapture(e.pointerId)});
+cv.addEventListener('pointermove',e=>{if(!drag)return;$('rot').value=((drag.r+(e.clientX-drag.x)*.6)%360+360)%360;
+  if(mode==='stack')$('tilt').value=Math.max(0,Math.min(65,drag.t-(e.clientY-drag.y)*.3));syncOut();dirty=true});
+cv.addEventListener('pointerup',()=>drag=null);cv.addEventListener('pointercancel',()=>drag=null);
+
+let upImg=null,upH=null;
+const load=f=>new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>{const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=r.result};r.onerror=rej;r.readAsDataURL(f)});
+$('fImg').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;try{upImg=await load(f);fromImage(upImg,upH);prep();dirty=true;
+  $('srcNote').innerHTML=`지금: <b>${f.name.replace(/[<>&]/g,'')}</b> · 높이는 ${upH?'올린 높이맵':'윤곽에서 자동 추정'}`}catch{$('srcNote').textContent='이미지를 읽지 못했습니다. PNG나 JPG 파일인지 확인해 주세요.'}});
+$('fH').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;try{upH=await load(f);if(upImg){fromImage(upImg,upH);prep();dirty=true;
+  $('srcNote').innerHTML=`지금: <b>내 이미지</b> · 높이는 <b>올린 높이맵</b> (밝을수록 높음)`}else $('srcNote').textContent='높이맵을 받았습니다. 이제 스프라이트 이미지를 올려 주세요.'}catch{$('srcNote').textContent='높이맵 이미지를 읽지 못했습니다.'}});
+$('reset').addEventListener('click',()=>{upImg=upH=null;$('fImg').value='';$('fH').value='';makeSample();prep();dirty=true;$('srcNote').innerHTML='지금: <b>내장 샘플</b> (높이맵을 정확히 알고 있는 이미지)'});
+
+makeSample();prep();syncOut();resize();
+window.__ts={frame,set:(o)=>{for(const k in o)$(k).value=o[k];syncOut();dirty=true},mode:m=>document.querySelector(`.seg [data-m=${m}]`).click()};
+})();
+</script>

@@ -1,0 +1,12 @@
+{
+  "_note": "예시 스키마. 수치는 임시값이며 고증 확인 전.",
+  "weapons": [
+    { "id": "ak74", "name": "AK-74", "caliber": "5.45x39", "magSize": 30, "rpm": 650,
+      "spreadDeg": 1.2, "muzzleVel": 900, "penetration": 55, "weightKg": 3.3, "soundRadius": 200 },
+    { "id": "svd", "name": "SVD", "caliber": "7.62x54R", "magSize": 10, "rpm": 30,
+      "spreadDeg": 0.3, "muzzleVel": 830, "penetration": 80, "weightKg": 4.3, "soundRadius": 250 },
+    { "id": "pm", "name": "PM", "caliber": "9x18", "magSize": 8, "rpm": 120,
+      "spreadDeg": 3.0, "muzzleVel": 315, "penetration": 15, "weightKg": 0.73, "soundRadius": 100 }
+  ],
+  "materials": { "plaster": 10, "wood": 20, "brick": 60, "concrete": 90 }
+}

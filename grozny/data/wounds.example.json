@@ -1,0 +1,12 @@
+{
+  "_note": "예시 스키마. docs/03_SYSTEMS.md 1절과 동기화.",
+  "bloodMl": { "max": 5000, "unconscious": 3000, "death": 2000 },
+  "instantKill": { "head": 0.85, "neck": 0.5, "chest": 0.25 },
+  "types": [
+    { "id": "graze", "bleedPerSec": 0.1, "pain": 5, "treat": ["bandage"] },
+    { "id": "gsw", "bleedPerSec": [0.5, 1.5], "pain": 30, "treat": ["tourniquet", "pressure_bandage"], "arteryChance": 0.15 },
+    { "id": "artery", "bleedPerSec": 4.0, "pain": 40, "treat": ["tourniquet"], "limbOnlyTreat": true },
+    { "id": "fracture", "bleedPerSec": 0, "pain": 50, "treat": ["splint"], "effects": { "arm": { "aim": -0.6 }, "leg": { "move": -1.0 } } },
+    { "id": "frostbite", "bleedPerSec": 0, "pain": 10, "treat": ["warmth"] }
+  ]
+}

@@ -44,7 +44,7 @@ DS.VEHICLES = DS.VEHICLES || {};
       name: '2A46 125mm', trunnion: L(1366, 712),
       muzzle: (1742 - 1366) / PPM * 1.051 + (1386 - 1366) / PPM * -0.051,
       barrelScale: 1.051,            // drawing's barrel is ~0.22 m short of the real 9.53 m overall length
-      elevMax: 14, elevMin: -6, rate: 0.30,
+      elevMax: 14, elevMin: -6, rate: 0.15, elevRate: 3.5, coincide: true,
       recoilLen: 0.30, recoilMass: 2400, reload: 7.5, stabilized: true, stab: 0.60,
       // carousel autoloader: the gun goes to the loading angle and is locked there for the cycle, then
       // released for the last `out` seconds to come back onto the lay. The stub of the semi-combustible case

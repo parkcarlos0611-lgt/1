@@ -34,7 +34,7 @@ DS.VEHICLES = DS.VEHICLES || {};
       vmaxF: 65 / 3.6, vmaxR: 12 / 3.6, brake: 4.0e5, engineBrake: 2.6e4 },
     exhaust: { x: L(60, 505)[0], y: L(60, 505)[1] },
     gun: { name: 'CN-105-F1 105mm', trunnion: L(515, 470), muzzle: (922 - 515) / PPM,
-      elevMax: 20, elevMin: -8, rate: 0.30, recoilLen: 0.3, recoilMass: 1800, reload: 7.5, stabilized: true, stab: 0.5 },
+      elevMax: 20, elevMin: -8, rate: 0.16, elevRate: 8, recoilLen: 0.3, recoilMass: 1800, reload: 7.5, stabilized: true, stab: 0.5 },
     // 20 mm M693 dual-feed cannon, left of the main gun: light armour, soft targets and helicopters
     coax: { name: 'M693 20mm 동축 기관포', ammo: 'M693', muzzle: L(540, 478), rate: 740 / 60, rounds: 480, spread: 1.0 },
     turretRing: L(370, 494),

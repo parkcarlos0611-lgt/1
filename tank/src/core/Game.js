@@ -481,7 +481,10 @@ DS.Game = class Game {
     this.elevDir = dir;
     if (dir !== 0) {
       this.elevHold += dt;
-      const h = this.elevHold - 0.35, r = h < 0 ? 0 : fine ? Math.min(0.5, 0.05 + h * 0.25) : Math.min(6, 0.15 + h * h * 3);
+      // the gunner's handle reaches the gun's own top speed: an M1A1 swings fast, an M60A1 or a T-72 only a few
+      // degrees a second (the gun then follows at its drive rate)
+      const top = this.player.def.gun.elevRate || 6;
+      const h = this.elevHold - 0.35, r = h < 0 ? 0 : fine ? Math.min(Math.min(0.5, top), 0.05 + h * 0.25) : Math.min(top, 0.15 + h * h * Math.max(1.5, top / 2));
       i.elevRate = dir * r * d2r;
     } else i.elevRate = 0;
     i.fire = k.has('Space') || !!this.mouseFire || this.touch.fire;
@@ -601,7 +604,7 @@ DS.Game = class Game {
         }
       }
       if (!this.sbx && up === 0 && foes.length && over.hidden && !this._won) { this._won = true; over.hidden = false; document.getElementById('over-t').textContent = '적 소대 전멸 — 임무 완료'; }
-      set('h-load', g.reload > 0 ? (g.locked ? '자동장전 — 포 고정 ' : '장전 중 ') + g.reload.toFixed(1) + ' s' : '장전 완료');
+      set('h-load', g.reload > 0 ? (g.locked ? '자동장전 — 포 고정 ' : '장전 중 ') + g.reload.toFixed(1) + ' s' : g.pend != null && g.laying ? '포 정렬 중 — 발사 대기' : g.laying ? '포 구동 중' : '장전 완료');
       { const lb = this._lbar || (this._lbar = document.getElementById('h-lbar')), full = (v.def.gun.reload || 1) * (v.wounds && v.wounds.loader ? 1.5 : 1);
         if (lb) { lb.style.width = (100 * Math.max(0, Math.min(1, 1 - g.reload / full))).toFixed(0) + '%'; lb.style.background = g.reload > 0 ? 'var(--warn)' : 'var(--ok)'; } }
       document.body.classList.toggle('sightbig', this.sightCv.classList.contains('big'));

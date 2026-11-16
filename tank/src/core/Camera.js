@@ -11,13 +11,25 @@ DS.Camera = class Camera {
     this.zoom += (this.tzoom - this.zoom) * Math.min(1, dt * 6);
     if (Math.abs(this.tzoom - this.zoom) < this.tzoom * 0.001) this.zoom = this.tzoom;      // settle exactly (caches key on it)
     const halfW = this.W / 2 / this.zoom;
-    const lead = Math.max(-1, Math.min(1, v.vel.x / 12)) * halfW * 0.35 * T.lookAhead + halfW * 0.25;
-    const tx = v.pos.x + lead;
-    const ty = v.pos.y - 1.5 + this.H / this.zoom * (0.5 - DS.T.camera.ground);     // ground line sits `ground` of the screen height above the bottom edge, at every zoom
+    // the ground line sits `ground` of the screen height above the bottom edge at every zoom. The part of the
+    // height that depends on the zoom is applied exactly every frame and only the vehicle's own rise and fall
+    // is smoothed: smoothing the whole height let the ground swing up and down the screen (even off it) each
+    // time the view zoomed, and settle back a second later
+    const off = this.H / this.zoom * (0.5 - T.ground);
+    let base = v.pos.y - 1.5;
     // aircraft: the ground stays at the bottom of the view until the machine climbs past the top third
-    let tyv = ty; if (v.heli) { const a = v.alt(), vh = this.H / this.zoom; tyv = v.pos.y - a - 1.5 + vh * (0.5 - T.ground) + Math.max(0, a - vh * 0.62); }
+    if (v.heli) { const a = v.alt(), vh = this.H / this.zoom; base = v.pos.y - a - 1.5 + Math.max(0, a - vh * 0.62); }
     const k = Math.min(1, dt * 3);
-    this.x += (tx - this.x) * k; this.y += (tyv - this.y) * Math.min(1, dt * 2.5);
+    let by = this.y - (this._off != null ? this._off : off);           // (also picks up a height another view set)
+    by += (base - by) * Math.min(1, dt * 2.5);
+    // sideways the same: the look-ahead is a share of the half-width (smoothed as the speed changes), applied at
+    // the current zoom; only the following of the vehicle is smoothed
+    const lf = 0.25 + Math.max(-1, Math.min(1, v.vel.x / 12)) * 0.35 * T.lookAhead;
+    this._lf = this._lf == null ? lf : this._lf + (lf - this._lf) * k;
+    let bx = this.x - (this._lead != null ? this._lead : halfW * this._lf);
+    bx += (v.pos.x - bx) * k;
+    const lead = halfW * this._lf;
+    this.x = bx + lead; this._lead = lead; this.y = by + off; this._off = off;
   }
   visible(x, y, r = 0) {
     const hw = this.W / 2 / this.zoom + r, hh = this.H / 2 / this.zoom + r;

@@ -34,7 +34,7 @@ DS.VEHICLES = DS.VEHICLES || {};
       vmaxF: 65 / 3.6, vmaxR: 10 / 3.6, brake: 1.5e5, engineBrake: 1.2e4 },
     exhaust: { x: L(760, 470)[0], y: L(760, 470)[1] },
     gun: { name: '2A28 73mm', trunnion: L(470, 430), muzzle: (710 - 470) / PPM,
-      elevMax: 33, elevMin: -4, rate: 0.3, recoilLen: 0.2, recoilMass: 450, reload: 8, stabilized: false, stab: 0 },
+      elevMax: 33, elevMin: -4, rate: 0.12, elevRate: 6, recoilLen: 0.2, recoilMass: 450, reload: 8, stabilized: false, stab: 0 },
     coax: { name: 'PKT 7.62mm 동축', ammo: 'M240_762', muzzle: L(480, 438), rate: 700 / 60, rounds: 2000, spread: 0.8 },
     // 9M14 Malyutka: one on the rail, three more inside (loaded through a hatch, so slowly)
     tow: { ammo: 'AT3', label: '말류트카', short: 'AT-3', c: L(440, 397), pivotPx: [440, 397], len: 0.86, h: 0.12, lift: 0, loaded: 1, reserve: 3, reloadTime: 50, raise: 0.4, range: 3000, minRange: 500, gunFallback: true },

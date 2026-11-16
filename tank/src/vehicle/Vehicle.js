@@ -279,14 +279,21 @@ DS.Vehicle = class Vehicle {
     // autoloader (T-72): from the shot until `out` seconds before the round is home the gun sits locked at the
     // loading angle; the sight line (aimW) stays free, so the gunner can keep it on the target meanwhile
     const AL = G.autoloader; gs.locked = !!(AL && gs.reload > AL.out && this.alive && this.firepower && gs.fired > 0);
-    const eg = gs.locked ? AL.angle * d2r : et, mx = (AL ? 0.26 : G.rate) * dt;
+    const eg = gs.locked ? AL.angle * d2r : et, mx = (gs.locked || (AL && gs.fired > 0 && gs.reload > 0 && Math.abs(gs.e - et) > 0.02) ? 0.26 : G.rate) * dt;   // (the autoloader's own drive throws the gun to and from the loading angle)
     gs.e += Math.max(-mx, Math.min(mx, eg - gs.e));
     gs.reload = Math.max(0, gs.reload - dt);
     // spent case / case stub thrown out of the turret rear a moment after the shot
     if (G.eject && gs.ejectT > 0) { gs.ejectT -= dt; if (gs.ejectT <= 0 && this.alive) { const q = this.local(this.dir * G.eject.port[0], G.eject.port[1]); this.events.push({ type: 'case', x: q.x, y: q.y, E: G.eject }); } }
     if (gs.rv < 0) { gs.rv += gs.aB * dt; gs.rx += gs.rv * dt; if (gs.rv >= 0) gs.rv = 0.0001; }
     else if (gs.rx < 0) { const a = -(G.recoilK || 64) * gs.rx - (G.recoilC || 15) * gs.rv; gs.rv += a * dt; gs.rx += gs.rv * dt; if (gs.rx > -1e-4) { gs.rx = 0; gs.rv = 0; } }
-    if (this.input.fire && this.alive && this.firepower && gs.ammo && gs.reload <= 0 && gs.rx === 0) this.fire(world);
+    // fire coincidence (M1A1, Challenger, T-72): the trigger is held until the gun has caught up with the sight
+    // (within 0.3 mil), a press kept for up to 1.5 s; older tanks fire wherever the gun is when pressed
+    const ready = this.alive && this.firepower && gs.ammo && gs.reload <= 0 && gs.rx === 0;
+    if (this.input.fire && ready) gs.pend = world.time;
+    gs.laying = !!(G.coincide && !gs.locked && Math.abs(eg - gs.e) > 0.0003);
+    const want = this.input.fire || (gs.pend != null && world.time - gs.pend < 1.5);
+    if (want && ready && !gs.laying) { gs.pend = null; this.fire(world); }
+    else if (gs.pend != null && world.time - gs.pend >= 1.5) gs.pend = null;
   }
 
   // muzzle velocity: fixed ammunition has its own; bagged charges (howitzer) set it by the charge chosen

@@ -34,7 +34,7 @@ DS.VEHICLES = DS.VEHICLES || {};
       vmaxF: 61 / 3.6, vmaxR: 16 / 3.6, brake: 3.2e5, engineBrake: 2.2e4 },
     exhaust: { x: L(600, 212)[0], y: L(600, 212)[1] },
     gun: { name: 'M242 25mm', trunnion: L(425, 170), muzzle: (614 - 425) / PPM,
-      elevMax: 60, elevMin: -10, rate: 1.0, recoilLen: 0.04, recoilMass: 110, reload: 0.3,   // 200 rounds/min
+      elevMax: 60, elevMin: -10, rate: 1, elevRate: 30, recoilLen: 0.04, recoilMass: 110, reload: 0.3,   // 200 rounds/min
       recoilK: 6400, recoilC: 140, stabilized: true },
     coax: { name: 'M240C 7.62mm 동축', ammo: 'M240_762', muzzle: L(452, 178), rate: 750 / 60, rounds: 2200, spread: 0.7 },
     // twin TOW launcher on the far (left) side of the turret: hidden behind it when stowed; raised, its top

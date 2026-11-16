@@ -55,7 +55,7 @@ DS.VEHICLES = DS.VEHICLES || {};
     gun: {                           // M256 120 mm L/44
       name: 'M256 120mm', trunnion: L(890, 792), boreY: 792,
       muzzle: (1416 - 890) / PPM,    // trunnion → muzzle (m)
-      elevMax: 20, elevMin: -10, rate: 0.40,   // deg, deg, rad/s
+      elevMax: 20, elevMin: -10, rate: 0.4, elevRate: 20, coincide: true,   // deg, deg, gun drive rad/s, gunner's handle deg/s (estimate), fire held until the gun meets the sight
       recoilLen: 0.30, recoilMass: 2900, reload: 6.5,
       stabilized: true, stab: 0.96,        // two-axis stabiliser: holds 96 % of the hull's pitching out of the lay
     },

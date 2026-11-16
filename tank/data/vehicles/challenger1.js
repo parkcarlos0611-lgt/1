@@ -32,7 +32,7 @@ DS.VEHICLES = DS.VEHICLES || {};
       vmaxF: 56 / 3.6, vmaxR: 13 / 3.6, brake: 6.4e5, engineBrake: 3.2e4 },
     exhaust: { x: L(60, 500)[0], y: L(60, 500)[1] },
     gun: { name: 'L11A5 120mm', trunnion: L(548, 467), muzzle: (905 - 548) / PPM,
-      elevMax: 20, elevMin: -10, rate: 0.32, recoilLen: 0.37, recoilMass: 2600, reload: 7.5, stabilized: true, stab: 0.9 },
+      elevMax: 20, elevMin: -10, rate: 0.25, elevRate: 12, coincide: true, recoilLen: 0.37, recoilMass: 2600, reload: 7.5, stabilized: true, stab: 0.9 },
     coax: { name: 'L8A2 7.62mm 동축', ammo: 'M240_762', muzzle: L(560, 476), rate: 750 / 60, rounds: 4000, spread: 0.7 },
     turretRing: L(380, 487),
     sight: { laser: true, thermal: true, tis: [500, 300], name: 'TOGS', crew: 1.0, rangeErr: 0.006, aimErr: 0.2, layTime: 2.5, detectMax: 4000, identMax: 2800, engageMax: 3000 },

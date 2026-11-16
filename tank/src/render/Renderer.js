@@ -59,6 +59,22 @@ DS.Renderer = class Renderer {
     while (i + 1 < m.length && m[i + 1].width >= screenW) i++;
     return m[i];
   }
+  // gravel lying on the plane: grey and pale pebbles with a shadow under each, the odd flat stone (screen-space
+  // texture, like the streaks)
+  makeGravel() {
+    const c = document.createElement('canvas'); c.width = 256; c.height = 128; const x = c.getContext('2d'), r = DS.rng(23);
+    for (let i = 0; i < 700; i++) {
+      const px = r() * 256, py = r() * 128, big = r() < 0.06, w = big ? 3 + r() * 4 : 0.8 + r() * 1.8, h = w * (0.45 + r() * 0.25);
+      const g = r(), col = g < 0.5 ? [128, 122, 114] : g < 0.8 ? [158, 150, 138] : [228, 222, 208];
+      for (const [ox, oy] of [[0, 0], [-256, 0], [0, -128], [-256, -128]]) {
+        const X = px + ox + (ox ? 0 : 0), Y = py + oy; if (X < -8 || Y < -8) continue;
+        x.fillStyle = 'rgba(70,56,40,0.35)'; x.beginPath(); x.ellipse(X - w * 0.2, Y + h * 0.6, w, h * 0.6, 0, 0, 7); x.fill();
+        x.fillStyle = `rgba(${col},${0.55 + r() * 0.35})`; x.beginPath(); x.ellipse(X, Y, w, h, 0, 0, 7); x.fill();
+        x.fillStyle = 'rgba(255,250,236,0.35)'; x.beginPath(); x.ellipse(X + w * 0.2, Y - h * 0.35, w * 0.5, h * 0.35, 0, 0, 7); x.fill();
+      }
+    }
+    return c;
+  }
   makeStreaks() {                      // horizontal wind streaks, light and dark, laid flat (screen-space texture)
     const c = document.createElement('canvas'); c.width = 512; c.height = 64; const x = c.getContext('2d'), r = DS.rng(17);
     for (let i = 0; i < 140; i++) {
@@ -522,7 +538,8 @@ DS.Renderer = class Renderer {
     }
     if (night) { ctx.fillStyle = `rgba(4,8,22,${DS.Sky.STARLIGHT * night})`; ctx.fillRect(0, 0, W, H); }      // starlight: never quite black
     ctx.restore();
-    if (night && opt.main !== false) this.nightLights(ctx, cam);         // windows, street lamps, burning floors, white searchlights
+    if (night && opt.main !== false) this.nightLights(ctx, cam);
+    if (night > 0.2) this.oilFires(ctx, cam, true);                      // the burning wells light the night         // windows, street lamps, burning floors, white searchlights
     if (opt.nv) DS.Searchlight.draw(ctx, cam, this.w, true);              // every searchlight beam, infrared too, in a night-vision sight
     if (night) {                                   // light sources stay bright in the dark
       ctx.globalCompositeOperation = 'lighter';
@@ -580,6 +597,7 @@ DS.Renderer = class Renderer {
     const F = [0.006, 0.012, 0.02, 0.05, 0.10, 0.18, 0.30];
     let near = null;
     for (let li = storm ? 2 : 0; li < 7; li++) {
+      if (li === 1) continue;                                                          // (was a second mountain range)
       const f = F[li], s = li < 2 ? 1.6 / dh : (0.6 + f * 2) / dh;                  // layer units per half-size pixel
       let L = S.land[li]; if (!L) L = S.land[li] = { c: document.createElement('canvas'), key: '', camx: 0 };
       let X0 = Wh / 2 - Ws / 2 - (cam.x - L.camx) * f * 8 / s;
@@ -593,6 +611,7 @@ DS.Renderer = class Renderer {
         L.c._v = (L.c._v || 0) + 1;
       }
       ctx.drawImage(L.c, X0 * sx, (hzH - top) * sy, Ws * sx, (top + bot) * sy);
+      if (li === 0) this.oilFires(ctx, cam, false);
       near = L;
     }
     // below the strips every layer is solid: the nearest one's colour
@@ -606,7 +625,8 @@ DS.Renderer = class Renderer {
       g.addColorStop(0, '#1a1a1a'); g.addColorStop(1, '#3a3a3a'); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H); return;
     }
     if (env.visibility) { g.addColorStop(0, '#b98d5a'); g.addColorStop(0.55, '#d8b07a'); g.addColorStop(1, '#e2c08c'); }
-    else { g.addColorStop(0, '#3f78bd'); g.addColorStop(0.3, '#7da9d6'); g.addColorStop(0.52, '#c3d6e2'); g.addColorStop(0.75, '#ecdcbc'); g.addColorStop(1, '#e8cf9f'); }
+    // a hazy desert sky: a soft grey-blue overhead, paling through dusty white to a warm haze at the horizon
+    else { g.addColorStop(0, '#6c8db6'); g.addColorStop(0.24, '#88a3c2'); g.addColorStop(0.4, '#aebfcd'); g.addColorStop(0.5, '#cdd0cb'); g.addColorStop(0.58, '#ddd5c4'); g.addColorStop(1, '#e3d6bc'); }
     ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
     // ---- daylight sky: palette from the sun's height, sun disc and glow, high cirrus (all of it is painted at
     // any hour; dusk colours and the night sky are laid over it by how far the sun is down) ----
@@ -626,7 +646,7 @@ DS.Renderer = class Renderer {
     }
     let sg = ctx.createRadialGradient(sx, sy, 0, sx, sy, H * 0.55);
     sg.addColorStop(0, storm ? 'rgba(255,235,200,0.75)' : 'rgba(255,250,232,1)'); sg.addColorStop(0.035, storm ? 'rgba(255,225,180,0.45)' : `rgba(255,${238 - 30 * low},${200 - 60 * low},0.75)`);
-    sg.addColorStop(0.25, `rgba(255,${225 - 40 * low},${180 - 70 * low},${storm ? 0.18 : 0.22})`); sg.addColorStop(1, 'rgba(255,220,180,0)');
+    sg.addColorStop(0.25, `rgba(255,${225 - 40 * low},${180 - 70 * low},${storm ? 0.18 : 0.16})`); sg.addColorStop(1, 'rgba(255,220,180,0)');
     ctx.fillStyle = sg; ctx.fillRect(0, 0, W, H);
     if (!storm) {                                  // thin cirrus, drifting very slowly with the view
       if (!this.clouds) { const r = DS.rng(5); this.clouds = Array.from({ length: 9 }, () => ({ x: r(), y: 0.06 + r() * 0.22, w: 0.12 + r() * 0.22, h: 0.006 + r() * 0.01, a: 0.12 + r() * 0.18 })); }
@@ -640,31 +660,29 @@ DS.Renderer = class Renderer {
       ctx.restore();
     }
     if (!storm) {
-      // cumulus: heaps of lumpy puffs with flat bases, lit from the sun's side, drifting slowly; a few faint
-      // shafts of light fan down from the sun through the haze
+      // stratus: long, thin, flat-bottomed sheets of cloud stretched by the wind, lit along the top, greyer
+      // underneath, drifting slowly; far ones smaller, paler, lower and slower
       const PS = this.w.particles, R5 = n => { const v = Math.sin(n * 91.7 + 13.3) * 43758.5453; return v - Math.floor(v); };
-      const span = W * 1.8, warm = low > 0.3 ? 0xffe2c0 : 0xfdfbf6;
+      const span = W * 2.2, warm = low > 0.3 ? 0xffe2c4 : 0xf7f5f0;
       // a soft glare spreading below the sun rather than hard shafts
-      { const cg = ctx.createRadialGradient(sx, sy, 0, sx, sy + H * 0.25, H * 0.55); cg.addColorStop(0, 'rgba(255,240,215,0.10)'); cg.addColorStop(1, 'rgba(255,240,215,0)'); ctx.fillStyle = cg; ctx.fillRect(0, 0, W, H); }
-      for (let i = 0; i < 8; i++) {
-        // each cloud: a flat-bottomed heap of many small puffs, densest and tallest in the middle, the top lit and
-        // the underside greyer; far ones smaller, paler and slower
-        const far = 0.4 + 0.6 * R5(i + 20), cw = W * (0.1 + 0.2 * R5(i)) * far, by = H * (0.12 + 0.24 * R5(i + 10));
-        const cx = ((R5(i + 30) * span - cam.x * cam.dpr * 0.012 * far + this.w.time * 2.2 * far) % span + span) % span - W * 0.4;
-        if (cx + cw < 0 || cx - cw > W) continue;
-        // each heap is painted once into its own image (its shape never changes) and placed where it has drifted
-        const ck = i + '|' + Math.round(cw) + '|' + warm, cc = this.cloudC || (this.cloudC = new Map());
+      { const cg = ctx.createRadialGradient(sx, sy, 0, sx, sy + H * 0.25, H * 0.55); cg.addColorStop(0, 'rgba(255,240,215,0.08)'); cg.addColorStop(1, 'rgba(255,240,215,0)'); ctx.fillStyle = cg; ctx.fillRect(0, 0, W, H); }
+      for (let i = 0; i < 9; i++) {
+        const far = 0.35 + 0.65 * R5(i + 20), cw = W * (0.16 + 0.3 * R5(i)) * (0.5 + 0.5 * far), by = H * (0.08 + 0.34 * (1 - far) + 0.06 * R5(i + 10));
+        const cx = ((R5(i + 30) * span - cam.x * cam.dpr * 0.012 * far + this.w.time * 1.6 * far) % span + span) % span - W * 0.6;
+        if (cx + cw * 1.2 < 0 || cx - cw * 1.2 > W) continue;
+        // each sheet is painted once into its own image (its shape never changes) and placed where it has drifted
+        const ck = 's' + i + '|' + Math.round(cw) + '|' + warm, cc = this.cloudC || (this.cloudC = new Map());
         let im = cc.get(ck);
         if (!im) {
-          const cwd = Math.ceil(cw * 2.2), cht = Math.ceil(cw * 0.75);
+          const cwd = Math.ceil(cw * 2.4), cht = Math.ceil(cw * 0.22);
           im = document.createElement('canvas'); im.width = Math.max(1, cwd); im.height = Math.max(1, cht);
-          const o = im.getContext('2d'), ox = cwd / 2, oy = cht * 0.78;              // heap centre and base inside the image
-          for (let k = 0; k < 26; k++) {
-            const u = R5(i * 31 + k), e = Math.sqrt(Math.max(0, 1 - (u * 2 - 1) ** 2)), r = cw * (0.05 + 0.1 * e) * (0.7 + 0.6 * R5(i * 5 + k * 3));
-            const px = ox + (u - 0.5) * cw * 1.6, py = oy - r * 0.3 - e * cw * 0.16 * R5(i * 7 + k);
-            const lit = py < oy - cw * 0.06;
-            o.globalAlpha = (0.32 + 0.4 * far) * (lit ? 1 : 0.8);
-            o.drawImage(PS.puff(lit ? warm : 0xc9cdd6, k & 3), px - r, py - r * 0.62, r * 2, r * 1.24);
+          const o = im.getContext('2d'), ox = cwd / 2, oy = cht * 0.72;
+          for (let k = 0; k < 34; k++) {
+            const u = R5(i * 31 + k), e = Math.sqrt(Math.max(0, 1 - (u * 2 - 1) ** 2)), r = cw * (0.035 + 0.06 * e) * (0.7 + 0.6 * R5(i * 5 + k * 3));
+            const px = ox + (u - 0.5) * cw * 2, py = oy - r * 0.2 - e * cw * 0.05 * R5(i * 7 + k);
+            const lit = py < oy - cw * 0.02;
+            o.globalAlpha = (0.16 + 0.3 * far) * (lit ? 1 : 0.85) * (0.6 + 0.4 * e);
+            o.drawImage(PS.puff(lit ? warm : 0xc3c8d0, k & 3), px - r * 2.6, py - r * 0.5, r * 5.2, r * 0.9);
           }
           if (cc.size > 64) cc.clear();
           cc.set(ck, im); im.ox = ox; im.oy = oy;
@@ -707,26 +725,17 @@ DS.Renderer = class Renderer {
     // ---- parallax dunes: asymmetric (long windward slope, short slip face), far layers fade into the haze,
     // faces turned to the sun lit, faces turned away shaded ----
     const hz = H * 0.5 + (cam.y - 14) * cam.zoom * cam.dpr * 0.04;
-    const haze = storm ? [214, 176, 122] : [236 - 10 * low, 222 - 12 * low, 196 - 10 * low], sand = storm ? [196, 156, 104] : [204, 170, 116];
+    const haze = storm ? [214, 176, 122] : [226 - 6 * low, 218 - 12 * low, 202 - 18 * low], sand = storm ? [196, 156, 104] : [210, 188, 150];
     const dune = (t) => { t = ((t % 1) + 1) % 1; const u = t < 0.72 ? t / 0.72 : 1 - (t - 0.72) / 0.28; return u * u * (3 - 2 * u); };
-    // far rocky range behind the dunes: a jagged ridge, blue-violet with distance, sunlit flanks
-    if (!storm) {
-      const N1 = n => { const v = Math.sin(n * 127.1 + 311.7) * 43758.5453; return v - Math.floor(v); };
-      const vn = x => { const i = Math.floor(x), f = x - i, s = f * f * (3 - 2 * f); return N1(i) + (N1(i + 1) - N1(i)) * s; };
-      const ridge = (wx, k) => 0.55 * vn(wx / 900 + k) + 0.3 * vn(wx / 260 + k * 3) + 0.15 * vn(wx / 70 + k * 7);
-      for (const [mi, [f, hgt, col, lit]] of [[0.006, 0.17, [150, 152, 176], 0.25], [0.012, 0.11, [176, 160, 158], 0.35]].entries()) {
-        if (li !== mi) continue;
-        const pts = [];
-        for (let x = -8; x <= W + 8; x += 8) { const wx = (x - W / 2) / cam.dpr * 1.6 + cam.x * f * 8 + 4000; const r = ridge(wx, f * 1000); pts.push([x, hz + H * 0.02 - H * hgt * Math.max(0, r - 0.32) * 1.9]); }
-        ctx.fillStyle = `rgb(${col})`; ctx.beginPath(); ctx.moveTo(-8, H);
-        for (const [x, y] of pts) ctx.lineTo(x, y);
-        ctx.lineTo(W + 8, H); ctx.closePath(); ctx.fill();
-        const sg3 = ctx.createLinearGradient(-8, 0, W + 8, 0);
-        for (let i = 2; i < pts.length; i += 2) { const sl = (pts[i - 2][1] - pts[i][1]) / 16 * sun.side, a = Math.max(-1, Math.min(1, sl * 1.2)); sg3.addColorStop((pts[i][0] + 8) / (W + 16), a > 0 ? `rgba(255,232,200,${(lit * a).toFixed(3)})` : `rgba(60,56,90,${(-lit * a).toFixed(3)})`); }
-        ctx.fillStyle = sg3; ctx.beginPath(); ctx.moveTo(-8, H); for (const [x, y] of pts) ctx.lineTo(x, y); ctx.lineTo(W + 8, H); ctx.closePath(); ctx.fill();
-      }
-    }
-    const layers = [[0.02, 0.85, 0.03, 30, 3200], [0.05, 0.68, 0.05, 55, 2300], [0.10, 0.5, 0.07, 80, 1700], [0.18, 0.32, 0.085, 105, 1300], [0.30, 0.16, 0.1, 125, 1000]];
+    const N1 = n => { const v = Math.sin(n * 127.1 + 311.7) * 43758.5453; return v - Math.floor(v); };
+    const vn = x => { const i = Math.floor(x), f = x - i, s = f * f * (3 - 2 * f); return N1(i) + (N1(i + 1) - N1(i)) * s; };
+    // the far horizon: a dead-flat line with the low, hazy silhouettes of the oil country on it — refinery
+    // stacks, storage tanks, pipe racks and lines of pump jacks (the burning wells are drawn live: oilFires())
+    if (li === 0) { if (!storm) this.oilSkyline(ctx, cam, hz + H * 0.012, haze, low); return; }
+    if (li === 1) return;
+    // the plain: five nearly flat rows of gravel desert with the odd low dune swell, far rows fading into the haze,
+    // each strewn with drift sand, pale crust and gravel
+    const layers = [[0.02, 0.6, 0.004, 30, 3200], [0.05, 0.45, 0.007, 55, 2300], [0.10, 0.32, 0.011, 80, 1700], [0.18, 0.2, 0.016, 105, 1300], [0.30, 0.1, 0.022, 125, 1000]];
     for (const [di, [f, fog, amp, base, lam]] of layers.entries()) {
       if (li !== 2 + di) continue;
       const fogK = storm ? Math.min(1, fog * 1.25 + 0.15) : fog;
@@ -735,30 +744,176 @@ DS.Renderer = class Renderer {
       for (let x = -8; x <= W + 8; x += 6) {
         // far layers keep their shape whatever the zoom: x is in screen pixels, only the pan moves them
         const wx = (x - W / 2) * px * (0.6 + f * 2) + cam.x * f * 8;
-        const y = hz + base * cam.dpr * 0.4 - amp * H * (0.25 + 0.55 * dune(wx / lam + f * 7) + 0.25 * dune(wx / (lam * 0.43) + f * 3) + 0.04 * Math.sin(wx * 0.05));
+        const sw = Math.max(0, vn(wx / (lam * 2.3) + di * 3.7) - 0.45) * 3.2;          // dunes only here and there
+        const y = hz + base * cam.dpr * 0.4 - amp * H * (0.3 + 0.25 * Math.sin(wx / lam * 1.7 + di) + sw * (1.6 * dune(wx / (lam * 0.6) + f * 7) + 0.4 * dune(wx / (lam * 0.27) + f * 3)));
         pts.push([x, y]);
       }
       ctx.fillStyle = `rgb(${col})`; ctx.beginPath(); ctx.moveTo(-8, H);
       for (const [x, y] of pts) ctx.lineTo(x, y);
       ctx.lineTo(W + 8, H); ctx.closePath(); ctx.fill();
-      // sun / shade on each facet as one horizontal gradient over a band under the crest line
       const kk = (1 - fogK) * (storm ? 0.4 : 1);
+      if (!storm) this.plainTexture(ctx, cam, pts, f, di, fogK, (layers[di + 1] ? layers[di + 1][3] - base : 120) * cam.dpr * 0.4 + amp * H, low);
+      // sun / shade on each facet as one horizontal gradient over a band under the crest line
       if (kk > 0.05) {
-        const sg2 = ctx.createLinearGradient(-8, 0, W + 8, 0), d = (16 + 46 * (1 - fogK)) * cam.dpr;
+        const sg2 = ctx.createLinearGradient(-8, 0, W + 8, 0), d = (8 + 22 * (1 - fogK)) * cam.dpr;
         for (let i = 1; i < pts.length; i += 2) {
-          const [xa, ya] = pts[i - 1], [, yb] = pts[i], sl = (ya - yb) / 6 * sun.side, a = Math.max(-1, Math.min(1, sl * 1.4)) * kk;
-          sg2.addColorStop((xa + 8) / (W + 16), a > 0 ? `rgba(255,${238 - 30 * low},${205 - 50 * low},${(0.34 * a).toFixed(3)})` : `rgba(96,66,36,${(-0.3 * a).toFixed(3)})`);
+          const [xa, ya] = pts[i - 1], [, yb] = pts[i], sl = (ya - yb) / 6 * sun.side * 2.5, a = Math.max(-1, Math.min(1, sl * 1.4)) * kk;
+          sg2.addColorStop((xa + 8) / (W + 16), a > 0 ? `rgba(240,${180 - 20 * low},${110 - 30 * low},${(0.4 * a).toFixed(3)})` : `rgba(120,96,70,${(-0.3 * a).toFixed(3)})`);
         }
         ctx.fillStyle = sg2; ctx.beginPath();
         pts.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y));
         for (let i = pts.length - 1; i >= 0; i--) ctx.lineTo(pts[i][0], pts[i][1] + d);
         ctx.closePath(); ctx.fill();
       }
-      if (f >= 0.1) {                              // crest highlight line on the nearer layers
-        ctx.strokeStyle = `rgba(255,240,210,${0.25 * kk})`; ctx.lineWidth = cam.dpr; ctx.beginPath();
+      if (f >= 0.1) {                              // a faint lit lip along the nearer rows
+        ctx.strokeStyle = `rgba(255,244,222,${0.18 * kk})`; ctx.lineWidth = cam.dpr; ctx.beginPath();
         pts.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.stroke();
       }
       if (f === 0.05 && !storm) this.farProps(ctx, cam, pts, f, col, px);
+    }
+  }
+  // Burning oil wells on the horizon (Kuwait, February 1991): at each burning site a jet of fire at the wellhead
+  // and a huge plume of black smoke rising, then bending over and trailing downwind. The plume body is painted
+  // once per light into its own image; the flames and the smoke boiling off the wellhead are drawn live. glow:
+  // the second pass after the night darkness, where the fire and its light on the smoke are added back.
+  oilFires(ctx, cam, glow) {
+    const env = this.w.env || {}; if (env.visibility || env.oilfires === false || (this.opt && this.opt.thermal)) return;
+    const W = cam.W * cam.dpr, H = cam.H * cam.dpr, d = cam.dpr, f = 0.006, t = this.w.time, PS = this.w.particles;
+    const y0 = H * 0.5 + (cam.y - 14) * cam.zoom * d * 0.04 + H * 0.012;
+    const toX = wx => W / 2 + (wx - 4000 - cam.x * f * 8) * d / 1.6;
+    const k0 = Math.floor(((-W / 2) / d * 1.6 + cam.x * f * 8 + 4000) / 600) - 2, k1 = Math.ceil(((W / 2) / d * 1.6 + cam.x * f * 8 + 4000) / 600) + 1;
+    const dark = env.dark != null ? env.dark : env.night || 0, sun = env.sun, low = sun ? Math.max(0, Math.min(1, (25 - sun.el) / 15)) : 1;
+    const tone = dark > 0.5 ? 2 : low > 0.5 ? 1 : 0, wind = (this.w.wind != null ? this.w.wind : 2) >= 0 ? 1 : -1;
+    const lerp = (a, b, u) => [16, 8, 0].reduce((c, sh) => c | Math.round(((a >> sh) & 255) + (((b >> sh) & 255) - ((a >> sh) & 255)) * u) << sh, 0);
+    const C = [[0x2b2b2e, 0x5f6066], [0x3a3330, 0x6e625e], [0x343a4c, 0x4a5164]][tone];
+    ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);
+    if (glow) ctx.globalCompositeOperation = 'lighter';
+    for (let k = k0; k <= k1; k++) {
+      const S = this.oilSites(k); if (!S || !S.fire) continue;
+      const h = S.h, sz = S.sz, fx = toX(S.x) + (h(11) - 0.5) * (20 + 40 * h(6)) * d * 3.2;
+      const R = H * 0.3 * sz, L = H * 0.8 * sz;                                        // how high it climbs, how far it trails
+      if (fx + (wind > 0 ? L + R : R) < 0 || fx - (wind > 0 ? R : L + R) > W) continue;
+      const path = u => [wind * L * Math.pow(u, 1.4), -R * (1 - Math.pow(1 - u, 2.2)), R * (0.07 + 0.42 * Math.sqrt(u))];
+      if (!glow) {
+        const key = k + '|' + Math.round(H) + '|' + tone + '|' + wind, cc = this.plumeC || (this.plumeC = new Map());
+        let im = cc.get(key);
+        if (!im) {
+          // billows: many overlapping lumps, lit on top and darker underneath (the puff sprites carry the light)
+          const pad = R * 0.55, cw = Math.ceil((L + pad * 2) / 2), ch = Math.ceil((R * 1.3 + pad) / 2);
+          im = document.createElement('canvas'); im.width = Math.max(1, cw); im.height = Math.max(1, ch);
+          const o = im.getContext('2d'); im.ox = wind > 0 ? pad / 2 : cw - pad / 2; im.oy = ch - pad / 4;
+          for (let j = 0; j < 260; j++) {
+            const u = Math.pow((j + h(100 + j)) / 260, 0.85), [px, py, r] = path(u), q = Math.min(5, Math.floor(u * 6)) / 5;
+            const a = h(200 + j) * 6.283, e = Math.sqrt(h(300 + j)), jx = Math.cos(a) * e * r * 0.75, jy = Math.sin(a) * e * r * 0.55;
+            const rr = r * (0.38 + 0.4 * h(400 + j)) * (1 - 0.3 * e);
+            o.globalAlpha = Math.min(1, 1.05 * (1 - u * 0.7));
+            o.drawImage(PS.puff(lerp(C[0], C[1], Math.min(1, q + (jy < 0 ? -0.1 : 0.15))), j & 3), im.ox + (px + jx - rr) / 2, im.oy + (py + jy - rr * 0.85) / 2, rr, rr * 0.85);
+          }
+          for (let j = 0; j < 10; j++) {                    // the fire's light on the underside of the column
+            const u = j / 10 * 0.12, [px, py, r] = path(u);
+            o.globalAlpha = (tone === 2 ? 0.5 : 0.25) * (1 - u / 0.12);
+            o.drawImage(PS.puff(0xb0582a, j & 3), im.ox + (px - r * 0.6) / 2, im.oy + (py - r * 0.2) / 2, r * 0.6, r * 0.5);
+          }
+          if (cc.size > 48) cc.clear();
+          cc.set(key, im);
+        }
+        ctx.globalAlpha = 1; ctx.drawImage(im, fx - im.ox * 2, y0 - im.oy * 2, im.width * 2, im.height * 2);
+        // smoke boiling off the wellhead, rising into the column
+        for (let j = 0; j < 4; j++) {
+          const ph = (t * 0.07 + j / 4 + h(12)) % 1, [px, py, r] = path(ph * 0.16), rr = r * (1.2 + ph);
+          ctx.globalAlpha = Math.sin(ph * Math.PI) * 0.7;
+          ctx.drawImage(PS.puff(C[0], (j + k) & 3), fx + px - rr / 2, y0 + py - rr * 0.45, rr, rr * 0.8);
+        }
+      } else {
+        const gr = ctx.createRadialGradient(fx, y0 - R * 0.04, 0, fx, y0 - R * 0.04, R * 0.35);
+        gr.addColorStop(0, `rgba(255,120,40,${0.3 * dark})`); gr.addColorStop(1, 'rgba(255,90,30,0)');
+        ctx.globalAlpha = 1; ctx.fillStyle = gr; ctx.fillRect(fx - R * 0.35, y0 - R * 0.4, R * 0.7, R * 0.75);
+        for (let j = 0; j < 9; j++) {                       // the fire lighting the column from below
+          const u = j / 9 * 0.32, [px, py, r] = path(u);
+          ctx.globalAlpha = 0.22 * dark * (1 - u / 0.34);
+          ctx.drawImage(PS.puff(0xff6a28, j & 3), fx + px - r * 0.8, y0 + py - r * 0.5, r * 1.6, r * 1.1);
+        }
+      }
+      // the fire: a few tongues of flame leaping off the wellhead
+      for (let j = 0; j < 3; j++) {
+        const fl = 1 + 0.3 * Math.sin(t * (11 + j * 3) + j * 2.1 + k) + 0.15 * Math.sin(t * 27 + j), w = H * 0.011 * sz * (1 - j * 0.2) * fl, hh = w * 2.4;
+        ctx.globalAlpha = glow ? 0.9 * dark : 0.95;
+        ctx.drawImage(PS.flame(j ? 0xff7a18 : 0xffa030, (j + Math.floor(t * 8)) & 3), fx - w / 2 + (j - 1) * w * 0.45 * sz, y0 - hh * 0.9, w, hh);
+      }
+    }
+    ctx.restore();
+  }
+  // the oil country on the horizon (layer 0 of the strip): clusters of refinery, tank farm and well field along
+  // the line, hazy blue-grey; site k sits at layer-x k·SITE (the burning wells of oilFires() use the same sites)
+  oilSites(k) {
+    const h = n => { const v = Math.sin(n * 78.233 + k * 12.9898) * 43758.5453; return v - Math.floor(v); };
+    if (h(1) > 0.62) return null;
+    return { x: (k + 0.15 + 0.7 * h(2)) * 600, kind: h(3) < 0.45 ? 'refinery' : h(3) < 0.75 ? 'tanks' : 'wells', fire: h(4) < 0.55, sz: 0.55 + 0.75 * h(5), h };
+  }
+  oilSkyline(ctx, cam, y0, haze, low) {
+    const W = cam.W * cam.dpr, H = cam.H * cam.dpr, f = 0.006, d = cam.dpr;
+    const toX = wx => (wx - 4000 - cam.x * f * 8) / 1.6 * d + W / 2;
+    const k0 = Math.floor(((-W / 2) / d * 1.6 + cam.x * f * 8 + 4000) / 600) - 1, k1 = Math.ceil(((W / 2) / d * 1.6 + cam.x * f * 8 + 4000) / 600) + 1;
+    const dk = haze.map(c => Math.round(c * 0.62 - 6)), lt = haze.map(c => Math.min(255, Math.round(c * 1.04 + 6)));
+    // the horizon line itself: a thin darker band of distant ground
+    ctx.fillStyle = `rgba(${dk},0.35)`; ctx.fillRect(0, y0 - 0.5 * d, W, 0.9 * d);
+    ctx.fillStyle = `rgb(${haze.map(c => Math.round(c * 0.93))})`; ctx.fillRect(0, y0 + 0.4 * d, W, H);
+    for (let k = k0; k <= k1; k++) {
+      const S = this.oilSites(k); if (!S) continue;
+      const cx = toX(S.x), h = S.h, u = d * 2;                                        // u: two css pixels
+      if (cx < -300 * d || cx > W + 300 * d) continue;
+      ctx.fillStyle = `rgb(${dk})`;
+      // a low pipe rack / plant line under everything
+      const pw = (20 + 40 * h(6)) * u * 2; ctx.fillRect(cx - pw / 2, y0 - 2 * u, pw, 2 * u);
+      if (S.kind !== 'wells') {
+        // stacks and columns
+        const n = 2 + Math.floor(h(7) * 5);
+        for (let i = 0; i < n; i++) { const x = cx - pw / 2 + pw * h(10 + i), t = (6 + 14 * h(20 + i)) * u * (S.kind === 'refinery' ? 1.4 : 0.8), w = (0.8 + 1.4 * h(30 + i)) * u;
+          ctx.fillRect(x, y0 - t, w, t); if (h(40 + i) < 0.4) ctx.fillRect(x - w, y0 - t * 0.6, w * 3, 0.8 * u); }
+        // storage tanks: squat, pale, lit on top
+        const nt = S.kind === 'tanks' ? 4 + Math.floor(h(8) * 5) : 1 + Math.floor(h(8) * 3);
+        for (let i = 0; i < nt; i++) { const tw = (6 + 6 * h(50 + i)) * u, th = tw * (0.45 + 0.15 * h(60 + i)), x = cx + (h(70 + i) - 0.5) * pw * 1.3;
+          ctx.fillStyle = `rgb(${lt})`; ctx.fillRect(x - tw / 2, y0 - th, tw, th);
+          ctx.fillStyle = `rgba(${dk},0.45)`; ctx.fillRect(x - tw / 2 + tw * 0.62, y0 - th, tw * 0.38, th); ctx.fillRect(x - tw / 2, y0 - th, tw, 0.6 * u); }
+      }
+      // pump jacks: a little A-frame with its walking beam, strung out along the line
+      const nj = S.kind === 'wells' ? 3 + Math.floor(h(9) * 4) : Math.floor(h(9) * 2);
+      ctx.fillStyle = `rgb(${dk})`; ctx.strokeStyle = `rgb(${dk})`; ctx.lineWidth = Math.max(1, u);
+      for (let i = 0; i < nj; i++) {
+        const x = cx + (h(80 + i) - 0.5) * pw * 3, s = (3 + 2 * h(90 + i)) * u;
+        ctx.beginPath(); ctx.moveTo(x - s * 0.6, y0); ctx.lineTo(x, y0 - s * 1.3); ctx.lineTo(x + s * 0.6, y0);
+        ctx.moveTo(x - s * 1.4, y0 - s * 1.1); ctx.lineTo(x + s * 1.2, y0 - s * 1.5); ctx.stroke();
+        ctx.fillRect(x - s * 1.6, y0 - s * 1.2, s * 0.5, s * 0.6);
+      }
+    }
+  }
+  // drift sand, pale crust and gravel strewn over one row of the plain, below its crest line (pts) to a depth
+  // dep; placed by layer-x so a repaint lands everything where it was
+  plainTexture(ctx, cam, pts, f, di, fogK, dep, low) {
+    const W = cam.W * cam.dpr, d = cam.dpr, sc = (0.6 + f * 2) / d, off = cam.x * f * 8;
+    const yAt = x => { const i = Math.max(0, Math.min(pts.length - 1, Math.round((x + 8) / 6))); return pts[i][1]; };
+    const near = (di + 1) / 5, cell = (10 + 6 * near) * d * sc, vis = Math.min(1, (1 - fogK) * 1.4);
+    const k0 = Math.floor(((-8 - W / 2) * sc + off) / cell), k1 = Math.ceil(((W + 8 - W / 2) * sc + off) / cell);
+    const sand = `rgba(222,${168 - 10 * low},${98 - 20 * low},`, crust = 'rgba(244,236,220,', grav = 'rgba(112,108,102,', gl = 'rgba(232,228,220,';
+    for (let k = k0; k <= k1; k++) {
+      const h = n => { const v = Math.sin(n * 41.17 + k * 17.31 + di * 101.3) * 43758.5453; return v - Math.floor(v); };
+      const x = (k * cell + h(1) * cell - off) / sc + W / 2, y = yAt(x) + (0.15 + 0.85 * h(2) ** 1.4) * dep, dn = (y - yAt(x)) / dep;
+      const zs = (0.5 + near) * (0.6 + 0.8 * dn) * d;                                    // closer down the row: bigger
+      const r = h(3);
+      if (r < 0.2) {                               // a drift of orange sand: a long, thin, soft-edged streak
+        const w = (14 + 50 * h(4)) * zs, t = (0.8 + 1.6 * h(5)) * zs;
+        ctx.fillStyle = sand + (0.32 * vis).toFixed(3) + ')'; ctx.beginPath(); ctx.ellipse(x, y, w, t, 0, 0, 7); ctx.fill();
+        ctx.fillStyle = sand + (0.3 * vis).toFixed(3) + ')'; ctx.beginPath(); ctx.ellipse(x + w * 0.1, y - t * 0.2, w * 0.6, t * 0.55, 0, 0, 7); ctx.fill();
+      } else if (r < 0.32) {                       // pale crust / limestone pan
+        const w = (8 + 26 * h(4)) * zs, t = (0.5 + 1 * h(5)) * zs;
+        ctx.fillStyle = crust + (0.4 * vis).toFixed(3) + ')'; ctx.beginPath(); ctx.ellipse(x, y, w, t, 0, 0, 7); ctx.fill();
+      } else {                                     // gravel: a scatter of grey pebbles, a few catching the light
+        const n = 3 + Math.floor(h(4) * 6);
+        for (let j = 0; j < n; j++) {
+          const gx = x + (h(10 + j) - 0.5) * cell / sc, gy = y + (h(20 + j) - 0.5) * 3 * zs, s = (0.35 + 0.6 * h(30 + j)) * zs;
+          ctx.fillStyle = (h(40 + j) < 0.75 ? grav : gl) + (0.55 * vis).toFixed(3) + ')'; ctx.fillRect(gx, gy, s * 1.6, s);
+        }
+      }
     }
   }
   // haze where the land meets the sky (every frame: it follows the horizon)
@@ -768,23 +923,18 @@ DS.Renderer = class Renderer {
     const hz = H * 0.5 + (cam.y - 14) * cam.zoom * cam.dpr * 0.04;
     const haze = storm ? [214, 176, 122] : [236 - 10 * low, 222 - 12 * low, 196 - 10 * low];
     const hg = ctx.createLinearGradient(0, hz - H * 0.1, 0, hz + H * 0.05);
-    hg.addColorStop(0, `rgba(${haze},0)`); hg.addColorStop(0.7, `rgba(${haze},${storm ? 0.35 : 0.22})`); hg.addColorStop(1, `rgba(${haze},0)`);
+    hg.addColorStop(0, `rgba(${haze},0)`); hg.addColorStop(0.7, `rgba(${haze},${storm ? 0.35 : 0.12})`); hg.addColorStop(1, `rgba(${haze},0)`);
     ctx.fillStyle = hg; ctx.fillRect(0, hz - H * 0.1, W, H * 0.15);
   }
 
-  // far silhouettes on a mid layer: a line of telegraph poles and the odd burnt-out hulk
+  // far silhouettes on a mid layer: the odd burnt-out hulk
   farProps(ctx, cam, pts, f, col, px) {
     const W = cam.W * cam.dpr, dk = `rgba(${col.map(c => Math.round(c * 0.72))})`;
     ctx.fillStyle = dk; ctx.strokeStyle = dk; ctx.lineWidth = Math.max(1, cam.dpr);
     const sc = px * (0.6 + f * 2), span = 40, wx0 = (-W / 2) * sc + cam.x * f * 8, wx1 = (W / 2) * sc + cam.x * f * 8;
     const toX = wx => (wx - cam.x * f * 8) / sc + W / 2;
     const yAt = x => { const i = Math.max(0, Math.min(pts.length - 1, Math.round((x + 8) / 6))); return pts[i][1]; };
-    let prev = null;
     for (let k = Math.floor(wx0 / span) - 1; k <= wx1 / span + 1; k++) {
-      const x = toX(k * span), y = yAt(x), hgt = 9 * cam.dpr;
-      ctx.fillRect(x - 0.5 * cam.dpr, y - hgt, cam.dpr, hgt); ctx.fillRect(x - 2.5 * cam.dpr, y - hgt, 5 * cam.dpr, 0.8 * cam.dpr);
-      if (prev) { ctx.beginPath(); ctx.moveTo(prev[0], prev[1]); ctx.quadraticCurveTo((prev[0] + x) / 2, (prev[1] + y - hgt) / 2 + 3 * cam.dpr, x, y - hgt); ctx.stroke(); }
-      prev = [x, y - hgt];
       const r = Math.abs(Math.sin(k * 91.7) * 43758.5) % 1;
       if (r < 0.12) { const hx = toX(k * span + 17); const hy = yAt(hx); ctx.beginPath(); ctx.moveTo(hx - 7 * cam.dpr, hy); ctx.lineTo(hx - 5 * cam.dpr, hy - 3 * cam.dpr); ctx.lineTo(hx + 2 * cam.dpr, hy - 3.5 * cam.dpr); ctx.lineTo(hx + 6 * cam.dpr, hy); ctx.fill(); }
     }
@@ -801,8 +951,14 @@ DS.Renderer = class Renderer {
     ctx.lineTo(x1 + step, bot); ctx.closePath();
     if (flat) { ctx.fillStyle = flat; ctx.fill(); return; }
     const g = ctx.createLinearGradient(0, gy + up, 0, gy - 5);
-    g.addColorStop(0, storm ? '#dcbd8d' : '#e6cc9f'); g.addColorStop(0.2, storm ? '#cfa878' : '#d6b07a'); g.addColorStop(1, storm ? '#b08a58' : '#b88c58');
+    g.addColorStop(0, storm ? '#dcbd8d' : '#e2d6bc'); g.addColorStop(0.2, storm ? '#cfa878' : '#d4c09a'); g.addColorStop(1, storm ? '#b08a58' : '#bca27a');
     ctx.fillStyle = g; ctx.fill();
+    if (!storm) {                                   // gravel on the far plane: smaller, a little behind the near plane's pace
+      if (!this.gravel) this.gravel = this.makeGravel();
+      ctx.save(); ctx.clip(); const m = ctx.getTransform(); ctx.setTransform(1, 0, 0, 1, 0, 0);
+      const ox = -(cam.x + cam.sx) * cam.zoom * cam.dpr * 0.8, oy = m.d * gy + m.f, pg = ctx.createPattern(this.gravel, 'repeat');
+      pg.setTransform(new DOMMatrix([0.6, 0, 0, 0.45, ox % 154, oy])); ctx.globalAlpha = 0.5; ctx.fillStyle = pg; ctx.fillRect(0, Math.max(0, oy - 60 * cam.dpr), ctx.canvas.width, ctx.canvas.height); ctx.restore();
+    }
     ctx.strokeStyle = 'rgba(120,92,58,0.35)'; ctx.lineWidth = Math.max(0.01, 1 / cam.zoom); ctx.beginPath();
     for (let x = x0; x <= x1 + step; x += step) ctx.lineTo(x, T.height0(x) + up);
     ctx.stroke();
@@ -819,8 +975,8 @@ DS.Renderer = class Renderer {
     // ground plane receding toward the viewer: hazed and pale at the far edge (the surface line), warmer and
     // more saturated close to us
     const g = ctx.createLinearGradient(0, gy + 0.5, 0, gy - 16);
-    g.addColorStop(0, storm ? '#d9b886' : `rgb(${226 + 6 * low},${196 - 4 * low},${150 - 14 * low})`);
-    g.addColorStop(0.25, storm ? '#c9a274' : '#d0a670'); g.addColorStop(1, storm ? '#a8814f' : '#ab7d4a');
+    g.addColorStop(0, storm ? '#d9b886' : `rgb(${222 + 8 * low},${206 - 6 * low},${174 - 20 * low})`);
+    g.addColorStop(0.25, storm ? '#c9a274' : '#cdb68e'); g.addColorStop(1, storm ? '#a8814f' : '#b0946a');
     ctx.fillStyle = g; ctx.fill();
     ctx.save(); ctx.clip();
     this.road(ctx, cam, x0, x1);
@@ -837,6 +993,7 @@ DS.Renderer = class Renderer {
       ctx.globalAlpha = 0.35; ctx.fillStyle = ps; ctx.fillRect(0, sy, ctx.canvas.width, ctx.canvas.height - sy);
       if (!storm) { const pr = ctx.createPattern(this.ripples, 'repeat'); pr.setTransform(new DOMMatrix([1, 0, 0, 1, ox % 512, oy % 256])); ctx.globalAlpha = 0.5; ctx.fillStyle = pr; ctx.fillRect(0, sy, ctx.canvas.width, ctx.canvas.height - sy); }
       ctx.globalAlpha = 0.6; ctx.fillStyle = pn; ctx.fillRect(0, sy, ctx.canvas.width, ctx.canvas.height - sy);
+      if (!storm) { if (!this.gravel) this.gravel = this.makeGravel(); const pg = ctx.createPattern(this.gravel, 'repeat'); pg.setTransform(new DOMMatrix([1, 0, 0, 1, ox % 256, oy % 128])); ctx.globalAlpha = 0.7; ctx.fillStyle = pg; ctx.fillRect(0, sy, ctx.canvas.width, ctx.canvas.height - sy); }
       ctx.restore(); ctx.globalAlpha = 1;
     }
     // soil band + ruts + disturbed earth along the surface, and sun / shade by slope

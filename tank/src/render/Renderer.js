@@ -1090,7 +1090,8 @@ DS.Renderer = class Renderer {
     ctx.save(); ctx.translate(G.trunnion[0], G.trunnion[1]); ctx.rotate(e); ctx.translate(rx, 0);
     ctx.scale(px, -px);
     const tpx = G.trunnion[0] * S.ppm + S.ox, tpy = S.oy - G.trunnion[1] * S.ppm;
-    ctx.fillStyle = '#b89464'; ctx.fillRect(-40 * S.ppm / 149, -11 * S.ppm / 149, 110 * S.ppm / 149, 22 * S.ppm / 149);
+    // (a barrel finished by tools/finish_sprites.py carries its own tube back past the trunnions; others get a filler)
+    if (!Sp.barrel.ext) { ctx.fillStyle = '#b89464'; ctx.fillRect(-40 * S.ppm / 149, -11 * S.ppm / 149, 110 * S.ppm / 149, 22 * S.ppm / 149); }
     if (G.barrelScale) {                      // stretch the tube from its root to the real overall length
       const x0 = Sp.barrel.x - tpx; ctx.translate(x0, 0); ctx.scale(G.barrelScale, 1); ctx.translate(-x0, 0);
     }

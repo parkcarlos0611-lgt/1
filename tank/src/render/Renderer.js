@@ -136,26 +136,43 @@ DS.Renderer = class Renderer {
     const w = this.w;
     this.cam = cam; this.opt = opt;
     if (opt.thermal) return this.thermalFrame(ctx, cam, opt);
+    // pass timings for the performance overlay (main view only)
+    const pf = opt.main && DS.Perf.on ? DS.Perf : null; let t0 = pf ? performance.now() : 0;
+    const mark = pf ? n => { const t = performance.now(); pf.sub(n, t - t0); t0 = t; } : () => {};
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    this.sky(ctx, cam);
-    cam.apply(ctx);
-    this.backGround(ctx, cam);
+    // WebGL world renderer (DS.GLW): the passes that have moved draw there; the 2D canvas carries the rest on a
+    // transparent background and DS.Post lays it over the GL picture
+    const G = opt.main && this.glw && this.glw.ok && this.glw.enabled ? this.glw : null;
+    if (opt.main) this.glActive = !!G;
+    if (G) {
+      const g = G.begin(ctx.canvas.width, ctx.canvas.height);
+      this.sky(g, cam); mark('sky');
+      cam.apply(g); this.backGround(g, cam); mark('ground');
+      G.end();
+      ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+      cam.apply(ctx);
+    } else {
+      this.sky(ctx, cam); mark('sky');
+      cam.apply(ctx);
+      this.backGround(ctx, cam); mark('ground');
+    }
     this.flora(ctx, cam, 'back');
-    this.props(ctx, cam, false);
-    this.buildings(ctx, cam);
+    this.props(ctx, cam, false); mark('props');
+    this.buildings(ctx, cam); mark('bld');
     w.particles.draw(ctx, cam, 0);
     for (const v of w.vehicles) if (cam.visible(v.pos.x, v.pos.y, 14) && this.shown(v)) this.vehicle(ctx, v, cam);
+    mark('veh');
     this.terrain(ctx, cam);
     for (const b of w.buildings) if (b.drawFront) b.drawFront(ctx, cam, null, this);
     this.flora(ctx, cam, 'line'); this.flora(ctx, cam, 'near');
-    this.props(ctx, cam, true);
+    this.props(ctx, cam, true); mark('front');
     this.fog(ctx, cam);
     this.traces(ctx, cam);
     w.fx.drawCases(ctx);
     this.projectiles(ctx, cam);
-    w.particles.draw(ctx, cam, 1);
+    w.particles.draw(ctx, cam, 1); mark('fx');
     this.atmosphere(ctx, cam, opt);
-    w.fx.drawFlashes(ctx);
+    w.fx.drawFlashes(ctx); mark('atmo');
     if (opt.main) {
       this.sightLine(ctx, cam);
       if (w.debug) DS.Debug.draw(ctx, w);
@@ -482,6 +499,7 @@ DS.Renderer = class Renderer {
       D.key = key; if (D.c.width !== Wh || D.c.height !== Hh) { D.c.width = Wh; D.c.height = Hh; }
       const half = Object.assign({}, cam); half.dpr = dh;
       this.skyPaint(D.c.getContext('2d'), half);
+      D.c._v = (D.c._v || 0) + 1;
     }
     ctx.imageSmoothingQuality = 'low'; ctx.drawImage(D.c, 0, 0, W, H);
     if (th) return;
@@ -503,6 +521,7 @@ DS.Renderer = class Renderer {
         o.setTransform(1, 0, 0, 1, 0, top - Hh * 0.5);
         const lc = Object.assign({}, cam, { x: cam.x, y: 14, W: Ws / dh, dpr: dh });
         this.skyLand(o, lc, li); L.col = this._landCol;
+        L.c._v = (L.c._v || 0) + 1;
       }
       ctx.drawImage(L.c, X0 * sx, (hzH - top) * sy, Ws * sx, (top + bot) * sy);
       near = L;

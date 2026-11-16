@@ -11,7 +11,7 @@ DS.Perf = {
   mode: '60', on: false,
   iv: new Float32Array(300), wk: new Float32Array(300), i: 0, n: 0,     // rendered frames: interval, work (ms)
   raw: new Float32Array(120), ri: 0, rn: 0, lastRaf: 0, lastDraw: 0,    // every browser refresh (for the display's rate)
-  sec: {}, secAvg: {}, t0: 0, tl: 0, calls: 0, callsAvg: 0, _fr: 0,
+  sec: {}, secAvg: {}, secR: {}, secRAvg: {}, t0: 0, tl: 0, calls: 0, callsAvg: 0, _fr: 0,
   // pacing: should this refresh be rendered?
   due(t) {
     if (this.lastRaf) { this.raw[this.ri] = t - this.lastRaf; this.ri = (this.ri + 1) % 120; this.rn = Math.min(120, this.rn + 1); }
@@ -28,12 +28,15 @@ DS.Perf = {
     this.t0 = this.tl = performance.now(); this.calls = 0;
     if (iv > 0) { this.iv[this.i] = iv; }
   },
+  // render sub-passes (Renderer.frame) and other fine timings, averaged with the stages
+  sub(name, ms) { this.secR[name] = (this.secR[name] || 0) + ms; },
   lap(name) { const t = performance.now(); this.sec[name] = (this.sec[name] || 0) + t - this.tl; this.tl = t; },
   end() {
     const w = performance.now() - this.t0; this.wk[this.i] = w;
     this.i = (this.i + 1) % this.N; this.n = Math.min(this.N, this.n + 1);
     if (++this._fr >= 30) {                                   // section averages over the last 30 frames
       for (const k in this.sec) { this.secAvg[k] = this.sec[k] / this._fr; this.sec[k] = 0; }
+      for (const k in this.secR) { this.secRAvg[k] = this.secR[k] / this._fr; this.secR[k] = 0; }
       this.callsAvg = this.calls; this._fr = 0;
     }
     if (this.on) this.callsSum = (this.callsSum || 0) + this.calls;
@@ -100,12 +103,12 @@ DS.Perf = {
     if (!this.on) return;
     if ((this._dr = (this._dr || 0) + 1) % 4) return;           // 15 times a second is plenty
     const el = document.getElementById('perf'); if (!el) return;
-    const dpr = Math.min(2, devicePixelRatio || 1), W = 300, H = 212;
-    if (el.width !== W * dpr) { el.width = W * dpr; el.height = H * dpr; el.style.width = W + 'px'; el.style.height = H + 'px'; }
+    const dpr = Math.min(2, devicePixelRatio || 1), W = 300, H = 282;
+    if (el.width !== W * dpr || el.height !== H * dpr) { el.width = W * dpr; el.height = H * dpr; el.style.width = W + 'px'; el.style.height = H + 'px'; }
     const c = el.getContext('2d'); c.setTransform(dpr, 0, 0, dpr, 0, 0);
     c.clearRect(0, 0, W, H); c.fillStyle = 'rgba(12,14,16,0.78)'; c.fillRect(0, 0, W, H);
     // graph: 0–40 ms, lines at the 60 and 120 Hz budgets
-    const gy = 80, gh = 56, ms = v => gy + gh - Math.min(1, v / 40) * gh;
+    const gy = 94, gh = 56, ms = v => gy + gh - Math.min(1, v / 40) * gh;
     c.strokeStyle = 'rgba(255,255,255,0.18)'; c.lineWidth = 1;
     for (const [v, col] of [[16.67, 'rgba(120,220,120,0.6)'], [8.33, 'rgba(120,180,255,0.45)'], [33.3, 'rgba(255,120,100,0.45)']]) { c.strokeStyle = col; c.beginPath(); c.moveTo(4, ms(v)); c.lineTo(W - 4, ms(v)); c.stroke(); }
     const n = this.n, bw = (W - 8) / this.N;
@@ -128,5 +131,10 @@ DS.Perf = {
     const A = this.secAvg, keys = Object.keys(A);
     c.fillStyle = '#d8d0b8';
     keys.forEach((k, i) => c.fillText(`${k} ${A[k].toFixed(2)}`, 6 + (i % 3) * 98, gy + gh + 6 + Math.floor(i / 3) * 14));
+    // render sub-passes and the post upload
+    const B = this.secRAvg, rk = Object.keys(B), y0 = gy + gh + 6 + Math.ceil(keys.length / 3) * 14 + 2;
+    c.fillStyle = '#a8c8e8';
+    rk.forEach((k, i) => c.fillText(`${k} ${B[k].toFixed(2)}`, 6 + (i % 3) * 98, y0 + Math.floor(i / 3) * 13));
+    c.fillStyle = '#b8c0c8'; c.fillText(`렌더러 ${g.rend.glActive ? 'WebGL (하늘·원경·뒤 지면)' : '2D'}${g.rend.glActive ? ' · GL 그리기 ' + (g.rend.glw.draws || 0) : ''}`, 6, 78);
   },
 };

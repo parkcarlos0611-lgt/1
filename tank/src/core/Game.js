@@ -15,6 +15,7 @@ DS.Game = class Game {
     this.post = new DS.Post(this.cv);
     let q = 2; try { const s = localStorage.getItem('ds.post'); if (s != null) q = +s; } catch (e) {}
     this.post.setQuality(this.post.ok ? q : 0); this.lowFps = 0;
+    this.rend.glw = this.post.ok ? new DS.GLW(this.post) : null;          // WebGL world renderer (src/render/GLW.js)
     await Promise.all(['m1a1', 'm2a2', 'm60a1', 'm109a3', 'm270', 't55', 't62', 't72', 'challenger1', 'amx30b2', 'bmp1', '2s1'].map(id => this.rend.load(DS.VEHICLES[id])).concat(this.rend.loadProps()));
     await this.rend.loadBuildings();
     await this.rend.loadCity();
@@ -311,8 +312,9 @@ DS.Game = class Game {
   // ---- post-processing inputs, all in device pixels of the main canvas ----
   postFrame(dt) {
     const P = this.post, w = this.world, cam = w.cam, env = w.env || {}, dpr = cam.dpr;
-    if (!P.ok || !P.q) { document.getElementById('hurt').style.display = ''; return; }
-    document.getElementById('hurt').style.display = 'none';
+    const GW = this.rend.glActive ? this.rend.glw : null;
+    if (!P.ok || (!P.q && !GW)) { document.getElementById('hurt').style.display = ''; return; }
+    document.getElementById('hurt').style.display = P.q ? 'none' : '';
     // drop a level when the frame rate stays low (DS.T.postAuto = false turns this off)
     if (DS.T.postAuto !== false) {
       this.lowFps = this.fps < 40 && !(this.rs > 0.5 && !navigator.webdriver) ? this.lowFps + dt : 0;      // resolution is lowered first
@@ -345,6 +347,7 @@ DS.Game = class Game {
       time: w.time, threshold: night > 0.4 ? 0.62 : storm ? 0.88 : 0.86, bloom: night > 0.4 ? 0.75 : storm ? 0.4 : 0.55,
       haze: night > 0.4 ? 0 : sun ? (storm ? 0.25 : 0.35 + 0.65 * (1 - low)) : 0.3, horizon: hz, hot, waves, hit,
       grain: night > 0.4 ? 0.045 : 0.022, vig: 0.38, lift, gain, sat, contrast,
+      world: GW ? GW.color : null,
       sharp: (() => { const k = this.cv.width / Math.max(1, innerWidth * Math.min(2, devicePixelRatio || 1)); return k < 0.97 ? Math.min(0.6, (1 - k) * 1.6) : 0; })(),
     });
   }

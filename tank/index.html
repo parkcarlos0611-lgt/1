@@ -33,6 +33,10 @@
   #sight { position: fixed; right: 10px; bottom: 56px; width: min(38vw, 54vh, 500px); aspect-ratio: 1; border-radius: 50%;
     border: 2px solid #0b0a08; box-shadow: 0 0 0 1px rgba(255,255,255,.08), 0 0 0 5px rgba(10,9,7,.85), 0 6px 24px rgba(0,0,0,.45); background: #000; pointer-events: none; }
   #sight.big { right: auto; bottom: auto; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(92vh, 92vw); z-index: 4; }
+  #sight.gl { background: transparent; }       /* WebGL: the view is in the picture underneath, the canvas holds the symbols */
+  /* 2D renderer: round the enlarged sight the screen is blurred or black (WebGL does this in the picture) */
+  #sightbg { position: fixed; inset: 0; z-index: 3; pointer-events: none; display: none; }
+  body.playing.sbig #sightbg { display: block; } #sightbg.blur { backdrop-filter: blur(9px) brightness(.62); -webkit-backdrop-filter: blur(9px) brightness(.62); } #sightbg.black { background: #000; }
   #sight.thermal { filter: grayscale(1) sepia(1) hue-rotate(68deg) saturate(2.6) brightness(.95); }
   /* helicopter sight (TADS FLIR): the same first-generation imager, shown in grey rather than green */
   #sight.thermal.mono { filter: grayscale(1) contrast(1.15) brightness(.95); }
@@ -326,6 +330,7 @@
   </div>
 </div>
 <canvas id="mini"></canvas>
+<div id="sightbg"></div>
 <canvas id="sight" aria-label="포수 조준경"></canvas>
 <div id="log" class="panel"></div>
 <div id="zoombar"><button data-z="0">근접</button><button data-z="1">전투</button><button data-z="2">광역</button></div>
@@ -344,6 +349,7 @@
     <div class="prow"><span>화면 효과</span><button type="button" data-p="post" data-v="0">끔</button><button type="button" data-p="post" data-v="1">낮음</button><button type="button" data-p="post" data-v="2">높음</button></div>
     <div class="prow"><span>해상도 자동 조절</span><button type="button" data-p="res">켬</button></div>
     <div class="prow"><span>렌더러</span><button type="button" data-p="rend" data-v="2d">2D</button><button type="button" data-p="rend" data-v="gl">WebGL (권장)</button></div>
+    <div class="prow"><span>조준경 확대 주변</span><button type="button" data-p="sbg" data-v="blur">흐리게</button><button type="button" data-p="sbg" data-v="black">검게</button></div>
     <div class="prow"><span>프레임 제한</span><button type="button" data-p="fps" data-v="60">60 고정</button><button type="button" data-p="fps" data-v="120">120 고정</button><button type="button" data-p="fps" data-v="free">자유</button></div>
     <div class="prow"><span>성능 표시 (F8)</span><button type="button" data-p="perf">켬</button></div>
     <div class="prow"><span>전체 화면 (F10)</span><button type="button" data-p="fs">켬</button></div>

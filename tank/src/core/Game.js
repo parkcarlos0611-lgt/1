@@ -196,9 +196,9 @@ DS.Game = class Game {
       if (e.code === 'Digit3') cam.tzoom = this.zoomMin();
       if (e.code === 'KeyQ') this.cycleAmmo();
       if (e.code === 'KeyE') this.lase();
-      if (e.code === 'KeyV') { this.sightMag = this.sightMag === 10 ? 3 : 10; this.fovI = (this.fovI || 0) + (e.shiftKey ? -1 : 1); if (this.tis) this.tis.blur = 0.45; const f = this.sightField(); if (f.n) this.toast(`${this.player.def.sight.name} ${f.n} · 시야각 ${f.fov}° · ×${f.mag}`); }
+      if (e.code === 'KeyV') { this.sightMag = this.sightMag === 10 ? 3 : 10; this.fovI = (this.fovI || 0) + (e.shiftKey ? -1 : 1); if (this.tis) this.tis.blur = 0.45; if (this.tisG) this.tisG.blur = 0.45; const f = this.sightField(); if (f.n) this.toast(`${this.player.def.sight.name} ${f.n} · 시야각 ${f.fov}° · ×${f.mag}`); }
       if (e.code === 'KeyT') this.nightSight(!(this.thermal || this.nv));
-      if (e.code === 'KeyB') { this.blackHot = !this.blackHot; this.sightCv.classList.toggle('bh', this.blackHot); if (this.tis) this.tis.cal = 0.3; }
+      if (e.code === 'KeyB') { this.blackHot = !this.blackHot; this.sightCv.classList.toggle('bh', this.blackHot); if (this.tis) this.tis.cal = 0.3; if (this.tisG) this.tisG.cal = 0.3; }
       if (e.code === 'BracketLeft' || e.code === 'BracketRight') {
         const a = this.world.tisAdj || (this.world.tisAdj = { level: 0, gain: 1 }), up = e.code === 'BracketRight';
         if (e.shiftKey) a.gain = Math.max(0.5, Math.min(3, a.gain * (up ? 1.12 : 1 / 1.12))); else a.level = Math.max(-0.2, Math.min(0.3, a.level + (up ? -0.02 : 0.02)));
@@ -352,6 +352,7 @@ DS.Game = class Game {
       world: GW ? GW.color : null, overlayAbove: !!GW,
       sharp: (() => { const k = this.cv.width / Math.max(1, innerWidth * Math.min(2, devicePixelRatio || 1)); return k < 0.97 ? Math.min(0.6, (1 - k) * 1.6) : 0; })(),
     });
+    if (GW) this.sightComposite();
   }
   // field of view of the gunner's sight: tanks have ×3 / ×10; a sight with its own list (TADS) steps through it,
   // with separate lists for the day TV and the FLIR
@@ -366,7 +367,8 @@ DS.Game = class Game {
   // sight (soft, with more detail across than up and down); the previous frame lingers (lag), each scan line
   // has its own slight offset (fixed-pattern noise), grain shimmers; refocus blur after a magnification change,
   // re-calibration flash after polarity.
-  tisRender(cam, dt) {
+  tisRender(cam, dt, out) {
+    if (out) return this.tisRenderGL(cam, dt, out);
     const cv = this.sightCv, c = this.sctx, R = this.player.def.sight.tis || [500, 300], lw = R[0], rows = R[1];
     const t = this.tis || (this.tis = { hi: document.createElement('canvas'), lo: document.createElement('canvas'), prev: document.createElement('canvas'), cam: new DS.Camera(), blur: 0, cal: 0, fpn: null, grain: null });
     const k = Math.max(lw / cam.W, rows / cam.H), hw = Math.max(1, Math.round(cam.W * k)), hh = Math.max(1, Math.round(cam.H * k));
@@ -394,6 +396,38 @@ DS.Game = class Game {
     t.cal = Math.max(0, t.cal - dt);
     if (t.cal > 0) { c.fillStyle = `rgba(255,255,255,${(t.cal / 0.3 * 0.8).toFixed(2)})`; c.fillRect(0, 0, cv.width, cv.height); }
     this.rend.markers(c, cam, false);
+  }
+  // the same imager on the GPU: detector lines, lag, line noise and grain in layers, into the sight's layer
+  tisRenderGL(cam, dt, out) {
+    const cv = this.sightCv, R = this.player.def.sight.tis || [500, 300], lw = R[0], rows = R[1], G = this.rend.glw;
+    const t = this.tisG || (this.tisG = { cam: new DS.Camera(), blur: 0, cal: 0 });
+    const k = Math.max(lw / cam.W, rows / cam.H), hw = Math.max(1, Math.round(cam.W * k)), hh = Math.max(1, Math.round(cam.H * k));
+    Object.assign(t.cam, cam); t.cam.dpr = k;
+    G.scope = ''; const hi = G.layer('tisHi', hw, hh);
+    this.rend.frame(hi, t.cam, { main: false, thermal: true });
+    G.scope = ''; const lo = G.layer('tisLo', lw, rows), prev = G.layer('tisPrev', lw, rows);
+    lo.setTransform(1, 0, 0, 1, 0, 0); lo.globalCompositeOperation = 'source-over'; lo.globalAlpha = 1; lo.drawImage(hi.canvas, 0, 0, lw, rows);
+    lo.globalAlpha = 0.35; lo.drawImage(prev.canvas, 0, 0); lo.globalAlpha = 1;
+    prev.setTransform(1, 0, 0, 1, 0, 0); prev.globalAlpha = 1; prev.globalCompositeOperation = 'source-over'; prev.drawImage(lo.canvas, 0, 0);
+    if (!t.fpn || t.fpn.height !== rows) {
+      t.fpn = document.createElement('canvas'); t.fpn.width = 1; t.fpn.height = rows; const f = t.fpn.getContext('2d'), r = DS.rng(rows);
+      for (let y = 0; y < rows; y++) { const v = (r() - 0.5) * 0.08; f.fillStyle = v > 0 ? `rgba(255,255,255,${v})` : `rgba(0,0,0,${-v})`; f.fillRect(0, y, 1, 1); }
+      t.grain = document.createElement('canvas'); t.grain.width = t.grain.height = 128; const g = t.grain.getContext('2d'), d = g.createImageData(128, 128);
+      for (let i = 0; i < d.data.length; i += 4) { const v = r() * 255; d.data[i] = d.data[i + 1] = d.data[i + 2] = v; d.data[i + 3] = 18; }
+      g.putImageData(d, 0, 0);
+    }
+    lo.drawImage(t.fpn, 0, 0, lw, rows);
+    const W = cv.width, H = cv.height;
+    out.setTransform(1, 0, 0, 1, 0, 0); out.globalAlpha = 1;
+    t.blur = Math.max(0, t.blur - dt);
+    if (t.blur > 0) {                                  // refocus: a few offset copies (a soft blur)
+      const b = t.blur * 10 * cam.dpr; out.drawImage(lo.canvas, 0, 0, W, H);
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1], [0.7, 0.7], [-0.7, -0.7]]) { out.globalAlpha = 0.3; out.drawImage(lo.canvas, dx * b, dy * b, W, H); }
+      out.globalAlpha = 1;
+    } else out.drawImage(lo.canvas, 0, 0, W, H);
+    out.globalAlpha = 0.6; out.drawImage(t.grain, (Math.random() * 64) | 0, (Math.random() * 64) | 0, 64, 64, 0, 0, W, H); out.globalAlpha = 1;
+    t.cal = Math.max(0, t.cal - dt);
+    if (t.cal > 0) { out.fillStyle = `rgba(255,255,255,${(t.cal / 0.3 * 0.8).toFixed(2)})`; out.fillRect(0, 0, W, H); }
   }
   // range to the aiming point. Laser: at once. Optical coincidence rangefinder (M60A1): the gunner needs a
   // couple of seconds to bring the two images together and the reading is off by a few per cent at long range
@@ -492,12 +526,13 @@ DS.Game = class Game {
     this.rend.frame();
     if (ed) this.sbx.overlay(this.rend.ctx);
     Pf.lap('render');
-    this.postFrame(dt);
-    Pf.lap('post');
-    // the gunner's sight is a second render of the world: refreshed every other frame unless it is enlarged
+    // the gunner's sight is a second render of the world: refreshed every other frame unless it is enlarged.
+    // With the WebGL renderer it is drawn before the post pass, which puts it into the finished picture
     this._sdt = (this._sdt || 0) + dt;
     if (this.sightCv.classList.contains('big') || (this._sf = !this._sf)) { this.sight(this._sdt); this._sdt = 0; }
     Pf.lap('sight');
+    this.postFrame(dt);
+    Pf.lap('post');
     this.hud();
     Pf.lap('hud');
     Pf.end(); Pf.draw(this);
@@ -642,6 +677,12 @@ DS.Game = class Game {
     const o = v.sightOrigin(), a = v.gun.aimW;
     cam.x = o.x + Math.cos(a) * R + (Math.random() - 0.5) * shake; cam.y = o.y + Math.sin(a) * R + (Math.random() - 0.5) * shake - k2 * 14 / mil / 1000 * R;
     cam.zoom = W / (2 * R * Math.tan(fov / 2));
+    const G = this.rend.glActive && this.post.ok && this.rend.glw;
+    cv.classList.toggle('gl', !!G);
+    { const big = cv.classList.contains('big'), bg = document.getElementById('sightbg'), m = this.ui.sightBg || 'blur';
+      document.body.classList.toggle('sbig', big && !G); if (bg && bg.className !== m) bg.className = m; }
+    if (G) return this.sightGL(G, cam, dt, R, W, H, dpr);
+    this._sightOut = null;
     if (this.thermal) this.tisRender(cam, dt); else this.rend.frame(this.sctx, cam, { main: false, nv: this.nv });
     const c = this.sctx, cx = W / 2, cy = H / 2, env = w.env || {};
     // heat shimmer over long ranges in daylight: rows of the picture wobble sideways
@@ -653,8 +694,48 @@ DS.Game = class Game {
     c.setTransform(dpr, 0, 0, dpr, 0, 0);
     // our own muzzle blast and dust blind the sight for a moment (less in thermal)
     if (this.kick > 0) { c.fillStyle = `rgba(${this.thermal ? '150,150,150' : '205,180,140'},${Math.min(0.92, this.kick * (this.thermal ? 0.45 : 1.1))})`; c.fillRect(0, 0, W, H); }
-    // reticle, the sight's own display and the eyepiece (src/render/SightHud.js)
+    this.sightHud(c, W, H, mil, fld);
+  }
+  // WebGL: the view is drawn into a GPU layer and put into the finished picture by DS.Post (postFrame →
+  // sightComposite) inside the eyepiece circle, through the sight's colour filter; the sight's own canvas keeps only
+  // the reticle and symbols on a transparent ground
+  sightGL(G, cam, dt, R, W, H, dpr) {
+    const cv = this.sightCv, w = this.world, env = w.env || {};
+    G.scope = ''; const out = G.layer('sight', cv.width, cv.height);
+    out.setTransform(1, 0, 0, 1, 0, 0); out.globalAlpha = 1; out.globalCompositeOperation = 'source-over';
+    if (this.thermal) this.tisRender(cam, dt, out); else this.rend.frame(out, cam, { main: false, nv: this.nv });
+    G.scope = '';
+    this._sightSh = !this.thermal && (env.night || 0) < 0.5 && R > 500 ? [Math.min(1.8, R / 1500) * dpr, w.time, dpr, Math.max(2, Math.round(2 * dpr))] : null;
+    out.setTransform(dpr, 0, 0, dpr, 0, 0);
+    if (this.kick > 0) { out.fillStyle = `rgba(${this.thermal ? '150,150,150' : '205,180,140'},${Math.min(0.92, this.kick * (this.thermal ? 0.45 : 1.1))})`; out.fillRect(0, 0, W, H); }
+    out.setTransform(1, 0, 0, 1, 0, 0);
+    this._sightOut = out.canvas; G.finish();
+    const c = this.sctx; c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, cv.width, cv.height);
+    if (this.thermal) this.rend.markers(c, cam, false);
+    const fld = this.sightField(), fov = fld.fov * Math.PI / 180, mil = W / (fov * 1000);
+    c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    this.sightHud(c, W, H, mil, fld);
+  }
+  // the sight in the finished picture (WebGL renderer; after DS.Post has drawn the frame)
+  sightComposite() {
+    const cv = this.sightCv, P = this.post, G = this.rend.glw;
+    if (!this._sightOut || !cv.clientWidth || cv.style.visibility === 'hidden' || !cv.classList.contains('gl')) return;
+    const r = cv.getBoundingClientRect(), pr = P.cv.getBoundingClientRect(), k = P.cv.width / Math.max(1, pr.width);
+    const x = (r.left + cv.clientLeft - pr.left) * k, y = (r.top + cv.clientTop - pr.top) * k, sw = cv.clientWidth * k, sh = cv.clientHeight * k;
+    const key = cv.className;
+    if (this._sfKey !== key) { this._sfKey = key; this._sf2 = DS.GLW.filterMats(getComputedStyle(cv).filter); }
+    const big = cv.classList.contains('big');
+    G.sightComposite({ cv: this._sightOut, x, y, w: sw, h: sh, m: this._sf2.m, n: this._sf2.n, sh: this._sightSh ? [this._sightSh[0] * cv.width / Math.max(1, cv.clientWidth) / this.world.cam.dpr, this._sightSh[1], this._sightSh[2], this._sightSh[3]] : null, big, bg: this.ui.sightBg || 'blur' }, P.cv.width, P.cv.height);
+    // the marks and labels on the 2D layer above must not show over the eyepiece
+    const m = this.cv.getBoundingClientRect(), km = this.cv.width / Math.max(1, m.width), c = this.rend.ctx;
+    c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.beginPath(); c.arc((r.left + r.width / 2 - m.left) * km, (r.top + r.height / 2 - m.top) * km, r.width / 2 * km + 2, 0, Math.PI * 2); c.clip();
+    c.clearRect(0, 0, this.cv.width, this.cv.height); c.restore();
+  }
+  // reticle, the sight's own display and the eyepiece (src/render/SightHud.js)
+  sightHud(c, W, H, mil, fld) {
+    const v = this.player, w = this.world, cv = this.sightCv;
     cv.classList.toggle('mono', !!v.heli);
+    DS.SightHud.overPicture = cv.classList.contains('gl');
     const g = v.gun, A = DS.AMMO[g.ammo], lasing = w.time - v.fc.lasedAt < 0.35;
     const mode = this.thermal ? (v.heli ? 'FLIR ' : 'TIS ') + (this.blackHot ? 'BH' : 'WH') : this.nv ? 'PASSIVE' : 'DAY';
     DS.SightHud.draw(c, { v, W, H, mil, fld, thermal: this.thermal, nv: this.nv, lasing, ready: g.reload <= 0, bs: v.fc.bs,

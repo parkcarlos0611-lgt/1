@@ -705,7 +705,7 @@ DS.Effects = class Effects {
   drawFlashes(ctx) {
     this.drawRings(ctx);
     const R = this.w.rend;
-    if (ctx.canvas._gl && R && R.glw) return this.drawFlashesGL(ctx, R.glw);
+    if (ctx.canvas._gl && R && R.glw && !(R.opt && R.opt.thermal)) return this.drawFlashesGL(ctx, R.glw);
     ctx.globalCompositeOperation = 'lighter';
     // flickering light cast by fires on the hull and the sand around them
     for (const v of this.w.vehicles) {

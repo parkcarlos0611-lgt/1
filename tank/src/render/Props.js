@@ -97,6 +97,27 @@ Object.assign(DS.Renderer.prototype, {
     }
     return c.c;
   },
+  // the props a view can show, in their list order: per row (one parallax), sorted by position, and only the
+  // stretch in view is looked at (the map holds thousands)
+  propsInView(L, cam, front) {
+    let I = this._pIdx;
+    if (!I || I.L !== L || I.n !== L.length) {
+      I = this._pIdx = { L, n: L.length, g: [] }; const M = new Map();
+      L.forEach((p, i) => { let G = M.get(p.z); if (!G) { G = { z: p.z, front: p.z < 0, ids: [], wmax: 0 }; M.set(p.z, G); I.g.push(G); } G.ids.push(i); G.wmax = Math.max(G.wmax, p.w || 4); });
+      for (const G of I.g) { G.ids.sort((a, b) => L[a].x - L[b].x); G.xs = Float64Array.from(G.ids, i => L[i].x); }
+      I.out = [];
+    }
+    const R = DS.MAP, out = I.out; out.length = 0;
+    const lb = (xs, v) => { let lo = 0, hi = xs.length; while (lo < hi) { const m = (lo + hi) >> 1; if (xs[m] < v) lo = m + 1; else hi = m; } return lo; };
+    for (const G of I.g) {
+      if (G.front !== front) continue;
+      const par = front ? 1 + 0.45 * R.front : (R.layers[G.z] || [1])[0], m = 6 + G.wmax * par / 2;
+      const a = cam.x + (cam.left - m - cam.x) / par, b = cam.x + (cam.right + m - cam.x) / par;
+      for (let j = lb(G.xs, a); j < G.xs.length && G.xs[j] <= b; j++) out.push(G.ids[j]);
+    }
+    out.sort((p, q) => p - q);
+    return out.map(i => L[i]);
+  },
   // front = false: the layers behind the line (drawn before the vehicles); true: the near row (after the ground)
   props(ctx, cam, front, grey) {
     if (!front) this._litList = null;                // (night lights recorded afresh for this picture)
@@ -118,8 +139,7 @@ Object.assign(DS.Renderer.prototype, {
       ctx.fill();
     }
     const LIFT = { 0.5: 0.12, 1: 0.1, 2: 0.4, 3: 0.7, 4: 0.94, 5: 1.2 };
-    for (const p of L) {
-      if ((p.z < 0) !== front) continue;
+    for (const p of this.propsInView(L, cam, front)) {
       const [par, haze] = front ? [1 + 0.45 * R.front, 0] : R.layers[p.z];
       const x = cam.x + (p.x - cam.x) * par;
       if (p.k === 'flag') { if (x > cam.left - 5 && x < cam.right + 5) this.flag(ctx, p, x, T.height(p.x) + LIFT[p.z] * lift(x) - 0.05, par, grey); continue; }

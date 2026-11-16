@@ -135,6 +135,7 @@ DS.Renderer = class Renderer {
   frame(ctx = this.ctx, cam = this.w.cam, opt = { main: true }) {
     const w = this.w;
     this.cam = cam; this.opt = opt;
+    if (this.glw) this.glw.scope = opt.main ? '' : opt.thermal ? ':t' : ':s';      // GL layers: one set per view
     if (opt.thermal) return this.thermalFrame(ctx, cam, opt);
     // pass timings for the performance overlay (main view only)
     const pf = opt.main && DS.Perf.on ? DS.Perf : null; let t0 = pf ? performance.now() : 0;
@@ -266,9 +267,13 @@ DS.Renderer = class Renderer {
   }
   thermalVehicle(ctx, v, cam, amb, tg) {
     const cv = ctx.canvas, store = this.tOffs || (this.tOffs = new Map());
-    let off = store.get(cv);
-    if (!off || off.width !== cv.width || off.height !== cv.height) { off = document.createElement('canvas'); off.width = cv.width; off.height = cv.height; store.set(cv, off); }
-    const o = off.getContext('2d'), m = ctx.getTransform(), z = Math.hypot(m.a, m.b);
+    let off = store.get(cv), o;
+    if (cv._gl && this.glw) { o = this.glw.layer('toff', cv.width, cv.height); off = o.canvas; }                // WebGL: a GPU layer
+    else {
+      if (!off || off.width !== cv.width || off.height !== cv.height) { off = document.createElement('canvas'); off.width = cv.width; off.height = cv.height; store.set(cv, off); }
+      o = off.getContext('2d');
+    }
+    const m = ctx.getTransform(), z = Math.hypot(m.a, m.b);
     const pts = [v.pos]; if (v.turretBody) pts.push(v.turretBody);
     let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
     for (const p of pts) { const sx = m.a * p.x + m.c * p.y + m.e, sy = m.b * p.x + m.d * p.y + m.f, h = 7.5 * z; x0 = Math.min(x0, sx - h); y0 = Math.min(y0, sy - h); x1 = Math.max(x1, sx + h); y1 = Math.max(y1, sy + h); }

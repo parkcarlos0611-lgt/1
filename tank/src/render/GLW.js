@@ -58,14 +58,49 @@ DS.GLW = class GLW {
         for (int i = 1; i < 8; i++) { if (i >= u_n) break; if (t >= u_off[i - 1]) c = mix(u_c[i - 1], u_c[i], clamp((t - u_off[i - 1]) / max(u_off[i] - u_off[i - 1], 1e-6), 0.0, 1.0)); }
         if (t <= u_off[0]) c = u_c[0];
         o = c * u_a * M(); }`);
+    // gunner's sight, put into the finished picture (after DS.Post): its view (a layer, rows bottom up) inside the
+    // eyepiece circle, through the sight's colour filter (the CSS filter chain as affine steps, each clamped, as the
+    // browser applies them), with the heat shimmer of long daylight views (rows slid sideways)
+    this.pSight = mk(VS, `in vec2 v_uv; in vec4 v_col; uniform sampler2D u_tex; uniform vec4 u_rect; uniform float u_H; uniform mat4 u_m[6]; uniform int u_n; uniform vec4 u_sh; out vec4 o;
+      void main() {
+        vec2 p = vec2(gl_FragCoord.x, u_H - gl_FragCoord.y) - u_rect.xy, q = p / u_rect.zw;
+        float r = length((q - 0.5) * 2.0), e = 1.0 - smoothstep(1.0 - 2.0 / u_rect.z, 1.0, r);
+        if (e <= 0.0) discard;
+        vec2 ts = vec2(textureSize(u_tex, 0)), tp = q * ts;
+        if (u_sh.x > 0.0 && tp.y > ts.y * 0.25 && tp.y < ts.y * 0.85) { float y = floor(tp.y / u_sh.w) * u_sh.w; tp.x -= sin(y * 0.11 / u_sh.z + u_sh.y * 9.0) * u_sh.x * (0.5 + 0.5 * sin(y * 0.031 / u_sh.z - u_sh.y * 3.0)); }
+        vec3 c = texture(u_tex, vec2(tp.x / ts.x, 1.0 - tp.y / ts.y)).rgb;
+        for (int i = 0; i < 6; i++) { if (i >= u_n) break; c = clamp((u_m[i] * vec4(c, 1.0)).rgb, 0.0, 1.0); }
+        o = vec4(c * e, e); }`);
+    // round the enlarged sight: the rest of the screen blurred (a reduced copy of the picture, mip-filtered and
+    // sampled in a ring of taps) and dimmed, or black; feathered at the eyepiece rim
+    this.pBg = mk(VS, `in vec2 v_uv; in vec4 v_col; uniform sampler2D u_scr; uniform vec4 u_rect; uniform float u_H, u_mode, u_lod; out vec4 o;
+      void main() {
+        vec2 p = vec2(gl_FragCoord.x, u_H - gl_FragCoord.y), c = u_rect.xy + u_rect.zw * 0.5;
+        float r = length(p - c) / (u_rect.z * 0.5); if (r < 0.985) discard;
+        float k = smoothstep(0.985, 1.06, r);
+        if (u_mode > 0.5) { o = vec4(0.0, 0.0, 0.0, k); return; }
+        vec2 uv = gl_FragCoord.xy / vec2(textureSize(u_scr, 0)) / 4.0, d = exp2(u_lod) * 1.5 / vec2(textureSize(u_scr, 0));
+        vec3 s = textureLod(u_scr, uv, u_lod).rgb * 0.2;
+        for (int i = 0; i < 8; i++) { float a = float(i) * 0.785398; s += textureLod(u_scr, uv + vec2(cos(a), sin(a)) * d, u_lod).rgb * 0.1; }
+        o = vec4(s * 0.62 * k, k); }`);
+    // samplers never change unit: set once (u_tex / u_scr on 0, the clip mask on 3); other uniforms are cached per
+    // program and texture bindings per unit, so a draw issues only the calls that change something
+    for (const P of [this.pTex, this.pMask, this.pGrad, this.pSight, this.pBg]) {
+      gl.useProgram(P.p); P.c = {};
+      if (P.u.u_tex) gl.uniform1i(P.u.u_tex, 0); if (P.u.u_scr) gl.uniform1i(P.u.u_scr, 0); if (P.u.u_mask) gl.uniform1i(P.u.u_mask, 3);
+    }
+    this.inval();
     this.MAXQ = 4096; this.vb = new Float32Array(this.MAXQ * 6 * 8); this.nv = 0;
     this.buf = gl.createBuffer(); this.vao = gl.createVertexArray();
-    gl.bindVertexArray(this.vao); gl.bindBuffer(gl.ARRAY_BUFFER, this.buf); gl.bufferData(gl.ARRAY_BUFFER, this.vb.byteLength, gl.DYNAMIC_DRAW); this.bufLen = this.vb.length;
+    // vertices go into one large buffer used as a ring: every draw writes past the last one, so no write waits for
+    // the GPU to finish reading earlier vertices; when it runs out the storage is replaced (orphaned), and each frame
+    this.ringN = 262144; this.ring = 0;
+    gl.bindVertexArray(this.vao); gl.bindBuffer(gl.ARRAY_BUFFER, this.buf); gl.bufferData(gl.ARRAY_BUFFER, this.ringN * 32, gl.DYNAMIC_DRAW);
     gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 32, 0);
     gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1, 2, gl.FLOAT, false, 32, 8);
     gl.enableVertexAttribArray(2); gl.vertexAttribPointer(2, 4, gl.FLOAT, false, 32, 16);
     gl.bindVertexArray(null);
-    this.white = this.mkTex(); gl.bindTexture(gl.TEXTURE_2D, this.white); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([255, 255, 255, 255]));
+    this.white = this.mkTex(); this.bind0(this.white); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([255, 255, 255, 255]));
     this.texs = new WeakMap(); this.texsR = new WeakMap(); this.cols = new Map();
     // atlas pages for small images (particle puffs, debris shards, small props…): many images on one texture, so
     // the quad batch is not broken by texture changes. 2048² pages, slots 8 px aligned with 8 px of empty border
@@ -73,7 +108,7 @@ DS.GLW = class GLW {
     // When the last page is full the oldest one is wiped and its images are uploaded again as they are drawn.
     this.ATL = 2048; this.atl = []; this.atlI = 0; this.atlDirty = new Set(); this.atlT = new Map();
     this.main = { masks: [], clipD: 0 }; this.T = null; this.W = 1; this.H = 1;
-    this.layers = {}; this.fx = { bias: -0.6, gray: 0 };
+    this.layers = {}; this.scope = ''; this.fx = { bias: -0.6, gray: 0 };
     this.ctx = new DS.GLCtx(this, 'main');
     DS.GLW.trackCanvases();
   }
@@ -90,7 +125,7 @@ DS.GLW = class GLW {
     if (t.W !== W || t.H !== H) {
       this.flush();
       const S = this.samples || (this.samples = Math.max(1, Math.min(4, gl.getParameter(gl.MAX_SAMPLES) || 1)));
-      gl.bindTexture(gl.TEXTURE_2D, t.color); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, W, H, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+      this.bind0(t.color); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, W, H, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
       gl.bindRenderbuffer(gl.RENDERBUFFER, t.crb); gl.renderbufferStorageMultisample(gl.RENDERBUFFER, S, gl.RGBA8, W, H);
       gl.bindRenderbuffer(gl.RENDERBUFFER, t.rb); gl.renderbufferStorageMultisample(gl.RENDERBUFFER, S, gl.DEPTH24_STENCIL8, W, H);
       gl.bindRenderbuffer(gl.RENDERBUFFER, t.mrb); gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH24_STENCIL8, W, H);     // (clip masks: single-sample)
@@ -118,6 +153,7 @@ DS.GLW = class GLW {
   }
   bind(t) {
     t.dirty = true;
+    if (!this.blendOn) { this.flush(); this.inval(); this.gl.enable(this.gl.BLEND); this.blendOn = true; this.blend = null; this.setBlend('source-over'); }
     if (this.T === t) return;
     this.flush();
     const gl = this.gl; this.T = t; this.W = t.W; this.H = t.H;
@@ -126,17 +162,63 @@ DS.GLW = class GLW {
   // an off-screen layer of its own (kept between frames; cleared with clearRect as a 2D canvas is)
   layer(key, W, H) {
     W = Math.max(1, W | 0); H = Math.max(1, H | 0);
+    key += this.scope;                                         // each view (main, sight, thermal) its own set
     let L = this.layers[key];
     if (!L) { L = this.layers[key] = { t: { masks: [], clipD: 0 } }; L.ctx = new DS.GLCtx(this, L.t); L.ctx.canvas._glTarget = L.t; }
     this.mkTarget(L.t, W, H); L.ctx.canvas.width = W; L.ctx.canvas.height = H;
     return L.ctx;
   }
-  // ---- clip masks (texture unit 3) ----
-  maskU(u) {
-    const gl = this.gl, T = this.T, m = T && T.clipD > 0 ? T.masks[T.clipD - 1] : null;
-    gl.uniform1f(u.u_useMask, m ? 1 : 0);
-    gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D, m ? m.t : this.white); gl.uniform1i(u.u_mask, 3); gl.activeTexture(gl.TEXTURE0);
+  // the sight into the finished picture on screen (W × H device px). S: { cv (its layer's canvas), x, y, w, h (px,
+  // y down), m (Float32Array of affine colour steps, 16 each), n, sh: [amp, t, dpr, row] | null, big, bg: 'blur' | 'black' }
+  sightComposite(S, W, H) {
+    const gl = this.gl; this.flush();
+    const t = S.cv._glTarget; if (!t) return; this.resolve(t); this.inval();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.viewport(0, 0, W, H); this.T = null; this.W = W; this.H = H;
+    const quad = (x0, y0, x1, y1) => { const v = this.qv || (this.qv = new Float32Array(48)); let o = 0; for (const [x, y] of [[x0, y0], [x1, y0], [x1, y1], [x0, y0], [x1, y1], [x0, y1]]) { v[o] = x; v[o + 1] = y; o += 8; } return v; };
+    gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA); this.blend = null;
+    if (S.big) {
+      let B = this.bgT;
+      const bw = Math.max(1, W >> 2), bh = Math.max(1, H >> 2);
+      if (!B || B.w !== bw || B.h !== bh) {
+        if (!B) B = this.bgT = { t: this.mkTex(), f: gl.createFramebuffer() };
+        this.bind0(B.t); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, bw, bh, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, B.f); gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, B.t, 0);
+        B.w = bw; B.h = bh;
+      }
+      if (S.bg !== 'black') {
+        gl.bindFramebuffer(gl.READ_FRAMEBUFFER, null); gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, B.f);
+        gl.blitFramebuffer(0, 0, W, H, 0, 0, bw, bh, gl.COLOR_BUFFER_BIT, gl.LINEAR);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        this.bind0(B.t); gl.generateMipmap(gl.TEXTURE_2D);
+      }
+      this.tris(this.pBg, quad(0, 0, W, H), 6, u => { this.bind0(B.t);
+        gl.uniform4f(u.u_rect, S.x, S.y, S.w, S.h); gl.uniform1f(u.u_H, H); gl.uniform1f(u.u_mode, S.bg === 'black' ? 1 : 0); gl.uniform1f(u.u_lod, 1.6); });
+    }
+    this.tris(this.pSight, quad(S.x - 2, S.y - 2, S.x + S.w + 2, S.y + S.h + 2), 6, u => {
+      this.bind0(t.color);
+      gl.uniform4f(u.u_rect, S.x, S.y, S.w, S.h); gl.uniform1f(u.u_H, H); gl.uniformMatrix4fv(u.u_m, false, S.m); gl.uniform1i(u.u_n, S.n);
+      const sh = S.sh || [0, 0, 1, 1]; gl.uniform4f(u.u_sh, sh[0], sh[1], sh[2], sh[3]); });
+    gl.disable(gl.BLEND); this.blendOn = false;
   }
+  // ---- clip masks (texture unit 3) ----
+  maskU(u, P) {
+    const gl = this.gl, T = this.T, m = T && T.clipD > 0 ? T.masks[T.clipD - 1] : null, t = m ? m.t : this.white;
+    this.u1f(P, 'u_useMask', m ? 1 : 0);
+    if (this.b3 !== t) { gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D, t); gl.activeTexture(gl.TEXTURE0); this.b3 = t; }
+  }
+  // ---- cached GL state ----
+  // everything another user of the context (DS.Post) may have changed: forget it
+  inval() { const gl = this.gl; this.prog = null; this.b0 = null; this.b3 = null; this.vaoOn = false; gl.activeTexture(gl.TEXTURE0); }
+  use(P) {
+    const gl = this.gl;
+    if (this.prog !== P) { gl.useProgram(P.p); this.prog = P; }
+    if (!this.vaoOn) { gl.bindVertexArray(this.vao); gl.bindBuffer(gl.ARRAY_BUFFER, this.buf); this.vaoOn = true; }
+    const c = P.c; if (c.rw !== this.W || c.rh !== this.H) { c.rw = this.W; c.rh = this.H; gl.uniform2f(P.u.u_res, this.W, this.H); }
+  }
+  u1f(P, n, v) { if (P.c[n] !== v && P.u[n]) { P.c[n] = v; this.gl.uniform1f(P.u[n], v); } }
+  u1i(P, n, v) { if (P.c[n] !== v && P.u[n]) { P.c[n] = v; this.gl.uniform1i(P.u[n], v); } }
+  bind0(t) { if (this.b0 !== t) { this.gl.bindTexture(this.gl.TEXTURE_2D, t); this.b0 = t; } }
   // clip: the path's fan triangles (device px) into the stencil of a mask target, covered with the enclosing
   // mask's value; the new mask becomes current until the matching restore()
   pushClip(ctx, v, n, x0, y0, x1, y1) {
@@ -145,7 +227,7 @@ DS.GLW = class GLW {
     let m = T.masks[d];
     if (!m || m.w !== W || m.h !== H) {
       if (!m) m = T.masks[d] = { t: this.mkTex(), f: gl.createFramebuffer() };
-      gl.bindTexture(gl.TEXTURE_2D, m.t); gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, W, H, 0, gl.RED, gl.UNSIGNED_BYTE, null);
+      this.bind0(m.t); gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, W, H, 0, gl.RED, gl.UNSIGNED_BYTE, null);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
       gl.bindFramebuffer(gl.FRAMEBUFFER, m.f); gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, m.t, 0);
       gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_STENCIL_ATTACHMENT, gl.RENDERBUFFER, T.mrb);
@@ -173,13 +255,13 @@ DS.GLW = class GLW {
   }
   texRep(img) {
     const r = this.tex(img, true);
-    if (!r.rep) { const gl = this.gl; gl.bindTexture(gl.TEXTURE_2D, r.t); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT); r.rep = true; }
+    if (!r.rep) { const gl = this.gl; this.bind0(r.t); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT); r.rep = true; }
     return r;
   }
   atlasPage(i) {
     const gl = this.gl, A = this.ATL; let pg = this.atl[i];
     if (pg) { this.flush(); this.atlT.delete(pg.t); gl.deleteTexture(pg.t); pg.gen++; } else pg = this.atl[i] = { gen: 0 };
-    const t = pg.t = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t);
+    const t = pg.t = gl.createTexture(); this.bind0(t);
     gl.texStorage2D(gl.TEXTURE_2D, 4, gl.RGBA8, A, A);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
@@ -197,7 +279,7 @@ DS.GLW = class GLW {
     return { pg, x, y };
   }
   mkTex() {
-    const gl = this.gl, t = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t);
+    const gl = this.gl, t = gl.createTexture(); this.bind0(t);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     return t;
@@ -216,7 +298,7 @@ DS.GLW = class GLW {
         const a = this.atlasAlloc(w, h), A = this.ATL;
         r = { pg: a.pg, gen: a.pg.gen, t: a.pg.t, x: a.x, y: a.y, ou: a.x / A, ov: a.y / A, su: 1 / A, sv: 1 / A }; M.set(img, r);
       }
-      gl.bindTexture(gl.TEXTURE_2D, r.t);
+      this.bind0(r.t);
       gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false); gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
       try { gl.texSubImage2D(gl.TEXTURE_2D, 0, r.x, r.y, w, h, gl.RGBA, gl.UNSIGNED_BYTE, img); } catch (e) { /* unreadable image: stays blank */ }
       gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
@@ -226,7 +308,7 @@ DS.GLW = class GLW {
     }
     if (!r || r.pg) { r = { t: this.mkTex() }; M.set(img, r); }
     this.flush();
-    gl.bindTexture(gl.TEXTURE_2D, r.t);
+    this.bind0(r.t);
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false); gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
     try { gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img); } catch (e) { /* unreadable image: stays blank */ }
     gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
@@ -258,17 +340,20 @@ DS.GLW = class GLW {
   begin(W, H) {
     const gl = this.gl;
     W = Math.max(1, W | 0); H = Math.max(1, H | 0);
+    this.inval(); this.ring = this.ringN;                      // (first draw of the frame takes fresh storage)
     this.mkTarget(this.main, W, H); this.T = null; this.bind(this.main);
     gl.disable(gl.DEPTH_TEST); gl.disable(gl.CULL_FACE); gl.disable(gl.SCISSOR_TEST);
     gl.clearColor(0, 0, 0, 1); gl.clearStencil(0); gl.stencilMask(0xff); gl.clear(gl.COLOR_BUFFER_BIT | gl.STENCIL_BUFFER_BIT);
-    gl.enable(gl.BLEND); this.blend = null; this.setBlend('source-over');
+    gl.enable(gl.BLEND); this.blendOn = true; this.blend = null; this.setBlend('source-over');
     gl.disable(gl.STENCIL_TEST);
     this.curTex = null; this.nv = 0; this.draws = 0; this.main.clipD = 0;
     this.ctx.reset(W, H);
     this.color = this.main.color;
     return this.ctx;
   }
-  end() { this.flush(); this.setBlend('source-over'); this.gl.disable(this.gl.BLEND); this.resolve(this.main); this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, null); this.T = null; }   // (blending off: DS.Post draws after)
+  // off-screen work done outside begin/end (the sight): send what is batched, leave the context to DS.Post
+  finish() { this.flush(); this.setBlend('source-over'); this.gl.disable(this.gl.BLEND); this.blendOn = false; this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, null); this.T = null; }
+  end() { this.flush(); this.setBlend('source-over'); this.gl.disable(this.gl.BLEND); this.blendOn = false; this.resolve(this.main); this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, null); this.T = null; }   // (blending off: DS.Post draws after)
   setBlend(op) {
     if (op === this.blend) return;
     this.flush(); const gl = this.gl; this.blend = op;
@@ -294,20 +379,16 @@ DS.GLW = class GLW {
     b[o] = x3; b[o + 1] = y3; b[o + 2] = u0; b[o + 3] = v1; b[o + 4] = c[0]; b[o + 5] = c[1]; b[o + 6] = c[2]; b[o + 7] = c[3];
     this.nv += 6;
   }
-  texU(u) { const gl = this.gl; gl.uniform1f(u.u_bias, this.fx.bias); gl.uniform1f(u.u_gray, this.fx.gray); }
+  texU(P) { this.u1f(P, 'u_bias', this.fx.bias); this.u1f(P, 'u_gray', this.fx.gray); }
   flush() {
     if (!this.nv) return;
     const gl = this.gl, P = this.pTex;
     if (this.atlDirty.size) this.atlMips();
-    gl.useProgram(P.p); gl.uniform2f(P.u.u_res, this.W, this.H); this.maskU(P.u); this.texU(P.u);
-    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, this.curTex); gl.uniform1i(P.u.u_tex, 0);
-    gl.bindVertexArray(this.vao); gl.bindBuffer(gl.ARRAY_BUFFER, this.buf);
-    gl.bufferSubData(gl.ARRAY_BUFFER, 0, this.vb, 0, this.nv * 8);
-    gl.drawArrays(gl.TRIANGLES, 0, this.nv); this.draws++;
-    gl.bindVertexArray(null);
+    this.use(P); this.maskU(P.u, P); this.texU(P); this.bind0(this.curTex);
+    gl.drawArrays(gl.TRIANGLES, this.put(this.vb, this.nv), this.nv); this.draws++;
     this.nv = 0;
   }
-  atlMips() { const gl = this.gl; gl.activeTexture(gl.TEXTURE0); for (const pg of this.atlDirty) { gl.bindTexture(gl.TEXTURE_2D, pg.t); gl.generateMipmap(gl.TEXTURE_2D); } this.atlDirty.clear(); }
+  atlMips() { const gl = this.gl; for (const pg of this.atlDirty) { this.bind0(pg.t); gl.generateMipmap(gl.TEXTURE_2D); } this.atlDirty.clear(); }
   // one triangle into the quad batch (solid fills of convex paths, opaque strokes)
   tri3(t, x0, y0, x1, y1, x2, y2, u, v, c) {
     if (t !== this.curTex || this.nv + 3 > this.MAXQ * 6) { this.flush(); this.curTex = t; }
@@ -321,12 +402,16 @@ DS.GLW = class GLW {
   tris(prog, verts, n, setU) {
     this.flush();
     const gl = this.gl; if (this.atlDirty.size) this.atlMips();
-    gl.useProgram(prog.p); gl.uniform2f(prog.u.u_res, this.W, this.H); this.maskU(prog.u); if (prog === this.pTex) this.texU(prog.u); if (setU) setU(prog.u);
-    gl.bindVertexArray(this.vao); gl.bindBuffer(gl.ARRAY_BUFFER, this.buf);
-    if (n * 8 > this.bufLen) { this.bufLen = Math.max(n * 8, this.bufLen * 2); gl.bufferData(gl.ARRAY_BUFFER, this.bufLen * 4, gl.DYNAMIC_DRAW); }
-    gl.bufferSubData(gl.ARRAY_BUFFER, 0, verts, 0, n * 8);
-    gl.drawArrays(gl.TRIANGLES, 0, n); this.draws++;
-    gl.bindVertexArray(null);
+    this.use(prog); this.maskU(prog.u, prog); if (prog === this.pTex) this.texU(prog); if (setU) setU(prog.u, prog);
+    gl.drawArrays(gl.TRIANGLES, this.put(verts, n), n); this.draws++;
+  }
+  // n vertices into the ring; returns the index of the first
+  put(verts, n) {
+    const gl = this.gl;
+    if (n > this.ringN) { this.ringN = Math.max(n, this.ringN * 2); this.ring = this.ringN; }
+    if (this.ring + n > this.ringN) { gl.bufferData(gl.ARRAY_BUFFER, this.ringN * 32, gl.DYNAMIC_DRAW); this.ring = 0; }
+    gl.bufferSubData(gl.ARRAY_BUFFER, this.ring * 32, verts, 0, n * 8);
+    const f = this.ring; this.ring += n; return f;
   }
 };
 
@@ -421,10 +506,10 @@ DS.GLCtx = class GLCtx {
     const gl = this.r.gl, n = Math.min(8, G.stops.length), off = new Float32Array(8), cs = new Float32Array(32);
     if (!G.sorted) { G.stops.sort((p, q) => p[0] - q[0]); G.sorted = true; }
     for (let i = 0; i < n; i++) { off[i] = G.stops[i][0]; cs.set(this.r.col(G.stops[i][1]), i * 4); }
-    const a = G.a; gl.uniform1i(u.u_kind, G.kind);
+    const a = G.a, R = this.r, P = R.pGrad; R.u1i(P, 'u_kind', G.kind);
     if (G.kind === 0) { gl.uniform2f(u.u_p0, a[0], a[1]); gl.uniform2f(u.u_p1, a[2], a[3]); }
     else { gl.uniform3f(u.u_c0, a[0], a[1], a[2]); gl.uniform3f(u.u_c1, a[3], a[4], a[5]); }
-    gl.uniform1i(u.u_n, Math.max(1, n)); gl.uniform1fv(u.u_off, off); gl.uniform4fv(u.u_c, cs); gl.uniform1f(u.u_a, this.globalAlpha);
+    R.u1i(P, 'u_n', Math.max(1, n)); gl.uniform1fv(u.u_off, off, 0, Math.max(1, n)); gl.uniform4fv(u.u_c, cs, 0, Math.max(1, n) * 4); R.u1f(P, 'u_a', this.globalAlpha);
   }
   // ---- paths (points stored in device space, as the 2D canvas transforms them when they are added) ----
   beginPath() { this.path = []; this.sub = null; }
@@ -549,7 +634,7 @@ DS.GLCtx = class GLCtx {
     gl.enable(gl.STENCIL_TEST); gl.colorMask(false, false, false, false); gl.stencilMask(0xff);
     if (nonzero) { gl.stencilFunc(gl.ALWAYS, 0, 0xff); gl.stencilOpSeparate(gl.FRONT, gl.KEEP, gl.KEEP, gl.INCR_WRAP); gl.stencilOpSeparate(gl.BACK, gl.KEEP, gl.KEEP, gl.DECR_WRAP); }
     else { gl.stencilFunc(gl.ALWAYS, 1, 0xff); gl.stencilOp(gl.KEEP, gl.KEEP, gl.REPLACE); }
-    R.tris(R.pTex, v, n, u => { gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, R.white); gl.uniform1i(u.u_tex, 0); });
+    R.tris(R.pTex, v, n, () => R.bind0(R.white));
     gl.colorMask(true, true, true, true);
   }
   cover(x0, y0, x1, y1, style) {
@@ -559,7 +644,7 @@ DS.GLCtx = class GLCtx {
     if (typeof style === 'string') {
       const c = this.solid(style), v = this.tmp; let o = 0;
       for (const [x, y] of [[x0, y0], [x1, y0], [x1, y1], [x0, y0], [x1, y1], [x0, y1]]) { v[o] = x; v[o + 1] = y; v[o + 2] = 0; v[o + 3] = 0; v[o + 4] = c[0]; v[o + 5] = c[1]; v[o + 6] = c[2]; v[o + 7] = c[3]; o += 8; }
-      R.tris(R.pTex, v, 6, u => { gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, R.white); gl.uniform1i(u.u_tex, 0); });
+      R.tris(R.pTex, v, 6, () => R.bind0(R.white));
     } else if (style instanceof DS.GLGrad) {
       // gradient: corners carried back into the user space of the fill
       const I = this.inv(), U = q => [I[0] * q[0] + I[2] * q[1] + I[4], I[1] * q[0] + I[3] * q[1] + I[5]];
@@ -575,6 +660,24 @@ DS.GLCtx = class GLCtx {
     }
     gl.disable(gl.STENCIL_TEST);
   }
+};
+// a CSS filter chain (grayscale, sepia, saturate, hue-rotate, brightness, contrast, invert) as affine colour steps
+// for the sight shader: column-major mat4s (rgb rows, offset in the fourth column), at most six
+DS.GLW.filterMats = function (css) {
+  const out = new Float32Array(96); let n = 0;
+  const put = (R, off = [0, 0, 0]) => { if (n >= 6) return; const b = n * 16; for (let r = 0; r < 3; r++) { for (let c = 0; c < 3; c++) out[b + c * 4 + r] = R[r * 3 + c]; out[b + 12 + r] = off[r]; } out[b + 15] = 1; n++; };
+  for (const m of (css || '').matchAll(/([a-z-]+)\(([-\d.]+)(deg)?\)/g)) {
+    const f = m[1], v = +m[2];
+    if (f === 'grayscale') { const a = 1 - Math.min(1, v); put([0.2126 + 0.7874 * a, 0.7152 - 0.7152 * a, 0.0722 - 0.0722 * a, 0.2126 - 0.2126 * a, 0.7152 + 0.2848 * a, 0.0722 - 0.0722 * a, 0.2126 - 0.2126 * a, 0.7152 - 0.7152 * a, 0.0722 + 0.9278 * a]); }
+    else if (f === 'sepia') { const a = 1 - Math.min(1, v); put([0.393 + 0.607 * a, 0.769 - 0.769 * a, 0.189 - 0.189 * a, 0.349 - 0.349 * a, 0.686 + 0.314 * a, 0.168 - 0.168 * a, 0.272 - 0.272 * a, 0.534 - 0.534 * a, 0.131 + 0.869 * a]); }
+    else if (f === 'saturate') put([0.213 + 0.787 * v, 0.715 - 0.715 * v, 0.072 - 0.072 * v, 0.213 - 0.213 * v, 0.715 + 0.285 * v, 0.072 - 0.072 * v, 0.213 - 0.213 * v, 0.715 - 0.715 * v, 0.072 + 0.928 * v]);
+    else if (f === 'hue-rotate') { const a = v * Math.PI / 180, c = Math.cos(a), s = Math.sin(a);
+      put([0.213 + c * 0.787 - s * 0.213, 0.715 - c * 0.715 - s * 0.715, 0.072 - c * 0.072 + s * 0.928, 0.213 - c * 0.213 + s * 0.143, 0.715 + c * 0.285 + s * 0.140, 0.072 - c * 0.072 - s * 0.283, 0.213 - c * 0.213 - s * 0.787, 0.715 - c * 0.715 + s * 0.715, 0.072 + c * 0.928 + s * 0.072]); }
+    else if (f === 'brightness') put([v, 0, 0, 0, v, 0, 0, 0, v]);
+    else if (f === 'contrast') put([v, 0, 0, 0, v, 0, 0, 0, v], [0.5 - 0.5 * v, 0.5 - 0.5 * v, 0.5 - 0.5 * v]);
+    else if (f === 'invert') { const a = Math.min(1, v), k = 1 - 2 * a; put([k, 0, 0, 0, k, 0, 0, 0, k], [a, a, a]); }
+  }
+  return { m: out, n };
 };
 DS.GLPat = class GLPat {
   constructor(img) { this.img = img; this.m = [1, 0, 0, 1, 0, 0]; }

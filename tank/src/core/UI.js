@@ -16,7 +16,7 @@ DS.UI = {
     try { const r = req.call(el, { navigationUI: 'hide' }); if (r && r.catch) r.catch(no); } catch (e) { no(); }
   },
   KEY: 'ds.ui',
-  defaults: { post: 2, resAuto: true, flyFx: true, vol: 0.8, btn: 1, hudFull: false, help: true, touch: 'auto', keys: {}, fpsMode: '60', perf: false, renderer: 'gl', rv: 3 },
+  defaults: { post: 2, resAuto: true, flyFx: true, vol: 0.8, btn: 1, hudFull: false, help: true, touch: 'auto', keys: {}, fpsMode: '60', perf: false, renderer: 'gl', rv: 3, sightBg: 'blur' },
   // remappable actions: [name, the key the game listens for]
   ACTIONS: [['전진', 'KeyD'], ['후진', 'KeyA'], ['포 올림 · 상승', 'KeyW'], ['포 내림 · 하강', 'KeyS'], ['사격', 'Space'], ['탄종', 'KeyQ'], ['거리측정', 'KeyE'],
     ['표적 선택', 'Backspace'], ['동축 기관총 · 로켓', 'KeyF'], ['미사일 (TOW · 헬파이어)', 'KeyX'], ['조준경 배율', 'KeyV'], ['열상 · 야간 조준경', 'KeyT'],
@@ -57,6 +57,7 @@ Object.assign(DS.Game.prototype, {
       if (a === 'touch') S.touch = b.dataset.v;
       if (a === 'fps') S.fpsMode = b.dataset.v;
       if (a === 'rend') S.renderer = b.dataset.v;
+      if (a === 'sbg') S.sightBg = b.dataset.v;
       if (a === 'perf') S.perf = !S.perf;
       if (a === 'fs') { DS.UI.fsToggle(m => this.toast(m)); return; }
       if (a === 'spd') { this.world.env.speed = +b.dataset.v; this.timeUi(); return; }
@@ -121,7 +122,7 @@ Object.assign(DS.Game.prototype, {
     // reflect in the menu
     const pm = $('#pause'), on = (sel, v) => pm.querySelectorAll(sel).forEach(b => b.classList.toggle('on', v(b)));
     on('[data-p=post]', b => +b.dataset.v === S.post); on('[data-p=btn]', b => +b.dataset.v === S.btn); on('[data-p=touch]', b => b.dataset.v === S.touch);
-    on('[data-p=res]', () => S.resAuto); on('[data-p=fps]', b => b.dataset.v === (S.fpsMode || '60')); on('[data-p=rend]', b => b.dataset.v === (S.renderer || 'gl')); on('[data-p=perf]', () => !!S.perf); on('[data-p=flyfx]', () => S.flyFx !== false); on('[data-p=hud]', () => S.hudFull); on('[data-p=help]', () => S.help);
+    on('[data-p=res]', () => S.resAuto); on('[data-p=fps]', b => b.dataset.v === (S.fpsMode || '60')); on('[data-p=rend]', b => b.dataset.v === (S.renderer || 'gl')); on('[data-p=sbg]', b => b.dataset.v === (S.sightBg || 'blur')); on('[data-p=perf]', () => !!S.perf); on('[data-p=flyfx]', () => S.flyFx !== false); on('[data-p=hud]', () => S.hudFull); on('[data-p=help]', () => S.help);
     pm.querySelector('#p-vol').value = Math.round(S.vol * 100); pm.querySelector('#p-volv').textContent = Math.round(S.vol * 100) + ' %';
   },
   keyList() {

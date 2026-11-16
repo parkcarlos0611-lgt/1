@@ -53,6 +53,9 @@ DS.SightHud = {
     c.save(); c.setTransform(c.getTransform()); c.imageSmoothingEnabled = true; c.imageSmoothingQuality = 'high';
     c.globalCompositeOperation = 'lighter'; c.globalAlpha = 0.45; c.drawImage(L, -2, -2, W + 4, H + 4); c.drawImage(L, 2, 1, W - 1, H - 1);
     c.globalAlpha = 1; c.drawImage(L, 0, 0, W, H);
+    // WebGL: the symbols lie on a transparent canvas over the picture, so the glow cannot add to the picture
+    // under it; a second sharp copy keeps them as bright as they read when the glow was added
+    if (this.overPicture) { c.globalCompositeOperation = 'source-over'; c.globalAlpha = 0.85; c.drawImage(L, 0, 0, W, H); c.globalAlpha = 1; }
     c.restore();
   },
 

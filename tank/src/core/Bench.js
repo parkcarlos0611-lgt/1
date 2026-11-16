@@ -18,13 +18,14 @@ DS.Bench = class Bench {
     this.WARM = 3; this.LEN = 20;
     g.player.god = true;
     // the settings stay as chosen for the whole run (no automatic resolution or effect drops)
-    DS.T.postAuto = false; DS.T.resAuto = false; if (g.rs !== 1) { g.rs = 1; g.resize(); }
+    // (Game skips both while a benchmark runs: settings applied later, e.g. at start-up, cannot turn them back on)
+    DS.T.postAuto = false; g.rs = 1; g.resize();
     this.next();
   }
   tag(s) { const el = document.getElementById('benchtag') || Object.assign(document.createElement('div'), { id: 'benchtag' }); if (!el.parentNode) document.body.appendChild(el); el.textContent = s; el.hidden = !s; }
   next() {
-    if (this.i >= 0) this.res.push(Object.assign({ name: this.SC[this.i].name }, DS.Perf.summary(this.iv, this.wk)));
-    this.i++; this.t = 0; this.iv = []; this.wk = [];
+    if (this.i >= 0) this.res.push(Object.assign({ name: this.SC[this.i].name, hitch: this.hitchSum() }, DS.Perf.summary(this.iv, this.wk)));
+    this.i++; this.t = 0; this.iv = []; this.wk = []; this.hs = { n: 0, w: 0, st: {}, up: 0, px: 0 }; this.ns = { n: 0, w: 0, st: {}, up: 0, px: 0 };
     if (this.i >= this.SC.length) return this.finish();
     const W = this.g.world; W.particles.n = 0; if (W.fx.flashes) W.fx.flashes.length = 0;
     this.SC[this.i].set();
@@ -40,9 +41,20 @@ DS.Bench = class Bench {
     if (this.t >= this.WARM + this.LEN) this.next();
   }
   record() {
+    const G = this.g.rend.glw, up = G ? G.upN || 0 : 0, px = G ? G.upPx || 0 : 0; if (G) { G.upN = 0; G.upPx = 0; }
     if (this.done || this.t < this.WARM) return;
     const P = DS.Perf, j = (P.i - 1 + P.N) % P.N;
     if (P.iv[j] > 0) this.iv.push(P.iv[j]); this.wk.push(P.wk[j]);
+    // hitches: frames more than 25 ms apart, against the others — what the script was doing in them, and how much
+    // was uploaded to the GPU (a hitch with little of either is the GPU, the compositor or garbage collection)
+    const S = P.iv[j] > 25 ? this.hs : this.ns; S.n++; S.w += P.wk[j]; S.up += up; S.px += px;
+    for (const k in P.fs) S.st[k] = (S.st[k] || 0) + P.fs[k];
+  }
+  hitchSum() {
+    const H = this.hs, N = this.ns, f = (S, k) => S.n ? (S.st[k] || 0) / S.n : 0, r = v => v.toFixed(1);
+    if (!H || !H.n) return '';
+    const part = S => ['sim', 'render', 'sight', 'post', 'hud'].map(k => `${{ sim: '시뮬', render: '렌더', sight: '조준경', post: '후처리', hud: 'HUD' }[k]} ${r(f(S, k))}`).join(' / ');
+    return `끊김 ${H.n}회 — 그 프레임: 작업 ${r(H.w / H.n)} ms (${part(H)}) · 업로드 ${r(H.up / H.n)}장 ${r(H.px / H.n / 1e6)} MP | 보통 프레임: 작업 ${r(N.n ? N.w / N.n : 0)} ms (${part(N)}) · 업로드 ${r(N.n ? N.up / N.n : 0)}장 ${r(N.n ? N.px / N.n / 1e6 : 0)} MP`;
   }
   // ---- scenes ----
   front(x0) {
@@ -88,8 +100,9 @@ DS.Bench = class Bench {
     const el = document.createElement('div'); el.id = 'benchres';
     el.innerHTML = `<div class="pbox"><h2>벤치마크 결과 ${ok ? '<span class="ok">합격</span>' : '<span class="ng">미달</span>'}</h2>
       <table><thead><tr><th>장면</th><th>평균 fps</th><th>1% 저점</th><th>p99 ms</th><th>최악 ms</th><th>작업 ms 평균/p99</th><th>18ms 초과</th></tr></thead><tbody>${rows}</tbody></table>
+      <div class="bhitch">${r.filter(s => s.hitch).map(s => `<p><b>${s.name}</b> ${s.hitch}</p>`).join('')}</div>
       <p class="bmeta">기준: 평균 ≥ 59 · 1% 저점 ≥ 55 · p99 ≤ 18 ms<br>
-      화면 ${screen.width}×${screen.height} @${devicePixelRatio} · 렌더 ${cv.width}×${cv.height} (×${f(g.rs || 1, 2)}) · 주사율 ${P.hz() || '?'} Hz · 제한 ${P.mode === 'free' ? '자유' : P.mode} · 화면 효과 ${['끔', '낮음', '높음'][g.post && g.post.ok ? g.post.q : 0]} · 자동 조절 끔(측정 중 고정)<br>${P.gpuLine(g)}<br>${ua}</p>
+      화면 ${screen.width}×${screen.height} @${devicePixelRatio} · 렌더 ${cv.width}×${cv.height} (×${f(g.rs || 1, 2)}) · 주사율 ${P.hz() || '?'} Hz · 제한 ${P.mode === 'free' ? '자유' : P.mode} · 화면 효과 ${['끔', '낮음', '높음'][g.post && g.post.ok ? g.post.q : 0]} · 해상도·효과 자동 조절 정지(측정 중 고정)<br>${P.gpuLine(g)}<br>${ua}</p>
       <div class="prow"><button type="button" class="big" id="b-again">다시 실행</button><button type="button" id="b-menu">작전 선택</button></div></div>`;
     document.body.appendChild(el);
     el.querySelector('#b-again').onclick = () => { location.hash = 'bench'; location.reload(); };

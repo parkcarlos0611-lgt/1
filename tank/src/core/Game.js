@@ -319,7 +319,7 @@ DS.Game = class Game {
     if (!P.ok || (!P.q && !GW)) { document.getElementById('hurt').style.display = ''; return; }
     document.getElementById('hurt').style.display = P.q ? 'none' : '';
     // drop a level when the frame rate stays low (DS.T.postAuto = false turns this off)
-    if (DS.T.postAuto !== false) {
+    if (DS.T.postAuto !== false && !this.bench) {
       this.lowFps = this.fps < 40 && !(this.rs > 0.5 && !navigator.webdriver) ? this.lowFps + dt : 0;      // resolution is lowered first
       if (this.lowFps > 3) { this.lowFps = 0; P.setQuality(P.q - 1); this.toast('프레임 저하 — 화면 효과 ' + ['끔', '낮음'][P.q]); }
     }
@@ -516,7 +516,7 @@ DS.Game = class Game {
     if (dt > 0) this.fps += (1 / dt - this.fps) * 0.05;
     // frame-rate governor: below 50 fps for a second and a half the picture is rendered smaller (it is stretched
     // back to the screen); with headroom for six seconds it creeps back up. Never touched while editing.
-    if (DS.T.resAuto !== false && !navigator.webdriver && this.player && !this.paused) this.governor(t);
+    if (DS.T.resAuto !== false && !navigator.webdriver && this.player && !this.paused && !this.bench) this.governor(t);      // (held still during the benchmark)
     const ed = this.sbx && this.sbx.edit;
     this.readInput(dt);
     if (ed) this.sbx.frame(dt);

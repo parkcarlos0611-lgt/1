@@ -25,12 +25,12 @@ DS.Perf = {
   },
   hz() { if (this.rn < 30) return 0; const a = Array.from(this.raw.subarray(0, this.rn)).sort((p, q) => p - q), m = a[a.length >> 1]; return m > 0 ? Math.round(1000 / m / 10) * 10 : 0; },
   begin(t, iv) {
-    this.t0 = this.tl = performance.now(); this.calls = 0;
+    this.t0 = this.tl = performance.now(); this.calls = 0; this.fs = this.fs || {}; for (const k in this.fs) this.fs[k] = 0;     // fs: this frame's stages
     if (iv > 0) { this.iv[this.i] = iv; }
   },
   // render sub-passes (Renderer.frame) and other fine timings, averaged with the stages
   sub(name, ms) { this.secR[name] = (this.secR[name] || 0) + ms; },
-  lap(name) { const t = performance.now(); this.sec[name] = (this.sec[name] || 0) + t - this.tl; this.tl = t; },
+  lap(name) { const t = performance.now(); this.sec[name] = (this.sec[name] || 0) + t - this.tl; if (this.fs) this.fs[name] = (this.fs[name] || 0) + t - this.tl; this.tl = t; },
   end() {
     const w = performance.now() - this.t0; this.wk[this.i] = w;
     this.i = (this.i + 1) % this.N; this.n = Math.min(this.N, this.n + 1);

@@ -236,6 +236,9 @@ Object.assign(DS.Renderer.prototype, {
   // repainted when the zoom changes, the view runs off its end or the ground under it changes shape.
   groundTex(ctx, cam, im, a, b, dyTop, dyBot, tileW, tileH, ox = 0) {
     if (!im) return;
+    // WebGL: the tiles themselves (quads of one texture, one batch); the strip cache below is for the 2D canvas,
+    // and redrawing and re-uploading it whenever the ground under it shifted (sand drift, craters) cost a frame
+    if (ctx.canvas._gl) return this.groundTiles(ctx, im, a, b, dyTop, dyBot, tileW, tileH, ox);
     const T = this.w.terrain, z = cam.zoom * cam.dpr, H = dyTop - dyBot, rows = Math.max(1, Math.ceil(H / tileH - 0.01));
     const k0 = Math.floor((a - ox) / tileW), k1 = Math.ceil((b - ox) / tileW), xa = ox + k0 * tileW, xb = ox + Math.max(k0 + 1, k1) * tileW;
     const byCv = this.gtx || (this.gtx = new Map()); let M = byCv.get(ctx.canvas); if (!M) byCv.set(ctx.canvas, M = new Map());

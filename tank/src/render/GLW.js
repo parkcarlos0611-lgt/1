@@ -26,13 +26,18 @@ DS.GLW = class GLW {
   // draws, clears, blits) and this.rgl does resources and uploads at once; play() then uploads the frame's
   // vertices in one go and replays the record, with nothing uploaded in between.
   recorder() {
-    const real = this.rgl, list = this.rec = [], fns = {};
+    const real = this.rgl, L = this.rec = [];
     const REC = ['useProgram', 'uniform1f', 'uniform1i', 'uniform2f', 'uniform3f', 'uniform4f', 'uniform1fv', 'uniform4fv', 'uniformMatrix4fv',
       'bindVertexArray', 'bindBuffer', 'drawArrays', 'bindTexture', 'activeTexture', 'enable', 'disable', 'blendFunc', 'blendFuncSeparate',
       'stencilFunc', 'stencilOp', 'stencilOpSeparate', 'stencilMask', 'colorMask', 'bindFramebuffer', 'viewport', 'scissor', 'clear',
       'clearColor', 'clearStencil', 'blitFramebuffer', 'generateMipmap'];
-    for (const k of REC) fns[k] = (...a) => { list.push(k, a); };
-    this.gl = new Proxy(real, { get: (t, k) => fns[k] || (typeof t[k] === 'function' ? t[k].bind(t) : t[k]) });
+    // a plain object (no Proxy): the context's constants and other methods copied over, the draw-time ones
+    // recorded into one flat array (name, argument count, arguments) — nothing allocated per call
+    const R = {};
+    for (let o = Object.getPrototypeOf(real); o && o !== Object.prototype; o = Object.getPrototypeOf(o))
+      for (const k of Object.getOwnPropertyNames(o)) { if (k in R || k === 'constructor') continue; let v; try { v = real[k]; } catch (e) { continue; } R[k] = typeof v === 'function' ? v.bind(real) : v; }
+    for (const k of REC) R[k] = function (a, b, c, d, e, f, g, h, i, j) { const n = arguments.length; L.push(k, n, a, b, c, d, e, f, g, h, i, j); };
+    this.gl = R;
     this.fv = new Float32Array(262144 * 8); this.fn = 0;
   }
   play() {
@@ -40,7 +45,15 @@ DS.GLW = class GLW {
     const gl = this.rgl;
     gl.bindVertexArray(this.vao); gl.bindBuffer(gl.ARRAY_BUFFER, this.buf);
     gl.bufferData(gl.ARRAY_BUFFER, this.fv.subarray(0, Math.max(8, this.fn * 8)), gl.STREAM_DRAW);
-    for (let i = 0; i < L.length; i += 2) gl[L[i]].apply(gl, L[i + 1]);
+    for (let i = 0; i < L.length; i += 12) {
+      const f = gl[L[i]], n = L[i + 1];
+      switch (n) {
+        case 0: f.call(gl); break; case 1: f.call(gl, L[i + 2]); break; case 2: f.call(gl, L[i + 2], L[i + 3]); break;
+        case 3: f.call(gl, L[i + 2], L[i + 3], L[i + 4]); break; case 4: f.call(gl, L[i + 2], L[i + 3], L[i + 4], L[i + 5]); break;
+        case 5: f.call(gl, L[i + 2], L[i + 3], L[i + 4], L[i + 5], L[i + 6]); break;
+        default: f.call(gl, L[i + 2], L[i + 3], L[i + 4], L[i + 5], L[i + 6], L[i + 7], L[i + 8], L[i + 9], L[i + 10], L[i + 11]);
+      }
+    }
     L.length = 0; this.fn = 0;
   }
   rbind(t) { this.rgl.bindTexture(this.rgl.TEXTURE_2D, t); }     // (resources: bound at once, not recorded)
@@ -354,6 +367,7 @@ DS.GLW = class GLW {
       }
       this.rbind(r.t);
       gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false); gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
+      this.upN = (this.upN || 0) + 1; this.upPx = (this.upPx || 0) + w * h;
       try { gl.texSubImage2D(gl.TEXTURE_2D, 0, r.x, r.y, w, h, gl.RGBA, gl.UNSIGNED_BYTE, img); } catch (e) { /* unreadable image: stays blank */ }
       gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
       this.atlDirty.add(r.pg);
@@ -363,6 +377,7 @@ DS.GLW = class GLW {
     if (!r || r.pg) { r = { t: this.mkTex() }; M.set(img, r); }
     this.rbind(r.t);
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false); gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
+    this.upN = (this.upN || 0) + 1; this.upPx = (this.upPx || 0) + w * h;
     try { gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img); } catch (e) { /* unreadable image: stays blank */ }
     gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
     if (w > 1 && h > 1) { gl.generateMipmap(gl.TEXTURE_2D); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR); }

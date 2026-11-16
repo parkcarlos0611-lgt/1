@@ -106,6 +106,7 @@ DS.Renderer = class Renderer {
     if (!storm) for (let j = Math.floor((cam.left - 40) / 220); j <= (cam.right + 40) / 220; j++) {
       if (H(j + 0.77) > 0.3) continue;
       const u0 = (j + 0.2 + 0.6 * H(j + 0.41)) * 220, L = [], Rr = [];
+      const RD = DS.MAP && DS.MAP.road; if (RD && u0 > RD[0] - 30 && u0 < RD[1] + 30) continue;     // never across a road
       for (let d = 0.04; d <= 1.25; d += 0.06) {
         const u = u0 + Math.sin(d * 4.2 + j) * 5 + d * 9 * (H(j + 0.13) < 0.5 ? 1 : -1), par = 1 + 0.45 * d, x = cam.x + (u - cam.x) * par;
         const w = (0.6 + 1.6 * d) * (0.8 + 0.4 * Math.sin(d * 7 + j)), y = T.height(x) - 0.25 - d * D;
@@ -618,7 +619,7 @@ DS.Renderer = class Renderer {
     const F = [0.006, 0.012, 0.02, 0.05, 0.10, 0.18, 0.30];
     let near = null;
     for (let li = storm ? 2 : 0; li < 7; li++) {
-      if (li === 1) continue;                                                          // (was a second mountain range)
+      if (li === 1 && !(DS.MAP && DS.MAP.town)) continue;                              // layer 1: the far city (town map only)
       const f = F[li], s = li < 2 ? 1.6 / dh : (0.6 + f * 2) / dh;                  // layer units per half-size pixel
       let L = S.land[li]; if (!L) L = S.land[li] = { c: document.createElement('canvas'), key: '', camx: 0 };
       let X0 = Wh / 2 - Ws / 2 - (cam.x - L.camx) * f * 8 / s;
@@ -753,7 +754,7 @@ DS.Renderer = class Renderer {
     // the far horizon: a dead-flat line with the low, hazy silhouettes of the oil country on it — refinery
     // stacks, storage tanks, pipe racks and lines of pump jacks (the burning wells are drawn live: oilFires())
     if (li === 0) { if (!storm) this.oilSkyline(ctx, cam, hz + H * 0.012, haze, low); return; }
-    if (li === 1) return;
+    if (li === 1) { if (!storm && DS.MAP && DS.MAP.town) this.citySkyline(ctx, cam, hz + H * 0.016, haze, low); return; }
     // the plain: five nearly flat rows of gravel desert with the odd low dune swell, far rows fading into the haze,
     // each strewn with drift sand, pale crust and gravel
     const layers = [[0.02, 0.6, 0.004, 30, 3200], [0.05, 0.45, 0.007, 55, 2300], [0.10, 0.32, 0.011, 80, 1700], [0.18, 0.2, 0.016, 105, 1300], [0.30, 0.1, 0.022, 125, 1000]];
@@ -872,6 +873,74 @@ DS.Renderer = class Renderer {
     if (typeof c === 'number') c = [c >> 16 & 255, c >> 8 & 255, c & 255];
     const k = 0.5 * Math.min(1, (this.w.env && this.w.env.night) || 0), to = [58, 66, 92];
     return k ? c.map((v, i) => Math.round(v + (to[i] - v) * k)) : c.map(Math.round);
+  }
+  // C1 — the far city on the horizon (town map; layer 1 of the strip, in front of the oil country): a hazy
+  // blue-grey skyline whose make-up follows the map. Layer-x wx stands for map position mx = (wx − 4000)/(8f), so
+  // the skyline straight ahead is the district you are in, and the city's towers rise from the side as you near
+  // the centre: low outskirts with a water tower or a minaret, dense mid-rise, the tower cluster of the centre
+  // with cranes, broken towers over the battered district, nothing out in the desert.
+  citySkyline(ctx, cam, y0, haze, low) {
+    const W = cam.W * cam.dpr, H = cam.H * cam.dpr, f = 0.012, d = cam.dpr, M = DS.MAP, u = H / 600;
+    const sm = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+    const sun = (this.w.env && this.w.env.sun) || { side: 1 };
+    const cell = 9, wx0 = (-8 - W / 2) / d * 1.6 + cam.x * f * 8 + 4000, wx1 = (W + 8 - W / 2) / d * 1.6 + cam.x * f * 8 + 4000;
+    const toX = wx => (wx - 4000 - cam.x * f * 8) / 1.6 * d + W / 2;
+    const sky = [166, 180, 198], base = haze.map((c, i) => Math.round(c * 0.4 + sky[i] * 0.6 - 18)), lit = haze.map((c, i) => Math.min(255, Math.round(c * 0.5 + sky[i] * 0.5 + 6))), dark = base.map(c => Math.round(c * 0.9));
+    const col = (c, a = 1) => `rgba(${c},${a})`;
+    // two passes: the farther, paler buildings, then the nearer, a shade darker
+    for (const pass of [0, 1]) {
+      const pc = pass ? dark : base, pl = pass ? base : lit;
+      for (let k = Math.floor(wx0 / cell) - 6; k <= wx1 / cell + 6; k++) {
+        const h = n => { const v = Math.sin(n * 63.71 + k * 19.19 + pass * 7.3) * 43758.5453; return v - Math.floor(v); };
+        const mx = (k * cell - 4000) / (f * 8);
+        const town = sm(1600, 3200, mx) * (1 - sm(16800, 18400, mx));                  // anything at all
+        const tall = Math.exp(-(((mx - 12400) / 2600) ** 2)), mid = sm(4200, 7000, mx) * (1 - sm(15500, 17500, mx)), ruin = sm(13800, 14600, mx) * (1 - sm(16800, 17600, mx));
+        if (town < 0.02 || h(1) > 0.25 + 0.65 * town * (0.35 + 0.65 * Math.max(mid, tall))) continue;
+        const x = toX(k * cell + h(2) * cell), y = y0 + pass * 2 * u;
+        let bw = (5 + 10 * h(3)) * u, bh = (3 + 4 * h(4)) * u * (0.6 + town);       // low blocks everywhere in town
+        const r = h(5);
+        if (r < tall * 0.85) { bh = (21 + 34 * h(6) * h(6) + 14 * tall) * u; bw = (6 + 7 * h(7)) * u; }
+        else if (r < tall * 0.85 + mid * 0.45) bh = (9 + 10 * h(6)) * u;
+        if (pass === 0) { bh *= 0.8; bw *= 0.85; }
+        const xl = x - bw / 2, top = y - bh;
+        ctx.fillStyle = col(pc); ctx.fillRect(xl, top, bw, bh + u);
+        // the side away from the sun a shade darker, the sunny edge a lighter line
+        ctx.fillStyle = col(dark, 0.5); ctx.fillRect(sun.side > 0 ? xl : xl + bw * 0.62, top, bw * 0.38, bh);
+        ctx.fillStyle = col(pl, 0.7); ctx.fillRect(sun.side > 0 ? xl + bw - u : xl, top, u, bh);
+        if (bh > 15 * u) {
+          // towers: floor bands, a crown (stepped, mast, or a slim spire), the odd one broken in the ruins
+          ctx.fillStyle = col(dark, 0.25); for (let fy = top + 3 * u; fy < y - 2 * u; fy += 2.6 * u) ctx.fillRect(xl + u, fy, bw - 2 * u, 0.7 * u);
+          const c = h(8);
+          ctx.fillStyle = col(pc);
+          if (ruin > 0.3 && h(9) < 0.7 * ruin) {                                   // broken top: a jagged bite out of it
+            ctx.fillStyle = `rgb(${haze.map(c => Math.round(c * 0.98))})`; ctx.beginPath(); ctx.moveTo(xl - u, top - u);
+            for (let i = 0; i <= 5; i++) ctx.lineTo(xl + bw * i / 5, top + bh * (0.08 + 0.3 * h(20 + i)) * (i % 2 ? 1 : 0.4));
+            ctx.lineTo(xl + bw + u, top - u); ctx.closePath(); ctx.fill();
+          } else if (c < 0.3) { ctx.fillRect(xl + bw * 0.2, top - 4 * u, bw * 0.6, 4 * u); ctx.fillRect(xl + bw * 0.38, top - 7 * u, bw * 0.24, 3 * u); }
+          else if (c < 0.55) ctx.fillRect(x - 0.4 * u, top - (8 + 10 * h(10)) * u, 0.8 * u, (8 + 10 * h(10)) * u);
+          else if (c < 0.7) { ctx.beginPath(); ctx.moveTo(xl + bw * 0.3, top); ctx.lineTo(x, top - 10 * u); ctx.lineTo(xl + bw * 0.7, top); ctx.fill(); }
+        } else {
+          const c = h(8);
+          ctx.fillStyle = col(pc);
+          if (c < 0.07 * town) {                                                   // a mosque: dome and minaret
+            const dr = Math.min(bw, 10 * u) * 0.45; ctx.beginPath(); ctx.ellipse(x, top, dr, dr * 0.95, 0, Math.PI, 0); ctx.fill();
+            const mxx = xl + bw + 2 * u, mh = bh + (9 + 6 * h(11)) * u;
+            ctx.fillRect(mxx, y - mh, 1.8 * u, mh); ctx.fillRect(mxx - 0.6 * u, y - mh * 0.78, 3 * u, 1.2 * u);
+            ctx.beginPath(); ctx.moveTo(mxx - 0.2 * u, y - mh); ctx.lineTo(mxx + 0.9 * u, y - mh - 4 * u); ctx.lineTo(mxx + 2 * u, y - mh); ctx.fill();
+          } else if (c < 0.1 * town) {                                             // a water tower: a bowl on a stem
+            const th = (10 + 5 * h(11)) * u, tr = (2.6 + 1.4 * h(12)) * u;
+            ctx.fillRect(x - 0.9 * u, y - th, 1.8 * u, th); ctx.beginPath(); ctx.ellipse(x, y - th, tr, tr * 0.75, 0, 0, 7); ctx.fill();
+            ctx.fillStyle = col(pl, 0.6); ctx.beginPath(); ctx.ellipse(x + tr * 0.25 * sun.side, y - th - tr * 0.2, tr * 0.5, tr * 0.35, 0, 0, 7); ctx.fill();
+          } else if (c < 0.2) ctx.fillRect(xl + bw * h(13), top - 2 * u, 2 * u, 2 * u);   // a roof water tank / stair head
+        }
+        // tower cranes over the centre
+        if (pass === 1 && tall > 0.35 && h(14) < 0.05) {
+          const ch = (28 + 16 * h(15)) * u, jib = (12 + 7 * h(16)) * u, cx = x + bw;
+          ctx.strokeStyle = col(dark, 0.9); ctx.lineWidth = Math.max(1, 0.8 * u); ctx.beginPath();
+          ctx.moveTo(cx, y); ctx.lineTo(cx, y - ch); ctx.moveTo(cx - jib * 0.3, y - ch); ctx.lineTo(cx + jib, y - ch); ctx.moveTo(cx, y - ch - 4 * u); ctx.lineTo(cx + jib * 0.7, y - ch); ctx.stroke();
+        }
+      }
+    }
   }
   // the oil country on the horizon (layer 0 of the strip): clusters of refinery, tank farm and well field along
   // the line, hazy blue-grey; site k sits at layer-x k·SITE (the burning wells of oilFires() use the same sites)

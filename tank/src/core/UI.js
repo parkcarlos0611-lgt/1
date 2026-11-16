@@ -16,7 +16,7 @@ DS.UI = {
     try { const r = req.call(el, { navigationUI: 'hide' }); if (r && r.catch) r.catch(no); } catch (e) { no(); }
   },
   KEY: 'ds.ui',
-  defaults: { post: 2, resAuto: true, flyFx: true, vol: 0.8, btn: 1, hudFull: false, help: false, helpSeen: false, touch: 'auto', keys: {}, fpsMode: '60', perf: false, renderer: 'gl', rv: 3, sightBg: 'blur' },
+  defaults: { post: 2, resAuto: true, flyFx: true, vol: 0.8, mix: { fx: 1, eng: 1, amb: 1 }, btn: 1, hudFull: false, help: false, helpSeen: false, touch: 'auto', keys: {}, fpsMode: '60', perf: false, renderer: 'gl', rv: 3, sightBg: 'blur' },
   // remappable actions: [name, the key the game listens for]
   ACTIONS: [['전진', 'KeyD'], ['후진', 'KeyA'], ['포 올림 · 상승', 'KeyW'], ['포 내림 · 하강', 'KeyS'], ['사격', 'Space'], ['탄종', 'KeyQ'], ['거리측정', 'KeyE'],
     ['표적 선택', 'Backspace'], ['동축 기관총 · 로켓', 'KeyF'], ['미사일 (TOW · 헬파이어)', 'KeyX'], ['조준경 배율', 'KeyV'], ['열상 · 야간 조준경', 'KeyT'],
@@ -99,6 +99,8 @@ Object.assign(DS.Game.prototype, {
     pm.querySelector('#p-clock').addEventListener('input', e => { this.world.env.clock = +e.target.value / 60; DS.Sky.update(this.world, 0); this.nightSight((this.world.env.night || 0) > 0.5 || this.thermal); this.timeUi(); });
     this.timeUi();
     pm.querySelector('#p-vol').addEventListener('input', e => { S.vol = +e.target.value / 100; DS.UI.save(S); this.uiApply(); });
+    pm.querySelectorAll('[data-mix]').forEach(el => el.addEventListener('input', e => { S.mix = Object.assign({ fx: 1, eng: 1, amb: 1 }, S.mix, { [el.dataset.mix]: +e.target.value / 100 }); DS.UI.save(S); this.uiApply(); }));
+    pm.querySelectorAll('[data-p=hatch]').forEach(b => b.addEventListener('click', () => { DS.Audio.hatch = b.dataset.v === '1'; this.uiApply(); }));
     addEventListener('keydown', e => { if (e.code === 'Escape' && !(this.sbx && this.sbx.edit)) this.setPause(!this.paused); });
     this.touchInit();
     // tapping a friendly vehicle in the list at the top rides it (missions and the town)
@@ -122,6 +124,7 @@ Object.assign(DS.Game.prototype, {
     if (this.rend && this.rend.glw) { this.rend.glw.enabled = S.renderer === 'gl'; if (this.rend.glw.ok) this.rend.glw.setMsaa(S.msaa || 'auto'); }
     DS.T.resAuto = S.resAuto; DS.T.flyFx = S.flyFx !== false; if (!S.resAuto && this.rs !== 1) { this.rs = 1; this.resize(); }
     DS.Audio.vol = S.vol; if (DS.Audio.master && DS.Audio.on) DS.Audio.master.gain.value = S.vol;
+    DS.Audio.setMix(Object.assign({ fx: 1, eng: 1, amb: 1 }, S.mix));
     document.documentElement.style.setProperty('--tb', (64 * S.btn).toFixed(0) + 'px');
     $('#hud').classList.toggle('compact', !S.hudFull); $('#hudmore').textContent = S.hudFull ? '간단히 ▴' : '자세히 ▾';
     this.setHelp(S.help);
@@ -132,6 +135,8 @@ Object.assign(DS.Game.prototype, {
     on('[data-p=post]', b => +b.dataset.v === S.post); on('[data-p=btn]', b => +b.dataset.v === S.btn); on('[data-p=touch]', b => b.dataset.v === S.touch);
     on('[data-p=res]', () => S.resAuto); on('[data-p=fps]', b => b.dataset.v === (S.fpsMode || '60')); on('[data-p=rend]', b => b.dataset.v === (S.renderer || 'gl')); on('[data-p=sbg]', b => b.dataset.v === (S.sightBg || 'blur')); on('[data-p=aa]', b => b.dataset.v === (S.msaa || 'auto')); on('[data-p=preset]', b => b.dataset.v === S.preset); on('[data-p=hitcam]', () => S.hitCam !== false); DS.T.hitCam = S.hitCam !== false; on('[data-p=perf]', () => !!S.perf); on('[data-p=flyfx]', () => S.flyFx !== false); on('[data-p=hud]', () => S.hudFull); on('[data-p=help]', () => S.help);
     pm.querySelector('#p-vol').value = Math.round(S.vol * 100); pm.querySelector('#p-volv').textContent = Math.round(S.vol * 100) + ' %';
+    pm.querySelectorAll('[data-mix]').forEach(el => { const v = Math.round(((S.mix || {})[el.dataset.mix] ?? 1) * 100); el.value = v; el.nextElementSibling.textContent = v + ' %'; });
+    on('[data-p=hatch]', b => (b.dataset.v === '1') === DS.Audio.hatch);
   },
   keyList() {
     const S = this.ui, el = document.getElementById('p-keys');

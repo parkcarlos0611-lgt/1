@@ -307,7 +307,7 @@ DS.Effects = class Effects {
   muzzle(v, e) {
     if (e.ammo.small) return this.cannon(v, e);                     // 25 mm chain gun (not the M1A1's narrow APFSDS rod)
     const P = this.P, K = DS.P, T = this.w.terrain;
-    DS.Audio.gun(e.x, e.y, parseInt((v.def.gun.name.match(/(\d+)mm/) || [0, 120])[1]));
+    DS.Audio.gun(e.x, e.y, parseInt((v.def.gun.name.match(/(\d+)mm/) || [0, 120])[1]), v, e.ammo);
     this.flashes.push({ x: e.x, y: e.y, dx: e.dx, dy: e.dy, t: 0, ttl: 0.085 });
     this.shake = Math.max(this.shake, 0.6);
     const big = v.def.gun.recoilMass > 1500 ? 1 : 0.55, ang = Math.atan2(e.dy, e.dx), sc = this.hex(T.soilAt(e.x).col[1]), sc2 = this.hex(T.soilAt(e.x).col[0]);

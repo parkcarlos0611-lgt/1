@@ -297,7 +297,7 @@ Object.assign(DS.Effects.prototype, {
     if (v.burning) this.burning(v, dt);
     // blade beat
     v._beat = (v._beat || 0) - dt * v.rpm;
-    if (v._beat <= 0 && v.rpm > 0.2) { v._beat = v.def.flight.beat || 0.105; DS.Audio.rotorBeat(v.pos.x, v.pos.y, v.rpm, v.def.flight.blades === 2); }
+    if (v._beat <= 0 && v.rpm > 0.2) { v._beat = v.def.flight.beat || 0.105; DS.Audio.rotorBeat(v.pos.x, v.pos.y, v.rpm, v.def.flight.blades === 2, v.vel && v.vel.x, v.vel && v.vel.y); }
     this.dispatch(v);
   },
 });

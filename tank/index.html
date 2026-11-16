@@ -398,6 +398,10 @@
     <div class="prow" data-tab="view"><span>전체 화면 (F10)</span><button type="button" data-p="fs">켬</button></div>
     <div class="prow" data-tab="game"><span>탄 비행 효과 (저공 충격파 먼지·초음속 파열음·포탄 휘파람)</span><button type="button" data-p="flyfx">켬</button></div>
     <div class="prow" data-tab="sound"><span>소리 크기</span><input id="p-vol" type="range" min="0" max="100" step="5" aria-label="소리 크기"><b id="p-volv"></b></div>
+    <div class="prow" data-tab="sound"><span>효과음 (포·피탄·폭발)</span><input id="p-vfx" data-mix="fx" type="range" min="0" max="150" step="5" aria-label="효과음"><b></b></div>
+    <div class="prow" data-tab="sound"><span>엔진·궤도</span><input id="p-veng" data-mix="eng" type="range" min="0" max="150" step="5" aria-label="엔진·궤도"><b></b></div>
+    <div class="prow" data-tab="sound"><span>환경음 (바람·먼 포성·도시)</span><input id="p-vamb" data-mix="amb" type="range" min="0" max="150" step="5" aria-label="환경음"><b></b></div>
+    <div class="prow" data-tab="sound"><span>해치 (U)</span><button type="button" data-p="hatch" data-v="1">열림</button><button type="button" data-p="hatch" data-v="0">닫힘 — 차체 너머로</button></div>
     <div class="prow" data-tab="ctrl"><span>터치 조작</span><button type="button" data-p="touch" data-v="auto">자동</button><button type="button" data-p="touch" data-v="on">항상</button><button type="button" data-p="touch" data-v="off">끔</button></div>
     <div class="prow" data-tab="ctrl"><span>버튼 크기</span><button type="button" data-p="btn" data-v="0.85">작게</button><button type="button" data-p="btn" data-v="1">보통</button><button type="button" data-p="btn" data-v="1.2">크게</button></div>
     <details class="pkeys prow" data-tab="ctrl"><summary>키 설정</summary><div id="p-keys"></div></details>

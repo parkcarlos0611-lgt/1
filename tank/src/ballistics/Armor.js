@@ -84,7 +84,7 @@ DS.Armor = {
     const prot = los * (heat ? M.ce : M.ke) + (P.era ? P.era * (heat ? 1 : 0.06) : 0);
     const pen = this.penetration(A, sp);
     const range = Math.abs(hit.x - proj.x0);
-    const r = { vehicle: v, plate: P.name, part: P.part, ammo: A, range, speed: sp, obl, los, prot, pen, x: hit.x, y: hit.y, effects: [] };
+    const r = { plateLocal: P, vehicle: v, plate: P.name, part: P.part, ammo: A, range, speed: sp, obl, los, prot, pen, x: hit.x, y: hit.y, effects: [] };
 
     if (v.def.proofD && A.small && A.d <= v.def.proofD) { r.result = 'nonpen'; return r; }     // armoured aircraft: small arms do nothing
     // protection that depends on the side hit (AH-1W): from ahead, rounds up to `front` calibre do nothing and up
@@ -141,6 +141,7 @@ DS.Armor = {
         if (Math.hypot(ox - ux * along, oy - uy * along) < m.r) hits.set(m, (hits.get(m) || 0) + 1);
       }
     }
+    r.mods = [...hits.keys()].map(m => m.id); r.spallLen = len; r.spallHalf = half;     // (for the hit camera)
     for (const [m, k] of hits) {
       if (rnd() < 1 - Math.pow(1 - pk, k)) r.effects.push(v.damage(m.id));
     }

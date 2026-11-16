@@ -222,6 +222,7 @@ DS.Game = class Game {
       if (e.code === 'KeyY') { const t = DS.Searchlight.cycle(this.player); this.toast(t || '이 차량에는 탐조등이 없음'); return; }
       if (e.code === 'KeyN' && !(this.mission && this.mission.range)) { this.cycleVehicle(e.shiftKey ? -1 : 1); return; }
       if (e.code === 'KeyC' && this.player.heli) { this.player.turn(); return; }
+      if (e.code === 'Backquote' && !e.repeat) { this.ui.hitCam = this.ui.hitCam === false; DS.UI.save(this.ui); this.uiApply(); this.toast(this.ui.hitCam === false ? '피탄 카메라 끔' : '피탄 카메라 켬'); }
       if (e.code === 'KeyZ') { this.world.xray = this.world.xray === false; this.toast(this.world.xray ? 'TOW 발사관 투시 켬' : 'TOW 발사관 투시 끔'); }
       if (e.code === 'KeyR') this.player.place(this.player.pos.x);
       if (e.code === 'KeyC' && this.mouse) { const m = cam.toWorld(this.mouse.x, this.mouse.y); this.world.terrain.crater(m.x, 1.6, 0.7, 0.35, 0); this.world.terrain.relax(undefined, undefined, 8); }
@@ -534,6 +535,7 @@ DS.Game = class Game {
     this.postFrame(dt);
     Pf.lap('post');
     this.hud();
+    if (!this.paused) DS.HitCam.update(dt); DS.HitCam.draw(this, dt);
     Pf.lap('hud');
     Pf.end(); Pf.draw(this);
     if (this.bench) this.bench.record();
@@ -701,7 +703,7 @@ DS.Game = class Game {
   // the reticle and symbols on a transparent ground
   sightGL(G, cam, dt, R, W, H, dpr) {
     const cv = this.sightCv, w = this.world, env = w.env || {};
-    G.scope = ''; const out = G.layer('sight', cv.width, cv.height);
+    G.scope = ''; const out = G.layer('sight', cv.width, cv.height, false, true);
     out.setTransform(1, 0, 0, 1, 0, 0); out.globalAlpha = 1; out.globalCompositeOperation = 'source-over';
     if (this.thermal) this.tisRender(cam, dt, out); else this.rend.frame(out, cam, { main: false, nv: this.nv });
     G.scope = '';

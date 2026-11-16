@@ -82,7 +82,8 @@ DS.Track = {
     const n = pts.length / 2;
     let total = 0;
     for (let i = 0; i < n; i++) { const j = (i + 1) % n; total += Math.hypot(pts[j * 2] - pts[i * 2], pts[j * 2 + 1] - pts[i * 2 + 1]); }
-    const count = Math.max(4, Math.round(total / pitch)), p = total / count;   // track stretches to fit
+    // (a vehicle drawn before its first physics step can hand over a wild outline: no more than a long track's links)
+    const count = Math.max(4, Math.min(400, Math.round(total / pitch))), p = total / count;   // track stretches to fit
     let off = ((s % p) + p) % p, acc = 0, seg = 0;
     let x0 = pts[0], y0 = pts[1], j = 1, sx = pts[2], sy = pts[3], segL = Math.hypot(sx - x0, sy - y0);
     for (let k = 0; k < count; k++) {

@@ -104,13 +104,21 @@ Object.assign(DS.Renderer.prototype, {
       if (lay.width !== lw || lay.height !== lh) { lay.width = lw; lay.height = lh; }
       ctx = lay.getContext('2d');
     }
+    if (ctx instanceof DS.GLNull) {                 // WebGL, frame phase: the layer was made before the frame — lay it on
+      this._litPrev = this._litList || this._litPrev; this._litList = null;
+      main.save(); main.setTransform(1, 0, 0, 1, 0, 0); main.globalCompositeOperation = 'lighter'; main.globalAlpha = 1; main.drawImage(lay, 0, 0, lw, lh, 0, 0, cv.width, cv.height); main.restore();
+      DS.Searchlight.draw(main, cam, this.w, false); return;
+    }
     ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1; ctx.clearRect(0, 0, lw, lh);
     ctx.setTransform(m.a / 2, m.b / 2, m.c / 2, m.d / 2, m.e / 2, m.f / 2);
     ctx.save(); ctx.globalCompositeOperation = 'lighter';
     // Drawn back to front: before each building's own lights go in, its silhouette erases whatever light from
     // farther back lies behind it, so no window or lamp shows through a nearer building.
     const cut = (im, x, y, w, h, f, ox = 0) => { ctx.save(); ctx.globalCompositeOperation = 'destination-out'; ctx.globalAlpha = 1; ctx.translate(x, y); ctx.scale(f === -1 ? -1 : 1, -1); ctx.drawImage(im, -w / 2, -h * ox, w, h); ctx.restore(); };
-    const list = this._litList || [], back = list.filter(L => L.z > 0), front = list.filter(L => !(L.z > 0));
+    // (WebGL pre phase: the frame's props have not recorded this picture's lights yet; last frame's list stands in)
+    const pre = this.glw && this.glw.phase === 'pre', list = pre ? (this._litPrev || []) : (this._litList || []);
+    if (!pre) this._litPrev = list;
+    const back = list.filter(L => L.z > 0), front = list.filter(L => !(L.z > 0));
     const rowsPass = items => { for (const L of items) {
       if (!L.lamp) cut(L.im, L.x, L.y, L.w, L.h, L.f, 0.985);
       if (L.lamp) {
@@ -150,7 +158,7 @@ Object.assign(DS.Renderer.prototype, {
       }
     }
     rowsPass(front);
-    ctx.restore(); this._litList = null;
+    ctx.restore(); if (!pre) this._litList = null;
     // cut out what stands in front: the vehicles
     ctx.save(); ctx.globalCompositeOperation = 'destination-out'; ctx.globalAlpha = 1;
     const lcam = Object.assign(Object.create(Object.getPrototypeOf(cam)), cam); lcam.zoom = cam.zoom / 2;

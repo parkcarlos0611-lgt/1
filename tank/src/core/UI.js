@@ -58,6 +58,8 @@ Object.assign(DS.Game.prototype, {
       if (a === 'fps') S.fpsMode = b.dataset.v;
       if (a === 'rend') S.renderer = b.dataset.v;
       if (a === 'sbg') S.sightBg = b.dataset.v;
+      if (a === 'aa') S.msaa = b.dataset.v;
+      if (a === 'hitcam') S.hitCam = S.hitCam === false;
       if (a === 'perf') S.perf = !S.perf;
       if (a === 'fs') { DS.UI.fsToggle(m => this.toast(m)); return; }
       if (a === 'spd') { this.world.env.speed = +b.dataset.v; this.timeUi(); return; }
@@ -111,7 +113,7 @@ Object.assign(DS.Game.prototype, {
     DS.Perf.mode = S.fpsMode || '60'; if (!!S.perf !== DS.Perf.on) DS.Perf.toggle(!!S.perf);
     // every scene pass now draws through WebGL (the 2D renderer stays as a fallback); saves from before move to it once
     if (S.rv !== 3) { S.renderer = 'gl'; S.rv = 3; DS.UI.save(S); }
-    if (this.rend && this.rend.glw) this.rend.glw.enabled = S.renderer === 'gl';
+    if (this.rend && this.rend.glw) { this.rend.glw.enabled = S.renderer === 'gl'; if (this.rend.glw.ok) this.rend.glw.setMsaa(S.msaa || 'auto'); }
     DS.T.resAuto = S.resAuto; DS.T.flyFx = S.flyFx !== false; if (!S.resAuto && this.rs !== 1) { this.rs = 1; this.resize(); }
     DS.Audio.vol = S.vol; if (DS.Audio.master && DS.Audio.on) DS.Audio.master.gain.value = S.vol;
     document.documentElement.style.setProperty('--tb', (64 * S.btn).toFixed(0) + 'px');
@@ -122,7 +124,7 @@ Object.assign(DS.Game.prototype, {
     // reflect in the menu
     const pm = $('#pause'), on = (sel, v) => pm.querySelectorAll(sel).forEach(b => b.classList.toggle('on', v(b)));
     on('[data-p=post]', b => +b.dataset.v === S.post); on('[data-p=btn]', b => +b.dataset.v === S.btn); on('[data-p=touch]', b => b.dataset.v === S.touch);
-    on('[data-p=res]', () => S.resAuto); on('[data-p=fps]', b => b.dataset.v === (S.fpsMode || '60')); on('[data-p=rend]', b => b.dataset.v === (S.renderer || 'gl')); on('[data-p=sbg]', b => b.dataset.v === (S.sightBg || 'blur')); on('[data-p=perf]', () => !!S.perf); on('[data-p=flyfx]', () => S.flyFx !== false); on('[data-p=hud]', () => S.hudFull); on('[data-p=help]', () => S.help);
+    on('[data-p=res]', () => S.resAuto); on('[data-p=fps]', b => b.dataset.v === (S.fpsMode || '60')); on('[data-p=rend]', b => b.dataset.v === (S.renderer || 'gl')); on('[data-p=sbg]', b => b.dataset.v === (S.sightBg || 'blur')); on('[data-p=aa]', b => b.dataset.v === (S.msaa || 'auto')); on('[data-p=hitcam]', () => S.hitCam !== false); DS.T.hitCam = S.hitCam !== false; on('[data-p=perf]', () => !!S.perf); on('[data-p=flyfx]', () => S.flyFx !== false); on('[data-p=hud]', () => S.hudFull); on('[data-p=help]', () => S.help);
     pm.querySelector('#p-vol').value = Math.round(S.vol * 100); pm.querySelector('#p-volv').textContent = Math.round(S.vol * 100) + ' %';
   },
   keyList() {

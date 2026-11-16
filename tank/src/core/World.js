@@ -44,6 +44,7 @@ DS.World = class World {
     r.t = p.t; r.shooter = p.owner; { const sp = Math.hypot(p.vx, p.vy) || 1; r.shotDx = p.vx / sp; r.shotDy = p.vy / sp; }
     this.fx.armor(r);
     this.addLog(r);
+    if (p.owner && p.owner === this.vehicles[0] && DS.HitCam) DS.HitCam.start(this, p, r);
     if (r.result === 'ricochet') {
       p.x = r.reflect.x; p.y = r.reflect.y; p.vx = r.reflect.vx; p.vy = r.reflect.vy;
       p.ignore = h.hit.v; p.ignoreT = 0.05;

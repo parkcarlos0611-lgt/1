@@ -146,6 +146,8 @@ DS.Renderer = class Renderer {
     const G = opt.main && this.glw && this.glw.ok && this.glw.enabled ? this.glw : null;
     if (opt.main) this.glActive = !!G;
     if (G) {
+      // layers first (shadows, fog, char, night light, scene light), while no frame is open, then the frame
+      G.setPhase('pre'); this.glPrepass(G.nullCtx(ctx.canvas.width, ctx.canvas.height), cam, opt); G.setPhase('main');
       const g = G.begin(ctx.canvas.width, ctx.canvas.height);
       this.sky(g, cam); mark('sky');
       cam.apply(g); this.backGround(g, cam); mark('ground');
@@ -166,7 +168,7 @@ DS.Renderer = class Renderer {
       w.particles.draw(g, cam, 1); mark('fx');
       this.atmosphere(g, cam, opt);
       w.fx.drawFlashes(g); mark('atmo');
-      G.end();
+      G.end(); G.setPhase(null);
       // the 2D canvas keeps only marks and text, above the GL picture (it is not uploaded)
       ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
       cam.apply(ctx);
@@ -177,6 +179,10 @@ DS.Renderer = class Renderer {
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       return;
     } else {
+      if (ctx.canvas._gl && this.glw && !opt.thermal) {
+        const n = this.glw.nullCtx(ctx.canvas.width, ctx.canvas.height); this.glw.setPhase('pre'); this.glPrepass(n, cam, opt); this.glw.setPhase('main');
+        this._glView = true;
+      }
       this.sky(ctx, cam); mark('sky');
       cam.apply(ctx);
       this.backGround(ctx, cam); mark('ground');
@@ -205,6 +211,19 @@ DS.Renderer = class Renderer {
     }
     this.markers(ctx, cam, !!opt.main);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
+    if (this._glView) { this._glView = false; this.glw.setPhase(null); }
+  }
+  // WebGL pre phase: the passes that build layers, in the order the frame uses them, against a context that draws
+  // nothing (GLW.layer hands the frame the made layers afterwards)
+  glPrepass(n, cam, opt) {
+    const w = this.w, env = w.env || {};
+    cam.apply(n);
+    for (const v of w.vehicles) if (cam.visible(v.pos.x, v.pos.y, 14) && this.shown(v)) { const a = this.charA(v); if (a) this.charred(n, v, cam, a); }
+    n.save(); this.shadows(n, cam); n.restore();
+    this.fog(n, cam);
+    if ((env.night || 0) && opt.main !== false) this.nightLights(n, cam);
+    w.fx.drawFlashes(n);
+    n.setTransform(1, 0, 0, 1, 0, 0);
   }
 
   // ---- thermal picture (gunner's sight only): drawn from temperatures, not colours — paint, markings and
@@ -897,9 +916,11 @@ DS.Renderer = class Renderer {
     o.setTransform(1, 0, 0, 1, 0, 0); o.globalCompositeOperation = 'source-over'; o.clearRect(0, 0, lw, lh);
     o.imageSmoothingEnabled = true; o.imageSmoothingQuality = 'high';
     const lcam = Object.assign(Object.create(Object.getPrototypeOf(cam)), cam); lcam.zoom = cam.zoom / 1.5;    // sprite levels a step down are enough for a silhouette
-    const bands = [];
+    let bands = [];
     let n = 0;
-    for (const v of this.w.vehicles) {
+    const made = o instanceof DS.GLNull;                        // (WebGL frame phase: made before the frame)
+    if (made) { n = off._n || 0; bands = off._bands || []; }
+    else for (const v of this.w.vehicles) {
       if (!cam.visible(v.pos.x, v.pos.y, 18) || !this.shown(v)) continue;
       let side = Lt.side, k = Lt.k;
       if (Lt.fire) {                                            // firelight: falls off with distance, flickers
@@ -915,7 +936,8 @@ DS.Renderer = class Renderer {
       this._sil = true; this.drawVehicle(o, v, lcam); this._sil = false; n++;
       if (!Lt.fire && !v.heli) bands.push([v.pos.x, Math.abs((v.g.idler.x - v.g.sprocket.x) * v.dir) / 2 + 0.25]);
     }
-    if (this.shadowExtra) n += this.shadowExtra(o, m, q, Lt, cam) || 0;      // scenery that casts into the same layer
+    if (this.shadowExtra && !made) n += this.shadowExtra(o, m, q, Lt, cam) || 0;      // scenery that casts into the same layer
+    off._n = n; off._bands = bands;
     if (!n) return;
     o.setTransform(1, 0, 0, 1, 0, 0); o.globalAlpha = 1; o.globalCompositeOperation = 'source-in'; o.fillStyle = '#281a0c'; o.fillRect(0, 0, lw, lh);
     o.globalCompositeOperation = 'source-over';
@@ -939,18 +961,22 @@ DS.Renderer = class Renderer {
   }
 
   vehicle(ctx, v, cam) {
+    const a = this.charA(v);
+    if (a) this.charred(ctx, v, cam, a); else this.drawVehicle(ctx, v, cam);
+  }
+  // drawn through the char layer (opacity), or 0: damaged, burning, or a contact not yet identified (faint)
+  charA(v) {
     const me = this.w.vehicles[0];
-    const faint = me && v.alive && v.team !== me.team && DS.Sensor.level(me, v) < 2;   // contact, not yet identified
-    if (v.scorch.length || v.burning || faint) this.charred(ctx, v, cam, faint ? 0.38 : 1);
-    else this.drawVehicle(ctx, v, cam);
+    const faint = me && v.alive && v.team !== me.team && DS.Sensor.level(me, v) < 2;
+    return v.scorch.length || v.burning || faint ? (faint ? 0.38 : 1) : 0;
   }
 
   // Damaged vehicle: drawn to an offscreen layer, then char marks are painted 'source-atop' so they
   // stay inside the vehicle's own silhouette and spread outward from where they started.
   charred(ctx, v, cam, alpha = 1) {
-    const cv = ctx.canvas;
+    const cv = ctx.canvas, gl = cv._gl && this.glw;
     let off, o;
-    if (cv._gl && this.glw) { o = this.glw.layer('charred', cv.width, cv.height); off = o.canvas; }      // WebGL: a GPU layer
+    if (gl) { /* WebGL: a GPU layer the size of the vehicle's box, made below */ }
     else {
       off = this.offs.get(cv);
       if (!off || off.width !== cv.width || off.height !== cv.height) { off = document.createElement('canvas'); off.width = cv.width; off.height = cv.height; this.offs.set(cv, off); }
@@ -965,13 +991,16 @@ DS.Renderer = class Renderer {
     }
     x0 = Math.max(0, Math.floor(x0)); y0 = Math.max(0, Math.floor(y0)); x1 = Math.min(cv.width, Math.ceil(x1)); y1 = Math.min(cv.height, Math.ceil(y1));
     if (x1 <= x0 || y1 <= y0) return;
-    o.setTransform(1, 0, 0, 1, 0, 0); o.clearRect(x0, y0, x1 - x0, y1 - y0);
-    o.setTransform(m);
+    let ox = 0, oy = 0;                                       // the layer's origin on the screen
+    if (gl) { o = this.glw.layer('charred', x1 - x0, y1 - y0, true); off = o.canvas; ox = x0; oy = y0; }
+    o.setTransform(1, 0, 0, 1, -ox, -oy); o.clearRect(x0, y0, x1 - x0, y1 - y0);
+    o.setTransform(m.a, m.b, m.c, m.d, m.e - ox, m.f - oy);
+    if (!(o instanceof DS.GLNull)) {                            // (WebGL frame phase: the layer is made already)
     this.drawVehicle(o, v, cam);
     o.globalCompositeOperation = 'source-atop';
     // overall soot builds up slowly the longer it burns
     const all = Math.min(0.55, (v.burning || 0) / 50 + (v.wreck ? 0.12 : 0));
-    if (all > 0) { o.save(); o.setTransform(1, 0, 0, 1, 0, 0); o.fillStyle = `rgba(16,12,9,${all})`; o.fillRect(x0, y0, x1 - x0, y1 - y0); o.restore(); }
+    if (all > 0) { o.save(); o.setTransform(1, 0, 0, 1, -ox, -oy); o.fillStyle = `rgba(16,12,9,${all})`; o.fillRect(x0, y0, x1 - x0, y1 - y0); o.restore(); }
     const t = this.w.time;
     for (const sp of v.scorch) {
       const p = v.spotWorld(sp), r = Math.min(sp.max, 0.3 + sp.t * 0.085), a = Math.min(0.93, 0.3 + sp.t * 0.035);
@@ -986,8 +1015,9 @@ DS.Renderer = class Renderer {
       }
     }
     o.globalCompositeOperation = 'source-over';
+    }
     ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = alpha; if (alpha < 1) ctx.filter = 'grayscale(0.7) blur(1px)';
-    ctx.drawImage(off, x0, y0, x1 - x0, y1 - y0, x0, y0, x1 - x0, y1 - y0); ctx.restore();
+    ctx.drawImage(off, x0 - ox, y0 - oy, x1 - x0, y1 - y0, x0, y0, x1 - x0, y1 - y0); ctx.restore();
   }
 
   drawVehicle(ctx, v, cam) {

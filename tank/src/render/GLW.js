@@ -107,43 +107,44 @@ DS.GLW = class GLW {
     // and mip levels 0–3 only, so no slot ever bleeds into its neighbour; a white block at (0, 0) for solids.
     // When the last page is full the oldest one is wiped and its images are uploaded again as they are drawn.
     this.ATL = 2048; this.atl = []; this.atlI = 0; this.atlDirty = new Set(); this.atlT = new Map();
-    this.main = { masks: [], clipD: 0 }; this.T = null; this.W = 1; this.H = 1;
+    this.main = { clipD: 0, clipBox: [], ms: true }; this.T = null; this.W = 1; this.H = 1;
+    this.maxSamples = Math.max(1, Math.min(4, gl.getParameter(gl.MAX_SAMPLES) || 1)); this.setMsaa('auto');
     this.layers = {}; this.scope = ''; this.fx = { bias: -0.6, gray: 0 };
     this.ctx = new DS.GLCtx(this, 'main');
     DS.GLW.trackCanvases();
   }
   // ---- render targets ----
-  // a target draws into multisampled buffers (4× MSAA: path and stroke edges smoothed as the 2D canvas
-  // smooths them; cheap on tiled GPUs) and is resolved into its texture when the texture is read
+  // The frame and the sight may draw multisampled (t.ms: 4× MSAA, resolved into the texture when it is read);
+  // off-screen layers draw straight into their texture. Every target has its own stencil (paths and clips).
+  // On tiled GPUs (iPad) switching targets in mid-frame stores and reloads the whole target, so layers are made
+  // before the frame starts (see phase) and clips stay in the target's own stencil.
   mkTarget(t, W, H) {
-    const gl = this.gl;
-    if (!t.fbo) {
-      t.fbo = gl.createFramebuffer(); t.rfbo = gl.createFramebuffer(); t.color = this.mkTex();
-      t.crb = gl.createRenderbuffer(); t.rb = gl.createRenderbuffer(); t.mrb = gl.createRenderbuffer();
-      t.masks = t.masks || []; t.clipD = 0;
-    }
-    if (t.W !== W || t.H !== H) {
+    const gl = this.gl, S = t.ms ? this.msaa : 0;
+    if (!t.fbo) { t.fbo = gl.createFramebuffer(); t.rfbo = gl.createFramebuffer(); t.color = this.mkTex(); t.crb = gl.createRenderbuffer(); t.rb = gl.createRenderbuffer(); t.clipD = 0; t.clipBox = []; }
+    if (t.W !== W || t.H !== H || t.S !== S) {
       this.flush();
-      const S = this.samples || (this.samples = Math.max(1, Math.min(4, gl.getParameter(gl.MAX_SAMPLES) || 1)));
       this.bind0(t.color); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, W, H, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-      gl.bindRenderbuffer(gl.RENDERBUFFER, t.crb); gl.renderbufferStorageMultisample(gl.RENDERBUFFER, S, gl.RGBA8, W, H);
-      gl.bindRenderbuffer(gl.RENDERBUFFER, t.rb); gl.renderbufferStorageMultisample(gl.RENDERBUFFER, S, gl.DEPTH24_STENCIL8, W, H);
-      gl.bindRenderbuffer(gl.RENDERBUFFER, t.mrb); gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH24_STENCIL8, W, H);     // (clip masks: single-sample)
       gl.bindFramebuffer(gl.FRAMEBUFFER, t.fbo);
-      gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.RENDERBUFFER, t.crb);
+      if (S > 1) {
+        gl.bindRenderbuffer(gl.RENDERBUFFER, t.crb); gl.renderbufferStorageMultisample(gl.RENDERBUFFER, S, gl.RGBA8, W, H);
+        gl.bindRenderbuffer(gl.RENDERBUFFER, t.rb); gl.renderbufferStorageMultisample(gl.RENDERBUFFER, S, gl.DEPTH24_STENCIL8, W, H);
+        gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.RENDERBUFFER, t.crb);
+      } else {
+        gl.bindRenderbuffer(gl.RENDERBUFFER, t.rb); gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH24_STENCIL8, W, H);
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, t.color, 0);
+      }
       gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_STENCIL_ATTACHMENT, gl.RENDERBUFFER, t.rb);
-      gl.clearColor(0, 0, 0, 0); gl.clearStencil(0); gl.clear(gl.COLOR_BUFFER_BIT | gl.STENCIL_BUFFER_BIT);
-      gl.bindFramebuffer(gl.FRAMEBUFFER, t.rfbo); gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, t.color, 0);
-      for (const m of t.masks) if (m) m.w = -1;                  // masks are rebuilt at the new size
-      t.W = W; t.H = H; t.dirty = true;
+      gl.clearColor(0, 0, 0, 0); gl.clearStencil(0); gl.stencilMask(0xff); gl.clear(gl.COLOR_BUFFER_BIT | gl.STENCIL_BUFFER_BIT); this._st = -1;
+      if (S > 1) { gl.bindFramebuffer(gl.FRAMEBUFFER, t.rfbo); gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, t.color, 0); }
+      t.W = W; t.H = H; t.S = S; t.dirty = S > 1; t.clipD = 0;
       if (this.T === t) this.T = null;                           // rebind on next use
-      else if (this.T) gl.bindFramebuffer(gl.FRAMEBUFFER, this.T.fbo);
+      else gl.bindFramebuffer(gl.FRAMEBUFFER, this.T ? this.T.fbo : null);
     }
     return t;
   }
   // multisampled buffer → texture
   resolve(t) {
-    if (!t.dirty) return;
+    if (!t.dirty || !(t.S > 1)) return;
     if (this.T === t) this.flush();
     const gl = this.gl;
     gl.bindFramebuffer(gl.READ_FRAMEBUFFER, t.fbo); gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, t.rfbo);
@@ -152,22 +153,40 @@ DS.GLW = class GLW {
     t.dirty = false;
   }
   bind(t) {
-    t.dirty = true;
+    t.dirty = t.S > 1;
     if (!this.blendOn) { this.flush(); this.inval(); this.gl.enable(this.gl.BLEND); this.blendOn = true; this.blend = null; this.setBlend('source-over'); }
     if (this.T === t) return;
     this.flush();
     const gl = this.gl; this.T = t; this.W = t.W; this.H = t.H;
-    gl.bindFramebuffer(gl.FRAMEBUFFER, t.fbo); gl.viewport(0, 0, t.W, t.H);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, t.fbo); gl.viewport(0, 0, t.W, t.H); this._st = -1;
   }
-  // an off-screen layer of its own (kept between frames; cleared with clearRect as a 2D canvas is)
-  layer(key, W, H) {
+  // an off-screen layer of its own (kept between frames; cleared with clearRect as a 2D canvas is).
+  // Phases (Renderer.frame): in 'pre', before the frame's target is bound, the passes run against a context that
+  // draws nothing (nullCtx) and build their layers — each use of a key its own instance (key#0, key#1…); in
+  // 'main' the same passes run again for real and get, in the same order, a context that draws nothing but whose
+  // canvas is the layer already made, so they only lay it on the picture. grow: the target may be larger than
+  // asked (rounded up, kept while it fits), so a layer that changes size every frame is not reallocated.
+  layer(key, W, H, grow, ms) {
     W = Math.max(1, W | 0); H = Math.max(1, H | 0);
     key += this.scope;                                         // each view (main, sight, thermal) its own set
+    if (this.phase) { const c = this.lcount; const n = c[key] = (c[key] || 0) + 1; key += '#' + (n - 1); }
     let L = this.layers[key];
-    if (!L) { L = this.layers[key] = { t: { masks: [], clipD: 0 } }; L.ctx = new DS.GLCtx(this, L.t); L.ctx.canvas._glTarget = L.t; }
-    this.mkTarget(L.t, W, H); L.ctx.canvas.width = W; L.ctx.canvas.height = H;
+    if (!L) { L = this.layers[key] = { t: { clipD: 0, clipBox: [] } }; L.ctx = new DS.GLCtx(this, L.t); L.ctx.canvas._glTarget = L.t; }
+    L.t.ms = !!ms;
+    if (this.phase === 'main' && L.built === this.frameNo) { L.nul = L.nul || new DS.GLNull(this, L.ctx.canvas); L.nul.reset(L.ctx.canvas.width, L.ctx.canvas.height); L.nul.canvas = L.ctx.canvas; return L.nul; }
+    let aw = W, ah = H;
+    if (grow) { const t = L.t; aw = t.W >= W && t.W <= W * 2 + 64 ? t.W : Math.ceil(W * 1.25 / 32) * 32; ah = t.H >= H && t.H <= H * 2 + 64 ? t.H : Math.ceil(H * 1.25 / 32) * 32; }
+    this.mkTarget(L.t, aw, ah); L.ctx.canvas.width = aw; L.ctx.canvas.height = ah;
+    if (this.phase === 'pre') L.built = this.frameNo;
     return L.ctx;
   }
+  // 4× MSAA on the frame and the sight: 'on', 'off', or 'auto' — off on high-density screens (2× and up, the
+  // iPad's): edges there are already finer than the eye resolves, and the multisampled frame is four times the
+  // memory traffic of a plain one on a tiled GPU
+  setMsaa(m) { this.msaaMode = m; this.msaa = m === 'on' || (m === 'auto' && (window.devicePixelRatio || 1) < 1.75) ? this.maxSamples : 0; }
+  setPhase(p) { this.phase = p; this.lcount = {}; if (p === 'pre') this.frameNo = (this.frameNo || 0) + 1; }
+  // a context that draws nothing, with the frame's size (the pre phase's stand-in for the frame)
+  nullCtx(W, H) { const n = this._nullMain || (this._nullMain = new DS.GLNull(this, { width: 1, height: 1, _gl: true })); n.reset(W, H); return n; }
   // the sight into the finished picture on screen (W × H device px). S: { cv (its layer's canvas), x, y, w, h (px,
   // y down), m (Float32Array of affine colour steps, 16 each), n, sh: [amp, t, dpr, row] | null, big, bg: 'blur' | 'black' }
   sightComposite(S, W, H) {
@@ -201,15 +220,21 @@ DS.GLW = class GLW {
       const sh = S.sh || [0, 0, 1, 1]; gl.uniform4f(u.u_sh, sh[0], sh[1], sh[2], sh[3]); });
     gl.disable(gl.BLEND); this.blendOn = false;
   }
-  // ---- clip masks (texture unit 3) ----
-  maskU(u, P) {
-    const gl = this.gl, T = this.T, m = T && T.clipD > 0 ? T.masks[T.clipD - 1] : null, t = m ? m.t : this.white;
-    this.u1f(P, 'u_useMask', m ? 1 : 0);
-    if (this.b3 !== t) { gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D, t); gl.activeTexture(gl.TEXTURE0); this.b3 = t; }
+  // (clips are in the stencil now: the shaders' mask input stays off)
+  maskU(u, P) { this.u1f(P, 'u_useMask', 0); }
+  // stencil: bits 0–5 count path windings, bits 6–7 hold the clip depth (up to three nested clips). Outside a
+  // fill, draws pass only where the clip depth is the current one.
+  clipTest() {
+    if (this.rawStencil) return;
+    const gl = this.gl, D = this.T ? Math.min(3, this.T.clipD | 0) : 0;
+    if (D === this._st) return;
+    this._st = D;
+    if (!D) { gl.disable(gl.STENCIL_TEST); return; }
+    gl.enable(gl.STENCIL_TEST); gl.stencilMask(0); gl.stencilFunc(gl.EQUAL, D << 6, 0xC0); gl.stencilOp(gl.KEEP, gl.KEEP, gl.KEEP);
   }
   // ---- cached GL state ----
   // everything another user of the context (DS.Post) may have changed: forget it
-  inval() { const gl = this.gl; this.prog = null; this.b0 = null; this.b3 = null; this.vaoOn = false; gl.activeTexture(gl.TEXTURE0); }
+  inval() { const gl = this.gl; this.prog = null; this.b0 = null; this.b3 = null; this.vaoOn = false; this._st = -1; this.rawStencil = false; gl.activeTexture(gl.TEXTURE0); }
   use(P) {
     const gl = this.gl;
     if (this.prog !== P) { gl.useProgram(P.p); this.prog = P; }
@@ -219,32 +244,38 @@ DS.GLW = class GLW {
   u1f(P, n, v) { if (P.c[n] !== v && P.u[n]) { P.c[n] = v; this.gl.uniform1f(P.u[n], v); } }
   u1i(P, n, v) { if (P.c[n] !== v && P.u[n]) { P.c[n] = v; this.gl.uniform1i(P.u[n], v); } }
   bind0(t) { if (this.b0 !== t) { this.gl.bindTexture(this.gl.TEXTURE_2D, t); this.b0 = t; } }
-  // clip: the path's fan triangles (device px) into the stencil of a mask target, covered with the enclosing
-  // mask's value; the new mask becomes current until the matching restore()
+  // clip: the path's fan winds into the low bits where the current clip holds, then wherever it wound the depth
+  // goes up one (and the count back to zero); restore() lowers the depth again over the clip's box
+  bbQuad(x0, y0, x1, y1) { const q = this.qv2 || (this.qv2 = new Float32Array(48)); let o = 0; for (const [x, y] of [[x0, y0], [x1, y0], [x1, y1], [x0, y0], [x1, y1], [x0, y1]]) { q[o] = x; q[o + 1] = y; o += 8; } return q; }
   pushClip(ctx, v, n, x0, y0, x1, y1) {
     this.flush();
-    const gl = this.gl, T = this.T, d = T.clipD, W = this.W, H = this.H;
-    let m = T.masks[d];
-    if (!m || m.w !== W || m.h !== H) {
-      if (!m) m = T.masks[d] = { t: this.mkTex(), f: gl.createFramebuffer() };
-      this.bind0(m.t); gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, W, H, 0, gl.RED, gl.UNSIGNED_BYTE, null);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-      gl.bindFramebuffer(gl.FRAMEBUFFER, m.f); gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, m.t, 0);
-      gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_STENCIL_ATTACHMENT, gl.RENDERBUFFER, T.mrb);
-      m.w = W; m.h = H;
-    }
-    gl.bindFramebuffer(gl.FRAMEBUFFER, m.f); gl.disable(gl.BLEND);
-    gl.clearColor(0, 0, 0, 1); gl.clear(gl.COLOR_BUFFER_BIT);
+    const gl = this.gl, T = this.T, d = T.clipD | 0;
+    if (d >= 3) { T.clipD = d + 1; return; }                    // (deeper than three: not clipped further)
     ctx.stencilFill(v, n, true);
-    gl.stencilFunc(gl.NOTEQUAL, 0, 0xff); gl.stencilOp(gl.ZERO, gl.ZERO, gl.ZERO);
-    const q = ctx.tmp; let o = 0;
-    for (const [x, y] of [[x0, y0], [x1, y0], [x1, y1], [x0, y0], [x1, y1], [x0, y1]]) { q[o] = x; q[o + 1] = y; o += 8; }
-    this.tris(this.pMask, q, 6);
-    gl.disable(gl.STENCIL_TEST);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, T.fbo); gl.enable(gl.BLEND); const b = this.blend; this.blend = null; this.setBlend(b || 'source-over');
-    T.clipD = d + 1;
+    this.rawStencil = true;
+    gl.enable(gl.STENCIL_TEST); gl.colorMask(false, false, false, false); gl.stencilMask(0xff);
+    gl.stencilFunc(gl.NOTEQUAL, (d + 1) << 6, 0x3f); gl.stencilOp(gl.KEEP, gl.KEEP, gl.REPLACE);
+    this.tris(this.pTex, this.bbQuad(x0, y0, x1, y1), 6, () => this.bind0(this.white));
+    gl.colorMask(true, true, true, true); this.rawStencil = false; this._st = -1;
+    T.clipBox[d] = [x0, y0, x1, y1]; T.clipD = d + 1;
   }
-  popClip(d) { const T = this.T; if (T && T.clipD !== d) { this.flush(); T.clipD = d; } }
+  popClip(d) {
+    const T = this.T; if (!T || (T.clipD | 0) === d) return;
+    this.flush();
+    const from = Math.min(3, T.clipD | 0), to = Math.min(3, d);
+    if (from > to) {
+      let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+      for (let k = to; k < from; k++) { const b = T.clipBox[k]; if (b) { x0 = Math.min(x0, b[0]); y0 = Math.min(y0, b[1]); x1 = Math.max(x1, b[2]); y1 = Math.max(y1, b[3]); } }
+      if (x1 > x0) {
+        const gl = this.gl; this.rawStencil = true;
+        gl.enable(gl.STENCIL_TEST); gl.colorMask(false, false, false, false); gl.stencilMask(0xc0);
+        gl.stencilFunc(gl.LESS, to << 6, 0xc0); gl.stencilOp(gl.KEEP, gl.KEEP, gl.REPLACE);
+        this.tris(this.pTex, this.bbQuad(x0, y0, x1, y1), 6, () => this.bind0(this.white));
+        gl.colorMask(true, true, true, true); this.rawStencil = false; this._st = -1;
+      }
+    }
+    T.clipD = d;
+  }
   // every 2D canvas counts its own changes (_v), so a repainted canvas is uploaded again (and only then)
   static trackCanvases() {
     if (DS.GLW._tracked) return; DS.GLW._tracked = true;
@@ -341,11 +372,11 @@ DS.GLW = class GLW {
     const gl = this.gl;
     W = Math.max(1, W | 0); H = Math.max(1, H | 0);
     this.inval(); this.ring = this.ringN;                      // (first draw of the frame takes fresh storage)
-    this.mkTarget(this.main, W, H); this.T = null; this.bind(this.main);
+    this.main.ms = true; this.mkTarget(this.main, W, H); this.T = null; this.bind(this.main);
     gl.disable(gl.DEPTH_TEST); gl.disable(gl.CULL_FACE); gl.disable(gl.SCISSOR_TEST);
     gl.clearColor(0, 0, 0, 1); gl.clearStencil(0); gl.stencilMask(0xff); gl.clear(gl.COLOR_BUFFER_BIT | gl.STENCIL_BUFFER_BIT);
     gl.enable(gl.BLEND); this.blendOn = true; this.blend = null; this.setBlend('source-over');
-    gl.disable(gl.STENCIL_TEST);
+    gl.disable(gl.STENCIL_TEST); this._st = 0;
     this.curTex = null; this.nv = 0; this.draws = 0; this.main.clipD = 0;
     this.ctx.reset(W, H);
     this.color = this.main.color;
@@ -384,7 +415,7 @@ DS.GLW = class GLW {
     if (!this.nv) return;
     const gl = this.gl, P = this.pTex;
     if (this.atlDirty.size) this.atlMips();
-    this.use(P); this.maskU(P.u, P); this.texU(P); this.bind0(this.curTex);
+    this.use(P); this.maskU(P.u, P); this.texU(P); this.bind0(this.curTex); this.clipTest();
     gl.drawArrays(gl.TRIANGLES, this.put(this.vb, this.nv), this.nv); this.draws++;
     this.nv = 0;
   }
@@ -402,7 +433,7 @@ DS.GLW = class GLW {
   tris(prog, verts, n, setU) {
     this.flush();
     const gl = this.gl; if (this.atlDirty.size) this.atlMips();
-    this.use(prog); this.maskU(prog.u, prog); if (prog === this.pTex) this.texU(prog); if (setU) setU(prog.u, prog);
+    this.use(prog); this.maskU(prog.u, prog); if (prog === this.pTex) this.texU(prog); if (setU) setU(prog.u, prog); this.clipTest();
     gl.drawArrays(gl.TRIANGLES, this.put(verts, n), n); this.draws++;
   }
   // n vertices into the ring; returns the index of the first
@@ -630,16 +661,18 @@ DS.GLCtx = class GLCtx {
     this.cover(x0, y0, x1, y1, this.strokeStyle);
   }
   stencilFill(v, n, nonzero) {
-    const R = this.r, gl = R.gl;
-    gl.enable(gl.STENCIL_TEST); gl.colorMask(false, false, false, false); gl.stencilMask(0xff);
-    if (nonzero) { gl.stencilFunc(gl.ALWAYS, 0, 0xff); gl.stencilOpSeparate(gl.FRONT, gl.KEEP, gl.KEEP, gl.INCR_WRAP); gl.stencilOpSeparate(gl.BACK, gl.KEEP, gl.KEEP, gl.DECR_WRAP); }
-    else { gl.stencilFunc(gl.ALWAYS, 1, 0xff); gl.stencilOp(gl.KEEP, gl.KEEP, gl.REPLACE); }
+    const R = this.r, gl = R.gl, D = Math.min(3, this.T().clipD | 0) << 6;
+    R.flush(); R.rawStencil = true;
+    gl.enable(gl.STENCIL_TEST); gl.colorMask(false, false, false, false); gl.stencilMask(0x3f);
+    if (nonzero) { gl.stencilFunc(gl.EQUAL, D, 0xc0); gl.stencilOpSeparate(gl.FRONT, gl.KEEP, gl.KEEP, gl.INCR_WRAP); gl.stencilOpSeparate(gl.BACK, gl.KEEP, gl.KEEP, gl.DECR_WRAP); }
+    else { gl.stencilFunc(gl.EQUAL, D | 1, 0xc0); gl.stencilOp(gl.KEEP, gl.KEEP, gl.REPLACE); }
     R.tris(R.pTex, v, n, () => R.bind0(R.white));
-    gl.colorMask(true, true, true, true);
+    gl.colorMask(true, true, true, true); R.rawStencil = false; R._st = -1;
   }
   cover(x0, y0, x1, y1, style) {
     const R = this.r, gl = R.gl;
-    gl.stencilFunc(gl.NOTEQUAL, 0, 0xff); gl.stencilOp(gl.ZERO, gl.ZERO, gl.ZERO);
+    R.rawStencil = true; gl.enable(gl.STENCIL_TEST); gl.stencilMask(0x3f);
+    gl.stencilFunc(gl.NOTEQUAL, 0, 0x3f); gl.stencilOp(gl.ZERO, gl.ZERO, gl.ZERO);
     x0 = Math.floor(x0) - 1; y0 = Math.floor(y0) - 1; x1 = Math.ceil(x1) + 1; y1 = Math.ceil(y1) + 1;
     if (typeof style === 'string') {
       const c = this.solid(style), v = this.tmp; let o = 0;
@@ -658,7 +691,7 @@ DS.GLCtx = class GLCtx {
       const lo = [Math.min(a[0], b[0]), Math.min(a[1], b[1])], hi = [Math.max(a[0], b[0]), Math.max(a[1], b[1])];
       this.fillRect(lo[0], lo[1], hi[0] - lo[0], hi[1] - lo[1]); R.flush(); this.fillStyle = save;
     }
-    gl.disable(gl.STENCIL_TEST);
+    R.rawStencil = false; R._st = -1;
   }
 };
 // a CSS filter chain (grayscale, sepia, saturate, hue-rotate, brightness, contrast, invert) as affine colour steps
@@ -678,6 +711,13 @@ DS.GLW.filterMats = function (css) {
     else if (f === 'invert') { const a = Math.min(1, v), k = 1 - 2 * a; put([k, 0, 0, 0, k, 0, 0, 0, k], [a, a, a]); }
   }
   return { m: out, n };
+};
+// draws nothing (keeps transforms and state): the stand-in frame of the pre phase, and a made layer's context in
+// the main phase
+DS.GLNull = class GLNull extends DS.GLCtx {
+  constructor(r, canvas) { super(r, { clipD: 0, clipBox: [] }); this.canvas = canvas; }
+  reset(W, H) { const c = this.canvas; super.reset(W, H); if (c) this.canvas = c; }
+  _b() {} drawImage() {} fillRect() {} clearRect() {} fill() {} stroke() {} strokeRect() {} clip() {} fillText() {} strokeText() {}
 };
 DS.GLPat = class GLPat {
   constructor(img) { this.img = img; this.m = [1, 0, 0, 1, 0, 0]; }

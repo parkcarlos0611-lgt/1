@@ -736,11 +736,27 @@ DS.Game = class Game {
     c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.beginPath(); c.arc((r.left + r.width / 2 - m.left) * km, (r.top + r.height / 2 - m.top) * km, r.width / 2 * km + 2, 0, Math.PI * 2); c.clip();
     c.clearRect(0, 0, this.cv.width, this.cv.height); c.restore();
   }
+  // A5 burst on target: the last round's strike shown in the sight for a few seconds — a diamond where it came
+  // down and how far above or below the line of sight that is (mils): lay that much the other way for the next
+  burstMark(c, W, H, mil) {
+    const L = this.world.lastImpact, cam = this.sightCam, v = this.player; if (!L || !cam) return;
+    const age = this.world.time - L.t; if (age > 6) return;
+    const sx = (L.x - cam.x - (cam.sx || 0)) * cam.zoom + W / 2, sy = -(L.y - cam.y - (cam.sy || 0)) * cam.zoom + H / 2;
+    const o = v.sightOrigin(), a = v.gun.aimW, ai = Math.atan2(L.y - o.y, L.x - o.x), d = Math.atan2(Math.sin(ai - a), Math.cos(ai - a)) * 1000 * v.dir;
+    const k = Math.max(0, Math.min(1, (6 - age) / 1.5)), s = Math.max(5, W / 90);
+    c.save(); c.globalAlpha = k; c.strokeStyle = L.armor ? 'rgba(255,90,60,0.95)' : 'rgba(255,220,120,0.95)'; c.lineWidth = Math.max(1.2, W / 400);
+    if (sx > -s && sx < W + s && sy > -s && sy < H + s) { c.beginPath(); c.moveTo(sx, sy - s); c.lineTo(sx + s, sy); c.lineTo(sx, sy + s); c.lineTo(sx - s, sy); c.closePath(); c.stroke(); }
+    c.fillStyle = c.strokeStyle; c.font = `600 ${Math.max(10, W / 34).toFixed(0)}px ui-monospace, monospace`; c.textAlign = 'left'; c.textBaseline = 'middle';
+    const tx = Math.min(W * 0.78, Math.max(W * 0.08, sx + s * 1.6)), ty = Math.min(H * 0.8, Math.max(H * 0.15, sy));
+    c.fillText(L.armor ? '명중' : `탄착 ${d >= 0 ? '▲' : '▼'}${Math.abs(d).toFixed(1)}`, tx, ty);
+    c.restore();
+  }
   // reticle, the sight's own display and the eyepiece (src/render/SightHud.js)
   sightHud(c, W, H, mil, fld) {
     const v = this.player, w = this.world, cv = this.sightCv;
     cv.classList.toggle('mono', !!v.heli);
     DS.SightHud.overPicture = cv.classList.contains('gl');
+    this.burstMark(c, W, H, mil);
     const g = v.gun, A = DS.AMMO[g.ammo], lasing = w.time - v.fc.lasedAt < 0.35;
     const mode = this.thermal ? (v.heli ? 'FLIR ' : 'TIS ') + (this.blackHot ? 'BH' : 'WH') : this.nv ? 'PASSIVE' : 'DAY';
     DS.SightHud.draw(c, { v, W, H, mil, fld, thermal: this.thermal, nv: this.nv, lasing, ready: g.reload <= 0, bs: v.fc.bs,

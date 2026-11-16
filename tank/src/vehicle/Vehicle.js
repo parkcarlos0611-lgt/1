@@ -263,6 +263,7 @@ DS.Vehicle = class Vehicle {
   stepGun(dt, world) {
     const G = this.def.gun, gs = this.gun, d2r = Math.PI / 180;
     if (this.turretGone) return;
+    DS.Gunnery.step(this, dt, world);
     if (this.alive && this.firepower) gs.aimW += this.input.elevRate * dt + this.input.elevStep;
     this.input.elevStep = 0;
     // an older stabiliser lets part of the hull's pitching through into the lay (gun.stab: share it holds out)
@@ -292,13 +293,14 @@ DS.Vehicle = class Vehicle {
   muzzleV(A) { const C = this.def.gun.charges; return A.bag && C ? C[Math.min(C.length - 1, this.gun.charge == null ? C.length - 1 : this.gun.charge)].v0 : A.v0; }
   fire(world) {
     const G = this.def.gun, gs = this.gun, A = DS.AMMO[gs.ammo];
-    const v0 = this.muzzleV(A), v0r = A.launchMass * v0 * 1.75 / G.recoilMass;     // projectile + propellant gas momentum
+    const S = DS.Gunnery.shot(this, A, world), v0 = S.v0, v0r = A.launchMass * v0 * 1.75 / G.recoilMass;     // (dispersion, bend, charge temperature, wear: src/ballistics/Gunnery.js)
     gs.rv = -v0r; gs.aB = v0r * v0r / (2 * G.recoilLen);
     gs.reload = G.reload; gs.fired++; this.lastFired = world.time; if (G.eject) gs.ejectT = G.eject.at;
     if (G.autoloader) this.events.push({ type: 'autoload' });
     if (G.pod) { gs.pod = (gs.pod == null ? G.pod : gs.pod) - 1; if (gs.pod <= 0) { gs.pod = G.pod; gs.reload = G.podReload; gs.podChange = true; } else gs.podChange = false; }
-    const m = this.muzzle();
-    const pr = world.spawnProjectile(m.x, m.y, m.dx * v0 + this.vel.x, m.dy * v0 + this.vel.y, A, this); pr.tracer = true;
+    const m = this.muzzle(), da = S.da * this.dir, cd = Math.cos(da), sd = Math.sin(da), ux = m.dx * cd - m.dy * sd, uy = m.dx * sd + m.dy * cd;
+    const pr = world.spawnProjectile(m.x, m.y, ux * v0 + this.vel.x, uy * v0 + this.vel.y, A, this); pr.tracer = true;
+    DS.Gunnery.fired(this, A);
     // indirect fire laid on a target (the fire-control map) and rockets count as locked on: through buildings
     pr.locked = !!this.indirectLock || (!!A.rocket && !!(this.lockTarget && this.lockTarget.alive));
     this.events.push({ type: G.launcher ? 'rocket' : 'fire', x: m.x, y: m.y, dx: m.dx, dy: m.dy, ammo: A });

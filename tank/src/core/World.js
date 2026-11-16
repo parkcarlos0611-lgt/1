@@ -23,6 +23,8 @@ DS.World = class World {
     } else { this.fx.impact(h); if (!m.owner.ai) this.addLog({ ground: true, range: h.range, ammo: h.ammo, t: h.t }); }
   }
   onProjectileHit(p, h) {
+    // A5: where the player's own main-gun round came down, for the sight's burst-on-target marker
+    if (p.owner && p.owner === this.vehicles[0] && !p.ammo.small) { const q = h.kind === 'armor' ? h.hit : h; this.lastImpact = { x: q.x, y: q.y, t: this.time, armor: h.kind === 'armor' }; }
     if (h.kind === 'armor' && h.hit && h.hit.v) DS.Searchlight.hit(h.hit.v, h.hit.x, h.hit.y);       // a round near a searchlight breaks it
     if (p.ammo.blast) {                                   // high explosive: bursts on whatever it meets
       const q = h.kind === 'ground' ? h : h.kind === 'building' ? h : h.hit;

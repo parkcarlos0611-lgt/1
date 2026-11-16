@@ -22,8 +22,8 @@ DS.FireControl = {
   },
 
   // elevation (world angle) that puts the shell through (tx, ty) from the muzzle
-  solve(v, ammo, tx, ty) {
-    const m = v.muzzle(), A = DS.AMMO[ammo], v0 = v.muzzleV(A);
+  solve(v, ammo, tx, ty, world) {
+    const m = v.muzzle(), A = DS.AMMO[ammo], W = world || (window.__game && window.__game.world), v0 = W ? DS.Gunnery.v0Fcs(v, A, W) : v.muzzleV(A);   // (the velocity the computer assumes: A4)
     const flat = { height: () => -1e9, n: 1e9, dx: 1 };
     const yAt = ang => {
       const p = new DS.Projectile(m.x, m.y, Math.cos(ang) * v0 + v.vel.x, Math.sin(ang) * v0 + v.vel.y, A, null);
@@ -51,17 +51,26 @@ DS.FireControl = {
       fc.lasedAt = world.time;
       if (r) { fc.range = r.range; fc.point = r; } else { fc.range = null; fc.point = null; }
     }
-    const R = fc.range || fc.bs;
-    // superelevation for range R along the current sight line
+    let R = fc.range || fc.bs;
     const o = v.sightOrigin(), a = v.gun.aimW;
+    // A3 range-rate: a computer with lead tracks the lased vehicle and lays for where it will be when the round
+    // arrives; the others lay for the range they were given
+    const tg = fc.point && fc.point.vehicle, F = DS.Gunnery.fcs(v);
+    if (F.lead && tg && tg.alive && fc.range) {
+      const dx = Math.cos(a), dy = Math.sin(a), Rn = (tg.pos.x - o.x) * dx + (tg.pos.y - o.y) * dy;
+      const vr = (tg.vel.x - v.vel.x) * dx + (tg.vel.y - v.vel.y) * dy, A = DS.AMMO[v.gun.ammo], vs = Math.max(300, DS.Gunnery.v0Fcs(v, A, world) * 0.88);
+      let Rp = Rn; for (let i = 0; i < 2; i++) Rp = Rn + vr * Rp / vs;
+      if (Rp > 50) { R = Rp; fc.leadR = Rp - Rn; }
+    } else fc.leadR = 0;
+    // superelevation for range R along the current sight line
     const tx = o.x + Math.cos(a) * R, ty = o.y + Math.sin(a) * R;
-    const ang = this.solve(v, v.gun.ammo, tx, ty);
+    const ang = this.solve(v, v.gun.ammo, tx, ty, world);
     const d = ang - v.gun.aimW;
     fc.se = Math.atan2(Math.sin(d), Math.cos(d));
     // coaxial MG: the computer also solves its (much steeper) trajectory for the same range
     if (v.def.coax) {
       const Rc = Math.min(fc.range || 800, 1800), cx = o.x + Math.cos(a) * Rc, cy = o.y + Math.sin(a) * Rc;
-      const dc = this.solve(v, v.def.coax.ammo, cx, cy) - v.gun.aimW; fc.seCoax = Math.atan2(Math.sin(dc), Math.cos(dc));
+      const dc = this.solve(v, v.def.coax.ammo, cx, cy, world) - v.gun.aimW; fc.seCoax = Math.atan2(Math.sin(dc), Math.cos(dc));
     }
   },
 };

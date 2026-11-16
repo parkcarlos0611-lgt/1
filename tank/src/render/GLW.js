@@ -66,7 +66,12 @@ DS.GLW = class GLW {
     gl.enableVertexAttribArray(2); gl.vertexAttribPointer(2, 4, gl.FLOAT, false, 32, 16);
     gl.bindVertexArray(null);
     this.white = this.mkTex(); gl.bindTexture(gl.TEXTURE_2D, this.white); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([255, 255, 255, 255]));
-    this.texs = new WeakMap(); this.cols = new Map();
+    this.texs = new WeakMap(); this.texsR = new WeakMap(); this.cols = new Map();
+    // atlas pages for small images (particle puffs, debris shards, small props…): many images on one texture, so
+    // the quad batch is not broken by texture changes. 2048² pages, slots 8 px aligned with 8 px of empty border
+    // and mip levels 0–3 only, so no slot ever bleeds into its neighbour; a white block at (0, 0) for solids.
+    // When the last page is full the oldest one is wiped and its images are uploaded again as they are drawn.
+    this.ATL = 2048; this.atl = []; this.atlI = 0; this.atlDirty = new Set(); this.atlT = new Map();
     this.main = { masks: [], clipD: 0 }; this.T = null; this.W = 1; this.H = 1;
     this.layers = {}; this.fx = { bias: -0.6, gray: 0 };
     this.ctx = new DS.GLCtx(this, 'main');
@@ -167,9 +172,29 @@ DS.GLW = class GLW {
     }
   }
   texRep(img) {
-    const r = this.tex(img);
+    const r = this.tex(img, true);
     if (!r.rep) { const gl = this.gl; gl.bindTexture(gl.TEXTURE_2D, r.t); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT); r.rep = true; }
     return r;
+  }
+  atlasPage(i) {
+    const gl = this.gl, A = this.ATL; let pg = this.atl[i];
+    if (pg) { this.flush(); this.atlT.delete(pg.t); gl.deleteTexture(pg.t); pg.gen++; } else pg = this.atl[i] = { gen: 0 };
+    const t = pg.t = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t);
+    gl.texStorage2D(gl.TEXTURE_2D, 4, gl.RGBA8, A, A);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAX_LEVEL, 3);
+    gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 16, 16, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(16 * 16 * 4).fill(255));
+    pg.x = 16; pg.y = 0; pg.rowH = 16; this.atlT.set(t, pg); this.atlDirty.add(pg);
+    return pg;
+  }
+  atlasAlloc(w, h) {
+    const A = this.ATL, W = 16 + Math.ceil(w / 8) * 8, H = 16 + Math.ceil(h / 8) * 8;
+    let pg = this.atl[this.atlI] || this.atlasPage(this.atlI);
+    if (pg.x + W > A) { pg.y += pg.rowH; pg.x = 0; pg.rowH = 0; }
+    if (pg.y + H > A) { this.atlI = (this.atlI + 1) % 3; pg = this.atlasPage(this.atlI); }
+    const x = pg.x + 8, y = pg.y + 8; pg.x += W; pg.rowH = Math.max(pg.rowH, H);
+    return { pg, x, y };
   }
   mkTex() {
     const gl = this.gl, t = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t);
@@ -178,13 +203,28 @@ DS.GLW = class GLW {
     return t;
   }
   // GL texture for an image, a 2D canvas (uploaded again when it changed) or a layer's canvas (its target)
-  tex(img) {
-    if (img._glTarget) { const t = img._glTarget; this.resolve(t); return { t: t.color, w: t.W, h: t.H, flip: true }; }
-    let r = this.texs.get(img);
+  tex(img, rep) {
+    if (img._glTarget) { const t = img._glTarget; this.resolve(t); return { t: t.color, w: t.W, h: t.H, flip: true, ou: 0, ov: 0, su: 1 / t.W, sv: 1 / t.H }; }
+    const M = rep ? this.texsR : this.texs;
+    let r = M.get(img);
     const v = img._v || 0, w = img.width, h = img.height;
-    if (r && r.v === v && r.w === w && r.h === h) return r;
+    if (r && r.v === v && r.w === w && r.h === h && (!r.pg || r.pg.gen === r.gen)) return r;
     const gl = this.gl;
-    if (!r) { r = { t: this.mkTex() }; this.texs.set(img, r); }
+    if (!rep && w <= 128 && h <= 128) {
+      // small: a slot on an atlas page (a new one when the size changed or the page was wiped)
+      if (!r || !r.pg || r.w !== w || r.h !== h || r.pg.gen !== r.gen) {
+        const a = this.atlasAlloc(w, h), A = this.ATL;
+        r = { pg: a.pg, gen: a.pg.gen, t: a.pg.t, x: a.x, y: a.y, ou: a.x / A, ov: a.y / A, su: 1 / A, sv: 1 / A }; M.set(img, r);
+      }
+      gl.bindTexture(gl.TEXTURE_2D, r.t);
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false); gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
+      try { gl.texSubImage2D(gl.TEXTURE_2D, 0, r.x, r.y, w, h, gl.RGBA, gl.UNSIGNED_BYTE, img); } catch (e) { /* unreadable image: stays blank */ }
+      gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+      this.atlDirty.add(r.pg);
+      r.v = v; r.w = w; r.h = h;
+      return r;
+    }
+    if (!r || r.pg) { r = { t: this.mkTex() }; M.set(img, r); }
     this.flush();
     gl.bindTexture(gl.TEXTURE_2D, r.t);
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false); gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
@@ -192,9 +232,12 @@ DS.GLW = class GLW {
     gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
     if (w > 1 && h > 1) { gl.generateMipmap(gl.TEXTURE_2D); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR); }
     if (r.rep) { gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT); }
-    r.v = v; r.w = w; r.h = h;
+    r.v = v; r.w = w; r.h = h; r.ou = 0; r.ov = 0; r.su = 1 / w; r.sv = 1 / h;
     return r;
   }
+  // a white texel for solid quads: on the atlas page being batched if there is one (no batch break)
+  solidT() { const p = this.curTex && this.atlT.get(this.curTex); return p ? p.t : this.white; }
+  solidUV() { return this.curTex && this.atlT.has(this.curTex) ? 8 / this.ATL : 0.5; }
   // CSS colour → premultiplied [r, g, b, a] (cached)
   col(s) {
     let c = this.cols.get(s); if (c) return c;
@@ -254,6 +297,7 @@ DS.GLW = class GLW {
   flush() {
     if (!this.nv) return;
     const gl = this.gl, P = this.pTex;
+    if (this.atlDirty.size) this.atlMips();
     gl.useProgram(P.p); gl.uniform2f(P.u.u_res, this.W, this.H); this.maskU(P.u); this.texU(P.u);
     gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, this.curTex); gl.uniform1i(P.u.u_tex, 0);
     gl.bindVertexArray(this.vao); gl.bindBuffer(gl.ARRAY_BUFFER, this.buf);
@@ -262,10 +306,20 @@ DS.GLW = class GLW {
     gl.bindVertexArray(null);
     this.nv = 0;
   }
+  atlMips() { const gl = this.gl; gl.activeTexture(gl.TEXTURE0); for (const pg of this.atlDirty) { gl.bindTexture(gl.TEXTURE_2D, pg.t); gl.generateMipmap(gl.TEXTURE_2D); } this.atlDirty.clear(); }
+  // one triangle into the quad batch (solid fills of convex paths, opaque strokes)
+  tri3(t, x0, y0, x1, y1, x2, y2, u, v, c) {
+    if (t !== this.curTex || this.nv + 3 > this.MAXQ * 6) { this.flush(); this.curTex = t; }
+    const b = this.vb; let o = this.nv * 8;
+    b[o] = x0; b[o + 1] = y0; b[o + 2] = u; b[o + 3] = v; b[o + 4] = c[0]; b[o + 5] = c[1]; b[o + 6] = c[2]; b[o + 7] = c[3]; o += 8;
+    b[o] = x1; b[o + 1] = y1; b[o + 2] = u; b[o + 3] = v; b[o + 4] = c[0]; b[o + 5] = c[1]; b[o + 6] = c[2]; b[o + 7] = c[3]; o += 8;
+    b[o] = x2; b[o + 1] = y2; b[o + 2] = u; b[o + 3] = v; b[o + 4] = c[0]; b[o + 5] = c[1]; b[o + 6] = c[2]; b[o + 7] = c[3];
+    this.nv += 3;
+  }
   // raw triangles (device px) through a program, outside the quad batch: stencil fans, covers, gradients
   tris(prog, verts, n, setU) {
     this.flush();
-    const gl = this.gl;
+    const gl = this.gl; if (this.atlDirty.size) this.atlMips();
     gl.useProgram(prog.p); gl.uniform2f(prog.u.u_res, this.W, this.H); this.maskU(prog.u); if (prog === this.pTex) this.texU(prog.u); if (setU) setU(prog.u);
     gl.bindVertexArray(this.vao); gl.bindBuffer(gl.ARRAY_BUFFER, this.buf);
     if (n * 8 > this.bufLen) { this.bufLen = Math.max(n * 8, this.bufLen * 2); gl.bufferData(gl.ARRAY_BUFFER, this.bufLen * 4, gl.DYNAMIC_DRAW); }
@@ -316,7 +370,7 @@ DS.GLCtx = class GLCtx {
     if (e === undefined) { dx = a; dy = b; dw = c === undefined ? img.width : c; dh = d === undefined ? img.height : d; }
     else { sx = a; sy = b; sw = c; sh = d; dx = e; dy = f; dw = g; dh = h; }
     this._b(); const R = this.r; R.setBlend(this.globalCompositeOperation);
-    const t = R.tex(img); let u0 = sx / t.w, v0 = sy / t.h, u1 = (sx + sw) / t.w, v1 = (sy + sh) / t.h, ga = this.globalAlpha;
+    const t = R.tex(img); let u0 = t.ou + sx * t.su, v0 = t.ov + sy * t.sv, u1 = t.ou + (sx + sw) * t.su, v1 = t.ov + (sy + sh) * t.sv, ga = this.globalAlpha;
     if (t.flip) { v0 = 1 - v0; v1 = 1 - v1; }                 // a layer: rows stored bottom up
     // filter: grayscale(k) and blur (a softer mip level) for this image
     let fx = null;
@@ -329,7 +383,8 @@ DS.GLCtx = class GLCtx {
   fillRect(x, y, w, h) {
     this._b(); const R = this.r; R.setBlend(this.globalCompositeOperation);
     if (typeof this.fillStyle === 'string') {
-      R.quad(R.white, this.X(x, y), this.Y(x, y), this.X(x + w, y), this.Y(x + w, y), this.X(x + w, y + h), this.Y(x + w, y + h), this.X(x, y + h), this.Y(x, y + h), 0, 0, 1, 1, this.solid(this.fillStyle));
+      const wu = R.solidUV();
+      R.quad(R.solidT(), this.X(x, y), this.Y(x, y), this.X(x + w, y), this.Y(x + w, y), this.X(x + w, y + h), this.Y(x + w, y + h), this.X(x, y + h), this.Y(x, y + h), wu, wu, wu, wu, this.solid(this.fillStyle));
     } else if (this.fillStyle instanceof DS.GLPat || (typeof CanvasPattern !== 'undefined' && this.fillStyle instanceof CanvasPattern)) {
       // pattern: tiled in the pattern's space (its own transform, as set on the 2D pattern, times the user space)
       const P = this.fillStyle, img = P.img || P._src; if (!img) return;
@@ -420,14 +475,34 @@ DS.GLCtx = class GLCtx {
   // nonzero fill through the stencil: each subpath as a triangle fan from its first point (front faces add,
   // back faces subtract), then the bounding box drawn where the count is not zero (and the count cleared)
   fill() {
-    this._b(); const R = this.r; R.setBlend(this.globalCompositeOperation); R.flush();
+    this._b(); const R = this.r; R.setBlend(this.globalCompositeOperation);
+    if (typeof this.fillStyle === 'string' && this.fastFill()) return;
+    R.flush();
     const F = this.fanOf(); if (!F.n) return;
     this.stencilFill(F.v, F.n, true);
     this.cover(F.x0, F.y0, F.x1, F.y1, this.fillStyle);
   }
+  // a solid fill of one convex outline needs no stencil: its fan goes straight into the quad batch
+  fastFill() {
+    let s = null;
+    for (const q of this.path) if (q.length >= 6) { if (s) return false; s = q; }
+    if (!s) return true;
+    const n = s.length >> 1; let sg = 0, turn = 0;
+    for (let i = 0; i < n; i++) {
+      const a = i * 2, b = ((i + 1) % n) * 2, c = ((i + 2) % n) * 2;
+      const ux = s[b] - s[a], uy = s[b + 1] - s[a + 1], vx = s[c] - s[b], vy = s[c + 1] - s[b + 1];
+      const cr = ux * vy - uy * vx; if (Math.abs(cr) < 1e-6) continue;
+      const k = cr > 0 ? 1 : -1; if (sg && k !== sg) return false; sg = k;
+      turn += Math.atan2(cr, ux * vx + uy * vy);
+    }
+    if (Math.abs(turn) > 6.3) return false;                  // winds round more than once (a star): stencil
+    const R = this.r, t = R.solidT(), wu = R.solidUV(), c = this.solid(this.fillStyle);
+    for (let i = 2; i < n; i++) R.tri3(t, s[0], s[1], s[i * 2 - 2], s[i * 2 - 1], s[i * 2], s[i * 2 + 1], wu, wu, c);
+    return true;
+  }
   // stroke: each segment a quad (butt ends, plus round caps/joins when asked) into the stencil, then the cover
   stroke() {
-    this._b(); const R = this.r; R.setBlend(this.globalCompositeOperation); R.flush();
+    this._b(); const R = this.r; R.setBlend(this.globalCompositeOperation);
     const sc = this.scaleOf(), hw = Math.max(0.35, this.lineWidth * sc / 2), round = this.lineCap === 'round' || this.lineJoin === 'round';
     let n = 0, v = this.tmp, x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
     const grow = () => { const nv = new Float32Array(v.length * 2); nv.set(v); this.tmp = v = nv; };
@@ -460,6 +535,11 @@ DS.GLCtx = class GLCtx {
       if (round) for (let i = 0; i < pts.length; i += 2) disc(pts[i], pts[i + 1]);
     }
     if (!n) return;
+    // opaque solid: overlaps between the pieces cannot show, so they go straight into the batch
+    if (typeof this.strokeStyle === 'string') { const c = this.solid(this.strokeStyle);
+      if (c[3] >= 0.999 && this.globalCompositeOperation === 'source-over') { const t = R.solidT(), wu = R.solidUV();
+        for (let i = 0; i + 2 < n; i += 3) R.tri3(t, v[i * 8], v[i * 8 + 1], v[i * 8 + 8], v[i * 8 + 9], v[i * 8 + 16], v[i * 8 + 17], wu, wu, c); return; } }
+    R.flush();
     this.stencilFill(v, n, false);
     this.cover(x0, y0, x1, y1, this.strokeStyle);
   }

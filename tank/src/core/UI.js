@@ -16,7 +16,7 @@ DS.UI = {
     try { const r = req.call(el, { navigationUI: 'hide' }); if (r && r.catch) r.catch(no); } catch (e) { no(); }
   },
   KEY: 'ds.ui',
-  defaults: { post: 2, resAuto: true, flyFx: true, vol: 0.8, btn: 1, hudFull: false, help: true, touch: 'auto', keys: {}, fpsMode: '60', perf: false, renderer: 'gl', rv: 3, sightBg: 'blur' },
+  defaults: { post: 2, resAuto: true, flyFx: true, vol: 0.8, btn: 1, hudFull: false, help: false, helpSeen: false, touch: 'auto', keys: {}, fpsMode: '60', perf: false, renderer: 'gl', rv: 3, sightBg: 'blur' },
   // remappable actions: [name, the key the game listens for]
   ACTIONS: [['전진', 'KeyD'], ['후진', 'KeyA'], ['포 올림 · 상승', 'KeyW'], ['포 내림 · 하강', 'KeyS'], ['사격', 'Space'], ['탄종', 'KeyQ'], ['거리측정', 'KeyE'],
     ['표적 선택', 'Backspace'], ['동축 기관총 · 로켓', 'KeyF'], ['미사일 (TOW · 헬파이어)', 'KeyX'], ['조준경 배율', 'KeyV'], ['열상 · 야간 조준경', 'KeyT'],
@@ -31,7 +31,7 @@ Object.assign(DS.Game.prototype, {
     const S = this.ui = DS.UI.load();
     this.uiApply();
     // HUD: the rows a driver needs at a glance; the rest behind 'details'
-    const core = ['h-clock', 'h-spd', 'h-ammo', 'h-load', 'h-rng', 'h-foe', 'h-tow', 'h-zoom'];
+    const core = ['h-spd', 'h-ammo', 'h-load', 'h-rng', 'h-tow'];
     document.querySelectorAll('#hud .r').forEach(r => { const b = r.querySelector('b'); if (!b || !core.some(id => r.querySelector('#' + id))) r.classList.add('x'); });
     document.getElementById('hudmore').onclick = () => { S.hudFull = !S.hudFull; this.uiApply(); DS.UI.save(S); };
     // full screen: the round button, the pause menu, F10
@@ -39,8 +39,11 @@ Object.assign(DS.Game.prototype, {
     document.getElementById('fsbtn').onclick = () => DS.UI.fsToggle(m => this.toast(m));
     addEventListener('keydown', e => { if (e.code === 'F10') { e.preventDefault(); DS.UI.fsToggle(m => this.toast(m)); } });
     document.addEventListener('fullscreenchange', fsSync); document.addEventListener('webkitfullscreenchange', fsSync); fsSync();
+    // the hit log: ≡ opens the whole list
+    document.getElementById('logbtn').onclick = () => { const on = document.body.classList.toggle('logall'); document.getElementById('logbtn').classList.toggle('on', on); };
     // pause menu
-    const pm = document.getElementById('pause');
+    const pm = document.getElementById('pause'); pm.dataset.tab = 'view';
+    pm.querySelector('.ptabs').addEventListener('click', e => { const b = e.target.closest('[data-tab-go]'); if (!b) return; pm.dataset.tab = b.dataset.tabGo; pm.querySelectorAll('.ptabs button').forEach(x => x.classList.toggle('on', x === b)); });
     document.getElementById('pausebtn').onclick = () => this.setPause(!this.paused);
     pm.addEventListener('click', e => {
       const b = e.target.closest('button'); if (!b) return;
@@ -59,6 +62,9 @@ Object.assign(DS.Game.prototype, {
       if (a === 'rend') S.renderer = b.dataset.v;
       if (a === 'sbg') S.sightBg = b.dataset.v;
       if (a === 'aa') S.msaa = b.dataset.v;
+      // quality presets: effects, anti-aliasing, resolution governor and frame limit in one choice
+      if (a === 'preset') { const P = { low: [1, 'off', true, '60'], mid: [2, 'auto', true, '60'], high: [2, 'on', false, '120'], auto: [2, 'auto', true, 'free'] }[b.dataset.v];
+        S.preset = b.dataset.v; [S.post, S.msaa, S.resAuto, S.fpsMode] = P; }
       if (a === 'hitcam') S.hitCam = S.hitCam === false;
       if (a === 'perf') S.perf = !S.perf;
       if (a === 'fs') { DS.UI.fsToggle(m => this.toast(m)); return; }
@@ -124,7 +130,7 @@ Object.assign(DS.Game.prototype, {
     // reflect in the menu
     const pm = $('#pause'), on = (sel, v) => pm.querySelectorAll(sel).forEach(b => b.classList.toggle('on', v(b)));
     on('[data-p=post]', b => +b.dataset.v === S.post); on('[data-p=btn]', b => +b.dataset.v === S.btn); on('[data-p=touch]', b => b.dataset.v === S.touch);
-    on('[data-p=res]', () => S.resAuto); on('[data-p=fps]', b => b.dataset.v === (S.fpsMode || '60')); on('[data-p=rend]', b => b.dataset.v === (S.renderer || 'gl')); on('[data-p=sbg]', b => b.dataset.v === (S.sightBg || 'blur')); on('[data-p=aa]', b => b.dataset.v === (S.msaa || 'auto')); on('[data-p=hitcam]', () => S.hitCam !== false); DS.T.hitCam = S.hitCam !== false; on('[data-p=perf]', () => !!S.perf); on('[data-p=flyfx]', () => S.flyFx !== false); on('[data-p=hud]', () => S.hudFull); on('[data-p=help]', () => S.help);
+    on('[data-p=res]', () => S.resAuto); on('[data-p=fps]', b => b.dataset.v === (S.fpsMode || '60')); on('[data-p=rend]', b => b.dataset.v === (S.renderer || 'gl')); on('[data-p=sbg]', b => b.dataset.v === (S.sightBg || 'blur')); on('[data-p=aa]', b => b.dataset.v === (S.msaa || 'auto')); on('[data-p=preset]', b => b.dataset.v === S.preset); on('[data-p=hitcam]', () => S.hitCam !== false); DS.T.hitCam = S.hitCam !== false; on('[data-p=perf]', () => !!S.perf); on('[data-p=flyfx]', () => S.flyFx !== false); on('[data-p=hud]', () => S.hudFull); on('[data-p=help]', () => S.help);
     pm.querySelector('#p-vol').value = Math.round(S.vol * 100); pm.querySelector('#p-volv').textContent = Math.round(S.vol * 100) + ' %';
   },
   keyList() {
@@ -160,11 +166,14 @@ Object.assign(DS.Game.prototype, {
     // right-hand buttons: built per vehicle
     const pad = document.getElementById('tpad');
     pad.addEventListener('pointerdown', e => {
-      const b = e.target.closest('button'); if (!b) return; e.preventDefault(); b.setPointerCapture(e.pointerId); b.classList.add('on');
+      const b = e.target.closest('button'); if (!b) return; e.preventDefault();
+      if (b.dataset.more) { pad.classList.toggle('open'); return; }
+      b.setPointerCapture(e.pointerId); b.classList.add('on');
+      if (b.closest('.tmore') && !b.dataset.hold) setTimeout(() => pad.classList.remove('open'), 150);
       if (b.dataset.m2) { this.mgDown = true; return; }
       if (b.dataset.hold) key(b.dataset.k, true); else { key(b.dataset.k, true); key(b.dataset.k, false); }
     });
-    const up = e => { const b = e.target.closest('button'); if (!b) return; b.classList.remove('on'); if (b.dataset.m2) { this.mgDown = false; return; } if (b.dataset.hold) key(b.dataset.k, false); };
+    const up = e => { const b = e.target.closest('button'); if (!b || b.dataset.more) return; b.classList.remove('on'); if (b.dataset.m2) { this.mgDown = false; return; } if (b.dataset.hold) key(b.dataset.k, false); };
     pad.addEventListener('pointerup', up); pad.addEventListener('pointercancel', up);
     // the main view: one finger aims, two fingers zoom
     const pts = new Map(), cv = this.cv, cam = this.world.cam;
@@ -215,7 +224,12 @@ Object.assign(DS.Game.prototype, {
     if (DS.Searchlight.has(v)) B.push(['탐조등', 'KeyY']);
     if (this.mission && !this.mission.range) B.push(['전환', 'KeyN']);     // ride another friendly vehicle
     B.sort((a, b) => (b[3] === 'fire') - (a[3] === 'fire'));        // the trigger first: it takes the corner
-    document.getElementById('tpad').innerHTML = B.map(([t, k, h, c]) => `<button type="button" data-k="${k}"${k === 'm2' ? ' data-m2="1"' : ''}${h ? ' data-hold="1"' : ''}${c ? ` class="${c}"` : ''}>${t}</button>`).join('');
+    // the trigger and the three buttons used shot by shot (target, range, round); everything else behind ⋯
+    const PRI = ['Space', 'Backspace', 'KeyE', 'Equal', 'Minus', 'KeyQ', 'KeyX', 'KeyF'], pri = [], more = [];
+    for (const b of B) (b[3] === 'fire' || (pri.length < 4 && PRI.includes(b[1]) && !(v.heli && b[1] === 'KeyF' && pri.length > 3)) ? pri : more).push(b);
+    const btn = ([t, k, h, c]) => `<button type="button" data-k="${k}"${k === 'm2' ? ' data-m2="1"' : ''}${h ? ' data-hold="1"' : ''}${c ? ` class="${c}"` : ''}>${t}</button>`;
+    const pad = document.getElementById('tpad'); pad.classList.remove('open');
+    pad.innerHTML = pri.map(btn).join('') + (more.length ? `<button type="button" class="more" data-more="1">⋯</button><div class="tmore">${more.map(btn).join('')}</div>` : '');
     document.getElementById('joy').dataset.mode = v.heli ? '이동 · 상승/하강' : v.def.indirectOnly || v.def.howitzer ? '이동' : '이동 · 포 앙각';
   },
 });

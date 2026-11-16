@@ -102,7 +102,7 @@ DS.World = class World {
       }
     }
   }
-  addLog(r) { this.log.unshift({ ...r, at: this.time }); if (this.log.length > 6) this.log.pop(); }
+  addLog(r) { this.log.unshift({ ...r, at: this.time }); if (this.log.length > 12) this.log.pop(); }
 
   update(frameDt) {
     DS.Sky.update(this, frameDt);

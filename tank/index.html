@@ -214,6 +214,37 @@
   #sb-selname { color: #f0e6c8; margin: 0 0 6px; line-height: 1.4; min-height: 2.8em; }
   #sbx .hint { color: var(--mu); font-size: 12px; line-height: 1.5; margin: 6px 0 0; }
   @media (max-width: 640px) { #hud { min-width: 0; font-size: 11px; } #mini { bottom: 150px; } }
+
+  /* ---- interface overhaul: fewer, quieter panels ---- */
+  #hud .lbar { display: none; height: 3px; margin: 2px 0 3px; background: rgba(255,255,255,.12); border-radius: 2px; overflow: hidden; }
+  #hud .lbar i { display: block; height: 100%; width: 100%; background: var(--ok); transition: width .1s linear; }
+  #hud.compact .lbar { display: block; }
+  #hud.compact { min-width: 176px; padding: 6px 9px; }
+  /* squad strip: one line of chips */
+  #foes { gap: 6px; padding: 4px 8px; max-width: min(70vw, 760px); flex-wrap: nowrap; overflow: hidden; align-items: center; }
+  #foes .chip { display: inline-flex; align-items: center; gap: 4px; padding: 1px 7px; border-radius: 10px; background: rgba(255,255,255,.07); white-space: nowrap; font-size: 11px; }
+  #foes .chip i { width: 7px; height: 7px; border-radius: 50%; display: inline-block; background: #7fe08f; }
+  #foes .chip.hurt i { background: #ffcc66; } #foes .chip.dead i { background: #ff6a55; } #foes .chip.dead { opacity: .5; } #foes .chip.idle i { background: #9a9a9a; }
+  #foes .chip.pal { pointer-events: auto; cursor: pointer; } #foes .chip.tgt { background: rgba(255,122,92,.22); color: #ffd0a0; } #foes .sum { color: var(--mu); font-size: 11px; white-space: nowrap; }
+  /* the hit log: the newest lines for a few seconds; ≡ opens the whole list */
+  #log .e.old { display: none; }
+  #log.quiet { display: none !important; } body.logall #log.quiet { display: grid !important; }
+  body.logall #log .e.old { display: block; } body.logall #log .e:nth-child(n+5) { display: block; } body.logall #log { max-height: 46vh; overflow: auto; pointer-events: auto; }
+  body.touchui #log { display: grid !important; top: auto; bottom: calc(var(--tb) * 2.6 + 30px); left: 10px; max-width: min(46vw, 340px); font-size: 11px; }
+  #logbtn { position: fixed; top: 10px; right: 124px; width: 30px; height: 30px; border-radius: 50%; border: 1px solid #6b5d45; background: var(--bg); color: var(--tx); font: 700 16px var(--kor); pointer-events: auto; z-index: 3; }
+  body:not(.playing) #logbtn { display: none; } #logbtn.on { background: rgba(255,204,102,.5); }
+  /* settings in tabs */
+  .ptabs { display: flex; gap: 4px; margin: 4px 0 8px; flex-wrap: wrap; }
+  .ptabs button { padding: 5px 12px; border-radius: 14px; border: 1px solid #6b5d45; background: transparent; color: var(--tx); font: inherit; cursor: pointer; }
+  .ptabs button.on { background: rgba(255,204,102,.35); border-color: #ffcc66; }
+  #pause .prow[data-tab] { display: none; } #pause[data-tab=view] .prow[data-tab=view], #pause[data-tab=game] .prow[data-tab=game], #pause[data-tab=ctrl] .prow[data-tab=ctrl], #pause[data-tab=sound] .prow[data-tab=sound], #pause[data-tab=adv] .prow[data-tab=adv] { display: flex; }
+  /* touch: the trigger and three buttons; the rest behind ⋯ */
+  #tpad { grid-template-columns: calc(var(--tb) * 1.45) repeat(2, var(--tb)); }
+  #tpad .tmore { display: none; position: fixed; right: 14px; bottom: calc(var(--tb) * 2 + 40px); direction: ltr; flex-wrap: wrap; justify-content: flex-end; gap: 8px; max-width: calc(var(--tb) * 4.6); }
+  #tpad.open .tmore { display: flex; } #tpad .tmore button { width: var(--tb); height: var(--tb); }
+  #tpad button.more { font-size: calc(var(--tb) * 0.36); }
+  /* the sight enlarged: everything else steps back */
+  body.sightbig :is(#hud, #foes, #log, #mini, #zoombar) { opacity: .28; transition: opacity .2s; }
 </style>
 </head>
 <body>
@@ -234,6 +265,7 @@
   <div class="r"><span>포 앙각</span><b id="h-elev">0</b></div>
   <div class="r"><span>탄종</span><b id="h-ammo">-</b></div>
   <div class="r"><span>장전</span><b id="h-load">-</b></div>
+  <div class="lbar"><i id="h-lbar"></i></div>
   <div class="r"><span>기관총 잔탄</span><b id="h-mg">-</b></div>
   <div class="r" id="row-tow" hidden><span>TOW</span><b id="h-tow">-</b></div>
   <div class="r"><span>레이저 거리</span><b id="h-rng">—</b></div>
@@ -243,6 +275,7 @@
   <div class="r"><span>줌 / 프레임</span><b><span id="h-zoom"></span> · <span id="h-fps"></span></b></div>
 </div>
 
+<button id="logbtn" type="button" title="교전 기록" aria-label="교전 기록 펼치기">≡</button>
 <button id="helpbtn" type="button" title="키 가이드 (H)" aria-label="키 가이드 켜기/끄기">?</button>
 <button id="fsbtn" type="button" title="전체 화면 (F10)" aria-label="전체 화면 켜기/끄기">⛶</button>
 <div id="help" class="panel">
@@ -350,23 +383,25 @@
     <h2>일시정지</h2>
     <div class="prow"><button type="button" data-p="resume" class="big">계속</button><button type="button" data-p="restart">다시 시작</button><button type="button" data-p="menu">작전 선택</button></div>
     <h3>설정</h3>
-    <div class="prow" id="p-timerow"><span>시각</span><input id="p-clock" type="range" min="0" max="1439" step="5" aria-label="시각"><b id="p-clockv"></b></div>
-    <div class="prow" id="p-speedrow"><span>시간 흐름</span><button type="button" data-p="spd" data-v="0">정지</button><button type="button" data-p="spd" data-v="1">실제</button><button type="button" data-p="spd" data-v="10">×10</button><button type="button" data-p="spd" data-v="60">1분=1시간</button></div>
-    <div class="prow"><span>화면 효과</span><button type="button" data-p="post" data-v="0">끔</button><button type="button" data-p="post" data-v="1">낮음</button><button type="button" data-p="post" data-v="2">높음</button></div>
-    <div class="prow"><span>해상도 자동 조절</span><button type="button" data-p="res">켬</button></div>
-    <div class="prow"><span>렌더러</span><button type="button" data-p="rend" data-v="2d">2D</button><button type="button" data-p="rend" data-v="gl">WebGL (권장)</button></div>
-    <div class="prow"><span>안티에일리어싱 (WebGL)</span><button type="button" data-p="aa" data-v="auto">자동</button><button type="button" data-p="aa" data-v="on">켬</button><button type="button" data-p="aa" data-v="off">끔</button></div>
-    <div class="prow"><span>피탄 카메라 ( ` 키)</span><button type="button" data-p="hitcam">켬</button></div>
-    <div class="prow"><span>조준경 확대 주변</span><button type="button" data-p="sbg" data-v="blur">흐리게</button><button type="button" data-p="sbg" data-v="black">검게</button></div>
-    <div class="prow"><span>프레임 제한</span><button type="button" data-p="fps" data-v="60">60 고정</button><button type="button" data-p="fps" data-v="120">120 고정</button><button type="button" data-p="fps" data-v="free">자유</button></div>
-    <div class="prow"><span>성능 표시 (F8)</span><button type="button" data-p="perf">켬</button></div>
-    <div class="prow"><span>전체 화면 (F10)</span><button type="button" data-p="fs">켬</button></div>
-    <div class="prow"><span>탄 비행 효과 (저공 충격파 먼지·초음속 파열음·포탄 휘파람)</span><button type="button" data-p="flyfx">켬</button></div>
-    <div class="prow"><span>소리 크기</span><input id="p-vol" type="range" min="0" max="100" step="5" aria-label="소리 크기"><b id="p-volv"></b></div>
-    <div class="prow"><span>터치 조작</span><button type="button" data-p="touch" data-v="auto">자동</button><button type="button" data-p="touch" data-v="on">항상</button><button type="button" data-p="touch" data-v="off">끔</button></div>
-    <div class="prow"><span>버튼 크기</span><button type="button" data-p="btn" data-v="0.85">작게</button><button type="button" data-p="btn" data-v="1">보통</button><button type="button" data-p="btn" data-v="1.2">크게</button></div>
-    <details class="pkeys"><summary>키 설정</summary><div id="p-keys"></div></details>
-    <div class="prow"><span>계기판 자세히</span><button type="button" data-p="hud">켬</button><span>키 가이드</span><button type="button" data-p="help">켬</button></div>
+    <div class="ptabs"><button type="button" data-tab-go="view" class="on">화면</button><button type="button" data-tab-go="game">게임</button><button type="button" data-tab-go="ctrl">조작</button><button type="button" data-tab-go="sound">소리</button><button type="button" data-tab-go="adv">고급</button></div>
+    <div class="prow" data-tab="view"><span>품질</span><button type="button" data-p="preset" data-v="low">낮음</button><button type="button" data-p="preset" data-v="mid">중간</button><button type="button" data-p="preset" data-v="high">높음</button><button type="button" data-p="preset" data-v="auto">자동</button></div>
+    <div class="prow" data-tab="game" id="p-timerow"><span>시각</span><input id="p-clock" type="range" min="0" max="1439" step="5" aria-label="시각"><b id="p-clockv"></b></div>
+    <div class="prow" data-tab="game" id="p-speedrow"><span>시간 흐름</span><button type="button" data-p="spd" data-v="0">정지</button><button type="button" data-p="spd" data-v="1">실제</button><button type="button" data-p="spd" data-v="10">×10</button><button type="button" data-p="spd" data-v="60">1분=1시간</button></div>
+    <div class="prow" data-tab="view"><span>화면 효과</span><button type="button" data-p="post" data-v="0">끔</button><button type="button" data-p="post" data-v="1">낮음</button><button type="button" data-p="post" data-v="2">높음</button></div>
+    <div class="prow" data-tab="adv"><span>해상도 자동 조절</span><button type="button" data-p="res">켬</button></div>
+    <div class="prow" data-tab="adv"><span>렌더러</span><button type="button" data-p="rend" data-v="2d">2D</button><button type="button" data-p="rend" data-v="gl">WebGL (권장)</button></div>
+    <div class="prow" data-tab="adv"><span>안티에일리어싱 (WebGL)</span><button type="button" data-p="aa" data-v="auto">자동</button><button type="button" data-p="aa" data-v="on">켬</button><button type="button" data-p="aa" data-v="off">끔</button></div>
+    <div class="prow" data-tab="game"><span>피탄 카메라 ( ` 키)</span><button type="button" data-p="hitcam">켬</button></div>
+    <div class="prow" data-tab="view"><span>조준경 확대 주변</span><button type="button" data-p="sbg" data-v="blur">흐리게</button><button type="button" data-p="sbg" data-v="black">검게</button></div>
+    <div class="prow" data-tab="view"><span>프레임 제한</span><button type="button" data-p="fps" data-v="60">60 고정</button><button type="button" data-p="fps" data-v="120">120 고정</button><button type="button" data-p="fps" data-v="free">자유</button></div>
+    <div class="prow" data-tab="adv"><span>성능 표시 (F8)</span><button type="button" data-p="perf">켬</button></div>
+    <div class="prow" data-tab="view"><span>전체 화면 (F10)</span><button type="button" data-p="fs">켬</button></div>
+    <div class="prow" data-tab="game"><span>탄 비행 효과 (저공 충격파 먼지·초음속 파열음·포탄 휘파람)</span><button type="button" data-p="flyfx">켬</button></div>
+    <div class="prow" data-tab="sound"><span>소리 크기</span><input id="p-vol" type="range" min="0" max="100" step="5" aria-label="소리 크기"><b id="p-volv"></b></div>
+    <div class="prow" data-tab="ctrl"><span>터치 조작</span><button type="button" data-p="touch" data-v="auto">자동</button><button type="button" data-p="touch" data-v="on">항상</button><button type="button" data-p="touch" data-v="off">끔</button></div>
+    <div class="prow" data-tab="ctrl"><span>버튼 크기</span><button type="button" data-p="btn" data-v="0.85">작게</button><button type="button" data-p="btn" data-v="1">보통</button><button type="button" data-p="btn" data-v="1.2">크게</button></div>
+    <details class="pkeys prow" data-tab="ctrl"><summary>키 설정</summary><div id="p-keys"></div></details>
+    <div class="prow" data-tab="game"><span>계기판 자세히</span><button type="button" data-p="hud">켬</button><span>키 가이드</span><button type="button" data-p="help">켬</button></div>
   </div>
 </div>
 

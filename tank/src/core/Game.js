@@ -108,7 +108,8 @@ DS.Game = class Game {
     if (town || M.map === 'town') this.rend.loadTown();
     if (M.map === 'town') { DS.MAP = DS.TOWN; W.terrain = new DS.Terrain(7, 'town'); W.props = DS.TOWN.layout(); }
     document.getElementById('menu').hidden = true; document.body.classList.add('playing');
-    let help = true; try { help = localStorage.getItem('ds.help') !== '0'; } catch (e) {}
+    // the key guide opens by itself the first time only; after that the ? button (or H) brings it
+    let help = false; try { if (!localStorage.getItem('ds.helpSeen')) { help = true; localStorage.setItem('ds.helpSeen', '1'); } else help = localStorage.getItem('ds.help') === '1'; } catch (e) {}
     this.setHelp(help);
     document.getElementById('helpbtn').onclick = () => this.setHelp(document.getElementById('help').classList.contains('hide'));
     W.env = { ...M.env }; W.wind = M.env.wind;
@@ -576,10 +577,15 @@ DS.Game = class Game {
       set('h-foe', `탐지 ${inSight}` + (found.length > inSight ? ` (+${found.length - inSight} 상실)` : '') + ` · 격파 ${foes.length - up}`);
       this.logPanel();
       const W0 = w.vehicles;
-      document.getElementById('foes').innerHTML = pals.map(e => `<div class="pal${e.alive ? '' : ' down'}" data-ride="${W0.indexOf(e)}"><b>${e.label}</b> <span>${e.alive ? (e.ai ? e.ai.state : '무인') : e.status}</span></div>`).join('') + found.map(e => {
-          const c = v.contacts.get(e), now = DS.Sensor.seenNow(v, e), id = c.d >= 2;
-          return `<div class="up${e === this.target ? ' sel' : ''}${now ? '' : ' lost'}"><b>${id ? e.def.name : '미식별'}</b> <span>${now ? Math.round(c.range) + ' m' : '상실'}</span></div>`;
-        }).join('') + foes.filter(e => !e.alive).map(e => `<div class="down"><b>${e.def.name}</b> <span>격파</span></div>`).join('');
+      // squad strip: a dot per friendly vehicle (green fine, amber damaged, red knocked out, grey holding), what
+      // is in sight and knocked out, and the selected target — the vehicle's name and state on hover
+      const short = l => { const m = /(\d)소대 (\d)호/.exec(l); return m ? m[1] + '-' + m[2] : l.replace(/\s.*$/, ''); };
+      const tg = this.target && this.target.alive ? this.target : null, tc = tg && v.contacts && v.contacts.get(tg);
+      const html = pals.map(e => { const st = !e.alive ? 'dead' : e.status !== '정상' ? 'hurt' : e.ai && /대기|유지|엄호/.test(e.ai.state || '') ? 'idle' : '';
+          return `<span class="chip pal ${st}" data-ride="${W0.indexOf(e)}" title="${e.label} · ${e.alive ? (e.ai ? e.ai.state : '무인') : e.status}"><i></i>${short(e.label)}</span>`; }).join('')
+        + `<span class="sum">적 ${inSight}${found.length > inSight ? '+' + (found.length - inSight) : ''} · 격파 ${foes.length - up}/${foes.length}</span>`
+        + (tg && tc ? `<span class="chip tgt">${tc.d >= 2 ? tg.def.name : '미식별'} ${Math.round(tc.range)} m</span>` : '');
+      const fe = document.getElementById('foes'); if (fe._h !== html) { fe.innerHTML = html; fe._h = html; }
       const over = document.getElementById('over');
       if (this.sbx) { if (!v.alive && !this._dead) this.toast('격파됨 — L 편집 모드에서 「모두 수리」'); this._dead = !v.alive; }
       else if (!v.alive && over.hidden) {
@@ -596,6 +602,9 @@ DS.Game = class Game {
       }
       if (!this.sbx && up === 0 && foes.length && over.hidden && !this._won) { this._won = true; over.hidden = false; document.getElementById('over-t').textContent = '적 소대 전멸 — 임무 완료'; }
       set('h-load', g.reload > 0 ? (g.locked ? '자동장전 — 포 고정 ' : '장전 중 ') + g.reload.toFixed(1) + ' s' : '장전 완료');
+      { const lb = this._lbar || (this._lbar = document.getElementById('h-lbar')), full = (v.def.gun.reload || 1) * (v.wounds && v.wounds.loader ? 1.5 : 1);
+        if (lb) { lb.style.width = (100 * Math.max(0, Math.min(1, 1 - g.reload / full))).toFixed(0) + '%'; lb.style.background = g.reload > 0 ? 'var(--warn)' : 'var(--ok)'; } }
+      document.body.classList.toggle('sightbig', this.sightCv.classList.contains('big'));
       set('h-pos', (v.pos.x / 1000).toFixed(2) + ' km');
       set('h-zoom', w.cam.zoom.toFixed(0) + ' px/m');
       set('h-fps', Math.round(this.fps) + ' fps' + ` · ${this.cv.width}×${this.cv.height}`);
@@ -632,20 +641,23 @@ DS.Game = class Game {
   // hit log: newest first
   logPanel() {
     const el = document.getElementById('log'), w = this.world;
-    const key = w.log.map(l => l.at).join(',');
+    const fresh = l => w.time - (l.at != null ? l.at : -1e9) < 7;
+    const key = w.log.map(l => l.at + (fresh(l) ? 'n' : 'o')).join(',');
+    el.classList.toggle('quiet', !w.log.some(fresh));
     if (el.dataset.k === key) return;
     el.dataset.k = key;
     const RES = { pen: ['관통', 'pen'], ricochet: ['도탄', 'ric'], nonpen: ['비관통', 'non'], track: ['궤도 피격', 'trk'] };
     el.innerHTML = w.log.map(l => {
-      if (l.ground) return `<div class="e"><b>지면 착탄</b> ${Math.round(l.range)} m · ${l.ammo.short}</div>`;
-      if (l.blast) return `<div class="e"><span class="tag trk">폭압</span> ${l.vehicle === this.player ? '<b class="me">피격</b> ' : ''}<b>${l.vehicle.label}</b> · ${l.direct ? '직격' : '폭발 중심에서 ' + l.dist.toFixed(1) + ' m'} · ${l.ammo.short} → ${l.effects.join(', ')}<i>${l.vehicle.status}</i></div>`;
+      const o = fresh(l) ? '' : ' old';
+      if (l.ground) return `<div class="e${o}"><b>지면 착탄</b> ${Math.round(l.range)} m · ${l.ammo.short}</div>`;
+      if (l.blast) return `<div class="e${o}"><span class="tag trk">폭압</span> ${l.vehicle === this.player ? '<b class="me">피격</b> ' : ''}<b>${l.vehicle.label}</b> · ${l.direct ? '직격' : '폭발 중심에서 ' + l.dist.toFixed(1) + ' m'} · ${l.ammo.short} → ${l.effects.join(', ')}<i>${l.vehicle.status}</i></div>`;
       const [t, c] = RES[l.result];
       let nums = l.obl == null ? '' : l.result === 'ricochet' ? `경사 ${l.obl.toFixed(0)}°` : `${Math.round(l.pen)} / ${Math.round(l.prot)} mm · 경사 ${l.obl.toFixed(0)}°`;
       if (l.layers && l.layers.length > 1) nums += ' · ' + l.layers.slice(1).map(L => `${L.name} ${L.prot}${L.stop ? ' 정지' : L.exit ? ' 이탈' : ' 관통'}`).join(' → ');
       if (this.sbx && l.speed) nums += ` · 착탄 ${Math.round(l.speed)} m/s · 실효 두께 ${Math.round(l.los)} mm` + (l.resid != null ? ` · 잔여 ${Math.round(l.resid)} mm` : '');   // range: full numbers
       const fx = l.effects && l.effects.length ? ' → ' + l.effects.join(', ') : '';
       const who = l.vehicle === this.player ? `<b class="me">피격</b> ${l.shooter ? l.shooter.label + ' → ' : ''}` : '';
-      return `<div class="e"><span class="tag ${c}">${t}</span> ${who}<b>${l.vehicle.label}</b> · ${Math.round(l.range)} m · ${l.plate} · ${l.ammo.short} ${nums}${fx}` +
+      return `<div class="e${o}"><span class="tag ${c}">${t}</span> ${who}<b>${l.vehicle.label}</b> · ${Math.round(l.range)} m · ${l.plate} · ${l.ammo.short} ${nums}${fx}` +
         `<i>${l.vehicle.status}</i></div>`;
     }).join('');
   }

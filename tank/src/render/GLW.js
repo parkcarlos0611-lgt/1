@@ -17,9 +17,33 @@
 // counts its canvas's changes, _v). Mipmapped; premultiplied alpha throughout.
 DS.GLW = class GLW {
   constructor(post) {
-    this.post = post; this.gl = post.gl; this.ok = false; this.enabled = true;
-    try { this.init(); this.ok = true; } catch (e) { console.warn('WebGL world renderer off:', e.message); }
+    this.post = post; this.gl = this.rgl = post.gl; this.ok = false; this.enabled = true;
+    try { this.init(); this.recorder(); this.ok = true; } catch (e) { this.gl = this.rgl; console.warn('WebGL world renderer off:', e.message); }
   }
+  // Deferred drawing. On the iPad (WebKit → ANGLE → Metal) writing a buffer or a texture while a render pass is
+  // drawing ends the pass: the whole target is stored and loaded again. Uploading each batch's vertices as it was
+  // drawn did that hundreds of times a frame. So this.gl records every draw-time call (state, binds, uniforms,
+  // draws, clears, blits) and this.rgl does resources and uploads at once; play() then uploads the frame's
+  // vertices in one go and replays the record, with nothing uploaded in between.
+  recorder() {
+    const real = this.rgl, list = this.rec = [], fns = {};
+    const REC = ['useProgram', 'uniform1f', 'uniform1i', 'uniform2f', 'uniform3f', 'uniform4f', 'uniform1fv', 'uniform4fv', 'uniformMatrix4fv',
+      'bindVertexArray', 'bindBuffer', 'drawArrays', 'bindTexture', 'activeTexture', 'enable', 'disable', 'blendFunc', 'blendFuncSeparate',
+      'stencilFunc', 'stencilOp', 'stencilOpSeparate', 'stencilMask', 'colorMask', 'bindFramebuffer', 'viewport', 'scissor', 'clear',
+      'clearColor', 'clearStencil', 'blitFramebuffer', 'generateMipmap'];
+    for (const k of REC) fns[k] = (...a) => { list.push(k, a); };
+    this.gl = new Proxy(real, { get: (t, k) => fns[k] || (typeof t[k] === 'function' ? t[k].bind(t) : t[k]) });
+    this.fv = new Float32Array(262144 * 8); this.fn = 0;
+  }
+  play() {
+    const L = this.rec; if (!L || !L.length) { this.fn = 0; return; }
+    const gl = this.rgl;
+    gl.bindVertexArray(this.vao); gl.bindBuffer(gl.ARRAY_BUFFER, this.buf);
+    gl.bufferData(gl.ARRAY_BUFFER, this.fv.subarray(0, Math.max(8, this.fn * 8)), gl.STREAM_DRAW);
+    for (let i = 0; i < L.length; i += 2) gl[L[i]].apply(gl, L[i + 1]);
+    L.length = 0; this.fn = 0;
+  }
+  rbind(t) { this.rgl.bindTexture(this.rgl.TEXTURE_2D, t); }     // (resources: bound at once, not recorded)
   init() {
     const gl = this.gl;
     const mk = (vs, fs) => {
@@ -94,13 +118,12 @@ DS.GLW = class GLW {
     this.buf = gl.createBuffer(); this.vao = gl.createVertexArray();
     // vertices go into one large buffer used as a ring: every draw writes past the last one, so no write waits for
     // the GPU to finish reading earlier vertices; when it runs out the storage is replaced (orphaned), and each frame
-    this.ringN = 262144; this.ring = 0;
-    gl.bindVertexArray(this.vao); gl.bindBuffer(gl.ARRAY_BUFFER, this.buf); gl.bufferData(gl.ARRAY_BUFFER, this.ringN * 32, gl.DYNAMIC_DRAW);
+    gl.bindVertexArray(this.vao); gl.bindBuffer(gl.ARRAY_BUFFER, this.buf); gl.bufferData(gl.ARRAY_BUFFER, 1 << 20, gl.STREAM_DRAW);
     gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 32, 0);
     gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1, 2, gl.FLOAT, false, 32, 8);
     gl.enableVertexAttribArray(2); gl.vertexAttribPointer(2, 4, gl.FLOAT, false, 32, 16);
     gl.bindVertexArray(null);
-    this.white = this.mkTex(); this.bind0(this.white); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([255, 255, 255, 255]));
+    this.white = this.mkTex(); this.rbind(this.white); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([255, 255, 255, 255]));
     this.texs = new WeakMap(); this.texsR = new WeakMap(); this.cols = new Map();
     // atlas pages for small images (particle puffs, debris shards, small props…): many images on one texture, so
     // the quad batch is not broken by texture changes. 2048² pages, slots 8 px aligned with 8 px of empty border
@@ -119,11 +142,11 @@ DS.GLW = class GLW {
   // On tiled GPUs (iPad) switching targets in mid-frame stores and reloads the whole target, so layers are made
   // before the frame starts (see phase) and clips stay in the target's own stencil.
   mkTarget(t, W, H) {
-    const gl = this.gl, S = t.ms ? this.msaa : 0;
+    const gl = this.rgl, S = t.ms ? this.msaa : 0;
     if (!t.fbo) { t.fbo = gl.createFramebuffer(); t.rfbo = gl.createFramebuffer(); t.color = this.mkTex(); t.crb = gl.createRenderbuffer(); t.rb = gl.createRenderbuffer(); t.clipD = 0; t.clipBox = []; }
     if (t.W !== W || t.H !== H || t.S !== S) {
       this.flush();
-      this.bind0(t.color); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, W, H, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+      this.rbind(t.color); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, W, H, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
       gl.bindFramebuffer(gl.FRAMEBUFFER, t.fbo);
       if (S > 1) {
         gl.bindRenderbuffer(gl.RENDERBUFFER, t.crb); gl.renderbufferStorageMultisample(gl.RENDERBUFFER, S, gl.RGBA8, W, H);
@@ -134,11 +157,10 @@ DS.GLW = class GLW {
         gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, t.color, 0);
       }
       gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_STENCIL_ATTACHMENT, gl.RENDERBUFFER, t.rb);
-      gl.clearColor(0, 0, 0, 0); gl.clearStencil(0); gl.stencilMask(0xff); gl.clear(gl.COLOR_BUFFER_BIT | gl.STENCIL_BUFFER_BIT); this._st = -1;
+      gl.disable(gl.SCISSOR_TEST); gl.colorMask(true, true, true, true); gl.clearColor(0, 0, 0, 0); gl.clearStencil(0); gl.stencilMask(0xff); gl.clear(gl.COLOR_BUFFER_BIT | gl.STENCIL_BUFFER_BIT); this._st = -1;
       if (S > 1) { gl.bindFramebuffer(gl.FRAMEBUFFER, t.rfbo); gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, t.color, 0); }
       t.W = W; t.H = H; t.S = S; t.dirty = S > 1; t.clipD = 0;
       if (this.T === t) this.T = null;                           // rebind on next use
-      else gl.bindFramebuffer(gl.FRAMEBUFFER, this.T ? this.T.fbo : null);
     }
     return t;
   }
@@ -199,10 +221,11 @@ DS.GLW = class GLW {
       let B = this.bgT;
       const bw = Math.max(1, W >> 2), bh = Math.max(1, H >> 2);
       if (!B || B.w !== bw || B.h !== bh) {
-        if (!B) B = this.bgT = { t: this.mkTex(), f: gl.createFramebuffer() };
-        this.bind0(B.t); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, bw, bh, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
-        gl.bindFramebuffer(gl.FRAMEBUFFER, B.f); gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, B.t, 0);
+        const rg = this.rgl;
+        if (!B) B = this.bgT = { t: this.mkTex(), f: rg.createFramebuffer() };
+        this.rbind(B.t); rg.texImage2D(rg.TEXTURE_2D, 0, rg.RGBA8, bw, bh, 0, rg.RGBA, rg.UNSIGNED_BYTE, null);
+        rg.texParameteri(rg.TEXTURE_2D, rg.TEXTURE_MIN_FILTER, rg.LINEAR_MIPMAP_LINEAR);
+        rg.bindFramebuffer(rg.FRAMEBUFFER, B.f); rg.framebufferTexture2D(rg.FRAMEBUFFER, rg.COLOR_ATTACHMENT0, rg.TEXTURE_2D, B.t, 0);
         B.w = bw; B.h = bh;
       }
       if (S.bg !== 'black') {
@@ -218,7 +241,7 @@ DS.GLW = class GLW {
       this.bind0(t.color);
       gl.uniform4f(u.u_rect, S.x, S.y, S.w, S.h); gl.uniform1f(u.u_H, H); gl.uniformMatrix4fv(u.u_m, false, S.m); gl.uniform1i(u.u_n, S.n);
       const sh = S.sh || [0, 0, 1, 1]; gl.uniform4f(u.u_sh, sh[0], sh[1], sh[2], sh[3]); });
-    gl.disable(gl.BLEND); this.blendOn = false;
+    gl.disable(gl.BLEND); this.blendOn = false; this.play();
   }
   // (clips are in the stencil now: the shaders' mask input stays off)
   maskU(u, P) { this.u1f(P, 'u_useMask', 0); }
@@ -286,13 +309,13 @@ DS.GLW = class GLW {
   }
   texRep(img) {
     const r = this.tex(img, true);
-    if (!r.rep) { const gl = this.gl; this.bind0(r.t); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT); r.rep = true; }
+    if (!r.rep) { const gl = this.rgl; this.rbind(r.t); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT); r.rep = true; }
     return r;
   }
   atlasPage(i) {
-    const gl = this.gl, A = this.ATL; let pg = this.atl[i];
-    if (pg) { this.flush(); this.atlT.delete(pg.t); gl.deleteTexture(pg.t); pg.gen++; } else pg = this.atl[i] = { gen: 0 };
-    const t = pg.t = gl.createTexture(); this.bind0(t);
+    const gl = this.rgl, A = this.ATL; let pg = this.atl[i];
+    if (pg) { this.flush(); this.play(); this.atlT.delete(pg.t); gl.deleteTexture(pg.t); pg.gen++; } else pg = this.atl[i] = { gen: 0 };   // (what was drawn from the old page goes out first)
+    const t = pg.t = gl.createTexture(); this.rbind(t);
     gl.texStorage2D(gl.TEXTURE_2D, 4, gl.RGBA8, A, A);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
@@ -310,7 +333,7 @@ DS.GLW = class GLW {
     return { pg, x, y };
   }
   mkTex() {
-    const gl = this.gl, t = gl.createTexture(); this.bind0(t);
+    const gl = this.rgl, t = gl.createTexture(); this.rbind(t);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     return t;
@@ -322,14 +345,14 @@ DS.GLW = class GLW {
     let r = M.get(img);
     const v = img._v || 0, w = img.width, h = img.height;
     if (r && r.v === v && r.w === w && r.h === h && (!r.pg || r.pg.gen === r.gen)) return r;
-    const gl = this.gl;
+    const gl = this.rgl;
     if (!rep && w <= 128 && h <= 128) {
       // small: a slot on an atlas page (a new one when the size changed or the page was wiped)
       if (!r || !r.pg || r.w !== w || r.h !== h || r.pg.gen !== r.gen) {
         const a = this.atlasAlloc(w, h), A = this.ATL;
         r = { pg: a.pg, gen: a.pg.gen, t: a.pg.t, x: a.x, y: a.y, ou: a.x / A, ov: a.y / A, su: 1 / A, sv: 1 / A }; M.set(img, r);
       }
-      this.bind0(r.t);
+      this.rbind(r.t);
       gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false); gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
       try { gl.texSubImage2D(gl.TEXTURE_2D, 0, r.x, r.y, w, h, gl.RGBA, gl.UNSIGNED_BYTE, img); } catch (e) { /* unreadable image: stays blank */ }
       gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
@@ -338,8 +361,7 @@ DS.GLW = class GLW {
       return r;
     }
     if (!r || r.pg) { r = { t: this.mkTex() }; M.set(img, r); }
-    this.flush();
-    this.bind0(r.t);
+    this.rbind(r.t);
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false); gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
     try { gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img); } catch (e) { /* unreadable image: stays blank */ }
     gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
@@ -371,7 +393,7 @@ DS.GLW = class GLW {
   begin(W, H) {
     const gl = this.gl;
     W = Math.max(1, W | 0); H = Math.max(1, H | 0);
-    this.inval(); this.ring = this.ringN;                      // (first draw of the frame takes fresh storage)
+    this.play(); this.inval();
     this.main.ms = true; this.mkTarget(this.main, W, H); this.T = null; this.bind(this.main);
     gl.disable(gl.DEPTH_TEST); gl.disable(gl.CULL_FACE); gl.disable(gl.SCISSOR_TEST);
     gl.clearColor(0, 0, 0, 1); gl.clearStencil(0); gl.stencilMask(0xff); gl.clear(gl.COLOR_BUFFER_BIT | gl.STENCIL_BUFFER_BIT);
@@ -383,8 +405,8 @@ DS.GLW = class GLW {
     return this.ctx;
   }
   // off-screen work done outside begin/end (the sight): send what is batched, leave the context to DS.Post
-  finish() { this.flush(); this.setBlend('source-over'); this.gl.disable(this.gl.BLEND); this.blendOn = false; this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, null); this.T = null; }
-  end() { this.flush(); this.setBlend('source-over'); this.gl.disable(this.gl.BLEND); this.blendOn = false; this.resolve(this.main); this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, null); this.T = null; }   // (blending off: DS.Post draws after)
+  finish() { this.flush(); this.setBlend('source-over'); this.gl.disable(this.gl.BLEND); this.blendOn = false; this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, null); this.T = null; this.play(); }
+  end() { this.flush(); this.setBlend('source-over'); this.gl.disable(this.gl.BLEND); this.blendOn = false; this.resolve(this.main); this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, null); this.T = null; this.play(); }   // (blending off: DS.Post draws after)
   setBlend(op) {
     if (op === this.blend) return;
     this.flush(); const gl = this.gl; this.blend = op;
@@ -419,7 +441,7 @@ DS.GLW = class GLW {
     gl.drawArrays(gl.TRIANGLES, this.put(this.vb, this.nv), this.nv); this.draws++;
     this.nv = 0;
   }
-  atlMips() { const gl = this.gl; for (const pg of this.atlDirty) { this.bind0(pg.t); gl.generateMipmap(gl.TEXTURE_2D); } this.atlDirty.clear(); }
+  atlMips() { const gl = this.rgl; for (const pg of this.atlDirty) { this.rbind(pg.t); gl.generateMipmap(gl.TEXTURE_2D); } this.atlDirty.clear(); }
   // one triangle into the quad batch (solid fills of convex paths, opaque strokes)
   tri3(t, x0, y0, x1, y1, x2, y2, u, v, c) {
     if (t !== this.curTex || this.nv + 3 > this.MAXQ * 6) { this.flush(); this.curTex = t; }
@@ -438,11 +460,12 @@ DS.GLW = class GLW {
   }
   // n vertices into the ring; returns the index of the first
   put(verts, n) {
-    const gl = this.gl;
-    if (n > this.ringN) { this.ringN = Math.max(n, this.ringN * 2); this.ring = this.ringN; }
-    if (this.ring + n > this.ringN) { gl.bufferData(gl.ARRAY_BUFFER, this.ringN * 32, gl.DYNAMIC_DRAW); this.ring = 0; }
-    gl.bufferSubData(gl.ARRAY_BUFFER, this.ring * 32, verts, 0, n * 8);
-    const f = this.ring; this.ring += n; return f;
+    if (!this.fv) {                                            // (not recording: straight into the buffer)
+      const gl = this.gl; gl.bufferData(gl.ARRAY_BUFFER, verts.subarray(0, n * 8), gl.STREAM_DRAW); return 0;
+    }
+    if ((this.fn + n) * 8 > this.fv.length) { const nv = new Float32Array(Math.max(this.fv.length * 2, (this.fn + n) * 8)); nv.set(this.fv.subarray(0, this.fn * 8)); this.fv = nv; }
+    this.fv.set(verts.subarray(0, n * 8), this.fn * 8);
+    const f = this.fn; this.fn += n; return f;
   }
 };
 

@@ -148,6 +148,9 @@ DS.Renderer = class Renderer {
       const g = G.begin(ctx.canvas.width, ctx.canvas.height);
       this.sky(g, cam); mark('sky');
       cam.apply(g); this.backGround(g, cam); mark('ground');
+      this.flora(g, cam, 'back');
+      this.props(g, cam, false); mark('props');
+      this.buildings(g, cam); mark('bld');
       G.end();
       ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
       cam.apply(ctx);
@@ -155,10 +158,10 @@ DS.Renderer = class Renderer {
       this.sky(ctx, cam); mark('sky');
       cam.apply(ctx);
       this.backGround(ctx, cam); mark('ground');
+      this.flora(ctx, cam, 'back');
+      this.props(ctx, cam, false); mark('props');
+      this.buildings(ctx, cam); mark('bld');
     }
-    this.flora(ctx, cam, 'back');
-    this.props(ctx, cam, false); mark('props');
-    this.buildings(ctx, cam); mark('bld');
     w.particles.draw(ctx, cam, 0);
     for (const v of w.vehicles) if (cam.visible(v.pos.x, v.pos.y, 14) && this.shown(v)) this.vehicle(ctx, v, cam);
     mark('veh');

@@ -368,9 +368,15 @@ DS.Structure = class Structure {
     this.chunks = this.chunks.filter(ch => ch.cells.length);
     // tumbling fragments
     const T = W.terrain;
+    // resting fragments in 1 m columns (with many pieces about, looking through all of them for each falling one
+    // grew with the square of the count)
+    const grid = new Map(); let maxW = 0;
+    for (const q of this.pieces) if (q.rest && !q.gone) { const k = Math.floor(q.x); let a = grid.get(k); if (!a) grid.set(k, a = []); a.push(q); if (q.wd > maxW) maxW = q.wd; }
     const supp = p => {                                   // ground (heap included) or a resting fragment under it
       let gy = T.height(p.x) + p.h * 0.35;
-      for (const q of this.pieces) { if (!q.rest || q === p || q.gone || Math.abs(q.x - p.x) > (q.wd + p.wd) * 0.38) continue; const top = q.y + q.h * 0.42 + p.h * 0.4; if (top > gy && top < p.y + 0.3) gy = top; }
+      const reach = (maxW + p.wd) * 0.38, k0 = Math.floor(p.x - reach), k1 = Math.floor(p.x + reach);
+      for (let k = k0; k <= k1; k++) { const a = grid.get(k); if (!a) continue;
+        for (const q of a) { if (q === p || q.gone || !q.rest || Math.abs(q.x - p.x) > (q.wd + p.wd) * 0.38) continue; const top = q.y + q.h * 0.42 + p.h * 0.4; if (top > gy && top < p.y + 0.3) gy = top; } }
       return gy;
     };
     for (const p of this.pieces) {
@@ -383,19 +389,19 @@ DS.Structure = class Structure {
       const gy = supp(p);
       if (p.y < gy) {
         p.y = gy;
-        if (p.src === 'shard' && p.vy < -9 && p.wd > 0.6 && this.budget()) { this.breakShard(W, p, gy); continue; }     // a hard landing breaks a big shard again
+        if (p.src === 'shard' && p.vy < -6 && p.wd > 0.35 && this.budget()) { this.breakShard(W, p, gy); continue; }     // a hard landing breaks a shard again (and its pieces may break again)
         if (p.vy < -2.5) { p.vy *= -0.25; p.vx *= 0.55; p.w *= 0.5; if (p.big && Math.random() < 0.5) W.particles.add(DS.P.DUST, p.x, gy, (Math.random() - 0.5) * 3, Math.random() * 2, 3 + Math.random() * 3, 0.8 + p.w0, { grow: 1, drag: 1, grav: 0, alpha: 0.32, col: 0xc9b79a }); }
         else { p.rest = 1; p.vx = p.vy = 0; p.a = Math.round(p.a / Math.PI) * Math.PI + (Math.random() - 0.5) * 0.5; }
       }
     }
     this.pieces = this.pieces.filter(p => !p.gone);
-    if (this.pieces.length > 460) { const rest = this.pieces.filter(p => p.rest); rest.sort((a, b) => b.wd - a.wd); const keep = new Set(rest.slice(0, 300)); this.pieces = this.pieces.filter(p => !p.rest || keep.has(p)); }
+    if (this.pieces.length > 1200) { const rest = this.pieces.filter(p => p.rest); rest.sort((a, b) => b.wd - a.wd); const keep = new Set(rest.slice(0, 900)); this.pieces = this.pieces.filter(p => !p.rest || keep.has(p)); }
   }
   breakShard(W, p, gy) {
     p.gone = true;
-    const sw = p.img.width, sh = p.img.height, src = { cv: p.img, ox: 0, oy: 0, m: p.wd / sw }, r = (a, b) => a + Math.random() * (b - a), n = 2 + Math.floor(Math.random() * 2), sp = Math.min(6, -p.vy * 0.25);
+    const sw = p.img.width, sh = p.img.height, src = { cv: p.img, ox: 0, oy: 0, m: p.wd / sw }, r = (a, b) => a + Math.random() * (b - a), n = 3 + Math.floor(Math.random() * 3), sp = Math.min(6, -p.vy * 0.25);
     for (let j = 0; j < n; j++) {
-      const f = r(0.4, 0.7), w = sw * f, h = sh * r(0.45, 0.8);
+      const f = r(0.3, 0.6), w = sw * f, h = sh * r(0.35, 0.65);
       this.addShard(W, this.shard(r(0, sw - w), r(0, sh - h), w, h, src), p.x + r(-0.3, 0.3) * p.wd, gy + 0.2, p.vx * 0.5 + r(-sp, sp), r(0.5, sp));
     }
     W.particles.add(DS.P.DUST, p.x, gy, r(-1.5, 1.5), r(0.5, 2), r(4, 7), 0.8 + p.wd * 0.6, { grow: 1, drag: 1, grav: 0, alpha: 0.35, col: 0xc9b79a });
@@ -444,7 +450,7 @@ DS.Structure = class Structure {
     if (!S.cv || sw < 1 || sh < 1) return null;
     const s = Math.min(1, 72 / Math.max(sw, sh)), w = Math.max(2, Math.ceil(sw * s)), h = Math.max(2, Math.ceil(sh * s));
     const c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d');
-    const n = 5 + Math.floor(Math.random() * 3), a0 = Math.random() * 6.28;
+    const n = 6 + Math.floor(Math.random() * 5), a0 = Math.random() * 6.28;           // ragged: 6–10 corners
     x.beginPath();
     for (let j = 0; j < n; j++) {
       const a = a0 + j / n * 6.283 + (Math.random() - 0.5) * 0.6, rr = 0.72 + Math.random() * 0.28;
@@ -460,7 +466,7 @@ DS.Structure = class Structure {
       wd: sh.wd, h: sh.h, big: sh.wd > 0.9, w0: sh.wd * 0.3, rest: 0 });
   }
   // budget: with many fragments about, new ones are made bigger (fewer), and past the cap only dust and grit
-  budget() { const n = this.pieces.length; return n > 420 ? 0 : 1 + n / 140; }
+  budget() { const n = this.pieces.length; return n > 1100 ? 0 : 1 + n / 400; }
   // blocks knocked out of a standing wall: each leaves as a few small shards blown away from the shot
   spillBlocks(W, ks, fromX) {
     const P = W.particles, r = (a, b) => a + Math.random() * (b - a), bs = this.bs, GX = this.GX, bud = this.budget();
@@ -490,8 +496,9 @@ DS.Structure = class Structure {
     if (bud) {
       // split the bay's box at random until each part is down to its drawn target size
       const parts = [], stack = [[cl.sx, cl.sy, cl.sw, cl.sh]];
-      const target = () => { const u = Math.random(); return (u < 0.1 ? r(1.5, 2.5) : u < 0.4 ? r(0.6, 1.2) : r(0.25, 0.6)) * p * bud; };
-      while (stack.length && parts.length < 60) {
+      // mostly small pieces, some mid-sized, the odd slab (metres, before the budget scales them up)
+      const target = () => { const u = Math.random(); return (u < 0.05 ? r(1.0, 1.6) : u < 0.3 ? r(0.45, 0.9) : r(0.12, 0.4)) * p * bud; };
+      while (stack.length && parts.length < 140) {
         const b = stack.pop(), t = target();
         if (b[2] <= t && b[3] <= t) { parts.push(b); continue; }
         if (b[2] >= b[3]) { const f = r(0.3, 0.7); stack.push([b[0], b[1], b[2] * f, b[3]], [b[0] + b[2] * f, b[1], b[2] * (1 - f), b[3]]); }
@@ -506,7 +513,7 @@ DS.Structure = class Structure {
     }
     // a little concrete, rebar and grit from the debris sheet
     const kinds = ['conc2', 'conc4', 'conc6', 'rebar2', 'rebar3', 'grit1', 'grit2'];
-    for (let n = 0; n < Math.round(3 * left); n++) {
+    for (let n = 0; n < Math.round(6 * left); n++) {
       const key = kinds[Math.floor(Math.random() * kinds.length)], I = DS.DEBRIS[key], sz = key.startsWith('grit') ? r(0.5, 0.9) : r(0.3, 0.8), q = at(r(cl.x0, cl.x1), r(cl.y0, cl.y1));
       this.pieces.push({ src: key, x: q.x, y: q.y, vx: (out || (Math.random() < 0.5 ? -1 : 1)) * r(0.5, 7) + vx0, vy: r(-2, 5) + vy0, a: r(-0.5, 0.5), w: r(-5, 5), wd: sz, h: sz * I.h / I.w, big: false, w0: sz * 0.3, rest: 0 });
     }
@@ -749,6 +756,7 @@ Object.assign(DS.Renderer.prototype, {
         x.save(); x.translate(px + ox, py + oy); x.rotate(a); x.drawImage(im, -w / 2, -h / 2, w, h); x.restore(); }
     }
     this._rubPat = this.ctx.createPattern(c, 'repeat');
+    if (this._rubPat) { const P = this._rubPat, st = P.setTransform.bind(P); P._src = c; P.setTransform = M => { P._m = M; st(M); }; }      // (the WebGL renderer tiles the same canvas)
     return this._rubPat;
   },
   loadCity() {

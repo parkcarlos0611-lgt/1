@@ -16,7 +16,7 @@ DS.UI = {
     try { const r = req.call(el, { navigationUI: 'hide' }); if (r && r.catch) r.catch(no); } catch (e) { no(); }
   },
   KEY: 'ds.ui',
-  defaults: { post: 2, resAuto: true, flyFx: true, vol: 0.8, btn: 1, hudFull: false, help: true, touch: 'auto', keys: {}, fpsMode: '60', perf: false, renderer: 'gl' },
+  defaults: { post: 2, resAuto: true, flyFx: true, vol: 0.8, btn: 1, hudFull: false, help: true, touch: 'auto', keys: {}, fpsMode: '60', perf: false, renderer: '2d', rv: 2 },
   // remappable actions: [name, the key the game listens for]
   ACTIONS: [['전진', 'KeyD'], ['후진', 'KeyA'], ['포 올림 · 상승', 'KeyW'], ['포 내림 · 하강', 'KeyS'], ['사격', 'Space'], ['탄종', 'KeyQ'], ['거리측정', 'KeyE'],
     ['표적 선택', 'Backspace'], ['동축 기관총 · 로켓', 'KeyF'], ['미사일 (TOW · 헬파이어)', 'KeyX'], ['조준경 배율', 'KeyV'], ['열상 · 야간 조준경', 'KeyT'],
@@ -108,7 +108,10 @@ Object.assign(DS.Game.prototype, {
     const S = this.ui, $ = s => document.querySelector(s);
     if (this.post && this.post.ok) { this.post.setQuality(S.post); try { localStorage.setItem('ds.post', S.post); } catch (e) {} }
     DS.Perf.mode = S.fpsMode || '60'; if (!!S.perf !== DS.Perf.on) DS.Perf.toggle(!!S.perf);
-    if (this.rend && this.rend.glw) this.rend.glw.enabled = S.renderer !== '2d';
+    // the WebGL renderer is opt-in until every pass has moved over (until then additive glows over GL-drawn
+    // scenery are composited a little differently); saves from before go back to 2D once
+    if (S.rv !== 2) { S.renderer = '2d'; S.rv = 2; DS.UI.save(S); }
+    if (this.rend && this.rend.glw) this.rend.glw.enabled = S.renderer === 'gl';
     DS.T.resAuto = S.resAuto; DS.T.flyFx = S.flyFx !== false; if (!S.resAuto && this.rs !== 1) { this.rs = 1; this.resize(); }
     DS.Audio.vol = S.vol; if (DS.Audio.master && DS.Audio.on) DS.Audio.master.gain.value = S.vol;
     document.documentElement.style.setProperty('--tb', (64 * S.btn).toFixed(0) + 'px');

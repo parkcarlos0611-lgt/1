@@ -30,14 +30,17 @@ DS.GLW = class GLW {
     const VS = `in vec2 a_pos; in vec2 a_uv; in vec4 a_col; uniform vec2 u_res; out vec2 v_uv; out vec4 v_col;
       void main() { v_uv = a_uv; v_col = a_col; gl_Position = vec4(a_pos.x / u_res.x * 2.0 - 1.0, 1.0 - a_pos.y / u_res.y * 2.0, 0.0, 1.0); }`;
     // textured / solid quads (a 1×1 white texture for solids); colour is a premultiplied multiplier
-    this.pTex = mk(VS, `in vec2 v_uv; in vec4 v_col; uniform sampler2D u_tex; out vec4 o; void main() { o = texture(u_tex, v_uv) * v_col; }`);
+    const MASK = `uniform sampler2D u_mask; uniform float u_useMask; float M() { return u_useMask > 0.5 ? texelFetch(u_mask, ivec2(gl_FragCoord.xy), 0).r : 1.0; }`;
+    this.pTex = mk(VS, `in vec2 v_uv; in vec4 v_col; uniform sampler2D u_tex; ${MASK} out vec4 o; void main() { o = texture(u_tex, v_uv, -0.6) * v_col * M(); }        // (mip bias: as sharp as the 2D canvas's high-quality smoothing)`);
+    // clip mask: 1 inside, times the enclosing clip (the previous mask) when there is one
+    this.pMask = mk(VS, `in vec2 v_uv; in vec4 v_col; ${MASK} out vec4 o; void main() { o = vec4(M(), 0.0, 0.0, 1.0); }`);
     // linear gradient: v_uv carries the user-space position; stops premultiplied
-    this.pGrad = mk(VS, `in vec2 v_uv; in vec4 v_col; uniform vec2 u_p0, u_p1; uniform int u_n; uniform float u_off[8]; uniform vec4 u_c[8]; uniform float u_a; out vec4 o;
+    this.pGrad = mk(VS, `in vec2 v_uv; in vec4 v_col; uniform vec2 u_p0, u_p1; uniform int u_n; uniform float u_off[8]; uniform vec4 u_c[8]; uniform float u_a; ${MASK} out vec4 o;
       void main() { vec2 d = u_p1 - u_p0; float t = clamp(dot(v_uv - u_p0, d) / max(dot(d, d), 1e-12), 0.0, 1.0);
         vec4 c = u_c[0];
         for (int i = 1; i < 8; i++) { if (i >= u_n) break; if (t >= u_off[i - 1]) c = mix(u_c[i - 1], u_c[i], clamp((t - u_off[i - 1]) / max(u_off[i] - u_off[i - 1], 1e-6), 0.0, 1.0)); }
         if (t <= u_off[0]) c = u_c[0];
-        o = c * u_a; }`);
+        o = c * u_a * M(); }`);
     this.MAXQ = 4096; this.vb = new Float32Array(this.MAXQ * 6 * 8); this.nv = 0;
     this.buf = gl.createBuffer(); this.vao = gl.createVertexArray();
     gl.bindVertexArray(this.vao); gl.bindBuffer(gl.ARRAY_BUFFER, this.buf); gl.bufferData(gl.ARRAY_BUFFER, this.vb.byteLength, gl.DYNAMIC_DRAW); this.bufLen = this.vb.length;
@@ -47,8 +50,57 @@ DS.GLW = class GLW {
     gl.bindVertexArray(null);
     this.white = this.mkTex(); gl.bindTexture(gl.TEXTURE_2D, this.white); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([255, 255, 255, 255]));
     this.texs = new WeakMap(); this.cols = new Map();
-    this.fbo = null; this.W = 0; this.H = 0;
+    this.fbo = null; this.W = 0; this.H = 0; this.masks = []; this.clipD = 0;
+    this.pMask.noMask = false;
     this.ctx = new DS.GLCtx(this);
+    DS.GLW.trackCanvases();
+  }
+  // the current clip mask (texture unit 3) for a program
+  maskU(u, off) {
+    const gl = this.gl, m = !off && this.clipD > 0 ? this.masks[this.clipD - 1] : null;
+    gl.uniform1f(u.u_useMask, m ? 1 : 0);
+    gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D, m ? m.t : this.white); gl.uniform1i(u.u_mask, 3); gl.activeTexture(gl.TEXTURE0);
+  }
+  // clip: the path's fan triangles (device px) into the stencil of a mask target, covered with the enclosing
+  // mask's value; the new mask becomes current until the matching restore()
+  pushClip(v, n, x0, y0, x1, y1) {
+    this.flush();
+    const gl = this.gl, d = this.clipD, W = this.W, H = this.H;
+    let m = this.masks[d];
+    if (!m || m.w !== W || m.h !== H) {
+      if (!m) m = this.masks[d] = { t: this.mkTex(), f: gl.createFramebuffer() };
+      gl.bindTexture(gl.TEXTURE_2D, m.t); gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, W, H, 0, gl.RED, gl.UNSIGNED_BYTE, null);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, m.f); gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, m.t, 0);
+      gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_STENCIL_ATTACHMENT, gl.RENDERBUFFER, this.rb);
+      m.w = W; m.h = H;
+    }
+    gl.bindFramebuffer(gl.FRAMEBUFFER, m.f); gl.disable(gl.BLEND);
+    gl.clearColor(0, 0, 0, 1); gl.clear(gl.COLOR_BUFFER_BIT);
+    this.ctx.stencilFill(v, n, true);
+    // cover: inside the path the enclosing mask (or 1)
+    gl.stencilFunc(gl.NOTEQUAL, 0, 0xff); gl.stencilOp(gl.ZERO, gl.ZERO, gl.ZERO);
+    const q = this.ctx.tmp; let o = 0;
+    for (const [x, y] of [[x0, y0], [x1, y0], [x1, y1], [x0, y0], [x1, y1], [x0, y1]]) { q[o] = x; q[o + 1] = y; o += 8; }
+    this.tris(this.pMask, q, 6);
+    gl.disable(gl.STENCIL_TEST);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbo); gl.enable(gl.BLEND); this.blend = null; this.setBlend('source-over');
+    this.clipD = d + 1;
+  }
+  popClip(d) { if (this.clipD !== d) { this.flush(); this.clipD = d; } }
+  // every 2D canvas counts its own changes (_v), so a repainted canvas is uploaded again (and only then)
+  static trackCanvases() {
+    if (DS.GLW._tracked) return; DS.GLW._tracked = true;
+    const P = CanvasRenderingContext2D.prototype;
+    for (const k of ['drawImage', 'fillRect', 'fill', 'stroke', 'strokeRect', 'clearRect', 'putImageData', 'fillText', 'strokeText']) {
+      const f = P[k]; P[k] = function () { const c = this.canvas; c._v = (c._v || 0) + 1; return f.apply(this, arguments); };
+    }
+  }
+  // a repeating texture for a pattern's source
+  texRep(img) {
+    const r = this.tex(img);
+    if (!r.rep) { const gl = this.gl; gl.bindTexture(gl.TEXTURE_2D, r.t); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT); r.rep = true; }
+    return r;
   }
   mkTex() {
     const gl = this.gl, t = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t);
@@ -68,6 +120,8 @@ DS.GLW = class GLW {
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false); gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
     try { gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img); } catch (e) { /* unreadable image: stays blank */ }
     gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+    // mipmaps: a big picture drawn small is filtered as the 2D canvas's smoothing does (no shimmer or jaggies)
+    if (w > 1 && h > 1) { gl.generateMipmap(gl.TEXTURE_2D); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR); }
     r.v = v; r.w = w; r.h = h;
     return r;
   }
@@ -105,7 +159,7 @@ DS.GLW = class GLW {
     gl.clearColor(0, 0, 0, 1); gl.clearStencil(0); gl.stencilMask(0xff); gl.clear(gl.COLOR_BUFFER_BIT | gl.STENCIL_BUFFER_BIT);
     gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA); this.blend = 'source-over';
     gl.disable(gl.STENCIL_TEST);
-    this.curTex = null; this.nv = 0; this.draws = 0;
+    this.curTex = null; this.nv = 0; this.draws = 0; this.clipD = 0;
     this.ctx.reset(W, H);
     return this.ctx;
   }
@@ -126,7 +180,7 @@ DS.GLW = class GLW {
   flush() {
     if (!this.nv) return;
     const gl = this.gl, P = this.pTex;
-    gl.useProgram(P.p); gl.uniform2f(P.u.u_res, this.W, this.H);
+    gl.useProgram(P.p); gl.uniform2f(P.u.u_res, this.W, this.H); this.maskU(P.u);
     gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, this.curTex); gl.uniform1i(P.u.u_tex, 0);
     gl.bindVertexArray(this.vao); gl.bindBuffer(gl.ARRAY_BUFFER, this.buf);
     gl.bufferSubData(gl.ARRAY_BUFFER, 0, this.vb, 0, this.nv * 8);
@@ -138,7 +192,7 @@ DS.GLW = class GLW {
   tris(prog, verts, n, setU) {
     this.flush();
     const gl = this.gl;
-    gl.useProgram(prog.p); gl.uniform2f(prog.u.u_res, this.W, this.H); if (setU) setU(prog.u);
+    gl.useProgram(prog.p); gl.uniform2f(prog.u.u_res, this.W, this.H); this.maskU(prog.u, prog.noMask); if (setU) setU(prog.u);
     gl.bindVertexArray(this.vao); gl.bindBuffer(gl.ARRAY_BUFFER, this.buf);
     if (n * 8 > this.bufLen) { this.bufLen = Math.max(n * 8, this.bufLen * 2); gl.bufferData(gl.ARRAY_BUFFER, this.bufLen * 4, gl.DYNAMIC_DRAW); }
     gl.bufferSubData(gl.ARRAY_BUFFER, 0, verts, 0, n * 8);
@@ -156,11 +210,25 @@ DS.GLCtx = class GLCtx {
     this.globalAlpha = 1; this.globalCompositeOperation = 'source-over';
     this.fillStyle = '#000'; this.strokeStyle = '#000'; this.lineWidth = 1; this.lineCap = 'butt'; this.lineJoin = 'miter';
     this.imageSmoothingEnabled = true; this.imageSmoothingQuality = 'low'; this.filter = 'none';
-    this.path = []; this.sub = null;
+    this.path = []; this.sub = null; this.dash = null;
   }
   // ---- state ----
-  save() { this.stack.push([this.m.slice(), this.globalAlpha, this.globalCompositeOperation, this.fillStyle, this.strokeStyle, this.lineWidth, this.lineCap, this.lineJoin]); }
-  restore() { const s = this.stack.pop(); if (!s) return; [this.m, this.globalAlpha, this.globalCompositeOperation, this.fillStyle, this.strokeStyle, this.lineWidth, this.lineCap, this.lineJoin] = s; }
+  save() { this.stack.push([this.m.slice(), this.globalAlpha, this.globalCompositeOperation, this.fillStyle, this.strokeStyle, this.lineWidth, this.lineCap, this.lineJoin, this.dash, this.r.clipD]); }
+  restore() { const s = this.stack.pop(); if (!s) return; let d; [this.m, this.globalAlpha, this.globalCompositeOperation, this.fillStyle, this.strokeStyle, this.lineWidth, this.lineCap, this.lineJoin, this.dash, d] = s; this.r.popClip(d); }
+  setLineDash(a) { this.dash = a && a.length ? a.slice() : null; }
+  getLineDash() { return this.dash ? this.dash.slice() : []; }
+  createPattern(img) { return new DS.GLPat(img); }
+  clip() {
+    const subs = this.path.filter(s => s.length >= 6); const R = this.r;
+    let n = 0, v = this.tmp, x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+    const push = (x, y) => { if (n * 8 + 8 > v.length) { const nv = new Float32Array(v.length * 2); nv.set(v); this.tmp = v = nv; } v[n * 8] = x; v[n * 8 + 1] = y; n++; };
+    for (const s of subs) {
+      for (let i = 2; i + 3 < s.length; i += 2) { push(s[0], s[1]); push(s[i], s[i + 1]); push(s[i + 2], s[i + 3]); }
+      for (let i = 0; i < s.length; i += 2) { x0 = Math.min(x0, s[i]); x1 = Math.max(x1, s[i]); y0 = Math.min(y0, s[i + 1]); y1 = Math.max(y1, s[i + 1]); }
+    }
+    if (!n) { x0 = y0 = x1 = y1 = -10; }              // an empty clip: nothing is drawn until restore
+    R.pushClip(v, n, Math.floor(x0) - 1, Math.floor(y0) - 1, Math.ceil(x1) + 1, Math.ceil(y1) + 1);
+  }
   setTransform(a, b, c, d, e, f) { if (typeof a === 'object') { const M = a; this.m = [M.a, M.b, M.c, M.d, M.e, M.f]; } else this.m = [a, b, c, d, e, f]; }
   getTransform() { const m = this.m; return { a: m[0], b: m[1], c: m[2], d: m[3], e: m[4], f: m[5] }; }
   resetTransform() { this.m = [1, 0, 0, 1, 0, 0]; }
@@ -188,6 +256,16 @@ DS.GLCtx = class GLCtx {
     const R = this.r; R.setBlend(this.globalCompositeOperation);
     if (typeof this.fillStyle === 'string') {
       R.quad(R.white, this.X(x, y), this.Y(x, y), this.X(x + w, y), this.Y(x + w, y), this.X(x + w, y + h), this.Y(x + w, y + h), this.X(x, y + h), this.Y(x, y + h), 0, 0, 1, 1, this.solid(this.fillStyle));
+    } else if (this.fillStyle instanceof DS.GLPat || (typeof CanvasPattern !== 'undefined' && this.fillStyle instanceof CanvasPattern)) {
+      // pattern: tiled in the pattern's space (its own transform, as set on the 2D pattern, times the user space)
+      const P = this.fillStyle, img = P.img || P._src; if (!img) return;
+      const t = R.texRep(img), pm = P.m || (P._m ? [P._m.a, P._m.b, P._m.c, P._m.d, P._m.e, P._m.f] : [1, 0, 0, 1, 0, 0]);
+      const det = pm[0] * pm[3] - pm[1] * pm[2] || 1e-12, U = (px, py) => { const qx = px - pm[4], qy = py - pm[5]; return [(pm[3] * qx - pm[2] * qy) / det / t.w, (-pm[1] * qx + pm[0] * qy) / det / t.h]; };
+      const c = [this.globalAlpha, this.globalAlpha, this.globalAlpha, this.globalAlpha], a = U(x, y), b = U(x + w, y), cc = U(x + w, y + h), d = U(x, y + h);
+      R.flush(); R.curTex = t.t;
+      const vb = R.vb; let o = R.nv * 8;
+      const Pt = (px, py, uv) => { vb[o] = this.X(px, py); vb[o + 1] = this.Y(px, py); vb[o + 2] = uv[0]; vb[o + 3] = uv[1]; vb[o + 4] = c[0]; vb[o + 5] = c[1]; vb[o + 6] = c[2]; vb[o + 7] = c[3]; o += 8; };
+      Pt(x, y, a); Pt(x + w, y, b); Pt(x + w, y + h, cc); Pt(x, y, a); Pt(x + w, y + h, cc); Pt(x, y + h, d); R.nv += 6; R.flush();
     } else this.gradQuad(this.fillStyle, [[x, y], [x + w, y], [x + w, y + h], [x, y + h]]);
   }
   clearRect() { /* the world target is cleared once at the start of the frame */ }
@@ -241,8 +319,25 @@ DS.GLCtx = class GLCtx {
     let n = 0, v = this.tmp, x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
     const grow = () => { const nv = new Float32Array(v.length * 2); nv.set(v); this.tmp = v = nv; };
     const tri = (ax, ay, bx, by, cx, cy) => { if ((n + 3) * 8 > v.length) grow(); for (const [x, y] of [[ax, ay], [bx, by], [cx, cy]]) { v[n * 8] = x; v[n * 8 + 1] = y; n++; } };
+    const sc = Math.sqrt(Math.abs(m[0] * m[3] - m[1] * m[2])), dash = this.dash ? this.dash.map(d => d * sc) : null, dl = dash ? dash.reduce((p, q) => p + q, 0) : 0;
     for (const s of this.path) {
-      const pts = s.closed ? s.concat([s[0], s[1]]) : s;
+      let pts = s.closed ? s.concat([s[0], s[1]]) : s;
+      if (dash && dl > 0) {                                // split into the dashes (device px along the line)
+        const out = []; let pos = 0;
+        for (let i = 0; i + 3 < pts.length; i += 2) {
+          const ax = pts[i], ay = pts[i + 1], bx = pts[i + 2], by = pts[i + 3], L = Math.hypot(bx - ax, by - ay); let u = 0;
+          while (u < L) {
+            let ph = pos % dl, k = 0; while (ph >= dash[k]) { ph -= dash[k]; k = (k + 1) % dash.length; }
+            const step = Math.min(L - u, dash[k] - ph);
+            if (k % 2 === 0) out.push([ax + (bx - ax) * u / L, ay + (by - ay) * u / L, ax + (bx - ax) * (u + step) / L, ay + (by - ay) * (u + step) / L]);
+            u += step; pos += step;
+          }
+        }
+        for (const [ax, ay, bx, by] of out) { const L = Math.hypot(bx - ax, by - ay); if (L < 1e-6) continue; const nx = -(by - ay) / L * hw, ny = (bx - ax) / L * hw;
+          tri(ax + nx, ay + ny, bx + nx, by + ny, bx - nx, by - ny); tri(ax + nx, ay + ny, bx - nx, by - ny, ax - nx, ay - ny);
+          x0 = Math.min(x0, ax - hw, bx - hw); x1 = Math.max(x1, ax + hw, bx + hw); y0 = Math.min(y0, ay - hw, by - hw); y1 = Math.max(y1, ay + hw, by + hw); }
+        continue;
+      }
       for (let i = 0; i + 3 < pts.length; i += 2) {
         const ax = pts[i], ay = pts[i + 1], bx = pts[i + 2], by = pts[i + 3], L = Math.hypot(bx - ax, by - ay); if (L < 1e-6) continue;
         const nx = -(by - ay) / L * hw, ny = (bx - ax) / L * hw;
@@ -282,6 +377,10 @@ DS.GLCtx = class GLCtx {
     }
     gl.disable(gl.STENCIL_TEST);
   }
+};
+DS.GLPat = class GLPat {
+  constructor(img) { this.img = img; this.m = [1, 0, 0, 1, 0, 0]; }
+  setTransform(M) { this.m = M ? [M.a, M.b, M.c, M.d, M.e, M.f] : [1, 0, 0, 1, 0, 0]; }
 };
 DS.GLGrad = class GLGrad {
   constructor(x0, y0, x1, y1) { this.x0 = x0; this.y0 = y0; this.x1 = x1; this.y1 = y1; this.stops = []; }

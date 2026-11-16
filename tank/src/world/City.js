@@ -576,7 +576,7 @@ DS.Structure = class Structure {
     const key = this.glass ? 'b' : 'a';
     if (!this.face || this.faceKey !== key) {
       const c = this.face || (this.face = document.createElement('canvas')); c.width = im.width; c.height = im.height;
-      const x = c.getContext('2d'); x.drawImage(im, 0, 0); this.faceKey = key;
+      const x = c.getContext('2d'); x.drawImage(im, 0, 0); this.faceKey = key; c._dirty = 'all'; c._dtrack = true;
       for (const o of this.ops) this.paint(x, o);
       const sk = this.skin || (this.skin = document.createElement('canvas')); sk.width = im.width; sk.height = im.height;
       const y = sk.getContext('2d'); y.drawImage(im, 0, 0); for (const o of this.ops) if (o.t === 'soot' || o.t === 'streak') this.paint(y, o);
@@ -584,7 +584,20 @@ DS.Structure = class Structure {
     }
     return this.face;
   }
-  op(o) { this.ops.push(o); if (this.face) { this.paint(this.face.getContext('2d'), o); if (o.t === 'soot' || o.t === 'streak') this.paint(this.skin.getContext('2d'), o); this.faceVer++; } }
+  op(o) { this.ops.push(o); if (this.face) { this.paint(this.face.getContext('2d'), o); this.dirty(this.face, o); if (o.t === 'soot' || o.t === 'streak') this.paint(this.skin.getContext('2d'), o); this.faceVer++; } }
+  // the part of the face an operation changed (sprite px), gathered until the GPU copy is refreshed: WebGL then
+  // uploads only that rectangle, not the whole face (a collapse paints hundreds of these)
+  dirty(cv, o) {
+    let x0, y0, x1, y1;
+    if (o.t === 'clr') { x0 = y0 = 1e9; x1 = y1 = -1e9; const walk = a => { if (typeof a[0] === 'number') { for (let i = 0; i + 1 < a.length; i += 2) { x0 = Math.min(x0, a[i]); x1 = Math.max(x1, a[i]); y0 = Math.min(y0, a[i + 1]); y1 = Math.max(y1, a[i + 1]); } } else for (const q of a) if (q && typeof q === 'object') { if (q.x != null) { x0 = Math.min(x0, q.x); x1 = Math.max(x1, q.x); y0 = Math.min(y0, q.y); y1 = Math.max(y1, q.y); } else walk(q); } }; walk(o.pts || []); }
+    else if (o.t === 'hole') { const bs = this.bs, cx = (o.k % this.GX + 0.5) * bs, cy = (((o.k / this.GX) | 0) + 0.5) * bs; x0 = cx - bs; x1 = cx + bs; y0 = cy - bs; y1 = cy + bs; }
+    else if (o.t === 'soot') { x0 = o.x - o.r; x1 = o.x + o.r; y0 = o.y - o.r; y1 = o.y + o.r; }
+    else if (o.t === 'streak') { const yc = o.y - o.h * 0.45; x0 = o.x - o.w; x1 = o.x + o.w; y0 = yc - o.h; y1 = yc + o.h; }
+    if (!(x1 >= x0)) { cv._dirty = 'all'; return; }
+    const d = cv._dirty; if (d === 'all') return;
+    x0 = Math.floor(x0) - 2; y0 = Math.floor(y0) - 2; x1 = Math.ceil(x1) + 2; y1 = Math.ceil(y1) + 2;
+    cv._dirty = d ? [Math.min(d[0], x0), Math.min(d[1], y0), Math.max(d[2], x1), Math.max(d[3], y1)] : [x0, y0, x1, y1];
+  }
   soot(lx, ly, r, a) { this.op({ t: 'soot', x: (lx + this.w / 2) * this.ppm, y: this.D.h - ly * this.ppm, r: r * this.ppm, a }); }
   paint(x, o) {
     x.save();

@@ -135,6 +135,8 @@ DS.Renderer = class Renderer {
   frame(ctx = this.ctx, cam = this.w.cam, opt = { main: true }) {
     const w = this.w;
     this.cam = cam; this.opt = opt;
+    { const env = w.env || {}, sun = env.sun, side = sun ? (sun.ex != null ? (sun.ex >= 0 ? 1 : -1) : sun.side) : 1;      // the sun on the smoke
+      w.particles.setLight(side, (env.night || 0) > 0.6 ? 2 : sun && sun.el < 14 ? 1 : 0); }
     if (this.glw) this.glw.scope = opt.main ? '' : opt.thermal ? ':t' : ':s';      // GL layers: one set per view
     if (opt.thermal) return this.thermalFrame(ctx, cam, opt);
     // pass timings for the performance overlay (main view only)

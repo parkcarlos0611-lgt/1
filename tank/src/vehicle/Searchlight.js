@@ -99,15 +99,20 @@ DS.Searchlight = {
       // light does not go into the ground: clip to what is above the surface
       { const T = world.terrain, st = Math.max(1, 4 / cam.zoom), a = cam.left - 2, b2 = cam.right + 2; ctx.beginPath(); ctx.moveTo(a, cam.top + 50);
         for (let x = a; x <= b2; x += st) ctx.lineTo(x, T.height(x) - 0.05); ctx.lineTo(b2, cam.top + 50); ctx.closePath(); ctx.clip(); }
-      // three nested cones, each wider and fainter: a soft-edged beam
-      for (const [wk, ak] of [[1, 1], [1.8, 0.45], [3, 0.18]]) {
-        const w0 = 0.12 * wk, w1 = Math.max(w0, D * S.half * wk);
-        const g = ctx.createLinearGradient(B.x, B.y, ex, ey);
-        g.addColorStop(0, `rgba(${c},${Math.min(1, air * 2.2 * ak)})`); g.addColorStop(0.06, `rgba(${c},${air * 1.4 * ak})`);
-        g.addColorStop(0.3, `rgba(${c},${air * 0.45 * ak})`); g.addColorStop(1, `rgba(${c},${air * 0.06 * ak})`);
-        ctx.fillStyle = g; ctx.beginPath();
-        ctx.moveTo(B.x + nx * w0, B.y + ny * w0); ctx.lineTo(ex + nx * w1, ey + ny * w1); ctx.lineTo(ex - nx * w1, ey - ny * w1); ctx.lineTo(B.x - nx * w0, B.y - ny * w0); ctx.closePath(); ctx.fill();
-      }
+      // the beam: soft round stamps of light laid along the axis, each as wide as the beam is there and overlapping
+      // the last by more than half — the overlaps add up to a smooth fall-off across and along the beam, with no
+      // edges between layers (it used to be three nested cones, which showed as bands)
+      { const P = world.particles, spr = P.sprite(nv ? 0xdcffdc : 0xfff6dc), half = D * S.half;
+        let t = 0, n = 0;
+        while (t < 1 && n < 900) {
+          const w = 0.3 + half * t * 1.5, x = B.x + B.dx * D * t, y = B.y + B.dy * D * t;
+          t += w * 0.5 / D; n++;
+          if (!cam.visible(x, y, w)) continue;
+          const f = 0.25 + 1.4 * Math.exp(-t * 9) + 0.35 * (1 - t);        // bright near the lamp, a long faint throw
+          ctx.globalAlpha = Math.min(1, air * 1.5 * f);
+          ctx.drawImage(spr, x - w, y - w, w * 2, w * 2);
+        }
+        ctx.globalAlpha = 1; }
       // where it lands: a pool of light (dimmer the farther the throw)
       if (D < S.L - 1) {
         const r = Math.max(1.5, D * S.half * 1.6), a = Math.min(0.85, (nv ? 1.1 : 0.7) * (300 / (D + 300)));

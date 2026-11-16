@@ -37,8 +37,15 @@ DS.Post = class Post {
         s += (texture(t, uv + d).rgb + texture(t, uv - d).rgb) * 0.316;
         s += (texture(t, uv + 2.0 * d).rgb + texture(t, uv - 2.0 * d).rgb) * 0.07;
         o = vec4(s, 1.0); }`);
+    // light shafts (god rays): the blurred bright pass marched toward the sun with decay — bright sky seen past
+    // clouds, dust, ridges and buildings streams out from the sun across the picture
+    this.pRays = prog(`in vec2 uv; out vec4 o; uniform sampler2D t, world; uniform vec2 sun;
+      vec3 B(vec2 p) { vec4 ov = texture(t, p); vec3 c = ov.rgb + texture(world, p).rgb * (1.0 - ov.a); float l = dot(c, vec3(0.3, 0.55, 0.15)); return c * smoothstep(0.55, 0.95, l) * smoothstep(0.38, 0.62, p.y); }     // (the sky only: lit sand is not a light source)
+      void main() { vec2 d = (sun - uv) / 32.0, p = uv; float w = 1.0; vec3 s = vec3(0.0);
+        for (int i = 0; i < 32; i++) { s += B(p) * w; w *= 0.94; p += d; }
+        o = vec4(s / 12.0, 1.0); }`);
     this.pComp = prog(`in vec2 uv; out vec4 o;
-      uniform sampler2D scene, bloom, world; uniform vec2 res; uniform float time, bloomK, hazeK, horizon, hit, grain;
+      uniform sampler2D scene, bloom, world, rays; uniform float raysK; uniform vec3 raysCol; uniform vec2 res; uniform float time, bloomK, hazeK, horizon, hit, grain;
       uniform vec4 hot[16]; uniform int nHot; uniform vec4 wave[8]; uniform int nWave;
       uniform vec3 lift, gain; uniform float sat, contrast, vig; uniform float sharp;
       float h21(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
@@ -76,6 +83,7 @@ DS.Post = class Post {
           c = clamp(c + sharp * 2.0 * (c - (n0 + n1 + n2 + n3) * 0.25), mn, mx); }
         vec3 bl = texture(bloom, suv).rgb * bloomK;
         c = 1.0 - (1.0 - c) * (1.0 - min(bl, vec3(1.0)));                // screen blend: glows, never clips flat
+        if (raysK > 0.001) c = 1.0 - (1.0 - c) * (1.0 - min(texture(rays, suv).rgb * raysCol * raysK, vec3(1.0)));
         // grade: lift / gain, contrast, saturation
         c = lift + c * (gain - lift);
         c = (c - 0.5) * contrast + 0.5;
@@ -154,8 +162,12 @@ DS.Post = class Post {
       this.pass(this.pBlur, B, bw, bh, u => { this.bind(0, A.t, u.t); gl.uniform2f(u.d, (1 + k) / bw, 0); });
       this.pass(this.pBlur, A, bw, bh, u => { this.bind(0, B.t, u.t); gl.uniform2f(u.d, 0, (1 + k) / bh); });
     }
+    // light shafts toward the sun (high quality only)
+    const R = P.rays, rk = this.q === 2 && R && R[2] > 0.01 ? R[2] : 0; let rt = this.black;
+    if (rk) { const C = this.target(2, bw, bh); this.pass(this.pRays, C, bw, bh, u => { this.bind(0, scene, u.t); this.bind(1, wt, u.world); gl.uniform2f(u.sun, R[0], R[1]); }); rt = C.t; }
     this.pass(this.pComp, null, W, H, u => {
-      this.bind(0, scene, u.scene); this.bind(1, A.t, u.bloom); this.bind(2, wt, u.world);
+      this.bind(0, scene, u.scene); this.bind(1, A.t, u.bloom); this.bind(2, wt, u.world); this.bind(3, rt, u.rays);
+      gl.uniform1f(u.raysK, rk); gl.uniform3f(u.raysCol, R ? R[3] : 1, R ? R[4] : 1, R ? R[5] : 1);
       gl.uniform2f(u.res, W, H); gl.uniform1f(u.time, P.time); gl.uniform1f(u.bloomK, P.bloom);
       gl.uniform1f(u.hazeK, P.haze); gl.uniform1f(u.horizon, H - P.horizon); gl.uniform1f(u.hit, P.hit); gl.uniform1f(u.grain, P.grain); gl.uniform1f(u.sharp, P.sharp || 0);
       const hot = this._hot || (this._hot = new Float32Array(64)), nh = Math.min(16, P.hot.length);

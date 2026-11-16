@@ -70,7 +70,8 @@ DS.GLW = class GLW {
     };
     const VS = `in vec2 a_pos; in vec2 a_uv; in vec4 a_col; uniform vec2 u_res; out vec2 v_uv; out vec4 v_col;
       void main() { v_uv = a_uv; v_col = a_col; gl_Position = vec4(a_pos.x / u_res.x * 2.0 - 1.0, 1.0 - a_pos.y / u_res.y * 2.0, 0.0, 1.0); }`;
-    const MASK = `uniform sampler2D u_mask; uniform float u_useMask; float M() { return u_useMask > 0.5 ? texelFetch(u_mask, ivec2(gl_FragCoord.xy), 0).r : 1.0; }`;
+    // (clips are in the stencil: no mask texture is sampled — a sampler left bound to unit 3 could form a feedback loop with the layer being drawn)
+    const MASK = `float M() { return 1.0; }`;
     // textured / solid quads (a 1×1 white texture for solids); colour is a premultiplied multiplier. Mip bias
     // -0.6: as sharp as the 2D canvas's high-quality smoothing; grey: the 'grayscale()' filter
     this.pTex = mk(VS, `in vec2 v_uv; in vec4 v_col; uniform sampler2D u_tex; uniform float u_bias, u_gray; ${MASK} out vec4 o;
@@ -375,6 +376,25 @@ DS.GLW = class GLW {
       return r;
     }
     if (!r || r.pg) { r = { t: this.mkTex() }; M.set(img, r); }
+    // a canvas that says which part changed (a building's face): only that rectangle goes up
+    const d = img._dtrack && img._dirty;
+    if (d && d !== 'all' && r.w === w && r.h === h && r.v != null) {
+      const x0 = Math.max(0, d[0]), y0 = Math.max(0, d[1]), x1 = Math.min(w, d[2]), y1 = Math.min(h, d[3]);
+      img._dirty = null; r.v = v;
+      if (x1 > x0 && y1 > y0) {
+        this.rbind(r.t);
+        try {
+          gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false); gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
+          gl.pixelStorei(gl.UNPACK_SKIP_PIXELS, x0); gl.pixelStorei(gl.UNPACK_SKIP_ROWS, y0);
+          this.upN = (this.upN || 0) + 1; this.upPx = (this.upPx || 0) + (x1 - x0) * (y1 - y0);
+          gl.texSubImage2D(gl.TEXTURE_2D, 0, x0, y0, x1 - x0, y1 - y0, gl.RGBA, gl.UNSIGNED_BYTE, img);
+        } catch (e) { img._dtrack = false; }               // (not supported here: whole uploads from now on)
+        gl.pixelStorei(gl.UNPACK_SKIP_PIXELS, 0); gl.pixelStorei(gl.UNPACK_SKIP_ROWS, 0); gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+        if (w > 1 && h > 1) gl.generateMipmap(gl.TEXTURE_2D);
+      }
+      return r;
+    }
+    if (img._dtrack) img._dirty = null;
     this.rbind(r.t);
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false); gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
     this.upN = (this.upN || 0) + 1; this.upPx = (this.upPx || 0) + w * h;
@@ -669,7 +689,7 @@ DS.GLCtx = class GLCtx {
       tri(ax + nx, ay + ny, bx + nx, by + ny, bx - nx, by - ny); tri(ax + nx, ay + ny, bx - nx, by - ny, ax - nx, ay - ny);
       x0 = Math.min(x0, ax - hw, bx - hw); x1 = Math.max(x1, ax + hw, bx + hw); y0 = Math.min(y0, ay - hw, by - hw); y1 = Math.max(y1, ay + hw, by + hw);
     };
-    const disc = (cx, cy) => { const k = Math.max(6, Math.min(20, Math.ceil(hw * 1.5))); for (let i = 0; i < k; i++) { const a = i / k * 6.2832, b = (i + 1) / k * 6.2832; tri(cx, cy, cx + Math.cos(a) * hw, cy + Math.sin(a) * hw, cx + Math.cos(b) * hw, cy + Math.sin(b) * hw); } };
+    const disc = (cx, cy) => { const k = Math.max(6, Math.min(16, Math.ceil(hw * 1.2))); for (let i = 0; i < k; i++) { const a = i / k * 6.2832, b = (i + 1) / k * 6.2832; tri(cx, cy, cx + Math.cos(a) * hw, cy + Math.sin(a) * hw, cx + Math.cos(b) * hw, cy + Math.sin(b) * hw); } };
     const dash = this.dash ? this.dash.map(d => d * sc) : null, dl = dash ? dash.reduce((p, q) => p + q, 0) : 0;
     for (const s of this.path) {
       const pts = s.closed ? s.concat([s[0], s[1]]) : s;
@@ -688,7 +708,14 @@ DS.GLCtx = class GLCtx {
         continue;
       }
       for (let i = 0; i + 3 < pts.length; i += 2) seg(pts[i], pts[i + 1], pts[i + 2], pts[i + 3]);
-      if (round) for (let i = 0; i < pts.length; i += 2) disc(pts[i], pts[i + 1]);
+      // round caps and joins: invisible on a line under ~2.5 px, and a straight-on joint needs none — discs only at the
+      // ends and where the line turns by more than ~8°
+      if (round && hw > 1.2) for (let i = 0; i < pts.length; i += 2) {
+        const end = !s.closed && (i === 0 || i === pts.length - 2);
+        if (!end && i >= 2 && i + 3 < pts.length) { const ax = pts[i] - pts[i - 2], ay = pts[i + 1] - pts[i - 1], bx = pts[i + 2] - pts[i], by = pts[i + 3] - pts[i + 1];
+          const cr = ax * by - ay * bx, dt = ax * bx + ay * by; if (dt > 0 && Math.abs(cr) < 0.14 * dt) continue; }
+        disc(pts[i], pts[i + 1]);
+      }
     }
     if (!n) return;
     // opaque solid: overlaps between the pieces cannot show, so they go straight into the batch

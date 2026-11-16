@@ -377,6 +377,13 @@ DS.Effects = class Effects {
       P.add(K.DUST, hit.x + this.rnd(-1, 1), hit.y + this.rnd(0, 2), Math.cos(a) * sp, Math.sin(a) * sp, this.rnd(4, 9), this.rnd(0.6, 1.4),
         { grow: this.rnd(0.6, 1.3), drag: 0.9, grav: 0, alpha: 0.32, col: sc });
     }
+    // the dust that hangs on after the plume has fallen: a few big slow puffs that spread, drift with the wind and
+    // thin out over a quarter of a minute (a ground strike only)
+    if (!hit.onArmor) for (let i = 0; i < (heat ? 12 : 9); i++) {
+      const s = this.rnd(-1, 1);
+      P.add(K.DUST, hit.x + s * this.rnd(0.5, 2.5), hit.y + this.rnd(0.3, 2.2), s * this.rnd(0.3, 1.6), this.rnd(0.2, 1.2), this.rnd(12, 22), this.rnd(1.3, 2.4),
+        { grow: this.rnd(0.35, 0.7), drag: 0.6, grav: 0, alpha: this.rnd(0.18, 0.28), col: Math.random() < 0.5 ? sc : sc2 });
+    }
     if (heat) {
       this.fireball(hit.x, hit.y + 0.6, 9, 1.2, 9, 0x2e2a26, 4.5, 0.6); this.sparks(hit.x, hit.y + 0.3, 30, 40, Math.PI / 2, 2.4); this.comets(hit.x, hit.y + 0.3, 3, 20);
       this.flashes.push({ x: hit.x, y: hit.y + 0.5, dx: 0, dy: 1, t: 0, ttl: 0.07, boom: true }); this.glow(hit.x, hit.y + 1, 14, 0.6, 0.45);
@@ -460,6 +467,11 @@ DS.Effects = class Effects {
     if (!air) for (let i = 0; i < Math.round(26 * k) + 4; i++) {    // ground surge rolling out both ways
       const s = Math.random() < 0.5 ? 1 : -1;
       P.add(K.DUST, x + s * r(0, 3), gy + r(0.3, 1.8), s * r(8, 30), r(0.2, 3), r(7, 14), r(2, 4), { grow: r(1.4, 2.8), drag: 1.0, grav: 0, alpha: 0.36, col: sc });
+    }
+    // a low curtain of dust that lingers over the crater long after the column has come down
+    if (!air) for (let i = 0; i < Math.round(14 * k) + 4; i++) {
+      const s = Math.random() < 0.5 ? 1 : -1;
+      P.add(K.DUST, x + s * r(1, 9), gy + r(0.5, 3.5), s * r(0.4, 2.5), r(0.2, 1.2), r(18, 30), r(2.5, 4.5), { grow: r(0.4, 0.9), drag: 0.5, grav: 0, alpha: r(0.2, 0.3), col: Math.random() < 0.5 ? sc : sc2 });
     }
     // fireball boiling up into black-brown smoke, burning fragments trailing smoke, a shower of sparks
     this.fireball(x, y + 1, Math.round(16 * k) + 5, 2.6, 16, 0x2a2521, 6, 0.7);

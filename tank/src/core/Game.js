@@ -351,6 +351,9 @@ DS.Game = class Game {
       haze: night > 0.4 ? 0 : sun ? (storm ? 0.25 : 0.35 + 0.65 * (1 - low)) : 0.3, horizon: hz, hot, waves, hit,
       grain: night > 0.4 ? 0.045 : 0.022, vig: 0.38, lift, gain, sat, contrast,
       world: GW ? GW.color : null, overlayAbove: !!GW,
+      // light shafts: the sun's place in the picture (as the sky paints it), strongest low in the sky, warm at dawn and dusk
+      rays: (() => { if (!sun || sun.el < -3 || night > 0.5) return null; const ex = sun.ex != null ? sun.ex : sun.side * 0.8;
+        return [0.5 + 0.4 * ex, 1 - Math.max(0.08, 0.47 - sun.el / 75), (storm ? 0.28 : 0.18 + 0.5 * low) * (1 - night * 1.6), 1, 0.9 - 0.15 * low, 0.75 - 0.3 * low]; })(),
       sharp: (() => { const k = this.cv.width / Math.max(1, innerWidth * Math.min(2, devicePixelRatio || 1)); return k < 0.97 ? Math.min(0.6, (1 - k) * 1.6) : 0; })(),
     });
     if (GW) this.sightComposite();

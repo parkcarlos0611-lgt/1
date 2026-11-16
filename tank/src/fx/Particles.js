@@ -80,15 +80,20 @@ DS.Particles = class Particles {
     }
     return (this.sprites[key] = m);
   }
+  // the light on the clouds (set each frame from the sky): side −1/1 the sun's side, tone 0 day, 1 low warm sun,
+  // 2 night (barely lit) — the lit flank and the shaded underside of every puff follow it
+  setLight(side, tone) { this.lside = side < 0 ? -1 : 1; this.ltone = tone; }
   puff(col, v) {
-    const key = 'p' + col + '/' + v; let s = this.sprites[key]; if (s) return s;
+    const sd = this.lside || 1, tn = this.ltone || 0;
+    const key = 'p' + col + '/' + v + '/' + sd + tn; let s = this.sprites[key]; if (s) return s;
     const S = 96; s = document.createElement('canvas'); s.width = s.height = S;
     const c = s.getContext('2d');
     c.drawImage(this.mask(v), 0, 0); c.globalCompositeOperation = 'source-in';
     c.fillStyle = '#' + col.toString(16).padStart(6, '0'); c.fillRect(0, 0, S, S);
     c.globalCompositeOperation = 'source-atop';
-    const g = c.createLinearGradient(S * 0.3, S * 0.15, S * 0.6, S * 0.9);
-    g.addColorStop(0, 'rgba(255,250,235,0.26)'); g.addColorStop(0.5, 'rgba(255,250,235,0)'); g.addColorStop(1, 'rgba(20,14,8,0.34)');
+    const lx = sd > 0 ? 0.72 : 0.28, g = c.createLinearGradient(S * lx, S * 0.12, S * (1 - lx * 0.6), S * 0.92);
+    const hl = tn === 2 ? 'rgba(170,180,210,0.07)' : tn === 1 ? 'rgba(255,214,160,0.34)' : 'rgba(255,250,235,0.28)';
+    g.addColorStop(0, hl); g.addColorStop(0.5, 'rgba(255,250,235,0)'); g.addColorStop(1, tn === 2 ? 'rgba(10,10,16,0.42)' : 'rgba(20,14,8,0.36)');
     c.fillStyle = g; c.fillRect(0, 0, S, S);
     return (this.sprites[key] = s);
   }
@@ -125,9 +130,22 @@ DS.Particles = class Particles {
         }
         ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round';
       }
-      for (let i = 0; i < this.n; i++) {
-        const k = this.kind[i];
+      // WebGL: the puff pass (made first, into its own layer) notes which of the other particles are in view, and
+      // the full-resolution pass that follows walks only those
+      const RL = this.rl || (this.rl = [{ a: new Int32Array(1024), len: 0 }, { a: new Int32Array(1024), len: 0 }]), L = RL[layer];
+      if (sel === 'puffs' && pass === 0) { L.len = 0; L.cam = cam; L.cx = cam.x; L.cy = cam.y; L.cz = cam.zoom; L.n = this.n; }
+      const useL = sel === 'rest' && L.cam === cam && L.cx === cam.x && L.cy === cam.y && L.cz === cam.zoom && L.n === this.n;
+      const NN = useL ? L.len : this.n;
+      for (let jj = 0; jj < NN; jj++) {
+        const i = useL ? L.a[jj] : jj, k = this.kind[i];
         if (only != null && k !== only) continue;
+        if (sel === 'puffs') {
+          const speck = k === P.GRAIN || k === P.DEBRIS, ad = k === P.FIRE || k === P.SPARK;
+          if (speck || ad || k === P.FLAME) {
+            if (cam.visible(this.x[i], this.y[i], this.size[i] + 2)) { if (L.len >= L.a.length) { const na = new Int32Array(L.a.length * 2); na.set(L.a); L.a = na; } L.a[L.len++] = i; }
+            if (speck || ad) continue;
+          }
+        }
         const add = k === P.FIRE || k === P.SPARK;
         if (k !== P.FLAME && add !== (pass === 1)) continue;
         if (glowOnly && pass === 0) continue;

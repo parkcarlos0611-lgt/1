@@ -700,15 +700,18 @@ DS.GLCtx = class GLCtx {
           const ax = pts[i], ay = pts[i + 1], bx = pts[i + 2], by = pts[i + 3], L = Math.hypot(bx - ax, by - ay);
           // only the part on the target is cut into dashes (a flight path kilometres long made tens of thousands
           // of them and stalled the GPU); off it the dash phase just moves on
-          const cl = this.clipSeg(ax, ay, bx, by, hw + 2); if (!cl) { pos += L; continue; }
-          let u = cl[0] * L; pos += u; const uEnd = cl[1] * L;
-          while (u < uEnd) {
-            let ph = pos % dl, k = 0; while (ph >= dash[k]) { ph -= dash[k]; k = (k + 1) % dash.length; }
-            const step = Math.min(uEnd - u, dash[k] - ph);
+          const cl = this.clipSeg(ax, ay, bx, by, hw + 2); if (!cl) { pos = (pos + L) % dl; continue; }
+          let u = cl[0] * L; pos = (pos + u) % dl; const uEnd = cl[1] * L;
+          // the phase is kept within one pattern (a long flight path summed to a huge pos, and a phase a rounding
+          // error short of a dash end gave a zero step: the loop never moved on and the game froze); every step
+          // moves at least a thousandth of a pixel, and the count is capped
+          for (let guard = 0; u < uEnd && guard < 8192; guard++) {
+            let ph = pos, k = 0; while (ph >= dash[k] && k < 64) { ph -= dash[k]; k++; } k %= dash.length;
+            const step = Math.min(uEnd - u, Math.max(1e-3, dash[k] - ph));
             if (k % 2 === 0) seg(ax + (bx - ax) * u / L, ay + (by - ay) * u / L, ax + (bx - ax) * (u + step) / L, ay + (by - ay) * (u + step) / L);
-            u += step; pos += step;
+            u += step; pos = (pos + step) % dl;
           }
-          pos += L - uEnd;
+          pos = (pos + L - uEnd) % dl;
         }
         continue;
       }

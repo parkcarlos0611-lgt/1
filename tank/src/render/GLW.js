@@ -697,24 +697,29 @@ DS.GLCtx = class GLCtx {
       if (dash && dl > 0) {                                // split into the dashes (device px along the line)
         let pos = 0;
         for (let i = 0; i + 3 < pts.length; i += 2) {
-          const ax = pts[i], ay = pts[i + 1], bx = pts[i + 2], by = pts[i + 3], L = Math.hypot(bx - ax, by - ay); let u = 0;
-          while (u < L) {
+          const ax = pts[i], ay = pts[i + 1], bx = pts[i + 2], by = pts[i + 3], L = Math.hypot(bx - ax, by - ay);
+          // only the part on the target is cut into dashes (a flight path kilometres long made tens of thousands
+          // of them and stalled the GPU); off it the dash phase just moves on
+          const cl = this.clipSeg(ax, ay, bx, by, hw + 2); if (!cl) { pos += L; continue; }
+          let u = cl[0] * L; pos += u; const uEnd = cl[1] * L;
+          while (u < uEnd) {
             let ph = pos % dl, k = 0; while (ph >= dash[k]) { ph -= dash[k]; k = (k + 1) % dash.length; }
-            const step = Math.min(L - u, dash[k] - ph);
+            const step = Math.min(uEnd - u, dash[k] - ph);
             if (k % 2 === 0) seg(ax + (bx - ax) * u / L, ay + (by - ay) * u / L, ax + (bx - ax) * (u + step) / L, ay + (by - ay) * (u + step) / L);
             u += step; pos += step;
           }
+          pos += L - uEnd;
         }
         continue;
       }
-      for (let i = 0; i + 3 < pts.length; i += 2) seg(pts[i], pts[i + 1], pts[i + 2], pts[i + 3]);
+      for (let i = 0; i + 3 < pts.length; i += 2) { const cl = this.clipSeg(pts[i], pts[i + 1], pts[i + 2], pts[i + 3], hw + 2); if (cl) seg(pts[i] + (pts[i + 2] - pts[i]) * cl[0], pts[i + 1] + (pts[i + 3] - pts[i + 1]) * cl[0], pts[i] + (pts[i + 2] - pts[i]) * cl[1], pts[i + 1] + (pts[i + 3] - pts[i + 1]) * cl[1]); }
       // round caps and joins: invisible on a line under ~2.5 px, and a straight-on joint needs none — discs only at the
       // ends and where the line turns by more than ~8°
       if (round && hw > 1.2) for (let i = 0; i < pts.length; i += 2) {
         const end = !s.closed && (i === 0 || i === pts.length - 2);
         if (!end && i >= 2 && i + 3 < pts.length) { const ax = pts[i] - pts[i - 2], ay = pts[i + 1] - pts[i - 1], bx = pts[i + 2] - pts[i], by = pts[i + 3] - pts[i + 1];
           const cr = ax * by - ay * bx, dt = ax * bx + ay * by; if (dt > 0 && Math.abs(cr) < 0.14 * dt) continue; }
-        disc(pts[i], pts[i + 1]);
+        if (this.clipSeg(pts[i], pts[i + 1], pts[i], pts[i + 1] + 0.01, hw + 2)) disc(pts[i], pts[i + 1]);
       }
     }
     if (!n) return;
@@ -725,6 +730,16 @@ DS.GLCtx = class GLCtx {
     R.flush();
     this.stencilFill(v, n, false);
     this.cover(x0, y0, x1, y1, this.strokeStyle);
+  }
+  // the part of a segment (device px) inside the target grown by m: [t0, t1] along it, or null (Liang–Barsky)
+  clipSeg(ax, ay, bx, by, m) {
+    const T = this.T(), x0 = -m, y0 = -m, x1 = (T.W || this.canvas.width) + m, y1 = (T.H || this.canvas.height) + m, dx = bx - ax, dy = by - ay;
+    let t0 = 0, t1 = 1;
+    for (const [p, q] of [[-dx, ax - x0], [dx, x1 - ax], [-dy, ay - y0], [dy, y1 - ay]]) {
+      if (p === 0) { if (q < 0) return null; continue; }
+      const r = q / p; if (p < 0) { if (r > t1) return null; if (r > t0) t0 = r; } else { if (r < t0) return null; if (r < t1) t1 = r; }
+    }
+    return t1 > t0 ? [t0, t1] : null;
   }
   stencilFill(v, n, nonzero) {
     const R = this.r, gl = R.gl, D = Math.min(3, this.T().clipD | 0) << 6;

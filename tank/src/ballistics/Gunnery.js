@@ -42,8 +42,10 @@ DS.Gunnery = {
     const r = world.rng || Math.random, F = this.fcs(v), W = this.wear(v), gs = v.gun;
     const move = Math.min(1, Math.abs(v.vt || 0) / 10);
     const sd = Math.hypot(this.dispMil(A) * F.disp * W.d, 0.12 + 0.25 * move);          // round + jump (+ on the move)
+    const lay = (v.wounds && v.wounds.gunner ? 0.25 : 0) + (v.opticsBroken ? 0.35 : 0);              // wounded gunner, auxiliary sight
+    const sdA = Math.hypot(sd, lay);
     const bend = this.bendMil(v) - (gs.mrsComp || 0);                                  // what the MRS has not taken out
-    const da = (this.gauss(r) * sd + bend) / 1000;
+    const da = (this.gauss(r) * sdA + bend) / 1000;
     return { da, v0: this.v0(v, A, world) * (1 + this.gauss(r) * 0.0025) };
   },
   // after the shot: the tube heats and wears

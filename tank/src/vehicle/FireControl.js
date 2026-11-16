@@ -46,6 +46,10 @@ DS.FireControl = {
   update(world, v, doLase) {
     const fc = v.fc;
     if (fc.indirect) { fc.se = 0; return; }           // howitzer laid by elevation: no sight-line correction
+    if (doLase && v.opticsBroken && v.def.sight.laser) {          // the laser sits in the broken sight head
+      if (v === world.vehicles[0] && window.__game) window.__game.toast('레이저 거리측정기 고장 — 조준경 헤드 파손');
+      doLase = false;
+    }
     if (doLase) {
       const r = this.lase(world, v);
       fc.lasedAt = world.time;

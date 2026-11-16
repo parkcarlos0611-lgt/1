@@ -295,7 +295,7 @@ DS.Vehicle = class Vehicle {
     const G = this.def.gun, gs = this.gun, A = DS.AMMO[gs.ammo];
     const S = DS.Gunnery.shot(this, A, world), v0 = S.v0, v0r = A.launchMass * v0 * 1.75 / G.recoilMass;     // (dispersion, bend, charge temperature, wear: src/ballistics/Gunnery.js)
     gs.rv = -v0r; gs.aB = v0r * v0r / (2 * G.recoilLen);
-    gs.reload = G.reload; gs.fired++; this.lastFired = world.time; if (G.eject) gs.ejectT = G.eject.at;
+    gs.reload = G.reload * (this.wounds && this.wounds.loader ? 1.5 : 1); gs.fired++; this.lastFired = world.time; if (G.eject) gs.ejectT = G.eject.at;
     if (G.autoloader) this.events.push({ type: 'autoload' });
     if (G.pod) { gs.pod = (gs.pod == null ? G.pod : gs.pod) - 1; if (gs.pod <= 0) { gs.pod = G.pod; gs.reload = G.podReload; gs.podChange = true; } else gs.podChange = false; }
     const m = this.muzzle(), da = S.da * this.dir, cd = Math.cos(da), sd = Math.sin(da), ux = m.dx * cd - m.dy * sd, uy = m.dx * sd + m.dy * cd;
@@ -354,7 +354,7 @@ DS.Vehicle = class Vehicle {
         const mx = 1.6 * dt; m.el += Math.max(-mx, Math.min(mx, want - m.el));
       }
       m.cool -= dt;
-      if (this.input.mgFire && this.alive && m.rounds > 0 && m.flip === 0 && m.cool <= 0) {
+      if (this.input.mgFire && this.alive && !this.mgBroken && m.rounds > 0 && m.flip === 0 && m.cool <= 0) {
         m.cool += 1 / D.rate; if (m.cool < 0) m.cool = 0; m.rounds--; m.n++;
         const q = this.mgMuzzle(); this.shootBullet(world, q.x, q.y, q.a, DS.AMMO[D.ammo], D.spread, m.n, true);
       }
@@ -422,8 +422,10 @@ DS.Vehicle = class Vehicle {
   crewAlive() { return this.def.modules.filter(m => m.type === 'crew' && !this.modState[m.id]).length; }
 
   // apply damage to a module (or 'track'); returns a short description for the hit log
-  damage(id, at) {
-    const rnd = Math.random;
+  // how: 'crit' (a crewman badly wounded: out of action, not killed) or the fragment energy that reached the
+  // module (0–1: a glancing fragment sets stowed rounds off less often)
+  damage(id, at, how) {
+    const rnd = Math.random, k = typeof how === 'number' ? 0.4 + 0.6 * how : 1;
     if (this.god) return '피해 없음 (무적)';
     if (id === 'track') {
       if (!this.trackBroken) { this.trackBroken = true; this.chain = DS.TrackChain.create(this, at ? at.x : this.pos.x, at ? at.y : this.pos.y - 1); this.events.push({ type: 'trackSnap', x: at ? at.x : this.pos.x, y: at ? at.y : this.pos.y - 1 }); }
@@ -435,22 +437,45 @@ DS.Vehicle = class Vehicle {
     let out = m.name + ' 피해';
     switch (m.type) {
       case 'crew':
-        out = m.name + ' 전사';
+        out = m.name + (how === 'crit' ? ' 중상 (전투 불능)' : ' 전사');
         if (id === 'driver') this.mobile = false;
         if (id === 'gunner' && this.modState.commander) this.firepower = false;
         if (this.crewAlive() <= 1 || (this.modState.gunner && this.modState.commander)) { this.knockOut('승무원 전투 불능'); out += ' → 승무원 전투 불능'; }
         break;
       case 'tow': this.towBroken = true; out += ' → TOW 사용 불가'; break;
       case 'gun': case 'optics': this.firepower = false; out += ' → 화력 불능'; break;
-      case 'engine': this.mobile = false; out += ' → 기동 불능'; if (rnd() < 0.2) { this.ignite(); out += ', 화재'; } break;
-      case 'fuel': if (rnd() < 0.45) { this.ignite(); out += ' → 화재'; } break;
-      case 'ammo': if (rnd() < 0.5) { this.cookoff(); out += ' → 탄약 유폭'; } else { this.ignite(); out += ' → 장약 화재'; } break;
-      case 'fuel_ammo': if (rnd() < 0.6) { this.cookoff(); out += ' → 탄약 유폭'; } else { this.ignite(); out += ' → 화재'; } break;
-      case 'ammo_carousel': if (rnd() < 0.8) { this.cookoff(); out += ' → 탄약 유폭, 포탑 이탈'; } else { this.ignite(); out += ' → 장약 화재'; } break;
+      case 'engine': this.mobile = false; out += ' → 기동 불능'; if (rnd() < 0.2) out += this.fire2('engine'); break;
+      case 'fuel': if (rnd() < 0.45) out += ' →' + this.fire2('fuel'); break;
+      case 'ammo': if (rnd() < 0.5 * k) { this.cookoff(); out += ' → 탄약 유폭'; } else if (rnd() < 0.7) { this.ignite(); out += ' → 장약 화재'; } break;
+      case 'fuel_ammo': if (rnd() < 0.6 * k) { this.cookoff(); out += ' → 탄약 유폭'; } else { this.ignite(); out += ' → 화재'; } break;
+      case 'ammo_carousel': if (rnd() < 0.8 * Math.max(0.7, k)) { this.cookoff(); out += ' → 탄약 유폭, 포탑 이탈'; } else { this.ignite(); out += ' → 장약 화재'; } break;
       case 'ammo_bustle': this.firepower = false; this.vent = 3.5; out += ' → 방폭 패널 배출 (승무원 생존)'; break;
     }
     this.setStatus();
     return out;
+  }
+  // an engine or fuel fire: a Halon system (M1A1, Challenger, Bradley) puts most of them out — once or twice
+  fire2(what) {
+    if (this.halon == null) this.halon = { m1a1: 2, challenger1: 1, m2a2: 1 }[this.def.id] || 0;
+    if (this.halon > 0) { this.halon--; if (Math.random() < 0.85) return ' 화재 → 자동 소화 장치 작동, 진화'; }
+    this.ignite(); return ' 화재';
+  }
+  // a crewman hurt but still at his post (a second wound puts him out of action): loaders load slower, gunners
+  // lay less steadily (src/ballistics/Gunnery.js, src/ai/TankAI.js)
+  wound(id) {
+    const m = this.mod(id); if (!m || this.modState[id] || this.god) return '';
+    const W = this.wounds || (this.wounds = {});
+    if (W[id]) return this.damage(id, null, 'crit');
+    W[id] = 1; this.setStatus(); return m.name + ' 부상';
+  }
+  // outside equipment struck (H5): sight head, searchlight, machine gun, gun tube
+  extDamage(id) {
+    if (this.god) return '';
+    if (id === 'optics') { if (this.opticsBroken) return ''; this.opticsBroken = true; this.setStatus(); return '조준경 헤드 파손 → 예비 조준경 (레이저 불능)'; }
+    if (id === 'lamp') { if (this.lampBroken) return ''; this.lampBroken = true; this.light = 0; return '탐조등 파손'; }
+    if (id === 'mg') { if (this.mgBroken) return ''; this.mgBroken = true; return '기관총 파손'; }
+    if (id === 'barrel') { if (this.barrelHit) return ''; this.barrelHit = true; this.firepower = false; this.setStatus(); return '포신 피격 → 주포 사용 불가'; }
+    return '';
   }
   setStatus() {
     if (this.wreck) this.status = '유폭 격파';
@@ -459,7 +484,7 @@ DS.Vehicle = class Vehicle {
     else if (!this.mobile && !this.firepower) this.status = '기동·화력 불능';
     else if (!this.mobile) this.status = '기동 불능';
     else if (!this.firepower) this.status = '화력 불능';
-    else this.status = this.crewAlive() < this.def.modules.filter(m => m.type === 'crew').length ? '승무원 부상' : '정상';
+    else this.status = this.crewAlive() < this.def.modules.filter(m => m.type === 'crew').length ? '승무원 전투 불능' : this.wounds && Object.keys(this.wounds).length ? '승무원 부상' : this.opticsBroken ? '조준경 파손' : '정상';
   }
   knockOut(reason) { this.diedAt = this.diedAt || this.simT; this.alive = false; this.koReason = reason; this.input.drive = 0; this.input.fire = false; this.setStatus(); }
   ignite() {

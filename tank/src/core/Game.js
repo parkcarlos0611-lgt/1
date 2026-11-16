@@ -640,8 +640,9 @@ DS.Game = class Game {
       if (l.ground) return `<div class="e"><b>지면 착탄</b> ${Math.round(l.range)} m · ${l.ammo.short}</div>`;
       if (l.blast) return `<div class="e"><span class="tag trk">폭압</span> ${l.vehicle === this.player ? '<b class="me">피격</b> ' : ''}<b>${l.vehicle.label}</b> · ${l.direct ? '직격' : '폭발 중심에서 ' + l.dist.toFixed(1) + ' m'} · ${l.ammo.short} → ${l.effects.join(', ')}<i>${l.vehicle.status}</i></div>`;
       const [t, c] = RES[l.result];
-      let nums = l.result === 'ricochet' ? `경사 ${l.obl.toFixed(0)}°` : `${Math.round(l.pen)} / ${Math.round(l.prot)} mm · 경사 ${l.obl.toFixed(0)}°`;
-      if (this.sbx) nums += ` · 착탄 ${Math.round(l.speed)} m/s · 실효 두께 ${Math.round(l.los)} mm` + (l.resid != null ? ` · 잔여 ${Math.round(l.resid)} mm` : '');   // range: full numbers
+      let nums = l.obl == null ? '' : l.result === 'ricochet' ? `경사 ${l.obl.toFixed(0)}°` : `${Math.round(l.pen)} / ${Math.round(l.prot)} mm · 경사 ${l.obl.toFixed(0)}°`;
+      if (l.layers && l.layers.length > 1) nums += ' · ' + l.layers.slice(1).map(L => `${L.name} ${L.prot}${L.stop ? ' 정지' : L.exit ? ' 이탈' : ' 관통'}`).join(' → ');
+      if (this.sbx && l.speed) nums += ` · 착탄 ${Math.round(l.speed)} m/s · 실효 두께 ${Math.round(l.los)} mm` + (l.resid != null ? ` · 잔여 ${Math.round(l.resid)} mm` : '');   // range: full numbers
       const fx = l.effects && l.effects.length ? ' → ' + l.effects.join(', ') : '';
       const who = l.vehicle === this.player ? `<b class="me">피격</b> ${l.shooter ? l.shooter.label + ' → ' : ''}` : '';
       return `<div class="e"><span class="tag ${c}">${t}</span> ${who}<b>${l.vehicle.label}</b> · ${Math.round(l.range)} m · ${l.plate} · ${l.ammo.short} ${nums}${fx}` +

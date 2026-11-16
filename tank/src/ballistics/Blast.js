@@ -23,6 +23,8 @@ DS.Blast = {
       } else {
         const pt = (direct || d < B.kill ? 1 : 1 - 0.75 * (d - B.kill) / (B.r - B.kill)) * (B.small ? 0.5 : 1);
         if (rnd() < pt) fx.push(v.damage('track', { x: Math.max(v.pos.x - half, Math.min(v.pos.x + half, x)), y: v.pos.y - 1.2 }));
+        // H5: fragments shred what sits outside — sight head, searchlight, machine gun — the nearer the burst, the likelier
+        for (const e of DS.Armor.ext(v)) { const de = Math.hypot(e.x - x, e.y - y); if (de < B.r * 0.8 && rnd() < (1 - de / (B.r * 0.8)) * (B.small ? 0.4 : 0.7)) { const t = v.extDamage(e.id); if (t) fx.push(t); } }
         const ext = v.def.modules.filter(m => m.type === 'gun' || m.type === 'optics' || (light && m.type === 'crew'));
         if (ext.length && rnd() < (light ? 0.5 : 0.25) * (1 - d / B.r + 0.3)) fx.push(v.damage(ext[Math.floor(rnd() * ext.length)].id));
         if (!fx.length) fx.push('흔들림 — 피해 없음');

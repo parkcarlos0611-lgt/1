@@ -42,8 +42,16 @@ DS.World = class World {
     }
     if (ai && ai.observe) ai.observe({ x: h.hit.x, hitVehicle: h.hit.v });
     if (h.hit.v === this.vehicles[0]) this.playerHitAt = this.time;
+    // H5: a round into the gun tube wrecks the gun (and stops there)
+    if (h.hit.barrel) {
+      p.alive = false; const v = h.hit.v, r = { vehicle: v, plate: '포신', part: 'turret', ammo: p.ammo, range: Math.abs(h.hit.x - p.x0), result: 'pen', x: h.hit.x, y: h.hit.y, effects: [v.extDamage('barrel') || '포신 (이미 손상)'], t: p.t, shooter: p.owner };
+      this.fx.sparks(h.hit.x, h.hit.y, 30, 30); this.fx.flashes.push({ x: h.hit.x, y: h.hit.y, dx: 0, dy: 1, t: 0, ttl: 0.06, boom: true });
+      this.addLog(r); return;
+    }
     const r = DS.Armor.resolve(this, p, h.hit);
-    r.t = p.t; r.shooter = p.owner; { const sp = Math.hypot(p.vx, p.vy) || 1; r.shotDx = p.vx / sp; r.shotDy = p.vy / sp; }
+    r.t = p.t; r.shotDx = 0; r.shooter = p.owner; { const sp = Math.hypot(p.vx, p.vy) || 1; r.shotDx = p.vx / sp; r.shotDy = p.vy / sp; }
+    // H5: a strike close to the sight head, the searchlight or the machine gun breaks it, whatever the armour did
+    for (const e of DS.Armor.ext(h.hit.v)) if (Math.hypot(e.x - h.hit.x, e.y - h.hit.y) < e.r && this.rng() < 0.8) { const t = h.hit.v.extDamage(e.id); if (t) r.effects.push(t); }
     this.fx.armor(r);
     this.addLog(r);
     if (p.owner && p.owner === this.vehicles[0] && DS.HitCam) DS.HitCam.start(this, p, r);
@@ -51,6 +59,10 @@ DS.World = class World {
       p.x = r.reflect.x; p.y = r.reflect.y; p.vx = r.reflect.vx; p.vy = r.reflect.vy;
       p.ignore = h.hit.v; p.ignoreT = 0.05;
       if (p.ammo.type === 'HEAT') { /* fuze graze: keeps flying, detonates on the next surface */ }
+    } else if (r.exit) {
+      // H1: through and out of the far side — the rod flies on, slower (it may strike something behind)
+      const k = Math.sqrt(r.exit.keep); p.x = r.exit.x; p.y = r.exit.y; p.vx *= k; p.vy *= k; p.ignore = h.hit.v; p.ignoreT = 0.1;
+      this.fx.sparks(r.exit.x, r.exit.y, 18, 25);
     } else {
       p.alive = false;
       if (p.ammo.type === 'HEAT') this.fx.impact({ x: h.hit.x, y: h.hit.y, vx: p.vx, vy: p.vy, ammo: p.ammo, onArmor: true });

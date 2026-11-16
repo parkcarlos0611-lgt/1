@@ -101,6 +101,15 @@ DS.HitCam = {
       const bw = W - 20, mx = Math.max(r.pen, r.prot) * 1.1, pw = bw * r.pen / mx, qw = bw * r.prot / mx;
       x.fillStyle = 'rgba(160,200,235,0.25)'; x.fillRect(10, H - 18, qw, 4); x.fillStyle = rc; x.fillRect(10, H - 11, pw * Math.min(1, t / 1.2), 4);
     }
+    // the layers it went through (H1): plate, protection against what was left of the round
+    if (r.layers && r.layers.length > 1 && after > 0.6) {
+      x.font = '600 10px ui-monospace, monospace'; x.textAlign = 'left'; let yy = 50;
+      for (const L of r.layers.slice(0, 4)) { x.fillStyle = L.stop ? '#9fc4e8' : L.exit ? '#ffb070' : '#ffd9cf'; x.fillText(`${L.name} ${L.prot} ← ${L.pen}${L.stop ? ' 정지' : L.exit ? ' 이탈' : ''}`, 10, yy); yy += 13; }
+    }
+    if (r.over && after > 0.6) { x.font = '600 10px ui-monospace, monospace'; x.textAlign = 'left'; x.fillStyle = '#ffe2a0'; x.fillText('오버매치 (얇은 판)', 10, H - 40); }
+    if (r.scab && after > 0.6) { x.font = '600 10px ui-monospace, monospace'; x.textAlign = 'left'; x.fillStyle = '#ffe2a0'; x.fillText('내부 박리 (HESH)', 10, H - 40); }
+    if (r.exit && after > 0.4) { const u = Math.min(1, (after - 0.4) / 0.8), q = v.toLocal(r.exit.x, r.exit.y), [ex, ey] = P(q.x, q.y), [fx, fy] = P(q.x + C.dx * 4 * u, q.y + C.dy * 4 * u);
+      x.strokeStyle = 'rgba(255,200,120,0.85)'; x.lineWidth = 1.5; x.setLineDash([3, 3]); x.beginPath(); x.moveTo(hx, hy); x.lineTo(ex, ey); x.lineTo(fx, fy); x.stroke(); x.setLineDash([]); }
     x.textAlign = 'right'; x.fillStyle = '#9fb8cc';
     x.fillText(`경사 ${Math.round(r.obl || 0)}° · ${Math.round(r.range || 0)} m`, W - 10, 18);
     if (after > 0.9 && r.effects && r.effects.length) { x.fillStyle = '#ffd9cf'; x.fillText(r.effects.slice(0, 2).join(' · ').slice(0, 46), W - 10, 34); }

@@ -154,7 +154,7 @@ DS.Renderer = class Renderer {
       this.flora(g, cam, 'back');
       this.props(g, cam, false); mark('props');
       this.buildings(g, cam); mark('bld');
-      w.particles.draw(g, cam, 0);
+      this.particlesGL(g, cam, 0);
       for (const v of w.vehicles) if (cam.visible(v.pos.x, v.pos.y, 14) && this.shown(v)) this.vehicle(g, v, cam);
       mark('veh');
       this.terrain(g, cam);
@@ -165,7 +165,7 @@ DS.Renderer = class Renderer {
       this.traces(g, cam);
       w.fx.drawCases(g);
       this.projectiles(g, cam);
-      w.particles.draw(g, cam, 1); mark('fx');
+      this.particlesGL(g, cam, 1); mark('fx');
       this.atmosphere(g, cam, opt);
       w.fx.drawFlashes(g); mark('atmo');
       G.end(); G.setPhase(null);
@@ -189,7 +189,7 @@ DS.Renderer = class Renderer {
       this.flora(ctx, cam, 'back');
       this.props(ctx, cam, false); mark('props');
       this.buildings(ctx, cam); mark('bld');
-      w.particles.draw(ctx, cam, 0);
+      if (ctx.canvas._gl && this.glw) this.particlesGL(ctx, cam, 0); else w.particles.draw(ctx, cam, 0);
       for (const v of w.vehicles) if (cam.visible(v.pos.x, v.pos.y, 14) && this.shown(v)) this.vehicle(ctx, v, cam);
       mark('veh');
     }
@@ -201,7 +201,7 @@ DS.Renderer = class Renderer {
     this.traces(ctx, cam);
     w.fx.drawCases(ctx);
     this.projectiles(ctx, cam);
-    w.particles.draw(ctx, cam, 1); mark('fx');
+    if (ctx.canvas._gl && this.glw) this.particlesGL(ctx, cam, 1); else w.particles.draw(ctx, cam, 1); mark('fx');
     this.atmosphere(ctx, cam, opt);
     w.fx.drawFlashes(ctx); mark('atmo');
     if (opt.main) {
@@ -215,9 +215,23 @@ DS.Renderer = class Renderer {
   }
   // WebGL pre phase: the passes that build layers, in the order the frame uses them, against a context that draws
   // nothing (GLW.layer hands the frame the made layers afterwards)
+  // WebGL: the soft clouds of smoke and dust (most of the overdraw when buildings come down) are drawn into a
+  // half-resolution layer — they are blurred by nature — and laid on; specks, fire and sparks stay full resolution
+  particlesGL(ctx, cam, layer) {
+    const cv = ctx.canvas, m = ctx.getTransform(), lw = Math.ceil(cv.width / 2), lh = Math.ceil(cv.height / 2);
+    const o = this.glw.layer('ptc' + layer, lw, lh), L = o.canvas;
+    if (!(o instanceof DS.GLNull)) {
+      o.setTransform(1, 0, 0, 1, 0, 0); o.globalAlpha = 1; o.globalCompositeOperation = 'source-over'; o.clearRect(0, 0, lw, lh);
+      o.setTransform(m.a / 2, m.b / 2, m.c / 2, m.d / 2, m.e / 2, m.f / 2);
+      L._n = this.w.particles.draw(o, cam, layer, null, false, 'puffs');
+    }
+    if (L._n) { ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over'; ctx.drawImage(L, 0, 0, lw, lh, 0, 0, cv.width, cv.height); ctx.restore(); }
+    if (!(ctx instanceof DS.GLNull)) this.w.particles.draw(ctx, cam, layer, null, false, 'rest');
+  }
   glPrepass(n, cam, opt) {
     const w = this.w, env = w.env || {};
     cam.apply(n);
+    this.particlesGL(n, cam, 0); this.particlesGL(n, cam, 1);
     for (const v of w.vehicles) if (cam.visible(v.pos.x, v.pos.y, 14) && this.shown(v)) { const a = this.charA(v); if (a) this.charred(n, v, cam, a); }
     n.save(); this.shadows(n, cam); n.restore();
     this.fog(n, cam);

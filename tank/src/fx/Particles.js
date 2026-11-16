@@ -108,10 +108,14 @@ DS.Particles = class Particles {
 
   // layer: 0 = behind vehicles, 1 = front
   // only: one kind; glowOnly: just the light-emitting part (a FLAME's fire, not the smoke it turns into)
-  draw(ctx, cam, layer, only, glowOnly) {
+  // sel (WebGL): 'puffs' — only the soft clouds (smoke, dust, the smoke of flames), for a half-resolution layer;
+  // 'rest' — everything else (specks, fire, sparks), at full resolution. Returns how many puffs were drawn.
+  draw(ctx, cam, layer, only, glowOnly, sel) {
     const P = DS.P, pz = 1.2 / cam.zoom;
     if (!this.bk) this.bk = new Map();
+    let nPuff = 0;
     for (let pass = 0; pass < 2; pass++) {
+      if (pass === 1 && sel === 'puffs') break;
       if (pass === 1) {
         for (const b of this.bk.values()) {
           if (!b.xy.length) continue;
@@ -127,6 +131,7 @@ DS.Particles = class Particles {
         const add = k === P.FIRE || k === P.SPARK;
         if (k !== P.FLAME && add !== (pass === 1)) continue;
         if (glowOnly && pass === 0) continue;
+        if (sel && pass === 0) { const speck = k === P.GRAIN || k === P.DEBRIS; if ((sel === 'puffs') === speck) continue; }
         const front = k === P.GRAIN || k === P.DEBRIS || add || k === P.FLAME || (this.rot[i] > 3.14);
         if ((layer === 1) !== front) continue;
         const t = this.life[i] / this.ttl[i], sz = this.size[i], x = this.x[i], y = this.y[i];
@@ -144,7 +149,7 @@ DS.Particles = class Particles {
         } else if (k === P.FLAME) {
           const v = ((this.rot[i] * 7) | 0) & 3;
           if (pass === 0) {                      // the smoke it turns into
-            const a = this.alpha[i] * Math.min(1, Math.max(0, (t - 0.1) * 4)) * (1 - t) * 1.25; if (a < 0.01) continue;
+            const a = this.alpha[i] * Math.min(1, Math.max(0, (t - 0.1) * 4)) * (1 - t) * 1.25; if (a < 0.01) continue; nPuff++;
             ctx.globalAlpha = a; ctx.drawImage(this.puff(this.col[i], v), x - sz, y - sz, sz * 2, sz * 2);
           } else {                               // the fire, gone by a third of its life
             const f = 1 - t / 0.34; if (f <= 0) continue;
@@ -157,6 +162,7 @@ DS.Particles = class Particles {
           else if (k === P.HEAT) a *= Math.sin(Math.PI * t);
           else a *= Math.min(1, t * 8) * (1 - t);
           if (a < 0.004) continue;
+          if (pass === 0) nPuff++;
           ctx.globalAlpha = a;
           const v = ((this.rot[i] * 7) | 0) & 3;
           const im = k === P.HEAT ? this.sprite(this.col[i]) : k === P.FIRE ? this.flame(this.col[i], v) : this.puff(this.col[i], v);
@@ -165,5 +171,6 @@ DS.Particles = class Particles {
       }
     }
     ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+    return nPuff;
   }
 };

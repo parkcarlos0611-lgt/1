@@ -313,6 +313,8 @@ DS.Game = class Game {
   postFrame(dt) {
     const P = this.post, w = this.world, cam = w.cam, env = w.env || {}, dpr = cam.dpr;
     const GW = this.rend.glActive ? this.rend.glw : null;
+    // with the GL renderer the 2D canvas holds only marks and text: it is shown above the GL picture
+    if (this._ovAbove !== !!GW) { this._ovAbove = !!GW; this.cv.style.zIndex = GW ? '1' : ''; if (P.cv) P.cv.style.zIndex = GW ? '0' : ''; }
     if (!P.ok || (!P.q && !GW)) { document.getElementById('hurt').style.display = ''; return; }
     document.getElementById('hurt').style.display = P.q ? 'none' : '';
     // drop a level when the frame rate stays low (DS.T.postAuto = false turns this off)
@@ -347,7 +349,7 @@ DS.Game = class Game {
       time: w.time, threshold: night > 0.4 ? 0.62 : storm ? 0.88 : 0.86, bloom: night > 0.4 ? 0.75 : storm ? 0.4 : 0.55,
       haze: night > 0.4 ? 0 : sun ? (storm ? 0.25 : 0.35 + 0.65 * (1 - low)) : 0.3, horizon: hz, hot, waves, hit,
       grain: night > 0.4 ? 0.045 : 0.022, vig: 0.38, lift, gain, sat, contrast,
-      world: GW ? GW.color : null,
+      world: GW ? GW.color : null, overlayAbove: !!GW,
       sharp: (() => { const k = this.cv.width / Math.max(1, innerWidth * Math.min(2, devicePixelRatio || 1)); return k < 0.97 ? Math.min(0.6, (1 - k) * 1.6) : 0; })(),
     });
   }

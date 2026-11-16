@@ -129,6 +129,13 @@ DS.Post = class Post {
     if (this.cv.width !== W || this.cv.height !== H) { this.cv.width = W; this.cv.height = H; this.cv.style.width = src.style.width; this.cv.style.height = src.style.height; }
     gl.bindVertexArray(this.vao);
     gl.bindTexture(gl.TEXTURE_2D, this.sceneTex);
+    if (P.overlayAbove) {
+      // the whole picture is in the GL world frame; the 2D canvas (marks, text) sits above this one: nothing to
+      // upload — the 'scene' layer is one transparent pixel
+      if (!this._clear) { this._clear = this.tex(); gl.bindTexture(gl.TEXTURE_2D, this._clear); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 0])); }
+    }
+    const scene = P.overlayAbove ? this._clear : this.sceneTex;
+    if (!P.overlayAbove) {
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true); gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
     const tu = DS.Perf.on ? performance.now() : 0;
     try { gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, src); gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false); if (tu) DS.Perf.sub('upload', performance.now() - tu); }
@@ -137,17 +144,18 @@ DS.Post = class Post {
       // cannot be handed to WebGL: switch the layer off and keep playing with the plain 2D picture
       this.ok = false; this.cv.remove(); console.warn('post-processing off:', e.message); return;
     }
+    }
     const ds = this.q === 2 ? 4 : 8, bw = Math.max(1, Math.ceil(W / ds)), bh = Math.max(1, Math.ceil(H / ds));
     const A = this.target(0, bw, bh), B = this.target(1, bw, bh);
     const wt = world || this.black;
-    if (this.q) this.pass(this.pBright, A, bw, bh, u => { this.bind(0, this.sceneTex, u.t); this.bind(1, wt, u.world); gl.uniform1f(u.th, P.threshold); });
+    if (this.q) this.pass(this.pBright, A, bw, bh, u => { this.bind(0, scene, u.t); this.bind(1, wt, u.world); gl.uniform1f(u.th, P.threshold); });
     const it = this.q === 2 ? 2 : 1;
     for (let k = 0; k < (this.q ? it : 0); k++) {
       this.pass(this.pBlur, B, bw, bh, u => { this.bind(0, A.t, u.t); gl.uniform2f(u.d, (1 + k) / bw, 0); });
       this.pass(this.pBlur, A, bw, bh, u => { this.bind(0, B.t, u.t); gl.uniform2f(u.d, 0, (1 + k) / bh); });
     }
     this.pass(this.pComp, null, W, H, u => {
-      this.bind(0, this.sceneTex, u.scene); this.bind(1, A.t, u.bloom); this.bind(2, wt, u.world);
+      this.bind(0, scene, u.scene); this.bind(1, A.t, u.bloom); this.bind(2, wt, u.world);
       gl.uniform2f(u.res, W, H); gl.uniform1f(u.time, P.time); gl.uniform1f(u.bloomK, P.bloom);
       gl.uniform1f(u.hazeK, P.haze); gl.uniform1f(u.horizon, H - P.horizon); gl.uniform1f(u.hit, P.hit); gl.uniform1f(u.grain, P.grain); gl.uniform1f(u.sharp, P.sharp || 0);
       const hot = this._hot || (this._hot = new Float32Array(64)), nh = Math.min(16, P.hot.length);

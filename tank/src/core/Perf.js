@@ -135,6 +135,6 @@ DS.Perf = {
     const B = this.secRAvg, rk = Object.keys(B), y0 = gy + gh + 6 + Math.ceil(keys.length / 3) * 14 + 2;
     c.fillStyle = '#a8c8e8';
     rk.forEach((k, i) => c.fillText(`${k} ${B[k].toFixed(2)}`, 6 + (i % 3) * 98, y0 + Math.floor(i / 3) * 13));
-    c.fillStyle = '#b8c0c8'; c.fillText(`렌더러 ${g.rend.glActive ? 'WebGL (하늘·원경·뒤 지면·건물·뒤 소품)' : '2D'}${g.rend.glActive ? ' · GL 그리기 ' + (g.rend.glw.draws || 0) : ''}`, 6, 78);
+    c.fillStyle = '#b8c0c8'; c.fillText(`렌더러 ${g.rend.glActive ? 'WebGL (전체 장면)' : '2D'}${g.rend.glActive ? ' · GL 그리기 ' + (g.rend.glw.draws || 0) : ''}`, 6, 78);
   },
 };

@@ -97,9 +97,14 @@ Object.assign(DS.Renderer.prototype, {
     // everything goes into a half-resolution layer; the vehicles (in front of the buildings) are cut out of it,
     // then it is added onto the picture
     const main = ctx, m = main.getTransform(), cv = main.canvas, lw = Math.ceil(cv.width / 2), lh = Math.ceil(cv.height / 2);
-    const lay = this._lightLayer || (this._lightLayer = document.createElement('canvas'));
-    if (lay.width !== lw || lay.height !== lh) { lay.width = lw; lay.height = lh; }
-    ctx = lay.getContext('2d'); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1; ctx.clearRect(0, 0, lw, lh);
+    let lay;
+    if (cv._gl && this.glw) { ctx = this.glw.layer('lights', lw, lh); lay = ctx.canvas; }       // WebGL: a GPU layer
+    else {
+      lay = this._lightLayer || (this._lightLayer = document.createElement('canvas'));
+      if (lay.width !== lw || lay.height !== lh) { lay.width = lw; lay.height = lh; }
+      ctx = lay.getContext('2d');
+    }
+    ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1; ctx.clearRect(0, 0, lw, lh);
     ctx.setTransform(m.a / 2, m.b / 2, m.c / 2, m.d / 2, m.e / 2, m.f / 2);
     ctx.save(); ctx.globalCompositeOperation = 'lighter';
     // Drawn back to front: before each building's own lights go in, its silhouette erases whatever light from

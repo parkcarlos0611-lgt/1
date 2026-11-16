@@ -151,9 +151,30 @@ DS.Renderer = class Renderer {
       this.flora(g, cam, 'back');
       this.props(g, cam, false); mark('props');
       this.buildings(g, cam); mark('bld');
+      w.particles.draw(g, cam, 0);
+      for (const v of w.vehicles) if (cam.visible(v.pos.x, v.pos.y, 14) && this.shown(v)) this.vehicle(g, v, cam);
+      mark('veh');
+      this.terrain(g, cam);
+      for (const b of w.buildings) if (b.drawFront) b.drawFront(g, cam, null, this);
+      this.flora(g, cam, 'line'); this.flora(g, cam, 'near');
+      this.props(g, cam, true); mark('front');
+      this.fog(g, cam);
+      this.traces(g, cam);
+      w.fx.drawCases(g);
+      this.projectiles(g, cam);
+      w.particles.draw(g, cam, 1); mark('fx');
+      this.atmosphere(g, cam, opt);
+      w.fx.drawFlashes(g); mark('atmo');
       G.end();
+      // the 2D canvas keeps only marks and text, above the GL picture (it is not uploaded)
       ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
       cam.apply(ctx);
+      this.sightLine(ctx, cam);
+      if (w.debug) DS.Debug.draw(ctx, w);
+      this.labels(ctx, cam);
+      this.markers(ctx, cam, true);
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      return;
     } else {
       this.sky(ctx, cam); mark('sky');
       cam.apply(ctx);
@@ -161,10 +182,10 @@ DS.Renderer = class Renderer {
       this.flora(ctx, cam, 'back');
       this.props(ctx, cam, false); mark('props');
       this.buildings(ctx, cam); mark('bld');
+      w.particles.draw(ctx, cam, 0);
+      for (const v of w.vehicles) if (cam.visible(v.pos.x, v.pos.y, 14) && this.shown(v)) this.vehicle(ctx, v, cam);
+      mark('veh');
     }
-    w.particles.draw(ctx, cam, 0);
-    for (const v of w.vehicles) if (cam.visible(v.pos.x, v.pos.y, 14) && this.shown(v)) this.vehicle(ctx, v, cam);
-    mark('veh');
     this.terrain(ctx, cam);
     for (const b of w.buildings) if (b.drawFront) b.drawFront(ctx, cam, null, this);
     this.flora(ctx, cam, 'line'); this.flora(ctx, cam, 'near');
@@ -343,10 +364,15 @@ DS.Renderer = class Renderer {
     // drawn into a layer at 1/10 of the screen and stretched back: the edges melt into the view, and the
     // hidden ground looks veiled in pale haze (dark at night) instead of painted over
     const DS_ = 10, cv = ctx.canvas, fw = Math.ceil(cv.width / DS_) + 2, fh = Math.ceil(cv.height / DS_) + 2;
-    let L = this.fogL && this.fogL.get(cv);
-    if (!this.fogL) this.fogL = new Map();
-    if (!L || L.width !== fw || L.height !== fh) { L = document.createElement('canvas'); L.width = fw; L.height = fh; this.fogL.set(cv, L); }
-    const f = L.getContext('2d'), m = ctx.getTransform();
+    let L, f;
+    if (cv._gl && this.glw) { f = this.glw.layer('fog', fw, fh); L = f.canvas; }             // WebGL: a GPU layer
+    else {
+      L = this.fogL && this.fogL.get(cv);
+      if (!this.fogL) this.fogL = new Map();
+      if (!L || L.width !== fw || L.height !== fh) { L = document.createElement('canvas'); L.width = fw; L.height = fh; this.fogL.set(cv, L); }
+      f = L.getContext('2d');
+    }
+    const m = ctx.getTransform();
     f.setTransform(1, 0, 0, 1, 0, 0); f.clearRect(0, 0, fw, fh);
     f.setTransform(m.a / DS_, m.b / DS_, m.c / DS_, m.d / DS_, m.e / DS_ + 1, m.f / DS_ + 1);
     const step = Math.max(1, 12 / cam.zoom), top = cam.top + 4, bot = cam.bottom - 4;
@@ -854,11 +880,15 @@ DS.Renderer = class Renderer {
     // (1/8 in dust); the layer is tinted once and stretched back, which is what softens the edges
     const m = ctx.getTransform(), cv = ctx.canvas, q = diffuse ? 8 : 2.5;
     const lw = Math.ceil(cv.width / q), lh = Math.ceil(cv.height / q);
-    if (!this.shOff) this.shOff = new Map();
-    let off = this.shOff.get(cv);
-    if (!off) { off = document.createElement('canvas'); this.shOff.set(cv, off); }
-    if (off.width !== lw || off.height !== lh) { off.width = lw; off.height = lh; }
-    const o = off.getContext('2d');
+    let off, o;
+    if (cv._gl && this.glw) { o = this.glw.layer('shadow', lw, lh); off = o.canvas; }        // WebGL: a GPU layer
+    else {
+      if (!this.shOff) this.shOff = new Map();
+      off = this.shOff.get(cv);
+      if (!off) { off = document.createElement('canvas'); this.shOff.set(cv, off); }
+      if (off.width !== lw || off.height !== lh) { off.width = lw; off.height = lh; }
+      o = off.getContext('2d');
+    }
     o.setTransform(1, 0, 0, 1, 0, 0); o.globalCompositeOperation = 'source-over'; o.clearRect(0, 0, lw, lh);
     o.imageSmoothingEnabled = true; o.imageSmoothingQuality = 'high';
     const lcam = Object.assign(Object.create(Object.getPrototypeOf(cam)), cam); lcam.zoom = cam.zoom / 1.5;    // sprite levels a step down are enough for a silhouette
@@ -914,9 +944,14 @@ DS.Renderer = class Renderer {
   // stay inside the vehicle's own silhouette and spread outward from where they started.
   charred(ctx, v, cam, alpha = 1) {
     const cv = ctx.canvas;
-    let off = this.offs.get(cv);
-    if (!off || off.width !== cv.width || off.height !== cv.height) { off = document.createElement('canvas'); off.width = cv.width; off.height = cv.height; this.offs.set(cv, off); }
-    const o = off.getContext('2d'), m = ctx.getTransform(), z = Math.hypot(m.a, m.b);
+    let off, o;
+    if (cv._gl && this.glw) { o = this.glw.layer('charred', cv.width, cv.height); off = o.canvas; }      // WebGL: a GPU layer
+    else {
+      off = this.offs.get(cv);
+      if (!off || off.width !== cv.width || off.height !== cv.height) { off = document.createElement('canvas'); off.width = cv.width; off.height = cv.height; this.offs.set(cv, off); }
+      o = off.getContext('2d');
+    }
+    const m = ctx.getTransform(), z = Math.hypot(m.a, m.b);
     const pts = [v.pos]; if (v.turretBody) pts.push(v.turretBody);
     let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
     for (const p of pts) {

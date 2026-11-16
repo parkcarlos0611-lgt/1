@@ -875,7 +875,7 @@ DS.Renderer = class Renderer {
     return k ? c.map((v, i) => Math.round(v + (to[i] - v) * k)) : c.map(Math.round);
   }
   // C1 — the far city on the horizon (town map; layer 1 of the strip, in front of the oil country): a hazy
-  // blue-grey skyline whose make-up follows the map. Layer-x wx stands for map position mx = (wx − 4000)/(8f), so
+  // blue-grey skyline whose make-up follows the map (from the low housing in; the outskirts get no far skyline). Layer-x wx stands for map position mx = (wx − 4000)/(8f), so
   // the skyline straight ahead is the district you are in, and the city's towers rise from the side as you near
   // the centre: low outskirts with a water tower or a minaret, dense mid-rise, the tower cluster of the centre
   // with cranes, broken towers over the battered district, nothing out in the desert.
@@ -893,7 +893,7 @@ DS.Renderer = class Renderer {
       for (let k = Math.floor(wx0 / cell) - 6; k <= wx1 / cell + 6; k++) {
         const h = n => { const v = Math.sin(n * 63.71 + k * 19.19 + pass * 7.3) * 43758.5453; return v - Math.floor(v); };
         const mx = (k * cell - 4000) / (f * 8);
-        const town = sm(1600, 3200, mx) * (1 - sm(16800, 18400, mx));                  // anything at all
+        const town = sm(4600, 5800, mx) * (1 - sm(16800, 18400, mx));                  // anything at all (the outskirts are left to their own rows)
         const tall = Math.exp(-(((mx - 12400) / 2600) ** 2)), mid = sm(4200, 7000, mx) * (1 - sm(15500, 17500, mx)), ruin = sm(13800, 14600, mx) * (1 - sm(16800, 17600, mx));
         if (town < 0.02 || h(1) > 0.25 + 0.65 * town * (0.35 + 0.65 * Math.max(mid, tall))) continue;
         const x = toX(k * cell + h(2) * cell), y = y0 + pass * 2 * u;

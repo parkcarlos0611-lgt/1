@@ -3,7 +3,7 @@
 DS.Effects = class Effects {
   constructor(world) {
     world.particles.onLand = (x, y, sz, vx, vy) => this.landed(x, y, sz, vx, vy);
-    this.w = world; this.P = world.particles; this.flashes = []; this.labels = []; this.blasts = []; this.waves = []; this.acc = 0; this.shake = 0; }
+    this.w = world; this.P = world.particles; this.flashes = []; this.rings = []; this.glows = []; this.labels = []; this.blasts = []; this.waves = []; this.acc = 0; this.shake = 0; }
   rnd(a, b) { return a + Math.random() * (b - a); }
   hex(s) { return parseInt(s.slice(1), 16); }
 
@@ -129,6 +129,10 @@ DS.Effects = class Effects {
         { grow: 0.6, drag: 1.5, grav: -0.1, alpha: 0.75, col: 0xff8a30 });
       if (Math.random() < 6 * k2 * dt) P.add(K.DARK, tb.x, tb.y + 0.8, this.rnd(-0.3, 0.3), this.rnd(2, 4), this.rnd(10, 18), this.rnd(0.6, 1.1), { grow: 0.8, drag: 0.35, grav: -0.03, alpha: 0.5, col: 0x26221f });
     }
+    // embers: glowing flecks carried up out of the fire, flickering out as they climb
+    let em = 9 * f * surge * dt + Math.random() * 0.3;
+    while (em-- >= 1) P.add(K.SPARK, p.x + this.rnd(-wide, wide), p.y + this.rnd(0.2, 1), this.rnd(-1, 1) + this.w.wind * 0.4, this.rnd(1.5, 5), this.rnd(1.2, 3.2), this.rnd(0.025, 0.05),
+      { drag: 1.2, grav: -0.06, alpha: 0.95, col: Math.random() < 0.5 ? 0xffa040 : 0xffd27a });
     if (v.wreck && Math.random() < dt * 0.6) {
       for (let i = 0; i < 16; i++) { const a = this.rnd(0.3, 2.8), sp = this.rnd(5, 20);
         P.add(K.FIRE, p.x, p.y + 0.5, Math.cos(a) * sp, Math.sin(a) * sp, this.rnd(0.1, 0.3), this.rnd(0.2, 0.5), { grow: 2, drag: 4, grav: 0.2, alpha: 1, col: 0xffb050 }); }
@@ -171,6 +175,7 @@ DS.Effects = class Effects {
     const p = v.local(v.g.ring.x, v.g.ring.y);
     this.blast(p.x, p.y, 2.2, null, null);
     this.flashes.push({ x: p.x, y: p.y + 1, dx: 0, dy: 1, t: 0, ttl: 0.14, boom: true, big: true });
+    this.ring(p.x, p.y + 1, 30, 0.5); this.glow(p.x, p.y + 3, 30, 1.0, 1.6);
     // ammunition going up: a rolling fireball that climbs into a mushroom of black smoke, a fountain of sparks
     // (burning propellant), fragments arcing away on smoke trails
     this.fireball(p.x, p.y + 1, 22, 2.4, 15, 0x1f1b18, 7, 0.9);
@@ -308,6 +313,7 @@ DS.Effects = class Effects {
     const big = v.def.gun.recoilMass > 1500 ? 1 : 0.55, ang = Math.atan2(e.dy, e.dx), sc = this.hex(T.soilAt(e.x).col[1]), sc2 = this.hex(T.soilAt(e.x).col[0]);
     // secondary flash: the propellant gases re-ignite a few metres ahead as a big round fireball
     this.flashes.push({ x: e.x + e.dx * 3.5 * big, y: e.y + e.dy * 3.5 * big, dx: 0, dy: 1, t: 0, ttl: 0.16, boom: true, big: big > 0.9 });
+    if (big > 0.9) this.ring(e.x + e.dx * 2, e.y + e.dy * 2, 14, 0.3);
     // muzzle fireball: a jet of flame along the bore that balloons a few metres out and cools into grey-brown smoke
     for (let i = 0; i < 16 * big; i++) {
       const d = this.rnd(0.6, 7) * big, sd = this.rnd(-1, 1) * 0.5 * d * 0.25;
@@ -373,12 +379,16 @@ DS.Effects = class Effects {
     }
     if (heat) {
       this.fireball(hit.x, hit.y + 0.6, 9, 1.2, 9, 0x2e2a26, 4.5, 0.6); this.sparks(hit.x, hit.y + 0.3, 30, 40, Math.PI / 2, 2.4); this.comets(hit.x, hit.y + 0.3, 3, 20);
-      this.flashes.push({ x: hit.x, y: hit.y + 0.5, dx: 0, dy: 1, t: 0, ttl: 0.07, boom: true });
+      this.flashes.push({ x: hit.x, y: hit.y + 0.5, dx: 0, dy: 1, t: 0, ttl: 0.07, boom: true }); this.glow(hit.x, hit.y + 1, 14, 0.6, 0.45);
     }
     const d = Math.abs(hit.x - this.w.cam.x);
     this.shake = Math.max(this.shake, Math.max(0, 0.5 - d / 300));
   }
 
+  // the shock front of a big blast: a pale ring of compressed, dust-laden air racing out and fading
+  // the light of a fireball on everything round it, dying away with the fire (WebGL renderer: lights the scene)
+  glow(x, y, R, a, ttl) { if (this.glows.length < 16) this.glows.push({ x, y, R, a, t: 0, ttl }); }
+  ring(x, y, R, a) { if (this.rings.length < 12) this.rings.push({ x, y, R, a, t: 0, ttl: 0.32 }); }
   // ---- building blocks for explosions ----
   // fireball that boils up and cools into smoke: n balls, radius r0, thrown outward at up to sp m/s
   fireball(x, y, n, r0, sp, smoke = 0x2b2622, ttl = 4, up = 0.5) {
@@ -457,8 +467,9 @@ DS.Effects = class Effects {
     if (near) { this.comets(x, y + 0.5, 9, 34); this.sparks(x, y + 0.6, 70, 60, Math.PI / 2, 2.6); }
     for (let i = 0; i < Math.round(18 * k); i++) { const a = Math.PI / 2 + r(-1.2, 1.2), sp = r(12, 45);
       P.add(K.DEBRIS, x, y + 0.5, Math.cos(a) * sp, Math.sin(a) * sp, r(2, 5), r(0.06, 0.2), { drag: 0.2, col: 0x3a342c }); }
-    this.flashes.push({ x, y: y + 1, dx: 0, dy: 1, t: 0, ttl: 0.1, boom: true });
+    this.flashes.push({ x, y: y + 1, dx: 0, dy: 1, t: 0, ttl: 0.1, boom: true, light: 70 });
     this.flashes.push({ x, y: y + 3, dx: 0, dy: 1, t: 0, ttl: 0.07, boom: true });
+    this.ring(x, y + 1, 26, 0.45); this.glow(x, y + 2, 26, 0.8, 0.7);
     const d = Math.abs(x - this.w.cam.x);
     this.shake = Math.max(this.shake, Math.max(0, 1.4 - d / 500));
   }
@@ -687,9 +698,14 @@ DS.Effects = class Effects {
   }
 
   update(dt) { this.stepBlasts(dt); this.stepCases(dt); this.stepComets(dt); for (const w of this.waves) w.t += dt; this.waves = this.waves.filter(w => w.t < 0.4); for (const f of this.flashes) f.t += dt; this.flashes = this.flashes.filter(f => f.t < f.ttl);
+    for (const r of this.rings) r.t += dt; this.rings = this.rings.filter(r => r.t < r.ttl);
+    for (const g of this.glows) g.t += dt; this.glows = this.glows.filter(g => g.t < g.ttl);
     for (const l of this.labels) l.t += dt; this.labels = this.labels.filter(l => l.t < 4); this.shake = Math.max(0, this.shake - dt * 2.5); }
 
   drawFlashes(ctx) {
+    this.drawRings(ctx);
+    const R = this.w.rend;
+    if (ctx.canvas._gl && R && R.glw) return this.drawFlashesGL(ctx, R.glw);
     ctx.globalCompositeOperation = 'lighter';
     // flickering light cast by fires on the hull and the sand around them
     for (const v of this.w.vehicles) {
@@ -718,5 +734,70 @@ DS.Effects = class Effects {
       ctx.fillStyle = g; ctx.fillRect(f.x - R, f.y - R, R * 2, R * 2);
     }
     ctx.globalCompositeOperation = 'source-over';
+  }
+  drawRings(ctx) {
+    if (!this.rings.length) return;
+    const env = this.w.env || {}, dk = 1 - 0.8 * (env.night || 0);
+    ctx.save(); ctx.lineCap = 'butt';
+    for (const r of this.rings) {
+      const u = r.t / r.ttl, rad = r.R * (1 - Math.pow(1 - u, 2.2)), a = r.a * (1 - u) * (1 - u) * dk;
+      if (a < 0.01 || rad < 0.3) continue;
+      // the front: a bright thin edge with a soft band of dust behind it; flattened where it hugs the ground
+      ctx.strokeStyle = `rgba(236,226,206,${a})`; ctx.lineWidth = 0.35 + rad * 0.03;
+      ctx.beginPath(); ctx.ellipse(r.x, r.y, rad, rad * 0.8, 0, 0, Math.PI * 2); ctx.stroke();
+      ctx.strokeStyle = `rgba(214,198,170,${a * 0.35})`; ctx.lineWidth = 0.8 + rad * 0.12;
+      ctx.beginPath(); ctx.ellipse(r.x, r.y, rad * 0.9, rad * 0.72, 0, 0, Math.PI * 2); ctx.stroke();
+    }
+    ctx.restore();
+  }
+  // WebGL: the fires and flashes themselves glow (added), and their light falls on the scene: a half-resolution
+  // light layer multiplies the picture by (1 + light), so it brightens what is there — sand, hulls, the smoke
+  // over a burning wreck — instead of washing a haze over it. In the dark the light is stronger in proportion,
+  // as a fire is as bright at night as by day while all else is dimmed (two passes reach eight times).
+  drawFlashesGL(ctx, G) {
+    const env = this.w.env || {}, night = env.night || 0, kd = Math.max(0.15, 1 - DS.Sky.STARLIGHT * night), passes = night > 0.25 ? 2 : 1;
+    const L = [], t = this.w.time;
+    for (const v of this.w.vehicles) {
+      if (!v.burning && !(v.jet > 0)) continue;
+      const p = v.fireSource(), k = Math.min(1, v.burning / 2 + (v.jet > 0 ? 1 : 0)) * (0.72 + 0.28 * Math.sin(t * 13) * Math.sin(t * 5.7)) * (1 + (v._flare > 0 ? 0.5 : 0));
+      L.push([p.x, p.y + 0.6, v.jet > 0 ? 22 : 14, 255, 150, 64, 0.34 * k]);
+    }
+    for (const g of this.glows) { const u = g.t / g.ttl; L.push([g.x, g.y, g.R * (0.8 + 0.4 * u), 255, 160, 70, g.a * (1 - u) * (1 - u)]); }
+    ctx.globalCompositeOperation = 'lighter';
+    for (const f of this.flashes) {
+      const k = 1 - f.t / f.ttl, a = Math.atan2(f.dy, f.dx);
+      ctx.save(); ctx.translate(f.x, f.y); ctx.rotate(a);
+      const Lf = f.small ? f.small : f.big ? 7 : f.boom ? 2.5 : 3.6 * (0.7 + 0.3 * k);
+      const g = ctx.createRadialGradient(Lf * 0.45, 0, 0, Lf * 0.45, 0, Lf);
+      g.addColorStop(0, `rgba(255,250,220,${0.95 * k})`); g.addColorStop(0.25, `rgba(255,200,90,${0.85 * k})`);
+      g.addColorStop(0.6, `rgba(255,120,30,${0.45 * k})`); g.addColorStop(1, 'rgba(255,80,0,0)');
+      ctx.fillStyle = g; ctx.scale(1, f.boom ? 1 : 0.55); ctx.beginPath(); ctx.arc(Lf * 0.45, 0, Lf, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+      // a faint halo in the air (the rest of the splash is light on the scene, below)
+      const Rr = f.small ? 3 : f.big ? 40 : 14, h = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, Rr * 0.6);
+      h.addColorStop(0, `rgba(255,180,90,${0.14 * k})`); h.addColorStop(1, 'rgba(255,150,60,0)');
+      ctx.fillStyle = h; ctx.fillRect(f.x - Rr, f.y - Rr, Rr * 2, Rr * 2);
+      L.push([f.x, f.y, f.light || Rr * 1.3, 255, 186, 100, (f.small ? 0.25 : 0.55) * k]);
+    }
+    if (night > 0.25) for (const p of this.w.projectiles) if (p.tracer && p.alive) L.push([p.x, p.y, 3.5, 255, 140, 70, 0.12]);
+    ctx.globalCompositeOperation = 'source-over';
+    if (!L.length) return;
+    const cam = this.w.cam, m = ctx.getTransform(), cv = ctx.canvas, lw = Math.ceil(cv.width / 2), lh = Math.ceil(cv.height / 2);
+    const o = G.layer('dlight', lw, lh);
+    o.setTransform(1, 0, 0, 1, 0, 0); o.globalAlpha = 1; o.globalCompositeOperation = 'source-over'; o.clearRect(0, 0, lw, lh);
+    o.setTransform(m.a / 2, m.b / 2, m.c / 2, m.d / 2, m.e / 2, m.f / 2); o.globalCompositeOperation = 'lighter';
+    let any = false;
+    for (const [x, y, Rl, r, g, b, a] of L) {
+      if (a < 0.01 || !cam.visible(x, y, Rl)) continue;
+      // light wanted a / kd above the dimmed scene; spread over the passes
+      const A = Math.min(1, Math.pow(1 + a / kd, 1 / passes) - 1); if (A < 0.01) continue; any = true;
+      const gr = o.createRadialGradient(x, y, 0, x, y, Rl);
+      gr.addColorStop(0, `rgba(${r},${g},${b},${A})`); gr.addColorStop(0.35, `rgba(${r},${g},${b},${A * 0.45})`); gr.addColorStop(1, `rgba(${r},${g},${b},0)`);
+      o.fillStyle = gr; o.fillRect(x - Rl, y - Rl, Rl * 2, Rl * 2);
+    }
+    if (!any) return;
+    ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'light';
+    for (let i = 0; i < passes; i++) ctx.drawImage(o.canvas, 0, 0, lw, lh, 0, 0, cv.width, cv.height);
+    ctx.restore();
   }
 };

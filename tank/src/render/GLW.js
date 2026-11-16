@@ -268,12 +268,13 @@ DS.GLW = class GLW {
     this.color = this.main.color;
     return this.ctx;
   }
-  end() { this.flush(); this.resolve(this.main); this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, null); this.T = null; }
+  end() { this.flush(); this.setBlend('source-over'); this.gl.disable(this.gl.BLEND); this.resolve(this.main); this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, null); this.T = null; }   // (blending off: DS.Post draws after)
   setBlend(op) {
     if (op === this.blend) return;
     this.flush(); const gl = this.gl; this.blend = op;
     switch (op) {
       case 'lighter': gl.blendFunc(gl.ONE, gl.ONE); break;
+      case 'light': gl.blendFuncSeparate(gl.DST_COLOR, gl.ONE, gl.ZERO, gl.ONE); break;            // dst × (1 + src): light falling on the picture
       case 'source-atop': gl.blendFuncSeparate(gl.DST_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ZERO, gl.ONE); break;
       case 'source-in': gl.blendFunc(gl.DST_ALPHA, gl.ZERO); break;
       case 'destination-in': gl.blendFunc(gl.ZERO, gl.SRC_ALPHA); break;

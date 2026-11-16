@@ -531,7 +531,8 @@ DS.GLCtx = class GLCtx {
     let fx = null;
     if (this.filter && this.filter !== 'none') { const gm = /grayscale\(([\d.]+)\)/.exec(this.filter), bm = /blur\(([\d.]+)px\)/.exec(this.filter); fx = { gray: gm ? +gm[1] : 0, bias: bm ? Math.log2(1 + +bm[1]) * 1.5 : -0.6 }; }
     if (fx) { R.flush(); R.fx = fx; }
-    R.quad(t.t, this.X(dx, dy), this.Y(dx, dy), this.X(dx + dw, dy), this.Y(dx + dw, dy), this.X(dx + dw, dy + dh), this.Y(dx + dw, dy + dh), this.X(dx, dy + dh), this.Y(dx, dy + dh), u0, v0, u1, v1, [ga, ga, ga, ga]);
+    const gc = this._gac && this._gac[0] === ga ? this._gac : (this._gac = [ga, ga, ga, ga]);       // (quad copies it: reused while the opacity stays)
+    R.quad(t.t, this.X(dx, dy), this.Y(dx, dy), this.X(dx + dw, dy), this.Y(dx + dw, dy), this.X(dx + dw, dy + dh), this.Y(dx + dw, dy + dh), this.X(dx, dy + dh), this.Y(dx, dy + dh), u0, v0, u1, v1, gc);
     if (fx) { R.flush(); R.fx = { bias: -0.6, gray: 0 }; }
   }
   // ---- rectangles ----

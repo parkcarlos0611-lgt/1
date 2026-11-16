@@ -366,37 +366,9 @@ DS.Structure = class Structure {
       }
     }
     this.chunks = this.chunks.filter(ch => ch.cells.length);
-    // tumbling fragments
-    const T = W.terrain;
-    // resting fragments in 1 m columns (with many pieces about, looking through all of them for each falling one
-    // grew with the square of the count)
-    const grid = new Map(); let maxW = 0;
-    for (const q of this.pieces) if (q.rest && !q.gone) { const k = Math.floor(q.x); let a = grid.get(k); if (!a) grid.set(k, a = []); a.push(q); if (q.wd > maxW) maxW = q.wd; }
-    const supp = p => {                                   // ground (heap included) or a resting fragment under it
-      let gy = T.height(p.x) + p.h * 0.35;
-      const reach = (maxW + p.wd) * 0.38, k0 = Math.floor(p.x - reach), k1 = Math.floor(p.x + reach);
-      for (let k = k0; k <= k1; k++) { const a = grid.get(k); if (!a) continue;
-        for (const q of a) { if (q === p || q.gone || !q.rest || Math.abs(q.x - p.x) > (q.wd + p.wd) * 0.38) continue; const top = q.y + q.h * 0.42 + p.h * 0.4; if (top > gy && top < p.y + 0.3) gy = top; } }
-      return gy;
-    };
-    for (const p of this.pieces) {
-      if (p.rest) {                                       // what it was lying on may have gone: then it falls again
-        p.chk = (p.chk || Math.random() * 0.25) - dt;
-        if (p.chk <= 0) { p.chk = 0.25; if (p.y > supp(p) + 0.12) { p.rest = 0; p.vy = 0; } }
-        continue;
-      }
-      p.vy -= g * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.a += p.w * dt;
-      const gy = supp(p);
-      if (p.y < gy) {
-        p.y = gy;
-        if (p.src === 'shard' && p.vy < -6 && p.wd > 0.35 && this.budget()) { this.breakShard(W, p, gy); continue; }     // a hard landing breaks a shard again (and its pieces may break again)
-        if (p.vy < -2.5) { p.vy *= -0.25; p.vx *= 0.55; p.w *= 0.5; if (p.big && Math.random() < 0.5) W.particles.add(DS.P.DUST, p.x, gy, (Math.random() - 0.5) * 3, Math.random() * 2, 3 + Math.random() * 3, 0.8 + p.w0, { grow: 1, drag: 1, grav: 0, alpha: 0.32, col: 0xc9b79a }); }
-        else { p.rest = 1; p.vx = p.vy = 0; p.a = Math.round(p.a / Math.PI) * Math.PI + (Math.random() - 0.5) * 0.5; }
-      }
-    }
-    this.pieces = this.pieces.filter(p => !p.gone);
-    if (this.pieces.length > 1200) { const rest = this.pieces.filter(p => p.rest); rest.sort((a, b) => b.wd - a.wd); const keep = new Set(rest.slice(0, 900)); this.pieces = this.pieces.filter(p => !p.rest || keep.has(p)); }
+    // tumbling fragments: stepped by DS.Debris (a worker), after every building has stepped (World.update)
   }
+  addPiece(p) { this.pieces.push(p); const W = this.world; (W.debris || (W.debris = new DS.Debris(W))).add(this, p); }
   breakShard(W, p, gy) {
     p.gone = true;
     const sw = p.img.width, sh = p.img.height, src = { cv: p.img, ox: 0, oy: 0, m: p.wd / sw }, r = (a, b) => a + Math.random() * (b - a), n = 3 + Math.floor(Math.random() * 3), sp = Math.min(6, -p.vy * 0.25);
@@ -462,7 +434,7 @@ DS.Structure = class Structure {
   }
   addShard(W, sh, x, y, vx, vy) {
     if (!sh) return;
-    this.pieces.push({ src: 'shard', img: sh.img, x, y, vx, vy, a: (Math.random() - 0.5) * 0.4, w: (Math.random() - 0.5) * (8 - Math.min(6, sh.wd * 3)),
+    this.addPiece({ src: 'shard', img: sh.img, x, y, vx, vy, a: (Math.random() - 0.5) * 0.4, w: (Math.random() - 0.5) * (8 - Math.min(6, sh.wd * 3)),
       wd: sh.wd, h: sh.h, big: sh.wd > 0.9, w0: sh.wd * 0.3, rest: 0 });
   }
   // budget: with many fragments about, new ones are made bigger (fewer), and past the cap only dust and grit
@@ -515,7 +487,7 @@ DS.Structure = class Structure {
     const kinds = ['conc2', 'conc4', 'conc6', 'rebar2', 'rebar3', 'grit1', 'grit2'];
     for (let n = 0; n < Math.round(6 * left); n++) {
       const key = kinds[Math.floor(Math.random() * kinds.length)], I = DS.DEBRIS[key], sz = key.startsWith('grit') ? r(0.5, 0.9) : r(0.3, 0.8), q = at(r(cl.x0, cl.x1), r(cl.y0, cl.y1));
-      this.pieces.push({ src: key, x: q.x, y: q.y, vx: (out || (Math.random() < 0.5 ? -1 : 1)) * r(0.5, 7) + vx0, vy: r(-2, 5) + vy0, a: r(-0.5, 0.5), w: r(-5, 5), wd: sz, h: sz * I.h / I.w, big: false, w0: sz * 0.3, rest: 0 });
+      this.addPiece({ src: key, x: q.x, y: q.y, vx: (out || (Math.random() < 0.5 ? -1 : 1)) * r(0.5, 7) + vx0, vy: r(-2, 5) + vy0, a: r(-0.5, 0.5), w: r(-5, 5), wd: sz, h: sz * I.h / I.w, big: false, w0: sz * 0.3, rest: 0 });
     }
     const cw = cl.x1 - cl.x0, chh = cl.y1 - cl.y0;
     for (let n = 0; n < Math.round(4 * left) + 2; n++) { const q = at(r(cl.x0, cl.x1), r(cl.y0, cl.y1));
@@ -584,7 +556,7 @@ DS.Structure = class Structure {
     for (let n = 0; n < 26; n++) {
       const key = ['glass2', 'glass3'][n % 2], I = DS.DEBRIS[key], sz = r(0.4, 0.9), cl = this.cells[Math.floor(Math.random() * this.cells.length)];
       if (!cl.ex || cl.st !== 'ok') continue;
-      this.pieces.push({ src: key, x: this.x + r(cl.x0, cl.x1), y: this.base + r(cl.y0, cl.y1), vx: r(-4, 4), vy: r(-1, 3), a: 0, w: r(-6, 6), wd: sz, h: sz * I.h / I.w, rest: 0, w0: 0.2 });
+      this.addPiece({ src: key, x: this.x + r(cl.x0, cl.x1), y: this.base + r(cl.y0, cl.y1), vx: r(-4, 4), vy: r(-1, 3), a: 0, w: r(-6, 6), wd: sz, h: sz * I.h / I.w, rest: 0, w0: 0.2 });
     }
     for (let n = 0; n < 160; n++) {
       const cl = this.cells[Math.floor(Math.random() * this.cells.length)]; if (!cl.ex || cl.st !== 'ok') continue;
@@ -672,6 +644,22 @@ DS.Structure = class Structure {
     if (this.x + this.w + 40 < cam.left || this.x - this.w - 40 > cam.right) return;
     this.drawHeap(ctx, cam, grey, R);
     const DI = R.debImg;
+    if (grey == null && ctx.m) {
+      // WebGL context: each fragment's transform composed straight into the context's matrix (thousands of them in a
+      // collapse; no save / restore per fragment)
+      const m0 = ctx.m, M = this._fm || (this._fm = [1, 0, 0, 1, 0, 0]);
+      const a0 = m0[0], b0 = m0[1], c0 = m0[2], d0 = m0[3], e0 = m0[4], f0 = m0[5];
+      ctx.m = M;
+      for (const p of this.pieces) {
+        if (p.x < cam.left - 3 || p.x > cam.right + 3) continue;
+        const img = p.src === 'shard' ? p.img : DI[p.src]; if (!img) continue;
+        const c = Math.cos(p.a), s = Math.sin(p.a);           // translate(x, y) · rotate(a) · scale(1, −1)
+        M[0] = a0 * c + c0 * s; M[1] = b0 * c + d0 * s; M[2] = a0 * s - c0 * c; M[3] = b0 * s - d0 * c; M[4] = a0 * p.x + c0 * p.y + e0; M[5] = b0 * p.x + d0 * p.y + f0;
+        ctx.drawImage(img, -p.wd / 2, -p.h / 2, p.wd, p.h);
+      }
+      ctx.m = m0;
+      return;
+    }
     for (const p of this.pieces) {
       if (p.x < cam.left - 3 || p.x > cam.right + 3) continue;
       const img = p.src === 'shard' ? p.img : DI[p.src]; if (!img) continue;

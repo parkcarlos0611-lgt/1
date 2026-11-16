@@ -141,6 +141,7 @@ DS.World = class World {
       this.acc -= h; this.time += h;
     }
     for (const b of this.buildings) b.step(frameDt, this);
+    if (this.debris) this.debris.frame(frameDt);           // building fragments (src/world/Debris.js)
     for (const p of this.projectiles) { if (p.burning) this.fx.rocketTrail(p, frameDt); if (DS.T.flyFx !== false) this.fx.flight(p, frameDt); }
     if (this.sched.length) { const due = this.sched.filter(s => s.t <= this.time); if (due.length) { this.sched = this.sched.filter(s => s.t > this.time); for (const s of due) s.fn(); } }
     this.terrain.relax(undefined, undefined, 1);

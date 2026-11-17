@@ -7,7 +7,7 @@ import { buildCar } from './gen/car.mjs';
 import { coupeD, sedanD } from './gen/detail30.mjs';
 import { coupe, townSedan } from './gen/vehicles30.mjs';
 import { buildFront } from './gen/front.mjs';
-import { airflow34, zephyr37 } from './gen/stream30d.mjs';
+import { airflow34, zephyr37, airflow34Front, airflow34Rear, zephyr37Front, zephyr37Rear } from './gen/stream30d.mjs';
 import { engineSV } from './gen/engineSV.mjs';
 import { buildUnderbody, smallPlatformUnder } from './gen/underbody.mjs';
 import { townCar34, townCarFront, townCarRear } from './gen/luxury30d.mjs';
@@ -46,3 +46,8 @@ writePNG(out + 'e1_detail_before_after.png', sh.w, sh.h, sh.d); console.log('ok'
   text(sh6, '1934 V12 TOWN CAR - SIDE / FRONT / REAR 12.5MM/PX', 16, 12, ink); drawPix(sh6, L, P, 16, 30, z);
   drawPix(sh6, Fv, P, 16, 50 + L.h * z, z); drawPix(sh6, Bv, P, 56 + Fv.w * z, 50 + L.h * z, z);
   writePNG(out + 'e1_towncar_views.png', sh6.w, sh6.h, sh6.d); }
+
+{ const V = [['AIRFLOW-TYPE FRONT', buildFront(P, airflow34Front, 12.5)], ['REAR', buildFront(P, airflow34Rear, 12.5)], ['PROW COUPE FRONT', buildFront(P, zephyr37Front, 12.5)], ['REAR', buildFront(P, zephyr37Rear, 12.5)]], z = 2;
+  const sh7 = new Sheet(V.reduce((a, [, c]) => a + c.w * z + 24, 24), Math.max(...V.map(([, c]) => c.h)) * z + 50, hex('#d9d3c7')); let x = 16;
+  for (const [n, c] of V) { text(sh7, n, x, 12, ink); drawPix(sh7, c, P, x, 30, z); x += c.w * z + 24; }
+  writePNG(out + 'e1_streamline_front_rear.png', sh7.w, sh7.h, sh7.d); }

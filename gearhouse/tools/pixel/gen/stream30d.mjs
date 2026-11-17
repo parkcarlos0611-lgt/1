@@ -55,3 +55,48 @@ export const zephyr37 = {
   bumperSets: [{ x0: 20, x1: 250, zs: [430], h: 70, clamp: 170, iron: [[200, 420], [420, 400]] }, { x0: 4380, x1: 4620, zs: [440], h: 70, clamp: 4450, iron: [[4250, 420], [4450, 430]] }],
   handles: [[Z(280, 125)[0], Z(280, 125)[1]]],
 };
+
+// ---- front / rear views (half outlines, y mm from centreline) ----
+const circ = (cy, cz, rr, n = 20) => Array.from({ length: n }, (_, k) => [cy + Math.cos(k / n * Math.PI * 2) * rr, cz + Math.sin(k / n * Math.PI * 2) * rr]);
+const tri = (zs) => zs.map(z => ({ half: 1, pts: [[0, z - 15], [820, z - 15], [845, z], [820, z + 15], [0, z + 15]], smooth: 0 }));
+export const airflow34Front = {
+  width: 1760, height: 1520, paint: 'paint.airflow', lowZ: 500, frame: 'chrome', glassStyle: 'period', tire: '6.50-16', track: 1420, hub: 40,
+  body: fillet([[0, 300, 0], [700, 300, 0], [830, 420, 80], [830, 900, 220], [760, 1050, 160], [620, 1110, 0], [600, 1380, 150], [520, 1495, 90], [0, 1497, 0]]),
+  glass: [fillet([[22, 1135, 0], [470, 1135, 30], [460, 1385, 60], [22, 1395, 0]])],
+  under: [{ half: 1, pts: [[0, 270], [640, 290], [640, 420], [0, 420]], ramp: 'black', base: 1 }],
+  grilles: [{ half: 1, pattern: 'vbar', bars: 'chrome', surround: 'chrome', pts: fillet([[0, 435, 0], [220, 435, 40], [220, 960, 120], [120, 1115, 100], [0, 1120, 0]]) }],
+  bumpers: tri([460, 505, 550]),
+  lamps: [{ y: 380, z: 750, r: 95, ramp: 'lensW', bezel: 'chrome' }, { y: 380, z: 590, r: 42, ramp: 'lensW', bezel: 'chrome' }],
+  parts: [{ pts: [[-12, 1135], [12, 1135], [12, 1395], [-12, 1395]], ramp: 'paint.airflow', base: 2 }],
+};
+export const airflow34Rear = {
+  width: 1760, height: 1520, paint: 'paint.airflow', lowZ: 500, frame: 'chrome', glassStyle: 'period', tire: '6.50-16', track: 1420, hub: 40,
+  body: fillet([[0, 300, 0], [700, 300, 0], [830, 420, 80], [830, 850, 220], [700, 1050, 160], [600, 1120, 0], [600, 1380, 150], [520, 1495, 90], [0, 1497, 0]]),
+  glass: [fillet([[30, 1190, 0], [300, 1190, 50], [300, 1340, 60], [30, 1340, 0]])],
+  under: [{ half: 1, pts: [[0, 270], [640, 290], [640, 420], [0, 420]], ramp: 'black', base: 1 }],
+  bumpers: tri([460, 505, 550]),
+  lamps: [{ y: 470, z: 640, r: 40, ramp: 'lensR', bezel: 'chrome' }],
+  parts: [{ pts: circ(0, 860, 360), chrome: 1 }, { pts: circ(0, 860, 325), ramp: 'paint.airflow', base: 3 }, { pts: circ(0, 860, 90), chrome: 1 },
+    { pts: [[-560, 610], [-330, 610], [-330, 720], [-560, 720]], ramp: 'white', base: 2 }],
+};
+const blade = { half: 1, pts: [[0, 410], [880, 420], [905, 455], [880, 520], [0, 515]], smooth: 0 };
+const overriders = [-1, 1].map(s => ({ pts: fillet([[s * 420, 370, 0], [s * 460, 370, 0], [s * 460, 600, 20], [s * 420, 600, 20]]), chrome: 1 }));
+export const zephyr37Front = {
+  width: 1880, height: 1730, paint: 'paint.zephyr', lowZ: 520, frame: 'chrome', glassStyle: 'period', tire: '7.00-16', track: 1450, hub: 40,
+  body: fillet([[0, 330, 0], [760, 330, 0], [880, 450, 80], [880, 900, 220], [800, 1150, 150], [660, 1180, 0], [640, 1300, 0], [600, 1640, 160], [480, 1720, 80], [0, 1722, 0]]),
+  glass: [fillet([[20, 1310, 0], [600, 1310, 30], [565, 1600, 70], [20, 1612, 0]])],
+  under: [{ half: 1, pts: [[0, 300], [700, 320], [700, 450], [0, 450]], ramp: 'black', base: 1 }],
+  grilles: [{ half: 1, pattern: 'hbar', bars: 'chrome', surround: 'chrome', pts: fillet([[0, 380, 0], [230, 420, 60], [200, 800, 140], [60, 1150, 60], [0, 1195, 0]]) }],
+  bumpers: [blade],
+  lamps: [{ y: 610, z: 820, r: 105, ramp: 'lensW', bezel: 'chrome' }],
+  parts: [...overriders, { pts: [[-10, 1310], [10, 1310], [10, 1612], [-10, 1612]], ramp: 'paint.zephyr', base: 2 }, { pts: [[-14, 1195], [14, 1195], [8, 1290], [-8, 1290]], chrome: 1 }],
+};
+export const zephyr37Rear = {
+  width: 1880, height: 1730, paint: 'paint.zephyr', lowZ: 520, frame: 'chrome', glassStyle: 'period', tire: '7.00-16', track: 1450, hub: 40,
+  body: fillet([[0, 330, 0], [760, 330, 0], [880, 450, 80], [880, 880, 220], [780, 1100, 150], [620, 1180, 0], [600, 1500, 200], [420, 1640, 120], [0, 1650, 0]]),
+  glass: [fillet([[0, 1360, 0], [260, 1360, 40], [220, 1520, 80], [0, 1530, 0]])],
+  under: [{ half: 1, pts: [[0, 300], [700, 320], [700, 450], [0, 450]], ramp: 'black', base: 1 }],
+  bumpers: [blade],
+  lamps: [{ y: 0, z: 0, pts: [[730, 820], [800, 820], [800, 1010], [730, 1010]], ramp: 'lensR', bezel: 'chrome' }],
+  parts: [...overriders, { pts: [[-150, 560], [150, 560], [150, 680], [-150, 680]], ramp: 'white', base: 2 }, { pts: [[-60, 980], [60, 980], [60, 1010], [-60, 1010]], chrome: 1 }],
+};

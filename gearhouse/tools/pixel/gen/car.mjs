@@ -85,6 +85,8 @@ export function buildCar(P, s, mm = 25, opt = {}) {
   for (const f of s.fenders || []) { /* wells under separate fenders */ const fm = M().poly(smooth(poly(f.pts), f.smooth ?? 3)); fm.clean(1); f._m = fm; }
   // wheels
   px.wheels = []; const T = s.tire ? tire(s.tire) : null;
+  const drawPart = p => { const m = M(); if (p.e) m.ellipse(v.X(p.e[0]), v.Y(p.e[1]), v.R(p.e[2]), v.R(p.e[3])); else m.poly(smooth(poly(p.pts), p.smooth ?? 1)); if (p.chrome) shadeChrome(px, m, P.id('chrome'), p.behind ? TAG.well : TAG.lamp); else shadeVolume(px, m, () => P.id(p.ramp), v, { tag: p.behind ? TAG.well : (p.tag || TAG.lamp), base: p.base ?? 2 }); };
+  for (const p of s.parts || []) if (p.behind) drawPart(p);
   for (const w0 of s.wheels) { const w = T ? { ...w0, r: T.r, tireFrac: T.frac } : w0; const wp = wheel(P, { ...s.wheel, ...w, r: v.R(w.r) }); const wx = Math.round(v.X(w.x) - wp.w / 2), wy = Math.round(v.Y(w.r) - wp.h / 2); px.blit(wp, wx, wy); px.wheels.push({ wp, wx, wy }); }
   // body paint (+ two-tone regions)
   const bodyM = body.copy().sub(arches); for (const g of s.cut || []) bodyM.sub(M().poly(poly(g)));
@@ -119,7 +121,7 @@ export function buildCar(P, s, mm = 25, opt = {}) {
   for (const sp0 of s.spares || []) { const sp = T ? { ...sp0, r: T.r, tireFrac: T.frac } : sp0; const wp = wheel(P, { ...s.wheel, ...sp, r: v.R(sp.r) }); const wx = Math.round(v.X(sp.x) - wp.w / 2), wy = Math.round(v.Y(sp.z) - wp.h / 2); for (let y = 0; y < wp.h; y++) for (let x = 0; x < wp.w; x++) { const i = y * wp.w + x; if (wp.r[i]) px.set(wx + x, wy + y, wp.r[i], wp.l[i], TAG.board); } }
   for (const b of s.boards || []) { const m = M().poly(poly(b.pts)); px.paint(m, (x, y) => [P.id(b.paint), !m.get(x, y - 1) ? 3 : !m.get(x, y + 1) ? 0 : ((x % 2) ? 1 : 2), TAG.board]); }
   // shut lines, louvres, trim
-  const onBody = (x, y) => paintM.get(x, y) || (s.fenders && px.tag(x, y) === TAG.fender);
+  const onBody = (x, y) => (paintM.get(x, y) && px.tag(x, y) === TAG.body) || px.tag(x, y) === TAG.fender;
   for (const d of s.doors || []) polyline(poly(smooth(d, 2, false)), (x, y) => { if (paintM.get(x, y) && px.tag(x, y) === TAG.body) px.set(x, y, px.ramp(x, y), 0, TAG.body); });
   for (const L of s.louvres || []) for (let x = L.x0; x <= L.x1; x += L.step) line(v.X(x), v.Y(L.z0), v.X(x + (L.lean || 0)), v.Y(L.z1), (X, Y) => { if (onBody(X, Y)) { px.set(X, Y, px.ramp(X, Y), 0, TAG.body); px.set(X + 1, Y, px.ramp(X + 1, Y), 3, TAG.body); } });
   for (const t of s.trim || []) {
@@ -141,7 +143,7 @@ export function buildCar(P, s, mm = 25, opt = {}) {
     if (l.bezel) for (let y = bb.y0; y <= bb.y1; y++) for (let x = bb.x0; x <= bb.x1; x++) if (m.get(x, y) && (!m.get(x - 1, y) || !m.get(x + 1, y) || !m.get(x, y - 1) || !m.get(x, y + 1))) px.set(x, y, P.id(l.bezel), y < (bb.y0 + bb.y1) / 2 ? 4 : 2, TAG.lamp);
   }
   const asym = s['asym' + (opt.side || 'L')] || {}; const extra = Object.values(asym).flat();
-  for (const p of [...(s.parts || []), ...extra]) { const m = M(); if (p.e) m.ellipse(v.X(p.e[0]), v.Y(p.e[1]), v.R(p.e[2]), v.R(p.e[3])); else m.poly(smooth(poly(p.pts), p.smooth ?? 1)); if (p.chrome) shadeChrome(px, m, P.id('chrome'), TAG.lamp); else shadeVolume(px, m, () => P.id(p.ramp), v, { tag: p.tag || TAG.lamp, base: p.base ?? 2 }); }
+  for (const p of [...(s.parts || []), ...extra]) if (!p.behind) drawPart(p);
   for (const h of s.handles || []) { const x = Math.round(v.X(h[0])), y = Math.round(v.Y(h[1])); px.set(x, y, P.id('chrome'), 4, TAG.trim); px.set(x + 1, y, P.id('chrome'), 3, TAG.trim); px.set(x, y + 1, px.ramp(x, y + 1) ? px.ramp(x, y + 1) : P.id('chrome'), 0, TAG.body); px.set(x + 1, y + 1, px.ramp(x + 1, y + 1), 0, TAG.body); }
   outlineLayers(px);
   return px;

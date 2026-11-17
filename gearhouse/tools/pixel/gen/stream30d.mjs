@@ -61,6 +61,7 @@ const circ = (cy, cz, rr, n = 20) => Array.from({ length: n }, (_, k) => [cy + M
 const tri = (zs) => zs.map(z => ({ half: 1, pts: [[0, z - 15], [820, z - 15], [845, z], [820, z + 15], [0, z + 15]], smooth: 0 }));
 export const airflow34Front = {
   width: 1760, height: 1520, paint: 'paint.airflow', lowZ: 500, frame: 'chrome', glassStyle: 'period', tire: '6.50-16', track: 1420, hub: 40,
+  hood: { half: 360, top: 1110, bottom: 430, round: 1, pts: [[0, 420, 0], [330, 420, 60], [365, 760, 160], [300, 1020, 160], [170, 1110, 80], [0, 1115, 0]] }, cowlZ: 1135, wiper: [-400, 1370, -150, 1300], wheelIn: [240, 1240, 180],
   body: fillet([[0, 300, 0], [700, 300, 0], [830, 420, 80], [830, 900, 220], [760, 1050, 160], [620, 1110, 0], [600, 1380, 150], [520, 1495, 90], [0, 1497, 0]]),
   glass: [fillet([[22, 1135, 0], [470, 1135, 30], [460, 1385, 60], [22, 1395, 0]])],
   under: [{ half: 1, pts: [[0, 270], [640, 290], [640, 420], [0, 420]], ramp: 'black', base: 1 }],
@@ -83,6 +84,7 @@ const blade = { half: 1, pts: [[0, 410], [880, 420], [905, 455], [880, 520], [0,
 const overriders = [-1, 1].map(s => ({ pts: fillet([[s * 420, 370, 0], [s * 460, 370, 0], [s * 460, 600, 20], [s * 420, 600, 20]]), chrome: 1 }));
 export const zephyr37Front = {
   width: 1880, height: 1730, paint: 'paint.zephyr', lowZ: 520, frame: 'chrome', glassStyle: 'period', tire: '7.00-16', track: 1450, hub: 40,
+  hood: { half: 420, top: 1215, bottom: 400, round: 1, pts: [[0, 390, 0], [400, 400, 80], [420, 760, 200], [300, 1080, 200], [110, 1210, 60], [0, 1215, 0]] }, cowlZ: 1300, wiper: [-450, 1590, -180, 1500], wheelIn: [260, 1420, 190],
   body: fillet([[0, 330, 0], [760, 330, 0], [880, 450, 80], [880, 900, 220], [800, 1150, 150], [660, 1180, 0], [640, 1300, 0], [600, 1640, 160], [480, 1720, 80], [0, 1722, 0]]),
   glass: [fillet([[20, 1310, 0], [600, 1310, 30], [565, 1600, 70], [20, 1612, 0]])],
   under: [{ half: 1, pts: [[0, 300], [700, 320], [700, 450], [0, 450]], ramp: 'black', base: 1 }],

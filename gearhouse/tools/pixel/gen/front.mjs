@@ -54,9 +54,33 @@ export function buildFront(P, s, mm = 25) {
   shadeFront(px, pm, P.id(s.paint), v, { lowZ: s.lowZ });
   if (tone) { const tm = pm.copy().and(tone); shadeFront(px, tm, P.id(s.tonePaint), v, { lowZ: s.lowZ }); }
   for (const p of s.under || []) { const m = p.half ? sym(v, W, H, p.pts, p.smooth ?? 1) : M().poly(smooth(v.P(p.pts), p.smooth ?? 1)); if (p.chrome) shadeChrome(px, m, P.id('chrome'), TAG.fender); else shadeFront(px, m, P.id(p.ramp), v, { tag: p.tag || TAG.fender, base: p.base ?? 2 }); }
+  if (s.hood || s.cowlZ) {
+    const hz = s.hood, cowl = s.cowlZ ?? (hz ? hz.top + 50 : 0), bodyR = P.id(s.paint), toneR = s.tonePaint ? P.id(s.tonePaint) : -1;
+    const isCab = (x, y) => { const r = px.ramp(x, y), t = px.tag(x, y); return t === TAG.body && (r === bodyR || r === toneR); };
+    const hoodM = hz ? M().poly((hz.pts ? fillet(hz.pts.concat(hz.pts.slice().reverse().map(([yy, zz, r]) => [-yy, zz, r]))) : [[-hz.half, hz.bottom], [hz.half, hz.bottom], [hz.half, hz.top], [-hz.half, hz.top]]).map(([yy, zz]) => [v.X(yy), v.Y(zz)])) : null;
+    const hoodX0 = hz ? Math.round(v.X(-hz.half)) : 0, hoodX1 = hz ? Math.round(v.X(hz.half)) - 1 : -1, yTop = hz ? Math.round(v.Y(hz.top)) : 0, yCowl = Math.round(v.Y(cowl));
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { if (!isCab(x, y)) continue; const z = (v.h - v.pad - y - 0.5) * v.mm;
+      if (z > cowl) continue;
+      const inHood = hz && hoodM.get(x, y);
+      if (inHood) continue;
+      let lv = px.lvl(x, y); if (lv < 0) continue;
+      lv = Math.max(0, lv - 1);                                                                 // cabin face sits behind the hood
+      if (hz && z < hz.top + 40 && (hoodM.get(x + 1, y) || hoodM.get(x - 1, y) || hoodM.get(x + 2, y) || hoodM.get(x - 2, y))) lv = 0;   // contact shadow at hood edges
+      if (y === yCowl || y === yCowl - 1) lv = 0;                                                // windshield-base shadow line
+      if (hz && y >= yCowl && y <= yTop && x >= hoodX0 - 3 && x <= hoodX1 + 3) lv = Math.min(lv, 1); // cowl band above the hood
+      px.set(x, y, px.ramp(x, y), lv, TAG.body); }
+    if (hz) { const m = hoodM; const bb = m.bbox(), cx = (bb.x0 + bb.x1 + 1) / 2, hw = Math.max(1, (bb.x1 - bb.x0 + 1) / 2);
+      px.paint(m, (x, y) => { const d = !m.get(x, y - 1) ? 0 : !m.get(x, y - 2) ? 1 : 9; const u = Math.abs(x + 0.5 - cx) / hw;
+        let lv = d === 0 ? 4 : d === 1 ? 3 : hz.round ? dith(x, y, 3.3 - 2.2 * u * u) : dith(x, y, 3 - 1.2 * (y - bb.y0) / Math.max(1, bb.y1 - bb.y0));
+        if (!m.get(x - 1, y) || !m.get(x + 1, y)) lv = 1;
+        if (!hz.round && Math.abs(x + 0.5 - cx) < 0.6) return [P.id('chrome'), d === 0 ? 4 : 3, TAG.fender]; return [P.id(hz.ramp || s.paint), lv, TAG.fender]; }); }
+  }
   if (s.spare) { const wp = wheel(P, { ...s.spare, r: v.R(s.spare.r) }); px.blit(wp, Math.round(v.cx - wp.w / 2), Math.round(v.Y(s.spare.z) - wp.h / 2)); }
   if (s.glassStyle === 'period') shadeGlassPeriod(px, glass, P.id('glass')); else shadeGlass(px, glass, P.id('glass'), { period: 23 });
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (glass.get(x, y) && (!glass.get(x, y - 1) || !glass.get(x, y + 1) || !glass.get(x - 1, y) || !glass.get(x + 1, y))) { if (s.frame === 'reveal') px.set(x, y, P.id(s.paint), glass.get(x, y + 1) ? 0 : 3, TAG.frame); else px.set(x, y, P.id(s.frame || 'chrome'), glass.get(x, y + 1) ? 3 : 4, TAG.frame); }
+  if (s.wiper) { const [y0, z0, y1, z1] = s.wiper; const a = v.X(y0), b = v.Y(z0), c2 = v.X(y1), d = v.Y(z1); const n = Math.max(Math.abs(c2 - a), Math.abs(d - b)); for (let k = 0; k <= n; k++) { const xx = Math.round(a + (c2 - a) * k / n), yy = Math.round(b + (d - b) * k / n); if (glass.get(xx, yy)) px.set(xx, yy, P.id('black'), 1, TAG.frame); } }
+  if (s.wheelIn) { const [yy, zz, rr] = s.wheelIn; const m = M().ellipse(v.X(yy), v.Y(zz), v.R(rr), v.R(rr * 0.35)); m.sub(M().ellipse(v.X(yy), v.Y(zz), Math.max(0, v.R(rr) - 1), Math.max(0, v.R(rr * 0.35) - 1))); m.and(glass); px.paint(m, () => [P.id('black'), 1, TAG.glass]); }
+  if (s.mirrorIn) { const m = M().poly([[-60, s.mirrorIn], [60, s.mirrorIn], [60, s.mirrorIn + 40], [-60, s.mirrorIn + 40]].map(([yy, zz]) => [v.X(yy), v.Y(zz)])); px.paint(m, () => [P.id('chrome'), 2, TAG.frame]); }
   for (const h of s.interior || []) { const m = M().ellipse(v.X(h[0]), v.Y(h[1]), v.R(h[2]), v.R(h[3])); m.and(glass); px.paint(m, () => [P.id('glass'), 0, TAG.glass]); }
   // grille: frame + pattern fill
   for (const g of s.grilles || []) {

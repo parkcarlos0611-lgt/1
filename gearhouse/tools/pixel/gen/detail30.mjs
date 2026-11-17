@@ -29,11 +29,11 @@ const front = {   // shared front clip, bumper, under-chassis
     { x0: 3930, x1: 4040, zs: [440], h: 42, iron: [[3860, 560], [3930, 470], [3960, 440]] }],
 };
 const frontParts = paint => [
-  { pts: fillet([[450, 640, 0], [450, 1170, 40], [480, 1236, 30], [575, 1242, 0], [575, 640, 0]]), chrome: 1 },   // radiator shell
+  { pts: fillet([[450, 640, 0], [450, 1170, 40], [480, 1236, 30], [575, 1242, 0], [575, 640, 0]]), chrome: 1, behind: 1 },   // radiator shell
   { pts: [[490, 1242], [545, 1242], [540, 1290], [495, 1290]], chrome: 1 },                                         // cap
   { pts: [[500, 1290], [560, 1305], [545, 1325], [505, 1315]], chrome: 1 },                                         // mascot wing (generic)
-  { pts: [[310, 835], [600, 835], [600, 865], [310, 865]], ramp: 'black', base: 1 },                                 // lamp bar
-  { pts: [[375, 865], [400, 865], [400, 915], [375, 915]], ramp: 'black', base: 1 },                                 // lamp stem
+  { pts: [[310, 835], [600, 835], [600, 865], [310, 865]], ramp: 'black', base: 1, behind: 1 },                                 // lamp bar
+  { pts: [[375, 865], [400, 865], [400, 915], [375, 915]], ramp: 'black', base: 1, behind: 1 },                                 // lamp stem
   { e: [405, 1020, 108, 112], chrome: 1 },                                                                            // lamp bucket
   { pts: [[1650, 1150], [1712, 1150], [1712, 1200], [1650, 1200]], chrome: 1 },                                       // cowl lamp
 ];

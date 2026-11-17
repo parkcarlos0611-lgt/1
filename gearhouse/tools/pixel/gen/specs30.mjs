@@ -104,6 +104,7 @@ export const stream37 = {
 // ---------- 1930 upright sedan: front & rear (half outlines, y from centreline) ----------
 export const sedan30front = {
   width: 1720, height: 1720, paint: 'paint.niagara', lowZ: 900, frame: 'reveal',
+  hood: { half: 275, top: 1250, bottom: 650 }, cowlZ: 1300, wiper: [-380, 1580, -120, 1500], wheelIn: [250, 1390, 190], mirrorIn: 1560,
   tyre: [[700, 0], [850, 0], [855, 700], [695, 700]],
   body: fillet([[0, 760, 0], [640, 760, 0], [645, 1300, 0], [625, 1640, 120], [560, 1716, 60], [0, 1716, 0]]),
   tone: [[0, 1650], [700, 1650], [700, 1800], [0, 1800]], tonePaint: 'black',

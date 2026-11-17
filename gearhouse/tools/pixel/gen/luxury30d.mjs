@@ -27,12 +27,12 @@ export const townCar34 = {
     { pts: [[S(460, 0)[0], 412], [S(612, 0)[0], 412]], w: 1, lv: 4, free: 1 }],
   louvres: [{ x0: S(320, 0)[0], x1: S(450, 0)[0], step: 45, z0: (192 - 108) * 9.89, z1: (192 - 84) * 9.89 }],
   parts: [
-    { pts: fillet([[...S(268, 140), 0], [...S(266, 100), 30], [...S(272, 66), 50], [...S(282, 64), 0], [...S(282, 140), 0]]), chrome: 1 },     // V shell edge
+    { pts: fillet([[...S(268, 140), 0], [...S(266, 100), 30], [...S(272, 66), 50], [...S(282, 64), 0], [...S(282, 140), 0]]), chrome: 1, behind: 1 },     // V shell edge
     { pts: [S(466, 61), S(472, 61), S(486, 20), S(480, 19)], chrome: 1 },                                                                         // chauffeur screen frame
     { pts: [S(520, 62), S(545, 62), S(548, 34), S(524, 36)], ramp: 'black', base: 1 },                                                            // chauffeur seat back
     { pts: [S(492, 52), S(505, 46), S(507, 48), S(494, 54)], ramp: 'black', base: 2 },                                                            // steering wheel
     { pts: [S(270, 64), S(280, 50), S(290, 47), S(284, 54), S(278, 64)], chrome: 1 },                                                            // generic swan mascot
-    { pts: [[...S(266, 96)], [...S(300, 96)], [...S(300, 99)], [...S(266, 99)]], ramp: 'black', base: 1 },                                        // lamp bar
+    { pts: [[...S(266, 96)], [...S(300, 96)], [...S(300, 99)], [...S(266, 99)]], ramp: 'black', base: 1, behind: 1 },                                        // lamp bar
     { e: [...S(279, 88), 118, 125], chrome: 1 },                                                                                                  // headlamp bucket
     { pts: fillet([[...S(738, 102), 30], [...S(760, 102), 30], [...S(760, 138), 20], [...S(738, 138), 20]]), ramp: 'black', base: 2 },          // luggage trunk
     { pts: [[...S(744, 108)], [...S(758, 108)], [...S(758, 110)], [...S(744, 110)]], chrome: 1 }],
@@ -44,11 +44,11 @@ export const townCar34 = {
 const Y = x => (x - 105) * 9.86, Zf = y => (190 - y) * 9.86;
 export const townCarFront = {
   width: 1900, height: 1840, paint: 'paint.cadmaroon', tonePaint: 'black', lowZ: 700, frame: 'chrome', glassStyle: 'period', tire: '7.50-17', track: 1480, hub: 50,
+  hood: { half: 300, top: 1262, bottom: 470 }, cowlZ: 1330, wiper: [-420, 1630, -150, 1560], wheelIn: [280, 1420, 200], mirrorIn: 1600,
   body: fillet([[0, 470, 0], [700, 470, 0], [790, 560, 60], [790, 1290, 0], [790, 1700, 150], [740, 1820, 80], [0, 1822, 0]]),
   tone: [[0, 1290], [900, 1290], [900, 1900], [0, 1900]],
   glass: [fillet([[0, 1330, 0], [540, 1330, 30], [540, 1650, 40], [0, 1650, 0]])],
   under: [
-    { half: 1, pts: [[0, 470], [300, 470], [300, 1262], [0, 1262]], ramp: 'paint.cadmaroon', base: 2 },
     { half: 0, pts: fillet([[600, 470, 0], [600, 900, 140], [740, 990, 80], [955, 905, 60], [975, 470, 0]]), ramp: 'black', base: 2 },
     { half: 0, pts: fillet([[-600, 470, 0], [-600, 900, 140], [-740, 990, 80], [-955, 905, 60], [-975, 470, 0]]), ramp: 'black', base: 2 },
     { half: 1, pts: [[0, 300], [420, 330], [620, 390], [0, 390]], ramp: 'black', base: 1 }],

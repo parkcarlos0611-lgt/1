@@ -77,6 +77,7 @@ export function smooth(pts, iters = 3, closed = true) {
 }
 
 export function line(x0, y0, x1, y1, plot) {
+  if (![x0, y0, x1, y1].every(Number.isFinite)) throw new Error('line(): non-finite coordinate');
   x0 = Math.round(x0); y0 = Math.round(y0); x1 = Math.round(x1); y1 = Math.round(y1);
   const dx = Math.abs(x1 - x0), dy = -Math.abs(y1 - y0), sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1; let e = dx + dy;
   for (;;) { plot(x0, y0); if (x0 === x1 && y0 === y1) break; const e2 = 2 * e; if (e2 >= dy) { e += dy; x0 += sx; } if (e2 <= dx) { e += dx; y0 += sy; } }

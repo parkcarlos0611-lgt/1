@@ -9,6 +9,7 @@ import { coupe, townSedan } from './gen/vehicles30.mjs';
 import { buildFront } from './gen/front.mjs';
 import { airflow34, zephyr37 } from './gen/stream30d.mjs';
 import { engineSV } from './gen/engineSV.mjs';
+import { buildUnderbody, smallPlatformUnder } from './gen/underbody.mjs';
 export const P = eraPalette();
 P.auto('paint.niagara', '#4b6283'); P.auto('paint.copra', '#7d3a2c'); P.auto('paint.airflow', '#3f8a72'); P.auto('paint.zephyr', '#7a1f2b'); P.add('ghost', ['#1d3557', '#2f5486', '#5c86bd', '#9cc3ea', '#dceeff'], '#9cc3ea');
 const out = new URL('../../samples/', import.meta.url).pathname, ink = hex('#3a3440');
@@ -32,3 +33,8 @@ writePNG(out + 'e1_detail_before_after.png', sh.w, sh.h, sh.d); console.log('ok'
   const e = engineSV(P, {}), z = 4; const sh4 = new Sheet(e.w * z + 32, e.h * z + 50, hex('#d9d3c7'));
   text(sh4, 'I4 3.3L SIDEVALVE - DETAIL (5MM/PX) FROM ENGINE-BAY PHOTOS', 16, 12, ink); drawPix(sh4, e, P, 16, 32, z);
   writePNG(out + 'e1_engine_sv_detail.png', sh4.w, sh4.h, sh4.d); }
+
+{ P.auto('floor', '#5a3a28', { sat: 0.7 }); P.auto('paint.wheel', '#c9a227');
+  const u = buildUnderbody(P, smallPlatformUnder, 12.5), z = 3; const sh5 = new Sheet(u.w * z + 32, u.h * z + 50, hex('#cfc9bd'));
+  text(sh5, '1930 SMALL PLATFORM - UNDERSIDE (VIEW FROM BELOW, FRONT LEFT) 12.5MM/PX', 16, 12, ink); drawPix(sh5, u, P, 16, 32, z);
+  writePNG(out + 'e1_underbody.png', sh5.w, sh5.h, sh5.d); }

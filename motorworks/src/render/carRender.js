@@ -50,7 +50,9 @@
       for (let i = 0; i <= 24; i++) { const t = U.lerp(t1, t2, i / 24); pts.push({ x: cx + Math.cos(t) * Ra, y: cy + Math.sin(t) * Ra }); }
       return pts;
     };
-    const rearB = Math.max(Ln.y, sillY), frontB = Math.max(F0.y, sillY);
+    // nose/tail faces continue down to the valance (≈ clearance + 110 mm) even if the outline stops higher
+    const valance = Math.max(sillY + 20, b.clr + 110);
+    const rearB = Math.max(Math.min(Ln.y, valance), sillY), frontB = Math.max(Math.min(F0.y, valance), sillY);
     const under = [{ x: Ln.x, y: rearB }, ...arch(rx, rearB, sillY), ...arch(fx, sillY, frontB), { x: F0.x, y: frontB }];
     const poly = side.concat(under);
     const halfW = x => U.yAt(top, U.clamp(x, 1, b.L - 1), 'max') ?? b.W * .45;

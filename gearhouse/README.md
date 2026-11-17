@@ -18,6 +18,8 @@
 | [docs/REFERENCE_ANALYSIS_3.md](docs/REFERENCE_ANALYSIS_3.md) | 3차: 정면 타이어 단면, 유선형 2종 측정, 엔진룸·하부 패턴, 승인된 자료 출처 |
 | [docs/REFERENCE_ANALYSIS_2.md](docs/REFERENCE_ANALYSIS_2.md) | 2차 레퍼런스 분석: 범퍼·하부·창문·장식 패턴, 디테일 축척 12.5mm/px, 자료 요청 목록 |
 | [docs/E1_ASSEMBLY_TEST.md](docs/E1_ASSEMBLY_TEST.md) | 조립 테스트: 프롭 무작위 조합 1930년대 차량 20대, 슬롯 호환 규칙, 디자인 점수 |
+| [docs/E2_REVISION_PLAN.md](docs/E2_REVISION_PLAN.md) | 1940년대 수정 계획(창문·적재함·군용) + 섀시·파워트레인 결합 계획, 자료 요청 |
+| [docs/TECH_PROGRESSION_PLAN.md](docs/TECH_PROGRESSION_PLAN.md) | 기술 계승·노후화 평가 (최근 시대일수록 엄격) |
 | [docs/REFERENCE_ANALYSIS_E2.md](docs/REFERENCE_ANALYSIS_E2.md) | 1940년대 레퍼런스 실측 10종, 군용차 모델링 원칙 |
 | [docs/E2_1940S_PLAN.md](docs/E2_1940S_PLAN.md) | 1940년대 계획: 전시·전후 처리, 폰툰 디자인 언어, 세그먼트별 복제 대상, 자료 요청 |
 | [docs/REFERENCE_ANALYSIS.md](docs/REFERENCE_ANALYSIS.md) | 1930년대 블루프린트 측정 → 휠베이스 비율 규칙, 생성기 구조 규칙 |

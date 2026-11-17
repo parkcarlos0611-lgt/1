@@ -14,6 +14,7 @@ import { drawCutaway, fired } from './cutaway.mjs';
 import { makeAssembly, drawAssembly } from './assembly.mjs';
 import { TEMPLATES, available, makeBody, landmarks } from '../tools/pixel/gen/v2/template.mjs';
 import { newDesign, sideSpec, frontSpec, rearSpec, optionsFor, ranges, clampDesign } from '../tools/pixel/gen/v3/design.mjs';
+import { baseList, baseName, measuredDesign, measuredSide, measuredView, measuredRanges, clampMeasured } from '../tools/pixel/gen/v3/base.mjs';
 import { buildFront } from '../tools/pixel/gen/front.mjs';
 import { baseWidth } from '../sim/dims.mjs';
 import { LIMITS, dimsFor, SIZE } from '../sim/dims.mjs';
@@ -51,8 +52,9 @@ function v2Sprite(v, paintIdx, rot = 0) {
 function v3Sprite(des, paintIdx, view = 'side', rot = 0) {
   const key = 'V3' + view + JSON.stringify(des) + paintIdx + rot; if (app.cache.has(key)) return app.cache.get(key);
   let out = { px: null }; try { const paint = 'paint.c' + paintIdx;
-    if (view === 'side') { const spec = sideSpec(des, paint); spec.wheel = { ...spec.wheel, rot }; out = { px: buildCar(P, spec, Math.max(25, Math.ceil(spec.len / 190))), spec }; }
-    else out = { px: buildFront(P, (view === 'front' ? frontSpec : rearSpec)(des, paint), 25) }; } catch (e) { console.warn(e); }
+    const meas = des.base && des.base !== 'free';                                                       // measured base car -> warped replica
+    if (view === 'side') { const spec = meas ? measuredSide(des, paint) : sideSpec(des, paint); spec.wheel = { ...spec.wheel, rot }; out = { px: buildCar(P, spec, Math.max(25, Math.ceil(spec.len / 190))), spec }; }
+    else out = { px: buildFront(P, meas ? measuredView(des, paint, view === 'rear') : (view === 'front' ? frontSpec : rearSpec)(des, paint), 25) }; } catch (e) { console.warn(e); }
   app.cache.set(key, out); if (app.cache.size > 160) app.cache.delete(app.cache.keys().next().value); return out; }
 // blueprint re-scan: white linework on blue paper revealed by a moving scan bar
 function blueprint(px, x0, y0, prog) { const sy = Math.round(px.h * prog); S.fill(x0 - 2, y0 - 2, px.w + 4, px.h + 4, hex('#1f4e8c'));
@@ -202,12 +204,21 @@ function cars(g) { windowBox(S, AX, AY, AW, AH, 'CAR DESIGN STUDIO');
   const d = app.draft || (app.draft = { name: 'MODEL ' + String.fromCharCode(65 + g.models.length), type: 'sedan4d', seg: 'family', engineId: readyE[0]?.id, gbId: readyG[0]?.id, final: 4.1, price: 850, trim: 1, paint: 0, feats: {},
     body: { style: 'box', wb: 2800, rake: 0.5, roofR: 0.5, noseR: 0.5, bodyR: 0.5, height: 0.5, hood: 0.5, nose: 0.5, belt: 0.5, blackFenders: true } });
   // ---- body designer v3: one record in mm, three views, era / measured limits; symmetric front & rear parts ----
-  let des = d.v3 || (d.v3 = newDesign(g.year, 'sedan4d')); if (des.year !== g.year) des.year = g.year;
+  let des = d.v3 || (d.v3 = measuredDesign(baseList(g.year).includes('sedan30') ? 'sedan30' : baseList(g.year)[0], g.year)); if (des.year !== g.year) des.year = g.year;
+  const meas = des.base && des.base !== 'free', baseOpts = ['free', ...baseList(g.year)], prevBase = des.base || 'free'; if (!des.base) des.base = 'free';
   const view = app.dview || 'side', tabs = [['side', 'SIDE'], ['front', 'FRONT'], ['rear', 'REAR']];
   tabs.forEach(([k, l], i) => { if (button(S, AX + 6 + i * 31, AY + 19, 29, 11, l, { active: view === k })) app.dview = k; });
   const R0 = ranges(g.year), opt = (k, key) => optionsFor(key || k, g.year), NM = { sedan4d: '4-DOOR SEDAN', coupe2d: '2-DOOR COUPE' };
-  const ctl = [];                                   // [kind, key, label, a, b, fmt]
-  if (view === 'side') ctl.push(['cyc', 'type', 'BODY TYPE', ['sedan4d', 'coupe2d'], null, t => NM[t]], ['sl', 'wb', 'WHEELBASE', 1867, 4430, v => Math.round(v) + 'MM', 25], ['sl', 'frontOH', 'FRONT OVERHANG', 380, 1400, v => Math.round(v) + 'MM', 10],
+  const ctl = [['cyc', 'base', 'BASE CAR', baseOpts, null, id => id === 'free' ? 'FREE DESIGN' : baseName(id)]];   // [kind, key, label, a, b, fmt]
+  const MR = meas ? measuredRanges(des) : null, srcs = baseList(g.year), sn = id => baseName(id), mm = v => Math.round(v) + 'MM';
+  if (meas) {
+    if (view === 'side') ctl.push(['sl', 'wb', 'WHEELBASE', ...MR.wb, mm, 10], ['sl', 'frontOH', 'FRONT OVERHANG', ...MR.frontOH, mm, 10], ['sl', 'rearOH', 'REAR OVERHANG', ...MR.rearOH, mm, 10], ['sl', 'belt', 'BODY HEIGHT', ...MR.belt, mm, 5],
+      ['sl', 'roof', 'ROOF HEIGHT', ...MR.roof, mm, 5], ['sl', 'width', 'WIDTH', ...MR.width, mm, 10], ['cyc', 'wheelFrom', 'WHEELS FROM', srcs, null, sn], ['sl', 'whitewall', 'WHITEWALL', 0, 0.45, v => Math.round(v * 100) + '%', 0.05],
+      ['cyc', 'lampFrom', 'HEADLAMPS FROM', srcs, null, sn], ['cyc', 'bumperFrom', 'BUMPERS FROM', srcs, null, sn], ['cyc', 'tailFrom', 'TAIL LAMPS FROM', srcs, null, sn], ['cyc', 'fenderBlack', 'FENDERS BLACK', [false, true]]);
+    if (view === 'front') ctl.push(['cyc', 'grilleFrom', 'GRILLE FROM', srcs, null, sn], ['cyc', 'lampFrom', 'HEADLAMPS FROM', srcs, null, sn], ['cyc', 'bumperFrom', 'BUMPERS FROM', srcs, null, sn], ['cyc', 'guards', 'BUMPER GUARDS', [0, 2]],
+      ['cyc', 'fog', 'FOG LAMPS', [false, true]], ['cyc', 'ornament', 'HOOD ORNAMENT', [true, false]]);
+    if (view === 'rear') ctl.push(['cyc', 'tailFrom', 'TAIL LAMPS FROM', srcs, null, sn], ['cyc', 'bumperFrom', 'BUMPERS FROM', srcs, null, sn]);
+  } else if (view === 'side') ctl.push(['cyc', 'type', 'BODY TYPE', ['sedan4d', 'coupe2d'], null, t => NM[t]], ['sl', 'wb', 'WHEELBASE', 1867, 4430, v => Math.round(v) + 'MM', 25], ['sl', 'frontOH', 'FRONT OVERHANG', 380, 1400, v => Math.round(v) + 'MM', 10],
     ['sl', 'rearOH', 'REAR OVERHANG', 300, 1700, v => Math.round(v) + 'MM', 10], ['sl', 'width', 'WIDTH', 1146, 2215, v => Math.round(v) + 'MM', 10], ['sl', 'roof', 'ROOF HEIGHT', ...R0.roof, v => Math.round(v) + 'MM', 5],
     ['sl', 'belt', 'BELT LINE', ...R0.belt, v => Math.round(v * des.roof) + 'MM', 0.005], ['sl', 'hood', 'HOOD HEIGHT', ...R0.hood, v => Math.round(v * des.roof) + 'MM', 0.005], ['sl', 'rake', 'SCREEN RAKE', ...R0.rake, v => Math.round(v) + ' DEG', 1],
     ['sl', 'cowl', 'COWL FROM FRONT AXLE', 500, des.wb * 0.55, v => Math.round(v) + 'MM', 10], ['sl', 'cabin', 'ROOF LENGTH', ...R0.cabin, v => Math.round(v) + 'MM', 10], ['sl', 'crown', 'ROOF CURVE', ...R0.crown, v => Math.round(v) + 'MM', 5],
@@ -216,15 +227,16 @@ function cars(g) { windowBox(S, AX, AY, AW, AH, 'CAR DESIGN STUDIO');
     ['sl', 'frontDoor', 'FRONT DOOR LENGTH', 800, 1150, v => Math.round(v) + 'MM', 10], ['sl', 'pillarB', 'B PILLAR', 70, 160, v => Math.round(v) + 'MM', 5], ['cyc', 'vent', 'VENT WINGS', [true, false]], ['cyc', 'splitScreen', 'SPLIT SCREEN', [true, false]],
     ['sl', 'louvres', 'HOOD LOUVRES', 0, 16, v => Math.round(v) + '', 1], ['cyc', 'spear', 'SIDE SPEAR', [true, false]], ['cyc', 'spare', 'SPARE', opt('spare')], ['cyc', 'wheel', 'WHEELS', opt('wheel')], ['sl', 'whitewall', 'WHITEWALL', 0, 0.45, v => Math.round(v * 100) + '%', 0.05],
     ['cyc', 'fenderBlack', 'FENDERS BLACK', [true, false]], ['cyc', 'roofTone', 'BLACK ROOF', [true, false]]);
-  if (view === 'front') ctl.push(['cyc', 'grille', 'GRILLE', opt('grille')], ['cyc', 'gpattern', 'GRILLE PATTERN', opt('gpattern')], ['sl', 'grilleW', 'GRILLE WIDTH', 0.25, 0.75, v => Math.round(v * des.width) + 'MM', 0.01], ['sl', 'grilleH', 'GRILLE HEIGHT', 0.3, 0.8, v => Math.round(v * 100) + '%', 0.01],
+  if (!meas && view === 'front') ctl.push(['cyc', 'grille', 'GRILLE', opt('grille')], ['cyc', 'gpattern', 'GRILLE PATTERN', opt('gpattern')], ['sl', 'grilleW', 'GRILLE WIDTH', 0.25, 0.75, v => Math.round(v * des.width) + 'MM', 0.01], ['sl', 'grilleH', 'GRILLE HEIGHT', 0.3, 0.8, v => Math.round(v * 100) + '%', 0.01],
     ['cyc', 'lamp', 'HEADLAMPS', opt('lamp')], ['sl', 'lampR', 'LAMP SIZE', 70, 135, v => Math.round(v * 2) + 'MM', 1], ['sl', 'lampY', 'LAMP SPACING (MIRRORED)', 0.3, 0.9, v => Math.round(v * des.width) + 'MM', 0.01], ['sl', 'lampZ', 'LAMP HEIGHT', 0.5, 0.95, v => Math.round(v * 100) + '%', 0.01],
     ['sl', 'bumperBars', 'BUMPER BARS', 1, 2, v => Math.round(v) + '', 1], ['cyc', 'guards', 'BUMPER GUARDS', [0, 2, 3]], ['cyc', 'fog', 'FOG LAMPS', [false, true]], ['cyc', 'ornament', 'HOOD ORNAMENT', [true, false]]);
-  if (view === 'rear') ctl.push(['cyc', 'tailLamp', 'TAIL LAMPS', opt('tailLamp')], ['sl', 'tailY', 'TAIL LAMP SPACING (MIRRORED)', 0.4, 0.95, v => Math.round(v * des.width) + 'MM', 0.01], ['cyc', 'rearWindow', 'REAR WINDOW', opt('rearWindow')], ['cyc', 'spare', 'SPARE', opt('spare')], ['cyc', 'guards', 'BUMPER GUARDS', [0, 2, 3]]);
+  if (!meas && view === 'rear') ctl.push(['cyc', 'tailLamp', 'TAIL LAMPS', opt('tailLamp')], ['sl', 'tailY', 'TAIL LAMP SPACING (MIRRORED)', 0.4, 0.95, v => Math.round(v * des.width) + 'MM', 0.01], ['cyc', 'rearWindow', 'REAR WINDOW', opt('rearWindow')], ['cyc', 'spare', 'SPARE', opt('spare')], ['cyc', 'guards', 'BUMPER GUARDS', [0, 2, 3]]);
   const before = JSON.stringify(des);
   scrollArea(S, 'design-' + view, AX + 4, AY + 32, 94, 168, ctl.length * 19 + 6, dy => ctl.forEach(([kind, key, label, a, b, fmt, step], i) => { const y = AY + 34 + i * 19 - dy;
     if (kind === 'sl') des[key] = slider(S, AX + 6, y, 86, label, des[key], a, b, { step: step || 0, fmt: fmt || (v => v.toFixed(2)), id: 'd3' + key });
     else { const list = a.length ? a : [des[key]]; des[key] = cycler(S, AX + 6, y - 2, 86, label, list, list.includes(des[key]) ? des[key] : list[0], { names: fmt || (v => (v === true ? 'YES' : v === false ? 'NO' : String(v).toUpperCase())) }); } }));
-  des.doors = des.type === 'coupe2d' ? 2 : 4; des.bumperBars = Math.round(des.bumperBars); des.louvres = Math.round(des.louvres); const notes = clampDesign(des);
+  if ((des.base || 'free') !== prevBase) { const nb = des.base; des = d.v3 = nb === 'free' ? { ...newDesign(g.year, 'sedan4d'), base: 'free' } : measuredDesign(nb, g.year); }   // new base car -> start from its measured values
+  let notes; if (des.base !== 'free') notes = clampMeasured(des); else { des.doors = des.type === 'coupe2d' ? 2 : 4; des.bumperBars = Math.round(des.bumperBars); des.louvres = Math.round(des.louvres); notes = clampDesign(des); }
   if (JSON.stringify(des) !== before) app.bpT = app.t;                                                          // design changed -> new blueprint scan
   d.paint = cycler(S, AX + 6, AY + 201, 86, 'PAINT', PAINTS.map((_, i) => i), d.paint, { names: i => 'COLOUR ' + (i + 1) }); S.fill(AX + 98 - 10, AY + 210, 6, 7, hex(PAINTS[d.paint]));
   d.type = des.type;
@@ -235,7 +247,7 @@ function cars(g) { windowBox(S, AX, AY, AW, AH, 'CAR DESIGN STUDIO');
   if (px) { const ox = cx + Math.max(2, (pw - px.w) / 2) | 0, oy = AY + 108 - px.h, prog = Math.min(1, (app.t - (app.bpT ?? -999)) / 40);
     if (prog < 1) { blueprint(px, ox, oy, prog); if ((app.t - app.bpT) % 8 === 0) AU.sfx('wrench'); } else drawPix(S, px, P, ox, oy, 1); }
   if (notes.length) text(S, 'ERA LIMIT: ' + notes.join(', ').toUpperCase(), cx + 3, AY + 104, C.red, 1, pw - 6);
-  const style = des.frontFender === 'integrated' ? 'pontoon' : des.rake > 18 || des.tail === 'fastback' ? 'stream' : 'box', q = { style, notes: [] }, tpl = { style }, v = des;
+  const style = des.base !== 'free' ? (TEMPLATES.find(t => t.id === des.base)?.style || 'box') : des.frontFender === 'integrated' ? 'pontoon' : des.rake > 18 || des.tail === 'fastback' ? 'stream' : 'box', q = { style, notes: [] }, tpl = { style }, v = des;
   // mechanicals
   if (!readyE.length || !readyG.length) { text(S, 'NEED A READY ENGINE AND GEARBOX', cx + 4, AY + 120, C.red); return; }
   d.engineId = cycler(S, cx, AY + 116, 97, 'ENGINE', readyE.map(e => e.id), d.engineId, { names: id => g.engines.find(e => e.id === id).name });

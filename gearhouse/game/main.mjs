@@ -1,0 +1,226 @@
+// GEARHOUSE 1930-1949 test build: scenes, designers, monthly loop, save/load. All UI is pixel-drawn (ui.mjs).
+import { W, H, C, Sheet, drawPix, input, text, tw, windowBox, panel, button, slider, cycler, bar, stat, graph, desk, bevel, rivet, lineTo } from './ui.mjs';
+import { eraPalette, hex } from '../tools/pixel/color.mjs';
+import { buildCar } from '../tools/pixel/gen/car.mjs';
+import { genBody, clampParams, limits } from '../tools/pixel/gen/bodygen.mjs';
+import { engineSV } from '../tools/pixel/gen/engineSV.mjs';
+import { flatheadV8, ohvI6, ptPalette } from '../tools/pixel/gen/engine40.mjs';
+import { engineSide } from '../tools/pixel/gen/props.mjs';
+import { engineStats, LAYOUTS, HEADS, maxCR } from '../sim/engine.mjs';
+import { GEARBOX, proposeRatios } from '../sim/drive.mjs';
+import { COUNTRIES, SEGS, TECH, RES_SCALE, newGame, stepMonth, evaluate, appeal, dateNum, has } from './world.mjs';
+
+const PAINTS = ['#2f3a4a', '#5c1c27', '#3f5a40', '#7d3a2c', '#4b6283', '#d8c9a0', '#1d1d22', '#6b5a3a', '#8c2a24', '#6b6e70'];
+const P = ptPalette(eraPalette()); PAINTS.forEach((h, i) => P.auto('paint.c' + i, h)); P.auto('paint.enginecream', '#b9ae8e');
+const S = new Sheet(W, H, C.desk), cv = document.getElementById('screen'), ctx = cv.getContext('2d'), img = new ImageData(S.d, W, H);
+const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+const money = n => (n < 0 ? '-$' : '$') + Math.abs(Math.round(n)).toLocaleString('en-US');
+const store = { get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } }, set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch { return false; } } };
+const app = { scene: 'title', g: null, tab: 'cars', t: 0, settings: { scale: 0, scan: true, ...(store.get('gh_settings') || {}) },
+  ng: { country: 'USA', year: 1930, capital: 250000, research: 'medium', name: 'GEARHOUSE MOTOR CO.' }, toast: null, cache: new Map() };
+const NAMES = ['GEARHOUSE MOTOR CO.', 'IRONWOOD AUTO WORKS', 'MERIDIAN MOTORS', 'BRASS & SONS CARRIAGE', 'NORTHLINE AUTOMOBILE', 'VALEN MOTOR WORKS'];
+const toast = t => (app.toast = { t, until: app.t + 150 });
+
+// ---------- sprite caches ----------
+const tyreFor = y => (y < 1933 ? '4.75-19' : y < 1936 ? '5.50-17' : y < 1946 ? '6.00-16' : '6.70-15');
+function carSprite(year, body, paintIdx, type) {
+  const key = JSON.stringify([year, body, paintIdx, type]); if (app.cache.has(key)) return app.cache.get(key);
+  const q = clampParams({ ...body, year, type, tire: tyreFor(year), paint: 'paint.c' + paintIdx, fenderPaint: body.style === 'box' && body.blackFenders ? 'black' : 'paint.c' + paintIdx });
+  let px = null; try { const s = genBody(q); Object.assign(s, { grad: [3.1, 1.4], glassStyle: 'period' }); px = buildCar(P, s, 25); } catch (e) { console.warn(e); }
+  const out = { px, q }; app.cache.set(key, out); if (app.cache.size > 80) app.cache.delete(app.cache.keys().next().value); return out; }
+function engineSprite(e) {
+  const key = 'E' + JSON.stringify([e.layout, e.head, e.bore, e.stroke]); if (app.cache.has(key)) return app.cache.get(key);
+  const L = LAYOUTS[e.layout], mm = 9; let px;
+  try { if (e.head === 'sv' && L.banks === 1) px = engineSV(P, { cyl: L.cyl, bore: e.bore, stroke: e.stroke, color: 'paint.enginegreen' }, mm);
+    else if (e.head === 'sv') px = flatheadV8(P, { bore: e.bore, stroke: e.stroke }, mm);
+    else if (L.banks === 1 && L.cyl === 6) px = ohvI6(P, { bore: e.bore, stroke: e.stroke, color: 'paint.engineGrey', box: 'none' }, mm);
+    else px = engineSide(P, { layout: L.banks > 1 ? 'V' : 'inline', cyl: L.cyl / L.banks, bore: e.bore, stroke: e.stroke, head: 'ohv', cover: 'paint.enginered' }, mm); } catch (err) { console.warn(err); }
+  app.cache.set(key, px); return px; }
+
+// ---------- scenes ----------
+function title() {
+  desk(S); const t = app.t;
+  for (let x = 0; x < W; x++) S.fill(x, 196, 1, 74, x % 16 < 8 ? hex('#3a2a20') : hex('#30221b'));   // workshop floor
+  S.fill(0, 195, W, 1, C.brassD);
+  text(S, 'GEARHOUSE', 240 - tw('GEARHOUSE', 5) / 2 + 3, 33, C.black, 5); text(S, 'GEARHOUSE', 240 - tw('GEARHOUSE', 5) / 2, 30, C.brass, 5);
+  text(S, 'MOTOR COMPANY SIMULATION - 1930-1949 TEST BUILD', 240 - tw('MOTOR COMPANY SIMULATION - 1930-1949 TEST BUILD') / 2, 62, C.paperDark);
+  const yr = 1930 + Math.floor((t / 240) % 20), car = carSprite(yr, { style: yr >= 1946 ? 'pontoon' : yr >= 1936 ? 'stream' : 'box', wb: 2800, rake: 0.5, roofR: 0.5, noseR: 0.5, bodyR: 0.5, height: 0.5, hood: 0.5, nose: 0.5, belt: 0.5, blackFenders: yr < 1935 }, Math.floor(t / 240) % 8, 'sedan4d').px;
+  if (car) { const cx = Math.round(((t * 0.8) % (W + car.w)) - car.w); drawPix(S, car, P, cx, 196 - car.h + 4, 1); }
+  text(S, String(yr), 446, 186, C.brass);
+  const bx = 190, items = [['NEW GAME', () => (app.scene = 'newgame')], ['CONTINUE', () => (app.scene = 'load')], ['SETTINGS', () => (app.scene = 'settings')]];
+  items.forEach(([l, f], i) => { if (button(S, bx, 86 + i * 22, 100, 17, l)) f(); });
+}
+function settings() {
+  desk(S); windowBox(S, 140, 50, 200, 150, 'SETTINGS'); const st = app.settings;
+  st.scale = cycler(S, 155, 75, 170, 'DISPLAY SCALE', [0, 2, 3, 4], st.scale, { names: v => (v ? v + 'X' : 'AUTO FIT') });
+  st.scan = cycler(S, 155, 100, 170, 'CRT SCANLINES', [true, false], st.scan, { names: v => (v ? 'ON' : 'OFF') });
+  text(S, 'SAVES ARE KEPT IN THIS BROWSER ONLY.', 155, 130, C.inkSoft);
+  if (button(S, 155, 170, 80, 16, 'BACK')) { store.set('gh_settings', st); resize(); app.scene = app.g ? 'hq' : 'title'; }
+}
+function newgame() {
+  desk(S); windowBox(S, 60, 20, 360, 230, 'NEW COMPANY'); const n = app.ng;
+  n.name = cycler(S, 75, 42, 200, 'COMPANY NAME', NAMES, n.name);
+  n.country = cycler(S, 75, 68, 200, 'HOME COUNTRY', Object.keys(COUNTRIES), n.country, { names: k => COUNTRIES[k].name });
+  n.year = Math.round(slider(S, 75, 96, 200, 'START YEAR', n.year, 1930, 1945, { step: 1, fmt: v => String(Math.round(v)) }));
+  n.capital = cycler(S, 75, 116, 200, 'STARTING CAPITAL', [100000, 250000, 500000], n.capital, { names: money });
+  n.research = cycler(S, 75, 142, 200, 'RESEARCH DEPARTMENT', Object.keys(RES_SCALE), n.research, { names: k => `${k.toUpperCase()} (${RES_SCALE[k].pts} PTS, ${money(RES_SCALE[k].cost)}/MO)` });
+  const c = COUNTRIES[n.country]; panel(S, 290, 42, 115, 120, 'COUNTRY');
+  [['WEALTH', c.wealth], ['FUEL COST', c.fuel / 1.8], ['ROADS', c.roads], ['WAGES', c.wage]].forEach(([l, v], i) => { text(S, l, 295, 54 + i * 16, C.ink); bar(S, 295, 61 + i * 16, 105, 5, v, i === 1 ? C.red : C.teal); });
+  text(S, `MARKET ${n.year}: ${(c.market[n.year] || 0)}K CARS`, 295, 122, C.ink); text(S, `WAR: ${c.war[0]}-${c.war[1]}`, 295, 132, C.red);
+  if (button(S, 75, 222, 80, 16, 'BACK')) app.scene = 'title';
+  if (button(S, 325, 222, 80, 16, 'FOUND IT', { tone: 'ox' })) { app.g = newGame(n); app.draft = null; app.edraft = null; app.scene = 'hq'; app.tab = 'engines'; }
+}
+function load() {
+  desk(S); windowBox(S, 120, 40, 240, 180, 'LOAD COMPANY');
+  for (let i = 1; i <= 3; i++) { const sv = store.get('gh_slot_' + i), y = 66 + (i - 1) * 40; panel(S, 135, y, 210, 32);
+    if (sv) { text(S, sv.name, 140, y + 5, C.ink); text(S, `${MONTHS[sv.month - 1]} ${sv.year}  ${money(sv.cash)}`, 140, y + 14, C.inkSoft); if (button(S, 290, y + 8, 48, 15, 'LOAD')) { app.g = sv; app.scene = 'hq'; app.tab = 'news'; } }
+    else text(S, `SLOT ${i} - EMPTY`, 140, y + 12, C.inkSoft); }
+  if (button(S, 135, 196, 80, 16, 'BACK')) app.scene = 'title';
+}
+// ---------- HQ ----------
+const TABS = [['news', 'OFFICE'], ['engines', 'ENGINES'], ['gearbox', 'GEARBOX'], ['cars', 'CAR DESIGN'], ['prod', 'PRODUCTION'], ['research', 'RESEARCH'], ['market', 'MARKET'], ['finance', 'FINANCE'], ['save', 'SAVE'], ['menu', 'MENU']];
+function hq() {
+  const g = app.g; desk(S);
+  bevel(S, 0, 0, W, 16, C.oxblood, C.oxL, C.oxD); rivet(S, 4, 7); rivet(S, W - 6, 7);
+  text(S, g.name, 10, 6, C.brassL); const dt = `${MONTHS[g.month - 1]} ${g.year}`; text(S, dt, 200, 6, C.white);
+  text(S, money(g.cash), 280, 6, g.cash < 0 ? hex('#ffb0a0') : C.brassL); text(S, `REP ${Math.round(g.rep * 100)}`, 360, 6, C.white);
+  TABS.forEach(([k, l], i) => { if (button(S, 3, 20 + i * 19, 66, 16, l, { active: app.tab === k, tone: k === 'menu' || k === 'save' ? 'teal' : 'brass' })) app.tab = k; });
+  if (!g.over && button(S, 3, 222, 66, 22, 'NEXT MONTH', { tone: 'ox' })) { stepMonth(g); }
+  if (!g.over && button(S, 3, 246, 66, 16, '+6 MONTHS')) { for (let i = 0; i < 6 && !g.over; i++) stepMonth(g); }
+  ({ news, engines, gearbox, cars, prod, research, market, finance, save, menu })[app.tab]?.(g);
+  if (g.over) { windowBox(S, 130, 80, 240, 100, 'THE BOOKS ARE CLOSED'); text(S, g.over, 145, 104, C.oxblood); text(S, `FINAL CASH ${money(g.cash)}`, 145, 118); text(S, `CARS SOLD ${g.models.reduce((a, m) => a + (m.sold || 0), 0).toLocaleString()}`, 145, 128);
+    text(S, `REPUTATION ${Math.round(g.rep * 100)}`, 145, 138); if (button(S, 145, 155, 90, 16, 'TITLE')) { app.scene = 'title'; app.g = null; } }
+}
+const AX = 74, AY = 20, AW = W - AX - 3, AH = H - AY - 3;
+function news(g) { windowBox(S, AX, AY, AW, AH, 'OFFICE - NEWS WIRE & SUMMARY');
+  panel(S, AX + 8, AY + 22, 220, AH - 30, 'TELEGRAMS'); g.news.slice(0, 22).forEach((n, i) => { const y = AY + 33 + i * 9, yy = Math.floor(n.d / 12), mm = n.d % 12; text(S, n.d ? `${MONTHS[mm]} ${yy}` : '----', AX + 12, y, C.oxblood); text(S, n.t.slice(0, 44), AX + 50, y, C.ink); });
+  const x = AX + 236; panel(S, x, AY + 22, AW - 244, 90, 'THIS MONTH'); const l = g.last || { rev: 0, cost: 0, sales: 0 };
+  stat(S, x + 5, AY + 34, 'CARS SOLD', l.sales.toLocaleString()); stat(S, x + 5, AY + 44, 'REVENUE', money(l.rev)); stat(S, x + 5, AY + 54, 'COSTS', money(l.cost), C.red); stat(S, x + 5, AY + 64, 'PROFIT', money(l.rev - l.cost), l.rev >= l.cost ? C.green : C.red);
+  stat(S, x + 5, AY + 78, 'FACTORY', `${g.factory}/MO`); stat(S, x + 5, AY + 88, 'MODELS', `${g.models.filter(m => !m.dead).length}`); stat(S, x + 5, AY + 98, 'RESEARCH', g.resCur ? TECH.find(t => t.id === g.resCur).name.slice(0, 16) : 'IDLE', g.resCur ? C.ink : C.red);
+  panel(S, x, AY + 118, AW - 244, 110, 'HOW TO PLAY'); ['1 ENGINES: DESIGN + TOOL UP', '2 GEARBOX: PICK TYPE + RATIOS', '3 CAR DESIGN: BODY, ENGINE,', '  SEGMENT, PRICE -> LAUNCH', '4 PRODUCTION: MONTHLY OUTPUT', '5 RESEARCH NEW TECH', '6 NEXT MONTH. SURVIVE TO 1950.', '', 'OLD TECH LOSES APPEAL OVER', 'TIME - KEEP MODERNISING.'].forEach((s, i) => text(S, s, x + 5, AY + 130 + i * 9, C.ink)); }
+
+function engines(g) { windowBox(S, AX, AY, AW, AH, 'ENGINE DESIGN - FAMILY + VARIANT');
+  const e = app.edraft || (app.edraft = { ...g.engines[0], id: null, name: 'NEW ENGINE', quality: 0 });
+  panel(S, AX + 6, AY + 20, 112, AH - 26, 'YOUR ENGINES'); g.engines.forEach((x, i) => { const y = AY + 31 + i * 15, rdy = x.readyAt <= dateNum(g);
+    if (button(S, AX + 9, y, 106, 13, `${x.name.slice(0, 13)} ${rdy ? '' : '*'}`, { active: app.edraft?.from === x.id })) app.edraft = { ...x, from: x.id, id: null, name: x.name + ' B' }; });
+  text(S, '* = TOOLING IN PROGRESS', AX + 9, AY + AH - 14, C.inkSoft);
+  const x0 = AX + 124, lay = Object.keys(LAYOUTS).filter(k => LAYOUTS[k].year <= g.year), heads = ['sv', 'fh', 'ohv', 'sohc', 'dohc'];
+  const headOK = h => h === 'sv' || h === 'fh' || (h === 'ohv' && has(g, 'ohv')) || (h === 'sohc' && has(g, 'ohv') && g.year >= 1946);
+  e.layout = cycler(S, x0, AY + 22, 110, 'LAYOUT', lay, e.layout);
+  const h2 = cycler(S, x0, AY + 46, 110, 'VALVETRAIN', heads, e.head, { names: h => HEADS[h].name, lock: h => !headOK(h) }); if (headOK(h2)) e.head = h2; else if (h2 !== e.head) toast('RESEARCH NEEDED FOR ' + HEADS[h2].name);
+  e.bore = Math.round(slider(S, x0, AY + 72, 110, 'BORE MM', e.bore, 65, 105, { step: 0.5, fmt: v => v.toFixed(1) }) * 2) / 2;
+  e.stroke = Math.round(slider(S, x0, AY + 92, 110, 'STROKE MM', e.stroke, 70, 130, { step: 0.5, fmt: v => v.toFixed(1) }) * 2) / 2;
+  const crMax = maxCR(g.year, e.head); e.cr = slider(S, x0, AY + 112, 110, `COMPRESSION (MAX ${crMax.toFixed(1)})`, Math.min(e.cr, crMax), 4.5, crMax, { step: 0.1, fmt: v => v.toFixed(1) + ':1' });
+  e.cam = slider(S, x0, AY + 132, 110, 'CAM: TORQUE..REVS', e.cam, 0, 1, { step: 0.05 });
+  e.carbs = cycler(S, x0, AY + 152, 110, 'CARBURETTORS', has(g, 'twincarb') ? [1, 2] : [1], e.carbs, { names: n => n + 'X DOWNDRAFT' });
+  e.carbSize = slider(S, x0, AY + 176, 110, 'CARB SIZE', e.carbSize, 0.6, 1.4, { step: 0.05 });
+  e.quality = Math.round(slider(S, x0, AY + 196, 110, 'BUILD QUALITY', e.quality, -3, 3, { step: 1, fmt: v => (v > 0 ? '+' : '') + Math.round(v) }));
+  const es = engineStats({ ...e, year: g.year }), x1 = AX + 242;
+  panel(S, x1, AY + 20, AW - 248, 76, 'OUTPUT');
+  graph(S, x1 + 4, AY + 30, 92, 62, [{ pts: es.curve.map(p => p.T), c: C.teal }, { pts: es.curve.map(p => p.hp * 2), c: C.red }], { labels: [{ t: 'NM', c: C.teal }, { t: 'HP', c: C.red }] });
+  const sx = x1 + 100; [['DISPLACE', `${es.litres.toFixed(2)}L ${Math.round(es.cid)}CI`], ['POWER', `${es.hp.toFixed(0)}HP @${es.hpRpm}`], ['TORQUE', `${es.torque.toFixed(0)}NM @${es.tRpm}`], ['REDLINE', es.redline + ' RPM'],
+    ['MASS', es.mass + ' KG'], ['SMOOTH', Math.round(es.smooth * 100) + '%'], ['RELIABLE', Math.round(es.reliability * 100) + '%'], ['UNIT COST', money(es.cost)]].forEach(([l, v], i) => stat(S, sx, AY + 30 + i * 8, l, v));
+  panel(S, x1, AY + 100, AW - 248, 100, 'SIDE VIEW (SCALE)'); const spr = engineSprite(e);
+  if (spr) { const sc = spr.w > AW - 256 || spr.h > 88 ? 0.5 : 1; if (sc === 1) drawPix(S, spr, P, x1 + 4 + Math.max(0, (AW - 256 - spr.w) / 2) | 0, AY + 110 + Math.max(0, 86 - spr.h) | 0, 1); else text(S, 'ENGINE TOO LARGE TO PREVIEW', x1 + 6, AY + 140); }
+  text(S, `${es.len}MM LONG  ${es.height}MM TALL`, x1 + 4, AY + 194, C.inkSoft);
+  const cost = es.tooling, can = g.cash >= cost; text(S, `TOOLING ${money(cost)} / ${es.engMonths} MONTHS`, x1, AY + 206, C.ink);
+  if (button(S, x1, AY + 214, 120, 16, 'TOOL UP FAMILY', { tone: 'ox', disabled: !can })) { const id = 'E' + g.serial++; g.engines.push({ ...e, id, from: undefined, name: `${e.layout}-${HEADS[e.head].name.split(' ')[0]} ${es.litres.toFixed(1)}`, readyAt: dateNum(g) + es.engMonths, tooling: cost }); g.cash -= cost; toast('ENGINE TOOLING STARTED'); }
+}
+function gearbox(g) { windowBox(S, AX, AY, AW, AH, 'GEARBOX + DRIVELINE');
+  const d = app.gdraft || (app.gdraft = { type: g.gearboxes[0].type, gears: 3, first: 2.9, top: 1.0 });
+  panel(S, AX + 6, AY + 20, 112, AH - 26, 'YOUR GEARBOXES'); g.gearboxes.forEach((x, i) => text(S, `${x.name.slice(0, 16)}${x.readyAt > dateNum(g) ? '*' : ''}`, AX + 10, AY + 32 + i * 10, C.ink));
+  const x0 = AX + 124, types = Object.keys(GEARBOX).filter(k => GEARBOX[k].year <= g.year), ok = k => k === 'crash3' || has(g, { sync3: 'sync3', sync4: 'sync4', od3: 'od', fluid: 'fluid', hydra4: 'hydra', tc2: 'hydra' }[k]);
+  const t2 = cycler(S, x0, AY + 22, 160, 'TYPE', types, d.type, { names: k => GEARBOX[k].name, lock: k => !ok(k) }); if (ok(t2)) d.type = t2; else if (t2 !== d.type) toast('RESEARCH NEEDED');
+  const G = GEARBOX[d.type]; d.gears = Math.max(G.gears[0], Math.min(G.gears[1], d.gears));
+  d.gears = cycler(S, x0, AY + 48, 160, 'FORWARD GEARS', Array.from({ length: G.gears[1] - G.gears[0] + 1 }, (_, i) => G.gears[0] + i), d.gears, { names: n => n + ' SPEEDS' });
+  d.first = slider(S, x0, AY + 76, 160, '1ST GEAR RATIO', d.first, 2.0, 4.0, { step: 0.05 }); d.top = slider(S, x0, AY + 96, 160, 'TOP GEAR RATIO', d.top, d.type === 'od3' ? 0.7 : 0.9, 1.0, { step: 0.01 });
+  const R = proposeRatios(d.gears, d.first, d.top); text(S, 'RATIOS: ' + R.join(' / '), x0, AY + 118, C.oxblood);
+  [['EFFICIENCY', Math.round(G.eff * 100) + '%'], ['MASS', G.mass + ' KG'], ['COMFORT', Math.round(G.comfort * 100) + '%'], ['SHIFT TIME', G.shift + ' S'], ['UNIT COST', money(G.cost)]].forEach(([l, v], i) => stat(S, x0, AY + 132 + i * 9, l, v));
+  panel(S, AX + 300, AY + 20, AW - 306, 120, 'RATIO LADDER'); R.forEach((r, i) => { const h = Math.round(r / 4 * 90); S.fill(AX + 310 + i * 18, AY + 130 - h, 12, h, C.teal); text(S, String(i + 1), AX + 313 + i * 18, AY + 133, C.ink); });
+  if (button(S, x0, AY + 186, 140, 16, `BUILD ($15,000 / 3 MO)`, { tone: 'ox', disabled: g.cash < 15000 })) { g.gearboxes.push({ id: 'G' + g.serial++, name: `${d.gears}-SPD ${G.name.split(' ').slice(-1)[0]}`, type: d.type, gears: d.gears, ratios: R, readyAt: dateNum(g) + 3 }); g.cash -= 15000; toast('GEARBOX TOOLING STARTED'); }
+}
+function cars(g) { windowBox(S, AX, AY, AW, AH, 'CAR DESIGN STUDIO');
+  const readyE = g.engines.filter(e => e.readyAt <= dateNum(g)), readyG = g.gearboxes.filter(x => x.readyAt <= dateNum(g));
+  const d = app.draft || (app.draft = { name: 'MODEL ' + String.fromCharCode(65 + g.models.length), type: 'sedan4d', seg: 'family', engineId: readyE[0]?.id, gbId: readyG[0]?.id, final: 4.1, price: 850, trim: 1, paint: 0, feats: {},
+    body: { style: 'box', wb: 2800, rake: 0.5, roofR: 0.5, noseR: 0.5, bodyR: 0.5, height: 0.5, hood: 0.5, nose: 0.5, belt: 0.5, blackFenders: true } });
+  const b = d.body, styles = ['box', 'stream', 'pontoon'], sOK = st => limits(g.year, st) && (st === 'box' || has(g, st));
+  const st2 = cycler(S, AX + 6, AY + 20, 100, 'BODY LANGUAGE', styles, b.style, { lock: st => !sOK(st) }); if (sOK(st2)) b.style = st2; else if (st2 !== b.style) toast(limits(g.year, st2) ? 'RESEARCH NEEDED' : 'NOT POSSIBLE IN ' + g.year);
+  d.type = cycler(S, AX + 6, AY + 44, 100, 'BODY TYPE', ['sedan4d', 'coupe2d'], d.type, { names: t => (t === 'sedan4d' ? '4-DOOR SEDAN' : '2-DOOR COUPE') });
+  b.wb = Math.round(slider(S, AX + 6, AY + 68, 100, 'WHEELBASE', b.wb, 2400, 3500, { step: 25, fmt: v => Math.round(v) + 'MM' }));
+  [['rake', 'SCREEN RAKE'], ['roofR', 'ROOF CURVE'], ['noseR', 'NOSE ROUND'], ['height', 'HEIGHT'], ['hood', 'HOOD LENGTH'], ['belt', 'BELT LINE']].forEach(([k, l], i) => (b[k] = slider(S, AX + 6, AY + 88 + i * 18, 100, l, b[k], 0, 1, { step: 0.05 })));
+  d.paint = cycler(S, AX + 6, AY + 196, 100, 'PAINT', PAINTS.map((_, i) => i), d.paint, { names: i => 'COLOUR ' + (i + 1) });
+  S.fill(AX + 108 - 8, AY + 205, 6, 7, hex(PAINTS[d.paint]));
+  if (b.style === 'box') b.blackFenders = cycler(S, AX + 6, AY + 220, 100, 'FENDERS', [true, false], b.blackFenders, { names: v => (v ? 'BLACK' : 'BODY COLOUR') });
+  // preview
+  const cx = AX + 112, pw = 240; panel(S, cx, AY + 20, pw, 92, `${g.year} - CLAMPED TO ERA LIMITS`);
+  const { px, q } = carSprite(g.year, b, d.paint, d.type); if (px) drawPix(S, px, P, cx + Math.max(2, (pw - px.w) / 2) | 0, AY + 108 - px.h, 1);
+  if (q.notes.length) text(S, q.notes[0].slice(0, 58), cx + 3, AY + 104, C.red);
+  // mechanicals
+  if (!readyE.length || !readyG.length) { text(S, 'NEED A READY ENGINE AND GEARBOX', cx + 4, AY + 120, C.red); return; }
+  d.engineId = cycler(S, cx, AY + 116, 118, 'ENGINE', readyE.map(e => e.id), d.engineId, { names: id => g.engines.find(e => e.id === id).name });
+  d.gbId = cycler(S, cx + 122, AY + 116, 118, 'GEARBOX', readyG.map(x => x.id), d.gbId, { names: id => g.gearboxes.find(x => x.id === id).name });
+  d.final = slider(S, cx, AY + 140, 118, 'FINAL DRIVE', d.final, 3.0, 5.5, { step: 0.05 }); d.trim = Math.round(slider(S, cx + 122, AY + 140, 118, 'TRIM LEVEL', d.trim, 0, 3, { step: 1, fmt: v => ['BASIC', 'STANDARD', 'DE LUXE', 'CUSTOM'][Math.round(v)] }));
+  const fe = [['hydbrake', 'HYD.BRAKES'], ['ifs', 'IND.FRONT'], ['steelroof', 'STEEL ROOF'], ['unibody', 'UNIT BODY']].filter(([k]) => has(g, k));
+  fe.forEach(([k, l], i) => { if (button(S, cx + i * 60, AY + 160, 57, 12, l, { active: d.feats[k] })) d.feats[k] = !d.feats[k]; });
+  d.seg = cycler(S, cx, AY + 176, 118, 'TARGET SEGMENT', Object.keys(SEGS), d.seg, { names: k => k.toUpperCase() });
+  d.price = Math.round(slider(S, cx + 122, AY + 176, 118, 'LIST PRICE', d.price, 350, 5000, { step: 10, fmt: money }));
+  const car = { ...d, body: { style: q.style, wb: b.wb, hood: q.hoodWB, height: q.hWB }, designScore: 0.62 + (q.style !== 'box' ? 0.1 : 0) - q.notes.length * 0.04 + (1 - Math.abs(b.belt - 0.5)) * 0.08 };
+  const ev = evaluate(g, car), x2 = cx + pw + 6, pw2 = AX + AW - x2 - 6;
+  panel(S, x2, AY + 20, pw2, 210, 'ENGINEERING REPORT');
+  if (ev) { const sm = ev.sim; [['TOP SPEED', `${sm.topMph.toFixed(0)} MPH`], ['0-60 MPH', sm.zeroSixty ? sm.zeroSixty.toFixed(1) + ' S' : 'NEVER'], ['ECONOMY', sm.mpg.toFixed(1) + ' MPG'], ['MAX GRADE', Math.round(sm.grade * 100) + '%'], ['WEIGHT', sm.mass + ' KG'], ['UNIT COST', money(ev.unit)]].forEach(([l, v], i) => stat(S, x2 + 4, AY + 31 + i * 8, l, v));
+    text(S, ev.fit ? 'ENGINE FITS THE BAY' : 'ENGINE TOO BIG - LONGER HOOD!', x2 + 4, AY + 82, ev.fit ? C.green : C.red);
+    [['PERFORMANCE', ev.perf], ['ECONOMY', ev.econ], ['COMFORT', ev.comfort], ['RELIABILITY', ev.rel], ['DESIGN', ev.design], ['MODERNITY', ev.modern]].forEach(([l, v], i) => { text(S, l, x2 + 4, AY + 92 + i * 12, C.inkSoft); bar(S, x2 + 4, AY + 98 + i * 12, pw2 - 10, 4, v, v < 0.4 ? C.red : C.teal); });
+    const a = appeal(ev, d.seg, d.price); text(S, `APPEAL ${Math.round(a * 100)}  MARGIN ${money(d.price - ev.unit)}`, x2 + 4, AY + 168, a > 0.45 ? C.green : C.oxblood);
+    const tool = 40000 + b.wb * 8 + (q.style !== 'box' ? 20000 : 0) + (d.feats.unibody ? 30000 : 0), months = 6 + (q.style === 'stream' ? 2 : q.style === 'pontoon' ? 3 : 0);
+    text(S, `TOOLING ${money(tool)}`, x2 + 4, AY + 180); text(S, `${months} MONTHS TO LAUNCH`, x2 + 4, AY + 188);
+    if (button(S, x2 + 4, AY + 198, pw2 - 8, 16, 'LAUNCH MODEL', { tone: 'ox', disabled: g.cash < tool || !ev.fit })) {
+      g.models.push({ ...JSON.parse(JSON.stringify(car)), sprite: { body: { ...b }, paint: d.paint, type: d.type, year: g.year }, id: 'M' + g.serial++, plan: Math.round(g.factory / Math.max(1, g.models.length + 1)), readyAt: dateNum(g) + months, sold: 0, stock: 0 });
+      g.cash -= tool; app.draft = null; toast('MODEL IN DEVELOPMENT'); app.tab = 'prod'; } }
+}
+function prod(g) { windowBox(S, AX, AY, AW, AH, 'PRODUCTION PLANNING');
+  text(S, `FACTORY CAPACITY ${g.factory} CARS / MONTH`, AX + 8, AY + 22, C.ink);
+  if (button(S, AX + 200, AY + 19, 120, 12, 'EXPAND +500 ($40,000)', { disabled: g.cash < 40000 })) { g.factory += 500; g.cash -= 40000; }
+  const live = g.models.filter(m => !m.dead); if (!live.length) text(S, 'NO MODELS YET - USE CAR DESIGN.', AX + 8, AY + 50, C.oxblood);
+  live.slice(0, 4).forEach((m, i) => { const y = AY + 36 + i * 54; panel(S, AX + 6, y, AW - 12, 50, `${m.name} - ${m.seg.toUpperCase()}`);
+    const sp = carSprite(m.sprite.year, m.sprite.body, m.sprite.paint, m.sprite.type).px; if (sp) drawPix(S, sp, P, AX + 10, y + 48 - Math.min(sp.h, 40), 1);
+    const x = AX + 230, ready = m.readyAt <= dateNum(g); if (!ready) { text(S, `IN DEVELOPMENT - ${m.readyAt - dateNum(g)} MONTHS`, x, y + 14, C.oxblood); return; }
+    m.price = Math.round(slider(S, x, y + 10, 70, 'PRICE', m.price, 350, 5000, { step: 10, fmt: money, id: m.id + 'p' }));
+    m.plan = Math.round(slider(S, x + 80, y + 10, 70, 'OUTPUT/MO', m.plan, 0, g.factory, { step: 10, fmt: v => String(Math.round(v)), id: m.id + 'o' }));
+    text(S, `SOLD LAST ${m.lastSold || 0}  TOTAL ${m.sold || 0}  STOCK ${m.stock || 0}`, x, y + 30, C.ink); text(S, `APPEAL ${Math.round((m.appeal || 0) * 100)}`, x, y + 39, C.teal); if ((m.stock || 0) > (m.lastSold || 0) * 2 + 50) text(S, 'STOCK PILING UP - CUT OUTPUT', x + 40, y + 39, C.red);
+    if (button(S, x + 110, y + 36, 48, 11, 'RETIRE', { tone: 'ox' })) m.dead = true; });
+}
+function research(g) { windowBox(S, AX, AY, AW, AH, `RESEARCH & DEVELOPMENT - ${g.research.toUpperCase()} DEPT (${RES_SCALE[g.research].pts} PTS/MO)`);
+  const av = TECH.filter(t => t.year <= g.year && !has(g, t.id)), done = TECH.filter(t => has(g, t.id));
+  av.slice(0, 11).forEach((t, i) => { const y = AY + 22 + i * 18, cur = g.resCur === t.id; if (button(S, AX + 8, y, 150, 15, t.name, { active: cur })) { if (!cur) { g.resCur = t.id; g.resPts = 0; } }
+    bar(S, AX + 162, y + 5, 80, 6, cur ? g.resPts / t.pts : 0, C.teal); text(S, `${t.pts} PTS  MAINSTREAM ${t.main}`, AX + 248, y + 5, C.inkSoft); });
+  text(S, 'KNOWN: ' + done.map(t => t.name).join(', ').slice(0, 95), AX + 8, AY + AH - 20, C.green); text(S, 'TECH OLDER THAN ITS ERA LOSES APPEAL - GRACE SHRINKS EACH DECADE.', AX + 8, AY + AH - 11, C.inkSoft); }
+function market(g) { windowBox(S, AX, AY, AW, AH, `MARKET - ${COUNTRIES[g.country].name}`); const M = COUNTRIES[g.country].market;
+  graph(S, AX + 8, AY + 22, 180, 90, [{ pts: Object.values(M), c: C.teal }], { labels: [{ t: 'NEW CARS / YEAR 1930-49', c: C.ink }] });
+  text(S, `${g.year}: ${(M[g.year] || 0)}K CARS`, AX + 8, AY + 116, C.oxblood); S.fill(AX + 8 + Math.round((g.year - 1930) / 19 * 178), AY + 22, 1, 90, C.red);
+  Object.entries(SEGS).forEach(([k, s], i) => { const y = AY + 22 + i * 22, x = AX + 200; text(S, k.toUpperCase(), x, y, C.ink); bar(S, x, y + 7, 100, 6, s.share / 0.45, C.teal);
+    text(S, `${money(s.price[0])}-${money(s.price[1])}`, x + 106, y + 7, C.inkSoft); });
+  text(S, 'BUYERS WEIGH PRICE, ECONOMY, RELIABILITY, SPEED, COMFORT,', AX + 8, AY + 140, C.inkSoft); text(S, 'DESIGN AND MODERNITY DIFFERENTLY PER SEGMENT.', AX + 8, AY + 149, C.inkSoft); }
+function finance(g) { windowBox(S, AX, AY, AW, AH, 'FINANCE'); graph(S, AX + 8, AY + 22, AW - 16, 100, [{ pts: g.hist.cash, c: C.green }], { min: Math.min(0, ...g.hist.cash), labels: [{ t: 'CASH', c: C.green }] });
+  graph(S, AX + 8, AY + 128, AW - 16, 70, [{ pts: g.hist.sales, c: C.teal }], { labels: [{ t: 'CARS SOLD / MONTH', c: C.teal }] });
+  text(S, `RESEARCH ${money(RES_SCALE[g.research].cost)}/MO   OVERHEAD ${money(4000 + g.factory * 3.2)}/MO`, AX + 8, AY + 206, C.ink); }
+function save(g) { windowBox(S, AX, AY, AW, AH, 'SAVE COMPANY'); for (let i = 1; i <= 3; i++) { const sv = store.get('gh_slot_' + i), y = AY + 26 + (i - 1) * 34; panel(S, AX + 10, y, 260, 28);
+  text(S, sv ? `${sv.name} - ${MONTHS[sv.month - 1]} ${sv.year}` : `SLOT ${i} - EMPTY`, AX + 15, y + 11, sv ? C.ink : C.inkSoft);
+  if (button(S, AX + 220, y + 7, 44, 14, 'SAVE')) toast(store.set('gh_slot_' + i, g) ? 'SAVED TO SLOT ' + i : 'SAVE FAILED (STORAGE BLOCKED)'); } }
+function menu(g) { windowBox(S, AX + 120, AY + 50, 160, 110, 'MENU'); if (button(S, AX + 135, AY + 75, 130, 16, 'SETTINGS')) app.scene = 'settings'; if (button(S, AX + 135, AY + 97, 130, 16, 'QUIT TO TITLE')) { app.scene = 'title'; app.g = null; }
+  if (button(S, AX + 135, AY + 119, 130, 16, 'BACK TO OFFICE')) app.tab = 'news'; }
+
+// ---------- loop / input ----------
+function cursor() { const x = input.x, y = input.y; if (x < 0) return; const A = ['1000000', '1100000', '1210000', '1221000', '1222100', '1222210', '1222221', '1221111', '1101210', '1000121', '0000011'];
+  A.forEach((r, j) => [...r].forEach((c, i) => c !== '0' && S.fill(x + i, y + j, 1, 1, c === '1' ? C.black : C.brassL))); }
+function frame() { app.t++; ({ title, settings, newgame, load, hq })[app.scene]();
+  if (app.toast && app.t < app.toast.until) { const w = tw(app.toast.t) + 16; bevel(S, (W - w) / 2, H - 22, w, 14, C.teal, C.tealL, hex('#1b3f3e')); text(S, app.toast.t, (W - w) / 2 + 8, H - 17, C.white); }
+  cursor(); input.clicked = false; input.wheel = 0; ctx.putImageData(img, 0, 0); requestAnimationFrame(frame); }
+function resize() { const k = app.settings.scale || Math.max(1, Math.floor(Math.min(innerWidth / W, innerHeight / H))); cv.style.width = W * k + 'px'; cv.style.height = H * k + 'px';
+  document.getElementById('scan').style.display = app.settings.scan ? 'block' : 'none'; document.getElementById('scan').style.width = cv.style.width; document.getElementById('scan').style.height = cv.style.height; }
+const pos = e => { const r = cv.getBoundingClientRect(); input.x = Math.floor((e.clientX - r.left) / r.width * W); input.y = Math.floor((e.clientY - r.top) / r.height * H); };
+cv.addEventListener('pointermove', pos); cv.addEventListener('pointerdown', e => { pos(e); input.down = true; input.clicked = true; });
+addEventListener('pointerup', () => { input.down = false; input.drag = null; }); cv.addEventListener('pointerleave', () => { input.x = -1; });
+cv.addEventListener('wheel', e => { e.preventDefault(); input.wheel = e.deltaY; }, { passive: false }); addEventListener('resize', resize);
+addEventListener('keydown', e => { if (e.key === 'Escape' && app.scene === 'hq') app.tab = 'menu'; if (e.key === ' ' && app.scene === 'hq' && !app.g.over) { e.preventDefault(); stepMonth(app.g); } });
+window.__gh = { app, input, stepMonth };
+resize(); frame();

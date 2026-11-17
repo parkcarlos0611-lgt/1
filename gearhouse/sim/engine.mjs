@@ -17,7 +17,7 @@ export const MATERIALS = { iron: { kg: 1, cost: 1, year: 1900 }, alHead: { kg: 0
 export const octane = y => y < 1930 ? 58 : y < 1946 ? 60 + (y - 1930) * 0.9 : y < 1960 ? 74 + (y - 1946) * 1.2 : Math.min(98, 91 + (y - 1960) * 0.4);
 export const maxCR = (y, head) => 2.6 + octane(y) * 0.05 + (head === 'sv' ? 0 : 0.6);
 // mean piston speed limit (m/s) by era and quality: materials / bearings / lubrication improve over time
-export const pistonLimit = (y, q = 0) => 10.5 + Math.max(0, y - 1925) * 0.13 + q * 0.5;
+export const pistonLimit = (y, q = 0) => 12.5 + Math.max(0, y - 1925) * 0.15 + q * 0.5;
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 export function displacement(e) { return Math.PI / 4 * (e.bore / 1000) ** 2 * (e.stroke / 1000) * LAYOUTS[e.layout].cyl; }   // m^3
@@ -26,18 +26,18 @@ export function displacement(e) { return Math.PI / 4 * (e.bore / 1000) ** 2 * (e
 export function engineCurve(e) {
   const L = LAYOUTS[e.layout], H = HEADS[e.head], D = displacement(e), year = e.year || 1940, q = e.quality || 0, cam = e.cam ?? 0.3;
   const cr = Math.min(e.cr ?? maxCR(year, e.head), maxCR(year, e.head));
-  const eta = (1 - Math.pow(cr, -0.3)) * 0.69;                                              // brake-relevant thermal efficiency
+  const eta = (1 - Math.pow(cr, -0.3)) * 0.61 * Math.pow(e.stroke / 95, 0.3);   // long strokes: compact chamber, better L-head combustion (calibrated)                                              // brake-relevant thermal efficiency
   const rp = H.pk * (0.82 + 0.45 * cam) * Math.sqrt(95 / e.stroke);                          // torque-peak rpm
-  const flowCap = (e.carbs || 1) * (e.carbSize || 1) * 0.0052 * (L.cyl >= 8 ? 1.25 : 1);       // induction capacity (m^3/s at VE 1)
+  const flowCap = (e.carbs || 1) * (e.carbSize || 1) * 0.105 * (L.cyl >= 8 ? 1.25 : 1) * Math.min(1.15, 0.75 + 0.012 * Math.max(0, year - 1930));   // + era carburettor / manifold know-how       // induction capacity (m^3/s at VE 1)
   const spLim = pistonLimit(year, q), rpmPiston = spLim * 60 / (2 * e.stroke / 1000);
   const redline = Math.round(Math.min(H.float * (0.92 + 0.18 * cam), rpmPiston) / 50) * 50;
   const pts = [];
   for (let rpm = 600; rpm <= redline; rpm += 100) {
-    let ve = H.ve * (1 - 0.32 * Math.log(rpm / rp) ** 2) * (1 + q * 0.01);
+    let ve = H.ve * (1 - 0.32 * Math.log(rpm / rp) ** 2) * (1 + q * 0.01) * Math.min(1, 0.84 + 0.01 * Math.max(0, year - 1930));   // era port / manifold know-how
     const need = D * rpm / 120 * ve; if (need > flowCap) ve *= Math.pow(flowCap / need, 0.6);   // carburettor choke
     const air = D * rpm / 120 * ve * 1.18;                                                    // kg/s
     const indicated = air / 12.8 * 44e6 * eta;                                                // W
-    const sp = 2 * e.stroke / 1000 * rpm / 60, fmep = (60 + 12 * rpm / 1000 + 2.4 * sp * sp) * 1000 * (1 - q * 0.02);
+    const sp = 2 * e.stroke / 1000 * rpm / 60, fmep = (50 + 10 * rpm / 1000 + 0.28 * sp * sp) * 1000 * (1 - q * 0.02);
     const friction = fmep * D * rpm / 120;
     const P = Math.max(0, indicated - friction), T = P / (rpm * Math.PI / 30);
     pts.push({ rpm, P, T, hp: P / 745.7 });
@@ -56,9 +56,9 @@ export function engineStats(e) {
   const stress = Math.max(c.redline * 2 * e.stroke / 1000 / 60 / pistonLimit(year, q), c.redline / H.float);
   const reliability = clamp(0.92 - 0.35 * Math.max(0, stress - 0.75) + q * 0.025 - (c.cr > maxCR(year, e.head) - 0.3 ? 0.04 : 0), 0.3, 0.99);
   const smooth = clamp(L.smooth + (L.cyl >= 8 ? 0.02 : 0) - (e.stroke / e.bore > 1.35 ? 0.05 : 0), 0, 1);
-  const cost = Math.round((180 + c.litres * 70 + L.cyl * 22) * H.cost * M.cost * (1 + q * 0.06) * (1 + (e.carbs || 1) * 0.04));   // $ per unit (1940 dollars)
+  const cost = Math.round((60 + c.litres * 25 + L.cyl * 8) * H.cost * M.cost * (1 + q * 0.06) * (1 + (e.carbs || 1) * 0.04));   // $ per unit (1940 dollars)
   const tooling = Math.round((60000 + L.cyl * 9000) * H.eng * M.cost);                        // family tooling (one-off)
   const engMonths = Math.round((5 + L.cyl * 0.5) * H.eng * (1 + Math.max(0, q) * 0.12));
-  const bsfc = 0.235 / Math.max(0.12, c.eta) * 0.098;                                           // kg/kWh at best point
+  const bsfc = 0.0818 / Math.max(0.12, c.eta);                                                  // kg/kWh at best point (3.6 MJ / (eta * 44 MJ/kg))
   return { ...c, len: Math.round(len), height: Math.round(height), width: Math.round(width), mass: Math.round(mass), reliability, smooth, cost, tooling, engMonths, bsfc };
 }

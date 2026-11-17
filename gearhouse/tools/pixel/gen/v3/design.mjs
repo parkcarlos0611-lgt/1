@@ -101,7 +101,8 @@ export function frontSpec(d0, paint, rear = false) {
   const sill = d.frontFender === 'integrated' ? 300 : Math.max(r * 1.15, 420), track = Wd - 300, tw = T.section * 1.05, ty = track / 2;
   const cab = half - (d.year < 1936 ? 80 : 120), tumble = d.year < 1936 ? 20 : 70, crownZ = Math.min(hoodZ - 60, r + gap + d.fenderCrown), fp = d.fenderBlack && d.year < 1936 ? 'black' : paint;
   const sep = d.frontFender !== 'integrated', hoodHalf = sep ? Math.min(half * 0.42, 260 + (d.year - 1930) * 8) : half - 60;
-  const body = fillet([[0, sep ? hoodZ - 40 : sill, 0], [sep ? hoodHalf + 40 : half - 20, sep ? hoodZ - 40 : sill, 0], [cab, beltZ, 0], [cab - tumble, H - 160, 120], [cab - tumble - 70, H, 80], [0, H, 0]]);
+  const body = fillet([[0, sill - 40, 0], [cab, sill - 40, 0], [cab, beltZ, 0],   // cowl / door sides run full width down to the sill behind the fenders (no empty triangles beside the hood)
+    [cab - tumble, H - 160, 120], [cab - tumble - 70, H, 80], [0, H, 0]]);
   const fin = d.year < 1936 ? ty - tw * 0.7 : hoodHalf + 30;                                         // 1930s narrow cycle-type wings -> 1940s wide fenders reaching the hood
   const fender = side => { const s = side; return fillet([[s * fin, sill - 80, 0], [s * fin, crownZ - (d.year < 1936 ? 140 : 60), 120], [s * ((fin + half) / 2), crownZ, d.year < 1936 ? 140 : 260], [s * (half - 10), crownZ - 120, 120], [s * half, sill - 60, 0]]); };
   const under = [{ half: 1, pts: [[0, r - 40], [ty, r - 40], [ty, r + 20], [0, r + 20]], ramp: 'black', base: 1 }];

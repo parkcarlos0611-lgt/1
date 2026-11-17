@@ -66,8 +66,10 @@ export function appeal(ev, seg, price) { const S = SEGS[seg], [lo, hi] = S.price
   const st = { price: pv, econ: ev.econ, rel: ev.rel, perf: ev.perf, comfort: ev.comfort, design: ev.design, modern: ev.modern };
   return Object.entries(S.w).reduce((a, [k, w]) => a + w * st[k], 0) * fitBand * (ev.fit ? 1 : 0.4) * inf; }
 
-export function newGame({ country = 'USA', year = 1930, capital = 250000, research = 'medium', name = 'GEARHOUSE MOTOR CO.' }) {
-  return { v: 1, name, country, year, month: 1, startYear: year, cash: capital, rep: 0.3, research, resPts: 0, resCur: null, known: TECH.filter(t => t.year + 8 < year).map(t => t.id).concat(['sync3'].filter(() => year >= 1934)),
+export const DIFF = { easy: { demand: 1.35, over: 0.8, cap: 1.5 }, normal: { demand: 1, over: 1, cap: 1 }, hard: { demand: 0.8, over: 1.15, cap: 0.8 } };
+export function newGame({ country = 'USA', year = 1930, capital = 250000, research = 'medium', name = 'GEARHOUSE MOTOR CO.', diff = 'normal' }) {
+  capital = Math.round(capital * DIFF[diff].cap);
+  return { v: 2, name, country, year, month: 1, startYear: year, cash: capital, diff, loan: 0, distress: 0, meeting: false, ach: [], rep: 0.3, research, resPts: 0, resCur: null, known: TECH.filter(t => t.year + 8 < year).map(t => t.id).concat(['sync3'].filter(() => year >= 1934)),
     engines: [{ id: 'E1', name: 'SV-4 STARTER', layout: 'I4', head: 'sv', material: 'iron', bore: 85, stroke: 105, cr: 5.4, cam: 0.3, carbs: 1, carbSize: 1, quality: 0, readyAt: 0, tooling: 0 }],
     gearboxes: [{ id: 'G1', name: '3-SPD BASIC', type: 'crash3', gears: 3, ratios: [2.9, 1.65, 1], readyAt: 0 }], models: [], factory: 1500, news: [{ t: `${year}: ${name} FOUNDED IN ${COUNTRIES[country].name}.`, d: 0 }],
     hist: { cash: [capital], sales: [0] }, serial: 2, over: false };
@@ -80,9 +82,9 @@ export function stepMonth(g) {
   // research
   g.cash -= R.cost; pl.cost += R.cost;
   if (g.resCur) { const t = TECH.find(x => x.id === g.resCur); g.resPts += R.pts * (war ? 1.3 : 1); if (g.resPts >= t.pts) { g.known.push(t.id); g.resPts = 0; g.resCur = null; g.news.unshift({ t: `RESEARCH DONE: ${t.name}`, d: dateNum(g) }); } }
-  // fixed overhead
-  const over = 4000 + g.factory * 3.2; g.cash -= over; pl.cost += over;
-  const marketY = (C.market[g.year] ?? 0) * 1000 / 12;
+  // fixed overhead (+ difficulty), stock storage 1%/month of its cost
+  const D = DIFF[g.diff || 'normal'], over = (4000 + g.factory * 3.2) * D.over; g.cash -= over; pl.cost += over;
+  const marketY = (C.market[g.year] ?? Math.round((C.market[1949] || 0) * Math.pow(1.03, g.year - 1949))) * 1000 / 12 * D.demand;
   if (civStop) { const contract = g.factory * 9 * (1 + g.rep);                      // war production contract replaces civil sales
     g.cash += contract; pl.rev += contract; if (g.month === 1 || !g._warNote) { g._warNote = 1; g.news.unshift({ t: 'CIVIL PRODUCTION HALTED - FACTORY ON WAR CONTRACTS', d: dateNum(g) }); } }
   else { g._warNote = 0; let capLeft = g.factory;
@@ -91,10 +93,25 @@ export function stepMonth(g) {
       const a = appeal(ev, m.seg, m.price), base = 0.70 + (g.year - 1930) * 0.008;                        // competitor appeal rises with time
       const share = Math.exp((a - base) * 12) / (150 + Math.exp((a - base) * 12)), rep = 0.6 + g.rep;
       const demand = marketY * SEGS[m.seg].share * share * rep * (C.wealth ** 0.3) * Math.max(0.2, 1.5 - m.price / SEGS[m.seg].price[1]);
-      const made = Math.min(m.plan, capLeft); capLeft -= made; m.stock = (m.stock || 0) + made;
+      const made = Math.min(m.plan, capLeft); capLeft -= made; m.stock = (m.stock || 0) + made; m.unit = ev.unit;
       const sold = Math.min(Math.round(demand), m.stock); m.stock -= sold; m.sold = (m.sold || 0) + sold; m.lastSold = sold; m.appeal = a;
-      g.cash += sold * m.price - made * ev.unit; pl.rev += sold * m.price; pl.cost += made * ev.unit; pl.sales += sold;
+      m.demandHist = [...(m.demandHist || []), Math.round(demand)].slice(-3);
+      const storage = m.stock * ev.unit * 0.01;
+      g.cash += sold * m.price - made * ev.unit - storage; pl.rev += sold * m.price; pl.cost += made * ev.unit + storage; pl.sales += sold;
       g.rep = Math.min(1, Math.max(0, g.rep + (sold > 0 ? (ev.rel - 0.75) * 0.004 + 0.001 : -0.001))); } }
+  // bank: credit line against factory, stock and live models; automatic draw, interest, repayment from surplus
+  const inv = g.models.reduce((a, m) => a + (m.stock || 0) * (m.unit || 0), 0); g.credit = Math.round(g.factory * 40 + Math.min(inv * 0.3, 100000) + g.models.filter(m => !m.dead).length * 10000);
+  if (g.loan > 0) { const i = g.loan * 0.006; g.cash -= i; pl.cost += i; }
+  if (g.cash < 0 && g.loan < g.credit) { const d = Math.min(g.credit - g.loan, -g.cash + 5000); g.loan += d; g.cash += d; if (d > 0) g.news.unshift({ t: `BANK CREDIT DRAWN: ${Math.round(d)}`, d: dateNum(g) }); }
+  else if (g.loan > 0 && g.cash > over * 4) { const r = Math.min(g.loan, (g.cash - over * 4) * 0.3); g.loan -= r; g.cash -= r; }
+  if (g.cash < 0) { g.distress = (g.distress || 0) + 1;
+    if (g.distress === 1) g.news.unshift({ t: 'WARNING: CREDIT EXHAUSTED - CASH NEGATIVE', d: dateNum(g) });
+    if (g.distress === 3 && (g.meetings || 0) < 3) { g.meeting = true; g.news.unshift({ t: 'THE BANK CALLS A MEETING', d: dateNum(g) }); } }
+  else g.distress = Math.max(0, (g.distress || 0) - 1);
+  // achievements
+  const total = g.models.reduce((a, m) => a + (m.sold || 0), 0), ach = (id, t) => { if (!g.ach.includes(id)) { g.ach.push(id); g.news.unshift({ t: 'MILESTONE: ' + t, d: dateNum(g) }); } };
+  if (total >= 1) ach('first', 'FIRST CAR SOLD'); if (total >= 10000) ach('10k', '10,000 CARS SOLD'); if (total >= 100000) ach('100k', '100,000 CARS SOLD');
+  if (g.year === 1934 && g.startYear <= 1931) ach('depr', 'SURVIVED THE DEPRESSION'); if (civStop) ach('war', 'WAR PRODUCTION');
   // events
   const ev = { '1931-1': 'BANK FAILURES: DEMAND COLLAPSES', '1933-3': 'BANK HOLIDAY - RECOVERY BEGINS', '1937-9': 'RECESSION OF 1937-38', '1939-9': 'WAR IN EUROPE', '1941-12': 'WAR DECLARED: CIVIL OUTPUT TO STOP',
     '1945-9': 'WAR ENDS - RECONVERSION', '1946-6': 'PENT-UP DEMAND: SELLERS MARKET', '1948-1': 'NEW-GENERATION BODIES ARRIVE' }[`${g.year}-${g.month}`];
@@ -102,7 +119,17 @@ export function stepMonth(g) {
   for (const t of TECH) if (t.year === g.year && g.month === 1) g.news.unshift({ t: `NEW IDEA AVAILABLE: ${t.name}`, d: dateNum(g) });
   g.last = pl; g.hist.cash.push(Math.round(g.cash)); g.hist.sales.push(pl.sales); if (g.hist.cash.length > 240) { g.hist.cash.shift(); g.hist.sales.shift(); }
   g.month++; if (g.month > 12) { g.month = 1; g.year++; }
-  if (g.cash < -50000) { g.over = 'BANKRUPT'; } if (g.year >= 1950) g.over = 'END OF TEST PERIOD (1949)';
+  if ((g.distress || 0) >= 6) g.over = 'BANKRUPT'; if (g.year >= 1950 && !g.sandbox) g.over = 'END OF TEST PERIOD (1949)';
   g.news = g.news.slice(0, 30);
 }
 export const has = (g, id) => g.known.includes(id);
+
+// bank meeting choices (when credit is exhausted for 3 months)
+export const BANK_OPTS = [['sell', 'SELL 30% OF FACTORY'], ['cut', 'RETIRE WEAKEST MODEL'], ['gov', 'GOVERNMENT CONTRACT (12 MO)'], ['merge', 'ACCEPT MERGER OFFER']];
+export function bankOption(g, k) {
+  if (k === 'sell') { const cut = Math.round(g.factory * 0.3); g.factory -= cut; g.cash += cut * 55; }
+  if (k === 'cut') { const live = g.models.filter(m => !m.dead && m.readyAt <= dateNum(g)).sort((a, b) => (a.appeal || 0) - (b.appeal || 0)); if (live[0]) { live[0].dead = true; g.cash += (live[0].stock || 0) * (live[0].unit || 0) * 0.6; live[0].stock = 0; } }
+  if (k === 'gov') { g.cash += g.factory * 25; g.rep = Math.max(0, g.rep - 0.05); }
+  if (k === 'merge') g.over = 'MERGED INTO A LARGER FIRM';
+  g.meeting = false; g.distress = 0; g.meetings = (g.meetings || 0) + 1; g.news.unshift({ t: 'BANK AGREEMENT: ' + BANK_OPTS.find(o => o[0] === k)[1], d: dateNum(g) });
+}

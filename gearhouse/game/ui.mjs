@@ -83,7 +83,7 @@ export function graph(s, x, y, w, h, series, { min = 0, max = null, labels = [] 
   s.fill(x, y, w, h, C.white); for (let gx = x; gx < x + w; gx += 8) s.fill(gx, y, 1, h, C.grid); for (let gy = y; gy < y + h; gy += 8) s.fill(x, gy, w, 1, C.grid);
   s.fill(x, y + h - 1, w, 1, C.inkSoft); s.fill(x, y, 1, h, C.inkSoft);
   const mx = max ?? Math.max(1e-9, ...series.flatMap(sr => sr.pts)); series.forEach((sr, k) => { let px = null, py = null;
-    sr.pts.forEach((v, i) => { const gx = x + 1 + Math.round(i / Math.max(1, sr.pts.length - 1) * (w - 3)), gy = y + h - 2 - Math.round((v - min) / (mx - min) * (h - 4));
+    sr.pts.forEach((v, i) => { if (Number.isNaN(v)) { px = null; return; } const gx = x + 1 + Math.round(i / Math.max(1, sr.pts.length - 1) * (w - 3)), gy = y + h - 2 - Math.round((v - min) / (mx - min) * (h - 4));
       if (px != null) lineTo(s, px, py, gx, gy, sr.c); px = gx; py = gy; }); });
   labels.forEach((l, i) => text(s, l.t, x + 3, y + 3 + i * 7, l.c)); }
 export function lineTo(s, x0, y0, x1, y1, c) { const dx = Math.abs(x1 - x0), dy = -Math.abs(y1 - y0), sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1; let e = dx + dy;

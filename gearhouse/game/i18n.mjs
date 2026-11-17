@@ -53,6 +53,14 @@ export const KO = {
   'FOUNDED IN': '창업:', 'RESEARCH DONE': '연구 완료', 'NEW IDEA AVAILABLE': '새 기술 연구 가능', 'CIVIL PRODUCTION HALTED - FACTORY ON WAR CONTRACTS': '민수 생산 중단 - 공장이 군수 계약으로 전환',
   'BANK FAILURES: DEMAND COLLAPSES': '은행 파산: 수요 급감', 'BANK HOLIDAY - RECOVERY BEGINS': '은행 휴일 - 회복 시작', 'RECESSION OF 1937-38': '1937-38 경기 후퇴', 'WAR IN EUROPE': '유럽 전쟁 발발',
   'WAR DECLARED: CIVIL OUTPUT TO STOP': '참전: 민수 생산 중단 예정', 'WAR ENDS - RECONVERSION': '종전 - 민수 전환', 'PENT-UP DEMAND: SELLERS MARKET': '억눌린 수요 폭발: 판매자 시장', 'NEW-GENERATION BODIES ARRIVE': '신세대 차체 등장',
+  'DIFFICULTY': '난이도', 'EASY - FORGIVING MARKET': '쉬움 - 너그러운 시장', 'NORMAL': '보통', 'HARD - TOUGH BUYERS': '어려움 - 까다로운 구매자', 'MEETING AT THE BANK': '은행 면담',
+  'YOUR CREDIT IS EXHAUSTED FOR 3 MONTHS.': '3개월째 신용 한도를 모두 썼습니다.', 'CHOOSE A RESCUE PLAN:': '회생 방안을 고르세요:', 'SELL 30% OF FACTORY': '공장 30% 매각', 'RETIRE WEAKEST MODEL': '가장 약한 모델 단종',
+  'GOVERNMENT CONTRACT (12 MO)': '정부 계약 (12개월)', 'ACCEPT MERGER OFFER': '합병 제안 수락', 'BANK AGREEMENT': '은행 합의', 'LOAN': '대출', 'BANK LOAN': '은행 대출', 'CREDIT LINE': '신용 한도', 'BORROW 10K': '10K 대출',
+  'REPAY 10K': '10K 상환', 'MATCH DEMAND': '수요에 맞춤', 'FORECAST': '예측', 'BANK CREDIT DRAWN': '은행 신용 인출', 'WARNING: CREDIT EXHAUSTED - CASH NEGATIVE': '경고: 신용 한도 소진 - 자금 적자', 'THE BANK CALLS A MEETING': '은행이 면담을 요청합니다',
+  'MILESTONE': '업적', 'FIRST CAR SOLD': '첫 차 판매', '10,000 CARS SOLD': '1만 대 판매', '100,000 CARS SOLD': '10만 대 판매', 'SURVIVED THE DEPRESSION': '대공황을 버텼다', 'WAR PRODUCTION': '전시 생산',
+  'THE MOTOR GAZETTE': '자동차 신보', 'CLOSES ITS DOORS': '문을 닫다', 'SOLD TO RIVAL': '경쟁사에 팔리다', 'ENTERS THE FIFTIES': '1950년대로', 'MILESTONES': '업적', 'FROM THE WIRE': '전보', 'KEEP PLAYING (1950+)': '계속하기 (1950+)',
+  'MERGED INTO A LARGER FIRM': '대기업에 합병됨', 'FINAL CASH': '최종 자금', 'MODELS': '모델',
+  'CUTAWAY': '투시도', 'CUT': '투시', 'EXT': '외관', 'CRANK SPEED': '크랭크 속도', 'STOP': '정지', 'RPM': 'RPM',
   'JAN': '1월', 'FEB': '2월', 'MAR': '3월', 'APR': '4월', 'MAY': '5월', 'JUN': '6월', 'JUL': '7월', 'AUG': '8월', 'SEP': '9월', 'OCT': '10월', 'NOV': '11월', 'DEC': '12월', 'MUTE': '음소거', 'SOUND': '소리' };
 const keys = Object.keys(KO).sort((a, b) => b.length - a.length);
 const esc = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');

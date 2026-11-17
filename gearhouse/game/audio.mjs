@@ -122,6 +122,7 @@ export function horn(t, year) { if (year < 1938) { tone(t, 330, 0.28, 'sawtooth'
   else { tone(t, 392, 0.45, 'square', 0.06); tone(t, 494, 0.45, 'square', 0.05); } }                                                   // electric trumpet pair
 export function sfx(kind) { unlock(); if (!ctx || vol.muted) return; const t = ctx.currentTime + 0.01;
   if (kind === 'click') tone(t, 1900, 0.025, 'square', 0.04);
+  if (kind === 'pop') { const src = ctx.createBufferSource(), lp = ctx.createBiquadFilter(), g = ctx.createGain(); src.buffer = noiseBuf; lp.type = 'lowpass'; lp.frequency.value = 380 + Math.random() * 120; src.connect(lp); lp.connect(g); g.connect(sfxBus); env(g, t, 0.003, 0.5, 0.09); src.start(t, Math.random()); src.stop(t + 0.12); tone(t, 70 + Math.random() * 15, 0.08, 'sine', 0.18); }
   if (kind === 'type') for (let i = 0; i < 5; i++) tone(t + i * 0.07 + Math.random() * 0.02, 2600 + Math.random() * 600, 0.02, 'square', 0.05);
   if (kind === 'till') { tone(t, 1568, 0.6, 'sine', 0.12); tone(t, 2093, 0.5, 'sine', 0.06); tone(t + 0.02, 3136, 0.3, 'sine', 0.03); }
   if (kind === 'wire') [0, 0.12, 0.2, 0.36].forEach((d, i) => tone(t + d, 760, i % 2 ? 0.06 : 0.11, 'sine', 0.06)); }

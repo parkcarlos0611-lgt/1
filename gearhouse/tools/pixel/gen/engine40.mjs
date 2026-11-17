@@ -30,8 +30,8 @@ function kit(P, Wmm, Hmm, ox, oz, mm = 5) {
 }
 
 // ---- flathead V8 (221/239 ci passenger, 337 ci truck/luxury: bigger bore & stroke -> longer, taller) ----
-export function flatheadV8(P, { bore = 81, stroke = 95, color = 'iron', head = 'alu' } = {}, mm = 5) {
-  const pitch = bore + 50, L = 4 * pitch + 60, k = stroke / 95;            // bank length (4 cyl per bank, staggered)
+export function flatheadV8(P, { bore = 81, stroke = 95, color = 'iron', head = 'alu', perBank = 4 } = {}, mm = 5) {   // perBank 6 = L-head V12
+  const pitch = bore + (perBank > 4 ? 38 : 50), L = perBank * pitch + 60, k = stroke / 95, nS = perBank * 2;            // bank length (4 cyl per bank, staggered)
   const K = kit(P, L + 420, 1000 * k + 200, 210, 290 * k, mm), { solid, band, poly, rect, ell, dot } = K;
   const deck = 200 * k, hd = 150;
   band([[-150, 380 * k], [-120, 150 * k], [-60, 60]], 16, 'rubber', 1);                                          // fan belt
@@ -43,13 +43,13 @@ export function flatheadV8(P, { bore = 81, stroke = 95, color = 'iron', head = '
   band([[-40, deck * 0.8], [-60, deck + 150], [-20, deck + hd + 120]], 50, 'rubber', 2);                         // lower -> upper hose
   // head: raked slab with three staggered rows of stud nuts (the defining look)
   solid(poly([[-10, deck], [L + 5, deck], [L - 10, deck + hd], [10, deck + hd + 10]]), head, { grad: [3.2, 1.6] });
-  for (let r = 0; r < 3; r++) for (let i = 0; i < 8; i++) { const x = 34 + i * (L - 80) / 7 + (r % 2) * (L / 30), z = deck + 30 + r * 40;   // 24 stud nuts: lit top-left, shadow bottom-right
+  for (let r = 0; r < 3; r++) for (let i = 0; i < nS; i++) { const x = 34 + i * (L - 80) / (nS - 1) + (r % 2) * (L / 30), z = deck + 30 + r * 40;   // 24 stud nuts: lit top-left, shadow bottom-right
     solid(rect(x - 6, z - 6, x + 6, z + 6), head, { base: 4 }); dot(x + 5, z - 6, 'black', 1); dot(x + 5, z - 1, 'black', 1); }
-  for (let i = 0; i < 9; i++) band([[20 + i * (L - 40) / 8, deck + 8], [24 + i * (L - 40) / 8, deck + hd - 12]], 5, head, 1);   // cooling ribs between studs
+  for (let i = 0; i <= nS; i++) band([[20 + i * (L - 40) / nS, deck + 8], [24 + i * (L - 40) / nS, deck + hd - 12]], 5, head, 1);   // cooling ribs between studs
   solid(rect(-20, deck + hd - 20, 40, deck + hd + 40, 10), head, { base: 3 });                                   // water outlet
-  for (let c = 0; c < 4; c++) { const x = 60 + c * pitch; solid(rect(x - 8, deck + hd + 5, x + 8, deck + hd + 40), 'white', { grad: [4, 2.4] }); band([[x, deck + hd + 40], [x + 40, deck + hd + 110], [-10, deck + hd + 150]], 7, 'black', 1); }   // plugs + leads
+  for (let c = 0; c < perBank; c++) { const x = 60 + c * pitch; solid(rect(x - 8, deck + hd + 5, x + 8, deck + hd + 40), 'white', { grad: [4, 2.4] }); band([[x, deck + hd + 40], [x + 40, deck + hd + 110], [-10, deck + hd + 150]], 7, 'black', 1); }   // plugs + leads
   // exhaust manifold along the lower block, rear outlet down
-  band([[40, deck * 0.25], [L - 60, deck * 0.25], [L - 10, -60], [L - 10, -240 * k]], 40, 'rust', 2); for (let c = 0; c < 4; c++) solid(rect(70 + c * pitch - 18, deck * 0.25, 70 + c * pitch + 18, deck * 0.25 + 50), 'rust', { base: 2 });
+  band([[40, deck * 0.25], [L - 60, deck * 0.25], [L - 10, -60], [L - 10, -240 * k]], 40, 'rust', 2); for (let c = 0; c < perBank; c++) solid(rect(70 + c * pitch - 18, deck * 0.25, 70 + c * pitch + 18, deck * 0.25 + 50), 'rust', { base: 2 });
   // nose: timing cover, distributor + cap, generator, oil filter canister on top front
   solid(rect(-40, deck * 0.6, 20, deck + 80), color, { base: 2 }); solid(ell(-10, deck + 130, 45, 40), 'black', { base: 2 });
   solid(rect(-30, deck + hd + 60, 170, deck + hd + 150, 40), 'black', { grad: [3.2, 0.8] }); solid(rect(110, deck + hd + 58, 126, deck + hd + 152), 'chrome', { grad: [4, 1.5] });   // generator

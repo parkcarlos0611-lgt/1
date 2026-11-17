@@ -215,7 +215,7 @@ function cursor() { const x = input.x, y = input.y; if (x < 0) return; const A =
 function frame() { app.t++; ({ title, settings, newgame, load, hq })[app.scene]();
   if (app.toast && app.t < app.toast.until) { const w = tw(app.toast.t) + 16; bevel(S, (W - w) / 2, H - 22, w, 14, C.teal, C.tealL, hex('#1b3f3e')); text(S, app.toast.t, (W - w) / 2 + 8, H - 17, C.white); }
   cursor(); input.clicked = false; input.wheel = 0; ctx.putImageData(img, 0, 0); requestAnimationFrame(frame); }
-function resize() { const k = app.settings.scale || Math.max(1, Math.floor(Math.min(innerWidth / W, innerHeight / H))); cv.style.width = W * k + 'px'; cv.style.height = H * k + 'px';
+function resize() { const fit = Math.min((innerWidth - 32) / W, (innerHeight - 16) / H), k = app.settings.scale ? Math.min(app.settings.scale, fit) : fit >= 1 ? Math.floor(fit) : fit; cv.style.width = W * k + 'px'; cv.style.height = H * k + 'px';
   document.getElementById('scan').style.display = app.settings.scan ? 'block' : 'none'; document.getElementById('scan').style.width = cv.style.width; document.getElementById('scan').style.height = cv.style.height; }
 const pos = e => { const r = cv.getBoundingClientRect(); input.x = Math.floor((e.clientX - r.left) / r.width * W); input.y = Math.floor((e.clientY - r.top) / r.height * H); };
 cv.addEventListener('pointermove', pos); cv.addEventListener('pointerdown', e => { pos(e); input.down = true; input.clicked = true; });
@@ -223,4 +223,7 @@ addEventListener('pointerup', () => { input.down = false; input.drag = null; });
 cv.addEventListener('wheel', e => { e.preventDefault(); input.wheel = e.deltaY; }, { passive: false }); addEventListener('resize', resize);
 addEventListener('keydown', e => { if (e.key === 'Escape' && app.scene === 'hq') app.tab = 'menu'; if (e.key === ' ' && app.scene === 'hq' && !app.g.over) { e.preventDefault(); stepMonth(app.g); } });
 window.__gh = { app, input, stepMonth };
-resize(); frame();
+// keep the running company across page updates in the viewer
+window.claude?.hot?.snapshot?.(() => ({ g: app.g, scene: app.scene, tab: app.tab }));
+const start = d => { if (d && d.g) Object.assign(app, { g: d.g, scene: d.scene || 'hq', tab: d.tab || 'news' }); resize(); frame(); };
+window.claude?.hot?.ready ? window.claude.hot.ready(start) : start(window.claude?.hot?.data ?? {});

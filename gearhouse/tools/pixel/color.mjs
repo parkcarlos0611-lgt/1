@@ -44,6 +44,8 @@ export function eraPalette() {
   P.add('rubber', ['#16141b', '#24222b', '#36343f', '#4f4d59', '#6e6c78'], '#0b0a0f');
   P.add('chrome', ['#2a3047', '#56627e', '#93a3bb', '#cfd9e6', '#ffffff'], '#171b2a');
   P.add('glass', ['#16283a', '#22425a', '#3c6f86', '#79aab6', '#cdebeb'], '#0d1824');
+  P.add('glassP', ['#161c22', '#26313a', '#43535e', '#74878f', '#b9c8ca'], '#0c1015');           // period glass v2: desaturated blue-grey
+  P.add('celluloid', ['#2f3027', '#46473b', '#626253', '#82816d', '#a3a189'], '#1b1c15');        // canvas-top side curtain window
   P.add('lensW', ['#5e5a48', '#9d9a80', '#d9d5b6', '#f5f2dc', '#ffffff'], '#2d2b24');
   P.add('lensR', ['#3d0a16', '#7a1522', '#c22c2b', '#f06a4a', '#ffc49a'], '#22050c');
   P.add('lensA', ['#5a2508', '#9c4b0c', '#e08a1c', '#ffc24a', '#fff0a8'], '#2d1204');

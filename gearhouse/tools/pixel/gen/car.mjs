@@ -3,6 +3,7 @@ import { Pix, Mask, View, smooth, line, polyline } from '../pix.mjs';
 import { wheel } from './wheel.mjs';
 import { tire } from './tire.mjs';
 import { anchorFloating } from './anchor.mjs';
+import { deriveGlass, shadeGlassV2, interiorHints, paneFrames, ventWing } from './windows.mjs';
 
 export const TAG = { shadow: 1, well: 2, wheel: 3, body: 4, fender: 6, board: 7, glass: 8, frame: 9, trim: 10, bumper: 11, lamp: 12, deco: 13 };
 const OUTLINED = new Set([TAG.wheel, TAG.body, TAG.fender, TAG.board, TAG.bumper, TAG.lamp]);
@@ -89,7 +90,13 @@ export function buildCar(P, s, mm = 25, opt = {}) {
   for (const f of s.fenders || []) { /* wells under separate fenders */ const fm = M().poly(smooth(poly(f.pts), f.smooth ?? 3)); fm.clean(1); f._m = fm; }
   // wheels
   px.wheels = []; const T = s.tire ? tire(s.tire) : null;
-  const drawPart = p => { const m = M(); if (p.e) m.ellipse(v.X(p.e[0]), v.Y(p.e[1]), v.R(p.e[2]), v.R(p.e[3])); else m.poly(smooth(poly(p.pts), p.smooth ?? 1)); if (p.chrome) shadeChrome(px, m, P.id('chrome'), p.behind ? TAG.well : TAG.lamp); else shadeVolume(px, m, () => P.id(p.ramp), v, { tag: p.behind ? TAG.well : (p.tag || TAG.lamp), base: p.base ?? 2 }); };
+  const drawPart = p => { const m = M(); if (p.e) m.ellipse(v.X(p.e[0]), v.Y(p.e[1]), v.R(p.e[2]), v.R(p.e[3]));
+    else if (p.band) { const rr = Math.max(0.5, v.R(p.th || 30) / 2); for (let i = 0; i + 1 < p.band.length; i++) line(v.X(p.band[i][0]), v.Y(p.band[i][1]), v.X(p.band[i + 1][0]), v.Y(p.band[i + 1][1]), (x, y) => m.circle(x + 0.5, y + 0.5, rr)); }
+    else m.poly(smooth(poly(p.pts), p.smooth ?? 1));
+    const tag = p.tag ?? (p.behind ? TAG.well : TAG.lamp), ramp = p.ramp === 'PAINT' ? s.paint : p.ramp;
+    if (p.chrome) shadeChrome(px, m, P.id('chrome'), p.behind ? TAG.well : TAG.lamp); else shadeVolume(px, m, () => P.id(ramp), v, { tag, base: p.base ?? 2, grad: p.grad || null, topLv: p.topLv ?? 4 });
+    if (p.grain) for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (m.get(x, y) && m.get(x, y - 1) && m.get(x, y + 1)) { const h = ((Math.floor((x + y * 7) / (3 + (y % 4))) * 2654435761) >>> 0) % 11; if (h < 2) px.set(x, y, P.id(ramp), Math.max(0, px.lvl(x, y) - 1), tag); }
+    if (p.edge) for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (m.get(x, y) && (!m.get(x - 1, y) || !m.get(x + 1, y))) px.set(x, y, P.id(ramp), Math.max(0, px.lvl(x, y) - 1), tag); };
   for (const p of s.parts || []) if (p.behind) drawPart(p);
   for (const w0 of s.wheels) { const w = T ? { ...w0, r: T.r, tireFrac: T.frac } : w0; const wp = wheel(P, { ...s.wheel, ...w, r: v.R(w.r) }); const wx = Math.round(v.X(w.x) - wp.w / 2), wy = Math.round(v.Y(w.r) - wp.h / 2); px.blit(wp, wx, wy); px.wheels.push({ wp, wx, wy }); }
   // body paint (+ two-tone regions)
@@ -98,15 +105,18 @@ export function buildCar(P, s, mm = 25, opt = {}) {
   const p1 = P.id(s.paint), tones = (s.tone || []).map(t => ({ r: P.id(t.paint), m: M().poly(smooth(poly(t.pts), t.smooth ?? 2)) }));
   const rampOf = (x, y) => { for (const t of tones) if (t.m.get(x, y)) return t.r; return p1; };
   // glass first-mask so shading can know what's above
-  const glass = M(); for (const g of s.glass) glass.poly(smooth(poly(g), s.glassSmooth ?? 1)); glass.and(bodyM);
+  let glass = M(), panes = null; if (s.win) { const d = deriveGlass(body, v, s.win); glass = d.glass; panes = d.panes; } else for (const g of s.glass) glass.poly(smooth(poly(g), s.glassSmooth ?? 1));
+  for (const g of s.glassExtra || []) glass.poly(smooth(poly(g), 1)); glass.and(bodyM);
   px.paint(glass, () => [P.id('glass'), 1, TAG.glass]);
   const paintM = bodyM.copy().sub(glass);
   shadeVolume(px, paintM, rampOf, v, { grad: s.grad, lowZ: s.lowZ ?? -1, spec: (s.spec || []).map(q => ({ ...q, z: typeof q.z === 'function' ? q.z : () => q.z })) });
-  if (s.glassStyle === 'period') shadeGlassPeriod(px, glass, P.id('glass')); else shadeGlass(px, glass, P.id('glass'), { period: s.glassPeriod || 19 });
+  if (s.win) { shadeGlassV2(px, glass, P.id('glassP'), TAG.glass, { streak: 21 }); interiorHints(px, glass, v, P.id('glassP'), TAG.glass, s.win); }
+  else if (s.glassStyle === 'period') shadeGlassPeriod(px, glass, P.id('glass')); else shadeGlass(px, glass, P.id('glass'), { period: s.glassPeriod || 19 });
   // interior hints through glass
   for (const h of s.interior || []) { const m = M(); if (h.e) m.ellipse(v.X(h.e[0]), v.Y(h.e[1]), v.R(h.e[2]), v.R(h.e[3])); else m.poly(poly(h.pts)); m.and(glass); px.paint(m, (x, y) => [P.id('glass'), 0, TAG.glass]); }
   // window frames
-  if (s.frame === 'reveal') {
+  if (s.win) { paneFrames(px, glass, P, s.win.frame || 'chrome', rampOf, TAG.frame); if (s.win.vent != null) ventWing(px, panes[0].m, v, s.win.vent, s.win.belt, s.win.ventTop ?? s.win.belt + 450, P, s.win.frame, TAG.frame); }
+  else if (s.frame === 'reveal') {
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (glass.get(x, y)) {
       const up = !glass.get(x, y - 1), dn = !glass.get(x, y + 1), fr = !glass.get(x - 1, y), bk = !glass.get(x + 1, y);
       const r = rampOf(x, y - 3) === P.id('black') ? rampOf(x, y + 3) : rampOf(x, y);

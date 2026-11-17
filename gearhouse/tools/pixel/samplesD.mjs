@@ -10,6 +10,7 @@ import { buildFront } from './gen/front.mjs';
 import { airflow34, zephyr37 } from './gen/stream30d.mjs';
 import { engineSV } from './gen/engineSV.mjs';
 import { buildUnderbody, smallPlatformUnder } from './gen/underbody.mjs';
+import { townCar34, townCarFront, townCarRear } from './gen/luxury30d.mjs';
 export const P = eraPalette();
 P.auto('paint.niagara', '#4b6283'); P.auto('paint.copra', '#7d3a2c'); P.auto('paint.airflow', '#3f8a72'); P.auto('paint.zephyr', '#7a1f2b'); P.add('ghost', ['#1d3557', '#2f5486', '#5c86bd', '#9cc3ea', '#dceeff'], '#9cc3ea');
 const out = new URL('../../samples/', import.meta.url).pathname, ink = hex('#3a3440');
@@ -38,3 +39,10 @@ writePNG(out + 'e1_detail_before_after.png', sh.w, sh.h, sh.d); console.log('ok'
   const u = buildUnderbody(P, smallPlatformUnder, 12.5), z = 3; const sh5 = new Sheet(u.w * z + 32, u.h * z + 50, hex('#cfc9bd'));
   text(sh5, '1930 SMALL PLATFORM - UNDERSIDE (VIEW FROM BELOW, FRONT LEFT) 12.5MM/PX', 16, 12, ink); drawPix(sh5, u, P, 16, 32, z);
   writePNG(out + 'e1_underbody.png', sh5.w, sh5.h, sh5.d); }
+
+{ P.auto('paint.cadmaroon', '#5c1c27');
+  const L = buildCar(P, townCar34, 12.5), Fv = buildFront(P, townCarFront, 12.5), Bv = buildFront(P, townCarRear, 12.5), z = 2;
+  const sh6 = new Sheet(Math.max(L.w, Fv.w + Bv.w + 20) * z + 40, (L.h + Fv.h) * z + 90, hex('#d9d3c7'));
+  text(sh6, '1934 V12 TOWN CAR - SIDE / FRONT / REAR 12.5MM/PX', 16, 12, ink); drawPix(sh6, L, P, 16, 30, z);
+  drawPix(sh6, Fv, P, 16, 50 + L.h * z, z); drawPix(sh6, Bv, P, 56 + Fv.w * z, 50 + L.h * z, z);
+  writePNG(out + 'e1_towncar_views.png', sh6.w, sh6.h, sh6.d); }

@@ -10,7 +10,7 @@ import { E1, townSedan } from './gen/vehicles30.mjs';
 import { tire } from './gen/tire.mjs';
 const P = eraPalette();
 P.auto('paint.niagara', '#4b6283'); P.auto('paint.copra', '#7d3a2c'); P.auto('paint.cream', '#d8c9a0', { sat: 0.9 }); P.auto('paint.ivory', '#e2dccb', { sat: 0.6 });
-P.auto('canvas', '#3c3833', { sat: 0.5 }); P.auto('paint.engineblue', '#2f5fa8'); P.auto('paint.crinkle', '#2b2b30', { sat: 0 }); P.auto('paint.tank', '#6d7a4a');
+P.auto('canvas', '#3c3833', { sat: 0.5 }); P.auto('paint.engineblue', '#2f5fa8'); P.auto('paint.crinkle', '#2b2b30', { sat: 0 });
 P.add('ghost', ['#1d3557', '#2f5486', '#5c86bd', '#9cc3ea', '#dceeff'], '#9cc3ea');
 const out = new URL('../../samples/', import.meta.url).pathname, ink = hex('#3a3440'), z = 4;
 const rows = E1.map(d => [d, buildCar(P, d.body), buildXray(P, d)]);

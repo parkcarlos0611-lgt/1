@@ -1,5 +1,6 @@
 // 1934 V12 town car (Fleetwood-type, debadged) - measured from user 4-view. Detail scale.
 import { fillet, arc } from './geom.mjs';
+import { chassisUnder } from './chassis.mjs';
 const S = (x, y) => [(x - 225) * 9.89, (192 - y) * 9.89];
 const p = (x, y, r = 0) => [...S(x, y), r];
 const F = 643, R = F + 3708, r = 402;
@@ -28,10 +29,15 @@ export const townCar34 = {
   louvres: [{ x0: S(320, 0)[0], x1: S(450, 0)[0], step: 45, z0: (192 - 108) * 9.89, z1: (192 - 84) * 9.89 }],
   parts: [
     { pts: fillet([[...S(268, 140), 0], [...S(266, 100), 30], [...S(272, 66), 50], [...S(282, 64), 0], [...S(282, 140), 0]]), chrome: 1, behind: 1 },     // V shell edge
-    { pts: [S(466, 61), S(472, 61), S(486, 20), S(480, 19)], chrome: 1 },                                                                         // chauffeur screen frame
-    { pts: [S(520, 62), S(545, 62), S(548, 34), S(524, 36)], ramp: 'black', base: 1 },                                                            // chauffeur seat back
-    { pts: [S(492, 52), S(505, 46), S(507, 48), S(494, 54)], ramp: 'black', base: 2 },                                                            // steering wheel
-    { pts: [S(270, 64), S(280, 50), S(290, 47), S(284, 54), S(278, 64)], chrome: 1 },                                                            // generic swan mascot
+    { pts: [S(469, 55), S(483, 22), S(492, 22), S(479, 55)], ramp: 'glass', base: 2 },                                                           // chauffeur screen glass
+    { pts: [S(463, 56), S(469, 56), S(484, 20), S(478, 20)], chrome: 1 },                                                                         // screen post (front)
+    { pts: [S(476, 56), S(480, 56), S(494, 21), S(490, 21)], chrome: 1 },                                                                         // screen post (rear)
+    { pts: [S(478, 20), S(492, 20), S(492, 23), S(478, 23)], chrome: 1 },                                                                         // screen top rail
+    { pts: [S(522, 63), S(527, 46, 30), S(533, 41, 20), S(548, 41, 20), S(551, 46), S(552, 63)], ramp: 'black', base: 2 },                    // seat back, sits on the belt
+    { pts: [S(500, 63), S(503, 63), S(511, 45), S(508, 45)], ramp: 'black', base: 1 },                                                            // steering column from the cowl
+    { e: [...S(511, 44), 32, 110], ramp: 'black', base: 3 },                                                                                         // wheel rim (edge-on)
+    { pts: [S(271, 67), S(279, 67), S(279, 63), S(271, 63)], chrome: 1 },                                                                         // radiator cap
+    { pts: [S(272, 63), S(277, 63), S(282, 54), S(292, 50), S(287, 56), S(281, 63)], chrome: 1 },                                                // generic swan mascot on the cap
     { pts: [[...S(266, 96)], [...S(300, 96)], [...S(300, 99)], [...S(266, 99)]], ramp: 'black', base: 1, behind: 1 },                                        // lamp bar
     { e: [...S(279, 88), 118, 125], chrome: 1 },                                                                                                  // headlamp bucket
     { pts: fillet([[...S(738, 102), 30], [...S(760, 102), 30], [...S(760, 138), 20], [...S(738, 138), 20]]), ramp: 'black', base: 2 },          // luggage trunk
@@ -39,6 +45,7 @@ export const townCar34 = {
   lamps: [{ e: [S(268, 88)[0], S(268, 88)[1], 22, 120], ramp: 'lensW' }, { e: [S(749, 118)[0], S(749, 118)[1], 30, 30], ramp: 'lensR', bezel: 'chrome' }],
   bumperSets: [{ x0: 0, x1: 200, zs: [420, 480], h: 40, clamp: 140, iron: [[160, 450], [460, 470]] }, { x0: 5150, x1: 5320, zs: [430, 490], h: 40, clamp: 5180, iron: [[4950, 460], [5200, 460]] }],
   handles: [[...S(548, 70)], [...S(612, 70)]],
+  under: chassisUnder({ F, R, r, frameZ: 560, front: 120, rear: 5150, exhaustZ: 380, muffler: [2900, 3500] }),
 };
 
 const Y = x => (x - 105) * 9.86, Zf = y => (190 - y) * 9.86;

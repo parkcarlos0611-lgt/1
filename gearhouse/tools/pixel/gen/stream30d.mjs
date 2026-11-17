@@ -1,6 +1,7 @@
 // Detail-scale streamline replicas (debadged): 1934 airflow-type sedan, 1937 prow-grille fastback coupe.
 // Measured from user-supplied 4-views (docs/REFERENCE_ANALYSIS_3.md). x mm from front bumper tip, z mm up.
 import { fillet, arc } from './geom.mjs';
+import { chassisUnder } from './chassis.mjs';
 
 // ---- 1934 airflow-type sedan: WB 3251, 6.50-16, integrated front fenders, rear skirts, triple-bar bumpers ----
 const A = (x, y) => [(x - 5) * 13.6, (143 - y) * 13.6];           // blueprint px -> mm
@@ -21,7 +22,7 @@ export const airflow34 = {
     ...[0, 1, 2, 3, 4].map(k => ({ pts: [A(84 + k * 2, 71 + k * 4), A(120, 71 + k * 4)], w: 1, lv: 4 })),
     { pts: [A(312, 58), A(345, 100)], w: 2, lv: 4, lv2: 2 },                                   // trunk spear
     { pts: [[RA - 300, 420], [RA + 480, 420]], w: 1, lv: 4 }],                               // skirt moulding
-  under: [{ pts: [[1300, 200], [3300, 200], [3300, 250], [1300, 250]], ramp: 'black', lv: 1 }],
+  under: [{ pts: [[1300, 200], [3300, 200], [3300, 250], [1300, 250]], ramp: 'black', lv: 1 }, ...chassisUnder({ F: FA, R: RA, r: 365, frameZ: 380, front: 300, rear: 4650, exhaustZ: 230, tank: false })],
   parts: [{ pts: [A(17, 92), A(23, 76), A(26, 77), A(21, 93)], chrome: 1 }],                  // grille wrap edge
   lamps: [{ e: [A(24, 82)[0], A(24, 82)[1], 30, 55], ramp: 'lensW', bezel: 'chrome' }, { e: [A(347, 104)[0], A(347, 104)[1], 25, 30], ramp: 'lensR', bezel: 'chrome' }],
   bumperSets: [{ x0: 60, x1: 240, zs: [380, 450, 520], h: 30, clamp: 120, iron: [[200, 450], [420, 420]] }, { x0: 4600, x1: 4800, zs: [380, 450, 520], h: 30, clamp: 4740, iron: [[4450, 420], [4640, 450]] }],
@@ -42,6 +43,7 @@ export const zephyr37 = {
     { paint: 'paint.zephyr', wx: FZ, wz: 378, wr: 430, smooth: 2, pts: [q(35, 202), q(38, 175), q(60, 140), q(110, 124), q(160, 134), q(210, 165), q(268, 199), q(272, 207), q(150, 207), ...arc(FZ, 378, 432, 432, 12, 168, 12), q(36, 207)] },
     { paint: 'paint.zephyr', wx: RZ, wz: 378, wr: 430, smooth: 2, pts: [q(352, 207), q(362, 168), q(398, 143), q(440, 139), q(480, 154), q(504, 188), q(505, 207), q(465, 207), ...arc(RZ, 378, 432, 432, 12, 168, 12)] }],
   boards: [{ paint: 'rubber', pts: [[1400, 270], [3200, 270], [3200, 320], [1400, 320]] }],
+  under: chassisUnder({ F: FZ, R: RZ, r: 378, frameZ: 420, front: 250, rear: 4500, exhaustZ: 250 }),
   glass: [fillet([[...Z(206, 117), 40], [...Z(216, 80), 90], [...Z(250, 72), 160], [...Z(277, 84), 200], [...Z(280, 117), 60]])],
   frame: 'chrome',
   interior: [{ pts: [Z(212, 100), Z(226, 92), Z(227, 94), Z(213, 102)] }],

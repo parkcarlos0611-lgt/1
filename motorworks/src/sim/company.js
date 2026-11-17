@@ -19,7 +19,7 @@
     const pf = S.defaultPlatform(G.t, { name: 'A46 래더 프레임 FR', wbMin: 2700, wbMax: 3100, wMin: 1750, wMax: 1950, bayLen: 1100 });
     pf.status = 'ready'; pf.readyT = G.t; pf.inherited = true; // pre-war chassis the company starts with
     G.platforms.push(pf);
-    const e = S.defaultEngine(G.t); e.name = '직렬 6기통 3.0 플랫헤드'; S.fixEngine(e, G.t); G.engines.push(e);
+    const e = S.defaultEngine(G.t); e.name = '직렬 6기통 3.7 플랫헤드'; S.fixEngine(e, G.t); G.engines.push(e);
     const c = S.defaultCar(G.t, e.id); c.name = '시티 세단'; c.segment = 'family'; c.price = 0; c.regions = ['na']; c.platformId = pf.id; G.cars.push(c);
     S.initRivals(G);
     S.log(G, `${G.t}년 1월 — ${G.name} 설립. 자본금 ${U.money(G.cash)}.`, 'good');
@@ -384,7 +384,8 @@
       if (sell > 0 && rng() < pRecall) {
         const units = Math.round(car.sold * (.1 + rng() * .4)), cost = units * (25 + rng() * 55) * cpi;
         G.cash -= cost; L.recall += cost; G.rep = Math.max(0, G.rep - 1.5 - rng() * 3);
-        S.log(G, `${y < 1966 ? '보증수리 캠페인' : '리콜'}: ${car.name} ${U.num(units)}대 (${['연료 펌프', '브레이크 라인', '조향 링키지', '배선 하니스', '도어 래치', '서스펜션 암', '냉각수 호스', '변속기 링키지', '에어백 인플레이터', 'BMS 소프트웨어'][Math.floor(rng() * 10)]}) — ${U.money(cost)}`, 'bad');
+        const causes = ['연료 펌프', '브레이크 라인', '조향 링키지', '배선 하니스', '도어 래치', '서스펜션 암', '냉각수 호스', '변속기 링키지'].concat(y > 1985 ? ['에어백 인플레이터', 'ECU 소프트웨어'] : [], car.powertrain !== 'ice' ? ['BMS 소프트웨어', '고전압 커넥터'] : []);
+        S.log(G, `${y < 1966 ? '보증수리 캠페인' : '리콜'}: ${car.name} ${U.num(units)}대 (${causes[Math.floor(rng() * causes.length)]} 결함) — ${U.money(cost)}`, 'bad');
       }
       if (car.launchT && G.t - car.launchT > 4 && (car.corrosion ?? .5) < .45 && rng() < .02) { G.rep = Math.max(0, G.rep - 1.5); S.log(G, `소비자 불만: ${car.name} 차체 부식 사례 확산`, 'bad'); }
     }

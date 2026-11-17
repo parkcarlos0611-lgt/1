@@ -127,7 +127,7 @@
   D.PE = [[1946, 9], [1960, 13], [1973, 7], [1982, 8], [1995, 12], [2000, 10], [2009, 8], [2015, 9], [2020, 12], [2035, 10]];
   // companies that enter the market over time (organic competition)
   D.ENTRANTS = [
-    { y: 1955, id: 'kit' }, { y: 1960, id: 'tat' }, { y: 1975, id: 'sgj' },
+    { y: 1947, id: 'fer' }, { y: 1955, id: 'kit' }, { y: 1960, id: 'tat' }, { y: 1975, id: 'sgj' },
     { y: 2003, id: 'vol2', name: 'Voltair Motors', home: 'na', color: '#2a7bbf', traits: { price: -.2, quality: .1, tech: 1, ev: 1 }, segs: ['lux', 'family', 'suv', 'sport'] },
     { y: 2008, id: 'hzu', name: 'Hanzhou Auto', home: 'ea', color: '#c43a2f', traits: { price: .6, quality: -.1, tech: .6, ev: .8 }, segs: ['econ', 'family', 'suv'] },
     { y: 2015, id: 'nrd', name: 'Nordwerk EV', home: 'eu', color: '#4a6a5a', traits: { price: -.3, quality: .2, tech: .9, ev: 1 }, segs: ['lux', 'suv'] }

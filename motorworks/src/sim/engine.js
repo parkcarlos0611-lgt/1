@@ -6,7 +6,7 @@
 
   S.defaultEngine = (year) => ({
     id: U.uid('eng'), name: '신형 엔진', year,
-    fuel: 'gas', layout: 'I', cyl: year < 1960 ? 6 : 4, vAngle: 60, bore: year < 1960 ? 84 : 80, stroke: year < 1960 ? 90 : 88,
+    fuel: 'gas', layout: 'I', cyl: year < 1960 ? 6 : 4, vAngle: 60, bore: year < 1960 ? 84 : 80, stroke: year < 1960 ? 111 : 88,
     blockMat: 'iron', headMat: year >= 1965 ? 'alu' : 'iron',
     head: year >= 1985 ? 'dohc' : year >= 1965 ? 'sohc' : year >= 1950 ? 'ohv' : 'flat', valves: year >= 1990 ? 4 : 2,
     crank: 'cast', rods: 'cast', pistons: 'cast',

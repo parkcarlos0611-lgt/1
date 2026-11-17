@@ -64,7 +64,7 @@
     const d = x.getImageData(0, 0, W, H), p = d.data;
     for (let yy = 0; yy < H; yy++) for (let xx = 0; xx < W; xx++) {
       const k2 = (yy * W + xx) * 4;
-      const n = (Math.sin(xx * .9 + Math.sin(yy * .7) * 2) + Math.sin(yy * 1.1 + Math.cos(xx * .6) * 2)) * peel * .25 + (rnd() - .5) * peel * .5;
+      const n = (rnd() - .5) * peel * .35;
       const f = flake && rnd() < .08 ? (rnd() * 60 * flake) : 0;
       p[k2] += n + f; p[k2 + 1] += n + f; p[k2 + 2] += n + f;
     }

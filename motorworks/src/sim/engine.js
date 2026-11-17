@@ -61,7 +61,9 @@
     const rpmPiston = pistonSpeedLim * 30 / stroke;
     const rpmValve = H.rpm + V.rpm + IG.rpm + (VV.id !== 'none' ? 300 : 0) - (diesel ? 1800 : 0) - (bore > .095 ? (bore - .095) * 30000 : 0);
     const rpmBottom = 5200 + CR.rpm + RO.rpm + PI.rpm - Math.max(0, (stroke - .08) * 20000);
-    const rpmMax = Math.max(2400, Math.min(rpmPiston, rpmValve, rpmBottom + 2000));
+    // breathing know-how (port design, cam grinding, manifold tuning) matured over decades
+    const eraBreath = U.table([[1946, .7], [1955, .78], [1965, .86], [1975, .9], [1990, 1], [2035, 1.04]], y);
+    const rpmMax = Math.max(2400, Math.min(rpmPiston, rpmValve, rpmBottom + 2000) * eraBreath);
     const redline = Math.round((e.redline > 0 ? Math.min(e.redline, rpmMax + 600) : rpmMax * .95) / 100) * 100;
     const idle = Math.round((diesel ? 750 : 650) + e.cam * 6 + (n <= 2 ? 150 : 0));
 
@@ -106,6 +108,9 @@
     const mixPower = 1 - Math.abs(mixF + .2) * .08 * (1.2 - F.prec);
     const mixEcon = 1 - mixF * .07 * (.4 + F.prec);
 
+    // emission-control tuning: catalysts with carburettors forced lean, retarded, EGR'd calibrations (1972–1990)
+    const efiSys = ['tbi', 'mpfi', 'gdi', 'crdi', 'tdi'].includes(e.fuelSys);
+    const emisTune = CT.lvl ? (efiSys ? .96 : .8) : 1;
     // ── torque curve ──
     const bmepK = diesel ? .95 : 1.42; // MPa at VE=1, CR10
     const curve = [];
@@ -113,11 +118,11 @@
     let peakTq = 0, peakTqRpm = 0, peakHp = 0, peakHpRpm = 0;
     for (let rpm = 1000; rpm <= redline + 1; rpm += 250) {
       const b = boostAt(rpm);
-      const pr = 1 + b * (ic ? .98 : .88);
+      const pr = 1 + b * (ic ? .8 : .68);
       let ve = veAt(rpm);
       const flowNeed = dispL / 1000 * rpm / 120 * ve * pr; // m³/s
       if (flowNeed > capRating) ve *= Math.pow(capRating / flowNeed, .55);
-      let bmep = bmepK * ve * pr * effRel * knockLoss * mixPower * (diesel ? 1 : 1);
+      let bmep = bmepK * ve * pr * effRel * knockLoss * mixPower * emisTune;
       if (e.asp === 'sc') bmep -= A.parasitic * b * 1.2;
       const fmep = fric(rpm) * (1 - q * .05);
       const tq = Math.max(0, (bmep - fmep) * 1e6 * dispL / 1000 / (4 * Math.PI)); // Nm

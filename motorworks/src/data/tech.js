@@ -267,3 +267,48 @@
   ];
   D.P.stages = [['stamping', '프레스 (강판 성형)'], ['welding', '차체 용접 (BIW)'], ['paint', '도장'], ['assembly', '의장/조립'], ['qa', '품질 검사']];
 })(window.MW);
+
+// ── Electrified powertrains, platforms, panels, supply chain (appended) ───
+(function (MW) {
+  const D = MW.data;
+  D.PT = {};
+  D.PT.types = [
+    { id: 'ice', name: '내연기관' },
+    { id: 'hev', name: '하이브리드 (HEV)', intro: 1997, mp: 2010 },
+    { id: 'phev', name: '플러그인 하이브리드 (PHEV)', intro: 2010, mp: 2020 },
+    { id: 'bev', name: '순수전기 (BEV)', intro: 1996, mp: 2020 }
+  ];
+  D.PT.cells = [
+    { id: 'nimh', name: '니켈수소 (NiMH)', intro: 1996, mp: 2003, life: 1.0, fire: 0 },
+    { id: 'nmc', name: '리튬이온 NMC/NCA', intro: 2008, mp: 2016, life: .9, fire: .02 },
+    { id: 'lfp', name: '리튬인산철 (LFP)', intro: 2010, mp: 2021, life: 1.25, fire: 0 },
+    { id: 'ss', name: '전고체', intro: 2028, mp: 2034, life: 1.2, fire: 0 }
+  ];
+  D.PT.motors = [
+    { id: 'dc', name: '직류 브러시 모터', eff: .8, kwkg: .6, cost: 2, intro: 1946, mp: 1960 },
+    { id: 'ind', name: '교류 유도 모터', eff: .9, kwkg: 1.4, cost: .8, intro: 1990, mp: 2012 },
+    { id: 'pmsm', name: '영구자석 동기 모터 (PMSM)', eff: .95, kwkg: 2.2, cost: .9, intro: 1997, mp: 2015 },
+    { id: 'axial', name: '축방향 자속 모터', eff: .96, kwkg: 5, cost: 1.5, intro: 2021, mp: 2032 }
+  ];
+  D.PT.inverters = [{ id: 'si', name: 'Si IGBT 인버터', eff: 0, cost: 0 }, { id: 'sic', name: 'SiC 인버터', eff: .03, cost: .15, intro: 2017, mp: 2024 }];
+  // motor $/kW in 1946 dollars is derived from cost (1946$/kW at maturity) through techCost
+  // body panels: share of skin area and the stamping draw depth they demand
+  D.PANELS = [
+    { id: 'hood', name: '후드', share: .14, depth: .35 }, { id: 'roof', name: '루프', share: .14, depth: .3 },
+    { id: 'fender', name: '프런트 펜더', share: .13, depth: .66 }, { id: 'door', name: '프런트 도어', share: .15, depth: .48 },
+    { id: 'rdoor', name: '리어 도어', share: .13, depth: .48 }, { id: 'quarter', name: '리어 쿼터', share: .17, depth: .74 },
+    { id: 'trunk', name: '트렁크/테일게이트', share: .14, depth: .52 }
+  ];
+  D.FORM = { mild: .95, galv: .86, hsla: .72, ahss: .55, uhss: .92, alu: .56, frp: 1.2, cfrp: 1.2 };
+  // stage throughput (fraction of a moving line's base rate) → line balancing / bottleneck
+  D.P.thru = { stamping: { hand: .35, press: .95, tandem: 1.2, transfer: 1.5, servo: 1.6 }, welding: { gas: .45, spot: .9, multi: 1.15, robot: 1.45, laser: 1.55, giga: 1.7 }, paint: { brush: .55, enamel: 1.0, ecoat: 1.25, robot: 1.45, water: 1.55 }, assembly: { stall: .3, line: 1, lean: 1.08, module: 1.15, auto: 1.25 }, qa: { visual: 2, spc: 2, tqm: 2, vision: 2, ai: 2 } };
+  D.SHIFTS = [{ n: 1, cap: 1, wage: 1 }, { n: 2, cap: 1.9, wage: 1.05 }, { n: 3, cap: 2.65, wage: 1.1 }];
+  // make-or-buy components. share = typical fraction of parts cost; capex 1946$ per unit/yr capacity
+  D.COMPONENTS = [
+    { id: 'engine', name: '엔진', share: 'engine', capex: 14, save: .12, hours: 1 },
+    { id: 'gearbox', name: '변속기', share: 'gearbox', capex: 8, save: .12 },
+    { id: 'interior', name: '시트·내장', share: 'interior', capex: 3, save: .08 },
+    { id: 'electronics', name: '전장·전자', share: 'features', capex: 6, save: .1, chip: 1 },
+    { id: 'battery', name: '배터리 팩', share: 'battery', capex: 30, save: .15, intro: 2008 }
+  ];
+})(window.MW);

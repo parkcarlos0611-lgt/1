@@ -103,3 +103,33 @@
   ];
   D.eventsAt = t => D.EVENTS.filter(e => t >= e.y && t < e.y + e.len / 12);
 })(window.MW);
+
+// ── Electrification, regulation & capital markets (appended) ───────────────
+(function (MW) {
+  const U = MW.U, D = MW.data;
+  // Li-ion pack price, nominal $/kWh (BloombergNEF survey: >1200 in 2010, 140 in 2020, 161 in 2022, 139 in 2023, 108 in 2025)
+  D.PACK_PRICE = { nmc: [[2008, 1400], [2010, 1200], [2013, 650], [2016, 290], [2018, 185], [2020, 140], [2021, 132], [2022, 161], [2023, 139], [2025, 108], [2030, 80], [2035, 65]],
+    lfp: [[2010, 1300], [2016, 280], [2020, 125], [2022, 140], [2023, 115], [2025, 85], [2030, 65], [2035, 55]],
+    nimh: [[1996, 2200], [2003, 1100], [2010, 700], [2020, 500], [2035, 450]], ss: [[2028, 260], [2032, 120], [2035, 85]] };
+  // pack-level specific energy Wh/kg
+  D.PACK_DENS = { nmc: [[2008, 80], [2012, 100], [2016, 130], [2020, 160], [2025, 185], [2030, 220], [2035, 250]], lfp: [[2010, 70], [2020, 125], [2025, 150], [2035, 180]], nimh: [[1996, 35], [2010, 45], [2035, 50]], ss: [[2028, 260], [2035, 330]] };
+  // public charging availability index 0..1
+  D.CHARGE_INFRA = { na: [[2010, 0], [2015, .1], [2020, .3], [2025, .5], [2035, .85]], eu: [[2010, 0], [2015, .12], [2020, .35], [2025, .6], [2035, .9]], ea: [[2010, 0], [2015, .1], [2020, .5], [2025, .75], [2035, .95]], em: [[2015, 0], [2025, .15], [2035, .5]] };
+  // purchase incentive for BEV (nominal $); US federal credit ended 2025-09-30
+  D.EV_INCENTIVE = { na: [[2009.9, 0], [2010, 7500], [2025.7, 7500], [2025.75, 0], [2035, 0]], eu: [[2010, 0], [2011, 4000], [2020, 6000], [2023, 4000], [2025, 2500], [2035, 1000]], ea: [[2012, 0], [2013, 6000], [2019, 6000], [2020, 3000], [2023, 0], [2035, 0]], em: [[2035, 0]] };
+  D.ELEC_PRICE = [[2000, .08], [2010, .11], [2020, .13], [2023, .16], [2035, .19]]; // $/kWh residential
+  // fuel-economy / CO2 regulation. CAFE in mpg (fine per 0.1 mpg per car), EU/EA in g CO2/km (fine per g per car)
+  D.CAFE = { na: { mpg: [[1977.9, 0], [1978, 18], [1985, 27.5], [2010, 27.5], [2012, 29.7], [2016, 34.5], [2020, 40], [2026, 49], [2035, 49]], fine: [[1978, 5], [2016, 14], [2022, 15], [2035, 15]] },
+    eu: { g: [[2007.9, 0], [2008, 160], [2015, 130], [2020, 95], [2025, 94], [2030, 50], [2035, 0]], fine: [[2008, 95], [2035, 95]] },
+    ea: { g: [[2011.9, 0], [2012, 160], [2020, 120], [2025, 93], [2035, 70]], fine: [[2012, 40], [2035, 60]] } };
+  D.NCAP_FROM = { na: 1979, eu: 1997, ea: 2006, em: 2010 };
+  // price/earnings multiple of listed carmakers by era
+  D.PE = [[1946, 9], [1960, 13], [1973, 7], [1982, 8], [1995, 12], [2000, 10], [2009, 8], [2015, 9], [2020, 12], [2035, 10]];
+  // companies that enter the market over time (organic competition)
+  D.ENTRANTS = [
+    { y: 1955, id: 'kit' }, { y: 1960, id: 'tat' }, { y: 1975, id: 'sgj' },
+    { y: 2003, id: 'vol2', name: 'Voltair Motors', home: 'na', color: '#2a7bbf', traits: { price: -.2, quality: .1, tech: 1, ev: 1 }, segs: ['lux', 'family', 'suv', 'sport'] },
+    { y: 2008, id: 'hzu', name: 'Hanzhou Auto', home: 'ea', color: '#c43a2f', traits: { price: .6, quality: -.1, tech: .6, ev: .8 }, segs: ['econ', 'family', 'suv'] },
+    { y: 2015, id: 'nrd', name: 'Nordwerk EV', home: 'eu', color: '#4a6a5a', traits: { price: -.3, quality: .2, tech: .9, ev: 1 }, segs: ['lux', 'suv'] }
+  ];
+})(window.MW);

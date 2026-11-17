@@ -1,35 +1,30 @@
-// Headless balance check: `node motorworks/tools/simcheck.js`
-// Prints representative engines/cars per era and a 10-year company run.
+// Headless balance check: `node motorworks/tools/simcheck.js [years]`
+// 1) the player's starter car in a simple 1946 company run, 2) the rival economy to 2035.
 global.window = {};
+global.localStorage = { getItem: () => null, setItem: () => { } };
 const path = require('path');
 const R = path.join(__dirname, '..', 'src') + '/';
-for (const f of ['util', 'data/world', 'data/tech', 'sim/engine', 'sim/car', 'sim/market', 'sim/company']) require(R + f + '.js');
-const { sim: S, U } = window.MW;
-
-console.log('— era reference cars —');
-const cases = [
-  [1946, {}], [1955, { layout: 'V', cyl: 8, vAngle: 90, bore: 95, stroke: 86, head: 'ohv', fuelSys: 'carb2' }],
-  [1965, { layout: 'V', cyl: 8, vAngle: 90, bore: 105, stroke: 95, head: 'ohv', fuelSys: 'carb4', compression: 10.5, cam: 70 }],
-  [1975, {}], [1990, { fuelSys: 'mpfi' }], [2005, {}],
-  [2015, { fuelSys: 'gdi', asp: 'turbo', boost: 14, intercooler: true, vvt: 'full', bore: 82, stroke: 93, crank: 'forged' }]
-];
-for (const [y, mods] of cases) {
-  const e = Object.assign(S.defaultEngine(y), mods); S.fixEngine(e, y); const er = S.evalEngine(e, y);
-  const c = S.defaultCar(y, e.id); const r = S.evalCar(c, e, er, y);
-  console.log(y, `${e.layout}${e.cyl} ${er.dispL.toFixed(2)}L ${Math.round(er.peakHp)}hp ${Math.round(er.peakTq)}Nm`, `${r.mass}kg Cd${r.A.cd.toFixed(2)}`,
-    `0-100 ${r.t100.toFixed(1)}s`, `${r.topSpeed.toFixed(0)}km/h`, `${r.lpk.toFixed(1)}L/100`, '|', Object.entries(r.r).map(([k, v]) => k.slice(0, 4) + v.toFixed(0)).join(' '));
-}
-
-console.log('\n— company run 1946 → 1956 —');
+for (const f of ['util', 'data/world', 'data/tech', 'data/bodies', 'sim/engine', 'sim/powertrain', 'sim/car', 'sim/platform', 'sim/autodesign', 'sim/market', 'sim/rivals', 'sim/company']) require(R + f + '.js');
+const { sim: S, U, data: D } = window.MW;
+const years = +(process.argv[2] || 89);
+const t0 = Date.now();
 const G = S.newGame({ seed: 42 });
-const c = G.cars[0];
-S.startEngineDev(G, G.engines[0]); S.startCarDev(G, c);
+const c = G.cars[0], pf = G.platforms[0];
+console.log('engine', S.startEngineDev(G, G.engines[0]), 'car', S.startCarDev(G, c));
 c.price = S.suggestPrice(G, c);
 S.buildFactory(G, 'na', 1, { stamping: 'press', welding: 'spot', paint: 'enamel', assembly: 'line', qa: 'visual' });
-S.recruitDealers(G, 'na', 150); G.marketing.na = 20000;
-for (let i = 0; i < 120 && !G.over; i++) {
+S.recruitDealers(G, 'na', 350); G.marketing.na = 25000;
+for (let i = 0; i < years * 12 && !G.over; i++) {
+  if (process.argv[3] === 'rich') G.cash = Math.max(G.cash, 1e9);
   S.step(G);
-  if (c.status === 'ready' && !G.factories[0].lines[0].modelId) S.assignLine(G, G.factories[0], 0, c.id);
-  if (i % 12 === 11) { const L = G.lastL; console.log(S.ym(G.t), 'cash', U.money(G.cash), 'rev/mo', U.money(L.rev), 'sold', L.units, 'demand', Math.round(c.lastDemand || 0), 'unit', U.money(c.unitCost || 0), 'price', c.price, 'rep', G.rep.toFixed(0)); }
+  if (c.status === 'ready' && !G.factories[0].lines[0].modelId) console.log('assign', S.assignLine(G, G.factories[0], 0, c.id));
+  if (G.month === 0 && (Math.floor(G.t) % 5 === 1 || i < 24)) {
+    const L = G.lastL;
+    const mk = G.lastMarket, tot = U.sum(Object.values(mk.regions).map(r => r.total));
+    const rv = G.rivals.filter(r => r.alive).map(r => `${r.id}:${(r.salesM / tot * 100).toFixed(1)}%${r.models.some(m => m.pt === 'bev') ? '⚡' : ''}`).join(' ');
+    const unmet = U.sum(Object.values(mk.regions).flatMap(r => Object.values(r.segs).map(s => s.unmet || 0))) / tot;
+    console.log(S.ym(G.t), 'cash', U.money(G.cash), 'sold', L.units, 'price', c.price, 'unit', U.money(c.unitCost || 0), '| unmet', (unmet * 100).toFixed(0) + '%', '|', rv);
+  }
 }
-console.log(G.over ? 'GAME OVER: ' + G.over : 'ok');
+console.log(G.over || 'ok', ((Date.now() - t0) / 1000).toFixed(1) + 's');
+console.log(G.log.filter(l => l.kind === 'rival' || /올해의|신뢰성|파산|인수|CAFE|CO₂/.test(l.msg)).slice(0, 30).map(l => S.ym(l.t) + ' ' + l.msg).join('\n'));

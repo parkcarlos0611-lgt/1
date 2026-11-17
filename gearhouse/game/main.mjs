@@ -10,7 +10,7 @@ import { flatheadV8, ohvI6, ptPalette } from '../tools/pixel/gen/engine40.mjs';
 import { engineSide } from '../tools/pixel/gen/props.mjs';
 import { engineStats, LAYOUTS, HEADS, maxCR } from '../sim/engine.mjs';
 import { drawCutaway, fired } from './cutaway.mjs';
-import { LIMITS, dimsFor } from '../sim/dims.mjs';
+import { LIMITS, dimsFor, SIZE } from '../sim/dims.mjs';
 import { GEARBOX, proposeRatios, rpmTrace } from '../sim/drive.mjs';
 import { COUNTRIES, SEGS, TECH, RES_SCALE, newGame, stepMonth, evaluate, appeal, dateNum, has, BANK_OPTS, bankOption } from './world.mjs';
 
@@ -29,8 +29,8 @@ const toast = t => (app.toast = { t, until: app.t + 150 });
 const tyreFor = y => (y < 1933 ? '4.75-19' : y < 1936 ? '5.50-17' : y < 1946 ? '6.00-16' : '6.70-15');
 function carSprite(year, body, paintIdx, type, rot = 0) {
   const key = JSON.stringify([year, body, paintIdx, type, rot]); if (app.cache.has(key)) return app.cache.get(key);
-  const q = clampParams({ ...body, year, type, tire: tyreFor(year), paint: 'paint.c' + paintIdx, fenderPaint: body.style === 'box' && body.blackFenders ? 'black' : 'paint.c' + paintIdx });
-  const L = LIMITS[type] || LIMITS.sedan4d; if (q.hWB * q.wb > L.h[1]) { q.hWB = L.h[1] / q.wb; q.notes.push(`HEIGHT CAPPED AT ${L.h[1]}MM (TALLEST REAL ${type === 'coupe2d' ? 'COUPE' : 'SEDAN'} +3%)`); }
+  const wbRef = SIZE[body.size || 'medium'], q = clampParams({ ...body, year, type, tire: tyreFor(year), paint: 'paint.c' + paintIdx, fenderPaint: body.style === 'box' && body.blackFenders ? 'black' : 'paint.c' + paintIdx }); q.wbRef = wbRef;
+  const L = LIMITS[type] || LIMITS.sedan4d; if (q.hWB * wbRef > L.h[1]) { q.hWB = L.h[1] / wbRef; q.notes.push(`HEIGHT CAPPED AT ${L.h[1]}MM (TALLEST REAL ${type === 'coupe2d' ? 'COUPE' : 'SEDAN'} +3%)`); }
   let px = null, len = q.wb * 1.6; try { const s = genBody(q); len = s.len; Object.assign(s, { grad: [3.1, 1.4], glassStyle: 'period' }); s.wheel = { ...s.wheel, rot }; px = buildCar(P, s, Math.max(25, Math.ceil(s.len / 190))); } catch (e) { console.warn(e); }
   const out = { px, q, dims: dimsFor(type, q, len, body.widthAdj ?? 0.5) }; app.cache.set(key, out); if (app.cache.size > 140) app.cache.delete(app.cache.keys().next().value); return out; }
 function engineSprite(e, maxW = 140, maxH = 84) {
@@ -177,8 +177,10 @@ function cars(g) { windowBox(S, AX, AY, AW, AH, 'CAR DESIGN STUDIO');
     body: { style: 'box', wb: 2800, rake: 0.5, roofR: 0.5, noseR: 0.5, bodyR: 0.5, height: 0.5, hood: 0.5, nose: 0.5, belt: 0.5, blackFenders: true } });
   const b = d.body, styles = ['box', 'stream', 'pontoon'], sOK = st => limits(g.year, st) && (st === 'box' || has(g, st));
   const st2 = cycler(S, AX + 6, AY + 20, 90, 'BODY LANGUAGE', styles, b.style, { lock: st => !sOK(st) }); if (sOK(st2)) b.style = st2; else if (st2 !== b.style) toast(limits(g.year, st2) ? 'RESEARCH NEEDED' : 'NOT POSSIBLE IN ' + g.year);
-  d.type = cycler(S, AX + 6, AY + 44, 90, 'BODY TYPE', ['sedan4d', 'coupe2d'], d.type, { names: t => (t === 'sedan4d' ? '4-DOOR SEDAN' : '2-DOOR COUPE') });
-  const LIM = LIMITS[d.type] || LIMITS.sedan4d; b.wb = Math.round(slider(S, AX + 6, AY + 68, 90, 'WHEELBASE', Math.max(LIM.wb[0], Math.min(LIM.wb[1], b.wb)), LIM.wb[0], LIM.wb[1], { step: 25, fmt: v => Math.round(v) + 'MM' }));
+  d.type = cycler(S, AX + 6, AY + 44, 44, 'BODY TYPE', ['sedan4d', 'coupe2d'], d.type, { names: t => (t === 'sedan4d' ? 'SEDAN' : 'COUPE') });
+  const sz0 = b.size || 'medium'; b.size = cycler(S, AX + 52, AY + 44, 44, 'SIZE CLASS', Object.keys(SIZE), sz0, { names: k => k.toUpperCase() }); if (b.size !== sz0) b.wb = SIZE[b.size];
+  const LIM = LIMITS[d.type] || LIMITS.sedan4d, ref = SIZE[b.size || 'medium'], lo = Math.max(LIM.wb[0], Math.round(ref * 0.85 / 25) * 25), hi = Math.min(LIM.wb[1], Math.round(ref * 1.3 / 25) * 25);
+  b.wb = Math.round(slider(S, AX + 6, AY + 68, 90, 'WHEELBASE', Math.max(lo, Math.min(hi, b.wb)), lo, hi, { step: 25, fmt: v => Math.round(v) + 'MM' }));
   const dm0 = carSprite(g.year, b, d.paint, d.type).dims;
   [['rake', 'SCREEN RAKE'], ['roofR', 'ROOF CURVE'], ['noseR', 'NOSE ROUND'], ['height', 'HEIGHT'], ['hood', 'HOOD LENGTH'], ['belt', 'BELT LINE']].forEach(([k, l], i) => { const y = AY + 88 + i * 18;
     if (k === 'height') { b.height = slider(S, AX + 6, y, 42, 'HEIGHT', b.height, 0, 1, { step: 0.05, fmt: () => String(dm0.height) }); b.widthAdj = slider(S, AX + 54, y, 42, 'WIDTH', b.widthAdj ?? 0.5, 0, 1, { step: 0.05, fmt: () => String(dm0.width) }); }

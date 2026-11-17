@@ -62,7 +62,7 @@ export function clampParams(p) {
 }
 
 // Build a buildCar() spec from clamped params.
-export function genBody(q) {
+function genBodyRef(q) {
   const T = tire(q.tire), r = T.r, wb = q.wb, H = q.hWB * wb;
   const F = Math.round(q.noseAhead * wb + 380 + (q.style === 'stream' ? 120 : 0)), R = F + wb;
   const noseX = F - q.noseAhead * wb, hoodZ = H * (q.beltH + 0.02), beltZ = H * q.beltH;
@@ -140,4 +140,18 @@ export function genBody(q) {
     tone: stream ? [] : [{ paint: 'black', pts: [[wsTopX - 200, roofZ - 55], [wsTopX - 200, roofZ + 200], [roofRearX + 300, roofZ + 200], [roofRearX + 300, roofZ - 55]], smooth: 0 }],
     handles: [[gSplit - 90, beltZ - 50]], geo,
   };
+}
+
+// Wheelbase changes ONLY the wheelbase (like real long / short wheelbase versions of one body):
+// the body is built at its size-class reference wheelbase, then everything behind a split line placed in the rear-door /
+// rear-seat section (between cowl and rear wheel arch) is shifted by the difference. Front end, height and width stay.
+export function genBody(q) {
+  const ref = q.wbRef || q.wb, d = Math.max(-0.15 * ref, Math.min(0.30 * ref, q.wb - ref));
+  const s = genBodyRef({ ...q, wb: ref }); if (Math.abs(d) < 1) return s;
+  const g = s.geo, split = g.cowlX + (g.R - g.gap - g.cowlX) * 0.62;
+  const walk = o => { if (Array.isArray(o)) { if (o.length >= 2 && o.length <= 4 && o.every(v => typeof v === 'number')) { if (o[0] > split) o[0] += d; return; } o.forEach(walk); return; }
+    if (o && typeof o === 'object') for (const [k, v] of Object.entries(o)) { if ((k === 'x' || k === 'wx' || k === 'x0' || k === 'x1' || k === 'clamp') && typeof v === 'number') { if (v > split) o[k] = v + d; } else if (k !== 'geo') walk(v); } };
+  const { geo, ...rest } = s; walk(rest); Object.assign(s, rest);
+  s.len += d; for (const k of ['R', 'tailX', 'roofRearX', 'gSplit']) if (geo[k] > split) geo[k] += d; geo.split = split; geo.dWB = d;
+  return s;
 }

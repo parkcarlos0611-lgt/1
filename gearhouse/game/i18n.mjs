@@ -62,6 +62,7 @@ export const KO = {
   'MERGED INTO A LARGER FIRM': '대기업에 합병됨', 'FINAL CASH': '최종 자금', 'MODELS': '모델',
   'CUTAWAY': '투시도', 'CUT': '투시', 'EXT': '외관', 'CRANK SPEED': '크랭크 속도', 'STOP': '정지', 'RPM': 'RPM',
   'WIDTH': '전폭', 'HEIGHT CAPPED AT': '전고 상한', 'TALLEST REAL': '실제 최고', 'COUPE': '쿠페', 'SEDAN': '세단',
+  'SIZE CLASS': '차급', 'LIMOUSINE': '리무진', 'SEDAN': '세단',
   'JAN': '1월', 'FEB': '2월', 'MAR': '3월', 'APR': '4월', 'MAY': '5월', 'JUN': '6월', 'JUL': '7월', 'AUG': '8월', 'SEP': '9월', 'OCT': '10월', 'NOV': '11월', 'DEC': '12월', 'MUTE': '음소거', 'SOUND': '소리' };
 const keys = Object.keys(KO).sort((a, b) => b.length - a.length);
 const esc = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');

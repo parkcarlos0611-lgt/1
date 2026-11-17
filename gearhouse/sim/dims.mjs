@@ -9,9 +9,10 @@ export const LIMITS = {
   truck:   { wb: [3000, 5150], w: [1900, 2510], h: [2100, 2680] },          // legal width ~2,440 (estimate, to verify)
   mil6x6:  { wb: [3600, 4290], w: [2100, 2307], h: [2300, 2874] } };
 const clamp = (v, [a, b]) => Math.max(a, Math.min(b, v));
-// width follows the size class set by the wheelbase (measured 1930s cars: ~1,450 at 2,300 WB, ~2,070 at 3,900 WB); player trims +-6 %
+// width follows the size class (reference wheelbase), NOT the player's stretched wheelbase (measured 1930s cars: ~1,450 at 2,300 WB, ~2,070 at 3,900 WB); player trims +-6 %
 export const baseWidth = wb => 1450 + (wb - 2300) * 0.39;
 export function dimsFor(type, q, len, widthAdj = 0.5) {
-  const L = LIMITS[type] || LIMITS.sedan4d, wb = clamp(q.wb, L.wb), width = Math.round(clamp(baseWidth(wb) * (0.94 + 0.12 * widthAdj), L.w));
-  return { wb, len: Math.round(len), width, height: Math.round(clamp(q.hWB * wb, L.h)), track: Math.round(width - 290), clearance: Math.round(q.year < 1936 ? 230 : 205) };
+  const L = LIMITS[type] || LIMITS.sedan4d, wb = clamp(q.wb, L.wb), ref = q.wbRef || wb, width = Math.round(clamp(baseWidth(ref) * (0.94 + 0.12 * widthAdj), L.w));
+  return { wb, len: Math.round(len), width, height: Math.round(clamp(q.hWB * ref, L.h)), track: Math.round(width - 290), clearance: Math.round(q.year < 1936 ? 230 : 205) };
 }
+export const SIZE = { small: 2350, medium: 2800, large: 3250, limousine: 3700 };

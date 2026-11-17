@@ -1,0 +1,666 @@
+[
+ {
+  "seed": 1,
+  "year": 1933,
+  "style": "box",
+  "type": "coupe2d",
+  "rejected": 23,
+  "picks": {
+   "wheel": "wh_art10",
+   "headlamp": "hl_tear_chrome",
+   "bumper": "bp_heavy_dip",
+   "hoodVent": "hv_vLong",
+   "trim": "tri_twoTone",
+   "spare": "sp_sideExposed",
+   "trunk": "tr_none",
+   "mascot": "ms_eagle",
+   "roof": "roo_leatherette"
+  },
+  "notes": [],
+  "score": 82,
+  "parts": {
+   "era": 0.68,
+   "harmony": 1,
+   "proportion": 0.79
+  },
+  "body": {
+   "tail": "upright",
+   "fender": "valanced",
+   "grille": "vee",
+   "wb": 3000,
+   "tire": "4.75-19",
+   "notes": []
+  }
+ },
+ {
+  "seed": 2,
+  "year": 1933,
+  "style": "stream",
+  "type": "sedan4d",
+  "rejected": 40,
+  "picks": {
+   "wheel": "wh_wire48ww",
+   "headlamp": "-",
+   "bumper": "bp_triple",
+   "hoodVent": "hv_horizontal",
+   "trim": "tri_pinstripe",
+   "spare": "-",
+   "trunk": "tr_none",
+   "mascot": "ms_hound",
+   "roof": "-"
+  },
+  "notes": [],
+  "score": 72,
+  "parts": {
+   "era": 0.74,
+   "harmony": 0.7,
+   "proportion": 0.72
+  },
+  "body": {
+   "tail": "fastback",
+   "fender": "pontoonF",
+   "grille": "vee",
+   "wb": 3100,
+   "tire": "6.50-20",
+   "notes": []
+  }
+ },
+ {
+  "seed": 3,
+  "year": 1934,
+  "style": "stream",
+  "type": "sedan4d",
+  "rejected": 35,
+  "picks": {
+   "wheel": "wh_wire40",
+   "headlamp": "hl_nose_flush",
+   "bumper": "bp_heavy_dip",
+   "hoodVent": "hv_horizontal",
+   "trim": "tri_spear",
+   "spare": "sp_inTrunk",
+   "trunk": "tr_none",
+   "mascot": "ms_swan",
+   "roof": "-"
+  },
+  "notes": [],
+  "score": 60,
+  "parts": {
+   "era": 0.68,
+   "harmony": 0.4,
+   "proportion": 0.78
+  },
+  "body": {
+   "tail": "fastback",
+   "fender": "pontoonF",
+   "grille": "vee",
+   "wb": 3100,
+   "tire": "5.25-18",
+   "notes": []
+  }
+ },
+ {
+  "seed": 4,
+  "year": 1935,
+  "style": "box",
+  "type": "sedan4d",
+  "rejected": 17,
+  "picks": {
+   "wheel": "wh_wire40",
+   "headlamp": "hl_bullet8_tilt",
+   "bumper": "bp_blade",
+   "hoodVent": "hv_horizontal",
+   "trim": "tri_bead",
+   "spare": "sp_sideExposed",
+   "trunk": "tr_box",
+   "mascot": "ms_eagle",
+   "roof": "roo_leatherette"
+  },
+  "notes": [],
+  "score": 72,
+  "parts": {
+   "era": 0.53,
+   "harmony": 1,
+   "proportion": 0.62
+  },
+  "body": {
+   "tail": "trunk",
+   "fender": "valanced",
+   "grille": "flat",
+   "wb": 3200,
+   "tire": "5.25-18",
+   "notes": []
+  }
+ },
+ {
+  "seed": 5,
+  "year": 1935,
+  "style": "box",
+  "type": "coupe2d",
+  "rejected": 18,
+  "picks": {
+   "wheel": "wh_fullcap",
+   "headlamp": "hl_tear_chrome",
+   "bumper": "bp_heavy_dip",
+   "hoodVent": "hv_vGroups",
+   "trim": "tri_bead",
+   "spare": "sp_inTrunk",
+   "trunk": "tr_box",
+   "mascot": "ms_rocket",
+   "roof": "roo_turret"
+  },
+  "notes": [],
+  "score": 54,
+  "parts": {
+   "era": 0.53,
+   "harmony": 0.4,
+   "proportion": 0.75
+  },
+  "body": {
+   "tail": "trunk",
+   "fender": "valanced",
+   "grille": "vee",
+   "wb": 3300,
+   "tire": "6.50-16",
+   "notes": []
+  }
+ },
+ {
+  "seed": 6,
+  "year": 1936,
+  "style": "stream",
+  "type": "coupe2d",
+  "rejected": 27,
+  "picks": {
+   "wheel": "wh_steel_cap",
+   "headlamp": "hl_nose_flush",
+   "bumper": "bp_triple",
+   "hoodVent": "hv_wrap",
+   "trim": "tri_rocker",
+   "spare": "sp_inTrunk",
+   "trunk": "tr_integrated",
+   "mascot": "ms_arrow",
+   "roof": "roo_turret"
+  },
+  "notes": [],
+  "score": 68,
+  "parts": {
+   "era": 0.73,
+   "harmony": 0.7,
+   "proportion": 0.6
+  },
+  "body": {
+   "tail": "bustle",
+   "fender": "skirted",
+   "grille": "louvre",
+   "wb": 2700,
+   "tire": "6.00-16",
+   "notes": []
+  }
+ },
+ {
+  "seed": 7,
+  "year": 1937,
+  "style": "stream",
+  "type": "sedan4d",
+  "rejected": 31,
+  "picks": {
+   "wheel": "wh_steel_cap",
+   "headlamp": "hl_pod_round",
+   "bumper": "bp_blade",
+   "hoodVent": "hv_horizontal",
+   "trim": "tri_twoTone",
+   "spare": "sp_inTrunk",
+   "trunk": "tr_none",
+   "mascot": "ms_eagle",
+   "roof": "roo_turret"
+  },
+  "notes": [],
+  "score": 70,
+  "parts": {
+   "era": 0.7,
+   "harmony": 0.7,
+   "proportion": 0.7
+  },
+  "body": {
+   "tail": "bustle",
+   "fender": "skirted",
+   "grille": "waterfall",
+   "wb": 2800,
+   "tire": "6.00-16",
+   "notes": []
+  }
+ },
+ {
+  "seed": 8,
+  "year": 1937,
+  "style": "box",
+  "type": "sedan4d",
+  "rejected": 31,
+  "picks": {
+   "wheel": "wh_disc",
+   "headlamp": "hl_pod_round",
+   "bumper": "bp_overriders",
+   "hoodVent": "hv_horizontal",
+   "trim": "tri_pinstripe",
+   "spare": "sp_inTrunk",
+   "trunk": "tr_none",
+   "mascot": "ms_rocket",
+   "roof": "roo_leatherette"
+  },
+  "notes": [],
+  "score": 68,
+  "parts": {
+   "era": 0.69,
+   "harmony": 0.7,
+   "proportion": 0.65
+  },
+  "body": {
+   "tail": "bustle",
+   "fender": "pontoonF",
+   "grille": "vee",
+   "wb": 2900,
+   "tire": "5.50-17",
+   "notes": []
+  }
+ },
+ {
+  "seed": 9,
+  "year": 1938,
+  "style": "stream",
+  "type": "sedan4d",
+  "rejected": 37,
+  "picks": {
+   "wheel": "wh_trimring",
+   "headlamp": "hl_flush_oval",
+   "bumper": "bp_blade",
+   "hoodVent": "hv_chromeBars",
+   "trim": "tri_rocker",
+   "spare": "sp_inTrunk",
+   "trunk": "tr_none",
+   "mascot": "ms_rocket",
+   "roof": "roo_turret"
+  },
+  "notes": [],
+  "score": 80,
+  "parts": {
+   "era": 0.69,
+   "harmony": 1,
+   "proportion": 0.68
+  },
+  "body": {
+   "tail": "fastback",
+   "fender": "skirted",
+   "grille": "waterfall",
+   "wb": 3000,
+   "tire": "6.00-16",
+   "notes": []
+  }
+ },
+ {
+  "seed": 10,
+  "year": 1939,
+  "style": "stream",
+  "type": "coupe2d",
+  "rejected": 39,
+  "picks": {
+   "wheel": "wh_fullcap",
+   "headlamp": "hl_flush_oval",
+   "bumper": "bp_overriders",
+   "hoodVent": "hv_wrap",
+   "trim": "tri_rocker",
+   "spare": "sp_inTrunk",
+   "trunk": "tr_none",
+   "mascot": "ms_rocket",
+   "roof": "roo_turret"
+  },
+  "notes": [],
+  "score": 68,
+  "parts": {
+   "era": 0.38,
+   "harmony": 1,
+   "proportion": 0.71
+  },
+  "body": {
+   "tail": "fastback",
+   "fender": "skirted",
+   "grille": "louvre",
+   "wb": 3000,
+   "tire": "6.50-16",
+   "notes": []
+  }
+ },
+ {
+  "seed": 11,
+  "year": 1930,
+  "style": "box",
+  "type": "coupe2d",
+  "rejected": 29,
+  "picks": {
+   "wheel": "wh_wire40",
+   "headlamp": "hl_drum9_chrome",
+   "bumper": "bp_tube",
+   "hoodVent": "hv_vLong",
+   "trim": "tri_bead",
+   "spare": "sp_rearCover",
+   "trunk": "tr_box",
+   "mascot": "ms_swan",
+   "roof": "roo_leatherette"
+  },
+  "notes": [],
+  "score": 74,
+  "parts": {
+   "era": 0.57,
+   "harmony": 1,
+   "proportion": 0.66
+  },
+  "body": {
+   "tail": "upright",
+   "fender": "separate",
+   "grille": "flat",
+   "wb": 3100,
+   "tire": "5.25-18",
+   "notes": []
+  }
+ },
+ {
+  "seed": 12,
+  "year": 1930,
+  "style": "box",
+  "type": "sedan4d",
+  "rejected": 28,
+  "picks": {
+   "wheel": "wh_wire32",
+   "headlamp": "hl_drum9_nickel",
+   "bumper": "bp_twin",
+   "hoodVent": "hv_vShort",
+   "trim": "tri_pinstripe",
+   "spare": "sp_sideCover",
+   "trunk": "tr_rack",
+   "mascot": "ms_eagle",
+   "roof": "roo_landau"
+  },
+  "notes": [],
+  "score": 81,
+  "parts": {
+   "era": 0.68,
+   "harmony": 1,
+   "proportion": 0.76
+  },
+  "body": {
+   "tail": "upright",
+   "fender": "separate",
+   "grille": "flat",
+   "wb": 3200,
+   "tire": "4.75-19",
+   "notes": []
+  }
+ },
+ {
+  "seed": 13,
+  "year": 1931,
+  "style": "box",
+  "type": "sedan4d",
+  "rejected": 29,
+  "picks": {
+   "wheel": "wh_wire48ww",
+   "headlamp": "hl_drum9_chrome",
+   "bumper": "bp_tube",
+   "hoodVent": "hv_vGroups",
+   "trim": "tri_pinstripe",
+   "spare": "sp_sideExposed",
+   "trunk": "tr_none",
+   "mascot": "ms_motometer",
+   "roof": "roo_insert"
+  },
+  "notes": [
+   "stream not available -> box"
+  ],
+  "score": 69,
+  "parts": {
+   "era": 0.72,
+   "harmony": 0.7,
+   "proportion": 0.64
+  },
+  "body": {
+   "tail": "trunk",
+   "fender": "separate",
+   "grille": "flat",
+   "wb": 3300,
+   "tire": "6.50-20",
+   "notes": []
+  }
+ },
+ {
+  "seed": 14,
+  "year": 1932,
+  "style": "box",
+  "type": "sedan4d",
+  "rejected": 25,
+  "picks": {
+   "wheel": "wh_wire48ww",
+   "headlamp": "hl_drum9_chrome",
+   "bumper": "bp_twin",
+   "hoodVent": "hv_vGroups",
+   "trim": "tri_pinstripe",
+   "spare": "sp_rearExposed",
+   "trunk": "tr_none",
+   "mascot": "ms_hound",
+   "roof": "roo_leatherette"
+  },
+  "notes": [
+   "stream not available -> box"
+  ],
+  "score": 76,
+  "parts": {
+   "era": 0.77,
+   "harmony": 0.7,
+   "proportion": 0.81
+  },
+  "body": {
+   "tail": "trunk",
+   "fender": "separate",
+   "grille": "flat",
+   "wb": 2700,
+   "tire": "6.50-20",
+   "notes": []
+  }
+ },
+ {
+  "seed": 15,
+  "year": 1932,
+  "style": "box",
+  "type": "coupe2d",
+  "rejected": 26,
+  "picks": {
+   "wheel": "wh_wire40",
+   "headlamp": "hl_tourer12",
+   "bumper": "bp_heavy_dip",
+   "hoodVent": "hv_vLong",
+   "trim": "tri_pinstripe",
+   "spare": "sp_sideExposed",
+   "trunk": "tr_none",
+   "mascot": "ms_swan",
+   "roof": "roo_leatherette"
+  },
+  "notes": [],
+  "score": 82,
+  "parts": {
+   "era": 0.72,
+   "harmony": 1,
+   "proportion": 0.71
+  },
+  "body": {
+   "tail": "trunk",
+   "fender": "separate",
+   "grille": "flat",
+   "wb": 2800,
+   "tire": "5.25-18",
+   "notes": []
+  }
+ },
+ {
+  "seed": 16,
+  "year": 1933,
+  "style": "box",
+  "type": "coupe2d",
+  "rejected": 27,
+  "picks": {
+   "wheel": "wh_disc",
+   "headlamp": "hl_drum9_chrome",
+   "bumper": "bp_tube",
+   "hoodVent": "hv_doors5",
+   "trim": "tri_pinstripe",
+   "spare": "sp_sideExposed",
+   "trunk": "tr_none",
+   "mascot": "ms_eagle",
+   "roof": "roo_insert"
+  },
+  "notes": [],
+  "score": 72,
+  "parts": {
+   "era": 0.69,
+   "harmony": 0.7,
+   "proportion": 0.8
+  },
+  "body": {
+   "tail": "bustle",
+   "fender": "valanced",
+   "grille": "vee",
+   "wb": 2900,
+   "tire": "5.50-17",
+   "notes": []
+  }
+ },
+ {
+  "seed": 17,
+  "year": 1934,
+  "style": "stream",
+  "type": "sedan4d",
+  "rejected": 34,
+  "picks": {
+   "wheel": "wh_steel_cap",
+   "headlamp": "hl_nose_flush",
+   "bumper": "bp_heavy_dip",
+   "hoodVent": "hv_horizontal",
+   "trim": "tri_twoTone",
+   "spare": "sp_inTrunk",
+   "trunk": "tr_integrated",
+   "mascot": "ms_hound",
+   "roof": "-"
+  },
+  "notes": [],
+  "score": 68,
+  "parts": {
+   "era": 0.62,
+   "harmony": 0.7,
+   "proportion": 0.73
+  },
+  "body": {
+   "tail": "bustle",
+   "fender": "pontoonF",
+   "grille": "waterfall",
+   "wb": 3000,
+   "tire": "6.00-16",
+   "notes": []
+  }
+ },
+ {
+  "seed": 18,
+  "year": 1934,
+  "style": "box",
+  "type": "sedan4d",
+  "rejected": 22,
+  "picks": {
+   "wheel": "wh_wire48ww",
+   "headlamp": "hl_bullet8_tilt",
+   "bumper": "bp_heavy_dip",
+   "hoodVent": "hv_horizontal",
+   "trim": "tri_spear",
+   "spare": "sp_rearCover",
+   "trunk": "tr_box",
+   "mascot": "ms_swan",
+   "roof": "roo_landau"
+  },
+  "notes": [],
+  "score": 73,
+  "parts": {
+   "era": 0.74,
+   "harmony": 0.7,
+   "proportion": 0.74
+  },
+  "body": {
+   "tail": "upright",
+   "fender": "valanced",
+   "grille": "vee",
+   "wb": 3000,
+   "tire": "6.50-20",
+   "notes": []
+  }
+ },
+ {
+  "seed": 19,
+  "year": 1935,
+  "style": "box",
+  "type": "coupe2d",
+  "rejected": 20,
+  "picks": {
+   "wheel": "wh_wire48ww",
+   "headlamp": "hl_bullet10_body",
+   "bumper": "bp_triple",
+   "hoodVent": "hv_vGroups",
+   "trim": "tri_twoTone",
+   "spare": "sp_sideCover",
+   "trunk": "tr_box",
+   "mascot": "ms_eagle",
+   "roof": "roo_turret"
+  },
+  "notes": [],
+  "score": 69,
+  "parts": {
+   "era": 0.63,
+   "harmony": 0.7,
+   "proportion": 0.75
+  },
+  "body": {
+   "tail": "upright",
+   "fender": "valanced",
+   "grille": "flat",
+   "wb": 3100,
+   "tire": "6.50-20",
+   "notes": []
+  }
+ },
+ {
+  "seed": 20,
+  "year": 1936,
+  "style": "stream",
+  "type": "coupe2d",
+  "rejected": 28,
+  "picks": {
+   "wheel": "wh_cover",
+   "headlamp": "hl_nose_flush",
+   "bumper": "bp_triple",
+   "hoodVent": "hv_wrap",
+   "trim": "tri_rocker",
+   "spare": "sp_inTrunk",
+   "trunk": "tr_none",
+   "mascot": "ms_swan",
+   "roof": "roo_turret"
+  },
+  "notes": [],
+  "score": 76,
+  "parts": {
+   "era": 0.58,
+   "harmony": 1,
+   "proportion": 0.69
+  },
+  "body": {
+   "tail": "fastback",
+   "fender": "skirted",
+   "grille": "waterfall",
+   "wb": 3200,
+   "tire": "7.00-16",
+   "notes": []
+  }
+ }
+]

@@ -54,6 +54,7 @@ export function eraPalette() {
   P.add('shadow', ['#000000', '#000000', '#000000', '#000000', '#000000'], '#000000');
   P.add('brass', ['#3d2a10', '#6e4d1a', '#a8792c', '#dcb45a', '#fff0b0'], '#22170a');
   P.auto('paint.tank', '#3b3e38', { sat: 0.6 });
+  P.auto('wood', '#9a6a3a', { sat: 0.9 });
   P.add('wire', ['#1c1f2a', '#3c4254', '#6f7a90', '#b3bfd0', '#eef3f8'], '#10121a');
   return P;
 }

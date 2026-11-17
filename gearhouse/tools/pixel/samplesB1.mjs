@@ -5,7 +5,7 @@ import { writePNG } from './png.mjs';
 import { text } from './font.mjs';
 import { writeFileSync } from 'node:fs';
 import { CATALOG_B1 } from './gen/propsB1.mjs';
-const P = eraPalette(); P.auto('paint.prop', '#4b6283'); P.auto('wood', '#9a6a3a', { sat: 0.9 }); P.add('ghost', ['#c9c3b6', '#bdb7aa', '#b1ab9f', '#a59f93', '#99938a'], '#a59f93');
+const P = eraPalette(); P.auto('paint.prop', '#4b6283'); P.add('ghost', ['#c9c3b6', '#bdb7aa', '#b1ab9f', '#a59f93', '#99938a'], '#a59f93');
 const out = new URL('../../samples/', import.meta.url).pathname, ink = hex('#3a3440'), sub = hex('#6a6070');
 const cats = [['fenderF', 'FRONT FENDERS 10 (FITTED TO 5.25-18 WHEEL)', 1], ['fenderR', 'REAR FENDERS 8', 1], ['board', 'RUNNING BOARDS 5 (PLAN VIEW)', 1], ['spare', 'SPARE MOUNTS 7', 1], ['trunk', 'TRUNKS 6 (BODY REAR = GREY)', 1], ['mascot', 'MASCOTS 10 - REWORK', 2]];
 const SW = 1500; let H = 16; const blocks = [];

@@ -5,7 +5,7 @@ import { writePNG } from './png.mjs';
 import { text } from './font.mjs';
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { CATALOG } from './gen/propsA.mjs';
-const P = eraPalette(); P.auto('paint.prop', '#5c2a30'); P.auto('wood', '#9a6a3a', { sat: 0.9 });
+const P = eraPalette(); P.auto('paint.prop', '#5c2a30');
 const out = new URL('../../samples/', import.meta.url).pathname, ink = hex('#3a3440'), sub = hex('#6a6070');
 const cats = ['headlamp', 'auxlamp', 'taillamp', 'grille', 'mascot', 'bumper', 'wheel'];
 const titles = { headlamp: 'HEADLAMPS 14', auxlamp: 'AUX LAMPS 8', taillamp: 'TAIL LAMPS 12', grille: 'GRILLES 16', mascot: 'MASCOTS 10 (GENERIC)', bumper: 'BUMPERS 10', wheel: 'WHEELS 14 (TYRE CODE SIZED)' };

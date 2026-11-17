@@ -142,16 +142,29 @@ function genBodyRef(q) {
   };
 }
 
-// Wheelbase changes ONLY the wheelbase (like real long / short wheelbase versions of one body):
-// the body is built at its size-class reference wheelbase, then everything behind a split line placed in the rear-door /
-// rear-seat section (between cowl and rear wheel arch) is shifted by the difference. Front end, height and width stay.
+// Wheelbase changes ONLY the body between the wheels; the cabin (doors, greenhouse, roof) keeps its size.
+// Extra length goes into two zones that real long-wheelbase versions grow: (A) the cowl / hood section between the front wheel
+// and the windscreen base, (B) the rear quarter between the rear door shut line and the rear wheel arch (only if that panel exists).
+// Everything behind each split line is translated, so no door, window or roof point is stretched.
 export function genBody(q) {
-  const ref = q.wbRef || q.wb, d = Math.max(-0.15 * ref, Math.min(0.30 * ref, q.wb - ref));
+  const ref = q.wbRef || q.wb; let d = q.wb - ref;
   const s = genBodyRef({ ...q, wb: ref }); if (Math.abs(d) < 1) return s;
-  const g = s.geo, split = g.cowlX + (g.R - g.gap - g.cowlX) * 0.62;
-  const walk = o => { if (Array.isArray(o)) { if (o.length >= 2 && o.length <= 4 && o.every(v => typeof v === 'number')) { if (o[0] > split) o[0] += d; return; } o.forEach(walk); return; }
-    if (o && typeof o === 'object') for (const [k, v] of Object.entries(o)) { if ((k === 'x' || k === 'wx' || k === 'x0' || k === 'x1' || k === 'clamp') && typeof v === 'number') { if (v > split) o[k] = v + d; } else if (k !== 'geo') walk(v); } };
-  const { geo, ...rest } = s; walk(rest); Object.assign(s, rest);
-  s.len += d; for (const k of ['R', 'tailX', 'roofRearX', 'gSplit']) if (geo[k] > split) geo[k] += d; geo.split = split; geo.dWB = d;
+  const g = s.geo, splitA = Math.min(g.cowlX, g.wsTopX) - 160, doorRear = Math.min(g.roofRearX - 60, g.R - g.gap), quarter = g.R - g.gap - doorRear;
+  const hasB = quarter > 60, splitB = hasB ? doorRear + Math.min(80, quarter * 0.4) : Infinity;
+  const minA = -(g.cowlX - g.noseX - 900), minB = hasB ? -(quarter - 50) : 0;                 // keep >= 900 mm of hood, >= 50 mm of quarter
+  let dA = hasB ? d * 0.5 : d, dB = hasB ? d - dA : 0;
+  if (dB < minB) { dA += dB - minB; dB = minB; } if (dA < minA) dA = minA; d = dA + dB;
+  const sh = x => x + (x > splitA ? dA : 0) + (x > splitB ? dB : 0);
+  const walk = o => { if (Array.isArray(o)) { if (o.length >= 2 && o.length <= 4 && o.every(v => typeof v === 'number')) { o[0] = sh(o[0]); return; } o.forEach(walk); return; }
+    if (o && typeof o === 'object') for (const [k, v] of Object.entries(o)) { if (['x', 'wx', 'x0', 'x1', 'clamp'].includes(k) && typeof v === 'number') o[k] = sh(v); else if (k !== 'geo') walk(v); } };
+  // rigid parts: fenders move with their wheel (front stays, rear translates), roof tone moves with the cabin - never stretched
+  const rigid = (o, dx) => { const mv = a => { if (Array.isArray(a)) { if (a.length >= 2 && a.length <= 4 && a.every(v => typeof v === 'number')) a[0] += dx; else a.forEach(mv); } }; mv(o.pts); if (typeof o.wx === 'number') o.wx += dx; };
+  const fenders = s.fenders || [], tone = s.tone || [], parts = s.parts || [], lamps = s.lamps || []; s.fenders = []; s.tone = []; s.parts = []; s.lamps = [];
+  fenders.forEach(f => rigid(f, f.wx > splitA ? sh(f.wx) - f.wx : 0)); tone.forEach(t => rigid(t, dA));
+  const cx = o => { const xs = []; const f = a => { if (Array.isArray(a)) { if (a.length >= 2 && a.length <= 4 && a.every(v => typeof v === 'number')) xs.push(a[0]); else a.forEach(f); } }; f(o.pts || o.e && [o.e]); return xs.length ? xs.reduce((p, q) => p + q, 0) / xs.length : 0; };
+  for (const o of [...parts, ...lamps]) { const c = cx(o), dx = sh(c) - c; if (o.e) o.e[0] += dx; else rigid(o, dx); }   // visors, lamps, shells move whole
+  const { geo, ...rest } = s; walk(rest); Object.assign(s, rest); Object.assign(s, { fenders, tone, parts, lamps });
+  s.len += d; for (const k of ['R', 'tailX', 'roofRearX', 'gSplit', 'cowlX', 'wsTopX']) if (typeof geo[k] === 'number') geo[k] = sh(geo[k]);
+  Object.assign(geo, { splitA, splitB, dA, dB, wbActual: ref + d });
   return s;
 }

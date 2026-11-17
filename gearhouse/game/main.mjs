@@ -1,6 +1,7 @@
 // GEARHOUSE 1930-1949 test build: scenes, designers, monthly loop, save/load. All UI is pixel-drawn (ui.mjs).
 import * as AU from './audio.mjs';
 import { lang, hooks } from './ui.mjs';
+import { scrollArea } from './ui.mjs';
 import { W, H, C, Sheet, drawPix, input, text, tw, windowBox, panel, button, slider, cycler, bar, stat, graph, desk, bevel, rivet, lineTo } from './ui.mjs';
 import { eraPalette, hex } from '../tools/pixel/color.mjs';
 import { buildCar } from '../tools/pixel/gen/car.mjs';
@@ -126,7 +127,7 @@ function hq() {
 }
 const AX = 74, AY = 20, AW = W - AX - 3, AH = H - AY - 3;
 function news(g) { windowBox(S, AX, AY, AW, AH, 'OFFICE - NEWS WIRE & SUMMARY');
-  panel(S, AX + 8, AY + 22, 220, AH - 30, 'TELEGRAMS'); g.news.slice(0, 22).forEach((n, i) => { const y = AY + 33 + i * 9, yy = Math.floor(n.d / 12), mm = n.d % 12; text(S, n.d ? `${MONTHS[mm]} ${yy}` : '----', AX + 12, y, C.oxblood); text(S, n.t, AX + 50, y, C.ink, 1, 172); });
+  panel(S, AX + 8, AY + 22, 220, AH - 30, 'TELEGRAMS'); scrollArea(S, 'news', AX + 9, AY + 31, 218, AH - 40, g.news.length * 9 + 4, dy => g.news.forEach((n, i) => { const y = AY + 33 + i * 9 - dy, yy = Math.floor(n.d / 12), mm = n.d % 12; text(S, n.d ? `${MONTHS[mm]} ${yy}` : '----', AX + 12, y, C.oxblood); text(S, n.t, AX + 50, y, C.ink, 1, 172); }));
   const x = AX + 236; panel(S, x, AY + 22, AW - 244, 90, 'THIS MONTH'); const l = g.last || { rev: 0, cost: 0, sales: 0 };
   stat(S, x + 5, AY + 34, 'CARS SOLD', l.sales.toLocaleString()); stat(S, x + 5, AY + 44, 'REVENUE', money(l.rev)); stat(S, x + 5, AY + 54, 'COSTS', money(l.cost), C.red); stat(S, x + 5, AY + 64, 'PROFIT', money(l.rev - l.cost), l.rev >= l.cost ? C.green : C.red);
   stat(S, x + 5, AY + 78, 'FACTORY', `${g.factory}/MO`); stat(S, x + 5, AY + 88, 'MODELS', `${g.models.filter(m => !m.dead).length}`); stat(S, x + 5, AY + 98, 'RESEARCH', g.resCur ? TECH.find(t => t.id === g.resCur).name.slice(0, 16) : 'IDLE', g.resCur ? C.ink : C.red);
@@ -134,8 +135,8 @@ function news(g) { windowBox(S, AX, AY, AW, AH, 'OFFICE - NEWS WIRE & SUMMARY');
 
 function engines(g) { windowBox(S, AX, AY, AW, AH, 'ENGINE DESIGN - FAMILY + VARIANT');
   const e = app.edraft || (app.edraft = { ...g.engines[0], id: null, name: 'NEW ENGINE', quality: 0 });
-  panel(S, AX + 6, AY + 20, 112, AH - 26, 'YOUR ENGINES'); g.engines.forEach((x, i) => { const y = AY + 31 + i * 15, rdy = x.readyAt <= dateNum(g);
-    if (button(S, AX + 9, y, 106, 13, `${x.name.slice(0, 13)} ${rdy ? '' : '*'}`, { active: app.edraft?.from === x.id })) app.edraft = { ...x, from: x.id, id: null, name: x.name + ' B' }; });
+  panel(S, AX + 6, AY + 20, 112, AH - 26, 'YOUR ENGINES'); scrollArea(S, 'englist', AX + 7, AY + 29, 110, AH - 46, g.engines.length * 15 + 4, dy => g.engines.forEach((x, i) => { const y = AY + 31 + i * 15 - dy, rdy = x.readyAt <= dateNum(g);
+    if (button(S, AX + 9, y, 106, 13, `${x.name.slice(0, 13)} ${rdy ? '' : '*'}`, { active: app.edraft?.from === x.id })) app.edraft = { ...x, from: x.id, id: null, name: x.name + ' B' }; }));
   text(S, '* = TOOLING IN PROGRESS', AX + 9, AY + AH - 14, C.inkSoft);
   const x0 = AX + 124, lay = Object.keys(LAYOUTS).filter(k => LAYOUTS[k].year <= g.year), heads = ['sv', 'fh', 'ohv', 'sohc', 'dohc'];
   const headOK = h => h === 'sv' || h === 'fh' || (h === 'ohv' && has(g, 'ohv')) || (h === 'sohc' && has(g, 'ohv') && g.year >= 1946);
@@ -238,7 +239,7 @@ function prod(g) { windowBox(S, AX, AY, AW, AH, 'PRODUCTION PLANNING');
   text(S, `FACTORY CAPACITY ${g.factory} CARS / MONTH`, AX + 8, AY + 22, C.ink);
   if (button(S, AX + 200, AY + 19, 120, 12, 'EXPAND +500 ($40,000)', { disabled: g.cash < 40000 })) { g.factory += 500; g.cash -= 40000; }
   const live = g.models.filter(m => !m.dead); if (!live.length) text(S, 'NO MODELS YET - USE CAR DESIGN.', AX + 8, AY + 50, C.oxblood);
-  live.slice(0, 4).forEach((m, i) => { const y = AY + 36 + i * 54; panel(S, AX + 6, y, AW - 12, 50, `${m.name} - ${m.seg.toUpperCase()}`);
+  scrollArea(S, 'prod', AX + 4, AY + 34, AW - 8, AH - 38, live.length * 54 + 6, dy => live.forEach((m, i) => { const y = AY + 36 + i * 54 - dy; panel(S, AX + 6, y, AW - 12, 50, `${m.name} - ${m.seg.toUpperCase()}`);
     const sp = m.sprite.v2 ? v2Sprite(m.sprite.v2, m.sprite.paint).px : carSprite(m.sprite.year, m.sprite.body, m.sprite.paint, m.sprite.type).px; if (sp) drawPix(S, sp, P, AX + 10, y + 48 - Math.min(sp.h, 40), 1);
     const x = AX + 230, ready = m.readyAt <= dateNum(g); if (!ready) { text(S, `IN DEVELOPMENT - ${m.readyAt - dateNum(g)} MONTHS`, x, y + 14, C.oxblood); return; }
     m.price = Math.round(slider(S, x, y + 10, 70, 'PRICE', m.price, 350, 5000, { step: 10, fmt: money, id: m.id + 'p' }));
@@ -246,12 +247,12 @@ function prod(g) { windowBox(S, AX, AY, AW, AH, 'PRODUCTION PLANNING');
     text(S, `SOLD LAST ${m.lastSold || 0}  TOTAL ${m.sold || 0}  STOCK ${m.stock || 0}`, x, y + 30, C.ink); text(S, `APPEAL ${Math.round((m.appeal || 0) * 100)}`, x, y + 39, C.teal); if ((m.stock || 0) > (m.lastSold || 0) * 2 + 50) text(S, 'STOCK PILING UP - CUT OUTPUT', x + 40, y + 39, C.red);
     if (button(S, x + 110, y + 36, 48, 11, 'RETIRE', { tone: 'ox' })) m.dead = true;
     const fc = m.demandHist?.length ? Math.round(m.demandHist.reduce((a, b) => a + b, 0) / m.demandHist.length * 1.05) : null; if (fc != null && button(S, x + 160, y + 10, 60, 11, 'MATCH DEMAND', { tone: 'teal' })) m.plan = Math.min(g.factory, fc);
-    if (fc != null) text(S, `FORECAST ${fc}`, x + 160, y + 24, C.inkSoft); });
+    if (fc != null) text(S, `FORECAST ${fc}`, x + 160, y + 24, C.inkSoft); })); 
 }
 function research(g) { windowBox(S, AX, AY, AW, AH, `RESEARCH & DEVELOPMENT - ${g.research.toUpperCase()} DEPT (${RES_SCALE[g.research].pts} PTS/MO)`);
   const av = TECH.filter(t => t.year <= g.year && !has(g, t.id)), done = TECH.filter(t => has(g, t.id));
-  av.slice(0, 11).forEach((t, i) => { const y = AY + 22 + i * 18, cur = g.resCur === t.id; if (button(S, AX + 8, y, 150, 15, t.name, { active: cur })) { if (!cur) { g.resCur = t.id; g.resPts = 0; } }
-    bar(S, AX + 162, y + 5, 80, 6, cur ? g.resPts / t.pts : 0, C.teal); text(S, `${t.pts} PTS  MAINSTREAM ${t.main}`, AX + 248, y + 5, C.inkSoft); });
+  scrollArea(S, 'research', AX + 6, AY + 20, AW - 12, AH - 44, av.length * 18 + 6, dy => { av.forEach((t, i) => { const y = AY + 22 + i * 18 - dy, cur = g.resCur === t.id; if (button(S, AX + 8, y, 150, 15, t.name, { active: cur })) { if (!cur) { g.resCur = t.id; g.resPts = 0; } }
+    bar(S, AX + 162, y + 5, 80, 6, cur ? g.resPts / t.pts : 0, C.teal); text(S, `${t.pts} PTS  MAINSTREAM ${t.main}`, AX + 248, y + 5, C.inkSoft); }); });
   text(S, 'KNOWN: ' + done.map(t => t.name).join(', ').slice(0, 95), AX + 8, AY + AH - 20, C.green); text(S, 'TECH OLDER THAN ITS ERA LOSES APPEAL - GRACE SHRINKS EACH DECADE.', AX + 8, AY + AH - 11, C.inkSoft); }
 function market(g) { windowBox(S, AX, AY, AW, AH, `MARKET - ${COUNTRIES[g.country].name}`); const M = COUNTRIES[g.country].market;
   graph(S, AX + 8, AY + 22, 180, 90, [{ pts: Object.values(M), c: C.teal }], { labels: [{ t: 'NEW CARS / YEAR 1930-49', c: C.ink }] });

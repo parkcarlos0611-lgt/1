@@ -8,7 +8,10 @@ export const lang = { ko: false };
 
 export const W = 480, H = 270;
 // integer-snap every fill (fractional coordinates would write into the wrong RGBA byte offsets)
-const _fill = Sheet.prototype.fill; Sheet.prototype.fill = function (x, y, w, h, c) { _fill.call(this, Math.round(x), Math.round(y), Math.round(w), Math.round(h), c); };
+export const clip = { on: false, x0: 0, y0: 0, x1: 0, y1: 0 };
+const _fill = Sheet.prototype.fill; Sheet.prototype.fill = function (x, y, w, h, c) { x = Math.round(x); y = Math.round(y); w = Math.round(w); h = Math.round(h);
+  if (clip.on) { const x1 = Math.min(x + w, clip.x1), y1 = Math.min(y + h, clip.y1); x = Math.max(x, clip.x0); y = Math.max(y, clip.y0); w = x1 - x; h = y1 - y; if (w <= 0 || h <= 0) return; } _fill.call(this, x, y, w, h, c); };
+const _blend = Sheet.prototype.blend; Sheet.prototype.blend = function (x, y, c, a) { if (clip.on && (x < clip.x0 || y < clip.y0 || x >= clip.x1 || y >= clip.y1)) return; _blend.call(this, x, y, c, a); };
 export const C = {
   desk: hex('#2a1d17'), desk2: hex('#33241c'), ink: hex('#2b2320'), inkSoft: hex('#6d5e52'), paper: hex('#e9dfc8'), paper2: hex('#ddd0b3'), paperDark: hex('#c7b792'),
   brass: hex('#c9a24a'), brassL: hex('#f0d68a'), brassD: hex('#7a5a22'), oxblood: hex('#7a2a24'), oxL: hex('#a8453a'), oxD: hex('#4a1814'), teal: hex('#2f6b6a'), tealL: hex('#5fa3a0'),
@@ -34,7 +37,7 @@ export const tw = (str, sc = 1) => { str = String(str).toUpperCase(); if (lang.k
 // ---- input / immediate-mode widgets ----
 export const hooks = { click: null };
 export const input = { x: -1, y: -1, down: false, clicked: false, released: false, wheel: 0, key: null, hot: null, drag: null };
-const inside = (x, y, w, h) => input.x >= x && input.x < x + w && input.y >= y && input.y < y + h;
+const inside = (x, y, w, h) => input.x >= x && input.x < x + w && input.y >= y && input.y < y + h && (!clip.on || (input.x >= clip.x0 && input.x < clip.x1 && input.y >= clip.y0 && input.y < clip.y1));
 export function bevel(s, x, y, w, h, face, light, dark, inset = false) {
   s.fill(x, y, w, h, C.black); s.fill(x + 1, y + 1, w - 2, h - 2, face);
   s.fill(x + 1, y + 1, w - 2, 1, inset ? dark : light); s.fill(x + 1, y + 1, 1, h - 2, inset ? dark : light);
@@ -90,3 +93,18 @@ export function lineTo(s, x0, y0, x1, y1, c) { x0 = Math.round(x0); y0 = Math.ro
   for (;;) { s.fill(x0, y0, 1, 1, c); if (x0 === x1 && y0 === y1) break; const e2 = 2 * e; if (e2 >= dy) { e += dy; x0 += sx; } if (e2 <= dx) { e += dx; y0 += sy; } } }
 export function desk(s, t) { s.fill(0, 0, W, H, C.desk); for (let y = 0; y < H; y += 3) for (let x = (y * 5) % 11; x < W; x += 11) s.fill(x, y, 6, 1, C.desk2); }
 export { Sheet, drawPix };
+
+// ---- swipe / wheel scroll area: draw(dy) renders content shifted by -scroll; content outside the box is clipped ----
+const SCR = {};
+export function scrollArea(s, id, x, y, w, h, contentH, draw) {
+  const st = SCR[id] || (SCR[id] = { off: 0, vel: 0, drag: false, ly: 0 }), max = Math.max(0, contentH - h), over = input.x >= x && input.x < x + w && input.y >= y && input.y < y + h;
+  if (over && input.clicked) { st.drag = true; st.ly = input.y; st.start = input.y; st.moved = false; }
+  if (st.drag) { if (!input.down) st.drag = false; else { const dy = input.y - st.ly; if (Math.abs(input.y - st.start) > 3) st.moved = true; st.vel = -dy; st.off -= dy; st.ly = input.y; } }
+  else { st.off += st.vel; st.vel *= 0.86; if (Math.abs(st.vel) < 0.1) st.vel = 0; }
+  if (over && input.wheel) st.off += Math.sign(input.wheel) * 18;
+  st.off = Math.max(0, Math.min(max, st.off));
+  const prev = { ...clip }; Object.assign(clip, { on: true, x0: x, y0: y, x1: x + w, y1: y + h });
+  const swallow = st.moved; if (swallow) input.clicked = false;                       // a swipe is not a click
+  draw(Math.round(st.off)); Object.assign(clip, prev);
+  if (max > 0) { const th = Math.max(10, Math.round(h * h / contentH)), ty = y + Math.round((h - th) * st.off / max); s.fill(x + w - 3, y, 3, h, C.paperDark); s.fill(x + w - 3, ty, 3, th, C.brass); s.fill(x + w - 3, ty, 1, th, C.brassL); }
+  return st; }

@@ -7,7 +7,10 @@ export const TAG = { shadow: 1, well: 2, wheel: 3, body: 4, fender: 6, board: 7,
 const OUTLINED = new Set([TAG.wheel, TAG.body, TAG.fender, TAG.board, TAG.bumper, TAG.lamp]);
 
 // Column-run shading for painted volumes seen from the side.
-export function shadeVolume(pix, mask, rampOf, v, { lowZ = -1, topLv = 4, base = 2, tag = TAG.body, spec = [] } = {}) {
+const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map(n => (n + 0.5) / 16);
+// dither only a narrow band around each step boundary -> clean flats, soft seams
+export const dith = (x, y, v, w = 0.22) => { const f = Math.floor(v); const fr = Math.min(1, Math.max(0, (v - f - 0.5) / (2 * w) + 0.5)); return Math.max(0, Math.min(4, f + (fr > BAYER[(y & 3) * 4 + (x & 3)] ? 1 : 0))); };
+export function shadeVolume(pix, mask, rampOf, v, { lowZ = -1, topLv = 4, base = 2, tag = TAG.body, spec = [], grad = null } = {}) {
   for (let x = 0; x < mask.w; x++) {
     let y = 0;
     while (y < mask.h) {
@@ -16,8 +19,9 @@ export function shadeVolume(pix, mask, rampOf, v, { lowZ = -1, topLv = 4, base =
       for (let yy = y0; yy <= y1; yy++) {
         const d = yy - y0, bd = y1 - yy, z = (v.h - v.pad - yy - 0.5) * v.mm;
         let lv = base;
-        if (z < lowZ) lv = base - 1;
-        if (bd === 0 && z < lowZ + 200) lv = Math.max(0, base - 2);
+        if (grad) { const n = y1 - y0, t = n > 0 ? d / n : 0.5; lv = dith(x, yy, grad[0] + (grad[1] - grad[0]) * Math.pow(t, 1.15)); if (bd === 0) lv = Math.max(0, lv - 1); }
+        else if (z < lowZ) lv = base - 1;
+        if (!grad && bd === 0 && z < lowZ + 200) lv = Math.max(0, base - 2);
         if (d === 0) lv = pix.tag(x, yy - 1) === TAG.glass ? topLv - 1 : topLv;
         else if (d === 1 && y1 - y0 > 3) lv = Math.max(lv, topLv - 1);
         for (const s of spec) if (Math.abs(z - s.z(x * v.mm)) < v.mm * 0.5 && x * v.mm > s.x0 && x * v.mm < s.x1 && ((x + (s.dash || 99)) % (s.dash || 99)) !== 0) lv = s.lv ?? topLv;
@@ -36,6 +40,10 @@ export function shadeChrome(pix, mask, ramp, tag = TAG.bumper, bands = [4, 3, 1,
       for (let k = 0; k < n; k++) pix.set(x, y0 + k, ramp, n <= 2 ? [3, 1][k] : bands[Math.min(bands.length - 1, Math.floor(k / n * bands.length))], tag);
     }
   }
+}
+export function shadeGlassPeriod(pix, mask, ramp, tag = TAG.glass) {
+  for (let x = 0; x < mask.w; x++) { let y = 0; while (y < mask.h) { if (!mask.get(x, y)) { y++; continue; } const y0 = y; while (y < mask.h && mask.get(x, y)) y++; const n = y - y0;
+    for (let k = 0; k < n; k++) { const t = k / Math.max(1, n - 1); let lv = dith(x, y0 + k, 2.9 - 3.4 * t); if (k === 0) lv = 1; pix.set(x, y0 + k, ramp, lv, tag); } } }
 }
 export function shadeGlass(pix, mask, ramp, { period = 19, tag = TAG.glass } = {}) {
   for (let y = 0; y < mask.h; y++) for (let x = 0; x < mask.w; x++) {
@@ -68,6 +76,10 @@ export function buildCar(P, s, mm = 25, opt = {}) {
   // body mask
   const body = M().poly(smooth(poly(s.body), s.smooth ?? 3)); body.clean(1);
   const arches = M(); for (const a of s.arches) arches.circle(v.X(a.x), v.Y(a.z), v.R(a.r));
+  const solidMM = (sh, ramp, lv, tag) => { const m = M(); if (sh.band) { const rr = Math.max(0.6, v.R(sh.th || 40) / 2); for (let i = 0; i + 1 < sh.band.length; i++) line(v.X(sh.band[i][0]), v.Y(sh.band[i][1]), v.X(sh.band[i + 1][0]), v.Y(sh.band[i + 1][1]), (x, y) => m.circle(x + 0.5, y + 0.5, rr)); }
+    else if (sh.e) m.ellipse(v.X(sh.e[0]), v.Y(sh.e[1]), Math.max(0.8, v.R(sh.e[2])), Math.max(0.8, v.R(sh.e[3]))); else m.poly(smooth(poly(sh.pts), sh.smooth ?? 0));
+    const r = P.id(ramp); px.paint(m, (x, y) => [r, !m.get(x, y - 1) ? Math.min(4, lv + 1) : !m.get(x, y + 1) ? Math.max(0, lv - 1) : lv, tag]); return m; };
+  for (const u of s.under || []) solidMM(u, u.ramp || 'black', u.lv ?? 1, TAG.well);
   // wheel wells (dark) inside body
   const well = arches.copy().and(body); px.paint(well, () => [P.id('black'), 0, TAG.well]);
   for (const f of s.fenders || []) { /* wells under separate fenders */ const fm = M().poly(smooth(poly(f.pts), f.smooth ?? 3)); fm.clean(1); f._m = fm; }
@@ -83,8 +95,8 @@ export function buildCar(P, s, mm = 25, opt = {}) {
   const glass = M(); for (const g of s.glass) glass.poly(smooth(poly(g), s.glassSmooth ?? 1)); glass.and(bodyM);
   px.paint(glass, () => [P.id('glass'), 1, TAG.glass]);
   const paintM = bodyM.copy().sub(glass);
-  shadeVolume(px, paintM, rampOf, v, { lowZ: s.lowZ ?? -1, spec: (s.spec || []).map(q => ({ ...q, z: typeof q.z === 'function' ? q.z : () => q.z })) });
-  shadeGlass(px, glass, P.id('glass'), { period: s.glassPeriod || 19 });
+  shadeVolume(px, paintM, rampOf, v, { grad: s.grad, lowZ: s.lowZ ?? -1, spec: (s.spec || []).map(q => ({ ...q, z: typeof q.z === 'function' ? q.z : () => q.z })) });
+  if (s.glassStyle === 'period') shadeGlassPeriod(px, glass, P.id('glass')); else shadeGlass(px, glass, P.id('glass'), { period: s.glassPeriod || 19 });
   // interior hints through glass
   for (const h of s.interior || []) { const m = M(); if (h.e) m.ellipse(v.X(h.e[0]), v.Y(h.e[1]), v.R(h.e[2]), v.R(h.e[3])); else m.poly(poly(h.pts)); m.and(glass); px.paint(m, (x, y) => [P.id('glass'), 0, TAG.glass]); }
   // window frames
@@ -103,7 +115,7 @@ export function buildCar(P, s, mm = 25, opt = {}) {
   }
   for (const a of s.aprons || []) { const m = M().poly(poly(a)); px.paint(m, (x, y) => [P.id('black'), m.get(x, y - 1) ? 0 : 1, TAG.well]); }
   // separate fenders + running boards (pre-war)
-  for (const f of s.fenders || []) { const m = f._m; m.sub(M().circle(v.X(f.wx), v.Y(f.wz), v.R(f.wr))); shadeVolume(px, m, () => P.id(f.paint), v, { tag: TAG.fender, lowZ: -1 }); }
+  for (const f of s.fenders || []) { const m = f._m; m.sub(M().circle(v.X(f.wx), v.Y(f.wz), v.R(f.wr))); shadeVolume(px, m, () => P.id(f.paint), v, { tag: TAG.fender, lowZ: -1, grad: s.grad ? [3.2, 0.4] : null }); }
   for (const sp0 of s.spares || []) { const sp = T ? { ...sp0, r: T.r, tireFrac: T.frac } : sp0; const wp = wheel(P, { ...s.wheel, ...sp, r: v.R(sp.r) }); const wx = Math.round(v.X(sp.x) - wp.w / 2), wy = Math.round(v.Y(sp.z) - wp.h / 2); for (let y = 0; y < wp.h; y++) for (let x = 0; x < wp.w; x++) { const i = y * wp.w + x; if (wp.r[i]) px.set(wx + x, wy + y, wp.r[i], wp.l[i], TAG.board); } }
   for (const b of s.boards || []) { const m = M().poly(poly(b.pts)); px.paint(m, (x, y) => [P.id(b.paint), !m.get(x, y - 1) ? 3 : !m.get(x, y + 1) ? 0 : ((x % 2) ? 1 : 2), TAG.board]); }
   // shut lines, louvres, trim
@@ -116,6 +128,11 @@ export function buildCar(P, s, mm = 25, opt = {}) {
   }
   for (const d of s.decals || []) { const m = M().poly(poly(d.pts)).and(paintM); px.paint(m, (x, y) => [P.id(d.paint), (paintM.get(x, y - 1) ? 2 : 3), TAG.body]); }
   // bumpers, lamps, misc solid parts
+  for (const b of s.bumperSets || []) {
+    if (b.iron) solidMM({ band: b.iron, th: b.ironTh || 28 }, 'black', 1, TAG.bumper);
+    for (const zc of b.zs) { const m = M().poly(smooth(poly([[b.x0, zc - b.h / 2], [b.x1, zc - b.h / 2], [b.x1 + b.h * 0.3, zc], [b.x1, zc + b.h / 2], [b.x0, zc + b.h / 2], [b.x0 - b.h * 0.3, zc]]), 1)); shadeChrome(px, m, P.id('chrome'), TAG.bumper, [4, 3, 1, 2, 1]); }
+    if (b.clamp) { const zs = b.zs; solidMM({ pts: [[b.clamp - 22, Math.min(...zs) - b.h / 2], [b.clamp + 22, Math.min(...zs) - b.h / 2], [b.clamp + 22, Math.max(...zs) + b.h / 2], [b.clamp - 22, Math.max(...zs) + b.h / 2]] }, 'chrome', 2, TAG.bumper); }
+  }
   for (const b of s.bumpers || []) { const m = M().poly(smooth(poly(b.pts), b.smooth ?? 2)); if (b.ramp === 'chrome' || !b.ramp) shadeChrome(px, m, P.id('chrome')); else shadeVolume(px, m, () => P.id(b.ramp), v, { tag: TAG.bumper, topLv: 3, base: 1 }); }
   for (const l of s.lamps || []) {
     const m = M(); if (l.e) m.ellipse(v.X(l.e[0]), v.Y(l.e[1]), v.R(l.e[2]), v.R(l.e[3])); else m.poly(smooth(poly(l.pts), l.smooth ?? 1));

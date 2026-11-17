@@ -16,6 +16,7 @@ export function wheel(P, { r, tireFrac = 0.30, style = 'hubcap', whitewall = 0, 
       if (t > 0.25 && t < 0.7 && dot > 0.35) lv = 2;
       if (t > 0.35 && t < 0.6 && dot > 0.8) lv = 3;
       if (t < 0.18 || (t > 0.8 && dot < -0.3)) lv = 0;
+      if (t > 0.86 && r > 20) { const a = Math.atan2(dy, dx); if (Math.floor((a + Math.PI) / (Math.PI * 2) * r * 1.6) % 2 === 0) lv = Math.max(0, lv - 1); }
       if (whitewall && t > 0.12 && t < 0.12 + whitewall) { px.set(x, y, wht, dot > 0.4 ? 4 : dot < -0.5 ? 1 : 3, T); continue; }
       px.set(x, y, rub, lv, T); continue;
     }
@@ -30,8 +31,10 @@ export function wheel(P, { r, tireFrac = 0.30, style = 'hubcap', whitewall = 0, 
       if (q > 0.45 && q < 0.78) { const a = Math.atan2(dy, dx) + rot; if (Math.abs(Math.sin(a * 3)) < 0.12) lv = Math.max(0, lv - 2); }
       px.set(x, y, chr, lv, T);
     } else if (style === 'wire') {
-      if (q > 0.86) px.set(x, y, chr, dot > 0.2 ? 3 : dot < -0.4 ? 1 : 2, T);
-      else if (q < 0.3) px.set(x, y, chr, q < 0.16 ? (dot > 0 ? 4 : 2) : (dot > 0 ? 2 : 1), T);
+      if (q > 0.9) px.set(x, y, chr, dot > 0.2 ? 3 : dot < -0.4 ? 1 : 2, T);
+      else if (q > 0.84) px.set(x, y, blk, 1, T);                                    // rim well
+      else if (q < 0.3) px.set(x, y, chr, q < 0.12 ? (dot > 0 ? 4 : 3) : q > 0.26 ? 1 : (dot > 0.3 ? 4 : dot > -0.3 ? 2 : 1), T);
+      else if (q < 0.62) px.set(x, y, P.id('iron'), q > 0.58 ? 0 : (dot > 0.3 ? 2 : 1), T);  // brake drum behind spokes
       else px.set(x, y, blk, 0, T);
     } else if (style === 'alloy') {
       const a = Math.atan2(dy, dx) + rot; const seg = ((a / (Math.PI * 2)) * spokes % 1 + 1) % 1;

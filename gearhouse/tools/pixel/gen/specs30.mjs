@@ -117,8 +117,8 @@ export const sedan30front = {
     { half: 1, pts: [[0, 330], [700, 330], [700, 380], [0, 380]], ramp: 'black', base: 1 },                           // axle beam
     { half: 1, pts: fillet([[0, 380], [520, 380], [520, 400], [0, 440]]), ramp: 'iron', base: 2 }],                 // transverse spring
   grilles: [{ half: 1, pattern: 'vbar', bars: 'black', surround: 'chrome', pts: fillet([[0, 420, 0], [268, 420, 0], [268, 1080, 60], [205, 1150, 60], [70, 1130, 40], [0, 1112, 0]]) }],
-  bumpers: [{ half: 1, pts: [[0, 425], [880, 425], [880, 465], [0, 465]], smooth: 0 }, { half: 1, pts: [[0, 495], [880, 495], [880, 535], [0, 535]], smooth: 0 }],
-  lamps: [{ y: 395, z: 935, r: 160, ramp: 'lensW', bezel: 'chrome' }],
+  bumpers: [{ half: 1, pts: [[0, 415], [870, 415], [895, 440], [870, 465], [0, 465]], smooth: 0 }, { half: 1, pts: [[0, 505], [870, 505], [895, 530], [870, 555], [0, 555]], smooth: 0 }],
+  lamps: [{ y: 430, z: 965, r: 128, ramp: 'lensW', bezel: 'chrome' }],
   parts: [{ half: 1, pts: [[0, 815], [520, 815], [520, 845], [0, 845]], ramp: 'black', base: 1 },                      // lamp bar
           { pts: [[-25, 1150], [25, 1150], [25, 1200], [-25, 1200]], chrome: 1 },                                     // filler cap
           { pts: [[-120, 1030], [120, 1030], [120, 1060], [-120, 1060]], chrome: 1 },                                  // shell badge bar

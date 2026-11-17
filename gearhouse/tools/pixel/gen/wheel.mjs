@@ -43,14 +43,31 @@ export function wheel(P, { r, tireFrac = 0.30, style = 'hubcap', whitewall = 0, 
       else if (hole) px.set(x, y, blk, q > 0.78 || seg < 0.24 ? 1 : 0, T);
       else if (q < 0.18) px.set(x, y, blk, dot > 0 ? 3 : 2, T);
       else px.set(x, y, alu, dot > 0.45 ? 4 : dot > -0.3 ? 3 : 1, T);
+    } else if (style === 'artillery' || style === 'steelspoke') { // tapered wooden / steel spokes
+      const a = Math.atan2(dy, dx) + rot, seg = ((a / (Math.PI * 2)) * spokes % 1 + 1) % 1, wdt = 0.16 + 0.22 * (1 - q);
+      const wood = P.id(style === 'artillery' ? 'wood' : paint);
+      if (q > 0.86) px.set(x, y, P.id(paint), dot > 0.2 ? 3 : 1, T);
+      else if (q < 0.26) px.set(x, y, chr, q < 0.14 ? (dot > 0 ? 4 : 2) : 1, T);
+      else if (Math.abs(seg - 0.5) < wdt / 2) px.set(x, y, wood, Math.abs(seg - 0.5) < wdt / 5 ? 3 : dot > 0 ? 2 : 1, T);
+      else px.set(x, y, P.id('iron'), q < 0.6 ? 1 : 0, T);
+    } else if (style === 'disc' || style === 'discperf' || style === 'trimring' || style === 'truck') {
+      const a = Math.atan2(dy, dx) + rot;
+      if (q > 0.9) px.set(x, y, P.id(paint), dot > 0.2 ? 3 : 1, T);
+      else if (style === 'trimring' && q > 0.72) px.set(x, y, chr, dot > 0.3 ? 4 : dot > -0.3 ? 3 : 1, T);
+      else if (style === 'discperf' && q > 0.5 && q < 0.66 && Math.abs(Math.sin(a * 6)) < 0.45) px.set(x, y, blk, 0, T);
+      else if (style === 'truck' && q > 0.45 && q < 0.7 && Math.abs(Math.sin(a * 3)) < 0.3) px.set(x, y, blk, 0, T);
+      else if (q < (style === 'truck' ? 0.3 : 0.24)) px.set(x, y, style === 'truck' ? P.id(paint) : chr, q < 0.12 ? 4 : dot > 0 ? 3 : 1, T);
+      else px.set(x, y, P.id(paint), q > 0.78 ? (dot > 0 ? 1 : 3) : (dot > 0.4 ? 3 : dot > -0.4 ? 2 : 1), T);
+    } else if (style === 'spinner') { // knock-off wire wheel
+      if (q > 0.86) px.set(x, y, chr, dot > 0.2 ? 3 : 1, T); else if (q < 0.22) px.set(x, y, P.id('brass'), dot > 0 ? 4 : 2, T); else px.set(x, y, blk, 0, T);
     } else { // painted steel + small cap + lug ring
       if (q > 0.88) px.set(x, y, P.id(paint), dot > 0 ? 3 : 1, T);
       else if (q < 0.42) px.set(x, y, chr, q < 0.3 ? (dot > 0.2 ? 4 : 2) : 1, T);
       else { const a = Math.atan2(dy, dx) + rot; const vent = q > 0.6 && q < 0.75 && Math.abs(Math.sin(a * 4)) < 0.3; px.set(x, y, vent ? blk : P.id(paint), vent ? 0 : dot > 0.4 ? 3 : 2, T); }
     }
   }
-  if (style === 'wire') { // spokes rasterised per angle (laced: two offset sets)
-    const n = spokes; const hubR = ri * 0.26, rimR = ri * 0.86;
+  if (style === 'wire' || style === 'spinner') { // spokes rasterised per angle (laced: two offset sets)
+    const n = spokes; const hubR = ri * (style === 'spinner' ? 0.2 : 0.26), rimR = ri * 0.86;
     for (let k = 0; k < n; k++) {
       const a = rot + (k / n) * Math.PI * 2, b = a + (k % 2 ? 0.35 : -0.35);
       line(c - 0.5 + Math.cos(a) * hubR, c - 0.5 + Math.sin(a) * hubR, c - 0.5 + Math.cos(b) * rimR, c - 0.5 + Math.sin(b) * rimR,

@@ -36,6 +36,8 @@
 - `e1_detail_before_after.png`, `e1_detail_front_rear.png`: 디테일 축척(12.5mm/px) 사실 묘사 — `node tools/pixel/samplesD.mjs`
 - `e1_streamline_detail.png`: 1934 에어플로형 세단 / 1937 V 그릴 패스트백 쿠페 (12.5mm/px)
 - `e1_engine_sv_detail.png`: 사이드밸브 직렬4 디테일 (엔진룸 사진 기반, 5mm/px)
+- `e1_underbody.png`: 하부 평면 뷰 / `e1_towncar_views.png`: 1934 V12 타운카 3뷰 / `e1_streamline_front_rear.png`: 유선형 정면·후면
+- `e1_props_batchA.png` + `data/props_e1_batchA.json`: 1930년대 외장 프롭 배치 A 84종 — `node tools/pixel/samplesProps.mjs`
 - `cars_1930s_side_x4.png`: 1930 업라이트 세단 / 1933 고급 카브리올레 / 1937 유선형 (블루프린트 비율 기반)
 - `car1930_views_x4.png`: 1930 세단 좌·우·정면·후면
 - `cars_side_x4.png`, `car57_views_x4.png`: 시대별 초기 샘플 (1950년대 이후는 아직 레퍼런스 미반영)

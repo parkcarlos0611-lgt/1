@@ -10,12 +10,21 @@ const KEY = {
     1930: { rake: [0, 6], roofR: [60, 220], noseR: [20, 60], bodyR: [40, 160], hWB: [0.60, 0.67], hoodWB: [0.38, 0.48], beltH: [0.72, 0.78], noseAhead: [0.02, 0.08], tail: ['upright', 'trunk'], fender: ['separate'], grille: ['flat'], glassRise: 0.12 },
     1935: { rake: [0, 14], roofR: [100, 320], noseR: [40, 160], bodyR: [80, 260], hWB: [0.55, 0.63], hoodWB: [0.38, 0.52], beltH: [0.70, 0.76], noseAhead: [0.03, 0.12], tail: ['upright', 'trunk', 'bustle'], fender: ['separate', 'valanced'], grille: ['flat', 'vee'], glassRise: 0.11 },
     1939: { rake: [6, 22], roofR: [160, 420], noseR: [80, 260], bodyR: [120, 340], hWB: [0.52, 0.60], hoodWB: [0.40, 0.55], beltH: [0.68, 0.74], noseAhead: [0.05, 0.16], tail: ['trunk', 'bustle'], fender: ['valanced', 'pontoonF'], grille: ['vee', 'waterfall'], glassRise: 0.11 },
+    1946: { rake: [10, 26], roofR: [200, 460], noseR: [120, 300], bodyR: [160, 380], hWB: [0.52, 0.58], hoodWB: [0.40, 0.52], beltH: [0.66, 0.72], noseAhead: [0.08, 0.18], tail: ['trunk', 'bustle'], fender: ['pontoonF'], grille: ['wide', 'vee'], glassRise: 0.11 },
+    1949: { rake: [14, 30], roofR: [240, 500], noseR: [160, 340], bodyR: [200, 420], hWB: [0.52, 0.58], hoodWB: [0.40, 0.50], beltH: [0.66, 0.72], noseAhead: [0.10, 0.20], tail: ['trunk'], fender: ['pontoonF'], grille: ['wide'], glassRise: 0.11 },
   },
   stream: {
     1930: null, // streamline bodies not offered before 1933 (no deep-draw presses / research)
     1933: { rake: [14, 26], roofR: [200, 420], noseR: [120, 300], bodyR: [160, 360], hWB: [0.50, 0.58], hoodWB: [0.40, 0.50], beltH: [0.68, 0.74], noseAhead: [0.08, 0.18], tail: ['fastback', 'bustle'], fender: ['valanced', 'pontoonF'], grille: ['vee', 'waterfall'], glassRise: 0.10 },
     1936: { rake: [20, 36], roofR: [260, 520], noseR: [160, 380], bodyR: [220, 460], hWB: [0.46, 0.55], hoodWB: [0.42, 0.52], beltH: [0.66, 0.72], noseAhead: [0.12, 0.22], tail: ['fastback', 'bustle'], fender: ['pontoonF', 'skirted'], grille: ['waterfall', 'louvre'], glassRise: 0.10 },
     1939: { rake: [24, 42], roofR: [300, 600], noseR: [200, 460], bodyR: [260, 520], hWB: [0.45, 0.53], hoodWB: [0.42, 0.55], beltH: [0.64, 0.70], noseAhead: [0.14, 0.25], tail: ['fastback', 'bustle'], fender: ['pontoonF', 'skirted'], grille: ['waterfall', 'louvre'], glassRise: 0.10 },
+    1942: { rake: [26, 44], roofR: [320, 620], noseR: [220, 480], bodyR: [280, 540], hWB: [0.45, 0.53], hoodWB: [0.42, 0.55], beltH: [0.64, 0.70], noseAhead: [0.14, 0.25], tail: ['fastback', 'bustle'], fender: ['pontoonF', 'skirted'], grille: ['wide', 'waterfall'], glassRise: 0.10 },
+    1949: { rake: [28, 46], roofR: [340, 640], noseR: [240, 500], bodyR: [300, 560], hWB: [0.46, 0.54], hoodWB: [0.40, 0.52], beltH: [0.64, 0.70], noseAhead: [0.14, 0.24], tail: ['fastback', 'bustle'], fender: ['pontoonF', 'skirted'], grille: ['wide'], glassRise: 0.10 },
+  },
+  // post-war full-width "pontoon" (slab-side, fenders integrated into the body): 1946+  (1949 sedan blueprint: H 0.53WB, belt 0.67H, rake ~45)
+  pontoon: {
+    1946: { rake: [30, 42], roofR: [300, 560], noseR: [200, 420], bodyR: [220, 460], hWB: [0.50, 0.56], hoodWB: [0.36, 0.46], beltH: [0.64, 0.70], noseAhead: [0.14, 0.22], tail: ['trunk', 'fastback'], fender: ['integrated'], grille: ['wide'], glassRise: 0.10 },
+    1949: { rake: [34, 46], roofR: [320, 600], noseR: [220, 460], bodyR: [240, 480], hWB: [0.50, 0.55], hoodWB: [0.34, 0.44], beltH: [0.64, 0.70], noseAhead: [0.16, 0.24], tail: ['trunk', 'fastback'], fender: ['integrated'], grille: ['wide'], glassRise: 0.10 },
   },
 };
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -40,7 +49,7 @@ export const RULES = {
 // p: { year, style, type:'sedan4d'|'coupe2d', wb, tire, height, hood, rake, roofR, noseR, tail, fender, belt, ... } all 0..1 sliders except year/wb/tire/type
 export function clampParams(p) {
   const L = limits(p.year, p.style), notes = [];
-  if (!L) { const q = clampParams({ ...p, style: 'box' }); q.notes.unshift(`${p.style} not available in ${p.year} -> box`); return q; }
+  if (!L) { const fb = p.style === 'pontoon' ? 'stream' : 'box'; const q = clampParams({ ...p, style: fb }); q.notes.unshift(`${p.style} not available in ${p.year} -> ${q.style}`); return q; }
   const pick = (k, v) => { const [lo, hi] = L[k]; const x = lo + (hi - lo) * Math.min(1, Math.max(0, v)); if (v < 0 || v > 1) notes.push(`${k} clamped`); return x; };
   const choose = (k, v) => { if (L[k].includes(v)) return v; notes.push(`${k} ${v} not allowed in ${p.year} -> ${L[k][0]}`); return L[k][0]; };
   return {
@@ -61,13 +70,13 @@ export function genBody(q) {
   const wsTopX = cowlX + Math.tan(rake) * (roofZ - 60 - beltZ), roofFrontX = wsTopX + 60;
   // cabin length from body type; enforce seat + roof rules
   const cabin = q.type === 'coupe2d' ? 1180 : 1780; const roofRearX = Math.min(R + 200, roofFrontX + cabin);
-  const sill = Math.max(RULES.minGround + 140, r * 1.25), bottom = q.fender === 'separate' ? sill : RULES.minGround + 160;
+  const sill = Math.max(RULES.minGround + 140, r * 1.25), bottom = q.fender === 'separate' ? sill : q.fender === 'integrated' ? RULES.minGround : RULES.minGround + 160;
   const tailX = q.tail === 'fastback' ? R + 0.30 * wb : q.tail === 'trunk' || q.tail === 'bustle' ? R + 0.26 * wb : R + 0.20 * wb;
-  const stream = q.style === 'stream';
+  const stream = q.style === 'stream' || q.style === 'pontoon', slab = q.fender === 'integrated';
   const glassTop = roofZ - (stream ? 150 : 110), glassBot = beltZ + 40;
   // ---- body outline ----
   const pts = [];
-  pts.push([noseX + 40, bottom + 120, 0]);
+  pts.push(slab ? [noseX + 60, bottom, 0] : [noseX + 40, bottom + 120, 0]);
   if (q.grille === 'flat') pts.push([noseX, bottom + 160, 0], [noseX, hoodZ - 40, q.noseR]);
   else pts.push([noseX - 30, bottom + 200, q.noseR * 0.5], [noseX + (stream ? 60 : 20), hoodZ - 40, q.noseR]);
   pts.push([noseX + 120, hoodZ, q.noseR * 0.6], [cowlX, hoodZ + 20, 0], [wsTopX, roofZ - 50, q.roofR * 0.4]);
@@ -78,6 +87,7 @@ export function genBody(q) {
   } else {
     pts.push([roofRearX, roofZ, q.roofR], [roofRearX + (stream ? 220 : 40), glassBot, q.bodyR * 0.5]);
     if (q.tail === 'upright') pts.push([roofRearX + 60, bottom + 160, q.bodyR * 0.6], [roofRearX + 20, bottom, 0]);
+    else if (slab) pts.push([roofRearX + 260, beltZ + 10, q.bodyR * 0.6], [tailX - 200, beltZ - 20, q.bodyR * 0.5], [tailX, beltZ * 0.72, q.bodyR * 0.6], [tailX - 40, bottom + 120, 60], [tailX - 120, bottom, 0]);
     else if (q.type === 'coupe2d') pts.push([roofRearX + 420, beltZ - 60, q.bodyR * 1.4], [tailX - 120, beltZ * 0.62, q.bodyR * 1.2], [tailX, beltZ * 0.4, q.bodyR * 0.8], [tailX - 80, bottom, 0]);
     else pts.push([tailX - 240, beltZ - (q.tail === 'bustle' ? 40 : 0), q.bodyR], [tailX, beltZ * 0.55, q.bodyR], [tailX - 80, bottom, 0]);
   }
@@ -95,6 +105,8 @@ export function genBody(q) {
     const val = q.fender === 'valanced' ? 120 : 0;
     fender.push({ paint: fp, wx: F, wz: r, wr: gap, smooth: 1, pts: [...arc(F, r, gap + 140 + val, gap + 140, 145, 30, 12), [cowlX + 60, bottom + 30, 0], [cowlX + 60, bottom - 30, 0], [F + gap * 0.95, r + gap * 0.35, 0], ...arc(F, r, gap, gap, 22, 150, 12), [F - gap - 90 - val * 0.3, r + gap * 0.52, 80]] });
     fender.push({ paint: fp, wx: R, wz: r, wr: gap, smooth: 1, pts: [[R - gap - 120, bottom - 20, 0], ...arc(R, r, gap + 140, gap + 120, 165, 22, 12), [R + gap + 250, bottom - 70, 0], [R + gap + 180, bottom - 110, 0], ...arc(R, r, gap, gap, 14, 166, 12)] });
+  } else if (slab) {
+    // wheel arches cut straight into the slab side; rear arch lower-skirted
   } else {
     fender.push({ paint: fp, wx: F, wz: r, wr: gap, smooth: 2, pts: [[noseX - 20, bottom + 60, 0], [noseX - 5, r + gap * 0.9, 0], [F - gap * 0.4, r + gap + 120, 0], [F + gap * 0.6, r + gap + 100, 0], [cowlX - 100, r + gap * 0.6, 0], [cowlX + 260, bottom + 20, 0], [cowlX + 280, bottom - 30, 0], [F + gap + 100, bottom - 30, 0], ...arc(F, r, gap, gap, 20, 165, 12)] });
     const skirt = q.fender === 'skirted';
@@ -114,7 +126,7 @@ export function genBody(q) {
   parts.push({ pts: [[noseX - bo - 40, bottom - 10], [noseX + 80, bottom - 10], [noseX + 80, bottom + 20], [noseX - bo - 40, bottom + 20]], ramp: 'black', base: 1 });
   parts.push({ pts: [[tailX - 100, bottom - 10], [tailX + 150, bottom - 10], [tailX + 150, bottom + 20], [tailX - 100, bottom + 20]], ramp: 'black', base: 1 });
   lamps.push({ e: [tailX - 40, beltZ * 0.6, 35, 45], ramp: 'lensR', bezel: 'chrome' });
-  const trim = stream ? [{ pts: [[cowlX, beltZ + 10], [roofRearX, beltZ + 10], [tailX - 300, beltZ * 0.75]], w: 1, lv: 4 }] : [{ pts: [[noseX + 60, beltZ], [tailX - 60, beltZ]], w: 2, ramp: q.paint, lv: 4, lv2: 0 }];
+  const trim = slab ? [{ pts: [[noseX + 200, r + gap + 40], [F + gap + 300, r + gap + 30], [g0 + 600, beltZ - 230]], w: 2, ramp: q.paint, lv: 4, lv2: 0 }, { pts: [[cowlX - 300, beltZ - 300], [roofRearX + 200, beltZ - 300]], w: 2 }] : stream ? [{ pts: [[cowlX, beltZ + 10], [roofRearX, beltZ + 10], [tailX - 300, beltZ * 0.75]], w: 1, lv: 4 }] : [{ pts: [[noseX + 60, beltZ], [tailX - 60, beltZ]], w: 2, ramp: q.paint, lv: 4, lv2: 0 }];
   const louvres = stream ? [] : [{ x0: noseX + q.hoodWB * wb * 0.45, x1: cowlX - 120, step: 55, z0: hoodZ * 0.62, z1: hoodZ * 0.85 }];
   if (stream && q.grille === 'louvre') for (let k = 0; k < 6; k++) trim.push({ pts: [[noseX + 300 + k * 60, hoodZ * 0.75 - k * 45], [cowlX - 80, hoodZ * 0.75 - k * 45]], w: 1, lv: 4 });
   const boards = q.fender === 'separate' || q.fender === 'valanced' ? [{ paint: 'rubber', pts: [[cowlX + 40, bottom - 140], [R - gap - 100, bottom - 140], [R - gap - 100, bottom - 80], [cowlX + 40, bottom - 80]] }] : [];
@@ -122,7 +134,7 @@ export function genBody(q) {
   const geo = { F, R, r, gap, noseX, tailX, bottom, hoodZ, beltZ, cowlX, roofZ, roofRearX, gSplit, wsTopX, stream };
   return {
     id: `gen_${q.year}_${q.style}_${q.type}`, len: Math.ceil(tailX + 220), height: Math.ceil(H + 20), paint: q.paint, lowZ: bottom + 140, smooth: 0, glassSmooth: 0,
-    body, arches: [{ x: F, z: r, r: gap }, { x: R, z: r, r: gap }], wheels: [{ x: F }, { x: R }], tire: q.tire,
+    body, arches: slab ? [{ x: F, z: r + 20, r: gap }, { x: R, z: r - gap * 0.3, r: gap * 0.9 }] : [{ x: F, z: r, r: gap }, { x: R, z: r, r: gap }], wheels: [{ x: F }, { x: R }], tire: q.tire,
     wheel: stream ? { style: 'steel', paint: q.paint, whitewall: 0.2 } : { style: 'wire', spokes: 24 },
     fenders: fender, boards, aprons, glass, frame: stream ? 'chrome' : 'reveal', doors, parts, lamps, bumpers, trim, louvres,
     tone: stream ? [] : [{ paint: 'black', pts: [[wsTopX - 200, roofZ - 55], [wsTopX - 200, roofZ + 200], [roofRearX + 300, roofZ + 200], [roofRearX + 300, roofZ - 55]], smooth: 0 }],

@@ -161,8 +161,8 @@
     fill();
     // side viewport with draggable outline handles
     let drag = null, hover = null, showH = UI.state.handles !== false && !locked;
-    const side = UI.carSide(car, y, { after: (x, v) => { side._v = v; if (!showH) return; for (const [k, list] of [['side', b.side], ['glass', b.glass]]) list.forEach((p, i) => { const px = v.ox + p.x * b.L * v.sc, py = v.gy - p.y * b.H * v.sc; x.fillStyle = k === 'glass' ? '#1f5fbf' : '#ffffff'; x.strokeStyle = k === 'glass' ? '#ffffff' : '#1f5fbf'; x.lineWidth = 1.5; x.beginPath(); const rr = hover && hover[0] === k && hover[1] === i ? 6 : 3.8; if (p.s) x.rect(px - rr, py - rr, rr * 2, rr * 2); else x.arc(px, py, rr, 0, 7); x.fill(); x.stroke(); }); } });
-    const top = UI.canvas('vp top', (x, W, H) => { R.studio(x, W, H, H, UI.STUDIO); const sc = Math.min((W - 60) / b.L, (H - 30) / b.W) * .92, ox = (W - b.L * sc) / 2; top._v = { ox, cy: H / 2, sc }; R.drawCarTop(x, car, { x: ox, y: H / 2, scale: sc, year: y }); if (showH) b.top.forEach((p, i) => { const px = ox + p.x * b.L * sc, py = H / 2 + p.y * b.W / 2 * sc; x.fillStyle = '#fff'; x.strokeStyle = '#1f5fbf'; x.lineWidth = 1.5; x.beginPath(); x.arc(px, py, hover && hover[0] === 'top' && hover[1] === i ? 6 : 3.8, 0, 7); x.fill(); x.stroke(); }); });
+    const side = UI.carSide(car, y, { after: (x, v) => { side._v = v; UI.bpDrawSide(x, car, v); if (!showH) return; for (const [k, list] of [['side', b.side], ['glass', b.glass]]) list.forEach((p, i) => { const px = v.ox + p.x * b.L * v.sc, py = v.gy - p.y * b.H * v.sc; x.fillStyle = k === 'glass' ? '#1f5fbf' : '#ffffff'; x.strokeStyle = k === 'glass' ? '#ffffff' : '#1f5fbf'; x.lineWidth = 1.5; x.beginPath(); const rr = hover && hover[0] === k && hover[1] === i ? 6 : 3.8; if (p.s) x.rect(px - rr, py - rr, rr * 2, rr * 2); else x.arc(px, py, rr, 0, 7); x.fill(); x.stroke(); }); } });
+    const top = UI.canvas('vp top', (x, W, H) => { R.studio(x, W, H, H, UI.STUDIO); const sc = Math.min((W - 60) / b.L, (H - 30) / b.W) * .92, ox = (W - b.L * sc) / 2; top._v = { ox, cy: H / 2, sc }; R.drawCarTop(x, car, { x: ox, y: H / 2, scale: sc, year: y }); UI.bpDrawTop(x, car, top._v); if (showH) b.top.forEach((p, i) => { const px = ox + p.x * b.L * sc, py = H / 2 + p.y * b.W / 2 * sc; x.fillStyle = '#fff'; x.strokeStyle = '#1f5fbf'; x.lineWidth = 1.5; x.beginPath(); x.arc(px, py, hover && hover[0] === 'top' && hover[1] === i ? 6 : 3.8, 0, 7); x.fill(); x.stroke(); }); });
     const hit = (cv, ev, keys) => {
       const rct = cv.getBoundingClientRect(), mx = ev.clientX - rct.left, my = ev.clientY - rct.top, v = cv._v; if (!v) return null;
       let best = null, bd = 12;
@@ -182,7 +182,19 @@
       });
       const end = () => { if (drag) { drag = null; recalc(); } };
       cv.addEventListener('pointerup', end); cv.addEventListener('pointercancel', end);
-      cv.addEventListener('dblclick', ev => { if (!showH || drag) return; const q = hit(cv, ev, keys); if (q?.best && q.best[0] === 'side') { const p = b.side[q.best[1]]; p.s = p.s ? undefined : 1; recalc(); } });
+      cv.addEventListener('dblclick', ev => {
+        if (!showH || drag) return; const q = hit(cv, ev, keys); if (!q) return;
+        if (q.best && q.best[0] === 'side') { const p = b.side[q.best[1]]; p.s = p.s ? undefined : 1; recalc(); return; }
+        if (q.best) return;
+        // insert a point on the nearest segment of the side outline / glass / plan
+        const v = q.v, toS = (k, p) => k === 'top' ? [v.ox + p.x * b.L * v.sc, v.cy + p.y * b.W / 2 * v.sc] : [v.ox + p.x * b.L * v.sc, v.gy - p.y * b.H * v.sc];
+        let bestK = null, bestI = -1, bd = 14;
+        for (const k of keys) { const L = b[k], closed = k === 'glass'; for (let i = 0; i < L.length - (closed ? 0 : 1); i++) { const [ax, ay] = toS(k, L[i]), [bx, by] = toS(k, L[(i + 1) % L.length]); const t = U.clamp(((q.mx - ax) * (bx - ax) + (q.my - ay) * (by - ay)) / ((bx - ax) ** 2 + (by - ay) ** 2 || 1), 0, 1); const dd = Math.hypot(ax + t * (bx - ax) - q.mx, ay + t * (by - ay) - q.my); if (dd < bd) { bd = dd; bestK = k; bestI = i; } } }
+        if (!bestK) return;
+        const np = bestK === 'top' ? { x: U.clamp((q.mx - v.ox) / (b.L * v.sc), 0, 1), y: U.clamp(Math.abs(q.my - v.cy) / (b.W / 2 * v.sc), .3, 1) } : { x: U.clamp((q.mx - v.ox) / (b.L * v.sc), 0, 1), y: U.clamp((v.gy - q.my) / (b.H * v.sc), 0, 1) };
+        b[bestK].splice(bestI + 1, 0, np); recalc();
+      });
+      cv.addEventListener('contextmenu', ev => { if (!showH) return; const q = hit(cv, ev, keys); if (q?.best && b[q.best[0]].length > (q.best[0] === 'glass' ? 4 : 6)) { ev.preventDefault(); b[q.best[0]].splice(q.best[1], 1); recalc(); } });
     };
     bind(side, ['side', 'glass']); bind(top, ['top']);
     // inspector
@@ -208,6 +220,7 @@
           UI.prop('원소재 보기', h('input', { type: 'checkbox', checked: !!b.rawSheet, onchange: ev => { b.rawSheet = ev.target.checked; car._rev++; } }), '도장 전 상태'),
           UI.prop('강판 텍스처', texUp, '차체 곡면에 맞춰 변형'), b.customTex ? UI.btn('텍스처 해제', () => { b.customTex = null; car._rev++; UI.render(); }, 'ghost sm') : null,
           h('p', { class: 'note' }, '편집: 점을 끌어 형상 변경, 차체 점을 더블클릭하면 각진 모서리(■)와 곡선(●)이 바뀝니다.'))],
+      bp: () => UI.blueprintTab(g, car, locked),
       panels: () => [grp('패널별 강판 (테일러드 블랭크)', ...(pair ? pair.ev.panels : []).map(p => {
         const cur = (b.panels && b.panels[p.id]) || null;
         return UI.prop(p.name, h('div', { class: 'row tight' }, UI.sel([{ id: '', name: '기본 소재와 동일' }, ...C.sheet], cur?.sheet || '', g.t, v => { b.panels = b.panels || {}; if (!v) delete b.panels[p.id]; else b.panels[p.id] = { sheet: v, grade: cur?.grade || 'B' }; recalc(); UI.render(); }),
@@ -255,7 +268,7 @@
           h('figure', {}, top, h('figcaption', {}, `평면 · 전폭 ${b.W} mm`))),
         rival ? h('details', { class: 'card cmp' }, h('summary', {}, `경쟁차와 나란히 보기 — ${rival.m.name}`), UI.carSide(rival.m.car, Math.floor(rival.m.launchT), {}), h('p', { class: 'note' }, `${rival.r.name} · ${Math.round(rival.m.spec.hp)} hp · 0→100 ${rival.m.spec.t100.toFixed(1)} s · ${rival.m.pt === 'bev' ? Math.round(rival.m.range) + ' km' : rival.m.spec.lpk.toFixed(1) + ' L/100km'} · ${U.money(rival.m.price, false)}`)) : null,
         h('div', { class: 'card' }, analysis)),
-      h('aside', { class: 'insp' }, UI.tabs([['body', '차체'], ['panels', '패널'], ['power', '파워트레인'], ['chassis', '섀시'], ['cabin', '실내·안전'], ['trims', '트림']], tab, t => { UI.state.tab.car = t; UI.render(); }), ...insp[tab]())
+      h('aside', { class: 'insp' }, UI.tabs([['body', '차체'], ['bp', '청사진'], ['panels', '패널'], ['power', '파워트레인'], ['chassis', '섀시'], ['cabin', '실내·안전'], ['trims', '트림']], tab, t => { UI.state.tab.car = t; UI.render(); }), ...insp[tab]())
     );
   };
 })(window.MW);

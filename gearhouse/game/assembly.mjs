@@ -6,6 +6,7 @@ import { Pix, drawPix } from '../tools/pixel/pix.mjs';
 import { hex } from '../tools/pixel/color.mjs';
 import { buildCar } from '../tools/pixel/gen/car.mjs';
 import { genBody } from '../tools/pixel/gen/bodygen.mjs';
+import { landmarks } from '../tools/pixel/gen/v2/template.mjs';
 import { drawMechSide, engineSprite } from '../tools/pixel/gen/mechview.mjs';
 import { engineStats, LAYOUTS } from '../sim/engine.mjs';
 import { C, W, H, text, tw, bevel, button, lineTo } from './ui.mjs';
@@ -29,7 +30,8 @@ const strip = (spec, ramp) => ({ ...spec, paint: ramp, tone: [], lamps: [], bump
   parts: (spec.parts || []).filter(p => !p.chrome), fenders: (spec.fenders || []).map(f => ({ ...f, paint: ramp })), boards: [], wheels: [], spares: [], anchor: false, grad: [2.6, 1.6] });
 
 export function makeAssembly(P, model, eng, year, paintIdx) {
-  const spec = genBody(model.q); Object.assign(spec, { grad: [3.1, 1.4], glassStyle: 'period' });
+  const spec = model.spec ? { ...JSON.parse(JSON.stringify(model.spec)), under: [], anchor: false } : genBody(model.q); Object.assign(spec, { grad: spec.grad || [3.1, 1.4], glassStyle: spec.glassStyle || 'period' });
+  if (!spec.geo) { const L = landmarks(spec); spec.geo = { r: L.r, F: L.F, R: L.R, gap: L.gap, noseX: L.noseX, cowlX: L.cowl, hoodZ: L.belt + 30, beltZ: L.belt, tailX: L.tailX }; }
   const mm = Math.max(25, Math.ceil(spec.len / 190)), full = buildCar(P, spec, mm);
   const blank = () => { const p = new Pix(full.w, full.h); p.X = full.X; p.Y = full.Y; p.mm = mm; return p; };
   const mech = mechFromBody(spec, eng, year);
@@ -54,7 +56,7 @@ export function drawAssembly(S, P, A, sfx) {
   S.fill(0, 30, W, 5, hex('#5a5550')); S.fill(0, 30, W, 1, hex('#7a746c'));                                                             // I-beam / conveyor rail
   S.fill(0, y0 + 58, W, H - y0 - 58, hex('#3a332d')); for (let x = 0; x < W; x += 24) S.fill(x, y0 + 58, 1, H - y0 - 58, hex('#332c27'));
   if (!A.early) { S.fill(0, y0 + 56, W, 3, hex('#6b645b')); for (let x = (A.t * 0.5) % 16; x < W; x += 16) S.fill(x, y0 + 57, 6, 1, hex('#8a8278')); }   // moving floor conveyor (1935+)
-  const scale = 2, ox = Math.round((W - A.full.w * scale) / 2), oy = y0 + 56 - A.full.h * scale + 2 * scale;
+  const scale = A.full.w * 2 <= W - 40 && A.full.h * 2 <= 130 ? 2 : 1, ox = Math.round((W - A.full.w * scale) / 2), oy = y0 + 56 - A.full.h * scale + 2 * scale;
   const put = (pix, dx = 0, dy = 0) => drawPix(S, pix, P, ox + dx, oy + dy, scale, { shadowA: 0 });
   // trestles until the wheels go on
   if (st < 3 || (st === 3 && u < 0.5)) for (const f of [0.25, 0.7]) { const tx = ox + A.full.w * scale * f; S.fill(tx - 8, oy + A.full.h * scale - 70, 16, 4, hex(A.early ? '#7a5a36' : '#555a5e')); lineTo(S, tx - 6, oy + A.full.h * scale - 66, tx - 12, y0 + 57, hex(A.early ? '#6a4c2c' : '#45494d')); lineTo(S, tx + 6, oy + A.full.h * scale - 66, tx + 12, y0 + 57, hex(A.early ? '#6a4c2c' : '#45494d')); }

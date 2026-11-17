@@ -65,6 +65,11 @@ export const KO = {
   'SIZE CLASS': '차급', 'LIMOUSINE': '리무진', 'SEDAN': '세단',
   'WATCH BUILD': '조립 보기', 'DONE': '완료', 'SKIP': '건너뛰기', 'FASTER': '빨리', 'FRAME': '프레임', 'CHASSIS': '섀시', 'POWERTRAIN': '파워트레인', 'ROLLING CHASSIS': '롤링 섀시', 'BODY IN WHITE': '도색 전 차체',
   'BODY DROP': '바디 드롭', 'PRIMER': '프라이머', 'PAINT AND TRIM': '도장과 마감', 'INSPECTION': '검사 후 출고', 'ASH FRAME + PANELS': '목골조 + 패널',
+  'BASE DESIGN (MEASURED)': '기본 설계 (실측)', 'BLEND PROPORTIONS WITH': '비율 혼합 대상', 'BLEND': '혼합', 'WHEELBASE (BETWEEN WHEELS)': '휠베이스 (휠 사이)', 'ROOF HEIGHT': '지붕 높이',
+  'SOURCE: MEASURED DRAWING': '출처: 실측 도면', 'NONE': '없음', 'STATION WAGON': '스테이션 왜건', 'PICKUP': '픽업', 'TRUCK': '트럭', 'RESEARCH NEEDED: STREAMLINE BODY': '연구 필요: 유선형 차체',
+  '1930 TOWN SEDAN': '1930 타운 세단', '1930 COUPE': '1930 쿠페', '1933 CABRIOLET': '1933 카브리올레', '1934 AIRFLOW-TYPE SEDAN': '1934 에어플로형 세단', '1934 V12 TOWN CAR': '1934 V12 타운카',
+  '1937 STREAMLINE COUPE': '1937 유선형 쿠페', '1940 V8 COUPE': '1940 V8 쿠페', '1940 V12 CONTINENTAL-TYPE': '1940 V12 컨티넨탈형', '1940 HALF-TON PICKUP': '1940 하프톤 픽업', '1940 3-TON TRUCK': '1940 3톤 트럭',
+  '1941 V8 LUXURY SEDAN': '1941 V8 고급 세단', '1942 FOUR-DOOR SEDAN': '1942 4도어 세단', '1946 SMALL FOUR-DOOR': '1946 소형 4도어', '1946 WOODY WAGON': '1946 우디 왜건', 'STREAM': '유선형', 'BOX': '박스형',
   'JAN': '1월', 'FEB': '2월', 'MAR': '3월', 'APR': '4월', 'MAY': '5월', 'JUN': '6월', 'JUL': '7월', 'AUG': '8월', 'SEP': '9월', 'OCT': '10월', 'NOV': '11월', 'DEC': '12월', 'MUTE': '음소거', 'SOUND': '소리' };
 const keys = Object.keys(KO).sort((a, b) => b.length - a.length);
 const esc = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');

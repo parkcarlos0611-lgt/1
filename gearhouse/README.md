@@ -13,6 +13,7 @@
 | [docs/GDD.md](docs/GDD.md) | 게임 디자인 문서: 메인 메뉴, 새 게임 설정, 시대 구분, 플랫폼/엔진/파워트레인/디자인 개발, 시뮬레이션 공식, 연구, 경영, UI |
 | [docs/SPRITE_SYSTEM.md](docs/SPRITE_SYSTEM.md) | 아트·렌더링 명세: 5뷰 좌표계, 실루엣 에셋 구조, 레이어 스택, 강판/도색 합성, 모듈형 엔진 스프라이트, 스프라이트 재활용 기법, 데이터 포맷 |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | 개발 계획: 기술 스택, 폴더 구조, 마일스톤, 콘텐츠 물량, 툴 체인, 리스크 |
+| [docs/E1_1930S_PLAN.md](docs/E1_1930S_PLAN.md) | 1930년대 제작 계획: 실차 복제 4종, 타이어 규격, VehicleDef(프레임·엔진·구동), 외장 프롭 224종 카탈로그, 단계별 보고 |
 | [docs/REFERENCE_ANALYSIS.md](docs/REFERENCE_ANALYSIS.md) | 1930년대 블루프린트 측정 → 휠베이스 비율 규칙, 생성기 구조 규칙 |
 | [docs/PIXEL_ART_PIPELINE.md](docs/PIXEL_ART_PIPELINE.md) | Claude Code 픽셀아트 생성 계획: 픽셀 스케일, 생성 방식 4종(DSL·절차적·벡터 래스터·텍스처), 품질 규칙·린터, 작업 루프, 단계별 계획 |
 
@@ -26,6 +27,8 @@
 
 ## 샘플 이미지 (`samples/`, `node tools/pixel/samples.mjs` · `samples30.mjs`로 재생성)
 
+- `e1_vehicles_xray_x4.png`: 1930년대 복제 차량 4종 외관 + X-ray(프레임·서스·엔진·변속·연료탱크) — `node tools/pixel/samplesE1.mjs`
+- `e1_town_sedan_views_x4.png`: 1930 타운 세단 4뷰 (타이어 규격 반영)
 - `cars_1930s_side_x4.png`: 1930 업라이트 세단 / 1933 고급 카브리올레 / 1937 유선형 (블루프린트 비율 기반)
 - `car1930_views_x4.png`: 1930 세단 좌·우·정면·후면
 - `cars_side_x4.png`, `car57_views_x4.png`: 시대별 초기 샘플 (1950년대 이후는 아직 레퍼런스 미반영)

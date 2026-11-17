@@ -1,6 +1,7 @@
 // Side-view car assembler: silhouette (mm splines) -> masks -> layered, shaded, outlined pixel sprite.
 import { Pix, Mask, View, smooth, line, polyline } from '../pix.mjs';
 import { wheel } from './wheel.mjs';
+import { tire } from './tire.mjs';
 
 export const TAG = { shadow: 1, well: 2, wheel: 3, body: 4, fender: 6, board: 7, glass: 8, frame: 9, trim: 10, bumper: 11, lamp: 12, deco: 13 };
 const OUTLINED = new Set([TAG.wheel, TAG.body, TAG.fender, TAG.board, TAG.bumper, TAG.lamp]);
@@ -71,8 +72,8 @@ export function buildCar(P, s, mm = 25, opt = {}) {
   const well = arches.copy().and(body); px.paint(well, () => [P.id('black'), 0, TAG.well]);
   for (const f of s.fenders || []) { /* wells under separate fenders */ const fm = M().poly(smooth(poly(f.pts), f.smooth ?? 3)); fm.clean(1); f._m = fm; }
   // wheels
-  px.wheels = [];
-  for (const w of s.wheels) { const wp = wheel(P, { ...s.wheel, ...w, r: v.R(w.r) }); const wx = Math.round(v.X(w.x) - wp.w / 2), wy = Math.round(v.Y(w.r) - wp.h / 2); px.blit(wp, wx, wy); px.wheels.push({ wp, wx, wy }); }
+  px.wheels = []; const T = s.tire ? tire(s.tire) : null;
+  for (const w0 of s.wheels) { const w = T ? { ...w0, r: T.r, tireFrac: T.frac } : w0; const wp = wheel(P, { ...s.wheel, ...w, r: v.R(w.r) }); const wx = Math.round(v.X(w.x) - wp.w / 2), wy = Math.round(v.Y(w.r) - wp.h / 2); px.blit(wp, wx, wy); px.wheels.push({ wp, wx, wy }); }
   // body paint (+ two-tone regions)
   const bodyM = body.copy().sub(arches); for (const g of s.cut || []) bodyM.sub(M().poly(poly(g)));
   bodyM.clean(1);
@@ -103,7 +104,7 @@ export function buildCar(P, s, mm = 25, opt = {}) {
   for (const a of s.aprons || []) { const m = M().poly(poly(a)); px.paint(m, (x, y) => [P.id('black'), m.get(x, y - 1) ? 0 : 1, TAG.well]); }
   // separate fenders + running boards (pre-war)
   for (const f of s.fenders || []) { const m = f._m; m.sub(M().circle(v.X(f.wx), v.Y(f.wz), v.R(f.wr))); shadeVolume(px, m, () => P.id(f.paint), v, { tag: TAG.fender, lowZ: -1 }); }
-  for (const sp of s.spares || []) { const wp = wheel(P, { ...s.wheel, ...sp, r: v.R(sp.r) }); const wx = Math.round(v.X(sp.x) - wp.w / 2), wy = Math.round(v.Y(sp.z) - wp.h / 2); for (let y = 0; y < wp.h; y++) for (let x = 0; x < wp.w; x++) { const i = y * wp.w + x; if (wp.r[i]) px.set(wx + x, wy + y, wp.r[i], wp.l[i], TAG.board); } }
+  for (const sp0 of s.spares || []) { const sp = T ? { ...sp0, r: T.r, tireFrac: T.frac } : sp0; const wp = wheel(P, { ...s.wheel, ...sp, r: v.R(sp.r) }); const wx = Math.round(v.X(sp.x) - wp.w / 2), wy = Math.round(v.Y(sp.z) - wp.h / 2); for (let y = 0; y < wp.h; y++) for (let x = 0; x < wp.w; x++) { const i = y * wp.w + x; if (wp.r[i]) px.set(wx + x, wy + y, wp.r[i], wp.l[i], TAG.board); } }
   for (const b of s.boards || []) { const m = M().poly(poly(b.pts)); px.paint(m, (x, y) => [P.id(b.paint), !m.get(x, y - 1) ? 3 : !m.get(x, y + 1) ? 0 : ((x % 2) ? 1 : 2), TAG.board]); }
   // shut lines, louvres, trim
   const onBody = (x, y) => paintM.get(x, y) || (s.fenders && px.tag(x, y) === TAG.fender);

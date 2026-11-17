@@ -35,12 +35,12 @@ export function outlineAll(px) {
 
 // ---------------- engine, side view (along crank) ----------------
 // One cylinder module = bore + wall; block/head/cover are 3-slice (end caps + repeated middle).
-export function engineSide(P, { layout = 'inline', cyl = 4, bore = 82, stroke = 86, head = 'ohv', cover = 'paint.enginered', intake = 'carb1' }) {
+export function engineSide(P, { layout = 'inline', cyl = 4, bore = 82, stroke = 86, head = 'ohv', cover = 'paint.enginered', intake = 'carb1', blower = false }, mm = 5) {
   const perBank = layout === 'V' ? cyl / 2 : cyl, pitch = bore + 14, len = perBank * pitch + (layout === 'V' ? bore / 2 : 0);
   const deck = stroke * 1.55 + 70, headH = head === 'dohc' ? 135 : head === 'sv' ? 35 : 95, coverH = head === 'sv' ? 0 : head === 'dohc' ? 75 : 60;
   const V = layout === 'V'; const top = deck + headH + coverH + (V ? 230 : 160);
   const front = 130, rear = 60, W = len + front + rear + 40;
-  const c = new Cv(W, top + 230, 5, front + 20, 220);
+  const c = new Cv(W, top + 230 + (blower ? 0 : 0), mm, front + 20 + (blower ? 260 : 0), 220);
   const iron = P.id('iron'), alu = P.id('alu'), cov = P.id(cover), chr = P.id('chrome'), blk = P.id('black'), rub = P.id('rubber');
   // oil pan (3-slice: sloped front, flat middle, deep sump at rear)
   c.solid(c.poly([[0, -60], [len, -60], [len - 10, -200], [len * 0.45, -200], [len * 0.3, -130], [20, -120]], 1), blk, { base: 1 });
@@ -85,6 +85,8 @@ export function engineSide(P, { layout = 'inline', cyl = 4, bore = 82, stroke = 
   // front: water pump, pulleys, belt, fan (fan blades edge-on), generator
   c.solid(c.ell(-100, blockTop * 0.22, 18, 70), blk, { base: 2, tag: 90 }); // crank pulley edge-on
   c.solid(c.ell(-40, blockTop + 60, 45, 45), P.id('black'), { base: 2, tag: 93 }); // generator end
+  if (blower) { c.solid(c.poly([[-380, -40], [-150, -40], [-150, 260], [-380, 260]], 1), P.id('alu'), { base: 2, tag: 94 }); c.solid(c.rect(-330, 260, -200, 330), P.id('alu'), { base: 3, tag: 95 }); }
+  c.px.ax = c.X(0); c.px.ay = c.Y(0);
   c.px.meta = { lenMM: Math.round(len + front + rear), heightMM: Math.round(top + 200), perBank, pitch };
   return c.done();
 }
@@ -190,8 +192,8 @@ export function panelSwatch(P, grade, paint = 'paint.coral') {
 }
 
 // ---------------- springs & tank (repeat / 3-slice demos) ----------------
-export function leafSpring(P, leaves = 5, lenMM = 1200) {
-  const c = new Cv(lenMM + 80, 140 + leaves * 18, 5, lenMM / 2 + 40, 20), st = P.id('iron');
+export function leafSpring(P, leaves = 5, lenMM = 1200, mm = 5) {
+  const c = new Cv(lenMM + 80, 140 + leaves * 18, mm, lenMM / 2 + 40, 20), st = P.id('iron');
   const th = 14, sag = 70, zc = x => 40 + leaves * th + sag * (2 * x / lenMM) ** 2;   // shared camber, main leaf on top
   for (let i = leaves - 1; i >= 0; i--) { const L = lenMM * (1 - i * 0.13); const pts = [];
     for (let k = 0; k <= 16; k++) { const x = -L / 2 + L * k / 16; pts.push([x, zc(x) - i * th]); }

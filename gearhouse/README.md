@@ -23,6 +23,7 @@
 | [docs/REFERENCE_ANALYSIS_2.md](docs/REFERENCE_ANALYSIS_2.md) | 2차 레퍼런스 분석: 범퍼·하부·창문·장식 패턴, 디테일 축척 12.5mm/px, 자료 요청 목록 |
 | [docs/E1_ASSEMBLY_TEST.md](docs/E1_ASSEMBLY_TEST.md) | 조립 테스트: 프롭 무작위 조합 1930년대 차량 20대, 슬롯 호환 규칙, 디자인 점수 |
 | [docs/E2_REVISION_PLAN.md](docs/E2_REVISION_PLAN.md) | 1940년대 수정 계획(창문·적재함·군용) + 섀시·파워트레인 결합 계획, 자료 요청 |
+| [docs/MASTER_GAME_PLAN.md](docs/MASTER_GAME_PLAN.md) | **마스터 계획**: 실제 순서 개발 파이프라인, 파라메트릭 차체 설계기(정면·후면 대칭), 부품 단위 엔진 설계, 자재·공장·장소, 신차 발표회·신문·잡지, 출시 후 평가, 테크트리, 편의·자유도 |
 | [docs/BODYGEN_V2_PLAN.md](docs/BODYGEN_V2_PLAN.md) | 차체 생성기 v2: 실측 템플릿·구간 모델, 휠베이스=휠 사이 차체만, 실부품 라이브러리, 하부 자동 생성 |
 | [docs/SOUND_PLAN.md](docs/SOUND_PLAN.md) | 사운드 계획: 새 기능 효과음, 기존 효과음·배경음악 강화 |
 | [docs/STAGE4_PLAN.md](docs/STAGE4_PLAN.md) | 4단계 계획: 자료 기반 차량 생성기 v2, 경제 밸런스, 상호작용, 장소 |

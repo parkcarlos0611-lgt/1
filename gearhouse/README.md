@@ -13,6 +13,7 @@
 | [docs/GDD.md](docs/GDD.md) | 게임 디자인 문서: 메인 메뉴, 새 게임 설정, 시대 구분, 플랫폼/엔진/파워트레인/디자인 개발, 시뮬레이션 공식, 연구, 경영, UI |
 | [docs/SPRITE_SYSTEM.md](docs/SPRITE_SYSTEM.md) | 아트·렌더링 명세: 5뷰 좌표계, 실루엣 에셋 구조, 레이어 스택, 강판/도색 합성, 모듈형 엔진 스프라이트, 스프라이트 재활용 기법, 데이터 포맷 |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | 개발 계획: 기술 스택, 폴더 구조, 마일스톤, 콘텐츠 물량, 툴 체인, 리스크 |
+| [docs/PIXEL_ART_PIPELINE.md](docs/PIXEL_ART_PIPELINE.md) | Claude Code 픽셀아트 생성 계획: 픽셀 스케일, 생성 방식 4종(DSL·절차적·벡터 래스터·텍스처), 품질 규칙·린터, 작업 루프, 단계별 계획 |
 
 ## 한 줄 요약 (핵심 결정 사항)
 

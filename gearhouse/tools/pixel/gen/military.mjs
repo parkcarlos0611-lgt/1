@@ -73,6 +73,7 @@ export function buildMil(P, s, mm = 12.5) {
   // outline: everything except shadow, against empty only (matte panels keep their own edges)
   const mark = []; for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const i = y * W + x; if (!px.r[i] || px.t[i] === TAG.shadow) continue; const e = (xx, yy) => { if (xx < 0 || yy < 0 || xx >= W || yy >= H) return true; const j = yy * W + xx; return !px.r[j] || px.t[j] === TAG.shadow; }; if (e(x - 1, y) || e(x + 1, y) || e(x, y - 1) || e(x, y + 1)) mark.push(i); }
   for (const i of mark) px.l[i] = -1;
-  anchorFloating(px, P, { bodyTags: [TAG.body, TAG.canvas], wheelTags: [TAG.wheel, TAG.back] });
+  if (s.anchor !== false) anchorFloating(px, P, { bodyTags: [TAG.body, TAG.canvas], wheelTags: [TAG.wheel, TAG.back] });
+  px.X = X; px.Y = Y; px.mm = mm;
   return px;
 }

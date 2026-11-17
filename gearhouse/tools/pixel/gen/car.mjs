@@ -173,6 +173,7 @@ export function buildCar(P, s, mm = 25, opt = {}) {
   for (const h of s.handles || []) { const x = Math.round(v.X(h[0])), y = Math.round(v.Y(h[1])); px.set(x, y, P.id('chrome'), 4, TAG.trim); px.set(x + 1, y, P.id('chrome'), 3, TAG.trim); px.set(x, y + 1, px.ramp(x, y + 1) ? px.ramp(x, y + 1) : P.id('chrome'), 0, TAG.body); px.set(x + 1, y + 1, px.ramp(x + 1, y + 1), 0, TAG.body); }
   outlineLayers(px);
   if (s.anchor !== false) anchorFloating(px, P);
+  px.X = x => v.X(x); px.Y = z => v.Y(z); px.mm = mm;
   return px;
 }
 

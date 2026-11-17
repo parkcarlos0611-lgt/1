@@ -64,7 +64,7 @@ export function button(s, x, y, w, h, label, { tone = 'brass', disabled = false,
   const hit = hov && input.clicked && !disabled; if (hit && hooks.click) hooks.click(); return hit; }
 // horizontal slider; returns new value
 export function slider(s, x, y, w, label, v, lo, hi, { step = 0, fmt = n => n.toFixed(2), id } = {}) {
-  text(s, label, x, y, C.ink); const vs = fmt(v); text(s, vs, x + w - tw(vs), y, C.oxblood);
+  const vs = fmt(v); text(s, label, x, y, C.ink, 1, Math.max(10, w - tw(vs) - 4)); text(s, vs, x + w - tw(vs), y, C.oxblood);
   const gy = y + 8; s.fill(x, gy + 2, w, 3, C.paperDark); s.fill(x, gy + 2, w, 1, C.inkSoft);
   const key = id || label; if (input.clicked && inside(x - 2, gy - 2, w + 4, 10)) input.drag = key;
   if (input.drag === key) { if (!input.down) input.drag = null; else { let t = Math.max(0, Math.min(1, (input.x - x) / w)); v = lo + (hi - lo) * t; if (step) v = Math.round(v / step) * step; } }

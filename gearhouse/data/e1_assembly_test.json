@@ -17,10 +17,13 @@
    "roof": "roo_leatherette"
   },
   "notes": [],
-  "score": 82,
+  "character": "luxury",
+  "cost": 17,
+  "prestige": 8,
+  "score": 68,
   "parts": {
    "era": 0.68,
-   "harmony": 1,
+   "harmony": 0.59,
    "proportion": 0.79
   },
   "body": {
@@ -30,7 +33,14 @@
    "wb": 3000,
    "tire": "4.75-19",
    "notes": []
-  }
+  },
+  "market": {
+   "economy": 68,
+   "family": 59,
+   "luxury": 59,
+   "sport": 61
+  },
+  "anchors": 2
  },
  {
   "seed": 2,
@@ -50,10 +60,13 @@
    "roof": "-"
   },
   "notes": [],
-  "score": 72,
+  "character": "luxury",
+  "cost": 15,
+  "prestige": 8,
+  "score": 77,
   "parts": {
    "era": 0.74,
-   "harmony": 0.7,
+   "harmony": 0.85,
    "proportion": 0.72
   },
   "body": {
@@ -63,7 +76,14 @@
    "wb": 3100,
    "tire": "6.50-20",
    "notes": []
-  }
+  },
+  "market": {
+   "economy": 79,
+   "family": 79,
+   "luxury": 67,
+   "sport": 74
+  },
+  "anchors": 2
  },
  {
   "seed": 3,
@@ -83,10 +103,13 @@
    "roof": "-"
   },
   "notes": [],
-  "score": 60,
+  "character": "family",
+  "cost": 20,
+  "prestige": 11,
+  "score": 70,
   "parts": {
    "era": 0.68,
-   "harmony": 0.4,
+   "harmony": 0.67,
    "proportion": 0.78
   },
   "body": {
@@ -96,7 +119,14 @@
    "wb": 3100,
    "tire": "5.25-18",
    "notes": []
-  }
+  },
+  "market": {
+   "economy": 68,
+   "family": 81,
+   "luxury": 62,
+   "sport": 70
+  },
+  "anchors": 2
  },
  {
   "seed": 4,
@@ -116,10 +146,13 @@
    "roof": "roo_leatherette"
   },
   "notes": [],
-  "score": 72,
+  "character": "family",
+  "cost": 18,
+  "prestige": 7,
+  "score": 59,
   "parts": {
    "era": 0.53,
-   "harmony": 1,
+   "harmony": 0.64,
    "proportion": 0.62
   },
   "body": {
@@ -129,7 +162,14 @@
    "wb": 3200,
    "tire": "5.25-18",
    "notes": []
-  }
+  },
+  "market": {
+   "economy": 78,
+   "family": 76,
+   "luxury": 49,
+   "sport": 55
+  },
+  "anchors": 1
  },
  {
   "seed": 5,
@@ -149,10 +189,13 @@
    "roof": "roo_turret"
   },
   "notes": [],
-  "score": 54,
+  "character": "luxury",
+  "cost": 21,
+  "prestige": 9,
+  "score": 57,
   "parts": {
    "era": 0.53,
-   "harmony": 0.4,
+   "harmony": 0.5,
    "proportion": 0.75
   },
   "body": {
@@ -162,7 +205,14 @@
    "wb": 3300,
    "tire": "6.50-16",
    "notes": []
-  }
+  },
+  "market": {
+   "economy": 62,
+   "family": 55,
+   "luxury": 57,
+   "sport": 53
+  },
+  "anchors": 2
  },
  {
   "seed": 6,
@@ -182,10 +232,13 @@
    "roof": "roo_turret"
   },
   "notes": [],
-  "score": 68,
+  "character": "luxury",
+  "cost": 19,
+  "prestige": 11,
+  "score": 79,
   "parts": {
    "era": 0.73,
-   "harmony": 0.7,
+   "harmony": 1,
    "proportion": 0.6
   },
   "body": {
@@ -195,7 +248,14 @@
    "wb": 2700,
    "tire": "6.00-16",
    "notes": []
-  }
+  },
+  "market": {
+   "economy": 66,
+   "family": 70,
+   "luxury": 71,
+   "sport": 74
+  },
+  "anchors": 3
  },
  {
   "seed": 7,
@@ -215,10 +275,13 @@
    "roof": "roo_turret"
   },
   "notes": [],
-  "score": 70,
+  "character": "family",
+  "cost": 16,
+  "prestige": 8,
+  "score": 74,
   "parts": {
    "era": 0.7,
-   "harmony": 0.7,
+   "harmony": 0.82,
    "proportion": 0.7
   },
   "body": {
@@ -228,7 +291,14 @@
    "wb": 2800,
    "tire": "6.00-16",
    "notes": []
-  }
+  },
+  "market": {
+   "economy": 76,
+   "family": 85,
+   "luxury": 57,
+   "sport": 71
+  },
+  "anchors": 2
  },
  {
   "seed": 8,
@@ -248,10 +318,13 @@
    "roof": "roo_leatherette"
   },
   "notes": [],
-  "score": 68,
+  "character": "family",
+  "cost": 15,
+  "prestige": 7,
+  "score": 53,
   "parts": {
    "era": 0.69,
-   "harmony": 0.7,
+   "harmony": 0.27,
    "proportion": 0.65
   },
   "body": {
@@ -261,7 +334,14 @@
    "wb": 2900,
    "tire": "5.50-17",
    "notes": []
-  }
+  },
+  "market": {
+   "economy": 81,
+   "family": 77,
+   "luxury": 49,
+   "sport": 57
+  },
+  "anchors": 1
  },
  {
   "seed": 9,
@@ -281,10 +361,13 @@
    "roof": "roo_turret"
   },
   "notes": [],
-  "score": 80,
+  "character": "luxury",
+  "cost": 21,
+  "prestige": 12,
+  "score": 76,
   "parts": {
    "era": 0.69,
-   "harmony": 1,
+   "harmony": 0.89,
    "proportion": 0.68
   },
   "body": {
@@ -294,7 +377,14 @@
    "wb": 3000,
    "tire": "6.00-16",
    "notes": []
-  }
+  },
+  "market": {
+   "economy": 67,
+   "family": 74,
+   "luxury": 74,
+   "sport": 73
+  },
+  "anchors": 1
  },
  {
   "seed": 10,
@@ -314,10 +404,13 @@
    "roof": "roo_turret"
   },
   "notes": [],
-  "score": 68,
+  "character": "luxury",
+  "cost": 21,
+  "prestige": 12,
+  "score": 64,
   "parts": {
    "era": 0.38,
-   "harmony": 1,
+   "harmony": 0.89,
    "proportion": 0.71
   },
   "body": {
@@ -327,7 +420,14 @@
    "wb": 3000,
    "tire": "6.50-16",
    "notes": []
-  }
+  },
+  "market": {
+   "economy": 51,
+   "family": 55,
+   "luxury": 62,
+   "sport": 59
+  },
+  "anchors": 2
  },
  {
   "seed": 11,
@@ -347,6 +447,9 @@
    "roof": "roo_leatherette"
   },
   "notes": [],
+  "character": "economy",
+  "cost": 15,
+  "prestige": 4,
   "score": 74,
   "parts": {
    "era": 0.57,
@@ -360,7 +463,14 @@
    "wb": 3100,
    "tire": "5.25-18",
    "notes": []
-  }
+  },
+  "market": {
+   "economy": 83,
+   "family": 62,
+   "luxury": 45,
+   "sport": 58
+  },
+  "anchors": 3
  },
  {
   "seed": 12,
@@ -380,10 +490,13 @@
    "roof": "roo_landau"
   },
   "notes": [],
-  "score": 81,
+  "character": "economy",
+  "cost": 15,
+  "prestige": 4,
+  "score": 77,
   "parts": {
    "era": 0.68,
-   "harmony": 1,
+   "harmony": 0.89,
    "proportion": 0.76
   },
   "body": {
@@ -393,7 +506,14 @@
    "wb": 3200,
    "tire": "4.75-19",
    "notes": []
-  }
+  },
+  "market": {
+   "economy": 95,
+   "family": 75,
+   "luxury": 51,
+   "sport": 64
+  },
+  "anchors": 3
  },
  {
   "seed": 13,
@@ -415,10 +535,13 @@
   "notes": [
    "stream not available -> box"
   ],
-  "score": 69,
+  "character": "luxury",
+  "cost": 19,
+  "prestige": 8,
+  "score": 74,
   "parts": {
    "era": 0.72,
-   "harmony": 0.7,
+   "harmony": 0.82,
    "proportion": 0.64
   },
   "body": {
@@ -428,7 +551,14 @@
    "wb": 3300,
    "tire": "6.50-20",
    "notes": []
-  }
+  },
+  "market": {
+   "economy": 76,
+   "family": 69,
+   "luxury": 65,
+   "sport": 65
+  },
+  "anchors": 0
  },
  {
   "seed": 14,
@@ -450,10 +580,13 @@
   "notes": [
    "stream not available -> box"
   ],
-  "score": 76,
+  "character": "luxury",
+  "cost": 17,
+  "prestige": 9,
+  "score": 80,
   "parts": {
    "era": 0.77,
-   "harmony": 0.7,
+   "harmony": 0.82,
    "proportion": 0.81
   },
   "body": {
@@ -463,7 +596,14 @@
    "wb": 2700,
    "tire": "6.50-20",
    "notes": []
-  }
+  },
+  "market": {
+   "economy": 81,
+   "family": 73,
+   "luxury": 70,
+   "sport": 71
+  },
+  "anchors": 1
  },
  {
   "seed": 15,
@@ -483,6 +623,9 @@
    "roof": "roo_leatherette"
   },
   "notes": [],
+  "character": "luxury",
+  "cost": 19,
+  "prestige": 11,
   "score": 82,
   "parts": {
    "era": 0.72,
@@ -496,7 +639,14 @@
    "wb": 2800,
    "tire": "5.25-18",
    "notes": []
-  }
+  },
+  "market": {
+   "economy": 66,
+   "family": 61,
+   "luxury": 70,
+   "sport": 69
+  },
+  "anchors": 2
  },
  {
   "seed": 16,
@@ -516,10 +666,13 @@
    "roof": "roo_insert"
   },
   "notes": [],
-  "score": 72,
+  "character": "economy",
+  "cost": 14,
+  "prestige": 6,
+  "score": 75,
   "parts": {
    "era": 0.69,
-   "harmony": 0.7,
+   "harmony": 0.78,
    "proportion": 0.8
   },
   "body": {
@@ -529,7 +682,14 @@
    "wb": 2900,
    "tire": "5.50-17",
    "notes": []
-  }
+  },
+  "market": {
+   "economy": 82,
+   "family": 62,
+   "luxury": 50,
+   "sport": 63
+  },
+  "anchors": 2
  },
  {
   "seed": 17,
@@ -549,10 +709,13 @@
    "roof": "-"
   },
   "notes": [],
-  "score": 68,
+  "character": "luxury",
+  "cost": 18,
+  "prestige": 10,
+  "score": 70,
   "parts": {
    "era": 0.62,
-   "harmony": 0.7,
+   "harmony": 0.78,
    "proportion": 0.73
   },
   "body": {
@@ -562,7 +725,14 @@
    "wb": 3000,
    "tire": "6.00-16",
    "notes": []
-  }
+  },
+  "market": {
+   "economy": 75,
+   "family": 78,
+   "luxury": 68,
+   "sport": 69
+  },
+  "anchors": 1
  },
  {
   "seed": 18,
@@ -582,10 +752,13 @@
    "roof": "roo_landau"
   },
   "notes": [],
-  "score": 73,
+  "character": "family",
+  "cost": 21,
+  "prestige": 12,
+  "score": 64,
   "parts": {
    "era": 0.74,
-   "harmony": 0.7,
+   "harmony": 0.46,
    "proportion": 0.74
   },
   "body": {
@@ -595,7 +768,14 @@
    "wb": 3000,
    "tire": "6.50-20",
    "notes": []
-  }
+  },
+  "market": {
+   "economy": 76,
+   "family": 80,
+   "luxury": 64,
+   "sport": 65
+  },
+  "anchors": 1
  },
  {
   "seed": 19,
@@ -615,10 +795,13 @@
    "roof": "roo_turret"
   },
   "notes": [],
-  "score": 69,
+  "character": "luxury",
+  "cost": 22,
+  "prestige": 12,
+  "score": 66,
   "parts": {
    "era": 0.63,
-   "harmony": 0.7,
+   "harmony": 0.64,
    "proportion": 0.75
   },
   "body": {
@@ -628,7 +811,14 @@
    "wb": 3100,
    "tire": "6.50-20",
    "notes": []
-  }
+  },
+  "market": {
+   "economy": 62,
+   "family": 59,
+   "luxury": 68,
+   "sport": 61
+  },
+  "anchors": 2
  },
  {
   "seed": 20,
@@ -648,6 +838,9 @@
    "roof": "roo_turret"
   },
   "notes": [],
+  "character": "luxury",
+  "cost": 23,
+  "prestige": 13,
   "score": 76,
   "parts": {
    "era": 0.58,
@@ -661,6 +854,13 @@
    "wb": 3200,
    "tire": "7.00-16",
    "notes": []
-  }
+  },
+  "market": {
+   "economy": 51,
+   "family": 59,
+   "luxury": 71,
+   "sport": 69
+  },
+  "anchors": 3
  }
 ]

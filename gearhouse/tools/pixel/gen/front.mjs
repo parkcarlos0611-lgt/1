@@ -4,6 +4,7 @@ import { fillet } from './geom.mjs';
 import { TAG, shadeChrome, shadeGlass, shadeGlassPeriod, outlineLayers, dith } from './car.mjs';
 import { wheel } from './wheel.mjs';
 import { tire as tireDims } from './tire.mjs';
+import { anchorFloating } from './anchor.mjs';
 
 class FView { constructor(wMM, hMM, mm, pad = 3) { this.mm = mm; this.pad = pad; this.w = Math.ceil(wMM / mm) + pad * 2; this.h = Math.ceil(hMM / mm) + pad * 2; this.cx = this.w / 2; }
   X(y) { return this.cx + y / this.mm; } Y(z) { return this.h - this.pad - z / this.mm; } R(v) { return v / this.mm; }
@@ -103,5 +104,6 @@ export function buildFront(P, s, mm = 25) {
   for (const l of s.lamps || []) { lamp(l, 1); if (!l.single) lamp(l, -1); }
   for (const p of s.parts || []) { const m = p.half ? sym(v, W, H, p.pts, 1) : M().poly(smooth(v.P(p.pts), p.smooth ?? 1)); if (p.chrome) shadeChrome(px, m, P.id('chrome'), TAG.lamp); else shadeFront(px, m, P.id(p.ramp), v, { tag: TAG.lamp, base: p.base ?? 2 }); }
   outlineLayers(px);
+  if (s.anchor !== false) anchorFloating(px, P);
   return px;
 }

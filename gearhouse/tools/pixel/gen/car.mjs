@@ -2,6 +2,7 @@
 import { Pix, Mask, View, smooth, line, polyline } from '../pix.mjs';
 import { wheel } from './wheel.mjs';
 import { tire } from './tire.mjs';
+import { anchorFloating } from './anchor.mjs';
 
 export const TAG = { shadow: 1, well: 2, wheel: 3, body: 4, fender: 6, board: 7, glass: 8, frame: 9, trim: 10, bumper: 11, lamp: 12, deco: 13 };
 const OUTLINED = new Set([TAG.wheel, TAG.body, TAG.fender, TAG.board, TAG.bumper, TAG.lamp]);
@@ -161,6 +162,7 @@ export function buildCar(P, s, mm = 25, opt = {}) {
   for (const p of [...(s.parts || []), ...extra]) if (!p.behind) drawPart(p);
   for (const h of s.handles || []) { const x = Math.round(v.X(h[0])), y = Math.round(v.Y(h[1])); px.set(x, y, P.id('chrome'), 4, TAG.trim); px.set(x + 1, y, P.id('chrome'), 3, TAG.trim); px.set(x, y + 1, px.ramp(x, y + 1) ? px.ramp(x, y + 1) : P.id('chrome'), 0, TAG.body); px.set(x + 1, y + 1, px.ramp(x + 1, y + 1), 0, TAG.body); }
   outlineLayers(px);
+  if (s.anchor !== false) anchorFloating(px, P);
   return px;
 }
 

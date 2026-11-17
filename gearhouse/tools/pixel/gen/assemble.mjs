@@ -9,36 +9,36 @@ const pick = (R, a) => a[Math.floor(R() * a.length)];
 // slot option tables: id, years, requirements (fn of body), mapping data
 const OPT = {
   wheel: [
-    { id: 'wh_wire32', y: [1928, 1934], tire: '4.75-19', w: { style: 'wire', spokes: 30 }, tags: ['box'] },
-    { id: 'wh_wire40', y: [1930, 1936], tire: '5.25-18', w: { style: 'wire', spokes: 40 }, tags: ['box'] },
-    { id: 'wh_wire48ww', y: [1930, 1936], tire: '6.50-20', w: { style: 'wire', spokes: 48, whitewall: 0.22 }, tags: ['luxury'] },
-    { id: 'wh_art10', y: [1928, 1933], tire: '4.75-19', w: { style: 'artillery', spokes: 10, paint: 'PAINT' }, tags: ['box'] },
-    { id: 'wh_disc', y: [1932, 1939], tire: '5.50-17', w: { style: 'disc', paint: 'PAINT' }, tags: [] },
-    { id: 'wh_steel_cap', y: [1934, 1939], tire: '6.00-16', w: { style: 'steel', paint: 'PAINT' }, tags: [] },
-    { id: 'wh_fullcap', y: [1934, 1939], tire: '6.50-16', w: { style: 'hubcap', whitewall: 0.3 }, tags: ['stream'] },
-    { id: 'wh_trimring', y: [1935, 1939], tire: '6.00-16', w: { style: 'trimring', paint: 'PAINT', whitewall: 0.25 }, tags: ['stream'] },
-    { id: 'wh_cover', y: [1936, 1939], tire: '7.00-16', w: { style: 'hubcap', whitewall: 0.45 }, tags: ['stream', 'luxury'] },
+    { id: 'wh_wire32', cost: 2, prest: 1, y: [1928, 1934], tire: '4.75-19', w: { style: 'wire', spokes: 30 }, tags: ['box'] },
+    { id: 'wh_wire40', cost: 3, prest: 2, y: [1930, 1936], tire: '5.25-18', w: { style: 'wire', spokes: 40 }, tags: ['box'] },
+    { id: 'wh_wire48ww', cost: 5, prest: 4, y: [1930, 1936], tire: '6.50-20', w: { style: 'wire', spokes: 48, whitewall: 0.22 }, tags: ['luxury'] },
+    { id: 'wh_art10', cost: 1, prest: 0, y: [1928, 1933], tire: '4.75-19', w: { style: 'artillery', spokes: 10, paint: 'PAINT' }, tags: ['box'] },
+    { id: 'wh_disc', cost: 1, prest: 1, y: [1932, 1939], tire: '5.50-17', w: { style: 'disc', paint: 'PAINT' }, tags: [] },
+    { id: 'wh_steel_cap', cost: 2, prest: 1, y: [1934, 1939], tire: '6.00-16', w: { style: 'steel', paint: 'PAINT' }, tags: [] },
+    { id: 'wh_fullcap', cost: 3, prest: 2, y: [1934, 1939], tire: '6.50-16', w: { style: 'hubcap', whitewall: 0.3 }, tags: ['stream'] },
+    { id: 'wh_trimring', cost: 3, prest: 2, y: [1935, 1939], tire: '6.00-16', w: { style: 'trimring', paint: 'PAINT', whitewall: 0.25 }, tags: ['stream'] },
+    { id: 'wh_cover', cost: 4, prest: 3, y: [1936, 1939], tire: '7.00-16', w: { style: 'hubcap', whitewall: 0.45 }, tags: ['stream', 'luxury'] },
   ],
   headlamp: [
-    { id: 'hl_drum9_nickel', y: [1928, 1931], k: 'drum', ramp: 'brass', d: 230, need: b => b.sepFenders },
-    { id: 'hl_drum9_chrome', y: [1930, 1933], k: 'drum', ramp: 'chrome', d: 230, need: b => b.sepFenders },
-    { id: 'hl_tourer12', y: [1928, 1933], k: 'drum', ramp: 'chrome', d: 300, need: b => b.sepFenders },
-    { id: 'hl_bullet8_tilt', y: [1932, 1935], k: 'bullet', ramp: 'chrome', d: 210, need: b => b.sepFenders },
-    { id: 'hl_bullet10_body', y: [1934, 1936], k: 'bullet', ramp: 'PAINT', d: 250, need: b => b.sepFenders },
-    { id: 'hl_tear_chrome', y: [1933, 1936], k: 'bullet', ramp: 'chrome', d: 220, need: b => b.sepFenders },
-    { id: 'hl_pod_round', y: [1935, 1938], k: 'pod', d: 200, need: b => !b.sepFenders },
-    { id: 'hl_flush_oval', y: [1937, 1939], k: 'flush', d: 240, need: b => !b.sepFenders },
-    { id: 'hl_nose_flush', y: [1934, 1937], k: 'flush', d: 190, need: b => !b.sepFenders },
+    { id: 'hl_drum9_nickel', tags: ['box', 'economy'], cost: 2, prest: 1,  y: [1928, 1931], k: 'drum', ramp: 'brass', d: 230, need: b => b.sepFenders },
+    { id: 'hl_drum9_chrome', tags: ['box', 'economy'], cost: 2, prest: 1,  y: [1930, 1933], k: 'drum', ramp: 'chrome', d: 230, need: b => b.sepFenders },
+    { id: 'hl_tourer12', tags: ['box', 'luxury'], cost: 5, prest: 4,  y: [1928, 1933], k: 'drum', ramp: 'chrome', d: 300, need: b => b.sepFenders },
+    { id: 'hl_bullet8_tilt', tags: ['box', 'sport'], cost: 3, prest: 2,  y: [1932, 1935], k: 'bullet', ramp: 'chrome', d: 210, need: b => b.sepFenders },
+    { id: 'hl_bullet10_body', tags: ['box', 'family'], cost: 3, prest: 2,  y: [1934, 1936], k: 'bullet', ramp: 'PAINT', d: 250, need: b => b.sepFenders },
+    { id: 'hl_tear_chrome', tags: ['stream', 'family'], cost: 3, prest: 2,  y: [1933, 1936], k: 'bullet', ramp: 'chrome', d: 220, need: b => b.sepFenders },
+    { id: 'hl_pod_round', tags: ['stream', 'family'], cost: 3, prest: 2,  y: [1935, 1938], k: 'pod', d: 200, need: b => !b.sepFenders },
+    { id: 'hl_flush_oval', tags: ['stream', 'luxury'], cost: 4, prest: 3,  y: [1937, 1939], k: 'flush', d: 240, need: b => !b.sepFenders },
+    { id: 'hl_nose_flush', tags: ['stream'], cost: 4, prest: 3,  y: [1934, 1937], k: 'flush', d: 190, need: b => !b.sepFenders },
   ],
   bumper: [
-    { id: 'bp_twin', y: [1928, 1934], k: 'twin' }, { id: 'bp_triple', y: [1933, 1936], k: 'triple' }, { id: 'bp_heavy_dip', y: [1932, 1937], k: 'heavy' },
-    { id: 'bp_overriders', y: [1934, 1939], k: 'overriders' }, { id: 'bp_blade', y: [1935, 1939], k: 'blade' }, { id: 'bp_tube', y: [1928, 1933], k: 'tube' },
+    { id: 'bp_twin', y: [1928, 1934], k: 'twin', tags: ['box', 'economy'], cost: 2, prest: 1 }, { id: 'bp_triple', y: [1933, 1936], k: 'triple', tags: ['stream'], cost: 3, prest: 2 }, { id: 'bp_heavy_dip', y: [1932, 1937], k: 'heavy', tags: ['luxury'], cost: 4, prest: 3 },
+    { id: 'bp_overriders', y: [1934, 1939], k: 'overriders', tags: ['family', 'luxury'], cost: 3, prest: 2 }, { id: 'bp_blade', y: [1935, 1939], k: 'blade', tags: ['stream', 'family'], cost: 3, prest: 2 }, { id: 'bp_tube', y: [1928, 1933], k: 'tube', tags: ['box', 'economy'], cost: 1, prest: 0 },
   ],
   hoodVent: [
-    { id: 'hv_vShort', y: [1928, 1934], need: b => !b.stream }, { id: 'hv_vLong', y: [1928, 1933], need: b => !b.stream }, { id: 'hv_vGroups', y: [1930, 1935], need: b => !b.stream },
-    { id: 'hv_horizontal', y: [1932, 1937] }, { id: 'hv_doors5', y: [1932, 1936], need: b => !b.stream }, { id: 'hv_speedlines', y: [1934, 1939] }, { id: 'hv_wrap', y: [1936, 1939], need: b => b.stream }, { id: 'hv_chromeBars', y: [1935, 1939] },
+    { id: 'hv_vShort', tags: ['box', 'economy'], cost: 1, prest: 0, y: [1928, 1934], need: b => !b.stream }, { id: 'hv_vLong', tags: ['box'], cost: 1, prest: 1, y: [1928, 1933], need: b => !b.stream }, { id: 'hv_vGroups', tags: ['box', 'luxury'], cost: 2, prest: 2, y: [1930, 1935], need: b => !b.stream },
+    { id: 'hv_horizontal', tags: ['family'], cost: 1, prest: 1, y: [1932, 1937] }, { id: 'hv_doors5', tags: ['box', 'luxury'], cost: 3, prest: 3, y: [1932, 1936], need: b => !b.stream }, { id: 'hv_speedlines', tags: ['stream', 'sport'], cost: 2, prest: 2, y: [1934, 1939] }, { id: 'hv_wrap', tags: ['stream'], cost: 3, prest: 3, y: [1936, 1939], need: b => b.stream }, { id: 'hv_chromeBars', tags: ['stream', 'luxury'], cost: 3, prest: 3, y: [1935, 1939] },
   ],
-  trim: [{ id: 'tri_bead', y: [1928, 1935], need: b => !b.stream }, { id: 'tri_pinstripe', y: [1928, 1939] }, { id: 'tri_spear', y: [1934, 1939] }, { id: 'tri_twoTone', y: [1930, 1937] }, { id: 'tri_rocker', y: [1935, 1939] }],
+  trim: [{ id: 'tri_bead', tags: ['box', 'economy'], cost: 1, prest: 0, y: [1928, 1935], need: b => !b.stream }, { id: 'tri_pinstripe', tags: ['luxury'], cost: 1, prest: 1, y: [1928, 1939] }, { id: 'tri_spear', tags: ['stream', 'family'], cost: 2, prest: 2, y: [1934, 1939] }, { id: 'tri_twoTone', tags: ['luxury', 'sport'], cost: 2, prest: 2, y: [1930, 1937] }, { id: 'tri_rocker', tags: ['stream', 'luxury'], cost: 2, prest: 2, y: [1935, 1939] }],
   spare: [
     { id: 'sp_rearExposed', y: [1928, 1935], need: b => !b.stream && (b.tail === 'upright' || b.tail === 'trunk') }, { id: 'sp_rearCover', y: [1930, 1937], need: b => !b.stream && (b.tail === 'upright' || b.tail === 'trunk') },
     { id: 'sp_sideExposed', y: [1928, 1935], need: b => b.sepFenders }, { id: 'sp_sideCover', y: [1930, 1937], need: b => b.sepFenders }, { id: 'sp_inTrunk', y: [1934, 1939], need: b => b.tail !== 'upright' },
@@ -127,11 +127,76 @@ export function assemble(seed) {
   // ---- design score ----
   const eraFit = Object.entries(report.picks).filter(([, id]) => id !== '-').map(([slot, id]) => { const o = OPT[slot].find(x => x.id === id); const c = (o.y[0] + o.y[1]) / 2, half = Math.max(1, (o.y[1] - o.y[0]) / 2); return Math.max(0, 1 - Math.abs(year - c) / (half * 1.6)); });
   const era = eraFit.reduce((a, v) => a + v, 0) / eraFit.length;
-  const tags = [wh, hv].filter(Boolean).flatMap(o => o.tags || []); const harmony = Math.min(1, 0.7 + (tags.includes(style) ? 0.3 : 0) - (tags.includes(style === 'box' ? 'stream' : 'box') ? 0.3 : 0) + (q.notes.length ? -0.2 : 0));
+  // harmony over every slot: share of style-tagged picks that match the body style, plus character consistency
+  const chosen = Object.entries(report.picks).map(([slot, id]) => OPT[slot] && OPT[slot].find(x => x.id === id)).filter(Boolean);
+  const styled = chosen.filter(o => (o.tags || []).some(t => t === 'box' || t === 'stream')), match = styled.filter(o => o.tags.includes(style)).length;
+  const chars = ['economy', 'family', 'luxury', 'sport'].map(c => chosen.filter(o => (o.tags || []).includes(c)).length), top = Math.max(...chars), totC = chars.reduce((x, y) => x + y, 0);
+  const harmony = Math.max(0, Math.min(1, 0.55 * (styled.length ? match / styled.length : 1) + 0.45 * (totC ? top / totC : 1) - (q.notes.length ? 0.15 : 0)));
+  report.character = ['economy', 'family', 'luxury', 'sport'][chars.indexOf(top)];
+  report.cost = chosen.reduce((x, o) => x + (o.cost || 1), 0) + Math.round((q.wb - 2600) / 200); report.prestige = chosen.reduce((x, o) => x + (o.prest || 0), 0);
   const Lm = limits(year, style), mid = k => (Lm[k][0] + Lm[k][1]) / 2, span = k => (Lm[k][1] - Lm[k][0]) / 2;
   const prop = 1 - (['hWB', 'hoodWB', 'beltH'].reduce((a, k) => a + Math.abs(q[k] - mid(k)) / span(k), 0) / 3) * 0.5;
   report.score = Math.round(40 * era + 35 * harmony + 25 * prop);
   report.parts = { era: +era.toFixed(2), harmony: +harmony.toFixed(2), proportion: +prop.toFixed(2) };
   report.body = { tail: q.tail, fender: q.fender, grille: q.grille, wb: q.wb, tire: q.tire, notes: q.notes };
   return { spec: s, report };
+}
+
+// ---------------- front / rear assembly (same picks as the side view) ----------------
+import { fillet as fl } from './geom.mjs';
+const GRILLES = [
+  { id: 'gr_flat_honey', y: [1928, 1931], shape: 'flat', pat: 'mesh', box: 1 }, { id: 'gr_dip_vfine', y: [1930, 1932], shape: 'dip', pat: 'vbar', box: 1 },
+  { id: 'gr_vee_slat', y: [1932, 1934], shape: 'vee', pat: 'vbar', box: 1 }, { id: 'gr_heart', y: [1933, 1935], shape: 'heart', pat: 'vbar', box: 1 },
+  { id: 'gr_shield_h', y: [1934, 1936], shape: 'shield', pat: 'hbar' }, { id: 'gr_waterfall', y: [1934, 1937], shape: 'waterfall', pat: 'vbar', stream: 1 },
+  { id: 'gr_prow_h', y: [1936, 1938], shape: 'prow', pat: 'hbar', stream: 1 }, { id: 'gr_harp', y: [1935, 1936], shape: 'flat', pat: 'vbar' },
+  { id: 'gr_egg_rect', y: [1937, 1938], shape: 'rect', pat: 'eggcrate' }, { id: 'gr_flat_hbar', y: [1936, 1937], shape: 'flat', pat: 'hbar' },
+  { id: 'gr_gothic', y: [1934, 1936], shape: 'gothic', pat: 'vbar' }, { id: 'gr_oval_mesh', y: [1938, 1939], shape: 'oval', pat: 'mesh', stream: 1 },
+];
+const GSHAPE = { // half outlines (y from centre, z)
+  flat: (w, z0, z1) => [[0, z0, 0], [w, z0, 30], [w, z1 - 60, 60], [w * 0.75, z1, 50], [0, z1, 0]],
+  dip: (w, z0, z1) => [[0, z0, 0], [w, z0, 30], [w, z1 - 30, 40], [w * 0.6, z1, 60], [0, z1 - 40, 0]],
+  vee: (w, z0, z1) => [[0, z0, 20], [w, z0 + (z1 - z0) * 0.15, 60], [w, z1 - 50, 70], [0, z1, 0]],
+  heart: (w, z0, z1) => [[0, z0, 60], [w, z0 + (z1 - z0) * 0.4, 200], [w * 0.9, z1 - 40, 120], [0, z1 - 60, 0]],
+  shield: (w, z0, z1) => [[0, z0, 40], [w * 0.6, z0 + 60, 120], [w, (z0 + z1) / 2, 200], [w, z1 - 80, 120], [0, z1, 0]],
+  waterfall: (w, z0, z1) => [[0, z0, 0], [w, z0, 30], [w, z0 + (z1 - z0) * 0.6, 200], [w * 0.5, z1, 160], [0, z1, 0]],
+  prow: (w, z0, z1) => [[0, z0, 0], [w, z0 + 20, 60], [w * 0.85, z0 + (z1 - z0) * 0.5, 160], [w * 0.25, z1 - 40, 60], [0, z1, 0]],
+  rect: (w, z0, z1) => [[0, z0, 0], [w, z0, 30], [w, z1, 30], [0, z1, 0]],
+  gothic: (w, z0, z1) => [[0, z0, 0], [w, z0, 20], [w, z0 + (z1 - z0) * 0.55, 100], [0, z1, 0]],
+  oval: (w, z0, z1) => Array.from({ length: 7 }, (_, i) => { const a = -Math.PI / 2 + i * Math.PI / 6; return [Math.cos(a) * w, (z0 + z1) / 2 + Math.sin(a) * (z1 - z0) / 2, 0]; }),
+};
+export function assembleViews(seed) {
+  const { spec, report } = assemble(seed); const g = spec.geo, R = rng(seed * 31 + 7);
+  const stream = g.stream, paint = spec.paint, Tq = tire(spec.tire), track = 1400 + Math.round((g.R - g.F - 2600) / 10);
+  const half = stream ? 860 : 830, cab = stream ? 640 : 650, hoodHalf = stream ? 380 : 280, roof = g.roofZ, belt = g.beltZ, cowl = belt + 40;
+  let gc = GRILLES.filter(o => report.year >= o.y[0] && report.year <= o.y[1] && (!o.box || !stream) && (!o.stream || stream));
+  if (!gc.length) { gc = GRILLES.filter(o => report.year >= o.y[0] && report.year <= o.y[1]); report.notes.push('grille: style relaxed (no style-matched grille this year)'); }
+  report.rejected += GRILLES.length - gc.length;
+  const gr = pick(R, gc); report.picks.grille = gr.id;
+  const sep = report.body.fender === 'separate' || report.body.fender === 'valanced';
+  const body = sep ? fl([[0, g.bottom, 0], [cab, g.bottom, 0], [cab, belt, 0], [cab - 20, roof - 80, 140], [cab - 90, roof, 70], [0, roof, 0]])
+                   : fl([[0, g.bottom - 60, 0], [half - 80, g.bottom - 60, 0], [half, g.bottom + 80, 80], [half, g.r + g.gap + 60, 220], [cab + 60, belt - 40, 160], [cab, belt + 60, 0], [cab - 30, roof - 80, 150], [cab - 100, roof, 80], [0, roof, 0]]);
+  const fenderSide = s => fl([[s * (cab - 80), g.bottom - 120, 0], [s * (cab - 80), g.r + g.gap * 0.6, 120], [s * (cab + 40), g.r + g.gap + 100, 90], [s * half, g.r + g.gap + 40, 60], [s * (half + 10), g.bottom - 120, 0]]);
+  const zs = report.picks.bumper ? spec.bumperSets[0].zs : [g.bottom + 20], bh = spec.bumperSets[0].h;
+  const bars = zs.map(z => ({ half: 1, pts: [[0, z - bh / 2], [half + 40, z - bh / 2], [half + 65, z], [half + 40, z + bh / 2], [0, z + bh / 2]], smooth: 0 }));
+  const lampZ = sep ? g.hoodZ * 0.8 : g.r + g.gap * 0.85, lampY = sep ? hoodHalf + 170 : half - 230;
+  const hlk = (report.picks.headlamp || '').includes('flush') || (report.picks.headlamp || '').includes('pod') ? 85 : 115;
+  const common = { width: half * 2 + 160, height: roof + 60, paint, lowZ: g.bottom + 200, frame: stream ? 'chrome' : 'reveal', glassStyle: 'period', tire: spec.tire, track, hub: 40, tonePaint: 'black' };
+  const front = { ...common, body,
+    tone: (spec.tone || []).some(t => t.paint === 'black') && !stream ? [[0, roof - 60], [cab + 20, roof - 60], [cab + 20, roof + 200], [0, roof + 200]] : null,
+    hood: stream ? { half: hoodHalf, top: g.hoodZ, bottom: g.bottom + 40, round: 1, pts: [[0, g.bottom + 40, 0], [hoodHalf - 20, g.bottom + 60, 60], [hoodHalf, (g.bottom + g.hoodZ) / 2, 160], [hoodHalf * 0.75, g.hoodZ - 20, 120], [0, g.hoodZ, 0]] } : { half: hoodHalf, top: g.hoodZ, bottom: g.bottom + 60 },
+    cowlZ: cowl, wiper: [-cab * 0.6, roof - 150, -cab * 0.2, roof - 260], wheelIn: [cab * 0.4, cowl + 140, 170],
+    glass: [fl([[0, cowl + 30, 0], [cab - 70, cowl + 30, 30], [cab - 110, roof - 90, 60], [0, roof - 90, 0]])],
+    under: [...(sep ? [{ half: 0, pts: fenderSide(1), ramp: spec.fenders[0]?.paint || 'black', base: 2 }, { half: 0, pts: fenderSide(-1), ramp: spec.fenders[0]?.paint || 'black', base: 2 },
+      { half: 1, pts: [[0, g.bottom - 60], [cab - 80, g.bottom - 60], [cab - 80, g.bottom + 80], [0, g.bottom + 80]], ramp: 'black', base: 1 }] : []),
+      { half: 1, pts: [[0, 260], [track / 2 - 120, 260], [track / 2 - 120, 320], [0, 320]], ramp: 'black', base: 1 }],
+    grilles: [{ half: 1, pattern: gr.pat, bars: 'chrome', surround: 'chrome', pts: fl(GSHAPE[gr.shape](stream ? 230 : 250, g.bottom + 60, g.hoodZ - 40)) }],
+    bumpers: bars, lamps: [{ y: lampY, z: lampZ, r: hlk, ramp: 'lensW', bezel: 'chrome' }],
+    parts: sep ? [{ half: 1, pts: [[0, lampZ - 150], [lampY - 40, lampZ - 150], [lampY - 40, lampZ - 125], [0, lampZ - 125]], ramp: 'black', base: 1 }] : [] };
+  const rear = { ...common, body, tone: front.tone,
+    glass: [fl([[0, belt + 150, 0], [cab * 0.42, belt + 150, 40], [cab * 0.38, roof - 120, 60], [0, roof - 120, 0]])],
+    under: front.under.slice(0, sep ? 3 : 0).concat([{ half: 1, pts: [[0, 260], [track / 2 - 120, 260], [track / 2 - 120, 320], [0, 320]], ramp: 'black', base: 1 }]),
+    bumpers: bars, lamps: [{ y: half - (sep ? 60 : 160), z: sep ? g.r + g.gap + 60 : belt * 0.6, r: 45, ramp: 'lensR', bezel: 'chrome' }],
+    parts: [{ pts: [[-150, g.bottom + 150], [150, g.bottom + 150], [150, g.bottom + 260], [-150, g.bottom + 260]], ramp: 'white', base: 2 }] };
+  if ((report.picks.spare || '').startsWith('sp_rear')) rear.spare = { z: g.bottom + 60 + Tq.r, r: Tq.r, style: report.picks.spare === 'sp_rearCover' ? 'disc' : 'wire', paint, spokes: 30, tireFrac: Tq.frac };
+  return { spec, front, rear, report };
 }

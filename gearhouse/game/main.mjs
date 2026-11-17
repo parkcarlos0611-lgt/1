@@ -10,6 +10,7 @@ import { flatheadV8, ohvI6, ptPalette } from '../tools/pixel/gen/engine40.mjs';
 import { engineSide } from '../tools/pixel/gen/props.mjs';
 import { engineStats, LAYOUTS, HEADS, maxCR } from '../sim/engine.mjs';
 import { drawCutaway, fired } from './cutaway.mjs';
+import { LIMITS, dimsFor } from '../sim/dims.mjs';
 import { GEARBOX, proposeRatios, rpmTrace } from '../sim/drive.mjs';
 import { COUNTRIES, SEGS, TECH, RES_SCALE, newGame, stepMonth, evaluate, appeal, dateNum, has, BANK_OPTS, bankOption } from './world.mjs';
 
@@ -29,8 +30,9 @@ const tyreFor = y => (y < 1933 ? '4.75-19' : y < 1936 ? '5.50-17' : y < 1946 ? '
 function carSprite(year, body, paintIdx, type, rot = 0) {
   const key = JSON.stringify([year, body, paintIdx, type, rot]); if (app.cache.has(key)) return app.cache.get(key);
   const q = clampParams({ ...body, year, type, tire: tyreFor(year), paint: 'paint.c' + paintIdx, fenderPaint: body.style === 'box' && body.blackFenders ? 'black' : 'paint.c' + paintIdx });
-  let px = null; try { const s = genBody(q); Object.assign(s, { grad: [3.1, 1.4], glassStyle: 'period' }); s.wheel = { ...s.wheel, rot }; px = buildCar(P, s, 25); } catch (e) { console.warn(e); }
-  const out = { px, q }; app.cache.set(key, out); if (app.cache.size > 140) app.cache.delete(app.cache.keys().next().value); return out; }
+  const L = LIMITS[type] || LIMITS.sedan4d; if (q.hWB * q.wb > L.h[1]) { q.hWB = L.h[1] / q.wb; q.notes.push(`HEIGHT CAPPED AT ${L.h[1]}MM (TALLEST REAL ${type === 'coupe2d' ? 'COUPE' : 'SEDAN'} +3%)`); }
+  let px = null, len = q.wb * 1.6; try { const s = genBody(q); len = s.len; Object.assign(s, { grad: [3.1, 1.4], glassStyle: 'period' }); s.wheel = { ...s.wheel, rot }; px = buildCar(P, s, Math.max(25, Math.ceil(s.len / 190))); } catch (e) { console.warn(e); }
+  const out = { px, q, dims: dimsFor(type, q, len, body.widthAdj ?? 0.5) }; app.cache.set(key, out); if (app.cache.size > 140) app.cache.delete(app.cache.keys().next().value); return out; }
 function engineSprite(e, maxW = 140, maxH = 84) {
   const key = 'E' + JSON.stringify([e.layout, e.head, e.bore, e.stroke, maxW, maxH]); if (app.cache.has(key)) return app.cache.get(key);
   const L = LAYOUTS[e.layout]; let px = null;
@@ -176,14 +178,16 @@ function cars(g) { windowBox(S, AX, AY, AW, AH, 'CAR DESIGN STUDIO');
   const b = d.body, styles = ['box', 'stream', 'pontoon'], sOK = st => limits(g.year, st) && (st === 'box' || has(g, st));
   const st2 = cycler(S, AX + 6, AY + 20, 90, 'BODY LANGUAGE', styles, b.style, { lock: st => !sOK(st) }); if (sOK(st2)) b.style = st2; else if (st2 !== b.style) toast(limits(g.year, st2) ? 'RESEARCH NEEDED' : 'NOT POSSIBLE IN ' + g.year);
   d.type = cycler(S, AX + 6, AY + 44, 90, 'BODY TYPE', ['sedan4d', 'coupe2d'], d.type, { names: t => (t === 'sedan4d' ? '4-DOOR SEDAN' : '2-DOOR COUPE') });
-  b.wb = Math.round(slider(S, AX + 6, AY + 68, 90, 'WHEELBASE', b.wb, 2400, 3500, { step: 25, fmt: v => Math.round(v) + 'MM' }));
-  [['rake', 'SCREEN RAKE'], ['roofR', 'ROOF CURVE'], ['noseR', 'NOSE ROUND'], ['height', 'HEIGHT'], ['hood', 'HOOD LENGTH'], ['belt', 'BELT LINE']].forEach(([k, l], i) => (b[k] = slider(S, AX + 6, AY + 88 + i * 18, 90, l, b[k], 0, 1, { step: 0.05 })));
+  const LIM = LIMITS[d.type] || LIMITS.sedan4d; b.wb = Math.round(slider(S, AX + 6, AY + 68, 90, 'WHEELBASE', Math.max(LIM.wb[0], Math.min(LIM.wb[1], b.wb)), LIM.wb[0], LIM.wb[1], { step: 25, fmt: v => Math.round(v) + 'MM' }));
+  const dm0 = carSprite(g.year, b, d.paint, d.type).dims;
+  [['rake', 'SCREEN RAKE'], ['roofR', 'ROOF CURVE'], ['noseR', 'NOSE ROUND'], ['height', 'HEIGHT'], ['hood', 'HOOD LENGTH'], ['belt', 'BELT LINE']].forEach(([k, l], i) => { const y = AY + 88 + i * 18;
+    if (k === 'height') { b.height = slider(S, AX + 6, y, 42, 'HEIGHT', b.height, 0, 1, { step: 0.05, fmt: () => String(dm0.height) }); b.widthAdj = slider(S, AX + 54, y, 42, 'WIDTH', b.widthAdj ?? 0.5, 0, 1, { step: 0.05, fmt: () => String(dm0.width) }); }
+    else b[k] = slider(S, AX + 6, y, 90, l, b[k], 0, 1, { step: 0.05 }); });
   d.paint = cycler(S, AX + 6, AY + 196, 90, 'PAINT', PAINTS.map((_, i) => i), d.paint, { names: i => 'COLOUR ' + (i + 1) });
   S.fill(AX + 98 - 8, AY + 205, 6, 7, hex(PAINTS[d.paint]));
   if (b.style === 'box') b.blackFenders = cycler(S, AX + 6, AY + 220, 90, 'FENDERS', [true, false], b.blackFenders, { names: v => (v ? 'BLACK' : 'BODY COLOUR') });
   // preview
-  const cx = AX + 100, pw = 200; panel(S, cx, AY + 20, pw, 92, `${g.year} - CLAMPED TO ERA LIMITS`);
-  const { px, q } = carSprite(g.year, b, d.paint, d.type); if (px) drawPix(S, px, P, cx + Math.max(2, (pw - px.w) / 2) | 0, AY + 108 - px.h, 1);
+  const cx = AX + 100, pw = 200; const { px, q, dims: dm } = carSprite(g.year, b, d.paint, d.type); panel(S, cx, AY + 20, pw, 92, `L${dm.len} W${dm.width} H${dm.height} WB${dm.wb} MM`); if (px) drawPix(S, px, P, cx + Math.max(2, (pw - px.w) / 2) | 0, AY + 108 - px.h, 1);
   if (q.notes.length) text(S, q.notes[0].slice(0, 58), cx + 3, AY + 104, C.red);
   // mechanicals
   if (!readyE.length || !readyG.length) { text(S, 'NEED A READY ENGINE AND GEARBOX', cx + 4, AY + 120, C.red); return; }
@@ -194,7 +198,7 @@ function cars(g) { windowBox(S, AX, AY, AW, AH, 'CAR DESIGN STUDIO');
   fe.forEach(([k, l], i) => { if (button(S, cx + i * 50, AY + 160, 48, 12, l, { active: d.feats[k] })) d.feats[k] = !d.feats[k]; });
   d.seg = cycler(S, cx, AY + 176, 97, 'TARGET SEGMENT', Object.keys(SEGS), d.seg, { names: k => k.toUpperCase() });
   d.price = Math.round(slider(S, cx + 103, AY + 176, 97, 'LIST PRICE', d.price, 350, 5000, { step: 10, fmt: money }));
-  const car = { ...d, body: { style: q.style, wb: b.wb, hood: q.hoodWB, height: q.hWB }, designScore: 0.62 + (q.style !== 'box' ? 0.1 : 0) - q.notes.length * 0.04 + (1 - Math.abs(b.belt - 0.5)) * 0.08 };
+  const car = { ...d, dims: dm, body: { style: q.style, wb: b.wb, hood: q.hoodWB, height: q.hWB }, designScore: 0.62 + (q.style !== 'box' ? 0.1 : 0) - q.notes.length * 0.04 + (1 - Math.abs(b.belt - 0.5)) * 0.08 };
   const ev = evaluate(g, car), x2 = cx + pw + 6, pw2 = AX + AW - x2 - 6;
   panel(S, x2, AY + 20, pw2, 210, 'ENGINEERING REPORT');
   if (ev) { const sm = ev.sim; [['TOP SPEED', `${sm.topMph.toFixed(0)} MPH`], ['0-60 MPH', sm.zeroSixty ? sm.zeroSixty.toFixed(1) + ' S' : 'NEVER'], ['ECONOMY', sm.mpg.toFixed(1) + ' MPG'], ['MAX GRADE', Math.round(sm.grade * 100) + '%'], ['WEIGHT', sm.mass + ' KG'], ['UNIT COST', money(ev.unit)]].forEach(([l, v], i) => stat(S, x2 + 4, AY + 31 + i * 8, l, v, C.ink, 44));
@@ -252,7 +256,7 @@ function end() { const g = app.g; desk(S); S.fill(60, 10, 360, 250, C.paper); S.
   text(S, head, 72, 52, C.oxblood, 1, 336); S.fill(70, 62, 340, 1, C.ink);
   const total = g.models.reduce((a, m) => a + (m.sold || 0), 0); [['CARS SOLD', total.toLocaleString('en-US')], ['FINAL CASH', money(g.cash)], ['BANK LOAN', money(g.loan || 0)], ['REPUTATION', Math.round(g.rep * 100)], ['MODELS', g.models.length]].forEach(([l, v], i) => stat(S, 72, 68 + i * 9, l, v));
   graph(S, 200, 66, 205, 52, [{ pts: g.hist.sales, c: C.teal }], { labels: [{ t: 'CARS SOLD / MONTH', c: C.teal }] });
-  text(S, 'MILESTONES', 72, 126, C.ink); (g.ach || []).forEach((a, i) => text(S, '* ' + a.toUpperCase(), 72, 136 + i * 8, C.green));
+  text(S, 'MILESTONES', 72, 126, C.ink); const AN = { first: 'FIRST CAR SOLD', '10k': '10,000 CARS SOLD', '100k': '100,000 CARS SOLD', depr: 'SURVIVED THE DEPRESSION', war: 'WAR PRODUCTION' }; (g.ach || []).forEach((a, i) => text(S, '* ' + (AN[a] || a), 72, 136 + i * 8, C.green, 1, 120));
   text(S, 'FROM THE WIRE', 200, 126, C.ink); g.news.slice(0, 11).forEach((n, i) => text(S, n.t, 200, 136 + i * 8, C.inkSoft, 1, 205));
   if (g.over.startsWith('END') && button(S, 72, 232, 120, 16, 'KEEP PLAYING (1950+)', { tone: 'teal' })) { g.over = false; g.sandbox = true; app.scene = 'hq'; }
   if (button(S, 290, 232, 110, 16, 'TITLE', { tone: 'ox' })) { app.scene = 'title'; app.g = null; } }

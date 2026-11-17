@@ -61,6 +61,7 @@ export const KO = {
   'THE MOTOR GAZETTE': '자동차 신보', 'CLOSES ITS DOORS': '문을 닫다', 'SOLD TO RIVAL': '경쟁사에 팔리다', 'ENTERS THE FIFTIES': '1950년대로', 'MILESTONES': '업적', 'FROM THE WIRE': '전보', 'KEEP PLAYING (1950+)': '계속하기 (1950+)',
   'MERGED INTO A LARGER FIRM': '대기업에 합병됨', 'FINAL CASH': '최종 자금', 'MODELS': '모델',
   'CUTAWAY': '투시도', 'CUT': '투시', 'EXT': '외관', 'CRANK SPEED': '크랭크 속도', 'STOP': '정지', 'RPM': 'RPM',
+  'WIDTH': '전폭', 'HEIGHT CAPPED AT': '전고 상한', 'TALLEST REAL': '실제 최고', 'COUPE': '쿠페', 'SEDAN': '세단',
   'JAN': '1월', 'FEB': '2월', 'MAR': '3월', 'APR': '4월', 'MAY': '5월', 'JUN': '6월', 'JUL': '7월', 'AUG': '8월', 'SEP': '9월', 'OCT': '10월', 'NOV': '11월', 'DEC': '12월', 'MUTE': '음소거', 'SOUND': '소리' };
 const keys = Object.keys(KO).sort((a, b) => b.length - a.length);
 const esc = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');

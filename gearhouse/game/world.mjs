@@ -48,9 +48,9 @@ export function modernity(year, items) { if (!items.length) return 1; let s = 0;
 // evaluate a car design (engine + gearbox + body params) - shared by the designer screen and the monthly market
 export function evaluate(g, car) {
   const e = g.engines.find(x => x.id === car.engineId), gb = g.gearboxes.find(x => x.id === car.gbId); if (!e || !gb) return null;
-  const es = engineStats({ ...e, year: g.year }), body = car.body, wb = body.wb, len = wb + 1500, width = 1720 + (car.type === 'sedan4d' ? 30 : 0);
-  const Cd = { box: 0.68, stream: 0.54, pontoon: 0.5 }[body.style] ?? 0.68, area = width / 1000 * (wb * body.height * 0.58 + 600) / 1000 * 0.82;
-  const bodyKg = 520 + (wb - 2500) * 0.28 + (car.type === 'sedan4d' ? 60 : 0) + (car.feats?.steelroof ? 25 : 0) - (car.feats?.unibody ? 90 : 0);
+  const es = engineStats({ ...e, year: g.year }), body = car.body, wb = body.wb, len = car.dims?.len ?? wb + 1500, width = car.dims?.width ?? 1720;
+  const Cd = { box: 0.68, stream: 0.54, pontoon: 0.5 }[body.style] ?? 0.68, area = width / 1000 * ((car.dims?.height ?? wb * body.height) - 180) / 1000 * 0.82;
+  const bodyKg = 520 + (wb - 2500) * 0.28 + (width - 1700) * 0.35 + (car.type === 'sedan4d' ? 60 : 0) + (car.feats?.steelroof ? 25 : 0) - (car.feats?.unibody ? 90 : 0);
   const sim = simulate({ es, engine: e, gearbox: gb, final: car.final, tyreR: 0.36, mass: bodyKg + 250, cda: Cd * area, driveFrac: 0.52 });
   const fit = es.len <= body.hood * wb + 320 && es.height <= 900;
   const unit = Math.round(es.cost + GEARBOX[gb.type].cost + 210 + (wb - 2500) * 0.15 + (body.style !== 'box' ? 45 : 0) + (car.trim ?? 1) * 55 + (car.feats?.ifs ? 25 : 0) + (car.feats?.hydbrake ? 12 : 0)) * (COUNTRIES[g.country].wage * 0.4 + 0.6);

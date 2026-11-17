@@ -83,7 +83,7 @@ export const airflow34Rear = {
     { pts: [[-560, 610], [-330, 610], [-330, 720], [-560, 720]], ramp: 'white', base: 2 }],
 };
 const blade = { half: 1, pts: [[0, 410], [880, 420], [905, 455], [880, 520], [0, 515]], smooth: 0 };
-const overriders = [-1, 1].map(s => ({ pts: fillet([[s * 420, 370, 0], [s * 460, 370, 0], [s * 460, 600, 20], [s * 420, 600, 20]]), chrome: 1 }));
+const overriders = [-1, 1].map(s => ({ guard: 1, pts: fillet([[s * 420, 370, 0], [s * 460, 370, 0], [s * 460, 600, 20], [s * 420, 600, 20]]), chrome: 1 }));
 export const zephyr37Front = {
   width: 1880, height: 1730, paint: 'paint.zephyr', lowZ: 520, frame: 'chrome', glassStyle: 'period', tire: '7.00-16', track: 1450, hub: 40,
   hood: { half: 420, top: 1215, bottom: 400, round: 1, pts: [[0, 390, 0], [400, 400, 80], [420, 760, 200], [300, 1080, 200], [110, 1210, 60], [0, 1215, 0]] }, cowlZ: 1300, wiper: [-450, 1590, -180, 1500], wheelIn: [260, 1420, 190],

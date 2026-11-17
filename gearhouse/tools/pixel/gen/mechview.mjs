@@ -34,7 +34,7 @@ export function drawMechSide(P, px, mech, { X = px.X, Y = px.Y, mm = px.mm } = {
   const d = drawer(P, px, X, Y, mm), m = mech, f = m.frame;
   if (m.exhaust) d.band(m.exhaust, 45, 'iron', 1); if (m.muffler) d.solid(d.rect(m.muffler[0], m.muffler[2] - 70, m.muffler[1], m.muffler[2] + 70, 40), 'iron', 2);
   if (m.tank) d.solid(d.rect(...m.tank, 40), 'paint.tank', 2, [3, 1.2]);
-  d.band(f.line, f.depth, 'black', 2);
+  if (f.depth) d.band(f.line, f.depth, f.ramp || 'black', 2);   // unit body: no separate frame
   for (const x of f.cross || []) { const z = zAt(f.line, x); if (z != null) d.solid(d.rect(x - 40, z - f.depth / 2, x + 40, z + f.depth / 2), 'iron', 3); }
   for (const ax of m.axles) { const T = tire(m.tire), z = T.r;
     if (ax.spring === 'transverse') { for (let k = 0; k < 5; k++) d.solid(d.rect(ax.x - 60 - (4 - k) * 70, z + 200 + k * 22, ax.x + 60 + (4 - k) * 70, z + 216 + k * 22), 'iron', 2); d.band([[ax.x, z], [ax.x + (ax.radius || 900), z + 120]], 40, 'iron', 2); }

@@ -46,7 +46,7 @@ export const baseName = id => (BASES[id] || {}).name || id;
 export function measuredDesign(id, year) {
   const t = tplOf(id), L = landmarks(t.spec), B = BASES[t.id];
   return { base: t.id, year, type: t.type, wb: Math.round(L.wb), frontOH: Math.round(L.frontOH), rearOH: Math.round(L.rearOH), belt: Math.round(L.belt), roof: Math.round(L.roof), width: B.width,
-    wheelFrom: t.id, whitewall: t.spec.wheel?.whitewall ?? 0, lampFrom: t.id, grilleFrom: t.id, bumperFrom: t.id, tailFrom: t.id, fenderBlack: false, guards: B.gen ? B.gen.guards : 0, fog: false, ornament: true };
+    wheelFrom: t.id, whitewall: t.spec.wheel?.whitewall ?? 0, lampFrom: t.id, grilleFrom: t.id, bumperFrom: t.id, tailFrom: t.id, shape: { screen: 0, crown: 0, back: 0, deck: 0, nose: 0, fTail: 0, fCrown: 0 }, fenderBlack: false, guards: B.gen ? B.gen.guards : 0, fog: false, ornament: true };
 }
 // limits around the measured car (body pressings can be re-tooled, not reinvented)
 export function measuredRanges(d) {
@@ -57,9 +57,35 @@ export function measuredRanges(d) {
 }
 export function clampMeasured(d) { const R = measuredRanges(d), notes = [];
   for (const k of Object.keys(R)) { const v = clamp(d[k], R[k][0], R[k][1]); if (Math.abs(v - d[k]) > 0.5) notes.push(k); d[k] = v; }
+  const SR = shapeRanges(d); d.shape = { ...(d.shape || {}) }; for (const k of Object.keys(SR)) d.shape[k] = clamp(d.shape[k] || 0, SR[k][0], SR[k][1]);
   const ok = baseList(d.year); for (const k of ['wheelFrom', 'lampFrom', 'grilleFrom', 'bumperFrom', 'tailFrom']) if (!ok.includes(d[k])) d[k] = d.base;
   return notes; }
 
+// ---- shape control points on the measured outline (mm). Each one moves only its neighbourhood; the door shut lines stay. ----
+export const SHAPE_KEYS = ['screen', 'crown', 'back', 'deck', 'nose', 'fTail', 'fCrown'];
+export function shapeRanges(d) { const t = tplOf(d.base), boards = (t.spec.boards || []).length > 0, L = landmarks(t.spec);
+  return { screen: [-120, 260], crown: [-50, 80], back: [-260, 320], deck: [-160, Math.round(Math.min(160, (L.roof - L.belt) * 0.3))], nose: [-140, 260], fTail: boards ? [0, 0] : [-150, 450], fCrown: [-70, 110] }; }
+const xf = t => (t >= 1 ? 0 : (1 - t * t) * (1 - t * t)), zr = (z, a, b) => clamp((z - a) / Math.max(1, b - a), 0, 1);
+function shapeSide(s, sh) {
+  const L = landmarks(s), body = []; eachPoint(s.body, p => body.push(p));
+  const roof = L.roof, belt = L.belt, top = body.filter(p => p[1] > roof - 70), hx = Math.min(...top.map(p => p[0])), rx = Math.max(...top.map(p => p[0]));
+  const rearPts = body.filter(p => p[0] > rx + 150 && p[1] > L.r), deckZ = rearPts.length ? Math.max(...rearPts.map(p => p[1])) : belt, deckX = L.tailX - (L.tailX - rx) * 0.4;
+  const front = body.filter(p => p[0] < L.F + 100), nz = front.length ? Math.max(...front.map(p => p[1])) : belt;
+  const f0 = (s.fenders || [])[0], fz = f0 ? Math.max(...f0.pts.map(p => p[1])) : 0, fRear = f0 ? Math.max(...f0.pts.map(p => p[0])) : 0, fRearZ = f0 ? f0.pts.reduce((a, p) => (p[0] > a[0] ? p : a), [-1e9, 0])[1] : 0;
+  const v = k => sh[k] || 0;
+  const fn = (x, z) => { const g = zr(z, belt, roof); return [v('screen') * xf(Math.abs(x - hx) / 550) * g ** 1.3 + v('back') * xf(Math.abs(x - rx) / 600) * g ** 1.3 + v('nose') * xf(Math.abs(x - L.noseX) / (L.F - L.noseX + 350)) * zr(z, L.r, nz) ** 1.5,
+    v('crown') * xf(Math.abs(x - (hx + rx) / 2) / ((rx - hx) / 2 + 300)) * g * g + v('deck') * xf(Math.abs(x - deckX) / ((L.tailX - rx) * 0.65 + 1)) * zr(z, L.r * 1.6, deckZ)]; };
+  const mv = p => { const [dx, dz] = fn(p[0], p[1]); p[0] += dx; p[1] += dz; };
+  const rigid = arr => (arr || []).forEach(o => { const pts = []; eachPoint(o, q => pts.push(q)); if (!pts.length) return; const cx = pts.reduce((a, q) => a + q[0], 0) / pts.length, cz = pts.reduce((a, q) => a + q[1], 0) / pts.length, [dx, dz] = fn(cx, cz); pts.forEach(q => { q[0] += dx; q[1] += dz; }); });
+  if (SHAPE_KEYS.some(k => v(k))) {
+    for (const k of ['body', 'glass', 'tone', 'trim', 'doors', 'decals']) if (s[k]) eachPoint(s[k], mv);
+    (s.handles || []).forEach(mv); if (s.win) s.win.open = s.win.open.map(([a, b, o = {}]) => [a, b, { ...o, cut: o.cut && o.cut.map(q => { const r = [...q]; mv(r); return r; }) }]);
+    (s.parts || []).forEach(p => { if (p.behind && p.pts && p.pts.length >= 9) eachPoint(p, mv); else rigid([p]); }); rigid(s.lamps);
+    if (f0 && (v('fTail') || v('fCrown'))) eachPoint(f0.pts, p => { p[0] += v('fTail') * zr(p[0], L.F + L.gap * 0.5, fRear) ** 1.5; p[1] += v('fCrown') * xf(Math.abs(p[0] - L.F) / (L.gap * 1.8)) * zr(p[1], L.r, fz); });
+  }
+  return [{ k: 'screen', x: hx + v('screen'), z: roof, ax: 'x' }, { k: 'crown', x: (hx + rx) / 2, z: roof + v('crown'), ax: 'z' }, { k: 'back', x: rx + v('back'), z: roof, ax: 'x' }, { k: 'deck', x: deckX, z: deckZ + v('deck'), ax: 'z' },
+    { k: 'nose', x: L.noseX + v('nose'), z: nz, ax: 'x' }, ...(f0 ? [{ k: 'fTail', x: fRear + v('fTail'), z: fRearZ, ax: 'x' }, { k: 'fCrown', x: L.F, z: fz + v('fCrown'), ax: 'z' }] : [])];
+}
 // ---- side: measured spec + extended section warp ----
 function warpSide(spec0, L, { dFO = 0, dWB = 0, dRO = 0, bh = 1, gh = 1 }) {
   const s = clone(spec0); let dB = L.quarterOK ? dWB * 0.5 : 0, dA = dWB - dB; dA = Math.max(dA, -(L.hood - 450)); if (L.quarterOK) dB = Math.max(dB, -(L.quarter - 60));
@@ -86,10 +112,11 @@ function warpSide(spec0, L, { dFO = 0, dWB = 0, dRO = 0, bh = 1, gh = 1 }) {
   return { s, X, Z };
 }
 const lensW = sp => (sp.lamps || []).find(l => l.ramp === 'lensW' && l.e), lensR = sp => (sp.lamps || []).find(l => l.ramp === 'lensR' && l.e);
-export function measuredSide(d, paint) {
+export function measuredSide(d, paint, strip = null) {
   const t = tplOf(d.base), L = landmarks(t.spec);
   const gh0 = L.roof - L.belt, belt2 = d.belt, roof2 = d.roof, bh = (belt2 - L.r) / Math.max(1, L.belt - L.r), gh = Math.max(0.6, (roof2 - belt2) / Math.max(1, gh0));
   const { s, X, Z } = warpSide(t.spec, L, { dFO: d.frontOH - L.frontOH, dWB: d.wb - L.wb, dRO: d.rearOH - L.rearOH, bh, gh });
+  const handles = shapeSide(s, d.shape || {});
   // part swaps (side view): wheels, headlamp, tail lamp, bumper section
   const W = tplOf(d.wheelFrom).spec.wheel; if (W) s.wheel = { ...clone(W), whitewall: d.whitewall };
   const swapLamp = (pick, src) => { const a = pick(s), b = pick(tplOf(src).spec); if (a && b) { a.e = [a.e[0], a.e[1], b.e[2], b.e[3]]; a.bezel = b.bezel; } };
@@ -97,9 +124,11 @@ export function measuredSide(d, paint) {
   if (d.bumperFrom !== t.id) { const src = tplOf(d.bumperFrom).spec.bumperSets || []; (s.bumperSets || []).forEach((b, i) => { const o = src[i] || src[0]; if (!o) return; const m0 = b.zs.reduce((a, z) => a + z, 0) / b.zs.length, m1 = o.zs.reduce((a, z) => a + z, 0) / o.zs.length;
     b.zs = o.zs.map(z => z - m1 + m0); b.h = o.h; }); }
   if (d.fenderBlack) for (const f of s.fenders || []) f.paint = 'black';
+  if (strip === 'lamps') s.lamps = (s.lamps || []).filter(l => l.ramp !== 'lensW'); if (strip === 'tail') s.lamps = (s.lamps || []).filter(l => l.ramp !== 'lensR');   // part removed (fitting effect)
+  if (strip === 'bumpers') s.bumperSets = []; if (strip === 'wheel') s.wheel = { style: 'disc', paint: 'black', whitewall: 0 };
   s.paint = t.spec.paint; repaint(s, paint);
   const L2 = landmarks(s);
-  s.geo = { r: L2.r, F: L2.F, R: L2.R, gap: L2.gap, noseX: L2.noseX, tailX: L2.tailX, cowlX: L2.cowl, hoodZ: L2.belt, beltZ: L2.belt, roofF: L2.cowl, roofR: L2.cab, H: L2.roof, base: t.id };
+  s.geo = { handles, r: L2.r, F: L2.F, R: L2.R, gap: L2.gap, noseX: L2.noseX, tailX: L2.tailX, cowlX: L2.cowl, hoodZ: L2.belt, beltZ: L2.belt, roofF: L2.cowl, roofR: L2.cab, H: L2.roof, base: t.id };
   s.v2 = { template: t.spec.id }; return s;
 }
 
@@ -138,7 +167,7 @@ export function front40(p) {
   // bumper: one deep blade with wrapped ends, iron brackets behind, optional guards
   const bumpers = [{ half: 1, pts: [[0, bz - bh / 2], [half - 40, bz - bh / 2 + 10], [half + 40, bz - bh * 0.15], [half + 50, bz + bh * 0.1], [half + 20, bz + bh / 2], [0, bz + bh / 2]], smooth: 1 }];
   under.push({ half: 0, pts: [[half * 0.5 - 30, bz - 160], [half * 0.5 + 30, bz - 160], [half * 0.5 + 30, bz], [half * 0.5 - 30, bz]], ramp: 'iron', base: 1 }, { half: 0, pts: [[-half * 0.5 - 30, bz - 160], [-half * 0.5 + 30, bz - 160], [-half * 0.5 + 30, bz], [-half * 0.5 - 30, bz]], ramp: 'iron', base: 1 });
-  if (p.guards) for (const sg of [1, -1]) parts.push({ pts: fillet([[sg * half * 0.4 - 32, bz - bh * 0.7, 10], [sg * half * 0.4 + 32, bz - bh * 0.7, 10], [sg * half * 0.4 + 26, bz + bh * 1.9, 30], [sg * half * 0.4 - 26, bz + bh * 1.9, 30]]), chrome: 1 });
+  if (p.guards) for (const sg of [1, -1]) parts.push({ guard: 1, pts: fillet([[sg * half * 0.4 - 32, bz - bh * 0.7, 10], [sg * half * 0.4 + 32, bz - bh * 0.7, 10], [sg * half * 0.4 + 26, bz + bh * 1.9, 30], [sg * half * 0.4 - 26, bz + bh * 1.9, 30]]), chrome: 1 });
   let hood = null, glass, wiper = null, wheelIn = null, interior = [];
   if (!rear) {
     const g0 = bz + bh / 2 + 25, gt = hoodTop - 45, gh = gt - g0, gw = hoodHalf;
@@ -153,9 +182,9 @@ export function front40(p) {
     grilles.push({ half: 1, pattern: ['wideH', 'lowH', 'truck'].includes(p.grille) ? 'hbar' : 'vbar', bars: 'chrome', surround: 'chrome', pts: fillet(G) });
     if (p.grille === 'prow') for (const sg of [1, -1]) grilles.push({ half: 0, pattern: 'hbar', bars: 'chrome', surround: 'chrome', pts: fillet([[sg * (hoodHalf + 15), g0 + 10, 0], [sg * (fin + 30), g0 + 10, 30], [sg * (fin + 10), g0 + gh * 0.32, 50], [sg * (hoodHalf + 15), g0 + gh * 0.36, 0]]) });
     if (p.grille !== 'shellV' && p.grille !== 'truck') parts.push({ pts: [[-12, gt + 10], [12, gt + 10], [12, hoodTop + 8], [-12, hoodTop + 8]], chrome: 1 });          // centre chrome strip
-    if (p.ornament) parts.push({ pts: fillet([[-16, hoodTop], [16, hoodTop], [6, hoodTop + 70, 20], [-6, hoodTop + 70, 20]]), chrome: 1 });
+    if (p.ornament) parts.push({ orn: 1, pts: fillet([[-16, hoodTop], [16, hoodTop], [6, hoodTop + 70, 20], [-6, hoodTop + 70, 20]]), chrome: 1 });
     lamps.push({ y: lampY, z: lampZ, r: lampR, ramp: 'lensW', bezel: 'chrome' }, { y: fin - 10, z: crown - 70, r: 28, ramp: 'lensA', bezel: 'chrome' });   // headlamps + parking lamps
-    if (p.fog) lamps.push({ y: half * 0.42, z: bz + bh + 110, r: 62, ramp: 'lensA', bezel: 'chrome' });
+    if (p.fog) lamps.push({ fog: 1, y: half * 0.42, z: bz + bh + 110, r: 62, ramp: 'lensA', bezel: 'chrome' });
     parts.push({ pts: [[-180, bz - bh / 2 - 125], [180, bz - bh / 2 - 125], [180, bz - bh / 2 - 15], [-180, bz - bh / 2 - 15]], ramp: 'white', base: 2 });          // plate
     const gw2 = roofH + 10; glass = p.split ? [fillet([[22, belt + 40, 0], [gw2, belt + 40, 30], [gw2 - 30, H - 130, 50], [22, H - 130, 0]])] : [fillet([[0, belt + 40, 0], [gw2, belt + 40, 30], [gw2 - 30, H - 130, 50], [0, H - 130, 0]])];
     wiper = [-gw2 * 0.6, belt + 60, -gw2 * 0.15, belt + 150]; wheelIn = [gw2 * 0.45, belt + 160, 170]; interior = [[gw2 * 0.45, belt + 150, 170, 60]];
@@ -189,10 +218,11 @@ function genFront(d, side, L2, rear, srcDesc) {
 // bbox of a list of point sets
 function bbox(list) { let y0 = 1e9, y1 = -1e9, z0 = 1e9, z1 = -1e9; eachPoint(list, p => { y0 = Math.min(y0, p[0]); y1 = Math.max(y1, p[0]); z0 = Math.min(z0, p[1]); z1 = Math.max(z1, p[1]); }); return { y0, y1, z0, z1 }; }
 const viewOf = (id, d, rear) => { const dd = { ...measuredDesign(id, d.year), width: BASES[id].width }; const side = measuredSide(dd, 'paint.c0'); const L2 = landmarks(side); return BASES[id].front ? fitFront(rear ? BASES[id].rear : BASES[id].front, dd, side, L2) : genFront(dd, side, L2, rear); };
-export function measuredView(d, paint, rear = false) {
+export function measuredView(d, paint, rear = false, strip = null) {
   const side = measuredSide(d, paint), L2 = landmarks(side), B = BASES[d.base];
   let f = B.front ? fitFront(rear ? B.rear : B.front, d, side, L2) : genFront(d, side, L2, rear);
-  if (B.front) { repaint(f, paint); f.paint = paint; if (!rear && d.fog) f.lamps.push({ y: d.width * 0.21, z: L2.r + 260, r: 62, ramp: 'lensA', bezel: 'chrome' }); }
+  if (B.front) { repaint(f, paint); f.paint = paint; if (!rear && d.ornament && f.hood && B.front !== townCarFront) f.parts.push({ orn: 1, pts: fillet([[-16, f.hood.top], [16, f.hood.top], [6, f.hood.top + 80, 20], [-6, f.hood.top + 80, 20]]), chrome: 1 });
+    if (!rear && d.fog) f.lamps.push({ fog: 1, y: d.width * 0.21, z: L2.r + 260, r: 62, ramp: 'lensA', bezel: 'chrome' }); }
   // part swaps, re-fitted to the base car's mounting points
   if (!rear && d.grilleFrom !== d.base && f.grilles?.length) { const src = viewOf(d.grilleFrom, d, false), sg = (src.grilles || []).filter(g => g.half); if (sg.length) {
     const a = bbox(f.grilles.filter(g => g.half).map(g => g.pts)), b = bbox(sg.map(g => g.pts)), hw = Math.max(a.y1, 60);
@@ -205,6 +235,8 @@ export function measuredView(d, paint, rear = false) {
   if (d.bumperFrom !== d.base) { const src = viewOf(d.bumperFrom, d, rear); if (src.bumpers?.length && f.bumpers?.length) {
     const a = bbox(f.bumpers.map(b => b.pts)), b = bbox(src.bumpers.map(x => x.pts)), ky = a.y1 / Math.max(1, b.y1), dz = (a.z0 + a.z1) / 2 - (b.z0 + b.z1) / 2;
     f.bumpers = clone(src.bumpers).map(x => { eachPoint(x.pts, p => { p[0] *= ky; p[1] += dz; }); return x; }); } }
-  if (B.front && d.fenderBlack) for (const u of f.under || []) if (!u.half && u.ramp === 'black') u.ramp = 'black';
+  if (strip === 'grille') f.grilles = []; if (strip === 'lamps') f.lamps = (f.lamps || []).filter(l => l.ramp !== 'lensW' || l.r < 40); if (strip === 'tail') f.lamps = (f.lamps || []).filter(l => l.ramp !== 'lensR');
+  if (strip === 'fog') f.lamps = (f.lamps || []).filter(l => !l.fog); if (strip === 'ornament') f.parts = (f.parts || []).filter(q => !q.orn);
+  if (strip === 'bumpers') { f.bumpers = []; f.parts = (f.parts || []).filter(q => !q.guard); }
   return f;
 }

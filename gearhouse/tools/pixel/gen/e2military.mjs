@@ -143,37 +143,45 @@ const tyreF = (xc, w, od) => [{ pts: [[xc - w / 2, 0, 40], [xc + w / 2, 0, 40], 
 const C2 = (W, pts) => pts.map(([x, z, r]) => [W / 2 + x, z, r]);
 const leafEnd = (W, x, z) => Array.from({ length: 4 }, (_, k) => ({ pts: C2(W, [[x - 45 + k * 6, z + k * 16], [x + 45 - k * 6, z + k * 16], [x + 45 - k * 6, z + k * 16 + 12], [x - 45 + k * 6, z + k * 16 + 12]]), ramp: 'iron', base: 2 }));
 const WJ = 1700;
+// measured on the front-view ref (1.81 mm/px): screen 1240-1647, cowl 1113-1240 full width, grille shell 580-1104 flaring
+// from +-466 to +-570, lamps +-445 @ 977, fender shelf +-760 @ 870-905, bumper +-650 @ 452-561. Driver sits on the viewer's right.
+const ring = (W, x, z, r) => { const pts = []; for (let a = 0; a <= 360; a += 15) pts.push([W / 2 + x + Math.cos(a * Math.PI / 180) * r, z + Math.sin(a * Math.PI / 180) * r]); return pts; };
 export const jeepFront = { len: WJ, height: 1800, paint: 'paint.od', wheels: [],
   chassis: [
-    { band: C2(WJ, [[-560, 356], [560, 356]]), th: 85, ramp: 'OD', base: 1 }, { e: [WJ / 2 + 150, 356, 135, 120], ramp: 'OD', base: 2 },            // axle tube + offset diff
-    ...[-380, 380].flatMap(x => [...leafEnd(WJ, x, 410), { pts: C2(WJ, [[x - 40, 470], [x + 40, 470], [x + 40, 560], [x - 40, 560]]), ramp: 'black', base: 1 }]),   // spring ends + frame horns
-    { band: C2(WJ, [[-520, 290], [520, 290]]), th: 30, ramp: 'iron', base: 2 }, { band: C2(WJ, [[-470, 560], [-540, 380]]), th: 34, ramp: 'iron' }, { band: C2(WJ, [[470, 560], [540, 380]]), th: 34, ramp: 'iron' }],   // tie rod, shocks
+    { band: C2(WJ, [[-560, 356], [560, 356]]), th: 85, ramp: 'OD', base: 1 }, { e: [WJ / 2 - 120, 340, 140, 125], ramp: 'OD', base: 2 },            // axle tube + offset diff
+    ...[-380, 380].flatMap(x => [...leafEnd(WJ, x, 400), { pts: C2(WJ, [[x - 40, 460], [x + 40, 460], [x + 40, 560], [x - 40, 560]]), ramp: 'black', base: 1 }]),
+    { band: C2(WJ, [[-520, 420], [520, 420]]), th: 30, ramp: 'iron', base: 2 }, { band: C2(WJ, [[-470, 560], [-540, 380]]), th: 34, ramp: 'iron' }, { band: C2(WJ, [[470, 560], [540, 380]]), th: 34, ramp: 'iron' }],
   inner: [
-    { pts: C2(WJ, [[-560, 700], [-340, 700], [-340, 860], [-560, 860]]), ramp: 'black', base: 0 }, { pts: C2(WJ, [[340, 700], [560, 700], [560, 860], [340, 860]]), ramp: 'black', base: 0 },   // wheel-house shadow
-    { pts: C2(WJ, [[-620, 1100], [620, 1100], [620, 1190], [-620, 1190]]), ramp: 'OD', base: 1 },                                                    // dash seen through the screen
-    ...[-420, -330, 280, 370].map(x => ({ e: [WJ / 2 + x, 1145, 26, 26], ramp: 'black', base: 2 })),                                                 // gauges
-    { pts: C2(WJ, [[-560, 1190], [-110, 1190], [-110, 1380], [-560, 1380]]), ramp: 'canvasOD', base: 1, r: 60 }, { pts: C2(WJ, [[110, 1190], [560, 1190], [560, 1380], [110, 1380]]), ramp: 'canvasOD', base: 1, r: 60 },
-    { band: C2(WJ, [[-470, 1300], [-170, 1300]]), th: 34, ramp: 'black', base: 2 }, { band: C2(WJ, [[-320, 1190], [-320, 1300]]), th: 34, ramp: 'black', base: 1 }],   // steering wheel rim (edge-on) + column
+    { pts: C2(WJ, [[-770, 560], [770, 560], [770, 870], [-770, 870]]), ramp: 'black', base: 0 },                                                    // wheel-houses / under-hood shadow
+    { pts: C2(WJ, [[-600, 1270], [600, 1270], [600, 1330], [-600, 1330]]), ramp: 'OD', base: 1 },                                                    // dash top through the screen
+  ],
+  seen: [
+    { band: [...ring(WJ, -330, 1270, 175)].filter(p => p[1] >= 1270), th: 60, ramp: 'rubber', base: 1 },                                            // rear spare seen through the screen (left)
+    { band: ring(WJ, 330, 1370, 105), th: 26, ramp: 'black', base: 1 }, { band: C2(WJ, [[330, 1370], [330, 1280]]), th: 26, ramp: 'black', base: 1 }, { band: C2(WJ, [[240, 1370], [420, 1370]]), th: 16, ramp: 'black', base: 1 }],   // steering wheel (driver = viewer's right)
   panels: [
-    ...tyreF(WJ / 2 - 622, 175, 711), ...tyreF(WJ / 2 + 622, 175, 711),
-    ...[-1, 1].flatMap(sg => [{ pts: C2(WJ, [[sg * 335, 800], [sg * 790, 800], [sg * 790, 878], [sg * 335, 878]].map(([x, z]) => [x, z])), base: 1 },        // fender front lip
-      { pts: C2(WJ, [[sg * 335, 878], [sg * 795, 878], [sg * 795, 905], [sg * 335, 905]]), base: 3 }]),                                                // fender shelf top
-    { pts: C2(WJ, [[-335, 470], [335, 470], [335, 1060], [-335, 1060]]), base: 2 },                                                                 // grille panel
-    { pts: C2(WJ, [[-340, 1060, 40], [340, 1060, 40], [320, 1100], [-320, 1100]]), base: 3 },                                                      // hood front edge / crown
-    { pts: C2(WJ, [[-810, 440], [810, 440], [820, 545], [-820, 545]]), base: 2 },                                                                   // C-channel bumper
-    { pts: C2(WJ, [[-650, 1100], [650, 1100], [650, 1140], [-650, 1140]]), base: 2 }, { pts: C2(WJ, [[-650, 1600], [650, 1600], [650, 1660], [-650, 1660]]), base: 2 },
-    ...[-650, -25, 610].map(x => ({ pts: C2(WJ, [[x, 1100], [x + 40, 1100], [x + 40, 1660], [x, 1660]]), base: 2 }))],
-  glass: [C2(WJ, [[-610, 1140], [-25, 1140], [-25, 1600], [-610, 1600]]), C2(WJ, [[15, 1140], [610, 1140], [610, 1600], [15, 1600]])],
+    ...tyreF(WJ / 2 - 624, 175, 711), ...tyreF(WJ / 2 + 624, 175, 711),
+    { pts: C2(WJ, [[-640, 880], [640, 880], [640, 1113], [-640, 1113]]), base: 1 },                                                                 // body front behind the grille (tub / cowl sides)
+    { pts: C2(WJ, [[-640, 1113], [640, 1113], [640, 1240], [-640, 1240]]), base: 2, rivets: 2 },                                                     // cowl under the screen
+    ...[-1, 1].flatMap(sg => [{ pts: C2(WJ, [[sg * 470, 800], [sg * 770, 800], [sg * 770, 872], [sg * 470, 872]]), base: 1 },                     // fender front lip
+      { pts: C2(WJ, [[sg * 470, 870], [sg * 775, 870], [sg * 775, 905], [sg * 470, 905]]), base: 3 }]),                                            // fender shelf
+    { pts: C2(WJ, [[-466, 580, 40], [466, 580, 40], [520, 900], [575, 1050, 90], [560, 1104], [-560, 1104], [-575, 1050, 90], [-520, 900]]), base: 2 },   // grille shell (flares upward)
+    { pts: C2(WJ, [[-560, 1100], [560, 1100], [540, 1125], [-540, 1125]]), base: 3 },                                                              // hood front edge
+    { pts: C2(WJ, [[-650, 452], [650, 452], [660, 561], [-660, 561]]), base: 2 },                                                                   // C-channel bumper
+    { pts: C2(WJ, [[-620, 1240], [620, 1240], [620, 1272], [-620, 1272]]), base: 2 }, { pts: C2(WJ, [[-620, 1612], [620, 1612], [620, 1647], [-620, 1647]]), base: 2 },
+    ...[-620, -18, 586].map(x => ({ pts: C2(WJ, [[x, 1240], [x + 34, 1240], [x + 34, 1647], [x, 1647]]), base: 2 }))],
+  glass: [C2(WJ, [[-586, 1272], [-18, 1272], [-18, 1612], [-586, 1612]]), C2(WJ, [[16, 1272], [586, 1272], [586, 1612], [16, 1612]])],
   details: [
-    ...Array.from({ length: 9 }, (_, k) => ({ pts: (x => C2(WJ, [[x - 17, 580], [x + 17, 580], [x + 17, 1000], [x - 17, 1000]]))(-200 + k * 50), ramp: 'black', base: 0, r: 16 })),   // 9 stamped slots
-    ...[-1, 1].flatMap(sg => [{ e: [WJ / 2 + sg * 272, 930, 62, 62], ramp: 'OD', base: 1 }, { e: [WJ / 2 + sg * 272, 930, 50, 50], ramp: 'lensW', base: 2 },   // recessed headlamps in the grille
-      { e: [WJ / 2 + sg * 272, 780, 22, 22], ramp: 'lensA', base: 2 }, { pts: C2(WJ, [[sg * 560 - 30, 905], [sg * 560 + 30, 905], [sg * 560 + 30, 950], [sg * 560 - 30, 950]]), ramp: 'OD', base: 2 },   // parking + blackout lamps
-      { band: C2(WJ, [[sg * 650, 440], [sg * 650, 395], [sg * 610, 380]]), th: 34, ramp: 'black', base: 2 },                                          // tow shackles
-      { pts: C2(WJ, [[sg * 300, 1065], [sg * 330, 1065], [sg * 330, 1090], [sg * 300, 1090]]), ramp: 'iron', base: 3 }]),                           // hood catches
-    { pts: C2(WJ, [[-760, 455], [-280, 455], [-280, 530], [-760, 530]]), ramp: 'OD', base: 3 }, { pts: C2(WJ, [[280, 455], [760, 455], [760, 530], [280, 530]]), ramp: 'OD', base: 3 },   // bumper number plates
-    { band: C2(WJ, [[-560, 1160], [-140, 1560]]), th: 20, ramp: 'black' }, { band: C2(WJ, [[120, 1590], [520, 1590]]), th: 20, ramp: 'black' },              // wipers
-    ...[-650, 610].map(x => ({ pts: C2(WJ, [[x - 10, 1080], [x + 50, 1080], [x + 50, 1110], [x - 10, 1110]]), ramp: 'iron', base: 3 }))],          // screen hinges
-  stencils: [{ type: 'text', x: WJ / 2 - 700, z: 475, n: 5 }, { type: 'text', x: WJ / 2 + 320, z: 475, n: 4 }, { type: 'star', x: WJ / 2, z: 492, r: 45 }] };
+    ...Array.from({ length: 9 }, (_, k) => ({ pts: (x => C2(WJ, [[x - 16, 625], [x + 16, 625], [x + 16, 1055], [x - 16, 1055]]))(-268 + k * 67), ramp: 'black', base: 0, r: 16 })),   // 9 stamped slots
+    ...[-1, 1].flatMap(sg => [{ e: [WJ / 2 + sg * 445, 977, 88, 88], ramp: 'OD', base: 1 }, { e: [WJ / 2 + sg * 445, 977, 70, 70], ramp: 'lensW', base: 2 },   // headlamps in the shell
+      { e: [WJ / 2 + sg * 420, 833, 36, 36], ramp: 'black', base: 1 }, { e: [WJ / 2 + sg * 420, 833, 20, 20], ramp: 'lensA', base: 2 },                   // parking lamps
+      { band: C2(WJ, [[sg * 600, 452], [sg * 600, 405], [sg * 560, 390]]), th: 34, ramp: 'black', base: 2 },
+      { pts: C2(WJ, [[sg * 320, 1104], [sg * 352, 1104], [sg * 352, 1135], [sg * 320, 1135]]), ramp: 'iron', base: 3 }]),
+    { pts: C2(WJ, [[650, 905], [740, 905], [740, 990], [650, 990]]), ramp: 'OD', base: 2, r: 30 }, { e: [WJ / 2 + 695, 950, 28, 28], ramp: 'black', base: 1 },   // blackout lamp on the fender
+    { pts: C2(WJ, [[-600, 470], [-240, 470], [-240, 545], [-600, 545]]), ramp: 'OD', base: 3 }, { pts: C2(WJ, [[240, 470], [600, 470], [600, 545], [240, 545]]), ramp: 'OD', base: 3 },
+    { band: C2(WJ, [[620, 1250], [700, 1330], [760, 1420]]), th: 22, ramp: 'black', base: 1 }, { e: [WJ / 2 + 780, 1440, 55, 55], ramp: 'OD', base: 2 },         // mirror
+    { band: C2(WJ, [[150, 1590], [420, 1560]]), th: 18, ramp: 'black' }, { e: [WJ / 2 + 150, 1590, 18, 18], ramp: 'iron', base: 2 },                          // wiper (top-hung)
+    ...[-620, 586].map(x => ({ pts: C2(WJ, [[x - 10, 1222], [x + 44, 1222], [x + 44, 1256], [x - 10, 1256]]), ramp: 'iron', base: 3 }))],
+  stencils: [{ type: 'text', x: WJ / 2 - 560, z: 495, n: 5 }, { type: 'text', x: WJ / 2 + 290, z: 495, n: 5 }, { type: 'text', x: WJ / 2 - 80, z: 1165, n: 5 }] };
 
 const WK = 2400;
 export function cckwFrontOf({ module = 'cargo' } = {}) {
@@ -189,11 +197,13 @@ export function cckwFrontOf({ module = 'cargo' } = {}) {
       { pts: C2(WK, [[-1110, 1150], [1110, 1150], [1110, tall ? 2950 : 2180, tall ? 300 : 0], [-1110, tall ? 2950 : 2180, tall ? 300 : 0]]), ramp: tall ? 'canvasOD' : 'OD', base: 1 },
       ...(tall ? [] : [0, 1, 2].map(k => ({ pts: C2(WK, [[-1100, 1500 + k * 230], [1100, 1500 + k * 230], [1100, 1680 + k * 230], [-1100, 1680 + k * 230]]), ramp: 'wood', base: 1 }))),
       ...[-1080, 1040].map(x => ({ pts: C2(WK, [[x, 1150], [x + 40, 1150], [x + 40, tall ? 2700 : 2230], [x, tall ? 2700 : 2230]]), ramp: 'OD', base: 2 })),
+      ...[-1, 1].map(sg => ({ pts: C2(WK, [[sg * 330, 860], [sg * 600, 860], [sg * 600, 1120], [sg * 330, 1120]]), ramp: 'black', base: 0 })),   // engine bay / inner fender shadow
       { pts: C2(WK, [[-820, 1700], [820, 1700], [820, 1830], [-820, 1830]]), ramp: 'OD', base: 0 },                                                  // dash through the screen
       { band: C2(WK, [[-600, 1870], [-260, 1830]]), th: 40, ramp: 'black', base: 2 }, { pts: C2(WK, [[-760, 1830], [-120, 1830], [-120, 2000], [-760, 2000]]), ramp: 'canvasOD', base: 1, r: 60 }],
     panels: [
       ...tyreF(WK / 2 - 795, 215, 889), ...tyreF(WK / 2 + 795, 215, 889),
-      { pts: C2(WK, [[-900, 1480], [900, 1480], [900, 2190, 80], [820, 2275, 60], [-820, 2275, 60], [-900, 2190, 80]]), base: 2, rivets: 2 },   // cab front
+      { pts: C2(WK, [[-900, 1100], [900, 1100], [900, 2190, 80], [820, 2275, 60], [-820, 2275, 60], [-900, 2190, 80]]), base: 2, rivets: 2 },   // cab front down to the fender crowns
+      ...[-1, 1].map(sg => ({ pts: C2(WK, [[sg * 440, 1110], [sg * 890, 1110], [sg * 890, 1480], [sg * 440, 1480]]), base: 1 })),                // cab front lower (shaded, behind the hood)
       { pts: C2(WK, [[-860, 1500], [860, 1500], [860, 1660], [-860, 1660]]), base: 1 },                                                            // cowl
       { pts: C2(WK, [[-430, 1480], [430, 1480], [400, 1620, 60], [-400, 1620, 60]]), base: 3 },                                                   // sloping hood top (star)
       ...[-1, 1].flatMap(sg => [{ pts: C2(WK, sg > 0 ? [[560, 860], [560, 1070, 160], [760, 1125, 100], [1125, 1095, 60], [1135, 860]] : [[-1135, 860], [-1125, 1095, 60], [-760, 1125, 100], [-560, 1070, 160], [-560, 860]]), base: 2 },

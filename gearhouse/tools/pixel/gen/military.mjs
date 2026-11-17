@@ -61,6 +61,7 @@ export function buildMil(P, s, mm = 12.5) {
       if ((x - bb.x0) % bow === Math.round(bow / 2)) { const yb = (() => { for (let y = bb.y1; y >= bb.y0; y--) if (m.get(x, y)) return y; return -1; })(); if (yb > 0) { px.set(x, yb + 1, id('black'), 1, TAG.canvas); px.set(x, yb + 2, id('black'), 1, TAG.canvas); } } } }   // tie-downs
   // glass
   for (const g of s.glass || []) { const m = poly(g, 20); shadeGlassV2(px, m, id('glassP'), TAG.detail, { streak: 17 }); }
+  for (const d of s.seen || []) { const m = shape(d); const gm = M(); for (const g of s.glass || []) gm.or(poly(g, 20)); m.and(gm); panel(m, d.ramp || 'black', { base: d.base ?? 0, tag: TAG.detail, bevel: false, grad: false }); }   // interior seen through the glass
   for (const g of s.celluloid || []) { const m = poly(g, 30); shadeGlassV2(px, m, id('celluloid'), TAG.canvas, { celluloid: true }); }
   // small hardware: lamps (blackout = tiny), hooks, tools, jerry cans, steering wheel, seats
   for (const d of s.details || []) { const m = d.e ? M().ellipse(X(d.e[0]), Y(d.e[1]), Math.max(0.8, d.e[2] / mm), Math.max(0.8, d.e[3] / mm)) : d.band ? band(d.band, d.th || 30) : poly(d.pts, d.r || 0); panel(m, d.ramp || 'black', { base: d.base ?? 1, tag: d.tag || TAG.detail, bevel: d.bevel !== false, grad: d.grad !== false }); }

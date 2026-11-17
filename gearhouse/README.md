@@ -23,6 +23,7 @@
 | [docs/REFERENCE_ANALYSIS_2.md](docs/REFERENCE_ANALYSIS_2.md) | 2차 레퍼런스 분석: 범퍼·하부·창문·장식 패턴, 디테일 축척 12.5mm/px, 자료 요청 목록 |
 | [docs/E1_ASSEMBLY_TEST.md](docs/E1_ASSEMBLY_TEST.md) | 조립 테스트: 프롭 무작위 조합 1930년대 차량 20대, 슬롯 호환 규칙, 디자인 점수 |
 | [docs/E2_REVISION_PLAN.md](docs/E2_REVISION_PLAN.md) | 1940년대 수정 계획(창문·적재함·군용) + 섀시·파워트레인 결합 계획, 자료 요청 |
+| [docs/SOUND_PLAN.md](docs/SOUND_PLAN.md) | 사운드 계획: 새 기능 효과음, 기존 효과음·배경음악 강화 |
 | [docs/STAGE4_PLAN.md](docs/STAGE4_PLAN.md) | 4단계 계획: 자료 기반 차량 생성기 v2, 경제 밸런스, 상호작용, 장소 |
 | [docs/TEST_BUILD_2_PLAN.md](docs/TEST_BUILD_2_PLAN.md) | 테스트판 2차 계획: 화면, 한국어, 그릴 수정, 배경음악, 시대별 엔진·차량 사운드 |
 | [docs/STAGE3_PLAN.md](docs/STAGE3_PLAN.md) | 3단계: 엔진·변속기 시스템 구현, 새 자료 분석, 차량 디자인 체계화, 테스트판 |

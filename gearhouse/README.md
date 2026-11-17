@@ -15,6 +15,7 @@
 | [docs/ROADMAP.md](docs/ROADMAP.md) | 개발 계획: 기술 스택, 폴더 구조, 마일스톤, 콘텐츠 물량, 툴 체인, 리스크 |
 | [docs/E1_1930S_PLAN.md](docs/E1_1930S_PLAN.md) | 1930년대 제작 계획: 실차 복제 4종, 타이어 규격, VehicleDef(프레임·엔진·구동), 외장 프롭 224종 카탈로그, 단계별 보고 |
 | [docs/E1_DESIGN_LIMITS_AND_SOURCING.md](docs/E1_DESIGN_LIMITS_AND_SOURCING.md) | 박스형/유선형 선택, 연도별 곡률·비율 한계, 자료 수급 보고 |
+| [docs/REFERENCE_ANALYSIS_3.md](docs/REFERENCE_ANALYSIS_3.md) | 3차: 정면 타이어 단면, 유선형 2종 측정, 엔진룸·하부 패턴, 승인된 자료 출처 |
 | [docs/REFERENCE_ANALYSIS_2.md](docs/REFERENCE_ANALYSIS_2.md) | 2차 레퍼런스 분석: 범퍼·하부·창문·장식 패턴, 디테일 축척 12.5mm/px, 자료 요청 목록 |
 | [docs/REFERENCE_ANALYSIS.md](docs/REFERENCE_ANALYSIS.md) | 1930년대 블루프린트 측정 → 휠베이스 비율 규칙, 생성기 구조 규칙 |
 | [docs/PIXEL_ART_PIPELINE.md](docs/PIXEL_ART_PIPELINE.md) | Claude Code 픽셀아트 생성 계획: 픽셀 스케일, 생성 방식 4종(DSL·절차적·벡터 래스터·텍스처), 품질 규칙·린터, 작업 루프, 단계별 계획 |
@@ -33,6 +34,8 @@
 - `e1_town_sedan_views_x4.png`: 1930 타운 세단 4뷰 (타이어 규격 반영)
 - `e1_design_language_x3.png`: 박스형/유선형 × 1931/1935/1939, 슬라이더 극단값 클램프, 금지 조합 대체 — `node tools/pixel/samplesGen.mjs`
 - `e1_detail_before_after.png`, `e1_detail_front_rear.png`: 디테일 축척(12.5mm/px) 사실 묘사 — `node tools/pixel/samplesD.mjs`
+- `e1_streamline_detail.png`: 1934 에어플로형 세단 / 1937 V 그릴 패스트백 쿠페 (12.5mm/px)
+- `e1_engine_sv_detail.png`: 사이드밸브 직렬4 디테일 (엔진룸 사진 기반, 5mm/px)
 - `cars_1930s_side_x4.png`: 1930 업라이트 세단 / 1933 고급 카브리올레 / 1937 유선형 (블루프린트 비율 기반)
 - `car1930_views_x4.png`: 1930 세단 좌·우·정면·후면
 - `cars_side_x4.png`, `car57_views_x4.png`: 시대별 초기 샘플 (1950년대 이후는 아직 레퍼런스 미반영)

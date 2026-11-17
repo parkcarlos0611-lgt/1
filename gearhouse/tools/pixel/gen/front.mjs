@@ -1,7 +1,9 @@
 // Front / rear orthographic view: half-car spec (y >= 0, mm from centreline) mirrored + asymmetric extras.
 import { Pix, Mask, smooth } from '../pix.mjs';
+import { fillet } from './geom.mjs';
 import { TAG, shadeChrome, shadeGlass, shadeGlassPeriod, outlineLayers, dith } from './car.mjs';
 import { wheel } from './wheel.mjs';
+import { tire as tireDims } from './tire.mjs';
 
 class FView { constructor(wMM, hMM, mm, pad = 3) { this.mm = mm; this.pad = pad; this.w = Math.ceil(wMM / mm) + pad * 2; this.h = Math.ceil(hMM / mm) + pad * 2; this.cx = this.w / 2; }
   X(y) { return this.cx + y / this.mm; } Y(z) { return this.h - this.pad - z / this.mm; } R(v) { return v / this.mm; }
@@ -33,8 +35,17 @@ const pattern = {
 export function buildFront(P, s, mm = 25) {
   const v = new FView(s.width, s.height + 40, mm), W = v.w, H = v.h, px = new Pix(W, H), M = () => new Mask(W, H);
   px.paint(M().ellipse(v.cx, v.Y(0) + 0.5, v.R(s.width * 0.55), 2.2), () => [P.id('shadow'), 0, TAG.shadow]);
-  // tyres
-  for (const sg of [1, -1]) { const m = M().poly(smooth(v.P(s.tyre.map(([y, z]) => [sg * y, z])), 1));
+  // tyres: if a tyre code is given, draw the real balloon section (stadium shape), tread crown, sidewall bulge, hub
+  if (s.tire) {
+    const T = tireDims(s.tire), tw = T.section * (s.tireBulge ?? 1.28), tc = s.track / 2;
+    for (const sg of [1, -1]) {
+      const yc = sg * tc, m = M().poly(fillet([[yc - tw / 2, 0, tw * 0.3], [yc - tw / 2, T.od, tw * 0.48], [yc + tw / 2, T.od, tw * 0.48], [yc + tw / 2, 0, tw * 0.3]]).map(([y, z]) => [v.X(y), v.Y(z)]));
+      const bb = m.bbox(), cx = (bb.x0 + bb.x1 + 1) / 2, hw = (bb.x1 - bb.x0 + 1) / 2;
+      px.paint(m, (x, y) => { const u = Math.abs(x + 0.5 - cx) / hw; let lv = u < 0.38 ? 2 : u < 0.72 ? 1 : 0;
+        if (u < 0.38 && (y % 3 === 0)) lv = 1; if (u > 0.55 && u < 0.72 && x + 0.5 < cx) lv = 2; return [P.id('rubber'), lv, TAG.wheel]; });
+      if (s.hub) { const hx = yc + sg * (tw / 2 + s.hub / 2 - 10); const hm = M().poly([[hx - s.hub / 2, T.r - 70], [hx + s.hub / 2, T.r - 70], [hx + s.hub / 2, T.r + 70], [hx - s.hub / 2, T.r + 70]].map(([y, z]) => [v.X(y), v.Y(z)])); shadeChrome(px, hm, P.id('chrome'), TAG.wheel); }
+    }
+  } else for (const sg of [1, -1]) { const m = M().poly(smooth(v.P(s.tyre.map(([y, z]) => [sg * y, z])), 1));
     const bb = m.bbox(); px.paint(m, (x, y) => [P.id('rubber'), (x === Math.round((bb.x0 + bb.x1) / 2) ? 2 : 1), TAG.wheel]); }
   const body = sym(v, W, H, s.body, s.smooth ?? 2);
   const glass = M(); for (const g of s.glass) glass.or(sym(v, W, H, g, 1)); glass.and(body);

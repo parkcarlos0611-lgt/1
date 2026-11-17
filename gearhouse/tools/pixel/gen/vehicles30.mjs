@@ -52,8 +52,8 @@ export const townSedan = {
     bumpers: [{ pts: [[0, 430], [75, 430], [75, 530], [0, 530]], smooth: 1 }, { pts: [[4130, 430], [4200, 430], [4200, 530], [4130, 530]], smooth: 1 }],
     handles: [[2385, 1235], [3085, 1235]],
   },
-  front: { ...sedan30front, tyre: [[715, 0], [835, 0], [840, 650], [710, 650]] },
-  rear: { ...sedan30rear, tyre: [[715, 0], [835, 0], [840, 560], [710, 560]], spare: { z: 870, r: 360, style: 'wire', spokes: 24, tireFrac: 0.33 } },
+  front: { ...sedan30front, tire: '4.75-19', track: 1422, hub: 60 },
+  rear: { ...sedan30rear, tire: '4.75-19', track: 1422, hub: 60, spare: { z: 870, r: 360, style: 'wire', spokes: 24, tireFrac: 0.33 } },
 };
 
 export const coupe = {

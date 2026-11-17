@@ -7,8 +7,10 @@ import { buildCar } from './gen/car.mjs';
 import { coupeD, sedanD } from './gen/detail30.mjs';
 import { coupe, townSedan } from './gen/vehicles30.mjs';
 import { buildFront } from './gen/front.mjs';
+import { airflow34, zephyr37 } from './gen/stream30d.mjs';
+import { engineSV } from './gen/engineSV.mjs';
 export const P = eraPalette();
-P.auto('paint.niagara', '#4b6283'); P.auto('paint.copra', '#7d3a2c'); P.add('ghost', ['#1d3557', '#2f5486', '#5c86bd', '#9cc3ea', '#dceeff'], '#9cc3ea');
+P.auto('paint.niagara', '#4b6283'); P.auto('paint.copra', '#7d3a2c'); P.auto('paint.airflow', '#3f8a72'); P.auto('paint.zephyr', '#7a1f2b'); P.add('ghost', ['#1d3557', '#2f5486', '#5c86bd', '#9cc3ea', '#dceeff'], '#9cc3ea');
 const out = new URL('../../samples/', import.meta.url).pathname, ink = hex('#3a3440');
 export const items = [['BEFORE (25MM/PX)', buildCar(P, coupe.body, 25), 4], ['AFTER - DETAIL 12.5MM/PX', buildCar(P, coupeD, 12.5), 2],
   ['BEFORE (25MM/PX)', buildCar(P, townSedan.body, 25), 4], ['AFTER - DETAIL 12.5MM/PX', buildCar(P, sedanD, 12.5), 2]];
@@ -20,3 +22,13 @@ writePNG(out + 'e1_detail_before_after.png', sh.w, sh.h, sh.d); console.log('ok'
   const sh2 = new Sheet((F.w + B.w) * z + 60, F.h * z + 50, hex('#d9d3c7'));
   text(sh2, 'FRONT 12.5MM/PX', 16, 12, ink); drawPix(sh2, F, P, 16, 30, z); text(sh2, 'REAR', 40 + F.w * z, 12, ink); drawPix(sh2, B, P, 40 + F.w * z, 30, z);
   writePNG(out + 'e1_detail_front_rear.png', sh2.w, sh2.h, sh2.d); }
+
+{ const L = [['1934 AIRFLOW-TYPE SEDAN 12.5MM/PX', buildCar(P, airflow34, 12.5)], ['1937 PROW-GRILLE FASTBACK COUPE 12.5MM/PX', buildCar(P, zephyr37, 12.5)]], z = 2;
+  const sh3 = new Sheet(Math.max(...L.map(([, c]) => c.w)) * z + 32, L.reduce((a, [, c]) => a + c.h * z + 40, 20), hex('#d9d3c7')); let y = 14;
+  for (const [n, c] of L) { text(sh3, n, 16, y, ink); drawPix(sh3, c, P, 16, y + 16, z); y += c.h * z + 40; }
+  writePNG(out + 'e1_streamline_detail.png', sh3.w, sh3.h, sh3.d); }
+
+{ P.auto('paint.enginegreen', '#45574d', { sat: 0.8 }); P.auto('rust', '#8a5236', { sat: 0.8 });
+  const e = engineSV(P, {}), z = 4; const sh4 = new Sheet(e.w * z + 32, e.h * z + 50, hex('#d9d3c7'));
+  text(sh4, 'I4 3.3L SIDEVALVE - DETAIL (5MM/PX) FROM ENGINE-BAY PHOTOS', 16, 12, ink); drawPix(sh4, e, P, 16, 32, z);
+  writePNG(out + 'e1_engine_sv_detail.png', sh4.w, sh4.h, sh4.d); }

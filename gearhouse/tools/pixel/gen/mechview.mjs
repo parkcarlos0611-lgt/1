@@ -46,10 +46,10 @@ export function drawMechSide(P, px, mech, { X = px.X, Y = px.Y, mm = px.mm } = {
     if (!ax.virtual) d.solid(d.ell(ax.x, z, 60, 60), 'iron', 3); }
   if (m.radiator) { const r = d.rect(...m.radiator); d.solid(r, 'iron', 1); for (let y = 0; y < r.h; y += 2) for (let x = 0; x < r.w; x++) if (r.get(x, y)) px.set(x, y, P.id('iron'), 3, 41); }
   for (const s of m.shafts || []) d.band(s, s.th || 50, 'chrome', 2);
-  const g = m.gearbox; d.solid(d.poly([[g.x0, g.z - 150], [g.x1, g.z - 110], [g.x1, g.z + 110], [g.x0, g.z + 150]], 30), 'alu', 2, [3.2, 1.2]);
-  if (g.lever) { d.band([[ (g.x0 + g.x1) / 2, g.z + 120], g.lever], 22, 'black', 2); d.solid(d.ell(...g.lever, 28, 28), 'black', 3); }
+  const g = m.gearbox; if (g) d.solid(d.poly([[g.x0, g.z - 150], [g.x1, g.z - 110], [g.x1, g.z + 110], [g.x0, g.z + 150]], 30), 'alu', 2, [3.2, 1.2]);
+  if (g && g.lever) { d.band([[ (g.x0 + g.x1) / 2, g.z + 120], g.lever], 22, 'black', 2); d.solid(d.ell(...g.lever, 28, 28), 'black', 3); }
   if (m.transfer) { const t = m.transfer; d.solid(d.rect(t.x0, t.z - 170, t.x1, t.z + 130, 30), 'alu', 2, [3.2, 1]); for (const lv of t.levers || []) { d.band([[lv[0], t.z + 120], lv], 18, 'black', 2); d.solid(d.ell(...lv, 22, 22), 'black', 3); } }
-  const e = m.engine, spr = engineSprite(P, e, mm); d.blit(spr, Math.round(X(e.x) - spr.ax), Math.round(Y(e.z) - spr.ay));
+  if (m.engine) { const e = m.engine, spr = engineSprite(P, e, mm); d.blit(spr, Math.round(X(e.x) - spr.ax), Math.round(Y(e.z) - spr.ay)); }
   if (m.steering) { d.band(m.steering, 26, 'iron', 1); d.solid(d.rect(m.steering[0][0] - 50, m.steering[0][1] - 50, m.steering[0][0] + 50, m.steering[0][1] + 60), 'iron', 2); }
   if (m.battery) d.solid(d.rect(...m.battery), 'black', 2);
   return px;

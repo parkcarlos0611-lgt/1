@@ -86,7 +86,7 @@ export function graph(s, x, y, w, h, series, { min = 0, max = null, labels = [] 
     sr.pts.forEach((v, i) => { if (Number.isNaN(v)) { px = null; return; } const gx = x + 1 + Math.round(i / Math.max(1, sr.pts.length - 1) * (w - 3)), gy = y + h - 2 - Math.round((v - min) / (mx - min) * (h - 4));
       if (px != null) lineTo(s, px, py, gx, gy, sr.c); px = gx; py = gy; }); });
   labels.forEach((l, i) => text(s, l.t, x + 3, y + 3 + i * 7, l.c)); }
-export function lineTo(s, x0, y0, x1, y1, c) { const dx = Math.abs(x1 - x0), dy = -Math.abs(y1 - y0), sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1; let e = dx + dy;
+export function lineTo(s, x0, y0, x1, y1, c) { x0 = Math.round(x0); y0 = Math.round(y0); x1 = Math.round(x1); y1 = Math.round(y1); if (![x0, y0, x1, y1].every(Number.isFinite)) return; const dx = Math.abs(x1 - x0), dy = -Math.abs(y1 - y0), sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1; let e = dx + dy;
   for (;;) { s.fill(x0, y0, 1, 1, c); if (x0 === x1 && y0 === y1) break; const e2 = 2 * e; if (e2 >= dy) { e += dy; x0 += sx; } if (e2 <= dx) { e += dx; y0 += sy; } } }
 export function desk(s, t) { s.fill(0, 0, W, H, C.desk); for (let y = 0; y < H; y += 3) for (let x = (y * 5) % 11; x < W; x += 11) s.fill(x, y, 6, 1, C.desk2); }
 export { Sheet, drawPix };

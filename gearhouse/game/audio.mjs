@@ -122,6 +122,19 @@ export function horn(t, year) { if (year < 1938) { tone(t, 330, 0.28, 'sawtooth'
   else { tone(t, 392, 0.45, 'square', 0.06); tone(t, 494, 0.45, 'square', 0.05); } }                                                   // electric trumpet pair
 export function sfx(kind) { unlock(); if (!ctx || vol.muted) return; const t = ctx.currentTime + 0.01;
   if (kind === 'click') tone(t, 1900, 0.025, 'square', 0.04);
+  const nz = (dur, f, q, vel, type = 'bandpass', at = t) => { const src = ctx.createBufferSource(), fl = ctx.createBiquadFilter(), g = ctx.createGain(); src.buffer = noiseBuf; fl.type = type; fl.frequency.value = f; fl.Q.value = q; src.connect(fl); fl.connect(g); g.connect(sfxBus); env(g, at, 0.004, vel, dur); src.start(at, Math.random()); src.stop(at + dur + 0.05); };
+  const ring = (f, dur, vel, at = t) => [1, 2.76, 5.4].forEach((m, i) => tone(at, f * m * (1 + (Math.random() - 0.5) * 0.02), dur / (i + 1), 'sine', vel / (i + 1.5)));   // struck metal partials
+  if (kind === 'rivet') for (let i = 0; i < 4; i++) { nz(0.03, 2500, 2, 0.4, 'bandpass', t + i * 0.045); ring(820, 0.12, 0.05, t + i * 0.045); }
+  if (kind === 'hammer') { nz(0.05, 1800, 1.5, 0.5); ring(560 + Math.random() * 80, 0.35, 0.09); }
+  if (kind === 'wrench') for (let i = 0; i < 5; i++) nz(0.02, 3200, 4, 0.25, 'bandpass', t + i * 0.06);
+  if (kind === 'ratchet') { nz(0.02, 2400, 5, 0.3); ring(1500, 0.08, 0.03); }
+  if (kind === 'thud') { tone(t, 60, 0.35, 'sine', 0.35, sfxBus, 38); nz(0.2, 300, 0.7, 0.4, 'lowpass'); ring(240, 0.6, 0.06, t + 0.01); }
+  if (kind === 'clunk') { tone(t, 90, 0.25, 'sine', 0.3, sfxBus, 55); nz(0.12, 700, 1, 0.35); }
+  if (kind === 'hiss') nz(0.5, 5200, 0.6, 0.12, 'highpass');
+  if (kind === 'weld') { for (let i = 0; i < 6; i++) nz(0.03 + Math.random() * 0.03, 3000 + Math.random() * 3000, 2, 0.15, 'bandpass', t + Math.random() * 0.12); tone(t, 100, 0.15, 'square', 0.02); }
+  if (kind === 'spray') nz(0.35, 4200, 0.5, 0.08);
+  if (kind === 'stamp') { nz(0.04, 900, 1, 0.5); tone(t, 140, 0.1, 'sine', 0.2); }
+  if (kind === 'start') { starter(t, 1938); }
   if (kind === 'pop') { const src = ctx.createBufferSource(), lp = ctx.createBiquadFilter(), g = ctx.createGain(); src.buffer = noiseBuf; lp.type = 'lowpass'; lp.frequency.value = 380 + Math.random() * 120; src.connect(lp); lp.connect(g); g.connect(sfxBus); env(g, t, 0.003, 0.5, 0.09); src.start(t, Math.random()); src.stop(t + 0.12); tone(t, 70 + Math.random() * 15, 0.08, 'sine', 0.18); }
   if (kind === 'type') for (let i = 0; i < 5; i++) tone(t + i * 0.07 + Math.random() * 0.02, 2600 + Math.random() * 600, 0.02, 'square', 0.05);
   if (kind === 'till') { tone(t, 1568, 0.6, 'sine', 0.12); tone(t, 2093, 0.5, 'sine', 0.06); tone(t + 0.02, 3136, 0.3, 'sine', 0.03); }

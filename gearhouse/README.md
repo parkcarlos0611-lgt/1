@@ -13,6 +13,7 @@
 | [docs/GDD.md](docs/GDD.md) | 게임 디자인 문서: 메인 메뉴, 새 게임 설정, 시대 구분, 플랫폼/엔진/파워트레인/디자인 개발, 시뮬레이션 공식, 연구, 경영, UI |
 | [docs/SPRITE_SYSTEM.md](docs/SPRITE_SYSTEM.md) | 아트·렌더링 명세: 5뷰 좌표계, 실루엣 에셋 구조, 레이어 스택, 강판/도색 합성, 모듈형 엔진 스프라이트, 스프라이트 재활용 기법, 데이터 포맷 |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | 개발 계획: 기술 스택, 폴더 구조, 마일스톤, 콘텐츠 물량, 툴 체인, 리스크 |
+| [docs/REFERENCE_ANALYSIS.md](docs/REFERENCE_ANALYSIS.md) | 1930년대 블루프린트 측정 → 휠베이스 비율 규칙, 생성기 구조 규칙 |
 | [docs/PIXEL_ART_PIPELINE.md](docs/PIXEL_ART_PIPELINE.md) | Claude Code 픽셀아트 생성 계획: 픽셀 스케일, 생성 방식 4종(DSL·절차적·벡터 래스터·텍스처), 품질 규칙·린터, 작업 루프, 단계별 계획 |
 
 ## 한 줄 요약 (핵심 결정 사항)
@@ -22,3 +23,10 @@
 3. **스프라이트는 조립 단위로 분해**: 실린더 1기통 모듈을 N번 반복해 직렬/V/수평대향 엔진을 만들고, 스포크 1개를 회전 반복해 휠을 만드는 식으로 적은 원화로 수천 가지 조합을 만든다.
 4. **시대 1930~2000을 7개 Era로 나누고**, 실루엣·소재·기술·색상 팔레트를 Era 태그로 해금한다.
 5. 기존 `cage/` 프로젝트와 동일한 **바닐라 JS + Canvas2D (선택적 WebGL)** 스택, 데이터 드리븐 JSON 콘텐츠.
+
+## 샘플 이미지 (`samples/`, `node tools/pixel/samples.mjs` · `samples30.mjs`로 재생성)
+
+- `cars_1930s_side_x4.png`: 1930 업라이트 세단 / 1933 고급 카브리올레 / 1937 유선형 (블루프린트 비율 기반)
+- `car1930_views_x4.png`: 1930 세단 좌·우·정면·후면
+- `cars_side_x4.png`, `car57_views_x4.png`: 시대별 초기 샘플 (1950년대 이후는 아직 레퍼런스 미반영)
+- `props_s2_x2.png`: 엔진(모듈 반복·뱅크 회전), 휠, 램프, 그릴, 강판 등급, 스프링, 탱크

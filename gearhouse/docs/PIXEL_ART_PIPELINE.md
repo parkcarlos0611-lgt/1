@@ -210,6 +210,8 @@ SPRITE_SYSTEM §5의 재활용 기법은 픽셀아트에서 다음과 같이 바
 
 ## 6. Claude Code 작업 루프
 
+> **선행 단계 — 레퍼런스 분석**: 시대·차종별 블루프린트를 격자 측정 → 휠베이스 비율 규칙으로 정리 → 생성 결과를 같은 축척의 블루프린트에 외곽선 오버레이로 대조. 결과는 [REFERENCE_ANALYSIS.md](REFERENCE_ANALYSIS.md).
+
 ```
  ┌─► ① 사양 작성/수정      (DSL 파일 · 생성기 파라미터 JSON · 팔레트)
  │   ② 빌드               node tools/pixel/build.js --group wheel --scale S1,S2

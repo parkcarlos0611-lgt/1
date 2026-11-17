@@ -22,7 +22,7 @@ export const townCar34 = {
   frame: 'chrome',
   interior: [{ e: [...S(600, 45), 80, 110] }],
   doors: [[S(510, 64), S(510, 140)], [S(553, 64), S(553, 140)], [S(648, 64), S(650, 120)]],
-  trim: [{ pts: [S(300, 72), S(738, 72)], w: 1, lv: 4 },                                           // belt moulding
+  trim: [{ pts: [S(300, 72), S(738, 72)], w: 2, lv: 4 },                                           // belt moulding
     { pts: [S(690, 30), S(700, 32), S(712, 45), S(722, 50), S(735, 58)], w: 2, lv: 4, lv2: 2 },    // landau bar
     ...[0, 1].map(k => ({ pts: [S(312, 92 + k * 5), S(360, 92 + k * 5)], w: 1, lv: 4 })),            // hood vent spears
     { pts: [[S(460, 0)[0], 412], [S(612, 0)[0], 412]], w: 1, lv: 4, free: 1 }],

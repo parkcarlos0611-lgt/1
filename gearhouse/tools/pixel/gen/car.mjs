@@ -130,7 +130,16 @@ export function buildCar(P, s, mm = 25, opt = {}) {
   for (const L of s.louvres || []) for (let x = L.x0; x <= L.x1; x += L.step) line(v.X(x), v.Y(L.z0), v.X(x + (L.lean || 0)), v.Y(L.z1), (X, Y) => { if (onBody(X, Y)) { px.set(X, Y, px.ramp(X, Y), 0, TAG.body); px.set(X + 1, Y, px.ramp(X + 1, Y), 3, TAG.body); } });
   for (const t of s.trim || []) {
     const pts = poly(smooth(t.pts, 2, false)), r = P.id(t.ramp || 'chrome');
-    polyline(pts, (x, y) => { const ok = t.onFender ? onSkin : onBody; if (!t.free && !ok(x, y)) return; px.set(x, y, r, t.lv ?? 3, TAG.trim); if (t.w > 1 && (t.free || ok(x, y + 1))) px.set(x, y + 1, r, t.lv2 ?? 1, TAG.trim); });
+    const isChrome = !t.ramp || t.ramp === 'chrome', cells = [];
+    polyline(pts, (x, y) => { const ok = t.onFender ? onSkin : onBody; if (!t.free && !ok(x, y)) return; cells.push([x, y, t.free || ok(x, y + 1)]); });
+    cells.forEach(([x, y, ok2], i) => {
+      if (isChrome) {                                                   // chrome moulding: sky streaks, darker lower lip, cast shadow, tapered ends
+        const end = i < 2 || i > cells.length - 3, streak = ((x + (t.seed || 0)) % 11) < 2 || ((x + 5) % 23) < 1;
+        px.set(x, y, r, end ? 2 : streak ? 4 : 3, TAG.trim);
+        let yy = y + 1; if (t.w > 1 && ok2 && !end) { px.set(x, yy, r, 1, TAG.trim); yy++; }
+        if (px.tag(x, yy) === TAG.body && px.lvl(x, yy) >= 0) px.set(x, yy, px.ramp(x, yy), Math.max(0, px.lvl(x, yy) - 1), TAG.body);
+      } else { px.set(x, y, r, t.lv ?? 3, TAG.trim); if (t.w > 1 && ok2) px.set(x, y + 1, r, t.lv2 ?? 1, TAG.trim); }
+    });
   }
   for (const d of s.decals || []) { const m = M().poly(poly(d.pts)).and(paintM); px.paint(m, (x, y) => [P.id(d.paint), (paintM.get(x, y - 1) ? 2 : 3), TAG.body]); }
   if (s.grad) for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { if (px.tag(x, y) !== TAG.body || px.lvl(x, y) < 0) continue;

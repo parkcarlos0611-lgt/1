@@ -55,6 +55,10 @@ export function eraPalette() {
   P.add('brass', ['#3d2a10', '#6e4d1a', '#a8792c', '#dcb45a', '#fff0b0'], '#22170a');
   P.auto('paint.tank', '#3b3e38', { sat: 0.6 });
   P.auto('wood', '#9a6a3a', { sat: 0.9 });
+  P.auto('woodLight', '#c49a5c', { sat: 0.9 }); P.auto('woodDark', '#5e3220', { sat: 0.9 });
+  P.add('paint.od', ['#2a2c20', '#3b3e2b', '#4b4f36', '#5d6143', '#70744f'], '#1a1b13');          // matte olive drab: compressed range, no white highlight
+  P.add('canvasOD', ['#3d3b2a', '#504d37', '#635f45', '#757052', '#86805f'], '#25231a');
+  P.add('stencil', ['#8c8a7a', '#a8a694', '#c4c2ae', '#d8d6c2', '#e6e4d0'], '#5a5848');
   P.add('wire', ['#1c1f2a', '#3c4254', '#6f7a90', '#b3bfd0', '#eef3f8'], '#10121a');
   return P;
 }

@@ -18,6 +18,7 @@
 | [docs/REFERENCE_ANALYSIS_3.md](docs/REFERENCE_ANALYSIS_3.md) | 3차: 정면 타이어 단면, 유선형 2종 측정, 엔진룸·하부 패턴, 승인된 자료 출처 |
 | [docs/REFERENCE_ANALYSIS_2.md](docs/REFERENCE_ANALYSIS_2.md) | 2차 레퍼런스 분석: 범퍼·하부·창문·장식 패턴, 디테일 축척 12.5mm/px, 자료 요청 목록 |
 | [docs/E1_ASSEMBLY_TEST.md](docs/E1_ASSEMBLY_TEST.md) | 조립 테스트: 프롭 무작위 조합 1930년대 차량 20대, 슬롯 호환 규칙, 디자인 점수 |
+| [docs/REFERENCE_ANALYSIS_E2.md](docs/REFERENCE_ANALYSIS_E2.md) | 1940년대 레퍼런스 실측 10종, 군용차 모델링 원칙 |
 | [docs/E2_1940S_PLAN.md](docs/E2_1940S_PLAN.md) | 1940년대 계획: 전시·전후 처리, 폰툰 디자인 언어, 세그먼트별 복제 대상, 자료 요청 |
 | [docs/REFERENCE_ANALYSIS.md](docs/REFERENCE_ANALYSIS.md) | 1930년대 블루프린트 측정 → 휠베이스 비율 규칙, 생성기 구조 규칙 |
 | [docs/PIXEL_ART_PIPELINE.md](docs/PIXEL_ART_PIPELINE.md) | Claude Code 픽셀아트 생성 계획: 픽셀 스케일, 생성 방식 4종(DSL·절차적·벡터 래스터·텍스처), 품질 규칙·린터, 작업 루프, 단계별 계획 |
@@ -42,6 +43,7 @@
 - `e1_props_batchA.png` + `data/props_e1_batchA.json`: 1930년대 외장 프롭 배치 A 84종 — `node tools/pixel/samplesProps.mjs`
 - `e1_assembly_test.png`: 조립 테스트 20대 — `node tools/pixel/samplesAsm.mjs`
 - `e1_assembly_3view.png`: 조립 차량 3뷰 / `e2_generator_preview.png`: 1940년대 생성기 미리보기 — `node tools/pixel/samplesE2.mjs`
+- `e2_civil.png`: 1940년대 민수 8종 / `e2_military.png`: 군용 4x4·6x6 — `node tools/pixel/samplesE2civ.mjs`, `samplesE2mil.mjs`
 - `cars_1930s_side_x4.png`: 1930 업라이트 세단 / 1933 고급 카브리올레 / 1937 유선형 (블루프린트 비율 기반)
 - `car1930_views_x4.png`: 1930 세단 좌·우·정면·후면
 - `cars_side_x4.png`, `car57_views_x4.png`: 시대별 초기 샘플 (1950년대 이후는 아직 레퍼런스 미반영)

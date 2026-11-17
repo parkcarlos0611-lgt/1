@@ -2,7 +2,7 @@
 import { Pix, line } from '../pix.mjs';
 const LX = -0.7071, LY = -0.7071; // light from top-left
 
-export function wheel(P, { r, tireFrac = 0.30, style = 'hubcap', whitewall = 0, spokes = 5, paint = 'white', rot = 0 }) {
+export function wheel(P, { r, tireFrac = 0.30, style = 'hubcap', whitewall = 0, spokes = 5, paint = 'white', rot = 0, tread = null }) {
   const S = Math.ceil(r * 2) + 1, c = S / 2, px = new Pix(S, S);
   const ri = r * (1 - tireFrac);
   const T = 3; // tag: wheel
@@ -16,6 +16,7 @@ export function wheel(P, { r, tireFrac = 0.30, style = 'hubcap', whitewall = 0, 
       if (t > 0.25 && t < 0.7 && dot > 0.35) lv = 2;
       if (t > 0.35 && t < 0.6 && dot > 0.8) lv = 3;
       if (t < 0.18 || (t > 0.8 && dot < -0.3)) lv = 0;
+      if (tread === 'ndt' && t > 0.78) { const a = Math.atan2(dy, dx); const blk = Math.floor((a + Math.PI) / (Math.PI * 2) * r * 0.9) % 2 === 0; if (!blk && t > 0.93) continue; px.set(x, y, rub, blk ? (dot > 0.2 ? 3 : 2) : 0, T); continue; }
       if (t > 0.86 && r > 20) { const a = Math.atan2(dy, dx); if (Math.floor((a + Math.PI) / (Math.PI * 2) * r * 1.6) % 2 === 0) lv = Math.max(0, lv - 1); }
       if (whitewall && t > 0.12 && t < 0.12 + whitewall) { px.set(x, y, wht, dot > 0.4 ? 4 : dot < -0.5 ? 1 : 3, T); continue; }
       px.set(x, y, rub, lv, T); continue;
@@ -58,6 +59,13 @@ export function wheel(P, { r, tireFrac = 0.30, style = 'hubcap', whitewall = 0, 
       else if (style === 'truck' && q > 0.45 && q < 0.7 && Math.abs(Math.sin(a * 3)) < 0.3) px.set(x, y, blk, 0, T);
       else if (q < (style === 'truck' ? 0.3 : 0.24)) px.set(x, y, style === 'truck' ? P.id(paint) : chr, q < 0.12 ? 4 : dot > 0 ? 3 : 1, T);
       else px.set(x, y, P.id(paint), q > 0.78 ? (dot > 0 ? 1 : 3) : (dot > 0.4 ? 3 : dot > -0.4 ? 2 : 1), T);
+    } else if (style === 'combat') {
+      const a = Math.atan2(dy, dx) + rot, pr = P.id(paint);
+      if (q > 0.9) px.set(x, y, pr, dot > 0.2 ? 2 : 1, T);
+      else if (q > 0.84) px.set(x, y, P.id('black'), 0, T);                                     // split-ring seam
+      else if (q > 0.36 && q < 0.46 && Math.abs(Math.sin(a * 3)) < 0.2) px.set(x, y, pr, 3, T); // lug nuts
+      else if (q < 0.24) px.set(x, y, pr, q < 0.12 ? 2 : (dot > 0 ? 2 : 1), T);
+      else px.set(x, y, pr, dot > 0.4 ? 2 : dot > -0.4 ? 2 : 1, T);
     } else if (style === 'spinner') { // knock-off wire wheel
       if (q > 0.86) px.set(x, y, chr, dot > 0.2 ? 3 : 1, T); else if (q < 0.22) px.set(x, y, P.id('brass'), dot > 0 ? 4 : 2, T); else px.set(x, y, blk, 0, T);
     } else { // painted steel + small cap + lug ring

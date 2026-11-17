@@ -19,6 +19,8 @@
 | [docs/REFERENCE_ANALYSIS_2.md](docs/REFERENCE_ANALYSIS_2.md) | 2차 레퍼런스 분석: 범퍼·하부·창문·장식 패턴, 디테일 축척 12.5mm/px, 자료 요청 목록 |
 | [docs/E1_ASSEMBLY_TEST.md](docs/E1_ASSEMBLY_TEST.md) | 조립 테스트: 프롭 무작위 조합 1930년대 차량 20대, 슬롯 호환 규칙, 디자인 점수 |
 | [docs/E2_REVISION_PLAN.md](docs/E2_REVISION_PLAN.md) | 1940년대 수정 계획(창문·적재함·군용) + 섀시·파워트레인 결합 계획, 자료 요청 |
+| [docs/ENGINE_DRIVETRAIN_SYSTEM_PLAN.md](docs/ENGINE_DRIVETRAIN_SYSTEM_PLAN.md) | 엔진·변속기·구동계 설계 시스템 (검증된 설계 시뮬 구조 참고 + 역사 제원 보정) |
+| [docs/REFERENCE_ANALYSIS_E2B.md](docs/REFERENCE_ANALYSIS_E2B.md) | 1940년대 추가 자료: 픽업 치수, 프레임·스텝다운, 엔진 8종, 자동변속기 컷어웨이 |
 | [docs/TECH_PROGRESSION_PLAN.md](docs/TECH_PROGRESSION_PLAN.md) | 기술 계승·노후화 평가 (최근 시대일수록 엄격) |
 | [docs/REFERENCE_ANALYSIS_E2.md](docs/REFERENCE_ANALYSIS_E2.md) | 1940년대 레퍼런스 실측 10종, 군용차 모델링 원칙 |
 | [docs/E2_1940S_PLAN.md](docs/E2_1940S_PLAN.md) | 1940년대 계획: 전시·전후 처리, 폰툰 디자인 언어, 세그먼트별 복제 대상, 자료 요청 |
@@ -45,7 +47,8 @@
 - `e1_props_batchA.png` + `data/props_e1_batchA.json`: 1930년대 외장 프롭 배치 A 84종 — `node tools/pixel/samplesProps.mjs`
 - `e1_assembly_test.png`: 조립 테스트 20대 — `node tools/pixel/samplesAsm.mjs`
 - `e1_assembly_3view.png`: 조립 차량 3뷰 / `e2_generator_preview.png`: 1940년대 생성기 미리보기 — `node tools/pixel/samplesE2.mjs`
-- `e2_civil.png`: 1940년대 민수 8종 / `e2_military.png`: 군용 4x4·6x6 — `node tools/pixel/samplesE2civ.mjs`, `samplesE2mil.mjs`
+- `e2_civil.png`: 1940년대 민수 8종(창 v2·적재함 모듈) / `e2_military.png`: 군용 v2 4x4·6x6 + 캡·장비 변형 — `node tools/pixel/samplesE2civ.mjs`, `samplesE2mil.mjs`
+- `e2_powertrain.png`: 1940년대 엔진·변속기 (5mm/px) — `samplesE2pt.mjs` / `e2_chassis_integration.png`: X-ray·분해도·하부 뷰 — `samplesE2mech.mjs`
 - `cars_1930s_side_x4.png`: 1930 업라이트 세단 / 1933 고급 카브리올레 / 1937 유선형 (블루프린트 비율 기반)
 - `car1930_views_x4.png`: 1930 세단 좌·우·정면·후면
 - `cars_side_x4.png`, `car57_views_x4.png`: 시대별 초기 샘플 (1950년대 이후는 아직 레퍼런스 미반영)

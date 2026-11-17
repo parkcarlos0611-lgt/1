@@ -205,9 +205,11 @@
         const tq = er.tqAt(Math.min(rpm, er.redline));
         force = tq * ratio * eff * conv / rW;
       }
-      const a0 = force / test;
-      const wt = test * gN * (driveFrac + (DR.id === 'FF' ? -1 : DR.id === 'AWD' || DR.id === '4WD' ? 0 : 1) * a0 / gN * A.cg / (b.wb / 1000) * (DR.id === 'AWD' || DR.id === '4WD' ? 0 : 1));
-      force = Math.min(force, muDrive * Math.max(wt, test * gN * .2));
+      // traction limit with longitudinal load transfer: a = μ g df / (1 ± μ h/L)
+      const hl = A.cg / (b.wb / 1000);
+      const sgn = DR.id === 'FF' ? 1 : (DR.id === 'AWD' || DR.id === '4WD') ? 0 : -1;
+      const aMax = muDrive * gN * driveFrac / Math.max(.3, 1 + sgn * muDrive * hl);
+      force = Math.min(force, aMax * test);
       const acc = (force - resist(v)) / test;
       v = Math.max(0, v + acc * dt); x += v * dt; t += dt;
       if (v > vmax) vmax = v;

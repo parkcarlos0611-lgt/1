@@ -37,6 +37,7 @@
     const xs0 = 0, xs1 = b.L;
     const topAt = t => { const xm = U.lerp(xs0, xs1, t); const yy = U.yAt(g.side, xm, 'max') ?? lowY; return { x: X(xm), y: Y(Math.max(yy, lowY)) - 1 }; };
     const botAt = t => ({ x: X(U.lerp(xs0, xs1, t)), y: Y(lowY - 2) });
+    ctx.fillStyle = sk.raw ? '#777b80' : (b.paint || '#888'); ctx.fill();
     R.warp(ctx, sk.img, topAt, botAt, 34, 5, 1);
     // curvature shading: side bulge (vertical), highlight band and shoulder shadow
     const yTop = Math.min(...up.map(p => p.y)), yBot = Y(lowY);
@@ -78,6 +79,8 @@
     ctx.fillStyle = year < 1970 ? 'rgba(235,235,240,.9)' : 'rgba(0,0,0,.45)';
     const hy = belt + 18 * s; ctx.fillRect(X(bX - 220), hy, 120 * s, Math.max(2, 18 * s)); if (b.doors >= 4) ctx.fillRect(X(dC - 200), hy, 120 * s, Math.max(2, 18 * s));
     if (b.bed) { vline(g.rx - b.wb * .45, Y(b.H * .62), doorBot); }
+    // wheel arches (cut into the body skin)
+    for (const cx of [g.fx, g.rx]) { const ag = ctx.createRadialGradient(X(cx), Y(wr), wr * s * .9, X(cx), Y(wr), wr * s * 1.12); ag.addColorStop(0, '#050607'); ag.addColorStop(1, '#1a1c20'); ctx.fillStyle = ag; ctx.beginPath(); ctx.arc(X(cx), Y(wr), wr * s * (b.fenders ? 1.04 : 1.12), 0, 7); ctx.fill(); }
     ctx.restore(); // unclip
     // greenhouse glass
     const gp = U.spline(b.glass.map(p => ({ x: p.x * b.L, y: p.y * b.H })), 8, true).map(p => ({ x: X(p.x), y: Y(p.y) }));
@@ -85,7 +88,6 @@
     const gg = ctx.createLinearGradient(0, Math.min(...gp.map(p => p.y)), 0, Math.max(...gp.map(p => p.y)));
     gg.addColorStop(0, '#46576b'); gg.addColorStop(.45, '#1c2733'); gg.addColorStop(1, '#0d131a');
     ctx.fillStyle = gg; ctx.fill();
-    ctx.save(); ctx.clip(); ctx.strokeStyle = 'rgba(200,220,240,.22)'; ctx.lineWidth = 10 * s * 10; ctx.beginPath(); const gx0 = Math.min(...gp.map(p => p.x)); ctx.moveTo(gx0 + 40 * s * 10, gp[1].y); ctx.lineTo(gx0 + 10 * s * 10, Y(lowY + 400)); ctx.stroke(); ctx.restore();
     ctx.strokeStyle = year < 1975 && b.chrome > .3 ? 'rgba(230,232,236,.9)' : 'rgba(10,10,12,.85)'; ctx.lineWidth = Math.max(1, s * 12); ctx.stroke();
     // B pillar
     ctx.fillStyle = 'rgba(12,12,14,.9)'; const bpT = U.yAt(gp, X(bX), 'min'); if (bpT != null) ctx.fillRect(X(bX) - Math.max(1.5, 30 * s), bpT, Math.max(3, 60 * s), Y(b.H * gl[0].y) - bpT + 2);
@@ -113,7 +115,6 @@
     // wheels
     const drawWheel = (cx) => {
       const x0 = X(cx), y0 = Y(wr), r = wr * s;
-      ctx.fillStyle = '#07080a'; ctx.beginPath(); ctx.arc(x0, y0, r * 1.1, Math.PI, 0); ctx.lineTo(x0 + r * 1.1, y0 + r); ctx.lineTo(x0 - r * 1.1, y0 + r); ctx.fill(); // arch
       const tg = ctx.createRadialGradient(x0, y0, r * .5, x0, y0, r); tg.addColorStop(0, '#2b2d31'); tg.addColorStop(.85, '#151618'); tg.addColorStop(1, '#0a0a0b');
       ctx.fillStyle = tg; ctx.beginPath(); ctx.arc(x0, y0, r, 0, 7); ctx.fill();
       const rimR = (car.rim * 25.4 / 2) * s;
@@ -132,7 +133,7 @@
       if (car.brakes !== 'drum' && year >= 1985) { ctx.strokeStyle = car.brakes === 'ccb' ? 'rgba(220,200,40,.8)' : 'rgba(150,40,30,.6)'; ctx.lineWidth = Math.max(1, rimR * .18); ctx.beginPath(); ctx.arc(x0, y0, rimR * .72, -1.2, -.3); ctx.stroke(); }
     };
     if (!b.fenders) { drawWheel(g.fx); drawWheel(g.rx); }
-    else { ctx.save(); drawWheel(g.fx); drawWheel(g.rx); ctx.restore(); ctx.save(); ctx.beginPath(); for (const cx of [g.fx, g.rx]) ctx.ellipse(X(cx), Y(wr * .95), wr * 1.58 * s, wr * 1.08 * s, 0, Math.PI, 0); ctx.clip(); ctx.restore(); }
+    else { drawWheel(g.fx); drawWheel(g.rx); }
     // outline
     ctx.beginPath(); poly.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)); ctx.closePath();
     ctx.strokeStyle = 'rgba(0,0,0,.6)'; ctx.lineWidth = 1.2; ctx.stroke();
@@ -154,6 +155,7 @@
     ctx.fillStyle = 'rgba(0,0,0,.3)'; ctx.save(); ctx.translate(4, 6); ctx.fill(); ctx.restore();
     ctx.clip();
     const sk = skinImage(b, year, o.gloss ?? .75, o.redraw);
+    ctx.fillStyle = sk.raw ? '#777b80' : (b.paint || '#888'); ctx.fillRect(X(0), Y(-b.W / 2), b.L * s, b.W * s);
     const hw = t => { const xm = t * b.L; return U.yAt(g.top, U.clamp(xm, 1, b.L - 1), 'max') ?? b.W * .3; };
     R.warp(ctx, sk.img, t => ({ x: X(t * b.L), y: Y(-hw(t)) - 1 }), t => ({ x: X(t * b.L), y: Y(hw(t)) + 1 }), 30, 6, 1);
     const sh = ctx.createLinearGradient(0, Y(-b.W / 2), 0, Y(b.W / 2));

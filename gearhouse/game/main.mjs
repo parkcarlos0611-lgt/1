@@ -1,4 +1,6 @@
 // GEARHOUSE 1930-1949 test build: scenes, designers, monthly loop, save/load. All UI is pixel-drawn (ui.mjs).
+import * as AU from './audio.mjs';
+import { lang, hooks } from './ui.mjs';
 import { W, H, C, Sheet, drawPix, input, text, tw, windowBox, panel, button, slider, cycler, bar, stat, graph, desk, bevel, rivet, lineTo } from './ui.mjs';
 import { eraPalette, hex } from '../tools/pixel/color.mjs';
 import { buildCar } from '../tools/pixel/gen/car.mjs';
@@ -7,7 +9,7 @@ import { engineSV } from '../tools/pixel/gen/engineSV.mjs';
 import { flatheadV8, ohvI6, ptPalette } from '../tools/pixel/gen/engine40.mjs';
 import { engineSide } from '../tools/pixel/gen/props.mjs';
 import { engineStats, LAYOUTS, HEADS, maxCR } from '../sim/engine.mjs';
-import { GEARBOX, proposeRatios } from '../sim/drive.mjs';
+import { GEARBOX, proposeRatios, rpmTrace } from '../sim/drive.mjs';
 import { COUNTRIES, SEGS, TECH, RES_SCALE, newGame, stepMonth, evaluate, appeal, dateNum, has } from './world.mjs';
 
 const PAINTS = ['#2f3a4a', '#5c1c27', '#3f5a40', '#7d3a2c', '#4b6283', '#d8c9a0', '#1d1d22', '#6b5a3a', '#8c2a24', '#6b6e70'];
@@ -16,21 +18,21 @@ const S = new Sheet(W, H, C.desk), cv = document.getElementById('screen'), ctx =
 const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
 const money = n => (n < 0 ? '-$' : '$') + Math.abs(Math.round(n)).toLocaleString('en-US');
 const store = { get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } }, set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch { return false; } } };
-const app = { scene: 'title', g: null, tab: 'cars', t: 0, settings: { scale: 0, scan: true, ...(store.get('gh_settings') || {}) },
+const app = { scene: 'title', g: null, tab: 'cars', t: 0, settings: { fill: true, scan: true, lang: (navigator.language || '').startsWith('ko') ? 'ko' : 'en', music: 0.6, sfx: 0.8, ...(store.get('gh_settings') || {}) },
   ng: { country: 'USA', year: 1930, capital: 250000, research: 'medium', name: 'GEARHOUSE MOTOR CO.' }, toast: null, cache: new Map() };
 const NAMES = ['GEARHOUSE MOTOR CO.', 'IRONWOOD AUTO WORKS', 'MERIDIAN MOTORS', 'BRASS & SONS CARRIAGE', 'NORTHLINE AUTOMOBILE', 'VALEN MOTOR WORKS'];
 const toast = t => (app.toast = { t, until: app.t + 150 });
 
 // ---------- sprite caches ----------
 const tyreFor = y => (y < 1933 ? '4.75-19' : y < 1936 ? '5.50-17' : y < 1946 ? '6.00-16' : '6.70-15');
-function carSprite(year, body, paintIdx, type) {
-  const key = JSON.stringify([year, body, paintIdx, type]); if (app.cache.has(key)) return app.cache.get(key);
+function carSprite(year, body, paintIdx, type, rot = 0) {
+  const key = JSON.stringify([year, body, paintIdx, type, rot]); if (app.cache.has(key)) return app.cache.get(key);
   const q = clampParams({ ...body, year, type, tire: tyreFor(year), paint: 'paint.c' + paintIdx, fenderPaint: body.style === 'box' && body.blackFenders ? 'black' : 'paint.c' + paintIdx });
-  let px = null; try { const s = genBody(q); Object.assign(s, { grad: [3.1, 1.4], glassStyle: 'period' }); px = buildCar(P, s, 25); } catch (e) { console.warn(e); }
-  const out = { px, q }; app.cache.set(key, out); if (app.cache.size > 80) app.cache.delete(app.cache.keys().next().value); return out; }
+  let px = null; try { const s = genBody(q); Object.assign(s, { grad: [3.1, 1.4], glassStyle: 'period' }); s.wheel = { ...s.wheel, rot }; px = buildCar(P, s, 25); } catch (e) { console.warn(e); }
+  const out = { px, q }; app.cache.set(key, out); if (app.cache.size > 140) app.cache.delete(app.cache.keys().next().value); return out; }
 function engineSprite(e) {
   const key = 'E' + JSON.stringify([e.layout, e.head, e.bore, e.stroke]); if (app.cache.has(key)) return app.cache.get(key);
-  const L = LAYOUTS[e.layout], mm = 9; let px;
+  const L = LAYOUTS[e.layout], mm = 12; let px;
   try { if (e.head === 'sv' && L.banks === 1) px = engineSV(P, { cyl: L.cyl, bore: e.bore, stroke: e.stroke, color: 'paint.enginegreen' }, mm);
     else if (e.head === 'sv') px = flatheadV8(P, { bore: e.bore, stroke: e.stroke }, mm);
     else if (L.banks === 1 && L.cyl === 6) px = ohvI6(P, { bore: e.bore, stroke: e.stroke, color: 'paint.engineGrey', box: 'none' }, mm);
@@ -44,18 +46,29 @@ function title() {
   S.fill(0, 195, W, 1, C.brassD);
   text(S, 'GEARHOUSE', 240 - tw('GEARHOUSE', 5) / 2 + 3, 33, C.black, 5); text(S, 'GEARHOUSE', 240 - tw('GEARHOUSE', 5) / 2, 30, C.brass, 5);
   text(S, 'MOTOR COMPANY SIMULATION - 1930-1949 TEST BUILD', 240 - tw('MOTOR COMPANY SIMULATION - 1930-1949 TEST BUILD') / 2, 62, C.paperDark);
-  const yr = 1930 + Math.floor((t / 240) % 20), car = carSprite(yr, { style: yr >= 1946 ? 'pontoon' : yr >= 1936 ? 'stream' : 'box', wb: 2800, rake: 0.5, roofR: 0.5, noseR: 0.5, bodyR: 0.5, height: 0.5, hood: 0.5, nose: 0.5, belt: 0.5, blackFenders: yr < 1935 }, Math.floor(t / 240) % 8, 'sedan4d').px;
-  if (car) { const cx = Math.round(((t * 0.8) % (W + car.w)) - car.w); drawPix(S, car, P, cx, 196 - car.h + 4, 1); }
+  // passing car: drives FORWARD (front is on the left -> moves right to left), wheels roll without slipping, 1px bob, exhaust puffs
+  const lap = 900, k = Math.floor(t / lap), yr = 1930 + (k % 20), u = (t % lap) / lap, speed = 0.75;
+  const body = { style: yr >= 1946 ? 'pontoon' : yr >= 1936 ? 'stream' : 'box', wb: 2800, rake: 0.5, roofR: 0.5, noseR: 0.5, bodyR: 0.5, height: 0.5, hood: 0.5, nose: 0.5, belt: 0.5, blackFenders: yr < 1935 };
+  const dist = (t % lap) * speed, wheelR = 340 / 25, FR = 16, frame = ((Math.floor(dist / wheelR / (2 * Math.PI / FR)) % FR) + FR) % FR;
+  const car = carSprite(yr, body, k % 8, 'sedan4d', frame * 2 * Math.PI / FR).px;
+  if (car) { const cx = Math.round(W - dist), bob = (Math.floor(dist / 7) % 2); app.puffs = (app.puffs || []).filter(p => p.life > 0);
+    if (t % 9 === 0) app.puffs.push({ x: cx + car.w - 4, y: 192 - 6, life: 60 });
+    for (const p of app.puffs) { p.x += 0.25; p.y -= 0.12; p.life--; const a = p.life / 60, r = 1 + (60 - p.life) / 20; S.fill(p.x - r, p.y - r, r * 2, r * 2, a > 0.5 ? hex('#6a5e55') : hex('#4a3f38')); }
+    drawPix(S, car, P, cx, 196 - car.h + 4 - bob, 1);
+    AU.passBy({ layout: yr >= 1946 ? 'V8' : yr >= 1936 ? 'V8' : yr >= 1932 ? 'I6' : 'I4', head: yr >= 1946 ? 'ohv' : 'sv', litres: 3.5 }, yr, (cx + car.w / 2) / W); if (dist > W + car.w - 2) AU.passEnd(); }
   text(S, String(yr), 446, 186, C.brass);
   const bx = 190, items = [['NEW GAME', () => (app.scene = 'newgame')], ['CONTINUE', () => (app.scene = 'load')], ['SETTINGS', () => (app.scene = 'settings')]];
   items.forEach(([l, f], i) => { if (button(S, bx, 86 + i * 22, 100, 17, l)) f(); });
 }
 function settings() {
-  desk(S); windowBox(S, 140, 50, 200, 150, 'SETTINGS'); const st = app.settings;
-  st.scale = cycler(S, 155, 75, 170, 'DISPLAY SCALE', [0, 2, 3, 4], st.scale, { names: v => (v ? v + 'X' : 'AUTO FIT') });
-  st.scan = cycler(S, 155, 100, 170, 'CRT SCANLINES', [true, false], st.scan, { names: v => (v ? 'ON' : 'OFF') });
-  text(S, 'SAVES ARE KEPT IN THIS BROWSER ONLY.', 155, 130, C.inkSoft);
-  if (button(S, 155, 170, 80, 16, 'BACK')) { store.set('gh_settings', st); resize(); app.scene = app.g ? 'hq' : 'title'; }
+  desk(S); windowBox(S, 130, 30, 220, 210, 'SETTINGS'); const st = app.settings;
+  st.lang = cycler(S, 145, 52, 190, 'LANGUAGE', ['ko', 'en'], st.lang, { names: v => (v === 'ko' ? '한국어' : 'ENGLISH') }); lang.ko = st.lang === 'ko';
+  st.fill = cycler(S, 145, 76, 190, 'DISPLAY SCALE', [true, false], st.fill !== false, { names: v => (v ? 'FILL SCREEN' : 'SHARP (WHOLE PIXELS)') });
+  st.scan = cycler(S, 145, 100, 190, 'CRT SCANLINES', [true, false], st.scan, { names: v => (v ? 'ON' : 'OFF') });
+  st.music = slider(S, 145, 126, 190, 'MUSIC VOLUME', st.music, 0, 1, { step: 0.05, fmt: v => Math.round(v * 100) + '%' });
+  st.sfx = slider(S, 145, 146, 190, 'SOUND FX VOLUME', st.sfx, 0, 1, { step: 0.05, fmt: v => Math.round(v * 100) + '%' }); AU.vol.music = st.music; AU.vol.sfx = st.sfx; AU.applyVolume();
+  text(S, 'SAVES ARE KEPT IN THIS BROWSER ONLY.', 145, 172, C.inkSoft); text(S, 'FONT: GALMURI (SIL OFL 1.1) BY QUIPLE', 145, 184, C.inkSoft);
+  if (button(S, 145, 212, 80, 16, 'BACK')) { store.set('gh_settings', st); resize(); app.scene = app.g ? 'hq' : 'title'; }
 }
 function newgame() {
   desk(S); windowBox(S, 60, 20, 360, 230, 'NEW COMPANY'); const n = app.ng;
@@ -84,8 +97,9 @@ function hq() {
   bevel(S, 0, 0, W, 16, C.oxblood, C.oxL, C.oxD); rivet(S, 4, 7); rivet(S, W - 6, 7);
   text(S, g.name, 10, 6, C.brassL); const dt = `${MONTHS[g.month - 1]} ${g.year}`; text(S, dt, 200, 6, C.white);
   text(S, money(g.cash), 280, 6, g.cash < 0 ? hex('#ffb0a0') : C.brassL); text(S, `REP ${Math.round(g.rep * 100)}`, 360, 6, C.white);
+  if (button(S, W - 52, 2, 44, 12, AU.vol.muted ? 'SOUND' : 'MUTE', { tone: 'ox' })) { AU.vol.muted = !AU.vol.muted; AU.applyVolume(); }
   TABS.forEach(([k, l], i) => { if (button(S, 3, 20 + i * 19, 66, 16, l, { active: app.tab === k, tone: k === 'menu' || k === 'save' ? 'teal' : 'brass' })) app.tab = k; });
-  if (!g.over && button(S, 3, 222, 66, 22, 'NEXT MONTH', { tone: 'ox' })) { stepMonth(g); }
+  if (!g.over && button(S, 3, 222, 66, 22, 'NEXT MONTH', { tone: 'ox' })) { const n0 = g.news[0]; stepMonth(g); AU.sfx(g.news[0] !== n0 ? 'wire' : 'type'); if (g.last?.sales) AU.sfx('till'); }
   if (!g.over && button(S, 3, 246, 66, 16, '+6 MONTHS')) { for (let i = 0; i < 6 && !g.over; i++) stepMonth(g); }
   ({ news, engines, gearbox, cars, prod, research, market, finance, save, menu })[app.tab]?.(g);
   if (g.over) { windowBox(S, 130, 80, 240, 100, 'THE BOOKS ARE CLOSED'); text(S, g.over, 145, 104, C.oxblood); text(S, `FINAL CASH ${money(g.cash)}`, 145, 118); text(S, `CARS SOLD ${g.models.reduce((a, m) => a + (m.sold || 0), 0).toLocaleString()}`, 145, 128);
@@ -93,7 +107,7 @@ function hq() {
 }
 const AX = 74, AY = 20, AW = W - AX - 3, AH = H - AY - 3;
 function news(g) { windowBox(S, AX, AY, AW, AH, 'OFFICE - NEWS WIRE & SUMMARY');
-  panel(S, AX + 8, AY + 22, 220, AH - 30, 'TELEGRAMS'); g.news.slice(0, 22).forEach((n, i) => { const y = AY + 33 + i * 9, yy = Math.floor(n.d / 12), mm = n.d % 12; text(S, n.d ? `${MONTHS[mm]} ${yy}` : '----', AX + 12, y, C.oxblood); text(S, n.t.slice(0, 44), AX + 50, y, C.ink); });
+  panel(S, AX + 8, AY + 22, 220, AH - 30, 'TELEGRAMS'); g.news.slice(0, 22).forEach((n, i) => { const y = AY + 33 + i * 9, yy = Math.floor(n.d / 12), mm = n.d % 12; text(S, n.d ? `${MONTHS[mm]} ${yy}` : '----', AX + 12, y, C.oxblood); text(S, n.t, AX + 50, y, C.ink, 1, 172); });
   const x = AX + 236; panel(S, x, AY + 22, AW - 244, 90, 'THIS MONTH'); const l = g.last || { rev: 0, cost: 0, sales: 0 };
   stat(S, x + 5, AY + 34, 'CARS SOLD', l.sales.toLocaleString()); stat(S, x + 5, AY + 44, 'REVENUE', money(l.rev)); stat(S, x + 5, AY + 54, 'COSTS', money(l.cost), C.red); stat(S, x + 5, AY + 64, 'PROFIT', money(l.rev - l.cost), l.rev >= l.cost ? C.green : C.red);
   stat(S, x + 5, AY + 78, 'FACTORY', `${g.factory}/MO`); stat(S, x + 5, AY + 88, 'MODELS', `${g.models.filter(m => !m.dead).length}`); stat(S, x + 5, AY + 98, 'RESEARCH', g.resCur ? TECH.find(t => t.id === g.resCur).name.slice(0, 16) : 'IDLE', g.resCur ? C.ink : C.red);
@@ -117,12 +131,13 @@ function engines(g) { windowBox(S, AX, AY, AW, AH, 'ENGINE DESIGN - FAMILY + VAR
   e.quality = Math.round(slider(S, x0, AY + 196, 110, 'BUILD QUALITY', e.quality, -3, 3, { step: 1, fmt: v => (v > 0 ? '+' : '') + Math.round(v) }));
   const es = engineStats({ ...e, year: g.year }), x1 = AX + 242;
   panel(S, x1, AY + 20, AW - 248, 76, 'OUTPUT');
-  graph(S, x1 + 4, AY + 30, 92, 62, [{ pts: es.curve.map(p => p.T), c: C.teal }, { pts: es.curve.map(p => p.hp * 2), c: C.red }], { labels: [{ t: 'NM', c: C.teal }, { t: 'HP', c: C.red }] });
-  const sx = x1 + 100; [['DISPLACE', `${es.litres.toFixed(2)}L ${Math.round(es.cid)}CI`], ['POWER', `${es.hp.toFixed(0)}HP @${es.hpRpm}`], ['TORQUE', `${es.torque.toFixed(0)}NM @${es.tRpm}`], ['REDLINE', es.redline + ' RPM'],
-    ['MASS', es.mass + ' KG'], ['SMOOTH', Math.round(es.smooth * 100) + '%'], ['RELIABLE', Math.round(es.reliability * 100) + '%'], ['UNIT COST', money(es.cost)]].forEach(([l, v], i) => stat(S, sx, AY + 30 + i * 8, l, v));
+  graph(S, x1 + 4, AY + 30, 66, 62, [{ pts: es.curve.map(p => p.T), c: C.teal }, { pts: es.curve.map(p => p.hp * 2), c: C.red }], { labels: [{ t: 'NM', c: C.teal }, { t: 'HP', c: C.red }] });
+  const sx = x1 + 73; [['DISPLACE', `${es.litres.toFixed(2)}L ${Math.round(es.cid)}CI`], ['POWER', `${es.hp.toFixed(0)}HP @${es.hpRpm}`], ['TORQUE', `${es.torque.toFixed(0)}NM @${es.tRpm}`], ['REDLINE', es.redline + ' RPM'],
+    ['MASS', es.mass + ' KG'], ['SMOOTH', Math.round(es.smooth * 100) + '%'], ['RELIABLE', Math.round(es.reliability * 100) + '%'], ['UNIT COST', money(es.cost)]].forEach(([l, v], i) => stat(S, sx, AY + 30 + i * 8, l, v, C.ink, 38));
   panel(S, x1, AY + 100, AW - 248, 100, 'SIDE VIEW (SCALE)'); const spr = engineSprite(e);
   if (spr) { const sc = spr.w > AW - 256 || spr.h > 88 ? 0.5 : 1; if (sc === 1) drawPix(S, spr, P, x1 + 4 + Math.max(0, (AW - 256 - spr.w) / 2) | 0, AY + 110 + Math.max(0, 86 - spr.h) | 0, 1); else text(S, 'ENGINE TOO LARGE TO PREVIEW', x1 + 6, AY + 140); }
-  text(S, `${es.len}MM LONG  ${es.height}MM TALL`, x1 + 4, AY + 194, C.inkSoft);
+  text(S, `${es.len}MM LONG  ${es.height}MM TALL`, x1 + 4, AY + 188, C.inkSoft, 1, AW - 330);
+  if (button(S, AX + AW - 70, AY + 186, 62, 12, 'DYNO TEST', { tone: 'teal' })) AU.dyno({ ...e, litres: es.litres }, g.year, es.redline);
   const cost = es.tooling, can = g.cash >= cost; text(S, `TOOLING ${money(cost)} / ${es.engMonths} MONTHS`, x1, AY + 206, C.ink);
   if (button(S, x1, AY + 214, 120, 16, 'TOOL UP FAMILY', { tone: 'ox', disabled: !can })) { const id = 'E' + g.serial++; g.engines.push({ ...e, id, from: undefined, name: `${e.layout}-${HEADS[e.head].name.split(' ')[0]} ${es.litres.toFixed(1)}`, readyAt: dateNum(g) + es.engMonths, tooling: cost }); g.cash -= cost; toast('ENGINE TOOLING STARTED'); }
 }
@@ -144,35 +159,36 @@ function cars(g) { windowBox(S, AX, AY, AW, AH, 'CAR DESIGN STUDIO');
   const d = app.draft || (app.draft = { name: 'MODEL ' + String.fromCharCode(65 + g.models.length), type: 'sedan4d', seg: 'family', engineId: readyE[0]?.id, gbId: readyG[0]?.id, final: 4.1, price: 850, trim: 1, paint: 0, feats: {},
     body: { style: 'box', wb: 2800, rake: 0.5, roofR: 0.5, noseR: 0.5, bodyR: 0.5, height: 0.5, hood: 0.5, nose: 0.5, belt: 0.5, blackFenders: true } });
   const b = d.body, styles = ['box', 'stream', 'pontoon'], sOK = st => limits(g.year, st) && (st === 'box' || has(g, st));
-  const st2 = cycler(S, AX + 6, AY + 20, 100, 'BODY LANGUAGE', styles, b.style, { lock: st => !sOK(st) }); if (sOK(st2)) b.style = st2; else if (st2 !== b.style) toast(limits(g.year, st2) ? 'RESEARCH NEEDED' : 'NOT POSSIBLE IN ' + g.year);
-  d.type = cycler(S, AX + 6, AY + 44, 100, 'BODY TYPE', ['sedan4d', 'coupe2d'], d.type, { names: t => (t === 'sedan4d' ? '4-DOOR SEDAN' : '2-DOOR COUPE') });
-  b.wb = Math.round(slider(S, AX + 6, AY + 68, 100, 'WHEELBASE', b.wb, 2400, 3500, { step: 25, fmt: v => Math.round(v) + 'MM' }));
-  [['rake', 'SCREEN RAKE'], ['roofR', 'ROOF CURVE'], ['noseR', 'NOSE ROUND'], ['height', 'HEIGHT'], ['hood', 'HOOD LENGTH'], ['belt', 'BELT LINE']].forEach(([k, l], i) => (b[k] = slider(S, AX + 6, AY + 88 + i * 18, 100, l, b[k], 0, 1, { step: 0.05 })));
-  d.paint = cycler(S, AX + 6, AY + 196, 100, 'PAINT', PAINTS.map((_, i) => i), d.paint, { names: i => 'COLOUR ' + (i + 1) });
-  S.fill(AX + 108 - 8, AY + 205, 6, 7, hex(PAINTS[d.paint]));
-  if (b.style === 'box') b.blackFenders = cycler(S, AX + 6, AY + 220, 100, 'FENDERS', [true, false], b.blackFenders, { names: v => (v ? 'BLACK' : 'BODY COLOUR') });
+  const st2 = cycler(S, AX + 6, AY + 20, 90, 'BODY LANGUAGE', styles, b.style, { lock: st => !sOK(st) }); if (sOK(st2)) b.style = st2; else if (st2 !== b.style) toast(limits(g.year, st2) ? 'RESEARCH NEEDED' : 'NOT POSSIBLE IN ' + g.year);
+  d.type = cycler(S, AX + 6, AY + 44, 90, 'BODY TYPE', ['sedan4d', 'coupe2d'], d.type, { names: t => (t === 'sedan4d' ? '4-DOOR SEDAN' : '2-DOOR COUPE') });
+  b.wb = Math.round(slider(S, AX + 6, AY + 68, 90, 'WHEELBASE', b.wb, 2400, 3500, { step: 25, fmt: v => Math.round(v) + 'MM' }));
+  [['rake', 'SCREEN RAKE'], ['roofR', 'ROOF CURVE'], ['noseR', 'NOSE ROUND'], ['height', 'HEIGHT'], ['hood', 'HOOD LENGTH'], ['belt', 'BELT LINE']].forEach(([k, l], i) => (b[k] = slider(S, AX + 6, AY + 88 + i * 18, 90, l, b[k], 0, 1, { step: 0.05 })));
+  d.paint = cycler(S, AX + 6, AY + 196, 90, 'PAINT', PAINTS.map((_, i) => i), d.paint, { names: i => 'COLOUR ' + (i + 1) });
+  S.fill(AX + 98 - 8, AY + 205, 6, 7, hex(PAINTS[d.paint]));
+  if (b.style === 'box') b.blackFenders = cycler(S, AX + 6, AY + 220, 90, 'FENDERS', [true, false], b.blackFenders, { names: v => (v ? 'BLACK' : 'BODY COLOUR') });
   // preview
-  const cx = AX + 112, pw = 240; panel(S, cx, AY + 20, pw, 92, `${g.year} - CLAMPED TO ERA LIMITS`);
+  const cx = AX + 100, pw = 200; panel(S, cx, AY + 20, pw, 92, `${g.year} - CLAMPED TO ERA LIMITS`);
   const { px, q } = carSprite(g.year, b, d.paint, d.type); if (px) drawPix(S, px, P, cx + Math.max(2, (pw - px.w) / 2) | 0, AY + 108 - px.h, 1);
   if (q.notes.length) text(S, q.notes[0].slice(0, 58), cx + 3, AY + 104, C.red);
   // mechanicals
   if (!readyE.length || !readyG.length) { text(S, 'NEED A READY ENGINE AND GEARBOX', cx + 4, AY + 120, C.red); return; }
-  d.engineId = cycler(S, cx, AY + 116, 118, 'ENGINE', readyE.map(e => e.id), d.engineId, { names: id => g.engines.find(e => e.id === id).name });
-  d.gbId = cycler(S, cx + 122, AY + 116, 118, 'GEARBOX', readyG.map(x => x.id), d.gbId, { names: id => g.gearboxes.find(x => x.id === id).name });
-  d.final = slider(S, cx, AY + 140, 118, 'FINAL DRIVE', d.final, 3.0, 5.5, { step: 0.05 }); d.trim = Math.round(slider(S, cx + 122, AY + 140, 118, 'TRIM LEVEL', d.trim, 0, 3, { step: 1, fmt: v => ['BASIC', 'STANDARD', 'DE LUXE', 'CUSTOM'][Math.round(v)] }));
+  d.engineId = cycler(S, cx, AY + 116, 97, 'ENGINE', readyE.map(e => e.id), d.engineId, { names: id => g.engines.find(e => e.id === id).name });
+  d.gbId = cycler(S, cx + 103, AY + 116, 97, 'GEARBOX', readyG.map(x => x.id), d.gbId, { names: id => g.gearboxes.find(x => x.id === id).name });
+  d.final = slider(S, cx, AY + 140, 97, 'FINAL DRIVE', d.final, 3.0, 5.5, { step: 0.05 }); d.trim = Math.round(slider(S, cx + 103, AY + 140, 97, 'TRIM LEVEL', d.trim, 0, 3, { step: 1, fmt: v => ['BASIC', 'STANDARD', 'DE LUXE', 'CUSTOM'][Math.round(v)] }));
   const fe = [['hydbrake', 'HYD.BRAKES'], ['ifs', 'IND.FRONT'], ['steelroof', 'STEEL ROOF'], ['unibody', 'UNIT BODY']].filter(([k]) => has(g, k));
-  fe.forEach(([k, l], i) => { if (button(S, cx + i * 60, AY + 160, 57, 12, l, { active: d.feats[k] })) d.feats[k] = !d.feats[k]; });
-  d.seg = cycler(S, cx, AY + 176, 118, 'TARGET SEGMENT', Object.keys(SEGS), d.seg, { names: k => k.toUpperCase() });
-  d.price = Math.round(slider(S, cx + 122, AY + 176, 118, 'LIST PRICE', d.price, 350, 5000, { step: 10, fmt: money }));
+  fe.forEach(([k, l], i) => { if (button(S, cx + i * 50, AY + 160, 48, 12, l, { active: d.feats[k] })) d.feats[k] = !d.feats[k]; });
+  d.seg = cycler(S, cx, AY + 176, 97, 'TARGET SEGMENT', Object.keys(SEGS), d.seg, { names: k => k.toUpperCase() });
+  d.price = Math.round(slider(S, cx + 103, AY + 176, 97, 'LIST PRICE', d.price, 350, 5000, { step: 10, fmt: money }));
   const car = { ...d, body: { style: q.style, wb: b.wb, hood: q.hoodWB, height: q.hWB }, designScore: 0.62 + (q.style !== 'box' ? 0.1 : 0) - q.notes.length * 0.04 + (1 - Math.abs(b.belt - 0.5)) * 0.08 };
   const ev = evaluate(g, car), x2 = cx + pw + 6, pw2 = AX + AW - x2 - 6;
   panel(S, x2, AY + 20, pw2, 210, 'ENGINEERING REPORT');
-  if (ev) { const sm = ev.sim; [['TOP SPEED', `${sm.topMph.toFixed(0)} MPH`], ['0-60 MPH', sm.zeroSixty ? sm.zeroSixty.toFixed(1) + ' S' : 'NEVER'], ['ECONOMY', sm.mpg.toFixed(1) + ' MPG'], ['MAX GRADE', Math.round(sm.grade * 100) + '%'], ['WEIGHT', sm.mass + ' KG'], ['UNIT COST', money(ev.unit)]].forEach(([l, v], i) => stat(S, x2 + 4, AY + 31 + i * 8, l, v));
-    text(S, ev.fit ? 'ENGINE FITS THE BAY' : 'ENGINE TOO BIG - LONGER HOOD!', x2 + 4, AY + 82, ev.fit ? C.green : C.red);
+  if (ev) { const sm = ev.sim; [['TOP SPEED', `${sm.topMph.toFixed(0)} MPH`], ['0-60 MPH', sm.zeroSixty ? sm.zeroSixty.toFixed(1) + ' S' : 'NEVER'], ['ECONOMY', sm.mpg.toFixed(1) + ' MPG'], ['MAX GRADE', Math.round(sm.grade * 100) + '%'], ['WEIGHT', sm.mass + ' KG'], ['UNIT COST', money(ev.unit)]].forEach(([l, v], i) => stat(S, x2 + 4, AY + 31 + i * 8, l, v, C.ink, 44));
+    text(S, ev.fit ? 'ENGINE FITS THE BAY' : 'ENGINE TOO BIG - LONGER HOOD!', x2 + 4, AY + 82, ev.fit ? C.green : C.red, 1, pw2 - 6);
     [['PERFORMANCE', ev.perf], ['ECONOMY', ev.econ], ['COMFORT', ev.comfort], ['RELIABILITY', ev.rel], ['DESIGN', ev.design], ['MODERNITY', ev.modern]].forEach(([l, v], i) => { text(S, l, x2 + 4, AY + 92 + i * 12, C.inkSoft); bar(S, x2 + 4, AY + 98 + i * 12, pw2 - 10, 4, v, v < 0.4 ? C.red : C.teal); });
-    const a = appeal(ev, d.seg, d.price); text(S, `APPEAL ${Math.round(a * 100)}  MARGIN ${money(d.price - ev.unit)}`, x2 + 4, AY + 168, a > 0.45 ? C.green : C.oxblood);
+    const a = appeal(ev, d.seg, d.price); text(S, `APPEAL ${Math.round(a * 100)}`, x2 + 4, AY + 166, a > 0.45 ? C.green : C.oxblood); text(S, `MARGIN ${money(d.price - ev.unit)}`, x2 + 4, AY + 174, d.price > ev.unit ? C.green : C.red);
     const tool = 40000 + b.wb * 8 + (q.style !== 'box' ? 20000 : 0) + (d.feats.unibody ? 30000 : 0), months = 6 + (q.style === 'stream' ? 2 : q.style === 'pontoon' ? 3 : 0);
-    text(S, `TOOLING ${money(tool)}`, x2 + 4, AY + 180); text(S, `${months} MONTHS TO LAUNCH`, x2 + 4, AY + 188);
+    if (button(S, cx + 103, AY + 200, 97, 13, 'TEST DRIVE', { tone: 'teal' })) { const eng = g.engines.find(x => x.id === d.engineId), gbx = g.gearboxes.find(x => x.id === d.gbId); AU.drive({ ...eng, litres: ev.es.litres }, g.year, rpmTrace({ es: ev.es, engine: eng, gearbox: gbx, final: d.final, tyreR: 0.36, mass: ev.sim.mass - ev.es.mass - GEARBOX[gbx.type].mass })); }
+    text(S, `TOOLING ${money(tool)}`, x2 + 4, AY + 182, C.ink, 1, pw2 - 6); text(S, `${months} MONTHS TO LAUNCH`, x2 + 4, AY + 190, C.ink, 1, pw2 - 6);
     if (button(S, x2 + 4, AY + 198, pw2 - 8, 16, 'LAUNCH MODEL', { tone: 'ox', disabled: g.cash < tool || !ev.fit })) {
       g.models.push({ ...JSON.parse(JSON.stringify(car)), sprite: { body: { ...b }, paint: d.paint, type: d.type, year: g.year }, id: 'M' + g.serial++, plan: Math.round(g.factory / Math.max(1, g.models.length + 1)), readyAt: dateNum(g) + months, sold: 0, stock: 0 });
       g.cash -= tool; app.draft = null; toast('MODEL IN DEVELOPMENT'); app.tab = 'prod'; } }
@@ -212,17 +228,22 @@ function menu(g) { windowBox(S, AX + 120, AY + 50, 160, 110, 'MENU'); if (button
 // ---------- loop / input ----------
 function cursor() { const x = input.x, y = input.y; if (x < 0) return; const A = ['1000000', '1100000', '1210000', '1221000', '1222100', '1222210', '1222221', '1221111', '1101210', '1000121', '0000011'];
   A.forEach((r, j) => [...r].forEach((c, i) => c !== '0' && S.fill(x + i, y + j, 1, 1, c === '1' ? C.black : C.brassL))); }
-function frame() { app.t++; ({ title, settings, newgame, load, hq })[app.scene]();
+function music() { const g = app.g; if (app.scene !== 'hq' || !g) return AU.setSong('title'); if (['engines', 'gearbox', 'cars'].includes(app.tab)) return AU.setSong('design');
+  const C2 = COUNTRIES[g.country]; AU.setSong(g.year < 1940 ? 'office30' : g.year >= C2.war[0] && g.year <= C2.war[1] ? 'war40' : 'office40'); }
+function frame() { app.t++; music(); if (app.scene !== 'title') AU.passEnd(); ({ title, settings, newgame, load, hq })[app.scene]();
   if (app.toast && app.t < app.toast.until) { const w = tw(app.toast.t) + 16; bevel(S, (W - w) / 2, H - 22, w, 14, C.teal, C.tealL, hex('#1b3f3e')); text(S, app.toast.t, (W - w) / 2 + 8, H - 17, C.white); }
   cursor(); input.clicked = false; input.wheel = 0; ctx.putImageData(img, 0, 0); requestAnimationFrame(frame); }
-function resize() { const fit = Math.min((innerWidth - 32) / W, (innerHeight - 16) / H), k = app.settings.scale ? Math.min(app.settings.scale, fit) : fit >= 1 ? Math.floor(fit) : fit; cv.style.width = W * k + 'px'; cv.style.height = H * k + 'px';
-  document.getElementById('scan').style.display = app.settings.scan ? 'block' : 'none'; document.getElementById('scan').style.width = cv.style.width; document.getElementById('scan').style.height = cv.style.height; }
+function resize() { const vv = window.visualViewport, vw = (vv ? vv.width : innerWidth) - 32, vh = (vv ? vv.height : innerHeight) - 8, fit = Math.max(0.3, Math.min(vw / W, vh / H));
+  const k = app.settings.fill === false && fit >= 1 ? Math.floor(fit) : fit; const w = Math.floor(W * k), h = Math.floor(H * k);
+  cv.style.width = w + 'px'; cv.style.height = h + 'px'; const sc = document.getElementById('scan'); sc.style.display = app.settings.scan ? 'block' : 'none'; sc.style.width = w + 'px'; sc.style.height = h + 'px'; }
+window.visualViewport?.addEventListener('resize', () => resize());
 const pos = e => { const r = cv.getBoundingClientRect(); input.x = Math.floor((e.clientX - r.left) / r.width * W); input.y = Math.floor((e.clientY - r.top) / r.height * H); };
-cv.addEventListener('pointermove', pos); cv.addEventListener('pointerdown', e => { pos(e); input.down = true; input.clicked = true; });
+cv.addEventListener('pointermove', pos); cv.addEventListener('pointerdown', e => { pos(e); input.down = true; input.clicked = true; AU.unlock(); });
+hooks.click = () => AU.sfx('click'); lang.ko = app.settings.lang === 'ko'; Object.assign(AU.vol, { music: app.settings.music ?? 0.6, sfx: app.settings.sfx ?? 0.8 });
 addEventListener('pointerup', () => { input.down = false; input.drag = null; }); cv.addEventListener('pointerleave', () => { input.x = -1; });
 cv.addEventListener('wheel', e => { e.preventDefault(); input.wheel = e.deltaY; }, { passive: false }); addEventListener('resize', resize);
 addEventListener('keydown', e => { if (e.key === 'Escape' && app.scene === 'hq') app.tab = 'menu'; if (e.key === ' ' && app.scene === 'hq' && !app.g.over) { e.preventDefault(); stepMonth(app.g); } });
-window.__gh = { app, input, stepMonth };
+window.__gh = { app, input, stepMonth, lang, AU };
 // keep the running company across page updates in the viewer
 window.claude?.hot?.snapshot?.(() => ({ g: app.g, scene: app.scene, tab: app.tab }));
 const start = d => { if (d && d.g) Object.assign(app, { g: d.g, scene: d.scene || 'hq', tab: d.tab || 'news' }); resize(); frame(); };

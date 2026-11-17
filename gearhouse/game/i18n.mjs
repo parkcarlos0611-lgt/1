@@ -1,0 +1,61 @@
+// UI language table. Strings are written in English in the code; when Korean is on, text() translates whole phrases first
+// (exact match), then the longest known phrases inside composed strings ("TOOLING $96,000 / 7 MONTHS" -> "툴링 $96,000 / 7 개월").
+export const KO = {
+  // title / menus
+  'NEW GAME': '새 게임', 'CONTINUE': '이어하기', 'SETTINGS': '설정', 'MOTOR COMPANY SIMULATION - 1930-1949 TEST BUILD': '자동차 회사 경영 시뮬레이션 - 1930~1949 테스트판',
+  'DISPLAY SCALE': '화면 배율', 'FILL SCREEN': '화면 꽉 채우기', 'SHARP (WHOLE PIXELS)': '선명하게 (정수 배율)', 'CRT SCANLINES': 'CRT 주사선', 'ON': '켜기', 'OFF': '끄기',
+  'SAVES ARE KEPT IN THIS BROWSER ONLY.': '저장은 이 브라우저에만 보관됩니다.', 'BACK': '뒤로', 'LANGUAGE': '언어', 'MUSIC VOLUME': '음악 볼륨', 'SOUND FX VOLUME': '효과음 볼륨',
+  'FONT: GALMURI (SIL OFL 1.1) BY QUIPLE': '글꼴: 갈무리 (SIL OFL 1.1, QUIPLE)', 'NEW COMPANY': '새 회사 설립', 'COMPANY NAME': '회사 이름', 'HOME COUNTRY': '본사 국가', 'START YEAR': '시작 연도',
+  'STARTING CAPITAL': '초기 자본', 'RESEARCH DEPARTMENT': '연구 부서 규모', 'COUNTRY': '국가 정보', 'WEALTH': '소득 수준', 'FUEL COST': '연료비', 'ROADS': '도로 사정', 'WAGES': '임금',
+  'FOUND IT': '창업하기', 'LOAD COMPANY': '회사 불러오기', 'LOAD': '불러오기', 'EMPTY': '비어 있음', 'SLOT': '슬롯', 'SMALL': '소형', 'MEDIUM': '중형', 'LARGE': '대형',
+  'UNITED STATES': '미국', 'GERMANY': '독일', 'BRITAIN': '영국', 'FRANCE': '프랑스', 'ITALY': '이탈리아', 'JAPAN': '일본',
+  'GEARHOUSE MOTOR CO.': '기어하우스 자동차', 'IRONWOOD AUTO WORKS': '아이언우드 자동차공업', 'MERIDIAN MOTORS': '메리디언 모터스', 'BRASS & SONS CARRIAGE': '브라스 부자 마차회사', 'NORTHLINE AUTOMOBILE': '노스라인 자동차', 'VALEN MOTOR WORKS': '발렌 자동차공장',
+  // HQ
+  'OFFICE': '사무실', 'ENGINES': '엔진', 'GEARBOX': '변속기', 'CAR DESIGN': '차 디자인', 'PRODUCTION': '생산', 'RESEARCH': '연구', 'MARKET': '시장', 'FINANCE': '재무', 'SAVE': '저장', 'MENU': '메뉴',
+  'NEXT MONTH': '다음 달', '+6 MONTHS': '+6개월', 'REP': '평판', 'REPUTATION': '평판', 'THE BOOKS ARE CLOSED': '장부를 덮습니다', 'BANKRUPT': '파산', 'END OF TEST PERIOD (1949)': '테스트 기간 종료 (1949)',
+  'FINAL CASH': '최종 자금', 'CARS SOLD': '판매 대수', 'TITLE': '타이틀로', 'QUIT TO TITLE': '타이틀로 나가기', 'BACK TO OFFICE': '사무실로',
+  'OFFICE - NEWS WIRE & SUMMARY': '사무실 - 전보와 요약', 'TELEGRAMS': '전보', 'THIS MONTH': '이번 달', 'REVENUE': '매출', 'COSTS': '비용', 'PROFIT': '이익', 'FACTORY': '공장', 'MODELS': '모델',
+  'IDLE': '없음', 'HOW TO PLAY': '진행 방법', '1 ENGINES: DESIGN + TOOL UP': '1 엔진: 설계 + 생산 설비', '2 GEARBOX: PICK TYPE + RATIOS': '2 변속기: 형식 + 기어비',
+  '3 CAR DESIGN: BODY, ENGINE,': '3 차 디자인: 차체, 엔진,', '  SEGMENT, PRICE -> LAUNCH': '  시장, 가격 -> 출시', '4 PRODUCTION: MONTHLY OUTPUT': '4 생산: 월 생산량', '5 RESEARCH NEW TECH': '5 신기술 연구',
+  '6 NEXT MONTH. SURVIVE TO 1950.': '6 다음 달. 1950년까지 버티기.', 'OLD TECH LOSES APPEAL OVER': '낡은 기술은 시간이 갈수록', 'TIME - KEEP MODERNISING.': '매력이 떨어집니다 - 계속 개선.',
+  // engines
+  'ENGINE DESIGN - FAMILY + VARIANT': '엔진 설계 - 패밀리 + 변형', 'YOUR ENGINES': '보유 엔진', '* = TOOLING IN PROGRESS': '* = 설비 준비 중', 'LAYOUT': '실린더 배열', 'VALVETRAIN': '밸브 기구',
+  'L-HEAD (SIDE VALVE)': 'L헤드 (사이드밸브)', 'F-HEAD (IOE)': 'F헤드 (IOE)', 'OHV PUSHROD': 'OHV 푸시로드', 'BORE MM': '보어 MM', 'STROKE MM': '스트로크 MM', 'COMPRESSION': '압축비', 'MAX': '최대',
+  'CAM: TORQUE..REVS': '캠: 토크형..고회전형', 'CARBURETTORS': '기화기', 'X DOWNDRAFT': '개 다운드래프트', 'CARB SIZE': '기화기 구경', 'BUILD QUALITY': '공정 등급', 'OUTPUT': '출력',
+  'DISPLACE': '배기량', 'POWER': '출력', 'TORQUE': '토크', 'REDLINE': '최고 회전', 'MASS': '무게', 'SMOOTH': '부드러움', 'RELIABLE': '신뢰성', 'UNIT COST': '대당 원가', 'SIDE VIEW (SCALE)': '측면 (실제 비율)',
+  'ENGINE TOO LARGE TO PREVIEW': '엔진이 커서 미리보기 불가', 'MM LONG': 'MM 길이', 'MM TALL': 'MM 높이', 'TOOLING': '설비비', 'MONTHS': '개월', 'TOOL UP FAMILY': '생산 설비 구축',
+  'ENGINE TOOLING STARTED': '엔진 생산 설비 구축 시작', 'RESEARCH NEEDED FOR': '연구 필요:', 'RESEARCH NEEDED': '연구가 필요합니다', 'NOT POSSIBLE IN': '이 연도에 불가:', 'DYNO TEST': '다이노 테스트',
+  // gearbox
+  'GEARBOX + DRIVELINE': '변속기 + 구동계', 'YOUR GEARBOXES': '보유 변속기', 'TYPE': '형식', 'FORWARD GEARS': '전진 단수', 'SPEEDS': '단', '1ST GEAR RATIO': '1단 기어비', 'TOP GEAR RATIO': '최고단 기어비',
+  'RATIOS': '기어비', 'EFFICIENCY': '효율', 'COMFORT': '편의성', 'SHIFT TIME': '변속 시간', 'RATIO LADDER': '기어비 사다리', 'GEARBOX TOOLING STARTED': '변속기 설비 구축 시작', 'BUILD': '제작',
+  '3-SPD CRASH BOX': '3단 비동기 수동', '3-SPD SYNCHROMESH': '3단 싱크로메시', '4-SPD SYNCHROMESH': '4단 싱크로메시', '3-SPD + OVERDRIVE': '3단 + 오버드라이브', 'FLUID CLUTCH SEMI-AUTO': '유체 클러치 반자동',
+  'FLUID COUPLING 4-SPD AUTO': '유체 커플링 4단 자동', 'TORQUE CONVERTER 2-SPD AUTO': '토크컨버터 2단 자동', '3-SPD BASIC': '3단 기본형', 'SV-4 STARTER': 'SV-4 기본 엔진',
+  // car design
+  'CAR DESIGN STUDIO': '차 디자인 스튜디오', 'BODY LANGUAGE': '디자인 언어', 'BOX': '박스형', 'STREAM': '유선형', 'PONTOON': '폰툰형', 'BODY TYPE': '차체 형식', '4-DOOR SEDAN': '4도어 세단', '2-DOOR COUPE': '2도어 쿠페',
+  'WHEELBASE': '휠베이스', 'SCREEN RAKE': '앞유리 경사', 'ROOF CURVE': '지붕 곡률', 'NOSE ROUND': '앞코 곡률', 'HEIGHT': '높이', 'HOOD LENGTH': '후드 길이', 'BELT LINE': '벨트라인', 'PAINT': '도색', 'COLOUR': '색상',
+  'FENDERS': '펜더', 'BLACK': '검정', 'BODY COLOUR': '차체색', 'CLAMPED TO ERA LIMITS': '시대 한계 적용', 'NEED A READY ENGINE AND GEARBOX': '완성된 엔진과 변속기가 필요합니다', 'ENGINE': '엔진', 'FINAL DRIVE': '종감속비',
+  'TRIM LEVEL': '트림', 'BASIC': '기본', 'STANDARD': '표준', 'DE LUXE': '디럭스', 'CUSTOM': '커스텀', 'HYD.BRAKES': '유압 브레이크', 'IND.FRONT': '독립 앞서스', 'STEEL ROOF': '강철 지붕', 'UNIT BODY': '일체형 차체',
+  'TARGET SEGMENT': '목표 시장', 'ECONOMY': '경제성', 'FAMILY': '패밀리', 'LUXURY': '고급', 'SPORT': '스포츠', 'UTILITY': '상용', 'LIST PRICE': '판매 가격', 'ENGINEERING REPORT': '설계 보고서',
+  'TOP SPEED': '최고 속도', '0-60 MPH': '0-60마일', 'NEVER': '도달 못함', 'MAX GRADE': '최대 등판', 'WEIGHT': '무게', 'ENGINE FITS THE BAY': '엔진룸에 장착 가능', 'ENGINE TOO BIG - LONGER HOOD!': '엔진이 큼 - 후드를 늘리세요!',
+  'PERFORMANCE': '성능', 'RELIABILITY': '신뢰성', 'DESIGN': '디자인', 'MODERNITY': '현대성', 'APPEAL': '매력도', 'MARGIN': '마진', 'MONTHS TO LAUNCH': '개월 후 출시', 'LAUNCH MODEL': '모델 출시',
+  'MODEL IN DEVELOPMENT': '모델 개발 시작', 'MODEL': '모델', 'TEST DRIVE': '시험 주행',
+  // production / research / market / finance / save
+  'PRODUCTION PLANNING': '생산 계획', 'FACTORY CAPACITY': '공장 생산 능력', 'CARS / MONTH': '대 / 월', 'EXPAND +500 ($40,000)': '증설 +500 ($40,000)', 'NO MODELS YET - USE CAR DESIGN.': '아직 모델이 없습니다 - 차 디자인에서 만드세요.',
+  'IN DEVELOPMENT': '개발 중', 'PRICE': '가격', 'OUTPUT/MO': '월 생산', 'SOLD LAST': '지난달 판매', 'TOTAL': '누적', 'STOCK': '재고', 'RETIRE': '단종', 'STOCK PILING UP - CUT OUTPUT': '재고 누적 - 생산을 줄이세요',
+  'RESEARCH & DEVELOPMENT': '연구 개발', 'DEPT': '부서', 'PTS/MO': '점/월', 'PTS': '점', 'MAINSTREAM': '대중화', 'KNOWN': '보유 기술', 'TECH OLDER THAN ITS ERA LOSES APPEAL - GRACE SHRINKS EACH DECADE.': '시대에 뒤처진 기술은 매력이 떨어지고, 유예기간은 10년마다 짧아집니다.',
+  'SYNCHROMESH 3-SPD': '3단 싱크로메시', 'OHV PUSHROD HEAD': 'OHV 헤드', 'ALUMINIUM HEAD': '알루미늄 헤드', 'HYDRAULIC BRAKES': '유압 브레이크', 'STREAMLINE BODY': '유선형 차체', 'ALL-STEEL ROOF': '전강철 지붕',
+  'INDEPENDENT FRONT': '독립 앞서스펜션', '4-SPD SYNCHROMESH': '4단 싱크로메시', 'OVERDRIVE': '오버드라이브', 'TWIN CARBURETTORS': '트윈 기화기', 'FLUID CLUTCH': '유체 클러치', 'FLUID COUPLING AUTO': '유체 커플링 자동변속',
+  'UNIT BODY ': '일체형 차체', '4WD + TRANSFER': '4륜구동 + 트랜스퍼', 'PONTOON SLAB BODY': '폰툰 차체', 'HIGH-COMPRESSION OHV V8': '고압축 OHV V8',
+  'NEW CARS / YEAR 1930-49': '연간 신차 판매 1930-49', 'K CARS': '천 대', 'BUYERS WEIGH PRICE, ECONOMY, RELIABILITY, SPEED, COMFORT,': '구매자는 가격, 경제성, 신뢰성, 속도, 편의성,',
+  'DESIGN AND MODERNITY DIFFERENTLY PER SEGMENT.': '디자인, 현대성을 시장마다 다르게 따집니다.', 'CASH': '자금', 'CARS SOLD / MONTH': '월 판매 대수', 'OVERHEAD': '고정비', 'SAVE COMPANY': '회사 저장', 'SAVED TO SLOT': '저장 완료: 슬롯',
+  'SAVE FAILED (STORAGE BLOCKED)': '저장 실패 (브라우저 저장소 차단)', 'WAR': '전쟁',
+  // news
+  'FOUNDED IN': '창업:', 'RESEARCH DONE': '연구 완료', 'NEW IDEA AVAILABLE': '새 기술 연구 가능', 'CIVIL PRODUCTION HALTED - FACTORY ON WAR CONTRACTS': '민수 생산 중단 - 공장이 군수 계약으로 전환',
+  'BANK FAILURES: DEMAND COLLAPSES': '은행 파산: 수요 급감', 'BANK HOLIDAY - RECOVERY BEGINS': '은행 휴일 - 회복 시작', 'RECESSION OF 1937-38': '1937-38 경기 후퇴', 'WAR IN EUROPE': '유럽 전쟁 발발',
+  'WAR DECLARED: CIVIL OUTPUT TO STOP': '참전: 민수 생산 중단 예정', 'WAR ENDS - RECONVERSION': '종전 - 민수 전환', 'PENT-UP DEMAND: SELLERS MARKET': '억눌린 수요 폭발: 판매자 시장', 'NEW-GENERATION BODIES ARRIVE': '신세대 차체 등장',
+  'JAN': '1월', 'FEB': '2월', 'MAR': '3월', 'APR': '4월', 'MAY': '5월', 'JUN': '6월', 'JUL': '7월', 'AUG': '8월', 'SEP': '9월', 'OCT': '10월', 'NOV': '11월', 'DEC': '12월', 'MUTE': '음소거', 'SOUND': '소리' };
+const keys = Object.keys(KO).sort((a, b) => b.length - a.length);
+const esc = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const RX = new RegExp(keys.map(k => (/^[A-Z0-9]/.test(k) ? '(?<![A-Z0-9])' : '') + esc(k) + (/[A-Z0-9]$/.test(k) ? '(?![A-Z0-9])' : '')).join('|'), 'g');
+const memo = new Map();
+export function tr(str) { if (KO[str]) return KO[str]; if (memo.has(str)) return memo.get(str); const o = str.replace(RX, m => KO[m] ?? m); if (memo.size > 4000) memo.clear(); memo.set(str, o); return o; }

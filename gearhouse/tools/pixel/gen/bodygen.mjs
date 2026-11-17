@@ -118,7 +118,7 @@ export function genBody(q) {
   const doors = [[[cowlX + 40, beltZ], [cowlX + 40, bottom + 10]], [[gSplit, beltZ], [gSplit, bottom + 10]]];
   if (q.type === 'sedan4d') doors.push([[Math.min(roofRearX - 60, R - gap), beltZ], [Math.min(roofRearX - 60, R - gap), r + gap * 0.9]]);
   const parts = [], lamps = [], bumpers = [];
-  if (q.grille === 'flat') parts.push({ pts: fillet([[noseX - 60, bottom + 150, 0], [noseX - 60, hoodZ - 60, 40], [noseX - 10, hoodZ - 10, 30], [noseX + 60, hoodZ - 10, 0], [noseX + 60, bottom + 150, 0]]), chrome: 1 });
+  if (q.grille === 'flat') parts.push({ pts: fillet([[noseX - 60, bottom + 150, 0], [noseX - 60, hoodZ - 60, 40], [noseX - 10, hoodZ - 10, 30], [noseX + 60, hoodZ - 10, 0], [noseX + 60, bottom + 150, 0]]), chrome: 1, clipFender: 1 });
   if (q.fender === 'separate' || q.fender === 'valanced') { parts.push({ e: [noseX - 150, hoodZ * 0.8, 105, 110], chrome: 1 }); lamps.push({ e: [noseX - 250, hoodZ * 0.8, 20, 90], ramp: 'lensW' }); parts.push({ pts: [[noseX - 170, hoodZ * 0.8 - 160], [noseX - 130, hoodZ * 0.8 - 160], [noseX - 130, hoodZ * 0.8 - 100], [noseX - 170, hoodZ * 0.8 - 100]], ramp: 'black', base: 1 }); }
   else lamps.push({ e: [noseX + 30, r + gap * 0.85, 30, 70], ramp: 'lensW', bezel: 'chrome' });
   const bo = stream ? 160 : 300; bumpers.push({ pts: [[noseX - bo - 80, bottom - 40], [noseX - bo, bottom - 40], [noseX - bo, bottom + 60], [noseX - bo - 80, bottom + 60]], smooth: 1 });

@@ -93,6 +93,7 @@ export function buildCar(P, s, mm = 25, opt = {}) {
   const drawPart = p => { const m = M(); if (p.e) m.ellipse(v.X(p.e[0]), v.Y(p.e[1]), v.R(p.e[2]), v.R(p.e[3]));
     else if (p.band) { const rr = Math.max(0.5, v.R(p.th || 30) / 2); for (let i = 0; i + 1 < p.band.length; i++) line(v.X(p.band[i][0]), v.Y(p.band[i][1]), v.X(p.band[i + 1][0]), v.Y(p.band[i + 1][1]), (x, y) => m.circle(x + 0.5, y + 0.5, rr)); }
     else m.poly(smooth(poly(p.pts), p.smooth ?? 1));
+    if (p.clipFender) { for (const f of s.fenders || []) if (f._m) m.sub(f._m); m.sub(arches); for (const w of px.wheels || []) for (let j = 0; j < w.wp.h; j++) for (let i = 0; i < w.wp.w; i++) if (w.wp.r[j * w.wp.w + i]) m.a[(w.wy + j) * W + w.wx + i] = 0; }   // radiator shell sits between the fenders: never over a fender or a wheel
     const tag = p.tag ?? (p.behind ? TAG.well : TAG.lamp), ramp = p.ramp === 'PAINT' ? s.paint : p.ramp;
     if (p.chrome) shadeChrome(px, m, P.id('chrome'), p.behind ? TAG.well : TAG.lamp); else shadeVolume(px, m, () => P.id(ramp), v, { tag, base: p.base ?? 2, grad: p.grad || null, topLv: p.topLv ?? 4 });
     if (p.grain) for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (m.get(x, y) && m.get(x, y - 1) && m.get(x, y + 1)) { const h = ((Math.floor((x + y * 7) / (3 + (y % 4))) * 2654435761) >>> 0) % 11; if (h < 2) px.set(x, y, P.id(ramp), Math.max(0, px.lvl(x, y) - 1), tag); }

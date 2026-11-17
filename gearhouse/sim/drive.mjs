@@ -33,3 +33,12 @@ export function simulate(car) {
   const bsfc = es.bsfc * (1 + 1.6 * Math.pow(1 - load, 2)) * (rc > es.redline * 0.75 ? 1.15 : 1), kgph = bsfc * pNeed / 1000, lp100 = kgph / 0.74 / (vc * 3.6) * 100;
   return { topKmh: vmax * 3.6, topMph: vmax * 2.237, zeroSixty: t >= 99 ? null : t, grade, mpg: 235.2 / lp100, lp100, mass: Math.round(m), cruiseRpm: Math.round(rc), comfort: G.comfort };
 }
+
+// rpm / load trace of a standing-start run through the gears (for the test-drive sound), ~10 s max
+export function rpmTrace(car) { const es = car.es || engineStats(car.engine), G = GEARBOX[car.gearbox.type], R = car.gearbox.ratios, fd = car.final, r = car.tyreR, m = car.mass + es.mass + G.mass, g = 9.81;
+  const tq = rpm => { const c = es.curve; const i = Math.max(0, Math.min(c.length - 1, Math.round((rpm - c[0].rpm) / 100))); return c[i].T; }, out = []; let v = 0, gi = 0, t = 0, pause = 0, rec = 0;
+  while (t < 10) { const rpm = Math.max(900, v / r * R[gi] * fd * 60 / (2 * Math.PI)); let load = 1;
+    if (pause > 0) { pause -= 0.05; load = 0.05; } else if (rpm > es.redline * 0.92 && gi + 1 < R.length) { gi++; pause = G.shift; }
+    else { const f = Math.min(tq(Math.min(rpm, es.redline)) * R[gi] * fd * G.eff / r, 0.75 * m * g * 0.55), res = 0.018 * m * g + 0.6 * 1.3 * v * v; v = Math.max(0, v + (f - res) / m * 0.05); if (f <= res * 1.02) load = 0.5; }
+    if ((rec += 0.05) >= 0.1) { rec = 0; out.push({ t: +t.toFixed(2), rpm: Math.round(pause > 0 ? rpm * 0.75 : Math.min(rpm, es.redline)), load }); } t += 0.05; }
+  return out; }

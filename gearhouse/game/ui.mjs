@@ -2,6 +2,9 @@
 // Look: 1930s works office - walnut desk, cream drafting paper, brass bevels, oxblood enamel title plates, rivets.
 import { Sheet, drawPix } from '../tools/pixel/pix.mjs';
 import { hex } from '../tools/pixel/color.mjs';
+import { tr } from './i18n.mjs';
+import { FONT } from './font_ko.mjs';
+export const lang = { ko: false };
 
 export const W = 480, H = 270;
 // integer-snap every fill (fractional coordinates would write into the wrong RGBA byte offsets)
@@ -18,11 +21,18 @@ const G = { A: '010101111101101', B: '110101110101110', C: '011100100100011', D:
   4: '101101111001001', 5: '111100110001110', 6: '011100111101111', 7: '111001010010010', 8: '111101111101111', 9: '111101111001110', '-': '000000111000000', '/': '001001010100100', '.': '000000000000010', ':': '000010000010000',
   '(': '010100100100010', ')': '010001001001010', '+': '000010111010000', '=': '000111000111000', ',': '000000000010100', '$': '011110010011110', '%': '101001010100101', '!': '010010010000010', '?': '110001010000010',
   '<': '001010100010001', '>': '100010001010100', "'": '010010000000000', '#': '101111101111101', '&': '010101010101011', '[': '110100100100110', ']': '011001001001011', '_': '000000000000111', '*': '000101010101000', '"': '101101000000000', '^': '010101000000000', '~': '000011110000000', '|': '010010010010010' };
-export function text(s, str, x, y, c = C.ink, sc = 1) { str = String(str).toUpperCase(); let cx = x;
-  for (const ch of str) { const g = G[ch]; if (g) for (let i = 0; i < 15; i++) if (g[i] === '1') s.fill(cx + (i % 3) * sc, y + Math.floor(i / 3) * sc, sc, sc, c); cx += 4 * sc; } return cx; }
-export const tw = (str, sc = 1) => String(str).length * 4 * sc - sc;
+// Korean mode: phrase-translate, then draw Galmuri7 bitmap glyphs (7px Hangul) - baseline 7px below y
+function glyphText(s, str, x, y, c, maxW) { let cx = x; const yb = y + 7;
+  for (const ch of str) { const g = FONT.g[ch.codePointAt(0)] || FONT.g[63]; const [dw, bw, bh, xo, yo] = g; if (maxW && cx + dw - x > maxW) break;
+    for (let j = 0; j < bh; j++) { const row = g[5 + j]; for (let i = 0; i < bw; i++) if ((row >> (bw - 1 - i)) & 1) s.fill(cx + xo + i, yb - (bh + yo) + j, 1, 1, c); } cx += dw; } return cx; }
+export function text(s, str, x, y, c = C.ink, sc = 1, maxW = 0) { str = String(str).toUpperCase(); x = Math.round(x); y = Math.round(y);
+  if (lang.ko && sc === 1) return glyphText(s, tr(str), x, y - 1, c, maxW);
+  let cx = x;
+  for (const ch of str) { if (maxW && cx + 4 * sc - x > maxW) break; const g = G[ch]; if (g) for (let i = 0; i < 15; i++) if (g[i] === '1') s.fill(cx + (i % 3) * sc, y + Math.floor(i / 3) * sc, sc, sc, c); cx += 4 * sc; } return cx; }
+export const tw = (str, sc = 1) => { str = String(str).toUpperCase(); if (lang.ko && sc === 1) { let w = 0; for (const ch of tr(str)) w += (FONT.g[ch.codePointAt(0)] || FONT.g[63])[0]; return w - 1; } return str.length * 4 * sc - sc; };
 
 // ---- input / immediate-mode widgets ----
+export const hooks = { click: null };
 export const input = { x: -1, y: -1, down: false, clicked: false, released: false, wheel: 0, key: null, hot: null, drag: null };
 const inside = (x, y, w, h) => input.x >= x && input.x < x + w && input.y >= y && input.y < y + h;
 export function bevel(s, x, y, w, h, face, light, dark, inset = false) {
@@ -48,7 +58,7 @@ export function button(s, x, y, w, h, label, { tone = 'brass', disabled = false,
   const T = tone === 'ox' ? [C.oxblood, C.oxL, C.oxD, C.brassL] : tone === 'teal' ? [C.teal, C.tealL, hex('#1b3f3e'), C.white] : [C.brass, C.brassL, C.brassD, C.ink];
   bevel(s, x, y, w, h, disabled ? C.paperDark : active ? T[2] : hov ? T[1] : T[0], disabled ? C.paper : T[1], disabled ? C.inkSoft : T[2], press || active);
   const lc = disabled ? C.inkSoft : active ? C.white : T[3]; text(s, label, x + Math.floor((w - tw(label)) / 2) + (press ? 1 : 0), y + Math.floor((h - 5) / 2) + (press ? 1 : 0), lc);
-  return hov && input.clicked && !disabled; }
+  const hit = hov && input.clicked && !disabled; if (hit && hooks.click) hooks.click(); return hit; }
 // horizontal slider; returns new value
 export function slider(s, x, y, w, label, v, lo, hi, { step = 0, fmt = n => n.toFixed(2), id } = {}) {
   text(s, label, x, y, C.ink); const vs = fmt(v); text(s, vs, x + w - tw(vs), y, C.oxblood);
@@ -64,10 +74,10 @@ export function cycler(s, x, y, w, label, opts, cur, { names = o => o, lock = ()
   if (button(s, x, y + 7, 9, 9, '<')) ni = (i - 1 + opts.length) % opts.length;
   if (button(s, x + w - 9, y + 7, 9, 9, '>')) ni = (i + 1) % opts.length;
   s.fill(x + 10, y + 7, w - 20, 9, C.white); s.fill(x + 10, y + 7, w - 20, 1, C.paperDark);
-  const nm = names(opts[ni]); text(s, nm.length * 4 > w - 22 ? nm.slice(0, Math.floor((w - 22) / 4)) : nm, x + 12, y + 9, lock(opts[ni]) ? C.red : C.ink);
+  const nm = String(names(opts[ni])); text(s, nm, x + 12, y + 9, lock(opts[ni]) ? C.red : C.ink, 1, w - 24);
   return opts[ni]; }
 export function bar(s, x, y, w, h, t, col = C.teal) { s.fill(x, y, w, h, C.paperDark); s.fill(x + 1, y + 1, Math.max(0, Math.round((w - 2) * Math.max(0, Math.min(1, t)))), h - 2, col); }
-export function stat(s, x, y, label, val, col = C.ink) { text(s, label, x, y, C.inkSoft); text(s, val, x + 56, y, col); }
+export function stat(s, x, y, label, val, col = C.ink, off = 56) { text(s, label, x, y, C.inkSoft, 1, off - 3); text(s, val, x + off, y, col); }
 // line graph on graph paper
 export function graph(s, x, y, w, h, series, { min = 0, max = null, labels = [] } = {}) {
   s.fill(x, y, w, h, C.white); for (let gx = x; gx < x + w; gx += 8) s.fill(gx, y, 1, h, C.grid); for (let gy = y; gy < y + h; gy += 8) s.fill(x, gy, w, 1, C.grid);

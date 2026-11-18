@@ -10,7 +10,7 @@ import { SUSP_F, SUSP_R, DAMPERS, tyreDims } from './chassis.mjs';
 
 const G = 9.81, RAD = Math.PI / 180, clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 // bias-ply slip curve: peak near 9 deg slip angle / 15 % slip ratio, falling to ~85 % when sliding (Stribeck-like)
-const slipCurve = x => { const a = Math.abs(x); return Math.sign(x) * (a <= 1 ? Math.sin(a * Math.PI / 2) : Math.max(0.84, 1 - (a - 1) * 0.08)); };
+const slipCurve = x => { const a = Math.abs(x); return Math.sign(x) * (a <= 1 ? Math.sin(a * Math.PI / 2) : Math.max(0.87, 1 - (a - 1) * 0.07)); };
 const torqueAt = (es, rpm) => { const c = es.curve; if (rpm <= c[0].rpm) return c[0].T * Math.max(0, rpm / c[0].rpm) ** 0.5; if (rpm >= c.at(-1).rpm) return Math.max(0, c.at(-1).T * (1 - (rpm - c.at(-1).rpm) / 600));
   const i = Math.floor((rpm - c[0].rpm) / 100); return c[i].T + (c[i + 1] ? (c[i + 1].T - c[i].T) * ((rpm - c[i].rpm) / 100) : 0); };
 
@@ -38,7 +38,8 @@ const AUTO = t => t === 'hydra4' || t === 'tc2';
 const FLUID = t => t === 'fluid' || t === 'hydra4' || t === 'tc2';
 
 // driver requests: shift up / down (manual), the gearbox decides whether and when it goes in
-export function requestShift(C, dir) { if (C.shift) return; const n = C.ratios.length, tgt = clamp(C.gear + dir, -1, n); if (tgt === C.gear) return;
+export function requestShift(C, dir) { if (C.shift && C.shift.t < C.shift.need) return; const n = C.ratios.length, still = Math.abs(C.u) < 0.8; let tgt = clamp(C.gear + dir, -1, n);
+  if (still && dir < 0 && C.gear === 1) tgt = -1; if (dir > 0 && C.gear === -1) tgt = 1; if (C.shift) C.shift = null; if (tgt === C.gear) return;   // standing still: first and reverse sit across the gate from each other
   if (tgt === -1 && Math.abs(C.u) > 0.8) { C.grind = 0.4; return; }                                          // reverse only at a standstill
   C.shift = { from: C.gear, to: tgt, t: 0, need: C.Gb.shift * (C.type === 'crash3' ? 0.7 : 0.6) }; }
 
@@ -56,31 +57,33 @@ function sub(C, inp, road, dt) {
   // ---- powertrain ----
   let thr = clamp(inp.gas, 0, 1); const brk = clamp(inp.brake, 0, 1), we = C.we, rpm = we * 30 / Math.PI;
   if (C.shift && (inp.autoShift || AUTO(C.type)) && C.shift.to > 0) { const tgt = driveSpeed(C) * C.final * gearRatio(C, C.shift.to); thr = tgt > we + 10 ? 1 : 0; }
-  const idle = 560 * Math.PI / 30, idleThr = clamp((idle - we) / (idle * 0.2), 0, 0.35), th = Math.max(thr, idleThr);
+  const idle = 560 * Math.PI / 30, idleThr = C.stalled ? 0 : clamp((idle - we) / (idle * 0.2), 0, 0.35), th = C.stalled ? 0 : Math.max(thr, idleThr);
   const Teng = torqueAt(es, rpm) * th - (1 - th) * (4 + we * 0.02 + es.litres * (2 + rpm / 1000 * 2.5));   // the curve is net brake torque; shut, friction and pumping drag
   let gr = gearRatio(C, C.gear); const sh = C.shift;
   if (sh) { sh.t += dt; gr = 0;                                                                                 // neutral while the lever moves
     const tgtIn = driveSpeed(C) * C.final * gearRatio(C, sh.to), dW = Math.abs(we - tgtIn), sync = C.type !== 'crash3' && !(sh.to === 1 && absU > 1);
-    const ready = sh.t >= sh.need && (sh.to === 0 || sync ? sh.t >= sh.need + Math.min(0.5, dW * 0.0012) : dW < 260 * Math.PI / 30 || absU < 0.3);
-    if (ready) { C.gear = sh.to; C.shift = null; gr = gearRatio(C, C.gear); } else if (!sync && sh.t > sh.need + 0.25 && dW > 260 * Math.PI / 30) C.grind = Math.min(1, C.grind + dt * 3); }
+    const ready = sh.t >= sh.need && (sh.to === 0 || sync ? sh.t >= sh.need + Math.min(0.5, dW * 0.0012) : dW < 340 * Math.PI / 30 || absU < 0.3);
+    if (ready) { C.gear = sh.to; C.shift = null; gr = gearRatio(C, C.gear); } else if (!sync && sh.t > sh.need + 0.25 && dW > 340 * Math.PI / 30) C.grind = Math.min(1, C.grind + dt * 3); }
   C.grind = Math.max(0, C.grind - dt * 1.5);
   const wDrive = driveSpeed(C), wIn = wDrive * C.final * gr; let Tc = 0;                                      // gearbox input shaft speed from the wheels
   if (gr !== 0) {
     if (C.type === 'tc2') { const sr = clamp(wIn / Math.max(1, we), -1, 1), Kp = 0.0062 * (es.torque / 200), Tp = Kp * we * we * (1 - Math.max(0, sr) ** 3); Tc = Tp; C.tcMul = sr < 0.85 ? 2.3 - 1.53 * Math.max(0, sr) : 1; C.tcSlip = 1 - sr; }
     else if (FLUID(C.type)) { const d = we - wIn, K = 0.0058 * (es.torque / 200); Tc = K * d * Math.abs(d); C.tcMul = 1; C.tcSlip = d / Math.max(1, we); }
     else { // dry clutch: the auto-clutch lets it in as the revs rise from rest and lets it out before the engine stalls
-      const want = Math.min(absU > 3 ? 1 : clamp((rpm - 750) / 900, 0, 1), clamp((rpm - 430) / 250, 0, 1)); C.clutch += clamp(want - C.clutch, -dt * 6, dt * 3); const eng = C.clutch, cap = es.torque * 1.6 * eng;
+      const want = Math.min(absU > 4 ? 1 : clamp((rpm - 900) / 1500, 0, 1), clamp((rpm - 430) / 250, 0, 1)); C.clutch += clamp(want - C.clutch, -dt * 14, dt * 1.6); const eng = C.clutch, cap = es.torque * 1.6 * eng;
       // viscous link solved implicitly against the engine and the driven wheels, so a near-locked clutch stays stable
       const Gr = gr * C.final, Iwd = 2 * C.Iw, Toth = (corners[2].fxw + corners[3].fxw) * C.R0, cv = 3000 * eng;
       Tc = clamp(cv * ((we - wIn) + dt * (Teng / C.Ie + Gr * Toth / Iwd)) / (1 + cv * dt * (1 / C.Ie + Gr * Gr / Iwd)), -cap, cap); C.tcMul = 1; C.tcSlip = (we - wIn) / Math.max(1, we); }
   } else C.tcMul = 1;
-  C.we = Math.max(0, we + (Teng - Tc) / C.Ie * dt); if (C.we * 30 / Math.PI > es.redline * 1.18) C.we = es.redline * 1.18 * Math.PI / 30;
+  C.we = Math.max(0, we + (Teng - Tc) / C.Ie * dt); if (C.we < 200 * Math.PI / 30) C.stalled = true;
+  if (C.stalled && (inp.gas > 0.2 || C.shift) && (gr === 0 || C.clutch < 0.1)) { C.we = 800 * Math.PI / 30; C.stalled = false; }   // the starter: neutral or clutch out
+  if (C.stalled) C.we = 0; if (C.we * 30 / Math.PI > es.redline * 1.18) C.we = es.redline * 1.18 * Math.PI / 30;
   const Taxle = Tc * (C.tcMul || 1) * gr * C.final * C.Gb.eff;                                               // to the differential: open, equal torque each side
   // automatic gearboxes choose their own gear; overdrive cuts in above ~30 mph on a lifted throttle
   if (AUTO(C.type) && !C.shift && C.gear > 0) { const mph = C.u * 2.237, n2 = C.ratios.length, up = 14 + C.gear * (n2 === 2 ? 22 : 12) * (0.6 + thr * 0.8), dn = up * 0.55;
     if (C.gear < n2 && mph > up) C.shift = { from: C.gear, to: C.gear + 1, t: 0, need: C.Gb.shift }; else if (C.gear > 1 && mph < dn) C.shift = { from: C.gear, to: C.gear - 1, t: 0, need: C.Gb.shift }; }
   if (C.type === 'od3') { if (!C.odOn && C.gear === C.ratios.length && C.u > 13.4 && thr < 0.2) C.odOn = true; if (C.odOn && (thr > 0.95 || C.u < 11)) C.odOn = false; }
-  if (inp.autoShift && !AUTO(C.type) && !C.shift && C.gear > 0) { const r2 = rpm; if (r2 > es.redline * 0.95 && C.gear < C.ratios.length) requestShift(C, 1); else if (r2 < 1150 && C.gear > 1 && absU > 1) requestShift(C, -1); }
+  if (inp.autoShift && !AUTO(C.type) && !C.shift && C.gear > 0) { const r2 = rpm, upAt = es.redline * (C.type === 'crash3' ? 0.78 : 0.93); if (r2 > upAt && C.gear < C.ratios.length && Math.abs(C.corners[2].kap) < 0.3) requestShift(C, 1); else if (r2 < 1150 && C.gear > 1 && absU > 1) requestShift(C, -1); }
   // ---- vertical: road under each tyre, unsprung masses, springs, dampers, leaf friction, stops, anti-roll bar ----
   const cosR = Math.cos(C.roll), sinR = Math.sin(C.roll);
   for (const c of corners) { const sC = C.s + c.x, nC = C.n + c.y; c.road = road(sC, nC).h; }

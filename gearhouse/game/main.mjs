@@ -575,8 +575,8 @@ function cars(g) { const CW = FULL ? 126 : 86;
   if (st.id === 'engine' && !ro && button(S, cx + 4, AY + 156, 96, 12, 'DESIGN AN ENGINE')) app.tab = 'engines';
   if (st.id === 'proto' && ev) { if (button(S, cx + 4, AY + 144, 94, 11, 'WATCH BUILD', { tone: 'teal' })) startAssembly(g, spec, d, 'cars', des.plat);
     if (button(S, cx + 102, AY + 144, 94, 11, 'DRIVE THE TRACK', { tone: 'teal' })) { const eng = g.engines.find(x => x.id === d.engineId), gbx = g.gearboxes.find(x => x.id === d.gbId), dd = JSON.parse(JSON.stringify(des)), pi = d.paint;
-      const car = { name: d.name, es: ev.es, engine: { ...eng, litres: ev.es.litres }, gearbox: gbx, final: d.final, mass: ev.sim.mass, cda: 0.6 * (dm.width / 1000) * ((dm.height - 180) / 1000) * 0.82 * 1.9, crr: ev.ch.crr, tyreR: ev.ch.tyreR, ch: { ...ev.ch, bias: d.ch.bias }, year: g.year };
-      app.trk = { pick: true, car, run: null, sprite: () => v3Sprite(dd, pi, 'rear').px, proj: d }; app.scene = 'track'; AU.unlock(); }
+      const car = { name: d.name, es: ev.es, engine: { ...eng, litres: ev.es.litres }, gearbox: gbx, final: d.final, mass: ev.sim.mass, cda: 0.6 * (dm.width / 1000) * ((dm.height - 180) / 1000) * 0.82, crr: ev.ch.crr, tyreR: ev.ch.tyreR, ch: { ...ev.ch, bias: d.ch.bias }, cfg: JSON.parse(JSON.stringify(d.ch)), wb: dm.wb, track: dm.width * 0.82, cgH: 0.5 + (dm.height - 1500) / 3000, hyd: !!d.feats.hydbrake, year: g.year };
+      app.trk = { pick: true, car, run: null, sprite: view => v3Sprite(dd, pi, view).px, proj: d }; app.scene = 'track'; AU.unlock(); }
     if (d.track) tx(`LAST DRIVE: ${d.track.where || ''}  ${d.track.best ? (lang.ko ? '최고 랩 ' : 'BEST LAP ') + d.track.best.toFixed(1) + ' S' : ''}  ${(d.track.top || 0).toFixed(0)} MPH`, 135, C.inkSoft); }
   if (vs === 5 && d.reviewDue && ev) {                                                                    // the board looks at the mock-up
     if (!d.review) { const t = TEMPLATES.find(x => x.id === des.base), L = t && landmarks(t.spec), n = [];
@@ -660,7 +660,7 @@ function mockroom() { if (drawMockRoom(S, P, app.room, AU.sfx)) { app.scene = 'h
 function track() { const K = app.trk, g = app.g, leave = () => { if (K.voice) K.voice.stop(); app.scene = 'hq'; app.tab = 'cars'; app.trk = null; };
   if (K.pick) { const r = drawTrackPick(S, g, nameField, K.proj.trackBest); if (r === 'back') leave(); else if (typeof r === 'number') { K.ti = r; K.run = makeDrive(K.car, r); K.run.name = trackName(g, r); K.pick = false; K.saved = false; } return; }
   const T = K.run; if (!K.voice && AU.ready()) K.voice = AU.engineVoice(T.car.engine, T.car.year);
-  const r = drawDrive(S, P, T, K.sprite, AU.sfx); if (K.voice) K.voice.set(T.rpm, T.load, T.done ? 0.25 : 1);
+  const r = drawDrive(S, P, T, K.sprite, AU.sfx); if (K.voice) K.voice.set(Math.max(500, T.C.we * 30 / Math.PI), T.C.shift ? 0.15 : (input.keys?.ArrowUp || T.autoGas ? 1 : 0.15), T.done ? 0.25 : 1);
   if (T.done && !K.saved) { K.saved = true; const L = T.log, best = L.laps.length ? Math.min(...L.laps) : null; K.proj.trackBest = K.proj.trackBest || []; if (best && !(K.proj.trackBest[K.ti] <= best)) K.proj.trackBest[K.ti] = best;
     const prev = K.proj.track || {}; K.proj.track = { where: T.name, best, top: L.top, maxG: L.maxG, fade: L.fade || !!prev.fade, spins: (prev.spins || 0) + L.spins, shake: Math.max(prev.shake || 0, L.shake), maxTb: L.maxTb }; AU.sfx('stamp'); }
   if (r === 'again') { K.pick = true; if (K.voice) { K.voice.stop(); K.voice = null; } } if (r === 'back') leave(); }

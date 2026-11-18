@@ -2,9 +2,9 @@
 import { Pix, line } from '../pix.mjs';
 const LX = -0.7071, LY = -0.7071; // light from top-left
 
-export function wheel(P, { r, tireFrac = 0.30, style = 'hubcap', whitewall = 0, spokes = 5, paint = 'white', rot = 0, tread = null }) {
+export function wheel(P, { r, tireFrac = 0.30, style = 'hubcap', whitewall = 0, spokes = 5, paint = 'white', rot = 0, tread = null, cap = true, marker = false }) {
   const S = Math.ceil(r * 2) + 1, c = S / 2, px = new Pix(S, S);
-  const ri = r * (1 - tireFrac);
+  const ri = Math.min(r * (1 - tireFrac), r - 3);                  // at least 3 px of sidewall
   const T = 3; // tag: wheel
   const rub = P.id('rubber'), chr = P.id('chrome'), wht = P.id('white'), blk = P.id('black'), alu = P.id('alu');
   for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
@@ -57,7 +57,7 @@ export function wheel(P, { r, tireFrac = 0.30, style = 'hubcap', whitewall = 0, 
       else if (style === 'trimring' && q > 0.72) px.set(x, y, chr, dot > 0.3 ? 4 : dot > -0.3 ? 3 : 1, T);
       else if (style === 'discperf' && q > 0.5 && q < 0.66 && Math.abs(Math.sin(a * 6)) < 0.45) px.set(x, y, blk, 0, T);
       else if (style === 'truck' && q > 0.45 && q < 0.7 && Math.abs(Math.sin(a * 3)) < 0.3) px.set(x, y, blk, 0, T);
-      else if (q < (style === 'truck' ? 0.3 : 0.24)) px.set(x, y, style === 'truck' ? P.id(paint) : chr, q < 0.12 ? 4 : dot > 0 ? 3 : 1, T);
+      else if (cap && q < (style === 'truck' ? 0.3 : 0.24)) px.set(x, y, style === 'truck' ? P.id(paint) : chr, q < 0.12 ? 4 : dot > 0 ? 3 : 1, T);
       else px.set(x, y, P.id(paint), q > 0.78 ? (dot > 0 ? 1 : 3) : (dot > 0.4 ? 3 : dot > -0.4 ? 2 : 1), T);
     } else if (style === 'combat') {
       const a = Math.atan2(dy, dx) + rot, pr = P.id(paint);
@@ -82,5 +82,6 @@ export function wheel(P, { r, tireFrac = 0.30, style = 'hubcap', whitewall = 0, 
         (x, y) => { const lit = (x - c) * LX + (y - c) * LY > 0; px.set(x, y, P.id('wire'), lit ? 3 : 2, T); });
     }
   }
+  if (marker) { const a = -rot, mx = Math.round(c - 0.5 + Math.cos(a) * ri * 0.84), my = Math.round(c - 0.5 + Math.sin(a) * ri * 0.84); px.set(mx, my, P.id('white'), 4, T); px.set(mx + 1, my, P.id('white'), 3, T); }   // rolling cue
   return px;
 }

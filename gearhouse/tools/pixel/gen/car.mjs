@@ -159,7 +159,7 @@ export function buildCar(P, s, mm = 25, opt = {}) {
   // bumpers, lamps, misc solid parts
   for (const b of s.bumperSets || []) {
     if (b.iron) solidMM({ band: b.iron, th: b.ironTh || 28 }, 'black', 1, TAG.bumper);
-    for (const zc of b.zs) { const m = M().poly(smooth(poly([[b.x0, zc - b.h / 2], [b.x1, zc - b.h / 2], [b.x1 + b.h * 0.3, zc], [b.x1, zc + b.h / 2], [b.x0, zc + b.h / 2], [b.x0 - b.h * 0.3, zc]]), 1)); shadeChrome(px, m, P.id('chrome'), TAG.bumper, [4, 3, 1, 2, 1]); }
+    for (const zc of b.zs) { const m = M().poly(smooth(poly([[b.x0, zc - b.h / 2], [b.x1, zc - b.h / 2], [b.x1 + b.h * 0.3, zc], [b.x1, zc + b.h / 2], [b.x0, zc + b.h / 2], [b.x0 - b.h * 0.3, zc]]), 1)); if (b.ramp && b.ramp !== 'chrome') shadeVolume(px, m, () => P.id(b.ramp), v, { tag: TAG.bumper, topLv: 3, base: 1 }); else shadeChrome(px, m, P.id('chrome'), TAG.bumper, [4, 3, 1, 2, 1]); }
     if (b.clamp) { const zs = b.zs; solidMM({ pts: [[b.clamp - 22, Math.min(...zs) - b.h / 2], [b.clamp + 22, Math.min(...zs) - b.h / 2], [b.clamp + 22, Math.max(...zs) + b.h / 2], [b.clamp - 22, Math.max(...zs) + b.h / 2]] }, 'chrome', 2, TAG.bumper); }
   }
   for (const b of s.bumpers || []) { const m = M().poly(smooth(poly(b.pts), b.smooth ?? 2)); if (b.ramp === 'chrome' || !b.ramp) shadeChrome(px, m, P.id('chrome')); else shadeVolume(px, m, () => P.id(b.ramp), v, { tag: TAG.bumper, topLv: 3, base: 1 }); }

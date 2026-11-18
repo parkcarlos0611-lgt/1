@@ -175,7 +175,7 @@ export function drawCrossPix(P, e, th, w, h, stage = 8) {
 }
 
 // ================= exterior =================
-export function drawOutsidePix(P, e, th, w, h, stage = 8) {
+export function drawOutsidePix(P, e, th, w, h, stage = 8, rate = 0) {
   const g = engineGeo(e), D = frame(P, g, w, h), { bx0, bx1 } = g, col = paintOf(e), V = g.L.banks > 1, zt = g.zd + g.headH + g.cover;
   if (stage >= 3) D.poly([[bx1, g.zc - 200], [bx1 + 86, g.zc - 214], [bx1 + 96, g.zd - 20], [bx1, g.zd - 50]], 'alu', S_.cast(3), 'BELL HOUSING');
   if (stage >= 7) { D.poly([[bx0 + 30, g.sd + 8], [bx1 - 30, g.sd + 8], [bx1 - 50, 20], [bx1 - 76, 0], [bx0 + 76, 0], [bx0 + 50, 20]], 'black', S_.cast(2.2), 'OIL PAN'); D.rect(bx0 + 26, g.sd, bx1 - 26, g.sd + 10, 'black', S_.flat(3), 'PAN FLANGE');
@@ -200,17 +200,80 @@ export function drawOutsidePix(P, e, th, w, h, stage = 8) {
     D.rect(bx0 + 70, g.zc - 10, bx0 + 116, g.zc + 54, 'iron', S_.cylV(), 'FUEL PUMP'); }
   if (stage >= 4) { const dx = V ? bx1 - 70 : g.x0 + g.n * g.pitch * 0.62, dz = V ? zt + 40 : g.zd - 40; D.rect(dx - 22, dz - 70, dx + 22, dz + 16, 'black', S_.cylV(), 'DISTRIBUTOR'); D.poly([[dx - 34, dz + 16], [dx + 34, dz + 16], [dx + 26, dz + 58], [dx - 26, dz + 58]], 'eng.cap', S_.cylV(), 'DISTRIBUTOR CAP');
     for (let i = 0; i < g.n; i++) { const x = g.x0 + g.pitch * (i + 0.5), pz = (g.sv ? g.zd + g.headH - 4 : g.zd + g.headH * 0.4) + 46; D.bar(dx + (i - g.n / 2) * 6, dz + 54, x, pz, 2.5, 2.5, 'black', S_.flat(1), 'IGNITION LEAD'); } }
-  if (stage >= 3) { D.circ(bx0 - 70, g.zc, 54, 'iron', S_.ball(), 'CRANK PULLEY'); D.circ(bx0 - 70, g.zc, 16, 'chrome', S_.ball(), 'CRANK PULLEY'); D.poly([[bx0 - 2, g.sd + 20], [bx0 - 60, g.sd + 40], [bx0 - 64, g.zd - 30], [bx0 - 2, g.zd - 10]], col, S_.cast(1.8), 'TIMING COVER');
-    D.rect(bx1 - 270, g.zc - 34, bx1 - 30, g.zc + 64, 'black', S_.cylH(), 'STARTER'); D.rect(bx1 - 300, g.zc - 4, bx1 - 270, g.zc + 34, 'chrome', S_.cylH(), 'STARTER'); }
-  if (stage >= 7) { const gz = g.zd - 36; D.rect(bx0 - 60, gz, bx0 + 140, gz + 96, 'black', S_.cylH(), 'GENERATOR'); for (const q of [0.25, 0.75]) D.rect(bx0 - 60 + 200 * q - 4, gz, bx0 - 60 + 200 * q + 4, gz + 96, 'chrome', S_.cylV(), 'GENERATOR BAND'); D.circ(bx0 - 74, gz + 48, 40, 'iron', S_.ball(), 'GENERATOR PULLEY');
-    D.bar(bx0 - 74, gz + 88, bx0 - 70 - 50, g.zc + 10, 4, 4, 'rubber', S_.flat(1), 'FAN BELT'); D.bar(bx0 - 74 + 40, gz + 48, bx0 - 70 + 50, g.zc, 4, 4, 'rubber', S_.flat(1), 'FAN BELT');
-    if (e.cooling === 'thermo') D.bar(bx0 + 40, zt - 10, bx0 - 120, zt + 120, 26, 26, 'rubber', S_.cylH(), 'RADIATOR HOSE');
-    else { D.poly([[bx0 - 104, g.zd - 90], [bx0 - 4, g.zd - 80], [bx0 - 4, g.zd + 20], [bx0 - 104, g.zd + 10]], col, S_.cast(2.6), 'WATER PUMP'); const fa = th * Math.PI / 180; for (const off of [0, Math.PI / 2]) { const fl = 280 * Math.abs(Math.cos(fa + off)) + 40; D.rect(bx0 - 150 - (off ? 8 : 0), g.zd - 40 - fl, bx0 - 132 - (off ? 8 : 0), g.zd - 40 + fl, 'black', S_.cylV(), 'FAN BLADE'); } D.circ(bx0 - 140, g.zd - 40, 26, 'chrome', S_.ball(), 'FAN HUB'); }
+  const A = accGeo(e, g), cr = th * Math.PI / 180, pl0 = bx0 - 112, pl1 = bx0 - 92, minW = 2.2 / D.k;   // pulleys all sit in one plane in front of the timing cover
+  if (stage >= 3) { D.poly([[bx0 - 2, g.sd + 20], [bx0 - 60, g.sd + 40], [bx0 - 64, g.zd - 30], [bx0 - 2, g.zd - 10]], col, S_.cast(1.8), 'TIMING COVER');
+    D.rect(bx1 - 270, g.zc - 34, bx1 - 30, g.zc + 64, 'black', S_.cylH(), 'STARTER'); D.rect(bx1 - 300, g.zc - 4, bx1 - 270, g.zc + 34, 'chrome', S_.cylH(), 'STARTER');
+    D.rect(pl1, g.zc - 20, bx0 - 60, g.zc + 20, 'chrome', S_.cylH(), 'CRANK SNOUT'); edgePulley(D, pl0, pl1, g.zc, A.crank.r, 'iron', cr, rate, 'CRANK PULLEY');
+    if (e.balancer === 'damper') D.rect(pl0 - 14, g.zc - A.crank.r - 8, pl0, g.zc + A.crank.r + 8, 'rubber', S_.cylV(), 'HARMONIC DAMPER'); }
+  if (stage >= 7) { const pz = g.zc + A.pump.z, gz = g.zc + A.gen.z, ap = cr * A.crank.r / A.pump.r, ag = cr * A.crank.r / A.gen.r;
+    D.rect(bx0 - 60, gz - 40, bx0 + 140, gz + 40, 'black', S_.cylH(), 'GENERATOR'); for (const q of [0.25, 0.75]) D.rect(bx0 - 60 + 200 * q - 4, gz - 40, bx0 - 60 + 200 * q + 4, gz + 40, 'chrome', S_.cylV(), 'GENERATOR BAND');
+    D.rect(pl1, gz - 8, bx0 - 60, gz + 8, 'chrome', S_.cylH(), 'GENERATOR SHAFT'); edgePulley(D, pl0, pl1, gz, A.gen.r, 'iron', ag, rate * A.crank.r / A.gen.r, 'GENERATOR PULLEY');
+    if (e.cooling === 'thermo') { D.bar(bx0 + 40, g.zd + g.headH - 10, bx0 - 140, g.zd + g.headH + 110, 26, 26, 'rubber', S_.cylH(), 'RADIATOR HOSE'); D.rect(pl1, pz - 14, bx0 - 2, pz + 14, col, S_.cast(2.4), 'FAN BRACKET'); }
+    else D.poly([[bx0 - 84, pz - 50], [bx0 - 4, pz - 60], [bx0 - 4, pz + 50], [bx0 - 84, pz + 40]], col, S_.cast(2.6), 'WATER PUMP');
+    D.rect(pl1, pz - 8, bx0 - 84, pz + 8, 'chrome', S_.cylH(), e.cooling === 'thermo' ? 'FAN SPINDLE' : 'PUMP SHAFT'); edgePulley(D, pl0, pl1, pz, A.pump.r, 'iron', ap, rate * A.crank.r / A.pump.r, 'FAN PULLEY');
+    // belt seen edge-on: one strip in the pulley plane from the lowest wrap to the highest, its joints running past
+    const zb0 = Math.min(g.zc - A.crank.r, gz - A.gen.r, pz - A.pump.r) - 3, zb1 = Math.max(g.zc + A.crank.r, gz + A.gen.r, pz + A.pump.r) + 3, bw = Math.max(8, minW), xm = (pl0 + pl1) / 2, tv = cr * A.crank.r, fast = rate * Math.PI / 180 * A.crank.r > 9;
+    D.rect(xm - bw / 2, zb0, xm + bw / 2, zb1, 'rubber', (x, y) => (fast ? 1 : (Math.floor(((D.oy - y) / D.k + tv) / 14) % 2 ? 1 : 2)), 'FAN BELT');
+    D.rect(pl0 - 10, pz - 22, pl0, pz + 22, 'chrome', S_.cylV(), 'FAN HUB'); const fa = ap, fx0 = pl0 - 24, fx1 = pl0 - 10;
+    if (rate * Math.PI / 180 * A.crank.r / A.pump.r > 0.35) D.rect(fx0, pz - A.fanR, fx1, pz + A.fanR, 'black', (x, y) => ((x + y) % 2 ? -9 : 1), 'FAN BLADE');
+    else for (const off of [0, Math.PI / 2]) { const fl = A.fanR * Math.abs(Math.cos(fa + off)) + 14; D.rect(fx0 - (off ? 4 : 0), pz - fl, fx1 - (off ? 4 : 0), pz + fl, 'black', S_.cylV(), 'FAN BLADE'); }
     if (e.lube !== 'splash' && (e.year || 1940) >= 1935) { const fx2 = g.x0 + g.n * g.pitch * 0.82; D.rect(fx2 - 42, g.zc + 34, fx2 + 42, g.zc + 190, 'eng.filter', S_.cylV(), 'OIL FILTER'); D.rect(fx2 - 46, g.zc + 190, fx2 + 46, g.zc + 204, 'chrome', S_.flat(3), 'OIL FILTER'); }
     D.bar(bx0 + 160, g.zd - 30, bx0 + 150, zt + 40, 3, 3, 'chrome', S_.flat(3), 'DIPSTICK'); D.circ(bx0 + 150, zt + 46, 8, 'chrome', S_.ball(), 'DIPSTICK'); }
   D.outline(); return D;
 }
 // palette entries the drawings use (registered once by the game / sample sheets)
+// ---- accessory drive: crank, water pump / fan and generator pulleys, in mm from the crank centre (x across the engine, z up) ----
+function accGeo(e, g) { const V = g.L.banks > 1, vd = g.zd - g.zc;
+  return { V, crank: { x: 0, z: 0, r: 60 }, pump: { x: 0, z: V ? g.r + 150 : vd * 0.75, r: 48 }, gen: { x: V ? -230 : -(e.bore / 2 + 115), z: V ? g.r + 130 : vd * 0.42, r: 32 }, fanR: Math.min(200, 120 + e.bore * 0.55) }; }
+// a pulley seen edge-on (side view): a short drum with a V groove and a glint that runs round with it
+function edgePulley(D, x0, x1, zc, r, ramp, ang, rate, name) { const gy = D.Y(zc + r * Math.sin(ang)), blur = Math.abs(rate) * Math.PI / 180 > 0.6;
+  return D.rect(x0, zc - r, x1, zc + r, ramp, (x, y, u, v) => { const groove = u > 0.3 && u < 0.7 ? -1 : 0, glint = !blur && Math.abs(y - gy) < 1 && u < 0.3 ? 2 : 0; return Math.max(0, Math.min(4, Math.round(3.6 - Math.abs(v - 0.35) * 3.4) + groove + glint)); }, name); }
+// a pulley seen face-on (front view): rim, groove, web and three bolt holes turning with it; a blur ring once it spins too fast to follow
+function facePulley(D, cx, cz, r, ramp, ang, rate, name) { D.circ(cx, cz, r, ramp, S_.ball(), name); D.circ(cx, cz, r - 6, 'black', S_.flat(1), name); D.circ(cx, cz, r - 9, ramp, S_.ball(), name); D.circ(cx, cz, Math.max(6, r * 0.22), 'chrome', S_.ball(), name);
+  if (Math.abs(rate) * Math.PI / 180 > 0.6) { D.circ(cx, cz, r * 0.62, ramp, (x, y) => ((x + y) % 2 ? 1 : -9), name); return; }
+  for (let q = 0; q < 3; q++) { const a = ang + q * 2.0944; D.circ(cx + Math.cos(a) * r * 0.55, cz + Math.sin(a) * r * 0.55, Math.max(4, r * 0.13), 'black', S_.flat(0), name); } }
+// the belt path round the pulleys: outer tangents between neighbours and arcs on each pulley, as points with running length
+function beltPath(C) { const cx = C.reduce((a, c) => a + c.x, 0) / C.length, cz = C.reduce((a, c) => a + c.z, 0) / C.length, L = C.slice().sort((a, b) => Math.atan2(a.z - cz, a.x - cx) - Math.atan2(b.z - cz, b.x - cx)), n = L.length, tan = [];
+  for (let i = 0; i < n; i++) { const a = L[i], b = L[(i + 1) % n], dx = b.x - a.x, dz = b.z - a.z, d = Math.hypot(dx, dz), ux = dx / d, uz = dz / d, c = (a.r - b.r) / d, sn = Math.sqrt(Math.max(0, 1 - c * c));
+    const nx = ux * c + uz * sn, nz = uz * c - ux * sn; tan.push({ nx, nz, p: [a.x + a.r * nx, a.z + a.r * nz], q: [b.x + b.r * nx, b.z + b.r * nz] }); }
+  const pts = []; for (let i = 0; i < n; i++) { const c = L[i], tin = tan[(i - 1 + n) % n], tout = tan[i]; let a0 = Math.atan2(tin.nz, tin.nx), a1 = Math.atan2(tout.nz, tout.nx); while (a1 < a0) a1 += 2 * Math.PI;
+    for (let a = a0; a <= a1 + 1e-6; a += 0.12) pts.push([c.x + Math.cos(a) * c.r, c.z + Math.sin(a) * c.r]); pts.push(tout.p, tout.q); }
+  let s0 = 0; return pts.map((p, i) => { if (i) s0 += Math.hypot(p[0] - pts[i - 1][0], p[1] - pts[i - 1][1]); return { x: p[0], z: p[1], s: s0 }; }); }
+
+export function drawFrontPix(P, e, th, w, h, stage = 8, rate = 0) {
+  const g = engineGeo(e), A = accGeo(e, g), V = A.V, flat = e.layout === 'F4', half = V ? (flat ? 90 : e.layout === 'V12' || e.layout === 'V6' ? 30 : 45) : 0, col = paintOf(e), alu = e.material === 'alHead' ? 'alu' : col;
+  const reach = g.zd - g.zc + g.headH + g.cover + 40, spanW = Math.max(V ? 2 * (reach * Math.sin(half * Math.PI / 180) + 170) : 560, 2 * (A.fanR + 40), 2 * (-A.gen.x + A.gen.r + 60)), spanH = (V && !flat ? reach * Math.cos(half * Math.PI / 180) : reach) + g.zc + 60;
+  const k = Math.min((w - 6) / spanW, (h - 6) / spanH), D = new Draw(P, w, h, k, w / 2, h - 3 - (h - 6 - spanH * k) / 2 - g.zc * k);
+  const T = (ang, u, v) => { const a = ang * Math.PI / 180; return [u * Math.cos(a) + v * Math.sin(a), -u * Math.sin(a) + v * Math.cos(a)]; };
+  const Q = (ang, pts, ramp, shade, name) => D.poly(pts.map(([u, v]) => T(ang, u, v)), ramp, shade, name), R = (ang, u0, v0, u1, v1, ramp, shade, name) => Q(ang, [[u0, v0], [u1, v0], [u1, v1], [u0, v1]], ramp, shade, name);
+  if (stage >= 7) D.poly([[-170, -g.zc + g.sd], [170, -g.zc + g.sd], [150, -g.zc + 10], [-150, -g.zc + 10]], 'black', S_.cast(2), 'OIL PAN');
+  D.circ(0, 0, g.r + 74, col, S_.cast(2.2), 'CRANKCASE');
+  const vd = g.zd - g.zc, hb = e.bore / 2, ext = g.sv ? e.bore * 0.8 : 0, v0 = g.r + 46;
+  (V ? [-half, half] : [0]).forEach((ang, bi) => { Q(ang, [[-hb - 30, v0], [hb + 30 + ext, v0 + (g.sv ? 40 : 0)], [hb + 30 + ext, vd], [-hb - 30, vd]], col, S_.cast(2.4), 'CYLINDER BLOCK');
+    if (stage >= 2) { R(ang, -hb - 32, vd, hb + 32 + ext, vd + 4, 'eng.gasket', S_.flat(3), 'HEAD GASKET'); R(ang, -hb - 30, vd + 4, hb + 30 + ext, vd + g.headH, alu, S_.cast(2.8), 'CYLINDER HEAD');
+      if (g.cover) R(ang, -hb - 20, vd + g.headH, hb + 26, vd + g.headH + g.cover, g.ohc ? 'alu' : 'black', S_.cylH(), 'VALVE COVER'); }
+    const side = V ? (bi ? 1 : -1) : 1;
+    if (stage >= 6) R(ang, side > 0 ? hb + 30 + ext : -hb - 70, vd - 70, side > 0 ? hb + 70 + ext : -hb - 30, vd - 20, 'rust', S_.cylH(), 'EXHAUST MANIFOLD');
+    if (stage >= 5 && !V) R(ang, -hb - 80, vd - (g.sv ? 60 : -30), -hb - 30, vd + (g.sv ? -10 : 80), 'alu', S_.cylH(), 'INTAKE MANIFOLD'); });
+  if (stage >= 5 && V) D.rect(-60, g.r + 200, 60, g.r + 250, 'alu', S_.cylH(), 'INTAKE MANIFOLD');
+  if (stage >= 3) { D.poly([[-95, -40], [95, -40], [110, 60], [40, vd * 0.6], [-40, vd * 0.6], [-110, 60]], col, S_.cast(3), 'TIMING COVER'); for (let q = 0; q < 6; q++) { const a = q * 1.047; D.dot(Math.cos(a) * 84, 10 + Math.sin(a) * 60, 'chrome', 4); } }
+  const cr = th * Math.PI / 180;
+  if (stage >= 7) { const ap = cr * A.crank.r / A.pump.r, ag = cr * A.crank.r / A.gen.r;
+    if (e.cooling === 'thermo') D.bar(0, A.pump.z, 0, A.pump.z - 70, 18, 22, col, S_.cast(2.4), 'FAN BRACKET'); else D.poly([[-56, A.pump.z - 70], [56, A.pump.z - 70], [64, A.pump.z + 30], [-64, A.pump.z + 30]], col, S_.cast(2.6), 'WATER PUMP');
+    D.bar(A.gen.x * 0.4, A.gen.z * 0.5, A.gen.x, A.gen.z, 8, 8, 'iron', S_.flat(2), 'GENERATOR BRACKET'); D.circ(A.gen.x, A.gen.z, 58, 'black', S_.ball(), 'GENERATOR'); D.bar(A.gen.x, A.gen.z, A.gen.x + 80, A.gen.z + 70, 6, 6, 'iron', S_.flat(2), 'ADJUSTING STRAP');
+    facePulley(D, A.gen.x, A.gen.z, A.gen.r, 'iron', ag, rate * A.crank.r / A.gen.r, 'GENERATOR PULLEY'); facePulley(D, A.pump.x, A.pump.z, A.pump.r, 'iron', ap, rate * A.crank.r / A.pump.r, 'FAN PULLEY'); }
+  if (stage >= 3) { if (e.balancer === 'damper') D.circ(0, 0, A.crank.r + 10, 'rubber', S_.ball(), 'HARMONIC DAMPER'); facePulley(D, 0, 0, A.crank.r, 'iron', cr, rate, 'CRANK PULLEY'); }
+  if (stage >= 7) { // belt: joints run along the path at crank speed x crank pulley radius; a plain strip once too fast to follow
+    const path = beltPath([A.crank, A.pump, A.gen].map(c => ({ ...c }))), tv = cr * A.crank.r, fast = rate * Math.PI / 180 * A.crank.r > 9, bw = Math.max(8, 2.4 / k);
+    for (let i = 1; i < path.length; i++) { const a = path[i - 1], b = path[i], seg = Math.hypot(b.x - a.x, b.z - a.z); if (seg < 0.01) continue; const m = Math.max(1, Math.ceil(seg / 7));
+      for (let j = 0; j < m; j++) { const t0 = j / m, t1 = (j + 1) / m, sm = a.s + seg * (t0 + t1) / 2, lv = fast ? 1 : Math.floor((sm - tv) / 14) % 2 ? 1 : 2;
+        D.bar(a.x + (b.x - a.x) * t0, a.z + (b.z - a.z) * t0, a.x + (b.x - a.x) * t1, a.z + (b.z - a.z) * t1, bw / 2, bw / 2, 'rubber', () => lv, 'FAN BELT'); } }
+    const ap = cr * A.crank.r / A.pump.r; D.circ(0, A.pump.z, 26, 'chrome', S_.ball(), 'FAN HUB');
+    if (rate * Math.PI / 180 * A.crank.r / A.pump.r > 0.35) D.circ(0, A.pump.z, A.fanR, 'black', (x, y) => ((x + y) % 2 ? -9 : 1), 'FAN BLADE');
+    else for (let q = 0; q < 4; q++) { const a = ap + q * Math.PI / 2, ca = Math.cos(a), sa = Math.sin(a); D.bar(ca * 24, A.pump.z + sa * 24, ca * A.fanR, A.pump.z + sa * A.fanR, 10, 24, 'black', S_.cylH(), 'FAN BLADE'); }
+    D.circ(0, A.pump.z, 12, 'chrome', S_.ball(), 'FAN HUB'); }
+  D.outline(); return D;
+}
 export function engPalette(P) { const add = (n, h, o) => { try { P.id(n); } catch { P.auto(n, h, o); } };
   add('eng.water', '#4f86b8'); add('eng.oil', '#b8892c'); add('eng.in', '#5b8fd0'); add('eng.cmp', '#d99a3a'); add('eng.pow', '#d0482c'); add('eng.exh', '#8a827a', { sat: 0.2 });
   add('eng.gasket', '#b06a3a'); add('eng.spring', '#8f969d', { sat: 0.2 }); add('eng.cap', '#6b2a22'); add('eng.spark', '#fff2a0'); add('eng.filter', '#c8642a'); return P; }

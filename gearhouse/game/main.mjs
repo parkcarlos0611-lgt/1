@@ -17,7 +17,7 @@ import { engineSV } from '../tools/pixel/gen/engineSV.mjs';
 import { flatheadV8, ohvI6, ptPalette } from '../tools/pixel/gen/engine40.mjs';
 import { engineSide } from '../tools/pixel/gen/props.mjs';
 import { engineStats, LAYOUTS, HEADS, maxCR, MATERIALS, PART_GROUPS, PART_OPTS, optsFor, devCost, durability, octane } from '../sim/engine.mjs';
-import { drawLongPix, drawCrossPix, drawOutsidePix, engPalette, STAGE_NAMES } from './engdraw.mjs';
+import { drawLongPix, drawCrossPix, drawOutsidePix, drawFrontPix, engPalette, STAGE_NAMES } from './engdraw.mjs';
 import { drawGearboxPix, GB_STEPS } from './gbdraw.mjs';
 import { makeAssembly, drawAssembly } from './assembly.mjs';
 import { drawFit } from './fitfx.mjs';
@@ -185,7 +185,7 @@ const ESTEPS = [['family', ['layout', 'material', 'maxBore', 'maxStroke', 'mains
 const ESTEP_HELP = ['THE CASTING: CYLINDERS, LAYOUT AND HOW BIG THE FAMILY MAY GROW.', 'THE HEAD: WHERE THE VALVES SIT AND THE SHAPE OF THE CHAMBER.', 'CRANK, RODS AND PISTONS: DISPLACEMENT AND HOW FAST IT MAY SPIN.',
   'COMPRESSION, CAM AND VALVE GEAR: WHERE THE TORQUE COMES IN.', 'CARBURETTORS, MIXTURE AND SPARK.', 'MANIFOLDS, PIPES AND MUFFLER.', 'WATER, FAN AND OIL.', 'RUN IT ON THE BENCH, NAME IT AND TOOL UP.'];
 function para(s, str, x, y, c, w, lh = 9) { const t = lang.ko ? tr(String(str).toUpperCase()) : String(str); let line = '', yy = y; for (const wd of t.split(' ')) { const nx = line ? line + ' ' + wd : wd; if (line && tw(nx) > w) { text(s, line, x, yy, c); yy += lh; line = wd; } else line = nx; } if (line) text(s, line, x, yy, c); return yy + lh; }
-function engDrawing(view, e, th, w, h, stage) { const D = (view === 'cross' ? drawCrossPix : view === 'ext' ? drawOutsidePix : drawLongPix)(P, e, th, w, h, stage); return D; }
+function engDrawing(view, e, th, w, h, stage, rate = 0) { return (view === 'cross' ? drawCrossPix : view === 'ext' ? drawOutsidePix : view === 'front' ? drawFrontPix : drawLongPix)(P, e, th, w, h, stage, rate); }
 function engines(g) { windowBox(S, AX, AY, AW, AH, 'ENGINE DESIGN');
   const e = app.edraft || (app.edraft = { ...JSON.parse(JSON.stringify(g.engines[0])), id: null, from: g.engines[0].id, name: 'NEW ENGINE', quality: 0 });
   if (!e.gq) e.gq = Object.fromEntries(PART_GROUPS.map(([k]) => [k, e.quality || 0])); if (e.maxBore == null) e.maxBore = e.bore + 4; if (e.maxStroke == null) e.maxStroke = e.stroke + 6;
@@ -219,13 +219,13 @@ function engines(g) { windowBox(S, AX, AY, AW, AH, 'ENGINE DESIGN');
   e.quality = Math.round(Object.values(e.gq).reduce((a, b) => a + b, 0) / Object.keys(e.gq).length); e.maxBore = Math.max(e.maxBore, 65); e.bore = Math.min(e.bore, e.maxBore); e.stroke = Math.min(e.stroke, e.maxStroke); if (e.rpmLimit != null) e.rpmLimit = Math.min(e.rpmLimit, es0.mechLimit);
   const es = engineStats({ ...e, year: g.year }), ed = { ...e, year: g.year };
   // right: the engine as built so far, three views
-  const x1 = AX + 122, pw1 = AX + AW - 6 - x1, VW = [['long', 'SECTION'], ['cross', 'CROSS'], ['ext', 'OUTSIDE']], vw = VW.some(v => v[0] === app.engView) ? app.engView : 'long';
+  const x1 = AX + 122, pw1 = AX + AW - 6 - x1, VW = [['long', 'SECTION'], ['cross', 'CROSS'], ['ext', 'OUTSIDE'], ['front', 'FRONT VIEW']], vw = VW.some(v => v[0] === app.engView) ? app.engView : 'long';
   const dyn = app.dyno, pr = dyn ? Math.max(0, Math.min(1, (app.t - dyn.f0 - 102) / 156)) : 1, B = app.bench || (app.bench = { rpm: 0, thr: 0, temp: 20, on: false });
-  const live = st === 7 ? (B.on ? B.rpm / 25 : 0) : dyn ? (app.t - dyn.f0 < 66 ? 0 : 40 + pr * 200) : app.visRpm ?? 30; app.th = (app.th || 0) + live * 6 / 60;
+  const live = st === 7 ? (B.on ? B.rpm / 25 : 0) : dyn ? (app.t - dyn.f0 < 66 ? 0 : 40 + pr * 200) : app.visRpm ?? 30; const rate = live * 6 / 60; app.th = (app.th || 0) + rate;
   const ph = st === 7 ? 110 : 150; panel(S, x1, AY + 32, pw1, ph, ''); VW.forEach(([k2, l], i) => { if (button(S, x1 + 2 + i * 44, AY + 33, 43, 9, l, { active: vw === k2 })) app.engView = k2; });
-  const D = engDrawing(vw, ed, app.th, pw1 - 4, ph - 14, st + 1); drawPix(S, D.px, P, x1 + 2, AY + 44, 1);
+  const leg = st >= 3 && st < 7 && (vw === 'long' || vw === 'cross'), D = engDrawing(vw, ed, app.th, pw1 - 4, ph - (leg ? 22 : 14), st + 1, rate); drawPix(S, D.px, P, x1 + 2, AY + 44, 1);
   { const mx = input.x - x1 - 2, my = input.y - AY - 44; if (mx >= 0 && my >= 0 && mx < D.px.w && my < D.px.h) { const t = D.px.t[my * D.px.w + mx], nm = D.names[t]; if (nm) { const w2 = tw(nm) + 6; S.fill(input.x + 6, input.y - 10, w2, 9, C.ink); text(S, nm, input.x + 9, input.y - 8, C.brassL); } } }
-  if (st >= 3 && st < 7) [['INTAKE STROKE', 'eng.in'], ['COMPRESSION STROKE', 'eng.cmp'], ['POWER STROKE', 'eng.pow'], ['EXHAUST STROKE', 'eng.exh']].forEach(([l, r], i) => { S.fill(x1 + pw1 - 124 + i * 31, AY + 35, 4, 4, P.ramps[P.id(r)].c[3]); text(S, l, x1 + pw1 - 119 + i * 31, AY + 35, C.inkSoft, 1, 25); });
+  if (leg) [['INTAKE STROKE', 'eng.in'], ['COMPRESSION STROKE', 'eng.cmp'], ['POWER STROKE', 'eng.pow'], ['EXHAUST STROKE', 'eng.exh']].forEach(([l, r], i) => { S.fill(x1 + 4 + i * 31, AY + 24 + ph, 4, 4, P.ramps[P.id(r)].c[3]); text(S, l, x1 + 9 + i * 31, AY + 24 + ph, C.inkSoft, 1, 25); });
   // below: running speed, the figures known so far, previous / next
   const yb = AY + 32 + ph + 4, known = { disp: st >= 2, red: st >= 3, power: st >= 4, rel: st >= 6 }, dash = '-';
   if (st < 7) { app.visRpm = slider(S, x1, yb + 2, 90, 'CRANK SPEED', app.visRpm ?? 30, 0, 160, { step: 5, fmt: v => (v ? Math.round(v) + '' : 'STOP'), id: 'visrpm' });
@@ -459,7 +459,7 @@ function cars(g) {
         if (fview === 'sect' && !uniB) text(S, pl.type === 'platform' ? `TUBE ${Math.round(pl.railH)} X ${pl.railT.toFixed(1)} MM` : `${Math.round(pl.railH)} X ${Math.round(pl.railW * (FRAME_TYPES[pl.type].box ? 1.15 : 1))} X ${pl.railT.toFixed(1)} MM`, cx + 6, AY + 160, C.ink); } }
     if (uniB) text(S, 'THE SHELL ITSELF IS DESIGNED WITH THE BODY', cx + 4, AY + 160, C.inkSoft, 1, pwV - 8); }
   else if (st.id === 'brief') briefDoc(g, d, cx + 3, AY + 29, pw - 6, 80);
-  else if (st.id === 'engine') { const e = g.engines.find(x => x.id === d.engineId); if (e) drawPix(S, drawOutsidePix(P, { ...e, year: g.year }, app.t * 4, pw - 8, 78).px, P, cx + 4, AY + 29, 1); else text(S, 'NO ENGINE READY', cx + 6, AY + 50, C.red); }   // the part-built engine
+  else if (st.id === 'engine') { const e = g.engines.find(x => x.id === d.engineId); if (e) drawPix(S, drawOutsidePix(P, { ...e, year: g.year }, app.t * 4, pw - 8, 78, 8, 4).px, P, cx + 4, AY + 29, 1); else text(S, 'NO ENGINE READY', cx + 6, AY + 50, C.red); }   // the part-built engine
   else if (st.id === 'driveline') { gearMesh(cx + 10, AY + 26, d.final, app.t); text(S, 'FINAL DRIVE ' + d.final.toFixed(2) + ' : 1', cx + 120, AY + 40, C.ink); text(S, 'PINION AND CROWN WHEEL', cx + 120, AY + 50, C.inkSoft, 1, 76); }
   else if (st.id === 'detail') { const NP = 5, inP = input.x >= cx && input.x < cx + pw && input.y >= AY + 20 && input.y < AY + 112;   // swipe / arrows: dashboard, side, front, rear, paint board
     if (inP && input.clicked && !input.drag) app.sw = input.x; if (app.sw != null && !input.down) { const dx = input.x - app.sw; if (dx < -14) app.dpage = ((app.dpage || 0) + 1) % NP; if (dx > 14) app.dpage = ((app.dpage || 0) + NP - 1) % NP; app.sw = null; }

@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>GEARHOUSE Body Prototype</title>
+<style>
+  :root { --bg: #1b1512; --panel: #2a211c; --ink: #e8dcc0; --dim: #a8987a; --line: #4a3b30; --accent: #c8a050; }
+  html, body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.4 system-ui, sans-serif; }
+  .wrap { display: grid; grid-template-columns: 220px 1fr; gap: 12px; padding: 12px 16px; max-width: 1500px; margin: 0 auto; }
+  @media (max-width: 760px) { .wrap { grid-template-columns: 1fr; } }
+  h1 { font-size: 16px; margin: 0 0 8px; color: var(--accent); letter-spacing: 0.04em; }
+  .side { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 10px; }
+  .side h2 { font-size: 12px; color: var(--dim); margin: 10px 0 6px; font-weight: 600; }
+  button { display: block; width: 100%; min-height: 40px; margin: 0 0 6px; background: #3a2e26; color: var(--ink); border: 1px solid var(--line); border-radius: 4px; font: inherit; text-align: left; padding: 8px 10px; cursor: pointer; }
+  button.on { background: #6b4f2a; border-color: var(--accent); }
+  .list { max-height: 300px; overflow: auto; }
+  .list button { min-height: 32px; padding: 5px 8px; font-size: 13px; }
+  .stage { background: #d6cdb8; border-radius: 6px; overflow: auto; touch-action: none; }
+  canvas { display: block; image-rendering: pixelated; }
+  .info { color: var(--dim); font-size: 13px; margin: 8px 0; min-height: 1.4em; }
+  .row { display: flex; gap: 8px; align-items: center; margin: 6px 0; }
+  .row input { width: 48px; height: 32px; border: 1px solid var(--line); background: none; }
+  .all { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end; background: #d6cdb8; border-radius: 6px; padding: 10px; margin-top: 12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="side">
+    <h1>GEARHOUSE · 차체 프로토타입 ①</h1>
+    <h2>차</h2><div id="cars"></div>
+    <h2>도장</h2>
+    <div class="row"><input type="color" id="c1"><input type="color" id="c2"><span class="info" style="margin:0">주색 · 보조색</span></div>
+    <h2>패널 (선택하면 제어점이 보입니다)</h2><div class="list" id="panels"></div>
+  </div>
+  <div>
+    <div class="info" id="info"></div>
+    <div class="stage" id="stage"><canvas id="cv"></canvas></div>
+    <div class="info">점을 끌어 모양을 바꿉니다. 실제 크기(1배) 보기:</div>
+    <div class="all" id="all"></div>
+  </div>
+</div>
+<script type="module" src="./ui/proto1.ts"></script>
+</body>
+</html>

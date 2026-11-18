@@ -10,3 +10,6 @@ This list holds work moved to a later stage than the current one, so it does not
 - Countries other than the USA.
 - The game's end year, the split into period parts, and the target play time for part 1. These are decided before stage 5.
 - Calendar during real-time scenes. The proposal is to pause the calendar during the scene and add the time it used when it ends.
+- Name data: the starter lists hold about 58,000 surname and given-name pairs (about 1.2 million with middle initials). Replace them with about 1,000 surnames and 1,000 given names per country from census and Social Security statistics, with weights by birth year.
+- People still to build: applicants and hiring routes, interviews and trials, satisfaction, pay demands, leaving, traits acting on work, portraits.
+- Money still to build: banks and loans, bank failures, the per-car profit sheet, the yearly tax, bankruptcy.

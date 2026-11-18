@@ -1,5 +1,7 @@
 // The whole game as plain data (system design 01). Nothing here knows about the screen; a save is this object as JSON.
 import type { DateStr } from './calendar';
+import type { Employee, Person } from './people';
+import type { Ledger } from './ledger';
 
 export const SAVE_VERSION = 1;
 export type Phase = 'morning' | 'day' | 'evening';
@@ -31,6 +33,10 @@ export interface GameState {
     /** notice kinds the player has switched off (they go to the journal instead) */
     quietKinds: string[];
   };
+  people: Record<string, Person>;
+  founderId: string | null;
+  employees: Employee[];
+  ledger: Ledger;
   founder: { hoursPerDay: number; overtimePerDay: number; overtimeThisWeek: number; fatigue: number };
   tasks: Record<string, Task>;
   plan: PlanSlot[];
@@ -41,6 +47,7 @@ export interface GameState {
 
 export function newGame(seed: number, start: DateStr = '1930-01-01'): GameState {
   return { version: SAVE_VERSION, seed, rng: '', clock: { date: start, started: start }, settings: { daysOff: [0], quietKinds: [] },
+    people: {}, founderId: null, employees: [], ledger: { cash: 0, entries: [] },
     founder: { hoursPerDay: 10, overtimePerDay: 0, overtimeThisWeek: 0, fatigue: 0 }, tasks: {}, plan: [], incidents: [], nextIncidentId: 1, journal: [] };
 }
 export const save = (g: GameState): string => JSON.stringify(g);

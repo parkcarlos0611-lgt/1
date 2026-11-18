@@ -1,0 +1,7 @@
+{
+ "note": "starting values, not yet checked against period sources",
+ "livingPerWeek": 18,
+ "utilitiesPerMonth": 9,
+ "rentPerMonth": 0,
+ "forecastWeeks": 8
+}

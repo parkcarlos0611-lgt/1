@@ -1,0 +1,119 @@
+{
+ "skills": [
+  "design",
+  "panel",
+  "weld",
+  "mech",
+  "wood",
+  "paint",
+  "trim",
+  "sales",
+  "manage"
+ ],
+ "founderBackgrounds": {
+  "mechanic": {
+   "skills": {
+    "mech": 70,
+    "weld": 60,
+    "panel": 35,
+    "wood": 25,
+    "paint": 30,
+    "trim": 20,
+    "design": 35,
+    "sales": 35,
+    "manage": 30
+   },
+   "cash": 900
+  },
+  "coachbuilder": {
+   "skills": {
+    "wood": 72,
+    "panel": 64,
+    "paint": 58,
+    "trim": 50,
+    "mech": 31,
+    "weld": 35,
+    "design": 40,
+    "sales": 35,
+    "manage": 28
+   },
+   "cash": 900
+  },
+  "racer": {
+   "skills": {
+    "mech": 62,
+    "weld": 40,
+    "panel": 30,
+    "wood": 20,
+    "paint": 25,
+    "trim": 15,
+    "design": 45,
+    "sales": 55,
+    "manage": 25
+   },
+   "cash": 800
+  },
+  "merchant": {
+   "skills": {
+    "sales": 72,
+    "manage": 65,
+    "design": 25,
+    "mech": 25,
+    "weld": 15,
+    "panel": 20,
+    "wood": 25,
+    "paint": 20,
+    "trim": 25
+   },
+   "cash": 2200
+  },
+  "engineer": {
+   "skills": {
+    "design": 75,
+    "mech": 50,
+    "weld": 30,
+    "panel": 25,
+    "wood": 20,
+    "paint": 15,
+    "trim": 15,
+    "sales": 30,
+    "manage": 40
+   },
+   "cash": 600
+  }
+ },
+ "traits": [
+  "careful",
+  "quick",
+  "teacher",
+  "stubborn",
+  "drinker",
+  "ambitious",
+  "loyal",
+  "boaster",
+  "gifted"
+ ],
+ "employeeHoursPerDay": 9,
+ "wages": {
+  "note": "weekly dollars, 1930; skilled auto wages not yet checked against sources",
+  "apprentice": [
+   12,
+   18
+  ],
+  "hand": [
+   20,
+   28
+  ],
+  "skilled": [
+   28,
+   40
+  ]
+ },
+ "lifespan": {
+  "min": 49,
+  "max": 99,
+  "betaA": 5,
+  "betaB": 3,
+  "earlyShare": 0.2
+ }
+}

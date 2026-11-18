@@ -84,17 +84,17 @@ function cycleWave(layout, head) {
 export function engineVoice(e, year = 1935, { pan = 0 } = {}) {
   if (!ctx) return null; const cyl = { I4: 4, I6: 6, I8: 8, V8: 8, V12: 12, V16: 16, F4: 4, I3: 3, V6: 6 }[e.layout] || 4;
   const o = ctx.createOscillator(); o.setPeriodicWave(cycleWave(e.layout, e.head));
-  const muff = ctx.createBiquadFilter(); muff.type = 'lowpass'; muff.frequency.value = year < 1940 ? 900 : 750; muff.Q.value = 2.2;     // pre-war mufflers: rawer, brighter
-  const pipe = ctx.createBiquadFilter(); pipe.type = 'peaking'; pipe.frequency.value = 140 + 40 / (e.litres || 3); pipe.gain.value = 7;
+  const muff = ctx.createBiquadFilter(); muff.type = 'lowpass'; muff.frequency.value = (year < 1940 ? 900 : 750) + (e.muffler === 'free' ? 300 : 0); muff.Q.value = 2.2;     // pre-war mufflers: rawer, brighter
+  const pipe = ctx.createBiquadFilter(); pipe.type = 'peaking'; pipe.frequency.value = (140 + 40 / (e.litres || 3)) * (e.exhaust === 'dual' ? 0.85 : 1); pipe.gain.value = 7 + (e.exhaust === 'dual' ? 3 : 0);
   const nz = ctx.createBufferSource(); nz.buffer = noiseBuf; nz.loop = true; const nbp = ctx.createBiquadFilter(); nbp.type = 'bandpass'; nbp.frequency.value = 1800; const ng = ctx.createGain(); ng.gain.value = 0.02;
-  const tick = ctx.createOscillator(); tick.type = 'square'; const tg = ctx.createGain(); tg.gain.value = e.head === 'sv' ? 0.004 : 0.012; const thp = ctx.createBiquadFilter(); thp.type = 'highpass'; thp.frequency.value = 2500;
+  const tick = ctx.createOscillator(); tick.type = 'square'; const tg = ctx.createGain(); tg.gain.value = (e.head === 'sv' ? 0.004 : 0.012) * (e.lifters === 'hydraulic' ? 0.3 : 1); const thp = ctx.createBiquadFilter(); thp.type = 'highpass'; thp.frequency.value = 2500;
   const g = ctx.createGain(); g.gain.value = 0; const pn = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
   o.connect(pipe); pipe.connect(muff); muff.connect(g); nz.connect(nbp); nbp.connect(ng); ng.connect(g); tick.connect(thp); thp.connect(tg); tg.connect(g);
   if (pn) { pn.pan.value = pan; g.connect(pn); pn.connect(sfxBus); } else g.connect(sfxBus);
-  o.start(); nz.start(); tick.start(); const size = Math.min(1.2, 0.55 + (e.litres || 3) * 0.12);
+  o.start(); nz.start(); tick.start(); const size = Math.min(1.35, (0.55 + (e.litres || 3) * 0.12) * (e.exhaust === 'dual' ? 1.12 : 1) * (e.muffler === 'free' ? 1.15 : 1)), freeM = e.muffler === 'free' ? 300 : 0;
   return { cyl,
     set(rpm, load = 0.3, level = 1, at = ctx.currentTime) { const f = rpm / 120; o.frequency.setTargetAtTime(f, at, 0.04); tick.frequency.setTargetAtTime(rpm / 120 * cyl / 2, at, 0.04);
-      muff.frequency.setTargetAtTime((year < 1940 ? 500 : 420) + rpm * 0.32 + load * 900, at, 0.05); ng.gain.setTargetAtTime(0.01 + load * 0.03 + rpm / 90000, at, 0.05);
+      muff.frequency.setTargetAtTime((year < 1940 ? 500 : 420) + freeM + rpm * 0.32 + load * 900, at, 0.05); ng.gain.setTargetAtTime(0.01 + load * 0.03 + rpm / 90000, at, 0.05);
       g.gain.setTargetAtTime(level * size * (0.16 + load * 0.22), at, 0.05); },
     pan(v) { if (pn) pn.pan.value = Math.max(-1, Math.min(1, v)); },
     stop(at = ctx.currentTime) { g.gain.setTargetAtTime(0, at, 0.08); [o, nz, tick].forEach(n => n.stop(at + 0.6)); } };

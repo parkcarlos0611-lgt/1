@@ -11,7 +11,8 @@ import { genBody, clampParams, limits } from '../tools/pixel/gen/bodygen.mjs';
 import { engineSV } from '../tools/pixel/gen/engineSV.mjs';
 import { flatheadV8, ohvI6, ptPalette } from '../tools/pixel/gen/engine40.mjs';
 import { engineSide } from '../tools/pixel/gen/props.mjs';
-import { engineStats, LAYOUTS, HEADS, maxCR } from '../sim/engine.mjs';
+import { engineStats, LAYOUTS, HEADS, maxCR, MATERIALS, PART_GROUPS, PART_OPTS, optsFor, devCost, durability } from '../sim/engine.mjs';
+import { buildEngineParts, explodedOffsets, BUILD_ORDER, PART_NAMES, FAIL_PARTS } from '../tools/pixel/gen/engineParts.mjs';
 import { drawCutaway, fired } from './cutaway.mjs';
 import { makeAssembly, drawAssembly } from './assembly.mjs';
 import { drawFit } from './fitfx.mjs';
@@ -169,42 +170,87 @@ function news(g) { windowBox(S, AX, AY, AW, AH, 'OFFICE - NEWS WIRE & SUMMARY');
   stat(S, x + 5, AY + 78, 'FACTORY', `${g.factory}/MO`); stat(S, x + 5, AY + 88, 'MODELS', `${g.models.filter(m => !m.dead).length}`); stat(S, x + 5, AY + 98, 'RESEARCH', g.resCur ? TECH.find(t => t.id === g.resCur).name.slice(0, 16) : 'IDLE', g.resCur ? C.ink : C.red);
   panel(S, x, AY + 118, AW - 244, 110, 'HOW TO PLAY'); ['1 ENGINES: DESIGN + TOOL UP', '2 GEARBOX: PICK TYPE + RATIOS', '3 CAR DESIGN: BODY, ENGINE,', '  SEGMENT, PRICE -> LAUNCH', '4 PRODUCTION: MONTHLY OUTPUT', '5 RESEARCH NEW TECH', '6 NEXT MONTH. SURVIVE TO 1950.', '', 'OLD TECH LOSES APPEAL OVER', 'TIME - KEEP MODERNISING.'].forEach((s, i) => text(S, s, x + 5, AY + 130 + i * 9, C.ink)); }
 
-function engines(g) { windowBox(S, AX, AY, AW, AH, 'ENGINE DESIGN - FAMILY + VARIANT');
+// ---------- engine designer: part groups, five views (exterior, cutaway, exploded, build-up, durability), family / variant ----------
+function engineSet(e, year, maxW, maxH, exploded = false) {
+  const key = 'EP' + JSON.stringify(e) + year + maxW + maxH + exploded; if (app.cache.has(key)) return app.cache.get(key);
+  const es = engineStats({ ...e, year }); let set = null;
+  for (const mm of [7, 8, 9, 10, 11, 12, 13, 14, 16, 18, 20, 23]) { set = buildEngineParts(P, { ...e, year }, es, mm); let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9; const off = exploded ? explodedOffsets(set) : {};
+    for (const p of set.parts) { if (!exploded && (p.id === 'crank' || p.id === 'pistons')) continue; const [dx, dy] = off[p.id] || [0, 0]; x0 = Math.min(x0, p.x + dx); y0 = Math.min(y0, p.y + dy); x1 = Math.max(x1, p.x + dx + p.px.w); y1 = Math.max(y1, p.y + dy + p.px.h); }
+    set.bb = { x0, y0, w: x1 - x0, h: y1 - y0 }; set.off = off; if (set.bb.w <= maxW && set.bb.h <= maxH) break; }
+  app.cache.set(key, set); return set; }
+const EXT_ORDER = ['bell', 'block', 'sump', 'timing', 'head', 'cover', 'exhaust', 'intake', 'carbs', 'water', 'generator', 'distributor', 'filter', 'starter'];
+function drawEngineSet(set, x, y, w, h, { exploded = false, upto = null, t = 0, red = [] } = {}) {
+  const ox = x + Math.round((w - set.bb.w) / 2) - set.bb.x0, oy = y + Math.round((h - set.bb.h) / 2) - set.bb.y0, by = Object.fromEntries(set.parts.map(p => [p.id, p]));
+  const order = exploded ? ['crank', 'pistons', ...EXT_ORDER] : upto ? BUILD_ORDER : EXT_ORDER; let hover = null;
+  order.forEach((id, i) => { const p = by[id]; if (!p) return; let [dx, dy] = exploded ? set.off[id] || [0, 0] : [0, 0];
+    if (upto) { const k = BUILD_ORDER.indexOf(id), st = k * 18; if (t < st) return; const u = Math.min(1, (t - st) / 18); dy -= Math.round((1 - u * u) * 40);
+      if ((id === 'crank' || id === 'pistons') && t > (BUILD_ORDER.indexOf('head') + 1) * 18) return; }
+    const X0 = Math.round(ox + p.x + dx), Y0 = Math.round(oy + p.y + dy); drawPix(S, p.px, P, X0, Y0, 1);
+    if (red.includes(id) && (app.t >> 3) % 2 === 0) for (let yy = 0; yy < p.px.h; yy++) for (let xx = 0; xx < p.px.w; xx++) if (p.px.r[yy * p.px.w + xx]) S.blend(X0 + xx, Y0 + yy, [230, 40, 30], 0.55);
+    if (input.x >= X0 && input.x < X0 + p.px.w && input.y >= Y0 && input.y < Y0 + p.px.h) hover = p; });
+  return hover; }
+function engines(g) { windowBox(S, AX, AY, AW, AH, 'ENGINE DESIGN - PARTS, FAMILY + VARIANT');
   const e = app.edraft || (app.edraft = { ...g.engines[0], id: null, name: 'NEW ENGINE', quality: 0 });
+  if (!e.gq) e.gq = Object.fromEntries(PART_GROUPS.map(([k]) => [k, e.quality || 0]));
   panel(S, AX + 6, AY + 20, 112, AH - 26, 'YOUR ENGINES'); scrollArea(S, 'englist', AX + 7, AY + 29, 110, AH - 46, g.engines.length * 15 + 4, dy => g.engines.forEach((x, i) => { const y = AY + 31 + i * 15 - dy, rdy = x.readyAt <= dateNum(g);
-    if (button(S, AX + 9, y, 106, 13, `${x.name.slice(0, 13)} ${rdy ? '' : '*'}`, { active: app.edraft?.from === x.id })) app.edraft = { ...x, from: x.id, id: null, name: x.name + ' B' }; }));
+    if (button(S, AX + 9, y, 106, 13, `${x.name.slice(0, 13)} ${rdy ? '' : '*'}`, { active: app.edraft?.from === x.id })) { app.edraft = { ...JSON.parse(JSON.stringify(x)), from: x.id, id: null, name: x.name + ' B' }; app.endu = null; } }));
   text(S, '* = TOOLING IN PROGRESS', AX + 9, AY + AH - 14, C.inkSoft);
-  const x0 = AX + 124, lay = Object.keys(LAYOUTS).filter(k => LAYOUTS[k].year <= g.year), heads = ['sv', 'fh', 'ohv', 'sohc', 'dohc'];
+  // ---- part group + its controls ----
+  const x0 = AX + 124, gi = app.egroup || 0, [gk, gname, keys] = PART_GROUPS[gi], before = JSON.stringify(e);
+  app.egroup = PART_GROUPS.findIndex(x => x[1] === cycler(S, x0, AY + 20, 110, 'PART GROUP', PART_GROUPS.map(x => x[1]), gname));
+  const lay = Object.keys(LAYOUTS).filter(k => LAYOUTS[k].year <= g.year), heads = ['sv', 'fh', 'ohv', 'sohc', 'dohc'];
   const headOK = h => h === 'sv' || h === 'fh' || (h === 'ohv' && has(g, 'ohv')) || (h === 'sohc' && has(g, 'ohv') && g.year >= 1946);
-  e.layout = cycler(S, x0, AY + 22, 110, 'LAYOUT', lay, e.layout);
-  const h2 = cycler(S, x0, AY + 46, 110, 'VALVETRAIN', heads, e.head, { names: h => HEADS[h].name, lock: h => !headOK(h) }); if (headOK(h2)) e.head = h2; else if (h2 !== e.head) toast('RESEARCH NEEDED FOR ' + HEADS[h2].name);
-  e.bore = Math.round(slider(S, x0, AY + 72, 110, 'BORE MM', e.bore, 65, 105, { step: 0.5, fmt: v => v.toFixed(1) }) * 2) / 2;
-  e.stroke = Math.round(slider(S, x0, AY + 92, 110, 'STROKE MM', e.stroke, 70, 130, { step: 0.5, fmt: v => v.toFixed(1) }) * 2) / 2;
-  const crMax = maxCR(g.year, e.head); e.cr = slider(S, x0, AY + 112, 110, `COMPRESSION (MAX ${crMax.toFixed(1)})`, Math.min(e.cr, crMax), 4.5, crMax, { step: 0.1, fmt: v => v.toFixed(1) + ':1' });
-  e.cam = slider(S, x0, AY + 132, 110, 'CAM: TORQUE..REVS', e.cam, 0, 1, { step: 0.05 });
-  e.carbs = cycler(S, x0, AY + 152, 110, 'CARBURETTORS', has(g, 'twincarb') ? [1, 2] : [1], e.carbs, { names: n => n + 'X DOWNDRAFT' });
-  e.carbSize = slider(S, x0, AY + 176, 110, 'CARB SIZE', e.carbSize, 0.6, 1.4, { step: 0.05 });
-  e.quality = Math.round(slider(S, x0, AY + 196, 110, 'BUILD QUALITY', e.quality, -3, 3, { step: 1, fmt: v => (v > 0 ? '+' : '') + Math.round(v) }));
-  const es = engineStats({ ...e, year: g.year }), x1 = AX + 242;
-  panel(S, x1, AY + 20, AW - 248, 76, 'OUTPUT');
-  // dyno run: starter (1.1 s) + idle (0.6 s), then the curve is traced while the engine sweeps to redline (2.6 s)
+  const opt = (k, label) => ['cyc', k, label, optsFor(k, g.year), v => PART_OPTS[k][v][0]];
+  const C2 = { layout: ['cyc', 'layout', 'LAYOUT', lay], material: ['cyc', 'material', 'MATERIAL', Object.keys(MATERIALS).filter(k => MATERIALS[k].year <= g.year), v => ({ iron: 'CAST IRON', alHead: 'ALUMINIUM HEAD', alBlock: 'ALUMINIUM BLOCK' })[v]],
+    mains: opt('mains', 'MAIN BEARINGS'), head: ['head'], chamber: opt('chamber', 'COMBUSTION CHAMBER'), bore: ['sl', 'bore', 'BORE MM', 65, 105, 0.5, v => v.toFixed(1)], stroke: ['sl', 'stroke', 'STROKE MM', 70, 130, 0.5, v => v.toFixed(1)],
+    crank: opt('crank', 'CRANKSHAFT'), cwt: opt('cwt', 'COUNTERWEIGHTS'), pistons: opt('pistons', 'PISTONS'), cam: ['sl', 'cam', 'CAM: TORQUE..REVS', 0, 1, 0.05], springs: opt('springs', 'VALVE SPRINGS'), lifters: opt('lifters', 'TAPPETS'),
+    carbType: opt('carbType', 'CARBURETTOR TYPE'), carbs: ['cyc', 'carbs', 'CARBURETTORS', has(g, 'twincarb') ? [1, 2] : [1], n => n + ' X'], carbSize: ['sl', 'carbSize', 'CARB SIZE', 0.6, 1.4, 0.05], manifold: opt('manifold', 'INTAKE MANIFOLD'),
+    cr: ['cr'], advance: ['sl', 'advance', 'SPARK ADVANCE', 0, 1, 0.05, v => v < 0.35 ? 'SAFE' : v < 0.65 ? 'NORMAL' : 'HOT'], exhManifold: opt('exhManifold', 'EXHAUST MANIFOLD'), exhaust: opt('exhaust', 'EXHAUST'), muffler: opt('muffler', 'MUFFLER'),
+    cooling: opt('cooling', 'COOLING'), radiator: ['sl', 'radiator', 'RADIATOR SIZE', 0.7, 1.4, 0.05, v => Math.round(v * 100) + '%'], lube: opt('lube', 'LUBRICATION'), oil: ['sl', 'oil', 'OIL CAPACITY', 0.7, 1.4, 0.05, v => Math.round(v * 100) + '%'] };
+  const rows = [...PART_GROUPS[app.egroup][2], 'q'];
+  scrollArea(S, 'epart' + app.egroup, x0 - 2, AY + 42, 114, 166, rows.length * 22 + 4, dy => rows.forEach((k, i) => { const y = AY + 46 + i * 22 - dy, c = C2[k];
+    if (k === 'q') { e.gq[PART_GROUPS[app.egroup][0]] = Math.round(slider(S, x0, y + 2, 108, 'GROUP QUALITY', e.gq[PART_GROUPS[app.egroup][0]], -3, 3, { step: 1, fmt: v => (v > 0 ? '+' : '') + Math.round(v), id: 'gq' + app.egroup })); return; }
+    if (c[0] === 'head') { const h2 = cycler(S, x0, y, 108, 'VALVETRAIN', heads, e.head, { names: h => HEADS[h].name, lock: h => !headOK(h) }); if (headOK(h2)) e.head = h2; else if (h2 !== e.head) toast('RESEARCH NEEDED FOR ' + HEADS[h2].name); return; }
+    if (c[0] === 'cr') { const crMax = maxCR(g.year, e.head, e.chamber); e.cr = slider(S, x0, y + 2, 108, `COMPRESSION (MAX ${crMax.toFixed(1)})`, Math.min(e.cr, crMax), 4.5, crMax, { step: 0.1, fmt: v => v.toFixed(1) + ':1', id: 'ecr' }); return; }
+    if (c[0] === 'sl') { const v0 = e[k] ?? (k === 'advance' || k === 'radiator' || k === 'oil' ? (k === 'advance' ? 0.5 : 1) : c[3]); e[k] = slider(S, x0, y + 2, 108, c[2], v0, c[3], c[4], { step: c[5], fmt: c[6] || (v => v.toFixed(2)), id: 'e' + k }); if (k === 'bore' || k === 'stroke') e[k] = Math.round(e[k] * 2) / 2; return; }
+    const list = c[3], dflt = list[0]; e[k] = cycler(S, x0, y, 108, c[2], list, list.includes(e[k]) ? e[k] : dflt, { names: c[4] || (v => String(v)) }); }));
+  e.quality = Math.round(Object.values(e.gq).reduce((a, b) => a + b, 0) / PART_GROUPS.length);
+  if (JSON.stringify(e) !== before) app.endu = null;
+  const es = engineStats({ ...e, year: g.year }), x1 = AX + 242, pw1 = AW - 248;
+  // ---- output: dyno curve + figures ----
+  panel(S, x1, AY + 20, pw1, 76, 'OUTPUT');
   const dy = app.dyno, pr = dy ? Math.max(0, Math.min(1, (app.t - dy.f0 - 102) / 156)) : 1, cur = dy?.curve || es.curve, k = Math.max(1, Math.round(pr * cur.length));
   const mxT = Math.max(...cur.map(p => Math.max(p.T, p.hp * 2))) * 1.08, ghost = app.lastDyno && app.lastDyno !== cur ? [{ pts: app.lastDyno.map(p => p.T), c: C.paperDark }] : [];
   graph(S, x1 + 4, AY + 30, 66, 62, [...ghost, { pts: cur.slice(0, k).map(p => p.T).concat(Array(Math.max(0, cur.length - k)).fill(NaN)), c: C.teal }, { pts: cur.slice(0, k).map(p => p.hp * 2).concat(Array(Math.max(0, cur.length - k)).fill(NaN)), c: C.red }], { max: mxT, labels: [{ t: 'NM', c: C.teal }, { t: 'HP', c: C.red }] });
   if (dy && pr > 0 && pr < 1) { const p = cur[k - 1]; S.fill(x1 + 5 + Math.round((k - 1) / Math.max(1, cur.length - 1) * 63), AY + 31, 1, 60, C.oxblood); text(S, `${p.rpm} RPM`, x1 + 6, AY + 84, C.oxblood); }
   if (dy && app.t - dy.f0 > 300) { app.lastDyno = dy.curve; app.dyno = null; }
-  const sx = x1 + 73; [['DISPLACE', `${es.litres.toFixed(2)}L ${Math.round(es.cid)}CI`], ['POWER', `${es.hp.toFixed(0)}HP @${es.hpRpm}`], ['TORQUE', `${es.torque.toFixed(0)}NM @${es.tRpm}`], ['REDLINE', es.redline + ' RPM'],
-    ['MASS', es.mass + ' KG'], ['SMOOTH', Math.round(es.smooth * 100) + '%'], ['RELIABLE', Math.round(es.reliability * 100) + '%'], ['UNIT COST', money(es.cost)]].forEach(([l, v], i) => stat(S, sx, AY + 30 + i * 8, l, v, C.ink, 38));
-  const vw = app.engView || 'cut'; panel(S, x1, AY + 100, AW - 248, 100, vw === 'cut' ? 'CUTAWAY' : 'SIDE VIEW (SCALE)');
-  if (button(S, x1 + AW - 302, AY + 101, 26, 7, 'CUT', { active: vw === 'cut' })) app.engView = 'cut'; if (button(S, x1 + AW - 274, AY + 101, 26, 7, 'EXT', { active: vw === 'ext' })) app.engView = 'ext';
-  if (vw === 'ext') { const spr = engineSprite(e, AW - 256, 80); if (spr) { drawPix(S, spr, P, x1 + 4 + Math.max(0, (AW - 256 - spr.w) / 2) | 0, AY + 108 + Math.max(0, 84 - spr.h) | 0, 1); text(S, `1PX = ${spr.mm}MM`, x1 + 4, AY + 110, C.inkSoft); } }
-  else { const live = dy ? (app.t - dy.f0 < 66 ? 0 : app.t - dy.f0 < 102 ? 40 : 40 + pr * 200) : app.visRpm ?? 30, th0 = app.th || 0; app.th = th0 + live * 6 / 60;
-    drawCutaway(S, x1 + 4, AY + 110, AW - 256, 74, e, app.th); if (live && live <= 90 && fired(e.layout, th0, app.th).length) AU.sfx('pop');
-    if (!dy) app.visRpm = slider(S, x1 + 4, AY + 184, 76, 'CRANK SPEED', app.visRpm ?? 30, 0, 160, { step: 5, fmt: v => (v ? Math.round(v) + '' : 'STOP'), id: 'visrpm' }); }
-  if (vw === 'ext') text(S, `${es.len}MM LONG  ${es.height}MM TALL`, x1 + 4, AY + 188, C.inkSoft, 1, AW - 330);
-  if (button(S, AX + AW - 70, AY + 186, 62, 12, 'DYNO TEST', { tone: 'teal', disabled: !!app.dyno })) { AU.dyno({ ...e, litres: es.litres }, g.year, es.redline); app.dyno = { f0: app.t, curve: es.curve }; app.engView = 'cut'; }
-  const cost = es.tooling, can = g.cash >= cost; text(S, `TOOLING ${money(cost)} / ${es.engMonths} MONTHS`, x1, AY + 206, C.ink);
-  if (button(S, x1, AY + 214, 120, 16, 'TOOL UP FAMILY', { tone: 'ox', disabled: !can })) confirmBox('TOOL UP ENGINE FAMILY', [`COST ${money(cost)}`, `TAKES ${es.engMonths} MONTHS`], () => { const id = 'E' + g.serial++; g.engines.push({ ...e, id, from: undefined, name: `${e.layout}-${HEADS[e.head].name.split(' ')[0]} ${es.litres.toFixed(1)}`, readyAt: dateNum(g) + es.engMonths, tooling: cost }); g.cash -= cost; toast('ENGINE TOOLING STARTED'); });
+  const sx = x1 + 73; [['DISPLACE', `${es.litres.toFixed(2)}L ${Math.round(es.cid)}CI`], ['POWER', `${es.hp.toFixed(0)}HP @${es.hpRpm}`], ['TORQUE', `${es.torque.toFixed(0)}NM @${es.tRpm}`], ['REDLINE', `${es.redline}`],
+    ['MASS', es.mass + ' KG'], ['SMOOTH', Math.round(es.smooth * 100) + '%'], ['RELIABLE', Math.round(es.reliability * 100) + '%'], ['UNIT COST', money(es.cost)]].forEach(([l, v], i) => stat(S, sx, AY + 30 + i * 8, l, v, i === 6 && es.reliability < 0.7 ? C.red : C.ink, 38));
+  // ---- views ----
+  const VW = [['ext', 'EXT'], ['cut', 'CUT'], ['expl', 'EXPL'], ['build', 'BUILD'], ['test', 'TEST']], vw = app.engView || 'ext';
+  panel(S, x1, AY + 100, pw1, 100, '');
+  VW.forEach(([k2, l], i) => { if (button(S, x1 + 2 + i * 30, AY + 101, 29, 8, l, { active: vw === k2 })) { app.engView = k2; if (k2 === 'build') app.ebuild = app.t; } });
+  const ix = x1 + 3, iy = AY + 110, iw = pw1 - 6, ih = 76;
+  if (vw === 'cut') { const live = dy ? (app.t - dy.f0 < 66 ? 0 : app.t - dy.f0 < 102 ? 40 : 40 + pr * 200) : app.visRpm ?? 30, th0 = app.th || 0; app.th = th0 + live * 6 / 60;
+    drawCutaway(S, ix, iy, iw, ih - 2, e, app.th); if (live && live <= 90 && fired(e.layout, th0, app.th).length) AU.sfx('pop');
+    if (!dy) app.visRpm = slider(S, ix, AY + 186, 76, 'CRANK SPEED', app.visRpm ?? 30, 0, 160, { step: 5, fmt: v => (v ? Math.round(v) + '' : 'STOP'), id: 'visrpm' }); }
+  else if (vw === 'expl') { const set = engineSet(e, g.year, iw, ih, true), hv = drawEngineSet(set, ix, iy, iw, ih, { exploded: true }); text(S, hv ? hv.name : 'POINT AT A PART', ix, AY + 190, hv ? C.oxblood : C.inkSoft, 1, iw); }
+  else if (vw === 'build') { const set = engineSet(e, g.year, iw, ih), t = app.t - (app.ebuild ?? app.t); drawEngineSet(set, ix, iy, iw, ih, { upto: true, t });
+    const k2 = Math.floor(t / 18); if (t % 18 === 17 && k2 < BUILD_ORDER.length) AU.sfx(k2 === 0 ? 'clunk' : k2 < 4 ? 'ratchet' : 'wrench'); const cur2 = BUILD_ORDER[Math.min(BUILD_ORDER.length - 1, k2)];
+    text(S, k2 < BUILD_ORDER.length ? PART_NAMES[cur2] : 'ASSEMBLED', ix, AY + 190, C.oxblood, 1, iw - 40); if (button(S, ix + iw - 36, AY + 188, 36, 9, 'AGAIN')) app.ebuild = app.t; }
+  else if (vw === 'test') { const set = engineSet(e, g.year, iw, ih - 10), en = app.endu, hrs = en ? Math.min(100, Math.floor((app.t - en.f0) / 3)) : 0, fails = en ? en.res.failures.filter(f => f.h <= hrs) : [];
+    drawEngineSet(set, ix, iy - 4, iw, ih - 10, { red: fails.flatMap(f => FAIL_PARTS[f.part] || []) });
+    if (en) { text(S, `${hrs} H ${hrs >= 100 ? '- DONE' : 'AT FULL LOAD'}`, ix, AY + 176, C.ink); text(S, fails.length ? fails.map(f => f.part + ' @' + f.h + 'H').join(', ') : hrs >= 100 ? 'NO FAILURES' : '', ix, AY + 184, fails.length ? C.red : C.green, 1, iw);
+      if (hrs < 100 && (app.t - en.f0) % 30 === 0) AU.sfx('hiss'); if (fails.length && fails[fails.length - 1].h === hrs && (app.t - en.f0) % 3 === 0) AU.sfx('clunk'); }
+    if (button(S, ix + iw - 56, AY + 188, 56, 9, 'RUN 100 H', { disabled: !!en && hrs < 100 })) { app.endu = { f0: app.t, res: durability({ ...e }, g.year, (g.serial * 7 + Math.round(e.bore * 3 + e.stroke)) | 0) }; AU.dyno({ ...e, litres: es.litres }, g.year, es.redline); } }
+  else { const set = engineSet(e, g.year, iw, ih); drawEngineSet(set, ix, iy, iw, ih); text(S, `${es.len}MM LONG  ${es.height}MM TALL  LIMIT: ${es.limitBy}`, ix, AY + 190, C.inkSoft, 1, iw); }
+  if (button(S, AX + AW - 70, AY + 204, 62, 12, 'DYNO TEST', { tone: 'teal', disabled: !!app.dyno })) { AU.dyno({ ...e, litres: es.litres }, g.year, es.redline); app.dyno = { f0: app.t, curve: es.curve }; }
+  // ---- development: a new family (block + head tooling) or a variant of an existing family ----
+  const dc = devCost(e, g.year, g.engines), can = g.cash >= dc.cost;
+  text(S, `${dc.kind}${dc.of ? ' (' + dc.of.name + ')' : ''} ${money(dc.cost)} / ${dc.months} MO`, x1, AY + 206, C.ink, 1, pw1 - 70);
+  if (button(S, x1, AY + 216, 120, 14, dc.kind === 'VARIANT' ? 'DEVELOP VARIANT' : 'TOOL UP FAMILY', { tone: 'ox', disabled: !can })) confirmBox(dc.kind === 'VARIANT' ? 'DEVELOP ENGINE VARIANT' : 'TOOL UP ENGINE FAMILY', [`COST ${money(dc.cost)}`, `TAKES ${dc.months} MONTHS`, dc.kind === 'VARIANT' ? 'SAME BLOCK AND HEAD CASTINGS.' : 'NEW BLOCK AND HEAD TOOLING.'], () => {
+    const id = 'E' + g.serial++; g.engines.push({ ...JSON.parse(JSON.stringify(e)), id, from: undefined, name: `${e.layout}-${HEADS[e.head].name.split(' ')[0]} ${es.litres.toFixed(1)}`, readyAt: dateNum(g) + dc.months, tooling: dc.cost,
+      maxBore: dc.of ? dc.of.maxBore ?? dc.of.bore + 4 : e.bore + 4, maxStroke: dc.of ? dc.of.maxStroke ?? dc.of.stroke + 6 : e.stroke + 6 }); g.cash -= dc.cost; toast(dc.kind === 'VARIANT' ? 'ENGINE VARIANT STARTED' : 'ENGINE TOOLING STARTED'); });
 }
 function gearbox(g) { windowBox(S, AX, AY, AW, AH, 'GEARBOX + DRIVELINE');
   const d = app.gdraft || (app.gdraft = { type: g.gearboxes[0].type, gears: 3, first: 2.9, top: 1.0 });
@@ -353,7 +399,7 @@ function cars(g) {
   // ---- preview (what this place shows) ----
   panel(S, cx, AY + 20, pw, 92, st.id === 'platform' && pst ? pst.kg + ' KG  STIFFNESS ' + Math.round(pst.stiff * 100) + '  STRENGTH X' + pst.margin.toFixed(2) + '  $' + pst.cost : st.id === 'body' ? `L${dm.len} W${dm.width} H${dm.height} WB${dm.wb} MM` : st.where);
   if (st.id === 'brief') briefDoc(g, d, cx + 3, AY + 29, pw - 6, 80);
-  else if (st.id === 'engine') { const e = g.engines.find(x => x.id === d.engineId); const es = e && engineSprite(e, 190, 76); if (es) drawPix(S, es, P, cx + ((pw - es.w) >> 1), AY + 106 - es.h, 1); else text(S, 'NO ENGINE READY', cx + 6, AY + 50, C.red); }
+  else if (st.id === 'engine') { const e = g.engines.find(x => x.id === d.engineId); if (e) drawEngineSet(engineSet(e, g.year, pw - 8, 76), cx + 4, AY + 30, pw - 8, 76); else text(S, 'NO ENGINE READY', cx + 6, AY + 50, C.red); }   // the part-built engine
   else if (st.id === 'driveline') { gearMesh(cx + 10, AY + 26, d.final, app.t); text(S, 'FINAL DRIVE ' + d.final.toFixed(2) + ' : 1', cx + 120, AY + 40, C.ink); text(S, 'PINION AND CROWN WHEEL', cx + 120, AY + 50, C.inkSoft, 1, 76); }
   else if (st.id === 'detail') { const NP = 5, inP = input.x >= cx && input.x < cx + pw && input.y >= AY + 20 && input.y < AY + 112;   // swipe / arrows: dashboard, side, front, rear, paint board
     if (inP && input.clicked && !input.drag) app.sw = input.x; if (app.sw != null && !input.down) { const dx = input.x - app.sw; if (dx < -14) app.dpage = ((app.dpage || 0) + 1) % NP; if (dx > 14) app.dpage = ((app.dpage || 0) + NP - 1) % NP; app.sw = null; }

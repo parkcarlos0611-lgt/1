@@ -4,6 +4,7 @@ import { lang, hooks, clip } from './ui.mjs';
 import { tr } from './i18n.mjs';
 import { textField, N, editing } from './ui.mjs';
 import { suggest } from './names.mjs';
+import { POS0, POS_R, clampPos, placeFront, placeSide } from '../tools/pixel/gen/v3/place.mjs';
 import { TRIM_NAMES, wheelsFor, WHEEL_NAMES, wwMax, trimSide, trimFront } from '../tools/pixel/gen/v3/trim.mjs';
 import { scrollArea } from './ui.mjs';
 import { W, H, C, Sheet, drawPix, input, text, tw, windowBox, panel, button, slider, cycler, bar, stat, graph, desk, bevel, rivet, lineTo } from './ui.mjs';
@@ -70,8 +71,8 @@ function v3Sprite(des, paintIdx, view = 'side', rot = 0, strip = null) {
   const key = 'V3' + view + JSON.stringify(des) + paintIdx + rot + (strip || ''); if (app.cache.has(key)) return app.cache.get(key);
   let out = { px: null }; try { const paint = typeof paintIdx === 'string' ? paintIdx : 'paint.c' + paintIdx;
     const meas = des.base && des.base !== 'free';                                                       // measured base car -> warped replica
-    if (view === 'side') { const spec = meas ? measuredSide(des, paint, strip) : sideSpec(des, paint); trimSide(spec, des.tv, paint); if (strip === 'wheel') spec.wheel = { style: 'disc', paint: 'black', whitewall: 0, cap: false }; spec.wheel = { ...spec.wheel, rot }; out = { px: buildCar(P, spec, Math.max(25, Math.ceil(spec.len / 190))), spec }; }
-    else out = { px: buildFront(P, trimFront(meas ? measuredView(des, paint, view === 'rear', strip) : (view === 'front' ? frontSpec : rearSpec)(des, paint), des.tv, paint, view === 'rear'), 25) }; } catch (e) { console.warn(e); }
+    if (view === 'side') { const spec = meas ? measuredSide(des, paint, strip) : sideSpec(des, paint); trimSide(spec, des.tv, paint); placeSide(spec, des.pos); if (strip === 'wheel') spec.wheel = { style: 'disc', paint: 'black', whitewall: 0, cap: false }; spec.wheel = { ...spec.wheel, rot }; out = { px: buildCar(P, spec, Math.max(25, Math.ceil(spec.len / 190))), spec }; }
+    else { const fs = placeFront(trimFront(meas ? measuredView(des, paint, view === 'rear', strip) : (view === 'front' ? frontSpec : rearSpec)(des, paint), des.tv, paint, view === 'rear'), des.pos, view === 'rear'); out = { px: buildFront(P, fs, 25), handles: fs.handles || [], warn: fs.warn || [], grilleArea: fs.grilleArea ?? 1 }; } } catch (e) { console.warn(e); }
   app.cache.set(key, out); if (app.cache.size > 160) app.cache.delete(app.cache.keys().next().value); return out; }
 // blueprint re-scan: white linework on blue paper revealed by a moving scan bar
 function blueprint(px, x0, y0, prog0) { const un = Math.min(1, prog0 / 0.14), prog = Math.max(0, (prog0 - 0.14) / 0.86), sy = Math.round(px.h * prog);   // the sheet unrolls, then the scan bar prints it
@@ -322,6 +323,7 @@ function cars(g) {
   let des = d.v3 || (d.v3 = measuredDesign(baseList(g.year).includes('sedan30') ? 'sedan30' : baseList(g.year)[0], g.year)); if (des.year !== g.year) des.year = g.year;
   const meas = des.base && des.base !== 'free', baseOpts = ['free', ...baseList(g.year)], prevBase = des.base || 'free'; if (!des.base) des.base = 'free';
   if (!des.plat) des.plat = platformDefault(des.base, g.year);
+  des.pos = clampPos(des.pos || { ...POS0 });
   if (des.plat.wb == null) { des.plat.wb = des.wb; des.plat.width = des.width; } clampFrame(des.plat, g.year);
   const fitBody = nb => { if (nb === 'free') return true; const r2 = measuredRanges({ base: nb }); return des.plat.wb >= r2.wb[0] - 1 && des.plat.wb <= r2.wb[1] + 1 && des.plat.width >= r2.width[0] - 1 && des.plat.width <= r2.width[1] + 1; };
   { const wl = wheelsFor(Math.round(d.trim ?? 1), g.year); if (!wl.includes(d.wheel)) d.wheel = wl[wl.length - 1]; d.ww = Math.min(d.ww ?? 0, wwMax(Math.round(d.trim ?? 1))); des.tv = { trim: Math.round(d.trim ?? 1), wheel: d.wheel, ww: d.ww }; }
@@ -377,9 +379,13 @@ function cars(g) {
         ['sl', 'bumperBars', 'BUMPER BARS', 1, 2, v => Math.round(v) + '', 1], ['cyc', 'guards', 'BUMPER GUARDS', [0, 2, 3]], ['cyc', 'fog', 'FOG LAMPS', [false, true]], ['cyc', 'ornament', 'HOOD ORNAMENT', [true, false]]);
       if (view === 'rear') ctl.push(['cyc', 'tailLamp', 'TAIL LAMPS', opt('tailLamp')], ['sl', 'tailY', 'TAIL LAMP SPACING (MIRRORED)', 0.4, 0.95, v => Math.round(v * des.width) + 'MM', 0.01], ['cyc', 'rearWindow', 'REAR WINDOW', opt('rearWindow')], ['cyc', 'spare', 'SPARE', opt('spare')], ['cyc', 'guards', 'BUMPER GUARDS', [0, 2, 3]]);
     } }
+  if (st.id === 'body' && (view === 'front' || view === 'rear')) { const sg = v => (v > 0 ? '+' : '') + Math.round(v) + 'MM', pc = v => Math.round(v * 100) + '%', P2 = (k, l, f, stp) => ['ps', k, l, POS_R[k][0], POS_R[k][1], f, stp];   // symmetric placement
+    if (view === 'front') ctl.push(P2('lampDY', 'LAMP SPACING (MIRRORED)', sg, 5), P2('lampDZ', 'LAMP HEIGHT', sg, 5), P2('lampK', 'LAMP SIZE', pc, 0.01), P2('grilleDZ', 'GRILLE POSITION', sg, 5), P2('grilleW', 'GRILLE WIDTH', pc, 0.01), P2('grilleH', 'GRILLE HEIGHT', pc, 0.01), P2('bumperDZ', 'BUMPER HEIGHT', sg, 5), P2('bumperW', 'BUMPER WIDTH', pc, 0.01));
+    else ctl.push(P2('tailDY', 'TAIL LAMP SPACING (MIRRORED)', sg, 5), P2('tailDZ', 'TAIL LAMP HEIGHT', sg, 5), P2('rBumperDZ', 'BUMPER HEIGHT', sg, 5)); }
   const before = JSON.stringify(des);
   scrollArea(S, 'design-' + st.id + view, AX + 4, AY + 19, 94, 210, ctl.length * 19 + 6, dy => ctl.forEach(([kind, key, label, a, b, fmt, step], i) => { const y = AY + 23 + i * 19 - dy, nm = fmt || (v => (v === true ? 'YES' : v === false ? 'NO' : String(v).toUpperCase()));
-    if (kind === 'name') { const obj = a; if (!ro) obj[key] = nameField('nm' + st.id + label, AX + 6, y - 2, 86, label, obj[key] || '', b, 16); else text(S, N(obj[key] || '-'), AX + 6, y + 5, C.ink, 1, 86); }
+    if (kind === 'ps') des.pos[key] = slider(S, AX + 6, y, 86, label, des.pos[key], a, b, { step, fmt, id: 'd3q' + key });
+    else if (kind === 'name') { const obj = a; if (!ro) obj[key] = nameField('nm' + st.id + label, AX + 6, y - 2, 86, label, obj[key] || '', b, 16); else text(S, N(obj[key] || '-'), AX + 6, y + 5, C.ink, 1, 86); }
     else if (kind === 'pls') des.plat[key] = slider(S, AX + 6, y, 86, label, des.plat[key], a, b, { step, fmt, id: 'd3p' + key });
     else if (kind === 'pl') des.plat[key] = cycler(S, AX + 6, y - 2, 86, label, a, a.includes(des.plat[key]) ? des.plat[key] : a[0], { names: fmt });
     else if (kind === 'sh') des.shape[key] = slider(S, AX + 6, y, 86, label, des.shape[key] || 0, a, b, { step, fmt, id: 'd3s' + key });
@@ -398,7 +404,7 @@ function cars(g) {
   if (JSON.stringify(des) !== before) {                                                                       // design changed: a part swap is fitted, anything else is re-scanned
     const o = JSON.parse(before), ch = Object.keys(des).filter(k => JSON.stringify(des[k]) !== JSON.stringify(o[k])), kinds = [...new Set(ch.map(k => PARTK[k] || 'shape'))];
     if (app.t - (app.lastEdit ?? -99) > 30) { (app.undo = app.undo || []).push(before); if (app.undo.length > 40) app.undo.shift(); app.redo = []; } app.lastEdit = app.t;
-    if (ch.length === 1 && (ch[0] === 'shape' || ch[0] === 'tv')) { /* live reshaping / trim: redrawn at once */ }
+    if (ch.length === 1 && (ch[0] === 'shape' || ch[0] === 'tv' || ch[0] === 'pos' || ch[0] === 'bodyName')) { /* live reshaping / trim: redrawn at once */ }
     else if (des.base !== 'free' && o.base === des.base && kinds.length === 1 && kinds[0] !== 'shape') { app.fit = { t: app.t, old: o, strip: kinds[0], view }; app.bpT = -999; } else { app.bpT = app.t; app.fit = null; } }
   d.type = des.type; d.feats.unibody = des.plat.type === 'unibody';
   const cx = AX + 100, pw = 200;
@@ -412,7 +418,9 @@ function cars(g) {
   const dm = { len: spec ? Math.round(spec.len) : 0, width: Math.round(des.width), height: Math.round(des.roof), wb: Math.round(des.wb) };
   const style = des.base !== 'free' ? (TEMPLATES.find(t => t.id === des.base)?.style || 'box') : des.frontFender === 'integrated' ? 'pontoon' : des.rake > 18 || des.tail === 'fastback' ? 'stream' : 'box';
   const hoodLen = spec ? spec.geo.cowlX - 250 : 1200;
-  const car = { ...d, v3: undefined, launch: undefined, dims: dm, platStats: pst, plat: JSON.parse(JSON.stringify(des.plat)), relMod: d.relMod || 0, body: { style, wb: dm.wb, hood: hoodLen / Math.max(1, dm.wb), height: dm.height / Math.max(1, dm.wb) }, designScore: 0.68 + (style !== 'box' ? 0.06 : 0) - notes.length * 0.02 + (d.reviewBonus || 0) };
+  const frontInfo = v3Sprite(des, d.paint, 'front');
+  const car = { ...d, v3: undefined, launch: undefined, dims: dm, platStats: pst, plat: JSON.parse(JSON.stringify(des.plat)), relMod: d.relMod || 0, body: { style, wb: dm.wb, hood: hoodLen / Math.max(1, dm.wb), height: dm.height / Math.max(1, dm.wb) }, designScore: 0.68 + (style !== 'box' ? 0.06 : 0) - notes.length * 0.02 + (d.reviewBonus || 0) - (frontInfo.warn?.length ? 0.04 : 0) };
+  car.relMod = (d.relMod || 0) - Math.max(0, 0.85 - (frontInfo.grilleArea ?? 1)) * 0.2;
   const ev = readyE.length && readyG.length ? evaluate(g, car) : null;
   const tool = Math.round((40000 + dm.wb * 8 + (style !== 'box' ? 20000 : 0) + (d.feats.unibody ? 30000 : 0)) * (reuse ? 0.7 : 1)), prepMo = 2 + (style === 'stream' ? 1 : style === 'pontoon' ? 2 : 0) + (d.feats.unibody ? 1 : 0);
   const costOf = i => (i === 8 ? tool : i === 1 ? (reuse ? 500 : uniB ? 1500 : DEV[1].cost) : i === 4 && uniB ? DEV[4].cost + 6000 : DEV[i].cost), moOf = i => (i === 8 ? prepMo : i === 1 && (reuse || uniB) ? 0 : i === 4 && uniB ? DEV[4].mo + 1 : DEV[i].mo);   // carried-over frame: cheap and quick; unit body: structure is done with the body
@@ -478,6 +486,17 @@ function cars(g) {
         const act = input.drag === id; if (act) { if (!input.down) input.drag = null; else { const SR = shapeRanges(des)[h.k]; des.shape[h.k] = Math.max(SR[0], Math.min(SR[1], app.hd.v0 + (h.ax === 'x' ? input.x - app.hd.x0 : app.hd.y0 - input.y) * px.mm)); app.lastEdit = app.t; } }
         S.fill(hx - 3, hy - 3, 7, 7, C.ink); S.fill(hx - 2, hy - 2, 5, 5, act ? C.red : near ? C.brassL : C.brass); S.fill(h.ax === 'x' ? hx - 5 : hx, h.ax === 'x' ? hy : hy - 5, h.ax === 'x' ? 11 : 1, h.ax === 'x' ? 1 : 11, act || near ? C.red : C.inkSoft);
         if (near || act) text(S, ({ screen: 'WINDSHIELD TOP', crown: 'ROOF CROWN', back: 'REAR WINDOW TOP', deck: 'DECK HEIGHT', nose: 'NOSE RAKE', fTail: 'FRONT FENDER TAIL', fCrown: 'FRONT FENDER CROWN' })[h.k], cx + 3, AY + 29, C.red, 1, pw - 60); } }
+    if (st.id === 'body' && (view === 'front' || view === 'rear') && px && !ro && shown.handles) { const ox = cx + Math.max(2, (pw - px.w) / 2) | 0, oy = AY + 106 - px.h, mx = ox + px.w / 2, SX = y => Math.round(mx + y / 25), SY = z => Math.round(oy + px.h - 3 - z / 25); let anyHot = false;
+      for (const h of shown.handles) { const hx = SX(h.y), hy = SY(h.z), id = 'Q' + h.k, near = Math.abs(input.x - hx) <= 4 && Math.abs(input.y - hy) <= 4;
+        if (near && input.clicked && !input.drag) { input.drag = id; app.hd = { x0: input.x, y0: input.y, p0: { ...des.pos }, old: JSON.parse(JSON.stringify(des)) }; (app.undo = app.undo || []).push(JSON.stringify(des)); app.redo = []; app.lastEdit = app.t; AU.sfx('click'); }
+        const act = input.drag === id; if (act) { const dxm = (input.x - app.hd.x0) * 25, dzm = (app.hd.y0 - input.y) * 25, p0 = app.hd.p0;
+          if (!input.down) { input.drag = null; const kind = h.k.startsWith('grille') ? 'grille' : h.k.includes('umper') ? 'bumpers' : h.k === 'tail' ? 'tail' : 'lamps'; app.fit = { t: app.t - 10, old: app.hd.old, strip: kind, view }; }   // dropped: the part is fitted in its new place
+          else { if (h.k === 'lamp') { des.pos.lampDY = p0.lampDY + dxm; des.pos.lampDZ = p0.lampDZ + dzm; } else if (h.k === 'tail') { des.pos.tailDY = p0.tailDY + dxm; des.pos.tailDZ = p0.tailDZ + dzm; }
+            else if (h.ax === 'z') des.pos[h.k] = p0[h.k] + dzm; else des.pos[h.k] = p0[h.k] + dxm / Math.max(100, h.base || 400); clampPos(des.pos); app.lastEdit = app.t; } }
+        anyHot = anyHot || near || act; const col = act ? C.red : near ? C.brassL : C.brass;
+        S.fill(hx - 3, hy - 3, 7, 7, C.ink); S.fill(hx - 2, hy - 2, 5, 5, col); if (h.y > 1) { const gx = SX(-h.y); S.fill(gx - 2, hy - 2, 5, 5, C.ink); S.fill(gx - 1, hy - 1, 3, 3, col); if (near || act) for (let x = gx + 3; x < hx - 3; x += 3) S.fill(x, hy, 1, 1, C.red); } }   // the mirrored twin moves with it
+      if (anyHot) for (let y = oy; y < oy + px.h; y += 3) S.fill(Math.round(mx), y, 1, 2, C.red);                                                       // centre line
+      if (shown.warn?.length) text(S, shown.warn[0], cx + 3, AY + 29, C.red, 1, pw - 6); }
     if (view === 'shape') text(S, 'DRAG THE HANDLES', cx + 3, AY + 104, C.inkSoft, 1, pw - 6);
     if (view === 'frame' && pst && pst.margin < 1) text(S, 'FRAME TOO WEAK - CRACKS IN SERVICE', cx + 3, AY + 104, C.red, 1, pw - 6);
     if (st.id === 'body' && notes.length) text(S, 'ERA LIMIT: ' + notes.join(', ').toUpperCase(), cx + 3, AY + 104, C.red, 1, pw - 6); }

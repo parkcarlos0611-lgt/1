@@ -1,0 +1,37 @@
+# Design decisions
+
+Each decision is listed with its date. The newest come first.
+
+## 2026-11-19 — reboot (plan: docs/REBOOT_PLAN.md)
+
+### Platform and code
+- **Engine:** TypeScript. Rendering on PixiJS 8.
+- **Packaging:** Capacitor for Android and iOS; Electron for Steam on Windows and Mac.
+- **Project location:** the new project is the `gearhouse/` folder itself. The first test build moves whole into `legacy/` with git mv; nothing is deleted. Its last commit before the move is `42b7f86` (game page version 27).
+- **What carries over from the first build:**
+  - Calculation formulas carry over: engine, chassis, gearbox and acceleration.
+  - Real-time physics and the drive screens are redesigned from a cause analysis (plan chapter 2). The old code is reference only.
+
+### Scope, time and people
+- **Countries:** USA, UK, Germany, France and Japan. The vertical slice uses the USA only.
+- **Time:**
+  - One day takes 8 s at 1x, 4 s at 2x and about 2.7 s at 3x.
+  - The game stops often, on many kinds of events.
+  - Skipping shows the days going by one at a time, quickly, and stops when an event happens.
+- **Public figures:** real people are named in the news. Nazi symbols never appear in pictures.
+- **Founder lifespan:** 80% of founders live to a Beta(5,3) lifespan mapped onto 49–99 years. 20% die earlier, at a random point in life; war, racing and period medicine move that point.
+
+### Art and screens
+- **Top-down driving is the default**; side-on shots are used only in some scenes. Top-down cars are sprite stacks about 300 px long.
+- **Asset sizes:** vehicles and parts are drawn about 400 px long, at roughly 12.5 mm/px. Asset scale is kept separate from screen scale. Pixel size is the same everywhere within one scene, and only integer scales are used.
+- **Who makes what:**
+  - Backgrounds and props are drawn by hand or adapted from images the planner makes.
+  - Vehicles and parts are generated from the design data.
+- **UI quality gate:** every screen is checked for click and touch targets, window overlap and text overflow before it is called done.
+- **Real brands:** car makers' names and logos are replaced with invented ones; historical events stay real.
+
+### Carried over from the first build
+These decisions still hold, from `legacy/docs/MASTER_GAME_PLAN.md`:
+- No real car or company brand names, logos or badges appear on screen.
+- Engine sound is synthesised from the design values.
+- No code ever uses the email address of the planner.

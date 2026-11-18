@@ -1,0 +1,21 @@
+{
+  "name": "gearhouse",
+  "private": true,
+  "version": "0.2.0",
+  "type": "module",
+  "description": "GEARHOUSE - a 1930s-onward car company and founder-family simulation in detailed pixel art",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "vite": "^5.4.11",
+    "vitest": "^2.1.8"
+  },
+  "dependencies": {
+    "pixi.js": "^8.6.6"
+  }
+}

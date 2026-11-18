@@ -2,6 +2,8 @@
 import * as AU from './audio.mjs';
 import { lang, hooks, clip } from './ui.mjs';
 import { tr } from './i18n.mjs';
+import { textField, N, editing } from './ui.mjs';
+import { suggest } from './names.mjs';
 import { TRIM_NAMES, wheelsFor, WHEEL_NAMES, wwMax, trimSide, trimFront } from '../tools/pixel/gen/v3/trim.mjs';
 import { scrollArea } from './ui.mjs';
 import { W, H, C, Sheet, drawPix, input, text, tw, windowBox, panel, button, slider, cycler, bar, stat, graph, desk, bevel, rivet, lineTo } from './ui.mjs';
@@ -120,7 +122,7 @@ function settings() {
 }
 function newgame() {
   desk(S); windowBox(S, 60, 20, 360, 230, 'NEW COMPANY'); const n = app.ng;
-  n.name = cycler(S, 75, 42, 200, 'COMPANY NAME', NAMES, n.name);
+  n.name = nameField('ngname', 75, 40, 200, 'COMPANY NAME', n.name, 'company', 24);
   n.country = cycler(S, 75, 68, 200, 'HOME COUNTRY', Object.keys(COUNTRIES), n.country, { names: k => COUNTRIES[k].name });
   n.year = Math.round(slider(S, 75, 96, 200, 'START YEAR', n.year, 1930, 1945, { step: 1, fmt: v => String(Math.round(v)) }));
   n.capital = cycler(S, 75, 116, 200, 'STARTING CAPITAL', [100000, 250000, 500000], n.capital, { names: money });
@@ -135,12 +137,14 @@ function newgame() {
 function load() {
   desk(S); windowBox(S, 120, 40, 240, 180, 'LOAD COMPANY');
   for (let i = 1; i <= 3; i++) { const sv = store.get('gh_slot_' + i), y = 66 + (i - 1) * 40; panel(S, 135, y, 210, 32);
-    if (sv) { text(S, sv.name, 140, y + 5, C.ink); text(S, `${MONTHS[sv.month - 1]} ${sv.year}  ${money(sv.cash)}`, 140, y + 14, C.inkSoft); if (button(S, 290, y + 8, 48, 15, 'LOAD')) { app.g = sv; app.scene = 'hq'; app.tab = 'news'; } }
+    if (sv) { text(S, N(sv.name), 140, y + 5, C.ink); text(S, `${MONTHS[sv.month - 1]} ${sv.year}  ${money(sv.cash)}`, 140, y + 14, C.inkSoft); if (button(S, 290, y + 8, 48, 15, 'LOAD')) { app.g = sv; app.scene = 'hq'; app.tab = 'news'; } }
     else text(S, `SLOT ${i} - EMPTY`, 140, y + 12, C.inkSoft); }
   if (button(S, 135, 196, 80, 16, 'BACK')) app.scene = 'title';
 }
 // ---------- HQ ----------
 const TABS = [['news', 'OFFICE'], ['engines', 'ENGINES'], ['gearbox', 'GEARBOX'], ['cars', 'CAR DESIGN'], ['prod', 'PRODUCTION'], ['research', 'RESEARCH'], ['market', 'MARKET'], ['finance', 'FINANCE'], ['save', 'SAVE'], ['menu', 'MENU']];
+// name field + dice (suggestion) button
+function nameField(id, x, y, w, label, value, kind, max = 16) { const v = textField(S, id, x, y, w - 13, label, value, { max }); if (button(S, x + w - 12, y + 7, 12, 11, '?', { tone: 'teal' })) { AU.sfx('click'); return suggest(kind, lang.ko); } return v; }
 function confirmBox(title, lines, yes) { app.ask = { title, lines: lines.filter(Boolean), yes }; AU.sfx('click'); }
 function hq() { const ask = app.ask, saved = ask ? { ...input } : null; if (ask) Object.assign(input, { clicked: false, down: false, x: -99, y: -99, wheel: 0 });
   hqBody(); if (ask && app.ask === ask) { Object.assign(input, saved);
@@ -149,7 +153,7 @@ function hq() { const ask = app.ask, saved = ask ? { ...input } : null; if (ask)
 function hqBody() {
   const g = app.g; desk(S);
   bevel(S, 0, 0, W, 16, C.oxblood, C.oxL, C.oxD); rivet(S, 4, 7); rivet(S, W - 6, 7);
-  text(S, g.name, 10, 6, C.brassL); const dt = `${MONTHS[g.month - 1]} ${g.year}`; text(S, dt, 200, 6, C.white);
+  text(S, N(g.name), 10, 6, C.brassL); const dt = `${MONTHS[g.month - 1]} ${g.year}`; text(S, dt, 200, 6, C.white);
   text(S, money(g.cash), 280, 6, g.cash < 0 ? hex('#ffb0a0') : C.brassL); text(S, `REP ${Math.round(g.rep * 100)}`, 360, 6, C.white); if (g.loan > 0) text(S, `LOAN ${money(g.loan)}`, 280, 0 + 11, hex('#ffb0a0'));
   if (button(S, W - 52, 2, 44, 12, AU.vol.muted ? 'SOUND' : 'MUTE', { tone: 'ox' })) { AU.vol.muted = !AU.vol.muted; AU.applyVolume(); }
   TABS.forEach(([k, l], i) => { if (button(S, 3, 20 + i * 19, 66, 16, l, { active: app.tab === k, tone: k === 'menu' || k === 'save' ? 'teal' : 'brass' })) app.tab = k; });
@@ -193,11 +197,11 @@ function engines(g) { windowBox(S, AX, AY, AW, AH, 'ENGINE DESIGN - PARTS, FAMIL
   const e = app.edraft || (app.edraft = { ...g.engines[0], id: null, name: 'NEW ENGINE', quality: 0 });
   if (!e.gq) e.gq = Object.fromEntries(PART_GROUPS.map(([k]) => [k, e.quality || 0]));
   panel(S, AX + 6, AY + 20, 112, AH - 26, 'YOUR ENGINES'); scrollArea(S, 'englist', AX + 7, AY + 29, 110, AH - 46, g.engines.length * 15 + 4, dy => g.engines.forEach((x, i) => { const y = AY + 31 + i * 15 - dy, rdy = x.readyAt <= dateNum(g);
-    if (button(S, AX + 9, y, 106, 13, `${x.name.slice(0, 13)} ${rdy ? '' : '*'}`, { active: app.edraft?.from === x.id })) { app.edraft = { ...JSON.parse(JSON.stringify(x)), from: x.id, id: null, name: x.name + ' B' }; app.endu = null; } }));
+    if (button(S, AX + 9, y, 106, 13, N(x.name.slice(0, 13)) + (rdy ? '' : ' *'), { active: app.edraft?.from === x.id })) { app.edraft = { ...JSON.parse(JSON.stringify(x)), from: x.id, id: null, name: x.name + ' B' }; app.endu = null; } }));
   text(S, '* = TOOLING IN PROGRESS', AX + 9, AY + AH - 14, C.inkSoft);
   // ---- part group + its controls ----
-  const x0 = AX + 124, gi = app.egroup || 0, [gk, gname, keys] = PART_GROUPS[gi], before = JSON.stringify(e);
-  app.egroup = PART_GROUPS.findIndex(x => x[1] === cycler(S, x0, AY + 20, 110, 'PART GROUP', PART_GROUPS.map(x => x[1]), gname));
+  const x0 = AX + 124, gi = app.egroup || 0, [gk, gname, keys] = PART_GROUPS[gi]; e.name = nameField('ename', x0, AY + 18, 110, 'ENGINE NAME', e.name, 'engine'); const before = JSON.stringify(e);
+  app.egroup = PART_GROUPS.findIndex(x => x[1] === cycler(S, x0, AY + 40, 110, 'PART GROUP', PART_GROUPS.map(x => x[1]), gname));
   const lay = Object.keys(LAYOUTS).filter(k => LAYOUTS[k].year <= g.year), heads = ['sv', 'fh', 'ohv', 'sohc', 'dohc'];
   const headOK = h => h === 'sv' || h === 'fh' || (h === 'ohv' && has(g, 'ohv')) || (h === 'sohc' && has(g, 'ohv') && g.year >= 1946);
   const opt = (k, label) => ['cyc', k, label, optsFor(k, g.year), v => PART_OPTS[k][v][0]];
@@ -208,7 +212,7 @@ function engines(g) { windowBox(S, AX, AY, AW, AH, 'ENGINE DESIGN - PARTS, FAMIL
     cr: ['cr'], advance: ['sl', 'advance', 'SPARK ADVANCE', 0, 1, 0.05, v => v < 0.35 ? 'SAFE' : v < 0.65 ? 'NORMAL' : 'HOT'], exhManifold: opt('exhManifold', 'EXHAUST MANIFOLD'), exhaust: opt('exhaust', 'EXHAUST'), muffler: opt('muffler', 'MUFFLER'),
     cooling: opt('cooling', 'COOLING'), radiator: ['sl', 'radiator', 'RADIATOR SIZE', 0.7, 1.4, 0.05, v => Math.round(v * 100) + '%'], lube: opt('lube', 'LUBRICATION'), oil: ['sl', 'oil', 'OIL CAPACITY', 0.7, 1.4, 0.05, v => Math.round(v * 100) + '%'] };
   const rows = [...PART_GROUPS[app.egroup][2], 'q'];
-  scrollArea(S, 'epart' + app.egroup, x0 - 2, AY + 42, 114, 166, rows.length * 22 + 4, dy => rows.forEach((k, i) => { const y = AY + 46 + i * 22 - dy, c = C2[k];
+  scrollArea(S, 'epart' + app.egroup, x0 - 2, AY + 62, 114, 148, rows.length * 22 + 4, dy => rows.forEach((k, i) => { const y = AY + 66 + i * 22 - dy, c = C2[k];
     if (k === 'q') { e.gq[PART_GROUPS[app.egroup][0]] = Math.round(slider(S, x0, y + 2, 108, 'GROUP QUALITY', e.gq[PART_GROUPS[app.egroup][0]], -3, 3, { step: 1, fmt: v => (v > 0 ? '+' : '') + Math.round(v), id: 'gq' + app.egroup })); return; }
     if (c[0] === 'head') { const h2 = cycler(S, x0, y, 108, 'VALVETRAIN', heads, e.head, { names: h => HEADS[h].name, lock: h => !headOK(h) }); if (headOK(h2)) e.head = h2; else if (h2 !== e.head) toast('RESEARCH NEEDED FOR ' + HEADS[h2].name); return; }
     if (c[0] === 'cr') { const crMax = maxCR(g.year, e.head, e.chamber); e.cr = slider(S, x0, y + 2, 108, `COMPRESSION (MAX ${crMax.toFixed(1)})`, Math.min(e.cr, crMax), 4.5, crMax, { step: 0.1, fmt: v => v.toFixed(1) + ':1', id: 'ecr' }); return; }
@@ -249,21 +253,22 @@ function engines(g) { windowBox(S, AX, AY, AW, AH, 'ENGINE DESIGN - PARTS, FAMIL
   const dc = devCost(e, g.year, g.engines), can = g.cash >= dc.cost;
   text(S, `${dc.kind}${dc.of ? ' (' + dc.of.name + ')' : ''} ${money(dc.cost)} / ${dc.months} MO`, x1, AY + 206, C.ink, 1, pw1 - 70);
   if (button(S, x1, AY + 216, 120, 14, dc.kind === 'VARIANT' ? 'DEVELOP VARIANT' : 'TOOL UP FAMILY', { tone: 'ox', disabled: !can })) confirmBox(dc.kind === 'VARIANT' ? 'DEVELOP ENGINE VARIANT' : 'TOOL UP ENGINE FAMILY', [`COST ${money(dc.cost)}`, `TAKES ${dc.months} MONTHS`, dc.kind === 'VARIANT' ? 'SAME BLOCK AND HEAD CASTINGS.' : 'NEW BLOCK AND HEAD TOOLING.'], () => {
-    const id = 'E' + g.serial++; g.engines.push({ ...JSON.parse(JSON.stringify(e)), id, from: undefined, name: `${e.layout}-${HEADS[e.head].name.split(' ')[0]} ${es.litres.toFixed(1)}`, readyAt: dateNum(g) + dc.months, tooling: dc.cost,
+    const id = 'E' + g.serial++, auto = !e.name || e.name === 'NEW ENGINE' || / B$/.test(e.name); g.engines.push({ ...JSON.parse(JSON.stringify(e)), id, from: undefined, name: auto ? `${e.layout}-${HEADS[e.head].name.split(' ')[0]} ${es.litres.toFixed(1)}` : e.name, readyAt: dateNum(g) + dc.months, tooling: dc.cost,
       maxBore: dc.of ? dc.of.maxBore ?? dc.of.bore + 4 : e.bore + 4, maxStroke: dc.of ? dc.of.maxStroke ?? dc.of.stroke + 6 : e.stroke + 6 }); g.cash -= dc.cost; toast(dc.kind === 'VARIANT' ? 'ENGINE VARIANT STARTED' : 'ENGINE TOOLING STARTED'); });
 }
 function gearbox(g) { windowBox(S, AX, AY, AW, AH, 'GEARBOX + DRIVELINE');
   const d = app.gdraft || (app.gdraft = { type: g.gearboxes[0].type, gears: 3, first: 2.9, top: 1.0 });
-  panel(S, AX + 6, AY + 20, 112, AH - 26, 'YOUR GEARBOXES'); g.gearboxes.forEach((x, i) => text(S, `${x.name.slice(0, 16)}${x.readyAt > dateNum(g) ? '*' : ''}`, AX + 10, AY + 32 + i * 10, C.ink));
+  panel(S, AX + 6, AY + 20, 112, AH - 26, 'YOUR GEARBOXES'); g.gearboxes.forEach((x, i) => text(S, N(x.name.slice(0, 16)) + (x.readyAt > dateNum(g) ? '*' : ''), AX + 10, AY + 32 + i * 10, C.ink));
   const x0 = AX + 124, types = Object.keys(GEARBOX).filter(k => GEARBOX[k].year <= g.year), ok = k => k === 'crash3' || has(g, { sync3: 'sync3', sync4: 'sync4', od3: 'od', fluid: 'fluid', hydra4: 'hydra', tc2: 'hydra' }[k]);
   const t2 = cycler(S, x0, AY + 22, 160, 'TYPE', types, d.type, { names: k => GEARBOX[k].name, lock: k => !ok(k) }); if (ok(t2)) d.type = t2; else if (t2 !== d.type) toast('RESEARCH NEEDED');
+  d.name = nameField('gname', x0 + 170, AY + 20, 100, 'GEARBOX NAME', d.name || '', 'gearbox');
   const G = GEARBOX[d.type]; d.gears = Math.max(G.gears[0], Math.min(G.gears[1], d.gears));
   d.gears = cycler(S, x0, AY + 48, 160, 'FORWARD GEARS', Array.from({ length: G.gears[1] - G.gears[0] + 1 }, (_, i) => G.gears[0] + i), d.gears, { names: n => n + ' SPEEDS' });
   d.first = slider(S, x0, AY + 76, 160, '1ST GEAR RATIO', d.first, 2.0, 4.0, { step: 0.05 }); d.top = slider(S, x0, AY + 96, 160, 'TOP GEAR RATIO', d.top, d.type === 'od3' ? 0.7 : 0.9, 1.0, { step: 0.01 });
   const R = proposeRatios(d.gears, d.first, d.top); text(S, 'RATIOS: ' + R.join(' / '), x0, AY + 118, C.oxblood);
   [['EFFICIENCY', Math.round(G.eff * 100) + '%'], ['MASS', G.mass + ' KG'], ['COMFORT', Math.round(G.comfort * 100) + '%'], ['SHIFT TIME', G.shift + ' S'], ['UNIT COST', money(G.cost)]].forEach(([l, v], i) => stat(S, x0, AY + 132 + i * 9, l, v));
   panel(S, AX + 300, AY + 20, AW - 306, 120, 'RATIO LADDER'); R.forEach((r, i) => { const h = Math.round(r / 4 * 90); S.fill(AX + 310 + i * 18, AY + 130 - h, 12, h, C.teal); text(S, String(i + 1), AX + 313 + i * 18, AY + 133, C.ink); });
-  if (button(S, x0, AY + 186, 140, 16, `BUILD ($15,000 / 3 MO)`, { tone: 'ox', disabled: g.cash < 15000 })) confirmBox('BUILD GEARBOX', ['COST $15,000', 'TAKES 3 MONTHS'], () => { g.gearboxes.push({ id: 'G' + g.serial++, name: `${d.gears}-SPD ${G.name.split(' ').slice(-1)[0]}`, type: d.type, gears: d.gears, ratios: R, readyAt: dateNum(g) + 3 }); g.cash -= 15000; toast('GEARBOX TOOLING STARTED'); });
+  if (button(S, x0, AY + 186, 140, 16, `BUILD ($15,000 / 3 MO)`, { tone: 'ox', disabled: g.cash < 15000 })) confirmBox('BUILD GEARBOX', ['COST $15,000', 'TAKES 3 MONTHS'], () => { g.gearboxes.push({ id: 'G' + g.serial++, name: d.name || `${d.gears}-SPD ${G.name.split(' ').slice(-1)[0]}`, type: d.type, gears: d.gears, ratios: R, readyAt: dateNum(g) + 3 }); g.cash -= 15000; toast('GEARBOX TOOLING STARTED'); });
 }
 // ---------- car development: 9 stages in their real order, each in its own place, with time and cost ----------
 // brief -> platform -> engine -> driveline -> body -> mock-up (executive review) -> detail -> prototype & test (defects) -> production prep (tooling)
@@ -280,14 +285,14 @@ const DEV = [
 // a stage that finished this month: mock-up waits for the review, prototype for the defect decision, tooling launches the model
 function devTick(g) { const d = g.proj; if (!d || !d.busy || dateNum(g) < d.busy.until) return; const { i, fix } = d.busy; d.busy = null; AU.sfx('stamp');
   if (i === 8 && d.launch) { const L = d.launch; g.models.push({ ...L, id: 'M' + g.serial++, plan: Math.min(Math.round((d.volume || 3000) / 12), g.factory), readyAt: dateNum(g), sold: 0, stock: 0 });   // monthly plan from the brief's annual volume
-    g.news.unshift({ t: L.name + ' ENTERS PRODUCTION', d: dateNum(g) }); g.proj = null; app.draft = null; app.dstage = null; toast('MODEL IN PRODUCTION'); return; }
+    g.news.unshift({ t: N(L.name) + ' ENTERS PRODUCTION', d: dateNum(g) }); g.proj = null; app.draft = null; app.dstage = null; toast('MODEL IN PRODUCTION'); return; }
   d.done[i] = true;
   if (i === 7 && fix) { d.relMod = (d.relMod || 0) + 0.015 * (d.defects?.length || 0); d.defects = null; d.testDue = false; d.stage = 8; toast('DEFECTS FIXED'); return; }
   if (i === 5) d.reviewDue = true; else if (i === 7) d.testDue = true; else d.stage = i + 1; toast(DEV[i].name + ' COMPLETE'); }
 const tr2 = s => (lang.ko ? tr(s) : s);
 function briefDoc(g, d, x, y, w, h) {                                       // typed project brief
   S.fill(x, y, w, h, C.white); S.fill(x, y, w, 1, C.paperDark); const sg = SEGS[d.seg], top = Object.entries(sg.w).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k]) => k.toUpperCase()).join(', ');
-  const lines = ['PROJECT BRIEF - ' + d.name, MONTHS[g.month - 1] + ' ' + g.year + '  ' + COUNTRIES[g.country].name, '', 'SEGMENT: ' + d.seg.toUpperCase(), 'TARGET PRICE: ' + money(d.price), 'VOLUME: ' + d.volume + ' CARS / YEAR', 'BUYERS VALUE: ' + top].map(tr2);
+  const lines = ['PROJECT BRIEF - ' + N(d.name), MONTHS[g.month - 1] + ' ' + g.year + '  ' + COUNTRIES[g.country].name, '', 'SEGMENT: ' + d.seg.toUpperCase(), 'TARGET PRICE: ' + money(d.price), 'VOLUME: ' + d.volume + ' CARS / YEAR', 'BUYERS VALUE: ' + top].map(tr2);
   const key = lines.join('|'); if (app.briefKey !== key) { app.briefKey = key; app.briefT = app.t; }
   let n = Math.floor((app.t - app.briefT) * 1.4); const total = lines.join('').length;
   lines.forEach((l, i) => { const s = l.slice(0, Math.max(0, n)); n -= l.length; if (s) text(S, s, x + 6, y + 5 + i * 10, i ? C.ink : C.oxblood, 1, w - 10); });
@@ -310,7 +315,7 @@ function cars(g) {
   let d = g.proj || (g.proj = { name: 'MODEL ' + String.fromCharCode(65 + g.models.length), type: 'sedan4d', seg: 'family', engineId: readyE[0]?.id, gbId: readyG[0]?.id, final: 4.1, price: 850, volume: 3000, trim: 1, paint: 0, feats: {}, stage: 0, done: [], busy: null, spent: 0 });
   if (d.stage == null) Object.assign(d, { stage: 0, done: [], busy: null, spent: 0, volume: 3000 }); app.draft = d;
   devTick(g); if (g.proj !== d) { app.tab = 'prod'; return; }
-  windowBox(S, AX, AY, AW, AH, 'NEW CAR PROJECT - ' + d.name);
+  windowBox(S, AX, AY, AW, AH, 'NEW CAR PROJECT - ' + N(d.name));
   const vs = app.dstage != null && app.dstage <= d.stage ? app.dstage : d.stage, st = DEV[vs], ro = vs < d.stage || !!d.busy, snap = ro ? JSON.stringify(d) : null;
   // ---- body design record (v3 / measured base) and platform ----
   let des = d.v3 || (d.v3 = measuredDesign(baseList(g.year).includes('sedan30') ? 'sedan30' : baseList(g.year)[0], g.year)); if (des.year !== g.year) des.year = g.year;
@@ -324,9 +329,9 @@ function cars(g) {
   const R0 = ranges(g.year), opt = (k, key) => optionsFor(key || k, g.year), NM = { sedan4d: '4-DOOR SEDAN', coupe2d: '2-DOOR COUPE' };
   const ctl = [];   // [kind, key, label, a, b, fmt, step]
   const MR = meas ? measuredRanges(des) : null, srcs = baseList(g.year), sn = id => baseName(id), mm = v => Math.round(v) + 'MM', yn = (a, b) => v => (v ? b : a);
-  if (st.id === 'brief') ctl.push(['dcyc', 'seg', 'TARGET SEGMENT', Object.keys(SEGS), null, k => k.toUpperCase()], ['dsl', 'price', 'TARGET PRICE', 350, 5000, money, 10], ['dsl', 'volume', 'ANNUAL VOLUME', 500, 30000, v => Math.round(v) + ' CARS', 100]);
+  if (st.id === 'brief') ctl.push(['name', 'name', 'MODEL NAME', d, 'model'], ['dcyc', 'seg', 'TARGET SEGMENT', Object.keys(SEGS), null, k => k.toUpperCase()], ['dsl', 'price', 'TARGET PRICE', 350, 5000, money, 10], ['dsl', 'volume', 'ANNUAL VOLUME', 500, 30000, v => Math.round(v) + ' CARS', 100]);
   if (st.id === 'platform') { const pl = des.plat, uni = pl.type === 'unibody';
-    ctl.push(['cyc', 'base', 'BASE CAR', baseOpts, null, id => id === 'free' ? 'FREE DESIGN' : baseName(id)]);
+    ctl.push(['name', 'name', 'PLATFORM NAME', des.plat, 'platform'], ['cyc', 'base', 'BASE CAR', baseOpts, null, id => id === 'free' ? 'FREE DESIGN' : baseName(id)]);
     if (meas) ctl.push(['sl', 'wb', 'WHEELBASE', ...MR.wb, mm, 10], ['sl', 'width', 'WIDTH', ...MR.width, mm, 10]); else ctl.push(['sl', 'wb', 'WHEELBASE', 1867, 4430, mm, 25], ['sl', 'width', 'WIDTH', 1146, 2215, mm, 10]);
     ctl.push(['pl', 'type', 'FRAME TYPE', typesFor(g.year, k => has(g, k)), null, k => FRAME_TYPES[k].name], ['pl', 'grade', 'STEEL GRADE', gradesFor(g.year), null, k => GRADES[k].name]);
     if (uni) ctl.push(['pls', 'railT', 'PANEL GAUGE', 0.9, 2.5, v => v.toFixed(1) + 'MM', 0.1]);
@@ -334,13 +339,14 @@ function cars(g) {
     else ctl.push(['pls', 'railH', 'RAIL DEPTH', 90, 280, mm, 5], ['pls', 'railT', 'STEEL GAUGE', 2.5, 8, v => v.toFixed(2) + 'MM', 0.25], ['pls', 'cross', 'CROSS-MEMBERS', 3, 8, v => Math.round(v) + '', 1], ['pls', 'kick', 'KICK-UP OVER AXLE', 0, 260, mm, 5]);
     if (has(g, 'ifs')) ctl.push(['fcyc', 'ifs', 'FRONT SUSPENSION', [false, true], null, yn('BEAM AXLE', 'INDEPENDENT')]);
     if (has(g, 'hydbrake')) ctl.push(['fcyc', 'hydbrake', 'BRAKES', [false, true], null, yn('MECHANICAL', 'HYDRAULIC')]); }
-  if (st.id === 'engine' && readyE.length) ctl.push(['dcyc', 'engineId', 'ENGINE', readyE.map(e => e.id), null, id => g.engines.find(e => e.id === id).name]);
-  if (st.id === 'driveline' && readyG.length) ctl.push(['dcyc', 'gbId', 'GEARBOX', readyG.map(x => x.id), null, id => g.gearboxes.find(x => x.id === id).name], ['dsl', 'final', 'FINAL DRIVE', 3.0, 5.5, v => v.toFixed(2), 0.05]);
-  if (st.id === 'detail') { const tr0 = Math.round(d.trim ?? 1); ctl.push(['dsl', 'trim', 'TRIM LEVEL', 0, 3, v => TRIM_NAMES[Math.round(v)], 1], ['dcyc', 'wheel', 'WHEELS', wheelsFor(tr0, g.year), null, k => WHEEL_NAMES[k]]);
+  if (st.id === 'engine' && readyE.length) ctl.push(['dcyc', 'engineId', 'ENGINE', readyE.map(e => e.id), null, id => N(g.engines.find(e => e.id === id).name)]);
+  if (st.id === 'driveline' && readyG.length) ctl.push(['dcyc', 'gbId', 'GEARBOX', readyG.map(x => x.id), null, id => N(g.gearboxes.find(x => x.id === id).name)], ['dsl', 'final', 'FINAL DRIVE', 3.0, 5.5, v => v.toFixed(2), 0.05]);
+  if (st.id === 'detail') { const tr0 = Math.round(d.trim ?? 1); d.trimNames = d.trimNames || [...TRIM_NAMES]; g.paintNames = g.paintNames || PAINTS.map((_, i) => 'COLOUR ' + (i + 1));
+    ctl.push(['dsl', 'trim', 'TRIM LEVEL', 0, 3, v => N(d.trimNames[Math.round(v)]), 1], ['name', tr0, 'TRIM NAME', d.trimNames, 'suffix'], ['dcyc', 'wheel', 'WHEELS', wheelsFor(tr0, g.year), null, k => WHEEL_NAMES[k]]);
     if (wwMax(tr0) > 0) ctl.push(['dsl', 'ww', 'WHITEWALL', 0, wwMax(tr0), v => Math.round(v * 100) + '%', 0.05]); if (has(g, 'steelroof')) ctl.push(['fcyc', 'steelroof', 'ROOF', [false, true], null, yn('FABRIC INSERT', 'ALL STEEL')]);
-    ctl.push(['dcyc', 'paint', 'PAINT', PAINTS.map((_, i) => i), null, i => 'COLOUR ' + (i + 1)], ['dsl', 'price', 'LIST PRICE', 350, 5000, money, 10]); }
+    ctl.push(['dcyc', 'paint', 'PAINT', PAINTS.map((_, i) => i), null, i => N(g.paintNames[i])], ['name', d.paint, 'COLOUR NAME', g.paintNames, 'colour'], ['dsl', 'price', 'LIST PRICE', 350, 5000, money, 10]); }
   if (st.id === 'prep') ctl.push(['dsl', 'volume', 'ANNUAL VOLUME', 500, 30000, v => Math.round(v) + ' CARS', 100]);
-  if (st.id === 'body') {
+  if (st.id === 'body') { if (view === 'side') ctl.push(['name', 'bodyName', 'BODY STYLE NAME', des, 'body']);
     if (meas) {
       if (view === 'shape') { const SR = shapeRanges(des), SL = { screen: 'WINDSHIELD TOP', crown: 'ROOF CROWN', back: 'REAR WINDOW TOP', deck: 'DECK HEIGHT', nose: 'NOSE RAKE', fTail: 'FRONT FENDER TAIL', fCrown: 'FRONT FENDER CROWN' };
         for (const k of SHAPE_KEYS) if (SR[k][1] > SR[k][0]) ctl.push(['sh', k, SL[k], SR[k][0], SR[k][1], v => (v > 0 ? '+' : '') + Math.round(v) + 'MM', 5]); }
@@ -365,7 +371,8 @@ function cars(g) {
     } }
   const before = JSON.stringify(des);
   scrollArea(S, 'design-' + st.id + view, AX + 4, AY + 19, 94, 210, ctl.length * 19 + 6, dy => ctl.forEach(([kind, key, label, a, b, fmt, step], i) => { const y = AY + 23 + i * 19 - dy, nm = fmt || (v => (v === true ? 'YES' : v === false ? 'NO' : String(v).toUpperCase()));
-    if (kind === 'pls') des.plat[key] = slider(S, AX + 6, y, 86, label, des.plat[key], a, b, { step, fmt, id: 'd3p' + key });
+    if (kind === 'name') { const obj = a; if (!ro) obj[key] = nameField('nm' + st.id + label, AX + 6, y - 2, 86, label, obj[key] || '', b, 16); else text(S, N(obj[key] || '-'), AX + 6, y + 5, C.ink, 1, 86); }
+    else if (kind === 'pls') des.plat[key] = slider(S, AX + 6, y, 86, label, des.plat[key], a, b, { step, fmt, id: 'd3p' + key });
     else if (kind === 'pl') des.plat[key] = cycler(S, AX + 6, y - 2, 86, label, a, a.includes(des.plat[key]) ? des.plat[key] : a[0], { names: fmt });
     else if (kind === 'sh') des.shape[key] = slider(S, AX + 6, y, 86, label, des.shape[key] || 0, a, b, { step, fmt, id: 'd3s' + key });
     else if (kind === 'sl') des[key] = slider(S, AX + 6, y, 86, label, des[key], a, b, { step: step || 0, fmt: fmt || (v => v.toFixed(2)), id: 'd3' + key });
@@ -459,7 +466,7 @@ function cars(g) {
   const finishNow = i => { d.done[i] = true; if (i === 5) d.reviewDue = true; else if (i === 7) d.testDue = true; else d.stage = i + 1; AU.sfx('stamp'); };
   const reopen = i => { d.stage = i; d.done = d.done.slice(0, i); d.reviewDue = d.testDue = false; d.review = null; d.defects = null; d.busy = null; app.dstage = i; AU.sfx('stamp'); };
   const actBtn = (l, o) => button(S, cx + 2, AY + 198, pw - 4, 14, l, o);
-  const info = { brief: ['SET THE TARGET: SEGMENT, PRICE AND VOLUME.', `${SEGS[d.seg].price.map(money).join(' - ')} IS THIS SEGMENT'S PRICE BAND.`, `OUR MODELS IN IT: ${g.models.filter(m => m.seg === d.seg && !m.dead).map(m => m.name).join(', ') || 'NONE'}`],
+  const info = { brief: ['SET THE TARGET: SEGMENT, PRICE AND VOLUME.', `${SEGS[d.seg].price.map(money).join(' - ')} IS THIS SEGMENT'S PRICE BAND.`, `OUR MODELS IN IT: ${g.models.filter(m => m.seg === d.seg && !m.dead).map(m => N(m.name)).join(', ') || 'NONE'}`],
     platform: ['CHOOSE THE BASE CAR, WHEELBASE AND FRAME.', 'WEAK STEEL SHOWS RED ON THE DRAWING.', 'IT CARRIES EVERYTHING THAT FOLLOWS.'],
     engine: [ev ? `${ev.es.hp.toFixed(0)} HP  ${ev.es.litres.toFixed(2)} L  ${Math.round(ev.es.mass)} KG` : 'NO ENGINE READY', ev && ev.fit ? 'FITS BETWEEN THE FRAME RAILS.' : 'TOO LONG FOR THIS BAY.', 'NEW ENGINES ARE DESIGNED IN THE ENGINES ROOM.'],
     driveline: [ev ? `TOP ${ev.sim.topMph.toFixed(0)} MPH  0-60 ${ev.sim.zeroSixty ? ev.sim.zeroSixty.toFixed(1) + ' S' : '-'}  ${ev.sim.mpg.toFixed(1)} MPG` : '-', 'HIGHER RATIO: QUICKER, THIRSTIER.', ''],
@@ -506,7 +513,7 @@ function prod(g) { windowBox(S, AX, AY, AW, AH, 'PRODUCTION PLANNING');
   text(S, `FACTORY CAPACITY ${g.factory} CARS / MONTH`, AX + 8, AY + 22, C.ink);
   if (button(S, AX + 200, AY + 19, 120, 12, 'EXPAND +500 ($40,000)', { disabled: g.cash < 40000 })) { g.factory += 500; g.cash -= 40000; }
   const live = g.models.filter(m => !m.dead); if (!live.length) text(S, 'NO MODELS YET - USE CAR DESIGN.', AX + 8, AY + 50, C.oxblood);
-  scrollArea(S, 'prod', AX + 4, AY + 34, AW - 8, AH - 38, live.length * 54 + 6, dy => live.forEach((m, i) => { const y = AY + 36 + i * 54 - dy; panel(S, AX + 6, y, AW - 12, 50, `${m.name} - ${m.seg.toUpperCase()}`);
+  scrollArea(S, 'prod', AX + 4, AY + 34, AW - 8, AH - 38, live.length * 54 + 6, dy => live.forEach((m, i) => { const y = AY + 36 + i * 54 - dy; panel(S, AX + 6, y, AW - 12, 50, N(m.name) + ` - ${m.seg.toUpperCase()}`);
     const sp = m.sprite.v3 ? v3Sprite(m.sprite.v3, m.sprite.paint).px : m.sprite.v2 ? v2Sprite(m.sprite.v2, m.sprite.paint).px : carSprite(m.sprite.year, m.sprite.body, m.sprite.paint, m.sprite.type).px; if (sp) drawPix(S, sp, P, AX + 10, y + 48 - Math.min(sp.h, 40), 1);
     const x = AX + 230, ready = m.readyAt <= dateNum(g); if (!ready) { text(S, `IN DEVELOPMENT - ${m.readyAt - dateNum(g)} MONTHS`, x, y + 14, C.oxblood); return; }
     m.price = Math.round(slider(S, x, y + 10, 70, 'PRICE', m.price, 350, 5000, { step: 10, fmt: money, id: m.id + 'p' }));
@@ -534,9 +541,9 @@ function finance(g) { windowBox(S, AX, AY, AW, AH, 'FINANCE'); graph(S, AX + 8, 
   if (button(S, AX + 250, AY + 222, 70, 13, 'BORROW 10K', { disabled: (g.loan || 0) + 10000 > (g.credit || g.factory * 60) })) confirmBox('BORROW $10,000', ['INTEREST IS CHARGED EVERY MONTH.'], () => { g.loan = (g.loan || 0) + 10000; g.cash += 10000; });
   if (button(S, AX + 325, AY + 222, 70, 13, 'REPAY 10K', { disabled: !(g.loan >= 10000) || g.cash < 10000 })) { g.loan -= 10000; g.cash -= 10000; } }
 function save(g) { windowBox(S, AX, AY, AW, AH, 'SAVE COMPANY'); for (let i = 1; i <= 3; i++) { const sv = store.get('gh_slot_' + i), y = AY + 26 + (i - 1) * 34; panel(S, AX + 10, y, 260, 28);
-  text(S, sv ? `${sv.name} - ${MONTHS[sv.month - 1]} ${sv.year}` : `SLOT ${i} - EMPTY`, AX + 15, y + 11, sv ? C.ink : C.inkSoft);
+  text(S, sv ? `${N(sv.name)} - ${MONTHS[sv.month - 1]} ${sv.year}` : `SLOT ${i} - EMPTY`, AX + 15, y + 11, sv ? C.ink : C.inkSoft);
   if (button(S, AX + 220, y + 7, 44, 14, 'SAVE')) toast(store.set('gh_slot_' + i, g) ? 'SAVED TO SLOT ' + i : 'SAVE FAILED (STORAGE BLOCKED)'); } }
-function menu(g) { windowBox(S, AX + 120, AY + 50, 160, 110, 'MENU'); if (button(S, AX + 135, AY + 75, 130, 16, 'SETTINGS')) app.scene = 'settings'; if (button(S, AX + 135, AY + 97, 130, 16, 'QUIT TO TITLE')) { app.scene = 'title'; app.g = null; }
+function menu(g) { windowBox(S, AX + 120, AY + 30, 160, 130, 'MENU'); g.name = nameField('coname', AX + 135, AY + 48, 130, 'COMPANY NAME', g.name, 'company', 24); if (button(S, AX + 135, AY + 75, 130, 16, 'SETTINGS')) app.scene = 'settings'; if (button(S, AX + 135, AY + 97, 130, 16, 'QUIT TO TITLE')) { app.scene = 'title'; app.g = null; }
   if (button(S, AX + 135, AY + 119, 130, 16, 'BACK TO OFFICE')) app.tab = 'news'; }
 
 // ---------- assembly line (first car of a design) ----------
@@ -547,7 +554,7 @@ function assembly() { const st = drawAssembly(S, P, app.asm, AU.sfx); if (button
 // ---------- end of game: newspaper front page ----------
 function end() { const g = app.g; desk(S); S.fill(60, 10, 360, 250, C.paper); S.fill(64, 14, 352, 242, C.white);
   text(S, 'THE MOTOR GAZETTE', 240 - tw('THE MOTOR GAZETTE', 3) / 2, 20, C.ink, 3); S.fill(70, 38, 340, 1, C.ink); text(S, `${MONTHS[g.month - 1]} ${g.year}`, 72, 41, C.inkSoft);
-  const head = g.over === 'BANKRUPT' ? `${g.name} CLOSES ITS DOORS` : g.over.startsWith('MERGED') ? `${g.name} SOLD TO RIVAL` : `${g.name} ENTERS THE FIFTIES`;
+  const head = g.over === 'BANKRUPT' ? `${N(g.name)} CLOSES ITS DOORS` : g.over.startsWith('MERGED') ? `${N(g.name)} SOLD TO RIVAL` : `${N(g.name)} ENTERS THE FIFTIES`;
   text(S, head, 72, 52, C.oxblood, 1, 336); S.fill(70, 62, 340, 1, C.ink);
   const total = g.models.reduce((a, m) => a + (m.sold || 0), 0); [['CARS SOLD', total.toLocaleString('en-US')], ['FINAL CASH', money(g.cash)], ['BANK LOAN', money(g.loan || 0)], ['REPUTATION', Math.round(g.rep * 100)], ['MODELS', g.models.length]].forEach(([l, v], i) => stat(S, 72, 68 + i * 9, l, v));
   graph(S, 200, 66, 205, 52, [{ pts: g.hist.sales, c: C.teal }], { labels: [{ t: 'CARS SOLD / MONTH', c: C.teal }] });
@@ -563,17 +570,18 @@ function music() { const g = app.g; if (app.scene !== 'hq' || !g) return AU.setS
   const C2 = COUNTRIES[g.country]; AU.setSong(g.year < 1940 ? 'office30' : g.year >= C2.war[0] && g.year <= C2.war[1] ? 'war40' : 'office40'); }
 function frame() { app.t++; music(); if (app.scene !== 'title') AU.passEnd(); ({ title, settings, newgame, load, hq, end, assembly })[app.scene]();
   if (app.toast && app.t < app.toast.until) { const w = tw(app.toast.t) + 16; bevel(S, (W - w) / 2, H - 22, w, 14, C.teal, C.tealL, hex('#1b3f3e')); text(S, app.toast.t, (W - w) / 2 + 8, H - 17, C.white); }
-  cursor(); input.clicked = false; input.wheel = 0; ctx.putImageData(img, 0, 0); requestAnimationFrame(frame); }
+  cursor(); input.clicked = false; input.wheel = 0; input.key = null; if (input.left) { input.left = false; input.x = -1; } ctx.putImageData(img, 0, 0); requestAnimationFrame(frame); }
 function resize() { const vv = window.visualViewport, vw = (vv ? vv.width : innerWidth) - 32, vh = (vv ? vv.height : innerHeight) - 8, fit = Math.max(0.3, Math.min(vw / W, vh / H));
   const k = app.settings.fill === false && fit >= 1 ? Math.floor(fit) : fit; const w = Math.floor(W * k), h = Math.floor(H * k);
   cv.style.width = w + 'px'; cv.style.height = h + 'px'; const sc = document.getElementById('scan'); sc.style.display = app.settings.scan ? 'block' : 'none'; sc.style.width = w + 'px'; sc.style.height = h + 'px'; }
 window.visualViewport?.addEventListener('resize', () => resize());
 const pos = e => { const r = cv.getBoundingClientRect(); input.x = Math.floor((e.clientX - r.left) / r.width * W); input.y = Math.floor((e.clientY - r.top) / r.height * H); };
-cv.addEventListener('pointermove', pos); cv.addEventListener('pointerdown', e => { pos(e); input.down = true; input.clicked = true; AU.unlock(); });
+cv.addEventListener('pointermove', pos); cv.style.touchAction = 'none'; cv.addEventListener('pointerdown', e => { pos(e); input.down = true; input.clicked = true; input.left = false; try { cv.setPointerCapture(e.pointerId); } catch {} AU.unlock(); });
 hooks.click = () => AU.sfx('click'); lang.ko = app.settings.lang === 'ko'; Object.assign(AU.vol, { music: app.settings.music ?? 0.6, sfx: app.settings.sfx ?? 0.8 });
-addEventListener('pointerup', () => { input.down = false; input.drag = null; }); cv.addEventListener('pointerleave', () => { input.x = -1; });
+addEventListener('pointerup', () => { input.down = false; input.drag = null; }); cv.addEventListener('pointerleave', () => { if (input.clicked) input.left = true; else input.x = -1; });   // a tap is kept until a frame has seen it
+addEventListener('pointercancel', () => { input.down = false; input.drag = null; });
 cv.addEventListener('wheel', e => { e.preventDefault(); input.wheel = e.deltaY; }, { passive: false }); addEventListener('resize', resize);
-addEventListener('keydown', e => { if (e.key === 'Escape' && app.scene === 'hq') app.tab = 'menu'; if (e.key === ' ' && app.scene === 'hq' && !app.g.over) { e.preventDefault(); stepMonth(app.g); } });
+addEventListener('keydown', e => { if (editing() || e.target?.tagName === 'INPUT') return; input.key = e.key; if (e.key === 'Escape' && app.scene === 'hq' && !app.ask) app.tab = 'menu'; if (e.key === ' ' && app.scene === 'hq' && !app.g.over) { e.preventDefault(); stepMonth(app.g); } });
 window.__gh = { app, input, stepMonth, lang, AU };
 // keep the running company across page updates in the viewer
 window.claude?.hot?.snapshot?.(() => ({ g: app.g, scene: app.scene, tab: app.tab }));

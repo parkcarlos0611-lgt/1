@@ -25,14 +25,22 @@ const G = { A: '010101111101101', B: '110101110101110', C: '011100100100011', D:
   '(': '010100100100010', ')': '010001001001010', '+': '000010111010000', '=': '000111000111000', ',': '000000000010100', '$': '011110010011110', '%': '101001010100101', '!': '010010010000010', '?': '110001010000010',
   '<': '001010100010001', '>': '100010001010100', "'": '010010000000000', '#': '101111101111101', '&': '010101010101011', '[': '110100100100110', ']': '011001001001011', '_': '000000000000111', '*': '000101010101000', '"': '101101000000000', '^': '010101000000000', '~': '000011110000000', '|': '010010010010010' };
 // Korean mode: phrase-translate, then draw Galmuri7 bitmap glyphs (7px Hangul) - baseline 7px below y
+// full Hangul set for player-typed names, loaded the first time it is needed
+let FULLG = null, fullLoading = false;
+export function ensureFullFont() { if (FULLG || fullLoading) return; fullLoading = true; import('./font_ko_full.mjs').then(m => { FULLG = m.decode(); }).catch(() => { fullLoading = false; }); }
+const glyph = cp => FONT.g[cp] || (FULLG && FULLG[cp]) || ((cp > 0x2fff && ensureFullFont()), FONT.g[63]);
+export const N = name => '\u0001' + String(name ?? '') + '\u0002';     // mark a player name: drawn as typed, never translated
+const MARK = ch => ch === '\u0001' || ch === '\u0002';
 function glyphText(s, str, x, y, c, maxW) { let cx = x; const yb = y + 7;
-  for (const ch of str) { const g = FONT.g[ch.codePointAt(0)] || FONT.g[63]; const [dw, bw, bh, xo, yo] = g; if (maxW && cx + dw - x > maxW) break;
+  for (const ch of str) { if (MARK(ch)) continue; const g = glyph(ch.codePointAt(0)); const [dw, bw, bh, xo, yo] = g; if (maxW && cx + dw - x > maxW) break;
     for (let j = 0; j < bh; j++) { const row = g[5 + j]; for (let i = 0; i < bw; i++) if ((row >> (bw - 1 - i)) & 1) s.fill(cx + xo + i, yb - (bh + yo) + j, 1, 1, c); } cx += dw; } return cx; }
 export function text(s, str, x, y, c = C.ink, sc = 1, maxW = 0) { str = String(str).toUpperCase(); x = Math.round(x); y = Math.round(y);
   if (lang.ko && sc === 1) return glyphText(s, tr(str), x, y - 1, c, maxW);
   let cx = x;
-  for (const ch of str) { if (maxW && cx + 4 * sc - x > maxW) break; const g = G[ch]; if (g) for (let i = 0; i < 15; i++) if (g[i] === '1') s.fill(cx + (i % 3) * sc, y + Math.floor(i / 3) * sc, sc, sc, c); cx += 4 * sc; } return cx; }
-export const tw = (str, sc = 1) => { str = String(str).toUpperCase(); if (lang.ko && sc === 1) { let w = 0; for (const ch of tr(str)) w += (FONT.g[ch.codePointAt(0)] || FONT.g[63])[0]; return w - 1; } return str.length * 4 * sc - sc; };
+  for (const ch of str) { if (MARK(ch)) continue; const cp = ch.codePointAt(0);
+    if (cp > 127 && sc === 1) { const gg = glyph(cp); if (maxW && cx + gg[0] - x > maxW) break; cx = glyphText(s, ch, cx, y - 1, c, 0); continue; }   // Korean letters inside an English screen
+    if (maxW && cx + 4 * sc - x > maxW) break; const g = G[ch]; if (g) for (let i = 0; i < 15; i++) if (g[i] === '1') s.fill(cx + (i % 3) * sc, y + Math.floor(i / 3) * sc, sc, sc, c); cx += 4 * sc; } return cx; }
+export const tw = (str, sc = 1) => { str = String(str).toUpperCase(); if (lang.ko && sc === 1) { let w = 0; for (const ch of tr(str)) if (!MARK(ch)) w += glyph(ch.codePointAt(0))[0]; return w - 1; } let w = 0; for (const ch of str) { if (MARK(ch)) continue; const cp = ch.codePointAt(0); w += cp > 127 && sc === 1 ? glyph(cp)[0] : 4 * sc; } return w - sc; };
 
 // ---- input / immediate-mode widgets ----
 export const hooks = { click: null };
@@ -99,7 +107,7 @@ const SCR = {};
 export function scrollArea(s, id, x, y, w, h, contentH, draw) {
   const st = SCR[id] || (SCR[id] = { off: 0, vel: 0, drag: false, ly: 0 }), max = Math.max(0, contentH - h), over = input.x >= x && input.x < x + w && input.y >= y && input.y < y + h;
   if (over && input.clicked) { st.drag = true; st.ly = input.y; st.start = input.y; st.moved = false; }
-  if (st.drag) { if (!input.down) st.drag = false; else { const dy = input.y - st.ly; if (Math.abs(input.y - st.start) > 3) st.moved = true; st.vel = -dy; st.off -= dy; st.ly = input.y; } }
+  if (st.drag) { if (!input.down) st.drag = false; else { const dy = input.y - st.ly; if (Math.abs(input.y - st.start) > 6) st.moved = true; st.vel = -dy; st.off -= dy; st.ly = input.y; } }
   else { st.off += st.vel; st.vel *= 0.86; if (Math.abs(st.vel) < 0.1) st.vel = 0; }
   if (over && input.wheel) st.off += Math.sign(input.wheel) * 18;
   st.off = Math.max(0, Math.min(max, st.off));
@@ -108,3 +116,20 @@ export function scrollArea(s, id, x, y, w, h, contentH, draw) {
   draw(Math.round(st.off)); Object.assign(clip, prev);
   if (max > 0) { const th = Math.max(10, Math.round(h * h / contentH)), ty = y + Math.round((h - th) * st.off / max); s.fill(x + w - 3, y, 3, h, C.paperDark); s.fill(x + w - 3, ty, 3, th, C.brass); s.fill(x + w - 3, ty, 1, th, C.brassL); }
   return st; }
+
+// ---- text field: a hidden HTML input takes the keystrokes (IME composition, phone keyboards); the pixel field shows them ----
+const TF = { id: null, orig: '', val: '', done: false, cancel: false }; let EL = null;
+export const editing = () => !!TF.id;
+function tfEl() { if (EL || typeof document === 'undefined') return EL; EL = document.createElement('input'); EL.type = 'text'; EL.autocomplete = 'off'; EL.spellcheck = false;
+  Object.assign(EL.style, { position: 'fixed', opacity: '0.01', fontSize: '16px', width: '160px', height: '22px', border: '0', padding: '0', zIndex: '20', pointerEvents: 'none', background: 'transparent', color: 'transparent', caretColor: 'transparent' });
+  document.body.appendChild(EL); EL.addEventListener('input', () => { TF.val = EL.value; });
+  EL.addEventListener('keydown', e => { e.stopPropagation(); if (e.isComposing) return; if (e.key === 'Enter') { TF.done = true; EL.blur(); } if (e.key === 'Escape') { TF.cancel = true; TF.done = true; EL.blur(); } });
+  EL.addEventListener('blur', () => { if (TF.id) TF.done = true; EL.style.left = '-9999px'; }); return EL; }
+export function textField(s, id, x, y, w, label, value, { max = 16, placeholder = '' } = {}) {
+  text(s, label, x, y, C.inkSoft, 1, w); const by = y + 7, on = TF.id === id, v = on ? TF.val : String(value ?? '');
+  s.fill(x, by, w, 11, on ? C.ink : C.brassD); s.fill(x + 1, by + 1, w - 2, 9, on ? C.white : C.paper2);
+  const ex = text(s, N(v || (on ? '' : placeholder)), x + 3, by + 2, v ? C.ink : C.inkSoft, 1, w - 8); if (on && (Math.floor(Date.now() / 400) % 2)) s.fill(Math.min(ex + 1, x + w - 3), by + 2, 1, 7, C.oxblood);
+  if (!on && input.clicked && inside(x, by, w, 11)) { const el = tfEl(); ensureFullFont(); if (el) { const cv = document.getElementById('screen'), r = cv ? cv.getBoundingClientRect() : { left: 0, top: 0, width: W }, k = r.width / W;
+      Object.assign(el.style, { left: (r.left + x * k) + 'px', top: (r.top + by * k) + 'px', width: Math.max(60, w * k) + 'px' }); el.maxLength = max; el.value = String(value ?? ''); TF.id = id; TF.orig = el.value; TF.val = el.value; TF.done = TF.cancel = false; setTimeout(() => el.focus(), 0); el.focus(); } }
+  if (on && TF.done) { const out = TF.cancel ? TF.orig : TF.val.trim().slice(0, max); TF.id = null; TF.done = TF.cancel = false; return out || String(value ?? ''); }
+  return value; }

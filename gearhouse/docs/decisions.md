@@ -11,6 +11,10 @@ Each decision is listed with its date. The newest come first.
 - Customers hit by the Depression can fail to pay.
 - Reputation is split into five fields: quality, performance, style, trust and value.
 - Every event, letter and article is written through the text-variety method in `docs/systems/00_text_variety.md`, so the same event reads differently each time.
+- Text is written by Claude and reviewed by the planner. Period speech is used lightly, so the text reads naturally.
+- Both a bought rolling chassis and a self-built chassis are offered.
+- Materials are ordered and used as one-car sets; the store also shows leftovers in real units.
+- A car is built in nine steps. One hands-on real-time step, panel beating, is in the slice.
 - Car bodies start from the measured base cars of the first test build and are edited in three layers: proportions, parts and panel points.
 
 ## 2026-11-19 — reboot (plan: docs/REBOOT_PLAN.md)

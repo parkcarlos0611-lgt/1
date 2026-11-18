@@ -3,40 +3,49 @@
 // the line assist holds the car on its line through the bends while the player works the pedals and the gears.
 import { W, H, C, text, button, input, held, bevel, lineTo, N, lang, tw } from './ui.mjs';
 import { hex } from '../tools/pixel/color.mjs';
-import { makeCar, stepCar, requestShift, rpmOf } from '../sim/dyn.mjs';
-import { drawSide } from './sideview.mjs';
+import { makeCar, stepCar, requestShift, rpmOf, settle } from '../sim/dyn.mjs';
+import { drawSide, elAt, riseAt, bankAt } from './sideview.mjs';
 
 // ---- tracks: straights and turns (right turns positive degrees), grade, banking (deg), rough surface; road width in metres ----
 const S_ = (len, o = {}) => ({ len, ...o }), T_ = (R, deg, o = {}) => ({ len: Math.abs(R * deg * Math.PI / 180), k: Math.sign(deg) / R, ...o });
 export const TRACKS = [
   { kind: 'TEST ROAD', surf: 'tar', laps: 2, width: 6.5, segs: [S_(500), T_(150, 90), S_(150, { grade: 0.10 }), S_(150, { grade: -0.10 }), T_(60, 90), S_(300, { rough: 1 }), T_(100, 60), T_(80, -30), S_(150), T_(120, 120), S_(200), T_(150, 30), S_(120)] },
-  { kind: 'BANKED OVAL', surf: 'con', laps: 3, width: 15, segs: [S_(600), T_(250, 180, { bank: 22 }), S_(600), T_(250, 180, { bank: 22 })] },
+  { kind: 'BANKED OVAL', surf: 'con', laps: 3, width: 15, segs: [S_(300), T_(250, 180, { bank: 22 }), S_(600), T_(250, 180, { bank: 22 }), S_(300)] },
   { kind: 'ROAD CIRCUIT', surf: 'tar', laps: 2, width: 10, segs: [S_(700), T_(40, 90), S_(250), T_(120, -45), T_(90, 90), S_(300, { grade: 0.05 }), T_(200, 60), S_(400, { grade: -0.05 }), T_(60, -60), T_(70, 150), S_(300), T_(150, 75), S_(100)] }];
 export const trackName = (g, i) => (g.trackNames?.[i] ? N(g.trackNames[i]) : lang.ko ? `${i + 1}번 트랙` : `TRACK ${i + 1}`);
 const DS = 2;
 function build(tr) { if (tr.cells) return tr; const cells = []; let el = 0, th = 0;
   for (const s of tr.segs) { const n = Math.max(1, Math.round(s.len / DS)); for (let q = 0; q < n; q++) { el += (s.grade || 0) * DS; th += (s.k || 0) * DS; cells.push({ k: s.k || 0, el, th, bank: s.bank || 0, rough: s.rough || 0, grade: s.grade || 0 }); } }
   let x = 0, y = 0; const pts = cells.map(c => { x += Math.cos(c.th) * DS; y += Math.sin(c.th) * DS; return [x, y]; }), ex = x, ey = y, n = pts.length;
-  tr.map = pts.map(([px, py], i) => [px - ex * (i + 1) / n, py - ey * (i + 1) / n]); const ez = el; cells.forEach((c, i) => { c.el -= ez * (i + 1) / n; }); tr.cells = cells; tr.L = cells.length * DS;
+  tr.map = pts.map(([px, py], i) => [px - ex * (i + 1) / n, py - ey * (i + 1) / n]); const ez = el; cells.forEach((c, i) => { c.el -= ez * (i + 1) / n; });
+  // crests and dips are rounded like a real road's (a 40 m running mean, about a 200 m vertical curve on a 10 % change);
+  // the climb the physics feels is the slope of the rounded road
+  { const RW = Math.round(20 / DS), src = cells.map(c => c.el); cells.forEach((c, i) => { let a = 0; for (let j = -RW; j <= RW; j++) a += src[((i + j) % n + n) % n]; c.el = a / (2 * RW + 1); });
+    cells.forEach((c, i) => { c.grade = (cells[(i + 1) % n].el - cells[(i - 1 + n) % n].el) / (2 * DS); }); }
+  // banking eases in and out over 60 m either side of a banked turn (a real bowl does; a step would launch the car)
+  const RB = Math.round(60 / DS); cells.forEach((c, i) => { let b = 0, sd = 0; for (let j = -RB; j <= RB; j++) { const q = cells[((i + j) % n + n) % n]; if (!q.bank) continue; const v = q.bank * (1 - Math.abs(j) / (RB + 1)); if (v > b) { b = v; sd = Math.sign(q.k); } } c.bankE = b; c.bankS = sd; }); tr.cells = cells; tr.L = cells.length * DS;
   for (let i = 0; i < n; i++) { const a = cells[i], b = cells[(i + 1) % n]; if (!a.k && b.k && Math.abs(b.k) > 1 / 180) for (const [d, m] of [[75, 3], [50, 2], [25, 1]]) { const j = ((i - d) % n + n) % n; cells[j].board = m; cells[j].bside = Math.sign(b.k); } }   // 150 / 100 / 50 m
   return tr; }
 const cellAt = (tr, s) => tr.cells[((Math.floor(s / DS) % tr.cells.length) + tr.cells.length) % tr.cells.length];
 // road under a tyre: curvature, grade, banking, grip and the small height changes the springs have to soak up (m)
 const hash = (a, b) => { const v = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return v - Math.floor(v); };
 function roadFn(tr) { const hw = tr.width / 2;
-  return (s, n) => { const c = cellAt(tr, s), off = Math.abs(n) > hw + 0.6, kerb = !off && Math.abs(n) > hw;
-    let h = 0.0025 * Math.sin(s * 0.9 + n) + 0.0015 * Math.sin(s * 2.3 - n * 1.7);                                  // a sound road is never quite flat
+  // absolute height under a tyre: the road's elevation, the rise of a banked turn, and the small bumps the springs soak up
+  const hf = (s, n) => { const c = cellAt(tr, s), off = Math.abs(n) > hw + 0.6, kerb = !off && Math.abs(n) > hw;
+    let h = elAt(tr, s) + riseAt(tr, s, Math.max(0, Math.min(tr.width, n + hw))) + 0.0025 * Math.sin(s * 0.9 + n) + 0.0015 * Math.sin(s * 2.3 - n * 1.7);   // a sound road is never quite flat
     if (tr.surf === 'con' && !off) h += (s % 6 < 0.12 ? -0.006 : 0);                                              // concrete slab joints
     if (c.rough) h += 0.010 * Math.sin(s * 1.9 + n * 0.8) + 0.007 * Math.sin(s * 3.7 - n * 2.1) + (hash(Math.floor(s * 1.5), Math.floor(n * 1.5)) > 0.97 ? -0.025 : 0);   // potholed gravel (a real one: +-1-2 cm, the odd hole)
     if (off) h += 0.02 * Math.sin(s * 1.3 + n * 0.7) + 0.015 * hash(Math.floor(s * 2), Math.floor(n * 2));         // field and verge
-    if (kerb) h += 0.012;
-    return { k: c.k, grade: c.grade, bank: c.bank, h, mu: off ? 0.55 : c.rough ? 0.74 : tr.surf === 'con' ? 0.95 : 1 }; }; }
+    if (kerb) h += 0.012; return h; };
+  const f = (s, n) => { const c = cellAt(tr, s), off = Math.abs(n) > hw + 0.6; const B = bankAt(tr, s); return { k: c.k, grade: c.grade, bank: B.b, bside: B.side, h: hf(s, n), mu: off ? 0.55 : c.rough ? 0.74 : tr.surf === 'con' ? 0.95 : 1 }; };
+  f.hf = hf; return f; }
 
 // ---- run state ----
 // car: { name, es, engine, gearbox, final, mass, cda, crr, cfg (chassis design), ch (chassis stats), wb, track, cgH, hyd, year }
 export function makeDrive(car, ti) { const tr = build(TRACKS[ti]), Cr = makeCar(car); Cr.n = tr.kind === 'TEST ROAD' ? -tr.width / 4 : 0;   // on the line: the right-hand lane on the road, the middle on a track (n is + to the left)
-  return { car, C: Cr, ti, tr, road: roadFn(tr), lap: 0, lapT0: 0, t: 0, autoShift: true, autoGas: false, assist: true, iSteer: 0, done: false, fx: [], skid: new Map(), spun: false, wasOff: false,
-    log: { laps: [], top: 0, maxG: 0, maxTb: 40, fade: false, spins: 0, offs: 0, shake: 0, grinds: 0, minCorner: [999, 999, 999] } }; }
+  const road = roadFn(tr); settle(Cr, road);
+  return { car, C: Cr, ti, tr, road, lap: 0, lapT0: 0, t: 0, autoShift: true, autoGas: false, assist: true, iSteer: 0, done: false, fx: [], skid: new Map(), spun: false, wasOff: false,
+    log: { laps: [], top: 0, maxG: 0, maxTb: 40, fade: false, spins: 0, offs: 0, shake: 0, grinds: 0, bottoms: 0, scrapes: 0, air: 0, minCorner: [999, 999, 999] } }; }
 
 // ---- line assist (plan 24-2 A): the driver holds a line through the bends; the player has the pedals and the gears.
 // It steers like a person, not a rail: it looks ahead, cannot add grip, and a car taken in too fast runs wide or spins ----
@@ -65,6 +74,12 @@ export function stepDrive(D, ctl, dt) {
   const off = Math.abs(C.n) > tr.width / 2 + 0.6; if (off && !D.wasOff) L.offs++; D.wasOff = off; if (Math.abs(C.n) > tr.width / 2 + 16) { C.n = Math.sign(C.n) * (tr.width / 2 + 16); C.v *= -0.3; C.u *= 0.7; }
   const c0 = cellAt(tr, C.s); if (c0.rough) L.shake = Math.max(L.shake, Math.abs(C.vz) * 4 + Math.abs(C.vroll) * 2);
   if (C.grind > 0.6 && !D.grinding) { L.grinds++; D.grinding = true; } if (C.grind < 0.1) D.grinding = false;
+  // landings and the underside: a hard hit on the bump stops, the frame or a bumper on the road, time in the air
+  if (C.bumpHit > 15000 && !D.bott) { L.bottoms++; D.bott = true; } if (C.bumpHit < 3000) D.bott = false; C.bumpHit = 0;
+  if (C.scrape > 0 && !D.scr) { L.scrapes++; D.scr = true; } if (!C.scrape) D.scr = false; L.air = Math.max(L.air, C.air);
+  if (C.scrape > 0 && Math.abs(C.u) > 2) for (let q = 0; q < 2; q++) D.fx.push({ s: C.s + (Math.random() - 0.3) * C.wb, n: C.n + (Math.random() - 0.5) * 0.8, h: 0.05, vs: C.u * 0.6 - Math.sign(C.u) * Math.random() * 4, vn: (Math.random() - 0.5) * 2, vh: 1 + Math.random() * 2, life: 0.25 + Math.random() * 0.2, size: 0.03, col: Math.random() < 0.5 ? [255, 214, 120] : [255, 160, 60], a: 1, grow: 0, grav: true });
+  if (D.wasAir && !C.air) for (let q = 0; q < 10; q++) D.fx.push({ s: C.s + (Math.random() - 0.5) * C.wb * 1.4, n: C.n + (Math.random() - 0.5) * 1.6, h: 0.1, vs: C.u * 0.2, vn: (Math.random() - 0.5) * 2, vh: 0.4 + Math.random() * 0.6, life: 1.2, size: 0.35, col: [196, 182, 150], a: 0.5, grow: 0.8 });
+  D.wasAir = C.air > 0.05;
   if (Math.abs(c0.k) > 1 / 300) { const sec = Math.min(2, Math.floor(((C.s % tr.L) + tr.L) % tr.L / tr.L * 3)); L.minCorner[sec] = Math.min(L.minCorner[sec], mph); }
   if (C.s >= (D.lap + 1) * tr.L) { L.laps.push(D.t - D.lapT0); D.lapT0 = D.t; D.lap++; if (D.lap >= tr.laps) D.done = true; }
   if (D.t > 900) D.done = true;
@@ -92,7 +107,7 @@ export function drawDrive(S, P, D, sprites, sfx, side) {
 // what the car sounds like this frame
 export function soundState(D) { const C = D.C, tr = D.tr, c0 = cellAt(tr, C.s), off = Math.abs(C.n) > tr.width / 2 + 0.6, wd = (C.corners[2].w + C.corners[3].w) / 2;
   return { v: C.u, slip: Math.max(...C.corners.map(c => c.slip)), surf: off ? 'grass' : c0.rough ? 'gravel' : tr.surf === 'con' ? 'con' : 'tar', gear: C.gear, top: C.ratios.length, gearSpeed: wd * C.final * (C.gear > 0 ? C.ratios[C.gear - 1] : C.gear < 0 ? -C.ratios[0] : 0),
-    load: D.pedal || 0, grind: C.grind, defl: C.corners.reduce((a, c) => a + c.defl, 0) / 4, brake: D.ctl?.brake || 0, hot: Math.min(1, (Math.max(...C.corners.map(c => c.tb)) - 60) / 240),
+    load: D.pedal || 0, grind: C.grind, scrape: C.scrape, defl: C.corners.reduce((a, c) => a + c.defl, 0) / 4, brake: D.ctl?.brake || 0, hot: Math.min(1, (Math.max(...C.corners.map(c => c.tb)) - 60) / 240),
     rpm: Math.max(0, C.we * 30 / Math.PI), engLoad: C.shift ? 0.1 : Math.max(0.08, D.pedal || 0), stalled: C.stalled }; }
 function gearLabel(C) { return C.shift ? '-' : C.gear === -1 ? 'R' : C.gear === 0 ? 'N' : String(C.gear) + (C.odOn ? ' OD' : ''); }
 function drawHud(S, D, ctl, left, right, gas, brake) { const C = D.C;
@@ -118,7 +133,7 @@ function drawHud(S, D, ctl, left, right, gas, brake) { const C = D.C;
 function report(S, D) { const L = D.log, best = L.laps.length ? Math.min(...L.laps) : null, fm = t => `${Math.floor(t / 60)}:${(t % 60).toFixed(1).padStart(4, '0')}`; S.fill(100, 26, 280, 160, hex('#2a1d17')); S.fill(102, 28, 276, 156, hex('#efe6cf'));
   text(S, (lang.ko ? '주행 보고 - ' : 'DRIVE REPORT - ') + (D.name || ''), 108, 34, hex('#7a2a22'), 1, 264);
   const rows = [['BEST LAP', best ? fm(best) : '-'], ['LAPS', L.laps.map(fm).join('  ')], ['TOP SPEED SEEN', L.top.toFixed(0) + ' MPH'], ['MOST CORNERING', L.maxG.toFixed(2) + ' G'], ['SLOWEST CORNER BY THIRD', L.minCorner.map(v => (v > 900 ? '-' : v.toFixed(0))).join(' / ') + ' MPH'],
-    ['BRAKES', `${Math.round(L.maxTb)} C${L.fade ? (lang.ko ? ', 페이드 발생' : ', FADED') : ''}`], ['SPINS / OFFS', `${L.spins} / ${L.offs}`], ['MISSED SHIFTS', String(L.grinds)], ['ROUGH ROAD', L.shake > 0.9 ? 'BODY SHAKES AND RATTLES' : L.shake > 0.5 ? 'SOME SHAKE' : 'SOLID']];
+    ['BRAKES', `${Math.round(L.maxTb)} C${L.fade ? (lang.ko ? ', 페이드 발생' : ', FADED') : ''}`], ['SPINS / OFFS', `${L.spins} / ${L.offs}`], ['MISSED SHIFTS', String(L.grinds)], ['BOTTOMED / SCRAPED', `${L.bottoms} / ${L.scrapes}${L.air > 0.15 ? (lang.ko ? `, 공중 ${L.air.toFixed(1)}초` : `, AIRBORNE ${L.air.toFixed(1)} S`) : ''}`], ['ROUGH ROAD', L.shake > 0.9 ? 'BODY SHAKES AND RATTLES' : L.shake > 0.5 ? 'SOME SHAKE' : 'SOLID']];
   rows.forEach(([a, b], i) => text(S, a, 108, 48 + i * 11, hex('#5a4a40'), 1, 110) + text(S, b, 222, 48 + i * 11, hex('#2a1d17'), 1, 150));
   if (button(S, 108, 162, 100, 16, 'DRIVE AGAIN')) return 'again'; if (button(S, 270, 162, 100, 16, 'BACK', { tone: 'ox' })) return 'back'; return null; }
 const dial = (S, x, y, R, frac, label, val, redFrom = 2) => { for (let yy = -R; yy <= R; yy++) for (let xx = -R; xx <= R; xx++) { const r = Math.hypot(xx, yy); if (r <= R) S.fill(x + xx, y + yy, 1, 1, r > R - 2 ? C.brass : hex('#f3ead2')); }

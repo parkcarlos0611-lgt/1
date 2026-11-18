@@ -35,9 +35,13 @@ function packs() { if (PK) return PK; const P1 = c => pack(c[0], c[1], c[2]), la
 
 // ---- track geometry along the drive line ----
 const cellAt = (tr, s) => tr.cells[((Math.floor(s / DS) % tr.cells.length) + tr.cells.length) % tr.cells.length];
-function elAt(tr, s) { const n = tr.cells.length, f = s / DS, i = Math.floor(f), t = f - i, a = tr.cells[(((i - 1) % n) + n) % n].el, b = tr.cells[((i % n) + n) % n].el; return a + (b - a) * t; }
+export function elAt(tr, s) { const n = tr.cells.length, f = s / DS, i = Math.floor(f), t = f - i, a = tr.cells[(((i - 1) % n) + n) % n].el, b = tr.cells[((i % n) + n) % n].el; return a + (b - a) * t; }
 // the outside of a banked turn rises: right-hand turns rise on the far side (n > 0 is the car's left, away from the camera)
-const bankRise = (tr, c, d) => { if (!c.bank) return 0; const w = tr.width, t = c.k > 0 ? d / w : 1 - d / w; return Math.max(0, t - 0.25) / 0.75 * w * Math.tan(c.bank * Math.PI / 180); };
+// banked turns: the road tilts at the bank angle across its whole width, the outside up (bankE eases in and out, read
+// smoothly along the road so the car never meets a step)
+export function bankAt(tr, s) { const n = tr.cells.length, f = s / DS - 0.5, i = Math.floor(f), t = f - i, a = tr.cells[((i % n) + n) % n], b = tr.cells[(((i + 1) % n) + n) % n];
+  return { b: (a.bankE || 0) + ((b.bankE || 0) - (a.bankE || 0)) * t, side: a.bankS || b.bankS || 0 }; }
+export const riseAt = (tr, s, d) => { const B = bankAt(tr, s); if (!B.b) return 0; const t = B.side > 0 ? d : tr.width - d; return Math.max(0, t) * Math.tan(B.b * Math.PI / 180); };
 
 // ---- props: placed once per track along the line, at depths behind the road (or a few in front) ----
 function placeProps(tr) { if (tr.props) return tr.props; const P = [], w = tr.width, L = tr.L, kind = tr.kind;
@@ -135,7 +139,7 @@ export function drawSide(P, D, side) {
   const roadPk = surf === 'con' ? Q.con : Q.tar, topY = D._topY || (D._topY = new Float32Array(SW));
   for (let X = 0; X < SW; X += step) {
     const x0 = camX + (X - SW / 2) * (Dc + d0) / f, c = cellAt(tr, x0), e = elAt(tr, x0), eL = Math.min(e, camEl + Hc - 0.4), k2 = Math.floor(x0 / DS), xs = (X - SW / 2) / f;
-    const eN = e + bankRise(tr, c, 0), eF = e + bankRise(tr, c, w), yN = PY(eN, 0), yF = PY(eF, w), yV = Math.min(PY(eL, w + 2.5), c.bank ? yF : 1e9);
+    const eN = e + riseAt(tr, x0, 0), eF = e + riseAt(tr, x0, w), yN = PY(eN, 0), yF = PY(eF, w), yV = Math.min(PY(eL, w + 2.5), c.bankE ? yF : 1e9);
     topY[X] = yF; if (step === 2 && X + 1 < SW) topY[X + 1] = yF;
     const rough = c.rough, rp = rough ? Q.gravel : roadPk, kerb = kerbTrack && Math.abs(c.k) > 1 / 400, hL = camEl + Hc - eL, hF = camEl + Hc - eF, hN = camEl + Hc - eN;
     for (let y = Math.max(0, Math.min(y0, Math.floor(yF))); y < SH; y++) { let pk;   // a banked wall can rise above the horizon
@@ -163,7 +167,7 @@ export function drawSide(P, D, side) {
   const props = tr.props, span = (SW / 2 + 200) * (Dc + 120) / f, lapB = Math.floor(camX / L) * L, near = [];
   let lastFence = null, lastPole = null;
   const drawProp = (p, x) => { const sc = f / (Dc + p.d) / PPM, e = elAt(tr, x), haze = p.d > w ? Math.min(0.5, (p.d - w) / 160) : 0, S2 = sprite(p.k, p.s, haze); if (!S2) return;
-    const X = PX(x, p.d), Y = PY(e + (p.k === 'wall' ? bankRise(tr, cellAt(tr, x), w) : 0), p.d), dw = S2.c.width * sc, dh = S2.c.height * sc; if (X + dw < 0 || X - dw > SW) return;
+    const X = PX(x, p.d), Y = PY(e + (p.k === 'wall' ? riseAt(tr, x, w) : 0), p.d), dw = S2.c.width * sc, dh = S2.c.height * sc; if (X + dw < 0 || X - dw > SW) return;
     ctx.drawImage(S2.c, Math.round(X - dw * S2.ax), Math.round(Y - dh), Math.max(1, Math.round(dw)), Math.max(1, Math.round(dh)));
     if (p.k === 'fence') { if (lastFence && Math.abs(lastFence[0] - X) < 60 * sc * PPM / 10) { ctx.fillStyle = '#ece6d6'; for (const hgt of [0.95, 0.55]) ctx.fillRect(Math.round(Math.min(lastFence[0], X)), Math.round(Y - hgt * sc * PPM), Math.round(Math.abs(X - lastFence[0])), Math.max(1, Math.round(0.08 * sc * PPM))); } lastFence = [X, Y]; }
     if (p.k === 'pole') { if (lastPole) { ctx.strokeStyle = 'rgba(40,36,32,0.8)'; ctx.lineWidth = 1; ctx.beginPath(); for (const off of [-0.6, 0.6]) { ctx.moveTo(lastPole[0] + off * sc * PPM, lastPole[1] - 7.6 * sc * PPM); ctx.quadraticCurveTo((lastPole[0] + X) / 2, (lastPole[1] + Y) / 2 - 7.2 * sc * PPM, X + off * sc * PPM, Y - 7.6 * sc * PPM); } ctx.stroke(); } lastPole = [X, Y]; } };
@@ -184,19 +188,19 @@ export function drawSide(P, D, side) {
 function drawCar(D, Pt, PX, PY, f, dCar) {
   const C = D.C, tr = D.tr, wb = C.wb, sc = f / (Dc + dCar) / Pt.ppm, scFar = f / (Dc + dCar + C.tr) / Pt.ppm, ppmS = f / (Dc + dCar);
   const [fw, rw] = Pt.ws, pxWb = fw.x - rw.x, xCGpx = rw.x + pxWb * (C.b / wb), dir = Math.cos(C.psi) >= 0 ? 1 : -1, squeeze = Math.max(0.3, Math.abs(Math.cos(C.psi))) * dir;
-  const eRoad = s => elAt(tr, s) + bankRise(tr, cellAt(tr, s), Math.max(0, Math.min(tr.width, dCar))), sF = C.s + C.a * dir, sR = C.s - C.b * dir, eF = eRoad(sF), eR = eRoad(sR);
-  const theta = Math.atan2(eF - eR, wb) * dir, eCG = eR + (eF - eR) * C.b / wb, zNear = C.z - (C.tr / 2) * C.roll, ang = theta - C.pitch * dir;
+  // heights are absolute (sim/dyn.mjs): the body reference point and each wheel's contact height, the road's own climb included
+  const eCG = elAt(tr, C.s) + riseAt(tr, C.s, Math.max(0, Math.min(tr.width, dCar))), zNear = C.z - (C.tr / 2) * C.roll, ang = -C.pitch * dir;
   // shadow: the sun high and a little behind on the left, the car's plan laid on the road
   const sx0 = PX(C.s - (Pt.W - xCGpx) / Pt.ppm * 1.0, dCar - 0.2), sx1 = PX(C.s + xCGpx / Pt.ppm, dCar + C.tr + 0.4), sy0 = PY(eCG, dCar - 0.2), sy1 = PY(eCG, dCar + C.tr + 0.4);
   const g = (D._ctx = ctx); g.fillStyle = 'rgba(28,22,16,0.34)'; g.beginPath(); g.moveTo(Math.min(sx0, sx1) + 8, sy0); g.lineTo(Math.max(sx0, sx1) - 4, sy0); g.lineTo(Math.max(sx0, sx1) + 6, sy1); g.lineTo(Math.min(sx0, sx1) + 14, sy1); g.closePath(); g.fill();
   const corner = (i) => C.corners[i];
-  const wheelAt = (wpos, ci, far) => { const c = corner(ci), sW = C.s + (wpos.x - xCGpx) / Pt.ppm * squeeze, dd = dCar + (far ? C.tr : 0), e = elAt(tr, sW) + bankRise(tr, cellAt(tr, sW), Math.max(0, Math.min(tr.width, dd))), rM = (Pt.gnd - wpos.y) / Pt.ppm;
-    const X = PX(sW, dd), Y = PY(e + rM + (c.zw || 0), dd); const fast = Math.abs(c.w) > 28, fr = ((Math.floor(-c.spin / (2 * Math.PI) * Pt.NF) % Pt.NF) + Pt.NF) % Pt.NF;
+  const wheelAt = (wpos, ci, far) => { const c = corner(ci), sW = C.s + (wpos.x - xCGpx) / Pt.ppm * squeeze, dd = dCar + (far ? C.tr : 0), e = 0, rM = (Pt.gnd - wpos.y) / Pt.ppm;
+    const X = PX(sW, dd), Y = PY(c.zw + rM + (far ? 0 : 0), dd); void e; const fast = Math.abs(c.w) > 28, fr = ((Math.floor(-c.spin / (2 * Math.PI) * Pt.NF) % Pt.NF) + Pt.NF) % Pt.NF;
     const j = Pt.ws.indexOf(wpos), cvs = fast && !far ? Pt.blur[j] : Pt.frames[fr][j][far ? 'far' : 'near'], s2 = far ? scFar : sc, ww = cvs.width * s2, hh = cvs.height * s2;
     ctx.drawImage(cvs, Math.round(X - ww / 2), Math.round(Y - hh / 2), Math.round(ww), Math.round(hh)); };
   // far wheels behind everything, then the arch, the near wheels, the body over their tops
   wheelAt(fw, 0, true); wheelAt(rw, 2, true);
-  const X0 = PX(C.s, dCar), Y0 = PY(eCG + zNear, dCar);
+  const X0 = PX(C.s, dCar), Y0 = PY(zNear, dCar);
   const body = (cvs) => { ctx.save(); ctx.translate(Math.round(X0), Math.round(Y0)); ctx.rotate(-ang); ctx.scale(sc * squeeze, sc); ctx.drawImage(cvs, -Math.round(xCGpx), -Pt.gnd); ctx.restore(); };
   body(Pt.well); wheelAt(fw, 1, false); wheelAt(rw, 3, false); body(Pt.body);
   void ppmS; }

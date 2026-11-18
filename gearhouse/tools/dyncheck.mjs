@@ -1,9 +1,10 @@
 // node tools/dyncheck.mjs : the real-time car physics (sim/dyn.mjs) against the design report (sim/chassis.mjs, sim/drive.mjs).
-// Standing still, 0-60 and top speed, 60-0 braking, steady skidpad, and the body's bounce frequency.
+// Standing still, 0-60 and top speed, 60-0 braking, steady skidpad, and the body's bounce frequency; then the side-view
+// checks of plan 24-3: a single bump, leaving the ground over a crest (flight time against the ballistic one), a short ramp.
 import { engineStats } from '../sim/engine.mjs';
 import { simulate, GEARBOX } from '../sim/drive.mjs';
 import { chassisDefault, chassisStats } from '../sim/chassis.mjs';
-import { makeCar, stepCar, rpmOf } from '../sim/dyn.mjs';
+import { makeCar, stepCar, rpmOf, settle } from '../sim/dyn.mjs';
 
 const CARS = [
   ['1938 OHV six, beam / live axle, hydraulic', { layout: 'I6', head: 'ohv', material: 'iron', bore: 85, stroke: 105, cr: 6, cam: 0.3, carbs: 1, carbSize: 1, quality: 0, year: 1938 }, { type: 'sync3', ratios: [2.9, 1.65, 1] }, 1938, {}, true],
@@ -35,5 +36,20 @@ for (const [name, e, gb, year, chg, hyd] of CARS) {
   // 5 bounce: lift the body 80 mm, let go, time the first half swing to the bottom
   C = makeCar(base); C.z = 0.08; let tb = null; for (let i = 0; i < 3000 && tb == null; i++) { const v0 = C.vz; stepCar(C, { gas: 0, brake: 0, steer: 0 }, flat, 0.001); if (v0 < 0 && C.vz >= 0) tb = C.t; }
   const f = tb ? 1 / (2 * tb) : 0; console.log(`  bounce Hz: ${fmt(f, (ch.fF + ch.fR) / 2)}`); worst = Math.max(worst, Math.abs(f / ((ch.fF + ch.fR) / 2) - 1));
+  // 6 single bump: 50 mm half-sine, 0.6 m long, at 15 m/s in neutral; peak body acceleration and how long it keeps moving
+  { const prof = s => (s > 20 && s < 20.6 ? 0.05 * Math.sin((s - 20) / 0.6 * Math.PI) : 0), rd = (s) => ({ k: 0, grade: 0, bank: 0, h: prof(s), mu: 1 }); rd.hf = s => prof(s);
+    C = makeCar(base); settle(C, rd); C.u = 15; C.gear = 0; for (const c of C.corners) c.w = C.u / C.R0; let pk = 0, last = 0, vz0 = 0, tOff = null;
+    for (let i = 0; i < 5000; i++) { stepCar(C, { gas: 0, brake: 0, steer: 0 }, rd, 0.001); const az = (C.vz - vz0) / 0.001; vz0 = C.vz; if (C.s > 19) { pk = Math.max(pk, Math.abs(az)); if (Math.abs(C.vz) > 0.02) last = C.t; } if (tOff == null && C.s - C.b > 20.6) tOff = C.t; }
+    console.log(`  bump 50 mm at 15 m/s: peak body ${(pk / 9.81).toFixed(2)} g, still moving ${(last - tOff).toFixed(2)} s after the rear wheels clear it`); }
+  // 7 crest: a 9 % ramp up, then the road drops away at 30 %; flight time against a thrown body's
+  { const prof = s => (s < 30 ? 0 : s < 50 ? (s - 30) * 0.09 : Math.max(-4, 1.8 - (s - 50) * 0.3)), rd = s => ({ k: 0, grade: 0, bank: 0, h: prof(s), mu: 1 }); rd.hf = s => prof(s);
+    C = makeCar(base); settle(C, rd); C.u = 22; C.gear = 0; for (const c of C.corners) c.w = C.u / C.R0; let air = 0, tAir = 0, maxStop = 0;
+    for (let i = 0; i < 4000; i++) { stepCar(C, { gas: 0, brake: 0, steer: 0 }, rd, 0.001); if (C.air > 0) tAir += 0.001; air = Math.max(air, C.air); maxStop = Math.max(maxStop, C.bumpHit); }
+    let tb = 0; for (let t = 0.01; t < 3; t += 0.001) { const y = 1.8 + 22 * 0.09 * t - 4.905 * t * t; if (y <= prof(50 + 22 * t)) { tb = t; break; } }   // a body thrown off the lip at the ramp's climb
+    console.log(`  crest at 22 m/s: in the air ${fmt(air, tb)} against a thrown body, worst bump stop on landing ${(maxStop / 1000).toFixed(1)} kN`); worst = Math.max(worst, Math.abs(air / tb - 1) * 0.5); }
+  // 8 a short 50 % ramp (27 deg, steeper than the approach angle) met at walking pace: the front bumper should touch
+  { const prof = s => (s < 12 ? 0 : Math.min(0.4, (s - 12) * 0.5)), rd = s => ({ k: 0, grade: 0, bank: 0, h: prof(s), mu: 1 }); rd.hf = s => prof(s);
+    C = makeCar(base); settle(C, rd); C.gear = 1; let scr = 0; for (let i = 0; i < 9000; i++) { stepCar(C, { gas: 0.5, brake: 0, steer: 0 }, rd, 0.001); scr = Math.max(scr, C.scrape); }
+    console.log(`  50 % ramp: underside contact ${scr > 0 ? (scr / 1000).toFixed(1) + ' kN' : 'none'}, got to ${C.s.toFixed(1)} m`); }
 }
 console.log('\nworst deviation from the report: ' + (worst * 100).toFixed(0) + '%');

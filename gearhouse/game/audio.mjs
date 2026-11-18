@@ -124,7 +124,8 @@ export function driveVoice() {
       grit.g.gain.setTargetAtTime(q.surf === 'gravel' || q.surf === 'grass' ? Math.min(0.08, v * 0.004) : 0, at, 0.06); wind.g.gain.setTargetAtTime(Math.min(0.12, v * v * 0.00009), at, 0.1); wind.b.frequency.setTargetAtTime(380 + v * 9, at, 0.1);
       // straight-cut indirect gears whine; top gear is direct and quiet
       const ind = q.gear > 0 && q.gear < q.top; whine.frequency.setTargetAtTime(Math.max(40, Math.abs(q.gearSpeed) * 24 / (2 * Math.PI)), at, 0.03); wg.gain.setTargetAtTime(ind || q.gear < 0 ? Math.min(0.03, Math.abs(q.gearSpeed) * 0.00012 * (0.4 + q.load)) : 0, at, 0.05);
-      grind.g.gain.setTargetAtTime(q.grind > 0.2 ? 0.09 * q.grind : 0, at, 0.02); grind.b.frequency.setTargetAtTime(2200 + Math.random() * 900, at, 0.01);
+      const scr = q.scrape > 0 && v > 0.3 ? Math.min(0.11, 0.03 + q.scrape / 40000) : 0;                     // the underside dragging on the road
+      grind.g.gain.setTargetAtTime(Math.max(q.grind > 0.2 ? 0.09 * q.grind : 0, scr), at, 0.02); grind.b.frequency.setTargetAtTime(scr ? 700 + Math.random() * 600 : 2200 + Math.random() * 900, at, 0.01);
       if (lastGear !== null && q.gear !== lastGear) knock(at, 300, 0.25, 0.07); lastGear = q.gear;
       if (Math.abs(q.defl - lastDefl) > 0.012) knock(at, 160, Math.min(0.35, Math.abs(q.defl - lastDefl) * 9), 0.14); lastDefl = q.defl;
       if (q.brake > 0.3 && v > 0.5 && v < 7 && q.hot > 0.4 && at - lastSq > 1.2) { lastSq = at; tone(at, 2900 + Math.random() * 400, 0.5, 'sine', 0.025 * q.hot); } },

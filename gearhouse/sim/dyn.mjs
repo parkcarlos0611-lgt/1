@@ -26,6 +26,7 @@ export function makeCar(p) {
   const beamF = !F.ifs, beamR = cfg.rs !== 'swing';
   return { p, cfg, ch, m, ms, wb, tr, a, b, h, Iz: m * (wb * wb + tr * tr) / 12 * 1.15, Ix: ms * (tr * tr + h * h) / 12 * 1.4, Iy: ms * (wb * wb + h * h) / 12 * 1.2, corners, beamF, beamR,
     R0: ty.r, Wt: ty.w * 25.4 / 1000, kt: 180000 * (cfg.psi / 28) ** 0.8, ct: 900, mu0: ch.mu0 / 0.66 * 0.7, relax: 0.55 + (28 - cfg.psi) * 0.01, Iw: 0.8 + ty.rim * 0.03,
+    ohF: (p.ohF ?? 800) / 1000, ohR: (p.ohR ?? 950) / 1000, clear: (p.clear ?? 200) / 1000, air: 0, scrape: 0, bumpHit: 0,
     arb: cfg.arb ? kF * (tr * 0.8) ** 2 * 0.45 : 0, Dm, hyd: !!p.hyd, Fb: ch.cap * m * G, bias: cfg.bias, drumKg: ch.drumKg, steerMax: 34 * RAD, sRatio: cfg.sRatio,
     es: p.es, Gb, type: p.gearbox.type, ratios: p.gearbox.ratios, rev: -(p.gearbox.ratios[0] * 1.1), final: p.final, cda: p.cda, crr: p.crr, Ie: 0.08 + p.es.litres * 0.035,
     // state
@@ -45,7 +46,17 @@ export function requestShift(C, dir) { if (C.shift && C.shift.t < C.shift.need) 
 
 function driveSpeed(C) { const [, , rl, rr] = C.corners; return (rl.w + rr.w) / 2; }
 
-// road: (s, n) -> { k, grade, bank, h, mu, rough }
+// The tyre is a circle, not a point: it rests on the highest bit of road under it, so it rides over a sharp edge
+// and bridges a hole narrower than itself (the side-scrolling tank project does the same for its road wheels).
+// Heights are absolute (the road's own elevation included), so crests unload the car and it can leave the ground.
+const hOf = (road, s, n) => (road.hf ? road.hf(s, n) : road(s, n).h);
+function tyreRest(road, s, n, R) { let best = -1e9; for (let i = -5; i <= 5; i++) { const dx = R * 0.9 * i / 5, h = hOf(road, s + dx, n) + Math.sqrt(R * R - dx * dx) - R; if (h > best) best = h; } return best; }
+// put the car at rest where it stands: wheels on the road, springs at their static length
+export function settle(C, road) { const cs = C.corners; for (const c of cs) { c.road = tyreRest(road, C.s + c.x, C.n + c.y, C.R0); c.zw = c.road; c.vzw = 0; }
+  const zf = (cs[0].zw + cs[1].zw) / 2, zr = (cs[2].zw + cs[3].zw) / 2; C.pitch = -(zf - zr) / C.wb; C.z = zr + (zf - zr) * C.b / C.wb;
+  C.roll = ((cs[0].zw - cs[1].zw) + (cs[2].zw - cs[3].zw)) / 2 / C.tr; C.vz = C.vroll = C.vpitch = 0; }
+
+// road: (s, n) -> { k, grade, bank, h (absolute height, m), mu, rough }; road.hf(s, n) may give the height alone
 export function stepCar(C, inp, road, dt) {
   const { es } = C, n = Math.max(1, Math.ceil(dt / 0.001)), h = dt / n; for (let q = 0; q < n; q++) sub(C, inp, road, h); }
 
@@ -86,16 +97,19 @@ function sub(C, inp, road, dt) {
   if (inp.autoShift && !AUTO(C.type) && !C.shift && C.gear > 0) { const r2 = rpm, upAt = es.redline * (C.type === 'crash3' ? 0.78 : 0.93); if (r2 > upAt && C.gear < C.ratios.length && Math.abs(C.corners[2].kap) < 0.3) requestShift(C, 1); else if (r2 < 1150 && C.gear > 1 && absU > 1) requestShift(C, -1); }
   // ---- vertical: road under each tyre, unsprung masses, springs, dampers, leaf friction, stops, anti-roll bar ----
   const cosR = Math.cos(C.roll), sinR = Math.sin(C.roll);
-  for (const c of corners) { const sC = C.s + c.x, nC = C.n + c.y; c.road = road(sC, nC).h; }
+  for (const c of corners) c.road = tyreRest(road, C.s + c.x, C.n + c.y, C.R0);
   const bodyAt = c => C.z + c.y * C.roll - c.x * C.pitch;                                                      // body point above the corner (relative to static ride height)
   for (const c of corners) { const defl = bodyAt(c) - c.zw, vb = C.vz + c.y * C.vroll - c.x * C.vpitch, rel = vb - c.vzw; c.defl = defl;
     const Dk = C.Dm === DAMPERS.friction ? Math.sign(rel) * Math.min(Math.abs(rel) * 8000, 700) : C.Dm === DAMPERS.lever ? Math.sign(rel) * Math.min(Math.abs(rel) * c.c, c.c * 0.35 + Math.abs(rel) * c.c * 0.25) : rel * c.c * (rel > 0 ? 1.3 : 0.7);
-    const stop = Math.abs(defl) > 0.075 ? Math.sign(defl) * (Math.abs(defl) - 0.075) ** 2 * 6e6 : 0, fr = Math.sign(rel) * Math.min(c.fric, Math.abs(rel) * 40000);
+    const stop = Math.abs(defl) > 0.075 ? Math.sign(defl) * (Math.abs(defl) - 0.075) ** 2 * 6e6 : 0; if (stop > C.bumpHit) C.bumpHit = stop; const fr = Math.sign(rel) * Math.min(c.fric, Math.abs(rel) * 40000);
     c.Fs = -(c.k * defl + Dk + stop + fr); }                                                                    // force on the body (+ up), equal and opposite on the wheel
   if (C.arb) { const [fl, fr] = corners, d = (fl.defl - fr.defl), M = C.arb * d / (C.tr * 0.8) ** 2 * 0.8; fl.Fs -= M; fr.Fs += M; }
   // tyres: vertical spring and damper against the road; geometric load transfer through the roll centres
-  const ayG = C.ay; for (const c of corners) { const pen = c.road - c.zw, Ft = C.kt * pen - C.ct * c.vzw;
-    const sd = c.y > 0 ? 1 : -1, geo = -sd * (m * ayG * (c.front ? C.b : C.a) / C.wb) * c.rc / C.tr; c.Fz = Math.max(0, Ft + c.st + geo); }
+  // on a banked turn the road leans into the car: part of the cornering load presses the tyres down instead of sideways
+  const bk = (rd.bank || 0) * RAD, bankN = bk && rd.k ? m * (C.u * C.u * Math.abs(rd.k) * Math.sin(bk) + G * (Math.cos(bk) - 1)) / 4 : 0;
+  const ayG = C.ay; let inAir = true; for (const c of corners) { const pen = c.road - c.zw, Ft = C.kt * pen - C.ct * c.vzw;
+    const sd = c.y > 0 ? 1 : -1, geo = -sd * (m * ayG * (c.front ? C.b : C.a) / C.wb) * c.rc / C.tr; c.Fz = Math.max(0, Ft + c.st + geo + bankN); if (c.Fz > 0) inAir = false; }
+  C.air = inAir ? C.air + dt : 0;
   // unsprung motion: independent corners alone, beam axles as one body (heave + tilt)
   const moveWheel = (c, F) => { c.vzw += F / c.mu * dt; };
   const axle = (L, Rr) => { const Fh = (L.Fz - L.st) - L.Fs + (Rr.Fz - Rr.st) - Rr.Fs, Mt = ((L.Fz - L.st) - L.Fs - ((Rr.Fz - Rr.st) - Rr.Fs)) * C.tr / 2, mA = L.mu + Rr.mu, IA = mA * C.tr * C.tr / 8;
@@ -117,11 +131,15 @@ function sub(C, inp, road, dt) {
     c.tb += (Tbr * Math.abs(c.w) / (C.drumKg * 460) - (c.tb - 30) * (0.02 + V * 0.0012)) * dt;
     Fx += c.Fx; Fy += c.Fy; Mz += c.x * c.Fy - c.y * c.Fx; }
   // ---- body: planar motion, then heave / roll / pitch from the springs and the load transfer ----
-  const drag = 0.6 * C.cda * C.u * Math.abs(C.u), roll0 = C.crr * m * G * Math.sign(C.u) * Math.min(1, absU), grav = m * G * (rd.grade || 0), bank = m * G * Math.sin((rd.bank || 0) * RAD) * Math.sign(rd.k || 0);
+  // the underside on the road: bumpers on a short steep ramp, the frame on a crest or a hard landing; it drags and scrapes
+  let Fsc = 0, Msc = 0; for (const [x, hp] of [[C.a + C.ohF, C.clear + 0.12], [C.a * 0.3, C.clear], [-C.b * 0.4, C.clear], [-C.b - C.ohR, C.clear + 0.16]]) {
+    const pen = hOf(road, C.s + x, C.n) - (C.z - x * C.pitch + hp); if (pen <= 0) continue; const vr = C.vz - x * C.vpitch, F = Math.max(0, 4e5 * pen - 6e3 * vr); Fsc += F; Msc += -F * x; }
+  C.scrape = Fsc; Fx -= Math.sign(C.u) * Math.min(Fsc * 0.45, Math.abs(C.u) * m * 20);
+  const drag = 0.6 * C.cda * C.u * Math.abs(C.u), roll0 = C.crr * m * G * Math.sign(C.u) * Math.min(1, absU), grav = m * G * (rd.grade || 0), bank = m * G * Math.sin((rd.bank || 0) * RAD) * Math.sign(rd.k || rd.bside || 0);
   const axB = (Fx - drag - roll0 - grav) / m, ayB = (Fy - bank) / m; C.u += (axB + C.v * C.r) * dt; C.v += (ayB - C.u * C.r) * dt; C.r += Mz / C.Iz * dt;
   if (absU < 0.05 && thr === 0 && Math.abs(Fx) < 50) { C.u *= 0.9; C.v *= 0.9; C.r *= 0.9; }
   C.ax = axB; C.ay = ayB; const ms = C.ms;
-  let Fh = 0, Mr = 0, Mp = 0; for (const c of corners) { Fh += c.Fs; Mr += c.Fs * c.y; Mp += -c.Fs * c.x; }
+  let Fh = Fsc, Mr = 0, Mp = Msc; for (const c of corners) { Fh += c.Fs; Mr += c.Fs * c.y; Mp += -c.Fs * c.x; }
   const hr = C.h - (corners[0].rc + corners[2].rc) / 2;                                                       // CG height above the roll axis
   C.vz += Fh / ms * dt; C.vroll += (Mr + ms * C.ay * hr) / C.Ix * dt; C.vpitch += (Mp - ms * C.ax * C.h) / C.Iy * dt;
   C.vroll *= 1 - 0.4 * dt; C.vpitch *= 1 - 0.4 * dt; C.z += C.vz * dt; C.roll += C.vroll * dt; C.pitch += C.vpitch * dt;

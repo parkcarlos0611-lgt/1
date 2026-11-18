@@ -13,6 +13,9 @@ import { scrollArea, audit } from './ui.mjs';
 import { W, H, C, Sheet, drawPix, input, text, tw, windowBox, panel, button, slider, cycler, bar, stat, graph, desk, bevel, rivet, lineTo } from './ui.mjs';
 import { eraPalette, hex } from '../tools/pixel/color.mjs';
 import { buildCar } from '../tools/pixel/gen/car.mjs';
+import { wheel } from '../tools/pixel/gen/wheel.mjs';
+import { tire } from '../tools/pixel/gen/tire.mjs';
+import { showScene } from './sideview.mjs';
 import { genBody, clampParams, limits } from '../tools/pixel/gen/bodygen.mjs';
 import { engineSV } from '../tools/pixel/gen/engineSV.mjs';
 import { flatheadV8, ohvI6, ptPalette } from '../tools/pixel/gen/engine40.mjs';
@@ -80,6 +83,11 @@ function v3Sprite(des, paintIdx, view = 'side', rot = 0, strip = null) {
     if (view === 'side') { const spec = meas ? measuredSide(des, paint, strip) : sideSpec(des, paint); trimSide(spec, des.tv, paint); placeSide(spec, des.pos); if (strip === 'wheel') spec.wheel = { style: 'disc', paint: 'black', whitewall: 0, cap: false }; spec.wheel = { ...spec.wheel, rot }; out = { px: buildCar(P, spec, Math.max(25, Math.ceil(spec.len / 190))), spec }; }
     else { const fs = placeFront(trimFront(meas ? measuredView(des, paint, view === 'rear', strip) : (view === 'front' ? frontSpec : rearSpec)(des, paint), des.tv, paint, view === 'rear'), des.pos, view === 'rear'); out = { px: buildFront(P, fs, 25), handles: fs.handles || [], warn: fs.warn || [], grilleArea: fs.grilleArea ?? 1 }; } } catch (e) { console.warn(e); }
   app.cache.set(key, out); if (app.cache.size > 160) app.cache.delete(app.cache.keys().next().value); return out; }
+// the side-on test drive needs the car at exactly 25 mm/px with its wheels apart: body picture, wheel centres, wheel turns
+function driveSide(des, paintIdx) { const paint = typeof paintIdx === 'string' ? paintIdx : 'paint.c' + paintIdx, meas = des.base && des.base !== 'free';
+  const spec = meas ? measuredSide(des, paint, null) : sideSpec(des, paint); trimSide(spec, des.tv, paint); placeSide(spec, des.pos); const px = buildCar(P, spec, 25);
+  const T = spec.tire ? tire(spec.tire) : null, ws = [...spec.wheels].sort((a, b) => a.x - b.x).slice(0, 2).map(w0 => (T ? { ...w0, r: T.r, tireFrac: T.frac } : w0));
+  return { px, wheels: ws.map(w => ({ x: w.x / 25 + 3, y: px.h - 3 - w.r / 25, r: w.r / 25 })), frames: n => Array.from({ length: n }, (_, k) => ws.map(w => wheel(P, { ...spec.wheel, ...w, r: w.r / 25, rot: k * 2 * Math.PI / n }))) }; }
 // blueprint re-scan: white linework on blue paper revealed by a moving scan bar
 function blueprint(px, x0, y0, prog0) { const un = Math.min(1, prog0 / 0.14), prog = Math.max(0, (prog0 - 0.14) / 0.86), sy = Math.round(px.h * prog);   // the sheet unrolls, then the scan bar prints it
   if (un < 1) { const w = Math.round((px.w + 4) * un); S.fill(x0 - 2, y0 - 2, w, px.h + 4, hex('#1f4e8c')); S.fill(x0 - 2 + w - 2, y0 - 3, 3, px.h + 6, hex('#16386a')); return; }
@@ -576,7 +584,7 @@ function cars(g) { const CW = FULL ? 126 : 86;
   if (st.id === 'proto' && ev) { if (button(S, cx + 4, AY + 144, 94, 11, 'WATCH BUILD', { tone: 'teal' })) startAssembly(g, spec, d, 'cars', des.plat);
     if (button(S, cx + 102, AY + 144, 94, 11, 'DRIVE THE TRACK', { tone: 'teal' })) { const eng = g.engines.find(x => x.id === d.engineId), gbx = g.gearboxes.find(x => x.id === d.gbId), dd = JSON.parse(JSON.stringify(des)), pi = d.paint;
       const car = { name: d.name, es: ev.es, engine: { ...eng, litres: ev.es.litres }, gearbox: gbx, final: d.final, mass: ev.sim.mass, cda: 0.6 * (dm.width / 1000) * ((dm.height - 180) / 1000) * 0.82, crr: ev.ch.crr, tyreR: ev.ch.tyreR, ch: { ...ev.ch, bias: d.ch.bias }, cfg: JSON.parse(JSON.stringify(d.ch)), wb: dm.wb, track: dm.width * 0.82, cgH: 0.5 + (dm.height - 1500) / 3000, hyd: !!d.feats.hydbrake, year: g.year };
-      app.trk = { pick: true, car, run: null, sprite: view => v3Sprite(dd, pi, view).px, proj: d }; app.scene = 'track'; AU.unlock(); }
+      app.trk = { pick: true, car, run: null, sprite: view => v3Sprite(dd, pi, view).px, side: () => driveSide(dd, pi), proj: d }; app.scene = 'track'; AU.unlock(); }
     if (d.track) tx(`LAST DRIVE: ${d.track.where || ''}  ${d.track.best ? (lang.ko ? '최고 랩 ' : 'BEST LAP ') + d.track.best.toFixed(1) + ' S' : ''}  ${(d.track.top || 0).toFixed(0)} MPH`, 135, C.inkSoft); }
   if (vs === 5 && d.reviewDue && ev) {                                                                    // the board looks at the mock-up
     if (!d.review) { const t = TEMPLATES.find(x => x.id === des.base), L = t && landmarks(t.spec), n = [];
@@ -657,10 +665,11 @@ function works() { const r = drawWorks(S, P, app.g, modelSprite, app.t); if (r =
 function plant() { const g = app.g, r = drawPlant(S, P, g, modelSprite, app.t, AU.sfx); if (r === 'works') app.scene = 'works'; if (r === 'map') goMap(); if (r === 'expand') { g.factory += 500; g.cash -= 40000; AU.sfx('stamp'); toast('FACTORY EXPANDED'); } }
 function dealer() { const g = app.g, r = drawDealer(S, P, g, modelSprite, app.t, money); if (r === 'map') goMap(); else if (r?.cut) { r.cut.price = Math.max(350, Math.round(r.cut.price * 0.95 / 10) * 10); AU.sfx('till'); toast('PRICE CUT'); } }
 function mockroom() { if (drawMockRoom(S, P, app.room, AU.sfx)) { app.scene = 'hq'; app.tab = 'cars'; app.room = null; } }
-function track() { const K = app.trk, g = app.g, leave = () => { if (K.voice) K.voice.stop(); if (K.dv) K.dv.stop(); app.scene = 'hq'; app.tab = 'cars'; app.trk = null; };
+function track() { const K = app.trk, g = app.g, leave = () => { if (K.voice) K.voice.stop(); if (K.dv) K.dv.stop(); showScene(false); app.scene = 'hq'; app.tab = 'cars'; app.trk = null; };
+  showScene(!K.pick);
   if (K.pick) { const r = drawTrackPick(S, g, nameField, K.proj.trackBest); if (r === 'back') leave(); else if (typeof r === 'number') { K.ti = r; K.run = makeDrive(K.car, r); K.run.name = trackName(g, r); K.pick = false; K.saved = false; } return; }
   const T = K.run; if (!K.voice && AU.ready()) { K.voice = AU.engineVoice(T.car.engine, T.car.year); K.dv = AU.driveVoice(); }
-  const r = drawDrive(S, P, T, K.sprite, AU.sfx); const q = soundState(T); if (K.voice) K.voice.set(q.stalled ? 0 : Math.max(450, q.rpm), q.engLoad, q.stalled ? 0 : T.done ? 0.25 : 1); if (K.dv) K.dv.set(T.done ? { ...q, v: 0, slip: 0 } : q);
+  const r = drawDrive(S, P, T, K.sprite, AU.sfx, K.side); const q = soundState(T); if (K.voice) K.voice.set(q.stalled ? 0 : Math.max(450, q.rpm), q.engLoad, q.stalled ? 0 : T.done ? 0.25 : 1); if (K.dv) K.dv.set(T.done ? { ...q, v: 0, slip: 0 } : q);
   if (T.done && !K.saved) { K.saved = true; const L = T.log, best = L.laps.length ? Math.min(...L.laps) : null; K.proj.trackBest = K.proj.trackBest || []; if (best && !(K.proj.trackBest[K.ti] <= best)) K.proj.trackBest[K.ti] = best;
     const prev = K.proj.track || {}; K.proj.track = { where: T.name, best, top: L.top, maxG: L.maxG, fade: L.fade || !!prev.fade, spins: (prev.spins || 0) + L.spins, shake: Math.max(prev.shake || 0, L.shake), maxTb: L.maxTb, grinds: (prev.grinds || 0) + L.grinds }; AU.sfx('stamp'); }
   if (r === 'again') { K.pick = true; if (K.voice) { K.voice.stop(); K.voice = null; } if (K.dv) { K.dv.stop(); K.dv = null; } } if (r === 'back') leave(); }

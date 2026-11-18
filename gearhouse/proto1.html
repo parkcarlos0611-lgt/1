@@ -21,6 +21,9 @@
   .info { color: var(--dim); font-size: 13px; margin: 8px 0; min-height: 1.4em; }
   .row { display: flex; gap: 8px; align-items: center; margin: 6px 0; }
   .row input { width: 48px; height: 32px; border: 1px solid var(--line); background: none; }
+  .tabs { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4px; margin-top: 12px; } .tabs button { text-align: center; padding: 8px 2px; }
+  label.sl { display: block; font-size: 13px; color: var(--dim); margin: 8px 0 2px; } input[type=range] { width: 100%; height: 28px; }
+  select { width: 100%; min-height: 36px; background: #3a2e26; color: var(--ink); border: 1px solid var(--line); border-radius: 4px; font: inherit; margin-bottom: 4px; }
   .all { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end; background: #d6cdb8; border-radius: 6px; padding: 10px; margin-top: 12px; }
 </style>
 </head>
@@ -28,15 +31,17 @@
 <div class="wrap">
   <div class="side">
     <h1>GEARHOUSE · 차체 프로토타입 ①</h1>
-    <h2>차</h2><div id="cars"></div>
+    <h2>기준 차 (실측)</h2><div class="list" id="cars" style="max-height:230px"></div>
     <h2>도장</h2>
     <div class="row"><input type="color" id="c1"><input type="color" id="c2"><span class="info" style="margin:0">주색 · 보조색</span></div>
-    <h2>패널 (선택하면 제어점이 보입니다)</h2><div class="list" id="panels"></div>
+    <div class="tabs"><button id="t1">1 비례</button><button id="t2">2 부품</button><button id="t3">3 패널</button></div>
+    <div id="pane"></div>
+    <button id="reset">수정 모두 지우기</button>
   </div>
   <div>
     <div class="info" id="info"></div>
     <div class="stage" id="stage"><canvas id="cv"></canvas></div>
-    <div class="info">점을 끌어 모양을 바꿉니다. 실제 크기(1배) 보기:</div>
+    <div class="info" id="hint"></div>
     <div class="all" id="all"></div>
   </div>
 </div>

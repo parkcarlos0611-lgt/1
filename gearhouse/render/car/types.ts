@@ -13,7 +13,10 @@ export type Surface =
   | 'fender'    // a separate round fender: pillow-shaped, big radius
   | 'flat';     // a flat plate (running board top, rack)
 
-export type Material = 'paint' | 'paint2' | 'black' | 'chrome' | 'glass' | 'rubber' | 'wood' | 'shadow' | 'canvas';
+export type Material = 'paint' | 'paint2' | 'black' | 'chrome' | 'glass' | 'rubber' | 'wood' | 'shadow' | 'canvas' | 'iron' | 'lens' | 'lensR' | 'white';
+
+/** a part that can be swapped as a unit from another car */
+export type Slot = 'grille' | 'lamp' | 'tail' | 'bumperF' | 'bumperR';
 
 export interface Panel {
   id: string;
@@ -27,11 +30,22 @@ export interface Panel {
   group?: string;
   /** edge rounding in px at 12.5 mm/px (default by surface) */
   bevel?: number;
+  /** draw only where a panel whose id starts with this is already showing (two-tone areas, glass, things seen through glass) */
+  clip?: string;
+  /** circles cut out of the panel (wheel arches) */
+  cut?: { x: number; z: number; r: number }[];
+  /** swappable part this panel belongs to */
+  slot?: Slot;
+  /** small parts move as a whole when the car is stretched, instead of being stretched themselves */
+  rigid?: boolean;
 }
+
+/** where the car's sections are, for stretching it: wheel centres, arch radius, cowl, cabin end, belt and roof heights */
+export interface Landmarks { fx: number; rx: number; r: number; gap: number; cowl: number; cab: number; belt: number; roof: number }
 
 /** details laid on top of the panels */
 export type Feature =
-  | { kind: 'seam'; pts: Pt[] }                                         // a shut line (door, hood, trunk)
+  | { kind: 'seam'; pts: Pt[]; lit?: boolean }                                       // a shut line (door, hood, trunk)
   | { kind: 'trim'; pts: Pt[]; width?: number }                         // chrome moulding along a line
   | { kind: 'handle'; at: Pt; len?: number }                            // door handle
   | { kind: 'hinge'; at: Pt }                                           // exposed hinge knuckle
@@ -69,4 +83,8 @@ export interface CarDesign {
   panels: Panel[];
   features: Feature[];
   wheels: WheelSpec[];
+  /** window surround: a shadowed reveal or a chrome frame */
+  frame?: 'reveal' | 'chrome';
+  marks?: Landmarks;
+  id?: string;
 }

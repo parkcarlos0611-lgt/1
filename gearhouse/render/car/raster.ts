@@ -48,6 +48,8 @@ export function rasterize(d: CarDesign): CarImage {
     if (bw <= 0 || bh <= 0) continue;
     const cov = coverage(poly.map(([px, py]) => [px - bx, py - by] as [number, number]), bw, bh), mask = new Uint8Array(bw * bh);
     for (let i = 0; i < bw * bh; i++) mask[i] = cov[i]! >= 0.5 ? 1 : 0;
+    if (p.cut) for (const c of p.cut) { const cx = X(c.x) - bx, cy = Y(c.z) - by, rr = c.r / MM_PER_PX; for (let y = Math.max(0, Math.floor(cy - rr)); y < Math.min(bh, cy + rr + 1); y++) for (let x = Math.max(0, Math.floor(cx - rr)); x < Math.min(bw, cx + rr + 1); x++) if (Math.hypot(x + 0.5 - cx, y + 0.5 - cy) < rr) mask[y * bw + x] = 0; }
+    if (p.clip) for (let y = 0; y < bh; y++) for (let x = 0; x < bw; x++) { const o = owner[(by + y) * w + bx + x]!; if (o < 0 || !ids[o]!.startsWith(p.clip)) mask[y * bw + x] = 0; }
     const dist = insideDistance(mask, bw, bh), S = SURF[p.surface], bev = p.bevel ?? S.bevel;
     // column and row spans for the curvature across the panel
     const top = new Int16Array(bw).fill(-1), bot = new Int16Array(bw).fill(-1), lft = new Int16Array(bh).fill(-1), rgt = new Int16Array(bh).fill(-1);
@@ -65,6 +67,8 @@ export function rasterize(d: CarDesign): CarImage {
         case 'glass': v = 0.16 + 0.42 * (1 - tv) * 0.8 + (((gx2 + gy2 * 0.7) % 31) < 2 && tv < 0.7 ? 0.22 : 0) + 0.15 * spec; break;
         case 'black': case 'rubber': v = 0.12 + 0.42 * diff + 0.3 * e + 0.5 * spec; break;
         case 'shadow': v = 0.3 + 0.5 * tv; break;
+        case 'lens': case 'lensR': v = 0.35 + 0.5 * (1 - tv) + 0.3 * spec; break;
+        case 'iron': case 'white': v = 0.15 + 0.6 * diff + 0.15 * e; break;
         case 'canvas': case 'wood': v = 0.12 + 0.75 * diff + 0.08 * e; break;
         default: v = 0.06 + 0.4 * diff + 0.42 * e + 0.55 * spec; }
       put(gx2, gy2, p.material, quant(p.material, v, gx2, gy2), id); }
@@ -106,9 +110,11 @@ export function rasterize(d: CarDesign): CarImage {
   function recolour(i: number, m: Material, lv: number) { const c = R[m][Math.max(0, Math.min(R[m].length - 1, lv))]!; rgba[i * 4] = c[0]; rgba[i * 4 + 1] = c[1]; rgba[i * 4 + 2] = c[2]; level[i] = lv; }
 
   // ---- window reveals: a shadowed recess along the top and front of each glass, a lit sill below it ----
-  for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) { const i = y * w + x, o = owner[i]!; if (o < 0 || mat[o] !== 'glass') continue;
+  for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) { const i = y * w + x, o = owner[i]!; if (o < 0 || mat[o] !== 'glass' || ids[o] === 'detail') continue;
     const up = owner[i - w]!, lf = owner[i - 1]!, dn = owner[i + w]!;
-    if ((up >= 0 && up !== o) || (lf >= 0 && lf !== o)) recolour(i, 'black', 0); else if (dn >= 0 && dn !== o) recolour(i, 'chrome', 4); }
+    const rt = owner[i + 1]!, edge = (q: number) => q >= 0 && q !== o && mat[q] !== 'glass' && mat[q] !== 'shadow';
+    if (d.frame === 'chrome') { if (edge(up)) recolour(i, 'chrome', 6); else if (edge(dn)) recolour(i, 'chrome', 3); else if (edge(lf) || edge(rt)) recolour(i, 'chrome', 5); }
+    else if (edge(up) || edge(lf)) recolour(i, 'black', 0); else if (edge(dn)) recolour(i, 'chrome', 4); }
 
   // ---- details ----
   const px = (p: Pt): [number, number] => [X(p[0]), Y(p[1])];
@@ -119,7 +125,7 @@ export function rasterize(d: CarDesign): CarImage {
     for (let s = 0; s <= n; s++) { const x = Math.floor(ax + (bx2 - ax) * s / n), y = Math.floor(ay + (by2 - ay) * s / n), key = x + ',' + y; if (key !== last) { last = key; fn(x, y); } } } }
   function drawFeature(f: Feature) {
     switch (f.kind) {
-      case 'seam': line(smoothOpen(f.pts).map(([x, z]) => [X(x), Y(z)]), (x, y) => { const o = at(x, y); if (o < 0) return; const m = mat[o]!; recolour(y * w + x, m, 0); const up = (y - 1) * w + x; if (at(x, y - 1) === o) recolour(up, m, Math.min(R[m].length - 1, level[up]! + 1)); }); break;
+      case 'seam': line(smoothOpen(f.pts).map(([x, z]) => [X(x), Y(z)]), (x, y) => { const o = at(x, y); if (o < 0) return; const m = mat[o]!; if (f.lit) { if (m === 'glass' || m === 'shadow') return; recolour(y * w + x, m, Math.min(R[m].length - 1, level[y * w + x]! + 2)); if (at(x, y + 1) === o) recolour((y + 1) * w + x, m, Math.max(0, level[(y + 1) * w + x]! - 2)); return; } recolour(y * w + x, m, 0); const up = (y - 1) * w + x; if (at(x, y - 1) === o) recolour(up, m, Math.min(R[m].length - 1, level[up]! + 1)); }); break;
       case 'trim': line(smoothOpen(f.pts).map(([x, z]) => [X(x), Y(z)]), (x, y) => { if (at(x, y) < 0) return; put(x, y, 'chrome', 6, fid); if ((f.width ?? 2) > 1 && at(x, y + 1) >= 0) put(x, y + 1, 'chrome', 2, fid); }); break;
       case 'handle': { const [x, y] = px(f.at).map(Math.round) as [number, number], n = Math.max(3, Math.round((f.len ?? 110) / MM_PER_PX));
         for (let k = 0; k < n; k++) { put(x + k, y, 'chrome', k === 0 ? 7 : k === n - 1 ? 3 : 5, fid); if (at(x + k, y + 1) >= 0) recolour((y + 1) * w + x + k, mat[at(x + k, y + 1)]!, 0); } put(x + 1, y - 1, 'chrome', 4, fid); break; }

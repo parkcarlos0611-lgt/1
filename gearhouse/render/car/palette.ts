@@ -39,5 +39,9 @@ export function rampsFor(paint: string, paint2: string): Record<Material, RGB[]>
     wood: ramp('#8a5a32', 7),
     shadow: [hexRGB('#0d0b0a'), hexRGB('#17130f'), hexRGB('#221c17')],
     canvas: ramp('#8c8270', 7, { span: 0.5 }),
+    iron: ramp('#4a4744', 7, { span: 0.45 }),
+    lens: [hexRGB('#5a5646'), hexRGB('#8f8a6e'), hexRGB('#c9c39c'), hexRGB('#ece6c0'), hexRGB('#fffbe0')],
+    lensR: [hexRGB('#3a0d0c'), hexRGB('#6e1713'), hexRGB('#a8261c'), hexRGB('#d8463a'), hexRGB('#f08a78')],
+    white: ramp('#d9d3c2', 7, { span: 0.4 }),
   };
 }

@@ -91,13 +91,44 @@ export function engineVoice(e, year = 1935, { pan = 0 } = {}) {
   const g = ctx.createGain(); g.gain.value = 0; const pn = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
   o.connect(pipe); pipe.connect(muff); muff.connect(g); nz.connect(nbp); nbp.connect(ng); ng.connect(g); tick.connect(thp); thp.connect(tg); tg.connect(g);
   if (pn) { pn.pan.value = pan; g.connect(pn); pn.connect(sfxBus); } else g.connect(sfxBus);
-  o.start(); nz.start(); tick.start(); const size = Math.min(1.35, (0.55 + (e.litres || 3) * 0.12) * (e.exhaust === 'dual' ? 1.12 : 1) * (e.muffler === 'free' ? 1.15 : 1)), freeM = e.muffler === 'free' ? 300 : 0;
+  // intake layer: carburettor hiss and roar that follows the firing frequency and opens up with the throttle
+  const inz = ctx.createBufferSource(); inz.buffer = noiseBuf; inz.loop = true; const ibp = ctx.createBiquadFilter(); ibp.type = 'bandpass'; ibp.Q.value = 3; const ig = ctx.createGain(); ig.gain.value = 0; inz.connect(ibp); ibp.connect(ig); ig.connect(g);
+  // cycle-to-cycle unevenness: a slow random wobble on the pitch, larger on side-valves and at idle
+  const wob = ctx.createOscillator(), wg = ctx.createGain(); wob.type = 'triangle'; wob.frequency.value = 5.3; wg.gain.value = 0; wob.connect(wg); wg.connect(o.frequency);
+  o.start(); nz.start(); tick.start(); inz.start(); wob.start(); const size = Math.min(1.35, (0.55 + (e.litres || 3) * 0.12) * (e.exhaust === 'dual' ? 1.12 : 1) * (e.muffler === 'free' ? 1.15 : 1)), freeM = e.muffler === 'free' ? 300 : 0;
+  let lastPop = 0, lastLoad = 0.3;
   return { cyl,
     set(rpm, load = 0.3, level = 1, at = ctx.currentTime) { const f = rpm / 120; o.frequency.setTargetAtTime(f, at, 0.04); tick.frequency.setTargetAtTime(rpm / 120 * cyl / 2, at, 0.04);
       muff.frequency.setTargetAtTime((year < 1940 ? 500 : 420) + freeM + rpm * 0.32 + load * 900, at, 0.05); ng.gain.setTargetAtTime(0.01 + load * 0.03 + rpm / 90000, at, 0.05);
-      g.gain.setTargetAtTime(level * size * (0.16 + load * 0.22), at, 0.05); },
+      ibp.frequency.setTargetAtTime(rpm / 60 * cyl / 2 * 3.2 + 300, at, 0.05); ig.gain.setTargetAtTime(level * (0.004 + load * load * 0.05), at, 0.06);
+      wg.gain.setTargetAtTime(f * (e.head === 'sv' ? 0.022 : 0.012) * (rpm < 900 ? 2 : 1), at, 0.1); wob.frequency.setTargetAtTime(3 + Math.random() * 5, at, 0.2);
+      if (load < 0.15 && lastLoad > 0.5 && rpm > 2200) lastPop = at;                                    // lifting off from high revs: a few pops in the pipe
+      if (at - lastPop < 0.9 && load < 0.2 && Math.random() < 0.08 * level) { const t = at + Math.random() * 0.05, b = ctx.createBufferSource(), bp2 = ctx.createBiquadFilter(), pg = ctx.createGain(); b.buffer = noiseBuf; bp2.type = 'lowpass'; bp2.frequency.value = 700; pg.gain.setValueAtTime(0.0001, t); pg.gain.exponentialRampToValueAtTime(0.18 * level, t + 0.005); pg.gain.exponentialRampToValueAtTime(0.0001, t + 0.06); b.connect(bp2); bp2.connect(pg); pg.connect(sfxBus); b.start(t); b.stop(t + 0.08); }
+      lastLoad = load; g.gain.setTargetAtTime(level * size * (0.16 + load * 0.22), at, 0.05); },
     pan(v) { if (pn) pn.pan.value = Math.max(-1, Math.min(1, v)); },
-    stop(at = ctx.currentTime) { g.gain.setTargetAtTime(0, at, 0.08); [o, nz, tick].forEach(n => n.stop(at + 0.6)); } };
+    stop(at = ctx.currentTime) { g.gain.setTargetAtTime(0, at, 0.08); [o, nz, tick, inz, wob].forEach(n => n.stop(at + 0.6)); } };
+}
+// everything else a moving car makes: tyres, road, wind, gears, and the knocks of driving
+export function driveVoice() {
+  if (!ctx) return null; const mk = (type, f, q) => { const s = ctx.createBufferSource(); s.buffer = noiseBuf; s.loop = true; const b = ctx.createBiquadFilter(); b.type = type; b.frequency.value = f; b.Q.value = q; const g = ctx.createGain(); g.gain.value = 0; s.connect(b); b.connect(g); g.connect(sfxBus); s.start(); return { s, b, g }; };
+  const squeal = mk('bandpass', 1100, 9), squeal2 = mk('bandpass', 1650, 12), roll = mk('lowpass', 260, 0.7), grit = mk('highpass', 2200, 0.7), wind = mk('bandpass', 520, 0.6);
+  const whine = ctx.createOscillator(), wg = ctx.createGain(); whine.type = 'triangle'; wg.gain.value = 0; whine.connect(wg); wg.connect(sfxBus); whine.start();
+  const grind = mk('bandpass', 2600, 4); let lastGear = null, lastDefl = 0, lastSq = 0;
+  const knock = (t, f, v, len = 0.09) => { const b = ctx.createBufferSource(), lp = ctx.createBiquadFilter(), g = ctx.createGain(); b.buffer = noiseBuf; lp.type = 'lowpass'; lp.frequency.value = f; g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(v, t + 0.006); g.gain.exponentialRampToValueAtTime(0.0001, t + len); b.connect(lp); lp.connect(g); g.connect(sfxBus); b.start(t); b.stop(t + len + 0.02); };
+  return {
+    // q: { v m/s, slip 0.., surf 'tar'|'con'|'gravel'|'grass', gear, gearSpeed rad/s, load 0..1, grind 0..1, defl m (suspension movement), brake 0..1, hot 0..1 }
+    set(q) { const at = ctx.currentTime, v = Math.abs(q.v), sl = Math.max(0, q.slip - 0.75);
+      squeal.g.gain.setTargetAtTime(Math.min(0.12, sl * 0.12) * (q.surf === 'grass' || q.surf === 'gravel' ? 0.15 : 1) * Math.min(1, v / 4), at, 0.04); squeal.b.frequency.setTargetAtTime(950 + sl * 260 + v * 4, at, 0.05);
+      squeal2.g.gain.setTargetAtTime(Math.min(0.05, Math.max(0, sl - 0.4) * 0.07) * (q.surf === 'grass' || q.surf === 'gravel' ? 0.1 : 1), at, 0.04);
+      const rough = q.surf === 'gravel' ? 2.2 : q.surf === 'grass' ? 1.4 : q.surf === 'con' ? 1.2 : 1; roll.g.gain.setTargetAtTime(Math.min(0.16, v * 0.004 * rough), at, 0.08); roll.b.frequency.setTargetAtTime(160 + v * 6, at, 0.1);
+      grit.g.gain.setTargetAtTime(q.surf === 'gravel' || q.surf === 'grass' ? Math.min(0.08, v * 0.004) : 0, at, 0.06); wind.g.gain.setTargetAtTime(Math.min(0.12, v * v * 0.00009), at, 0.1); wind.b.frequency.setTargetAtTime(380 + v * 9, at, 0.1);
+      // straight-cut indirect gears whine; top gear is direct and quiet
+      const ind = q.gear > 0 && q.gear < q.top; whine.frequency.setTargetAtTime(Math.max(40, Math.abs(q.gearSpeed) * 24 / (2 * Math.PI)), at, 0.03); wg.gain.setTargetAtTime(ind || q.gear < 0 ? Math.min(0.03, Math.abs(q.gearSpeed) * 0.00012 * (0.4 + q.load)) : 0, at, 0.05);
+      grind.g.gain.setTargetAtTime(q.grind > 0.2 ? 0.09 * q.grind : 0, at, 0.02); grind.b.frequency.setTargetAtTime(2200 + Math.random() * 900, at, 0.01);
+      if (lastGear !== null && q.gear !== lastGear) knock(at, 300, 0.25, 0.07); lastGear = q.gear;
+      if (Math.abs(q.defl - lastDefl) > 0.012) knock(at, 160, Math.min(0.35, Math.abs(q.defl - lastDefl) * 9), 0.14); lastDefl = q.defl;
+      if (q.brake > 0.3 && v > 0.5 && v < 7 && q.hot > 0.4 && at - lastSq > 1.2) { lastSq = at; tone(at, 2900 + Math.random() * 400, 0.5, 'sine', 0.025 * q.hot); } },
+    stop() { const at = ctx.currentTime; for (const n of [squeal, squeal2, roll, grit, wind, grind]) { n.g.gain.setTargetAtTime(0, at, 0.05); n.s.stop(at + 0.4); } wg.gain.setTargetAtTime(0, at, 0.05); whine.stop(at + 0.4); } };
 }
 // dyno: idle -> redline -> idle over ~5 s
 export function dyno(e, year, redline) { unlock(); const v = engineVoice(e, year); if (!v) return; const t0 = ctx.currentTime + 0.05;

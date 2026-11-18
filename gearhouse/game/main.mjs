@@ -6,7 +6,7 @@ import { textField, N, editing } from './ui.mjs';
 import { suggest } from './names.mjs';
 import { drawCity, drawWorks, drawPlant, drawDealer } from './places.mjs';
 import { drawMockRoom } from './track.mjs';
-import { makeDrive, drawDrive, drawTrackPick, trackName } from './drive3d.mjs';
+import { makeDrive, drawDrive, drawTrackPick, trackName, soundState } from './drive3d.mjs';
 import { POS0, POS_R, clampPos, placeFront, placeSide } from '../tools/pixel/gen/v3/place.mjs';
 import { TRIM_NAMES, wheelsFor, WHEEL_NAMES, wwMax, trimSide, trimFront } from '../tools/pixel/gen/v3/trim.mjs';
 import { scrollArea, audit } from './ui.mjs';
@@ -589,7 +589,7 @@ function cars(g) { const CW = FULL ? 126 : 86;
     if (button(S, cx + 101, AY + 198, 97, 14, 'REVISE THE BODY', { tone: 'ox' })) confirmBox('REVISE THE BODY', ['BACK TO THE STYLING STUDIO.', 'BODY AND MOCK-UP MUST BE DONE AGAIN (AND PAID AGAIN).'], () => { reopen(4); }); }
   else if (vs === 7 && d.testDue && ev) {                                                                 // durability run results
     if (!d.defects) { let s = [...JSON.stringify(des) + d.engineId + d.gbId].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7); const rnd = () => ((s = (s * 1103515245 + 12345) >>> 0) / 4294967296);
-      const cand = [[pst && pst.margin < 1.15, 'FRAME CRACK AT THE KICK-UP'], [(ev.ch ? ev.ch.fadeStops < 8 : !d.feats.hydbrake) || !!d.track?.fade, 'BRAKE FADE ON LONG DESCENTS'], [(ev.ch && ev.ch.balance < -0.06) || d.track?.spins > 0, 'TAIL STEPS OUT IN FAST CORNERS'], [ev.ch && ev.ch.fF > 1.9, 'FRONT END SHAKES ON BAD ROADS'], [(pst && pst.stiff < 0.6) || d.track?.shake > 0.8, 'DOOR RATTLE ON ROUGH ROADS'], [ev.es.reliability < 0.75, 'OVERHEATING ON THE HILL CLIMB'],
+      const cand = [[pst && pst.margin < 1.15, 'FRAME CRACK AT THE KICK-UP'], [(ev.ch ? ev.ch.fadeStops < 8 : !d.feats.hydbrake) || !!d.track?.fade, 'BRAKE FADE ON LONG DESCENTS'], [(ev.ch && ev.ch.balance < -0.06) || d.track?.spins > 0, 'TAIL STEPS OUT IN FAST CORNERS'], [ev.ch && ev.ch.fF > 1.9, 'FRONT END SHAKES ON BAD ROADS'], [(pst && pst.stiff < 0.6) || d.track?.shake > 0.8, 'DOOR RATTLE ON ROUGH ROADS'], [d.track?.grinds > 3, 'GEARS HARD TO CHANGE'], [ev.es.reliability < 0.75, 'OVERHEATING ON THE HILL CLIMB'],
         [true, 'WATER LEAK AT THE WINDSHIELD'], [true, 'GEARBOX WHINE IN SECOND'], [d.feats.unibody && g.year < 1945, 'SHELL CORROSION AT THE SILLS']];
       d.defects = cand.filter(([c]) => c && rnd() < 0.35 + (1 - ev.rel) * 0.8).map(([, s2]) => s2).slice(0, 4); AU.sfx('type'); }
     tx(d.defects.length ? `${d.defects.length} DEFECTS FOUND` : 'NO DEFECTS FOUND', 159, d.defects.length ? C.oxblood : C.green); d.defects.forEach((s2, i) => tx('- ' + s2, 167 + i * 8, C.ink));
@@ -657,13 +657,13 @@ function works() { const r = drawWorks(S, P, app.g, modelSprite, app.t); if (r =
 function plant() { const g = app.g, r = drawPlant(S, P, g, modelSprite, app.t, AU.sfx); if (r === 'works') app.scene = 'works'; if (r === 'map') goMap(); if (r === 'expand') { g.factory += 500; g.cash -= 40000; AU.sfx('stamp'); toast('FACTORY EXPANDED'); } }
 function dealer() { const g = app.g, r = drawDealer(S, P, g, modelSprite, app.t, money); if (r === 'map') goMap(); else if (r?.cut) { r.cut.price = Math.max(350, Math.round(r.cut.price * 0.95 / 10) * 10); AU.sfx('till'); toast('PRICE CUT'); } }
 function mockroom() { if (drawMockRoom(S, P, app.room, AU.sfx)) { app.scene = 'hq'; app.tab = 'cars'; app.room = null; } }
-function track() { const K = app.trk, g = app.g, leave = () => { if (K.voice) K.voice.stop(); app.scene = 'hq'; app.tab = 'cars'; app.trk = null; };
+function track() { const K = app.trk, g = app.g, leave = () => { if (K.voice) K.voice.stop(); if (K.dv) K.dv.stop(); app.scene = 'hq'; app.tab = 'cars'; app.trk = null; };
   if (K.pick) { const r = drawTrackPick(S, g, nameField, K.proj.trackBest); if (r === 'back') leave(); else if (typeof r === 'number') { K.ti = r; K.run = makeDrive(K.car, r); K.run.name = trackName(g, r); K.pick = false; K.saved = false; } return; }
-  const T = K.run; if (!K.voice && AU.ready()) K.voice = AU.engineVoice(T.car.engine, T.car.year);
-  const r = drawDrive(S, P, T, K.sprite, AU.sfx); if (K.voice) K.voice.set(Math.max(500, T.C.we * 30 / Math.PI), T.C.shift ? 0.15 : (input.keys?.ArrowUp || T.autoGas ? 1 : 0.15), T.done ? 0.25 : 1);
+  const T = K.run; if (!K.voice && AU.ready()) { K.voice = AU.engineVoice(T.car.engine, T.car.year); K.dv = AU.driveVoice(); }
+  const r = drawDrive(S, P, T, K.sprite, AU.sfx); const q = soundState(T); if (K.voice) K.voice.set(q.stalled ? 0 : Math.max(450, q.rpm), q.engLoad, q.stalled ? 0 : T.done ? 0.25 : 1); if (K.dv) K.dv.set(T.done ? { ...q, v: 0, slip: 0 } : q);
   if (T.done && !K.saved) { K.saved = true; const L = T.log, best = L.laps.length ? Math.min(...L.laps) : null; K.proj.trackBest = K.proj.trackBest || []; if (best && !(K.proj.trackBest[K.ti] <= best)) K.proj.trackBest[K.ti] = best;
-    const prev = K.proj.track || {}; K.proj.track = { where: T.name, best, top: L.top, maxG: L.maxG, fade: L.fade || !!prev.fade, spins: (prev.spins || 0) + L.spins, shake: Math.max(prev.shake || 0, L.shake), maxTb: L.maxTb }; AU.sfx('stamp'); }
-  if (r === 'again') { K.pick = true; if (K.voice) { K.voice.stop(); K.voice = null; } } if (r === 'back') leave(); }
+    const prev = K.proj.track || {}; K.proj.track = { where: T.name, best, top: L.top, maxG: L.maxG, fade: L.fade || !!prev.fade, spins: (prev.spins || 0) + L.spins, shake: Math.max(prev.shake || 0, L.shake), maxTb: L.maxTb, grinds: (prev.grinds || 0) + L.grinds }; AU.sfx('stamp'); }
+  if (r === 'again') { K.pick = true; if (K.voice) { K.voice.stop(); K.voice = null; } if (K.dv) { K.dv.stop(); K.dv = null; } } if (r === 'back') leave(); }
 function assembly() { const st = drawAssembly(S, P, app.asm, AU.sfx); if (button(S, W - 70, 4, 62, 14, st >= 9 ? 'DONE' : 'SKIP', { tone: 'ox' }) || app.asm.t > 9 * 110 + 100) { app.scene = 'hq'; app.tab = app.asmBack || 'cars'; app.asm = null; }
   if (button(S, W - 136, 4, 62, 14, 'FASTER')) app.asm.t = Math.min(9 * 110, app.asm.t + 40); }
 

@@ -18,7 +18,9 @@ const DS = 2;
 function build(tr) { if (tr.cells) return tr; const cells = []; let el = 0, th = 0;
   for (const s of tr.segs) { const n = Math.max(1, Math.round(s.len / DS)); for (let q = 0; q < n; q++) { el += (s.grade || 0) * DS; th += (s.k || 0) * DS; cells.push({ k: s.k || 0, el, th, bank: s.bank || 0, rough: s.rough || 0, grade: s.grade || 0 }); } }
   let x = 0, y = 0; const pts = cells.map(c => { x += Math.cos(c.th) * DS; y += Math.sin(c.th) * DS; return [x, y]; }), ex = x, ey = y, n = pts.length;
-  tr.map = pts.map(([px, py], i) => [px - ex * (i + 1) / n, py - ey * (i + 1) / n]); tr.cells = cells; tr.L = cells.length * DS; return tr; }
+  tr.map = pts.map(([px, py], i) => [px - ex * (i + 1) / n, py - ey * (i + 1) / n]); tr.cells = cells; tr.L = cells.length * DS;
+  for (let i = 0; i < n; i++) { const a = cells[i], b = cells[(i + 1) % n]; if (!a.k && b.k && Math.abs(b.k) > 1 / 180) for (const [d, m] of [[75, 3], [50, 2], [25, 1]]) { const j = ((i - d) % n + n) % n; cells[j].board = m; cells[j].bside = Math.sign(b.k); } }   // 150 / 100 / 50 m
+  return tr; }
 const cellAt = (tr, s) => tr.cells[((Math.floor(s / DS) % tr.cells.length) + tr.cells.length) % tr.cells.length];
 // road under a tyre: curvature, grade, banking, grip and the small height changes the springs have to soak up (m)
 const hash = (a, b) => { const v = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return v - Math.floor(v); };
@@ -85,7 +87,7 @@ export function drawDrive(S, P, D, sprites, sfx) {
   D.pedal = Math.max(0, Math.min(1, (D.pedal || 0) + ((gasK || (D.autoGas && !brake)) ? 1 / 36 : -1 / 12)));   // a foot, not a switch: about 0.6 s to the floor
   const ctl = { steer: (right ? 1 : 0) - (left ? 1 : 0), gas: D.pedal, brake: brake ? 1 : 0, up: key === 'a' || key === 'A' || key === 'Shift', down: key === 'z' || key === 'Z' || key === 'Control', hand: k[' '] };
   if (button(S, W - 160, H - 44, 50, 19, 'SHIFT +', { tone: 'teal' })) ctl.up = true; if (button(S, W - 160, H - 23, 50, 19, 'SHIFT -', { tone: 'teal' })) ctl.down = true;
-  stepDrive(D, ctl, 1 / 60); for (const c of D.C.corners) c.tbMax = Math.max(c.tbMax || 0, c.tb);
+  D.ctl = ctl; stepDrive(D, ctl, 1 / 60); for (const c of D.C.corners) c.tbMax = Math.max(c.tbMax || 0, c.tb);
   // camera: trails the car's heading and line, turns round to face the car when it is reversing
   const psiR = -C.psi, xR = -C.n, revWant = C.gear === -1 && C.u < -0.3 ? 1 : C.u > 0.3 || C.gear > 0 ? 0 : D.cam.rev; D.cam.rev += Math.sign(revWant - D.cam.rev) * Math.min(Math.abs(revWant - D.cam.rev), 1 / 36);
   const back = D.cam.rev > 0.5, dir = back ? -1 : 1; D.cam.psi += (psiR - D.cam.psi) * 0.15; D.cam.x = xR - Math.sin(D.cam.psi) * CAMD * dir;   // the camera hangs behind (or, reversing, in front of) the car along its heading const cb = cellAt(tr, C.s).bank * Math.sign(cellAt(tr, C.s).k || 0); D.cam.roll += ((cb * 0.55 * Math.PI / 180) * dir - D.cam.roll) * 0.05;
@@ -121,6 +123,13 @@ export function drawDrive(S, P, D, sprites, sfx) {
       else if (r0 < 0.8) { const tx = p.sx + s2 * (hw + 1.6) * sc; put(tx, p.sy - 1 * sc, 0.12 * sc, 1 * sc, COL.post, lim); put(tx, p.sy - 1 * sc, 0.12 * sc, 0.18 * sc, hex('#b0341f'), lim); }
       else { const tx = p.sx + s2 * (hw + 2.5) * sc; put(tx - 0.6 * sc, p.sy - 0.5 * sc, 1.2 * sc, 0.5 * sc, hex('#c8b26a'), lim); put(tx - 0.6 * sc, p.sy - 0.5 * sc, 1.2 * sc, 0.08 * sc, hex('#e2d08a'), lim); } }    // straw bales
     if (tr.surf === 'con' && id % 5 === 0 && !p.c.bank) for (const s2 of [-1, 1]) put(p.sx + s2 * (hw + 2) * sc, p.sy - 1.1 * sc, 0.25 * sc, 1.1 * sc, COL.wallD, lim);
+    if (p.c.board) { const sd = -p.c.bside, bx = p.sx + sd * (hw + 2.2) * sc; put(bx - 0.06 * sc, p.sy - 1.6 * sc, 0.12 * sc, 1.6 * sc, COL.wallD, lim); put(bx - 0.5 * sc, p.sy - 2.6 * sc, 1 * sc, 1.1 * sc, hex('#f3ead2'), lim); for (let q = 0; q < p.c.board; q++) put(bx - 0.4 * sc, p.sy - 2.5 * sc + q * 0.32 * sc, 0.8 * sc, 0.16 * sc, hex('#1d1a1c'), lim); }
+    if (tr.kind === 'TEST ROAD' && id % 18 === 0) { const px2 = p.sx - (hw + 9) * sc; put(px2 - 0.1 * sc, p.sy - 8 * sc, 0.2 * sc, 8 * sc, COL.trunk, lim); put(px2 - 0.9 * sc, p.sy - 7.4 * sc, 1.8 * sc, 0.12 * sc, COL.trunk, lim); }   // telegraph poles
+    if (tr.kind === 'ROAD CIRCUIT' && id % 3 === 0 && p.z > 6) for (const s2 of [-1, 1]) { const fx2 = p.sx + s2 * (hw + 4) * sc, q2 = proj[n + 3]; put(fx2 - 0.05 * sc, p.sy - 1.1 * sc, 0.1 * sc, 1.1 * sc, hex('#f3ead2'), lim);
+      if (q2) { const nx = q2.sx + s2 * (hw + 4) * q2.sc, x0 = Math.min(fx2, nx), w0 = Math.abs(nx - fx2) + 1; put(x0, p.sy - 1 * sc, w0, Math.max(1, 0.07 * sc), hex('#f3ead2'), lim); put(x0, p.sy - 0.6 * sc, w0, Math.max(1, 0.07 * sc), hex('#f3ead2'), lim); } }   // white rail fence
+    if (tr.kind === 'ROAD CIRCUIT' && id > nC - 30 && id % 5 === 0) { const gx = p.sx + (hw + 7) * sc; put(gx, p.sy - 4 * sc, 9 * sc, 4 * sc, hex('#d8cfb8'), lim); put(gx, p.sy - 4.4 * sc, 9 * sc, 0.5 * sc, hex('#7a2a22'), lim); put(gx + 1 * sc, p.sy - 2.6 * sc, 1.4 * sc, 1.2 * sc, hex('#3a3a40'), lim); put(gx + 4 * sc, p.sy - 2.6 * sc, 1.4 * sc, 1.2 * sc, hex('#3a3a40'), lim); }   // pits
+    if ((tr.kind === 'ROAD CIRCUIT' || tr.surf === 'con') && id < 24 && id % 3 === 0) { const gx = p.sx - (hw + 8) * sc; for (let r3 = 0; r3 < 5; r3++) put(gx - (9 - r3) * sc, p.sy - (1 + r3 * 0.9) * sc, (9 - r3) * sc, 0.9 * sc, r3 % 2 ? hex('#8a7e6a') : hex('#9e927c'), lim); put(gx - 9 * sc, p.sy - 6.2 * sc, 9 * sc, 0.4 * sc, hex('#5a4a38'), lim);
+      for (let q = 0; q < 6; q++) put(gx - (8.5 - q * 1.4) * sc, p.sy - (1.6 + (q % 4) * 0.9) * sc, 0.35 * sc, 0.45 * sc, [hex('#3a3440'), hex('#7a2a22'), hex('#d8cfb8')][(q + id) % 3], lim); }   // grandstand with people
     if (tr.surf === 'con' && id < 40 && id % 4 === 0) { const gx = p.sx - (hw + 6) * sc; put(gx - 6 * sc, p.sy - 5 * sc, 6 * sc, 5 * sc, hex('#8a7e6a'), lim); put(gx - 6 * sc, p.sy - 5.4 * sc, 6 * sc, 0.5 * sc, hex('#6a5a48'), lim); } }
   // shadow under the car (sun high and a little behind-left), tyre contact shadows, then the car
   const onRoad = z => { const f = Math.max(0, z / DS - (1 - frac)), i = Math.min(VIEW - 1, Math.floor(f)), t = f - i, a = proj[i], b = proj[i + 1]; return { sx: a.sx + (b.sx - a.sx) * t, sy: a.sy + (b.sy - a.sy) * t, sc: a.sc + (b.sc - a.sc) * t }; };
@@ -133,6 +142,11 @@ export function drawDrive(S, P, D, sprites, sfx) {
   drawHud(S, D, ctl, left, right, gasK, brake);
   return D.done ? report(S, D) : button(S, W - 66, 2, 60, 12, 'BACK', { tone: 'ox' }) ? 'back' : null;
 }
+// what the car sounds like this frame
+export function soundState(D) { const C = D.C, tr = D.tr, c0 = cellAt(tr, C.s), off = Math.abs(C.n) > tr.width / 2 + 0.6, wd = (C.corners[2].w + C.corners[3].w) / 2;
+  return { v: C.u, slip: Math.max(...C.corners.map(c => c.slip)), surf: off ? 'grass' : c0.rough ? 'gravel' : tr.surf === 'con' ? 'con' : 'tar', gear: C.gear, top: C.ratios.length, gearSpeed: wd * C.final * (C.gear > 0 ? C.ratios[C.gear - 1] : C.gear < 0 ? -C.ratios[0] : 0),
+    load: D.pedal || 0, grind: C.grind, defl: C.corners.reduce((a, c) => a + c.defl, 0) / 4, brake: D.ctl?.brake || 0, hot: Math.min(1, (Math.max(...C.corners.map(c => c.tb)) - 60) / 240),
+    rpm: Math.max(0, C.we * 30 / Math.PI), engLoad: C.shift ? 0.1 : Math.max(0.08, D.pedal || 0), stalled: C.stalled }; }
 function gearLabel(C) { return C.shift ? '-' : C.gear === -1 ? 'R' : C.gear === 0 ? 'N' : String(C.gear) + (C.odOn ? ' OD' : ''); }
 function drawHud(S, D, ctl, left, right, gas, brake) { const C = D.C;
   // map

@@ -1,6 +1,7 @@
 // GEARHOUSE 1930-1949 test build: scenes, designers, monthly loop, save/load. All UI is pixel-drawn (ui.mjs).
 import * as AU from './audio.mjs';
-import { lang, hooks } from './ui.mjs';
+import { lang, hooks, clip } from './ui.mjs';
+import { tr } from './i18n.mjs';
 import { scrollArea } from './ui.mjs';
 import { W, H, C, Sheet, drawPix, input, text, tw, windowBox, panel, button, slider, cycler, bar, stat, graph, desk, bevel, rivet, lineTo } from './ui.mjs';
 import { eraPalette, hex } from '../tools/pixel/color.mjs';
@@ -26,7 +27,7 @@ import { GEARBOX, proposeRatios, rpmTrace } from '../sim/drive.mjs';
 import { COUNTRIES, SEGS, TECH, RES_SCALE, newGame, stepMonth, evaluate, appeal, dateNum, has, BANK_OPTS, bankOption } from './world.mjs';
 
 const PAINTS = ['#2f3a4a', '#5c1c27', '#3f5a40', '#7d3a2c', '#4b6283', '#d8c9a0', '#1d1d22', '#6b5a3a', '#8c2a24', '#6b6e70'];
-const P = ptPalette(eraPalette()); PAINTS.forEach((h, i) => P.auto('paint.c' + i, h)); P.auto('paint.enginecream', '#b9ae8e'); P.auto('bare', '#9aa0a6', { sat: 0.2 }); P.auto('primerRed', '#8a3b2a'); P.auto('primerGrey', '#7d8085'); P.auto('canvas', '#3b3631', { sat: 0.5 });
+const P = ptPalette(eraPalette()); PAINTS.forEach((h, i) => P.auto('paint.c' + i, h)); P.auto('paint.enginecream', '#b9ae8e'); P.auto('bare', '#9aa0a6', { sat: 0.2 }); P.auto('primerRed', '#8a3b2a'); P.auto('primerGrey', '#7d8085'); P.auto('paint.clay', '#b49a74', { sat: 0.4 }); P.auto('paint.mockwood', '#8a6a44', { sat: 0.5 }); P.auto('canvas', '#3b3631', { sat: 0.5 });
 { const seen = new Set(); const scan = o => { if (typeof o === 'string' && o.startsWith('paint.')) seen.add(o); else if (o && typeof o === 'object') Object.values(o).forEach(scan); }; TEMPLATES.forEach(t => scan(t.spec)); [...seen].forEach(n => { try { P.id(n); } catch { P.auto(n, '#3a4250'); } }); }
 const S = new Sheet(W, H, C.desk), cv = document.getElementById('screen'), ctx = cv.getContext('2d'), img = new ImageData(S.d, W, H);
 const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
@@ -62,7 +63,7 @@ function platSprite(des, spec, paintIdx) { const key = 'PL' + JSON.stringify(des
 const PARTK = { grilleFrom: 'grille', lampFrom: 'lamps', bumperFrom: 'bumpers', guards: 'bumpers', tailFrom: 'tail', wheelFrom: 'wheel', whitewall: 'wheel', ornament: 'ornament', fog: 'fog' };   // part swaps -> fitting effect
 function v3Sprite(des, paintIdx, view = 'side', rot = 0, strip = null) {
   const key = 'V3' + view + JSON.stringify(des) + paintIdx + rot + (strip || ''); if (app.cache.has(key)) return app.cache.get(key);
-  let out = { px: null }; try { const paint = 'paint.c' + paintIdx;
+  let out = { px: null }; try { const paint = typeof paintIdx === 'string' ? paintIdx : 'paint.c' + paintIdx;
     const meas = des.base && des.base !== 'free';                                                       // measured base car -> warped replica
     if (view === 'side') { const spec = meas ? measuredSide(des, paint, strip) : sideSpec(des, paint); spec.wheel = { ...spec.wheel, rot }; out = { px: buildCar(P, spec, Math.max(25, Math.ceil(spec.len / 190))), spec }; }
     else out = { px: buildFront(P, meas ? measuredView(des, paint, view === 'rear', strip) : (view === 'front' ? frontSpec : rearSpec)(des, paint), 25) }; } catch (e) { console.warn(e); }
@@ -145,7 +146,7 @@ function hq() {
   TABS.forEach(([k, l], i) => { if (button(S, 3, 20 + i * 19, 66, 16, l, { active: app.tab === k, tone: k === 'menu' || k === 'save' ? 'teal' : 'brass' })) app.tab = k; });
   if (!g.over && button(S, 3, 222, 66, 22, 'NEXT MONTH', { tone: 'ox' })) { const n0 = g.news[0]; stepMonth(g); AU.sfx(g.news[0] !== n0 ? 'wire' : 'type'); if (g.last?.sales) AU.sfx('till'); }
   if (!g.over && button(S, 3, 246, 66, 16, '+6 MONTHS')) { for (let i = 0; i < 6 && !g.over; i++) stepMonth(g); }
-  ({ news, engines, gearbox, cars, prod, research, market, finance, save, menu })[app.tab]?.(g);
+  devTick(g); ({ news, engines, gearbox, cars, prod, research, market, finance, save, menu })[app.tab]?.(g);
   if (g.meeting && !g.over) { windowBox(S, 120, 60, 260, 150, 'MEETING AT THE BANK'); text(S, 'YOUR CREDIT IS EXHAUSTED FOR 3 MONTHS.', 134, 84, C.ink); text(S, 'CHOOSE A RESCUE PLAN:', 134, 94, C.oxblood);
     BANK_OPTS.forEach(([k, l], i) => { if (button(S, 134, 108 + i * 22, 232, 17, l, { tone: k === 'merge' ? 'ox' : 'brass' })) { bankOption(g, k); AU.sfx('wire'); } }); return; }
   if (g.over) { app.scene = 'end'; return; }
@@ -210,111 +211,224 @@ function gearbox(g) { windowBox(S, AX, AY, AW, AH, 'GEARBOX + DRIVELINE');
   panel(S, AX + 300, AY + 20, AW - 306, 120, 'RATIO LADDER'); R.forEach((r, i) => { const h = Math.round(r / 4 * 90); S.fill(AX + 310 + i * 18, AY + 130 - h, 12, h, C.teal); text(S, String(i + 1), AX + 313 + i * 18, AY + 133, C.ink); });
   if (button(S, x0, AY + 186, 140, 16, `BUILD ($15,000 / 3 MO)`, { tone: 'ox', disabled: g.cash < 15000 })) { g.gearboxes.push({ id: 'G' + g.serial++, name: `${d.gears}-SPD ${G.name.split(' ').slice(-1)[0]}`, type: d.type, gears: d.gears, ratios: R, readyAt: dateNum(g) + 3 }); g.cash -= 15000; toast('GEARBOX TOOLING STARTED'); }
 }
-function cars(g) { windowBox(S, AX, AY, AW, AH, 'CAR DESIGN STUDIO');
+// ---------- car development: 9 stages in their real order, each in its own place, with time and cost ----------
+// brief -> platform -> engine -> driveline -> body -> mock-up (executive review) -> detail -> prototype & test (defects) -> production prep (tooling)
+const DEV = [
+  { id: 'brief', name: 'BRIEF', mo: 1, cost: 2000, where: 'PLANNING OFFICE' },
+  { id: 'platform', name: 'PLATFORM', mo: 1, cost: 6000, where: 'DRAWING OFFICE - CHASSIS' },
+  { id: 'engine', name: 'ENGINE', mo: 0, cost: 0, where: 'ENGINE TEST ROOM' },
+  { id: 'driveline', name: 'DRIVELINE', mo: 0, cost: 1500, where: 'DRAWING OFFICE - DRIVELINE' },
+  { id: 'body', name: 'BODY', mo: 1, cost: 8000, where: 'STYLING STUDIO' },
+  { id: 'mockup', name: 'MOCK-UP', mo: 1, cost: 5000, where: 'MOCK-UP ROOM' },
+  { id: 'detail', name: 'DETAIL', mo: 1, cost: 4000, where: 'DRAWING OFFICE - DETAIL' },
+  { id: 'proto', name: 'PROTOTYPE', mo: 2, cost: 12000, where: 'PROVING GROUND' },
+  { id: 'prep', name: 'TOOLING', mo: 3, cost: 0, where: 'FACTORY - PRODUCTION PREP' }];
+// a stage that finished this month: mock-up waits for the review, prototype for the defect decision, tooling launches the model
+function devTick(g) { const d = g.proj; if (!d || !d.busy || dateNum(g) < d.busy.until) return; const { i, fix } = d.busy; d.busy = null; AU.sfx('stamp');
+  if (i === 8 && d.launch) { const L = d.launch; g.models.push({ ...L, id: 'M' + g.serial++, plan: Math.min(Math.round((d.volume || 3000) / 12), g.factory), readyAt: dateNum(g), sold: 0, stock: 0 });   // monthly plan from the brief's annual volume
+    g.news.unshift({ t: L.name + ' ENTERS PRODUCTION', d: dateNum(g) }); g.proj = null; app.draft = null; app.dstage = null; toast('MODEL IN PRODUCTION'); return; }
+  d.done[i] = true;
+  if (i === 7 && fix) { d.relMod = (d.relMod || 0) + 0.015 * (d.defects?.length || 0); d.defects = null; d.testDue = false; d.stage = 8; toast('DEFECTS FIXED'); return; }
+  if (i === 5) d.reviewDue = true; else if (i === 7) d.testDue = true; else d.stage = i + 1; toast(DEV[i].name + ' COMPLETE'); }
+const tr2 = s => (lang.ko ? tr(s) : s);
+function briefDoc(g, d, x, y, w, h) {                                       // typed project brief
+  S.fill(x, y, w, h, C.white); S.fill(x, y, w, 1, C.paperDark); const sg = SEGS[d.seg], top = Object.entries(sg.w).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k]) => k.toUpperCase()).join(', ');
+  const lines = ['PROJECT BRIEF - ' + d.name, MONTHS[g.month - 1] + ' ' + g.year + '  ' + COUNTRIES[g.country].name, '', 'SEGMENT: ' + d.seg.toUpperCase(), 'TARGET PRICE: ' + money(d.price), 'VOLUME: ' + d.volume + ' CARS / YEAR', 'BUYERS VALUE: ' + top].map(tr2);
+  const key = lines.join('|'); if (app.briefKey !== key) { app.briefKey = key; app.briefT = app.t; }
+  let n = Math.floor((app.t - app.briefT) * 1.4); const total = lines.join('').length;
+  lines.forEach((l, i) => { const s = l.slice(0, Math.max(0, n)); n -= l.length; if (s) text(S, s, x + 6, y + 5 + i * 10, i ? C.ink : C.oxblood, 1, w - 10); });
+  if ((app.t - app.briefT) * 1.4 < total && (app.t - app.briefT) % 5 === 0) AU.sfx('type'); }
+function gearMesh(x, y, ratio, t) {                                         // final drive: pinion turning the crown wheel
+  const draw = (cx, cy, R, n, ang, c1, c2) => { for (let yy = -R; yy <= R; yy++) for (let xx = -R; xx <= R; xx++) { const r = Math.hypot(xx, yy); if (r <= R - 2) S.fill(cx + xx, cy + yy, 1, 1, r < R * 0.3 ? c2 : c1); }
+    for (let k = 0; k < n; k++) { const a = ang + k * 6.2832 / n; for (let q = R - 2; q <= R + 2; q++) S.fill(Math.round(cx + Math.cos(a) * q), Math.round(cy + Math.sin(a) * q), 2, 2, c1); } S.fill(cx - 1, cy - 1, 3, 3, C.ink); };
+  const R2 = Math.round(Math.min(34, 8 * ratio)), R1 = 8, ox = x + 60, oy = y + 40;
+  draw(ox, oy, R2, Math.round(9 * ratio), -t * 0.06 / ratio, C.brassD, C.brass); draw(ox + R2 + R1 + 3, oy, R1, 9, t * 0.06 + 0.35, C.brass, C.brassL); }
+function dashboard(x, y, w, h, trim) {                                      // instrument panel by trim level
+  const wood = trim >= 2, face = wood ? hex('#6b4a2a') : hex('#3a3632'); S.fill(x, y, w, h, hex('#cfc5b0')); S.fill(x + 8, y + 18, w - 16, 34, face); S.fill(x + 8, y + 18, w - 16, 1, wood ? hex('#9a7046') : hex('#5a5550'));
+  const n = 1 + Math.min(3, trim); for (let k = 0; k < n; k++) { const cx = x + w / 2 + (k - (n - 1) / 2) * 30, cy = y + 34, R = k === 0 ? 11 : 8;
+    for (let yy = -R; yy <= R; yy++) for (let xx = -R; xx <= R; xx++) { const r = Math.hypot(xx, yy); if (r <= R) S.fill(cx + xx, cy + yy, 1, 1, r > R - 1.5 ? C.brassL : hex('#efe6cf')); }
+    lineTo(S, cx, cy, cx + Math.cos(-2.4 + k + app.t * 0.01) * (R - 2), cy + Math.sin(-2.4 + k + app.t * 0.01) * (R - 2), C.red); }
+  for (let a = 3.5; a < 5.95; a += 0.02) S.fill(Math.round(x + w / 2 + Math.cos(a) * 34), Math.round(y + h + 22 + Math.sin(a) * 34), 2, 2, C.black);   // steering wheel rim
+  text(S, ['BASIC', 'STANDARD', 'DE LUXE', 'CUSTOM'][trim], x + 4, y + 4, C.ink); }
+function cars(g) {
+  if (!g.proj && app.draft) g.proj = app.draft;
   const readyE = g.engines.filter(e => e.readyAt <= dateNum(g)), readyG = g.gearboxes.filter(x => x.readyAt <= dateNum(g));
-  const d = app.draft || (app.draft = { name: 'MODEL ' + String.fromCharCode(65 + g.models.length), type: 'sedan4d', seg: 'family', engineId: readyE[0]?.id, gbId: readyG[0]?.id, final: 4.1, price: 850, trim: 1, paint: 0, feats: {},
-    body: { style: 'box', wb: 2800, rake: 0.5, roofR: 0.5, noseR: 0.5, bodyR: 0.5, height: 0.5, hood: 0.5, nose: 0.5, belt: 0.5, blackFenders: true } });
-  // ---- body designer v3: one record in mm, three views, era / measured limits; symmetric front & rear parts ----
+  let d = g.proj || (g.proj = { name: 'MODEL ' + String.fromCharCode(65 + g.models.length), type: 'sedan4d', seg: 'family', engineId: readyE[0]?.id, gbId: readyG[0]?.id, final: 4.1, price: 850, volume: 3000, trim: 1, paint: 0, feats: {}, stage: 0, done: [], busy: null, spent: 0 });
+  if (d.stage == null) Object.assign(d, { stage: 0, done: [], busy: null, spent: 0, volume: 3000 }); app.draft = d;
+  devTick(g); if (g.proj !== d) { app.tab = 'prod'; return; }
+  windowBox(S, AX, AY, AW, AH, 'NEW CAR PROJECT - ' + d.name);
+  const vs = app.dstage != null && app.dstage <= d.stage ? app.dstage : d.stage, st = DEV[vs], ro = vs < d.stage || !!d.busy, snap = ro ? JSON.stringify(d) : null;
+  // ---- body design record (v3 / measured base) and platform ----
   let des = d.v3 || (d.v3 = measuredDesign(baseList(g.year).includes('sedan30') ? 'sedan30' : baseList(g.year)[0], g.year)); if (des.year !== g.year) des.year = g.year;
   const meas = des.base && des.base !== 'free', baseOpts = ['free', ...baseList(g.year)], prevBase = des.base || 'free'; if (!des.base) des.base = 'free';
   if (!des.plat) des.plat = platformDefault(des.base, g.year);
-  const isMeas = des.base && des.base !== 'free', tabs = [['side', 'SIDE'], ...(isMeas ? [['shape', 'SHAPE']] : []), ['front', 'FRONT'], ['rear', 'REAR'], ['frame', 'FRAME']];
-  if (!isMeas && app.dview === 'shape') app.dview = 'side'; const view = app.dview || 'side', tbw = 34;
-  tabs.forEach(([k, l], i) => { if (button(S, AX + 96 + i * tbw, AY + 2, tbw - 2, 10, l, { active: view === k })) app.dview = k; });   // view tabs in the title bar
+  const isMeas = meas, tabs = st.id === 'body' ? [['side', 'SIDE'], ...(isMeas ? [['shape', 'SHAPE']] : []), ['front', 'FRONT'], ['rear', 'REAR']] : [];
+  if ((!isMeas && app.dview === 'shape') || app.dview === 'frame') app.dview = 'side';
+  const view = st.id === 'platform' ? 'frame' : st.id === 'body' ? app.dview || 'side' : st.id === 'mockup' ? ['side', 'front', 'rear'][Math.floor(app.t / 110) % 3] : 'side', tbw = 34;
+  tabs.forEach(([k, l], i) => { if (button(S, AX + 120 + i * tbw, AY + 2, tbw - 2, 10, l, { active: view === k })) app.dview = k; });
   const R0 = ranges(g.year), opt = (k, key) => optionsFor(key || k, g.year), NM = { sedan4d: '4-DOOR SEDAN', coupe2d: '2-DOOR COUPE' };
-  const ctl = [['cyc', 'base', 'BASE CAR', baseOpts, null, id => id === 'free' ? 'FREE DESIGN' : baseName(id)]];   // [kind, key, label, a, b, fmt]
-  const MR = meas ? measuredRanges(des) : null, srcs = baseList(g.year), sn = id => baseName(id), mm = v => Math.round(v) + 'MM';
-  if (meas) {
-    if (view === 'shape') { const SR = shapeRanges(des), SL = { screen: 'WINDSHIELD TOP', crown: 'ROOF CROWN', back: 'REAR WINDOW TOP', deck: 'DECK HEIGHT', nose: 'NOSE RAKE', fTail: 'FRONT FENDER TAIL', fCrown: 'FRONT FENDER CROWN' };
-      for (const k of SHAPE_KEYS) if (SR[k][1] > SR[k][0]) ctl.push(['sh', k, SL[k], SR[k][0], SR[k][1], v => (v > 0 ? '+' : '') + Math.round(v) + 'MM', 5]); }
-    if (view === 'side') ctl.push(['sl', 'wb', 'WHEELBASE', ...MR.wb, mm, 10], ['sl', 'frontOH', 'FRONT OVERHANG', ...MR.frontOH, mm, 10], ['sl', 'rearOH', 'REAR OVERHANG', ...MR.rearOH, mm, 10], ['sl', 'belt', 'BODY HEIGHT', ...MR.belt, mm, 5],
-      ['sl', 'roof', 'ROOF HEIGHT', ...MR.roof, mm, 5], ['sl', 'width', 'WIDTH', ...MR.width, mm, 10], ['cyc', 'wheelFrom', 'WHEELS FROM', srcs, null, sn], ['sl', 'whitewall', 'WHITEWALL', 0, 0.45, v => Math.round(v * 100) + '%', 0.05],
-      ['cyc', 'lampFrom', 'HEADLAMPS FROM', srcs, null, sn], ['cyc', 'bumperFrom', 'BUMPERS FROM', srcs, null, sn], ['cyc', 'tailFrom', 'TAIL LAMPS FROM', srcs, null, sn], ['cyc', 'fenderBlack', 'FENDERS BLACK', [false, true]]);
-    if (view === 'front') ctl.push(['cyc', 'grilleFrom', 'GRILLE FROM', srcs, null, sn], ['cyc', 'lampFrom', 'HEADLAMPS FROM', srcs, null, sn], ['cyc', 'bumperFrom', 'BUMPERS FROM', srcs, null, sn], ['cyc', 'guards', 'BUMPER GUARDS', [0, 2]],
-      ['cyc', 'fog', 'FOG LAMPS', [false, true]], ['cyc', 'ornament', 'HOOD ORNAMENT', [true, false]]);
-    if (view === 'rear') ctl.push(['cyc', 'tailFrom', 'TAIL LAMPS FROM', srcs, null, sn], ['cyc', 'bumperFrom', 'BUMPERS FROM', srcs, null, sn]);
-  } else if (view === 'side') ctl.push(['cyc', 'type', 'BODY TYPE', ['sedan4d', 'coupe2d'], null, t => NM[t]], ['sl', 'wb', 'WHEELBASE', 1867, 4430, v => Math.round(v) + 'MM', 25], ['sl', 'frontOH', 'FRONT OVERHANG', 380, 1400, v => Math.round(v) + 'MM', 10],
-    ['sl', 'rearOH', 'REAR OVERHANG', 300, 1700, v => Math.round(v) + 'MM', 10], ['sl', 'width', 'WIDTH', 1146, 2215, v => Math.round(v) + 'MM', 10], ['sl', 'roof', 'ROOF HEIGHT', ...R0.roof, v => Math.round(v) + 'MM', 5],
-    ['sl', 'belt', 'BELT LINE', ...R0.belt, v => Math.round(v * des.roof) + 'MM', 0.005], ['sl', 'hood', 'HOOD HEIGHT', ...R0.hood, v => Math.round(v * des.roof) + 'MM', 0.005], ['sl', 'rake', 'SCREEN RAKE', ...R0.rake, v => Math.round(v) + ' DEG', 1],
-    ['sl', 'cowl', 'COWL FROM FRONT AXLE', 500, des.wb * 0.55, v => Math.round(v) + 'MM', 10], ['sl', 'cabin', 'ROOF LENGTH', ...R0.cabin, v => Math.round(v) + 'MM', 10], ['sl', 'crown', 'ROOF CURVE', ...R0.crown, v => Math.round(v) + 'MM', 5],
-    ['sl', 'noseRound', 'NOSE ROUND', ...R0.noseRound, v => Math.round(v) + 'MM', 5], ['cyc', 'tail', 'TAIL', opt('tail')], ['sl', 'deck', 'DECK HEIGHT', 0.5, 0.72, v => Math.round(v * des.roof) + 'MM', 0.005],
-    ['cyc', 'frontFender', 'FRONT FENDER', opt('frontFender')], ['cyc', 'rearFender', 'REAR FENDER', opt('rearFender')], ['sl', 'fenderCrown', 'FENDER CROWN', 40, 260, v => Math.round(v) + 'MM', 5], ['cyc', 'board', 'RUNNING BOARD', [true, false]],
-    ['sl', 'frontDoor', 'FRONT DOOR LENGTH', 800, 1150, v => Math.round(v) + 'MM', 10], ['sl', 'pillarB', 'B PILLAR', 70, 160, v => Math.round(v) + 'MM', 5], ['cyc', 'vent', 'VENT WINGS', [true, false]], ['cyc', 'splitScreen', 'SPLIT SCREEN', [true, false]],
-    ['sl', 'louvres', 'HOOD LOUVRES', 0, 16, v => Math.round(v) + '', 1], ['cyc', 'spear', 'SIDE SPEAR', [true, false]], ['cyc', 'spare', 'SPARE', opt('spare')], ['cyc', 'wheel', 'WHEELS', opt('wheel')], ['sl', 'whitewall', 'WHITEWALL', 0, 0.45, v => Math.round(v * 100) + '%', 0.05],
-    ['cyc', 'fenderBlack', 'FENDERS BLACK', [true, false]], ['cyc', 'roofTone', 'BLACK ROOF', [true, false]]);
-  if (!meas && view === 'front') ctl.push(['cyc', 'grille', 'GRILLE', opt('grille')], ['cyc', 'gpattern', 'GRILLE PATTERN', opt('gpattern')], ['sl', 'grilleW', 'GRILLE WIDTH', 0.25, 0.75, v => Math.round(v * des.width) + 'MM', 0.01], ['sl', 'grilleH', 'GRILLE HEIGHT', 0.3, 0.8, v => Math.round(v * 100) + '%', 0.01],
-    ['cyc', 'lamp', 'HEADLAMPS', opt('lamp')], ['sl', 'lampR', 'LAMP SIZE', 70, 135, v => Math.round(v * 2) + 'MM', 1], ['sl', 'lampY', 'LAMP SPACING (MIRRORED)', 0.3, 0.9, v => Math.round(v * des.width) + 'MM', 0.01], ['sl', 'lampZ', 'LAMP HEIGHT', 0.5, 0.95, v => Math.round(v * 100) + '%', 0.01],
-    ['sl', 'bumperBars', 'BUMPER BARS', 1, 2, v => Math.round(v) + '', 1], ['cyc', 'guards', 'BUMPER GUARDS', [0, 2, 3]], ['cyc', 'fog', 'FOG LAMPS', [false, true]], ['cyc', 'ornament', 'HOOD ORNAMENT', [true, false]]);
-  if (!meas && view === 'rear') ctl.push(['cyc', 'tailLamp', 'TAIL LAMPS', opt('tailLamp')], ['sl', 'tailY', 'TAIL LAMP SPACING (MIRRORED)', 0.4, 0.95, v => Math.round(v * des.width) + 'MM', 0.01], ['cyc', 'rearWindow', 'REAR WINDOW', opt('rearWindow')], ['cyc', 'spare', 'SPARE', opt('spare')], ['cyc', 'guards', 'BUMPER GUARDS', [0, 2, 3]]);
-  if (view === 'frame') { const pl = des.plat, uni = pl.type === 'unibody';                                   // platform: frame type, rail section, steel
-    ctl.length = 0; ctl.push(['pl', 'type', 'FRAME TYPE', typesFor(g.year, k => has(g, k)), null, k => FRAME_TYPES[k].name], ['pl', 'grade', 'STEEL GRADE', gradesFor(g.year), null, k => GRADES[k].name]);
+  const ctl = [];   // [kind, key, label, a, b, fmt, step]
+  const MR = meas ? measuredRanges(des) : null, srcs = baseList(g.year), sn = id => baseName(id), mm = v => Math.round(v) + 'MM', yn = (a, b) => v => (v ? b : a);
+  if (st.id === 'brief') ctl.push(['dcyc', 'seg', 'TARGET SEGMENT', Object.keys(SEGS), null, k => k.toUpperCase()], ['dsl', 'price', 'TARGET PRICE', 350, 5000, money, 10], ['dsl', 'volume', 'ANNUAL VOLUME', 500, 30000, v => Math.round(v) + ' CARS', 100]);
+  if (st.id === 'platform') { const pl = des.plat, uni = pl.type === 'unibody';
+    ctl.push(['cyc', 'base', 'BASE CAR', baseOpts, null, id => id === 'free' ? 'FREE DESIGN' : baseName(id)]);
+    if (meas) ctl.push(['sl', 'wb', 'WHEELBASE', ...MR.wb, mm, 10], ['sl', 'width', 'WIDTH', ...MR.width, mm, 10]); else ctl.push(['sl', 'wb', 'WHEELBASE', 1867, 4430, mm, 25], ['sl', 'width', 'WIDTH', 1146, 2215, mm, 10]);
+    ctl.push(['pl', 'type', 'FRAME TYPE', typesFor(g.year, k => has(g, k)), null, k => FRAME_TYPES[k].name], ['pl', 'grade', 'STEEL GRADE', gradesFor(g.year), null, k => GRADES[k].name]);
     if (uni) ctl.push(['pls', 'railT', 'PANEL GAUGE', 0.9, 2.5, v => v.toFixed(1) + 'MM', 0.1]);
-    else if (pl.type === 'platform') ctl.push(['pls', 'railH', 'TUBE DIAMETER', 90, 200, v => Math.round(v) + 'MM', 5], ['pls', 'railT', 'TUBE WALL', 2.5, 5, v => v.toFixed(2) + 'MM', 0.25]);
-    else ctl.push(['pls', 'railH', 'RAIL DEPTH', 90, 280, v => Math.round(v) + 'MM', 5], ['pls', 'railT', 'STEEL GAUGE', 2.5, 8, v => v.toFixed(2) + 'MM', 0.25], ['pls', 'cross', 'CROSS-MEMBERS', 3, 8, v => Math.round(v) + '', 1], ['pls', 'kick', 'KICK-UP OVER AXLE', 0, 260, v => Math.round(v) + 'MM', 5]); }
+    else if (pl.type === 'platform') ctl.push(['pls', 'railH', 'TUBE DIAMETER', 90, 200, mm, 5], ['pls', 'railT', 'TUBE WALL', 2.5, 5, v => v.toFixed(2) + 'MM', 0.25]);
+    else ctl.push(['pls', 'railH', 'RAIL DEPTH', 90, 280, mm, 5], ['pls', 'railT', 'STEEL GAUGE', 2.5, 8, v => v.toFixed(2) + 'MM', 0.25], ['pls', 'cross', 'CROSS-MEMBERS', 3, 8, v => Math.round(v) + '', 1], ['pls', 'kick', 'KICK-UP OVER AXLE', 0, 260, mm, 5]);
+    if (has(g, 'ifs')) ctl.push(['fcyc', 'ifs', 'FRONT SUSPENSION', [false, true], null, yn('BEAM AXLE', 'INDEPENDENT')]);
+    if (has(g, 'hydbrake')) ctl.push(['fcyc', 'hydbrake', 'BRAKES', [false, true], null, yn('MECHANICAL', 'HYDRAULIC')]); }
+  if (st.id === 'engine' && readyE.length) ctl.push(['dcyc', 'engineId', 'ENGINE', readyE.map(e => e.id), null, id => g.engines.find(e => e.id === id).name]);
+  if (st.id === 'driveline' && readyG.length) ctl.push(['dcyc', 'gbId', 'GEARBOX', readyG.map(x => x.id), null, id => g.gearboxes.find(x => x.id === id).name], ['dsl', 'final', 'FINAL DRIVE', 3.0, 5.5, v => v.toFixed(2), 0.05]);
+  if (st.id === 'detail') { ctl.push(['dsl', 'trim', 'TRIM LEVEL', 0, 3, v => ['BASIC', 'STANDARD', 'DE LUXE', 'CUSTOM'][Math.round(v)], 1]); if (has(g, 'steelroof')) ctl.push(['fcyc', 'steelroof', 'ROOF', [false, true], null, yn('FABRIC INSERT', 'ALL STEEL')]);
+    ctl.push(['dcyc', 'paint', 'PAINT', PAINTS.map((_, i) => i), null, i => 'COLOUR ' + (i + 1)], ['dsl', 'price', 'LIST PRICE', 350, 5000, money, 10]); }
+  if (st.id === 'prep') ctl.push(['dsl', 'volume', 'ANNUAL VOLUME', 500, 30000, v => Math.round(v) + ' CARS', 100]);
+  if (st.id === 'body') {
+    if (meas) {
+      if (view === 'shape') { const SR = shapeRanges(des), SL = { screen: 'WINDSHIELD TOP', crown: 'ROOF CROWN', back: 'REAR WINDOW TOP', deck: 'DECK HEIGHT', nose: 'NOSE RAKE', fTail: 'FRONT FENDER TAIL', fCrown: 'FRONT FENDER CROWN' };
+        for (const k of SHAPE_KEYS) if (SR[k][1] > SR[k][0]) ctl.push(['sh', k, SL[k], SR[k][0], SR[k][1], v => (v > 0 ? '+' : '') + Math.round(v) + 'MM', 5]); }
+      if (view === 'side') ctl.push(['sl', 'frontOH', 'FRONT OVERHANG', ...MR.frontOH, mm, 10], ['sl', 'rearOH', 'REAR OVERHANG', ...MR.rearOH, mm, 10], ['sl', 'belt', 'BODY HEIGHT', ...MR.belt, mm, 5],
+        ['sl', 'roof', 'ROOF HEIGHT', ...MR.roof, mm, 5], ['cyc', 'wheelFrom', 'WHEELS FROM', srcs, null, sn], ['sl', 'whitewall', 'WHITEWALL', 0, 0.45, v => Math.round(v * 100) + '%', 0.05],
+        ['cyc', 'lampFrom', 'HEADLAMPS FROM', srcs, null, sn], ['cyc', 'bumperFrom', 'BUMPERS FROM', srcs, null, sn], ['cyc', 'tailFrom', 'TAIL LAMPS FROM', srcs, null, sn], ['cyc', 'fenderBlack', 'FENDERS BLACK', [false, true]]);
+      if (view === 'front') ctl.push(['cyc', 'grilleFrom', 'GRILLE FROM', srcs, null, sn], ['cyc', 'lampFrom', 'HEADLAMPS FROM', srcs, null, sn], ['cyc', 'bumperFrom', 'BUMPERS FROM', srcs, null, sn], ['cyc', 'guards', 'BUMPER GUARDS', [0, 2]],
+        ['cyc', 'fog', 'FOG LAMPS', [false, true]], ['cyc', 'ornament', 'HOOD ORNAMENT', [true, false]]);
+      if (view === 'rear') ctl.push(['cyc', 'tailFrom', 'TAIL LAMPS FROM', srcs, null, sn], ['cyc', 'bumperFrom', 'BUMPERS FROM', srcs, null, sn]);
+    } else {
+      if (view === 'side') ctl.push(['cyc', 'type', 'BODY TYPE', ['sedan4d', 'coupe2d'], null, t => NM[t]], ['sl', 'frontOH', 'FRONT OVERHANG', 380, 1400, mm, 10], ['sl', 'rearOH', 'REAR OVERHANG', 300, 1700, mm, 10], ['sl', 'roof', 'ROOF HEIGHT', ...R0.roof, mm, 5],
+        ['sl', 'belt', 'BELT LINE', ...R0.belt, v => Math.round(v * des.roof) + 'MM', 0.005], ['sl', 'hood', 'HOOD HEIGHT', ...R0.hood, v => Math.round(v * des.roof) + 'MM', 0.005], ['sl', 'rake', 'SCREEN RAKE', ...R0.rake, v => Math.round(v) + ' DEG', 1],
+        ['sl', 'cowl', 'COWL FROM FRONT AXLE', 500, des.wb * 0.55, mm, 10], ['sl', 'cabin', 'ROOF LENGTH', ...R0.cabin, mm, 10], ['sl', 'crown', 'ROOF CURVE', ...R0.crown, mm, 5],
+        ['sl', 'noseRound', 'NOSE ROUND', ...R0.noseRound, mm, 5], ['cyc', 'tail', 'TAIL', opt('tail')], ['sl', 'deck', 'DECK HEIGHT', 0.5, 0.72, v => Math.round(v * des.roof) + 'MM', 0.005],
+        ['cyc', 'frontFender', 'FRONT FENDER', opt('frontFender')], ['cyc', 'rearFender', 'REAR FENDER', opt('rearFender')], ['sl', 'fenderCrown', 'FENDER CROWN', 40, 260, mm, 5], ['cyc', 'board', 'RUNNING BOARD', [true, false]],
+        ['sl', 'frontDoor', 'FRONT DOOR LENGTH', 800, 1150, mm, 10], ['sl', 'pillarB', 'B PILLAR', 70, 160, mm, 5], ['cyc', 'vent', 'VENT WINGS', [true, false]], ['cyc', 'splitScreen', 'SPLIT SCREEN', [true, false]],
+        ['sl', 'louvres', 'HOOD LOUVRES', 0, 16, v => Math.round(v) + '', 1], ['cyc', 'spear', 'SIDE SPEAR', [true, false]], ['cyc', 'spare', 'SPARE', opt('spare')], ['cyc', 'wheel', 'WHEELS', opt('wheel')], ['sl', 'whitewall', 'WHITEWALL', 0, 0.45, v => Math.round(v * 100) + '%', 0.05],
+        ['cyc', 'fenderBlack', 'FENDERS BLACK', [true, false]], ['cyc', 'roofTone', 'BLACK ROOF', [true, false]]);
+      if (view === 'front') ctl.push(['cyc', 'grille', 'GRILLE', opt('grille')], ['cyc', 'gpattern', 'GRILLE PATTERN', opt('gpattern')], ['sl', 'grilleW', 'GRILLE WIDTH', 0.25, 0.75, v => Math.round(v * des.width) + 'MM', 0.01], ['sl', 'grilleH', 'GRILLE HEIGHT', 0.3, 0.8, v => Math.round(v * 100) + '%', 0.01],
+        ['cyc', 'lamp', 'HEADLAMPS', opt('lamp')], ['sl', 'lampR', 'LAMP SIZE', 70, 135, v => Math.round(v * 2) + 'MM', 1], ['sl', 'lampY', 'LAMP SPACING (MIRRORED)', 0.3, 0.9, v => Math.round(v * des.width) + 'MM', 0.01], ['sl', 'lampZ', 'LAMP HEIGHT', 0.5, 0.95, v => Math.round(v * 100) + '%', 0.01],
+        ['sl', 'bumperBars', 'BUMPER BARS', 1, 2, v => Math.round(v) + '', 1], ['cyc', 'guards', 'BUMPER GUARDS', [0, 2, 3]], ['cyc', 'fog', 'FOG LAMPS', [false, true]], ['cyc', 'ornament', 'HOOD ORNAMENT', [true, false]]);
+      if (view === 'rear') ctl.push(['cyc', 'tailLamp', 'TAIL LAMPS', opt('tailLamp')], ['sl', 'tailY', 'TAIL LAMP SPACING (MIRRORED)', 0.4, 0.95, v => Math.round(v * des.width) + 'MM', 0.01], ['cyc', 'rearWindow', 'REAR WINDOW', opt('rearWindow')], ['cyc', 'spare', 'SPARE', opt('spare')], ['cyc', 'guards', 'BUMPER GUARDS', [0, 2, 3]]);
+    } }
   const before = JSON.stringify(des);
-  scrollArea(S, 'design-' + view, AX + 4, AY + 19, 94, 181, ctl.length * 19 + 6, dy => ctl.forEach(([kind, key, label, a, b, fmt, step], i) => { const y = AY + 23 + i * 19 - dy;
+  scrollArea(S, 'design-' + st.id + view, AX + 4, AY + 19, 94, 210, ctl.length * 19 + 6, dy => ctl.forEach(([kind, key, label, a, b, fmt, step], i) => { const y = AY + 23 + i * 19 - dy, nm = fmt || (v => (v === true ? 'YES' : v === false ? 'NO' : String(v).toUpperCase()));
     if (kind === 'pls') des.plat[key] = slider(S, AX + 6, y, 86, label, des.plat[key], a, b, { step, fmt, id: 'd3p' + key });
     else if (kind === 'pl') des.plat[key] = cycler(S, AX + 6, y - 2, 86, label, a, a.includes(des.plat[key]) ? des.plat[key] : a[0], { names: fmt });
     else if (kind === 'sh') des.shape[key] = slider(S, AX + 6, y, 86, label, des.shape[key] || 0, a, b, { step, fmt, id: 'd3s' + key });
     else if (kind === 'sl') des[key] = slider(S, AX + 6, y, 86, label, des[key], a, b, { step: step || 0, fmt: fmt || (v => v.toFixed(2)), id: 'd3' + key });
-    else { const list = a.length ? a : [des[key]]; des[key] = cycler(S, AX + 6, y - 2, 86, label, list, list.includes(des[key]) ? des[key] : list[0], { names: fmt || (v => (v === true ? 'YES' : v === false ? 'NO' : String(v).toUpperCase())) }); } }));
-  if ((des.base || 'free') !== prevBase) { const nb = des.base; des = d.v3 = nb === 'free' ? { ...newDesign(g.year, 'sedan4d'), base: 'free' } : measuredDesign(nb, g.year); }   // new base car -> start from its measured values
+    else if (kind === 'dsl') d[key] = slider(S, AX + 6, y, 86, label, d[key], a, b, { step, fmt, id: 'dd' + key });
+    else if (kind === 'dcyc') d[key] = cycler(S, AX + 6, y - 2, 86, label, a, a.includes(d[key]) ? d[key] : a[0], { names: nm });
+    else if (kind === 'fcyc') d.feats[key] = cycler(S, AX + 6, y - 2, 86, label, a, !!d.feats[key], { names: nm });
+    else { const list = a.length ? a : [des[key]]; des[key] = cycler(S, AX + 6, y - 2, 86, label, list, list.includes(des[key]) ? des[key] : list[0], { names: nm }); } }));
+  if (ro) { const o = JSON.parse(snap); for (const k of Object.keys(d)) delete d[k]; Object.assign(d, o); des = d.v3; }        // looking back / work in progress: nothing changes
+  d.trim = Math.round(d.trim); if (!readyE.some(e => e.id === d.engineId)) d.engineId = readyE[0]?.id; if (!readyG.some(x => x.id === d.gbId)) d.gbId = readyG[0]?.id;
+  if ((des.base || 'free') !== prevBase) { const nb = des.base, keep = des.plat.type; des = d.v3 = nb === 'free' ? { ...newDesign(g.year, 'sedan4d'), base: 'free' } : measuredDesign(nb, g.year); des.plat = platformDefault(nb === 'free' ? null : nb, g.year); }
   clampPlatform(des.plat, g.year, k => has(g, k)); let notes; if (des.base !== 'free') notes = clampMeasured(des); else { des.doors = des.type === 'coupe2d' ? 2 : 4; des.bumperBars = Math.round(des.bumperBars); des.louvres = Math.round(des.louvres); notes = clampDesign(des); }
   if (JSON.stringify(des) !== before) {                                                                       // design changed: a part swap is fitted, anything else is re-scanned
     const o = JSON.parse(before), ch = Object.keys(des).filter(k => JSON.stringify(des[k]) !== JSON.stringify(o[k])), kinds = [...new Set(ch.map(k => PARTK[k] || 'shape'))];
-    if (app.t - (app.lastEdit ?? -99) > 30) { (app.undo = app.undo || []).push(before); if (app.undo.length > 40) app.undo.shift(); app.redo = []; } app.lastEdit = app.t;   // one undo step per burst of edits
-    if (ch.length === 1 && ch[0] === 'shape') { /* live reshaping: no re-scan while dragging */ }
+    if (app.t - (app.lastEdit ?? -99) > 30) { (app.undo = app.undo || []).push(before); if (app.undo.length > 40) app.undo.shift(); app.redo = []; } app.lastEdit = app.t;
+    if (ch.length === 1 && ch[0] === 'shape') { /* live reshaping */ }
     else if (des.base !== 'free' && o.base === des.base && kinds.length === 1 && kinds[0] !== 'shape') { app.fit = { t: app.t, old: o, strip: kinds[0], view }; app.bpT = -999; } else { app.bpT = app.t; app.fit = null; } }
-  d.paint = cycler(S, AX + 6, AY + 201, 86, 'PAINT', PAINTS.map((_, i) => i), d.paint, { names: i => 'COLOUR ' + (i + 1) }); S.fill(AX + 98 - 10, AY + 210, 6, 7, hex(PAINTS[d.paint]));
-  d.type = des.type;
-  // preview: blueprint scan after every change, then the rendered car
+  d.type = des.type; d.feats.unibody = des.plat.type === 'unibody';
   const cx = AX + 100, pw = 200;
-  if (button(S, AX + AW - 62, AY + 3, 28, 9, 'UNDO', { disabled: !(app.undo || []).length })) { (app.redo = app.redo || []).push(JSON.stringify(des)); des = d.v3 = JSON.parse(app.undo.pop()); app.bpT = app.t; app.fit = null; app.lastEdit = -99; }
-  if (button(S, AX + AW - 32, AY + 3, 28, 9, 'REDO', { disabled: !(app.redo || []).length })) { app.undo.push(JSON.stringify(des)); des = d.v3 = JSON.parse(app.redo.pop()); app.bpT = app.t; app.fit = null; app.lastEdit = -99; }
-  const sp = v3Sprite(des, d.paint, 'side'), shown = view === 'side' || view === 'shape' ? sp : view === 'frame' ? platSprite(des, sp.spec, d.paint) : v3Sprite(des, d.paint, view), px = shown.px, spec = sp.spec;
-  const pst = spec ? platformStats(des.plat, spec.geo, { heavy: des.base === 'truck40' }) : null;
+  if (!ro && (st.id === 'body' || st.id === 'platform')) {
+    if (button(S, AX + AW - 62, AY + 3, 28, 9, 'UNDO', { disabled: !(app.undo || []).length })) { (app.redo = app.redo || []).push(JSON.stringify(des)); des = d.v3 = JSON.parse(app.undo.pop()); app.bpT = app.t; app.fit = null; app.lastEdit = -99; }
+    if (button(S, AX + AW - 32, AY + 3, 28, 9, 'REDO', { disabled: !(app.redo || []).length })) { app.undo.push(JSON.stringify(des)); des = d.v3 = JSON.parse(app.redo.pop()); app.bpT = app.t; app.fit = null; app.lastEdit = -99; } }
+  // ---- evaluation (shared by every stage) ----
+  const sp = v3Sprite(des, d.paint, 'side'), spec = sp.spec, pst = spec ? platformStats(des.plat, spec.geo, { heavy: des.base === 'truck40' }) : null;
   const dm = { len: spec ? Math.round(spec.len) : 0, width: Math.round(des.width), height: Math.round(des.roof), wb: Math.round(des.wb) };
-  panel(S, cx, AY + 20, pw, 92, view === 'frame' && pst ? pst.kg + ' KG  STIFFNESS ' + Math.round(pst.stiff * 100) + '  STRENGTH X' + pst.margin.toFixed(2) + '  $' + pst.cost : `L${dm.len} W${dm.width} H${dm.height} WB${dm.wb} MM`);
-  if (px) { const ox = cx + Math.max(2, (pw - px.w) / 2) | 0, oy = view === 'frame' ? AY + 29 : AY + 108 - px.h, prog = Math.min(1, (app.t - (app.bpT ?? -999)) / 40);
-    const fit = app.fit && app.fit.view === view ? app.fit : null;
-    if (prog < 1) { blueprint(px, ox, oy, prog); if ((app.t - app.bpT) % 8 === 0) AU.sfx('wrench'); }
-    else if (fit) { if (!fit.fx) fit.fx = { bare: v3Sprite(des, d.paint, view, 0, fit.strip).px, old: v3Sprite(fit.old, d.paint, view).px, now: px, small: fit.strip === 'ornament' || fit.strip === 'fog' };
-      if (!drawFit(S, P, fit.fx, ox, oy, 1, app.t - fit.t, AU.sfx)) { app.fit = null; drawPix(S, px, P, ox, oy, 1); } }
-    else drawPix(S, px, P, ox, oy, 1);
-    if (view === 'shape' && prog >= 1 && spec?.geo?.handles) for (const h of spec.geo.handles) {   // control points: drag along their axis
-      const hx = ox + Math.round(px.X(h.x)), hy = oy + Math.round(px.Y(h.z)), id = 'H' + h.k, near = Math.abs(input.x - hx) <= 4 && Math.abs(input.y - hy) <= 4;
-      if (near && input.clicked && !input.drag) { input.drag = id; app.hd = { x0: input.x, y0: input.y, v0: des.shape[h.k] || 0 }; (app.undo = app.undo || []).push(JSON.stringify(des)); app.redo = []; app.lastEdit = app.t; AU.sfx('click'); }
-      const act = input.drag === id; if (act) { if (!input.down) input.drag = null; else { const SR = shapeRanges(des)[h.k]; des.shape[h.k] = Math.max(SR[0], Math.min(SR[1], app.hd.v0 + (h.ax === 'x' ? input.x - app.hd.x0 : app.hd.y0 - input.y) * px.mm)); app.lastEdit = app.t; } }
-      S.fill(hx - 3, hy - 3, 7, 7, C.ink); S.fill(hx - 2, hy - 2, 5, 5, act ? C.red : near ? C.brassL : C.brass); S.fill(h.ax === 'x' ? hx - 5 : hx, h.ax === 'x' ? hy : hy - 5, h.ax === 'x' ? 11 : 1, h.ax === 'x' ? 1 : 11, act || near ? C.red : C.inkSoft);
-      if (near || act) text(S, ({ screen: 'WINDSHIELD TOP', crown: 'ROOF CROWN', back: 'REAR WINDOW TOP', deck: 'DECK HEIGHT', nose: 'NOSE RAKE', fTail: 'FRONT FENDER TAIL', fCrown: 'FRONT FENDER CROWN' })[h.k], cx + 3, AY + 29, C.red, 1, pw - 60); } }
-  if (view === 'shape') text(S, 'DRAG THE HANDLES', cx + 3, AY + 104, C.inkSoft, 1, pw - 6);
-  if (view === 'frame' && pst && pst.margin < 1) text(S, 'FRAME TOO WEAK - CRACKS IN SERVICE', cx + 3, AY + 104, C.red, 1, pw - 6);
-  if (notes.length) text(S, 'ERA LIMIT: ' + notes.join(', ').toUpperCase(), cx + 3, AY + 104, C.red, 1, pw - 6);
-  const style = des.base !== 'free' ? (TEMPLATES.find(t => t.id === des.base)?.style || 'box') : des.frontFender === 'integrated' ? 'pontoon' : des.rake > 18 || des.tail === 'fastback' ? 'stream' : 'box', q = { style, notes: [] }, tpl = { style }, v = des;
-  // mechanicals
-  if (!readyE.length || !readyG.length) { text(S, 'NEED A READY ENGINE AND GEARBOX', cx + 4, AY + 120, C.red); return; }
-  d.engineId = cycler(S, cx, AY + 116, 97, 'ENGINE', readyE.map(e => e.id), d.engineId, { names: id => g.engines.find(e => e.id === id).name });
-  d.gbId = cycler(S, cx + 103, AY + 116, 97, 'GEARBOX', readyG.map(x => x.id), d.gbId, { names: id => g.gearboxes.find(x => x.id === id).name });
-  d.final = slider(S, cx, AY + 140, 97, 'FINAL DRIVE', d.final, 3.0, 5.5, { step: 0.05 }); d.trim = Math.round(slider(S, cx + 103, AY + 140, 97, 'TRIM LEVEL', d.trim, 0, 3, { step: 1, fmt: v => ['BASIC', 'STANDARD', 'DE LUXE', 'CUSTOM'][Math.round(v)] }));
-  d.feats.unibody = des.plat.type === 'unibody'; const fe = [['hydbrake', 'HYD.BRAKES'], ['ifs', 'IND.FRONT'], ['steelroof', 'STEEL ROOF']].filter(([k]) => has(g, k));
-  fe.forEach(([k, l], i) => { if (button(S, cx + i * 50, AY + 160, 48, 12, l, { active: d.feats[k] })) d.feats[k] = !d.feats[k]; });
-  d.seg = cycler(S, cx, AY + 176, 97, 'TARGET SEGMENT', Object.keys(SEGS), d.seg, { names: k => k.toUpperCase() });
-  d.price = Math.round(slider(S, cx + 103, AY + 176, 97, 'LIST PRICE', d.price, 350, 5000, { step: 10, fmt: money }));
-  const hoodLen = spec ? spec.geo.cowlX - 250 : 1200, b = { belt: 0.5 };
-  const car = { ...d, dims: dm, platStats: pst, plat: JSON.parse(JSON.stringify(des.plat)), v3: JSON.parse(JSON.stringify(des)), body: { style, wb: dm.wb, hood: hoodLen / Math.max(1, dm.wb), height: dm.height / Math.max(1, dm.wb) }, designScore: 0.68 + (style !== 'box' ? 0.06 : 0) - notes.length * 0.02 + 0 * (1 - Math.abs(b.belt - 0.5)) * 0.08 };
-  const ev = evaluate(g, car), x2 = cx + pw + 6, pw2 = AX + AW - x2 - 6;
-  panel(S, x2, AY + 20, pw2, 210, 'ENGINEERING REPORT');
+  const style = des.base !== 'free' ? (TEMPLATES.find(t => t.id === des.base)?.style || 'box') : des.frontFender === 'integrated' ? 'pontoon' : des.rake > 18 || des.tail === 'fastback' ? 'stream' : 'box';
+  const hoodLen = spec ? spec.geo.cowlX - 250 : 1200;
+  const car = { ...d, v3: undefined, launch: undefined, dims: dm, platStats: pst, plat: JSON.parse(JSON.stringify(des.plat)), relMod: d.relMod || 0, body: { style, wb: dm.wb, hood: hoodLen / Math.max(1, dm.wb), height: dm.height / Math.max(1, dm.wb) }, designScore: 0.68 + (style !== 'box' ? 0.06 : 0) - notes.length * 0.02 + (d.reviewBonus || 0) };
+  const ev = readyE.length && readyG.length ? evaluate(g, car) : null;
+  const tool = 40000 + dm.wb * 8 + (style !== 'box' ? 20000 : 0) + (d.feats.unibody ? 30000 : 0), prepMo = 2 + (style === 'stream' ? 1 : style === 'pontoon' ? 2 : 0) + (d.feats.unibody ? 1 : 0);
+  const costOf = i => (i === 8 ? tool : DEV[i].cost), moOf = i => (i === 8 ? prepMo : DEV[i].mo);
+  // ---- preview (what this place shows) ----
+  panel(S, cx, AY + 20, pw, 92, st.id === 'platform' && pst ? pst.kg + ' KG  STIFFNESS ' + Math.round(pst.stiff * 100) + '  STRENGTH X' + pst.margin.toFixed(2) + '  $' + pst.cost : st.id === 'body' ? `L${dm.len} W${dm.width} H${dm.height} WB${dm.wb} MM` : st.where);
+  if (st.id === 'brief') briefDoc(g, d, cx + 3, AY + 29, pw - 6, 80);
+  else if (st.id === 'engine') { const e = g.engines.find(x => x.id === d.engineId); const es = e && engineSprite(e, 190, 76); if (es) drawPix(S, es, P, cx + ((pw - es.w) >> 1), AY + 106 - es.h, 1); else text(S, 'NO ENGINE READY', cx + 6, AY + 50, C.red); }
+  else if (st.id === 'driveline') { gearMesh(cx + 10, AY + 26, d.final, app.t); text(S, 'FINAL DRIVE ' + d.final.toFixed(2) + ' : 1', cx + 120, AY + 40, C.ink); text(S, 'PINION AND CROWN WHEEL', cx + 120, AY + 50, C.inkSoft, 1, 76); }
+  else if (st.id === 'detail') dashboard(cx + 3, AY + 29, pw - 6, 60, d.trim);
+  else if (st.id === 'proto') { const p2 = v3Sprite(des, d.paint, 'side', Math.floor(app.t / 3) % 8).px; if (p2) { const span = pw + p2.w, x = cx - p2.w + (app.t * 1.2) % span; S.fill(cx + 1, AY + 104, pw - 2, 2, hex('#8a7a62'));
+      for (let k = 0; k < 6; k++) S.fill(cx + 1 + ((k * 37 - app.t * 2) % (pw - 4) + pw - 4) % (pw - 4), AY + 106, 6, 1, hex('#6b5d4a'));
+      Object.assign(clip, { on: true, x0: cx + 1, y0: AY + 28, x1: cx + pw - 1, y1: AY + 111 }); drawPix(S, p2, P, Math.round(x), AY + 104 - p2.h + ((app.t >> 3) % 2), 1); for (let k = 0; k < 4; k++) S.fill(Math.round(x) - 3 - k * 4, AY + 100 - ((app.t + k * 3) % 6), 2, 2, hex('#b8aa90')); clip.on = false; } }
+  else if (st.id === 'prep') { const fr = spec && platformSide(P, des.plat, spec.geo, spec.tire || '6.00-16', 45); if (fr) { S.fill(cx + 1, AY + 100, pw - 2, 3, hex('#5a5550')); for (let k = 0; k < 3; k++) { const x = cx + ((k * (fr.w + 20) + app.t * 0.4) % (pw + fr.w)) - fr.w; Object.assign(clip, { on: true, x0: cx + 1, y0: AY + 28, x1: cx + pw - 1, y1: AY + 111 }); drawPix(S, fr, P, Math.round(x), AY + 100 - fr.h, 1); clip.on = false; } }
+    text(S, 'UNPAINTED FRAMES ON THE LINE', cx + 3, AY + 30, C.inkSoft, 1, pw - 6); }
+  else {                                                                                                         // platform, body, mock-up: the sprite views
+    const mock = st.id === 'mockup', mp = mock ? (g.year < 1938 ? 'paint.mockwood' : 'paint.clay') : d.paint;
+    const shown = view === 'side' || view === 'shape' ? (mock ? v3Sprite(des, mp, 'side') : sp) : view === 'frame' ? platSprite(des, spec, d.paint) : v3Sprite(des, mp, view), px = shown.px;
+    if (mock) { for (let k = 0; k < 2; k++) { const lx = cx + 50 + k * 100; for (let yy = AY + 30; yy < AY + 108; yy++) { const hw = (yy - AY - 30) * 0.45; for (let xx = -hw; xx <= hw; xx += 1) S.blend(Math.round(lx + xx), yy, [255, 244, 210], 0.07); } }
+      for (let xx = -70; xx <= 70; xx++) { const hh = Math.round(Math.sqrt(1 - (xx / 70) ** 2) * 5); S.fill(cx + 100 + xx, AY + 104 - hh, 1, hh * 2, hex('#6b5a46')); } }
+    if (px) { const ox = cx + Math.max(2, (pw - px.w) / 2) | 0, oy = view === 'frame' ? AY + 29 : AY + 106 - px.h, prog = mock ? 1 : Math.min(1, (app.t - (app.bpT ?? -999)) / 40);
+      const fit = !mock && app.fit && app.fit.view === view ? app.fit : null;
+      if (prog < 1) { blueprint(px, ox, oy, prog); if ((app.t - app.bpT) % 8 === 0) AU.sfx('wrench'); }
+      else if (fit) { if (!fit.fx) fit.fx = { bare: v3Sprite(des, d.paint, view, 0, fit.strip).px, old: v3Sprite(fit.old, d.paint, view).px, now: px, small: fit.strip === 'ornament' || fit.strip === 'fog' };
+        if (!drawFit(S, P, fit.fx, ox, oy, 1, app.t - fit.t, AU.sfx)) { app.fit = null; drawPix(S, px, P, ox, oy, 1); } }
+      else { drawPix(S, px, P, ox, oy, 1);
+        if (view === 'frame' && pst && pst.margin < 1) for (let y = 0; y < px.h; y++) for (let x = 0; x < px.w; x++) { const i = y * px.w + x; if (px.r[i] === P.byName.bare) S.blend(ox + x, oy + y, [220, 40, 30], 0.55); } }   // under-strength steel in red
+      if (view === 'shape' && !ro && prog >= 1 && spec?.geo?.handles) for (const h of spec.geo.handles) {   // control points: drag along their axis
+        const hx = ox + Math.round(px.X(h.x)), hy = oy + Math.round(px.Y(h.z)), id = 'H' + h.k, near = Math.abs(input.x - hx) <= 4 && Math.abs(input.y - hy) <= 4;
+        if (near && input.clicked && !input.drag) { input.drag = id; app.hd = { x0: input.x, y0: input.y, v0: des.shape[h.k] || 0 }; (app.undo = app.undo || []).push(JSON.stringify(des)); app.redo = []; app.lastEdit = app.t; AU.sfx('click'); }
+        const act = input.drag === id; if (act) { if (!input.down) input.drag = null; else { const SR = shapeRanges(des)[h.k]; des.shape[h.k] = Math.max(SR[0], Math.min(SR[1], app.hd.v0 + (h.ax === 'x' ? input.x - app.hd.x0 : app.hd.y0 - input.y) * px.mm)); app.lastEdit = app.t; } }
+        S.fill(hx - 3, hy - 3, 7, 7, C.ink); S.fill(hx - 2, hy - 2, 5, 5, act ? C.red : near ? C.brassL : C.brass); S.fill(h.ax === 'x' ? hx - 5 : hx, h.ax === 'x' ? hy : hy - 5, h.ax === 'x' ? 11 : 1, h.ax === 'x' ? 1 : 11, act || near ? C.red : C.inkSoft);
+        if (near || act) text(S, ({ screen: 'WINDSHIELD TOP', crown: 'ROOF CROWN', back: 'REAR WINDOW TOP', deck: 'DECK HEIGHT', nose: 'NOSE RAKE', fTail: 'FRONT FENDER TAIL', fCrown: 'FRONT FENDER CROWN' })[h.k], cx + 3, AY + 29, C.red, 1, pw - 60); } }
+    if (view === 'shape') text(S, 'DRAG THE HANDLES', cx + 3, AY + 104, C.inkSoft, 1, pw - 6);
+    if (view === 'frame' && pst && pst.margin < 1) text(S, 'FRAME TOO WEAK - CRACKS IN SERVICE', cx + 3, AY + 104, C.red, 1, pw - 6);
+    if (st.id === 'body' && notes.length) text(S, 'ERA LIMIT: ' + notes.join(', ').toUpperCase(), cx + 3, AY + 104, C.red, 1, pw - 6); }
+  // ---- engineering report (always) ----
+  const x2 = cx + pw + 6, pw2 = AX + AW - x2 - 6; panel(S, x2, AY + 20, pw2, 210, 'ENGINEERING REPORT');
   if (ev) { const sm = ev.sim; [['TOP SPEED', `${sm.topMph.toFixed(0)} MPH`], ['0-60 MPH', sm.zeroSixty ? sm.zeroSixty.toFixed(1) + ' S' : 'NEVER'], ['ECONOMY', sm.mpg.toFixed(1) + ' MPG'], ['MAX GRADE', Math.round(sm.grade * 100) + '%'], ['WEIGHT', sm.mass + ' KG'], ['UNIT COST', money(ev.unit)]].forEach(([l, v], i) => stat(S, x2 + 4, AY + 31 + i * 8, l, v, C.ink, 44));
     text(S, ev.fit ? 'ENGINE FITS THE BAY' : 'ENGINE TOO BIG - LONGER HOOD!', x2 + 4, AY + 82, ev.fit ? C.green : C.red, 1, pw2 - 6);
     [['PERFORMANCE', ev.perf], ['ECONOMY', ev.econ], ['COMFORT', ev.comfort], ['RELIABILITY', ev.rel], ['DESIGN', ev.design], ['MODERNITY', ev.modern]].forEach(([l, v], i) => { text(S, l, x2 + 4, AY + 92 + i * 12, C.inkSoft); bar(S, x2 + 4, AY + 98 + i * 12, pw2 - 10, 4, v, v < 0.4 ? C.red : C.teal); });
-    const a = appeal(ev, d.seg, d.price); text(S, `APPEAL ${Math.round(a * 100)}`, x2 + 4, AY + 166, a > 0.45 ? C.green : C.oxblood); text(S, `MARGIN ${money(d.price - ev.unit)}`, x2 + 4, AY + 174, d.price > ev.unit ? C.green : C.red);
-    const tool = 40000 + dm.wb * 8 + (q.style !== 'box' ? 20000 : 0) + (d.feats.unibody ? 30000 : 0), months = 6 + (q.style === 'stream' ? 2 : q.style === 'pontoon' ? 3 : 0);
-    if (button(S, cx, AY + 200, 97, 13, 'WATCH BUILD', { tone: 'teal' })) startAssembly(g, sp.spec, d, 'cars', des.plat);
-    if (button(S, cx + 103, AY + 200, 97, 13, 'TEST DRIVE', { tone: 'teal' })) { const eng = g.engines.find(x => x.id === d.engineId), gbx = g.gearboxes.find(x => x.id === d.gbId); AU.drive({ ...eng, litres: ev.es.litres }, g.year, rpmTrace({ es: ev.es, engine: eng, gearbox: gbx, final: d.final, tyreR: 0.36, mass: ev.sim.mass - ev.es.mass - GEARBOX[gbx.type].mass })); }
-    text(S, `TOOLING ${money(tool)}`, x2 + 4, AY + 182, C.ink, 1, pw2 - 6); text(S, `${months} MONTHS TO LAUNCH`, x2 + 4, AY + 190, C.ink, 1, pw2 - 6);
-    if (button(S, x2 + 4, AY + 198, pw2 - 8, 16, 'LAUNCH MODEL', { tone: 'ox', disabled: g.cash < tool || !ev.fit })) {
-      g.models.push({ ...JSON.parse(JSON.stringify(car)), sprite: { v3: JSON.parse(JSON.stringify(des)), paint: d.paint }, id: 'M' + g.serial++, plan: Math.round(g.factory / Math.max(1, g.models.length + 1)), readyAt: dateNum(g) + months, sold: 0, stock: 0 });
-      g.cash -= tool; app.draft = null; toast('MODEL IN DEVELOPMENT'); app.tab = 'prod'; startAssembly(g, sp.spec, d, 'prod', des.plat); } }
+    const a = appeal(ev, d.seg, d.price); text(S, `APPEAL ${Math.round(a * 100)}`, x2 + 4, AY + 166, a > 0.45 ? C.green : C.oxblood); text(S, `MARGIN ${money(d.price - ev.unit)}`, x2 + 4, AY + 174, d.price > ev.unit ? C.green : C.red); }
+  else text(S, 'NEED A READY ENGINE AND GEARBOX', x2 + 4, AY + 31, C.red, 1, pw2 - 6);
+  text(S, `TOOLING ${money(tool)}`, x2 + 4, AY + 184, C.ink, 1, pw2 - 6); text(S, `SPENT ${money(d.spent || 0)}`, x2 + 4, AY + 192, C.inkSoft, 1, pw2 - 6);
+  const left = DEV.reduce((a, s2, i) => a + (i >= d.stage ? moOf(i) : 0), 0) - (d.busy ? dateNum(g) - d.busy.from : 0); text(S, `ABOUT ${Math.max(0, left)} MONTHS TO PRODUCTION`, x2 + 4, AY + 200, C.ink, 1, pw2 - 6);
+  // ---- this place: what the stage does, and its action ----
+  panel(S, cx, AY + 116, pw, 98, st.where); const tx = (s, y, c = C.ink) => text(S, s, cx + 4, AY + y, c, 1, pw - 8);
+  const finishNow = i => { d.done[i] = true; if (i === 5) d.reviewDue = true; else if (i === 7) d.testDue = true; else d.stage = i + 1; AU.sfx('stamp'); };
+  const reopen = i => { d.stage = i; d.done = d.done.slice(0, i); d.reviewDue = d.testDue = false; d.review = null; d.defects = null; d.busy = null; app.dstage = i; AU.sfx('stamp'); };
+  const actBtn = (l, o) => button(S, cx + 2, AY + 198, pw - 4, 14, l, o);
+  const info = { brief: ['SET THE TARGET: SEGMENT, PRICE AND VOLUME.', `${SEGS[d.seg].price.map(money).join(' - ')} IS THIS SEGMENT'S PRICE BAND.`, `OUR MODELS IN IT: ${g.models.filter(m => m.seg === d.seg && !m.dead).map(m => m.name).join(', ') || 'NONE'}`],
+    platform: ['CHOOSE THE BASE CAR, WHEELBASE AND FRAME.', 'WEAK STEEL SHOWS RED ON THE DRAWING.', 'IT CARRIES EVERYTHING THAT FOLLOWS.'],
+    engine: [ev ? `${ev.es.hp.toFixed(0)} HP  ${ev.es.litres.toFixed(2)} L  ${Math.round(ev.es.mass)} KG` : 'NO ENGINE READY', ev && ev.fit ? 'FITS BETWEEN THE FRAME RAILS.' : 'TOO LONG FOR THIS BAY.', 'NEW ENGINES ARE DESIGNED IN THE ENGINES ROOM.'],
+    driveline: [ev ? `TOP ${ev.sim.topMph.toFixed(0)} MPH  0-60 ${ev.sim.zeroSixty ? ev.sim.zeroSixty.toFixed(1) + ' S' : '-'}  ${ev.sim.mpg.toFixed(1)} MPG` : '-', 'HIGHER RATIO: QUICKER, THIRSTIER.', ''],
+    body: ['SHAPE THE BODY ON THE MEASURED CAR.', 'EVERY CHANGE IS RE-DRAWN ON A NEW BLUEPRINT.', ''],
+    mockup: [g.year < 1938 ? 'FULL-SIZE WOODEN MOCK-UP ON THE TURNTABLE.' : 'FULL-SIZE CLAY MODEL ON THE TURNTABLE.', 'THE BOARD REVIEWS IT WHEN IT IS READY.', ''],
+    detail: ['INTERIOR, TRIM, PAINT AND LIST PRICE.', `TRIM ${['BASIC', 'STANDARD', 'DE LUXE', 'CUSTOM'][d.trim]}: ${1 + Math.min(3, d.trim)} DIALS`, ''],
+    proto: ['HAND-BUILT PROTOTYPES, TEST DRIVES', 'AND A DURABILITY RUN ON THE PROVING GROUND.', ''],
+    prep: ['PRESS DIES, JIGS AND LINE LAYOUT.', `TOOLING ${money(tool)} - ${prepMo} MONTHS`, 'THE MODEL ENTERS PRODUCTION WHEN IT IS DONE.'] }[st.id];
+  info.forEach((s, i) => tx(s, 126 + i * 9, i ? C.inkSoft : C.ink));
+  if (st.id === 'engine' && !ro && button(S, cx + 4, AY + 156, 96, 12, 'DESIGN AN ENGINE')) app.tab = 'engines';
+  if (st.id === 'proto' && ev) { if (button(S, cx + 4, AY + 144, 94, 11, 'WATCH BUILD', { tone: 'teal' })) startAssembly(g, spec, d, 'cars', des.plat);
+    if (button(S, cx + 102, AY + 144, 94, 11, 'TEST DRIVE', { tone: 'teal' })) { const eng = g.engines.find(x => x.id === d.engineId), gbx = g.gearboxes.find(x => x.id === d.gbId); AU.drive({ ...eng, litres: ev.es.litres }, g.year, rpmTrace({ es: ev.es, engine: eng, gearbox: gbx, final: d.final, tyreR: 0.36, mass: ev.sim.mass - ev.es.mass - GEARBOX[gbx.type].mass })); } }
+  if (vs === 5 && d.reviewDue && ev) {                                                                    // the board looks at the mock-up
+    if (!d.review) { const t = TEMPLATES.find(x => x.id === des.base), L = t && landmarks(t.spec), n = [];
+      if (L && des.roof > L.roof + 50) n.push('ROOF LOOKS TALL'); if (L && des.roof < L.roof - 50) n.push('LOW AND SLEEK - THE BOARD LIKES IT');
+      if (ev.modern < 0.5) n.push('LOOKS DATED NEXT TO RIVALS'); if (style !== 'box' && g.year < 1935) n.push('TOO DARING FOR THE DEALERS?'); if (notes.length) n.push('OUTSIDE CURRENT PRACTICE');
+      if (L && des.frontOH > L.frontOH * 1.15) n.push('LONG NOSE - LOOKS POWERFUL'); if (!n.length) n.push('A HANDSOME, HONEST CAR');
+      d.review = { score: Math.max(0.2, Math.min(0.98, ev.design * 0.6 + ev.modern * 0.3 + (n.some(s => s.includes('LIKES') || s.includes('POWERFUL')) ? 0.08 : 0) - (n.includes('ROOF LOOKS TALL') ? 0.06 : 0))), notes: n }; AU.sfx('type'); }
+    tx(`BOARD SCORE ${Math.round(d.review.score * 100)} / 100`, 156, d.review.score > 0.6 ? C.green : C.oxblood); d.review.notes.slice(0, 3).forEach((s, i) => tx('- ' + s, 165 + i * 9, C.ink));
+    if (button(S, cx + 2, AY + 198, 97, 14, 'APPROVE', { tone: 'teal' })) { d.reviewBonus = (d.review.score - 0.6) * 0.15; d.reviewDue = false; d.stage = 6; app.dstage = null; AU.sfx('stamp'); }
+    if (button(S, cx + 101, AY + 198, 97, 14, 'REVISE THE BODY', { tone: 'ox' })) reopen(4); }
+  else if (vs === 7 && d.testDue && ev) {                                                                 // durability run results
+    if (!d.defects) { let s = [...JSON.stringify(des) + d.engineId + d.gbId].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7); const rnd = () => ((s = (s * 1103515245 + 12345) >>> 0) / 4294967296);
+      const cand = [[pst && pst.margin < 1.15, 'FRAME CRACK AT THE KICK-UP'], [!d.feats.hydbrake, 'BRAKE FADE ON LONG DESCENTS'], [pst && pst.stiff < 0.6, 'DOOR RATTLE ON ROUGH ROADS'], [ev.es.reliability < 0.75, 'OVERHEATING ON THE HILL CLIMB'],
+        [true, 'WATER LEAK AT THE WINDSHIELD'], [true, 'GEARBOX WHINE IN SECOND'], [d.feats.unibody && g.year < 1945, 'SHELL CORROSION AT THE SILLS']];
+      d.defects = cand.filter(([c]) => c && rnd() < 0.35 + (1 - ev.rel) * 0.8).map(([, s2]) => s2).slice(0, 4); AU.sfx('type'); }
+    tx(d.defects.length ? `${d.defects.length} DEFECTS FOUND` : 'NO DEFECTS FOUND', 159, d.defects.length ? C.oxblood : C.green); d.defects.forEach((s2, i) => tx('- ' + s2, 167 + i * 8, C.ink));
+    const fixCost = 2500 * d.defects.length;
+    if (d.defects.length && button(S, cx + 2, AY + 198, 97, 14, `FIX ALL ${money(fixCost)} +1 MO`, { tone: 'teal', disabled: g.cash < fixCost })) { g.cash -= fixCost; d.spent = (d.spent || 0) + fixCost; d.busy = { i: 7, from: dateNum(g), until: dateNum(g) + 1, fix: true }; AU.sfx('wrench'); }
+    if (button(S, d.defects.length ? cx + 101 : cx + 2, AY + 198, d.defects.length ? 97 : pw - 4, 14, d.defects.length ? 'SHIP AS IS' : 'CONTINUE', { tone: 'ox' })) { d.relMod = (d.relMod || 0) - 0.03 * d.defects.length; d.testDue = false; d.defects = null; d.stage = 8; app.dstage = null; AU.sfx('stamp'); } }
+  else if (vs < d.stage) { tx('DONE. REOPENING IT MEANS THE LATER STAGES', 156, C.inkSoft); tx('MUST BE DONE AGAIN (AND PAID AGAIN).', 165, C.inkSoft); if (actBtn('REOPEN THIS STAGE', { tone: 'ox', disabled: !!d.busy })) reopen(vs); }
+  else if (d.busy) { const k = d.busy.until - dateNum(g); actBtn(`${DEV[d.busy.i].name} IN PROGRESS - ${k} MO LEFT`, { disabled: true }); }
+  else { const c = costOf(vs), m = moOf(vs), ok = (vs !== 2 || readyE.length) && (vs !== 3 || readyG.length) && (vs !== 8 || (ev && ev.fit));
+    if (actBtn(`START ${st.name}  ${money(c)}  ${m ? m + ' MO' : 'NOW'}`, { tone: 'ox', disabled: g.cash < c || !ok })) { g.cash -= c; d.spent = (d.spent || 0) + c;
+      if (vs === 8) d.launch = JSON.parse(JSON.stringify({ ...car, name: d.name, sprite: { v3: des, paint: d.paint } }));
+      if (m) { d.busy = { i: vs, from: dateNum(g), until: dateNum(g) + m }; AU.sfx('type'); } else finishNow(vs); app.dstage = null; } }
+  // ---- the pipeline: nine places in order ----
+  const bw = Math.floor((AW - 8) / 9), by = AY + AH - 17;
+  DEV.forEach((s2, i) => { const x = AX + 4 + i * bw, done = i < d.stage || d.done[i], cur = i === d.stage;
+    if (button(S, x, by, bw - 2, 13, s2.name, { tone: done ? 'teal' : cur ? 'brass' : 'ox', active: i === vs, disabled: i > d.stage })) app.dstage = i;
+    if (d.busy && d.busy.i === i) { const p = Math.min(1, (dateNum(g) - d.busy.from + 0.5) / Math.max(1, d.busy.until - d.busy.from)); S.fill(x + 1, by + 11, Math.round((bw - 4) * p), 2, C.amber); } });
 }
 function prod(g) { windowBox(S, AX, AY, AW, AH, 'PRODUCTION PLANNING');
   text(S, `FACTORY CAPACITY ${g.factory} CARS / MONTH`, AX + 8, AY + 22, C.ink);

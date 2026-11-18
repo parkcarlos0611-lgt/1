@@ -18,6 +18,7 @@ import { flatheadV8, ohvI6, ptPalette } from '../tools/pixel/gen/engine40.mjs';
 import { engineSide } from '../tools/pixel/gen/props.mjs';
 import { engineStats, LAYOUTS, HEADS, maxCR, MATERIALS, PART_GROUPS, PART_OPTS, optsFor, devCost, durability, octane } from '../sim/engine.mjs';
 import { drawLongPix, drawCrossPix, drawOutsidePix, engPalette, STAGE_NAMES } from './engdraw.mjs';
+import { drawGearboxPix, GB_STEPS } from './gbdraw.mjs';
 import { makeAssembly, drawAssembly } from './assembly.mjs';
 import { drawFit } from './fitfx.mjs';
 import { TEMPLATES, available, makeBody, landmarks } from '../tools/pixel/gen/v2/template.mjs';
@@ -249,19 +250,43 @@ function engines(g) { windowBox(S, AX, AY, AW, AH, 'ENGINE DESIGN');
   if (st > first && button(S, x1, AY + AH - 18, 50, 14, 'BACK')) app.estep = st - 1;
   if (st < 7 && button(S, AX + AW - 70, AY + AH - 18, 62, 14, 'NEXT STEP', { tone: 'teal' })) { app.estep = st + 1; app.emax = Math.max(app.emax, st + 1); AU.sfx(st === 0 ? 'clunk' : 'ratchet'); }
 }
+// ---------- gearbox designer in steps (plan 21-1): type -> gears and ratios -> test and release ----------
+const gearName = n => (lang.ko ? n + '단 기어' : n + ' GEAR');
+const GB_HELP = ['THE KIND OF GEARBOX: HOW IT SHIFTS, HOW MUCH IT LOSES, WHAT IT COSTS.', 'HOW MANY SPEEDS AND HOW WIDE THE SPREAD FROM FIRST TO TOP.', 'TRY EACH GEAR, CHECK THE SPEEDS, NAME IT AND TOOL UP.'];
 function gearbox(g) { windowBox(S, AX, AY, AW, AH, 'GEARBOX + DRIVELINE');
-  const d = app.gdraft || (app.gdraft = { type: g.gearboxes[0].type, gears: 3, first: 2.9, top: 1.0 });
-  panel(S, AX + 6, AY + 20, 112, AH - 26, 'YOUR GEARBOXES'); g.gearboxes.forEach((x, i) => text(S, N(x.name.slice(0, 16)) + (x.readyAt > dateNum(g) ? '*' : ''), AX + 10, AY + 32 + i * 10, C.ink));
-  const x0 = AX + 124, types = Object.keys(GEARBOX).filter(k => GEARBOX[k].year <= g.year), ok = k => k === 'crash3' || has(g, { sync3: 'sync3', sync4: 'sync4', od3: 'od', fluid: 'fluid', hydra4: 'hydra', tc2: 'hydra' }[k]);
-  const t2 = cycler(S, x0, AY + 22, 160, 'TYPE', types, d.type, { names: k => GEARBOX[k].name, lock: k => !ok(k) }); if (ok(t2)) d.type = t2; else if (t2 !== d.type) toast('RESEARCH NEEDED');
-  d.name = nameField('gname', x0 + 170, AY + 20, 100, 'GEARBOX NAME', d.name || '', 'gearbox');
-  const G = GEARBOX[d.type]; d.gears = Math.max(G.gears[0], Math.min(G.gears[1], d.gears));
-  d.gears = cycler(S, x0, AY + 48, 160, 'FORWARD GEARS', Array.from({ length: G.gears[1] - G.gears[0] + 1 }, (_, i) => G.gears[0] + i), d.gears, { names: n => n + ' SPEEDS' });
-  d.first = slider(S, x0, AY + 76, 160, '1ST GEAR RATIO', d.first, 2.0, 4.0, { step: 0.05 }); d.top = slider(S, x0, AY + 96, 160, 'TOP GEAR RATIO', d.top, d.type === 'od3' ? 0.7 : 0.9, 1.0, { step: 0.01 });
-  const R = proposeRatios(d.gears, d.first, d.top); text(S, 'RATIOS: ' + R.join(' / '), x0, AY + 118, C.oxblood);
-  [['EFFICIENCY', Math.round(G.eff * 100) + '%'], ['MASS', G.mass + ' KG'], ['COMFORT', Math.round(G.comfort * 100) + '%'], ['SHIFT TIME', G.shift + ' S'], ['UNIT COST', money(G.cost)]].forEach(([l, v], i) => stat(S, x0, AY + 132 + i * 9, l, v));
-  panel(S, AX + 300, AY + 20, AW - 306, 120, 'RATIO LADDER'); R.forEach((r, i) => { const h = Math.round(r / 4 * 90); S.fill(AX + 310 + i * 18, AY + 130 - h, 12, h, C.teal); text(S, String(i + 1), AX + 313 + i * 18, AY + 133, C.ink); });
-  if (button(S, x0, AY + 186, 140, 16, `BUILD ($15,000 / 3 MO)`, { tone: 'ox', disabled: g.cash < 15000 })) confirmBox('BUILD GEARBOX', ['COST $15,000', 'TAKES 3 MONTHS'], () => { g.gearboxes.push({ id: 'G' + g.serial++, name: d.name || `${d.gears}-SPD ${G.name.split(' ').slice(-1)[0]}`, type: d.type, gears: d.gears, ratios: R, readyAt: dateNum(g) + 3 }); g.cash -= 15000; toast('GEARBOX TOOLING STARTED'); });
+  const d = app.gdraft || (app.gdraft = { type: g.gearboxes[0].type, gears: 3, first: 2.9, top: 1.0, test: -1 });
+  let st = app.gstep ?? 0; app.gmax = Math.max(app.gmax ?? 0, st);
+  const bw = Math.floor((AW - 12) / 3); GB_STEPS.forEach((l, i) => { if (button(S, AX + 6 + i * bw, AY + 18, bw - 2, 12, l, { tone: i < st ? 'teal' : i === st ? 'brass' : 'ox', active: i === st, disabled: i > app.gmax })) { app.gstep = i; AU.sfx('click'); } });
+  st = app.gstep ?? 0;
+  const types = Object.keys(GEARBOX).filter(k => GEARBOX[k].year <= g.year), ok = k => k === 'crash3' || has(g, { sync3: 'sync3', sync4: 'sync4', od3: 'od', fluid: 'fluid', hydra4: 'hydra', tc2: 'hydra' }[k]);
+  const G = GEARBOX[d.type]; d.gears = Math.max(G.gears[0], Math.min(G.gears[1], d.gears)); d.top = Math.max(d.type === 'od3' ? 0.7 : 0.9, Math.min(1, d.top)); const R = proposeRatios(d.gears, d.first, d.top); d.ratios = R;
+  // left column
+  const x0 = AX + 6; panel(S, x0 - 2, AY + 32, 114, AH - 36, ''); para(S, GB_HELP[st], x0, AY + 34, C.inkSoft, 108); const y0 = AY + 70;
+  if (st === 0) { const t2 = cycler(S, x0, y0, 108, 'TYPE', types, d.type, { names: k => GEARBOX[k].name, lock: k => !ok(k) }); if (ok(t2)) d.type = t2; else if (t2 !== d.type) toast('RESEARCH NEEDED');
+    text(S, 'YOUR GEARBOXES', x0, y0 + 30, C.inkSoft); g.gearboxes.forEach((x, i) => text(S, N(x.name.slice(0, 16)) + (x.readyAt > dateNum(g) ? '*' : ''), x0, y0 + 40 + i * 9, C.ink, 1, 108)); }
+  if (st === 1) { d.gears = cycler(S, x0, y0, 108, 'FORWARD GEARS', Array.from({ length: G.gears[1] - G.gears[0] + 1 }, (_, i) => G.gears[0] + i), d.gears, { names: n => n + ' SPEEDS' });
+    d.first = slider(S, x0, y0 + 26, 108, '1ST GEAR RATIO', d.first, 2.0, 4.0, { step: 0.05, id: 'gfirst' }); d.top = slider(S, x0, y0 + 48, 108, 'TOP GEAR RATIO', d.top, d.type === 'od3' ? 0.7 : 0.9, 1.0, { step: 0.01, id: 'gtop' });
+    text(S, 'RATIOS', x0, y0 + 72, C.inkSoft); R.forEach((r, i) => stat(S, x0, y0 + 82 + i * 9, gearName(i + 1), r.toFixed(2) + ':1', C.ink, 40)); }
+  const engs = g.engines.filter(e => !(e.readyAt > dateNum(g))), eng = engs.find(e => e.id === app.gEng) || engs[0] || g.engines[0];
+  if (st === 2) { d.name = nameField('gname', x0, y0 - 2, 108, 'GEARBOX NAME', d.name || '', 'gearbox');
+    const sel = [-1, ...R.map((_, i) => i), -2]; d.test = cycler(S, x0, y0 + 26, 108, 'TEST GEAR', sel, sel.includes(d.test) ? d.test : -1, { names: v => (v === -1 ? 'NEUTRAL' : v === -2 ? 'REVERSE' : gearName(v + 1)) });
+    if (engs.length) { const id = cycler(S, x0, y0 + 52, 108, 'WITH ENGINE', engs.map(e => e.id), eng.id, { names: id2 => N(g.engines.find(e => e.id === id2).name) }); app.gEng = id; } }
+  // right: drawing
+  const x1 = AX + 122, pw1 = AX + AW - 6 - x1, ph = 132; panel(S, x1, AY + 32, pw1, ph, '');
+  app.gang = (app.gang || 0) + (st === 2 && d.test === -1 ? 0.06 : 0.12); const D = drawGearboxPix(P, d, app.gang, pw1 - 4, ph - 4, st + 1, st === 2 ? d.test : -1); drawPix(S, D.px, P, x1 + 2, AY + 34, 1);
+  { const mx = input.x - x1 - 2, my = input.y - AY - 34; if (mx >= 0 && my >= 0 && mx < D.px.w && my < D.px.h) { const nm = D.names[D.px.t[my * D.px.w + mx]]; if (nm) { S.fill(input.x + 6, input.y - 10, tw(nm) + 6, 9, C.ink); text(S, nm, input.x + 9, input.y - 8, C.brassL); } } }
+  // below the drawing
+  const yb = AY + 32 + ph + 4;
+  if (st === 0) [['EFFICIENCY', Math.round(G.eff * 100) + '%'], ['MASS', G.mass + ' KG'], ['COMFORT', Math.round(G.comfort * 100) + '%'], ['SHIFT TIME', G.shift + ' S'], ['UNIT COST', money(G.cost)], ['SPEEDS', G.gears[0] === G.gears[1] ? String(G.gears[0]) : G.gears[0] + '-' + G.gears[1]]].forEach(([l, v], i) => stat(S, x1 + (i % 3) * 88, yb + Math.floor(i / 3) * 10, l, v, C.ink, 46));
+  if (st === 1) { const bwid = Math.min(22, Math.floor((pw1 - 10) / R.length)); R.forEach((r, i) => { const h2 = Math.round(r / 4 * 34); S.fill(x1 + 4 + i * bwid, yb + 36 - h2, bwid - 6, h2, C.teal); text(S, String(i + 1), x1 + 4 + i * bwid, yb + 38, C.ink); });
+    const spread = R[0] / R.at(-1), steps = R.slice(1).map((r, i) => R[i] / r); stat(S, x1 + 130, yb, 'SPREAD', spread.toFixed(2), C.ink, 60); stat(S, x1 + 130, yb + 10, 'LARGEST STEP', Math.max(...steps, 1).toFixed(2), Math.max(...steps, 1) > 1.9 ? C.red : C.ink, 60); stat(S, x1 + 130, yb + 20, 'MASS', G.mass + ' KG', C.ink, 60); }
+  if (st === 2 && eng) { const es = engineStats({ ...eng, year: g.year }), fd = 4.1, tr0 = 0.33, mph = r => es.redline * 2 * Math.PI / 60 * tr0 / (r * fd) * 2.237;
+    text(S, `SPEED AT RED LINE: ${es.redline} RPM / FINAL DRIVE 4.1`, x1, yb, C.inkSoft, 1, pw1); R.forEach((r, i) => stat(S, x1 + (i % 3) * 88, yb + 10 + Math.floor(i / 3) * 9, gearName(i + 1), Math.round(mph(r)) + ' MPH', i === d.test ? C.oxblood : C.ink, 40)); }
+  // footer
+  if (st > 0 && button(S, x1, AY + AH - 18, 50, 14, 'BACK')) app.gstep = st - 1;
+  if (st < 2 && button(S, AX + AW - 70, AY + AH - 18, 62, 14, 'NEXT STEP', { tone: 'teal' })) { app.gstep = st + 1; app.gmax = Math.max(app.gmax, st + 1); AU.sfx('ratchet'); }
+  if (st === 2 && button(S, AX + AW - 128, AY + AH - 18, 120, 14, `BUILD ($15,000 / 3 MO)`, { tone: 'ox', disabled: g.cash < 15000 })) confirmBox('BUILD GEARBOX', ['COST $15,000', 'TAKES 3 MONTHS'], () => {
+    g.gearboxes.push({ id: 'G' + g.serial++, name: d.name || `${d.gears}-SPD ${G.name.split(' ').slice(-1)[0]}`, type: d.type, gears: d.gears, ratios: R, readyAt: dateNum(g) + 3 }); g.cash -= 15000; toast('GEARBOX TOOLING STARTED'); app.gstep = 0; app.gmax = 0; app.gdraft = null; });
 }
 // ---------- car development: 9 stages in their real order, each in its own place, with time and cost ----------
 // brief -> platform -> engine -> driveline -> body -> mock-up (executive review) -> detail -> prototype & test (defects) -> production prep (tooling)

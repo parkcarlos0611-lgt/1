@@ -214,3 +214,4 @@ export function drawOutsidePix(P, e, th, w, h, stage = 8) {
 export function engPalette(P) { const add = (n, h, o) => { try { P.id(n); } catch { P.auto(n, h, o); } };
   add('eng.water', '#4f86b8'); add('eng.oil', '#b8892c'); add('eng.in', '#5b8fd0'); add('eng.cmp', '#d99a3a'); add('eng.pow', '#d0482c'); add('eng.exh', '#8a827a', { sat: 0.2 });
   add('eng.gasket', '#b06a3a'); add('eng.spring', '#8f969d', { sat: 0.2 }); add('eng.cap', '#6b2a22'); add('eng.spark', '#fff2a0'); add('eng.filter', '#c8642a'); return P; }
+export { Draw, S_ };

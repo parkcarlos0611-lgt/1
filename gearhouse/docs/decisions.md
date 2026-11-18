@@ -2,6 +2,17 @@
 
 Each decision is listed with its date. The newest come first.
 
+## 2026-11-19 — system design answers (docs/systems)
+
+- The founder's working hours are the small workshop's key resource.
+- The player sets which weekdays are days off. Public holidays are skipped days.
+- Reading newspapers and magazines costs no time.
+- Customers' hidden wants are found out by consultation.
+- Customers hit by the Depression can fail to pay.
+- Reputation is split into five fields: quality, performance, style, trust and value.
+- Every event, letter and article is written through the text-variety method in `docs/systems/00_text_variety.md`, so the same event reads differently each time.
+- Car bodies start from the measured base cars of the first test build and are edited in three layers: proportions, parts and panel points.
+
 ## 2026-11-19 — reboot (plan: docs/REBOOT_PLAN.md)
 
 ### Platform and code

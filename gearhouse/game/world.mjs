@@ -95,8 +95,11 @@ export function stepMonth(g) {
       const share = Math.exp((a - base) * 12) / (150 + Math.exp((a - base) * 12)), rep = 0.6 + g.rep;
       const demand = marketY * SEGS[m.seg].share * share * rep * (C.wealth ** 0.3) * Math.max(0.2, 1.5 - m.price / SEGS[m.seg].price[1]);
       const made = Math.min(m.plan, capLeft); capLeft -= made; m.stock = (m.stock || 0) + made; m.unit = ev.unit;
-      const sold = Math.min(Math.round(demand), m.stock); m.stock -= sold; m.sold = (m.sold || 0) + sold; m.lastSold = sold; m.appeal = a;
+      const stale = Math.min(1, (m.stockAge || 0) / 6);                                                       // shop-worn stock sells slower until the price comes down
+      const sold = Math.min(Math.round(demand * (1 - 0.15 * stale)), m.stock); m.stock -= sold; m.sold = (m.sold || 0) + sold; m.lastSold = sold; m.appeal = a;
       m.demandHist = [...(m.demandHist || []), Math.round(demand)].slice(-3);
+      const age0 = m.stockAge || 0; m.stockAge = m.stock > Math.max(40, sold * 1.5) ? age0 + 1 : Math.max(0, age0 - 2); if (m.lastPrice != null && m.price < m.lastPrice) m.stockAge = Math.max(0, m.stockAge - 3); m.lastPrice = m.price;
+      if (age0 < 6 && m.stockAge >= 6) g.news.unshift({ t: 'UNSOLD ' + m.name + ' GATHERING DUST ON THE LOTS - CUT OUTPUT OR PRICE', d: dateNum(g) });
       const storage = m.stock * ev.unit * 0.01;
       g.cash += sold * m.price - made * ev.unit - storage; pl.rev += sold * m.price; pl.cost += made * ev.unit + storage; pl.sales += sold;
       g.rep = Math.min(1, Math.max(0, g.rep + (sold > 0 ? (ev.rel - 0.75) * 0.004 + 0.001 : -0.001))); } }

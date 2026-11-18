@@ -4,6 +4,7 @@ import { lang, hooks, clip } from './ui.mjs';
 import { tr } from './i18n.mjs';
 import { textField, N, editing } from './ui.mjs';
 import { suggest } from './names.mjs';
+import { drawCity, drawWorks, drawPlant, drawDealer } from './places.mjs';
 import { drawMockRoom, makeRun, drawTrack } from './track.mjs';
 import { POS0, POS_R, clampPos, placeFront, placeSide } from '../tools/pixel/gen/v3/place.mjs';
 import { TRIM_NAMES, wheelsFor, WHEEL_NAMES, wwMax, trimSide, trimFront } from '../tools/pixel/gen/v3/trim.mjs';
@@ -145,7 +146,7 @@ function load() {
   if (button(S, 135, 196, 80, 16, 'BACK')) app.scene = 'title';
 }
 // ---------- HQ ----------
-const TABS = [['news', 'OFFICE'], ['engines', 'ENGINES'], ['gearbox', 'GEARBOX'], ['cars', 'CAR DESIGN'], ['prod', 'PRODUCTION'], ['research', 'RESEARCH'], ['market', 'MARKET'], ['finance', 'FINANCE'], ['save', 'SAVE'], ['menu', 'MENU']];
+const TABS = [['map', 'CITY'], ['news', 'OFFICE'], ['engines', 'ENGINES'], ['gearbox', 'GEARBOX'], ['cars', 'CAR DESIGN'], ['prod', 'PRODUCTION'], ['research', 'RESEARCH'], ['market', 'MARKET'], ['finance', 'FINANCE'], ['save', 'SAVE'], ['menu', 'MENU']];
 // name field + dice (suggestion) button
 function nameField(id, x, y, w, label, value, kind, max = 16) { const v = textField(S, id, x, y, w - 13, label, value, { max }); if (button(S, x + w - 12, y + 7, 12, 11, '?', { tone: 'teal' })) { AU.sfx('click'); return suggest(kind, lang.ko); } return v; }
 function confirmBox(title, lines, yes) { app.ask = { title, lines: lines.filter(Boolean), yes }; AU.sfx('click'); }
@@ -159,10 +160,10 @@ function hqBody() {
   text(S, N(g.name), 10, 6, C.brassL); const dt = `${MONTHS[g.month - 1]} ${g.year}`; text(S, dt, 200, 6, C.white);
   text(S, money(g.cash), 280, 6, g.cash < 0 ? hex('#ffb0a0') : C.brassL); text(S, `REP ${Math.round(g.rep * 100)}`, 360, 6, C.white); if (g.loan > 0) text(S, `LOAN ${money(g.loan)}`, 280, 0 + 11, hex('#ffb0a0'));
   if (button(S, W - 52, 2, 44, 12, AU.vol.muted ? 'SOUND' : 'MUTE', { tone: 'ox' })) { AU.vol.muted = !AU.vol.muted; AU.applyVolume(); }
-  TABS.forEach(([k, l], i) => { if (button(S, 3, 20 + i * 19, 66, 16, l, { active: app.tab === k, tone: k === 'menu' || k === 'save' ? 'teal' : 'brass' })) app.tab = k; });
+  TABS.forEach(([k, l], i) => { if (button(S, 3, 19 + i * 18, 66, 16, l, { active: app.tab === k, tone: k === 'menu' || k === 'save' ? 'teal' : 'brass' })) app.tab = k; });
   if (!g.over && button(S, 3, 222, 66, 22, 'NEXT MONTH', { tone: 'ox' })) { const n0 = g.news[0]; stepMonth(g); AU.sfx(g.news[0] !== n0 ? 'wire' : 'type'); if (g.last?.sales) AU.sfx('till'); }
   if (!g.over && button(S, 3, 246, 66, 16, '+6 MONTHS')) { for (let i = 0; i < 6 && !g.over; i++) stepMonth(g); }
-  devTick(g); ({ news, engines, gearbox, cars, prod, research, market, finance, save, menu })[app.tab]?.(g);
+  devTick(g); ({ map: cityTab, news, engines, gearbox, cars, prod, research, market, finance, save, menu })[app.tab]?.(g);
   if (g.meeting && !g.over) { windowBox(S, 120, 60, 260, 150, 'MEETING AT THE BANK'); text(S, 'YOUR CREDIT IS EXHAUSTED FOR 3 MONTHS.', 134, 84, C.ink); text(S, 'CHOOSE A RESCUE PLAN:', 134, 94, C.oxblood);
     BANK_OPTS.forEach(([k, l], i) => { if (button(S, 134, 108 + i * 22, 232, 17, l, { tone: k === 'merge' ? 'ox' : 'brass' })) confirmBox(l, ['THIS DECISION CANNOT BE UNDONE.'], () => { bankOption(g, k); AU.sfx('wire'); }); }); return; }
   if (g.over) { app.scene = 'end'; return; }
@@ -603,6 +604,15 @@ function menu(g) { windowBox(S, AX + 120, AY + 30, 160, 130, 'MENU'); g.name = n
 
 // ---------- assembly line (first car of a design) ----------
 function startAssembly(g, spec, d, back, plat = null) { const eng = g.engines.find(x => x.id === d.engineId); if (!eng || !spec) return; try { app.asm = makeAssembly(P, { spec, plat }, eng, g.year, d.paint); app.asmBack = back; app.scene = 'assembly'; } catch (e) { console.warn(e); } }
+// ---------- stage E: places ----------
+const modelSprite = m => (m.sprite?.v3 ? v3Sprite(m.sprite.v3, m.sprite.paint).px : m.sprite?.v2 ? v2Sprite(m.sprite.v2, m.sprite.paint).px : null);
+function cityTab(g) { windowBox(S, AX, AY, AW, AH, 'THE CITY - ' + COUNTRIES[g.country].name); const hit = drawCity(S, g, AX + 4, AY + 17, AW - 8, AH - 21, app.t);
+  if (hit === 'works') app.scene = 'works'; if (hit === 'dealer') app.scene = 'dealer'; if (hit === 'office') app.tab = 'news';
+  if (hit === 'track') { if (g.proj && g.proj.stage >= 7) { app.tab = 'cars'; app.dstage = 7; } else toast('NO PROTOTYPE TO TEST YET'); } }
+const goMap = () => { app.scene = 'hq'; app.tab = 'map'; };
+function works() { const r = drawWorks(S, P, app.g, modelSprite, app.t); if (r === 'plant') app.scene = 'plant'; if (r === 'map') goMap(); }
+function plant() { const g = app.g, r = drawPlant(S, P, g, modelSprite, app.t, AU.sfx); if (r === 'works') app.scene = 'works'; if (r === 'map') goMap(); if (r === 'expand') { g.factory += 500; g.cash -= 40000; AU.sfx('stamp'); toast('FACTORY EXPANDED'); } }
+function dealer() { const g = app.g, r = drawDealer(S, P, g, modelSprite, app.t, money); if (r === 'map') goMap(); else if (r?.cut) { r.cut.price = Math.max(350, Math.round(r.cut.price * 0.95 / 10) * 10); AU.sfx('till'); toast('PRICE CUT'); } }
 function mockroom() { if (drawMockRoom(S, P, app.room, AU.sfx)) { app.scene = 'hq'; app.tab = 'cars'; app.room = null; } }
 function track() { const K = app.trk, T = K.run; if (!K.voice && AU.ready()) { K.voice = AU.engineVoice(T.engine, T.year); }
   const r = drawTrack(S, P, T, K.sprite, AU.sfx); if (K.voice) K.voice.set(T.rpm, T.load, T.done ? 0.25 : 1);
@@ -628,7 +638,7 @@ function cursor() { const x = input.x, y = input.y; if (x < 0) return; const A =
   A.forEach((r, j) => [...r].forEach((c, i) => c !== '0' && S.fill(x + i, y + j, 1, 1, c === '1' ? C.black : C.brassL))); }
 function music() { const g = app.g; if (app.scene !== 'hq' || !g) return AU.setSong('title'); if (['engines', 'gearbox', 'cars'].includes(app.tab)) return AU.setSong('design');
   const C2 = COUNTRIES[g.country]; AU.setSong(g.year < 1940 ? 'office30' : g.year >= C2.war[0] && g.year <= C2.war[1] ? 'war40' : 'office40'); }
-function frame() { app.t++; music(); if (app.scene !== 'title') AU.passEnd(); ({ title, settings, newgame, load, hq, end, assembly, mockroom, track })[app.scene]();
+function frame() { app.t++; music(); if (app.scene !== 'title') AU.passEnd(); ({ title, settings, newgame, load, hq, end, assembly, mockroom, track, works, plant, dealer })[app.scene]();
   if (app.toast && app.t < app.toast.until) { const w = tw(app.toast.t) + 16; bevel(S, (W - w) / 2, H - 22, w, 14, C.teal, C.tealL, hex('#1b3f3e')); text(S, app.toast.t, (W - w) / 2 + 8, H - 17, C.white); }
   cursor(); input.clicked = false; input.wheel = 0; input.key = null; if (input.left) { input.left = false; input.x = -1; } ctx.putImageData(img, 0, 0); requestAnimationFrame(frame); }
 function resize() { const vv = window.visualViewport, vw = (vv ? vv.width : innerWidth) - 32, vh = (vv ? vv.height : innerHeight) - 8, fit = Math.max(0.3, Math.min(vw / W, vh / H));

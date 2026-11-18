@@ -2,7 +2,7 @@
 // the car's rear view sits at the bottom, leaning with roll and pitch and riding the bumps.
 // Physics: engine torque curve, gears and final drive, drag, rolling resistance, grades (as the engineering report);
 // cornering limited by the chassis grip, balance and banking; brakes by the chassis deceleration with drum heating and fade.
-import { W, H, C, text, button, input, bevel, lineTo, N, lang, tw } from './ui.mjs';
+import { W, H, C, text, button, input, held, bevel, lineTo, N, lang, tw } from './ui.mjs';
 import { hex } from '../tools/pixel/color.mjs';
 import { GEARBOX } from '../sim/drive.mjs';
 
@@ -68,8 +68,8 @@ const HZ = 92, F = 230, CAMH = 1.35, AHEAD = 5, VIEW = 260;
 const COL = { sky0: hex('#9fb8c4'), sky1: hex('#d9e2dc'), hill: hex('#8fa292'), hill2: hex('#7a8f7c'), g0: hex('#7f9a5c'), g1: hex('#748f53'), tar: hex('#6f6b66'), tar2: hex('#67635e'), con: hex('#aaa59a'), con2: hex('#a19c90'), gravel: hex('#8a7a62'), gravel2: hex('#807058'),
   rum0: hex('#e9e2d0'), rum1: hex('#b0341f'), line: hex('#efe6cf'), wall: hex('#c9c2b2'), wallD: hex('#9d9686'), trunk: hex('#5d4b3a'), leaf: hex('#56724a'), leaf2: hex('#6f8a5c'), post: hex('#efe6cf') };
 export function drawDrive(S, P, D, sprite, sfx) {
-  const k = input.keys || {}, tch = input.down && input.y >= 214, left = k.ArrowLeft || (tch && input.x < 60), right = k.ArrowRight || (tch && input.x >= 62 && input.x < 122);
-  const brake = k.ArrowDown || (tch && input.x >= W - 60), gas = !brake && (k.ArrowUp || k[' '] || (tch && input.x >= W - 122 && input.x < W - 62) || D.autoGas);
+  const k = input.keys || {}, left = k.ArrowLeft || held(2, H - 44, 56, 40), right = k.ArrowRight || held(62, H - 44, 56, 40);   // every finger counts: steer and pedal together
+  const brake = k.ArrowDown || held(W - 58, H - 44, 56, 40), gas = !brake && (k.ArrowUp || k[' '] || held(W - 120, H - 44, 56, 40) || D.autoGas);
   for (let q = 0; q < 3; q++) stepDrive(D, gas, brake, (right ? 1 : 0) - (left ? 1 : 0), 1 / 180);
   const tr = D.tr, cells = tr.cells, nC = cells.length, sCam = D.s - AHEAD, i0 = Math.floor(sCam / DS), frac = (sCam / DS) - i0, at = i => cells[((i % nC) + nC) % nC], elev0 = at(i0).el;
   // sky and far hills turn with the car's heading round the lap

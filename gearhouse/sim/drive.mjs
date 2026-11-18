@@ -24,7 +24,7 @@ export function simulate(car) {
   let vmax = 0; for (let v = 1; v < 70; v += 0.25) if (R.some((_, gi) => force(v, gi) > resist(v))) vmax = v;
   // 0-60 mph with shift pauses
   let v = 0, t = 0, gi = 0, pause = 0; const dt = 0.05;
-  while (v < 26.8 && t < 99) { if (pause > 0) pause -= dt; else { let f = force(v, gi); if (gi + 1 < R.length && (rpmAt(v, gi) > es.redline * 0.97 || force(v, gi + 1) > f)) { gi++; pause = G.shift; } else v += (f - resist(v)) / m * dt; }
+  while (v < 26.8 && t < 99) { if (pause > 0) pause -= dt; else { let f = force(v, gi); if (gi + 1 < R.length && (rpmAt(v, gi) > es.redline * 0.97 || force(v, gi + 1) > f)) { gi++; pause = G.shift; } else v += (f - resist(v)) / (m + ((0.08 + es.litres * 0.035) * (R[gi] * fd) ** 2 * G.eff + 4 * (0.8 + 0.03 * 16)) / (r * r)) * dt; }   // flywheel and wheels to spin up as well (matches the real-time car)
     if (pause > 0) v = Math.max(0, v - resist(v) / m * dt); t += dt; }
   // grade-ability in first gear at peak torque
   const f1 = Math.min(es.torque * R[0] * fd * G.eff / r, (car.mu ?? 0.75) * m * g * (car.driveFrac ?? 0.55)), grade = Math.max(0, Math.min(0.9, (f1 - crr * m * g) / (m * g)));

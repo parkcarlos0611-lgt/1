@@ -34,7 +34,9 @@ const MARK = ch => ch === '\u0001' || ch === '\u0002';
 function glyphText(s, str, x, y, c, maxW) { let cx = x; const yb = y + 7;
   for (const ch of str) { if (MARK(ch)) continue; const g = glyph(ch.codePointAt(0)); const [dw, bw, bh, xo, yo] = g; if (maxW && cx + dw - x > maxW) break;
     for (let j = 0; j < bh; j++) { const row = g[5 + j]; for (let i = 0; i < bw; i++) if ((row >> (bw - 1 - i)) & 1) s.fill(cx + xo + i, yb - (bh + yo) + j, 1, 1, c); } cx += dw; } return cx; }
-export function text(s, str, x, y, c = C.ink, sc = 1, maxW = 0) { str = String(str).toUpperCase(); x = Math.round(x); y = Math.round(y);
+// audit mode (tests): every button drawn and every text cut short by its width, per frame
+export const audit = { on: false, btn: [], cut: [], last: { btn: [], cut: [] } };
+export function text(s, str, x, y, c = C.ink, sc = 1, maxW = 0) { str = String(str).toUpperCase(); x = Math.round(x); y = Math.round(y); if (audit.on && maxW && tw(str, sc) > maxW) audit.cut.push({ s: lang.ko ? tr(str) : str, x, y, maxW, w: tw(str, sc) });
   if (lang.ko && sc === 1) return glyphText(s, tr(str), x, y - 1, c, maxW);
   let cx = x;
   for (const ch of str) { if (MARK(ch)) continue; const cp = ch.codePointAt(0);
@@ -44,7 +46,9 @@ export const tw = (str, sc = 1) => { str = String(str).toUpperCase(); if (lang.k
 
 // ---- input / immediate-mode widgets ----
 export const hooks = { click: null };
-export const input = { x: -1, y: -1, down: false, clicked: false, released: false, wheel: 0, key: null, hot: null, drag: null };
+export const input = { x: -1, y: -1, down: false, clicked: false, released: false, wheel: 0, key: null, hot: null, drag: null, pts: new Map(), prim: null, touch: false };
+// every finger (or the mouse button) currently held, so driving controls can be pressed together
+export const held = (x, y, w, h) => { for (const p of input.pts.values()) if (p.x >= x && p.x < x + w && p.y >= y && p.y < y + h) return true; return false; };
 const inside = (x, y, w, h) => input.x >= x && input.x < x + w && input.y >= y && input.y < y + h && (!clip.on || (input.x >= clip.x0 && input.x < clip.x1 && input.y >= clip.y0 && input.y < clip.y1));
 export function bevel(s, x, y, w, h, face, light, dark, inset = false) {
   s.fill(x, y, w, h, C.black); s.fill(x + 1, y + 1, w - 2, h - 2, face);
@@ -65,11 +69,12 @@ export function windowBox(s, x, y, w, h, title, { close = false } = {}) {
   return false; }
 export function panel(s, x, y, w, h, title) { s.fill(x, y, w, h, C.paperDark); s.fill(x + 1, y + 1, w - 2, h - 2, C.paper); if (title) { s.fill(x + 1, y + 1, w - 2, 7, C.paper2); text(s, title, x + 3, y + 2, C.inkSoft); } }
 export function button(s, x, y, w, h, label, { tone = 'brass', disabled = false, active = false } = {}) {
-  const hov = !disabled && inside(x, y, w, h), press = hov && input.down;
+  const sl = input.touch && h < 14 ? 2 : 0, hov = !disabled && inside(x - sl, y - sl, w + 2 * sl, h + 2 * sl), press = hov && input.down;   // fingers get a little more room on small buttons
   const T = tone === 'ox' ? [C.oxblood, C.oxL, C.oxD, C.brassL] : tone === 'teal' ? [C.teal, C.tealL, hex('#1b3f3e'), C.white] : [C.brass, C.brassL, C.brassD, C.ink];
   bevel(s, x, y, w, h, disabled ? C.paperDark : active ? T[2] : hov ? T[1] : T[0], disabled ? C.paper : T[1], disabled ? C.inkSoft : T[2], press || active);
   const lc = disabled ? C.inkSoft : active ? C.white : T[3]; text(s, label, x + Math.floor((w - tw(label)) / 2) + (press ? 1 : 0), y + Math.floor((h - 5) / 2) + (press ? 1 : 0), lc);
-  const hit = hov && input.clicked && !disabled; if (hit && hooks.click) hooks.click(); return hit; }
+  if (audit.on) audit.btn.push({ l: lang.ko ? tr(String(label).toUpperCase()) : String(label), x, y, w, h, dis: disabled, over: tw(label) > w - 2 });
+  const hit = hov && input.clicked && !disabled; if (hit) { input.clicked = false; if (hooks.click) hooks.click(); } return hit; }   // one tap, one button
 // horizontal slider; returns new value
 export function slider(s, x, y, w, label, v, lo, hi, { step = 0, fmt = n => n.toFixed(2), id } = {}) {
   const vs = fmt(v); text(s, label, x, y, C.ink, 1, Math.max(10, w - tw(vs) - 4)); text(s, vs, x + w - tw(vs), y, C.oxblood);

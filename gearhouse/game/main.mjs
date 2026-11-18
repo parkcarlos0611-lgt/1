@@ -9,7 +9,7 @@ import { drawMockRoom } from './track.mjs';
 import { makeDrive, drawDrive, drawTrackPick, trackName } from './drive3d.mjs';
 import { POS0, POS_R, clampPos, placeFront, placeSide } from '../tools/pixel/gen/v3/place.mjs';
 import { TRIM_NAMES, wheelsFor, WHEEL_NAMES, wwMax, trimSide, trimFront } from '../tools/pixel/gen/v3/trim.mjs';
-import { scrollArea } from './ui.mjs';
+import { scrollArea, audit } from './ui.mjs';
 import { W, H, C, Sheet, drawPix, input, text, tw, windowBox, panel, button, slider, cycler, bar, stat, graph, desk, bevel, rivet, lineTo } from './ui.mjs';
 import { eraPalette, hex } from '../tools/pixel/color.mjs';
 import { buildCar } from '../tools/pixel/gen/car.mjs';
@@ -161,12 +161,17 @@ function hq() { const ask = app.ask, saved = ask ? { ...input } : null; if (ask)
 function hqBody() {
   const g = app.g; desk(S);
   bevel(S, 0, 0, W, 16, C.oxblood, C.oxL, C.oxD); rivet(S, 4, 7); rivet(S, W - 6, 7);
-  text(S, N(g.name), 10, 6, C.brassL); const dt = `${MONTHS[g.month - 1]} ${g.year}`; text(S, dt, 200, 6, C.white);
-  text(S, money(g.cash), 280, 6, g.cash < 0 ? hex('#ffb0a0') : C.brassL); text(S, `REP ${Math.round(g.rep * 100)}`, 360, 6, C.white); if (g.loan > 0) text(S, `LOAN ${money(g.loan)}`, 280, 0 + 11, hex('#ffb0a0'));
+  FULL = ['engines', 'gearbox', 'cars'].includes(app.tab) && !g.over; AX = FULL ? 3 : 74; AW = W - AX - 3;
+  const nextMonth = () => { const n0 = g.news[0]; stepMonth(g); AU.sfx(g.news[0] !== n0 ? 'wire' : 'type'); if (g.last?.sales) AU.sfx('till'); };
+  const dt = `${MONTHS[g.month - 1]} ${g.year}`;
+  if (FULL) { if (button(S, 3, 2, 50, 12, '< OFFICE', { tone: 'ox' })) app.tab = 'news'; text(S, N(g.name), 58, 6, C.brassL, 1, 96); text(S, dt, 160, 6, C.white); text(S, money(g.cash), 214, 6, g.cash < 0 ? hex('#ffb0a0') : C.brassL);
+    text(S, `REP ${Math.round(g.rep * 100)}`, 270, 6, C.white, 1, 42); if (button(S, 318, 2, 104, 12, 'NEXT MONTH', { tone: 'ox' })) nextMonth(); }
+  else { text(S, N(g.name), 10, 6, C.brassL); text(S, dt, 200, 6, C.white); text(S, money(g.cash), 280, 6, g.cash < 0 ? hex('#ffb0a0') : C.brassL); text(S, `REP ${Math.round(g.rep * 100)}`, 360, 6, C.white); }
+  if (g.loan > 0) text(S, `LOAN ${money(g.loan)}`, FULL ? 214 : 280, 0 + 11, hex('#ffb0a0'));
   if (button(S, W - 52, 2, 44, 12, AU.vol.muted ? 'SOUND' : 'MUTE', { tone: 'ox' })) { AU.vol.muted = !AU.vol.muted; AU.applyVolume(); }
-  TABS.forEach(([k, l], i) => { if (button(S, 3, 19 + i * 18, 66, 16, l, { active: app.tab === k, tone: k === 'menu' || k === 'save' ? 'teal' : 'brass' })) app.tab = k; });
-  if (!g.over && button(S, 3, 222, 66, 22, 'NEXT MONTH', { tone: 'ox' })) { const n0 = g.news[0]; stepMonth(g); AU.sfx(g.news[0] !== n0 ? 'wire' : 'type'); if (g.last?.sales) AU.sfx('till'); }
-  if (!g.over && button(S, 3, 246, 66, 16, '+6 MONTHS')) { for (let i = 0; i < 6 && !g.over; i++) stepMonth(g); }
+  if (!FULL) { TABS.forEach(([k, l], i) => { if (button(S, 3, 19 + i * 18, 66, 16, l, { active: app.tab === k, tone: k === 'menu' || k === 'save' ? 'teal' : 'brass' })) app.tab = k; });
+    if (!g.over && button(S, 3, 222, 66, 22, 'NEXT MONTH', { tone: 'ox' })) nextMonth();
+    if (!g.over && button(S, 3, 246, 66, 16, '+6 MONTHS')) { for (let i = 0; i < 6 && !g.over; i++) stepMonth(g); } }
   devTick(g); ({ map: cityTab, news, engines, gearbox, cars, prod, research, market, finance, save, menu })[app.tab]?.(g);
   if (g.meeting && !g.over) { windowBox(S, 120, 60, 260, 150, 'MEETING AT THE BANK'); text(S, 'YOUR CREDIT IS EXHAUSTED FOR 3 MONTHS.', 134, 84, C.ink); text(S, 'CHOOSE A RESCUE PLAN:', 134, 94, C.oxblood);
     BANK_OPTS.forEach(([k, l], i) => { if (button(S, 134, 108 + i * 22, 232, 17, l, { tone: k === 'merge' ? 'ox' : 'brass' })) confirmBox(l, ['THIS DECISION CANNOT BE UNDONE.'], () => { bankOption(g, k); AU.sfx('wire'); }); }); return; }
@@ -174,7 +179,7 @@ function hqBody() {
   if (false) { windowBox(S, 130, 80, 240, 100, 'THE BOOKS ARE CLOSED'); text(S, g.over, 145, 104, C.oxblood); text(S, `FINAL CASH ${money(g.cash)}`, 145, 118); text(S, `CARS SOLD ${g.models.reduce((a, m) => a + (m.sold || 0), 0).toLocaleString()}`, 145, 128);
     text(S, `REPUTATION ${Math.round(g.rep * 100)}`, 145, 138); if (button(S, 145, 155, 90, 16, 'TITLE')) { app.scene = 'title'; app.g = null; } }
 }
-const AX = 74, AY = 20, AW = W - AX - 3, AH = H - AY - 3;
+let AX = 74, AW = W - AX - 3, FULL = false; const AY = 20, AH = H - AY - 3;   // design rooms take the whole screen (FULL): no side menu
 function news(g) { windowBox(S, AX, AY, AW, AH, 'OFFICE - NEWS WIRE & SUMMARY');
   panel(S, AX + 8, AY + 22, 220, AH - 30, 'TELEGRAMS'); scrollArea(S, 'news', AX + 9, AY + 31, 218, AH - 40, g.news.length * 9 + 4, dy => g.news.forEach((n, i) => { const y = AY + 33 + i * 9 - dy, yy = Math.floor(n.d / 12), mm = n.d % 12; text(S, n.d ? `${MONTHS[mm]} ${yy}` : '----', AX + 12, y, C.oxblood); text(S, n.t, AX + 50, y, C.ink, 1, 172); }));
   const x = AX + 236; panel(S, x, AY + 22, AW - 244, 90, 'THIS MONTH'); const l = g.last || { rev: 0, cost: 0, sales: 0 };
@@ -190,12 +195,12 @@ const ESTEP_HELP = ['THE CASTING: CYLINDERS, LAYOUT AND HOW BIG THE FAMILY MAY G
   'COMPRESSION, CAM AND VALVE GEAR: WHERE THE TORQUE COMES IN.', 'CARBURETTORS, MIXTURE AND SPARK.', 'MANIFOLDS, PIPES AND MUFFLER.', 'WATER, FAN AND OIL.', 'RUN IT ON THE BENCH, NAME IT AND TOOL UP.'];
 function para(s, str, x, y, c, w, lh = 9) { const t = lang.ko ? tr(String(str).toUpperCase()) : String(str); let line = '', yy = y; for (const wd of t.split(' ')) { const nx = line ? line + ' ' + wd : wd; if (line && tw(nx) > w) { text(s, line, x, yy, c); yy += lh; line = wd; } else line = nx; } if (line) text(s, line, x, yy, c); return yy + lh; }
 function engDrawing(view, e, th, w, h, stage, rate = 0) { return (view === 'cross' ? drawCrossPix : view === 'ext' ? drawOutsidePix : view === 'front' ? drawFrontPix : drawLongPix)(P, e, th, w, h, stage, rate); }
-function engines(g) { windowBox(S, AX, AY, AW, AH, 'ENGINE DESIGN');
+function engines(g) { const LW = FULL ? 150 : 108; windowBox(S, AX, AY, AW, AH, 'ENGINE DESIGN');
   const e = app.edraft || (app.edraft = { ...JSON.parse(JSON.stringify(g.engines[0])), id: null, from: g.engines[0].id, name: 'NEW ENGINE', quality: 0 });
   if (!e.gq) e.gq = Object.fromEntries(PART_GROUPS.map(([k]) => [k, e.quality || 0])); if (e.maxBore == null) e.maxBore = e.bore + 4; if (e.maxStroke == null) e.maxStroke = e.stroke + 6;
   const variant = !!e.from, first = variant ? 2 : 0; let st = Math.max(first, app.estep ?? first); app.emax = Math.max(app.emax ?? st, st);
   // step bar
-  const bw = Math.floor((AW - 12) / 8); ESTEPS.forEach(([k], i) => { const lock = i < first, done = i < st; if (button(S, AX + 6 + i * bw, AY + 18, bw - 2, 12, STAGE_NAMES[i], { tone: done ? 'teal' : i === st ? 'brass' : 'ox', active: i === st, disabled: lock || i > app.emax })) { app.estep = i; AU.sfx('click'); } });
+  const bw = Math.floor((AW - 12) / 8), SHORT = { 'COOLING AND OIL': 'COOLING', 'TEST AND RELEASE': 'TEST', 'FUEL SYSTEM': 'FUEL', 'BOTTOM END': 'BOTTOM' }; ESTEPS.forEach(([k], i) => { const lock = i < first, done = i < st, nm = tw(STAGE_NAMES[i]) > bw - 4 ? SHORT[STAGE_NAMES[i]] || STAGE_NAMES[i] : STAGE_NAMES[i]; if (button(S, AX + 6 + i * bw, AY + 18, bw - 2, 12, nm, { tone: done ? 'teal' : i === st ? 'brass' : 'ox', active: i === st, disabled: lock || i > app.emax })) { app.estep = i; AU.sfx('click'); } });
   st = Math.max(first, app.estep ?? first);
   const lay = Object.keys(LAYOUTS).filter(k => LAYOUTS[k].year <= g.year), heads = ['sv', 'fh', 'ohv', 'sohc', 'dohc'];
   const headOK = h => h === 'sv' || h === 'fh' || (h === 'ohv' && has(g, 'ohv')) || (h === 'sohc' && has(g, 'ohv') && g.year >= 1946);
@@ -210,20 +215,20 @@ function engines(g) { windowBox(S, AX, AY, AW, AH, 'ENGINE DESIGN');
     cooling: opt('cooling', 'COOLING'), radiator: ['sl', 'radiator', 'RADIATOR SIZE', 0.7, 1.4, 0.05, v => Math.round(v * 100) + '%'], lube: opt('lube', 'LUBRICATION'), oil: ['sl', 'oil', 'OIL CAPACITY', 0.7, 1.4, 0.05, v => Math.round(v * 100) + '%'] };
   // left column: what this step decides
   const x0 = AX + 6, rows = st === 0 ? ['from', ...ESTEPS[0][1], 'q'] : st === 7 ? ['name'] : [...ESTEPS[st][1], 'q'], gkey = PART_GROUPS.find(p => p[2].some(k => ESTEPS[st][1].includes(k)))?.[0] || 'family';
-  panel(S, x0 - 2, AY + 32, 114, AH - 36, ''); para(S, ESTEP_HELP[st], x0, AY + 34, C.inkSoft, 108);
-  scrollArea(S, 'estep' + st, x0 - 2, AY + 54, 114, st === 7 ? 26 : AH - 76, rows.length * 22 + 4, dy => rows.forEach((k, i) => { const y = AY + 58 + i * 22 - dy, c = C2[k];
-    if (k === 'from') { const ids = ['new', ...g.engines.map(x => x.id)], cur = e.from || 'new', v = cycler(S, x0, y, 108, 'START FROM', ids, cur, { names: id => (id === 'new' ? 'NEW FAMILY' : N(g.engines.find(x => x.id === id).name)) });
+  panel(S, x0 - 2, AY + 32, (LW + 6), AH - 36, ''); para(S, ESTEP_HELP[st], x0, AY + 34, C.inkSoft, LW);
+  scrollArea(S, 'estep' + st, x0 - 2, AY + 54, (LW + 6), st === 7 ? 26 : AH - 76, rows.length * 22 + 4, dy => rows.forEach((k, i) => { const y = AY + 58 + i * 22 - dy, c = C2[k];
+    if (k === 'from') { const ids = ['new', ...g.engines.map(x => x.id)], cur = e.from || 'new', v = cycler(S, x0, y, LW, 'START FROM', ids, cur, { names: id => (id === 'new' ? 'NEW FAMILY' : N(g.engines.find(x => x.id === id).name)) });
       if (v !== cur) { if (v === 'new') { e.from = null; } else { const src = g.engines.find(x => x.id === v); app.edraft = { ...JSON.parse(JSON.stringify(src)), from: v, id: null, name: src.name + ' B' }; app.estep = 2; } } return; }
-    if (k === 'name') { e.name = nameField('ename', x0, y - 2, 108, 'ENGINE NAME', e.name, 'engine'); return; }
-    if (k === 'q') { e.gq[gkey] = Math.round(slider(S, x0, y + 2, 108, 'GROUP QUALITY', e.gq[gkey] ?? 0, -3, 3, { step: 1, fmt: v => (v > 0 ? '+' : '') + Math.round(v), id: 'gq' + st })); return; }
-    if (c[0] === 'head') { const h2 = cycler(S, x0, y, 108, 'VALVETRAIN', heads, e.head, { names: h => HEADS[h].name, lock: h => !headOK(h) }); if (headOK(h2)) e.head = h2; else if (h2 !== e.head) toast('RESEARCH NEEDED FOR ' + HEADS[h2].name); return; }
-    if (c[0] === 'cr') { const crMax = maxCR(g.year, e.head, e.chamber); e.cr = slider(S, x0, y + 2, 108, `COMPRESSION (MAX ${crMax.toFixed(1)})`, Math.min(e.cr, crMax), 4.5, crMax, { step: 0.1, fmt: v => v.toFixed(1) + ':1', id: 'ecr' }); return; }
-    if (c[0] === 'sl') { const v0 = e[k] ?? ({ advance: 0.5, mixture: 0.5, radiator: 1, oil: 1, exhDia: 1, rpmLimit: es0.mechLimit })[k] ?? c[3]; e[k] = slider(S, x0, y + 2, 108, c[2], Math.min(v0, c[4]), c[3], c[4], { step: c[5], fmt: c[6] || (v => v.toFixed(2)), id: 'e' + k }); if (k === 'bore' || k === 'stroke' || k === 'maxBore' || k === 'maxStroke') e[k] = Math.round(e[k] * 2) / 2; return; }
-    const list = c[3]; e[k] = cycler(S, x0, y, 108, c[2], list, list.includes(e[k]) ? e[k] : list[0], { names: c[4] || (v => String(v)) }); }));
+    if (k === 'name') { e.name = nameField('ename', x0, y - 2, LW, 'ENGINE NAME', e.name, 'engine'); return; }
+    if (k === 'q') { e.gq[gkey] = Math.round(slider(S, x0, y + 2, LW, 'GROUP QUALITY', e.gq[gkey] ?? 0, -3, 3, { step: 1, fmt: v => (v > 0 ? '+' : '') + Math.round(v), id: 'gq' + st })); return; }
+    if (c[0] === 'head') { const h2 = cycler(S, x0, y, LW, 'VALVETRAIN', heads, e.head, { names: h => HEADS[h].name, lock: h => !headOK(h) }); if (headOK(h2)) e.head = h2; else if (h2 !== e.head) toast('RESEARCH NEEDED FOR ' + HEADS[h2].name); return; }
+    if (c[0] === 'cr') { const crMax = maxCR(g.year, e.head, e.chamber); e.cr = slider(S, x0, y + 2, LW, `COMPRESSION (MAX ${crMax.toFixed(1)})`, Math.min(e.cr, crMax), 4.5, crMax, { step: 0.1, fmt: v => v.toFixed(1) + ':1', id: 'ecr' }); return; }
+    if (c[0] === 'sl') { const v0 = e[k] ?? ({ advance: 0.5, mixture: 0.5, radiator: 1, oil: 1, exhDia: 1, rpmLimit: es0.mechLimit })[k] ?? c[3]; e[k] = slider(S, x0, y + 2, LW, c[2], Math.min(v0, c[4]), c[3], c[4], { step: c[5], fmt: c[6] || (v => v.toFixed(2)), id: 'e' + k }); if (k === 'bore' || k === 'stroke' || k === 'maxBore' || k === 'maxStroke') e[k] = Math.round(e[k] * 2) / 2; return; }
+    const list = c[3]; e[k] = cycler(S, x0, y, LW, c[2], list, list.includes(e[k]) ? e[k] : list[0], { names: c[4] || (v => String(v)) }); }));
   e.quality = Math.round(Object.values(e.gq).reduce((a, b) => a + b, 0) / Object.keys(e.gq).length); e.maxBore = Math.max(e.maxBore, 65); e.bore = Math.min(e.bore, e.maxBore); e.stroke = Math.min(e.stroke, e.maxStroke); if (e.rpmLimit != null) e.rpmLimit = Math.min(e.rpmLimit, es0.mechLimit);
   const es = engineStats({ ...e, year: g.year }), ed = { ...e, year: g.year };
   // right: the engine as built so far, three views
-  const x1 = AX + 122, pw1 = AX + AW - 6 - x1, VW = [['long', 'SECTION'], ['cross', 'CROSS'], ['ext', 'OUTSIDE'], ['front', 'FRONT VIEW']], vw = VW.some(v => v[0] === app.engView) ? app.engView : 'long';
+  const x1 = AX + LW + 14, pw1 = AX + AW - 6 - x1, VW = [['long', 'SECTION'], ['cross', 'CROSS'], ['ext', 'OUTSIDE'], ['front', 'FRONT VIEW']], vw = VW.some(v => v[0] === app.engView) ? app.engView : 'long';
   const dyn = app.dyno, pr = dyn ? Math.max(0, Math.min(1, (app.t - dyn.f0 - 102) / 156)) : 1, B = app.bench || (app.bench = { rpm: 0, thr: 0, temp: 20, on: false });
   const live = st === 7 ? (B.on ? B.rpm / 25 : 0) : dyn ? (app.t - dyn.f0 < 66 ? 0 : 40 + pr * 200) : app.visRpm ?? 30; const rate = live * 6 / 60; app.th = (app.th || 0) + rate;
   const ph = st === 7 ? 110 : 150; panel(S, x1, AY + 32, pw1, ph, ''); VW.forEach(([k2, l], i) => { if (button(S, x1 + 2 + i * 44, AY + 33, 43, 9, l, { active: vw === k2 })) app.engView = k2; });
@@ -234,7 +239,7 @@ function engines(g) { windowBox(S, AX, AY, AW, AH, 'ENGINE DESIGN');
   const yb = AY + 32 + ph + 4, known = { disp: st >= 2, red: st >= 3, power: st >= 4, rel: st >= 6 }, dash = '-';
   if (st < 7) { app.visRpm = slider(S, x1, yb + 2, 90, 'CRANK SPEED', app.visRpm ?? 30, 0, 160, { step: 5, fmt: v => (v ? Math.round(v) + '' : 'STOP'), id: 'visrpm' });
     [['DISPLACE', known.disp ? es.litres.toFixed(2) + 'L' : dash], ['POWER', known.power ? es.hp.toFixed(0) + 'HP' : dash], ['RED LINE', known.red ? String(es.redline) : dash], ['MASS', es.mass + 'KG'], ['RELIABLE', known.rel ? Math.round(es.reliability * 100) + '%' : dash], ['UNIT COST', st >= 2 ? money(es.cost) : dash]]
-      .forEach(([l, v], i) => stat(S, x1 + 98 + (i % 3) * 60, yb + (i >> 1 & 0) + Math.floor(i / 3) * 9, l, v, C.ink, 32)); }
+      .forEach(([l, v], i) => stat(S, x1 + 98 + (i % 3) * Math.floor((pw1 - 98) / 3), yb + Math.floor(i / 3) * 9, l, v, C.ink, 38)); }
   else { // test and release: bench, curve, every figure, tooling
     const bx = x1 + 2, by = yb; B.thr = slider(S, bx + 40, by, 64, 'THROTTLE', B.thr, 0, 1, { step: 0.02, fmt: v => Math.round(v * 100) + '%', id: 'bthr' });
     if (button(S, bx, by + 1, 36, 12, B.on ? 'STOP' : 'START', { tone: B.on ? 'ox' : 'teal' })) { B.on = !B.on; if (B.on) { AU.unlock(); AU.sfx('start'); } }
@@ -242,11 +247,11 @@ function engines(g) { windowBox(S, AX, AY, AW, AH, 'ENGINE DESIGN');
     B.temp += ((B.on ? 75 + hp / Math.max(1, es.hp) * 25 * (1 + es.overheat * 2) : 20) - B.temp) * 0.004; if (B.on && AU.ready()) { if (!app.bv) app.bv = AU.engineVoice({ ...e, litres: es.litres }, g.year); app.bv.set(Math.max(idle, B.rpm), 0.2 + B.thr * 0.8, 0.8); }
     [['RPM', String(Math.round(B.rpm / 10) * 10)], ['HP', hp.toFixed(0)], ['NM', tq.toFixed(0)], ['WATER', Math.round(B.temp) + 'C']].forEach(([l, v], i) => stat(S, bx + 110 + (i % 2) * 74, by + 1 + (i >> 1) * 9, l, v, i === 3 && B.temp > 98 ? C.red : C.ink, 26));
     Object.entries(es.bars).forEach(([l, v], i) => { const u = v * (B.rpm / Math.max(1, es.redline)) ** (i === 1 ? 2 : 1); text(S, l, bx, by + 22 + i * 8, C.inkSoft, 1, 54); bar(S, bx + 56, by + 23 + i * 8, 48, 4, Math.min(1, u), u > 0.97 ? C.red : u > 0.8 ? C.amber : C.teal); });
-    const gx = bx + 110, gw = pw1 - 114, cur = es.curve, mxT = Math.max(...cur.map(p => Math.max(p.T, p.hp * 2))) * 1.08; graph(S, gx, by + 20, gw, 34, [{ pts: cur.map(p => p.T), c: C.teal }, { pts: cur.map(p => p.hp * 2), c: C.red }], { max: mxT }); if (B.rpm > 600) S.fill(gx + 1 + Math.round((B.rpm - cur[0].rpm) / Math.max(1, cur.at(-1).rpm - cur[0].rpm) * (gw - 3)), by + 21, 1, 32, C.oxblood);
+    const gx = bx + 110, gw = pw1 - (LW + 6), cur = es.curve, mxT = Math.max(...cur.map(p => Math.max(p.T, p.hp * 2))) * 1.08; graph(S, gx, by + 20, gw, 34, [{ pts: cur.map(p => p.T), c: C.teal }, { pts: cur.map(p => p.hp * 2), c: C.red }], { max: mxT }); if (B.rpm > 600) S.fill(gx + 1 + Math.round((B.rpm - cur[0].rpm) / Math.max(1, cur.at(-1).rpm - cur[0].rpm) * (gw - 3)), by + 21, 1, 32, C.oxblood);
     const ST = [['POWER', `${es.hp.toFixed(0)}HP @${es.hpRpm}`], ['TORQUE', `${es.torque.toFixed(0)}NM @${es.tRpm}`], ['DISPLACE', `${es.litres.toFixed(2)}L`], ['RED LINE', `${es.redline}`], ['LIMITED BY', es.redline < es.mechLimit ? 'RPM LIMIT' : es.limitBy], ['MASS', es.mass + ' KG'], ['SMOOTH', Math.round(es.smooth * 100) + '%'],
       ['RELIABLE', Math.round(es.reliability * 100) + '%'], ['RESPONSE', Math.round(es.response * 100) + '%'], ['NOISE', Math.round(es.noise * 100) + '%'], ['EFFICIENCY', Math.round(es.thermal * 100) + '%'], ['COOLING', es.coolKW + ' KW'], ['OCTANE NEED', `${es.octaneReq} (${Math.round(octane(g.year))})`], ['UNIT COST', money(es.cost)], ['SERVICE/YR', money(es.service)]];
-    scrollArea(S, 'estats', x0 - 2, AY + 84, 114, AH - 112, ST.length * 9 + 2, dy2 => ST.forEach(([l, v], i) => stat(S, x0, AY + 86 + i * 9 - dy2, l, v, (l === 'RELIABLE' && es.reliability < 0.7) || (l === 'OCTANE NEED' && es.octaneReq > octane(g.year)) ? C.red : C.ink, 50)));
-    const dc = devCost(e, g.year, g.engines), can = g.cash >= dc.cost; text(S, `${dc.kind}${dc.of ? ' (' + N(dc.of.name) + ')' : ''}`, x0, AY + AH - 24, C.inkSoft, 1, 108); text(S, `${money(dc.cost)} / ${dc.months} MO`, x0, AY + AH - 14, can ? C.ink : C.red, 1, 108);
+    scrollArea(S, 'estats', x0 - 2, AY + 84, (LW + 6), AH - 112, ST.length * 9 + 2, dy2 => ST.forEach(([l, v], i) => stat(S, x0, AY + 86 + i * 9 - dy2, l, v, (l === 'RELIABLE' && es.reliability < 0.7) || (l === 'OCTANE NEED' && es.octaneReq > octane(g.year)) ? C.red : C.ink, 50)));
+    const dc = devCost(e, g.year, g.engines), can = g.cash >= dc.cost; text(S, `${dc.kind}${dc.of ? ' (' + N(dc.of.name) + ')' : ''}`, x0, AY + AH - 24, C.inkSoft, 1, LW); text(S, `${money(dc.cost)} / ${dc.months} MO`, x0, AY + AH - 14, can ? C.ink : C.red, 1, LW);
     if (button(S, AX + AW - 128, AY + AH - 18, 120, 14, dc.kind === 'VARIANT' ? 'DEVELOP VARIANT' : 'TOOL UP FAMILY', { tone: 'ox', disabled: !can })) confirmBox(dc.kind === 'VARIANT' ? 'DEVELOP ENGINE VARIANT' : 'TOOL UP ENGINE FAMILY', [`COST ${money(dc.cost)}`, `TAKES ${dc.months} MONTHS`, dc.kind === 'VARIANT' ? 'SAME BLOCK AND HEAD CASTINGS.' : 'NEW BLOCK AND HEAD TOOLING.'], () => {
       const id = 'E' + g.serial++, auto = !e.name || e.name === 'NEW ENGINE' || / B$/.test(e.name); g.engines.push({ ...JSON.parse(JSON.stringify(e)), id, from: undefined, name: auto ? `${e.layout}-${HEADS[e.head].name.split(' ')[0]} ${es.litres.toFixed(1)}` : e.name, readyAt: dateNum(g) + dc.months, tooling: dc.cost,
         maxBore: dc.of ? dc.of.maxBore ?? dc.of.bore + 4 : e.maxBore, maxStroke: dc.of ? dc.of.maxStroke ?? dc.of.stroke + 6 : e.maxStroke }); g.cash -= dc.cost; toast(dc.kind === 'VARIANT' ? 'ENGINE VARIANT STARTED' : 'ENGINE TOOLING STARTED'); app.edraft = null; app.estep = 0; app.emax = 0; }); }
@@ -262,7 +267,7 @@ function chLines(ev) { const c = ev.ch, K = lang.ko, bal = c.balance > 0.12 ? (K
     : [perf, `RIDE F ${c.fF.toFixed(2)} R ${c.fR.toFixed(2)} HZ  COMFORT ${Math.round(c.ride * 100)}%`, `ROLL ${c.roll.toFixed(1)} DEG/G  DIVE ${c.dive.toFixed(1)}  SQUAT ${c.squat.toFixed(1)} DEG`, `GRIP ${c.latG.toFixed(2)} G  ${bal}`, `60-0 MPH ${Math.round(c.stop60)} FT  FADE AFTER ${fade} STOPS`, `STEERING ${c.turns.toFixed(1)} TURNS  UNSPRUNG F${c.uF} R${c.uR} KG`]; }
 const gearName = n => (lang.ko ? n + '단 기어' : n + ' GEAR');
 const GB_HELP = ['THE KIND OF GEARBOX: HOW IT SHIFTS, HOW MUCH IT LOSES, WHAT IT COSTS.', 'HOW MANY SPEEDS AND HOW WIDE THE SPREAD FROM FIRST TO TOP.', 'TRY EACH GEAR, CHECK THE SPEEDS, NAME IT AND TOOL UP.'];
-function gearbox(g) { windowBox(S, AX, AY, AW, AH, 'GEARBOX + DRIVELINE');
+function gearbox(g) { const LW = FULL ? 150 : 108; windowBox(S, AX, AY, AW, AH, 'GEARBOX + DRIVELINE');
   const d = app.gdraft || (app.gdraft = { type: g.gearboxes[0].type, gears: 3, first: 2.9, top: 1.0, test: -1 });
   let st = app.gstep ?? 0; app.gmax = Math.max(app.gmax ?? 0, st);
   const bw = Math.floor((AW - 12) / 3); GB_STEPS.forEach((l, i) => { if (button(S, AX + 6 + i * bw, AY + 18, bw - 2, 12, l, { tone: i < st ? 'teal' : i === st ? 'brass' : 'ox', active: i === st, disabled: i > app.gmax })) { app.gstep = i; AU.sfx('click'); } });
@@ -270,18 +275,18 @@ function gearbox(g) { windowBox(S, AX, AY, AW, AH, 'GEARBOX + DRIVELINE');
   const types = Object.keys(GEARBOX).filter(k => GEARBOX[k].year <= g.year), ok = k => k === 'crash3' || has(g, { sync3: 'sync3', sync4: 'sync4', od3: 'od', fluid: 'fluid', hydra4: 'hydra', tc2: 'hydra' }[k]);
   const G = GEARBOX[d.type]; d.gears = Math.max(G.gears[0], Math.min(G.gears[1], d.gears)); d.top = Math.max(d.type === 'od3' ? 0.7 : 0.9, Math.min(1, d.top)); const R = proposeRatios(d.gears, d.first, d.top); d.ratios = R;
   // left column
-  const x0 = AX + 6; panel(S, x0 - 2, AY + 32, 114, AH - 36, ''); para(S, GB_HELP[st], x0, AY + 34, C.inkSoft, 108); const y0 = AY + 70;
-  if (st === 0) { const t2 = cycler(S, x0, y0, 108, 'TYPE', types, d.type, { names: k => GEARBOX[k].name, lock: k => !ok(k) }); if (ok(t2)) d.type = t2; else if (t2 !== d.type) toast('RESEARCH NEEDED');
-    text(S, 'YOUR GEARBOXES', x0, y0 + 30, C.inkSoft); g.gearboxes.forEach((x, i) => text(S, N(x.name.slice(0, 16)) + (x.readyAt > dateNum(g) ? '*' : ''), x0, y0 + 40 + i * 9, C.ink, 1, 108)); }
-  if (st === 1) { d.gears = cycler(S, x0, y0, 108, 'FORWARD GEARS', Array.from({ length: G.gears[1] - G.gears[0] + 1 }, (_, i) => G.gears[0] + i), d.gears, { names: n => n + ' SPEEDS' });
-    d.first = slider(S, x0, y0 + 26, 108, '1ST GEAR RATIO', d.first, 2.0, 4.0, { step: 0.05, id: 'gfirst' }); d.top = slider(S, x0, y0 + 48, 108, 'TOP GEAR RATIO', d.top, d.type === 'od3' ? 0.7 : 0.9, 1.0, { step: 0.01, id: 'gtop' });
+  const x0 = AX + 6; panel(S, x0 - 2, AY + 32, (LW + 6), AH - 36, ''); para(S, GB_HELP[st], x0, AY + 34, C.inkSoft, LW); const y0 = AY + 70;
+  if (st === 0) { const t2 = cycler(S, x0, y0, LW, 'TYPE', types, d.type, { names: k => GEARBOX[k].name, lock: k => !ok(k) }); if (ok(t2)) d.type = t2; else if (t2 !== d.type) toast('RESEARCH NEEDED');
+    text(S, 'YOUR GEARBOXES', x0, y0 + 30, C.inkSoft); g.gearboxes.forEach((x, i) => text(S, N(x.name.slice(0, 16)) + (x.readyAt > dateNum(g) ? '*' : ''), x0, y0 + 40 + i * 9, C.ink, 1, LW)); }
+  if (st === 1) { d.gears = cycler(S, x0, y0, LW, 'FORWARD GEARS', Array.from({ length: G.gears[1] - G.gears[0] + 1 }, (_, i) => G.gears[0] + i), d.gears, { names: n => n + ' SPEEDS' });
+    d.first = slider(S, x0, y0 + 26, LW, '1ST GEAR RATIO', d.first, 2.0, 4.0, { step: 0.05, id: 'gfirst' }); d.top = slider(S, x0, y0 + 48, LW, 'TOP GEAR RATIO', d.top, d.type === 'od3' ? 0.7 : 0.9, 1.0, { step: 0.01, id: 'gtop' });
     text(S, 'RATIOS', x0, y0 + 72, C.inkSoft); R.forEach((r, i) => stat(S, x0, y0 + 82 + i * 9, gearName(i + 1), r.toFixed(2) + ':1', C.ink, 40)); }
   const engs = g.engines.filter(e => !(e.readyAt > dateNum(g))), eng = engs.find(e => e.id === app.gEng) || engs[0] || g.engines[0];
-  if (st === 2) { d.name = nameField('gname', x0, y0 - 2, 108, 'GEARBOX NAME', d.name || '', 'gearbox');
-    const sel = [-1, ...R.map((_, i) => i), -2]; d.test = cycler(S, x0, y0 + 26, 108, 'TEST GEAR', sel, sel.includes(d.test) ? d.test : -1, { names: v => (v === -1 ? 'NEUTRAL' : v === -2 ? 'REVERSE' : gearName(v + 1)) });
-    if (engs.length) { const id = cycler(S, x0, y0 + 52, 108, 'WITH ENGINE', engs.map(e => e.id), eng.id, { names: id2 => N(g.engines.find(e => e.id === id2).name) }); app.gEng = id; } }
+  if (st === 2) { d.name = nameField('gname', x0, y0 - 2, LW, 'GEARBOX NAME', d.name || '', 'gearbox');
+    const sel = [-1, ...R.map((_, i) => i), -2]; d.test = cycler(S, x0, y0 + 26, LW, 'TEST GEAR', sel, sel.includes(d.test) ? d.test : -1, { names: v => (v === -1 ? 'NEUTRAL' : v === -2 ? 'REVERSE' : gearName(v + 1)) });
+    if (engs.length) { const id = cycler(S, x0, y0 + 52, LW, 'WITH ENGINE', engs.map(e => e.id), eng.id, { names: id2 => N(g.engines.find(e => e.id === id2).name) }); app.gEng = id; } }
   // right: drawing
-  const x1 = AX + 122, pw1 = AX + AW - 6 - x1, ph = 132; panel(S, x1, AY + 32, pw1, ph, '');
+  const x1 = AX + LW + 14, pw1 = AX + AW - 6 - x1, ph = 132; panel(S, x1, AY + 32, pw1, ph, '');
   app.gang = (app.gang || 0) + (st === 2 && d.test === -1 ? 0.06 : 0.12); const D = drawGearboxPix(P, d, app.gang, pw1 - 4, ph - 4, st + 1, st === 2 ? d.test : -1); drawPix(S, D.px, P, x1 + 2, AY + 34, 1);
   { const mx = input.x - x1 - 2, my = input.y - AY - 34; if (mx >= 0 && my >= 0 && mx < D.px.w && my < D.px.h) { const nm = D.names[D.px.t[my * D.px.w + mx]]; if (nm) { S.fill(input.x + 6, input.y - 10, tw(nm) + 6, 9, C.ink); text(S, nm, input.x + 9, input.y - 8, C.brassL); } } }
   // below the drawing
@@ -336,7 +341,7 @@ function dashboard(x, y, w, h, trim) {                                      // i
     lineTo(S, cx, cy, cx + Math.cos(-2.4 + k + app.t * 0.01) * (R - 2), cy + Math.sin(-2.4 + k + app.t * 0.01) * (R - 2), C.red); }
   for (let a = 3.5; a < 5.95; a += 0.02) S.fill(Math.round(x + w / 2 + Math.cos(a) * 34), Math.round(y + h + 22 + Math.sin(a) * 34), 2, 2, C.black);   // steering wheel rim
   text(S, ['BASIC', 'STANDARD', 'DE LUXE', 'CUSTOM'][trim], x + 4, y + 4, C.ink); }
-function cars(g) {
+function cars(g) { const CW = FULL ? 126 : 86;
   if (!g.proj && app.draft) g.proj = app.draft;
   const readyE = g.engines.filter(e => e.readyAt <= dateNum(g)), readyG = g.gearboxes.filter(x => x.readyAt <= dateNum(g));
   let d = g.proj || (g.proj = { name: 'MODEL ' + String.fromCharCode(65 + g.models.length), type: 'sedan4d', seg: 'family', engineId: readyE[0]?.id, gbId: readyG[0]?.id, final: 4.1, price: 850, volume: 3000, trim: 1, paint: 0, feats: {}, stage: 0, done: [], busy: null, spent: 0 });
@@ -356,7 +361,7 @@ function cars(g) {
   if ((!isMeas && app.dview === 'shape') || (app.dview === 'frame' && !uniB)) app.dview = 'side';
   const view = st.id === 'platform' ? 'frame' : st.id === 'body' ? app.dview || 'side' : st.id === 'mockup' ? ['side', 'front', 'rear'][Math.floor(app.t / 110) % 3] : 'side', tbw = 34;
   const fview = uniB ? 'plan' : app.fview || 'plan';
-  tabs.forEach(([k, l], i) => { if (button(S, AX + 120 + i * tbw, AY + 2, tbw - 2, 10, l, { active: st.id === 'platform' ? fview === k : view === k })) { if (st.id === 'platform') app.fview = k; else app.dview = k; } });
+  tabs.forEach(([k, l], i) => { if (button(S, AX + CW + 34 + i * tbw, AY + 2, tbw - 2, 10, l, { active: st.id === 'platform' ? fview === k : view === k })) { if (st.id === 'platform') app.fview = k; else app.dview = k; } });
   const R0 = ranges(g.year), opt = (k, key) => optionsFor(key || k, g.year), NM = { sedan4d: '4-DOOR SEDAN', coupe2d: '2-DOOR COUPE' };
   const ctl = [];   // [kind, key, label, a, b, fmt, step]
   const MR = meas ? measuredRanges(des) : null, srcs = baseList(g.year), sn = id => baseName(id), mm = v => Math.round(v) + 'MM', yn = (a, b) => v => (v ? b : a);
@@ -415,19 +420,19 @@ function cars(g) {
     if (view === 'front') ctl.push(P2('lampDY', 'LAMP SPACING (MIRRORED)', sg, 5), P2('lampDZ', 'LAMP HEIGHT', sg, 5), P2('lampK', 'LAMP SIZE', pc, 0.01), P2('grilleDZ', 'GRILLE POSITION', sg, 5), P2('grilleW', 'GRILLE WIDTH', pc, 0.01), P2('grilleH', 'GRILLE HEIGHT', pc, 0.01), P2('bumperDZ', 'BUMPER HEIGHT', sg, 5), P2('bumperW', 'BUMPER WIDTH', pc, 0.01));
     else ctl.push(P2('tailDY', 'TAIL LAMP SPACING (MIRRORED)', sg, 5), P2('tailDZ', 'TAIL LAMP HEIGHT', sg, 5), P2('rBumperDZ', 'BUMPER HEIGHT', sg, 5)); }
   const before = JSON.stringify(des);
-  scrollArea(S, 'design-' + st.id + view, AX + 4, AY + 19, 94, 210, ctl.length * 19 + 6, dy => ctl.forEach(([kind, key, label, a, b, fmt, step], i) => { const y = AY + 23 + i * 19 - dy, nm = fmt || (v => (v === true ? 'YES' : v === false ? 'NO' : String(v).toUpperCase()));
-    if (kind === 'ps') des.pos[key] = slider(S, AX + 6, y, 86, label, des.pos[key], a, b, { step, fmt, id: 'd3q' + key });
-    else if (kind === 'name') { const obj = a; if (!ro) obj[key] = nameField('nm' + st.id + label, AX + 6, y - 2, 86, label, obj[key] || '', b, 16); else text(S, N(obj[key] || '-'), AX + 6, y + 5, C.ink, 1, 86); }
-    else if (kind === 'pls') des.plat[key] = slider(S, AX + 6, y, 86, label, des.plat[key], a, b, { step, fmt, id: 'd3p' + key });
-    else if (kind === 'pl') des.plat[key] = cycler(S, AX + 6, y - 2, 86, label, a, a.includes(des.plat[key]) ? des.plat[key] : a[0], { names: fmt });
-    else if (kind === 'sh') des.shape[key] = slider(S, AX + 6, y, 86, label, des.shape[key] || 0, a, b, { step, fmt, id: 'd3s' + key });
-    else if (kind === 'sl') des[key] = slider(S, AX + 6, y, 86, label, des[key], a, b, { step: step || 0, fmt: fmt || (v => v.toFixed(2)), id: 'd3' + key });
-    else if (kind === 'dsl') d[key] = slider(S, AX + 6, y, 86, label, d[key], a, b, { step, fmt, id: 'dd' + key });
-    else if (kind === 'dcyc') d[key] = cycler(S, AX + 6, y - 2, 86, label, a, a.includes(d[key]) ? d[key] : a[0], { names: nm });
-    else if (kind === 'fcyc') d.feats[key] = cycler(S, AX + 6, y - 2, 86, label, a, !!d.feats[key], { names: nm });
-    else if (kind === 'ccyc') { const v0 = d.ch[key]; d.ch[key] = cycler(S, AX + 6, y - 2, 86, label, a, a.includes(v0) ? v0 : a[0], { names: nm }); if (d.ch[key] !== v0) app.dlPage = CH_PAGE[key] ?? app.dlPage; }
-    else if (kind === 'csl') { const v0 = d.ch[key]; d.ch[key] = slider(S, AX + 6, y, 86, label, d.ch[key], a, b, { step, fmt, id: 'dc' + key }); if (d.ch[key] !== v0) app.dlPage = CH_PAGE[key] ?? app.dlPage; }
-    else { const list = a.length ? a : [des[key]]; des[key] = cycler(S, AX + 6, y - 2, 86, label, list, list.includes(des[key]) ? des[key] : list[0], { names: nm }); } }));
+  scrollArea(S, 'design-' + st.id + view, AX + 4, AY + 19, CW + 8, 210, ctl.length * 19 + 6, dy => ctl.forEach(([kind, key, label, a, b, fmt, step], i) => { const y = AY + 23 + i * 19 - dy, nm = fmt || (v => (v === true ? 'YES' : v === false ? 'NO' : String(v).toUpperCase()));
+    if (kind === 'ps') des.pos[key] = slider(S, AX + 6, y, CW, label, des.pos[key], a, b, { step, fmt, id: 'd3q' + key });
+    else if (kind === 'name') { const obj = a; if (!ro) obj[key] = nameField('nm' + st.id + label, AX + 6, y - 2, CW, label, obj[key] || '', b, 16); else text(S, N(obj[key] || '-'), AX + 6, y + 5, C.ink, 1, 86); }
+    else if (kind === 'pls') des.plat[key] = slider(S, AX + 6, y, CW, label, des.plat[key], a, b, { step, fmt, id: 'd3p' + key });
+    else if (kind === 'pl') des.plat[key] = cycler(S, AX + 6, y - 2, CW, label, a, a.includes(des.plat[key]) ? des.plat[key] : a[0], { names: fmt });
+    else if (kind === 'sh') des.shape[key] = slider(S, AX + 6, y, CW, label, des.shape[key] || 0, a, b, { step, fmt, id: 'd3s' + key });
+    else if (kind === 'sl') des[key] = slider(S, AX + 6, y, CW, label, des[key], a, b, { step: step || 0, fmt: fmt || (v => v.toFixed(2)), id: 'd3' + key });
+    else if (kind === 'dsl') d[key] = slider(S, AX + 6, y, CW, label, d[key], a, b, { step, fmt, id: 'dd' + key });
+    else if (kind === 'dcyc') d[key] = cycler(S, AX + 6, y - 2, CW, label, a, a.includes(d[key]) ? d[key] : a[0], { names: nm });
+    else if (kind === 'fcyc') d.feats[key] = cycler(S, AX + 6, y - 2, CW, label, a, !!d.feats[key], { names: nm });
+    else if (kind === 'ccyc') { const v0 = d.ch[key]; d.ch[key] = cycler(S, AX + 6, y - 2, CW, label, a, a.includes(v0) ? v0 : a[0], { names: nm }); if (d.ch[key] !== v0) app.dlPage = CH_PAGE[key] ?? app.dlPage; }
+    else if (kind === 'csl') { const v0 = d.ch[key]; d.ch[key] = slider(S, AX + 6, y, CW, label, d.ch[key], a, b, { step, fmt, id: 'dc' + key }); if (d.ch[key] !== v0) app.dlPage = CH_PAGE[key] ?? app.dlPage; }
+    else { const list = a.length ? a : [des[key]]; des[key] = cycler(S, AX + 6, y - 2, CW, label, list, list.includes(des[key]) ? des[key] : list[0], { names: nm }); } }));
   if (ro) { const o = JSON.parse(snap); for (const k of Object.keys(d)) delete d[k]; Object.assign(d, o); des = d.v3; }        // looking back / work in progress: nothing changes
   d.trim = Math.round(d.trim); if (!readyE.some(e => e.id === d.engineId)) d.engineId = readyE[0]?.id; if (!readyG.some(x => x.id === d.gbId)) d.gbId = readyG[0]?.id;
   if ((des.base || 'free') !== prevBase) { const nb = des.base, pl0 = des.plat, tv0 = des.tv;                    // another body shell on the same frame
@@ -441,7 +446,7 @@ function cars(g) {
     if (ch.length === 1 && (ch[0] === 'shape' || ch[0] === 'tv' || ch[0] === 'pos' || ch[0] === 'bodyName')) { /* live reshaping / trim: redrawn at once */ }
     else if (des.base !== 'free' && o.base === des.base && kinds.length === 1 && kinds[0] !== 'shape') { app.fit = { t: app.t, old: o, strip: kinds[0], view }; app.bpT = -999; } else { app.bpT = app.t; app.fit = null; } }
   d.type = des.type; d.feats.unibody = des.plat.type === 'unibody';
-  const cx = AX + 100, pw = 200;
+  const cx = AX + CW + 14, pw = FULL ? 222 : 200;
   if (!ro && (st.id === 'body' || st.id === 'platform')) {
     if (button(S, AX + AW - 62, AY + 3, 28, 9, 'UNDO', { disabled: !(app.undo || []).length })) { (app.redo = app.redo || []).push(JSON.stringify(des)); des = d.v3 = JSON.parse(app.undo.pop()); app.bpT = app.t; app.fit = null; app.lastEdit = -99; }
     if (button(S, AX + AW - 32, AY + 3, 28, 9, 'REDO', { disabled: !(app.redo || []).length })) { app.undo.push(JSON.stringify(des)); des = d.v3 = JSON.parse(app.redo.pop()); app.bpT = app.t; app.fit = null; app.lastEdit = -99; } }
@@ -480,7 +485,7 @@ function cars(g) {
   else if (st.id === 'engine') { const e = g.engines.find(x => x.id === d.engineId); if (e) drawPix(S, drawOutsidePix(P, { ...e, year: g.year }, app.t * 4, pw - 8, 78, 8, 4).px, P, cx + 4, AY + 29, 1); else text(S, 'NO ENGINE READY', cx + 6, AY + 50, C.red); }   // the part-built engine
   else if (st.id === 'driveline') { const pg = app.dlPage || 0, PG = ['FINAL DRIVE', 'SUSPENSION', 'BRAKES', 'TYRES'];
     PG.forEach((l, i) => { if (button(S, cx + 2 + i * 49, AY + 28, 48, 9, l, { active: pg === i })) app.dlPage = i; });
-    let Dp = null; if (pg === 0) { gearMesh(cx + 10, AY + 40, d.final, app.t); text(S, 'FINAL DRIVE ' + d.final.toFixed(2) + ' : 1', cx + 120, AY + 54, C.ink); text(S, 'PINION AND CROWN WHEEL', cx + 120, AY + 64, C.inkSoft, 1, 76); }
+    let Dp = null; if (pg === 0) { gearMesh(cx + 10, AY + 40, d.final, app.t); text(S, 'FINAL DRIVE ' + d.final.toFixed(2) + ' : 1', cx + 120, AY + 54, C.ink); text(S, 'PINION AND CROWN WHEEL', cx + 120, AY + 64, C.inkSoft, 1, pw - 124); }
     else if (pg === 1) { Dp = drawSuspPix(P, d.ch, app.t, pw - 6, 70); text(S, 'FRONT', cx + 4, AY + 39, C.inkSoft); text(S, 'REAR', cx + pw / 2 + 4, AY + 39, C.inkSoft); }
     else if (pg === 2) Dp = drawBrakePix(P, d.ch, !!d.feats.hydbrake, app.t, pw - 6, 70, ev?.ch ? Math.min(1, 8 / Math.max(1, ev.ch.fadeStops)) * (app.t % 400 > 200 ? 1 : 0) : 0);
     else Dp = drawTyrePix(P, d.ch, pw - 6, 70);
@@ -548,7 +553,7 @@ function cars(g) {
     const a = appeal(ev, d.seg, d.price); text(S, `APPEAL ${Math.round(a * 100)}`, x2 + 4, AY + 166, a > 0.45 ? C.green : C.oxblood); text(S, `MARGIN ${money(d.price - ev.unit)}`, x2 + 4, AY + 174, d.price > ev.unit ? C.green : C.red); }
   else text(S, 'NEED A READY ENGINE AND GEARBOX', x2 + 4, AY + 31, C.red, 1, pw2 - 6);
   if (!wide) { text(S, `TOOLING ${money(tool)}`, x2 + 4, AY + 184, C.ink, 1, pw2 - 6); text(S, `SPENT ${money(d.spent || 0)}`, x2 + 4, AY + 192, C.inkSoft, 1, pw2 - 6); }
-  const left = DEV.reduce((a, s2, i) => a + (i >= d.stage ? moOf(i) : 0), 0) - (d.busy ? dateNum(g) - d.busy.from : 0); if (!wide) text(S, `ABOUT ${Math.max(0, left)} MONTHS TO PRODUCTION`, x2 + 4, AY + 200, C.ink, 1, pw2 - 6);
+  const left = DEV.reduce((a, s2, i) => a + (i >= d.stage ? moOf(i) : 0), 0) - (d.busy ? dateNum(g) - d.busy.from : 0); if (!wide) { text(S, 'IN PRODUCTION IN', x2 + 4, AY + 200, C.inkSoft, 1, pw2 - 6); text(S, `ABOUT ${Math.max(0, left)} MONTHS`, x2 + 4, AY + 209, C.ink, 1, pw2 - 6); }
   // ---- this place: what the stage does, and its action ----
   panel(S, cx, wide ? AY + 172 : AY + 116, pwV, wide ? 42 : 98, wide ? '' : st.where); const tx = (s, y, c = C.ink) => { if (!wide || y <= 135) text(S, s, cx + 4, AY + y + (wide ? 48 : 0), c, 1, pwV - 8); };
   const finishNow = i => { d.done[i] = true; if (i === 5) d.reviewDue = true; else if (i === 7) d.testDue = true; else d.stage = i + 1; AU.sfx('stamp'); };
@@ -679,22 +684,26 @@ function cursor() { const x = input.x, y = input.y; if (x < 0) return; const A =
   A.forEach((r, j) => [...r].forEach((c, i) => c !== '0' && S.fill(x + i, y + j, 1, 1, c === '1' ? C.black : C.brassL))); }
 function music() { const g = app.g; if (app.scene !== 'hq' || !g) return AU.setSong('title'); if (['engines', 'gearbox', 'cars'].includes(app.tab)) return AU.setSong('design');
   const C2 = COUNTRIES[g.country]; AU.setSong(g.year < 1940 ? 'office30' : g.year >= C2.war[0] && g.year <= C2.war[1] ? 'war40' : 'office40'); }
-function frame() { app.t++; music(); if (app.bv && !(app.scene === 'hq' && app.tab === 'engines')) { app.bv.stop(); app.bv = null; if (app.bench) app.bench.on = false; } if (app.scene !== 'title') AU.passEnd(); ({ title, settings, newgame, load, hq, end, assembly, mockroom, track, works, plant, dealer })[app.scene]();
+function frame() { app.t++; if (audit.on) { audit.last = { btn: audit.btn, cut: audit.cut }; audit.btn = []; audit.cut = []; } music(); if (app.bv && !(app.scene === 'hq' && app.tab === 'engines')) { app.bv.stop(); app.bv = null; if (app.bench) app.bench.on = false; } if (app.scene !== 'title') AU.passEnd(); ({ title, settings, newgame, load, hq, end, assembly, mockroom, track, works, plant, dealer })[app.scene]();
   if (app.toast && app.t < app.toast.until) { const w = tw(app.toast.t) + 16; bevel(S, (W - w) / 2, H - 22, w, 14, C.teal, C.tealL, hex('#1b3f3e')); text(S, app.toast.t, (W - w) / 2 + 8, H - 17, C.white); }
   cursor(); input.clicked = false; input.wheel = 0; input.key = null; if (input.left) { input.left = false; input.x = -1; } ctx.putImageData(img, 0, 0); requestAnimationFrame(frame); }
 function resize() { const vv = window.visualViewport, vw = (vv ? vv.width : innerWidth) - 32, vh = (vv ? vv.height : innerHeight) - 8, fit = Math.max(0.3, Math.min(vw / W, vh / H));
   const k = app.settings.fill === false && fit >= 1 ? Math.floor(fit) : fit; const w = Math.floor(W * k), h = Math.floor(H * k);
   cv.style.width = w + 'px'; cv.style.height = h + 'px'; const sc = document.getElementById('scan'); sc.style.display = app.settings.scan ? 'block' : 'none'; sc.style.width = w + 'px'; sc.style.height = h + 'px'; }
 window.visualViewport?.addEventListener('resize', () => resize());
-const pos = e => { const r = cv.getBoundingClientRect(); input.x = Math.floor((e.clientX - r.left) / r.width * W); input.y = Math.floor((e.clientY - r.top) / r.height * H); };
-cv.addEventListener('pointermove', pos); cv.style.touchAction = 'none'; cv.addEventListener('pointerdown', e => { pos(e); input.down = true; input.clicked = true; input.left = false; try { cv.setPointerCapture(e.pointerId); } catch {} AU.unlock(); });
+// pointers: each finger is tracked on its own (input.pts); the latest one to touch drives the menus (input.x / input.y / input.down)
+const at = e => { const r = cv.getBoundingClientRect(); return { x: Math.floor((e.clientX - r.left) / r.width * W), y: Math.floor((e.clientY - r.top) / r.height * H) }; };
+const pos = e => { const p = at(e); if (input.pts.has(e.pointerId)) input.pts.set(e.pointerId, p); if (e.pointerId === input.prim || input.prim == null) { input.x = p.x; input.y = p.y; } };
+cv.addEventListener('pointermove', pos); cv.style.touchAction = 'none';
+cv.addEventListener('pointerdown', e => { const p = at(e); input.pts.set(e.pointerId, p); input.prim = e.pointerId; input.x = p.x; input.y = p.y; input.down = true; input.clicked = true; input.left = false; if (e.pointerType === 'touch') input.touch = true; try { cv.setPointerCapture(e.pointerId); } catch {} AU.unlock(); });
+const lift = e => { input.pts.delete(e.pointerId); if (e.pointerId === input.prim) { input.down = false; input.drag = null; input.prim = null; } if (!input.pts.size) { input.down = false; input.drag = null; } };
 hooks.click = () => AU.sfx('click'); lang.ko = app.settings.lang === 'ko'; Object.assign(AU.vol, { music: app.settings.music ?? 0.6, sfx: app.settings.sfx ?? 0.8 });
-addEventListener('pointerup', () => { input.down = false; input.drag = null; }); cv.addEventListener('pointerleave', () => { if (input.clicked) input.left = true; else input.x = -1; });   // a tap is kept until a frame has seen it
-addEventListener('pointercancel', () => { input.down = false; input.drag = null; });
+addEventListener('pointerup', lift); cv.addEventListener('pointerleave', () => { if (input.clicked) input.left = true; else input.x = -1; });   // a tap is kept until a frame has seen it
+addEventListener('pointercancel', lift);
 cv.addEventListener('wheel', e => { e.preventDefault(); input.wheel = e.deltaY; }, { passive: false }); addEventListener('resize', resize);
 addEventListener('keyup', e => { if (input.keys) input.keys[e.key] = false; });
 addEventListener('keydown', e => { if (editing() || e.target?.tagName === 'INPUT') return; input.key = e.key; (input.keys = input.keys || {})[e.key] = true; if (app.scene === 'track') { e.preventDefault(); return; } if (e.key === 'Escape' && app.scene === 'hq' && !app.ask) app.tab = 'menu'; if (e.key === ' ' && app.scene === 'hq' && !app.g.over) { e.preventDefault(); stepMonth(app.g); } });
-window.__gh = { app, input, stepMonth, lang, AU };
+window.__gh = { app, input, stepMonth, lang, AU, audit };
 // keep the running company across page updates in the viewer
 window.claude?.hot?.snapshot?.(() => ({ g: app.g, scene: app.scene, tab: app.tab }));
 const start = d => { if (d && d.g) Object.assign(app, { g: d.g, scene: d.scene || 'hq', tab: d.tab || 'news' }); resize(); frame(); };

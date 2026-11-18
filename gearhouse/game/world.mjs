@@ -58,7 +58,7 @@ export function evaluate(g, car) {
   const techMain = [STYLE_MAIN[body.style], e.head === 'sv' ? 1910 : e.head === 'ohv' ? 1950 : 1960, GEARBOX[gb.type].year + 4, car.feats?.hydbrake ? 1936 : 1925, car.feats?.ifs ? 1939 : 1928, ...(car.plat ? [FRAME_TYPES[car.plat.type]?.main ?? 1925] : [])];
   const modern = modernity(g.year, techMain);
   const perf = Math.min(1, es.hp / sim.mass * 1000 / (55 + (g.year - 1930) * 1.6)), econ = Math.min(1, sim.mpg / 26 / COUNTRIES[g.country].fuel ** 0.3);
-  const comfort = Math.min(1, 0.25 + sim.comfort * 0.35 + es.smooth * 0.25 + (car.feats?.ifs ? 0.1 : 0) + (car.trim || 1) * 0.05 + (car.platStats ? (car.platStats.stiff - 0.6) * 0.12 : 0));   // stiffer platform: less shake and squeak
+  const comfort = Math.min(1, 0.25 + sim.comfort * 0.35 + es.smooth * 0.25 + (car.feats?.ifs ? 0.1 : 0) + (car.trim || 1) * 0.05 + (car.platStats ? (car.platStats.stiff - 0.6) * 0.12 + (car.platStats.comfort || 0) : 0));   // stiffer platform: less shake and squeak
   const rel = Math.min(1, es.reliability * (1 + (car.relMod || 0))) * (e.quality >= 0 ? 1 : 0.95) * (car.platStats && car.platStats.margin < 1 ? 0.7 + 0.3 * car.platStats.margin : 1), design = Math.min(1, (car.designScore ?? 0.6) * (0.85 + (body.style === 'box' ? 0 : 0.15)));
   return { es, sim, fit, unit, modern, perf, econ, comfort, rel, design, wMod: WMOD(g.year) };
 }

@@ -25,6 +25,7 @@ import { buildFront } from '../tools/pixel/gen/front.mjs';
 import { FRAME_TYPES, GRADES, platformDefault, typesFor, gradesFor, clampPlatform, platformStats, platformPlan, platformSide, unitShell } from '../tools/pixel/gen/v3/platform.mjs';
 import { Pix } from '../tools/pixel/pix.mjs';
 import { stripBody } from './assembly.mjs';
+import { isLadder, clampFrame, frameGeo, framePlan, frameSide, frameSection, frameZones } from '../tools/pixel/gen/v3/frame.mjs';
 import { baseWidth } from '../sim/dims.mjs';
 import { LIMITS, dimsFor, SIZE } from '../sim/dims.mjs';
 import { GEARBOX, proposeRatios, rpmTrace } from '../sim/drive.mjs';
@@ -321,24 +322,30 @@ function cars(g) {
   let des = d.v3 || (d.v3 = measuredDesign(baseList(g.year).includes('sedan30') ? 'sedan30' : baseList(g.year)[0], g.year)); if (des.year !== g.year) des.year = g.year;
   const meas = des.base && des.base !== 'free', baseOpts = ['free', ...baseList(g.year)], prevBase = des.base || 'free'; if (!des.base) des.base = 'free';
   if (!des.plat) des.plat = platformDefault(des.base, g.year);
+  if (des.plat.wb == null) { des.plat.wb = des.wb; des.plat.width = des.width; } clampFrame(des.plat, g.year);
+  const fitBody = nb => { if (nb === 'free') return true; const r2 = measuredRanges({ base: nb }); return des.plat.wb >= r2.wb[0] - 1 && des.plat.wb <= r2.wb[1] + 1 && des.plat.width >= r2.width[0] - 1 && des.plat.width <= r2.width[1] + 1; };
   { const wl = wheelsFor(Math.round(d.trim ?? 1), g.year); if (!wl.includes(d.wheel)) d.wheel = wl[wl.length - 1]; d.ww = Math.min(d.ww ?? 0, wwMax(Math.round(d.trim ?? 1))); des.tv = { trim: Math.round(d.trim ?? 1), wheel: d.wheel, ww: d.ww }; }
-  const isMeas = meas, tabs = st.id === 'body' ? [['side', 'SIDE'], ...(isMeas ? [['shape', 'SHAPE']] : []), ['front', 'FRONT'], ['rear', 'REAR']] : [];
-  if ((!isMeas && app.dview === 'shape') || app.dview === 'frame') app.dview = 'side';
+  const isMeas = meas, uniB = des.plat.type === 'unibody', ladP = isLadder(des.plat), tabs = st.id === 'body' ? [['side', 'SIDE'], ...(isMeas ? [['shape', 'SHAPE']] : []), ['front', 'FRONT'], ['rear', 'REAR'], ...(uniB ? [['frame', 'SHELL']] : [])] : st.id === 'platform' && !uniB ? [['plan', 'PLAN'], ['fside', 'SIDE'], ['sect', 'SECTION']] : [];
+  if ((!isMeas && app.dview === 'shape') || (app.dview === 'frame' && !uniB)) app.dview = 'side';
   const view = st.id === 'platform' ? 'frame' : st.id === 'body' ? app.dview || 'side' : st.id === 'mockup' ? ['side', 'front', 'rear'][Math.floor(app.t / 110) % 3] : 'side', tbw = 34;
-  tabs.forEach(([k, l], i) => { if (button(S, AX + 120 + i * tbw, AY + 2, tbw - 2, 10, l, { active: view === k })) app.dview = k; });
+  const fview = uniB ? 'plan' : app.fview || 'plan';
+  tabs.forEach(([k, l], i) => { if (button(S, AX + 120 + i * tbw, AY + 2, tbw - 2, 10, l, { active: st.id === 'platform' ? fview === k : view === k })) { if (st.id === 'platform') app.fview = k; else app.dview = k; } });
   const R0 = ranges(g.year), opt = (k, key) => optionsFor(key || k, g.year), NM = { sedan4d: '4-DOOR SEDAN', coupe2d: '2-DOOR COUPE' };
   const ctl = [];   // [kind, key, label, a, b, fmt, step]
   const MR = meas ? measuredRanges(des) : null, srcs = baseList(g.year), sn = id => baseName(id), mm = v => Math.round(v) + 'MM', yn = (a, b) => v => (v ? b : a);
   if (st.id === 'brief') ctl.push(['name', 'name', 'MODEL NAME', d, 'model'], ['dcyc', 'seg', 'TARGET SEGMENT', Object.keys(SEGS), null, k => k.toUpperCase()], ['dsl', 'price', 'TARGET PRICE', 350, 5000, money, 10], ['dsl', 'volume', 'ANNUAL VOLUME', 500, 30000, v => Math.round(v) + ' CARS', 100]);
-  if (st.id === 'platform') { const pl = des.plat, uni = pl.type === 'unibody';
-    ctl.push(['name', 'name', 'PLATFORM NAME', des.plat, 'platform'], ['cyc', 'base', 'BASE CAR', baseOpts, null, id => id === 'free' ? 'FREE DESIGN' : baseName(id)]);
-    if (meas) ctl.push(['sl', 'wb', 'WHEELBASE', ...MR.wb, mm, 10], ['sl', 'width', 'WIDTH', ...MR.width, mm, 10]); else ctl.push(['sl', 'wb', 'WHEELBASE', 1867, 4430, mm, 25], ['sl', 'width', 'WIDTH', 1146, 2215, mm, 10]);
-    ctl.push(['pl', 'type', 'FRAME TYPE', typesFor(g.year, k => has(g, k)), null, k => FRAME_TYPES[k].name], ['pl', 'grade', 'STEEL GRADE', gradesFor(g.year), null, k => GRADES[k].name]);
-    if (uni) ctl.push(['pls', 'railT', 'PANEL GAUGE', 0.9, 2.5, v => v.toFixed(1) + 'MM', 0.1]);
-    else if (pl.type === 'platform') ctl.push(['pls', 'railH', 'TUBE DIAMETER', 90, 200, mm, 5], ['pls', 'railT', 'TUBE WALL', 2.5, 5, v => v.toFixed(2) + 'MM', 0.25]);
-    else ctl.push(['pls', 'railH', 'RAIL DEPTH', 90, 280, mm, 5], ['pls', 'railT', 'STEEL GAUGE', 2.5, 8, v => v.toFixed(2) + 'MM', 0.25], ['pls', 'cross', 'CROSS-MEMBERS', 3, 8, v => Math.round(v) + '', 1], ['pls', 'kick', 'KICK-UP OVER AXLE', 0, 260, mm, 5]);
-    if (has(g, 'ifs')) ctl.push(['fcyc', 'ifs', 'FRONT SUSPENSION', [false, true], null, yn('BEAM AXLE', 'INDEPENDENT')]);
-    if (has(g, 'hydbrake')) ctl.push(['fcyc', 'hydbrake', 'BRAKES', [false, true], null, yn('MECHANICAL', 'HYDRAULIC')]); }
+  if (st.id === 'platform') { const pl = des.plat, uni = pl.type === 'unibody', srcM = g.models.filter(m => m.plat && m.plat.type !== 'unibody' && !m.dead), pc = v => Math.round(v * 100) + '%';
+    ctl.push(['name', 'name', 'PLATFORM NAME', des.plat, 'platform']);
+    if (srcM.length) ctl.push(['pl', 'from', 'PLATFORM SOURCE', ['new', ...srcM.map(m => m.id)], null, k => (k === 'new' ? 'NEW PLATFORM' : N(g.models.find(m => m.id === k)?.name || '?'))]);
+    if (!pl.from || pl.from === 'new') {
+      ctl.push(['pl', 'type', 'STRUCTURE', typesFor(g.year, k => has(g, k)), null, k => FRAME_TYPES[k].name], ['pls', 'wb', 'WHEELBASE', 2000, 4430, mm, 10], ['pls', 'width', 'WIDTH', 1400, 2215, mm, 10], ['pl', 'grade', 'STEEL GRADE', gradesFor(g.year), null, k => GRADES[k].name]);
+      if (pl.type === 'platform') ctl.push(['pls', 'railH', 'TUBE DIAMETER', 90, 200, mm, 5], ['pls', 'railT', 'TUBE WALL', 2.5, 5, v => v.toFixed(2) + 'MM', 0.25]);
+      else if (!uni) { ctl.push(['pls', 'railH', 'RAIL DEPTH', 90, 280, mm, 5], ['pls', 'railW', 'RAIL WIDTH', 40, 100, mm, 5], ['pls', 'railT', 'STEEL GAUGE', 2.5, 8, v => v.toFixed(2) + 'MM', 0.25], ['pls', 'taper', 'FRONT NARROWING', 0.6, 0.95, pc, 0.01], ['pls', 'kick', 'KICK-UP OVER AXLE', 0, 260, mm, 5]);
+        if (g.year >= 1932) ctl.push(['pls', 'drop', 'DOUBLE DROP', 0, 120, mm, 5]);
+        ctl.push(['pls', 'cross', 'CROSS-MEMBERS', 3, 8, v => Math.round(v) + '', 1], ['pl', 'xType', 'CROSS-MEMBER TYPE', ['channel', 'tube'], null, k => (k === 'tube' ? 'TUBE' : 'CHANNEL')], ['pl', 'join', 'JOINTS', g.year >= 1936 ? ['rivet', 'weld'] : ['rivet'], null, k => (k === 'weld' ? 'WELDED' : 'RIVETED')],
+          ['pl', 'gusset', 'KICK-UP FISH PLATES', [false, true], null, yn('NO', 'YES')], ['pls', 'mounts', 'BODY MOUNTS', 6, 14, v => Math.round(v) + '', 2]); }
+      if (has(g, 'ifs')) ctl.push(['fcyc', 'ifs', 'FRONT SUSPENSION', [false, true], null, yn('BEAM AXLE', 'INDEPENDENT')]);
+      if (has(g, 'hydbrake')) ctl.push(['fcyc', 'hydbrake', 'BRAKES', [false, true], null, yn('MECHANICAL', 'HYDRAULIC')]); } }
   if (st.id === 'engine' && readyE.length) ctl.push(['dcyc', 'engineId', 'ENGINE', readyE.map(e => e.id), null, id => N(g.engines.find(e => e.id === id).name)]);
   if (st.id === 'driveline' && readyG.length) ctl.push(['dcyc', 'gbId', 'GEARBOX', readyG.map(x => x.id), null, id => N(g.gearboxes.find(x => x.id === id).name)], ['dsl', 'final', 'FINAL DRIVE', 3.0, 5.5, v => v.toFixed(2), 0.05]);
   if (st.id === 'detail') { const tr0 = Math.round(d.trim ?? 1); d.trimNames = d.trimNames || [...TRIM_NAMES]; g.paintNames = g.paintNames || PAINTS.map((_, i) => 'COLOUR ' + (i + 1));
@@ -346,7 +353,8 @@ function cars(g) {
     if (wwMax(tr0) > 0) ctl.push(['dsl', 'ww', 'WHITEWALL', 0, wwMax(tr0), v => Math.round(v * 100) + '%', 0.05]); if (has(g, 'steelroof')) ctl.push(['fcyc', 'steelroof', 'ROOF', [false, true], null, yn('FABRIC INSERT', 'ALL STEEL')]);
     ctl.push(['dcyc', 'paint', 'PAINT', PAINTS.map((_, i) => i), null, i => N(g.paintNames[i])], ['name', d.paint, 'COLOUR NAME', g.paintNames, 'colour'], ['dsl', 'price', 'LIST PRICE', 350, 5000, money, 10]); }
   if (st.id === 'prep') ctl.push(['dsl', 'volume', 'ANNUAL VOLUME', 500, 30000, v => Math.round(v) + ' CARS', 100]);
-  if (st.id === 'body') { if (view === 'side') ctl.push(['name', 'bodyName', 'BODY STYLE NAME', des, 'body']);
+  if (st.id === 'body') { if (view === 'side') ctl.push(['name', 'bodyName', 'BODY STYLE NAME', des, 'body'], ['cyc', 'base', 'BODY SHELL', baseOpts, null, id => (id === 'free' ? 'FREE DESIGN' : baseName(id)) + (fitBody(id) ? '' : ' - NO FIT')]);
+    if (view === 'frame') ctl.push(['pls', 'railT', 'PANEL GAUGE', 0.9, 2.5, v => v.toFixed(1) + 'MM', 0.1], ['pls', 'sill', 'SILL DEPTH', 0.8, 1.4, v => Math.round(v * 100) + '%', 0.05], ['pl', 'brace', 'BULKHEAD BRACE', [false, true], null, yn('NO', 'YES')]);
     if (meas) {
       if (view === 'shape') { const SR = shapeRanges(des), SL = { screen: 'WINDSHIELD TOP', crown: 'ROOF CROWN', back: 'REAR WINDOW TOP', deck: 'DECK HEIGHT', nose: 'NOSE RAKE', fTail: 'FRONT FENDER TAIL', fCrown: 'FRONT FENDER CROWN' };
         for (const k of SHAPE_KEYS) if (SR[k][1] > SR[k][0]) ctl.push(['sh', k, SL[k], SR[k][0], SR[k][1], v => (v > 0 ? '+' : '') + Math.round(v) + 'MM', 5]); }
@@ -382,7 +390,10 @@ function cars(g) {
     else { const list = a.length ? a : [des[key]]; des[key] = cycler(S, AX + 6, y - 2, 86, label, list, list.includes(des[key]) ? des[key] : list[0], { names: nm }); } }));
   if (ro) { const o = JSON.parse(snap); for (const k of Object.keys(d)) delete d[k]; Object.assign(d, o); des = d.v3; }        // looking back / work in progress: nothing changes
   d.trim = Math.round(d.trim); if (!readyE.some(e => e.id === d.engineId)) d.engineId = readyE[0]?.id; if (!readyG.some(x => x.id === d.gbId)) d.gbId = readyG[0]?.id;
-  if ((des.base || 'free') !== prevBase) { const nb = des.base, keep = des.plat.type; des = d.v3 = nb === 'free' ? { ...newDesign(g.year, 'sedan4d'), base: 'free' } : measuredDesign(nb, g.year); des.plat = platformDefault(nb === 'free' ? null : nb, g.year); }
+  if ((des.base || 'free') !== prevBase) { const nb = des.base, pl0 = des.plat, tv0 = des.tv;                    // another body shell on the same frame
+    if (!fitBody(nb)) { des.base = prevBase; toast('THIS BODY DOES NOT FIT THE FRAME'); } else { des = d.v3 = nb === 'free' ? { ...newDesign(g.year, 'sedan4d'), base: 'free' } : measuredDesign(nb, g.year); des.plat = pl0; des.tv = tv0; app.bpT = app.t; } }
+  { const pl = des.plat; if (pl.from && pl.from !== 'new' && pl.fromOK !== pl.from) { const m = g.models.find(x => x.id === pl.from); if (m) { const nm = pl.name; Object.assign(pl, JSON.parse(JSON.stringify(m.plat)), { from: m.id, fromOK: m.id, name: nm || m.plat.name }); } } else if (pl.from === 'new') delete pl.fromOK;
+    clampFrame(pl, g.year); des.wb = pl.wb; des.width = pl.width; }
   clampPlatform(des.plat, g.year, k => has(g, k)); let notes; if (des.base !== 'free') notes = clampMeasured(des); else { des.doors = des.type === 'coupe2d' ? 2 : 4; des.bumperBars = Math.round(des.bumperBars); des.louvres = Math.round(des.louvres); notes = clampDesign(des); }
   if (JSON.stringify(des) !== before) {                                                                       // design changed: a part swap is fitted, anything else is re-scanned
     const o = JSON.parse(before), ch = Object.keys(des).filter(k => JSON.stringify(des[k]) !== JSON.stringify(o[k])), kinds = [...new Set(ch.map(k => PARTK[k] || 'shape'))];
@@ -395,17 +406,35 @@ function cars(g) {
     if (button(S, AX + AW - 62, AY + 3, 28, 9, 'UNDO', { disabled: !(app.undo || []).length })) { (app.redo = app.redo || []).push(JSON.stringify(des)); des = d.v3 = JSON.parse(app.undo.pop()); app.bpT = app.t; app.fit = null; app.lastEdit = -99; }
     if (button(S, AX + AW - 32, AY + 3, 28, 9, 'REDO', { disabled: !(app.redo || []).length })) { app.undo.push(JSON.stringify(des)); des = d.v3 = JSON.parse(app.redo.pop()); app.bpT = app.t; app.fit = null; app.lastEdit = -99; } }
   // ---- evaluation (shared by every stage) ----
-  const sp = v3Sprite(des, d.paint, 'side'), spec = sp.spec, pst = spec ? platformStats(des.plat, spec.geo, { heavy: des.base === 'truck40' }) : null;
+  const sp = v3Sprite(des, d.paint, 'side'), spec = sp.spec, fg = frameGeo(des.plat, spec?.tire || '6.00-16'), heavy = des.plat.wb > 3700, pst = platformStats(des.plat, fg, { heavy });
+  const zones = ladP ? frameZones(des.plat, fg, pst, { heavy }) : []; if (zones.length) pst.margin = Math.min(...zones.filter(z => z.id !== 'tors').map(z => z.margin));
+  const reuse = des.plat.from && des.plat.from !== 'new';
   const dm = { len: spec ? Math.round(spec.len) : 0, width: Math.round(des.width), height: Math.round(des.roof), wb: Math.round(des.wb) };
   const style = des.base !== 'free' ? (TEMPLATES.find(t => t.id === des.base)?.style || 'box') : des.frontFender === 'integrated' ? 'pontoon' : des.rake > 18 || des.tail === 'fastback' ? 'stream' : 'box';
   const hoodLen = spec ? spec.geo.cowlX - 250 : 1200;
   const car = { ...d, v3: undefined, launch: undefined, dims: dm, platStats: pst, plat: JSON.parse(JSON.stringify(des.plat)), relMod: d.relMod || 0, body: { style, wb: dm.wb, hood: hoodLen / Math.max(1, dm.wb), height: dm.height / Math.max(1, dm.wb) }, designScore: 0.68 + (style !== 'box' ? 0.06 : 0) - notes.length * 0.02 + (d.reviewBonus || 0) };
   const ev = readyE.length && readyG.length ? evaluate(g, car) : null;
-  const tool = 40000 + dm.wb * 8 + (style !== 'box' ? 20000 : 0) + (d.feats.unibody ? 30000 : 0), prepMo = 2 + (style === 'stream' ? 1 : style === 'pontoon' ? 2 : 0) + (d.feats.unibody ? 1 : 0);
-  const costOf = i => (i === 8 ? tool : DEV[i].cost), moOf = i => (i === 8 ? prepMo : DEV[i].mo);
+  const tool = Math.round((40000 + dm.wb * 8 + (style !== 'box' ? 20000 : 0) + (d.feats.unibody ? 30000 : 0)) * (reuse ? 0.7 : 1)), prepMo = 2 + (style === 'stream' ? 1 : style === 'pontoon' ? 2 : 0) + (d.feats.unibody ? 1 : 0);
+  const costOf = i => (i === 8 ? tool : i === 1 ? (reuse ? 500 : uniB ? 1500 : DEV[1].cost) : i === 4 && uniB ? DEV[4].cost + 6000 : DEV[i].cost), moOf = i => (i === 8 ? prepMo : i === 1 && (reuse || uniB) ? 0 : i === 4 && uniB ? DEV[4].mo + 1 : DEV[i].mo);   // carried-over frame: cheap and quick; unit body: structure is done with the body
   // ---- preview (what this place shows) ----
-  panel(S, cx, AY + 20, pw, 92, st.id === 'platform' && pst ? pst.kg + ' KG  STIFFNESS ' + Math.round(pst.stiff * 100) + '  STRENGTH X' + pst.margin.toFixed(2) + '  $' + pst.cost : st.id === 'body' ? `L${dm.len} W${dm.width} H${dm.height} WB${dm.wb} MM` : st.where);
-  if (st.id === 'brief') briefDoc(g, d, cx + 3, AY + 29, pw - 6, 80);
+  const wide = st.id === 'platform', pwV = wide ? AX + AW - cx - 6 : pw;
+  panel(S, cx, AY + 20, pwV, wide ? 150 : 92, st.id === 'platform' && pst ? pst.kg + ' KG  STIFFNESS ' + Math.round(pst.stiff * 100) + '  STRENGTH X' + pst.margin.toFixed(2) + '  $' + pst.cost : st.id === 'body' ? `L${dm.len} W${dm.width} H${dm.height} WB${dm.wb} MM` : st.where);
+  if (wide) { const pl = des.plat, key = 'FR' + JSON.stringify(pl) + fview + (spec?.tire || ''); let fs = app.cache.get(key);
+    if (!fs) { fs = { px: null }; try { const len = fg.tailX - fg.noseX + 120, T2 = { track: fg.track, tireCode: fg.tire, width: fg.width };
+        if (fview === 'sect' && !uniB) fs.px = frameSection(P, pl, 1.5);
+        else if (ladP) { const mmF = Math.max(11, Math.ceil(Math.max(len / (pwV - 12), fview === 'plan' ? (fg.width + 200) / 132 : 1))); fs.px = fview === 'plan' ? framePlan(P, pl, fg, mmF) : frameSide(P, pl, fg, mmF); }
+        else { const mmF = Math.max(13, Math.ceil(Math.max(len / (pwV - 12), (fg.width + 200) / 132))); fs.px = fview === 'fside' && !uniB ? platformSide(P, pl, fg, fg.tire, mmF) : platformPlan(P, pl, fg, T2, mmF); if (fs.px) { fs.px.mm = mmF; } } } catch (e) { console.warn(e); }
+      app.cache.set(key, fs); }
+    const px = fs.px; if (px) { const ox = cx + ((pwV - px.w) >> 1), oy = AY + 30 + Math.max(0, (136 - px.h) >> 1), prog = Math.min(1, (app.t - (app.bpT ?? -999)) / 100);
+      if (prog < 1) { blueprint(px, ox, oy, prog); if ((app.t - app.bpT) % 7 === 0 && prog > 0.14) AU.sfx('type'); if (input.clicked && input.x >= cx && input.x < cx + pwV && input.y >= AY + 20 && input.y < AY + 170) app.bpT = -999; }
+      else { drawPix(S, px, P, ox, oy, 1);
+        const tt = app.ftest != null ? app.t - app.ftest : 1e9, zi = Math.floor(tt / 40);                      // load test: each zone is loaded in turn; weak steel stays red
+        if (px.X && fview !== 'sect') zones.forEach((z, i) => { const act = zi === i && tt < zones.length * 40, bad = z.margin < 1; if (!bad && !act) return; if (bad && !act && (app.t >> 4) % 2) return;
+          const x0 = Math.round(px.X(z.x0)), x1 = Math.round(px.X(z.x1)); for (let y = 0; y < px.h; y++) for (let x = Math.max(0, x0); x < Math.min(px.w, x1); x++) if (px.r[y * px.w + x] === P.byName.bare) S.blend(ox + x, oy + y, bad ? [225, 40, 30] : [60, 170, 80], 0.6);
+          if (act) { S.fill(ox + ((x0 + x1) >> 1) - 5, oy - 2 + Math.min(6, (tt % 40) >> 2), 11, 6, C.ink); if (tt % 40 === 1) AU.sfx('clunk'); } });
+        if (fview === 'sect' && !uniB) text(S, pl.type === 'platform' ? `TUBE ${Math.round(pl.railH)} X ${pl.railT.toFixed(1)} MM` : `${Math.round(pl.railH)} X ${Math.round(pl.railW * (FRAME_TYPES[pl.type].box ? 1.15 : 1))} X ${pl.railT.toFixed(1)} MM`, cx + 6, AY + 160, C.ink); } }
+    if (uniB) text(S, 'THE SHELL ITSELF IS DESIGNED WITH THE BODY', cx + 4, AY + 160, C.inkSoft, 1, pwV - 8); }
+  else if (st.id === 'brief') briefDoc(g, d, cx + 3, AY + 29, pw - 6, 80);
   else if (st.id === 'engine') { const e = g.engines.find(x => x.id === d.engineId); if (e) drawEngineSet(engineSet(e, g.year, pw - 8, 76), cx + 4, AY + 30, pw - 8, 76); else text(S, 'NO ENGINE READY', cx + 6, AY + 50, C.red); }   // the part-built engine
   else if (st.id === 'driveline') { gearMesh(cx + 10, AY + 26, d.final, app.t); text(S, 'FINAL DRIVE ' + d.final.toFixed(2) + ' : 1', cx + 120, AY + 40, C.ink); text(S, 'PINION AND CROWN WHEEL', cx + 120, AY + 50, C.inkSoft, 1, 76); }
   else if (st.id === 'detail') { const NP = 5, inP = input.x >= cx && input.x < cx + pw && input.y >= AY + 20 && input.y < AY + 112;   // swipe / arrows: dashboard, side, front, rear, paint board
@@ -430,7 +459,7 @@ function cars(g) {
       clip.on = false; } }
   else if (st.id === 'prep') { const fr = spec && platformSide(P, des.plat, spec.geo, spec.tire || '6.00-16', 45); if (fr) { S.fill(cx + 1, AY + 100, pw - 2, 3, hex('#5a5550')); for (let k = 0; k < 3; k++) { const x = cx + ((k * (fr.w + 20) + app.t * 0.4) % (pw + fr.w)) - fr.w; Object.assign(clip, { on: true, x0: cx + 1, y0: AY + 28, x1: cx + pw - 1, y1: AY + 111 }); drawPix(S, fr, P, Math.round(x), AY + 100 - fr.h, 1); clip.on = false; } }
     text(S, 'UNPAINTED FRAMES ON THE LINE', cx + 3, AY + 30, C.inkSoft, 1, pw - 6); }
-  else {                                                                                                         // platform, body, mock-up: the sprite views
+  else if (!wide) {                                                                                              // body, mock-up: the sprite views
     const mock = st.id === 'mockup', mp = mock ? (g.year < 1938 ? 'paint.mockwood' : 'paint.clay') : d.paint;
     const shown = view === 'side' || view === 'shape' ? (mock ? v3Sprite(des, mp, 'side') : sp) : view === 'frame' ? platSprite(des, spec, d.paint) : v3Sprite(des, mp, view), px = shown.px;
     if (mock) { for (let k = 0; k < 2; k++) { const lx = cx + 50 + k * 100; for (let yy = AY + 30; yy < AY + 108; yy++) { const hw = (yy - AY - 30) * 0.45; for (let xx = -hw; xx <= hw; xx += 1) S.blend(Math.round(lx + xx), yy, [255, 244, 210], 0.07); } }
@@ -453,29 +482,30 @@ function cars(g) {
     if (view === 'frame' && pst && pst.margin < 1) text(S, 'FRAME TOO WEAK - CRACKS IN SERVICE', cx + 3, AY + 104, C.red, 1, pw - 6);
     if (st.id === 'body' && notes.length) text(S, 'ERA LIMIT: ' + notes.join(', ').toUpperCase(), cx + 3, AY + 104, C.red, 1, pw - 6); }
   // ---- engineering report (always) ----
-  const x2 = cx + pw + 6, pw2 = AX + AW - x2 - 6; panel(S, x2, AY + 20, pw2, 210, 'ENGINEERING REPORT');
-  if (ev) { const sm = ev.sim; [['TOP SPEED', `${sm.topMph.toFixed(0)} MPH`], ['0-60 MPH', sm.zeroSixty ? sm.zeroSixty.toFixed(1) + ' S' : 'NEVER'], ['ECONOMY', sm.mpg.toFixed(1) + ' MPG'], ['MAX GRADE', Math.round(sm.grade * 100) + '%'], ['WEIGHT', sm.mass + ' KG'], ['UNIT COST', money(ev.unit)]].forEach(([l, v], i) => stat(S, x2 + 4, AY + 31 + i * 8, l, v, C.ink, 44));
+  const x2 = cx + pw + 6, pw2 = AX + AW - x2 - 6; if (!wide) panel(S, x2, AY + 20, pw2, 210, 'ENGINEERING REPORT');
+  if (wide) { /* the frame drawing takes the whole width */ } else if (ev) { const sm = ev.sim; [['TOP SPEED', `${sm.topMph.toFixed(0)} MPH`], ['0-60 MPH', sm.zeroSixty ? sm.zeroSixty.toFixed(1) + ' S' : 'NEVER'], ['ECONOMY', sm.mpg.toFixed(1) + ' MPG'], ['MAX GRADE', Math.round(sm.grade * 100) + '%'], ['WEIGHT', sm.mass + ' KG'], ['UNIT COST', money(ev.unit)]].forEach(([l, v], i) => stat(S, x2 + 4, AY + 31 + i * 8, l, v, C.ink, 44));
     text(S, ev.fit ? 'ENGINE FITS THE BAY' : 'ENGINE TOO BIG - LONGER HOOD!', x2 + 4, AY + 82, ev.fit ? C.green : C.red, 1, pw2 - 6);
     [['PERFORMANCE', ev.perf], ['ECONOMY', ev.econ], ['COMFORT', ev.comfort], ['RELIABILITY', ev.rel], ['DESIGN', ev.design], ['MODERNITY', ev.modern]].forEach(([l, v], i) => { text(S, l, x2 + 4, AY + 92 + i * 12, C.inkSoft); bar(S, x2 + 4, AY + 98 + i * 12, pw2 - 10, 4, v, v < 0.4 ? C.red : C.teal); });
     const a = appeal(ev, d.seg, d.price); text(S, `APPEAL ${Math.round(a * 100)}`, x2 + 4, AY + 166, a > 0.45 ? C.green : C.oxblood); text(S, `MARGIN ${money(d.price - ev.unit)}`, x2 + 4, AY + 174, d.price > ev.unit ? C.green : C.red); }
   else text(S, 'NEED A READY ENGINE AND GEARBOX', x2 + 4, AY + 31, C.red, 1, pw2 - 6);
-  text(S, `TOOLING ${money(tool)}`, x2 + 4, AY + 184, C.ink, 1, pw2 - 6); text(S, `SPENT ${money(d.spent || 0)}`, x2 + 4, AY + 192, C.inkSoft, 1, pw2 - 6);
-  const left = DEV.reduce((a, s2, i) => a + (i >= d.stage ? moOf(i) : 0), 0) - (d.busy ? dateNum(g) - d.busy.from : 0); text(S, `ABOUT ${Math.max(0, left)} MONTHS TO PRODUCTION`, x2 + 4, AY + 200, C.ink, 1, pw2 - 6);
+  if (!wide) { text(S, `TOOLING ${money(tool)}`, x2 + 4, AY + 184, C.ink, 1, pw2 - 6); text(S, `SPENT ${money(d.spent || 0)}`, x2 + 4, AY + 192, C.inkSoft, 1, pw2 - 6); }
+  const left = DEV.reduce((a, s2, i) => a + (i >= d.stage ? moOf(i) : 0), 0) - (d.busy ? dateNum(g) - d.busy.from : 0); if (!wide) text(S, `ABOUT ${Math.max(0, left)} MONTHS TO PRODUCTION`, x2 + 4, AY + 200, C.ink, 1, pw2 - 6);
   // ---- this place: what the stage does, and its action ----
-  panel(S, cx, AY + 116, pw, 98, st.where); const tx = (s, y, c = C.ink) => text(S, s, cx + 4, AY + y, c, 1, pw - 8);
+  panel(S, cx, wide ? AY + 172 : AY + 116, pwV, wide ? 42 : 98, wide ? '' : st.where); const tx = (s, y, c = C.ink) => { if (!wide || y <= 135) text(S, s, cx + 4, AY + y + (wide ? 48 : 0), c, 1, pwV - 8); };
   const finishNow = i => { d.done[i] = true; if (i === 5) d.reviewDue = true; else if (i === 7) d.testDue = true; else d.stage = i + 1; AU.sfx('stamp'); };
   const reopen = i => { d.stage = i; d.done = d.done.slice(0, i); d.reviewDue = d.testDue = false; d.review = null; d.defects = null; d.busy = null; app.dstage = i; AU.sfx('stamp'); };
-  const actBtn = (l, o) => button(S, cx + 2, AY + 198, pw - 4, 14, l, o);
+  const actBtn = (l, o) => button(S, cx + 2, AY + 198, pwV - 4 - (wide && ladP ? 72 : 0), 14, l, o);
+  if (wide && ladP && button(S, cx + pwV - 72, AY + 198, 70, 14, 'LOAD TEST', { tone: 'teal' })) { app.ftest = app.t; app.fview = app.fview === 'sect' ? 'plan' : app.fview; AU.sfx('hiss'); }
   const info = { brief: ['SET THE TARGET: SEGMENT, PRICE AND VOLUME.', `${SEGS[d.seg].price.map(money).join(' - ')} IS THIS SEGMENT'S PRICE BAND.`, `OUR MODELS IN IT: ${g.models.filter(m => m.seg === d.seg && !m.dead).map(m => N(m.name)).join(', ') || 'NONE'}`],
-    platform: ['CHOOSE THE BASE CAR, WHEELBASE AND FRAME.', 'WEAK STEEL SHOWS RED ON THE DRAWING.', 'IT CARRIES EVERYTHING THAT FOLLOWS.'],
+    platform: [reuse ? 'CARRIED-OVER FRAME: NO NEW FRAME TOOLING.' : uniB ? 'UNIT BODY: NO SEPARATE FRAME.' : zones.map(z => z.name + ' X' + z.margin.toFixed(2)).join('  ')],
     engine: [ev ? `${ev.es.hp.toFixed(0)} HP  ${ev.es.litres.toFixed(2)} L  ${Math.round(ev.es.mass)} KG` : 'NO ENGINE READY', ev && ev.fit ? 'FITS BETWEEN THE FRAME RAILS.' : 'TOO LONG FOR THIS BAY.', 'NEW ENGINES ARE DESIGNED IN THE ENGINES ROOM.'],
     driveline: [ev ? `TOP ${ev.sim.topMph.toFixed(0)} MPH  0-60 ${ev.sim.zeroSixty ? ev.sim.zeroSixty.toFixed(1) + ' S' : '-'}  ${ev.sim.mpg.toFixed(1)} MPG` : '-', 'HIGHER RATIO: QUICKER, THIRSTIER.', ''],
-    body: ['SHAPE THE BODY ON THE MEASURED CAR.', 'EVERY CHANGE IS RE-DRAWN ON A NEW BLUEPRINT.', ''],
+    body: [uniB ? 'BODY AND STRUCTURE ARE ONE WELDED SHELL.' : 'CHOOSE A BODY SHELL THAT FITS THE FRAME.', 'EVERY CHANGE IS RE-DRAWN ON A NEW BLUEPRINT.', ''],
     mockup: [g.year < 1938 ? 'FULL-SIZE WOODEN MOCK-UP ON THE TURNTABLE.' : 'FULL-SIZE CLAY MODEL ON THE TURNTABLE.', 'THE BOARD REVIEWS IT WHEN IT IS READY.', ''],
     detail: ['INTERIOR, TRIM, PAINT AND LIST PRICE.', `TRIM ${['BASIC', 'STANDARD', 'DE LUXE', 'CUSTOM'][d.trim]}: ${1 + Math.min(3, d.trim)} DIALS`, ''],
     proto: ['HAND-BUILT PROTOTYPES, TEST DRIVES', 'AND A DURABILITY RUN ON THE PROVING GROUND.', ''],
     prep: ['PRESS DIES, JIGS AND LINE LAYOUT.', `TOOLING ${money(tool)} - ${prepMo} MONTHS`, 'THE MODEL ENTERS PRODUCTION WHEN IT IS DONE.'] }[st.id];
-  info.forEach((s, i) => tx(s, 126 + i * 9, i ? C.inkSoft : C.ink));
+  info.forEach((s, i) => tx(s, 126 + i * 9, i ? C.inkSoft : wide && pst.margin < 1 ? C.red : C.ink));
   if (st.id === 'engine' && !ro && button(S, cx + 4, AY + 156, 96, 12, 'DESIGN AN ENGINE')) app.tab = 'engines';
   if (st.id === 'proto' && ev) { if (button(S, cx + 4, AY + 144, 94, 11, 'WATCH BUILD', { tone: 'teal' })) startAssembly(g, spec, d, 'cars', des.plat);
     if (button(S, cx + 102, AY + 144, 94, 11, 'TEST DRIVE', { tone: 'teal' })) { const eng = g.engines.find(x => x.id === d.engineId), gbx = g.gearboxes.find(x => x.id === d.gbId); AU.drive({ ...eng, litres: ev.es.litres }, g.year, rpmTrace({ es: ev.es, engine: eng, gearbox: gbx, final: d.final, tyreR: 0.36, mass: ev.sim.mass - ev.es.mass - GEARBOX[gbx.type].mass })); } }

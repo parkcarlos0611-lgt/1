@@ -32,17 +32,18 @@ const G0 = g => ({ ...g, tailX: Math.max(g.tailX, g.R + 800), noseX: Math.min(g.
 export function platformStats(pl, geo, { heavy = false } = {}) { geo = G0(geo);
   const T = FRAME_TYPES[pl.type], G = GRADES[pl.grade] || GRADES.mild, L = (geo.tailX - geo.noseX - 300) / 1000, wb = (geo.R - geo.F) / 1000;
   if (pl.type === 'unibody') {                                         // floor pan, sills, tunnel, stub rails: the body carries the load
-    const kg = Math.round(70 + L * 9 * pl.railT / 1.6), stiff = 1.0 * (pl.railT / 1.6) ** 0.4 * G.k ** 0.2;
-    return { kg, stiff, margin: (pl.railT / 1.6) * G.k * 1.15, cost: Math.round(55 * G.cost + kg * 0.2), label: T.name }; }
+    const sl = pl.sill ?? 1, kg = Math.round(70 + L * 9 * pl.railT / 1.6 + (sl - 1) * 30 + (pl.brace ? 5 : 0)), stiff = 1.0 * (pl.railT / 1.6) ** 0.4 * G.k ** 0.2 * sl ** 0.5 * (pl.brace ? 1.06 : 1);
+    return { kg, stiff, margin0: (pl.railT / 1.6) * G.k * 1.15 * sl ** 0.5, margin: (pl.railT / 1.6) * G.k * 1.15 * sl ** 0.5, cost: Math.round(55 * G.cost + kg * 0.2), label: T.name }; }
   if (pl.type === 'platform') {                                        // backbone tube (diameter railH, wall railT) + 1 mm pressed floor pan + front torsion tubes + rear fork
     const D = pl.railH, tubeKg = Math.PI * D * pl.railT * (wb * 1000 + 600) * 7850e-9, pan = 1.0 * 1100 * (wb * 1000 * 0.8) * 7850e-9 * 1.25, kg = Math.round(tubeKg + pan + 24);
     const stiff = T.stiff * (D / 120) ** 0.9 * (pl.railT / 2.5) ** 0.4 * G.k ** 0.1, modulus = Math.PI / 4 * D * D * pl.railT * 2.3 * G.k, need = 122 * 122 * 4 * (wb / 2.8) * (heavy ? 3.2 : 1);
-    return { kg, stiff, margin: modulus / need, cost: Math.round(kg * 0.36 * G.cost + 18), label: T.name }; }
-  const fl = pl.railH * 0.33, area = (T.box ? 2 * pl.railH + 2 * fl : pl.railH + 2 * fl) * pl.railT, rho = 7850e-6 * 1e-3;   // mm2 -> kg per mm
-  const rails = 2 * area * L * 1000 * rho, cross = pl.cross * area * 0.55 * 1300 * rho, xk = T.x ? 2 * area * 0.8 * 1900 * rho : 0, kg = Math.round(rails + cross + xk + 8);
-  const stiff = T.stiff * (pl.railH / 150) ** 0.8 * (pl.railT / 4) ** 0.5 * (1 + (pl.cross - 4) * 0.04) * (T.box ? 1 : 0.95);
+    return { kg, stiff, margin0: modulus / need, margin: modulus / need, cost: Math.round(kg * 0.36 * G.cost + 18), label: T.name }; }
+  const fl = pl.railW ?? pl.railH * 0.33, weld = pl.join === 'weld', area = (T.box ? 2 * pl.railH + 2 * fl : pl.railH + 2 * fl) * pl.railT, rho = 7850e-6 * 1e-3;   // mm2 -> kg per mm
+  const rails = 2 * area * L * 1000 * rho, cross = pl.cross * area * 0.55 * 1300 * rho, xk = T.x ? 2 * area * 0.8 * 1900 * rho : 0, kg = Math.round((rails + cross + xk) * (weld ? 0.98 : 1) + 8 + (pl.gusset ? 6 : 0) + (pl.mounts || 8) * 0.4);
+  const stiff = T.stiff * (pl.railH / 150) ** 0.8 * (pl.railT / 4) ** 0.5 * (1 + (pl.cross - 4) * 0.04) * (T.box ? 1 : 0.95) * (weld ? 1.06 : 1) * (pl.xType === 'tube' ? 1.04 : 1) * ((fl / (pl.railH * 0.33)) ** 0.3);
   const modulus = pl.railH * pl.railH * pl.railT * (T.box ? 1.6 : 1) * G.k, need = 122 * 122 * 4 * (wb / 2.8) * (heavy ? 3.2 : 1);
-  return { kg, stiff, margin: modulus / need, cost: Math.round(kg * 0.32 * G.cost + pl.cross * 2 + (T.box ? 12 : 0) + (T.x ? 8 : 0)), label: T.name };
+  const m0 = modulus / need * ((fl / (pl.railH * 0.33)) ** 0.4);
+  return { kg, stiff, margin0: m0, margin: m0, cost: Math.round(kg * 0.32 * G.cost + pl.cross * 2 + (T.box ? 12 : 0) + (T.x ? 8 : 0) + (pl.mounts || 8) * 0.8 + (weld ? -3 : 0)), label: T.name, comfort: ((pl.mounts || 8) - 8) * 0.008 + (pl.drop || 0) / 120 * 0.03 };
 }
 // frame centre line in side view (z of the rail centre), shared with the assembly scene
 export function frameLine(pl, geo) { geo = G0(geo); const fz = geo.r + 150, k = pl.type === 'unibody' ? 0 : pl.kick;

@@ -1,3 +1,4 @@
+import { isLadder, frameSide } from '../tools/pixel/gen/v3/frame.mjs';
 import { frameLine, crossAt, unitShell } from '../tools/pixel/gen/v3/platform.mjs';
 import { drawFit, FIT_LEN } from './fitfx.mjs';
 // Assembly-line sequence: the car is built up in real factory order from the SAME geometry the designer produced.
@@ -22,7 +23,7 @@ function mechFromBody(spec, eng, year, plat) {
   const ex = g.noseX + 300, eEnd = ex + es.len - 120;
   const kind = eng.head === 'sv' && L.banks === 1 ? 'sv_i4' : eng.head === 'sv' ? 'flathead_v8' : L.cyl === 6 && L.banks === 1 ? 'ohv_i6' : 'sv_i4';
   const opts = kind === 'sv_i4' ? { cyl: L.cyl, bore: eng.bore, stroke: eng.stroke, color: 'paint.enginegreen' } : kind === 'flathead_v8' ? { bore: eng.bore, stroke: eng.stroke, perBank: L.cyl / 2 } : { bore: eng.bore, stroke: eng.stroke, color: 'paint.engineGrey' };
-  return { tire: spec.tire, frame: plat ? { line: frameLine(plat, g), depth: plat.type === 'unibody' ? 0 : plat.railH * 0.8, ramp: 'bare', cross: plat.type === 'unibody' ? [] : crossAt(plat, g) } : { line: [[g.noseX + 120, fz + 40], [F + 320, fz], [R - 520, fz], [R - 220, fz + 170], [R + 380, fz + 170], [g.tailX - 160, fz + 110]], depth: 110, cross: [g.noseX + 160, g.cowlX + 60, R + 360] },
+  return { tire: spec.tire, frame: plat ? { line: frameLine(plat, g), depth: plat.type === 'unibody' || isLadder(plat) ? 0 : plat.railH * 0.8, ramp: 'bare', cross: plat.type === 'unibody' ? [] : crossAt(plat, g) } : { line: [[g.noseX + 120, fz + 40], [F + 320, fz], [R - 520, fz], [R - 220, fz + 170], [R + 380, fz + 170], [g.tailX - 160, fz + 110]], depth: 110, cross: [g.noseX + 160, g.cowlX + 60, R + 360] },
     axles: [{ x: F, spring: 'leaf', springLen: 900 }, { x: R, drive: 1, spring: 'leaf', springLen: 1250, diffR: 150 }],
     engine: { kind, x: ex, z: r + 170, opts }, radiator: [g.noseX + 150, r + 60, g.noseX + 215, g.hoodZ - 90],
     gearbox: { x0: eEnd, x1: eEnd + 280, z: r + 140 }, shafts: [[[eEnd + 280, r + 130], [R - 150, r + 30]]],
@@ -50,8 +51,9 @@ export function makeAssembly(P, model, eng, year, paintIdx) {
   const pc = { ...spec, wheels: [], spares: [], anchor: false }, noTrim = { lamps: [], bumperSets: [], trim: [], handles: [], parts: (spec.parts || []).filter(p => !p.chrome) };
   const t0 = buildCar(P, { ...pc, ...noTrim }, mm), t1 = buildCar(P, { ...pc, ...noTrim, bumperSets: spec.bumperSets || [] }, mm), t2 = buildCar(P, { ...pc, ...noTrim, bumperSets: spec.bumperSets || [], lamps: spec.lamps || [] }, mm);
   const fits = [{ bare: t0, old: null, now: t1 }, { bare: t1, old: null, now: t2 }, { bare: t2, old: null, now: painted }];
+  const frameS = plat && isLadder(plat) ? [1, 2, 3].map(k => { const q = blank(); frameSide(P, plat, { ...spec.geo, tire: spec.tire || '6.00-16' }, mm, { stage: k, into: q, X: full.X, Z: full.Y }); return q; }) : null;   // the designed frame: rails, then cross-members, then hangers and mounts
   const shell = uni ? unitShell(P, buildCar(P, stripBody({ ...spec, fenders: [], boards: [] }, 'bare'), mm), spec) : null;
-  return { uni, shell, trim0: t0, fits, full, frameOnly, chassis, driveline, eSpr, wheelsOnly, biw, prim, painted, mech, year, early, t: 0, mm, eng: mech.engine };
+  return { uni, shell, frameS, trim0: t0, fits, full, frameOnly, chassis, driveline, eSpr, wheelsOnly, biw, prim, painted, mech, year, early, t: 0, mm, eng: mech.engine };
 }
 
 // scene drawing: factory backdrop by era + the staged layers. returns current stage index (9 = done)
@@ -70,13 +72,14 @@ export function drawAssembly(S, P, A, sfx) {
   if (st < 3 || (st === 3 && u < 0.5)) for (const f of [0.25, 0.7]) { const tx = ox + A.full.w * scale * f; S.fill(tx - 8, oy + A.full.h * scale - 70, 16, 4, hex(A.early ? '#7a5a36' : '#555a5e')); lineTo(S, tx - 6, oy + A.full.h * scale - 66, tx - 12, y0 + 57, hex(A.early ? '#6a4c2c' : '#45494d')); lineTo(S, tx + 6, oy + A.full.h * scale - 66, tx + 12, y0 + 57, hex(A.early ? '#6a4c2c' : '#45494d')); }
   const lift = st < 4 ? -14 : 0;                                       // chassis sits higher on trestles
   if (A.uni && st < 4) put(A.shell, 0, st === 3 ? Math.round((1 - Math.min(1, u * 2)) * lift) : lift);   // unit body: the shell is welded first, mechanicals bolt to it
+  if (A.frameS && st < 3) put(A.frameS[st === 0 ? (u < 0.35 ? 0 : u < 0.7 ? 1 : 2) : 2], 0, lift);
   if (st === 0) { put(A.frameOnly, 0, lift); if (A.t % 14 === 0) sfx(A.uni ? 'weld' : 'rivet'); if (A.t % 9 === 0) S.fill(ox + 40 + (A.t * 7) % (A.full.w * scale - 80), oy + A.full.h * scale - 80, 2, 2, hex('#ffe08a')); }
   if (st === 1) { put(A.chassis, 0, lift); if (A.t % 24 === 0) sfx('wrench'); }
   if (st === 2) { put(A.driveline, 0, lift);                           // engine comes down on the chain hoist
     const e = A.eSpr, drop = Math.max(0, 1 - u * 1.6), ex = ox + Math.round(A.full.X(A.eng.x) * scale - e.ax * scale), ey = oy + Math.round(A.full.Y(A.eng.z) * scale - e.ay * scale) + lift - Math.round(drop * 90), sway = Math.round(Math.sin(A.t * 0.2) * 2 * drop);
     lineTo(S, ex + e.w + sway, 34, ex + e.w * 0.6 + sway, ey + 6, hex('#9a9690')); lineTo(S, ex + e.w + sway, 34, ex + e.w * 1.3 + sway, ey + 6, hex('#9a9690')); S.fill(ex + e.w - 3 + sway, 33, 7, 6, hex('#b0341f'));
     drawPix(S, e, P, ex + sway, ey, scale, { shadowA: 0 }); if (A.t % 6 === 0 && drop > 0) sfx('ratchet'); if (Math.abs(drop) < 0.01 && A.t % FR === Math.round(FR / 1.6)) sfx('thud'); }
-  if (st >= 3 && st < 9) { const dl = st === 3 ? Math.round((1 - Math.min(1, u * 2)) * lift) : 0; put(A.wheelsOnly, 0, dl); put(A.full === null ? A.chassis : A.driveline, 0, dl); drawPix(S, A.eSpr, P, ox + Math.round(A.full.X(A.eng.x) * scale - A.eSpr.ax * scale), oy + dl + Math.round(A.full.Y(A.eng.z) * scale - A.eSpr.ay * scale), scale, { shadowA: 0 }); if (st === 3 && A.t % FR === 20) sfx('hiss'); }
+  if (st >= 3 && st < 9) { const dl = st === 3 ? Math.round((1 - Math.min(1, u * 2)) * lift) : 0; if (A.frameS) put(A.frameS[2], 0, dl); put(A.wheelsOnly, 0, dl); put(A.full === null ? A.chassis : A.driveline, 0, dl); drawPix(S, A.eSpr, P, ox + Math.round(A.full.X(A.eng.x) * scale - A.eSpr.ax * scale), oy + dl + Math.round(A.full.Y(A.eng.z) * scale - A.eSpr.ay * scale), scale, { shadowA: 0 }); if (st === 3 && A.t % FR === 20) sfx('hiss'); }
   if (st === 4) { put(A.biw, 0, A.uni ? 0 : -80); if (A.t % 5 === 0) { sfx(A.early ? 'hammer' : 'weld'); for (let k = 0; k < 3; k++) S.fill(ox + 60 + ((A.t * 37 + k * 50) % (A.full.w * scale - 120)), oy - 40 + ((A.t * 13 + k * 20) % 60), 2, 2, hex(A.early ? '#c49a5c' : '#fff1a8')); } }
   if (st === 5 && A.uni) { put(A.biw); if (A.t % 20 === 0) sfx('hiss'); }
   else if (st === 5) { put(A.biw, 0, -80 + Math.round(Math.min(1, u * 1.4) * 80)); if (A.t % FR === 80) sfx('clunk'); lineTo(S, ox + 60, 34, ox + 60, oy - 80 + Math.round(Math.min(1, u * 1.4) * 80) + 30, hex('#7a746c')); lineTo(S, ox + A.full.w * scale - 60, 34, ox + A.full.w * scale - 60, oy - 80 + Math.round(Math.min(1, u * 1.4) * 80) + 30, hex('#7a746c')); }

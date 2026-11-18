@@ -1,4 +1,4 @@
-import { frameLine, crossAt } from '../tools/pixel/gen/v3/platform.mjs';
+import { frameLine, crossAt, unitShell } from '../tools/pixel/gen/v3/platform.mjs';
 import { drawFit, FIT_LEN } from './fitfx.mjs';
 // Assembly-line sequence: the car is built up in real factory order from the SAME geometry the designer produced.
 // 1 frame on trestles -> 2 axles/springs/steering -> 3 engine lowered on a chain hoist + gearbox, shafts, tank, exhaust
@@ -50,7 +50,8 @@ export function makeAssembly(P, model, eng, year, paintIdx) {
   const pc = { ...spec, wheels: [], spares: [], anchor: false }, noTrim = { lamps: [], bumperSets: [], trim: [], handles: [], parts: (spec.parts || []).filter(p => !p.chrome) };
   const t0 = buildCar(P, { ...pc, ...noTrim }, mm), t1 = buildCar(P, { ...pc, ...noTrim, bumperSets: spec.bumperSets || [] }, mm), t2 = buildCar(P, { ...pc, ...noTrim, bumperSets: spec.bumperSets || [], lamps: spec.lamps || [] }, mm);
   const fits = [{ bare: t0, old: null, now: t1 }, { bare: t1, old: null, now: t2 }, { bare: t2, old: null, now: painted }];
-  return { uni, trim0: t0, fits, full, frameOnly, chassis, driveline, eSpr, wheelsOnly, biw, prim, painted, mech, year, early, t: 0, mm, eng: mech.engine };
+  const shell = uni ? unitShell(P, buildCar(P, stripBody({ ...spec, fenders: [], boards: [] }, 'bare'), mm), spec) : null;
+  return { uni, shell, trim0: t0, fits, full, frameOnly, chassis, driveline, eSpr, wheelsOnly, biw, prim, painted, mech, year, early, t: 0, mm, eng: mech.engine };
 }
 
 // scene drawing: factory backdrop by era + the staged layers. returns current stage index (9 = done)
@@ -68,7 +69,7 @@ export function drawAssembly(S, P, A, sfx) {
   // trestles until the wheels go on
   if (st < 3 || (st === 3 && u < 0.5)) for (const f of [0.25, 0.7]) { const tx = ox + A.full.w * scale * f; S.fill(tx - 8, oy + A.full.h * scale - 70, 16, 4, hex(A.early ? '#7a5a36' : '#555a5e')); lineTo(S, tx - 6, oy + A.full.h * scale - 66, tx - 12, y0 + 57, hex(A.early ? '#6a4c2c' : '#45494d')); lineTo(S, tx + 6, oy + A.full.h * scale - 66, tx + 12, y0 + 57, hex(A.early ? '#6a4c2c' : '#45494d')); }
   const lift = st < 4 ? -14 : 0;                                       // chassis sits higher on trestles
-  if (A.uni && st < 4) put(A.biw, 0, st === 3 ? Math.round((1 - Math.min(1, u * 2)) * lift) : lift);   // unit body: the shell is welded first, mechanicals bolt to it
+  if (A.uni && st < 4) put(A.shell, 0, st === 3 ? Math.round((1 - Math.min(1, u * 2)) * lift) : lift);   // unit body: the shell is welded first, mechanicals bolt to it
   if (st === 0) { put(A.frameOnly, 0, lift); if (A.t % 14 === 0) sfx(A.uni ? 'weld' : 'rivet'); if (A.t % 9 === 0) S.fill(ox + 40 + (A.t * 7) % (A.full.w * scale - 80), oy + A.full.h * scale - 80, 2, 2, hex('#ffe08a')); }
   if (st === 1) { put(A.chassis, 0, lift); if (A.t % 24 === 0) sfx('wrench'); }
   if (st === 2) { put(A.driveline, 0, lift);                           // engine comes down on the chain hoist

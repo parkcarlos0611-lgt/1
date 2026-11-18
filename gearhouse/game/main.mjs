@@ -17,7 +17,7 @@ import { TEMPLATES, available, makeBody, landmarks } from '../tools/pixel/gen/v2
 import { newDesign, sideSpec, frontSpec, rearSpec, optionsFor, ranges, clampDesign } from '../tools/pixel/gen/v3/design.mjs';
 import { baseList, baseName, measuredDesign, measuredSide, measuredView, measuredRanges, clampMeasured, shapeRanges, SHAPE_KEYS } from '../tools/pixel/gen/v3/base.mjs';
 import { buildFront } from '../tools/pixel/gen/front.mjs';
-import { FRAME_TYPES, GRADES, platformDefault, typesFor, gradesFor, clampPlatform, platformStats, platformPlan, platformSide } from '../tools/pixel/gen/v3/platform.mjs';
+import { FRAME_TYPES, GRADES, platformDefault, typesFor, gradesFor, clampPlatform, platformStats, platformPlan, platformSide, unitShell } from '../tools/pixel/gen/v3/platform.mjs';
 import { Pix } from '../tools/pixel/pix.mjs';
 import { stripBody } from './assembly.mjs';
 import { baseWidth } from '../sim/dims.mjs';
@@ -56,7 +56,7 @@ function v2Sprite(v, paintIdx, rot = 0) {
 // platform preview: plan + rail profile (frames) or floor plan + bare-steel body shell (unit body)
 function platSprite(des, spec, paintIdx) { const key = 'PL' + JSON.stringify(des) + paintIdx; if (app.cache.has(key)) return app.cache.get(key); let out = { px: null };
   try { const pl = des.plat, geo = spec.geo, T = spec.tire || '6.00-16', width = des.width || 1800, track = Math.round(width - 300);
-    if (pl.type === 'unibody') { const b = buildCar(P, stripBody({ ...spec, under: [], anchor: false }, 'bare'), 52), pla = platformPlan(P, pl, geo, { track, tireCode: T, width }, 64); const px = new Pix(Math.max(b.w, pla.w), b.h + pla.h + 2); px.blit(pla, 0, 0); px.blit(b, 0, pla.h + 2); out = { px }; }
+    if (pl.type === 'unibody') { const b = unitShell(P, buildCar(P, stripBody({ ...spec, under: [], fenders: [], boards: [], anchor: false }, 'bare'), 52), spec), pla = platformPlan(P, pl, geo, { track, tireCode: T, width }, 64); const px = new Pix(Math.max(b.w, pla.w), b.h + pla.h + 2); px.blit(pla, 0, 0); px.blit(b, 0, pla.h + 2); out = { px }; }
     else { const a = platformPlan(P, pl, geo, { track, tireCode: T, width }, 45), b = platformSide(P, pl, geo, T, 45), px = new Pix(Math.max(a.w, b.w), a.h + b.h + 2); px.blit(a, 0, 0); px.blit(b, 0, a.h + 2); out = { px }; } } catch (e) { console.warn(e); }
   app.cache.set(key, out); return out; }
 const PARTK = { grilleFrom: 'grille', lampFrom: 'lamps', bumperFrom: 'bumpers', guards: 'bumpers', tailFrom: 'tail', wheelFrom: 'wheel', whitewall: 'wheel', ornament: 'ornament', fog: 'fog' };   // part swaps -> fitting effect
@@ -249,6 +249,7 @@ function cars(g) { windowBox(S, AX, AY, AW, AH, 'CAR DESIGN STUDIO');
   if (view === 'frame') { const pl = des.plat, uni = pl.type === 'unibody';                                   // platform: frame type, rail section, steel
     ctl.length = 0; ctl.push(['pl', 'type', 'FRAME TYPE', typesFor(g.year, k => has(g, k)), null, k => FRAME_TYPES[k].name], ['pl', 'grade', 'STEEL GRADE', gradesFor(g.year), null, k => GRADES[k].name]);
     if (uni) ctl.push(['pls', 'railT', 'PANEL GAUGE', 0.9, 2.5, v => v.toFixed(1) + 'MM', 0.1]);
+    else if (pl.type === 'platform') ctl.push(['pls', 'railH', 'TUBE DIAMETER', 90, 200, v => Math.round(v) + 'MM', 5], ['pls', 'railT', 'TUBE WALL', 2.5, 5, v => v.toFixed(2) + 'MM', 0.25]);
     else ctl.push(['pls', 'railH', 'RAIL DEPTH', 90, 280, v => Math.round(v) + 'MM', 5], ['pls', 'railT', 'STEEL GAUGE', 2.5, 8, v => v.toFixed(2) + 'MM', 0.25], ['pls', 'cross', 'CROSS-MEMBERS', 3, 8, v => Math.round(v) + '', 1], ['pls', 'kick', 'KICK-UP OVER AXLE', 0, 260, v => Math.round(v) + 'MM', 5]); }
   const before = JSON.stringify(des);
   scrollArea(S, 'design-' + view, AX + 4, AY + 19, 94, 181, ctl.length * 19 + 6, dy => ctl.forEach(([kind, key, label, a, b, fmt, step], i) => { const y = AY + 23 + i * 19 - dy;

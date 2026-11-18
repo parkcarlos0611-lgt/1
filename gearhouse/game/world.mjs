@@ -1,3 +1,4 @@
+import { chassisStats } from '../sim/chassis.mjs';
 import { FRAME_TYPES } from '../tools/pixel/gen/v3/platform.mjs';
 // World data + monthly simulation for the 1930-1949 test build.
 import { engineStats } from '../sim/engine.mjs';
@@ -52,15 +53,16 @@ export function evaluate(g, car) {
   const es = engineStats({ ...e, year: g.year }), body = car.body, wb = body.wb, len = car.dims?.len ?? wb + 1500, width = car.dims?.width ?? 1720;
   const Cd = { box: 0.68, stream: 0.54, pontoon: 0.5 }[body.style] ?? 0.68, area = width / 1000 * ((car.dims?.height ?? wb * body.height) - 180) / 1000 * 0.82;
   const bodyKg = 520 + (wb - 2500) * 0.28 + (width - 1700) * 0.35 + (car.type === 'sedan4d' ? 60 : 0) + (car.feats?.steelroof ? 25 : 0) - (car.feats?.unibody ? 90 : 0) + (car.platStats ? car.platStats.kg - 95 : 0);   // frame / shell mass from the platform design
-  const sim = simulate({ es, engine: e, gearbox: gb, final: car.final, tyreR: 0.36, mass: bodyKg + 250, cda: Cd * area, driveFrac: 0.52 });
+  const kerb = bodyKg + 250 + (es.mass - 200) + GEARBOX[gb.type].mass, ch = car.ch ? chassisStats(car.ch, { mass: kerb, engineKg: es.mass, wb, track: width * 0.82, cgH: 0.5 + ((car.dims?.height ?? 1600) - 1500) / 3000, hyd: !!car.feats?.hydbrake }) : null;
+  const sim = simulate({ es, engine: e, gearbox: gb, final: car.final, tyreR: ch ? ch.tyreR : 0.36, crr: ch ? ch.crr : undefined, mass: bodyKg + 250, cda: Cd * area, driveFrac: 0.52 });
   const fit = es.len <= body.hood * wb + 320 && es.height <= 900;
-  const unit = Math.round(es.cost + GEARBOX[gb.type].cost + 210 + (wb - 2500) * 0.15 + (body.style !== 'box' ? 45 : 0) + (car.trim ?? 1) * 55 + (car.feats?.ifs ? 25 : 0) + (car.feats?.hydbrake ? 12 : 0) + (car.platStats ? car.platStats.cost - 40 : 0)) * (COUNTRIES[g.country].wage * 0.4 + 0.6);
+  const unit = Math.round(es.cost + GEARBOX[gb.type].cost + 210 + (wb - 2500) * 0.15 + (body.style !== 'box' ? 45 : 0) + (car.trim ?? 1) * 55 + (ch ? ch.cost : (car.feats?.ifs ? 25 : 0) + (car.feats?.hydbrake ? 12 : 0)) + (car.platStats ? car.platStats.cost - 40 : 0)) * (COUNTRIES[g.country].wage * 0.4 + 0.6);
   const techMain = [STYLE_MAIN[body.style], e.head === 'sv' ? 1910 : e.head === 'ohv' ? 1950 : 1960, GEARBOX[gb.type].year + 4, car.feats?.hydbrake ? 1936 : 1925, car.feats?.ifs ? 1939 : 1928, ...(car.plat ? [FRAME_TYPES[car.plat.type]?.main ?? 1925] : [])];
   const modern = modernity(g.year, techMain);
-  const perf = Math.min(1, es.hp / sim.mass * 1000 / (55 + (g.year - 1930) * 1.6)), econ = Math.min(1, sim.mpg / 26 / COUNTRIES[g.country].fuel ** 0.3);
-  const comfort = Math.min(1, 0.25 + sim.comfort * 0.35 + es.smooth * 0.25 + (car.feats?.ifs ? 0.1 : 0) + (car.trim || 1) * 0.05 + (car.platStats ? (car.platStats.stiff - 0.6) * 0.12 + (car.platStats.comfort || 0) : 0));   // stiffer platform: less shake and squeak
+  const perf = Math.min(1, es.hp / sim.mass * 1000 / (55 + (g.year - 1930) * 1.6) + (ch ? (ch.latG - 0.63) * 0.6 + (ch.decel - 0.55) * 0.3 : 0)), econ = Math.min(1, sim.mpg / 26 / COUNTRIES[g.country].fuel ** 0.3);
+  const comfort = Math.min(1, 0.25 + sim.comfort * 0.35 + es.smooth * 0.25 + (ch ? (ch.ride - 0.3) * 0.3 + (ch.control - 0.8) * 0.1 : car.feats?.ifs ? 0.1 : 0) + (car.trim || 1) * 0.05 + (car.platStats ? (car.platStats.stiff - 0.6) * 0.12 + (car.platStats.comfort || 0) : 0));   // stiffer platform: less shake and squeak
   const rel = Math.min(1, es.reliability * (1 + (car.relMod || 0))) * (e.quality >= 0 ? 1 : 0.95) * (car.platStats && car.platStats.margin < 1 ? 0.7 + 0.3 * car.platStats.margin : 1), design = Math.min(1, (car.designScore ?? 0.6) * (0.85 + (body.style === 'box' ? 0 : 0.15)));
-  return { es, sim, fit, unit, modern, perf, econ, comfort, rel, design, wMod: WMOD(g.year) };
+  return { es, sim, ch, fit, unit, modern, perf, econ, comfort, rel, design, wMod: WMOD(g.year) };
 }
 export function appeal(ev, seg, price) { const S = SEGS[seg], [lo, hi] = S.price, mid = (lo + hi) / 2, inf = 1;
   const pv = Math.max(0, Math.min(1, 1 - (price - lo) / (hi - lo) * 0.8)), fitBand = price < lo * 0.7 || price > hi * 1.6 ? 0.5 : 1;

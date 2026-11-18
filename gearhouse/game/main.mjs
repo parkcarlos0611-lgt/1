@@ -19,6 +19,9 @@ import { engineSide } from '../tools/pixel/gen/props.mjs';
 import { engineStats, LAYOUTS, HEADS, maxCR, MATERIALS, PART_GROUPS, PART_OPTS, optsFor, devCost, durability, octane } from '../sim/engine.mjs';
 import { drawLongPix, drawCrossPix, drawOutsidePix, drawFrontPix, engPalette, STAGE_NAMES } from './engdraw.mjs';
 import { drawGearboxPix, GB_STEPS } from './gbdraw.mjs';
+import { drawSuspPix, drawBrakePix, drawTyrePix } from './chassdraw.mjs';
+import { SUSP_F, SUSP_R, DAMPERS, STEERING, tyresFor, chassisDefault, clampChassis } from '../sim/chassis.mjs';
+const CH_PAGE = { fs: 1, rs: 1, kF: 1, kR: 1, damp: 1, zeta: 1, arb: 1, drum: 2, drumW: 2, bias: 2, tyre: 3, psi: 3, steer: 1, sRatio: 1 };
 import { makeAssembly, drawAssembly } from './assembly.mjs';
 import { drawFit } from './fitfx.mjs';
 import { TEMPLATES, available, makeBody, landmarks } from '../tools/pixel/gen/v2/template.mjs';
@@ -251,6 +254,11 @@ function engines(g) { windowBox(S, AX, AY, AW, AH, 'ENGINE DESIGN');
   if (st < 7 && button(S, AX + AW - 70, AY + AH - 18, 62, 14, 'NEXT STEP', { tone: 'teal' })) { app.estep = st + 1; app.emax = Math.max(app.emax, st + 1); AU.sfx(st === 0 ? 'clunk' : 'ratchet'); }
 }
 // ---------- gearbox designer in steps (plan 21-1): type -> gears and ratios -> test and release ----------
+function chLines(ev) { const c = ev.ch, K = lang.ko, bal = c.balance > 0.12 ? (K ? '언더스티어' : 'UNDERSTEER') : c.balance < -0.04 ? (K ? '오버스티어' : 'OVERSTEER') : (K ? '중립' : 'NEUTRAL'), fade = c.fadeStops >= 20 ? '20+' : c.fadeStops;
+  const perf = `${K ? '최고' : 'TOP'} ${ev.sim.topMph.toFixed(0)} MPH  0-60 ${ev.sim.zeroSixty ? ev.sim.zeroSixty.toFixed(1) + (K ? '초' : ' S') : '-'}  ${ev.sim.mpg.toFixed(1)} MPG`;
+  return K ? [perf, `승차 진동 앞 ${c.fF.toFixed(2)} 뒤 ${c.fR.toFixed(2)} HZ  승차감 ${Math.round(c.ride * 100)}%`, `롤 ${c.roll.toFixed(1)}도/G  앞 숙임 ${c.dive.toFixed(1)}도  뒤 앉음 ${c.squat.toFixed(1)}도`,
+      `횡 접지 ${c.latG.toFixed(2)}G  ${bal}`, `60-0 MPH 제동 거리 ${Math.round(c.stop60)}FT  ${fade}회 제동 후 페이드`, `조향 ${c.turns.toFixed(1)}회전  스프링 아래 무게 앞 ${c.uF} 뒤 ${c.uR}KG`]
+    : [perf, `RIDE F ${c.fF.toFixed(2)} R ${c.fR.toFixed(2)} HZ  COMFORT ${Math.round(c.ride * 100)}%`, `ROLL ${c.roll.toFixed(1)} DEG/G  DIVE ${c.dive.toFixed(1)}  SQUAT ${c.squat.toFixed(1)} DEG`, `GRIP ${c.latG.toFixed(2)} G  ${bal}`, `60-0 MPH ${Math.round(c.stop60)} FT  FADE AFTER ${fade} STOPS`, `STEERING ${c.turns.toFixed(1)} TURNS  UNSPRUNG F${c.uF} R${c.uR} KG`]; }
 const gearName = n => (lang.ko ? n + '단 기어' : n + ' GEAR');
 const GB_HELP = ['THE KIND OF GEARBOX: HOW IT SHIFTS, HOW MUCH IT LOSES, WHAT IT COSTS.', 'HOW MANY SPEEDS AND HOW WIDE THE SPREAD FROM FIRST TO TOP.', 'TRY EACH GEAR, CHECK THE SPEEDS, NAME IT AND TOOL UP.'];
 function gearbox(g) { windowBox(S, AX, AY, AW, AH, 'GEARBOX + DRIVELINE');
@@ -294,7 +302,7 @@ const DEV = [
   { id: 'brief', name: 'BRIEF', mo: 1, cost: 2000, where: 'PLANNING OFFICE' },
   { id: 'platform', name: 'PLATFORM', mo: 1, cost: 6000, where: 'DRAWING OFFICE - CHASSIS' },
   { id: 'engine', name: 'ENGINE', mo: 0, cost: 0, where: 'ENGINE TEST ROOM' },
-  { id: 'driveline', name: 'DRIVELINE', mo: 0, cost: 1500, where: 'DRAWING OFFICE - DRIVELINE' },
+  { id: 'driveline', name: 'CHASSIS', mo: 0, cost: 1500, where: 'DRAWING OFFICE - RUNNING GEAR' },
   { id: 'body', name: 'BODY', mo: 1, cost: 8000, where: 'STYLING STUDIO' },
   { id: 'mockup', name: 'MOCK-UP', mo: 1, cost: 5000, where: 'MOCK-UP ROOM' },
   { id: 'detail', name: 'DETAIL', mo: 1, cost: 4000, where: 'DRAWING OFFICE - DETAIL' },
@@ -362,10 +370,17 @@ function cars(g) {
         if (g.year >= 1932) ctl.push(['pls', 'drop', 'DOUBLE DROP', 0, 120, mm, 5]);
         ctl.push(['pls', 'cross', 'CROSS-MEMBERS', 3, 8, v => Math.round(v) + '', 1], ['pl', 'xType', 'CROSS-MEMBER TYPE', ['channel', 'tube'], null, k => (k === 'tube' ? 'TUBE' : 'CHANNEL')], ['pl', 'join', 'JOINTS', g.year >= 1936 ? ['rivet', 'weld'] : ['rivet'], null, k => (k === 'weld' ? 'WELDED' : 'RIVETED')],
           ['pl', 'gusset', 'KICK-UP FISH PLATES', [false, true], null, yn('NO', 'YES')], ['pls', 'mounts', 'BODY MOUNTS', 6, 14, v => Math.round(v) + '', 2]); }
-      if (has(g, 'ifs')) ctl.push(['fcyc', 'ifs', 'FRONT SUSPENSION', [false, true], null, yn('BEAM AXLE', 'INDEPENDENT')]);
-      if (has(g, 'hydbrake')) ctl.push(['fcyc', 'hydbrake', 'BRAKES', [false, true], null, yn('MECHANICAL', 'HYDRAULIC')]); } }
+    } }
   if (st.id === 'engine' && readyE.length) ctl.push(['dcyc', 'engineId', 'ENGINE', readyE.map(e => e.id), null, id => N(g.engines.find(e => e.id === id).name)]);
-  if (st.id === 'driveline' && readyG.length) ctl.push(['dcyc', 'gbId', 'GEARBOX', readyG.map(x => x.id), null, id => N(g.gearboxes.find(x => x.id === id).name)], ['dsl', 'final', 'FINAL DRIVE', 3.0, 5.5, v => v.toFixed(2), 0.05]);
+  if (!d.ch) d.ch = { ...chassisDefault(g.year), fs: d.feats.ifs ? 'wish' : 'beam' }; clampChassis(d.ch, g.year, k => has(g, k)); d.feats.ifs = SUSP_F[d.ch.fs].ifs;
+  if (st.id === 'driveline') { const av = (o) => Object.keys(o).filter(k => o[k].year <= g.year && (!o[k].tech || has(g, o[k].tech))), pc = v => Math.round(v * 100) + '%';
+    if (readyG.length) ctl.push(['dcyc', 'gbId', 'GEARBOX', readyG.map(x => x.id), null, id => N(g.gearboxes.find(x => x.id === id).name)]); ctl.push(['dsl', 'final', 'FINAL DRIVE', 3.0, 5.5, v => v.toFixed(2), 0.05]);
+    ctl.push(['ccyc', 'fs', 'FRONT SUSPENSION', av(SUSP_F), null, k => SUSP_F[k].name], ['csl', 'kF', 'FRONT SPRING RATE', 12, 45, v => Math.round(v) + ' N/MM', 1], ['ccyc', 'rs', 'REAR SUSPENSION', av(SUSP_R), null, k => SUSP_R[k].name], ['csl', 'kR', 'REAR SPRING RATE', 12, 50, v => Math.round(v) + ' N/MM', 1],
+      ['ccyc', 'damp', 'DAMPERS', av(DAMPERS), null, k => DAMPERS[k].name], ['csl', 'zeta', 'DAMPING', 0.1, 0.45, pc, 0.01]);
+    if (g.year >= 1934) ctl.push(['ccyc', 'arb', 'ANTI-ROLL BAR', [false, true], null, yn('NONE', 'FRONT BAR')]);
+    if (has(g, 'hydbrake')) ctl.push(['fcyc', 'hydbrake', 'BRAKES', [false, true], null, yn('MECHANICAL', 'HYDRAULIC')]);
+    ctl.push(['csl', 'drum', 'DRUM DIAMETER', 230, 340, mm, 5], ['csl', 'drumW', 'DRUM WIDTH', 32, 65, mm, 1], ['csl', 'bias', 'FRONT BRAKE SHARE', 0.45, 0.7, pc, 0.01],
+      ['ccyc', 'tyre', 'TYRES', tyresFor(g.year), null, k => k], ['csl', 'psi', 'TYRE PRESSURE', 20, 36, v => Math.round(v) + ' PSI', 1], ['ccyc', 'steer', 'STEERING GEAR', av(STEERING), null, k => STEERING[k].name], ['csl', 'sRatio', 'STEERING RATIO', 12, 26, v => v.toFixed(1) + ':1', 0.5]); }
   if (st.id === 'detail') { const tr0 = Math.round(d.trim ?? 1); d.trimNames = d.trimNames || [...TRIM_NAMES]; g.paintNames = g.paintNames || PAINTS.map((_, i) => 'COLOUR ' + (i + 1));
     ctl.push(['dsl', 'trim', 'TRIM LEVEL', 0, 3, v => N(d.trimNames[Math.round(v)]), 1], ['name', tr0, 'TRIM NAME', d.trimNames, 'suffix'], ['dcyc', 'wheel', 'WHEELS', wheelsFor(tr0, g.year), null, k => WHEEL_NAMES[k]]);
     if (wwMax(tr0) > 0) ctl.push(['dsl', 'ww', 'WHITEWALL', 0, wwMax(tr0), v => Math.round(v * 100) + '%', 0.05]); if (has(g, 'steelroof')) ctl.push(['fcyc', 'steelroof', 'ROOF', [false, true], null, yn('FABRIC INSERT', 'ALL STEEL')]);
@@ -409,6 +424,8 @@ function cars(g) {
     else if (kind === 'dsl') d[key] = slider(S, AX + 6, y, 86, label, d[key], a, b, { step, fmt, id: 'dd' + key });
     else if (kind === 'dcyc') d[key] = cycler(S, AX + 6, y - 2, 86, label, a, a.includes(d[key]) ? d[key] : a[0], { names: nm });
     else if (kind === 'fcyc') d.feats[key] = cycler(S, AX + 6, y - 2, 86, label, a, !!d.feats[key], { names: nm });
+    else if (kind === 'ccyc') { const v0 = d.ch[key]; d.ch[key] = cycler(S, AX + 6, y - 2, 86, label, a, a.includes(v0) ? v0 : a[0], { names: nm }); if (d.ch[key] !== v0) app.dlPage = CH_PAGE[key] ?? app.dlPage; }
+    else if (kind === 'csl') { const v0 = d.ch[key]; d.ch[key] = slider(S, AX + 6, y, 86, label, d.ch[key], a, b, { step, fmt, id: 'dc' + key }); if (d.ch[key] !== v0) app.dlPage = CH_PAGE[key] ?? app.dlPage; }
     else { const list = a.length ? a : [des[key]]; des[key] = cycler(S, AX + 6, y - 2, 86, label, list, list.includes(des[key]) ? des[key] : list[0], { names: nm }); } }));
   if (ro) { const o = JSON.parse(snap); for (const k of Object.keys(d)) delete d[k]; Object.assign(d, o); des = d.v3; }        // looking back / work in progress: nothing changes
   d.trim = Math.round(d.trim); if (!readyE.some(e => e.id === d.engineId)) d.engineId = readyE[0]?.id; if (!readyG.some(x => x.id === d.gbId)) d.gbId = readyG[0]?.id;
@@ -460,7 +477,13 @@ function cars(g) {
     if (uniB) text(S, 'THE SHELL ITSELF IS DESIGNED WITH THE BODY', cx + 4, AY + 160, C.inkSoft, 1, pwV - 8); }
   else if (st.id === 'brief') briefDoc(g, d, cx + 3, AY + 29, pw - 6, 80);
   else if (st.id === 'engine') { const e = g.engines.find(x => x.id === d.engineId); if (e) drawPix(S, drawOutsidePix(P, { ...e, year: g.year }, app.t * 4, pw - 8, 78, 8, 4).px, P, cx + 4, AY + 29, 1); else text(S, 'NO ENGINE READY', cx + 6, AY + 50, C.red); }   // the part-built engine
-  else if (st.id === 'driveline') { gearMesh(cx + 10, AY + 26, d.final, app.t); text(S, 'FINAL DRIVE ' + d.final.toFixed(2) + ' : 1', cx + 120, AY + 40, C.ink); text(S, 'PINION AND CROWN WHEEL', cx + 120, AY + 50, C.inkSoft, 1, 76); }
+  else if (st.id === 'driveline') { const pg = app.dlPage || 0, PG = ['FINAL DRIVE', 'SUSPENSION', 'BRAKES', 'TYRES'];
+    PG.forEach((l, i) => { if (button(S, cx + 2 + i * 49, AY + 28, 48, 9, l, { active: pg === i })) app.dlPage = i; });
+    let Dp = null; if (pg === 0) { gearMesh(cx + 10, AY + 40, d.final, app.t); text(S, 'FINAL DRIVE ' + d.final.toFixed(2) + ' : 1', cx + 120, AY + 54, C.ink); text(S, 'PINION AND CROWN WHEEL', cx + 120, AY + 64, C.inkSoft, 1, 76); }
+    else if (pg === 1) { Dp = drawSuspPix(P, d.ch, app.t, pw - 6, 70); text(S, 'FRONT', cx + 4, AY + 39, C.inkSoft); text(S, 'REAR', cx + pw / 2 + 4, AY + 39, C.inkSoft); }
+    else if (pg === 2) Dp = drawBrakePix(P, d.ch, !!d.feats.hydbrake, app.t, pw - 6, 70, ev?.ch ? Math.min(1, 8 / Math.max(1, ev.ch.fadeStops)) * (app.t % 400 > 200 ? 1 : 0) : 0);
+    else Dp = drawTyrePix(P, d.ch, pw - 6, 70);
+    if (Dp) { drawPix(S, Dp.px, P, cx + 3, AY + 39, 1); const mx = input.x - cx - 3, my = input.y - AY - 39; if (mx >= 0 && my >= 0 && mx < Dp.px.w && my < Dp.px.h) { const nm = Dp.names[Dp.px.t[my * Dp.px.w + mx]]; if (nm) { S.fill(input.x + 6, input.y - 10, tw(nm) + 6, 9, C.ink); text(S, nm, input.x + 9, input.y - 8, C.brassL); } } } }
   else if (st.id === 'detail') { const NP = 5, inP = input.x >= cx && input.x < cx + pw && input.y >= AY + 20 && input.y < AY + 112;   // swipe / arrows: dashboard, side, front, rear, paint board
     if (inP && input.clicked && !input.drag) app.sw = input.x; if (app.sw != null && !input.down) { const dx = input.x - app.sw; if (dx < -14) app.dpage = ((app.dpage || 0) + 1) % NP; if (dx > 14) app.dpage = ((app.dpage || 0) + NP - 1) % NP; app.sw = null; }
     const pg = app.dpage || 0, drag = app.sw != null && input.down ? input.x - app.sw : 0;
@@ -534,7 +557,7 @@ function cars(g) {
   const info = { brief: ['SET THE TARGET: SEGMENT, PRICE AND VOLUME.', `${SEGS[d.seg].price.map(money).join(' - ')} IS THIS SEGMENT'S PRICE BAND.`, `OUR MODELS IN IT: ${g.models.filter(m => m.seg === d.seg && !m.dead).map(m => N(m.name)).join(', ') || 'NONE'}`],
     platform: [reuse ? 'CARRIED-OVER FRAME: NO NEW FRAME TOOLING.' : uniB ? 'UNIT BODY: NO SEPARATE FRAME.' : zones.map(z => z.name + ' X' + z.margin.toFixed(2)).join('  ')],
     engine: [ev ? `${ev.es.hp.toFixed(0)} HP  ${ev.es.litres.toFixed(2)} L  ${Math.round(ev.es.mass)} KG` : 'NO ENGINE READY', ev && ev.fit ? 'FITS BETWEEN THE FRAME RAILS.' : 'TOO LONG FOR THIS BAY.', 'NEW ENGINES ARE DESIGNED IN THE ENGINES ROOM.'],
-    driveline: [ev ? `TOP ${ev.sim.topMph.toFixed(0)} MPH  0-60 ${ev.sim.zeroSixty ? ev.sim.zeroSixty.toFixed(1) + ' S' : '-'}  ${ev.sim.mpg.toFixed(1)} MPG` : '-', 'HIGHER RATIO: QUICKER, THIRSTIER.', ''],
+    driveline: ev && ev.ch ? chLines(ev) : [ev ? `TOP ${ev.sim.topMph.toFixed(0)} MPH` : '-', '', ''],
     body: [uniB ? 'BODY AND STRUCTURE ARE ONE WELDED SHELL.' : 'CHOOSE A BODY SHELL THAT FITS THE FRAME.', 'EVERY CHANGE IS RE-DRAWN ON A NEW BLUEPRINT.', ''],
     mockup: [g.year < 1938 ? 'FULL-SIZE WOODEN MOCK-UP ON THE TURNTABLE.' : 'FULL-SIZE CLAY MODEL ON THE TURNTABLE.', 'THE BOARD REVIEWS IT WHEN IT IS READY.', ''],
     detail: ['INTERIOR, TRIM, PAINT AND LIST PRICE.', `TRIM ${['BASIC', 'STANDARD', 'DE LUXE', 'CUSTOM'][d.trim]}: ${1 + Math.min(3, d.trim)} DIALS`, ''],
@@ -560,7 +583,7 @@ function cars(g) {
     if (button(S, cx + 101, AY + 198, 97, 14, 'REVISE THE BODY', { tone: 'ox' })) confirmBox('REVISE THE BODY', ['BACK TO THE STYLING STUDIO.', 'BODY AND MOCK-UP MUST BE DONE AGAIN (AND PAID AGAIN).'], () => { reopen(4); }); }
   else if (vs === 7 && d.testDue && ev) {                                                                 // durability run results
     if (!d.defects) { let s = [...JSON.stringify(des) + d.engineId + d.gbId].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7); const rnd = () => ((s = (s * 1103515245 + 12345) >>> 0) / 4294967296);
-      const cand = [[pst && pst.margin < 1.15, 'FRAME CRACK AT THE KICK-UP'], [!d.feats.hydbrake, 'BRAKE FADE ON LONG DESCENTS'], [pst && pst.stiff < 0.6, 'DOOR RATTLE ON ROUGH ROADS'], [ev.es.reliability < 0.75, 'OVERHEATING ON THE HILL CLIMB'],
+      const cand = [[pst && pst.margin < 1.15, 'FRAME CRACK AT THE KICK-UP'], [ev.ch ? ev.ch.fadeStops < 8 : !d.feats.hydbrake, 'BRAKE FADE ON LONG DESCENTS'], [ev.ch && ev.ch.balance < -0.06, 'TAIL STEPS OUT IN FAST CORNERS'], [ev.ch && ev.ch.fF > 1.9, 'FRONT END SHAKES ON BAD ROADS'], [pst && pst.stiff < 0.6, 'DOOR RATTLE ON ROUGH ROADS'], [ev.es.reliability < 0.75, 'OVERHEATING ON THE HILL CLIMB'],
         [true, 'WATER LEAK AT THE WINDSHIELD'], [true, 'GEARBOX WHINE IN SECOND'], [d.feats.unibody && g.year < 1945, 'SHELL CORROSION AT THE SILLS']];
       d.defects = cand.filter(([c]) => c && rnd() < 0.35 + (1 - ev.rel) * 0.8).map(([, s2]) => s2).slice(0, 4); AU.sfx('type'); }
     tx(d.defects.length ? `${d.defects.length} DEFECTS FOUND` : 'NO DEFECTS FOUND', 159, d.defects.length ? C.oxblood : C.green); d.defects.forEach((s2, i) => tx('- ' + s2, 167 + i * 8, C.ink));

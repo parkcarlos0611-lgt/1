@@ -4,6 +4,7 @@ import { lang, hooks, clip } from './ui.mjs';
 import { tr } from './i18n.mjs';
 import { textField, N, editing } from './ui.mjs';
 import { suggest } from './names.mjs';
+import { drawMockRoom, makeRun, drawTrack } from './track.mjs';
 import { POS0, POS_R, clampPos, placeFront, placeSide } from '../tools/pixel/gen/v3/place.mjs';
 import { TRIM_NAMES, wheelsFor, WHEEL_NAMES, wwMax, trimSide, trimFront } from '../tools/pixel/gen/v3/trim.mjs';
 import { scrollArea } from './ui.mjs';
@@ -525,9 +526,14 @@ function cars(g) {
     proto: ['HAND-BUILT PROTOTYPES, TEST DRIVES', 'AND A DURABILITY RUN ON THE PROVING GROUND.', ''],
     prep: ['PRESS DIES, JIGS AND LINE LAYOUT.', `TOOLING ${money(tool)} - ${prepMo} MONTHS`, 'THE MODEL ENTERS PRODUCTION WHEN IT IS DONE.'] }[st.id];
   info.forEach((s, i) => tx(s, 126 + i * 9, i ? C.inkSoft : wide && pst.margin < 1 ? C.red : C.ink));
+  if (st.id === 'mockup' && button(S, cx + 4, AY + 144, 120, 11, 'ENTER THE MOCK-UP ROOM', { tone: 'teal' })) { const dd = JSON.parse(JSON.stringify(des)), mp = g.year < 1938 ? 'paint.mockwood' : 'paint.clay';
+    app.room = { t: 0, spin: true, lights: 'spot', wood: g.year < 1938, get: v => v3Sprite(dd, mp, v).px, notes: d.review?.notes, score: d.review?.score }; app.scene = 'mockroom'; }
   if (st.id === 'engine' && !ro && button(S, cx + 4, AY + 156, 96, 12, 'DESIGN AN ENGINE')) app.tab = 'engines';
   if (st.id === 'proto' && ev) { if (button(S, cx + 4, AY + 144, 94, 11, 'WATCH BUILD', { tone: 'teal' })) startAssembly(g, spec, d, 'cars', des.plat);
-    if (button(S, cx + 102, AY + 144, 94, 11, 'TEST DRIVE', { tone: 'teal' })) { const eng = g.engines.find(x => x.id === d.engineId), gbx = g.gearboxes.find(x => x.id === d.gbId); AU.drive({ ...eng, litres: ev.es.litres }, g.year, rpmTrace({ es: ev.es, engine: eng, gearbox: gbx, final: d.final, tyreR: 0.36, mass: ev.sim.mass - ev.es.mass - GEARBOX[gbx.type].mass })); } }
+    if (button(S, cx + 102, AY + 144, 94, 11, 'DRIVE THE TRACK', { tone: 'teal' })) { const eng = g.engines.find(x => x.id === d.engineId), gbx = g.gearboxes.find(x => x.id === d.gbId), dd = JSON.parse(JSON.stringify(des)), pi = d.paint;
+      app.trk = { run: null, mk: () => makeRun({ es: ev.es, engine: { ...eng, litres: ev.es.litres }, gearbox: gbx, final: d.final, mass: ev.sim.mass, cda: 0.6 * (dm.width / 1000) * ((dm.height - 180) / 1000) * 0.82 * 1.9, hyd: !!d.feats.hydbrake, stiff: pst.stiff, year: g.year, name: d.name }), sprite: rot => v3Sprite(dd, pi, 'side', rot).px, proj: d };
+      app.trk.run = app.trk.mk(); app.scene = 'track'; AU.unlock(); }
+    if (d.track) tx(`LAST DRIVE: 0-60 ${d.track.t60 ? d.track.t60.toFixed(1) + ' S' : '-'}  TOP ${d.track.top.toFixed(0)} MPH`, 135, C.inkSoft); }
   if (vs === 5 && d.reviewDue && ev) {                                                                    // the board looks at the mock-up
     if (!d.review) { const t = TEMPLATES.find(x => x.id === des.base), L = t && landmarks(t.spec), n = [];
       if (L && des.roof > L.roof + 50) n.push('ROOF LOOKS TALL'); if (L && des.roof < L.roof - 50) n.push('LOW AND SLEEK - THE BOARD LIKES IT');
@@ -597,6 +603,11 @@ function menu(g) { windowBox(S, AX + 120, AY + 30, 160, 130, 'MENU'); g.name = n
 
 // ---------- assembly line (first car of a design) ----------
 function startAssembly(g, spec, d, back, plat = null) { const eng = g.engines.find(x => x.id === d.engineId); if (!eng || !spec) return; try { app.asm = makeAssembly(P, { spec, plat }, eng, g.year, d.paint); app.asmBack = back; app.scene = 'assembly'; } catch (e) { console.warn(e); } }
+function mockroom() { if (drawMockRoom(S, P, app.room, AU.sfx)) { app.scene = 'hq'; app.tab = 'cars'; app.room = null; } }
+function track() { const K = app.trk, T = K.run; if (!K.voice && AU.ready()) { K.voice = AU.engineVoice(T.engine, T.year); }
+  const r = drawTrack(S, P, T, K.sprite, AU.sfx); if (K.voice) K.voice.set(T.rpm, T.load, T.done ? 0.25 : 1);
+  if (T.done && !K.saved) { K.saved = true; K.proj.track = { ...T.log }; AU.sfx('stamp'); }
+  if (r === 'again') { K.run = K.mk(); K.saved = false; } if (r === 'back') { if (K.voice) K.voice.stop(); app.scene = 'hq'; app.tab = 'cars'; app.trk = null; } }
 function assembly() { const st = drawAssembly(S, P, app.asm, AU.sfx); if (button(S, W - 70, 4, 62, 14, st >= 9 ? 'DONE' : 'SKIP', { tone: 'ox' }) || app.asm.t > 9 * 110 + 100) { app.scene = 'hq'; app.tab = app.asmBack || 'cars'; app.asm = null; }
   if (button(S, W - 136, 4, 62, 14, 'FASTER')) app.asm.t = Math.min(9 * 110, app.asm.t + 40); }
 
@@ -617,7 +628,7 @@ function cursor() { const x = input.x, y = input.y; if (x < 0) return; const A =
   A.forEach((r, j) => [...r].forEach((c, i) => c !== '0' && S.fill(x + i, y + j, 1, 1, c === '1' ? C.black : C.brassL))); }
 function music() { const g = app.g; if (app.scene !== 'hq' || !g) return AU.setSong('title'); if (['engines', 'gearbox', 'cars'].includes(app.tab)) return AU.setSong('design');
   const C2 = COUNTRIES[g.country]; AU.setSong(g.year < 1940 ? 'office30' : g.year >= C2.war[0] && g.year <= C2.war[1] ? 'war40' : 'office40'); }
-function frame() { app.t++; music(); if (app.scene !== 'title') AU.passEnd(); ({ title, settings, newgame, load, hq, end, assembly })[app.scene]();
+function frame() { app.t++; music(); if (app.scene !== 'title') AU.passEnd(); ({ title, settings, newgame, load, hq, end, assembly, mockroom, track })[app.scene]();
   if (app.toast && app.t < app.toast.until) { const w = tw(app.toast.t) + 16; bevel(S, (W - w) / 2, H - 22, w, 14, C.teal, C.tealL, hex('#1b3f3e')); text(S, app.toast.t, (W - w) / 2 + 8, H - 17, C.white); }
   cursor(); input.clicked = false; input.wheel = 0; input.key = null; if (input.left) { input.left = false; input.x = -1; } ctx.putImageData(img, 0, 0); requestAnimationFrame(frame); }
 function resize() { const vv = window.visualViewport, vw = (vv ? vv.width : innerWidth) - 32, vh = (vv ? vv.height : innerHeight) - 8, fit = Math.max(0.3, Math.min(vw / W, vh / H));
@@ -630,7 +641,8 @@ hooks.click = () => AU.sfx('click'); lang.ko = app.settings.lang === 'ko'; Objec
 addEventListener('pointerup', () => { input.down = false; input.drag = null; }); cv.addEventListener('pointerleave', () => { if (input.clicked) input.left = true; else input.x = -1; });   // a tap is kept until a frame has seen it
 addEventListener('pointercancel', () => { input.down = false; input.drag = null; });
 cv.addEventListener('wheel', e => { e.preventDefault(); input.wheel = e.deltaY; }, { passive: false }); addEventListener('resize', resize);
-addEventListener('keydown', e => { if (editing() || e.target?.tagName === 'INPUT') return; input.key = e.key; if (e.key === 'Escape' && app.scene === 'hq' && !app.ask) app.tab = 'menu'; if (e.key === ' ' && app.scene === 'hq' && !app.g.over) { e.preventDefault(); stepMonth(app.g); } });
+addEventListener('keyup', e => { if (input.keys) input.keys[e.key] = false; });
+addEventListener('keydown', e => { if (editing() || e.target?.tagName === 'INPUT') return; input.key = e.key; (input.keys = input.keys || {})[e.key] = true; if (app.scene === 'track') { e.preventDefault(); return; } if (e.key === 'Escape' && app.scene === 'hq' && !app.ask) app.tab = 'menu'; if (e.key === ' ' && app.scene === 'hq' && !app.g.over) { e.preventDefault(); stepMonth(app.g); } });
 window.__gh = { app, input, stepMonth, lang, AU };
 // keep the running company across page updates in the viewer
 window.claude?.hot?.snapshot?.(() => ({ g: app.g, scene: app.scene, tab: app.tab }));

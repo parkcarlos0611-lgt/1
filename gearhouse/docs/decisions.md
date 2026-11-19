@@ -143,3 +143,12 @@ These decisions still hold, from `legacy/docs/MASTER_GAME_PLAN.md`:
 - Reflections keep the paint's colour and are soft bands on rounded surfaces; chrome is a hard cold line with a lip and a shadow, only in a part's place.
 - The plan view is made from the same design as the side, front and rear views.
 - Each of the 200 reference cars can be a body shell, a rival model, a car on the road, or several of these; order: the slice's cars, then the rest of the 1930s, then the 1940s; the schedule is set after the three samples have all four views and one car's real effort is measured.
+
+## 2026-11-19 — structure first, picture as the answer sheet (method Z)
+
+- A car is held as elements: each a whole closed shape in millimetres (hood, cowl, door, sill, quarter, tail, roof, fenders, parts), hidden areas included. The captured pixel map (Y) is kept only as the answer sheet that outlines, shut lines and shading are fitted to and scored against; it is not drawn in the game.
+- Reason, from one test on the sedan: the pixel map repeats the view far more closely (colour difference 5.6 against 24.4) and survives a tenth more length and another paint, but a part cannot be exchanged or taken off without holes, because what a part covers is not in the picture.
+- Shading belongs to the shape: a 16 x 16 grid of tone steps per painted element, read from the view, over the element's width and each column's height. It follows the element when the car is stretched and is dithered afresh.
+- Dark paints keep their dark tone steps apart (they used to run together into black).
+- Pixel snapping (grid by autocorrelation, majority colour per cell) is not used: the reference views have no coarser grid, and snapping made the capture worse (9.4 against 5.6) and broke fine lines.
+- Tools: zkit.py (fit, split), sedan36_z.py, shade.py, zscore.py, ztest.ts, zsheet.py, snap.py.

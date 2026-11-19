@@ -41,6 +41,11 @@ export interface Panel {
   rigid?: boolean;
   /** the structure drawn inside the panel by the part library (render/car/flat.ts) */
   detail?: Detail;
+  /** the element of the car this panel is (hood, door, roof ...): a whole closed shape, hidden parts included */
+  element?: string;
+  /** how light falls on the panel: tone steps on a small grid over its own width (nx) and each column's height (nt).
+   *  It belongs to the shape, so it stretches with it and is dithered afresh at any size. */
+  shade?: { nx: number; nt: number; v: number[] };
 }
 /** structure inside a part: grille slats that follow its front edge, a fluted lens, a bright bumper bar, wood planks */
 export type Detail =
@@ -111,5 +116,7 @@ export interface CarDesign {
   tones?: Record<string, ToneMap>;
   /** parts from the part library (render/car/parts.ts), expanded into panels before drawing */
   parts?: import('./parts').PartSpec[];
+  /** tone steps added to the glass: 0 dark with reflections, 1 pale as on a studio drawing */
+  glassLift?: number;
   id?: string;
 }

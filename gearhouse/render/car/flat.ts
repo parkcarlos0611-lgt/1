@@ -23,13 +23,15 @@ function fromLab([L, a, b]: RGB): RGB { const l = (L + 0.3963377774 * a + 0.2158
 const lerpHue = (h: number, t: number, k: number) => { const d = ((t - h + Math.PI * 3) % (Math.PI * 2)) - Math.PI; return h + d * k; };
 export function autoRamp(base: string, { steps = 5, baseIdx = 2, dL = 0.1, shift = 0.12, sat = 1 } = {}): Ramp {
   const [L, a, b] = toLab(hex(base)), C = Math.hypot(a, b) * sat, H = Math.atan2(b, a), c: RGB[] = [];
-  for (let i = 0; i < steps; i++) { const k = i - baseIdx, L2 = Math.max(0.08, Math.min(0.98, L + k * dL)), H2 = lerpHue(H, k < 0 ? 4.6 : 1.5, Math.min(1, Math.abs(k) * shift)), C2 = C * (k > 0 ? 1 - 0.18 * k : 1 - 0.08 * -k) + (C < 0.02 ? 0 : 0.004 * Math.abs(k));
+  for (let i = 0; i < steps; i++) { const k = i - baseIdx, down = Math.min(dL, Math.max(0.02, (L - 0.09) / Math.max(1, baseIdx))), L2 = Math.max(0.08, Math.min(0.98, L + k * (k < 0 ? down : dL))), H2 = lerpHue(H, k < 0 ? 4.6 : 1.5, Math.min(1, Math.abs(k) * shift)), C2 = C * (k > 0 ? 1 - 0.18 * k : 1 - 0.08 * -k) + (C < 0.02 ? 0 : 0.004 * Math.abs(k));
     c.push(fromLab([L2, C2 * Math.cos(H2), C2 * Math.sin(H2)])); }
   const [L0, a0, b0] = toLab(c[0]!), C0 = Math.hypot(a0, b0), H0 = lerpHue(Math.atan2(b0, a0), 4.6, 0.3);
   return { c, o: fromLab([Math.max(0.06, L0 - 0.11), C0 * 0.9 * Math.cos(H0), C0 * 0.9 * Math.sin(H0)]) }; }
 const fixed = (c: string[], o: string): Ramp => ({ c: c.map(hex), o: hex(o) });
 /** a glossy paint gives back the sky: one more step above the ramp, pale and nearly grey, for reflection bands */
 function glossy(r: Ramp): Ramp { const t = r.c.at(-1)!, sky: RGB = [196, 204, 200]; return { c: [...r.c, t.map((v, i) => Math.round(v * 0.62 + sky[i]! * 0.38)) as RGB], o: r.o }; }
+/** the tone steps a paint colour is drawn with, darkest first (tools fit a reference view to these) */
+export const paintRamp = (paint: string): string[] => glossy(autoRamp(paint, { steps: 7, baseIdx: 3, dL: 0.075, shift: 0.06 })).c.map(c => '#' + c.map(v => v.toString(16).padStart(2, '0')).join(''));
 function palette(d: CarDesign): Record<Material, Ramp> {
   return { paint: glossy(autoRamp(d.paint, { steps: 7, baseIdx: 3, dL: 0.075, shift: 0.06 })), paint2: glossy(autoRamp(d.paint2, { steps: 7, baseIdx: 3, dL: 0.075, shift: 0.06 })),
     rubber: fixed(['#16141b', '#24222b', '#36343f', '#4f4d59', '#6e6c78'], '#0b0a0f'), chrome: fixed(['#2a3047', '#56627e', '#93a3bb', '#cfd9e6', '#ffffff'], '#171b2a'),
@@ -79,9 +81,9 @@ export function rasterizeFlat(d0: CarDesign, opt: { frameW?: number; shadow?: bo
     /** the tone the reference shows at a pixel, as a step of this material's ramp */
     const toneAt = (gx: number, gyy: number): number => { const tx = Math.floor(((gx - PAD + 0.5) * MM - T!.x0) / T!.mm), ty = Math.floor((T!.z1 - (gy - gyy - 0.5) * MM) / T!.mm); if (tx < 0 || ty < 0 || tx >= T!.w || ty >= T!.h) return -1; return Math.round(tm![ty * T!.w + tx]! / Math.max(1, T!.steps - 1) * (PAL[mt].c.length - 1)); };
     for (let x = 0; x < bw; x++) { let y = 0; while (y < bh) { if (!M(x, y)) { y++; continue; } const ya = y; while (y < bh && M(x, y)) y++; const yb = y - 1, n = yb - ya;
-      for (let yy = ya; yy <= yb; yy++) { const t = n > 0 ? (yy - ya) / n : 0.5, gx = bx + x, gyy = by + yy, k = yy - ya, kb = yb - yy; let l: number;
+      for (let yy = ya; yy <= yb; yy++) { const t = n > 0 ? (yy - ya) / n : 0.5, gx = bx + x, gyy = by + yy, k = yy - ya, kb = yb - yy; let l: number, shaded = -1;
         if (mt === 'chrome') { const bands = [4, 3, 1, 2, 2, 1]; l = n <= 1 ? [3, 1][k]! : bands[Math.min(5, Math.floor(k / (n + 1) * 6))]!; }
-        else if (mt === 'glass') { let v = t < 0.18 ? 3.0 - t * 3 : t < 0.55 ? 2.15 - (t - 0.18) * 1.4 : 1.6 - (t - 0.55) * 3.2; if (((gx - bx) + (gyy - by) * 0.9) % 21 < 1.6 && t < 0.7) v = 3.2; l = dith(gx, gyy, v, 0.2); if (k === 0) l = Math.min(l, 1); }
+        else if (mt === 'glass') { let v = t < 0.18 ? 3.0 - t * 3 : t < 0.55 ? 2.15 - (t - 0.18) * 1.4 : 1.6 - (t - 0.55) * 3.2; if (((gx - bx) + (gyy - by) * 0.9) % 21 < 1.6 && t < 0.7) v = 3.2; v += d.glassLift ?? 0; l = dith(gx, gyy, v, 0.2); if (k === 0) l = Math.min(l, 1); }
         else if (mt === 'lens' || mt === 'lensR') l = t < 0.35 ? 3 : x - 0 < 2 ? 4 : 2;
         else if (mt === 'shadow') l = 0;
         else if (mt === 'paint' || mt === 'paint2' || mt === 'canvas' || mt === 'wood') { const g = GRAD[p.surface] ?? GRAD.side!; let v = g[0] + (g[1] - g[0]) * Math.pow(t, 1.15);
@@ -89,7 +91,10 @@ export function rasterizeFlat(d0: CarDesign, opt: { frameW?: number; shadow?: bo
           l = dith(gx, gyy, v, 0.13); if (kb === 0 && n > 2) l = Math.max(0, l - 1);
           if (k === 0) { const above = at(gx, gyy - 1); l = above >= 0 && mat[above] === 'glass' ? 3 : 4; } else if (k === 1 && n > 3) l = Math.max(l, 3); }
         else { const base = mt === 'black' ? 1 : mt === 'white' ? 3 : 2; l = k === 0 && n > 1 ? base + 1 : kb === 0 && n > 1 ? base - 1 : base; }
-        set(gx, gyy, mt, l, ly, id); if (tm && mt !== 'glass') { const tl = toneAt(gx, gyy); if (tl >= 0) setRaw(gyy * w + gx, tl); } if (p.clip) noOutline[gyy * w + gx] = 1; } } }
+        if (p.shade && (mt === 'paint' || mt === 'paint2')) { const S = p.shade, fu = Math.min(S.nx - 1, Math.max(0, (gx + 0.5 - x0) / Math.max(1, x1 - x0) * S.nx - 0.5)), ft = t * (S.nt - 1), u0 = Math.floor(fu), t0 = Math.floor(ft), u1 = Math.min(S.nx - 1, u0 + 1), t1 = Math.min(S.nt - 1, t0 + 1), au = fu - u0, bt = ft - t0;
+          const g = (a: number, b: number) => S.v[b * S.nx + a]!, v = (g(u0, t0) * (1 - au) + g(u1, t0) * au) * (1 - bt) + (g(u0, t1) * (1 - au) + g(u1, t1) * au) * bt, f = Math.floor(v), fr = Math.min(1, Math.max(0, (v - f - 0.5) / 0.3 + 0.5));
+          shaded = f + (fr > BAYER[(gyy & 3) * 4 + (gx & 3)]! ? 1 : 0); }
+        set(gx, gyy, mt, l, ly, id); if (shaded >= 0) setRaw(gyy * w + gx, shaded); if (tm && mt !== 'glass') { const tl = toneAt(gx, gyy); if (tl >= 0) setRaw(gyy * w + gx, tl); } if (p.clip) noOutline[gyy * w + gx] = 1; } } }
     if (mt === 'glass') glassMasks.push({ m, bx, by, bw, bh, ly, id });
     if (p.detail) detail(p.detail, M, bx, by, bw, bh, ly, mt);
   });

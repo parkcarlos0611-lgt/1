@@ -27,6 +27,8 @@ export interface Incident {
 export interface Task { id: string; label: string; skill: string; hoursNeeded: number; hoursDone: number; done: boolean;
   /** cannot be worked yet: an earlier step is unfinished or the materials have not come */
   blocked?: boolean;
+  /** cannot be worked today for a passing reason (rain keeps paint from drying) */
+  held?: string;
   /** hours each person put in (for the quality of the result) */
   by?: Record<string, number>;
   /** the owning system reports the end of this task itself */

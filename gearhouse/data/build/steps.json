@@ -142,7 +142,7 @@
    ]
   },
   {
-   "id": "paint",
+   "id": "paint", "noRain": true,
    "skill": "paint",
    "hours": {
     "body_only": 60,

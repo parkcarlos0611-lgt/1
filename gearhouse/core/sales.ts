@@ -25,7 +25,7 @@ export interface Customer { id: number; personId: string; type: string; standing
   /** the bank this customer keeps their money in (town register) */ bankId?: string }
 export interface Inquiry { id: number; customerId: number; received: DateStr; letter: string; revealed: { budget: boolean; mustHave: boolean }; rounds: number; state: 'open' | 'quoted' | 'ordered' | 'lost'; quote?: QuoteOffer; counter?: { price: number; due: DateStr } }
 export interface QuoteOffer { designId: string; price: number; due: DateStr; depositRate: number; rough?: boolean; meets: string[] }
-export interface Order { id: number; customerId: number; inquiryId: number; designId: string; price: number; deposit: number; placed: DateStr; due: DateStr; meets: string[]; state: 'building' | 'delivered' | 'cancelled'; lateTold?: boolean; payDelayUntil?: DateStr; carId?: number }
+export interface Order { id: number; customerId: number; inquiryId: number; designId: string; price: number; deposit: number; placed: DateStr; due: DateStr; meets: string[]; state: 'building' | 'delivered' | 'cancelled'; lateTold?: boolean; /** working days the weather stopped the work: nobody counts these as late */ excusedDays?: number; /** the customer was asked once for more time */ askedDelay?: boolean; payDelayUntil?: DateStr; carId?: number }
 export interface SoldCar { carId: number; orderId: number; customerId: number; delivered: DateStr; satisfaction: number }
 export interface Advert { medium: string; size: 'classified' | 'eighth' | 'quarter'; from: DateStr; until: DateStr }
 export interface MarketState { awareness: { town: number; city: number; state: number; nation: number }; reputation: Record<Field, number>; customers: Record<number, Customer>; inquiries: Inquiry[]; orders: Order[]; sold: SoldCar[]; adverts: Advert[];
@@ -105,7 +105,7 @@ export class Sales {
     return this.handOver(a, ord, 0.8); }
   private handOver(a: Api, ord: Order, share: number): { satisfaction: number } { const M = this.M, c = this.customer(ord.customerId), car = a.g.shop.cars.find(x => x.id === ord.carId)!, W = this.data.satisfaction;
     const balance = Math.round((ord.price - ord.deposit) * share * 100) / 100; post(a, 'balance', balance, 'order ' + ord.id);
-    const d = a.g.shop.designs[ord.designId]!, missed = c.mustHave.filter(m => !ord.meets.includes(m)).length, lateDays = Math.max(0, daysBetween(ord.due, a.date)), seen = car.defects.filter(x => !x.fixed && (x.step === 'paint' || x.step === 'joining' || x.step === 'trim')).length;
+    const d = a.g.shop.designs[ord.designId]!, missed = c.mustHave.filter(m => !ord.meets.includes(m)).length, lateDays = Math.max(0, daysBetween(ord.due, a.date) - (ord.excusedDays ?? 0)), seen = car.defects.filter(x => !x.fixed && (x.step === 'paint' || x.step === 'joining' || x.step === 'trim')).length;
     const spec = clamp(1 - missed * 0.6 - (d.orderType === c.orderType ? 0 : 0.4), -1, 1), qual = clamp((car.quality.visible - W.qualityMid) / 30 - seen * 0.25, -1, 1), perf = clamp((car.quality.hidden - W.qualityMid) / 35, -1, 1), del = clamp(1 - lateDays / 20, -1, 1),
       val = clamp((c.budget[1] - ord.price * share) / (c.budget[1] * 0.25) * 0.5 + qual * 0.5, -1, 1);
     const poor = qual < -0.3 ? 0.4 : 1;                                       // a badly made car on time and to order still pleases nobody
@@ -118,6 +118,10 @@ export class Sales {
     M.awareness.town = clamp(M.awareness.town + 2 + c.standing / 25, 0, 100); if (M.awareness.town > 60) M.awareness.city = clamp(M.awareness.city + c.standing / 40, 0, 100);
     if (s >= this.data.pleasedAt) for (let n = Math.round(1 + c.standing / 45 * a.rng.float()); n > 0; n--) M.pending.push({ due: addDays(a.date, a.rng.int(10, 70)), kind: 'referral', by: a.g.people[c.personId]!.family });
     a.bus.emit('car_delivered', { orderId: ord.id, carId: car.id, satisfaction: s, standing: c.standing }); return { satisfaction: s }; }
+  /** ask the customer for more time, once per order: likelier for a few days, a calm customer, a trusted shop, and before the day has passed */
+  askDelay(orderId: number, days: number): boolean { const a = this.sim.api(), ord = this.M.orders.find(o => o.id === orderId); if (!ord || ord.state !== 'building') throw new Error('no such order in work'); if (ord.askedDelay) throw new Error('the customer was already asked'); if (!(days > 0)) throw new Error('days must be more than none');
+    const c = this.customer(ord.customerId), late = a.date > addDays(ord.due, ord.excusedDays ?? 0), p = clamp(0.8 - days / 50 - c.temper * 0.3 + this.M.reputation.trust / 250 - (late ? 0.2 : 0), 0.05, 0.95), ok = a.rng.float() < p; ord.askedDelay = true;
+    if (ok) { ord.due = addDays(ord.due, days); ord.lateTold = false; } else this.bump('trust', -1, a); a.log(`${ok ? 'delay_granted' : 'delay_refused'}:${orderId}`); return ok; }
   /** a car shown in public: people judge the make and finish they can see */
   exhibit(visible: number, share: number): void { const a = this.sim.api(), v = clamp((visible - this.data.satisfaction.qualityMid) / 30, -1, 1) * 100; this.pull('style', v, share, a); this.pull('quality', v, share * 0.7, a); }
   /** people who heard of the workshop and may come asking */
@@ -157,7 +161,7 @@ export class Sales {
     // inquiries left unanswered are lost when the customer's patience runs out
     for (const q of M.inquiries) if ((q.state === 'open') && daysBetween(q.received, a.date) > this.customer(q.customerId).patience + q.rounds * 10) { q.state = 'lost'; this.bump('trust', -1, a); } }
   private evening(a: Api): void { const M = this.M;
-    for (const ord of M.orders) if (ord.state === 'building' && !ord.lateTold && a.date > ord.due) { ord.lateTold = true; a.raise('order_late', 'decision', { orderId: ord.id, due: ord.due }, 30); }
+    for (const ord of M.orders) if (ord.state === 'building' && !ord.lateTold && a.date > addDays(ord.due, ord.excusedDays ?? 0)) { ord.lateTold = true; a.raise('order_late', 'decision', { orderId: ord.id, due: ord.due, excusedDays: ord.excusedDays ?? 0, mayAsk: !ord.askedDelay }, 30); }
     // cars sold in the last year can break down where a fault was left in
     for (const sc of M.sold) { if (daysBetween(sc.delivered, a.date) > this.data.warrantyDays) continue; const car = a.g.shop.cars.find(c => c.id === sc.carId)!;
       for (const df of car.defects) if (!df.found && !df.fixed && a.rng.float() < this.data.breakdownPerDayPerDefect) { df.found = true; sc.satisfaction = clamp(sc.satisfaction - 12 * df.severity, -100, 100); this.pull('trust', -60, 0.04 * df.severity, a); this.pull('quality', -50, 0.03 * df.severity, a);

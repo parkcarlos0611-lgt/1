@@ -87,3 +87,9 @@ These decisions still hold, from `legacy/docs/MASTER_GAME_PLAN.md`:
 - Papers print short weather notes by a leaning set per publication.
 - Links from weather to other systems (painting, deliveries, wanted features, roads, utilities, farms) come next, as soon as possible.
 - Real weather disasters are added when the real events are verified.
+
+## 2026-11-19 — weather links and delays
+
+- Rain stops the paint step for the day; working days lost to it are not counted as late.
+- A customer can be asked once per order for more time.
+- A cold wave raises the next utilities bill by 40% (heating); a heat wave by 15% (ice and fans; workshops of the 1930s had no air cooling).

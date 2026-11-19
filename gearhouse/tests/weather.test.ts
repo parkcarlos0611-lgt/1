@@ -3,7 +3,8 @@ import { DATA, newWorld, openWorld } from '../core/world';
 import { addDays, daysBetween, parts } from '../core/calendar';
 import { load, save } from '../core/state';
 import { Rng } from '../core/rng';
-import { weatherNote, weatherWords, type WeatherState } from '../core/weather';
+import { blockedTopics, endSpell, startSpell, weatherNote, weatherWords, type WeatherState } from '../core/weather';
+import { mult, active } from '../core/conditions';
 
 const FOUNDER = { background: 'coachbuilder', age: 31, given: 'Walter', family: 'Hoffman' }, D = DATA.weather;
 describe('weather', () => {
@@ -34,6 +35,29 @@ describe('weather', () => {
           if (m >= 5 && m <= 9) expect(a.headline, is.date).not.toMatch(/한파|폭설|눈보라|강추위|된서리/); if (m === 12 || m <= 2) expect(a.headline, is.date).not.toMatch(/폭염|무더위|가뭄/); } }
       spellWeeks += g.journal.filter(j => j.text.startsWith('weather_start:')).length; }
     expect(notes).toBeGreaterThan(15); expect(notes).toBeLessThan(spellWeeks * 4); });
+  it('rain holds the paint step; those days are not counted as late, and the customer can be asked for more time', async () => { const w = newWorld(3, FOUNDER), { sim, sales, shop } = w, g = sim.g, long = D.events.find(e => e.id === 'long_rain')!, rain0 = long.rain;
+    shop.addDesign({ id: 'body', name: 'b', baseCar: 'sedan30', orderType: 'body_only', size: 1, effort: { proportion: 0, parts: 0, panels: 0 } }); for (const part of Object.keys(shop.bom(g.shop.designs.body!))) g.supply.lots.push({ part, grade: 3, qty: 1, quality: 70, unitCost: 20, received: g.clock.date });
+    const q = sales.firstCustomer(); const ord = sales.bookFor({ type: 'doctor', standing: 60, body: 'sedan', mustHave: [] }, { designId: 'body', price: 700, due: '1930-12-01', depositRate: 0.3, meets: [] }, 1)[0]!; sales.drop(q.id); const b = shop.startBuild('body', ord.id), paint = () => g.tasks[`build:${b.id}:paint`]!;
+    const dry = () => { delete g.weather.event; g.weather.graceUntil = '1999-01-01'; g.weather.today = 'clear'; }; D.months = Object.fromEntries(Object.keys(D.months).map(k => [k, [0, 0]])) as typeof D.months;
+    try { dry(); for (let i = 0; i < 300 && paint().blocked; i++) sim.stepDay(); expect(paint().blocked).toBe(false); const done = paint().hoursDone; long.rain = 1;
+      startSpell(sim.api(), D, 'long_rain', 12); ord.due = addDays(g.clock.date, 3); for (let i = 0; i < 10; i++) sim.stepDay();
+      expect(paint().held).toBe('rain'); expect(paint().hoursDone).toBe(done); expect(ord.excusedDays).toBeGreaterThanOrEqual(7); expect(g.incidents.filter(i => i.kind === 'paint_held').length).toBe(1); expect(g.incidents.some(i => i.kind === 'order_late')).toBe(false);   /* past the day, but the rain is known to all */
+      endSpell(sim.api(), D); dry(); sim.stepDay(); sim.stepDay(); sim.stepDay(); expect(paint().held).toBeUndefined(); expect(paint().hoursDone).toBeGreaterThan(done);
+      const due = ord.due; let granted = 0; for (let seed = 1; seed <= 30; seed++) { const x = newWorld(seed, FOUNDER); x.shop.addDesign({ id: 'body', name: 'b', baseCar: 'sedan30', orderType: 'body_only', size: 1, effort: { proportion: 0, parts: 0, panels: 0 } });
+        const o = x.sales.bookFor({ type: 'doctor', standing: 60, body: 'sedan', mustHave: [] }, { designId: 'body', price: 700, due: '1930-06-01', depositRate: 0.3, meets: [] }, 1)[0]!; if (x.sales.askDelay(o.id, 10)) { granted++; expect(o.due).toBe('1930-06-11'); } else expect(o.due).toBe('1930-06-01'); expect(() => x.sales.askDelay(o.id, 5)).toThrow(/already/); }
+      expect(granted).toBeGreaterThan(8); expect(granted).toBeLessThan(30); expect(ord.due).toBe(due);
+    } finally { long.rain = rain0; D.months = JSON.parse(JSON.stringify((await import('../data/weather/us_midwest.json')).default.months)); } });
+  it('spells reach the bills, the suppliers, what customers ask for, the farms and the roads', () => { const w = newWorld(2, FOUNDER), g = w.sim.g, api = () => w.sim.api(); g.weather.graceUntil = '1999-01-01';
+    startSpell(api(), D, 'cold_wave', 6); expect(mult(g, 'utilities')).toBeCloseTo(1.4); expect(active(g, 'want', 'closed_roof').length).toBe(1); for (let i = 0; i < 40; i++) w.sim.stepDay();
+    expect(g.ledger.entries.filter(e => e.kind === 'utilities')[0]!.amount).toBeCloseTo(-DATA.finance.utilitiesPerMonth * 1.4); expect(mult(g, 'utilities')).toBe(1); expect(g.weather.event).toBeUndefined();
+    startSpell(api(), D, 'heat_wave', 5); expect(active(g, 'utilities').filter(c => c.from === 'weather:heat_wave').map(c => c.value)).toEqual([1.15]); /* ice and fans: less than heating */ endSpell(api(), D);
+    const from = (k: 'supplier_lead' | 'supplier_reliability' | 'demand_type', key?: string) => active(g, k, key).filter(c => c.from.startsWith('weather:')).reduce((t, c) => t * c.value, 1);   /* the papers may have brought conditions of their own */
+    startSpell(api(), D, 'blizzard', 4); expect(from('supplier_lead')).toBeCloseTo(1.5); expect(from('supplier_reliability')).toBeCloseTo(0.8); endSpell(api(), D);
+    startSpell(api(), D, 'drought', 20); expect(from('demand_type', 'farmer')).toBeCloseTo(0.8); expect(from('demand_type', 'doctor')).toBe(1); expect(blockedTopics(g.weather, D, g.clock.date)).toEqual(['good_season']); endSpell(api(), D);
+    expect(blockedTopics(g.weather, D, addDays(g.clock.date, 60))).toEqual(['good_season']); expect(blockedTopics(g.weather, D, addDays(g.clock.date, 120))).toEqual([]);
+    const day0 = g.clock.date; for (let i = 0; i < 100; i++) w.sim.stepDay(); for (const is of g.media.issues) if (is.date > day0 && is.date <= addDays(day0, 90)) expect(is.articles.some(a => a.id === 'good_season')).toBe(false);
+    startSpell(api(), D, 'long_rain', 3); endSpell(api(), D); expect(active(g, 'want', 'high_clearance').some(c => c.from === 'after:long_rain')).toBe(true); const n = g.media.issues.length; for (let i = 0; i < 8; i++) w.sim.stepDay();
+    expect(g.media.issues.slice(n).some(is => is.articles.some(a => a.id.startsWith('after:long_rain')))).toBe(true); });
   it('survives a save', () => { const w = newWorld(6, FOUNDER); for (let i = 0; i < 400; i++) w.sim.stepDay(); const again = openWorld(load(save(w.sim.g))); expect(again.sim.g.weather).toEqual(w.sim.g.weather);
     for (let i = 0; i < 60; i++) { w.sim.stepDay(); again.sim.stepDay(); } expect(again.sim.g.weather).toEqual(w.sim.g.weather); expect(again.sim.g.market.inquiries.length).toBe(w.sim.g.market.inquiries.length); });
 });

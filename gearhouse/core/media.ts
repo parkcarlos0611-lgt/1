@@ -12,7 +12,7 @@ import { Press, newPress, type PressState } from './press';
 import { Register, newRegister, type RegisterData, type RegisterState } from './register';
 import { begin, beginBoost, type CondKind } from './conditions';
 import type { Chance } from './chances';
-import { weatherNote, weatherWords, type WeatherData } from './weather';
+import { blockedTopics, weatherNote, weatherWords, type WeatherData } from './weather';
 
 export interface Article extends NewsItem { page: number }
 export interface Issue { id: number; publication: string; date: DateStr; articles: Article[]; playerAds: string[]; supplierAds: string[] }
@@ -30,6 +30,8 @@ export class Media {
     // what happens in the game becomes news for the next issue
     sim.bus.on('order_placed', e => { const c = sim.g.market.customers[e.customerId]; if (c && c.standing >= 60) this.note(4, `${sim.g.people[c.personId]!.family} 씨, 새 차 주문`, 'order:' + e.orderId); });
     sim.bus.on('car_delivered', e => { if (e.satisfaction >= 60) this.note(5, '읍내 공방의 새 차, 주인 "흡족하다"', 'delivered:' + e.orderId); else if (e.satisfaction <= -40) this.note(5, '새 차 받은 주민, 공방에 불만', 'unhappy:' + e.orderId); });
+    sim.bus.on('car_broke_down', e => { if (e.severity >= 2) this.note(3, '읍내 공방이 지은 차, 길에서 고장', 'broke:' + e.carId); });
+    sim.bus.on('weather_event_ended', e => { const n = this.weather?.events.find(x => x.id === e.kind)?.after?.news; if (n) this.note(n.importance, n.headlines[sim.rng.int(0, n.headlines.length - 1)]!, 'after:' + e.kind + ':' + e.date); });
     sim.bus.on('employee_hired', e => this.note(2, '읍내 공방, 일손 한 명 들여', 'hired:' + e.personId));
   }
   readonly press: Press; readonly register: Register;
@@ -64,7 +66,8 @@ export class Media {
       const words = { ...this.fiction.words }; for (const [list, kind] of [['bank', 'bank'], ['factory', 'factory'], ['rival', 'rival']] as const) { words[list] = this.register.alive(kind).map(e => e.name); }
       if (this.weather) words.weather = weatherWords(g.weather, this.weather);                 // the papers speak of the weather there is
       const wn = this.weather ? weatherNote(g.weather, this.weather, last, a.date, a.rng, pub.weatherDesk ?? 0) : null;
-      const fiction = { ...this.fiction, words }, own = this.press.turnover(a.rng, pub.id, a.date), town = this.register.weeklyNews(a.rng, this.names, fiction, a.date, this.times(a.date), facts, this.bodies?.voices ?? []);
+      const barred = this.weather ? blockedTopics(g.weather, this.weather, a.date) : [];
+      const fiction = { ...this.fiction, words, topics: barred.length ? this.fiction.topics.filter(t => !barred.includes(t.id)) : this.fiction.topics }, own = this.press.turnover(a.rng, pub.id, a.date), town = this.register.weeklyNews(a.rng, this.names, fiction, a.date, this.times(a.date), facts, this.bodies?.voices ?? []);
       const items: NewsItem[] = [...realItems(a.rng, this.real, last, a.date), ...S.news.splice(0).map((n): NewsItem => ({ origin: 'fictional', id: n.id, relation: 'related', importance: n.importance, headline: n.headline, weight: n.importance + 0.5 })), ...own, ...town, ...(wn ? [{ origin: 'fictional', id: 'weather_note', relation: 'background', slant: 'neutral', importance: wn.importance, headline: wn.headline, lead: wn.lead, weight: wn.importance - 0.5 } as NewsItem] : []), ...fictionalItems(a.rng, fiction, facts, S.recent, sup, this.bodies?.voices)];
       for (const it of items) this.press.assign(a.rng, pub.id, it);
       for (const it of items) { if (it.lead) it.lead = it.lead.replace('{town}', this.town); const e = it.effect; if (!e || e.kind === 'supplier_found') continue;

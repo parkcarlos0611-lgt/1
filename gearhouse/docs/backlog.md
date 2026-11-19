@@ -36,5 +36,6 @@ This list holds work moved to a later stage than the current one, so it does not
   - five-year run with the new topics: 9 of 60 bankrupt, end cash about $14,000
   - a tender's buyer is a made-up person of type "county"; public bodies as register entities come later
   - effects waiting for their systems: wages and applicants (hiring), loan interest (banks), rival prices (rivals), inspection rules (car quality)
-- Weather, next (review 11, chapter 5 — to do soon): no painting on rainy days, longer supplier lead times in a blizzard, wanted features by spell, rough roads after a long rain, heating costs in a cold wave, drought against good-harvest news and farmers; sky and light on screen; real weather disasters with the real-event check; headline patterns without a weather word ("대홍수") still ignore the season.
+- Weather, still to do: sky and light on screen; real weather disasters with the real-event check; headline patterns without a weather word ("대홍수") still ignore the season; heat and cold acting on work speed; snow and frost acting on paint; the answer to a request for more time comes at once rather than by post.
+- Signals nobody listens to yet: customer_cannot_pay, wage_missed, employee_left, delivery_delayed, stock_short, reputation_changed (to connect with the people and bank systems).
 - Tenders: designs have a `use` field (passenger or utility) but no utility base cars yet; the record counts cars delivered to customers who wanted a pickup or delivery body.

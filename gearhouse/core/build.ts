@@ -7,7 +7,7 @@ import type { Supply } from './supply';
 import type { Task } from './state';
 
 export type OrderType = 'body_only' | 'bought' | 'built';
-export interface StepData { id: string; skill: string; hours: Record<OrderType, number>; sized?: boolean; after: string[]; needs: Partial<Record<OrderType | 'all', Record<string, number>>>; visible: number; hidden: number; defects: string[] }
+export interface StepData { id: string; skill: string; /** cannot be done on a rainy day */ noRain?: boolean; hours: Record<OrderType, number>; sized?: boolean; after: string[]; needs: Partial<Record<OrderType | 'all', Record<string, number>>>; visible: number; hidden: number; defects: string[] }
 export interface BuildData { toolLevel: number; /** a step below this quality may leave a fault; the chance grows over the span */ defect: { below: number; span: number }; repeatFactor: number[]; design: { baseHours: Record<OrderType, number>; perProportion: number; perPart: number; perPanel: number; mockupHours: number }; steps: StepData[] }
 export interface Design { id: string; name: string; baseCar: string; orderType: OrderType; /** a working vehicle (delivery van, pickup, official car) rather than a private car */ use?: 'passenger' | 'utility';
   /** body size against a mid-size car (1 = mid-size) */
@@ -16,7 +16,7 @@ export interface Design { id: string; name: string; baseCar: string; orderType: 
   effort: { proportion: number; parts: number; panels: number };
   state: 'drawing' | 'ready'; mockupDone: boolean; built: number }
 export interface Defect { step: string; kind: string; severity: number; found: boolean; fixed: boolean }
-export interface BuildStep { step: string; taskId: string; quality?: number; material?: number; cost: number; shortTold?: boolean }
+export interface BuildStep { step: string; taskId: string; quality?: number; material?: number; cost: number; shortTold?: boolean; heldTold?: boolean }
 export interface Build { id: number; designId: string; orderId?: number; started: DateStr; steps: BuildStep[]; state: 'building' | 'done' }
 export interface Car { id: number; buildId: number; designId: string; built: DateStr; quality: { visible: number; hidden: number }; defects: Defect[];
   /** money actually spent on it: materials and employees' wages for their hours; the founder's own hours are counted apart */
@@ -49,7 +49,14 @@ export class Shop {
       b.steps.push(h === 0 ? { step: st.id, taskId: id, cost: 0, quality: -1 } : { step: st.id, taskId: id, cost: 0 }); }
     this.S.builds.push(b); return b; }
 
-  system(): System { return { id: 'shop', morning: a => this.release(a), evening: a => { this.finish(a); this.release(a); } }; }
+  system(): System { return { id: 'shop', morning: a => { this.release(a); this.hold(a); }, evening: a => { this.finish(a); this.release(a); } }; }
+
+  /** paint does not dry in the rain: the step waits, and the customer is not told the car is late for those days */
+  private hold(a: Api): void { const rain = a.g.weather?.today === 'rain';
+    for (const b of this.S.builds) { if (b.state !== 'building') continue; for (const bs of b.steps) { const st = this.data.steps.find(s => s.id === bs.step), t = a.g.tasks[bs.taskId]; if (!st?.noRain || !t || t.done || t.blocked) continue;
+        if (!rain) { delete t.held; continue; } t.held = 'rain'; const ord = a.g.market.orders.find(o => o.id === b.orderId);
+        if (a.workday && ord) ord.excusedDays = (ord.excusedDays ?? 0) + 1;
+        if (!bs.heldTold) { bs.heldTold = true; a.raise('paint_held', 'notice', { buildId: b.id, step: st.id, orderId: b.orderId }); } } } }
 
   /** let steps start whose earlier steps are done and whose materials are in the store */
   private release(a: Api): void { const tasks = a.g.tasks;

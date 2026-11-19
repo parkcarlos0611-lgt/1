@@ -73,11 +73,11 @@ export class Simulation {
       if (t.hoursDone >= t.hoursNeeded - 1e-9) { t.hoursDone = t.hoursNeeded; t.done = true; this.bus.emit('task_done', { date: a.date, taskId: t.id }); if (!t.quiet) a.raise('task_done', 'notice', { taskId: t.id }); }
       return h; };
     let left = f.hoursPerDay + f.overtimePerDay;
-    for (const slot of g.plan) { const t = g.tasks[slot.taskId]; if (t && !t.done && !t.blocked) left -= spend(t, founder, left, slot.maxHours ?? Infinity, tired); }
-    if (left > 0) for (const t of Object.values(g.tasks)) { if (!t.done && !t.blocked) left -= spend(t, founder, left, Infinity, tired); if (left <= 0) break; }
+    for (const slot of g.plan) { const t = g.tasks[slot.taskId]; if (t && !t.done && !t.blocked && !t.held) left -= spend(t, founder, left, slot.maxHours ?? Infinity, tired); }
+    if (left > 0) for (const t of Object.values(g.tasks)) { if (!t.done && !t.blocked && !t.held) left -= spend(t, founder, left, Infinity, tired); if (left <= 0) break; }
     for (const e of g.employees) { const p = g.people[e.personId]!; let h = this.employeeHours;
-      const open = Object.values(g.tasks).filter(t => !t.done && !t.blocked).sort((x, y) => (p.skills[y.skill] ?? 0) - (p.skills[x.skill] ?? 0)), mine = e.assignedTo ? g.tasks[e.assignedTo] : undefined;
-      for (const t of mine && !mine.done && !mine.blocked ? [mine, ...open] : open) { if (h <= 0) break; if (!t.done) h -= spend(t, p, h, Infinity, 1); } }
+      const open = Object.values(g.tasks).filter(t => !t.done && !t.blocked && !t.held).sort((x, y) => (p.skills[y.skill] ?? 0) - (p.skills[x.skill] ?? 0)), mine = e.assignedTo ? g.tasks[e.assignedTo] : undefined;
+      for (const t of mine && !mine.done && !mine.blocked && !mine.held ? [mine, ...open] : open) { if (h <= 0) break; if (!t.done) h -= spend(t, p, h, Infinity, 1); } }
     if (weekday(a.date) === 6) { f.fatigue = f.overtimeThisWeek > FATIGUE_FREE_OVERTIME ? f.fatigue + 1 : 0;   // Saturday night: a hard week tells next week
       for (const e of g.employees) narrow(e, g.people[e.personId]!, founder?.skills.manage ?? 30); }
   }

@@ -4,6 +4,7 @@
 import type { CarDesign, Detail, Feature, Material, Panel, Pt, WheelSpec } from './types';
 import { coverage, smoothClosed, smoothOpen } from './geom';
 import type { CarImage } from './raster';
+import { expandParts } from './parts';
 
 export const MM_PER_PX = 10;
 const PAD = 6;
@@ -32,7 +33,7 @@ function glossy(r: Ramp): Ramp { const t = r.c.at(-1)!, sky: RGB = [214, 226, 22
 function palette(d: CarDesign): Record<Material, Ramp> {
   return { paint: glossy(autoRamp(d.paint, { steps: 7, baseIdx: 3, dL: 0.075, shift: 0.06 })), paint2: glossy(autoRamp(d.paint2, { steps: 7, baseIdx: 3, dL: 0.075, shift: 0.06 })),
     rubber: fixed(['#16141b', '#24222b', '#36343f', '#4f4d59', '#6e6c78'], '#0b0a0f'), chrome: fixed(['#2a3047', '#56627e', '#93a3bb', '#cfd9e6', '#ffffff'], '#171b2a'),
-    glass: fixed(['#161c22', '#26313a', '#43535e', '#74878f', '#b9c8ca'], '#0c1015'), lens: fixed(['#5e5a48', '#9d9a80', '#d9d5b6', '#f5f2dc', '#ffffff'], '#2d2b24'),
+    glass: fixed(['#2c343b', '#56616a', '#8e989f', '#b9c1c5', '#e0e5e6'], '#141a1f'), lens: fixed(['#5e5a48', '#9d9a80', '#d9d5b6', '#f5f2dc', '#ffffff'], '#2d2b24'),
     lensR: fixed(['#3d0a16', '#7a1522', '#c22c2b', '#f06a4a', '#ffc49a'], '#22050c'), iron: fixed(['#202128', '#34363f', '#4f525d', '#737783', '#a1a5ae'], '#121318'),
     black: fixed(['#0f0e14', '#1b1a22', '#2a2933', '#403f4b', '#5d5c69'], '#07060a'), white: fixed(['#7b7f8c', '#a9adb7', '#d4d7dc', '#eff0ef', '#ffffff'], '#3e404a'),
     shadow: fixed(['#07060a', '#0f0e14', '#16151c', '#1b1a22', '#22212a'], '#07060a'), wood: autoRamp('#9a6a3a', { sat: 0.9 }), canvas: autoRamp('#8c8270', { sat: 0.8 }) }; }
@@ -45,7 +46,8 @@ const OUTLINED = new Set<Material>(['paint', 'paint2', 'chrome', 'black', 'rubbe
 /** shading of a painted run, top to bottom, by kind of surface */
 const GRAD: Record<string, [number, number]> = { side: [2.75, 1.45], hood: [3.0, 1.6], roof: [3.5, 2.1], fender: [3.25, 0.45], flat: [2.2, 1.6] };
 
-export function rasterizeFlat(d: CarDesign, opt: { frameW?: number; shadow?: boolean; mm?: number } = {}): CarImage {
+export function rasterizeFlat(d0: CarDesign, opt: { frameW?: number; shadow?: boolean; mm?: number } = {}): CarImage {
+  const d = expandParts(d0);
   const MM = opt.mm ?? MM_PER_PX, t0 = performance.now(), PAL = palette(d), frameW = opt.frameW ?? Math.max(2, Math.round(20 / MM));
   const span = (n: number) => Math.max(1, Math.round(n / MM)), w = Math.ceil(d.length / MM) + PAD * 2, h = Math.ceil(d.height / MM) + PAD * 2, gy = h - PAD;
   const X = (x: number) => PAD + x / MM, Y = (z: number) => gy - z / MM;
@@ -88,15 +90,17 @@ export function rasterizeFlat(d: CarDesign, opt: { frameW?: number; shadow?: boo
     if (mt === 'glass') glassMasks.push({ m, bx, by, bw, bh, ly, id });
     if (p.detail) detail(p.detail, M, bx, by, bw, bh, ly, mt);
   });
-  // chunky window frames: a ring of the body colour (a deep reveal above and in front, a lit sill below)
-  for (const g of glassMasks) { const G = (x: number, y: number) => x >= 0 && y >= 0 && x < g.bw && y < g.bh && g.m[y * g.bw + x] === 1 && mat[(g.by + y) * w + g.bx + x] === 'glass';
-    const dist = (x: number, y: number) => { for (let r = 1; r <= frameW; r++) for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) if (!G(x + dx * r, y + dy * r)) return { r, dx, dy }; return null; };
+  // chunky window frames, built on the body around each opening so the glass keeps its measured size:
+  // a bright bead or a shadowed reveal next to the glass, the body colour lit or shaded beyond it
+  for (const g of glassMasks) { const isG = (x: number, y: number) => { const i = at(x, y); return i >= 0 && mat[i] === 'glass' && owner[i] === g.id; };
     const marks: [number, number, Material, number][] = [];
-    for (let y = 0; y < g.bh; y++) for (let x = 0; x < g.bw; x++) { if (!G(x, y)) continue; const e = dist(x, y); if (!e) continue;
-      const below = at(g.bx + x, g.by + y + 3), bodyM: Material = below >= 0 && (mat[below] === 'paint2') ? 'paint2' : 'paint', fr = d.frame === 'chrome' && e.r === frameW ? 'chrome' : bodyM;
-      const l = fr === 'chrome' ? (e.dy < 0 ? 4 : e.dy > 0 ? 2 : 3) : e.dy > 0 ? (e.r === 1 ? 3 : 4) : e.dy < 0 || e.dx < 0 ? (e.r === 1 ? 0 : 1) : 1;
-      marks.push([g.bx + x, g.by + y, fr, l]); }
-    for (const [x, y, m, l] of marks) { set(x, y, m, l, g.ly); noOutline[y * w + x] = 1; } }
+    for (let y = g.by - frameW; y < g.by + g.bh + frameW; y++) for (let x = g.bx - frameW; x < g.bx + g.bw + frameW; x++) { const i = at(x, y); if (i < 0 || (mat[i] !== 'paint' && mat[i] !== 'paint2')) continue;
+      let e: { r: number; dx: number; dy: number } | null = null; for (let r = 1; r <= frameW && !e; r++) for (const [dx, dy] of [[0, 1], [0, -1], [1, 0], [-1, 0]] as const) if (isG(x + dx * r, y + dy * r)) { e = { r, dx, dy }; break; }
+      if (!e) continue; const bodyM = mat[i]!, top = e.dy > 0, sill = e.dy < 0;                       // dy > 0: the glass is below, this is the frame's top
+      if (e.r === 1 && d.frame === 'chrome') marks.push([x, y, 'chrome', top ? 2 : sill ? 4 : 3]);
+      else if (e.r === 1) marks.push([x, y, bodyM, top ? 0 : sill ? 4 : e.dx > 0 ? 1 : 2]);
+      else marks.push([x, y, bodyM, top ? 4 : sill ? 1 : 3]); }
+    for (const [x, y, m, l] of marks) { set(x, y, m, l, layer[y * w + x]!); noOutline[y * w + x] = 1; } }
 
   // ---- details on the skin ----
   const FEAT = 1e6, onPaint = (x: number, y: number) => { const i = at(x, y); return i >= 0 && (mat[i] === 'paint' || mat[i] === 'paint2'); };

@@ -104,5 +104,7 @@ export interface CarDesign {
   /** window surround: a shadowed reveal or a chrome frame */
   frame?: 'reveal' | 'chrome';
   marks?: Landmarks;
+  /** parts from the part library (render/car/parts.ts), expanded into panels before drawing */
+  parts?: import('./parts').PartSpec[];
   id?: string;
 }

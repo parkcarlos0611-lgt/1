@@ -46,7 +46,7 @@ const OUTLINED = new Set<Material>(['paint', 'paint2', 'chrome', 'black', 'rubbe
 /** shading of a painted run, top to bottom, by kind of surface */
 const GRAD: Record<string, [number, number]> = { side: [2.75, 1.45], hood: [3.0, 1.6], roof: [3.5, 2.1], fender: [3.25, 0.45], flat: [2.2, 1.6] };
 
-export function rasterizeFlat(d0: CarDesign, opt: { frameW?: number; shadow?: boolean; mm?: number } = {}): CarImage {
+export function rasterizeFlat(d0: CarDesign, opt: { frameW?: number; shadow?: boolean; mm?: number; outline?: number } = {}): CarImage {
   const d = expandParts(d0);
   const MM = opt.mm ?? MM_PER_PX, t0 = performance.now(), PAL = palette(d), frameW = opt.frameW ?? Math.max(2, Math.round(20 / MM));
   const span = (n: number) => Math.max(1, Math.round(n / MM)), w = Math.ceil(d.length / MM) + PAD * 2, h = Math.ceil(d.height / MM) + PAD * 2, gy = h - PAD;
@@ -141,6 +141,12 @@ export function rasterizeFlat(d0: CarDesign, opt: { frameW?: number; shadow?: bo
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const i = y * w + x, m = mat[i]; if (!m || !OUTLINED.has(m) || noOutline[i] || layer[i]! >= FEAT) continue;
     for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) { const j = at(x + dx, y + dy); if (j < 0 || !mat[j] || mat[j] === 'shadow' || (layer[j]! < layer[i]! && !(noOutline[j] && layer[j]! >= layer[i]! - 0))) { out.push(i); break; } } }
   const OUTL = new Uint8Array(N); for (const i of out) OUTL[i] = 1;
+  // the outline against the background is drawn two pixels thick all round, roof and bonnet top included (the first build's weight at this scale)
+  const empty = (j: number) => j < 0 || !mat[j] || mat[j] === 'shadow', thick = opt.outline ?? 2;
+  if (thick > 1) { const more: number[] = [];
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const i = y * w + x, m = mat[i]; if (!m || OUTL[i] || !OUTLINED.has(m) || noOutline[i] || layer[i]! >= FEAT) continue;
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) { const j = at(x + dx, y + dy), k = at(x + 2 * dx, y + 2 * dy); if (j >= 0 && OUTL[j] && empty(k)) { more.push(i); break; } } }
+    for (const i of more) OUTL[i] = 1; }
 
   const rgba = new Uint8ClampedArray(N * 4);
   if (opt.shadow !== false) { const cx = X(d.length / 2), rx = d.length * 0.47 / MM; for (let y = gy - 1; y <= gy + 1; y++) for (let x = Math.floor(cx - rx); x <= cx + rx; x++) { const i = at(x, y); if (i < 0) continue; rgba[i * 4 + 3] = 70; } }

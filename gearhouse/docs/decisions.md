@@ -131,3 +131,9 @@ These decisions still hold, from `legacy/docs/MASTER_GAME_PLAN.md`:
 - Parts are built as a library of parts with their own structure (grille, lamps, wheels and caps, bumpers, tail lamps, handles and hinges, trim, running boards).
 - Paint gets seven tones; reflection bands, overlap shadows and glimpses through the glass are added.
 - Source images are never used as pictures in the game, not even for cars that are only seen.
+
+## 2026-11-19 — front and rear views (review 19); outline weight
+
+- One design gives side, front and rear views: heights and wheels come from the side, the front and rear keep widths and section shapes; half outlines mirrored.
+- Overall width comes from the catalogue figures, else from the class rule; the three samples get rear views too, later cars the front first; this follows the side detail work.
+- The outline against the background is two pixels thick all round, roof and bonnet top included; lines between parts stay one pixel.

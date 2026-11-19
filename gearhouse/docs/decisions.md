@@ -110,3 +110,8 @@ These decisions still hold, from `legacy/docs/MASTER_GAME_PLAN.md`:
 - Choosing a car: era, kind of car, body shell, parts in eleven fixed places, then dimensions by the outline. Dimensions change the figures.
 - The frame is chosen from a list and drawn on the plan; wheelbase, track and reinforcements are values of it.
 - Outlines are traced with a helper tool and then finished by hand; three samples first, to measure quality and effort.
+
+## 2026-11-19 — how cars are drawn
+
+- Cars are drawn in the first build's manner (render/car/flat.ts): five flat tones per material, an outline only where a part meets the background or a part behind it, narrow dithering, chunky window frames, parts strictly in layer order.
+- Cars that are only seen (rivals, cars on the road) are made the same way and carry a kind of car; how they are generated and tied to the systems is under review (review 16).

@@ -24,8 +24,8 @@ function env(ry: number): number {
 
 export interface CarImage { w: number; h: number; rgba: Uint8ClampedArray; owner: Int16Array; ms: number; groundY: number; X: (x: number) => number; Y: (z: number) => number }
 
-export function rasterize(d: CarDesign): CarImage {
-  const t0 = performance.now(), R = rampsFor(d.paint, d.paint2);
+export function rasterize(d: CarDesign, opt: { frameW?: number; tone?: number } = {}): CarImage {
+  const t0 = performance.now(), R = rampsFor(d.paint, d.paint2), frameW = opt.frameW ?? 1, tone = opt.tone ?? 1;
   const w = Math.ceil(d.length / MM_PER_PX) + PAD * 2, h = Math.ceil(d.height / MM_PER_PX) + PAD * 2, gy = h - PAD;
   const X = (x: number) => PAD + x / MM_PER_PX, Y = (z: number) => gy - z / MM_PER_PX;
   const rgba = new Uint8ClampedArray(w * h * 4), owner = new Int16Array(w * h).fill(-1), mat: Material[] = [], level = new Uint8Array(w * h);
@@ -33,6 +33,7 @@ export function rasterize(d: CarDesign): CarImage {
   const put = (x: number, y: number, m: Material, lv: number, id: number) => { if (x < 0 || y < 0 || x >= w || y >= h) return; const i = y * w + x, ramp = R[m], k = Math.max(0, Math.min(ramp.length - 1, lv)), c = ramp[k]!;
     rgba[i * 4] = c[0]; rgba[i * 4 + 1] = c[1]; rgba[i * 4 + 2] = c[2]; rgba[i * 4 + 3] = 255; owner[i] = id; mat[id] = m; level[i] = k; };
   const quant = (m: Material, v: number, x: number, y: number) => { const n = R[m].length, dz = m === 'paint' || m === 'paint2' || m === 'canvas' ? 0.32 : m === 'black' || m === 'rubber' ? 0.22 : 0.08;
+    if (m === 'paint' || m === 'paint2') v = Math.pow(Math.max(0, v), tone);                     // tone > 1: the body sits lower in its ramp, as a deep gloss colour does
     return Math.round(Math.max(0, Math.min(1, v)) * (n - 1) + BAYER[(y & 3) * 4 + (x & 3)]! * dz); };
 
   // ---- draw order: panels and wheels together ----
@@ -111,10 +112,10 @@ export function rasterize(d: CarDesign): CarImage {
 
   // ---- window reveals: a shadowed recess along the top and front of each glass, a lit sill below it ----
   for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) { const i = y * w + x, o = owner[i]!; if (o < 0 || mat[o] !== 'glass' || ids[o] === 'detail') continue;
-    const up = owner[i - w]!, lf = owner[i - 1]!, dn = owner[i + w]!;
-    const rt = owner[i + 1]!, edge = (q: number) => q >= 0 && q !== o && mat[q] !== 'glass' && mat[q] !== 'shadow';
+    const ow = (k: number, dx: number, dy: number) => { const xx = x + dx * k, yy = y + dy * k; return xx < 0 || yy < 0 || xx >= w || yy >= h ? -1 : owner[yy * w + xx]!; }, edge = (q: number) => q >= 0 && q !== o && mat[q] !== 'glass' && mat[q] !== 'shadow';
+    let up = -1, lf = -1, dn = -1, rt = -1; for (let k = 1; k <= frameW; k++) { if (up < 0 && edge(ow(k, 0, -1))) up = ow(k, 0, -1); if (lf < 0 && edge(ow(k, -1, 0))) lf = ow(k, -1, 0); if (dn < 0 && edge(ow(k, 0, 1))) dn = ow(k, 0, 1); if (rt < 0 && edge(ow(k, 1, 0))) rt = ow(k, 1, 0); }
     if (d.frame === 'chrome') { if (edge(up)) recolour(i, 'chrome', 6); else if (edge(dn)) recolour(i, 'chrome', 3); else if (edge(lf) || edge(rt)) recolour(i, 'chrome', 5); }
-    else if (edge(up) || edge(lf)) recolour(i, 'black', 0); else if (edge(dn)) recolour(i, 'chrome', 4); }
+    else if (edge(up) || edge(lf)) recolour(i, frameW > 1 ? 'paint' : 'black', 0); else if (edge(dn)) recolour(i, frameW > 1 ? 'paint' : 'chrome', frameW > 1 ? 7 : 4); else if (edge(rt) && frameW > 1) recolour(i, 'paint', 2); }
 
   // ---- details ----
   const px = (p: Pt): [number, number] => [X(p[0]), Y(p[1])];

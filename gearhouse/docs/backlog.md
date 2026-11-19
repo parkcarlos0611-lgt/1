@@ -32,8 +32,9 @@ This list holds work moved to a later stage than the current one, so it does not
 - News effects, after the conditions and the chances (core/conditions.ts, core/chances.ts):
   - a headline's percentage or amount is drawn apart from the effect's value, so "값 1할 올라" may bring a 15% rise
   - general sentences shared by all topics sometimes do not suit the topic (a remark on eight-cylinder cars under a road opening)
-  - weather words have no season yet (a cold wave in a July issue); see review 11
   - the plain bot takes no chances, so tenders, shows, clearances and auctions are untested for balance
   - five-year run with the new topics: 9 of 60 bankrupt, end cash about $14,000
   - a tender's buyer is a made-up person of type "county"; public bodies as register entities come later
   - effects waiting for their systems: wages and applicants (hiring), loan interest (banks), rival prices (rivals), inspection rules (car quality)
+- Weather, next (review 11, chapter 5 — to do soon): no painting on rainy days, longer supplier lead times in a blizzard, wanted features by spell, rough roads after a long rain, heating costs in a cold wave, drought against good-harvest news and farmers; sky and light on screen; real weather disasters with the real-event check; headline patterns without a weather word ("대홍수") still ignore the season.
+- Tenders: designs have a `use` field (passenger or utility) but no utility base cars yet; the record counts cars delivered to customers who wanted a pickup or delivery body.

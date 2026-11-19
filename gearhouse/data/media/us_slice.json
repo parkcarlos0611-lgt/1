@@ -11,14 +11,16 @@
     4,
     8
    ],
-   "supplierAdChance": 0.35
+   "supplierAdChance": 0.35,
+   "weatherDesk": 0.7
   },
   {
    "id": "motor_monthly",
    "kind": "magazine",
    "name": "American Motorist Monthly",
    "monthDay": 1,
-   "pages": 8
+   "pages": 8,
+   "weatherDesk": 0
   }
  ],
  "ageing": [

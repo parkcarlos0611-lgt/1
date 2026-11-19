@@ -30,7 +30,7 @@ export interface ChanceSpec { kind: ChanceKind; days: [number, number] }
 /** the parts the papers' names for materials stand for */
 export const MATERIAL_PART: Record<string, string> = { 강판: 'body_steel_set', 철강: 'chassis_steel_set', 물푸레나무: 'ash_frame_set', 판유리: 'glass_set', 도료: 'paint_set', 니스: 'paint_set', 가죽: 'trim_set', 타이어: 'wheels_tyres_set', 고무: 'wheels_tyres_set', 구리선: 'fittings_set', 부속품: 'fittings_set' };
 const CARS_KO = ['두', '세', '네', '다섯', '여섯'];
-export interface Topic { id: string; relation: Relation; slant: Slant; /** written only when the town register says so, about one named subject */ entity?: string; /** who may be quoted on it */ officials?: string[]; low?: string[]; mid?: string[]; high?: string[]; effect?: Effect; delayWeeks?: [number, number]; /** names a supplier */ supplier?: boolean; conds?: CondSpec[]; chance?: ChanceSpec }
+export interface Topic { id: string; relation: Relation; slant: Slant; /** written only when the town register says so, about one named subject */ entity?: string; /** who may be quoted on it */ officials?: string[]; low?: string[]; mid?: string[]; high?: string[]; effect?: Effect; delayWeeks?: [number, number]; /** names a supplier */ supplier?: boolean; /** written only when the weather gives it something to say */ needsWeather?: boolean; conds?: CondSpec[]; chance?: ChanceSpec }
 export interface FictionData { topics: Topic[]; words: Record<string, string[]>;
   /** endings that may follow a headline: who said what, how the town took it, where and when */ tails: { t: string; w: number; noQuote?: boolean; minImportance?: number; notRelation?: Relation[] }[];
   /** articles of each importance per issue: [min, max] or a chance below 1 */
@@ -67,7 +67,7 @@ export interface VoiceInfo { id: string; beats: Relation[]; slants: Slant[]; imp
 export function fictionalItems(rng: Rng, data: FictionData, facts: Record<string, string | number>, recent: string[], suppliers: { id: string; name: string; known: boolean; materials?: string[] }[], voices: VoiceInfo[] = []): NewsItem[] {
   const out: NewsItem[] = [];
   for (let importance = 6; importance >= 1; importance--) { const per = data.perIssue[String(importance)] ?? 0, n = typeof per === 'number' ? (rng.float() < per ? 1 : 0) : rng.int(per[0], per[1]), tier = tierOf(importance);
-    for (let k = 0; k < n; k++) { const relation = pickW(rng, RELATIONS, r => data.relationWeights[r]), pool = data.topics.filter(t => t.relation === relation && t[tier]?.length && !t.entity); if (!pool.length) continue;
+    for (let k = 0; k < n; k++) { const relation = pickW(rng, RELATIONS, r => data.relationWeights[r]), pool = data.topics.filter(t => t.relation === relation && t[tier]?.length && !t.entity && !(t.needsWeather && !data.words.weather?.length)); if (!pool.length) continue;
       const usable = (p: string) => [...p.matchAll(/\{=(\w+)(?::[^}]+)?\}/g)].every(m => (data.words[`${m[1]}@${importance}`] ?? data.words[`${m[1]}@neutral`] ?? data.words[m[1]!] ?? []).length > 0);          // nothing to say about banks when no bank is left
       const fresh = pool.filter(t => !recent.includes(t.id + ':' + tier)), topic = pickW(rng, fresh.length ? fresh : pool, () => 1), pats = topic[tier]!.filter(usable), f = { ...facts }; if (!pats.length) continue;
       let supplierId: string | undefined, sells: string[] | undefined;

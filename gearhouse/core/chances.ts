@@ -1,7 +1,7 @@
 // Chances the papers bring (review 09, chapter 3-3): a county tender, a motor show, a supplier's clearance sale,
 // an auction of a closed workshop's tools. The article carries no mark; the reader has to act before the last day.
 // A chance that was never read passes, and the journal says the paper had it.
-import { addDays, type DateStr } from './calendar';
+import { addDays, daysBetween, type DateStr } from './calendar';
 import { post } from './ledger';
 import type { ChanceKind } from './news';
 import type { Api, Simulation, System } from './sim';
@@ -13,7 +13,7 @@ export interface Chance { id: number; kind: ChanceKind; issueId: number; headlin
   supplierId?: string; /** cars asked for in a tender */ cars?: number;
   /** what the player put in: a price per car and a design, a car to show, a bid */ price?: number; designId?: string; carId?: number; bid?: number; fee?: number;
   /** the day the outcome is known */ resolves?: DateStr }
-export interface ChanceData { tender: { refPrice: [number, number]; buildDaysPerCar: number; deposit: number; hours: number };
+export interface ChanceData { tender: { /** working vehicles delivered within `recordDays` that a small and a large tender ask for */ record: [number, number]; recordDays: number; refPrice: [number, number]; buildDaysPerCar: number; deposit: number; hours: number };
   show: { fee: number[]; awareness: number[]; prizeAt: number; hours: number }; clearance: { mult: number[]; graceDays: number }; auction: { value: number[]; tools: number[]; maxBonus: number; hours: number } }
 const at = (a: number[], importance: number) => a[Math.min(a.length - 1, importance - 1)]!, clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
@@ -21,8 +21,13 @@ export class Chances {
   constructor(private sim: Simulation, private data: ChanceData, private sales: Sales, private supply: Supply, private note: (importance: number, headline: string, id: string) => void) {}
   private get S() { return this.sim.g.media; }
   private read(c: Chance): boolean { return !!this.S.copies.find(x => x.issueId === c.issueId)?.read; }
-  /** the chances the player knows of: still open, and from a paper that was read */
-  open(): Chance[] { return this.S.chances.filter(c => c.state === 'open' && this.read(c)); }
+  /** working vehicles (delivery vans, pickups, official cars) the shop has delivered lately: its record with public buyers */
+  utilityRecord(): number { const g = this.sim.g, M = g.market, T = this.data.tender; return M.sold.filter(s => { if (daysBetween(s.delivered, g.clock.date) > T.recordDays) return false; const o = M.orders.find(x => x.id === s.orderId), body = M.customers[s.customerId]?.body;
+    return g.shop.designs[o?.designId ?? '']?.use === 'utility' || body === 'pickup' || body === 'delivery' || M.customers[s.customerId]?.type === 'county'; }).length; }
+  /** a public buyer hears only shops that have built working vehicles before; a coachbuilder of costly private cars is not asked */
+  mayBid(c: Chance): boolean { return this.utilityRecord() >= this.data.tender.record[c.importance >= 5 ? 1 : 0]!; }
+  /** the chances the player knows of and may take: still open, and from a paper that was read */
+  open(): Chance[] { return this.S.chances.filter(c => c.state === 'open' && this.read(c) && (c.kind !== 'tender' || this.mayBid(c))); }
   get(id: number): Chance { const c = this.S.chances.find(x => x.id === id); if (!c) throw new Error('no chance ' + id); return c; }
   private take(id: number, kind: ChanceKind): Chance { const c = this.get(id), today = this.sim.g.clock.date; if (c.kind !== kind) throw new Error(`chance ${id} is a ${c.kind}`); if (c.state !== 'open') throw new Error('that chance is ' + c.state);
     if (!this.read(c)) throw new Error('the paper that had it was not read'); if (today > c.deadline) throw new Error('too late'); return c; }
@@ -30,6 +35,7 @@ export class Chances {
 
   /** bid for a public tender: a price per car and the design to build */
   bid(id: number, designId: string, price: number): Chance { const c = this.take(id, 'tender'), a = this.sim.api(); if (!a.g.shop.designs[designId]) throw new Error('unknown design ' + designId);
+    if (!this.mayBid(c)) throw new Error('no record of working vehicles: the clerk sends the papers back');
     c.designId = designId; c.price = price; c.state = 'entered'; c.resolves = addDays(c.deadline, a.rng.int(3, 10)); this.work(c, this.data.tender.hours); return c; }
   /** enter a car in a show: one still in the shop, or one a pleased owner will lend */
   enter(id: number, carId: number): Chance { const c = this.take(id, 'show'), a = this.sim.api(), sold = a.g.market.sold.find(s => s.carId === carId); if (!a.g.shop.cars.some(x => x.id === carId)) throw new Error('no car ' + carId);
@@ -44,7 +50,7 @@ export class Chances {
   system(): System { return { id: 'chances', morning: a => this.morning(a) }; }
   private morning(a: Api): void { const D = this.data, g = a.g, M = g.market;
     for (const c of this.S.chances) {
-      if (c.state === 'open' && a.date > c.deadline) { c.state = 'missed'; a.log(this.read(c) ? `기회를 흘려보냈다: “${c.headline}”` : `그때 신문에 났었다: “${c.headline}”`); continue; }
+      if (c.state === 'open' && a.date > c.deadline) { c.state = 'missed'; a.log(this.read(c) ? (c.kind === 'tender' && !this.mayBid(c) ? `납품 실적이 없어 낼 수 없었다: “${c.headline}”` : `기회를 흘려보냈다: “${c.headline}”`) : `그때 신문에 났었다: “${c.headline}”`); continue; }
       if (c.state !== 'entered' || !c.resolves || c.resolves > a.date) continue;
       if (c.kind === 'tender') { const ref = D.tender.refPrice[0] + (D.tender.refPrice[1] - D.tender.refPrice[0]) * a.rng.float(), name = (M.reputation.trust + M.reputation.quality) / 200;
         const p = clamp(0.55 - (c.price! / ref - 1) * 2.5 + name * 0.3 + M.awareness.town / 100 * 0.15, 0.02, 0.95), won = a.rng.float() < p;

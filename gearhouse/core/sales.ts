@@ -30,7 +30,7 @@ export interface SoldCar { carId: number; orderId: number; customerId: number; d
 export interface Advert { medium: string; size: 'classified' | 'eighth' | 'quarter'; from: DateStr; until: DateStr }
 export interface MarketState { awareness: { town: number; city: number; state: number; nation: number }; reputation: Record<Field, number>; customers: Record<number, Customer>; inquiries: Inquiry[]; orders: Order[]; sold: SoldCar[]; adverts: Advert[];
   /** passing changes in demand that the papers warned of */ boosts: { until: DateStr; mult: number; from: string }[];
-  pending: { due: DateStr; kind: 'answer' | 'referral'; inquiryId?: number; by?: string }[]; nextId: number; text: TextMemory }
+  pending: { due: DateStr; kind: 'answer' | 'referral' | 'return'; inquiryId?: number; by?: string }[]; nextId: number; text: TextMemory }
 export const newMarket = (): MarketState => ({ awareness: { town: 8, city: 0, state: 0, nation: 0 }, reputation: { quality: 0, performance: 0, style: 0, trust: 0, value: 0 }, customers: {}, inquiries: [], orders: [], sold: [], adverts: [], boosts: [], pending: [], nextId: 1, text: {} });
 
 const BODY_KO: Record<string, string> = { sedan: '4인승 세단', coupe: '쿠페', limousine: '리무진', town_car: '타운카', pickup: '짐칸 트럭', delivery: '배달차', roadster: '2인승 로드스터', cabriolet: '카브리올레' };
@@ -41,6 +41,7 @@ const lerp = (r: [number, number], t: number) => r[0] + (r[1] - r[0]) * t, clamp
 export class Sales {
   constructor(private sim: Simulation, private data: SalesData, private eco: EconomyData, private names: NameData, private people: PeopleData, private shop: Shop, private letters: TextSet, private where: { town: string; paper: string }) {}
   /** the town's banks, once the register is there: where a customer banks, and whether that bank has closed */
+  /** days over which callers kept away by a spell of weather come back */ returnDays = 14;
   banks?: { pick(rng: Api['rng']): string | undefined; closed(id: string): boolean };
   private get M() { return this.sim.g.market; }
   private year(d: DateStr) { return String(dateParts(d).year); }
@@ -133,7 +134,8 @@ export class Sales {
   private day(a: Api): void { const M = this.M, R = this.data.rates, demand = this.eco.demand[this.year(a.date)] ?? 1;
     // answers to quotes, and friends of pleased customers
     const due = M.pending.filter(p => p.due <= a.date); M.pending = M.pending.filter(p => p.due > a.date);
-    for (const p of due) { if (p.kind === 'referral') { if (a.workday && a.rng.float() < demand) this.arrive(a, 'referral', { referredBy: p.by }); continue; }
+    for (const p of due) { if (p.kind === 'return') { if (a.workday) this.arrive(a, 'walk_in', { channel: 'visit' }); else M.pending.push({ ...p, due: addDays(a.date, 1) }); continue; }   // on a day off they come the next day
+      if (p.kind === 'referral') { if (a.workday && a.rng.float() < demand) this.arrive(a, 'referral', { referredBy: p.by }); continue; }
       const q = this.inquiry(p.inquiryId!), c = this.customer(q.customerId), o = q.quote!; if (q.state !== 'quoted') continue; const ch = this.chance(c, o, q.received), roll = a.rng.float(), name = fullName(a.g.people[c.personId]!);
       if (roll < ch) { const ord = this.book(a, q, o); a.raise('quote_answer', 'notice', { inquiryId: q.id, customer: name, answer: 'accept', orderId: ord.id }); }
       else if (roll < ch + (1 - ch) * 0.6 && q.rounds < this.data.maxRounds) { q.rounds++; q.state = 'open';               // haggles: a lower price, or an earlier day
@@ -147,7 +149,11 @@ export class Sales {
     M.boosts = M.boosts.filter(b => b.until > a.date); const T = this.data.customerTypes, byType = T.reduce((s, t) => s + t.weight * mult(a.g, 'demand_type', t.id), 0) / T.reduce((s, t) => s + t.weight, 0);
     perWeek *= clamp(M.boosts.reduce((t, b) => t * b.mult, 1) * byType, DEMAND_RANGE[0], DEMAND_RANGE[1]);                  // all passing changes together stay within bounds
     const rep = Object.values(M.reputation).reduce((t, v) => t + v, 0) / 500; perWeek *= clamp(1 + rep * this.data.reputationPull, 0.25, 3);     // a good name brings callers, a bad one keeps them away
-    if (a.rng.float() < perWeek * demand / 6) this.arrive(a, a.rng.float() < 0.25 ? 'walk_in' : M.adverts.some(ad => ad.from <= a.date && a.date < ad.until) ? 'ad' : 'walk_in');
+    const W = a.g.weather; for (; W.returning > 0; W.returning--) M.pending.push({ due: addDays(a.date, a.rng.int(1, this.returnDays)), kind: 'return' });      // those a spell of weather kept away
+    if (a.rng.float() < perWeek * demand / 6) { const source: Source = a.rng.float() < 0.25 ? 'walk_in' : M.adverts.some(ad => ad.from <= a.date && a.date < ad.until) ? 'ad' : 'walk_in';
+      const channel: Channel = source === 'walk_in' ? 'visit' : a.g.supply.phone && a.rng.float() < 0.4 ? 'phone' : a.rng.float() < 0.3 ? 'visit' : 'mail';
+      if (channel === 'visit' && W.visit < 1 && a.rng.float() >= W.visit) { if (W.event) W.lost++; }                                 // weather keeps callers at home; letters and the telephone are not touched
+      else { this.arrive(a, source, { channel }); if (channel === 'visit' && W.visit > 1 && a.rng.float() < W.visit - 1) this.arrive(a, 'walk_in', { channel: 'visit' }); } }
     // inquiries left unanswered are lost when the customer's patience runs out
     for (const q of M.inquiries) if ((q.state === 'open') && daysBetween(q.received, a.date) > this.customer(q.customerId).patience + q.rounds * 10) { q.state = 'lost'; this.bump('trust', -1, a); } }
   private evening(a: Api): void { const M = this.M;

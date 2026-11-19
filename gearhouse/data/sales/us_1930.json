@@ -403,11 +403,11 @@
   "sidemount_spare"
  ],
  "rates": {
-  "note": "inquiries per week",
-  "adClassified": 0.35,
-  "adEighth": 0.8,
-  "adQuarter": 1.3,
-  "walkInPerAwareness": 0.004,
+  "note": "inquiries per week; raised about 10% when weather began keeping callers at home, so that a year brings as many as before",
+  "adClassified": 0.38,
+  "adEighth": 0.87,
+  "adQuarter": 1.42,
+  "walkInPerAwareness": 0.0046,
   "phoneBonus": 1.4
  },
  "adCost": {

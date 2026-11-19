@@ -37,6 +37,8 @@ export interface GameEvents {
   car_delivered: { orderId: number; carId: number; satisfaction: number; standing: number };
   car_broke_down: { carId: number; kind: string; severity: number };
   reputation_changed: { field: string; value: number };
+  weather_event_started: { kind: string; date: DateStr; days: number };
+  weather_event_ended: { kind: string; date: DateStr };
   newspaper_published: { issueId: number; publication: string; date: DateStr };
   employee_hired: { date: DateStr; personId: string; wage: number };
   employee_left: { date: DateStr; personId: string; reason: string };

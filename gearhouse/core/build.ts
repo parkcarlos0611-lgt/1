@@ -9,7 +9,7 @@ import type { Task } from './state';
 export type OrderType = 'body_only' | 'bought' | 'built';
 export interface StepData { id: string; skill: string; hours: Record<OrderType, number>; sized?: boolean; after: string[]; needs: Partial<Record<OrderType | 'all', Record<string, number>>>; visible: number; hidden: number; defects: string[] }
 export interface BuildData { toolLevel: number; /** a step below this quality may leave a fault; the chance grows over the span */ defect: { below: number; span: number }; repeatFactor: number[]; design: { baseHours: Record<OrderType, number>; perProportion: number; perPart: number; perPanel: number; mockupHours: number }; steps: StepData[] }
-export interface Design { id: string; name: string; baseCar: string; orderType: OrderType;
+export interface Design { id: string; name: string; baseCar: string; orderType: OrderType; /** a working vehicle (delivery van, pickup, official car) rather than a private car */ use?: 'passenger' | 'utility';
   /** body size against a mid-size car (1 = mid-size) */
   size: number;
   /** how far the body departs from its base car: proportions 0..1, parts swapped, panels reshaped by hand */

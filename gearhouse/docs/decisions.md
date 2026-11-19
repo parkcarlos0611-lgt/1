@@ -77,3 +77,13 @@ These decisions still hold, from `legacy/docs/MASTER_GAME_PLAN.md`:
 - All demand multipliers together are kept within 0.5 to 1.6; at most two conditions of one kind hold at once, the weakest giving way to a stronger one.
 - Four chances that the reader must act on before a last day: a public tender, a motor show, a supplier's clearance sale, a tool auction. An unread chance passes and the journal says the paper had it.
 - The motor show no longer raises awareness by itself; only entering a car does.
+
+## 2026-11-19 — tenders and weather (review 11)
+
+- A public tender is open only to a shop with a record of working vehicles: at least one delivered in the last three years for a county or town tender, three for a state-level one. The article is still printed; a shop without the record cannot bid.
+- No price ceiling keeps costly shops out of tenders; a high bid already loses on price.
+- Weather: clear, rain, snow; six seasonal spells (cold wave, blizzard, long rain, heat wave, drought, fine autumn) of at most a month; a long rain once a year at most; a grace of 7-14 days after a spell (5-10 in winter).
+- Weather changes only callers in person; half of those a spell kept away come within two weeks after it.
+- Papers print short weather notes by a leaning set per publication.
+- Links from weather to other systems (painting, deliveries, wanted features, roads, utilities, farms) come next, as soon as possible.
+- Real weather disasters are added when the real events are verified.

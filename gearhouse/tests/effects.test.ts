@@ -16,6 +16,9 @@ const days = (w: W, n: number) => { for (let i = 0; i < n; i++) w.sim.stepDay();
 function chance(w: W, kind: ChanceKind, o: Partial<Chance> = {}, read = true): Chance { const S = w.sim.g.media, today = w.sim.g.clock.date, issueId = 9000 + S.chances.length; S.copies.push({ issueId, place: 'desk', read, marked: false });
   const c: Chance = { id: 8000 + S.chances.length, kind, issueId, headline: '시험 기사', importance: 4, opened: today, deadline: '1930-01-20', state: 'open', ...o }; S.chances.push(c); return c; }
 
+/** a car already delivered to a customer who wanted that kind of body */
+function delivered(w: W, body: string): void { const g = w.sim.g, M = g.market, id = 7000 + M.sold.length; M.customers[id] = { ...w.sales.customer(w.sales.firstCustomer().customerId), id, body };
+  g.shop.cars.push({ id, buildId: 0, designId: 'patrol', built: g.clock.date, quality: { visible: 60, hidden: 60 }, defects: [], cost: 0, ownHours: 0 }); M.sold.push({ carId: id, orderId: -1, customerId: id, delivered: g.clock.date, satisfaction: 50 }); }
 describe('passing conditions', () => {
   it('multiply or add by key, end on their day, and hold two of a kind at most', () => { const w = newWorld(1, FOUNDER), g = w.sim.g;
     expect(mult(g, 'budget', 'farmer')).toBe(1); cond(w, { kind: 'budget', key: 'farmer', value: 1.2 }); cond(w, { kind: 'budget', value: 0.9 });
@@ -58,7 +61,9 @@ describe('chances from the papers', () => {
     days(w, 25); expect(read.state).toBe('missed'); expect(w.sim.g.journal.some(j => j.text.startsWith('기회를 흘려보냈다'))).toBe(true); expect(() => w.chances.auction(read.id, 50)).toThrow(); });
   it('a tender is won on price and name, and brings an order for every car', () => { let won = 0, lost = 0;
     for (let seed = 1; seed <= 12; seed++) { const w = newWorld(seed, FOUNDER), g = w.sim.g; w.shop.addDesign({ id: 'patrol', name: 'patrol', baseCar: 'sedan30', orderType: 'bought', size: 1, effort: { proportion: 0, parts: 0, panels: 0 } });
-      const cheap = chance(w, 'tender', { cars: 3 }), dear = chance(w, 'tender', { cars: 3 }); w.chances.bid(cheap.id, 'patrol', 1000); w.chances.bid(dear.id, 'patrol', 2400); const cash = g.ledger.cash; days(w, 35);
+      const cheap = chance(w, 'tender', { cars: 3 }), dear = chance(w, 'tender', { cars: 3 }), big = chance(w, 'tender', { cars: 5, importance: 5 });
+      /* a shop that has only built private cars is not heard */ expect(() => w.chances.bid(cheap.id, 'patrol', 1000)).toThrow(/record/); expect(w.chances.open()).toEqual([]); delivered(w, 'delivery'); expect(w.chances.utilityRecord()).toBe(1);
+      expect(w.chances.open().map(c => c.id)).toEqual([cheap.id, dear.id]); expect(() => w.chances.bid(big.id, 'patrol', 1000)).toThrow(/record/); /* a large tender asks for more */ w.chances.bid(cheap.id, 'patrol', 1000); w.chances.bid(dear.id, 'patrol', 2400); const cash = g.ledger.cash; days(w, 35);
       if (cheap.state === 'won') { won++; const mine = g.market.orders.filter(o => o.designId === 'patrol' && o.price === 1000); expect(mine.length).toBe(3); expect(g.ledger.cash).toBeGreaterThan(cash + 600); expect(g.incidents.some(i => i.kind === 'tender_result' && i.payload.won === true)).toBe(true); }
       if (dear.state === 'lost') lost++; }
     expect(won).toBeGreaterThanOrEqual(9); expect(lost).toBeGreaterThanOrEqual(11); });

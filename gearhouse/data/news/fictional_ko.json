@@ -715,7 +715,8 @@
    "officials": [
     "농민회 회장",
     "군수"
-   ]
+   ],
+   "needsWeather": true
   },
   {
    "id": "election",
@@ -870,7 +871,8 @@
     "소방대장",
     "읍장",
     "군수"
-   ]
+   ],
+   "needsWeather": true
   },
   {
    "id": "fair",

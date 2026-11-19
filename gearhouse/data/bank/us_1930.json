@@ -1,0 +1,44 @@
+{
+ "note": "Banking for the slice. Starting values, not checked against period sources: savings interest, loan rates of small-town banks, the share of deposits recovered from failed banks and the tax are all to be verified.",
+ "depositRate": 0.03,
+ "loan": {
+  "rate": [
+   0.06,
+   0.09
+  ],
+  "ofYearIncome": 0.5,
+  "floor": 400,
+  "terms": [
+   6,
+   12,
+   24
+  ],
+  "answerDays": [
+   3,
+   7
+  ],
+  "missedLimit": 3
+ },
+ "run": {
+  "weeklyShare": 0.2
+ },
+ "failure": {
+  "recover": [
+   0.1,
+   0.6
+  ],
+  "months": [
+   6,
+   18
+  ]
+ },
+ "tax": {
+  "exemption": 1500,
+  "rate": 0.04,
+  "dueMonth": 3,
+  "dueDay": 15
+ },
+ "bankruptcy": {
+  "days": 60
+ }
+}

@@ -6,10 +6,11 @@ import type { Incident } from './state';
 import type { World } from './world';
 import { makePerson, firstImpression } from './people';
 import { DATA } from './world';
+import { reach } from './bank';
 
-export interface BotLog { /** chances taken, and tenders and auctions won */ chances?: Record<string, number>; delaysAsked?: number; inquiries: number; quoted: number; orders: number; delivered: number; lost: number; cannotPay: number; satisfaction: number[]; bankruptDate?: string; minCash: number }
+export interface BotLog { loans?: number; loansRefused?: number; lostAtBank?: number; /** chances taken, and tenders and auctions won */ chances?: Record<string, number>; delaysAsked?: number; inquiries: number; quoted: number; orders: number; delivered: number; lost: number; cannotPay: number; satisfaction: number[]; bankruptDate?: string; minCash: number }
 
-export function runBot(w: World, days: number, opt: { hire?: boolean; advert?: boolean; deposit?: number; chances?: boolean } = {}): BotLog {
+export function runBot(w: World, days: number, opt: { hire?: boolean; advert?: boolean; deposit?: number; chances?: boolean; /** keep this share of the cash at a bank and borrow when cash runs short */ bank?: number } = {}): BotLog {
   const { sim, supply, shop, sales, media } = w, g = sim.g, log: BotLog = { inquiries: 0, quoted: 0, orders: 0, delivered: 0, lost: 0, cannotPay: 0, satisfaction: [], minCash: g.ledger.cash };
   const price = (part: string) => DATA.parts.parts[part]!.price, asked = new Set<string>();
   for (const [id, t] of [['std_body', 'body_only'], ['std_bought', 'bought'], ['std_built', 'built']] as const) if (!g.shop.designs[id]) shop.addDesign({ id, name: id, baseCar: 'sedan30', orderType: t, size: 1, effort: { proportion: 0, parts: 0, panels: 0 } });
@@ -46,17 +47,21 @@ export function runBot(w: World, days: number, opt: { hire?: boolean; advert?: b
         const ord = g.market.orders.at(-1)!; log.orders++; shop.startBuild(ord.designId, ord.id); stockUp();
         if (opt.hire !== false && g.employees.length < 2 && g.ledger.cash > 450 + 300 * g.employees.length && active() >= 1) { const p = makePerson(sim.rng, DATA.names, DATA.people, +g.clock.date.slice(0, 4), { age: sim.rng.int(19, 40), level: sim.rng.int(40, 60) }); sim.hire(p, 18 + Math.round(Math.max(...Object.values(p.skills)) / 5), firstImpression(sim.rng, p, DATA.people.skills)); }
         break; }
-      case 'supplier_quote': { const q = supply.quote(P.quoteId), total = q.lines.reduce((t, l) => t + l.qty * l.unitPrice, 0); if (g.ledger.cash >= total) { supply.order(q.id); sim.resolve(it.id, 'order'); } break; }
+      case 'supplier_quote': { const q = supply.quote(P.quoteId), total = q.lines.reduce((t, l) => t + l.qty * l.unitPrice, 0); if (reach(g) >= total) { supply.order(q.id); sim.resolve(it.id, 'order'); } break; }
       case 'car_built': { const b = g.shop.builds.find(x => g.shop.cars.find(c => c.id === P.carId)!.buildId === x.id)!, ord = g.market.orders.find(o => o.id === b.orderId); if (!ord || ord.state !== 'building') break;
         let r = sales.deliver(ord.id, P.carId); if ('cannotPay' in r) { log.cannotPay++; sim.resolve(r.cannotPay.id, 'discount'); r = sales.settle(ord.id, 'discount')!; }
         log.delivered++; log.satisfaction.push((r as { satisfaction: number }).satisfaction); if (g.employees.length && active() === 0) sim.dismiss(g.employees[0]!.personId, 'no work'); break; }
       case 'stock_short': stockUp(); break;
+      case 'cash_warning': if (opt.bank != null && g.bank.bankId && !g.bank.asked && !g.bank.loans.length) { const t = w.bank.terms(500, 12), amount = Math.min(600, t.limit); if (amount >= 100) try { w.bank.ask(amount, 12); } catch { /* the banker will not talk */ } } break;
+      case 'loan_answer': if (P.granted) log.loans = (log.loans ?? 0) + 1; else log.loansRefused = (log.loansRefused ?? 0) + 1; break;
+      case 'bank_closed': log.lostAtBank = (log.lostAtBank ?? 0) + (P.locked as number); break;
     } };
   let adUntil = '';
   for (let i = 0; i < days; i++) {
     if (opt.advert !== false && g.clock.date >= adUntil && g.ledger.cash > 60) { sales.placeAdvert('classified', 4); adUntil = addDays(g.clock.date, 28); }
     for (const it of sim.stepDay().stops) handle(it);
-    log.minCash = Math.min(log.minCash, g.ledger.cash); if (g.ledger.cash < -200 && !log.bankruptDate) { log.bankruptDate = g.clock.date; break; }
+    if (opt.bank != null) { if (!g.bank.bankId) { const b = w.bank.banks()[0]; if (b) w.bank.open(b.id); } if (g.bank.bankId && g.clock.date.endsWith('-15') && g.ledger.cash > 300) { const want = (g.ledger.cash + g.bank.deposit) * opt.bank - g.bank.deposit; if (want > 50) w.bank.deposit(Math.min(want, g.ledger.cash - 200)); } }
+    const have = reach(g); log.minCash = Math.min(log.minCash, have); if ((have < -200 || g.bank.bankrupt) && !log.bankruptDate) { log.bankruptDate = g.clock.date; break; }
   }
   return log;
 }

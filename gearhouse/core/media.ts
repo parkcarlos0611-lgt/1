@@ -67,6 +67,7 @@ export class Media {
       const wn = this.weather ? weatherNote(g.weather, this.weather, last, a.date, a.rng, pub.weatherDesk ?? 0) : null;
       const barred = this.weather ? blockedTopics(g.weather, this.weather, a.date) : [];
       const fiction = { ...this.fiction, words, topics: barred.length ? this.fiction.topics.filter(t => !barred.includes(t.id)) : this.fiction.topics }, own = this.press.turnover(a.rng, pub.id, a.date), town = this.register.weeklyNews(a.rng, this.names, fiction, a.date, this.times(a.date), facts, this.bodies?.voices ?? []);
+      for (const it of town) { const e = it.entityId ? this.register.get(it.entityId) : undefined; if (e) a.bus.emit('register_changed', { entityId: e.id, kind: e.kind, status: e.status, name: e.name }); }
       const items: NewsItem[] = [...realItems(a.rng, this.real, last, a.date), ...S.news.splice(0).map((n): NewsItem => ({ origin: 'fictional', id: n.id, relation: 'related', importance: n.importance, headline: n.headline, weight: n.importance + 0.5 })), ...own, ...town, ...(wn ? [{ origin: 'fictional', id: 'weather_note', relation: 'background', slant: 'neutral', importance: wn.importance, headline: wn.headline, lead: wn.lead, weight: wn.importance - 0.5 } as NewsItem] : []), ...fictionalItems(a.rng, fiction, facts, S.recent, sup, this.bodies?.voices)];
       for (const it of items) this.press.assign(a.rng, pub.id, it);
       for (const it of items) { if (it.lead) it.lead = it.lead.replace('{town}', this.town); const e = it.effect; if (!e || e.kind === 'supplier_found') continue;

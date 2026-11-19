@@ -41,6 +41,11 @@ export interface GameEvents {
   work_held: { buildId: number; orderId?: number; reason: string };
   /** something the papers warned of has come: more or fewer callers for some weeks, or the town hearing of the trade */
   news_effect: { kind: 'demand' | 'awareness'; value: number; weeks: number; from: string; held?: boolean };
+  /** something in the town register changed state (a bank closed, a factory laid men off) */
+  register_changed: { entityId: string; kind: string; status: string; name: string };
+  loan_taken: { loanId: number; amount: number };
+  bank_failed: { bankId: string; lost: number };
+  bankrupt: { date: DateStr };
   weather_event_started: { kind: string; date: DateStr; days: number };
   weather_event_ended: { kind: string; date: DateStr; /** callers the spell kept away who now come */ returning: number };
   /** someone meant to call in person and stayed at home for the weather */

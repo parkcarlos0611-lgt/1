@@ -6,6 +6,7 @@ import { load, save, type Incident, type Task } from '../core/state';
 import { addDays, daysBetween, parts, weekday } from '../core/calendar';
 import { fullName } from '../core/people';
 import { statement } from '../core/ledger';
+import { carSheet, reach } from '../core/bank';
 
 const KEY = 'gearhouse.slice.save';
 const WD = ['일', '월', '화', '수', '목', '금', '토'];
@@ -18,7 +19,7 @@ const MUST: Record<string, string> = { closed_roof: '닫힌 지붕', folding_top
 const SKY: Record<string, string> = { clear: '맑음', rain: '비', snow: '눈' };
 const SPELL: Record<string, string> = { cold_wave: '한파', blizzard: '폭설', long_rain: '긴 비', heat_wave: '폭염', drought: '가뭄', fine_autumn: '맑은 가을' };
 const KIND: Record<string, string> = { inquiry: '문의', quote_answer: '견적 답장', supplier_quote: '공급사 견적', parts_delivered: '납품 도착', delivery_delayed: '납품 지연', stock_short: '자재 부족', build_step_done: '공정 끝', car_built: '차 완성', newspaper: '신문 도착',
-  month_closed: '달 마감', cash_warning: '현금 경고', customer_cannot_pay: '잔금 미납', order_late: '납기 지남', car_broke_down: '판 차 고장', paint_held: '비로 도장 멈춤', tender_result: '입찰 결과', show_result: '품평회 결과', auction_result: '경매 결과', wage_missed: '급여 밀림', design_finalized: '설계 완료', supplier_no_stock: '물건 없음' };
+  month_closed: '달 마감', loan_answer: '대출 답', loan_missed: '상환 밀림', bank_closed: '은행 문 닫음', bank_settled: '묶인 예금 정리', tax_notice: '세금 고지', bankruptcy: '파산', cash_warning: '현금 경고', customer_cannot_pay: '잔금 미납', order_late: '납기 지남', car_broke_down: '판 차 고장', paint_held: '비로 도장 멈춤', tender_result: '입찰 결과', show_result: '품평회 결과', auction_result: '경매 결과', wage_missed: '급여 밀림', design_finalized: '설계 완료', supplier_no_stock: '물건 없음' };
 const DESIGNS = [['std_body', 'body_only', '표준 세단 차체'], ['std_bought', 'bought', '표준 세단 (사 온 섀시)'], ['std_built', 'built', '표준 세단 (자체 섀시)']] as const;
 
 const $ = <T extends HTMLElement = HTMLElement>(sel: string) => document.querySelector<T>(sel)!;
@@ -31,7 +32,7 @@ let w: World | null = null, tab: 'tray' | 'papers' | 'plan' | 'book' = 'tray', s
 const store = { get: () => { try { return localStorage.getItem(KEY); } catch { return null; } }, set: (v: string) => { try { localStorage.setItem(KEY, v); } catch { /* private window */ } }, clear: () => { try { localStorage.removeItem(KEY); } catch { /* same */ } } };
 const g = () => w!.sim.g;
 const SAY: [RegExp, string][] = [[/nothing more to ask/, '더 물을 것이 없다.'], [/all they will say/, '손님이 더는 말을 아낀다. 견적을 보낼 때다.'], [/not open for talks/, '지금은 상담할 수 없다.'], [/already asked/, '이미 한 번 청했다.'], [/will not haggle/, '손님이 더는 흥정하지 않는다.'], [/no more haggling/, '더는 흥정할 수 없다.'],
-  [/not known yet/, '아직 모르는 가게다.'], [/no telephone/, '전화가 없다.'], [/drawer is full/, '서랍이 가득 찼다.'], [/owner will not lend/, '주인이 차를 빌려주지 않는다.'], [/no record of working/, '납품 실적이 없어 서류를 받아 주지 않는다.'], [/too late/, '기한이 지났다.'], [/not read/, '그 신문을 읽지 않았다.'], [/design not ready/, '설계가 아직 끝나지 않았다.']];
+  [/not known yet/, '아직 모르는 가게다.'], [/no telephone/, '전화가 없다.'], [/drawer is full/, '서랍이 가득 찼다.'], [/owner will not lend/, '주인이 차를 빌려주지 않는다.'], [/no record of working/, '납품 실적이 없어 서류를 받아 주지 않는다.'], [/too late/, '기한이 지났다.'], [/not read/, '그 신문을 읽지 않았다.'], [/design not ready/, '설계가 아직 끝나지 않았다.'], [/not that much in hand/, '손에 그만한 돈이 없다.'], [/not that much at the bank/, '은행에 그만한 돈이 없다.'], [/only a little while the run/, '은행 앞에 줄이 늘어서 조금씩만 내준다.'], [/will not talk about that much/, '은행이 그만큼은 이야기하지 않는다.'], [/has not answered/, '은행이 아직 답하지 않았다.'], [/no account/, '거래하는 은행이 없다.']];
 function toast(text: string) { text = SAY.find(([re]) => re.test(text))?.[1] ?? text; const t = $('#toast'); t.textContent = text; t.classList.add('on'); clearTimeout(toastT); toastT = window.setTimeout(() => t.classList.remove('on'), 2600); }
 /** thrown by an action that has already redrawn the screen itself */
 class Skip extends Error {}
@@ -67,7 +68,7 @@ function frame() { $('#app').innerHTML = `<header><div class="when"><b id="date"
     <nav id="tabs"></nav><main id="main"></main><div id="toast" role="status"></div>`; }
 function render() { if (!w) return; const G = g(), W = G.weather, wait = waiting();
   $('#date').textContent = dateKo(G.clock.date); $('#sky').textContent = `${SKY[W.today]}${W.event ? ' · ' + SPELL[W.event.kind] : ''}`; $('#sky').className = 'sky ' + W.today;
-  $('#cash').textContent = money(G.ledger.cash);
+  $('#cash').textContent = money(reach(G));
   $('#speed').innerHTML = [[0, '멈춤'], [1, '1배'], [2, '2배'], [3, '3배'], [9, '다음 일까지']].map(([v, l]) => `<button data-v="${v}" class="${speed === v ? 'on' : ''}" ${v && wait.length ? 'disabled' : ''}>${l}</button>`).join('');
   $('#speed').querySelectorAll('button').forEach(b => { b.onclick = () => { speed = +b.dataset.v!; render(); }; });
   const unread = G.media.copies.filter(c => c.place === 'desk' && !c.read).length, nTray = wait.length + notices().length;
@@ -88,6 +89,8 @@ function summary(i: Incident): string { const P = i.payload as Record<string, an
     case 'stock_short': return `${STEP[P.step] ?? P.step} 공정에 ${PART[P.part] ?? P.part} 없음`; case 'build_step_done': return `${STEP[P.step] ?? P.step}${P.quality > 0 ? ` — 품질 ${P.quality}` : ''}`; case 'car_built': return `겉 품질 ${P.quality.visible}, 속 품질 ${P.quality.hidden}`;
     case 'newspaper': return String(P.lead ?? P.name); case 'month_closed': return `${P.month}: 들어온 돈 ${money(P.income)}, 나간 돈 ${money(P.spending)}`; case 'cash_warning': return `${P.weeks}주 안에 현금이 바닥난다`;
     case 'customer_cannot_pay': return `${P.customer} — 잔금 ${money(P.owed)}`; case 'order_late': return `주문 ${P.orderId}, 약속한 날 ${short(P.due)}`; case 'paint_held': return '비가 그칠 때까지 도장을 쉰다'; case 'car_broke_down': return `주문 ${P.orderId}의 차`;
+    case 'loan_answer': return P.granted ? `${money(P.amount)}를 빌려주겠다고 한다` : '빌려줄 수 없다고 한다'; case 'loan_missed': return `${money(P.payment)}를 내지 못했다 (${P.missed}/${P.limit}번째)`; case 'bank_closed': return `${P.bank} — 맡긴 돈 ${money(P.locked)}가 묶였다`;
+    case 'bank_settled': return `${P.bank}: ${money(P.back)} 돌려받음, ${money(P.lost)} 잃음`; case 'tax_notice': return `${P.year}년 벌이 ${money(P.profit)}, 세금 ${money(P.amount)} (${short(P.due)}까지)`; case 'bankruptcy': return '더는 버틸 수 없다';
     case 'tender_result': return P.won ? `낙찰! ${P.cars}대` : '다른 업체가 가져갔다'; case 'show_result': return P.prize ? '상을 받았다' : '출품을 마쳤다'; case 'auction_result': return P.won ? `낙찰 ${money(P.bid)}` : '다른 사람이 가져갔다'; default: return ''; } }
 function matCost(designId: string): number { const d = g().shop.designs[designId]!; return Object.entries(w!.shop.bom(d)).reduce((t, [p, n]) => t + DATA.parts.parts[p]!.price * n, 0); }
 function detail(i: Incident): string { const P = i.payload as Record<string, any>, G = g(), open = i.state === 'open', done = `<div class="row"><button data-do="seen" data-id="${i.id}">치우기</button></div>`;
@@ -164,7 +167,15 @@ function plan(): string { const G = g(), tasks = Object.values(G.tasks).filter(t
 
 // ---------- the book ----------
 function book(): string { const G = g(), month = G.clock.date.slice(0, 7), st = statement(G, month), R = G.market.reputation;
-  return `<section><h2>이번 달 <small>${month}</small></h2><dl><dt>들어온 돈</dt><dd>${money(st.income)}</dd><dt>나간 돈</dt><dd>${money(st.spending)}</dd><dt>현금</dt><dd>${money(G.ledger.cash)}</dd></dl>
+  const Bk = G.bank, banks = w!.bank.banks(), mine = banks.find(b => b.id === Bk.bankId), t = Bk.bankId ? w!.bank.terms(300, 12) : null, sheets = G.market.orders.filter(o => o.state === 'delivered').slice(-5).reverse().map(o => ({ o, s: carSheet(G, o.id) })).filter(x => x.s);
+  return `<section><h2>이번 달 <small>${month}</small></h2><dl><dt>들어온 돈</dt><dd>${money(st.income)}</dd><dt>나간 돈</dt><dd>${money(st.spending)}</dd><dt>손에 든 돈</dt><dd>${money(G.ledger.cash)}</dd><dt>은행에 맡긴 돈</dt><dd>${money(Bk.deposit)}</dd>${Bk.tax && Bk.tax.amount > 0 ? `<dt>낼 세금</dt><dd>${money(Bk.tax.amount)} (${short(Bk.tax.due)}까지)</dd>` : ''}</dl>
+    <h2>은행 <small>${mine ? esc(mine.name) : '거래하는 은행이 없다'}</small></h2>${Bk.bankrupt ? '<p class="note">빚을 갚지 못해 공방 문을 닫게 되었다.</p>' : ''}
+    ${banks.length ? `<label>거래 은행 <select id="b-bank">${banks.map(b => `<option value="${b.id}" ${b.id === Bk.bankId ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}</select></label><div class="row"><button data-do="bankOpen">${mine ? '이 은행으로 옮긴다' : '계좌를 연다'}</button></div>` : '<p class="empty">읍내 은행은 첫 신문이 온 뒤에 알게 된다.</p>'}
+    ${mine ? `<label>금액 ($) <input id="b-amount" type="number" min="1" step="10" value="100"></label><div class="row"><button data-do="bankIn">맡긴다</button><button data-do="bankOut">찾는다</button></div><p class="hint">맡긴 돈에는 한 해 ${Math.round(DATA.bank.depositRate * 100)}푼 이자가 붙고, 은행이 대출을 내줄 때 본다. 은행이 문을 닫으면 맡긴 돈이 묶인다. 은행 사정은 신문으로만 알 수 있다. 손에 든 돈이 모자라면 은행 돈으로 치른다.</p>
+    <fieldset><legend>대출</legend>${Bk.loans.length ? `<table><tr><th>빌린 돈</th><th>남은 돈</th><th>다달이</th><th>밀림</th></tr>${Bk.loans.map(l => `<tr><td>${money(l.principal)}</td><td>${money(l.balance)}</td><td>${money(l.payment)}</td><td>${l.missed}</td></tr>`).join('')}</table>` : ''}
+    ${Bk.asked ? `<p class="tag">${money(Bk.asked.amount)}를 청했다. 은행의 답을 기다린다.</p>` : `<p class="hint">지금 은행이 이야기해 볼 만한 한도는 ${money(t!.limit)}, 이자는 한 해 ${(t!.rate * 100).toFixed(1)}%다.</p><label>빌릴 돈 ($) <input id="l-amount" type="number" min="50" step="50" value="${Math.min(300, t!.limit)}"></label><label>기간 <select id="l-months">${DATA.bank.loan.terms.map(m => `<option value="${m}" ${m === 12 ? 'selected' : ''}>${m}달</option>`).join('')}</select></label><div class="row"><button data-do="loanAsk">대출을 청한다</button></div>`}</fieldset>` : ''}
+    ${Bk.frozen.length ? `<p class="note">문 닫은 은행에 ${money(Bk.frozen.reduce((x, f) => x + f.amount, 0))}가 묶여 있다. 얼마를 돌려받을지는 정리가 끝나야 안다.</p>` : ''}
+    <h2>차 한 대의 셈</h2>${sheets.length ? `<table><tr><th>주문</th><th>받은 돈</th><th>자재·품삯</th><th>남은 돈</th><th>내 시간</th></tr>${sheets.map(({ o, s }) => `<tr><td>${o.id}</td><td>${money(s!.paid)}</td><td>${money(s!.materialsAndWages)}</td><td>${money(s!.left)}</td><td>${s!.ownHours}시간</td></tr>`).join('')}</table>` : '<p class="empty">넘겨준 차가 아직 없다.</p>'}
     <h2>읍내의 평</h2><dl><dt>읍에서 아는 정도</dt><dd>${Math.round(G.market.awareness.town)} / 100</dd>${(Object.entries({ quality: '품질', performance: '성능', style: '맵시', trust: '신뢰', value: '값어치' }) as [keyof typeof R, string][]).map(([k, l]) => `<dt>${l}</dt><dd>${Math.round(R[k])}</dd>`).join('')}</dl>
     <h2>주문</h2>${G.market.orders.length ? `<ul class="list plain">${G.market.orders.slice(-8).reverse().map(o => `<li><b>주문 ${o.id}</b><span>${money(o.price)} · ${short(o.due)}까지</span><time>${o.state === 'building' ? '제작 중' : o.state === 'delivered' ? '넘겨줌' : '취소'}</time></li>`).join('')}</ul>` : '<p class="empty">아직 주문이 없다.</p>'}
     <h2>일지</h2><ul class="journal">${G.journal.filter(j => !/^(holiday|expired|weather_|delay_)/.test(j.text) && !KIND[j.text]).slice(-12).reverse().map(j => `<li><time>${short(j.date)}</time>${esc(j.text)}</li>`).join('') || '<li>적힌 것이 없다.</li>'}</ul>
@@ -198,6 +209,9 @@ function act(what: string, d: DOMStringMap, root: HTMLElement) { const W = w!, G
     case 'askPart': { const s = W.supply.sellers(d.part!)[0]!; W.supply.inquire(s.id, [{ part: d.part!, qty: +d.qty!, grade: s.line.grade }], s.mailDays === 0 ? 'visit' : 'mail'); toast(s.mailDays === 0 ? '가게에 들러 물었다.' : '편지로 값을 물었다. 며칠 걸린다.'); break; }
     case 'planUp': case 'planDown': { const ids = Object.values(G.tasks).filter(t => !t.done).map(t => t.id), cur = [...G.plan.map(s => s.taskId).filter(x => ids.includes(x)), ...ids.filter(x => !G.plan.some(s => s.taskId === x))], k = cur.indexOf(d.id!), j = k + (what === 'planUp' ? -1 : 1);
       if (k >= 0 && j >= 0 && j < cur.length) { [cur[k], cur[j]] = [cur[j]!, cur[k]!]; G.plan = cur.map(taskId => ({ taskId })); } break; }
+    case 'bankOpen': W.bank.open(val('#b-bank')); toast('계좌를 열었다.'); break;
+    case 'bankIn': W.bank.deposit(+val('#b-amount')); break; case 'bankOut': W.bank.withdraw(+val('#b-amount')); break;
+    case 'loanAsk': W.bank.ask(+val('#l-amount'), +val('#l-months')); toast('은행에 대출을 청했다. 며칠 뒤 답이 온다.'); break;
     case 'restart': speed = 0; w = null; startScreen(); throw new Skip(); }
   store.set(save(g())); }
 (globalThis as { gearhouse?: unknown }).gearhouse = { world: () => w };          // for checks from the browser console and the screen tests

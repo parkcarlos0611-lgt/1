@@ -93,3 +93,11 @@ These decisions still hold, from `legacy/docs/MASTER_GAME_PLAN.md`:
 - Rain stops the paint step for the day; working days lost to it are not counted as late.
 - A customer can be asked once per order for more time.
 - A cold wave raises the next utilities bill by 40% (heating); a heat wave by 15% (ice and fans; workshops of the 1930s had no air cooling).
+
+## 2026-11-19 — after the first play; banks
+
+- Chances come about half as often and are worth more.
+- Headlines carry no unrelated time and place; quotes are said by someone who could say them; letters keep one speech level.
+- A customer sits through two talks before a quote.
+- Banks: one account at a town bank, 3% on deposits, loans of 6/12/24 months, payments monthly, three missed payments end the game; a failed bank locks the deposit away and returns part of it later; the papers are the only warning.
+- Tax: told on January 2, paid on March 15, 4% of the year's earnings above $1,500 (to be checked against sources).

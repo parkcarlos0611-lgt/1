@@ -8,6 +8,7 @@ import { newMarket, type MarketState } from './sales';
 import { newMedia, type MediaState } from './media';
 import type { Condition } from './conditions';
 import { newWeather, type WeatherState } from './weather';
+import { newBank, type BankState } from './bank';
 
 export const SAVE_VERSION = 1;
 export type Phase = 'morning' | 'day' | 'evening';
@@ -64,19 +65,20 @@ export interface GameState {
   /** passing conditions the papers warned of (core/conditions.ts) */
   conditions: Condition[];
   weather: WeatherState;
+  bank: BankState;
 }
 
 export function newGame(seed: number, start: DateStr = '1930-01-01'): GameState {
   return { version: SAVE_VERSION, seed, rng: '', clock: { date: start, started: start }, settings: { daysOff: [0], quietKinds: [] },
     people: {}, founderId: null, employees: [], ledger: { cash: 0, entries: [] },
     supply: { suppliers: {}, pending: [], quotes: [], orders: [], lots: [], nextId: 1, phone: false }, shop: { designs: {}, builds: [], cars: [], nextId: 1 }, market: newMarket(), media: newMedia(),
-    founder: { hoursPerDay: 10, overtimePerDay: 0, overtimeThisWeek: 0, fatigue: 0 }, tasks: {}, plan: [], incidents: [], nextIncidentId: 1, journal: [], conditions: [], weather: newWeather() };
+    founder: { hoursPerDay: 10, overtimePerDay: 0, overtimeThisWeek: 0, fatigue: 0 }, tasks: {}, plan: [], incidents: [], nextIncidentId: 1, journal: [], conditions: [], weather: newWeather(), bank: newBank() };
 }
 export const save = (g: GameState): string => JSON.stringify(g);
 /** load a save, converting older versions step by step */
 export function load(json: string): GameState {
   const g = JSON.parse(json) as GameState; if (typeof g.version !== 'number' || g.version > SAVE_VERSION) throw new Error('save version ' + g.version + ' is not supported');
   // version converters go here: while (g.version < SAVE_VERSION) convert[g.version](g)
-  g.conditions ??= []; g.weather ??= newWeather();
+  g.conditions ??= []; g.weather ??= newWeather(); g.bank ??= newBank();
   return g;
 }

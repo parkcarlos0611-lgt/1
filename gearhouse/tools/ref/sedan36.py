@@ -6,27 +6,28 @@ def sh(p): return [[x,z,1] for x,z in p]
 FX,RX,R,ARCH=783,3715,400,455
 P=[]
 def add(id,pts,material,surface,z,**k): P.append({'id':id,'pts':pts,'material':material,'surface':surface,'z':z,**k})
-add('well',sh([[FX-430,R-20]]+[[round(FX+math.cos(a)*430),round(R+math.sin(a)*430)] for a in [math.pi*k/14 for k in range(14,-1,-1)]]+[[FX+430,R-20]]),'shadow','flat',2)
-add('well2',sh([[RX-430,R-20]]+[[round(RX+math.cos(a)*430),round(R+math.sin(a)*430)] for a in [math.pi*k/14 for k in range(14,-1,-1)]]+[[RX+430,R-20]]),'shadow','flat',2)
+add('well',sh([[FX-470,R-140]]+[[round(FX+math.cos(a)*470),round(R+math.sin(a)*470)] for a in [math.pi*k/14 for k in range(14,-1,-1)]]+[[FX+470,R-140]]),'shadow','flat',2)
+add('well2',sh([[RX-470,R-140]]+[[round(RX+math.cos(a)*470),round(R+math.sin(a)*470)] for a in [math.pi*k/14 for k in range(14,-1,-1)]]+[[RX+470,R-140]]),'shadow','flat',2)
 add('under',sh([[300,420],[1300,420],[1300,560],[300,560]]),'black','flat',1)
+add('apronF',sh([[1150,290],[1790,290],[1790,380],[1150,380]]),'shadow','flat',2)
 add('under2',sh([[4050,380],[4450,380],[4450,520],[4050,520]]),'black','flat',1)
 # grille shell: leaning back, chrome surround with a dark core
-add('grille',sh([[150,585],[128,700],[150,1000],[195,1195],[235,1290],[300,1300],[300,585]]),'black','flat',15,slot='grille')
-add('grilleShell',sh([[128,700],[150,1000],[195,1195],[235,1290],[262,1290],[220,1190],[176,1000],[154,700]]),'chrome','side',15.5,slot='grille')
+add('grille',sh([[170,585],[150,700],[185,1000],[235,1195],[275,1290],[300,1300],[300,585]]),'black','flat',15,slot='grille')
+add('grilleShell',sh([[150,700],[185,1000],[235,1195],[275,1290],[300,1290],[260,1190],[211,1000],[176,700]]),'chrome','side',15.5,slot='grille')
 # the body shell from radiator to tail
-body=[[300,560],[300,900],[300,1180],[300,1300],[340,1320],[700,1342],[1200,1352],[1600,1378],[1668,1400],[1740,1560],[1815,1730],[1880,1810],[1990,1862],[2200,1893],[2500,1907],[3000,1905],[3300,1890],[3480,1856],[3660,1776],[3780,1672],[3880,1520],[3960,1372],[4040,1290],[4120,1250],[4200,1120],[4290,900],[4370,760],[4420,700],[4455,640],[4440,560],[4300,440],[4150,400],[3300,300],[1760,300],[1500,400],[1300,480]]
+body=[[300,560],[300,900],[300,1180],[310,1300],[350,1320],[700,1342],[1200,1352],[1600,1378],[1668,1400],[1710,1560],[1780,1730],[1860,1815],[1990,1862],[2200,1893],[2500,1907],[3000,1905],[3300,1890],[3480,1856],[3660,1776],[3780,1672],[3880,1520],[3930,1372],[4000,1290],[4080,1240],[4160,1110],[4250,900],[4340,760],[4420,700],[4455,640],[4440,560],[4300,440],[4150,400],[3300,300],[1760,300],[1500,400],[1300,480]]
 add('body',sh(body),'paint','side',10,bevel=5,cut=[{'x':FX,'z':R,'r':ARCH},{'x':RX,'z':R,'r':ARCH}])
 # glass: windscreen seen edge-on, door window with its vent pane, rear quarter window
-add('glass',[[1700,1415],[1745,1400],[1890,1745],[1850,1770]],'glass','side',12,clip='body')
+add('glass',[[1680,1415],[1720,1400],[1860,1745],[1825,1775]],'glass','side',12,clip='body')
 add('glass2',[[1880,1385],[2650,1372],[2685,1405],[2685,1640],[2625,1690],[2070,1690],[1985,1650],[1850,1420]],'glass','side',12,clip='body')
 add('glass3',[[2830,1405],[2870,1372],[3520,1372],[3560,1415],[3545,1490],[3420,1610],[3260,1675],[2875,1690],[2830,1650]],'glass','side',12,clip='body')
 add('inside',sh([[2060,1380],[2105,1380],[2115,1690],[2070,1690]]),'paint','side',13,clip='glass2')
-add('board',sh([[1790,290],[3310,290],[3310,385],[1790,385]]),'rubber','flat',19)
-add('apron',sh([[1790,250],[3310,250],[3310,292],[1790,292]]),'black','flat',18)
+add('board',sh([[1790,290],[3310,290],[3310,385],[1790,385]]),'rubber','flat',19,slot='board')
+add('apron',sh([[1790,250],[3310,250],[3310,292],[1790,292]]),'black','flat',18,slot='board')
 ff=[[140,430],[138,560],[175,700],[250,830],[380,930],[560,990],[783,1005],[980,985],[1150,915],[1330,790],[1520,620],[1700,480],[1790,420],[1790,288],[1560,288],[1300,330],[330,380]]
-add('fenderF',ff,'paint','fender',20,cut=[{'x':FX,'z':R,'r':ARCH-15}])
+add('fenderF',ff,'paint','fender',20,slot='fenderF',cut=[{'x':FX,'z':R,'r':ARCH-15}])
 fr=[[3290,290],[3285,520],[3325,760],[3430,905],[3590,985],[3760,1005],[3920,960],[4080,850],[4230,690],[4370,520],[4455,430],[4440,362],[4150,352]]
-add('fenderR',fr,'paint','fender',20,cut=[{'x':RX,'z':R,'r':ARCH-15}])
+add('fenderR',fr,'paint','fender',20,slot='fenderR',cut=[{'x':RX,'z':R,'r':ARCH-15}])
 # bumpers on their irons
 add('bumperIron',sh([[95,470],[300,470],[300,520],[95,520]]),'black','flat',24,slot='bumperF')
 add('bumper',[[0,405],[70,395],[112,430],[118,560],[80,615],[20,620],[0,590]],'chrome','side',25,slot='bumperF',bevel=3)
@@ -35,9 +36,9 @@ add('bumperIron2',sh([[4390,440],[4570,440],[4570,490],[4390,490]]),'black','fla
 add('bumper2',[[4650,365],[4580,355],[4545,390],[4540,520],[4575,580],[4635,585],[4650,555]],'chrome','side',25,slot='bumperR',bevel=3)
 add('bumperGuard2',sh([[4580,520],[4625,520],[4625,650],[4580,650]]),'chrome','side',25.5,slot='bumperR',bevel=2)
 # lamps: a bucket faired into the catwalk, a small stalk lamp at the tail
-add('lampShell',ell(262,1000,95,105),'paint','fender',27,slot='lamp',rigid=True,bevel=6)
-add('lampRim',ell(222,1000,52,98),'chrome','fender',27.5,slot='lamp',rigid=True,bevel=2)
-add('lens',ell(212,1000,34,80),'lens','flat',28,slot='lamp',rigid=True)
+add('lampShell',ell(300,1010,110,95),'paint','fender',27,slot='lamp',rigid=True,bevel=6)
+add('lampRim',ell(205,1010,28,88),'chrome','fender',27.5,slot='lamp',rigid=True,bevel=2)
+add('lens',ell(196,1010,14,70),'lens','flat',28,slot='lamp',rigid=True)
 add('tailStalk',sh([[4400,650],[4460,650],[4460,690],[4400,690]]),'black','flat',27,slot='tail',rigid=True)
 add('bezel',ell(4462,690,34,62),'chrome','fender',28,slot='tail',rigid=True,bevel=2)
 add('tailLens',ell(4470,690,20,46),'lensR','flat',28.5,slot='tail',rigid=True)

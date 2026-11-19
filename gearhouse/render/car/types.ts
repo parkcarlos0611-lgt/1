@@ -16,7 +16,8 @@ export type Surface =
 export type Material = 'paint' | 'paint2' | 'black' | 'chrome' | 'glass' | 'rubber' | 'wood' | 'shadow' | 'canvas' | 'iron' | 'lens' | 'lensR' | 'white';
 
 /** a part that can be swapped as a unit from another car */
-export type Slot = 'grille' | 'lamp' | 'tail' | 'bumperF' | 'bumperR';
+/** the eleven places a part can be swapped (review 15): wheels are the eleventh, kept in WheelSpec */
+export type Slot = 'grille' | 'lamp' | 'tail' | 'bumperF' | 'bumperR' | 'fenderF' | 'fenderR' | 'roof' | 'board' | 'spare';
 
 export interface Panel {
   id: string;

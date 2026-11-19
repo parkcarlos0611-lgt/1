@@ -3,6 +3,7 @@
 import { addDays, type DateStr } from './calendar';
 import { post } from './ledger';
 import type { Api, Simulation, System } from './sim';
+import { mult, plus } from './conditions';
 
 export interface CatalogLine { part: string; grade: number; price: number; minOrder: number; leadDays: number }
 export interface SupplierData { id: string; name: string; size: string; mailDays: number; knownAtStart: boolean; phone: boolean; reliability: number; consistency: number; temper: number; catalog: CatalogLine[] }
@@ -70,8 +71,8 @@ export class Supply {
   private morning(a: Api): void { const S = this.S;
     // deliveries due today or overdue
     for (const o of S.orders) { if (o.state !== 'coming' || o.due > a.date) continue; const d = this.sup(o.supplierId);
-      if (!o.late && a.rng.float() > d.reliability) { o.late = true; o.due = addDays(a.date, a.rng.int(2, 7)); a.bus.emit('delivery_delayed', { orderId: o.id, due: o.due }); a.raise('delivery_delayed', 'notice', { orderId: o.id, supplier: d.name, due: o.due }); continue; }
-      for (const l of o.lines) { const base = this.parts.gradeQuality[String(l.grade)] ?? 60, q = Math.max(15, Math.min(98, base + (a.rng.float() - 0.5) * 2 * (1 - d.consistency) * 30));
+      if (!o.late && a.rng.float() > d.reliability * mult(a.g, 'supplier_reliability', d.id)) { o.late = true; o.due = addDays(a.date, a.rng.int(2, 7)); a.bus.emit('delivery_delayed', { orderId: o.id, due: o.due }); a.raise('delivery_delayed', 'notice', { orderId: o.id, supplier: d.name, due: o.due }); continue; }
+      for (const l of o.lines) { const base = this.parts.gradeQuality[String(l.grade)] ?? 60, q = Math.max(15, Math.min(98, base + plus(a.g, 'material_quality', l.part) + (a.rng.float() - 0.5) * 2 * (1 - d.consistency) * 30));
         S.lots.push({ part: l.part, grade: l.grade, qty: l.qty, quality: Math.round(q), unitCost: l.unitPrice, received: a.date }); }
       if (!o.paid) { post(a, 'materials', -o.total, d.name); o.paid = true; }
       o.state = 'delivered'; S.suppliers[o.supplierId]!.relation += 1; a.bus.emit('parts_delivered', { orderId: o.id, supplierId: o.supplierId }); a.raise('parts_delivered', 'notice', { orderId: o.id, supplier: d.name, lines: o.lines }); }
@@ -82,7 +83,7 @@ export class Supply {
         for (const w of p.lines ?? []) { const c = d.catalog.filter(x => x.part === w.part && (w.grade == null || x.grade === w.grade)).sort((x, y) => x.price - y.price)[0]; if (!c) continue;
           lines.push({ part: c.part, grade: c.grade, qty: Math.max(w.qty, c.minOrder), unitPrice: Math.round(c.price * (st.priceMult && st.priceUntil && st.priceUntil > a.date ? st.priceMult : 1) * 100) / 100 }); lead = Math.max(lead, c.leadDays); }
         st.catalogKnown = true; if (!lines.length) { a.raise('supplier_no_stock', 'notice', { supplier: d.name }); continue; }
-        const q: Quote = { id: S.nextId++, supplierId: d.id, via: p.via, lines, leadDays: lead, prepaid: st.relation < 60, round: 0, date: a.date, state: 'open' };
+        const q: Quote = { id: S.nextId++, supplierId: d.id, via: p.via, lines, leadDays: Math.round(lead * mult(a.g, 'supplier_lead', d.id)), prepaid: st.relation < 60, round: 0, date: a.date, state: 'open' };
         S.quotes.push(q); a.bus.emit('supplier_quote_received', { quoteId: q.id, supplierId: d.id }); a.raise('supplier_quote', 'decision', { quoteId: q.id, supplier: d.name }, 14); }
       else { const q = S.quotes.find(x => x.id === p.quoteId); if (!q || q.state !== 'open') continue; q.round++;
         const founder = a.g.founderId ? a.g.people[a.g.founderId] : undefined, chance = d.temper * 0.6 + st.relation / 250 + (founder?.skills.sales ?? 30) / 300 + (p.lever === 'prepay' || p.lever === 'premium' ? 0.25 : 0.1), ok = a.rng.float() < chance;

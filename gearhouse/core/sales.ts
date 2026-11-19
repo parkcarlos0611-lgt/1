@@ -8,6 +8,7 @@ import type { Api, Simulation, System } from './sim';
 import type { OrderType, Shop } from './build';
 import type { Incident } from './state';
 import { compose, type TextMemory, type TextSet } from './text';
+import { active, mult, plus, DEMAND_RANGE } from './conditions';
 
 export type Field = 'quality' | 'performance' | 'style' | 'trust' | 'value';
 export interface CustomerType { id: string; weight: number; age: [number, number]; standing: [number, number]; budget: Record<OrderType, [number, number]>; orderTypes: Record<OrderType, number>; bodies: string[]; priorities: Field[]; temper: [number, number]; patience: [number, number] }
@@ -48,10 +49,11 @@ export class Sales {
 
   /** a new customer walks into the story: who they are, what they want, and the letter (or talk) that says part of it */
   private arrive(a: Api, source: Source, o: { type?: string; orderType?: OrderType; referredBy?: string; channel?: Channel } = {}): Inquiry { const M = this.M, r = a.rng, year = dateParts(a.date).year;
-    const types = this.data.customerTypes, T = o.type ? types.find(t => t.id === o.type)! : (() => { let x = r.float() * types.reduce((s, t) => s + t.weight, 0); for (const t of types) { x -= t.weight; if (x <= 0) return t; } return types[0]!; })();
+    const types = this.data.customerTypes, T = o.type ? types.find(t => t.id === o.type)! : (() => { const w = (t: CustomerType) => t.weight * mult(a.g, 'demand_type', t.id); let x = r.float() * types.reduce((s, t) => s + w(t), 0); for (const t of types) { x -= w(t); if (x <= 0) return t; } return types[0]!; })();
     const ot = o.orderType ?? (() => { const e = Object.entries(T.orderTypes) as [OrderType, number][]; let x = r.float() * e.reduce((s, v) => s + v[1], 0); for (const [k, w] of e) { x -= w; if (x <= 0) return k; } return e[0]![0]; })();
     const p = makePerson(r, this.names, this.people, year, { age: r.int(T.age[0], T.age[1]), sex: r.float() < 0.9 ? 'm' : 'f' }); a.g.people[p.id] = p;
-    const wealth = r.float(), mid = lerp(T.budget[ot], wealth) * (0.85 + 0.15 * (this.eco.demand[this.year(a.date)] ?? 1)), must: string[] = []; for (let i = r.int(0, 2); i > 0; i--) { const m = this.data.mustHaves[r.int(0, this.data.mustHaves.length - 1)]!; if (!must.includes(m)) must.push(m); }
+    const wealth = r.float(), mid = lerp(T.budget[ot], wealth) * (0.85 + 0.15 * (this.eco.demand[this.year(a.date)] ?? 1)) * clamp(mult(a.g, 'budget', T.id), 0.6, 1.4), must: string[] = []; for (let i = r.int(0, 2); i > 0; i--) { const m = this.data.mustHaves[r.int(0, this.data.mustHaves.length - 1)]!; if (!must.includes(m)) must.push(m); }
+    for (const w of active(a.g, 'want')) if (w.key && !must.includes(w.key) && r.float() < w.value) must.unshift(w.key);        // what the times make people ask for
     const c: Customer = { id: M.nextId++, personId: p.id, type: T.id, standing: Math.round(lerp(T.standing, r.float())), budget: [Math.round(mid * 0.85), Math.round(mid * 1.1)], orderType: ot, body: T.bodies[r.int(0, T.bodies.length - 1)]!, priorities: T.priorities, mustHave: must,
       wantDays: r.int(45, 120), patience: r.int(T.patience[0], T.patience[1]), temper: lerp(T.temper, r.float()), channel: o.channel ?? (source === 'walk_in' || source === 'first' ? 'visit' : a.g.supply.phone && r.float() < 0.4 ? 'phone' : r.float() < 0.3 ? 'visit' : 'mail'), source, referredBy: o.referredBy };
     c.bankId = this.banks?.pick(r); if (!c.bankId) delete c.bankId;
@@ -64,7 +66,7 @@ export class Sales {
   /** the customer every game starts with (walkthrough finding 1) */
   firstCustomer(type = 'doctor', orderType: OrderType = 'body_only'): Inquiry { return this.arrive(this.sim.api(), 'first', { type, orderType }); }
 
-  placeAdvert(size: Advert['size'], weeks: number, medium = 'town_weekly'): void { const a = this.sim.api(); post(a, 'advertising', -this.data.adCost[size] * weeks, medium); this.M.adverts.push({ medium, size, from: a.date, until: addDays(a.date, weeks * 7) }); a.bus.emit('ad_placed', { medium, size, weeks }); }
+  placeAdvert(size: Advert['size'], weeks: number, medium = 'town_weekly'): void { const a = this.sim.api(); post(a, 'advertising', -Math.round(this.data.adCost[size] * weeks * mult(a.g, 'ad_cost') * 100) / 100, medium); this.M.adverts.push({ medium, size, from: a.date, until: addDays(a.date, weeks * 7) }); a.bus.emit('ad_placed', { medium, size, weeks }); }
 
   /** talk it through: an hour or two of the founder's time may bring out the budget and the must-haves */
   consult(inquiryId: number): Inquiry { const q = this.inquiry(inquiryId), g = this.sim.g, sales = g.founderId ? g.people[g.founderId]!.skills.sales ?? 30 : 30, r = this.sim.rng;
@@ -92,7 +94,7 @@ export class Sales {
   deliver(orderId: number, carId: number): { satisfaction: number } | { cannotPay: Incident } { const a = this.sim.api(), M = this.M, ord = M.orders.find(o => o.id === orderId), car = a.g.shop.cars.find(c => c.id === carId); if (!ord || ord.state !== 'building' || !car) throw new Error('nothing to deliver');
     const c = this.customer(ord.customerId); ord.carId = carId;
     const lostBank = !!c.bankId && !!this.banks?.closed(c.bankId);                                  // their bank has shut: the money is locked up
-    if (!ord.payDelayUntil && a.rng.float() < (this.eco.cannotPay[this.year(a.date)] ?? 0.05) * (c.type === 'banker' || c.type === 'heir' ? 1.4 : 1) + (lostBank ? 0.5 : 0)) {       // the Depression reaches the customer
+    if (!ord.payDelayUntil && a.rng.float() < (this.eco.cannotPay[this.year(a.date)] ?? 0.05) * (c.type === 'banker' || c.type === 'heir' ? 1.4 : 1) + (lostBank ? 0.5 : 0) + plus(a.g, 'cannot_pay', c.type)) {       // the Depression reaches the customer
       ord.payDelayUntil = a.date; a.bus.emit('customer_cannot_pay', { orderId }); return { cannotPay: a.raise('customer_cannot_pay', 'decision', { orderId, customer: fullName(a.g.people[c.personId]!), owed: ord.price - ord.deposit }, 21) }; }
     return this.handOver(a, ord, 1); }
   /** the player's answer when a customer cannot pay: wait a month or two, take less, or keep the deposit and the car */
@@ -115,6 +117,15 @@ export class Sales {
     M.awareness.town = clamp(M.awareness.town + 2 + c.standing / 25, 0, 100); if (M.awareness.town > 60) M.awareness.city = clamp(M.awareness.city + c.standing / 40, 0, 100);
     if (s >= this.data.pleasedAt) for (let n = Math.round(1 + c.standing / 45 * a.rng.float()); n > 0; n--) M.pending.push({ due: addDays(a.date, a.rng.int(10, 70)), kind: 'referral', by: a.g.people[c.personId]!.family });
     a.bus.emit('car_delivered', { orderId: ord.id, carId: car.id, satisfaction: s, standing: c.standing }); return { satisfaction: s }; }
+  /** a car shown in public: people judge the make and finish they can see */
+  exhibit(visible: number, share: number): void { const a = this.sim.api(), v = clamp((visible - this.data.satisfaction.qualityMid) / 30, -1, 1) * 100; this.pull('style', v, share, a); this.pull('quality', v, share * 0.7, a); }
+  /** people who heard of the workshop and may come asking */
+  refer(by: string, n: number, withinDays: [number, number] = [10, 60]): void { const a = this.sim.api(); for (; n > 0; n--) this.M.pending.push({ due: addDays(a.date, a.rng.int(withinDays[0], withinDays[1])), kind: 'referral', by }); }
+  /** orders won outside the usual inquiry (a public tender): one buyer, several cars of one design */
+  bookFor(buyer: { type: string; standing: number; body: string; mustHave: string[] }, o: QuoteOffer, cars: number): Order[] { const a = this.sim.api(), M = this.M, d = a.g.shop.designs[o.designId]; if (!d) throw new Error('unknown design ' + o.designId);
+    const p = makePerson(a.rng, this.names, this.people, dateParts(a.date).year, { age: a.rng.int(35, 60), sex: 'm' }); a.g.people[p.id] = p;
+    const c: Customer = { id: M.nextId++, personId: p.id, type: buyer.type, standing: buyer.standing, budget: [Math.round(o.price * 0.95), Math.round(o.price * 1.05)], orderType: d.orderType, body: buyer.body, priorities: ['trust', 'value', 'quality'], mustHave: buyer.mustHave, wantDays: daysBetween(a.date, o.due), patience: 30, temper: 0.5, channel: 'mail', source: 'ad' }; M.customers[c.id] = c;
+    const out: Order[] = []; for (let i = 0; i < cars; i++) { const q: Inquiry = { id: M.nextId++, customerId: c.id, received: a.date, letter: '', revealed: { budget: true, mustHave: true }, rounds: 0, state: 'quoted', quote: o }; M.inquiries.push(q); out.push(this.book(a, q, o)); } return out; }
   private pull(f: Field, toward: number, share: number, a: Api): void { this.bump(f, (toward - this.M.reputation[f]) * share, a); }
   private bump(f: Field, by: number, a: Api): void { const M = this.M, v = clamp(M.reputation[f] + by, -100, 100); if (Math.round(v) !== Math.round(M.reputation[f])) a.bus.emit('reputation_changed', { field: f, value: Math.round(v) }); M.reputation[f] = v; }
 
@@ -133,7 +144,8 @@ export class Sales {
     // new inquiries: adverts running in the paper, and people who know of us in town
     const phone = a.g.supply.phone ? R.phoneBonus : 1; let perWeek = M.awareness.town * R.walkInPerAwareness;
     for (const ad of M.adverts) if (ad.from <= a.date && a.date < ad.until) perWeek += (ad.size === 'classified' ? R.adClassified : ad.size === 'eighth' ? R.adEighth : R.adQuarter) * phone;
-    M.boosts = M.boosts.filter(b => b.until > a.date); for (const b of M.boosts) perWeek *= b.mult;
+    M.boosts = M.boosts.filter(b => b.until > a.date); const T = this.data.customerTypes, byType = T.reduce((s, t) => s + t.weight * mult(a.g, 'demand_type', t.id), 0) / T.reduce((s, t) => s + t.weight, 0);
+    perWeek *= clamp(M.boosts.reduce((t, b) => t * b.mult, 1) * byType, DEMAND_RANGE[0], DEMAND_RANGE[1]);                  // all passing changes together stay within bounds
     const rep = Object.values(M.reputation).reduce((t, v) => t + v, 0) / 500; perWeek *= clamp(1 + rep * this.data.reputationPull, 0.25, 3);     // a good name brings callers, a bad one keeps them away
     if (a.rng.float() < perWeek * demand / 6) this.arrive(a, a.rng.float() < 0.25 ? 'walk_in' : M.adverts.some(ad => ad.from <= a.date && a.date < ad.until) ? 'ad' : 'walk_in');
     // inquiries left unanswered are lost when the customer's patience runs out

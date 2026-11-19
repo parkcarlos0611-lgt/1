@@ -70,3 +70,10 @@ These decisions still hold, from `legacy/docs/MASTER_GAME_PLAN.md`:
 - A successor writes in the seat's voice with one or two small habits of their own.
 - Real news is printed as wire copy with a local paragraph.
 - The town register is two tables kept in the save (entities and records) and starts with five kinds: banks, factories, rival makers, roads and public offices.
+
+## 2026-11-19 — effects of news (review 09, applied)
+
+- Passing conditions: seven kinds (inquiries by customer type, budgets, cannot-pay chance, wanted car character, supplier lead time and reliability, material quality, advert and utility costs).
+- All demand multipliers together are kept within 0.5 to 1.6; at most two conditions of one kind hold at once, the weakest giving way to a stronger one.
+- Four chances that the reader must act on before a last day: a public tender, a motor show, a supplier's clearance sale, a tool auction. An unread chance passes and the journal says the paper had it.
+- The motor show no longer raises awareness by itself; only entering a car does.

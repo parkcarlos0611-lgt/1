@@ -10,15 +10,17 @@ import { makeName, type NameData } from './people';
 import { writeBody, type Body, type BodyData } from './newsBody';
 import { Press, newPress, type PressState } from './press';
 import { Register, newRegister, type RegisterData, type RegisterState } from './register';
+import { begin, beginBoost, type CondKind } from './conditions';
+import type { Chance } from './chances';
 
 export interface Article extends NewsItem { page: number }
 export interface Issue { id: number; publication: string; date: DateStr; articles: Article[]; playerAds: string[]; supplierAds: string[] }
 export interface Copy { issueId: number; place: 'desk' | 'drawer' | 'shelf' | 'gone'; read: boolean; marked: boolean }
 /** something a paper warned of, on its way to the game */
-export interface Coming { due: DateStr; kind: 'demand' | 'supplier_price' | 'awareness'; value: number; weeks: number; supplierId?: string; from: string }
-export interface MediaState { issues: Issue[]; copies: Copy[]; news: { importance: number; headline: string; id: string }[]; coming: Coming[]; recent: string[]; nextId: number; press: PressState; register: RegisterState }
+export interface Coming { due: DateStr; kind: 'demand' | 'supplier_price' | 'awareness' | 'condition'; value: number; weeks: number; supplierId?: string; from: string; cond?: CondKind; key?: string; headline?: string }
+export interface MediaState { issues: Issue[]; copies: Copy[]; news: { importance: number; headline: string; id: string }[]; coming: Coming[]; recent: string[]; nextId: number; press: PressState; register: RegisterState; /** what readers could act on (core/chances.ts) */ chances: Chance[] }
 export interface MediaData { publications: { id: string; kind: string; name: string; weekday?: number; pages: number; supplierAdChance?: number }[]; ageing: { years: number; look: string }[]; limits: { desk: number; drawer: number } }
-export const newMedia = (): MediaState => ({ issues: [], copies: [], news: [], coming: [], recent: [], nextId: 1, press: newPress(), register: newRegister() });
+export const newMedia = (): MediaState => ({ issues: [], copies: [], news: [], coming: [], recent: [], nextId: 1, press: newPress(), register: newRegister(), chances: [] });
 
 const PART_KO: Record<string, string> = { body_steel_set: '강판', chassis_steel_set: '철강', ash_frame_set: '물푸레나무', glass_set: '판유리', paint_set: '도료', trim_set: '가죽', wheels_tyres_set: '타이어', fittings_set: '부속품', engine: '엔진', gearbox: '변속기', axles_set: '차축', rolling_chassis: '섀시' };
 export class Media {
@@ -31,7 +33,8 @@ export class Media {
   }
   readonly press: Press; readonly register: Register;
   private get S() { return this.sim.g.media; }
-  private note(importance: number, headline: string, id: string) { this.S.news.push({ importance, headline, id }); }
+  /** something the next issue should carry about the workshop */
+  note(importance: number, headline: string, id: string) { this.S.news.push({ importance, headline, id }); }
 
   /** the text of an article, written from its seed (null while its topic has no body sentences yet) */
   body(issueId: number, index: number): Body | null { const art = this.S.issues.find(i => i.id === issueId)?.articles[index]; return art && this.bodies ? writeBody(art, this.bodies, this.fiction, this.town) : null; }
@@ -45,7 +48,10 @@ export class Media {
   system(): System { return { id: 'media', morning: a => this.morning(a) }; }
   private morning(a: Api): void { const S = this.S, g = a.g;
     // what earlier papers warned of now arrives
-    for (const c of S.coming.filter(x => x.due <= a.date)) { if (c.kind === 'demand') g.market.boosts.push({ until: addDays(a.date, c.weeks * 7), mult: c.value, from: c.from });
+    for (const c of S.coming.filter(x => x.due <= a.date)) { let held = true;
+      if (c.kind === 'demand') held = beginBoost(g.market.boosts, { until: addDays(a.date, c.weeks * 7), mult: c.value, from: c.from });
+      if (c.kind === 'condition' && c.cond) held = begin(g, { kind: c.cond, key: c.key, value: c.value, until: addDays(a.date, c.weeks * 7), from: c.from });
+      if (held && c.headline) a.log(`신문에 났던 일이 닥쳤다: “${c.headline}”`);                    // the cause is on record whether or not the paper was read
       if (c.kind === 'awareness') g.market.awareness.town = Math.min(100, g.market.awareness.town + c.value);
       if (c.kind === 'supplier_price' && c.supplierId) { const s = g.supply.suppliers[c.supplierId]; if (s) { s.priceMult = c.value; s.priceUntil = addDays(a.date, c.weeks * 7); } } }
     S.coming = S.coming.filter(x => x.due > a.date);
@@ -59,11 +65,13 @@ export class Media {
       const items: NewsItem[] = [...realItems(a.rng, this.real, last, a.date), ...S.news.splice(0).map((n): NewsItem => ({ origin: 'fictional', id: n.id, relation: 'related', importance: n.importance, headline: n.headline, weight: n.importance + 0.5 })), ...own, ...town, ...fictionalItems(a.rng, fiction, facts, S.recent, sup, this.bodies?.voices)];
       for (const it of items) this.press.assign(a.rng, pub.id, it);
       for (const it of items) { if (it.lead) it.lead = it.lead.replace('{town}', this.town); const e = it.effect; if (!e || e.kind === 'supplier_found') continue;
-        const due = addDays(a.date, (it.delayWeeks ?? 0) * 7); e.due = due; S.coming.push({ due, kind: e.kind, value: e.value ?? 1, weeks: e.weeks ?? 0, supplierId: e.supplierId, from: it.id }); }
+        const due = addDays(a.date, (it.delayWeeks ?? 0) * 7); e.due = due; S.coming.push({ due, kind: e.kind, value: e.value ?? 1, weeks: e.weeks ?? 0, supplierId: e.supplierId, from: it.id, headline: it.headline }); }
+      for (const it of items) for (const c of it.conds ?? []) S.coming.push({ due: addDays(a.date, (it.delayWeeks ?? 0) * 7), kind: 'condition', cond: c.cond, key: c.key, value: c.value, weeks: c.weeks, from: it.id, headline: it.headline });
       items.sort((x, y) => y.weight - x.weight);
       const ads = items.filter(it => it.effect?.kind === 'supplier_found' && it.effect.supplierId).map(it => it.effect!.supplierId!), unknown = sup.filter(s => !s.known && !ads.includes(s.id)); if (unknown.length && a.rng.float() < (pub.supplierAdChance ?? 0.3)) ads.push(unknown[a.rng.int(0, unknown.length - 1)]!.id);
       const issue: Issue = { id: S.nextId++, publication: pub.id, date: a.date, articles: items.map((x, i) => ({ ...x, page: i < 3 ? 1 : x.relation === 'unrelated' ? 2 : x.relation === 'background' ? 3 : i < 7 ? 2 : 3 })), playerAds: g.market.adverts.filter(ad => ad.medium === pub.id && ad.from <= a.date && a.date < ad.until).map(ad => ad.size), supplierAds: ads };
-      S.issues.push(issue); S.copies.push({ issueId: issue.id, place: 'desk', read: false, marked: issue.articles.some(x => x.id.startsWith('order:') || x.id.startsWith('delivered:') || x.id.startsWith('unhappy:')) || issue.playerAds.length > 0 });
+      S.issues.push(issue);
+      for (const x of issue.articles) if (x.chance) S.chances.push({ id: S.nextId++, kind: x.chance.kind, issueId: issue.id, headline: x.headline, importance: x.importance ?? 3, opened: a.date, deadline: addDays(a.date, x.chance.days), state: 'open', supplierId: x.chance.supplierId, cars: x.chance.cars }); S.copies.push({ issueId: issue.id, place: 'desk', read: false, marked: issue.articles.some(x => x.id.startsWith('order:') || x.id.startsWith('delivered:') || x.id.startsWith('unhappy:')) || issue.playerAds.length > 0 });
       a.bus.emit('newspaper_published', { issueId: issue.id, publication: pub.id, date: a.date });
       a.raise('newspaper', 'notice', { issueId: issue.id, name: pub.name, lead: issue.articles[0]?.headline, ads: ads.map(s => this.supplierNames[s]) }); } }
 }

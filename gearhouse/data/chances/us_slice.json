@@ -1,0 +1,7 @@
+{
+ "note": "Chances the papers bring (review 09, 3-3). Starting values, to be tuned. Arrays are one value per importance 1..6. Prices are 1930 dollars and not checked against period sources.",
+ "tender": { "refPrice": [1150, 1500], "buildDaysPerCar": 45, "deposit": 0.25, "hours": 3 },
+ "show": { "fee": [2, 3, 5, 10, 20, 40], "awareness": [1, 2, 3, 5, 8, 12], "prizeAt": 68, "hours": 8 },
+ "clearance": { "mult": [0.88, 0.84, 0.78, 0.72, 0.64, 0.55], "graceDays": 7 },
+ "auction": { "value": [15, 25, 40, 60, 90, 130], "tools": [3, 5, 8, 12, 18, 25], "maxBonus": 35, "hours": 5 }
+}

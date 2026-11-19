@@ -183,6 +183,33 @@
     "공장장",
     "읍장",
     "상공회 총무"
+   ],
+   "conds": [
+    {
+     "cond": "demand_type",
+     "values": [
+      0.97,
+      0.95,
+      0.9,
+      0.85,
+      0.75,
+      0.65
+     ],
+     "weeks": 20,
+     "key": "shopkeeper"
+    },
+    {
+     "cond": "cannot_pay",
+     "values": [
+      0,
+      0,
+      0.01,
+      0.02,
+      0.04,
+      0.06
+     ],
+     "weeks": 20
+    }
    ]
   },
   {
@@ -224,6 +251,45 @@
     "은행장",
     "상공회 총무",
     "읍장"
+   ],
+   "conds": [
+    {
+     "cond": "budget",
+     "values": [
+      0.99,
+      0.98,
+      0.96,
+      0.93,
+      0.88,
+      0.82
+     ],
+     "weeks": 14
+    },
+    {
+     "cond": "cannot_pay",
+     "values": [
+      0,
+      0.01,
+      0.02,
+      0.04,
+      0.08,
+      0.12
+     ],
+     "weeks": 14
+    },
+    {
+     "cond": "demand_type",
+     "values": [
+      0.97,
+      0.94,
+      0.85,
+      0.75,
+      0.6,
+      0.5
+     ],
+     "weeks": 14,
+     "key": "banker"
+    }
    ]
   },
   {
@@ -262,6 +328,34 @@
    "officials": [
     "곡물상",
     "농민회 회장"
+   ],
+   "conds": [
+    {
+     "cond": "demand_type",
+     "values": [
+      1.05,
+      1.1,
+      1.2,
+      1.3,
+      1.45,
+      1.6
+     ],
+     "weeks": 18,
+     "key": "farmer"
+    },
+    {
+     "cond": "budget",
+     "values": [
+      1.02,
+      1.03,
+      1.06,
+      1.1,
+      1.15,
+      1.2
+     ],
+     "weeks": 18,
+     "key": "farmer"
+    }
    ]
   },
   {
@@ -301,26 +395,18 @@
     "주 박람회 자동차관 신설… 군내 제작자 초청",
     "{town}서 첫 자동차 박람회, 관람객 {=n} 명 예상"
    ],
-   "effect": {
-    "kind": "awareness",
-    "add": [
-     1,
-     2,
-     3,
-     5,
-     8,
-     12
-    ]
-   },
-   "delayWeeks": [
-    3,
-    8
-   ],
    "slant": "good",
    "officials": [
     "박람회 위원장",
     "상공회 총무"
-   ]
+   ],
+   "chance": {
+    "kind": "show",
+    "days": [
+     14,
+     35
+    ]
+   }
   },
   {
    "id": "rival_model",
@@ -488,11 +574,11 @@
    ],
    "mid": [
     "{=factory}, 배달 트럭 {=n} 대 주문",
-    "군청, 순찰차 {=n} 대 입찰 부친다"
+    "읍내 운송업자들, 마차 팔고 트럭으로 갈아타"
    ],
    "high": [
     "우체국, 군내 배달 전부 자동차로 바꾼다… {=n} 대 발주",
-    "주 경찰, 순찰차 {=n} 대 입찰… 지역 업체도 참가 가능"
+    "큰 목장들, 말 대신 트럭… 올해만 {=n} 대 들여"
    ],
    "slant": "good",
    "officials": [
@@ -922,6 +1008,21 @@
    "officials": [
     "공장장",
     "상공회 총무"
+   ],
+   "conds": [
+    {
+     "cond": "demand_type",
+     "values": [
+      1.02,
+      1.04,
+      1.08,
+      1.12,
+      1.12,
+      1.12
+     ],
+     "weeks": 16,
+     "key": "shopkeeper"
+    }
    ]
   },
   {
@@ -956,6 +1057,21 @@
    "officials": [
     "공장장",
     "상공회 총무"
+   ],
+   "conds": [
+    {
+     "cond": "demand_type",
+     "values": [
+      1.03,
+      1.05,
+      1.1,
+      1.15,
+      1.15,
+      1.15
+     ],
+     "weeks": 20,
+     "key": "shopkeeper"
+    }
    ]
   },
   {
@@ -988,6 +1104,311 @@
     "군수",
     "도로 감독",
     "읍장"
+   ],
+   "conds": [
+    {
+     "cond": "want",
+     "values": [
+      0.15,
+      0.15,
+      0.2,
+      0.25,
+      0.3,
+      0.3
+     ],
+     "weeks": 40,
+     "key": "fast"
+    }
+   ]
+  },
+  {
+   "id": "tender",
+   "relation": "essential",
+   "slant": "good",
+   "officials": [
+    "군수",
+    "군 서기",
+    "상공회 총무"
+   ],
+   "mid": [
+    "군청, 순찰차 {cars} 대 입찰 부친다",
+    "읍 소방대, 지휘차 {cars} 대 입찰 공고",
+    "군 보건소, 왕진용 자동차 {cars} 대 구한다… 값 써내기로 정해"
+   ],
+   "high": [
+    "주 경찰, 순찰차 {cars} 대 입찰… 지역 업체도 참가 가능",
+    "군청, 관용차 {cars} 대 한꺼번에 바꾼다… 입찰 공고"
+   ],
+   "chance": {
+    "kind": "tender",
+    "days": [
+     14,
+     28
+    ]
+   }
+  },
+  {
+   "id": "clearance_sale",
+   "relation": "essential",
+   "slant": "good",
+   "officials": [
+    "가게 지배인",
+    "상공회 총무"
+   ],
+   "low": [
+    "{supplier}, 묵은 {=material} 재고 싸게 내놓아",
+    "{supplier} 재고 정리… {=material} 떨이"
+   ],
+   "mid": [
+    "{supplier} 창고 비운다… {=material} 등 싸게",
+    "{supplier}, 기한 두고 {=material} 떨이 판매"
+   ],
+   "high": [
+    "{supplier} 창고 이전 정리: 전 품목 헐값",
+    "{supplier}, 창고 통째로 떨이… {=material} 헐값"
+   ],
+   "supplier": true,
+   "chance": {
+    "kind": "clearance",
+    "days": [
+     10,
+     21
+    ]
+   }
+  },
+  {
+   "id": "tool_auction",
+   "relation": "essential",
+   "slant": "neutral",
+   "officials": [
+    "경매인",
+    "보안관"
+   ],
+   "low": [
+    "{person} 씨네 헛간 정리, 헌 공구 몇 점 경매",
+    "{=place}에서 헌 공구 경매 열린다"
+   ],
+   "mid": [
+    "문 닫은 마차 공방 공구 경매 부쳐… 판금 공구 다수",
+    "폐업 정비소 공구 일체 경매, {=place}에서"
+   ],
+   "high": [
+    "파산한 차체 공장 설비 경매… 영국제 휠링 머신도 나와",
+    "폐업 공장 공구 수백 점 경매, 인근 업자들 몰릴 듯"
+   ],
+   "chance": {
+    "kind": "auction",
+    "days": [
+     7,
+     18
+    ]
+   }
+  },
+  {
+   "id": "rough_roads",
+   "relation": "essential",
+   "slant": "bad",
+   "officials": [
+    "도로 감독",
+    "군수"
+   ],
+   "low": [
+    "군도 곳곳 패여 수레바퀴 빠져",
+    "{=road} 진창, 차 다니기 어려워"
+   ],
+   "mid": [
+    "{=road} 진창에 차 여러 대 빠져… \"바닥 높은 차라야 다닌다\"",
+    "군도 절반 통행 어려워… 운전자들 불만"
+   ],
+   "high": [
+    "큰물 뒤 군내 도로 절반 유실… 복구에 반년",
+    "도로 예산 끊겨 군도 방치… \"차 바닥이 남아나지 않는다\""
+   ],
+   "conds": [
+    {
+     "cond": "want",
+     "values": [
+      0.1,
+      0.15,
+      0.25,
+      0.3,
+      0.4,
+      0.5
+     ],
+     "weeks": 12,
+     "key": "high_clearance"
+    }
+   ],
+   "delayWeeks": [
+    0,
+    1
+   ]
+  },
+  {
+   "id": "rail_trouble",
+   "relation": "essential",
+   "slant": "bad",
+   "officials": [
+    "역장",
+    "상공회 총무",
+    "도매상 지배인"
+   ],
+   "low": [
+    "화물 열차 연착 잦아… 짐 하루 이틀 늦어",
+    "역 화물 창고 밀려, 짐 찾기 더뎌"
+   ],
+   "mid": [
+    "철도 화물 적체… 동부에서 오는 짐 한 주 늦어",
+    "선로 보수로 화물 열차 감편, 납품 지연 잇따라"
+   ],
+   "high": [
+    "철도 파업: 화물 운송 멈춰… 공장·가게 자재 끊겨",
+    "철교 유실로 화물 두 주째 묶여"
+   ],
+   "conds": [
+    {
+     "cond": "supplier_lead",
+     "values": [
+      1.1,
+      1.15,
+      1.3,
+      1.5,
+      1.8,
+      2.2
+     ],
+     "weeks": 6
+    },
+    {
+     "cond": "supplier_reliability",
+     "values": [
+      0.97,
+      0.95,
+      0.9,
+      0.85,
+      0.7,
+      0.6
+     ],
+     "weeks": 6
+    }
+   ],
+   "delayWeeks": [
+    0,
+    1
+   ]
+  },
+  {
+   "id": "bad_material",
+   "relation": "essential",
+   "slant": "bad",
+   "officials": [
+    "도매상 지배인",
+    "상공회 총무"
+   ],
+   "low": [
+    "{=material} 품질 고르지 않다는 말 돌아",
+    "일부 {=material}, 예전만 못하다는 불평"
+   ],
+   "mid": [
+    "불량 {=material} 나돌아… 공방들 \"받아 보고 놀랐다\"",
+    "{=material} 품질 떨어져, 공장들 원가 줄인 탓"
+   ],
+   "high": [
+    "불량 {=material} 대량 유통… 군내 공방 피해 속출",
+    "{=material} 파동: 규격 미달품 섞여 들어와"
+   ],
+   "conds": [
+    {
+     "cond": "material_quality",
+     "values": [
+      -2,
+      -3,
+      -5,
+      -8,
+      -12,
+      -16
+     ],
+     "weeks": 10,
+     "key": "{material}"
+    }
+   ],
+   "delayWeeks": [
+    0,
+    2
+   ]
+  },
+  {
+   "id": "ad_rates",
+   "relation": "essential",
+   "slant": "bad",
+   "officials": [
+    "본지 광고부",
+    "상공회 총무"
+   ],
+   "low": [
+    "본지 광고료 소폭 조정 알림",
+    "종이 값 올라 본지 광고료 조정"
+   ],
+   "mid": [
+    "본지, 다음 달부터 광고료 인상",
+    "신문 용지 값 뛰어… 광고료 인상 불가피"
+   ],
+   "conds": [
+    {
+     "cond": "ad_cost",
+     "values": [
+      1.05,
+      1.1,
+      1.15,
+      1.25,
+      1.25,
+      1.25
+     ],
+     "weeks": 26
+    }
+   ],
+   "delayWeeks": [
+    3,
+    5
+   ]
+  },
+  {
+   "id": "power_rates",
+   "relation": "essential",
+   "slant": "bad",
+   "officials": [
+    "전등 회사 지배인",
+    "상공회 총무",
+    "읍 의원"
+   ],
+   "low": [
+    "전등 회사, 요금 조정 예고",
+    "수도 요금 소폭 인상"
+   ],
+   "mid": [
+    "전기 요금 다음 달부터 인상… 가게·공방 부담",
+    "전등 회사 요금 인상안, 읍 의회 통과"
+   ],
+   "high": [
+    "전기 요금 큰 폭 인상… 상공회 \"장사 접으란 말이냐\"",
+    "전력 회사 합병 뒤 요금 껑충"
+   ],
+   "conds": [
+    {
+     "cond": "utilities",
+     "values": [
+      1.05,
+      1.1,
+      1.2,
+      1.3,
+      1.5,
+      1.7
+     ],
+     "weeks": 26
+    }
+   ],
+   "delayWeeks": [
+    3,
+    6
    ]
   }
  ],

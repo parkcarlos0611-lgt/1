@@ -12,6 +12,7 @@ import { josa } from './text';
 export type Relation = 'essential' | 'related' | 'background' | 'unrelated';
 export type RealLevel = 'important' | 'very_important' | 'historic';
 export type Tier = 'low' | 'mid' | 'high';
+import type { CondKind } from './conditions';
 export const RELATIONS: Relation[] = ['essential', 'related', 'background', 'unrelated'];
 export const tierOf = (importance: number): Tier => (importance <= 2 ? 'low' : importance <= 4 ? 'mid' : 'high');
 
@@ -21,7 +22,15 @@ export type Effect =
   | { kind: 'supplier_found' }                                        // a supplier the player may not know yet
   | { kind: 'awareness'; add: number[] };                             // the town hears of the workshop's trade
 export type Slant = 'good' | 'bad' | 'neutral';
-export interface Topic { id: string; relation: Relation; slant: Slant; /** written only when the town register says so, about one named subject */ entity?: string; /** who may be quoted on it */ officials?: string[]; low?: string[]; mid?: string[]; high?: string[]; effect?: Effect; delayWeeks?: [number, number] }
+/** a passing condition a topic brings (core/conditions.ts); the key may be '{supplier}' or '{material}', taken from the headline */
+export interface CondSpec { cond: CondKind; key?: string; values: number[]; weeks: number }
+export type ChanceKind = 'tender' | 'show' | 'clearance' | 'auction';
+/** something the reader can act on before a last day (core/chances.ts) */
+export interface ChanceSpec { kind: ChanceKind; days: [number, number] }
+/** the parts the papers' names for materials stand for */
+export const MATERIAL_PART: Record<string, string> = { 강판: 'body_steel_set', 철강: 'chassis_steel_set', 물푸레나무: 'ash_frame_set', 판유리: 'glass_set', 도료: 'paint_set', 니스: 'paint_set', 가죽: 'trim_set', 타이어: 'wheels_tyres_set', 고무: 'wheels_tyres_set', 구리선: 'fittings_set', 부속품: 'fittings_set' };
+const CARS_KO = ['두', '세', '네', '다섯', '여섯'];
+export interface Topic { id: string; relation: Relation; slant: Slant; /** written only when the town register says so, about one named subject */ entity?: string; /** who may be quoted on it */ officials?: string[]; low?: string[]; mid?: string[]; high?: string[]; effect?: Effect; delayWeeks?: [number, number]; /** names a supplier */ supplier?: boolean; conds?: CondSpec[]; chance?: ChanceSpec }
 export interface FictionData { topics: Topic[]; words: Record<string, string[]>;
   /** endings that may follow a headline: who said what, how the town took it, where and when */ tails: { t: string; w: number; noQuote?: boolean; minImportance?: number; notRelation?: Relation[] }[];
   /** articles of each importance per issue: [min, max] or a chance below 1 */
@@ -32,7 +41,13 @@ export interface RealData { events: RealEvent[]; angles: Record<Relation, string
 export interface NewsItem { origin: 'fictional' | 'real'; id: string; slant?: Slant;
   /** what the headline said, so the body says the same; the seed the body is written from; the voice that writes it */ slots?: Record<string, string>; seed?: number; voice?: string;
   /** the reporter named under it, that reporter's own habits, and the register entity it is about */ byline?: string; quirk?: { word?: string; short?: boolean }; entityId?: string; /** weeks from the paper to the effect */ delayWeeks?: number; relation: Relation; importance?: number; level?: RealLevel; headline: string; lead?: string;
-  /** how prominently it is printed */ weight: number; effect?: { kind: Effect['kind']; value?: number; weeks?: number; supplierId?: string; due?: DateStr } }
+  /** how prominently it is printed */ weight: number; effect?: { kind: Effect['kind']; value?: number; weeks?: number; supplierId?: string; due?: DateStr };
+  /** passing conditions it brings after the delay */ conds?: { cond: CondKind; key?: string; value: number; weeks: number }[];
+  /** what a reader can act on, and for how many days */ chance?: { kind: ChanceKind; days: number; supplierId?: string; cars?: number } }
+
+/** the conditions a topic brings at this importance, with keys taken from what the headline named */
+export function condsOf(topic: Topic, importance: number, bound: Record<string, string>, supplierId?: string): NewsItem['conds'] { if (!topic.conds?.length) return undefined;
+  return topic.conds.map(c => ({ cond: c.cond, key: c.key === '{supplier}' ? supplierId : c.key === '{material}' ? MATERIAL_PART[bound.material ?? ''] : c.key, value: val(c.values, importance), weeks: c.weeks })).filter(c => c.value !== 0 && c.value !== 1 || c.cond === 'want'); }
 
 /** fill a pattern: {=list} picks a word (a list named list@N is used for importance N when it exists); {fact} takes a fact;
  *  either may carry a Korean particle pair, {=list:을/를}. Picks are remembered in `bound`, so a headline and its body agree. */
@@ -56,13 +71,15 @@ export function fictionalItems(rng: Rng, data: FictionData, facts: Record<string
       const usable = (p: string) => [...p.matchAll(/\{=(\w+)(?::[^}]+)?\}/g)].every(m => (data.words[`${m[1]}@${importance}`] ?? data.words[`${m[1]}@neutral`] ?? data.words[m[1]!] ?? []).length > 0);          // nothing to say about banks when no bank is left
       const fresh = pool.filter(t => !recent.includes(t.id + ':' + tier)), topic = pickW(rng, fresh.length ? fresh : pool, () => 1), pats = topic[tier]!.filter(usable), f = { ...facts }; if (!pats.length) continue;
       let supplierId: string | undefined, sells: string[] | undefined;
-      if (topic.effect?.kind === 'supplier_price' || topic.effect?.kind === 'supplier_found') { const cand = suppliers.filter(s => (topic.effect!.kind === 'supplier_found' ? !s.known : true)); if (!cand.length) continue; const s = cand[rng.int(0, cand.length - 1)]!; supplierId = s.id; f.supplier = s.name; if (s.materials?.length) sells = s.materials; }
-      const dw = topic.delayWeeks ?? [1, 3]; const item: NewsItem = { origin: 'fictional', id: topic.id, relation, importance, delayWeeks: topic.effect ? rng.int(dw[0], dw[1]) : undefined, headline: '', weight: importance };
+      if (topic.supplier || topic.effect?.kind === 'supplier_price' || topic.effect?.kind === 'supplier_found') { const cand = suppliers.filter(s => (topic.effect?.kind === 'supplier_found' ? !s.known : true)); if (!cand.length) continue; const s = cand[rng.int(0, cand.length - 1)]!; supplierId = s.id; f.supplier = s.name; if (s.materials?.length) sells = s.materials; }
+      const dw = topic.delayWeeks ?? [1, 3]; const item: NewsItem = { origin: 'fictional', id: topic.id, relation, importance, delayWeeks: topic.effect || topic.conds ? rng.int(dw[0], dw[1]) : undefined, headline: '', weight: importance };
+      if (topic.chance) { item.chance = { kind: topic.chance.kind, days: rng.int(topic.chance.days[0], topic.chance.days[1]), supplierId }; if (topic.chance.kind === 'tender') { item.chance.cars = importance >= 5 ? rng.int(4, 6) : rng.int(2, 3); f.cars = CARS_KO[item.chance.cars - 2]!; } }
       const pat = pats[rng.int(0, pats.length - 1)]!, tail = pickW(rng, tailsFor(data, pat, importance, relation), x => x.w);
       const bound: Record<string, string> = {}, words = { ...data.words, ...(topic.officials ? { official: topic.officials } : {}), ...(sells ? { material: sells } : {}) }; item.headline = fill(rng, pat + tail.t, words, f, importance, bound, topic.slant); item.slant = topic.slant; item.seed = rng.next();
       item.slots = { ...bound, ...Object.fromEntries(Object.entries(f).map(([k, v]) => [k, String(v)])) };
       const fit = voices.filter(v => v.beats.includes(relation) && v.slants.includes(topic.slant) && importance >= (v.importance?.[0] ?? 1) && importance <= (v.importance?.[1] ?? 6)); if (fit.length) item.voice = fit[rng.int(0, fit.length - 1)]!.id;
       const e = topic.effect; if (e) item.effect = e.kind === 'supplier_found' ? { kind: e.kind, supplierId } : e.kind === 'awareness' ? { kind: e.kind, value: val(e.add, importance) } : { kind: e.kind, value: val(e.mult, importance), weeks: e.weeks, supplierId };
+      item.conds = condsOf(topic, importance, bound, supplierId); if (!item.conds) delete item.conds;
       recent.push(topic.id + ':' + tier); if (recent.length > 40) recent.shift(); out.push(item); } }
   return out; }
 

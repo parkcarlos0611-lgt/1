@@ -4,7 +4,7 @@
 // The newspaper reads it, so a closed bank is not reported open again, and writes it, so the town remembers.
 import { addDays, daysBetween, parts, type DateStr } from './calendar';
 import type { Rng } from './rng';
-import { fill, tierOf, tailsFor, type FictionData, type NewsItem, type VoiceInfo } from './news';
+import { condsOf, fill, tierOf, tailsFor, type FictionData, type NewsItem, type VoiceInfo } from './news';
 import { makeName, type NameData } from './people';
 
 export interface Entity { id: string; kind: string; name: string; status: string; since: DateStr; attrs: Record<string, string | number> }
@@ -54,5 +54,6 @@ export class Register {
     item.slots = { ...bound, ...Object.fromEntries(Object.entries(f).map(([k, v]) => [k, String(v)])) };
     const fit = voices.filter(v => v.beats.includes(t.relation) && v.slants.includes(t.slant) && importance >= (v.importance?.[0] ?? 1) && importance <= (v.importance?.[1] ?? 6)); if (fit.length) item.voice = fit[rng.int(0, fit.length - 1)]!.id;
     const ef = t.effect, dw = t.delayWeeks ?? [1, 3]; if (ef && (ef.kind === 'demand' || ef.kind === 'supplier_price')) { item.effect = { kind: ef.kind, value: ef.mult[Math.min(ef.mult.length - 1, importance - 1)], weeks: ef.weeks }; item.delayWeeks = rng.int(dw[0], dw[1]); }
+    const conds = condsOf(t, importance, bound); if (conds) { item.conds = conds; item.delayWeeks ??= rng.int(dw[0], dw[1]); }
     return item; }
 }

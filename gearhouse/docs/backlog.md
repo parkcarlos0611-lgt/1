@@ -25,9 +25,15 @@ This list holds work moved to a later stage than the current one, so it does not
 - Newspaper still to build: written history articles, local and period article sets through the text engine, the magazine and road tests, classifieds (jobs, sales), page layout.
 - News: article bodies; endings that sometimes do not suit their headline; Korean spellings for people's and suppliers' names; effects for bank failures and job seekers once those systems exist; verification of the 43 real events against sources.
 - News, after the register and the reporters:
-  - bodies for the 28 topics outside the pilot
   - wire credit and dateline on real news
-  - seven further effects on numbers and four opportunities (review 09, chapter 3)
   - seasons on topics and words
   - amounts by topic
   - shops and people of note as register entities
+- News effects, after the conditions and the chances (core/conditions.ts, core/chances.ts):
+  - a headline's percentage or amount is drawn apart from the effect's value, so "값 1할 올라" may bring a 15% rise
+  - general sentences shared by all topics sometimes do not suit the topic (a remark on eight-cylinder cars under a road opening)
+  - weather words have no season yet (a cold wave in a July issue); see review 11
+  - the plain bot takes no chances, so tenders, shows, clearances and auctions are untested for balance
+  - five-year run with the new topics: 9 of 60 bankrupt, end cash about $14,000
+  - a tender's buyer is a made-up person of type "county"; public bodies as register entities come later
+  - effects waiting for their systems: wages and applicants (hiring), loan interest (banks), rival prices (rivals), inspection rules (car quality)

@@ -20,6 +20,16 @@ export interface GameEvents {
   wage_paid: { date: DateStr; personId: string; amount: number };
   wage_missed: { date: DateStr; personId: string; amount: number };
   founder_created: { personId: string };
+  supplier_found: { supplierId: string; via: string };
+  supplier_quote_received: { quoteId: number; supplierId: string };
+  purchase_ordered: { orderId: number; supplierId: string; total: number };
+  parts_delivered: { orderId: number; supplierId: string };
+  delivery_delayed: { orderId: number; due: DateStr };
+  stock_short: { buildId: number; step: string; part: string };
+  design_finalized: { designId: string };
+  build_step_done: { buildId: number; step: string; quality: number };
+  defect_created: { buildId: number; step: string; kind: string; severity: number };
+  car_built: { carId: number; buildId: number; designId: string };
   employee_hired: { date: DateStr; personId: string; wage: number };
   employee_left: { date: DateStr; personId: string; reason: string };
 }

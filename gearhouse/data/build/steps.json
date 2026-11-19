@@ -1,0 +1,235 @@
+{
+ "note": "Build steps of one car (system design 04). Hours are for a mid-size car; 'sized' steps scale with the body. Order types: body_only (customer's chassis), bought (rolling chassis), built (own chassis).",
+ "toolLevel": 60,
+ "repeatFactor": [
+  1,
+  0.9,
+  0.85,
+  0.8,
+  0.75
+ ],
+ "design": {
+  "baseHours": {
+   "body_only": 60,
+   "bought": 80,
+   "built": 150
+  },
+  "perProportion": 0.3,
+  "perPart": 0.07,
+  "perPanel": 0.18,
+  "mockupHours": 40
+ },
+ "steps": [
+  {
+   "id": "chassis",
+   "skill": "mech",
+   "hours": {
+    "body_only": 10,
+    "bought": 10,
+    "built": 120
+   },
+   "after": [],
+   "needs": {
+    "bought": {
+     "rolling_chassis": 1
+    },
+    "built": {
+     "chassis_steel_set": 1,
+     "axles_set": 1,
+     "wheels_tyres_set": 1
+    }
+   },
+   "visible": 0,
+   "hidden": 3,
+   "defects": [
+    "brake_pull",
+    "frame_crack"
+   ]
+  },
+  {
+   "id": "power",
+   "skill": "mech",
+   "hours": {
+    "body_only": 0,
+    "bought": 30,
+    "built": 30
+   },
+   "after": [
+    "chassis"
+   ],
+   "needs": {
+    "bought": {
+     "engine": 1,
+     "gearbox": 1
+    },
+    "built": {
+     "engine": 1,
+     "gearbox": 1
+    }
+   },
+   "visible": 0,
+   "hidden": 3,
+   "defects": [
+    "overheating",
+    "oil_leak"
+   ]
+  },
+  {
+   "id": "frame",
+   "skill": "wood",
+   "hours": {
+    "body_only": 60,
+    "bought": 60,
+    "built": 60
+   },
+   "sized": true,
+   "after": [
+    "chassis"
+   ],
+   "needs": {
+    "all": {
+     "ash_frame_set": 1
+    }
+   },
+   "visible": 1,
+   "hidden": 2,
+   "defects": [
+    "door_sag",
+    "squeak"
+   ]
+  },
+  {
+   "id": "panels",
+   "skill": "panel",
+   "hours": {
+    "body_only": 140,
+    "bought": 140,
+    "built": 140
+   },
+   "sized": true,
+   "after": [
+    "frame"
+   ],
+   "needs": {
+    "all": {
+     "body_steel_set": 1
+    }
+   },
+   "visible": 3,
+   "hidden": 1,
+   "defects": [
+    "rain_leak",
+    "wavy_panel"
+   ]
+  },
+  {
+   "id": "joining",
+   "skill": "weld",
+   "hours": {
+    "body_only": 50,
+    "bought": 50,
+    "built": 50
+   },
+   "after": [
+    "panels"
+   ],
+   "needs": {},
+   "visible": 2,
+   "hidden": 2,
+   "defects": [
+    "door_fit",
+    "rattle"
+   ]
+  },
+  {
+   "id": "paint",
+   "skill": "paint",
+   "hours": {
+    "body_only": 60,
+    "bought": 60,
+    "built": 60
+   },
+   "sized": true,
+   "after": [
+    "joining"
+   ],
+   "needs": {
+    "all": {
+     "paint_set": 1
+    }
+   },
+   "visible": 4,
+   "hidden": 0,
+   "defects": [
+    "paint_blotch",
+    "paint_lift"
+   ]
+  },
+  {
+   "id": "trim",
+   "skill": "trim",
+   "hours": {
+    "body_only": 50,
+    "bought": 50,
+    "built": 50
+   },
+   "sized": true,
+   "after": [
+    "paint"
+   ],
+   "needs": {
+    "all": {
+     "trim_set": 1
+    }
+   },
+   "visible": 3,
+   "hidden": 0,
+   "defects": [
+    "seat_seam",
+    "roof_lining"
+   ]
+  },
+  {
+   "id": "fittings",
+   "skill": "mech",
+   "hours": {
+    "body_only": 30,
+    "bought": 30,
+    "built": 30
+   },
+   "after": [
+    "paint",
+    "power"
+   ],
+   "needs": {
+    "all": {
+     "fittings_set": 1,
+     "glass_set": 1
+    }
+   },
+   "visible": 2,
+   "hidden": 1,
+   "defects": [
+    "wiring_fault",
+    "window_stick"
+   ]
+  },
+  {
+   "id": "final",
+   "skill": "mech",
+   "hours": {
+    "body_only": 15,
+    "bought": 15,
+    "built": 15
+   },
+   "after": [
+    "trim",
+    "fittings"
+   ],
+   "needs": {},
+   "visible": 1,
+   "hidden": 1,
+   "defects": []
+  }
+ ]
+}

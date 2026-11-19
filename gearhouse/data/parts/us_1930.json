@@ -1,0 +1,70 @@
+{
+ "note": "Starting values for the 1930 slice; prices are not yet checked against period sources. A 'set' is what one mid-size car needs; 'unit' and 'perSet' say what a set is in real units, for showing leftovers.",
+ "gradeQuality": {
+  "1": 50,
+  "2": 65,
+  "3": 80
+ },
+ "parts": {
+  "rolling_chassis": {
+   "price": 420,
+   "unit": "chassis",
+   "perSet": 1
+  },
+  "engine": {
+   "price": 190,
+   "unit": "engine",
+   "perSet": 1
+  },
+  "gearbox": {
+   "price": 55,
+   "unit": "gearbox",
+   "perSet": 1
+  },
+  "chassis_steel_set": {
+   "price": 48,
+   "unit": "m of channel",
+   "perSet": 14
+  },
+  "axles_set": {
+   "price": 120,
+   "unit": "set",
+   "perSet": 1
+  },
+  "wheels_tyres_set": {
+   "price": 70,
+   "unit": "wheels",
+   "perSet": 5
+  },
+  "body_steel_set": {
+   "price": 62,
+   "unit": "sheets",
+   "perSet": 9
+  },
+  "ash_frame_set": {
+   "price": 34,
+   "unit": "m of ash",
+   "perSet": 46
+  },
+  "glass_set": {
+   "price": 28,
+   "unit": "panes",
+   "perSet": 7
+  },
+  "paint_set": {
+   "price": 22,
+   "unit": "cans",
+   "perSet": 6
+  },
+  "trim_set": {
+   "price": 58,
+   "unit": "hides",
+   "perSet": 4
+  },
+  "fittings_set": {
+   "price": 64,
+   "unit": "set",
+   "perSet": 1
+  }
+ }
+}

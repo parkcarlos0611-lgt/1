@@ -2,6 +2,8 @@
 import type { DateStr } from './calendar';
 import type { Employee, Person } from './people';
 import type { Ledger } from './ledger';
+import type { SupplyState } from './supply';
+import type { ShopState } from './build';
 
 export const SAVE_VERSION = 1;
 export type Phase = 'morning' | 'day' | 'evening';
@@ -18,7 +20,13 @@ export interface Incident {
   choice?: string;
 }
 /** a piece of work that takes hours: a design stage, a build step, a repair job... */
-export interface Task { id: string; label: string; skill: string; hoursNeeded: number; hoursDone: number; done: boolean }
+export interface Task { id: string; label: string; skill: string; hoursNeeded: number; hoursDone: number; done: boolean;
+  /** cannot be worked yet: an earlier step is unfinished or the materials have not come */
+  blocked?: boolean;
+  /** hours each person put in (for the quality of the result) */
+  by?: Record<string, number>;
+  /** the owning system reports the end of this task itself */
+  quiet?: boolean }
 /** the weekly plan on the desk: tasks in order, each with an optional cap of hours per day */
 export interface PlanSlot { taskId: string; maxHours?: number }
 
@@ -37,6 +45,8 @@ export interface GameState {
   founderId: string | null;
   employees: Employee[];
   ledger: Ledger;
+  supply: SupplyState;
+  shop: ShopState;
   founder: { hoursPerDay: number; overtimePerDay: number; overtimeThisWeek: number; fatigue: number };
   tasks: Record<string, Task>;
   plan: PlanSlot[];
@@ -48,6 +58,7 @@ export interface GameState {
 export function newGame(seed: number, start: DateStr = '1930-01-01'): GameState {
   return { version: SAVE_VERSION, seed, rng: '', clock: { date: start, started: start }, settings: { daysOff: [0], quietKinds: [] },
     people: {}, founderId: null, employees: [], ledger: { cash: 0, entries: [] },
+    supply: { suppliers: {}, pending: [], quotes: [], orders: [], lots: [], nextId: 1, phone: false }, shop: { designs: {}, builds: [], cars: [], nextId: 1 },
     founder: { hoursPerDay: 10, overtimePerDay: 0, overtimeThisWeek: 0, fatigue: 0 }, tasks: {}, plan: [], incidents: [], nextIncidentId: 1, journal: [] };
 }
 export const save = (g: GameState): string => JSON.stringify(g);

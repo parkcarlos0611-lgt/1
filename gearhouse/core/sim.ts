@@ -23,6 +23,11 @@ export class Simulation {
   constructor(public g: GameState, private holidays: HolidayData) { this.rng = new Rng(g.seed); if (g.rng) this.rng.load(g.rng); }
   use(s: System): this { this.systems.push(s); return this; }
 
+  /** today's hooks, for actions taken between days (the player answering, ordering, starting work) */
+  api(): Api { const g = this.g, date = g.clock.date; return { g, rng: this.rng, bus: this.bus, date, workday: true,
+    raise: (kind, grade, payload = {}, deadlineDays) => { const it: Incident = { id: g.nextIncidentId++, kind, grade, date, phase: 'day', payload, state: grade === 'decision' ? 'open' : 'resolved', deadline: deadlineDays != null ? addDays(date, deadlineDays) : undefined }; g.incidents.push(it); this.bus.emit('incident_raised', { incident: it }); return it; },
+    log: text => { g.journal.push({ date, text }); } }; }
+
   addTask(t: Omit<Task, 'hoursDone' | 'done'>): void { this.g.tasks[t.id] = { ...t, hoursDone: 0, done: false }; }
 
   /** answer an open incident */
@@ -63,16 +68,16 @@ export class Simulation {
     const g = this.g, f = g.founder, tired = f.fatigue > 0 ? 0.9 : 1, founder = g.founderId ? g.people[g.founderId] : undefined;
     f.overtimeThisWeek += f.overtimePerDay;
     const spend = (t: Task, who: Person | undefined, left: number, cap: number, eff: number): number => { const rate = (who ? skillRate(who.skills[t.skill] ?? 20) : 1) * eff, h = Math.min(left, cap, (t.hoursNeeded - t.hoursDone) / rate); if (h <= 0) return 0;
-      t.hoursDone += h * rate; if (who) learn(who, t.skill, h, ageOn(who, a.date));
+      t.hoursDone += h * rate; if (who) learn(who, t.skill, h, ageOn(who, a.date)); (t.by ??= {})[who?.id ?? 'founder'] = (t.by[who?.id ?? 'founder'] ?? 0) + h;
       this.bus.emit('hours_spent', { date: a.date, taskId: t.id, hours: h, who: who?.id ?? 'founder' });
-      if (t.hoursDone >= t.hoursNeeded - 1e-9) { t.hoursDone = t.hoursNeeded; t.done = true; this.bus.emit('task_done', { date: a.date, taskId: t.id }); a.raise('task_done', 'notice', { taskId: t.id }); }
+      if (t.hoursDone >= t.hoursNeeded - 1e-9) { t.hoursDone = t.hoursNeeded; t.done = true; this.bus.emit('task_done', { date: a.date, taskId: t.id }); if (!t.quiet) a.raise('task_done', 'notice', { taskId: t.id }); }
       return h; };
     let left = f.hoursPerDay + f.overtimePerDay;
-    for (const slot of g.plan) { const t = g.tasks[slot.taskId]; if (t && !t.done) left -= spend(t, founder, left, slot.maxHours ?? Infinity, tired); }
-    if (left > 0) for (const t of Object.values(g.tasks)) { if (!t.done) left -= spend(t, founder, left, Infinity, tired); if (left <= 0) break; }
+    for (const slot of g.plan) { const t = g.tasks[slot.taskId]; if (t && !t.done && !t.blocked) left -= spend(t, founder, left, slot.maxHours ?? Infinity, tired); }
+    if (left > 0) for (const t of Object.values(g.tasks)) { if (!t.done && !t.blocked) left -= spend(t, founder, left, Infinity, tired); if (left <= 0) break; }
     for (const e of g.employees) { const p = g.people[e.personId]!; let h = this.employeeHours;
-      const open = Object.values(g.tasks).filter(t => !t.done).sort((x, y) => (p.skills[y.skill] ?? 0) - (p.skills[x.skill] ?? 0)), mine = e.assignedTo ? g.tasks[e.assignedTo] : undefined;
-      for (const t of mine && !mine.done ? [mine, ...open] : open) { if (h <= 0) break; if (!t.done) h -= spend(t, p, h, Infinity, 1); } }
+      const open = Object.values(g.tasks).filter(t => !t.done && !t.blocked).sort((x, y) => (p.skills[y.skill] ?? 0) - (p.skills[x.skill] ?? 0)), mine = e.assignedTo ? g.tasks[e.assignedTo] : undefined;
+      for (const t of mine && !mine.done && !mine.blocked ? [mine, ...open] : open) { if (h <= 0) break; if (!t.done) h -= spend(t, p, h, Infinity, 1); } }
     if (weekday(a.date) === 6) { f.fatigue = f.overtimeThisWeek > FATIGUE_FREE_OVERTIME ? f.fatigue + 1 : 0;   // Saturday night: a hard week tells next week
       for (const e of g.employees) narrow(e, g.people[e.personId]!, founder?.skills.manage ?? 30); }
   }

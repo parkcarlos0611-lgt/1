@@ -152,3 +152,10 @@ These decisions still hold, from `legacy/docs/MASTER_GAME_PLAN.md`:
 - Dark paints keep their dark tone steps apart (they used to run together into black).
 - Pixel snapping (grid by autocorrelation, majority colour per cell) is not used: the reference views have no coarser grid, and snapping made the capture worse (9.4 against 5.6) and broke fine lines.
 - Tools: zkit.py (fit, split), sedan36_z.py, shade.py, zscore.py, ztest.ts, zsheet.py, snap.py.
+
+## 2026-11-19 — method ZY: elements that carry the view's detail
+
+- Named ZY: the structure of Z (whole elements in millimetres) with the detail of Y handed to each element. A cell of an element's skin is a material and a tone step, or empty where the view does not show the element; the cells sit in the element's own box, so they move, stretch and are exchanged with it (data/skins, tools/ref/skin.py).
+- Where an element has no cell (behind a fender or a lamp), the game draws it by its rules in the element's usual tone. A part exchanged for another form, and a wheel of another kind, are drawn by the rules too.
+- Sedan, against its view: colour difference 6.2 (Y 5.6, Z 24.4); a tenth longer, repainted, lamps and wheels exchanged and elements pulled apart all hold.
+- The capture now leaves wheel arches open, which ends paint running into the tyres on a repaint.

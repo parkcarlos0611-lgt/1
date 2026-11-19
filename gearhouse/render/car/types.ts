@@ -59,6 +59,11 @@ export type Detail =
 /** tone steps on a grid over a panel's box: x0 and z1 are its top left corner in mm */
 export interface ToneMap { x0: number; z1: number; w: number; h: number; mm: number; steps: number; d: number[] }
 /** where the car's sections are, for stretching it: wheel centres, arch radius, cowl, cabin end, belt and roof heights */
+/** Method ZY: what the reference view shows of each element, kept with the element. `b` is the element's box when it was
+ *  read (x0, x1, z0, z1 in mm), `x0`/`z1` the top left of the grid; each cell is material * 16 + tone step, or -1 where
+ *  the view does not show the element (run-length coded: value, count). The cells move and stretch with the element. */
+export interface ElementSkin { b: [number, number, number, number]; x0: number; z1: number; w: number; h: number; d: number[]; sig?: string }
+export interface CarSkin { mm: number; paint: string; materials: Material[]; tones: Partial<Record<Material, string[]>>; elements: Record<string, ElementSkin> }
 export interface Landmarks { fx: number; rx: number; r: number; gap: number; cowl: number; cab: number; belt: number; roof: number }
 
 /** details laid on top of the panels */
@@ -118,5 +123,7 @@ export interface CarDesign {
   parts?: import('./parts').PartSpec[];
   /** tone steps added to the glass: 0 dark with reflections, 1 pale as on a studio drawing */
   glassLift?: number;
+  /** method ZY: the reference view's detail, element by element (tools/ref/skin.py) */
+  skin?: CarSkin;
   id?: string;
 }

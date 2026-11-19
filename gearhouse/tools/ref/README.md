@@ -5,3 +5,5 @@
 Sheets and real names stay outside the repository (see docs/reference/cars_catalogue.md for the working list). Needs `opencv-python-headless`.
 
 Method Z (structure first): `sedan36_z.py` fits a hand-written body to its view and cuts the shell into elements (`zkit.py`), `shade.py` reads how light falls on each element, `zscore.py` scores a drawing against the view element by element, `ztest.ts` and `zsheet.py` set the same changes on a pixel map and on elements side by side. Needs `shapely`.
+
+Method ZY: `capture.py` with the fitted body's roles, then `skin.py`, hands the view's detail to the elements (`data/skins/<id>.json`); `render.ts` attaches `<id>.skin.json` lying next to a body, `ztest.ts` takes the skin as its last argument.

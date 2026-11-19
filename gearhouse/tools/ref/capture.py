@@ -20,7 +20,9 @@ panels = sorted(R['panels'], key=lambda p: p['z']); names = ['body'] + [p['id'] 
 role = np.zeros((h, w), np.int32); rmat = {0: 'paint'}
 for k, p in enumerate(panels, 1):
     if p['material'] == 'shadow': continue
-    m = np.zeros((h, w), np.uint8); cv2.fillPoly(m, [poly(p['pts'])], 1); role[m > 0] = k; rmat[k] = p['material']
+    m = np.zeros((h, w), np.uint8); cv2.fillPoly(m, [poly(p['pts'])], 1)
+    for c in p.get('cut') or []: cv2.circle(m, (int(round(X(c['x']))), int(round(Y(c['z'])))), int(round(c['r'] / MM)), 0, -1)      # wheel arches are open
+    role[m > 0] = k; rmat[k] = p['material']
 for k, wh in enumerate(R['wheels']):
     m = np.zeros((h, w), np.uint8); cv2.circle(m, (int(round(X(wh['x']))), int(round(Y(wh['r'])))), int(round(wh['r'] / MM)), 1, -1)
     behind = role.copy(); idx = len(panels) + 1 + k; fender = np.isin(role, [i for i, p in enumerate(panels, 1) if p['material'] == 'paint' and (p.get('slot') or '').startswith('fender')])

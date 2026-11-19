@@ -1,6 +1,6 @@
 // The same four changes made to one car held two ways (decision of 2026-11-19): as a captured pixel map (Y) and as
 // fitted elements (Z). Longer by a tenth, another paint, other lamps and wheels, and the elements pulled apart.
-// npx tsx tools/ref/ztest.ts <body z json> <its captured map json> <donor map json> <out dir>
+// npx tsx tools/ref/ztest.ts <body z json> <its captured map json> <donor map json> <out dir> [skin json: method ZY]
 import { readFileSync, writeFileSync } from 'node:fs';
 import { rasterizeFlat } from '../../render/car/flat';
 import { expandParts } from '../../render/car/parts';
@@ -9,8 +9,9 @@ import { drawMap, type CarMap } from '../../render/car/mapped';
 import { encodePNG } from '../png';
 import type { CarDesign, Pt } from '../../render/car/types';
 import type { PartSpec } from '../../render/car/parts';
-const [zPath, yPath, donorPath, out] = process.argv.slice(2) as [string, string, string, string];
+const [zPath, yPath, donorPath, out, skinPath] = process.argv.slice(2) as [string, string, string, string, string | undefined];
 const Z0 = JSON.parse(readFileSync(zPath, 'utf8')) as CarDesign, Y0 = JSON.parse(readFileSync(yPath, 'utf8')) as CarMap, DON = JSON.parse(readFileSync(donorPath, 'utf8')) as CarMap;
+if (skinPath) Z0.skin = JSON.parse(readFileSync(skinPath, 'utf8'));
 const clone = <T>(o: T): T => JSON.parse(JSON.stringify(o));
 const save = (name: string, img: { w: number; h: number; rgba: Uint8ClampedArray }) => { writeFileSync(`${out}/${name}.png`, encodePNG(img.w, img.h, img.rgba)); console.log(name, `${img.w}x${img.h}`); };
 const PAINT = '#7a1420', HOOD = 150, CABIN = 315;

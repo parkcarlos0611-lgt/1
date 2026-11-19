@@ -172,3 +172,8 @@ These decisions still hold, from `legacy/docs/MASTER_GAME_PLAN.md`:
 - Technology check: a randomly picked car (1940s #2, four-wheel-drive utility, 1948) in left, right, front, rear and plan views; the right side is the left side turned end for end with the light kept top left. Removing the tilt, a longer wheelbase, repainting and other wheels all hold.
 - Renderer: wire mesh grille, tread tyres, black or painted hubs, canvas colour, lines on canvas; small parts move whole when a car is stretched (demo).
 - Proposed (awaiting decision): only 1920s cars (sheets made by the planner) and 1930s cars up to about 1934 become full, exchangeable parts in all five views, with common mounting marks; later cars wait for their era.
+
+## 2026-11-19 — running gear, suspension and a production system (review 23, proposals)
+
+- Fixed on the sample utility: the front bumper bolts to frame ends and a valance; wheel houses are an inner arch panel a little larger than the opening instead of a black fill.
+- Proposed (awaiting decision): running gear (frame, powertrain, suspension, tyres) is defined once in three dimensions per class of car and projected into every view, with wheelbase, track, frame height, tyre size and engine length set per car; suspension drawn from mount points and driven by the first build's reduced multi-body model, in stages (rest pose, slow scenes, driving); a fact sheet per car from research; automatic checks for attachment, gaps, agreement between views and lone pixels.

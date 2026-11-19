@@ -6,7 +6,7 @@ upright, windscreen, tub, tilt, bumper, chassis, lamps, hinges, straps, wheels.
 Sizes: length 3350, wheelbase 2032 (80 in), width 1550; heights from the side view (1803 over the tilt).
 
   python3 tools/ref/lr48.py data/bodies"""
-import sys, os; sys.path.insert(0, os.path.dirname(__file__))
+import sys, os, math; sys.path.insert(0, os.path.dirname(__file__))
 from kit import Body, ell, sh, sym
 OUT = sys.argv[1]; L, W, H = 3350, 1550, 1803; C = W // 2
 META = dict(year=1948, paint='#616a53', paint2='#616a53', canvas='#a18d69', frame='reveal')
@@ -15,7 +15,10 @@ WHEEL = dict(rim=0.6, style='disc', spokes=0, rimMaterial='paint', cap=0.3, capR
 
 def side():
     b = Body()
-    b.well('wellF', FX, 450, 400).well('wellR', RX, 450, 410)
+    # wheel houses: the inner arch seen past the tyre, a dark panel a little larger than the opening so no gap shows at its edge
+    for name, x, rr, z0, z1 in (('houseF', FX, 420, 590, 470), ('houseR', RX, 430, 525, 525)):
+        b.add(name, sh([[x - rr, z0]] + [[round(x + math.cos(a) * rr), round(450 + math.sin(a) * rr)] for a in [math.pi * k / 16 for k in range(16, -1, -1)]] + [[x + rr, z1]]), 'black', 'flat', 2)
+    b.add('horn', sh([[40, 395], [112, 395], [112, 600], [40, 600]]), 'black', 'flat', 3)        # the frame end the bumper bolts to
     b.add('chassis', sh([[40, 395], [3310, 395], [3310, 525], [40, 525]]), 'black', 'flat', 1)
     b.add('step', sh([[1240, 395], [2160, 395], [2160, 475], [1240, 475]]), 'black', 'flat', 3)
     b.add('crossR', sh([[3280, 380], [3345, 380], [3345, 525], [3280, 525]]), 'black', 'flat', 3)
@@ -50,9 +53,10 @@ def side():
 def front():
     b = Body()
     for u in (-1, 1): b.add(f'tyre{u}', [[C + u * 600, 0, 1], [C + u * 830, 0, 1], [C + u * 840, 470, 1], [C + u * 590, 470, 1]], 'rubber', 'fender', 1, detail={'kind': 'planks', 'pitch': 45})
+    b.add('valance', sh([[70, 540], [1480, 540], [1480, 612], [70, 612]]), 'black', 'flat', 4)      # what the bumper sits against, between the frame ends
     b.add('axle', sh([[200, 300], [1350, 300], [1350, 400], [200, 400]]), 'black', 'flat', 2)
     b.add('diff', ell(560, 290, 150, 140), 'iron', 'fender', 3)
-    for x in (400, 1110): b.add(f'rail{x}', sh([[x, 380], [x + 70, 380], [x + 70, 470], [x, 470]]), 'black', 'flat', 2)
+    for x in (400, 1110): b.add(f'rail{x}', sh([[x, 380], [x + 70, 380], [x + 70, 560], [x, 560]]), 'black', 'flat', 2)
     b.add('panhard', sh([[300, 440], [1250, 440], [1250, 470], [300, 470]]), 'iron', 'flat', 2)
     b.add('bulkhead', sh([[130, 1000], [1420, 1000], [1420, 1288], [130, 1288]]), 'paint', 'side', 10, element='bulkhead')
     b.add('screenFrame', sh([[118, 1272], [1432, 1272], [1432, 1702], [118, 1702]]), 'chrome', 'flat', 12, element='screen')

@@ -8,7 +8,7 @@ import type { Task } from './state';
 
 export type OrderType = 'body_only' | 'bought' | 'built';
 export interface StepData { id: string; skill: string; hours: Record<OrderType, number>; sized?: boolean; after: string[]; needs: Partial<Record<OrderType | 'all', Record<string, number>>>; visible: number; hidden: number; defects: string[] }
-export interface BuildData { toolLevel: number; repeatFactor: number[]; design: { baseHours: Record<OrderType, number>; perProportion: number; perPart: number; perPanel: number; mockupHours: number }; steps: StepData[] }
+export interface BuildData { toolLevel: number; /** a step below this quality may leave a fault; the chance grows over the span */ defect: { below: number; span: number }; repeatFactor: number[]; design: { baseHours: Record<OrderType, number>; perProportion: number; perPart: number; perPanel: number; mockupHours: number }; steps: StepData[] }
 export interface Design { id: string; name: string; baseCar: string; orderType: OrderType;
   /** body size against a mid-size car (1 = mid-size) */
   size: number;
@@ -81,7 +81,7 @@ export class Shop {
     for (const bs of b.steps) { const st = this.data.steps.find(s => s.id === bs.step), t = g.tasks[bs.taskId]!; cost += bs.cost; own += t.by?.[g.founderId ?? 'founder'] ?? t.by?.founder ?? 0; if (!st || bs.quality == null || bs.quality < 0) continue;
       vis += bs.quality * st.visible; vw += st.visible; hid += bs.quality * st.hidden; hw += st.hidden;
       // poor work leaves faults behind: the lower the quality, the likelier and the worse
-      const chance = Math.max(0.02, Math.min(0.8, (75 - bs.quality) / 60)); if (st.defects.length && a.rng.float() < chance) { const kind = st.defects[a.rng.int(0, st.defects.length - 1)]!, severity = bs.quality < 45 ? 3 : bs.quality < 60 ? 2 : 1;
+      const chance = Math.max(0.02, Math.min(0.8, (this.data.defect.below - bs.quality) / this.data.defect.span)); if (st.defects.length && a.rng.float() < chance) { const kind = st.defects[a.rng.int(0, st.defects.length - 1)]!, severity = bs.quality < 45 ? 3 : bs.quality < 60 ? 2 : 1;
         defects.push({ step: st.id, kind, severity, found: false, fixed: false }); a.bus.emit('defect_created', { buildId: b.id, step: st.id, kind, severity }); } }
     const car: Car = { id: this.S.nextId++, buildId: b.id, designId: d.id, built: a.date, quality: { visible: Math.round(vis / Math.max(1, vw)), hidden: Math.round(hid / Math.max(1, hw)) }, defects, cost: Math.round(cost * 100) / 100, ownHours: Math.round(own) };
     b.state = 'done'; d.built++; this.S.cars.push(car); for (const bs of b.steps) delete g.tasks[bs.taskId];

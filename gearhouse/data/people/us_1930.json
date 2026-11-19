@@ -23,7 +23,7 @@
     "sales": 35,
     "manage": 30
    },
-   "cash": 900
+   "cash": 1800
   },
   "coachbuilder": {
    "skills": {
@@ -37,7 +37,7 @@
     "sales": 35,
     "manage": 28
    },
-   "cash": 900
+   "cash": 1800
   },
   "racer": {
    "skills": {
@@ -51,7 +51,7 @@
     "sales": 55,
     "manage": 25
    },
-   "cash": 800
+   "cash": 1600
   },
   "merchant": {
    "skills": {
@@ -65,7 +65,7 @@
     "paint": 20,
     "trim": 25
    },
-   "cash": 2200
+   "cash": 4400
   },
   "engineer": {
    "skills": {
@@ -79,7 +79,7 @@
     "sales": 30,
     "manage": 40
    },
-   "cash": 600
+   "cash": 1200
   }
  },
  "traits": [

@@ -231,5 +231,9 @@
    "hidden": 1,
    "defects": []
   }
- ]
+ ],
+ "defect": {
+  "below": 66,
+  "span": 60
+ }
 }

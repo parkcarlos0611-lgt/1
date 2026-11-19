@@ -428,8 +428,10 @@
   "performance": 15,
   "delivery": 15,
   "value": 15,
-  "qualityMid": 45
+  "qualityMid": 42
  },
- "breakdownPerDayPerDefect": 0.006,
- "warrantyDays": 365
+ "breakdownPerDayPerDefect": 0.004,
+ "warrantyDays": 365,
+ "pleasedAt": 50,
+ "reputationPull": 1.5
 }

@@ -12,7 +12,9 @@ import { compose, type TextMemory, type TextSet } from './text';
 export type Field = 'quality' | 'performance' | 'style' | 'trust' | 'value';
 export interface CustomerType { id: string; weight: number; age: [number, number]; standing: [number, number]; budget: Record<OrderType, [number, number]>; orderTypes: Record<OrderType, number>; bodies: string[]; priorities: Field[]; temper: [number, number]; patience: [number, number] }
 export interface SalesData { customerTypes: CustomerType[]; mustHaves: string[]; rates: { adClassified: number; adEighth: number; adQuarter: number; walkInPerAwareness: number; phoneBonus: number }; adCost: { classified: number; eighth: number; quarter: number };
-  mailDays: number; depositRate: [number, number]; maxRounds: number; satisfaction: Record<'spec' | 'quality' | 'performance' | 'delivery' | 'value' | 'qualityMid', number>; breakdownPerDayPerDefect: number; warrantyDays: number }
+  mailDays: number; depositRate: [number, number]; maxRounds: number; satisfaction: Record<'spec' | 'quality' | 'performance' | 'delivery' | 'value' | 'qualityMid', number>; breakdownPerDayPerDefect: number; warrantyDays: number;
+  /** satisfaction from which a customer sends friends */ pleasedAt: number;
+  /** how much the average reputation moves the number of inquiries: at +100 they are multiplied by 1 + this */ reputationPull: number }
 export interface EconomyData { demand: Record<string, number>; cannotPay: Record<string, number> }
 export type Source = 'ad' | 'referral' | 'walk_in' | 'first';
 export type Channel = 'visit' | 'mail' | 'phone';
@@ -101,10 +103,13 @@ export class Sales {
     let s = (spec > 0 ? spec * poor : spec) * W.spec + qual * W.quality + perf * W.performance + (del > 0 ? del * poor : del) * W.delivery + val * W.value; if (s < 0) s *= 1 + c.temper * 0.6; s = Math.round(clamp(s, -100, 100));
     ord.state = 'delivered'; M.sold.push({ carId: car.id, orderId: ord.id, customerId: c.id, delivered: a.date, satisfaction: s });
     // what people say afterwards: reputation in the fields this customer cares about, the town knows us a little better
-    this.bump('quality', qual * 6, a); this.bump('trust', del * 4 + (spec < 0 ? -4 : 1), a); this.bump('value', val * 4, a); this.bump('style', qual * 3 * (c.priorities.includes('style') ? 1.5 : 0.6), a); this.bump('performance', perf * 3, a);
+    // Reputation is what people have lately seen of us: each delivery pulls every field part of the way toward what this car showed.
+    this.pull('quality', qual * 100, 0.14, a); this.pull('performance', perf * 100, 0.1, a); this.pull('style', qual * 100 * (c.priorities.includes('style') ? 1 : 0.7), 0.1, a);
+    this.pull('trust', clamp(del * 60 + (spec < 0 ? -50 : 25), -100, 100), 0.12, a); this.pull('value', val * 100, 0.12, a);
     M.awareness.town = clamp(M.awareness.town + 2 + c.standing / 25, 0, 100); if (M.awareness.town > 60) M.awareness.city = clamp(M.awareness.city + c.standing / 40, 0, 100);
-    if (s >= 60) for (let n = Math.round(1 + c.standing / 45 * a.rng.float()); n > 0; n--) M.pending.push({ due: addDays(a.date, a.rng.int(10, 70)), kind: 'referral', by: a.g.people[c.personId]!.family });
+    if (s >= this.data.pleasedAt) for (let n = Math.round(1 + c.standing / 45 * a.rng.float()); n > 0; n--) M.pending.push({ due: addDays(a.date, a.rng.int(10, 70)), kind: 'referral', by: a.g.people[c.personId]!.family });
     a.bus.emit('car_delivered', { orderId: ord.id, carId: car.id, satisfaction: s, standing: c.standing }); return { satisfaction: s }; }
+  private pull(f: Field, toward: number, share: number, a: Api): void { this.bump(f, (toward - this.M.reputation[f]) * share, a); }
   private bump(f: Field, by: number, a: Api): void { const M = this.M, v = clamp(M.reputation[f] + by, -100, 100); if (Math.round(v) !== Math.round(M.reputation[f])) a.bus.emit('reputation_changed', { field: f, value: Math.round(v) }); M.reputation[f] = v; }
 
   system(): System { return { id: 'sales', day: a => this.day(a), evening: a => this.evening(a) }; }
@@ -122,6 +127,7 @@ export class Sales {
     // new inquiries: adverts running in the paper, and people who know of us in town
     const phone = a.g.supply.phone ? R.phoneBonus : 1; let perWeek = M.awareness.town * R.walkInPerAwareness;
     for (const ad of M.adverts) if (ad.from <= a.date && a.date < ad.until) perWeek += (ad.size === 'classified' ? R.adClassified : ad.size === 'eighth' ? R.adEighth : R.adQuarter) * phone;
+    const rep = Object.values(M.reputation).reduce((t, v) => t + v, 0) / 500; perWeek *= clamp(1 + rep * this.data.reputationPull, 0.25, 3);     // a good name brings callers, a bad one keeps them away
     if (a.rng.float() < perWeek * demand / 6) this.arrive(a, a.rng.float() < 0.25 ? 'walk_in' : M.adverts.some(ad => ad.from <= a.date && a.date < ad.until) ? 'ad' : 'walk_in');
     // inquiries left unanswered are lost when the customer's patience runs out
     for (const q of M.inquiries) if ((q.state === 'open') && daysBetween(q.received, a.date) > this.customer(q.customerId).patience + q.rounds * 10) { q.state = 'lost'; this.bump('trust', -1, a); } }
@@ -129,7 +135,7 @@ export class Sales {
     for (const ord of M.orders) if (ord.state === 'building' && !ord.lateTold && a.date > ord.due) { ord.lateTold = true; a.raise('order_late', 'decision', { orderId: ord.id, due: ord.due }, 30); }
     // cars sold in the last year can break down where a fault was left in
     for (const sc of M.sold) { if (daysBetween(sc.delivered, a.date) > this.data.warrantyDays) continue; const car = a.g.shop.cars.find(c => c.id === sc.carId)!;
-      for (const df of car.defects) if (!df.found && !df.fixed && a.rng.float() < this.data.breakdownPerDayPerDefect) { df.found = true; sc.satisfaction = clamp(sc.satisfaction - 12 * df.severity, -100, 100); this.bump('trust', -2 * df.severity, a); this.bump('quality', -1.5 * df.severity, a);
+      for (const df of car.defects) if (!df.found && !df.fixed && a.rng.float() < this.data.breakdownPerDayPerDefect) { df.found = true; sc.satisfaction = clamp(sc.satisfaction - 12 * df.severity, -100, 100); this.pull('trust', -60, 0.04 * df.severity, a); this.pull('quality', -50, 0.03 * df.severity, a);
         a.bus.emit('car_broke_down', { carId: car.id, kind: df.kind, severity: df.severity }); a.raise('car_broke_down', 'decision', { carId: car.id, orderId: sc.orderId, kind: df.kind, severity: df.severity, step: df.step }, 14); } }
     if (dateParts(addDays(a.date, 1)).day === 1) { M.awareness.town = Math.max(0, M.awareness.town - 0.6); M.awareness.city = Math.max(0, M.awareness.city - 0.4); }   // people forget
   }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { newWorld, openWorld } from '../core/world';
+import { DATA, newWorld, openWorld } from '../core/world';
 import { runBot } from '../core/bot';
 import { load, save } from '../core/state';
 import type { Incident } from '../core/state';
@@ -33,6 +33,6 @@ describe('newspaper', () => {
 describe('five years of ordinary play', () => {
   it('runs to the end, the same every time, and keeps the books straight', () => { const run = (seed: number) => { const w = newWorld(seed, FOUNDER), log = runBot(w, 1826); return { log, g: w.sim.g }; };
     const a = run(1930), b = run(1930); expect(save(a.g)).toBe(save(b.g)); expect(a.log.inquiries).toBeGreaterThan(20);
-    const sum = a.g.ledger.entries.reduce((t, e) => t + e.amount, 0); expect(Math.abs(900 + sum - a.g.ledger.cash)).toBeLessThan(0.01); });
+    const sum = a.g.ledger.entries.reduce((t, e) => t + e.amount, 0); expect(Math.abs(DATA.people.founderBackgrounds.coachbuilder!.cash + sum - a.g.ledger.cash)).toBeLessThan(0.01); });
   it('a save in the middle continues exactly', () => { const a = newWorld(77, FOUNDER); runBot(a, 400); const b = openWorld(load(save(a.sim.g))); for (let i = 0; i < 200; i++) { a.sim.stepDay(); b.sim.stepDay(); } expect(save(b.sim.g)).toBe(save(a.sim.g)); });
 });

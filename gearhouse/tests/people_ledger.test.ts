@@ -35,7 +35,7 @@ describe('ledger', () => {
   it('pays living costs, utilities and wages, and closes the month', () => { const { s } = company(); const p = makePerson(s.rng, names, PD, 1930, { age: 19 }); s.hire(p, 13, {}); let closed = 0;
     s.bus.on('month_closed', () => closed++); while (s.g.clock.date <= '1930-01-31') s.stepDay();
     const st = statement(s.g, '1930-01'); expect(closed).toBe(1); expect(st.byKind.living).toBe(-18 * 4); expect(st.byKind.wages).toBe(-13 * 4); expect(st.byKind.utilities).toBeUndefined();   // Jan 1 was a holiday: the bill comes on Feb 1
-    expect(s.g.ledger.cash).toBe(900 - 72 - 52); });
+    expect(s.g.ledger.cash).toBe(PD.founderBackgrounds.coachbuilder!.cash - 72 - 52); });
   it('warns before the cash runs out, once a month', () => { const { s } = company(); s.g.ledger.cash = 120; const stops = [] as string[]; for (let i = 0; i < 20; i++) stops.push(...s.stepDay().stops.map(x => x.kind));
     expect(stops.filter(k => k === 'cash_warning').length).toBe(1); expect(forecast(s.g, finance).some(c => c < 0)).toBe(true); });
   it('raises a decision when wages cannot be paid', () => { const { s } = company(); s.g.ledger.cash = 20; s.hire(makePerson(s.rng, names, PD, 1930), 30, {}); const kinds: string[] = []; for (let i = 0; i < 5; i++) kinds.push(...s.stepDay().stops.map(x => x.kind)); expect(kinds).toContain('wage_missed'); });

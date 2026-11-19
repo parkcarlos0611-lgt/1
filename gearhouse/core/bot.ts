@@ -9,7 +9,7 @@ import { DATA } from './world';
 
 export interface BotLog { inquiries: number; quoted: number; orders: number; delivered: number; lost: number; cannotPay: number; satisfaction: number[]; bankruptDate?: string; minCash: number }
 
-export function runBot(w: World, days: number, opt: { hire?: boolean; advert?: boolean } = {}): BotLog {
+export function runBot(w: World, days: number, opt: { hire?: boolean; advert?: boolean; deposit?: number } = {}): BotLog {
   const { sim, supply, shop, sales, media } = w, g = sim.g, log: BotLog = { inquiries: 0, quoted: 0, orders: 0, delivered: 0, lost: 0, cannotPay: 0, satisfaction: [], minCash: g.ledger.cash };
   const price = (part: string) => DATA.parts.parts[part]!.price, asked = new Set<string>();
   for (const [id, t] of [['std_body', 'body_only'], ['std_bought', 'bought'], ['std_built', 'built']] as const) if (!g.shop.designs[id]) shop.addDesign({ id, name: id, baseCar: 'sedan30', orderType: t, size: 1, effort: { proportion: 0, parts: 0, panels: 0 } });
@@ -29,7 +29,7 @@ export function runBot(w: World, days: number, opt: { hire?: boolean; advert?: b
         if (active() >= 2 || !canSupply(designId)) { sales.drop(q.id); log.lost++; break; }
         sales.consult(q.id); const v = sales.view(q.id), d = g.shop.designs[designId]!, cost = Object.entries(shop.bom(d)).reduce((t, [p, n]) => t + price(p) * n, 0), hours = shop.buildHours(d);
         const ask = v.budget ? v.budget[1] * 0.96 : cost * 1.25 + hours * 0.85, due = addDays(g.clock.date, Math.ceil((active() + 1) * hours / workPerDay() * 7 / 6 * 1.25) + 16);
-        sales.quote(q.id, { designId, price: Math.round(Math.max(ask, cost * 1.15 + hours * 0.5) / 5) * 5, due, depositRate: 0.3, meets: v.mustHave ?? [] }); log.quoted++; break; }
+        sales.quote(q.id, { designId, price: Math.round(Math.max(ask, cost * 1.15 + hours * 0.5) / 5) * 5, due, depositRate: opt.deposit ?? 0.4, meets: v.mustHave ?? [] }); log.quoted++; break; }
       case 'quote_answer': { const q = sales.inquiry(P.inquiryId);
         if (P.answer === 'haggle') { const d = g.shop.designs[q.quote!.designId]!, floor = Object.entries(shop.bom(d)).reduce((t, [p, n]) => t + price(p) * n, 0) * 1.1 + shop.buildHours(d) * 0.4; if (q.counter!.price >= floor) { sales.acceptCounter(q.id); sim.resolve(it.id, 'accept'); } else { sales.drop(q.id); log.lost++; sim.resolve(it.id, 'drop'); break; } }
         else if (P.answer === 'reject') { log.lost++; break; }

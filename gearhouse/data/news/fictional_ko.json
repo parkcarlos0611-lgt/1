@@ -57,7 +57,8 @@
    "delayWeeks": [
     2,
     4
-   ]
+   ],
+   "slant": "bad"
   },
   {
    "id": "price_down",
@@ -91,7 +92,8 @@
    "delayWeeks": [
     2,
     4
-   ]
+   ],
+   "slant": "good"
   },
   {
    "id": "road_paving",
@@ -125,7 +127,8 @@
    "delayWeeks": [
     4,
     10
-   ]
+   ],
+   "slant": "good"
   },
   {
    "id": "factory_trouble",
@@ -159,7 +162,8 @@
    "delayWeeks": [
     2,
     5
-   ]
+   ],
+   "slant": "bad"
   },
   {
    "id": "bank_worry",
@@ -193,7 +197,8 @@
    "delayWeeks": [
     1,
     3
-   ]
+   ],
+   "slant": "bad"
   },
   {
    "id": "good_season",
@@ -226,7 +231,8 @@
    "delayWeeks": [
     2,
     6
-   ]
+   ],
+   "slant": "good"
   },
   {
    "id": "new_supplier",
@@ -242,7 +248,8 @@
    ],
    "effect": {
     "kind": "supplier_found"
-   }
+   },
+   "slant": "neutral"
   },
   {
    "id": "motor_show",
@@ -273,7 +280,8 @@
    "delayWeeks": [
     3,
     8
-   ]
+   ],
+   "slant": "good"
   },
   {
    "id": "rival_model",
@@ -289,7 +297,8 @@
    "high": [
     "{=rival}, 전 차종 {=pct} 값 내려 업계 발칵",
     "{=rival} 새 공장 가동, 하루 {=n} 대 찍는다"
-   ]
+   ],
+   "slant": "neutral"
   },
   {
    "id": "rival_trouble",
@@ -305,7 +314,8 @@
    "high": [
     "{=rival} 파산 신청, 빚 {=amount}",
     "{=rival}, 경쟁사에 넘어가… 이름만 남는다"
-   ]
+   ],
+   "slant": "bad"
   },
   {
    "id": "race",
@@ -321,7 +331,8 @@
    "high": [
     "{=track} 대경주에 관중 {=n} 명… 우승 상금 {=amount}",
     "전국 기록 깨져: {=track}서 새 속도 기록"
-   ]
+   ],
+   "slant": "good"
   },
   {
    "id": "road_accident",
@@ -338,7 +349,8 @@
    "high": [
     "{=road} 참사: 자동차 사고로 {=n} 명 숨져",
     "건널목서 기차와 자동차 충돌… {=official} \"차단기 놓겠다\""
-   ]
+   ],
+   "slant": "bad"
   },
   {
    "id": "fuel",
@@ -355,7 +367,8 @@
    "high": [
     "휘발유 값 {=pct} 폭등, 차 세워 두는 집 늘어",
     "주 의회, 휘발유세 올린다… 도로 예산 {=amount}"
-   ]
+   ],
+   "slant": "neutral"
   },
   {
    "id": "registrations",
@@ -371,7 +384,8 @@
    "high": [
     "주 전체 신차 등록 {=pct} 급감",
     "군내 자동차 {=n} 대 넘어… 열 집에 한 대꼴"
-   ]
+   ],
+   "slant": "neutral"
   },
   {
    "id": "traffic_rule",
@@ -387,7 +401,8 @@
    "high": [
     "주 의회, 자동차 검사 의무화… {=carpart} 불량 차 운행 금지",
     "새 도로법 통과: {=rule} 주 전체 시행"
-   ]
+   ],
+   "slant": "neutral"
   },
   {
    "id": "garage_trade",
@@ -404,7 +419,8 @@
    "high": [
     "우체국, 군내 배달 전부 자동차로 바꾼다… {=n} 대 발주",
     "주 경찰, 순찰차 {=n} 대 입찰… 지역 업체도 참가 가능"
-   ]
+   ],
+   "slant": "good"
   },
   {
    "id": "crop_prices",
@@ -421,7 +437,8 @@
    "high": [
     "{=crop} 값 {=pct} 폭락… 밭에서 썩히는 집도",
     "{=goods} 값 {=pct} 뛰어 주부들 아우성"
-   ]
+   ],
+   "slant": "neutral"
   },
   {
    "id": "county_budget",
@@ -437,7 +454,8 @@
    "high": [
     "군 금고 바닥… 교사 봉급 {=n} 명분 밀려",
     "체납 농지 {=n} 곳 경매 넘어가"
-   ]
+   ],
+   "slant": "bad"
   },
   {
    "id": "railway",
@@ -453,7 +471,8 @@
    "high": [
     "철도 지선 폐쇄 검토… {town} 상인들 반발",
     "철도 파업으로 화물 {=n} 량 묶여"
-   ]
+   ],
+   "slant": "neutral"
   },
   {
    "id": "shops",
@@ -470,7 +489,8 @@
    "high": [
     "중심가 가게 {=n} 곳 문 닫아",
     "{town} 최대 {=shop} 파산, 빚 {=amount}"
-   ]
+   ],
+   "slant": "neutral"
   },
   {
    "id": "jobs",
@@ -486,7 +506,8 @@
    "high": [
     "군내 실직자 {=n} 명 넘어… {=official} 대책 회의",
     "무료 급식소 열어, 하루 {=n} 명 찾아"
-   ]
+   ],
+   "slant": "bad"
   },
   {
    "id": "season",
@@ -502,7 +523,8 @@
    "high": [
     "{=weather} 한 달째… {=crop} 수확 {=pct} 줄 듯",
     "기록적 {=weather}, 군 전체 피해 {=amount}"
-   ]
+   ],
+   "slant": "neutral"
   },
   {
    "id": "election",
@@ -518,7 +540,8 @@
    "high": [
     "{=official} 공금 {=amount} 유용 혐의… 사임",
     "주지사 선거 {town} 유세에 {=n} 명 몰려"
-   ]
+   ],
+   "slant": "neutral"
   },
   {
    "id": "bank_report",
@@ -534,7 +557,8 @@
    "high": [
     "군내 은행 예금 총액 {=pct} 감소",
     "{=bank}, 농지 담보 {=n} 건 회수 나서"
-   ]
+   ],
+   "slant": "neutral"
   },
   {
    "id": "fire",
@@ -546,12 +570,13 @@
    ],
    "mid": [
     "{=street} {=shop} 전소, 피해 {=amount}",
-    "{=factory} 창고 불타… 소방대 {=n} 시간 사투"
+    "{=factory} 창고 불타… 소방대 {=hours} 시간 사투"
    ],
    "high": [
     "중심가 대화재: 가게 {=n} 곳 잿더미, 피해 {=amount}",
     "{=factory} 큰불, {town} 하늘 붉게 물들여"
-   ]
+   ],
+   "slant": "bad"
   },
   {
    "id": "church_social",
@@ -568,7 +593,8 @@
    "high": [
     "{=church} 새 예배당 봉헌, {=n} 명 참석",
     "{=club} 주 대회 {town}서 열려… 손님 {=n} 명"
-   ]
+   ],
+   "slant": "good"
   },
   {
    "id": "sports",
@@ -585,7 +611,8 @@
    "high": [
     "{=team} 주 대회 결승 진출… 읍 전체 들썩",
     "{=team} 주 챔피언! 환영 인파 {=n} 명"
-   ]
+   ],
+   "slant": "good"
   },
   {
    "id": "crime",
@@ -602,7 +629,8 @@
    "high": [
     "{=bank}에 무장 강도, {=amount} 빼앗아 달아나",
     "열차 강도 일당 {=n} 명 붙잡혀"
-   ]
+   ],
+   "slant": "bad"
   },
   {
    "id": "weather_event",
@@ -619,7 +647,8 @@
    "high": [
     "{=weather} 덮쳐 {=n} 가구 집 잃어… 피해 {=amount}",
     "대홍수: 강 넘쳐 {town} 낮은 지대 잠겨"
-   ]
+   ],
+   "slant": "bad"
   },
   {
    "id": "fair",
@@ -636,7 +665,8 @@
    "high": [
     "군 박람회 사상 최다 {=n} 명 입장",
     "주 박람회서 {town} 출품 {=animal} 대상"
-   ]
+   ],
+   "slant": "good"
   },
   {
    "id": "people",
@@ -654,7 +684,8 @@
    "high": [
     "{town} 개척 세대 마지막 어른 {person} 옹 별세",
     "{person} 씨, {=amount} 들여 도서관 지어 기증"
-   ]
+   ],
+   "slant": "neutral"
   },
   {
    "id": "oddity",
@@ -671,7 +702,8 @@
    "high": [
     "비행선 {town} 상공 지나… 읍 전체 하늘 구경",
     "유명 비행사, {=place} 옆 들판에 불시착"
-   ]
+   ],
+   "slant": "good"
   }
  ],
  "words": {
@@ -1089,6 +1121,14 @@
    "사진은 내주에",
    "관계자 명단 3면",
    "독자 투고 환영"
+  ],
+  "hours": [
+   "두",
+   "세",
+   "네",
+   "다섯",
+   "여섯",
+   "일곱"
   ]
  },
  "tails": [

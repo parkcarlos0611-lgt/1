@@ -54,3 +54,11 @@ These decisions still hold, from `legacy/docs/MASTER_GAME_PLAN.md`:
 ## 2026-11-19 — names
 
 - People's and suppliers' names stay in Latin letters; they are not converted to Korean spellings.
+
+## 2026-11-19 — news bodies and effects (reviews 09 and 10)
+
+- An article's slant is good news, bad news or neutral.
+- Bodies are assembled in three layers: fact sentences per topic and tier, ten frames, ten voices.
+- Effects are added in this order: the town register, then seven changes in numbers, then four opportunities.
+- Verification of the real events is a separate, later task.
+- The reporter seats and the town register as a database are under review (review 10).

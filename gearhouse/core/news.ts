@@ -20,7 +20,8 @@ export type Effect =
   | { kind: 'supplier_price'; mult: number[]; weeks: number }        // one supplier's prices
   | { kind: 'supplier_found' }                                        // a supplier the player may not know yet
   | { kind: 'awareness'; add: number[] };                             // the town hears of the workshop's trade
-export interface Topic { id: string; relation: Relation; low?: string[]; mid?: string[]; high?: string[]; effect?: Effect; delayWeeks?: [number, number] }
+export type Slant = 'good' | 'bad' | 'neutral';
+export interface Topic { id: string; relation: Relation; slant: Slant; low?: string[]; mid?: string[]; high?: string[]; effect?: Effect; delayWeeks?: [number, number] }
 export interface FictionData { topics: Topic[]; words: Record<string, string[]>;
   /** endings that may follow a headline: who said what, how the town took it, where and when */ tails: { t: string; w: number; noQuote?: boolean; minImportance?: number; notRelation?: Relation[] }[];
   /** articles of each importance per issue: [min, max] or a chance below 1 */
@@ -28,14 +29,15 @@ export interface FictionData { topics: Topic[]; words: Record<string, string[]>;
 export interface RealEvent { id: string; date?: DateStr; annual?: { month: number; day: number; from?: number; to?: number }; level: RealLevel; relation: Relation; headlines: string[]; effect?: Effect }
 export interface RealData { events: RealEvent[]; angles: Record<Relation, string[]> }
 
-export interface NewsItem { origin: 'fictional' | 'real'; id: string; /** weeks from the paper to the effect */ delayWeeks?: number; relation: Relation; importance?: number; level?: RealLevel; headline: string; lead?: string;
+export interface NewsItem { origin: 'fictional' | 'real'; id: string; slant?: Slant;
+  /** what the headline said, so the body says the same; the seed the body is written from; the voice that writes it */ slots?: Record<string, string>; seed?: number; voice?: string; /** weeks from the paper to the effect */ delayWeeks?: number; relation: Relation; importance?: number; level?: RealLevel; headline: string; lead?: string;
   /** how prominently it is printed */ weight: number; effect?: { kind: Effect['kind']; value?: number; weeks?: number; supplierId?: string; due?: DateStr } }
 
-/** fill a pattern: {=list} picks a word (a list named list@N is used for importance N when it exists); {fact} takes a fact */
-export function fill(rng: Rng, pattern: string, words: Record<string, string[]>, facts: Record<string, string | number>, importance = 0): string {
-  return pattern.replace(/\{=(\w+)(?::([^}]+))?\}/g, (_, k: string, j?: string) => { const w = words[`${k}@${importance}`] ?? words[k], v = w?.length ? w[rng.int(0, w.length - 1)]! : ''; return j ? v + josa(v, j) : v; })
-    .replace(/\{(\w+)\}/g, (m, k: string) => (facts[k] != null ? String(facts[k]) : m)); }
-/** how many different lines a pattern can give (facts such as names not counted) */
+/** fill a pattern: {=list} picks a word (a list named list@N is used for importance N when it exists); {fact} takes a fact;
+ *  either may carry a Korean particle pair, {=list:을/를}. Picks are remembered in `bound`, so a headline and its body agree. */
+export function fill(rng: Rng, pattern: string, words: Record<string, string[]>, facts: Record<string, string | number>, importance = 0, bound?: Record<string, string>): string {
+  return pattern.replace(/\{=(\w+)(?::([^}]+))?\}/g, (_, k: string, j?: string) => { let v = bound?.[k]; if (v == null) { const w = words[`${k}@${importance}`] ?? words[k]; v = w?.length ? w[rng.int(0, w.length - 1)]! : ''; if (bound) bound[k] = v; } return j ? v + josa(v, j) : v; })
+    .replace(/\{(\w+)(?::([^}]+))?\}/g, (m, k: string, j?: string) => { if (facts[k] == null) return m; const v = String(facts[k]); return j ? v + josa(v, j) : v; }); }
 /** different lines a topic pattern gives once the endings are counted */
 /** the endings that suit a headline: no second quotation, no official's word on small town items */
 export function tailsFor(data: FictionData, pattern: string, importance: number, relation: Relation) { const quoted = /["“…]/.test(pattern); return data.tails.filter(x => !(x.noQuote && quoted) && !(pattern.includes('…') && x.t.startsWith('…')) && importance >= (x.minImportance ?? 1) && !(x.notRelation ?? []).includes(relation)); }
@@ -45,7 +47,8 @@ const pickW = <T>(rng: Rng, items: T[], w: (x: T) => number): T => { let t = rng
 const val = (a: number[], importance: number) => a[Math.min(a.length - 1, importance - 1)] ?? a[0]!;
 
 /** the fictional items of one issue */
-export function fictionalItems(rng: Rng, data: FictionData, facts: Record<string, string | number>, recent: string[], suppliers: { id: string; name: string; known: boolean }[]): NewsItem[] {
+export interface VoiceInfo { id: string; beats: Relation[]; slants: Slant[]; importance?: [number, number] }
+export function fictionalItems(rng: Rng, data: FictionData, facts: Record<string, string | number>, recent: string[], suppliers: { id: string; name: string; known: boolean }[], voices: VoiceInfo[] = []): NewsItem[] {
   const out: NewsItem[] = [];
   for (let importance = 6; importance >= 1; importance--) { const per = data.perIssue[String(importance)] ?? 0, n = typeof per === 'number' ? (rng.float() < per ? 1 : 0) : rng.int(per[0], per[1]), tier = tierOf(importance);
     for (let k = 0; k < n; k++) { const relation = pickW(rng, RELATIONS, r => data.relationWeights[r]), pool = data.topics.filter(t => t.relation === relation && t[tier]?.length); if (!pool.length) continue;
@@ -54,7 +57,9 @@ export function fictionalItems(rng: Rng, data: FictionData, facts: Record<string
       if (topic.effect?.kind === 'supplier_price' || topic.effect?.kind === 'supplier_found') { const cand = suppliers.filter(s => (topic.effect!.kind === 'supplier_found' ? !s.known : true)); if (!cand.length) continue; const s = cand[rng.int(0, cand.length - 1)]!; supplierId = s.id; f.supplier = s.name; }
       const dw = topic.delayWeeks ?? [1, 3]; const item: NewsItem = { origin: 'fictional', id: topic.id, relation, importance, delayWeeks: topic.effect ? rng.int(dw[0], dw[1]) : undefined, headline: '', weight: importance };
       const pat = pats[rng.int(0, pats.length - 1)]!, tail = pickW(rng, tailsFor(data, pat, importance, relation), x => x.w);
-      item.headline = fill(rng, pat + tail.t, data.words, f, importance);
+      const bound: Record<string, string> = {}; item.headline = fill(rng, pat + tail.t, data.words, f, importance, bound); item.slant = topic.slant; item.seed = rng.next();
+      item.slots = { ...bound, ...Object.fromEntries(Object.entries(f).map(([k, v]) => [k, String(v)])) };
+      const fit = voices.filter(v => v.beats.includes(relation) && v.slants.includes(topic.slant) && importance >= (v.importance?.[0] ?? 1) && importance <= (v.importance?.[1] ?? 6)); if (fit.length) item.voice = fit[rng.int(0, fit.length - 1)]!.id;
       const e = topic.effect; if (e) item.effect = e.kind === 'supplier_found' ? { kind: e.kind, supplierId } : e.kind === 'awareness' ? { kind: e.kind, value: val(e.add, importance) } : { kind: e.kind, value: val(e.mult, importance), weeks: e.weeks, supplierId };
       recent.push(topic.id + ':' + tier); if (recent.length > 40) recent.shift(); out.push(item); } }
   return out; }

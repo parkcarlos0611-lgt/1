@@ -7,9 +7,9 @@ import type { World } from './world';
 import { makePerson, firstImpression } from './people';
 import { DATA } from './world';
 
-export interface BotLog { inquiries: number; quoted: number; orders: number; delivered: number; lost: number; cannotPay: number; satisfaction: number[]; bankruptDate?: string; minCash: number }
+export interface BotLog { /** chances taken, and tenders and auctions won */ chances?: Record<string, number>; delaysAsked?: number; inquiries: number; quoted: number; orders: number; delivered: number; lost: number; cannotPay: number; satisfaction: number[]; bankruptDate?: string; minCash: number }
 
-export function runBot(w: World, days: number, opt: { hire?: boolean; advert?: boolean; deposit?: number } = {}): BotLog {
+export function runBot(w: World, days: number, opt: { hire?: boolean; advert?: boolean; deposit?: number; chances?: boolean } = {}): BotLog {
   const { sim, supply, shop, sales, media } = w, g = sim.g, log: BotLog = { inquiries: 0, quoted: 0, orders: 0, delivered: 0, lost: 0, cannotPay: 0, satisfaction: [], minCash: g.ledger.cash };
   const price = (part: string) => DATA.parts.parts[part]!.price, asked = new Set<string>();
   for (const [id, t] of [['std_body', 'body_only'], ['std_bought', 'bought'], ['std_built', 'built']] as const) if (!g.shop.designs[id]) shop.addDesign({ id, name: id, baseCar: 'sedan30', orderType: t, size: 1, effort: { proportion: 0, parts: 0, panels: 0 } });
@@ -22,9 +22,19 @@ export function runBot(w: World, days: number, opt: { hire?: boolean; advert?: b
     const bySupplier: Record<string, { part: string; qty: number; grade: number }[]> = {};
     for (const [p, n] of Object.entries(need)) { const have = supply.stock(p) + supply.coming(p), key = p + ':' + g.market.orders.length; if (have >= n - 1e-9 || asked.has(key)) continue; const s = supply.sellers(p)[0]; if (!s) continue; asked.add(key); (bySupplier[s.id] ??= []).push({ part: p, qty: Math.ceil(n - have), grade: s.line.grade }); }
     for (const [id, lines] of Object.entries(bySupplier)) supply.inquire(id, lines, supply.sellers(lines[0]!.part).find(x => x.id === id)!.mailDays === 0 ? 'visit' : 'mail'); };
+  const took2 = (k: string) => { const C = (log.chances ??= {}); C[k] = (C[k] ?? 0) + 1; };
   const handle = (it: Incident) => { const P = it.payload as Record<string, any>;
     switch (it.kind) {
-      case 'newspaper': media.read(P.issueId); media.move(P.issueId, 'gone'); break;
+      case 'newspaper': { media.read(P.issueId); media.move(P.issueId, 'gone'); if (opt.chances === false) break; const C = (log.chances ??= {}), took = (k: string) => { C[k] = (C[k] ?? 0) + 1; };
+        for (const c of w.chances.open()) { try {
+            if (c.kind === 'clearance' && g.market.orders.some(o => o.state === 'building')) { w.chances.clear(c.id); took('clearance'); }
+            if (c.kind === 'auction' && g.ledger.cash > 600 && (g.shop.toolBonus ?? 0) < DATA.chances.auction.maxBonus) { w.chances.auction(c.id, Math.round(DATA.chances.auction.value[Math.min(5, c.importance - 1)]! * 0.8)); took('auction'); }
+            if (c.kind === 'show' && g.ledger.cash > 300 && g.shop.cars.length) { const lendable = g.shop.cars.filter(x => (g.market.sold.find(s => s.carId === x.id)?.satisfaction ?? 99) >= 30); if (lendable.length) { w.chances.enter(c.id, lendable.reduce((x, y) => (x.quality.visible >= y.quality.visible ? x : y)).id); took('show'); } }
+            if (c.kind === 'tender' && active() === 0 && (c.cars ?? 9) <= 3 && canSupply('std_bought')) { w.chances.bid(c.id, 'std_bought', 1250); took('tender'); }
+          } catch { /* not for this shop this time */ } } break; }
+      case 'tender_result': if (P.won) { took2('tender_won'); for (const id of P.orderIds as number[]) { log.orders++; shop.startBuild('std_bought', id); } stockUp(); } break;
+      case 'auction_result': if (P.won) took2('auction_won'); break;
+      case 'order_late': if (P.mayAsk && g.market.orders.find(o => o.id === P.orderId)?.state === 'building') { log.delaysAsked = (log.delaysAsked ?? 0) + 1; sales.askDelay(P.orderId, 14); } break;
       case 'inquiry': { log.inquiries++; const q = sales.inquiry(P.inquiryId), c = sales.customer(q.customerId), designId = designFor(c.orderType);
         if (active() >= 2 || !canSupply(designId)) { sales.drop(q.id); log.lost++; break; }
         sales.consult(q.id); const v = sales.view(q.id), d = g.shop.designs[designId]!, cost = Object.entries(shop.bom(d)).reduce((t, [p, n]) => t + price(p) * n, 0), hours = shop.buildHours(d);

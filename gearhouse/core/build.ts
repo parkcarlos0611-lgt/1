@@ -51,11 +51,12 @@ export class Shop {
 
   system(): System { return { id: 'shop', morning: a => { this.release(a); this.hold(a); }, evening: a => { this.finish(a); this.release(a); } }; }
 
+  /** better tools come into the shop (an auction, a purchase), up to a ceiling */
+  improveTools(by: number, max: number): number { this.S.toolBonus = Math.min(max, (this.S.toolBonus ?? 0) + by); return this.S.toolBonus; }
   /** paint does not dry in the rain: the step waits, and the customer is not told the car is late for those days */
   private hold(a: Api): void { const rain = a.g.weather?.today === 'rain';
     for (const b of this.S.builds) { if (b.state !== 'building') continue; for (const bs of b.steps) { const st = this.data.steps.find(s => s.id === bs.step), t = a.g.tasks[bs.taskId]; if (!st?.noRain || !t || t.done || t.blocked) continue;
-        if (!rain) { delete t.held; continue; } t.held = 'rain'; const ord = a.g.market.orders.find(o => o.id === b.orderId);
-        if (a.workday && ord) ord.excusedDays = (ord.excusedDays ?? 0) + 1;
+        if (!rain) { delete t.held; continue; } t.held = 'rain'; if (a.workday) a.bus.emit('work_held', { buildId: b.id, orderId: b.orderId, reason: 'rain' });
         if (!bs.heldTold) { bs.heldTold = true; a.raise('paint_held', 'notice', { buildId: b.id, step: st.id, orderId: b.orderId }); } } } }
 
   /** let steps start whose earlier steps are done and whose materials are in the store */

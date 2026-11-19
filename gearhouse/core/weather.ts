@@ -3,7 +3,7 @@
 // month at most, a long rain comes once a year at most, and after a spell there is a grace before the next may begin.
 // Weather keeps people from calling in person; half of those kept away by a spell come when it is over.
 import { addDays, daysBetween, parts, type DateStr } from './calendar';
-import type { Api, System } from './sim';
+import type { Api, Simulation, System } from './sim';
 import { begin, type CondKind } from './conditions';
 
 export type Sky = 'clear' | 'rain' | 'snow';
@@ -15,8 +15,8 @@ export interface WeatherData { months: Record<string, [number, number]>; persist
   grace: [number, number]; graceWinter: [number, number]; maxDays: number; returnShare: number; returnDays: number; events: WeatherEvent[]; dayWords: Record<Sky, string[]>;
   notes: Record<string, { title: string; start: string[]; ongoing: string[]; end: string[] }> }
 export interface WeatherState { today: Sky; /** how callers in person are multiplied today */ visit: number; event?: { kind: string; start: DateStr; end: DateStr }; /** the spell that ended last */ last?: { kind: string; start: DateStr; end: DateStr };
-  graceUntil?: DateStr; longRainYear?: number; /** callers a spell kept away, and those of them now due to come */ lost: number; returning: number }
-export const newWeather = (): WeatherState => ({ today: 'clear', visit: 1, lost: 0, returning: 0 });
+  graceUntil?: DateStr; longRainYear?: number; /** callers the present spell has kept away */ lost: number }
+export const newWeather = (): WeatherState => ({ today: 'clear', visit: 1, lost: 0 });
 const season = (month: number) => (month === 12 || month <= 2 ? 'winter' : month >= 6 && month <= 8 ? 'summer' : 'other');
 
 const nextBill = (d: DateStr): DateStr => { let x = addDays(d, 1); while (parts(x).day !== 1) x = addDays(x, 1); return addDays(x, 1); };
@@ -27,12 +27,15 @@ export function startSpell(a: Api, D: WeatherData, kind: string, days: number): 
   a.bus.emit('weather_event_started', { kind, date: a.date, days }); a.log('weather_start:' + kind); }
 /** a spell ends: the grace before the next, the callers who waited, and what it leaves behind */
 export function endSpell(a: Api, D: WeatherData): void { const W = a.g.weather; if (!W.event) return; const e = D.events.find(x => x.id === W.event!.kind), g = season(parts(a.date).month) === 'winter' ? D.graceWinter : D.grace;
-  W.last = W.event; delete W.event; W.graceUntil = addDays(a.date, a.rng.int(g[0], g[1])); W.returning += Math.floor(W.lost * D.returnShare); W.lost = 0;
+  W.last = W.event; delete W.event; W.graceUntil = addDays(a.date, a.rng.int(g[0], g[1])); const returning = Math.floor(W.lost * D.returnShare); W.lost = 0;
   for (const c of e?.after?.conds ?? []) begin(a.g, { kind: c.cond, key: c.key, value: c.value, until: addDays(a.date, c.days ?? 14), from: 'after:' + W.last.kind });
-  a.bus.emit('weather_event_ended', { kind: W.last.kind, date: a.date }); a.log('weather_end:' + W.last.kind); }
+  a.bus.emit('weather_event_ended', { kind: W.last.kind, date: a.date, returning }); a.log('weather_end:' + W.last.kind); }
 /** news topics the weather of these months rules out (no good harvest in a drought) */
 export function blockedTopics(W: WeatherState | undefined, D: WeatherData, today: DateStr): string[] { if (!W) return []; const out: string[] = [];
   for (const e of D.events) { if (!e.blocksTopics) continue; if (W.event?.kind === e.id || (W.last?.kind === e.id && daysBetween(W.last.end, today) <= (e.blockDays ?? 0))) out.push(...e.blocksTopics); } return out; }
+
+/** the weather counts the callers a spell keeps at home */
+export function weatherLinks(sim: Simulation): void { sim.bus.on('caller_kept_away', () => { const W = sim.g.weather; if (W.event) W.lost++; }); }
 
 export function weatherSystem(D: WeatherData): System { return { id: 'weather', morning(a: Api) { const W = (a.g.weather ??= newWeather()), r = a.rng, { year, month } = parts(a.date);
   if (W.event && a.date > W.event.end) endSpell(a, D);

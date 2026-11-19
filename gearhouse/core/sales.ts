@@ -8,7 +8,7 @@ import type { Api, Simulation, System } from './sim';
 import type { OrderType, Shop } from './build';
 import type { Incident } from './state';
 import { compose, type TextMemory, type TextSet } from './text';
-import { active, mult, plus, DEMAND_RANGE } from './conditions';
+import { active, beginBoost, mult, plus, DEMAND_RANGE } from './conditions';
 
 export type Field = 'quality' | 'performance' | 'style' | 'trust' | 'value';
 export interface CustomerType { id: string; weight: number; age: [number, number]; standing: [number, number]; budget: Record<OrderType, [number, number]>; orderTypes: Record<OrderType, number>; bodies: string[]; priorities: Field[]; temper: [number, number]; patience: [number, number] }
@@ -39,7 +39,11 @@ const SEASON_KO = ['겨울', '겨울', '봄', '봄', '봄', '여름', '여름', 
 const lerp = (r: [number, number], t: number) => r[0] + (r[1] - r[0]) * t, clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 
 export class Sales {
-  constructor(private sim: Simulation, private data: SalesData, private eco: EconomyData, private names: NameData, private people: PeopleData, private shop: Shop, private letters: TextSet, private where: { town: string; paper: string }) {}
+  constructor(private sim: Simulation, private data: SalesData, private eco: EconomyData, private names: NameData, private people: PeopleData, private shop: Shop, private letters: TextSet, private where: { town: string; paper: string }) {
+    // days the weather stopped the work on an order are known to the customer too
+    sim.bus.on('work_held', e => { const ord = this.M.orders.find(o => o.id === e.orderId); if (ord && ord.state === 'building') ord.excusedDays = (ord.excusedDays ?? 0) + 1; });
+    sim.bus.on('weather_event_ended', e => { for (let n = e.returning; n > 0; n--) this.M.pending.push({ due: addDays(e.date, sim.rng.int(1, this.returnDays)), kind: 'return' }); });   // those a spell of weather kept away
+    sim.bus.on('news_effect', e => { const today = sim.g.clock.date; if (e.kind === 'demand') e.held = beginBoost(this.M.boosts, { until: addDays(today, e.weeks * 7), mult: e.value, from: e.from }); else this.known(e.value); }); }
   /** the town's banks, once the register is there: where a customer banks, and whether that bank has closed */
   /** days over which callers kept away by a spell of weather come back */ returnDays = 14;
   banks?: { pick(rng: Api['rng']): string | undefined; closed(id: string): boolean };
@@ -122,6 +126,8 @@ export class Sales {
   askDelay(orderId: number, days: number): boolean { const a = this.sim.api(), ord = this.M.orders.find(o => o.id === orderId); if (!ord || ord.state !== 'building') throw new Error('no such order in work'); if (ord.askedDelay) throw new Error('the customer was already asked'); if (!(days > 0)) throw new Error('days must be more than none');
     const c = this.customer(ord.customerId), late = a.date > addDays(ord.due, ord.excusedDays ?? 0), p = clamp(0.8 - days / 50 - c.temper * 0.3 + this.M.reputation.trust / 250 - (late ? 0.2 : 0), 0.05, 0.95), ok = a.rng.float() < p; ord.askedDelay = true;
     if (ok) { ord.due = addDays(ord.due, days); ord.lateTold = false; } else this.bump('trust', -1, a); a.log(`${ok ? 'delay_granted' : 'delay_refused'}:${orderId}`); return ok; }
+  /** the town (and the city beyond it) hears more of the workshop */
+  known(town: number, city = 0): void { const A = this.M.awareness; A.town = clamp(A.town + town, 0, 100); A.city = clamp(A.city + city, 0, 100); }
   /** a car shown in public: people judge the make and finish they can see */
   exhibit(visible: number, share: number): void { const a = this.sim.api(), v = clamp((visible - this.data.satisfaction.qualityMid) / 30, -1, 1) * 100; this.pull('style', v, share, a); this.pull('quality', v, share * 0.7, a); }
   /** people who heard of the workshop and may come asking */
@@ -153,10 +159,10 @@ export class Sales {
     M.boosts = M.boosts.filter(b => b.until > a.date); const T = this.data.customerTypes, byType = T.reduce((s, t) => s + t.weight * mult(a.g, 'demand_type', t.id), 0) / T.reduce((s, t) => s + t.weight, 0);
     perWeek *= clamp(M.boosts.reduce((t, b) => t * b.mult, 1) * byType, DEMAND_RANGE[0], DEMAND_RANGE[1]);                  // all passing changes together stay within bounds
     const rep = Object.values(M.reputation).reduce((t, v) => t + v, 0) / 500; perWeek *= clamp(1 + rep * this.data.reputationPull, 0.25, 3);     // a good name brings callers, a bad one keeps them away
-    const W = a.g.weather; for (; W.returning > 0; W.returning--) M.pending.push({ due: addDays(a.date, a.rng.int(1, this.returnDays)), kind: 'return' });      // those a spell of weather kept away
+    const W = a.g.weather;
     if (a.rng.float() < perWeek * demand / 6) { const source: Source = a.rng.float() < 0.25 ? 'walk_in' : M.adverts.some(ad => ad.from <= a.date && a.date < ad.until) ? 'ad' : 'walk_in';
       const channel: Channel = source === 'walk_in' ? 'visit' : a.g.supply.phone && a.rng.float() < 0.4 ? 'phone' : a.rng.float() < 0.3 ? 'visit' : 'mail';
-      if (channel === 'visit' && W.visit < 1 && a.rng.float() >= W.visit) { if (W.event) W.lost++; }                                 // weather keeps callers at home; letters and the telephone are not touched
+      if (channel === 'visit' && W.visit < 1 && a.rng.float() >= W.visit) a.bus.emit('caller_kept_away', { date: a.date });                                 // weather keeps callers at home; letters and the telephone are not touched
       else { this.arrive(a, source, { channel }); if (channel === 'visit' && W.visit > 1 && a.rng.float() < W.visit - 1) this.arrive(a, 'walk_in', { channel: 'visit' }); } }
     // inquiries left unanswered are lost when the customer's patience runs out
     for (const q of M.inquiries) if ((q.state === 'open') && daysBetween(q.received, a.date) > this.customer(q.customerId).patience + q.rounds * 10) { q.state = 'lost'; this.bump('trust', -1, a); } }

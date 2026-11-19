@@ -7,6 +7,7 @@ import type { ChanceKind } from './news';
 import type { Api, Simulation, System } from './sim';
 import type { Sales } from './sales';
 import type { Supply } from './supply';
+import type { Shop } from './build';
 
 export interface Chance { id: number; kind: ChanceKind; issueId: number; headline: string; importance: number; opened: DateStr; deadline: DateStr;
   state: 'open' | 'entered' | 'won' | 'lost' | 'done' | 'missed';
@@ -18,7 +19,7 @@ export interface ChanceData { tender: { /** working vehicles delivered within `r
 const at = (a: number[], importance: number) => a[Math.min(a.length - 1, importance - 1)]!, clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
 export class Chances {
-  constructor(private sim: Simulation, private data: ChanceData, private sales: Sales, private supply: Supply, private note: (importance: number, headline: string, id: string) => void) {}
+  constructor(private sim: Simulation, private data: ChanceData, private sales: Sales, private supply: Supply, private shop: Shop, private note: (importance: number, headline: string, id: string) => void) {}
   private get S() { return this.sim.g.media; }
   private read(c: Chance): boolean { return !!this.S.copies.find(x => x.issueId === c.issueId)?.read; }
   /** working vehicles (delivery vans, pickups, official cars) the shop has delivered lately: its record with public buyers */
@@ -43,7 +44,7 @@ export class Chances {
     c.state = 'entered'; c.resolves = addDays(c.deadline, a.rng.int(7, 21)); this.work(c, this.data.show.hours); return c; }
   /** write to the supplier about the clearance: their prices are cut until a few days after the last day */
   clear(id: number): Chance { const c = this.take(id, 'clearance'), a = this.sim.api(), st = c.supplierId ? a.g.supply.suppliers[c.supplierId] : undefined; if (!st || !c.supplierId) throw new Error('no supplier');
-    this.supply.discover(c.supplierId, 'clearance'); st.priceMult = at(this.data.clearance.mult, c.importance); st.priceUntil = addDays(c.deadline, this.data.clearance.graceDays); c.state = 'done'; return c; }
+    this.supply.discover(c.supplierId, 'clearance'); this.supply.offer(c.supplierId, at(this.data.clearance.mult, c.importance), addDays(c.deadline, this.data.clearance.graceDays)); c.state = 'done'; return c; }
   /** bid at an auction of tools; the hammer falls on the last day */
   auction(id: number, bid: number): Chance { const c = this.take(id, 'auction'); if (!(bid > 0)) throw new Error('a bid must be more than nothing'); c.bid = bid; c.state = 'entered'; c.resolves = c.deadline; this.work(c, this.data.auction.hours); return c; }
 
@@ -58,10 +59,10 @@ export class Chances {
           c.state = 'won'; this.note(4, '읍내 공방, 관청 자동차 납품 따내', 'tender:' + c.id); a.raise('tender_result', 'notice', { chanceId: c.id, won: true, cars: c.cars, price: c.price, due, orderIds: orders.map(o => o.id) }); }
         else { c.state = 'lost'; a.raise('tender_result', 'notice', { chanceId: c.id, won: false }); } }
       if (c.kind === 'show') { const car = g.shop.cars.find(x => x.id === c.carId), q = car?.quality.visible ?? 40, gain = at(D.show.awareness, c.importance) * clamp(q / 60, 0.4, 1.6), prize = q >= D.show.prizeAt + (a.rng.float() - 0.5) * 16;
-        M.awareness.town = Math.min(100, M.awareness.town + gain); if (c.importance >= 4) M.awareness.city = Math.min(100, M.awareness.city + gain / 2);
+        this.sales.known(gain, c.importance >= 4 ? gain / 2 : 0);
         this.sales.exhibit(q, 0.03 * c.importance); if (prize) { this.sales.refer('박람회', 1 + (c.importance >= 5 ? 1 : 0)); this.note(Math.min(6, c.importance + 1), '읍내 공방 차, 박람회서 상 받아', 'prize:' + c.id); }
         c.state = prize ? 'won' : 'done'; a.raise('show_result', 'notice', { chanceId: c.id, prize, awareness: Math.round(gain * 10) / 10, quality: q }); }
       if (c.kind === 'auction') { const value = at(D.auction.value, c.importance) * (0.8 + a.rng.float() * 0.4), rival = value * (0.5 + a.rng.float() * 0.7), won = c.bid! >= rival && g.ledger.cash >= c.bid!;
-        if (won) { post(a, 'tools', -c.bid!, c.headline); g.shop.toolBonus = Math.min(D.auction.maxBonus, (g.shop.toolBonus ?? 0) + at(D.auction.tools, c.importance)); }
+        if (won) { post(a, 'tools', -c.bid!, c.headline); this.shop.improveTools(at(D.auction.tools, c.importance), D.auction.maxBonus); }
         c.state = won ? 'won' : 'lost'; a.raise('auction_result', 'notice', { chanceId: c.id, won, bid: c.bid, tools: g.shop.toolBonus ?? 0 }); } } }
 }

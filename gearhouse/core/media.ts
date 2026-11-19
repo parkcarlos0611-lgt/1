@@ -10,7 +10,7 @@ import { makeName, type NameData } from './people';
 import { writeBody, type Body, type BodyData } from './newsBody';
 import { Press, newPress, type PressState } from './press';
 import { Register, newRegister, type RegisterData, type RegisterState } from './register';
-import { begin, beginBoost, type CondKind } from './conditions';
+import { begin, type CondKind } from './conditions';
 import type { Chance } from './chances';
 import { blockedTopics, weatherNote, weatherWords, type WeatherData } from './weather';
 
@@ -52,11 +52,10 @@ export class Media {
   private morning(a: Api): void { const S = this.S, g = a.g;
     // what earlier papers warned of now arrives
     for (const c of S.coming.filter(x => x.due <= a.date)) { let held = true;
-      if (c.kind === 'demand') held = beginBoost(g.market.boosts, { until: addDays(a.date, c.weeks * 7), mult: c.value, from: c.from });
+      if (c.kind === 'demand' || c.kind === 'awareness') { const e = { kind: c.kind, value: c.value, weeks: c.weeks, from: c.from, held: true }; a.bus.emit('news_effect', e); held = e.held; }
       if (c.kind === 'condition' && c.cond) held = begin(g, { kind: c.cond, key: c.key, value: c.value, until: addDays(a.date, c.weeks * 7), from: c.from });
       if (held && c.headline) a.log(`신문에 났던 일이 닥쳤다: “${c.headline}”`);                    // the cause is on record whether or not the paper was read
-      if (c.kind === 'awareness') g.market.awareness.town = Math.min(100, g.market.awareness.town + c.value);
-      if (c.kind === 'supplier_price' && c.supplierId) { const s = g.supply.suppliers[c.supplierId]; if (s) { s.priceMult = c.value; s.priceUntil = addDays(a.date, c.weeks * 7); } } }
+      if (c.kind === 'supplier_price' && c.supplierId) this.supply.offer(c.supplierId, c.value, addDays(a.date, c.weeks * 7)); }
     S.coming = S.coming.filter(x => x.due > a.date);
     for (const pub of this.data.publications) { if (pub.kind !== 'newspaper' || weekday(a.date) !== pub.weekday) continue;
       const last = S.issues.filter(i => i.publication === pub.id).at(-1)?.date ?? addDays(a.date, -7), sup = Object.entries(g.supply.suppliers).filter(([, s]) => !s.closed).map(([id, s]) => ({ id, name: this.supplierNames[id] ?? id, known: s.known, materials: this.supply.sells(id).map(p => PART_KO[p]).filter((x): x is string => !!x) }));

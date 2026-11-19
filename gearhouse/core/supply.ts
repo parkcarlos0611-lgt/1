@@ -32,6 +32,8 @@ export class Supply {
   private sup(id: string): SupplierData { const d = this.data.suppliers.find(s => s.id === id); if (!d) throw new Error('unknown supplier ' + id); return d; }
   private delay(d: SupplierData, via: Via): number { if (via === 'mail') return Math.max(2, d.mailDays * 2 + 1); if (via === 'phone' && !(d.phone && this.S.phone)) throw new Error('no telephone line to ' + d.id); return via === 'visit' ? d.mailDays : 0; }
 
+  /** a supplier's prices are multiplied until a day (a rise or a fall the papers told of, a clearance) */
+  offer(id: string, mult: number, until: DateStr): void { const s = this.S.suppliers[id]; if (s) { s.priceMult = mult; s.priceUntil = until; } }
   /** the player learns of a supplier (directory, an advert, a tip) */
   discover(id: string, via: string): void { const s = this.S.suppliers[id]; if (s && !s.known) { s.known = true; this.sim.bus.emit('supplier_found', { supplierId: id, via }); } }
   /** the telephone directory: every shop and wholesaler within two days' post gets a name and an address */

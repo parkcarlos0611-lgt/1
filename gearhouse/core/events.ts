@@ -37,8 +37,14 @@ export interface GameEvents {
   car_delivered: { orderId: number; carId: number; satisfaction: number; standing: number };
   car_broke_down: { carId: number; kind: string; severity: number };
   reputation_changed: { field: string; value: number };
+  /** work on a build stood still today for a reason outside the shop (rain on paint) */
+  work_held: { buildId: number; orderId?: number; reason: string };
+  /** something the papers warned of has come: more or fewer callers for some weeks, or the town hearing of the trade */
+  news_effect: { kind: 'demand' | 'awareness'; value: number; weeks: number; from: string; held?: boolean };
   weather_event_started: { kind: string; date: DateStr; days: number };
-  weather_event_ended: { kind: string; date: DateStr };
+  weather_event_ended: { kind: string; date: DateStr; /** callers the spell kept away who now come */ returning: number };
+  /** someone meant to call in person and stayed at home for the weather */
+  caller_kept_away: { date: DateStr };
   newspaper_published: { issueId: number; publication: string; date: DateStr };
   employee_hired: { date: DateStr; personId: string; wage: number };
   employee_left: { date: DateStr; personId: string; reason: string };

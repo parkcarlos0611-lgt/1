@@ -30,6 +30,14 @@ export interface GameEvents {
   build_step_done: { buildId: number; step: string; quality: number };
   defect_created: { buildId: number; step: string; kind: string; severity: number };
   car_built: { carId: number; buildId: number; designId: string };
+  inquiry_received: { inquiryId: number; customerId: number; source: string };
+  ad_placed: { medium: string; size: string; weeks: number };
+  order_placed: { orderId: number; customerId: number; price: number };
+  customer_cannot_pay: { orderId: number };
+  car_delivered: { orderId: number; carId: number; satisfaction: number; standing: number };
+  car_broke_down: { carId: number; kind: string; severity: number };
+  reputation_changed: { field: string; value: number };
+  newspaper_published: { issueId: number; publication: string; date: DateStr };
   employee_hired: { date: DateStr; personId: string; wage: number };
   employee_left: { date: DateStr; personId: string; reason: string };
 }

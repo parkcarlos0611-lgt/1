@@ -1,0 +1,87 @@
+{
+ "note": "Dated real events for the newspaper, written from memory; every date and fact is to be verified against sources before release, and the article texts are still to be written.",
+ "events": [
+  {
+   "date": "1930-06-17",
+   "id": "smoot_hawley",
+   "importance": 8,
+   "headline": "후버 대통령, 관세법에 서명",
+   "tags": [
+    "economy"
+   ]
+  },
+  {
+   "date": "1930-12-11",
+   "id": "bank_of_us",
+   "importance": 8,
+   "headline": "뉴욕의 대형 은행 문 닫아, 예금주 수십만 명 발 동동",
+   "tags": [
+    "bank"
+   ]
+  },
+  {
+   "date": "1931-05-01",
+   "id": "empire_state",
+   "importance": 6,
+   "headline": "세계 최고층 엠파이어 스테이트 빌딩 문 열어",
+   "tags": [
+    "wonder"
+   ]
+  },
+  {
+   "date": "1932-11-08",
+   "id": "fdr_elected",
+   "importance": 10,
+   "headline": "루스벨트, 후버 누르고 대통령 당선",
+   "tags": [
+    "politics"
+   ]
+  },
+  {
+   "date": "1933-01-30",
+   "id": "hitler_chancellor",
+   "importance": 7,
+   "headline": "히틀러, 독일 총리에 임명",
+   "tags": [
+    "abroad"
+   ]
+  },
+  {
+   "date": "1933-03-06",
+   "id": "bank_holiday",
+   "importance": 10,
+   "headline": "전국 은행 일제히 휴업, 루스벨트 대통령 긴급 선포",
+   "tags": [
+    "bank"
+   ]
+  },
+  {
+   "date": "1933-12-05",
+   "id": "repeal",
+   "importance": 9,
+   "headline": "금주법 폐지, 13년 만에 술집 문 다시 열려",
+   "tags": [
+    "law"
+   ]
+  },
+  {
+   "date": "1934-05-11",
+   "id": "dust_storm",
+   "importance": 7,
+   "headline": "대평원의 흙먼지, 동부 해안까지 뒤덮어",
+   "tags": [
+    "weather",
+    "farm"
+   ]
+  },
+  {
+   "date": "1935-08-14",
+   "id": "social_security",
+   "importance": 8,
+   "headline": "루스벨트 대통령, 사회보장법에 서명",
+   "tags": [
+    "politics"
+   ]
+  }
+ ]
+}

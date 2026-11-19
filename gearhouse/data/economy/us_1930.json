@@ -1,0 +1,19 @@
+{
+ "note": "Game values for the slice by year, not statistics: how demand for hand-built cars shrinks in the Depression and how often a customer cannot pay. To be replaced by monthly indices from public statistics (system design 07).",
+ "demand": {
+  "1930": 1.0,
+  "1931": 0.8,
+  "1932": 0.6,
+  "1933": 0.6,
+  "1934": 0.75,
+  "1935": 0.85
+ },
+ "cannotPay": {
+  "1930": 0.05,
+  "1931": 0.09,
+  "1932": 0.13,
+  "1933": 0.11,
+  "1934": 0.07,
+  "1935": 0.05
+ }
+}

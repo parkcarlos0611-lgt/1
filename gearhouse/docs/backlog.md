@@ -16,3 +16,10 @@ This list holds work moved to a later stage than the current one, so it does not
 - Supply still to build: finding suppliers through the directory and adverts (with the newspaper), inspection of deliveries, relations acting on credit and priority, price changes and closures from the economy, long contracts, incidents (bad batch, price rise, offers), the founder's time for visits.
 - Build still to build: the three-layer body edit feeding the design effort, the calculated performance figures on a finished design, test drives finding defects, fixing defects, rushing, tools, the hands-on panel step, small incidents during a build.
 - Balance to check with the five-year run: a founder's weak skills (a coachbuilder's 28 in mechanics, 31 in welding) give step qualities of 38-47 and about three defects on the first car.
+- Balance, from the first five-year runs (tools/fiveYears.ts, 30 runs of a plain bot player, coachbuilder founder):
+  - 12 of 30 runs go bankrupt (cash below -$200), the earliest in August 1930.
+  - Customer satisfaction averages 25; only 4% of customers are pleased (60 or more) and 12% are unhappy.
+  - Quality reputation ends near -74, while the surviving runs end with about $10,000.
+  - To work on: where the early runs run dry, how reputation falls with breakdowns, quality from weak skills, and the bot's own pricing and hiring.
+- Sales still to build: stock cars, rough quotes, order changes and visits during a build, repairs under warranty as work, the first customer by founder background, letters for answers, complaints and thanks.
+- Newspaper still to build: written history articles, local and period article sets through the text engine, the magazine and road tests, classifieds (jobs, sales), page layout.

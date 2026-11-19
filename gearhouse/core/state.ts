@@ -4,6 +4,8 @@ import type { Employee, Person } from './people';
 import type { Ledger } from './ledger';
 import type { SupplyState } from './supply';
 import type { ShopState } from './build';
+import { newMarket, type MarketState } from './sales';
+import { newMedia, type MediaState } from './media';
 
 export const SAVE_VERSION = 1;
 export type Phase = 'morning' | 'day' | 'evening';
@@ -47,6 +49,8 @@ export interface GameState {
   ledger: Ledger;
   supply: SupplyState;
   shop: ShopState;
+  market: MarketState;
+  media: MediaState;
   founder: { hoursPerDay: number; overtimePerDay: number; overtimeThisWeek: number; fatigue: number };
   tasks: Record<string, Task>;
   plan: PlanSlot[];
@@ -58,7 +62,7 @@ export interface GameState {
 export function newGame(seed: number, start: DateStr = '1930-01-01'): GameState {
   return { version: SAVE_VERSION, seed, rng: '', clock: { date: start, started: start }, settings: { daysOff: [0], quietKinds: [] },
     people: {}, founderId: null, employees: [], ledger: { cash: 0, entries: [] },
-    supply: { suppliers: {}, pending: [], quotes: [], orders: [], lots: [], nextId: 1, phone: false }, shop: { designs: {}, builds: [], cars: [], nextId: 1 },
+    supply: { suppliers: {}, pending: [], quotes: [], orders: [], lots: [], nextId: 1, phone: false }, shop: { designs: {}, builds: [], cars: [], nextId: 1 }, market: newMarket(), media: newMedia(),
     founder: { hoursPerDay: 10, overtimePerDay: 0, overtimeThisWeek: 0, fatigue: 0 }, tasks: {}, plan: [], incidents: [], nextIncidentId: 1, journal: [] };
 }
 export const save = (g: GameState): string => JSON.stringify(g);

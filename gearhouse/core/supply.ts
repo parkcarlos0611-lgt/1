@@ -33,6 +33,12 @@ export class Supply {
 
   /** the player learns of a supplier (directory, an advert, a tip) */
   discover(id: string, via: string): void { const s = this.S.suppliers[id]; if (s && !s.known) { s.known = true; this.sim.bus.emit('supplier_found', { supplierId: id, via }); } }
+  /** the telephone directory: every shop and wholesaler within two days' post gets a name and an address */
+  directory(): string[] { const found: string[] = []; for (const d of this.data.suppliers) if (d.size !== 'maker' && d.mailDays <= 2 && !this.S.suppliers[d.id]!.known) { this.discover(d.id, 'directory'); found.push(d.id); } return found; }
+  /** known suppliers that sell a part, cheapest first */
+  sellers(part: string): { id: string; line: CatalogLine; mailDays: number }[] { return this.data.suppliers.filter(d => this.S.suppliers[d.id]!.known && !this.S.suppliers[d.id]!.closed).flatMap(d => d.catalog.filter(c => c.part === part).map(line => ({ id: d.id, line, mailDays: d.mailDays }))).sort((x, y) => x.line.price * x.line.minOrder - y.line.price * y.line.minOrder); }
+  /** sets of a part already ordered and on their way */
+  coming(part: string): number { return this.S.orders.filter(o => o.state === 'coming').flatMap(o => o.lines).filter(l => l.part === part).reduce((t, l) => t + l.qty, 0); }
   /** ask for prices; the answer comes as a quote after the time the contact takes */
   inquire(id: string, lines: { part: string; qty: number; grade?: number }[], via: Via): void {
     const d = this.sup(id); if (!this.S.suppliers[id]!.known) throw new Error('supplier not known yet: ' + id);

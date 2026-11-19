@@ -1,0 +1,46 @@
+{
+ "note": "The slice's two publications; names are fictional.",
+ "publications": [
+  {
+   "id": "town_weekly",
+   "kind": "newspaper",
+   "name": "The Millbrook Courier",
+   "weekday": 4,
+   "pages": 4,
+   "localArticles": [
+    4,
+    8
+   ],
+   "supplierAdChance": 0.35
+  },
+  {
+   "id": "motor_monthly",
+   "kind": "magazine",
+   "name": "American Motorist Monthly",
+   "monthDay": 1,
+   "pages": 8
+  }
+ ],
+ "ageing": [
+  {
+   "years": 1,
+   "look": "new"
+  },
+  {
+   "years": 5,
+   "look": "yellowed"
+  },
+  {
+   "years": 15,
+   "look": "creased"
+  },
+  {
+   "years": 999,
+   "look": "brittle"
+  }
+ ],
+ "limits": {
+  "desk": 5,
+  "drawer": 60
+ }
+}

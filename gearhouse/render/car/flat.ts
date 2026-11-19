@@ -162,6 +162,10 @@ export function rasterizeFlat(d0: CarDesign, opt: { frameW?: number; shadow?: bo
           const ph = (k - shell) % pitch; set(gx, gy, ph < 1 ? 'chrome' : 'black', ph < 1 ? (y % 5 === 0 ? 3 : 1) : 0, ly); } } }
     else if (dt.kind === 'flutes') { const pitch = Math.max(2, Math.round(dt.pitch / MM)); for (let y = 0; y < bh; y++) for (let x = 0; x < bw; x++) if (M(x, y)) { const i = (by + y) * w + bx + x; if ((x % pitch) === pitch - 1) lv[i] = Math.max(0, lv[i]! - 1); if (x === 1 && y > 1 && y < 4) lv[i] = PAL[mt].c.length - 1; } }
     else if (dt.kind === 'bar') { for (let x = 0; x < bw; x++) { let y0 = -1; for (let y = 0; y < bh; y++) if (M(x, y)) { y0 = y; break; } if (y0 < 0) continue; const i = (by + y0 + 1) * w + bx + x; if ((x + 3) % 9 < 2 && mat[i]) lv[i] = PAL[mat[i]!].c.length - 1; } }
+    else if (dt.kind === 'vbars') { const pitch = Math.max(2, Math.round(dt.pitch / MM)), ring = Math.max(1, Math.round((dt.ring ?? 20) / MM)); let cx = 0, n = 0; for (let y = 0; y < bh; y++) for (let x = 0; x < bw; x++) if (M(x, y)) { cx += x; n++; } cx = Math.round(cx / Math.max(1, n));
+      for (let y = 0; y < bh; y++) for (let x = 0; x < bw; x++) { if (!M(x, y)) continue; let edge = 99; for (let r = 1; r <= ring; r++) if (!M(x - r, y) || !M(x + r, y) || !M(x, y - r) || !M(x, y + r)) { edge = r; break; }
+        const gx = bx + x, gy = by + y; if (edge <= ring) { set(gx, gy, 'chrome', !M(x, y - edge) ? 4 : !M(x, y + edge) ? 1 : !M(x - edge, y) ? 3 : 2, ly); continue; }
+        const k = ((x - cx) % pitch + pitch) % pitch; set(gx, gy, k === 0 ? 'chrome' : 'black', k === 0 ? (x === cx ? 4 : 2) : k === 1 ? 1 : 0, ly); } }
     else if (dt.kind === 'planks' || dt.kind === 'ribs') { const pitch = Math.max(2, Math.round(dt.pitch / MM)); for (let y = 0; y < bh; y++) for (let x = 0; x < bw; x++) if (M(x, y) && y % pitch === pitch - 1) { const i = (by + y) * w + bx + x; lv[i] = 0; if (M(x, y + 1)) lv[i + w] = Math.min(PAL[mt].c.length - 1, lv[i + w]! + 1); } }
   }
 

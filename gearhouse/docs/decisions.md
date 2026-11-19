@@ -137,3 +137,9 @@ These decisions still hold, from `legacy/docs/MASTER_GAME_PLAN.md`:
 - One design gives side, front and rear views: heights and wheels come from the side, the front and rear keep widths and section shapes; half outlines mirrored.
 - Overall width comes from the catalogue figures, else from the class rule; the three samples get rear views too, later cars the front first; this follows the side detail work.
 - The outline against the background is two pixels thick all round, roof and bonnet top included; lines between parts stay one pixel.
+
+## 2026-11-19 — chrome and reflections; plan views; the 200 cars (review 20)
+
+- Reflections keep the paint's colour and are soft bands on rounded surfaces; chrome is a hard cold line with a lip and a shadow, only in a part's place.
+- The plan view is made from the same design as the side, front and rear views.
+- Each of the 200 reference cars can be a body shell, a rival model, a car on the road, or several of these; order: the slice's cars, then the rest of the 1930s, then the 1940s; the schedule is set after the three samples have all four views and one car's real effort is measured.

@@ -48,7 +48,8 @@ export type Detail =
   | { kind: 'flutes'; pitch: number }
   | { kind: 'bar' }
   | { kind: 'planks'; pitch: number }
-  | { kind: 'ribs'; pitch: number };
+  | { kind: 'ribs'; pitch: number }
+  | { kind: 'vbars'; pitch: number; ring?: number };
 
 /** where the car's sections are, for stretching it: wheel centres, arch radius, cowl, cabin end, belt and roof heights */
 export interface Landmarks { fx: number; rx: number; r: number; gap: number; cowl: number; cab: number; belt: number; roof: number }

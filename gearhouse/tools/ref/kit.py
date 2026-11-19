@@ -25,3 +25,12 @@ def tube(centre, width):
         a, b = centre[max(0, i - 1)], centre[min(len(centre) - 1, i + 1)]; dx, dz = b[0] - a[0], b[1] - a[1]; l = math.hypot(dx, dz) or 1; nx, nz = -dz / l * width / 2, dx / l * width / 2
         L.append([round(x + nx), round(z + nz)]); R.append([round(x - nx), round(z - nz)])
     return L + R[::-1]
+
+def sym(half, c):
+    """a full outline from a half one: points (w, z) from the centre line outwards, first and last on the centre line; c is the centre's x"""
+    right = [[round(c + w), round(z), 1] for w, z in half]
+    left = [[round(c - w), round(z), 1] for w, z in reversed(half) if w != 0]
+    return right + left
+def pair(pts, c):
+    """the same small outline on both sides of the centre line, as two outlines"""
+    return [[[round(c + w), round(z)] for w, z in pts], [[round(c - w), round(z)] for w, z in pts]]

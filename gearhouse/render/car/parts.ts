@@ -12,13 +12,21 @@ export type PartSpec =
   /** a bumper seen end-on: the bar, an over-rider standing on it, the iron back to the frame */
   | { kind: 'bumper'; form: 'bar'; slot?: Slot; end: number; inner: number; z: number; h: number; guard?: { w: number; h: number; inset?: number; pair?: number }; iron?: number }
   /** a tail lamp: round on a stalk, or set into the fender */
-  | { kind: 'tail'; form: 'stalk' | 'flush'; slot?: Slot; at: XZ; d: number; stalk?: number };
+  | { kind: 'tail'; form: 'stalk' | 'flush'; slot?: Slot; at: XZ; d: number; stalk?: number }
+  // ---- seen from the front or the rear: x across the car, z up ----
+  /** a grille face: straight sides from the top down to a shoulder, then narrowing to its foot; upright bars and a chrome surround */
+  | { kind: 'grille'; form: 'face'; slot?: Slot; at: XZ; top: number; half: number; foot: number; shoulder: number; pitch?: number }
+  /** a round lamp or tail lamp seen head-on: a chrome rim and the glass */
+  | { kind: 'lamp' | 'tail'; form: 'round'; slot?: Slot; at: XZ; d: number }
+  /** a bumper bar across the car with its over-riders (u: their distance from the centre line); dip: how far the middle drops */
+  | { kind: 'bumper'; form: 'across'; slot?: Slot; at: XZ; half: number; h: number; dip?: number; guards?: number[] };
 
 const ell = (cx: number, cz: number, rx: number, rz: number, n = 24): Pt[] => Array.from({ length: n }, (_, k) => [Math.round(cx + Math.cos(k / n * 6.2832) * rx), Math.round(cz + Math.sin(k / n * 6.2832) * rz)] as Pt);
 const sharp = (p: XZ[]): Pt[] => p.map(([x, z]) => [Math.round(x), Math.round(z), 1] as Pt);
 
 export function partPanels(s: PartSpec, n: number): Panel[] {
   const id = (t: string) => `${s.kind}${n}_${t}`;
+  if (s.form === 'face' || s.form === 'round' || s.form === 'across') return faceOn(s, id);
   switch (s.kind) {
     case 'grille': { const back = [...s.front].reverse().map(([x, z]) => [x + s.depth, z] as XZ), top = s.front.at(-1)!;
       return [{ id: id('band'), pts: sharp([...s.front, [top[0] + s.depth, top[1]], ...back.slice(1)]), material: 'black', surface: 'flat', z: 15, slot: s.slot ?? 'grille', detail: { kind: 'grille', pitch: s.pitch ?? 30, shell: s.shell ?? 20 } }]; }
@@ -43,5 +51,15 @@ export function partPanels(s: PartSpec, n: number): Panel[] {
       return ps; }
   }
 }
+function faceOn(s: Extract<PartSpec, { form: 'face' | 'round' | 'across' }>, id: (t: string) => string): Panel[] {
+  if (s.form === 'face') { const [c, foot] = s.at, H = s.top, slot = s.slot ?? 'grille';
+    return [{ id: id('face'), pts: sharp([[c, foot], [c + s.foot, foot + (s.shoulder - foot) * 0.35], [c + s.half, s.shoulder], [c + s.half, H - 30], [c + s.half - 30, H], [c - s.half + 30, H], [c - s.half, H - 30], [c - s.half, s.shoulder], [c - s.foot, foot + (s.shoulder - foot) * 0.35]]), material: 'black', surface: 'flat', z: 15, slot, detail: { kind: 'vbars', pitch: s.pitch ?? 24 } }]; }
+  if (s.form === 'round') { const [x, z] = s.at, r = s.d / 2, slot = s.slot ?? s.kind;
+    return [{ id: id('rim'), pts: ell(x, z, r, r), material: 'chrome', surface: 'fender', z: 27, slot, rigid: true, bevel: 2 },
+      { id: id('glass'), pts: ell(x, z, r * 0.78, r * 0.78), material: s.kind === 'tail' ? 'lensR' : 'lens', surface: 'flat', z: 28, slot, rigid: true, ...(s.kind === 'lamp' ? { detail: { kind: 'flutes' as const, pitch: 20 } } : {}) }]; }
+  const [c, z] = s.at, h2 = s.h / 2, dp = s.dip ?? 0, hf = s.half, slot = s.slot ?? 'bumperF';
+  const ps: Panel[] = [{ id: id('bar'), pts: sharp([[c - hf, z - h2 + 15], [c - hf + 30, z - h2], [c - hf * 0.3, z - h2], [c, z - h2 - dp], [c + hf * 0.3, z - h2], [c + hf - 30, z - h2], [c + hf, z - h2 + 15], [c + hf, z + h2 - 15], [c + hf - 30, z + h2], [c + hf * 0.3, z + h2], [c, z + h2 - dp], [c - hf * 0.3, z + h2], [c - hf + 30, z + h2], [c - hf, z + h2 - 15]]), material: 'chrome', surface: 'side', z: 25, slot, bevel: 3, detail: { kind: 'bar' } }];
+  for (const u of s.guards ?? []) for (const sd of [1, -1]) ps.push({ id: id(`guard${sd}${u}`), pts: sharp([[c + sd * u - 22, z - h2 - 70], [c + sd * u + 22, z - h2 - 70], [c + sd * u + 26, z + h2 + 90], [c + sd * u, z + h2 + 120], [c + sd * u - 26, z + h2 + 90]]), material: 'chrome', surface: 'fender', z: 25.5, slot, bevel: 3 });
+  return ps; }
 /** the design with its parts turned into panels, ready to draw */
 export function expandParts(d: CarDesign): CarDesign { if (!d.parts?.length) return d; return { ...d, panels: [...d.panels, ...d.parts.flatMap((p, k) => partPanels(p, k))] }; }

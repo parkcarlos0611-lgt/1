@@ -27,8 +27,9 @@ export interface Order { id: number; customerId: number; inquiryId: number; desi
 export interface SoldCar { carId: number; orderId: number; customerId: number; delivered: DateStr; satisfaction: number }
 export interface Advert { medium: string; size: 'classified' | 'eighth' | 'quarter'; from: DateStr; until: DateStr }
 export interface MarketState { awareness: { town: number; city: number; state: number; nation: number }; reputation: Record<Field, number>; customers: Record<number, Customer>; inquiries: Inquiry[]; orders: Order[]; sold: SoldCar[]; adverts: Advert[];
+  /** passing changes in demand that the papers warned of */ boosts: { until: DateStr; mult: number; from: string }[];
   pending: { due: DateStr; kind: 'answer' | 'referral'; inquiryId?: number; by?: string }[]; nextId: number; text: TextMemory }
-export const newMarket = (): MarketState => ({ awareness: { town: 8, city: 0, state: 0, nation: 0 }, reputation: { quality: 0, performance: 0, style: 0, trust: 0, value: 0 }, customers: {}, inquiries: [], orders: [], sold: [], adverts: [], pending: [], nextId: 1, text: {} });
+export const newMarket = (): MarketState => ({ awareness: { town: 8, city: 0, state: 0, nation: 0 }, reputation: { quality: 0, performance: 0, style: 0, trust: 0, value: 0 }, customers: {}, inquiries: [], orders: [], sold: [], adverts: [], boosts: [], pending: [], nextId: 1, text: {} });
 
 const BODY_KO: Record<string, string> = { sedan: '4인승 세단', coupe: '쿠페', limousine: '리무진', town_car: '타운카', pickup: '짐칸 트럭', delivery: '배달차', roadster: '2인승 로드스터', cabriolet: '카브리올레' };
 const MUST_KO: Record<string, string> = { closed_roof: '닫힌 지붕', folding_top: '접이식 지붕', dark_colour: '짙은 색', two_tone: '투톤 도장', four_seats: '네 사람 자리', big_boot: '큰 짐칸', high_clearance: '높은 지상고', quiet: '조용한 실내', fast: '빠른 속도', sidemount_spare: '옆에 다는 예비 바퀴' };
@@ -127,6 +128,7 @@ export class Sales {
     // new inquiries: adverts running in the paper, and people who know of us in town
     const phone = a.g.supply.phone ? R.phoneBonus : 1; let perWeek = M.awareness.town * R.walkInPerAwareness;
     for (const ad of M.adverts) if (ad.from <= a.date && a.date < ad.until) perWeek += (ad.size === 'classified' ? R.adClassified : ad.size === 'eighth' ? R.adEighth : R.adQuarter) * phone;
+    M.boosts = M.boosts.filter(b => b.until > a.date); for (const b of M.boosts) perWeek *= b.mult;
     const rep = Object.values(M.reputation).reduce((t, v) => t + v, 0) / 500; perWeek *= clamp(1 + rep * this.data.reputationPull, 0.25, 3);     // a good name brings callers, a bad one keeps them away
     if (a.rng.float() < perWeek * demand / 6) this.arrive(a, a.rng.float() < 0.25 ? 'walk_in' : M.adverts.some(ad => ad.from <= a.date && a.date < ad.until) ? 'ad' : 'walk_in');
     // inquiries left unanswered are lost when the customer's patience runs out

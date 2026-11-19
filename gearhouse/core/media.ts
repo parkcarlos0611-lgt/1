@@ -4,20 +4,21 @@
 import { daysBetween, weekday, type DateStr } from './calendar';
 import type { Api, Simulation, System } from './sim';
 import type { Supply } from './supply';
+import { addDays } from './calendar';
+import { fictionalItems, realItems, type FictionData, type NewsItem, type RealData } from './news';
+import { makeName, type NameData } from './people';
 
-export interface Article { kind: 'history' | 'company' | 'local' | 'trade'; id: string; importance: number; headline: string; page: number }
+export interface Article extends NewsItem { page: number }
 export interface Issue { id: number; publication: string; date: DateStr; articles: Article[]; playerAds: string[]; supplierAds: string[] }
 export interface Copy { issueId: number; place: 'desk' | 'drawer' | 'shelf' | 'gone'; read: boolean; marked: boolean }
-export interface MediaState { issues: Issue[]; copies: Copy[]; news: { importance: number; headline: string; id: string }[]; nextId: number }
-export interface MediaData { publications: { id: string; kind: string; name: string; weekday?: number; pages: number; localArticles?: [number, number]; supplierAdChance?: number }[]; ageing: { years: number; look: string }[]; limits: { desk: number; drawer: number } }
-export interface HistoryData { events: { date: DateStr; id: string; importance: number; headline: string }[] }
-export const newMedia = (): MediaState => ({ issues: [], copies: [], news: [], nextId: 1 });
-
-// placeholder local items until the local-article text sets are written (system design 06, chapter 11)
-const LOCAL = ['감리교회 바자회, 토요일 열려', '읍내 제분소 화재, 인명 피해 없어', '군 품평회 일정 확정', '강가 다리 보수 공사 시작', '고등학교 농구부, 이웃 군에 승리', '우체국장 은퇴, 30년 근속', '철물점에 도둑, 금고는 무사', '첫눈에 마차 세 대 미끄러져', '읍 의회, 중심가 포장 논의', '젖소 품평회 우승은 서쪽 농장', '소방대 새 펌프차 도착', '봄 장터 날짜 정해져'];
+/** something a paper warned of, on its way to the game */
+export interface Coming { due: DateStr; kind: 'demand' | 'supplier_price' | 'awareness'; value: number; weeks: number; supplierId?: string; from: string }
+export interface MediaState { issues: Issue[]; copies: Copy[]; news: { importance: number; headline: string; id: string }[]; coming: Coming[]; recent: string[]; nextId: number }
+export interface MediaData { publications: { id: string; kind: string; name: string; weekday?: number; pages: number; supplierAdChance?: number }[]; ageing: { years: number; look: string }[]; limits: { desk: number; drawer: number } }
+export const newMedia = (): MediaState => ({ issues: [], copies: [], news: [], coming: [], recent: [], nextId: 1 });
 
 export class Media {
-  constructor(private sim: Simulation, private data: MediaData, private history: HistoryData, private supply: Supply, private supplierNames: Record<string, string>) {
+  constructor(private sim: Simulation, private data: MediaData, private fiction: FictionData, private real: RealData, private names: NameData, private supply: Supply, private supplierNames: Record<string, string>, private town: string) {
     // what happens in the game becomes news for the next issue
     sim.bus.on('order_placed', e => { const c = sim.g.market.customers[e.customerId]; if (c && c.standing >= 60) this.note(4, `${sim.g.people[c.personId]!.family} 씨, 새 차 주문`, 'order:' + e.orderId); });
     sim.bus.on('car_delivered', e => { if (e.satisfaction >= 60) this.note(5, '읍내 공방의 새 차, 주인 "흡족하다"', 'delivered:' + e.orderId); else if (e.satisfaction <= -40) this.note(5, '새 차 받은 주민, 공방에 불만', 'unhappy:' + e.orderId); });
@@ -34,16 +35,22 @@ export class Media {
     if (place === 'drawer' && this.S.copies.filter(x => x.place === 'drawer').length >= L.drawer) throw new Error('the drawer is full'); c.place = place; }
 
   system(): System { return { id: 'media', morning: a => this.morning(a) }; }
-  private morning(a: Api): void { const S = this.S;
+  private morning(a: Api): void { const S = this.S, g = a.g;
+    // what earlier papers warned of now arrives
+    for (const c of S.coming.filter(x => x.due <= a.date)) { if (c.kind === 'demand') g.market.boosts.push({ until: addDays(a.date, c.weeks * 7), mult: c.value, from: c.from });
+      if (c.kind === 'awareness') g.market.awareness.town = Math.min(100, g.market.awareness.town + c.value);
+      if (c.kind === 'supplier_price' && c.supplierId) { const s = g.supply.suppliers[c.supplierId]; if (s) { s.priceMult = c.value; s.priceUntil = addDays(a.date, c.weeks * 7); } } }
+    S.coming = S.coming.filter(x => x.due > a.date);
     for (const pub of this.data.publications) { if (pub.kind !== 'newspaper' || weekday(a.date) !== pub.weekday) continue;
-      const last = S.issues.filter(i => i.publication === pub.id).at(-1)?.date ?? '0000-00-00', arts: Omit<Article, 'page'>[] = [];
-      for (const h of this.history.events) if (h.date > last && h.date <= a.date) arts.push({ kind: 'history', id: h.id, importance: h.importance, headline: h.headline });
-      for (const n of S.news.splice(0)) arts.push({ kind: 'company', id: n.id, importance: n.importance, headline: n.headline });
-      const [lo, hi] = pub.localArticles ?? [4, 8]; for (let k = a.rng.int(lo, hi), used = new Set<number>(); k > 0; k--) { let i = a.rng.int(0, LOCAL.length - 1); while (used.has(i)) i = (i + 1) % LOCAL.length; used.add(i); arts.push({ kind: 'local', id: 'local:' + i, importance: a.rng.int(1, 3), headline: LOCAL[i]! }); }
-      arts.sort((x, y) => y.importance - x.importance);
-      const unknown = Object.entries(a.g.supply.suppliers).filter(([, s]) => !s.known && !s.closed).map(([id]) => id), ads: string[] = []; if (unknown.length && a.rng.float() < (pub.supplierAdChance ?? 0.3)) ads.push(unknown[a.rng.int(0, unknown.length - 1)]!);
-      const issue: Issue = { id: S.nextId++, publication: pub.id, date: a.date, articles: arts.map((x, i) => ({ ...x, page: i < 3 ? 1 : x.kind === 'local' ? 2 : 3 })), playerAds: a.g.market.adverts.filter(ad => ad.medium === pub.id && ad.from <= a.date && a.date < ad.until).map(ad => ad.size), supplierAds: ads };
-      S.issues.push(issue); S.copies.push({ issueId: issue.id, place: 'desk', read: false, marked: issue.articles.some(x => x.kind === 'company') || issue.playerAds.length > 0 });
+      const last = S.issues.filter(i => i.publication === pub.id).at(-1)?.date ?? addDays(a.date, -7), sup = Object.entries(g.supply.suppliers).filter(([, s]) => !s.closed).map(([id, s]) => ({ id, name: this.supplierNames[id] ?? id, known: s.known }));
+      const person = makeName(a.rng, this.names, 'm'), facts = { town: this.town, person: `${person.given} ${person.family}` };
+      const items: NewsItem[] = [...realItems(a.rng, this.real, last, a.date), ...S.news.splice(0).map((n): NewsItem => ({ origin: 'fictional', id: n.id, relation: 'related', importance: n.importance, headline: n.headline, weight: n.importance + 0.5 })), ...fictionalItems(a.rng, this.fiction, facts, S.recent, sup)];
+      for (const it of items) { if (it.lead) it.lead = it.lead.replace('{town}', this.town); const e = it.effect; if (!e || e.kind === 'supplier_found') continue;
+        const due = addDays(a.date, (it.delayWeeks ?? 0) * 7); e.due = due; S.coming.push({ due, kind: e.kind, value: e.value ?? 1, weeks: e.weeks ?? 0, supplierId: e.supplierId, from: it.id }); }
+      items.sort((x, y) => y.weight - x.weight);
+      const ads = items.filter(it => it.effect?.kind === 'supplier_found' && it.effect.supplierId).map(it => it.effect!.supplierId!), unknown = sup.filter(s => !s.known && !ads.includes(s.id)); if (unknown.length && a.rng.float() < (pub.supplierAdChance ?? 0.3)) ads.push(unknown[a.rng.int(0, unknown.length - 1)]!.id);
+      const issue: Issue = { id: S.nextId++, publication: pub.id, date: a.date, articles: items.map((x, i) => ({ ...x, page: i < 3 ? 1 : x.relation === 'unrelated' ? 2 : x.relation === 'background' ? 3 : i < 7 ? 2 : 3 })), playerAds: g.market.adverts.filter(ad => ad.medium === pub.id && ad.from <= a.date && a.date < ad.until).map(ad => ad.size), supplierAds: ads };
+      S.issues.push(issue); S.copies.push({ issueId: issue.id, place: 'desk', read: false, marked: issue.articles.some(x => x.id.startsWith('order:') || x.id.startsWith('delivered:') || x.id.startsWith('unhappy:')) || issue.playerAds.length > 0 });
       a.bus.emit('newspaper_published', { issueId: issue.id, publication: pub.id, date: a.date });
       a.raise('newspaper', 'notice', { issueId: issue.id, name: pub.name, lead: issue.articles[0]?.headline, ads: ads.map(s => this.supplierNames[s]) }); } }
 }

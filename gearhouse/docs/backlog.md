@@ -23,3 +23,4 @@ This list holds work moved to a later stage than the current one, so it does not
   - To work on: where the early runs run dry, how reputation falls with breakdowns, quality from weak skills, and the bot's own pricing and hiring.
 - Sales still to build: stock cars, rough quotes, order changes and visits during a build, repairs under warranty as work, the first customer by founder background, letters for answers, complaints and thanks.
 - Newspaper still to build: written history articles, local and period article sets through the text engine, the magazine and road tests, classifieds (jobs, sales), page layout.
+- News: article bodies; endings that sometimes do not suit their headline; Korean spellings for people's and suppliers' names; effects for bank failures and job seekers once those systems exist; verification of the 43 real events against sources.

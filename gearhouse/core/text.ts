@@ -13,7 +13,7 @@ export interface Composed { text: string; situation: string; layout: number; use
 const has = (want: string | string[] | undefined, v: string | undefined) => want == null || (Array.isArray(want) ? want.includes(v ?? '') : want === v);
 function pickW<T>(rng: Rng, items: T[], w: (x: T) => number): T { let t = rng.float() * items.reduce((s, i) => s + w(i), 0); for (const i of items) { t -= w(i); if (t <= 0) return i; } return items[items.length - 1]!; }
 /** Korean particles follow the last sound of the word before them: {name:은/는} -> 은 after a final consonant, 는 after a vowel */
-function josa(word: string, pair: string): string { const [a, b] = pair.split('/') as [string, string], ch = word.charCodeAt(word.length - 1), ro = a === '으로';
+export function josa(word: string, pair: string): string { const [a, b] = pair.split('/') as [string, string], ch = word.charCodeAt(word.length - 1), ro = a === '으로';
   if (ch < 0xac00 || ch > 0xd7a3) { const closed = /[013678lmnrLMNR]$/.test(word); return ro ? (closed && !/[lLrR1]$/.test(word) ? a : b) : closed ? a : b; }
   const jong = (ch - 0xac00) % 28; return ro ? (jong === 0 || jong === 8 ? b : a) : jong ? a : b; }
 

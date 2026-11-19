@@ -3,6 +3,7 @@ import { DATA, newWorld, openWorld } from '../core/world';
 import { runBot } from '../core/bot';
 import { load, save } from '../core/state';
 import type { Incident } from '../core/state';
+import { RELATIONS, combosWithTails, tierOf } from '../core/news';
 
 const FOUNDER = { background: 'coachbuilder', age: 31, given: 'Walter', family: 'Hoffman' };
 function until(w: ReturnType<typeof newWorld>, kind: string, max = 300): Incident { for (let i = 0; i < max; i++) { const hit = w.sim.stepDay().stops.find(x => x.kind === kind); if (hit) return hit; } throw new Error('never saw ' + kind); }
@@ -25,10 +26,22 @@ describe('customers and orders', () => {
     const good = play(92), bad = play(22); expect(good.s).toBeGreaterThan(60); expect(good.rep).toBeGreaterThan(0); expect(good.friends).toBeGreaterThan(0); expect(bad.s).toBeLessThan(0); expect(bad.rep).toBeLessThan(0); expect(bad.friends).toBe(0); expect(good.town).toBeGreaterThan(8); });
 });
 describe('newspaper', () => {
-  it('comes every Thursday with history on its date, and adverts teach suppliers', () => { const w = newWorld(8, FOUNDER); const issues: Incident[] = []; for (let i = 0; i < 400; i++) issues.push(...w.sim.stepDay().stops.filter(x => x.kind === 'newspaper'));
-    expect(issues[0]!.date).toBe('1930-01-02'); expect(issues.length).toBe(54); /* 57 Thursdays, three of them holidays (Thanksgiving, Christmas, New Year) with no paper */ const tariff = w.sim.g.media.issues.find(i => i.articles.some(a => a.id === 'smoot_hawley'))!; expect(tariff.date).toBe('1930-06-19'); expect(tariff.articles[0]!.id).toBe('smoot_hawley');
+  it('comes every Thursday, prints real events on their date, and adverts teach suppliers', () => { const w = newWorld(8, FOUNDER); const issues: Incident[] = []; for (let i = 0; i < 400; i++) issues.push(...w.sim.stepDay().stops.filter(x => x.kind === 'newspaper'));
+    expect(issues[0]!.date).toBe('1930-01-02'); expect(issues.length).toBe(54); /* 57 Thursdays, three of them holidays (Thanksgiving, Christmas, New Year) with no paper */
+    const tariff = w.sim.g.media.issues.find(i => i.articles.some(a => a.id === 'smoot_hawley'))!; expect(tariff.date).toBe('1930-06-19'); expect(tariff.articles[0]!.id).toBe('smoot_hawley'); expect(tariff.articles[0]!.page).toBe(1); expect(tariff.articles[0]!.lead).toContain('밀브룩'.slice(0, 0));
     const known0 = Object.values(w.sim.g.supply.suppliers).filter(s => s.known).length; for (const is of w.sim.g.media.issues) w.media.read(is.id); expect(Object.values(w.sim.g.supply.suppliers).filter(s => s.known).length).toBeGreaterThan(known0);
-    expect(w.media.look(1, '1930-06-01')).toBe('new'); expect(w.media.look(1, '1934-01-01')).toBe('creased'); w.media.move(1, 'drawer'); expect(w.media.look(1, '1934-01-01')).toBe('yellowed'); /* a copy left on the desk ages faster than one kept in the drawer */ expect(w.media.look(1, '1960-01-01')).toBe('brittle'); });
+    expect(w.media.look(1, '1930-06-01')).toBe('new'); expect(w.media.look(1, '1934-01-01')).toBe('creased'); w.media.move(1, 'drawer'); expect(w.media.look(1, '1934-01-01')).toBe('yellowed'); /* a copy left on the desk ages faster than one kept in the drawer */ });
+  it('has news for every class: six importances and three real levels, each in four relations to the game', () => { const F = DATA.fiction, R = DATA.real;
+    for (let imp = 1; imp <= 6; imp++) for (const rel of RELATIONS) { const n = F.topics.filter(t => t.relation === rel).reduce((m, t) => m + (t[tierOf(imp)] ?? []).reduce((k, p) => k + combosWithTails(p, F, imp, rel), 0), 0); expect(n, `importance ${imp} ${rel}`).toBeGreaterThanOrEqual(1000); }
+    for (const lv of ['important', 'very_important', 'historic']) for (const rel of RELATIONS) expect(R.events.some(e => e.level === lv && e.relation === rel), `${lv} ${rel}`).toBe(true);
+    expect(R.events.reduce((n, e) => n + e.headlines.length * R.angles[e.relation].length, 0)).toBeGreaterThanOrEqual(600); });
+  it('leaves no slot unfilled and seldom prints a headline twice in a game', () => { const w = newWorld(12, FOUNDER); for (let i = 0; i < 1826; i++) w.sim.stepDay(); const all = w.sim.g.media.issues.flatMap(i => i.articles), fic = all.filter(a => a.origin === 'fictional');
+    for (const a of all) { expect(a.headline).not.toMatch(/[{}]/); expect(a.headline.length).toBeGreaterThan(4); } expect(new Set(fic.map(a => a.headline)).size / fic.length).toBeGreaterThan(0.95);
+    expect(new Set(fic.map(a => a.importance)).size).toBe(6); expect(new Set(all.map(a => a.relation)).size).toBe(4); expect(all.filter(a => a.origin === 'real').length).toBeGreaterThan(50); });
+  it('what the paper warns of reaches the game later', () => { const w = newWorld(21, FOUNDER); let warned: { due: string; kind: string } | null = null;
+    for (let i = 0; i < 900 && !warned; i++) { w.sim.stepDay(); const c = w.sim.g.media.coming.find(x => x.kind === 'demand'); if (c) warned = { due: c.due, kind: c.kind }; }
+    expect(warned).not.toBeNull(); expect(warned!.due > w.sim.g.clock.date).toBe(true); expect(w.sim.g.market.boosts.length).toBe(0); while (w.sim.g.clock.date <= warned!.due) w.sim.stepDay(); expect(w.sim.g.market.boosts.length).toBeGreaterThan(0);
+    const b = newWorld(5, FOUNDER); while (b.sim.g.clock.date <= '1933-03-12') b.sim.stepDay(); expect(b.sim.g.market.boosts.some(x => x.from === 'bank_holiday' && x.mult < 0.6)).toBe(true); });
 });
 describe('five years of ordinary play', () => {
   it('runs to the end, the same every time, and keeps the books straight', () => { const run = (seed: number) => { const w = newWorld(seed, FOUNDER), log = runBot(w, 1826); return { log, g: w.sim.g }; };

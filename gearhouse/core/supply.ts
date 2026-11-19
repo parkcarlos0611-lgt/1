@@ -16,7 +16,7 @@ export interface PurchaseOrder { id: number; supplierId: string; lines: QuoteLin
 export interface Lot { part: string; grade: number; qty: number; quality: number; unitCost: number; received: DateStr }
 interface Pending { due: DateStr; kind: 'reply' | 'haggle'; supplierId: string; via: Via; lines?: { part: string; qty: number; grade?: number }[]; quoteId?: number; lever?: Lever }
 export interface SupplyState {
-  suppliers: Record<string, { known: boolean; catalogKnown: boolean; relation: number; closed: boolean }>;
+  suppliers: Record<string, { known: boolean; catalogKnown: boolean; relation: number; closed: boolean; /** a passing price change the papers warned of */ priceMult?: number; priceUntil?: DateStr }>;
   pending: Pending[]; quotes: Quote[]; orders: PurchaseOrder[]; lots: Lot[]; nextId: number;
   /** the workshop has a telephone */
   phone: boolean;
@@ -78,7 +78,7 @@ export class Supply {
     for (const p of due) { const d = this.sup(p.supplierId), st = S.suppliers[p.supplierId]!;
       if (p.kind === 'reply') { const lines: QuoteLine[] = []; let lead = 0;
         for (const w of p.lines ?? []) { const c = d.catalog.filter(x => x.part === w.part && (w.grade == null || x.grade === w.grade)).sort((x, y) => x.price - y.price)[0]; if (!c) continue;
-          lines.push({ part: c.part, grade: c.grade, qty: Math.max(w.qty, c.minOrder), unitPrice: c.price }); lead = Math.max(lead, c.leadDays); }
+          lines.push({ part: c.part, grade: c.grade, qty: Math.max(w.qty, c.minOrder), unitPrice: Math.round(c.price * (st.priceMult && st.priceUntil && st.priceUntil > a.date ? st.priceMult : 1) * 100) / 100 }); lead = Math.max(lead, c.leadDays); }
         st.catalogKnown = true; if (!lines.length) { a.raise('supplier_no_stock', 'notice', { supplier: d.name }); continue; }
         const q: Quote = { id: S.nextId++, supplierId: d.id, via: p.via, lines, leadDays: lead, prepaid: st.relation < 60, round: 0, date: a.date, state: 'open' };
         S.quotes.push(q); a.bus.emit('supplier_quote_received', { quoteId: q.id, supplierId: d.id }); a.raise('supplier_quote', 'decision', { quoteId: q.id, supplier: d.name }, 14); }

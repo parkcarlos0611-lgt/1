@@ -29,7 +29,7 @@ export function autoRamp(base: string, { steps = 5, baseIdx = 2, dL = 0.1, shift
   return { c, o: fromLab([Math.max(0.06, L0 - 0.11), C0 * 0.9 * Math.cos(H0), C0 * 0.9 * Math.sin(H0)]) }; }
 const fixed = (c: string[], o: string): Ramp => ({ c: c.map(hex), o: hex(o) });
 /** a glossy paint gives back the sky: one more step above the ramp, pale and nearly grey, for reflection bands */
-function glossy(r: Ramp): Ramp { const t = r.c.at(-1)!, sky: RGB = [214, 226, 228]; return { c: [...r.c, t.map((v, i) => Math.round(v * 0.35 + sky[i]! * 0.65)) as RGB], o: r.o }; }
+function glossy(r: Ramp): Ramp { const t = r.c.at(-1)!, sky: RGB = [196, 204, 200]; return { c: [...r.c, t.map((v, i) => Math.round(v * 0.62 + sky[i]! * 0.38)) as RGB], o: r.o }; }
 function palette(d: CarDesign): Record<Material, Ramp> {
   return { paint: glossy(autoRamp(d.paint, { steps: 7, baseIdx: 3, dL: 0.075, shift: 0.06 })), paint2: glossy(autoRamp(d.paint2, { steps: 7, baseIdx: 3, dL: 0.075, shift: 0.06 })),
     rubber: fixed(['#16141b', '#24222b', '#36343f', '#4f4d59', '#6e6c78'], '#0b0a0f'), chrome: fixed(['#2a3047', '#56627e', '#93a3bb', '#cfd9e6', '#ffffff'], '#171b2a'),
@@ -112,7 +112,7 @@ export function rasterizeFlat(d0: CarDesign, opt: { frameW?: number; shadow?: bo
   const darken = (x: number, y: number, by: number) => { const i = at(x, y); if (i >= 0 && mat[i]) lv[i] = Math.max(0, lv[i]! - by); };
   for (const f of d.features as Feature[]) switch (f.kind) {
     case 'seam': line(P2(f.pts), (x, y) => { if (!onPaint(x, y)) return; lv[y * w + x] = 0; if (f.lit && onPaint(x, y + 1)) lv[(y + 1) * w + x] = 4; }); break;
-    case 'trim': line(P2(f.pts), (x, y, k, n) => { if (!onPaint(x, y)) return; const end = k < 2 || k > n - 3, streak = (x % 11) < 2 || ((x + 5) % 23) < 1; set(x, y, 'chrome', end ? 2 : streak ? 4 : 3, FEAT); noOutline[y * w + x] = 1;
+    case 'trim': line(P2(f.pts), (x, y, k, n) => { if (!onPaint(x, y)) return; const end = k < 2 || k > n - 3, streak = (x % 11) < 2 || ((x + 5) % 23) < 1; set(x, y, 'chrome', end ? 2 : streak ? 4 : 3, FEAT); noOutline[y * w + x] = 1; if (onPaint(x, y - 1)) darken(x, y - 1, 1);
       let yy = y + 1; if ((f.width ?? 2) > 1 && onPaint(x, yy) && !end) { set(x, yy, 'chrome', 1, FEAT); noOutline[yy * w + x] = 1; yy++; } if (onPaint(x, yy)) darken(x, yy, 1); }); break;
     case 'louvres': { const n = f.n, sl = f.slant ?? 0.25; for (let k = 0; k < n; k++) { const xm = f.x0 + (f.x1 - f.x0) * (k + 0.5) / n; line([[X(xm), Y(f.z0)], [X(xm + (f.z1 - f.z0) * sl), Y(f.z1)]], (x, y) => { if (!onPaint(x, y)) return; lv[y * w + x] = 0; if (onPaint(x + 1, y)) lv[y * w + x + 1] = Math.min(4, lv[y * w + x + 1]! + 1); }); } break; }
     case 'handle': { const x = Math.round(X(f.at[0])), y = Math.round(Y(f.at[1])), n = Math.max(2, Math.round((f.len ?? 110) / MM)); for (let k = 0; k < n; k++) { set(x + k, y, 'chrome', k === 0 ? 4 : 3, FEAT); noOutline[y * w + x + k] = 1; darken(x + k, y + 1, 2); } break; }
@@ -120,7 +120,8 @@ export function rasterizeFlat(d0: CarDesign, opt: { frameW?: number; shadow?: bo
     case 'bolt': { const x = Math.round(X(f.at[0])), y = Math.round(Y(f.at[1])); darken(x, y, 2); break; }
     case 'cap': { const x = Math.round(X(f.at[0])), y = Math.round(Y(f.at[1])), n = Math.round(f.h / MM); for (let k = 0; k < n; k++) set(x, y - k, 'chrome', k === n - 1 ? 4 : 2, FEAT); break; }
     case 'plate': { const x0 = Math.round(X(f.x0)), y0 = Math.round(Y(f.z0 + f.h)), ww = Math.round(f.w / MM), hh = Math.round(f.h / MM); for (let y = 0; y < hh; y++) for (let x = 0; x < ww; x++) set(x0 + x, y0 + y, y === 0 || x === 0 ? 'chrome' : 'black', y === 0 ? 3 : 1, FEAT); break; }
-    case 'highlight': line(P2(f.pts), (x, y, k, n) => { if (!onPaint(x, y)) return; const i = y * w + x, end = k < 2 || k > n - 3; setRaw(i, end ? top(i) - 1 : top(i)); const wd = f.width ?? 2; for (let k2 = 1; k2 < wd; k2++) if (onPaint(x, y + k2) && !end) setRaw(i + w * k2, top(i) - k2); }); break;
+    case 'highlight': { const wd = f.width ?? 2, half = Math.floor((wd - 1) / 2); line(P2(f.pts), (x, y, k, n) => { if (!onPaint(x, y)) return; const i = y * w + x, fade = Math.min(k, n - 1 - k) < 3 ? 1 : 0;
+      for (let o = -half; o <= wd - 1 - half; o++) { if (!onPaint(x, y + o)) continue; const j = i + w * o, lvl = top(j) - fade - Math.abs(o) - (o > 0 ? 1 : 0); if (lv[j]! < lvl) setRaw(j, lvl); } }); break; }
     case 'crease': line(P2(f.pts), (x, y) => { if (!onPaint(x, y)) return; const i = y * w + x; setRaw(i, top(i) - 1); if (onPaint(x, y + 1)) setRaw(i + w, 1); }); break;
     case 'bead': line(P2(f.pts), (x, y) => { if (!onPaint(x, y)) return; const i = y * w + x; setRaw(i, 0); if (onPaint(x, y + 1)) setRaw(i + w, Math.min(top(i), lv[i + w]! + 1)); }); break;
     case 'interior': { const isGlass = (x: number, y: number) => { const i = at(x, y); return i >= 0 && mat[i] === 'glass' && !noOutline[i]; }, sh = f.seatH ?? 260;
@@ -157,8 +158,8 @@ export function rasterizeFlat(d0: CarDesign, opt: { frameW?: number; shadow?: bo
   function detail(dt: Detail, M: (x: number, y: number) => boolean, bx: number, by: number, bw: number, bh: number, ly: number, mt: Material) {
     if (dt.kind === 'grille') { const pitch = Math.max(2, dt.pitch / MM), shell = Math.max(1, Math.round((dt.shell ?? 25) / MM));
       for (let y = 0; y < bh; y++) { let lf = -1; for (let x = 0; x < bw; x++) if (M(x, y)) { lf = x; break; } if (lf < 0) continue;
-        for (let x = lf; x < bw && M(x, y); x++) { const k = x - lf, gx = bx + x, gy = by + y; if (k < shell) { set(gx, gy, 'chrome', k === 0 ? 3 : 4, ly); continue; }
-          const ph = (k - shell) % pitch; set(gx, gy, ph < 1 ? 'chrome' : 'black', ph < 1 ? (y % 4 === 0 ? 4 : 2) : ph < 2 ? 2 : 0, ly); } } }
+        for (let x = lf; x < bw && M(x, y); x++) { const k = x - lf, gx = bx + x, gy = by + y; if (k < shell) { set(gx, gy, 'chrome', k === 0 ? 3 : 2, ly); continue; }
+          const ph = (k - shell) % pitch; set(gx, gy, ph < 1 ? 'chrome' : 'black', ph < 1 ? (y % 5 === 0 ? 3 : 1) : 0, ly); } } }
     else if (dt.kind === 'flutes') { const pitch = Math.max(2, Math.round(dt.pitch / MM)); for (let y = 0; y < bh; y++) for (let x = 0; x < bw; x++) if (M(x, y)) { const i = (by + y) * w + bx + x; if ((x % pitch) === pitch - 1) lv[i] = Math.max(0, lv[i]! - 1); if (x === 1 && y > 1 && y < 4) lv[i] = PAL[mt].c.length - 1; } }
     else if (dt.kind === 'bar') { for (let x = 0; x < bw; x++) { let y0 = -1; for (let y = 0; y < bh; y++) if (M(x, y)) { y0 = y; break; } if (y0 < 0) continue; const i = (by + y0 + 1) * w + bx + x; if ((x + 3) % 9 < 2 && mat[i]) lv[i] = PAL[mat[i]!].c.length - 1; } }
     else if (dt.kind === 'planks' || dt.kind === 'ribs') { const pitch = Math.max(2, Math.round(dt.pitch / MM)); for (let y = 0; y < bh; y++) for (let x = 0; x < bw; x++) if (M(x, y) && y % pitch === pitch - 1) { const i = (by + y) * w + bx + x; lv[i] = 0; if (M(x, y + 1)) lv[i + w] = Math.min(PAL[mt].c.length - 1, lv[i + w]! + 1); } }

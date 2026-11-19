@@ -8,9 +8,9 @@ export type PartSpec =
   /** a radiator grille seen from the side: a band behind its front edge, slats following the edge */
   | { kind: 'grille'; form: 'band'; slot?: Slot; front: XZ[]; depth: number; pitch?: number; shell?: number }
   /** a head lamp: in a body-colour pod faired into the catwalk, a chrome bullet on a stand, or set into the fender */
-  | { kind: 'lamp'; form: 'pod' | 'bullet' | 'flush'; slot?: Slot; at: XZ; d: number; len?: number; facing?: 'front' | 'rear' }
+  | { kind: 'lamp'; form: 'pod' | 'bullet' | 'flush'; slot?: Slot; at: XZ; d: number; len?: number; facing?: 'front' | 'rear'; stand?: boolean }
   /** a bumper seen end-on: the bar, an over-rider standing on it, the iron back to the frame */
-  | { kind: 'bumper'; form: 'bar'; slot?: Slot; end: number; inner: number; z: number; h: number; guard?: { w: number; h: number; inset?: number }; iron?: number }
+  | { kind: 'bumper'; form: 'bar'; slot?: Slot; end: number; inner: number; z: number; h: number; guard?: { w: number; h: number; inset?: number; pair?: number }; iron?: number }
   /** a tail lamp: round on a stalk, or set into the fender */
   | { kind: 'tail'; form: 'stalk' | 'flush'; slot?: Slot; at: XZ; d: number; stalk?: number };
 
@@ -26,12 +26,14 @@ export function partPanels(s: PartSpec, n: number): Panel[] {
       const lens: Panel = { id: id('lens'), pts: ell(x + dir * r * 0.05, z, r * 0.3, r * 0.8), material: 'lens', surface: 'flat', z: 28, slot, rigid: true, detail: { kind: 'flutes', pitch: 20 } };
       if (s.form === 'pod') return [{ id: id('pod'), pts: ell(x - dir * len * 0.55, z, len * 0.6, r * 0.95), material: 'paint', surface: 'fender', z: 27, slot, rigid: true, bevel: 6 },
         { id: id('rim'), pts: ell(x, z, r * 0.5, r), material: 'chrome', surface: 'fender', z: 27.5, slot, rigid: true, bevel: 2 }, lens];
-      if (s.form === 'bullet') return [{ id: id('stand'), pts: sharp([[x - dir * len * 0.4 - 25, z - r], [x - dir * len * 0.4 + 25, z - r], [x - dir * len * 0.4 + 25, z - r - 180], [x - dir * len * 0.4 - 25, z - r - 180]]), material: 'chrome', surface: 'side', z: 26.5, slot, rigid: true },
+      if (s.form === 'bullet') return [...(s.stand === false ? [] : [{ id: id('stand'), pts: sharp([[x - dir * len * 0.4 - 25, z - r], [x - dir * len * 0.4 + 25, z - r], [x - dir * len * 0.4 + 25, z - r - 180], [x - dir * len * 0.4 - 25, z - r - 180]]), material: 'chrome', surface: 'side', z: 26.5, slot, rigid: true } as Panel]),
         { id: id('shell'), pts: ell(x - dir * len * 0.45, z, len * 0.55, r), material: 'chrome', surface: 'fender', z: 27, slot, rigid: true, bevel: 6 }, lens];
       return [{ id: id('rim'), pts: ell(x, z, r * 0.45, r), material: 'chrome', surface: 'fender', z: 27, slot, rigid: true, bevel: 2 }, lens]; }
-    case 'bumper': { const out = Math.sign(s.end - s.inner), lo = s.z - s.h / 2, hi = s.z + s.h / 2, e = s.end, i = s.inner, round = Math.min(25, s.h * 0.25), slot = s.slot ?? (out < 0 ? 'bumperF' : 'bumperR');      // out: the way the bumper faces, -1 at the front
+    case 'bumper': { const out = Math.sign(s.end - s.inner), lo = s.z - s.h / 2, hi = s.z + s.h / 2, e = s.end, i = s.inner, round = Math.min(45, s.h * 0.4), slot = s.slot ?? (out < 0 ? 'bumperF' : 'bumperR');      // out: the way the bumper faces, -1 at the front
       const ps: Panel[] = [{ id: id('bar'), pts: sharp([[e, lo + round], [e - out * round, lo], [i, lo + 8], [i, hi - 8], [e - out * round, hi], [e, hi - round]]), material: 'chrome', surface: 'side', z: 25, slot, bevel: 3, detail: { kind: 'bar' } }];
       if (s.iron) ps.unshift({ id: id('iron'), pts: sharp([[i, s.z - 25], [i - out * s.iron, s.z - 25], [i - out * s.iron, s.z + 25], [i, s.z + 25]]), material: 'black', surface: 'flat', z: 24, slot });
+      if (s.guard?.pair) { const gx = e - out * ((s.guard.inset ?? 20) + s.guard.pair), g0 = s.z - s.guard.h / 2 + 15, g1 = s.z + s.guard.h / 2 - 15, gw = s.guard.w * 0.8;   // the far over-rider, seen past the near one
+        ps.push({ id: id('guard2'), pts: sharp([[gx, g0 + 15], [gx - out * gw, g0 + 15], [gx - out * gw, g1 - 15], [gx, g1 - 15]]), material: 'chrome', surface: 'side', z: 24.5, slot, bevel: 2 }); }
       if (s.guard) { const gx = e - out * (s.guard.inset ?? 20), g0 = s.z - s.guard.h / 2, g1 = s.z + s.guard.h / 2, gw = s.guard.w;
         ps.push({ id: id('guard'), pts: sharp([[gx, g0 + 20], [gx - out * 10, g0], [gx - out * (gw - 10), g0], [gx - out * gw, g0 + 30], [gx - out * gw, g1 - 25], [gx - out * (gw - 15), g1], [gx - out * 10, g1], [gx, g1 - 20]]), material: 'chrome', surface: 'side', z: 25.5, slot, bevel: 2 }); }
       return ps; }

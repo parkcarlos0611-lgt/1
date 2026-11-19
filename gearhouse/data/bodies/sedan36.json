@@ -30,13 +30,14 @@
 },
 {
 "kind": "lamp",
-"form": "pod",
+"form": "bullet",
 "at": [
-447,
+440,
 1010
 ],
 "d": 190,
-"len": 200
+"len": 230,
+"stand": false
 },
 {
 "kind": "bumper",
@@ -47,7 +48,8 @@
 "h": 118,
 "guard": {
 "w": 95,
-"h": 284
+"h": 284,
+"pair": 140
 },
 "iron": 200
 },
@@ -60,7 +62,8 @@
 "h": 118,
 "guard": {
 "w": 95,
-"h": 284
+"h": 284,
+"pair": 140
 },
 "iron": 200
 },
@@ -1299,7 +1302,7 @@
 1
 ]
 ],
-"width": 2
+"width": 3
 },
 {
 "kind": "highlight",
@@ -1335,7 +1338,7 @@
 1
 ]
 ],
-"width": 3
+"width": 4
 },
 {
 "kind": "highlight",

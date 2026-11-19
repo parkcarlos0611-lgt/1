@@ -41,8 +41,8 @@ F=[{'kind':'seam','pts':[[1615,560,1],[1640,1000,1],[1668,1398,1]]},            
    {'kind':'louvres','x0':745,'x1':1490,'z0':1000,'z1':1140,'n':18,'slant':0},
    {'kind':'trim','pts':[[745,1068,1],[1490,1068,1]],'width':1},{'kind':'trim','pts':[[1050,985,1],[1470,985,1]],'width':1},
    {'kind':'highlight','pts':[[1217,1281,1],[1400,1278,1],[1573,1286,1]],'width':2},
-   {'kind':'highlight','pts':[[429,864,1],[611,968,1],[764,998,1],[883,995,1],[976,974,1],[1096,932,1],[1168,894,1]],'width':2},
-   {'kind':'highlight','pts':[[937,898,1],[1085,842,1],[1189,780,1],[1339,665,1],[1449,570,1],[1515,507,1]],'width':3},
+   {'kind':'highlight','pts':[[429,864,1],[611,968,1],[764,998,1],[883,995,1],[976,974,1],[1096,932,1],[1168,894,1]],'width':3},
+   {'kind':'highlight','pts':[[937,898,1],[1085,842,1],[1189,780,1],[1339,665,1],[1449,570,1],[1515,507,1]],'width':4},
    {'kind':'highlight','pts':[[1079,978,1],[1284,980,1],[1468,978,1]],'width':1},
    {'kind':'highlight','pts':[[2256,480,1],[2726,480,1]],'width':1},
    {'kind':'highlight','pts':[[3330,700,1],[3450,880,1],[3620,975,1],[3800,985,1],[3980,925,1],[4180,780,1],[4380,560,1]],'width':3},
@@ -52,9 +52,9 @@ F=[{'kind':'seam','pts':[[1615,560,1],[1640,1000,1],[1668,1398,1]]},            
    {'kind':'hinge','at':[1728,1250]},{'kind':'hinge','at':[1728,700]}]
 W=[{'x':x,'r':R,'rim':0.56,'style':'disc','spokes':0,'rimMaterial':'paint','zOrder':5,'cap':0.56,'capRings':1} for x in (FX,RX)]
 PARTS=[{'kind':'grille','form':'band','front':[[215,578],[250,800],[314,1000],[382,1245],[420,1300]],'depth':95,'pitch':35},
-       {'kind':'lamp','form':'pod','at':[447,1010],'d':190,'len':200},
-       {'kind':'bumper','form':'bar','end':0,'inner':205,'z':451,'h':118,'guard':{'w':95,'h':284},'iron':200},
-       {'kind':'bumper','form':'bar','end':4650,'inner':4445,'z':451,'h':118,'guard':{'w':95,'h':284},'iron':200},
+       {'kind':'lamp','form':'bullet','at':[440,1010],'d':190,'len':230,'stand':False},
+       {'kind':'bumper','form':'bar','end':0,'inner':205,'z':451,'h':118,'guard':{'w':95,'h':284,'pair':140},'iron':200},
+       {'kind':'bumper','form':'bar','end':4650,'inner':4445,'z':451,'h':118,'guard':{'w':95,'h':284,'pair':140},'iron':200},
        {'kind':'tail','form':'stalk','at':[4462,690],'d':120,'stalk':70}]
 d={'parts':PARTS,'id':'sedan36','name':'two-door sedan, 1936','year':1936,'length':4650,'height':1908,'paint':'#0f3322','paint2':'#0f3322','panels':P,'features':F,'wheels':W,'frame':'chrome',
    'marks':{'fx':FX,'rx':RX,'r':R,'gap':ARCH,'cowl':1668,'cab':3960,'belt':1262,'roof':1907}}

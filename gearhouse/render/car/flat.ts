@@ -40,7 +40,7 @@ function palette(d: CarDesign): Record<Material, Ramp> {
     glass: fixed(['#2c343b', '#56616a', '#8e989f', '#b9c1c5', '#e0e5e6'], '#141a1f'), lens: fixed(['#5e5a48', '#9d9a80', '#d9d5b6', '#f5f2dc', '#ffffff'], '#2d2b24'),
     lensR: fixed(['#3d0a16', '#7a1522', '#c22c2b', '#f06a4a', '#ffc49a'], '#22050c'), iron: fixed(['#202128', '#34363f', '#4f525d', '#737783', '#a1a5ae'], '#121318'),
     black: fixed(['#0f0e14', '#1b1a22', '#2a2933', '#403f4b', '#5d5c69'], '#07060a'), white: fixed(['#7b7f8c', '#a9adb7', '#d4d7dc', '#eff0ef', '#ffffff'], '#3e404a'),
-    shadow: fixed(['#07060a', '#0f0e14', '#16151c', '#1b1a22', '#22212a'], '#07060a'), wood: autoRamp('#9a6a3a', { sat: 0.9 }), canvas: autoRamp('#8c8270', { sat: 0.8 }) }; }
+    shadow: fixed(['#07060a', '#0f0e14', '#16151c', '#1b1a22', '#22212a'], '#07060a'), wood: autoRamp('#9a6a3a', { sat: 0.9 }), canvas: autoRamp(d.canvas ?? '#8c8270', { sat: 0.8 }) }; }
 
 const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map(n => (n + 0.5) / 16);
 /** dither only a narrow band around each tone step: clean flats, soft seams */
@@ -140,7 +140,7 @@ export function rasterizeFlat(d0: CarDesign, opt: { frameW?: number; shadow?: bo
     for (const [x, y, m, l] of marks) { set(x, y, m, l, layer[y * w + x]!); noOutline[y * w + x] = 1; } }
 
   // ---- details on the skin ----
-  const FEAT = 1e6, onPaint = (x: number, y: number) => { const i = at(x, y); return i >= 0 && skinRGB[i]! < 0 && (mat[i] === 'paint' || mat[i] === 'paint2'); };
+  const FEAT = 1e6, onPaint = (x: number, y: number) => { const i = at(x, y); return i >= 0 && skinRGB[i]! < 0 && (mat[i] === 'paint' || mat[i] === 'paint2' || mat[i] === 'canvas'); };
   const line = (pts: [number, number][], plot: (x: number, y: number, k: number, n: number) => void) => { const cells: [number, number][] = [];
     for (let i = 0; i + 1 < pts.length; i++) { let [xa, ya] = pts[i]!.map(Math.round) as [number, number]; const [xb, yb] = pts[i + 1]!.map(Math.round) as [number, number], dx = Math.abs(xb - xa), dy = -Math.abs(yb - ya), sx = xa < xb ? 1 : -1, sy = ya < yb ? 1 : -1; let e = dx + dy;
       for (;;) { if (!cells.length || cells.at(-1)![0] !== xa || cells.at(-1)![1] !== ya) cells.push([xa, ya]); if (xa === xb && ya === yb) break; const e2 = 2 * e; if (e2 >= dy) { e += dy; xa += sx; } if (e2 <= dx) { e += dx; ya += sy; } } }
@@ -207,6 +207,8 @@ export function rasterizeFlat(d0: CarDesign, opt: { frameW?: number; shadow?: bo
       for (let y = 0; y < bh; y++) for (let x = 0; x < bw; x++) { if (!M(x, y)) continue; let edge = 99; for (let r = 1; r <= ring; r++) if (!M(x - r, y) || !M(x + r, y) || !M(x, y - r) || !M(x, y + r)) { edge = r; break; }
         const gx = bx + x, gy = by + y; if (edge <= ring) { set(gx, gy, 'chrome', !M(x, y - edge) ? 4 : !M(x, y + edge) ? 1 : !M(x - edge, y) ? 3 : 2, ly); continue; }
         const k = ((x - cx) % pitch + pitch) % pitch; set(gx, gy, k === 0 ? 'chrome' : 'black', k === 0 ? (x === cx ? 4 : 2) : k === 1 ? 1 : 0, ly); } }
+    else if (dt.kind === 'mesh') { const pitch = Math.max(2, Math.round(dt.pitch / MM)); for (let y = 0; y < bh; y++) for (let x = 0; x < bw; x++) { if (!M(x, y)) continue; const gx = bx + x, gy = by + y, wx = x % pitch === 0, wy = y % pitch === 0;
+        set(gx, gy, wx || wy ? 'chrome' : 'black', wx && wy ? 4 : wx || wy ? ((x + y) & 1 ? 2 : 3) : !M(x, y - 1) || y % pitch === 1 ? 0 : 1, ly); } }
     else if (dt.kind === 'planks' || dt.kind === 'ribs') { const pitch = Math.max(2, Math.round(dt.pitch / MM)); for (let y = 0; y < bh; y++) for (let x = 0; x < bw; x++) if (M(x, y) && y % pitch === pitch - 1) { const i = (by + y) * w + bx + x; lv[i] = 0; if (M(x, y + 1)) lv[i + w] = Math.min(PAL[mt].c.length - 1, lv[i + w]! + 1); } }
   }
 
@@ -218,6 +220,7 @@ export function rasterizeFlat(d0: CarDesign, opt: { frameW?: number; shadow?: bo
       if (dd > ri) { const t = (dd - ri) / (r - ri); let l = 1; if (t > 0.25 && t < 0.7 && dot > 0.35) l = 2; if (t > 0.35 && t < 0.6 && dot > 0.8) l = 3; if (t < 0.18 || (t > 0.8 && dot < -0.3)) l = 0;
         if (s.whitewall && t > 0.12 && t < 0.12 + s.whitewall) { set(x, y, 'white', dot > 0.4 ? 4 : dot < -0.5 ? 1 : 3, ly, id); continue; }
         if (Math.abs(t - 0.5) < 0.6 / Math.max(1, r - ri) && dot > -0.3) l = Math.min(4, l + 1);                     // the bead ring on the sidewall
+        if (s.tread && t > 0.7) { const ang = Math.atan2(dy, dx), blk = Math.floor((ang / (Math.PI * 2) + 1) * Math.max(18, Math.round(r * 1.3))) & 1; if (!blk && t > 0.95) continue; l = blk ? (dot > 0.2 ? 3 : 2) : 0; }
         set(x, y, 'rubber', l, ly, id); continue; }
       const q = dd / ri, a = Math.atan2(dy, dx);
       if (s.style === 'wire') { if (q > 0.9) set(x, y, 'chrome', dot > 0.2 ? 3 : dot < -0.4 ? 1 : 2, ly, id); else if (q > 0.84) set(x, y, 'black', 1, ly, id);
@@ -232,6 +235,6 @@ export function rasterizeFlat(d0: CarDesign, opt: { frameW?: number; shadow?: bo
         if (q > 0.9) set(x, y, rimM, dot > 0.2 ? 3 : 1, ly, id); else if (q > 0.82) set(x, y, rimM, dot > 0 ? 1 : 3, ly, id);
         else if (q < cap) { const u = q / cap; let l = u > 1 - 1.5 * pxq / cap ? 1 : u < 0.22 ? (dot > 0 ? 4 : 3) : dot > 0.35 ? 4 : dot > -0.3 ? 3 : 2;
           for (let k = 1; k <= rings; k++) if (Math.abs(u - (0.22 + 0.6 * k / (rings + 1))) < 0.7 * pxq / cap) l = dot > 0 ? 2 : 1;
-          if (u < 0.12 && dx < 0 && dy < 0) l = 4; set(x, y, 'chrome', l, ly, id); }
+          if (u < 0.12 && dx < 0 && dy < 0) l = 4; set(x, y, s.capMaterial ?? 'chrome', s.capMaterial === 'black' ? Math.max(0, l - 2) : l, ly, id); }
         else set(x, y, rimM, dot > 0.3 ? 3 : 2, ly, id); } } }
 }

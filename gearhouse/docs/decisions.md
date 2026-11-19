@@ -165,3 +165,10 @@ These decisions still hold, from `legacy/docs/MASTER_GAME_PLAN.md`:
 - ZY2: element skins on the game's own ramps (each tone of the view to the ramp step nearest in lightness), hidden paint carried on smoothly, a mostly hidden wheel taking the detail of the wheel the view shows best, lone cells cleaned, badges and lettering on hub caps removed. Z2: the same detail as shapes per element (tools/ref/decals.py), drawn afresh at any scale.
 - On the three samples both pass longer, repaint, lamps and wheels from another car, pulled apart, 7 and 15 mm/px; colour difference 11-18 against the view. ZY2 is a third the size; Z2 can be made from it at any time. Proposed: ZY2 as the stored form (review 21, awaiting decision).
 - Capture: chrome keeps the body colour in its reflections; a low-saturation paint no longer takes chrome as paint. Method Z build steps are shared (zkit.build); a second paint tone keeps its colour.
+
+## 2026-11-19 — method Z only; five views of one car; early cars as full parts (review 22)
+
+- Cars are drawn by method Z only: hand-written parts fitted to the reference lines, drawn by the game's rules with at most a coarse light grid per part. Z2 and ZY2 are not used: they carry the picture's noise, measured well on colour difference while looking no better, and limit what the game can change. Judging is by eye, side by side at game size.
+- Technology check: a randomly picked car (1940s #2, four-wheel-drive utility, 1948) in left, right, front, rear and plan views; the right side is the left side turned end for end with the light kept top left. Removing the tilt, a longer wheelbase, repainting and other wheels all hold.
+- Renderer: wire mesh grille, tread tyres, black or painted hubs, canvas colour, lines on canvas; small parts move whole when a car is stretched (demo).
+- Proposed (awaiting decision): only 1920s cars (sheets made by the planner) and 1930s cars up to about 1934 become full, exchangeable parts in all five views, with common mounting marks; later cars wait for their era.

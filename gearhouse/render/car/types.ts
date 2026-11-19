@@ -54,7 +54,9 @@ export type Detail =
   | { kind: 'bar' }
   | { kind: 'planks'; pitch: number }
   | { kind: 'ribs'; pitch: number }
-  | { kind: 'vbars'; pitch: number; ring?: number };
+  | { kind: 'vbars'; pitch: number; ring?: number }
+  /** a wire mesh: bright wires both ways over a dark ground */
+  | { kind: 'mesh'; pitch: number };
 
 /** tone steps on a grid over a panel's box: x0 and z1 are its top left corner in mm */
 export interface ToneMap { x0: number; z1: number; w: number; h: number; mm: number; steps: number; d: number[] }
@@ -105,6 +107,10 @@ export interface WheelSpec {
   zOrder?: number;
   /** hub cap: radius as a share of the rim, rings pressed into it */
   cap?: number; capRings?: number;
+  /** an off-road tyre: tread blocks round the outer edge */
+  tread?: boolean;
+  /** what the hub cap is: chrome unless given (a painted or black hub on working vehicles) */
+  capMaterial?: Material;
   /** a chrome trim ring on the rim */
   trim?: boolean;
 }
@@ -129,6 +135,8 @@ export interface CarDesign {
   parts?: import('./parts').PartSpec[];
   /** tone steps added to the glass: 0 dark with reflections, 1 pale as on a studio drawing */
   glassLift?: number;
+  /** colour of the canvas (hoods, tilts); a light buff when not given */
+  canvas?: string;
   /** method ZY: the reference view's detail, element by element (tools/ref/skin.py) */
   skin?: CarSkin;
   /** method Z2: the view's detail as shapes, element by element (tools/ref/decals.py) */

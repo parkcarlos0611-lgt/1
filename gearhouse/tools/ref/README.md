@@ -9,3 +9,5 @@ Method Z (structure first): `sedan36_z.py` fits a hand-written body to its view 
 Method ZY: `capture.py` with the fitted body's roles, then `skin.py`, hands the view's detail to the elements (`data/skins/<id>.json`); `render.ts` attaches `<id>.skin.json` lying next to a body, `ztest.ts` takes the skin as its last argument.
 
 ZY2 and Z2 (review 21): `zkit.build` with a small per-car script (`speedster35_z.py`, `pickup48_z.py`) makes the elements; `skin.py --common --fill --clean` writes `data/skins/<id>.json`, `decals.py` turns it into `data/decals/<id>.json`; `ztest2.ts <id> <donor id> <dir>` draws seven changes for both, `zsheet.py` (A=, B=) and `zrow.py` lay them out.
+
+Five views by method Z (review 22): `lr48.py` writes the hand designs, `lr48_z.py` fits them to their views, `shade.py` adds the light grid, `mirror.ts` makes the right side from the left, `lr48_demo.ts` shows changes. Views are cut from a sheet with `trace.views`.

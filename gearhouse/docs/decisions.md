@@ -101,3 +101,12 @@ These decisions still hold, from `legacy/docs/MASTER_GAME_PLAN.md`:
 - A customer sits through two talks before a quote.
 - Banks: one account at a town bank, 3% on deposits, loans of 6/12/24 months, payments monthly, three missed payments end the game; a failed bank locks the deposit away and returns part of it later; the papers are the only warning.
 - Tax: told on January 2, paid on March 15, 4% of the year's earnings above $1,500 (to be checked against sources).
+
+## 2026-11-19 — the car itself comes first (reviews 14 and 15)
+
+- Reference sheets made by the planner are material, not assets: cars are rebuilt at the 400 px rule from traced outlines, as the first build did from drawings.
+- Only badges and lettering are removed; grilles and a car's own design stay.
+- The underside views of the sheets are guesses and are used only as examples of layout.
+- Choosing a car: era, kind of car, body shell, parts in eleven fixed places, then dimensions by the outline. Dimensions change the figures.
+- The frame is chosen from a list and drawn on the plan; wheelbase, track and reinforcements are values of it.
+- Outlines are traced with a helper tool and then finished by hand; three samples first, to measure quality and effort.

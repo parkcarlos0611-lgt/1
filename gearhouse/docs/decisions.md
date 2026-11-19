@@ -124,3 +124,10 @@ These decisions still hold, from `legacy/docs/MASTER_GAME_PLAN.md`:
 - The side view has fixed lanes (two or three); a lane change is a short slide. Wheels stay fixed in the car picture for now.
 - Cars going the other way are drawn separately in the near lane and mirrored in the far lane.
 - Next after the three sample bodies and the drivetrain figures: a straight test in side view.
+
+## 2026-11-19 — body detail (review 18)
+
+- The reference scale is 10 mm/px, about one to one with the reference sheets; scenes may draw at other scales from the same data.
+- Parts are built as a library of parts with their own structure (grille, lamps, wheels and caps, bumpers, tail lamps, handles and hinges, trim, running boards).
+- Paint gets seven tones; reflection bands, overlap shadows and glimpses through the glass are added.
+- Source images are never used as pictures in the game, not even for cars that are only seen.

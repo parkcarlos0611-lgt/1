@@ -292,46 +292,12 @@
 "material": "black",
 "surface": "flat",
 "z": 15,
-"slot": "grille"
-},
-{
-"id": "grilleBars",
-"pts": [
-[
-188,
-560,
-1
-],
-[
-180,
-800,
-1
-],
-[
-196,
-1020,
-1
-],
-[
-222,
-1020,
-1
-],
-[
-208,
-800,
-1
-],
-[
-214,
-560,
-1
-]
-],
-"material": "chrome",
-"surface": "side",
-"z": 15.5,
-"slot": "grille"
+"slot": "grille",
+"detail": {
+"kind": "grille",
+"pitch": 30,
+"shell": 20
+}
 },
 {
 "id": "body",
@@ -514,7 +480,11 @@
 ],
 "material": "wood",
 "surface": "flat",
-"z": 9
+"z": 9,
+"detail": {
+"kind": "planks",
+"pitch": 70
+}
 },
 {
 "id": "stakePost",
@@ -856,7 +826,11 @@
 "material": "rubber",
 "surface": "flat",
 "z": 19,
-"slot": "board"
+"slot": "board",
+"detail": {
+"kind": "ribs",
+"pitch": 25
+}
 },
 {
 "id": "step",
@@ -948,7 +922,10 @@
 "surface": "side",
 "z": 25,
 "slot": "bumperF",
-"bevel": 3
+"bevel": 3,
+"detail": {
+"kind": "bar"
+}
 },
 {
 "id": "bumperIron2",
@@ -1192,7 +1169,11 @@
 "surface": "flat",
 "z": 28,
 "slot": "lamp",
-"rigid": true
+"rigid": true,
+"detail": {
+"kind": "flutes",
+"pitch": 20
+}
 },
 {
 "id": "bezel",
@@ -1501,6 +1482,123 @@
 "width": 2
 },
 {
+"kind": "highlight",
+"pts": [
+[
+300,
+1000,
+1
+],
+[
+600,
+1110,
+1
+],
+[
+1100,
+1120,
+1
+],
+[
+1450,
+1040,
+1
+],
+[
+1640,
+880,
+1
+]
+],
+"width": 3
+},
+{
+"kind": "highlight",
+"pts": [
+[
+3200,
+780,
+1
+],
+[
+3400,
+1010,
+1
+],
+[
+3775,
+1125,
+1
+],
+[
+4150,
+1090,
+1
+],
+[
+4420,
+950,
+1
+],
+[
+4520,
+760,
+1
+]
+],
+"width": 3
+},
+{
+"kind": "highlight",
+"pts": [
+[
+400,
+1405,
+1
+],
+[
+800,
+1455,
+1
+],
+[
+1300,
+1480,
+1
+]
+],
+"width": 2
+},
+{
+"kind": "highlight",
+"pts": [
+[
+1900,
+2005,
+1
+],
+[
+2300,
+2012,
+1
+],
+[
+2580,
+1990,
+1
+]
+],
+"width": 2
+},
+{
+"kind": "interior",
+"belt": 1490,
+"seats": [
+2300
+],
+"wheel": 1900
+},
+{
 "kind": "handle",
 "at": [
 2330,
@@ -1527,20 +1625,24 @@
 {
 "x": 912,
 "r": 420,
-"rim": 0.62,
+"rim": 0.6,
 "style": "disc",
 "spokes": 0,
 "rimMaterial": "paint",
-"zOrder": 5
+"zOrder": 5,
+"cap": 0.55,
+"capRings": 2
 },
 {
 "x": 3773,
 "r": 420,
-"rim": 0.62,
+"rim": 0.6,
 "style": "disc",
 "spokes": 0,
 "rimMaterial": "paint",
-"zOrder": 5
+"zOrder": 5,
+"cap": 0.55,
+"capRings": 2
 }
 ]
 }

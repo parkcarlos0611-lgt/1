@@ -39,7 +39,16 @@ export interface Panel {
   slot?: Slot;
   /** small parts move as a whole when the car is stretched, instead of being stretched themselves */
   rigid?: boolean;
+  /** the structure drawn inside the panel by the part library (render/car/flat.ts) */
+  detail?: Detail;
 }
+/** structure inside a part: grille slats that follow its front edge, a fluted lens, a bright bumper bar, wood planks */
+export type Detail =
+  | { kind: 'grille'; pitch: number; shell?: number }
+  | { kind: 'flutes'; pitch: number }
+  | { kind: 'bar' }
+  | { kind: 'planks'; pitch: number }
+  | { kind: 'ribs'; pitch: number };
 
 /** where the car's sections are, for stretching it: wheel centres, arch radius, cowl, cabin end, belt and roof heights */
 export interface Landmarks { fx: number; rx: number; r: number; gap: number; cowl: number; cab: number; belt: number; roof: number }
@@ -54,7 +63,11 @@ export type Feature =
   | { kind: 'lamp'; at: Pt; r: number; facing: 'front' | 'rear' }      // headlamp bucket or tail lamp
   | { kind: 'bolt'; at: Pt }
   | { kind: 'cap'; at: Pt; h: number }                                  // radiator cap and its mascot post
-  | { kind: 'plate'; x0: number; z0: number; w: number; h: number };    // blank number plate
+  | { kind: 'plate'; x0: number; z0: number; w: number; h: number }     // blank number plate
+  | { kind: 'highlight'; pts: Pt[]; width?: number }                    // a reflection band along a crown (fender top, roof)
+  | { kind: 'crease'; pts: Pt[] }                                       // a pressed character line: lit above, shaded below
+  | { kind: 'bead'; pts: Pt[] }                                         // welting where a fender meets the body
+  | { kind: 'interior'; belt: number; seats: number[]; wheel?: number; seatH?: number };   // what is seen through the glass
 
 export interface WheelSpec {
   /** centre x mm; z is the radius (it stands on the ground) */
@@ -71,6 +84,10 @@ export interface WheelSpec {
   spare?: boolean;
   /** draw order among panels */
   zOrder?: number;
+  /** hub cap: radius as a share of the rim, rings pressed into it */
+  cap?: number; capRings?: number;
+  /** a chrome trim ring on the rim */
+  trim?: boolean;
 }
 
 export interface CarDesign {

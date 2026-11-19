@@ -51,6 +51,8 @@ export type Detail =
   | { kind: 'ribs'; pitch: number }
   | { kind: 'vbars'; pitch: number; ring?: number };
 
+/** tone steps on a grid over a panel's box: x0 and z1 are its top left corner in mm */
+export interface ToneMap { x0: number; z1: number; w: number; h: number; mm: number; steps: number; d: number[] }
 /** where the car's sections are, for stretching it: wheel centres, arch radius, cowl, cabin end, belt and roof heights */
 export interface Landmarks { fx: number; rx: number; r: number; gap: number; cowl: number; cab: number; belt: number; roof: number }
 
@@ -105,6 +107,8 @@ export interface CarDesign {
   /** window surround: a shadowed reveal or a chrome frame */
   frame?: 'reveal' | 'chrome';
   marks?: Landmarks;
+  /** where each panel is lighter and darker, read off a reference view (tools/ref/tones.py); keyed by panel id */
+  tones?: Record<string, ToneMap>;
   /** parts from the part library (render/car/parts.ts), expanded into panels before drawing */
   parts?: import('./parts').PartSpec[];
   id?: string;

@@ -74,7 +74,10 @@ export function rasterizeFlat(d0: CarDesign, opt: { frameW?: number; shadow?: bo
     if (p.cut) for (const c of p.cut) { const cx = X(c.x) - bx, cy = Y(c.z) - by, rr = c.r / MM; for (let y = 0; y < bh; y++) for (let x = 0; x < bw; x++) if (Math.hypot(x + 0.5 - cx, y + 0.5 - cy) < rr) m[y * bw + x] = 0; }
     if (p.clip) for (let y = 0; y < bh; y++) for (let x = 0; x < bw; x++) { const o = owner[(by + y) * w + bx + x]!; if (o < 0 || !ids[o]!.startsWith(p.clip)) m[y * bw + x] = 0; }
     const M = (x: number, y: number) => x >= 0 && y >= 0 && x < bw && y < bh && m[y * bw + x] === 1;
-    const mt = p.material;
+    const mt = p.material, T = d.tones?.[p.id]; let tm: Int16Array | null = null;
+    if (T) { tm = new Int16Array(T.w * T.h); let q = 0; for (let i = 0; i < T.d.length; i += 2) { tm.fill(T.d[i]!, q, q + T.d[i + 1]!); q += T.d[i + 1]!; } }
+    /** the tone the reference shows at a pixel, as a step of this material's ramp */
+    const toneAt = (gx: number, gyy: number): number => { const tx = Math.floor(((gx - PAD + 0.5) * MM - T!.x0) / T!.mm), ty = Math.floor((T!.z1 - (gy - gyy - 0.5) * MM) / T!.mm); if (tx < 0 || ty < 0 || tx >= T!.w || ty >= T!.h) return -1; return Math.round(tm![ty * T!.w + tx]! / Math.max(1, T!.steps - 1) * (PAL[mt].c.length - 1)); };
     for (let x = 0; x < bw; x++) { let y = 0; while (y < bh) { if (!M(x, y)) { y++; continue; } const ya = y; while (y < bh && M(x, y)) y++; const yb = y - 1, n = yb - ya;
       for (let yy = ya; yy <= yb; yy++) { const t = n > 0 ? (yy - ya) / n : 0.5, gx = bx + x, gyy = by + yy, k = yy - ya, kb = yb - yy; let l: number;
         if (mt === 'chrome') { const bands = [4, 3, 1, 2, 2, 1]; l = n <= 1 ? [3, 1][k]! : bands[Math.min(5, Math.floor(k / (n + 1) * 6))]!; }
@@ -86,7 +89,7 @@ export function rasterizeFlat(d0: CarDesign, opt: { frameW?: number; shadow?: bo
           l = dith(gx, gyy, v, 0.13); if (kb === 0 && n > 2) l = Math.max(0, l - 1);
           if (k === 0) { const above = at(gx, gyy - 1); l = above >= 0 && mat[above] === 'glass' ? 3 : 4; } else if (k === 1 && n > 3) l = Math.max(l, 3); }
         else { const base = mt === 'black' ? 1 : mt === 'white' ? 3 : 2; l = k === 0 && n > 1 ? base + 1 : kb === 0 && n > 1 ? base - 1 : base; }
-        set(gx, gyy, mt, l, ly, id); if (p.clip) noOutline[gyy * w + gx] = 1; } } }
+        set(gx, gyy, mt, l, ly, id); if (tm && mt !== 'glass') { const tl = toneAt(gx, gyy); if (tl >= 0) setRaw(gyy * w + gx, tl); } if (p.clip) noOutline[gyy * w + gx] = 1; } } }
     if (mt === 'glass') glassMasks.push({ m, bx, by, bw, bh, ly, id });
     if (p.detail) detail(p.detail, M, bx, by, bw, bh, ly, mt);
   });
@@ -120,9 +123,9 @@ export function rasterizeFlat(d0: CarDesign, opt: { frameW?: number; shadow?: bo
     case 'bolt': { const x = Math.round(X(f.at[0])), y = Math.round(Y(f.at[1])); darken(x, y, 2); break; }
     case 'cap': { const x = Math.round(X(f.at[0])), y = Math.round(Y(f.at[1])), n = Math.round(f.h / MM); for (let k = 0; k < n; k++) set(x, y - k, 'chrome', k === n - 1 ? 4 : 2, FEAT); break; }
     case 'plate': { const x0 = Math.round(X(f.x0)), y0 = Math.round(Y(f.z0 + f.h)), ww = Math.round(f.w / MM), hh = Math.round(f.h / MM); for (let y = 0; y < hh; y++) for (let x = 0; x < ww; x++) set(x0 + x, y0 + y, y === 0 || x === 0 ? 'chrome' : 'black', y === 0 ? 3 : 1, FEAT); break; }
-    case 'highlight': { const wd = f.width ?? 2, half = Math.floor((wd - 1) / 2); line(P2(f.pts), (x, y, k, n) => { if (!onPaint(x, y)) return; const i = y * w + x, fade = Math.min(k, n - 1 - k) < 3 ? 1 : 0;
+    case 'highlight': { if (d.tones) break; const wd = f.width ?? 2, half = Math.floor((wd - 1) / 2); line(P2(f.pts), (x, y, k, n) => { if (!onPaint(x, y)) return; const i = y * w + x, fade = Math.min(k, n - 1 - k) < 3 ? 1 : 0;
       for (let o = -half; o <= wd - 1 - half; o++) { if (!onPaint(x, y + o)) continue; const j = i + w * o, lvl = top(j) - fade - Math.abs(o) - (o > 0 ? 1 : 0); if (lv[j]! < lvl) setRaw(j, lvl); } }); break; }
-    case 'crease': line(P2(f.pts), (x, y) => { if (!onPaint(x, y)) return; const i = y * w + x; setRaw(i, top(i) - 1); if (onPaint(x, y + 1)) setRaw(i + w, 1); }); break;
+    case 'crease': if (d.tones) break; else line(P2(f.pts), (x, y) => { if (!onPaint(x, y)) return; const i = y * w + x; setRaw(i, top(i) - 1); if (onPaint(x, y + 1)) setRaw(i + w, 1); }); break;
     case 'bead': line(P2(f.pts), (x, y) => { if (!onPaint(x, y)) return; const i = y * w + x; setRaw(i, 0); if (onPaint(x, y + 1)) setRaw(i + w, Math.min(top(i), lv[i + w]! + 1)); }); break;
     case 'interior': { const isGlass = (x: number, y: number) => { const i = at(x, y); return i >= 0 && mat[i] === 'glass' && !noOutline[i]; }, sh = f.seatH ?? 260;
       for (const sx of f.seats) { const cx = X(sx), cy = Y(f.belt + sh - 80), rx = 150 / MM, ry = 95 / MM; for (let y = Math.floor(cy - ry); y <= Y(f.belt); y++) for (let x = Math.floor(cx - rx); x <= cx + rx; x++) { if (!isGlass(x, y)) continue;

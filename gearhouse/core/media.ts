@@ -51,10 +51,10 @@ export class Media {
   system(): System { return { id: 'media', morning: a => this.morning(a) }; }
   private morning(a: Api): void { const S = this.S, g = a.g;
     // what earlier papers warned of now arrives
-    for (const c of S.coming.filter(x => x.due <= a.date)) { let held = true;
+    const told = new Set<string>(); for (const c of S.coming.filter(x => x.due <= a.date)) { let held = true;
       if (c.kind === 'demand' || c.kind === 'awareness') { const e = { kind: c.kind, value: c.value, weeks: c.weeks, from: c.from, held: true }; a.bus.emit('news_effect', e); held = e.held; }
       if (c.kind === 'condition' && c.cond) held = begin(g, { kind: c.cond, key: c.key, value: c.value, until: addDays(a.date, c.weeks * 7), from: c.from });
-      if (held && c.headline) a.log(`신문에 났던 일이 닥쳤다: “${c.headline}”`);                    // the cause is on record whether or not the paper was read
+      if (held && c.headline && !told.has(c.headline)) { told.add(c.headline); a.log(`신문에 났던 일이 닥쳤다: “${c.headline}”`); }                    // the cause is on record whether or not the paper was read
       if (c.kind === 'supplier_price' && c.supplierId) this.supply.offer(c.supplierId, c.value, addDays(a.date, c.weeks * 7)); }
     S.coming = S.coming.filter(x => x.due > a.date);
     for (const pub of this.data.publications) { if (pub.kind !== 'newspaper' || weekday(a.date) !== pub.weekday) continue;

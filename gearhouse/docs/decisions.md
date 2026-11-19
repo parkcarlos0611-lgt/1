@@ -115,3 +115,12 @@ These decisions still hold, from `legacy/docs/MASTER_GAME_PLAN.md`:
 
 - Cars are drawn in the first build's manner (render/car/flat.ts): five flat tones per material, an outline only where a part meets the background or a part behind it, narrow dithering, chunky window frames, parts strictly in layer order.
 - Cars that are only seen (rivals, cars on the road) are made the same way and carry a kind of car; how they are generated and tied to the systems is under review (review 16).
+
+## 2026-11-19 — background cars and driving views (reviews 16 and 17)
+
+- Makers have a house style; their models are combined only inside it. Model shapes are set by hand at first; each car gets wear: paint chips, lost gloss, rust and dirt, five steps each.
+- Road traffic starts from simple weights and moves to counts of cars sold and still running. Cars the player sold are seen on the road.
+- Views by scene: side view for streets, deliveries, straight tests, drag races and hill climbs; top view for track races, rallies and handling tests. One physics model for both.
+- The side view has fixed lanes (two or three); a lane change is a short slide. Wheels stay fixed in the car picture for now.
+- Cars going the other way are drawn separately in the near lane and mirrored in the far lane.
+- Next after the three sample bodies and the drivetrain figures: a straight test in side view.

@@ -37,7 +37,7 @@ export function runBot(w: World, days: number, opt: { hire?: boolean; advert?: b
       case 'order_late': if (P.mayAsk && g.market.orders.find(o => o.id === P.orderId)?.state === 'building') { log.delaysAsked = (log.delaysAsked ?? 0) + 1; sales.askDelay(P.orderId, 14); } break;
       case 'inquiry': { log.inquiries++; const q = sales.inquiry(P.inquiryId), c = sales.customer(q.customerId), designId = designFor(c.orderType);
         if (active() >= 2 || !canSupply(designId)) { sales.drop(q.id); log.lost++; break; }
-        sales.consult(q.id); const v = sales.view(q.id), d = g.shop.designs[designId]!, cost = Object.entries(shop.bom(d)).reduce((t, [p, n]) => t + price(p) * n, 0), hours = shop.buildHours(d);
+        sales.consult(q.id); if (!sales.view(q.id).budget) try { sales.consult(q.id); } catch { /* nothing more to ask */ } const v = sales.view(q.id), d = g.shop.designs[designId]!, cost = Object.entries(shop.bom(d)).reduce((t, [p, n]) => t + price(p) * n, 0), hours = shop.buildHours(d);
         const ask = v.budget ? v.budget[1] * 0.96 : cost * 1.25 + hours * 0.85, due = addDays(g.clock.date, Math.ceil((active() + 1) * hours / workPerDay() * 7 / 6 * 1.25) + 16);
         sales.quote(q.id, { designId, price: Math.round(Math.max(ask, cost * 1.15 + hours * 0.5) / 5) * 5, due, depositRate: opt.deposit ?? 0.4, meets: v.mustHave ?? [] }); log.quoted++; break; }
       case 'quote_answer': { const q = sales.inquiry(P.inquiryId);

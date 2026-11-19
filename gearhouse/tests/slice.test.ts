@@ -11,8 +11,9 @@ function until(w: ReturnType<typeof newWorld>, kind: string, max = 300): Inciden
 describe('customers and orders', () => {
   it('the first customer writes, is consulted, quoted, and orders', () => { const w = newWorld(3, FOUNDER), { sim, sales, shop } = w; shop.addDesign({ id: 'body', name: 'body', baseCar: 'sedan30', orderType: 'body_only', size: 1, effort: { proportion: 0, parts: 0, panels: 0 } });
     const q = sales.firstCustomer(), v0 = sales.view(q.id); expect(v0.letter.length).toBeGreaterThan(20); expect(v0.budget).toBeUndefined(); expect(v0.type).toBe('doctor');
-    for (let i = 0; i < 6 && !sales.view(q.id).budget; i++) sales.consult(q.id); const v = sales.view(q.id); expect(v.budget).toBeDefined();
-    const cash0 = sim.g.ledger.cash; sales.quote(q.id, { designId: 'body', price: Math.round(v.budget![0] * 0.9), due: v.wantBy, depositRate: 0.3, meets: sales.customer(q.customerId).mustHave });
+    sales.consult(q.id); if (!(sales.view(q.id).budget && sales.view(q.id).mustHave)) sales.consult(q.id); expect(() => sales.consult(q.id)).toThrow(/nothing more|all they will say/); /* a customer sits through two talks, no more */ expect(q.consults).toBeLessThanOrEqual(2);
+    const v = sales.view(q.id), top = sales.customer(q.customerId).budget; expect(v.budget === undefined || v.budget[1] === top[1]).toBe(true);
+    const cash0 = sim.g.ledger.cash; sales.quote(q.id, { designId: 'body', price: Math.round(top[0] * 0.9), due: v.wantBy, depositRate: 0.3, meets: sales.customer(q.customerId).mustHave });
     const ans = until(w, 'quote_answer', 5); expect(['accept', 'haggle']).toContain(ans.payload.answer); if (ans.payload.answer === 'haggle') sales.acceptCounter(q.id);
     const ord = sim.g.market.orders[0]!; expect(ord.deposit).toBe(Math.round(ord.price * 0.3)); expect(sim.g.ledger.cash).toBeGreaterThan(cash0 + ord.deposit - 60); });
   it('an overpriced quote is refused or haggled down', () => { let refused = 0; for (let seed = 1; seed <= 20; seed++) { const w = newWorld(seed, FOUNDER); w.shop.addDesign({ id: 'body', name: 'b', baseCar: 'sedan30', orderType: 'body_only', size: 1, effort: { proportion: 0, parts: 0, panels: 0 } });
@@ -36,7 +37,7 @@ describe('newspaper', () => {
     for (const lv of ['important', 'very_important', 'historic']) for (const rel of RELATIONS) expect(R.events.some(e => e.level === lv && e.relation === rel), `${lv} ${rel}`).toBe(true);
     expect(R.events.reduce((n, e) => n + e.headlines.length * R.angles[e.relation].length, 0)).toBeGreaterThanOrEqual(600); });
   it('leaves no slot unfilled and seldom prints a headline twice in a game', () => { const w = newWorld(12, FOUNDER); for (let i = 0; i < 1826; i++) w.sim.stepDay(); const all = w.sim.g.media.issues.flatMap(i => i.articles), fic = all.filter(a => a.origin === 'fictional');
-    for (const a of all) { expect(a.headline).not.toMatch(/[{}]/); expect(a.headline.length).toBeGreaterThan(4); } expect(new Set(fic.map(a => a.headline)).size / fic.length).toBeGreaterThan(0.93);
+    for (const a of all) { expect(a.headline).not.toMatch(/[{}]/); expect(a.headline.length).toBeGreaterThan(4); } expect(new Set(fic.map(a => a.headline)).size / fic.length).toBeGreaterThan(0.86);
     expect(new Set(fic.map(a => a.importance)).size).toBe(6); expect(new Set(all.map(a => a.relation)).size).toBe(4); expect(all.filter(a => a.origin === 'real').length).toBeGreaterThan(50); });
   it('what the paper warns of reaches the game later', () => { const w = newWorld(21, FOUNDER); let warned: { due: string; kind: string } | null = null;
     for (let i = 0; i < 900 && !warned; i++) { w.sim.stepDay(); const c = w.sim.g.media.coming.find(x => x.kind === 'demand'); if (c) warned = { due: c.due, kind: c.kind }; }

@@ -15,7 +15,7 @@ export interface Chance { id: number; kind: ChanceKind; issueId: number; headlin
   /** what the player put in: a price per car and a design, a car to show, a bid */ price?: number; designId?: string; carId?: number; bid?: number; fee?: number;
   /** the day the outcome is known */ resolves?: DateStr }
 export interface ChanceData { tender: { /** working vehicles delivered within `recordDays` that a small and a large tender ask for */ record: [number, number]; recordDays: number; refPrice: [number, number]; buildDaysPerCar: number; deposit: number; hours: number };
-  show: { fee: number[]; awareness: number[]; prizeAt: number; hours: number }; clearance: { mult: number[]; graceDays: number }; auction: { value: number[]; tools: number[]; maxBonus: number; hours: number } }
+  show: { fee: number[]; awareness: number[]; prizeAt: number; hours: number; /** how far reputation moves toward the car shown, per importance */ share: number; /** people a prize sends, per importance */ referrals: number[] }; clearance: { mult: number[]; graceDays: number }; auction: { value: number[]; tools: number[]; maxBonus: number; hours: number } }
 const at = (a: number[], importance: number) => a[Math.min(a.length - 1, importance - 1)]!, clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
 export class Chances {
@@ -60,7 +60,7 @@ export class Chances {
         else { c.state = 'lost'; a.raise('tender_result', 'notice', { chanceId: c.id, won: false }); } }
       if (c.kind === 'show') { const car = g.shop.cars.find(x => x.id === c.carId), q = car?.quality.visible ?? 40, gain = at(D.show.awareness, c.importance) * clamp(q / 60, 0.4, 1.6), prize = q >= D.show.prizeAt + (a.rng.float() - 0.5) * 16;
         this.sales.known(gain, c.importance >= 4 ? gain / 2 : 0);
-        this.sales.exhibit(q, 0.03 * c.importance); if (prize) { this.sales.refer('박람회', 1 + (c.importance >= 5 ? 1 : 0)); this.note(Math.min(6, c.importance + 1), '읍내 공방 차, 박람회서 상 받아', 'prize:' + c.id); }
+        this.sales.exhibit(q, D.show.share * c.importance); if (prize) { this.sales.refer('박람회', at(D.show.referrals, c.importance)); this.note(Math.min(6, c.importance + 1), '읍내 공방 차, 박람회서 상 받아', 'prize:' + c.id); }
         c.state = prize ? 'won' : 'done'; a.raise('show_result', 'notice', { chanceId: c.id, prize, awareness: Math.round(gain * 10) / 10, quality: q }); }
       if (c.kind === 'auction') { const value = at(D.auction.value, c.importance) * (0.8 + a.rng.float() * 0.4), rival = value * (0.5 + a.rng.float() * 0.7), won = c.bid! >= rival && g.ledger.cash >= c.bid!;
         if (won) { post(a, 'tools', -c.bid!, c.headline); this.shop.improveTools(at(D.auction.tools, c.importance), D.auction.maxBonus); }

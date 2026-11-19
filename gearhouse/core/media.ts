@@ -59,7 +59,7 @@ export class Media {
     S.coming = S.coming.filter(x => x.due > a.date);
     for (const pub of this.data.publications) { if (pub.kind !== 'newspaper' || weekday(a.date) !== pub.weekday) continue;
       const last = S.issues.filter(i => i.publication === pub.id).at(-1)?.date ?? addDays(a.date, -7), sup = Object.entries(g.supply.suppliers).filter(([, s]) => !s.closed).map(([id, s]) => ({ id, name: this.supplierNames[id] ?? id, known: s.known, materials: this.supply.sells(id).map(p => PART_KO[p]).filter((x): x is string => !!x) }));
-      const person = makeName(a.rng, this.names, 'm'), facts = { town: this.town, person: `${person.given} ${person.family}` };
+      const names = Array.from({ length: 10 }, () => { const n = makeName(a.rng, this.names, 'm'); return `${n.given} ${n.family}`; }), facts = { town: this.town, person: names[0]!, persons: names.join('|') };   // a different neighbour in each item
       this.press.staff(a.rng, pub.id, a.date); this.register.found(a.rng, this.names, a.date);
       // names in general items come from the register: only banks, factories and makers that still exist
       const words = { ...this.fiction.words }; for (const [list, kind] of [['bank', 'bank'], ['factory', 'factory'], ['rival', 'rival']] as const) { words[list] = this.register.alive(kind).map(e => e.name); }

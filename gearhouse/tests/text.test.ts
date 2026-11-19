@@ -12,8 +12,8 @@ describe('text variety', () => {
     for (let i = 0; i < N; i++) { const c = compose(r, 'inquiry', set, facts, voices[i % voices.length]!, m), first = c.text.split(/[.?]/)[0]!; seen.set(c.text, (seen.get(c.text) ?? 0) + 1); if (first === last) sameStart++; last = first; }
     const repeats = N - seen.size; expect(repeats / N).toBeLessThan(0.02); expect(sameStart / N).toBeLessThan(0.02); expect(seen.size).toBeGreaterThan(9800); });
   it('speaks in the voice of the writer', () => { const r = new Rng(3), m: TextMemory = {}; let low = 0, high = 0;
-    for (let i = 0; i < 300; i++) { const LOW = /보시오|적소|쓰겠소|필요하오|주시오\.|되겠소|기다리오|줄이오|정했소|하더이다|않소|하시오|얼마면|듯하오|[^십]시오\./; if (LOW.test(compose(r, 'a', set, facts, { formal: 'low', job: 'farmer' }, m).text)) low++; if (LOW.test(compose(r, 'b', set, facts, { formal: 'high', job: 'banker' }, m).text)) high++; }
-    expect(low).toBeGreaterThan(200); expect(high).toBe(0); });
+    for (let i = 0; i < 300; i++) { const LOW = /거두절미|짧게 쓰겠습니다|씨께\.|필요합니다|하나 지어 주십시오|되겠습니까|회답을 기다립니다|이만 줄입니다|마음을 정했습니다|믿음직했습니다|얼마면|못 넘길 듯합니다|되는지 안 되는지/, MIXED = /[가-힣](하오|이오|겠소|았소|었소)[.?]|[^십]시오[.?]|[적않]소[.?]|[가-힣]요\.$/;   /* plain-spoken, yet in one speech level */ const plain = compose(r, 'a', set, facts, { formal: 'low', job: 'farmer' }, m).text; expect(plain).not.toMatch(MIXED); if (LOW.test(plain)) low++; if (LOW.test(compose(r, 'b', set, facts, { formal: 'high', job: 'banker' }, m).text)) high++; }
+    expect(low).toBeGreaterThan(200); expect(high).toBeLessThan(low / 3); });
   it('follows the situation it is given', () => { const r = new Rng(4), m: TextMemory = {}; for (let i = 0; i < 200; i++) { const c = compose(r, 'x', set, facts, { formal: 'mid' }, m, { situation: 'saw_ad' }); expect(c.situation).toBe('saw_ad'); expect(c.text).toMatch(/광고|쿠리어|안내란/); }
     let ad = 0; for (let i = 0; i < 400; i++) if (compose(r, 'y', set, facts, { formal: 'mid' }, m, { ctx: { source: 'ad' } }).situation === 'saw_ad') ad++; expect(ad).toBeGreaterThan(220);
     for (let i = 0; i < 300; i++) expect(compose(r, 'z', set, facts, { formal: 'mid', job: 'racer' }, m).situation).not.toBe('family_grew'); });

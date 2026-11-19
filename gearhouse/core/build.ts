@@ -82,7 +82,7 @@ export class Shop {
   private stepQuality(a: Api, t: Task, st: StepData, bs: BuildStep): number { const g = a.g; let hours = 0, skill = 0;
     for (const [who, h] of Object.entries(t.by ?? {})) { const p = g.people[who === 'founder' ? g.founderId ?? '' : who]; hours += h; skill += h * (p?.skills[st.skill] ?? 50); }
     const s = hours ? skill / hours : 50, tired = g.founder.fatigue > 0 ? 5 : 0;
-    return Math.round(Math.max(5, Math.min(99, s * 0.6 + (bs.material ?? 65) * 0.3 + Math.min(95, this.data.toolLevel + (a.g.shop.toolBonus ?? 0)) * 0.1 - tired + (a.rng.float() - 0.5) * 12))); }
+    return Math.round(Math.max(5, Math.min(99, s * 0.55 + (bs.material ?? 65) * 0.3 + Math.min(95, this.data.toolLevel + (a.g.shop.toolBonus ?? 0)) * 0.15 - tired + (a.rng.float() - 0.5) * 12))); }
   private wageCost(t: Task): number { const g = this.sim.g; let c = 0; for (const [who, h] of Object.entries(t.by ?? {})) { const e = g.employees.find(x => x.personId === who); if (e) c += h * e.wage / (this.sim.employeeHours * 6); } return Math.round(c * 100) / 100; }
 
   private complete(a: Api, b: Build, d: Design): void { const g = a.g, defects: Defect[] = []; let vis = 0, vw = 0, hid = 0, hw = 0, cost = 0, own = 0;

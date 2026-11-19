@@ -13,7 +13,7 @@ import { active, beginBoost, mult, plus, DEMAND_RANGE } from './conditions';
 export type Field = 'quality' | 'performance' | 'style' | 'trust' | 'value';
 export interface CustomerType { id: string; weight: number; age: [number, number]; standing: [number, number]; budget: Record<OrderType, [number, number]>; orderTypes: Record<OrderType, number>; bodies: string[]; priorities: Field[]; temper: [number, number]; patience: [number, number] }
 export interface SalesData { customerTypes: CustomerType[]; mustHaves: string[]; rates: { adClassified: number; adEighth: number; adQuarter: number; walkInPerAwareness: number; phoneBonus: number }; adCost: { classified: number; eighth: number; quarter: number };
-  mailDays: number; depositRate: [number, number]; maxRounds: number; satisfaction: Record<'spec' | 'quality' | 'performance' | 'delivery' | 'value' | 'qualityMid', number>; breakdownPerDayPerDefect: number; warrantyDays: number;
+  mailDays: number; depositRate: [number, number]; maxRounds: number; /** talks a customer will sit through before a quote (one more after each round of haggling) */ maxConsults: number; satisfaction: Record<'spec' | 'quality' | 'performance' | 'delivery' | 'value' | 'qualityMid', number>; breakdownPerDayPerDefect: number; warrantyDays: number;
   /** satisfaction from which a customer sends friends */ pleasedAt: number;
   /** how much the average reputation moves the number of inquiries: at +100 they are multiplied by 1 + this */ reputationPull: number }
 export interface EconomyData { demand: Record<string, number>; cannotPay: Record<string, number> }
@@ -23,7 +23,7 @@ export interface Customer { id: number; personId: string; type: string; standing
   /** days from the inquiry by which the car is wanted */
   wantDays: number; patience: number; temper: number; channel: Channel; source: Source; referredBy?: string;
   /** the bank this customer keeps their money in (town register) */ bankId?: string }
-export interface Inquiry { id: number; customerId: number; received: DateStr; letter: string; revealed: { budget: boolean; mustHave: boolean }; rounds: number; state: 'open' | 'quoted' | 'ordered' | 'lost'; quote?: QuoteOffer; counter?: { price: number; due: DateStr } }
+export interface Inquiry { id: number; customerId: number; received: DateStr; letter: string; revealed: { budget: boolean; mustHave: boolean }; /** talks held so far */ consults?: number; rounds: number; state: 'open' | 'quoted' | 'ordered' | 'lost'; quote?: QuoteOffer; counter?: { price: number; due: DateStr } }
 export interface QuoteOffer { designId: string; price: number; due: DateStr; depositRate: number; rough?: boolean; meets: string[] }
 export interface Order { id: number; customerId: number; inquiryId: number; designId: string; price: number; deposit: number; placed: DateStr; due: DateStr; meets: string[]; state: 'building' | 'delivered' | 'cancelled'; lateTold?: boolean; /** working days the weather stopped the work: nobody counts these as late */ excusedDays?: number; /** the customer was asked once for more time */ askedDelay?: boolean; payDelayUntil?: DateStr; carId?: number }
 export interface SoldCar { carId: number; orderId: number; customerId: number; delivered: DateStr; satisfaction: number }
@@ -74,8 +74,10 @@ export class Sales {
   placeAdvert(size: Advert['size'], weeks: number, medium = 'town_weekly'): void { const a = this.sim.api(); post(a, 'advertising', -Math.round(this.data.adCost[size] * weeks * mult(a.g, 'ad_cost') * 100) / 100, medium); this.M.adverts.push({ medium, size, from: a.date, until: addDays(a.date, weeks * 7) }); a.bus.emit('ad_placed', { medium, size, weeks }); }
 
   /** talk it through: an hour or two of the founder's time may bring out the budget and the must-haves */
-  consult(inquiryId: number): Inquiry { const q = this.inquiry(inquiryId), g = this.sim.g, sales = g.founderId ? g.people[g.founderId]!.skills.sales ?? 30 : 30, r = this.sim.rng;
-    this.sim.addTask({ id: `consult:${q.id}:${q.rounds}:${g.clock.date}`, label: 'consultation', skill: 'sales', hoursNeeded: 1.5, quiet: true });
+  consult(inquiryId: number): Inquiry { const q = this.inquiry(inquiryId), g = this.sim.g, sales = g.founderId ? g.people[g.founderId]!.skills.sales ?? 30 : 30, r = this.sim.rng, n = q.consults ?? 0;
+    if (q.state !== 'open') throw new Error('this inquiry is not open for talks'); if (q.revealed.budget && q.revealed.mustHave) throw new Error('there is nothing more to ask');
+    if (n >= this.data.maxConsults + q.rounds) throw new Error('the customer has said all they will say for now'); q.consults = n + 1;
+    this.sim.addTask({ id: `consult:${q.id}:${n}:${g.clock.date}`, label: 'consultation', skill: 'sales', hoursNeeded: 1.5, quiet: true });
     if (r.float() < 0.45 + sales / 180) q.revealed.mustHave = true; if (r.float() < 0.25 + sales / 160) q.revealed.budget = true; return q; }
   /** what the player may see of a customer */
   view(inquiryId: number): { name: string; type: string; body: string; orderType: OrderType; letter: string; budget?: [number, number]; mustHave?: string[]; wantBy: DateStr } { const q = this.inquiry(inquiryId), c = this.customer(q.customerId);

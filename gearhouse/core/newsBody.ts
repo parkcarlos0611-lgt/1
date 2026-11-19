@@ -6,7 +6,7 @@ import { fill, tierOf, type FictionData, type NewsItem, type Relation, type Slan
 
 export interface Voice { id: string; label: string; beats: Relation[]; slants: Slant[]; style?: 'archaic' | 'terse'; /** importance this voice writes: [from, to] */ importance: [number, number]; /** turns of phrase this voice puts in place of the plain ones */ swaps?: [string, string][]; vo: string[]; va: string[]; vc: string[] }
 export interface BodyData { frames: Record<string, string[][]>; X: Record<Relation, Record<Slant, string[]>>; O: Record<Slant, string[]>; P: Record<Slant, string[]>; Q: string[]; words: Record<string, string[]>;
-  topics: Record<string, { speakers: string[]; say: string[] } & Record<Tier, { L: string[]; D: string[]; N: string[] }>>; voices: Voice[] }
+  topics: Record<string, { speakers: string[]; say: string[]; /** for each thing said, the speakers (by index) who could say it; empty for anyone */ by?: string[] } & Record<Tier, { L: string[]; D: string[]; N: string[] }>>; voices: Voice[] }
 export interface Body { sentences: string[]; text: string; voice: string; frame: number }
 
 export function writeBody(item: NewsItem, data: BodyData, fiction: FictionData, town: string): Body | null {
@@ -19,7 +19,7 @@ export function writeBody(item: NewsItem, data: BodyData, fiction: FictionData, 
   const left: Record<string, string[]> = { L: [...facts.L], D: [...facts.D], N: [...facts.N], X: [...data.X[item.relation][slant]], O: [...data.O[slant]], P: [...data.P[slant]], Q: [...data.Q], vo: [...voice.vo], va: [...voice.va], vc: [...voice.vc] };
   const out: string[] = [];
   for (const el of frame) { const pool = left[el]; if (!pool?.length) continue; const pat = pool.splice(rng.int(0, pool.length - 1), 1)[0]!;   // no sentence twice in one article
-    if (el === 'Q') { delete bound.speaker; delete bound.say; }                                                                      // a second quotation is another speaker
+    if (el === 'Q') { const i = rng.int(0, T.say.length - 1), who = (T.by?.[i] ?? '').split('').map(c => T.speakers[+c]!).filter(Boolean), can = who.length ? who : T.speakers; bound.say = T.say[i]!; bound.speaker = can[rng.int(0, can.length - 1)]!; }                                                                      // a second quotation is another speaker
     out.push(fill(rng, pat, words, slots, imp, bound, slant)); }
   if (item.slots?.before && item.slots.beforeHeadline) out.splice(Math.min(2, out.length), 0, `본지가 ${item.slots.before} "${item.slots.beforeHeadline.split(/[…—(\[]/)[0]!.trim()}"라고 전한 데 이은 일이다.`);   // the paper remembers
   if (item.quirk?.short && out.length > 3) out.splice(out.length - 2, 1); if (item.quirk?.word && out.length > 1) out[1] = `${item.quirk.word} ${out[1]}`;

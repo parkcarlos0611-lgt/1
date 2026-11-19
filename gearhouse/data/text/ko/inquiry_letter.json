@@ -137,19 +137,19 @@
     "formal": "mid"
    },
    {
-    "t": "안녕하시오.",
+    "t": "안녕하십니까.",
     "formal": "low"
    },
    {
-    "t": "{founder} 씨 보시오.",
+    "t": "{founder} 씨께.",
     "formal": "low"
    },
    {
-    "t": "거두절미하고 적소.",
+    "t": "거두절미하고 적습니다.",
     "formal": "low"
    },
    {
-    "t": "바쁘실 테니 짧게 쓰겠소.",
+    "t": "바쁘실 테니 짧게 쓰겠습니다.",
     "formal": "low"
    }
   ],
@@ -171,11 +171,11 @@
     "job": "banker"
    },
    {
-    "t": "{town} 밖에서 농사짓는 {customer:이요/요}.",
+    "t": "{town} 밖에서 농사짓는 {customer}입니다.",
     "job": "farmer"
    },
    {
-    "t": "나는 {town} 서쪽에서 옥수수를 기르는 {customer:이라/라} 하오.",
+    "t": "저는 {town} 서쪽에서 옥수수를 기르는 {customer}입니다.",
     "job": "farmer"
    },
    {
@@ -239,7 +239,7 @@
     "situation": "saw_ad"
    },
    {
-    "t": "신문 광고를 보고 적소.",
+    "t": "신문 광고를 보고 적습니다.",
     "situation": "saw_ad",
     "formal": "low"
    },
@@ -260,7 +260,7 @@
     "situation": "friend_car"
    },
    {
-    "t": "{friend:이/가} 타는 차를 얻어 탔다가 마음을 정했소.",
+    "t": "{friend:이/가} 타는 차를 얻어 탔다가 마음을 정했습니다.",
     "situation": "friend_car",
     "formal": "low"
    },
@@ -273,7 +273,7 @@
     "situation": "passing"
    },
    {
-    "t": "지나다 보니 일하는 모양새가 믿음직하더이다.",
+    "t": "지나다 보니 일하는 모양새가 믿음직했습니다.",
     "situation": "passing",
     "formal": "low"
    },
@@ -286,7 +286,7 @@
     "situation": "old_car_worn"
    },
    {
-    "t": "타던 차가 {=old_car_trouble} 올봄을 못 넘길 듯하오.",
+    "t": "타던 차가 {=old_car_trouble} 올봄을 못 넘길 듯합니다.",
     "situation": "old_car_worn",
     "formal": "low"
    },
@@ -340,7 +340,7 @@
     "job": "doctor"
    },
    {
-    "t": "밭둑길을 매일 다니니 차가 남아나질 않소.",
+    "t": "밭둑길을 매일 다니니 차가 남아나질 않습니다.",
     "situation": "bad_roads",
     "job": "farmer"
    }
@@ -362,11 +362,11 @@
     "t": "{body} 한 대를 부탁드리려 합니다."
    },
    {
-    "t": "{body:이/가} 필요하오.",
+    "t": "{body:이/가} 필요합니다.",
     "formal": "low"
    },
    {
-    "t": "{body} 하나 지어 주시오.",
+    "t": "{body} 하나 지어 주십시오.",
     "formal": "low"
    },
    {
@@ -417,11 +417,11 @@
     "t": "급한 일은 아니나 {season:을/를} 넘기지는 않았으면 합니다."
    },
    {
-    "t": "{must:은/는} 꼭 넣어 주시오.",
+    "t": "{must:은/는} 꼭 넣어 주십시오.",
     "formal": "low"
    },
    {
-    "t": "{season}까지 되겠소?",
+    "t": "{season}까지 되겠습니까?",
     "formal": "low"
    },
    {
@@ -470,11 +470,11 @@
     "t": "은행 일이 어수선하여 큰돈을 묶어 두기는 조심스럽습니다."
    },
    {
-    "t": "값만 맞으면 바로 맡기겠소.",
+    "t": "값만 맞으면 바로 맡기겠습니다.",
     "formal": "low"
    },
    {
-    "t": "얼마면 되겠소?",
+    "t": "얼마면 되겠습니까?",
     "formal": "low"
    },
    {
@@ -502,15 +502,15 @@
     "t": "그럼 이만 줄입니다."
    },
    {
-    "t": "회답을 기다리오.",
+    "t": "회답을 기다립니다.",
     "formal": "low"
    },
    {
-    "t": "되는지 안 되는지만 알려 주시오.",
+    "t": "되는지 안 되는지만 알려 주십시오.",
     "formal": "low"
    },
    {
-    "t": "이만 줄이오.",
+    "t": "이만 줄입니다.",
     "formal": "low"
    },
    {
@@ -565,5 +565,6 @@
    "작년 가을 일로 손해를 보아",
    "세상이 뒤숭숭하여"
   ]
- }
+ },
+ "note_speech": "Every part is written in one speech level (합니다체); bluntness, not a different verb ending, marks a plain-spoken customer."
 }

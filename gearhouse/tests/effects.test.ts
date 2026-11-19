@@ -42,7 +42,7 @@ describe('passing conditions', () => {
     expect(b.lead).toBe(a.lead * 2); expect(b.quality).toBeLessThan(a.quality - 20);
     const late = newWorld(2, FOUNDER); cond(late, { kind: 'supplier_reliability', value: 0 }); late.supply.directory(); const s = late.supply.sellers('glass_set')[0]!; late.supply.inquire(s.id, [{ part: 'glass_set', qty: 1 }], 'mail');
     late.supply.order(until(late, 'supplier_quote', 30).payload.quoteId as number); until(late, 'delivery_delayed', 120);
-    const w = newWorld(2, FOUNDER), g = w.sim.g, cost = (kind: string) => g.ledger.entries.filter(e => e.kind === kind).map(e => e.amount);
+    const w = newWorld(2, FOUNDER), g = w.sim.g; g.weather.graceUntil = FAR; /* no cold wave on the bill */ const cost = (kind: string) => g.ledger.entries.filter(e => e.kind === kind).map(e => e.amount);
     w.sales.placeAdvert('eighth', 2); cond(w, { kind: 'ad_cost', value: 1.5 }); cond(w, { kind: 'utilities', value: 2 }); w.sales.placeAdvert('eighth', 2); days(w, 40);
     expect(cost('advertising')).toEqual([-DATA.sales.adCost.eighth * 2, -DATA.sales.adCost.eighth * 3]); expect(cost('utilities')[0]).toBe(-DATA.finance.utilitiesPerMonth * 2); });
   it('come from the papers some weeks later, leave their cause in the journal, and survive a save', () => { let landed = 0, kinds = new Set<string>();

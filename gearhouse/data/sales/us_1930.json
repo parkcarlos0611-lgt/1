@@ -433,5 +433,6 @@
  "breakdownPerDayPerDefect": 0.004,
  "warrantyDays": 365,
  "pleasedAt": 50,
- "reputationPull": 1.5
+ "reputationPull": 1.5,
+ "maxConsults": 2
 }

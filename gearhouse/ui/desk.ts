@@ -30,7 +30,9 @@ const short = (d: string) => { const p = parts(d); return `${p.month}/${p.day}`;
 let w: World | null = null, tab: 'tray' | 'papers' | 'plan' | 'book' = 'tray', speed = 0, dayPart = 0, lastTick = 0, openIssue: number | null = null, openItem: number | null = null, toastT = 0;
 const store = { get: () => { try { return localStorage.getItem(KEY); } catch { return null; } }, set: (v: string) => { try { localStorage.setItem(KEY, v); } catch { /* private window */ } }, clear: () => { try { localStorage.removeItem(KEY); } catch { /* same */ } } };
 const g = () => w!.sim.g;
-function toast(text: string) { const t = $('#toast'); t.textContent = text; t.classList.add('on'); clearTimeout(toastT); toastT = window.setTimeout(() => t.classList.remove('on'), 2600); }
+const SAY: [RegExp, string][] = [[/nothing more to ask/, '더 물을 것이 없다.'], [/all they will say/, '손님이 더는 말을 아낀다. 견적을 보낼 때다.'], [/not open for talks/, '지금은 상담할 수 없다.'], [/already asked/, '이미 한 번 청했다.'], [/will not haggle/, '손님이 더는 흥정하지 않는다.'], [/no more haggling/, '더는 흥정할 수 없다.'],
+  [/not known yet/, '아직 모르는 가게다.'], [/no telephone/, '전화가 없다.'], [/drawer is full/, '서랍이 가득 찼다.'], [/owner will not lend/, '주인이 차를 빌려주지 않는다.'], [/no record of working/, '납품 실적이 없어 서류를 받아 주지 않는다.'], [/too late/, '기한이 지났다.'], [/not read/, '그 신문을 읽지 않았다.'], [/design not ready/, '설계가 아직 끝나지 않았다.']];
+function toast(text: string) { text = SAY.find(([re]) => re.test(text))?.[1] ?? text; const t = $('#toast'); t.textContent = text; t.classList.add('on'); clearTimeout(toastT); toastT = window.setTimeout(() => t.classList.remove('on'), 2600); }
 /** thrown by an action that has already redrawn the screen itself */
 class Skip extends Error {}
 function attempt(f: () => void) { try { f(); } catch (e) { if (e instanceof Skip) return; toast(String((e as Error).message)); } render(); }
@@ -95,7 +97,7 @@ function detail(i: Incident): string { const P = i.payload as Record<string, any
       const state = q.state === 'open' ? '' : `<p class="tag">${q.state === 'quoted' ? '견적을 보냈다. 답을 기다린다.' : q.state === 'ordered' ? '주문이 되었다.' : '끝난 문의다.'}</p>`;
       return `${head}<blockquote class="letter">${esc(v.letter)}</blockquote><dl><dt>손님</dt><dd>${esc(v.name)}</dd><dt>원하는 차</dt><dd>${BODY[v.body] ?? v.body} · ${ORDER[v.orderType]}</dd><dt>받고 싶은 날</dt><dd>${dateKo(v.wantBy)}</dd>
         <dt>예산</dt><dd>${v.budget ? `${money(v.budget[0])} ~ ${money(v.budget[1])}` : '아직 모른다'}</dd><dt>꼭 원하는 것</dt><dd>${v.mustHave ? (v.mustHave.map(m => MUST[m] ?? m).join(', ') || '없다') : '아직 모른다'}</dd></dl>${state}
-        ${q.state === 'open' && open ? `<div class="row"><button data-do="consult" data-id="${q.id}">상담한다 (1.5시간)</button></div>
+        ${q.state === 'open' && open ? `<div class="row"><button data-do="consult" data-id="${q.id}" ${(v.budget && v.mustHave) || (q.consults ?? 0) >= DATA.sales.maxConsults + q.rounds ? 'disabled' : ''}>${v.budget && v.mustHave ? '더 물을 것이 없다' : (q.consults ?? 0) >= DATA.sales.maxConsults + q.rounds ? '손님이 더는 말을 아낀다' : `상담한다 (1.5시간, ${DATA.sales.maxConsults + q.rounds - (q.consults ?? 0)}번 남음)`}</button></div>
         <fieldset><legend>견적 보내기</legend><label>설계 <select id="q-design">${DESIGNS.map(d => `<option value="${d[0]}" ${d[0] === def ? 'selected' : ''}>${d[2]}</option>`).join('')}</select></label>
         <p class="hint">자재 값 약 ${money(cost)}, 작업 약 ${Math.round(hours)}시간. 설계 화면은 다음 차례에 나온다.</p>
         <label>값 ($) <input id="q-price" type="number" min="50" step="5" value="${Math.round((v.budget ? v.budget[1] * 0.96 : cost * 1.25 + hours * 0.85) / 5) * 5}"></label>

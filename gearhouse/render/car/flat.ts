@@ -1,7 +1,7 @@
 // Car body rasteriser in the first build's manner: few flat tones per material (5 steps), a dark outline drawn
 // only where a part meets the background or a part behind it, narrow dithering at tone steps, chunky window
 // frames. Same design data as raster.ts; parts are drawn strictly in their layer order.
-import type { CarDesign, Detail, ElementSkin, Feature, Material, Panel, Pt, WheelSpec } from './types';
+import type { CarDesign, Detail, ElementDecals, ElementSkin, Feature, Material, Panel, Pt, WheelSpec } from './types';
 import { coverage, smoothClosed, smoothOpen } from './geom';
 import type { CarImage } from './raster';
 import { expandParts } from './parts';
@@ -32,6 +32,8 @@ const fixed = (c: string[], o: string): Ramp => ({ c: c.map(hex), o: hex(o) });
 function glossy(r: Ramp): Ramp { const t = r.c.at(-1)!, sky: RGB = [196, 204, 200]; return { c: [...r.c, t.map((v, i) => Math.round(v * 0.62 + sky[i]! * 0.38)) as RGB], o: r.o }; }
 /** the tone steps a paint colour is drawn with, darkest first (tools fit a reference view to these) */
 export const paintRamp = (paint: string): string[] => glossy(autoRamp(paint, { steps: 7, baseIdx: 3, dL: 0.075, shift: 0.06 })).c.map(c => '#' + c.map(v => v.toString(16).padStart(2, '0')).join(''));
+/** every material's tone steps for a paint colour, darkest first, as the renderer draws them (tools fit views to these) */
+export const gameRamps = (paint: string): Record<string, string[]> => Object.fromEntries(Object.entries(palette({ paint, paint2: paint } as CarDesign)).map(([k, r]) => [k, r.c.map(c => '#' + c.map(v => v.toString(16).padStart(2, '0')).join(''))]));
 function palette(d: CarDesign): Record<Material, Ramp> {
   return { paint: glossy(autoRamp(d.paint, { steps: 7, baseIdx: 3, dL: 0.075, shift: 0.06 })), paint2: glossy(autoRamp(d.paint2, { steps: 7, baseIdx: 3, dL: 0.075, shift: 0.06 })),
     rubber: fixed(['#16141b', '#24222b', '#36343f', '#4f4d59', '#6e6c78'], '#0b0a0f'), chrome: fixed(['#2a3047', '#56627e', '#93a3bb', '#cfd9e6', '#ffffff'], '#171b2a'),
@@ -57,7 +59,7 @@ export function rasterizeFlat(d0: CarDesign, opt: { frameW?: number; shadow?: bo
   const ids: string[] = [];
   // ---- method ZY: the reference view's own detail on each element, where the view shows it ----
   const SK = d.skin, skinRGB = new Int32Array(N).fill(-1), skRamp: Partial<Record<Material, RGB[]>> = {};
-  if (SK) { for (const [k, v] of Object.entries(SK.tones)) skRamp[k as Material] = v!.map(hex); const n = skRamp.paint?.length ?? 8;
+  if (SK && !SK.common) { for (const [k, v] of Object.entries(SK.tones ?? {})) skRamp[k as Material] = v!.map(hex); const n = skRamp.paint?.length ?? 8;
     if (d.paint.toLowerCase() !== SK.paint.toLowerCase()) skRamp.paint = autoRamp(d.paint, { steps: n, baseIdx: Math.floor(n * 0.45), dL: 0.52 / n, shift: 0.06 }).c;
     if (skRamp.paint) PAL.paint = { c: skRamp.paint, o: PAL.paint.o }; }
   function applySkin(S: ElementSkin, own: number, x0: number, x1: number, z0: number, z1: number) {
@@ -69,6 +71,17 @@ export function rasterizeFlat(d0: CarDesign, opt: { frameW?: number; shadow?: bo
       let v = cell(sx, sy); if (v < 0) for (const [dx, dy] of [[0, -1], [-1, 0], [1, 0], [0, 1]] as const) { v = cell(sx + dx, sy + dy); if (v >= 0) break; }
       if (v < 0) { if (plain >= 0 && (mat[i] === 'paint' || mat[i] === 'paint2')) lv[i] = plain; continue; }   // not in the view: the element's own usual tone, drawn by the rules
       const m = SK!.materials[v >> 4]!, r = skRamp[m] ?? PAL[m].c, c = r[Math.min(r.length - 1, v & 15)]!; mat[i] = m; skinRGB[i] = (c[0] << 16) | (c[1] << 8) | c[2]; } }
+  /** method Z2: fill each region of an element (even-odd over its rings), mapped from the box it was read in to the element's box now */
+  const DC = d.decals;
+  function applyDecals(D: ElementDecals, own: number, x0: number, x1: number, z0: number, z1: number) {
+    const kx = Math.max(1, x1 - x0) / Math.max(1, D.b[1] - D.b[0]), kz = Math.max(1, z1 - z0) / Math.max(1, D.b[3] - D.b[2]);
+    for (const R of D.r) { const ramp = PAL[R.m].c, c = ramp[Math.min(ramp.length - 1, R.l)]!, rgb = (c[0] << 16) | (c[1] << 8) | c[2];
+      const rings = R.rings.map(r => { const o: number[] = []; for (let i = 0; i < r.length; i += 2) o.push(X(x0 + (r[i]! - D.b[0]) * kx), Y(z0 + (r[i + 1]! - D.b[2]) * kz)); return o; });
+      let ya = 1e9, yb = -1e9; for (const r of rings) for (let i = 1; i < r.length; i += 2) { ya = Math.min(ya, r[i]!); yb = Math.max(yb, r[i]!); }
+      for (let y = Math.max(0, Math.floor(ya)); y <= Math.min(h - 1, Math.ceil(yb)); y++) { const cy = y + 0.5, xs: number[] = [];
+        for (const r of rings) { const n = r.length / 2; for (let i = 0; i < n; i++) { const ax = r[i * 2]!, ay = r[i * 2 + 1]!, bx = r[((i + 1) % n) * 2]!, by = r[((i + 1) % n) * 2 + 1]!; if ((ay <= cy) !== (by <= cy)) xs.push(ax + (cy - ay) * (bx - ax) / (by - ay)); } }
+        xs.sort((a, b) => a - b);
+        for (let k = 0; k + 1 < xs.length; k += 2) for (let x = Math.max(0, Math.ceil(xs[k]! - 0.5)); x <= Math.min(w - 1, Math.floor(xs[k + 1]! - 0.5)); x++) { const i = y * w + x; if (owner[i] !== own) continue; mat[i] = R.m; skinRGB[i] = rgb; } } } }
   const boxMM = (pts: Pt[]) => { let a = 1e9, b = -1e9, c = 1e9, e = -1e9; for (const q of pts) { a = Math.min(a, q[0]); b = Math.max(b, q[0]); c = Math.min(c, q[1]); e = Math.max(e, q[1]); } return [a, b, c, e] as const; };
   const shift = (m: Material) => (PAL[m].c.length - 5) >> 1;
   const set = (x: number, y: number, m: Material, l: number, ly: number, id = -1) => { if (x < 0 || y < 0 || x >= w || y >= h) return; const i = y * w + x; if (ly >= 1e6 && skinRGB[i]! >= 0) return; skinRGB[i] = -1; mat[i] = m; lv[i] = Math.max(0, Math.min(PAL[m].c.length - 1, Math.max(0, Math.min(4, l)) + shift(m))); layer[i] = ly; if (id >= 0) owner[i] = id; };
@@ -82,7 +95,7 @@ export function rasterizeFlat(d0: CarDesign, opt: { frameW?: number; shadow?: bo
   items.sort((a, b) => zOf(a) - zOf(b));
   const glassMasks: { m: Uint8Array; bx: number; by: number; bw: number; bh: number; ly: number; id: number }[] = [];
   items.forEach((it, ly) => {
-    if (it.k === 'w') { const wi = ids.push('wheel') - 1, s = it.s, S = SK?.elements['wheel' + d.wheels.indexOf(s)], zc = s.z ?? s.r; drawWheel(s, ly, wi); if (S && S.sig === s.style + ':' + (s.whitewall ?? 0)) applySkin(S, wi, s.x - s.r, s.x + s.r, zc - s.r, zc + s.r); return; }
+    if (it.k === 'w') { const wi = ids.push('wheel') - 1, s = it.s, S = SK?.elements['wheel' + d.wheels.indexOf(s)], zc = s.z ?? s.r; drawWheel(s, ly, wi); const sig = s.style + ':' + (s.whitewall ?? 0); if (S && S.sig === sig) applySkin(S, wi, s.x - s.r, s.x + s.r, zc - s.r, zc + s.r); const D = DC?.['wheel' + d.wheels.indexOf(s)]; if (D && D.sig === sig) applyDecals(D, wi, s.x - s.r, s.x + s.r, zc - s.r, zc + s.r); return; }
     const p = it.p, id = ids.push(p.id) - 1, poly = smoothClosed(p.pts).map(([x, z]) => [X(x), Y(z)] as [number, number]);
     let x0 = w, x1 = 0, y0 = h, y1 = 0; for (const [px, py] of poly) { x0 = Math.min(x0, px); x1 = Math.max(x1, px); y0 = Math.min(y0, py); y1 = Math.max(y1, py); }
     const bx = Math.max(0, Math.floor(x0) - 1), by = Math.max(0, Math.floor(y0) - 1), bw = Math.min(w, Math.ceil(x1) + 2) - bx, bh = Math.min(h, Math.ceil(y1) + 2) - by; if (bw <= 0 || bh <= 0) return;
@@ -112,7 +125,7 @@ export function rasterizeFlat(d0: CarDesign, opt: { frameW?: number; shadow?: bo
         set(gx, gyy, mt, l, ly, id); if (shaded >= 0) setRaw(gyy * w + gx, shaded); if (tm && mt !== 'glass') { const tl = toneAt(gx, gyy); if (tl >= 0) setRaw(gyy * w + gx, tl); } if (p.clip) noOutline[gyy * w + gx] = 1; } } }
     if (mt === 'glass') glassMasks.push({ m, bx, by, bw, bh, ly, id });
     if (p.detail) detail(p.detail, M, bx, by, bw, bh, ly, mt);
-    const S = SK?.elements[p.id]; if (S) { const b = boxMM(p.pts); applySkin(S, id, b[0], b[1], b[2], b[3]); }
+    const S = SK?.elements[p.id], D = DC?.[p.id]; if (S || D) { const b = boxMM(p.pts); if (S) applySkin(S, id, b[0], b[1], b[2], b[3]); if (D) applyDecals(D, id, b[0], b[1], b[2], b[3]); }
   });
   // chunky window frames, built on the body around each opening so the glass keeps its measured size:
   // a bright bead or a shadowed reveal next to the glass, the body colour lit or shaded beyond it
@@ -177,7 +190,7 @@ export function rasterizeFlat(d0: CarDesign, opt: { frameW?: number; shadow?: bo
   if (opt.shadow !== false) { const cx = X(d.length / 2), rx = d.length * 0.47 / MM; for (let y = gy - 1; y <= gy + 1; y++) for (let x = Math.floor(cx - rx); x <= cx + rx; x++) { const i = at(x, y); if (i < 0) continue; rgba[i * 4 + 3] = 70; } }
   for (let i = 0; i < N; i++) { const m = mat[i]; if (!m) continue; const R = PAL[m], k = skinRGB[i]!, c = OUTL[i] ? R.o : k >= 0 ? [(k >> 16) & 255, (k >> 8) & 255, k & 255] : R.c[lv[i]!]!; rgba[i * 4] = c[0]!; rgba[i * 4 + 1] = c[1]!; rgba[i * 4 + 2] = c[2]!; rgba[i * 4 + 3] = 255; }
   // where the view's own detail reaches the edge of the car, the outline goes outside it, so none of the detail is lost
-  if (SK && thick > 0) for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const i = y * w + x; if (mat[i] && mat[i] !== 'shadow') continue; let near = false;
+  if ((SK || DC) && thick > 0) for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const i = y * w + x; if (mat[i] && mat[i] !== 'shadow') continue; let near = false;
     for (let dy = -thick; dy <= thick && !near; dy++) for (let dx = -thick; dx <= thick; dx++) { if (Math.abs(dx) + Math.abs(dy) > thick) continue; const j = at(x + dx, y + dy); if (j >= 0 && skinRGB[j]! >= 0) { near = true; break; } }
     if (near) { rgba[i * 4] = 14; rgba[i * 4 + 1] = 13; rgba[i * 4 + 2] = 18; rgba[i * 4 + 3] = 255; } }
   return { w, h, rgba, owner, ms: performance.now() - t0, groundY: gy, X, Y };

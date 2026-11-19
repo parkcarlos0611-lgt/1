@@ -159,3 +159,9 @@ These decisions still hold, from `legacy/docs/MASTER_GAME_PLAN.md`:
 - Where an element has no cell (behind a fender or a lamp), the game draws it by its rules in the element's usual tone. A part exchanged for another form, and a wheel of another kind, are drawn by the rules too.
 - Sedan, against its view: colour difference 6.2 (Y 5.6, Z 24.4); a tenth longer, repainted, lamps and wheels exchanged and elements pulled apart all hold.
 - The capture now leaves wheel arches open, which ends paint running into the tyres on a repaint.
+
+## 2026-11-19 — ZY2 and Z2 (review 21)
+
+- ZY2: element skins on the game's own ramps (each tone of the view to the ramp step nearest in lightness), hidden paint carried on smoothly, a mostly hidden wheel taking the detail of the wheel the view shows best, lone cells cleaned, badges and lettering on hub caps removed. Z2: the same detail as shapes per element (tools/ref/decals.py), drawn afresh at any scale.
+- On the three samples both pass longer, repaint, lamps and wheels from another car, pulled apart, 7 and 15 mm/px; colour difference 11-18 against the view. ZY2 is a third the size; Z2 can be made from it at any time. Proposed: ZY2 as the stored form (review 21, awaiting decision).
+- Capture: chrome keeps the body colour in its reflections; a low-saturation paint no longer takes chrome as paint. Method Z build steps are shared (zkit.build); a second paint tone keeps its colour.

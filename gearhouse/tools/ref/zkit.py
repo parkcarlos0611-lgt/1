@@ -74,3 +74,43 @@ def split(body_pts, cuts):
                 from shapely.ops import unary_union
                 u = unary_union(gs); pieces[name] = u if u.geom_type == 'Polygon' else max(u.geoms, key=lambda g: g.area)
     return {k: [[int(round(x)), int(round(z)), 1] for x, z in list(g.exterior.coords)[:-1]] for k, g in pieces.items()}
+
+def ext(line, by=160):
+    """a cut line made longer at both ends along its end segments, so it surely crosses the shell"""
+    a, b = np.array(line[0][:2], float), np.array(line[1][:2], float); c, e = np.array(line[-2][:2], float), np.array(line[-1][:2], float)
+    u = (a - b) / np.linalg.norm(a - b); v = (e - c) / np.linalg.norm(e - c); return [list(a + u * by)] + [q[:2] for q in line] + [list(e + v * by)]
+
+def paint_of(png, length, map_json):
+    """the body colour as the view shows it: the middle tone of the pixels a capture calls paint"""
+    import json
+    M = json.load(open(map_json)); w, h = M['w'], M['h']; src = cv2.imread(png, cv2.IMREAD_UNCHANGED); img = cv2.resize(src, (w, h), interpolation=cv2.INTER_AREA)[..., :3][..., ::-1]
+    u = lambda a: np.repeat(np.array(a).reshape(-1, 2)[:, 0], np.array(a).reshape(-1, 2)[:, 1]).reshape(h, w)
+    px = img[(u(M['e']) >= 0) & (u(M['m']) == 0)].astype(float); lum = px @ [0.299, 0.587, 0.114]; sel = px[np.abs(lum - np.percentile(lum, 50)) < 3]
+    return '#%02x%02x%02x' % tuple(np.median(sel, 0).astype(int))
+
+def build(src_body, png, out_id, fits, cuts, rest, surfaces=None, paint=None):
+    """the steps every car takes in method Z: fit the named panels to the view, fit each cut line to the view's dark
+    lines, cut the shell (panel 'body') into elements, drop the shut lines that became element borders.
+    fits: [(panel id, 'sil' | 'edge' | 'grad', reach px)]; cuts: [(piece cut, name on the left, name on the right, line in mm)];
+    rest: the name of what is left of the shell. Returns the design and a log of how far things moved (mm)."""
+    import json, copy
+    d = json.load(open(src_body)); V = View(png, d['length']); P = {p['id']: p for p in d['panels']}; log = {}
+    F = {'sil': V.sil * 3, 'edge': np.maximum(V.sil * 3, V.grad), 'grad': V.grad}
+    for pid, field, reach in fits: P[pid]['pts'], log[pid] = fit_closed(V, P[pid]['pts'], F[field], reach=reach, floor=25)
+    fitted = []
+    for k, (target, left, right, core) in enumerate(cuts):
+        f, log[f'cut {left}'] = fit_open(V, [[x, z, 1] for x, z in core], V.dark, reach=3, floor=4); fitted.append((target, left, right, ext(f)))
+    pieces = split(P['body']['pts'], fitted); pieces[rest] = pieces.pop('_')
+    base = P['body']; out = []; names = [n for _, l, r, _ in fitted for n in (l, r) if n != '_'] + [rest]; names = list(dict.fromkeys(names))
+    for p in d['panels']:
+        if p['id'] != 'body': out.append(p); continue
+        for name in names:
+            q = copy.deepcopy(base); q.update(id=name, pts=pieces[name], surface=(surfaces or {}).get(name, 'side'), element=name.split('.')[1]); q.pop('bevel', None); out.append(q)
+    d['panels'] = out; d['id'] = out_id
+    if paint: d['paint'] = paint                                                  # a second tone (leather, two-tone) keeps its own colour
+    lines = [np.array(c[3], float) for c in fitted]
+    def near_cut(f):
+        pts = np.array([q[:2] for q in f['pts']], float)
+        return all(min(np.min(np.hypot(*(L - p).T)) for L in [np.array([a + (b - a) * t for a, b in zip(l[:-1], l[1:]) for t in np.linspace(0, 1, 12)]) for l in lines]) < 60 for p in pts)
+    d['features'] = [f for f in d['features'] if not (f['kind'] == 'seam' and near_cut(f))]
+    return d, log

@@ -63,7 +63,13 @@ export interface ToneMap { x0: number; z1: number; w: number; h: number; mm: num
  *  read (x0, x1, z0, z1 in mm), `x0`/`z1` the top left of the grid; each cell is material * 16 + tone step, or -1 where
  *  the view does not show the element (run-length coded: value, count). The cells move and stretch with the element. */
 export interface ElementSkin { b: [number, number, number, number]; x0: number; z1: number; w: number; h: number; d: number[]; sig?: string }
-export interface CarSkin { mm: number; paint: string; materials: Material[]; tones: Partial<Record<Material, string[]>>; elements: Record<string, ElementSkin> }
+/** common: the cells are steps of the game's own ramps (tools/ref/skin.py --common), so a car's skin and its parts share
+ *  one palette with every other car and follow any paint; otherwise `tones` are the view's own colours */
+export interface CarSkin { mm: number; paint: string; materials: Material[]; tones?: Partial<Record<Material, string[]>>; common?: boolean; elements: Record<string, ElementSkin> }
+/** Method Z2: what the view shows of an element as shapes, not cells. Each region is one material at one step of the
+ *  game's ramp, as outlines in mm (x, z pairs) read when the element's box was `b`; holes are further rings (even-odd).
+ *  Regions are drawn in order over the element; they stretch with it and are drawn afresh at any scale. */
+export interface ElementDecals { b: [number, number, number, number]; r: { m: Material; l: number; rings: number[][] }[]; sig?: string }
 export interface Landmarks { fx: number; rx: number; r: number; gap: number; cowl: number; cab: number; belt: number; roof: number }
 
 /** details laid on top of the panels */
@@ -125,5 +131,7 @@ export interface CarDesign {
   glassLift?: number;
   /** method ZY: the reference view's detail, element by element (tools/ref/skin.py) */
   skin?: CarSkin;
+  /** method Z2: the view's detail as shapes, element by element (tools/ref/decals.py) */
+  decals?: Record<string, ElementDecals>;
   id?: string;
 }

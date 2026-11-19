@@ -36,11 +36,12 @@ MATS = ['paint', 'paint2', 'chrome', 'glass', 'rubber', 'black', 'lens', 'lensR'
 mat = np.full((h, w), -1, np.int32)
 for k, name in rmat.items():
     sel = mask & (role == k); mat[sel] = MATS.index(name if name in MATS else 'paint')
-painty = (hue < 22) & (Sa > 28) if ps > 40 else (abs(V - pv) < 60) & (Sa < 60)
+painty = (hue < 22) & (Sa > max(28, ps * 0.75)) if ps > 40 else (abs(V - pv) < 60) & (Sa < 60)
 cold = (Sa < 42) & (V > 150) & ~painty                                        # bright and colourless: chrome, or glass
 isglass = mat == MATS.index('glass'); ispaint = (mat == MATS.index('paint')) | (mat == MATS.index('paint2'))
 mat[mask & ispaint & cold & (trim > 0)] = MATS.index('chrome')                # a chrome strip where the hand body has one
-mat[mask & ~ispaint & ~isglass & painty & (V > 40) & (mat != MATS.index('lensR')) & (mat != MATS.index('wood')) & (mat != MATS.index('rubber')) & (mat != MATS.index('paint2'))] = MATS.index('paint')   # body colour showing in a part's box
+strict = (mat != MATS.index('chrome')) | ((Sa > ps * 0.9) & (abs(V - pv) < 40))          # chrome takes the body's colour in its reflections; only plain paint is paint
+mat[mask & ~ispaint & ~isglass & painty & strict & (V > 40) & (mat != MATS.index('lensR')) & (mat != MATS.index('wood')) & (mat != MATS.index('rubber')) & (mat != MATS.index('paint2'))] = MATS.index('paint')   # body colour showing in a part's box
 wheel = role > len(panels)
 for k, wh in enumerate(R['wheels']):                                          # inside a wheel: tyre, painted rim, bright cap, by radius and colour
     yy, xx = np.mgrid[0:h, 0:w]; rr = np.hypot(xx + 0.5 - X(wh['x']), yy + 0.5 - Y(wh['r'])) * MM; me = mask & (role == len(panels) + 1 + k)

@@ -58,7 +58,11 @@
     2,
     4
    ],
-   "slant": "bad"
+   "slant": "bad",
+   "officials": [
+    "상공회 총무",
+    "도매상 지배인"
+   ]
   },
   {
    "id": "price_down",
@@ -93,20 +97,24 @@
     2,
     4
    ],
-   "slant": "good"
+   "slant": "good",
+   "officials": [
+    "상공회 총무",
+    "도매상 지배인"
+   ]
   },
   {
    "id": "road_paving",
    "relation": "essential",
    "low": [
-    "{=road}에 자갈 새로 깐다",
-    "{=road} 패인 곳 메우기로… {=official} \"봄 전에 끝낸다\"",
-    "{=road} 배수로 정비, {=day}부터"
+    "{entity}에 자갈 새로 깐다",
+    "{entity} 패인 곳 메우기로… {=official} \"봄 전에 끝낸다\"",
+    "{entity} 배수로 정비, {=day}부터"
    ],
    "mid": [
-    "{=road} 포장 공사 확정, 예산 {=amount}",
-    "{=official}, {=road} 포장 약속… \"진창길 끝낸다\"",
-    "{=road:과/와} {=road} 잇는 새 길 낸다"
+    "{entity} 포장 공사 확정, 예산 {=amount}",
+    "{=official}, {entity} 포장 약속… \"진창길 끝낸다\"",
+    "{entity} 넓히고 곧게 편다"
    ],
    "high": [
     "주 정부, {town} 잇는 간선도로 전 구간 포장 발표… 예산 {=amount}",
@@ -128,24 +136,30 @@
     4,
     10
    ],
-   "slant": "good"
+   "slant": "good",
+   "entity": "road",
+   "officials": [
+    "군수",
+    "도로 감독",
+    "읍장"
+   ]
   },
   {
    "id": "factory_trouble",
    "relation": "essential",
    "low": [
-    "{=factory}, 근무 시간 줄여",
-    "{=factory}, 토요일 조업 중단",
-    "{=factory} 일감 줄어 {=n} 명 쉬게 해"
+    "{entity}, 근무 시간 줄여",
+    "{entity}, 토요일 조업 중단",
+    "{entity} 일감 줄어 {=n} 명 쉬게 해"
    ],
    "mid": [
-    "{=factory}, {=n} 명 내보내",
-    "{=factory} 절반만 돌린다… {=n} 명 일손 놓아",
-    "{=factory} 임금 깎아, 직공 {=n} 명 반발"
+    "{entity}, {=n} 명 내보내",
+    "{entity} 절반만 돌린다… {=n} 명 일손 놓아",
+    "{entity} 임금 깎아, 직공 {=n} 명 반발"
    ],
    "high": [
-    "{=factory} 문 닫는다… {=n} 명 일자리 잃어",
-    "{=factory} 파산, {=n} 명 거리로… {town} 상가 직격"
+    "{entity} 문 닫는다… {=n} 명 일자리 잃어",
+    "{entity} 파산, {=n} 명 거리로… {town} 상가 직격"
    ],
    "effect": {
     "kind": "demand",
@@ -163,24 +177,30 @@
     2,
     5
    ],
-   "slant": "bad"
+   "slant": "bad",
+   "entity": "factory",
+   "officials": [
+    "공장장",
+    "읍장",
+    "상공회 총무"
+   ]
   },
   {
    "id": "bank_worry",
    "relation": "essential",
    "low": [
-    "{=bank}, 예금 인출 조금 늘어",
-    "{=bank} \"우리 은행은 튼튼하다\" 광고 내",
-    "{=bank} 이사회 {=day} 열려… 소문 진화 나서"
+    "{entity}, 예금 인출 조금 늘어",
+    "{entity} \"우리 은행은 튼튼하다\" 광고 내",
+    "{entity} 이사회 {=day} 열려… 소문 진화 나서"
    ],
    "mid": [
-    "{=bank} 앞에 긴 줄… 은행 측 \"걱정 없다\"",
-    "{=bank}, 인출 한도 두기로",
-    "{=bank} 대출 죄어… 상인들 돈줄 마른다"
+    "{entity} 앞에 긴 줄… 은행 측 \"걱정 없다\"",
+    "{entity}, 인출 한도 두기로",
+    "{entity} 대출 죄어… 상인들 돈줄 마른다"
    ],
    "high": [
-    "{=bank} 문 닫아… 예금 {=amount} 묶여",
-    "{=bank} 지급 정지, 예금주 {=n} 명 발 동동"
+    "{entity} 문 닫아… 예금 {=amount} 묶여",
+    "{entity} 지급 정지, 예금주 {=n} 명 발 동동"
    ],
    "effect": {
     "kind": "demand",
@@ -198,7 +218,13 @@
     1,
     3
    ],
-   "slant": "bad"
+   "slant": "bad",
+   "entity": "bank",
+   "officials": [
+    "은행장",
+    "상공회 총무",
+    "읍장"
+   ]
   },
   {
    "id": "good_season",
@@ -232,7 +258,11 @@
     2,
     6
    ],
-   "slant": "good"
+   "slant": "good",
+   "officials": [
+    "곡물상",
+    "농민회 회장"
+   ]
   },
   {
    "id": "new_supplier",
@@ -249,7 +279,12 @@
    "effect": {
     "kind": "supplier_found"
    },
-   "slant": "neutral"
+   "slant": "neutral",
+   "officials": [
+    "읍장",
+    "군수",
+    "상공회 총무"
+   ]
   },
   {
    "id": "motor_show",
@@ -281,41 +316,57 @@
     3,
     8
    ],
-   "slant": "good"
+   "slant": "good",
+   "officials": [
+    "박람회 위원장",
+    "상공회 총무"
+   ]
   },
   {
    "id": "rival_model",
    "relation": "related",
    "low": [
-    "{=rival}, 내년형 값 {=pct} 내려",
-    "{=rival} 대리점, {=street}에 전시차 들여"
+    "{entity}, 내년형 값 {=pct} 내려",
+    "{entity} 대리점, {=street}에 전시차 들여"
    ],
    "mid": [
-    "{=rival}, 8기통 신형 내놓아… 값 {=amount}",
-    "{=rival} 신형 {=n} 대 군내 팔려"
+    "{entity}, 8기통 신형 내놓아… 값 {=amount}",
+    "{entity} 신형 {=n} 대 군내 팔려"
    ],
    "high": [
-    "{=rival}, 전 차종 {=pct} 값 내려 업계 발칵",
-    "{=rival} 새 공장 가동, 하루 {=n} 대 찍는다"
+    "{entity}, 전 차종 {=pct} 값 내려 업계 발칵",
+    "{entity} 새 공장 가동, 하루 {=n} 대 찍는다"
    ],
-   "slant": "neutral"
+   "slant": "neutral",
+   "entity": "rival",
+   "officials": [
+    "읍장",
+    "군수",
+    "상공회 총무"
+   ]
   },
   {
    "id": "rival_trouble",
    "relation": "related",
    "low": [
-    "{=rival} 대리점 문 닫아",
-    "{=rival}, 직공 {=n} 명 쉬게 해"
+    "{entity} 대리점 문 닫아",
+    "{entity}, 직공 {=n} 명 쉬게 해"
    ],
    "mid": [
-    "{=rival}, 배당 거르고 감원 {=n} 명",
-    "{=rival} 채권단 회의… 매각설"
+    "{entity}, 배당 거르고 감원 {=n} 명",
+    "{entity} 채권단 회의… 매각설"
    ],
    "high": [
-    "{=rival} 파산 신청, 빚 {=amount}",
-    "{=rival}, 경쟁사에 넘어가… 이름만 남는다"
+    "{entity} 파산 신청, 빚 {=amount}",
+    "{entity}, 경쟁사에 넘어가… 이름만 남는다"
    ],
-   "slant": "bad"
+   "slant": "bad",
+   "entity": "rival",
+   "officials": [
+    "읍장",
+    "군수",
+    "상공회 총무"
+   ]
   },
   {
    "id": "race",
@@ -332,7 +383,11 @@
     "{=track} 대경주에 관중 {=n} 명… 우승 상금 {=amount}",
     "전국 기록 깨져: {=track}서 새 속도 기록"
    ],
-   "slant": "good"
+   "slant": "good",
+   "officials": [
+    "대회 주최자",
+    "보안관"
+   ]
   },
   {
    "id": "road_accident",
@@ -350,7 +405,11 @@
     "{=road} 참사: 자동차 사고로 {=n} 명 숨져",
     "건널목서 기차와 자동차 충돌… {=official} \"차단기 놓겠다\""
    ],
-   "slant": "bad"
+   "slant": "bad",
+   "officials": [
+    "보안관",
+    "도로 감독"
+   ]
   },
   {
    "id": "fuel",
@@ -368,7 +427,12 @@
     "휘발유 값 {=pct} 폭등, 차 세워 두는 집 늘어",
     "주 의회, 휘발유세 올린다… 도로 예산 {=amount}"
    ],
-   "slant": "neutral"
+   "slant": "neutral",
+   "officials": [
+    "읍장",
+    "군수",
+    "상공회 총무"
+   ]
   },
   {
    "id": "registrations",
@@ -385,7 +449,12 @@
     "주 전체 신차 등록 {=pct} 급감",
     "군내 자동차 {=n} 대 넘어… 열 집에 한 대꼴"
    ],
-   "slant": "neutral"
+   "slant": "neutral",
+   "officials": [
+    "읍장",
+    "군수",
+    "상공회 총무"
+   ]
   },
   {
    "id": "traffic_rule",
@@ -402,7 +471,12 @@
     "주 의회, 자동차 검사 의무화… {=carpart} 불량 차 운행 금지",
     "새 도로법 통과: {=rule} 주 전체 시행"
    ],
-   "slant": "neutral"
+   "slant": "neutral",
+   "officials": [
+    "보안관",
+    "읍장",
+    "도로 감독"
+   ]
   },
   {
    "id": "garage_trade",
@@ -420,7 +494,12 @@
     "우체국, 군내 배달 전부 자동차로 바꾼다… {=n} 대 발주",
     "주 경찰, 순찰차 {=n} 대 입찰… 지역 업체도 참가 가능"
    ],
-   "slant": "good"
+   "slant": "good",
+   "officials": [
+    "읍장",
+    "군수",
+    "상공회 총무"
+   ]
   },
   {
    "id": "crop_prices",
@@ -438,7 +517,11 @@
     "{=crop} 값 {=pct} 폭락… 밭에서 썩히는 집도",
     "{=goods} 값 {=pct} 뛰어 주부들 아우성"
    ],
-   "slant": "neutral"
+   "slant": "neutral",
+   "officials": [
+    "곡물상",
+    "농민회 회장"
+   ]
   },
   {
    "id": "county_budget",
@@ -455,7 +538,12 @@
     "군 금고 바닥… 교사 봉급 {=n} 명분 밀려",
     "체납 농지 {=n} 곳 경매 넘어가"
    ],
-   "slant": "bad"
+   "slant": "bad",
+   "officials": [
+    "군수",
+    "군 회계관",
+    "읍장"
+   ]
   },
   {
    "id": "railway",
@@ -472,7 +560,11 @@
     "철도 지선 폐쇄 검토… {town} 상인들 반발",
     "철도 파업으로 화물 {=n} 량 묶여"
    ],
-   "slant": "neutral"
+   "slant": "neutral",
+   "officials": [
+    "역장",
+    "읍장"
+   ]
   },
   {
    "id": "shops",
@@ -490,7 +582,11 @@
     "중심가 가게 {=n} 곳 문 닫아",
     "{town} 최대 {=shop} 파산, 빚 {=amount}"
    ],
-   "slant": "neutral"
+   "slant": "neutral",
+   "officials": [
+    "상공회 총무",
+    "읍장"
+   ]
   },
   {
    "id": "jobs",
@@ -507,7 +603,12 @@
     "군내 실직자 {=n} 명 넘어… {=official} 대책 회의",
     "무료 급식소 열어, 하루 {=n} 명 찾아"
    ],
-   "slant": "bad"
+   "slant": "bad",
+   "officials": [
+    "군수",
+    "읍장",
+    "구호 위원"
+   ]
   },
   {
    "id": "season",
@@ -524,24 +625,33 @@
     "{=weather} 한 달째… {=crop} 수확 {=pct} 줄 듯",
     "기록적 {=weather}, 군 전체 피해 {=amount}"
    ],
-   "slant": "neutral"
+   "slant": "neutral",
+   "officials": [
+    "농민회 회장",
+    "군수"
+   ]
   },
   {
    "id": "election",
    "relation": "background",
    "low": [
-    "{=official} 선거에 {person} 씨 출마",
+    "{entity} 선거에 {person} 씨 출마",
     "{=club}, 후보 초청 토론회"
    ],
    "mid": [
-    "{=official} 선거, {person} 씨 {=n} 표 차 당선",
+    "{entity} 선거, {person} 씨 {=n} 표 차 당선",
     "읍 의회 선거 투표율 사상 최고"
    ],
    "high": [
-    "{=official} 공금 {=amount} 유용 혐의… 사임",
+    "{entity} 공금 {=amount} 유용 혐의… 사임",
     "주지사 선거 {town} 유세에 {=n} 명 몰려"
    ],
-   "slant": "neutral"
+   "slant": "neutral",
+   "entity": "office",
+   "officials": [
+    "선거 관리인",
+    "읍장"
+   ]
   },
   {
    "id": "bank_report",
@@ -558,7 +668,11 @@
     "군내 은행 예금 총액 {=pct} 감소",
     "{=bank}, 농지 담보 {=n} 건 회수 나서"
    ],
-   "slant": "neutral"
+   "slant": "neutral",
+   "officials": [
+    "은행장",
+    "상공회 총무"
+   ]
   },
   {
    "id": "fire",
@@ -576,7 +690,11 @@
     "중심가 대화재: 가게 {=n} 곳 잿더미, 피해 {=amount}",
     "{=factory} 큰불, {town} 하늘 붉게 물들여"
    ],
-   "slant": "bad"
+   "slant": "bad",
+   "officials": [
+    "소방대장",
+    "읍장"
+   ]
   },
   {
    "id": "church_social",
@@ -594,7 +712,12 @@
     "{=church} 새 예배당 봉헌, {=n} 명 참석",
     "{=club} 주 대회 {town}서 열려… 손님 {=n} 명"
    ],
-   "slant": "good"
+   "slant": "good",
+   "officials": [
+    "읍장",
+    "군수",
+    "상공회 총무"
+   ]
   },
   {
    "id": "sports",
@@ -612,7 +735,11 @@
     "{=team} 주 대회 결승 진출… 읍 전체 들썩",
     "{=team} 주 챔피언! 환영 인파 {=n} 명"
    ],
-   "slant": "good"
+   "slant": "good",
+   "officials": [
+    "교장",
+    "교육감"
+   ]
   },
   {
    "id": "crime",
@@ -630,7 +757,11 @@
     "{=bank}에 무장 강도, {=amount} 빼앗아 달아나",
     "열차 강도 일당 {=n} 명 붙잡혀"
    ],
-   "slant": "bad"
+   "slant": "bad",
+   "officials": [
+    "보안관",
+    "판사"
+   ]
   },
   {
    "id": "weather_event",
@@ -648,7 +779,12 @@
     "{=weather} 덮쳐 {=n} 가구 집 잃어… 피해 {=amount}",
     "대홍수: 강 넘쳐 {town} 낮은 지대 잠겨"
    ],
-   "slant": "bad"
+   "slant": "bad",
+   "officials": [
+    "소방대장",
+    "읍장",
+    "군수"
+   ]
   },
   {
    "id": "fair",
@@ -666,7 +802,11 @@
     "군 박람회 사상 최다 {=n} 명 입장",
     "주 박람회서 {town} 출품 {=animal} 대상"
    ],
-   "slant": "good"
+   "slant": "good",
+   "officials": [
+    "박람회 위원장",
+    "읍장"
+   ]
   },
   {
    "id": "people",
@@ -685,7 +825,12 @@
     "{town} 개척 세대 마지막 어른 {person} 옹 별세",
     "{person} 씨, {=amount} 들여 도서관 지어 기증"
    ],
-   "slant": "neutral"
+   "slant": "neutral",
+   "officials": [
+    "읍장",
+    "군수",
+    "상공회 총무"
+   ]
   },
   {
    "id": "oddity",
@@ -703,7 +848,147 @@
     "비행선 {town} 상공 지나… 읍 전체 하늘 구경",
     "유명 비행사, {=place} 옆 들판에 불시착"
    ],
-   "slant": "good"
+   "slant": "good",
+   "officials": [
+    "읍장",
+    "군수",
+    "상공회 총무"
+   ]
+  },
+  {
+   "id": "bank_steady",
+   "relation": "essential",
+   "slant": "good",
+   "entity": "bank",
+   "low": [
+    "{entity}, 예금 다시 늘어",
+    "{entity} 창구 한산… 소문 가라앉아",
+    "{entity} \"고비 넘겼다\""
+   ],
+   "mid": [
+    "{entity} 정상 영업, 인출 한도 푼다",
+    "{entity}에 새 자금 {=amount}… 예금주들 안도"
+   ],
+   "effect": {
+    "kind": "demand",
+    "mult": [
+     1.01,
+     1.02,
+     1.05,
+     1.05,
+     1.05,
+     1.05
+    ],
+    "weeks": 10
+   },
+   "delayWeeks": [
+    1,
+    2
+   ],
+   "officials": [
+    "은행장",
+    "상공회 총무"
+   ]
+  },
+  {
+   "id": "factory_recover",
+   "relation": "essential",
+   "slant": "good",
+   "entity": "factory",
+   "low": [
+    "{entity}, 토요일 조업 다시 시작",
+    "{entity} 일감 늘어 근무 시간 되돌려"
+   ],
+   "mid": [
+    "{entity}, 내보냈던 직공 {=n} 명 다시 불러",
+    "{entity} 주문 밀려 야간 조업"
+   ],
+   "effect": {
+    "kind": "demand",
+    "mult": [
+     1.02,
+     1.03,
+     1.06,
+     1.08,
+     1.08,
+     1.08
+    ],
+    "weeks": 16
+   },
+   "delayWeeks": [
+    1,
+    3
+   ],
+   "officials": [
+    "공장장",
+    "상공회 총무"
+   ]
+  },
+  {
+   "id": "factory_hiring",
+   "relation": "essential",
+   "slant": "good",
+   "entity": "factory",
+   "low": [
+    "{entity}, 일꾼 {=n} 명 뽑는다",
+    "{entity} 새 기계 들여… 직공 구해"
+   ],
+   "mid": [
+    "{entity} 증설, {=n} 명 새로 고용",
+    "{entity}, 큰 주문 따내 {=n} 명 채용"
+   ],
+   "effect": {
+    "kind": "demand",
+    "mult": [
+     1.02,
+     1.03,
+     1.06,
+     1.08,
+     1.08,
+     1.08
+    ],
+    "weeks": 20
+   },
+   "delayWeeks": [
+    2,
+    5
+   ],
+   "officials": [
+    "공장장",
+    "상공회 총무"
+   ]
+  },
+  {
+   "id": "road_opened",
+   "relation": "essential",
+   "slant": "good",
+   "entity": "road",
+   "mid": [
+    "{entity} 포장 마쳐… {=day} 개통",
+    "진창길은 옛말: {entity} 새 포장도로 열려",
+    "{entity} 개통식에 {=n} 명, 첫 차는 {=official} 탑승"
+   ],
+   "effect": {
+    "kind": "demand",
+    "mult": [
+     1.1,
+     1.1,
+     1.12,
+     1.18,
+     1.18,
+     1.18
+    ],
+    "weeks": 40
+   },
+   "delayWeeks": [
+    0,
+    1
+   ],
+   "officials": [
+    "군수",
+    "도로 감독",
+    "읍장"
+   ]
   }
  ],
  "words": {
@@ -722,7 +1007,7 @@
   "road": [
    "읍내 중심가",
    "강변길",
-   "제분소 길",
+   "방죽길",
    "군청 앞길",
    "북쪽 군도",
    "역전 큰길",
@@ -760,7 +1045,7 @@
    "장터 옆",
    "군청 맞은편",
    "북쪽 어귀",
-   "제분소 옆",
+   "물레방아 옆",
    "다리목"
   ],
   "rival": [
@@ -1074,20 +1359,6 @@
    "다 함께 견뎌야",
    "말을 잇기 어렵다"
   ],
-  "react": [
-   "환영",
-   "걱정",
-   "술렁",
-   "시큰둥",
-   "반색",
-   "한숨",
-   "설왕설래",
-   "엇갈린 반응",
-   "기대",
-   "불만",
-   "조심스러운 낙관",
-   "뒷말 무성"
-  ],
   "who": [
    "상인들",
    "농가",
@@ -1129,6 +1400,30 @@
    "다섯",
    "여섯",
    "일곱"
+  ],
+  "react@good": [
+   "환영",
+   "반색",
+   "기대",
+   "박수",
+   "조심스러운 낙관",
+   "흐뭇"
+  ],
+  "react@bad": [
+   "걱정",
+   "한숨",
+   "술렁",
+   "불만",
+   "뒤숭숭",
+   "발 동동"
+  ],
+  "react@neutral": [
+   "설왕설래",
+   "엇갈린 반응",
+   "시큰둥",
+   "뒷말 무성",
+   "갑론을박",
+   "덤덤"
   ]
  },
  "tails": [

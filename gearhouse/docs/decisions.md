@@ -62,3 +62,11 @@ These decisions still hold, from `legacy/docs/MASTER_GAME_PLAN.md`:
 - Effects are added in this order: the town register, then seven changes in numbers, then four opportunities.
 - Verification of the real events is a separate, later task.
 - The reporter seats and the town register as a database are under review (review 10).
+
+## 2026-11-19 — reporters and the town register (review 10)
+
+- Voices stay at their present strength.
+- Each publication has its own staff of fourteen seats: ten named seats, one per voice, and four unnamed seats.
+- A successor writes in the seat's voice with one or two small habits of their own.
+- Real news is printed as wire copy with a local paragraph.
+- The town register is two tables kept in the save (entities and records) and starts with five kinds: banks, factories, rival makers, roads and public offices.

@@ -8,23 +8,28 @@ import { addDays } from './calendar';
 import { fictionalItems, realItems, type FictionData, type NewsItem, type RealData } from './news';
 import { makeName, type NameData } from './people';
 import { writeBody, type Body, type BodyData } from './newsBody';
+import { Press, newPress, type PressState } from './press';
+import { Register, newRegister, type RegisterData, type RegisterState } from './register';
 
 export interface Article extends NewsItem { page: number }
 export interface Issue { id: number; publication: string; date: DateStr; articles: Article[]; playerAds: string[]; supplierAds: string[] }
 export interface Copy { issueId: number; place: 'desk' | 'drawer' | 'shelf' | 'gone'; read: boolean; marked: boolean }
 /** something a paper warned of, on its way to the game */
 export interface Coming { due: DateStr; kind: 'demand' | 'supplier_price' | 'awareness'; value: number; weeks: number; supplierId?: string; from: string }
-export interface MediaState { issues: Issue[]; copies: Copy[]; news: { importance: number; headline: string; id: string }[]; coming: Coming[]; recent: string[]; nextId: number }
+export interface MediaState { issues: Issue[]; copies: Copy[]; news: { importance: number; headline: string; id: string }[]; coming: Coming[]; recent: string[]; nextId: number; press: PressState; register: RegisterState }
 export interface MediaData { publications: { id: string; kind: string; name: string; weekday?: number; pages: number; supplierAdChance?: number }[]; ageing: { years: number; look: string }[]; limits: { desk: number; drawer: number } }
-export const newMedia = (): MediaState => ({ issues: [], copies: [], news: [], coming: [], recent: [], nextId: 1 });
+export const newMedia = (): MediaState => ({ issues: [], copies: [], news: [], coming: [], recent: [], nextId: 1, press: newPress(), register: newRegister() });
 
+const PART_KO: Record<string, string> = { body_steel_set: '강판', chassis_steel_set: '철강', ash_frame_set: '물푸레나무', glass_set: '판유리', paint_set: '도료', trim_set: '가죽', wheels_tyres_set: '타이어', fittings_set: '부속품', engine: '엔진', gearbox: '변속기', axles_set: '차축', rolling_chassis: '섀시' };
 export class Media {
-  constructor(private sim: Simulation, private data: MediaData, private fiction: FictionData, private real: RealData, private names: NameData, private supply: Supply, private supplierNames: Record<string, string>, private town: string, private bodies?: BodyData) {
+  constructor(private sim: Simulation, private data: MediaData, private fiction: FictionData, private real: RealData, private names: NameData, private supply: Supply, private supplierNames: Record<string, string>, private town: string, private bodies?: BodyData, private regData?: RegisterData, private times: (date: DateStr) => number = () => 1) {
+    this.press = new Press(sim.g.media.press, bodies?.voices ?? [], names); this.register = new Register(sim.g.media.register, regData ?? { kinds: {}, anniversary: { minImportance: 9, years: [] } });
     // what happens in the game becomes news for the next issue
     sim.bus.on('order_placed', e => { const c = sim.g.market.customers[e.customerId]; if (c && c.standing >= 60) this.note(4, `${sim.g.people[c.personId]!.family} 씨, 새 차 주문`, 'order:' + e.orderId); });
     sim.bus.on('car_delivered', e => { if (e.satisfaction >= 60) this.note(5, '읍내 공방의 새 차, 주인 "흡족하다"', 'delivered:' + e.orderId); else if (e.satisfaction <= -40) this.note(5, '새 차 받은 주민, 공방에 불만', 'unhappy:' + e.orderId); });
     sim.bus.on('employee_hired', e => this.note(2, '읍내 공방, 일손 한 명 들여', 'hired:' + e.personId));
   }
+  readonly press: Press; readonly register: Register;
   private get S() { return this.sim.g.media; }
   private note(importance: number, headline: string, id: string) { this.S.news.push({ importance, headline, id }); }
 
@@ -45,9 +50,14 @@ export class Media {
       if (c.kind === 'supplier_price' && c.supplierId) { const s = g.supply.suppliers[c.supplierId]; if (s) { s.priceMult = c.value; s.priceUntil = addDays(a.date, c.weeks * 7); } } }
     S.coming = S.coming.filter(x => x.due > a.date);
     for (const pub of this.data.publications) { if (pub.kind !== 'newspaper' || weekday(a.date) !== pub.weekday) continue;
-      const last = S.issues.filter(i => i.publication === pub.id).at(-1)?.date ?? addDays(a.date, -7), sup = Object.entries(g.supply.suppliers).filter(([, s]) => !s.closed).map(([id, s]) => ({ id, name: this.supplierNames[id] ?? id, known: s.known }));
+      const last = S.issues.filter(i => i.publication === pub.id).at(-1)?.date ?? addDays(a.date, -7), sup = Object.entries(g.supply.suppliers).filter(([, s]) => !s.closed).map(([id, s]) => ({ id, name: this.supplierNames[id] ?? id, known: s.known, materials: this.supply.sells(id).map(p => PART_KO[p]).filter((x): x is string => !!x) }));
       const person = makeName(a.rng, this.names, 'm'), facts = { town: this.town, person: `${person.given} ${person.family}` };
-      const items: NewsItem[] = [...realItems(a.rng, this.real, last, a.date), ...S.news.splice(0).map((n): NewsItem => ({ origin: 'fictional', id: n.id, relation: 'related', importance: n.importance, headline: n.headline, weight: n.importance + 0.5 })), ...fictionalItems(a.rng, this.fiction, facts, S.recent, sup, this.bodies?.voices)];
+      this.press.staff(a.rng, pub.id, a.date); this.register.found(a.rng, this.names, a.date);
+      // names in general items come from the register: only banks, factories and makers that still exist
+      const words = { ...this.fiction.words }; for (const [list, kind] of [['bank', 'bank'], ['factory', 'factory'], ['rival', 'rival']] as const) { words[list] = this.register.alive(kind).map(e => e.name); }
+      const fiction = { ...this.fiction, words }, own = this.press.turnover(a.rng, pub.id, a.date), town = this.register.weeklyNews(a.rng, this.names, fiction, a.date, this.times(a.date), facts, this.bodies?.voices ?? []);
+      const items: NewsItem[] = [...realItems(a.rng, this.real, last, a.date), ...S.news.splice(0).map((n): NewsItem => ({ origin: 'fictional', id: n.id, relation: 'related', importance: n.importance, headline: n.headline, weight: n.importance + 0.5 })), ...own, ...town, ...fictionalItems(a.rng, fiction, facts, S.recent, sup, this.bodies?.voices)];
+      for (const it of items) this.press.assign(a.rng, pub.id, it);
       for (const it of items) { if (it.lead) it.lead = it.lead.replace('{town}', this.town); const e = it.effect; if (!e || e.kind === 'supplier_found') continue;
         const due = addDays(a.date, (it.delayWeeks ?? 0) * 7); e.due = due; S.coming.push({ due, kind: e.kind, value: e.value ?? 1, weeks: e.weeks ?? 0, supplierId: e.supplierId, from: it.id }); }
       items.sort((x, y) => y.weight - x.weight);

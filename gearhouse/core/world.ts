@@ -12,6 +12,7 @@ import economy from '../data/economy/us_1930.json';
 import fiction from '../data/news/fictional_ko.json';
 import realNews from '../data/news/real_us_1930s.json';
 import bodies from '../data/news/bodies_ko.json';
+import registerData from '../data/register/us_slice.json';
 import mediaData from '../data/media/us_slice.json';
 import letters from '../data/text/ko/inquiry_letter.json';
 import { Simulation } from './sim';
@@ -25,8 +26,9 @@ import { Media, type MediaData } from './media';
 import type { TextSet } from './text';
 import type { FictionData, RealData } from './news';
 import type { BodyData } from './newsBody';
+import type { RegisterData } from './register';
 
-export const DATA = { holidays, names, people: peopleData as unknown as PeopleData, finance, parts: partsData as unknown as PartsData, suppliers: suppliers as SupplyData, build: buildData as unknown as BuildData, sales: salesData as unknown as SalesData, economy, fiction: fiction as unknown as FictionData, real: realNews as unknown as RealData, bodies: bodies as unknown as BodyData, media: mediaData as unknown as MediaData };
+export const DATA = { holidays, names, people: peopleData as unknown as PeopleData, finance, parts: partsData as unknown as PartsData, suppliers: suppliers as SupplyData, build: buildData as unknown as BuildData, sales: salesData as unknown as SalesData, economy, fiction: fiction as unknown as FictionData, real: realNews as unknown as RealData, bodies: bodies as unknown as BodyData, register: registerData as unknown as RegisterData, media: mediaData as unknown as MediaData };
 export interface World { sim: Simulation; supply: Supply; shop: Shop; sales: Sales; media: Media }
 export interface FounderChoice { background: string; age: number; given?: string; family?: string }
 
@@ -34,7 +36,8 @@ export interface FounderChoice { background: string; age: number; given?: string
 export function openWorld(g: GameState, founder?: FounderChoice): World {
   const sim = new Simulation(g, DATA.holidays).use(financeSystem(DATA.finance)), supply = new Supply(sim, DATA.suppliers, DATA.parts), shop = new Shop(sim, DATA.build, supply);
   const sales = new Sales(sim, DATA.sales, DATA.economy, DATA.names, DATA.people, shop, letters as TextSet, { town: '밀브룩', paper: '밀브룩 쿠리어' });
-  const media = new Media(sim, DATA.media, DATA.fiction, DATA.real, DATA.names, supply, Object.fromEntries(DATA.suppliers.suppliers.map(s => [s.id, s.name])), '밀브룩', DATA.bodies);
+  const media = new Media(sim, DATA.media, DATA.fiction, DATA.real, DATA.names, supply, Object.fromEntries(DATA.suppliers.suppliers.map(s => [s.id, s.name])), '밀브룩', DATA.bodies, DATA.register, d => (DATA.economy.demand as Record<string, number>)[d.slice(0, 4)] ?? 1);
+  sales.banks = { pick: rng => { const b = media.register.alive('bank'); return b.length ? b[rng.int(0, b.length - 1)]!.id : undefined; }, closed: id => media.register.get(id)?.status === 'closed' };
   sim.use(supply.system()).use(shop.system()).use(sales.system()).use(media.system());
   if (founder && !g.founderId) sim.setFounder(makeFounder(sim.rng, DATA.names, DATA.people, 1930, founder), DATA.people.founderBackgrounds[founder.background]!.cash);
   return { sim, supply, shop, sales, media };

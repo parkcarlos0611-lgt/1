@@ -8,7 +8,7 @@ import { writeBody } from '../core/newsBody';
 
 const F = DATA.fiction, B = DATA.bodies, rng = new Rng(1933);
 export function makeItem(r: Rng, topicId: string, importance: number, voice?: string): NewsItem { const t = F.topics.find(x => x.id === topicId)!, pats = t[tierOf(importance)]!, pat = pats[r.int(0, pats.length - 1)]!, tails = tailsFor(F, pat, importance, t.relation), tail = tails[r.int(0, tails.length - 1)]!;
-  const facts = { town: '밀브룩', person: 'Howard Keller', supplier: 'Tri-County Auto Supply' }, bound: Record<string, string> = {}, headline = fill(r, pat + tail.t, F.words, facts, importance, bound), fit = B.voices.filter(v => v.beats.includes(t.relation) && v.slants.includes(t.slant) && importance >= v.importance[0] && importance <= v.importance[1]);
+  const facts = { town: '밀브룩', person: 'Howard Keller', supplier: 'Tri-County Auto Supply' }, bound: Record<string, string> = {}, headline = fill(r, pat + tail.t, t.officials ? { ...F.words, official: t.officials } : F.words, facts, importance, bound, t.slant), fit = B.voices.filter(v => v.beats.includes(t.relation) && v.slants.includes(t.slant) && importance >= v.importance[0] && importance <= v.importance[1]);
   return { origin: 'fictional', id: topicId, relation: t.relation, slant: t.slant, importance, headline, weight: importance, slots: { ...bound, ...facts }, seed: r.next(), voice: voice ?? fit[r.int(0, fit.length - 1)]!.id }; }
 if (process.argv[1]?.endsWith('bodySamples.ts')) {
   const out: string[] = ['# 기사 본문 시범 (주제 4개)', '', '`tools/bodySamples.ts`가 만든 파일이다. 말투와 시대감을 검수하기 위한 것이고, 고칠 곳을 표시해 주시면 조각 데이터(`data/news/bodies_ko.json`)를 고친다.', ''];

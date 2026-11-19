@@ -37,6 +37,8 @@ export class Supply {
   directory(): string[] { const found: string[] = []; for (const d of this.data.suppliers) if (d.size !== 'maker' && d.mailDays <= 2 && !this.S.suppliers[d.id]!.known) { this.discover(d.id, 'directory'); found.push(d.id); } return found; }
   /** known suppliers that sell a part, cheapest first */
   sellers(part: string): { id: string; line: CatalogLine; mailDays: number }[] { return this.data.suppliers.filter(d => this.S.suppliers[d.id]!.known && !this.S.suppliers[d.id]!.closed).flatMap(d => d.catalog.filter(c => c.part === part).map(line => ({ id: d.id, line, mailDays: d.mailDays }))).sort((x, y) => x.line.price * x.line.minOrder - y.line.price * y.line.minOrder); }
+  /** the parts a supplier sells */
+  sells(id: string): string[] { return [...new Set(this.sup(id).catalog.map(c => c.part))]; }
   /** sets of a part already ordered and on their way */
   coming(part: string): number { return this.S.orders.filter(o => o.state === 'coming').flatMap(o => o.lines).filter(l => l.part === part).reduce((t, l) => t + l.qty, 0); }
   /** ask for prices; the answer comes as a quote after the time the contact takes */

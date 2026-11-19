@@ -20,7 +20,8 @@ export type Source = 'ad' | 'referral' | 'walk_in' | 'first';
 export type Channel = 'visit' | 'mail' | 'phone';
 export interface Customer { id: number; personId: string; type: string; standing: number; budget: [number, number]; orderType: OrderType; body: string; priorities: Field[]; mustHave: string[];
   /** days from the inquiry by which the car is wanted */
-  wantDays: number; patience: number; temper: number; channel: Channel; source: Source; referredBy?: string }
+  wantDays: number; patience: number; temper: number; channel: Channel; source: Source; referredBy?: string;
+  /** the bank this customer keeps their money in (town register) */ bankId?: string }
 export interface Inquiry { id: number; customerId: number; received: DateStr; letter: string; revealed: { budget: boolean; mustHave: boolean }; rounds: number; state: 'open' | 'quoted' | 'ordered' | 'lost'; quote?: QuoteOffer; counter?: { price: number; due: DateStr } }
 export interface QuoteOffer { designId: string; price: number; due: DateStr; depositRate: number; rough?: boolean; meets: string[] }
 export interface Order { id: number; customerId: number; inquiryId: number; designId: string; price: number; deposit: number; placed: DateStr; due: DateStr; meets: string[]; state: 'building' | 'delivered' | 'cancelled'; lateTold?: boolean; payDelayUntil?: DateStr; carId?: number }
@@ -38,6 +39,8 @@ const lerp = (r: [number, number], t: number) => r[0] + (r[1] - r[0]) * t, clamp
 
 export class Sales {
   constructor(private sim: Simulation, private data: SalesData, private eco: EconomyData, private names: NameData, private people: PeopleData, private shop: Shop, private letters: TextSet, private where: { town: string; paper: string }) {}
+  /** the town's banks, once the register is there: where a customer banks, and whether that bank has closed */
+  banks?: { pick(rng: Api['rng']): string | undefined; closed(id: string): boolean };
   private get M() { return this.sim.g.market; }
   private year(d: DateStr) { return String(dateParts(d).year); }
   customer(id: number): Customer { return this.M.customers[id]!; }
@@ -51,6 +54,7 @@ export class Sales {
     const wealth = r.float(), mid = lerp(T.budget[ot], wealth) * (0.85 + 0.15 * (this.eco.demand[this.year(a.date)] ?? 1)), must: string[] = []; for (let i = r.int(0, 2); i > 0; i--) { const m = this.data.mustHaves[r.int(0, this.data.mustHaves.length - 1)]!; if (!must.includes(m)) must.push(m); }
     const c: Customer = { id: M.nextId++, personId: p.id, type: T.id, standing: Math.round(lerp(T.standing, r.float())), budget: [Math.round(mid * 0.85), Math.round(mid * 1.1)], orderType: ot, body: T.bodies[r.int(0, T.bodies.length - 1)]!, priorities: T.priorities, mustHave: must,
       wantDays: r.int(45, 120), patience: r.int(T.patience[0], T.patience[1]), temper: lerp(T.temper, r.float()), channel: o.channel ?? (source === 'walk_in' || source === 'first' ? 'visit' : a.g.supply.phone && r.float() < 0.4 ? 'phone' : r.float() < 0.3 ? 'visit' : 'mail'), source, referredBy: o.referredBy };
+    c.bankId = this.banks?.pick(r); if (!c.bankId) delete c.bankId;
     M.customers[c.id] = c;
     const founder = a.g.founderId ? a.g.people[a.g.founderId] : undefined, formal = c.standing > 70 ? 'high' : c.standing < 42 ? 'low' : 'mid';
     const letter = compose(r, 'inquiry_letter', this.letters, { founder: founder?.family ?? '', shop: (founder?.family ?? '') + ' 공방', town: this.where.town, customer: fullName(p), paper: this.where.paper, friend: o.referredBy ?? '', body: BODY_KO[c.body] ?? c.body, must: MUST_KO[must[0] ?? 'quiet'] ?? '', season: SEASON_KO[(dateParts(addDays(a.date, c.wantDays)).month - 1)]! },
@@ -87,7 +91,8 @@ export class Sales {
   /** hand the car over: the balance is paid (or not), and the customer makes up their mind about it */
   deliver(orderId: number, carId: number): { satisfaction: number } | { cannotPay: Incident } { const a = this.sim.api(), M = this.M, ord = M.orders.find(o => o.id === orderId), car = a.g.shop.cars.find(c => c.id === carId); if (!ord || ord.state !== 'building' || !car) throw new Error('nothing to deliver');
     const c = this.customer(ord.customerId); ord.carId = carId;
-    if (!ord.payDelayUntil && a.rng.float() < (this.eco.cannotPay[this.year(a.date)] ?? 0.05) * (c.type === 'banker' || c.type === 'heir' ? 1.4 : 1)) {       // the Depression reaches the customer
+    const lostBank = !!c.bankId && !!this.banks?.closed(c.bankId);                                  // their bank has shut: the money is locked up
+    if (!ord.payDelayUntil && a.rng.float() < (this.eco.cannotPay[this.year(a.date)] ?? 0.05) * (c.type === 'banker' || c.type === 'heir' ? 1.4 : 1) + (lostBank ? 0.5 : 0)) {       // the Depression reaches the customer
       ord.payDelayUntil = a.date; a.bus.emit('customer_cannot_pay', { orderId }); return { cannotPay: a.raise('customer_cannot_pay', 'decision', { orderId, customer: fullName(a.g.people[c.personId]!), owed: ord.price - ord.deposit }, 21) }; }
     return this.handOver(a, ord, 1); }
   /** the player's answer when a customer cannot pay: wait a month or two, take less, or keep the deposit and the car */

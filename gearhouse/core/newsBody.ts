@@ -20,7 +20,9 @@ export function writeBody(item: NewsItem, data: BodyData, fiction: FictionData, 
   const out: string[] = [];
   for (const el of frame) { const pool = left[el]; if (!pool?.length) continue; const pat = pool.splice(rng.int(0, pool.length - 1), 1)[0]!;   // no sentence twice in one article
     if (el === 'Q') { delete bound.speaker; delete bound.say; }                                                                      // a second quotation is another speaker
-    out.push(fill(rng, pat, words, slots, imp, bound)); }
+    out.push(fill(rng, pat, words, slots, imp, bound, slant)); }
+  if (item.slots?.before && item.slots.beforeHeadline) out.splice(Math.min(2, out.length), 0, `본지가 ${item.slots.before} "${item.slots.beforeHeadline.split(/[…—(\[]/)[0]!.trim()}"라고 전한 데 이은 일이다.`);   // the paper remembers
+  if (item.quirk?.short && out.length > 3) out.splice(out.length - 2, 1); if (item.quirk?.word && out.length > 1) out[1] = `${item.quirk.word} ${out[1]}`;
   let sentences = out;
   if (voice.swaps) sentences = sentences.map(x => (x.includes('"') ? x : voice.swaps!.reduce((t, [from, to]) => (t.endsWith(from) ? t.slice(0, -from.length) + to : t), x)));
   if (voice.style === 'archaic') sentences = sentences.map(s => s.replace(/했다\./g, '하였다.').replace(/됐다\./g, '되었다.').replace(/났다\./g, '났더라.'));

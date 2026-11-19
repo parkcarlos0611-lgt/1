@@ -17,6 +17,8 @@ import weatherData from '../data/weather/us_midwest.json';
 import { weatherLinks, weatherSystem, newWeather, type WeatherData } from './weather';
 import bankData from '../data/bank/us_1930.json';
 import { Bank, newBank, type BankData } from './bank';
+import handover from '../data/text/ko/handover.json';
+import type { HandoverText } from './sales';
 import chanceData from '../data/chances/us_slice.json';
 import { Chances, type ChanceData } from './chances';
 import mediaData from '../data/media/us_slice.json';
@@ -43,7 +45,7 @@ export function openWorld(g: GameState, founder?: FounderChoice): World {
   g.weather ??= newWeather(); g.bank ??= newBank(); const sim = new Simulation(g, DATA.holidays).use(weatherSystem(DATA.weather)).use(financeSystem(DATA.finance)), supply = new Supply(sim, DATA.suppliers, DATA.parts), shop = new Shop(sim, DATA.build, supply);
   const sales = new Sales(sim, DATA.sales, DATA.economy, DATA.names, DATA.people, shop, letters as TextSet, { town: '밀브룩', paper: '밀브룩 쿠리어' });
   const media = new Media(sim, DATA.media, DATA.fiction, DATA.real, DATA.names, supply, Object.fromEntries(DATA.suppliers.suppliers.map(s => [s.id, s.name])), '밀브룩', DATA.bodies, DATA.register, d => (DATA.economy.demand as Record<string, number>)[d.slice(0, 4)] ?? 1, DATA.weather);
-  sales.returnDays = DATA.weather.returnDays; weatherLinks(sim);
+  sales.returnDays = DATA.weather.returnDays; sales.handoverText = handover as unknown as HandoverText; weatherLinks(sim);
   sales.banks = { pick: rng => { const b = media.register.alive('bank'); return b.length ? b[rng.int(0, b.length - 1)]!.id : undefined; }, closed: id => media.register.get(id)?.status === 'closed' };
   g.media.chances ??= []; const chances = new Chances(sim, DATA.chances, sales, supply, shop, (i, h, id) => media.note(i, h, id));
   const bank = new Bank(sim, DATA.bank, { list: () => media.register.alive('bank').map(e => ({ id: e.id, name: e.name })), status: id => media.register.get(id)?.status, name: id => media.register.get(id)?.name ?? id }, d => (DATA.economy.demand as Record<string, number>)[d.slice(0, 4)] ?? 1);

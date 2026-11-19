@@ -9,6 +9,7 @@ import type { OrderType, Shop } from './build';
 import type { Incident } from './state';
 import { compose, type TextMemory, type TextSet } from './text';
 import { active, beginBoost, mult, plus, DEMAND_RANGE } from './conditions';
+import { josa } from './text';
 
 export type Field = 'quality' | 'performance' | 'style' | 'trust' | 'value';
 export interface CustomerType { id: string; weight: number; age: [number, number]; standing: [number, number]; budget: Record<OrderType, [number, number]>; orderTypes: Record<OrderType, number>; bodies: string[]; priorities: Field[]; temper: [number, number]; patience: [number, number] }
@@ -16,6 +17,9 @@ export interface SalesData { customerTypes: CustomerType[]; mustHaves: string[];
   mailDays: number; depositRate: [number, number]; maxRounds: number; /** talks a customer will sit through before a quote (one more after each round of haggling) */ maxConsults: number; satisfaction: Record<'spec' | 'quality' | 'performance' | 'delivery' | 'value' | 'qualityMid', number>; breakdownPerDayPerDefect: number; warrantyDays: number;
   /** satisfaction from which a customer sends friends */ pleasedAt: number;
   /** how much the average reputation moves the number of inquiries: at +100 they are multiplied by 1 + this */ reputationPull: number }
+export type HandoverText = Record<'look' | 'spec' | 'day' | 'pay' | 'leave', Record<string, string[]>> & { drive: Record<'ok' | 'fault', string[]>; letter: Record<'thanks' | 'complaint', string[]> };
+/** the handing over as the customer lived it: five moments, and the short of it */
+export interface Scene { lines: string[]; summary: string }
 export interface EconomyData { demand: Record<string, number>; cannotPay: Record<string, number> }
 export type Source = 'ad' | 'referral' | 'walk_in' | 'first';
 export type Channel = 'visit' | 'mail' | 'phone';
@@ -25,12 +29,13 @@ export interface Customer { id: number; personId: string; type: string; standing
   /** the bank this customer keeps their money in (town register) */ bankId?: string }
 export interface Inquiry { id: number; customerId: number; received: DateStr; letter: string; revealed: { budget: boolean; mustHave: boolean }; /** talks held so far */ consults?: number; rounds: number; state: 'open' | 'quoted' | 'ordered' | 'lost'; quote?: QuoteOffer; counter?: { price: number; due: DateStr } }
 export interface QuoteOffer { designId: string; price: number; due: DateStr; depositRate: number; rough?: boolean; meets: string[] }
-export interface Order { id: number; customerId: number; inquiryId: number; designId: string; price: number; deposit: number; placed: DateStr; due: DateStr; meets: string[]; state: 'building' | 'delivered' | 'cancelled'; lateTold?: boolean; /** working days the weather stopped the work: nobody counts these as late */ excusedDays?: number; /** the customer was asked once for more time */ askedDelay?: boolean; payDelayUntil?: DateStr; carId?: number }
+export interface Order { id: number; customerId: number; inquiryId: number; designId: string; price: number; deposit: number; placed: DateStr; due: DateStr; meets: string[]; state: 'building' | 'delivered' | 'cancelled'; lateTold?: boolean; /** working days the weather stopped the work: nobody counts these as late */ excusedDays?: number; /** the customer was asked once for more time */ askedDelay?: boolean;
+  /** how the finished car reaches the customer: they were told and come for it, or it is driven to them */ handover?: { how: 'collect' | 'drive'; told: DateStr; comes: DateStr; arrived?: boolean; early?: number; fault?: boolean; hours?: number }; payDelayUntil?: DateStr; carId?: number }
 export interface SoldCar { carId: number; orderId: number; customerId: number; delivered: DateStr; satisfaction: number }
 export interface Advert { medium: string; size: 'classified' | 'eighth' | 'quarter'; from: DateStr; until: DateStr }
 export interface MarketState { awareness: { town: number; city: number; state: number; nation: number }; reputation: Record<Field, number>; customers: Record<number, Customer>; inquiries: Inquiry[]; orders: Order[]; sold: SoldCar[]; adverts: Advert[];
   /** passing changes in demand that the papers warned of */ boosts: { until: DateStr; mult: number; from: string }[];
-  pending: { due: DateStr; kind: 'answer' | 'referral' | 'return'; inquiryId?: number; by?: string }[]; nextId: number; text: TextMemory }
+  pending: { due: DateStr; kind: 'answer' | 'referral' | 'return' | 'letter'; text?: string; inquiryId?: number; by?: string }[]; nextId: number; text: TextMemory }
 export const newMarket = (): MarketState => ({ awareness: { town: 8, city: 0, state: 0, nation: 0 }, reputation: { quality: 0, performance: 0, style: 0, trust: 0, value: 0 }, customers: {}, inquiries: [], orders: [], sold: [], adverts: [], boosts: [], pending: [], nextId: 1, text: {} });
 
 const BODY_KO: Record<string, string> = { sedan: '4인승 세단', coupe: '쿠페', limousine: '리무진', town_car: '타운카', pickup: '짐칸 트럭', delivery: '배달차', roadster: '2인승 로드스터', cabriolet: '카브리올레' };
@@ -46,6 +51,7 @@ export class Sales {
     sim.bus.on('news_effect', e => { const today = sim.g.clock.date; if (e.kind === 'demand') e.held = beginBoost(this.M.boosts, { until: addDays(today, e.weeks * 7), mult: e.value, from: e.from }); else this.known(e.value); }); }
   /** the town's banks, once the register is there: where a customer banks, and whether that bank has closed */
   /** days over which callers kept away by a spell of weather come back */ returnDays = 14;
+  /** what customers say when they take their car */ handoverText?: HandoverText;
   banks?: { pick(rng: Api['rng']): string | undefined; closed(id: string): boolean };
   private get M() { return this.sim.g.market; }
   private year(d: DateStr) { return String(dateParts(d).year); }
@@ -98,24 +104,38 @@ export class Sales {
     q.state = 'ordered'; this.M.orders.push(ord); post(a, 'deposit', deposit, 'order ' + ord.id); a.bus.emit('order_placed', { orderId: ord.id, customerId: ord.customerId, price: ord.price }); return ord; }
 
   /** hand the car over: the balance is paid (or not), and the customer makes up their mind about it */
-  deliver(orderId: number, carId: number): { satisfaction: number } | { cannotPay: Incident } { const a = this.sim.api(), M = this.M, ord = M.orders.find(o => o.id === orderId), car = a.g.shop.cars.find(c => c.id === carId); if (!ord || ord.state !== 'building' || !car) throw new Error('nothing to deliver');
+  /** tell the customer the car is ready: they come for it on the promised day, or sooner if it is early and they can */
+  tellReady(orderId: number, carId: number): DateStr { const a = this.sim.api(), ord = this.M.orders.find(o => o.id === orderId); if (!ord || ord.state !== 'building' || !a.g.shop.cars.some(c => c.id === carId)) throw new Error('nothing to hand over'); if (ord.handover) throw new Error('the customer has been told already');
+    const c = this.customer(ord.customerId), reach = addDays(a.date, c.channel === 'mail' ? this.data.mailDays : 0), early = daysBetween(reach, ord.due), sooner = early > 2 && a.rng.float() < 0.75 - c.temper * 0.3;
+    const comes = early <= 2 ? addDays(reach, a.rng.int(1, 3)) : sooner ? addDays(reach, a.rng.int(1, Math.min(5, early))) : ord.due; ord.carId = carId; ord.handover = { how: 'collect', told: a.date, comes, early: Math.max(0, daysBetween(comes, ord.due)) }; return comes; }
+  /** hours it takes to drive a car to its buyer and come back by rail or on foot */
+  driveHours(orderId: number): number { const c = this.customer(this.M.orders.find(o => o.id === orderId)!.customerId); return c.channel === 'mail' ? 8 : 3; }
+  /** drive the car to the customer: a courtesy people remember; a fault left in may show on the way */
+  driveOver(orderId: number, carId: number): { satisfaction: number; scene?: Scene } | { cannotPay: Incident } { const a = this.sim.api(), ord = this.M.orders.find(o => o.id === orderId), car = a.g.shop.cars.find(c => c.id === carId); if (!ord || ord.state !== 'building' || !car) throw new Error('nothing to hand over');
+    const spell = a.g.weather.event?.kind; if (spell === 'blizzard' || spell === 'long_rain' || a.g.weather.today === 'snow') throw new Error('the roads are no good for a new car today'); if (!a.workday) throw new Error('not on a day off');
+    const hours = this.driveHours(orderId), fault = car.defects.some(d => !d.found && !d.fixed && a.rng.float() < 0.12 * d.severity); if (fault) { const d = car.defects.find(x => !x.found && !x.fixed)!; d.found = true; }
+    this.sim.addTask({ id: `drive:${orderId}:${a.date}`, label: 'delivery', skill: 'sales', hoursNeeded: hours, quiet: true }); post(a, 'delivery', -(hours > 4 ? 3 : 1), 'fare home'); this.known(0.5);
+    ord.handover = { how: 'drive', told: a.date, comes: a.date, arrived: true, early: Math.max(0, daysBetween(a.date, ord.due)), fault, hours }; return this.deliver(orderId, carId); }
+  deliver(orderId: number, carId: number): { satisfaction: number; scene?: Scene } | { cannotPay: Incident } { const a = this.sim.api(), M = this.M, ord = M.orders.find(o => o.id === orderId), car = a.g.shop.cars.find(c => c.id === carId); if (!ord || ord.state !== 'building' || !car) throw new Error('nothing to deliver');
     const c = this.customer(ord.customerId); ord.carId = carId;
     const lostBank = !!c.bankId && !!this.banks?.closed(c.bankId);                                  // their bank has shut: the money is locked up
     if (!ord.payDelayUntil && a.rng.float() < (this.eco.cannotPay[this.year(a.date)] ?? 0.05) * (c.type === 'banker' || c.type === 'heir' ? 1.4 : 1) + (lostBank ? 0.5 : 0) + plus(a.g, 'cannot_pay', c.type)) {       // the Depression reaches the customer
       ord.payDelayUntil = a.date; a.bus.emit('customer_cannot_pay', { orderId }); return { cannotPay: a.raise('customer_cannot_pay', 'decision', { orderId, customer: fullName(a.g.people[c.personId]!), owed: ord.price - ord.deposit }, 21) }; }
     return this.handOver(a, ord, 1); }
   /** the player's answer when a customer cannot pay: wait a month or two, take less, or keep the deposit and the car */
-  settle(orderId: number, choice: 'wait' | 'discount' | 'keep_deposit'): { satisfaction: number } | null { const a = this.sim.api(), ord = this.M.orders.find(o => o.id === orderId)!;
+  settle(orderId: number, choice: 'wait' | 'discount' | 'keep_deposit'): { satisfaction: number; scene?: Scene } | null { const a = this.sim.api(), ord = this.M.orders.find(o => o.id === orderId)!;
     if (choice === 'keep_deposit') { ord.state = 'cancelled'; this.bump('trust', -3, a); return null; }
     if (choice === 'wait') { ord.payDelayUntil = addDays(a.date, a.rng.int(30, 60)); ord.due = ord.payDelayUntil; this.bump('trust', 2, a); return null; }
     return this.handOver(a, ord, 0.8); }
-  private handOver(a: Api, ord: Order, share: number): { satisfaction: number } { const M = this.M, c = this.customer(ord.customerId), car = a.g.shop.cars.find(x => x.id === ord.carId)!, W = this.data.satisfaction;
+  private handOver(a: Api, ord: Order, share: number): { satisfaction: number; scene?: Scene } { const M = this.M, c = this.customer(ord.customerId), car = a.g.shop.cars.find(x => x.id === ord.carId)!, W = this.data.satisfaction;
     const balance = Math.round((ord.price - ord.deposit) * share * 100) / 100; post(a, 'balance', balance, 'order ' + ord.id);
-    const d = a.g.shop.designs[ord.designId]!, missed = c.mustHave.filter(m => !ord.meets.includes(m)).length, lateDays = Math.max(0, daysBetween(ord.due, a.date) - (ord.excusedDays ?? 0)), seen = car.defects.filter(x => !x.fixed && (x.step === 'paint' || x.step === 'joining' || x.step === 'trim')).length;
+    const d = a.g.shop.designs[ord.designId]!, missed = c.mustHave.filter(m => !ord.meets.includes(m)).length, lateDays = Math.max(0, daysBetween(ord.due, ord.handover?.how === 'collect' ? ord.handover.told : a.date) - (ord.excusedDays ?? 0)),      /* judged by the day the car stood ready */ seen = car.defects.filter(x => !x.fixed && (x.step === 'paint' || x.step === 'joining' || x.step === 'trim')).length;
     const spec = clamp(1 - missed * 0.6 - (d.orderType === c.orderType ? 0 : 0.4), -1, 1), qual = clamp((car.quality.visible - W.qualityMid) / 30 - seen * 0.25, -1, 1), perf = clamp((car.quality.hidden - W.qualityMid) / 35, -1, 1), del = clamp(1 - lateDays / 20, -1, 1),
       val = clamp((c.budget[1] - ord.price * share) / (c.budget[1] * 0.25) * 0.5 + qual * 0.5, -1, 1);
     const poor = qual < -0.3 ? 0.4 : 1;                                       // a badly made car on time and to order still pleases nobody
-    let s = (spec > 0 ? spec * poor : spec) * W.spec + qual * W.quality + perf * W.performance + (del > 0 ? del * poor : del) * W.delivery + val * W.value; if (s < 0) s *= 1 + c.temper * 0.6; s = Math.round(clamp(s, -100, 100));
+    let s = (spec > 0 ? spec * poor : spec) * W.spec + qual * W.quality + perf * W.performance + (del > 0 ? del * poor : del) * W.delivery + val * W.value; const H = ord.handover; if (H?.early && lateDays === 0) s += Math.min(6, H.early / 5);                    // sooner than promised
+    if (H?.how === 'drive') s += H.fault ? -8 : 5;                                                                        // brought to the door; or broke down there
+    if (s < 0) s *= 1 + c.temper * 0.6; s = Math.round(clamp(s, -100, 100));
     ord.state = 'delivered'; M.sold.push({ carId: car.id, orderId: ord.id, customerId: c.id, delivered: a.date, satisfaction: s });
     // what people say afterwards: reputation in the fields this customer cares about, the town knows us a little better
     // Reputation is what people have lately seen of us: each delivery pulls every field part of the way toward what this car showed.
@@ -123,7 +143,17 @@ export class Sales {
     this.pull('trust', clamp(del * 60 + (spec < 0 ? -50 : 25), -100, 100), 0.12, a); this.pull('value', val * 100, 0.12, a);
     M.awareness.town = clamp(M.awareness.town + 2 + c.standing / 25, 0, 100); if (M.awareness.town > 60) M.awareness.city = clamp(M.awareness.city + c.standing / 40, 0, 100);
     if (s >= this.data.pleasedAt) for (let n = Math.round(1 + c.standing / 45 * a.rng.float()); n > 0; n--) M.pending.push({ due: addDays(a.date, a.rng.int(10, 70)), kind: 'referral', by: a.g.people[c.personId]!.family });
-    a.bus.emit('car_delivered', { orderId: ord.id, carId: car.id, satisfaction: s, standing: c.standing }); return { satisfaction: s }; }
+    if (H?.how === 'drive' && !H.fault) this.pull('trust', 70, 0.05, a);
+    const name = fullName(a.g.people[c.personId]!); if (this.handoverText && (s >= 50 || s <= 0) && a.rng.float() < 0.7) { const L = this.handoverText.letter[s >= 50 ? 'thanks' : 'complaint']; M.pending.push({ due: addDays(a.date, a.rng.int(7, 30)), kind: 'letter', text: L[a.rng.int(0, L.length - 1)]!.replace('{customer}', name) }); }
+    const scene = this.scene(a, ord, c, { spec, qual, del, val, lateDays, missed: c.mustHave.filter(m => !ord.meets.includes(m)), balance, s });
+    a.bus.emit('car_delivered', { orderId: ord.id, carId: car.id, satisfaction: s, standing: c.standing }); return { satisfaction: s, scene }; }
+  private scene(a: Api, ord: Order, c: Customer, v: { spec: number; qual: number; del: number; val: number; lateDays: number; missed: string[]; balance: number; s: number }): Scene | undefined { const T = this.handoverText; if (!T) return undefined;
+    const lvl = (x: number) => (x > 0.35 ? 'good' : x < -0.2 ? 'bad' : 'mid'), pick = (l: string[]) => l[a.rng.int(0, l.length - 1)]!, H = ord.handover, lines: string[] = [];
+    if (H?.how === 'drive') lines.push(pick(T.drive[H.fault ? 'fault' : 'ok']).replace('{hours}', String(H.hours ?? 3)));
+    lines.push(pick(T.look[lvl(v.qual)]!)); const must = MUST_KO[v.missed[0] ?? ''] ?? '부탁드린 것'; lines.push(pick(T.spec[v.missed.length ? 'bad' : v.spec > 0.5 ? 'good' : 'mid']!).replace(/\{must:([^}]+)\}/, (_, j) => must + josa(must, j)));
+    lines.push(pick(T.day[v.lateDays > 5 ? 'bad' : v.lateDays > 0 ? 'mid' : (H?.early ?? 0) >= 5 ? 'early' : 'good']!)); lines.push(pick(T.pay[lvl(v.val)]!).replace('{balance}', '$' + Math.round(v.balance).toLocaleString('en-US'))); lines.push(pick(T.leave[v.s >= this.data.pleasedAt ? 'good' : v.s < 10 ? 'bad' : 'mid']!));
+    const best = ([['만듦새', v.qual], ['사양', v.spec], ['날짜', v.del], ['값', v.val]] as [string, number][]).sort((x, y) => y[1] - x[1]);
+    return { lines, summary: `손님의 마음 ${v.s}. 좋았던 것: ${best[0]![0]}. 아쉬웠던 것: ${best[3]![1] < 0.3 ? best[3]![0] : '없음'}.` }; }
   /** ask the customer for more time, once per order: likelier for a few days, a calm customer, a trusted shop, and before the day has passed */
   askDelay(orderId: number, days: number): boolean { const a = this.sim.api(), ord = this.M.orders.find(o => o.id === orderId); if (!ord || ord.state !== 'building') throw new Error('no such order in work'); if (ord.askedDelay) throw new Error('the customer was already asked'); if (!(days > 0)) throw new Error('days must be more than none');
     const c = this.customer(ord.customerId), late = a.date > addDays(ord.due, ord.excusedDays ?? 0), p = clamp(0.8 - days / 50 - c.temper * 0.3 + this.M.reputation.trust / 250 - (late ? 0.2 : 0), 0.05, 0.95), ok = a.rng.float() < p; ord.askedDelay = true;
@@ -147,6 +177,7 @@ export class Sales {
     // answers to quotes, and friends of pleased customers
     const due = M.pending.filter(p => p.due <= a.date); M.pending = M.pending.filter(p => p.due > a.date);
     for (const p of due) { if (p.kind === 'return') { if (a.workday) this.arrive(a, 'walk_in', { channel: 'visit' }); else M.pending.push({ ...p, due: addDays(a.date, 1) }); continue; }   // on a day off they come the next day
+      if (p.kind === 'letter') { a.raise('customer_letter', 'notice', { text: p.text }); continue; }
       if (p.kind === 'referral') { if (a.workday && a.rng.float() < demand) this.arrive(a, 'referral', { referredBy: p.by }); continue; }
       const q = this.inquiry(p.inquiryId!), c = this.customer(q.customerId), o = q.quote!; if (q.state !== 'quoted') continue; const ch = this.chance(c, o, q.received), roll = a.rng.float(), name = fullName(a.g.people[c.personId]!);
       if (roll < ch) { const ord = this.book(a, q, o); a.raise('quote_answer', 'notice', { inquiryId: q.id, customer: name, answer: 'accept', orderId: ord.id }); }
@@ -155,6 +186,10 @@ export class Sales {
         a.raise('quote_answer', 'decision', { inquiryId: q.id, customer: name, answer: 'haggle', counter: q.counter }, c.patience); }
       else { q.state = 'lost'; a.raise('quote_answer', 'notice', { inquiryId: q.id, customer: name, answer: 'reject' }); } }
     if (!a.workday) return;                                                                 // no post and no callers on a day off
+    // customers who were told their car is ready come for it, unless the weather keeps them
+    for (const ord of M.orders) { const H = ord.handover; if (ord.state !== 'building' || !H || H.arrived || H.comes > a.date) continue; const sp = a.g.weather.event?.kind;
+      if (sp === 'blizzard' || (a.g.weather.visit < 0.75 && a.rng.float() > a.g.weather.visit)) { H.comes = addDays(a.date, 1); ord.excusedDays = (ord.excusedDays ?? 0) + 1; continue; }
+      H.arrived = true; a.raise('customer_arrives', 'decision', { orderId: ord.id, carId: ord.carId, customer: fullName(a.g.people[this.customer(ord.customerId).personId]!) }, 30); }
     // new inquiries: adverts running in the paper, and people who know of us in town
     const phone = a.g.supply.phone ? R.phoneBonus : 1; let perWeek = M.awareness.town * R.walkInPerAwareness;
     for (const ad of M.adverts) if (ad.from <= a.date && a.date < ad.until) perWeek += (ad.size === 'classified' ? R.adClassified : ad.size === 'eighth' ? R.adEighth : R.adQuarter) * phone;
@@ -169,7 +204,7 @@ export class Sales {
     // inquiries left unanswered are lost when the customer's patience runs out
     for (const q of M.inquiries) if ((q.state === 'open') && daysBetween(q.received, a.date) > this.customer(q.customerId).patience + q.rounds * 10) { q.state = 'lost'; this.bump('trust', -1, a); } }
   private evening(a: Api): void { const M = this.M;
-    for (const ord of M.orders) if (ord.state === 'building' && !ord.lateTold && a.date > addDays(ord.due, ord.excusedDays ?? 0)) { ord.lateTold = true; a.raise('order_late', 'decision', { orderId: ord.id, due: ord.due, excusedDays: ord.excusedDays ?? 0, mayAsk: !ord.askedDelay }, 30); }
+    for (const ord of M.orders) if (ord.state === 'building' && !ord.handover && !ord.lateTold && a.date > addDays(ord.due, ord.excusedDays ?? 0)) { ord.lateTold = true; a.raise('order_late', 'decision', { orderId: ord.id, due: ord.due, excusedDays: ord.excusedDays ?? 0, mayAsk: !ord.askedDelay }, 30); }
     // cars sold in the last year can break down where a fault was left in
     for (const sc of M.sold) { if (daysBetween(sc.delivered, a.date) > this.data.warrantyDays) continue; const car = a.g.shop.cars.find(c => c.id === sc.carId)!;
       for (const df of car.defects) if (!df.found && !df.fixed && a.rng.float() < this.data.breakdownPerDayPerDefect) { df.found = true; sc.satisfaction = clamp(sc.satisfaction - 12 * df.severity, -100, 100); this.pull('trust', -60, 0.04 * df.severity, a); this.pull('quality', -50, 0.03 * df.severity, a);

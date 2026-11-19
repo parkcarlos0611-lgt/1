@@ -84,5 +84,7 @@ export class Simulation {
   employeeHours = 9;
 
   /** play days until something stops the game or the limit is reached (the skip buttons) */
+  /** the game as a save: what the player did since the last day counts too */
+  snapshot(): string { this.g.rng = this.rng.save(); return JSON.stringify(this.g); }
   runUntilStop(maxDays: number): DayResult[] { const out: DayResult[] = []; for (let i = 0; i < maxDays; i++) { const r = this.stepDay(); out.push(r); if (r.stops.length) break; } return out; }
 }

@@ -10,7 +10,7 @@ import { reach } from './bank';
 
 export interface BotLog { loans?: number; loansRefused?: number; lostAtBank?: number; /** chances taken, and tenders and auctions won */ chances?: Record<string, number>; delaysAsked?: number; inquiries: number; quoted: number; orders: number; delivered: number; lost: number; cannotPay: number; satisfaction: number[]; bankruptDate?: string; minCash: number }
 
-export function runBot(w: World, days: number, opt: { hire?: boolean; advert?: boolean; deposit?: number; chances?: boolean; /** keep this share of the cash at a bank and borrow when cash runs short */ bank?: number } = {}): BotLog {
+export function runBot(w: World, days: number, opt: { hire?: boolean; advert?: boolean; deposit?: number; chances?: boolean; /** false: hand the car over the moment it is built, as before */ handover?: boolean; /** keep this share of the cash at a bank and borrow when cash runs short */ bank?: number } = {}): BotLog {
   const { sim, supply, shop, sales, media } = w, g = sim.g, log: BotLog = { inquiries: 0, quoted: 0, orders: 0, delivered: 0, lost: 0, cannotPay: 0, satisfaction: [], minCash: g.ledger.cash };
   const price = (part: string) => DATA.parts.parts[part]!.price, asked = new Set<string>();
   for (const [id, t] of [['std_body', 'body_only'], ['std_bought', 'bought'], ['std_built', 'built']] as const) if (!g.shop.designs[id]) shop.addDesign({ id, name: id, baseCar: 'sedan30', orderType: t, size: 1, effort: { proportion: 0, parts: 0, panels: 0 } });
@@ -49,7 +49,10 @@ export function runBot(w: World, days: number, opt: { hire?: boolean; advert?: b
         break; }
       case 'supplier_quote': { const q = supply.quote(P.quoteId), total = q.lines.reduce((t, l) => t + l.qty * l.unitPrice, 0); if (reach(g) >= total) { supply.order(q.id); sim.resolve(it.id, 'order'); } break; }
       case 'car_built': { const b = g.shop.builds.find(x => g.shop.cars.find(c => c.id === P.carId)!.buildId === x.id)!, ord = g.market.orders.find(o => o.id === b.orderId); if (!ord || ord.state !== 'building') break;
+        if (ord.handover) break; if (opt.handover !== false) { sales.tellReady(ord.id, P.carId); break; }
         let r = sales.deliver(ord.id, P.carId); if ('cannotPay' in r) { log.cannotPay++; sim.resolve(r.cannotPay.id, 'discount'); r = sales.settle(ord.id, 'discount')!; }
+        log.delivered++; log.satisfaction.push((r as { satisfaction: number }).satisfaction); if (g.employees.length && active() === 0) sim.dismiss(g.employees[0]!.personId, 'no work'); break; }
+      case 'customer_arrives': { let r = sales.deliver(P.orderId, P.carId); sim.resolve(it.id, 'hand over'); if ('cannotPay' in r) { log.cannotPay++; sim.resolve(r.cannotPay.id, 'discount'); r = sales.settle(P.orderId, 'discount')!; }
         log.delivered++; log.satisfaction.push((r as { satisfaction: number }).satisfaction); if (g.employees.length && active() === 0) sim.dismiss(g.employees[0]!.personId, 'no work'); break; }
       case 'stock_short': stockUp(); break;
       case 'cash_warning': if (opt.bank != null && g.bank.bankId && !g.bank.asked && !g.bank.loans.length) { const t = w.bank.terms(500, 12), amount = Math.min(600, t.limit); if (amount >= 100) try { w.bank.ask(amount, 12); } catch { /* the banker will not talk */ } } break;

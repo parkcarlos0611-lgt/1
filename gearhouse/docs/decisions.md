@@ -50,3 +50,7 @@ These decisions still hold, from `legacy/docs/MASTER_GAME_PLAN.md`:
 - No real car or company brand names, logos or badges appear on screen.
 - Engine sound is synthesised from the design values.
 - No code ever uses the email address of the planner.
+
+## 2026-11-19 — names
+
+- People's and suppliers' names stay in Latin letters; they are not converted to Korean spellings.

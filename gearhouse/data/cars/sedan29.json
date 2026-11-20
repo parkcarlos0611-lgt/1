@@ -9,6 +9,7 @@
 "paint2": "#232327",
 "canvas": "#34343a",
 "chrome": "#a49d94",
+"glassTint": "#a9aeae",
 "wheels": [
 {
 "x": 508,

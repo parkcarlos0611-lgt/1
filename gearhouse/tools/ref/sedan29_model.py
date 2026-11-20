@@ -207,7 +207,7 @@ part('spare', 'spare', 'rubber', 'fender', wheel={'r': 380},
      top=tyre_section(3680, 3860, -385, 385), smooth=('side', 'top'), detail={'kind': 'treadFace', 'pitch': 38})
 part('spareHub', 'spare', 'chrome', 'flat', on='spare', smooth=('side',), y=[-60, 60], side=ell(S(1770, 0)[0], 868, 36, 70), lift=1)
 
-M = {'id': 'sedan29', 'name': 'four-door sedan, 1929', 'year': 1929, 'length': L, 'width': W, 'height': H, 'paint': '#3b3e25', 'paint2': '#232327', 'canvas': '#34343a', 'chrome': '#a49d94',   # nickel, as the shell and lamps show it on the sheet
+M = {'id': 'sedan29', 'name': 'four-door sedan, 1929', 'year': 1929, 'length': L, 'width': W, 'height': H, 'paint': '#3b3e25', 'paint2': '#232327', 'canvas': '#34343a', 'chrome': '#a49d94', 'glassTint': '#a9aeae',   # nickel, as the shell and lamps show it on the sheet
      'wheels': [{'x': FX, 'r': R, 'y': 690}, {'x': RX, 'r': R, 'y': 690}], 'wheel': {'rim': 0.66, 'style': 'wire', 'spokes': 36, 'rimMaterial': 'paint', 'cap': 0.22, 'capRings': 1},
      'parts': P}
 json.dump(M, open(OUT, 'w'), indent=0)

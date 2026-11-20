@@ -146,6 +146,8 @@ export interface CarDesign {
   glassLift?: number;
   /** the bright metal's own colour (nickel is warmer and greyer than chrome); a cold blue-white chrome when not given */
   chrome?: string;
+  /** pale period glass of this colour, drawn with a shadow under the frame and broad soft reflections; dark glass with streaks when not given */
+  glassTint?: string;
   /** colour of the canvas (hoods, tilts); a light buff when not given */
   canvas?: string;
   /** method ZY: the reference view's detail, element by element (tools/ref/skin.py) */

@@ -273,3 +273,7 @@ These decisions still hold, from `legacy/docs/MASTER_GAME_PLAN.md`:
 - Rear: the back's two panel lines, its moulding catching the light, a number-plate lamp, the boot handle and a dark apron under the body behind the bumpers.
 - Front: the frame is two rails whose ends show from in front (it was drawn as a bar across, over the shell's bottom); the front cross member sits lower; the shell's surround goes on round the bottom of the core.
 - The lamp face: nickel rim, a dark gap, then the silvered reflector in the bright metal's own colour with a darker band, a bright ring and a bright bulb at the centre (the dark bulb read as an eye).
+
+## 2026-11-20 — period glass
+
+- A car may give its glass a tint (design.glassTint): pale glass as the period sheets draw it, lighter at the top, a shadow under the frame, one broad soft reflection and a thin one, a lit lower lip; the old dark glass with thin streaks remains for cars without one. The front view no longer darkens its glass.

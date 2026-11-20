@@ -37,7 +37,7 @@ export const gameRamps = (paint: string): Record<string, string[]> => Object.fro
 function palette(d: CarDesign): Record<Material, Ramp> {
   return { paint: glossy(autoRamp(d.paint, { steps: 7, baseIdx: 3, dL: 0.075, shift: 0.06 })), paint2: glossy(autoRamp(d.paint2, { steps: 7, baseIdx: 3, dL: 0.075, shift: 0.06 })),
     rubber: fixed(['#16141b', '#24222b', '#36343f', '#4f4d59', '#6e6c78'], '#0b0a0f'), chrome: d.chrome ? { c: autoRamp(d.chrome, { steps: 5, baseIdx: 2, dL: 0.17, shift: 0.04 }).c, o: autoRamp(d.chrome, { steps: 5, baseIdx: 2, dL: 0.17 }).o } : fixed(['#2a3047', '#56627e', '#93a3bb', '#cfd9e6', '#ffffff'], '#171b2a'),
-    glass: fixed(['#2c343b', '#56616a', '#8e989f', '#b9c1c5', '#e0e5e6'], '#141a1f'), lens: fixed(['#5e5a48', '#9d9a80', '#d9d5b6', '#f5f2dc', '#ffffff'], '#2d2b24'),
+    glass: d.glassTint ? autoRamp(d.glassTint, { steps: 5, baseIdx: 2, dL: 0.11, shift: 0.04 }) : fixed(['#2c343b', '#56616a', '#8e989f', '#b9c1c5', '#e0e5e6'], '#141a1f'), lens: fixed(['#5e5a48', '#9d9a80', '#d9d5b6', '#f5f2dc', '#ffffff'], '#2d2b24'),
     lensR: fixed(['#3d0a16', '#7a1522', '#c22c2b', '#f06a4a', '#ffc49a'], '#22050c'), iron: fixed(['#202128', '#34363f', '#4f525d', '#737783', '#a1a5ae'], '#121318'),
     black: fixed(['#0f0e14', '#1b1a22', '#2a2933', '#403f4b', '#5d5c69'], '#07060a'), white: fixed(['#7b7f8c', '#a9adb7', '#d4d7dc', '#eff0ef', '#ffffff'], '#3e404a'),
     shadow: fixed(['#07060a', '#0f0e14', '#16151c', '#1b1a22', '#22212a'], '#07060a'), wood: autoRamp('#9a6a3a', { sat: 0.9 }), canvas: autoRamp(d.canvas ?? '#8c8270', { sat: 0.8 }) }; }
@@ -112,7 +112,11 @@ export function rasterizeFlat(d0: CarDesign, opt: { frameW?: number; shadow?: bo
     for (let x = 0; x < bw; x++) { let y = 0; while (y < bh) { if (!M(x, y)) { y++; continue; } const ya = y; while (y < bh && M(x, y)) y++; const yb = y - 1, n = yb - ya;
       for (let yy = ya; yy <= yb; yy++) { const t = n > 0 ? (yy - ya) / n : 0.5, gx = bx + x, gyy = by + yy, k = yy - ya, kb = yb - yy; let l: number, shaded = -1;
         if (mt === 'chrome') { const bands = [4, 3, 1, 2, 2, 1]; l = n <= 1 ? [3, 1][k]! : bands[Math.min(5, Math.floor(k / (n + 1) * 6))]!; }
-        else if (mt === 'glass') { let v = t < 0.18 ? 3.0 - t * 3 : t < 0.55 ? 2.15 - (t - 0.18) * 1.4 : 1.6 - (t - 0.55) * 3.2; if (((gx - bx) + (gyy - by) * 0.9) % 21 < 1.6 && t < 0.7) v = 3.2; v += d.glassLift ?? 0; l = dith(gx, gyy, v, 0.2); if (k === 0) l = Math.min(l, 1); }
+        else if (mt === 'glass') { let v: number;
+          if (d.glassTint) {   // pale glass as the period sheets draw it: lighter at the top, a shadow under the frame, one broad soft reflection and a thin one, a lit lower lip
+            const u = (gx - bx) / Math.max(1, bw), sd = u + t * 0.55, band = Math.abs(sd - 0.42) < 0.09 ? 0.9 : Math.abs(sd - 0.66) < 0.025 ? 0.6 : 0;
+            v = 2.7 - t * 0.9 + band; if (k <= 1) v = 1.2 + k * 0.6; if (kb === 0 && n > 3) v = 3.4; l = dith(gx, gyy, v, 0.22); }
+          else { v = t < 0.18 ? 3.0 - t * 3 : t < 0.55 ? 2.15 - (t - 0.18) * 1.4 : 1.6 - (t - 0.55) * 3.2; if (((gx - bx) + (gyy - by) * 0.9) % 21 < 1.6 && t < 0.7) v = 3.2; v += d.glassLift ?? 0; l = dith(gx, gyy, v, 0.2); if (k === 0) l = Math.min(l, 1); } }
         else if (mt === 'lens' || mt === 'lensR') l = t < 0.35 ? 3 : x - 0 < 2 ? 4 : 2;
         else if (mt === 'shadow') l = 0;
         else if (mt === 'paint' || mt === 'paint2' || mt === 'canvas' || mt === 'wood') { const g = GRAD[p.surface] ?? GRAD.side!; let v = g[0] + (g[1] - g[0]) * Math.pow(t, 1.15);

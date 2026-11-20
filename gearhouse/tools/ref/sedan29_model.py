@@ -135,9 +135,10 @@ part('body', 'body', 'paint', 'side', fit=3.5,
                      {'kind': 'bead', 'pts': side((742, 312), (1200, 314), (1694, 312))}, {'kind': 'highlight', 'pts': side((746, 322), (1690, 322)), 'width': 1},
                      {'kind': 'handle', 'at': S(990, 345), 'len': 120}, {'kind': 'handle', 'at': S(1085, 345), 'len': 120}],
             'rear': [{'kind': 'bead', 'pts': [[-655, 1200], [0, 1225], [655, 1200]]}]})
-part('roof', 'roof', 'canvas', 'roof', color='#2e2e2c', fit=3.5, nofit=('front', 'rear'),   # the cap's cloth as the sheet shows it lit from above; its shadows are near black
+part('roof', 'roof', 'canvas', 'roof', color='#222220', fit=3.5, nofit=('front', 'rear'),   # the cap's cloth as the sheet shows it lit from above; its shadows are near black
      side=side((675, 84), (722, 38), (800, 20), (1100, 4), (1480, 6), (1610, 18), (1668, 45), (1692, 90), (1640, 74), (1560, 64), (750, 64), (700, 90)),
-     front=half([0, 1688], [560, 1688], [640, 1676], [702, 1655], [714, 1700], [706, 1770], [660, 1810], [0, 1822]), rear=half([0, 1766], [600, 1766], [690, 1744], [716, 1780], [692, 1814], [0, 1822]),
+     front=half([0, 1688], [560, 1688], [630, 1686], [662, 1690], [672, 1706], [674, 1736], [668, 1768], [652, 1792], [624, 1808], [560, 1817], [300, 1821], [0, 1822]),
+     rear=half([0, 1764], [560, 1764], [632, 1762], [664, 1766], [674, 1778], [672, 1792], [658, 1806], [628, 1815], [560, 1819], [300, 1821], [0, 1822]),   # no wider than the body (665 mm from the centre); a cloth cap, its corners rounded
      smooth=('top', 'front', 'rear'), top=halfT([1585, 0], [1585, 560], [1600, 640], [1660, 680], [3500, 680], [3590, 650], [3635, 580], [3645, 480], [3645, 0]))
 part('screenFrame', 'screen', 'black', 'flat', on='body', x=[1564, 1599], front=fhalf((0, 100), (300, 100), (300, 240), (0, 240)))
 part('screen', 'screen', 'glass', 'side', on='screenFrame', x=[1562, 1600], front=fhalf((0, 115), (182, 115), (182, 222), (0, 222)), side=side((742, 112), (760, 112), (760, 226), (742, 226)))
@@ -166,7 +167,10 @@ for k, (a, b) in enumerate(((785, 890), (1105, 1215))):
 part('lamp', 'lamp', 'chrome', 'fender', slot='lamp', pair=True, fit=2.5, smooth=('side', 'front', 'top'),
      side=side((150, 345), (160, 330), (180, 326), (205, 335), (228, 352), (234, 372), (232, 400), (215, 415), (190, 420), (160, 418), (148, 400), (145, 372)),
      front=ell(377, 910, 121, 121), top=[[410, 330], [330, 300], [250, 318], [205, 395], [250, 472], [330, 492], [410, 462]])
-part('lens', 'lamp', 'lens', 'flat', on='lamp', slot='lamp', pair=True, x=[303, 312], smooth=('front',), front=ell(377, 910, 98, 98), lift=3, detail={'kind': 'flutes', 'pitch': 22})
+# the lamp seen face on, as the front sheet draws it: a chrome rim, a silvered reflector behind clear glass (bright,
+# shaded like a bowl), the bulb a dark point at its centre
+part('lens', 'lamp', 'chrome', 'fender', on='lamp', slot='lamp', pair=True, x=[303, 312], smooth=('front',), front=ell(377, 910, 100, 100))
+part('bulb', 'lamp', 'black', 'flat', on='lens', slot='lamp', pair=True, x=[300, 304], smooth=('front',), front=ell(377, 910, 16, 16))
 part('lampBar', 'lamp', 'chrome', 'flat', slot='lamp', x=[380, 420], front=half([0, 872], [270, 880], [270, 905], [0, 900]))
 part('lampStand', 'lamp', 'chrome', 'flat', slot='lamp', pair=True, y=[370, 396], side=side((180, 418), (198, 418), (203, 470), (182, 470)))
 for k, py in enumerate((615, 661)):

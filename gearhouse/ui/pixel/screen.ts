@@ -24,7 +24,7 @@ export class Screen {
     for (;;) { if (!dash || (k++ % (dash * 2)) < dash) this.px(x0, y0, c); if (x0 === x1 && y0 === y1) break; const e2 = 2 * e; if (e2 >= dy) { e += dy; x0 += sx; } if (e2 <= dx) { e += dx; y0 += sy; } } }
   /** text in Galmuri7, top at y (the glyphs stand on y + 7); returns the x after it */
   text(s: string, x: number, y: number, c: RGB, maxW = 0): number { let cx = x | 0; const yb = (y | 0) + 7;
-    for (const ch of s) { const g = glyph(ch.codePointAt(0)!), [dw, bw, bh, xo, yo] = g as [number, number, number, number, number]; if (maxW && cx + dw - x > maxW) break;
+    for (const ch of s) { const g = glyph(ch.codePointAt(0)!), [dw, bw, bh, xo, yo] = g as [number, number, number, number, number]; if (maxW && cx + dw - 1 - x > maxW) break;
       for (let j = 0; j < bh; j++) { const row = g[5 + j]!; for (let i = 0; i < bw; i++) if ((row >> (bw - 1 - i)) & 1) this.px(cx + xo + i, yb - (bh + yo) + j, c); } cx += dw; }
     return cx; }
   tw(s: string) { let w = 0; for (const ch of s) w += glyph(ch.codePointAt(0)!)[0]!; return Math.max(0, w - 1); }

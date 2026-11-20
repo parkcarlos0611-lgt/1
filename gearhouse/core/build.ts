@@ -14,7 +14,9 @@ export interface Design { id: string; name: string; baseCar: string; orderType: 
   size: number;
   /** how far the body departs from its base car: proportions 0..1, parts swapped, panels reshaped by hand */
   effort: { proportion: number; parts: number; panels: number };
-  state: 'drawing' | 'ready'; mockupDone: boolean; built: number }
+  state: 'drawing' | 'ready'; mockupDone: boolean; built: number;
+  /** what the drawing board made of it (the screen's own record: the edit, the inquiry it was drawn for) */
+  drawing?: { edit: Record<string, unknown>; inquiryId?: number; length?: number; height?: number } }
 export interface Defect { step: string; kind: string; severity: number; found: boolean; fixed: boolean }
 export interface BuildStep { step: string; taskId: string; quality?: number; material?: number; cost: number; shortTold?: boolean; heldTold?: boolean }
 export interface Build { id: number; designId: string; orderId?: number; started: DateStr; steps: BuildStep[]; state: 'building' | 'done' }

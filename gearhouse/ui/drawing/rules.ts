@@ -18,5 +18,5 @@ export function rules(era: Era, size: number): Rules {
   const E = ERA[era], k = SIZE[size]!.k, r = {} as Record<NumKey, Range | null>;
   for (const key of Object.keys(E.r) as NumKey[]) { const row = E.r[key]; if (!row) { r[key] = null; continue; } const [lo, hi, step] = row;
     r[key] = { min: Math.round(lo * k / step) * step, max: Math.round(hi * k / step) * step, step }; }
-  return { era, size, label: `${E.name} · ${SIZE[size]!.name}`, r, fendersOff: E.fendersOff, bumpersOff: E.bumpersOff, rearDoorMin: 540, cabinMin: 900 };
+  return { era, size, label: `${E.name} · ${SIZE[size]!.name}`, r, fendersOff: E.fendersOff, bumpersOff: E.bumpersOff, rearDoorMin: 450, cabinMin: 900 };
 }

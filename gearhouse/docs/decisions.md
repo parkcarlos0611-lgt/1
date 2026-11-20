@@ -243,3 +243,9 @@ These decisions still hold, from `legacy/docs/MASTER_GAME_PLAN.md`:
 
 - Seen from in front and behind, the roof cap is no wider than the body and its corners are rounded; its cloth is darker, as the sheet shows it.
 - The lamp seen face on is a chrome rim, a silvered reflector shaded like a bowl and a dark bulb at the centre (sub-parts of the lamp, each lying on the one before).
+
+## 2026-11-20 — sub-parts, first round
+
+- Front: the cap's cloth comes down beside the windscreen as dark corner pillars; the radiator shell has a darker inner lip between it and the core; the front bumper bars carry two pairs of clamps; the front fenders' crowns catch the light.
+- Side: each side window lies in a raised moulding frame; the body's rear top corner is rounded as the sheet draws it.
+- Painted wire wheels read as the wheel's colour with dark gaps.

@@ -238,7 +238,7 @@ export function rasterizeFlat(d0: CarDesign, opt: { frameW?: number; shadow?: bo
       if (s.style === 'wire') { const own = s.rimMaterial === 'paint' || s.rimMaterial === 'paint2'; if (q > 0.9) set(x, y, own ? rimM : 'chrome', dot > 0.2 ? 4 : dot < -0.4 ? 2 : 3, ly, id); else if (q > 0.84) set(x, y, 'black', 1, ly, id);
         else if (q < 0.3) set(x, y, 'chrome', q < 0.12 ? (dot > 0 ? 4 : 3) : q > 0.26 ? 1 : dot > 0.3 ? 4 : dot > -0.3 ? 2 : 1, ly, id);
         else { const sp = s.spokes || 30, ang = ((a / (Math.PI * 2)) * sp % 1 + 1) % 1, own = s.rimMaterial === 'paint' || s.rimMaterial === 'paint2';       // painted wire wheels: rim and spokes in the body colour
-          set(x, y, ang < 0.3 ? (own ? rimM : 'chrome') : 'black', ang < 0.3 ? (dot > 0 ? 4 : 3) : 0, ly, id); } }
+          const w = own ? 0.5 : 0.3; set(x, y, ang < w ? (own ? rimM : 'chrome') : 'black', ang < w ? (dot > 0 ? 4 : 3) : 0, ly, id); } }   // painted wire wheels read as the wheel's colour with dark gaps
       else if (s.style === 'artillery') { const sp = s.spokes || 12, seg = ((a / (Math.PI * 2)) * sp % 1 + 1) % 1, wdt = 0.16 + 0.22 * (1 - q);
         if (q > 0.86) set(x, y, rimM, dot > 0.2 ? 3 : 1, ly, id); else if (q < 0.26) set(x, y, 'chrome', q < 0.14 ? (dot > 0 ? 4 : 2) : 1, ly, id);
         else if (Math.abs(seg - 0.5) < wdt / 2) set(x, y, rimM, Math.abs(seg - 0.5) < wdt / 5 ? 3 : dot > 0 ? 2 : 1, ly, id); else set(x, y, 'iron', q < 0.6 ? 1 : 0, ly, id); }

@@ -49,7 +49,7 @@ def snap(view, pts, reach):
         if u.geom_type == 'Polygon': f = [[round(x), round(z)] for x, z in list(u.exterior.coords)[:-1]]
     return f, moved
 P = []; notes = []
-def part(id, element, material, surface='side', *, color=None, on=None, fit=0, nofit=(), x=None, y=None, z=None, pair=False, slot=None, smooth=(), detail=None, feats=None, cutWheel=None, wheel=None, lift=0, **views):
+def part(id, element, material, surface='side', *, layer=None, color=None, on=None, fit=0, nofit=(), x=None, y=None, z=None, pair=False, slot=None, smooth=(), detail=None, feats=None, cutWheel=None, wheel=None, lift=0, **views):
     """views: side=[[x,z]..], front=[[y,z]..], rear=[[y,z]..] or 'front', top=[[x,y]..]; the box comes from the side view
     (x, z) and the front or top view (y) unless given"""
     bb = lambda pts, k: [min(p[k] for p in pts), max(p[k] for p in pts)]
@@ -89,24 +89,24 @@ def part(id, element, material, surface='side', *, color=None, on=None, fit=0, n
             f2.setdefault(v, []).append(g)
     X, Y, Z = box['x'], box['y'], box['z']
     P.append({'id': id, 'element': element, 'material': material, 'surface': surface, 'box': {'x': X, 'y': Y, 'z': Z}, 'sheet': sheet, 'pair': pair, 'outlines': o,
-              **({'slot': slot} if slot else {}), **({'detail': detail} if detail else {}), **({'features': f2} if f2 else {}), **({'cutWheel': cutWheel} if cutWheel else {}), **({'wheel': wheel} if wheel else {}), **({'lift': lift} if lift else {}), **({'on': on} if on else {}), **({'color': color} if color else {})})
+              **({'slot': slot} if slot else {}), **({'detail': detail} if detail else {}), **({'features': f2} if f2 else {}), **({'cutWheel': cutWheel} if cutWheel else {}), **({'wheel': wheel} if wheel else {}), **({'lift': lift} if lift else {}), **({'on': on} if on else {}), **({'color': color} if color else {}), **({'layer': layer} if layer else {})})
 
 # ---------------- chassis parts seen from outside ----------------
 for i, wx in enumerate((FX, RX)):
-    part(f'house{i}', 'frame', 'black', 'flat', y=[0, 560], side=[[wx - 440, 440]] + [[round(wx + math.cos(a) * 440), round(400 + math.sin(a) * 440)] for a in [math.pi * k / 14 for k in range(14, -1, -1)]] + [[wx + 440, 440]])
-part('frame', 'frame', 'black', 'flat', pair=True, side=[[150, 440], [3740, 440], [3740, 560], [150, 560]], front=[[360, 440], [430, 440], [430, 560], [360, 560]], rear='front')   # two rails: from in front only their ends show
+    part(f'house{i}', 'house', 'black', 'flat', y=[0, 560], side=[[wx - 440, 440]] + [[round(wx + math.cos(a) * 440), round(400 + math.sin(a) * 440)] for a in [math.pi * k / 14 for k in range(14, -1, -1)]] + [[wx + 440, 440]])
+part('frame', 'frame', 'black', 'flat', pair=True, side=[[150, 440], [3740, 440], [3740, 560], [150, 560]], front=[[360, 440], [430, 440], [430, 560], [360, 560]], rear='front', top=[[150, 360], [3740, 360], [3740, 430], [150, 430]])   # two rails: from in front only their ends show
 part('axleF', 'axle', 'black', 'flat', x=[470, 546], front=half([0, 330], [640, 330], [640, 400], [560, 400], [520, 365], [0, 365]))
 part('springF', 'spring', 'iron', 'flat', x=[480, 536], front=half([0, 520], [120, 510], [400, 450], [560, 400], [560, 430], [400, 480], [120, 545], [0, 555]))
 part('axleR', 'axle', 'black', 'flat', x=[3090, 3184], rear=half([0, 250], [120, 260], [170, 330], [640, 345], [640, 415], [170, 430], [120, 500], [0, 510]), smooth=('rear',))
 part('springR', 'spring', 'iron', 'flat', x=[3200, 3260], rear=half([0, 560], [120, 550], [420, 480], [580, 420], [580, 450], [420, 512], [120, 585], [0, 595]))
 tyre = [[606, 6], [640, 0], [748, 0], [782, 6], [798, 40], [805, 200], [807, 381], [804, 560], [796, 690], [782, 734], [760, 754], [725, 762], [663, 762], [628, 754], [606, 734], [592, 690], [584, 560], [581, 381], [583, 200], [590, 40]]   # face on (front sheet): a balloon section, flat where it stands, round at the top
-part('tyreF', 'wheel', 'rubber', 'fender', x=[FX - R, FX + R], pair=True, front=tyre, smooth=('front',), detail={'kind': 'treadFace', 'pitch': 38})
-part('tyreR', 'wheel', 'rubber', 'fender', x=[RX - R, RX + R], pair=True, rear=tyre, smooth=('rear',), detail={'kind': 'treadFace', 'pitch': 38})
+part('tyreF', 'wheel', 'rubber', 'fender', x=[FX - R, FX + R], pair=True, front=tyre, top=[[FX - R, 588], [FX + R, 588], [FX + R, 806], [FX - R, 806]], smooth=('front',), detail={'kind': 'treadFace', 'pitch': 38})
+part('tyreR', 'wheel', 'rubber', 'fender', x=[RX - R, RX + R], pair=True, rear=tyre, top=[[RX - R, 588], [RX + R, 588], [RX + R, 806], [RX - R, 806]], smooth=('rear',), detail={'kind': 'treadFace', 'pitch': 38})
 
 # ---------------- body ----------------
 part('splash', 'apron', 'black', 'flat', x=[560, 1450], z=[300, 880], top=halfT([500, 0], [500, 600], [1450, 620], [1450, 0]),
      front=half([0, 380], [600, 380], [600, 880], [0, 880]))
-part('crossF', 'frame', 'black', 'flat', x=[150, 500], z=[330, 385], top=halfT([150, 0], [150, 540], [270, 560], [500, 560], [500, 0]), front=half([0, 330], [560, 330], [560, 385], [0, 385]))
+part('crossF', 'frame', 'black', 'flat', x=[150, 500], z=[330, 385], top=halfT([150, 0], [150, 430], [230, 430], [230, 0]), front=half([0, 330], [560, 330], [560, 385], [0, 385]))   # a thin cross member ahead of the radiator (chassis sheet)
 part('spareCarrier', 'spare', 'iron', 'flat', y=[-40, 40], side=side((1694, 425), (1760, 425), (1760, 440), (1694, 440)), top=halfT([3600, 0], [3600, 40], [3760, 40], [3760, 0]))
 part('apron', 'apron', 'black', 'flat', y=[-640, 640], side=side((560, 585), (1262, 585), (1262, 702), (560, 702)), top=halfT([1300, 0], [1300, 640], [2700, 640], [2700, 0]))
 part('shell', 'radiator', 'chrome', 'flat', slot='grille', fit=3,
@@ -206,6 +206,33 @@ part('spare', 'spare', 'rubber', 'fender', wheel={'r': 380},
      side=tyre_section(cxs - 100, cxs + 100, 868 - 300, 868 + 300), rear=ell(0, 775, 385, 385),
      top=tyre_section(3680, 3860, -385, 385), smooth=('side', 'top'), detail={'kind': 'treadFace', 'pitch': 38})
 part('spareHub', 'spare', 'chrome', 'flat', on='spare', smooth=('side',), y=[-60, 60], side=ell(S(1770, 0)[0], 868, 36, 70), lift=1)
+
+# ---------------- the chassis under the body (chassis sheet; layer 'chassis': drawn in the chassis views and checked against the body) ----------------
+R4 = lambda x0, x1, a0, a1: [[x0, a0], [x1, a0], [x1, a1], [x0, a1]]
+CH = dict(layer='chassis')
+ENG = '#3e5a3a'
+part('core', 'radiator', 'black', 'flat', **CH, y=[-270, 270], side=R4(600, 680, 600, 1330), top=halfT([600, 0], [600, 270], [680, 270], [680, 0]), front=half([0, 600], [270, 600], [270, 1330], [0, 1330]), detail={'kind': 'ribs', 'pitch': 25}) if False else None
+part('radiatorCore', 'radiator', 'black', 'flat', **CH, side=R4(600, 680, 600, 1210), top=halfT([600, 0], [600, 270], [680, 270], [680, 0]), front=half([0, 600], [250, 600], [250, 1210], [0, 1210]), detail={'kind': 'ribs', 'pitch': 25})
+part('fan', 'engine', 'black', 'flat', **CH, side=R4(690, 715, 760, 1120), top=halfT([690, 0], [690, 180], [715, 180], [715, 0]), front=ell(0, 940, 180, 180))
+part('sump', 'engine', 'black', 'side', **CH, side=[[800, 470], [1350, 470], [1330, 562], [820, 562]], top=halfT([800, 0], [800, 150], [1350, 150], [1350, 0]), front=half([0, 470], [150, 470], [170, 562], [0, 562]))
+part('block', 'engine', 'paint2', 'side', **CH, color=ENG, side=R4(738, 1398, 562, 1012), top=halfT([738, 0], [738, 200], [1398, 200], [1398, 0]), front=half([0, 562], [200, 562], [230, 900], [200, 1012], [0, 1012]))
+part('head', 'engine', 'paint2', 'side', **CH, color=ENG, side=[[748, 1012], [1388, 1012], [1378, 1062], [758, 1062]], top=halfT([748, 0], [748, 150], [1388, 150], [1388, 0]), front=half([0, 1012], [170, 1012], [150, 1062], [0, 1062]))
+part('generator', 'engine', 'black', 'fender', **CH, side=R4(768, 968, 862, 962), top=[[768, 210], [968, 210], [968, 310], [768, 310]], front=ell(260, 912, 50, 50))
+part('starter', 'engine', 'black', 'fender', **CH, side=R4(798, 1038, 652, 762), top=[[798, -320], [1038, -320], [1038, -210], [798, -210]], front=ell(-265, 707, 55, 55))
+part('bell', 'gearbox', 'paint2', 'side', **CH, color=ENG, side=[[1398, 512], [1608, 540], [1608, 900], [1398, 932]], top=halfT([1398, 0], [1398, 230], [1608, 180], [1608, 0]), front=ell(0, 722, 230, 210))
+part('gearbox', 'gearbox', 'paint2', 'side', **CH, color=ENG, side=R4(1608, 1958, 552, 782), top=halfT([1608, 0], [1608, 150], [1958, 130], [1958, 0]), front=half([0, 552], [150, 552], [150, 782], [0, 782]), detail={'kind': 'ribs', 'pitch': 60})
+part('lever', 'gearbox', 'iron', 'flat', **CH, side=[[1770, 782], [1800, 782], [1880, 1100], [1855, 1100]], top=[[1770, -15], [1880, -15], [1880, 15], [1770, 15]])
+part('torqueTube', 'driveline', 'iron', 'fender', **CH, side=[[1958, 610], [3060, 430], [3060, 480], [1958, 680]], top=halfT([1958, 0], [1958, 45], [3060, 45], [3060, 0]))
+part('rearDiff', 'axle', 'iron', 'fender', **CH, side=ell(3137, 400, 140, 130), top=halfT([3000, 0], [3000, 160], [3270, 160], [3270, 0]), rear=ell(0, 400, 160, 140))
+part('axleTubeR', 'axle', 'black', 'flat', **CH, side=R4(3100, 3174, 360, 440), top=halfT([3100, 0], [3100, 700], [3174, 700], [3174, 0]))
+part('axleTubeF', 'axle', 'black', 'flat', **CH, side=R4(470, 546, 330, 400), top=halfT([470, 0], [470, 680], [546, 680], [546, 0]))
+part('tank', 'tank', 'iron', 'side', **CH, side=R4(1345, 1560, 1000, 1230), top=halfT([1345, 0], [1345, 520], [1560, 520], [1560, 0]), front=half([0, 1000], [520, 1000], [520, 1240], [0, 1240]))
+part('column', 'steering', 'black', 'flat', **CH, side=[[1290, 640], [1320, 640], [1870, 1330], [1840, 1340]], top=[[1290, 330], [1870, 330], [1870, 370], [1290, 370]])
+part('steerWheel', 'steering', 'black', 'flat', **CH, side=ell(1866, 1352, 28, 190), top=[[1850, 160], [1885, 160], [1885, 540], [1850, 540]], front=ell(350, 1352, 190, 190))
+part('exhaust', 'exhaust', 'iron', 'flat', **CH, side=[[1100, 700], [1140, 560], [1180, 440], [1300, 425], [2400, 430], [2400, 470], [1310, 465], [1200, 480], [1170, 570], [1140, 700]], top=[[1100, 230], [2400, 280], [2400, 320], [1100, 270]])
+part('muffler', 'exhaust', 'iron', 'side', **CH, side=R4(2400, 2950, 395, 478), top=[[2400, 250], [2950, 250], [2950, 350], [2400, 350]])
+part('tailpipe', 'exhaust', 'iron', 'flat', **CH, side=R4(2950, 3700, 425, 447), top=[[2950, 290], [3700, 290], [3700, 310], [2950, 310]])
+P = [p for p in P if p]
 
 M = {'id': 'sedan29', 'name': 'four-door sedan, 1929', 'year': 1929, 'length': L, 'width': W, 'height': H, 'paint': '#3b3e25', 'paint2': '#232327', 'canvas': '#34343a', 'chrome': '#a49d94', 'glassTint': '#a9aeae',   # nickel, as the shell and lamps show it on the sheet
      'wheels': [{'x': FX, 'r': R, 'y': 690}, {'x': RX, 'r': R, 'y': 690}], 'wheel': {'rim': 0.66, 'style': 'wire', 'spokes': 36, 'rimMaterial': 'paint', 'cap': 0.22, 'capRings': 1},

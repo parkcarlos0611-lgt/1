@@ -24,6 +24,8 @@ export interface CarPart {
   wheel?: { r: number };
   /** a small step forward in the order, for a part lying on another's surface (a lens on its lamp) */
   lift?: number;
+  /** 'chassis': under the body, drawn only in the chassis views */
+  layer?: string;
   /** the part lies on this part's face (a lens in its lamp, glass in the body, a core in its shell): in every view it is
    *  drawn just above that part, whatever the boxes say */
   on?: string;
@@ -40,14 +42,17 @@ export interface CarModel {
 
 const lerp = (r: [number, number], u: number) => r[0] + (r[1] - r[0]) * u;
 /** the design of one view; `only` keeps the named parts (to look at parts one by one) */
-export function viewDesign(m: CarModel, view: ViewName, only?: (p: CarPart) => boolean): CarDesign {
+export function viewDesign(m: CarModel, view: ViewName, only?: (p: CarPart) => boolean, opt: { chassis?: boolean } = {}): CarDesign {
+  // the chassis views: the chassis parts with the frame, axles, springs, tyres and wheels; the body views leave the chassis out
+  const RUNNING = new Set(['frame', 'axle', 'spring', 'wheel']);
+  if (!only) only = opt.chassis ? (p => p.layer === 'chassis' || RUNNING.has(p.element)) : (p => p.layer !== 'chassis');
   const key: OutlineKey = view === 'left' || view === 'right' ? 'side' : view, C = m.width / 2;
   const depth = (p: CarPart) => (key === 'side' ? Math.max(Math.abs(p.box.y[0]), Math.abs(p.box.y[1])) : key === 'front' ? -p.box.x[0] : key === 'rear' ? p.box.x[1] : p.box.z[1]) + (p.lift ?? 0) * 3;
   type Item = { d: number; n: number; p?: CarPart; sign?: 1 | -1; w?: number };
   const items: Item[] = []; let n = 0;
   for (const p of m.parts) { if (only && !only(p)) continue; if (!p.outlines[key] && !(p.wheel && key === 'rear')) continue;
     items.push({ d: depth(p), n: n++, p, sign: 1 }); if (p.pair && key !== 'side') items.push({ d: depth(p), n: n++, p, sign: -1 }); }
-  if (key === 'side' && !only) m.wheels.forEach((w, i) => items.push({ d: w.y + 57, n: n++, w: i }));
+  if (key === 'side' && (!only || opt.chassis || only({ element: 'body' } as unknown as CarPart))) m.wheels.forEach((w, i) => items.push({ d: w.y + 57, n: n++, w: i }));
   const byId = new Map(m.parts.map(p => [p.id, p]));
   for (const it of items) { let q = it.p, k = 0; while (q?.on && byId.get(q.on) && k++ < 5) q = byId.get(q.on)!; if (q && q !== it.p) it.d = depth(q) + 0.01 * k + (it.p!.lift ?? 0) * 0.001; }
   items.sort((a, b) => a.d - b.d || a.n - b.n);
@@ -69,7 +74,7 @@ export function viewDesign(m: CarModel, view: ViewName, only?: (p: CarPart) => b
       if (g.kind === 'handle') g.len = g.len * (b.x[1] - b.x[0]);
       features.push(g as Feature); }
   });
-  if (!only) for (const f of m.features?.[key] ?? []) features.push(f);
+  if (!opt.chassis) for (const f of m.features?.[key] ?? []) features.push(f);
   const top = key === 'top', across = key === 'front' || key === 'rear';
   return { id: `${m.id}_${view}`, name: `${m.name} (${view})`, year: m.year, length: across ? m.width : m.length, height: top ? m.width : m.height, paint: m.paint, paint2: m.paint2, ...(m.canvas ? { canvas: m.canvas } : {}), ...(m.chrome ? { chrome: m.chrome } : {}), ...(m.glassTint ? { glassTint: m.glassTint } : {}), panels, features, wheels, frame: 'reveal' };
 }

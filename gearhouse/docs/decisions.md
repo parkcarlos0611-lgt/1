@@ -277,3 +277,9 @@ These decisions still hold, from `legacy/docs/MASTER_GAME_PLAN.md`:
 ## 2026-11-20 — period glass
 
 - A car may give its glass a tint (design.glassTint): pale glass as the period sheets draw it, lighter at the top, a shadow under the frame, one broad soft reflection and a thin one, a lit lower lip; the old dark glass with thin streaks remains for cars without one. The front view no longer darkens its glass.
+
+## 2026-11-20 — the chassis in the same 3D model (first pass)
+
+- The sedan's chassis parts (radiator core, fan, engine block, head, sump, generator, starter, bell housing, gearbox and lever, torque tube, rear axle and differential, fuel tank, steering, exhaust) are parts of the same 3D model with layer 'chassis'. Body views leave them out; chassis views (tools/ref/modelviews.ts writes <id>_<view>_chassis) draw them with the frame, axles, springs and tyres.
+- Fit check (tools/ref/fitcheck.py): engine and radiator within the hood and shell, gearbox and tank under the cowl, ground clearance, the engine ahead of the cowl's back; all pass on the sedan.
+- First pass: chassis parts are boxes and simple outlines from the chassis sheet's proportions; their outlines are next to be taken off the chassis sheet as the body's were.

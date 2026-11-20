@@ -1,0 +1,15 @@
+<title>GEARHOUSE 제도판</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+  /* One pixel-art screen (480 x 270) scaled up without smoothing, centred on a dark desk-lamp ground. */
+  :root { --bg: #1c1410; --fg: #e6d8b2; --dim: #a8987a; color-scheme: dark; }
+  body { background: var(--bg); color: var(--fg); font: 14px/1.5 system-ui, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; }
+  .wrap { min-height: 100%; display: grid; place-items: center; gap: 10px; padding-block: 12px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  canvas { display: block; width: min(100%, calc((100vh - 70px) * 16 / 9)); max-width: 1440px; aspect-ratio: 16 / 9; image-rendering: pixelated; image-rendering: crisp-edges; touch-action: manipulation; }
+  p { margin: 0; max-width: 70ch; color: var(--dim); font-size: 13px; text-align: center; }
+</style>
+<div class="wrap">
+  <canvas id="board" aria-label="제도판: 1929 4도어 세단 도면과 주문서"></canvas>
+  <p>오른쪽 아래에서 축간·지붕 높이·차체 높이를 바꾸거나 짐받이를 달면 빨간 선으로 먼저 겹쳐 그립니다. "수정"은 지우개로 지우고 다시 그리고, "취소"는 빨간 선만 지웁니다. 그리는 중에 누르면 빨리 넘어갑니다. 가로 화면을 권합니다.</p>
+</div>
+<script>/*BUNDLE*/</script>

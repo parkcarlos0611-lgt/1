@@ -63,7 +63,9 @@ export type Detail =
    *  shoulders are darker than the crown */
   | { kind: 'treadFace'; pitch: number }
   /** a radiator core: small dark cells in rows, a little lighter at the top */
-  | { kind: 'cells'; pitch: number };
+  | { kind: 'cells'; pitch: number }
+  /** a lamp's silvered reflector seen through its glass */
+  | { kind: 'bowl' };
 
 /** tone steps on a grid over a panel's box: x0 and z1 are its top left corner in mm */
 export interface ToneMap { x0: number; z1: number; w: number; h: number; mm: number; steps: number; d: number[] }
@@ -142,6 +144,8 @@ export interface CarDesign {
   parts?: import('./parts').PartSpec[];
   /** tone steps added to the glass: 0 dark with reflections, 1 pale as on a studio drawing */
   glassLift?: number;
+  /** the bright metal's own colour (nickel is warmer and greyer than chrome); a cold blue-white chrome when not given */
+  chrome?: string;
   /** colour of the canvas (hoods, tilts); a light buff when not given */
   canvas?: string;
   /** method ZY: the reference view's detail, element by element (tools/ref/skin.py) */

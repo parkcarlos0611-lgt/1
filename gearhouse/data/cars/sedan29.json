@@ -8,6 +8,7 @@
 "paint": "#3b3e25",
 "paint2": "#232327",
 "canvas": "#34343a",
+"chrome": "#a49d94",
 "wheels": [
 {
 "x": 508,
@@ -12600,7 +12601,7 @@
 {
 "id": "lens",
 "element": "lamp",
-"material": "chrome",
+"material": "white",
 "surface": "fender",
 "box": {
 "x": [
@@ -12730,6 +12731,9 @@
 ]
 },
 "slot": "lamp",
+"detail": {
+"kind": "bowl"
+},
 "on": "lamp"
 },
 {

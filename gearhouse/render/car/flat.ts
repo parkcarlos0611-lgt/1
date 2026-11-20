@@ -36,7 +36,7 @@ export const paintRamp = (paint: string): string[] => glossy(autoRamp(paint, { s
 export const gameRamps = (paint: string): Record<string, string[]> => Object.fromEntries(Object.entries(palette({ paint, paint2: paint } as CarDesign)).map(([k, r]) => [k, r.c.map(c => '#' + c.map(v => v.toString(16).padStart(2, '0')).join(''))]));
 function palette(d: CarDesign): Record<Material, Ramp> {
   return { paint: glossy(autoRamp(d.paint, { steps: 7, baseIdx: 3, dL: 0.075, shift: 0.06 })), paint2: glossy(autoRamp(d.paint2, { steps: 7, baseIdx: 3, dL: 0.075, shift: 0.06 })),
-    rubber: fixed(['#16141b', '#24222b', '#36343f', '#4f4d59', '#6e6c78'], '#0b0a0f'), chrome: fixed(['#2a3047', '#56627e', '#93a3bb', '#cfd9e6', '#ffffff'], '#171b2a'),
+    rubber: fixed(['#16141b', '#24222b', '#36343f', '#4f4d59', '#6e6c78'], '#0b0a0f'), chrome: d.chrome ? { c: autoRamp(d.chrome, { steps: 5, baseIdx: 2, dL: 0.17, shift: 0.04 }).c, o: autoRamp(d.chrome, { steps: 5, baseIdx: 2, dL: 0.17 }).o } : fixed(['#2a3047', '#56627e', '#93a3bb', '#cfd9e6', '#ffffff'], '#171b2a'),
     glass: fixed(['#2c343b', '#56616a', '#8e989f', '#b9c1c5', '#e0e5e6'], '#141a1f'), lens: fixed(['#5e5a48', '#9d9a80', '#d9d5b6', '#f5f2dc', '#ffffff'], '#2d2b24'),
     lensR: fixed(['#3d0a16', '#7a1522', '#c22c2b', '#f06a4a', '#ffc49a'], '#22050c'), iron: fixed(['#202128', '#34363f', '#4f525d', '#737783', '#a1a5ae'], '#121318'),
     black: fixed(['#0f0e14', '#1b1a22', '#2a2933', '#403f4b', '#5d5c69'], '#07060a'), white: fixed(['#7b7f8c', '#a9adb7', '#d4d7dc', '#eff0ef', '#ffffff'], '#3e404a'),
@@ -208,13 +208,21 @@ export function rasterizeFlat(d0: CarDesign, opt: { frameW?: number; shadow?: bo
       for (let y = 0; y < bh; y++) for (let x = 0; x < bw; x++) { if (!M(x, y)) continue; let edge = 99; for (let r = 1; r <= ring; r++) if (!M(x - r, y) || !M(x + r, y) || !M(x, y - r) || !M(x, y + r)) { edge = r; break; }
         const gx = bx + x, gy = by + y; if (edge <= ring) { set(gx, gy, 'chrome', !M(x, y - edge) ? 4 : !M(x, y + edge) ? 1 : !M(x - edge, y) ? 3 : 2, ly); continue; }
         const k = ((x - cx) % pitch + pitch) % pitch; set(gx, gy, k === 0 ? 'chrome' : 'black', k === 0 ? (x === cx ? 4 : 2) : k === 1 ? 1 : 0, ly); } }
+    else if (dt.kind === 'bowl') { // a lamp's silvered reflector seen through its glass: dark at the rim, bright in a ring, a hot spot upper left
+      let cx = 0, cy = 0, n = 0, r = 0; for (let y = 0; y < bh; y++) for (let x = 0; x < bw; x++) if (M(x, y)) { cx += x; cy += y; n++; } cx /= Math.max(1, n); cy /= Math.max(1, n); r = Math.sqrt(n / Math.PI);
+      for (let y = 0; y < bh; y++) for (let x = 0; x < bw; x++) { if (!M(x, y)) continue; const dx = x + 0.5 - cx, dy = y + 0.5 - cy, q = Math.hypot(dx, dy) / Math.max(1, r), d = (-dx - dy) / (Math.hypot(dx, dy) || 1) * 0.7071;
+        const l = q > 0.86 ? 1 : q > 0.68 ? (d > 0.2 ? 3 : 2) : q > 0.4 ? (d > 0.3 ? 4 : d < -0.4 ? 2 : 3) : (d > 0 && q > 0.15 ? 4 : 3); set(bx + x, by + y, mt, l, ly); } }
     else if (dt.kind === 'treadFace') {
       let y0 = bh, y1 = -1; for (let y = 0; y < bh; y++) for (let x = 0; x < bw; x++) if (M(x, y)) { y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
       const cy = (y0 + y1) / 2, ry = Math.max(1, (y1 - y0) / 2), R = ry * MM, pitch = dt.pitch;
       for (let y = 0; y < bh; y++) { let a = -1, b = -1; for (let x = 0; x < bw; x++) if (M(x, y)) { if (a < 0) a = x; b = x; } if (a < 0) continue;
-        const v = Math.max(-1, Math.min(1, (y + 0.5 - cy) / ry)), th = Math.asin(v), arc = th * R / pitch, groove = (arc - Math.floor(arc)) < 0.28 && Math.abs(v) < 0.97, edge = Math.abs(v) > 0.9;
-        for (let x = a; x <= b; x++) { const u = (x - a + 0.5) / Math.max(1, b - a + 1), shoulder = u < 0.16 || u > 0.84, lit = u < 0.4 && u > 0.16 && v < 0.2;
-          let l = shoulder ? 1 : lit ? 3 : 2; if (groove && !shoulder) l = 0; else if (groove) l = 0; if (edge) l = Math.min(l, 1); if (x === a || x === b) l = 0;
+        const v = Math.max(-1, Math.min(1, (y + 0.5 - cy) / ry)), th = Math.asin(v), arc = th * R / pitch, edge = Math.abs(v) > 0.9;
+        // the tread in three bands: a continuous centre rib between two grooves, and blocks either side, the right ones half a
+        // pitch behind the left ones (zigzag); the shoulders round away and are darker
+        const fr = arc - Math.floor(arc), fr2 = (arc + 0.5) - Math.floor(arc + 0.5);
+        for (let x = a; x <= b; x++) { const u = (x - a + 0.5) / Math.max(1, b - a + 1), shoulder = u < 0.14 || u > 0.86, rib = u > 0.43 && u < 0.57, ribEdge = (u > 0.39 && u <= 0.43) || (u >= 0.57 && u < 0.61), left = u < 0.5;
+          const lit = u < 0.5 && v < 0.25, blockGap = !rib && !ribEdge && !shoulder && (left ? fr : fr2) < 0.26 && Math.abs(v) < 0.97;
+          let l = shoulder ? 1 : rib ? (lit ? 3 : 2) : ribEdge ? 0 : lit ? 3 : 2; if (blockGap) l = 0; if (shoulder && (left ? fr : fr2) < 0.2) l = 0; if (edge) l = Math.min(l, 1); if (x === a || x === b) l = 0;
           set(bx + x, by + y, 'rubber', l, ly); } } }
     else if (dt.kind === 'cells') { const p = Math.max(2, Math.round(dt.pitch / MM)); let top = bh; for (let y = 0; y < bh; y++) for (let x = 0; x < bw; x++) if (M(x, y)) top = Math.min(top, y);
       for (let y = 0; y < bh; y++) for (let x = 0; x < bw; x++) { if (!M(x, y)) continue; const row = Math.floor(y / p), off = row % 2 ? Math.floor(p / 2) : 0, cell = ((x + off) % p === 0) || (y % p === 0);
@@ -237,8 +245,10 @@ export function rasterizeFlat(d0: CarDesign, opt: { frameW?: number; shadow?: bo
       const q = dd / ri, a = Math.atan2(dy, dx);
       if (s.style === 'wire') { const own = s.rimMaterial === 'paint' || s.rimMaterial === 'paint2'; if (q > 0.9) set(x, y, own ? rimM : 'chrome', dot > 0.2 ? 4 : dot < -0.4 ? 2 : 3, ly, id); else if (q > 0.84) set(x, y, 'black', 1, ly, id);
         else if (q < 0.3) set(x, y, 'chrome', q < 0.12 ? (dot > 0 ? 4 : 3) : q > 0.26 ? 1 : dot > 0.3 ? 4 : dot > -0.3 ? 2 : 1, ly, id);
-        else { const sp = s.spokes || 30, ang = ((a / (Math.PI * 2)) * sp % 1 + 1) % 1, own = s.rimMaterial === 'paint' || s.rimMaterial === 'paint2';       // painted wire wheels: rim and spokes in the body colour
-          const w = own ? 0.5 : 0.3; set(x, y, ang < w ? (own ? rimM : 'chrome') : 'black', ang < w ? (dot > 0 ? 4 : 3) : 0, ly, id); } }   // painted wire wheels read as the wheel's colour with dark gaps
+        else { // cross-laced wire: two sets of spokes leaving the hub at a slant, one each way, so they cross in a lattice as on the real wheel
+          const sp = Math.max(8, Math.round((s.spokes || 30) / 2)), own = s.rimMaterial === 'paint' || s.rimMaterial === 'paint2', tw = (1 - q) * 0.9;
+          const f1 = (((a + tw) / (Math.PI * 2)) * sp % 1 + 1) % 1, f2 = (((a - tw) / (Math.PI * 2)) * sp % 1 + 1) % 1, w = own ? 0.26 : 0.2, on = f1 < w || f2 < w, both = f1 < w && f2 < w;
+          set(x, y, on ? (own ? rimM : 'chrome') : 'black', on ? (both ? 4 : dot > 0 ? 3 : 2) : 0, ly, id); } }
       else if (s.style === 'artillery') { const sp = s.spokes || 12, seg = ((a / (Math.PI * 2)) * sp % 1 + 1) % 1, wdt = 0.16 + 0.22 * (1 - q);
         if (q > 0.86) set(x, y, rimM, dot > 0.2 ? 3 : 1, ly, id); else if (q < 0.26) set(x, y, 'chrome', q < 0.14 ? (dot > 0 ? 4 : 2) : 1, ly, id);
         else if (Math.abs(seg - 0.5) < wdt / 2) set(x, y, rimM, Math.abs(seg - 0.5) < wdt / 5 ? 3 : dot > 0 ? 2 : 1, ly, id); else set(x, y, 'iron', q < 0.6 ? 1 : 0, ly, id); }

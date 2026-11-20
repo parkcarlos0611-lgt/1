@@ -170,9 +170,9 @@ for k, (a, b) in enumerate(((785, 890), (1105, 1215))):
 part('lamp', 'lamp', 'chrome', 'fender', slot='lamp', pair=True, fit=2.5, smooth=('side', 'front', 'top'),
      side=side((150, 345), (160, 330), (180, 326), (205, 335), (228, 352), (234, 372), (232, 400), (215, 415), (190, 420), (160, 418), (148, 400), (145, 372)),
      front=ell(377, 910, 121, 121), top=[[410, 330], [330, 300], [250, 318], [205, 395], [250, 472], [330, 492], [410, 462]])
-# the lamp seen face on, as the front sheet draws it: a chrome rim, a silvered reflector behind clear glass (bright,
-# shaded like a bowl), the bulb a dark point at its centre
-part('lens', 'lamp', 'chrome', 'fender', on='lamp', slot='lamp', pair=True, x=[303, 312], smooth=('front',), front=ell(377, 910, 100, 100))
+# the lamp seen face on, as the front sheet draws it: a nickel rim, then glass over a silvered reflector (its own
+# material: brighter and whiter than the rim, shaded like a bowl), the bulb a dark point at its centre
+part('lens', 'lamp', 'white', 'fender', on='lamp', slot='lamp', pair=True, x=[303, 312], smooth=('front',), front=ell(377, 910, 100, 100), detail={'kind': 'bowl'})
 part('bulb', 'lamp', 'black', 'flat', on='lens', slot='lamp', pair=True, x=[300, 304], smooth=('front',), front=ell(377, 910, 16, 16))
 part('lampBar', 'lamp', 'chrome', 'flat', slot='lamp', x=[380, 420], front=half([0, 872], [270, 880], [270, 905], [0, 900]))
 part('lampStand', 'lamp', 'chrome', 'flat', slot='lamp', pair=True, y=[370, 396], side=side((180, 418), (198, 418), (203, 470), (182, 470)))
@@ -200,7 +200,7 @@ part('spare', 'spare', 'rubber', 'fender', wheel={'r': 380},
      top=tyre_section(3680, 3860, -385, 385), smooth=('side', 'top'), detail={'kind': 'treadFace', 'pitch': 38})
 part('spareHub', 'spare', 'chrome', 'flat', on='spare', smooth=('side',), y=[-60, 60], side=ell(S(1770, 0)[0], 868, 36, 70), lift=1)
 
-M = {'id': 'sedan29', 'name': 'four-door sedan, 1929', 'year': 1929, 'length': L, 'width': W, 'height': H, 'paint': '#3b3e25', 'paint2': '#232327', 'canvas': '#34343a',
+M = {'id': 'sedan29', 'name': 'four-door sedan, 1929', 'year': 1929, 'length': L, 'width': W, 'height': H, 'paint': '#3b3e25', 'paint2': '#232327', 'canvas': '#34343a', 'chrome': '#a49d94',   # nickel, as the shell and lamps show it on the sheet
      'wheels': [{'x': FX, 'r': R, 'y': 690}, {'x': RX, 'r': R, 'y': 690}], 'wheel': {'rim': 0.66, 'style': 'wire', 'spokes': 36, 'rimMaterial': 'paint', 'cap': 0.22, 'capRings': 1},
      'parts': P}
 json.dump(M, open(OUT, 'w'), indent=0)

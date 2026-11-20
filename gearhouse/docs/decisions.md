@@ -253,3 +253,10 @@ These decisions still hold, from `legacy/docs/MASTER_GAME_PLAN.md`:
 ## 2026-11-20 — the spare drawn as the tyre it is
 
 - Seen from the side and from above, the spare shows its tread edge on with the same section and the same face-on tread as the road tyres seen from in front (one shared tyre section per car). The section is rounder at the top, flat where it stands, and its tread finer.
+
+## 2026-11-20 — lamp glass, nickel, tread bands, laced wire wheels
+
+- The lamp's face is its own material (glass over a silvered reflector, detail 'bowl'), no longer the rim's chrome.
+- A car may give its bright metal's colour (design.chrome); the 1929 sedan's is nickel, warmer and greyer than chrome.
+- Tyres seen face on: a continuous centre rib between two grooves, blocks either side in a zigzag, darker shoulders.
+- Wire wheels: two sets of slanted spokes crossing in a lattice, as on a laced wheel; painted wheels in their own colour.

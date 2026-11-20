@@ -34,7 +34,7 @@ export interface CarPart {
 }
 export interface CarModel {
   id: string; name: string; year: number; length: number; width: number; height: number; paint: string; paint2: string;
-  wheels: { x: number; r: number; y: number }[]; wheel: Partial<WheelSpec>; canvas?: string;
+  wheels: { x: number; r: number; y: number }[]; wheel: Partial<WheelSpec>; canvas?: string; chrome?: string;
   features?: Partial<Record<OutlineKey, Feature[]>>; parts: CarPart[];
 }
 
@@ -71,5 +71,5 @@ export function viewDesign(m: CarModel, view: ViewName, only?: (p: CarPart) => b
   });
   if (!only) for (const f of m.features?.[key] ?? []) features.push(f);
   const top = key === 'top', across = key === 'front' || key === 'rear';
-  return { id: `${m.id}_${view}`, name: `${m.name} (${view})`, year: m.year, length: across ? m.width : m.length, height: top ? m.width : m.height, paint: m.paint, paint2: m.paint2, ...(m.canvas ? { canvas: m.canvas } : {}), panels, features, wheels, frame: 'reveal', ...(key === 'front' ? { glassLift: -1 } : {}) };
+  return { id: `${m.id}_${view}`, name: `${m.name} (${view})`, year: m.year, length: across ? m.width : m.length, height: top ? m.width : m.height, paint: m.paint, paint2: m.paint2, ...(m.canvas ? { canvas: m.canvas } : {}), ...(m.chrome ? { chrome: m.chrome } : {}), panels, features, wheels, frame: 'reveal', ...(key === 'front' ? { glassLift: -1 } : {}) };
 }

@@ -34,7 +34,11 @@ export const UTILITY48: RigSpec = {
 
 type V2 = { x: number; y: number };
 export interface Tyre { side: 1 | -1; axle: 0 | 1; p: V2[]; v: V2[]; hub: V2; angle: number; contact: number }
-export interface Ground { near: (x: number) => number; far: (x: number) => number }
+/** what the tyre stands on: grip, rolling resistance (share of the load) and how far a loaded tyre sinks (m) */
+export interface Soil { mu: number; crr: number; sink: number; dust: number }
+export const SOILS: Record<string, Soil> = { asphalt: { mu: 0.95, crr: 0.015, sink: 0, dust: 0 }, gravel: { mu: 0.72, crr: 0.03, sink: 0.008, dust: 0.5 },
+  dirt: { mu: 0.65, crr: 0.04, sink: 0.012, dust: 0.7 }, sand: { mu: 0.5, crr: 0.11, sink: 0.04, dust: 1 } };
+export interface Ground { near: (x: number) => number; far: (x: number) => number; soil?: (x: number) => Soil }
 
 export class Rig {
   s: RigSpec; g: Ground; t = 0;
@@ -44,6 +48,10 @@ export class Rig {
   ay: [number, number]; avy: [number, number] = [0, 0]; aph: [number, number] = [0, 0]; awph: [number, number] = [0, 0];
   tyres: Tyre[] = [];
   throttle = 0; brake = 0;
+  /** torque at all four wheels together at full throttle (N m); the powertrain sets it every step */
+  maxTorque: number;
+  /** the fastest a tyre's tread slides on the ground this step (m/s): dust and wheelspin */
+  slip = 0;
   /** spring deflection from rest per corner [axle][near, far] (m, + compressed), for the drawing */
   defl: number[][] = [[0, 0], [0, 0]];
   /** a visual squash of the body picture driven by its vertical acceleration (see review 24: elastic, not rotated) */
@@ -51,7 +59,7 @@ export class Rig {
   private F0: number[];
 
   constructor(spec: RigSpec, ground: Ground, x: number) {
-    this.s = spec; this.g = ground; this.x = x;
+    this.s = spec; this.g = ground; this.x = x; this.maxTorque = spec.maxTorque;
     const h0 = Math.max(ground.near(x), ground.far(x));
     this.y = h0 + spec.comH; this.ay = [h0 + spec.wheelR, h0 + spec.wheelR];
     const share = [-spec.axleX[1] / (spec.axleX[0] - spec.axleX[1]), spec.axleX[0] / (spec.axleX[0] - spec.axleX[1])];
@@ -84,7 +92,7 @@ export class Rig {
       Fa[axle] = Fa[axle]! - F; Ma[axle] = Ma[axle]! - F * side * s.halfSpringTrack;
     }
     // ---- tyres: rings of mass points ----
-    const drive = this.throttle * s.maxTorque / 4;
+    const drive = this.throttle * this.maxTorque / 4; let roll = 0; this.slip = 0;
     for (const ty of this.tyres) {
       const h = this.hub(ty.axle, ty.side); ty.hub = h;
       const hv = { x: this.vx, y: this.avy[ty.axle] + ty.side * s.halfTrack * this.awph[ty.axle] };
@@ -110,11 +118,11 @@ export class Rig {
         // drive: a turning force round the ring (clockwise drives the car forward), its reaction on the axle housing
         const tx = uy, tyy = -ux, Fd = drive / (N * s.wheelR); f[k]!.x += tx * Fd; f[k]!.y += tyy * Fd;
         // the ground
-        const gy = ty.side > 0 ? this.g.near(p.x) : this.g.far(p.x);
+        const so = this.g.soil?.(p.x), gy = (ty.side > 0 ? this.g.near(p.x) : this.g.far(p.x)) - (so ? so.sink : 0), mu = so ? so.mu : T.mu;
         if (p.y < gy) {
           const pen = gy - p.y, sl = ((ty.side > 0 ? this.g.near(p.x + 0.02) : this.g.far(p.x + 0.02)) - gy) / 0.02, nl = Math.hypot(1, sl), gnx = -sl / nl, gny = 1 / nl;
           const vn = v.x * gnx + v.y * gny, Fn = Math.max(0, T.groundK * pen - T.groundC * vn), vt = v.x * gny - v.y * gnx;
-          const Ft = -Math.min(T.mu * Fn, Math.abs(vt) * 4000) * Math.sign(vt) - this.brake * T.mu * Fn * Math.tanh(vt / 0.05);
+          const Ft = -Math.min(mu * Fn, Math.abs(vt) * 4000) * Math.sign(vt) - this.brake * mu * Fn * Math.tanh(vt / 0.05); roll += Fn * (so ? so.crr : 0.015); this.slip = Math.max(this.slip, Math.abs(vt));
           f[k]!.x += gnx * Fn + gny * Ft; f[k]!.y += gny * Fn - gnx * Ft; ty.contact++;
         }
       }
@@ -126,6 +134,7 @@ export class Rig {
       let om = 0; for (let k = 0; k < N; k++) { const p = ty.p[k]!, v = ty.v[k]!, dx = p.x - h.x, dy = p.y - h.y; om += (dx * (v.y - hv.y) - dy * (v.x - hv.x)) / (dx * dx + dy * dy); }
       ty.angle += om / N * dt;
     }
+    Fbx -= roll * Math.tanh(this.vx / 0.3);                                                // rolling resistance, more in sand
     // ---- integrate the rigid parts ----
     this.vx += Fbx / (s.bodyMass + 2 * s.axleMass) * dt; this.x += this.vx * dt;
     this.vy += Fby / s.bodyMass * dt; this.y += this.vy * dt;

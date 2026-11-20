@@ -56,7 +56,12 @@ export type Detail =
   | { kind: 'ribs'; pitch: number }
   | { kind: 'vbars'; pitch: number; ring?: number }
   /** a wire mesh: bright wires both ways over a dark ground */
-  | { kind: 'mesh'; pitch: number };
+  | { kind: 'mesh'; pitch: number }
+  /** a tyre seen face on: the tread blocks crowd together towards the top and bottom (the tread turns away), the
+   *  shoulders are darker than the crown */
+  | { kind: 'treadFace'; pitch: number }
+  /** a radiator core: small dark cells in rows, a little lighter at the top */
+  | { kind: 'cells'; pitch: number };
 
 /** tone steps on a grid over a panel's box: x0 and z1 are its top left corner in mm */
 export interface ToneMap { x0: number; z1: number; w: number; h: number; mm: number; steps: number; d: number[] }

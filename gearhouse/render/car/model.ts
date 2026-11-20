@@ -21,6 +21,8 @@ export interface CarPart {
   wheel?: { r: number };
   /** a small step forward in the order, for a part lying on another's surface (a lens on its lamp) */
   lift?: number;
+  /** how light falls on the part in each view, read off that view of the sheet (tools/ref/modelshade.py) */
+  shade?: Partial<Record<OutlineKey, { nx: number; nt: number; v: number[] }>>;
 }
 export interface CarModel {
   id: string; name: string; year: number; length: number; width: number; height: number; paint: string; paint2: string;
@@ -47,7 +49,7 @@ export function viewDesign(m: CarModel, view: ViewName, only?: (p: CarPart) => b
     const at = (u: number, v: number): [number, number] => key === 'side' ? [lerp(b.x, u), lerp(b.z, v)] : key === 'front' ? [C + s * lerp(b.y, u), lerp(b.z, v)] : key === 'rear' ? [C - s * lerp(b.y, u), lerp(b.z, v)] : [lerp(b.x, u), C + s * lerp(b.y, v)];
     if (p.wheel && key === 'rear') { wheels.push({ ...W, x: C, r: p.wheel.r, z: (b.z[0] + b.z[1]) / 2, zOrder: z, spare: true }); return; }
     const pts = p.outlines[key]!.map(([u, v, sharp]): Pt => { const [x, y] = at(u, v); return sharp ? [Math.round(x), Math.round(y), 1] : [Math.round(x), Math.round(y)]; });
-    const panel: Panel = { id: p.id + (s < 0 ? '~' : ''), pts, material: p.material, surface: p.surface, z, element: p.element, ...(p.slot ? { slot: p.slot } : {}), ...(p.detail ? { detail: p.detail } : {}) };
+    const panel: Panel = { id: p.id + (s < 0 ? '~' : ''), pts, material: p.material, surface: p.surface, z, element: p.element, ...(p.slot ? { slot: p.slot } : {}), ...(p.detail ? { detail: p.detail } : {}), ...(p.shade?.[key] ? { shade: p.shade[key] } : {}) };
     if (p.cutWheel && key === 'side') { const w = m.wheels[p.cutWheel.i]!; panel.cut = [{ x: w.x, z: w.r, r: p.cutWheel.r }]; }
     panels.push(panel);
     for (const f of p.features?.[key] ?? []) { const g = JSON.parse(JSON.stringify(f));

@@ -217,3 +217,11 @@ These decisions still hold, from `legacy/docs/MASTER_GAME_PLAN.md`:
 - Improvement A: placed outlines are pulled onto the nearest strong line of the drawing (zkit.fit_closed, centred outlines kept symmetric). B: every part gets a score per view, the share of its visible outline lying on a line of the drawing (tools/ref/score.py, pass mark 80); in views other than the side the score also counts the sheet's own disagreement. C: outlines are checked over the enlarged view (tools/ref/overlay.py).
 - The car's interior is not drawn.
 - Next, in order: lines inside parts taken from the drawing, light per part, rounded corners, sub-parts (glass with reveal and frame, lamp with rim and lens, fender with face and side); then counts and colours measured; then the procedure written down, a second car made by it, and only then several cars at once.
+
+## 2026-11-20 — plan, front and rear views read again; tyres seen face on; light per part (review 28, continued)
+
+- Plan view outlines read off the plan sheet again: fenders full length, running board from fender to fender under both, splash aprons and the front cross member under the hood, bullet lamps, curved front bumper with its irons, rear bumpers either side of the spare with the spare carrier.
+- Tyres seen from in front or behind: a balloon section flattened where it stands, its tread drawn face on (blocks crowd together towards the top and bottom, darker shoulders; detail 'treadFace'). Radiator core: rows of dark cells ('cells').
+- Parts lying on another part's face (windscreen, side glass, radiator core, lamp lens) are lifted in the drawing order so the face never covers them.
+- Improvement G: light per painted part and per view is read off the sheet and kept in the model (tools/ref/modelshade.py, part.shade).
+- Open: headlamp height. The side sheet puts the lamp centre about 1030 mm up, the front sheet about 900 mm; by the side-view rule the front view shows the lamps higher than its sheet.

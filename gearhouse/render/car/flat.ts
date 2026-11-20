@@ -207,6 +207,17 @@ export function rasterizeFlat(d0: CarDesign, opt: { frameW?: number; shadow?: bo
       for (let y = 0; y < bh; y++) for (let x = 0; x < bw; x++) { if (!M(x, y)) continue; let edge = 99; for (let r = 1; r <= ring; r++) if (!M(x - r, y) || !M(x + r, y) || !M(x, y - r) || !M(x, y + r)) { edge = r; break; }
         const gx = bx + x, gy = by + y; if (edge <= ring) { set(gx, gy, 'chrome', !M(x, y - edge) ? 4 : !M(x, y + edge) ? 1 : !M(x - edge, y) ? 3 : 2, ly); continue; }
         const k = ((x - cx) % pitch + pitch) % pitch; set(gx, gy, k === 0 ? 'chrome' : 'black', k === 0 ? (x === cx ? 4 : 2) : k === 1 ? 1 : 0, ly); } }
+    else if (dt.kind === 'treadFace') {
+      let y0 = bh, y1 = -1; for (let y = 0; y < bh; y++) for (let x = 0; x < bw; x++) if (M(x, y)) { y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+      const cy = (y0 + y1) / 2, ry = Math.max(1, (y1 - y0) / 2), R = ry * MM, pitch = dt.pitch;
+      for (let y = 0; y < bh; y++) { let a = -1, b = -1; for (let x = 0; x < bw; x++) if (M(x, y)) { if (a < 0) a = x; b = x; } if (a < 0) continue;
+        const v = Math.max(-1, Math.min(1, (y + 0.5 - cy) / ry)), th = Math.asin(v), arc = th * R / pitch, groove = (arc - Math.floor(arc)) < 0.28 && Math.abs(v) < 0.97, edge = Math.abs(v) > 0.9;
+        for (let x = a; x <= b; x++) { const u = (x - a + 0.5) / Math.max(1, b - a + 1), shoulder = u < 0.16 || u > 0.84, lit = u < 0.4 && u > 0.16 && v < 0.2;
+          let l = shoulder ? 1 : lit ? 3 : 2; if (groove && !shoulder) l = 0; else if (groove) l = 0; if (edge) l = Math.min(l, 1); if (x === a || x === b) l = 0;
+          set(bx + x, by + y, 'rubber', l, ly); } } }
+    else if (dt.kind === 'cells') { const p = Math.max(2, Math.round(dt.pitch / MM)); let top = bh; for (let y = 0; y < bh; y++) for (let x = 0; x < bw; x++) if (M(x, y)) top = Math.min(top, y);
+      for (let y = 0; y < bh; y++) for (let x = 0; x < bw; x++) { if (!M(x, y)) continue; const row = Math.floor(y / p), off = row % 2 ? Math.floor(p / 2) : 0, cell = ((x + off) % p === 0) || (y % p === 0);
+        set(bx + x, by + y, 'black', cell ? (y - top < bh * 0.3 ? 3 : 2) : y - top < 2 ? 2 : 0, ly); } }
     else if (dt.kind === 'mesh') { const pitch = Math.max(2, Math.round(dt.pitch / MM)); for (let y = 0; y < bh; y++) for (let x = 0; x < bw; x++) { if (!M(x, y)) continue; const gx = bx + x, gy = by + y, wx = x % pitch === 0, wy = y % pitch === 0;
         set(gx, gy, wx || wy ? 'chrome' : 'black', wx && wy ? 4 : wx || wy ? ((x + y) & 1 ? 2 : 3) : !M(x, y - 1) || y % pitch === 1 ? 0 : 1, ly); } }
     else if (dt.kind === 'planks' || dt.kind === 'ribs') { const pitch = Math.max(2, Math.round(dt.pitch / MM)); for (let y = 0; y < bh; y++) for (let x = 0; x < bw; x++) if (M(x, y) && y % pitch === pitch - 1) { const i = (by + y) * w + bx + x; lv[i] = 0; if (M(x, y + 1)) lv[i + w] = Math.min(PAL[mt].c.length - 1, lv[i + w]! + 1); } }

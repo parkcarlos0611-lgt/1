@@ -17,6 +17,13 @@ export type SoundKind = '' | keyof typeof CH;
 export class Sound {
   on = true; private ac: AudioContext | null = null; private noise: AudioBuffer | null = null; private ch: Record<string, { g: GainNode; f: BiquadFilterNode }> = {}; private t = 0;
   private amb: Record<string, { g: GainNode; f?: BiquadFilterNode; o?: OscillatorNode }> = {};
+  /** browsers let sound start only from a real gesture: on touch screens a press (pointerdown) does not count, the lift
+   *  (pointerup, touchend, click) does; an AudioContext made too early stays suspended. So every input calls this: it
+   *  makes the context once and resumes it while it is not running. On iPhone and iPad the 'playback' session plays
+   *  even with the silent switch on (web audio is muted by it otherwise). */
+  unlock() { try { const n = navigator as Navigator & { audioSession?: { type: string } }; if (n.audioSession && n.audioSession.type !== 'playback') n.audioSession.type = 'playback'; } catch { /* older browsers */ }
+    this.start(); if (this.ac && this.ac.state !== 'running') void this.ac.resume().catch(() => undefined); }
+  get state() { return this.ac?.state ?? 'none'; }
   start() { if (this.ac) return; try { const ac = new AudioContext(), len = ac.sampleRate * 2, buf = ac.createBuffer(1, len, ac.sampleRate), d = buf.getChannelData(0); for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
     const src = (b: BiquadFilterType, f: number, q: number) => { const s = ac.createBufferSource(); s.buffer = buf; s.loop = true; s.loopStart = Math.random(); const bp = ac.createBiquadFilter(); bp.type = b; bp.frequency.value = f; bp.Q.value = q; const g = ac.createGain(); g.gain.value = 0; s.connect(bp).connect(g).connect(ac.destination); s.start(0, Math.random() * 1.5); return { g, f: bp }; };
     for (const [k, [f, q]] of Object.entries(CH)) this.ch[k] = src('bandpass', f, q);
@@ -46,8 +53,9 @@ export class App {
     this.ui = new UI(this.S, typer); cv.width = W; cv.height = H; this.ctx = cv.getContext('2d')!; this.img = this.ctx.createImageData(W, H);
     const toPx = (ev: PointerEvent) => { const r = cv.getBoundingClientRect(); return [(ev.clientX - r.left) / r.width * W, (ev.clientY - r.top) / r.height * H] as const; };
     cv.addEventListener('pointermove', ev => { const [x, y] = toPx(ev); this.ui.move(x, y); });
-    cv.addEventListener('pointerdown', ev => { this.sound.start(); const [x, y] = toPx(ev); this.ui.move(x, y); this.ui.down(x, y); ev.preventDefault(); });
-    addEventListener('pointerup', () => this.ui.up());
+    cv.addEventListener('pointerdown', ev => { this.sound.unlock(); const [x, y] = toPx(ev); this.ui.move(x, y); this.ui.down(x, y); ev.preventDefault(); });
+    addEventListener('pointerup', () => { this.sound.unlock(); this.ui.up(); });
+    for (const k of ['touchend', 'click', 'keydown'] as const) addEventListener(k, () => this.sound.unlock(), { capture: true });
     addEventListener('keydown', e => { if (this.ui.key(e)) { e.preventDefault(); return; } if (document.activeElement === typer) return; if (this.top?.key?.(this, e)) e.preventDefault(); });
     addEventListener('resize', () => this.fit()); this.fit();
     requestAnimationFrame(t => this.loop(t));

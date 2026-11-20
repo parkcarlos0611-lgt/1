@@ -199,3 +199,8 @@ These decisions still hold, from `legacy/docs/MASTER_GAME_PLAN.md`:
 
 - The picture squash is removed. Sprung pictures are placed whole at whole pixels: the body moves up and down on its springs and a little fore and aft when speeding up or braking; it takes a new pose only after standing on a slope for a moment, never for a bounce. Spring and damper mounts follow the drawn body.
 - Tyres stay ring tyres (contact squash), with the carcass damped against ringing round the hub; they are drawn round above the hub and pressed flat only below it.
+
+## 2026-11-20 — the first full car: 1929 four-door sedan (method Z)
+
+- From the planner's 1920s sheet and chassis sheet: left, right (mirrored), front, rear and plan views fitted to the sheet (tools/ref/sedan29.py, sedan29_z.py), sized from the wheelbase 2629 mm; a chassis design with frame, four-cylinder engine, gearbox, fuel tank in the cowl, steering and exhaust.
+- In the test track as a second car: transverse leaf springs front and rear seen end-on, lever dampers, torque tube to the rear axle, rear-wheel drive, three speeds (physics SEDAN29, SEDAN29_DRIVE, SEDAN29_LAYOUT).

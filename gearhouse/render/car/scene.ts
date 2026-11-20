@@ -15,6 +15,8 @@ export interface GearLayout {
   cx: number; cz: number;
   /** per axle, front first: the spring's fixed eye and shackle pin along the car, their height, the damper's frame mount */
   springs: { fixed: number; shackle: number }[]; eyeZ: number; pinZ: number; damperTop: { x: number; z: number }[]; damperDx: number[];
+  /** a transverse leaf spring across each axle (seen end-on in the side view) instead of a spring along each side */
+  transverse?: boolean;
   /** the transfer box's outputs to the front and rear shafts */
   outputs: { x: number; z: number }[];
   /** panels of the body design that belong to the running gear and are drawn with it, not with the body */
@@ -24,6 +26,12 @@ export const LR48_LAYOUT: GearLayout = {
   cx: 1740, cz: 780, springs: [{ fixed: 3220, shackle: 2300 }, { fixed: 1160, shackle: 260 }], eyeZ: 365, pinZ: 380,
   damperTop: [{ x: 2610, z: 520 }, { x: 860, z: 520 }], damperDx: [-0.13, 0.13], outputs: [{ x: 1900, z: 380 }, { x: 1650, z: 380 }],
   running: ['houseF', 'houseR', 'horn', 'chassis', 'crossR'],
+};
+/** the 1929 four-door sedan: transverse leaf springs front and rear, lever dampers, a torque tube to the rear axle */
+export const SEDAN29_LAYOUT: GearLayout = {
+  cx: 1900, cz: 700, springs: [{ fixed: 0, shackle: 0 }, { fixed: 0, shackle: 0 }], eyeZ: 600, pinZ: 600, transverse: true,
+  damperTop: [{ x: 3500, z: 560 }, { x: 650, z: 560 }], damperDx: [-0.02, 0.02], outputs: [{ x: 1930, z: 660 }, { x: 1930, z: 660 }],
+  running: ['houseF', 'houseR'],
 };
 export type SurfaceKind = 'asphalt' | 'gravel' | 'dirt' | 'sand';
 const SURF: Record<SurfaceKind, RGB[]> = {
@@ -70,6 +78,11 @@ export class DriveScene {
   }
   private corner(cv: Canvas, axle: 0 | 1, side: 1 | -1) {
     const r = this.rig, s = r.s, far = side < 0, L = this.L, hx = r.x + s.axleX[axle], ay = r.ay[axle] + side * s.halfSpringTrack * r.aph[axle], sp = L.springs[axle]!;
+    if (L.transverse) {                                                                   // the spring end-on: a stack of leaves on the axle, its shackle up to the crossmember
+      if (far) return; const top = this.sprung(this.L.cx + s.axleX[axle] * 1000, L.eyeZ, 0), ty = top.y, n = 6;
+      for (let k = 0; k < n; k++) { const y = ay + 0.06 + (ty - ay - 0.06) * k / n; const [x0, y0] = this.P(hx - 0.06 + k * 0.004, y), [x1] = this.P(hx + 0.06 - k * 0.004, y); cv.line(x0, y0, x1, y0, 1, IRON, k === 0 || k === n - 1); }
+      const T = this.sprung(L.damperTop[axle]!.x, L.damperTop[axle]!.z, side), B = { x: hx + L.damperDx[axle]!, y: ay + 0.05 };
+      damper(cv, this.P(T.x, T.y), this.P(B.x, B.y)); return; }
     const A = this.sprung(sp.fixed, L.eyeZ, side), Pp = this.sprung(sp.shackle, L.pinZ, side), S = { x: hx, y: ay + 0.075 }, l = 0.1, away = Math.sign(Pp.x - S.x);
     const E = (a: number) => ({ x: Pp.x + away * l * Math.sin(a), y: Pp.y - l * Math.cos(a) }), len = (a: number) => Math.hypot(A.x - S.x, A.y - S.y) + Math.hypot(S.x - E(a).x, S.y - E(a).y);
     const key = axle * 2 + (far ? 1 : 0); this.L0[key] ??= len(0);
@@ -81,7 +94,7 @@ export class DriveScene {
   }
   private wheel(cv: Canvas, k: number) {
     const r = this.rig, t = r.tyres[k]!, far = t.side < 0;
-    tyre(cv, t.p.map(q => this.P(q.x, q.y, far)), this.P(t.hub.x, t.hub.y, far), r.s.wheelR * 0.6 * this.SC, -t.angle, this.paint, { tread: true, capR: 0.07 * this.SC, round: r.s.wheelR * this.SC });
+    tyre(cv, t.p.map(q => this.P(q.x, q.y, far)), this.P(t.hub.x, t.hub.y, far), r.s.wheelR * 0.6 * this.SC, -t.angle, this.paint, { tread: !!this.designs.body.wheels[0]?.tread, capR: 0.07 * this.SC, round: r.s.wheelR * this.SC });
   }
   private groundFill(cv: Canvas, far: boolean) {
     for (let X = 0; X < this.W; X++) { const wx = this.camX + (X + 0.5 - (far ? this.far[0] : 0) - this.W / 2) / this.SC, g = far ? this.ground.far(wx) : this.ground.near(wx), top = Math.round(this.sy(g) + (far ? this.far[1] : 0)), R = SURF[this.kind(wx)];
@@ -111,10 +124,10 @@ export class DriveScene {
     this.blit(cv, this.house, 1);
     cv.dim = 0.42; cv.dimTo = [52, 58, 74]; this.corner(cv, 0, -1); this.corner(cv, 1, -1); this.wheel(cv, 1); this.wheel(cv, 3); cv.dim = 0;
     this.blit(cv, this.chassis, 0);
-    for (const axle of [0, 1] as const) { const hx = r.x + s.axleX[axle], ay = r.ay[axle];
+    for (const axle of [0, 1] as const) { const hx = r.x + s.axleX[axle], ay = r.ay[axle]; const driven = !(s.rearDrive && axle === 0);
       cv.disc(...this.P(hx, ay), 0.13 * this.SC, (dx, dy, q) => (q > 0.85 ? [14, 13, 18] : IRON[(-dx - dy) > 2 ? 3 : 2]!));
       const o = this.L.outputs[axle]!, out = this.sprung(o.x, o.z, 0), pin = { x: hx + (axle === 0 ? -0.17 : 0.17), y: ay - 0.02 };
-      shaft(cv, this.P(out.x, out.y), this.P(pin.x, pin.y)); }
+      if (driven) shaft(cv, this.P(out.x, out.y), this.P(pin.x, pin.y)); }
     this.corner(cv, 0, 1); this.corner(cv, 1, 1); this.wheel(cv, 0); this.wheel(cv, 2);
     if (!this.xray) this.blit(cv, this.body, 1);
     else { const before = cv.rgba.slice(); let img: CarImage | null = null;

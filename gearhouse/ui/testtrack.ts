@@ -1,12 +1,18 @@
 // Test drive page (review 24): drive the 1948 utility over the test course with the pedals, see its springs work,
 // look through the body, change the springs and the transfer range. Bundled into one page by tools/ref/buildtrack.mjs.
-import { Rig, UTILITY48, type RigSpec } from '../physics/rig';
-import { Powertrain, UTILITY48_DRIVE } from '../physics/powertrain';
-import { DriveScene, LR48_LAYOUT } from '../render/car/scene';
+import { Rig, UTILITY48, SEDAN29, type RigSpec } from '../physics/rig';
+import { Powertrain, UTILITY48_DRIVE, SEDAN29_DRIVE, type PowertrainSpec } from '../physics/powertrain';
+import { DriveScene, LR48_LAYOUT, SEDAN29_LAYOUT, type GearLayout } from '../render/car/scene';
 import { Canvas } from '../render/car/running';
 import { COURSE, COURSE_END, kind } from './course';
-import body from '../data/bodies/lr48_right.json';
-import chassis from '../data/bodies/lr48_chassis_right.json';
+import lrBody from '../data/bodies/lr48_right.json';
+import lrChassis from '../data/bodies/lr48_chassis_right.json';
+import sdBody from '../data/bodies/sedan29_right.json';
+import sdChassis from '../data/bodies/sedan29_chassis_right.json';
+const CARS: Record<string, { spec: RigSpec; drive: PowertrainSpec; layout: GearLayout; body: unknown; chassis: unknown; name: string; transfer: boolean }> = {
+  sedan29: { spec: SEDAN29, drive: SEDAN29_DRIVE, layout: SEDAN29_LAYOUT, body: sdBody, chassis: sdChassis, name: '1929 4도어 세단', transfer: false },
+  lr48: { spec: UTILITY48, drive: UTILITY48_DRIVE, layout: LR48_LAYOUT, body: lrBody, chassis: lrChassis, name: '1948 다목적차', transfer: true } };
+let car = 'sedan29';
 import type { CarDesign } from '../render/car/types';
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -15,10 +21,11 @@ cvEl.width = W; cvEl.height = H;
 const SPRINGS: Record<string, { k: number; c: number; label: string }> = { soft: { k: 0.6, c: 0.7, label: '부드럽게' }, std: { k: 1, c: 1, label: '표준' }, hard: { k: 1.6, c: 1.3, label: '단단하게' } };
 let rig: Rig, scene: DriveScene, pt: Powertrain, lastAngles: number[] = [], pedal = 0, brake = 0, springs = 'std', range: 'high' | 'low' = 'high', built = false;
 
-function spec(): RigSpec { const f = SPRINGS[springs]!; return { ...UTILITY48, spring: { ...UTILITY48.spring, k: [UTILITY48.spring.k[0] * f.k, UTILITY48.spring.k[1] * f.k], c: [UTILITY48.spring.c[0] * f.c, UTILITY48.spring.c[1] * f.c] } }; }
+function spec(): RigSpec { const f = SPRINGS[springs]!, B = CARS[car]!.spec; return { ...B, spring: { ...B.spring, k: [B.spring.k[0] * f.k, B.spring.k[1] * f.k], c: [B.spring.c[0] * f.c, B.spring.c[1] * f.c] } }; }
 async function reset(rebuild: boolean) {
-  const old = scene; rig = new Rig(spec(), COURSE, 3); rig.run(1.0); pt = new Powertrain(UTILITY48_DRIVE); pt.range = range;
-  scene = new DriveScene(rig, COURSE, kind, { body: body as unknown as CarDesign, chassis: chassis as unknown as CarDesign }, LR48_LAYOUT, W, H);
+  const old = scene; rig = new Rig(spec(), COURSE, 3); rig.run(1.0); const C = CARS[car]!; pt = new Powertrain(C.drive); pt.range = C.transfer ? range : 'high';
+  scene = new DriveScene(rig, COURSE, kind, { body: C.body as CarDesign, chassis: C.chassis as CarDesign }, C.layout, W, H);
+  $('carName').textContent = C.name; for (const r of ['high', 'low']) $<HTMLInputElement>(`rg-${r}`).disabled = !C.transfer;
   if (rebuild || !old) { const bar = $('progress'); bar.hidden = false;
     await scene.build(async (d, n) => { if (d % 3 === 0) { $('progressText').textContent = `차를 자세별로 그리는 중 ${d}/${n}`; (bar.querySelector('i') as HTMLElement).style.width = `${d / n * 100}%`; await new Promise(r => setTimeout(r, 0)); } });
     bar.hidden = true; built = true; }
@@ -52,6 +59,7 @@ addEventListener('keydown', e => { if (e.repeat) return; if (e.key === 'ArrowRig
 addEventListener('keyup', e => { if (['ArrowRight', 'd', 'ArrowLeft', 'a'].includes(e.key)) pedal = 0; if ([' ', 'ArrowDown', 's'].includes(e.key)) brake = 0; });
 $('xray').addEventListener('change', () => (scene.xray = $<HTMLInputElement>('xray').checked));
 for (const k of Object.keys(SPRINGS)) $(`sp-${k}`).addEventListener('change', () => { springs = k; void reset(false); });
+for (const k of Object.keys(CARS)) $(`car-${k}`).addEventListener('change', () => { car = k; void reset(true); });
 for (const r of ['high', 'low'] as const) $(`rg-${r}`).addEventListener('change', () => { range = r; pt.range = r; pt.gear = 1; });
 $('restart').addEventListener('click', () => void reset(false));
 void reset(true).then(() => requestAnimationFrame(frame));

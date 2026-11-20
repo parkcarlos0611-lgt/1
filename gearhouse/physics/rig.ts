@@ -22,8 +22,18 @@ export interface RigSpec {
   spring: { k: [number, number]; c: [number, number]; friction: number; bump: number; rebound: number };
   tyre: { nodes: number; mass: number; radialK: number; radialC: number; shapeC: number; ringK: number; crossK: number; pressure: number; groundK: number; groundC: number; mu: number };
   maxTorque: number;
+  /** only the rear wheels are driven (otherwise all four) */
+  rearDrive?: boolean;
 }
 /** a 1948 four-wheel-drive utility: 80 in wheelbase, 6.00-16 tyres, about 1.3 t */
+/** a 1929 four-door sedan: 103.5 in wheelbase, 4.50-21 tyres, about 1.1 t; transverse leaf springs (soft, wide spring base) */
+export const SEDAN29: RigSpec = {
+  bodyMass: 900, pitchInertia: 1500, rollInertia: 330, axleMass: 70, axleRollInertia: 26,
+  axleX: [1.39, -1.24], comH: 0.70, wheelR: 0.381, halfTrack: 0.71, halfSpringTrack: 0.36,
+  spring: { k: [30000, 34000], c: [1800, 2000], friction: 300, bump: 0.08, rebound: 0.08 },
+  tyre: { nodes: 18, mass: 0.6, radialK: 18000, radialC: 140, shapeC: 40, ringK: 2.2e6, crossK: 26000, pressure: 2.4e5 * 0.12, groundK: 150000, groundC: 420, mu: 0.9 },
+  maxTorque: 1200, rearDrive: true,
+};
 export const UTILITY48: RigSpec = {
   bodyMass: 1050, pitchInertia: 1350, rollInertia: 380, axleMass: 85, axleRollInertia: 34,
   axleX: [1.02, -1.012], comH: 0.78, wheelR: 0.365, halfTrack: 0.64, halfSpringTrack: 0.44,
@@ -90,9 +100,9 @@ export class Rig {
       Fa[axle] = Fa[axle]! - F; Ma[axle] = Ma[axle]! - F * side * s.halfSpringTrack;
     }
     // ---- tyres: rings of mass points ----
-    const drive = this.throttle * this.maxTorque / 4; let roll = 0; this.slip = 0;
+    const drive0 = this.throttle * this.maxTorque / (s.rearDrive ? 2 : 4); let roll = 0; this.slip = 0;
     for (const ty of this.tyres) {
-      const h = this.hub(ty.axle, ty.side); ty.hub = h;
+      const h = this.hub(ty.axle, ty.side); ty.hub = h; const drive = s.rearDrive && ty.axle === 0 ? 0 : drive0;
       const hv = { x: this.vx, y: this.avy[ty.axle] + ty.side * s.halfTrack * this.awph[ty.axle] };
       const f: V2[] = ty.p.map(() => ({ x: 0, y: -T.mass * 9.81 }));
       let hx = 0, hy = 0, area = 0;

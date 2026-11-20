@@ -5,6 +5,8 @@ export interface PowertrainSpec { peakTorque: number; peakRpm: number; width: nu
 /** a 1.6 litre four of 1948: about 50 hp, 108 Nm at 2000 rpm; transfer 1.148 high, 2.52 low; axles 4.7 */
 export const UTILITY48_DRIVE: PowertrainSpec = { peakTorque: 108, peakRpm: 2000, width: 3500, idle: 600, redline: 4300, gears: [2.99, 2.04, 1.38, 1.0], reverse: 2.64, final: 4.7, high: 1.148, low: 2.52, eff: 0.85 };
 
+/** the 1929 sedan: 3.3 litre side-valve four, 40 hp, about 175 Nm at 1000 rpm; three speeds; 3.77 axle; no transfer box */
+export const SEDAN29_DRIVE: PowertrainSpec = { peakTorque: 175, peakRpm: 1000, width: 3000, idle: 450, redline: 2800, gears: [3.11, 1.84, 1.0], reverse: 3.75, final: 3.77, high: 1, low: 1, eff: 0.88 };
 export class Powertrain {
   gear = 1; range: 'high' | 'low' = 'high'; rpm: number; reversing = false; clutch = 1;
   constructor(public s: PowertrainSpec) { this.rpm = s.idle; }

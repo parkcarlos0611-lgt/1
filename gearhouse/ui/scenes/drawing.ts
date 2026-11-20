@@ -61,16 +61,19 @@ const base = model as unknown as CarModel;
 let cur: Edit = { ...NO_EDIT, ...spec.start }, next: Edit = { ...cur };
 const PAPER = { x: 6, y: 6, w: 316, h: 258 }, SIDE = { x: 22, y: 20 }, PLAN = { x: 22, y: 150 };
 type Views = { side: LineMap; plan: LineMap };
+/** which pair of views the sheet shows: side and plan, or front and rear (same baseline) */
+let sheetMode: 'sp' | 'fr' = 'sp';
+const FRONT = { x: 48, y: 20 }, REAR = { x: 178, y: 20 };
 const cache = new Map<string, Views>();
 const FR = frameJson as unknown as Frame;
 let eraNo = ERAS.indexOf(spec.era); const RU = (): Rules => rules(ERAS[eraNo]!, sheetNo);
 /** the edit as built: the lights layout falls back to one the doors have room for */
 const eff = (e: Edit): Edit => { const R = RU(), ok = fits(FR, e, R.rearDoorMin, R.cabinMin), L = ([6, 4, 2] as const).filter(l => l <= e.lights).find(l => ok.includes(l)) ?? 2; return L === e.lights ? e : { ...e, lights: L }; };
 const carOf = (e: Edit) => edited(base, eff(e), FR);
-const views = (e: Edit): Views => { const k = JSON.stringify(eff(e)); let v = cache.get(k); if (!v) { const m = carOf(e); v = { side: lineMap(m, 'left', MM), plan: lineMap(m, 'top', MM) }; cache.set(k, v); } return v; };
+const views = (e: Edit): Views => { const k = sheetMode + JSON.stringify(eff(e)); let v = cache.get(k); if (!v) { const m = carOf(e); v = sheetMode === 'sp' ? { side: lineMap(m, 'left', MM), plan: lineMap(m, 'top', MM) } : { side: lineMap(m, 'front', MM), plan: lineMap(m, 'rear', MM) }; cache.set(k, v); } return v; };
 const sheet = new Uint8Array(W * H);                                    // 0 paper, 1 line, 2 red, 3 smudge
 const put = (L: LineMap, ox: number, oy: number, into: Set<number>) => { for (let y = 0; y < L.h; y++) for (let x = 0; x < L.w; x++) if (L.on[y * L.w + x]) into.add((oy + y) * W + ox + x); };
-const pixelsOf = (V: Views) => { const s = new Set<number>(); put(V.side, SIDE.x, SIDE.y + (100 - V.side.h), s); put(V.plan, PLAN.x, PLAN.y, s); return s; };
+const pixelsOf = (V: Views) => { const s = new Set<number>(); if (sheetMode === 'sp') { put(V.side, SIDE.x, SIDE.y + (100 - V.side.h), s); put(V.plan, PLAN.x, PLAN.y, s); } else { put(V.side, FRONT.x, FRONT.y + (100 - V.side.h), s); put(V.plan, REAR.x, REAR.y + (100 - V.plan.h), s); } return s; };
 let drawnNow = pixelsOf(views(cur)), redNow = new Set<number>(), drawnKeep = new Set<number>();
 
 // ---------------- strokes: pencil, red pencil, eraser ----------------
@@ -241,6 +244,7 @@ function arrowLine(x0: number, y0: number, x1: number, y1: number, label: string
   else { S.px(x0 - 1, y0 + 1, col); S.px(x0 + 1, y0 + 1, col); S.px(x1 - 1, y1 - 1, col); S.px(x1 + 1, y1 - 1, col); S.text(label, x0 + 3, ((y0 + y1) >> 1) - 4, col); }
 }
 function dims() {
+  if (sheetMode === 'fr') return dimsFR();
   const P = SH(), m = fig(cur), n = fig(next), V = views(cur), ground = SIDE.y + (100 - V.side.h) + V.side.h - 2;
   const fx = base.wheels[0]!.x / MM + SIDE.x + 2, rx = m.wb / MM + fx, x0 = SIDE.x + 2 + m.x0 / MM, x1 = x0 + m.length / MM, lab = (a: number, b: number) => (a === b ? `${a}` : `${a} → ${b}`);
   arrowLine(fx, ground + 8, rx, ground + 8, lab(m.wb, n.wb), m.wb === n.wb ? P.line2 : P.red);
@@ -253,6 +257,20 @@ function dims() {
   const L0 = eff(cur).lights, L1 = eff(next).lights; S.text(L0 === L1 ? lightsName(L0) : `${lightsName(L0)} → ${lightsName(L1)}`, PAPER.x + 50, PAPER.y + 6, L0 === L1 ? P.label : P.red);
 }
 
+/** front and rear: width and height of each, the track between the tyres, one ground line */
+function dimsFR() { const P = SH(), m = fig(cur), n = fig(next), V = views(cur), ground = FRONT.y + 100 - 2, lab = (a: number, b: number) => (a === b ? `${a}` : `${a} → ${b}`);
+  S.line(FRONT.x - 10, ground, REAR.x + V.plan.w + 16, ground, P.line2, 2);
+  for (const [o, L, name] of [[FRONT, V.side, '정면도'], [REAR, V.plan, '배면도']] as const) { const x0 = o.x + 2, x1 = o.x + L.w - 2;
+    arrowLine(x0, ground + 9, x1, ground + 9, `${m.width}`, P.line2); S.text(name, o.x, PAPER.y + 6, P.label); }
+  const hx = REAR.x + V.plan.w + 10; arrowLine(hx, ground - m.height / MM, hx, ground, lab(m.height, n.height), m.height === n.height ? P.line2 : P.red);
+  S.text('바퀴 간격 · 차폭은 도면 1(옆 · 위)과 같은 차', PAPER.x + 8, ground + 22, P.label);
+}
+/** the views on the sheet (side and plan, or front and rear) and in the exterior (side, front, rear) */
+function viewSwitch() {
+  if (view === 'exterior') { const r = split({ x: 196, y: 10, w: 120, h: 12 }, ['*', '*', '*'], 2); (['left', 'front', 'rear'] as const).forEach((v, k) => { if (ui.tab('ext-' + v, r[k]!, ['옆', '앞', '뒤'][k]!, extView === v)) extView = v; }); return; }
+  const r = split({ x: 222, y: 10, w: 94, h: 12 }, ['*', '*'], 2); if (ui.tab('sheet-sp', r[0]!, '옆 · 위', sheetMode === 'sp')) setMode('sp'); if (ui.tab('sheet-fr', r[1]!, '앞 · 뒤', sheetMode === 'fr')) setMode('fr'); }
+function setMode(m: 'sp' | 'fr') { if (m === sheetMode) return; flush(); sheetMode = m; drawnNow = pixelsOf(views(cur)); const want = pixelsOf(views(next)); redNow = new Set([...want].filter(p => !drawnNow.has(p)));
+  sheet.fill(0); for (const p of drawnNow) sheet[p] = 1; for (const p of redNow) sheet[p] = 2; app.sound.once('paper'); }
 // ---------------- cards, tabs, controls ----------------
 const ui = app.ui, CARD = { x: 330, y: 20, w: 142, h: 118 };
 function orderCard() {
@@ -306,12 +324,12 @@ function tools() {
   else { S.fill(x - 3, y - 7, 8, 6, hex('#d8a0a8')); S.fill(x - 3, y - 2, 8, 2, hex('#b8808a')); S.fill(x - 3, y - 11, 8, 4, hex('#3a5aa0')); S.hline(x - 3, x + 4, y - 7, hex('#f0c8cc')); }
 }
 // ---------------- the exterior: where the drawing goes next ----------------
-let extKey = '', extImg: CarImage | null = null;
+let extKey = '', extImg: CarImage | null = null, extView: 'left' | 'front' | 'rear' = 'left';
 function exterior() {
-  const key = JSON.stringify(eff(cur)); if (key !== extKey) { extKey = key; extImg = rasterizeFlat(viewDesign(carOf(cur), 'left'), { shadow: true }); }
+  const key = extView + JSON.stringify(eff(cur)); if (key !== extKey) { extKey = key; extImg = rasterizeFlat(viewDesign(carOf(cur), extView), { shadow: true }); }
   const x = PAPER.x, y = PAPER.y, w = PAPER.w, h = PAPER.h; S.fill(x + 3, y + 3, w, h, C.shadow);
   for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) S.px(x + i, y + j, j < h * 0.62 ? hex(j % 4 === 0 ? '#c9d3d6' : '#d2dcde') : hex(rnd(j * 91 + i) < 0.1 ? '#8c8478' : '#9a9286'));     // the workshop wall and floor
-  const im = extImg!, k = Math.max(1, Math.ceil(im.w / (w - 40))), dw = Math.floor(im.w / k), dh = Math.floor(im.h / k), ox = x + ((w - dw) >> 1), oy = y + Math.round(h * 0.62) - Math.round(im.groundY / k);
+  const im = extImg!, k = Math.max(1, Math.ceil(Math.max(im.w / (w - 40), im.h / (h * 0.55)))), dw = Math.floor(im.w / k), dh = Math.floor(im.h / k), ox = x + ((w - dw) >> 1), oy = y + Math.round(h * 0.62) - Math.round(im.groundY / k);
   for (let j = 0; j < dh; j++) for (let i = 0; i < dw; i++) { let r = 0, g = 0, b = 0, a = 0;          // the picture is drawn at 10 mm a pixel: shrink it to fit (box filter)
     for (let v = 0; v < k; v++) for (let u = 0; u < k; u++) { const o = ((j * k + v) * im.w + i * k + u) * 4, aa = im.rgba[o + 3]!; r += im.rgba[o]! * aa; g += im.rgba[o + 1]! * aa; b += im.rgba[o + 2]! * aa; a += aa; }
     if (a < 8 * k * k) continue; S.px(ox + i, oy + j, [Math.round(r / a), Math.round(g / a), Math.round(b / a)], Math.min(1, a / (255 * k * k) * 1.2)); }
@@ -321,7 +339,7 @@ function exterior() {
 queue('pencil', [...drawnNow]);
 return {
   id: 'drawing',
-  frame(_app, dt) { step(dt); if (!busy()) fast = false; desk(); if (view === 'exterior') exterior(); else { paper(); sheetPixels(); dims(); tools(); }
+  frame(_app, dt) { step(dt); if (!busy()) fast = false; desk(); if (view === 'exterior') exterior(); else { paper(); sheetPixels(); dims(); tools(); } viewSwitch();
     if (view === 'estimate') estimateCard(); else if (view === 'exterior') exteriorCard(); else orderCard(); tabs(); controls();
     if (ui.missed() && busy()) fast = true; },
   key(_app, e) { if (e.key === ' ') { fast = true; return true; } if (e.key === 'Enter' && pending()) { apply(); return true; } if (e.key === 'Escape' && pending()) { cancel(); return true; } return false; },

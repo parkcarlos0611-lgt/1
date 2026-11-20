@@ -11,6 +11,7 @@ import { hex, type RGB } from '../pixel/screen';
 import { viewDesign, type CarModel } from '../../render/car/model';
 import { rasterizeFlat } from '../../render/car/flat';
 import model from '../../data/cars/sedan29.json';
+import { kitchenScene } from './kitchen';
 
 const W = 480, H = 270, BASE_Y = 168, YARD_Y = 172, WALK_Y = 200, KERB_Y = 211, ROAD_Y = 214, LANE_Y = 246;
 type Mat = 0 | 1 | 2 | 3 | 4 | 5;                                         // 0 sky, 1 building, 2 lawn, 3 concrete, 4 road, 5 roof
@@ -219,10 +220,9 @@ export function streetScene(app: App): Scene {
       // the customer at the door
       if (ev.phase === 'answer') { const r = { x: 150, y: 40, w: 180, h: 44 }; ui.panel(r, 'card'); ui.label({ x: r.x + 8, y: r.y + 5, w: r.w - 16, h: 9 }, '손님이 문을 두드린다', COL.ink);
         const [a, b] = split({ x: r.x + 8, y: r.y + 22, w: r.w - 16, h: 16 }, ['*', '*'], 6);
-        if (ui.button('let-in', a!, '맞이한다')) { ev.phase = 'inside'; ev.t = 0; } if (ui.button('turn-away', b!, '돌려보낸다')) { ev.phase = 'walkOut'; ev.t = 0; ev.dir = 'down'; } }
-      if (ev.phase === 'inside' && ev.fade >= 1) { const r = { x: 120, y: 90, w: 240, h: 70 }; ui.panel(r, 'card'); ui.label({ x: r.x + 8, y: r.y + 6, w: r.w - 16, h: 9 }, '주방 탁자에서 상담', COL.ink);
-        ui.paragraph({ x: r.x + 8, y: r.y + 20, w: r.w - 16, h: 22 }, '집 안 장면(주방, 차 · 커피, 대화 선택지)은 다음 견본. 상담 중에는 시간이 흐르지 않는다.', COL.inkSoft);
-        if (ui.button('done-talk', { x: r.x + r.w - 88, y: r.y + r.h - 20, w: 80, h: 14 }, '상담 끝')) { ev.phase = 'walkOut'; ev.dir = 'down'; } }
+        if (ui.button('let-in', a!, '맞이한다')) { ev.phase = 'inside'; ev.t = 0; ev.said = ''; } if (ui.button('turn-away', b!, '돌려보낸다')) { ev.phase = 'walkOut'; ev.t = 0; ev.dir = 'down'; } }
+      if (ev.phase === 'inside' && ev.fade >= 1 && !ev.said) { ev.said = 'in';                 // into the kitchen (prototype C); back out when the talk is over
+        app.push(kitchenScene(app, { hour: hour(), sky, done: () => { app.pop(); ev.phase = 'walkOut'; ev.dir = 'down'; ev.said = ''; } })); }
       // the prototype's switches
       const bar = split({ x: 228, y: 254, w: 248, h: 13 }, [62, 44, 44, '*'], 3);
       if (ui.button('call', bar[0]!, '손님 부르기', { disabled: busyEvent() })) { ev.phase = 'arrive'; ev.carX = W + 10; ev.t = 0; ev.fade = 0; }

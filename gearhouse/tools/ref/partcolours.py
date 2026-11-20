@@ -5,7 +5,7 @@ import sys, json
 n = 0
 M = json.load(open(sys.argv[1])); T = json.load(open(sys.argv[2])); OWN = {'paint2', 'canvas', 'wood'}   # the body colour is the car's paint (measured once on the side view); parts in shadow or tiny parts give no reliable colour
 for p in M['parts']:
-    if p['material'] not in OWN: continue
+    if p['material'] not in OWN or p.get('color'): continue
     for key in ('side', 'front', 'rear', 'top'):
         t = T.get(f"{p['id']}.{key}")
         if not t or not t['colours'] or p.get('on'): continue

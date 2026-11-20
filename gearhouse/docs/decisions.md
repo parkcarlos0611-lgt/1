@@ -233,3 +233,8 @@ These decisions still hold, from `legacy/docs/MASTER_GAME_PLAN.md`:
 - Parts lying on another's face say so (part.on: a lens on its lamp, glass on the body, a core in its shell) and are drawn just above it in every view.
 - Part tiles (tools/ref/tiles.py): every part in every view cut from the sheet, enlarged 8 times, its drawn outline over it, with its measured colours, pattern repeat and share of outline on a line; measurements saved for the build.
 - Colours: fenders, roof and wood take their middle tone from their tiles (tools/ref/partcolours.py, part.color); the body keeps the paint measured once on the side view, as shaded panels give darker colours than the paint.
+
+## 2026-11-20 — roof checked; lines inside parts taken from the sheet (review 30)
+
+- Roof: seen from in front and behind it is a dark cloth cap with a low arch and rounded corners, wrapping onto the body; its outline there is measured, not pulled onto lines (the visor's lines pulled it into waves). The body's back reaches up to the cap with rounded top corners (its own rear outline, no longer the front one). The cap's colour is set from the sheet's lit cloth.
+- Improvement F: long straight-ish lines inside painted parts are found on the enlarged sheet (dark: shut lines and mouldings; bright, in the side view only: lit edges) and kept with the part as features of that view (tools/ref/innerlines.py); 67 on the sedan.

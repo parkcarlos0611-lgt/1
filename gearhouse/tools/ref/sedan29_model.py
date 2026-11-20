@@ -49,13 +49,13 @@ def snap(view, pts, reach):
         if u.geom_type == 'Polygon': f = [[round(x), round(z)] for x, z in list(u.exterior.coords)[:-1]]
     return f, moved
 P = []; notes = []
-def part(id, element, material, surface='side', *, on=None, fit=0, x=None, y=None, z=None, pair=False, slot=None, smooth=(), detail=None, feats=None, cutWheel=None, wheel=None, lift=0, **views):
+def part(id, element, material, surface='side', *, color=None, on=None, fit=0, nofit=(), x=None, y=None, z=None, pair=False, slot=None, smooth=(), detail=None, feats=None, cutWheel=None, wheel=None, lift=0, **views):
     """views: side=[[x,z]..], front=[[y,z]..], rear=[[y,z]..] or 'front', top=[[x,y]..]; the box comes from the side view
     (x, z) and the front or top view (y) unless given"""
     bb = lambda pts, k: [min(p[k] for p in pts), max(p[k] for p in pts)]
     if fit:
         for v in list(views):
-            if views[v] == 'front': continue
+            if views[v] == 'front' or v in nofit: continue
             views[v], mv = snap(v, views[v], fit); SNAP[f'{id}.{v}'] = round(mv)
     if views.get('rear') == 'front': views['rear'] = views['front']
     # each view keeps the sheet's own place and size for the part (review 29); the common box, used for the drawing order,
@@ -89,7 +89,7 @@ def part(id, element, material, surface='side', *, on=None, fit=0, x=None, y=Non
             f2.setdefault(v, []).append(g)
     X, Y, Z = box['x'], box['y'], box['z']
     P.append({'id': id, 'element': element, 'material': material, 'surface': surface, 'box': {'x': X, 'y': Y, 'z': Z}, 'sheet': sheet, 'pair': pair, 'outlines': o,
-              **({'slot': slot} if slot else {}), **({'detail': detail} if detail else {}), **({'features': f2} if f2 else {}), **({'cutWheel': cutWheel} if cutWheel else {}), **({'wheel': wheel} if wheel else {}), **({'lift': lift} if lift else {}), **({'on': on} if on else {})})
+              **({'slot': slot} if slot else {}), **({'detail': detail} if detail else {}), **({'features': f2} if f2 else {}), **({'cutWheel': cutWheel} if cutWheel else {}), **({'wheel': wheel} if wheel else {}), **({'lift': lift} if lift else {}), **({'on': on} if on else {}), **({'color': color} if color else {})})
 
 # ---------------- chassis parts seen from outside ----------------
 for i, wx in enumerate((FX, RX)):
@@ -128,16 +128,17 @@ part('cowl', 'cowl', 'paint', 'side', fit=3,
      top=halfT([1240, 0], [1240, 525], [1450, 600], [1560, 640], [1560, 0]))
 part('body', 'body', 'paint', 'side', fit=3.5,
      side=side((738, 232), (745, 64), (1560, 64), (1640, 74), (1682, 96), (1695, 150), (1697, 420), (1702, 585), (770, 585), (770, 306), (740, 302)),
-     front=fhalf((0, 60), (308, 62), (328, 90), (330, 440), (318, 600), (0, 600)), rear='front',
+     front=fhalf((0, 60), (308, 62), (328, 90), (330, 440), (318, 600), (0, 600)), nofit=('rear',),
+     rear=half([0, 580], [640, 580], [664, 880], [668, 1600], [656, 1700], [624, 1752], [566, 1774], [0, 1778]),   # the back of the body reaches up to the cap, its top corners round (rear sheet)
      top=halfT([1450, 0], [1450, 600], [1560, 690], [1640, 712], [3520, 712], [3620, 690], [3672, 620], [3690, 520], [3690, 0]),
      feats={'side': [{'kind': 'seam', 'pts': side((1068, 70), (1068, 582))}, {'kind': 'seam', 'pts': side((1362, 70), (1362, 582))},
                      {'kind': 'bead', 'pts': side((742, 312), (1200, 314), (1694, 312))}, {'kind': 'highlight', 'pts': side((746, 322), (1690, 322)), 'width': 1},
                      {'kind': 'handle', 'at': S(990, 345), 'len': 120}, {'kind': 'handle', 'at': S(1085, 345), 'len': 120}],
             'rear': [{'kind': 'bead', 'pts': [[-655, 1200], [0, 1225], [655, 1200]]}]})
-part('roof', 'roof', 'canvas', 'roof', fit=3.5,
+part('roof', 'roof', 'canvas', 'roof', color='#2e2e2c', fit=3.5, nofit=('front', 'rear'),   # the cap's cloth as the sheet shows it lit from above; its shadows are near black
      side=side((675, 84), (722, 38), (800, 20), (1100, 4), (1480, 6), (1610, 18), (1668, 45), (1692, 90), (1640, 74), (1560, 64), (750, 64), (700, 90)),
-     front=fhalf((0, 22), (250, 20), (318, 34), (346, 70), (332, 96), (0, 92)), rear='front',
-     top=halfT([1585, 0], [1585, 560], [1600, 640], [1660, 680], [3500, 680], [3590, 650], [3635, 580], [3645, 480], [3645, 0]), smooth=('top',))
+     front=half([0, 1688], [560, 1688], [640, 1676], [702, 1655], [714, 1700], [706, 1770], [660, 1810], [0, 1822]), rear=half([0, 1766], [600, 1766], [690, 1744], [716, 1780], [692, 1814], [0, 1822]),
+     smooth=('top', 'front', 'rear'), top=halfT([1585, 0], [1585, 560], [1600, 640], [1660, 680], [3500, 680], [3590, 650], [3635, 580], [3645, 480], [3645, 0]))
 part('screenFrame', 'screen', 'black', 'flat', on='body', x=[1564, 1599], front=fhalf((0, 100), (300, 100), (300, 240), (0, 240)))
 part('screen', 'screen', 'glass', 'side', on='screenFrame', x=[1562, 1600], front=fhalf((0, 115), (182, 115), (182, 222), (0, 222)), side=side((742, 112), (760, 112), (760, 226), (742, 226)))
 part('screenBar', 'screen', 'black', 'flat', on='screen', x=[1558, 1600], front=[[-12, F(0, 222)[1]], [12, F(0, 222)[1]], [12, F(0, 115)[1]], [-12, F(0, 115)[1]]])

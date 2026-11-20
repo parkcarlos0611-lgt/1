@@ -204,3 +204,9 @@ These decisions still hold, from `legacy/docs/MASTER_GAME_PLAN.md`:
 
 - From the planner's 1920s sheet and chassis sheet: left, right (mirrored), front, rear and plan views fitted to the sheet (tools/ref/sedan29.py, sedan29_z.py), sized from the wheelbase 2629 mm; a chassis design with frame, four-cylinder engine, gearbox, fuel tank in the cowl, steering and exhaust.
 - In the test track as a second car: transverse leaf springs front and rear seen end-on, lever dampers, torque tube to the rear axle, rear-wheel drive, three speeds (physics SEDAN29, SEDAN29_DRIVE, SEDAN29_LAYOUT).
+
+## 2026-11-20 — one 3D part model per car; every car's parts are its own
+
+- A car is one 3D part model (render/car/model.ts, data/cars): each part has one box in the car's space and its outlines from the side, front, rear and above in the unit box. All five views are projected from it, so a part sits at the same place in every view; drawing order comes from where the parts are (further out, further forward, further back, higher), never from a hand-written list. Where the sheet's views disagree, the model wins and the tool lists the disagreement.
+- Corrects review 15 ("parts of a place grouped into a few dozen kinds"): body parts are NOT grouped. Every reference car gives its own lamp, grille and shell, fenders, bumpers, wheels, body and roof, shaped from its own sheet, so 200 cars give 200 of each (as in Automation). Stock forms describe how a material is drawn, never a shape. Only running gear (frame, drive line, suspension, tyres) uses shared models per class.
+- First car rebuilt this way: the 1929 sedan, 43 parts (tools/ref/sedan29_model.py). A parts check sheet shows every part alone in every view (tools/ref/modelviews.ts, partsheet.py). The earlier per-view files (sedan29.py, sedan29_z.py) are superseded.

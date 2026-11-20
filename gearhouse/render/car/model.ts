@@ -1,0 +1,62 @@
+// One car as a 3D part model (decision of 2026-11-20): every part has one box in the car's space (x from the front
+// bumper back, y from the centre line outwards, z up; mm) and its outline from the side, front, rear and above, each
+// stored in the unit box. A view is made by putting every outline into its part's box, so a part sits at the same
+// place in every view, and by ordering parts by where they are: in the side view the part further out is in front,
+// in the front view the part further forward, in the rear view the part further back, in the plan the higher part.
+// Nobody writes a drawing order. Moving or resizing a box changes all views together.
+import type { CarDesign, Detail, Feature, Material, Panel, Pt, Slot, Surface, WheelSpec } from './types';
+
+export type ViewName = 'left' | 'right' | 'front' | 'rear' | 'top';
+type OutlineKey = 'side' | 'front' | 'rear' | 'top';
+export interface CarPart {
+  id: string; element: string; material: Material; surface: Surface; slot?: Slot;
+  box: { x: [number, number]; y: [number, number]; z: [number, number] };
+  /** one each side of the centre line (y is then the left one's) */
+  pair: boolean;
+  outlines: Partial<Record<OutlineKey, [number, number, number][]>>;
+  detail?: Detail; features?: Partial<Record<OutlineKey, any[]>>;
+  /** the wheel arch cut out of this part in the side view */
+  cutWheel?: { i: number; r: number };
+  /** drawn as a wheel when seen flat on (the spare, from behind) */
+  wheel?: { r: number };
+  /** a small step forward in the order, for a part lying on another's surface (a lens on its lamp) */
+  lift?: number;
+}
+export interface CarModel {
+  id: string; name: string; year: number; length: number; width: number; height: number; paint: string; paint2: string;
+  wheels: { x: number; r: number; y: number }[]; wheel: Partial<WheelSpec>; canvas?: string;
+  features?: Partial<Record<OutlineKey, Feature[]>>; parts: CarPart[];
+}
+
+const lerp = (r: [number, number], u: number) => r[0] + (r[1] - r[0]) * u;
+/** the design of one view; `only` keeps the named parts (to look at parts one by one) */
+export function viewDesign(m: CarModel, view: ViewName, only?: (p: CarPart) => boolean): CarDesign {
+  const key: OutlineKey = view === 'left' || view === 'right' ? 'side' : view, C = m.width / 2;
+  const depth = (p: CarPart) => (key === 'side' ? Math.max(Math.abs(p.box.y[0]), Math.abs(p.box.y[1])) : key === 'front' ? -p.box.x[0] : key === 'rear' ? p.box.x[1] : p.box.z[1]) + (p.lift ?? 0) * 3;
+  type Item = { d: number; n: number; p?: CarPart; sign?: 1 | -1; w?: number };
+  const items: Item[] = []; let n = 0;
+  for (const p of m.parts) { if (only && !only(p)) continue; if (!p.outlines[key] && !(p.wheel && key === 'rear')) continue;
+    items.push({ d: depth(p), n: n++, p, sign: 1 }); if (p.pair && key !== 'side') items.push({ d: depth(p), n: n++, p, sign: -1 }); }
+  if (key === 'side' && !only) m.wheels.forEach((w, i) => items.push({ d: w.y + 57, n: n++, w: i }));
+  items.sort((a, b) => a.d - b.d || a.n - b.n);
+  const panels: Panel[] = [], wheels: WheelSpec[] = [], features: Feature[] = [];
+  const W: WheelSpec = { x: 0, r: 0, rim: 0.6, style: 'disc', spokes: 0, rimMaterial: 'paint', ...m.wheel } as WheelSpec;
+  items.forEach((it, z) => {
+    if (it.w !== undefined) { const w = m.wheels[it.w]!; wheels.push({ ...W, x: w.x, r: w.r, zOrder: z }); return; }
+    const p = it.p!, b = p.box, s = it.sign!;
+    const at = (u: number, v: number): [number, number] => key === 'side' ? [lerp(b.x, u), lerp(b.z, v)] : key === 'front' ? [C + s * lerp(b.y, u), lerp(b.z, v)] : key === 'rear' ? [C - s * lerp(b.y, u), lerp(b.z, v)] : [lerp(b.x, u), C + s * lerp(b.y, v)];
+    if (p.wheel && key === 'rear') { wheels.push({ ...W, x: C, r: p.wheel.r, z: (b.z[0] + b.z[1]) / 2, zOrder: z, spare: true }); return; }
+    const pts = p.outlines[key]!.map(([u, v, sharp]): Pt => { const [x, y] = at(u, v); return sharp ? [Math.round(x), Math.round(y), 1] : [Math.round(x), Math.round(y)]; });
+    const panel: Panel = { id: p.id + (s < 0 ? '~' : ''), pts, material: p.material, surface: p.surface, z, element: p.element, ...(p.slot ? { slot: p.slot } : {}), ...(p.detail ? { detail: p.detail } : {}) };
+    if (p.cutWheel && key === 'side') { const w = m.wheels[p.cutWheel.i]!; panel.cut = [{ x: w.x, z: w.r, r: p.cutWheel.r }]; }
+    panels.push(panel);
+    for (const f of p.features?.[key] ?? []) { const g = JSON.parse(JSON.stringify(f));
+      if (g.pts) g.pts = g.pts.map((q: number[]) => [...at(q[0]!, q[1]!).map(Math.round), 1]); if (g.at) g.at = [...at(g.at[0], g.at[1]).map(Math.round), 1];
+      if (g.kind === 'louvres') { const a = at(g.x0, g.z0), c = at(g.x1, g.z1); g.x0 = a[0]; g.z0 = a[1]; g.x1 = c[0]; g.z1 = c[1]; }
+      if (g.kind === 'handle') g.len = g.len * (b.x[1] - b.x[0]);
+      features.push(g as Feature); }
+  });
+  if (!only) for (const f of m.features?.[key] ?? []) features.push(f);
+  const top = key === 'top', across = key === 'front' || key === 'rear';
+  return { id: `${m.id}_${view}`, name: `${m.name} (${view})`, year: m.year, length: across ? m.width : m.length, height: top ? m.width : m.height, paint: m.paint, paint2: m.paint2, ...(m.canvas ? { canvas: m.canvas } : {}), panels, features, wheels, frame: 'reveal', ...(key === 'front' ? { glassLift: -1 } : {}) };
+}

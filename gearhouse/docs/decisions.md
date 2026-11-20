@@ -249,3 +249,7 @@ These decisions still hold, from `legacy/docs/MASTER_GAME_PLAN.md`:
 - Front: the cap's cloth comes down beside the windscreen as dark corner pillars; the radiator shell has a darker inner lip between it and the core; the front bumper bars carry two pairs of clamps; the front fenders' crowns catch the light.
 - Side: each side window lies in a raised moulding frame; the body's rear top corner is rounded as the sheet draws it.
 - Painted wire wheels read as the wheel's colour with dark gaps.
+
+## 2026-11-20 — the spare drawn as the tyre it is
+
+- Seen from the side and from above, the spare shows its tread edge on with the same section and the same face-on tread as the road tyres seen from in front (one shared tyre section per car). The section is rounder at the top, flat where it stands, and its tread finer.

@@ -99,9 +99,9 @@ part('axleF', 'axle', 'black', 'flat', x=[470, 546], front=half([0, 330], [640, 
 part('springF', 'spring', 'iron', 'flat', x=[480, 536], front=half([0, 520], [120, 510], [400, 450], [560, 400], [560, 430], [400, 480], [120, 545], [0, 555]))
 part('axleR', 'axle', 'black', 'flat', x=[3090, 3184], rear=half([0, 250], [120, 260], [170, 330], [640, 345], [640, 415], [170, 430], [120, 500], [0, 510]), smooth=('rear',))
 part('springR', 'spring', 'iron', 'flat', x=[3200, 3260], rear=half([0, 560], [120, 550], [420, 480], [580, 420], [580, 450], [420, 512], [120, 585], [0, 595]))
-tyre = [[600, 8], [640, 0], [748, 0], [788, 8], [800, 60], [806, 381], [800, 700], [788, 748], [748, 762], [640, 762], [600, 748], [588, 700], [582, 381], [588, 60]]   # read off the front view: 588..806 from the centre line
-part('tyreF', 'wheel', 'rubber', 'fender', x=[FX - R, FX + R], pair=True, front=tyre, smooth=('front',), detail={'kind': 'treadFace', 'pitch': 55})
-part('tyreR', 'wheel', 'rubber', 'fender', x=[RX - R, RX + R], pair=True, rear=tyre, smooth=('rear',), detail={'kind': 'treadFace', 'pitch': 55})
+tyre = [[606, 6], [640, 0], [748, 0], [782, 6], [798, 40], [805, 200], [807, 381], [804, 560], [796, 690], [782, 734], [760, 754], [725, 762], [663, 762], [628, 754], [606, 734], [592, 690], [584, 560], [581, 381], [583, 200], [590, 40]]   # face on (front sheet): a balloon section, flat where it stands, round at the top
+part('tyreF', 'wheel', 'rubber', 'fender', x=[FX - R, FX + R], pair=True, front=tyre, smooth=('front',), detail={'kind': 'treadFace', 'pitch': 38})
+part('tyreR', 'wheel', 'rubber', 'fender', x=[RX - R, RX + R], pair=True, rear=tyre, smooth=('rear',), detail={'kind': 'treadFace', 'pitch': 38})
 
 # ---------------- body ----------------
 part('splash', 'apron', 'black', 'flat', x=[560, 1450], z=[300, 880], top=halfT([500, 0], [500, 600], [1450, 620], [1450, 0]),
@@ -188,8 +188,16 @@ for k, u in enumerate((215, 575)):
 part('ironF', 'bumperF', 'black', 'flat', slot='bumperF', pair=True, side=side((42, 600), (120, 610), (120, 640), (42, 676)), front=[[330, 320], [362, 320], [362, 480], [330, 480]], top=[[40, 210], [40, 245], [260, 245], [260, 210]], lift=1)
 part('ironR', 'bumperR', 'black', 'flat', slot='bumperR', pair=True, side=side((1700, 610), (1780, 600), (1780, 676), (1700, 640)), rear=[[540, 400], [572, 400], [572, 545], [540, 545]], top=[[3600, 520], [3600, 552], [3800, 552], [3800, 520]])
 part('tail', 'tail', 'lensR', 'flat', on='body', slot='tail', pair=True, smooth=('rear', 'side'), x=[3590, 3640], side=ell(3615, 720, 22, 50), rear=ell(590, 690, 50, 50))
+# the spare is a tyre too: seen from the side it shows its tread edge on, exactly as the road tyres do from in front
+# (the same section, the same face-on tread); from above the same, lying across the car
+def tyre_section(u0, u1, v0, v1, across_first=True):
+    lo_u, hi_u = min(q[0] for q in tyre), max(q[0] for q in tyre); hi_v = max(q[1] for q in tyre)
+    return [[round(u0 + (q[0] - lo_u) / (hi_u - lo_u) * (u1 - u0)), round(v0 + q[1] / hi_v * (v1 - v0))] if across_first else
+            [round(v0 + q[1] / hi_v * (v1 - v0)), round(u0 + (q[0] - lo_u) / (hi_u - lo_u) * (u1 - u0))] for q in tyre]
+cxs = S(1752, 0)[0]
 part('spare', 'spare', 'rubber', 'fender', wheel={'r': 380},
-     side=ell(S(1752, 0)[0], 868, 100, 296), rear=ell(0, 775, 385, 385), top=halfT([3680, 0], [3680, 380], [3700, 410], [3840, 410], [3860, 380], [3860, 0]), smooth=('side', 'top'), detail={'kind': 'ribs', 'pitch': 40})
+     side=tyre_section(cxs - 100, cxs + 100, 868 - 300, 868 + 300), rear=ell(0, 775, 385, 385),
+     top=tyre_section(3680, 3860, -385, 385), smooth=('side', 'top'), detail={'kind': 'treadFace', 'pitch': 38})
 part('spareHub', 'spare', 'chrome', 'flat', on='spare', smooth=('side',), y=[-60, 60], side=ell(S(1770, 0)[0], 868, 36, 70), lift=1)
 
 M = {'id': 'sedan29', 'name': 'four-door sedan, 1929', 'year': 1929, 'length': L, 'width': W, 'height': H, 'paint': '#3b3e25', 'paint2': '#232327', 'canvas': '#34343a',

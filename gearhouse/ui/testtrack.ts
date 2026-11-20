@@ -23,7 +23,7 @@ async function reset(rebuild: boolean) {
     await scene.build(async (d, n) => { if (d % 3 === 0) { $('progressText').textContent = `차를 자세별로 그리는 중 ${d}/${n}`; (bar.querySelector('i') as HTMLElement).style.width = `${d / n * 100}%`; await new Promise(r => setTimeout(r, 0)); } });
     bar.hidden = true; built = true; }
   else Object.assign(scene, { body: (old as any).body, house: (old as any).house, chassis: (old as any).chassis });
-  scene.squash = Number(($<HTMLInputElement>('squash')).value) / 2; scene.xray = $<HTMLInputElement>('xray').checked; lastAngles = rig.tyres.map(t => t.angle);
+  scene.xray = $<HTMLInputElement>('xray').checked; lastAngles = rig.tyres.map(t => t.angle);
 }
 const cv = new Canvas(W, H), image = new ImageData(W, H);
 let last = performance.now(), acc = 0;
@@ -51,7 +51,6 @@ hold('gas', () => (pedal = 1), () => (pedal = 0)); hold('back', () => (pedal = -
 addEventListener('keydown', e => { if (e.repeat) return; if (e.key === 'ArrowRight' || e.key === 'd') pedal = 1; if (e.key === 'ArrowLeft' || e.key === 'a') pedal = -0.7; if (e.key === ' ' || e.key === 'ArrowDown' || e.key === 's') { brake = 1; e.preventDefault(); } });
 addEventListener('keyup', e => { if (['ArrowRight', 'd', 'ArrowLeft', 'a'].includes(e.key)) pedal = 0; if ([' ', 'ArrowDown', 's'].includes(e.key)) brake = 0; });
 $('xray').addEventListener('change', () => (scene.xray = $<HTMLInputElement>('xray').checked));
-$('squash').addEventListener('input', () => { scene.squash = Number($<HTMLInputElement>('squash').value) / 2; $('squashVal').textContent = `${$<HTMLInputElement>('squash').value}`; });
 for (const k of Object.keys(SPRINGS)) $(`sp-${k}`).addEventListener('change', () => { springs = k; void reset(false); });
 for (const r of ['high', 'low'] as const) $(`rg-${r}`).addEventListener('change', () => { range = r; pt.range = r; pt.gear = 1; });
 $('restart').addEventListener('click', () => void reset(false));

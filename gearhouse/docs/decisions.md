@@ -194,3 +194,8 @@ These decisions still hold, from `legacy/docs/MASTER_GAME_PLAN.md`:
 - Fixed: the tyre's sinkage was mixed into the ground slope, so a sinking tyre was pushed backwards (sand) or spun (gravel). Slopes come from the ground alone; soils blend over a metre.
 - Body bounce is the sprung body moving whole on its springs and tyres (heave, pitch, roll); the picture squash is off by default and proposed for removal.
 - Proposed (awaiting decision): reference images for running gear per kind of part (about 60: engines, gearboxes, axles, springs, dampers, tanks, frames), generated orthographic sheets like the car sheets, used as shape references only.
+
+## 2026-11-20 — body placed whole, tyres keep their weight (review 25, section 5)
+
+- The picture squash is removed. Sprung pictures are placed whole at whole pixels: the body moves up and down on its springs and a little fore and aft when speeding up or braking; it takes a new pose only after standing on a slope for a moment, never for a bounce. Spring and damper mounts follow the drawn body.
+- Tyres stay ring tyres (contact squash), with the carcass damped against ringing round the hub; they are drawn round above the hub and pressed flat only below it.

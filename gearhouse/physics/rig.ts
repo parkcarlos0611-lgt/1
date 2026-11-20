@@ -3,7 +3,7 @@
 // heightfield, fixed small time step) and BeamNG.drive (tyres as rings of mass points held to the hub by springs and
 // air pressure, so they squash and bounce on their own). Units are SI; x forward, y up.
 //
-//   sprung body        x, y, pitch and roll (rigid; its picture is squashed a little by a visual spring, see jiggle)
+//   sprung body        x, y, pitch and roll (rigid: it moves whole on its springs, its picture never changes shape)
 //   two beam axles     heave and roll each, located fore and aft by the body (leaf springs locate a beam axle)
 //   four leaf springs  spring rate, interleaf friction, rebound strap, bump rubber; a telescopic damper beside each
 //   four tyres         a ring of N mass points: radial, ring and cross springs, internal pressure, ground contact
@@ -20,7 +20,7 @@ export interface RigSpec {
   axleX: [number, number]; comH: number;
   wheelR: number; halfTrack: number; halfSpringTrack: number;
   spring: { k: [number, number]; c: [number, number]; friction: number; bump: number; rebound: number };
-  tyre: { nodes: number; mass: number; radialK: number; radialC: number; ringK: number; crossK: number; pressure: number; groundK: number; groundC: number; mu: number };
+  tyre: { nodes: number; mass: number; radialK: number; radialC: number; shapeC: number; ringK: number; crossK: number; pressure: number; groundK: number; groundC: number; mu: number };
   maxTorque: number;
 }
 /** a 1948 four-wheel-drive utility: 80 in wheelbase, 6.00-16 tyres, about 1.3 t */
@@ -28,7 +28,7 @@ export const UTILITY48: RigSpec = {
   bodyMass: 1050, pitchInertia: 1350, rollInertia: 380, axleMass: 85, axleRollInertia: 34,
   axleX: [1.02, -1.012], comH: 0.78, wheelR: 0.365, halfTrack: 0.64, halfSpringTrack: 0.44,
   spring: { k: [42000, 48000], c: [2600, 2900], friction: 260, bump: 0.085, rebound: 0.09 },
-  tyre: { nodes: 18, mass: 0.75, radialK: 22000, radialC: 25, ringK: 2.5e6, crossK: 30000, pressure: 1.8e5 * 0.16, groundK: 160000, groundC: 260, mu: 0.95 },
+  tyre: { nodes: 18, mass: 0.75, radialK: 22000, radialC: 150, shapeC: 45, ringK: 2.5e6, crossK: 30000, pressure: 1.8e5 * 0.16, groundK: 160000, groundC: 450, mu: 0.95 },
   maxTorque: 1600,
 };
 
@@ -54,8 +54,6 @@ export class Rig {
   slip = 0;
   /** spring deflection from rest per corner [axle][near, far] (m, + compressed), for the drawing */
   defl: number[][] = [[0, 0], [0, 0]];
-  /** a visual squash of the body picture driven by its vertical acceleration (see review 24: elastic, not rotated) */
-  jig = 0; jv = 0; private lastVy = 0;
   private F0: number[];
 
   constructor(spec: RigSpec, ground: Ground, x: number) {
@@ -101,15 +99,19 @@ export class Rig {
       for (let k = 0; k < N; k++) { const a = ty.p[k]!, b = ty.p[(k + 1) % N]!; area += (a.x - h.x) * (b.y - h.y) - (b.x - h.x) * (a.y - h.y); }
       area = Math.abs(area) / 2; const A0 = Math.PI * s.wheelR * s.wheelR * Math.sin(Math.PI * 2 / N) / (Math.PI * 2 / N), P = T.pressure * (A0 / Math.max(area, A0 * 0.5));
       ty.contact = 0;
+      // the ring's own turning speed, so the carcass can be damped against moving as one stiff wheel: a tyre does not
+      // ring like a bell after a bump, it has weight (review 26)
+      let om = 0; for (let k = 0; k < N; k++) { const p = ty.p[k]!, v = ty.v[k]!, dx = p.x - h.x, dy = p.y - h.y; om += (dx * (v.y - hv.y) - dy * (v.x - hv.x)) / (dx * dx + dy * dy); } om /= N;
       for (let k = 0; k < N; k++) {
         const p = ty.p[k]!, v = ty.v[k]!, dx = p.x - h.x, dy = p.y - h.y, L = Math.hypot(dx, dy) || 1e-6, ux = dx / L, uy = dy / L;
         // radial spring to the hub, damped along the spoke
         const vr = (v.x - hv.x) * ux + (v.y - hv.y) * uy, Fr = -T.radialK * (L - s.wheelR) - T.radialC * vr;
         f[k]!.x += ux * Fr; f[k]!.y += uy * Fr; hx -= ux * Fr; hy -= uy * Fr;
+        const sx2 = -T.shapeC * (v.x - hv.x + om * dy), sy2 = -T.shapeC * (v.y - hv.y - om * dx); f[k]!.x += sx2; f[k]!.y += sy2; hx -= sx2; hy -= sy2;
         // ring and cross springs keep the tread's shape
         for (const [j, K] of [[(k + 1) % N, T.ringK], [(k + 2) % N, T.crossK]] as const) {
           const q = ty.p[j]!, ex = q.x - p.x, ey = q.y - p.y, l = Math.hypot(ex, ey) || 1e-6, r0 = 2 * s.wheelR * Math.sin(Math.PI * (j === (k + 1) % N ? 1 : 2) / N);
-          const rv = ((ty.v[j]!.x - v.x) * ex + (ty.v[j]!.y - v.y) * ey) / l, Fs = K * (l - r0) + (K > 1e5 ? 60 : 8) * rv;
+          const rv = ((ty.v[j]!.x - v.x) * ex + (ty.v[j]!.y - v.y) * ey) / l, Fs = K * (l - r0) + (K > 1e5 ? 400 : 40) * rv;
           f[k]!.x += ex / l * Fs; f[k]!.y += ey / l * Fs; f[j]!.x -= ex / l * Fs; f[j]!.y -= ey / l * Fs;
         }
         // air pressure pushes each piece of the ring outward
@@ -132,8 +134,7 @@ export class Rig {
       Fbx += hx; Fa[ty.axle] = Fa[ty.axle]! + hy; Ma[ty.axle] = Ma[ty.axle]! + hy * ty.side * s.halfTrack;
       Mb += drive * 0.15;                                                                     // axle wind-up felt through the springs: the nose lifts
       // the wheel's turn, for its drawing: the mean speed of the ring round the hub
-      let om = 0; for (let k = 0; k < N; k++) { const p = ty.p[k]!, v = ty.v[k]!, dx = p.x - h.x, dy = p.y - h.y; om += (dx * (v.y - hv.y) - dy * (v.x - hv.x)) / (dx * dx + dy * dy); }
-      ty.angle += om / N * dt;
+      ty.angle += om * dt;
     }
     Fbx -= roll * Math.tanh(this.vx / 0.3);                                                // rolling resistance, more in sand
     // ---- integrate the rigid parts ----
@@ -142,9 +143,6 @@ export class Rig {
     this.w += Mb / s.pitchInertia * dt; this.th += this.w * dt;
     this.wph += Mbr / s.rollInertia * dt; this.ph += this.wph * dt;
     for (const i of [0, 1] as const) { this.avy[i] += Fa[i]! / s.axleMass * dt; this.ay[i] += this.avy[i] * dt; this.awph[i] += Ma[i]! / s.axleRollInertia * dt; this.aph[i] += this.awph[i] * dt; }
-    // ---- the picture's squash: a stiff visual spring pushed by the body's vertical acceleration ----
-    const acc = (this.vy - this.lastVy) / dt; this.lastVy = this.vy;
-    this.jv += (-900 * this.jig - 28 * this.jv - acc * 1.6) * dt; this.jig += this.jv * dt;
     this.t += dt;
   }
   run(seconds: number, dt = 1 / 4000) { const n = Math.round(seconds / dt); for (let i = 0; i < n; i++) this.step(dt); }

@@ -44,7 +44,10 @@ export class Canvas {
 }
 
 /** a tyre from the ring of points the physics gives (screen pixels), its wheel drawn at the hub, nuts turned by `angle` */
-export function tyre(cv: Canvas, ring: [number, number][], hub: [number, number], rimR: number, angle: number, paint: RGB[], opt: { tread?: boolean; capR?: number } = {}) {
+export function tyre(cv: Canvas, ring0: [number, number][], hub: [number, number], rimR: number, angle: number, paint: RGB[], opt: { tread?: boolean; capR?: number; round?: number } = {}) {
+  // with `round`: the tyre keeps its round shape about the hub and only gives where it is pressed in (the ground under
+  // it), so it never wobbles like jelly; its weight shows (review 26)
+  const ring: [number, number][] = opt.round ? ring0.map(([x, y]) => { const dx = x - hub[0], dy = y - hub[1], d = Math.hypot(dx, dy) || 1, R = opt.round!, keep = dy > 0 ? Math.min(R, d) : R; return [hub[0] + dx / d * keep, hub[1] + dy / d * keep]; }) : ring0;
   // a smooth outline through the ring's points
   const n = ring.length, P: [number, number][] = [];
   for (let i = 0; i < n; i++) { const p0 = ring[(i - 1 + n) % n]!, p1 = ring[i]!, p2 = ring[(i + 1) % n]!, p3 = ring[(i + 2) % n]!;

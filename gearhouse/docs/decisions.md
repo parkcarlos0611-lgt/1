@@ -225,3 +225,11 @@ These decisions still hold, from `legacy/docs/MASTER_GAME_PLAN.md`:
 - Parts lying on another part's face (windscreen, side glass, radiator core, lamp lens) are lifted in the drawing order so the face never covers them.
 - Improvement G: light per painted part and per view is read off the sheet and kept in the model (tools/ref/modelshade.py, part.shade).
 - Open: headlamp height. The side sheet puts the lamp centre about 1030 mm up, the front sheet about 900 mm; by the side-view rule the front view shows the lamps higher than its sheet.
+
+## 2026-11-20 — the reference at the centre (review 29)
+
+- Each view keeps the sheet's own place and size for every part (part.sheet); the common box (mean of the views that show each axis) is used for the drawing order, for exchanging parts and for the physics. Where a view differs from the common box by more than 50 mm the build lists it. This replaces "the side view rules" of review 28.
+- Proportion check (tools/ref/proportions.py): for every view and part, the sheet's place and size against where the drawn part really ends up, and its place against the body; tolerance 30 mm and 5 %.
+- Parts lying on another's face say so (part.on: a lens on its lamp, glass on the body, a core in its shell) and are drawn just above it in every view.
+- Part tiles (tools/ref/tiles.py): every part in every view cut from the sheet, enlarged 8 times, its drawn outline over it, with its measured colours, pattern repeat and share of outline on a line; measurements saved for the build.
+- Colours: fenders, roof and wood take their middle tone from their tiles (tools/ref/partcolours.py, part.color); the body keeps the paint measured once on the side view, as shaded panels give darker colours than the paint.

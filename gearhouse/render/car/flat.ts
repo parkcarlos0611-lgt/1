@@ -56,7 +56,8 @@ export function rasterizeFlat(d0: CarDesign, opt: { frameW?: number; shadow?: bo
   const span = (n: number) => Math.max(1, Math.round(n / MM)), w = Math.ceil(d.length / MM) + PAD * 2, h = Math.ceil(d.height / MM) + PAD * 2, gy = h - PAD;
   const X = (x: number) => PAD + x / MM, Y = (z: number) => gy - z / MM;
   const N = w * h, mat = new Array<Material | null>(N).fill(null), lv = new Int8Array(N), layer = new Int32Array(N).fill(-1), owner = new Int16Array(N).fill(-1), noOutline = new Uint8Array(N);
-  const ids: string[] = [];
+  const ids: string[] = [], ownRamp: (Ramp | undefined)[] = [], ownMat: (Material | undefined)[] = [];
+  const OWN = new Set<Material>(['paint', 'paint2', 'canvas', 'black', 'rubber', 'iron', 'wood']);
   // ---- method ZY: the reference view's own detail on each element, where the view shows it ----
   const SK = d.skin, skinRGB = new Int32Array(N).fill(-1), skRamp: Partial<Record<Material, RGB[]>> = {};
   if (SK && !SK.common) { for (const [k, v] of Object.entries(SK.tones ?? {})) skRamp[k as Material] = v!.map(hex); const n = skRamp.paint?.length ?? 8;
@@ -96,7 +97,7 @@ export function rasterizeFlat(d0: CarDesign, opt: { frameW?: number; shadow?: bo
   const glassMasks: { m: Uint8Array; bx: number; by: number; bw: number; bh: number; ly: number; id: number }[] = [];
   items.forEach((it, ly) => {
     if (it.k === 'w') { const wi = ids.push('wheel') - 1, s = it.s, S = SK?.elements['wheel' + d.wheels.indexOf(s)], zc = s.z ?? s.r; drawWheel(s, ly, wi); const sig = s.style + ':' + (s.whitewall ?? 0); if (S && S.sig === sig) applySkin(S, wi, s.x - s.r, s.x + s.r, zc - s.r, zc + s.r); const D = DC?.['wheel' + d.wheels.indexOf(s)]; if (D && D.sig === sig) applyDecals(D, wi, s.x - s.r, s.x + s.r, zc - s.r, zc + s.r); return; }
-    const p = it.p, id = ids.push(p.id) - 1, poly = smoothClosed(p.pts).map(([x, z]) => [X(x), Y(z)] as [number, number]);
+    const p = it.p, id = ids.push(p.id) - 1, _own = p.color && OWN.has(p.material) ? (ownMat[id] = p.material, ownRamp[id] = p.material === 'paint' || p.material === 'paint2' ? glossy(autoRamp(p.color, { steps: 7, baseIdx: 3, dL: 0.075, shift: 0.06 })) : autoRamp(p.color, { steps: 5, baseIdx: 2, dL: 0.09, shift: 0.08 })) : undefined, poly = smoothClosed(p.pts).map(([x, z]) => [X(x), Y(z)] as [number, number]);
     let x0 = w, x1 = 0, y0 = h, y1 = 0; for (const [px, py] of poly) { x0 = Math.min(x0, px); x1 = Math.max(x1, px); y0 = Math.min(y0, py); y1 = Math.max(y1, py); }
     const bx = Math.max(0, Math.floor(x0) - 1), by = Math.max(0, Math.floor(y0) - 1), bw = Math.min(w, Math.ceil(x1) + 2) - bx, bh = Math.min(h, Math.ceil(y1) + 2) - by; if (bw <= 0 || bh <= 0) return;
     const cov = coverage(poly.map(([px, py]) => [px - bx, py - by] as [number, number]), bw, bh), m = new Uint8Array(bw * bh);
@@ -188,7 +189,7 @@ export function rasterizeFlat(d0: CarDesign, opt: { frameW?: number; shadow?: bo
 
   const rgba = new Uint8ClampedArray(N * 4);
   if (opt.shadow !== false) { const cx = X(d.length / 2), rx = d.length * 0.47 / MM; for (let y = gy - 1; y <= gy + 1; y++) for (let x = Math.floor(cx - rx); x <= cx + rx; x++) { const i = at(x, y); if (i < 0) continue; rgba[i * 4 + 3] = 70; } }
-  for (let i = 0; i < N; i++) { const m = mat[i]; if (!m) continue; const R = PAL[m], k = skinRGB[i]!, c = OUTL[i] ? R.o : k >= 0 ? [(k >> 16) & 255, (k >> 8) & 255, k & 255] : R.c[lv[i]!]!; rgba[i * 4] = c[0]!; rgba[i * 4 + 1] = c[1]!; rgba[i * 4 + 2] = c[2]!; rgba[i * 4 + 3] = 255; }
+  for (let i = 0; i < N; i++) { const m = mat[i]; if (!m) continue; const o = owner[i]!, R = (o >= 0 && ownMat[o] === m && ownRamp[o]) || PAL[m], k = skinRGB[i]!, c = OUTL[i] ? R.o : k >= 0 ? [(k >> 16) & 255, (k >> 8) & 255, k & 255] : R.c[lv[i]!]!; rgba[i * 4] = c[0]!; rgba[i * 4 + 1] = c[1]!; rgba[i * 4 + 2] = c[2]!; rgba[i * 4 + 3] = 255; }
   // where the view's own detail reaches the edge of the car, the outline goes outside it, so none of the detail is lost
   if ((SK || DC) && thick > 0) for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const i = y * w + x; if (mat[i] && mat[i] !== 'shadow') continue; let near = false;
     for (let dy = -thick; dy <= thick && !near; dy++) for (let dx = -thick; dx <= thick; dx++) { if (Math.abs(dx) + Math.abs(dy) > thick) continue; const j = at(x + dx, y + dy); if (j >= 0 && skinRGB[j]! >= 0) { near = true; break; } }

@@ -14,6 +14,9 @@ export interface CarPart {
   /** one each side of the centre line (y is then the left one's) */
   pair: boolean;
   outlines: Partial<Record<OutlineKey, [number, number, number][]>>;
+  /** where the sheet draws the part in each view: [across0, across1, up0, up1] in that view's axes (side x,z; front and rear y,z; top x,y).
+   *  Each view is drawn there, so it keeps the sheet's proportions; `box` is the common place used for order, exchange and physics. */
+  sheet?: Partial<Record<OutlineKey, [number, number, number, number]>>;
   detail?: Detail; features?: Partial<Record<OutlineKey, any[]>>;
   /** the wheel arch cut out of this part in the side view */
   cutWheel?: { i: number; r: number };
@@ -21,6 +24,11 @@ export interface CarPart {
   wheel?: { r: number };
   /** a small step forward in the order, for a part lying on another's surface (a lens on its lamp) */
   lift?: number;
+  /** the part lies on this part's face (a lens in its lamp, glass in the body, a core in its shell): in every view it is
+   *  drawn just above that part, whatever the boxes say */
+  on?: string;
+  /** the part's colour as the sheet shows it (tools/ref/tiles.py) */
+  color?: string;
   /** how light falls on the part in each view, read off that view of the sheet (tools/ref/modelshade.py) */
   shade?: Partial<Record<OutlineKey, { nx: number; nt: number; v: number[] }>>;
 }
@@ -40,16 +48,19 @@ export function viewDesign(m: CarModel, view: ViewName, only?: (p: CarPart) => b
   for (const p of m.parts) { if (only && !only(p)) continue; if (!p.outlines[key] && !(p.wheel && key === 'rear')) continue;
     items.push({ d: depth(p), n: n++, p, sign: 1 }); if (p.pair && key !== 'side') items.push({ d: depth(p), n: n++, p, sign: -1 }); }
   if (key === 'side' && !only) m.wheels.forEach((w, i) => items.push({ d: w.y + 57, n: n++, w: i }));
+  const byId = new Map(m.parts.map(p => [p.id, p]));
+  for (const it of items) { let q = it.p, k = 0; while (q?.on && byId.get(q.on) && k++ < 5) q = byId.get(q.on)!; if (q && q !== it.p) it.d = depth(q) + 0.01 * k + (it.p!.lift ?? 0) * 0.001; }
   items.sort((a, b) => a.d - b.d || a.n - b.n);
   const panels: Panel[] = [], wheels: WheelSpec[] = [], features: Feature[] = [];
   const W: WheelSpec = { x: 0, r: 0, rim: 0.6, style: 'disc', spokes: 0, rimMaterial: 'paint', ...m.wheel } as WheelSpec;
   items.forEach((it, z) => {
     if (it.w !== undefined) { const w = m.wheels[it.w]!; wheels.push({ ...W, x: w.x, r: w.r, zOrder: z }); return; }
-    const p = it.p!, b = p.box, s = it.sign!;
+    const p = it.p!, s = it.sign!, sb = p.sheet?.[key], b = { ...p.box };
+    if (sb) { if (key === 'side') { b.x = [sb[0], sb[1]]; b.z = [sb[2], sb[3]]; } else if (key === 'top') { b.x = [sb[0], sb[1]]; b.y = [sb[2], sb[3]]; } else { b.y = [sb[0], sb[1]]; b.z = [sb[2], sb[3]]; } }
     const at = (u: number, v: number): [number, number] => key === 'side' ? [lerp(b.x, u), lerp(b.z, v)] : key === 'front' ? [C + s * lerp(b.y, u), lerp(b.z, v)] : key === 'rear' ? [C - s * lerp(b.y, u), lerp(b.z, v)] : [lerp(b.x, u), C + s * lerp(b.y, v)];
     if (p.wheel && key === 'rear') { wheels.push({ ...W, x: C, r: p.wheel.r, z: (b.z[0] + b.z[1]) / 2, zOrder: z, spare: true }); return; }
     const pts = p.outlines[key]!.map(([u, v, sharp]): Pt => { const [x, y] = at(u, v); return sharp ? [Math.round(x), Math.round(y), 1] : [Math.round(x), Math.round(y)]; });
-    const panel: Panel = { id: p.id + (s < 0 ? '~' : ''), pts, material: p.material, surface: p.surface, z, element: p.element, ...(p.slot ? { slot: p.slot } : {}), ...(p.detail ? { detail: p.detail } : {}), ...(p.shade?.[key] ? { shade: p.shade[key] } : {}) };
+    const panel: Panel = { id: p.id + (s < 0 ? '~' : ''), pts, material: p.material, surface: p.surface, z, element: p.element, ...(p.slot ? { slot: p.slot } : {}), ...(p.detail ? { detail: p.detail } : {}), ...(p.shade?.[key] ? { shade: p.shade[key] } : {}), ...(p.color ? { color: p.color } : {}) };
     if (p.cutWheel && key === 'side') { const w = m.wheels[p.cutWheel.i]!; panel.cut = [{ x: w.x, z: w.r, r: p.cutWheel.r }]; }
     panels.push(panel);
     for (const f of p.features?.[key] ?? []) { const g = JSON.parse(JSON.stringify(f));

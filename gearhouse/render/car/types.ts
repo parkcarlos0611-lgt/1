@@ -39,6 +39,8 @@ export interface Panel {
   slot?: Slot;
   /** small parts move as a whole when the car is stretched, instead of being stretched themselves */
   rigid?: boolean;
+  /** the part's own colour, measured on the reference sheet: its tone steps are built from it instead of the material's (review 29) */
+  color?: string;
   /** the structure drawn inside the panel by the part library (render/car/flat.ts) */
   detail?: Detail;
   /** the element of the car this panel is (hood, door, roof ...): a whole closed shape, hidden parts included */

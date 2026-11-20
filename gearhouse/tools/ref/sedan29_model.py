@@ -49,7 +49,7 @@ def snap(view, pts, reach):
         if u.geom_type == 'Polygon': f = [[round(x), round(z)] for x, z in list(u.exterior.coords)[:-1]]
     return f, moved
 P = []; notes = []
-def part(id, element, material, surface='side', *, fit=0, x=None, y=None, z=None, pair=False, slot=None, smooth=(), detail=None, feats=None, cutWheel=None, wheel=None, lift=0, **views):
+def part(id, element, material, surface='side', *, on=None, fit=0, x=None, y=None, z=None, pair=False, slot=None, smooth=(), detail=None, feats=None, cutWheel=None, wheel=None, lift=0, **views):
     """views: side=[[x,z]..], front=[[y,z]..], rear=[[y,z]..] or 'front', top=[[x,y]..]; the box comes from the side view
     (x, z) and the front or top view (y) unless given"""
     bb = lambda pts, k: [min(p[k] for p in pts), max(p[k] for p in pts)]
@@ -58,13 +58,26 @@ def part(id, element, material, surface='side', *, fit=0, x=None, y=None, z=None
             if views[v] == 'front': continue
             views[v], mv = snap(v, views[v], fit); SNAP[f'{id}.{v}'] = round(mv)
     if views.get('rear') == 'front': views['rear'] = views['front']
-    X = x or (bb(views['side'], 0) if 'side' in views else bb(views['top'], 0)); Z = z or (bb(views['side'], 1) if 'side' in views else bb(views.get('front') or views['rear'], 1))
-    fr = views.get('front') or views.get('rear'); Y = y or (bb(fr, 0) if fr else bb(views['top'], 1))
-    axes = {'side': (X, Z), 'front': (Y, Z), 'rear': (Y, Z), 'top': (X, Y)}; o = {}; f2 = {}
+    # each view keeps the sheet's own place and size for the part (review 29); the common box, used for the drawing order,
+    # for exchanging parts and for the physics, is the mean of the views that show each axis, and each view's
+    # difference from it is kept and reported
+    AX = {'side': ('x', 'z'), 'front': ('y', 'z'), 'rear': ('y', 'z'), 'top': ('x', 'y')}; sheet = {}
+    for v, pts in views.items(): sheet[v] = bb(pts, 0) + bb(pts, 1)
+    given = {'x': x, 'y': y, 'z': z}; box = {}
+    for ax in 'xyz':
+        if given[ax]: box[ax] = list(given[ax]); continue
+        got = [sheet[v][0:2] if AX[v][0] == ax else sheet[v][2:4] for v in sheet if ax in AX[v]]
+        if not got: raise SystemExit(f'{id}: no view gives its {ax}')
+        box[ax] = [round(sum(g[0] for g in got) / len(got)), round(sum(g[1] for g in got) / len(got))]
+    corr = {}
+    for v, sb in sheet.items():
+        a, b = AX[v]; d = [round((sb[0] + sb[1]) / 2 - (box[a][0] + box[a][1]) / 2), round((sb[2] + sb[3]) / 2 - (box[b][0] + box[b][1]) / 2),
+                           round((sb[1] - sb[0]) - (box[a][1] - box[a][0])), round((sb[3] - sb[2]) - (box[b][1] - box[b][0]))]
+        if any(d): corr[v] = d
+        if max(abs(t) for t in d) > 50: notes.append(f'{id:10s} {v:5s} differs from the common box by {d} mm (centre {a}, centre {b}, size {a}, size {b})')
+    o = {}; f2 = {}
     for v, pts in views.items():
-        a, b = axes[v]; ba, bbz = bb(pts, 0), bb(pts, 1)
-        for name, own, box in ((f'{v} across', ba, a), (f'{v} up', bbz, b)):
-            if abs((own[1] - own[0]) - (box[1] - box[0])) > 60 or abs((own[0] + own[1]) / 2 - (box[0] + box[1]) / 2) > 60: notes.append(f'{id:10s} {name:12s} sheet {own} -> model {box}')
+        ba, bbz = bb(pts, 0), bb(pts, 1)
         nu = lambda p: [round((p[0] - ba[0]) / max(1, ba[1] - ba[0]), 4), round((p[1] - bbz[0]) / max(1, bbz[1] - bbz[0]), 4)]
         o[v] = [nu(p) + ([0] if v in smooth else [1]) for p in pts]
         for f in (feats or {}).get(v, []):
@@ -74,8 +87,9 @@ def part(id, element, material, surface='side', *, fit=0, x=None, y=None, z=None
             if g['kind'] == 'louvres': (g['x0'], g['z0']), (g['x1'], g['z1']) = nu([g['x0'], g['z0']]), nu([g['x1'], g['z1']])
             if g['kind'] == 'handle': g['len'] = g.get('len', 110) / max(1, ba[1] - ba[0])
             f2.setdefault(v, []).append(g)
-    P.append({'id': id, 'element': element, 'material': material, 'surface': surface, 'box': {'x': X, 'y': Y, 'z': Z}, 'pair': pair, 'outlines': o,
-              **({'slot': slot} if slot else {}), **({'detail': detail} if detail else {}), **({'features': f2} if f2 else {}), **({'cutWheel': cutWheel} if cutWheel else {}), **({'wheel': wheel} if wheel else {}), **({'lift': lift} if lift else {})})
+    X, Y, Z = box['x'], box['y'], box['z']
+    P.append({'id': id, 'element': element, 'material': material, 'surface': surface, 'box': {'x': X, 'y': Y, 'z': Z}, 'sheet': sheet, 'pair': pair, 'outlines': o,
+              **({'slot': slot} if slot else {}), **({'detail': detail} if detail else {}), **({'features': f2} if f2 else {}), **({'cutWheel': cutWheel} if cutWheel else {}), **({'wheel': wheel} if wheel else {}), **({'lift': lift} if lift else {}), **({'on': on} if on else {})})
 
 # ---------------- chassis parts seen from outside ----------------
 for i, wx in enumerate((FX, RX)):
@@ -99,8 +113,8 @@ part('shell', 'radiator', 'chrome', 'flat', slot='grille', fit=3,
      side=side((243, 292), (250, 274), (275, 271), (284, 285), (284, 640), (243, 640)),
      front=fhalf((0, 262), (60, 268), (110, 290), (140, 328), (152, 388), (155, 600), (148, 640), (128, 652), (0, 655)), smooth=('front',),
      top=halfT([390, 0], [390, 330], [500, 330], [500, 0]))
-part('core', 'radiator', 'black', 'flat', slot='grille', x=[505, 520], front=fhalf((0, 300), (70, 302), (106, 320), (118, 360), (118, 612), (108, 630), (0, 634)), smooth=('front',), lift=12, detail={'kind': 'cells', 'pitch': 30})
-part('cap', 'radiator', 'chrome', 'flat', slot='grille', side=side((252, 272), (250, 252), (262, 240), (274, 252), (272, 272)), front=fhalf((0, 262), (12, 268), (16, 300), (0, 302)))
+part('core', 'radiator', 'black', 'flat', on='shell', slot='grille', x=[505, 520], front=fhalf((0, 300), (70, 302), (106, 320), (118, 360), (118, 612), (108, 630), (0, 634)), smooth=('front',), detail={'kind': 'cells', 'pitch': 30})
+part('cap', 'radiator', 'chrome', 'flat', on='shell', slot='grille', side=side((252, 272), (250, 252), (262, 240), (274, 252), (272, 272)), front=fhalf((0, 262), (12, 268), (16, 300), (0, 302)))
 part('hood', 'hood', 'paint', 'side', fit=3,
      side=side((284, 284), (628, 268), (630, 585), (284, 585)),
      front=fhalf((0, 262), (120, 270), (200, 290), (240, 325), (250, 400), (250, 600), (0, 600)), smooth=('front',),
@@ -124,13 +138,13 @@ part('roof', 'roof', 'canvas', 'roof', fit=3.5,
      side=side((675, 84), (722, 38), (800, 20), (1100, 4), (1480, 6), (1610, 18), (1668, 45), (1692, 90), (1640, 74), (1560, 64), (750, 64), (700, 90)),
      front=fhalf((0, 22), (250, 20), (318, 34), (346, 70), (332, 96), (0, 92)), rear='front',
      top=halfT([1585, 0], [1585, 560], [1600, 640], [1660, 680], [3500, 680], [3590, 650], [3635, 580], [3645, 480], [3645, 0]), smooth=('top',))
-part('screenFrame', 'screen', 'black', 'flat', x=[1564, 1599], front=fhalf((0, 100), (300, 100), (300, 240), (0, 240)), lift=10)
-part('screen', 'screen', 'glass', 'side', lift=11, x=[1562, 1600], front=fhalf((0, 115), (182, 115), (182, 222), (0, 222)), side=side((742, 112), (760, 112), (760, 226), (742, 226)))
-part('screenBar', 'screen', 'black', 'flat', lift=12, x=[1558, 1600], front=[[-12, F(0, 222)[1]], [12, F(0, 222)[1]], [12, F(0, 115)[1]], [-12, F(0, 115)[1]]])
+part('screenFrame', 'screen', 'black', 'flat', on='body', x=[1564, 1599], front=fhalf((0, 100), (300, 100), (300, 240), (0, 240)))
+part('screen', 'screen', 'glass', 'side', on='screenFrame', x=[1562, 1600], front=fhalf((0, 115), (182, 115), (182, 222), (0, 222)), side=side((742, 112), (760, 112), (760, 226), (742, 226)))
+part('screenBar', 'screen', 'black', 'flat', on='screen', x=[1558, 1600], front=[[-12, F(0, 222)[1]], [12, F(0, 222)[1]], [12, F(0, 115)[1]], [-12, F(0, 115)[1]]])
 for k, (a, b, c, d) in enumerate(((810, 110, 1022, 265), (1108, 105, 1315, 265), (1392, 105, 1528, 255))):
-    (x0, z1), (x1, z0) = S(a, b), S(c, d); part(f'glass{k}', 'body', 'glass', 'side', fit=3, y=[666, 668], pair=True, lift=10, side=rrect(x0, z0, x1, z1, 45))
-part('rearGlass', 'body', 'glass', 'side', x=[3602, 3606], rear=half([0, 1290], [320, 1290], [330, 1310], [330, 1552], [310, 1572], [0, 1572]))
-part('rearBar', 'body', 'black', 'flat', x=[3602, 3608], rear=[[-11, 1290], [11, 1290], [11, 1572], [-11, 1572]], lift=1)
+    (x0, z1), (x1, z0) = S(a, b), S(c, d); part(f'glass{k}', 'body', 'glass', 'side', on='body', fit=3, y=[666, 668], pair=True, side=rrect(x0, z0, x1, z1, 45))
+part('rearGlass', 'body', 'glass', 'side', on='body', x=[3602, 3606], rear=half([0, 1290], [320, 1290], [330, 1310], [330, 1552], [310, 1572], [0, 1572]))
+part('rearBar', 'body', 'black', 'flat', on='rearGlass', x=[3602, 3608], rear=[[-11, 1290], [11, 1290], [11, 1572], [-11, 1572]], lift=1)
 
 # ---------------- wings, boards ----------------
 part('fenderF', 'fenderF', 'paint2', 'fender', fit=3, slot='fenderF', pair=True, cutWheel={'i': 0, 'r': 412}, smooth=('front', 'top'),
@@ -150,22 +164,23 @@ for k, (a, b) in enumerate(((785, 890), (1105, 1215))):
 # ---------------- lamps, bumpers, spare ----------------
 part('lamp', 'lamp', 'chrome', 'fender', slot='lamp', pair=True, fit=2.5, smooth=('side', 'front', 'top'),
      side=side((150, 345), (160, 330), (180, 326), (205, 335), (228, 352), (234, 372), (232, 400), (215, 415), (190, 420), (160, 418), (148, 400), (145, 372)),
-     front=ell(383, 1031, 117, 117), top=[[410, 330], [330, 300], [250, 318], [205, 395], [250, 472], [330, 492], [410, 462]])
-part('lens', 'lamp', 'lens', 'flat', slot='lamp', pair=True, x=[303, 312], smooth=('front',), front=ell(383, 1031, 96, 96), lift=3, detail={'kind': 'flutes', 'pitch': 22})
-part('lampBar', 'lamp', 'chrome', 'flat', slot='lamp', x=[380, 420], front=half([0, 990], [270, 1000], [270, 1030], [0, 1022]))
+     front=ell(377, 910, 121, 121), top=[[410, 330], [330, 300], [250, 318], [205, 395], [250, 472], [330, 492], [410, 462]])
+part('lens', 'lamp', 'lens', 'flat', on='lamp', slot='lamp', pair=True, x=[303, 312], smooth=('front',), front=ell(377, 910, 98, 98), lift=3, detail={'kind': 'flutes', 'pitch': 22})
+part('lampBar', 'lamp', 'chrome', 'flat', slot='lamp', x=[380, 420], front=half([0, 872], [270, 880], [270, 905], [0, 900]))
 part('lampStand', 'lamp', 'chrome', 'flat', slot='lamp', pair=True, y=[370, 396], side=side((180, 418), (198, 418), (203, 470), (182, 470)))
 for k, py in enumerate((615, 661)):
     z = S(0, py)[1]
-    part(f'bumperF{k}', 'bumperF', 'chrome', 'fender', slot='bumperF', side=side((2, py - 11), (42, py - 11), (46, py), (42, py + 11), (2, py + 11)), front=half([0, z - 23], [655, z - 23], [668, z], [655, z + 23], [0, z + 23]),
+    zf, zr = (440, 358)[k], (470, 395)[k]                                       # the bars' heights as the front and rear sheets draw them
+    part(f'bumperF{k}', 'bumperF', 'chrome', 'fender', slot='bumperF', side=side((2, py - 11), (42, py - 11), (46, py), (42, py + 11), (2, py + 11)), front=half([0, zf - 24], [655, zf - 24], [668, zf], [655, zf + 24], [0, zf + 24]),
          top=halfT([0, 0], [0, 560], [20, 640], [70, 690], [110, 690], [80, 620], [60, 540], [60, 0]))
-    part(f'bumperR{k}', 'bumperR', 'chrome', 'fender', slot='bumperR', pair=True, side=side((1778, py - 11), (1834, py - 11), (1834, py + 11), (1778, py + 11)), rear=[[330, z - 23], [790, z - 23], [800, z], [790, z + 23], [330, z + 23]],
+    part(f'bumperR{k}', 'bumperR', 'chrome', 'fender', slot='bumperR', pair=True, side=side((1778, py - 11), (1834, py - 11), (1834, py + 11), (1778, py + 11)), rear=[[290, zr - 23], [790, zr - 23], [800, zr], [790, zr + 23], [290, zr + 23]],
          top=[[3770, 290], [3770, 790], [3800, 805], [3885, 805], [3885, 290]])
-part('ironF', 'bumperF', 'black', 'flat', slot='bumperF', pair=True, side=side((42, 600), (120, 610), (120, 640), (42, 676)), front=[[330, 400], [362, 400], [362, 545], [330, 545]], top=[[40, 210], [40, 245], [260, 245], [260, 210]], lift=1)
+part('ironF', 'bumperF', 'black', 'flat', slot='bumperF', pair=True, side=side((42, 600), (120, 610), (120, 640), (42, 676)), front=[[330, 320], [362, 320], [362, 480], [330, 480]], top=[[40, 210], [40, 245], [260, 245], [260, 210]], lift=1)
 part('ironR', 'bumperR', 'black', 'flat', slot='bumperR', pair=True, side=side((1700, 610), (1780, 600), (1780, 676), (1700, 640)), rear=[[540, 400], [572, 400], [572, 545], [540, 545]], top=[[3600, 520], [3600, 552], [3800, 552], [3800, 520]])
-part('tail', 'tail', 'lensR', 'flat', slot='tail', pair=True, smooth=('rear', 'side'), x=[3590, 3640], side=ell(3615, 720, 22, 50), rear=ell(570, 720, 50, 50))
-part('spare', 'spare', 'rubber', 'fender', wheel={'r': 330},
-     side=ell(S(1752, 0)[0], 868, 100, 296), rear=ell(0, 868, 330, 330), top=halfT([3680, 0], [3680, 380], [3700, 410], [3840, 410], [3860, 380], [3860, 0]), smooth=('side', 'top'), detail={'kind': 'ribs', 'pitch': 40})
-part('spareHub', 'spare', 'chrome', 'flat', smooth=('side',), y=[-60, 60], side=ell(S(1770, 0)[0], 868, 36, 70), lift=1)
+part('tail', 'tail', 'lensR', 'flat', on='body', slot='tail', pair=True, smooth=('rear', 'side'), x=[3590, 3640], side=ell(3615, 720, 22, 50), rear=ell(590, 690, 50, 50))
+part('spare', 'spare', 'rubber', 'fender', wheel={'r': 380},
+     side=ell(S(1752, 0)[0], 868, 100, 296), rear=ell(0, 775, 385, 385), top=halfT([3680, 0], [3680, 380], [3700, 410], [3840, 410], [3860, 380], [3860, 0]), smooth=('side', 'top'), detail={'kind': 'ribs', 'pitch': 40})
+part('spareHub', 'spare', 'chrome', 'flat', on='spare', smooth=('side',), y=[-60, 60], side=ell(S(1770, 0)[0], 868, 36, 70), lift=1)
 
 M = {'id': 'sedan29', 'name': 'four-door sedan, 1929', 'year': 1929, 'length': L, 'width': W, 'height': H, 'paint': '#3b3e25', 'paint2': '#232327', 'canvas': '#34343a',
      'wheels': [{'x': FX, 'r': R, 'y': 690}, {'x': RX, 'r': R, 'y': 690}], 'wheel': {'rim': 0.66, 'style': 'wire', 'spokes': 36, 'rimMaterial': 'paint', 'cap': 0.22, 'capRings': 1},
@@ -173,4 +188,4 @@ M = {'id': 'sedan29', 'name': 'four-door sedan, 1929', 'year': 1929, 'length': L
 json.dump(M, open(OUT, 'w'), indent=0)
 print(OUT, len(P), 'parts;', sum(len(p['outlines']) for p in P), 'outlines')
 print('outlines pulled onto the drawing, mean move in mm:', SNAP)
-print('where the sheet views disagree with the one model (the model wins):'); print('\n'.join('  ' + n for n in notes))
+print('where a view of the sheet differs from the common box by more than 50 mm (each view keeps its own):'); print('\n'.join('  ' + n for n in notes))

@@ -94,7 +94,7 @@ def part(id, element, material, surface='side', *, color=None, on=None, fit=0, n
 # ---------------- chassis parts seen from outside ----------------
 for i, wx in enumerate((FX, RX)):
     part(f'house{i}', 'frame', 'black', 'flat', y=[0, 560], side=[[wx - 440, 440]] + [[round(wx + math.cos(a) * 440), round(400 + math.sin(a) * 440)] for a in [math.pi * k / 14 for k in range(14, -1, -1)]] + [[wx + 440, 440]])
-part('frame', 'frame', 'black', 'flat', y=[-420, 420], side=[[150, 440], [3740, 440], [3740, 560], [150, 560]], front=half([0, 440], [420, 440], [420, 560], [0, 560]), rear='front')
+part('frame', 'frame', 'black', 'flat', pair=True, side=[[150, 440], [3740, 440], [3740, 560], [150, 560]], front=[[360, 440], [430, 440], [430, 560], [360, 560]], rear='front')   # two rails: from in front only their ends show
 part('axleF', 'axle', 'black', 'flat', x=[470, 546], front=half([0, 330], [640, 330], [640, 400], [560, 400], [520, 365], [0, 365]))
 part('springF', 'spring', 'iron', 'flat', x=[480, 536], front=half([0, 520], [120, 510], [400, 450], [560, 400], [560, 430], [400, 480], [120, 545], [0, 555]))
 part('axleR', 'axle', 'black', 'flat', x=[3090, 3184], rear=half([0, 250], [120, 260], [170, 330], [640, 345], [640, 415], [170, 430], [120, 500], [0, 510]), smooth=('rear',))
@@ -106,12 +106,12 @@ part('tyreR', 'wheel', 'rubber', 'fender', x=[RX - R, RX + R], pair=True, rear=t
 # ---------------- body ----------------
 part('splash', 'apron', 'black', 'flat', x=[560, 1450], z=[300, 880], top=halfT([500, 0], [500, 600], [1450, 620], [1450, 0]),
      front=half([0, 380], [600, 380], [600, 880], [0, 880]))
-part('crossF', 'frame', 'black', 'flat', x=[150, 500], z=[380, 470], top=halfT([150, 0], [150, 540], [270, 560], [500, 560], [500, 0]), front=half([0, 380], [560, 380], [560, 470], [0, 470]))
+part('crossF', 'frame', 'black', 'flat', x=[150, 500], z=[330, 385], top=halfT([150, 0], [150, 540], [270, 560], [500, 560], [500, 0]), front=half([0, 330], [560, 330], [560, 385], [0, 385]))
 part('spareCarrier', 'spare', 'iron', 'flat', y=[-40, 40], side=side((1694, 425), (1760, 425), (1760, 440), (1694, 440)), top=halfT([3600, 0], [3600, 40], [3760, 40], [3760, 0]))
 part('apron', 'apron', 'black', 'flat', y=[-640, 640], side=side((560, 585), (1262, 585), (1262, 702), (560, 702)), top=halfT([1300, 0], [1300, 640], [2700, 640], [2700, 0]))
 part('shell', 'radiator', 'chrome', 'flat', slot='grille', fit=3,
      side=side((243, 292), (250, 274), (275, 271), (284, 285), (284, 640), (243, 640)),
-     front=fhalf((0, 262), (60, 268), (110, 290), (140, 328), (152, 388), (156, 600), (150, 642), (134, 662), (100, 670), (0, 672)), smooth=('front',),   # a thick nickel surround, round at the bottom too
+     front=fhalf((0, 262), (60, 268), (110, 290), (140, 328), (152, 388), (156, 600), (153, 652), (140, 676), (110, 688), (0, 692)), smooth=('front',),   # a thick nickel surround, round at the bottom too
      top=halfT([390, 0], [390, 330], [500, 330], [500, 0]))
 part('lip', 'radiator', 'iron', 'flat', on='shell', slot='grille', x=[505, 522], front=fhalf((0, 300), (70, 302), (104, 320), (116, 360), (116, 606), (106, 628), (70, 636), (0, 638)), smooth=('front',))
 part('core', 'radiator', 'black', 'flat', on='lip', slot='grille', x=[505, 520], front=fhalf((0, 312), (60, 314), (95, 330), (106, 366), (106, 598), (96, 618), (60, 625), (0, 626)), smooth=('front',), detail={'kind': 'cells', 'pitch': 30})
@@ -135,7 +135,8 @@ part('body', 'body', 'paint', 'side', fit=3.5,
      feats={'side': [{'kind': 'seam', 'pts': side((1068, 70), (1068, 582))}, {'kind': 'seam', 'pts': side((1362, 70), (1362, 582))},
                      {'kind': 'bead', 'pts': side((742, 312), (1200, 314), (1694, 312))}, {'kind': 'highlight', 'pts': side((746, 322), (1690, 322)), 'width': 1},
                      {'kind': 'handle', 'at': S(990, 345), 'len': 120}, {'kind': 'handle', 'at': S(1085, 345), 'len': 120}],
-            'rear': [{'kind': 'bead', 'pts': [[-655, 1200], [0, 1225], [655, 1200]]}]})
+            'rear': [{'kind': 'bead', 'pts': [[-655, 1200], [0, 1225], [655, 1200]]}, {'kind': 'seam', 'pts': [[-430, 640], [-440, 1700]]}, {'kind': 'seam', 'pts': [[430, 640], [440, 1700]]},
+                     {'kind': 'highlight', 'pts': [[-600, 1260], [-560, 1600]], 'width': 1}, {'kind': 'highlight', 'pts': [[-655, 1190], [0, 1214], [655, 1190]], 'width': 1}]})   # the back's panel lines and moulding (rear sheet)
 part('roof', 'roof', 'canvas', 'roof', color='#222220', fit=3.5, nofit=('front', 'rear'),   # the cap's cloth as the sheet shows it lit from above; its shadows are near black
      side=side((675, 84), (722, 38), (800, 20), (1100, 4), (1480, 6), (1610, 18), (1668, 45), (1692, 90), (1640, 74), (1560, 64), (750, 64), (700, 90)),
      front=half([0, 1688], [560, 1688], [630, 1686], [662, 1690], [672, 1706], [674, 1736], [668, 1768], [652, 1792], [624, 1808], [560, 1817], [300, 1821], [0, 1822]),
@@ -148,6 +149,9 @@ part('screenBar', 'screen', 'black', 'flat', on='screen', x=[1558, 1600], front=
 for k, (a, b, c, d) in enumerate(((810, 110, 1022, 265), (1108, 105, 1315, 265), (1392, 105, 1528, 255))):
     (x0, z1), (x1, z0) = S(a, b), S(c, d); part(f'wframe{k}', 'body', 'paint', 'side', on='body', y=[664, 666], pair=True, side=rrect(x0 - 55, z0 - 55, x1 + 55, z1 + 55, 85)); part(f'glass{k}', 'body', 'glass', 'side', on=f'wframe{k}', fit=3, y=[666, 668], pair=True, side=rrect(x0, z0, x1, z1, 45))
 part('rearGlass', 'body', 'glass', 'side', on='body', x=[3602, 3606], rear=half([0, 1290], [320, 1290], [330, 1310], [330, 1552], [310, 1572], [0, 1572]))
+part('plateLamp', 'body', 'chrome', 'fender', on='body', x=[3655, 3665], rear=ell(0, 1170, 28, 22), smooth=('rear',))
+part('handleR', 'body', 'chrome', 'flat', on='body', x=[3655, 3665], rear=ell(0, 1820 - 89 * 2, 18, 14), smooth=('rear',))
+part('rearApron', 'body', 'black', 'flat', x=[3640, 3660], rear=half([0, 430], [560, 430], [560, 590], [0, 590]))
 part('rearBar', 'body', 'black', 'flat', on='rearGlass', x=[3602, 3608], rear=[[-11, 1290], [11, 1290], [11, 1572], [-11, 1572]], lift=1)
 
 # ---------------- wings, boards ----------------
@@ -173,8 +177,8 @@ part('lamp', 'lamp', 'chrome', 'fender', slot='lamp', pair=True, fit=2.5, smooth
      front=ell(377, 910, 121, 121), top=[[410, 330], [330, 300], [250, 318], [205, 395], [250, 472], [330, 492], [410, 462]])
 # the lamp seen face on, as the front sheet draws it: a nickel rim, then glass over a silvered reflector (its own
 # material: brighter and whiter than the rim, shaded like a bowl), the bulb a dark point at its centre
-part('lens', 'lamp', 'white', 'fender', on='lamp', slot='lamp', pair=True, x=[303, 312], smooth=('front',), front=ell(377, 910, 100, 100), detail={'kind': 'bowl'})
-part('bulb', 'lamp', 'black', 'flat', on='lens', slot='lamp', pair=True, x=[300, 304], smooth=('front',), front=ell(377, 910, 16, 16))
+part('lampGap', 'lamp', 'iron', 'flat', on='lamp', slot='lamp', pair=True, x=[304, 314], smooth=('front',), front=ell(377, 910, 104, 104))
+part('lens', 'lamp', 'chrome', 'flat', on='lampGap', slot='lamp', pair=True, x=[303, 312], smooth=('front',), front=ell(377, 910, 100, 100), detail={'kind': 'bowl'})
 part('lampBar', 'lamp', 'chrome', 'flat', slot='lamp', x=[380, 420], front=half([0, 872], [270, 880], [270, 905], [0, 900]))
 part('lampStand', 'lamp', 'chrome', 'flat', slot='lamp', pair=True, y=[370, 396], side=side((180, 418), (198, 418), (203, 470), (182, 470)))
 for k, py in enumerate((615, 661)):

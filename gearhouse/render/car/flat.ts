@@ -211,7 +211,8 @@ export function rasterizeFlat(d0: CarDesign, opt: { frameW?: number; shadow?: bo
     else if (dt.kind === 'bowl') { // a lamp's silvered reflector seen through its glass: dark at the rim, bright in a ring, a hot spot upper left
       let cx = 0, cy = 0, n = 0, r = 0; for (let y = 0; y < bh; y++) for (let x = 0; x < bw; x++) if (M(x, y)) { cx += x; cy += y; n++; } cx /= Math.max(1, n); cy /= Math.max(1, n); r = Math.sqrt(n / Math.PI);
       for (let y = 0; y < bh; y++) for (let x = 0; x < bw; x++) { if (!M(x, y)) continue; const dx = x + 0.5 - cx, dy = y + 0.5 - cy, q = Math.hypot(dx, dy) / Math.max(1, r), d = (-dx - dy) / (Math.hypot(dx, dy) || 1) * 0.7071;
-        const l = q > 0.86 ? 0 : q > 0.68 ? (d > 0.2 ? 2 : 1) : q > 0.4 ? (d > 0.3 ? 4 : d < -0.4 ? 1 : 2) : (d > 0 && q > 0.15 ? 3 : 2); set(bx + x, by + y, mt, l, ly); } }   // silver, not white: mostly the middle steps
+        // the glass's fluted outer ring (fine radial ribs), then the bowl: a darker band, a bright ring, the centre
+                const l = q > 0.86 ? 1 : q > 0.74 ? (d > 0.2 ? 2 : 1) : q > 0.45 ? (d > 0.3 ? 4 : d < -0.4 ? 2 : 3) : q > 0.22 ? 2 : 4; set(bx + x, by + y, mt, l, ly); } }   // silver, not white; the bulb a bright point, not a dark hole
     else if (dt.kind === 'treadFace') {
       let y0 = bh, y1 = -1; for (let y = 0; y < bh; y++) for (let x = 0; x < bw; x++) if (M(x, y)) { y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
       const cy = (y0 + y1) / 2, ry = Math.max(1, (y1 - y0) / 2), R = ry * MM, pitch = dt.pitch;

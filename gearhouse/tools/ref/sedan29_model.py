@@ -111,10 +111,10 @@ part('spareCarrier', 'spare', 'iron', 'flat', y=[-40, 40], side=side((1694, 425)
 part('apron', 'apron', 'black', 'flat', y=[-640, 640], side=side((560, 585), (1262, 585), (1262, 702), (560, 702)), top=halfT([1300, 0], [1300, 640], [2700, 640], [2700, 0]))
 part('shell', 'radiator', 'chrome', 'flat', slot='grille', fit=3,
      side=side((243, 292), (250, 274), (275, 271), (284, 285), (284, 640), (243, 640)),
-     front=fhalf((0, 262), (60, 268), (110, 290), (140, 328), (152, 388), (155, 600), (148, 640), (128, 652), (0, 655)), smooth=('front',),
+     front=fhalf((0, 262), (60, 268), (110, 290), (140, 328), (152, 388), (156, 600), (150, 642), (134, 662), (100, 670), (0, 672)), smooth=('front',),   # a thick nickel surround, round at the bottom too
      top=halfT([390, 0], [390, 330], [500, 330], [500, 0]))
-part('lip', 'radiator', 'iron', 'flat', on='shell', slot='grille', x=[505, 522], front=fhalf((0, 290), (78, 292), (116, 312), (128, 356), (128, 618), (116, 640), (0, 645)), smooth=('front',))
-part('core', 'radiator', 'black', 'flat', on='lip', slot='grille', x=[505, 520], front=fhalf((0, 300), (70, 302), (106, 320), (118, 360), (118, 612), (108, 630), (0, 634)), smooth=('front',), detail={'kind': 'cells', 'pitch': 30})
+part('lip', 'radiator', 'iron', 'flat', on='shell', slot='grille', x=[505, 522], front=fhalf((0, 300), (70, 302), (104, 320), (116, 360), (116, 606), (106, 628), (70, 636), (0, 638)), smooth=('front',))
+part('core', 'radiator', 'black', 'flat', on='lip', slot='grille', x=[505, 520], front=fhalf((0, 312), (60, 314), (95, 330), (106, 366), (106, 598), (96, 618), (60, 625), (0, 626)), smooth=('front',), detail={'kind': 'cells', 'pitch': 30})
 part('cap', 'radiator', 'chrome', 'flat', on='shell', slot='grille', side=side((252, 272), (250, 252), (262, 240), (274, 252), (272, 272)), front=fhalf((0, 262), (12, 268), (16, 300), (0, 302)))
 part('hood', 'hood', 'paint', 'side', fit=3,
      side=side((284, 284), (628, 268), (630, 585), (284, 585)),
@@ -156,7 +156,8 @@ part('fenderF', 'fenderF', 'paint2', 'fender', fit=3, slot='fenderF', pair=True,
      front=[F(*q) for q in ((150, 687), (180, 560), (230, 500), (290, 465), (350, 452), (400, 465), (418, 500), (420, 580), (395, 602), (330, 562), (280, 562), (240, 602), (200, 687))],
      top=[[150, 640], [165, 760], [230, 830], [400, 850], [1320, 850], [1440, 822], [1490, 760], [1485, 630], [1420, 592], [600, 590], [420, 575], [260, 545], [175, 575]],
      feats={'side': [{'kind': 'highlight', 'pts': side((110, 490), (160, 452), (230, 432), (325, 447), (410, 490), (490, 548)), 'width': 2}],
-            'front': [{'kind': 'highlight', 'pts': [F(*q) for q in ((185, 545), (230, 500), (290, 470), (350, 460), (395, 472))], 'width': 2}]})
+            'front': [{'kind': 'highlight', 'pts': [F(*q) for q in ((185, 545), (230, 500), (290, 470), (350, 460), (395, 472))], 'width': 2}],
+            'top': [{'kind': 'highlight', 'pts': [[300, 720], [800, 745], [1300, 740]], 'width': 2}]})   # the crown catches the light along its length
 part('fenderR', 'fenderR', 'paint2', 'fender', fit=3, slot='fenderR', pair=True, cutWheel={'i': 1, 'r': 412}, smooth=('rear', 'top'),
      side=side((1250, 585), (1265, 520), (1300, 460), (1350, 420), (1420, 400), (1500, 398), (1570, 420), (1630, 470), (1670, 540), (1700, 610), (1740, 660), (1785, 690), (1790, 706), (1700, 702), (1690, 682), (1250, 682)),
      rear=[[560, 380], [560, 760], [600, 860], [700, 905], [790, 880], [840, 800], [850, 380]],
@@ -187,7 +188,9 @@ for k, u in enumerate((215, 575)):
     part(f'clampF{k}', 'bumperF', 'chrome', 'flat', on='bumperF0', slot='bumperF', pair=True, x=[0, 30], front=[[u - 14, 322], [u + 14, 322], [u + 14, 500], [u - 14, 500]])
 part('ironF', 'bumperF', 'black', 'flat', slot='bumperF', pair=True, side=side((42, 600), (120, 610), (120, 640), (42, 676)), front=[[330, 320], [362, 320], [362, 480], [330, 480]], top=[[40, 210], [40, 245], [260, 245], [260, 210]], lift=1)
 part('ironR', 'bumperR', 'black', 'flat', slot='bumperR', pair=True, side=side((1700, 610), (1780, 600), (1780, 676), (1700, 640)), rear=[[540, 400], [572, 400], [572, 545], [540, 545]], top=[[3600, 520], [3600, 552], [3800, 552], [3800, 520]])
-part('tail', 'tail', 'lensR', 'flat', on='body', slot='tail', pair=True, smooth=('rear', 'side'), x=[3590, 3640], side=ell(3615, 720, 22, 50), rear=ell(590, 690, 50, 50))
+# tail lamps carried on the rear fenders (rear sheet), so in front of them: a nickel rim and a red glass
+part('tailRim', 'tail', 'chrome', 'fender', on='fenderR', slot='tail', pair=True, smooth=('rear',), x=[3640, 3650], rear=ell(585, 690, 76, 76))
+part('tail', 'tail', 'lensR', 'flat', on='tailRim', slot='tail', pair=True, smooth=('rear', 'side'), x=[3590, 3640], side=ell(3615, 720, 22, 50), rear=ell(585, 690, 60, 60))
 # the spare is a tyre too: seen from the side it shows its tread edge on, exactly as the road tyres do from in front
 # (the same section, the same face-on tread); from above the same, lying across the car
 def tyre_section(u0, u1, v0, v1, across_first=True):

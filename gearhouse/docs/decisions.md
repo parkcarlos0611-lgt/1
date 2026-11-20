@@ -260,3 +260,10 @@ These decisions still hold, from `legacy/docs/MASTER_GAME_PLAN.md`:
 - A car may give its bright metal's colour (design.chrome); the 1929 sedan's is nickel, warmer and greyer than chrome.
 - Tyres seen face on: a continuous centre rib between two grooves, blocks either side in a zigzag, darker shoulders.
 - Wire wheels: two sets of slanted spokes crossing in a lattice, as on a laced wheel; painted wheels in their own colour.
+
+## 2026-11-20 — tail lamps on the fenders, the shell's surround, silvered lamps, hub caps
+
+- Rear tail lamps lie on the rear fenders (they were set on the body, which the fenders cover in the rear view), each a nickel rim with red glass.
+- The radiator shell's surround is thicker and wraps round the bottom of the core, as the front sheet draws it.
+- The lamp's reflector reads silver (middle steps), not white; wire wheels' hub caps follow the wheel's cap size.
+- Plan view: the front fenders' crowns catch the light along their length.

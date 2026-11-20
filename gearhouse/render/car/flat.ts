@@ -211,7 +211,7 @@ export function rasterizeFlat(d0: CarDesign, opt: { frameW?: number; shadow?: bo
     else if (dt.kind === 'bowl') { // a lamp's silvered reflector seen through its glass: dark at the rim, bright in a ring, a hot spot upper left
       let cx = 0, cy = 0, n = 0, r = 0; for (let y = 0; y < bh; y++) for (let x = 0; x < bw; x++) if (M(x, y)) { cx += x; cy += y; n++; } cx /= Math.max(1, n); cy /= Math.max(1, n); r = Math.sqrt(n / Math.PI);
       for (let y = 0; y < bh; y++) for (let x = 0; x < bw; x++) { if (!M(x, y)) continue; const dx = x + 0.5 - cx, dy = y + 0.5 - cy, q = Math.hypot(dx, dy) / Math.max(1, r), d = (-dx - dy) / (Math.hypot(dx, dy) || 1) * 0.7071;
-        const l = q > 0.86 ? 1 : q > 0.68 ? (d > 0.2 ? 3 : 2) : q > 0.4 ? (d > 0.3 ? 4 : d < -0.4 ? 2 : 3) : (d > 0 && q > 0.15 ? 4 : 3); set(bx + x, by + y, mt, l, ly); } }
+        const l = q > 0.86 ? 0 : q > 0.68 ? (d > 0.2 ? 2 : 1) : q > 0.4 ? (d > 0.3 ? 4 : d < -0.4 ? 1 : 2) : (d > 0 && q > 0.15 ? 3 : 2); set(bx + x, by + y, mt, l, ly); } }   // silver, not white: mostly the middle steps
     else if (dt.kind === 'treadFace') {
       let y0 = bh, y1 = -1; for (let y = 0; y < bh; y++) for (let x = 0; x < bw; x++) if (M(x, y)) { y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
       const cy = (y0 + y1) / 2, ry = Math.max(1, (y1 - y0) / 2), R = ry * MM, pitch = dt.pitch;
@@ -244,7 +244,7 @@ export function rasterizeFlat(d0: CarDesign, opt: { frameW?: number; shadow?: bo
         set(x, y, 'rubber', l, ly, id); continue; }
       const q = dd / ri, a = Math.atan2(dy, dx);
       if (s.style === 'wire') { const own = s.rimMaterial === 'paint' || s.rimMaterial === 'paint2'; if (q > 0.9) set(x, y, own ? rimM : 'chrome', dot > 0.2 ? 4 : dot < -0.4 ? 2 : 3, ly, id); else if (q > 0.84) set(x, y, 'black', 1, ly, id);
-        else if (q < 0.3) set(x, y, 'chrome', q < 0.12 ? (dot > 0 ? 4 : 3) : q > 0.26 ? 1 : dot > 0.3 ? 4 : dot > -0.3 ? 2 : 1, ly, id);
+        else if (q < (s.cap ?? 0.3)) set(x, y, 'chrome', q < 0.12 ? (dot > 0 ? 4 : 3) : q > 0.26 ? 1 : dot > 0.3 ? 4 : dot > -0.3 ? 2 : 1, ly, id);
         else { // cross-laced wire: two sets of spokes leaving the hub at a slant, one each way, so they cross in a lattice as on the real wheel
           const sp = Math.max(8, Math.round((s.spokes || 30) / 2)), own = s.rimMaterial === 'paint' || s.rimMaterial === 'paint2', tw = (1 - q) * 0.9;
           const f1 = (((a + tw) / (Math.PI * 2)) * sp % 1 + 1) % 1, f2 = (((a - tw) / (Math.PI * 2)) * sp % 1 + 1) % 1, w = own ? 0.26 : 0.2, on = f1 < w || f2 < w, both = f1 < w && f2 < w;

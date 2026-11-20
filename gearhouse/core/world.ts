@@ -24,6 +24,9 @@ import { Chances, type ChanceData } from './chances';
 import mediaData from '../data/media/us_slice.json';
 import letters from '../data/text/ko/inquiry_letter.json';
 import { Simulation } from './sim';
+import { Repair, type RepairData } from './repair';
+import { Clock } from './clock';
+import repairData from '../data/repair/us_1930.json';
 import { newGame, type GameState } from './state';
 import { makeFounder, type PeopleData } from './people';
 import { financeSystem } from './ledger';
@@ -37,7 +40,7 @@ import type { BodyData } from './newsBody';
 import type { RegisterData } from './register';
 
 export const DATA = { holidays, names, people: peopleData as unknown as PeopleData, finance, parts: partsData as unknown as PartsData, suppliers: suppliers as SupplyData, build: buildData as unknown as BuildData, sales: salesData as unknown as SalesData, economy, fiction: fiction as unknown as FictionData, real: realNews as unknown as RealData, bodies: bodies as unknown as BodyData, register: registerData as unknown as RegisterData, media: mediaData as unknown as MediaData, chances: chanceData as unknown as ChanceData, weather: weatherData as unknown as WeatherData, bank: bankData as unknown as BankData };
-export interface World { sim: Simulation; supply: Supply; shop: Shop; sales: Sales; media: Media; chances: Chances; bank: Bank }
+export interface World { clock: Clock; repair: Repair; sim: Simulation; supply: Supply; shop: Shop; sales: Sales; media: Media; chances: Chances; bank: Bank }
 export interface FounderChoice { background: string; age: number; given?: string; family?: string }
 
 /** a running game from a saved state, or a new one when a founder is given */
@@ -51,6 +54,7 @@ export function openWorld(g: GameState, founder?: FounderChoice): World {
   const bank = new Bank(sim, DATA.bank, { list: () => media.register.alive('bank').map(e => ({ id: e.id, name: e.name })), status: id => media.register.get(id)?.status, name: id => media.register.get(id)?.name ?? id }, d => (DATA.economy.demand as Record<string, number>)[d.slice(0, 4)] ?? 1);
   sim.use(supply.system()).use(shop.system()).use(sales.system()).use(media.system()).use(chances.system()).use(bank.system());
   if (founder && !g.founderId) sim.setFounder(makeFounder(sim.rng, DATA.names, DATA.people, 1930, founder), DATA.people.founderBackgrounds[founder.background]!.cash);
-  return { sim, supply, shop, sales, media, chances, bank };
+  const repair = new Repair(sim, repairData as unknown as RepairData, DATA.names as never, DATA.people), clock = new Clock(sim); sim.use(repair.system());
+  return { sim, supply, shop, sales, media, chances, bank, repair, clock };
 }
 export const newWorld = (seed: number, founder: FounderChoice): World => openWorld(newGame(seed), founder);

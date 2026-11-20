@@ -1,0 +1,20 @@
+{
+  "note": "Repair jobs (version one, review 39): cheap cars brought to the shop with damage on their parts. Prices in 1930 dollars; hours at the bench. To be balanced with the five-year runner.",
+  "arrivalsPerWeek": 1.6,
+  "labourRate": 0.55,
+  "cars": [
+    { "id": "sedan29", "name": "1929 대중 세단", "value": 420, "colours": ["#3b3e25", "#22324a", "#4a2a2a", "#2a2a2c"] }
+  ],
+  "damage": [
+    { "kind": "rust", "name": "녹", "weight": 5, "rustingOnly": true, "hours": [3, 9], "materials": 1.2, "hiddenChance": 0.35 },
+    { "kind": "dent", "name": "찌그러짐", "weight": 3, "parts": ["fenderF", "fenderR", "hood"], "hours": [2, 6], "materials": 0.6, "hiddenChance": 0 },
+    { "kind": "lamp", "name": "깨진 헤드램프", "weight": 2, "parts": ["lamp"], "hours": [1, 2], "materials": 4.5, "hiddenChance": 0 },
+    { "kind": "roof", "name": "찢어진 지붕 천", "weight": 1, "parts": ["roof"], "hours": [4, 8], "materials": 3.2, "hiddenChance": 0 }
+  ],
+  "budgetSpread": [0.75, 1.35],
+  "wantDays": [5, 21],
+  "patience": [3, 8],
+  "maxConsults": 2,
+  "complaintDays": [60, 180],
+  "pleasedAt": 70
+}

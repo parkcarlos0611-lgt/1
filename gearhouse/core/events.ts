@@ -35,6 +35,10 @@ export interface GameEvents {
   order_placed: { orderId: number; customerId: number; price: number };
   customer_cannot_pay: { orderId: number };
   car_delivered: { orderId: number; carId: number; satisfaction: number; standing: number };
+  repair_inquiry: { jobId: number; source: string };
+  repair_agreed: { jobId: number; price: number };
+  repair_ready: { jobId: number };
+  repair_collected: { jobId: number; satisfaction: number; price: number };
   car_broke_down: { carId: number; kind: string; severity: number };
   reputation_changed: { field: string; value: number };
   /** work on a build stood still today for a reason outside the shop (rain on paint) */

@@ -9,6 +9,8 @@ import { newMedia, type MediaState } from './media';
 import type { Condition } from './conditions';
 import { newWeather, type WeatherState } from './weather';
 import { newBank, type BankState } from './bank';
+import type { AgendaItem, TimeState } from './clock';
+import type { RepairState } from './repair';
 
 export const SAVE_VERSION = 1;
 export type Phase = 'morning' | 'day' | 'evening';
@@ -66,6 +68,11 @@ export interface GameState {
   conditions: Condition[];
   weather: WeatherState;
   bank: BankState;
+  /** the minute clock and what is due at a time of day (core/clock.ts) */
+  time?: TimeState;
+  agenda?: AgendaItem[];
+  /** repair jobs (core/repair.ts) */
+  repair?: RepairState;
 }
 
 export function newGame(seed: number, start: DateStr = '1930-01-01'): GameState {

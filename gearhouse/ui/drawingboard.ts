@@ -17,12 +17,12 @@ const C = { wood: hex('#5a3b26'), wood2: hex('#4a2f1e'), wood3: hex('#6b4730'), 
 const BRASS = ['#4a3410', '#7a5a22', '#a37c34', '#c9a052', '#e4c47a', '#fbeab2'].map(hex);
 
 // ---------------- the four sheets ----------------
-interface Sheet { name: string; who: string; paper: RGB; paper2: RGB; paper3: RGB; grid: RGB; line: RGB; line2: RGB; red: RGB; red2: RGB; smudge: RGB; label: RGB; eraser: boolean; worn: boolean }
+interface Sheet { name: string; who: string; paper: RGB; paper2: RGB; paper3: RGB; grid: RGB; line: RGB; line2: RGB; red: RGB; red2: RGB; smudge: RGB; label: RGB; eraser: boolean; worn: boolean; style: 'worn' | 'clean' | 'blue' | 'screen' }
 const SHEETS: Sheet[] = [
-  { name: '닳은 제도지', who: '소규모 공방', paper: hex('#e6d8b2'), paper2: hex('#d9c99e'), paper3: hex('#cdbb8c'), grid: hex('#d6c79f'), line: hex('#3d3c44'), line2: hex('#5c5a62'), red: hex('#b8322a'), red2: hex('#d0614f'), smudge: hex('#c4b48a'), label: hex('#6b5d48'), eraser: true, worn: true },
-  { name: '깔끔한 제도지', who: '설계실이 있는 제작소', paper: hex('#f4f1e6'), paper2: hex('#e9e5d6'), paper3: hex('#d9d4c2'), grid: hex('#e4e8e8'), line: hex('#1d2430'), line2: hex('#3a4352'), red: hex('#c0312a'), red2: hex('#d85a4a'), smudge: hex('#e2ddcb'), label: hex('#4a5260'), eraser: true, worn: false },
-  { name: '청사진', who: '중견 · 설계 부서', paper: hex('#1f4f8a'), paper2: hex('#1b477d'), paper3: hex('#163c6c'), grid: hex('#2a5c98'), line: hex('#e8f0f8'), line2: hex('#b8cce4'), red: hex('#ffd060'), red2: hex('#ffe598'), smudge: hex('#245590'), label: hex('#b8cce4'), eraser: false, worn: false },
-  { name: '검은 화면', who: '대기업 · 1980년대 이후', paper: hex('#0c0f14'), paper2: hex('#10141a'), paper3: hex('#161b22'), grid: hex('#151c26'), line: hex('#e6f2ff'), line2: hex('#8fb8e0'), red: hex('#ff6a4a'), red2: hex('#ff9a80'), smudge: hex('#12171e'), label: hex('#8fb8e0'), eraser: false, worn: false } ];
+  { name: '닳은 제도지', who: '소규모 공방', paper: hex('#e6d8b2'), paper2: hex('#d9c99e'), paper3: hex('#cdbb8c'), grid: hex('#d6c79f'), line: hex('#3d3c44'), line2: hex('#5c5a62'), red: hex('#b8322a'), red2: hex('#d0614f'), smudge: hex('#c4b48a'), label: hex('#6b5d48'), eraser: true, worn: true, style: 'worn' },
+  { name: '깔끔한 제도지', who: '설계실이 있는 제작소', paper: hex('#f4f1e6'), paper2: hex('#e9e5d6'), paper3: hex('#d9d4c2'), grid: hex('#e4e8e8'), line: hex('#1d2430'), line2: hex('#3a4352'), red: hex('#c0312a'), red2: hex('#d85a4a'), smudge: hex('#e2ddcb'), label: hex('#4a5260'), eraser: true, worn: false, style: 'clean' },
+  { name: '청사진', who: '중견 · 설계 부서', paper: hex('#1f4f8a'), paper2: hex('#1b477d'), paper3: hex('#163c6c'), grid: hex('#2a5c98'), line: hex('#e8f0f8'), line2: hex('#b8cce4'), red: hex('#ffd060'), red2: hex('#ffe598'), smudge: hex('#245590'), label: hex('#b8cce4'), eraser: false, worn: false, style: 'blue' },
+  { name: '검은 화면', who: '대기업 · 1980년대 이후', paper: hex('#0c0f14'), paper2: hex('#10141a'), paper3: hex('#161b22'), grid: hex('#151c26'), line: hex('#e6f2ff'), line2: hex('#8fb8e0'), red: hex('#ff6a4a'), red2: hex('#ff9a80'), smudge: hex('#12171e'), label: hex('#8fb8e0'), eraser: false, worn: false, style: 'screen' } ];
 let sheetNo = 0; const SH = () => SHEETS[sheetNo]!;
 
 // ---------------- the drawing ----------------
@@ -38,7 +38,7 @@ const pixelsOf = (V: Views) => { const s = new Set<number>(); put(V.side, SIDE.x
 let drawnNow = pixelsOf(views(cur)), redNow = new Set<number>(), drawnKeep = new Set<number>();
 
 // ---------------- strokes: pencil, red pencil, eraser ----------------
-type Job = { kind: 'pencil' | 'red' | 'erase' | 'unred'; pix: number[]; i: number; then?: () => void };
+type Job = { kind: 'pencil' | 'red' | 'erase' | 'unred' | 'scan'; pix: number[]; i: number; then?: () => void; tgt?: Uint8Array; y?: number; speed?: number };
 const jobs: Job[] = []; let tool: { kind: Job['kind']; x: number; y: number } | null = null, fast = false, blink = 0;
 const queue = (kind: Job['kind'], pix: Set<number> | number[], then?: () => void) => { const arr = [...pix];
   if (!SH().eraser && (kind === 'erase' || kind === 'unred')) { jobs.push({ kind, pix: arr, i: 0, then }); return; }
@@ -51,6 +51,9 @@ function apply1(job: Job, p: number) {
 }
 function step(dt: number) {
   const job = jobs[0]; if (!job) { tool = null; sound(0, 0); return; }
+  if (job.kind === 'scan') { const y0 = Math.floor(job.y!); job.y = job.y! + (fast ? 4000 : job.speed!) * dt; sound(0, 0);   // the screen redraws under a falling scan line
+    for (let y = Math.max(PAPER.y, y0); y < Math.min(PAPER.y + PAPER.h, job.y); y++) for (let x = PAPER.x; x < PAPER.x + PAPER.w; x++) sheet[y * W + x] = job.tgt![y * W + x]!;
+    if (job.y >= PAPER.y + PAPER.h) { jobs.shift(); job.then?.(); } return; }
   if (!SH().eraser && (job.kind === 'erase' || job.kind === 'unred')) {   // screens and blueprints: the old lines blink and go
     blink += dt; if (blink > 0.45 || fast) { for (const p of job.pix) apply1(job, p); job.i = job.pix.length; blink = 0; } }
   else { let n = Math.max(1, Math.round((fast ? 8000 : job.kind === 'erase' || job.kind === 'unred' ? 700 : job.kind === 'red' ? 900 : SH().eraser ? 420 : 1400) * dt));
@@ -59,7 +62,7 @@ function step(dt: number) {
   if (job.i >= job.pix.length) { jobs.shift(); job.then?.(); }
 }
 /** finish every stroke at once (a button pressed while drawing) */
-function flush() { while (jobs.length) { const j = jobs[0]!; while (j.i < j.pix.length) apply1(j, j.pix[j.i++]!); jobs.shift(); j.then?.(); } tool = null; }
+function flush() { while (jobs.length) { const j = jobs[0]!; if (j.tgt) sheet.set(j.tgt); while (j.i < j.pix.length) apply1(j, j.pix[j.i++]!); jobs.shift(); j.then?.(); } tool = null; }
 const busy = () => jobs.length > 0;
 
 // ---------------- the order and the estimate ----------------
@@ -103,16 +106,21 @@ buttons.push({ id: 'tab-ext', x: 426, y: 4, w: 46, h: 13, label: () => '외장',
 buttons.push({ id: 'sheet', x: 330, y: 255, w: 104, h: 13, label: () => '도면: ' + SH().name, on: () => switchSheet() });
 buttons.push({ id: 'sound', x: 436, y: 255, w: 36, h: 13, label: () => (soundOn ? '소리' : '무음'), on: () => (soundOn = !soundOn) });
 
+const isScan = () => SH().style === 'screen';
+function scanTo(drawn: Set<number>, red: Set<number>, speed: number, then?: () => void) {
+  const t = new Uint8Array(W * H); for (const p of drawn) t[p] = 1; for (const p of red) t[p] = 2; jobs.push({ kind: 'scan', pix: [], i: 0, tgt: t, y: PAPER.y, speed, then }); }
 function change(e: Edit) {
   flush(); next = e; const want = pixelsOf(views(next)), redWant = new Set([...want].filter(p => !drawnNow.has(p)));
+  if (isScan()) { redNow = redWant; scanTo(drawnNow, redNow, 520); return; }
   const add = [...redWant].filter(p => !redNow.has(p)), drop = [...redNow].filter(p => !redWant.has(p));
   redNow = redWant; if (drop.length) queue('unred', drop); if (add.length) queue('red', add);
 }
 function apply() {
   flush(); const want = pixelsOf(views(next)), gone = [...drawnNow].filter(p => !want.has(p)), red = [...redNow], after = { ...next };
+  if (isScan()) { scanTo(want, new Set(), 210, () => { cur = after; drawnNow = want; redNow = new Set(); }); return; }
   drawnKeep = want; queue('erase', gone, () => queue('pencil', red, () => { cur = after; drawnNow = want; redNow = new Set(); }));
 }
-function cancel() { flush(); const red = [...redNow]; next = { ...cur }; redNow = new Set(); queue('unred', red); }
+function cancel() { flush(); const red = [...redNow]; next = { ...cur }; redNow = new Set(); if (isScan()) scanTo(drawnNow, redNow, 520); else queue('unred', red); }
 function switchSheet() { flush(); sheetNo = (sheetNo + 1) % SHEETS.length; sheet.fill(0); for (const p of drawnNow) sheet[p] = 1; for (const p of redNow) sheet[p] = 2; }
 
 // ---------------- typing a figure ----------------
@@ -137,23 +145,82 @@ function sound(kind: number, on: number) { if (!AC || !gainP || !gainE) return; 
 // ---------------- drawing the screen ----------------
 const rnd = (i: number) => { let x = (i * 2654435761) >>> 0; x ^= x >>> 15; x = Math.imul(x, 2246822519) >>> 0; x ^= x >>> 13; return (x >>> 0) / 4294967296; };
 function desk() { for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const g = Math.sin(y * 0.55 + Math.sin(x * 0.02 + y * 0.05) * 3) + (rnd(y * 977 + (x >> 3)) - 0.5) * 0.6; S.px(x, y, g > 0.75 ? C.wood3 : g < -0.7 ? C.wood2 : C.wood); } }
-function paper() {
-  const { x, y, w, h } = PAPER, P = SH();
-  S.fill(x + 3, y + 3, w, h, C.shadow);
-  for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) { const r = rnd(j * 3301 + i * 7), edge = Math.min(i, j, w - 1 - i, h - 1 - j);
-    let c = P.worn && r < 0.06 ? P.paper2 : P.paper;
-    if (P.worn) { const stain = Math.hypot(i - 262, j - 46); if (edge < 3 && r < 0.5) c = P.paper2; if (edge < 1) c = P.paper3; if (Math.abs(stain - 17) < 1.2 && r < 0.7) c = P.paper3; else if (stain < 17 && r < 0.12) c = P.paper2; if (i === 158 || j === 129) c = r < 0.5 ? P.paper2 : P.paper3; }
-    else if (edge < 1) c = P.paper3;
-    const gx = (i - 16) % 10 === 0, gy = (j - 14) % 10 === 0;
-    if ((gx || gy) && i > 12 && i < 230 && j > 10 && j < h - 40 && (P.worn ? r < 0.6 : true)) c = P.grid;
-    S.px(x + i, y + j, c); }
-  if (SHEETS.indexOf(P) <= 1) for (const [px, py] of [[x + 4, y + 4], [x + w - 6, y + 4], [x + 4, y + h - 6], [x + w - 6, y + h - 6]] as const) { S.fill(px, py, 3, 3, BRASS[1]!); S.px(px, py, BRASS[4]!); }
-  const tx = x + 214, ty = y + 226, tw = 96, th = 28; S.line(tx, ty, tx + tw, ty, P.line); S.line(tx, ty, tx, ty + th, P.line); S.line(tx, ty + 14, tx + tw, ty + 14, P.line2); S.line(tx + 50, ty + 14, tx + 50, ty + th, P.line2);
-  S.text('4도어 세단 1929', tx + 4, ty + 3, P.line); S.text('축척 1:20', tx + 4, ty + 17, P.line2); S.text('도면 1', tx + 55, ty + 17, P.line2);
+// ---------------- paper, ink and screens ----------------
+const mix = (a: RGB, b: RGB, t: number): RGB => [Math.round(a[0] + (b[0] - a[0]) * t), Math.round(a[1] + (b[1] - a[1]) * t), Math.round(a[2] + (b[2] - a[2]) * t)];
+const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map(v => (v + 0.5) / 16);
+const bayer = (x: number, y: number) => BAYER[(y & 3) * 4 + (x & 3)]!;
+function vnoise(x: number, y: number, seed: number) { const xi = Math.floor(x), yi = Math.floor(y), fx = x - xi, fy = y - yi, u = fx * fx * (3 - 2 * fx), v = fy * fy * (3 - 2 * fy);
+  const r = (a: number, b: number) => rnd(((a * 73856093) ^ (b * 19349663) ^ (seed * 83492791)) >>> 0); return (r(xi, yi) * (1 - u) + r(xi + 1, yi) * u) * (1 - v) + (r(xi, yi + 1) * (1 - u) + r(xi + 1, yi + 1) * u) * v; }
+/** the sheet's ground, made once per sheet: a few tones of the paper laid with an ordered dither, so it stays pixel art */
+const tex = new Map<number, RGB[]>();
+function paperTex(): RGB[] {
+  let t = tex.get(sheetNo); if (t) return t; const P = SH(), { w, h } = PAPER; t = new Array(w * h);
+  const hi = P.style === 'screen' ? mix(P.paper, P.grid, 0.5) : mix(P.paper, P.style === 'blue' ? hex('#3a72b8') : hex('#fffdf4'), 0.45), tones = [hi, P.paper, P.paper2, P.paper3];
+  for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) {
+    const edge = Math.min(i, j, w - 1 - i, h - 1 - j), n = 0.6 * vnoise(i / 22, j / 22, 1) + 0.4 * vnoise(i / 6, j / 6, 2), fibre = vnoise(i / 11, j / 1.6, 3);
+    let v = 1;
+    if (P.style === 'worn') { v = 1 + (n - 0.5) * 1.6 + (fibre > 0.8 ? 0.6 : 0) + Math.max(0, 7 - edge) / 7 * 1.3;
+      if (i === 157 || j === 128) v -= 0.9; if (i === 158 || j === 129) v += 1.4; if (i === 159 || j === 130) v += 0.6;            // the folds: a lit side and a shadow side
+      const d = Math.hypot(i - 262, j - 46); v += 1.3 * Math.exp(-((d - 17) ** 2) / 1.6) + (d < 17 ? 0.3 : 0);                      // a cup ring
+      for (const [fx, fy] of [[40, 210], [205, 20], [290, 150], [120, 240]] as const) { const e = Math.hypot(i - fx, j - fy); if (e < 2.2) v += 1.5 - e * 0.4; }   // foxing
+      if (i + j < 9) v += 0.8; }
+    else if (P.style === 'clean') v = 0.7 + (n - 0.5) * 0.5 + Math.max(0, 3 - edge) / 3 * 0.8;
+    else if (P.style === 'blue') v = 1 + (n - 0.5) * 1.7 + (fibre > 0.85 ? -0.5 : 0) + Math.max(0, 6 - edge) / 6 * 0.9;
+    else { const cx = (i - w / 2) / (w / 2), cy = (j - h / 2) / (h / 2); v = 1.2 + (cx * cx + cy * cy) * 0.9 - (n - 0.5) * 0.4; }
+    let c = tones[Math.max(0, Math.min(3, Math.floor(v + bayer(i, j) - 0.5)))]!;
+    // the grid: fine lines every 10 px, a stronger one every 50; pencil grids are broken, printed ones whole, screens show dots between
+    const gi = (i - 16) % 10 === 0, gj = (j - 14) % 10 === 0, Gi = (i - 16) % 50 === 0, Gj = (j - 14) % 50 === 0, inside = i > 12 && i < w - 12 && j > 10 && j < h - 34;
+    if (inside && (gi || gj)) { const major = (Gi && i > 12) || (Gj && j > 10);
+      if (P.style === 'worn') { if (vnoise(i / 4, j / 4, 9) > 0.35) c = major ? P.grid : mix(c, P.grid, 0.5); }
+      else if (P.style === 'screen') { if (major) c = (i + j) % 2 ? P.grid : mix(P.grid, P.paper, 0.4); else if (gi && gj) c = P.grid; }
+      else c = major ? P.grid : mix(c, P.grid, 0.55); }
+    t[j * w + i] = c; }
+  tex.set(sheetNo, t); return t;
 }
-function sheetPixels() { const P = SH();
-  for (let i = 0; i < W * H; i++) { const v = sheet[i]; if (!v) continue; const x = i % W, y = (i / W) | 0, r = rnd(i);
-    if (v === 1) S.px(x, y, P.worn && r < 0.18 ? P.line2 : P.line); else if (v === 2) S.px(x, y, r < 0.2 ? P.red2 : P.red); else if (P.eraser) S.px(x, y, P.smudge); } }
+function paper() {
+  const { x, y, w, h } = PAPER, P = SH(), T = paperTex();
+  S.fill(x + 3, y + 3, w, h, C.shadow); S.fill(x + 1, y + 1, w, h, mix(C.shadow, C.wood, 0.5));
+  for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) S.px(x + i, y + j, T[j * w + i]!);
+  if (P.style !== 'worn') { const fc = P.style === 'clean' ? P.line2 : P.line2;                                                   // a ruled border with zone ticks
+    S.hline(x + 3, x + w - 4, y + 3, fc); S.hline(x + 3, x + w - 4, y + h - 4, fc); S.vline(x + 3, y + 3, y + h - 4, fc); S.vline(x + w - 4, y + 3, y + h - 4, fc);
+    for (let k = 1; k < 6; k++) { const zx = x + 3 + Math.round(k * (w - 7) / 6); S.vline(zx, y + 1, y + 2, fc); S.vline(zx, y + h - 3, y + h - 2, fc); }
+    for (let k = 1; k < 4; k++) { const zy = y + 3 + Math.round(k * (h - 7) / 4); S.hline(x + 1, x + 2, zy, fc); S.hline(x + w - 3, x + w - 2, zy, fc); } }
+  if (P.style === 'worn' || P.style === 'clean') for (const [px, py] of [[x + 5, y + 5], [x + w - 8, y + 5], [x + 5, y + h - 8], [x + w - 8, y + h - 8]] as const) {   // drawing pins
+    S.px(px + 1, py + 3, C.shadow); S.px(px + 2, py + 3, C.shadow); S.px(px + 3, py + 2, C.shadow); S.fill(px, py, 3, 3, BRASS[2]!); S.px(px, py, BRASS[5]!); S.px(px + 1, py, BRASS[4]!); S.px(px, py + 1, BRASS[4]!); S.px(px + 2, py + 2, BRASS[1]!); }
+  const tw = 98, th = 28, tx = x + w - 4 - tw, ty = y + h - 4 - th, ink = P.line, ink2 = P.line2;                                        // the title block
+  if (P.style === 'worn') { S.line(tx, ty, tx + tw, ty + 1, ink); S.line(tx, ty, tx + 1, ty + th, ink); }
+  else { S.hline(tx, tx + tw, ty, ink); S.vline(tx, ty, ty + th, ink); S.hline(tx + 1, tx + tw, ty + 1, ink2); }
+  S.hline(tx, tx + tw, ty + 14, ink2); S.vline(tx + 50, ty + 14, ty + th, ink2);
+  S.text('4도어 세단 1929', tx + 4, ty + 4, ink); S.text('축척 1:20', tx + 4, ty + 17, ink2); S.text(P.style === 'screen' ? 'DWG-001' : '도면 1', tx + 55, ty + 17, ink2);
+}
+function sheetPixels() { const P = SH(), glow = P.style === 'blue' ? mix(P.paper, P.line, 0.28) : P.style === 'screen' ? mix(P.paper, P.line2, 0.3) : null;
+  if (glow || P.style === 'worn') for (let i = 0; i < W * H; i++) { const v = sheet[i]; if (v !== 1 && v !== 2) continue; const x = i % W, y = (i / W) | 0;   // a glow on lit lines, graphite dust on pencil
+    for (const q of [i - 1, i + 1, i - W, i + W]) if (!sheet[q]) { if (glow) S.px(q % W, (q / W) | 0, v === 2 ? mix(P.paper, P.red, 0.3) : glow); else if (rnd(q * 7 + 3) < 0.22) S.px(q % W, (q / W) | 0, v === 2 ? P.red2 : P.line2, 0.22); }
+    if (P.style === 'screen' && (x + y) % 2 === 0) for (const q of [i - W - 1, i + W + 1]) if (!sheet[q]) S.px(q % W, (q / W) | 0, glow!, 0.5); }
+  for (let i = 0; i < W * H; i++) { const v = sheet[i]; if (!v) continue; const x = i % W, y = (i / W) | 0;
+    if (v === 1) { let c = P.line;
+      if (P.style === 'worn') { const pr = vnoise(x / 7, y / 7, 7); c = pr > 0.62 ? P.line : pr < 0.3 ? P.line2 : rnd(i) < 0.25 ? P.line2 : P.line; }      // the pencil's pressure comes and goes
+      else if (P.style === 'blue') c = rnd(i) < 0.12 ? P.line2 : P.line;
+      S.px(x, y, c); }
+    else if (v === 2) S.px(x, y, P.style === 'worn' && vnoise(x / 6, y / 6, 8) < 0.35 ? P.red2 : P.red);
+    else if (P.eraser) S.px(x, y, mix(P.smudge, T0(i), 0.4)); }
+  const job = jobs[0];
+  if (job?.kind === 'scan') { const sy = Math.floor(job.y!); for (let k = 0; k < 10; k++) { const yy = sy - k; if (yy < PAPER.y || yy >= PAPER.y + PAPER.h) continue;   // the scan line and its afterglow
+    for (let xx = PAPER.x + 1; xx < PAPER.x + PAPER.w - 1; xx++) S.px(xx, yy, k === 0 ? P.line : P.line2, k === 0 ? 0.85 : 0.32 * (1 - k / 10)); } }
+  if (P.style === 'screen') { polyhedron(); for (let yy = PAPER.y + 1; yy < PAPER.y + PAPER.h; yy += 2) for (let xx = PAPER.x; xx < PAPER.x + PAPER.w; xx++) S.px(xx, yy, [0, 0, 0], 0.18); }   // scanlines
+}
+const T0 = (i: number) => { const T = paperTex(), x = i % W - PAPER.x, y = ((i / W) | 0) - PAPER.y; return T[y * PAPER.w + x] ?? SH().paper; };
+/** an icosahedron turning slowly in the corner of the screen: the machine is thinking */
+const PHI = (1 + Math.sqrt(5)) / 2, ICO: [number, number, number][] = [];
+for (const a of [-1, 1]) for (const b of [-PHI, PHI]) ICO.push([0, a, b], [a, b, 0], [b, 0, a]);
+const ICO_E: [number, number][] = []; ICO.forEach((p, i) => ICO.forEach((q, j) => { if (j > i && Math.abs(Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]) - 2) < 1e-6) ICO_E.push([i, j]); }));
+function polyhedron() {
+  const P = SH(), t = performance.now() / 1000, ay = t * 0.45, ax = 0.5 + Math.sin(t * 0.21) * 0.35, cx = PAPER.x + PAPER.w - 28, cy = PAPER.y + 26, r = 9.5;
+  const pr = ICO.map(([x, y, z]) => { const x1 = x * Math.cos(ay) + z * Math.sin(ay), z1 = -x * Math.sin(ay) + z * Math.cos(ay), y1 = y * Math.cos(ax) - z1 * Math.sin(ax), z2 = y * Math.sin(ax) + z1 * Math.cos(ax); return [cx + x1 * r, cy + y1 * r, z2] as const; });
+  const order = ICO_E.map(([i, j]) => ({ i, j, z: pr[i]![2] + pr[j]![2] })).sort((a, b) => a.z - b.z);
+  for (const { i, j, z } of order) S.line(pr[i]![0], pr[i]![1], pr[j]![0], pr[j]![1], z < 0 ? mix(P.paper, P.line2, 0.45) : P.line, z < 0 ? 1 : 0);
+  S.text('형상 연산', cx - 18, cy + 18, P.line2);
+}
 function arrowLine(x0: number, y0: number, x1: number, y1: number, label: string, col: RGB) {
   const P = SH(); S.line(x0, y0, x1, y1, col);
   if (y0 === y1) { S.px(x0 + 1, y0 - 1, col); S.px(x0 + 1, y0 + 1, col); S.px(x1 - 1, y1 - 1, col); S.px(x1 - 1, y1 + 1, col); const tw = S.tw(label); S.fill(((x0 + x1) >> 1) - (tw >> 1) - 1, y0 - 4, tw + 2, 8, P.paper); S.text(label, ((x0 + x1) >> 1) - (tw >> 1), y0 - 4, col); }

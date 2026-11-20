@@ -185,12 +185,12 @@ for k, py in enumerate((615, 661)):
     z = S(0, py)[1]
     zf, zr = (440, 358)[k], (470, 395)[k]                                       # the bars' heights as the front and rear sheets draw them
     part(f'bumperF{k}', 'bumperF', 'chrome', 'fender', slot='bumperF', side=side((2, py - 11), (42, py - 11), (46, py), (42, py + 11), (2, py + 11)), front=half([0, zf - 24], [655, zf - 24], [668, zf], [655, zf + 24], [0, zf + 24]),
-         top=halfT([130, 0], [130, 560], [150, 640], [200, 690], [240, 690], [210, 620], [190, 540], [190, 0]))   # in the plan the bars sit just ahead of the shell, their ends curving back
+         top=halfT([75, 0], [75, 560], [95, 640], [145, 690], [185, 690], [155, 620], [135, 540], [135, 0]))   # in the plan the bars sit just ahead of the shell, their ends curving back
     part(f'bumperR{k}', 'bumperR', 'chrome', 'fender', slot='bumperR', pair=True, side=side((1778, py - 11), (1834, py - 11), (1834, py + 11), (1778, py + 11)), rear=[[290, zr - 23], [790, zr - 23], [800, zr], [790, zr + 23], [290, zr + 23]],
          top=[[3770, 290], [3770, 790], [3800, 805], [3885, 805], [3885, 290]])
 for k, u in enumerate((215, 575)):
     part(f'clampF{k}', 'bumperF', 'chrome', 'flat', on='bumperF0', slot='bumperF', pair=True, x=[0, 30], front=[[u - 14, 322], [u + 14, 322], [u + 14, 500], [u - 14, 500]])
-part('ironF', 'bumperF', 'black', 'flat', slot='bumperF', pair=True, side=side((42, 600), (120, 610), (120, 640), (42, 676)), front=[[330, 320], [362, 320], [362, 480], [330, 480]], top=[[180, 210], [180, 245], [420, 245], [420, 210]], lift=1)
+part('ironF', 'bumperF', 'black', 'flat', slot='bumperF', pair=True, side=side((42, 600), (120, 610), (120, 640), (42, 676)), front=[[330, 320], [362, 320], [362, 480], [330, 480]], top=[[125, 210], [125, 245], [420, 245], [420, 210]], lift=1)
 part('ironR', 'bumperR', 'black', 'flat', slot='bumperR', pair=True, side=side((1700, 610), (1780, 600), (1780, 676), (1700, 640)), rear=[[540, 400], [572, 400], [572, 545], [540, 545]], top=[[3600, 520], [3600, 552], [3800, 552], [3800, 520]])
 # tail lamps carried on the rear fenders (rear sheet), so in front of them: a nickel rim and a red glass
 part('tailRim', 'tail', 'chrome', 'fender', on='fenderR', slot='tail', pair=True, smooth=('rear',), x=[3640, 3650], rear=ell(585, 690, 76, 76))

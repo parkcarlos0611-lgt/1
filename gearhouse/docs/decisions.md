@@ -188,3 +188,9 @@ These decisions still hold, from `legacy/docs/MASTER_GAME_PLAN.md`:
 
 - A test-drive page (ui/testtrack.ts, ui/testtrack.page.html, bundled by tools/ref/buildtrack.mjs) lets the planner drive the 1948 utility over a course of asphalt, gravel with a log on one side and a hump on the other, a dip, a ledge, washboard, sand dunes and rock steps, with pedals or keys; look through the body; set the landing squash; pick soft, standard or hard springs; and use the transfer box's high or low range.
 - Shared pieces: the drive scene (render/car/scene.ts) used by the page and the frame tool; soils with grip, rolling resistance, sinkage and dust (physics/rig.ts); a powertrain with a slipping clutch from rest, four gears changed by road speed, high and low range and governed revs (physics/powertrain.ts).
+
+## 2026-11-20 — sand fixed; the body bounces whole; references for running gear (review 25)
+
+- Fixed: the tyre's sinkage was mixed into the ground slope, so a sinking tyre was pushed backwards (sand) or spun (gravel). Slopes come from the ground alone; soils blend over a metre.
+- Body bounce is the sprung body moving whole on its springs and tyres (heave, pitch, roll); the picture squash is off by default and proposed for removal.
+- Proposed (awaiting decision): reference images for running gear per kind of part (about 60: engines, gearboxes, axles, springs, dampers, tanks, frames), generated orthographic sheets like the car sheets, used as shape references only.

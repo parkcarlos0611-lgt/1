@@ -14,4 +14,11 @@ describe('running-gear rig (review 24)', () => {
     for (let i = 0; i < 60; i++) { r.run(0.05); maxRoll = Math.max(maxRoll, Math.abs(r.ph)); }
     expect(r.x).toBeGreaterThan(4); expect(maxRoll).toBeGreaterThan(0.005); expect(Number.isFinite(r.vx)).toBe(true);
   });
+  it('drives on soft sand and over the course dunes (a sinking tyre is not pushed backwards)', async () => {
+    const { SOILS } = await import('../physics/rig'); const { COURSE } = await import('../ui/course');
+    const flat = new Rig(UTILITY48, { near: () => 0, far: () => 0, soil: () => SOILS.sand! }, 0); flat.run(0.8); flat.maxTorque = 1500; flat.throttle = 1; flat.run(2);
+    expect(flat.vx).toBeGreaterThan(1.5);
+    const dune = new Rig(UTILITY48, COURSE, 43); dune.run(0.8); dune.maxTorque = 1500; for (let i = 0; i < 60; i++) { dune.throttle = dune.vx < 5 ? 1 : 0; dune.run(0.1); }
+    expect(dune.x).toBeGreaterThan(60);
+  });
 });

@@ -120,7 +120,8 @@ export class Rig {
         // the ground
         const so = this.g.soil?.(p.x), gy = (ty.side > 0 ? this.g.near(p.x) : this.g.far(p.x)) - (so ? so.sink : 0), mu = so ? so.mu : T.mu;
         if (p.y < gy) {
-          const pen = gy - p.y, sl = ((ty.side > 0 ? this.g.near(p.x + 0.02) : this.g.far(p.x + 0.02)) - gy) / 0.02, nl = Math.hypot(1, sl), gnx = -sl / nl, gny = 1 / nl;
+          const gf = ty.side > 0 ? this.g.near : this.g.far, pen = gy - p.y, sl = (gf(p.x + 0.02) - gf(p.x - 0.02)) / 0.04,      // the slope of the ground itself (the sink is level)
+          nl = Math.hypot(1, sl), gnx = -sl / nl, gny = 1 / nl;
           const vn = v.x * gnx + v.y * gny, Fn = Math.max(0, T.groundK * pen - T.groundC * vn), vt = v.x * gny - v.y * gnx;
           const Ft = -Math.min(mu * Fn, Math.abs(vt) * 4000) * Math.sign(vt) - this.brake * mu * Fn * Math.tanh(vt / 0.05); roll += Fn * (so ? so.crr : 0.015); this.slip = Math.max(this.slip, Math.abs(vt));
           f[k]!.x += gnx * Fn + gny * Ft; f[k]!.y += gny * Fn - gnx * Ft; ty.contact++;

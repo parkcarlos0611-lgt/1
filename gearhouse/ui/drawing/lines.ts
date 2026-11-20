@@ -69,7 +69,22 @@ export function lineMap(m: CarModel, view: 'left' | 'top' | 'front' | 'rear', mm
   for (const f of d.features) if (f.kind === 'seam' || f.kind === 'bead') { const pts = smoothOpen(f.pts as Pt[]).map(([x, z]) => [X(x), Y(z)]);
     for (let i = 0; i + 1 < pts.length; i++) { const [ax, ay] = pts[i]!, [bx, by] = pts[i + 1]!, n = Math.ceil(Math.hypot(bx! - ax!, by! - ay!) * 2) + 1;
       for (let k = 0; k <= n; k++) { const x = Math.floor(ax! + (bx! - ax!) * k / n), y = Math.floor(ay! + (by! - ay!) * k / n); if (at(x, y) >= 0) on[y * w + x] = 1; } } }
+  thin(on, w, h);
   return { w, h, on, owner, names };
+}
+
+/** two lines a pixel apart (a part's edge against its neighbour's) read as one thick smear in pencil: thin every line to one
+ *  pixel (Zhang-Suen), so the drawing stays a drawing */
+function thin(on: Uint8Array, w: number, h: number) {
+  const at = (x: number, y: number) => (x < 0 || y < 0 || x >= w || y >= h ? 0 : on[y * w + x]!);
+  for (let changed = true, pass = 0; changed && pass < 20; pass++) { changed = false;
+    for (const sub of [0, 1]) { const kill: number[] = [];
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { if (!on[y * w + x]) continue;
+        const n = [at(x, y - 1), at(x + 1, y - 1), at(x + 1, y), at(x + 1, y + 1), at(x, y + 1), at(x - 1, y + 1), at(x - 1, y), at(x - 1, y - 1)], b = n.reduce((a, v) => a + v, 0);
+        if (b < 2 || b > 6) continue; let t = 0; for (let i = 0; i < 8; i++) if (!n[i] && n[(i + 1) % 8]) t++; if (t !== 1) continue;
+        if (sub === 0 ? n[0]! * n[2]! * n[4]! || n[2]! * n[4]! * n[6]! : n[0]! * n[2]! * n[6]! || n[0]! * n[4]! * n[6]!) continue;
+        kill.push(y * w + x); }
+      for (const k of kill) on[k] = 0; if (kill.length) changed = true; } }
 }
 
 /** the pixels of a set in drawing order: walks from pixel to touching pixel, lifting the pencil only when it must */

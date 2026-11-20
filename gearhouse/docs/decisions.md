@@ -294,3 +294,12 @@ These decisions still hold, from `legacy/docs/MASTER_GAME_PLAN.md`:
 - Decided (all as recommended): the whole interface is period-object pixel art, continuing the first build's way (one small pixel buffer scaled up, Galmuri pixel font, wood, drafting paper, brass, enamel); long text uses a larger pixel font; the drawing board is the first pixel screen; the interface's materials change with the company's size and era, as the drawing sheets do (worn paper, clean paper, blueprint, black screen).
 - Drawing board demo (ui/drawingboard.ts, ui/drawing/lines.ts, ui/pixel/screen.ts; bundled by tools/ref/buildpage.mjs): a worn drafting sheet with the 1929 sedan in pencil lines only (side and plan, 1 px = 20 mm, drawn from the 3D part model), dimension lines, title block and the order's checklist. Changing the wheelbase, roof height, body height or adding a roof rack draws the change in red over the drawing; "수정" rubs the old lines out with an eraser and draws the change in pencil, "취소" rubs the red out; pencil scratch and eraser rub sounds from noise.
 - Galmuri font files are copied into ui/pixel with their licence (docs/licenses/Galmuri-OFL.md).
+
+## 2026-11-20 — 도면 화면 2차 (제도판 데모)
+- 도면 선은 한 픽셀 굵기로 가늘게 한다(Zhang-Suen 세선화). 이웃 부품 경계가 겹쳐 두 줄로 번지던 것을 없앤다.
+- 그리는 중에도 모든 버튼이 동작한다: 누르면 남은 선을 바로 끝내고 그 조작을 한다.
+- 치수는 숫자 창을 눌러 키보드로 입력한다(mm, Enter 확정, Esc 취소, 범위로 자름). 휴대폰은 숨은 숫자 입력칸으로 키패드를 연다.
+- 황동 버튼: 둥근 모서리, 6단 황동 명암, 광택 줄, 눌림 상태, 새긴 글자. 패널에 황동 나사.
+- 도면 4종(닳은 제도지 · 깔끔한 제도지 · 청사진 · 검은 화면)을 같은 선 그림에 종이·선 색만 바꿔 쓴다. 청사진과 검은 화면은 지우개 대신 선이 깜빡이며 바뀐다. 데모에서는 버튼으로 돌려 보고, 게임에서는 회사 규모 + 시대로 연다(검토 26).
+- 견적 탭: 섀시 구매가, 강판 면적, 물푸레 골조, 유리·지붕 천, 도장·내장, 짐받이, 노무 시간. 합계, 무게, 최고 속도, 제작 기간. 바꾼 값은 빨간 "전 → 후"로 보인다. 값은 1차 추정치다.
+- 외장 탭: 도면 치수 그대로 지금의 차 렌더러로 그린 그림. 휠·그릴·램프·색 고르기는 다음 단계.

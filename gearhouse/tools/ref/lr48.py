@@ -113,3 +113,29 @@ def top():
     b.save(f'{OUT}/lr48_top.json', id='lr48_top', name='four-wheel-drive utility, 1948 (plan)', length=L, height=WT, **META)
 
 side(); front(); rear(); top()
+
+def chassis():
+    """what the body hides: frame, engine and gearbox, transfer box, radiator, exhaust (left side; the leaf springs,
+    dampers, shafts, axles and tyres move and are drawn by the running-gear drawing, render/car/running.ts)"""
+    b = Body()
+    b.add('rail', sh([[40, 400], [3310, 400], [3310, 520], [40, 520]]), 'iron', 'side', 10, element='frame')
+    b.add('horn', sh([[0, 395], [70, 395], [70, 600], [0, 600]]), 'black', 'flat', 11, element='frame')
+    b.add('crossR', sh([[3280, 380], [3345, 380], [3345, 525], [3280, 525]]), 'black', 'flat', 11, element='frame')
+    b.add('radiator', sh([[190, 520], [290, 520], [290, 1000], [190, 1000]]), 'black', 'flat', 8, element='radiator', detail={'kind': 'ribs', 'pitch': 30})
+    b.add('sump', sh([[530, 330], [990, 330], [1010, 520], [510, 520]]), 'black', 'side', 6, element='engine')
+    b.add('block', sh([[470, 520], [1050, 520], [1050, 900], [470, 900]]), 'iron', 'side', 7, element='engine', detail={'kind': 'flutes', 'pitch': 145})
+    b.add('head', sh([[490, 900], [1030, 900], [1010, 990], [510, 990]]), 'iron', 'side', 8, element='engine')
+    b.add('rocker', sh([[540, 990], [980, 990], [960, 1040], [560, 1040]]), 'paint', 'side', 9, element='engine')
+    b.add('dynamo', ell(380, 780, 70, 70), 'black', 'flat', 9, element='engine')
+    b.add('carb', sh([[1060, 760], [1150, 760], [1150, 900], [1060, 900]]), 'chrome', 'flat', 9, element='engine')
+    b.add('manifold', sh([[600, 640], [940, 640], [940, 700], [600, 700]]), 'iron', 'flat', 9, element='engine')
+    b.add('bellhousing', sh([[1050, 380], [1300, 420], [1300, 800], [1050, 880]]), 'black', 'side', 7, element='gearbox')
+    b.add('gearbox', sh([[1300, 450], [1550, 450], [1550, 700], [1300, 760]]), 'black', 'side', 7, element='gearbox', detail={'kind': 'ribs', 'pitch': 60})
+    b.add('transfer', sh([[1450, 300], [1700, 300], [1700, 640], [1450, 640]]), 'iron', 'side', 8, element='transfer', detail={'kind': 'ribs', 'pitch': 80})
+    b.add('pipe', sh([[950, 640], [1000, 640], [1000, 345], [2950, 345], [2950, 315], [960, 315]]), 'iron', 'flat', 5, element='exhaust')
+    b.add('silencer', sh([[1950, 290], [2450, 290], [2450, 395], [1950, 395]]), 'iron', 'side', 5, element='exhaust')
+    for x in (130, 1050, 2190, 3090): b.add(f'hanger{x}', sh([[x - 30, 345], [x + 30, 345], [x + 30, 400], [x - 30, 400]]), 'black', 'flat', 12, element='frame')   # spring hangers and shackle pins
+    for x in (FX, RX): b.add(f'stop{x}', sh([[x - 45, 340], [x + 45, 340], [x + 35, 400], [x - 35, 400]]), 'black', 'flat', 12, element='frame')                  # bump rubbers
+    b.save(f'{OUT}/lr48_chassis.json', id='lr48_chassis', name='four-wheel-drive utility, 1948 (chassis, left side)', length=L, height=H, **META)
+
+chassis()

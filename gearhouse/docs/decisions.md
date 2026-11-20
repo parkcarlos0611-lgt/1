@@ -177,3 +177,9 @@ These decisions still hold, from `legacy/docs/MASTER_GAME_PLAN.md`:
 
 - Fixed on the sample utility: the front bumper bolts to frame ends and a valance; wheel houses are an inner arch panel a little larger than the opening instead of a black fill.
 - Proposed (awaiting decision): running gear (frame, powertrain, suspension, tyres) is defined once in three dimensions per class of car and projected into every view, with wheelbase, track, frame height, tyre size and engine length set per car; suspension drawn from mount points and driven by the first build's reduced multi-body model, in stages (rest pose, slow scenes, driving); a fact sheet per car from research; automatic checks for attachment, gaps, agreement between views and lone pixels.
+
+## 2026-11-20 — bouncy running gear (review 24)
+
+- A side-view running-gear simulation (physics/rig.ts) after Desert Steel (sprung stations, wheels as circles on a heightfield, small fixed step) and BeamNG (tyres as rings of mass points with pressure): rigid body with pitch and roll, two beam axles, four leaf springs with friction, bump rubbers and rebound straps, telescopic dampers, four ring tyres, near and far ground; drive torque on all four wheels.
+- Pictures are not turned: sprung pictures (body, wheel houses, chassis with engine, gearbox and transfer box) are drawn again from their outlines at every whole degree of pitch (render/car/pose.ts), the rest moves pixel columns; rows squash a little on landing by a visual spring; tyres, wheels, leaf springs, dampers and shafts are drawn every frame from the physics (render/car/running.ts). Far-side wheels, springs and dampers show offset and darkened.
+- Research on real cars is a detail reference only.

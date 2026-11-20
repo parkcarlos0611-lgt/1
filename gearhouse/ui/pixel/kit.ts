@@ -36,8 +36,13 @@ export class UI {
   }
   // ---- input, fed by the shell ----
   move(x: number, y: number) { this.mx = x; this.my = y; }
-  down(x: number, y: number) { this.click = { x, y }; this.taken = false; }
-  up() { this.pressed = ''; }
+  down(x: number, y: number) { this.click = { x, y }; this.taken = false; this.isDown = true; }
+  up() { this.pressed = ''; this.isDown = false; }
+  isDown = false;
+  /** where the pointer is and whether it is held (tools that are dragged: brushes, tape, spray) */
+  pointer() { return { x: this.mx, y: this.my, down: this.isDown }; }
+  /** whether a widget took this frame's click (a tool should not paint under a button) */
+  get tookClick() { return this.taken; }
   get hoverAny() { return this.recs.some(r => r.tap && inside(r, this.mx, this.my)); }
   /** a click this frame that no widget took (the drawing board uses it to hurry the pencil) */
   missed(): boolean { return !!this.click && !this.taken; }

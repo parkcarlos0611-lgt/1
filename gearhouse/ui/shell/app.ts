@@ -10,15 +10,18 @@ export const W = 480, H = 270;
 const KEY = 'gearhouse.slice.save';                                         // the same save as the HTML desk, so both read one game
 export const store = { get: () => { try { return localStorage.getItem(KEY); } catch { return null; } }, set: (v: string) => { try { localStorage.setItem(KEY, v); } catch { /* private window */ } } };
 
-/** noise through band filters: the pencil's scratch and the eraser's rub; more sounds join here */
+/** noise through band filters: the pencil's scratch, the eraser's rub, the wire brush, the spray gun's hiss, masking
+ *  tape tearing off the roll. One channel plays at a time, its loudness and pitch set every frame */
+const CH: Record<string, [number, number, number]> = { pencil: [4200, 1.2, 0.08], eraser: [900, 0.8, 0.18], scrape: [2600, 1.6, 0.22], spray: [6500, 0.5, 0.09], tape: [1400, 3, 0.2], brush: [700, 1, 0.1] };
+export type SoundKind = '' | keyof typeof CH;
 export class Sound {
-  on = true; private ac: AudioContext | null = null; private gains: Record<string, GainNode> = {}; private t = 0;
-  start() { if (this.ac) return; try { const ac = new AudioContext(), len = ac.sampleRate * 2, buf = ac.createBuffer(1, len, ac.sampleRate), ch = buf.getChannelData(0); for (let i = 0; i < len; i++) ch[i] = Math.random() * 2 - 1;
-    const mk = (f: number, q: number) => { const src = ac.createBufferSource(); src.buffer = buf; src.loop = true; const bp = ac.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = f; bp.Q.value = q; const g = ac.createGain(); g.gain.value = 0; src.connect(bp).connect(g).connect(ac.destination); src.start(); return g; };
-    this.gains = { pencil: mk(4200, 1.2), eraser: mk(900, 0.8) }; this.ac = ac; } catch { this.ac = null; } }
-  /** which noise is playing this frame ('' for none) */
-  play(kind: '' | 'pencil' | 'eraser') { const ac = this.ac; if (!ac) return; this.t += 1; const now = ac.currentTime, j = 0.5 + 0.5 * Math.sin(this.t * 0.9) * Math.sin(this.t * 0.37);
-    this.gains.pencil?.gain.setTargetAtTime(this.on && kind === 'pencil' ? 0.05 + 0.06 * j : 0, now, 0.02); this.gains.eraser?.gain.setTargetAtTime(this.on && kind === 'eraser' ? 0.12 + 0.1 * j : 0, now, 0.03); }
+  on = true; private ac: AudioContext | null = null; private ch: Record<string, { g: GainNode; f: BiquadFilterNode }> = {}; private t = 0;
+  start() { if (this.ac) return; try { const ac = new AudioContext(), len = ac.sampleRate * 2, buf = ac.createBuffer(1, len, ac.sampleRate), d = buf.getChannelData(0); for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    for (const [k, [f, q]] of Object.entries(CH)) { const src = ac.createBufferSource(); src.buffer = buf; src.loop = true; const bp = ac.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = f; bp.Q.value = q; const g = ac.createGain(); g.gain.value = 0; src.connect(bp).connect(g).connect(ac.destination); src.start(); this.ch[k] = { g, f: bp }; }
+    this.ac = ac; } catch { this.ac = null; } }
+  /** which noise plays this frame ('' for none); amount 0..1 scales it, pitch multiplies its band */
+  play(kind: SoundKind, amount = 1, pitch = 1) { const ac = this.ac; if (!ac) return; this.t += 1; const now = ac.currentTime, j = 0.5 + 0.5 * Math.sin(this.t * 0.9) * Math.sin(this.t * 0.37);
+    for (const [k, c] of Object.entries(this.ch)) { const on = this.on && k === kind, base = CH[k]!; c.g.gain.setTargetAtTime(on ? base[2] * Math.min(1, amount) * (0.6 + 0.4 * j) : 0, now, 0.02); if (on) c.f.frequency.setTargetAtTime(base[0] * pitch, now, 0.03); } }
 }
 
 export class App {

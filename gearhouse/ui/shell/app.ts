@@ -15,13 +15,28 @@ export const store = { get: () => { try { return localStorage.getItem(KEY); } ca
 const CH: Record<string, [number, number, number]> = { pencil: [4200, 1.2, 0.08], eraser: [900, 0.8, 0.18], scrape: [2600, 1.6, 0.22], spray: [6500, 0.5, 0.09], tape: [1400, 3, 0.2], brush: [700, 1, 0.1] };
 export type SoundKind = '' | keyof typeof CH;
 export class Sound {
-  on = true; private ac: AudioContext | null = null; private ch: Record<string, { g: GainNode; f: BiquadFilterNode }> = {}; private t = 0;
+  on = true; private ac: AudioContext | null = null; private noise: AudioBuffer | null = null; private ch: Record<string, { g: GainNode; f: BiquadFilterNode }> = {}; private t = 0;
+  private amb: Record<string, { g: GainNode; f?: BiquadFilterNode; o?: OscillatorNode }> = {};
   start() { if (this.ac) return; try { const ac = new AudioContext(), len = ac.sampleRate * 2, buf = ac.createBuffer(1, len, ac.sampleRate), d = buf.getChannelData(0); for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
-    for (const [k, [f, q]] of Object.entries(CH)) { const src = ac.createBufferSource(); src.buffer = buf; src.loop = true; const bp = ac.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = f; bp.Q.value = q; const g = ac.createGain(); g.gain.value = 0; src.connect(bp).connect(g).connect(ac.destination); src.start(); this.ch[k] = { g, f: bp }; }
-    this.ac = ac; } catch { this.ac = null; } }
-  /** which noise plays this frame ('' for none); amount 0..1 scales it, pitch multiplies its band */
+    const src = (b: BiquadFilterType, f: number, q: number) => { const s = ac.createBufferSource(); s.buffer = buf; s.loop = true; s.loopStart = Math.random(); const bp = ac.createBiquadFilter(); bp.type = b; bp.frequency.value = f; bp.Q.value = q; const g = ac.createGain(); g.gain.value = 0; s.connect(bp).connect(g).connect(ac.destination); s.start(0, Math.random() * 1.5); return { g, f: bp }; };
+    for (const [k, [f, q]] of Object.entries(CH)) this.ch[k] = src('bandpass', f, q);
+    this.amb.rain = src('lowpass', 1400, 0.4); this.amb.wind = src('lowpass', 380, 0.7);
+    { const o = ac.createOscillator(); o.type = 'sawtooth'; o.frequency.value = 38; const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 260; const g = ac.createGain(); g.gain.value = 0; o.connect(lp).connect(g).connect(ac.destination); o.start(); this.amb.engine = { g, f: lp, o }; }
+    this.ac = ac; this.noise = buf; } catch { this.ac = null; } }
+  /** which tool noise plays this frame ('' for none); amount 0..1 scales it, pitch multiplies its band */
   play(kind: SoundKind, amount = 1, pitch = 1) { const ac = this.ac; if (!ac) return; this.t += 1; const now = ac.currentTime, j = 0.5 + 0.5 * Math.sin(this.t * 0.9) * Math.sin(this.t * 0.37);
     for (const [k, c] of Object.entries(this.ch)) { const on = this.on && k === kind, base = CH[k]!; c.g.gain.setTargetAtTime(on ? base[2] * Math.min(1, amount) * (0.6 + 0.4 * j) : 0, now, 0.02); if (on) c.f.frequency.setTargetAtTime(base[0] * pitch, now, 0.03); } }
+  /** the sounds of the place, each on its own: rain, wind, a car's engine (amount 0..1, pitch for the engine's revs) */
+  ambient(kind: 'rain' | 'wind' | 'engine', amount: number, pitch = 1) { const ac = this.ac, c = this.amb[kind]; if (!ac || !c) return; const now = ac.currentTime;
+    c.g.gain.setTargetAtTime(this.on ? amount * (kind === 'engine' ? 0.12 : kind === 'rain' ? 0.25 : 0.15) : 0, now, 0.15); if (c.o) c.o.frequency.setTargetAtTime(32 * pitch, now, 0.2); }
+  /** a short sound made on the spot: a spray can shaken (the ball rattling), a knock on the door */
+  once(kind: 'shake' | 'knock') { const ac = this.ac, nb = this.noise; if (!ac || !nb || !this.on) return; const t0 = ac.currentTime;
+    const burst = (at: number, f: number, q: number, dur: number, vol: number) => { const s = ac.createBufferSource(); s.buffer = nb; const bp = ac.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = f; bp.Q.value = q; const g = ac.createGain();
+      g.gain.setValueAtTime(0, at); g.gain.linearRampToValueAtTime(vol, at + 0.004); g.gain.exponentialRampToValueAtTime(0.0008, at + dur); s.connect(bp).connect(g).connect(ac.destination); s.start(at, Math.random() * 1.5); s.stop(at + dur + 0.02); };
+    const ping = (at: number, f: number, dur: number, vol: number, type: OscillatorType = 'sine') => { const o = ac.createOscillator(); o.type = type; o.frequency.value = f; const g = ac.createGain(); g.gain.setValueAtTime(0, at); g.gain.linearRampToValueAtTime(vol, at + 0.003); g.gain.exponentialRampToValueAtTime(0.0008, at + dur); o.connect(g).connect(ac.destination); o.start(at); o.stop(at + dur + 0.02); };
+    if (kind === 'shake') for (let k = 0; k < 9; k++) { const at = t0 + k * 0.085 + Math.random() * 0.012; burst(at, 3200 + Math.random() * 900, 4, 0.05, 0.35); ping(at, 2300 + Math.random() * 500, 0.04, 0.05); if (k % 2) burst(at + 0.02, 900, 1.5, 0.06, 0.12); }   // the mixing ball clacking in the can
+    else for (const [k, at] of [[0, 0], [1, 0.22], [2, 0.38]] as const) { burst(t0 + at, 180 + k * 10, 1.2, 0.12, 0.9); ping(t0 + at, 95, 0.14, 0.35, 'triangle'); }   // knock knock-knock on a wooden door
+  }
 }
 
 export class App {

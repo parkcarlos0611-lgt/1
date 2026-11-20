@@ -4,7 +4,9 @@
 // company's size and era: worn paper, clean paper, blueprint, black screen. Figures can be typed in. A last tab shows
 // where the drawing goes next: the exterior design, in colour. Everything is pixel art in one 480 x 270 buffer.
 import { Screen, hex, type RGB } from './pixel/screen';
-import { lineMap, edited, measure, strokeOrder, NO_EDIT, type Edit, type LineMap } from './drawing/lines';
+import { lineMap, edited, measure, strokeOrder, fits, NO_EDIT, type Edit, type LineMap, type Frame } from './drawing/lines';
+import { rules, ERAS, eraName, type NumKey, type Rules } from './drawing/rules';
+import frameJson from '../data/cars/sedan29_frame.json';
 import { viewDesign, type CarModel } from '../render/car/model';
 import { rasterizeFlat } from '../render/car/flat';
 import type { CarImage } from '../render/car/raster';
@@ -31,7 +33,12 @@ let cur: Edit = { ...NO_EDIT }, next: Edit = { ...NO_EDIT };
 const PAPER = { x: 6, y: 6, w: 316, h: 258 }, SIDE = { x: 22, y: 20 }, PLAN = { x: 22, y: 150 };
 type Views = { side: LineMap; plan: LineMap };
 const cache = new Map<string, Views>();
-const views = (e: Edit): Views => { const k = JSON.stringify(e); let v = cache.get(k); if (!v) { const m = edited(base, e); v = { side: lineMap(m, 'left', MM), plan: lineMap(m, 'top', MM) }; cache.set(k, v); } return v; };
+const FR = frameJson as unknown as Frame;
+let eraNo = 0; const RU = (): Rules => rules(ERAS[eraNo]!, sheetNo);
+/** the edit as built: the lights layout falls back to one the doors have room for */
+const eff = (e: Edit): Edit => { const R = RU(), ok = fits(FR, e, R.rearDoorMin, R.cabinMin), L = ([6, 4, 2] as const).filter(l => l <= e.lights).find(l => ok.includes(l)) ?? 2; return L === e.lights ? e : { ...e, lights: L }; };
+const carOf = (e: Edit) => edited(base, eff(e), FR);
+const views = (e: Edit): Views => { const k = JSON.stringify(eff(e)); let v = cache.get(k); if (!v) { const m = carOf(e); v = { side: lineMap(m, 'left', MM), plan: lineMap(m, 'top', MM) }; cache.set(k, v); } return v; };
 const sheet = new Uint8Array(W * H);                                    // 0 paper, 1 line, 2 red, 3 smudge
 const put = (L: LineMap, ox: number, oy: number, into: Set<number>) => { for (let y = 0; y < L.h; y++) for (let x = 0; x < L.w; x++) if (L.on[y * L.w + x]) into.add((oy + y) * W + ox + x); };
 const pixelsOf = (V: Views) => { const s = new Set<number>(); put(V.side, SIDE.x, SIDE.y + (100 - V.side.h), s); put(V.plan, PLAN.x, PLAN.y, s); return s; };
@@ -67,45 +74,73 @@ const busy = () => jobs.length > 0;
 
 // ---------------- the order and the estimate ----------------
 type Fig = ReturnType<typeof measure>;
-const cost = (e: Edit) => estimate(measure(edited(base, e)), e).total;
+const fig = (e: Edit) => measure(carOf(e)), B0 = fig(NO_EDIT);
+const cost = (e: Edit) => estimate(e).total;
+const lightsName = (l: number) => (l === 2 ? '2도어' : `${l}라이트`);
 const ORDER = { from: '닥터 하워드 부부', ask: [
-  { t: '4도어 세단', test: () => true, val: () => '세단' },
+  { t: '4도어 세단', test: (m: Fig) => m.lights !== 2, val: (m: Fig) => `세단 ${lightsName(m.lights)}` },
   { t: '머리 공간: 전고 1850 이상', test: (m: Fig) => m.height >= 1850, val: (m: Fig) => `${m.height}` },
   { t: '뒷좌석: 축간 2700 이상', test: (m: Fig) => m.wb >= 2700, val: (m: Fig) => `${m.wb}` },
   { t: '시골길: 지상고 310 이상', test: (m: Fig) => m.clearance >= 310, val: (m: Fig) => `${m.clearance}` },
   { t: '왕진 가방: 짐받이', test: (m: Fig) => m.rack, val: (m: Fig) => (m.rack ? '있음' : '없음') },
   { t: '예산 $1,200 이하', test: (_m: Fig, e: Edit) => cost(e) <= 1200, val: (_m: Fig, e: Edit) => `$${cost(e)}` } ] };
 /** a rough estimate from the drawing (first pass: prices of 1929, a bought chassis, the body built in the shop) */
-function estimate(m: Fig, e: Edit) {
-  const panel = (m.length * 2 + m.wb) / 1000 * (m.height / 1000) * 2.1, labour = 260 + e.wb * 0.25 + e.roof * 0.3 + Math.abs(e.lift) * 0.2 + (e.rack ? 18 : 0);
+function estimate(e0: Edit) {
+  const e = eff(e0), m = fig(e0), L = e.lights, gs = 1 + e.grille / 100, bs = 1 + e.bumper / 100, fs = 1 + e.fender / 100, nb = +e.bumperF + +e.bumperR;
+  const panel = (m.length * 2 + m.wb) / 1000 * (m.height / 1000) * 2.1, doors = L === 2 ? 2 : 4, glass = (L === 6 ? 6 : 4) + 2;
+  const labour = 260 + e.wb * 0.25 + e.roof * 0.3 + Math.abs(e.lift) * 0.2 + (e.rack ? 18 : 0) + Math.abs(e.door) * 0.05 - (L !== 6 ? 6 : 0) - (L === 2 ? 14 : 0)
+    + (Math.abs(e.lampX) + Math.abs(e.lampZ)) * 0.03 + Math.abs(e.grilleX) * 0.05 + Math.abs(e.grille) * 0.6 - (e.fenders ? 0 : 12);
   const rows: [string, number][] = [['섀시 (구매)', 520], ['강판 ' + panel.toFixed(1) + '제곱m', Math.round(panel * 9)], ['물푸레 골조', Math.round(70 + e.wb * 0.05 + e.roof * 0.06)],
-    ['유리 · 지붕 천', Math.round(48 + e.roof * 0.05)], ['도장 · 내장', 95], ...(e.rack ? [['짐받이', 22] as [string, number]] : []), [`노무 ${Math.round(labour)}시간`, Math.round(labour * 0.5)]];
-  const total = rows.reduce((a, r) => a + r[1], 0), kg = Math.round(1020 + e.wb * 0.18 + e.roof * 0.15 + (e.rack ? 14 : 0)), vmax = Math.round(105 - e.roof * 0.02 - (e.rack ? 3 : 0) - e.lift * 0.02);
+    [`문 ${doors}짝 · 유리 ${glass}장`, Math.round(doors * 7 + glass * 4 + e.roof * 0.05)], ['그릴 · 램프', Math.round(30 * gs + 16)],
+    ...(nb ? [[`범퍼 ${nb}개`, Math.round(14 * nb * bs)] as [string, number]] : []), ...(e.fenders ? [['펜더 · 발판', Math.round(38 * fs)] as [string, number]] : []),
+    ['도장 · 내장', 95], ...(e.rack ? [['짐받이', 22] as [string, number]] : []), [`노무 ${Math.round(labour)}시간`, Math.round(labour * 0.5)]];
+  const total = rows.reduce((a, r) => a + r[1], 0);
+  const kg = Math.round(1020 + e.wb * 0.18 + e.roof * 0.15 + (e.rack ? 14 : 0) - (2 - nb) * 16 - (e.fenders ? 0 : 45) + e.fender * 0.8 + e.grille * 0.3 - (L === 2 ? 10 : 0));
+  const vmax = Math.round(105 - e.roof * 0.02 - (e.rack ? 3 : 0) - e.lift * 0.02 + (e.fenders ? 0 : 4) - e.fender * 0.05);
   return { rows, total, kg, vmax, days: Math.ceil(labour / 9) };
 }
 
 // ---------------- controls ----------------
-type Btn = { id: string; x: number; y: number; w: number; h: number; label: () => string; on: () => void; show?: () => boolean; big?: boolean };
-const pending = () => JSON.stringify(cur) !== JSON.stringify(next);
-const CTRL = [
-  { k: 'wb', label: '축간', step: 50, min: -200, max: 400, base: () => measure(edited(base, NO_EDIT)).wb },
-  { k: 'roof', label: '지붕 높이', step: 25, min: -100, max: 200, base: () => measure(edited(base, NO_EDIT)).height },
-  { k: 'lift', label: '차체 높이', step: 25, min: -50, max: 100, base: () => measure(edited(base, NO_EDIT)).clearance } ] as const;
-let tab: 'order' | 'estimate' = 'order', mode: 'drawing' | 'exterior' = 'drawing', editing: number | null = null, typed = '';
+type Btn = { id: string; x: number; y: number; w: number; h: number; label: () => string; on: () => void; show?: () => boolean; big?: boolean; off?: () => boolean };
+const pending = () => JSON.stringify(eff(cur)) !== JSON.stringify(eff(next)) || JSON.stringify(cur) !== JSON.stringify(next);
+type RowDef = { k: keyof Edit; label: string; kind: 'num' | 'bool' | 'lights'; base?: () => number; unit?: string; yes?: string; no?: string; allowed?: () => boolean };
+const lampZ0 = (() => { const l = base.parts.find(p => p.id === 'lamp')!; return Math.round((l.box.z[0] + l.box.z[1]) / 2); })();
+const PAGES: { name: string; w: number; rows: RowDef[] }[] = [
+  { name: '차체', w: 34, rows: [{ k: 'wb', label: '축간', kind: 'num', base: () => B0.wb }, { k: 'door', label: '앞문 길이', kind: 'num', base: () => FR.B - FR.A }, { k: 'lights', label: '옆창 배치', kind: 'lights' },
+    { k: 'roof', label: '지붕 높이', kind: 'num', base: () => B0.height }, { k: 'lift', label: '차체 높이', kind: 'num', base: () => B0.clearance }, { k: 'rack', label: '지붕 짐받이', kind: 'bool', yes: '있음', no: '없음' }] },
+  { name: '앞모습', w: 40, rows: [{ k: 'lampX', label: '램프 앞뒤', kind: 'num', base: () => 0 }, { k: 'lampZ', label: '램프 높이', kind: 'num', base: () => lampZ0 },
+    { k: 'grilleX', label: '그릴 앞뒤', kind: 'num', base: () => 0 }, { k: 'grille', label: '그릴 크기', kind: 'num', base: () => 100, unit: '%' }] },
+  { name: '범퍼 · 펜더', w: 62, rows: [{ k: 'bumperF', label: '앞 범퍼', kind: 'bool', yes: '있음', no: '없음', allowed: () => RU().bumpersOff }, { k: 'bumperR', label: '뒤 범퍼', kind: 'bool', yes: '있음', no: '없음', allowed: () => RU().bumpersOff },
+    { k: 'bumper', label: '범퍼 크기', kind: 'num', base: () => 100, unit: '%' }, { k: 'fenders', label: '펜더 · 발판', kind: 'bool', yes: '있음', no: '없음', allowed: () => RU().fendersOff },
+    { k: 'fender', label: '펜더 크기', kind: 'num', base: () => 100, unit: '%' }] } ];
+let view: 'order' | 'estimate' | 'exterior' = 'order', page = 0, editing: NumKey | null = null, typed = '';
+const ROW0 = 156, PITCH = 13, rng = (k: keyof Edit) => RU().r[k as NumKey] ?? null;
+const shown = (v: number, d: RowDef) => (d.base!() === 0 ? (v > 0 ? `+${v}` : `${v}`) : `${v}`) + (d.unit ?? '');
 const buttons: Btn[] = [];
-CTRL.forEach((c, i) => { const y = 155 + i * 19;
-  buttons.push({ id: c.k + '-', x: 404, y, w: 18, h: 16, label: () => '-', on: () => change({ ...next, [c.k]: Math.max(c.min, next[c.k] - c.step) }) });
-  buttons.push({ id: c.k + '+', x: 454, y, w: 18, h: 16, label: () => '+', on: () => change({ ...next, [c.k]: Math.min(c.max, next[c.k] + c.step) }) });
-  buttons.push({ id: c.k + '=', x: 423, y, w: 30, h: 16, label: () => '', on: () => startTyping(i) }); });
-buttons.push({ id: 'rack', x: 404, y: 212, w: 68, h: 16, label: () => (next.rack ? '떼기' : '달기'), on: () => change({ ...next, rack: !next.rack }) });
-buttons.push({ id: 'apply', x: 330, y: 233, w: 70, h: 19, label: () => '수정', big: true, on: () => apply(), show: () => pending() });
-buttons.push({ id: 'cancel', x: 404, y: 233, w: 68, h: 19, label: () => '취소', big: true, on: () => cancel(), show: () => pending() });
-buttons.push({ id: 'tab-order', x: 330, y: 4, w: 46, h: 13, label: () => '주문서', on: () => (tab = 'order') });
-buttons.push({ id: 'tab-est', x: 378, y: 4, w: 46, h: 13, label: () => '견적', on: () => (tab = 'estimate') });
-buttons.push({ id: 'tab-ext', x: 426, y: 4, w: 46, h: 13, label: () => '외장', on: () => { mode = mode === 'exterior' ? 'drawing' : 'exterior'; } });
-buttons.push({ id: 'sheet', x: 330, y: 255, w: 104, h: 13, label: () => '도면: ' + SH().name, on: () => switchSheet() });
-buttons.push({ id: 'sound', x: 436, y: 255, w: 36, h: 13, label: () => (soundOn ? '소리' : '무음'), on: () => (soundOn = !soundOn) });
+PAGES.forEach((pg, pi) => pg.rows.forEach((d, i) => { const y = ROW0 + i * PITCH, here = () => page === pi;
+  if (d.kind === 'num') { const k = d.k as NumKey, ok = () => here() && !!rng(k);
+    buttons.push({ id: k + '-', x: 404, y, w: 16, h: 12, label: () => '-', show: ok, off: () => (next[k] as number) <= rng(k)!.min, on: () => change({ ...next, [k]: Math.max(rng(k)!.min, (next[k] as number) - rng(k)!.step) }) });
+    buttons.push({ id: k + '+', x: 456, y, w: 16, h: 12, label: () => '+', show: ok, off: () => (next[k] as number) >= rng(k)!.max, on: () => change({ ...next, [k]: Math.min(rng(k)!.max, (next[k] as number) + rng(k)!.step) }) });
+    buttons.push({ id: k + '=', x: 421, y, w: 34, h: 12, label: () => '', show: ok, on: () => startTyping(k) }); }
+  else if (d.kind === 'bool') { const k = d.k as 'rack' | 'bumperF' | 'bumperR' | 'fenders', ok = () => here() && (!d.allowed || d.allowed());
+    buttons.push({ id: k + '!', x: 404, y, w: 68, h: 12, label: () => (next[k] ? d.yes! : d.no!), show: ok, on: () => change({ ...next, [k]: !next[k] }) }); }
+  else buttons.push({ id: 'lights!', x: 404, y, w: 68, h: 12, show: here, label: () => { const L = eff(next).lights; return L === next.lights ? lightsName(L) : `${lightsName(L)} 자동`; },
+    on: () => change({ ...next, lights: next.lights === 6 ? 4 : next.lights === 4 ? 2 : 6 }) }); }));
+buttons.push({ id: 'apply', x: 330, y: 236, w: 70, h: 17, label: () => '수정', big: true, on: () => apply(), show: () => pending() });
+buttons.push({ id: 'cancel', x: 404, y: 236, w: 68, h: 17, label: () => '취소', big: true, on: () => cancel(), show: () => pending() });
+buttons.push({ id: 'tab-order', x: 330, y: 4, w: 46, h: 13, label: () => '주문서', on: () => (view = 'order') });
+buttons.push({ id: 'tab-est', x: 378, y: 4, w: 46, h: 13, label: () => '견적', on: () => (view = 'estimate') });
+buttons.push({ id: 'tab-ext', x: 426, y: 4, w: 46, h: 13, label: () => '외장', on: () => (view = 'exterior') });
+{ let px = 330; PAGES.forEach((pg, pi) => { buttons.push({ id: 'page' + pi, x: px, y: 143, w: pg.w, h: 11, label: () => pg.name, on: () => { endTyping(true); page = pi; } }); px += pg.w + 2; }); }
+buttons.push({ id: 'sheet', x: 330, y: 256, w: 82, h: 12, label: () => '도면: ' + SH().name, on: () => switchSheet() });
+buttons.push({ id: 'era', x: 414, y: 256, w: 44, h: 12, label: () => ['1920년대', '1935', '1939'][eraNo]!, on: () => { flush(); eraNo = (eraNo + 1) % ERAS.length; clampAll(); } });
+buttons.push({ id: 'sound', x: 458, y: 256, w: 14, h: 12, label: () => '', on: () => (soundOn = !soundOn) });
 
+/** keep the edit inside the table after the era or the company size changed; what no longer fits shows as a red change */
+function clampAll() { const R = RU(), e = { ...next } as Edit & Record<string, unknown>;
+  for (const k of Object.keys(R.r) as NumKey[]) { const r = R.r[k]; e[k] = r ? Math.max(r.min, Math.min(r.max, e[k] as number)) : 0; }
+  if (!R.fendersOff) e.fenders = true; if (!R.bumpersOff) { e.bumperF = true; e.bumperR = true; }
+  if (JSON.stringify(e) !== JSON.stringify(next)) change(e); }
 const isScan = () => SH().style === 'screen';
 function scanTo(drawn: Set<number>, red: Set<number>, speed: number, then?: () => void) {
   const t = new Uint8Array(W * H); for (const p of drawn) t[p] = 1; for (const p of red) t[p] = 2; jobs.push({ kind: 'scan', pix: [], i: 0, tgt: t, y: PAPER.y, speed, then }); }
@@ -121,16 +156,17 @@ function apply() {
   drawnKeep = want; queue('erase', gone, () => queue('pencil', red, () => { cur = after; drawnNow = want; redNow = new Set(); }));
 }
 function cancel() { flush(); const red = [...redNow]; next = { ...cur }; redNow = new Set(); if (isScan()) scanTo(drawnNow, redNow, 520); else queue('unred', red); }
-function switchSheet() { flush(); sheetNo = (sheetNo + 1) % SHEETS.length; sheet.fill(0); for (const p of drawnNow) sheet[p] = 1; for (const p of redNow) sheet[p] = 2; }
+function switchSheet() { flush(); sheetNo = (sheetNo + 1) % SHEETS.length; sheet.fill(0); for (const p of drawnNow) sheet[p] = 1; for (const p of redNow) sheet[p] = 2; clampAll(); }
 
 // ---------------- typing a figure ----------------
 const typer = document.getElementById('typer') as HTMLInputElement;
-function startTyping(i: number) { flush(); editing = i; const c = CTRL[i]!; typed = String(c.base() + next[c.k]); typer.value = typed; typer.focus({ preventScroll: true }); typer.select(); }
+const rowOf = (k: keyof Edit) => PAGES.flatMap(p => p.rows).find(d => d.k === k)!;
+function startTyping(k: NumKey) { flush(); editing = k; typed = String(rowOf(k).base!() + next[k]); typer.value = typed; typer.focus({ preventScroll: true }); typer.select(); }
 function endTyping(ok: boolean) {
-  if (editing === null) return; const c = CTRL[editing]!, v = parseInt(typed, 10); editing = null; typer.blur();
-  if (ok && Number.isFinite(v)) { const d = Math.round(Math.max(c.min, Math.min(c.max, v - c.base()))); change({ ...next, [c.k]: d }); }
+  if (editing === null) return; const k = editing, d = rowOf(k), r = rng(k)!, v = parseInt(typed, 10); editing = null; typer.blur();
+  if (ok && Number.isFinite(v)) { const x = Math.round(Math.max(r.min, Math.min(r.max, v - d.base!()))); if (x !== next[k]) change({ ...next, [k]: x }); }
 }
-typer.addEventListener('input', () => { typed = typer.value.replace(/[^0-9]/g, '').slice(0, 5); typer.value = typed; });
+typer.addEventListener('input', () => { typed = typer.value.replace(/[^0-9-]/g, '').replace(/(?!^)-/g, '').slice(0, 6); typer.value = typed; });
 typer.addEventListener('keydown', e => { if (e.key === 'Enter') { endTyping(true); e.preventDefault(); } else if (e.key === 'Escape') { endTyping(false); e.preventDefault(); } });
 typer.addEventListener('blur', () => { if (editing !== null) endTyping(true); });
 
@@ -227,60 +263,81 @@ function arrowLine(x0: number, y0: number, x1: number, y1: number, label: string
   else { S.px(x0 - 1, y0 + 1, col); S.px(x0 + 1, y0 + 1, col); S.px(x1 - 1, y1 - 1, col); S.px(x1 + 1, y1 - 1, col); S.text(label, x0 + 3, ((y0 + y1) >> 1) - 4, col); }
 }
 function dims() {
-  const P = SH(), m = measure(edited(base, cur)), n = measure(edited(base, next)), V = views(cur), ground = SIDE.y + (100 - V.side.h) + V.side.h - 2;
-  const fx = base.wheels[0]!.x / MM + SIDE.x + 2, rx = m.wb / MM + fx, x0 = SIDE.x + 2, x1 = x0 + m.length / MM, lab = (a: number, b: number) => (a === b ? `${a}` : `${a} → ${b}`);
+  const P = SH(), m = fig(cur), n = fig(next), V = views(cur), ground = SIDE.y + (100 - V.side.h) + V.side.h - 2;
+  const fx = base.wheels[0]!.x / MM + SIDE.x + 2, rx = m.wb / MM + fx, x0 = SIDE.x + 2 + m.x0 / MM, x1 = x0 + m.length / MM, lab = (a: number, b: number) => (a === b ? `${a}` : `${a} → ${b}`);
   arrowLine(fx, ground + 8, rx, ground + 8, lab(m.wb, n.wb), m.wb === n.wb ? P.line2 : P.red);
   arrowLine(x0, ground + 18, x1, ground + 18, lab(m.length, n.length), m.length === n.length ? P.line2 : P.red);
   for (const xx of [fx, rx]) S.line(xx, ground - 3, xx, ground + 10, P.line2, 1);
   arrowLine(x1 + 12, ground - m.height / MM, x1 + 12, ground, lab(m.height, n.height), m.height === n.height ? P.line2 : P.red);
-  S.line(x0 - 6, ground, x1 + 30, ground, P.line2, 2);
-  const py0 = PLAN.y + 2, py1 = PLAN.y + 2 + m.width / MM, px = SIDE.x + 2 + m.length / MM + 12; arrowLine(px, py0, px, py1, `${m.width}`, P.line2);
+  S.line(SIDE.x - 4, ground, x1 + 30, ground, P.line2, 2);
+  const py0 = PLAN.y + 2, py1 = PLAN.y + 2 + m.width / MM, px = x1 + 12; arrowLine(px, py0, px, py1, `${m.width}`, P.line2);
   S.text('옆면도', PAPER.x + 8, PAPER.y + 6, P.label); S.text('평면도', PAPER.x + 8, PLAN.y - 9, P.label);
+  const L0 = eff(cur).lights, L1 = eff(next).lights; S.text(L0 === L1 ? lightsName(L0) : `${lightsName(L0)} → ${lightsName(L1)}`, PAPER.x + 50, PAPER.y + 6, L0 === L1 ? P.label : P.red);
 }
 function cardBox(x: number, y: number, w: number, h: number) { S.fill(x + 2, y + 2, w, h, C.shadow); S.fill(x, y, w, h, C.card); for (let i = 0; i < w; i++) if (rnd(i * 31) < 0.3) S.px(x + i, y, C.card2); }
 function tick(x: number, y: number, ok: boolean, col: RGB) {
   S.fill(x, y, 9, 9, hex('#fbf6e6')); S.line(x, y, x + 8, y, C.ink); S.line(x, y + 8, x + 8, y + 8, C.ink); S.line(x, y, x, y + 8, C.ink); S.line(x + 8, y, x + 8, y + 8, C.ink);
   if (ok) { S.line(x + 2, y + 4, x + 3, y + 6, col); S.line(x + 3, y + 6, x + 7, y + 1, col); } else { S.line(x + 2, y + 2, x + 6, y + 6, col); S.line(x + 6, y + 2, x + 2, y + 6, col); } }
+const CARD = { x: 330, y: 20, w: 142, h: 118 };
 function orderCard() {
-  const x = 330, y = 20, w = 142, h = 128; cardBox(x, y, w, h); S.text(ORDER.from, x + 6, y + 5, C.ink, w - 10); S.hline(x + 6, x + w - 6, y + 15, C.card2);
-  const m = measure(edited(base, cur)), n = measure(edited(base, next));
-  ORDER.ask.forEach((a, i) => { const yy = y + 19 + i * 18, okNow = a.test(m, cur), okNext = a.test(n, next), changed = pending() && (okNow !== okNext || a.val(m, cur) !== a.val(n, next)), ok = changed ? okNext : okNow;
-    tick(x + 6, yy, ok, changed ? C.red : ok ? C.ok : C.bad); S.text(a.t, x + 18, yy, C.ink, w - 22); S.text(changed ? `${a.val(m, cur)} → ${a.val(n, next)}` : a.val(m, cur), x + 18, yy + 9, changed ? C.red : C.inkSoft, w - 22); });
+  const { x, y, w, h } = CARD; cardBox(x, y, w, h); S.text(ORDER.from, x + 6, y + 4, C.ink, w - 10); S.hline(x + 6, x + w - 6, y + 14, C.card2);
+  const m = fig(cur), n = fig(next);
+  ORDER.ask.forEach((a, i) => { const yy = y + 18 + i * 16, okNow = a.test(m, cur), okNext = a.test(n, next), changed = pending() && (okNow !== okNext || a.val(m, cur) !== a.val(n, next)), ok = changed ? okNext : okNow;
+    tick(x + 6, yy, ok, changed ? C.red : ok ? C.ok : C.bad); S.text(a.t, x + 18, yy - 1, C.ink, w - 22); S.text(changed ? `${a.val(m, cur)} → ${a.val(n, next)}` : a.val(m, cur), x + 18, yy + 7, changed ? C.red : C.inkSoft, w - 22); });
 }
 function estimateCard() {
-  const x = 330, y = 20, w = 142, h = 128; cardBox(x, y, w, h); const e = pending() ? next : cur, E0 = estimate(measure(edited(base, cur)), cur), E = estimate(measure(edited(base, e)), e);
-  S.text('견적 (1929년 값)', x + 6, y + 5, C.ink); S.hline(x + 6, x + w - 6, y + 15, C.card2);
-  E.rows.forEach(([t, v], i) => { const yy = y + 19 + i * 9; S.text(t, x + 6, yy, C.inkSoft, 90); const s = `$${v}`; S.text(s, x + w - 6 - S.tw(s), yy, C.ink); });
-  const yt = y + 19 + E.rows.length * 9 + 1; S.hline(x + 6, x + w - 6, yt, C.ink);
-  const tot = E.total === E0.total ? `$${E.total}` : `$${E0.total} → $${E.total}`; S.text('합계', x + 6, yt + 3, C.ink); S.text(tot, x + w - 6 - S.tw(tot), yt + 3, E.total === E0.total ? C.ink : C.red);
-  S.text(`무게 ${E.kg}kg · 최고 ${E.vmax}km/h`, x + 6, yt + 14, C.inkSoft, w - 10); S.text(`제작 기간 ${E.days}일 (9시간/일)`, x + 6, yt + 23, C.inkSoft, w - 10);
+  const { x, y, w, h } = CARD; cardBox(x, y, w, h); const E0 = estimate(cur), E = estimate(pending() ? next : cur);
+  S.text('견적 (1929년 값)', x + 6, y + 4, C.ink); S.hline(x + 6, x + w - 6, y + 14, C.card2);
+  E.rows.forEach(([t, v], i) => { const yy = y + 17 + i * 8, was = E0.rows.find(r => r[0] === t), col = was?.[1] === v ? C.ink : C.red; S.text(t, x + 6, yy, was ? C.inkSoft : C.red, 96); const s = `$${v}`; S.text(s, x + w - 6 - S.tw(s), yy, col); });
+  const yt = y + 18 + E.rows.length * 8; S.hline(x + 6, x + w - 6, yt, C.ink);
+  const tot = E.total === E0.total ? `$${E.total}` : `$${E0.total} → $${E.total}`; S.text('합계', x + 6, yt + 2, C.ink); S.text(tot, x + w - 6 - S.tw(tot), yt + 2, E.total === E0.total ? C.ink : C.red);
+  S.text(`${E.kg}kg · ${E.vmax}km/h · ${E.days}일`, x + 6, yt + 11, C.inkSoft, w - 10);
 }
-/** a brass plate: rounded corners, a bevel lit from the top left, a polished streak, an engraved label; pressed when held */
-function brassButton(b: Btn, hot: boolean, down: boolean) {
+function exteriorCard() {
+  const { x, y, w, h } = CARD, e = eff(cur); cardBox(x, y, w, h); S.text('외장 설계 (다음 단계)', x + 6, y + 4, C.ink); S.hline(x + 6, x + w - 6, y + 14, C.card2);
+  const lines: [string, string][] = [['차체', `세단 ${lightsName(e.lights)}`], ['그릴', `니켈 껍데기 ${100 + e.grille}%`], ['램프', '바 위 한 쌍'], ['범퍼', e.bumperF && e.bumperR ? '앞뒤' : e.bumperF ? '앞만' : e.bumperR ? '뒤만' : '없음'], ['펜더', e.fenders ? `있음 ${100 + e.fender}%` : '없음'], ['색', '올리브 녹색 (기본)']];
+  lines.forEach(([a, b], i) => { S.text(a, x + 6, y + 18 + i * 10, C.inkSoft); S.text(b, x + 40, y + 18 + i * 10, C.ink, w - 46); });
+  S.hline(x + 6, x + w - 6, y + 80, C.card2); S.text('여기서 고를 것 (준비 중):', x + 6, y + 84, C.inkSoft); S.text('휠 · 그릴 무늬 · 램프 모양', x + 6, y + 94, C.ink, w - 10); S.text('색 · 몰딩 · 장식', x + 6, y + 104, C.ink, w - 10);
+}
+/** a brass plate: rounded corners, a bevel lit from the top left, a polished streak, an engraved label. Held down it sinks
+ *  into the panel: darker, lit from below, the letters bright */
+function brassButton(b: Btn, hot: boolean, down: boolean, dim = false) {
   const { x, y, w, h } = b, R = BRASS, label = b.label(), P = down ? 1 : 0;
-  S.fill(x + 1, y + 2, w, h - 1, C.shadow);
+  if (!down) S.fill(x + 1, y + 2, w, h - 1, C.shadow);
   for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) { const cx = Math.min(i, w - 1 - i), cy = Math.min(j, h - 1 - j); if (cx + cy < 2 && !(cx === 1 && cy === 1)) continue;     // rounded corners
-    const t = j / (h - 1); let k = down ? (t < 0.5 ? 2 : 3) : t < 0.18 ? 4 : t < 0.55 ? 3 : t < 0.85 ? 2 : 1; if (hot && !down) k = Math.min(5, k + 1);
+    const t = j / (h - 1); let k = down ? (t < 0.25 ? 0 : t < 0.6 ? 1 : 2) : t < 0.18 ? 4 : t < 0.55 ? 3 : t < 0.85 ? 2 : 1; if (hot && !down) k = Math.min(5, k + 1);
     if (!down && (i + j * 0.6) % 17 < 1.2 && t > 0.15 && t < 0.7) k = Math.min(5, k + 1);                                       // a polished streak
-    const edge = cx === 0 || cy === 0 || (cx + cy === 2 && cx === 1); if (edge) k = (i < w / 2 && j < h / 2) !== down ? 4 : 0; if (cx + cy === 2 && cx !== 1 && edge) k = 0;
-    S.px(x + i, y + j + P, R[k]!); }
-  S.px(x + 2, y + 2 + P, R[5]!);                                                                                                    // a glint on the corner
-  const tw = S.tw(label), tx = x + ((w - tw) >> 1), ty = y + ((h - 8) >> 1) + P; S.text(label, tx, ty + 1, R[4]!); S.text(label, tx, ty, R[0]!);   // engraved: dark letters, lit lower lip
+    const edge = cx === 0 || cy === 0 || (cx + cy === 2 && cx === 1); if (edge) k = down ? (j > h / 2 ? 3 : 0) : (i < w / 2 && j < h / 2) ? 4 : 0; if (cx + cy === 2 && cx !== 1 && edge) k = 0;
+    if (dim) k = Math.max(0, k - 2); S.px(x + i, y + j + P, R[k]!); }
+  if (!down) S.px(x + 2, y + 2, R[5]!);                                                                                             // a glint on the corner
+  const tw = S.tw(label), tx = x + ((w - tw) >> 1), ty = y + ((h - 8) >> 1) + P;
+  if (down) S.text(label, tx, ty, hex('#fff1c0')); else { S.text(label, tx, ty + 1, R[dim ? 2 : 4]!); S.text(label, tx, ty, R[0]!); }   // engraved: dark letters on a lit lip; pressed: lit letters
 }
 let hover = '', pressed = '';
 function controls() {
-  const x = 326, y = 150; S.fill(x + 2, y + 2, 150, 80, C.shadow); S.fill(x, y, 150, 80, C.wood2); S.hline(x, x + 149, y, C.wood3);
-  for (const [sx, sy] of [[x + 2, y + 2], [x + 146, y + 2], [x + 2, y + 76], [x + 146, y + 76]] as const) { S.px(sx, sy, BRASS[4]!); S.px(sx + 1, sy + 1, BRASS[1]!); }   // brass screws
-  CTRL.forEach((c, i) => { const yy = 155 + i * 19, v = c.base() + next[c.k], changed = next[c.k] !== cur[c.k]; S.text(c.label, 332, yy + 4, C.card);
-    // the figure's window: a recessed dark plate; typing shows a caret
-    const bx = 423, bw = 30; S.fill(bx, yy, bw, 16, hex('#1a120b')); S.hline(bx, bx + bw - 1, yy + 15, BRASS[2]!); S.vline(bx + bw - 1, yy, yy + 15, BRASS[2]!);
-    const s = editing === i ? typed : `${v}`, tw = S.tw(s); S.text(s, bx + ((bw - tw) >> 1), yy + 4, editing === i ? hex('#fff4c8') : changed ? C.red2 : BRASS[4]!);
-    if (editing === i && (performance.now() / 400 | 0) % 2) S.vline(bx + ((bw + tw) >> 1) + 1, yy + 3, yy + 12, hex('#fff4c8')); });
-  S.text('지붕 짐받이', 332, 216, C.card);
-  for (const b of buttons) if ((!b.show || b.show()) && !b.id.endsWith('=')) brassButton(b, hover === b.id, pressed === b.id);
-  if (!pending()) S.text(busy() ? '그리는 중… (누르면 빨리)' : '바꾸거나 숫자를 눌러 입력', 332, 238, C.card2, 140);
+  const x = 326, y = 141, w = 150, h = 92; S.fill(x + 2, y + 2, w, h, C.shadow); S.fill(x, y, w, h, C.wood2); S.hline(x, x + w - 1, y, C.wood3); S.hline(x + 2, x + w - 3, y + 14, C.shadow);
+  for (const [sx, sy] of [[x + 2, y + 88], [x + w - 4, y + 88]] as const) { S.px(sx, sy, BRASS[4]!); S.px(sx + 1, sy + 1, BRASS[1]!); }   // brass screws
+  PAGES[page]!.rows.forEach((d, i) => { const yy = ROW0 + i * PITCH;
+    S.text(d.label, 332, yy + 2, C.card);
+    if (d.kind === 'num') { const k = d.k as NumKey, r = rng(k);
+      if (!r) { S.text('이 시대엔 고정', 404, yy + 2, C.card2); return; }
+      const v = d.base!() + next[k], changed = next[k] !== cur[k], bx = 421, bw = 34;
+      S.fill(bx, yy, bw, 12, hex('#1a120b')); S.hline(bx, bx + bw - 1, yy + 11, BRASS[2]!); S.vline(bx + bw - 1, yy, yy + 11, BRASS[2]!);
+      const s = editing === k ? typed : shown(v, d), tw = S.tw(s); S.text(s, bx + ((bw - tw) >> 1), yy + 2, editing === k ? hex('#fff4c8') : changed ? C.red2 : BRASS[4]!);
+      if (editing === k && (performance.now() / 400 | 0) % 2) S.vline(bx + ((bw + tw) >> 1) + 1, yy + 2, yy + 9, hex('#fff4c8')); }
+    else if (d.allowed && !d.allowed()) S.text('이 시대엔 필수', 404, yy + 2, C.card2); });
+  for (const b of buttons) if ((!b.show || b.show()) && !b.id.endsWith('=') && !b.id.startsWith('tab') && !b.id.startsWith('page')) {
+    const changed = b.id.endsWith('!') && (b.id === 'lights!' ? eff(next).lights !== eff(cur).lights : next[b.id.slice(0, -1) as 'rack'] !== cur[b.id.slice(0, -1) as 'rack']);
+    brassButton(b, hover === b.id, pressed === b.id, b.off?.()); if (changed) { S.px(b.x + b.w - 4, b.y + 3, C.red2); S.px(b.x + b.w - 3, b.y + 3, C.red2); S.px(b.x + b.w - 4, b.y + 4, C.red); S.px(b.x + b.w - 3, b.y + 4, C.red); } }
+  PAGES.forEach((_, pi) => { const b = buttons.find(q => q.id === 'page' + pi)!; brassButton(b, hover === b.id, page === pi); });
+  // the sound switch: a little speaker
+  const sb = buttons.find(q => q.id === 'sound')!; const sx = sb.x + 3, sy = sb.y + 3; S.fill(sx, sy + 2, 2, 3, BRASS[0]!); for (let k = 0; k < 3; k++) S.vline(sx + 2 + k, sy + 2 - k, sy + 4 + k, BRASS[0]!);
+  if (soundOn) { S.px(sx + 6, sy + 2, BRASS[0]!); S.px(sx + 6, sy + 4, BRASS[0]!); S.px(sx + 7, sy + 3, BRASS[0]!); } else { S.px(sx + 6, sy + 1, C.red); S.px(sx + 7, sy + 5, C.red); }
+  if (!pending()) S.text(busy() ? '그리는 중… (누르면 빨리)' : `범위: ${RU().label}`, 330, 240, C.card2, 142);
 }
-function tabs() { for (const id of ['tab-order', 'tab-est', 'tab-ext']) { const b = buttons.find(q => q.id === id)!, on = (id === 'tab-order' && tab === 'order' && mode === 'drawing') || (id === 'tab-est' && tab === 'estimate' && mode === 'drawing') || (id === 'tab-ext' && mode === 'exterior'); brassButton(b, hover === id || on, on); } }
+/** the three tabs over the card: the one you are on stays pressed in and opens into the card like a folder tab */
+function tabs() { for (const [id, v] of [['tab-order', 'order'], ['tab-est', 'estimate'], ['tab-ext', 'exterior']] as const) { const b = buttons.find(q => q.id === id)!, on = view === v;
+  brassButton(b, hover === id && !on, on); if (on) { S.fill(b.x + 1, b.y + b.h + 1, b.w - 2, CARD.y - b.y - b.h - 1, C.card); S.vline(b.x, b.y + b.h, CARD.y, C.shadow); } } }
 function tools() {
   if (!tool || !SH().eraser) return; const { x, y } = tool;
   if (tool.kind === 'pencil' || tool.kind === 'red') for (let k = 0; k < 16; k++) { const px = x + 1 + k, py = y - 1 - k; S.px(px, py, k < 2 ? SH().line : k < 4 ? BRASS[4]! : tool.kind === 'red' ? C.red : hex('#5c5a62')); S.px(px + 1, py, k < 4 ? BRASS[1]! : C.shadow); }
@@ -289,7 +346,7 @@ function tools() {
 // ---------------- the exterior: where the drawing goes next ----------------
 let extKey = '', extImg: CarImage | null = null;
 function exterior() {
-  const key = JSON.stringify(cur); if (key !== extKey) { extKey = key; extImg = rasterizeFlat(viewDesign(edited(base, cur), 'left'), { shadow: true }); }
+  const key = JSON.stringify(eff(cur)); if (key !== extKey) { extKey = key; extImg = rasterizeFlat(viewDesign(carOf(cur), 'left'), { shadow: true }); }
   const x = PAPER.x, y = PAPER.y, w = PAPER.w, h = PAPER.h; S.fill(x + 3, y + 3, w, h, C.shadow);
   for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) S.px(x + i, y + j, j < h * 0.62 ? hex(j % 4 === 0 ? '#c9d3d6' : '#d2dcde') : hex(rnd(j * 91 + i) < 0.1 ? '#8c8478' : '#9a9286'));     // the workshop wall and floor
   const im = extImg!, k = Math.max(1, Math.ceil(im.w / (w - 40))), dw = Math.floor(im.w / k), dh = Math.floor(im.h / k), ox = x + ((w - dw) >> 1), oy = y + Math.round(h * 0.62) - Math.round(im.groundY / k);
@@ -298,8 +355,8 @@ function exterior() {
     if (a < 8 * k * k) continue; S.px(ox + i, oy + j, [Math.round(r / a), Math.round(g / a), Math.round(b / a)], Math.min(1, a / (255 * k * k) * 1.2)); }
   S.text('외장 설계 - 다음 단계', x + 8, y + 6, C.ink); S.text('도면의 치수 그대로. 여기서 휠 · 그릴 · 램프 · 색을 고릅니다 (준비 중)', x + 8, y + h - 14, C.ink, w - 16);
 }
-function frame() { desk(); if (mode === 'exterior') exterior(); else { paper(); sheetPixels(); dims(); tools(); }
-  if (tab === 'estimate') estimateCard(); else orderCard(); tabs(); controls(); }
+function frame() { desk(); if (view === 'exterior') exterior(); else { paper(); sheetPixels(); dims(); tools(); }
+  if (view === 'estimate') estimateCard(); else if (view === 'exterior') exteriorCard(); else orderCard(); tabs(); controls(); }
 
 // ---------------- page ----------------
 const cv = document.getElementById('board') as HTMLCanvasElement, ctx = cv.getContext('2d')!, img = ctx.createImageData(W, H);
@@ -307,8 +364,8 @@ cv.width = W; cv.height = H;
 const toPx = (ev: PointerEvent) => { const r = cv.getBoundingClientRect(); return [(ev.clientX - r.left) / r.width * W, (ev.clientY - r.top) / r.height * H] as const; };
 const hit = (x: number, y: number) => buttons.find(b => (!b.show || b.show()) && x >= b.x && x < b.x + b.w && y >= b.y && y < b.y + b.h);
 cv.addEventListener('pointermove', ev => { const [x, y] = toPx(ev); hover = hit(x, y)?.id ?? ''; cv.style.cursor = hover ? 'pointer' : 'default'; });
-cv.addEventListener('pointerdown', ev => { startSound(); const [x, y] = toPx(ev), b = hit(x, y); if (editing !== null && b?.id !== CTRL[editing]!.k + '=') endTyping(true);
-  if (b) { pressed = b.id; b.on(); ev.preventDefault(); } else if (busy()) fast = true; });
+cv.addEventListener('pointerdown', ev => { startSound(); const [x, y] = toPx(ev), b = hit(x, y); if (editing !== null && b?.id !== editing + '=') endTyping(true);
+  if (b) { pressed = b.id; if (!b.off?.()) b.on(); ev.preventDefault(); } else if (busy()) fast = true; });
 addEventListener('pointerup', () => (pressed = ''));
 addEventListener('keydown', e => { if (document.activeElement === typer) return; if (e.key === ' ') { fast = true; e.preventDefault(); } if (e.key === 'Enter' && pending()) apply(); if (e.key === 'Escape' && pending()) cancel(); });
 let last = performance.now();

@@ -72,7 +72,7 @@ export function viewDesign(m: CarModel, view: ViewName, only?: (p: CarPart) => b
       if (g.pts) g.pts = g.pts.map((q: number[]) => [...at(q[0]!, q[1]!).map(Math.round), 1]); if (g.at) g.at = [...at(g.at[0], g.at[1]).map(Math.round), 1];
       if (g.kind === 'louvres') { const a = at(g.x0, g.z0), c = at(g.x1, g.z1); g.x0 = a[0]; g.z0 = a[1]; g.x1 = c[0]; g.z1 = c[1]; }
       if (g.kind === 'handle') g.len = g.len * (b.x[1] - b.x[0]);
-      features.push(g as Feature); }
+      g.part = p.id; features.push(g as Feature); }
   });
   if (!opt.chassis) for (const f of m.features?.[key] ?? []) features.push(f);
   const top = key === 'top', across = key === 'front' || key === 'rear';

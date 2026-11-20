@@ -21,6 +21,17 @@ class Sheet:
         if not cs: raise SystemExit(f'nothing of kind {kind} in the box of {name}')
         c = max(cs, key=cv2.contourArea); c = cv2.approxPolyDP(c, eps * s.K / 2, True).reshape(-1, 2)
         pts = [[round(float(x) * s.sx), round(float(s.h - y) * s.sz)] for x, y in c]; s.done.append((name, pts)); return pts
+    def fill(s, seeds, tol=14, eps=1.0, close=4, name='', grow=0):
+        """the area of the drawing that a part's own colour fills, grown from seed points (mm) up to the lines drawn round it"""
+        img = cv2.GaussianBlur(s.im[..., :3], (0, 0), 1.0); tot = np.zeros((s.h, s.w), np.uint8)
+        for x, z in seeds:
+            m = np.zeros((s.h + 2, s.w + 2), np.uint8); cv2.floodFill(img.copy(), m, s.px(x, z), 0, (tol,) * 3, (tol,) * 3, 4 | cv2.FLOODFILL_FIXED_RANGE | cv2.FLOODFILL_MASK_ONLY | (255 << 8)); tot |= m[1:-1, 1:-1]
+        tot[~s.cls['mask']] = 0; k = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (close * 2 + 1, close * 2 + 1)); tot = cv2.morphologyEx(tot, cv2.MORPH_CLOSE, k)
+        if grow: tot = cv2.dilate(tot, np.ones((grow * 2 + 1,) * 2, np.uint8))
+        cs, _ = cv2.findContours(tot, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+        if not cs: raise SystemExit(f'nothing filled for {name}')
+        c = cv2.approxPolyDP(max(cs, key=cv2.contourArea), eps * s.K / 2, True).reshape(-1, 2)
+        pts = [[round(float(x) * s.sx), round(float(s.h - y) * s.sz)] for x, y in c]; s.done.append((name, pts)); return pts
     def note(s, name, pts): s.done.append((name, [p[:2] for p in pts])); return pts
     def overlay(s, out):
         v = s.im[..., :3].copy(); v[s.im[..., 3] < 128] = (200, 200, 200)

@@ -132,16 +132,16 @@ for k, py in enumerate((615, 661)):
          top=halfT([0, 0], [0, 600], [40, 668], [90, 668], [86, 600], [86, 0]))
     part(f'bumperR{k}', 'bumperR', 'chrome', 'fender', slot='bumperR', pair=True, side=side((1778, py - 11), (1834, py - 11), (1834, py + 11), (1778, py + 11)), rear=[[330, z - 23], [790, z - 23], [800, z], [790, z + 23], [330, z + 23]],
          top=[[3765, 330], [3765, 790], [3885, 790], [3885, 330]])
-part('ironF', 'bumperF', 'black', 'flat', slot='bumperF', pair=True, side=side((42, 600), (120, 610), (120, 640), (42, 676)), front=[[330, 400], [362, 400], [362, 545], [330, 545]], lift=1)
-part('ironR', 'bumperR', 'black', 'flat', slot='bumperR', pair=True, side=side((1700, 610), (1780, 600), (1780, 676), (1700, 640)), rear=[[540, 400], [572, 400], [572, 545], [540, 545]])
+part('ironF', 'bumperF', 'black', 'flat', slot='bumperF', pair=True, side=side((42, 600), (120, 610), (120, 640), (42, 676)), front=[[330, 400], [362, 400], [362, 545], [330, 545]], top=[[60, 330], [60, 362], [520, 362], [520, 330]], lift=1)
+part('ironR', 'bumperR', 'black', 'flat', slot='bumperR', pair=True, side=side((1700, 610), (1780, 600), (1780, 676), (1700, 640)), rear=[[540, 400], [572, 400], [572, 545], [540, 545]], top=[[3560, 540], [3560, 572], [3800, 572], [3800, 540]])
 part('tail', 'tail', 'lensR', 'flat', slot='tail', pair=True, smooth=('rear', 'side'), x=[3590, 3640], side=ell(3615, 720, 22, 50), rear=ell(570, 720, 50, 50))
-part('spare', 'spare', 'rubber', 'fender', smooth=('side',), z=[487, 1249], wheel={'r': R},
-     side=ell(S(1760, 0)[0], 868, 88, 381), rear=ell(0, 868, 381, 381), top=halfT([3640, 0], [3640, 381], [3810, 381], [3810, 0]), detail={'kind': 'ribs', 'pitch': 40})
+part('spare', 'spare', 'rubber', 'fender', smooth=('side',), wheel={'r': 330},
+     side=ell(S(1760, 0)[0], 868, 88, 300), rear=ell(0, 868, 330, 330), top=halfT([3640, 0], [3640, 330], [3810, 330], [3810, 0]), detail={'kind': 'ribs', 'pitch': 40})
 part('spareHub', 'spare', 'chrome', 'flat', smooth=('side',), y=[-60, 60], side=ell(S(1770, 0)[0], 868, 36, 70), lift=1)
 
 M = {'id': 'sedan29', 'name': 'four-door sedan, 1929', 'year': 1929, 'length': L, 'width': W, 'height': H, 'paint': '#3b3e25', 'paint2': '#232327', 'canvas': '#34343a',
      'wheels': [{'x': FX, 'r': R, 'y': 690}, {'x': RX, 'r': R, 'y': 690}], 'wheel': {'rim': 0.66, 'style': 'wire', 'spokes': 36, 'rimMaterial': 'paint', 'cap': 0.22, 'capRings': 1},
-     'features': {'side': [{'kind': 'interior', 'belt': S(0, 268)[1], 'seats': [2050, 2620, 3100], 'wheel': 1830}]}, 'parts': P}
+     'parts': P}
 json.dump(M, open(OUT, 'w'), indent=0)
 print(OUT, len(P), 'parts;', sum(len(p['outlines']) for p in P), 'outlines')
 print('where the sheet views disagree with the one model (the model wins):'); print('\n'.join('  ' + n for n in notes))

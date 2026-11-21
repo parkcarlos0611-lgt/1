@@ -31,12 +31,15 @@ export function visitor() {
     let lb = 0, lo = 0; for (const [x, y] of [[214, 140], [248, 140], [205, 120], [258, 120]] as const) { const i = (y * W + x) * 4; lb += base[i]! + base[i + 1]! + base[i + 2]!; lo += out[i]! + out[i + 1]! + out[i + 2]!; }
     const k = Math.min(1.4, lo / Math.max(1, lb)), warm = [1.02, 0.98, 0.92];
     const ids = (kd as unknown as { regionId: Record<string, number> }).regionId, cloth = ids.cloth!, top = ids.tableTop!;
-    const keep = (x: number, y: number) => { const r = reg[(y * W + x) * 4]!; return !(r === cloth || (r === top && y >= 199)); };   // the table's front stands before him
+    const keep = (x: number, y: number) => { const r = reg[(y * W + x) * 4]!; return r !== cloth && r !== top; };   // the table stands before him: its front, and its top from the far edge on
+    /** what of him lies on the table top: his hands and cuffs (his forearms come towards us over it), nothing else */
+    const onTable = (p: Uint8ClampedArray, w: number, h: number, x: number, y: number) => { for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const xx = x + dx, yy = y + dy; if (xx < 0 || yy < 0 || xx >= w || yy >= h) continue; const j = (yy * w + xx) * 4; if (p[j + 3]! < 128) continue;
+        const r = p[j]!, g = p[j + 1]!, b = p[j + 2]!; if ((r > 140 && g > 85 && b < 160 && r - b > 35) || (r > 175 && g > 170 && b > 160)) return true; } return false; };
     // a soft shadow where his hands rest, and under his shoes
-    const shade = (cx: number, cy: number, rx: number, ry: number, a: number) => { for (let y = Math.floor(cy - ry); y <= cy + ry; y++) for (let x = Math.floor(cx - rx); x <= cx + rx; x++) { const q = ((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2; if (q >= 1 || !keep(x, y) && y < 199) continue; const i = (y * W + x) * 4, f = 1 - a * (1 - q); out[i] = out[i]! * f; out[i + 1] = out[i + 1]! * f; out[i + 2] = out[i + 2]! * f; } };
+    const shade = (cx: number, cy: number, rx: number, ry: number, a: number) => { for (let y = Math.floor(cy - ry); y <= cy + ry; y++) for (let x = Math.floor(cx - rx); x <= cx + rx; x++) { const q = ((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2; if (q >= 1) continue; const i = (y * W + x) * 4, f = 1 - a * (1 - q); out[i] = out[i]! * f; out[i + 1] = out[i + 1]! * f; out[i + 2] = out[i + 2]! * f; } };
     shade(231, 261, 20, 2.5, 0.45); if (frame === 'sit') shade(231, 197, 24, 2, 0.3);
     const [fx, fy] = fm.at as [number, number], [fw, fh] = fm.size as [number, number];
-    for (let y = 0; y < fh; y++) for (let x = 0; x < fw; x++) { const j = (y * fw + x) * 4; if (px[j + 3]! < 128) continue; const X = fx + x, Y = fy + y; if (X < 0 || Y < 0 || X >= W || Y >= H || !keep(X, Y)) continue;
+    for (let y = 0; y < fh; y++) for (let x = 0; x < fw; x++) { const j = (y * fw + x) * 4; if (px[j + 3]! < 128) continue; const X = fx + x, Y = fy + y; if (X < 0 || Y < 0 || X >= W || Y >= H) continue; if (!keep(X, Y) && !(reg[(Y * W + X) * 4] === top && onTable(px, fw, fh, x, y))) continue;
       const i = (Y * W + X) * 4; out[i] = Math.min(255, px[j]! * k * warm[0]!); out[i + 1] = Math.min(255, px[j + 1]! * k * warm[1]!); out[i + 2] = Math.min(255, px[j + 2]! * k * warm[2]!); }
     // his cup: on its saucer in front of him, or in his hand while he drinks
     const cupW = CUP.x1 - CUP.x0, cupH = CUP.y1 - CUP.y0, held = fm.hand;

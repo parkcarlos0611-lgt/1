@@ -1,0 +1,1042 @@
+[
+ {
+  "id": "ws_single",
+  "cat": "windshield",
+  "slot": "windshield",
+  "name": "FLAT SINGLE",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "ws_singleOpen",
+  "cat": "windshield",
+  "slot": "windshield",
+  "name": "CRANK-OPEN",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "ws_split",
+  "cat": "windshield",
+  "slot": "windshield",
+  "name": "SPLIT TWO-PANE",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "ws_vee",
+  "cat": "windshield",
+  "slot": "windshield",
+  "name": "V SPLIT",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "ws_aero",
+  "cat": "windshield",
+  "slot": "windshield",
+  "name": "TWIN AERO SCREENS",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "ws_racing",
+  "cat": "windshield",
+  "slot": "windshield",
+  "name": "RACING SCREEN",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "ws_chrome",
+  "cat": "windshield",
+  "slot": "windshield",
+  "name": "CHROME FRAMED",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "ws_round",
+  "cat": "windshield",
+  "slot": "windshield",
+  "name": "ROUNDED CORNERS",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "vis_flat",
+  "cat": "visor",
+  "slot": "visor",
+  "name": "FLAT STEEL",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "vis_curved",
+  "cat": "visor",
+  "slot": "visor",
+  "name": "CURVED INTEGRAL",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "vis_glass",
+  "cat": "visor",
+  "slot": "visor",
+  "name": "TINTED GLASS",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "vis_stub",
+  "cat": "visor",
+  "slot": "visor",
+  "name": "STUB PEAK",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "roo_insert",
+  "cat": "roof",
+  "slot": "roof",
+  "name": "STEEL + FABRIC INSERT",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "roo_landau",
+  "cat": "roof",
+  "slot": "roof",
+  "name": "LANDAU CANVAS",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "roo_softUp",
+  "cat": "roof",
+  "slot": "roof",
+  "name": "SOFT TOP UP",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "roo_canvasDown",
+  "cat": "roof",
+  "slot": "roof",
+  "name": "SOFT TOP FOLDED",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "roo_turret",
+  "cat": "roof",
+  "slot": "roof",
+  "name": "STEEL TURRET TOP",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "roo_opera",
+  "cat": "roof",
+  "slot": "roof",
+  "name": "OPERA BLIND QUARTER",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "roo_leatherette",
+  "cat": "roof",
+  "slot": "roof",
+  "name": "LEATHERETTE",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "roo_sunshine",
+  "cat": "roof",
+  "slot": "roof",
+  "name": "SLIDING SUNSHINE ROOF",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "hoo_vShort",
+  "cat": "hoodVent",
+  "slot": "hoodVent",
+  "name": "VERTICAL SHORT",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "hoo_vLong",
+  "cat": "hoodVent",
+  "slot": "hoodVent",
+  "name": "VERTICAL LONG",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "hoo_vGroups",
+  "cat": "hoodVent",
+  "slot": "hoodVent",
+  "name": "VERTICAL 3 GROUPS",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "hoo_horizontal",
+  "cat": "hoodVent",
+  "slot": "hoodVent",
+  "name": "HORIZONTAL",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "hoo_doors3",
+  "cat": "hoodVent",
+  "slot": "hoodVent",
+  "name": "VENT DOORS 3",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "hoo_doors5",
+  "cat": "hoodVent",
+  "slot": "hoodVent",
+  "name": "VENT DOORS 5",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "hoo_doors7",
+  "cat": "hoodVent",
+  "slot": "hoodVent",
+  "name": "VENT DOORS 7",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "hoo_speedlines",
+  "cat": "hoodVent",
+  "slot": "hoodVent",
+  "name": "CHROME SPEEDLINES",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "hoo_wrap",
+  "cat": "hoodVent",
+  "slot": "hoodVent",
+  "name": "WRAP LOUVRES",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "hoo_mesh",
+  "cat": "hoodVent",
+  "slot": "hoodVent",
+  "name": "MESH PANEL",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "hoo_chromeBars",
+  "cat": "hoodVent",
+  "slot": "hoodVent",
+  "name": "CHROME BARS",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "hoo_angled",
+  "cat": "hoodVent",
+  "slot": "hoodVent",
+  "name": "ANGLED LOUVRES",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "cow_flapClosed",
+  "cat": "cowlVent",
+  "slot": "cowlVent",
+  "name": "FLAP CLOSED",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "cow_flapOpen",
+  "cat": "cowlVent",
+  "slot": "cowlVent",
+  "name": "FLAP OPEN",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "cow_louvred",
+  "cat": "cowlVent",
+  "slot": "cowlVent",
+  "name": "LOUVRED",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "cow_scoop",
+  "cat": "cowlVent",
+  "slot": "cowlVent",
+  "name": "SCOOP",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "tri_bead",
+  "cat": "trim",
+  "slot": "trim",
+  "name": "BELT BEAD",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "tri_pinstripe",
+  "cat": "trim",
+  "slot": "trim",
+  "name": "DOUBLE PINSTRIPE",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "tri_spear",
+  "cat": "trim",
+  "slot": "trim",
+  "name": "CHROME SPEAR",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "tri_spearTail",
+  "cat": "trim",
+  "slot": "trim",
+  "name": "SPEAR WITH TAIL",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "tri_twoTone",
+  "cat": "trim",
+  "slot": "trim",
+  "name": "TWO-TONE DIVIDER",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "tri_rocker",
+  "cat": "trim",
+  "slot": "trim",
+  "name": "ROCKER MOULDING",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "tri_fenderBead",
+  "cat": "trim",
+  "slot": "trim",
+  "name": "FENDER BEAD",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "tri_hoodCentre",
+  "cat": "trim",
+  "slot": "trim",
+  "name": "HOOD CENTRE STRIP",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "han_tHandle",
+  "cat": "handle",
+  "slot": "handle",
+  "name": "T-HANDLE",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "han_lever",
+  "cat": "handle",
+  "slot": "handle",
+  "name": "LEVER",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "han_pushButton",
+  "cat": "handle",
+  "slot": "handle",
+  "name": "PUSH BUTTON",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "han_flap",
+  "cat": "handle",
+  "slot": "handle",
+  "name": "PULL FLAP",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "han_recessed",
+  "cat": "handle",
+  "slot": "handle",
+  "name": "RECESSED",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "mir_spare",
+  "cat": "mirror",
+  "slot": "mirror",
+  "name": "SPARE-WHEEL MIRROR",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "mir_fender",
+  "cat": "mirror",
+  "slot": "mirror",
+  "name": "FENDER MIRROR",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "mir_door",
+  "cat": "mirror",
+  "slot": "mirror",
+  "name": "DOOR MIRROR",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "mir_cowl",
+  "cat": "mirror",
+  "slot": "mirror",
+  "name": "COWL MIRROR",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "mir_pillarClamp",
+  "cat": "mirror",
+  "slot": "mirror",
+  "name": "PILLAR CLAMP",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "mir_oblong",
+  "cat": "mirror",
+  "slot": "mirror",
+  "name": "OBLONG",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "hor_twinTrumpet",
+  "cat": "horn",
+  "slot": "horn",
+  "name": "TWIN TRUMPETS",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "hor_single",
+  "cat": "horn",
+  "slot": "horn",
+  "name": "SINGLE TRUMPET",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "hor_disc",
+  "cat": "horn",
+  "slot": "horn",
+  "name": "DISC HORN",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "hor_grillePlate",
+  "cat": "horn",
+  "slot": "horn",
+  "name": "GRILLE PLATE",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "wip_topVacuum",
+  "cat": "wiper",
+  "slot": "wiper",
+  "name": "TOP VACUUM",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "wip_twinBottom",
+  "cat": "wiper",
+  "slot": "wiper",
+  "name": "TWIN BOTTOM",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "wip_chromeArm",
+  "cat": "wiper",
+  "slot": "wiper",
+  "name": "CHROME ARM",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "pla_rearLamp",
+  "cat": "plate",
+  "slot": "plate",
+  "name": "REAR + LAMP",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "pla_frontBar",
+  "cat": "plate",
+  "slot": "plate",
+  "name": "FRONT BAR",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "pla_stopCombo",
+  "cat": "plate",
+  "slot": "plate",
+  "name": "STOP COMBO",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "pla_roundFrame",
+  "cat": "plate",
+  "slot": "plate",
+  "name": "ROUND FRAME",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "ste_aluTread",
+  "cat": "step",
+  "slot": "step",
+  "name": "ALU TREAD",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "ste_rubberPad",
+  "cat": "step",
+  "slot": "step",
+  "name": "RUBBER PAD",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "ste_chromeStep",
+  "cat": "step",
+  "slot": "step",
+  "name": "CHROME STEP",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "emb_shieldChevron",
+  "cat": "emblem",
+  "slot": "emblem",
+  "name": "SHIELD CHEVRON",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "emb_wingedCircle",
+  "cat": "emblem",
+  "slot": "emblem",
+  "name": "WINGED CIRCLE",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "emb_laurel",
+  "cat": "emblem",
+  "slot": "emblem",
+  "name": "LAUREL",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "emb_crownCrest",
+  "cat": "emblem",
+  "slot": "emblem",
+  "name": "CROWN CREST",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "emb_diamond",
+  "cat": "emblem",
+  "slot": "emblem",
+  "name": "DIAMOND",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "emb_ovalBars",
+  "cat": "emblem",
+  "slot": "emblem",
+  "name": "OVAL BARS",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "emb_triangle",
+  "cat": "emblem",
+  "slot": "emblem",
+  "name": "TRIANGLE",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "emb_hexagon",
+  "cat": "emblem",
+  "slot": "emblem",
+  "name": "HEXAGON",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "emb_torch",
+  "cat": "emblem",
+  "slot": "emblem",
+  "name": "TORCH",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "emb_starburst",
+  "cat": "emblem",
+  "slot": "emblem",
+  "name": "STARBURST",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "sxp_1",
+  "cat": "sidePipe",
+  "slot": "sidePipe",
+  "name": "SINGLE FLEX",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "sxp_3",
+  "cat": "sidePipe",
+  "slot": "sidePipe",
+  "name": "TRIPLE FLEX",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "sxp_4",
+  "cat": "sidePipe",
+  "slot": "sidePipe",
+  "name": "QUAD FLEX",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "pan_woodSteel",
+  "cat": "panel",
+  "slot": "panel",
+  "name": "WOOD FRAME + STEEL",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "pan_thinSteel",
+  "cat": "panel",
+  "slot": "panel",
+  "name": "THIN STEEL",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "pan_thickSteel",
+  "cat": "panel",
+  "slot": "panel",
+  "name": "THICK STEEL",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "pan_alu",
+  "cat": "panel",
+  "slot": "panel",
+  "name": "HAND-FORMED ALU",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "pan_fabric",
+  "cat": "panel",
+  "slot": "panel",
+  "name": "FABRIC BODY",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "pan_polished",
+  "cat": "panel",
+  "slot": "panel",
+  "name": "POLISHED ALU",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "hub_naveSmall",
+  "cat": "hubcap",
+  "slot": "hubcap",
+  "name": "SMALL NAVE",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "hub_dome",
+  "cat": "hubcap",
+  "slot": "hubcap",
+  "name": "DOME",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "hub_flatRing",
+  "cat": "hubcap",
+  "slot": "hubcap",
+  "name": "FLAT + RING",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "hub_hexKnockoff",
+  "cat": "hubcap",
+  "slot": "hubcap",
+  "name": "KNOCK-OFF",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "hub_artillery",
+  "cat": "hubcap",
+  "slot": "hubcap",
+  "name": "ARTILLERY CAP",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "hub_ribbedDisc",
+  "cat": "hubcap",
+  "slot": "hubcap",
+  "name": "RIBBED DISC",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "tyr_blackwall",
+  "cat": "tyre",
+  "slot": "tyre",
+  "name": "BLACKWALL",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "tyr_wideWW",
+  "cat": "tyre",
+  "slot": "tyre",
+  "name": "WIDE WHITEWALL",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "tyr_narrowWW",
+  "cat": "tyre",
+  "slot": "tyre",
+  "name": "NARROW WHITEWALL",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "tyr_racing",
+  "cat": "tyre",
+  "slot": "tyre",
+  "name": "RACING TREAD",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "tyr_mudSnow",
+  "cat": "tyre",
+  "slot": "tyre",
+  "name": "MUD & SNOW",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "tyr_doubleStripe",
+  "cat": "tyre",
+  "slot": "tyre",
+  "name": "DOUBLE STRIPE",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "gua_overrider",
+  "cat": "guard",
+  "slot": "guard",
+  "name": "OVERRIDER",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "gua_bullet",
+  "cat": "guard",
+  "slot": "guard",
+  "name": "BULLET GUARD",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "gua_twinPost",
+  "cat": "guard",
+  "slot": "guard",
+  "name": "TWIN POST",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "gua_grilleGuard",
+  "cat": "guard",
+  "slot": "guard",
+  "name": "GRILLE GUARD",
+  "years": [
+   1928,
+   1939
+  ]
+ }
+]

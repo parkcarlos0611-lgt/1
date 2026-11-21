@@ -1,0 +1,438 @@
+{
+ "note": "Starting values for the slice, to be tuned with the five-year run. Budgets are 1930 dollars for the whole job.",
+ "customerTypes": [
+  {
+   "id": "doctor",
+   "weight": 16,
+   "age": [
+    34,
+    62
+   ],
+   "standing": [
+    50,
+    75
+   ],
+   "budget": {
+    "body_only": [
+     550,
+     900
+    ],
+    "bought": [
+     1500,
+     2600
+    ],
+    "built": [
+     1900,
+     3200
+    ]
+   },
+   "orderTypes": {
+    "body_only": 5,
+    "bought": 4,
+    "built": 1
+   },
+   "bodies": [
+    "sedan",
+    "coupe"
+   ],
+   "priorities": [
+    "trust",
+    "quality",
+    "value"
+   ],
+   "temper": [
+    0.3,
+    0.6
+   ],
+   "patience": [
+    8,
+    16
+   ]
+  },
+  {
+   "id": "banker",
+   "weight": 9,
+   "age": [
+    40,
+    68
+   ],
+   "standing": [
+    70,
+    95
+   ],
+   "budget": {
+    "body_only": [
+     900,
+     1800
+    ],
+    "bought": [
+     2600,
+     5200
+    ],
+    "built": [
+     3200,
+     7000
+    ]
+   },
+   "orderTypes": {
+    "body_only": 4,
+    "bought": 4,
+    "built": 2
+   },
+   "bodies": [
+    "sedan",
+    "limousine",
+    "town_car"
+   ],
+   "priorities": [
+    "style",
+    "quality",
+    "trust"
+   ],
+   "temper": [
+    0.5,
+    0.9
+   ],
+   "patience": [
+    6,
+    12
+   ]
+  },
+  {
+   "id": "farmer",
+   "weight": 18,
+   "age": [
+    30,
+    66
+   ],
+   "standing": [
+    25,
+    55
+   ],
+   "budget": {
+    "body_only": [
+     250,
+     520
+    ],
+    "bought": [
+     900,
+     1500
+    ],
+    "built": [
+     1100,
+     1800
+    ]
+   },
+   "orderTypes": {
+    "body_only": 6,
+    "bought": 3,
+    "built": 1
+   },
+   "bodies": [
+    "pickup",
+    "sedan",
+    "delivery"
+   ],
+   "priorities": [
+    "value",
+    "trust",
+    "quality"
+   ],
+   "temper": [
+    0.2,
+    0.5
+   ],
+   "patience": [
+    10,
+    25
+   ]
+  },
+  {
+   "id": "heir",
+   "weight": 6,
+   "age": [
+    21,
+    34
+   ],
+   "standing": [
+    55,
+    90
+   ],
+   "budget": {
+    "body_only": [
+     800,
+     1600
+    ],
+    "bought": [
+     2200,
+     4800
+    ],
+    "built": [
+     2800,
+     6500
+    ]
+   },
+   "orderTypes": {
+    "body_only": 2,
+    "bought": 4,
+    "built": 4
+   },
+   "bodies": [
+    "roadster",
+    "coupe",
+    "cabriolet"
+   ],
+   "priorities": [
+    "style",
+    "performance",
+    "quality"
+   ],
+   "temper": [
+    0.5,
+    0.9
+   ],
+   "patience": [
+    4,
+    9
+   ]
+  },
+  {
+   "id": "racer",
+   "weight": 5,
+   "age": [
+    22,
+    40
+   ],
+   "standing": [
+    30,
+    65
+   ],
+   "budget": {
+    "body_only": [
+     300,
+     700
+    ],
+    "bought": [
+     1200,
+     2400
+    ],
+    "built": [
+     1500,
+     3200
+    ]
+   },
+   "orderTypes": {
+    "body_only": 2,
+    "bought": 3,
+    "built": 5
+   },
+   "bodies": [
+    "roadster"
+   ],
+   "priorities": [
+    "performance",
+    "value",
+    "trust"
+   ],
+   "temper": [
+    0.4,
+    0.8
+   ],
+   "patience": [
+    5,
+    12
+   ]
+  },
+  {
+   "id": "shopkeeper",
+   "weight": 20,
+   "age": [
+    28,
+    62
+   ],
+   "standing": [
+    30,
+    60
+   ],
+   "budget": {
+    "body_only": [
+     220,
+     480
+    ],
+    "bought": [
+     850,
+     1400
+    ],
+    "built": [
+     1000,
+     1700
+    ]
+   },
+   "orderTypes": {
+    "body_only": 6,
+    "bought": 3,
+    "built": 1
+   },
+   "bodies": [
+    "delivery",
+    "pickup"
+   ],
+   "priorities": [
+    "value",
+    "trust",
+    "quality"
+   ],
+   "temper": [
+    0.3,
+    0.6
+   ],
+   "patience": [
+    8,
+    20
+   ]
+  },
+  {
+   "id": "lawyer",
+   "weight": 10,
+   "age": [
+    32,
+    64
+   ],
+   "standing": [
+    55,
+    85
+   ],
+   "budget": {
+    "body_only": [
+     650,
+     1200
+    ],
+    "bought": [
+     1800,
+     3400
+    ],
+    "built": [
+     2200,
+     4200
+    ]
+   },
+   "orderTypes": {
+    "body_only": 4,
+    "bought": 5,
+    "built": 1
+   },
+   "bodies": [
+    "sedan",
+    "coupe",
+    "cabriolet"
+   ],
+   "priorities": [
+    "quality",
+    "style",
+    "trust"
+   ],
+   "temper": [
+    0.5,
+    0.8
+   ],
+   "patience": [
+    6,
+    14
+   ]
+  },
+  {
+   "id": "cinema",
+   "weight": 4,
+   "age": [
+    30,
+    58
+   ],
+   "standing": [
+    45,
+    80
+   ],
+   "budget": {
+    "body_only": [
+     700,
+     1400
+    ],
+    "bought": [
+     2000,
+     4000
+    ],
+    "built": [
+     2400,
+     5000
+    ]
+   },
+   "orderTypes": {
+    "body_only": 3,
+    "bought": 5,
+    "built": 2
+   },
+   "bodies": [
+    "cabriolet",
+    "town_car",
+    "roadster"
+   ],
+   "priorities": [
+    "style",
+    "performance",
+    "value"
+   ],
+   "temper": [
+    0.4,
+    0.8
+   ],
+   "patience": [
+    5,
+    11
+   ]
+  }
+ ],
+ "mustHaves": [
+  "closed_roof",
+  "folding_top",
+  "dark_colour",
+  "two_tone",
+  "four_seats",
+  "big_boot",
+  "high_clearance",
+  "quiet",
+  "fast",
+  "sidemount_spare"
+ ],
+ "rates": {
+  "note": "inquiries per week; raised about 10% when weather began keeping callers at home, so that a year brings as many as before",
+  "adClassified": 0.38,
+  "adEighth": 0.87,
+  "adQuarter": 1.42,
+  "walkInPerAwareness": 0.0046,
+  "phoneBonus": 1.4
+ },
+ "adCost": {
+  "note": "per week; not found in period sources",
+  "classified": 0.5,
+  "eighth": 4,
+  "quarter": 8
+ },
+ "mailDays": 3,
+ "depositRate": [
+  0.25,
+  0.5
+ ],
+ "maxRounds": 2,
+ "satisfaction": {
+  "spec": 30,
+  "quality": 25,
+  "performance": 15,
+  "delivery": 15,
+  "value": 15,
+  "qualityMid": 42
+ },
+ "breakdownPerDayPerDefect": 0.004,
+ "warrantyDays": 365,
+ "pleasedAt": 50,
+ "reputationPull": 1.5,
+ "maxConsults": 2
+}

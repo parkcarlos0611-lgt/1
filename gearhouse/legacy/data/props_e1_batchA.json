@@ -1,0 +1,1007 @@
+[
+ {
+  "id": "hl_drum9_nickel",
+  "cat": "headlamp",
+  "slot": "headlamp",
+  "name": "DRUM 9IN NICKEL FLUTED",
+  "years": [
+   1928,
+   1931
+  ],
+  "tags": [
+   "economy"
+  ]
+ },
+ {
+  "id": "hl_drum9_chrome",
+  "cat": "headlamp",
+  "slot": "headlamp",
+  "name": "DRUM 9IN CHROME",
+  "years": [
+   1930,
+   1933
+  ],
+  "tags": [
+   "economy"
+  ]
+ },
+ {
+  "id": "hl_drum10_prism",
+  "cat": "headlamp",
+  "slot": "headlamp",
+  "name": "DRUM 10IN PRISM",
+  "years": [
+   1930,
+   1934
+  ],
+  "tags": [
+   "luxury"
+  ]
+ },
+ {
+  "id": "hl_bullet8_tilt",
+  "cat": "headlamp",
+  "slot": "headlamp",
+  "name": "BULLET 8IN TILT-RAY",
+  "years": [
+   1932,
+   1935
+  ],
+  "tags": [
+   "sport"
+  ]
+ },
+ {
+  "id": "hl_bullet10_body",
+  "cat": "headlamp",
+  "slot": "headlamp",
+  "name": "BULLET 10IN BODY SHELL",
+  "years": [
+   1934,
+   1936
+  ],
+  "tags": [
+   "family"
+  ]
+ },
+ {
+  "id": "hl_tear_chrome",
+  "cat": "headlamp",
+  "slot": "headlamp",
+  "name": "TEARDROP CHROME",
+  "years": [
+   1933,
+   1936
+  ],
+  "tags": [
+   "streamline"
+  ]
+ },
+ {
+  "id": "hl_tear_body",
+  "cat": "headlamp",
+  "slot": "headlamp",
+  "name": "TEARDROP BODY COLOUR",
+  "years": [
+   1935,
+   1937
+  ],
+  "tags": [
+   "family"
+  ]
+ },
+ {
+  "id": "hl_pod_round",
+  "cat": "headlamp",
+  "slot": "headlamp",
+  "name": "FENDER POD ROUND",
+  "years": [
+   1935,
+   1938
+  ],
+  "tags": [
+   "family",
+   "streamline"
+  ]
+ },
+ {
+  "id": "hl_flush_oval",
+  "cat": "headlamp",
+  "slot": "headlamp",
+  "name": "FENDER-FLUSH OVAL",
+  "years": [
+   1937,
+   1939
+  ],
+  "tags": [
+   "streamline"
+  ]
+ },
+ {
+  "id": "hl_tourer12",
+  "cat": "headlamp",
+  "slot": "headlamp",
+  "name": "TOURER 12IN WITH VISOR",
+  "years": [
+   1928,
+   1933
+  ],
+  "tags": [
+   "luxury",
+   "sport"
+  ]
+ },
+ {
+  "id": "hl_hidden",
+  "cat": "headlamp",
+  "slot": "headlamp",
+  "name": "HIDDEN CRANK-UP (CLOSED)",
+  "years": [
+   1936,
+   1937
+  ],
+  "tags": [
+   "streamline"
+  ]
+ },
+ {
+  "id": "hl_nose_flush",
+  "cat": "headlamp",
+  "slot": "headlamp",
+  "name": "NOSE-FLUSH ROUND",
+  "years": [
+   1934,
+   1937
+  ],
+  "tags": [
+   "streamline"
+  ]
+ },
+ {
+  "id": "hl_twin_park",
+  "cat": "headlamp",
+  "slot": "headlamp",
+  "name": "LAMP + PARKING LAMP",
+  "years": [
+   1934,
+   1936
+  ],
+  "tags": [
+   "family",
+   "luxury"
+  ]
+ },
+ {
+  "id": "hl_triple",
+  "cat": "headlamp",
+  "slot": "headlamp",
+  "name": "TRIPLE CLUSTER",
+  "years": [
+   1935,
+   1937
+  ],
+  "tags": [
+   "luxury"
+  ]
+ },
+ {
+  "id": "ax_fog_clear",
+  "cat": "auxlamp",
+  "slot": "auxlamp",
+  "name": "FOG LAMP CLEAR 6IN",
+  "years": [
+   1930,
+   1939
+  ],
+  "tags": [
+   "accessory"
+  ]
+ },
+ {
+  "id": "ax_fog_amber",
+  "cat": "auxlamp",
+  "slot": "auxlamp",
+  "name": "FOG LAMP AMBER 6IN",
+  "years": [
+   1930,
+   1939
+  ],
+  "tags": [
+   "accessory"
+  ]
+ },
+ {
+  "id": "ax_driving",
+  "cat": "auxlamp",
+  "slot": "auxlamp",
+  "name": "DRIVING LAMP 7IN",
+  "years": [
+   1930,
+   1939
+  ],
+  "tags": [
+   "accessory"
+  ]
+ },
+ {
+  "id": "ax_spot",
+  "cat": "auxlamp",
+  "slot": "auxlamp",
+  "name": "SPOTLIGHT (PILLAR)",
+  "years": [
+   1930,
+   1939
+  ],
+  "tags": [
+   "accessory"
+  ]
+ },
+ {
+  "id": "ax_twin_fog",
+  "cat": "auxlamp",
+  "slot": "auxlamp",
+  "name": "TWIN FOG BAR",
+  "years": [
+   1930,
+   1939
+  ],
+  "tags": [
+   "accessory"
+  ]
+ },
+ {
+  "id": "ax_cowl",
+  "cat": "auxlamp",
+  "slot": "auxlamp",
+  "name": "COWL LAMP",
+  "years": [
+   1930,
+   1939
+  ],
+  "tags": [
+   "accessory"
+  ]
+ },
+ {
+  "id": "ax_park_bullet",
+  "cat": "auxlamp",
+  "slot": "auxlamp",
+  "name": "PARKING BULLET",
+  "years": [
+   1930,
+   1939
+  ],
+  "tags": [
+   "accessory"
+  ]
+ },
+ {
+  "id": "ax_guard_fog",
+  "cat": "auxlamp",
+  "slot": "auxlamp",
+  "name": "FOG WITH STONE GUARD",
+  "years": [
+   1930,
+   1939
+  ],
+  "tags": [
+   "accessory"
+  ]
+ },
+ {
+  "id": "tl_round_single",
+  "cat": "taillamp",
+  "slot": "taillamp",
+  "name": "ROUND SINGLE",
+  "years": [
+   1930,
+   1939
+  ],
+  "tags": []
+ },
+ {
+  "id": "tl_round_stop",
+  "cat": "taillamp",
+  "slot": "taillamp",
+  "name": "ROUND STOP/TAIL",
+  "years": [
+   1930,
+   1939
+  ],
+  "tags": []
+ },
+ {
+  "id": "tl_tear_chrome",
+  "cat": "taillamp",
+  "slot": "taillamp",
+  "name": "TEARDROP CHROME",
+  "years": [
+   1930,
+   1939
+  ],
+  "tags": []
+ },
+ {
+  "id": "tl_tear_body",
+  "cat": "taillamp",
+  "slot": "taillamp",
+  "name": "TEARDROP BODY",
+  "years": [
+   1930,
+   1939
+  ],
+  "tags": []
+ },
+ {
+  "id": "tl_heart",
+  "cat": "taillamp",
+  "slot": "taillamp",
+  "name": "HEART",
+  "years": [
+   1930,
+   1939
+  ],
+  "tags": []
+ },
+ {
+  "id": "tl_oval_fender",
+  "cat": "taillamp",
+  "slot": "taillamp",
+  "name": "OVAL FENDER",
+  "years": [
+   1930,
+   1939
+  ],
+  "tags": []
+ },
+ {
+  "id": "tl_plate_combo",
+  "cat": "taillamp",
+  "slot": "taillamp",
+  "name": "PLATE COMBO RECT",
+  "years": [
+   1930,
+   1939
+  ],
+  "tags": []
+ },
+ {
+  "id": "tl_vertical",
+  "cat": "taillamp",
+  "slot": "taillamp",
+  "name": "VERTICAL BULLET",
+  "years": [
+   1930,
+   1939
+  ],
+  "tags": []
+ },
+ {
+  "id": "tl_beehive",
+  "cat": "taillamp",
+  "slot": "taillamp",
+  "name": "BEEHIVE RIBBED",
+  "years": [
+   1930,
+   1939
+  ],
+  "tags": []
+ },
+ {
+  "id": "tl_double_bar",
+  "cat": "taillamp",
+  "slot": "taillamp",
+  "name": "DOUBLE ON BAR",
+  "years": [
+   1930,
+   1939
+  ],
+  "tags": []
+ },
+ {
+  "id": "tl_flush_vert",
+  "cat": "taillamp",
+  "slot": "taillamp",
+  "name": "FENDER FLUSH VERTICAL",
+  "years": [
+   1930,
+   1939
+  ],
+  "tags": []
+ },
+ {
+  "id": "tl_torpedo",
+  "cat": "taillamp",
+  "slot": "taillamp",
+  "name": "STREAMLINE TORPEDO",
+  "years": [
+   1930,
+   1939
+  ],
+  "tags": []
+ },
+ {
+  "id": "gr_flat_honey",
+  "cat": "grille",
+  "slot": "grille",
+  "name": "FLAT SHELL HONEYCOMB",
+  "years": [
+   1928,
+   1931
+  ],
+  "tags": []
+ },
+ {
+  "id": "gr_dip_vfine",
+  "cat": "grille",
+  "slot": "grille",
+  "name": "DIP SHELL FINE BARS",
+  "years": [
+   1930,
+   1931
+  ],
+  "tags": []
+ },
+ {
+  "id": "gr_tall_mesh",
+  "cat": "grille",
+  "slot": "grille",
+  "name": "TALL SHELL STONE MESH",
+  "years": [
+   1928,
+   1933
+  ],
+  "tags": []
+ },
+ {
+  "id": "gr_vee_slat",
+  "cat": "grille",
+  "slot": "grille",
+  "name": "V SHELL SLATS",
+  "years": [
+   1932,
+   1934
+  ],
+  "tags": []
+ },
+ {
+  "id": "gr_vee_shutter",
+  "cat": "grille",
+  "slot": "grille",
+  "name": "V SHELL SHUTTERS",
+  "years": [
+   1930,
+   1933
+  ],
+  "tags": []
+ },
+ {
+  "id": "gr_heart",
+  "cat": "grille",
+  "slot": "grille",
+  "name": "HEART",
+  "years": [
+   1933,
+   1935
+  ],
+  "tags": []
+ },
+ {
+  "id": "gr_shield_h",
+  "cat": "grille",
+  "slot": "grille",
+  "name": "SHIELD HORIZONTAL",
+  "years": [
+   1934,
+   1935
+  ],
+  "tags": []
+ },
+ {
+  "id": "gr_waterfall",
+  "cat": "grille",
+  "slot": "grille",
+  "name": "WATERFALL",
+  "years": [
+   1934,
+   1937
+  ],
+  "tags": []
+ },
+ {
+  "id": "gr_prow_h",
+  "cat": "grille",
+  "slot": "grille",
+  "name": "PROW V HORIZONTAL",
+  "years": [
+   1936,
+   1938
+  ],
+  "tags": []
+ },
+ {
+  "id": "gr_harp",
+  "cat": "grille",
+  "slot": "grille",
+  "name": "WIDE HARP",
+  "years": [
+   1935,
+   1936
+  ],
+  "tags": []
+ },
+ {
+  "id": "gr_egg_rect",
+  "cat": "grille",
+  "slot": "grille",
+  "name": "EGG-CRATE RECT",
+  "years": [
+   1937,
+   1937
+  ],
+  "tags": []
+ },
+ {
+  "id": "gr_split_twin",
+  "cat": "grille",
+  "slot": "grille",
+  "name": "SPLIT TWIN SIDE",
+  "years": [
+   1938,
+   1939
+  ],
+  "tags": []
+ },
+ {
+  "id": "gr_louvre_wrap",
+  "cat": "grille",
+  "slot": "grille",
+  "name": "LOUVRE WRAP NOSE",
+  "years": [
+   1936,
+   1937
+  ],
+  "tags": []
+ },
+ {
+  "id": "gr_gothic",
+  "cat": "grille",
+  "slot": "grille",
+  "name": "GOTHIC ARCH",
+  "years": [
+   1934,
+   1936
+  ],
+  "tags": []
+ },
+ {
+  "id": "gr_oval_mesh",
+  "cat": "grille",
+  "slot": "grille",
+  "name": "WIDE OVAL MESH",
+  "years": [
+   1938,
+   1939
+  ],
+  "tags": []
+ },
+ {
+  "id": "gr_flat_hbar",
+  "cat": "grille",
+  "slot": "grille",
+  "name": "FLAT HORIZONTAL BARS",
+  "years": [
+   1936,
+   1937
+  ],
+  "tags": []
+ },
+ {
+  "id": "ms_cap",
+  "cat": "mascot",
+  "slot": "mascot",
+  "name": "CAP",
+  "years": [
+   1928,
+   1939
+  ],
+  "tags": [
+   "decor"
+  ]
+ },
+ {
+  "id": "ms_motometer",
+  "cat": "mascot",
+  "slot": "mascot",
+  "name": "MOTOMETER",
+  "years": [
+   1928,
+   1939
+  ],
+  "tags": [
+   "decor"
+  ]
+ },
+ {
+  "id": "ms_wingcap",
+  "cat": "mascot",
+  "slot": "mascot",
+  "name": "WINGCAP",
+  "years": [
+   1928,
+   1939
+  ],
+  "tags": [
+   "decor"
+  ]
+ },
+ {
+  "id": "ms_eagle",
+  "cat": "mascot",
+  "slot": "mascot",
+  "name": "EAGLE",
+  "years": [
+   1928,
+   1939
+  ],
+  "tags": [
+   "decor"
+  ]
+ },
+ {
+  "id": "ms_arrow",
+  "cat": "mascot",
+  "slot": "mascot",
+  "name": "ARROW",
+  "years": [
+   1928,
+   1939
+  ],
+  "tags": [
+   "decor"
+  ]
+ },
+ {
+  "id": "ms_swan",
+  "cat": "mascot",
+  "slot": "mascot",
+  "name": "SWAN",
+  "years": [
+   1928,
+   1939
+  ],
+  "tags": [
+   "decor"
+  ]
+ },
+ {
+  "id": "ms_hound",
+  "cat": "mascot",
+  "slot": "mascot",
+  "name": "HOUND",
+  "years": [
+   1928,
+   1939
+  ],
+  "tags": [
+   "decor"
+  ]
+ },
+ {
+  "id": "ms_rocket",
+  "cat": "mascot",
+  "slot": "mascot",
+  "name": "ROCKET",
+  "years": [
+   1928,
+   1939
+  ],
+  "tags": [
+   "decor"
+  ]
+ },
+ {
+  "id": "ms_propeller",
+  "cat": "mascot",
+  "slot": "mascot",
+  "name": "PROPELLER",
+  "years": [
+   1928,
+   1939
+  ],
+  "tags": [
+   "decor"
+  ]
+ },
+ {
+  "id": "ms_figure",
+  "cat": "mascot",
+  "slot": "mascot",
+  "name": "FIGURE",
+  "years": [
+   1928,
+   1939
+  ],
+  "tags": [
+   "decor"
+  ]
+ },
+ {
+  "id": "bp_twin",
+  "cat": "bumper",
+  "slot": "bumper",
+  "name": "TWIN BAR + CLAMPS",
+  "years": [
+   1928,
+   1939
+  ],
+  "tags": []
+ },
+ {
+  "id": "bp_triple",
+  "cat": "bumper",
+  "slot": "bumper",
+  "name": "TRIPLE BAR",
+  "years": [
+   1928,
+   1939
+  ],
+  "tags": []
+ },
+ {
+  "id": "bp_heavy_dip",
+  "cat": "bumper",
+  "slot": "bumper",
+  "name": "HEAVY CENTRE DIP",
+  "years": [
+   1928,
+   1939
+  ],
+  "tags": []
+ },
+ {
+  "id": "bp_overriders",
+  "cat": "bumper",
+  "slot": "bumper",
+  "name": "SINGLE + OVERRIDERS",
+  "years": [
+   1928,
+   1939
+  ],
+  "tags": []
+ },
+ {
+  "id": "bp_blade",
+  "cat": "bumper",
+  "slot": "bumper",
+  "name": "CURVED BLADE",
+  "years": [
+   1928,
+   1939
+  ],
+  "tags": []
+ },
+ {
+  "id": "bp_split",
+  "cat": "bumper",
+  "slot": "bumper",
+  "name": "SPLIT + GUARD",
+  "years": [
+   1928,
+   1939
+  ],
+  "tags": []
+ },
+ {
+  "id": "bp_bumperettes",
+  "cat": "bumper",
+  "slot": "bumper",
+  "name": "REAR BUMPERETTES",
+  "years": [
+   1928,
+   1939
+  ],
+  "tags": []
+ },
+ {
+  "id": "bp_tube",
+  "cat": "bumper",
+  "slot": "bumper",
+  "name": "TUBE BAR",
+  "years": [
+   1928,
+   1939
+  ],
+  "tags": []
+ },
+ {
+  "id": "bp_nerf",
+  "cat": "bumper",
+  "slot": "bumper",
+  "name": "SPORTS NERF",
+  "years": [
+   1928,
+   1939
+  ],
+  "tags": []
+ },
+ {
+  "id": "bp_channel",
+  "cat": "bumper",
+  "slot": "bumper",
+  "name": "COMMERCIAL CHANNEL",
+  "years": [
+   1928,
+   1939
+  ],
+  "tags": []
+ },
+ {
+  "id": "wh_wire32",
+  "cat": "wheel",
+  "slot": "wheel",
+  "name": "WIRE 32 4.75-19",
+  "years": [
+   1928,
+   1939
+  ],
+  "tags": [],
+  "tire": "4.75-19"
+ },
+ {
+  "id": "wh_wire40",
+  "cat": "wheel",
+  "slot": "wheel",
+  "name": "WIRE 40 5.25-18",
+  "years": [
+   1928,
+   1939
+  ],
+  "tags": [],
+  "tire": "5.25-18"
+ },
+ {
+  "id": "wh_wire48ww",
+  "cat": "wheel",
+  "slot": "wheel",
+  "name": "WIRE 48 WHITEWALL 6.50-20",
+  "years": [
+   1928,
+   1939
+  ],
+  "tags": [],
+  "tire": "6.50-20"
+ },
+ {
+  "id": "wh_art10",
+  "cat": "wheel",
+  "slot": "wheel",
+  "name": "WOOD ARTILLERY 10 4.75-19",
+  "years": [
+   1928,
+   1939
+  ],
+  "tags": [],
+  "tire": "4.75-19"
+ },
+ {
+  "id": "wh_art12",
+  "cat": "wheel",
+  "slot": "wheel",
+  "name": "WOOD ARTILLERY 12 5.50-17",
+  "years": [
+   1928,
+   1939
+  ],
+  "tags": [],
+  "tire": "5.50-17"
+ },
+ {
+  "id": "wh_disc",
+  "cat": "wheel",
+  "slot": "wheel",
+  "name": "STEEL DISC PLAIN 5.50-17",
+  "years": [
+   1928,
+   1939
+  ],
+  "tags": [],
+  "tire": "5.50-17"
+ },
+ {
+  "id": "wh_discperf",
+  "cat": "wheel",
+  "slot": "wheel",
+  "name": "STEEL DISC PERFORATED 6.00-16",
+  "years": [
+   1928,
+   1939
+  ],
+  "tags": [],
+  "tire": "6.00-16"
+ },
+ {
+  "id": "wh_steel_cap",
+  "cat": "wheel",
+  "slot": "wheel",
+  "name": "STEEL + SMALL CAP 6.00-16",
+  "years": [
+   1928,
+   1939
+  ],
+  "tags": [],
+  "tire": "6.00-16"
+ },
+ {
+  "id": "wh_fullcap",
+  "cat": "wheel",
+  "slot": "wheel",
+  "name": "FULL CHROME CAP 6.50-16",
+  "years": [
+   1928,
+   1939
+  ],
+  "tags": [],
+  "tire": "6.50-16"
+ },
+ {
+  "id": "wh_trimring",
+  "cat": "wheel",
+  "slot": "wheel",
+  "name": "STEEL + TRIM RING 6.00-16",
+  "years": [
+   1928,
+   1939
+  ],
+  "tags": [],
+  "tire": "6.00-16"
+ },
+ {
+  "id": "wh_cover",
+  "cat": "wheel",
+  "slot": "wheel",
+  "name": "FULL WHEEL COVER 7.00-16",
+  "years": [
+   1928,
+   1939
+  ],
+  "tags": [],
+  "tire": "7.00-16"
+ },
+ {
+  "id": "wh_steelspoke",
+  "cat": "wheel",
+  "slot": "wheel",
+  "name": "STEEL SPOKE 5.25-18",
+  "years": [
+   1928,
+   1939
+  ],
+  "tags": [],
+  "tire": "5.25-18"
+ },
+ {
+  "id": "wh_spinner",
+  "cat": "wheel",
+  "slot": "wheel",
+  "name": "KNOCK-OFF WIRE 5.50-18",
+  "years": [
+   1928,
+   1939
+  ],
+  "tags": [],
+  "tire": "5.50-18"
+ },
+ {
+  "id": "wh_truck",
+  "cat": "wheel",
+  "slot": "wheel",
+  "name": "TRUCK DEMOUNTABLE 6.00-20",
+  "years": [
+   1928,
+   1939
+  ],
+  "tags": [],
+  "tire": "6.00-20"
+ }
+]

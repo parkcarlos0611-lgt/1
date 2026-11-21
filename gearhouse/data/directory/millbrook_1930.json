@@ -1,0 +1,383 @@
+{
+ "about": "The Millbrook telephone directory, 1930 (review 47). A classified directory: trades in alphabetical order, each listing a name, an address and a number; display advertisements between. The page is printed in English as it was; the game shows a Korean gloss when the pointer rests on an entry. Entries with a supplier are the supply system's own (data/suppliers); the rest are the town. Long-distance firms are reached through the operator (dial 0).",
+ "title": [
+  "MILLBROOK",
+  "TELEPHONE",
+  "DIRECTORY"
+ ],
+ "year": 1930,
+ "myNumber": "3108",
+ "localCost": 0.05,
+ "longCost": 0.75,
+ "howTo": [
+  "TO CALL: LIFT THE RECEIVER,",
+  "WAIT FOR THE DIAL TONE, THEN",
+  "DIAL THE NUMBER WANTED.",
+  "FOR THE OPERATOR DIAL 0.",
+  "LONG DISTANCE: ASK OPERATOR."
+ ],
+ "trades": [
+  {
+   "id": "auto",
+   "en": "AUTOMOBILE SUPPLIES",
+   "ko": "자동차 부품 · 용품"
+  },
+  {
+   "id": "bank",
+   "en": "BANKS",
+   "ko": "은행"
+  },
+  {
+   "id": "cartage",
+   "en": "CARTAGE & TOWING",
+   "ko": "운송 · 견인"
+  },
+  {
+   "id": "coal",
+   "en": "COAL & ICE",
+   "ko": "석탄 · 얼음"
+  },
+  {
+   "id": "drug",
+   "en": "DRUGGISTS",
+   "ko": "약국"
+  },
+  {
+   "id": "garage",
+   "en": "GARAGES",
+   "ko": "정비소 (경쟁 업소)"
+  },
+  {
+   "id": "glass",
+   "en": "GLASS",
+   "ko": "유리"
+  },
+  {
+   "id": "grocer",
+   "en": "GROCERS",
+   "ko": "식료품점"
+  },
+  {
+   "id": "hardware",
+   "en": "HARDWARE",
+   "ko": "철물"
+  },
+  {
+   "id": "news",
+   "en": "NEWSPAPERS",
+   "ko": "신문사"
+  },
+  {
+   "id": "paint",
+   "en": "PAINT & VARNISH",
+   "ko": "도료 · 니스"
+  },
+  {
+   "id": "doctor",
+   "en": "PHYSICIANS",
+   "ko": "의사"
+  },
+  {
+   "id": "rail",
+   "en": "RAILROADS",
+   "ko": "철도"
+  },
+  {
+   "id": "steel",
+   "en": "STEEL & SHEET METAL",
+   "ko": "강판 · 강재"
+  },
+  {
+   "id": "wire",
+   "en": "TELEGRAPH",
+   "ko": "전보"
+  },
+  {
+   "id": "tire",
+   "en": "TIRES",
+   "ko": "타이어"
+  }
+ ],
+ "entries": [
+  {
+   "id": "tri_county",
+   "trade": "auto",
+   "name": "TRI-COUNTY AUTO SUPPLY",
+   "ko": "트라이카운티 자동차 용품 (도매)",
+   "addr": "RIVER RD. - WHOLESALE",
+   "no": "4021",
+   "supplier": "tri_county_supply",
+   "hello": "트라이카운티 자동차 용품입니다. 어떤 물건을 찾으십니까?"
+  },
+  {
+   "id": "oneil",
+   "trade": "auto",
+   "name": "O'NEIL WRECKING",
+   "ko": "오닐 폐차장 (중고 부품)",
+   "addr": "NORTH TOWN LINE",
+   "no": "4466",
+   "hello": "오닐이오. 뭐든 있을 수도 있고 없을 수도 있소. 직접 와서 보시오."
+  },
+  {
+   "id": "savings",
+   "trade": "bank",
+   "name": "MILLBROOK SAVINGS BANK",
+   "ko": "밀브룩 저축은행",
+   "addr": "1 MAIN ST.",
+   "no": "1001",
+   "hello": "밀브룩 저축은행입니다. 대출 상담은 창구로 오셔야 합니다."
+  },
+  {
+   "id": "lansing",
+   "trade": "cartage",
+   "name": "LANSING CARTAGE CO.",
+   "ko": "랜싱 운송 (견인 · 평판 트럭)",
+   "addr": "DEPOT ST. - DAY & NIGHT",
+   "no": "2290",
+   "hello": "랜싱 운송입니다. 견인이 필요하면 언제든 부르십시오."
+  },
+  {
+   "id": "crystal_ice",
+   "trade": "coal",
+   "name": "CRYSTAL ICE & COAL",
+   "ko": "크리스털 얼음 · 석탄",
+   "addr": "MILL RACE",
+   "no": "2205",
+   "hello": "크리스털 얼음·석탄입니다. 석탄은 화요일마다 돕니다."
+  },
+  {
+   "id": "pharmacy",
+   "trade": "drug",
+   "name": "MILLBROOK PHARMACY",
+   "ko": "밀브룩 약국 (커피도 팖)",
+   "addr": "STATION SQ.",
+   "no": "1650",
+   "hello": "밀브룩 약국입니다. 말씀하세요.",
+   "grocer": [
+    {
+     "item": "coffee",
+     "ko": "커피 1파운드",
+     "price": 0.36
+    }
+   ]
+  },
+  {
+   "id": "boyle_garage",
+   "trade": "garage",
+   "name": "BOYLE'S GARAGE",
+   "ko": "보일 정비소 (경쟁 업소)",
+   "addr": "4 ELM ST.",
+   "no": "3377",
+   "hello": "보일 정비소요. ...아, 그쪽이 새로 연 집이로군. 손님 뺏어 가진 마시오."
+  },
+  {
+   "id": "dunmore",
+   "trade": "glass",
+   "name": "DUNMORE GLASS & MIRROR",
+   "ko": "던모어 유리 · 거울 (전화 없음, 편지로)",
+   "addr": "12 CANAL ST. - NO TELEPHONE",
+   "no": ""
+  },
+  {
+   "id": "harris",
+   "trade": "grocer",
+   "name": "HARRIS GROCERY",
+   "ko": "해리스 식료품점 (차 · 커피 · 설탕)",
+   "addr": "14 MAIN ST. - WE DELIVER",
+   "no": "2417",
+   "hello": "네, 해리스 식료품입니다. 무엇을 보내 드릴까요?",
+   "grocer": [
+    {
+     "item": "tea",
+     "ko": "홍차 반 파운드",
+     "price": 0.32
+    },
+    {
+     "item": "coffee",
+     "ko": "커피 1파운드",
+     "price": 0.38
+    }
+   ]
+  },
+  {
+   "id": "kessler",
+   "trade": "hardware",
+   "name": "KESSLER HARDWARE",
+   "ko": "케슬러 철물 (강재 · 부속 · 도료)",
+   "addr": "22 SECOND ST.",
+   "no": "3375",
+   "supplier": "kessler_hardware",
+   "hello": "케슬러 철물점이오. 뭐가 필요하시오?"
+  },
+  {
+   "id": "courier",
+   "trade": "news",
+   "name": "MILLBROOK COURIER",
+   "ko": "밀브룩 쿠리어 (신문, 광고 접수)",
+   "addr": "PRINTING HOUSE, MAIN ST.",
+   "no": "1102",
+   "hello": "쿠리어 신문 광고부입니다. 광고는 한 줄에 50센트, 다음 주 판부터 실립니다."
+  },
+  {
+   "id": "lakeshore",
+   "trade": "paint",
+   "name": "LAKESHORE PAINT & VARNISH",
+   "ko": "레이크쇼어 도료 (래커 · 에나멜, 장거리)",
+   "addr": "TOLEDO, OHIO - LONG DIST.",
+   "no": "",
+   "long": true,
+   "supplier": "lakeshore_paint",
+   "hello": "레이크쇼어 도료, 털리도입니다. 카탈로그 가격으로 말씀드리지요."
+  },
+  {
+   "id": "dr_avery",
+   "trade": "doctor",
+   "name": "J. AVERY, M.D.",
+   "ko": "에이버리 의원",
+   "addr": "OFFICE 9-12, 2-5",
+   "no": "1219",
+   "hello": "에이버리 의원입니다. 선생님은 왕진 중이십니다."
+  },
+  {
+   "id": "depot",
+   "trade": "rail",
+   "name": "NEW YORK CENTRAL DEPOT",
+   "ko": "뉴욕 센트럴 철도 역 (화물)",
+   "addr": "STATION SQ. - FREIGHT",
+   "no": "1300",
+   "hello": "역 화물 창구입니다. 화물은 도착하면 엽서로 알려 드립니다."
+  },
+  {
+   "id": "hoosier",
+   "trade": "steel",
+   "name": "HOOSIER SHEET & STEEL",
+   "ko": "후지어 강판 (차체 · 섀시 강재, 장거리)",
+   "addr": "GARY, IND. - LONG DIST.",
+   "no": "",
+   "long": true,
+   "supplier": "hoosier_steel",
+   "hello": "후지어 강판입니다. 판재든 형강이든 말씀하십시오."
+  },
+  {
+   "id": "western_union",
+   "trade": "wire",
+   "name": "WESTERN UNION",
+   "ko": "웨스턴 유니언 (전보)",
+   "addr": "STATION SQ.",
+   "no": "1500",
+   "hello": "웨스턴 유니언입니다. 전보는 한 단어에 2센트입니다."
+  },
+  {
+   "id": "main_tire",
+   "trade": "tire",
+   "name": "MAIN STREET TIRE CO.",
+   "ko": "메인 가 타이어 (바퀴 · 타이어)",
+   "addr": "30 MAIN ST.",
+   "no": "2620",
+   "supplier": "main_street_tire",
+   "hello": "메인 가 타이어입니다. 몇 인치짜리를 찾으십니까?"
+  }
+ ],
+ "longDistance": [
+  {
+   "id": "great_lakes",
+   "name": "GREAT LAKES AXLE & GEAR",
+   "ko": "그레이트 레이크스 차축 · 기어 (디트로이트)",
+   "addr": "DETROIT, MICH.",
+   "supplier": "great_lakes_axle",
+   "hello": "그레이트 레이크스, 디트로이트입니다.",
+   "short": "차축 · 기어"
+  },
+  {
+   "id": "marlowe",
+   "name": "MARLOWE MOTOR WORKS",
+   "ko": "말로 모터 웍스 (엔진, 클리블랜드)",
+   "addr": "CLEVELAND, OHIO",
+   "supplier": "marlowe_motor",
+   "hello": "말로 모터 웍스입니다. 엔진 말씀이십니까?",
+   "short": "엔진 상사"
+  },
+  {
+   "id": "standard_chassis",
+   "name": "STANDARD CHASSIS CORP.",
+   "ko": "스탠더드 섀시 (완성 섀시)",
+   "addr": "FLINT, MICH.",
+   "supplier": "standard_chassis",
+   "hello": "스탠더드 섀시입니다.",
+   "short": "섀시 회사"
+  },
+  {
+   "id": "ohio_lamp",
+   "name": "OHIO LAMP & FITTINGS",
+   "ko": "오하이오 램프 · 부속",
+   "addr": "DAYTON, OHIO",
+   "supplier": "ohio_lamp",
+   "hello": "오하이오 램프입니다.",
+   "short": "램프 · 부속"
+  }
+ ],
+ "ads": [
+  {
+   "after": "auto",
+   "head": [
+    "TRI-COUNTY"
+   ],
+   "lines": [
+    "PARTS FOR EVERY CAR",
+    "PROMPT SHIPMENT"
+   ],
+   "phone": "4021",
+   "ko": "트라이카운티 광고: 어떤 차 부품이든, 빠른 발송"
+  },
+  {
+   "after": "grocer",
+   "head": [
+    "HARRIS"
+   ],
+   "lines": [
+    "FINE TEAS & COFFEES",
+    "FREE DELIVERY"
+   ],
+   "phone": "2417",
+   "ko": "해리스 광고: 좋은 차와 커피, 무료 배달"
+  },
+  {
+   "after": "paint",
+   "head": [
+    "LACQUER"
+   ],
+   "lines": [
+    "DRIES IN AN HOUR",
+    "LAKESHORE - TOLEDO"
+   ],
+   "phone": "",
+   "ko": "레이크쇼어 래커 광고: 한 시간이면 마름"
+  },
+  {
+   "after": "tire",
+   "head": [
+    "TIRES!"
+   ],
+   "lines": [
+    "ALL SIZES IN STOCK",
+    "MAIN STREET TIRE"
+   ],
+   "phone": "2620",
+   "ko": "메인 가 타이어 광고: 모든 크기 재고"
+  }
+ ],
+ "parts": {
+  "chassis_steel_set": "섀시 강재 한 벌",
+  "fittings_set": "부속 한 벌",
+  "paint_set": "도료 한 벌",
+  "wheels_tyres_set": "바퀴 · 타이어 한 벌",
+  "glass_set": "유리 한 벌",
+  "ash_frame_set": "물푸레 골조 한 벌",
+  "body_steel_set": "차체 강판 한 벌",
+  "trim_set": "내장 한 벌",
+  "axles_set": "차축 한 벌",
+  "gearbox": "변속기",
+  "engine": "엔진",
+  "rolling_chassis": "완성 섀시"
+ }
+}

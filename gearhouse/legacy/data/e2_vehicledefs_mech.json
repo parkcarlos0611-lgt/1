@@ -1,0 +1,252 @@
+[
+ {
+  "id": "e2_mil_4x4",
+  "wheels": [
+   {
+    "x": 505,
+    "drive": true,
+    "steer": true,
+    "dual": false
+   },
+   {
+    "x": 2536,
+    "drive": true,
+    "steer": false,
+    "dual": false
+   }
+  ],
+  "track": 1245,
+  "tire": "6.00-16",
+  "frameGeom": {
+   "type": "ladder",
+   "line": [
+    [
+     40,
+     440
+    ],
+    [
+     260,
+     390
+    ],
+    [
+     3240,
+     390
+    ]
+   ],
+   "depth": 95,
+   "width": 760,
+   "cross": [
+    120,
+    920,
+    1500,
+    2050,
+    3200
+   ]
+  },
+  "engineAt": {
+   "x": 400,
+   "z": 560
+  },
+  "layout": "F4",
+  "frame": "ladder_channel",
+  "engine": {
+   "type": "L-head I4",
+   "cid": 134.2,
+   "bore": 79.4,
+   "stroke": 111.1,
+   "hp": 60,
+   "rpm": 4000,
+   "torqueNm": 142
+  },
+  "gearbox": {
+   "type": "manual",
+   "speeds": 3,
+   "ratios": [
+    2.665,
+    1.564,
+    1
+   ],
+   "rev": 3.554
+  },
+  "transfer": {
+   "ranges": 2,
+   "ratios": [
+    1,
+    1.97
+   ]
+  },
+  "finalDrive": 4.88,
+  "massKg": 1040,
+  "tyre": "6.00-16"
+ },
+ {
+  "id": "e2_mil_6x6",
+  "wheels": [
+   {
+    "x": 588,
+    "drive": true,
+    "steer": true,
+    "dual": false
+   },
+   {
+    "x": 4150,
+    "drive": true,
+    "steer": false,
+    "dual": true
+   },
+   {
+    "x": 5358,
+    "drive": true,
+    "steer": false,
+    "dual": true
+   }
+  ],
+  "track": 1590,
+  "tire": "7.50-20",
+  "frameGeom": {
+   "type": "ladder",
+   "line": [
+    [
+     30,
+     860
+    ],
+    [
+     6360,
+     860
+    ]
+   ],
+   "depth": 170,
+   "width": 860,
+   "taper": 1,
+   "cross": [
+    150,
+    1300,
+    2600,
+    3500,
+    4754,
+    6300
+   ]
+  },
+  "engineAt": {
+   "x": 470,
+   "z": 820
+  },
+  "layout": "F6",
+  "frame": "ladder_channel_heavy",
+  "engine": {
+   "type": "OHV I6",
+   "cid": 269.5,
+   "bore": 96,
+   "stroke": 101.6,
+   "hp": 91.5,
+   "rpm": 2750,
+   "torqueNm": 293
+  },
+  "gearbox": {
+   "type": "manual",
+   "speeds": 5,
+   "ratios": [
+    6.06,
+    3.5,
+    1.8,
+    1,
+    0.79
+   ],
+   "rev": 6
+  },
+  "transfer": {
+   "ranges": 2,
+   "ratios": [
+    1,
+    2.63
+   ]
+  },
+  "finalDrive": 6.6,
+  "rearSusp": "walking_beam_tandem",
+  "massKg": 4800,
+  "tyre": "7.50-20 dual"
+ },
+ {
+  "id": "e2_sedan42",
+  "wheels": [
+   {
+    "x": 788,
+    "drive": false,
+    "steer": true,
+    "dual": false
+   },
+   {
+    "x": 3685,
+    "drive": true,
+    "steer": false,
+    "dual": false
+   }
+  ],
+  "track": 1450,
+  "tire": "6.00-16",
+  "frameGeom": {
+   "type": "x_member",
+   "line": [
+    [
+     300,
+     520
+    ],
+    [
+     1100,
+     430
+    ],
+    [
+     3000,
+     430
+    ],
+    [
+     3350,
+     620
+    ],
+    [
+     4200,
+     620
+    ],
+    [
+     4600,
+     540
+    ]
+   ],
+   "depth": 110,
+   "width": 900,
+   "cross": [
+    330,
+    4500
+   ]
+  },
+  "engineAt": {
+   "x": 520,
+   "z": 560
+  },
+  "layout": "FR",
+  "frame": "ladder_x_member",
+  "engine": {
+   "type": "L-head V8",
+   "cid": 221,
+   "bore": 77.8,
+   "stroke": 95.25,
+   "hp": 90,
+   "rpm": 3800,
+   "torqueNm": 212
+  },
+  "gearbox": {
+   "type": "manual_column",
+   "speeds": 3,
+   "ratios": [
+    2.82,
+    1.6,
+    1
+   ],
+   "rev": 3.62
+  },
+  "drive": "torque_tube",
+  "finalDrive": 3.78,
+  "massKg": 1440,
+  "tyre": "6.00-16"
+ }
+]

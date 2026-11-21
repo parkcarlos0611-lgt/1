@@ -1,0 +1,309 @@
+{
+ "note": "The town register (review 10): what exists in and around the town, the states each kind can be in, and how it moves between them week by week. Chances are per week; bad moves grow in bad times, good moves in good times.",
+ "kinds": {
+  "bank": {
+   "start": "sound",
+   "names": [
+    "농민저축은행",
+    "밀브룩 제일은행",
+    "상인신탁",
+    "군민은행",
+    "시민저축은행",
+    "곡물거래은행"
+   ],
+   "moves": [
+    {
+     "from": "sound",
+     "to": "uneasy",
+     "chance": 0.004,
+     "mood": "bad",
+     "topic": "bank_worry",
+     "importance": [
+      1,
+      2
+     ]
+    },
+    {
+     "from": "uneasy",
+     "to": "run",
+     "chance": 0.045,
+     "mood": "bad",
+     "topic": "bank_worry",
+     "importance": [
+      3,
+      4
+     ]
+    },
+    {
+     "from": "uneasy",
+     "to": "sound",
+     "chance": 0.12,
+     "mood": "good",
+     "topic": "bank_steady",
+     "importance": [
+      1,
+      2
+     ]
+    },
+    {
+     "from": "run",
+     "to": "closed",
+     "chance": 0.14,
+     "mood": "bad",
+     "topic": "bank_worry",
+     "importance": [
+      5,
+      6
+     ]
+    },
+    {
+     "from": "run",
+     "to": "uneasy",
+     "chance": 0.3,
+     "mood": "good",
+     "topic": "bank_steady",
+     "importance": [
+      3,
+      3
+     ]
+    }
+   ],
+   "gone": [
+    "closed"
+   ]
+  },
+  "factory": {
+   "start": "normal",
+   "names": [
+    "농기계 공장",
+    "통조림 공장",
+    "가구 공장",
+    "벽돌 공장",
+    "제분소",
+    "마차 공장",
+    "유리 공장",
+    "주물 공장",
+    "방직 공장",
+    "제재소"
+   ],
+   "moves": [
+    {
+     "from": "normal",
+     "to": "short_time",
+     "chance": 0.004,
+     "mood": "bad",
+     "topic": "factory_trouble",
+     "importance": [
+      1,
+      2
+     ]
+    },
+    {
+     "from": "short_time",
+     "to": "layoffs",
+     "chance": 0.05,
+     "mood": "bad",
+     "topic": "factory_trouble",
+     "importance": [
+      3,
+      4
+     ]
+    },
+    {
+     "from": "short_time",
+     "to": "normal",
+     "chance": 0.09,
+     "mood": "good",
+     "topic": "factory_recover",
+     "importance": [
+      1,
+      2
+     ]
+    },
+    {
+     "from": "layoffs",
+     "to": "closed",
+     "chance": 0.02,
+     "mood": "bad",
+     "topic": "factory_trouble",
+     "importance": [
+      5,
+      6
+     ]
+    },
+    {
+     "from": "layoffs",
+     "to": "short_time",
+     "chance": 0.14,
+     "mood": "good",
+     "topic": "factory_recover",
+     "importance": [
+      3,
+      3
+     ]
+    },
+    {
+     "from": "normal",
+     "to": "normal",
+     "chance": 0.004,
+     "mood": "good",
+     "topic": "factory_hiring",
+     "importance": [
+      2,
+      3
+     ],
+     "type": "hiring"
+    }
+   ],
+   "gone": [
+    "closed"
+   ]
+  },
+  "rival": {
+   "start": "normal",
+   "names": [
+    "애틀러스 모터",
+    "컬럼비아 왜건",
+    "노스스타 자동차",
+    "벨몬트 모터스",
+    "크레센트 식스",
+    "패트리어트 모터",
+    "서밋 자동차",
+    "이글록 모터스",
+    "미드랜드 에이트",
+    "레이크쇼어 모터"
+   ],
+   "moves": [
+    {
+     "from": "normal",
+     "to": "trouble",
+     "chance": 0.004,
+     "mood": "bad",
+     "topic": "rival_trouble",
+     "importance": [
+      1,
+      3
+     ]
+    },
+    {
+     "from": "trouble",
+     "to": "bankrupt",
+     "chance": 0.022,
+     "mood": "bad",
+     "topic": "rival_trouble",
+     "importance": [
+      5,
+      6
+     ]
+    },
+    {
+     "from": "trouble",
+     "to": "normal",
+     "chance": 0.1,
+     "mood": "good",
+     "topic": "rival_model",
+     "importance": [
+      3,
+      4
+     ]
+    },
+    {
+     "from": "normal",
+     "to": "normal",
+     "chance": 0.012,
+     "mood": "any",
+     "topic": "rival_model",
+     "importance": [
+      1,
+      4
+     ],
+     "type": "model"
+    }
+   ],
+   "gone": [
+    "bankrupt"
+   ]
+  },
+  "road": {
+   "start": "gravel",
+   "names": [
+    "읍내 중심가",
+    "강변길",
+    "방죽길",
+    "군청 앞길",
+    "북쪽 군도",
+    "역전 큰길",
+    "서쪽 농로",
+    "주도 9호선",
+    "다리 건너 길",
+    "공동묘지 길",
+    "학교 앞길",
+    "장터 길"
+   ],
+   "moves": [
+    {
+     "from": "gravel",
+     "to": "gravel",
+     "chance": 0.006,
+     "mood": "any",
+     "topic": "road_paving",
+     "importance": [
+      1,
+      2
+     ],
+     "type": "repair"
+    },
+    {
+     "from": "gravel",
+     "to": "planned",
+     "chance": 0.0012,
+     "mood": "any",
+     "topic": "road_paving",
+     "importance": [
+      3,
+      4
+     ]
+    },
+    {
+     "from": "planned",
+     "to": "paved",
+     "chance": 0.03,
+     "mood": "any",
+     "topic": "road_opened",
+     "importance": [
+      3,
+      4
+     ]
+    }
+   ],
+   "gone": []
+  },
+  "office": {
+   "start": "held",
+   "names": [
+    "군수",
+    "읍장",
+    "보안관",
+    "교육감",
+    "우체국장",
+    "판사",
+    "소방대장",
+    "도로 감독"
+   ],
+   "termYears": [
+    2,
+    4
+   ],
+   "topic": "election"
+  }
+ },
+ "anniversary": {
+  "minImportance": 5,
+  "years": [
+   1,
+   5,
+   10,
+   25
+  ]
+ }
+}

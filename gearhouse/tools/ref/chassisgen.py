@@ -80,8 +80,7 @@ def build(m, cid):
     zAt = lambda x: float(__import__('numpy').interp(x, [q[0] for q in prof], [q[1] for q in prof]))
     rivS = [{'kind': 'bolt', 'at': [x, zAt(x) + RAIL_D / 2]} for x in range(int(xs[0]) + 120, int(xs[3]) - 60, 240)]
     out.append(part('frame', 'frame', 'iron', {'top': top, 'side': side, 'front': sec(hw[0]), 'rear': sec(hw[3])}, pair=True,
-                    feats={'top': [{'kind': 'highlight', 'pts': edge, 'width': 1}, {'kind': 'seam', 'pts': inner}] + rivT,
-                           'side': [{'kind': 'highlight', 'pts': [[x, z + RAIL_D - 10] for x, z in prof], 'width': 1}, {'kind': 'seam', 'pts': [[x, z + 12] for x, z in prof]}] + rivS}))
+                    feats={'top': [{'kind': 'highlight', 'pts': edge, 'width': 1}, {'kind': 'seam', 'pts': inner}] + rivT}))   # none from the side: the rails run at the hubs' height and the lines showed across the wheels
     # ---- cross members where the under view shows them
     for k, (cx, cw) in enumerate(L['cross']):
         x0, x1 = X(cx) - cw / 2, X(cx) + cw / 2; h = min(hw[0] if X(cx) < xs[1] else hw[2] if X(cx) < kx0 else hw[3], 900)

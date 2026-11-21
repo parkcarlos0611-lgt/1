@@ -15,7 +15,7 @@ export type Slot = 'grille' | 'lamp' | 'bumperF' | 'bumperR' | 'fenderF' | 'fend
 export const SLOTS: { id: Slot; name: string }[] = [
   { id: 'grille', name: '그릴' }, { id: 'lamp', name: '헤드램프' }, { id: 'fenderF', name: '앞 펜더' }, { id: 'fenderR', name: '뒤 펜더' },
   { id: 'board', name: '발판' }, { id: 'bumperF', name: '앞 범퍼' }, { id: 'bumperR', name: '뒤 범퍼' }, { id: 'tail', name: '미등' }, { id: 'wheel', name: '바퀴' } ];
-export type Grade = 'own' | 'fits' | 'work' | 'no';
+export type Grade = 'own' | 'fits' | 'work' | 'no' | 'none';
 export interface Fit { grade: Grade; notes: string[]; change: number }
 /** the player's own reshaping of a slot's part, as multipliers on the fitted size: 1 leaves it as it was fitted */
 export interface Adjust { size: number; width: number; length: number }
@@ -45,6 +45,17 @@ function mount(m: CarModel, slot: Slot): { x: number; z: number; size: number; y
     default: return null; }
 }
 
+/** the slot left empty: its parts taken off; what they covered on the body closed by the black inner panel */
+export function removeSlot(base: CarModel, slot: Slot): { model: CarModel; fit: Fit } {
+  const r = JSON.parse(JSON.stringify(base)) as CarModel, mine = r.parts.filter(p => p.slot === slot);
+  if (slot === 'wheel' || !mine.length) return { model: r, fit: { grade: 'none', notes: [slot === 'wheel' ? '바퀴는 뺄 수 없음' : '원래 없음'], change: 0 } };
+  const backs = BACKED.has(slot) ? mine.filter(p => !p.on).map(p => backing(p)) : [];
+  r.parts = [...backs, ...r.parts.filter(p => p.slot !== slot)];
+  return { model: r, fit: { grade: 'none', notes: ['달지 않음'], change: 0 } };
+}
+const backing = (p: CarPart): CarPart => { const q = JSON.parse(JSON.stringify(p)) as CarPart; q.id = 'back_' + p.id; q.material = 'black'; q.surface = 'flat'; delete q.slot; delete q.features; delete q.detail; delete q.shade; delete q.color;
+  const inner = Math.max(40, Math.min(Math.abs(q.box.y[0]), Math.abs(q.box.y[1])) - 60); q.box.y = q.pair ? [Math.max(0, inner - 40), inner] : [-inner, inner]; return q; };
+
 /** the base car with the donor's parts for one slot put on */
 export function fitSlot(base: CarModel, donor: CarModel, slot: Slot, adj: Adjust = NO_ADJUST): { model: CarModel; fit: Fit } {
   const r = JSON.parse(JSON.stringify(base)) as CarModel, same = (a: Adjust) => a.size === 1 && a.width === 1 && a.length === 1;
@@ -72,8 +83,7 @@ export function fitSlot(base: CarModel, donor: CarModel, slot: Slot, adj: Adjust
   // a wing's inner valance, the radiator's dark core), so a smaller part shows that, not a hole
   let open = 0;
   if (BACKED.has(slot) && mine.length) {
-    const backs = mine.filter(p => !p.on).map(p => { const q = JSON.parse(JSON.stringify(p)) as CarPart; q.id = 'back_' + p.id; q.material = 'black'; q.surface = 'flat'; delete q.slot; delete q.features; delete q.detail; delete q.shade; delete q.color;
-      const inner = Math.max(40, Math.min(Math.abs(q.box.y[0]), Math.abs(q.box.y[1])) - 60); q.box.y = q.pair ? [Math.max(0, inner - 40), inner] : [-inner, inner]; return q; });
+    const backs = mine.filter(p => !p.on).map(backing);
     r.parts.unshift(...backs);
     const before = cover(base, p => p.slot === slot), after = cover(r, p => theirs.some(q => q.id === p.id)); let n = 0, o = 0;
     for (let i = 0; i < before.mask.length; i++) if (before.mask[i]) { n++; if (!after.mask[i]) o++; }
@@ -92,9 +102,10 @@ export function fitSlot(base: CarModel, donor: CarModel, slot: Slot, adj: Adjust
 }
 
 /** several slots at once: each from its own donor (or the base's own part) */
-export function assemble(base: CarModel, choice: Partial<Record<Slot, CarModel>>, adjust: Partial<Record<Slot, Adjust>> = {}): { model: CarModel; fits: Partial<Record<Slot, Fit>> } {
+export function assemble(base: CarModel, choice: Partial<Record<Slot, CarModel | null>>, adjust: Partial<Record<Slot, Adjust>> = {}): { model: CarModel; fits: Partial<Record<Slot, Fit>> } {
   let m = base; const fits: Partial<Record<Slot, Fit>> = {};
-  for (const { id } of SLOTS) { const d = choice[id] ?? base, a = adjust[id] ?? NO_ADJUST; if (d === base && a === NO_ADJUST) { fits[id] = { grade: 'own', notes: [], change: 0 }; continue; }
+  for (const { id } of SLOTS) { if (choice[id] === null) { const r = removeSlot(m, id); m = r.model; fits[id] = r.fit; continue; }
+    const d = choice[id] ?? base, a = adjust[id] ?? NO_ADJUST; if (d === base && a === NO_ADJUST) { fits[id] = { grade: 'own', notes: [], change: 0 }; continue; }
     const r = fitSlot(m, d === base ? m : d, id, a); m = r.model; fits[id] = r.fit; }
   return { model: m, fits };
 }

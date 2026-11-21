@@ -6,7 +6,7 @@ import { Front2GL } from '../../render/place/front2gl';
 import { air, moon, dayOfYear } from '../../core/atmosphere';
 import { newGround } from '../../core/ground';
 import { newHouse } from '../../core/house';
-import { carSprite, carTurns, stepCar, along, depthScale, TURN_X, TURN_IN, KERB_GROUND, type CarSprite, type CarMotion } from './car';
+import { carSprite, carTurns, spunSprite, stepCar, along, depthScale, TURN_X, TURN_IN, KERB_GROUND, type CarSprite, type CarMotion } from './car';
 import { pixels } from './pics';
 import { newCaller, stepCaller, drawCaller, TO_DOOR, AWAY, FROM_LEFT, type Caller } from './caller';
 import cut from '../../data/places/front2_cut.json';
@@ -125,7 +125,8 @@ export function frontPlace(app: App) {
     // exhaust from the tail pipe while the engine runs: thick in the cold
     if (running && Math.random() < dt * (outdoorTemp < 8 ? 14 : 5)) { const tx = k === 0 ? sp.tail[0] - sp.anchor[0] : k === 12 ? sp.tail[0] - sp.anchor[0] : sp.w * 0.45, ty = k === 0 || k === 12 ? sp.tail[1] - sp.anchor[1] : -6; car.puffs.push({ x: p.x + tx * sc, y: p.y + ty * sc, age: 0 }); }
     for (const q of car.puffs) { q.age += dt; q.x += dt * (6 + m.v * 0.3) + Math.sin(q.age * 3) * dt * 2; q.y -= dt * 4; } car.puffs = car.puffs.filter(q => q.age < 2.2);
-    return { sprite: sp, x: p.x - sp.anchor[0] * sc, y: p.y - sp.anchor[1] * sc, wheel: k === 0 ? m.wheel : 0, scale: sc, side: k === 0 }; }
+    const shown = k === 0 ? spunSprite(sp, m.wheel) : sp;   // the wheels' own pictures at this angle (the GPU no longer turns them)
+    return { sprite: shown, x: p.x - sp.anchor[0] * sc, y: p.y - sp.anchor[1] * sc, wheel: 0, scale: sc, side: k === 0 }; }
   // ---- the customer on foot (step 3): out of the parked car, up to the door, a knock; let in, he sits at the kitchen table
   let caller: Caller | null = null, callerWait = -1, leaving: 'walk' | 'drive' | null = null, knockAt = 0;
   const hooks: { knock?: (n: number, name: string) => void; gaveUp?: () => void; handover?: (job: number) => void } = {};

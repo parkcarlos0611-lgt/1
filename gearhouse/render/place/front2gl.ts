@@ -109,8 +109,10 @@ export class Front2GL {
   private albBuf = new Uint8Array(N * 4); private infoBuf = new Uint8Array(N * 4); private lightBuf = new Uint8Array(N * 4); private footBuf = new Uint8Array(N * 4); private read = new Uint8Array(N * 4); private nightUV: number[][] = [];
   /** the customer's car and where it is (render/place's front: ui/world/car.ts) */
   car: { sprite: import('../../ui/world/car').CarSprite; x: number; y: number; wheel: number; heads: boolean; scale: number } | null = null; private carKey: unknown = null;
-  private setCar() { const gl = this.gl, c = this.car; if (!c || c.sprite === this.carKey) return; this.carKey = c.sprite; const sp = c.sprite;
-    for (const [n, px] of [['car', sp.rgba], ['carInfo', sp.info]] as const) { if (this.tex[n]) gl.deleteTexture(this.tex[n]!); delete this.tex[n]; this.upload(n, px, sp.w, sp.h); } }
+  private carInfoKey: unknown = null;
+  /** a new car, or the same car with its wheels at another angle (only its colours change then) */
+  private setCar() { const gl = this.gl, c = this.car; if (!c || c.sprite === this.carKey) return; this.carKey = c.sprite; const sp = c.sprite, same = sp.info === this.carInfoKey; this.carInfoKey = sp.info;
+    for (const [n, px] of [['car', sp.rgba], ['carInfo', sp.info]] as const) { if (n === 'carInfo' && same) continue; if (this.tex[n]) gl.deleteTexture(this.tex[n]!); delete this.tex[n]; this.upload(n, px, sp.w, sp.h); } }
   static make(scene: Front2): Front2GL | null { try { const cv = document.createElement('canvas'); cv.width = W; cv.height = H; const gl = cv.getContext('webgl2', { antialias: false, preserveDrawingBuffer: false }); return gl ? new Front2GL(gl, scene) : null; } catch { return null; } }
   private constructor(gl: WebGL2RenderingContext, private s: Front2) { this.gl = gl;
     const sh = (type: number, src: string) => { const x = gl.createShader(type)!; gl.shaderSource(x, src); gl.compileShader(x); if (!gl.getShaderParameter(x, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(x) ?? 'shader'); return x; };

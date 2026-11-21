@@ -15,7 +15,11 @@ import type { Damage } from '../../core/repair';
 export const CAR_MM = 27, KERB_GROUND = 244;
 /** material codes the GPU reads: 1 paint, 2 chrome, 3 glass, 4 rubber/black, 5 head lamp lens, 6 tail lamp, 7 other */
 export interface CarSprite { w: number; h: number; rgba: Uint8ClampedArray; info: Uint8ClampedArray; groundY: number; hubs: [number, number, number][]; tail: [number, number]; front: number; head: [number, number];
-  /** the point under the car's middle, on the ground, in the picture */ anchor: [number, number] }
+  /** the point under the car's middle, on the ground, in the picture */ anchor: [number, number];
+  /** the same car with its wheels drawn at each step of one spoke's turn (review 63): a turning wheel shows these in turn */
+  spins?: CarSprite[]; spinPeriod?: number }
+/** the picture of a car whose wheels have turned `angle` (radians) */
+export function spunSprite(sp: CarSprite, angle: number): CarSprite { if (!sp.spins || !sp.spinPeriod) return sp; const P = sp.spinPeriod, n = sp.spins.length; return sp.spins[Math.floor((((angle % P) + P) % P) / P * n) % n]!; }
 const MAT: Record<string, number> = { paint: 1, paint2: 1, chrome: 2, glass: 3, rubber: 4, black: 4, lens: 5, lensR: 6 };
 const GLOSS: Record<number, number> = { 1: 0.55, 2: 0.95, 3: 0.7, 4: 0.12, 5: 0.6, 6: 0.5, 7: 0.15 };
 
@@ -45,7 +49,15 @@ export function carSprite(colour: string, damages: Damage[], o: { mm?: number; d
   const tp = m.parts.find(p => p.id === 'tailpipe'), tail: [number, number] = tp ? [im.X(tp.box.x[1]), im.Y((tp.box.z[0] + tp.box.z[1]) / 2)] : [w - 6, im.groundY - 6];
   let front = w, hx = 0, hy = 0, hn = 0; for (let i = 0; i < w * h; i++) { if (rgba[i * 4 + 3]! > 10) front = Math.min(front, i % w); if (info[i * 4] === 5 || (mat[i] === 'lens')) { hx += i % w; hy += (i / w) | 0; hn++; } }
   let bx0 = w, bx1 = 0; for (let i = 0; i < w * h; i++) if (rgba[i * 4 + 3]! > 10) { bx0 = Math.min(bx0, i % w); bx1 = Math.max(bx1, i % w); }
-  return { w, h, rgba, info, groundY: im.groundY, hubs, tail, front, head: hn ? [hx / hn, hy / hn] : [front + 3, im.groundY - 20], anchor: [(bx0 + bx1 + 1) / 2, im.groundY] }; }
+  const out: CarSprite = { w, h, rgba, info, groundY: im.groundY, hubs, tail, front, head: hn ? [hx / hn, hy / hn] : [front + 3, im.groundY - 20], anchor: [(bx0 + bx1 + 1) / 2, im.groundY] };
+  // the wheels at eight steps through one spoke's turn, each drawn as it is (a picture turned afterwards loses its pixels)
+  const st = m.wheel?.style ?? 'disc';
+  if (st !== 'disc') { const n = st === 'artillery' ? (m.wheel.spokes || 12) : Math.max(8, Math.round((m.wheel.spokes || 30) / 2)), P = Math.PI * 2 / n, N = 8; out.spinPeriod = P; out.spins = [out];
+    for (let k = 1; k < N; k++) { const im2 = rasterizeFlat(viewDesign(m, 'left'), { mm: MMx, shadow: false, wheelSpin: P * k / N }), px = new Uint8ClampedArray(rgba);
+      for (const [hx, hy, hr] of hubs) for (let y = Math.floor(hy - hr); y <= hy + hr; y++) for (let x = Math.floor(hx - hr); x <= hx + hr; x++) {
+        if (x < 0 || y < 0 || x >= w || y >= h || Math.hypot(x + 0.5 - hx, y + 0.5 - hy) > hr * 0.9) continue; const i = (y * w + x) * 4; px[i] = im2.rgba[i]!; px[i + 1] = im2.rgba[i + 1]!; px[i + 2] = im2.rgba[i + 2]!; px[i + 3] = im2.rgba[i + 3]!; }
+      out.spins.push({ ...out, rgba: px, spins: undefined }); } }
+  return out; }
 
 /** the car turned: its pictures from the side (0°) round to its back (90°) every 7.5° (review 56). The part model
  *  has only the four flat views, so the car's solid is made from them: a point is inside the car where the side, the

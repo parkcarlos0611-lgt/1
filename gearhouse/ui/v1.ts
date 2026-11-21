@@ -7,7 +7,7 @@ import { load } from '../core/state';
 import { split, COL, rnd } from './pixel/kit';
 
 /** the build's number (it follows the published page's version) and the pre-alpha's steps: 1 done, 0.5 begun, 0 to come */
-const BUILD = 18;
+const BUILD = 19;
 const STATUS: [string, number][] = [['1 집 앞 · 주방 · 전화 · 문', 1], ['2 손님 차 (실제 크기)', 1], ['3 손님 방문 · 상담', 1], ['4 차고 수리 (녹 · 판금)', 1], ['5 인도 · 대금', 1], ['다음: 차고 · 공방 새 그림', 0], ['다음: 저장 · 손님 여러 모습', 0]];
 const app = new App(document.getElementById('board') as HTMLCanvasElement, document.getElementById('typer') as HTMLInputElement);
 app.push({ id: 'title', frame() { const S = app.S, ui = app.ui; for (let y = 0; y < 270; y++) for (let x = 0; x < 480; x++) { const v = Math.sin(y * 0.55 + Math.sin(x * 0.02 + y * 0.05) * 3) + (rnd(y * 977 + (x >> 3)) - 0.5) * 0.6; S.px(x, y, v > 0.75 ? COL.wood3 : v < -0.7 ? COL.wood2 : COL.wood); }

@@ -50,7 +50,8 @@ const OUTLINED = new Set<Material>(['paint', 'paint2', 'chrome', 'black', 'rubbe
 /** shading of a painted run, top to bottom, by kind of surface */
 const GRAD: Record<string, [number, number]> = { side: [2.75, 1.45], hood: [3.0, 1.6], roof: [3.5, 2.1], fender: [3.25, 0.45], flat: [2.2, 1.6] };
 
-export function rasterizeFlat(d0: CarDesign, opt: { frameW?: number; shadow?: boolean; mm?: number; outline?: number } = {}): CarImage {
+export function rasterizeFlat(d0: CarDesign, opt: { frameW?: number; shadow?: boolean; mm?: number; outline?: number; wheelSpin?: number } = {}): CarImage {
+  const SPIN = opt.wheelSpin ?? 0;   // the wheels turned by this much (radians): their pictures at each angle are drawn, not turned afterwards
   const d = expandParts(d0);
   const MM = opt.mm ?? MM_PER_PX, t0 = performance.now(), PAL = palette(d), frameW = opt.frameW ?? Math.max(2, Math.round(20 / MM));
   const span = (n: number) => Math.max(1, Math.round(n / MM)), w = Math.ceil(d.length / MM) + PAD * 2, h = Math.ceil(d.height / MM) + PAD * 2, gy = h - PAD;
@@ -247,16 +248,16 @@ export function rasterizeFlat(d0: CarDesign, opt: { frameW?: number; shadow?: bo
         if (Math.abs(t - 0.5) < 0.6 / Math.max(1, r - ri) && dot > -0.3) l = Math.min(4, l + 1);                     // the bead ring on the sidewall
         if (s.tread && t > 0.7) { const ang = Math.atan2(dy, dx), blk = Math.floor((ang / (Math.PI * 2) + 1) * Math.max(18, Math.round(r * 1.3))) & 1; if (!blk && t > 0.95) continue; l = blk ? (dot > 0.2 ? 3 : 2) : 0; }
         set(x, y, 'rubber', l, ly, id); continue; }
-      const q = dd / ri, a = Math.atan2(dy, dx);
+      const q = dd / ri, a = Math.atan2(dy, dx) + SPIN;
       if (s.style === 'wire') { const own = s.rimMaterial === 'paint' || s.rimMaterial === 'paint2'; if (q > 0.9) set(x, y, own ? rimM : 'chrome', dot > 0.2 ? 4 : dot < -0.4 ? 2 : 3, ly, id); else if (q > 0.84) set(x, y, 'black', 1, ly, id);
         else if (q < (s.cap ?? 0.3)) set(x, y, 'chrome', q < 0.12 ? (dot > 0 ? 4 : 3) : q > 0.26 ? 1 : dot > 0.3 ? 4 : dot > -0.3 ? 2 : 1, ly, id);
         else { // cross-laced wire: two sets of spokes leaving the hub at a slant, one each way, so they cross in a lattice as on the real wheel
           const sp = Math.max(8, Math.round((s.spokes || 30) / 2)), own = s.rimMaterial === 'paint' || s.rimMaterial === 'paint2', tw = (1 - q) * 0.9;
           const f1 = (((a + tw) / (Math.PI * 2)) * sp % 1 + 1) % 1, f2 = (((a - tw) / (Math.PI * 2)) * sp % 1 + 1) % 1, w = own ? 0.26 : 0.2, on = f1 < w || f2 < w, both = f1 < w && f2 < w;
           set(x, y, on ? (own ? rimM : 'chrome') : 'black', on ? (both ? 4 : dot > 0 ? 3 : 2) : 0, ly, id); } }
-      else if (s.style === 'artillery') { const sp = s.spokes || 12, seg = ((a / (Math.PI * 2)) * sp % 1 + 1) % 1, wdt = 0.16 + 0.22 * (1 - q);
+      else if (s.style === 'artillery') { const sp = s.spokes || 12, seg = ((a / (Math.PI * 2)) * sp % 1 + 1) % 1, wdt = 0.3 + 0.26 * (1 - q);
         if (q > 0.86) set(x, y, rimM, dot > 0.2 ? 3 : 1, ly, id); else if (q < 0.26) set(x, y, 'chrome', q < 0.14 ? (dot > 0 ? 4 : 2) : 1, ly, id);
-        else if (Math.abs(seg - 0.5) < wdt / 2) set(x, y, rimM, Math.abs(seg - 0.5) < wdt / 5 ? 3 : dot > 0 ? 2 : 1, ly, id); else set(x, y, 'iron', q < 0.6 ? 1 : 0, ly, id); }
+        else if (Math.abs(seg - 0.5) < wdt / 2) set(x, y, rimM, Math.abs(seg - 0.5) < wdt / 5 ? 3 : dot > 0 ? 2 : 1, ly, id); else set(x, y, 'black', 0, ly, id); }
       else { // pressed-steel disc in the body colour with a domed chrome cap, its pressed rings, and a trim ring if fitted
         const cap = s.cap ?? 0.52, rings = s.capRings ?? 1, pxq = 1 / Math.max(1, ri);
         if (s.trim && q > 0.84) { set(x, y, 'chrome', q > 0.95 ? 1 : dot > 0.3 ? 4 : dot > -0.3 ? 3 : 1, ly, id); continue; }

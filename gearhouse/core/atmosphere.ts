@@ -37,13 +37,16 @@ function wave(seed: number, day: number, minute: number, ch: number): number {
 }
 export function dayOfYear(date: DateStr): number { const { year, month, day } = parts(date); return Math.round((Date.UTC(year, month - 1, day) - Date.UTC(year, 0, 1)) / 864e5) + 1; }
 
-/** the sun at local solar time (1930: standard time, no summer time in most places) */
-export function sun(date: DateStr, minute: number, lat = LATITUDE): { alt: number; az: number } {
-  const n = dayOfYear(date), decl = 23.44 * Math.sin(2 * Math.PI * (284 + n) / 365) * rad, H = (minute / 60 - 12) * 15 * rad, phi = lat * rad;
+/** a body's height and bearing from its declination and hour angle (degrees) */
+function place(declDeg: number, hourAngleDeg: number, lat: number): { alt: number; az: number } {
+  const decl = declDeg * rad, H = hourAngleDeg * rad, phi = lat * rad;
   const alt = Math.asin(Math.sin(phi) * Math.sin(decl) + Math.cos(phi) * Math.cos(decl) * Math.cos(H));
   const az = Math.atan2(Math.sin(H), Math.cos(H) * Math.sin(phi) - Math.tan(decl) * Math.cos(phi)) / rad + 180;
   return { alt: alt / rad, az: (az + 360) % 360 };
 }
+const declination = (date: DateStr) => 23.44 * Math.sin(2 * Math.PI * (284 + dayOfYear(date)) / 365);
+/** the sun at local solar time (1930: standard time, no summer time in most places) */
+export function sun(date: DateStr, minute: number, lat = LATITUDE): { alt: number; az: number } { return place(declination(date), (minute / 60 - 12) * 15, lat); }
 
 export function air(date: DateStr, minute: number, sky: Sky, seed: number): Air {
   const s = sun(date, minute), day = dayOfYear(date) + parts(date).year * 400;
@@ -56,4 +59,14 @@ export function air(date: DateStr, minute: number, sky: Sky, seed: number): Air 
   const m = parts(date).month - 1, diurnal = -Math.cos((minute / 60 - 3) / 24 * 2 * Math.PI);
   const temp = MONTH_TEMP[m]! + diurnal * (sky === 'clear' ? 6 : 3) - (sky === 'clear' ? 0 : 2) + (w(5) - 0.5) * 3;
   return { sunAlt: s.alt, sunAz: s.az, daylight, cloud, rain, snow, wind, temp, sky };
+}
+
+/** the moon, near enough for the sky: its phase (0 new, 0.5 full) from a known new moon; it stands that share of a turn
+ *  east of the sun (so it rises about 50 minutes later each day), and a full moon rides as high as the sun does half a
+ *  year on */
+export function moon(date: DateStr, minute: number, lat = LATITUDE): { alt: number; az: number; phase: number } {
+  const { year, month, day } = parts(date), days = (Date.UTC(year, month - 1, day) + minute * 60000 - Date.UTC(2000, 0, 6, 18, 14)) / 864e5;
+  const phase = ((days / 29.530588) % 1 + 1) % 1, decl = declination(date) * Math.cos(2 * Math.PI * phase);   // full: opposite the sun
+  const p = place(decl, (minute / 60 - 12) * 15 - phase * 360, lat);
+  return { ...p, phase };
 }

@@ -18,7 +18,7 @@ import type { Air } from '../../core/atmosphere';
 export const W = 480, H = 270;
 const N = W * H;
 const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map(v => v / 16 - 0.5);
-type V3 = [number, number, number];
+export type V3 = [number, number, number];
 interface Plane { n: 'v' | 'h'; z?: number; Y?: number; ys?: number[]; zs?: number[] }
 export interface RoomData {
   window: { glass: number[]; muntinX: number[]; railY: number[]; sill: number; horizon: number; curtains: number[][]; open: number; houseLight: number[] };
@@ -38,19 +38,25 @@ export interface RoomEnv {
 interface Puff { x: number; y: number; vx: number; vy: number; age: number; life: number; size: number; a: number }
 interface Drop { x: number; y: number; v: number; wait: number; trail: number }
 
-const clamp = (v: number, a = 0, b = 1) => (v < a ? a : v > b ? b : v);
-const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
-const mix3 = (a: V3, b: V3, t: number): V3 => [lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t)];
-function hash2(x: number, y: number): number { let h = (x * 374761393 + y * 668265263) | 0; h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967296; }
-function noise(x: number, y: number): number { const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi, u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf);
+export const clamp = (v: number, a = 0, b = 1) => (v < a ? a : v > b ? b : v);
+export const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+export const mix3 = (a: V3, b: V3, t: number): V3 => [lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t)];
+export function hash2(x: number, y: number): number { let h = (x * 374761393 + y * 668265263) | 0; h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967296; }
+export function noise(x: number, y: number): number { const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi, u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf);
   return lerp(lerp(hash2(xi, yi), hash2(xi + 1, yi), u), lerp(hash2(xi, yi + 1), hash2(xi + 1, yi + 1), u), v); }
 /** points across the lamp shade's open mouth (x, z offsets): the light is not a point, so shadows soften */
-const SHADE: [number, number][] = [[-7, 0], [7, 0], [0, -6], [0, 6], [0, 0]];
+const SHADE_R = 9;
+/** signed distance from a point to a rectangle (negative inside) */
+function rectSD(x: number, z: number, x0: number, x1: number, z0: number, z1: number): number { const dx = Math.max(x0 - x, x - x1), dz = Math.max(z0 - z, z - z1); return dx > 0 || dz > 0 ? Math.hypot(Math.max(dx, 0), Math.max(dz, 0)) : Math.max(dx, dz); }
+/** how much of a light of radius r (seen from the point) clears an edge at signed distance d: 0 hidden .. 1 clear */
+function edgeVis(d: number, r: number): number { const u = clamp(0.5 + d / (2 * Math.max(0.4, r))); return u * u * (3 - 2 * u); }
+/** the share of [a-r, a+r] that lies inside [lo, hi] */
+function cover(a: number, r: number, lo: number, hi: number): number { r = Math.max(0.4, r); return clamp((Math.min(a + r, hi) - Math.max(a - r, lo)) / (2 * r)); }
 const tone = (v: number) => (v <= 0.9 ? v : 0.9 + (v - 0.9) / (1 + (v - 0.9) * 2));
-const fbm = (x: number, y: number) => noise(x, y) * 0.55 + noise(x * 2.1 + 7, y * 2.1 + 3) * 0.3 + noise(x * 4.3 + 1, y * 4.3 + 9) * 0.15;
+export const fbm = (x: number, y: number) => noise(x, y) * 0.55 + noise(x * 2.1 + 7, y * 2.1 + 3) * 0.3 + noise(x * 4.3 + 1, y * 4.3 + 9) * 0.15;
 
 /** the sky's colours by the sun's height: [top, horizon] */
-function skyColours(alt: number, cloud: number): [V3, V3] {
+export function skyColours(alt: number, cloud: number): [V3, V3] {
   const keys: [number, V3, V3][] = [[-18, [8, 11, 24], [16, 20, 38]], [-8, [22, 30, 62], [60, 58, 92]], [-2, [52, 66, 120], [196, 120, 92]], [3, [92, 122, 186], [240, 168, 104]], [12, [104, 148, 214], [226, 206, 170]], [30, [96, 146, 222], [192, 212, 232]]];
   let top = keys[0]![1], hor = keys[0]![2];
   for (let k = 0; k < keys.length - 1; k++) { const [a0, t0, h0] = keys[k]!, [a1, t1, h1] = keys[k + 1]!; if (alt >= a0) { const f = clamp((alt - a0) / (a1 - a0)); top = mix3(t0, t1, f); hor = mix3(h0, h1, f); } }
@@ -105,6 +111,20 @@ export class Room {
     return true;
   }
 
+  /** how much of the sun reaches the point through the window (0..1): the sun seen through glass and sky haze is a
+   *  small disc, about two degrees across, so at the window it covers a patch that grows with the distance; the share of
+   *  that patch that is clear glass (not frame, not bars) is the light. The table shades the floor the same way. */
+  private sunVis(x: number, y: number, z: number, s: V3, k: number): number {
+    if (s[2] >= -0.02) return 0; const D = this.D, [g0, gy0, g1] = D.window.glass as [number, number, number], sill = D.window.sill;
+    const t = -z / s[2], hx = x + t * s[0], hy = y + t * s[1], r = t * 0.018, L = t;
+    let v = cover(hx, r, g0, g1) * cover(hy, r, gy0, sill); if (v <= 0) return 0;
+    const [m0, m1] = D.window.muntinX as [number, number], [r0, r1] = D.window.railY as [number, number], gap = sill - k;
+    v *= 1 - cover(hx, r, m0, m1) * cover(hy, r, gy0, gap); v *= 1 - cover(hy, r, r0, r1);
+    if (k > 0) { v *= 1 - cover(hy, r, r0 - k, r1 - k); v *= 1 - cover(hy, r, gap - 3, gap); }
+    const T = D.table; if (y > T.Y[1]! && s[1] < 0) { const tt = (T.Y[0]! - y) / s[1]; if (tt > 0 && tt < L) { const qx = x + tt * s[0], qz = z + tt * s[2]; v *= edgeVis(rectSD(qx, qz, T.x[0]!, T.x[1]!, T.z[0]!, T.z[1]!), tt * 0.018); } }
+    return v;
+  }
+
   /** the sun's light on the floor and tables, and the beam of it through the air: worked out four times a second (the
    *  sun moves slowly). The sun is a little disc, not a point: five rays to it, so the bars' shadows have soft edges. */
   private updateSun(e: RoomEnv, k: number) { const a = e.air;
@@ -112,7 +132,7 @@ export class Room {
     this.sunMap.fill(0); this.shaft.fill(0); if (a.sunAlt <= 0.5 || a.cloud > 0.97) return;
     const R = Math.PI / 180, dirs: V3[] = [[0, 0], [0.8, 0], [-0.8, 0], [0, 1.1], [0, -1.1]].map(([da, dz]) => { const al = (a.sunAlt + da!) * R, az = (a.sunAz + dz!) * R; return [-Math.cos(al) * Math.sin(az), -Math.sin(al), Math.cos(al) * Math.cos(az)] as V3; });
     if (dirs[0]![2] >= -0.02) return;
-    for (let i = 0; i < N; i++) { if (!this.hor[i]) continue; let n = 0; for (const d of dirs) if (this.sunlit(this.X[i]!, this.Y[i]!, this.Z[i]!, d, k)) n++; this.sunMap[i] = n / dirs.length; }
+    for (let i = 0; i < N; i++) { if (!this.hor[i]) continue; this.sunMap[i] = this.sunVis(this.X[i]!, this.Y[i]!, this.Z[i]!, dirs[0]!, k); }
     const hw = W >> 1, hh = H >> 1, s0 = dirs[0]!, glassId = this.ids.glass!, steps = 12;
     for (let sy = 0; sy < hh; sy++) for (let sx = 0; sx < hw; sx++) { const x = sx * 2 + 1, y = sy * 2 + 1, i = y * W + x, z0 = this.rid[i] === glassId ? 0 : this.Z[i]!; let acc = 0;
       for (let q = 0; q < steps; q++) { const z = z0 + (320 - z0) * (q + 0.5) / steps, wy = y - z * 0.175; if (wy < 0 || wy > 214) continue; if (this.sunlit(x, wy, z, s0, k)) acc++; }
@@ -138,7 +158,7 @@ export class Room {
       const ws = this.winSky[i]! * day * 0.7; r += ws * ambC[0]; g += ws * ambC[1]; b += ws * ambC[2];
       if (lampI > 0) { const vx = bx - x, vy = by - y, vz = bz - z, d = Math.sqrt(vx * vx + vy * vy + vz * vz), ndl = h ? -vy / d : id === wallId ? vz / d : (vz / d + 0.3) / 1.3, down = -vy / d;
         let e1 = Math.max(0, ndl) * clamp((down + 0.12) / 0.42) / (1 + (d / L.reach) ** 2) + (vy > 0 ? 0.05 / (1 + (d / 90) ** 2) : 0);
-        if ((id === floorId || id === legsId) && y > T.Y[1]!) { let hit = 0; for (const [ox, oz] of SHADE) { const lx = bx + ox, lz = bz + oz, tt = (T.Y[0]! - y) / (by - y), tx = x + tt * (lx - x), tz = z + tt * (lz - z); if (tx >= T.x[0]! && tx <= T.x[1]! && tz >= T.z[0]! && tz <= T.z[1]!) hit++; } e1 *= 1 - 0.84 * hit / SHADE.length; }   // the shade's mouth is wide: a soft-edged shadow
+        if (id === floorId && y > T.Y[1]!) { const tt = (T.Y[0]! - y) / (by - y), qx = x + tt * (bx - x), qz = z + tt * (bz - z), r = SHADE_R * (y - T.Y[0]!) / Math.max(1, y - by); e1 *= 1 - 0.84 * (1 - edgeVis(rectSD(qx, qz, T.x[0]!, T.x[1]!, T.z[0]!, T.z[1]!), r)); }   // the shade's mouth is wide: the shadow's edge is soft, softer further from the table
         e1 = (e1 + 0.17 / (1 + (d / 210) ** 2)) * lampI; r += e1 * lc[0]; g += e1 * lc[1]; b += e1 * lc[2]; }   // and what comes back off the walls and the ceiling
       if (sunI > 0 && h && this.sunMap[i]! > 0) { const e2 = sunI * (0.45 + 0.9 * Math.max(0, -s[1])) * this.sunMap[i]!; r += e2 * sunC[0]; g += e2 * sunC[1]; b += e2 * sunC[2]; }
       if (fl > 0) { const vx = B.at[0]! - x, vy = B.at[1]! - y, vz = B.z - z, d2 = vx * vx + vy * vy * 2 + vz * vz; if (d2 < 2500) { const e3 = fl / (1 + d2 / 120); r += e3; g += e3 * 0.62; b += e3 * 0.5; } }
@@ -152,16 +172,16 @@ export class Room {
     this.dust(e, s, sunI, sunC, bx, by, bz, lampI, k);
     this.tap(e);
     if (e.highlight) this.highlight(e.highlight, ang);
-    // ---- the sun's beam in the air (dust and steam make it show), then out in 18-bit colour (64 levels a channel) with a
-    // light ordered dither: the light still falls in steps, without the grain of fewer levels
+    // ---- the sun's beam in the air (dust and steam make it show), then out at full colour (the painting's own
+    // pixels carry the look; stepped light made blocks in the dark)
     const sh = sunI * (0.55 + 0.45 * a.daylight) * 62, hw = W >> 1;
     for (let i = 0; i < N; i++) { const x = i % W, y = (i / W) | 0;
       if (sh > 0) { const fx = Math.min(hw - 1.001, Math.max(0, (x - 1) / 2)), fy = Math.min((H >> 1) - 1.001, Math.max(0, (y - 1) / 2)), x0 = fx | 0, y0 = fy | 0, u = fx - x0, v = fy - y0, S = this.shaft;
         const b = (S[y0 * hw + x0]! * (1 - u) + S[y0 * hw + x0 + 1]! * u) * (1 - v) + (S[(y0 + 1) * hw + x0]! * (1 - u) + S[(y0 + 1) * hw + x0 + 1]! * u) * v;
         if (b > 0) { const w = b * sh; this.lit[i * 3] = this.lit[i * 3]! + w * sunC[0]; this.lit[i * 3 + 1] = this.lit[i * 3 + 1]! + w * sunC[1]; this.lit[i * 3 + 2] = this.lit[i * 3 + 2]! + w * sunC[2] * 0.9; } }
-      const th = BAYER[(y & 3) * 4 + (x & 3)]! * 4;
-      out[i * 4] = Math.min(255, Math.max(0, Math.round((this.lit[i * 3]! + th) / 4) * 4)); out[i * 4 + 1] = Math.min(255, Math.max(0, Math.round((this.lit[i * 3 + 1]! + th) / 4) * 4));
-      out[i * 4 + 2] = Math.min(255, Math.max(0, Math.round((this.lit[i * 3 + 2]! + th) / 4) * 4)); out[i * 4 + 3] = 255; }
+      const th = 0;
+      out[i * 4] = Math.min(255, Math.max(0, Math.round(this.lit[i * 3]! + th))); out[i * 4 + 1] = Math.min(255, Math.max(0, Math.round(this.lit[i * 3 + 1]! + th)));
+      out[i * 4 + 2] = Math.min(255, Math.max(0, Math.round(this.lit[i * 3 + 2]! + th))); out[i * 4 + 3] = 255; }
   }
 
   // ---- the window: the view out, the glass, the sash
@@ -176,6 +196,7 @@ export class Room {
     if (a.rain > 0 && Math.random() < dt * 90 * a.rain) this.streaks.push({ x: gx0 + Math.random() * (gx1 - gx0 + 30), y: gy0 - 4, v: 130 + Math.random() * 70, snow: false });
     if (a.snow > 0 && Math.random() < dt * 30 * a.snow) this.streaks.push({ x: gx0 + Math.random() * (gx1 - gx0 + 20), y: gy0 - 2, v: 10 + Math.random() * 10, snow: true });
     for (const q of this.streaks) { q.y += q.v * dt; q.x += q.snow ? Math.sin(t * 1.3 + q.v) * dt * 4 - a.wind * dt * 6 : -q.v * dt * (0.15 + a.wind * 0.35); } this.streaks = this.streaks.filter(q => q.y < sill + 2 && q.x > gx0 - 30);
+    const onGlass = (x: number, y: number) => x >= gx0 && x < gx1 && y >= gy0 && y < sill && frameAt(x, y) < 0;
     const frameAt = (x: number, y: number): number => { // the base picture's pixel for a bar of the frame, or -1
       if (y < r0 && x >= m0 && x < m1) return y * W + x; if (y >= r0 && y < r1) return y * W + x;
       if (k === 0) return x >= m0 && x < m1 ? y * W + x : -1;
@@ -201,7 +222,7 @@ export class Room {
       this.lit[i * 3] = c[0]; this.lit[i * 3 + 1] = c[1]; this.lit[i * 3 + 2] = c[2]; this.lum[i] = outL; }
     // rain and snow beyond the glass (drawn on the view; the bars stand in front)
     const lit = 0.25 + 0.75 * a.daylight;
-    for (const q of this.streaks) { if (!q.snow) for (let j = 0; j < 4; j++) this.paint(q.x + j * 0.3, q.y - j, [200 * lit, 210 * lit, 225 * lit], 0.22 - j * 0.04, (x, y) => frameAt(x, y) < 0); else this.paint(q.x, q.y, [245 * lit, 245 * lit, 250 * lit], 0.8, (x, y) => frameAt(x, y) < 0); }
+    for (const q of this.streaks) { if (!q.snow) for (let j = 0; j < 4; j++) this.paint(q.x + j * 0.3, q.y - j, [200 * lit, 210 * lit, 225 * lit], 0.22 - j * 0.04, onGlass); else this.paint(q.x, q.y, [245 * lit, 245 * lit, 250 * lit], 0.8, onGlass); }
     // drops on the glass: they gather, wait, then run down in jerks, leaving a wet line
     if (a.rain > 0 && this.drops.length < 110) for (let n2 = 0; n2 < 1 + a.rain * 3; n2++) if (Math.random() < dt * 10 * a.rain) this.drops.push({ x: gx0 + Math.floor(Math.random() * (gx1 - gx0)), y: gy0 + Math.random() * (sill - gy0), v: 0, wait: 0.5 + Math.random() * 6, trail: 0 });
     for (const d of this.drops) { if (d.wait > 0) { d.wait -= dt; if (d.wait <= 0) d.v = 6 + Math.random() * 22; } else { d.y += d.v * dt; d.trail = Math.min(14, d.trail + d.v * dt); if (Math.random() < dt * 1.5) { d.wait = 0.2 + Math.random() * 1.2; } } }
@@ -221,12 +242,14 @@ export class Room {
       const d = Math.hypot(x - cx, y - cy), w = alpha * clamp(1 - d / (r + 0.5)); if (w <= 0 || (ok && !ok(x, y))) continue; if (!soft && w < 0.5 && w + BAYER[(y & 3) * 4 + (x & 3)]! < 0.25) continue;
       const i = y * W + x, ww = soft ? w : Math.min(1, w * 1.4); this.lit[i * 3] = lerp(this.lit[i * 3]!, c[0], ww); this.lit[i * 3 + 1] = lerp(this.lit[i * 3 + 1]!, c[1], ww); this.lit[i * 3 + 2] = lerp(this.lit[i * 3 + 2]!, c[2], ww); } }
 
-  // ---- the curtains stir: a breath when the window is shut, more in the wind through an open one
-  private curtains(e: RoomEnv) { const t = e.t, amp = 0.55 + e.window * (0.9 + 3.2 * e.air.wind);
-    for (const [cx0, cy0, cx1, cy1] of this.D.window.curtains as [number, number, number, number][]) { const h = cy1 - cy0, row = new Float32Array((cx1 - cx0 + 8) * 3);
-      for (let y = cy0; y < cy1; y++) { const f = ((y - cy0) / h) ** 1.6, sh = Math.round(amp * f * (Math.sin(t * 1.3 + y * 0.07) * 0.7 + Math.sin(t * 2.9 + y * 0.13) * 0.3)); if (!sh) continue;
-        for (let x = cx0 - 4; x < cx1 + 4; x++) { const i = y * W + x; row[(x - cx0 + 4) * 3] = this.lit[i * 3]!; row[(x - cx0 + 4) * 3 + 1] = this.lit[i * 3 + 1]!; row[(x - cx0 + 4) * 3 + 2] = this.lit[i * 3 + 2]!; }
-        for (let x = cx0 - 4; x < cx1 + 4; x++) { const sx = Math.max(cx0 - 4, Math.min(cx1 + 3, x - sh)), i = y * W + x; this.lit[i * 3] = row[(sx - cx0 + 4) * 3]!; this.lit[i * 3 + 1] = row[(sx - cx0 + 4) * 3 + 1]!; this.lit[i * 3 + 2] = row[(sx - cx0 + 4) * 3 + 2]!; } } } }
+  // ---- the curtains: still while the window is shut; through an open one the wind bends each hanging panel as one
+  // piece, most at the hem, slowly, now more, now less
+  private curtains(e: RoomEnv) { const t = e.t, amp = e.window * (1 + 4 * e.air.wind); if (amp < 0.3) return;
+    const gust = 0.55 + 0.45 * Math.sin(t * 0.37) * Math.sin(t * 0.23 + 1), sway = amp * gust * (Math.sin(t * 0.9) * 0.8 + Math.sin(t * 1.7 + 0.5) * 0.2);
+    for (const [cx0, cy0, cx1, cy1] of this.D.window.curtains as [number, number, number, number][]) { const h = cy1 - cy0, row = new Float32Array((cx1 - cx0 + 12) * 3);
+      for (let y = cy0; y < cy1; y++) { const sh = Math.round(sway * ((y - cy0) / h) ** 2); if (!sh) continue;
+        for (let x = cx0 - 6; x < cx1 + 6; x++) { const i = y * W + x; row[(x - cx0 + 6) * 3] = this.lit[i * 3]!; row[(x - cx0 + 6) * 3 + 1] = this.lit[i * 3 + 1]!; row[(x - cx0 + 6) * 3 + 2] = this.lit[i * 3 + 2]!; }
+        for (let x = cx0 - 6; x < cx1 + 6; x++) { const sx = Math.max(cx0 - 6, Math.min(cx1 + 5, x - sh)), i = y * W + x; this.lit[i * 3] = row[(sx - cx0 + 6) * 3]!; this.lit[i * 3 + 1] = row[(sx - cx0 + 6) * 3 + 1]!; this.lit[i * 3 + 2] = row[(sx - cx0 + 6) * 3 + 2]!; } } } }
 
   // ---- the kettle: the flame under it, steam from spout and lid, the lid rattling at the boil
   private kettle(e: RoomEnv) { const D = this.D, dt = e.dt, t = e.t, kt = e.kettle, boil = kt >= 99;

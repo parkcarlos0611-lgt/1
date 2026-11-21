@@ -33,3 +33,11 @@ describe('the kitchen', () => {
     k.burner = true; settleKitchen(k, 600, 18); expect(k.burner).toBe(false); expect(k.kettle).toBeLessThan(19); expect(k.fog).toBe(0);
   });
 });
+
+import { moon } from '../core/atmosphere';
+describe('the moon', () => {
+  test('full at the full moon of 13 January 1930, new on 29 January; a full moon is up at midnight', () => {
+    const f = moon('1930-01-14', 0); expect(Math.abs(f.phase - 0.5)).toBeLessThan(0.06); expect(f.alt).toBeGreaterThan(30);
+    expect(Math.min(moon('1930-01-29', 720).phase, 1 - moon('1930-01-29', 720).phase)).toBeLessThan(0.06);
+  });
+});

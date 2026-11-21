@@ -119,6 +119,22 @@ for p in D['paint']: x0, y0, x1, y1 = p[1:]; reg[y0:y1, x0:x1] = D['regionId'][p
 for y in range(gy0, gy1):
     for x in range(gx0, gx1):
         if not (mx0 <= x < mx1 or ry0 <= y < ry1): reg[y, x] = D['regionId']['glass']
+# the table: the cloth by its colours (red checks, and cream checks with red beside them), not by its box. Across the
+# top and the front the cloth is one piece, so each row is cloth from its leftmost to its rightmost cloth pixel; below
+# the front only the side drapes hang. The legs and the chair under the table keep the floor's light.
+tx0, ty0, tx1, ty1 = D['tableBox']; R_ = base[..., 0]; G_ = base[..., 1]; B_ = base[..., 2]
+red = (R_ > G_ + 28) & (R_ > 70); cream = (R_ > 140) & (G_ > 115) & (B_ > 85) & (np.abs(R_ - G_) < 50)
+near = np.zeros((H, W), bool)
+for d in range(1, 4):
+    near[:, d:] |= red[:, :-d]; near[:, :-d] |= red[:, d:]; near[d:] |= red[:-d]; near[:-d] |= red[d:]
+found = red | (cream & near); cloth = np.zeros((H, W), bool); hem, drapes = D['tableHem'], D['tableDrapes']
+for y in range(ty0, ty1):
+    xs = np.nonzero(found[y, tx0:tx1])[0] + tx0
+    if y < hem and len(xs) > 20: cloth[y, xs.min():xs.max() + 1] = True
+    elif y >= hem:
+        for d0, d1 in drapes: cloth[y, d0:d1] = found[y, d0:d1]
+cloth = clean(cloth, 2)
+reg[cloth & (np.arange(H)[:, None] < D['tableFront'])] = D['regionId']['tableTop']; reg[cloth & (np.arange(H)[:, None] >= D['tableFront'])] = D['regionId']['cloth']
 cx0, cy0, cx1, cy1 = D['chairBack']                              # the chair's back between the boards: brown, not green
 for y in range(cy0, cy1):
     for x in range(cx0, cx1):

@@ -9,7 +9,7 @@
 
 type Tool = 'pencil' | 'eraser' | 'scrape' | 'spray' | 'tape' | 'lead';
 export type SoundKind = '' | Tool;
-type Once = 'shake' | 'knock' | 'clink' | 'pour' | 'tick' | 'pulses' | 'pickup' | 'hangup' | 'paper' | 'peel' | 'blip' | 'chime';
+type Once = 'shake' | 'knock' | 'clink' | 'pour' | 'tick' | 'pulses' | 'pickup' | 'hangup' | 'paper' | 'peel' | 'blip' | 'chime' | 'drip' | 'chain' | 'sash' | 'ignite' | 'rattle';
 
 export class Sound {
   on = true; private ac: AudioContext | null = null; private buf: Record<string, AudioBuffer> = {}; private t = 0;
@@ -49,6 +49,8 @@ export class Sound {
     const amb = (name: string, base: number, buf: string, filters: [BiquadFilterType, number, number][]) => { const g = ac.createGain(); g.gain.value = 0; g.connect(ac.destination); chain(buf, filters, g); this.amb[name] = { g, base }; };
     amb('rain', 0.3, 'white', [['lowpass', 1500, 0.4]]); amb('drops', 0.12, 'crackle', [['bandpass', 3000, 0.6]]); amb('wind', 0.16, 'white', [['lowpass', 380, 0.7]]); amb('line', 0.035, 'hiss', [['bandpass', 1800, 0.4]]);
     { const o = ac.createOscillator(); o.type = 'sawtooth'; o.frequency.value = 38; const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 260; const g = ac.createGain(); g.gain.value = 0; o.connect(lp).connect(g).connect(ac.destination); o.start(); this.amb.engine = { g, o, base: 0.12 }; }
+    amb('simmer', 0.16, 'sizzle', [['bandpass', 650, 0.5]]);
+    { const o = ac.createOscillator(); o.type = 'sine'; o.frequency.value = 1850; const lfo = ac.createOscillator(); lfo.frequency.value = 5.5; const lg = ac.createGain(); lg.gain.value = 28; lfo.connect(lg).connect(o.frequency); lfo.start(); const g = ac.createGain(); g.gain.value = 0; o.connect(g).connect(ac.destination); o.start(); this.amb.whistle = { g, o, base: 0.03 }; }   // a kettle's whistle, wavering
     { const o = ac.createOscillator(); o.type = 'sine'; o.frequency.value = 60; const g = ac.createGain(); g.gain.value = 0; o.connect(g).connect(ac.destination); o.start(); this.amb.hum = { g, o, base: 0.02 }; }
   } catch { this.ac = null; } }
 
@@ -57,7 +59,7 @@ export class Sound {
     for (const [k, c] of Object.entries(this.tools)) { const on = this.on && k === kind, flutter = k === 'spray' ? 0.9 + Math.random() * 0.2 : 1;
       c.g.gain.setTargetAtTime(on ? c.base * Math.min(1, amount) * flutter : 0, now, on ? 0.015 : 0.04); if (on && Math.abs(pitch - c.rate) > 0.02) { c.rate = pitch; for (const s of c.src) s.playbackRate.setTargetAtTime(pitch, now, 0.05); } } }
   /** the place: rain (with drops), wind, an engine (pitch for its revs), the open telephone line (its hiss and hum) */
-  ambient(kind: 'rain' | 'wind' | 'engine' | 'line', amount: number, pitch = 1) { const ac = this.ac; if (!ac) return; const now = ac.currentTime, set = (k: string, a: number) => { const c = this.amb[k]; if (c) c.g.gain.setTargetAtTime(this.on ? a * c.base : 0, now, 0.15); };
+  ambient(kind: 'rain' | 'wind' | 'engine' | 'line' | 'simmer' | 'whistle', amount: number, pitch = 1) { const ac = this.ac; if (!ac) return; const now = ac.currentTime, set = (k: string, a: number) => { const c = this.amb[k]; if (c) c.g.gain.setTargetAtTime(this.on ? a * c.base : 0, now, 0.15); };
     if (kind === 'rain') { set('rain', amount); set('drops', amount); } else if (kind === 'line') { set('line', amount); set('hum', amount); } else set(kind, amount);
     if (kind === 'engine' && this.amb.engine?.o) this.amb.engine.o.frequency.setTargetAtTime(32 * pitch, now, 0.2); }
 
@@ -80,6 +82,11 @@ export class Sound {
       case 'peel': burst(t0, 2200, 0.9, 0.25, 0.4, 'bandpass', this.buf.crackle); burst(t0 + 0.2, 1400, 0.9, 0.12, 0.3, 'bandpass', this.buf.crackle); break;
       case 'blip': { const p = o.pitch ?? 1; tone(t0, (210 + Math.random() * 40) * p, 0.05, 0.035, 'triangle', 0.9); break; }                     // a voice's murmur, one syllable
       case 'chime': tone(t0, 1320, 0.6, 0.06); tone(t0 + 0.12, 1760, 0.7, 0.05); break;
+      case 'drip': tone(t0, 1050, 0.07, 0.045, 'sine', 1.8); burst(t0, 3200, 4, 0.02, 0.04); break;                                                   // a drop into the basin
+      case 'chain': burst(t0, 4200, 6, 0.02, 0.22); tone(t0, 3100, 0.05, 0.025, 'triangle'); burst(t0 + 0.09, 3600, 6, 0.02, 0.16); tone(t0 + 0.1, 900, 0.03, 0.03, 'square'); break;   // the pull chain and the switch inside the socket
+      case 'sash': burst(t0, 260, 0.8, 0.5, 0.32, 'lowpass', this.buf.grit); burst(t0 + 0.05, 900, 1.2, 0.35, 0.07, 'bandpass', this.buf.grit); burst(t0 + 0.5, 140, 1, 0.12, 0.45); break;   // wood in its runners, the bump at the end
+      case 'ignite': burst(t0, 2800, 0.8, 0.18, 0.32, 'bandpass', this.buf.crackle); burst(t0 + 0.14, 1200, 0.6, 0.35, 0.1); burst(t0 + 0.6, 180, 0.8, 0.4, 0.55, 'lowpass'); burst(t0 + 0.6, 900, 0.5, 0.5, 0.07); break;   // a match struck, the gas catching
+      case 'rattle': tone(t0, 1600 + Math.random() * 260, 0.04, 0.022, 'triangle'); burst(t0, 2600, 3, 0.02, 0.05); break;                               // the kettle's lid on the boil
     } }
   private dt: { stop: () => void } | null = null;
   /** the dial tone when the handset is lifted: 350 and 440 Hz, steady (the American 'precise' tone) */

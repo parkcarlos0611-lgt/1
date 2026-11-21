@@ -8,7 +8,7 @@ import imgD0 from '../../assets/people/customer_drink0.png';
 import imgD1 from '../../assets/people/customer_drink1.png';
 import imgD2 from '../../assets/people/customer_drink2.png';
 import imgD3 from '../../assets/people/customer_drink3.png';
-import imgSetting from '../../assets/places/kitchen/setting.png';
+import imgCup from '../../assets/people/teacup.png';
 import imgBase from '../../assets/places/kitchen/base.png';
 import imgRegions from '../../assets/places/kitchen/regions.png';
 import kd from '../../data/places/kitchen.json';
@@ -19,12 +19,12 @@ const M = meta as unknown as { frames: Record<string, F> };
 const URL: Record<string, string> = { sit: imgSit, drink0: imgD0, drink1: imgD1, drink2: imgD2, drink3: imgD3 };
 /** the round of drinking: which frame for how long (seconds) */
 const ROUND: [string, number][] = [['sit', 5.5], ['drink0', 0.35], ['drink1', 0.5], ['drink2', 1.4], ['drink1', 0.45], ['drink3', 0.35]];
-const CUP = { x0: 184, y0: 180, x1: 209, y1: 199 }, SAUCER_ROWS = 5, PLACE = { x: 219, y: 186 };   // the cup and saucer as they stood in the picture; where his goes
+const CUP_W = 24, CUP_H = 14, SAUCER_ROWS = 5, PLACE = { x: 212, y: 183 };   // the cup and saucer (tools/people/teacup.py); where his stands, well on the table top (rows 189..200)
 
 export function visitor() {
   let t = Math.random() * 4;
   return function draw(out: Uint8ClampedArray, dt: number, steam: boolean) { t += dt;
-    const base = pixels(imgBase), reg = pixels(imgRegions), set = pixels(imgSetting); if (!base || !reg || !set) return;
+    const base = pixels(imgBase), reg = pixels(imgRegions), set = pixels(imgCup, CUP_W, CUP_H); if (!base || !reg || !set) return;
     let total = ROUND.reduce((s, r) => s + r[1], 0), u = t % total, frame = 'sit'; for (const [f, d] of ROUND) { if (u < d) { frame = f; break; } u -= d; }
     const fm = M.frames[frame]!, px = pixels(URL[frame]!, fm.size[0], fm.size[1]); if (!px) return;
     // the room's light where he sits: what the wall behind his shoulder shows against its own colour
@@ -41,11 +41,12 @@ export function visitor() {
     const [fx, fy] = fm.at as [number, number], [fw, fh] = fm.size as [number, number];
     for (let y = 0; y < fh; y++) for (let x = 0; x < fw; x++) { const j = (y * fw + x) * 4; if (px[j + 3]! < 128) continue; const X = fx + x, Y = fy + y; if (X < 0 || Y < 0 || X >= W || Y >= H) continue; if (!keep(X, Y) && !(reg[(Y * W + X) * 4] === top && onTable(px, fw, fh, x, y))) continue;
       const i = (Y * W + X) * 4; out[i] = Math.min(255, px[j]! * k * warm[0]!); out[i + 1] = Math.min(255, px[j + 1]! * k * warm[1]!); out[i + 2] = Math.min(255, px[j + 2]! * k * warm[2]!); }
-    // his cup: on its saucer in front of him, or in his hand while he drinks
-    const cupW = CUP.x1 - CUP.x0, cupH = CUP.y1 - CUP.y0, held = fm.hand;
-    for (let y = 0; y < cupH; y++) for (let x = 0; x < cupW; x++) { const j = ((CUP.y0 + y) * W + CUP.x0 + x) * 4; if (set[j + 3]! < 128) continue; const saucer = y >= cupH - SAUCER_ROWS;
-      if (held && !saucer) { const X = Math.round(held[0]! - cupW / 2 + x), Y = Math.round(held[1]! - (cupH - SAUCER_ROWS) + 3 + y); if (X < 0 || Y < 0 || X >= W || Y >= H) continue; const i = (Y * W + X) * 4; out[i] = set[j]! * k; out[i + 1] = set[j + 1]! * k; out[i + 2] = set[j + 2]! * k; continue; }
-      const X = PLACE.x + x, Y = PLACE.y + y, i = (Y * W + X) * 4; out[i] = set[j]! * k; out[i + 1] = set[j + 1]! * k; out[i + 2] = set[j + 2]! * k; }
-    // steam off the hot tea
-    if (steam) { const sx = held ? held[0]! : PLACE.x + cupW / 2, sy = held ? held[1]! - 9 : PLACE.y + 2; for (let n = 0; n < 9; n++) { const a = (t * 0.7 + n / 9) % 1, x = Math.round(sx + Math.sin(a * 6 + n) * 2 * a), y = Math.round(sy - a * 14); if (x < 0 || y < 0) continue; const i = (y * W + x) * 4, w = 0.22 * (1 - a); out[i] = out[i]! + (235 - out[i]!) * w; out[i + 1] = out[i + 1]! + (235 - out[i + 1]!) * w; out[i + 2] = out[i + 2]! + (235 - out[i + 2]!) * w; } } };
+    // his cup: on its saucer in front of him, or in his hand while he drinks; the saucer's soft shadow on the cloth
+    const held = fm.hand; shade(PLACE.x + CUP_W / 2, PLACE.y + CUP_H, 11, 1.6, 0.35);
+    for (let y = 0; y < CUP_H; y++) for (let x = 0; x < CUP_W; x++) { const j = (y * CUP_W + x) * 4; if (set[j + 3]! < 128) continue; const saucer = y >= CUP_H - SAUCER_ROWS;
+      const X = held && !saucer ? Math.round(held[0]! - CUP_W / 2 + x) : PLACE.x + x, Y = held && !saucer ? Math.round(held[1]! - (CUP_H - SAUCER_ROWS) + 3 + y) : PLACE.y + y; if (X < 0 || Y < 0 || X >= W || Y >= H) continue;
+      const i = (Y * W + X) * 4; out[i] = Math.min(255, set[j]! * k); out[i + 1] = Math.min(255, set[j + 1]! * k); out[i + 2] = Math.min(255, set[j + 2]! * k * 0.97); }
+    // steam off the hot tea while the cup stands: two faint wisps that sway as they rise and thin out (none while it is at his lips)
+    if (steam && !held) for (let n = 0; n < 2; n++) { const sx = PLACE.x + 9 + n * 5; for (let h = 0; h < 16; h++) { const a = h / 16, x = sx + Math.sin(t * 1.3 + h * 0.35 + n * 2) * (0.6 + a * 2.2), y = PLACE.y + 1 - h;
+        for (const dx of [0, 1]) { const X = Math.floor(x) + dx, f = dx ? x - Math.floor(x) : 1 - (x - Math.floor(x)); if (X < 0 || y < 0) continue; const i = (y * W + X) * 4, w = 0.13 * (1 - a) * Math.min(1, h / 3) * f * (0.7 + 0.3 * Math.sin(t * 2 + h * 0.5 + n)); out[i] = out[i]! + (240 - out[i]!) * w; out[i + 1] = out[i + 1]! + (240 - out[i + 1]!) * w; out[i + 2] = out[i + 2]! + (238 - out[i + 2]!) * w; } } } };
 }

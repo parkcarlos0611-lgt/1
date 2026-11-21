@@ -33,6 +33,8 @@ export interface Panel {
   bevel?: number;
   /** draw only where a panel whose id starts with this is already showing (two-tone areas, glass, things seen through glass) */
   clip?: string;
+  /** parts this one runs into without a seam (a wing swept into the body): no dark outline where it meets them */
+  join?: string[];
   /** circles cut out of the panel (wheel arches) */
   cut?: { x: number; z: number; r: number }[];
   /** swappable part this panel belongs to */

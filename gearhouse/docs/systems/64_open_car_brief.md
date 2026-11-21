@@ -10,6 +10,10 @@ This brief adds what is new for open cars and names the parts so the four builds
 | fnTT33 | 1933 Frazer Nash TT Replica | left | 2590 mm | 1933 | 1933 light sports |
 | bmw315 | 1935 BMW 315/1 Roadster | right | 2400 mm | 1935 | 1935 roadster |
 
+Checked sizes (2026-11-21): bmw315 wheelbase 2400, length about 3800, width 1440, height 1350, track 1153 front / 1220
+rear (two sources agree, track from one). fnTT33: wheelbase 2590 (8 ft 6 in) is the usual figure; no reliable length,
+width or height was found. Scale by the wheelbase; report how far the sheet's length, width and height are from these.
+
 ## What is new
 - **Scale.** These are low open two-seaters: about 3.3–3.9 m long, 1.15–1.40 m high to the screen top, 1.4–1.6 m wide.
   The sedan range in brief 63 does not apply.
@@ -23,6 +27,11 @@ This brief adds what is new for open cars and names the parts so the four builds
   in the side view, the tail in the top view, the wing's section in the front view). Pick the surface kind that is
   nearest (`fender` for a wing or a rounded tail, `hood` for the bonnet, `side` for the body) and let modelshade.py
   carry the sheet's light, as the sedans did.
+- **Seamless joins.** Every part is outlined where it meets a part drawn before it. Where the sheet shows no seam (a wing
+  that sweeps into the body, a tail that runs on from the body sides), give the later part `join: ['body', ...]` (ids or
+  id prefixes of the parts it runs into): no dark line is drawn between them. Keep the wings their own parts (they are
+  the player's swap slots); do not merge them into the body to hide a seam. Where the real car has a seam or welt, leave
+  the outline.
 
 ## Open body: what is and is not drawn
 - **Not drawn** (as for the sedans, and added for open cars): no seats or cushions, **no steering wheel** or column, no

@@ -57,7 +57,7 @@ export function rasterizeFlat(d0: CarDesign, opt: { frameW?: number; shadow?: bo
   const span = (n: number) => Math.max(1, Math.round(n / MM)), w = Math.ceil(d.length / MM) + PAD * 2, h = Math.ceil(d.height / MM) + PAD * 2, gy = h - PAD;
   const X = (x: number) => PAD + x / MM, Y = (z: number) => gy - z / MM;
   const N = w * h, mat = new Array<Material | null>(N).fill(null), lv = new Int8Array(N), layer = new Int32Array(N).fill(-1), owner = new Int16Array(N).fill(-1), noOutline = new Uint8Array(N);
-  const ids: string[] = [], ownRamp: (Ramp | undefined)[] = [], ownMat: (Material | undefined)[] = [];
+  const ids: string[] = [], ownJoin: (string[] | undefined)[] = [], ownRamp: (Ramp | undefined)[] = [], ownMat: (Material | undefined)[] = [];
   const OWN = new Set<Material>(['paint', 'paint2', 'canvas', 'black', 'rubber', 'iron', 'wood']);
   // ---- method ZY: the reference view's own detail on each element, where the view shows it ----
   const SK = d.skin, skinRGB = new Int32Array(N).fill(-1), skRamp: Partial<Record<Material, RGB[]>> = {};
@@ -98,7 +98,7 @@ export function rasterizeFlat(d0: CarDesign, opt: { frameW?: number; shadow?: bo
   const glassMasks: { m: Uint8Array; bx: number; by: number; bw: number; bh: number; ly: number; id: number }[] = [];
   items.forEach((it, ly) => {
     if (it.k === 'w') { const wi = ids.push('wheel') - 1, s = it.s, S = SK?.elements['wheel' + d.wheels.indexOf(s)], zc = s.z ?? s.r; drawWheel(s, ly, wi); const sig = s.style + ':' + (s.whitewall ?? 0); if (S && S.sig === sig) applySkin(S, wi, s.x - s.r, s.x + s.r, zc - s.r, zc + s.r); const D = DC?.['wheel' + d.wheels.indexOf(s)]; if (D && D.sig === sig) applyDecals(D, wi, s.x - s.r, s.x + s.r, zc - s.r, zc + s.r); return; }
-    const p = it.p, id = ids.push(p.id) - 1, _own = p.color && OWN.has(p.material) ? (ownMat[id] = p.material, ownRamp[id] = p.material === 'paint' || p.material === 'paint2' ? glossy(autoRamp(p.color, { steps: 7, baseIdx: 3, dL: 0.075, shift: 0.06 })) : autoRamp(p.color, { steps: 5, baseIdx: 2, dL: 0.09, shift: 0.08 })) : undefined, poly = smoothClosed(p.pts).map(([x, z]) => [X(x), Y(z)] as [number, number]);
+    const p = it.p, id = ids.push(p.id) - 1, _j = (ownJoin[id] = (p as { join?: string[] }).join), _own = p.color && OWN.has(p.material) ? (ownMat[id] = p.material, ownRamp[id] = p.material === 'paint' || p.material === 'paint2' ? glossy(autoRamp(p.color, { steps: 7, baseIdx: 3, dL: 0.075, shift: 0.06 })) : autoRamp(p.color, { steps: 5, baseIdx: 2, dL: 0.09, shift: 0.08 })) : undefined, poly = smoothClosed(p.pts).map(([x, z]) => [X(x), Y(z)] as [number, number]);
     let x0 = w, x1 = 0, y0 = h, y1 = 0; for (const [px, py] of poly) { x0 = Math.min(x0, px); x1 = Math.max(x1, px); y0 = Math.min(y0, py); y1 = Math.max(y1, py); }
     const bx = Math.max(0, Math.floor(x0) - 1), by = Math.max(0, Math.floor(y0) - 1), bw = Math.min(w, Math.ceil(x1) + 2) - bx, bh = Math.min(h, Math.ceil(y1) + 2) - by; if (bw <= 0 || bh <= 0) return;
     const cov = coverage(poly.map(([px, py]) => [px - bx, py - by] as [number, number]), bw, bh), m = new Uint8Array(bw * bh);
@@ -182,8 +182,12 @@ export function rasterizeFlat(d0: CarDesign, opt: { frameW?: number; shadow?: bo
 
   // ---- outline: where an outlined part meets the background, or a part drawn before it ----
   const out: number[] = [];
+  // seamless joins: owners that run into each other (either side naming the other) get no outline between them
+  const joinOf = (o: number) => ownJoin[o], base = (s: string) => s.replace(/~$/, '');
+  const joined = (a: number, b: number) => { if (a < 0 || b < 0) return false; const ja = joinOf(a), jb = joinOf(b), ia = base(ids[a] ?? ''), ib = base(ids[b] ?? '');
+    return !!(ja?.some(n => ib.startsWith(n)) || jb?.some(n => ia.startsWith(n))); };
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const i = y * w + x, m = mat[i]; if (!m || skinRGB[i]! >= 0 || !OUTLINED.has(m) || noOutline[i] || layer[i]! >= FEAT) continue;
-    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) { const j = at(x + dx, y + dy); if (j < 0 || !mat[j] || mat[j] === 'shadow' || (layer[j]! < layer[i]! && !(noOutline[j] && layer[j]! >= layer[i]! - 0))) { out.push(i); break; } } }
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) { const j = at(x + dx, y + dy); if (j < 0 || !mat[j] || mat[j] === 'shadow' || (layer[j]! < layer[i]! && !(noOutline[j] && layer[j]! >= layer[i]! - 0) && !joined(owner[i]!, owner[j]!))) { out.push(i); break; } } }
   const OUTL = new Uint8Array(N); for (const i of out) OUTL[i] = 1;
   // the outline against the background is drawn two pixels thick all round, roof and bonnet top included (the first build's weight at this scale)
   const empty = (j: number) => j < 0 || !mat[j] || mat[j] === 'shadow', thick = opt.outline ?? 2;

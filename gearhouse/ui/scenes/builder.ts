@@ -6,7 +6,7 @@ import { COL, split } from '../pixel/kit';
 import { hex, type RGB } from '../pixel/screen';
 import { viewDesign, type CarModel } from '../../render/car/model';
 import { rasterizeFlat } from '../../render/car/flat';
-import { SLOTS, assemble, type Slot, type Grade } from '../../render/car/swap';
+import { SLOTS, assemble, NO_ADJUST, type Slot, type Grade, type Adjust } from '../../render/car/swap';
 import fordT from '../../data/cars/sheet/fordT23.json';
 import chev from '../../data/cars/sheet/chevAB28.json';
 import plym from '../../data/cars/sheet/plymU29.json';
@@ -24,11 +24,11 @@ const BG: RGB = hex('#e6e2d6');
 
 export function builderScene(app: App): Scene {
   const ui = app.ui, S = app.S;
-  let base = 1; const pick: Partial<Record<Slot, number>> = {}; let cache: { key: string; side: ReturnType<typeof rasterizeFlat>; front: ReturnType<typeof rasterizeFlat>; fits: ReturnType<typeof assemble>['fits'] } | null = null;
+  let base = 1, sel: Slot = 'grille'; const pick: Partial<Record<Slot, number>> = {}, adj: Partial<Record<Slot, Adjust>> = {}; let cache: { key: string; side: ReturnType<typeof rasterizeFlat>; front: ReturnType<typeof rasterizeFlat>; fits: ReturnType<typeof assemble>['fits'] } | null = null;
   function build() {
-    const key = base + JSON.stringify(pick); if (cache?.key === key) return cache;
+    const key = base + JSON.stringify(pick) + JSON.stringify(adj); if (cache?.key === key) return cache;
     const choice: Partial<Record<Slot, CarModel>> = {}; for (const [s, k] of Object.entries(pick)) choice[s as Slot] = CARS[k!]!.m;
-    const r = assemble(CARS[base]!.m, choice), m = r.model;
+    const r = assemble(CARS[base]!.m, choice, adj), m = r.model;
     const sideMM = Math.max(10, Math.ceil(m.length / 280)), frontMM = Math.max(10, Math.ceil(m.height / 100));
     cache = { key, side: rasterizeFlat(viewDesign(m, 'left'), { mm: sideMM, shadow: true }), front: rasterizeFlat(viewDesign(m, 'front'), { mm: frontMM, shadow: true }), fits: r.fits }; return cache;
   }
@@ -43,11 +43,11 @@ export function builderScene(app: App): Scene {
       ui.label({ ...t!, y: 8, h: 9 }, '부품 빌더 (시험) · 다른 차의 부품을 끼워 본다', COL.cream); if (ui.button('back', b!, '돌아가기')) { app.pop(); return; }
       // the base car
       const left = { x: 4, y: 24, w: 172, h: 222 }; ui.panel(left, 'card'); ui.label({ x: 10, y: 27, w: 160, h: 9 }, '바탕 차', COL.inkSoft);
-      CARS.forEach((c, k) => { const r = { x: 10 + (k % 2) * 81, y: 38 + Math.floor(k / 2) * 15, w: 78, h: 13 }; if (ui.tab('base' + k, r, c.short, base === k)) { base = k; for (const s in pick) delete pick[s as Slot]; } });
+      CARS.forEach((c, k) => { const r = { x: 10 + (k % 2) * 81, y: 38 + Math.floor(k / 2) * 15, w: 78, h: 13 }; if (ui.tab('base' + k, r, c.short, base === k)) { base = k; for (const s in pick) delete pick[s as Slot]; for (const s in adj) delete adj[s as Slot]; } });
       // the slots
       const c = build(); ui.label({ x: 10, y: 100, w: 160, h: 9 }, '자리 · 가져올 차 · 맞음', COL.inkSoft);
       SLOTS.forEach((s, k) => { const y = 111 + k * 15, cur = pick[s.id] ?? base, f = c.fits[s.id] ?? { grade: 'own' as Grade, notes: [], change: 0 };
-        ui.label({ x: 10, y: y + 2, w: 38, h: 9 }, s.name, COL.ink);
+        if (ui.tab('sel' + s.id, { x: 8, y, w: 40, h: 13 }, s.name, sel === s.id)) sel = s.id;   // the slot to reshape
         if (ui.button('p' + s.id, { x: 48, y, w: 12, h: 13 }, '<')) pick[s.id] = (cur + CARS.length - 1) % CARS.length;
         ui.label({ x: 61, y: y + 2, w: 58, h: 9 }, CARS[cur]!.short, cur === base ? COL.inkSoft : COL.ink, 'c');
         if (ui.button('n' + s.id, { x: 120, y, w: 12, h: 13 }, '>')) pick[s.id] = (cur + 1) % CARS.length;
@@ -55,8 +55,15 @@ export function builderScene(app: App): Scene {
       // the car as it comes out
       const right = { x: 180, y: 24, w: 296, h: 222 }; ui.panel(right, 'card');
       blit(c.side, 184, 28, 288, 132); blit(c.front, 184, 164, 96, 78);
-      let ny = 166; for (const s of SLOTS) { const f = c.fits[s.id]; if (!f || f.grade === 'own') continue; if (ny > 236) break;
-        ui.label({ x: 286, y: ny, w: 186, h: 9 }, `${s.name}: ${GRADE[f.grade][0]} · ${f.notes.join(', ')}`, f.grade === 'no' ? COL.bad : COL.ink); ny += 10; }
+      let ny = 166; for (const s of SLOTS) { const f = c.fits[s.id]; if (!f || f.grade === 'own') continue; if (ny > 196) break;
+        ny += 10 * ui.paragraph({ x: 286, y: ny, w: 186, h: 20 }, `${s.name}: ${GRADE[f.grade][0]} · ${f.notes.join(', ')}`, f.grade === 'no' ? COL.bad : COL.ink); }
       if (ny === 166) ui.label({ x: 286, y: 166, w: 186, h: 9 }, '왼쪽에서 자리마다 가져올 차를 고른다', COL.inkSoft);
+      // reshaping the chosen slot's part: size, width, length (the wheels keep their size: their spec changes, not their scale)
+      const name = SLOTS.find(q => q.id === sel)!.name, a = adj[sel] ?? NO_ADJUST; S.hline(286, 471, 208, COL.card2);
+      ui.label({ x: 286, y: 210, w: 186, h: 9 }, sel === 'wheel' ? '바퀴는 규격만 바꾼다' : `${name} 모양 바꾸기 (자리에 맞춘 크기 대비)`, COL.inkSoft);
+      if (sel !== 'wheel') (['size', 'width', 'length'] as const).forEach((k, i) => { const x = 286 + i * 62;
+        ui.label({ x, y: 220, w: 60, h: 9 }, ({ size: '크기', width: '폭', length: '길이' } as const)[k], COL.ink);
+        const v = ui.stepper(`adj-${k}`, { x, y: 230, w: 60, h: 13 }, Math.round(a[k] * 100), { min: 60, max: 150, step: 5 }, n => `${n}%`);
+        if (v !== null) { const n = { ...a, [k]: v / 100 }; if (n.size === 1 && n.width === 1 && n.length === 1) delete adj[sel]; else adj[sel] = n; } });
     } };
 }

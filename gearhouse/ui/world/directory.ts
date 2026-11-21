@@ -16,6 +16,7 @@ import type { BookState } from '../../core/house';
 import cut from '../../data/places/phone_cut.json';
 import dir from '../../data/directory/millbrook_1930.json';
 import imgOpen from '../../assets/places/phone/book_open.jpg';
+import imgCover from '../../assets/places/phone/cover.png';
 
 export interface Entry { id: string; trade?: string; name: string; ko: string; addr: string; no: string; supplier?: string; hello?: string; grocer?: { item: string; ko: string; price: number }[]; long?: boolean; short?: string }
 interface Ad { after: string; head: string[]; lines: string[]; phone: string; ko: string }
@@ -30,7 +31,7 @@ const H_ = { title: 0, trade: 36, entry: 40, ad: 116, long: 36 }, TOP = 42, ROOM
 const TABS: [string, string, (b: Block) => boolean][] = [
   ['A', 'A–C', b => b.kind === 'trade' && b.en < 'D'], ['D', 'D–G', b => b.kind === 'trade' && b.en >= 'D' && b.en < 'H'], ['H', 'H–N', b => b.kind === 'trade' && b.en >= 'H' && b.en < 'P'],
   ['P', 'P–T', b => b.kind === 'trade' && b.en >= 'P'], ['L', '장거리', b => b.kind === 'long'] ];
-const W = 480, H = 270, CLOSED: Rect = { x: 258, y: 40, w: 150, h: 190 };
+const W = 480, H = 270, CLOSED: Rect = { x: 268, y: 38, w: 134, h: 191 };
 
 function layout(): Placed[][] {
   const blocks: Block[] = [];
@@ -58,10 +59,14 @@ export function directoryBook(app: App, state: () => BookState) {
     const c = cv.getContext('2d')!, centre = (s: string, y: number, font: string, colour = INK, sp = 0) => { c.font = font; c.fillStyle = colour; setSpacing(c, sp); c.textAlign = 'center'; c.fillText(s, mL + cw / 2, y); c.textAlign = 'left'; setSpacing(c, 0); };
     const rule = (y: number, w = 1, colour = INK2) => { c.fillStyle = colour; c.fillRect(mL, y, cw, w); };
     for (const { b, y: by } of pages[idx] ?? []) { const y = TOP + by;
-      if (b.kind === 'title') { if (fresh) { centre('MILLBROOK', 150, `700 46px ${SERIF}`, INK, 3); centre('TELEPHONE', 198, `400 30px ${SERIF}`, INK, 6); centre('DIRECTORY', 236, `400 30px ${SERIF}`, INK, 6);
-          rule(262, 2, INK); rule(266, 1); centre(String(DIR.year), 316, `500 44px ${COND}`, RED, 4); rule(340, 1); rule(344, 2, INK);
-          DIR.howTo.forEach((s, k) => centre(s.charAt(0) + s.slice(1).toLowerCase(), 388 + k * 22, `italic 400 15px ${SERIF}`, INK2)); centre('CLASSIFIED SECTION', 530, `500 17px ${COND}`, INK, 3); centre('Trades in alphabetical order', 554, `italic 400 13px ${SERIF}`, INK2);
-          centre('MILLBROOK & TRI-COUNTY TELEPHONE CO.', 628, `400 12px ${SERIF}`, INK2, 2); } continue; }
+      if (b.kind === 'title') { if (fresh) {   // page two, as the directories of 1929-30 had it: how to use the book, and the town in figures
+          centre('PAGE TWO', 70, `400 12px ${SERIF}`, INK2, 3); centre('How to Use', 112, `700 30px ${SERIF}`); centre('the Classified Telephone Directory', 142, `italic 400 17px ${SERIF}`); rule(158, 2, INK); rule(162, 1);
+          const how = ['Locate the heading which describes the article,', 'service or business you wish. Under it you will', 'find the business houses ready to serve you,', 'with their addresses and telephone numbers.', '', 'To call: lift the receiver, wait for the dial', 'tone, then dial the number wanted. For the', 'Operator, or for Long Distance, dial 0.'];
+          how.forEach((t, k) => centre(t, 190 + k * 19, `400 14px ${SERIF}`, INK)); rule(352, 1);
+          centre('MILLBROOK', 384, `700 20px ${SERIF}`, INK, 4); centre('Its Book for Its People', 404, `italic 400 13px ${SERIF}`, INK2);
+          const facts: [string, string][] = [['POPULATION', '6,400'], ['FACTORIES', '14 mills, 1,900 hands'], ['BANKS', 'Savings and national'], ['RAILROAD', 'N. Y. Central, freight'], ['ROADS', 'State highway, paved 1928']];
+          facts.forEach(([h, v], k) => { const y = 440 + k * 30; c.font = `500 12px ${COND}`; c.fillStyle = INK; setSpacing(c, 1.5); c.fillText(h + ' —', mL, y); setSpacing(c, 0); c.font = `400 14px ${SERIF}`; c.fillStyle = INK; c.fillText(v, mL + 104, y); });
+          centre('MILLBROOK & TRI-COUNTY TELEPHONE CO.', 628, `400 11px ${SERIF}`, INK2, 2); } continue; }
       if (b.kind === 'trade' || b.kind === 'long') { if (fresh) { rule(y + 4, 2, INK); rule(y + 8, 1); centre(b.kind === 'long' ? 'LONG DISTANCE — CALL THE OPERATOR' : b.en, y + 26, `500 15px ${COND}`, INK, 2); rule(y + 31, 1); }
         hits.push({ r: { x: x0 + mL, y: y0 + y, w: cw, h: 34 }, tip: b.kind === 'long' ? '장거리 — 0번 교환원에게' : b.ko }); continue; }
       if (b.kind === 'entry') { const e = b.e, no = e.long ? 'Call 0' : e.no || 'no tel.';
@@ -89,7 +94,10 @@ export function directoryBook(app: App, state: () => BookState) {
 
   // ---------------- the book on the page ----------------
   /** where the open book lies on the screen (game pixels); growing from the closed book while it opens */
-  function dest(): Rect { const h = 258, w = (h * O.size[0]!) / O.size[1]!, full = { x: (W - w) / 2, y: (H - h) / 2, w, h }, e = 1 - (1 - anim) ** 3;
+  /** the cover on its way up from the desk */
+  function coverRect(): Rect { const u = 1 - (1 - Math.min(1, anim / 0.5)) ** 3, h = CLOSED.h + (250 - CLOSED.h) * u, w = (h * 422) / 602; return { x: CLOSED.x + ((W - w) / 2 - CLOSED.x) * u, y: CLOSED.y + ((H - h) / 2 - CLOSED.y) * u, w, h }; }
+  function dest(): Rect { const h = 258, w = (h * O.size[0]!) / O.size[1]!, full = { x: (W - w) / 2, y: (H - h) / 2, w, h }, e = anim < 0.5 ? 0 : 1 - (1 - (anim - 0.5) / 0.5) ** 3;
+    if (anim >= 0.5) { const cw = (250 * 422) / 602, from = { x: (W - cw) / 2, y: (H - 250) / 2, w: cw, h: 250 }; return { x: from.x + (full.x - from.x) * e, y: from.y + (full.y - from.y) * e, w: from.w + (full.w - from.w) * e, h: from.h + (full.h - from.h) * e }; }
     return { x: CLOSED.x + (full.x - CLOSED.x) * e, y: CLOSED.y + (full.y - CLOSED.y) * e, w: CLOSED.w + (full.w - CLOSED.w) * e, h: CLOSED.h + (full.h - CLOSED.h) * e }; }
   /** draw a page's print onto the book, bent down into the gutter: narrower and shorter towards the spine */
   function bend(c: CanvasRenderingContext2D, src: HTMLCanvasElement, side: 0 | 1, d: Rect, sc: number) { const [x0, y0, x1, y1] = pageBox(side), pw = x1 - x0, ph = y1 - y0, step = 3;
@@ -98,7 +106,9 @@ export function directoryBook(app: App, state: () => BookState) {
       c.drawImage(src, sx, 0, step, ph, d.x + Math.min(xa, xb) * sc, d.y + yy * sc, Math.abs(xb - xa) * sc + 0.4, hh * sc); } }
 
   function draw(c: CanvasRenderingContext2D) { const d = dest(), sc = d.w / O.size[0]!, sp = spread(), spine = O.spine;
-    c.clearRect(0, 0, W, H); if (!img) return; c.imageSmoothingEnabled = true; c.imageSmoothingQuality = 'high';
+    c.clearRect(0, 0, W, H); if (!img) return;
+    if (anim < 0.5) { const cv = coverCanvas(); if (cv) { const r = coverRect();   // the cover first, lifted to the eye
+        c.imageSmoothingEnabled = true; c.imageSmoothingQuality = 'high'; c.save(); c.shadowColor = 'rgba(0,0,0,0.55)'; c.shadowBlur = 14; c.shadowOffsetY = 5; c.drawImage(cv, r.x, r.y, r.w, r.h); c.restore(); return; } } c.imageSmoothingEnabled = true; c.imageSmoothingQuality = 'high';
     c.save(); c.shadowColor = 'rgba(0,0,0,0.55)'; c.shadowBlur = 14; c.shadowOffsetY = 5; c.drawImage(img, d.x, d.y, d.w, d.h); c.restore();
     const showL = turn && turn.dir < 0 ? sp - 2 : sp, showR = turn && turn.dir > 0 ? sp + 3 : sp + 1;
     bend(c, print(showL, 0).cv, 0, d, sc); bend(c, print(showR, 1).cv, 1, d, sc);
@@ -120,31 +130,47 @@ export function directoryBook(app: App, state: () => BookState) {
     TABS.forEach(([letter], n) => { const tx = d.x + (O.right[2]! - 12) * sc, ty = d.y + (110 + n * 96) * sc, tw = 18 * sc, th = 52 * sc; c.fillStyle = 'rgba(58,34,22,0.92)'; c.fillRect(tx, ty, tw, th);
       c.fillStyle = 'rgba(236,222,190,0.95)'; c.font = `700 ${Math.round(15 * sc * 10) / 10}px ${SERIF}`; c.textAlign = 'center'; c.fillText(letter, tx + tw / 2 - sc, ty + th / 2 + 5 * sc); c.textAlign = 'left'; }); }
 
+  (globalThis as { __cover?: () => string | undefined }).__cover = () => coverCanvas()?.toDataURL();   // for review pictures
+
   // ---------------- the book shut, on the desk (pixels) ----------------
-  function drawClosed(k: number, hover: boolean) { const r = CLOSED, d = S.d, put = (x: number, y: number, c: RGB, a = 1) => { if (x < 0 || y < 0 || x >= W || y >= H) return; const i = (y * W + x) * 4; d[i] = d[i]! + (c[0] * k - d[i]!) * a; d[i + 1] = d[i + 1]! + (c[1] * k - d[i + 1]!) * a; d[i + 2] = d[i + 2]! + (c[2] * k - d[i + 2]!) * a; d[i + 3] = 255; };
-    const hash = (x: number, y: number) => { let h = (x * 374761393 + y * 668265263) | 0; h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
-    for (let y = r.y + 4; y < r.y + r.h + 6; y++) for (let x = r.x + 4; x < r.x + r.w + 7; x++) { const e = Math.min(x - r.x - 4, y - r.y - 4, r.x + r.w + 7 - x, r.y + r.h + 6 - y); put(x, y, [16, 8, 4], Math.min(0.5, e / 8)); }   // its shadow
-    for (let y = r.y + 2; y < r.y + r.h + 2; y++) for (let x = r.x + r.w - 2; x < r.x + r.w + 3; x++) put(x, y, (y + x) % 3 ? [222, 204, 164] : [176, 156, 118]);   // the page block's edge
-    for (let x = r.x + 2; x < r.x + r.w + 2; x++) for (let y = r.y + r.h - 2; y < r.y + r.h + 2; y++) put(x, y, (x + y) % 3 ? [214, 196, 156] : [170, 150, 112]);
-    for (let y = r.y; y < r.y + r.h; y++) for (let x = r.x; x < r.x + r.w; x++) { const n = hash(x >> 1, y >> 1) * 0.5 + hash(x, y) * 0.5, edge = Math.min(x - r.x, y - r.y, r.x + r.w - 1 - x, r.y + r.h - 1 - y), spineBand = x - r.x < 14;
-      let c: RGB = [128 + n * 22, 64 + n * 12, 32 + n * 8]; if (spineBand) c = [96 + n * 18, 46 + n * 10, 24 + n * 6]; if (spineBand && [38, 40, 150, 152].includes(y - r.y)) c = [150, 92, 52];
-      if (edge < 2) c = [c[0] * 0.7, c[1] * 0.7, c[2] * 0.7]; if (edge === 2) c = [c[0] * 1.12, c[1] * 1.12, c[2] * 1.12];
-      const inset = Math.min(x - r.x - 20, y - r.y - 10, r.x + r.w - 11 - x, r.y + r.h - 11 - y); if (inset === 0) c = [c[0] * 0.72, c[1] * 0.72, c[2] * 0.72]; if (inset === -1) c = [c[0] * 1.15, c[1] * 1.15, c[2] * 1.15];
-      put(x, y, c); }
-    const gold: RGB = [218, 182, 104], goldD: RGB = [92, 60, 28], cx = r.x + 14 + (r.w - 14) / 2, stamp = (txt: string, y: number, font: string, sp = 0) => {   // gold leaf pressed into the leather: a dark edge under, the gold on top
-      printText(txt, cx + 0.6, y + 0.8, { font, align: 'center', spacing: sp }, (px, py, a) => put(px, py, goldD, a * 0.8)); printText(txt, cx, y, { font, align: 'center', spacing: sp }, (px, py, a) => put(px, py, gold, a)); };
-    stamp('MILLBROOK', r.y + 48, `700 9px ${SERIF}`, 1.5); stamp('TELEPHONE', r.y + 72, `400 14px ${SERIF}`, 1.2); stamp('DIRECTORY', r.y + 90, `400 14px ${SERIF}`, 1.2);
-    for (let x = cx - 30; x <= cx + 30; x++) { put(x, r.y + 100, gold, 0.8); put(x, r.y + 103, gold, 0.5); } stamp('1930', r.y + 122, `500 15px ${GOTHIC}`, 2);
-    for (let a = 0; a < Math.PI * 2; a += 0.05) { put(Math.round(cx + Math.cos(a) * 10), Math.round(r.y + 140 + Math.sin(a) * 10), gold); }   // a bell in a ring
-    for (let y = -6; y <= 5; y++) for (let x = -5; x <= 5; x++) { const w = 1.5 + (y + 6) * 0.35; if (Math.abs(x) <= w && y < 5) put(cx + x, r.y + 140 + y, y === -6 ? goldD : gold); }
-    if (hover) for (let x = r.x; x < r.x + r.w; x++) { put(x, r.y, [255, 226, 150]); put(x, r.y + r.h - 1, [255, 226, 150]); } }
+  /** the cover, printed as the classified directories of 1929-30 were (review 51): an advertisement across the top,
+   *  the town, CLASSIFIED TELEPHONE DIRECTORY, the season of issue and the date it was corrected to, the line saying what
+   *  is in it, "see page two", the company's name, and its small print (not liable for errors; the book is the
+   *  company's and goes back when the next one comes). Printed over the planner's cover paper and its engraving. */
+  let cover: HTMLCanvasElement | null = null, coverKey = '', coverImg: HTMLImageElement | null = null;
+  { const ci = new Image(); ci.onload = () => { coverImg = ci; }; ci.src = imgCover; }
+  function coverCanvas(): HTMLCanvasElement | null { if (!coverImg) return null; const year = DIR.year, key = `${year}|${fontsReady}`; if (cover && coverKey === key) return cover;
+    const cw = coverImg.width, ch = coverImg.height, cv = document.createElement('canvas'); cv.width = cw; cv.height = ch; const c = cv.getContext('2d')!; c.drawImage(coverImg, 0, 0);
+    const ink = 'rgba(34,24,18,0.9)', red = 'rgba(132,34,22,0.88)', mid = cw / 2;
+    const say = (t: string, y: number, font: string, colour = ink, sp = 0) => { c.font = font; c.fillStyle = colour; setSpacing(c, sp); c.textAlign = 'center'; c.fillText(t, mid, y); c.textAlign = 'left'; setSpacing(c, 0); };
+    c.globalCompositeOperation = 'multiply';   // ink sinks into the paper
+    // the advertisement across the head of the cover
+    c.strokeStyle = ink; c.lineWidth = 1.6; c.strokeRect(78, 31, cw - 156, 40); c.lineWidth = 0.6; c.strokeRect(82, 35, cw - 164, 32);
+    say('KESSLER HARDWARE', 49, `700 13px ${SERIF}`, red, 1.5); say('Paints · Lacquers · Tools · Sheet Iron  —  Telephone 3375', 62, `italic 400 9px ${SERIF}`);
+    say('MILLBROOK AND VICINITY', 116, `700 13px ${SERIF}`, ink, 2.5);
+    say('Classified', 158, `700 38px ${SERIF}`); say('Telephone', 196, `700 38px ${SERIF}`); say('Directory', 226, `700 30px ${SERIF}`, ink, 1);
+    say(`SPRING ${year}`, 262, `500 19px ${COND}`, red, 3); say(`Corrected to March 15, ${year}`, 280, `italic 400 11px ${SERIF}`);
+    const para = ['Classified lists of Millbrook business houses who are', 'subscribers to the telephone service, arranged in', 'alphabetical order under their respective business headings.'];
+    para.forEach((t, k) => say(t, 304 + k * 12, `400 9.5px ${SERIF}`)); say('See Page Two for Complete Information on Use of this Directory', 348, `italic 400 9px ${SERIF}`);
+    say('MILLBROOK & TRI-COUNTY TELEPHONE COMPANY', 372, `500 10px ${COND}`, ink, 1.6);
+    say('The Company is not liable for errors or omissions.', 388, `400 7px ${SERIF}`); say('This book is the property of the Company and must be returned', 397, `400 7px ${SERIF}`); say('upon delivery of a copy of the next issue.', 406, `400 7px ${SERIF}`);
+    c.globalCompositeOperation = 'source-over'; cover = cv; coverKey = key; return cv; }
+
+  // ---------------- the book shut, on the desk (pixels) ----------------
+  let small: { px: Uint8ClampedArray; key: string } | null = null;
+  function drawClosed(k: number, hover: boolean) { const r = CLOSED, d = S.d, put = (x: number, y: number, c: number[], a = 1) => { if (x < 0 || y < 0 || x >= W || y >= H) return; const i = (y * W + x) * 4; d[i] = d[i]! + (c[0]! * k - d[i]!) * a; d[i + 1] = d[i + 1]! + (c[1]! * k - d[i + 1]!) * a; d[i + 2] = d[i + 2]! + (c[2]! * k - d[i + 2]!) * a; d[i + 3] = 255; };
+    for (let y = r.y + 3; y < r.y + r.h + 6; y++) for (let x = r.x + 3; x < r.x + r.w + 7; x++) { const e = Math.min(x - r.x - 3, y - r.y - 3, r.x + r.w + 7 - x, r.y + r.h + 6 - y); put(x, y, [16 / k, 8 / k, 4 / k], Math.min(0.5, e / 8)); }   // its shadow on the desk
+    const cv = coverCanvas(); if (!cv) return; const key = coverKey;
+    if (!small || small.key !== key) { const t = document.createElement('canvas'); t.width = r.w; t.height = r.h; const c = t.getContext('2d')!; c.imageSmoothingEnabled = true; c.imageSmoothingQuality = 'high'; c.drawImage(cv, 0, 0, r.w, r.h); small = { px: c.getImageData(0, 0, r.w, r.h).data, key }; }
+    for (let y = 0; y < r.h; y++) for (let x = 0; x < r.w; x++) { const j = (y * r.w + x) * 4, a = small.px[j + 3]! / 255; if (a < 0.05) continue; put(r.x + x, r.y + y, [small.px[j]!, small.px[j + 1]!, small.px[j + 2]!], a); }
+    if (hover) for (let x = r.x; x < r.x + r.w; x++) { put(x, r.y - 2, [255 / k, 226 / k, 150 / k], 0.8); put(x, r.y + r.h + 1, [255 / k, 226 / k, 150 / k], 0.8); } }
 
   // ---------------- the hand on the book ----------------
   function frame(dt: number): { closed: boolean } { const f = app.fine(), d = dest(), sc = d.w / O.size[0]!, p = ui.pointer();
-    anim = Math.min(1, anim + dt / 0.28); if (turn) { turn.t += dt / 0.5; if (turn.t >= 1) { state().page = Math.max(0, Math.min(pages.length - 2, spread() + turn.dir * 2)); turn = null; } }
+    const was = anim; anim = Math.min(1, anim + dt / (anim < 0.5 ? 0.7 : 0.35)); if (was < 0.5 && anim >= 0.5) app.sound.once('paper'); if (turn) { turn.t += dt / 0.5; if (turn.t >= 1) { state().page = Math.max(0, Math.min(pages.length - 2, spread() + turn.dir * 2)); turn = null; } }
     // the room behind darkens; where the book lies the pixel screen is left clear so the fine print shows
     for (let i = 0; i < W * H * 4; i += 4) { S.d[i] = S.d[i]! * 0.42; S.d[i + 1] = S.d[i + 1]! * 0.4; S.d[i + 2] = S.d[i + 2]! * 0.38; }
-    for (let y = Math.max(0, Math.floor(d.y)); y < Math.min(H, Math.ceil(d.y + d.h)); y++) for (let x = Math.max(0, Math.floor(d.x)); x < Math.min(W, Math.ceil(d.x + d.w)); x++) S.d[(y * W + x) * 4 + 3] = 0;
+    const hole = anim < 0.5 ? coverRect() : d; for (let y = Math.max(0, Math.floor(hole.y)); y < Math.min(H, Math.ceil(hole.y + hole.h)); y++) for (let x = Math.max(0, Math.floor(hole.x)); x < Math.min(W, Math.ceil(hole.x + hole.w)); x++) S.d[(y * W + x) * 4 + 3] = 0;
     if (ready) draw(f.ctx);
     if (anim < 1) return { closed: false };
     // the pointer, in the picture's own pixels

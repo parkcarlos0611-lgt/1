@@ -6,7 +6,7 @@ import { Front2GL } from '../../render/place/front2gl';
 import { air, moon, dayOfYear } from '../../core/atmosphere';
 import { newGround } from '../../core/ground';
 import { newHouse } from '../../core/house';
-import { carSprite, carTurns, stepCar, along, depthScale, TURN_X, KERB_GROUND, type CarSprite, type CarMotion } from './car';
+import { carSprite, carTurns, stepCar, along, depthScale, TURN_X, TURN_IN, KERB_GROUND, type CarSprite, type CarMotion } from './car';
 import { pixels } from './pics';
 import cut from '../../data/places/front2_cut.json';
 import p_garage from '../../assets/places/front2/garage.png';
@@ -108,13 +108,13 @@ export function frontPlace(app: App) {
   function carFrame(dt: number, outdoorTemp: number) { const W = app.world!, h = house();
     if (!car && h.car) { try { W.repair.view(h.car); car = { job: h.car, frames: null, m: { s: 0, v: 0, wheel: 0, state: 'parked', t: 9 }, puffs: [] }; } catch { h.car = undefined; } }
     if (!car) return null;
-    if (!car.frames) { const v = W.repair.view(car.job), side = carSprite(v.colour, v.damages); if (!side) return null; car.frames = carTurns(side, v.colour); }
+    if (!car.frames) { const v = W.repair.view(car.job), side = carSprite(v.colour, v.damages); if (!side) return null; car.frames = TURN_IN ? carTurns(side, v.colour) : [side]; }
     const m = car.m, was = m.state; stepCar(m, dt, car.frames[0]!.hubs[0]![2]);
     if (m.state === 'gone') { car = null; h.car = undefined; app.sound.ambient('engine', 0); return null; }
     const running = m.state !== 'parked'; app.sound.ambient('engine', running ? (m.state === 'idle' ? 0.45 : 0.75) : 0, 0.8 + m.v / 70);
     if (was === 'idle' && m.state === 'parked') app.sound.once('knock', { vol: 0.6 });   // the engine off, the door shut
     // where it is: along the way in (or, leaving, back out and away to the left), turned as the way turns, smaller further up the drive
-    const p = m.state === 'leave' && (m.away ?? 0) > 0 ? { x: TURN_X - m.away!, y: KERB_GROUND, yaw: 0 } : along(m.s), k = Math.min(12, Math.round(p.yaw / 7.5)), sp = car.frames[k]!, sc = depthScale(p.y);
+    const p = m.state === 'leave' && (m.away ?? 0) > 0 ? { x: (TURN_IN ? TURN_X : along(m.s).x) - m.away!, y: KERB_GROUND, yaw: 0 } : along(m.s), k = Math.min(car.frames.length - 1, Math.round(p.yaw / 7.5)), sp = car.frames[k]!, sc = depthScale(p.y);
     // exhaust from the tail pipe while the engine runs: thick in the cold
     if (running && Math.random() < dt * (outdoorTemp < 8 ? 14 : 5)) { const tx = k === 0 ? sp.tail[0] - sp.anchor[0] : k === 12 ? sp.tail[0] - sp.anchor[0] : sp.w * 0.45, ty = k === 0 || k === 12 ? sp.tail[1] - sp.anchor[1] : -6; car.puffs.push({ x: p.x + tx * sc, y: p.y + ty * sc, age: 0 }); }
     for (const q of car.puffs) { q.age += dt; q.x += dt * (6 + m.v * 0.3) + Math.sin(q.age * 3) * dt * 2; q.y -= dt * 4; } car.puffs = car.puffs.filter(q => q.age < 2.2);

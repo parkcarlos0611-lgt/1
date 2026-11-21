@@ -87,8 +87,11 @@ export const depthScale = (y: number) => 0.92 + Math.max(0, Math.min(1, (y - 172
 /** the way in: along the road from the right, round into the drive, up it to stand before the right-hand garage door */
 export const TURN_X = 470, TURN_R = 44, STOP_Y = 188;
 export interface CarPath { x: number; y: number; yaw: number }
+/** turning into the drive with the turned pictures is kept but switched off (planner, 2026-11-21): the car comes along the
+ *  road and stops at the kerb before the house */
+export const TURN_IN = false, KERB_X = 268;
 /** where the car is at a distance `s` (screen pixels) along the way in, counted from where it stands at the end */
-export function along(s: number): CarPath { const arc = TURN_R * Math.PI / 2, upLen = (KERB_GROUND - TURN_R * 0.75) - STOP_Y;
+export function along(s: number): CarPath { if (!TURN_IN) return { x: KERB_X + s, y: KERB_GROUND, yaw: 0 }; const arc = TURN_R * Math.PI / 2, upLen = (KERB_GROUND - TURN_R * 0.75) - STOP_Y;
   if (s <= upLen) return { x: TURN_X - TURN_R, y: STOP_Y + s, yaw: 90 };
   if (s <= upLen + arc) { const f = (s - upLen) / arc, ph = (1 - f) * Math.PI / 2; return { x: TURN_X - TURN_R * Math.sin(ph), y: KERB_GROUND - TURN_R * (1 - Math.cos(ph)) * 0.75, yaw: ph * 180 / Math.PI }; }
   return { x: TURN_X + (s - upLen - arc), y: KERB_GROUND, yaw: 0 }; }
@@ -99,5 +102,5 @@ export function stepCar(c: CarMotion, dt: number, r: number) {
   c.t += dt; let ds = 0;
   if (c.state === 'arrive') { const target = Math.min(70, Math.max(0, c.s * 1.1), c.s > 0 && along(c.s).yaw > 0 ? 26 : 70); c.v += Math.max(-60 * dt, Math.min(30 * dt, target - c.v)); ds = -Math.min(c.v * dt, c.s); c.s += ds; if (c.s < 0.3 && c.v < 3) { c.s = 0; c.v = 0; c.state = 'idle'; c.t = 0; } }
   else if (c.state === 'idle' && c.t > 3.2) { c.state = 'parked'; c.t = 0; }
-  else if (c.state === 'leave') { const p = along(c.s); c.v = Math.min(p.yaw > 0 ? 22 : 80, c.v + 20 * dt); if (p.yaw > 0 || c.s < 1) { ds = c.v * dt; c.s += ds; } else { c.away = (c.away ?? 0) + c.v * dt; ds = c.v * dt; } if ((c.away ?? 0) > 700) c.state = 'gone'; }
+  else if (c.state === 'leave') { const p = along(c.s); c.v = Math.min(p.yaw > 0 ? 22 : 80, c.v + 20 * dt); if (TURN_IN && (p.yaw > 0 || c.s < 1)) { ds = c.v * dt; c.s += ds; } else { c.away = (c.away ?? 0) + c.v * dt; ds = c.v * dt; } if ((c.away ?? 0) > 700) c.state = 'gone'; }
   c.wheel += (c.state === 'leave' && (c.away ?? 0) > 0 ? ds : -ds) / r; }

@@ -215,9 +215,12 @@ export class Front2 {
       return [wall, wall * 0.8, wall * 0.6]; };                                                                           // papered walls, darker as they come nearer
     const hallLight = (x: number, y: number, ap: number) => { const fl = y > 46 ? 1 : 0, far = x >= 6 && x < 14 && y >= 16 && y < 46 ? 0.5 : 0; return 0.14 + far + (0.34 + 0.18 * fl) * ap * outdoor; };
     leaf(161, 181, 100, 162, e.door, 'r', true, (x, y) => hall(x, y), 1, e.door, hallLight, 3);
-    if (e.door > 0.01 && e.houseLit) { const op = Math.sin(e.door * 1.35), cx = 171;   // the spill: a wedge widening down the steps and along the path
-      for (let y = 160; y < 214; y++) { const dy = y - 160, half = 3 + op * (9 + dy * 0.55), k = 0.85 * op * Math.exp(-dy / 30);
-        for (let x = Math.floor(cx - half - 2); x <= cx + half + 2; x++) { if (x < 0 || x >= W) continue; const edge = clamp((half + 1 - Math.abs(x - cx)) / 1.6) * (0.85 + 0.15 * Math.sin(x * 0.9)); this.dWarm[y * W + x] = Math.max(this.dWarm[y * W + x]!, k * edge); } } }
+    // the spill: the hall's light comes out only through the gap between the left jamb and the door's free edge, so the
+    // patch it throws down the steps and along the path is that gap carried outwards and down: its left side fixed by
+    // the jamb, its right side following the door as it swings; brightest where the gap is widest
+    if (e.door > 0.01 && e.houseLit) { const th = e.door * 1.35, gapL = 161, gapR = 181 - 20 * Math.abs(Math.cos(th)), gw = Math.max(0, gapR - gapL), op = gw / 20;
+      for (let y = 160; y < 214; y++) { const dy = y - 160, spread = dy * 0.42, x0 = gapL - spread * 0.55, x1 = gapR + spread * (0.55 + 0.6 * op), k = 0.9 * Math.min(1, op * 1.6) * Math.exp(-dy / 32);
+        for (let x = Math.floor(x0 - 2); x <= x1 + 2; x++) { if (x < 0 || x >= W) continue; const edge = clamp(Math.min(x - x0 + 1, x1 - x + 1) / 1.6) * (0.85 + 0.15 * Math.sin(x * 0.9)); this.dWarm[y * W + x] = Math.max(this.dWarm[y * W + x]!, k * edge); } } }
 
     // the garage inside: board walls in shadow, a small window high on the back wall, a bench along it with a few tools,
     // the concrete floor brighter the nearer the door. How much daylight comes in follows how far each bay is open.

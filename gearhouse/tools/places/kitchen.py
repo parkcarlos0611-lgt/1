@@ -1,144 +1,135 @@
-"""Take the kitchen reference picture apart into the pieces the game lights and moves (review 42).
+"""Take the kitchen picture apart into the pieces the game lights and moves (reviews 42, 44).
 
-    python3 tools/places/kitchen.py <reference.png>   ->  assets/places/kitchen/{base,lamp,far,regions}.png
+    python3 tools/places/kitchen.py <kitchen.png>   ->  assets/places/kitchen/{base,lamp,far,setting,regions}.png
 
-- base.png: the room with nothing that changes baked in: the cups, the teapot, the jug and their steam are taken off the
-  table, the lamp's pool of light is taken off the wall, the lamp is taken off (the wallpaper filled in behind it).
-  What is left is the room under even light: the game multiplies it by the light it works out.
-- lamp.png: the hanging lamp on its own (alpha), drawn swinging; the game finds the bulb by its brightness.
-- far.png: the fields and the farmhouse seen through the window (alpha), drawn under the game's own sky.
-- regions.png: what every pixel is (red channel = region number, see data/places/kitchen.json).
-All at 480x270, the game's size; the colours are kept (the game dithers to 15-bit colour when it draws).
+The picture is the planner's second kitchen (2026-11-21): even daylight, the lamp off, nothing glowing, so the
+painting is kept as it is (no light to divide out). Taken out of it:
+- the table's china (butter dish, two cups, the jug) and the steam over the cups: kept as sprites (setting.png) for
+  when a customer sits down, and filled in behind (the boards behind run upright, so a column's own pixels above fill
+  it; the cloth's checks repeat across, so the check one over fills it)
+- the lamp (lamp.png, off as painted; the game lights its bulb): its mask is the pixels unlike the wallpaper filled in
+  behind it, cleaned of single stray pixels and pinholes so no fringe of wallpaper comes away with it
+- the fields and farmhouse beyond the window (far.png): the game draws its own sky
+- a map of what every pixel is (regions.png, red channel = region number, data/places/kitchen.json)
+All at 480x270.
 """
 import sys, json, os
 import numpy as np
-from PIL import Image, ImageFilter
+from PIL import Image
 
 W, H = 480, 270
-here = os.path.dirname(os.path.abspath(__file__))
-root = os.path.abspath(os.path.join(here, '..', '..'))
-out = os.path.join(root, 'assets', 'places', 'kitchen')
-os.makedirs(out, exist_ok=True)
+root = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..'))
+out = os.path.join(root, 'assets', 'places', 'kitchen'); os.makedirs(out, exist_ok=True)
 D = json.load(open(os.path.join(root, 'data', 'places', 'kitchen.json')))
-src = Image.open(sys.argv[1]).convert('RGB').resize((W, H), Image.BOX)
-a = np.asarray(src).astype(np.float32)
+a = np.asarray(Image.open(sys.argv[1]).convert('RGB').resize((W, H), Image.BOX)).astype(np.float32)
 base = a.copy()
+C = D['cut']
+def rect(r): return r['x0'], r['y0'], r['x1'], r['y1']
 
-def gblur(x, r):
-    k = np.exp(-0.5 * (np.arange(-3 * r, 3 * r + 1) / r) ** 2); k /= k.sum()
-    x = np.apply_along_axis(lambda v: np.convolve(v, k, 'same'), 0, x)
-    return np.apply_along_axis(lambda v: np.convolve(v, k, 'same'), 1, x)
+def clean(mask, passes=1):
+    """drop pixels with fewer than 2 of 4 neighbours set, fill pixels with 3+ set (no fringe, no pinholes)"""
+    m = mask.copy()
+    for _ in range(passes):
+        n = np.zeros(m.shape, np.int32)
+        n[1:] += m[:-1]; n[:-1] += m[1:]; n[:, 1:] += m[:, :-1]; n[:, :-1] += m[:, 1:]
+        m = (m & (n >= 2)) | (~m & (n >= 3))
+    return m
 
-def rect(name): r = D['cut'][name]; return r['x0'], r['y0'], r['x1'], r['y1']
-
-# --- 1. the things on the table -------------------------------------------------------------------------------------
-# steam: the wainscot behind runs in vertical boards, so each column's middle value is the board without the steam
+# --- 1. the table: china and steam off, kept as sprites ------------------------------------------------------------
+# steam: the boards behind run upright, so the rows just above the steam, repeated downwards, are the boards behind it
 for name in ('steam1', 'steam2'):
-    x0, y0, x1, y1 = rect(name)
+    x0, y0, x1, y1 = rect(C[name]); src = base[y0 - 9:y0, x0:x1].copy()
+    for y in range(y0, y1): base[y, x0:x1] = src[(y - y0) % 9]
+edge = C['clothEdge']; cx = C['chairMirror']
+for name in ('dish', 'cup1', 'jug', 'cup2'):                    # above the cloth's edge
+    x0, y0, x1, y1 = rect(C[name])
     for x in range(x0, x1):
-        col = base[y0 - 8:y1, x]; med = np.median(col, axis=0); lum = col.mean(1); ml = np.median(lum)
-        for y in range(y0, y1):
-            if base[y, x].mean() > ml + 6: base[y, x] = med
-# the china: above the cloth's edge, repeat the boards from just above; on the cloth, repeat the checks one check over
-cloth_y = D['cut']['clothEdge']
-for name in ('teapot', 'cup1', 'jug', 'cup2'):
-    x0, y0, x1, y1 = rect(name)
-    for y in range(y0, min(y1, cloth_y)):
-        for x in range(x0, x1): base[y, x] = base[y0 - 1 - ((y - y0) % 5), x]
-P = D['cut']['clothPeriod']
-for name in ('teapot', 'cup1', 'jug', 'cup2'):
-    x0, y0, x1, y1 = rect(name)
-    for y in range(cloth_y, y1):
-        for x in range(x0, x1): base[y, x] = base[y, x - P * (1 + (x - x0) // P)]
+        if name == 'jug' and C['chairX'][0] <= x < C['chairX'][1]:   # the chair is the same both sides: its left half
+            for y in range(y0, min(y1, edge)): base[y, x] = base[y, 2 * cx - x]
+            continue
+        above = base[y0 - 8:y0, x].copy()
+        for y in range(y0, min(y1, edge)): base[y, x] = above[(y - y0) % len(above)]
+masked = np.zeros((H, W), bool)
+for name in ('dish', 'cup1', 'jug', 'cup2'): x0, y0, x1, y1 = rect(C[name]); masked[y0:y1, x0:x1] = True
+# on the cloth: the checks repeat across, their spacing growing smoothly towards the front (perspective). The spacing is
+# measured to a tenth of a pixel on each row, a straight line fitted through the rows, and the check one spacing over
+# copied in (between two pixels, the in-between colour).
+ys = list(range(edge, max(r['y1'] for r in (C['dish'], C['cup1'], C['jug'], C['cup2']))))
+def shifted(row, p_):
+    xs = np.arange(W) - p_; i0 = np.clip(np.floor(xs).astype(int), 0, W - 2); f = (xs - i0)[:, None]
+    return row[i0] * (1 - f) + row[i0 + 1] * f
+per = []
+for y in ys:
+    ok = ~masked[y]; ok[:C['clothX'][0] + 14] = False; ok[C['clothX'][1]:] = False
+    best = min(((np.abs(base[y] - shifted(base[y], p_))[ok].mean(), p_) for p_ in np.arange(9.0, 13.01, 0.1)))
+    per.append(best[1])
+fit = np.polyfit(ys, per, 1)
+for y in ys:
+    p_ = np.polyval(fit, y)
+    for x in range(W):
+        if not masked[y, x]: continue
+        for k in range(1, 8):
+            sx = x - k * p_; x0_ = int(np.floor(sx))
+            if x0_ >= 0 and not masked[y, x0_] and not masked[y, x0_ + 1]:
+                f = sx - x0_; base[y, x] = base[y, x0_] * (1 - f) + base[y, x0_ + 1] * f; break
+            sx = x + k * p_; x0_ = int(np.floor(sx))
+            if x0_ + 1 < W and not masked[y, x0_] and not masked[y, x0_ + 1]:
+                f = sx - x0_; base[y, x] = base[y, x0_] * (1 - f) + base[y, x0_ + 1] * f; break
+print('cloth spacing', np.round(per, 1), 'fit', np.round(fit, 3))
+setting = np.zeros((H, W, 4), np.uint8)
+for name in ('dish', 'cup1', 'jug', 'cup2'):
+    x0, y0, x1, y1 = rect(C[name])
+    m = np.zeros((H, W), bool); m[y0:y1, x0:x1] = np.abs(a[y0:y1, x0:x1] - base[y0:y1, x0:x1]).sum(2) > C['settingThreshold']
+    m = clean(m, 2); setting[m, :3] = a[m]; setting[m, 3] = 255
 
-# --- 2. the lamp's light on the wall: taken off with the rest of the painter's light in step 6 --------------------------
-lx0, ly0, lx1, ly1 = rect('lamp')
-
-# --- 3. the lamp, cut out; the wallpaper filled in behind -------------------------------------------------------------
-PW = D['cut']['wallPeriod']
-lamp_rgba = np.zeros((H, W, 4), np.uint8)
+# --- 2. the lamp: cut out, the wallpaper filled in behind from the same row a repeat or two over --------------------
+lx0, ly0, lx1, ly1 = rect(C['lamp']); PW = C['wallPeriod']
 filled = base.copy()
 for y in range(ly0, ly1):
     for x in range(lx0, lx1):
         k = 1
-        while lx0 <= x - k * PW < lx1: k += 1
-        filled[y, x] = base[y, x - k * PW] if x - k * PW >= 0 else base[y, x + k * PW]
-diff = np.abs(a[ly0:ly1, lx0:lx1] - filled[ly0:ly1, lx0:lx1]).sum(2)
-for y in range(ly0, ly1):
-    for x in range(lx0, lx1):
-        if diff[y - ly0, x - lx0] > D['cut']['lampThreshold']:
-            lamp_rgba[y, x, :3] = a[y, x]; lamp_rgba[y, x, 3] = 255
+        while lx0 <= x - k * PW: k += 1
+        left = x - k * PW; k2 = 1
+        while x + k2 * PW < lx1: k2 += 1
+        right = x + k2 * PW
+        filled[y, x] = base[y, left] if (x - left) <= (right - x) or right >= W else base[y, right]
+m = np.zeros((H, W), bool)
+m[ly0:ly1, lx0:lx1] = np.abs(a[ly0:ly1, lx0:lx1] - filled[ly0:ly1, lx0:lx1]).sum(2) > C['lampThreshold']
+rx0, rx1 = C['rod']; m[ly0:C['shadeTop'], rx0:rx1] = True          # the rod is thin: take it whole
+yy, xx = np.mgrid[0:H, 0:W]; bx, by, brx, bry = D['lamp']['bulb']
+bulb = ((xx - bx) / brx) ** 2 + ((yy - by) / bry) ** 2 <= 1
+m = (m & ((yy < C['shadeRim']) | bulb)) | bulb                                     # under the rim only the bulb (all of it): the rest is wall
+m = clean(m, 2)
+lamp = np.zeros((H, W, 4), np.uint8); lamp[m, :3] = a[m]; lamp[m, 3] = 255
 base = filled
 
-# --- 4. the window: what is glass, the far fields kept apart -----------------------------------------------------------
-win = D['window']; gx0, gy0, gx1, gy1 = win['glass']
-far_rgba = np.zeros((H, W, 4), np.uint8)
+# --- 3. the window: glass, the far fields kept apart ------------------------------------------------------------------
+win = D['window']; gx0, gy0, gx1, gy1 = win['glass']; mx0, mx1 = win['muntinX']; ry0, ry1 = win['railY']; house = win['house']
+far = np.zeros((H, W, 4), np.uint8)
 for y in range(gy0, gy1):
     for x in range(gx0, gx1):
-        if win['muntinX'][0] <= x < win['muntinX'][1] or win['railY'][0] <= y < win['railY'][1]: continue
-        r, g, b = a[y, x]
-        horizon = win['horizon']
-        house = win['house']
-        # the farmhouse stands above the horizon: its pixels are those unlike the sky at the same height beside it
+        if mx0 <= x < mx1 or ry0 <= y < ry1: continue
         sky = a[y, house[0] - 3]
         inhouse = house[0] <= x < house[2] and house[1] <= y < house[3] and np.abs(a[y, x] - sky).sum() > win['houseSky']
-        if y >= horizon or inhouse:
-            far_rgba[y, x, :3] = a[y, x]; far_rgba[y, x, 3] = 255
+        if y >= win['horizon'] or inhouse: far[y, x, :3] = a[y, x]; far[y, x, 3] = 255
 
-# --- 5. regions --------------------------------------------------------------------------------------------------------
+# --- 4. regions ---------------------------------------------------------------------------------------------------------
 reg = np.full((H, W), D['regionId']['wall'], np.uint8)
-def paint(name, r):
-    x0, y0, x1, y1 = r; reg[y0:y1, x0:x1] = D['regionId'][name]
-for p in D['paint']: paint(p[0], p[1:])
+for p in D['paint']: x0, y0, x1, y1 = p[1:]; reg[y0:y1, x0:x1] = D['regionId'][p[0]]
 for y in range(gy0, gy1):
     for x in range(gx0, gx1):
-        if not (win['muntinX'][0] <= x < win['muntinX'][1] or win['railY'][0] <= y < win['railY'][1]): reg[y, x] = D['regionId']['glass']
-# the chair's back shows between the boards above the table: the boards are green, the chair is brown
-cx0, cy0, cx1, cy1 = D['chairBack']
+        if not (mx0 <= x < mx1 or ry0 <= y < ry1): reg[y, x] = D['regionId']['glass']
+cx0, cy0, cx1, cy1 = D['chairBack']                              # the chair's back between the boards: brown, not green
 for y in range(cy0, cy1):
     for x in range(cx0, cx1):
         r, g, b = base[y, x]
-        if r > g + 6: reg[y, x] = D['regionId']['chair']
-
-# --- 6. the wall under even light ----------------------------------------------------------------------------------------
-# the painter lit the whole wall from the lamp; the game lights it itself, so the broad light is divided out: the wall's
-# brightness blurred over its own pixels only (normalised blur), brought to one level; the paper's small pattern stays.
-for part in ('wall', 'wainscot'):
-    m = (reg == D['regionId'][part]).astype(np.float32); R = D['flatten']['radius']; norm = np.maximum(gblur(m, R), 1e-3)
-    for c in range(3):
-        ch = base[..., c]; ill = gblur(ch * m, R) / norm; target = np.percentile(ch[m > 0], D['flatten']['level'])
-        base[..., c] = np.where(m > 0, ch * (target / np.maximum(ill, 1)) ** D['flatten']['strength'], ch)
-
-# --- 7. the wallpaper, printed again -----------------------------------------------------------------------------------
-# the painter's lamp left a hot spot the blur cannot take out, and the paper's motifs wander (the picture was generated).
-# So the paper is printed again: its ground colour and its little trefoil (the median of the motifs found on a clean
-# stretch) on a regular staggered lattice, as a 90s artist would have drawn it. Pixels of plain paper caught inside an
-# object's box (round the kettle, the curtains, the window) are given back to the wall first.
-WP = D['wallpaper']; ground = np.array(WP['ground'], np.float32)
-flat = base.copy()
-for name in WP['reclaim']:
-    for p in D['paint']:
-        if p[0] != name: continue
-        x0, y0, x1, y1 = p[1:]
-        sub = flat[y0:y1, x0:x1]; near = np.abs(sub - ground).sum(2) < WP['reclaimDistance']
-        r = reg[y0:y1, x0:x1]; r[near & (r == D['regionId'][name])] = D['regionId']['wall']
-wall = reg == D['regionId']['wall']
-base[wall] = ground
-motif = [(dx, dy, np.array(c, np.float32)) for dx, dy, c in WP['motif']]
-j = 0
-while WP['y0'] + j * WP['dy'] < H + 4:
-    yc = WP['y0'] + j * WP['dy']; xs = WP['x0'] + (WP['stagger'] if j % 2 else 0)
-    i = -1
-    while xs + i * WP['dx'] < W + 4:
-        cx, cy = int(round(xs + i * WP['dx'])), int(round(yc))
-        for dx, dy, c in motif:
-            x, y = cx + dx, cy + dy
-            if 0 <= x < W and 0 <= y < H and wall[y, x]: base[y, x] = c
-        i += 1
-    j += 1
+        if r > g + 4: reg[y, x] = D['regionId']['chair']
+ground = np.array(D['wallGround'], np.float32)                   # plain wallpaper caught in an object's box: wall again
+for name in ('curtain', 'kettle', 'stoveTop', 'fridge'):
+    reg[(reg == D['regionId'][name]) & (np.abs(base - ground).sum(2) < D['wallReclaim'])] = D['regionId']['wall']
 
 def save(arr, name, mode): Image.fromarray(arr, mode).save(os.path.join(out, name), optimize=True)
 save(np.clip(base, 0, 255).astype(np.uint8), 'base.png', 'RGB')
-save(lamp_rgba, 'lamp.png', 'RGBA'); save(far_rgba, 'far.png', 'RGBA')
+save(lamp, 'lamp.png', 'RGBA'); save(far, 'far.png', 'RGBA'); save(setting, 'setting.png', 'RGBA')
 save(np.stack([reg, reg, reg], 2), 'regions.png', 'RGB')
 print('ok', out)

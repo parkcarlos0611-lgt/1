@@ -36,7 +36,7 @@ export function kitchenPlace(app: App) {
 
   /** draw the room into the screen; `over` is the spot under the pointer */
   function draw(dt: number, over: KitchenSpot | null): boolean {
-    if (!room) { const b = pixels(imgBase), l = pixels(imgLamp), f = pixels(imgFar), r = pixels(imgRegions); if (!b || !l || !f || !r) return false; room = new Room(data as unknown as RoomData, { base: b, lamp: l, far: f, regions: r }); }
+    if (!room) { const b = pixels(imgBase), l = pixels(imgLamp), f = pixels(imgFar), r = pixels(imgRegions); if (!b || !l || !f || !r) return false; room = new Room(data as unknown as RoomData, { base: b, lamp: l, far: f, regions: r }); (globalThis as { __room?: Room }).__room = room; }
     t += dt; const W = app.world!, g = W.sim.g, s = k(), A = air(W.clock.today, W.clock.minute, g.weather.today ?? 'clear', g.seed);
     stepKitchen(s, dt, ROOM_TEMP, A.temp);
     const want = s.lamp ? 1 : 0; if (lampLevel < 0) lampLevel = want; lampLevel += (want - lampLevel) * Math.min(1, dt * (want ? 18 : 10));

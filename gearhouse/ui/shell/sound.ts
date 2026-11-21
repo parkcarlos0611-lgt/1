@@ -9,7 +9,7 @@
 
 type Tool = 'pencil' | 'eraser' | 'scrape' | 'spray' | 'tape' | 'lead';
 export type SoundKind = '' | Tool;
-type Once = 'shake' | 'knock' | 'clink' | 'pour' | 'tick' | 'pulses' | 'pickup' | 'hangup' | 'paper' | 'peel' | 'blip' | 'chime' | 'drip' | 'chain' | 'sash' | 'ignite' | 'rattle';
+type Once = 'shake' | 'knock' | 'clink' | 'pour' | 'tick' | 'pulses' | 'pickup' | 'hangup' | 'paper' | 'peel' | 'blip' | 'chime' | 'drip' | 'chain' | 'sash' | 'ignite' | 'rattle' | 'bird' | 'creak' | 'car' | 'train';
 
 export class Sound {
   on = true; private ac: AudioContext | null = null; private buf: Record<string, AudioBuffer> = {}; private t = 0;
@@ -36,6 +36,8 @@ export class Sound {
     { let p = 0; this.buf.hiss = mk(2, i => { p = p * 0.86 + (Math.random() * 2 - 1) * 0.14; return (p * 2.2 + (Math.random() * 2 - 1) * 0.35) * (0.85 + 0.15 * Math.sin(i / sr * 2 * Math.PI * 7)); }); }
     // sizzle: flux boiling under the soldering iron: crackle and soft noise
     { let p = 0; this.buf.sizzle = mk(2, () => { p = p * 0.97 + (Math.random() * 2 - 1) * 0.03; return p * 3 + (Math.random() < 0.02 ? (Math.random() * 2 - 1) : 0); }); }
+    // brown: a slow wandering rumble, a room's air
+    { let p = 0; this.buf.brown = mk(3, () => { p = (p + (Math.random() * 2 - 1) * 0.02) * 0.995; return p * 6; }); }
   }
   start() { if (this.ac) return; try { const ac = new AudioContext(); this.make(ac); this.ac = ac;
     const chain = (buf: string, filters: [BiquadFilterType, number, number][], gain: GainNode) => { const s = ac.createBufferSource(); s.buffer = this.buf[buf]!; s.loop = true; let node: AudioNode = s; for (const [type, f, q] of filters) { const bq = ac.createBiquadFilter(); bq.type = type; bq.frequency.value = f; bq.Q.value = q; node.connect(bq); node = bq; } node.connect(gain); s.start(0, Math.random() * 1.5); return s; };
@@ -50,6 +52,12 @@ export class Sound {
     amb('rain', 0.3, 'white', [['lowpass', 1500, 0.4]]); amb('drops', 0.12, 'crackle', [['bandpass', 3000, 0.6]]); amb('wind', 0.16, 'white', [['lowpass', 380, 0.7]]); amb('line', 0.035, 'hiss', [['bandpass', 1800, 0.4]]);
     { const o = ac.createOscillator(); o.type = 'sawtooth'; o.frequency.value = 38; const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 260; const g = ac.createGain(); g.gain.value = 0; o.connect(lp).connect(g).connect(ac.destination); o.start(); this.amb.engine = { g, o, base: 0.12 }; }
     amb('simmer', 0.16, 'sizzle', [['bandpass', 650, 0.5]]);
+    // the quiet of a place: a room's low air (brown-ish noise), the outdoors far off (air and distant traffic)
+    amb('room', 0.09, 'brown', [['lowpass', 220, 0.5]]); amb('outside', 0.07, 'white', [['lowpass', 900, 0.4], ['highshelf', 3000, -12]]);
+    { const o = ac.createOscillator(); o.type = 'sawtooth'; o.frequency.value = 60; const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 180; const o2 = ac.createOscillator(); o2.frequency.value = 120; const g2 = ac.createGain(); g2.gain.value = 0.35; o2.connect(g2);
+      const g = ac.createGain(); g.gain.value = 0; o.connect(lp).connect(g); g2.connect(g); g.connect(ac.destination); o.start(); o2.start(); this.amb.fridge = { g, o, base: 0.018 }; }   // the refrigerator's motor
+    { const o = ac.createOscillator(); o.frequency.value = 4500; const am = ac.createGain(); am.gain.value = 0; const lfo = ac.createOscillator(); lfo.type = 'square'; lfo.frequency.value = 28; const lg = ac.createGain(); lg.gain.value = 0.5; lfo.connect(lg).connect(am.gain);
+      const lfo2 = ac.createOscillator(); lfo2.type = 'square'; lfo2.frequency.value = 0.9; const lg2 = ac.createGain(); lg2.gain.value = 0.5; lfo2.connect(lg2).connect(am.gain); const g = ac.createGain(); g.gain.value = 0; o.connect(am).connect(g).connect(ac.destination); o.start(); lfo.start(); lfo2.start(); this.amb.crickets = { g, o, base: 0.012 }; }   // crickets: a trill in bursts
     { const o = ac.createOscillator(); o.type = 'sine'; o.frequency.value = 1850; const lfo = ac.createOscillator(); lfo.frequency.value = 5.5; const lg = ac.createGain(); lg.gain.value = 28; lfo.connect(lg).connect(o.frequency); lfo.start(); const g = ac.createGain(); g.gain.value = 0; o.connect(g).connect(ac.destination); o.start(); this.amb.whistle = { g, o, base: 0.03 }; }   // a kettle's whistle, wavering
     { const o = ac.createOscillator(); o.type = 'sine'; o.frequency.value = 60; const g = ac.createGain(); g.gain.value = 0; o.connect(g).connect(ac.destination); o.start(); this.amb.hum = { g, o, base: 0.02 }; }
   } catch { this.ac = null; } }
@@ -59,16 +67,16 @@ export class Sound {
     for (const [k, c] of Object.entries(this.tools)) { const on = this.on && k === kind, flutter = k === 'spray' ? 0.9 + Math.random() * 0.2 : 1;
       c.g.gain.setTargetAtTime(on ? c.base * Math.min(1, amount) * flutter : 0, now, on ? 0.015 : 0.04); if (on && Math.abs(pitch - c.rate) > 0.02) { c.rate = pitch; for (const s of c.src) s.playbackRate.setTargetAtTime(pitch, now, 0.05); } } }
   /** the place: rain (with drops), wind, an engine (pitch for its revs), the open telephone line (its hiss and hum) */
-  ambient(kind: 'rain' | 'wind' | 'engine' | 'line' | 'simmer' | 'whistle', amount: number, pitch = 1) { const ac = this.ac; if (!ac) return; const now = ac.currentTime, set = (k: string, a: number) => { const c = this.amb[k]; if (c) c.g.gain.setTargetAtTime(this.on ? a * c.base : 0, now, 0.15); };
+  ambient(kind: 'rain' | 'wind' | 'engine' | 'line' | 'simmer' | 'whistle' | 'room' | 'fridge' | 'outside' | 'crickets', amount: number, pitch = 1) { const ac = this.ac; if (!ac) return; const now = ac.currentTime, set = (k: string, a: number) => { const c = this.amb[k]; if (c) c.g.gain.setTargetAtTime(this.on ? a * c.base : 0, now, 0.15); };
     if (kind === 'rain') { set('rain', amount); set('drops', amount); } else if (kind === 'line') { set('line', amount); set('hum', amount); } else set(kind, amount);
     if (kind === 'engine' && this.amb.engine?.o) this.amb.engine.o.frequency.setTargetAtTime(32 * pitch, now, 0.2); }
 
   /** short sounds made once. `n` for the dial's pulses (the digit), `pitch` for a voice's murmur */
-  once(kind: Once, o: { n?: number; pitch?: number } = {}) { const ac = this.ac, nb = this.buf.white; if (!ac || !nb || !this.on) return; const t0 = ac.currentTime;
+  once(kind: Once, o: { n?: number; pitch?: number; vol?: number } = {}) { const ac = this.ac, nb = this.buf.white; if (!ac || !nb || !this.on) return; const t0 = ac.currentTime, V = o.vol ?? 1;
     const burst = (at: number, f: number, q: number, dur: number, vol: number, type: BiquadFilterType = 'bandpass', buf = nb) => { const s = ac.createBufferSource(); s.buffer = buf; const bp = ac.createBiquadFilter(); bp.type = type; bp.frequency.value = f; bp.Q.value = q; const g = ac.createGain();
-      g.gain.setValueAtTime(0, at); g.gain.linearRampToValueAtTime(vol, at + 0.003); g.gain.exponentialRampToValueAtTime(0.0008, at + dur); s.connect(bp).connect(g).connect(ac.destination); s.start(at, Math.random() * 1.5); s.stop(at + dur + 0.02); };
+      g.gain.setValueAtTime(0, at); g.gain.linearRampToValueAtTime(vol * V, at + 0.003); g.gain.exponentialRampToValueAtTime(0.0008, at + dur); s.connect(bp).connect(g).connect(ac.destination); s.start(at, Math.random() * 1.5); s.stop(at + dur + 0.02); };
     const tone = (at: number, f: number, dur: number, vol: number, type: OscillatorType = 'sine', bend = 1) => { const os = ac.createOscillator(); os.type = type; os.frequency.setValueAtTime(f, at); if (bend !== 1) os.frequency.exponentialRampToValueAtTime(f * bend, at + dur); const g = ac.createGain();
-      g.gain.setValueAtTime(0, at); g.gain.linearRampToValueAtTime(vol, at + 0.004); g.gain.exponentialRampToValueAtTime(0.0008, at + dur); os.connect(g).connect(ac.destination); os.start(at); os.stop(at + dur + 0.02); };
+      g.gain.setValueAtTime(0, at); g.gain.linearRampToValueAtTime(vol * V, at + 0.004); g.gain.exponentialRampToValueAtTime(0.0008, at + dur); os.connect(g).connect(ac.destination); os.start(at); os.stop(at + dur + 0.02); };
     switch (kind) {
       case 'shake': for (let k = 0; k < 9; k++) { const at = t0 + k * 0.085 + Math.random() * 0.012; burst(at, 3200 + Math.random() * 900, 4, 0.05, 0.35); tone(at, 2300 + Math.random() * 500, 0.04, 0.05); if (k % 2) burst(at + 0.02, 900, 1.5, 0.06, 0.12); } break;   // the mixing ball clacking in the can
       case 'knock': for (const [k, at] of [[0, 0], [1, 0.22], [2, 0.38]] as const) { burst(t0 + at, 180 + k * 10, 1.2, 0.12, 0.9); tone(t0 + at, 95, 0.14, 0.35, 'triangle'); } break;
@@ -86,6 +94,12 @@ export class Sound {
       case 'chain': burst(t0, 4200, 6, 0.02, 0.22); tone(t0, 3100, 0.05, 0.025, 'triangle'); burst(t0 + 0.09, 3600, 6, 0.02, 0.16); tone(t0 + 0.1, 900, 0.03, 0.03, 'square'); break;   // the pull chain and the switch inside the socket
       case 'sash': burst(t0, 260, 0.8, 0.5, 0.32, 'lowpass', this.buf.grit); burst(t0 + 0.05, 900, 1.2, 0.35, 0.07, 'bandpass', this.buf.grit); burst(t0 + 0.5, 140, 1, 0.12, 0.45); break;   // wood in its runners, the bump at the end
       case 'ignite': burst(t0, 2800, 0.8, 0.18, 0.32, 'bandpass', this.buf.crackle); burst(t0 + 0.14, 1200, 0.6, 0.35, 0.1); burst(t0 + 0.6, 180, 0.8, 0.4, 0.55, 'lowpass'); burst(t0 + 0.6, 900, 0.5, 0.5, 0.07); break;   // a match struck, the gas catching
+      case 'bird': { const n = 2 + Math.floor(Math.random() * 4), f = 2600 + Math.random() * 1800; for (let k = 0; k < n; k++) tone(t0 + k * (0.09 + Math.random() * 0.05), f * (0.9 + Math.random() * 0.25), 0.06 + Math.random() * 0.05, 0.02, 'sine', 1.15 + Math.random() * 0.3); break; }   // a sparrow's few notes
+      case 'creak': burst(t0, 380 + Math.random() * 200, 3, 0.45, 0.06, 'bandpass', this.buf.crackle); burst(t0 + 0.2, 300, 4, 0.3, 0.04, 'bandpass', this.buf.crackle); break;   // the house's boards
+      case 'car': { const os = ac.createOscillator(); os.type = 'sawtooth'; os.frequency.setValueAtTime(30, t0); os.frequency.linearRampToValueAtTime(44, t0 + 2.2); os.frequency.linearRampToValueAtTime(34, t0 + 4.5); const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 320; const g = ac.createGain();
+        g.gain.setValueAtTime(0, t0); g.gain.linearRampToValueAtTime(0.05 * V, t0 + 2.2); g.gain.linearRampToValueAtTime(0, t0 + 4.8); os.connect(lp).connect(g).connect(ac.destination); os.start(t0); os.stop(t0 + 5); burst(t0 + 1.2, 700, 0.6, 2.4, 0.02, 'bandpass'); break; }   // a car going by in the street, far off
+      case 'train': for (const [f, d] of [[440, 0], [554, 0], [659, 0]] as const) { const os = ac.createOscillator(); os.frequency.value = f; const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 900; const g = ac.createGain();
+        g.gain.setValueAtTime(0, t0 + d); g.gain.linearRampToValueAtTime(0.012 * V, t0 + 0.35); g.gain.setValueAtTime(0.012 * V, t0 + 1.4); g.gain.linearRampToValueAtTime(0, t0 + 2.4); os.connect(lp).connect(g).connect(ac.destination); os.start(t0); os.stop(t0 + 2.5); } break;   // a steam whistle miles away
       case 'rattle': tone(t0, 1600 + Math.random() * 260, 0.04, 0.022, 'triangle'); burst(t0, 2600, 3, 0.02, 0.05); break;                               // the kettle's lid on the boil
     } }
   private dt: { stop: () => void } | null = null;

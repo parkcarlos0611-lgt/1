@@ -15,7 +15,9 @@ import type { Incident } from '../../core/state';
 import { parts, weekday } from '../../core/calendar';
 import { drawingScene, standardAsks } from '../scenes/drawing';
 import { phoneScene } from '../scenes/phone';
-import imgFront from '../../assets/placeholder/front.png';
+import imgFront from '../../assets/places/front/front.png';
+import { ambience } from './ambience';
+import { parts as dateParts } from '../../core/calendar';
 import imgKitchen from '../../assets/placeholder/kitchen.png';
 import imgGarage from '../../assets/placeholder/garage.png';
 import imgWorkshop from '../../assets/placeholder/workshop.png';
@@ -43,7 +45,7 @@ function pic(url: string): Uint8ClampedArray | null { if (pics.has(url)) return 
   const im = new Image(); im.onload = () => { const c = document.createElement('canvas'); c.width = 480; c.height = 270; const x = c.getContext('2d')!; x.drawImage(im, 0, 0, 480, 270); pics.set(url, x.getImageData(0, 0, 480, 270).data); }; im.src = url; return null; }
 
 export function worldScene(app: App): Scene {
-  const ui = app.ui, S = app.S, W = () => app.world!, kitchen = kitchenPlace(app);
+  const ui = app.ui, S = app.S, W = () => app.world!, kitchen = kitchenPlace(app), quiet = ambience();
   let place: Place = 'front', fade = 0, going: Place | null = null, after: (() => void) | null = null, t = 0, eventLeft = 0, lastSave = -1;
   const notes: { at: string; text: string; inc?: Incident }[] = [], cards: { text: string; go?: Place; until: number }[] = [];
   const travel = (to: Place, then?: () => void) => { if (fade) return; if (place === 'kitchen' && to !== 'kitchen') kitchen.quiet(); going = to; after = then ?? null; fade = 0.001; app.sound.once('paper'); };
@@ -79,7 +81,8 @@ export function worldScene(app: App): Scene {
       let over: Spot | null = null, kOver: KitchenSpot | null = null;
       if (place === 'kitchen') { for (const s of kitchen.spots) if (inside(s.r)) kOver = s; } else for (const s of PLACES[place].spots) if (inside(s.r)) over = s;
       if (place !== 'kitchen' || !kitchen.draw(dt, fade ? null : kOver)) draw();
-      { const A = air(W().clock.today, W().clock.minute, W().sim.g.weather.today ?? 'clear', W().sim.g.seed); if (place !== 'kitchen') { app.sound.ambient('rain', A.rain * (place === 'front' ? 1 : 0.3)); app.sound.ambient('wind', A.wind * (place === 'front' ? 0.8 : 0.15)); } }
+      { const A = air(W().clock.today, W().clock.minute, W().sim.g.weather.today ?? 'clear', W().sim.g.seed); if (place !== 'kitchen') { app.sound.ambient('rain', A.rain * (place === 'front' ? 1 : 0.3)); app.sound.ambient('wind', A.wind * (place === 'front' ? 0.8 : 0.15)); }
+        quiet(app.sound, place, A, W().clock.minute, dateParts(W().clock.today).month, W().sim.g.house?.kitchen.window ?? 0, dt); }
       if (kOver && !fade) { const label = kOver.label(), tw = S.tw(label) + 8, lx = Math.min(480 - tw - 2, Math.max(2, pt.x - tw / 2)), ly = Math.max(24, pt.y - 16); S.fill(lx, ly, tw, 11, hex('#1a120b')); S.text(label, lx + 4, ly + 2, COL.lit);
         if (ui.missed()) { if (kOver.go) travel(kOver.go); else if (!kitchen.act(kOver.act)) act(kOver.act); } }
       if (over && !fade) { const r = over.r; for (let x = r.x; x < r.x + r.w; x++) { if (((x + Math.floor(t * 12)) >> 2) % 2) { S.px(x, r.y, COL.lit); S.px(x, r.y + r.h - 1, COL.lit); } } for (let y = r.y; y < r.y + r.h; y++) if (((y + Math.floor(t * 12)) >> 2) % 2) { S.px(r.x, y, COL.lit); S.px(r.x + r.w - 1, y, COL.lit); }

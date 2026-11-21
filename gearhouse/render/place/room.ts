@@ -24,7 +24,7 @@ export interface RoomData {
   window: { glass: number[]; muntinX: number[]; railY: number[]; sill: number; horizon: number; curtains: number[][]; open: number; houseLight: number[] };
   regionId: Record<string, number>; planes: Record<string, Plane>;
   table: { x: number[]; Y: number[]; z: number[] };
-  lamp: { pivot: number[]; Y: number; z: number; reach: number; colour: number[]; power: number };
+  lamp: { pivot: number[]; Y: number; z: number; reach: number; colour: number[]; power: number; bulb: number[]; rim: number };
   burner: { at: number[]; z: number; flame: number[] }; kettle: { spout: number[]; lid: number[] }; faucet: number[]; basin: number;
 }
 export interface Pics { base: Uint8ClampedArray; lamp: Uint8ClampedArray; far: Uint8ClampedArray; regions: Uint8ClampedArray }
@@ -44,6 +44,8 @@ const mix3 = (a: V3, b: V3, t: number): V3 => [lerp(a[0], b[0], t), lerp(a[1], b
 function hash2(x: number, y: number): number { let h = (x * 374761393 + y * 668265263) | 0; h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967296; }
 function noise(x: number, y: number): number { const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi, u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf);
   return lerp(lerp(hash2(xi, yi), hash2(xi + 1, yi), u), lerp(hash2(xi, yi + 1), hash2(xi + 1, yi + 1), u), v); }
+/** points across the lamp shade's open mouth (x, z offsets): the light is not a point, so shadows soften */
+const SHADE: [number, number][] = [[-7, 0], [7, 0], [0, -6], [0, 6], [0, 0]];
 const tone = (v: number) => (v <= 0.9 ? v : 0.9 + (v - 0.9) / (1 + (v - 0.9) * 2));
 const fbm = (x: number, y: number) => noise(x, y) * 0.55 + noise(x * 2.1 + 7, y * 2.1 + 3) * 0.3 + noise(x * 4.3 + 1, y * 4.3 + 9) * 0.15;
 
@@ -60,7 +62,8 @@ export class Room {
   private alb = new Float32Array(N * 3); private lit = new Float32Array(N * 3); private lum = new Float32Array(N);
   private X = new Float32Array(N); private Y = new Float32Array(N); private Z = new Float32Array(N); private hor = new Uint8Array(N); private rid = new Uint8Array(N);
   private prox = new Float32Array(N); private winSky = new Float32Array(N);
-  private lampPx: { x: number; y: number; c: V3; glow: boolean }[] = [];
+  private lampPx: { x: number; y: number; c: V3; glow: number; lip: boolean }[] = [];
+  sunMap = new Float32Array(N); shaft = new Float32Array((W >> 1) * (H >> 1)); private sunAt = -9; private sunK = -1; private sunAlt = -99;
   private far = new Float32Array(N * 4);
   private ids: Record<string, number>;
   private puffs: Puff[] = []; private drops: Drop[] = []; private streaks: { x: number; y: number; v: number; snow: boolean }[] = [];
@@ -81,7 +84,7 @@ export class Room {
       const vx = wc[0] - x, vy = wc[1] - this.Y[i]!, vz = wc[2] - this.Z[i]!, d = Math.hypot(vx, vy, vz), ndl = this.hor[i] ? -vy / d : vz / d, cw = (this.Z[i]! - wc[2]) / d;
       this.winSky[i] = Math.max(0, ndl) * Math.max(0, cw) / (1 + (d / 120) ** 2);
       if (p.far[i * 4 + 3]! > 0) { this.far[i * 4] = p.far[i * 4]!; this.far[i * 4 + 1] = p.far[i * 4 + 1]!; this.far[i * 4 + 2] = p.far[i * 4 + 2]!; this.far[i * 4 + 3] = 1; }
-      if (p.lamp[i * 4 + 3]! > 0) { const c: V3 = [p.lamp[i * 4]!, p.lamp[i * 4 + 1]!, p.lamp[i * 4 + 2]!]; this.lampPx.push({ x, y, c, glow: y > D.lamp.Y - 18 && (c[0] + c[1] + c[2]) / 3 > 150 }); } }
+      if (p.lamp[i * 4 + 3]! > 0) { const c: V3 = [p.lamp[i * 4]!, p.lamp[i * 4 + 1]!, p.lamp[i * 4 + 2]!]; const [bx0, by0, brx, bry] = D.lamp.bulb as [number, number, number, number], q = ((x - bx0) / brx) ** 2 + ((y - by0) / bry) ** 2; this.lampPx.push({ x, y, c, glow: q <= 1 ? 1 - Math.sqrt(q) * 0.7 : 0, lip: q > 1 && y >= D.lamp.rim - 4 && y < D.lamp.rim }); } }
     for (let k = 0; k < 60; k++) this.motes.push({ x: 30 + Math.random() * 330, y: 40 + Math.random() * 210, z: Math.random() * 260, ph: Math.random() * 9 });
   }
 
@@ -102,15 +105,28 @@ export class Room {
     return true;
   }
 
+  /** the sun's light on the floor and tables, and the beam of it through the air: worked out four times a second (the
+   *  sun moves slowly). The sun is a little disc, not a point: five rays to it, so the bars' shadows have soft edges. */
+  private updateSun(e: RoomEnv, k: number) { const a = e.air;
+    if (e.t - this.sunAt < 0.25 && k === this.sunK && Math.abs(a.sunAlt - this.sunAlt) < 0.3) return; this.sunAt = e.t; this.sunK = k; this.sunAlt = a.sunAlt;
+    this.sunMap.fill(0); this.shaft.fill(0); if (a.sunAlt <= 0.5 || a.cloud > 0.97) return;
+    const R = Math.PI / 180, dirs: V3[] = [[0, 0], [0.8, 0], [-0.8, 0], [0, 1.1], [0, -1.1]].map(([da, dz]) => { const al = (a.sunAlt + da!) * R, az = (a.sunAz + dz!) * R; return [-Math.cos(al) * Math.sin(az), -Math.sin(al), Math.cos(al) * Math.cos(az)] as V3; });
+    if (dirs[0]![2] >= -0.02) return;
+    for (let i = 0; i < N; i++) { if (!this.hor[i]) continue; let n = 0; for (const d of dirs) if (this.sunlit(this.X[i]!, this.Y[i]!, this.Z[i]!, d, k)) n++; this.sunMap[i] = n / dirs.length; }
+    const hw = W >> 1, hh = H >> 1, s0 = dirs[0]!, glassId = this.ids.glass!, steps = 12;
+    for (let sy = 0; sy < hh; sy++) for (let sx = 0; sx < hw; sx++) { const x = sx * 2 + 1, y = sy * 2 + 1, i = y * W + x, z0 = this.rid[i] === glassId ? 0 : this.Z[i]!; let acc = 0;
+      for (let q = 0; q < steps; q++) { const z = z0 + (320 - z0) * (q + 0.5) / steps, wy = y - z * 0.175; if (wy < 0 || wy > 214) continue; if (this.sunlit(x, wy, z, s0, k)) acc++; }
+      this.shaft[sy * hw + sx] = acc / steps * (320 - z0) / 320; } }
+
   draw(out: Uint8ClampedArray, e: RoomEnv): void {
-    const D = this.D, a = e.air, t = e.t, k = this.open(e); this.sounds = [];
+    const D = this.D, a = e.air, t = e.t, k = this.open(e); this.sounds = []; this.updateSun(e, k);
     // ---- the light, worked out once a frame
     const altR = a.sunAlt * Math.PI / 180, azR = a.sunAz * Math.PI / 180;
     const s: V3 = [-Math.cos(altR) * Math.sin(azR), -Math.sin(altR), Math.cos(altR) * Math.cos(azR)];
     const sunI = clamp(Math.sin(altR) * 4) * (1 - a.cloud) ** 1.6 * 1.5, sunC = mix3([1, 0.55, 0.32], [1, 0.95, 0.86], clamp(a.sunAlt / 25));
     const day = a.daylight, dusk = clamp(1 - Math.abs(a.sunAlt - 2) / 9) * (1 - a.cloud * 0.7);
     const ambC = mix3(mix3([0.98, 0.98, 1.0], [0.9, 0.92, 0.96], a.cloud), [1, 0.82, 0.68], dusk * 0.6);
-    const amb = day * (0.66 - 0.12 * a.cloud), night: V3 = [0.045, 0.055, 0.1];
+    const amb = day * (0.84 + 0.08 * (1 - a.cloud)), night: V3 = [0.045, 0.055, 0.1];
     const L = D.lamp, ang = 0.011 * Math.sin(t * 1.9) + 0.006 * Math.sin(t * 0.53 + 1) + e.window * a.wind * 0.05 * Math.sin(t * 2.6) * (0.6 + 0.4 * Math.sin(t * 0.7));
     this.sway = ang; const len = L.Y - L.pivot[1]!, bx = L.pivot[0]! + Math.sin(ang) * len, by = L.pivot[1]! + Math.cos(ang) * len, bz = L.z;
     const flick = 1 + 0.018 * (noise(t * 9, 3) - 0.5) * 2, lampI = e.lamp * L.power * flick, lc = L.colour as V3;
@@ -119,12 +135,12 @@ export class Room {
     for (let i = 0; i < N; i++) { const id = this.rid[i]!; if (id === glassId) continue;
       const x = this.X[i]!, y = this.Y[i]!, z = this.Z[i]!, h = this.hor[i]!;
       let r = night[0] + ambC[0] * amb * (0.62 + 0.38 * this.prox[i]!), g = night[1] + ambC[1] * amb * (0.62 + 0.38 * this.prox[i]!), b = night[2] + ambC[2] * amb * (0.62 + 0.38 * this.prox[i]!);
-      const ws = this.winSky[i]! * day * 1.5; r += ws * ambC[0]; g += ws * ambC[1]; b += ws * ambC[2];
+      const ws = this.winSky[i]! * day * 0.7; r += ws * ambC[0]; g += ws * ambC[1]; b += ws * ambC[2];
       if (lampI > 0) { const vx = bx - x, vy = by - y, vz = bz - z, d = Math.sqrt(vx * vx + vy * vy + vz * vz), ndl = h ? -vy / d : id === wallId ? vz / d : (vz / d + 0.3) / 1.3, down = -vy / d;
         let e1 = Math.max(0, ndl) * clamp((down + 0.12) / 0.42) / (1 + (d / L.reach) ** 2) + (vy > 0 ? 0.05 / (1 + (d / 90) ** 2) : 0);
-        if ((id === floorId || id === legsId) && y > T.Y[1]!) { const tt = (T.Y[0]! - y) / (by - y), tx = x + tt * (bx - x), tz = z + tt * (bz - z); if (tx >= T.x[0]! && tx <= T.x[1]! && tz >= T.z[0]! && tz <= T.z[1]!) e1 *= 0.16; }
+        if ((id === floorId || id === legsId) && y > T.Y[1]!) { let hit = 0; for (const [ox, oz] of SHADE) { const lx = bx + ox, lz = bz + oz, tt = (T.Y[0]! - y) / (by - y), tx = x + tt * (lx - x), tz = z + tt * (lz - z); if (tx >= T.x[0]! && tx <= T.x[1]! && tz >= T.z[0]! && tz <= T.z[1]!) hit++; } e1 *= 1 - 0.84 * hit / SHADE.length; }   // the shade's mouth is wide: a soft-edged shadow
         e1 = (e1 + 0.17 / (1 + (d / 210) ** 2)) * lampI; r += e1 * lc[0]; g += e1 * lc[1]; b += e1 * lc[2]; }   // and what comes back off the walls and the ceiling
-      if (sunI > 0 && h && this.sunlit(x, y, z, s, k)) { const e2 = sunI * (0.45 + 0.9 * Math.max(0, -s[1])); r += e2 * sunC[0]; g += e2 * sunC[1]; b += e2 * sunC[2]; }
+      if (sunI > 0 && h && this.sunMap[i]! > 0) { const e2 = sunI * (0.45 + 0.9 * Math.max(0, -s[1])) * this.sunMap[i]!; r += e2 * sunC[0]; g += e2 * sunC[1]; b += e2 * sunC[2]; }
       if (fl > 0) { const vx = B.at[0]! - x, vy = B.at[1]! - y, vz = B.z - z, d2 = vx * vx + vy * vy * 2 + vz * vz; if (d2 < 2500) { const e3 = fl / (1 + d2 / 120); r += e3; g += e3 * 0.62; b += e3 * 0.5; } }
       const tr = tone(r), tg = tone(g), tb = tone(b);
       this.lit[i * 3] = this.alb[i * 3]! * tr; this.lit[i * 3 + 1] = this.alb[i * 3 + 1]! * tg; this.lit[i * 3 + 2] = this.alb[i * 3 + 2]! * tb; this.lum[i] = (tr + tg + tb) / 3; }
@@ -132,13 +148,20 @@ export class Room {
     this.curtains(e);
     this.kettle(e);
     this.lampSprite(e, ang, amb, ambC, lampI);
+    this.lampAir(bx, by, lampI, lc);
     this.dust(e, s, sunI, sunC, bx, by, bz, lampI, k);
     this.tap(e);
     if (e.highlight) this.highlight(e.highlight, ang);
-    // ---- out, in 15-bit colour
-    for (let i = 0; i < N; i++) { const x = i % W, y = (i / W) | 0, th = BAYER[(y & 3) * 4 + (x & 3)]! * 8;
-      out[i * 4] = Math.min(255, Math.max(0, Math.round((this.lit[i * 3]! + th) / 8) * 8)); out[i * 4 + 1] = Math.min(255, Math.max(0, Math.round((this.lit[i * 3 + 1]! + th) / 8) * 8));
-      out[i * 4 + 2] = Math.min(255, Math.max(0, Math.round((this.lit[i * 3 + 2]! + th) / 8) * 8)); out[i * 4 + 3] = 255; }
+    // ---- the sun's beam in the air (dust and steam make it show), then out in 18-bit colour (64 levels a channel) with a
+    // light ordered dither: the light still falls in steps, without the grain of fewer levels
+    const sh = sunI * (0.55 + 0.45 * a.daylight) * 62, hw = W >> 1;
+    for (let i = 0; i < N; i++) { const x = i % W, y = (i / W) | 0;
+      if (sh > 0) { const fx = Math.min(hw - 1.001, Math.max(0, (x - 1) / 2)), fy = Math.min((H >> 1) - 1.001, Math.max(0, (y - 1) / 2)), x0 = fx | 0, y0 = fy | 0, u = fx - x0, v = fy - y0, S = this.shaft;
+        const b = (S[y0 * hw + x0]! * (1 - u) + S[y0 * hw + x0 + 1]! * u) * (1 - v) + (S[(y0 + 1) * hw + x0]! * (1 - u) + S[(y0 + 1) * hw + x0 + 1]! * u) * v;
+        if (b > 0) { const w = b * sh; this.lit[i * 3] = this.lit[i * 3]! + w * sunC[0]; this.lit[i * 3 + 1] = this.lit[i * 3 + 1]! + w * sunC[1]; this.lit[i * 3 + 2] = this.lit[i * 3 + 2]! + w * sunC[2] * 0.9; } }
+      const th = BAYER[(y & 3) * 4 + (x & 3)]! * 4;
+      out[i * 4] = Math.min(255, Math.max(0, Math.round((this.lit[i * 3]! + th) / 4) * 4)); out[i * 4 + 1] = Math.min(255, Math.max(0, Math.round((this.lit[i * 3 + 1]! + th) / 4) * 4));
+      out[i * 4 + 2] = Math.min(255, Math.max(0, Math.round((this.lit[i * 3 + 2]! + th) / 4) * 4)); out[i * 4 + 3] = 255; }
   }
 
   // ---- the window: the view out, the glass, the sash
@@ -220,12 +243,21 @@ export class Room {
     if (boil) { this.rattle -= dt; if (this.rattle <= 0) { this.rattle = 0.08 + Math.random() * 0.2; this.sounds.push('rattle'); }
       if (this.rattle > 0.14) { for (let y = ly - 1; y < ly + 5; y++) for (let x = lx - 8; x <= lx + 8; x++) { const i = y * W + x, j = (y + 1) * W + x; this.lit[i * 3] = this.lit[j * 3]!; this.lit[i * 3 + 1] = this.lit[j * 3 + 1]!; this.lit[i * 3 + 2] = this.lit[j * 3 + 2]!; } } } }
 
-  // ---- the lamp: its shade drawn swinging, the underside and bulb glowing when it is on
-  private lampSprite(e: RoomEnv, ang: number, amb: number, ambC: V3, lampI: number) { const py = this.D.lamp.pivot[1]!, sin = Math.sin(ang);
+  // ---- the lamp: its shade drawn swinging; when on, the bulb glows (hottest at the filament) and the inside of the
+  // shade's lip catches the light; off, it is the lamp as painted, lit by the room
+  private lampSprite(e: RoomEnv, ang: number, amb: number, ambC: V3, lampI: number) { const py = this.D.lamp.pivot[1]!, sin = Math.sin(ang), on = clamp(e.lamp);
     for (const p of this.lampPx) { const x = p.x + Math.round(sin * (p.y - py)), i = p.y * W + x; if (x < 0 || x >= W) continue;
-      let c: V3; if (p.glow) { const on = Math.min(1, e.lamp); c = mix3([p.c[0] * 0.3 + 18, p.c[1] * 0.3 + 18, p.c[2] * 0.3 + 20], [Math.min(255, p.c[0] * 1.08), Math.min(255, p.c[1] * 1.04), p.c[2] * 0.95], on); c = [c[0] * (0.4 + 0.6 * Math.max(on, amb)), c[1] * (0.4 + 0.6 * Math.max(on, amb)), c[2] * (0.4 + 0.6 * Math.max(on, amb))]; }
-      else { const l = 0.05 + amb * 0.85 + lampI * 0.22; c = [p.c[0] * l * ambC[0], p.c[1] * l * ambC[1], p.c[2] * l * ambC[2]]; }
+      const l = 0.07 + amb * 0.9 + lampI * 0.12; let c: V3 = [p.c[0] * l * ambC[0], p.c[1] * l * ambC[1], p.c[2] * l * ambC[2]];
+      if (p.glow > 0 && on > 0) c = mix3(c, mix3([255, 222, 160], [255, 252, 236], p.glow), on * (0.55 + 0.45 * p.glow));
+      else if (p.lip && on > 0) { const dx = (p.x - this.D.lamp.bulb[0]!) / 16, dy = (this.D.lamp.rim - p.y) / 3; c = mix3(c, [236, 196, 128], on * 0.7 * Math.exp(-dx * dx) * (0.4 + 0.6 * (1 - dy))); }   // the inside of the shade, lit most near the bulb
       this.lit[i * 3] = c[0]; this.lit[i * 3 + 1] = c[1]; this.lit[i * 3 + 2] = c[2]; } }
+
+  // ---- the lamp in the air: a faint cone of light under the shade and a glow round the bulb
+  private lampAir(bx: number, by: number, lampI: number, lc: V3) { if (lampI <= 0.01) return; const rim = this.D.lamp.rim;
+    for (let y = Math.max(0, Math.floor(by - 16)); y < 214; y++) for (let x = Math.max(0, Math.floor(bx - 150)); x < Math.min(W, bx + 150); x++) { const dx = x - bx, dy = y - by, d2 = dx * dx + dy * dy, i = y * W + x;
+      let w = 0.75 * Math.exp(-d2 / 38) * lampI;                                                     // the bulb's glow
+      if (y > rim) { const cos = dy / Math.sqrt(d2), cone = clamp((cos - 0.52) / 0.2); w += cone * 0.075 * lampI / (1 + d2 / 9000); }   // the cone in the dust
+      if (w < 0.004) continue; this.lit[i * 3] = this.lit[i * 3]! + w * 255 * lc[0]; this.lit[i * 3 + 1] = this.lit[i * 3 + 1]! + w * 255 * lc[1]; this.lit[i * 3 + 2] = this.lit[i * 3 + 2]! + w * 255 * lc[2]; } }
 
   // ---- dust turning slowly: seen only where the sun's beam or the lamp's cone lights it
   private dust(e: RoomEnv, s: V3, sunI: number, sunC: V3, bx: number, by: number, bz: number, lampI: number, k: number) { const dt = e.dt, t = e.t;

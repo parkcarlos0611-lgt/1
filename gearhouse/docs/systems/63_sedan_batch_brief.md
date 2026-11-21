@@ -28,14 +28,17 @@ docs/systems/62_direct_model_guide.md, which still holds (goal, tools, hand-in, 
   known and will be fixed in the game).
 
 ## Notes for the know-how (from the fifth car on)
-The aim is that later cars (and, if it works, a cheaper model with Fable's checklist and review) can come near this
-quality. Add a file `notes.md` in the folder with:
-- **Reusable parts**: each part of your script that another car could use as it is or with a few numbers changed
-  (visor, drum lamp on a stand, split bumperettes, black upper body, cowl lamp, corner light, two-pane screen, wood
-  window surround, board edge strip, artillery wheel spec, ...). For each: the function or block in your script, what
-  it takes (sizes, positions), and what of it was particular to this car.
+What is shared between cars is the way of working, never the result. Every part of every car is read off that car's
+own sheet; another car's outlines, shapes or numbers are never copied in, even where two cars look alike (the cars'
+differences are what the game is made of, and each car's parts become its own elements for the player's builder).
+Add a file `notes.md` in the folder with:
+- **Methods**: how you made each kind of part (visor, drum lamp on a stand, split bumperettes, black upper body, cowl
+  lamp, corner light, two-pane screen, wood window surround, board edge strip, wheel spec, ...): which view and crop
+  you read it from, how you checked it, what helper code did the work. Code may be shared as a procedure (a function
+  that takes the points or sizes read off a sheet), never as a stored shape.
 - **Details caught**: the list of details of this car you found on the sheet and built, in the form of a checklist
-  another builder could tick off (part, count, shape, colour, which views show it). Mark those the draft had wrong.
+  another builder could tick off for their own car (part, count, shape, colour, which views show it). Mark those the
+  draft had wrong.
 - **Pitfalls**: what took you longest or went wrong first, and how you got past it.
 
 ## Each car

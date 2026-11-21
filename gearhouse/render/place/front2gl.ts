@@ -20,8 +20,8 @@ out vec4 o;
 float hash2(int x, int y) { uint h = uint(x) * 374761393u + uint(y) * 668265263u; h = (h ^ (h >> 13u)) * 1274126177u; h ^= h >> 16u; return float(h) / 4294967296.0; }
 `;
 const FS_A = COMMON + `
-uniform sampler2D uAlb, uInfo, uLight, uTree, uSkyC, uSkyO, uNight, uCar, uCarInfo;
-uniform float uCarOn, uWheelAng, uHeads; uniform vec2 uCarPos, uCarSize, uHeadPos; uniform vec3 uHub0, uHub1; uniform float uCarGround, uCarFront;
+uniform sampler2D uAlb, uInfo, uLight, uTree, uSkyC, uSkyO, uNight, uCar, uCarInfo, uFoot;
+uniform float uCarOn, uWheelAng, uHeads, uCarScale; uniform vec2 uCarPos, uCarSize, uHeadPos; uniform vec3 uHub0, uHub1; uniform float uCarGround, uCarFront;
 uniform float uT, uOff, uMixO, uKeep, uDay, uSunAlt, uCloud, uMoonPhase, uMoonUp, uLevel, uLampOn, uWinLit, uWl, uHouseLit, uWet, uSparkle, uAmp;
 uniform vec3 uTop, uHor, uSunCol, uAmb, uNb;
 uniform vec2 uSun, uMoon, uLamp, uPool;
@@ -54,8 +54,9 @@ void main() {
     if (mix(a0, a1, f) >= 0.5) { vec3 tc = a0 > 0.0 && a1 > 0.0 ? mix(c0.rgb, c1.rgb, f) : (a0 > 0.0 ? c0.rgb : c1.rgb); alb = tc * 255.0; kind = 2; cover = 1.0; inside = 0; gw = -1; snowy = (a0 > 0.0 ? c0.a : c1.a) < 0.9; } }
   // the customer's car: in front of everything; its wheels turned as far as it has rolled
   bool car = false; int cm = 0; float cg = 0.0; float fxp = float(x), fyp = float(y);
-  if (uCarOn > 0.5) { vec2 lp = vec2(fxp, fyp) - uCarPos;
-    if (lp.x >= 0.0 && lp.y >= 0.0 && lp.x < uCarSize.x && lp.y < uCarSize.y) { vec2 q = lp + 0.5;
+  if (uCarOn > 0.5) { vec2 lp = (vec2(fxp, fyp) - uCarPos) / uCarScale;
+    float foot = texelFetch(uFoot, p, 0).r * 255.0;   // what stands nearer than the car (the street lamp, the mailbox) hides it
+    if (lp.x >= 0.0 && lp.y >= 0.0 && lp.x < uCarSize.x && lp.y < uCarSize.y && !(kind == 2 && foot > uCarGround + 1.0)) { vec2 q = lp + 0.5;
       for (int k = 0; k < 2; k++) { vec3 hb = k == 0 ? uHub0 : uHub1; vec2 d = lp + 0.5 - hb.xy; if (length(d) < hb.z) { float cs = cos(-uWheelAng), sn = sin(-uWheelAng); q = hb.xy + vec2(d.x * cs - d.y * sn, d.x * sn + d.y * cs); } }
       ivec2 qi = clamp(ivec2(floor(q)), ivec2(0), ivec2(uCarSize) - 1); vec4 cc = texelFetch(uCar, qi, 0);
       if (cc.a > 0.5) { vec4 ci = texelFetch(uCarInfo, qi, 0); car = true; cm = int(ci.r * 255.0 + 0.5); cg = ci.g; alb = cc.rgb * 255.0; kind = 2; cover = 1.0; inside = 0; gw = -1; snowy = false; } } }
@@ -68,12 +69,12 @@ void main() {
   rgb *= li.g;
   if (li.b > 0.0 && uHouseLit > 0.5) rgb += li.b * max(uWl, 0.15) * vec3(1.0, 0.72, 0.42);
   if (kind == 5 && uWet > 0.0) alb *= 1.0 - 0.32 * uWet;
-  if (uCarOn > 0.5 && !car && (kind == 5 || kind == 1)) { float cx = uCarPos.x + uCarSize.x * 0.5, dx = (fxp - cx) / (uCarSize.x * 0.47), dy = (fyp - uCarGround - 0.5) / 3.4, q = dx * dx + dy * dy;   // the car's shadow on the road: dark under it, soft at the ends
+  if (uCarOn > 0.5 && !car && (kind == 5 || kind == 1)) { float cx = uCarPos.x + uCarSize.x * uCarScale * 0.5, dx = (fxp - cx) / (uCarSize.x * uCarScale * 0.47), dy = (fyp - uCarGround - 0.5) / 3.4, q = dx * dx + dy * dy;   // the car's shadow on the road: dark under it, soft at the ends
     if (q < 1.0) rgb *= 1.0 - (0.62 - 0.25 * (1.0 - uLevel)) * pow(1.0 - q, 0.8); }
   if (uCarOn > 0.5 && uHeads > 0.5 && !car && (kind == 5 || kind == 1)) { float ahead = uCarPos.x + uCarFront - fxp, dy = abs(fyp - uCarGround + 3.0);   // its head lamps' beams along the road ahead
     if (ahead > 0.0 && ahead < 150.0 && dy < 3.0 + ahead * 0.12) rgb += 1.4 * exp(-ahead / 60.0) * clamp((3.0 + ahead * 0.12 - dy) / 3.0, 0.0, 1.0) * vec3(1.0, 0.9, 0.66); }
   vec3 c = alb * rgb;
-  if (car) { float upf = clamp(1.0 - (fyp - uCarPos.y) / (uCarSize.y * 0.6), 0.0, 1.0);   // the paint, the chrome and the glass give back the sky: the top surfaces most
+  if (car) { float upf = clamp(1.0 - (fyp - uCarPos.y) / (uCarSize.y * uCarScale * 0.6), 0.0, 1.0);   // the paint, the chrome and the glass give back the sky: the top surfaces most
     if (cm >= 1 && cm <= 3) { vec3 sk = skyAt(x, clamp(int(24.0 + (fyp - uCarPos.y) * 1.3), 0, 179)); float wgt = cg * (cm == 2 ? 0.42 : cm == 3 ? 0.5 : 0.36 * upf + 0.06); vec3 tint = cm == 2 ? mix(sk, vec3(dot(sk, vec3(0.33))), 0.6) * 1.1 : sk * 0.95; c = mix(c, tint, wgt); }   // chrome: the sky's light more than its colour
     if (uHeads > 0.5 && cm == 5) c = vec3(255.0, 242.0, 196.0); if (uHeads > 0.5 && cm == 6) c = vec3(214.0, 38.0, 28.0); }
   if (snowy && uSparkle > 0.0 && hash2(x * 7 + int(floor(uT * 1.7 + hash2(x, y) * 9.0)), y * 13) > 0.9975) c = vec3(255.0, 254.0, 248.0);
@@ -88,7 +89,7 @@ void main() {
   if (uCarOn > 0.5 && uHeads > 0.5) { float d2 = pow(fxp - uHeadPos.x, 2.0) + pow(fyp - uHeadPos.y, 2.0); if (d2 < 400.0) c += 0.6 * exp(-d2 / 30.0) * vec3(255.0, 236.0, 190.0); }
   o = vec4(clamp(c, 0.0, 255.0) / 255.0, 1.0); }`;
 const FS_B = COMMON + `
-uniform sampler2D uA, uInfo, uLight, uCar; uniform float uWet, uRain, uT, uLampOn, uWinLit, uWl, uCarOn, uCarGround; uniform vec2 uLamp, uCarPos, uCarSize; uniform vec4 uWin[4];
+uniform sampler2D uA, uInfo, uLight, uCar; uniform float uWet, uRain, uT, uLampOn, uWinLit, uWl, uCarOn, uCarGround, uCarScale; uniform vec2 uLamp, uCarPos, uCarSize; uniform vec4 uWin[4];
 void main() { int x = int(gl_FragCoord.x), y = int(gl_FragCoord.y); vec3 c = texelFetch(uA, ivec2(x, y), 0).rgb * 255.0; vec4 inf = texelFetch(uInfo, ivec2(x, y), 0);
   int kind = int(inf.r * 255.0 + 0.5); float pr = texelFetch(uLight, ivec2(x, y), 0).a * 255.0;
   if (uWet > 0.05 && kind == 5 && y >= 168) { int my = clamp(2 * (y < 203 ? 168 : 203) - y - 2, 0, 179); float k = uWet * (y >= 222 ? 0.22 : 0.14); c = mix(c, texelFetch(uA, ivec2(x, my), 0).rgb * 255.0, k);
@@ -97,17 +98,17 @@ void main() { int x = int(gl_FragCoord.x), y = int(gl_FragCoord.y); vec3 c = tex
       float dx = (float(x) - L.x + jit) / (L.z >= 1.0 ? 4.5 : 6.0), down = float(y) - max(L.y, 200.0), fade = down > 0.0 ? exp(-down / 46.0) : 0.0, kk = L.z * uWet * 0.75 * exp(-dx * dx) * fade;
       c += kk * vec3(255.0, 206.0, 130.0); } }
   if (pr >= 1.0) c = texelFetch(uA, ivec2(x, int(pr)), 0).rgb * 255.0 * vec3(0.8, 0.82, 0.88);   // a puddle's water
-  if (uCarOn > 0.5 && uWet > 0.05 && kind == 5 && float(y) > uCarGround) { float dd = float(y) - uCarGround; int my = int(2.0 * uCarGround - float(y)); vec2 lp = vec2(float(x), float(my)) - uCarPos;   // the car mirrored in the wet road
-    if (dd < uCarSize.y * 0.7 && lp.x >= 0.0 && lp.y >= 0.0 && lp.x < uCarSize.x && lp.y < uCarSize.y && texelFetch(uCar, ivec2(lp), 0).a > 0.5) {
+  if (uCarOn > 0.5 && uWet > 0.05 && kind == 5 && float(y) > uCarGround) { float dd = float(y) - uCarGround; int my = int(2.0 * uCarGround - float(y)); vec2 lp = (vec2(float(x), float(my)) - uCarPos) / uCarScale;   // the car mirrored in the wet road
+    if (dd < uCarSize.y * uCarScale * 0.7 && lp.x >= 0.0 && lp.y >= 0.0 && lp.x < uCarSize.x && lp.y < uCarSize.y && texelFetch(uCar, ivec2(lp), 0).a > 0.5) {
       float jit = sin(float(y) * 1.9 + uT * (uRain > 0.0 ? 8.0 : 1.0)) * (uRain > 0.0 ? 1.0 : 0.0); vec3 m = texelFetch(uA, ivec2(clamp(x + int(jit), 0, 479), my), 0).rgb * 255.0;
-      c = mix(c, m * vec3(0.78, 0.8, 0.86), uWet * 0.55 * (1.0 - dd / (uCarSize.y * 0.7))); } }
+      c = mix(c, m * vec3(0.78, 0.8, 0.86), uWet * 0.55 * (1.0 - dd / (uCarSize.y * uCarScale * 0.7))); } }
   o = vec4(clamp(c, 0.0, 255.0) / 255.0, 1.0); }`;
 
 export class Front2GL {
   private gl: WebGL2RenderingContext; private progA: WebGLProgram; private progB: WebGLProgram; private tex: Record<string, WebGLTexture> = {}; private fbA: WebGLFramebuffer; private texA: WebGLTexture;
-  private albBuf = new Uint8Array(N * 4); private infoBuf = new Uint8Array(N * 4); private lightBuf = new Uint8Array(N * 4); private read = new Uint8Array(N * 4); private nightUV: number[][] = [];
+  private albBuf = new Uint8Array(N * 4); private infoBuf = new Uint8Array(N * 4); private lightBuf = new Uint8Array(N * 4); private footBuf = new Uint8Array(N * 4); private read = new Uint8Array(N * 4); private nightUV: number[][] = [];
   /** the customer's car and where it is (render/place's front: ui/world/car.ts) */
-  car: { sprite: import('../../ui/world/car').CarSprite; x: number; y: number; wheel: number; heads: boolean } | null = null; private carKey: unknown = null;
+  car: { sprite: import('../../ui/world/car').CarSprite; x: number; y: number; wheel: number; heads: boolean; scale: number } | null = null; private carKey: unknown = null;
   private setCar() { const gl = this.gl, c = this.car; if (!c || c.sprite === this.carKey) return; this.carKey = c.sprite; const sp = c.sprite;
     for (const [n, px] of [['car', sp.rgba], ['carInfo', sp.info]] as const) { if (this.tex[n]) gl.deleteTexture(this.tex[n]!); delete this.tex[n]; this.upload(n, px, sp.w, sp.h); } }
   static make(scene: Front2): Front2GL | null { try { const cv = document.createElement('canvas'); cv.width = W; cv.height = H; const gl = cv.getContext('webgl2', { antialias: false, preserveDrawingBuffer: false }); return gl ? new Front2GL(gl, scene) : null; } catch { return null; } }
@@ -122,7 +123,7 @@ export class Front2GL {
     for (const p of ws) { for (let y = 0; y < p.h; y++) atlas.set(p.px.subarray(y * p.w * 4, (y + 1) * p.w * 4), (y * aw + ox) * 4); this.nightUV.push([ox, 0, p.w, p.h]); ox += p.w; }
     this.upload('night', atlas, aw, ah);
     this.texA = this.blank(); this.fbA = gl.createFramebuffer()!; gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbA); gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this.texA, 0); gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    for (const n of ['alb', 'info', 'light', 'tree']) this.upload(n, new Uint8Array(N * 4), W, H); }
+    for (const n of ['alb', 'info', 'light', 'tree', 'foot']) this.upload(n, new Uint8Array(N * 4), W, H); }
   private blank(): WebGLTexture { const gl = this.gl, t = gl.createTexture()!; gl.bindTexture(gl.TEXTURE_2D, t); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, W, H, 0, gl.RGBA, gl.UNSIGNED_BYTE, null); for (const k of [gl.TEXTURE_MIN_FILTER, gl.TEXTURE_MAG_FILTER]) gl.texParameteri(gl.TEXTURE_2D, k, gl.NEAREST); return t; }
   private upload(name: string, px: Uint8Array | Uint8ClampedArray, w: number, h: number) { const gl = this.gl; let t = this.tex[name]; const fresh = !t; if (!t) { t = gl.createTexture()!; this.tex[name] = t; } gl.bindTexture(gl.TEXTURE_2D, t);
     const data = px instanceof Uint8Array ? px : new Uint8Array(px.buffer, px.byteOffset, px.byteLength);
@@ -134,6 +135,7 @@ export class Front2GL {
         this.albBuf[a] = s.alb[i * 3]!; this.albBuf[a + 1] = s.alb[i * 3 + 1]!; this.albBuf[a + 2] = s.alb[i * 3 + 2]!; this.albBuf[a + 3] = Math.round(s.cover[i]! * 255);
         this.infoBuf[a] = s.kind[i]!; this.infoBuf[a + 1] = s.glass[i]! + 1; this.infoBuf[a + 2] = s.snowy[i] ? 255 : 0; this.infoBuf[a + 3] = s.inside[i]!;
         this.lightBuf[a] = Math.min(255, Math.round(s.inLevel[i]! / 1.5 * 255)); this.lightBuf[a + 1] = Math.round(s.dShade[i]! * 255); this.lightBuf[a + 2] = Math.min(255, Math.round(s.dWarm[i]! * 255)); this.lightBuf[a + 3] = s.pudRow[i]!; }
+      for (let i = 0; i < N; i++) this.footBuf[i * 4] = s.footY[i]!; this.upload('foot', this.footBuf, W, H);
       this.upload('alb', this.albBuf, W, H); this.upload('info', this.infoBuf, W, H); this.upload('light', this.lightBuf, W, H); }
     if (ch.tree) this.upload('tree', s.tree, W, H); }
 
@@ -149,7 +151,7 @@ export class Front2GL {
     const wins = C.windows.flatMap(b => [b[0]!, b[1]!, b[2]!, b[3]!]);
     // pass A
     let p = this.progA; gl.useProgram(p); gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbA); gl.viewport(0, 0, W, H);
-    bindT(p, 'uAlb', this.tex.alb!, 0); bindT(p, 'uInfo', this.tex.info!, 1); bindT(p, 'uLight', this.tex.light!, 2); bindT(p, 'uTree', this.tex.tree!, 3); bindT(p, 'uSkyC', this.tex.sky_summer!, 4); bindT(p, 'uSkyO', this.tex['sky_' + season]!, 5); bindT(p, 'uNight', this.tex.night!, 6);
+    bindT(p, 'uAlb', this.tex.alb!, 0); bindT(p, 'uInfo', this.tex.info!, 1); bindT(p, 'uLight', this.tex.light!, 2); bindT(p, 'uTree', this.tex.tree!, 3); bindT(p, 'uSkyC', this.tex.sky_summer!, 4); bindT(p, 'uSkyO', this.tex['sky_' + season]!, 5); bindT(p, 'uNight', this.tex.night!, 6); bindT(p, 'uFoot', this.tex.foot!, 9);
     u1(p, 'uT', t); u1(p, 'uOff', t * (1.8 + a.wind * 8)); u1(p, 'uMixO', mixO); u1(p, 'uKeep', clamp(day * 1.1 - dusk * 0.35)); u1(p, 'uDay', day); u1(p, 'uSunAlt', a.sunAlt); u1(p, 'uCloud', a.cloud);
     u1(p, 'uMoonPhase', e.moon.phase); u1(p, 'uMoonUp', e.moon.alt > 0 && day < 0.6 ? 1 : 0); u1(p, 'uLevel', level); u1(p, 'uLampOn', lampOn ? 1 : 0); u1(p, 'uWinLit', winLit ? 1 : 0); u1(p, 'uWl', wl); u1(p, 'uHouseLit', e.houseLit ? 1 : 0);
     u1(p, 'uWet', e.wet); u1(p, 'uSparkle', clamp(a.sunAlt / 8) * (1 - a.cloud) + (lampOn ? 0.3 : 0)); u1(p, 'uAmp', 0.35 + 1.4 * a.wind);
@@ -158,14 +160,14 @@ export class Front2GL {
     u4(p, 'uWin', wins); u4(p, 'uNightUV', this.nightUV.flat()); u4(p, 'uDoorGlass', C.doorGlass); u4(p, 'uTreeRect', s.treeRect); u4(p, 'uLampRect', [Math.round(lampP[0]), Math.round(lampP[1]), s.P.lamp!.w, s.P.lamp!.h]);
     const car = this.car; this.setCar(); const sp = car?.sprite;
     u1(p, 'uCarOn', car ? 1 : 0); if (car && sp) { bindT(p, 'uCar', this.tex.car!, 7); bindT(p, 'uCarInfo', this.tex.carInfo!, 8); u2(p, 'uCarPos', [Math.round(car.x), Math.round(car.y)]); u2(p, 'uCarSize', [sp.w, sp.h]);
-      gl.uniform3fv(gl.getUniformLocation(p, 'uHub0'), sp.hubs[0]!); gl.uniform3fv(gl.getUniformLocation(p, 'uHub1'), sp.hubs[1]!); u1(p, 'uWheelAng', car.wheel); u1(p, 'uHeads', car.heads ? 1 : 0); u1(p, 'uCarGround', Math.round(car.y) + sp.groundY); u1(p, 'uCarFront', sp.front);
-      u2(p, 'uHeadPos', [Math.round(car.x) + sp.head[0], Math.round(car.y) + sp.head[1]]); }
+      gl.uniform3fv(gl.getUniformLocation(p, 'uHub0'), sp.hubs[0] ?? [0, 0, 0]); gl.uniform3fv(gl.getUniformLocation(p, 'uHub1'), sp.hubs[1] ?? [0, 0, 0]); u1(p, 'uWheelAng', car.wheel); u1(p, 'uHeads', car.heads ? 1 : 0); u1(p, 'uCarScale', car.scale); u1(p, 'uCarGround', Math.round(car.y + sp.groundY * car.scale)); u1(p, 'uCarFront', sp.front * car.scale);
+      u2(p, 'uHeadPos', [Math.round(car.x) + sp.head[0] * car.scale, Math.round(car.y) + sp.head[1] * car.scale]); }
     else { bindT(p, 'uCar', this.tex.alb!, 7); bindT(p, 'uCarInfo', this.tex.alb!, 8); }
     gl.drawArrays(gl.TRIANGLES, 0, 3);
     // pass B
     p = this.progB; gl.useProgram(p); gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.viewport(0, 0, W, H);
     bindT(p, 'uA', this.texA, 0); bindT(p, 'uInfo', this.tex.info!, 1); bindT(p, 'uLight', this.tex.light!, 2);
-    u1(p, 'uCarOn', car ? 1 : 0); bindT(p, 'uCar', car ? this.tex.car! : this.tex.alb!, 3); if (car && sp) { u2(p, 'uCarPos', [Math.round(car.x), Math.round(car.y)]); u2(p, 'uCarSize', [sp.w, sp.h]); u1(p, 'uCarGround', Math.round(car.y) + sp.groundY); }
+    u1(p, 'uCarOn', car ? 1 : 0); bindT(p, 'uCar', car ? this.tex.car! : this.tex.alb!, 3); if (car && sp) { u2(p, 'uCarPos', [Math.round(car.x), Math.round(car.y)]); u2(p, 'uCarSize', [sp.w, sp.h]); u1(p, 'uCarScale', car.scale); u1(p, 'uCarGround', Math.round(car.y + sp.groundY * car.scale)); }
     u1(p, 'uWet', e.wet); u1(p, 'uRain', a.rain); u1(p, 'uT', t); u1(p, 'uLampOn', lampOn ? 1 : 0); u1(p, 'uWinLit', winLit ? 1 : 0); u1(p, 'uWl', wl); u2(p, 'uLamp', [lx, ly]); u4(p, 'uWin', wins);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
     gl.readPixels(0, 0, W, H, gl.RGBA, gl.UNSIGNED_BYTE, this.read);

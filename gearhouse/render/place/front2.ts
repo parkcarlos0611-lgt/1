@@ -43,7 +43,7 @@ export class Front2 {
   alb = new Float32Array(N * 3); lit = new Float32Array(N * 3); kind = new Uint8Array(N); private sky = new Float32Array(W * 180 * 3);
   glass = new Int8Array(N).fill(-1); cover = new Float32Array(N); snowy = new Uint8Array(N); inside = new Uint8Array(N); inLevel = new Float32Array(N); dShade = new Float32Array(N); dWarm = new Float32Array(N); treeM = new Uint8Array(N); private marking = 0;
   /** for the GPU path (render/place/front2gl.ts): puddle water's mirror row, the tree on its own layer, and the keys that say when the cached layers must be made again */
-  pudRow = new Uint8Array(N); tree = new Uint8ClampedArray(N * 4); treeRect = [0, 0, 1, 1]; private sKey = ''; private dKey = ''; private tKey = ''; private sAlb = new Float32Array(N * 3); private sKind = new Uint8Array(N); private sSnowy = new Uint8Array(N); private sCover = new Float32Array(N);
+  pudRow = new Uint8Array(N); /** the screen row where what this pixel shows stands on the ground (for what hides the car) */ footY = new Uint8Array(N); tree = new Uint8ClampedArray(N * 4); treeRect = [0, 0, 1, 1]; private sKey = ''; private dKey = ''; private tKey = ''; private sAlb = new Float32Array(N * 3); private sKind = new Uint8Array(N); private sSnowy = new Uint8Array(N); private sCover = new Float32Array(N);
   private smoke: { x: number; y: number; age: number; life: number }[] = []; private fall: { x: number; y: number; v: number; snow: number }[] = []; private bird = { x: -1, y: 0, wait: 6, dir: 1 };
   constructor(readonly C: Cut, readonly P: Record<string, Pic>) {
     // the panes of the house's windows: the dark glass inside each window box (not the shutters, not the bars)
@@ -58,7 +58,7 @@ export class Front2 {
       for (let sx = -1; sx < p.w; sx++) { const x = ix + sx + 1; if (x < 0 || x >= W) continue; if (keep && !keep(x, y)) continue;
         const a0 = sx >= 0 ? p.px[(sy * p.w + sx) * 4 + 3]! : 0, a1 = sx + 1 < p.w ? p.px[(sy * p.w + sx + 1) * 4 + 3]! : 0, a = (a1 * (1 - f) + a0 * f) / 255; if (a < 0.5) continue;
         const j0 = (sy * p.w + Math.max(0, sx)) * 4, j1 = (sy * p.w + Math.min(p.w - 1, sx + 1)) * 4, i = y * W + x, w1 = a1 > 0 ? (a0 > 0 ? 1 - f : 1) : 0;
-        this.alb[i * 3] = p.px[j1]! * w1 + p.px[j0]! * (1 - w1); this.alb[i * 3 + 1] = p.px[j1 + 1]! * w1 + p.px[j0 + 1]! * (1 - w1); this.alb[i * 3 + 2] = p.px[j1 + 2]! * w1 + p.px[j0 + 2]! * (1 - w1); this.kind[i] = k; this.treeM[i] = this.marking; } } }
+        this.alb[i * 3] = p.px[j1]! * w1 + p.px[j0]! * (1 - w1); this.alb[i * 3 + 1] = p.px[j1 + 1]! * w1 + p.px[j0 + 1]! * (1 - w1); this.alb[i * 3 + 2] = p.px[j1 + 2]! * w1 + p.px[j0 + 2]! * (1 - w1); this.kind[i] = k; this.treeM[i] = this.marking; this.footY[i] = Math.min(255, y0 + p.h); } } }
 
   draw(out: Uint8ClampedArray, e: Front2Env): void { const a = e.air, t = e.t, C = this.C, P = this.P;
     const day = a.daylight, dusk = clamp(1 - Math.abs(a.sunAlt - 2) / 10) * (1 - a.cloud * 0.5), night = 1 - day;
@@ -150,8 +150,9 @@ export class Front2 {
         const cv = src.px[j + 3]! / 255; this.cover[i] = cv; if (cv < 0.04) continue; this.alb[i * 3] = src.px[j]!; this.alb[i * 3 + 1] = src.px[j + 1]!; this.alb[i * 3 + 2] = src.px[j + 2]!;
         if (edge && base.px[j + 3]! > 100) { this.alb[i * 3] = (this.alb[i * 3]! + base.px[j]!) / 2; this.alb[i * 3 + 1] = (this.alb[i * 3 + 1]! + base.px[j + 1]!) / 2; this.alb[i * 3 + 2] = (this.alb[i * 3 + 2]! + base.px[j + 2]!) / 2; }
         this.kind[i] = y >= 168 && (y >= 203 || (x >= 296 && x < 470) || (x >= 152 && x < 188)) ? K.Wet : K.Ground; }
+      for (let i = 0; i < N; i++) this.footY[i] = (i / W) | 0;
       this.lay(P.garage!, C.garage!.at, K.Wall); this.lay(P.house!, C.house!.at, K.Wall); this.lay(P.mailbox!, C.mailbox!.at, K.Wall); this.lay(P.lamp!, C.lamp!.at, K.Wall);
-      if (e.snow > 0.05) { const before = this.kind.slice(); this.lay(P.snowcaps!, [0, 0], K.Wall, (x, y) => { const f = clump(x * 1.6, y * 2.2) - (e.snow * 1.5 - 0.15); return f < 0 || (f < 0.25 && hash2(x * 5, y * 3 + 7) < (1 - f / 0.25) * 0.5); }); for (let i = 0; i < N; i++) if (this.kind[i] !== before[i] || (this.kind[i] === K.Wall && P.snowcaps!.px[i * 4 + 3]! > 128 && clump((i % W) * 1.6, ((i / W) | 0) * 2.2) < e.snow * 1.5 - 0.15)) this.snowy[i] = 1; }
+      if (e.snow > 0.05) { const before = this.kind.slice(), fb = this.footY.slice(); this.lay(P.snowcaps!, [0, 0], K.Wall, (x, y) => { const f = clump(x * 1.6, y * 2.2) - (e.snow * 1.5 - 0.15); return f < 0 || (f < 0.25 && hash2(x * 5, y * 3 + 7) < (1 - f / 0.25) * 0.5); }); for (let i = 0; i < N; i++) if (this.kind[i] !== before[i] || (this.kind[i] === K.Wall && P.snowcaps!.px[i * 4 + 3]! > 128 && clump((i % W) * 1.6, ((i / W) | 0) * 2.2) < e.snow * 1.5 - 0.15)) this.snowy[i] = 1; this.footY.set(fb); }
       if (ga === 'autumn' || (gb === 'autumn' && gf > 0.5) || ga === 'winter_bare' && e.doy > 300 && e.doy < 335) { for (const [n, x, y] of [['leaves_1', 4, 166], ['leaves_0', 192, 190], ['leaves_2', 262, 196]] as [string, number, number][]) if (P[n]) this.lay(P[n]!, [x, y], K.Ground); }
       if (e.snow > 0.6) { for (const [n, x, y] of [['snowpile_1', 268, 178], ['snowpile_0', 452, 180], ['snowpile_2', 0, 206]] as [string, number, number][]) if (P[n]) this.lay(P[n]!, [x, y], K.Ground); }
       if (e.wet > 0.35) for (const [n, x0, y0] of [['puddle_1', 318, 186], ['puddle_0', 410, 192], ['puddle_2', 96, 236]] as [string, number, number][]) { const p = P[n]; if (!p) continue; const sc = Math.min(1, (e.wet - 0.35) / 0.4);   // puddles: their rims as drawn; their water mirrors the row the GPU looks up

@@ -1,0 +1,19 @@
+[
+ {"id": "fordT23", "sheet": "358adfbc", "side": "left", "wheelbase": 2540, "year": 1923, "name": "1923 small sedan", "car": "1923 Ford Model T Fordor"},
+ {"id": "chevAB28", "sheet": "624bbd1c", "side": "left", "wheelbase": 2718, "year": 1928, "name": "1928 light sedan", "car": "1928 Chevrolet National AB"},
+ {"id": "plymU29", "sheet": "624bbd1c", "side": "right", "wheelbase": 2788, "year": 1929, "name": "1929 light four sedan", "car": "1929 Plymouth Model U"},
+ {"id": "buick28", "sheet": "d5f881aa", "side": "left", "wheelbase": 2908, "year": 1928, "name": "1928 four-door sedan", "car": "1928 Buick four-door"},
+ {"id": "dodgeV28", "sheet": "d5f881aa", "side": "right", "wheelbase": 2864, "year": 1928, "name": "1928 six sedan", "car": "1928 Dodge Brothers Victory Six"},
+ {"id": "willys27", "sheet": "38bcc8df", "side": "left", "wheelbase": 2883, "year": 1927, "name": "1927 sleeve-valve sedan", "car": "1927 Willys-Knight 70A"},
+ {"id": "lasalle27", "sheet": "38bcc8df", "side": "right", "wheelbase": 3175, "year": 1927, "name": "1927 fine sedan", "car": "1927 LaSalle five-passenger"},
+ {"id": "pierce28", "sheet": "2d78cb14", "side": "left", "wheelbase": 3302, "year": 1928, "name": "1928 luxury sedan", "car": "1928 Pierce-Arrow 81"},
+ {"id": "franklin29", "sheet": "2d78cb14", "side": "right", "wheelbase": 3048, "year": 1929, "name": "1929 air-cooled sedan", "car": "1929 Franklin 135"},
+ {"id": "essexC24", "sheet": "ad286807", "side": "left", "wheelbase": 2807, "year": 1924, "name": "1924 two-door coach", "car": "1924 Essex Coach"},
+ {"id": "overland25", "sheet": "ad286807", "side": "right", "wheelbase": 2540, "year": 1925, "name": "1925 small four sedan", "car": "1925 Overland Model 91"},
+ {"id": "essex27", "sheet": "2f8cbad6", "side": "left", "wheelbase": 2807, "year": 1927, "name": "1927 six sedan", "car": "1927 Essex"},
+ {"id": "studeS25", "sheet": "817e7c58", "side": "left", "wheelbase": 2870, "year": 1925, "name": "1925 standard six sedan", "car": "1925 Studebaker Standard Six"},
+ {"id": "packard25", "sheet": "817e7c58", "side": "right", "wheelbase": 3378, "year": 1925, "name": "1925 seven-passenger sedan", "car": "1925 Packard Six seven-passenger"},
+ {"id": "oaklandL26", "sheet": "22bd8c3f", "side": "left", "wheelbase": 2870, "year": 1926, "name": "1926 landau sedan", "car": "1926 Oakland Landau"},
+ {"id": "pontiac29", "sheet": "998b3ae3", "side": "left", "wheelbase": 2794, "year": 1929, "name": "1929 six-cylinder sedan", "car": "1929 Pontiac four-door"},
+ {"id": "oakland29", "sheet": "998b3ae3", "side": "right", "wheelbase": 2972, "year": 1929, "name": "1929 landaulet sedan", "car": "1929 Oakland 6-212 Landaulet"}
+]

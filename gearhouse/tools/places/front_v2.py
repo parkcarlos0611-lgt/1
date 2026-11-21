@@ -116,21 +116,31 @@ def sky_mask(a):
     line = np.array([int(np.median(line[max(0, x - 3):x + 4])) for x in range(len(line))])
     for x in range(a.shape[1]): m[line[x]:, x] = False
     return m
-def matte(a, m, lo=16, span=46):
-    """soft coverage for the woods against the painted sky (review 50): the sky's colour just above the woods, column by
-    column, is the background; how far a pixel is from it is how much of it is tree. Its colour is freed of the sky in it,
-    so the game's own sky shows through the gaps between the branches, softly, with no hard steps"""
-    Hh, Ww = m.shape; first = np.array([np.argmax(~m[:, x]) if (~m[:, x]).any() else Hh for x in range(Ww)])
-    B = np.zeros((Ww, 3), np.float32)
-    for x in range(Ww): y = max(4, int(first[x])); B[x] = a[y - 4:y, x].mean(0)
-    B = np.stack([np.convolve(np.pad(B[:, c], 12, mode='edge'), np.ones(25) / 25, 'valid') for c in range(3)], 1)
-    top = int(np.percentile(first, 2)) - 6; bottom = int(np.percentile(first, 90)) + 14
-    alpha = np.where(m, 0.0, 1.0).astype(np.float32); rgb = a.copy()
-    for y in range(max(0, top), min(Hh, bottom)):
-        d = np.abs(a[y] - B).sum(1); al = np.clip((d - lo) / span, 0, 1)
-        if y > bottom - 8: al = np.maximum(al, (y - (bottom - 8)) / 8)
-        alpha[y] = al; ok = al > 0.04; rgb[y, ok] = np.clip(B[ok] + (a[y, ok] - B[ok]) / al[ok, None], 0, 255)
-    alpha[:max(0, top)] = 0
+def matte(a, m, lo=6, span=40, band=(84, 172)):
+    """soft coverage for the woods against the painted sky (reviews 50, 51). Near the horizon the painted sky is a bright
+    haze, brighter than higher up, so each row is judged against its own sky: the brightest pixels near each column in
+    that row are the sky there (its colour, its brightness); a pixel darker than that is that much tree. The sky in it
+    is taken out of its colour, so the game's own sky shows through between the crowns and the branches, with no line"""
+    Hh, Ww = m.shape; L = a.mean(2); alpha = np.ones((Hh, Ww), np.float32); rgb = a.copy(); y0, y1 = band
+    alpha[:y0] = 0; win = 61; skyL = np.zeros((Hh, Ww), np.float32); skyC = np.zeros((Hh, Ww, 3), np.float32)
+    for y in range(y0, y1):
+        row = L[y]
+        for x in range(Ww):
+            lo_, hi_ = max(0, x - win // 2), min(Ww, x + win // 2 + 1); seg = row[lo_:hi_]; t = np.percentile(seg, 88)
+            skyL[y, x] = t; skyC[y, x] = a[y, lo_:hi_][seg >= t - 6].mean(0)
+    # where the trees begin in each column: the first two rows running that are clearly darker than their sky (the
+    # clouds' shadows above are not: they are higher, and not that much darker); above it is sky
+    tops = np.full(Ww, y1, np.int32)
+    for x in range(Ww):
+        for y in range(116, y1 - 1):
+            if L[y, x] < skyL[y, x] - 22 and L[y + 1, x] < skyL[y + 1, x] - 22: tops[x] = y; break
+    tops = np.array([tops[max(0, x - 2):x + 3].min() for x in range(Ww)])
+    for y in range(y0, y1):
+        row = L[y]; sky = skyL[y]; col = skyC[y]
+        fade = min(1, (y1 - y) / 10)                       # the lowest rows of the woods: solid
+        al = np.clip((sky - row - lo) / span, 0, 1); al = al * fade + (1 - fade)
+        rel = y - tops; al = np.where(rel >= 3, 1, np.where(rel < -6, 0, al))   # solid inside the woods as painted; soft only at the crowns' outline (and the twigs just above it)
+        alpha[y] = al; ok = al > 0.04; rgb[y, ok] = np.clip(col[ok] + (a[y, ok] - col[ok]) / al[ok, None], 0, 255)
     return rgb, alpha
 
 skies = {}
@@ -166,14 +176,17 @@ for y, x in zip(*np.nonzero(white)):
 dk = snowy.mean(2) < 118; snowy[dk] = snowy[dk] * np.array([1.08, 0.97, 0.86])   # the branches warmer (brown, not the snow's blue); the sky between them as painted
 wb[woods] = snowy
 m = sky_mask(ws)
-rgb, al = matte(wb, m, 5, 22); save(np.concatenate([rgb, al[..., None] * 255], 2), 'ground_winter_bare.png')
+rgb, al = matte(wb, m, 4, 30); save(np.concatenate([rgb, al[..., None] * 255], 2), 'ground_winter_bare.png')
 
 # --- the winter example's snow on the roofs, chimney, mailbox and lamp ----------------------------------------------------
 we = np.asarray(Image.open(os.path.join(U, '7d8d0e8b-image.png')).convert('RGB')).astype(np.float32)
 L = we.mean(2); sat = we.max(2) - we.min(2); snow = (L > 188) & (sat < 46)
 zone = np.zeros(snow.shape, bool)
 for x0, y0, x1, y1 in [(150, 100, 1050, 330), (1000, 210, 1680, 340), (760, 125, 860, 175), (480, 600, 545, 650), (1540, 350, 1620, 400)]: zone[y0:y1, x0:x1] = True
-caps = np.concatenate([we, np.where(snow & zone, 255, 0)[..., None]], 2)
+cm = snow & zone
+for _ in range(2):   # close the gaps (the eaves came out dotted) and drop lone specks
+    n = np.zeros(cm.shape, np.int32); n[1:] += cm[:-1]; n[:-1] += cm[1:]; n[:, 1:] += cm[:, :-1]; n[:, :-1] += cm[:, 1:]; cm = (cm & (n >= 2)) | (~cm & (n >= 3) & zone)
+caps = np.concatenate([we, np.where(cm, 255, 0)[..., None]], 2)
 save(shrink(caps, k), 'snowcaps.png'); cut['snowcaps'] = {'at': [0, 0]}
 
 # --- the night example's lamplit windows -------------------------------------------------------------------------------------

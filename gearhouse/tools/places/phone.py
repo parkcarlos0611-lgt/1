@@ -74,7 +74,7 @@ body_wh = piece(BODY, sB, 'body', whole=True)   # without the bit of cord that l
 stop_wh = piece(STOP, sB, 'stop', lambda q: ~((q[..., 0] > 232) & (q[..., 1] > 190) & (q[..., 2] > 140)) & (q[..., :3].mean(2) > 48))   # the brass hook (and the ring under it), not the cream card nor the black body
 ring = (bx + RING[0] * sB, by + RING[1] * sB, RING[2] * sB)
 sW = ring[2] / WHEEL[2]; Z = 3                               # the wheel's rim on the ring; kept at three times
-r = WHEEL[2] + 6; wheel_wh = piece((WHEEL[0] - r, WHEEL[1] - r, WHEEL[0] + r, WHEEL[1] + r), sW * Z, 'wheel')
+r = 274; wheel_wh = piece((WHEEL[0] - r, WHEEL[1] - r, WHEEL[0] + r, WHEEL[1] + r), sW * Z, 'wheel', whole=True)
 sH = 187 / (HANDSET[2] - HANDSET[0]); handset_wh = piece(HANDSET, sH, 'handset')
 # the cord's colours, from the parts sheet's braid
 cord = P[200:700, 760:960]; cm = cord[..., 3] > 0; cols = cord[cm][:, :3]; lum = cols.mean(1)

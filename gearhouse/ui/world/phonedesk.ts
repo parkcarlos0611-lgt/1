@@ -15,6 +15,7 @@ import type { App, Scene } from '../shell/app';
 import { COL, type Rect } from '../pixel/kit';
 import { hex, type RGB } from '../pixel/screen';
 import { tiny } from '../pixel/tiny';
+import { printText, SERIF, GOTHIC } from '../pixel/printed';
 import { pixels } from './pics';
 import { directoryBook, DIR, type Entry } from './directory';
 import { newHouse, type HouseState } from '../../core/house';
@@ -87,7 +88,7 @@ export function phoneDesk(app: App): Scene {
     for (let y = r.y + 3; y < r.y + r.h + 3; y++) for (let x = r.x + 3; x < r.x + r.w + 3; x++) put(x, y, [16, 8, 4], 0.35);
     for (let y = r.y; y < r.y + r.h; y++) for (let x = r.x; x < r.x + r.w; x++) put(x, y, y < r.y + 6 ? [168 * k, 52 * k, 40 * k] : (y - r.y) % 9 === 8 ? [196 * k, 204 * k, 214 * k] : [236 * k, 230 * k, 212 * k]);
     S.text('메모', r.x + 4, r.y + 8, [90, 70, 56]);
-    list.slice(0, 7).forEach((e, n) => { const nm = (e.short ?? e.ko.split(' (')[0]!).slice(0, 6); S.text(nm, r.x + 3, r.y + 18 + n * 9, [70, 70, 84], r.w - 22); tiny(e.no || '0', r.x + r.w - 17, r.y + 20 + n * 9, (x, y) => put(x, y, [150, 40, 34])); });
+    list.slice(0, 7).forEach((e, n) => { const nm = (e.short ?? e.ko.split(' (')[0]!).slice(0, 6); S.text(nm, r.x + 3, r.y + 18 + n * 9, [70, 70, 84], r.w - 22); printText(e.no || '0', r.x + r.w - 3, r.y + 25 + n * 9, { font: `400 8px ${SERIF}`, align: 'right' }, (x, y, c) => put(x, y, [120, 50, 46], c)); /* in pencil */ });
     if (!list.length) S.text('(번호부에서', r.x + 3, r.y + 20, [130, 120, 110]), S.text(' 동그라미)', r.x + 3, r.y + 29, [130, 120, 110]); }
 
   // for tests: the dial's state
@@ -104,9 +105,9 @@ export function phoneDesk(app: App): Scene {
       // the telephone: its shadow, the body, the number card's figures, the wheel, the stop, the cord, the handset
       shadow(C.body.at[0]! + C.body.size[0]! / 2 + 6, C.body.at[1]! + C.body.size[1]! - 4, C.body.size[0]! / 2 + 6, 9, 0.55);
       sprite(body, C.body.size[0]!, C.body.size[1]!, C.body.at[0]!, C.body.at[1]!, k);
-      C.wheel.holes.forEach((_, i) => { const a = holeAt(i, 0), s = i === 9 ? '0' : String(i + 1); tiny(s, rcx + Math.cos(a) * C.wheel.holeR - 1, rcy + Math.sin(a) * C.wheel.holeR - 2, (x, y) => put(x, y, [40 * k, 30 * k, 26 * k])); });
+      C.wheel.holes.forEach((_, i) => { const a = holeAt(i, 0), s = i === 9 ? '0' : String(i + 1); printText(s, rcx + Math.cos(a) * C.wheel.holeR, rcy + Math.sin(a) * C.wheel.holeR + 3.5, { font: `500 9px ${GOTHIC}`, align: 'center' }, (x, y, c) => put(x, y, [30 * k, 22 * k, 20 * k], c)); });   // the figures on the number ring, black gothic as the dials had them
       wheel(wh, k);
-      tiny('MILLBROOK', rcx - 17, rcy - 9, (x, y) => put(x, y, [70 * k, 56 * k, 44 * k])); tiny(DIR.myNumber, rcx - 15, rcy - 1, (x, y) => put(x, y, [RED[0] * k, RED[1] * k, RED[2] * k]), 2);
+      printText('MILLBROOK', rcx, rcy - 4, { font: `700 5px ${SERIF}`, align: 'center', spacing: 0.2 }, (x, y, c) => put(x, y, [70 * k, 56 * k, 44 * k], c)); printText(DIR.myNumber, rcx, rcy + 7, { font: `700 11px ${SERIF}`, align: 'center', spacing: 0.5 }, (x, y, c) => put(x, y, [RED[0] * k, RED[1] * k, RED[2] * k], c));   // the number card, as typed by the company
       sprite(stop, 17, 23, C.stop.at[0]!, C.stop.at[1]!, k);
       if (grab) { const a = holeAt(grab.hole, rot), fx = rcx + Math.cos(a) * C.wheel.holeR, fy = rcy + Math.sin(a) * C.wheel.holeR; for (let j = -5; j <= 5; j++) for (let i = -5; i <= 5; i++) { const q = i * i + j * j; if (q < 26) put(fx + i, fy + j, q > 18 ? [150, 96, 72] : j < -2 ? [246, 214, 190] : [226, 176, 146]); } }
       const hy = C.handset.at[1]! - lift * 130, hx = C.handset.at[0]! - lift * 10;

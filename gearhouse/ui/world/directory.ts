@@ -11,7 +11,7 @@
 import type { App } from '../shell/app';
 import { COL, type Rect } from '../pixel/kit';
 import { hex, type RGB } from '../pixel/screen';
-import { tiny } from '../pixel/tiny';
+import { printText, GOTHIC } from '../pixel/printed';
 import type { BookState } from '../../core/house';
 import cut from '../../data/places/phone_cut.json';
 import dir from '../../data/directory/millbrook_1930.json';
@@ -61,7 +61,7 @@ export function directoryBook(app: App, state: () => BookState) {
       if (b.kind === 'title') { if (fresh) { centre('MILLBROOK', 150, `700 46px ${SERIF}`, INK, 3); centre('TELEPHONE', 198, `400 30px ${SERIF}`, INK, 6); centre('DIRECTORY', 236, `400 30px ${SERIF}`, INK, 6);
           rule(262, 2, INK); rule(266, 1); centre(String(DIR.year), 316, `500 44px ${COND}`, RED, 4); rule(340, 1); rule(344, 2, INK);
           DIR.howTo.forEach((s, k) => centre(s.charAt(0) + s.slice(1).toLowerCase(), 388 + k * 22, `italic 400 15px ${SERIF}`, INK2)); centre('CLASSIFIED SECTION', 530, `500 17px ${COND}`, INK, 3); centre('Trades in alphabetical order', 554, `italic 400 13px ${SERIF}`, INK2);
-          centre('THE NEW YORK TELEPHONE COMPANY', 628, `400 12px ${SERIF}`, INK2, 2); } continue; }
+          centre('MILLBROOK & TRI-COUNTY TELEPHONE CO.', 628, `400 12px ${SERIF}`, INK2, 2); } continue; }
       if (b.kind === 'trade' || b.kind === 'long') { if (fresh) { rule(y + 4, 2, INK); rule(y + 8, 1); centre(b.kind === 'long' ? 'LONG DISTANCE — CALL THE OPERATOR' : b.en, y + 26, `500 15px ${COND}`, INK, 2); rule(y + 31, 1); }
         hits.push({ r: { x: x0 + mL, y: y0 + y, w: cw, h: 34 }, tip: b.kind === 'long' ? '장거리 — 0번 교환원에게' : b.ko }); continue; }
       if (b.kind === 'entry') { const e = b.e, no = e.long ? 'Call 0' : e.no || 'no tel.';
@@ -131,8 +131,10 @@ export function directoryBook(app: App, state: () => BookState) {
       if (edge < 2) c = [c[0] * 0.7, c[1] * 0.7, c[2] * 0.7]; if (edge === 2) c = [c[0] * 1.12, c[1] * 1.12, c[2] * 1.12];
       const inset = Math.min(x - r.x - 20, y - r.y - 10, r.x + r.w - 11 - x, r.y + r.h - 11 - y); if (inset === 0) c = [c[0] * 0.72, c[1] * 0.72, c[2] * 0.72]; if (inset === -1) c = [c[0] * 1.15, c[1] * 1.15, c[2] * 1.15];
       put(x, y, c); }
-    const gold: RGB = [218, 182, 104], goldD: RGB = [120, 84, 40], cx = r.x + 14 + (r.w - 14) / 2, stamp = (s: string, y: number, scale: number) => { const w = s.length * 4 * scale - scale, x = Math.round(cx - w / 2); tiny(s, x + 1, y + 1, (px, py) => put(px, py, goldD), scale); tiny(s, x, y, (px, py) => put(px, py, gold), scale); };
-    stamp('MILLBROOK', r.y + 40, 1); stamp('TELEPHONE', r.y + 58, 2); stamp('DIRECTORY', r.y + 74, 2); stamp(String(DIR.year), r.y + 100, 2);
+    const gold: RGB = [218, 182, 104], goldD: RGB = [92, 60, 28], cx = r.x + 14 + (r.w - 14) / 2, stamp = (txt: string, y: number, font: string, sp = 0) => {   // gold leaf pressed into the leather: a dark edge under, the gold on top
+      printText(txt, cx + 0.6, y + 0.8, { font, align: 'center', spacing: sp }, (px, py, a) => put(px, py, goldD, a * 0.8)); printText(txt, cx, y, { font, align: 'center', spacing: sp }, (px, py, a) => put(px, py, gold, a)); };
+    stamp('MILLBROOK', r.y + 48, `700 9px ${SERIF}`, 1.5); stamp('TELEPHONE', r.y + 72, `400 14px ${SERIF}`, 1.2); stamp('DIRECTORY', r.y + 90, `400 14px ${SERIF}`, 1.2);
+    for (let x = cx - 30; x <= cx + 30; x++) { put(x, r.y + 100, gold, 0.8); put(x, r.y + 103, gold, 0.5); } stamp('1930', r.y + 122, `500 15px ${GOTHIC}`, 2);
     for (let a = 0; a < Math.PI * 2; a += 0.05) { put(Math.round(cx + Math.cos(a) * 10), Math.round(r.y + 140 + Math.sin(a) * 10), gold); }   // a bell in a ring
     for (let y = -6; y <= 5; y++) for (let x = -5; x <= 5; x++) { const w = 1.5 + (y + 6) * 0.35; if (Math.abs(x) <= w && y < 5) put(cx + x, r.y + 140 + y, y === -6 ? goldD : gold); }
     if (hover) for (let x = r.x; x < r.x + r.w; x++) { put(x, r.y, [255, 226, 150]); put(x, r.y + r.h - 1, [255, 226, 150]); } }

@@ -116,11 +116,28 @@ def sky_mask(a):
     line = np.array([int(np.median(line[max(0, x - 3):x + 4])) for x in range(len(line))])
     for x in range(a.shape[1]): m[line[x]:, x] = False
     return m
+def matte(a, m, lo=16, span=46):
+    """soft coverage for the woods against the painted sky (review 50): the sky's colour just above the woods, column by
+    column, is the background; how far a pixel is from it is how much of it is tree. Its colour is freed of the sky in it,
+    so the game's own sky shows through the gaps between the branches, softly, with no hard steps"""
+    Hh, Ww = m.shape; first = np.array([np.argmax(~m[:, x]) if (~m[:, x]).any() else Hh for x in range(Ww)])
+    B = np.zeros((Ww, 3), np.float32)
+    for x in range(Ww): y = max(4, int(first[x])); B[x] = a[y - 4:y, x].mean(0)
+    B = np.stack([np.convolve(np.pad(B[:, c], 12, mode='edge'), np.ones(25) / 25, 'valid') for c in range(3)], 1)
+    top = int(np.percentile(first, 2)) - 6; bottom = int(np.percentile(first, 90)) + 14
+    alpha = np.where(m, 0.0, 1.0).astype(np.float32); rgb = a.copy()
+    for y in range(max(0, top), min(Hh, bottom)):
+        d = np.abs(a[y] - B).sum(1); al = np.clip((d - lo) / span, 0, 1)
+        if y > bottom - 8: al = np.maximum(al, (y - (bottom - 8)) / 8)
+        alpha[y] = al; ok = al > 0.04; rgb[y, ok] = np.clip(B[ok] + (a[y, ok] - B[ok]) / al[ok, None], 0, 255)
+    alpha[:max(0, top)] = 0
+    return rgb, alpha
+
 skies = {}
 for name, f in BG.items():
     a = np.asarray(Image.open(os.path.join(U, f + '-image.png')).convert('RGB').resize((W, H), Image.BOX)).astype(np.float32)
-    m = sky_mask(a)
-    g = np.concatenate([a, np.where(m, 0, 255)[..., None]], 2); save(g, 'ground_' + name + '.png')
+    m = sky_mask(a); rgb, al = matte(a, m)
+    g = np.concatenate([rgb, al[..., None] * 255], 2); save(g, 'ground_' + name + '.png')
     # the sky picture: its rows down to the woods; behind the trees, the sky above carried down
     SH = 180; sky = a[:SH].copy()
     for x in range(W):
@@ -149,7 +166,7 @@ for y, x in zip(*np.nonzero(white)):
 dk = snowy.mean(2) < 118; snowy[dk] = snowy[dk] * np.array([1.08, 0.97, 0.86])   # the branches warmer (brown, not the snow's blue); the sky between them as painted
 wb[woods] = snowy
 m = sky_mask(ws)
-save(np.concatenate([wb, np.where(m, 0, 255)[..., None]], 2), 'ground_winter_bare.png')
+rgb, al = matte(wb, m, 5, 22); save(np.concatenate([rgb, al[..., None] * 255], 2), 'ground_winter_bare.png')
 
 # --- the winter example's snow on the roofs, chimney, mailbox and lamp ----------------------------------------------------
 we = np.asarray(Image.open(os.path.join(U, '7d8d0e8b-image.png')).convert('RGB')).astype(np.float32)

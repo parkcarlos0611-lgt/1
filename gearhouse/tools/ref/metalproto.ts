@@ -77,5 +77,5 @@ panels.forEach((p, k) => {
 // shadow cast by each part onto what lies behind it (a soft offset towards the lower right)
 const sh = new Float32Array(W * H);
 for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const o = owner[y * W + x]!; if (o < 0) continue; for (let d2 = 1; d2 <= 4; d2++) { const xx = x + d2, yy = y + d2; if (xx >= W || yy >= H) break; const o2 = owner[yy * W + xx]!; if (o2 !== o && o2 < o) sh[yy * W + xx] = Math.max(sh[yy * W + xx]!, 0.45 * (1 - d2 / 5)); } }
-for (let i = 0; i < W * H; i++) if (sh[i]) { img[i * 4] *= 1 - sh[i]!; img[i * 4 + 1] *= 1 - sh[i]!; img[i * 4 + 2] *= 1 - sh[i]!; }
+for (let i = 0; i < W * H; i++) if (sh[i]) { img[i * 4] = img[i * 4]! * (1 - sh[i]!); img[i * 4 + 1] = img[i * 4 + 1]! * (1 - sh[i]!); img[i * 4 + 2] = img[i * 4 + 2]! * (1 - sh[i]!); }
 writeFileSync(OUT, encodePNG(W, H, img)); console.log(W, H, panels.length);

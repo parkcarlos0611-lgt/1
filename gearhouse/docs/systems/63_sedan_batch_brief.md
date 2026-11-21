@@ -27,6 +27,14 @@ docs/systems/62_direct_model_guide.md, which still holds (goal, tools, hand-in, 
 - Do not try to change the game's renderer (the artillery spokes draw thinner and darker than the sheets; that is
   known and will be fixed in the game).
 
+## Not modelled (decision 2026-11-21)
+- Nothing inside the car: no seats, steering wheel or column, dashboard, cabin, nothing seen through the glass, and no
+  wipers. The glass is glass; the game gives every car's interior the same dark tone behind it.
+- No gearbox housing and no steering gear in the chassis layer for now (they do not show from outside).
+- The chassis layer (frame, engine, drive line, axles, springs, tank, exhaust) is not the car builder's work: it will
+  come from the engine and frame generators, from the car's specification (engine kind, cylinders, bore and stroke,
+  gears, suspension, wheelbase, track, tyres). Leave the draft's chassis layer as it is.
+
 ## Notes for the know-how (from the fifth car on)
 What is shared between cars is the way of working, never the result. Every part of every car is read off that car's
 own sheet; another car's outlines, shapes or numbers are never copied in, even where two cars look alike (the cars'

@@ -17,6 +17,7 @@ import { drawingScene, standardAsks } from '../scenes/drawing';
 import { phoneDesk } from './phonedesk';
 import { post } from '../../core/ledger';
 import { newHouse } from '../../core/house';
+import { newGround, stepGround } from '../../core/ground';
 import imgFront from '../../assets/places/front/front.png';
 import { ambience } from './ambience';
 import { parts as dateParts } from '../../core/calendar';
@@ -66,6 +67,11 @@ export function worldScene(app: App): Scene {
     if (a === 'drafting') { app.push(drawingScene(app, { from: '공방 설계 (자작)', asks: standardAsks({ body: 'sedan' }), era: '1920s', size: 0, back: () => app.pop() })); return; }
     if (a === 'call') { app.push(phoneDesk(app)); return; }
     app.toast({ table: '손님과 마주 앉는 곳 (손님 흐름은 다음 단계)', books: '잡지와 부품 카탈로그 (부품 라이브러리는 뒤 단계)', bench: '공구 (수리 작업은 6단계)', bay: '차를 세우는 칸 (수리 차가 들어오면 여기에)' }[a] ?? a); }
+  /** the snow lying and the wet roads brought up to the clock, an hour at a time (a night's sleep included) */
+  function groundUpTo() { const w = W(), g = w.sim.g, gr = (g.ground ??= newGround()), [y, m, d] = w.clock.today.split('-').map(Number) as [number, number, number], now = Date.UTC(y, m - 1, d) / 60000 + w.clock.minute;
+    if (gr.at === undefined || now < gr.at) gr.at = now; let left = Math.min(now - gr.at, 3 * 1440);
+    while (left > 0) { const step = Math.min(60, left), at = new Date((now - left + step) * 60000); stepGround(gr, step, air(at.toISOString().slice(0, 10), at.getUTCHours() * 60 + at.getUTCMinutes(), g.weather.today ?? 'clear', g.seed)); left -= step; }
+    gr.at = now; }
   const dateKo = () => { const d = W().clock.today, p = parts(d); return `${p.year}년 ${p.month}월 ${p.day}일 (${WD[weekday(d)]})`; };
 
   /** the room's light by the hour: dark at night, warm at dusk; the outdoors also greys under rain */
@@ -81,13 +87,14 @@ export function worldScene(app: App): Scene {
   return { id: 'world', enter() { notes.unshift({ at: W().clock.hhmm(), text: `${dateKo()}, 밀브룩. 공방의 하루가 시작된다.` }); },
     frame(_a, dt) { t += dt;
       // time
-      const p = W().clock.tick(dt, pace()); take(p); if (eventLeft > 0) eventLeft -= dt;
+      const p = W().clock.tick(dt, pace()); take(p); groundUpTo(); if (eventLeft > 0) eventLeft -= dt;
       const hour = Math.floor(W().clock.minute / 60); if (hour !== lastSave) { lastSave = hour; app.save(); }
       // objects you can use: the living kitchen lights what is under the pointer; the other places outline it
       const pt = ui.pointer(), inside = (r: Rect) => pt.x >= r.x && pt.x < r.x + r.w && pt.y >= r.y && pt.y < r.y + r.h && pt.y > 22 && pt.y < 246;
       let over: Spot | null = null, kOver: KitchenSpot | null = null;
       if (place === 'kitchen') { for (const s of kitchen.spots) if (inside(s.r)) kOver = s; } else for (const s of PLACES[place].spots) if (inside(s.r)) over = s;
       if (place === 'kitchen' ? !kitchen.draw(dt, fade ? null : kOver) : place === 'front' ? !front.draw(dt) : true) draw();
+      if ((globalThis as { __still?: boolean }).__still) return;   // for pictures of the place alone
       { const A = air(W().clock.today, W().clock.minute, W().sim.g.weather.today ?? 'clear', W().sim.g.seed); if (place !== 'kitchen') { app.sound.ambient('rain', A.rain * (place === 'front' ? 1 : 0.3)); app.sound.ambient('wind', A.wind * (place === 'front' ? 0.8 : 0.15)); }
         quiet(app.sound, place, A, W().clock.minute, dateParts(W().clock.today).month, W().sim.g.house?.kitchen.window ?? 0, dt); }
       if (kOver && !fade) { const label = kOver.label(), tw = S.tw(label) + 8, lx = Math.min(480 - tw - 2, Math.max(2, pt.x - tw / 2)), ly = Math.max(24, pt.y - 16); S.fill(lx, ly, tw, 11, hex('#1a120b')); S.text(label, lx + 4, ly + 2, COL.lit);

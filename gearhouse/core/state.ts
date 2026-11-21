@@ -9,6 +9,7 @@ import { newMedia, type MediaState } from './media';
 import type { Condition } from './conditions';
 import { newWeather, type WeatherState } from './weather';
 import type { HouseState } from './house';
+import type { Ground } from './ground';
 import { newBank, type BankState } from './bank';
 import type { AgendaItem, TimeState } from './clock';
 import type { RepairState } from './repair';
@@ -70,6 +71,8 @@ export interface GameState {
   weather: WeatherState;
   /** the house as the player left it (review 42) */
   house?: HouseState;
+  /** snow lying, wet roads (review 49) */
+  ground?: Ground;
   bank: BankState;
   /** the minute clock and what is due at a time of day (core/clock.ts) */
   time?: TimeState;

@@ -9,7 +9,7 @@
 
 type Tool = 'pencil' | 'eraser' | 'scrape' | 'spray' | 'tape' | 'lead';
 export type SoundKind = '' | Tool;
-type Once = 'shake' | 'knock' | 'clink' | 'pour' | 'tick' | 'pulses' | 'pickup' | 'hangup' | 'paper' | 'peel' | 'blip' | 'chime' | 'drip' | 'chain' | 'sash' | 'ignite' | 'rattle' | 'bird' | 'creak' | 'car' | 'train';
+type Once = 'shake' | 'knock' | 'clink' | 'pour' | 'tick' | 'pulses' | 'pickup' | 'hangup' | 'paper' | 'peel' | 'blip' | 'chime' | 'drip' | 'chain' | 'sash' | 'ignite' | 'rattle' | 'bird' | 'creak' | 'car' | 'train' | 'murmur';
 
 export class Sound {
   on = true; private ac: AudioContext | null = null; private buf: Record<string, AudioBuffer> = {}; private t = 0;
@@ -100,6 +100,15 @@ export class Sound {
         g.gain.setValueAtTime(0, t0); g.gain.linearRampToValueAtTime(0.05 * V, t0 + 2.2); g.gain.linearRampToValueAtTime(0, t0 + 4.8); os.connect(lp).connect(g).connect(ac.destination); os.start(t0); os.stop(t0 + 5); burst(t0 + 1.2, 700, 0.6, 2.4, 0.02, 'bandpass'); break; }   // a car going by in the street, far off
       case 'train': for (const [f, d] of [[440, 0], [554, 0], [659, 0]] as const) { const os = ac.createOscillator(); os.frequency.value = f; const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 900; const g = ac.createGain();
         g.gain.setValueAtTime(0, t0 + d); g.gain.linearRampToValueAtTime(0.012 * V, t0 + 0.35); g.gain.setValueAtTime(0.012 * V, t0 + 1.4); g.gain.linearRampToValueAtTime(0, t0 + 2.4); os.connect(lp).connect(g).connect(ac.destination); os.start(t0); os.stop(t0 + 2.5); } break;   // a steam whistle miles away
+      case 'murmur': { // one syllable of a voice down the line: no words, only its sound. A buzz at the voice's pitch through two
+        // vowel bands chosen at random, then squeezed into the telephone's narrow band, with a little line noise
+        const f0 = (112 + Math.random() * 28) * (o.pitch ?? 1), dur = 0.06 + Math.random() * 0.08, os = ac.createOscillator(); os.type = 'sawtooth';
+        os.frequency.setValueAtTime(f0, t0); os.frequency.linearRampToValueAtTime(f0 * (0.88 + Math.random() * 0.26), t0 + dur);
+        const band = (f: number, q: number, v: number) => { const b = ac.createBiquadFilter(); b.type = 'bandpass'; b.frequency.value = f; b.Q.value = q; const g = ac.createGain(); g.gain.value = v; os.connect(b).connect(g); return g; };
+        const tel = ac.createBiquadFilter(); tel.type = 'bandpass'; tel.frequency.value = 1300; tel.Q.value = 0.8; const out = ac.createGain();
+        out.gain.setValueAtTime(0, t0); out.gain.linearRampToValueAtTime(0.32 * V, t0 + 0.012); out.gain.setValueAtTime(0.3 * V, t0 + dur * 0.65); out.gain.exponentialRampToValueAtTime(0.0008, t0 + dur + 0.05);
+        band(300 + Math.random() * 550, 5, 1).connect(tel); band(900 + Math.random() * 1400, 6, 0.7).connect(tel); tel.connect(out).connect(ac.destination); os.start(t0); os.stop(t0 + dur + 0.07);
+        burst(t0, 2600, 1.2, dur * 0.6, 0.01, 'bandpass'); break; }
       case 'rattle': tone(t0, 1600 + Math.random() * 260, 0.04, 0.022, 'triangle'); burst(t0, 2600, 3, 0.02, 0.05); break;                               // the kettle's lid on the boil
     } }
   private dt: { stop: () => void } | null = null;

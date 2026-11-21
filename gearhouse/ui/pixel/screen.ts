@@ -13,7 +13,7 @@ export class Screen {
   d: Uint8ClampedArray;
   constructor(public w = 480, public h = 270) { this.d = new Uint8ClampedArray(w * h * 4); }
   px(x: number, y: number, c: RGB, a = 1) { x |= 0; y |= 0; if (x < 0 || y < 0 || x >= this.w || y >= this.h) return; const o = (y * this.w + x) * 4;
-    if (a >= 1) { this.d[o] = c[0]; this.d[o + 1] = c[1]; this.d[o + 2] = c[2]; } else { this.d[o] = this.d[o]! + (c[0] - this.d[o]!) * a; this.d[o + 1] = this.d[o + 1]! + (c[1] - this.d[o + 1]!) * a; this.d[o + 2] = this.d[o + 2]! + (c[2] - this.d[o + 2]!) * a; }
+    if (a >= 1) { this.d[o] = c[0]; this.d[o + 1] = c[1]; this.d[o + 2] = c[2]; this.d[o + 3] = 255; } else { this.d[o] = this.d[o]! + (c[0] - this.d[o]!) * a; this.d[o + 1] = this.d[o + 1]! + (c[1] - this.d[o + 1]!) * a; this.d[o + 2] = this.d[o + 2]! + (c[2] - this.d[o + 2]!) * a; }
     this.d[o + 3] = 255; }
   get(x: number, y: number): RGB { const o = ((y | 0) * this.w + (x | 0)) * 4; return [this.d[o]!, this.d[o + 1]!, this.d[o + 2]!]; }
   fill(x: number, y: number, w: number, h: number, c: RGB) { for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) this.px(x + i, y + j, c); }

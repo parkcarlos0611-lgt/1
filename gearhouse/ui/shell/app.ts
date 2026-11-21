@@ -15,8 +15,16 @@ import { Sound } from './sound';
 
 export class App {
   S = new Screen(W, H); ui: UI; sound = new Sound(); stack: Scene[] = []; world: World | null = null;
+  /** a sharper layer under the pixel screen for close views of print (the directory, letters, catalogues): where a scene
+   *  leaves the pixel screen clear (alpha 0) this layer shows through, so the pixel interface stays on top of it.
+   *  Draw in game pixels: the context is already scaled by k (device pixels a game pixel). */
+  fine(): { ctx: CanvasRenderingContext2D; k: number } { if (!this.fineCv) { const f = document.createElement('canvas'); f.style.position = 'absolute'; f.style.left = '0'; f.style.top = '0'; f.style.zIndex = '0'; f.style.pointerEvents = 'none';
+      this.cv.parentElement!.insertBefore(f, this.cv); this.fineCv = f; this.fineCtx = f.getContext('2d')!; this.fit(); }
+    this.fineUsed = true; const k = this.fineCv.width / W; this.fineCtx!.setTransform(k, 0, 0, k, 0, 0); return { ctx: this.fineCtx!, k }; }
+  private fineCv: HTMLCanvasElement | null = null; private fineCtx: CanvasRenderingContext2D | null = null; private fineUsed = false;
   private msg = ''; private msgAt = -99; private ctx: CanvasRenderingContext2D; private img: ImageData; private last = performance.now();
   constructor(private cv: HTMLCanvasElement, typer: HTMLInputElement | null) {
+    const holder = document.createElement('div'); holder.style.position = 'relative'; holder.style.lineHeight = '0'; cv.parentNode!.insertBefore(holder, cv); holder.appendChild(cv); cv.style.position = 'relative'; cv.style.zIndex = '1';
     this.ui = new UI(this.S, typer); cv.width = W; cv.height = H; this.ctx = cv.getContext('2d')!; this.img = this.ctx.createImageData(W, H);
     const toPx = (ev: PointerEvent) => { const r = cv.getBoundingClientRect(); return [(ev.clientX - r.left) / r.width * W, (ev.clientY - r.top) / r.height * H] as const; };
     cv.addEventListener('pointermove', ev => { const [x, y] = toPx(ev); this.ui.move(x, y); });
@@ -29,7 +37,8 @@ export class App {
   }
   /** the biggest whole-number scale that fits; below 2 the canvas fills the window (crisp pixels either way) */
   fit() { const vw = innerWidth, vh = innerHeight - (this.cv.dataset.reserve ? +this.cv.dataset.reserve : 0), k = Math.min(vw / W, vh / H), n = Math.floor(k);
-    const s = n >= 2 ? n : k; this.cv.style.width = Math.floor(W * s) + 'px'; this.cv.style.height = Math.floor(H * s) + 'px'; }
+    const s = n >= 2 ? n : k; this.cv.style.width = Math.floor(W * s) + 'px'; this.cv.style.height = Math.floor(H * s) + 'px';
+    if (this.fineCv) { const dpr = Math.min(3, devicePixelRatio || 1), cw = Math.floor(W * s), ch = Math.floor(H * s); this.fineCv.style.width = cw + 'px'; this.fineCv.style.height = ch + 'px'; this.fineCv.width = Math.round(cw * dpr); this.fineCv.height = Math.round(ch * dpr); } }
   get top(): Scene | undefined { return this.stack[this.stack.length - 1]; }
   push(s: Scene) { this.ui.endTyping(true); this.stack.push(s); s.enter?.(this); }
   pop() { this.ui.endTyping(true); const s = this.stack.pop(); s?.leave?.(this); }
@@ -37,6 +46,6 @@ export class App {
   toast(text: string) { this.msg = text; this.msgAt = performance.now() / 1000; }
   save() { if (this.world) store.set(this.world.sim.snapshot()); }
   private loop(now: number) { const dt = Math.min(0.05, (now - this.last) / 1000); this.last = now;
-    this.ui.begin(); this.top?.frame(this, dt); this.ui.toast(this.msg, now / 1000 - this.msgAt); this.ui.end();
+    this.fineUsed = false; this.ui.begin(); this.top?.frame(this, dt); if (!this.fineUsed && this.fineCv && this.fineCv.style.display !== 'none') this.fineCv.style.display = 'none'; else if (this.fineUsed && this.fineCv) this.fineCv.style.display = ''; this.ui.toast(this.msg, now / 1000 - this.msgAt); this.ui.end();
     this.cv.style.cursor = this.ui.hover ? 'pointer' : 'default'; this.S.blit(this.ctx, this.img); requestAnimationFrame(t => this.loop(t)); }
 }

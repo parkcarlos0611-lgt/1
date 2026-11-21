@@ -1,14 +1,14 @@
 // The front of the house, the second living place (reviews 45, 46, 49): the planner's sprites and season pictures put
 // together and lit by the game (render/place/front2.ts).
 import type { App } from '../shell/app';
-import { Front2, type Pic } from '../../render/place/front2';
+import { Front2, lantern, type Pic } from '../../render/place/front2';
 import { Front2GL } from '../../render/place/front2gl';
 import { air, moon, dayOfYear } from '../../core/atmosphere';
 import { newGround } from '../../core/ground';
 import { newHouse } from '../../core/house';
 import { carSprite, carTurns, stepCar, along, depthScale, TURN_X, TURN_IN, KERB_GROUND, type CarSprite, type CarMotion } from './car';
 import { pixels } from './pics';
-import { newCaller, stepCaller, drawCaller, TO_DOOR, AWAY, type Caller } from './caller';
+import { newCaller, stepCaller, drawCaller, TO_DOOR, AWAY, FROM_LEFT, type Caller } from './caller';
 import cut from '../../data/places/front2_cut.json';
 import p_garage from '../../assets/places/front2/garage.png';
 import p_ground_autumn from '../../assets/places/front2/ground_autumn.png';
@@ -89,7 +89,7 @@ export function frontPlace(app: App) {
   let scene: Front2 | null = null, gpu: Front2GL | null = null, gpuTried = false, t = 0, door = 0, doorWant = 0, flag = 0, leaves = [0, 0, 0, 0], leafAt = [0, 0, 0, 0], then: (() => void) | null = null, thenAt = 0;
   const house = () => (app.world!.sim.g.house ??= newHouse()), garageOpen = () => !!house().garageOpen, unread = () => house().mail ?? 0;
   const spots: FrontSpot[] = [
-    { r: { x: 156, y: 96, w: 30, h: 70 }, label: () => (caller?.state === 'knock' ? '문을 열어 손님을 들인다' : '현관 (집 안으로)'), act: 'door', hl: [] },
+    { r: { x: 156, y: 96, w: 30, h: 70 }, label: () => (caller?.state === 'knock' && !handing ? (collecting !== null ? '문을 연다 (차를 찾으러 온 손님)' : '문을 열어 손님을 들인다') : '현관 (집 안으로)'), act: 'door', hl: [] },
     // the garage: shut, its doors open it; open, the doors folded back at each side shut it, and the way in is between
     ...[[303, 316], [366, 391], [445, 458]].map(([x0, x1]) => ({ r: { x: x0!, y: 98, w: x1! - x0!, h: 70 }, label: () => (garageOpen() ? '차고문을 닫는다' : '차고문을 연다'), act: 'garageDoors', hl: [] })),
     { r: { x: 316, y: 98, w: 50, h: 70 }, label: () => (garageOpen() ? '차고 안으로 들어간다' : '차고문을 연다'), act: 'garageIn', hl: [] },
@@ -98,7 +98,7 @@ export function frontPlace(app: App) {
     { r: { x: 136, y: 174, w: 22, h: 34 }, label: () => (unread() ? `우편함 (편지 ${unread()}통)` : '우편함 (비었다)'), act: 'mail', hl: [] } ];
   /** returns true if the front handled it; `go` is called to move to another place */
   function act(a: string, go: (to: 'kitchen' | 'garage') => void): boolean { const snd = app.sound;
-    if (a === 'door' && caller?.state === 'knock') { letIn(go); return true; }
+    if (a === 'door' && caller?.state === 'knock' && !handing) { letIn(go); return true; }
     if (a === 'door') { doorWant = 1; snd.once('tick'); snd.once('creak'); then = () => go('kitchen'); thenAt = t + 0.9; return true; }   // the door swings open, the hall shows, then in
     const openG = () => { house().garageOpen = true; leafAt = [t, t + 0.25, t + 0.5, t + 0.75]; snd.once('sash'); setTimeout(() => snd.once('creak'), 300); setTimeout(() => snd.once('sash', { vol: 0.8 }), 550); };
     const shutG = () => { house().garageOpen = false; leafAt = [t + 0.75, t + 0.5, t + 0.25, t]; snd.once('creak'); setTimeout(() => snd.once('knock', { vol: 0.5 }), 900); };
@@ -115,7 +115,7 @@ export function frontPlace(app: App) {
   function carFrame(dt: number, outdoorTemp: number) { const W = app.world!, h = house();
     if (!car && h.car) { try { W.repair.view(h.car); car = { job: h.car, frames: null, m: { s: 0, v: 0, wheel: 0, state: 'parked', t: 9 }, puffs: [] }; } catch { h.car = undefined; } }
     if (!car) return null;
-    if (!car.frames) { const v = W.repair.view(car.job), side = carSprite(v.colour, v.damages); if (!side) return null; car.frames = TURN_IN ? carTurns(side, v.colour) : [side]; }
+    if (!car.frames) { const v = W.repair.view(car.job), side = carSprite(v.colour, v.state === 'collected' ? [] : v.damages); if (!side) return null; car.frames = TURN_IN ? carTurns(side, v.colour) : [side]; }
     const m = car.m, was = m.state; stepCar(m, dt, car.frames[0]!.hubs[0]![2]);
     if (m.state === 'gone') { car = null; h.car = undefined; app.sound.ambient('engine', 0); return null; }
     const running = m.state !== 'parked'; app.sound.ambient('engine', running ? (m.state === 'idle' ? 0.45 : 0.75) : 0, 0.8 + m.v / 70);
@@ -128,9 +128,18 @@ export function frontPlace(app: App) {
     return { sprite: sp, x: p.x - sp.anchor[0] * sc, y: p.y - sp.anchor[1] * sc, wheel: k === 0 ? m.wheel : 0, scale: sc, side: k === 0 }; }
   // ---- the customer on foot (step 3): out of the parked car, up to the door, a knock; let in, he sits at the kitchen table
   let caller: Caller | null = null, callerWait = -1, leaving: 'walk' | 'drive' | null = null, knockAt = 0;
-  const hooks: { knock?: (n: number, name: string) => void; gaveUp?: () => void } = {};
+  const hooks: { knock?: (n: number, name: string) => void; gaveUp?: () => void; handover?: (job: number) => void } = {};
+  // ---- a customer come to collect (step 5): on foot to the door; let in, the car is handed over and paid for, and he drives it away
+  let collecting: number | null = null, handing = false;
+  function collectorArrives(job: number) { if (collecting !== null) return; collecting = job; handing = false; caller = newCaller(FROM_LEFT); }
+  /** the car handed over: paid for, out of the bay to the kerb with him at the wheel, and away */
+  function handOver(): { satisfaction: number; paid: number } | null { if (collecting === null) return null; const job = collecting, h = house(); let r: { satisfaction: number; paid: number };
+    try { r = app.world!.repair.collect(job); } catch { collecting = null; caller = null; return null; }
+    collecting = null; handing = false; caller = null; doorWant = 0; if (h.bay?.job === job) h.bay = undefined; if (car) { leaving = 'walk'; return r; }   /* the kerb taken by another customer's car: his is driven out the back lane; he walks round to it */
+    h.car = job; car = { job, frames: null, m: { s: 0, v: 0, wheel: 0, state: 'parked', t: 9 }, puffs: [] }; leaving = 'drive'; return r; }   /* out of the bay to the kerb; he walks down to it and drives off */
   const jobOpen = () => { const h = house(); if (!h.car) return false; try { return app.world!.repair.view(h.car).state === 'asked'; } catch { return false; } };
   function letIn(go?: (to: 'kitchen') => void) { if (!caller || caller.state !== 'knock') return; doorWant = 1; app.sound.once('creak');
+    if (collecting !== null) { handing = true; const job = collecting; setTimeout(() => hooks.handover?.(job), 500); return; }   /* he has come for his car: it is handed over on the step */
     setTimeout(() => { caller = null; house().visitor = true; if (go) { then = () => go('kitchen'); thenAt = t + 0.3; } else setTimeout(() => { doorWant = 0; }, 700); }, 650); }
   /** the talk is over: he comes out of the house; agreed, he walks off and leaves the car; not, he drives away */
   function visitorLeaves(drive: boolean) { house().visitor = false; leaving = drive ? 'drive' : 'walk'; }
@@ -139,7 +148,8 @@ export function frontPlace(app: App) {
     if (!caller && leaving) { caller = newCaller(leaving === 'drive' ? [...TO_DOOR].reverse() : AWAY); doorWant = 1; app.sound.once('creak'); setTimeout(() => { doorWant = 0; setTimeout(() => app.sound.once('knock', { vol: 0.35 }), 450); }, 900); }
     if (!caller) return; const r = stepCaller(caller, dt);
     if (r === 'step') app.sound.once('step', { vol: 0.5 + 0.5 * Math.min(1, (caller.s / 200)) });
-    if (caller.path === TO_DOOR) { if (r === 'arrived' || (caller.state === 'knock' && caller.t >= knockAt)) { caller.knocks++; app.sound.once('knock'); knockAt = caller.t + 14;
+    if (caller.path === FROM_LEFT) { if (!handing && (r === 'arrived' || (caller.state === 'knock' && caller.t >= knockAt && caller.knocks < 5))) { caller.knocks++; app.sound.once('knock'); knockAt = caller.t + 14; try { hooks.knock?.(caller.knocks, app.world!.repair.view(collecting!).name); } catch { /* gone */ } } }
+    else if (caller.path === TO_DOOR) { if (r === 'arrived' || (caller.state === 'knock' && caller.t >= knockAt)) { caller.knocks++; app.sound.once('knock'); knockAt = caller.t + 14;
         if (caller.knocks > 4) { try { app.world!.repair.decline(h.car!); } catch { /* already settled */ } caller = null; leaving = 'drive'; hooks.gaveUp?.(); }
         else hooks.knock?.(caller.knocks, app.world!.repair.view(h.car!).name); } }
     else if (caller.state === 'knock') { const was = leaving; caller = null; leaving = null; if (was === 'drive') carLeaves(); } }
@@ -159,11 +169,12 @@ export function frontPlace(app: App) {
     if (gpu) gpu.car = cf ? { sprite: cf.sprite, x: cf.x, y: cf.y, wheel: cf.wheel, scale: cf.scale, heads: heads && cf.side && car!.m.state !== 'parked' } : null;
     (gpu ?? scene).draw(app.S.d, { t, dt, air: A, moon: moon(W.clock.today, W.clock.minute), minute: W.clock.minute, doy: dayOfYear(W.clock.today), houseLit: !!g.house?.kitchen.lamp, snow: gr.snow, wet: gr.wet, door, garage: leaves.map(v => v * v * (3 - 2 * v)), flag });
     const d = app.S.d;
+    { const day = A.daylight; lantern(d, scene.P.lamp!, scene.C.lamp!.at as [number, number], day < 0.32 || (A.rain > 0 && day < 0.55) ? 1 : 0); }   // the street lamp's head, from its own picture
     if (cf && !gpu) { const sp = cf.sprite, ox = Math.round(cf.x), oy = Math.round(cf.y), k = 0.25 + 0.75 * A.daylight, sc = cf.scale;   // no GPU: the car laid in, lit by the hour only
       for (let y = 0; y < Math.round(sp.h * sc); y++) for (let x = 0; x < Math.round(sp.w * sc); x++) { const j = (Math.min(sp.h - 1, Math.floor(y / sc)) * sp.w + Math.min(sp.w - 1, Math.floor(x / sc))) * 4; if (sp.rgba[j + 3]! < 128) continue; const X = ox + x, Y = oy + y; if (X < 0 || X >= 480 || Y < 0 || Y >= 270) continue; const i = (Y * 480 + X) * 4; d[i] = sp.rgba[j]! * k; d[i + 1] = sp.rgba[j + 1]! * k; d[i + 2] = sp.rgba[j + 2]! * k; } }
     if (caller) drawCaller(d, caller, Math.max(A.daylight, door * (g.house?.kitchen.lamp ? 0.5 : 0)));
     if (car) for (const p of car.puffs) { const r = 1 + p.age * 2.2, a = 0.28 * (1 - p.age / 2.2); for (let y = Math.floor(p.y - r); y <= p.y + r; y++) for (let x = Math.floor(p.x - r); x <= p.x + r; x++) { if (x < 0 || y < 0 || x >= 480 || y >= 270) continue; const w = a * Math.max(0, 1 - Math.hypot(x - p.x, y - p.y) / (r + 0.5)), i = (y * 480 + x) * 4, lv = 150 + 60 * A.daylight; d[i] = d[i]! + (lv - d[i]!) * w; d[i + 1] = d[i + 1]! + (lv - d[i + 1]!) * w; d[i + 2] = d[i + 2]! + (lv + 6 - d[i + 2]!) * w; } }
     return true; }
-  const api = { draw, spots, act, cameOut, carArrives, carLeaves, carState: () => car?.m.state ?? 'none', letIn, visitorLeaves, hooks, callerState: () => caller?.state ?? (leaving ? 'leaving' : 'none') }; (globalThis as { __front?: unknown }).__front = api;   // for tests
+  const api = { draw, spots, act, cameOut, carArrives, carLeaves, carState: () => car?.m.state ?? 'none', letIn, visitorLeaves, hooks, collectorArrives, handOver, collecting: () => collecting, callerState: () => caller?.state ?? (leaving ? 'leaving' : 'none') }; (globalThis as { __front?: unknown }).__front = api;   // for tests
   return api;
 }

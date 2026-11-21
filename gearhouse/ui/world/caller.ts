@@ -13,6 +13,8 @@ type P = [number, number];
 export const TO_DOOR: P[] = [[236, 247], [192, 247], [190, 211], [171, 209], [171, 169]];
 /** after the job is agreed: down the path and off along the pavement to the left, on foot */
 export const AWAY: P[] = [[171, 169], [171, 209], [-20, 211]];
+/** coming to collect a car (step 5): on foot along the pavement from the left, up the path to the door */
+export const FROM_LEFT: P[] = [[-20, 211], [171, 209], [171, 169]];
 const pxPerM = (y: number) => 32 + Math.max(0, Math.min(1, (y - 169) / 75)) * 5, TALL = 1.8;
 
 export type CallerState = 'walk' | 'knock' | 'gone';

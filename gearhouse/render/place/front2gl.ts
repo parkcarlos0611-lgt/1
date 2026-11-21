@@ -84,7 +84,7 @@ void main() {
       c = vec3(mix(c.r, 240.0, k), mix(c.g, 176.0, k), mix(c.b, 104.0, k * 0.9)); }
     else if (gw < 4) { vec4 wb = uWin[gw], nu = uNightUV[gw]; float u = clamp((fxp - wb.x) / (wb.z - wb.x), 0.0, 0.999), v = clamp((fyp - wb.y) / (wb.w - wb.y), 0.0, 0.999);
       vec3 nw = texelFetch(uNight, ivec2(int(nu.x + u * nu.z), int(nu.y + v * nu.w)), 0).rgb * 255.0; c = mix(c, nw * vec3(1.05, 1.0, 0.95), uWl); } }
-  if (uLampOn > 0.5) { if (fxp >= uLampRect.x && fxp < uLampRect.x + uLampRect.z && fyp >= uLampRect.y && fyp < uLampRect.y + 18.0 && kind == 2 && (alb.r + alb.g + alb.b) / 3.0 >= 120.0) c = vec3(255.0, 232.0, 170.0);
+  if (uLampOn > 0.5) { /* the lantern itself is lit afterwards, from its own picture (lantern() in front2.ts) */
     float d2 = pow(fxp - uLamp.x, 2.0) + pow(fyp - uLamp.y, 2.0); if (d2 < 729.0) c += 0.55 * exp(-d2 / 81.0) * vec3(255.0, 214.0, 140.0); }
   if (uCarOn > 0.5 && uHeads > 0.5) { float d2 = pow(fxp - uHeadPos.x, 2.0) + pow(fyp - uHeadPos.y, 2.0); if (d2 < 400.0) c += 0.6 * exp(-d2 / 30.0) * vec3(255.0, 236.0, 190.0); }
   o = vec4(clamp(c, 0.0, 255.0) / 255.0, 1.0); }`;

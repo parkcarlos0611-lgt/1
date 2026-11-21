@@ -16,6 +16,21 @@ import { W, H, clamp, lerp, mix3, hash2, noise, skyColours, type V3 } from './ro
 
 const N = W * H;
 export interface Pic { px: Uint8ClampedArray; w: number; h: number }
+/** the street lamp lit, laid over the finished picture from the lamp's own sprite (only its pixels: never the wall
+ *  behind it): the frosted panes glow, brightest round the bulb and fading to their edges with the glass's own grain;
+ *  the iron bars stay dark, lit a little from inside; a soft halo in the damp air around the head */
+export function lantern(out: Uint8ClampedArray, lp: Pic, at: [number, number], on: number): void { if (on <= 0) return;
+  const ox = Math.round(at[0]), oy = Math.round(at[1]), rows = Math.min(lp.h, 26); let cx = 0, cy = 0, n = 0;
+  const glass = (j: number) => lp.px[j + 3]! >= 128 && (lp.px[j]! + lp.px[j + 1]! + lp.px[j + 2]!) / 3 >= 105;
+  for (let y = 0; y < rows; y++) for (let x = 0; x < lp.w; x++) if (glass((y * lp.w + x) * 4)) { cx += x; cy += y; n++; } if (!n) return; cx /= n; cy /= n;
+  // the halo first (the head is drawn over it)
+  const R = 18; for (let y = Math.floor(oy + cy - R); y <= oy + cy + R; y++) for (let x = Math.floor(ox + cx - R); x <= ox + cx + R; x++) { if (x < 0 || y < 0 || x >= W || y >= H) continue; const d = Math.hypot(x - ox - cx, (y - oy - cy) * 1.1); if (d > R) continue;
+    const k = on * (0.5 * Math.exp(-d / 4.5) + 0.16 * Math.exp(-d / 11)) * (1 - d / R), i = (y * W + x) * 4; out[i] = out[i]! + (255 - out[i]!) * k; out[i + 1] = out[i + 1]! + (214 - out[i + 1]!) * k * 0.95; out[i + 2] = out[i + 2]! + (150 - out[i + 2]!) * k * 0.8; }
+  for (let y = 0; y < rows; y++) for (let x = 0; x < lp.w; x++) { const j = (y * lp.w + x) * 4; if (lp.px[j + 3]! < 128) continue; const X = ox + x, Y = oy + y; if (X < 0 || Y < 0 || X >= W || Y >= H) continue; const i = (Y * W + X) * 4;
+    const d = Math.hypot(x - cx, (y - cy) * 0.9), grain = (lp.px[j]! + lp.px[j + 1]! + lp.px[j + 2]!) / 3 / 220;
+    if (glass(j)) { const core = Math.exp(-(d * d) / 14), k = on * (0.72 + 0.28 * core) * (0.9 + 0.1 * grain);
+      out[i] = Math.min(255, (236 + 19 * core) * k + out[i]! * (1 - on)); out[i + 1] = Math.min(255, (196 + 46 * core) * k + out[i + 1]! * (1 - on)); out[i + 2] = Math.min(255, (122 + 92 * core) * k + out[i + 2]! * (1 - on)); }
+    else if (d < 9) { const k = on * 0.35 * Math.exp(-d / 5); out[i] = out[i]! + (150 - out[i]!) * k; out[i + 1] = out[i + 1]! + (110 - out[i + 1]!) * k; out[i + 2] = out[i + 2]! + (70 - out[i + 2]!) * k; } } }
 export interface Front2Env { t: number; dt: number; air: Air; moon: { alt: number; az: number; phase: number }; minute: number; doy: number; houseLit: boolean; snow: number; wet: number;
   /** how far open: the front door (0..1, inward), the garage's four leaves (0..1, outward); the mailbox flag (0 down .. 1 up) */
   door: number; garage: number[]; flag: number }
@@ -128,8 +143,7 @@ export class Front2 {
         else { const nbx = C.windows[gw]!, nw = P['nightwin_' + gw]!, u = (x - nbx[0]!) / (nbx[2]! - nbx[0]!), v = (y - nbx[1]!) / (nbx[3]! - nbx[1]!), j = (Math.min(nw.h - 1, Math.max(0, Math.floor(v * nw.h))) * nw.w + Math.min(nw.w - 1, Math.max(0, Math.floor(u * nw.w)))) * 4;
           this.lit[i * 3] = lerp(this.lit[i * 3]!, nw.px[j]! * 1.05, wl); this.lit[i * 3 + 1] = lerp(this.lit[i * 3 + 1]!, nw.px[j + 1]!, wl); this.lit[i * 3 + 2] = lerp(this.lit[i * 3 + 2]!, nw.px[j + 2]! * 0.95, wl); } } }
     // ---- the street lamp lit: its lantern, its glow in the air
-    if (lampOn) { const lp = P.lamp!; for (let sy2 = 0; sy2 < 18; sy2++) for (let sx2 = 0; sx2 < lp.w; sx2++) { const j = (sy2 * lp.w + sx2) * 4; if (lp.px[j + 3]! < 128) continue; const l = (lp.px[j]! + lp.px[j + 1]! + lp.px[j + 2]!) / 3; if (l < 120) continue; const i = (Math.round(lampP[1]) + sy2) * W + Math.round(lampP[0]) + sx2; this.lit[i * 3] = 255; this.lit[i * 3 + 1] = 232; this.lit[i * 3 + 2] = 170; }
-      this.glow(lx, ly, 0.55, [255, 214, 140], 9); }
+    /* the lantern and its glow in the air: lantern(), after the picture is made (both renderers) */
     // ---- wet: the road shines; lights draw long streaks down it, broken by the rain
     if (e.wet > 0.05) this.wetShine(e, lampOn ? [[lx, ly, 1]] : [], winLit ? C.windows.map(b => [(b[0]! + b[2]!) / 2, b[3]!, 0.55 * wl] as [number, number, number]) : []);
     if (e.wet > 0.35) this.puddles(e);

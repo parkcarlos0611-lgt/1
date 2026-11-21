@@ -7,6 +7,7 @@ import type { App } from '../shell/app';
 import { COL, split, type Rect } from '../pixel/kit';
 import { newHouse, type BayState } from '../../core/house';
 import { post } from '../../core/ledger';
+import { addDays } from '../../core/calendar';
 import type { Damage, JobResult } from '../../core/repair';
 import { bodyworkScene } from '../scenes/bodywork';
 import { carSprite, type CarSprite } from './car';
@@ -61,6 +62,8 @@ export function bayPlace(app: App, passTime: (minutes: number) => void) {
   function finish(b: BayState) { const R = app.world!.repair, j = R.job(b.job), hasRust = j.damages.some(d => d.kind === 'rust'), undone = j.damages.filter(d => d.kind !== 'rust' && !b.fixed.includes(key(d))).length;
     const body: JobResult | null = hasRust ? b.body ?? null : null, sat = Math.max(0, (body ? body.satisfaction : hasRust ? 25 : 92) - undone * 30);
     R.finish(b.job, { satisfaction: sat, backChance: body ? body.backChance : hasRust ? 0.7 : 0.04, hours: b.minutes / 60, parts: body?.parts });
+    // he comes for it on the day agreed (or, finished late, the next morning)
+    const C = app.world!.clock, due = j.due ?? C.today, date = due > C.today ? due : addDays(C.today, 1); C.schedule({ date, minute: 9 * 60 + (j.id * 47) % 420, kind: 'repair_collect', ref: j.id });
     app.sound.once('chime'); app.toast(undone || (hasRust && !body) ? '손을 덜 댄 채 끝냈다. 손님이 알아챌 것이다.' : '일이 끝났다. 차는 손님이 찾으러 올 때까지 차고에 있다.'); }
 
   return { drawCar, panel, has: () => !!bay() };

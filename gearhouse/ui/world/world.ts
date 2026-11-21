@@ -53,9 +53,13 @@ function pic(url: string): Uint8ClampedArray | null { if (pics.has(url)) return 
 export function worldScene(app: App): Scene {
   const ui = app.ui, S = app.S, W = () => app.world!, kitchen = kitchenPlace(app), front = frontPlace(app), quiet = ambience(), talk = consultation(app, drive => front.visitorLeaves(drive)), bay = bayPlace(app, m => take(W().clock.advance(m)));
   let place: Place = 'front', fade = 0, going: Place | null = null, after: (() => void) | null = null, t = 0, eventLeft = 0, lastSave = -1;
-  const notes: { at: string; text: string; inc?: Incident }[] = [], cards: { text: string; go?: Place; until: number; door?: boolean }[] = [];
+  const notes: { at: string; text: string; inc?: Incident }[] = [], cards: { text: string; go?: Place; until: number; door?: boolean; hand?: number }[] = [];
   front.hooks.knock = (n, name) => { for (let k = cards.length - 1; k >= 0; k--) if (cards[k]!.door) cards.splice(k, 1); cards.unshift({ text: n === 1 ? `똑, 똑. ${name} 씨가 현관에서 문을 두드린다.` : `다시 두드린다. (${n}번째)`, until: t + 13, door: true }); };
-  front.hooks.gaveUp = () => { for (let k = cards.length - 1; k >= 0; k--) if (cards[k]!.door) cards.splice(k, 1); app.toast('기다리던 손님이 차로 돌아간다.'); };
+  front.hooks.handover = job => { for (let k = cards.length - 1; k >= 0; k--) if (cards[k]!.door) cards.splice(k, 1); const v = W().repair.view(job); cards.unshift({ text: `${v.name} 씨: "차는 다 됐소?" 약속한 값 $${v.price}.`, hand: job, until: t + 1e6 }); };
+  /** a test: a customer's car at the kerb now, wherever the clock is (the pre-alpha's button) */
+  function testCustomer() { const w = W(), h = (w.sim.g.house ??= newHouse()); if (h.car || front.carState() !== 'none') { app.toast('이미 손님 차가 집 앞에 있다'); return; }
+    const j = w.repair.arrive(w.sim.api(), 'walk_in'); w.sim.g.agenda = (w.sim.g.agenda ?? []).filter(a => !(a.kind === 'repair_visit' && a.ref === j.id)); eventLeft = 25; front.carArrives(j.id); if (place !== 'front') travel('front'); }
+  front.hooks.gaveUp =() => { for (let k = cards.length - 1; k >= 0; k--) if (cards[k]!.door) cards.splice(k, 1); app.toast('기다리던 손님이 차로 돌아간다.'); };
   const travel = (to: Place, then?: () => void) => { if (fade) return; if (place === 'kitchen' && to !== 'kitchen') kitchen.quiet(); going = to; after = then ?? null; fade = 0.001; app.sound.once('paper'); };
   const pace = (): Pace => (app.top?.id !== 'world' || (place === 'kitchen' && talk.open()) ? 'talk' : eventLeft > 0 ? 'event' : PLACES[place].pace);
   function take(p: Passage) {
@@ -65,6 +69,7 @@ export function worldScene(app: App): Scene {
       const pl = d.payload as { from: string; items: { item: 'tea' | 'coffee'; qty: number; price: number }[] }, pt = ((W().sim.g.house ??= newHouse()).pantry ??= { tea: 1, coffee: 1 }); let tot = 0;
       for (const it of pl.items) { pt[it.item] += it.qty; tot += it.qty * it.price; }
       post(W().sim.api(), 'groceries', -tot, pl.from); cards.push({ text: `${pl.from}에서 배달이 왔다. ${pl.items.map(i => (i.item === 'tea' ? '홍차 ' : '커피 ') + i.qty).join(', ')} · $${tot.toFixed(2)}`, go: 'front', until: t + 15 }); }
+    else if (d.kind === 'repair_collect') { try { const j = W().repair.view(d.ref!); if (j.state === 'ready') { eventLeft = 25; front.collectorArrives(d.ref!); cards.push({ text: `${j.name} 씨가 차를 찾으러 걸어온다.`, go: 'front', until: t + 20 }); } } catch { /* gone */ } }
     else if (d.kind === 'repair_visit') { const j = W().repair.view(d.ref!); eventLeft = 25; front.carArrives(d.ref!); cards.push({ text: `차 한 대가 집 앞에 섰다. ${j.name} 씨, ${j.car}.`, go: 'front', until: t + 20 }); }
     if (notes.length > 30) notes.length = 30; }
   function act(a: string) { const w = W();
@@ -117,6 +122,7 @@ export function worldScene(app: App): Scene {
       ui.label(a!, `${dateKo()} · ${PLACES[place].name}`, COL.cream); ui.label(b!, W().clock.hhmm(), COL.lit, 'r'); ui.label(c!, `${SKY[g.weather.today ?? 'clear'] ?? ''} · $${Math.round(g.ledger.cash)}`, COL.cream, 'r');
       ui.label(e!, { free: '하루 60초', event: '느리게', work: '작업 20배', talk: '멈춤' }[pace()], COL.card2, 'r');
       // where you can go
+      if (ui.button('test-customer', { x: 4, y: 234, w: 84, h: 13 }, '손님 부르기 (시험)')) testCustomer();
       const nav = split({ x: 4, y: 250, w: 330, h: 16 }, NAV.map(() => '*' as const), 2); NAV.forEach((n, k) => { if (ui.tab('go-' + n, nav[k]!, PLACES[n].name, place === n)) { if (n === 'phone') act('call'); else if (n !== place) travel(n); } });
       // the day's notes
       const open = pt.x >= 330 && pt.y >= 176 && pt.y < 248, nb = open ? { x: 330, y: 176, w: 146, h: 70 } : { x: 330, y: 224, w: 146, h: 22 }; ui.panel(nb, 'card'); let ny = nb.y + 4;
@@ -124,7 +130,9 @@ export function worldScene(app: App): Scene {
       // something happening now
       for (let k = cards.length - 1; k >= 0; k--) if (cards[k]!.until < t) cards.splice(k, 1);
       const card = place === 'kitchen' && talk.open() ? cards.find(c => c.door) : cards[0]; if (card) { const r = { x: 276, y: 26, w: 200, h: 44 }; ui.panel(r, 'card'); ui.paragraph({ x: r.x + 6, y: r.y + 4, w: r.w - 12, h: 20 }, card.text, COL.ink);
-        const [b1, b2] = split({ x: r.x + 6, y: r.y + 27, w: r.w - 12, h: 13 }, ['*', '*'], 6); if (card.door) { if (ui.button('card-go', b1!, '문을 연다')) { cards.splice(cards.indexOf(card), 1); if (place === 'front') front.letIn(to => travel(to)); else { front.letIn(); if (place !== 'kitchen') travel('kitchen'); } } if (ui.button('card-x', b2!, '기다리게 한다')) cards.splice(cards.indexOf(card), 1); }
+        const [b1, b2] = split({ x: r.x + 6, y: r.y + 27, w: r.w - 12, h: 13 }, ['*', '*'], 6); if (card.hand !== undefined) { if (ui.button('card-go', { x: r.x + 6, y: r.y + 27, w: r.w - 12, h: 13 }, '차 열쇠를 내주고 값을 받는다')) { cards.splice(cards.indexOf(card), 1); const res = front.handOver();
+          if (res) { const s = res.satisfaction; app.sound.once('clink'); app.toast(`$${res.paid} 받았다. ${s >= 60 ? '차를 한 바퀴 돌아보고 흡족해한다.' : s >= 25 ? '고친 자리를 손으로 쓸어 보더니 말이 없다.' : '"이게 다 고친 거요?" 불만스럽게 값을 치른다.'}`); } } }
+        else if (card.door) { if (ui.button('card-go', b1!, '문을 연다')) { cards.splice(cards.indexOf(card), 1); if (place === 'front') front.letIn(to => travel(to)); else { front.letIn(); if (place !== 'kitchen') travel('kitchen'); } } if (ui.button('card-x', b2!, '기다리게 한다')) cards.splice(cards.indexOf(card), 1); }
         else { if (card.go && ui.button('card-go', b1!, '나가 본다')) { travel(card.go); cards.shift(); } if (ui.button('card-x', b2!, '두고 본다')) cards.shift(); } }
       // between rooms: a fade
       if (fade > 0) { fade += dt * 2.4; if (fade >= 1 && going) { if (going === 'front' && place === 'kitchen') front.cameOut(); place = going; going = null; after?.(); after = null; } const a2 = fade < 1 ? fade : Math.max(0, 2 - fade); if (fade >= 2) fade = 0; for (let i = 0; i < 480 * 270; i++) S.px(i % 480, (i / 480) | 0, [0, 0, 0], a2); }

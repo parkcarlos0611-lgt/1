@@ -85,14 +85,18 @@ export function frontPlace(app: App) {
   const house = () => (app.world!.sim.g.house ??= newHouse()), garageOpen = () => !!house().garageOpen, unread = () => house().mail ?? 0;
   const spots: FrontSpot[] = [
     { r: { x: 156, y: 96, w: 30, h: 70 }, label: () => '현관 (집 안으로)', act: 'door', hl: [] },
-    { r: { x: 300, y: 98, w: 160, h: 70 }, label: () => (garageOpen() ? '차고로 들어간다' : '차고문을 연다'), act: 'garage', hl: [] },
-    { r: { x: 458, y: 98, w: 14, h: 70 }, label: () => (garageOpen() ? '차고문을 닫는다' : '차고'), act: 'garageShut', hl: [] },
+    // the garage: shut, its doors open it; open, the doors folded back at each side shut it, and the way in is between
+    ...[[303, 316], [366, 391], [445, 458]].map(([x0, x1]) => ({ r: { x: x0!, y: 98, w: x1! - x0!, h: 70 }, label: () => (garageOpen() ? '차고문을 닫는다' : '차고문을 연다'), act: 'garageDoors', hl: [] })),
+    { r: { x: 316, y: 98, w: 50, h: 70 }, label: () => (garageOpen() ? '차고 안으로 들어간다' : '차고문을 연다'), act: 'garageIn', hl: [] },
+    { r: { x: 391, y: 98, w: 54, h: 70 }, label: () => (garageOpen() ? '차고 안으로 들어간다' : '차고문을 연다'), act: 'garageIn', hl: [] },
     { r: { x: 136, y: 174, w: 22, h: 34 }, label: () => (unread() ? `우편함 (편지 ${unread()}통)` : '우편함 (비었다)'), act: 'mail', hl: [] } ];
   /** returns true if the front handled it; `go` is called to move to another place */
   function act(a: string, go: (to: 'kitchen' | 'garage') => void): boolean { const snd = app.sound;
-    if (a === 'door') { doorWant = 1; snd.once('tick'); snd.once('creak'); then = () => go('kitchen'); thenAt = t + 0.55; return true; }
-    if (a === 'garage') { if (garageOpen()) { go('garage'); return true; } house().garageOpen = true; leafAt = [t, t + 0.25, t + 0.5, t + 0.75]; snd.once('sash'); setTimeout(() => snd.once('creak'), 300); setTimeout(() => snd.once('sash', { vol: 0.8 }), 550); return true; }
-    if (a === 'garageShut') { if (!garageOpen()) return false; house().garageOpen = false; leafAt = [t + 0.75, t + 0.5, t + 0.25, t]; snd.once('creak'); setTimeout(() => snd.once('knock', { vol: 0.5 }), 900); return true; }
+    if (a === 'door') { doorWant = 1; snd.once('tick'); snd.once('creak'); then = () => go('kitchen'); thenAt = t + 0.9; return true; }   // the door swings open, the hall shows, then in
+    const openG = () => { house().garageOpen = true; leafAt = [t, t + 0.25, t + 0.5, t + 0.75]; snd.once('sash'); setTimeout(() => snd.once('creak'), 300); setTimeout(() => snd.once('sash', { vol: 0.8 }), 550); };
+    const shutG = () => { house().garageOpen = false; leafAt = [t + 0.75, t + 0.5, t + 0.25, t]; snd.once('creak'); setTimeout(() => snd.once('knock', { vol: 0.5 }), 900); };
+    if (a === 'garageDoors') { if (garageOpen()) shutG(); else openG(); return true; }
+    if (a === 'garageIn') { if (!garageOpen()) openG(); else if (Math.min(...leaves) > 0.9) go('garage'); return true; }   // in only once the doors stand open
     if (a === 'mail') { const n = unread(); snd.once('paper'); app.toast(n ? `편지 ${n}통을 꺼냈다 (책상 위 쪽지에 있다)` : '우편함은 비어 있다'); house().mail = 0; return true; }
     return false; }
   /** coming out of the house: the door is open behind and swings shut */
@@ -100,7 +104,7 @@ export function frontPlace(app: App) {
   function draw(dt: number): boolean {
     if (!scene) { const P: Record<string, Pic> = {}; for (const [n, [url, w, h]] of Object.entries(PICS)) { const px = pixels(url, w, h); if (!px) return false; P[n] = { px, w, h }; } scene = new Front2(cut as never, P); leaves = leaves.map(() => (garageOpen() ? 1 : 0)); }
     t += dt; const W = app.world!, g = W.sim.g, sky = g.weather.today ?? 'clear', A = air(W.clock.today, W.clock.minute, sky, g.seed), gr = (g.ground ??= newGround());
-    door += Math.max(-dt * 2.2, Math.min(dt * 2.2, doorWant - door)); if (then && t >= thenAt) { const f = then; then = null; f(); doorWant = 0; door = 0; }
+    door += Math.max(-dt * 1.6, Math.min(dt * 1.6, doorWant - door)); if (then && t >= thenAt) { const f = then; then = null; f(); setTimeout(() => { if (!then) { doorWant = 0; door = 0; } }, 900); }   /* shut behind, once the screen has gone dark */
     const want = garageOpen() ? 1 : 0; leaves = leaves.map((v, k) => (t < leafAt[k]! ? v : v + Math.max(-dt * 1.4, Math.min(dt * 1.4, want - v))));
     flag += Math.max(-dt * 3, Math.min(dt * 3, (unread() ? 1 : 0) - flag));
     scene.draw(app.S.d, { t, dt, air: A, moon: moon(W.clock.today, W.clock.minute), minute: W.clock.minute, doy: dayOfYear(W.clock.today), houseLit: !!g.house?.kitchen.lamp, snow: gr.snow, wet: gr.wet, door, garage: leaves.map(v => v * v * (3 - 2 * v)), flag });

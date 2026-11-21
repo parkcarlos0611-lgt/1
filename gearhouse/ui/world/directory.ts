@@ -15,7 +15,7 @@ import { printText, GOTHIC } from '../pixel/printed';
 import type { BookState } from '../../core/house';
 import cut from '../../data/places/phone_cut.json';
 import dir from '../../data/directory/millbrook_1930.json';
-import imgOpen from '../../assets/places/phone/book_open.jpg';
+import imgOpen from '../../assets/places/phone/book_open.png';
 import imgCover from '../../assets/places/phone/cover.png';
 
 export interface Entry { id: string; trade?: string; name: string; ko: string; addr: string; no: string; supplier?: string; hello?: string; grocer?: { item: string; ko: string; price: number }[]; long?: boolean; short?: string }
@@ -169,7 +169,7 @@ export function directoryBook(app: App, state: () => BookState) {
   function frame(dt: number): { closed: boolean } { const f = app.fine(), d = dest(), sc = d.w / O.size[0]!, p = ui.pointer();
     const was = anim; anim = Math.min(1, anim + dt / (anim < 0.5 ? 0.7 : 0.35)); if (was < 0.5 && anim >= 0.5) app.sound.once('paper'); if (turn) { turn.t += dt / 0.5; if (turn.t >= 1) { state().page = Math.max(0, Math.min(pages.length - 2, spread() + turn.dir * 2)); turn = null; } }
     // the room behind darkens; where the book lies the pixel screen is left clear so the fine print shows
-    for (let i = 0; i < W * H * 4; i += 4) { S.d[i] = S.d[i]! * 0.42; S.d[i + 1] = S.d[i + 1]! * 0.4; S.d[i + 2] = S.d[i + 2]! * 0.38; }
+    const dim = 0.42 - 0.2 * Math.min(1, anim * 2); for (let i = 0; i < W * H * 4; i += 4) { S.d[i] = S.d[i]! * dim; S.d[i + 1] = S.d[i + 1]! * dim * 0.95; S.d[i + 2] = S.d[i + 2]! * dim * 0.9; }   // the room falls away into shadow
     const hole = anim < 0.5 ? coverRect() : d; for (let y = Math.max(0, Math.floor(hole.y)); y < Math.min(H, Math.ceil(hole.y + hole.h)); y++) for (let x = Math.max(0, Math.floor(hole.x)); x < Math.min(W, Math.ceil(hole.x + hole.w)); x++) S.d[(y * W + x) * 4 + 3] = 0;
     if (ready) draw(f.ctx);
     if (anim < 1) return { closed: false };

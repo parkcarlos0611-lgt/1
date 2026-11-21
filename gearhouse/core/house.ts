@@ -18,7 +18,9 @@ export interface Pantry { tea: number; coffee: number }
 export interface BookState { marks: string[]; page: number }
 export interface HouseState { kitchen: KitchenState; pantry?: Pantry; book?: BookState;
   /** the garage doors left open; letters waiting in the mailbox */
-  garageOpen?: boolean; mail?: number }
+  garageOpen?: boolean; mail?: number;
+  /** a customer sitting at the kitchen table */
+  visitor?: boolean }
 export const newHouse = (): HouseState => ({ kitchen: { lamp: false, window: 0, windowWanted: 0, burner: false, kettle: 46, fog: 0 } });
 
 export const BOIL = 100;

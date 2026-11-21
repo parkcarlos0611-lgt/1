@@ -89,7 +89,24 @@ book = {'left': [int(colsx.min()), int(rows.min()), spine - 1, int(rows.max())],
 
 # --- the open book, kept at the scene's full size for the close view (paper, gutter, page edges) ----------------------
 BX0, BY0, BX1, BY1 = 745, 105, 1656, 846
-full = np.asarray(scene).astype(int)[BY0:BY1, BX0:BX1]; Image.fromarray(full.astype(np.uint8)).save(os.path.join(out, 'book_open.jpg'), quality=90)
+full = np.asarray(scene).astype(int)[BY0:BY1, BX0:BX1]
+def cut_from_desk(a):
+    """the open book without the desk round it (review 53): the desk's colour, flooded in from the picture's edges"""
+    from collections import deque
+    from PIL import ImageFilter
+    Hh, Ww = a.shape[:2]; desk = np.concatenate([a[0:8, 0:40].reshape(-1, 3), a[0:8, -40:].reshape(-1, 3), a[-6:, 0:30].reshape(-1, 3)]).mean(0)
+    ok = (np.abs(a - desk).sum(2) < 95) & (a.sum(2) < desk.sum() + 90); m = np.zeros((Hh, Ww), bool); q = deque()
+    for y in range(Hh):
+        for x in range(Ww):
+            if (y in (0, Hh - 1) or x in (0, Ww - 1)) and ok[y, x]: m[y, x] = True; q.append((y, x))
+    while q:
+        y, x = q.popleft()
+        for dy, dx in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            c, d = y + dy, x + dx
+            if 0 <= c < Hh and 0 <= d < Ww and not m[c, d] and ok[c, d]: m[c, d] = True; q.append((c, d))
+    al = np.asarray(Image.fromarray(np.where(m, 0, 255).astype(np.uint8)).filter(ImageFilter.MinFilter(3)).filter(ImageFilter.GaussianBlur(1)))
+    return np.concatenate([a.astype(np.uint8), al[..., None]], 2)
+Image.fromarray(cut_from_desk(full), 'RGBA').save(os.path.join(out, 'book_open.png'), optimize=True)
 fc = (full[..., 0] > 190) & (full[..., 1] > 160) & (full[..., 2] > 110); frows = np.nonzero(fc.sum(1) > 200)[0]; fcols = np.nonzero(fc.sum(0) > 200)[0]
 fspine = int(fcols.min() + 150 + np.argmin(fc[frows.min():frows.max(), fcols.min() + 150:fcols.max() - 150].sum(0)))
 open_book = {'size': [BX1 - BX0, BY1 - BY0], 'left': [int(fcols.min()), int(frows.min()), fspine - 2, int(frows.max())], 'right': [fspine + 3, int(frows.min()), int(fcols.max()), int(frows.max())], 'spine': fspine}

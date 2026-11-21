@@ -9,6 +9,7 @@ import { Room, type RoomData, type RoomEnv } from '../../render/place/room';
 import { air } from '../../core/atmosphere';
 import { newHouse, stepKitchen, type KitchenState } from '../../core/house';
 import { pixels } from './pics';
+import { visitor } from './visitor';
 import data from '../../data/places/kitchen.json';
 import imgBase from '../../assets/places/kitchen/base.png';
 import imgLamp from '../../assets/places/kitchen/lamp.png';
@@ -19,6 +20,7 @@ export interface KitchenSpot { r: Rect; label: () => string; act: string; hl: st
 const ROOM_TEMP = 18;
 
 export function kitchenPlace(app: App) {
+  const seat = visitor();
   let room: Room | null = null, lampLevel = -1, t = 0;
   const k = (): KitchenState => ((app.world!.sim.g.house ??= newHouse()).kitchen);
   const spots: KitchenSpot[] = [
@@ -42,6 +44,7 @@ export function kitchenPlace(app: App) {
     const want = s.lamp ? 1 : 0; if (lampLevel < 0) lampLevel = want; lampLevel += (want - lampLevel) * Math.min(1, dt * (want ? 18 : 10));
     const env: RoomEnv = { t, dt, air: A, minute: W.clock.minute, lamp: lampLevel, window: s.window, burner: s.burner, kettle: s.kettle, fog: s.fog, highlight: over ? over.hl : null };
     room.draw(app.S.d, env);
+    if (app.world!.sim.g.house?.visitor) seat(app.S.d, dt, true);   // a customer across the table (version one, step 3)
     for (const q of room.sounds) if (q === 'drip' || q === 'rattle') app.sound.once(q);
     app.sound.ambient('simmer', Math.max(0, Math.min(1, (s.kettle - 55) / 45)) * (s.burner ? 1 : 0.4));
     app.sound.ambient('whistle', s.kettle >= 99 && s.burner ? 1 : 0);

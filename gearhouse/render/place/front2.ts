@@ -20,17 +20,17 @@ export interface Front2Env { t: number; dt: number; air: Air; moon: { alt: numbe
   /** how far open: the front door (0..1, inward), the garage's four leaves (0..1, outward); the mailbox flag (0 down .. 1 up) */
   door: number; garage: number[]; flag: number }
 type Cut = Record<string, { at: number[]; size: number[] }> & { windows: number[][]; doorGlass: number[]; nightwin: number[][] };
-const enum K { Sky, Ground, Wall, Glass, Lantern, Wet }
+export const enum K { Sky, Ground, Wall, Glass, Lantern, Wet }
 
 /** which ground picture, and how far into the next (by day of the year) */
-function seasonOf(doy: number): [string, string, number] {
+export function seasonOf(doy: number): [string, string, number] {
   const S: [number, string][] = [[0, 'winter_bare'], [80, 'winter_bare'], [110, 'spring'], [152, 'spring'], [162, 'summer'], [253, 'summer'], [274, 'autumn'], [314, 'autumn'], [329, 'winter_bare'], [366, 'winter_bare']];
   for (let i = 0; i < S.length - 1; i++) { const [d0, a] = S[i]!, [d1, b] = S[i + 1]!; if (doy >= d0 && doy < d1) return [a, b, a === b ? 0 : (doy - d0) / (d1 - d0)]; } return ['winter_bare', 'winter_bare', 0]; }
 /** which tree, and how far into the next */
-function treeOf(doy: number): [string, string, number] {
+export function treeOf(doy: number): [string, string, number] {
   const T: [number, string][] = [[0, 'tree_bare'], [84, 'tree_bare'], [100, 'tree_bud'], [110, 'tree_bud'], [118, 'tree_blossom'], [136, 'tree_blossom'], [148, 'tree_summer'], [258, 'tree_summer'], [270, 'tree_yellow'], [282, 'tree_yellow'], [290, 'tree_red'], [298, 'tree_red'], [306, 'tree_late'], [316, 'tree_late'], [326, 'tree_bare'], [366, 'tree_bare']];
   for (let i = 0; i < T.length - 1; i++) { const [d0, a] = T[i]!, [d1, b] = T[i + 1]!; if (doy >= d0 && doy < d1) return [a, b, a === b ? 0 : (doy - d0) / (d1 - d0)]; } return ['tree_bare', 'tree_bare', 0]; }
-const cell = (x: number, y: number, s = 3) => hash2(Math.floor(x / s) + 911, Math.floor(y / s) + 37);   // a patch's own threshold, for changing a patch at a time
+export const cell = (x: number, y: number, s = 3) => hash2(Math.floor(x / s) + 911, Math.floor(y / s) + 37);   // a patch's own threshold, for changing a patch at a time
 /** where snow lies first (low) and last (high): the lawn before the paths, the pavement after, the road last and its
  *  wheel tracks never; drifts along the foot of the house; in clumps of all sizes */
 function snowField(x: number, y: number): number { let bias = 0;
@@ -40,10 +40,12 @@ function snowField(x: number, y: number): number { let bias = 0;
 const clump = (x: number, y: number) => Math.min(1, Math.max(0, (noise(x / 9 + 3.1, y / 9 + 7.7) * 0.65 + noise(x / 3.5 + 11, y / 3.5) * 0.35 - 0.2) / 0.6));
 
 export class Front2 {
-  private alb = new Float32Array(N * 3); private lit = new Float32Array(N * 3); private kind = new Uint8Array(N); private sky = new Float32Array(W * 180 * 3);
-  private glass = new Int8Array(N).fill(-1); private cover = new Float32Array(N); private snowy = new Uint8Array(N); private inside = new Uint8Array(N); private inLevel = new Float32Array(N); private dShade = new Float32Array(N); private dWarm = new Float32Array(N); private treeM = new Uint8Array(N); private marking = 0;
+  alb = new Float32Array(N * 3); lit = new Float32Array(N * 3); kind = new Uint8Array(N); private sky = new Float32Array(W * 180 * 3);
+  glass = new Int8Array(N).fill(-1); cover = new Float32Array(N); snowy = new Uint8Array(N); inside = new Uint8Array(N); inLevel = new Float32Array(N); dShade = new Float32Array(N); dWarm = new Float32Array(N); treeM = new Uint8Array(N); private marking = 0;
+  /** for the GPU path (render/place/front2gl.ts): puddle water's mirror row, the tree on its own layer, and the keys that say when the cached layers must be made again */
+  pudRow = new Uint8Array(N); tree = new Uint8ClampedArray(N * 4); treeRect = [0, 0, 1, 1]; private sKey = ''; private dKey = ''; private tKey = ''; private sAlb = new Float32Array(N * 3); private sKind = new Uint8Array(N); private sSnowy = new Uint8Array(N); private sCover = new Float32Array(N);
   private smoke: { x: number; y: number; age: number; life: number }[] = []; private fall: { x: number; y: number; v: number; snow: number }[] = []; private bird = { x: -1, y: 0, wait: 6, dir: 1 };
-  constructor(private C: Cut, private P: Record<string, Pic>) {
+  constructor(readonly C: Cut, readonly P: Record<string, Pic>) {
     // the panes of the house's windows: the dark glass inside each window box (not the shutters, not the bars)
     const hs = P.house!, [hx, hy] = C.house!.at as [number, number];
     C.windows.forEach((b, wi) => { for (let y = Math.floor(b[1]!); y < Math.ceil(b[3]!); y++) for (let x = Math.floor(b[0]!); x < Math.ceil(b[2]!); x++) { const sx = x - Math.round(hx), sy = y - Math.round(hy); if (sx < 0 || sy < 0 || sx >= hs.w || sy >= hs.h) continue;
@@ -135,6 +137,43 @@ export class Front2 {
     for (let i = 0; i < N; i++) { out[i * 4] = Math.min(255, Math.max(0, this.lit[i * 3]!)); out[i * 4 + 1] = Math.min(255, Math.max(0, this.lit[i * 3 + 1]!)); out[i * 4 + 2] = Math.min(255, Math.max(0, this.lit[i * 3 + 2]!)); out[i * 4 + 3] = 255; }
   }
 
+  /** the layers the GPU lights (review 54), made again only when what they show has changed: the ground, the buildings,
+   *  the snow and the heaps (by day, snow, wet); the doors over a copy of that (by how far they are open and the light
+   *  they let in); the tree on its own, unswayed (the GPU sways it). Returns which of them changed. */
+  layers(e: Front2Env): { base: boolean; tree: boolean } { const P = this.P, C = this.C, q = (v: number, s: number) => Math.round(v / s);
+    const sKey = `${e.doy}|${q(e.snow, 0.03)}|${q(e.wet, 0.05)}`, out = { base: false, tree: false };
+    if (sKey !== this.sKey) { this.sKey = sKey; this.dKey = '';
+      const [ga, gb, gf] = seasonOf(e.doy), A = P['ground_' + ga]!, B = P['ground_' + gb]!, SN = P.ground_winter_snow!;
+      this.kind.fill(K.Sky); this.cover.fill(1); this.snowy.fill(0); this.treeM.fill(0); this.pudRow.fill(0); this.alb.fill(0);
+      for (let i = 0; i < N; i++) { const x = i % W, y = (i / W) | 0, c = cell(x, y, 4), sf = e.snow > 0 ? snowField(x, y) : 9, base = c < gf ? B : A, edge = Math.abs(sf - e.snow) < 0.035, dust = sf >= e.snow && sf - e.snow < 0.2 && hash2(x * 3 + 1, y * 5) < (1 - (sf - e.snow) / 0.2) * 0.55, src = sf < e.snow || dust ? SN : base, j = i * 4;
+        if (sf < e.snow && y >= 100) this.snowy[i] = 1;
+        const cv = src.px[j + 3]! / 255; this.cover[i] = cv; if (cv < 0.04) continue; this.alb[i * 3] = src.px[j]!; this.alb[i * 3 + 1] = src.px[j + 1]!; this.alb[i * 3 + 2] = src.px[j + 2]!;
+        if (edge && base.px[j + 3]! > 100) { this.alb[i * 3] = (this.alb[i * 3]! + base.px[j]!) / 2; this.alb[i * 3 + 1] = (this.alb[i * 3 + 1]! + base.px[j + 1]!) / 2; this.alb[i * 3 + 2] = (this.alb[i * 3 + 2]! + base.px[j + 2]!) / 2; }
+        this.kind[i] = y >= 168 && (y >= 203 || (x >= 296 && x < 470) || (x >= 152 && x < 188)) ? K.Wet : K.Ground; }
+      this.lay(P.garage!, C.garage!.at, K.Wall); this.lay(P.house!, C.house!.at, K.Wall); this.lay(P.mailbox!, C.mailbox!.at, K.Wall); this.lay(P.lamp!, C.lamp!.at, K.Wall);
+      if (e.snow > 0.05) { const before = this.kind.slice(); this.lay(P.snowcaps!, [0, 0], K.Wall, (x, y) => { const f = clump(x * 1.6, y * 2.2) - (e.snow * 1.5 - 0.15); return f < 0 || (f < 0.25 && hash2(x * 5, y * 3 + 7) < (1 - f / 0.25) * 0.5); }); for (let i = 0; i < N; i++) if (this.kind[i] !== before[i] || (this.kind[i] === K.Wall && P.snowcaps!.px[i * 4 + 3]! > 128 && clump((i % W) * 1.6, ((i / W) | 0) * 2.2) < e.snow * 1.5 - 0.15)) this.snowy[i] = 1; }
+      if (ga === 'autumn' || (gb === 'autumn' && gf > 0.5) || ga === 'winter_bare' && e.doy > 300 && e.doy < 335) { for (const [n, x, y] of [['leaves_1', 4, 166], ['leaves_0', 192, 190], ['leaves_2', 262, 196]] as [string, number, number][]) if (P[n]) this.lay(P[n]!, [x, y], K.Ground); }
+      if (e.snow > 0.6) { for (const [n, x, y] of [['snowpile_1', 268, 178], ['snowpile_0', 452, 180], ['snowpile_2', 0, 206]] as [string, number, number][]) if (P[n]) this.lay(P[n]!, [x, y], K.Ground); }
+      if (e.wet > 0.35) for (const [n, x0, y0] of [['puddle_1', 318, 186], ['puddle_0', 410, 192], ['puddle_2', 96, 236]] as [string, number, number][]) { const p = P[n]; if (!p) continue; const sc = Math.min(1, (e.wet - 0.35) / 0.4);   // puddles: their rims as drawn; their water mirrors the row the GPU looks up
+        for (let sy = 0; sy < p.h; sy++) for (let sx = 0; sx < p.w; sx++) { const j = (sy * p.w + sx) * 4, al = p.px[j + 3]!; if (al === 0) continue; const x = x0 + sx, y = y0 + sy; if (x < 0 || x >= W || y >= H || cell(x, y, 2) > sc) continue; const i = y * W + x;
+          if (al < 200) this.pudRow[i] = Math.max(1, y0 - (y - y0) - 10); else { this.alb[i * 3] = p.px[j]! * 0.85; this.alb[i * 3 + 1] = p.px[j + 1]! * 0.85; this.alb[i * 3 + 2] = p.px[j + 2]! * 0.85; } } }
+      this.sAlb.set(this.alb); this.sKind.set(this.kind); this.sSnowy.set(this.snowy); this.sCover.set(this.cover); out.base = true; }
+    const dKey = `${q(e.door, 0.01)}|${e.garage.map(v => q(v, 0.01)).join(',')}|${q(e.flag, 0.05)}|${e.houseLit}|${q(e.air.daylight, 0.02)}|${q(e.air.cloud, 0.05)}`;
+    if (dKey !== this.dKey) { this.dKey = dKey; this.alb.set(this.sAlb); this.kind.set(this.sKind); this.snowy.set(this.sSnowy); this.cover.set(this.sCover);
+      this.inside.fill(0); this.dShade.fill(1); this.dWarm.fill(0); this.doors(e); out.base = true; }
+    const tKey = `${e.doy}|${q(e.snow, 0.05)}`;
+    if (tKey !== this.tKey) { this.tKey = tKey; out.tree = true;   // the tree, on its own layer: drawn into spare buffers with the same routine, then lifted out
+      const alb = this.alb, kind = this.kind, snowy = this.snowy, tA = new Float32Array(N * 3), tK = new Uint8Array(N).fill(K.Sky), tS = new Uint8Array(N);
+      this.alb = tA; this.kind = tK; this.snowy = tS; this.treeM.fill(0); this.marking = 1;
+      const [ta, tb, tf] = treeOf(e.doy); if (tf > 0) { this.lay(P[ta]!, C[ta]!.at, K.Wall, (x, y) => clump(x, y) >= tf); this.lay(P[tb]!, C[tb]!.at, K.Wall, (x, y) => clump(x, y) < tf); } else this.lay(P[ta]!, C[ta]!.at, K.Wall);
+      this.marking = 0;
+      if (e.snow > 0.12) for (let i = W * 2; i < N; i++) { if (!this.treeM[i] || this.treeM[i - W]) continue; const x = i % W, y = (i / W) | 0; if (clump(x * 3, y * 3) > e.snow * 1.4) continue;
+        const put = (k: number, a: number) => { tA[k * 3] = lerp(tA[k * 3]!, 234, a); tA[k * 3 + 1] = lerp(tA[k * 3 + 1]!, 238, a); tA[k * 3 + 2] = lerp(tA[k * 3 + 2]!, 248, a); tS[k] = 1; };
+        put(i, 0.9); if (e.snow > 0.55 && this.treeM[i + W]) put(i + W, 0.55); if (e.snow > 0.8 && !this.treeM[i - W] && y > 2) { put(i - W, 0.8); tK[i - W] = K.Wall; } }
+      for (let i = 0; i < N; i++) { const on = tK[i] !== K.Sky; this.tree[i * 4] = tA[i * 3]!; this.tree[i * 4 + 1] = tA[i * 3 + 1]!; this.tree[i * 4 + 2] = tA[i * 3 + 2]!; this.tree[i * 4 + 3] = on ? (tS[i] ? 200 : 255) : 0; }
+      this.alb = alb; this.kind = kind; this.snowy = snowy; const tp = P[ta]!; this.treeRect = [C[ta]!.at[0]!, Math.round(C[ta]!.at[1]!), tp.w, tp.h]; }
+    return out; }
+
   /** the front door (hinged on its right, opening inward: the leaf narrows towards the hinge and its free edge goes
    *  away, a little shorter; the hall shows behind it), the garage's four leaves (each hinged at its outer edge, swinging
    *  out towards the street: they narrow towards the hinge and their free edges come nearer, taller and lower; the dark
@@ -217,15 +256,15 @@ export class Front2 {
         else { const lv = (this.lit[i * 3]! + this.lit[i * 3 + 1]! + this.lit[i * 3 + 2]!) / (3 * 128); this.lit[i * 3] = p.px[j]! * lv * 0.85; this.lit[i * 3 + 1] = p.px[j + 1]! * lv * 0.85; this.lit[i * 3 + 2] = p.px[j + 2]! * lv * 0.85; } } } }
   private dab(cx: number, cy: number, r: number, c: V3, a: number) { for (let y = Math.floor(cy - r); y <= Math.ceil(cy + r); y++) for (let x = Math.floor(cx - r); x <= Math.ceil(cx + r); x++) { if (x < 0 || y < 0 || x >= W || y >= H) continue; const w = a * clamp(1 - Math.hypot(x - cx, y - cy) / (r + 0.5)); if (w <= 0) continue; const i = y * W + x;
     this.lit[i * 3] = lerp(this.lit[i * 3]!, c[0], w); this.lit[i * 3 + 1] = lerp(this.lit[i * 3 + 1]!, c[1], w); this.lit[i * 3 + 2] = lerp(this.lit[i * 3 + 2]!, c[2], w); } }
-  private chimney(e: Front2Env) { const a = e.air, cx = 236, cy = 34, lv = 0.15 + 0.85 * a.daylight;
+  chimney(e: Front2Env) { const a = e.air, cx = 236, cy = 34, lv = 0.15 + 0.85 * a.daylight;
     if (a.temp < 12 && Math.random() < e.dt * 5) this.smoke.push({ x: cx + (Math.random() - 0.5) * 3, y: cy, age: 0, life: 4 + Math.random() * 3 });
     for (const p of this.smoke) { p.age += e.dt; p.y -= e.dt * (7 - p.age * 0.8); p.x += e.dt * (2 + a.wind * 14) * (0.4 + p.age * 0.3) + Math.sin(e.t + p.age) * e.dt * 1.5; }
     this.smoke = this.smoke.filter(p => p.age < p.life); for (const p of this.smoke) this.dab(p.x, p.y, 1 + p.age * 1.3, [168 * lv + 10, 166 * lv + 10, 170 * lv + 14], 0.3 * (1 - p.age / p.life) * Math.min(1, p.age * 2)); }
-  private birds(e: Front2Env) { const B = this.bird, a = e.air; if (B.x < 0) { B.wait -= e.dt; if (B.wait <= 0 && a.daylight > 0.5 && a.rain === 0 && a.snow === 0) { B.dir = Math.random() < 0.5 ? 1 : -1; B.x = B.dir > 0 ? -4 : W + 4; B.y = 14 + Math.random() * 50; } return; }
+  birds(e: Front2Env) { const B = this.bird, a = e.air; if (B.x < 0) { B.wait -= e.dt; if (B.wait <= 0 && a.daylight > 0.5 && a.rain === 0 && a.snow === 0) { B.dir = Math.random() < 0.5 ? 1 : -1; B.x = B.dir > 0 ? -4 : W + 4; B.y = 14 + Math.random() * 50; } return; }
     B.x += B.dir * e.dt * 34; B.y += Math.sin(e.t * 2) * e.dt * 3; if (B.x < -6 || B.x > W + 6) { B.x = -1; B.wait = 10 + Math.random() * 20; return; }
     const flap = Math.sin(e.t * 13) > 0, x = Math.round(B.x), y = Math.round(B.y); for (const [dx, dy] of [[0, 0], [-1, flap ? -1 : 0], [1, flap ? -1 : 0], [-2, flap ? -1 : 1], [2, flap ? -1 : 1]] as const) { const i = (y + dy) * W + x + dx; if (i >= 0 && i < N && this.kind[i] === K.Sky) { this.lit[i * 3] = 46; this.lit[i * 3 + 1] = 44; this.lit[i * 3 + 2] = 48; } } }
   /** rain; snow in three depths (far: small, faint, slow; near: big, soft, quick) */
-  private weather(e: Front2Env) { const a = e.air, lv = 0.3 + 0.7 * a.daylight;
+  weather(e: Front2Env) { const a = e.air, lv = 0.3 + 0.7 * a.daylight;
     if (a.rain > 0) for (let k = 0; k < 4; k++) if (Math.random() < e.dt * 70 * a.rain) this.fall.push({ x: Math.random() * (W + 60), y: -6, v: 260 + Math.random() * 90, snow: 0 });
     if (a.snow > 0) for (const [depth, rate, v] of [[1, 34, 9], [2, 16, 16], [3, 4, 30]] as const) if (Math.random() < e.dt * rate * a.snow * 2) this.fall.push({ x: Math.random() * (W + 40), y: -3, v: v + Math.random() * v * 0.5, snow: depth });
     const gust = 0.5 + 0.9 * Math.max(0, Math.sin(e.t * 0.31) * Math.sin(e.t * 0.17 + 1));   // the wind comes in gusts

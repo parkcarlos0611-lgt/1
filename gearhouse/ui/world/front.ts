@@ -2,6 +2,7 @@
 // together and lit by the game (render/place/front2.ts).
 import type { App } from '../shell/app';
 import { Front2, type Pic } from '../../render/place/front2';
+import { Front2GL } from '../../render/place/front2gl';
 import { air, moon, dayOfYear } from '../../core/atmosphere';
 import { newGround } from '../../core/ground';
 import { newHouse } from '../../core/house';
@@ -81,7 +82,7 @@ const PICS: Record<string, [string, number, number]> = {
 export interface FrontSpot { r: { x: number; y: number; w: number; h: number }; label: () => string; act: string; hl: string[]; go?: 'kitchen' | 'garage' }
 
 export function frontPlace(app: App) {
-  let scene: Front2 | null = null, t = 0, door = 0, doorWant = 0, flag = 0, leaves = [0, 0, 0, 0], leafAt = [0, 0, 0, 0], then: (() => void) | null = null, thenAt = 0;
+  let scene: Front2 | null = null, gpu: Front2GL | null = null, gpuTried = false, t = 0, door = 0, doorWant = 0, flag = 0, leaves = [0, 0, 0, 0], leafAt = [0, 0, 0, 0], then: (() => void) | null = null, thenAt = 0;
   const house = () => (app.world!.sim.g.house ??= newHouse()), garageOpen = () => !!house().garageOpen, unread = () => house().mail ?? 0;
   const spots: FrontSpot[] = [
     { r: { x: 156, y: 96, w: 30, h: 70 }, label: () => '현관 (집 안으로)', act: 'door', hl: [] },
@@ -107,7 +108,8 @@ export function frontPlace(app: App) {
     door += Math.max(-dt * 1.6, Math.min(dt * 1.6, doorWant - door)); if (then && t >= thenAt) { const f = then; then = null; f(); setTimeout(() => { if (!then) { doorWant = 0; door = 0; } }, 900); }   /* shut behind, once the screen has gone dark */
     const want = garageOpen() ? 1 : 0; leaves = leaves.map((v, k) => (t < leafAt[k]! ? v : v + Math.max(-dt * 1.4, Math.min(dt * 1.4, want - v))));
     flag += Math.max(-dt * 3, Math.min(dt * 3, (unread() ? 1 : 0) - flag));
-    scene.draw(app.S.d, { t, dt, air: A, moon: moon(W.clock.today, W.clock.minute), minute: W.clock.minute, doy: dayOfYear(W.clock.today), houseLit: !!g.house?.kitchen.lamp, snow: gr.snow, wet: gr.wet, door, garage: leaves.map(v => v * v * (3 - 2 * v)), flag });
+    if (!gpuTried) { gpuTried = true; const off = (globalThis as { __cpu?: boolean }).__cpu; gpu = off ? null : Front2GL.make(scene); (globalThis as { __gpu?: boolean }).__gpu = !!gpu; }   // the GPU where there is one; the CPU otherwise
+    (gpu ?? scene).draw(app.S.d, { t, dt, air: A, moon: moon(W.clock.today, W.clock.minute), minute: W.clock.minute, doy: dayOfYear(W.clock.today), houseLit: !!g.house?.kitchen.lamp, snow: gr.snow, wet: gr.wet, door, garage: leaves.map(v => v * v * (3 - 2 * v)), flag });
     return true; }
   return { draw, spots, act, cameOut };
 }

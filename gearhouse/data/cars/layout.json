@@ -59,7 +59,8 @@
      60
     ]
    ],
-   "engineFrom": 244
+   "engineFrom": 244,
+   "tank": "seat"
   },
   "plymU29": {
    "front": -234,

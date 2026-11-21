@@ -27,13 +27,19 @@ def unit(pts):
     return b, [[round((x - b[0]) / max(1, b[1] - b[0]), 4), round((y - b[2]) / max(1, b[3] - b[2]), 4), 1] for x, y in pts]
 
 
-def part(pid, element, material, views, *, layer=None, pair=False, surface='flat', y=None):
+def part(pid, element, material, views, *, layer=None, pair=False, surface='flat', y=None, feats=None):
     """views: {view: [[a, b], ...] in that view's axes (side x,z; front/rear y,z; top x,y)}"""
     p = {'id': pid, 'element': element, 'material': material, 'surface': surface, 'pair': pair, 'outlines': {}, 'sheet': {}}
     if layer: p['layer'] = layer
     AX = {'side': ('x', 'z'), 'front': ('y', 'z'), 'rear': ('y', 'z'), 'top': ('x', 'y')}; got = {}
     for v, pts in views.items():
         b, o = unit(pts); p['outlines'][v] = o; p['sheet'][v] = [round(t) for t in b]
+        nu = lambda q: [round((q[0] - b[0]) / max(1, b[1] - b[0]), 4), round((q[1] - b[2]) / max(1, b[3] - b[2]), 4)]
+        for f in (feats or {}).get(v, []):
+            g = dict(f)
+            if 'pts' in g: g['pts'] = [nu(q) for q in g['pts']]
+            if 'at' in g: g['at'] = nu(g['at'])
+            p.setdefault('features', {}).setdefault(v, []).append(g)
         a1, a2 = AX[v]; got.setdefault(a1, []).append(b[0:2]); got.setdefault(a2, []).append(b[2:4])
     box = {}
     for ax in 'xyz':
@@ -58,7 +64,7 @@ def build(m, cid):
     X = lambda d: FX + d                                     # layout distances are from the front axle
     zr = L.get('railZ', R + 60)                              # the rails' underside over the axles' height
     kick = L.get('kickup', 110) if s['springs'] == 'semi' else L.get('kickup', 40)
-    keep = [p for p in m['parts'] if p.get('layer') != 'chassis' and p['element'] != 'frame']
+    keep = [p for p in m['parts'] if p.get('layer') != 'chassis' and p['element'] != 'frame' and p['id'] not in ('leafF', 'leafR')]   # what this generator makes is made again
     out = []
     # ---- the frame: one rail (mirrored), its plan line through the layout's half-widths
     xs = [X(L['front']), X(L['narrowEnd']), X(L['wideFrom']), X(L['rear'])]; hw = [L['hwFront'], L['hwFront'], L['hwMid'], L['hwRear']]
@@ -68,12 +74,19 @@ def build(m, cid):
     prof = [(xs[0], zr + 30), (X(0) + 250, zr), (kx0, zr), (kx0 + 200, zr + kick), (kx1, zr + kick), (xs[3], zr + kick)]
     side = [[x, z] for x, z in prof] + [[x, z + RAIL_D] for x, z in reversed(prof)]
     sec = lambda h: [[h - RAIL_W / 2, zr], [h + RAIL_W / 2, zr], [h + RAIL_W / 2, zr + RAIL_D], [h - RAIL_W / 2, zr + RAIL_D]]
-    out.append(part('frame', 'frame', 'black', {'top': top, 'side': side, 'front': sec(hw[0]), 'rear': sec(hw[3])}, pair=True))
+    edge = [[x, h + RAIL_W / 2 - 8] for x, h in zip(xs, hw)]; inner = [[x, h - RAIL_W / 2 + 6] for x, h in zip(xs, hw)]
+    hwAt = lambda x: float(__import__('numpy').interp(x, xs, hw))
+    rivT = [{'kind': 'bolt', 'at': [x, hwAt(x)]} for x in range(int(xs[0]) + 120, int(xs[3]) - 60, 240)]
+    zAt = lambda x: float(__import__('numpy').interp(x, [q[0] for q in prof], [q[1] for q in prof]))
+    rivS = [{'kind': 'bolt', 'at': [x, zAt(x) + RAIL_D / 2]} for x in range(int(xs[0]) + 120, int(xs[3]) - 60, 240)]
+    out.append(part('frame', 'frame', 'iron', {'top': top, 'side': side, 'front': sec(hw[0]), 'rear': sec(hw[3])}, pair=True,
+                    feats={'top': [{'kind': 'highlight', 'pts': edge, 'width': 1}, {'kind': 'seam', 'pts': inner}] + rivT,
+                           'side': [{'kind': 'highlight', 'pts': [[x, z + RAIL_D - 10] for x, z in prof], 'width': 1}, {'kind': 'seam', 'pts': [[x, z + 12] for x, z in prof]}] + rivS}))
     # ---- cross members where the under view shows them
     for k, (cx, cw) in enumerate(L['cross']):
         x0, x1 = X(cx) - cw / 2, X(cx) + cw / 2; h = min(hw[0] if X(cx) < xs[1] else hw[2] if X(cx) < kx0 else hw[3], 900)
         z0 = zr + (kick if X(cx) > kx0 + 100 else 0) + 20
-        out.append(part(f'cross{k}', 'frame', 'black', {'top': [[x0, -h], [x1, -h], [x1, h], [x0, h]], 'side': [[x0, z0], [x1, z0], [x1, z0 + 80], [x0, z0 + 80]],
+        out.append(part(f'cross{k}', 'frame', 'iron', feats={'top': [{'kind': 'highlight', 'pts': [[x0 + 10, -h + 20], [x0 + 10, h - 20]], 'width': 1}]}, views={'top': [[x0, -h], [x1, -h], [x1, h], [x0, h]], 'side': [[x0, z0], [x1, z0], [x1, z0 + 80], [x0, z0 + 80]],
                                                         **({'front': [[-h, z0], [h, z0], [h, z0 + 80], [-h, z0 + 80]]} if k == 0 else {}), **({'rear': [[-h, z0], [h, z0], [h, z0 + 80], [-h, z0 + 80]]} if k == len(L['cross']) - 1 else {})}))
     # ---- the engine (a volume): from the sump's front as the under view shows it
     el, eh, ew = engine_size(s['engine']); ex0 = X(L['engineFrom']); ez0 = zr - 60
@@ -86,6 +99,32 @@ def build(m, cid):
     out.append(part('driveline', 'driveline', 'iron', {'side': [[gear_end, zr + 40], [RX - dr, dz + tw / 2], [RX - dr, dz - tw / 2], [gear_end, zr + 40 - tw]], 'top': [[gear_end, -tw / 2], [RX - dr, -tw / 2], [RX - dr, tw / 2], [gear_end, tw / 2]]}, layer='chassis'))
     circ = lambda cx, cz, r, n=20: [[cx + math.cos(t * 2 * math.pi / n) * r, cz + math.sin(t * 2 * math.pi / n) * r] for t in range(n)]
     out.append(part('rearDiff', 'axle', 'iron', {'side': circ(RX, dz, dr), 'top': [[RX - dr, -dr], [RX + dr * 0.7, -dr], [RX + dr * 0.7, dr], [RX - dr, dr]], 'rear': circ(0, dz, dr)}, layer='chassis'))
+    # ---- the axles seen from above (their front and rear outlines are the sheet's, kept on the car's own parts)
+    tr = s['track'] / 2
+    for pid, ax, w_ in (('axleF', FX, 70), ('axleR', RX, 90)):
+        for p in keep:
+            if p['id'] == pid:
+                b, o = unit([[ax - w_ / 2, -tr], [ax + w_ / 2, -tr], [ax + w_ / 2, tr], [ax - w_ / 2, tr]]); p['outlines']['top'] = o; p.setdefault('sheet', {})['top'] = [round(t) for t in b]
+    # ---- the springs: semi-elliptic leaves under each rail (side: a shallow arc of leaves), or one transverse leaf per axle
+    leaf = lambda x0, x1, z, sag, n=12: [[x0 + (x1 - x0) * k / n, z - sag * (1 - (2 * k / n - 1) ** 2)] for k in range(n + 1)]
+    if s['springs'] == 'semi':
+        for nm, cx, ln, h in (('leafF', FX, 900, hw[0]), ('leafR', RX, 1350, hw[3])):
+            a = leaf(cx - ln / 2, cx + ln / 2, zr - 10, 70); bot = [[x, z - 45] for x, z in reversed(a)]
+            out.append(part(nm, 'spring', 'iron', {'side': a + bot, 'top': [[cx - ln / 2, h - 28], [cx + ln / 2, h - 28], [cx + ln / 2, h + 28], [cx - ln / 2, h + 28]]}, pair=True,
+                            feats={'side': [{'kind': 'seam', 'pts': [[x, z - 15] for x, z in a]}, {'kind': 'seam', 'pts': [[x, z - 30] for x, z in a[2:-2]]}]}))
+    else:
+        for nm, cx in (('leafF', FX), ('leafR', RX)):
+            out.append(part(nm, 'spring', 'iron', {'top': [[cx - 30, -hw[0]], [cx + 30, -hw[0]], [cx + 30, hw[0]], [cx - 30, hw[0]]], 'side': [[cx - 30, zr + 10], [cx + 30, zr + 10], [cx + 30, zr + 60], [cx - 30, zr + 60]]}))
+    # ---- exhaust down the right side to a silencer, out at the back; the fuel tank behind the rear axle (or under the seat)
+    ey = 230; px = ex0 + el * 0.6
+    out.append(part('exhaust', 'exhaust', 'iron', {'side': [[px, zr + 120], [px + 120, zr - 20], [RX - 700, zr - 20], [RX - 700, zr - 70], [px + 90, zr - 70], [px - 40, zr + 120]], 'top': [[px, ey - 25], [RX - 700, ey - 25], [RX - 700, ey + 25], [px, ey + 25]]}, layer='chassis'))
+    mx0, mx1 = RX - 1300, RX - 650
+    out.append(part('muffler', 'exhaust', 'iron', {'side': [[mx0, zr - 110], [mx1, zr - 110], [mx1, zr + 20], [mx0, zr + 20]], 'top': [[mx0, ey - 70], [mx1, ey - 70], [mx1, ey + 70], [mx0, ey + 70]]}, layer='chassis',
+                         feats={'top': [{'kind': 'highlight', 'pts': [[mx0 + 30, ey - 40], [mx1 - 30, ey - 40]], 'width': 1}]}))
+    out.append(part('tailpipe', 'exhaust', 'iron', {'side': [[mx1, zr - 60], [xs[3] + 60, zr + kick - 40], [xs[3] + 60, zr + kick - 10], [mx1, zr - 30]], 'top': [[mx1, ey - 18], [xs[3] + 60, ey - 18], [xs[3] + 60, ey + 18], [mx1, ey + 18]]}, layer='chassis'))
+    if L.get('tank', 'rear') == 'rear':
+        tx0, tx1 = RX + 250, min(xs[3] - 40, RX + 700); th = hw[3] - 60
+        out.append(part('tank', 'tank', 'iron', {'side': [[tx0, zr + kick - 140], [tx1, zr + kick - 140], [tx1, zr + kick + 140], [tx0, zr + kick + 140]], 'top': [[tx0, -th], [tx1, -th], [tx1, th], [tx0, th]], 'rear': [[-th, zr + kick - 140], [th, zr + kick - 140], [th, zr + kick + 140], [-th, zr + kick + 140]]}, layer='chassis'))
     m = copy.deepcopy(m); m['parts'] = keep + out
     m['running'] = {'engine': {**s['engine'], 'length': round(el), 'height': round(eh), 'width': round(ew), 'cc': round(math.pi / 4 * s['engine']['bore'] ** 2 * s['engine']['stroke'] * CYL[s['engine']['layout']] / 1000)},
                     'gearbox': {'gears': s['gears'], 'end': round(gear_end)}, 'drive': s['drive'], 'springs': s['springs']}

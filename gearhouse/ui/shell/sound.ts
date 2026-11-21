@@ -9,7 +9,7 @@
 
 type Tool = 'pencil' | 'eraser' | 'scrape' | 'spray' | 'tape' | 'lead';
 export type SoundKind = '' | Tool;
-type Once = 'shake' | 'knock' | 'clink' | 'pour' | 'tick' | 'pulses' | 'pickup' | 'hangup' | 'paper' | 'peel' | 'blip' | 'chime' | 'drip' | 'chain' | 'sash' | 'ignite' | 'rattle' | 'bird' | 'creak' | 'car' | 'train' | 'murmur';
+type Once = 'shake' | 'knock' | 'clink' | 'pour' | 'tick' | 'pulses' | 'pickup' | 'hangup' | 'paper' | 'peel' | 'blip' | 'chime' | 'drip' | 'chain' | 'sash' | 'ignite' | 'rattle' | 'bird' | 'creak' | 'car' | 'train' | 'murmur' | 'step';
 
 export class Sound {
   on = true; private ac: AudioContext | null = null; private buf: Record<string, AudioBuffer> = {}; private t = 0;
@@ -79,6 +79,7 @@ export class Sound {
       g.gain.setValueAtTime(0, at); g.gain.linearRampToValueAtTime(vol * V, at + 0.004); g.gain.exponentialRampToValueAtTime(0.0008, at + dur); os.connect(g).connect(ac.destination); os.start(at); os.stop(at + dur + 0.02); };
     switch (kind) {
       case 'shake': for (let k = 0; k < 9; k++) { const at = t0 + k * 0.085 + Math.random() * 0.012; burst(at, 3200 + Math.random() * 900, 4, 0.05, 0.35); tone(at, 2300 + Math.random() * 500, 0.04, 0.05); if (k % 2) burst(at + 0.02, 900, 1.5, 0.06, 0.12); } break;   // the mixing ball clacking in the can
+      case 'step': burst(t0, 520 + Math.random() * 160, 1.4, 0.05, 0.11, 'lowpass'); burst(t0 + 0.01, 2600, 2, 0.015, 0.03, 'bandpass', this.buf.grit); break;   // a leather sole on stone
       case 'knock': for (const [k, at] of [[0, 0], [1, 0.22], [2, 0.38]] as const) { burst(t0 + at, 180 + k * 10, 1.2, 0.12, 0.9); tone(t0 + at, 95, 0.14, 0.35, 'triangle'); } break;
       case 'clink': tone(t0, 2630, 0.35, 0.09); tone(t0, 3950, 0.22, 0.05); tone(t0, 1310, 0.18, 0.04); burst(t0, 5000, 2, 0.02, 0.2); break;          // china on a saucer
       case 'pour': for (let k = 0; k < 14; k++) burst(t0 + k * 0.06, 700 + k * 45 + Math.random() * 80, 3, 0.09, 0.18); burst(t0, 400, 0.7, 0.9, 0.08, 'lowpass'); break;   // the pitch rises as the cup fills

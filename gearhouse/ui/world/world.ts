@@ -27,6 +27,7 @@ import imgWorkshop from '../../assets/placeholder/workshop.png';
 import imgPhone from '../../assets/placeholder/phone.png';
 import { kitchenPlace, type KitchenSpot } from './kitchen';
 import { frontPlace, type FrontSpot } from './front';
+import { consultation, PANEL } from './consult';
 import { settleKitchen } from '../../core/house';
 import { air } from '../../core/atmosphere';
 
@@ -49,11 +50,13 @@ function pic(url: string): Uint8ClampedArray | null { if (pics.has(url)) return 
   const im = new Image(); im.onload = () => { const c = document.createElement('canvas'); c.width = 480; c.height = 270; const x = c.getContext('2d')!; x.drawImage(im, 0, 0, 480, 270); pics.set(url, x.getImageData(0, 0, 480, 270).data); }; im.src = url; return null; }
 
 export function worldScene(app: App): Scene {
-  const ui = app.ui, S = app.S, W = () => app.world!, kitchen = kitchenPlace(app), front = frontPlace(app), quiet = ambience();
+  const ui = app.ui, S = app.S, W = () => app.world!, kitchen = kitchenPlace(app), front = frontPlace(app), quiet = ambience(), talk = consultation(app, drive => front.visitorLeaves(drive));
   let place: Place = 'front', fade = 0, going: Place | null = null, after: (() => void) | null = null, t = 0, eventLeft = 0, lastSave = -1;
-  const notes: { at: string; text: string; inc?: Incident }[] = [], cards: { text: string; go?: Place; until: number }[] = [];
+  const notes: { at: string; text: string; inc?: Incident }[] = [], cards: { text: string; go?: Place; until: number; door?: boolean }[] = [];
+  front.hooks.knock = (n, name) => { for (let k = cards.length - 1; k >= 0; k--) if (cards[k]!.door) cards.splice(k, 1); cards.unshift({ text: n === 1 ? `똑, 똑. ${name} 씨가 현관에서 문을 두드린다.` : `다시 두드린다. (${n}번째)`, until: t + 13, door: true }); };
+  front.hooks.gaveUp = () => { for (let k = cards.length - 1; k >= 0; k--) if (cards[k]!.door) cards.splice(k, 1); app.toast('기다리던 손님이 차로 돌아간다.'); };
   const travel = (to: Place, then?: () => void) => { if (fade) return; if (place === 'kitchen' && to !== 'kitchen') kitchen.quiet(); going = to; after = then ?? null; fade = 0.001; app.sound.once('paper'); };
-  const pace = (): Pace => (app.top?.id !== 'world' ? 'talk' : eventLeft > 0 ? 'event' : PLACES[place].pace);
+  const pace = (): Pace => (app.top?.id !== 'world' || (place === 'kitchen' && talk.open()) ? 'talk' : eventLeft > 0 ? 'event' : PLACES[place].pace);
   function take(p: Passage) {
     for (const s of p.stops) if (['customer_letter', 'supplier_quote', 'loan_answer', 'tax_notice', 'repair_complaint'].includes(s.kind)) { const h = (W().sim.g.house ??= newHouse()); h.mail = (h.mail ?? 0) + 1; }   // letters come by the mailbox
     for (const s of p.stops) notes.unshift({ at: W().clock.hhmm(), text: `${KIND[s.kind] ?? s.kind}${s.payload.customer ? ' · ' + String(s.payload.customer) : ''}`, inc: s });
@@ -67,7 +70,7 @@ export function worldScene(app: App): Scene {
     if (a === 'sleep') { if (fade) return; travel('workshop', () => { const m0 = w.clock.minute; take(w.clock.sleep()); if (w.sim.g.house) settleKitchen(w.sim.g.house.kitchen, 1440 - m0 + w.clock.minute, 18); app.save(); app.toast(`잠에서 깼다. ${dateKo()}`); }); return; }
     if (a === 'drafting') { app.push(drawingScene(app, { from: '공방 설계 (자작)', asks: standardAsks({ body: 'sedan' }), era: '1920s', size: 0, back: () => app.pop() })); return; }
     if (a === 'call') { app.push(phoneDesk(app)); return; }
-    app.toast({ table: '손님과 마주 앉는 곳 (손님 흐름은 다음 단계)', books: '잡지와 부품 카탈로그 (부품 라이브러리는 뒤 단계)', bench: '공구 (수리 작업은 6단계)', bay: '차를 세우는 칸 (수리 차가 들어오면 여기에)' }[a] ?? a); }
+    app.toast({ table: '손님과 마주 앉는 곳 (손님이 오면 여기서 이야기한다)', books: '잡지와 부품 카탈로그 (부품 라이브러리는 뒤 단계)', bench: '공구 (수리 작업은 6단계)', bay: '차를 세우는 칸 (수리 차가 들어오면 여기에)' }[a] ?? a); }
   /** the snow lying and the wet roads brought up to the clock, an hour at a time (a night's sleep included) */
   function groundUpTo() { const w = W(), g = w.sim.g, gr = (g.ground ??= newGround()), [y, m, d] = w.clock.today.split('-').map(Number) as [number, number, number], now = Date.UTC(y, m - 1, d) / 60000 + w.clock.minute;
     if (gr.at === undefined || now < gr.at) gr.at = now; let left = Math.min(now - gr.at, 3 * 1440);
@@ -93,9 +96,10 @@ export function worldScene(app: App): Scene {
       // objects you can use: the living kitchen lights what is under the pointer; the other places outline it
       const pt = ui.pointer(), inside = (r: Rect) => pt.x >= r.x && pt.x < r.x + r.w && pt.y >= r.y && pt.y < r.y + r.h && pt.y > 22 && pt.y < 246;
       let over: Spot | null = null, kOver: KitchenSpot | null = null, fOver: FrontSpot | null = null;
-      if (place === 'kitchen') { for (const s of kitchen.spots) if (inside(s.r)) kOver = s; } else if (place === 'front') { for (const s of front.spots) if (inside(s.r)) fOver = s; } else for (const s of PLACES[place].spots) if (inside(s.r)) over = s;
+      if (place === 'kitchen') { if (!(talk.open() && inside(PANEL))) for (const s of kitchen.spots) if (inside(s.r)) kOver = s; } else if (place === 'front') { for (const s of front.spots) if (inside(s.r)) fOver = s; } else for (const s of PLACES[place].spots) if (inside(s.r)) over = s;
       if (place === 'kitchen' ? !kitchen.draw(dt, fade ? null : kOver) : place === 'front' ? !front.draw(dt) : true) draw();
       if ((globalThis as { __still?: boolean }).__still) return;   // for pictures of the place alone
+      if (place === 'kitchen' && !fade) talk.draw();   // a customer at the table: the talk
       { const A = air(W().clock.today, W().clock.minute, W().sim.g.weather.today ?? 'clear', W().sim.g.seed); if (place !== 'kitchen') { app.sound.ambient('rain', A.rain * (place === 'front' ? 1 : 0.3)); app.sound.ambient('wind', A.wind * (place === 'front' ? 0.8 : 0.15)); }
         quiet(app.sound, place, A, W().clock.minute, dateParts(W().clock.today).month, W().sim.g.house?.kitchen.window ?? 0, dt); }
       if (fOver && !fade) { const label = fOver.label(), tw = S.tw(label) + 8, lx = Math.min(480 - tw - 2, Math.max(2, pt.x - tw / 2)), ly = Math.max(24, pt.y - 16); S.fill(lx, ly, tw, 11, hex('#1a120b')); S.text(label, lx + 4, ly + 2, COL.lit);
@@ -116,8 +120,9 @@ export function worldScene(app: App): Scene {
       for (const [k, n] of notes.slice(0, open ? 4 : 1).entries()) { if (ny > nb.y + nb.h - 12) break; ny += 10 * ui.paragraph({ x: nb.x + 5, y: ny, w: nb.w - 10, h: Math.min(20, nb.y + nb.h - 3 - ny) }, `${n.at} ${n.text}`, k ? COL.inkSoft : COL.ink) + 2; }
       // something happening now
       for (let k = cards.length - 1; k >= 0; k--) if (cards[k]!.until < t) cards.splice(k, 1);
-      const card = cards[0]; if (card) { const r = { x: 276, y: 26, w: 200, h: 44 }; ui.panel(r, 'card'); ui.paragraph({ x: r.x + 6, y: r.y + 4, w: r.w - 12, h: 20 }, card.text, COL.ink);
-        const [b1, b2] = split({ x: r.x + 6, y: r.y + 27, w: r.w - 12, h: 13 }, ['*', '*'], 6); if (card.go && ui.button('card-go', b1!, '나가 본다')) { travel(card.go); cards.shift(); } if (ui.button('card-x', b2!, '두고 본다')) cards.shift(); }
+      const card = place === 'kitchen' && talk.open() ? cards.find(c => c.door) : cards[0]; if (card) { const r = { x: 276, y: 26, w: 200, h: 44 }; ui.panel(r, 'card'); ui.paragraph({ x: r.x + 6, y: r.y + 4, w: r.w - 12, h: 20 }, card.text, COL.ink);
+        const [b1, b2] = split({ x: r.x + 6, y: r.y + 27, w: r.w - 12, h: 13 }, ['*', '*'], 6); if (card.door) { if (ui.button('card-go', b1!, '문을 연다')) { cards.splice(cards.indexOf(card), 1); if (place === 'front') front.letIn(to => travel(to)); else { front.letIn(); if (place !== 'kitchen') travel('kitchen'); } } if (ui.button('card-x', b2!, '기다리게 한다')) cards.splice(cards.indexOf(card), 1); }
+        else { if (card.go && ui.button('card-go', b1!, '나가 본다')) { travel(card.go); cards.shift(); } if (ui.button('card-x', b2!, '두고 본다')) cards.shift(); } }
       // between rooms: a fade
       if (fade > 0) { fade += dt * 2.4; if (fade >= 1 && going) { if (going === 'front' && place === 'kitchen') front.cameOut(); place = going; going = null; after?.(); after = null; } const a2 = fade < 1 ? fade : Math.max(0, 2 - fade); if (fade >= 2) fade = 0; for (let i = 0; i < 480 * 270; i++) S.px(i % 480, (i / 480) | 0, [0, 0, 0], a2); }
       void mix; void store;

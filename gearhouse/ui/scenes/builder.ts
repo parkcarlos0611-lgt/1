@@ -8,6 +8,9 @@ import { hex, type RGB } from '../pixel/screen';
 import { viewDesign, type CarModel, type ViewName } from '../../render/car/model';
 import { rasterizeFlat } from '../../render/car/flat';
 import { SLOTS, assemble, fitSlot, NO_ADJUST, type Slot, type Grade, type Adjust } from '../../render/car/swap';
+import { fitEngine, LAYOUTS, VALVES, displacement, type EngineSpec, type EngineFit } from '../../render/car/engine';
+import { weightOf, workOf, slotArea } from '../../render/car/stats';
+import { applyWear, NEW, type Wear } from '../../render/car/wear';
 import fordT from '../../data/cars/sheet/fordT23.json';
 import chev from '../../data/cars/sheet/chevAB28.json';
 import plym from '../../data/cars/sheet/plymU29.json';
@@ -22,6 +25,9 @@ const CARS: { m: CarModel; short: string }[] = [
   .map(([m, s]) => ({ m: m as unknown as CarModel, short: s as string }));
 const GRADE: Record<Grade, [string, RGB]> = { own: ['원래', hex('#8a8478')], fits: ['맞음', hex('#3f6e3a')], work: ['손봄', hex('#b07a1e')], no: ['안 맞음', hex('#a8402c')], none: ['없음', hex('#5a5550')] };
 const BG: RGB = hex('#e6e2d6'), TILE: RGB = hex('#efebe0');
+/** the period's paint, as the makers listed it */
+const PAINTS: [string, string][] = [['검정', '#1d1d20'], ['밤색', '#4a1e22'], ['군청', '#223249'], ['녹색', '#253a2c'], ['올리브', '#3b3e25'], ['회색', '#5a5c5c'], ['황갈', '#8a6e48'], ['크림', '#c8b98e']];
+type Mode = 'parts' | 'engine' | 'paint';
 /** the view a slot's part is best seen in, for its picture in the picker */
 const VIEW_OF: Record<Slot, ViewName> = { grille: 'front', lamp: 'front', bumperF: 'front', bumperR: 'rear', tail: 'rear', fenderF: 'left', fenderR: 'left', board: 'left', wheel: 'left' };
 type Img = { w: number; h: number; rgba: Uint8ClampedArray };
@@ -30,17 +36,25 @@ export function builderScene(app: App): Scene {
   const ui = app.ui, S = app.S;
   let base = 1, sel: Slot | null = null, picker = false, zoom = 1, panX = 0, panY = 0, drag: { x: number; y: number; px: number; py: number } | null = null;
   const pick: Partial<Record<Slot, number | null>> = {}, adj: Partial<Record<Slot, Adjust>> = {};
-  let cache: { key: string; m: CarModel; front: Img; fits: ReturnType<typeof assemble>['fits'] } | null = null, sideKey = '', side: Img | null = null;
+  let mode: Mode = 'parts', eng: EngineSpec | null = null, gears = 3, colour: string | null = null, blackWings = true, wear: Wear = { ...NEW };
+  const ownEngine = (): EngineSpec => { const r = (CARS[base]!.m as unknown as { running?: { engine: EngineSpec } }).running?.engine; return r ? { layout: r.layout, kind: r.kind, bore: r.bore, stroke: r.stroke } : { layout: 'I4', kind: 'sv', bore: 95, stroke: 105 }; };
+  let cache: { key: string; m: CarModel; front: Img; fits: ReturnType<typeof assemble>['fits']; engFit: EngineFit | null; cc: number; kg: number; kg0: number; hours: number; dollars: number } | null = null, sideKey = '', side: Img | null = null;
   const thumbs = new Map<string, Img | null>(), grades = new Map<string, Grade>();
   function build() {
-    const key = base + JSON.stringify(pick) + JSON.stringify(adj); if (cache?.key === key) return cache;
+    const key = base + JSON.stringify([pick, adj, eng, gears, colour, blackWings, wear]); if (cache?.key === key) return cache;
     const choice: Partial<Record<Slot, CarModel | null>> = {}; for (const [s, k] of Object.entries(pick)) choice[s as Slot] = k === null ? null : CARS[k!]!.m;
-    const r = assemble(CARS[base]!.m, choice, adj), m = r.model;
-    cache = { key, m, front: rasterizeFlat(viewDesign(m, 'front'), { mm: Math.max(10, Math.ceil(m.height / 100)), shadow: true }), fits: r.fits }; return cache;
+    const r = assemble(CARS[base]!.m, choice, adj); let m = r.model, engFit: EngineFit | null = null, cc = displacement(ownEngine());
+    if (eng) { const e = fitEngine(m, eng, gears); m = e.model; engFit = e.fit; cc = e.cc; }
+    if (colour) { m = { ...m, paint: colour, paint2: blackWings ? '#1c1c1f' : colour } as CarModel; } else if (!blackWings) m = { ...m, paint2: (m as unknown as { paint: string }).paint } as CarModel;
+    let hours = 0, dollars = 0; for (const s of SLOTS) { const f = r.fits[s.id]; if (!f) continue; const w = workOf(s.id, f, { area: slotArea(m, s.id) }); hours += w.hours; dollars += w.dollars; }
+    if (engFit) { hours += 24 + (engFit.grade === 'work' ? 30 : engFit.grade === 'no' ? 80 : 0); dollars += engFit.grade === 'fits' ? 6 : 18; }
+    if (colour || !blackWings) { hours += 40; dollars += 14; }
+    const front = applyWear(rasterizeFlat(viewDesign(m, 'front'), { mm: Math.max(10, Math.ceil(m.height / 100)), shadow: true }), wear);
+    cache = { key, m, front, fits: r.fits, engFit, cc, kg: weightOf(m), kg0: weightOf(CARS[base]!.m), hours: Math.round(hours * 2) / 2, dollars: Math.round(dollars * 4) / 4 }; return cache;
   }
   /** the car from the side at the zoom asked for (fit: the whole car in the box) */
-  function sideImg(m: CarModel, key: string, bw: number): Img { const mm = Math.max(3, m.length / (bw - 8) / zoom), k = key + '|' + mm.toFixed(2);
-    if (k !== sideKey || !side) { side = rasterizeFlat(viewDesign(m, 'left'), { mm, shadow: true }); sideKey = k; } return side; }
+  function sideImg(m: CarModel, key: string, bw: number): Img { const mm = Math.max(3, m.length / (bw - 8) / zoom), under = mode === 'engine', k = key + '|' + mm.toFixed(2) + under;
+    if (k !== sideKey || !side) { side = under ? rasterizeFlat(viewDesign(m, 'left', undefined, { chassis: true }), { mm, shadow: true }) : applyWear(rasterizeFlat(viewDesign(m, 'left'), { mm, shadow: true }), wear); sideKey = k; } return side; }
   /** one car's part for a slot, drawn alone, cropped to itself */
   function thumb(slot: Slot, k: number): Img | null { const key = slot + k; if (thumbs.has(key)) return thumbs.get(key)!;
     const m = CARS[k]!.m, v = VIEW_OF[slot]; let d = viewDesign(m, v, slot === 'wheel' ? undefined : p => p.slot === slot);
@@ -58,17 +72,46 @@ export function builderScene(app: App): Scene {
     for (let y = Math.max(by, y0); y < Math.min(by + bh, y0 + h); y++) for (let x = Math.max(bx, x0); x < Math.min(bx + bw, x0 + w); x++) {
       const sx = Math.min(im.w - 1, Math.floor((x - x0) / sc)), sy = Math.min(im.h - 1, Math.floor((y - y0) / sc)), j = (sy * im.w + sx) * 4, a = im.rgba[j + 3]! / 255; if (a < 0.05) continue; S.px(x, y, [im.rgba[j]!, im.rgba[j + 1]!, im.rgba[j + 2]!], a); } }
   /** a slider: drag along the bar; returns the new value when it moved */
-  function slider(id: string, x: number, y: number, w: number, v: number, lo: number, hi: number): number | null {
+  function slider(id: string, x: number, y: number, w: number, v: number, lo: number, hi: number, step = 0.05, mark = 1): number | null { void id;
     const p = ui.pointer(), over = p.x >= x - 2 && p.x < x + w + 2 && p.y >= y - 3 && p.y < y + 8;
-    S.fill(x, y + 2, w, 3, COL.well); const t = (v - lo) / (hi - lo), kx = Math.round(x + t * w), one = Math.round(x + (1 - lo) / (hi - lo) * w);
+    S.fill(x, y + 2, w, 3, COL.well); const t = (v - lo) / (hi - lo), kx = Math.round(x + t * w), one = Math.round(x + (mark - lo) / (hi - lo) * w);
     S.fill(one, y, 1, 7, COL.inkSoft); S.fill(kx - 2, y - 1, 5, 9, over ? COL.lit : hex('#c9a45a')); S.fill(kx - 1, y, 3, 7, hex('#e8c878'));
-    if (p.down && over) { const n = Math.round((lo + Math.max(0, Math.min(1, (p.x - x) / w)) * (hi - lo)) * 20) / 20; if (Math.abs(n - v) > 0.001) return n; } return null; }
+    if (p.down && over) { const n = Math.round((lo + Math.max(0, Math.min(1, (p.x - x) / w)) * (hi - lo)) / step) * step; if (Math.abs(n - v) > 0.001) return n; } return null; }
+
+  /** the engine: its layout, valve gear, bore and stroke, gears; and how it goes into the engine room */
+  function enginePanel(c: NonNullable<typeof cache>) {
+    const e = eng ?? ownEngine(), own = ownEngine(), set = (n: EngineSpec) => { eng = n; };
+    const row = (y: number, label: string, text: string, id: string, prev: () => void, next: () => void) => { ui.label({ x: 286, y: y + 2, w: 40, h: 9 }, label, COL.ink);
+      if (ui.button(id + '-', { x: 326, y, w: 12, h: 12 }, '<')) prev(); ui.label({ x: 340, y: y + 2, w: 70, h: 9 }, text, COL.ink, 'c'); if (ui.button(id + '+', { x: 412, y, w: 12, h: 12 }, '>')) next(); };
+    const li = Math.max(0, LAYOUTS.findIndex(l => l.id === e.layout)), vi = Math.max(0, VALVES.findIndex(v => v.id === e.kind));
+    row(164, '배치', LAYOUTS[li]!.name, 'lay', () => set({ ...e, layout: LAYOUTS[(li + LAYOUTS.length - 1) % LAYOUTS.length]!.id }), () => set({ ...e, layout: LAYOUTS[(li + 1) % LAYOUTS.length]!.id }));
+    row(177, '밸브', VALVES[vi]!.name, 'val', () => set({ ...e, kind: VALVES[(vi + VALVES.length - 1) % VALVES.length]!.id }), () => set({ ...e, kind: VALVES[(vi + 1) % VALVES.length]!.id }));
+    for (const [k, lo, hi, y] of [['bore', 65, 110, 193], ['stroke', 80, 140, 203]] as const) { ui.label({ x: 286, y: y - 1, w: 26, h: 9 }, k === 'bore' ? '보어' : '행정', COL.ink);
+      const v = slider('e' + k, 312, y, 112, e[k], lo, hi, 0.5, own[k]); ui.label({ x: 428, y: y - 1, w: 44, h: 9 }, `${e[k].toFixed(1)} mm`, COL.ink, 'r'); if (v !== null) set({ ...e, [k]: v }); }
+    ui.label({ x: 286, y: 214, w: 30, h: 9 }, '변속', COL.ink); [3, 4].forEach((g, i) => { if (ui.tab('gear' + g, { x: 318 + i * 30, y: 212, w: 28, h: 12 }, `${g}단`, gears === g)) { gears = g; if (!eng) eng = own; } });
+    if (ui.button('eng-own', { x: 412, y: 212, w: 60, h: 12 }, '원래 엔진')) { eng = null; gears = 3; }
+    const f = c.engFit, [gl, gc] = f ? GRADE[f.grade] : GRADE.own;
+    S.fill(286, 227, 36, 11, gc); ui.label({ x: 286, y: 228, w: 36, h: 9 }, f ? gl : '원래', COL.cream, 'c');
+    ui.label({ x: 326, y: 228, w: 146, h: 9 }, `${c.cc.toLocaleString()} cc${f ? ` · 엔진룸 채움 ${f.fill}%` : ''}`, COL.ink);
+    if (f) ui.label({ x: 286, y: 239, w: 186, h: 9 }, f.notes.join(', '), f.grade === 'no' ? COL.bad : COL.inkSoft); }
+  /** the paint and how the car has worn */
+  function paintPanel() {
+    ui.label({ x: 286, y: 164, w: 186, h: 9 }, '칠 색 (다시 누르면 원래 색)', COL.ink);
+    PAINTS.forEach(([n, h], i) => { const x = 286 + (i % 4) * 47, y = 174 + Math.floor(i / 4) * 13;
+      if (ui.tab('paint' + i, { x, y, w: 45, h: 12 }, '   ' + n, colour === h)) colour = colour === h ? null : h; S.fill(x + 3, y + 3, 6, 6, hex(h)); });
+    if (ui.tab('wings', { x: 286, y: 201, w: 70, h: 12 }, '펜더 검정', blackWings)) blackWings = !blackWings;
+    if (ui.button('paint-own', { x: 360, y: 201, w: 52, h: 12 }, '원래 칠')) { colour = null; blackWings = true; }
+    if (ui.button('wear-new', { x: 416, y: 201, w: 56, h: 12 }, '새 차로')) wear = { ...NEW };
+    ui.label({ x: 286, y: 217, w: 28, h: 9 }, '낡음', COL.ink);
+    for (const [k, lab, x] of [['dent', '찌그러짐', 316], ['lamp', '깨진 램프', 372]] as const) if (ui.tab('w' + k, { x, y: 215, w: 54, h: 12 }, lab, wear[k])) wear = { ...wear, [k]: !wear[k] };
+    for (const [k, lab, y] of [['rust', '녹', 230], ['fade', '바램', 239]] as const) { ui.label({ x: 286, y: y - 1, w: 26, h: 9 }, lab, COL.ink); const v = slider('w' + k, 312, y, 120, wear[k], 0, 1, 0.05, 0); ui.label({ x: 436, y: y - 1, w: 36, h: 9 }, `${Math.round(wear[k] * 100)}%`, COL.ink, 'r'); if (v !== null) wear = { ...wear, [k]: Math.round(v * 100) / 100 }; } }
 
   return { id: 'builder',
     frame() {
       S.fill(0, 0, 480, 270, COL.wood2);
       const top = { x: 4, y: 4, w: 472, h: 16 }; ui.panel(top, 'enamel'); const [t, b] = split({ x: 10, y: 7, w: 460, h: 11 }, ['*', 60], 4);
-      ui.label({ ...t!, y: 8, h: 9 }, '부품 빌더 (시험) · 자리를 누르면 끼울 부품이 크게 나온다', COL.cream); if (ui.button('back', b!, '돌아가기')) { app.pop(); return; }
+      ui.label({ x: 10, y: 8, w: 110, h: 9 }, '부품 빌더 (시험)', COL.cream); if (ui.button('back', b!, '돌아가기')) { app.pop(); return; } void t;
+      (['parts', 'engine', 'paint'] as const).forEach((md, i) => { if (ui.tab('mode' + md, { x: 184 + i * 64, y: 6, w: 60, h: 12 }, ({ parts: '부품', engine: '엔진', paint: '칠 · 낡음' } as const)[md], mode === md)) { mode = md; picker = false; } });
       // the base car
       const left = { x: 4, y: 24, w: 172, h: 222 }; ui.panel(left, 'card'); ui.label({ x: 10, y: 27, w: 160, h: 9 }, '바탕 차', COL.inkSoft);
       CARS.forEach((c, k) => { const r = { x: 10 + (k % 2) * 81, y: 38 + Math.floor(k / 2) * 15, w: 78, h: 13 }; if (ui.tab('base' + k, r, c.short, base === k)) { base = k; for (const s in pick) delete pick[s as Slot]; for (const s in adj) delete adj[s as Slot]; grades.clear(); sel = null; picker = false; } });
@@ -94,7 +137,7 @@ export function builderScene(app: App): Scene {
         return;
       }
       // the car as it comes out: large, zoom and move
-      const vb = { x: 184, y: 28, w: 288, h: 132 }, im = sideImg(c.m, c.key, vb.w), p = ui.pointer(), inView = p.x >= vb.x && p.x < vb.x + vb.w && p.y >= vb.y && p.y < vb.y + vb.h;
+      const vb = { x: 184, y: 28, w: 288, h: 120 }, im = sideImg(c.m, c.key, vb.w), p = ui.pointer(), inView = p.x >= vb.x && p.x < vb.x + vb.w && p.y >= vb.y && p.y < vb.y + vb.h;
       if (p.down && inView && !ui.hoverAny) { if (!drag) drag = { x: p.x, y: p.y, px: panX, py: panY }; panX = drag.px + p.x - drag.x; panY = drag.py + p.y - drag.y; } else drag = null;
       if (zoom === 1) { panX = 0; panY = 0; }
       blit(im, vb.x, vb.y, vb.w, vb.h, BG, false, Math.round(panX), Math.round(panY));
@@ -102,6 +145,10 @@ export function builderScene(app: App): Scene {
       if (ui.button('zfit', { x: 400, y: 30, w: 30, h: 12 }, '전체')) { zoom = 1; panX = 0; panY = 0; }
       ui.label({ x: 188, y: 31, w: 80, h: 9 }, `${Math.round(zoom * 100)}%${zoom > 1 ? ' · 끌어서 이동' : ''}`, COL.inkSoft);
       blit(c.front, 184, 164, 96, 78, BG);
+      const dk = c.kg - c.kg0; S.fill(184, 150, 288, 11, hex('#d6d0bf'));
+      ui.label({ x: 188, y: 151, w: 284, h: 9 }, `무게 ${c.kg.toLocaleString()} kg${dk ? ` (${dk > 0 ? '+' : ''}${dk})` : ''} · 작업 ${c.hours}시간 · 재료 $${c.dollars.toFixed(2)}${mode === 'engine' ? ' · 밑에서 본 차대' : ''}`, COL.ink);
+      if (mode === 'engine') { enginePanel(c); return; }
+      if (mode === 'paint') { paintPanel(); return; }
       // how each changed slot fits
       let ny = 164; for (const s of SLOTS) { const f = c.fits[s.id]; if (!f || f.grade === 'own') continue; if (ny > 194) break;
         ny += 10 * ui.paragraph({ x: 286, y: ny, w: 186, h: 20 }, `${s.name}: ${GRADE[f.grade][0]} · ${f.notes.join(', ')}`, f.grade === 'no' ? COL.bad : COL.ink); }

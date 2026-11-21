@@ -6,6 +6,7 @@ import { Front2GL } from '../../render/place/front2gl';
 import { air, moon, dayOfYear } from '../../core/atmosphere';
 import { newGround } from '../../core/ground';
 import { newHouse } from '../../core/house';
+import { carSprite, stepCar, KERB_GROUND, type CarSprite, type CarMotion } from './car';
 import { pixels } from './pics';
 import cut from '../../data/places/front2_cut.json';
 import p_garage from '../../assets/places/front2/garage.png';
@@ -100,6 +101,22 @@ export function frontPlace(app: App) {
     if (a === 'garageIn') { if (!garageOpen()) openG(); else if (Math.min(...leaves) > 0.9) go('garage'); return true; }   // in only once the doors stand open
     if (a === 'mail') { const n = unread(); snd.once('paper'); app.toast(n ? `편지 ${n}통을 꺼냈다 (책상 위 쪽지에 있다)` : '우편함은 비어 있다'); house().mail = 0; return true; }
     return false; }
+  // ---- the customer's car (step 2): it comes along the road and stops at the kerb; it is kept in the save while its job is open
+  let car: { job: number; sprite: CarSprite | null; m: CarMotion; puffs: { x: number; y: number; age: number }[] } | null = null;
+  function carArrives(job: number) { car = { job, sprite: null, m: { x: 500, v: 70, wheel: 0, state: 'arrive', t: 0 }, puffs: [] }; house().car = job; }
+  function carLeaves() { if (car) { car.m.state = 'leave'; car.m.t = 0; } }
+  function carFrame(dt: number, outdoorTemp: number) { const W = app.world!, h = house();
+    if (!car && h.car) { try { W.repair.view(h.car); car = { job: h.car, sprite: null, m: { x: 196, v: 0, wheel: 0, state: 'parked', t: 9 }, puffs: [] }; } catch { h.car = undefined; } }
+    if (!car) return null;
+    if (!car.sprite) { const v = W.repair.view(car.job); car.sprite = carSprite(v.colour, v.damages); if (!car.sprite) return null; }
+    const sp = car.sprite, m = car.m, was = m.state; stepCar(m, dt, sp.hubs[0]![2]);
+    if (m.state === 'gone') { car = null; h.car = undefined; app.sound.ambient('engine', 0); return null; }
+    const running = m.state !== 'parked'; app.sound.ambient('engine', running ? (m.state === 'idle' ? 0.45 : 0.75) : 0, 0.8 + m.v / 70);
+    if (was === 'idle' && m.state === 'parked') app.sound.once('knock', { vol: 0.6 });   // the engine off, the door shut
+    // exhaust from the tail pipe while the engine runs: thick in the cold
+    if (running && Math.random() < dt * (outdoorTemp < 8 ? 14 : 5)) car.puffs.push({ x: m.x + sp.tail[0], y: KERB_GROUND - sp.groundY + sp.tail[1], age: 0 });
+    for (const p of car.puffs) { p.age += dt; p.x += dt * (6 + m.v * 0.3) + Math.sin(p.age * 3) * dt * 2; p.y -= dt * 4; } car.puffs = car.puffs.filter(p => p.age < 2.2);
+    return { sprite: sp, x: m.x, y: KERB_GROUND - sp.groundY, wheel: m.wheel }; }
   /** coming out of the house: the door is open behind and swings shut */
   function cameOut() { door = 1; doorWant = 0; setTimeout(() => app.sound.once('knock', { vol: 0.35 }), 450); }
   function draw(dt: number): boolean {
@@ -109,7 +126,14 @@ export function frontPlace(app: App) {
     const want = garageOpen() ? 1 : 0; leaves = leaves.map((v, k) => (t < leafAt[k]! ? v : v + Math.max(-dt * 1.4, Math.min(dt * 1.4, want - v))));
     flag += Math.max(-dt * 3, Math.min(dt * 3, (unread() ? 1 : 0) - flag));
     if (!gpuTried) { gpuTried = true; const off = (globalThis as { __cpu?: boolean }).__cpu; gpu = off ? null : Front2GL.make(scene); (globalThis as { __gpu?: boolean }).__gpu = !!gpu; }   // the GPU where there is one; the CPU otherwise
+    const cf = carFrame(dt, A.temp), heads = A.daylight < 0.35 || (A.rain > 0 && A.daylight < 0.6);
+    if (gpu) gpu.car = cf ? { sprite: cf.sprite, x: cf.x, y: cf.y, wheel: cf.wheel, heads: heads && car!.m.state !== 'parked' } : null;
     (gpu ?? scene).draw(app.S.d, { t, dt, air: A, moon: moon(W.clock.today, W.clock.minute), minute: W.clock.minute, doy: dayOfYear(W.clock.today), houseLit: !!g.house?.kitchen.lamp, snow: gr.snow, wet: gr.wet, door, garage: leaves.map(v => v * v * (3 - 2 * v)), flag });
+    const d = app.S.d;
+    if (cf && !gpu) { const sp = cf.sprite, ox = Math.round(cf.x), oy = Math.round(cf.y), k = 0.25 + 0.75 * A.daylight;   // no GPU: the car laid in, lit by the hour only
+      for (let y = 0; y < sp.h; y++) for (let x = 0; x < sp.w; x++) { const j = (y * sp.w + x) * 4; if (sp.rgba[j + 3]! < 128) continue; const X = ox + x, Y = oy + y; if (X < 0 || X >= 480 || Y < 0 || Y >= 270) continue; const i = (Y * 480 + X) * 4; d[i] = sp.rgba[j]! * k; d[i + 1] = sp.rgba[j + 1]! * k; d[i + 2] = sp.rgba[j + 2]! * k; } }
+    if (car) for (const p of car.puffs) { const r = 1 + p.age * 2.2, a = 0.28 * (1 - p.age / 2.2); for (let y = Math.floor(p.y - r); y <= p.y + r; y++) for (let x = Math.floor(p.x - r); x <= p.x + r; x++) { if (x < 0 || y < 0 || x >= 480 || y >= 270) continue; const w = a * Math.max(0, 1 - Math.hypot(x - p.x, y - p.y) / (r + 0.5)), i = (y * 480 + x) * 4, lv = 150 + 60 * A.daylight; d[i] = d[i]! + (lv - d[i]!) * w; d[i + 1] = d[i + 1]! + (lv - d[i + 1]!) * w; d[i + 2] = d[i + 2]! + (lv + 6 - d[i + 2]!) * w; } }
     return true; }
-  return { draw, spots, act, cameOut };
+  const api = { draw, spots, act, cameOut, carArrives, carLeaves, carState: () => car?.m.state ?? 'none' }; (globalThis as { __front?: unknown }).__front = api;   // for tests
+  return api;
 }

@@ -198,7 +198,7 @@ export function rasterizeFlat(d0: CarDesign, opt: { frameW?: number; shadow?: bo
   if ((SK || DC) && thick > 0) for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const i = y * w + x; if (mat[i] && mat[i] !== 'shadow') continue; let near = false;
     for (let dy = -thick; dy <= thick && !near; dy++) for (let dx = -thick; dx <= thick; dx++) { if (Math.abs(dx) + Math.abs(dy) > thick) continue; const j = at(x + dx, y + dy); if (j >= 0 && skinRGB[j]! >= 0) { near = true; break; } }
     if (near) { rgba[i * 4] = 14; rgba[i * 4 + 1] = 13; rgba[i * 4 + 2] = 18; rgba[i * 4 + 3] = 255; } }
-  return { w, h, rgba, owner, ms: performance.now() - t0, groundY: gy, X, Y };
+  return { w, h, rgba, owner, ms: performance.now() - t0, groundY: gy, X, Y, mat, ids };
 
   // ---- the part library's structure inside a panel ----
   function detail(dt: Detail, M: (x: number, y: number) => boolean, bx: number, by: number, bw: number, bh: number, ly: number, mt: Material) {

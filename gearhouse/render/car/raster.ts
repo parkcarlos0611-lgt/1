@@ -22,7 +22,9 @@ function env(ry: number): number {
   if (ry < 0.06) return 0.1 + 0.05 * (ry + 0.12) / 0.18;
   return 0.42 - 0.2 * Math.min(1, (ry - 0.06) / 0.6); }
 
-export interface CarImage { w: number; h: number; rgba: Uint8ClampedArray; owner: Int16Array; ms: number; groundY: number; X: (x: number) => number; Y: (z: number) => number }
+export interface CarImage { w: number; h: number; rgba: Uint8ClampedArray; owner: Int16Array; ms: number; groundY: number; X: (x: number) => number; Y: (z: number) => number;
+  /** each pixel's material, and the part each owner index stands for (the flat renderer gives these) */
+  mat?: (Material | null)[]; ids?: string[] }
 
 export function rasterize(d: CarDesign, opt: { frameW?: number; tone?: number } = {}): CarImage {
   const t0 = performance.now(), R = rampsFor(d.paint, d.paint2), frameW = opt.frameW ?? 1, tone = opt.tone ?? 1;

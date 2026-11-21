@@ -84,6 +84,8 @@ const PICS: Record<string, [string, number, number]> = {
 export interface FrontSpot { r: { x: number; y: number; w: number; h: number }; label: () => string; act: string; hl: string[]; go?: 'kitchen' | 'garage' }
 
 export function frontPlace(app: App) {
+  /** the customer's car once the job is agreed: into the garage (its rectangle follows the car; empty when there is none) */
+  const carSpot: FrontSpot = { r: { x: 0, y: 0, w: 0, h: 0 }, label: () => (house().bay ? '차고 칸이 차 있다' : garageOpen() ? '차를 차고에 넣는다' : '차를 넣으려면 차고문부터 연다'), act: 'carIn', hl: [] };
   let scene: Front2 | null = null, gpu: Front2GL | null = null, gpuTried = false, t = 0, door = 0, doorWant = 0, flag = 0, leaves = [0, 0, 0, 0], leafAt = [0, 0, 0, 0], then: (() => void) | null = null, thenAt = 0;
   const house = () => (app.world!.sim.g.house ??= newHouse()), garageOpen = () => !!house().garageOpen, unread = () => house().mail ?? 0;
   const spots: FrontSpot[] = [
@@ -92,6 +94,7 @@ export function frontPlace(app: App) {
     ...[[303, 316], [366, 391], [445, 458]].map(([x0, x1]) => ({ r: { x: x0!, y: 98, w: x1! - x0!, h: 70 }, label: () => (garageOpen() ? '차고문을 닫는다' : '차고문을 연다'), act: 'garageDoors', hl: [] })),
     { r: { x: 316, y: 98, w: 50, h: 70 }, label: () => (garageOpen() ? '차고 안으로 들어간다' : '차고문을 연다'), act: 'garageIn', hl: [] },
     { r: { x: 391, y: 98, w: 54, h: 70 }, label: () => (garageOpen() ? '차고 안으로 들어간다' : '차고문을 연다'), act: 'garageIn', hl: [] },
+    carSpot,
     { r: { x: 136, y: 174, w: 22, h: 34 }, label: () => (unread() ? `우편함 (편지 ${unread()}통)` : '우편함 (비었다)'), act: 'mail', hl: [] } ];
   /** returns true if the front handled it; `go` is called to move to another place */
   function act(a: string, go: (to: 'kitchen' | 'garage') => void): boolean { const snd = app.sound;
@@ -101,6 +104,8 @@ export function frontPlace(app: App) {
     const shutG = () => { house().garageOpen = false; leafAt = [t + 0.75, t + 0.5, t + 0.25, t]; snd.once('creak'); setTimeout(() => snd.once('knock', { vol: 0.5 }), 900); };
     if (a === 'garageDoors') { if (garageOpen()) shutG(); else openG(); return true; }
     if (a === 'garageIn') { if (!garageOpen()) openG(); else if (Math.min(...leaves) > 0.9) go('garage'); return true; }   // in only once the doors stand open
+    if (a === 'carIn' && car) { const h = house(); if (h.bay) { app.toast('차고 칸에 이미 다른 차가 있다'); return true; } if (!garageOpen()) { openG(); return true; }
+      h.bay = { job: car.job, fixed: [], minutes: 0 }; h.car = undefined; car = null; app.sound.once('car'); app.sound.ambient('engine', 0); go('garage'); return true; }
     if (a === 'mail') { const n = unread(); snd.once('paper'); app.toast(n ? `편지 ${n}통을 꺼냈다 (책상 위 쪽지에 있다)` : '우편함은 비어 있다'); house().mail = 0; return true; }
     return false; }
   // ---- the customer's car (step 2): it comes along the road and stops at the kerb; it is kept in the save while its job is open
@@ -147,7 +152,10 @@ export function frontPlace(app: App) {
     const want = garageOpen() ? 1 : 0; leaves = leaves.map((v, k) => (t < leafAt[k]! ? v : v + Math.max(-dt * 1.4, Math.min(dt * 1.4, want - v))));
     flag += Math.max(-dt * 3, Math.min(dt * 3, (unread() ? 1 : 0) - flag));
     if (!gpuTried) { gpuTried = true; const off = (globalThis as { __cpu?: boolean }).__cpu; gpu = off ? null : Front2GL.make(scene); (globalThis as { __gpu?: boolean }).__gpu = !!gpu; }   // the GPU where there is one; the CPU otherwise
-    callerFrame(dt); const cf = carFrame(dt, A.temp), heads = A.daylight < 0.35 || (A.rain > 0 && A.daylight < 0.6);
+    callerFrame(dt); const cf = carFrame(dt, A.temp);
+    { let agreed = false; if (car && car.m.state === 'parked' && !caller) { try { agreed = W.repair.view(car.job).state === 'agreed'; } catch { /* gone */ } }
+      if (cf && agreed) Object.assign(carSpot.r, { x: Math.round(cf.x), y: Math.round(cf.y), w: Math.round(cf.sprite.w * cf.scale), h: Math.round(cf.sprite.h * cf.scale) }); else Object.assign(carSpot.r, { w: 0, h: 0 }); }
+    const heads = A.daylight < 0.35 || (A.rain > 0 && A.daylight < 0.6);
     if (gpu) gpu.car = cf ? { sprite: cf.sprite, x: cf.x, y: cf.y, wheel: cf.wheel, scale: cf.scale, heads: heads && cf.side && car!.m.state !== 'parked' } : null;
     (gpu ?? scene).draw(app.S.d, { t, dt, air: A, moon: moon(W.clock.today, W.clock.minute), minute: W.clock.minute, doy: dayOfYear(W.clock.today), houseLit: !!g.house?.kitchen.lamp, snow: gr.snow, wet: gr.wet, door, garage: leaves.map(v => v * v * (3 - 2 * v)), flag });
     const d = app.S.d;

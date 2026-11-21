@@ -14,6 +14,11 @@ import { rasterizeFlat } from '../../render/car/flat';
 import { finishOf, coatAt, coatTotal, type Finish, type FinishSheet } from '../../render/car/finish';
 import model from '../../data/cars/sedan29.json';
 import finishJson from '../../data/cars/sedan29_finish.json';
+import type { JobResult, PartResult } from '../../core/repair';
+
+/** a customer's car on the stand (version one, step 4): its paint, where it has rust (some under the paint, unseen until
+ *  the wire wool goes through), and what to do with the work: finished (the inspection's result) or left for later */
+export interface BodyJob { title: string; colour: string; rust: { part: string; severity: number; hidden: boolean }[]; done: (r: JobResult, minutes: number) => void; away: (minutes: number) => void }
 
 type Tool = 'lens' | 'brush' | 'lead' | 'mask' | 'spray';
 const TOOLS: { id: Tool; name: string; tip: string }[] = [
@@ -32,11 +37,11 @@ const SHEET = finishJson as unknown as FinishSheet;
 interface Mask { part: number; r: { x0: number; y0: number; x1: number; y1: number }; laid: boolean; sides: Uint8Array[] }
 interface View { name: 'left' | 'front' | 'rear'; title: string; w: number; h: number; N: number; groundY: number;
   kind: Uint8Array; orig: RGB[]; tone: Float32Array; part: Int16Array; parts: string[]; fin: Finish[];
-  rust0: Float32Array; rust: Float32Array; pit: Float32Array; worn: Float32Array; fill: Float32Array; weak: Uint8Array; paint: Float32Array; pcol: Int8Array; over: Float32Array; scratch: Float32Array;
+  rust0: Float32Array; rust: Float32Array; hid: Uint8Array; pit: Float32Array; worn: Float32Array; fill: Float32Array; weak: Uint8Array; paint: Float32Array; pcol: Int8Array; over: Float32Array; scratch: Float32Array;
   paper: Int16Array; masks: Mask[]; cam: { x: number; y: number }; camF: { x: number; y: number }; zoom: number; focus: number }
 
-export function bodyworkScene(app: App): Scene {
-  const ui = app.ui, S = app.S, base = model as unknown as CarModel;
+export function bodyworkScene(app: App, job?: BodyJob): Scene {
+  const ui = app.ui, S = app.S, base = (() => { const m = JSON.parse(JSON.stringify(model)) as CarModel; if (job) { m.paint = job.colour; m.paint2 = job.colour; } return m; })();
   const vn = (x: number, y: number, s: number) => { const xi = Math.floor(x), yi = Math.floor(y), fx = x - xi, fy = y - yi, u = fx * fx * (3 - 2 * fx), v = fy * fy * (3 - 2 * fy), r = (a: number, b: number) => rnd(((a * 73856093) ^ (b * 19349663) ^ (s * 83492791)) >>> 0);
     return (r(xi, yi) * (1 - u) + r(xi + 1, yi) * u) * (1 - v) + (r(xi, yi + 1) * (1 - u) + r(xi + 1, yi + 1) * u) * v; };
   // ---------------- a view: the picture and every layer of work on it ----------------
@@ -51,15 +56,22 @@ export function bodyworkScene(app: App): Scene {
         kind[i] = f.base.kind === 'glass' || f.base.kind === 'brass' ? 2 : f.base.kind === 'rubber' && !f.coats.length ? 3 : f.coats.some(c => c.kind === 'dressing') ? 5 : 1;
         if (kind[i] === 1) { const top = f.coats[f.coats.length - 1]; tone[i] = lum(orig[i]!) / Math.max(8, lum(hex(top?.colour ?? '#808080'))); } }
       else { let wheel = false; for (const q of wheels) if (Math.hypot(x - q.cx, y - q.cy) < q.rim + 1) wheel = true; part[i] = partOf(wheel ? 'wheel' : 'tyre'); kind[i] = wheel ? 4 : 3; } }
-    const v: View = { name, title, w, h, N, groundY: im.groundY, kind, orig, tone, part, parts, fin, rust0: new Float32Array(N), rust: new Float32Array(N), pit: new Float32Array(N), worn: new Float32Array(N), fill: new Float32Array(N), weak: new Uint8Array(N),
+    const v: View = { name, title, w, h, N, groundY: im.groundY, kind, orig, tone, part, parts, fin, rust0: new Float32Array(N), rust: new Float32Array(N), hid: new Uint8Array(N), pit: new Float32Array(N), worn: new Float32Array(N), fill: new Float32Array(N), weak: new Uint8Array(N),
       paint: new Float32Array(N), pcol: new Int8Array(N).fill(-1), over: new Float32Array(N), scratch: new Float32Array(N), paper: new Int16Array(N).fill(-1), masks: [], cam: { x: 0, y: 0 }, camF: { x: 0, y: 0 }, zoom: 1, focus: -1 };
     // rust on the lower panels of parts whose base rusts: sills, fender skirts and edges, door bottoms
     const low: number[] = []; for (let i = 0; i < N; i++) if (kind[i] === 1 && fin[part[i]!]!.base.rusts && (i / w | 0) > im.groundY - 124) low.push(i);
     let rx = 0, ry = 0, rn = 0;
-    for (let k = 0; k < (name === 'left' ? 6 : 3) && low.length; k++) { const c = low[Math.floor(rnd(k * 977 + 13 + seed) * low.length)]!, cx = c % w, cy = (c / w) | 0, r = 10 + rnd(k * 31 + seed) * 16;
-      for (let y = cy - 36; y <= cy + 36; y++) for (let x = cx - 44; x <= cx + 44; x++) { if (x < 0 || y < 0 || x >= w || y >= h) continue; const i = y * w + x; if (kind[i] !== 1 || !fin[part[i]!]!.base.rusts) continue;
+    // where the rust is: the sample's lower panels, or a customer's: on the parts the job names, lower edges first
+    type Patch = { at: number; r: number; only: number; hidden: boolean };
+    const patches: Patch[] = [];
+    if (!job) for (let k = 0; k < (name === 'left' ? 6 : 3) && low.length; k++) patches.push({ at: low[Math.floor(rnd(k * 977 + 13 + seed) * low.length)]!, r: 10 + rnd(k * 31 + seed) * 16, only: -1, hidden: false });
+    else job.rust.forEach((d, n) => { const k = idx.get(d.part); if (k === undefined) return; const mine: number[] = []; for (let i = 0; i < N; i++) if (part[i] === k && kind[i] === 1) mine.push(i); if (mine.length < 40) return;
+      const ys = mine.map(i => (i / w) | 0).sort((a, b) => a - b), cut = ys[Math.floor(ys.length * 0.45)]!, lower = mine.filter(i => ((i / w) | 0) >= cut), count = name === 'left' ? 1 + Math.round(d.severity * 2) : 1;
+      for (let j = 0; j < count; j++) patches.push({ at: lower[Math.floor(rnd(n * 131 + j * 977 + seed) * lower.length)]!, r: 6 + d.severity * 14 + rnd(n * 7 + j * 31 + seed) * 6, only: k, hidden: d.hidden }); });
+    for (const [k, P] of patches.entries()) { const cx = P.at % w, cy = (P.at / w) | 0, r = P.r;
+      for (let y = cy - 36; y <= cy + 36; y++) for (let x = cx - 44; x <= cx + 44; x++) { if (x < 0 || y < 0 || x >= w || y >= h) continue; const i = y * w + x; if (kind[i] !== 1 || !fin[part[i]!]!.base.rusts || (P.only >= 0 && part[i] !== P.only)) continue;
         const dd = Math.hypot((x - cx) / 1.4, y - cy) / r, n = vn(x / 6, y / 6, k + seed) * 0.6 + vn(x / 2.4, y / 2.4, k + 9 + seed) * 0.4, val = Math.max(0, 1 - dd + (n - 0.5) * 0.9);
-        if (val > 0.05) { v.rust0[i] = v.rust[i] = Math.min(1, Math.max(v.rust0[i]!, val * (0.6 + n * 0.6))); rx += x; ry += y; rn++; } } }
+        if (val > 0.05) { v.rust0[i] = v.rust[i] = Math.min(1, Math.max(v.rust0[i]!, val * (0.6 + n * 0.6))); if (P.hidden) v.hid[i] = 1; rx += x; ry += y; rn++; } } }
     v.cam = { x: Math.round(rn ? rx / rn - VIEW.w / 2 : (w - VIEW.w) / 2), y: Math.round(rn ? ry / rn - VIEW.h / 2 : (h - VIEW.h) / 2) }; v.camF = { ...v.cam };
     return v;
   }
@@ -111,13 +123,14 @@ export function bodyworkScene(app: App): Scene {
   function unmaskAll() { for (const v of VIEWS) { v.paper.fill(-1); v.masks = []; } maskPick = null; taping = null; app.sound.once('peel'); }
 
   // ---------------- inspection, over all three views ----------------
-  function inspect() { const c: Record<string, number> = {}; const add = (k: string, n = 1) => (c[k] = (c[k] ?? 0) + n); let rustArea = 0;
+  let result: JobResult | null = null;
+  function inspect() { const c: Record<string, number> = {}; const add = (k: string, n = 1) => (c[k] = (c[k] ?? 0) + n); let rustArea = 0; const per: Record<string, PartResult> = {}, pp = (v: View, i: number) => (per[v.parts[v.part[i]!]!] ??= { hiddenRust: 0, pits: 0, bare: 0 });
     for (const v of VIEWS) { const bareV = (i: number) => v.worn[i]! >= coatTotal(v.fin[v.part[i]!]!);
       for (const m of v.masks) for (let k = 0; k < 4; k++) if (!sideDone(m, k)) add('untaped'); if (v.masks.length) add('masksLeft', v.masks.length);
       for (let i = 0; i < v.N; i++) { const k = v.kind[i]; if (!k) continue; const pt = v.paint[i]!;
         if (k === 2) { add('shiny'); if (v.over[i]! > 0.25) add('mist'); if (v.scratch[i]! > 0.3) add('scr'); } if (k === 3 || k === 4) { add('dark'); if (v.over[i]! > 0.25) add('darkMist'); if (k === 4 && v.scratch[i]! > 0.3) add('wheelScr'); }
         if (k === 5 && v.scratch[i]! > 0.3) add('soft'); if (k !== 1) continue; if (v.rust0[i]! > 0.08) rustArea++;
-        if (v.rust[i]! > 0.08) add(pt > 0.3 ? 'rustHid' : 'rustSeen'); if (pt > 0.3 && v.pit[i]! - v.fill[i]! > 0.12) add('pits'); if (v.fill[i]! - v.pit[i]! > 0.22) add('bumps');
+        if (v.rust[i]! > 0.08) { const under = pt > 0.3 || (v.hid[i] && v.worn[i]! < 1); add(under ? 'rustHid' : 'rustSeen'); if (under) pp(v, i).hiddenRust++; } if (pt > 0.3 && v.pit[i]! - v.fill[i]! > 0.12) pp(v, i).pits++; if (bareV(i) && pt < 0.3) pp(v, i).bare++; if (pt > 0.3 && v.pit[i]! - v.fill[i]! > 0.12) add('pits'); if (v.fill[i]! - v.pit[i]! > 0.22) add('bumps');
         if (bareV(i) && pt < 0.3) add('bareLeft'); else if (bareV(i) && pt < 0.7) add('thin'); if (pt > 2.6) add('runs'); if (pt > 0.3 && v.pcol[i]! > 0) add('other'); else if (pt > 0.3) add('near');
         if (bareV(i) && v.rust0[i]! < 0.05) add('extra'); if (!bareV(i) && v.worn[i]! > 3 && pt < 0.3) add('scratched'); if (v.weak[i] && pt > 0.3) add('weakLead'); } }
     const g = (k: string) => c[k] ?? 0, pc = (n: number, of = rustArea) => Math.round(n / Math.max(1, of) * 100), cm = (n: number) => Math.round(n * MM * MM / 100);
@@ -129,7 +142,9 @@ export function bodyworkScene(app: App): Scene {
       ['고무 발판 · 천 지붕 상처', g('soft') ? Math.max(2, pc(g('soft'))) : 0, 1, `${cm(g('soft'))} cm2`], ['테이프를 덜 붙인 종이 가장자리', g('untaped') * 5, 0.4, `${g('untaped')}곳`], ['떼지 않은 종이 · 테이프', g('masksLeft') * 20, 1, `${g('masksLeft')}장`]];
     const pen = lines.reduce((a, [, v, k]) => a + Math.min(60, v) * k, 0), sat = Math.max(0, Math.round(100 - pen)), back = Math.min(95, Math.round(pc(g('rustHid')) * 1.6 + pc(g('pits')) * 0.9 + pc(g('bareLeft')) * 1.2 + pc(g('weakLead')) * 0.8));
     report = [`녹 슬었던 넓이 ${cm(rustArea)} cm2 (옆 · 앞 · 뒤)`, ...lines.filter(l => l[1] > 0).map(([t, , , s]) => `${t}  ${s}`)];
-    verdict = `손님 만족 ${sat}점 · 반년 안에 들뜨거나 다시 녹슬 확률 ${back}%`; }
+    verdict = `손님 만족 ${sat}점 · 반년 안에 들뜨거나 다시 녹슬 확률 ${back}%`;
+    for (const q of Object.values(per)) { q.hiddenRust = cm(q.hiddenRust); q.pits = cm(q.pits); q.bare = cm(q.bare); }
+    result = { satisfaction: sat, backChance: back / 100, hours: minutes / 60, parts: per }; }
 
   // ---------------- drawing ----------------
   const wall = (x: number, y: number): RGB => { const wx = x + Math.floor(V.cam.x * 0.3), plank = Math.floor(wx / 26), g = vn(wx / 40, y / 3, plank) * 0.5 + rnd((plank * 7) >>> 0) * 0.5;
@@ -145,6 +160,7 @@ export function bodyworkScene(app: App): Scene {
         if (V.pit[i]! - V.fill[i]! > 0.15) c = mix(c, hex('#000000'), 0.18); if (V.paint[i]! > 2.6) c = mix(c, hex('#000000'), x % 3 === 0 ? 0.3 : 0.12); }
       else if (at.coat === null) { if (V.fill[i]! > 0.02) { const hi = V.fill[i]! - V.pit[i]!; c = hi > 0.22 ? LEAD[0]! : hi < -0.1 ? LEAD[2]! : LEAD[1]!; }
         else { const p = V.pit[i]!; c = p > 0.3 ? mix(steel, hex('#000000'), 0.5) : p > 0.12 ? mix(steel, hex('#000000'), 0.25) : rnd(i * 3) < 0.25 ? mix(steel, hex('#ffffff'), 0.2) : steel; if (V.rust[i]! > 0.05) c = mix(c, RUST[V.rust[i]! > 0.4 ? 2 : 1]!, Math.min(1, V.rust[i]! * 1.5)); } }
+      else if (V.hid[i] && worn < 1) { if (V.rust[i]! > 0.45 && rnd(i * 13) < 0.06) c = mix(c, hex('#ffffff'), 0.07); }   /* rust under the paint: only a blister here and there */
       else { if (V.rust[i]! > 0.05) { const r = V.rust[i]!, n = rnd(i * 7); c = mix(c, r > 0.6 ? (n < 0.3 ? RUST[3]! : RUST[2]!) : r > 0.3 ? RUST[1]! : RUST[0]!, Math.min(1, 0.35 + r)); }
         if (worn > 0) c = at.coat === top ? mix(c, mix(c, hex('#ffffff'), 0.35), Math.min(1, worn / 8)) : mix(shown, at.coat.kind === 'surfacer' ? hex('#ffffff') : shown, 0.1); } }
     else { if (V.over[i]! > 0.05) c = mix(c, COLOURS[colour]!.rgb ?? hex(base.paint), Math.min(0.85, V.over[i]!)); if (V.scratch[i]! > 0.1) c = mix(c, k === 5 ? hex('#5a5a5e') : hex('#e8ecef'), V.scratch[i]! * 0.5); }
@@ -215,9 +231,9 @@ export function bodyworkScene(app: App): Scene {
       toolSprite();
       // the plates
       const bar = { x: 4, y: 4, w: 472, h: 18 }; ui.panel(bar, 'enamel'); const [t1, tv, t2] = split({ x: 12, y: 7, w: 456, h: 12 }, ['*', 100, 70], 4);
-      ui.label({ ...t1!, y: 9, h: 9 }, V.focus >= 0 ? `부품: ${partName(V.focus)}` : '수리 견본: 1929 세단 · 녹 제거와 부분 도색', COL.cream);
+      ui.label({ ...t1!, y: 9, h: 9 }, V.focus >= 0 ? `부품: ${partName(V.focus)}` : job ? job.title : '수리 견본: 1929 세단 · 녹 제거와 부분 도색', COL.cream);
       split(tv!, ['*', '*', '*'], 2).forEach((r, k) => { if (ui.tab('view' + k, r, VIEWS[k]!.title, V === VIEWS[k])) { V = VIEWS[k]!; maskPick = null; taping = null; whole = false; } });
-      ui.label({ ...t2!, y: 9, h: 9 }, clock(), COL.cream, 'r');
+      if (job) { const [cl, out] = split(t2!, ['*', 34], 2); ui.label({ ...cl!, y: 9, h: 9 }, clock(), COL.cream, 'r'); if (ui.button('away', out!, '나가기')) { job.away(minutes); minutes = 0; app.pop(); return; } } else ui.label({ ...t2!, y: 9, h: 9 }, clock(), COL.cream, 'r');
       S.fill(0, VIEW.y + VIEW.h, S.w, 14, COL.wood2); S.hline(0, S.w - 1, VIEW.y + VIEW.h, COL.shadow);
       const tipRow = { x: 8, y: 228, w: 464, h: 10 };
       if (maskPick && !maskPick.laid) { const [l, b1, b2] = split(tipRow, ['*', 60, 40], 4); ui.label({ ...l!, y: 229, h: 9 }, `${partName(maskPick.part)}: 점선 치수로 종이를 자른다`, COL.cream); if (ui.button('paper', { ...b1!, y: 227, h: 12 }, '종이 대기')) { layPaper(maskPick); maskPick = null; } if (ui.button('paper-no', { ...b2!, y: 227, h: 12 }, '취소')) maskPick = null; }
@@ -234,7 +250,8 @@ export function bodyworkScene(app: App): Scene {
       if (report) { const r = { x: 90, y: 28, w: 300, h: 206 }; ui.panel(r, 'card'); ui.label({ x: r.x + 10, y: r.y + 6, w: r.w - 20, h: 10 }, '검사 결과', COL.ink); S.hline(r.x + 8, r.x + r.w - 8, r.y + 18, COL.card2);
         report.slice(0, 15).forEach((l, i) => ui.label({ x: r.x + 10, y: r.y + 21 + i * 10, w: r.w - 20, h: 9 }, l, i ? COL.inkSoft : COL.ink));
         ui.paragraph({ x: r.x + 10, y: r.y + 176, w: r.w - 90, h: 22 }, verdict, COL.ink);
-        if (ui.button('close', { x: r.x + r.w - 70, y: r.y + r.h - 20, w: 60, h: 14 }, '계속')) report = null; }
+        if (ui.button('close', { x: r.x + r.w - 70, y: r.y + r.h - 20, w: 60, h: 14 }, '계속')) report = null;
+        if (job && result && ui.button('finish', { x: r.x + r.w - 70, y: r.y + r.h - 38, w: 60, h: 14 }, '이대로 끝')) { job.done(result, minutes); minutes = 0; report = null; app.pop(); return; } }
     },
     key(_a, e) { const k = '12345'.indexOf(e.key); if (k >= 0) { tool = TOOLS[k]!.id; return true; }
       const mv: Record<string, [number, number]> = { ArrowLeft: [-40, 0], ArrowRight: [40, 0], ArrowUp: [0, -30], ArrowDown: [0, 30] }; const m = mv[e.key];

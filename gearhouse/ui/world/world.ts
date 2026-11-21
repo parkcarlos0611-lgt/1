@@ -28,6 +28,7 @@ import imgPhone from '../../assets/placeholder/phone.png';
 import { kitchenPlace, type KitchenSpot } from './kitchen';
 import { frontPlace, type FrontSpot } from './front';
 import { consultation, PANEL } from './consult';
+import { bayPlace, BAY_PANEL } from './bay';
 import { settleKitchen } from '../../core/house';
 import { air } from '../../core/atmosphere';
 
@@ -50,7 +51,7 @@ function pic(url: string): Uint8ClampedArray | null { if (pics.has(url)) return 
   const im = new Image(); im.onload = () => { const c = document.createElement('canvas'); c.width = 480; c.height = 270; const x = c.getContext('2d')!; x.drawImage(im, 0, 0, 480, 270); pics.set(url, x.getImageData(0, 0, 480, 270).data); }; im.src = url; return null; }
 
 export function worldScene(app: App): Scene {
-  const ui = app.ui, S = app.S, W = () => app.world!, kitchen = kitchenPlace(app), front = frontPlace(app), quiet = ambience(), talk = consultation(app, drive => front.visitorLeaves(drive));
+  const ui = app.ui, S = app.S, W = () => app.world!, kitchen = kitchenPlace(app), front = frontPlace(app), quiet = ambience(), talk = consultation(app, drive => front.visitorLeaves(drive)), bay = bayPlace(app, m => take(W().clock.advance(m)));
   let place: Place = 'front', fade = 0, going: Place | null = null, after: (() => void) | null = null, t = 0, eventLeft = 0, lastSave = -1;
   const notes: { at: string; text: string; inc?: Incident }[] = [], cards: { text: string; go?: Place; until: number; door?: boolean }[] = [];
   front.hooks.knock = (n, name) => { for (let k = cards.length - 1; k >= 0; k--) if (cards[k]!.door) cards.splice(k, 1); cards.unshift({ text: n === 1 ? `똑, 똑. ${name} 씨가 현관에서 문을 두드린다.` : `다시 두드린다. (${n}번째)`, until: t + 13, door: true }); };
@@ -70,7 +71,7 @@ export function worldScene(app: App): Scene {
     if (a === 'sleep') { if (fade) return; travel('workshop', () => { const m0 = w.clock.minute; take(w.clock.sleep()); if (w.sim.g.house) settleKitchen(w.sim.g.house.kitchen, 1440 - m0 + w.clock.minute, 18); app.save(); app.toast(`잠에서 깼다. ${dateKo()}`); }); return; }
     if (a === 'drafting') { app.push(drawingScene(app, { from: '공방 설계 (자작)', asks: standardAsks({ body: 'sedan' }), era: '1920s', size: 0, back: () => app.pop() })); return; }
     if (a === 'call') { app.push(phoneDesk(app)); return; }
-    app.toast({ table: '손님과 마주 앉는 곳 (손님이 오면 여기서 이야기한다)', books: '잡지와 부품 카탈로그 (부품 라이브러리는 뒤 단계)', bench: '공구 (수리 작업은 6단계)', bay: '차를 세우는 칸 (수리 차가 들어오면 여기에)' }[a] ?? a); }
+    app.toast({ table: '손님과 마주 앉는 곳 (손님이 오면 여기서 이야기한다)', books: '잡지와 부품 카탈로그 (부품 라이브러리는 뒤 단계)', bench: '공구 (수리 작업은 6단계)', bay: bay.has() ? '오른쪽 작업 카드에서 일을 고른다' : '차를 세우는 칸 (합의한 손님 차를 집 앞에서 넣는다)' }[a] ?? a); }
   /** the snow lying and the wet roads brought up to the clock, an hour at a time (a night's sleep included) */
   function groundUpTo() { const w = W(), g = w.sim.g, gr = (g.ground ??= newGround()), [y, m, d] = w.clock.today.split('-').map(Number) as [number, number, number], now = Date.UTC(y, m - 1, d) / 60000 + w.clock.minute;
     if (gr.at === undefined || now < gr.at) gr.at = now; let left = Math.min(now - gr.at, 3 * 1440);
@@ -85,6 +86,7 @@ export function worldScene(app: App): Scene {
     for (let i = 0; i < 480 * 270; i++) { let r = src[i * 4]!, g = src[i * 4 + 1]!, b = src[i * 4 + 2]!; const k = dark;
       r = r * k + 14 * (1 - k); g = g * k + 18 * (1 - k); b = b * k + 36 * (1 - k); if (dusk > 0 && out) { r = Math.min(255, r * (1 + dusk * 0.15)); b = b * (1 - dusk * 0.12); }
       d[i * 4] = r; d[i * 4 + 1] = g; d[i * 4 + 2] = b; d[i * 4 + 3] = 255; }
+    if (place === 'garage') bay.drawCar(d, 0.6 + 0.4 * L);
     if (out && sky === 'rain') for (let k = 0; k < 200; k++) { const x0 = (rnd(k * 31) * 480 + t * 40) % 480, y0 = (rnd(k * 17) * 270 + t * (260 + rnd(k) * 80)) % 270; for (let j = 0; j < 5; j++) S.px(x0 - j * 0.3, y0 - j, hex('#c8d4e0'), 0.32 - j * 0.05); }
     if (out && sky === 'snow') for (let k = 0; k < 150; k++) { const x0 = (rnd(k * 31) * 480 + Math.sin(t + k) * 8) % 480, y0 = (rnd(k * 17) * 270 + t * (24 + rnd(k) * 20)) % 270; S.px(x0, y0, hex('#ffffff'), 0.85); } }
 
@@ -96,10 +98,11 @@ export function worldScene(app: App): Scene {
       // objects you can use: the living kitchen lights what is under the pointer; the other places outline it
       const pt = ui.pointer(), inside = (r: Rect) => pt.x >= r.x && pt.x < r.x + r.w && pt.y >= r.y && pt.y < r.y + r.h && pt.y > 22 && pt.y < 246;
       let over: Spot | null = null, kOver: KitchenSpot | null = null, fOver: FrontSpot | null = null;
-      if (place === 'kitchen') { if (!(talk.open() && inside(PANEL))) for (const s of kitchen.spots) if (inside(s.r)) kOver = s; } else if (place === 'front') { for (const s of front.spots) if (inside(s.r)) fOver = s; } else for (const s of PLACES[place].spots) if (inside(s.r)) over = s;
+      if (place === 'kitchen') { if (!(talk.open() && inside(PANEL))) for (const s of kitchen.spots) if (inside(s.r)) kOver = s; } else if (place === 'front') { for (const s of front.spots) if (inside(s.r)) fOver = s; } else if (!(place === 'garage' && bay.has() && inside(BAY_PANEL))) for (const s of PLACES[place].spots) if (inside(s.r)) over = s;
       if (place === 'kitchen' ? !kitchen.draw(dt, fade ? null : kOver) : place === 'front' ? !front.draw(dt) : true) draw();
       if ((globalThis as { __still?: boolean }).__still) return;   // for pictures of the place alone
       if (place === 'kitchen' && !fade) talk.draw();   // a customer at the table: the talk
+      if (place === 'garage' && !fade) bay.panel();   // a customer's car in the bay: the work
       { const A = air(W().clock.today, W().clock.minute, W().sim.g.weather.today ?? 'clear', W().sim.g.seed); if (place !== 'kitchen') { app.sound.ambient('rain', A.rain * (place === 'front' ? 1 : 0.3)); app.sound.ambient('wind', A.wind * (place === 'front' ? 0.8 : 0.15)); }
         quiet(app.sound, place, A, W().clock.minute, dateParts(W().clock.today).month, W().sim.g.house?.kitchen.window ?? 0, dt); }
       if (fOver && !fade) { const label = fOver.label(), tw = S.tw(label) + 8, lx = Math.min(480 - tw - 2, Math.max(2, pt.x - tw / 2)), ly = Math.max(24, pt.y - 16); S.fill(lx, ly, tw, 11, hex('#1a120b')); S.text(label, lx + 4, ly + 2, COL.lit);

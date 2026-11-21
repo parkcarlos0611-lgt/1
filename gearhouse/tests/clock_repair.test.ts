@@ -51,4 +51,8 @@ describe('repair jobs', () => {
     expect(w.sim.g.ledger.cash).toBeCloseTo(cash + r.paid); expect(w.sim.g.repair!.later.some(l => l.kind === 'complaint')).toBe(true);
     let complained = false; for (let i = 0; i < 200 && !complained; i++) complained = w.sim.stepDay().stops.some(s => s.kind === 'repair_complaint'); expect(complained).toBe(true);
   });
+  it('work at the bench: worse damage takes longer and costs more in materials', () => {
+    const w = newWorld(5, FOUNDER), R = w.repair, lo = R.work({ part: 'hood', kind: 'dent', severity: 0.2, hidden: false }), hi = R.work({ part: 'hood', kind: 'dent', severity: 0.9, hidden: false });
+    expect(hi.hours).toBeGreaterThan(lo.hours); expect(hi.materials).toBeGreaterThan(lo.materials); expect(lo.hours % 0.5).toBe(0);
+  });
 });

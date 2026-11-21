@@ -62,6 +62,8 @@ export class Repair {
     a.bus.emit('repair_inquiry', { jobId: j.id, source }); a.raise('repair_inquiry', 'decision', { jobId: j.id, customer: fullName(p), car: car.name, referredBy, minute }, j.patience); this.saveRng(); return j; }
   /** labour and materials at the shop's rate: what a fair price looks like */
   fairPrice(damages: Damage[]): number { const D = this.data; return Math.round(damages.reduce((s, d) => { const k = D.damage.find(x => x.kind === d.kind)!; return s + ((k.hours[0] + (k.hours[1] - k.hours[0]) * d.severity) * D.labourRate + k.materials * (0.5 + d.severity)); }, 0) * 4) / 4 + 2; }
+  /** the work a damage takes at the bench: hours and materials (dollars) */
+  work(d: Damage): { hours: number; materials: number } { const k = this.data.damage.find(x => x.kind === d.kind)!; return { hours: Math.round((k.hours[0] + (k.hours[1] - k.hours[0]) * d.severity) * 2) / 2, materials: Math.round(k.materials * (0.5 + d.severity) * 4) / 4 }; }
   /** what the shop knows about a job */
   view(id: number) { const j = this.job(id); return { name: fullName(this.sim.g.people[j.personId]!), car: this.data.cars.find(c => c.id === j.car.model)!.name, colour: j.car.colour, damages: j.damages.filter(d => !d.hidden || j.revealed.hidden),
     budget: j.revealed.budget ? j.budget : undefined, wantBy: addDays(j.received, j.wantDays), state: j.state, price: j.price, due: j.due }; }

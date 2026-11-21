@@ -22,26 +22,26 @@ const GLOSS: Record<number, number> = { 1: 0.55, 2: 0.95, 3: 0.7, 4: 0.12, 5: 0.
 function rnd(x: number, y: number) { let h = (x * 374761393 + y * 668265263) | 0; h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967296; }
 
 /** the car's picture, or null until the driver's picture has loaded */
-export function carSprite(colour: string, damages: Damage[]): CarSprite | null {
-  const drv = pixels(imgDriver, 22, 42), DW = 22; if (!drv) return null;
+export function carSprite(colour: string, damages: Damage[], o: { mm?: number; driver?: boolean } = {}): CarSprite | null {
+  const MMx = o.mm ?? CAR_MM, big = CAR_MM / MMx, drv = pixels(imgDriver, 22, 42), DW = 22; if (!drv && o.driver !== false) return null;
   const m = JSON.parse(JSON.stringify(sedan)) as CarModel; m.paint = colour; m.paint2 = colour;
-  const im = rasterizeFlat(viewDesign(m, 'left'), { mm: CAR_MM, shadow: false }), w = im.w, h = im.h, rgba = new Uint8ClampedArray(im.rgba), info = new Uint8ClampedArray(w * h * 4), ids = im.ids ?? [], mat = im.mat ?? [];
+  const im = rasterizeFlat(viewDesign(m, 'left'), { mm: MMx, shadow: false }), w = im.w, h = im.h, rgba = new Uint8ClampedArray(im.rgba), info = new Uint8ClampedArray(w * h * 4), ids = im.ids ?? [], mat = im.mat ?? [];
   const partOf = (i: number) => ids[im.owner[i]!] ?? '';
   for (let i = 0; i < w * h; i++) { if (rgba[i * 4 + 3]! < 10) continue; const code = MAT[mat[i] ?? ''] ?? 7; info[i * 4] = code; info[i * 4 + 1] = Math.round((GLOSS[code] ?? 0.1) * 255); info[i * 4 + 3] = 255; }
   // the damage, where it is
   const hurt = new Map(damages.map(d => [d.part, d]));
   for (let i = 0; i < w * h; i++) { if (rgba[i * 4 + 3]! < 10) continue; const x = i % w, y = (i / w) | 0, d = hurt.get(partOf(i)); if (!d) continue; const sev = d.severity ?? 0.5;
     if (d.kind === 'rust' && info[i * 4] === 1) { const n = rnd(x >> 1, y >> 1) * 0.6 + rnd(x, y) * 0.4, low = (y / h) ** 1.5; if (n < sev * 0.55 + low * 0.35) { const k = n < sev * 0.3 ? 1 : 0.6; rgba[i * 4] = 120 * k + 20; rgba[i * 4 + 1] = 62 * k + 10; rgba[i * 4 + 2] = 30 * k + 8; info[i * 4 + 1] = 20; } }   // rust: brown, dull, worst low down
-    if (d.kind === 'dent' && info[i * 4] === 1) { const cx = w * (d.part === 'fenderR' ? 0.78 : d.part === 'hood' ? 0.3 : 0.14), cy = h * 0.55, r = 6 + sev * 5, q = Math.hypot(x - cx, (y - cy) * 1.4) / r; if (q < 1) { const k = 0.7 + 0.3 * q; rgba[i * 4] = rgba[i * 4]! * k; rgba[i * 4 + 1] = rgba[i * 4 + 1]! * k; rgba[i * 4 + 2] = rgba[i * 4 + 2]! * k; info[i * 4 + 1] = Math.round(info[i * 4 + 1]! * q); } }   // a dent: a dull, darker hollow that catches no sky
+    if (d.kind === 'dent' && info[i * 4] === 1) { const cx = w * (d.part === 'fenderR' ? 0.78 : d.part === 'hood' ? 0.3 : 0.14), cy = h * 0.55, r = (6 + sev * 5) * big, q = Math.hypot(x - cx, (y - cy) * 1.4) / r; if (q < 1) { const k = 0.7 + 0.3 * q; rgba[i * 4] = rgba[i * 4]! * k; rgba[i * 4 + 1] = rgba[i * 4 + 1]! * k; rgba[i * 4 + 2] = rgba[i * 4 + 2]! * k; info[i * 4 + 1] = Math.round(info[i * 4 + 1]! * q); } }   // a dent: a dull, darker hollow that catches no sky
     if (d.kind === 'lamp' && (info[i * 4] === 5)) { rgba[i * 4] = 70; rgba[i * 4 + 1] = 66; rgba[i * 4 + 2] = 60; info[i * 4] = 7; if (rnd(x, y) < 0.3) { rgba[i * 4] = 190; rgba[i * 4 + 1] = 190; rgba[i * 4 + 2] = 180; } }   // the lens broken: dark, a few shards
     if (d.kind === 'roof' && partOf(i) === 'roof' && rnd(x >> 1, y) < sev * 0.5) { rgba[i * 4] = 30; rgba[i * 4 + 1] = 28; rgba[i * 4 + 2] = 26; } }
   // the customer at the wheel, seen through the front side window: darker behind the glass
   const glass0: number[] = []; for (let i = 0; i < w * h; i++) if (partOf(i) === 'glass0') glass0.push(i);
-  if (glass0.length) { let gx0 = w, gx1 = 0, gy1 = 0; for (const i of glass0) { const x = i % w, y = (i / w) | 0; gx0 = Math.min(gx0, x); gx1 = Math.max(gx1, x); gy1 = Math.max(gy1, y); }
+  if (glass0.length && drv && o.driver !== false) { let gx0 = w, gx1 = 0, gy1 = 0; for (const i of glass0) { const x = i % w, y = (i / w) | 0; gx0 = Math.min(gx0, x); gx1 = Math.max(gx1, x); gy1 = Math.max(gy1, y); }
     const ox = Math.round((gx0 + gx1) / 2 - DW / 2), oy = gy1 - 22, inG = new Set(glass0);
     for (let y = 0; y < 42; y++) for (let x = 0; x < DW; x++) { const j = (y * DW + x) * 4; if (drv[j + 3]! < 128) continue; const X = ox + x, Y = oy + y, i = Y * w + X; if (X < 0 || Y < 0 || X >= w || Y >= h || !inG.has(i)) continue;
       rgba[i * 4] = rgba[i * 4]! * 0.35 + drv[j]! * 0.5; rgba[i * 4 + 1] = rgba[i * 4 + 1]! * 0.35 + drv[j + 1]! * 0.5; rgba[i * 4 + 2] = rgba[i * 4 + 2]! * 0.35 + drv[j + 2]! * 0.5; } }
-  const hubs = m.wheels.map(wh => [im.X(wh.x), im.Y(wh.r), wh.r / CAR_MM] as [number, number, number]);
+  const hubs = m.wheels.map(wh => [im.X(wh.x), im.Y(wh.r), wh.r / MMx] as [number, number, number]);
   const tp = m.parts.find(p => p.id === 'tailpipe'), tail: [number, number] = tp ? [im.X(tp.box.x[1]), im.Y((tp.box.z[0] + tp.box.z[1]) / 2)] : [w - 6, im.groundY - 6];
   let front = w, hx = 0, hy = 0, hn = 0; for (let i = 0; i < w * h; i++) { if (rgba[i * 4 + 3]! > 10) front = Math.min(front, i % w); if (info[i * 4] === 5 || (mat[i] === 'lens')) { hx += i % w; hy += (i / w) | 0; hn++; } }
   let bx0 = w, bx1 = 0; for (let i = 0; i < w * h; i++) if (rgba[i * 4 + 3]! > 10) { bx0 = Math.min(bx0, i % w); bx1 = Math.max(bx1, i % w); }

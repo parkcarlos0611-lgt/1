@@ -22,7 +22,10 @@ export interface HouseState { kitchen: KitchenState; pantry?: Pantry; book?: Boo
   /** a customer sitting at the kitchen table */
   visitor?: boolean;
   /** the repair job whose car stands at the kerb */
-  car?: number }
+  car?: number;
+  /** the car in the garage's bay: its job, the damages already put right (by kind and part), the bodywork's result */
+  bay?: BayState }
+export interface BayState { job: number; fixed: string[]; body?: import('./repair').JobResult; minutes: number }
 export const newHouse = (): HouseState => ({ kitchen: { lamp: false, window: 0, windowWanted: 0, burner: false, kettle: 46, fog: 0 } });
 
 export const BOIL = 100;

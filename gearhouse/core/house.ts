@@ -16,7 +16,9 @@ export interface KitchenState {
 export interface Pantry { tea: number; coffee: number }
 /** the telephone directory as the player has left it: entries ringed in pencil, the page it lies open at */
 export interface BookState { marks: string[]; page: number }
-export interface HouseState { kitchen: KitchenState; pantry?: Pantry; book?: BookState }
+export interface HouseState { kitchen: KitchenState; pantry?: Pantry; book?: BookState;
+  /** the garage doors left open; letters waiting in the mailbox */
+  garageOpen?: boolean; mail?: number }
 export const newHouse = (): HouseState => ({ kitchen: { lamp: false, window: 0, windowWanted: 0, burner: false, kettle: 46, fog: 0 } });
 
 export const BOIL = 100;

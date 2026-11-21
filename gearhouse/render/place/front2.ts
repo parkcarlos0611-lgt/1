@@ -16,7 +16,9 @@ import { W, H, clamp, lerp, mix3, hash2, noise, skyColours, type V3 } from './ro
 
 const N = W * H;
 export interface Pic { px: Uint8ClampedArray; w: number; h: number }
-export interface Front2Env { t: number; dt: number; air: Air; moon: { alt: number; az: number; phase: number }; minute: number; doy: number; houseLit: boolean; snow: number; wet: number }
+export interface Front2Env { t: number; dt: number; air: Air; moon: { alt: number; az: number; phase: number }; minute: number; doy: number; houseLit: boolean; snow: number; wet: number;
+  /** how far open: the front door (0..1, inward), the garage's four leaves (0..1, outward); the mailbox flag (0 down .. 1 up) */
+  door: number; garage: number[]; flag: number }
 type Cut = Record<string, { at: number[]; size: number[] }> & { windows: number[][]; doorGlass: number[]; nightwin: number[][] };
 const enum K { Sky, Ground, Wall, Glass, Lantern, Wet }
 
@@ -39,7 +41,7 @@ const clump = (x: number, y: number) => Math.min(1, Math.max(0, (noise(x / 9 + 3
 
 export class Front2 {
   private alb = new Float32Array(N * 3); private lit = new Float32Array(N * 3); private kind = new Uint8Array(N); private sky = new Float32Array(W * 180 * 3);
-  private glass = new Int8Array(N).fill(-1); private cover = new Float32Array(N); private snowy = new Uint8Array(N); private treeM = new Uint8Array(N); private marking = 0;
+  private glass = new Int8Array(N).fill(-1); private cover = new Float32Array(N); private snowy = new Uint8Array(N); private inside = new Uint8Array(N); private treeM = new Uint8Array(N); private marking = 0;
   private smoke: { x: number; y: number; age: number; life: number }[] = []; private fall: { x: number; y: number; v: number; snow: number }[] = []; private bird = { x: -1, y: 0, wait: 6, dir: 1 };
   constructor(private C: Cut, private P: Record<string, Pic>) {
     // the panes of the house's windows: the dark glass inside each window box (not the shutters, not the bars)
@@ -87,6 +89,7 @@ export class Front2 {
       if (edge && base.px[j + 3]! > 100) { this.alb[i * 3] = (this.alb[i * 3]! + base.px[j]!) / 2; this.alb[i * 3 + 1] = (this.alb[i * 3 + 1]! + base.px[j + 1]!) / 2; this.alb[i * 3 + 2] = (this.alb[i * 3 + 2]! + base.px[j + 2]!) / 2; }   /* slush at the edge of the snow */ this.kind[i] = y >= 168 && (y >= 203 || (x >= 296 && x < 470) || (x >= 152 && x < 188)) ? K.Wet : K.Ground; }
     // ---- the buildings and things
     this.lay(P.garage!, C.garage!.at, K.Wall); this.lay(P.house!, C.house!.at, K.Wall); this.lay(P.mailbox!, C.mailbox!.at, K.Wall); this.lay(P.lamp!, C.lamp!.at, K.Wall);
+    this.inside.fill(0); this.doors(e);
     const [ta, tb, tf] = treeOf(e.doy), amp = 0.35 + 1.4 * a.wind, sway = (p: Pic) => (sy: number) => { const up = clamp(1 - sy / (p.h * 0.62)); return amp * up * up * (Math.sin(t * 0.9 + sy * 0.015) * 0.75 + Math.sin(t * 2.1 + sy * 0.04) * 0.25); };
     this.marking = 1;
     if (tf > 0) { const pa = P[ta]!, pb = P[tb]!; this.lay(pa, C[ta]!.at, K.Wall, (x, y) => clump(x, y) >= tf, sway(pa)); this.lay(pb, C[tb]!.at, K.Wall, (x, y) => clump(x, y) < tf, sway(pb)); }
@@ -110,6 +113,7 @@ export class Front2 {
       let r = nb[0] + level * ambC[0], g = nb[1] + level * ambC[1], b = nb[2] + level * ambC[2];
       if (lampOn) { const d2 = (x - lx) ** 2 + (y - ly) ** 2; let kk = 0.45 / (1 + d2 / 900); if (kd === K.Wet || kd === K.Ground) { const ex = (x - pool[0]) / 60, ey = (y - pool[1]) / 15; kk += 1.05 * Math.exp(-(ex * ex + ey * ey) * 1.6); } r += kk; g += kk * 0.78; b += kk * 0.5; }
       if (winLit && (kd === K.Ground || kd === K.Wet)) for (const wb of C.windows) { const cx = (wb[0]! + wb[2]!) / 2, d = (x - cx) / 22, dy = (y - (wb[3]! + 26)) / 12; const kk = 0.22 * wl * Math.exp(-(d * d + dy * dy)); r += kk; g += kk * 0.72; b += kk * 0.42; }
+      if (this.inside[i]) { const deep = this.inside[i] === 2 ? 0.62 : 0.55; r *= deep; g *= deep; b *= deep; if (this.inside[i] === 1 && e.houseLit && day < 0.5) { r += 0.75 * wl; g += 0.55 * wl; b += 0.3 * wl; } }   // indoors through an open door: dimmer, lamplit in the evening
       let ar = this.alb[i * 3]!, ag = this.alb[i * 3 + 1]!, ab = this.alb[i * 3 + 2]!; if (kd === K.Wet && e.wet > 0) { const w = 1 - 0.32 * e.wet; ar *= w; ag *= w; ab *= w; }
       this.lit[i * 3] = ar * r; this.lit[i * 3 + 1] = ag * g; this.lit[i * 3 + 2] = ab * b;
       if (this.snowy[i] && sparkle > 0 && hash2(x * 7 + Math.floor(t * 1.7 + hash2(x, y) * 9), y * 13) > 0.9975) { this.lit[i * 3] = 255; this.lit[i * 3 + 1] = 254; this.lit[i * 3 + 2] = 248; }   // the sun glinting on snow crystals
@@ -127,6 +131,39 @@ export class Front2 {
     this.chimney(e); this.birds(e); this.weather(e);
     for (let i = 0; i < N; i++) { out[i * 4] = Math.min(255, Math.max(0, this.lit[i * 3]!)); out[i * 4 + 1] = Math.min(255, Math.max(0, this.lit[i * 3 + 1]!)); out[i * 4 + 2] = Math.min(255, Math.max(0, this.lit[i * 3 + 2]!)); out[i * 4 + 3] = 255; }
   }
+
+  /** the front door (hinged on its right, opening inward: the leaf narrows towards the hinge and its free edge goes
+   *  away, a little shorter; the hall shows behind it), the garage's four leaves (each hinged at its outer edge, swinging
+   *  out towards the street: they narrow towards the hinge and their free edges come nearer, taller and lower; the dark
+   *  garage shows behind), the mailbox's red flag */
+  private doors(e: Front2Env) { const al = this.alb;
+    const leaf = (x0: number, x1: number, y0: number, y1: number, open: number, hinge: 'l' | 'r', inward: boolean, room: (x: number, y: number) => V3, kind: 1 | 2) => {
+      if (open <= 0.002) return; const w = x1 - x0, h = y1 - y0, src = new Float32Array(w * h * 3);
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const i = (y0 + y) * W + x0 + x; src[(y * w + x) * 3] = al[i * 3]!; src[(y * w + x) * 3 + 1] = al[i * 3 + 1]!; src[(y * w + x) * 3 + 2] = al[i * 3 + 2]!; }
+      for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) { const i = y * W + x, c = room(x - x0, y - y0); al[i * 3] = c[0]; al[i * 3 + 1] = c[1]; al[i * 3 + 2] = c[2]; this.inside[i] = kind; this.kind[i] = K.Wall; }
+      const th = open * (inward ? 1.35 : 1.5), cos = Math.cos(th), sin = Math.sin(th), pw = Math.max(1, w * Math.abs(cos)), shade = 0.72 + 0.28 * Math.abs(cos);
+      for (let k = 0; k < Math.ceil(pw); k++) { const u = (k + 0.5) / pw /* 0 at the hinge .. 1 at the free edge */, sx = Math.min(w - 1, Math.floor(u * w)), col = hinge === 'l' ? x0 + k : x1 - 1 - k;
+        const grow = inward ? 1 - 0.12 * sin * u : 1 + 0.2 * sin * u, hh = h * grow, top = inward ? y0 + (h - hh) * 0.5 : y0 - (hh - h) * 0.3;
+        for (let y = Math.floor(top); y < top + hh; y++) { if (y < 0 || y >= H) continue; const sy = Math.min(h - 1, Math.max(0, Math.floor((y - top) / hh * h))), j = (sy * w + (hinge === 'l' ? sx : w - 1 - sx)) * 3, i = y * W + col;
+          al[i * 3] = src[j]! * shade; al[i * 3 + 1] = src[j + 1]! * shade; al[i * 3 + 2] = src[j + 2]! * shade; this.inside[i] = 0; this.kind[i] = K.Wall; } } };
+    // the hall: a dark brown passage, the floor boards lighter, a runner
+    leaf(161, 181, 100, 162, e.door, 'r', true, (x, y) => { const fl = y > 46, wall = 92 + (x % 6 === 0 ? -10 : 0); return fl ? [128 - (62 - y) * 0.6, 100, 76] : y < 6 ? [70, 54, 42] : [wall, wall * 0.78, wall * 0.6]; }, 1);   /* the hall: papered walls, the floor, the kitchen's light beyond */
+    // the garage: dark inside, its concrete floor catching the daylight from the door
+    // the garage inside: board walls in shadow, a small window high on the back wall, a bench along it with a few tools,
+    // the concrete floor brighter where the daylight falls in through the door
+    const room = (x: number, y: number): V3 => { const gx = x % 71, fl = clamp((y - 46) / 20), board = gx % 7 === 0 ? -7 : (gx * 13) % 5;
+      let c: V3 = [44 + board, 38 + board * 0.8, 33 + board * 0.6];
+      if (y >= 10 && y < 20 && gx >= 26 && gx < 44) c = (gx - 26) % 6 === 0 || y === 14 ? [52, 44, 36] : [112, 122, 132];   // the window
+      if (y >= 36 && y < 40 && gx > 4 && gx < 64) c = [70, 52, 36];                                                  // the bench top
+      if (y >= 40 && y < 47 && (gx === 8 || gx === 60)) c = [48, 36, 26];                                             // its legs
+      if (y >= 28 && y < 36 && gx > 10 && gx < 58 && (gx % 9 === 2 || (gx % 9 === 3 && y < 31))) c = [86, 84, 80];   // tools on the wall
+      if (y >= 46) c = [lerp(54, 104, fl), lerp(50, 98, fl), lerp(46, 90, fl)];
+      return c; };
+    const G = e.garage; leaf(305, 341, 101, 167, G[0]!, 'l', false, (x, y) => room(x, y), 2); leaf(341, 377, 101, 167, G[1]!, 'r', false, (x, y) => room(x + 36, y), 2);
+    leaf(385, 420, 101, 167, G[2]!, 'l', false, (x, y) => room(x, y), 2); leaf(420, 456, 101, 167, G[3]!, 'r', false, (x, y) => room(x + 35, y), 2);
+    // the mailbox's flag: down along the box, up when there is a letter in it
+    const ang = e.flag * Math.PI / 2, px = 152.5, py = 184; for (let k = 0; k < 7; k++) { const x = Math.round(px + Math.cos(ang) * k), y = Math.round(py - Math.sin(ang) * k), i = y * W + x; al[i * 3] = k > 3 ? 176 : 120; al[i * 3 + 1] = k > 3 ? 36 : 30; al[i * 3 + 2] = k > 3 ? 28 : 26; this.kind[i] = K.Wall;
+      if (k > 3) { const x2 = Math.round(x - Math.sin(ang)), y2 = Math.round(y - Math.cos(ang)), i2 = y2 * W + x2; al[i2 * 3] = 150; al[i2 * 3 + 1] = 30; al[i2 * 3 + 2] = 24; this.kind[i2] = K.Wall; } } }
 
   private add(i: number, c: V3, w: number) { this.lit[i * 3] = this.lit[i * 3]! + c[0] * w; this.lit[i * 3 + 1] = this.lit[i * 3 + 1]! + c[1] * w; this.lit[i * 3 + 2] = this.lit[i * 3 + 2]! + c[2] * w; }
   private glow(cx: number, cy: number, k: number, c: V3, r: number) { for (let y = Math.floor(cy - r * 3); y < cy + r * 3; y++) for (let x = Math.floor(cx - r * 3); x < cx + r * 3; x++) { if (x < 0 || y < 0 || x >= W || y >= H) continue; this.add(y * W + x, c, k * Math.exp(-((x - cx) ** 2 + (y - cy) ** 2) / (r * r))); } }

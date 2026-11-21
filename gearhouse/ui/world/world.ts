@@ -26,7 +26,7 @@ import imgGarage from '../../assets/placeholder/garage.png';
 import imgWorkshop from '../../assets/placeholder/workshop.png';
 import imgPhone from '../../assets/placeholder/phone.png';
 import { kitchenPlace, type KitchenSpot } from './kitchen';
-import { frontPlace } from './front';
+import { frontPlace, type FrontSpot } from './front';
 import { settleKitchen } from '../../core/house';
 import { air } from '../../core/atmosphere';
 
@@ -55,6 +55,7 @@ export function worldScene(app: App): Scene {
   const travel = (to: Place, then?: () => void) => { if (fade) return; if (place === 'kitchen' && to !== 'kitchen') kitchen.quiet(); going = to; after = then ?? null; fade = 0.001; app.sound.once('paper'); };
   const pace = (): Pace => (app.top?.id !== 'world' ? 'talk' : eventLeft > 0 ? 'event' : PLACES[place].pace);
   function take(p: Passage) {
+    for (const s of p.stops) if (['customer_letter', 'supplier_quote', 'loan_answer', 'tax_notice', 'repair_complaint'].includes(s.kind)) { const h = (W().sim.g.house ??= newHouse()); h.mail = (h.mail ?? 0) + 1; }   // letters come by the mailbox
     for (const s of p.stops) notes.unshift({ at: W().clock.hhmm(), text: `${KIND[s.kind] ?? s.kind}${s.payload.customer ? ' · ' + String(s.payload.customer) : ''}`, inc: s });
     for (const d of p.due) if (d.kind === 'delivery') { // the grocer's boy with what was ordered on the telephone; paid at the door
       const pl = d.payload as { from: string; items: { item: 'tea' | 'coffee'; qty: number; price: number }[] }, pt = ((W().sim.g.house ??= newHouse()).pantry ??= { tea: 1, coffee: 1 }); let tot = 0;
@@ -91,12 +92,14 @@ export function worldScene(app: App): Scene {
       const hour = Math.floor(W().clock.minute / 60); if (hour !== lastSave) { lastSave = hour; app.save(); }
       // objects you can use: the living kitchen lights what is under the pointer; the other places outline it
       const pt = ui.pointer(), inside = (r: Rect) => pt.x >= r.x && pt.x < r.x + r.w && pt.y >= r.y && pt.y < r.y + r.h && pt.y > 22 && pt.y < 246;
-      let over: Spot | null = null, kOver: KitchenSpot | null = null;
-      if (place === 'kitchen') { for (const s of kitchen.spots) if (inside(s.r)) kOver = s; } else for (const s of PLACES[place].spots) if (inside(s.r)) over = s;
+      let over: Spot | null = null, kOver: KitchenSpot | null = null, fOver: FrontSpot | null = null;
+      if (place === 'kitchen') { for (const s of kitchen.spots) if (inside(s.r)) kOver = s; } else if (place === 'front') { for (const s of front.spots) if (inside(s.r)) fOver = s; } else for (const s of PLACES[place].spots) if (inside(s.r)) over = s;
       if (place === 'kitchen' ? !kitchen.draw(dt, fade ? null : kOver) : place === 'front' ? !front.draw(dt) : true) draw();
       if ((globalThis as { __still?: boolean }).__still) return;   // for pictures of the place alone
       { const A = air(W().clock.today, W().clock.minute, W().sim.g.weather.today ?? 'clear', W().sim.g.seed); if (place !== 'kitchen') { app.sound.ambient('rain', A.rain * (place === 'front' ? 1 : 0.3)); app.sound.ambient('wind', A.wind * (place === 'front' ? 0.8 : 0.15)); }
         quiet(app.sound, place, A, W().clock.minute, dateParts(W().clock.today).month, W().sim.g.house?.kitchen.window ?? 0, dt); }
+      if (fOver && !fade) { const label = fOver.label(), tw = S.tw(label) + 8, lx = Math.min(480 - tw - 2, Math.max(2, pt.x - tw / 2)), ly = Math.max(24, pt.y - 16); S.fill(lx, ly, tw, 11, hex('#1a120b')); S.text(label, lx + 4, ly + 2, COL.lit);
+        if (ui.missed()) front.act(fOver.act, to => travel(to)); }
       if (kOver && !fade) { const label = kOver.label(), tw = S.tw(label) + 8, lx = Math.min(480 - tw - 2, Math.max(2, pt.x - tw / 2)), ly = Math.max(24, pt.y - 16); S.fill(lx, ly, tw, 11, hex('#1a120b')); S.text(label, lx + 4, ly + 2, COL.lit);
         if (ui.missed()) { if (kOver.go) travel(kOver.go); else if (!kitchen.act(kOver.act)) act(kOver.act); } }
       if (over && !fade) { const r = over.r; for (let x = r.x; x < r.x + r.w; x++) { if (((x + Math.floor(t * 12)) >> 2) % 2) { S.px(x, r.y, COL.lit); S.px(x, r.y + r.h - 1, COL.lit); } } for (let y = r.y; y < r.y + r.h; y++) if (((y + Math.floor(t * 12)) >> 2) % 2) { S.px(r.x, y, COL.lit); S.px(r.x + r.w - 1, y, COL.lit); }
@@ -116,7 +119,7 @@ export function worldScene(app: App): Scene {
       const card = cards[0]; if (card) { const r = { x: 276, y: 26, w: 200, h: 44 }; ui.panel(r, 'card'); ui.paragraph({ x: r.x + 6, y: r.y + 4, w: r.w - 12, h: 20 }, card.text, COL.ink);
         const [b1, b2] = split({ x: r.x + 6, y: r.y + 27, w: r.w - 12, h: 13 }, ['*', '*'], 6); if (card.go && ui.button('card-go', b1!, '나가 본다')) { travel(card.go); cards.shift(); } if (ui.button('card-x', b2!, '두고 본다')) cards.shift(); }
       // between rooms: a fade
-      if (fade > 0) { fade += dt * 2.4; if (fade >= 1 && going) { place = going; going = null; after?.(); after = null; } const a2 = fade < 1 ? fade : Math.max(0, 2 - fade); if (fade >= 2) fade = 0; for (let i = 0; i < 480 * 270; i++) S.px(i % 480, (i / 480) | 0, [0, 0, 0], a2); }
+      if (fade > 0) { fade += dt * 2.4; if (fade >= 1 && going) { if (going === 'front' && place === 'kitchen') front.cameOut(); place = going; going = null; after?.(); after = null; } const a2 = fade < 1 ? fade : Math.max(0, 2 - fade); if (fade >= 2) fade = 0; for (let i = 0; i < 480 * 270; i++) S.px(i % 480, (i / 480) | 0, [0, 0, 0], a2); }
       void mix; void store;
     },
     key(_a, e) { const k = '12345'.indexOf(e.key); if (k >= 0) { const n = NAV[k]!; if (n === 'phone') act('call'); else travel(n); return true; } return false; } };

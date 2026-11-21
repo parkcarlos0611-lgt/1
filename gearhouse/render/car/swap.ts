@@ -4,7 +4,12 @@
 // rear wing's tail. A donor's parts are moved from the donor's mount to the base's and scaled by what that mount says
 // (a wheel's radius, the bonnet's height, the track), keeping their own shape. How much they had to be scaled says how
 // well they fit: as they are, with work (a panel beaten wider, a bracket made), or not at all.
-import type { CarModel, CarPart } from './model';
+import { viewDesign, type CarModel, type CarPart } from './model';
+import { rasterizeFlat } from './flat';
+/** slots whose parts interlock with the body (the body was cut to them): what they covered must not be left open */
+const BACKED = new Set<Slot>(['fenderF', 'fenderR', 'grille', 'board']);
+/** the side view's coverage of some parts, as a coarse mask */
+function cover(m: CarModel, keep: (p: CarPart) => boolean): { mask: Uint8Array; w: number } { const d = viewDesign(m, 'left', keep); d.wheels = []; const im = rasterizeFlat(d, { mm: 25, shadow: false }); const mask = new Uint8Array(im.w * im.h); for (let i = 0; i < mask.length; i++) mask[i] = im.rgba[i * 4 + 3]! > 100 ? 1 : 0; return { mask, w: im.w }; }
 
 export type Slot = 'grille' | 'lamp' | 'bumperF' | 'bumperR' | 'fenderF' | 'fenderR' | 'board' | 'tail' | 'wheel';
 export const SLOTS: { id: Slot; name: string }[] = [
@@ -63,6 +68,17 @@ export function fitSlot(base: CarModel, donor: CarModel, slot: Slot, adj: Adjust
     p.id = 'x_' + p.id; if (p.on && theirs.some(q => 'x_' + p.on === q.id || q.id === p.on)) p.on = 'x_' + p.on.replace(/^x_/, '');
   }
   const at = Math.max(0, r.parts.findIndex(p => p.slot === slot)); r.parts = r.parts.filter(p => p.slot !== slot); r.parts.splice(Math.min(at, r.parts.length), 0, ...theirs);
+  // what the old part covered stays closed: its outline left behind the body as the black inner panel (a splash apron,
+  // a wing's inner valance, the radiator's dark core), so a smaller part shows that, not a hole
+  let open = 0;
+  if (BACKED.has(slot) && mine.length) {
+    const backs = mine.filter(p => !p.on).map(p => { const q = JSON.parse(JSON.stringify(p)) as CarPart; q.id = 'back_' + p.id; q.material = 'black'; q.surface = 'flat'; delete q.slot; delete q.features; delete q.detail; delete q.shade; delete q.color;
+      const inner = Math.max(40, Math.min(Math.abs(q.box.y[0]), Math.abs(q.box.y[1])) - 60); q.box.y = q.pair ? [Math.max(0, inner - 40), inner] : [-inner, inner]; return q; });
+    r.parts.unshift(...backs);
+    const before = cover(base, p => p.slot === slot), after = cover(r, p => theirs.some(q => q.id === p.id)); let n = 0, o = 0;
+    for (let i = 0; i < before.mask.length; i++) if (before.mask[i]) { n++; if (!after.mask[i]) o++; }
+    open = n ? o / n : 0;
+  }
   // how well it fits: the work of reshaping it from what it was (beaten wider, cut shorter), and how far it is still from
   // the place it has to fill (a gap, or standing proud): the larger decides
   const pc = (k: number) => `${k > 1 ? '+' : ''}${Math.round((k - 1) * 100)}%`, notes: string[] = [];
@@ -70,7 +86,8 @@ export function fitSlot(base: CarModel, donor: CarModel, slot: Slot, adj: Adjust
   for (const [n, k] of Object.entries(work)) if (Math.abs(k - 1) >= 0.03) notes.push(`${n} ${pc(k)}`);
   for (const [n, k] of Object.entries(off)) if (Math.abs(k - 1) >= 0.03) notes.push(`자리보다 ${n} ${pc(k)}`);
   if (!mine.length) notes.push('바탕 차에 없던 부품');
-  const change = Math.max(...Object.values(work).map(k => Math.abs(k - 1)), ...Object.values(off).map(k => Math.abs(k - 1)));
+  if (open >= 0.03) notes.push(`안쪽 판 새로 댐 ${Math.round(open * 100)}%`);
+  const change = Math.max(open * 0.5, ...Object.values(work).map(k => Math.abs(k - 1)), ...Object.values(off).map(k => Math.abs(k - 1)));
   return { model: r, fit: { grade: change < FITS ? 'fits' : change < WORK ? 'work' : 'no', notes: notes.length ? notes : ['그대로 맞음'], change } };
 }
 

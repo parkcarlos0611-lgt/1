@@ -27,10 +27,22 @@ docs/systems/62_direct_model_guide.md, which still holds (goal, tools, hand-in, 
 - Do not try to change the game's renderer (the artillery spokes draw thinner and darker than the sheets; that is
   known and will be fixed in the game).
 
+## Notes for the know-how (from the fifth car on)
+The aim is that later cars (and, if it works, a cheaper model with Fable's checklist and review) can come near this
+quality. Add a file `notes.md` in the folder with:
+- **Reusable parts**: each part of your script that another car could use as it is or with a few numbers changed
+  (visor, drum lamp on a stand, split bumperettes, black upper body, cowl lamp, corner light, two-pane screen, wood
+  window surround, board edge strip, artillery wheel spec, ...). For each: the function or block in your script, what
+  it takes (sizes, positions), and what of it was particular to this car.
+- **Details caught**: the list of details of this car you found on the sheet and built, in the form of a checklist
+  another builder could tick off (part, count, shape, colour, which views show it). Mark those the draft had wrong.
+- **Pitfalls**: what took you longest or went wrong first, and how you got past it.
+
 ## Each car
 - Folder: /tmp/claude-0/-home-user-1/0b845933-8226-57c8-b442-07d308e42630/scratchpad/batch/<id>/ (the six cut views
   v_*.png, and draft/ with the automatic model <id>_auto.json, its report and mv_auto/).
 - The list with sheet, side, approximate wheelbase, year and the plain game name: tools/ref/batch_sedans.json.
 - Hand in, in the folder: <id>.py, <id>.json, run.sh, cmp.png + cmp.json (autocmp with draft= and direct=),
-  parts.png, report.md (what was built, parts added/removed, scores, what is still wrong, how long, how many rounds).
+  parts.png, report.md (what was built, parts added/removed, scores, what is still wrong, how long, how many rounds),
+  and from the fifth car on notes.md (above).
 - Write only in the folder; change nothing in the repository; do not commit.

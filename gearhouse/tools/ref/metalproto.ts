@@ -31,7 +31,7 @@ const METAL: Record<string, { base: V3; spec: V3; rough: number; rust: number }>
 const metalOf = (id: string, el: string) => id.startsWith('tyre') ? 'rubber' : /exhaust|muffler|tailpipe|manifold/.test(id) ? 'exhaust' : el === 'frame' || el === 'spring' || /tank|cross/.test(id) ? 'enamel' : /driveline|axleF/.test(id) ? 'tube' : 'iron';
 
 // the panels from below: lowest parts nearest the eye, so drawn last
-const panels = [...d.panels].sort((a, b) => b.z - a.z);
+const panels = [...d.panels].sort((a, b) => b.z - a.z).sort((a, b) => Number(a.id.startsWith('tyre')) - Number(b.id.startsWith('tyre')));   // the tyres stand round the axle ends
 const img = new Uint8ClampedArray(W * H * 4), owner = new Int32Array(W * H).fill(-1);
 for (let i = 0; i < W * H; i++) { img[i * 4] = 214; img[i * 4 + 1] = 212; img[i * 4 + 2] = 205; img[i * 4 + 3] = 255; }
 const inside = (pts: number[][], x: number, y: number) => { let c = false; for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) { const [xi, yi] = pts[i]!, [xj, yj] = pts[j]!; if ((yi! > y) !== (yj! > y) && x < (xj! - xi!) * (y - yi!) / (yj! - yi!) + xi!) c = !c; } return c; };
@@ -67,6 +67,11 @@ panels.forEach((p, k) => {
     let r = c[0] * sh + mt.spec[0] * spec + grain, g = c[1] * sh + mt.spec[1] * spec + grain, b = c[2] * sh + mt.spec[2] * spec + grain;
     r *= 1 - grime; g *= 1 - grime; b *= 1 - grime * 0.9;
     if (e < 0.9) { r *= 0.55; g *= 0.55; b *= 0.55; }                                          // the dark line where a part ends
+    if (kind === 'tyre') {   // rubber, not metal: a crowned tread of blocks across the tyre's width, the shoulders rounding away, no gloss
+      const t = Math.abs(a2), along = long ? x : y, block = Math.floor(along / 3) % 2, groove = (Math.floor(along / 3) + (t > 0.45 ? 1 : 0)) % 2;
+      const crown = 0.55 + 0.45 * Math.sqrt(Math.max(0, 1 - t * t)), lit = t < 0.82 ? (groove ? 0.62 : 1) : 0.7 - (t - 0.82) * 1.5;
+      const v = 34 * crown * lit + (block ? 4 : 0) + (hash(x, y, 77) - 0.5) * 6 + (t > 0.9 ? 8 : 0);
+      r = v; g = v; b = v + 1; if (e < 0.9) { r *= 0.6; g *= 0.6; b *= 0.6; } }
     const i = (y * W + x) * 4; img[i] = r; img[i + 1] = g; img[i + 2] = b; owner[y * W + x] = k;
   } });
 // shadow cast by each part onto what lies behind it (a soft offset towards the lower right)

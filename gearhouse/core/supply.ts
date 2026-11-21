@@ -69,6 +69,21 @@ export class Supply {
   storeView(): { part: string; sets: number; units: number; unit: string }[] { const by = new Map<string, number>(); for (const l of this.S.lots) by.set(l.part, (by.get(l.part) ?? 0) + l.qty);
     return [...by].map(([part, sets]) => ({ part, sets, units: Math.round(sets * this.parts.parts[part]!.perSet * 10) / 10, unit: this.parts.parts[part]!.unit })); }
 
+  /** on the telephone the prices come at once (review 47): a quote, or null when they have none of it */
+  call(id: string, lines: { part: string; qty: number; grade?: number }[]): Quote | null { const d = this.sup(id);
+    if (!(d.phone && this.S.phone)) throw new Error('no telephone line to ' + id); if (!this.S.suppliers[id]!.known) this.discover(id, 'telephone');
+    return this.makeQuote(this.sim.api(), d, lines, 'phone'); }
+  /** the cheapest line of the catalogue for each part asked for, at today's price */
+  private makeQuote(a: Api, d: SupplierData, want: { part: string; qty: number; grade?: number }[], via: Via): Quote | null { const S = this.S, st = S.suppliers[d.id]!, lines: QuoteLine[] = []; let lead = 0;
+    for (const w of want) { const c = d.catalog.filter(x => x.part === w.part && (w.grade == null || x.grade === w.grade)).sort((x, y) => x.price - y.price)[0]; if (!c) continue;
+      lines.push({ part: c.part, grade: c.grade, qty: Math.max(w.qty, c.minOrder), unitPrice: Math.round(c.price * (st.priceMult && st.priceUntil && st.priceUntil > a.date ? st.priceMult : 1) * 100) / 100 }); lead = Math.max(lead, c.leadDays); }
+    st.catalogKnown = true; if (!lines.length) return null;
+    const q: Quote = { id: S.nextId++, supplierId: d.id, via, lines, leadDays: Math.round(lead * mult(a.g, 'supplier_lead', d.id)), prepaid: st.relation < 60, round: 0, date: a.date, state: 'open' };
+    S.quotes.push(q); a.bus.emit('supplier_quote_received', { quoteId: q.id, supplierId: d.id }); return q; }
+  /** a supplier's catalogue, as the telephone tells it */
+  catalog(id: string): CatalogLine[] { return this.sup(id).catalog; }
+  supplier(id: string): SupplierData { return this.sup(id); }
+
   system(): System { return { id: 'supply', morning: a => this.morning(a) }; }
   private morning(a: Api): void { const S = this.S;
     // deliveries due today or overdue
@@ -81,12 +96,9 @@ export class Supply {
     // answers to letters, calls and visits
     const due = S.pending.filter(p => p.due <= a.date); S.pending = S.pending.filter(p => p.due > a.date);
     for (const p of due) { const d = this.sup(p.supplierId), st = S.suppliers[p.supplierId]!;
-      if (p.kind === 'reply') { const lines: QuoteLine[] = []; let lead = 0;
-        for (const w of p.lines ?? []) { const c = d.catalog.filter(x => x.part === w.part && (w.grade == null || x.grade === w.grade)).sort((x, y) => x.price - y.price)[0]; if (!c) continue;
-          lines.push({ part: c.part, grade: c.grade, qty: Math.max(w.qty, c.minOrder), unitPrice: Math.round(c.price * (st.priceMult && st.priceUntil && st.priceUntil > a.date ? st.priceMult : 1) * 100) / 100 }); lead = Math.max(lead, c.leadDays); }
-        st.catalogKnown = true; if (!lines.length) { a.raise('supplier_no_stock', 'notice', { supplier: d.name }); continue; }
-        const q: Quote = { id: S.nextId++, supplierId: d.id, via: p.via, lines, leadDays: Math.round(lead * mult(a.g, 'supplier_lead', d.id)), prepaid: st.relation < 60, round: 0, date: a.date, state: 'open' };
-        S.quotes.push(q); a.bus.emit('supplier_quote_received', { quoteId: q.id, supplierId: d.id }); a.raise('supplier_quote', 'decision', { quoteId: q.id, supplier: d.name }, 14); }
+      if (p.kind === 'reply') { const q = this.makeQuote(a, d, p.lines ?? [], p.via);
+        if (!q) { a.raise('supplier_no_stock', 'notice', { supplier: d.name }); continue; }
+        a.raise('supplier_quote', 'decision', { quoteId: q.id, supplier: d.name }, 14); }
       else { const q = S.quotes.find(x => x.id === p.quoteId); if (!q || q.state !== 'open') continue; q.round++;
         const founder = a.g.founderId ? a.g.people[a.g.founderId] : undefined, chance = d.temper * 0.6 + st.relation / 250 + (founder?.skills.sales ?? 30) / 300 + (p.lever === 'prepay' || p.lever === 'premium' ? 0.25 : 0.1), ok = a.rng.float() < chance;
         if (ok) { if (p.lever === 'prepay') { q.prepaid = true; q.lines.forEach(l => { l.unitPrice = Math.round(l.unitPrice * 0.93 * 100) / 100; }); }

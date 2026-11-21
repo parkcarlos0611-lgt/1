@@ -12,7 +12,11 @@ export interface KitchenState {
   /** steam on the glass 0..1 */
   fog: number;
 }
-export interface HouseState { kitchen: KitchenState }
+/** what is in the larder (tea and coffee for customers, review 33) */
+export interface Pantry { tea: number; coffee: number }
+/** the telephone directory as the player has left it: entries ringed in pencil, the page it lies open at */
+export interface BookState { marks: string[]; page: number }
+export interface HouseState { kitchen: KitchenState; pantry?: Pantry; book?: BookState }
 export const newHouse = (): HouseState => ({ kitchen: { lamp: false, window: 0, windowWanted: 0, burner: false, kettle: 46, fog: 0 } });
 
 export const BOIL = 100;

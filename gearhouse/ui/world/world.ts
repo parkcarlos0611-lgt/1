@@ -14,7 +14,9 @@ import type { Pace, Passage } from '../../core/clock';
 import type { Incident } from '../../core/state';
 import { parts, weekday } from '../../core/calendar';
 import { drawingScene, standardAsks } from '../scenes/drawing';
-import { phoneScene } from '../scenes/phone';
+import { phoneDesk } from './phonedesk';
+import { post } from '../../core/ledger';
+import { newHouse } from '../../core/house';
 import imgFront from '../../assets/places/front/front.png';
 import { ambience } from './ambience';
 import { parts as dateParts } from '../../core/calendar';
@@ -53,12 +55,16 @@ export function worldScene(app: App): Scene {
   const pace = (): Pace => (app.top?.id !== 'world' ? 'talk' : eventLeft > 0 ? 'event' : PLACES[place].pace);
   function take(p: Passage) {
     for (const s of p.stops) notes.unshift({ at: W().clock.hhmm(), text: `${KIND[s.kind] ?? s.kind}${s.payload.customer ? ' · ' + String(s.payload.customer) : ''}`, inc: s });
-    for (const d of p.due) if (d.kind === 'repair_visit') { const j = W().repair.view(d.ref!); eventLeft = 25; cards.push({ text: `차 한 대가 집 앞에 섰다. ${j.name} 씨, ${j.car}.`, go: 'front', until: t + 20 }); app.sound.ambient('engine', 0.6, 0.9); setTimeout(() => app.sound.ambient('engine', 0), 2500); }
+    for (const d of p.due) if (d.kind === 'delivery') { // the grocer's boy with what was ordered on the telephone; paid at the door
+      const pl = d.payload as { from: string; items: { item: 'tea' | 'coffee'; qty: number; price: number }[] }, pt = ((W().sim.g.house ??= newHouse()).pantry ??= { tea: 1, coffee: 1 }); let tot = 0;
+      for (const it of pl.items) { pt[it.item] += it.qty; tot += it.qty * it.price; }
+      post(W().sim.api(), 'groceries', -tot, pl.from); cards.push({ text: `${pl.from}에서 배달이 왔다. ${pl.items.map(i => (i.item === 'tea' ? '홍차 ' : '커피 ') + i.qty).join(', ')} · $${tot.toFixed(2)}`, go: 'front', until: t + 15 }); }
+    else if (d.kind === 'repair_visit') { const j = W().repair.view(d.ref!); eventLeft = 25; cards.push({ text: `차 한 대가 집 앞에 섰다. ${j.name} 씨, ${j.car}.`, go: 'front', until: t + 20 }); app.sound.ambient('engine', 0.6, 0.9); setTimeout(() => app.sound.ambient('engine', 0), 2500); }
     if (notes.length > 30) notes.length = 30; }
   function act(a: string) { const w = W();
     if (a === 'sleep') { if (fade) return; travel('workshop', () => { const m0 = w.clock.minute; take(w.clock.sleep()); if (w.sim.g.house) settleKitchen(w.sim.g.house.kitchen, 1440 - m0 + w.clock.minute, 18); app.save(); app.toast(`잠에서 깼다. ${dateKo()}`); }); return; }
     if (a === 'drafting') { app.push(drawingScene(app, { from: '공방 설계 (자작)', asks: standardAsks({ body: 'sedan' }), era: '1920s', size: 0, back: () => app.pop() })); return; }
-    if (a === 'call') { app.push(phoneScene(app)); return; }
+    if (a === 'call') { app.push(phoneDesk(app)); return; }
     app.toast({ table: '손님과 마주 앉는 곳 (손님 흐름은 다음 단계)', books: '잡지와 부품 카탈로그 (부품 라이브러리는 뒤 단계)', bench: '공구 (수리 작업은 6단계)', bay: '차를 세우는 칸 (수리 차가 들어오면 여기에)' }[a] ?? a); }
   const dateKo = () => { const d = W().clock.today, p = parts(d); return `${p.year}년 ${p.month}월 ${p.day}일 (${WD[weekday(d)]})`; };
 

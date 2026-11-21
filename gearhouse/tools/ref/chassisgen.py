@@ -92,15 +92,34 @@ def build(m, cid):
     el, eh, ew = engine_size(s['engine']); ex0 = X(L['engineFrom']); ez0 = zr - 60
     out.append(part('engine', 'engine', 'iron', {'side': [[ex0, ez0], [ex0 + el, ez0], [ex0 + el, ez0 + eh], [ex0, ez0 + eh]], 'top': [[ex0, -ew / 2], [ex0 + el, -ew / 2], [ex0 + el, ew / 2], [ex0, ew / 2]],
                                                   'front': [[-ew / 2, ez0], [ew / 2, ez0], [ew / 2, ez0 + eh], [-ew / 2, ez0 + eh]]}, layer='chassis'))
-    gear_end = ex0 + el + (0 if s['gears'] == 2 else 380)       # the gearbox behind the bell housing: figures only
+    # the clutch housing and the gearbox behind it, joined to the engine (the Model T's gears are in the engine's own case)
+    gear_end = ex0 + el
+    if s['gears'] > 2:
+        bl, gl = 170, (300 if s['gears'] == 3 else 360); bh, gh = eh * 0.62, eh * 0.48; bw, gw = ew * 0.95, ew * 0.7
+        bz, gz = ez0 + eh * 0.08, ez0 + eh * 0.12; x1 = ex0 + el
+        out.append(part('bell', 'gearbox', 'iron', {'side': [[x1, bz], [x1 + bl, bz + bh * 0.15], [x1 + bl, bz + bh * 0.85], [x1, bz + bh]], 'top': [[x1, -bw / 2], [x1 + bl, -gw / 2], [x1 + bl, gw / 2], [x1, bw / 2]]}, layer='chassis'))
+        x2 = x1 + bl
+        out.append(part('gearbox', 'gearbox', 'iron', {'side': [[x2, gz], [x2 + gl, gz + 20], [x2 + gl, gz + gh], [x2, gz + gh]], 'top': [[x2, -gw / 2], [x2 + gl, -gw / 2 + 15], [x2 + gl, gw / 2 - 15], [x2, gw / 2]]}, layer='chassis',
+                        feats={'side': [{'kind': 'seam', 'pts': [[x2 + 10, gz + gh * 0.55], [x2 + gl - 10, gz + gh * 0.55]]}]}))
+        gear_end = x2 + gl
+    # the engine's mounts: arms from the block's sides out to the rails, at its front and at the clutch housing
+    for k, mx in enumerate((ex0 + 60, ex0 + el - 40)):
+        h0 = hw[0] if mx < xs[1] else hw[2]
+        out.append(part(f'mount{k}', 'engine', 'iron', {'top': [[mx - 25, ew / 2 - 10], [mx + 25, ew / 2 - 10], [mx + 25, h0], [mx - 25, h0]], 'side': [[mx - 25, zr + RAIL_D - 30], [mx + 25, zr + RAIL_D - 30], [mx + 25, zr + RAIL_D], [mx - 25, zr + RAIL_D]]}, layer='chassis', pair=True))
     # ---- the drive line and the differential
     dz = R; dr = 150 if s['engine']['layout'] == 'I4' else 170
     tw = 90 if s['drive'] == 'torque' else 60
-    out.append(part('driveline', 'driveline', 'iron', {'side': [[gear_end, zr + 40], [RX - dr, dz + tw / 2], [RX - dr, dz - tw / 2], [gear_end, zr + 40 - tw]], 'top': [[gear_end, -tw / 2], [RX - dr, -tw / 2], [RX - dr, tw / 2], [gear_end, tw / 2]]}, layer='chassis'))
+    gz_mid = ez0 + eh * 0.35
+    out.append(part('driveline', 'driveline', 'iron', {'side': [[gear_end, gz_mid + tw / 2], [RX - dr * 0.8, dz + tw / 2], [RX - dr * 0.8, dz - tw / 2], [gear_end, gz_mid - tw / 2]], 'top': [[gear_end, -tw / 2], [RX - dr * 0.8, -tw / 2], [RX - dr * 0.8, tw / 2], [gear_end, tw / 2]]}, layer='chassis'))
     circ = lambda cx, cz, r, n=20: [[cx + math.cos(t * 2 * math.pi / n) * r, cz + math.sin(t * 2 * math.pi / n) * r] for t in range(n)]
     out.append(part('rearDiff', 'axle', 'iron', {'side': circ(RX, dz, dr), 'top': [[RX - dr, -dr], [RX + dr * 0.7, -dr], [RX + dr * 0.7, dr], [RX - dr, dr]], 'rear': circ(0, dz, dr)}, layer='chassis'))
     # ---- the axles seen from above (their front and rear outlines are the sheet's, kept on the car's own parts)
-    tr = s['track'] / 2
+    tr = L.get('track', s['track']) / 2; tw_ = L.get('tyreW', 120); rr = m['wheels'][0]['r']
+    for pid, ax in (('tyreF', FX), ('tyreR', RX)):              # the tyres seen from above, where the wheels are
+        for p in keep:
+            if p['id'] == pid:
+                b, o = unit([[ax - rr, tr - tw_ / 2], [ax + rr, tr - tw_ / 2], [ax + rr, tr + tw_ / 2], [ax - rr, tr + tw_ / 2]]); p['outlines']['top'] = o; p.setdefault('sheet', {})['top'] = [round(t) for t in b]
+                p['box']['x'] = [round(ax - rr), round(ax + rr)]; p['box']['y'] = [round(tr - tw_ / 2), round(tr + tw_ / 2)]
     for pid, ax, w_ in (('axleF', FX, 70), ('axleR', RX, 90)):
         for p in keep:
             if p['id'] == pid:
@@ -115,13 +134,17 @@ def build(m, cid):
     else:
         for nm, cx in (('leafF', FX), ('leafR', RX)):
             out.append(part(nm, 'spring', 'iron', {'top': [[cx - 30, -hw[0]], [cx + 30, -hw[0]], [cx + 30, hw[0]], [cx - 30, hw[0]]], 'side': [[cx - 30, zr + 10], [cx + 30, zr + 10], [cx + 30, zr + 60], [cx - 30, zr + 60]]}))
-    # ---- exhaust down the right side to a silencer, out at the back; the fuel tank behind the rear axle (or under the seat)
-    ey = 230; px = ex0 + el * 0.6
-    out.append(part('exhaust', 'exhaust', 'iron', {'side': [[px, zr + 120], [px + 120, zr - 20], [RX - 700, zr - 20], [RX - 700, zr - 70], [px + 90, zr - 70], [px - 40, zr + 120]], 'top': [[px, ey - 25], [RX - 700, ey - 25], [RX - 700, ey + 25], [px, ey + 25]]}, layer='chassis'))
-    mx0, mx1 = RX - 1300, RX - 650
-    out.append(part('muffler', 'exhaust', 'iron', {'side': [[mx0, zr - 110], [mx1, zr - 110], [mx1, zr + 20], [mx0, zr + 20]], 'top': [[mx0, ey - 70], [mx1, ey - 70], [mx1, ey + 70], [mx0, ey + 70]]}, layer='chassis',
-                         feats={'top': [{'kind': 'highlight', 'pts': [[mx0 + 30, ey - 40], [mx1 - 30, ey - 40]], 'width': 1}]}))
-    out.append(part('tailpipe', 'exhaust', 'iron', {'side': [[mx1, zr - 60], [xs[3] + 60, zr + kick - 40], [xs[3] + 60, zr + kick - 10], [mx1, zr - 30]], 'top': [[mx1, ey - 18], [xs[3] + 60, ey - 18], [xs[3] + 60, ey + 18], [mx1, ey + 18]]}, layer='chassis'))
+    # ---- the exhaust: the manifold along the engine's right side, the down pipe behind it, the pipe to the silencer, the tail
+    ey = ew / 2 + 35; mz = ez0 + eh * 0.55; pz = zr - 40; mx0, mx1 = RX - 1300, RX - 650; pr = 25
+    out.append(part('manifold', 'exhaust', 'iron', {'top': [[ex0 + 40, ey - 30], [ex0 + el - 30, ey - 30], [ex0 + el - 30, ey + 30], [ex0 + 40, ey + 30]], 'side': [[ex0 + 40, mz - 30], [ex0 + el - 30, mz - 30], [ex0 + el - 30, mz + 30], [ex0 + 40, mz + 30]]}, layer='chassis'))
+    dx = ex0 + el - 60
+    out.append(part('exhaust', 'exhaust', 'iron', {'side': [[dx - pr, mz], [dx + pr, mz], [dx + 120 + pr, pz + pr], [mx0, pz + pr], [mx0, pz - pr], [dx + 120 - pr, pz - pr], [dx - pr, mz - 10]],
+                                                   'top': [[dx - pr, ey - pr], [mx0, ey - pr], [mx0, ey + pr], [dx - pr, ey + pr]]}, layer='chassis'))
+    out.append(part('muffler', 'exhaust', 'iron', {'side': [[mx0, pz - 70], [mx1, pz - 70], [mx1, pz + 70], [mx0, pz + 70]], 'top': [[mx0, ey - 70], [mx1, ey - 70], [mx1, ey + 70], [mx0, ey + 70]]}, layer='chassis',
+                         feats={'top': [{'kind': 'highlight', 'pts': [[mx0 + 30, ey - 40], [mx1 - 30, ey - 40]], 'width': 1}], 'side': [{'kind': 'highlight', 'pts': [[mx0 + 30, pz + 40], [mx1 - 30, pz + 40]], 'width': 1}]}))
+    tz = zr + kick - 30
+    out.append(part('tailpipe', 'exhaust', 'iron', {'side': [[mx1, pz - 18], [mx1 + 250, pz - 18], [xs[3] - 100, tz - 18], [xs[3] + 60, tz - 18], [xs[3] + 60, tz + 18], [xs[3] - 100, tz + 18], [mx1 + 250, pz + 18], [mx1, pz + 18]],
+                                                    'top': [[mx1, ey - 18], [xs[3] + 60, ey - 18], [xs[3] + 60, ey + 18], [mx1, ey + 18]]}, layer='chassis'))
     if L.get('tank', 'rear') == 'rear':
         tx0, tx1 = RX + 250, min(xs[3] - 40, RX + 700); th = hw[3] - 60
         out.append(part('tank', 'tank', 'iron', {'side': [[tx0, zr + kick - 140], [tx1, zr + kick - 140], [tx1, zr + kick + 140], [tx0, zr + kick + 140]], 'top': [[tx0, -th], [tx1, -th], [tx1, th], [tx0, th]], 'rear': [[-th, zr + kick - 140], [th, zr + kick - 140], [th, zr + kick + 140], [-th, zr + kick + 140]]}, layer='chassis'))

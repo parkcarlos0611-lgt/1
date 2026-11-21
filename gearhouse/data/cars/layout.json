@@ -1,5 +1,5 @@
 {
- "about": "The running gear's layout as each sheet's under view shows it (review 64), read off a gridded zoom: distances along the car from the front axle (mm, + backwards), half-widths of the frame rails from the centre line (mm). front/rear: the frame's ends; narrowEnd: where the narrow front part ends; wideFrom: where the rails reach their full width; cross: [x, width] of each cross member; engineFrom: where the engine's front stands.",
+ "about": "The running gear's layout as each sheet's under view shows it (review 64), read off a gridded zoom: distances along the car from the front axle (mm, + backwards), half-widths of the frame rails from the centre line (mm). front/rear: the frame's ends; narrowEnd: where the narrow front part ends; wideFrom: where the rails reach their full width; cross: [x, width] of each cross member; engineFrom: where the engine's front stands. track and tyreW: the tyres' centres apart and their width where they stand, measured on the front and rear views (the wings were drawn to them).",
  "cars": {
   "chevAB28": {
    "front": -198,
@@ -27,7 +27,9 @@
      80
     ]
    ],
-   "engineFrom": 60
+   "engineFrom": 60,
+   "track": 1405,
+   "tyreW": 187
   },
   "fordT23": {
    "front": -166,
@@ -60,7 +62,9 @@
     ]
    ],
    "engineFrom": 244,
-   "tank": "seat"
+   "tank": "seat",
+   "track": 1500,
+   "tyreW": 200
   },
   "plymU29": {
    "front": -234,
@@ -88,7 +92,9 @@
      70
     ]
    ],
-   "engineFrom": 0
+   "engineFrom": 0,
+   "track": 1384,
+   "tyreW": 183
   },
   "pontiac29": {
    "front": -360,
@@ -116,7 +122,9 @@
      70
     ]
    ],
-   "engineFrom": 45
+   "engineFrom": 45,
+   "track": 1382,
+   "tyreW": 214
   },
   "dodgeV28": {
    "front": -398,
@@ -148,7 +156,9 @@
      70
     ]
    ],
-   "engineFrom": 95
+   "engineFrom": 95,
+   "track": 1600,
+   "tyreW": 220
   },
   "willys27": {
    "front": -408,
@@ -180,7 +190,9 @@
      70
     ]
    ],
-   "engineFrom": -51
+   "engineFrom": -51,
+   "track": 1569,
+   "tyreW": 229
   },
   "buick28": {
    "front": -392,
@@ -212,7 +224,9 @@
      70
     ]
    ],
-   "engineFrom": 69
+   "engineFrom": 69,
+   "track": 1613,
+   "tyreW": 222
   },
   "hudson26": {
    "front": -477,
@@ -248,7 +262,9 @@
      80
     ]
    ],
-   "engineFrom": -48
+   "engineFrom": -48,
+   "track": 1534,
+   "tyreW": 212
   }
  }
 }

@@ -64,3 +64,10 @@ Raw WebGL2 (no three.js: the passes are few and custom, the page stays small), i
 
 Not yet live (next): motion blur (step 5), the materials' textures (tyre tread, cloth, leather, wood, the
 radiator's honeycomb) and age (step 4), smooth shading for close views, perspective and the sun moving.
+
+## PBR, step 1 (review 102): the light only, no textures yet, to compare
+`uLook` in the live renderer: 0 the baked pictures' stepped light; 1 and 2 metallic-roughness shading (GGX, Smith,
+Schlick), the sun with its shadow, the sky as an analytic light (irradiance from ground to zenith, its reflection
+blurred by roughness, the split-sum curve), a clear coat on paint, a filmic curve and gamma; 1 steps the brightness into
+seven bands (the pixel look kept), 2 leaves it smooth. Each material kind has its metalness and roughness (paint by its
+gloss, chrome 0.12, rubber 0.9, canvas 0.95...). The page has a selector and a side-by-side view of all three.

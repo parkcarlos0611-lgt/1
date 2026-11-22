@@ -48,15 +48,22 @@ const numOf = (e: Entrant): string => { if (!race) return myNum; let k = 0; for 
 // ---- the live renderer (review 99): the scene drawn every frame by WebGL2, where the browser has it; the baked pictures otherwise ----
 const glCanvas = document.createElement('canvas'); let live: LiveRenderer | null = null, liveFence = -1;
 try { live = new LiveRenderer(glCanvas); live.setGround(groundData(T, SCN, START)); } catch (e) { console.warn('live renderer unavailable', e); live = null; }
-const liveOK = !!live; let liveR = live;
+const liveOK = !!live; let liveR = live; let look: 'baked' | 'stepped' | 'pbr' | 'split' = 'baked';   /* the light and materials: the baked pictures' stepped light, or physically based (review 102) */
 function drawLive(el: number) { const L = live!; void el;
   if (broken.size !== liveFence) { L.setFence(fenceData(T, fenceOk)); liveFence = broken.size; }
   glCanvas.width = VW; glCanvas.height = VH;
   const list = race ? race.cars.map(e => ({ c: e.car, sp: e.driver ? others.get(e)! : sprites, turn: e.wheelTurn })) : [{ c: car, sp: sprites, turn: wheelTurn }];
   const cars = list.map(({ c, sp, turn }) => ({ g: L.car(sp.mesh), tyres: c.rings, x: c.x, y: c.y, z: T.height(c.s, c.off) + c.zb - (c.rings[0]!.rest + c.rings[2]!.rest) / 2,   /* drawn lower by the tyres' standing give: the flattened tread on the road */ yaw: c.yaw, roll: c.tilt + c.roll * 1.5, pitch: c.pitch, steerL: c.steerAt(0), steerR: c.steerAt(1), spin: turn, player: c === car }));
   const props = [...SCN.props, ...trainCars()].flatMap(q => { const f = PROPS[q.kind]; return f ? [{ g: L.prop(q.kind, f), x: q.x, y: q.y, z: q.z ?? 0, h: q.heading }] : []; });
-  L.render({ x: camX, y: camY, z: camZ, ang: turning() ? camAng : Math.PI / 2, pitch: pitchDeg, mm, W: VW, H: VH, cy: st.chase && !st.cine ? 0.66 : 0.55 }, cars, props, skids, { glass: 0.8 });
-  ctx = main; main.clearRect(0, 0, VW, VH); main.drawImage(glCanvas, 0, 0); drawDebris(el);
+  const view = { x: camX, y: camY, z: camZ, ang: turning() ? camAng : Math.PI / 2, pitch: pitchDeg, mm, W: VW, H: VH, cy: st.chase && !st.cine ? 0.66 : 0.55 };
+  ctx = main; main.clearRect(0, 0, VW, VH);
+  if (look === 'split') {   // the three looks side by side, the same moment: each a third of the picture, its name over it
+    const w3 = Math.floor(VW / 3), names = ['기존 (단계 조명)', 'PBR 단계화', 'PBR 연속'];
+    for (let k = 0; k < 3; k++) { L.render(view, cars, props, skids, { glass: 0.8, look: k }); main.drawImage(glCanvas, k * w3, 0, w3, VH, k * w3, 0, w3, VH); }
+    main.fillStyle = 'rgba(0,0,0,0.55)'; main.fillRect(0, VH - 20, VW, 20); main.fillStyle = '#f2ead6'; main.font = '11px sans-serif'; main.textAlign = 'center';
+    for (let k = 0; k < 3; k++) main.fillText(names[k]!, k * w3 + w3 / 2, VH - 6); main.fillStyle = '#000'; for (let k = 1; k < 3; k++) main.fillRect(k * w3 - 1, 0, 2, VH); main.textAlign = 'left'; }
+  else { L.render(view, cars, props, skids, { glass: 0.8, look: look === 'stepped' ? 1 : look === 'pbr' ? 2 : 0 }); main.drawImage(glCanvas, 0, 0); }
+  drawDebris(el);
   if (car.speed > 30) { const v = Math.min(1, (car.speed - 30) / 30) * 0.35, g = main.createRadialGradient(VW / 2, VH / 2, VH * 0.35, VW / 2, VH / 2, VW * 0.62); g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, `rgba(0,0,0,${v})`); main.fillStyle = g; main.fillRect(0, 0, VW, VH); } }
 
 function choose(id: string) { carId = id; propSprites.clear(); broken.clear(); debris.length = 0; const spec = raceSpec(id), m = MESH_CARS.find(c => c.id === id)!;
@@ -377,6 +384,7 @@ const setFree = (on: boolean) => { st.free = on; ($('free') as HTMLInputElement)
     if (k === 'PageUp') { e.preventDefault(); want(pitchDeg + 5, mm); } if (k === 'PageDown') { e.preventDefault(); want(pitchDeg - 5, mm); } if (k === 'Home') setFree(false); }); }
 { const t = $<HTMLInputElement>('live'); t.checked = liveOK; t.disabled = !liveOK; if (!liveOK) $('livenote').textContent = '이 브라우저는 WebGL2가 없어 구운 그림으로 그립니다';
   t.addEventListener('change', () => { live = t.checked ? liveR : null; if (!live) rebake(true); t.blur(); }); }
+$<HTMLSelectElement>('look').addEventListener('change', e => { look = (e.target as HTMLSelectElement).value as typeof look; (e.target as HTMLElement).blur(); });
 $<HTMLInputElement>('num').addEventListener('change', e => { const el = e.target as HTMLInputElement, v = el.value.replace(/\D/g, '').slice(0, 3); el.value = v || myNum; if (v && v !== myNum) { myNum = v; rebake(true); say(`차 번호 ${v}`); } el.blur(); });
 $<HTMLInputElement>('free').addEventListener('change', e => setFree((e.target as HTMLInputElement).checked));
 $<HTMLInputElement>('pitch').addEventListener('change', e => { want(+(e.target as HTMLInputElement).value, mm); (e.target as HTMLElement).blur(); });

@@ -6,6 +6,8 @@
 import { Build, section, wing, type Mesh, type V } from './mesh';
 
 const PAINT = '#222226', PAINT2 = '#1e1e21', ROOF = '#2c2c30', FRAME = '#3a3a41', SEAM = '#3c3c43', STRIPE = '#c9b4b0', NICKEL = '#d6cab8', GLASS = '#9fb4c0', RUBBER = '#222127', WHITE = '#f6f3ec', DARK = '#151517', IRON = '#4a4b54', LENS = '#efe9cf', RED = '#c22c2b';
+// the interior: tan leather, darker leather on the doors and sides, a dark cloth headliner, a walnut dash
+const UPH = '#8b5e3a', CARD = '#5f4630', HEADL = '#34302c', FLOORC = '#1b1a19', DASHC = '#5a3d24';
 const FX = 584, RX = 3988, R = 419, WY = 711, TW = 135, L = 4742, DZ = -75, HUB = R - DZ, KW = 0.86, WU = 628;
 /** the builder with everything lowered by `dz`: the body is written in the sheet's heights */
 class Low extends Build { dz = 0; override tri(a: V, b: V, c: V): this { const d = this.dz; return super.tri([a[0], a[1], a[2] + d], [b[0], b[1], b[2] + d], [c[0], c[1], c[2] + d]); } }
@@ -19,6 +21,13 @@ const skinY = (x: number, z: number) => { const w = at(HALF, x), zb = at(BOT, x)
 const cabSide = (x: number): [number, number][] => { const wl = at([[2046, 520], [2196, WU]], x), zb = at([[2046, 489], [3384, 489], [3696, 640]], x); return [[0.8 * wl, zb], [0.86 * wl, zb + 260], [0.97 * wl, 1100], [wl, 1200], [WU, 1300], [WU, 1850], [WU - 45, 1886]]; };
 const cabRing = (x: number): V[] => { const h = cabSide(x); return [...h.map(([y, z]) => [x, y, z] as V), ...h.slice().reverse().map(([y, z]) => [x, -y, z] as V)]; };
 const cabY = (x: number, z: number) => { const h = cabSide(x).map(([y, zz]) => [zz, y] as [number, number]); return at(h, z); };
+/** a colour darkened: k of its brightness */
+const dim = (c: string, k: number) => '#' + [1, 3, 5].map(i => Math.round(parseInt(c.slice(i, i + 2), 16) * k).toString(16).padStart(2, '0')).join('');
+/** an end of the cabin at x, set `d` inside the skin, round an opening [half-width, z0, z1]: the part below the opening (if `lower`), beside it and above it up to `top` */
+function endFace(b: Build, x: number, d: number, [gy, g0, g1]: readonly [number, number, number], lower: boolean, top: number): void { const Y = (z: number) => cabY(x, z) - d;
+  if (lower) { const zs = [...cabSide(x).map(p => p[1]).filter(z => z < g0), g0], P: V[] = [...zs.map(z => [x, Y(z), z] as V), ...zs.slice().reverse().map(z => [x, -Y(z), z] as V)], m: V = [x, 0, (zs[0]! + g0) / 2]; for (let i = 0; i < P.length; i++) b.tri(m, P[i]!, P[(i + 1) % P.length]!); }
+  const zt = Math.min(top, 1850), w = Y(g0); for (const s of [1, -1]) b.quad([x, s * gy, g0], [x, s * w, g0], [x, s * w, g1], [x, s * gy, g1]);
+  b.quad([x, -w, g1], [x, w, g1], [x, w, zt], [x, -w, zt]); if (top > 1850) b.quad([x, -w, 1850], [x, w, 1850], [x, Y(top), top], [x, -Y(top), top]); }
 /** a point of the sheet's wing brought in round the real wheel */
 const near = (hx: number, x: number, z: number): [number, number] => [hx + (x - hx) * KW, HUB + (z - HUB) * KW];
 
@@ -26,14 +35,44 @@ function wheel(b: Build, x: number, s: 1 | -1, spin = 0) { const o: V = [x, s * 
   b.mat(RUBBER, 0.05, 'tyre').lathe('y', o, [[-f, rim], [-f, R - 45], [-f * 0.5, R], [f * 0.5, R], [f, R - 30]], 20, false);
   b.mat(WHITE, 0.15).lathe('y', o, [[f, R - 30], [f, rim + 2]], 20, false);              // the white wall
   b.mat(DARK, 0.05).lathe('y', o, [[f * 0.3, 0], [f * 0.3, rim]], 20, false).lathe('y', o, [[-f * 0.6, 170], [-f * 1.4, 170], [-f * 1.4, 0]], 12, false);
-  b.mat('#2c2c31', 0.4).lathe('y', o, [[f, rim + 4], [f * 0.6, rim - 24]], 20, false);
+  b.mat('#2c2c31', 0.4, 'paint').lathe('y', o, [[f, rim + 4], [f * 0.6, rim - 24]], 20, false);
   b.mat(NICKEL, 0.9, 'metal').lathe('y', o, [[f * 0.5, 52], [f * 1.35, 40], [f * 1.45, 0]], 8, false);
-  b.mat('#5d5e68', 0.4); for (let k = 0; k < 16; k++) { const a = spin + k / 16 * Math.PI * 2, a2 = a + (k % 2 ? 0.45 : -0.45), yh = s * WY + f * (k % 2 ? 1.15 : 0.55); b.bar([x + Math.cos(a2) * 42, yh, R + Math.sin(a2) * 42], [x + Math.cos(a) * (rim - 20), s * WY + f * 0.7, R + Math.sin(a) * (rim - 20)], 11); } }
+  b.mat('#5d5e68', 0.4, 'metal'); for (let k = 0; k < 16; k++) { const a = spin + k / 16 * Math.PI * 2, a2 = a + (k % 2 ? 0.45 : -0.45), yh = s * WY + f * (k % 2 ? 1.15 : 0.55); b.bar([x + Math.cos(a2) * 42, yh, R + Math.sin(a2) * 42], [x + Math.cos(a) * (rim - 20), s * WY + f * 0.7, R + Math.sin(a) * (rim - 20)], 11); } }
 
 export function mesh(spin = 0): Mesh { const b = new Low(); b.dz = DZ;
   // ---- bonnet and cowl; the cabin with its turn-under; the padded roof with its peak over the screen ----
   b.mat(PAINT, 0.45, 'paint').loft([669, 704, 1000, 1300, 1500, 1722, 1900, 2050].map(x => section(x, at(HALF, x), at(BOT, x), at(TOP, x), at(SQ, x), 6)));
-  b.loft([2046, 2196, 2915, 3384, 3696].map(cabRing));
+  // the cabin's skin, hollow: the turned-under sides and the bottom without a lid, the flat upper sides round the windows, the ends round the screen and the rear window
+  const WINS = [[2250, 2800, 1372, 1818], [2996, 3354, 1405, 1806]] as const, SCR = [440, 1418, 1844] as const, RWN = [308, 1470, 1776] as const;
+  { const R = [2046, 2196, 2915, 3384, 3696].map(cabRing), K = R[0]!.length; for (let r = 0; r + 1 < R.length; r++) for (let i = 0; i < K; i++) if (i !== 4 && i !== 6 && i !== 8) b.quad(R[r]![i]!, R[r]![(i + 1) % K]!, R[r + 1]![(i + 1) % K]!, R[r + 1]![i]!);
+    for (const s of [1, -1]) { const q = (x0: number, x1: number, z0: number, z1: number) => b.quad([x0, s * WU, z0], [x1, s * WU, z0], [x1, s * WU, z1], [x0, s * WU, z1]);
+      q(2046, 2250, 1300, 1850); q(2800, 2996, 1300, 1850); q(3354, 3696, 1300, 1850); for (const [x0, x1, z0, z1] of WINS) { q(x0, x1, 1300, z0); q(x0, x1, z1, 1850); } }
+    endFace(b, 2046, 0, SCR, true, 1886); endFace(b, 3696, 0, RWN, true, 1886); }
+  // ---- the interior, seen through the glass: floor and toe board, the sides' and ends' inner faces, shelf, headliner, dash, the one seat ----
+  { const T = 20, X0 = 2046 + T, X1 = 3696 - T, FL = 540, YU = WU - T, HL = 1855, xr = 3080, xb = xr - 80, c1 = xb - 90, c0 = c1 - 490, zc = 960, zt = zc + 560, LX = [X0, 2196, 2915, xb], LZ = [FL, 749, 1100, 1200, 1300], iy = (x: number, z: number) => cabY(x, z) - T;
+    b.mat(FLOORC, 0.05); for (let i = 0; i + 1 < LX.length; i++) { const x0 = LX[i]!, x1 = LX[i + 1]!; b.quad([x0, -iy(x0, FL), FL], [x0, iy(x0, FL), FL], [x1, iy(x1, FL), FL], [x1, -iy(x1, FL), FL]); }
+    { const P: V[] = [...LZ.map(z => [X0, iy(X0, z), z] as V), ...LZ.slice().reverse().map(z => [X0, -iy(X0, z), z] as V)]; for (let i = 0; i < P.length; i++) b.tri([X0, 0, 900], P[i]!, P[(i + 1) % P.length]!); }   // the toe board
+    b.mat(CARD, 0.25, 'leather');
+    for (const s of [1, -1]) { for (let i = 0; i + 1 < LX.length; i++) for (let j = 0; j + 1 < LZ.length; j++) { const x0 = LX[i]!, x1 = LX[i + 1]!, z0 = LZ[j]!, z1 = LZ[j + 1]!; b.quad([x0, s * iy(x0, z0), z0], [x1, s * iy(x1, z0), z0], [x1, s * iy(x1, z1), z1], [x0, s * iy(x0, z1), z1]); }
+      const q = (x0: number, x1: number, z0: number, z1: number) => b.quad([x0, s * YU, z0], [x1, s * YU, z0], [x1, s * YU, z1], [x0, s * YU, z1]);
+      q(X0, 2250, 1300, HL); q(2800, 2996, 1300, HL); q(3354, X1, 1300, HL); for (const [x0, x1, z0, z1] of WINS) { q(x0, x1, 1300, z0); q(x0, x1, z1, HL); } }
+    endFace(b, X0, T, SCR, false, HL); endFace(b, X1, T, RWN, false, 1822);
+    b.mat(dim(CARD, 0.62), 0.1, 'canvas').quad([xb - 10, -YU, 1330], [xb - 10, YU, 1330], [X1, YU, 1330], [X1, -YU, 1330]);                               // the parcel shelf behind the seat
+    b.mat(HEADL, 0.05, 'canvas').quad([X0, -YU, HL], [X0, YU, HL], [3560, YU, HL], [3560, -YU, HL]).quad([3560, -YU, HL], [3560, YU, HL], [X1, YU, 1822], [X1, -YU, 1822]);
+    // the openings' reveals from the skin in to the lining
+    b.mat(FRAME, 0.3); for (const s of [1, -1]) for (const [x0, x1, z0, z1] of WINS) { const P = [[x0, z0], [x1, z0], [x1, z1], [x0, z1]] as const; for (let i = 0; i < 4; i++) { const [xa, za] = P[i]!, [xc, zd] = P[(i + 1) % 4]!; b.quad([xa, s * WU, za], [xc, s * WU, zd], [xc, s * YU, zd], [xa, s * YU, za]); } }
+    for (const [xo, xi, [gy, g0, g1]] of [[2046, X0, SCR], [3696, X1, RWN]] as const) { const P = [[-gy, g0], [gy, g0], [gy, g1], [-gy, g1]] as const; for (let i = 0; i < 4; i++) { const [ya, za] = P[i]!, [yc, zd] = P[(i + 1) % 4]!; b.quad([xo, ya, za], [xo, yc, zd], [xi, yc, zd], [xi, ya, za]); } }
+    // the dash under the screen: its back face towards the seat, the instrument plate in its middle
+    { const r = (x: number): V[] => [[x, -iy(x, 1215) + 2, 1215], [x, iy(x, 1215) - 2, 1215], [x, YU - 2, 1400], [x, -YU + 2, 1400]]; b.mat(DASHC, 0.3, 'wood').loft([r(X0), r(X0 + 120)]);
+      b.mat(NICKEL, 0.9, 'metal').box(X0 + 120, X0 + 125, -170, 170, 1262, 1352); }
+    // the seat: a dark base, the cushion, the raked back, their pleats
+    { const w = iy(c0, zc - 150) - 12, w2 = YU - 22, r = (x0: number, x1: number, y: number, z: number): V[] => [[x0, -y, z], [x1, -y, z], [x1, y, z], [x0, y, z]];
+      b.mat(FLOORC, 0.05).box(c0 + 40, c1, -w + 20, w - 20, FL, zc - 140);
+      b.mat(UPH, 0.25, 'leather').loft([r(c0 + 12, c1 + 30, w, zc - 150), r(c0, c1 + 30, w + 6, zc - 60), r(c0 + 14, c1 + 30, w, zc + 8), [[c0 + 60, -w + 22, zc + 22], [c1 + 30, -w + 22, zc - 18], [c1 + 30, w - 22, zc - 18], [c0 + 60, w - 22, zc + 22]]]);
+      b.mat(UPH, 0.25, 'leather').loft([r(c1, xb, w + 6, zc - 50), r(xr - 100, xr - 8, w2, zt - 90), r(xr - 88, xr, w2 - 6, zt - 25), r(xr - 66, xr - 8, w2 - 26, zt)]);
+      b.mat(dim(UPH, 0.5), 0.05); const np = Math.round((w - 40) / 115); for (let k = -np; k <= np; k++) { const y = k * (w - 40) / np, e = 8;
+        b.quad([c1 - 4, y - e, zc - 20], [c1 - 4, y + e, zc - 20], [xr - 104, y * 1.1 + e, zt - 90], [xr - 104, y * 1.1 - e, zt - 90]);
+        if (Math.abs(k) < np) b.quad([c0 + 60, y - e, zc + 26], [c0 + 60, y + e, zc + 26], [c1, y + e, zc - 11], [c1, y - e, zc - 11]); } } }
   b.mat(ROOF, 0.1, 'canvas').loft(([[2012, 570, 1866, 1922], [2030, 612, 1864, 1946], [2067, 634, 1862, 1971], [2246, 637, 1862, 1986], [3444, 637, 1862, 1981], [3594, 634, 1856, 1946], [3674, 616, 1830, 1900], [3701, 585, 1790, 1850]] as const).map(([x, w, zb, zt]) => section(x, w, zb, zt, 5, 6, 16)));
   // the screen on the cabin's front: two panes inside a frame and a centre bar
   { const X = 2040; b.mat(GLASS, 0.5, 'glass'); for (const s of [1, -1]) b.quad([X, s * 14, 1430], [X, s * 430, 1430], [X, s * 430, 1832], [X, s * 14, 1832]);
@@ -57,7 +96,7 @@ export function mesh(spin = 0): Mesh { const b = new Low(); b.dz = DZ;
   // ---- the nose: the nickel shell, dark core with its slats, badge, the cap with its mascot ----
   b.mat(NICKEL, 0.9, 'metal').loft([section(672, 272, 590, 1392, 3, 6), section(444, 272, 590, 1392, 3, 6), section(444, 230, 615, 1262, 3.4, 6), section(470, 230, 615, 1262, 3.4, 6)], false);
   b.mat('#39332b', 0.05).loft([section(462, 231, 614, 1263, 3.4, 6)]);
-  b.mat('#6a6258', 0.3); for (let k = -4; k <= 4; k++) { const zt = 938 + 324 * (1 - (Math.abs(k * 46) / 230) ** 3.4) ** (1 / 3.4) - 6; b.quad([455, k * 46 - 4, 620], [455, k * 46 + 4, 620], [455, k * 46 + 4, zt], [455, k * 46 - 4, zt]); }
+  b.mat('#6a6258', 0.3, 'metal'); for (let k = -4; k <= 4; k++) { const zt = 938 + 324 * (1 - (Math.abs(k * 46) / 230) ** 3.4) ** (1 / 3.4) - 6; b.quad([455, k * 46 - 4, 620], [455, k * 46 + 4, 620], [455, k * 46 + 4, zt], [455, k * 46 - 4, zt]); }
   b.mat('#b8322c', 0.5).lathe('x', [0, 0, 1318], [[436, 0], [440, 28]], 10, false);
   b.mat(NICKEL, 0.9, 'metal').loft([[0, 44], [34, 40], [58, 22], [84, 30], [118, 26], [124, 0]].map(([a, r]) => Array.from({ length: 10 }, (_, i) => { const t = i / 10 * Math.PI * 2; return [600 + Math.cos(t) * r!, Math.sin(t) * r!, 1386 + a!] as V; })), false).bar([600, -70, 1480], [600, 70, 1480], 14, 26);
   // ---- wings, running boards, lamps, wheels ----
@@ -75,7 +114,7 @@ export function mesh(spin = 0): Mesh { const b = new Low(); b.dz = DZ;
     b.mat(DARK, 0.05).box(RX - 430, RX + 300, Math.min(s * 380, s * 566), Math.max(s * 380, s * 566), 420, 1000);   // the rear wheel house
     // head lamps: nickel drums on posts; tail lamps on the rear wings
     b.mat(NICKEL, 0.9, 'metal').lathe('x', [0, s * 380, 1183], [[247, 120], [300, 123], [380, 108], [430, 78], [459, 28]], 14);
-    b.mat('#e8e0d2', 0.9).lathe('x', [0, s * 380, 1183], [[207, 116], [213, 129], [247, 129]], 14, false);
+    b.mat('#e8e0d2', 0.9, 'metal').lathe('x', [0, s * 380, 1183], [[207, 116], [213, 129], [247, 129]], 14, false);
     b.mat(LENS, 0.6, 'lens').lathe('x', [0, s * 380, 1183], [[190, 0], [196, 70], [209, 117]], 14, false);
     b.mat('#2a2a30', 0.2).bar([330, s * 384, 1070], [330, s * 395, 560], 30);
     { const [tx, tz] = near(RX, 4560, 800); b.mat(NICKEL, 0.9, 'metal').lathe('x', [0, s * 705, tz], [[tx - 40, 34], [tx - 12, 56], [tx + 14, 56]], 10); b.mat(RED, 0.5).lathe('x', [0, s * 705, tz], [[tx + 14, 46], [tx + 24, 28], [tx + 26, 0]], 10, false); }

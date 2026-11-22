@@ -25,7 +25,10 @@ export interface RaceSpec {
   cgH: number; frontShare: number;                     // centre of gravity: height (m), share of weight on the front axle
   hp: number; hpRpm: number; torqueRpm: number; idle: number; redline: number;
   gears: number[]; final: number; eff: number;
-  brakes: 'rear' | 'four'; hydraulic: boolean; brakeG: number;   // the deceleration the brakes manage when new and cold
+  brakes: 'rear' | 'four' | 'disc'; hydraulic: boolean; brakeG: number;   // the deceleration the brakes manage when new and cold
+  /** era features (review 94), absent on the period cars: the tyres' make, a gear change's time (a crash box about 0.5 s,
+   *  synchromesh about 0.25), the era the car comes from (the page marks cars from outside the game's period) */
+  tyreKind?: 'crossply' | 'racing30' | 'racing50' | 'radial'; shiftT?: number; era?: string;
   cdA: number; crr: number; steerLock: number;          // drag area m², rolling resistance, front wheels' lock (deg)
   topKmh: number; check: boolean;
   cooling: { siphon: boolean; margin: number } }   // the water's circulation (no pump on the Model T [v]), the radiator against the engine's heat [?]
@@ -51,7 +54,32 @@ const KG: Record<string, number> = { fordT23: 990, chevAB28: 1160, plymU29: 1155
 // cooling: the Model T's thermosiphon boiled on long pulls; a supercharged eight runs hot; big luxury radiators had room
 const COOL: Record<string, { siphon: boolean; margin: number }> = { fordT23: { siphon: true, margin: 1.0 }, dueSSJ35: { siphon: false, margin: 0.92 }, dueA21: { siphon: false, margin: 1.2 }, fnTT33: { siphon: false, margin: 1.0 }, bmw315: { siphon: false, margin: 1.0 }, buick28: { siphon: false, margin: 1.15 } };
 export const RACE_CARS: string[] = Object.keys(PERIOD);
+
+// ---- experimental cars (review 94): outside the game's period, to try the features cars gained over the years ----
+//   napier33  1933 Napier-Railton, the Brooklands outer-circuit record car: Napier Lion W12, 23.944 L, 580 bhp at 2585
+//             rpm [v] (another source: 600 at 2200 [~]); about 2049 kg [v]; wheelbase 3302 [v], length 4724 [~]; Moss
+//             three-speed box, no reverse, no synchromesh [v]; drums [v] (one table: no front brakes [?], four kept);
+//             the outer-circuit lap record 143.44 mph (1935) [~, not confirmed by the sources read]; track 1500 [?];
+//             axle and gears [?]: set for about 270 km/h at the power peak. Racing cross-plies of the 1930s.
+//   jagD55    1955 Jaguar D-type, long nose: 3442 cc six, 250 [v] to 270 hp at 6000 [v, Revs Institute]; Dunlop discs
+//             all round with a servo [v]; 4470 x 1638 x 1118, wheelbase 2286 [v Encycarpedia]; 870-992 kg [~]; top
+//             162-174 mph [v, by version]; four speeds with synchromesh [v], ratios [~]; Le Mans axle 2.79 [~];
+//             track 1270 front [~]. Dunlop racing tyres 6.50-16 (cross-plies still: racing radials came in the late
+//             1960s). Its monocoque and low body: a low centre of gravity and a small drag area [~].
+const EXP: Record<string, RaceSpec> = {
+  napier33: { id: 'napier33', name: '1933 Napier-Railton (실험)', mass: 2049 + 75, wheelbase: 3.302, track: 1.5, tyreR: 0.45, tyreW: 0.18, cgH: 0.66, frontShare: 0.52,
+    hp: 580, hpRpm: 2585, torqueRpm: 1700, idle: 500, redline: 2900, gears: [2.2, 1.45, 1.0], final: 1.62, eff: 0.9,
+    brakes: 'four', hydraulic: false, brakeG: 0.42, cdA: 1.2, crr: 0.016, steerLock: 24, topKmh: 270, check: false,
+    cooling: { siphon: false, margin: 1.35 }, tyreKind: 'racing30', shiftT: 0.6, era: '1933 · 항공 엔진 기록차' },
+  jagD55: { id: 'jagD55', name: '1955 Jaguar D-type (실험)', mass: 900 + 75, wheelbase: 2.286, track: 1.27, tyreR: 0.368, tyreW: 0.165, cgH: 0.4, frontShare: 0.49,
+    hp: 270, hpRpm: 6000, torqueRpm: 4500, idle: 800, redline: 6500, gears: [2.14, 1.39, 1.1, 1.0], final: 2.79, eff: 0.92,
+    brakes: 'disc', hydraulic: true, brakeG: 0.95, cdA: 0.6, crr: 0.014, steerLock: 30, topKmh: 280, check: false,
+    cooling: { siphon: false, margin: 1.25 }, tyreKind: 'racing50', shiftT: 0.25, era: '1955 · 후대 (디스크 브레이크, 모노코크)' } };
+export const EXP_CARS: string[] = Object.keys(EXP);
+/** the engine for the sound: cylinders, valves, blower (the experimental cars are not in the game's data) */
+export const EXP_ENGINE: Record<string, { kind: string; layout: string; supercharged?: boolean }> = { napier33: { kind: 'ohv', layout: 'W12' }, jagD55: { kind: 'ohv', layout: 'I6' } };
 export function raceSpec(id: string): RaceSpec {
+  if (EXP[id]) return EXP[id]!;
   const s = (specs as { cars: Record<string, { car: string; engine: { hp: number }; wheelbase: number; track: number; tyre: string }> }).cars[id]!, p = PERIOD[id]!, t = tyre(s.tyre), hpRpm = p[0];
   return { id, name: s.car, mass: KG[id]! + 75, wheelbase: s.wheelbase / 1000, track: s.track / 1000, tyreR: t.r, tyreW: t.w, cgH: p[6], frontShare: p[7],
     hp: s.engine.hp, hpRpm, torqueRpm: hpRpm * 0.55, idle: Math.max(350, hpRpm * 0.18), redline: hpRpm * 1.12, gears: p[1], final: p[2], eff: 0.88,

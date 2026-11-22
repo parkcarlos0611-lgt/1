@@ -11,6 +11,8 @@ import { SLOTS, assemble, fitSlot, NO_ADJUST, type Slot, type Grade, type Adjust
 import { fitEngine, LAYOUTS, VALVES, displacement, type EngineSpec, type EngineFit } from '../../render/car/engine';
 import { weightOf, workOf, slotArea } from '../../render/car/stats';
 import { applyWear, NEW, type Wear } from '../../render/car/wear';
+import { meshImage, KINDS, type Mesh, type MeshView } from '../../render/car/mesh';
+import { MESH_CARS } from '../../render/car/meshcars';
 import fordT from '../../data/cars/sheet/fordT23.json';
 import chev from '../../data/cars/sheet/chevAB28.json';
 import plym from '../../data/cars/sheet/plymU29.json';
@@ -35,6 +37,16 @@ type Mode = 'parts' | 'engine' | 'paint';
 /** the view a slot's part is best seen in, for its picture in the picker */
 const VIEW_OF: Record<Slot, ViewName> = { grille: 'front', lamp: 'front', bumperF: 'front', bumperR: 'rear', tail: 'rear', fenderF: 'left', fenderR: 'left', board: 'left', wheel: 'left' };
 type Img = { w: number; h: number; rgba: Uint8ClampedArray };
+// The 3D-first pilot (review 94): the cars that have their own mesh are drawn from it (studio light, smooth shading, the
+// 2D wear on top) while they carry their own parts; a swapped part or the chassis view goes back to the 2D part model,
+// which is still what the swaps are made of. The mesh's paint is recoloured by part: the wings take the second colour.
+const MESH_OF: Record<number, string> = { 10: 'dueSSJ35' };
+const meshes = new Map<number, Mesh>();
+function painted(base: number, paint: string | null, paint2: string | null): Mesh | null { const id = MESH_OF[base]; if (!id) return null;
+  let M = meshes.get(base); if (!M) { M = MESH_CARS.find(c => c.id === id)!.mesh(); meshes.set(base, M); } if (!paint && !paint2) return M;
+  const col = M.col.slice(), P = KINDS.indexOf('paint'), rgb = (h: string) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+  for (let t = 0; t < M.n; t++) { if (M.kind[t] !== P) continue; const wing = /^fender/.test(M.names?.[M.part[t]!] ?? ''), c = wing ? paint2 : paint; if (c) col.set(rgb(c), t * 3); }
+  return { ...M, col }; }
 
 export function builderScene(app: App): Scene {
   const ui = app.ui, S = app.S;
@@ -42,8 +54,10 @@ export function builderScene(app: App): Scene {
   const pick: Partial<Record<Slot, number | null>> = {}, adj: Partial<Record<Slot, Adjust>> = {};
   let mode: Mode = 'parts', eng: EngineSpec | null = null, gears = 3, colour: string | null = null, blackWings = true, wear: Wear = { ...NEW };
   const ownEngine = (): EngineSpec => { const r = (CARS[base]!.m as unknown as { running?: { engine: EngineSpec } }).running?.engine; return r ? { layout: r.layout, kind: r.kind, bore: r.bore, stroke: r.stroke } : { layout: 'I4', kind: 'sv', bore: 95, stroke: 105 }; };
-  let cache: { key: string; m: CarModel; front: Img; fits: ReturnType<typeof assemble>['fits']; engFit: EngineFit | null; cc: number; kg: number; kg0: number; hours: number; dollars: number } | null = null, sideKey = '', side: Img | null = null;
+  let cache: { key: string; m: CarModel; m3: Mesh | null; front: Img; fits: ReturnType<typeof assemble>['fits']; engFit: EngineFit | null; cc: number; kg: number; kg0: number; hours: number; dollars: number } | null = null, sideKey = '', side: Img | null = null;
   const thumbs = new Map<string, Img | null>(), grades = new Map<string, Grade>();
+  /** the car carries only its own parts (no swaps, no adjustments): its mesh can stand for it */
+  const own = () => Object.values(pick).every(k => k === undefined || k === base) && Object.values(adj).every(a => !a || JSON.stringify(a) === JSON.stringify(NO_ADJUST));
   function build() {
     const key = base + JSON.stringify([pick, adj, eng, gears, colour, blackWings, wear]); if (cache?.key === key) return cache;
     const choice: Partial<Record<Slot, CarModel | null>> = {}; for (const [s, k] of Object.entries(pick)) choice[s as Slot] = k === null ? null : CARS[k!]!.m;
@@ -53,12 +67,13 @@ export function builderScene(app: App): Scene {
     let hours = 0, dollars = 0; for (const s of SLOTS) { const f = r.fits[s.id]; if (!f) continue; const w = workOf(s.id, f, { area: slotArea(m, s.id) }); hours += w.hours; dollars += w.dollars; }
     if (engFit) { hours += 24 + (engFit.grade === 'work' ? 30 : engFit.grade === 'no' ? 80 : 0); dollars += engFit.grade === 'fits' ? 6 : 18; }
     if (colour || !blackWings) { hours += 40; dollars += 14; }
-    const front = applyWear(rasterizeFlat(viewDesign(m, 'front'), { mm: Math.max(10, Math.ceil(m.height / 100)), shadow: true }), wear);
-    cache = { key, m, front, fits: r.fits, engFit, cc, kg: weightOf(m), kg0: weightOf(CARS[base]!.m), hours: Math.round(hours * 2) / 2, dollars: Math.round(dollars * 4) / 4 }; return cache;
+    const M3 = own() ? painted(base, colour, colour ? (blackWings ? '#1c1c1f' : colour) : blackWings ? null : (m as unknown as { paint: string }).paint) : null;
+    const front = applyWear(M3 ? meshImage(M3, 'front', Math.max(10, Math.ceil(m.height / 100))) : rasterizeFlat(viewDesign(m, 'front'), { mm: Math.max(10, Math.ceil(m.height / 100)), shadow: true }), wear);
+    cache = { key, m, m3: M3, front, fits: r.fits, engFit, cc, kg: weightOf(m), kg0: weightOf(CARS[base]!.m), hours: Math.round(hours * 2) / 2, dollars: Math.round(dollars * 4) / 4 }; return cache;
   }
   /** the car from the side at the zoom asked for (fit: the whole car in the box) */
   function sideImg(m: CarModel, key: string, bw: number): Img { const mm = Math.max(3, m.length / (bw - 8) / zoom), under = mode === 'engine', k = key + '|' + mm.toFixed(2) + under;
-    if (k !== sideKey || !side) { side = under ? rasterizeFlat(viewDesign(m, 'left', undefined, { chassis: true }), { mm, shadow: true }) : applyWear(rasterizeFlat(viewDesign(m, 'left'), { mm, shadow: true }), wear); sideKey = k; } return side; }
+    if (k !== sideKey || !side) { const M3 = cache?.m3; side = under ? rasterizeFlat(viewDesign(m, 'left', undefined, { chassis: true }), { mm, shadow: true }) : applyWear(M3 ? meshImage(M3, 'left' as MeshView, mm) : rasterizeFlat(viewDesign(m, 'left'), { mm, shadow: true }), wear); sideKey = k; } return side; }
   /** one car's part for a slot, drawn alone, cropped to itself */
   function thumb(slot: Slot, k: number): Img | null { const key = slot + k; if (thumbs.has(key)) return thumbs.get(key)!;
     const m = CARS[k]!.m, v = VIEW_OF[slot]; let d = viewDesign(m, v, slot === 'wheel' ? undefined : p => p.slot === slot);

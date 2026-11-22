@@ -16,6 +16,16 @@ const G = 9.81, RHO = 1.2;
 export interface Tyre { mu: number; B: number; C: number; E: number; loadSens: number; peakSlip: number; peakAngle: number }
 /** a 1920s-30s cross-ply on dry concrete: modest grip, a soft gradual peak, holding on well past it */
 export const CROSSPLY: Tyre = { mu: 0.9, B: 1.6, C: 1.45, E: 0.7, loadSens: 0.08, peakSlip: 0.12, peakAngle: 0.13 };   // review 89: grippier, and holding on past the peak rather than letting go
+/** the tyres by era (review 94, the experimental cars): what a car's `tyreKind` picks. A racing cross-ply of the 1930s
+ *  (a softer tread, narrower peak), one of the 1950s (Dunlop's racing tyres on the disc-braked cars: wider, softer, more
+ *  grip and a sharper peak), and a radial (the Michelin X's construction, 1946 on the road, in racing from the late
+ *  1960s: a stiff belt, a short peak at small slip angles, then letting go sooner). Figures [~]: shaped from the
+ *  period's road tests (about 0.8-0.9 g on cross-plies, about 1 g on 1950s racing tyres), not measured curves. */
+export const TYRES: Record<'crossply' | 'racing30' | 'racing50' | 'radial', Tyre> = {
+  crossply: CROSSPLY,
+  racing30: { mu: 0.98, B: 1.7, C: 1.45, E: 0.6, loadSens: 0.09, peakSlip: 0.11, peakAngle: 0.12 },
+  racing50: { mu: 1.08, B: 1.9, C: 1.45, E: 0.5, loadSens: 0.1, peakSlip: 0.1, peakAngle: 0.1 },
+  radial:   { mu: 1.12, B: 2.4, C: 1.4, E: 0.3, loadSens: 0.1, peakSlip: 0.08, peakAngle: 0.08 } };
 
 export class Vehicle {
   x = 0; y = 0; yaw = 0; vx = 0; vy = 0; r = 0; s = 0; off = 0;
@@ -29,7 +39,7 @@ export class Vehicle {
   health: Health; lastFailure: Failure | null = null;
   rpm = 0; gear = 1; shift = 0; steer = 0; ax = 0; ay = 0; tax = 0; tay = 0; brakeT = [20, 20, 20, 20]; auto = true; tilt = 0;
   private k: number; private c: number; private Ip: number; private Ir: number; private Iz: number; private Iw: number; private Ie: number;
-  constructor(readonly spec: RaceSpec, readonly track: Track, readonly tyre: Tyre = CROSSPLY) {
+  constructor(readonly spec: RaceSpec, readonly track: Track, readonly tyre: Tyre = TYRES[spec.tyreKind ?? 'crossply']) {
     const m = spec.mass, L = spec.wheelbase;
     this.k = m / 4 * (2 * Math.PI * 1.6) ** 2; this.c = 2 * 0.3 * Math.sqrt(this.k * m / 4);   // stiff leaves: about 1.6 Hz, a third of critical damping
     this.Iz = m * (L * L + spec.track * spec.track) / 12 * 1.15; this.Ip = m * L * L / 14; this.Ir = m * spec.track * spec.track / 10;
@@ -67,8 +77,8 @@ export class Vehicle {
     // ---- drive line: gear changes, the engine, the clutch, the open differential ----
     this.shift -= dt;
     const wheelRpm = Math.max(0, this.vx) / c.tyreR * c.gears[this.gear - 1]! * c.final * 30 / Math.PI;   // the road speed in engine revs (the automatic does not count a wheel spinning)
-    if (this.shift <= 0) { if (this.auto) { if (wheelRpm > c.hpRpm * 1.04 && this.gear < c.gears.length) { this.gear++; this.shift = 0.5; } else if (this.gear > 1 && wheelRpm * c.gears[this.gear - 2]! / c.gears[this.gear - 1]! < c.hpRpm * 0.8) { this.gear--; this.shift = 0.5; } }   // down only when the lower gear has room
-      else if (u.gear && u.gear !== this.gear) { this.gear = Math.max(1, Math.min(c.gears.length, u.gear)); this.shift = 0.5; } }
+    if (this.shift <= 0) { if (this.auto) { if (wheelRpm > c.hpRpm * 1.04 && this.gear < c.gears.length) { this.gear++; this.shift = c.shiftT ?? 0.5; } else if (this.gear > 1 && wheelRpm * c.gears[this.gear - 2]! / c.gears[this.gear - 1]! < c.hpRpm * 0.8) { this.gear--; this.shift = c.shiftT ?? 0.5; } }   // down only when the lower gear has room
+      else if (u.gear && u.gear !== this.gear) { this.gear = Math.max(1, Math.min(c.gears.length, u.gear)); this.shift = c.shiftT ?? 0.5; } }
     const Gr = c.gears[this.gear - 1]! * c.final, we = this.rpm * Math.PI / 30, wd = (this.w[2]! + this.w[3]!) / 2, idle = c.idle * Math.PI / 30;
     const thr = this.shift > 0 ? 0 : Math.max(0, Math.min(1, u.throttle)) * (this.auto && this.rpm > c.redline * 0.98 ? 0.25 : 1),   // off the throttle through a change; the automatic also eases off past the red line (a spinning wheel)
      fric = 0.06 * torqueAt(c, c.torqueRpm) * (0.3 + 0.7 * this.rpm / c.hpRpm);
@@ -90,14 +100,14 @@ export class Vehicle {
       const Fz = F[i]!, mu = ty.mu * (1 - ty.loadSens * (Fz / (m * G / 4) - 1)) * (this.onGrass[i] ? 0.55 : 1);   // grass: little grip
       const sx = kappa / ty.peakSlip, sa = Math.tan(alpha) / ty.peakAngle, sig = Math.hypot(sx, sa);
       let fx = 0, fy = 0; if (sig > 1e-9 && Fz > 0) { const Bs = ty.B * sig, f = Math.sin(ty.C * Math.atan(Bs - ty.E * (Bs - Math.atan(Bs)))); fx = mu * Fz * f * sx / sig; fy = -mu * Fz * f * sa / sig; }
-      const rear = i >= 2, fade = 1 / (1 + Math.max(0, this.brakeT[i]! - 250) / 200);
+      const rear = i >= 2, disc = c.brakes === 'disc', fade = 1 / (1 + Math.max(0, this.brakeT[i]! - (disc ? 550 : 250)) / (disc ? 400 : 200));   // drums fade from about 250 degrees; discs (open to the air, the pad's heat not swelling a drum away from its shoes) hold on far longer
       const bt = (u.brake * (c.brakes === 'rear' ? (rear ? 0.5 : 0) : rear ? 0.42 : 0.58) * brakeCap + (rear ? (u.handbrake ?? 0) * brakeCap * 0.35 : 0)) * fade;
       // the wheel's spin, stepped half-implicitly: the tyre pushes back harder the faster the wheel slips, too stiffly at
       // low speed for a plain step (it would ring), so its stiffness joins the wheel's inertia
       const K = mu * Fz * ty.C * ty.B / ty.peakSlip * R * R / v0;
       const w0 = this.w[i]!, wf = w0 + ((rear ? Taxle / 2 : 0) - fx * R - Fz * (this.onGrass[i] ? 0.07 : c.crr) * R * Math.tanh(w0)) / (this.Iw + K * dt) * dt, bs = bt / (this.Iw + K * dt) * dt;
       this.w[i] = Math.abs(wf) <= bs ? 0 : wf - Math.sign(wf) * bs;                // brakes stop a wheel, never turn it back
-      this.brakeT[i] = this.brakeT[i]! + (bt * Math.abs(this.w[i]!) / 9000 - (this.brakeT[i]! - 20) * (0.004 + this.speed * 0.0004)) * dt;
+      this.brakeT[i] = this.brakeT[i]! + (bt * Math.abs(this.w[i]!) / 9000 - (this.brakeT[i]! - 20) * (0.004 + this.speed * 0.0004) * (disc ? 2.2 : 1)) * dt;
       Fx[i] = fx * cs - fy * sn; Fy[i] = fx * sn + fy * cs; }
     // ---- the whole car: tyres, the air, gravity down the slope; turning ----
     const v = this.speed, drag = 0.5 * RHO * c.cdA * v * v;

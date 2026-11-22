@@ -51,7 +51,7 @@ const skids: { x: number; y: number; z: number; a: number }[] = [], puffs: { x: 
 let lapStart = -1, lastLap = 0, bestLap = 0, clock = 0, prevS = 0, msg = '', msgT = 0;
 // a race: the entrants and their pictures (the player's car is `car`, its pictures `sprites`)
 const SCN = millbrookScenery(T), propSprites = new Map<string, PropSprites>(); const train = { d: -1, wait: 40 };
-const propPic = (kind: string) => { let p = propSprites.get(kind); if (!p) { const f = PROPS[kind]; if (!f) return null; p = new PropSprites(f(), mm, pitchDeg); propSprites.set(kind, p); } return p; };
+const propPic = (kind: string, arg?: number) => { const key = arg ? `${kind}@${arg}` : kind; let p = propSprites.get(key); if (!p) { const f = PROPS[kind]; if (!f) return null; p = new PropSprites(f(arg), mm, pitchDeg); propSprites.set(key, p); } return p; };
 let race: Race | null = null; const others = new Map<Entrant, CarSprites>(); let raceSeed = 7;
 // race numbers (review 96): the player's from the page, the others' 1, 2, 3... by the entry list, skipping the player's;
 // laid on the cars' number decals (only cars with number discs show them)
@@ -82,7 +82,7 @@ function drawLive(el: number) { const L = live!; void el;
   glCanvas.width = VW; glCanvas.height = VH;
   const list = race ? race.cars.map(e => ({ c: e.car, sp: e.driver ? others.get(e)! : sprites, turn: e.wheelTurn })) : [{ c: car, sp: sprites, turn: wheelTurn }];
   const cars = list.map(({ c, sp, turn }, k) => ({ wear: wearOf(c, k), g: (() => { const g = L.car(sp.mesh); artFor(L, g, c.spec.id, sp.mesh); return g; })(), tyres: c.rings, x: c.x, y: c.y, z: T.height(c.s, c.off) + c.zb - (c.rings[0]!.rest + c.rings[2]!.rest) / 2,   /* drawn lower by the tyres' standing give: the flattened tread on the road */ yaw: c.yaw, roll: c.tilt + c.roll * 1.5, pitch: c.pitch, steerL: c.steerAt(0), steerR: c.steerAt(1), spin: turn, player: c === car }));
-  const props: import('../render/live/renderer').LiveProp[] = [...SCN.props, ...trainCars()].flatMap(q => { const f = PROPS[q.kind]; return f ? [{ g: L.prop(q.kind, f), x: q.x, y: q.y, z: q.z ?? 0, h: q.heading }] : []; });
+  const props: import('../render/live/renderer').LiveProp[] = [...SCN.props, ...trainCars()].flatMap(q => { const f = PROPS[q.kind]; return f ? [{ g: L.prop(q.arg ? `${q.kind}@${q.arg}` : q.kind, () => f(q.arg)), x: q.x, y: q.y, z: q.z ?? 0, h: q.heading }] : []; });
   // the fence (review 112): solid, in chunks near the camera, lit, shadowed and outlined as everything else; its loose pieces
   { const near = T.locate(camX, camY, car.s).s, nC = Math.ceil(T.length / CHUNK); for (let d = -5; d <= 5; d++) for (const side of [-1, 1]) { const c = ((Math.floor(near / CHUNK) + d) % nC + nC) % nC, key = `${side}:${c}`;
       let f = fenceGpu.get(key); if (f === undefined) { const ch = fenceChunk(T, side, c, fenceOk); f = ch ? { g: L.car(ch.mesh), m: m4mul(m4t(...ch.origin), m4s(1 / 1000)), x: ch.origin[0], y: ch.origin[1] } : null; fenceGpu.set(key, f); }
@@ -222,7 +222,7 @@ function marks(c: Vehicle) { markTick++; for (let i = 0; i < 4; i++) { const k =
 interface Drawn { Y: number; img: HTMLCanvasElement; X0: number; Y0: number; car?: Vehicle; over?: boolean; glints?: [number, number][] }
 function scene(): Drawn[] { const a = (turning() ? camAng : Math.PI / 2) - Math.PI / 2, reach = Math.hypot(VW, VH / SP) * mm / 2000 + 30, out: Drawn[] = [];
   const seen = (x: number, y: number) => Math.abs(x - camX) < reach && Math.abs(y - camY) < reach;
-  const prop = (q: Placed) => { if (!seen(q.x, q.y)) return; const ps = propPic(q.kind); if (!ps) return; const [X, Y] = P(q.x, q.y, q.z ?? 0), f = ps.get(q.heading - a);
+  const prop = (q: Placed) => { if (!seen(q.x, q.y)) return; const ps = propPic(q.kind, q.arg); if (!ps) return; const [X, Y] = P(q.x, q.y, q.z ?? 0), f = ps.get(q.heading - a);
     out.push({ Y: P(q.x, q.y, 0)[1], img: f.canvas, X0: Math.round(X - f.ax), Y0: Math.round(Y - f.ay), over: q.overhead }); };
   for (const q of SCN.props) prop(q); for (const q of trainCars()) prop(q);
   const cars = race ? race.cars.map(e => ({ c: e.car, sp: e.driver ? others.get(e)! : sprites, turn: e.wheelTurn })) : [{ c: car, sp: sprites, turn: wheelTurn }];

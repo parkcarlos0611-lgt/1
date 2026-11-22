@@ -5,7 +5,7 @@
 // for a deck over the track its height. Seeded, so the woods stand in the same places every time.
 import type { Track } from './track';
 
-export interface Placed { kind: string; x: number; y: number; heading: number; z?: number; overhead?: boolean }
+export interface Placed { kind: string; x: number; y: number; heading: number; z?: number; overhead?: boolean; /** a size the prop's mesh takes (an abutment's height, mm) */ arg?: number }
 export interface GroundLine { pts: [number, number][]; width: number; kind: 'rail' | 'river' | 'road' }
 export interface GroundArea { pts: [number, number][]; kind: 'apron' | 'mown' }
 export interface Scenery { props: Placed[]; lines: GroundLine[]; areas: GroundArea[]; railway: [number, number][] }
@@ -26,8 +26,10 @@ export function millbrookScenery(T: Track): Scenery { const L = T.length, W2 = T
     for (let k = 0; k < 6; k++) facing('garageBay', s0 + 90 + k * 14.5, W2 + 34); facing('fuelPumps', s0 + 78, W2 + 14); facing('teaHut', s0 + 8, W2 + 14); }
   // ---- the Members' Bridge across the track ----
   { const s = T.spec.landmarks.find(l => l.name === "Members' Bridge")!.s, h = T.at(s).h, top = (o: number) => T.height(s, o);
-    facing('bridgeAbutment', s, -(W2 + 3)); facing('bridgeAbutment', s, W2 + 3);
-    for (const o of [-13, 0, 13]) { const p = T.point(s, o); props.push({ kind: 'bridgeDeck', x: p.x, y: p.y, heading: h - Math.PI / 2, z: Math.max(top(-W2), top(W2)) + 5.8, overhead: true }); } }
+    // the deck lies level 5.8 m over the higher edge (here the banking's top); each abutment stands on the ground at its
+    // side and reaches up to the deck, so the low side's is the taller (review 113: it stood 5.8 m and the deck floated)
+    const deck = Math.max(top(-W2), top(W2)) + 5.8; for (const o of [-(W2 + 3), W2 + 3]) { const z = top(o), p = T.point(s, o); props.push({ kind: 'bridgeAbutment', x: p.x, y: p.y, heading: o < 0 ? h + Math.PI : h, z, arg: Math.round((deck - z) * 1000) }); }
+    for (const o of [-13, 0, 13]) { const p = T.point(s, o); props.push({ kind: 'bridgeDeck', x: p.x, y: p.y, heading: h - Math.PI / 2, z: deck, overhead: true }); } }
   // ---- the railway: a line outside the Railway Straight, running on past both ends; a station and signal box ----
   const railway: [number, number][] = []; { const off = -(W2 + 26), a = T.point(rail.s0, off), b = T.point(rail.s1, off), dx = b.x - a.x, dy = b.y - a.y, l = Math.hypot(dx, dy), ux = dx / l, uy = dy / l;
     for (let d = -900; d <= l + 900; d += 30) railway.push([a.x + ux * d, a.y + uy * d]); lines.push({ pts: railway, width: 4, kind: 'rail' });
@@ -36,7 +38,7 @@ export function millbrookScenery(T: Track): Scenery { const L = T.length, W2 = T
     for (let d = -880; d < l + 880; d += 55) props.push({ ...at(d, -6), kind: 'telegraphPole' }); }
   // ---- the river under the Byfleet Banking, and the bridge's parapets ----
   { const s = T.spec.landmarks.find(l => l.name === 'Byfleet Bridge')!.s, pts: [number, number][] = []; for (let o = -420; o <= 420; o += 30) { const p = T.point(s + Math.sin(o / 90) * 25, o); pts.push([p.x, p.y]); } lines.push({ pts, width: 9, kind: 'river' });
-    for (const o of [-(W2 + 1), W2 + 1]) { const p = T.point(s, o); props.push({ kind: 'riverBridge', x: p.x, y: p.y, heading: T.at(s).h + (o < 0 ? Math.PI : 0) }); } }
+    for (const o of [-(W2 + 1), W2 + 1]) { const p = T.point(s, o); props.push({ kind: 'riverBridge', x: p.x, y: p.y, heading: T.at(s).h + (o < 0 ? Math.PI : 0), z: T.height(s, o) }); } }   /* on the edge of the road, the banking's top on the high side */
   // ---- the aerodrome inside: a mown strip, hangars and works along the Railway Straight's inside, aeroplanes, a windsock ----
   { const mid = T.nodes.reduce((a, n) => [a[0]! + n.x / L, a[1]! + n.y / L], [0, 0]); const h = T.at((rail.s0 + rail.s1) / 2).h, ux = Math.cos(h), uy = Math.sin(h);
     areas.push({ pts: [[-500, -60], [500, -60], [500, 60], [-500, 60]].map(([a, b]) => [mid[0]! + ux * a! - uy * b!, mid[1]! + uy * a! + ux * b!] as [number, number]), kind: 'mown' });

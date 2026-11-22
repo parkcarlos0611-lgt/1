@@ -40,7 +40,8 @@ export function scoreboard(): Mesh { const b = new Build(), L = 12000, Z = 2200,
   b.mat(CREAM, 0.3, 'paint').box(1500, L - 1500, -260, -60, Z + H + 300, Z + H + 1300); b.mat(RED, 0.3, 'paint').box(1800, L - 1800, -300, -260, Z + H + 500, Z + H + 1100);
   return b.mesh(L); }
 /** the Members' Bridge: one abutment (a concrete pier with a balustrade, stairs up); stood each side of the track */
-export function bridgeAbutment(): Mesh { const b = new Build(), L = 7000, D = 3000, H = 5800;
+/** H: its height to the deck (mm): taller where it stands on the low side of a banking (review 113) */
+export function bridgeAbutment(H = 5800): Mesh { const b = new Build(), L = 7000, D = 3000;
   b.mat(CONCRETE, 0.25, 'paint').box(0, L, -D / 2, D / 2, 0, H).box(0, L, -D / 2 - 200, D / 2 + 200, H, H + 400);
   b.mat('#8f8a82', 0.2, 'paint'); for (let k = 0; k < 10; k++) b.box(L - 2000 - k * 400, L - 1600 - k * 400, D / 2, D / 2 + 1600, 0, H - k * H / 10);   // the steps beside it
   b.mat(CONCRETE, 0.25, 'paint'); for (let x = 200; x < L; x += 600) b.box(x, x + 180, -D / 2 - 150, -D / 2 + 50, H + 400, H + 1300); b.box(0, L, -D / 2 - 200, -D / 2 + 100, H + 1300, H + 1500);

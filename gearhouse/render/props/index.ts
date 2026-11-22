@@ -4,4 +4,5 @@ import * as stands from './stands';
 import * as paddock from './paddock';
 import * as aerodrome from './aerodrome';
 import * as railway from './railway';
-export const PROPS: Record<string, () => Mesh> = { ...(stands as unknown as Record<string, () => Mesh>), ...(paddock as unknown as Record<string, () => Mesh>), ...(aerodrome as unknown as Record<string, () => Mesh>), ...(railway as unknown as Record<string, () => Mesh>) };
+/** each prop's mesh; a few take a size (an abutment its height) from the placing's `arg` */
+export const PROPS: Record<string, (arg?: number) => Mesh> = { ...(stands as unknown as Record<string, (arg?: number) => Mesh>), ...(paddock as unknown as Record<string, (arg?: number) => Mesh>), ...(aerodrome as unknown as Record<string, (arg?: number) => Mesh>), ...(railway as unknown as Record<string, (arg?: number) => Mesh>) };

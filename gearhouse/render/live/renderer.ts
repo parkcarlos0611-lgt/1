@@ -311,7 +311,7 @@ type Piece = [{ vao: WebGLVertexArrayObject; n: number }, M4, WheelDraw?];
 export class LiveRenderer {
   readonly gl: WebGL2RenderingContext; private obj: WebGLProgram; private aoP: WebGLProgram; private downP: WebGLProgram; private upP: WebGLProgram; private finalP: WebGLProgram; readonly hdr: boolean;
   /** render targets after the scene: 0 occlusion, 1 the composed picture, 2-5 the bloom's halvings */ private rt: { t: WebGLTexture; f: WebGLFramebuffer; w: number; h: number }[] = []; private smoke: WebGLProgram; private smokeVao: WebGLVertexArrayObject | null = null; private smokeBuf: WebGLBuffer | null = null; private ground: WebGLProgram; private depth: WebGLProgram; private post: WebGLProgram;
-  private fbo: WebGLFramebuffer; private tCol: WebGLTexture; private tId: WebGLTexture; private tN: WebGLTexture; private tV: WebGLTexture; private prevVP: Float32Array | null = null; private prevM = new Map<string, M4>(); private ids = new WeakMap<GpuMesh, number>(); private nid = 0; private idOf(g: GpuMesh) { let k = this.ids.get(g); if (k === undefined) { k = this.nid++; this.ids.set(g, k); } return k; } private nextM = new Map<string, M4>(); private tDepth: WebGLTexture; private W = 0; private H = 0;
+  private fbo: WebGLFramebuffer; private tCol: WebGLTexture; private tId: WebGLTexture; private tN: WebGLTexture; private tV: WebGLTexture; private prevVP: Float32Array | null = null; private prevCam: [number, number] | null = null; private prevM = new Map<string, M4>(); private ids = new WeakMap<GpuMesh, number>(); private nid = 0; private idOf(g: GpuMesh) { let k = this.ids.get(g); if (k === undefined) { k = this.nid++; this.ids.set(g, k); } return k; } private nextM = new Map<string, M4>(); private tDepth: WebGLTexture; private W = 0; private H = 0;
   private sFbo: WebGLFramebuffer; private sTex: WebGLTexture; private S = 2048;
   private groundVao: WebGLVertexArrayObject | null = null; private groundN = 0; private fenceVao: WebGLVertexArrayObject | null = null; private fenceN = 0;
   private skidVao: WebGLVertexArrayObject; private skidBuf: WebGLBuffer; private kinds = new Map<string, GpuMesh>(); private cars = new Map<Mesh, GpuMesh>();
@@ -372,6 +372,7 @@ export class LiveRenderer {
     VP[1] = up[0]! * 2 * k / v.H; VP[5] = up[1]! * 2 * k / v.H; VP[9] = up[2]! * 2 * k / v.H; VP[13] = 1 - 2 * Math.round(v.H * v.cy + dot(c, up) * k) / v.H;
     VP[2] = vd[0]! / R; VP[6] = vd[1]! / R; VP[10] = vd[2]! / R; VP[14] = -dot(c, vd) / R; VP[15] = 1;
     const eye = [-vd[0]!, -vd[1]!, -vd[2]!];
+    if (this.prevCam && Math.hypot(v.x - this.prevCam[0], v.y - this.prevCam[1]) > 15) { this.prevVP = null; this.prevM.clear(); }   /* a cut (the car put back, a new shot): no smear from the jump */ this.prevCam = [v.x, v.y];
     // ---- the sun's view for the shadows: around the camera's target, as far as the picture reaches ----
     const reach = Math.min(160, Math.hypot(v.W, v.H / Math.max(0.2, SP)) * v.mm / 2000 + 12), lz = SUN_W.map(x => -x), lx0 = [lz[1]!, -lz[0]!, 0], ll = Math.hypot(lx0[0]!, lx0[1]!), lx = [lx0[0]! / ll, lx0[1]! / ll, 0];
     const ly = [lz[1]! * lx[2]! - lz[2]! * lx[1]!, lz[2]! * lx[0]! - lz[0]! * lx[2]!, lz[0]! * lx[1]! - lz[1]! * lx[0]!], LR = 200, LV = new Float32Array(16);

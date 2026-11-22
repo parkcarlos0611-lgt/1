@@ -29,7 +29,7 @@ export function autoRamp(base: string, { steps = 5, baseIdx = 2, dL = 0.1, shift
   return { c, o: fromLab([Math.max(0.06, L0 - 0.11), C0 * 0.9 * Math.cos(H0), C0 * 0.9 * Math.sin(H0)]) }; }
 const fixed = (c: string[], o: string): Ramp => ({ c: c.map(hex), o: hex(o) });
 /** a glossy paint gives back the sky: one more step above the ramp, pale and nearly grey, for reflection bands */
-function glossy(r: Ramp): Ramp { const t = r.c.at(-1)!, sky: RGB = [214, 220, 216]; return { c: [...r.c, t.map((v, i) => Math.round(v * 0.5 + sky[i]! * 0.5)) as RGB], o: r.o }; }
+function glossy(r: Ramp): Ramp { const t = r.c.at(-1)!, light = 0.3 * t[0] + 0.59 * t[1] + 0.11 * t[2] > 150, sky: RGB = light ? [252, 251, 246] : [214, 220, 216]; return { c: [...r.c, t.map((v, i) => Math.round(v * 0.5 + sky[i]! * 0.5)) as RGB], o: r.o }; }
 /** the tone steps a paint colour is drawn with, darkest first (tools fit a reference view to these) */
 export const paintRamp = (paint: string): string[] => glossy(autoRamp(paint, { steps: 7, baseIdx: 3, dL: 0.075, shift: 0.06 })).c.map(c => '#' + c.map(v => v.toString(16).padStart(2, '0')).join(''));
 /** every material's tone steps for a paint colour, darkest first, as the renderer draws them (tools fit views to these) */
@@ -93,7 +93,7 @@ export function rasterizeFlat(d0: CarDesign, opt: { frameW?: number; shadow?: bo
   // gloss (review 69): a lacquered panel gives back the sky above, a sharp dark horizon a third of the way down, the
   // lighter ground under it; its crowns (wing tops, bonnet, roof, and every panel seen from above) carry a bright
   // broken streak of sky. Laid over the panel's own shading (the sheet's light included), as many steps as GL asks.
-  const GL = Math.max(0, Math.min(1, d.gloss ?? 0.6)), plan = /_top$/.test(d.id ?? '');
+  const GL = Math.max(0, Math.min(1, d.gloss ?? 0.7)), plan = /_top$/.test(d.id ?? '');
   const glossAt = (i: number, gx: number, gy: number, t: number, n: number, surf: string) => {
     const crown = surf === 'fender' || surf === 'roof' || surf === 'hood' || plan;
     let add = 0;

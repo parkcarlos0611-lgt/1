@@ -194,8 +194,8 @@ part('screenCentre', 'screen', 'chrome', 'flat', on='screenFrame', lift=2, x=[S(
 part('screenFoot', 'screen', 'chrome', 'flat', on='screenFrame', lift=2, x=[S(256, 0)[0], S(266, 0)[0]],
      front=fhalf((0, 27), (35, 28), (68, 30.5), (69, 33), (35, 31), (0, 30)), rear=bhalf((0, 27), (35, 28), (68, 30.5), (69, 33), (35, 31), (0, 30)))
 # the folded hood bunched beside the screen's posts, as the sheet shows it from the front
-part('tonneauFront', 'tonneau', 'canvas', 'fender', color=TAN, pair=True, smooth=('front',), x=[S(300, 0)[0], S(330, 0)[0]], z=[F(0, 57)[1], F(0, 16)[1]],
-     front=fr((70, 20), (78, 16), (86, 22), (94, 33), (100, 45), (99, 54), (92, 57), (84, 52), (78, 42), (72, 30)))
+part('tonneauFront', 'tonneau', 'canvas', 'fender', color=TAN, pair=True, smooth=('front',), x=[S(300, 0)[0], S(330, 0)[0]], z=[F(0, 50)[1], F(0, 26)[1]],
+     front=fr((71, 30), (76, 26), (81, 29), (86, 36), (89, 43), (88, 49), (83, 50), (78, 45), (73, 38)))   # review 71: only the bunched cloth that shows past the posts
 part('mirror', 'mirror', 'chrome', 'fender', on='screen', lift=2, x=[S(272, 0)[0], S(278, 0)[0]], front=fhalf((0, 16), (10, 16), (11, 19), (10, 25), (0, 25)), rear=bhalf((0, 16), (11, 16), (12, 19), (11, 24), (0, 24)), smooth=('front', 'rear'))
 
 # ---------------- wings: dark (paint2), each one sweep; no outline where they run into each other ----------------

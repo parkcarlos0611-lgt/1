@@ -38,10 +38,29 @@ def cut(sheet_path, side, out_dir=None):
     sh = cv2.cvtColor(cv2.imread(sheet_path, cv2.IMREAD_UNCHANGED), cv2.COLOR_BGRA2RGBA); vs = cut_views(sh, side)
     if len(vs) < 6: raise SystemExit(f'{sheet_path} {side}: found {len(vs)} views')
     out = {}
-    for name, (x, y, w, h) in zip(ROWS, vs[:6]):
-        crop = sh[y:y + h, x:x + w].copy(); out[name] = crop
-        if out_dir: cv2.imwrite(f'{out_dir}/v_{name}.png', cv2.cvtColor(crop, cv2.COLOR_RGBA2BGRA))
+    for name, (x, y, w, h) in zip(ROWS, vs[:6]): out[name] = sh[y:y + h, x:x + w].copy()
+    if plan_reversed(out): out['top'] = np.ascontiguousarray(out['top'][::-1, ::-1]); out['under'] = np.ascontiguousarray(out['under'][::-1, ::-1])
+    if out_dir:
+        for name, crop in out.items(): cv2.imwrite(f'{out_dir}/v_{name}.png', cv2.cvtColor(crop, cv2.COLOR_RGBA2BGRA))
     return out
+
+def plan_reversed(v):
+    """some sheets draw the plan and the under view with the car's front to the right (review 70): compare where the
+    wheels stand in the under view (dark tyres at its top and bottom edges) with the side view's overhangs; True when the
+    under view's ends match the side view's the other way round (the plan and under view are then turned half round)"""
+    side = v['left']; m = side[..., 3] > 127; ws = sorted(find_wheels(m, side[..., :3]), key=lambda t: t[0]); sw = m.shape[1]
+    if len(ws) < 2: return False
+    fo, ro = ws[0][0] / sw, (sw - ws[-1][0]) / sw
+    u = v['under']; um = u[..., 3] > 127; h, w = um.shape
+    rows = np.where(um.any(axis=1))[0]; t0, t1 = rows[0], rows[-1]; k = max(2, int((t1 - t0) * 0.05))
+    band = np.r_[t0:t0 + k, t1 - k + 1:t1 + 1]; col = um[band].sum(axis=0) > len(band) * 0.6   # only the tyres reach the outer rows
+    xs = np.where(col)[0]
+    if len(xs) < 4: return False
+    groups = np.split(xs, np.where(np.diff(xs) > w * 0.08)[0] + 1); groups = [g for g in groups if len(g) > w * 0.03]
+    if len(groups) < 2: return False
+    cols = np.where(um.any(axis=0))[0]; x0, x1 = cols[0], cols[-1]; L = max(1, x1 - x0)
+    ol, orr = ((groups[0][0] + groups[0][-1]) / 2 - x0) / L, (x1 - (groups[-1][0] + groups[-1][-1]) / 2) / L
+    return abs(ol - ro) + abs(orr - fo) < abs(ol - fo) + abs(orr - ro) - 0.02
 
 
 def glass_mask(rgb, mask):

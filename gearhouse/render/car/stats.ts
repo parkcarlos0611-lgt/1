@@ -19,7 +19,11 @@ function runningKg(p: CarPart, m: CarModel): number | null {
   if (p.element === 'frame') return (p.box.y[1] - p.box.y[0]) / 1000 * 8;
   if (p.layer === 'chassis') return 4;
   return null; }
-export function weightOf(m: CarModel): number { let kg = 0;
+/** the car's weight: the real car's figure where the model carries one (m.kg, with m.kgModel the parts' own estimate for
+ *  the car as built), so a change of parts or engine moves it by what the parts estimate says it changes (review 71) */
+export function weightOf(m: CarModel): number { const own = estimate(m), r = m as unknown as { kg?: number; kgModel?: number };
+  return r.kg && r.kgModel ? Math.round(own + r.kg - r.kgModel) : own; }
+export function estimate(m: CarModel): number { let kg = 0;
   for (const p of m.parts) { const r = runningKg(p, m); if (r !== null) { kg += r; continue; } kg += partArea(p) * (KG_M2[p.material] ?? 8) * (p.pair ? 2 : 1); }
   return Math.round(kg + 60); }                                                      // seats, trim, wiring, the things not modelled
 /** the bench work for one slot's change: hours and material dollars */

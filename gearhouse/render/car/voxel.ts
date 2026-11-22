@@ -255,13 +255,16 @@ export function drawStack(sl: { z: number; pic: Pic }[], S: Solid, yaw: number, 
   return { w, h, rgba }; }
 
 /** the solid's outer cells, ready to draw again and again (positions about the car's middle, outward directions, colours) */
-export interface Surface { n: number; pos: Float32Array; nrm: Float32Array; col: Uint8ClampedArray; gloss: Float32Array; c: number; tex: Uint8Array; part: Int16Array }
+export interface Surface { n: number; pos: Float32Array; nrm: Float32Array; col: Uint8ClampedArray; gloss: Float32Array; c: number; tex: Uint8Array; part: Int16Array;
+  /** the grid it came from, and which surface cell (or -1) each grid cell is: for drawing it as stacked slices (B) */
+  grid: { nx: number; ny: number; nz: number; x0: number; y0: number; cx: number; at: Int32Array } }
 let SMOOTH = 1;
 /** how far surface cells are moved onto the smooth sheet (0 off, 1 full): for comparison */
 export function setSmooth(v: number) { SMOOTH = v; }
 export function surfaceOf(S: Solid, T?: Tex, W = 0): Surface {
   const cx = S.x0 + S.nx * S.c / 2, pos: number[] = [], nrm: number[] = [], col: number[] = [], gl: number[] = [], tx: number[] = [], pt: number[] = [], { nx, ny, nz, den } = S, sx = 1, sy = nx, sz = nx * ny;
-  for (let k = 0; k < nz; k++) for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) { const a = (k * ny + j) * nx + i, id = S.owner[a]!; if (id < 0 || !surf(S, i, j, k)) continue;
+  const gat = new Int32Array(nx * ny * nz).fill(-1);
+  for (let k = 0; k < nz; k++) for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) { const a = (k * ny + j) * nx + i, id = S.owner[a]!; if (id < 0) continue; if (!surf(S, i, j, k)) { gat[a] = -2; continue; }
     const X = S.x0 + (i + 0.5) * S.c, Y = S.y0 + (j + 0.5) * S.c, Z = (k + 0.5) * S.c;
     // outward: down the slope of the blurred solid (smooth over the cells' steps); the cells' own count where that is flat
     let gx = (i > 0 ? den[a - sx]! : 0) - (i < nx - 1 ? den[a + sx]! : 0), gy = (j > 0 ? den[a - sy]! : 0) - (j < ny - 1 ? den[a + sy]! : 0), gz = (k > 0 ? den[a - sz]! : 0) - (k < nz - 1 ? den[a + sz]! : 0); const gn = Math.hypot(gx, gy, gz);
@@ -269,19 +272,31 @@ export function surfaceOf(S: Solid, T?: Tex, W = 0): Surface {
     // review 77: each surface cell moved along its outward direction to where the blurred solid crosses one half, so the
     // surface lies on a smooth sheet instead of on the cells' steps (silhouettes and shading both lose the staircase)
     const off = gn > 0.05 ? Math.max(-0.7, Math.min(0.7, (den[a]! - 0.5) / (gn / 2))) * S.c * SMOOTH : 0;
-    pos.push(X - cx + nn[0] * off, Y + nn[1] * off, Z + nn[2] * off); nrm.push(...nn);
+    gat[a] = gl.length; pos.push(X - cx + nn[0] * off, Y + nn[1] * off, Z + nn[2] * off); nrm.push(...nn);
     const m = S.mat[id]!, broad = m === 'paint' || m === 'paint2' || m === 'canvas', tc = T ? texel(T, W, S.ids[id]!, X, Y, Z, nn, S.rgb[id]!, broad) : null;
     const ao = 1 - 0.6 * Math.max(0, Math.min(1, (den[a]! - 0.6) / 0.32)), c0 = tc ?? S.rgb[id]!;   // crevices get less of the sky
     col.push(c0[0] * ao, c0[1] * ao, c0[2] * ao); tx.push(tc && !broad ? 1 : 0); pt.push(id);
     gl.push(m === 'paint' || m === 'paint2' ? 0.35 : m === 'chrome' ? 0.8 : m === 'glass' ? 0.5 : 0.05); }
-  return { n: gl.length, pos: new Float32Array(pos), nrm: new Float32Array(nrm), col: new Uint8ClampedArray(col), gloss: new Float32Array(gl), c: S.c, tex: new Uint8Array(tx), part: new Int16Array(pt) }; }
+  return { n: gl.length, pos: new Float32Array(pos), nrm: new Float32Array(nrm), col: new Uint8ClampedArray(col), gloss: new Float32Array(gl), c: S.c, tex: new Uint8Array(tx), part: new Int16Array(pt), grid: { nx, ny, nz, x0: S.x0, y0: S.y0, cx, at: gat } }; }
 /** A from a Surface. Drawn in two steps: which cell shows at each pixel; then each pixel lit, its outward direction
  *  first averaged with its neighbours on the same surface (the cells' steps go, the form's own edges stay), the light
  *  in a few steps (flat tones, as pixel art has them), bright metal giving back sky, horizon and ground. */
-export function drawSurface(F: Surface, yaw: number, pitch: number, mmPx: number, w: number, h: number, outline: boolean | number = true): Pic {
+export function drawSurface(F: Surface, yaw: number, pitch: number, mmPx: number, w: number, h: number, outline: boolean | number = true, stacked = false): Pic {
   const rgba = new Uint8ClampedArray(w * h * 4), zb = new Float32Array(w * h).fill(-1e9), ix = new Int32Array(w * h).fill(-1), th = yaw * Math.PI / 180, ph = pitch * Math.PI / 180, ct = Math.cos(th), st = Math.sin(th), sp = Math.sin(ph), cp = Math.cos(ph);
   const sun: [number, number, number] = [SUN[0] * ct + SUN[1] * st, -SUN[0] * st + SUN[1] * ct, SUN[2]], q = Math.max(2, Math.ceil(F.c * 1.45 / mmPx)), half = q >> 1;   // big enough that no cell behind shows between
-  for (let t = 0; t < F.n; t++) { const x = F.pos[t * 3]!, y = F.pos[t * 3 + 1]!, z = F.pos[t * 3 + 2]!, xr = x * ct - y * st, yr = x * st + y * ct;
+  if (stacked) { // B (review 78): the solid as level slices, one a cell high, each pixel looking down through them from the top:
+    // the first slice whose cell under that pixel is a surface cell shows (every pixel filled exactly, nearest cell, crisp)
+    const G = F.grid, c = F.c;
+    for (let Y = 0; Y < h; Y++) for (let X = 0; X < w; X++) { const xr = (X + 0.5 - w / 2) * mmPx;
+      // a ray at the camera's slant moves more than a cell across for each cell down: sampled three times a cell, or it slips through thin walls
+      for (let kk = G.nz * 3 - 1; kk >= 0; kk--) { const k = Math.floor(kk / 3), z = (kk + 0.5) * c / 3, yr = -((Y + 0.5 - h * 0.6) * mmPx + z * cp) / sp, x = xr * ct + yr * st + G.cx, y = -xr * st + yr * ct;
+        const i = Math.floor((x - G.x0) / c), j = Math.floor((y - G.y0) / c); if (i < 0 || j < 0 || i >= G.nx || j >= G.ny) continue;
+        const g = (k * G.ny + j) * G.nx + i; let t = G.at[g]!; if (t === -1) continue;
+        if (t === -2) { const N1 = [1, -1, G.nx, -G.nx, G.nx * G.ny, -G.nx * G.ny]; t = -1; for (const d of N1) { const u = G.at[g + d]; if (u !== undefined && u >= 0) { t = u; break; } } if (t < 0) break; }   // the ray slipped between surface cells into the solid: the nearest surface cell shows
+        const a = Y * w + X; ix[a] = t;
+        { const px = F.pos[t * 3]!, py = F.pos[t * 3 + 1]!; zb[a] = -(px * st + py * ct) * cp + F.pos[t * 3 + 2]! * sp; }   // the cell's own (smoothed) depth, not the slice's: walls do not read as a lattice of steps
+        break; } } }
+  else for (let t = 0; t < F.n; t++) { const x = F.pos[t * 3]!, y = F.pos[t * 3 + 1]!, z = F.pos[t * 3 + 2]!, xr = x * ct - y * st, yr = x * st + y * ct;
     const px = Math.round(w / 2 + xr / mmPx), py = Math.round(h * 0.6 + (-yr * sp - z * cp) / mmPx), depth = -yr * cp + z * sp;
     if (px < -q || py < -q || px > w + q || py > h + q) continue;
     for (let dy = 0; dy < q; dy++) for (let dx = 0; dx < q; dx++) { const X = px + dx - half, Y = py + dy - half; if (X < 0 || Y < 0 || X >= w || Y >= h) continue; const a = Y * w + X; if (depth < zb[a]!) continue; zb[a] = depth; ix[a] = t; } }
@@ -307,12 +322,12 @@ export function drawSurface(F: Surface, yaw: number, pitch: number, mmPx: number
   { const c2 = new Uint8ClampedArray(rgba); const same = (a: number, b: number) => Math.abs(c2[a * 4]! - c2[b * 4]!) + Math.abs(c2[a * 4 + 1]! - c2[b * 4 + 1]!) + Math.abs(c2[a * 4 + 2]! - c2[b * 4 + 2]!) < 18;
     for (let Y = 1; Y < h - 1; Y++) for (let X = 1; X < w - 1; X++) { const a = Y * w + X; if (!c2[a * 4 + 3]) continue; const nb = [a - 1, a + 1, a - w, a + w]; if (nb.some(b => !c2[b * 4 + 3])) continue;
       if (nb.every(b => !same(a, b)) && same(nb[0]!, nb[1]!) && same(nb[0]!, nb[2]!) && same(nb[0]!, nb[3]!)) for (let q = 0; q < 3; q++) rgba[a * 4 + q] = c2[nb[0]! * 4 + q]!; } }
-  if (outline) { const o = new Uint8Array(w * h), jump = 3 * F.c;
+  if (outline) { const o = new Uint8Array(w * h), jump = (stacked ? 5 : 3) * F.c;
     for (let Y = 0; Y < h; Y++) for (let X = 0; X < w; X++) { const a = Y * w + X; if (!rgba[a * 4 + 3]) continue;
       for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) { const XX = X + dx, YY = Y + dy, b = YY * w + XX;
         if (XX < 0 || YY < 0 || XX >= w || YY >= h || !rgba[b * 4 + 3]) { o[a] = 2; break; } if (zb[b]! - zb[a]! > jump) o[a] = Math.max(o[a]!, 1);
         // where a bright part meets another part in front of it: a thin dark seam, so small fittings stand apart
-        else if (ix[b]! >= 0 && ix[a]! >= 0 && F.part[ix[a]!] !== F.part[ix[b]!] && zb[b]! - zb[a]! > 0.6 * F.c && (F.gloss[ix[a]!]! > 0.6 || F.gloss[ix[b]!]! > 0.6)) o[a] = Math.max(o[a]!, 1); } }
+        else if (ix[b]! >= 0 && ix[a]! >= 0 && F.part[ix[a]!] !== F.part[ix[b]!] && zb[b]! - zb[a]! > (stacked ? 1.5 : 0.6) * F.c && (F.gloss[ix[a]!]! > 0.6 || F.gloss[ix[b]!]! > 0.6)) o[a] = Math.max(o[a]!, 1); } }
     if (outline === 2) { const o2 = new Uint8Array(o); for (let Y = 1; Y < h - 1; Y++) for (let X = 1; X < w - 1; X++) { const a = Y * w + X; if (o[a] !== 2) continue; for (const b of [a - 1, a + 1, a - w, a + w]) if (rgba[b * 4 + 3] && !o[b]) o2[b] = 2; } o.set(o2); }   // a thicker outline: two pixels round the car
     for (let a = 0; a < w * h; a++) if (o[a]) { const k = o[a] === 2 ? 0.28 : 0.6; rgba[a * 4] = rgba[a * 4]! * k; rgba[a * 4 + 1] = rgba[a * 4 + 1]! * k; rgba[a * 4 + 2] = rgba[a * 4 + 2]! * k; } }
   for (let a = 0; a < w * h; a++) if (shadow[a] && !rgba[a * 4 + 3]) { rgba[a * 4] = 24; rgba[a * 4 + 1] = 22; rgba[a * 4 + 2] = 20; rgba[a * 4 + 3] = 110; }

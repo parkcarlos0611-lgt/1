@@ -59,6 +59,17 @@ change starts from here. Code: render/car/voxel.ts. Check: tools/ref/solidshot.t
   so black cars keep their form; bright metal gives back sky above, a dark horizon, the ground below.
 - A dark line round the car and where one surface stands well before another.
 
+## Review 78: B (stacked slices) is the track's way
+- The planner judged stacked slices better, above all small and from a distance. B now draws the same solid as A with
+  every rule above (texture, crevices, smoothed light, seams, outline, shadow): each pixel looks down through the level
+  slices and the first surface cell it meets shows, so every pixel is exactly filled with its nearest cell (crisp, no
+  splat holes). A and B share the lighting and finishing steps; only the step that decides which cell shows differs.
+- A ray at the 40-degree slant moves more than a cell across for each cell down: it is sampled three times a cell, or it
+  slips through thin walls (dark speckle). A ray that lands inside the solid shows the nearest surface cell.
+- Depth for outlines comes from the cell's smoothed position, not the slice, and stacked mode uses looser outline
+  thresholds; otherwise walls read as a lattice.
+- Defaults: B, 0.75–0.85 of the base scale, 2-pixel outline. About 0.4 s a heading on the CPU; baked once per car.
+
 ## Review 77: the staircase
 - Surface cells are moved along their outward direction to where the blurred solid crosses one half (at most 0.7 of a
   cell): the surface lies on a smooth sheet, so silhouettes and shading lose most of the cells' steps. No cost at run time.

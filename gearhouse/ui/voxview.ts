@@ -19,7 +19,7 @@ const CARS: [string, unknown][] = [['1935 그랜드 로드스터', ssj], ['1935 
 const BASE_MM = 16.7;   // the track game's scale: a 5 m car about 300 px long
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const cv = $<HTMLCanvasElement>('view'), ctx = cv.getContext('2d')!, stat = $('stat');
-const st = { car: 0, mode: 'A' as 'A' | 'B' | 'C' | 'AB', yaw: 30, pitch: 40, zoom: 1, cell: 15, spin: false, px: 2, tex: true, line: true, lineW: 1 };
+const st = { car: 0, mode: 'B' as 'A' | 'B' | 'C' | 'AB', yaw: 30, pitch: 40, zoom: 0.75, cell: 15, spin: false, px: 2, tex: true, line: true, lineW: 2 };
 const W = 400, H = 260;
 let solid: Solid | null = null, surf: Surface | null = null, slices: Record<string, { z: number; pic: Pic }[]> = {}, key = '', dirty = true, building = false;
 
@@ -36,7 +36,7 @@ function frame() {
   if (st.spin) { st.yaw = (st.yaw + 0.6) % 360; ($<HTMLInputElement>('yaw')).value = String(Math.round(st.yaw)); dirty = true; }
   if (dirty && ensure()) { dirty = false; const mm = BASE_MM / st.zoom, two = st.mode === 'AB', w = two ? W / 2 : W, t = performance.now();
     cv.width = W; cv.height = H; ctx.clearRect(0, 0, W, H);
-    const draw = (m: 'A' | 'B' | 'C', x: number) => { if (m === 'A') put(drawSurface(surf!, st.yaw, st.pitch, mm, w, H, st.line ? st.lineW : false), x); else put(drawStack(slicesFor(m === 'B' ? 1 : 4, mm), solid!, st.yaw, st.pitch, mm, w, H), x); };
+    const draw = (m: 'A' | 'B' | 'C', x: number) => { if (m === 'A' || m === 'B') put(drawSurface(surf!, st.yaw, st.pitch, mm, w, H, st.line ? st.lineW : false, m === 'B'), x); else put(drawStack(slicesFor(4, mm), solid!, st.yaw, st.pitch, mm, w, H), x); };
     if (two) { draw('A', 0); draw('B', W / 2); } else draw(st.mode as 'A' | 'B' | 'C', 0);
     if (two) { ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.fillRect(W / 2, 0, 1, H); }
     cv.style.width = `${W * st.px}px`; cv.style.height = `${H * st.px}px`;

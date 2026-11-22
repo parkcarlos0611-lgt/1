@@ -135,23 +135,28 @@ export function drawMesh(M0: Mesh, yaw: number, pitch: number, mm: number, w: nu
         if (carry < 0.04 || !isPaint(i)) { carry = isPaint(i) ? carry : 0; continue; }
         const j = i * 4, a = carry * 0.85, far = Math.min(1, (Y - from) / len0); rgba[j] = mix(rgba[j]!, mix(96, 150, far), a); rgba[j + 1] = mix(rgba[j + 1]!, mix(44, 78, far), a); rgba[j + 2] = mix(rgba[j + 2]!, mix(20, 36, far), a);
         carry *= fall * (0.985 + hash(X, Y) * 0.015); } } }
+  // which pixels some glass lies in front of (for the lines below: glass counts as the car)
+  const gHit = new Uint8Array(N);
+  for (const t of glassTris) fill(prj(...vtx(t, 0)), prj(...vtx(t, 1)), prj(...vtx(t, 2)), (i, dd) => { if (dd > zb[i]!) gHit[i] = 1; });
+  // ---- lines: thin and dark where two parts meet or one surface stands well before another; thick and black round the car
+  //      (glass counts as the car: no thick line round what is seen through a window; the parts behind glass keep their
+  //      thin lines, drawn before the glass so it dims them) ----
+  const ol = o.outline ?? 2, e = new Uint8Array(N); if (ol > 0) { const solid = (j: number) => tri[j]! >= 0 || gHit[j] === 1;
+    for (let Y = 0; Y < h; Y++) for (let X = 0; X < w; X++) { const i = Y * w + X; if (!solid(i)) continue; const t = tri[i]!;
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) { const XX = X + dx, YY = Y + dy, j = YY * w + XX; if (XX < 0 || YY < 0 || XX >= w || YY >= h || !solid(j)) { e[i] = 2; break; }
+        if (t >= 0 && tri[j]! >= 0 && (zb[j]! - zb[i]! > 60 || (M.part[tri[j]!] !== M.part[t] && zb[j]! - zb[i]! > 4))) e[i] = Math.max(e[i]!, 1); } }
+    for (let pass = 2; pass <= ol; pass++) { const e2 = new Uint8Array(e); for (let Y = 1; Y < h - 1; Y++) for (let X = 1; X < w - 1; X++) { const i = Y * w + X; if (e[i] !== 2) continue; for (const j of [i - 1, i + 1, i - w, i + w]) if (solid(j) && !e[j]) e2[j] = 2; } e.set(e2); }
+    for (let i = 0; i < N; i++) if (e[i]) { const k = e[i] === 2 ? 0.2 : 0.5; rgba[i * 4] = rgba[i * 4]! * k; rgba[i * 4 + 1] = rgba[i * 4 + 1]! * k; rgba[i * 4 + 2] = rgba[i * 4 + 2]! * k; if (e[i] === 2) rgba[i * 4 + 3] = 255; } }
   // ---- glass: where it lies before what is drawn, back panes first, laid over at its own strength ----
-  const gHit = new Uint8Array(N), gz = new Float32Array(glassTris.length);
+  const gz = new Float32Array(glassTris.length);
   glassTris.forEach((t, j) => { gz[j] = (prj(...vtx(t, 0))[2] + prj(...vtx(t, 1))[2] + prj(...vtx(t, 2))[2]) / 3; });
   const order = glassTris.map((t, j) => j).sort((a, b) => gz[a]! - gz[b]!);
   for (const j of order) { const t = glassTris[j]!, n = normal(t), d = Math.max(0, n[0] * sun[0] + n[1] * sun[1] + n[2] * sun[2]), shine = M.kind[t] === SHINE;
     const k = 0.62 + 0.45 * d + (n[2] > 0.3 ? 0.1 : 0), c: V = shine ? [M.col[t * 3]!, M.col[t * 3 + 1]!, M.col[t * 3 + 2]!] : GLASS_TINT, a = shine ? Math.min(1, ga + 0.15) : ga;
     const A = prj(...vtx(t, 0)), B = prj(...vtx(t, 1)), C = prj(...vtx(t, 2));
-    fill(A, B, C, (i, dd) => { if (dd <= zb[i]!) return; gHit[i] = 1; const q = i * 4, da = rgba[q + 3]! / 255, oa = a + da * (1 - a);
+    fill(A, B, C, (i, dd) => { if (dd <= zb[i]!) return; const q = i * 4, da = rgba[q + 3]! / 255, oa = a + da * (1 - a);
       for (let ch = 0; ch < 3; ch++) rgba[q + ch] = (Math.min(255, c[ch]! * k) * a + rgba[q + ch]! * da * (1 - a)) / oa; rgba[q + 3] = oa * 255; }); }
-  // ---- lines: thin and dark where two parts meet or one surface stands well before another; thick and black round the car
-  //      (glass counts as the car: no thick line round what is seen through a window) ----
-  const ol = o.outline ?? 2; if (ol > 0) { const e = new Uint8Array(N), solid = (j: number) => tri[j]! >= 0 || gHit[j] === 1;
-    for (let Y = 0; Y < h; Y++) for (let X = 0; X < w; X++) { const i = Y * w + X; if (!solid(i)) continue; const t = tri[i]!;
-      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) { const XX = X + dx, YY = Y + dy, j = YY * w + XX; if (XX < 0 || YY < 0 || XX >= w || YY >= h || !solid(j)) { e[i] = 2; break; }
-        if (t >= 0 && tri[j]! >= 0 && !gHit[i] && (zb[j]! - zb[i]! > 60 || (M.part[tri[j]!] !== M.part[t] && zb[j]! - zb[i]! > 4))) e[i] = Math.max(e[i]!, 1); } }
-    for (let pass = 2; pass <= ol; pass++) { const e2 = new Uint8Array(e); for (let Y = 1; Y < h - 1; Y++) for (let X = 1; X < w - 1; X++) { const i = Y * w + X; if (e[i] !== 2) continue; for (const j of [i - 1, i + 1, i - w, i + w]) if (solid(j) && !e[j]) e2[j] = 2; } e.set(e2); }
-    for (let i = 0; i < N; i++) if (e[i]) { const k = e[i] === 2 ? 0.2 : 0.5; rgba[i * 4] = rgba[i * 4]! * k; rgba[i * 4 + 1] = rgba[i * 4 + 1]! * k; rgba[i * 4 + 2] = rgba[i * 4 + 2]! * k; if (e[i] === 2) rgba[i * 4 + 3] = 255; } }
+  if (ol > 0) for (let i = 0; i < N; i++) if (e[i] === 2 && gHit[i]) { rgba[i * 4] = rgba[i * 4]! * 0.2; rgba[i * 4 + 1] = rgba[i * 4 + 1]! * 0.2; rgba[i * 4 + 2] = rgba[i * 4 + 2]! * 0.2; rgba[i * 4 + 3] = 255; }   // the outline over a window's edge
   return { w, h, rgba }; }
 
 /** for each painted pixel, how far (mm) it lies from its part's edge on screen: seams and edges rust first */

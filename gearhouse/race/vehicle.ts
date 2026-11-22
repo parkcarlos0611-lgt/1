@@ -9,6 +9,7 @@
 import type { RaceSpec } from './cars';
 import { torqueAt } from './cars';
 import type { Track } from './track';
+import { Health, type Failure } from './health';
 
 export interface Controls { throttle: number; brake: number; steer: number; clutch?: number; gear?: number; handbrake?: number }   // steer -1 (right) .. 1 (left)
 const G = 9.81, RHO = 1.2;
@@ -24,13 +25,15 @@ export class Vehicle {
   w = [0, 0, 0, 0]; load = [0, 0, 0, 0]; slipX = [0, 0, 0, 0]; slipA = [0, 0, 0, 0]; airborne = [false, false, false, false];
   /** each wheel off the concrete (on the grass); `over`: the car has gone over the top of a banking */
   onGrass = [false, false, false, false]; over = false;
+  /** the engine's heat and wear; the last failure that happened (for the page to tell) */
+  health: Health; lastFailure: Failure | null = null;
   rpm = 0; gear = 1; shift = 0; steer = 0; ax = 0; ay = 0; tax = 0; tay = 0; brakeT = [20, 20, 20, 20]; auto = true; tilt = 0;
   private k: number; private c: number; private Ip: number; private Ir: number; private Iz: number; private Iw: number; private Ie: number;
   constructor(readonly spec: RaceSpec, readonly track: Track, readonly tyre: Tyre = CROSSPLY) {
     const m = spec.mass, L = spec.wheelbase;
     this.k = m / 4 * (2 * Math.PI * 1.6) ** 2; this.c = 2 * 0.3 * Math.sqrt(this.k * m / 4);   // stiff leaves: about 1.6 Hz, a third of critical damping
     this.Iz = m * (L * L + spec.track * spec.track) / 12 * 1.15; this.Ip = m * L * L / 14; this.Ir = m * spec.track * spec.track / 10;
-    this.Iw = 1.2 + spec.tyreR * spec.tyreR * 10; this.Ie = 0.25 + spec.hp / 400; this.rpm = spec.idle; }
+    this.Iw = 1.2 + spec.tyreR * spec.tyreR * 10; this.Ie = 0.25 + spec.hp / 400; this.rpm = spec.idle; this.health = new Health(spec.hp, spec.cooling, Math.floor(Math.random() * 1e9)); }
   /** set the car down at distance s, offset off, running at v (m/s) along the track */
   place(s: number, off: number, v = 0): this { const p = this.track.point(s, off), n = this.track.at(s), c = this.spec; this.x = p.x; this.y = p.y; this.yaw = n.h; this.vx = v; this.vy = 0; this.r = v * n.k; this.s = s; this.off = off;
     this.w = this.w.map(() => v / c.tyreR); this.gear = this.auto ? this.bestGear(v) : 1; this.rpm = Math.max(c.idle, v / c.tyreR * c.gears[this.gear - 1]! * c.final * 30 / Math.PI); return this; }
@@ -69,13 +72,15 @@ export class Vehicle {
     const Gr = c.gears[this.gear - 1]! * c.final, we = this.rpm * Math.PI / 30, wd = (this.w[2]! + this.w[3]!) / 2, idle = c.idle * Math.PI / 30;
     const thr = this.shift > 0 ? 0 : Math.max(0, Math.min(1, u.throttle)),   // off the throttle through a change
      fric = 0.06 * torqueAt(c, c.torqueRpm) * (0.3 + 0.7 * this.rpm / c.hpRpm);
-    const Te = (this.rpm < c.redline * 1.1 ? thr * torqueAt(c, this.rpm) : 0) - fric * (1 - thr) + (this.rpm < c.idle ? fric * 2 : 0);   // below idle the governor of the hand throttle holds it
+    const hp = this.health.power, alive = this.health.running;
+    const Te = alive ? (this.rpm < c.redline * 1.1 ? thr * torqueAt(c, this.rpm) * hp : 0) - fric * (1 - thr) + (this.rpm < c.idle ? fric * 2 : 0) : -fric * 3 - (this.rpm > 1 ? 30 : 0);   // below idle the hand throttle holds it; a dead engine only drags
     // the clutch: a driver's foot (or the automatic, which lets it in as the engine picks up from rest)
     const auto = this.shift > 0 ? 0 : Math.max(0, Math.min(1, wd * Gr > we * 0.97 ? 1 : (this.rpm - c.idle * 1.3) / (c.idle * 1.2)));
     const engaged = u.clutch === undefined ? auto : Math.min(auto, 1 - u.clutch), cap = engaged * torqueAt(c, c.torqueRpm) * 2.2;
     const need = (we - wd * Gr) / (dt * (1 / this.Ie + Gr * Gr / (2 * this.Iw)));   // what would hold the clutch locked this step
     const Tc = Math.max(-cap, Math.min(cap, need));
-    this.rpm = Math.max(idle * 0.5, we + (Te - Tc) / this.Ie * dt) * 30 / Math.PI;
+    this.rpm = Math.max(alive ? idle * 0.5 : 0, we + (Te - Tc) / this.Ie * dt) * 30 / Math.PI;
+    { const f = this.health.step(dt, this.rpm, c.redline, Math.max(0, Te) * this.rpm * Math.PI / 30, this.speed); if (f) this.lastFailure = f; }
     const Taxle = Tc * Gr * c.eff;
     // ---- tyres ----
     const Fx = [0, 0, 0, 0], Fy = [0, 0, 0, 0], brakeCap = c.brakeG * m * G * R, ty = this.tyre;

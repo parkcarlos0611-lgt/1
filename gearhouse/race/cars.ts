@@ -27,7 +27,8 @@ export interface RaceSpec {
   gears: number[]; final: number; eff: number;
   brakes: 'rear' | 'four'; hydraulic: boolean; brakeG: number;   // the deceleration the brakes manage when new and cold
   cdA: number; crr: number; steerLock: number;          // drag area m², rolling resistance, front wheels' lock (deg)
-  topKmh: number; check: boolean }
+  topKmh: number; check: boolean;
+  cooling: { siphon: boolean; margin: number } }   // the water's circulation (no pump on the Model T [v]), the radiator against the engine's heat [?]
 
 /** tyre sizes: 30x3.5 (overall diameter x section, inches), 4.50-20 (section - rim), 33x5 */
 export function tyre(size: string): { r: number; w: number } { const a = size.match(/^(\d+(?:\.\d+)?)x(\d+(?:\.\d+)?)$/), b = size.match(/^(\d+(?:\.\d+)?)-(\d+)$/), inch = 0.0254;
@@ -47,12 +48,14 @@ const PERIOD: Record<string, [number, number[], number, 'rear' | 'four', boolean
   dueA21:    [3600, [2.9, 1.66, 1.0], 3.8, 'four', true, 1.8, 0.7, 0.5, 33, 117] };
 const KG: Record<string, number> = { fordT23: 990, chevAB28: 1160, plymU29: 1155, pontiac29: 1250, dodgeV28: 1300, willys27: 1225, buick28: 1590, fnTT33: 770, bmw315: 750, dueSSJ35: 2270, dueA21: 1750 };
 
+// cooling: the Model T's thermosiphon boiled on long pulls; a supercharged eight runs hot; big luxury radiators had room
+const COOL: Record<string, { siphon: boolean; margin: number }> = { fordT23: { siphon: true, margin: 1.0 }, dueSSJ35: { siphon: false, margin: 0.92 }, dueA21: { siphon: false, margin: 1.2 }, fnTT33: { siphon: false, margin: 1.0 }, bmw315: { siphon: false, margin: 1.0 }, buick28: { siphon: false, margin: 1.15 } };
 export const RACE_CARS: string[] = Object.keys(PERIOD);
 export function raceSpec(id: string): RaceSpec {
   const s = (specs as { cars: Record<string, { car: string; engine: { hp: number }; wheelbase: number; track: number; tyre: string }> }).cars[id]!, p = PERIOD[id]!, t = tyre(s.tyre), hpRpm = p[0];
   return { id, name: s.car, mass: KG[id]! + 75, wheelbase: s.wheelbase / 1000, track: s.track / 1000, tyreR: t.r, tyreW: t.w, cgH: p[6], frontShare: p[7],
     hp: s.engine.hp, hpRpm, torqueRpm: hpRpm * 0.55, idle: Math.max(350, hpRpm * 0.18), redline: hpRpm * 1.12, gears: p[1], final: p[2], eff: 0.88,
-    brakes: p[3], hydraulic: p[4], brakeG: p[3] === 'rear' ? 0.32 : p[4] ? 0.62 : 0.5, cdA: p[5], crr: 0.018, steerLock: p[8], topKmh: p[9], check: true }; }
+    brakes: p[3], hydraulic: p[4], brakeG: p[3] === 'rear' ? 0.32 : p[4] ? 0.62 : 0.5, cdA: p[5], crr: 0.018, steerLock: p[8], topKmh: p[9], check: true, cooling: COOL[id] ?? { siphon: false, margin: 1.1 } }; }
 
 /** engine torque (Nm) at revs, full throttle: a hump peaking at torqueRpm, its power peaking at hpRpm, falling past it */
 export function torqueAt(c: RaceSpec, rpm: number): number {

@@ -10,12 +10,16 @@ import { CarSprites } from '../race/sprites';
 import { MESH_CARS } from '../render/car/meshcars';
 import { Driver } from '../race/driver';
 import { Race, type Entrant } from '../race/race';
+import { Health, WARN } from '../race/health';
+import { Sound } from './sound';
+import specsData from '../data/cars/specs.json';
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const T = millbrook(), cv = $<HTMLCanvasElement>('view'), ctx = cv.getContext('2d')!;
 let SP = Math.sin(30 * Math.PI / 180), CP = Math.cos(30 * Math.PI / 180), pitchDeg = 30; const DT = 1 / 200, START = T.spec.landmarks.find(l => l.kind === 'line')!.s;
 let VW = 768, VH = 432, mm = 50;                                               // the picture's own pixels, millimetres a pixel
-const st = { auto: true, assist: false, pilot: false, chase: false }; let pilot = new Driver(T), camAng = Math.PI / 2, wheelTurn = 0;   // camAng: the world heading that shows as up the screen let pilot = new Driver(T);
+const st = { auto: true, assist: false, pilot: false, chase: false, progressive: false };
+let snd: Sound | null = null, lastGear = 1, lastV = 0, wasAir = false; const steam: { x: number; y: number; z: number; r: number; a: number }[] = []; let pilot = new Driver(T), camAng = Math.PI / 2, wheelTurn = 0;   // camAng: the world heading that shows as up the screen let pilot = new Driver(T);
 let car!: Vehicle, sprites!: CarSprites, carId = 'chevAB28', camX = 0, camY = 0, camZ = 0;
 const keys = new Set<string>(), input = { steer: 0, throttle: 0, brake: 0, hand: 0 }; let manualGear = 1;
 const skids: { x: number; y: number; z: number; a: number }[] = [], puffs: { x: number; y: number; z: number; r: number; a: number; vx: number; vy: number }[] = [];
@@ -59,6 +63,30 @@ function drawBridges() { for (const l of T.spec.landmarks) { if (l.kind !== 'bri
   ctx.fillStyle = 'rgba(20,20,18,0.35)'; const q = (s: number, o: number) => T.point(s, o);
   ctx.beginPath(); for (const [s, o] of [[l.s - 2, -W2], [l.s - 2, W2], [l.s + 3, W2], [l.s + 3, -W2]] as const) { const p = q(s, o); ctx.lineTo(...P(p.x + 2, p.y - 2, p.z)); } ctx.closePath(); ctx.fill();
   ctx.fillStyle = '#7d756a'; ctx.strokeStyle = '#2a2622'; ctx.lineWidth = 2; ctx.beginPath(); for (const [s, o] of [[l.s - 1.5, -W2], [l.s - 1.5, W2], [l.s + 1.5, W2], [l.s + 1.5, -W2]] as const) { const p = q(s, o); ctx.lineTo(...P(p.x, p.y, h + Math.max(a.z, b.z))); } ctx.closePath(); ctx.fill(); ctx.stroke(); void d; } }
+// ---- the minimap: the circuit, the line, every car ----
+const MINI = $<HTMLCanvasElement>('mini'), mctx = MINI.getContext('2d')!; let mbox = { x0: 0, y0: 0, k: 1 };
+{ let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity; for (const n of T.nodes) { x0 = Math.min(x0, n.x); x1 = Math.max(x1, n.x); y0 = Math.min(y0, n.y); y1 = Math.max(y1, n.y); } const k = 130 / Math.max(x1 - x0, y1 - y0); mbox = { x0: x0 - (150 / k - (x1 - x0)) / 2, y0: y1 + (150 / k - (y1 - y0)) / 2, k }; }
+const mp = (x: number, y: number): [number, number] => [(x - mbox.x0) * mbox.k, (mbox.y0 - y) * mbox.k];
+function mini() { mctx.clearRect(0, 0, 150, 150); mctx.strokeStyle = 'rgba(235,230,220,0.85)'; mctx.lineWidth = 3; mctx.beginPath(); T.nodes.forEach((n, i) => { if (i % 8) return; const [X, Y] = mp(n.x, n.y); if (i) mctx.lineTo(X, Y); else mctx.moveTo(X, Y); }); mctx.closePath(); mctx.stroke();
+  { const a = T.point(START, -18), b = T.point(START, 18), [ax, ay] = mp(a.x, a.y), [bx, by] = mp(b.x, b.y); mctx.strokeStyle = '#fff'; mctx.lineWidth = 2; mctx.beginPath(); mctx.moveTo(ax, ay); mctx.lineTo(bx, by); mctx.stroke(); }
+  const dots = race ? race.cars.map(e => ({ c: e.car, me: !e.driver })) : [{ c: car, me: true }];
+  for (const d of dots) { const [X, Y] = mp(d.c.x, d.c.y); mctx.fillStyle = d.me ? '#ffb347' : '#9fc3ff'; mctx.beginPath(); mctx.arc(X, Y, d.me ? 4 : 3, 0, Math.PI * 2); mctx.fill(); if (d.me) { mctx.strokeStyle = '#000'; mctx.lineWidth = 1; mctx.stroke(); } } }
+// ---- steam from a boiling radiator or a blown gasket ----
+function drawSteam(el: number) { const h = car.health; if ((h.water >= WARN.boil || h.failed === 'gasket') && Math.random() < 0.5) { const f = car.spec.wheelbase * (1 - car.spec.frontShare) + 0.4; steam.push({ x: car.x + Math.cos(car.yaw) * f, y: car.y + Math.sin(car.yaw) * f, z: T.height(car.s, car.off) + 1.2, r: 0.3, a: 0.5 }); }
+  for (const p of steam) { p.z += 1.2 * el; p.r += 0.8 * el; p.a -= 0.35 * el; } for (let i = steam.length - 1; i >= 0; i--) if (steam[i]!.a <= 0) steam.splice(i, 1);
+  for (const p of steam) { ctx.fillStyle = `rgba(245,245,245,${p.a})`; ctx.beginPath(); ctx.arc(...P(p.x, p.y, p.z), p.r * 1000 / mm, 0, Math.PI * 2); ctx.fill(); } }
+// ---- sounds ----
+const ENGINE = (specsData as { cars: Record<string, { engine: { kind: string; layout: string } }> }).cars;
+const voiceOf = (id: string) => { const e = ENGINE[id]!.engine; return { cylinders: +e.layout.replace(/\D/g, '') || 4, kind: (e.kind === 'sleeve' ? 'sleeve' : e.kind === 'ohv' ? 'ohv' : 'sv') as 'sv' | 'ohv' | 'sleeve', supercharged: id === 'dueSSJ35' }; };
+function sounds() { if (!snd) return; const me = race?.player, keep = new Set<unknown>(['me']);
+  snd.voice('me', voiceOf(carId)).set(car.rpm, st.pilot ? 0.7 : input.throttle, 1, 0, car.health.running);
+  if (race) for (const e of race.cars) { if (e === me) continue; const d = Math.hypot(e.car.x - car.x, e.car.y - car.y); if (d > 220) continue; keep.add(e); const [X] = P(e.car.x, e.car.y, 0);
+    snd.voice(e, voiceOf(e.id)).set(e.car.rpm, 0.8, 1 / (1 + (d / 30) ** 2), (X - VW / 2) / (VW / 2), e.car.health.running); }
+  snd.dropVoices(keep);
+  const slip = Math.max(...car.slipA.map(a => Math.abs(a) / 0.12), ...car.slipX.map(k => Math.abs(k) / 0.15)); snd.update(car.onGrass.some(Boolean) ? 0 : slip, car.speed, { piece: T.pieceAt(car.s), s: car.s, startDist: Math.abs(T.gap(START, car.s)) });
+  if (car.gear !== lastGear) { snd.hit('shift'); lastGear = car.gear; }
+  if (Math.abs(car.speed - lastV) > 2.5) snd.hit('knock', Math.min(1.5, Math.abs(car.speed - lastV) / 4)); lastV = car.speed;
+  const air = car.airborne.filter(Boolean).length >= 2; if (wasAir && !air && car.speed > 20) snd.hit('thud'); wasAir = air; }
 function marks(c: Vehicle) { for (let i = 0; i < 4; i++) { const sl = Math.max(Math.abs(c.slipX[i]!) / 0.15, Math.abs(c.slipA[i]!) / 0.12); if (sl < 1 || c.airborne[i] || c.onGrass[i]) continue; if (Math.random() > 0.35) continue;
     const [px, py] = c.wheelAt(i), cy = Math.cos(c.yaw), sy2 = Math.sin(c.yaw), x = c.x + px * cy - py * sy2, y = c.y + px * sy2 + py * cy, q = T.locate(x, y, c.s), z = T.height(q.s, q.off);
     skids.push({ x, y, z, a: Math.min(0.55, 0.15 * sl) }); if (skids.length > 9000) skids.shift(); if (Math.random() < 0.25) puffs.push({ x, y, z: z + 0.2, r: 0.3, a: 0.35, vx: (Math.random() - 0.5) * 0.6, vy: (Math.random() - 0.5) * 0.6 }); } }
@@ -73,6 +101,10 @@ const fmt = (t: number) => t > 0 ? `${Math.floor(t / 60)}:${(t % 60).toFixed(2).
 function hud() { const kmh = car.speed * 3.6; $('spd').textContent = kmh.toFixed(0); $('gear').textContent = String(car.gear); $('rpm').textContent = car.rpm.toFixed(0);
   ($('rpmbar') as HTMLElement).style.width = `${Math.min(100, car.rpm / car.spec.redline * 100)}%`; ($('rpmbar') as HTMLElement).style.background = car.rpm > car.spec.hpRpm * 1.05 ? 'var(--warn)' : 'var(--accent)';
   $('lap').textContent = `이번 바퀴 ${lapStart >= 0 ? fmt(clock - lapStart) : '-'}`; $('last').textContent = `지난 ${fmt(lastLap)}`; $('best').textContent = `최고 ${fmt(bestLap)}`; $('where').textContent = T.pieceAt(car.s);
+  { const h = car.health, w = h.warnings(car.rpm, car.spec.redline), cls = (k: string) => w.includes(k) ? (k === 'boil' ? 'boil' : 'hot') : '';
+    $('heat').innerHTML = `<span class="${cls('boil') || cls('water')}">물 ${h.water.toFixed(0)}°</span><span class="${cls('oil')}">오일 ${h.oil.toFixed(0)}°</span>${h.level < 0.98 ? `<span class="hot">냉각수 ${(h.level * 100).toFixed(0)}%</span>` : ''}${w.includes('revs') ? '<span class="boil">과회전</span>' : ''}${h.failed ? `<span class="boil">${({ gasket: '개스킷 파손', valve: '밸브 손상', bearing: '베어링 소착', seized: '엔진 고착' } as Record<string, string>)[h.failed]}</span>` : ''}`; }
+  if (car.lastFailure) { const f = car.lastFailure; car.lastFailure = null; snd?.hit('bang'); say(({ gasket: '헤드 개스킷이 나갔습니다 — 출력이 떨어지고 더 뜨거워집니다', valve: '과회전으로 밸브가 상했습니다 — 출력이 떨어집니다', bearing: '오일이 너무 뜨거워 베어링이 녹아붙었습니다 — 엔진이 멈췄습니다', seized: '과열로 엔진이 고착됐습니다 — 엔진이 멈췄습니다' } as Record<string, string>)[f]!); msgT = 6; }
+  ($('gasbar') as HTMLElement).style.height = `${input.throttle * 100}%`; ($('brakebar') as HTMLElement).style.height = `${input.brake * 100}%`;
   $('bake').textContent = sprites.pending ? `그림 굽는 중 ${sprites.count}장` : ''; $('msg').textContent = msgT > 0 ? msg : '';
   if (race) { const me = race.player!, ord = race.order(), pos = ord.indexOf(me) + 1, wait = me.start - race.clock;
     $('lap').textContent = wait > 0 ? `출발까지 ${Math.ceil(wait)}초` : me.finish ? `완주 ${fmt(me.finish - me.start)}` : `${Math.min(race.laps, me.lapAt.length)}/${race.laps}바퀴 · ${fmt(race.clock - me.start)}`;
@@ -109,7 +141,7 @@ $<HTMLInputElement>('touch').addEventListener('change', e => document.body.class
 const down = (...ks: string[]) => ks.some(k => keys.has(k));
 function controls(dt: number): Controls { const left = down('arrowleft', 'a'), right = down('arrowright', 'd'), want = left === right ? 0 : left ? 1 : -1;
   input.steer += want === 0 ? -Math.sign(input.steer) * Math.min(Math.abs(input.steer), dt * 4) : Math.max(-dt * 2.6, Math.min(dt * 2.6, want - input.steer));
-  input.throttle = Math.max(0, Math.min(1, input.throttle + (down('arrowup', 'w') ? 4 : -6) * dt)); input.brake = Math.max(0, Math.min(1, input.brake + (down('arrowdown', 's') ? 5 : -8) * dt)); input.hand = down(' ') ? 1 : 0;
+  input.throttle = Math.max(0, Math.min(1, input.throttle + (down('arrowup', 'w') ? (st.progressive ? 0.55 : 4) : (st.progressive ? -3 : -6)) * dt));   // the gauge mode: the pedal goes down as long as it is held input.brake = Math.max(0, Math.min(1, input.brake + (down('arrowdown', 's') ? 5 : -8) * dt)); input.hand = down(' ') ? 1 : 0;
   let steer = input.steer; if (st.assist) { const over = car.r - car.speed * T.at(car.s).k; if (Math.abs(over) > 0.1 && Math.sign(over) === Math.sign(-car.vy)) steer += Math.atan2(car.vy, Math.max(5, car.vx)) / (car.spec.steerLock * Math.PI / 180 / (1 + car.speed / 25)) * 0.7; }
   return { steer: Math.max(-1, Math.min(1, steer)), throttle: input.throttle, brake: input.brake, handbrake: input.hand, gear: manualGear }; }
 // ---- the loop ----
@@ -128,10 +160,20 @@ function frame(now: number) { const el = Math.min(0.1, (now - last) / 1000); las
   camX += (tx - camX) * Math.min(1, el * 5); camY += (ty - camY) * Math.min(1, el * 5); camZ += (tz - camZ) * Math.min(1, el * 5);
   { const vh = car.speed > 2 ? Math.atan2(Math.sin(car.yaw) * car.vx + Math.cos(car.yaw) * car.vy, Math.cos(car.yaw) * car.vx - Math.sin(car.yaw) * car.vy) : car.yaw, d = Math.atan2(Math.sin(vh - camAng), Math.cos(vh - camAng)); camAng += d * Math.min(1, el * 2.5); }   // the turning camera follows where the car goes, gently
   turnCam();
-  drawTrack(); drawCars(); drawPuffs(); drawBridges(); hud(); sprites.work(5); for (const sp of others.values()) sp.work(2); requestAnimationFrame(frame); }
+  drawTrack(); drawCars(); drawPuffs(); drawSteam(el); drawBridges(); hud(); mini(); sounds(); sprites.work(5); for (const sp of others.values()) sp.work(2); requestAnimationFrame(frame); }
 // ---- page ----
 const pick = $<HTMLSelectElement>('car'); for (const id of RACE_CARS) pick.add(new Option(raceSpec(id).name, id)); pick.value = carId;
 pick.addEventListener('change', () => { carId = pick.value; if (race) stopRace(); else choose(pick.value); pick.blur(); });
+$<HTMLInputElement>('progressive').addEventListener('change', e => { st.progressive = (e.target as HTMLInputElement).checked; document.body.classList.toggle('progressive', st.progressive); });
+$<HTMLInputElement>('sound').addEventListener('change', e => { if ((e.target as HTMLInputElement).checked) { snd = new Sound(); snd.volume = +$<HTMLInputElement>('vol').value; } else { snd?.close(); snd = null; } });
+$<HTMLInputElement>('vol').addEventListener('input', e => { if (snd) snd.volume = +(e.target as HTMLInputElement).value; });
+$('repair').addEventListener('click', e => { car.health = new Health(car.spec.hp, car.spec.cooling, Math.floor(Math.random() * 1e9)); say('엔진을 새것처럼 고쳤습니다'); (e.target as HTMLElement).blur(); });
+// full screen: the picture alone; where the browser cannot (an iPhone), the page itself fills the screen
+$('fs').addEventListener('click', () => { const el = document.querySelector('.screen') as HTMLElement & { webkitRequestFullscreen?: () => void };
+  if (document.fullscreenElement) void document.exitFullscreen(); else if (document.body.classList.contains('fakefull')) document.body.classList.remove('fakefull');
+  else if (el.requestFullscreen) void el.requestFullscreen().catch(() => document.body.classList.add('fakefull')); else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen(); else document.body.classList.add('fakefull');
+  setTimeout(fit, 150); });
+document.addEventListener('fullscreenchange', () => setTimeout(fit, 100));
 $('race').addEventListener('click', e => { startRace(); (e.target as HTMLElement).blur(); });
 $('practice').addEventListener('click', e => { stopRace(); $('race').textContent = '레이스 시작'; (e.target as HTMLElement).blur(); });
 $<HTMLInputElement>('auto').addEventListener('change', e => { st.auto = (e.target as HTMLInputElement).checked; car.auto = st.auto; manualGear = car.gear; });
@@ -141,7 +183,8 @@ $<HTMLInputElement>('chase').addEventListener('change', e => { st.chase = (e.tar
 $<HTMLInputElement>('pitch').addEventListener('change', e => { pitchDeg = +(e.target as HTMLInputElement).value; SP = Math.sin(pitchDeg * Math.PI / 180); CP = Math.cos(pitchDeg * Math.PI / 180); const s0 = car.s, o0 = car.off, v0 = car.speed; choose(carId); car.place(s0, o0, v0); (e.target as HTMLElement).blur(); });
 $<HTMLInputElement>('pitch').addEventListener('input', e => { $('pitchv').textContent = `${(e.target as HTMLInputElement).value}°`; });
 $<HTMLSelectElement>('scale').addEventListener('change', e => { mm = +(e.target as HTMLSelectElement).value; choose(carId); (e.target as HTMLElement).blur(); });
-function fit() { const box = document.querySelector('.track') as HTMLElement, room = Math.min(box.clientWidth - 14, 1600);
+function fit() { if (document.fullscreenElement || document.body.classList.contains('fakefull')) { const k = Math.max(1, Math.round(innerWidth / 900)); VW = Math.ceil(innerWidth / k / 2) * 2; VH = Math.ceil(innerHeight / k); cv.width = VW; cv.height = VH; cv.style.width = `${VW * k}px`; cv.style.height = `${VH * k}px`; ctx.imageSmoothingEnabled = false; return; }
+  const box = document.querySelector('.track') as HTMLElement, room = Math.min(box.clientWidth - 14, 1600);
   // the height left on the screen below the picture's top (a phone on its side has little), at least a usable strip
   const availH = Math.max(200, innerHeight - Math.max(0, box.getBoundingClientRect().top + scrollY) - 16);
   const k = Math.max(1, Math.floor(Math.min(room / 768, availH / 432)));

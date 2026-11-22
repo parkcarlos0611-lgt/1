@@ -51,5 +51,6 @@ export class Driver {
     // brake only when well over it
     const e = target - v, hold = Math.min(0.45, 0.04 + v * v * car.spec.cdA * 0.6 / (car.spec.hp * 745.7 / Math.max(v, 5)) );
     const throttle = e > 0 ? Math.min(1, hold + e / 3) : Math.max(0, hold + e / 2);
-    return { steer: Math.max(-1, Math.min(1, delta / lock)), throttle: throttle * this.pace * (1 - this.lift) * (this.care < 1 && Math.abs(T.at(car.s).k) > 1e-3 ? this.care : 1), brake: e < -1.5 ? Math.min(1, (-e - 1.5) / 3) : 0 }; }
+    const cool = car.health.water > 97 ? Math.max(0.55, 1 - (car.health.water - 97) / 10) : 1;   // it watches the water gauge and eases off
+    return { steer: Math.max(-1, Math.min(1, delta / lock)), throttle: throttle * cool * this.pace * (1 - this.lift) * (this.care < 1 && Math.abs(T.at(car.s).k) > 1e-3 ? this.care : 1), brake: e < -1.5 ? Math.min(1, (-e - 1.5) / 3) : 0 }; }
 }

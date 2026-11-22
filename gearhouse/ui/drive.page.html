@@ -53,13 +53,25 @@
   .btn:first-child { border-color: var(--accent); color: var(--accent); font-weight: 600; }
   .board { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; font-size: 0.85rem; font-variant-numeric: tabular-nums; }
   .board li { display: flex; justify-content: space-between; gap: 8px; } .board li.me { color: var(--accent); font-weight: 600; } .board span { color: var(--soft); }
+  .fsbtn { position: absolute; top: 6px; right: 6px; width: 32px; height: 32px; border: 1px solid rgba(255,255,255,0.6); border-radius: 4px; background: rgba(20,18,15,0.45); color: #fff; font-size: 1.1rem; line-height: 1; cursor: pointer; z-index: 3; }
+  .mini { position: absolute; top: 44px; right: 6px; width: 120px; height: 120px; background: rgba(20,18,15,0.35); border-radius: 6px; z-index: 2; pointer-events: none; }
+  .pedals { position: absolute; right: 8px; top: 172px; display: none; gap: 4px; z-index: 2; pointer-events: none; }
+  .pedals div { width: 10px; height: 90px; background: rgba(255,255,255,0.25); border-radius: 3px; position: relative; overflow: hidden; }
+  .pedals i { position: absolute; left: 0; right: 0; bottom: 0; height: 0; background: #6fbf6a; } #brakebar { background: #d0584a; }
+  body.progressive .pedals { display: flex; }
+  .heat { display: inline-flex; gap: 10px; } .heat .hot { color: #ffcf5a; font-weight: 600; } .heat .boil { color: #ff6b5a; font-weight: 700; animation: blink 0.6s steps(2) infinite; }
+  @keyframes blink { 50% { opacity: 0.3; } } @media (prefers-reduced-motion: reduce) { .heat .boil { animation: none; } }
+  .screen:fullscreen { display: flex; align-items: center; justify-content: center; background: #111; width: 100vw; height: 100vh; }
+  body.fakefull .screen { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; background: #111; }
   .note { font-size: 0.8rem; color: var(--soft); line-height: 1.5; margin: 0; }
 </style>
 <h1>Millbrook 시험 주행</h1>
 <p class="lede">Millbrook Outer Circuit(4.45 km, 반시계 방향)을 한 대로 돌아 봅니다. 뱅크가 높을수록 밝게 보이고, 빠를수록 위쪽을 달려야 뱅크가 차를 받쳐 줍니다.</p>
 <div class="bench">
   <div class="stage">
-    <div class="track"><div class="screen"><div class="hud"><span><b id="spd">0</b> km/h</span><span>기어 <b id="gear">1</b></span><span><span class="bar"><span id="rpmbar"></span></span> <span id="rpm">0</span> rpm</span><span><span id="lap">-</span></span><span><span id="last">-</span></span><span><span id="best">-</span></span><span id="where"></span></div><canvas id="view" width="768" height="432" aria-label="주행 화면"></canvas>
+    <div class="track"><div class="screen"><div class="hud"><span><b id="spd">0</b> km/h</span><span>기어 <b id="gear">1</b></span><span><span class="bar"><span id="rpmbar"></span></span> <span id="rpm">0</span> rpm</span><span><span id="lap">-</span></span><span><span id="last">-</span></span><span><span id="best">-</span></span><span id="where"></span><span id="heat" class="heat"></span></div>
+      <button type="button" id="fs" class="fsbtn" aria-label="전체화면">⛶</button><canvas id="mini" class="mini" width="150" height="150" aria-label="미니맵"></canvas>
+      <div class="pedals" id="pedals" aria-hidden="true"><div><i id="gasbar"></i></div><div><i id="brakebar"></i></div></div><canvas id="view" width="768" height="432" aria-label="주행 화면"></canvas>
       <div class="pad" id="pad" aria-label="터치 조작">
         <div class="side"><button type="button" data-key="arrowleft" aria-label="왼쪽">◀</button><button type="button" data-key="arrowright" aria-label="오른쪽">▶</button></div>
         <div class="mid"><button type="button" data-key="q" class="small" aria-label="기어 내림">Q</button><button type="button" data-key="e" class="small" aria-label="기어 올림">E</button><button type="button" data-key="r" class="small" aria-label="트랙으로 복귀">R</button></div>
@@ -77,6 +89,10 @@
     </fieldset>
     <label class="check"><input type="checkbox" id="auto" checked> 자동 변속 (<kbd>M</kbd>)</label>
     <label class="check"><input type="checkbox" id="assist"> 카운터스티어 보조</label>
+    <label class="check"><input type="checkbox" id="progressive"> 가속 게이지 모드 (오래 누를수록 가속이 차오름)</label>
+    <label class="check"><input type="checkbox" id="sound"> 소리 켜기 (엔진, 타이어, 바람, 주변음)</label>
+    <div class="row"><label for="vol">음량</label><input type="range" id="vol" min="0" max="1" step="0.05" value="0.7"></div>
+    <button type="button" id="repair" class="btn">엔진 수리 (연습)</button>
     <label class="check"><input type="checkbox" id="pilot"> 시험 운전자에게 맡기기</label>
     <div class="row"><label for="pitch">카메라 높이 <span class="val" id="pitchv">30°</span></label><input type="range" id="pitch" min="20" max="50" step="5" value="30"></div>
     <label class="check"><input type="checkbox" id="chase"> 차를 따라 도는 카메라</label>

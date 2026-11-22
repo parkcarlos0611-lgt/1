@@ -1,0 +1,50 @@
+{
+ "about": "Millbrook Outer Circuit handicapper's book (review 86): the test driver's lap times in seconds, from rest to the end of the first lap (standing) and a lap at speed (flying), from tools/ref/handicaps.ts. estimated: the driver could not finish a clean lap; taken from its best clean lap in the trials.",
+ "cars": {
+  "dueA21": {
+   "standing": 156,
+   "flying": 142.5
+  },
+  "buick28": {
+   "standing": 172.3,
+   "flying": 160.2
+  },
+  "fnTT33": {
+   "standing": 135,
+   "flying": 122.7
+  },
+  "willys27": {
+   "standing": 184,
+   "flying": 174.5
+  },
+  "bmw315": {
+   "standing": 154.5,
+   "flying": 139.8
+  },
+  "pontiac29": {
+   "standing": 178.3,
+   "flying": 169
+  },
+  "plymU29": {
+   "standing": 183.4,
+   "flying": 171.9
+  },
+  "fordT23": {
+   "standing": 258.4,
+   "flying": 245.9
+  },
+  "dodgeV28": {
+   "standing": 175.4,
+   "flying": 165
+  },
+  "chevAB28": {
+   "standing": 206.8,
+   "flying": 195.6
+  },
+  "dueSSJ35": {
+   "standing": 111.0,
+   "flying": 100.5,
+   "estimated": true
+  }
+ }
+}

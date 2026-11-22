@@ -89,7 +89,7 @@ function posed(M: Mesh, steer: number, spin: number): Mesh { if (!steer && !spin
   const cs = Math.cos(spin), ss2 = Math.sin(spin), cd = Math.cos(steer), sd = Math.sin(steer);
   for (const w of W) for (const t of w.tris) for (let k = 0; k < 3; k++) { const i = t * 9 + k * 3; let x = pos[i]! - w.hx, y = pos[i + 1]! - w.hy, z = pos[i + 2]! - w.hz;
     if (spin) { const x1 = x * cs - z * ss2, z1 = x * ss2 + z * cs; x = x1; z = z1; }
-    if (w.front && steer) { const x2 = x * cd - y * sd, y2 = x * sd + y * cd; x = x2; y = y2; }   // about the upright: the wheel's front (x < 0) goes to the left (y < 0)
+    if (w.front && steer) { const x2 = x * cd + y * sd, y2 = -x * sd + y * cd; x = x2; y = y2; }   // about the upright: the wheel's front (x < 0) goes to the car's left (+y in the drawn, mirrored frame)
     pos[i] = x + w.hx; pos[i + 1] = y + w.hy; pos[i + 2] = z + w.hz; }
   return { ...M, pos }; }
 /** the mesh turned about its centre's ground point (x = half its length, y = 0, z = 0): roll about the length, then

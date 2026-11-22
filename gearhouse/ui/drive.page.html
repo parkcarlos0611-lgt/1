@@ -49,13 +49,17 @@
   .pad button.on { background: rgba(255,255,255,0.45); color: #222; }
   @media (pointer: coarse) { .pad { display: flex; } .keys-help { display: none; } }
   body.touch .pad { display: flex; }
+  .btn { font: inherit; padding: 8px 14px; border: 1px solid var(--line); border-radius: 4px; background: var(--bg); color: var(--ink); cursor: pointer; }
+  .btn:first-child { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+  .board { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; font-size: 0.85rem; font-variant-numeric: tabular-nums; }
+  .board li { display: flex; justify-content: space-between; gap: 8px; } .board li.me { color: var(--accent); font-weight: 600; } .board span { color: var(--soft); }
   .note { font-size: 0.8rem; color: var(--soft); line-height: 1.5; margin: 0; }
 </style>
 <h1>Millbrook 시험 주행</h1>
 <p class="lede">Millbrook Outer Circuit(4.45 km, 반시계 방향)을 한 대로 돌아 봅니다. 뱅크가 높을수록 밝게 보이고, 빠를수록 위쪽을 달려야 뱅크가 차를 받쳐 줍니다.</p>
 <div class="bench">
   <div class="stage">
-    <div class="track"><div class="screen"><div class="hud"><span><b id="spd">0</b> km/h</span><span>기어 <b id="gear">1</b></span><span><span class="bar"><span id="rpmbar"></span></span> <span id="rpm">0</span> rpm</span><span>이번 바퀴 <span id="lap">-</span></span><span>지난 <span id="last">-</span></span><span>최고 <span id="best">-</span></span><span id="where"></span></div><canvas id="view" width="768" height="432" aria-label="주행 화면"></canvas>
+    <div class="track"><div class="screen"><div class="hud"><span><b id="spd">0</b> km/h</span><span>기어 <b id="gear">1</b></span><span><span class="bar"><span id="rpmbar"></span></span> <span id="rpm">0</span> rpm</span><span><span id="lap">-</span></span><span><span id="last">-</span></span><span><span id="best">-</span></span><span id="where"></span></div><canvas id="view" width="768" height="432" aria-label="주행 화면"></canvas>
       <div class="pad" id="pad" aria-label="터치 조작">
         <div class="side"><button type="button" data-key="arrowleft" aria-label="왼쪽">◀</button><button type="button" data-key="arrowright" aria-label="오른쪽">▶</button></div>
         <div class="mid"><button type="button" data-key="q" class="small" aria-label="기어 내림">Q</button><button type="button" data-key="e" class="small" aria-label="기어 올림">E</button><button type="button" data-key="r" class="small" aria-label="트랙으로 복귀">R</button></div>
@@ -65,6 +69,12 @@
   </div>
   <form class="dials" onsubmit="return false">
     <div class="row"><label for="car">차</label><select id="car"></select></div>
+    <fieldset><legend>핸디캡 레이스</legend>
+      <div class="row"><label for="laps">바퀴 수</label><select id="laps"><option value="1">1바퀴</option><option value="2" selected>2바퀴</option><option value="3">3바퀴</option></select></div>
+      <div class="seg"><button type="button" id="race" class="btn">레이스 시작</button><button type="button" id="practice" class="btn">연습 주행</button></div>
+      <p class="note">상대 3대가 무작위로 나옵니다. 느린 차가 먼저, 빠른 차가 나중에 출발해서, 계산대로라면 모두 같이 결승선에 들어옵니다.</p>
+      <ol id="board" class="board"></ol><div id="results"></div>
+    </fieldset>
     <label class="check"><input type="checkbox" id="auto" checked> 자동 변속 (<kbd>M</kbd>)</label>
     <label class="check"><input type="checkbox" id="assist"> 카운터스티어 보조</label>
     <label class="check"><input type="checkbox" id="pilot"> 시험 운전자에게 맡기기</label>

@@ -9,6 +9,7 @@ import { Vehicle, type Controls } from '../race/vehicle';
 import { CarSprites } from '../race/sprites';
 import { MESH_CARS } from '../render/car/meshcars';
 import { Driver } from '../race/driver';
+import { Race, type Entrant } from '../race/race';
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const T = millbrook(), cv = $<HTMLCanvasElement>('view'), ctx = cv.getContext('2d')!;
@@ -19,6 +20,8 @@ let car!: Vehicle, sprites!: CarSprites, carId = 'chevAB28', camX = 0, camY = 0,
 const keys = new Set<string>(), input = { steer: 0, throttle: 0, brake: 0, hand: 0 }; let manualGear = 1;
 const skids: { x: number; y: number; z: number; a: number }[] = [], puffs: { x: number; y: number; z: number; r: number; a: number; vx: number; vy: number }[] = [];
 let lapStart = -1, lastLap = 0, bestLap = 0, clock = 0, prevS = 0, msg = '', msgT = 0;
+// a race: the entrants and their pictures (the player's car is `car`, its pictures `sprites`)
+let race: Race | null = null; const others = new Map<Entrant, CarSprites>(); let raceSeed = 7;
 
 function choose(id: string) { carId = id; const spec = raceSpec(id), m = MESH_CARS.find(c => c.id === id)!;
   car = new Vehicle(spec, T); car.auto = st.auto; car.place(START + 30, 0, 0); manualGear = 1;
@@ -56,14 +59,37 @@ function drawBridges() { for (const l of T.spec.landmarks) { if (l.kind !== 'bri
   ctx.fillStyle = 'rgba(20,20,18,0.35)'; const q = (s: number, o: number) => T.point(s, o);
   ctx.beginPath(); for (const [s, o] of [[l.s - 2, -W2], [l.s - 2, W2], [l.s + 3, W2], [l.s + 3, -W2]] as const) { const p = q(s, o); ctx.lineTo(...P(p.x + 2, p.y - 2, p.z)); } ctx.closePath(); ctx.fill();
   ctx.fillStyle = '#7d756a'; ctx.strokeStyle = '#2a2622'; ctx.lineWidth = 2; ctx.beginPath(); for (const [s, o] of [[l.s - 1.5, -W2], [l.s - 1.5, W2], [l.s + 1.5, W2], [l.s + 1.5, -W2]] as const) { const p = q(s, o); ctx.lineTo(...P(p.x, p.y, h + Math.max(a.z, b.z))); } ctx.closePath(); ctx.fill(); ctx.stroke(); void d; } }
+function marks(c: Vehicle) { for (let i = 0; i < 4; i++) { const sl = Math.max(Math.abs(c.slipX[i]!) / 0.15, Math.abs(c.slipA[i]!) / 0.12); if (sl < 1 || c.airborne[i] || c.onGrass[i]) continue; if (Math.random() > 0.35) continue;
+    const [px, py] = c.wheelAt(i), cy = Math.cos(c.yaw), sy2 = Math.sin(c.yaw), x = c.x + px * cy - py * sy2, y = c.y + px * sy2 + py * cy, q = T.locate(x, y, c.s), z = T.height(q.s, q.off);
+    skids.push({ x, y, z, a: Math.min(0.55, 0.15 * sl) }); if (skids.length > 9000) skids.shift(); if (Math.random() < 0.25) puffs.push({ x, y, z: z + 0.2, r: 0.3, a: 0.35, vx: (Math.random() - 0.5) * 0.6, vy: (Math.random() - 0.5) * 0.6 }); } }
+/** every car in view, the farthest first */
+function drawCars() { if (!race) { drawCar(); return; } const a = (st.chase ? camAng : Math.PI / 2) - Math.PI / 2;
+  const list = race.cars.map(e => { const c = e.car, z = T.height(c.s, c.off) + c.zb, [X, Y] = P(c.x, c.y, z); return { e, c, X, Y }; }).filter(q => q.X > -150 && q.X < VW + 150 && q.Y > -150 && q.Y < VH + 150).sort((p, q) => p.Y - q.Y);
+  for (const { e, c, X, Y } of list) { const sp = e.driver ? others.get(e)! : sprites, f = sp.get(sp.key(c.yaw - a, c.tilt + c.roll * 1.5, c.steer, e.wheelTurn, c.speed)); ctx.drawImage(f.canvas, Math.round(X - f.ax), Math.round(Y - f.ay)); } }
 function drawCar() { const z = T.height(car.s, car.off) + car.zb, roll = car.tilt + car.roll * 1.5, a = (st.chase ? camAng : Math.PI / 2) - Math.PI / 2;
   const f = sprites.get(sprites.key(car.yaw - a, roll, car.steer, wheelTurn, car.speed)), [X, Y] = P(car.x, car.y, z); ctx.drawImage(f.canvas, Math.round(X - f.ax), Math.round(Y - f.ay)); }
 function drawPuffs() { for (const p of puffs) { ctx.fillStyle = `rgba(205,200,190,${p.a})`; const r = p.r * 1000 / mm; ctx.beginPath(); ctx.arc(...P(p.x, p.y, p.z), r, 0, Math.PI * 2); ctx.fill(); } }
 const fmt = (t: number) => t > 0 ? `${Math.floor(t / 60)}:${(t % 60).toFixed(2).padStart(5, '0')}` : '-';
 function hud() { const kmh = car.speed * 3.6; $('spd').textContent = kmh.toFixed(0); $('gear').textContent = String(car.gear); $('rpm').textContent = car.rpm.toFixed(0);
   ($('rpmbar') as HTMLElement).style.width = `${Math.min(100, car.rpm / car.spec.redline * 100)}%`; ($('rpmbar') as HTMLElement).style.background = car.rpm > car.spec.hpRpm * 1.05 ? 'var(--warn)' : 'var(--accent)';
-  $('lap').textContent = lapStart >= 0 ? fmt(clock - lapStart) : '-'; $('last').textContent = fmt(lastLap); $('best').textContent = fmt(bestLap); $('where').textContent = T.pieceAt(car.s);
-  $('bake').textContent = sprites.pending ? `그림 굽는 중 ${sprites.count}장` : ''; $('msg').textContent = msgT > 0 ? msg : ''; }
+  $('lap').textContent = `이번 바퀴 ${lapStart >= 0 ? fmt(clock - lapStart) : '-'}`; $('last').textContent = `지난 ${fmt(lastLap)}`; $('best').textContent = `최고 ${fmt(bestLap)}`; $('where').textContent = T.pieceAt(car.s);
+  $('bake').textContent = sprites.pending ? `그림 굽는 중 ${sprites.count}장` : ''; $('msg').textContent = msgT > 0 ? msg : '';
+  if (race) { const me = race.player!, ord = race.order(), pos = ord.indexOf(me) + 1, wait = me.start - race.clock;
+    $('lap').textContent = wait > 0 ? `출발까지 ${Math.ceil(wait)}초` : me.finish ? `완주 ${fmt(me.finish - me.start)}` : `${Math.min(race.laps, me.lapAt.length)}/${race.laps}바퀴 · ${fmt(race.clock - me.start)}`;
+    $('last').textContent = `${pos}/${race.cars.length}위`; $('best').textContent = '';
+    $('board').innerHTML = ord.map((e, k) => `<li${e === me ? ' class="me"' : ''}>${k + 1}. ${e.name}${e === me ? ' (나)' : ''} <span>${e.finish ? fmt(e.finish - e.start) : race!.clock < e.start ? `출발 ${Math.ceil(e.start - race!.clock)}초 뒤` : `${(e.dist / 1000).toFixed(2)} km`}</span></li>`).join(''); } }
+function results() { const r = race!, me = r.player!, ord = r.order(); $('results').dataset.shown = '1';
+  say(`결승 ${ord.indexOf(me) + 1}위 — ${ord[0]!.name} 우승`); }
+function startRace() { const laps = +$<HTMLSelectElement>('laps').value, pool = RACE_CARS.filter(id => id !== carId); raceSeed = (raceSeed * 48271) % 2147483647;
+  const pick: string[] = []; let r = raceSeed; while (pick.length < 3) { r = (r * 16807) % 2147483647; const id = pool[r % pool.length]!; if (!pick.includes(id)) pick.push(id); }
+  race = new Race(T, [carId, ...pick], laps, carId, raceSeed); const me = race.player!; car = me.car; car.auto = st.auto; manualGear = 1; pilot = new Driver(T);
+  others.clear(); const small = matchMedia('(pointer: coarse)').matches;
+  for (const e of race.cars) if (e.driver) { const m = MESH_CARS.find(c => c.id === e.id)!, sp = new CarSprites(m.mesh(), mm, pitchDeg, e.car.spec.steerLock * Math.PI / 180, { outline: 3, glass: 0.8 }, small ? 400 : 900); sp.prepare([0]); others.set(e, sp); }
+  sprites = new CarSprites(MESH_CARS.find(c => c.id === carId)!.mesh(), mm, pitchDeg, car.spec.steerLock * Math.PI / 180, { outline: 3, glass: 0.8 }, small ? 800 : 1800); sprites.prepare([0]); sprites.work(300);
+  skids.length = 0; puffs.length = 0; delete $('results').dataset.shown; camX = car.x; camY = car.y; camAng = car.yaw;
+  const starts = [...race.cars].sort((a, b) => a.start - b.start).map(e => `${e.name}${e.driver ? '' : ' (나)'} ${e.start ? `+${e.start.toFixed(0)}초` : '맨 먼저'}`).join(' · ');
+  say(`핸디캡 ${laps}바퀴 · ${starts}`); msgT = 8; $('race').textContent = '레이스 다시'; }
+function stopRace() { race = null; others.clear(); $('board').innerHTML = ''; choose(carId); }
 // ---- controls ----
 // one press, from a key or a screen button
 function press(k: string) { if (k === 'm') { st.auto = !st.auto; car.auto = st.auto; manualGear = car.gear; ($('auto') as HTMLInputElement).checked = st.auto; say(st.auto ? '자동 변속' : '수동 변속 (Q/E)'); }
@@ -89,13 +115,11 @@ function controls(dt: number): Controls { const left = down('arrowleft', 'a'), r
 // ---- the loop ----
 let last = performance.now(), acc = 0;
 function frame(now: number) { const el = Math.min(0.1, (now - last) / 1000); last = now; acc += el; clock += el; msgT -= el;
-  while (acc >= DT) { acc -= DT; const u = st.pilot ? pilot.drive(car) : controls(DT); car.step(DT, u); wheelTurn += (car.w[0]! + car.w[1]!) / 2 * DT;
-    // marks and smoke where the tyres slide
-    for (let i = 0; i < 4; i++) { const sl = Math.max(Math.abs(car.slipX[i]!) / 0.15, Math.abs(car.slipA[i]!) / 0.12); if (sl < 1 || car.airborne[i] || car.onGrass[i]) continue; if (Math.random() > 0.35) continue;
-      const [px, py] = car.wheelAt(i), c = Math.cos(car.yaw), s = Math.sin(car.yaw), x = car.x + px * c - py * s, y = car.y + px * s + py * c, q = T.locate(x, y, car.s), z = T.height(q.s, q.off);
-      skids.push({ x, y, z, a: Math.min(0.55, 0.15 * sl) }); if (skids.length > 9000) skids.shift(); if (Math.random() < 0.25) puffs.push({ x, y, z: z + 0.2, r: 0.3, a: 0.35, vx: (Math.random() - 0.5) * 0.6, vy: (Math.random() - 0.5) * 0.6 }); }
+  while (acc >= DT) { acc -= DT; const u = st.pilot ? pilot.drive(car) : controls(DT);
+    if (race) { race.step(DT, u); wheelTurn = race.player!.wheelTurn; if (race.done && !$('results').dataset.shown) results(); } else { car.step(DT, u); wheelTurn += (car.w[0]! + car.w[1]!) / 2 * DT; }
+    for (const c of race ? race.cars.map(e => e.car) : [car]) marks(c);
     // lap: forward across the start line
-    if (T.gap(prevS, START) > 0 && T.gap(car.s, START) <= 0 && car.vx > 1) { if (lapStart >= 0) { lastLap = clock - lapStart; if (!bestLap || lastLap < bestLap) bestLap = lastLap; say(`한 바퀴 ${fmt(lastLap)}`); } lapStart = clock; }
+    if (!race && T.gap(prevS, START) > 0 && T.gap(car.s, START) <= 0 && car.vx > 1) { if (lapStart >= 0) { lastLap = clock - lapStart; if (!bestLap || lastLap < bestLap) bestLap = lastLap; say(`한 바퀴 ${fmt(lastLap)}`); } lapStart = clock; }
     prevS = car.s;
     if (car.over) { say('뱅크 꼭대기를 넘어갔습니다 — 트랙으로 복귀'); car.over = false; car.place(car.s, 0, 0); } }
   for (const p of puffs) { p.x += p.vx * el; p.y += p.vy * el; p.z += 0.4 * el; p.r += 0.9 * el; p.a -= 0.4 * el; } while (puffs.length && puffs[0]!.a <= 0) puffs.shift(); for (let i = puffs.length - 1; i >= 0; i--) if (puffs[i]!.a <= 0) puffs.splice(i, 1);
@@ -104,10 +128,12 @@ function frame(now: number) { const el = Math.min(0.1, (now - last) / 1000); las
   camX += (tx - camX) * Math.min(1, el * 5); camY += (ty - camY) * Math.min(1, el * 5); camZ += (tz - camZ) * Math.min(1, el * 5);
   { const vh = car.speed > 2 ? Math.atan2(Math.sin(car.yaw) * car.vx + Math.cos(car.yaw) * car.vy, Math.cos(car.yaw) * car.vx - Math.sin(car.yaw) * car.vy) : car.yaw, d = Math.atan2(Math.sin(vh - camAng), Math.cos(vh - camAng)); camAng += d * Math.min(1, el * 2.5); }   // the turning camera follows where the car goes, gently
   turnCam();
-  drawTrack(); drawCar(); drawPuffs(); drawBridges(); hud(); sprites.work(6); requestAnimationFrame(frame); }
+  drawTrack(); drawCars(); drawPuffs(); drawBridges(); hud(); sprites.work(5); for (const sp of others.values()) sp.work(2); requestAnimationFrame(frame); }
 // ---- page ----
 const pick = $<HTMLSelectElement>('car'); for (const id of RACE_CARS) pick.add(new Option(raceSpec(id).name, id)); pick.value = carId;
-pick.addEventListener('change', () => { choose(pick.value); pick.blur(); });
+pick.addEventListener('change', () => { carId = pick.value; if (race) stopRace(); else choose(pick.value); pick.blur(); });
+$('race').addEventListener('click', e => { startRace(); (e.target as HTMLElement).blur(); });
+$('practice').addEventListener('click', e => { stopRace(); $('race').textContent = '레이스 시작'; (e.target as HTMLElement).blur(); });
 $<HTMLInputElement>('auto').addEventListener('change', e => { st.auto = (e.target as HTMLInputElement).checked; car.auto = st.auto; manualGear = car.gear; });
 $<HTMLInputElement>('pilot').addEventListener('change', e => { st.pilot = (e.target as HTMLInputElement).checked; if (st.pilot) { car.auto = true; } else car.auto = st.auto; });
 $<HTMLInputElement>('assist').addEventListener('change', e => { st.assist = (e.target as HTMLInputElement).checked; });

@@ -1,0 +1,659 @@
+{
+ "about": "The 2D part models drawn flat for the live renderer (tools/ref/artatlas.ts): per car its views stacked (left, right, front, rear, top); each [x, y, w, h, X0, Y0]: the picture, and the pixel of the car origin (x 0, z 0). Horizontal: side and plan x/mm, front C + y, rear C - y; vertical: up is z (plan: C - y). Alpha: the pixel part group, 1 + its index in groups (render/live/artgroups.ts), 0 none.",
+ "mm": 5,
+ "groups": [
+  "screenFrame",
+  "hood",
+  "body",
+  "strap",
+  "tonneau",
+  "cockpit",
+  "lampRim",
+  "lamp",
+  "buckle",
+  "shell",
+  "seat",
+  "fenderF",
+  "fenderR",
+  "hinge",
+  "house",
+  "wheel",
+  "tailRim",
+  "tail",
+  "under",
+  "screenPane",
+  "screenPost",
+  "badgeF",
+  "badgeFIn",
+  "lens",
+  "grilleR",
+  "grilleL",
+  "coreR",
+  "coreL",
+  "noseBar",
+  "tyreF",
+  "badgeR",
+  "badgeRIn",
+  "handleR",
+  "tyreR",
+  "underR",
+  "roof",
+  "visor",
+  "wframe",
+  "wreveal",
+  "wwood",
+  "glass",
+  "cap",
+  "cowlLamp",
+  "spare",
+  "handle",
+  "lampStand",
+  "spareCarrier",
+  "frame",
+  "bumperF",
+  "bumperR",
+  "ironF",
+  "ironR",
+  "leafF",
+  "leafR",
+  "board",
+  "boardTrim",
+  "cross",
+  "badgeRim",
+  "badge",
+  "core",
+  "lampGap",
+  "sweepF",
+  "houseF",
+  "splash",
+  "clampFC",
+  "clampF",
+  "hubF",
+  "axleF",
+  "springF",
+  "rearFrame",
+  "rearWood",
+  "rearGlass",
+  "plateRim",
+  "plate",
+  "rearApron",
+  "clampR",
+  "axleR",
+  "springR",
+  "step",
+  "stayF",
+  "wood",
+  "wframeQ",
+  "glassQ",
+  "belt",
+  "doorHandle",
+  "badgeGem",
+  "lampStay",
+  "screenBar",
+  "underTop",
+  "mirror",
+  "coreBar",
+  "horn",
+  "bumperFiron",
+  "spareStrap",
+  "spareHub",
+  "bumperRiron",
+  "spotLamp",
+  "fuelCap",
+  "screenPivot",
+  "fenderStayR",
+  "mirrorArm",
+  "guard",
+  "fenderStayF",
+  "tailStalk",
+  "screenWood",
+  "crank",
+  "rearBar",
+  "hubR",
+  "wgarnish",
+  "handleBoss",
+  "tailStem",
+  "bracketR",
+  "lampTop",
+  "hoodBand",
+  "fenderLamp",
+  "screenIn",
+  "cowlLens",
+  "endF",
+  "endR",
+  "postF",
+  "postGlass",
+  "rearReveal",
+  "screenTop"
+ ],
+ "cars": {
+  "bmw315": {
+   "C": 833.5,
+   "length": 3634,
+   "width": 739,
+   "height": 1458,
+   "views": {
+    "left": [
+     0,
+     0,
+     739,
+     278,
+     6,
+     272
+    ],
+    "right": [
+     0,
+     278,
+     739,
+     278,
+     6,
+     272
+    ],
+    "front": [
+     0,
+     556,
+     346,
+     278,
+     6,
+     272
+    ],
+    "rear": [
+     0,
+     834,
+     346,
+     278,
+     6,
+     272
+    ],
+    "top": [
+     0,
+     1112,
+     739,
+     346,
+     6,
+     340
+    ]
+   }
+  },
+  "buick28": {
+   "C": 1001,
+   "length": 4288,
+   "width": 870,
+   "height": 1945,
+   "views": {
+    "left": [
+     0,
+     0,
+     870,
+     383,
+     6,
+     377
+    ],
+    "right": [
+     0,
+     383,
+     870,
+     383,
+     6,
+     377
+    ],
+    "front": [
+     0,
+     766,
+     413,
+     383,
+     6,
+     377
+    ],
+    "rear": [
+     0,
+     1149,
+     413,
+     383,
+     6,
+     377
+    ],
+    "top": [
+     0,
+     1532,
+     870,
+     413,
+     6,
+     407
+    ]
+   }
+  },
+  "chevAB28": {
+   "C": 865.5,
+   "length": 4101,
+   "width": 833,
+   "height": 1883,
+   "views": {
+    "left": [
+     0,
+     0,
+     833,
+     381,
+     6,
+     375
+    ],
+    "right": [
+     0,
+     381,
+     833,
+     381,
+     6,
+     375
+    ],
+    "front": [
+     0,
+     762,
+     359,
+     381,
+     6,
+     375
+    ],
+    "rear": [
+     0,
+     1143,
+     359,
+     381,
+     6,
+     375
+    ],
+    "top": [
+     0,
+     1524,
+     833,
+     359,
+     6,
+     353
+    ]
+   }
+  },
+  "dodgeV28": {
+   "C": 990.5,
+   "length": 4225,
+   "width": 857,
+   "height": 1933,
+   "views": {
+    "left": [
+     0,
+     0,
+     857,
+     381,
+     6,
+     375
+    ],
+    "right": [
+     0,
+     381,
+     857,
+     381,
+     6,
+     375
+    ],
+    "front": [
+     0,
+     762,
+     409,
+     381,
+     6,
+     375
+    ],
+    "rear": [
+     0,
+     1143,
+     409,
+     381,
+     6,
+     375
+    ],
+    "top": [
+     0,
+     1524,
+     857,
+     409,
+     6,
+     403
+    ]
+   }
+  },
+  "dueA21": {
+   "C": 970,
+   "length": 4742,
+   "width": 961,
+   "height": 2048,
+   "views": {
+    "left": [
+     0,
+     0,
+     961,
+     412,
+     6,
+     406
+    ],
+    "right": [
+     0,
+     412,
+     961,
+     412,
+     6,
+     406
+    ],
+    "front": [
+     0,
+     824,
+     400,
+     412,
+     6,
+     406
+    ],
+    "rear": [
+     0,
+     1236,
+     400,
+     412,
+     6,
+     406
+    ],
+    "top": [
+     0,
+     1648,
+     961,
+     400,
+     6,
+     394
+    ]
+   }
+  },
+  "dueSSJ35": {
+   "C": 1028.5,
+   "length": 4517,
+   "width": 916,
+   "height": 1680,
+   "views": {
+    "left": [
+     0,
+     0,
+     916,
+     314,
+     6,
+     308
+    ],
+    "right": [
+     0,
+     314,
+     916,
+     314,
+     6,
+     308
+    ],
+    "front": [
+     0,
+     628,
+     424,
+     314,
+     6,
+     308
+    ],
+    "rear": [
+     0,
+     942,
+     424,
+     314,
+     6,
+     308
+    ],
+    "top": [
+     0,
+     1256,
+     916,
+     424,
+     6,
+     418
+    ]
+   }
+  },
+  "fnTT33": {
+   "C": 823,
+   "length": 3382,
+   "width": 689,
+   "height": 1386,
+   "views": {
+    "left": [
+     0,
+     0,
+     689,
+     261,
+     6,
+     255
+    ],
+    "right": [
+     0,
+     261,
+     689,
+     261,
+     6,
+     255
+    ],
+    "front": [
+     0,
+     522,
+     342,
+     261,
+     6,
+     255
+    ],
+    "rear": [
+     0,
+     783,
+     342,
+     261,
+     6,
+     255
+    ],
+    "top": [
+     0,
+     1044,
+     689,
+     342,
+     6,
+     336
+    ]
+   }
+  },
+  "fordT23": {
+   "C": 937.5,
+   "length": 3475,
+   "width": 707,
+   "height": 2155,
+   "views": {
+    "left": [
+     0,
+     0,
+     707,
+     442,
+     6,
+     436
+    ],
+    "right": [
+     0,
+     442,
+     707,
+     442,
+     6,
+     436
+    ],
+    "front": [
+     0,
+     884,
+     387,
+     442,
+     6,
+     436
+    ],
+    "rear": [
+     0,
+     1326,
+     387,
+     442,
+     6,
+     436
+    ],
+    "top": [
+     0,
+     1768,
+     707,
+     387,
+     6,
+     381
+    ]
+   }
+  },
+  "plymU29": {
+   "C": 868,
+   "length": 4051,
+   "width": 823,
+   "height": 1856,
+   "views": {
+    "left": [
+     0,
+     0,
+     823,
+     374,
+     6,
+     368
+    ],
+    "right": [
+     0,
+     374,
+     823,
+     374,
+     6,
+     368
+    ],
+    "front": [
+     0,
+     748,
+     360,
+     374,
+     6,
+     368
+    ],
+    "rear": [
+     0,
+     1122,
+     360,
+     374,
+     6,
+     368
+    ],
+    "top": [
+     0,
+     1496,
+     823,
+     360,
+     6,
+     354
+    ]
+   }
+  },
+  "pontiac29": {
+   "C": 851.5,
+   "length": 4030,
+   "width": 818,
+   "height": 1817,
+   "views": {
+    "left": [
+     0,
+     0,
+     818,
+     366,
+     6,
+     360
+    ],
+    "right": [
+     0,
+     366,
+     818,
+     366,
+     6,
+     360
+    ],
+    "front": [
+     0,
+     732,
+     353,
+     366,
+     6,
+     360
+    ],
+    "rear": [
+     0,
+     1098,
+     353,
+     366,
+     6,
+     360
+    ],
+    "top": [
+     0,
+     1464,
+     818,
+     353,
+     6,
+     347
+    ]
+   }
+  },
+  "willys27": {
+   "C": 959.5,
+   "length": 4322,
+   "width": 877,
+   "height": 2100,
+   "views": {
+    "left": [
+     0,
+     0,
+     877,
+     426,
+     6,
+     420
+    ],
+    "right": [
+     0,
+     426,
+     877,
+     426,
+     6,
+     420
+    ],
+    "front": [
+     0,
+     852,
+     396,
+     426,
+     6,
+     420
+    ],
+    "rear": [
+     0,
+     1278,
+     396,
+     426,
+     6,
+     420
+    ],
+    "top": [
+     0,
+     1704,
+     877,
+     396,
+     6,
+     390
+    ]
+   }
+  }
+ }
+}

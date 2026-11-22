@@ -94,3 +94,12 @@ Per car, rust, fading and dirt (0..1), in the live shader, by noise in the car's
 - Dirt: thrown up low on the body and the wheels, dust settling on what faces up; dull and rough.
 The page sets the player's car's age; its dirt grows as it is driven (fast on the grass), a wash takes it off; the
 others in a race carry a mixed, fixed age.
+
+## PBR, step 4 (review 105): the 2D art laid on (brief 73 §2)
+tools/ref/artatlas.ts draws each car's part model flat in five views (left, right, front, rear, plan) at 5 mm a pixel
+into one picture per car (assets/art), the alpha holding each pixel's part group (render/live/artgroups.ts brings the
+2D parts' and the mesh's names to one). The live shader takes, for a painted face, the views that see it (blended by how
+squarely) and uses a view's pixel only where it shows this same part, so what stands before a part in a view (a spare
+before the tail, a wheel before the wing) never lands on it. The art's colour replaces the vertex colour (85 %) under the
+PBR light, wear and textures. Only meshes with named parts can take it: the SSJ now; the other period meshes get names
+when they are rebuilt 3D-first.

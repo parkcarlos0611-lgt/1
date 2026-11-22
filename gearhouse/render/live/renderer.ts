@@ -78,6 +78,17 @@ precision highp float;
 ${LIGHT}
 in vec3 vWorld, vObj; flat in vec3 vN, vObjN, vCol; flat in float vGloss, vKind, vPart;
 uniform mat4 uModel; uniform vec3 uEye, uSun; uniform vec2 uObj; uniform vec3 uWear; uniform float uObjZ, uCarH;
+// ---- the 2D art laid on (review 105, PBR step 4): the part model's views of this car, each face taking the view it looks along ----
+uniform sampler2D uArt, uArtLut; uniform int uArtOn; uniform highp int uWheel; uniform float uArtMM, uArtC; uniform vec4 uArtR[5]; uniform vec2 uArtO[5];
+vec4 artAt(int v, float h, float vv) { vec4 r = uArtR[v]; vec2 px = vec2(uArtO[v].x + h / uArtMM, uArtO[v].y - vv / uArtMM);
+  if (px.x < 0. || px.y < 0. || px.x >= r.z || px.y >= r.w) return vec4(0.); return texelFetch(uArt, ivec2(r.xy + px), 0); }
+/** the views that see this face, blended by how squarely; a view's pixel counts only where it shows this same part (else it shows what stands before it) */
+vec4 artOn(vec3 p, vec3 n, float part) { vec3 w = pow(abs(n), vec3(4.)); w /= w.x + w.y + w.z; vec4 a = vec4(0.); float ws = 0.;
+  float g = floor(texelFetch(uArtLut, ivec2(int(part), 0), 0).r * 255. + 0.5); if (g < 0.5) return vec4(0.);
+  vec4 s = n.y > 0. ? artAt(0, p.x, p.z) : artAt(1, p.x, p.z); if (abs(s.a * 255. - g) < 0.5) { a += s * w.y; ws += w.y; }
+  vec4 f = n.x < 0. ? artAt(2, uArtC + p.y, p.z) : artAt(3, uArtC - p.y, p.z); if (abs(f.a * 255. - g) < 0.5) { a += f * w.x; ws += w.x; }
+  if (n.z > 0.) { vec4 t = artAt(4, p.x, uArtC - p.y); if (abs(t.a * 255. - g) < 0.5) { a += t * w.z; ws += w.z; } }
+  return ws > 0.01 ? vec4(a.rgb / ws, ws) : vec4(0.); }
 // ---- age (review 104), the 2D wear system's rules in the material's terms: noise in the thing's own axes ----
 float h3(vec3 p) { p = fract(p * 0.3183099 + 0.1); p *= 17.; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
 float vnoise(vec3 x) { vec3 i = floor(x), f = fract(x); f = f * f * (3. - 2. * f);
@@ -112,6 +123,7 @@ void main() {
     else if (kind == 8) { L = 4; sa = 0.7; sn = 0.8; sr = 0.6; } else if (kind == 7) { L = 5; sa = 0.6; sn = 0.9; sr = 0.5; } else if (kind == 6) { L = 6; sa = 0.9; sn = 0.6; sr = 0.6; } else if (kind == 0) { L = 0; sa = 0.35; sn = 0.3; sr = 0.3; }
     vec3 no = vObjN; if (dot(normalize(mat3(uModel) * no), uEye) < 0.) no = -no;
     Detail dt = detail(L, vObj / 1000., no, sa, sn, sr); vec3 nw = normalize(mat3(uModel) * dt.n); if (dot(nw, uEye) < 0.) nw = n;
+    if (uArtOn == 1 && uWheel == 0 && uMode == 0 && (kind == 0 || kind == 1 || kind == 7 || kind == 8 || kind == 10)) { vec4 art = artOn(vObj, no, vPart); if (art.a > 0.) base = mix(base, art.rgb, 0.85 * art.a); }   /* the painted detail of the 2D art: badges, lines, louvres, pleats */
     base *= dt.tone; rough = clamp(rough + dt.rough, 0.04, 1.);
     if (uWear != vec3(0.)) { vec3 P = vObj / 1000.; float Z = (vObj.z + uObjZ) / 1000., low = 1. - smoothstep(0.17, 0.64, Z / max(0.8, uCarH));   /* low down: by the car's own height */
       bool painted = kind == 1 || (kind == 0 && metal < 0.5);
@@ -184,7 +196,7 @@ export class LiveRenderer {
   private sFbo: WebGLFramebuffer; private sTex: WebGLTexture; private S = 2048;
   private groundVao: WebGLVertexArrayObject | null = null; private groundN = 0; private fenceVao: WebGLVertexArrayObject | null = null; private fenceN = 0;
   private skidVao: WebGLVertexArrayObject; private skidBuf: WebGLBuffer; private kinds = new Map<string, GpuMesh>(); private cars = new Map<Mesh, GpuMesh>();
-  private u = new Map<WebGLProgram, Map<string, WebGLUniformLocation | null>>(); private blank: WebGLTexture; private tex: { alb: WebGLTexture; nor: WebGLTexture; rgh: WebGLTexture; size: Float32Array; luma: Float32Array; rough: Float32Array } | null = null;
+  private u = new Map<WebGLProgram, Map<string, WebGLUniformLocation | null>>(); private blank: WebGLTexture; private arts = new Map<GpuMesh, { lut: WebGLTexture; tex: WebGLTexture; mm: number; C: number; rects: Float32Array; origins: Float32Array }>(); private tex: { alb: WebGLTexture; nor: WebGLTexture; rgh: WebGLTexture; size: Float32Array; luma: Float32Array; rough: Float32Array } | null = null;
   constructor(readonly canvas: HTMLCanvasElement) {
     const gl = canvas.getContext('webgl2', { antialias: false, alpha: false, depth: false, preserveDrawingBuffer: true }); if (!gl) throw new Error('no WebGL2'); this.gl = gl;
     this.obj = program(gl, OBJ_VS, OBJ_FS); this.ground = program(gl, GROUND_VS, GROUND_FS); this.depth = program(gl, DEPTH_VS, DEPTH_FS); this.post = program(gl, POST_VS, POST_FS);
@@ -213,6 +225,13 @@ export class LiveRenderer {
       gl.generateMipmap(gl.TEXTURE_2D_ARRAY); gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR); gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
       gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_S, gl.REPEAT); gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_T, gl.REPEAT); return t; };
     this.tex = { alb: arr(alb), nor: arr(nor), rgh: arr(rgh), size: new Float32Array(layers.map(l => l.size_m)), luma: new Float32Array(layers.map(l => l.luma_mean)), rough: new Float32Array(layers.map(l => l.rough_mean)) }; }
+  /** a car's 2D art (its part model's views stacked: left, right, front, rear, top), laid on its mesh's painted faces */
+  setArt(g: GpuMesh, img: ImageBitmap, meta: { mm: number; C: number; views: Record<string, number[]> }, partGroups: number[]) { const gl = this.gl, t = gl.createTexture()!; gl.bindTexture(gl.TEXTURE_2D, t);
+    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false); gl.pixelStorei(gl.UNPACK_COLORSPACE_CONVERSION_WEBGL, gl.NONE);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, img); this.texParams(gl.NEAREST); const V = ['left', 'right', 'front', 'rear', 'top'].map(v => meta.views[v]!);
+    const lut = gl.createTexture()!; gl.bindTexture(gl.TEXTURE_2D, lut); gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1); gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, partGroups.length, 1, 0, gl.RED, gl.UNSIGNED_BYTE, new Uint8Array(partGroups)); gl.pixelStorei(gl.UNPACK_ALIGNMENT, 4); this.texParams(gl.NEAREST);
+    this.arts.set(g, { lut, tex: t, mm: meta.mm, C: meta.C, rects: new Float32Array(V.flatMap(v => [v[0]!, v[1]!, v[2]!, v[3]!])), origins: new Float32Array(V.flatMap(v => [v[4]!, v[5]!])) }); }
+  hasArt(g: GpuMesh): boolean { return this.arts.has(g); }
   setGround(d: GroundData) { this.groundVao = this.vaoOf(d); this.groundN = d.n; }
   setFence(d: GroundData) { this.fenceVao = this.vaoOf(d); this.fenceN = d.n; }
   /** the GPU copy of a prop's mesh (by kind) or a car's (by its mesh object), made once */
@@ -220,7 +239,7 @@ export class LiveRenderer {
   car(M: Mesh): GpuMesh { let g = this.cars.get(M); if (!g) { g = gpuMesh(this.gl, M, true); this.cars.set(M, g); } return g; }
   forget(M: Mesh) { this.cars.delete(M); }
 
-  render(v: LiveView, cars: LiveCar[], props: LiveProp[], skids: Skid[], o: { glass?: number; /** 0 the baked look, 1 PBR stepped, 2 PBR smooth */ look?: number } = {}) { const gl = this.gl; this.size(v.W, v.H);
+  render(v: LiveView, cars: LiveCar[], props: LiveProp[], skids: Skid[], o: { glass?: number; /** 0 the baked look, 1 PBR stepped, 2 PBR smooth */ look?: number; /** lay the 2D art on (default yes) */ art?: boolean } = {}) { const gl = this.gl; this.size(v.W, v.H);
     // ---- the camera: orthographic, turned to v.ang, tilted down by v.pitch, v.mm millimetres a pixel, snapped to whole pixels ----
     const a = v.ang - Math.PI / 2, cA = Math.cos(a), sA = Math.sin(a), SP = Math.sin(v.pitch * Math.PI / 180), CP = Math.cos(v.pitch * Math.PI / 180), k = 1000 / v.mm, R = 900;
     const rx = [cA, sA, 0], ry = [-sA, cA, 0], up = [ry[0]! * SP, ry[1]! * SP, CP], vd = [ry[0]! * CP, ry[1]! * CP, -SP], c = [v.x, v.y, v.z], dot = (p: number[], q: number[]) => p[0]! * q[0]! + p[1]! * q[1]! + p[2]! * q[2]!;
@@ -259,6 +278,9 @@ export class LiveRenderer {
       gl.uniform1f(this.loc(this.ground, 'uBias'), 0.00002); gl.bindVertexArray(this.skidVao); gl.drawArrays(gl.TRIANGLES, 0, S.length * 6); gl.disable(gl.BLEND); gl.depthMask(true); gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.COLOR_ATTACHMENT1]); }
     gl.useProgram(this.obj); gl.uniformMatrix4fv(this.loc(this.obj, 'uVP'), false, VP); gl.uniform1i(this.loc(this.obj, 'uLook'), o.look ?? 0); gl.uniform3fv(this.loc(this.obj, 'uEye'), eye); gl.uniform3fv(this.loc(this.obj, 'uSun'), SUN_W); gl.uniform1f(this.loc(this.obj, 'uGlass'), o.glass ?? 0.8); shadowTo(this.obj);
     gl.uniform1i(this.loc(this.obj, 'uDecTex'), 2);
+    const artTo = (g: GpuMesh | null) => { const a = g && o.art !== false ? this.arts.get(g) : undefined; gl.uniform1i(this.loc(this.obj, 'uArtOn'), a ? 1 : 0); gl.activeTexture(gl.TEXTURE6); gl.bindTexture(gl.TEXTURE_2D, a ? a.tex : this.blank); gl.uniform1i(this.loc(this.obj, 'uArt'), 6); gl.activeTexture(gl.TEXTURE7); gl.bindTexture(gl.TEXTURE_2D, a ? a.lut : this.blank); gl.uniform1i(this.loc(this.obj, 'uArtLut'), 7); if (!a) return;
+      gl.uniform1f(this.loc(this.obj, 'uArtMM'), a.mm); gl.uniform1f(this.loc(this.obj, 'uArtC'), a.C); gl.uniform4fv(this.loc(this.obj, 'uArtR'), a.rects); gl.uniform2fv(this.loc(this.obj, 'uArtO'), a.origins); };
+    artTo(null);
     let id = 1; const objU = (outline: number) => { gl.uniform2f(this.loc(this.obj, 'uObj'), (id & 255) / 255, ((id >> 8) & 255) / 255); gl.uniform1f(this.loc(this.obj, 'uOutline'), outline); id++; };
     const draw = (part: { vao: WebGLVertexArrayObject; n: number }, M: M4, w?: WheelDraw) => { if (!part.n) return; gl.uniformMatrix4fv(this.loc(this.obj, 'uModel'), false, M); gl.uniform1i(this.loc(this.obj, 'uWheel'), w ? 1 : 0);
       if (!w) gl.uniform1f(this.loc(this.obj, 'uObjZ'), 0); if (w) { gl.uniform1f(this.loc(this.obj, 'uSpin'), w.spin); gl.uniform1f(this.loc(this.obj, 'uObjZ'), w.hubZ); gl.uniform1fv(this.loc(this.obj, 'uDef'), w.def); gl.uniform2f(this.loc(this.obj, 'uShift'), w.sx, w.sy); gl.uniform1f(this.loc(this.obj, 'uTyreR'), w.R); gl.uniform1f(this.loc(this.obj, 'uRim'), w.rim); } gl.bindVertexArray(part.vao); gl.drawArrays(gl.TRIANGLES, 0, part.n); };
@@ -273,7 +295,7 @@ export class LiveRenderer {
     gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.NONE]); gl.uniform1f(this.loc(this.obj, 'uBias'), 0.25 / R);
     cars.forEach((q, i) => { gl.uniform4f(this.loc(this.obj, 'uSil'), 1, 226 / 255, 168 / 255, q.player ? 0.6 : 0.4); for (const [part, M, w] of carM[i]!.opaque) draw(part, M, w); });
     gl.disable(gl.STENCIL_TEST); gl.disable(gl.BLEND); gl.depthFunc(gl.LESS); gl.depthMask(true); gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.COLOR_ATTACHMENT1]); gl.uniform1f(this.loc(this.obj, 'uBias'), 0); gl.uniform1i(this.loc(this.obj, 'uMode'), 0);
-    cars.forEach((q, i) => { objU(outlineC); const m = carM[i]!; gl.uniform3fv(this.loc(this.obj, 'uWear'), q.wear ?? [0, 0, 0]); gl.uniform1f(this.loc(this.obj, 'uCarH'), q.g.height); decals(q.g); draw(q.g.body, m.body); decals(null); for (const [part, M, w] of m.opaque.slice(1)) draw(part, M, w); });
+    cars.forEach((q, i) => { objU(outlineC); const m = carM[i]!; gl.uniform3fv(this.loc(this.obj, 'uWear'), q.wear ?? [0, 0, 0]); gl.uniform1f(this.loc(this.obj, 'uCarH'), q.g.height); artTo(q.g); decals(q.g); draw(q.g.body, m.body); decals(null); for (const [part, M, w] of m.opaque.slice(1)) draw(part, M, w); });
     // glass over all, at its own strength, nothing else written
     gl.uniform1i(this.loc(this.obj, 'uMode'), 2); gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false); gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.NONE]);
     gl.uniform3f(this.loc(this.obj, 'uWear'), 0, 0, 0); for (const p of ps) draw(p.g.glass, placeMesh(p.g.len, p.x, p.y, p.z, p.h)); for (const m of carM) for (const [part, M, w] of m.glass) draw(part, M, w);

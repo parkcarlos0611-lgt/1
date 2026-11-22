@@ -12,6 +12,10 @@ import { PROPS } from '../render/props/index';
 import { renumber } from '../render/car/mesh';
 import { LiveRenderer } from '../render/live/renderer';
 import { groundData, fenceData } from '../render/live/ground';
+import texAlb from '../assets/textures/pbr/albedo.jpg';
+import texNor from '../assets/textures/pbr/normal.jpg';
+import texRgh from '../assets/textures/pbr/rough.jpg';
+import texMeta from '../assets/textures/pbr/pbr.json';
 import { MESH_CARS } from '../render/car/meshcars';
 import { Driver } from '../race/driver';
 import { Race, type Entrant } from '../race/race';
@@ -48,7 +52,10 @@ const numOf = (e: Entrant): string => { if (!race) return myNum; let k = 0; for 
 // ---- the live renderer (review 99): the scene drawn every frame by WebGL2, where the browser has it; the baked pictures otherwise ----
 const glCanvas = document.createElement('canvas'); let live: LiveRenderer | null = null, liveFence = -1;
 try { live = new LiveRenderer(glCanvas); live.setGround(groundData(T, SCN, START)); } catch (e) { console.warn('live renderer unavailable', e); live = null; }
-const liveOK = !!live; let liveR = live; let look: 'baked' | 'stepped' | 'pbr' | 'split' = 'baked';   /* the light and materials: the baked pictures' stepped light, or physically based (review 102) */
+// the PBR detail textures (Poly Haven, CC0): loaded once, laid on when ready
+if (live) { const L = live, im = [texAlb, texNor, texRgh].map(src => { const i = new Image(); i.src = src; return i; });
+  void Promise.all(im.map(i => i.decode())).then(() => L.setTextures(im[0]!, im[1]!, im[2]!, (texMeta as { layers: { size_m: number; luma_mean: number; rough_mean: number }[] }).layers)).catch(e => console.warn('textures', e)); }
+const liveOK = !!live; let liveR = live; let look: 'baked' | 'stepped' | 'pbr' | 'split' = 'pbr';   /* the light and materials: the baked pictures' stepped light, or physically based (review 102) */
 function drawLive(el: number) { const L = live!; void el;
   if (broken.size !== liveFence) { L.setFence(fenceData(T, fenceOk)); liveFence = broken.size; }
   glCanvas.width = VW; glCanvas.height = VH;

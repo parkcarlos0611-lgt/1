@@ -40,6 +40,19 @@ vec3 pbr(vec3 baseSrgb, vec3 n, vec3 v, vec3 l, float sh, float metal, float rou
   col += kd * alb * irradiance(n) + envS * (f0 * ab.x + ab.y);
   if (coat > 0.) { float Fc = (0.04 + 0.96 * pow(1. - nv, 5.)) * coat; col = col * (1. - Fc) + toLin(envAt(r.z)) * Fc + D_GGX(nh, 0.06) * V_Smith(nv, nl, 0.06) * 0.04 * coat * SUN_E * nl * sh; }
   return col; }
+// ---- PBR detail textures (review 103): seven layers (concrete, grass, metal, rubber, leather, canvas, wood), each a
+// tile of known size; the albedo used for its light and dark only (the game keeps its colours), roughness and normals ----
+uniform highp sampler2DArray uAlb, uNor, uRgh; uniform int uTex; uniform float uTSize[7], uTLuma[7], uTRough[7];
+struct Detail { float tone; float rough; vec3 n; };
+/** a layer laid three ways (by the normal's main axes) at point p (m), on normal n: its tone, roughness offset, bent normal */
+Detail detail(int L, vec3 p, vec3 n, float sa, float sn, float sr) { Detail d; d.tone = 1.; d.rough = 0.; d.n = n; if (uTex == 0 || L < 0) return d;
+  vec3 q = p / uTSize[L], w = pow(abs(n), vec3(4.)); w /= (w.x + w.y + w.z); float fl = float(L);
+  vec3 ax = vec3(q.zy, fl), ay = vec3(q.xz, fl), az = vec3(q.xy, fl);
+  vec3 a = texture(uAlb, ax).rgb * w.x + texture(uAlb, ay).rgb * w.y + texture(uAlb, az).rgb * w.z;
+  float r = texture(uRgh, ax).r * w.x + texture(uRgh, ay).r * w.y + texture(uRgh, az).r * w.z;
+  vec3 tx = texture(uNor, ax).xyz * 2. - 1., ty = texture(uNor, ay).xyz * 2. - 1., tz = texture(uNor, az).xyz * 2. - 1.;
+  vec3 bend = vec3(0., tx.y, tx.x) * w.x + vec3(ty.x, 0., ty.y) * w.y + vec3(tz.xy, 0.) * w.z;
+  d.tone = clamp(mix(1., dot(a, vec3(0.3, 0.59, 0.11)) / uTLuma[L], sa), 0.45, 1.7); d.rough = (r - uTRough[L]) * sr; d.n = normalize(n + bend * sn); return d; }
 /** the linear colour to the screen: exposure, filmic curve, gamma; stepped in brightness for the stepped look */
 vec3 present(vec3 c) { vec3 s = pow(aces(c * 0.6), vec3(1. / 2.2));   /* exposure set so the concrete reads as bright as in the baked look */ if (uLook == 1) { float L = dot(s, vec3(0.3, 0.59, 0.11)), q = floor(L * 7. + 0.5) / 7.; s *= q / max(L, 1e-3); } return min(s, vec3(1.)); }
 float lightAt(vec3 w) { vec4 l = uLight * vec4(w, 1.); vec3 q = l.xyz * 0.5 + 0.5; if (q.x <= 0. || q.y <= 0. || q.x >= 1. || q.y >= 1. || q.z >= 1.) return 1.; return texture(uShadow, vec3(q.xy, q.z - 0.0015)); }
@@ -64,7 +77,7 @@ const OBJ_FS = `#version 300 es
 precision highp float;
 ${LIGHT}
 in vec3 vWorld, vObj; flat in vec3 vN, vObjN, vCol; flat in float vGloss, vKind, vPart;
-uniform vec3 uEye, uSun; uniform vec2 uObj; uniform float uOutline; uniform int uMode; uniform vec4 uSil; uniform float uGlass;
+uniform mat4 uModel; uniform vec3 uEye, uSun; uniform vec2 uObj; uniform float uOutline; uniform int uMode; uniform vec4 uSil; uniform float uGlass;
 uniform int uDecN; uniform vec3 uDecO[4], uDecN_[4], uDecUp[4]; uniform float uDecR[4]; uniform sampler2D uDecTex;
 layout(location=0) out vec4 oCol; layout(location=1) out vec4 oId;
 void main() {
@@ -87,7 +100,13 @@ void main() {
     if (kind == 1) { rough = 0.55 - 0.3 * vGloss; coat = vGloss; } else if (kind == 2 || kind == 10) { metal = 1.; rough = vGloss > 0.7 ? 0.12 : 0.42; }
     else if (kind == 5) rough = 0.9; else if (kind == 7) rough = 0.95; else if (kind == 8) rough = 0.5; else if (kind == 6) rough = 0.65; else if (kind == 9) rough = 0.15;
     else if (vGloss > 0.7) { metal = 1.; rough = 0.15; } else rough = 0.85 - 0.6 * vGloss;
-    oCol = vec4(present(pbr(base, n, uEye, uSun, sh, metal, rough, coat)), 1.); oId = vec4(uObj, vPart / 255., uOutline / 8.); return; }
+    // the material's detail, laid in the thing's own axes (it moves with it); bright metal and paint only a little
+    int L = -1; float sa = 0., sn = 0., sr = 0.;
+    if (kind == 1) { L = 2; sa = 0.; sn = 0.18; sr = 0.35; } else if (metal > 0.5) { L = 2; sa = 0.12; sn = 0.3; sr = 0.5; } else if (kind == 5) { L = 3; sa = 0.5; sn = 0.6; sr = 0.3; }
+    else if (kind == 8) { L = 4; sa = 0.7; sn = 0.8; sr = 0.6; } else if (kind == 7) { L = 5; sa = 0.6; sn = 0.9; sr = 0.5; } else if (kind == 6) { L = 6; sa = 0.9; sn = 0.6; sr = 0.6; } else if (kind == 0) { L = 0; sa = 0.35; sn = 0.3; sr = 0.3; }
+    vec3 no = vObjN; if (dot(normalize(mat3(uModel) * no), uEye) < 0.) no = -no;
+    Detail dt = detail(L, vObj / 1000., no, sa, sn, sr); vec3 nw = normalize(mat3(uModel) * dt.n); if (dot(nw, uEye) < 0.) nw = n;
+    oCol = vec4(present(pbr(base * dt.tone, nw, uEye, uSun, sh, metal, clamp(rough + dt.rough, 0.04, 1.), coat)), 1.); oId = vec4(uObj, vPart / 255., uOutline / 8.); return; }
   float dq = floor(d * 4. + 0.5) / 4.;
   vec3 diff = SUN_C * dq * 0.78 + (SKY_C * up + GROUND_C * (1. - up)) * 0.6, c;
   vec3 env = envAt(rz);
@@ -106,9 +125,10 @@ in vec3 vWorld; in vec4 vCol; flat in float vFlag; uniform float uCell; uniform 
 layout(location=0) out vec4 oCol; layout(location=1) out vec4 oId;
 float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 void main() { vec3 c = vCol.rgb;
-  if (vFlag > 0.5) { vec2 cell = floor(vWorld.xy / vec2(uCell * 2., uCell)); float h = hash(cell); if (h > 0.955) c = vec3(107., 130., 83.) / 255.; else if (h > 0.91) c = vec3(83., 104., 63.) / 255.; }
+  if (vFlag > 0.5 && uLook == 0) { vec2 cell = floor(vWorld.xy / vec2(uCell * 2., uCell)); float h = hash(cell); if (h > 0.955) c = vec3(107., 130., 83.) / 255.; else if (h > 0.91) c = vec3(83., 104., 63.) / 255.; }
   if (uLook > 0) { vec3 nn = normalize(cross(dFdx(vWorld), dFdy(vWorld))); if (nn.z < 0.) nn = -nn; float sh = lightAt(vWorld + vec3(0., 0., 0.02));   // the ground as a rough, dull surface
-    oCol = vec4(present(pbr(c, nn, uEye, uSun, sh, 0., 0.92, 0.)), vCol.a); oId = vec4(0.); return; }
+    Detail dt = detail(vFlag > 0.5 ? 1 : 0, vWorld, nn, vFlag > 0.5 ? 0.8 : 0.7, 0.6, 0.4);
+    oCol = vec4(present(pbr(c * dt.tone, dt.n, uEye, uSun, sh, 0., clamp(0.92 + dt.rough, 0.3, 1.), 0.)), vCol.a); oId = vec4(0.); return; }
   c = mix(c, vec3(24., 22., 20.) / 255., (1. - lightAt(vWorld + vec3(0., 0., 0.02))) * 0.43);
   oCol = vec4(c, vCol.a); oId = vec4(0.); }`;
 const DEPTH_VS = `#version 300 es
@@ -119,7 +139,7 @@ const POST_VS = `#version 300 es
 out vec2 vUv; void main() { vec2 p = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2); vUv = p; gl_Position = vec4(p * 2. - 1., 0., 1.); }`;
 const POST_FS = `#version 300 es
 precision highp float;
-uniform sampler2D uCol, uId, uDepth; uniform float uRange, uStep; in vec2 vUv; out vec4 o;
+uniform sampler2D uCol, uId, uDepth; uniform float uRange, uStep; uniform int uInner; in vec2 vUv; out vec4 o;
 float obj(vec4 id) { return floor(id.r * 255. + 0.5) + floor(id.g * 255. + 0.5) * 256.; }
 void main() { ivec2 p = ivec2(gl_FragCoord.xy), sz = textureSize(uCol, 0); vec4 c = texelFetch(uCol, p, 0), id = texelFetch(uId, p, 0); float me = obj(id);
   if (me > 0.) { float dp = texelFetch(uDepth, p, 0).r * 2. * uRange; int w = int(floor(id.a * 8. + 0.5)); float k = 1.;
@@ -127,7 +147,7 @@ void main() { ivec2 p = ivec2(gl_FragCoord.xy), sz = textureSize(uCol, 0); vec4 
     for (int s = 1; s <= 3; s++) { if (s > w) break; for (int j = 0; j < 4; j++) { ivec2 q = p + dirs[j] * s; if (q.x < 0 || q.y < 0 || q.x >= sz.x || q.y >= sz.y) { k = 0.2; continue; }
       vec4 iq = texelFetch(uId, q, 0); float oq = obj(iq), dq = texelFetch(uDepth, q, 0).r * 2. * uRange;
       if (oq != me && (oq == 0. || dq > dp)) k = 0.2;
-      else if (s == 1 && oq == me && k > 0.5 && ((abs(iq.b - id.b) > 0.001 && dp - dq > 0.004) || dp - dq > uStep)) k = 0.5; } }
+      else if (uInner == 1 && s == 1 && oq == me && k > 0.5 && ((abs(iq.b - id.b) > 0.001 && dp - dq > 0.004) || dp - dq > uStep)) k = 0.5; } }
     c.rgb *= k; }
   o = vec4(c.rgb, 1.); }`;
 
@@ -139,7 +159,7 @@ export class LiveRenderer {
   private sFbo: WebGLFramebuffer; private sTex: WebGLTexture; private S = 2048;
   private groundVao: WebGLVertexArrayObject | null = null; private groundN = 0; private fenceVao: WebGLVertexArrayObject | null = null; private fenceN = 0;
   private skidVao: WebGLVertexArrayObject; private skidBuf: WebGLBuffer; private kinds = new Map<string, GpuMesh>(); private cars = new Map<Mesh, GpuMesh>();
-  private u = new Map<WebGLProgram, Map<string, WebGLUniformLocation | null>>(); private blank: WebGLTexture;
+  private u = new Map<WebGLProgram, Map<string, WebGLUniformLocation | null>>(); private blank: WebGLTexture; private tex: { alb: WebGLTexture; nor: WebGLTexture; rgh: WebGLTexture; size: Float32Array; luma: Float32Array; rough: Float32Array } | null = null;
   constructor(readonly canvas: HTMLCanvasElement) {
     const gl = canvas.getContext('webgl2', { antialias: false, alpha: false, depth: false, preserveDrawingBuffer: true }); if (!gl) throw new Error('no WebGL2'); this.gl = gl;
     this.obj = program(gl, OBJ_VS, OBJ_FS); this.ground = program(gl, GROUND_VS, GROUND_FS); this.depth = program(gl, DEPTH_VS, DEPTH_FS); this.post = program(gl, POST_VS, POST_FS);
@@ -160,6 +180,14 @@ export class LiveRenderer {
   private vaoOf(d: GroundData): WebGLVertexArrayObject { const gl = this.gl, vao = gl.createVertexArray()!; gl.bindVertexArray(vao);
     const b = (loc: number, data: ArrayBufferView, size: number, type: number, norm: boolean) => { const buf = gl.createBuffer()!; gl.bindBuffer(gl.ARRAY_BUFFER, buf); gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, size, type, norm, 0, 0); };
     b(0, d.pos, 3, gl.FLOAT, false); b(1, d.col, 3, gl.UNSIGNED_BYTE, true); b(2, d.flag, 1, gl.FLOAT, false); gl.bindVertexArray(null); return vao; }
+  /** the PBR detail textures: three pictures of the layers stacked top to bottom (albedo, normal, roughness), each layer
+   *  a square tile; its size (m), mean brightness and roughness. Mipmapped, repeating, as texture arrays */
+  setTextures(alb: HTMLImageElement, nor: HTMLImageElement, rgh: HTMLImageElement, layers: { size_m: number; luma_mean: number; rough_mean: number }[]) { const gl = this.gl, n = layers.length;
+    const arr = (img: HTMLImageElement) => { const S = img.width, c = document.createElement('canvas'); c.width = S; c.height = S * n; const x = c.getContext('2d')!; x.drawImage(img, 0, 0); const px = x.getImageData(0, 0, S, S * n).data;
+      const t = gl.createTexture()!; gl.bindTexture(gl.TEXTURE_2D_ARRAY, t); gl.texImage3D(gl.TEXTURE_2D_ARRAY, 0, gl.RGBA8, S, S, n, 0, gl.RGBA, gl.UNSIGNED_BYTE, px);
+      gl.generateMipmap(gl.TEXTURE_2D_ARRAY); gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR); gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_S, gl.REPEAT); gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_T, gl.REPEAT); return t; };
+    this.tex = { alb: arr(alb), nor: arr(nor), rgh: arr(rgh), size: new Float32Array(layers.map(l => l.size_m)), luma: new Float32Array(layers.map(l => l.luma_mean)), rough: new Float32Array(layers.map(l => l.rough_mean)) }; }
   setGround(d: GroundData) { this.groundVao = this.vaoOf(d); this.groundN = d.n; }
   setFence(d: GroundData) { this.fenceVao = this.vaoOf(d); this.fenceN = d.n; }
   /** the GPU copy of a prop's mesh (by kind) or a car's (by its mesh object), made once */
@@ -192,7 +220,10 @@ export class LiveRenderer {
     for (let i = 0; i < 3; i++) { gl.activeTexture(gl.TEXTURE0 + i); gl.bindTexture(gl.TEXTURE_2D, this.blank); }
     gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbo); gl.viewport(0, 0, v.W, v.H); gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.COLOR_ATTACHMENT1]);
     gl.clearBufferfv(gl.COLOR, 0, [0.36, 0.45, 0.28, 1]); gl.clearBufferfv(gl.COLOR, 1, [0, 0, 0, 0]); gl.clearBufferfi(gl.DEPTH_STENCIL, 0, 1, 0);
-    const shadowTo = (p: WebGLProgram) => { gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, this.sTex); gl.uniform1i(this.loc(p, 'uShadow'), 1); gl.uniformMatrix4fv(this.loc(p, 'uLight'), false, LV); };
+    const texTo = (p: WebGLProgram) => { gl.uniform1i(this.loc(p, 'uTex'), this.tex ? 1 : 0); if (!this.tex) return; const t = this.tex;
+      [t.alb, t.nor, t.rgh].forEach((x, i) => { gl.activeTexture(gl.TEXTURE3 + i); gl.bindTexture(gl.TEXTURE_2D_ARRAY, x); gl.uniform1i(this.loc(p, ['uAlb', 'uNor', 'uRgh'][i]!), 3 + i); });
+      gl.uniform1fv(this.loc(p, 'uTSize'), t.size); gl.uniform1fv(this.loc(p, 'uTLuma'), t.luma); gl.uniform1fv(this.loc(p, 'uTRough'), t.rough); };
+    const shadowTo = (p: WebGLProgram) => { texTo(p); gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, this.sTex); gl.uniform1i(this.loc(p, 'uShadow'), 1); gl.uniformMatrix4fv(this.loc(p, 'uLight'), false, LV); };
     gl.useProgram(this.ground); gl.uniformMatrix4fv(this.loc(this.ground, 'uVP'), false, VP); gl.uniform1i(this.loc(this.ground, 'uLook'), o.look ?? 0); gl.uniform3fv(this.loc(this.ground, 'uSun'), SUN_W); gl.uniform3fv(this.loc(this.ground, 'uEye'), eye); gl.uniform1f(this.loc(this.ground, 'uCell'), Math.max(0.03, v.mm / 1000)); gl.uniform1f(this.loc(this.ground, 'uBias'), 0); shadowTo(this.ground);
     if (this.groundVao) { gl.bindVertexArray(this.groundVao); gl.drawArrays(gl.TRIANGLES, 0, this.groundN); }
     if (this.fenceVao && this.fenceN) { gl.bindVertexArray(this.fenceVao); gl.drawArrays(gl.TRIANGLES, 0, this.fenceN); }
@@ -225,7 +256,7 @@ export class LiveRenderer {
     // ---- the outlines, onto the page's canvas ----
     gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.viewport(0, 0, v.W, v.H); gl.disable(gl.DEPTH_TEST); gl.useProgram(this.post);
     [this.tCol, this.tId, this.tDepth].forEach((t, i) => { gl.activeTexture(gl.TEXTURE0 + i); gl.bindTexture(gl.TEXTURE_2D, t); gl.uniform1i(this.loc(this.post, ['uCol', 'uId', 'uDepth'][i]!), i); });
-    gl.uniform1f(this.loc(this.post, 'uRange'), R); gl.uniform1f(this.loc(this.post, 'uStep'), (60 + 2 * v.mm / Math.tan(Math.max(5, v.pitch) * Math.PI / 180)) / 1000);
+    gl.uniform1i(this.loc(this.post, 'uInner'), (o.look ?? 0) === 0 ? 1 : 0); gl.uniform1f(this.loc(this.post, 'uRange'), R);   /* PBR: no lines over the shading inside a thing, its outline only */ gl.uniform1f(this.loc(this.post, 'uStep'), (60 + 2 * v.mm / Math.tan(Math.max(5, v.pitch) * Math.PI / 180)) / 1000);
     gl.bindVertexArray(null); gl.drawArrays(gl.TRIANGLES, 0, 3); }
 
   /** a car's pieces with their matrices: the body on its springs (rolled and pitched about its middle), each wheel at its

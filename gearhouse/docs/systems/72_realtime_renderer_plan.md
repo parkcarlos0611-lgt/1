@@ -71,3 +71,15 @@ Schlick), the sun with its shadow, the sky as an analytic light (irradiance from
 blurred by roughness, the split-sum curve), a clear coat on paint, a filmic curve and gamma; 1 steps the brightness into
 seven bands (the pixel look kept), 2 leaves it smooth. Each material kind has its metalness and roughness (paint by its
 gloss, chrome 0.12, rubber 0.9, canvas 0.95...). The page has a selector and a side-by-side view of all three.
+
+## PBR, step 2 (review 103): the look chosen (PBR, smooth) and detail textures
+- The test drive opens in PBR (smooth). In it the outline goes round each thing only: no lines over the shading inside
+  it (the part lines and depth steps are left to the light).
+- Seven CC0 texture sets from Poly Haven (assets/textures/pbr, credits in pbr.json and on the page): brushed concrete 03
+  (the track and plain surfaces), sparse grass (the fields), blue metal plate (paint's and metal's fine roughness and
+  dents), rubberized track (tyres), brown leather, waffle pique cotton (canvas), oak wood planks. 512 px each, stacked
+  into three texture arrays (albedo, normal, roughness), mipmapped.
+- Laid three ways along the surface's main axes (triplanar): in the thing's own axes on cars and props (the texture
+  moves with them), in the world's on the ground; each at its real tile size. The albedo is used for its light and dark
+  only, so the game keeps its own colours; roughness and normals as drawn. Each material its strength (paint and chrome
+  barely; wood, leather and canvas fully).

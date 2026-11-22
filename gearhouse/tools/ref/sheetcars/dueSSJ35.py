@@ -146,7 +146,7 @@ part('hood', 'hood', 'paint', 'side', fit=2,
                     {'kind': 'louvres', 'x0': T(410, 0)[0], 'x1': T(322, 0)[0], 'z0': T(0, -40)[1], 'z1': T(0, -24)[1], 'n': 26, 'slant': 0}]})
 part('cowl', 'cowl', 'paint', 'side', join=['hood'],
      side=side((220, 29), (232, 27.5), (244, 28), (252, 31), (257, 40), (262, 49), (262, 131), (220, 131)),
-     front=fhalf((0, 32), (55, 32), (68, 40), (78, 55), (84, 80), (84, 140), (0, 140)), smooth=('front',),
+     front=fhalf((0, 32), (64, 32), (73, 36), (79, 46), (83, 62), (84, 80), (84, 140), (0, 140)), smooth=('front',),
      top=halfT((298, 0), (297, 30), (300, 54), (255, 60), (240, 62), (240, 0)),
      feats={'side': [{'kind': 'seam', 'pts': side((221, 30), (221, 124))}, {'kind': 'highlight', 'pts': side((224, 39), (250, 38)), 'width': 2}]})
 part('body', 'body', 'paint', 'side', join=['cowl'],
@@ -178,12 +178,24 @@ part('tonneau', 'tonneau', 'canvas', 'fender', color=TAN, on='body', lift=2, smo
             'top': [{'kind': 'crease', 'pts': top((137, 50), (136, 0), (137, -50))}]})
 
 # ---------------- the raked screen: frame, glass, the frame's top edge only in the plan ----------------
+# review 71: the screen as the sheet draws it from the front: two panes meeting at a slight V on a centre post, a thin
+# bright frame (posts leaning out from the scuttle, a top rail rising to the middle, a foot rail), the panes clear between
 part('screenFrame', 'screen', 'chrome', 'flat',
      side=side((252, 42), (258, 26), (268, 2), (273, 0), (284, 3), (290, 8), (288, 12), (276, 26), (262, 46), (256, 46)),
-     front=fhalf((0, 4), (70, 3), (82, 6), (84, 12), (76, 34), (0, 34)), rear=bhalf((0, 4), (72, 3), (84, 6), (85, 13), (78, 34), (0, 34)),
-     top=[[S(268, 0)[0], -F(82, 0)[0]], [S(275, 0)[0], -F(82, 0)[0]], [S(275, 0)[0], F(82, 0)[0]], [S(268, 0)[0], F(82, 0)[0]]])
-part('screen', 'screen', 'glass', 'side', on='screenFrame', lift=1,
-     side=side((259, 40), (270, 8), (280, 11), (263, 42)), front=fhalf((0, 9), (72, 8), (66, 30), (0, 30)), rear=bhalf((0, 9), (74, 8), (68, 30), (0, 30)))
+     front=fhalf((0, 2), (40, 4), (78, 7), (85, 8), (85, 11), (78, 10.5), (40, 7.5), (0, 5.5)), rear=bhalf((0, 2), (40, 4), (78, 7), (85, 8), (85, 11), (78, 10.5), (40, 7.5), (0, 5.5)),
+     top=[[S(268, 0)[0], -F(82, 0)[0]], [S(275, 0)[0], -F(82, 0)[0]], [S(271, 0)[0], 0], [S(275, 0)[0], F(82, 0)[0]], [S(268, 0)[0], F(82, 0)[0]], [S(264, 0)[0], 0]])
+part('screen', 'screen', 'glass', 'side', on='screenFrame', lift=1, y=[-F(70, 0)[0], F(70, 0)[0]], side=side((259, 40), (270, 8), (280, 11), (263, 42)))
+part('screenPane', 'screen', 'glass', 'side', on='screenFrame', lift=1, pair=True, x=[S(259, 0)[0], S(280, 0)[0]],
+     front=fr((3, 8.5), (40, 9.5), (77, 12.5), (67, 30.5), (35, 28.5), (3, 27.5)), rear=re((3, 8.5), (40, 9.5), (77, 12.5), (67, 30.5), (35, 28.5), (3, 27.5)))
+part('screenPost', 'screen', 'chrome', 'flat', on='screenFrame', lift=2, pair=True, x=[S(262, 0)[0], S(276, 0)[0]],
+     front=fr((78, 8), (85, 9), (73, 37), (67, 37)), rear=re((78, 8), (85, 9), (73, 37), (67, 37)))
+part('screenCentre', 'screen', 'chrome', 'flat', on='screenFrame', lift=2, x=[S(262, 0)[0], S(276, 0)[0]],
+     front=fhalf((0, 4), (2.5, 4), (2.5, 30), (0, 30)), rear=bhalf((0, 4), (2.5, 4), (2.5, 30), (0, 30)))
+part('screenFoot', 'screen', 'chrome', 'flat', on='screenFrame', lift=2, x=[S(256, 0)[0], S(266, 0)[0]],
+     front=fhalf((0, 27), (35, 28), (68, 30.5), (69, 33), (35, 31), (0, 30)), rear=bhalf((0, 27), (35, 28), (68, 30.5), (69, 33), (35, 31), (0, 30)))
+# the folded hood bunched beside the screen's posts, as the sheet shows it from the front
+part('tonneauFront', 'tonneau', 'canvas', 'fender', color=TAN, pair=True, smooth=('front',), x=[S(300, 0)[0], S(330, 0)[0]], z=[F(0, 57)[1], F(0, 16)[1]],
+     front=fr((70, 20), (78, 16), (86, 22), (94, 33), (100, 45), (99, 54), (92, 57), (84, 52), (78, 42), (72, 30)))
 part('mirror', 'mirror', 'chrome', 'fender', on='screen', lift=2, x=[S(272, 0)[0], S(278, 0)[0]], front=fhalf((0, 16), (10, 16), (11, 19), (10, 25), (0, 25)), rear=bhalf((0, 16), (11, 16), (12, 19), (11, 24), (0, 24)), smooth=('front', 'rear'))
 
 # ---------------- wings: dark (paint2), each one sweep; no outline where they run into each other ----------------
@@ -207,7 +219,7 @@ part('apronF', 'apron', 'paint2', 'fender', x=[S(20, 0)[0], S(62, 0)[0]], smooth
 part('lamp', 'lamp', 'chrome', 'fender', slot='lamp', pair=True, smooth=('side', 'front', 'top'),
      side=side((41, 47), (46, 45), (52, 47), (58, 52), (62, 57), (58, 60), (50, 62), (42, 62)), front=fell(59.5, 78, 19.5), z=[S(0, 62)[1], S(0, 45)[1]],
      top=top((472, 34), (475, 44), (472, 55), (462, 56), (450, 50), (442, 44), (450, 38), (462, 33)))
-part('lens', 'lamp', 'lens', 'flat', on='lamp', slot='lamp', pair=True, lift=1, x=[S(40, 0)[0], S(42, 0)[0]], smooth=('front',), front=fell(59.5, 78, 17))
+part('lens', 'lamp', 'chrome', 'flat', detail={'kind': 'bowl'}, on='lamp', slot='lamp', pair=True, lift=1, x=[S(40, 0)[0], S(42, 0)[0]], smooth=('front',), front=fell(59.5, 78, 17))
 part('lampStand', 'lamp', 'chrome', 'flat', slot='lamp', pair=True, x=[S(48, 0)[0], S(54, 0)[0]], front=fr((55, 96), (64, 96), (64, 100), (62, 100), (62, 116), (57, 116), (57, 100), (55, 100)), side=side((48, 62), (54, 62), (54, 68), (48, 68)))
 part('lampBar', 'lamp', 'chrome', 'flat', slot='lamp', top=halfT((462, 0), (462, 44), (458, 44), (458, 0)), front=fhalf((0, 97), (72, 97), (72, 100), (0, 100)))
 part('horn', 'horn', 'chrome', 'fender', pair=True, smooth=('front', 'top'), top=top((477, 27), (470, 27), (466, 31), (470, 35), (477, 35)), front=fr((44, 126), (53, 126), (54, 132), (52, 140), (45, 140), (43, 132)))   # the small bells above the bumper irons (front view)

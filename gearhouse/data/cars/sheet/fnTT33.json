@@ -12659,7 +12659,7 @@
   {
    "id": "lens",
    "element": "lamp",
-   "material": "lens",
+   "material": "chrome",
    "surface": "flat",
    "box": {
     "x": [
@@ -12809,7 +12809,10 @@
     ]
    },
    "slot": "lamp",
-   "on": "lampGap"
+   "on": "lampGap",
+   "detail": {
+    "kind": "bowl"
+   }
   },
   {
    "id": "lampBar",

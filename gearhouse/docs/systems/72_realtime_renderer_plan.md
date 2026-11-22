@@ -44,3 +44,23 @@ with all the lighting, reflection and gloss of review 90, while the baked versio
 - Phones: the passes are cheap at the low resolution, but shadow maps and several targets need checking on a mid-range
   phone early.
 - Two renderers to keep alike while both live: the material rules (kinds, gloss, wear) stay in one place and both read them.
+
+## Done (review 99): the test drive switched over
+Raw WebGL2 (no three.js: the passes are few and custom, the page stays small), in `render/live/`:
+- `gpu.ts`: a mesh's buffers (body, each road wheel apart about its hub, glass apart, decals as pictures), matrices.
+  The files' +y is put on the left of the heading, as the baked renderer's mirror draws it (checked side by side).
+- `ground.ts`: the fields, the gravel and mown areas, the railway (ballast, sleepers, rails), the river, the concrete
+  a metre at a time in nine strips (lighter where it climbs), joints, dark edges, the earth banks, the start line;
+  the fence, built again when a stretch breaks.
+- `renderer.ts`: an orthographic camera matching the baked projection (any heading, any height 15-85 degrees, any
+  scale, snapped to whole pixels); a shadow map from the sun (cars and props on everything, snapped to its texels);
+  the scene into colour, thing-and-part and depth; the baked light ported (stepped sun, sky and ground light, metal
+  and glass mirroring the simple world, paint's two-step highlight, glass with Fresnel, decals in object space);
+  the outlines from those layers (the dark edge inside each thing, the thinner lines between parts and at depth
+  steps); a car hidden by anything shows its light outline over the hidden part only (a stencilled pass against
+  what stands before it). Skid marks on the concrete.
+- The page: the live renderer on by default where WebGL2 is, the baked pictures otherwise (a switch to compare);
+  no baking at all when live, so the free camera's height and zoom change at once and smoothly.
+
+Not yet live (next): motion blur (step 5), the materials' textures (tyre tread, cloth, leather, wood, the
+radiator's honeycomb) and age (step 4), smooth shading for close views, perspective and the sun moving.

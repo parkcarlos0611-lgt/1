@@ -10,6 +10,8 @@ import { CarSprites, PropSprites } from '../race/sprites';
 import { millbrookScenery, type Placed } from '../race/scenery';
 import { PROPS } from '../render/props/index';
 import { renumber } from '../render/car/mesh';
+import { LiveRenderer } from '../render/live/renderer';
+import { groundData, fenceData } from '../render/live/ground';
 import { MESH_CARS } from '../render/car/meshcars';
 import { Driver } from '../race/driver';
 import { Race, type Entrant } from '../race/race';
@@ -43,10 +45,23 @@ let race: Race | null = null; const others = new Map<Entrant, CarSprites>(); let
 let myNum = '6';
 const meshOf = (id: string, num: string) => renumber(MESH_CARS.find(c => c.id === id)!.mesh(), num);
 const numOf = (e: Entrant): string => { if (!race) return myNum; let k = 0; for (const x of race.cars) { if (x === race.player) continue; k++; if (String(k) === myNum) k++; if (x === e) return String(k); } return myNum; };
+// ---- the live renderer (review 99): the scene drawn every frame by WebGL2, where the browser has it; the baked pictures otherwise ----
+const glCanvas = document.createElement('canvas'); let live: LiveRenderer | null = null, liveFence = -1;
+try { live = new LiveRenderer(glCanvas); live.setGround(groundData(T, SCN, START)); } catch (e) { console.warn('live renderer unavailable', e); live = null; }
+const liveOK = !!live; let liveR = live;
+function drawLive(el: number) { const L = live!; void el;
+  if (broken.size !== liveFence) { L.setFence(fenceData(T, fenceOk)); liveFence = broken.size; }
+  glCanvas.width = VW; glCanvas.height = VH;
+  const list = race ? race.cars.map(e => ({ c: e.car, sp: e.driver ? others.get(e)! : sprites, turn: e.wheelTurn })) : [{ c: car, sp: sprites, turn: wheelTurn }];
+  const cars = list.map(({ c, sp, turn }) => ({ g: L.car(sp.mesh), x: c.x, y: c.y, z: T.height(c.s, c.off) + c.zb, yaw: c.yaw, roll: c.tilt + c.roll * 1.5, pitch: c.pitch, steer: c.steer, spin: turn, player: c === car }));
+  const props = [...SCN.props, ...trainCars()].flatMap(q => { const f = PROPS[q.kind]; return f ? [{ g: L.prop(q.kind, f), x: q.x, y: q.y, z: q.z ?? 0, h: q.heading }] : []; });
+  L.render({ x: camX, y: camY, z: camZ, ang: turning() ? camAng : Math.PI / 2, pitch: pitchDeg, mm, W: VW, H: VH, cy: st.chase && !st.cine ? 0.66 : 0.55 }, cars, props, skids, { glass: 0.8 });
+  ctx = main; main.clearRect(0, 0, VW, VH); main.drawImage(glCanvas, 0, 0); drawDebris(el);
+  if (car.speed > 30) { const v = Math.min(1, (car.speed - 30) / 30) * 0.35, g = main.createRadialGradient(VW / 2, VH / 2, VH * 0.35, VW / 2, VH / 2, VW * 0.62); g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, `rgba(0,0,0,${v})`); main.fillStyle = g; main.fillRect(0, 0, VW, VH); } }
 
 function choose(id: string) { carId = id; propSprites.clear(); broken.clear(); debris.length = 0; const spec = raceSpec(id), m = MESH_CARS.find(c => c.id === id)!;
   car = new Vehicle(spec, T); car.auto = st.auto; car.place(START + 30, 0, 0); manualGear = 1;
-  sprites = new CarSprites(meshOf(id, myNum), mm, pitchDeg, spec.steerLock * Math.PI / 180, { outline: 3, glass: 0.8 }, matchMedia('(pointer: coarse)').matches ? 1200 : 2400); sprites.prepare([0]); sprites.work(500); sprites.prepare([-1, 1, -2, 2, -3, -4, -5]); camAng = car.yaw;
+  sprites = new CarSprites(meshOf(id, myNum), mm, pitchDeg, spec.steerLock * Math.PI / 180, { outline: 3, glass: 0.8 }, matchMedia('(pointer: coarse)').matches ? 1200 : 2400); sprites.prepare([0]); (live ? 0 : sprites.work(500)); sprites.prepare([-1, 1, -2, 2, -3, -4, -5]); camAng = car.yaw;
   pilot = new Driver(T); lapStart = -1; lastLap = 0; bestLap = 0; skids.length = 0; puffs.length = 0; say(`${spec.name} · 출발선 뒤에서 시작`); }
 function say(t: string) { msg = t; msgT = 3; }
 // ---- the world to the picture ----
@@ -191,7 +206,7 @@ function drawDebris(el: number) { for (let k = debris.length - 1; k >= 0; k--) {
     if (d.z < floor) { d.z = floor; d.vz = Math.abs(d.vz) * 0.3; d.vx *= 0.6; d.vy *= 0.6; d.va *= 0.6; if (Math.abs(d.vz) < 0.5) { d.vz = 0; d.va *= 0.8; } }
     const [X, Y] = P(d.x, d.y, d.z), [X2, Y2] = P(d.x + Math.cos(d.a) * d.len, d.y + Math.sin(d.a) * d.len, d.z + Math.sin(d.a * 0.7) * d.len * 0.3);
     main.globalAlpha = Math.min(1, d.life / 1.5); main.strokeStyle = '#3a352c'; main.lineWidth = 3; main.beginPath(); main.moveTo(X, Y); main.lineTo(X2, Y2); main.stroke(); main.strokeStyle = d.col; main.lineWidth = 1.5; main.beginPath(); main.moveTo(X, Y); main.lineTo(X2, Y2); main.stroke(); main.globalAlpha = 1; } }
-function drawWorld(el: number) { const all = scene(), cars = all.filter(d => d.car), props = all.filter(d => !d.car);
+function drawWorld(el: number) { if (live) { drawLive(el); return; } const all = scene(), cars = all.filter(d => d.car), props = all.filter(d => !d.car);
   if (bg.width !== VW || bg.height !== VH) { bg.width = VW; bg.height = VH; } ctx = bgx; bgx.imageSmoothingEnabled = false; drawTrack();
   // the still world (ground and buildings) on the layer behind; what stands before a car is drawn again over it
   const front = new Set<Drawn>(); for (const d of props) { bgx.drawImage(d.img, d.X0, d.Y0); for (const c of cars) if ((d.over || d.Y > c.Y) && covers(c, d)) front.add(d); }
@@ -242,7 +257,7 @@ function startRace() { const laps = +$<HTMLSelectElement>('laps').value, pool = 
   const mode = $<HTMLSelectElement>('mode').value as 'handicap' | 'scratch'; race = new Race(T, [carId, ...pick], laps, carId, raceSeed, mode); const me = race.player!; car = me.car; car.auto = st.auto; manualGear = 1; pilot = new Driver(T);
   others.clear(); const small = matchMedia('(pointer: coarse)').matches;
   for (const e of race.cars) if (e.driver) { const sp = new CarSprites(meshOf(e.id, numOf(e)), mm, pitchDeg, e.car.spec.steerLock * Math.PI / 180, { outline: 3, glass: 0.8 }, small ? 400 : 900); sp.prepare([0]); others.set(e, sp); }
-  sprites = new CarSprites(meshOf(carId, myNum), mm, pitchDeg, car.spec.steerLock * Math.PI / 180, { outline: 3, glass: 0.8 }, small ? 800 : 1800); sprites.prepare([0]); sprites.work(300);
+  sprites = new CarSprites(meshOf(carId, myNum), mm, pitchDeg, car.spec.steerLock * Math.PI / 180, { outline: 3, glass: 0.8 }, small ? 800 : 1800); sprites.prepare([0]); (live ? 0 : sprites.work(300));
   skids.length = 0; puffs.length = 0; delete $('results').dataset.shown; camX = car.x; camY = car.y; camAng = car.yaw;
   const starts = [...race.cars].sort((a, b) => a.start - b.start).map(e => `${e.name}${e.driver ? '' : ' (나)'} ${e.start ? `+${e.start.toFixed(0)}초` : '맨 먼저'}`).join(' · ');
   say(mode === 'scratch' ? `동시 출발 ${laps}바퀴 · 5초 뒤 출발` : `핸디캡 ${laps}바퀴 · ${starts}`); msgT = 8; $('race').textContent = '레이스 다시'; }
@@ -295,7 +310,7 @@ function frame(now: number) { const el = Math.min(0.1, (now - last) / 1000); las
   { const R = SCN.railway; let len = 0; for (let k = 0; k + 1 < R.length; k++) len += Math.hypot(R[k + 1]![0] - R[k]![0], R[k + 1]![1] - R[k]![1]);   // the train: now and then along the line
     if (train.d < 0) { train.wait -= el; if (train.wait <= 0) train.d = 0; } else { train.d += 24 * el; if (train.d > len + 80) { train.d = -1; train.wait = 70 + Math.random() * 120; } }
     if (snd) { const q = trainCars()[0]; snd.train = q ? Math.max(0, 1 - Math.hypot(q.x - car.x, q.y - car.y) / 400) : 0; } }
-  drawWorld(el); drawPuffs(); drawSteam(el); if (st.cine) letterbox(); else dials(); hud(); mini(); sounds(); sprites.work(5); for (const sp of others.values()) sp.work(2); requestAnimationFrame(frame); }
+  drawWorld(el); drawPuffs(); drawSteam(el); if (st.cine) letterbox(); else dials(); hud(); mini(); sounds(); (live ? 0 : sprites.work(5)); if (!live) for (const sp of others.values()) sp.work(2); requestAnimationFrame(frame); }
 // ---- page ----
 const pick = $<HTMLSelectElement>('car'); for (const id of RACE_CARS) pick.add(new Option(raceSpec(id).name, id));
 { const g = document.createElement('optgroup'); g.label = '실험: 시대 밖의 차'; for (const id of EXP_CARS) g.append(new Option(`${raceSpec(id).name} — ${raceSpec(id).era}`, id)); pick.append(g); }
@@ -325,14 +340,15 @@ $<HTMLInputElement>('chase').addEventListener('change', e => { st.chase = (e.tar
 // gesture ends); turning needs nothing new (the pictures are kept for 64 headings).
 const ZOOM = [12, 16, 20, 25, 30, 40, 50, 65, 80, 100, 130], PMIN = 15, PMAX = 85;
 let bakeT = 0;
-function rebake() { SP = Math.sin(pitchDeg * Math.PI / 180); CP = Math.cos(pitchDeg * Math.PI / 180); propSprites.clear(); const small = matchMedia('(pointer: coarse)').matches;
-  sprites = new CarSprites(meshOf(carId, myNum), mm, pitchDeg, car.spec.steerLock * Math.PI / 180, { outline: 3, glass: 0.8 }, small ? 1200 : 2400); sprites.prepare([0]); sprites.work(300);
+function rebake(full = !live) { SP = Math.sin(pitchDeg * Math.PI / 180); CP = Math.cos(pitchDeg * Math.PI / 180); ($('pitch') as HTMLInputElement).value = String(pitchDeg); $('pitchv').textContent = `${pitchDeg}°`; camShow(); if (!full) return;   // live: nothing to bake
+  propSprites.clear(); const small = matchMedia('(pointer: coarse)').matches;
+  sprites = new CarSprites(meshOf(carId, myNum), mm, pitchDeg, car.spec.steerLock * Math.PI / 180, { outline: 3, glass: 0.8 }, small ? 1200 : 2400); sprites.prepare([0]); (live ? 0 : sprites.work(300));
   for (const e of [...others.keys()]) { const sp = new CarSprites(meshOf(e.id, numOf(e)), mm, pitchDeg, e.car.spec.steerLock * Math.PI / 180, { outline: 3, glass: 0.8 }, small ? 400 : 900); sp.prepare([0]); others.set(e, sp); }
   ($('pitch') as HTMLInputElement).value = String(pitchDeg); $('pitchv').textContent = `${pitchDeg}°`; camShow(); }
 const camShow = () => { $('camv').textContent = `${st.free ? '자유' : st.chase ? '따라 돎' : '북쪽 위'} · 높이 ${pitchDeg}° · ${mm} mm/픽셀 · 방향 ${Math.round(((90 - camAng * 180 / Math.PI) % 360 + 360) % 360)}°`; };
 /** a new height or scale, baked once the gesture has rested */
-function want(p: number, m: number) { p = Math.max(PMIN, Math.min(PMAX, Math.round(p / 5) * 5)); if (p === pitchDeg && m === mm) return; pitchDeg = p; mm = m; SP = Math.sin(p * Math.PI / 180); CP = Math.cos(p * Math.PI / 180);
-  ($('scale') as HTMLSelectElement).value = String(m); camShow(); clearTimeout(bakeT); bakeT = setTimeout(rebake, 250) as unknown as number; }
+function want(p: number, m: number) { p = Math.max(PMIN, Math.min(PMAX, Math.round(p / (live ? 1 : 5)) * (live ? 1 : 5)));   /* live: any whole degree, at once */ if (p === pitchDeg && m === mm) return; pitchDeg = p; mm = m; SP = Math.sin(p * Math.PI / 180); CP = Math.cos(p * Math.PI / 180);
+  ($('scale') as HTMLSelectElement).value = String(m); camShow(); clearTimeout(bakeT); if (live) rebake(); else bakeT = setTimeout(rebake, 250) as unknown as number; }
 const zoom = (step: number) => { const i = ZOOM.indexOf(mm), k = Math.max(0, Math.min(ZOOM.length - 1, (i < 0 ? ZOOM.findIndex(z => z >= mm) : i) + step)); want(pitchDeg, ZOOM[k]!); };
 const setFree = (on: boolean) => { st.free = on; ($('free') as HTMLInputElement).checked = on; if (!on) camAng = car.yaw; camShow(); };
 { const ptrs = new Map<number, { x: number; y: number }>(); let pinch0 = 0, pitch0 = 0, dy0 = 0;
@@ -340,7 +356,7 @@ const setFree = (on: boolean) => { st.free = on; ($('free') as HTMLInputElement)
   cv.addEventListener('pointerdown', e => { cv.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY }); pitch0 = pitchDeg; dy0 = 0;
     if (ptrs.size === 2) { const [a, b] = [...ptrs.values()]; pinch0 = Math.hypot(a!.x - b!.x, a!.y - b!.y); } });
   cv.addEventListener('pointermove', e => { const p = ptrs.get(e.pointerId); if (!p) return; const dx = e.clientX - p.x, dy = e.clientY - p.y; p.x = e.clientX; p.y = e.clientY;
-    if (ptrs.size === 1) { if (st.cine) setCine(false); if (!st.free) setFree(true); camAng -= dx * 0.008; dy0 += dy; const np = Math.max(PMIN, Math.min(PMAX, pitch0 + dy0 * 0.25)); if (Math.round(np / 5) * 5 !== pitchDeg) want(np, mm); camShow(); }
+    if (ptrs.size === 1) { if (st.cine) setCine(false); if (!st.free) setFree(true); camAng -= dx * 0.008; dy0 += dy; const np = Math.max(PMIN, Math.min(PMAX, pitch0 + dy0 * 0.25)); if (Math.round(np / (live ? 1 : 5)) * (live ? 1 : 5) !== pitchDeg) want(np, mm); camShow(); }
     else if (ptrs.size === 2 && pinch0 > 0) { const [a, b] = [...ptrs.values()], d = Math.hypot(a!.x - b!.x, a!.y - b!.y); if (d / pinch0 > 1.3) { zoom(-1); pinch0 = d; } else if (pinch0 / d > 1.3) { zoom(1); pinch0 = d; } } });
   const up = (e: PointerEvent) => { ptrs.delete(e.pointerId); pinch0 = 0; };
   cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
@@ -350,10 +366,12 @@ const setFree = (on: boolean) => { st.free = on; ($('free') as HTMLInputElement)
     if (k === ',' || k === '<') { if (!st.free) setFree(true); camAng += 0.12; camShow(); } if (k === '.' || k === '>') { if (!st.free) setFree(true); camAng -= 0.12; camShow(); }
     if (k === '-' || k === '_') zoom(1); if (k === '=' || k === '+') zoom(-1);
     if (k === 'PageUp') { e.preventDefault(); want(pitchDeg + 5, mm); } if (k === 'PageDown') { e.preventDefault(); want(pitchDeg - 5, mm); } if (k === 'Home') setFree(false); }); }
-$<HTMLInputElement>('num').addEventListener('change', e => { const el = e.target as HTMLInputElement, v = el.value.replace(/\D/g, '').slice(0, 3); el.value = v || myNum; if (v && v !== myNum) { myNum = v; rebake(); say(`차 번호 ${v}`); } el.blur(); });
+{ const t = $<HTMLInputElement>('live'); t.checked = liveOK; t.disabled = !liveOK; if (!liveOK) $('livenote').textContent = '이 브라우저는 WebGL2가 없어 구운 그림으로 그립니다';
+  t.addEventListener('change', () => { live = t.checked ? liveR : null; if (!live) rebake(true); t.blur(); }); }
+$<HTMLInputElement>('num').addEventListener('change', e => { const el = e.target as HTMLInputElement, v = el.value.replace(/\D/g, '').slice(0, 3); el.value = v || myNum; if (v && v !== myNum) { myNum = v; rebake(true); say(`차 번호 ${v}`); } el.blur(); });
 $<HTMLInputElement>('free').addEventListener('change', e => setFree((e.target as HTMLInputElement).checked));
 $<HTMLInputElement>('pitch').addEventListener('change', e => { want(+(e.target as HTMLInputElement).value, mm); (e.target as HTMLElement).blur(); });
-$<HTMLInputElement>('pitch').addEventListener('input', e => { $('pitchv').textContent = `${(e.target as HTMLInputElement).value}°`; });
+$<HTMLInputElement>('pitch').addEventListener('input', e => { $('pitchv').textContent = `${(e.target as HTMLInputElement).value}°`; if (live) want(+(e.target as HTMLInputElement).value, mm); });
 $<HTMLSelectElement>('scale').addEventListener('change', e => { want(pitchDeg, +(e.target as HTMLSelectElement).value); (e.target as HTMLElement).blur(); });
 function fit() { if (document.fullscreenElement || document.body.classList.contains('fakefull')) { const k = Math.max(1, Math.round(innerWidth / 900)) * (st.cine ? 2 : 1); VW = Math.ceil(innerWidth / k / 2) * 2; VH = Math.ceil(innerHeight / k); cv.width = VW; cv.height = VH; cv.style.width = `${VW * k}px`; cv.style.height = `${VH * k}px`; ctx.imageSmoothingEnabled = false; return; }
   const box = document.querySelector('.track') as HTMLElement, room = Math.min(box.clientWidth - 14, 1600);

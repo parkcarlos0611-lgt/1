@@ -166,9 +166,17 @@ function decalAt(d: Prepped, x: number, y: number, z: number, M0: Mesh, t: numbe
   const u = dx * d.rt[0] + dy * d.rt[1] + dz * d.rt[2], v = dx * d.up[0] + dy * d.up[1] + dz * d.up[2]; if (u * u + v * v > d.r * d.r) return null;
   const q = t * 9, P = M0.pos, e1: V = [P[q + 3]! - P[q]!, P[q + 4]! - P[q + 1]!, P[q + 5]! - P[q + 2]!], e2: V = [P[q + 6]! - P[q]!, P[q + 7]! - P[q + 1]!, P[q + 8]! - P[q + 2]!], fn = norm(cross(e1, e2));
   if (Math.abs(fn[0] * d.n[0] + fn[1] * d.n[1] + fn[2] * d.n[2]) < 0.45) return null;   // not round an edge onto a face that turns away
-  const n = d.chars.length; if (n) { const H = d.r * (n === 1 ? 1.2 : n === 2 ? 1.0 : 0.72), gap = 0.1, W = n * 0.6 + (n - 1) * gap, gx = u / H + W / 2, gy = v / H + 0.5;   // the figures across the disc's middle
-    if (gy >= -STROKE && gy <= 1 + STROKE && gx >= -STROKE && gx <= W + STROKE) { const k = Math.max(0, Math.min(n - 1, Math.floor(gx / (0.6 + gap)))); for (const j of [k - 1, k, k + 1]) if (j >= 0 && j < n && inkAt(d.chars[j]!, gx - j * (0.6 + gap), gy)) return d.inkRgb; } }
-  return d.rgb; }
+  return inkOn(d.chars, d.r, u, v) ? d.inkRgb : d.rgb; }
+/** is (u, v) on the disc (mm from its centre, across and up) in the figures' ink? */
+function inkOn(chars: string[], r: number, u: number, v: number): boolean { const n = chars.length; if (!n) return false;
+  const H = r * (n === 1 ? 1.2 : n === 2 ? 1.0 : 0.72), gap = 0.1, W = n * 0.6 + (n - 1) * gap, gx = u / H + W / 2, gy = v / H + 0.5;   // the figures across the disc's middle
+  if (gy < -STROKE || gy > 1 + STROKE || gx < -STROKE || gx > W + STROKE) return false; const k = Math.max(0, Math.min(n - 1, Math.floor(gx / (0.6 + gap))));
+  for (const j of [k - 1, k, k + 1]) if (j >= 0 && j < n && inkAt(chars[j]!, gx - j * (0.6 + gap), gy)) return true; return false; }
+/** a decal as a picture (for the live renderer's texture): size x size pixels across its disc, RGBA, clear outside it */
+export function decalPicture(d: Decal, size: number): Uint8Array { const out = new Uint8Array(size * size * 4), col = hexV(d.col), ink = hexV(d.ink ?? '#111111'), chars = [...(d.text ?? '')];
+  for (let j = 0; j < size; j++) for (let i = 0; i < size; i++) { const u = ((i + 0.5) / size * 2 - 1) * d.r, v = ((j + 0.5) / size * 2 - 1) * d.r; if (u * u + v * v > d.r * d.r) continue;
+    const c = inkOn(chars, d.r, u, v) ? ink : col, q = (j * size + i) * 4; out[q] = c[0]; out[q + 1] = c[1]; out[q + 2] = c[2]; out[q + 3] = 255; }
+  return out; }
 /** the mesh turned about its centre's ground point (x = half its length, y = 0, z = 0): roll about the length, then
  *  pitch about the width. In the drawn (mirrored) frame, so roll > 0 lifts the car's left side as seen */
 function tilted(M: Mesh, roll: number, pitch: number): Mesh { if (!roll && !pitch) return M; const pos = Float32Array.from(M.pos), cx = M.length / 2, cr = Math.cos(roll), sr = Math.sin(roll), cp = Math.cos(pitch), sp = Math.sin(pitch);

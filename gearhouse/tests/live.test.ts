@@ -20,4 +20,10 @@ describe('the live renderer (review 99)', () => {
     const T = millbrook(), g = groundData(T, millbrookScenery(T), 120); expect(g.n).toBeGreaterThan(T.length * 9 * 6);
     const all = fenceData(T, () => true).n, gap = fenceData(T, (s, m) => !(s > 0 && m > 100 && m < 110)).n; expect(gap).toBeLessThan(all);
   });
+  it('lays every piece of the concrete on the surface, the bowl of a banking too: nothing stands clear of it to cut through a car (review 108)', () => {
+    const T = millbrook(), g = groundData(T, millbrookScenery(T), 120); let worst = 0, n = 0;
+    for (let t = 0; t < g.n / 3; t += 7) { const q = t * 9, cx = (g.pos[q]! + g.pos[q + 3]! + g.pos[q + 6]!) / 3, cy = (g.pos[q + 1]! + g.pos[q + 4]! + g.pos[q + 7]!) / 3, cz = (g.pos[q + 2]! + g.pos[q + 5]! + g.pos[q + 8]!) / 3;
+      const l = T.locate(cx, cy); if (Math.abs(l.off) > T.spec.width / 2 - 0.2) continue; n++; worst = Math.max(worst, cz - T.height(l.s, l.off)); }
+    expect(n).toBeGreaterThan(1000); expect(worst).toBeLessThan(0.06);
+  });
 });

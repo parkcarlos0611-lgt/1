@@ -42,12 +42,14 @@ export function groundData(T: Track, S: Scenery, start: number): GroundData { co
   for (let s = 0; s < L; s++) { const s1 = s + 1;
     for (let k = 0; k < 9; k++) { const o0 = -W2 + k * 2 * W2 / 9, o1 = o0 + 2 * W2 / 9, z = (T.height(s, o0) + T.height(s, o1)) / 2, slope = Math.abs(T.slope(s, (o0 + o1) / 2).across), v = Math.round(156 + z * 5 - slope * 34);
       g.quad(P(s, o0), P(s, o1), P(s1, o1), P(s1, o0), [v, v - 2, v - 9]); }
-    if (s % T.spec.joints === 0) g.quad(P(s - 0.04, -W2, 0.005), P(s - 0.04, W2, 0.005), P(s + 0.04, W2, 0.005), P(s + 0.04, -W2, 0.005), [92, 88, 80]);
+    // the joints across: laid in the same nine pieces as the concrete, so they follow a banking's curve (one straight
+    // piece edge to edge would stand clear of the bowl's middle and cut through the cars, review 108)
+    if (s % T.spec.joints === 0) for (let k = 0; k < 9; k++) { const o0 = -W2 + k * 2 * W2 / 9, o1 = o0 + 2 * W2 / 9; g.quad(P(s - 0.04, o0, 0.005), P(s - 0.04, o1, 0.005), P(s + 0.04, o1, 0.005), P(s + 0.04, o0, 0.005), [92, 88, 80]); }
     for (const o of [-W2, W2]) { const i = o < 0 ? 1 : -1; g.quad(P(s, o, 0.006), P(s, o + i * 0.18, 0.006), P(s1, o + i * 0.18, 0.006), P(s1, o, 0.006), hex('#3b3a35')); }
     const bk = T.bankAt(s).b, out = T.at(s).k >= 0 || bk ? (bk && T.at((bk.s0 + bk.s1) / 2).k < 0 ? 1 : -1) : -1, H = T.height(s, out * W2) - T.bump(s), H1 = T.height(s1, out * W2) - T.bump(s1);
     if (H > 0.3 || H1 > 0.3) { const a = T.point(s, out * W2), b = T.point(s1, out * W2), fa = T.point(s, out * (W2 + Math.max(H, 0.3) * 2.4)), fb = T.point(s1, out * (W2 + Math.max(H1, 0.3) * 2.4));
       g.quad([a.x, a.y, a.z], [b.x, b.y, b.z], [fb.x, fb.y, -0.025], [fa.x, fa.y, -0.025], hex('#4c6340'), 1); } }
-  g.quad(P(start - 0.15, -W2, 0.008), P(start - 0.15, W2, 0.008), P(start + 0.15, W2, 0.008), P(start + 0.15, -W2, 0.008), hex('#f2efe6'));
+  for (let k = 0; k < 9; k++) { const o0 = -W2 + k * 2 * W2 / 9, o1 = o0 + 2 * W2 / 9; g.quad(P(start - 0.15, o0, 0.008), P(start - 0.15, o1, 0.008), P(start + 0.15, o1, 0.008), P(start + 0.15, o0, 0.008), hex('#f2efe6')); }
   return g.done(); }
 
 /** the fence along both edges: a rail at 0.9 m, a post every 3 m, the stretches not broken */

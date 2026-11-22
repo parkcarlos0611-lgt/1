@@ -9,7 +9,12 @@ export type V = [number, number, number];
 export const KINDS = ['plain', 'paint', 'metal', 'glass', 'shine', 'tyre', 'wood', 'canvas', 'leather', 'lens', 'grille'] as const;
 export type Kind = typeof KINDS[number];
 /** `kind` per triangle (KINDS index); `tex` per triangle: 1 or 2 on a tyre's tread, alternate blocks round the wheel */
-export interface Mesh { n: number; pos: Float32Array; col: Uint8Array; gloss: Float32Array; part: Int16Array; kind: Uint8Array; tex: Uint8Array; length: number; /** each part number's name (the parts' common names, as the 2D part models had: body, hood, fenderF, lamp, ...) */ names?: string[] }
+/** a decal (review 95): a picture laid on the skin, not a part. It is projected along `n` (the way it faces, out of the
+ *  surface) onto whatever painted face lies within its reach, round its centre `o` (file frame, mm): a disc of radius
+ *  `r` in `col`, and `text` (digits and capitals) in `ink` across it, upright along `up`. The face keeps its own part,
+ *  gloss and lighting, so the decal shades, ages and rusts with the panel under it, and has no outline of its own. */
+export interface Decal { o: V; n: V; up: V; r: number; col: string; text?: string; ink?: string }
+export interface Mesh { decals?: Decal[]; n: number; pos: Float32Array; col: Uint8Array; gloss: Float32Array; part: Int16Array; kind: Uint8Array; tex: Uint8Array; length: number; /** each part number's name (the parts' common names, as the 2D part models had: body, hood, fenderF, lamp, ...) */ names?: string[] }
 const hex = (h: string): V => { const v = parseInt(h.replace('#', ''), 16); return [(v >> 16) & 255, (v >> 8) & 255, v & 255]; };
 const sub = (a: V, b: V): V => [a[0] - b[0], a[1] - b[1], a[2] - b[2]], add = (a: V, b: V): V => [a[0] + b[0], a[1] + b[1], a[2] + b[2]], mul = (a: V, k: number): V => [a[0] * k, a[1] * k, a[2] * k];
 const cross = (a: V, b: V): V => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]], len = (a: V) => Math.hypot(a[0], a[1], a[2]), norm = (a: V): V => { const l = len(a) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };
@@ -44,7 +49,10 @@ export class Build {
     const ring = ([a, r]: [number, number]): V[] => Array.from({ length: seg }, (_, i) => { const t = i / seg * Math.PI * 2, c = Math.cos(t) * r, s = Math.sin(t) * r; return (axis === 'x' ? [o[0] + a, o[1] + c, o[2] + s] : [o[0] + c, o[1] + a, o[2] + s]) as V; });
     const top = Math.max(...prof.map(p => p[1]));   // the outermost band (a tyre's tread) is marked in alternate blocks
     return this.loft(prof.map(ring), caps, (b, i) => prof[b]![1] === top && prof[b + 1]![1] === top ? 1 + (i & 1) : 0); }
-  mesh(length: number): Mesh { return { n: this.G.length, pos: new Float32Array(this.P), col: new Uint8Array(this.C), gloss: new Float32Array(this.G), part: new Int16Array(this.T), kind: new Uint8Array(this.K), tex: new Uint8Array(this.X), length, names: this.N.slice() }; }
+  private D: Decal[] = [];
+  /** lay a decal on the paint (see Decal) */
+  decal(d: Decal): this { this.D.push(d); return this; }
+  mesh(length: number): Mesh { return { decals: this.D.slice(), n: this.G.length, pos: new Float32Array(this.P), col: new Uint8Array(this.C), gloss: new Float32Array(this.G), part: new Int16Array(this.T), kind: new Uint8Array(this.K), tex: new Uint8Array(this.X), length, names: this.N.slice() }; }
 }
 /** a body section at x: a closed ring, half-width w about y = 0, from zb up to zt; `top` and `bot` are how square the
  *  upper and lower halves are (2 a circle's roundness, 6 nearly a box); `k` points round */
@@ -121,6 +129,22 @@ function posed(M: Mesh, steer: number, spin: number): Mesh { if (!steer && !spin
     if (w.front && steer) { const x2 = x * cd + y * sd, y2 = -x * sd + y * cd; x = x2; y = y2; }   // about the upright: the wheel's front (x < 0) goes to the car's left (+y in the drawn, mirrored frame)
     pos[i] = x + w.hx; pos[i + 1] = y + w.hy; pos[i + 2] = z + w.hz; }
   return { ...M, pos }; }
+// ---- decals ----
+/** capitals and digits, 5 x 7 */
+const GLYPH: Record<string, string> = { '0': '0e11131519110e', '1': '040c040404040e', '2': '0e11010204081f', '3': '1f02040201110e', '4': '02060a121f0202', '5': '1f101e0101110e', '6': '0608101e11110e', '7': '1f010204080808', '8': '0e11110e11110e', '9': '0e11110f01020c' };
+const glyphRows = (c: string): number[] => { const g = GLYPH[c] ?? '00000000000000'; return Array.from({ length: 7 }, (_, k) => parseInt(g.slice(k * 2, k * 2 + 2), 16) || 0); };
+type Prepped = Decal & { rt: V; rgb: V; inkRgb: V; rows: number[][] };
+const hexV = (h: string): V => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+function prepDecal(d: Decal): Prepped { const n = norm(d.n), up = norm(d.up); return { ...d, n, up, rt: norm(cross(n, up)), rgb: hexV(d.col), inkRgb: hexV(d.ink ?? '#111111'), rows: [...(d.text ?? '')].map(glyphRows) }; }
+/** the decal's colour at a point of the car as built, on triangle t; null where it does not lie */
+function decalAt(d: Prepped, x: number, y: number, z: number, M0: Mesh, t: number): V | null {
+  const dx = x - d.o[0], dy = y - d.o[1], dz = z - d.o[2], depth = dx * d.n[0] + dy * d.n[1] + dz * d.n[2]; if (Math.abs(depth) > d.r * 0.8) return null;
+  const u = dx * d.rt[0] + dy * d.rt[1] + dz * d.rt[2], v = dx * d.up[0] + dy * d.up[1] + dz * d.up[2]; if (u * u + v * v > d.r * d.r) return null;
+  const q = t * 9, P = M0.pos, e1: V = [P[q + 3]! - P[q]!, P[q + 4]! - P[q + 1]!, P[q + 5]! - P[q + 2]!], e2: V = [P[q + 6]! - P[q]!, P[q + 7]! - P[q + 1]!, P[q + 8]! - P[q + 2]!], fn = norm(cross(e1, e2));
+  if (Math.abs(fn[0] * d.n[0] + fn[1] * d.n[1] + fn[2] * d.n[2]) < 0.45) return null;   // not round an edge onto a face that turns away
+  if (d.rows.length) { const H = d.r * 1.05, cell = H / 7, cw = cell * 6, W = cw * d.rows.length - cell, gx = (u + W / 2) / cell, gy = (H / 2 - v) / cell;
+    if (gy >= 0 && gy < 7 && gx >= 0) { const ch = Math.floor(gx / 6), col = Math.floor(gx) - ch * 6; if (ch < d.rows.length && col < 5 && (d.rows[ch]![Math.floor(gy)]! >> (4 - col)) & 1) return d.inkRgb; } }
+  return d.rgb; }
 /** the mesh turned about its centre's ground point (x = half its length, y = 0, z = 0): roll about the length, then
  *  pitch about the width. In the drawn (mirrored) frame, so roll > 0 lifts the car's left side as seen */
 function tilted(M: Mesh, roll: number, pitch: number): Mesh { if (!roll && !pitch) return M; const pos = Float32Array.from(M.pos), cx = M.length / 2, cr = Math.cos(roll), sr = Math.sin(roll), cp = Math.cos(pitch), sp = Math.sin(pitch);
@@ -130,6 +154,7 @@ export function drawMesh(M0: Mesh, yaw: number, pitch: number, mm: number, w: nu
   const M = tilted(asDrawn(posed(M0, o.steer ?? 0, o.spin ?? 0)), o.roll ?? 0, o.pitch ?? 0), W = o.wear ?? NEW, ga = o.glass ?? 0.8;
   const th = yaw * Math.PI / 180, ph = pitch * Math.PI / 180, ct = Math.cos(th), st = Math.sin(th), sp = Math.sin(ph), cp = Math.cos(ph), N = w * h, cx = M.length / 2, cy = h * (o.cy ?? 0.62);
   const zb = new Float32Array(N).fill(-1e9), tri = new Int32Array(N).fill(-1), rgba = new Uint8ClampedArray(N * 4), at = new Float32Array(N * 3);   // at: the point of the car each pixel shows
+  const DEC = M0.decals?.length ? M0.decals.map(prepDecal) : null, rest = DEC ? new Float32Array(N * 3) : null;   // rest: that point on the car as built (the file's frame), where decals are laid
   const cam: V = [-cp * st, -cp * ct, sp], sun: V = o.studio ? norm([cam[0] * 0.8 + ct * 0.35, cam[1] * 0.8 - st * 0.35, cam[2] * 0.8 + 0.75]) : [SUN[0] * ct + SUN[1] * st, -SUN[0] * st + SUN[1] * ct, SUN[2]];
   const prj = (x: number, y: number, z: number): V => { const xr = (x - cx) * ct - y * st, yr = (x - cx) * st + y * ct; return [w / 2 + xr / mm, cy + (-yr * sp - z * cp) / mm, -yr * cp + z * sp]; };
   const fill = (a: V, b: V, c: V, f: (i: number, d: number, l0: number, l1: number, l2: number) => void) => { const x0 = Math.max(0, Math.floor(Math.min(a[0], b[0], c[0]))), x1 = Math.min(w - 1, Math.ceil(Math.max(a[0], b[0], c[0]))), y0 = Math.max(0, Math.floor(Math.min(a[1], b[1], c[1]))), y1 = Math.min(h - 1, Math.ceil(Math.max(a[1], b[1], c[1])));
@@ -144,7 +169,7 @@ export function drawMesh(M0: Mesh, yaw: number, pitch: number, mm: number, w: nu
   const shadow = new Uint8Array(N), glassTris: number[] = [];
   for (let t = 0; t < M.n; t++) { const A = prj(...vtx(t, 0)), B = prj(...vtx(t, 1)), C = prj(...vtx(t, 2)), kd = M.kind[t]!;
     if (kd === GLASS || kd === SHINE) glassTris.push(t);
-    else fill(A, B, C, (i, d, l0, l1, l2) => { if (d > zb[i]!) { zb[i] = d; tri[i] = t; if (bary) { bary[i * 2] = l0; bary[i * 2 + 1] = l1; } const q = t * 9; at[i * 3] = l0 * p[q]! + l1 * p[q + 3]! + l2 * p[q + 6]!; at[i * 3 + 1] = l0 * p[q + 1]! + l1 * p[q + 4]! + l2 * p[q + 7]!; at[i * 3 + 2] = l0 * p[q + 2]! + l1 * p[q + 5]! + l2 * p[q + 8]!; } });
+    else fill(A, B, C, (i, d, l0, l1, l2) => { if (d > zb[i]!) { zb[i] = d; tri[i] = t; if (bary) { bary[i * 2] = l0; bary[i * 2 + 1] = l1; } const q = t * 9; at[i * 3] = l0 * p[q]! + l1 * p[q + 3]! + l2 * p[q + 6]!; at[i * 3 + 1] = l0 * p[q + 1]! + l1 * p[q + 4]! + l2 * p[q + 7]!; at[i * 3 + 2] = l0 * p[q + 2]! + l1 * p[q + 5]! + l2 * p[q + 8]!; if (rest) { const r0 = M0.pos; for (let k = 0; k < 3; k++) rest[i * 3 + k] = l0 * r0[q + k]! + l1 * r0[q + 3 + k]! + l2 * r0[q + 6 + k]!; } } });
     if (o.shadow !== false && pitch > 5) { const q = t * 9, g = (k: number): V => { const z = p[q + k + 2]!; return prj(p[q + k]! - sun[0] / sun[2] * z, p[q + k + 1]! - sun[1] / sun[2] * z, 0); }; fill(g(0), g(3), g(6), i => { shadow[i] = 1; }); } }
   // ---- pass 2: flat tones, then each material's texture, then age ----
   let ymax = 1; for (let i = 1; i < p.length; i += 3) ymax = Math.max(ymax, Math.abs(p[i]!));
@@ -174,7 +199,8 @@ export function drawMesh(M0: Mesh, yaw: number, pitch: number, mm: number, w: nu
     else if (names[M.part[t]!] === 'core' || names[M.part[t]!] === 'radiatorCore') { const [, gap] = cells(U / 8, V2 / 8); tone = gap < 0.12 ? 2.2 : 0.8; }   // the radiator's honeycomb
     else if (kd === LEATHER) { const v = fbm(U / 45, V2 / 45); tone = v > 0.62 ? 0.86 : v < 0.36 ? 1.1 : 1;   // creased and polished by wear
       const a = (((U + V2) % 110) + 110) % 110, b2 = (((U - V2) % 110) + 110) % 110; if ((a < 4 || b2 < 4)) tone *= 0.86; if (a < 9 && b2 < 9) tone *= 0.6; }   // buttoned, the pleats running between
-    else if (kd === GRILLE) { const a = ((U + V2) / 26 % 1 + 1) % 1, b = ((U - V2) / 26 % 1 + 1) % 1; if (a < 0.28 || b < 0.28) { cr = 150; cg = 148; cb = 140; } }   // a diamond mesh of bright wire
+    if (DEC && kd === PAINT) for (const d of DEC) { const c = decalAt(d, rest![i * 3]!, rest![i * 3 + 1]!, rest![i * 3 + 2]!, M0, t); if (c) { [cr, cg, cb] = c; tone = 1; } }
+    if (kd === GRILLE) { const a = ((U + V2) / 26 % 1 + 1) % 1, b = ((U - V2) / 26 % 1 + 1) % 1; if (a < 0.28 || b < 0.28) { cr = 150; cg = 148; cb = 140; } }   // a diamond mesh of bright wire
     const L = lit([cr * tone, cg * tone, cb * tone], n, sun, cam, kd === TYRE || kd === CANVAS || kd === LEATHER ? Math.min(g, 0.25) : g, vn ? BAYER4[((i / w | 0) & 3) * 4 + (i % w & 3)]! : -1);
     let R = Math.min(255, L.c[0] + L.spec), G = Math.min(255, L.c[1] + L.spec * 0.97), B = Math.min(255, L.c[2] + L.spec * 0.9);
     if ((g > 0.7 && R + G + B > 640) || L.spec > 60) glintAt.push(i);   // where a sparkle may flash

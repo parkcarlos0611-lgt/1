@@ -6,6 +6,8 @@
 // fairing behind the driver running into the tall tail fin.
 import { Build, section, type Mesh, type V } from './mesh';
 
+/** the race number on its discs (6: the works car that won Le Mans in 1955) */
+const NUMBER = '6';
 const PAINT = '#1f4a36', SEAM = '#12281e', CHROME = '#c9cbcf', ALLOY = '#aeb2b6', LEATHER = '#5d6f4a', LEATHER2 = '#44523a', GLASS = '#a9c2cc', RUBBER = '#26242b', DARK = '#1c1b20', LENS = '#efe9cf', RED = '#c22c2b', WHITE = '#e9e6dc';
 const FX = 1000, RX = FX + 2286, R = 360, TW = 165, WYF = 635, WYR = 610, L = 4470;   // the axles, the tyre's radius and width, half the tracks
 const RA = 388, YINF = 518, YINR = 493;                                               // the wheel arches' radius; the wheel wells' inner walls
@@ -47,9 +49,6 @@ function turn(b: Build, o: V, prof: [number, number][], seg = 10, caps = true) {
 /** an oval patch lying on the body's top, `lift` above the skin: lamp covers, the number discs */
 function patch(b: Build, cx: number, cy: number, rx: number, ry: number, lift: number, seg = 14) { const p = (f: number, i: number): V => { const t = i / seg * Math.PI * 2, x = cx + Math.cos(t) * rx * f, y = cy + Math.sin(t) * ry * f; return [x, y, skinZ(x, y) + lift]; };
   for (let i = 0; i < seg; i++) { b.tri([cx, cy, skinZ(cx, cy) + lift], p(0.5, i), p(0.5, i + 1)); b.quad(p(0.5, i), p(1, i), p(1, i + 1), p(0.5, i + 1)); } }
-/** a round patch on the body's side (s: which side), centre [cx, cz] */
-function sidePatch(b: Build, s: number, cx: number, cz: number, r: number, lift: number, seg = 14) { const p = (f: number, i: number): V => { const t = i / seg * Math.PI * 2, x = cx + Math.cos(t) * r * f, z = cz + Math.sin(t) * r * f; return [x, s * (sideY(x, z) + lift), z]; };
-  for (let i = 0; i < seg; i++) { b.tri([cx, s * (sideY(cx, cz) + lift), cz], p(0.5, i), p(0.5, i + 1)); b.quad(p(0.5, i), p(1, i), p(1, i + 1), p(0.5, i + 1)); } }
 /** a line drawn on the body's top from one point to another (a panel's edge) */
 function seam(b: Build, x0: number, y0: number, x1: number, y1: number, n = 8, t = 9) { const l = Math.hypot(x1 - x0, y1 - y0) || 1, ox = -(y1 - y0) / l * t / 2, oy = (x1 - x0) / l * t / 2;
   const p = (i: number, k: number): V => { const f = i / n, x = x0 + (x1 - x0) * f + ox * k, y = y0 + (y1 - y0) * f + oy * k; return [x, y, skinZ(x, y) + 3]; }; for (let i = 0; i < n; i++) b.quad(p(i, -1), p(i + 1, -1), p(i + 1, 1), p(i, 1)); }
@@ -88,7 +87,10 @@ export function jagDMesh(spin = 0): Mesh { const b = new Build();
   { const y = (x: number, z: number) => sideY(x, z) + 2; for (const x of [2260, 2800]) b.quad([x, y(x, 250), 250], [x + 9, y(x, 250), 250], [x + 9, y(x, 600), 600], [x, y(x, 600), 600]); b.quad([2260, y(2260, 250), 250], [2800, y(2800, 250), 250], [2800, y(2800, 259), 259], [2260, y(2260, 259), 259]); }
   b.name('strap').mat('#6b4a2c', 0.2, 'leather'); for (const s of [1, -1]) b.bar([2050, s * (sideY(2050, 640) + 4), 640], [2125, s * (sideY(2125, 640) + 4), 640], 30, 10);   // the bonnet's leather straps
   // ---- the number discs: on the bonnet, on each side behind the front wheel, on the tail ----
-  b.name('roundel').mat(WHITE, 0.3); patch(b, 1130, 0, 215, 215, 5, 16); patch(b, 3500, -330, 190, 190, 5, 16); for (const s of [1, -1]) sidePatch(b, s, 1810, 500, 185, 4, 16);
+  // decals laid on the paint, not parts (review 95): the number upright as the far side seen across the top, and as each side is seen
+  b.decal({ o: [1130, 0, skinZ(1130, 0)], n: [0, 0, 1], up: [0, 1, 0], r: 215, col: WHITE, text: NUMBER, ink: '#121212' });
+  b.decal({ o: [3500, -330, skinZ(3500, -330)], n: [0, 0, 1], up: [0, 1, 0], r: 190, col: WHITE, text: NUMBER, ink: '#121212' });
+  for (const s of [1, -1]) b.decal({ o: [1810, s * sideY(1810, 500), 500], n: [0, s, 0], up: [0, 0, 1], r: 185, col: WHITE, text: NUMBER, ink: '#121212' });
   // ---- the driver's place: a dark floor and dash, the seat, the headrest pad ----
   { const w = at(HALF, 2500), y0 = 0.14 * w + 3, y1 = 0.79 * w - 3;
     b.name('cockpit').mat(DARK, 0.05).box(CX0 + 2, CX1 - 2, y0, y1, FLOOR - 8, FLOOR + 3);

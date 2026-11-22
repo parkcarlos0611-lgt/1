@@ -62,12 +62,17 @@ const SUN: V = norm([-0.45, 0.35, 0.82]);
  *  -y from a nose-left heading, so it draws the mirror image. Mirror once here so a car's left shows nose-left, as in 2D. */
 const mirrored = new WeakMap<Mesh, Mesh>();
 function asDrawn(M: Mesh): Mesh { let m = mirrored.get(M); if (!m) { const pos = Float32Array.from(M.pos); for (let i = 1; i < pos.length; i += 3) pos[i] = -pos[i]!; m = { ...M, pos }; mirrored.set(M, m); } return m; }
-export interface DrawOpts { outline?: number; shadow?: boolean; cy?: number; /** how much of what is behind glass it hides, 0..1 */ glass?: number; wear?: Wear }
+export interface DrawOpts { outline?: number; shadow?: boolean; cy?: number; /** the car tilted on its ground point: roll (rad, its left side up +), pitch (rad, nose up +) */ roll?: number; pitch?: number; /** how much of what is behind glass it hides, 0..1 */ glass?: number; wear?: Wear }
 const PAINT = 1, METAL = 2, GLASS = 3, SHINE = 4, TYRE = 5, WOOD = 6, CANVAS = 7, LEATHER = 8, LENS = 9, GRILLE = 10;
 const GLASS_TINT: V = [150, 172, 182];
 const lum = (r: number, g: number, b: number) => 0.3 * r + 0.59 * g + 0.11 * b;
+/** the mesh turned about its centre's ground point (x = half its length, y = 0, z = 0): roll about the length, then
+ *  pitch about the width. In the drawn (mirrored) frame, so roll > 0 lifts the car's left side as seen */
+function tilted(M: Mesh, roll: number, pitch: number): Mesh { if (!roll && !pitch) return M; const pos = Float32Array.from(M.pos), cx = M.length / 2, cr = Math.cos(roll), sr = Math.sin(roll), cp = Math.cos(pitch), sp = Math.sin(pitch);
+  for (let i = 0; i < pos.length; i += 3) { let x = pos[i]! - cx, y = pos[i + 1]!, z = pos[i + 2]!; const y1 = y * cr + z * sr, z1 = -y * sr + z * cr; y = y1; z = z1; const x2 = x * cp - z * sp, z2 = x * sp + z * cp; pos[i] = x2 + cx; pos[i + 1] = y; pos[i + 2] = z2; }
+  return { ...M, pos }; }
 export function drawMesh(M0: Mesh, yaw: number, pitch: number, mm: number, w: number, h: number, o: DrawOpts = {}): Pic {
-  const M = asDrawn(M0), W = o.wear ?? NEW, ga = o.glass ?? 0.8;
+  const M = tilted(asDrawn(M0), o.roll ?? 0, o.pitch ?? 0), W = o.wear ?? NEW, ga = o.glass ?? 0.8;
   const th = yaw * Math.PI / 180, ph = pitch * Math.PI / 180, ct = Math.cos(th), st = Math.sin(th), sp = Math.sin(ph), cp = Math.cos(ph), N = w * h, cx = M.length / 2, cy = h * (o.cy ?? 0.62);
   const zb = new Float32Array(N).fill(-1e9), tri = new Int32Array(N).fill(-1), rgba = new Uint8ClampedArray(N * 4), at = new Float32Array(N * 3);   // at: the point of the car each pixel shows
   const sun: V = [SUN[0] * ct + SUN[1] * st, -SUN[0] * st + SUN[1] * ct, SUN[2]], cam: V = [-cp * st, -cp * ct, sp];

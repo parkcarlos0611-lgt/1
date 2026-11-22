@@ -87,7 +87,10 @@ export class Vehicle {
       let fx = 0, fy = 0; if (sig > 1e-9 && Fz > 0) { const Bs = ty.B * sig, f = Math.sin(ty.C * Math.atan(Bs - ty.E * (Bs - Math.atan(Bs)))); fx = mu * Fz * f * sx / sig; fy = -mu * Fz * f * sa / sig; }
       const rear = i >= 2, fade = 1 / (1 + Math.max(0, this.brakeT[i]! - 250) / 200);
       const bt = (u.brake * (c.brakes === 'rear' ? (rear ? 0.5 : 0) : rear ? 0.42 : 0.58) * brakeCap + (rear ? (u.handbrake ?? 0) * brakeCap * 0.35 : 0)) * fade;
-      const w0 = this.w[i]!, wf = w0 + ((rear ? Taxle / 2 : 0) - fx * R - Fz * (this.onGrass[i] ? 0.07 : c.crr) * R * Math.tanh(w0)) / this.Iw * dt, bs = bt / this.Iw * dt;
+      // the wheel's spin, stepped half-implicitly: the tyre pushes back harder the faster the wheel slips, too stiffly at
+      // low speed for a plain step (it would ring), so its stiffness joins the wheel's inertia
+      const K = mu * Fz * ty.C * ty.B / ty.peakSlip * R * R / v0;
+      const w0 = this.w[i]!, wf = w0 + ((rear ? Taxle / 2 : 0) - fx * R - Fz * (this.onGrass[i] ? 0.07 : c.crr) * R * Math.tanh(w0)) / (this.Iw + K * dt) * dt, bs = bt / (this.Iw + K * dt) * dt;
       this.w[i] = Math.abs(wf) <= bs ? 0 : wf - Math.sign(wf) * bs;                // brakes stop a wheel, never turn it back
       this.brakeT[i] = this.brakeT[i]! + (bt * Math.abs(this.w[i]!) / 9000 - (this.brakeT[i]! - 20) * (0.004 + this.speed * 0.0004)) * dt;
       Fx[i] = fx * cs - fy * sn; Fy[i] = fx * sn + fy * cs; }

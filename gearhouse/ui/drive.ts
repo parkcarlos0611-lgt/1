@@ -17,7 +17,9 @@ import { Sound, type Skid } from './sound';
 import specsData from '../data/cars/specs.json';
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
-const T = millbrook(), cv = $<HTMLCanvasElement>('view'), ctx = cv.getContext('2d')!;
+const T = millbrook(), cv = $<HTMLCanvasElement>('view'), main = cv.getContext('2d')!; let ctx = main;
+// the layer behind the player's car: the ground, the scenery and the other cars, smeared along the motion; the car stays sharp
+const bg = document.createElement('canvas'), bgx = bg.getContext('2d')!; let blurOn = true, lastCamX = 0, lastCamY = 0, shake = 0;
 let SP = Math.sin(30 * Math.PI / 180), CP = Math.cos(30 * Math.PI / 180), pitchDeg = 30; const DT = 1 / 200, START = T.spec.landmarks.find(l => l.kind === 'line')!.s;
 let VW = 768, VH = 432, mm = 50;                                               // the picture's own pixels, millimetres a pixel
 const st = { auto: true, assist: false, pilot: false, chase: false, progressive: false, cine: false };
@@ -95,6 +97,18 @@ function mini() { mctx.clearRect(0, 0, 150, 150); mctx.strokeStyle = 'rgba(235,2
   const dots = race ? race.cars.map(e => ({ c: e.car, me: !e.driver })) : [{ c: car, me: true }];
   for (const d of dots) { const [X, Y] = mp(d.c.x, d.c.y); mctx.fillStyle = d.me ? '#ffb347' : '#9fc3ff'; mctx.beginPath(); mctx.arc(X, Y, d.me ? 4 : 3, 0, Math.PI * 2); mctx.fill(); if (d.me) { mctx.strokeStyle = '#000'; mctx.lineWidth = 1; mctx.stroke(); } } }
 // ---- steam from a boiling radiator or a blown gasket ----
+/** the dials (temporary): a speedometer and a revolution counter, bottom left, period faces */
+function dials() { const r = Math.max(26, Math.min(46, Math.round(VH * 0.11))), y = VH - r - 8, top = Math.ceil(car.spec.topKmh / 20) * 20 + 20, maxR = Math.ceil(car.spec.redline * 1.2 / 500) * 500;
+  const dial = (cx: number, v: number, max: number, step: number, label: string, red: number, sub: string) => { const a0 = Math.PI * 0.75, a1 = Math.PI * 2.25, ang = (x: number) => a0 + (a1 - a0) * Math.min(1, Math.max(0, x / max));
+    main.fillStyle = 'rgba(18,16,14,0.82)'; main.beginPath(); main.arc(cx, y, r, 0, Math.PI * 2); main.fill(); main.strokeStyle = '#b9a77e'; main.lineWidth = 2; main.stroke();
+    if (red < max) { main.strokeStyle = '#c0392b'; main.lineWidth = 3; main.beginPath(); main.arc(cx, y, r - 4, ang(red), ang(max)); main.stroke(); }
+    main.strokeStyle = '#efe7d2'; main.fillStyle = '#efe7d2'; main.font = `${Math.max(6, Math.round(r * 0.22))}px Oswald, sans-serif`; main.textAlign = 'center'; main.textBaseline = 'middle';
+    for (let x = 0; x <= max + 1e-6; x += step / 2) { const a = ang(x), big = Math.abs(x / step - Math.round(x / step)) < 1e-6, r0 = r - (big ? 8 : 5); main.lineWidth = big ? 1.5 : 1; main.beginPath(); main.moveTo(cx + Math.cos(a) * r0, y + Math.sin(a) * r0); main.lineTo(cx + Math.cos(a) * (r - 2), y + Math.sin(a) * (r - 2)); main.stroke();
+      if (big && r > 30) main.fillText(String(Math.round(x / (label === 'rpm' ? 1000 : 1))), cx + Math.cos(a) * (r - 15), y + Math.sin(a) * (r - 15)); }
+    const a = ang(v); main.strokeStyle = '#ff9f40'; main.lineWidth = 2; main.beginPath(); main.moveTo(cx - Math.cos(a) * 5, y - Math.sin(a) * 5); main.lineTo(cx + Math.cos(a) * (r - 6), y + Math.sin(a) * (r - 6)); main.stroke();
+    main.fillStyle = '#d8c9a3'; main.beginPath(); main.arc(cx, y, 3, 0, Math.PI * 2); main.fill(); main.fillStyle = '#efe7d2'; main.fillText(sub, cx, y + r * 0.45); main.font = `${Math.max(5, Math.round(r * 0.16))}px Oswald, sans-serif`; main.fillText(label === 'rpm' ? 'RPM ×1000' : 'KM/H', cx, y - r * 0.38); main.textAlign = 'left'; };
+  dial(8 + r, car.speed * 3.6, top, top > 160 ? 40 : 20, 'km/h', top, `${(car.speed * 3.6).toFixed(0)}`);
+  dial(8 + r * 3 + 8, car.rpm, maxR, 1000, 'rpm', car.spec.redline, `${car.gear}단`); }
 function letterbox() { const b = Math.round(VH * 0.1); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, VW, b); ctx.fillRect(0, VH - b, VW, b);
   ctx.fillStyle = '#e9e4d8'; ctx.font = `${Math.max(7, Math.round(b * 0.42))}px Oswald, sans-serif`; ctx.textBaseline = 'middle';
   const me = race?.player, lap = me ? `${Math.min(race!.laps, me.lapAt.length)}/${race!.laps}바퀴 · ${race!.order().indexOf(me) + 1}위` : T.pieceAt(car.s);
@@ -127,14 +141,47 @@ function marks(c: Vehicle) { markTick++; for (let i = 0; i < 4; i++) { const k =
     skids.push({ x, y, z, a: Math.min(0.6, 0.12 + 0.45 * k.amount) * (k.kind === 'lock' ? 1.2 : 1) }); if (skids.length > 9000) skids.shift(); if (Math.random() < 0.12 * (0.3 + k.amount)) puffs.push({ x, y, z: z + 0.2, r: 0.3, a: 0.35, vx: (Math.random() - 0.5) * 0.6, vy: (Math.random() - 0.5) * 0.6 }); } }
 /** every car in view, the farthest first */
 /** the scenery and the cars together, the farthest first; decks over the track after them all */
-function drawWorld() { const a = (turning() ? camAng : Math.PI / 2) - Math.PI / 2, reach = Math.hypot(VW, VH / SP) * mm / 2000 + 30, items: { Y: number; draw: () => void }[] = [], over: (() => void)[] = [];
+/** what the scene holds this frame, each with its depth (screen Y of its ground point), its picture and where it lands */
+interface Drawn { Y: number; img: HTMLCanvasElement; X0: number; Y0: number; car?: Vehicle; over?: boolean }
+function scene(): Drawn[] { const a = (turning() ? camAng : Math.PI / 2) - Math.PI / 2, reach = Math.hypot(VW, VH / SP) * mm / 2000 + 30, out: Drawn[] = [];
   const seen = (x: number, y: number) => Math.abs(x - camX) < reach && Math.abs(y - camY) < reach;
-  const prop = (q: Placed) => { if (!seen(q.x, q.y)) return; const ps = propPic(q.kind); if (!ps) return; const [X, Y] = P(q.x, q.y, q.z ?? 0), f = ps.get(q.heading - a), d = () => ctx.drawImage(f.canvas, Math.round(X - f.ax), Math.round(Y - f.ay)); if (q.overhead) over.push(d); else items.push({ Y: P(q.x, q.y, 0)[1], draw: d }); };
+  const prop = (q: Placed) => { if (!seen(q.x, q.y)) return; const ps = propPic(q.kind); if (!ps) return; const [X, Y] = P(q.x, q.y, q.z ?? 0), f = ps.get(q.heading - a);
+    out.push({ Y: P(q.x, q.y, 0)[1], img: f.canvas, X0: Math.round(X - f.ax), Y0: Math.round(Y - f.ay), over: q.overhead }); };
   for (const q of SCN.props) prop(q); for (const q of trainCars()) prop(q);
   const cars = race ? race.cars.map(e => ({ c: e.car, sp: e.driver ? others.get(e)! : sprites, turn: e.wheelTurn })) : [{ c: car, sp: sprites, turn: wheelTurn }];
   for (const { c, sp, turn } of cars) { const z = T.height(c.s, c.off) + c.zb, [X, Y] = P(c.x, c.y, z); if (X < -150 || X > VW + 150 || Y < -150 || Y > VH + 150) continue;
-    items.push({ Y: P(c.x, c.y, 0)[1], draw: () => { const f = sp.get(sp.key(c.yaw - a, c.tilt + c.roll * 1.5, c.steer, turn, c.speed)); ctx.drawImage(f.canvas, Math.round(X - f.ax), Math.round(Y - f.ay)); } }); }
-  items.sort((p, q) => p.Y - q.Y); for (const it of items) it.draw(); for (const d of over) d(); }
+    const f = sp.get(sp.key(c.yaw - a, c.tilt + c.roll * 1.5, c.steer, turn, c.speed)); out.push({ Y: P(c.x, c.y, 0)[1], img: f.canvas, X0: Math.round(X - f.ax), Y0: Math.round(Y - f.ay), car: c }); }
+  return out.sort((p, q) => (p.over ? 1 : 0) - (q.over ? 1 : 0) || p.Y - q.Y); }
+const boxes = (a: Drawn, b: Drawn) => a.X0 < b.X0 + b.img.width && b.X0 < a.X0 + a.img.width && a.Y0 < b.Y0 + b.img.height && b.Y0 < a.Y0 + a.img.height;
+const alphas = new WeakMap<HTMLCanvasElement, Uint8Array>();
+const alphaOf = (c: HTMLCanvasElement) => { let a = alphas.get(c); if (!a) { const d = c.getContext('2d')!.getImageData(0, 0, c.width, c.height).data; a = new Uint8Array(c.width * c.height); for (let i = 0; i < a.length; i++) a[i] = d[i * 4 + 3]!; alphas.set(c, a); } return a; };
+/** does b cover a fair part of what a shows (their pictures' solid pixels, not their boxes)? */
+function hits(a: Drawn, b: Drawn): boolean { if (!boxes(a, b)) return false; const A = alphaOf(a.img), B = alphaOf(b.img), aw = a.img.width, bw = b.img.width; let n = 0, m = 0;
+  const x0 = Math.max(a.X0, b.X0), x1 = Math.min(a.X0 + aw, b.X0 + bw), y0 = Math.max(a.Y0, b.Y0), y1 = Math.min(a.Y0 + a.img.height, b.Y0 + b.img.height);
+  for (let y = y0; y < y1; y += 2) for (let x = x0; x < x1; x += 2) { if (A[(y - a.Y0) * aw + (x - a.X0)]! < 128) continue; m++; if (B[(y - b.Y0) * bw + (x - b.X0)]! > 128) n++; }
+  return n > 6 && n > m * 0.15; }
+/** a car's outline filled in one light colour (for when a building hides it) */
+const silhouettes = new WeakMap<HTMLCanvasElement, HTMLCanvasElement>();
+function silhouette(img: HTMLCanvasElement): HTMLCanvasElement { let s = silhouettes.get(img); if (s) return s; s = document.createElement('canvas'); s.width = img.width; s.height = img.height; const c = s.getContext('2d')!;
+  c.drawImage(img, 0, 0); c.globalCompositeOperation = 'source-in'; c.fillStyle = '#ffe2a8'; c.fillRect(0, 0, s.width, s.height); silhouettes.set(img, s); return s; }
+/** the whole picture: the layer behind (blurred by the camera's motion), the player's car sharp, what stands before it, the hidden cars' outlines */
+function drawWorld(el: number) { const all = scene(), meI = all.findIndex(d => d.car === car), me = all[meI];
+  if (bg.width !== VW || bg.height !== VH) { bg.width = VW; bg.height = VH; } ctx = bgx; bgx.imageSmoothingEnabled = false; drawTrack();
+  const front: Drawn[] = []; for (const d of all) { if (d.car === car) continue; if (me && (d.over || d.Y > me.Y) && hits(d, me)) front.push(d); bgx.drawImage(d.img, d.X0, d.Y0); }
+  ctx = main;
+  // the smear: copies of the layer laid back along the way the ground streams past, fainter as they go
+  const vx = (camX - lastCamX) / Math.max(el, 1e-3), vy = (camY - lastCamY) / Math.max(el, 1e-3); lastCamX = camX; lastCamY = camY;
+  const [sx0, sy0] = P(camX, camY, camZ), [sx1, sy1] = P(camX + vx * 0.05, camY + vy * 0.05, camZ), bx = sx1 - sx0, by = sy1 - sy0, blur = blurOn ? Math.min(40, Math.hypot(bx, by)) : 0;
+  shake = car.speed > 25 ? (car.speed - 25) * 0.012 + Math.min(1.5, Math.abs(car.vzb) * 3) : Math.min(1.5, Math.abs(car.vzb) * 3);
+  const jx = Math.round((Math.random() - 0.5) * shake), jy = Math.round((Math.random() - 0.5) * shake);
+  main.clearRect(0, 0, VW, VH); main.drawImage(bg, jx, jy);
+  if (blur > 1.5) { const n = 6, ux = bx / Math.hypot(bx, by), uy = by / Math.hypot(bx, by); for (let k = 1; k <= n; k++) { main.globalAlpha = 0.42 * (1 - k / (n + 1)); const d = blur * k / n; main.drawImage(bg, Math.round(jx + ux * d), Math.round(jy + uy * d)); } main.globalAlpha = 1; }
+  if (me) { main.drawImage(me.img, me.X0 + jx, me.Y0 + jy); for (const d of front) main.drawImage(d.img, d.X0 + jx, d.Y0 + jy); }
+  // a car a building hides: its outline over it, faint
+  for (const c of all) { if (!c.car) continue; const hidden = c === me ? front.length > 0 && front.some(d => !d.car) : all.some(d => !d.car && (d.over || d.Y > c.Y) && hits(d, c));
+    if (hidden) { main.globalAlpha = c === me ? 0.55 : 0.35; main.drawImage(silhouette(c.img), c.X0 + jx, c.Y0 + jy); main.globalAlpha = 1; } }
+  // speed: the edges darken a little
+  if (car.speed > 30) { const v = Math.min(1, (car.speed - 30) / 30) * 0.35, g = main.createRadialGradient(VW / 2, VH / 2, VH * 0.35, VW / 2, VH / 2, VW * 0.62); g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, `rgba(0,0,0,${v})`); main.fillStyle = g; main.fillRect(0, 0, VW, VH); } }
 /** the train's pieces where it is on the line (locomotive, tender, three carriages), or none */
 function trainCars(): Placed[] { if (train.d < 0) return []; const R = SCN.railway, out: Placed[] = []; let acc = 0; const at = (d: number): Placed | null => { acc = 0; for (let k = 0; k + 1 < R.length; k++) { const [x0, y0] = R[k]!, [x1, y1] = R[k + 1]!, n = Math.hypot(x1 - x0, y1 - y0); if (acc + n >= d) { const f = (d - acc) / n; return { kind: '', x: x0 + (x1 - x0) * f, y: y0 + (y1 - y0) * f, heading: Math.atan2(y1 - y0, x1 - x0) }; } acc += n; } return null; };
   for (const [kind, back] of [['locomotive', 6], ['tender', 15.9], ['carriage', 27.3], ['carriage', 42.5], ['carriage', 57.7]] as const) { const q = at(train.d - back); if (q) out.push({ ...q, kind }); } return out; }
@@ -217,12 +264,13 @@ function frame(now: number) { const el = Math.min(0.1, (now - last) / 1000); las
   { const R = SCN.railway; let len = 0; for (let k = 0; k + 1 < R.length; k++) len += Math.hypot(R[k + 1]![0] - R[k]![0], R[k + 1]![1] - R[k]![1]);   // the train: now and then along the line
     if (train.d < 0) { train.wait -= el; if (train.wait <= 0) train.d = 0; } else { train.d += 24 * el; if (train.d > len + 80) { train.d = -1; train.wait = 70 + Math.random() * 120; } }
     if (snd) { const q = trainCars()[0]; snd.train = q ? Math.max(0, 1 - Math.hypot(q.x - car.x, q.y - car.y) / 400) : 0; } }
-  drawTrack(); drawWorld(); drawPuffs(); drawSteam(el); if (st.cine) letterbox(); hud(); mini(); sounds(); sprites.work(5); for (const sp of others.values()) sp.work(2); requestAnimationFrame(frame); }
+  drawWorld(el); drawPuffs(); drawSteam(el); if (st.cine) letterbox(); else dials(); hud(); mini(); sounds(); sprites.work(5); for (const sp of others.values()) sp.work(2); requestAnimationFrame(frame); }
 // ---- page ----
 const pick = $<HTMLSelectElement>('car'); for (const id of RACE_CARS) pick.add(new Option(raceSpec(id).name, id)); pick.value = carId;
 pick.addEventListener('change', () => { carId = pick.value; if (race) stopRace(); else choose(pick.value); pick.blur(); });
 const setCine = (on: boolean) => { st.cine = on; ($('cine') as HTMLInputElement).checked = on; document.body.classList.toggle('cine', on); shot.until = 0; fit(); };
 $<HTMLInputElement>('cine').addEventListener('change', e => setCine((e.target as HTMLInputElement).checked));
+$<HTMLInputElement>('blur').addEventListener('change', e => { blurOn = (e.target as HTMLInputElement).checked; });
 $<HTMLInputElement>('progressive').addEventListener('change', e => { st.progressive = (e.target as HTMLInputElement).checked; document.body.classList.toggle('progressive', st.progressive); });
 $<HTMLInputElement>('sound').addEventListener('change', e => { if ((e.target as HTMLInputElement).checked) { snd = new Sound(); snd.volume = +$<HTMLInputElement>('vol').value; } else { snd?.close(); snd = null; } });
 $<HTMLInputElement>('vol').addEventListener('input', e => { if (snd) snd.volume = +(e.target as HTMLInputElement).value; });

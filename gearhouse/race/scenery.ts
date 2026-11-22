@@ -14,7 +14,7 @@ export function millbrookScenery(T: Track): Scenery { const L = T.length, W2 = T
   let r = 20251122; const rnd = () => { r = (r * 16807) % 2147483647; return r / 2147483647; };
   const piece = (name: string) => { let acc = 0; for (const p of T.spec.pieces) { const len = p.kind === 'straight' ? p.len : Math.abs(p.radius * p.turn * Math.PI / 180); if (p.name === name) return { s0: acc, s1: acc + len }; acc += len; } return { s0: 0, s1: 0 }; };
   /** a prop beside the track at s, `off` to the left (+) or right (-), its front toward the track */
-  const facing = (kind: string, s: number, off: number, z?: number) => { const p = T.point(s, off), h = T.at(s).h; props.push({ kind, x: p.x, y: p.y, heading: off < 0 ? h : h + Math.PI, z }); };
+  const facing = (kind: string, s: number, off: number, z?: number) => { const p = T.point(s, off), h = T.at(s).h; props.push({ kind, x: p.x, y: p.y, heading: off < 0 ? h + Math.PI : h, z }); };   // the drawing mirrors a mesh's sides, so a front (-y) toward the track needs the half turn
   const start = T.spec.landmarks.find(l => l.kind === 'line')!.s, home = piece('Home Straight'), mem = piece("Members' Banking"), rail = piece('Railway Straight'), byf = piece('Byfleet Banking');
   // ---- the start: stands outside along the straight, the clock, the timing box and the scoreboard ----
   for (let k = 0; k < 6; k++) facing('grandstandBay', start - 40 + k * 15.6, -(W2 + 9));
@@ -31,12 +31,12 @@ export function millbrookScenery(T: Track): Scenery { const L = T.length, W2 = T
   // ---- the railway: a line outside the Railway Straight, running on past both ends; a station and signal box ----
   const railway: [number, number][] = []; { const off = -(W2 + 26), a = T.point(rail.s0, off), b = T.point(rail.s1, off), dx = b.x - a.x, dy = b.y - a.y, l = Math.hypot(dx, dy), ux = dx / l, uy = dy / l;
     for (let d = -900; d <= l + 900; d += 30) railway.push([a.x + ux * d, a.y + uy * d]); lines.push({ pts: railway, width: 4, kind: 'rail' });
-    const at = (d: number, side: number): Placed => ({ kind: '', x: a.x + ux * d - uy * side, y: a.y + uy * d + ux * side, heading: Math.atan2(uy, ux) + (side > 0 ? 0 : Math.PI) });
+    const at = (d: number, side: number): Placed => ({ kind: '', x: a.x + ux * d - uy * side, y: a.y + uy * d + ux * side, heading: Math.atan2(uy, ux) + (side > 0 ? Math.PI : 0) });
     for (let k = 0; k < 3; k++) props.push({ ...at(-500 + k * 15.2, 9), kind: 'platform' }); props.push({ ...at(-485, 16), kind: 'stationBuilding' }); props.push({ ...at(-300, -8), kind: 'signalBox' });
     for (let d = -880; d < l + 880; d += 55) props.push({ ...at(d, -6), kind: 'telegraphPole' }); }
   // ---- the river under the Byfleet Banking, and the bridge's parapets ----
   { const s = T.spec.landmarks.find(l => l.name === 'Byfleet Bridge')!.s, pts: [number, number][] = []; for (let o = -420; o <= 420; o += 30) { const p = T.point(s + Math.sin(o / 90) * 25, o); pts.push([p.x, p.y]); } lines.push({ pts, width: 9, kind: 'river' });
-    for (const o of [-(W2 + 1), W2 + 1]) { const p = T.point(s, o); props.push({ kind: 'riverBridge', x: p.x, y: p.y, heading: T.at(s).h + (o < 0 ? 0 : Math.PI) }); } }
+    for (const o of [-(W2 + 1), W2 + 1]) { const p = T.point(s, o); props.push({ kind: 'riverBridge', x: p.x, y: p.y, heading: T.at(s).h + (o < 0 ? Math.PI : 0) }); } }
   // ---- the aerodrome inside: a mown strip, hangars and works along the Railway Straight's inside, aeroplanes, a windsock ----
   { const mid = T.nodes.reduce((a, n) => [a[0]! + n.x / L, a[1]! + n.y / L], [0, 0]); const h = T.at((rail.s0 + rail.s1) / 2).h, ux = Math.cos(h), uy = Math.sin(h);
     areas.push({ pts: [[-500, -60], [500, -60], [500, 60], [-500, 60]].map(([a, b]) => [mid[0]! + ux * a! - uy * b!, mid[1]! + uy * a! + ux * b!] as [number, number]), kind: 'mown' });

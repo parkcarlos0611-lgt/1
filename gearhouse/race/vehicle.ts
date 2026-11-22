@@ -14,8 +14,8 @@ import { Health, type Failure } from './health';
 export interface Controls { throttle: number; brake: number; steer: number; clutch?: number; gear?: number; handbrake?: number }   // steer -1 (right) .. 1 (left)
 const G = 9.81, RHO = 1.2;
 export interface Tyre { mu: number; B: number; C: number; E: number; loadSens: number; peakSlip: number; peakAngle: number }
-/** a 1920s-30s cross-ply on dry concrete: modest grip, a soft gradual peak at large slip */
-export const CROSSPLY: Tyre = { mu: 0.78, B: 1.6, C: 1.55, E: 0.4, loadSens: 0.1, peakSlip: 0.12, peakAngle: 0.14 };
+/** a 1920s-30s cross-ply on dry concrete: modest grip, a soft gradual peak, holding on well past it */
+export const CROSSPLY: Tyre = { mu: 0.9, B: 1.6, C: 1.45, E: 0.7, loadSens: 0.08, peakSlip: 0.12, peakAngle: 0.13 };   // review 89: grippier, and holding on past the peak rather than letting go
 
 export class Vehicle {
   x = 0; y = 0; yaw = 0; vx = 0; vy = 0; r = 0; s = 0; off = 0;

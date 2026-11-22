@@ -18,7 +18,12 @@ const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as 
 const T = millbrook(), cv = $<HTMLCanvasElement>('view'), ctx = cv.getContext('2d')!;
 let SP = Math.sin(30 * Math.PI / 180), CP = Math.cos(30 * Math.PI / 180), pitchDeg = 30; const DT = 1 / 200, START = T.spec.landmarks.find(l => l.kind === 'line')!.s;
 let VW = 768, VH = 432, mm = 50;                                               // the picture's own pixels, millimetres a pixel
-const st = { auto: true, assist: false, pilot: false, chase: false, progressive: false };
+const st = { auto: true, assist: false, pilot: false, chase: false, progressive: false, cine: false };
+const turning = () => st.chase || st.cine;
+// ---- the cinematic view: shots cut between trackside cameras (the world turned to look from the camera at the car), a
+//      low chase and a high fixed view; pixels twice the size, the gauges hidden, bars top and bottom with a caption ----
+const W2c = T.spec.width / 2, CAMS = Array.from({ length: Math.floor(T.length / 380) }, (_, i) => { const s = i * 380 + 60, side = i % 2 ? 1 : -1, p = T.point(s, side * (W2c + 16)); return { s, x: p.x, y: p.y }; });
+let cut = false; let shot: { kind: 'side' | 'chase' | 'top'; cam?: { s: number; x: number; y: number }; until: number } = { kind: 'chase', until: 0 }, shotN = 0;
 let snd: Sound | null = null, lastGear = 1, lastV = 0, wasAir = false; const steam: { x: number; y: number; z: number; r: number; a: number }[] = []; let pilot = new Driver(T), camAng = Math.PI / 2, wheelTurn = 0;   // camAng: the world heading that shows as up the screen let pilot = new Driver(T);
 let car!: Vehicle, sprites!: CarSprites, carId = 'chevAB28', camX = 0, camY = 0, camZ = 0;
 const keys = new Set<string>(), input = { steer: 0, throttle: 0, brake: 0, hand: 0 }; let manualGear = 1;
@@ -34,8 +39,8 @@ function choose(id: string) { carId = id; const spec = raceSpec(id), m = MESH_CA
 function say(t: string) { msg = t; msgT = 3; }
 // ---- the world to the picture ----
 // world to picture: the camera turned so that the heading camAng points up the screen (fixed camera: north up)
-let cA = 0, sA = 1; const turnCam = () => { const a = (st.chase ? camAng : Math.PI / 2) - Math.PI / 2; cA = Math.cos(a); sA = Math.sin(a); };
-const P = (x: number, y: number, z: number): [number, number] => { const dx = x - camX, dy = y - camY, rx = dx * cA + dy * sA, ry = -dx * sA + dy * cA; return [rx * 1000 / mm + VW / 2, (-ry * SP - (z - camZ) * CP) * 1000 / mm + VH * (st.chase ? 0.66 : 0.55)]; };
+let cA = 0, sA = 1; const turnCam = () => { const a = (turning() ? camAng : Math.PI / 2) - Math.PI / 2; cA = Math.cos(a); sA = Math.sin(a); };
+const P = (x: number, y: number, z: number): [number, number] => { const dx = x - camX, dy = y - camY, rx = dx * cA + dy * sA, ry = -dx * sA + dy * cA; return [rx * 1000 / mm + VW / 2, (-ry * SP - (z - camZ) * CP) * 1000 / mm + VH * (st.chase && !st.cine ? 0.66 : 0.55)]; };
 const sx = (x: number, y = camY) => P(x, y, 0)[0], sy = (y: number, z: number, x = camX) => P(x, y, z)[1]; void sx; void sy;
 function drawTrack() {
   // grass, with a little texture fixed to the ground
@@ -72,6 +77,10 @@ function mini() { mctx.clearRect(0, 0, 150, 150); mctx.strokeStyle = 'rgba(235,2
   const dots = race ? race.cars.map(e => ({ c: e.car, me: !e.driver })) : [{ c: car, me: true }];
   for (const d of dots) { const [X, Y] = mp(d.c.x, d.c.y); mctx.fillStyle = d.me ? '#ffb347' : '#9fc3ff'; mctx.beginPath(); mctx.arc(X, Y, d.me ? 4 : 3, 0, Math.PI * 2); mctx.fill(); if (d.me) { mctx.strokeStyle = '#000'; mctx.lineWidth = 1; mctx.stroke(); } } }
 // ---- steam from a boiling radiator or a blown gasket ----
+function letterbox() { const b = Math.round(VH * 0.1); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, VW, b); ctx.fillRect(0, VH - b, VW, b);
+  ctx.fillStyle = '#e9e4d8'; ctx.font = `${Math.max(7, Math.round(b * 0.42))}px Oswald, sans-serif`; ctx.textBaseline = 'middle';
+  const me = race?.player, lap = me ? `${Math.min(race!.laps, me.lapAt.length)}/${race!.laps}바퀴 · ${race!.order().indexOf(me) + 1}위` : T.pieceAt(car.s);
+  ctx.fillText(`${car.spec.name}  ·  ${(car.speed * 3.6).toFixed(0)} km/h  ·  ${lap}`, Math.round(b * 0.5), VH - b / 2); ctx.fillText('MILLBROOK', Math.round(b * 0.5), b / 2); }
 function drawSteam(el: number) { const h = car.health; if ((h.water >= WARN.boil || h.failed === 'gasket') && Math.random() < 0.5) { const f = car.spec.wheelbase * (1 - car.spec.frontShare) + 0.4; steam.push({ x: car.x + Math.cos(car.yaw) * f, y: car.y + Math.sin(car.yaw) * f, z: T.height(car.s, car.off) + 1.2, r: 0.3, a: 0.5 }); }
   for (const p of steam) { p.z += 1.2 * el; p.r += 0.8 * el; p.a -= 0.35 * el; } for (let i = steam.length - 1; i >= 0; i--) if (steam[i]!.a <= 0) steam.splice(i, 1);
   for (const p of steam) { ctx.fillStyle = `rgba(245,245,245,${p.a})`; ctx.beginPath(); ctx.arc(...P(p.x, p.y, p.z), p.r * 1000 / mm, 0, Math.PI * 2); ctx.fill(); } }
@@ -91,10 +100,10 @@ function marks(c: Vehicle) { for (let i = 0; i < 4; i++) { const sl = Math.max(M
     const [px, py] = c.wheelAt(i), cy = Math.cos(c.yaw), sy2 = Math.sin(c.yaw), x = c.x + px * cy - py * sy2, y = c.y + px * sy2 + py * cy, q = T.locate(x, y, c.s), z = T.height(q.s, q.off);
     skids.push({ x, y, z, a: Math.min(0.55, 0.15 * sl) }); if (skids.length > 9000) skids.shift(); if (Math.random() < 0.25) puffs.push({ x, y, z: z + 0.2, r: 0.3, a: 0.35, vx: (Math.random() - 0.5) * 0.6, vy: (Math.random() - 0.5) * 0.6 }); } }
 /** every car in view, the farthest first */
-function drawCars() { if (!race) { drawCar(); return; } const a = (st.chase ? camAng : Math.PI / 2) - Math.PI / 2;
+function drawCars() { if (!race) { drawCar(); return; } const a = (turning() ? camAng : Math.PI / 2) - Math.PI / 2;
   const list = race.cars.map(e => { const c = e.car, z = T.height(c.s, c.off) + c.zb, [X, Y] = P(c.x, c.y, z); return { e, c, X, Y }; }).filter(q => q.X > -150 && q.X < VW + 150 && q.Y > -150 && q.Y < VH + 150).sort((p, q) => p.Y - q.Y);
   for (const { e, c, X, Y } of list) { const sp = e.driver ? others.get(e)! : sprites, f = sp.get(sp.key(c.yaw - a, c.tilt + c.roll * 1.5, c.steer, e.wheelTurn, c.speed)); ctx.drawImage(f.canvas, Math.round(X - f.ax), Math.round(Y - f.ay)); } }
-function drawCar() { const z = T.height(car.s, car.off) + car.zb, roll = car.tilt + car.roll * 1.5, a = (st.chase ? camAng : Math.PI / 2) - Math.PI / 2;
+function drawCar() { const z = T.height(car.s, car.off) + car.zb, roll = car.tilt + car.roll * 1.5, a = (turning() ? camAng : Math.PI / 2) - Math.PI / 2;
   const f = sprites.get(sprites.key(car.yaw - a, roll, car.steer, wheelTurn, car.speed)), [X, Y] = P(car.x, car.y, z); ctx.drawImage(f.canvas, Math.round(X - f.ax), Math.round(Y - f.ay)); }
 function drawPuffs() { for (const p of puffs) { ctx.fillStyle = `rgba(205,200,190,${p.a})`; const r = p.r * 1000 / mm; ctx.beginPath(); ctx.arc(...P(p.x, p.y, p.z), r, 0, Math.PI * 2); ctx.fill(); } }
 const fmt = (t: number) => t > 0 ? `${Math.floor(t / 60)}:${(t % 60).toFixed(2).padStart(5, '0')}` : '-';
@@ -107,26 +116,27 @@ function hud() { const kmh = car.speed * 3.6; $('spd').textContent = kmh.toFixed
   ($('gasbar') as HTMLElement).style.height = `${input.throttle * 100}%`; ($('brakebar') as HTMLElement).style.height = `${input.brake * 100}%`;
   $('bake').textContent = sprites.pending ? `그림 굽는 중 ${sprites.count}장` : ''; $('msg').textContent = msgT > 0 ? msg : '';
   if (race) { const me = race.player!, ord = race.order(), pos = ord.indexOf(me) + 1, wait = me.start - race.clock;
-    $('lap').textContent = wait > 0 ? `출발까지 ${Math.ceil(wait)}초` : me.finish ? `완주 ${fmt(me.finish - me.start)}` : `${Math.min(race.laps, me.lapAt.length)}/${race.laps}바퀴 · ${fmt(race.clock - me.start)}`;
+    $('lap').textContent = wait > 0 ? (race.mode === 'scratch' ? `출발 신호 ${Math.ceil(wait)}` : `출발까지 ${Math.ceil(wait)}초`) : race.clock - me.start < 1.2 && race.mode === 'scratch' ? '출발!' : me.finish ? `완주 ${fmt(me.finish - me.start)}` : `${Math.min(race.laps, me.lapAt.length)}/${race.laps}바퀴 · ${fmt(race.clock - me.start)}`;
     $('last').textContent = `${pos}/${race.cars.length}위`; $('best').textContent = '';
     $('board').innerHTML = ord.map((e, k) => `<li${e === me ? ' class="me"' : ''}>${k + 1}. ${e.name}${e === me ? ' (나)' : ''} <span>${e.finish ? fmt(e.finish - e.start) : race!.clock < e.start ? `출발 ${Math.ceil(e.start - race!.clock)}초 뒤` : `${(e.dist / 1000).toFixed(2)} km`}</span></li>`).join(''); } }
 function results() { const r = race!, me = r.player!, ord = r.order(); $('results').dataset.shown = '1';
   say(`결승 ${ord.indexOf(me) + 1}위 — ${ord[0]!.name} 우승`); }
 function startRace() { const laps = +$<HTMLSelectElement>('laps').value, pool = RACE_CARS.filter(id => id !== carId); raceSeed = (raceSeed * 48271) % 2147483647;
   const pick: string[] = []; let r = raceSeed; while (pick.length < 3) { r = (r * 16807) % 2147483647; const id = pool[r % pool.length]!; if (!pick.includes(id)) pick.push(id); }
-  race = new Race(T, [carId, ...pick], laps, carId, raceSeed); const me = race.player!; car = me.car; car.auto = st.auto; manualGear = 1; pilot = new Driver(T);
+  const mode = $<HTMLSelectElement>('mode').value as 'handicap' | 'scratch'; race = new Race(T, [carId, ...pick], laps, carId, raceSeed, mode); const me = race.player!; car = me.car; car.auto = st.auto; manualGear = 1; pilot = new Driver(T);
   others.clear(); const small = matchMedia('(pointer: coarse)').matches;
   for (const e of race.cars) if (e.driver) { const m = MESH_CARS.find(c => c.id === e.id)!, sp = new CarSprites(m.mesh(), mm, pitchDeg, e.car.spec.steerLock * Math.PI / 180, { outline: 3, glass: 0.8 }, small ? 400 : 900); sp.prepare([0]); others.set(e, sp); }
   sprites = new CarSprites(MESH_CARS.find(c => c.id === carId)!.mesh(), mm, pitchDeg, car.spec.steerLock * Math.PI / 180, { outline: 3, glass: 0.8 }, small ? 800 : 1800); sprites.prepare([0]); sprites.work(300);
   skids.length = 0; puffs.length = 0; delete $('results').dataset.shown; camX = car.x; camY = car.y; camAng = car.yaw;
   const starts = [...race.cars].sort((a, b) => a.start - b.start).map(e => `${e.name}${e.driver ? '' : ' (나)'} ${e.start ? `+${e.start.toFixed(0)}초` : '맨 먼저'}`).join(' · ');
-  say(`핸디캡 ${laps}바퀴 · ${starts}`); msgT = 8; $('race').textContent = '레이스 다시'; }
+  say(mode === 'scratch' ? `동시 출발 ${laps}바퀴 · 5초 뒤 출발` : `핸디캡 ${laps}바퀴 · ${starts}`); msgT = 8; $('race').textContent = '레이스 다시'; }
 function stopRace() { race = null; others.clear(); $('board').innerHTML = ''; choose(carId); }
 // ---- controls ----
 // one press, from a key or a screen button
 function press(k: string) { if (k === 'm') { st.auto = !st.auto; car.auto = st.auto; manualGear = car.gear; ($('auto') as HTMLInputElement).checked = st.auto; say(st.auto ? '자동 변속' : '수동 변속 (Q/E)'); }
   if (!st.auto && (k === 'e' || k === 'x')) manualGear = Math.min(car.spec.gears.length, manualGear + 1); if (!st.auto && (k === 'q' || k === 'z')) manualGear = Math.max(1, manualGear - 1);
-  if (k === 'r') { car.place(car.s, 0, 0); say('트랙으로 복귀'); } }
+  if (k === 'r') { car.place(car.s, 0, 0); say('트랙으로 복귀'); }
+  if (k === 'c') setCine(!st.cine); }
 addEventListener('keydown', e => { const k = e.key.toLowerCase(); if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' '].includes(k)) e.preventDefault(); keys.add(k);
   if (!e.repeat) press(k); });
 addEventListener('keyup', e => keys.delete(e.key.toLowerCase()));
@@ -159,11 +169,19 @@ function frame(now: number) { const el = Math.min(0.1, (now - last) / 1000); las
   const lead = Math.min(10, car.speed * 0.2), tx = car.x + Math.cos(car.yaw) * lead, ty = car.y + Math.sin(car.yaw) * lead, tz = T.height(car.s, car.off);
   camX += (tx - camX) * Math.min(1, el * 5); camY += (ty - camY) * Math.min(1, el * 5); camZ += (tz - camZ) * Math.min(1, el * 5);
   { const vh = car.speed > 2 ? Math.atan2(Math.sin(car.yaw) * car.vx + Math.cos(car.yaw) * car.vy, Math.cos(car.yaw) * car.vx - Math.sin(car.yaw) * car.vy) : car.yaw, d = Math.atan2(Math.sin(vh - camAng), Math.cos(vh - camAng)); camAng += d * Math.min(1, el * 2.5); }   // the turning camera follows where the car goes, gently
+  if (st.cine) { const kinds = ['side', 'chase', 'side', 'top'] as const, passed = shot.kind === 'side' && shot.cam && T.gap(shot.cam.s, car.s) > 160;
+    if (clock > shot.until || passed) { const kind = kinds[shotN++ % kinds.length]!; let cam = undefined as typeof shot.cam;
+      if (kind === 'side') { let best = Infinity; for (const c of CAMS) { const g = T.gap(car.s, c.s); if (g > 40 && g < best && g < 600) { best = g; cam = c; } } }
+      shot = { kind: kind === 'side' && !cam ? 'chase' : kind, cam, until: clock + (kind === 'side' ? 14 : kind === 'chase' ? 6 : 5) }; cut = true; }
+    const want = shot.kind === 'side' && shot.cam ? Math.atan2(car.y - shot.cam.y, car.x - shot.cam.x) : shot.kind === 'top' ? Math.PI / 2 : car.yaw;
+    const d = Math.atan2(Math.sin(want - camAng), Math.cos(want - camAng)); camAng = cut ? want : camAng + d * Math.min(1, el * 3); if (cut) { camX = car.x; camY = car.y; } cut = false; }
   turnCam();
-  drawTrack(); drawCars(); drawPuffs(); drawSteam(el); drawBridges(); hud(); mini(); sounds(); sprites.work(5); for (const sp of others.values()) sp.work(2); requestAnimationFrame(frame); }
+  drawTrack(); drawCars(); drawPuffs(); drawSteam(el); drawBridges(); if (st.cine) letterbox(); hud(); mini(); sounds(); sprites.work(5); for (const sp of others.values()) sp.work(2); requestAnimationFrame(frame); }
 // ---- page ----
 const pick = $<HTMLSelectElement>('car'); for (const id of RACE_CARS) pick.add(new Option(raceSpec(id).name, id)); pick.value = carId;
 pick.addEventListener('change', () => { carId = pick.value; if (race) stopRace(); else choose(pick.value); pick.blur(); });
+const setCine = (on: boolean) => { st.cine = on; ($('cine') as HTMLInputElement).checked = on; document.body.classList.toggle('cine', on); shot.until = 0; fit(); };
+$<HTMLInputElement>('cine').addEventListener('change', e => setCine((e.target as HTMLInputElement).checked));
 $<HTMLInputElement>('progressive').addEventListener('change', e => { st.progressive = (e.target as HTMLInputElement).checked; document.body.classList.toggle('progressive', st.progressive); });
 $<HTMLInputElement>('sound').addEventListener('change', e => { if ((e.target as HTMLInputElement).checked) { snd = new Sound(); snd.volume = +$<HTMLInputElement>('vol').value; } else { snd?.close(); snd = null; } });
 $<HTMLInputElement>('vol').addEventListener('input', e => { if (snd) snd.volume = +(e.target as HTMLInputElement).value; });
@@ -183,12 +201,13 @@ $<HTMLInputElement>('chase').addEventListener('change', e => { st.chase = (e.tar
 $<HTMLInputElement>('pitch').addEventListener('change', e => { pitchDeg = +(e.target as HTMLInputElement).value; SP = Math.sin(pitchDeg * Math.PI / 180); CP = Math.cos(pitchDeg * Math.PI / 180); const s0 = car.s, o0 = car.off, v0 = car.speed; choose(carId); car.place(s0, o0, v0); (e.target as HTMLElement).blur(); });
 $<HTMLInputElement>('pitch').addEventListener('input', e => { $('pitchv').textContent = `${(e.target as HTMLInputElement).value}°`; });
 $<HTMLSelectElement>('scale').addEventListener('change', e => { mm = +(e.target as HTMLSelectElement).value; choose(carId); (e.target as HTMLElement).blur(); });
-function fit() { if (document.fullscreenElement || document.body.classList.contains('fakefull')) { const k = Math.max(1, Math.round(innerWidth / 900)); VW = Math.ceil(innerWidth / k / 2) * 2; VH = Math.ceil(innerHeight / k); cv.width = VW; cv.height = VH; cv.style.width = `${VW * k}px`; cv.style.height = `${VH * k}px`; ctx.imageSmoothingEnabled = false; return; }
+function fit() { if (document.fullscreenElement || document.body.classList.contains('fakefull')) { const k = Math.max(1, Math.round(innerWidth / 900)) * (st.cine ? 2 : 1); VW = Math.ceil(innerWidth / k / 2) * 2; VH = Math.ceil(innerHeight / k); cv.width = VW; cv.height = VH; cv.style.width = `${VW * k}px`; cv.style.height = `${VH * k}px`; ctx.imageSmoothingEnabled = false; return; }
   const box = document.querySelector('.track') as HTMLElement, room = Math.min(box.clientWidth - 14, 1600);
   // the height left on the screen below the picture's top (a phone on its side has little), at least a usable strip
   const availH = Math.max(200, innerHeight - Math.max(0, box.getBoundingClientRect().top + scrollY) - 16);
   const k = Math.max(1, Math.floor(Math.min(room / 768, availH / 432)));
   if (room >= 768 && availH >= 432) { VW = 768; VH = 432; cv.style.width = `${VW * k}px`; cv.style.height = `${VH * k}px`; }
   else { VW = Math.max(300, Math.floor(room / 2) * 2); VH = Math.min(Math.round(VW * (innerHeight > innerWidth ? 0.8 : 0.56)), Math.floor(availH)); cv.style.width = `${VW}px`; cv.style.height = `${VH}px`; }
+  if (st.cine) { VW = Math.floor(VW / 4) * 2; VH = Math.floor(VH / 2); }   // the cinematic view: pixels twice the size (closer)
   cv.width = VW; cv.height = VH; ctx.imageSmoothingEnabled = false; }
 addEventListener('resize', fit); addEventListener('orientationchange', () => setTimeout(fit, 200)); fit(); choose(carId); camX = car.x; camY = car.y; camZ = 0; requestAnimationFrame(frame);

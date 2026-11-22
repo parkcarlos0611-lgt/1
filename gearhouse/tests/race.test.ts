@@ -10,6 +10,12 @@ describe('a handicap race at Millbrook', () => {
     expect(by.fordT23).toBe(0); expect(by.chevAB28!).toBeGreaterThan(0); expect(by.fnTT33!).toBeGreaterThan(by.dueA21!);
     for (const c of r.cars) expect(c.start + bookTime(c.id, 2)).toBeCloseTo(r.limitTime, 6);
   });
+  it('a scratch race starts everyone at once, the slowest at the front', () => {
+    const r = new Race(T, ['fnTT33', 'fordT23', 'chevAB28', 'dueA21'], 1, null, 1, 'scratch');
+    expect(r.cars.every(c => c.start === 0)).toBe(true);
+    const back = (id: string) => T.gap(r.cars.find(c => c.id === id)!.car.s, r.startS);
+    expect(back('fordT23')).toBeLessThan(back('fnTT33'));
+  });
   it('keeps cars from passing through each other', () => {
     const r = new Race(T, ['chevAB28', 'plymU29'], 1, null); const [a, b] = r.cars.map(c => c.car);
     a!.place(400, 0, 20); b!.place(403, 0.3, 5); r.clock = 1e4;

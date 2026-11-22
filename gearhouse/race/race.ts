@@ -15,14 +15,17 @@ export const bookTime = (id: string, laps: number) => { const b = BOOK[id] ?? { 
 
 export class Race {
   readonly cars: Entrant[] = []; clock = -5; done = false; readonly startS: number; readonly limitTime: number;
-  constructor(readonly track: Track, ids: string[], readonly laps: number, player: string | null, seed = 1) {
+  /** mode: 'handicap' (the limit first, scratch last, by the book) or 'scratch' (all at once from a grid in pairs, the slowest at the front) */
+  constructor(readonly track: Track, ids: string[], readonly laps: number, player: string | null, seed = 1, readonly mode: 'handicap' | 'scratch' = 'handicap') {
     this.startS = track.spec.landmarks.find(l => l.kind === 'line')!.s;
     this.limitTime = Math.max(...ids.map(id => bookTime(id, laps)));
     // across the line, each in its own place; the start each is given
     let r = seed; const rnd = () => { r = (r * 16807) % 2147483647; return r / 2147483647; };
-    ids.forEach((id, k) => { const spec = raceSpec(id), car = new Vehicle(spec, track), grid = -10 + k * (20 / Math.max(1, ids.length - 1));
-      car.place(this.startS - 6, grid, 0);
-      this.cars.push({ id, name: spec.name, car, driver: id === player ? null : new Driver(track, 0.64 + rnd() * 0.08, 3.0, 0.9 + rnd() * 0.1), start: this.limitTime - bookTime(id, laps), laps: 0, lapAt: [], finish: 0, dist: 0, prevS: car.s, stuck: 0, wheelTurn: 0, grid }); }); }
+    const order = mode === 'scratch' ? [...ids].sort((a, b) => bookTime(b, laps) - bookTime(a, laps)) : ids;   // scratch: the slowest on the front row
+    ids.forEach((id, k) => { const spec = raceSpec(id), car = new Vehicle(spec, track), at = order.indexOf(id);
+      const grid = mode === 'scratch' ? (at % 2 ? 5 : -5) : -10 + k * (20 / Math.max(1, ids.length - 1)), back = mode === 'scratch' ? 6 + Math.floor(at / 2) * 9 : 6;
+      car.place(this.startS - back, grid, 0);
+      this.cars.push({ id, name: spec.name, car, driver: id === player ? null : new Driver(track, 0.64 + rnd() * 0.08, 3.0, 0.9 + rnd() * 0.1), start: mode === 'scratch' ? 0 : this.limitTime - bookTime(id, laps), laps: 0, lapAt: [], finish: 0, dist: 0, prevS: car.s, stuck: 0, wheelTurn: 0, grid }); }); }
   get player(): Entrant | undefined { return this.cars.find(c => !c.driver); }
   /** the order: finished by time, then by distance run */
   order(): Entrant[] { return [...this.cars].sort((a, b) => (a.finish && b.finish ? a.finish - b.finish : a.finish ? -1 : b.finish ? 1 : b.dist - a.dist)); }

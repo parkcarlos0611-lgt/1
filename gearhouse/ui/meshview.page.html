@@ -41,6 +41,7 @@
   </div>
   <form class="dials" onsubmit="return false">
     <div class="row"><label for="car">차</label><select id="car"></select></div>
+    <div class="row"><label for="num">차 번호 (번호판이 있는 차)</label><input type="text" id="num" value="6" maxlength="3" inputmode="numeric" pattern="[0-9]*" style="width:5em"></div>
     <div class="row"><label for="yaw">방향</label><input type="range" id="yaw" min="0" max="359" value="30"></div>
     <label class="check"><input type="checkbox" id="spin"> 자동으로 돌리기</label>
     <label class="check"><input type="checkbox" id="roll"> 바퀴 굴리기</label>

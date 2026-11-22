@@ -9,6 +9,7 @@ import { Vehicle, type Controls } from '../race/vehicle';
 import { CarSprites, PropSprites } from '../race/sprites';
 import { millbrookScenery, type Placed } from '../race/scenery';
 import { PROPS } from '../render/props/index';
+import { renumber } from '../render/car/mesh';
 import { MESH_CARS } from '../render/car/meshcars';
 import { Driver } from '../race/driver';
 import { Race, type Entrant } from '../race/race';
@@ -37,10 +38,15 @@ let lapStart = -1, lastLap = 0, bestLap = 0, clock = 0, prevS = 0, msg = '', msg
 const SCN = millbrookScenery(T), propSprites = new Map<string, PropSprites>(); const train = { d: -1, wait: 40 };
 const propPic = (kind: string) => { let p = propSprites.get(kind); if (!p) { const f = PROPS[kind]; if (!f) return null; p = new PropSprites(f(), mm, pitchDeg); propSprites.set(kind, p); } return p; };
 let race: Race | null = null; const others = new Map<Entrant, CarSprites>(); let raceSeed = 7;
+// race numbers (review 96): the player's from the page, the others' 1, 2, 3... by the entry list, skipping the player's;
+// laid on the cars' number decals (only cars with number discs show them)
+let myNum = '6';
+const meshOf = (id: string, num: string) => renumber(MESH_CARS.find(c => c.id === id)!.mesh(), num);
+const numOf = (e: Entrant): string => { if (!race) return myNum; let k = 0; for (const x of race.cars) { if (x === race.player) continue; k++; if (String(k) === myNum) k++; if (x === e) return String(k); } return myNum; };
 
 function choose(id: string) { carId = id; propSprites.clear(); broken.clear(); debris.length = 0; const spec = raceSpec(id), m = MESH_CARS.find(c => c.id === id)!;
   car = new Vehicle(spec, T); car.auto = st.auto; car.place(START + 30, 0, 0); manualGear = 1;
-  sprites = new CarSprites(m.mesh(), mm, pitchDeg, spec.steerLock * Math.PI / 180, { outline: 3, glass: 0.8 }, matchMedia('(pointer: coarse)').matches ? 1200 : 2400); sprites.prepare([0]); sprites.work(500); sprites.prepare([-1, 1, -2, 2, -3, -4, -5]); camAng = car.yaw;
+  sprites = new CarSprites(meshOf(id, myNum), mm, pitchDeg, spec.steerLock * Math.PI / 180, { outline: 3, glass: 0.8 }, matchMedia('(pointer: coarse)').matches ? 1200 : 2400); sprites.prepare([0]); sprites.work(500); sprites.prepare([-1, 1, -2, 2, -3, -4, -5]); camAng = car.yaw;
   pilot = new Driver(T); lapStart = -1; lastLap = 0; bestLap = 0; skids.length = 0; puffs.length = 0; say(`${spec.name} · 출발선 뒤에서 시작`); }
 function say(t: string) { msg = t; msgT = 3; }
 // ---- the world to the picture ----
@@ -230,8 +236,8 @@ function startRace() { const laps = +$<HTMLSelectElement>('laps').value, pool = 
   const pick: string[] = []; let r = raceSeed; while (pick.length < 3) { r = (r * 16807) % 2147483647; const id = pool[r % pool.length]!; if (!pick.includes(id)) pick.push(id); }
   const mode = $<HTMLSelectElement>('mode').value as 'handicap' | 'scratch'; race = new Race(T, [carId, ...pick], laps, carId, raceSeed, mode); const me = race.player!; car = me.car; car.auto = st.auto; manualGear = 1; pilot = new Driver(T);
   others.clear(); const small = matchMedia('(pointer: coarse)').matches;
-  for (const e of race.cars) if (e.driver) { const m = MESH_CARS.find(c => c.id === e.id)!, sp = new CarSprites(m.mesh(), mm, pitchDeg, e.car.spec.steerLock * Math.PI / 180, { outline: 3, glass: 0.8 }, small ? 400 : 900); sp.prepare([0]); others.set(e, sp); }
-  sprites = new CarSprites(MESH_CARS.find(c => c.id === carId)!.mesh(), mm, pitchDeg, car.spec.steerLock * Math.PI / 180, { outline: 3, glass: 0.8 }, small ? 800 : 1800); sprites.prepare([0]); sprites.work(300);
+  for (const e of race.cars) if (e.driver) { const sp = new CarSprites(meshOf(e.id, numOf(e)), mm, pitchDeg, e.car.spec.steerLock * Math.PI / 180, { outline: 3, glass: 0.8 }, small ? 400 : 900); sp.prepare([0]); others.set(e, sp); }
+  sprites = new CarSprites(meshOf(carId, myNum), mm, pitchDeg, car.spec.steerLock * Math.PI / 180, { outline: 3, glass: 0.8 }, small ? 800 : 1800); sprites.prepare([0]); sprites.work(300);
   skids.length = 0; puffs.length = 0; delete $('results').dataset.shown; camX = car.x; camY = car.y; camAng = car.yaw;
   const starts = [...race.cars].sort((a, b) => a.start - b.start).map(e => `${e.name}${e.driver ? '' : ' (나)'} ${e.start ? `+${e.start.toFixed(0)}초` : '맨 먼저'}`).join(' · ');
   say(mode === 'scratch' ? `동시 출발 ${laps}바퀴 · 5초 뒤 출발` : `핸디캡 ${laps}바퀴 · ${starts}`); msgT = 8; $('race').textContent = '레이스 다시'; }
@@ -315,8 +321,8 @@ $<HTMLInputElement>('chase').addEventListener('change', e => { st.chase = (e.tar
 const ZOOM = [12, 16, 20, 25, 30, 40, 50, 65, 80, 100, 130], PMIN = 15, PMAX = 85;
 let bakeT = 0;
 function rebake() { SP = Math.sin(pitchDeg * Math.PI / 180); CP = Math.cos(pitchDeg * Math.PI / 180); propSprites.clear(); const small = matchMedia('(pointer: coarse)').matches;
-  sprites = new CarSprites(MESH_CARS.find(c => c.id === carId)!.mesh(), mm, pitchDeg, car.spec.steerLock * Math.PI / 180, { outline: 3, glass: 0.8 }, small ? 1200 : 2400); sprites.prepare([0]); sprites.work(300);
-  for (const e of [...others.keys()]) { const m = MESH_CARS.find(c => c.id === e.id)!, sp = new CarSprites(m.mesh(), mm, pitchDeg, e.car.spec.steerLock * Math.PI / 180, { outline: 3, glass: 0.8 }, small ? 400 : 900); sp.prepare([0]); others.set(e, sp); }
+  sprites = new CarSprites(meshOf(carId, myNum), mm, pitchDeg, car.spec.steerLock * Math.PI / 180, { outline: 3, glass: 0.8 }, small ? 1200 : 2400); sprites.prepare([0]); sprites.work(300);
+  for (const e of [...others.keys()]) { const sp = new CarSprites(meshOf(e.id, numOf(e)), mm, pitchDeg, e.car.spec.steerLock * Math.PI / 180, { outline: 3, glass: 0.8 }, small ? 400 : 900); sp.prepare([0]); others.set(e, sp); }
   ($('pitch') as HTMLInputElement).value = String(pitchDeg); $('pitchv').textContent = `${pitchDeg}°`; camShow(); }
 const camShow = () => { $('camv').textContent = `${st.free ? '자유' : st.chase ? '따라 돎' : '북쪽 위'} · 높이 ${pitchDeg}° · ${mm} mm/픽셀 · 방향 ${Math.round(((90 - camAng * 180 / Math.PI) % 360 + 360) % 360)}°`; };
 /** a new height or scale, baked once the gesture has rested */
@@ -339,6 +345,7 @@ const setFree = (on: boolean) => { st.free = on; ($('free') as HTMLInputElement)
     if (k === ',' || k === '<') { if (!st.free) setFree(true); camAng += 0.12; camShow(); } if (k === '.' || k === '>') { if (!st.free) setFree(true); camAng -= 0.12; camShow(); }
     if (k === '-' || k === '_') zoom(1); if (k === '=' || k === '+') zoom(-1);
     if (k === 'PageUp') { e.preventDefault(); want(pitchDeg + 5, mm); } if (k === 'PageDown') { e.preventDefault(); want(pitchDeg - 5, mm); } if (k === 'Home') setFree(false); }); }
+$<HTMLInputElement>('num').addEventListener('change', e => { const el = e.target as HTMLInputElement, v = el.value.replace(/\D/g, '').slice(0, 3); el.value = v || myNum; if (v && v !== myNum) { myNum = v; rebake(); say(`차 번호 ${v}`); } el.blur(); });
 $<HTMLInputElement>('free').addEventListener('change', e => setFree((e.target as HTMLInputElement).checked));
 $<HTMLInputElement>('pitch').addEventListener('change', e => { want(+(e.target as HTMLInputElement).value, mm); (e.target as HTMLElement).blur(); });
 $<HTMLInputElement>('pitch').addEventListener('input', e => { $('pitchv').textContent = `${(e.target as HTMLInputElement).value}°`; });

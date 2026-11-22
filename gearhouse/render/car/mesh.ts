@@ -13,7 +13,7 @@ export type Kind = typeof KINDS[number];
  *  surface) onto whatever painted face lies within its reach, round its centre `o` (file frame, mm): a disc of radius
  *  `r` in `col`, and `text` (digits and capitals) in `ink` across it, upright along `up`. The face keeps its own part,
  *  gloss and lighting, so the decal shades, ages and rusts with the panel under it, and has no outline of its own. */
-export interface Decal { o: V; n: V; up: V; r: number; col: string; text?: string; ink?: string }
+export interface Decal { o: V; n: V; up: V; r: number; col: string; text?: string; ink?: string; /** this decal carries the car's race number (renumber() changes it) */ num?: boolean }
 export interface Mesh { decals?: Decal[]; n: number; pos: Float32Array; col: Uint8Array; gloss: Float32Array; part: Int16Array; kind: Uint8Array; tex: Uint8Array; length: number; /** each part number's name (the parts' common names, as the 2D part models had: body, hood, fenderF, lamp, ...) */ names?: string[] }
 const hex = (h: string): V => { const v = parseInt(h.replace('#', ''), 16); return [(v >> 16) & 255, (v >> 8) & 255, v & 255]; };
 const sub = (a: V, b: V): V => [a[0] - b[0], a[1] - b[1], a[2] - b[2]], add = (a: V, b: V): V => [a[0] + b[0], a[1] + b[1], a[2] + b[2]], mul = (a: V, k: number): V => [a[0] * k, a[1] * k, a[2] * k];
@@ -130,20 +130,44 @@ function posed(M: Mesh, steer: number, spin: number): Mesh { if (!steer && !spin
     pos[i] = x + w.hx; pos[i + 1] = y + w.hy; pos[i + 2] = z + w.hz; }
   return { ...M, pos }; }
 // ---- decals ----
-/** capitals and digits, 5 x 7 */
-const GLYPH: Record<string, string> = { '0': '0e11131519110e', '1': '040c040404040e', '2': '0e11010204081f', '3': '1f02040201110e', '4': '02060a121f0202', '5': '1f101e0101110e', '6': '0608101e11110e', '7': '1f010204080808', '8': '0e11110e11110e', '9': '0e11110f01020c' };
-const glyphRows = (c: string): number[] => { const g = GLYPH[c] ?? '00000000000000'; return Array.from({ length: 7 }, (_, k) => parseInt(g.slice(k * 2, k * 2 + 2), 16) || 0); };
-type Prepped = Decal & { rt: V; rgb: V; inkRgb: V; rows: number[][] };
+/** race numbers as the period painted them (review 96): bold, round-shouldered strokes of even weight, a figure 0.6 as
+ *  wide as it is tall, the stroke about a seventh of the height. Each figure is a few strokes (lines and arcs) in a box
+ *  0..0.6 across, 0..1 up; a point is ink within half a stroke of one of them, so the shapes stay smooth at any size. */
+type Pt = [number, number];
+const arc = (cx: number, cy: number, rx: number, ry: number, a0: number, a1: number, n = 20): Pt[] => Array.from({ length: n + 1 }, (_, k) => { const a = (a0 + (a1 - a0) * k / n) * Math.PI / 180; return [cx + Math.cos(a) * rx, cy + Math.sin(a) * ry] as Pt; });
+const cat = (...ps: Pt[][]): Pt[] => ps.flat();
+const FIG: Record<string, Pt[][]> = {
+  '0': [arc(0.3, 0.5, 0.215, 0.415, 0, 360, 32)],
+  '1': [[[0.12, 0.72], [0.36, 0.925], [0.36, 0.0]]],
+  '2': [cat(arc(0.3, 0.7, 0.21, 0.21, 170, -25), [[0.09, 0.088], [0.6, 0.088]])],
+  '3': [arc(0.3, 0.725, 0.2, 0.19, 160, -105), arc(0.29, 0.29, 0.225, 0.215, 105, -160)],
+  '4': [[[0.43, 0.0], [0.43, 0.925], [0.07, 0.31], [0.6, 0.31]]],
+  '5': [cat([[0.58, 0.912], [0.14, 0.912], [0.115, 0.535]], arc(0.3, 0.3, 0.21, 0.21, 125, -160))],
+  '6': [arc(0.3, 0.29, 0.215, 0.215, 0, 360, 28), arc(0.46, 0.29, 0.375, 0.635, 180, 95)],
+  '7': [[[0.0, 0.912], [0.53, 0.912], [0.23, 0.0]]],
+  '8': [arc(0.3, 0.725, 0.185, 0.19, 0, 360, 26), arc(0.3, 0.28, 0.225, 0.205, 0, 360, 28)],
+  '9': [arc(0.3, 0.71, 0.215, 0.215, 0, 360, 28), arc(0.14, 0.71, 0.375, 0.635, 0, -85)] };
+const STROKE = 0.088;   // half the stroke, in heights: about a sixth of the height, the painters' bold figure
+/** ink at (x, y) in a figure's box? */
+function inkAt(c: string, x: number, y: number): boolean { const f = FIG[c]; if (!f) return false;
+  for (const line of f) for (let k = 0; k + 1 < line.length; k++) { const [ax, ay] = line[k]!, [bx, by] = line[k + 1]!, ex = bx - ax, ey = by - ay, l2 = ex * ex + ey * ey;
+    const t0 = l2 ? ((x - ax) * ex + (y - ay) * ey) / l2 : 0, open = Math.hypot(line[0]![0] - line[line.length - 1]![0], line[0]![1] - line[line.length - 1]![1]) > 1e-6;
+    if (open && ((k === 0 && t0 < 0) || (k + 2 === line.length && t0 > 1))) continue;   // a stroke's ends cut square, as a brush or a stencil leaves them
+    const t = Math.max(0, Math.min(1, t0)), dx = x - ax - ex * t, dy = y - ay - ey * t; if (dx * dx + dy * dy < STROKE * STROKE) return true; }
+  return false; }
+type Prepped = Decal & { rt: V; rgb: V; inkRgb: V; chars: string[] };
 const hexV = (h: string): V => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
-function prepDecal(d: Decal): Prepped { const n = norm(d.n), up = norm(d.up); return { ...d, n, up, rt: norm(cross(n, up)), rgb: hexV(d.col), inkRgb: hexV(d.ink ?? '#111111'), rows: [...(d.text ?? '')].map(glyphRows) }; }
+function prepDecal(d: Decal): Prepped { const n = norm(d.n), up = norm(d.up); return { ...d, n, up, rt: norm(cross(n, up)), rgb: hexV(d.col), inkRgb: hexV(d.ink ?? '#111111'), chars: [...(d.text ?? '')] }; }
+/** a mesh with its race number changed: every decal marked as the number carries `text` */
+export function renumber(M: Mesh, text: string): Mesh { return M.decals?.some(d => d.num) ? { ...M, decals: M.decals.map(d => d.num ? { ...d, text } : d) } : M; }
 /** the decal's colour at a point of the car as built, on triangle t; null where it does not lie */
 function decalAt(d: Prepped, x: number, y: number, z: number, M0: Mesh, t: number): V | null {
   const dx = x - d.o[0], dy = y - d.o[1], dz = z - d.o[2], depth = dx * d.n[0] + dy * d.n[1] + dz * d.n[2]; if (Math.abs(depth) > d.r * 0.8) return null;
   const u = dx * d.rt[0] + dy * d.rt[1] + dz * d.rt[2], v = dx * d.up[0] + dy * d.up[1] + dz * d.up[2]; if (u * u + v * v > d.r * d.r) return null;
   const q = t * 9, P = M0.pos, e1: V = [P[q + 3]! - P[q]!, P[q + 4]! - P[q + 1]!, P[q + 5]! - P[q + 2]!], e2: V = [P[q + 6]! - P[q]!, P[q + 7]! - P[q + 1]!, P[q + 8]! - P[q + 2]!], fn = norm(cross(e1, e2));
   if (Math.abs(fn[0] * d.n[0] + fn[1] * d.n[1] + fn[2] * d.n[2]) < 0.45) return null;   // not round an edge onto a face that turns away
-  if (d.rows.length) { const H = d.r * 1.05, cell = H / 7, cw = cell * 6, W = cw * d.rows.length - cell, gx = (u + W / 2) / cell, gy = (H / 2 - v) / cell;
-    if (gy >= 0 && gy < 7 && gx >= 0) { const ch = Math.floor(gx / 6), col = Math.floor(gx) - ch * 6; if (ch < d.rows.length && col < 5 && (d.rows[ch]![Math.floor(gy)]! >> (4 - col)) & 1) return d.inkRgb; } }
+  const n = d.chars.length; if (n) { const H = d.r * (n === 1 ? 1.2 : n === 2 ? 1.0 : 0.72), gap = 0.1, W = n * 0.6 + (n - 1) * gap, gx = u / H + W / 2, gy = v / H + 0.5;   // the figures across the disc's middle
+    if (gy >= -STROKE && gy <= 1 + STROKE && gx >= -STROKE && gx <= W + STROKE) { const k = Math.max(0, Math.min(n - 1, Math.floor(gx / (0.6 + gap)))); for (const j of [k - 1, k, k + 1]) if (j >= 0 && j < n && inkAt(d.chars[j]!, gx - j * (0.6 + gap), gy)) return d.inkRgb; } }
   return d.rgb; }
 /** the mesh turned about its centre's ground point (x = half its length, y = 0, z = 0): roll about the length, then
  *  pitch about the width. In the drawn (mirrored) frame, so roll > 0 lifts the car's left side as seen */

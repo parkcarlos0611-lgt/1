@@ -82,6 +82,7 @@
   </div>
   <form class="dials" onsubmit="return false">
     <div class="row"><label for="car">차</label><select id="car"></select></div>
+    <div class="row"><label for="num">차 번호 (번호판이 있는 차)</label><input type="text" id="num" value="6" maxlength="3" inputmode="numeric" pattern="[0-9]*" style="width:5em"></div>
     <fieldset><legend>레이스</legend>
       <div class="row"><label for="mode">출발 방식</label><select id="mode"><option value="handicap">핸디캡 (느린 차 먼저)</option><option value="scratch">동시 출발 (그리드)</option></select></div>
       <div class="row"><label for="laps">바퀴 수</label><select id="laps"><option value="1">1바퀴</option><option value="2" selected>2바퀴</option><option value="3">3바퀴</option></select></div>

@@ -87,10 +87,12 @@ export function jagDMesh(spin = 0): Mesh { const b = new Build();
   { const y = (x: number, z: number) => sideY(x, z) + 2; for (const x of [2260, 2800]) b.quad([x, y(x, 250), 250], [x + 9, y(x, 250), 250], [x + 9, y(x, 600), 600], [x, y(x, 600), 600]); b.quad([2260, y(2260, 250), 250], [2800, y(2800, 250), 250], [2800, y(2800, 259), 259], [2260, y(2260, 259), 259]); }
   b.name('strap').mat('#6b4a2c', 0.2, 'leather'); for (const s of [1, -1]) b.bar([2050, s * (sideY(2050, 640) + 4), 640], [2125, s * (sideY(2125, 640) + 4), 640], 30, 10);   // the bonnet's leather straps
   // ---- the number discs: on the bonnet, on each side behind the front wheel, on the tail ----
-  // decals laid on the paint, not parts (review 95): the number upright as the far side seen across the top, and as each side is seen
-  b.decal({ o: [1130, 0, skinZ(1130, 0)], n: [0, 0, 1], up: [0, 1, 0], r: 215, col: WHITE, text: NUMBER, ink: '#121212' });
-  b.decal({ o: [3500, -330, skinZ(3500, -330)], n: [0, 0, 1], up: [0, 1, 0], r: 190, col: WHITE, text: NUMBER, ink: '#121212' });
-  for (const s of [1, -1]) b.decal({ o: [1810, s * sideY(1810, 500), 500], n: [0, s, 0], up: [0, 0, 1], r: 185, col: WHITE, text: NUMBER, ink: '#121212' });
+  // the number discs: decals laid on the paint, not parts (review 95), each read as on the works cars: the bonnet's
+  // from in front of the car (the oncoming car told at a glance), the tail's from behind, each side's from that side
+  const disc = { col: WHITE, text: NUMBER, ink: '#141414', num: true };
+  b.decal({ ...disc, o: [1130, 0, skinZ(1130, 0)], n: [0, 0, 1], up: [1, 0, 0], r: 215 });
+  b.decal({ ...disc, o: [3500, -330, skinZ(3500, -330)], n: [0, 0, 1], up: [-1, 0, 0], r: 190 });
+  for (const s of [1, -1]) b.decal({ ...disc, o: [1810, s * sideY(1810, 500), 500], n: [0, s, 0], up: [0, 0, 1], r: 185 });
   // ---- the driver's place: a dark floor and dash, the seat, the headrest pad ----
   { const w = at(HALF, 2500), y0 = 0.14 * w + 3, y1 = 0.79 * w - 3;
     b.name('cockpit').mat(DARK, 0.05).box(CX0 + 2, CX1 - 2, y0, y1, FLOOR - 8, FLOOR + 3);

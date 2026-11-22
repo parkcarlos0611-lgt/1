@@ -1,8 +1,23 @@
 // The cars' figures for the driving game (review 84). Mass, engine size and power, gearbox count, drive, wheelbase,
-// track and tyres come from the game's data (data/cars/specs.json, the sheets' kerb weights); the rest is period
-// figures as remembered, marked `check` until each is looked up: the revs of peak power, the gear and axle ratios,
-// which wheels have brakes, the drag area, the centre of gravity's height, and the top speed a road test of the day
-// found (the physics is tuned against it).
+// track and tyres come from the game's data (data/cars/specs.json, the sheets' kerb weights). Checked against sources
+// on 2026-11-22 (review 85), each line's notes below: [v] verified by a source, [~] a secondary or estimated figure,
+// [?] none found, as remembered. Top speeds are what the physics is tuned against.
+//   fordT23   20 hp @ 1600 [v], 113 Nm @ 900 [v], axle 3.63-3.64 [v], top 42 mph / 68 km/h [v]; brakes rear only [v]
+//   chevAB28  35 hp @ 2200 [v], four-wheel mechanical [v], top 50-55 mph [~]
+//   plymU29   45 hp @ 2800 [v], top [?] (about 60 mph assumed); brakes: hydraulic as Chrysler's Lockheed [?] (one
+//             estimated source says mechanical)
+//   pontiac29 60 hp @ 3000 [v], top 60 mph [~]
+//   dodgeV28  58 hp @ 3000 [v], hydraulic brakes [v], top about 60 mph [~]
+//   willys27  53 hp [v], revs [?], top 60-65 mph [~]
+//   buick28   63 hp @ 2800 [v], four-wheel mechanical (contracting) [v], top [?]
+//   fnTT33    four speeds, chain [v]; a period test: 57 hp, 85 mph flat out [~] (the game's data keeps 62 hp)
+//   bmw315    40 PS [v], top 120 km/h [v], about 750 kg [~], revs [?]
+//   dueSSJ35  SJ: 320 hp at 4200 rpm [v] (the game's data keeps the SSJ's claimed 400), three speeds [v], top 130-140
+//             mph [~], axle [?]: a high one, as some 1935 SJ chassis had [~] (3.3 here)
+//   dueA21    88 hp @ 3600 [v], 170 lb-ft @ 1500 [v], the first production four-wheel hydraulic brakes [v], top 71 mph
+//             (Wikipedia) to 75 mph [v]
+//   Gear ratios other than the Model T's, drag areas, centres of gravity: [?]. The tyres' grip on dry concrete (0.78)
+//   [?]: period tests found about 0.4 sliding on wet concrete.
 import specs from '../data/cars/specs.json';
 
 export interface RaceSpec {
@@ -20,16 +35,16 @@ export function tyre(size: string): { r: number; w: number } { const a = size.ma
 // per car: [peak-power revs, gear ratios, axle ratio, brakes, hydraulic, drag area, cg height, front share, lock, top speed km/h]
 const PERIOD: Record<string, [number, number[], number, 'rear' | 'four', boolean, number, number, number, number, number]> = {
   fordT23:   [1600, [2.75, 1.0], 3.64, 'rear', false, 1.95, 0.78, 0.44, 32, 68],
-  chevAB28:  [2200, [3.32, 1.69, 1.0], 3.82, 'four', false, 1.9, 0.72, 0.46, 32, 88],
+  chevAB28:  [2200, [3.32, 1.69, 1.0], 3.82, 'four', false, 1.9, 0.72, 0.46, 32, 85],
   plymU29:   [2800, [3.06, 1.68, 1.0], 4.3, 'four', true, 1.85, 0.7, 0.47, 32, 97],
   pontiac29: [3000, [3.0, 1.7, 1.0], 4.4, 'four', false, 1.9, 0.72, 0.47, 32, 97],
-  dodgeV28:  [3000, [3.0, 1.73, 1.0], 4.3, 'four', true, 1.85, 0.7, 0.47, 32, 105],
+  dodgeV28:  [3000, [3.0, 1.73, 1.0], 4.3, 'four', true, 1.85, 0.7, 0.47, 32, 100],
   willys27:  [2600, [3.18, 1.73, 1.0], 4.73, 'four', false, 1.95, 0.73, 0.47, 32, 97],
   buick28:   [2800, [3.0, 1.75, 1.0], 4.27, 'four', false, 1.95, 0.72, 0.48, 32, 105],
   fnTT33:    [4500, [3.6, 2.13, 1.43, 1.0], 4.0, 'four', false, 0.95, 0.5, 0.45, 36, 137],
   bmw315:    [4300, [3.62, 2.1, 1.44, 1.0], 4.75, 'four', false, 1.0, 0.52, 0.48, 36, 120],
-  dueSSJ35:  [4750, [2.48, 1.53, 1.0], 3.78, 'four', true, 1.35, 0.62, 0.53, 34, 217],
-  dueA21:    [3600, [2.9, 1.66, 1.0], 3.8, 'four', true, 1.8, 0.7, 0.5, 33, 140] };
+  dueSSJ35:  [4200, [2.48, 1.53, 1.0], 3.3, 'four', true, 1.35, 0.62, 0.53, 34, 217],
+  dueA21:    [3600, [2.9, 1.66, 1.0], 3.8, 'four', true, 1.8, 0.7, 0.5, 33, 117] };
 const KG: Record<string, number> = { fordT23: 990, chevAB28: 1160, plymU29: 1155, pontiac29: 1250, dodgeV28: 1300, willys27: 1225, buick28: 1590, fnTT33: 770, bmw315: 750, dueSSJ35: 2270, dueA21: 1750 };
 
 export const RACE_CARS: string[] = Object.keys(PERIOD);

@@ -1,0 +1,32 @@
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>4K 텍스처 시제품</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500&family=Noto+Sans+KR:wght@400;600&display=swap">
+<style>
+  :root { --bg: #161513; --panel: #1f1e1b; --ink: #ece8df; --soft: #a39d90; --line: #3a3832; --accent: #d78a5c; --display: 'Oswald', 'Arial Narrow', sans-serif; --body: 'Noto Sans KR', system-ui, sans-serif; color-scheme: dark; }
+  :root[data-theme="light"] { --bg: #e9e6df; --panel: #f6f4ef; --ink: #23211d; --soft: #6b665c; --line: #cfc9bc; --accent: #a0522d; color-scheme: light; }
+  @media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) { --bg: #e9e6df; --panel: #f6f4ef; --ink: #23211d; --soft: #6b665c; --line: #cfc9bc; --accent: #a0522d; color-scheme: light; } }
+  html, body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--body); height: 100%; }
+  .wrap { display: grid; grid-template-rows: 1fr auto; height: 100dvh; }
+  .view { position: relative; min-height: 0; }
+  canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; }
+  .bar { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; padding: 10px 16px; background: var(--panel); border-top: 1px solid var(--line); }
+  .bar h1 { font-family: var(--display); font-weight: 500; font-size: 1.1rem; margin: 0; letter-spacing: 0.04em; }
+  label { font-size: 0.8rem; color: var(--soft); display: flex; gap: 6px; align-items: center; }
+  select, input[type=range] { accent-color: var(--accent); }
+  select { font: inherit; padding: 4px 6px; border: 1px solid var(--line); border-radius: 4px; background: var(--bg); color: var(--ink); }
+  #stat { font-size: 0.75rem; color: var(--soft); font-variant-numeric: tabular-nums; flex: 1 1 260px; }
+  .tip { position: absolute; left: 12px; top: 10px; font-size: 0.75rem; color: #fff; text-shadow: 0 1px 2px #000; pointer-events: none; }
+</style>
+<div class="wrap">
+  <div class="view"><canvas id="cv" aria-label="고해상도 사진 화면"></canvas><div class="tip">끌어서 돌리기 · 휠/두 손가락으로 확대 · 콘크리트, 가죽 시트, 캔버스 덮개, 크롬 가까이 보기</div></div>
+  <div class="bar">
+    <h1>4K PBR 텍스처 시제품</h1>
+    <label>차 <select id="car"></select></label>
+    <label>텍스처 <select id="res"><option value="512">512 (지금 게임)</option><option value="2048">2K</option><option value="4096" selected>4K</option></select></label>
+    <label>보기 <select id="focus"><option value="car">차 전체</option><option value="cockpit">캔버스 덮개·가죽 시트</option><option value="road">콘크리트 노면</option></select></label>
+    <label>배율 <input type="range" id="zoom" min="0.6" max="20" step="0.1" value="3"></label>
+    <span id="stat">준비 중…</span>
+  </div>
+</div>
+<script>/*BUNDLE*/</script>

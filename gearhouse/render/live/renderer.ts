@@ -48,15 +48,17 @@ vec3 pbrX(vec3 baseSrgb, vec3 n, vec3 v, vec3 l, float sh, float metal, float ro
   return col; }
 // ---- PBR detail textures (review 103): seven layers (concrete, grass, metal, rubber, leather, canvas, wood), each a
 // tile of known size; the albedo used for its light and dark only (the game keeps its colours), roughness and normals ----
-uniform highp sampler2DArray uAlb, uNor, uRgh; uniform int uTex; uniform float uTSize[7], uTLuma[7], uTRough[7];
+uniform highp sampler2DArray uAlb, uNor, uRgh, uHiAlb, uHiNor; uniform int uTex, uHi; uniform int uHiIdx[7]; uniform float uTSize[7], uTLuma[7], uTRough[7];   /* uHi: the high-resolution layers (2K/4K) for some materials (review 114) */
 struct Detail { float tone; float rough; vec3 n; };
 /** a layer laid three ways (by the normal's main axes) at point p (m), on normal n: its tone, roughness offset, bent normal */
 Detail detail(int L, vec3 p, vec3 n, float sa, float sn, float sr) { sa = max(sa, 0.12 * (uTexK - 1.)) * uTexK; sn *= uTexK; sr *= uTexK; Detail d; d.tone = 1.; d.rough = 0.; d.n = n; if (uTex == 0 || L < 0) return d;
   vec3 q = p / uTSize[L], w = pow(abs(n), vec3(4.)); w /= (w.x + w.y + w.z); float fl = float(L);
   vec3 ax = vec3(q.zy, fl), ay = vec3(q.xz, fl), az = vec3(q.xy, fl);
   vec3 a = texture(uAlb, ax).rgb * w.x + texture(uAlb, ay).rgb * w.y + texture(uAlb, az).rgb * w.z;
+  int hi = uHi == 1 ? uHiIdx[L] : -1; vec3 hx = vec3(q.zy, float(hi)), hy = vec3(q.xz, float(hi)), hz = vec3(q.xy, float(hi));
+  if (hi >= 0) a = texture(uHiAlb, hx).rgb * w.x + texture(uHiAlb, hy).rgb * w.y + texture(uHiAlb, hz).rgb * w.z;
   float r = texture(uRgh, ax).r * w.x + texture(uRgh, ay).r * w.y + texture(uRgh, az).r * w.z;
-  vec3 tx = texture(uNor, ax).xyz * 2. - 1., ty = texture(uNor, ay).xyz * 2. - 1., tz = texture(uNor, az).xyz * 2. - 1.;
+  vec3 tx = (hi >= 0 ? texture(uHiNor, hx) : texture(uNor, ax)).xyz * 2. - 1., ty = (hi >= 0 ? texture(uHiNor, hy) : texture(uNor, ay)).xyz * 2. - 1., tz = (hi >= 0 ? texture(uHiNor, hz) : texture(uNor, az)).xyz * 2. - 1.;
   vec3 bend = vec3(0., tx.y, tx.x) * w.x + vec3(ty.x, 0., ty.y) * w.y + vec3(tz.xy, 0.) * w.z;
   d.tone = clamp(mix(1., dot(a, vec3(0.3, 0.59, 0.11)) / uTLuma[L], sa), 0.2, 2.2); d.rough = (r - uTRough[L]) * sr; d.n = normalize(n + bend * sn); return d; }
 /** the linear colour to the screen: exposure, filmic curve, gamma; stepped in brightness for the stepped look */
@@ -357,6 +359,17 @@ export class LiveRenderer {
     const lut = gl.createTexture()!; gl.bindTexture(gl.TEXTURE_2D, lut); gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1); gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, partGroups.length, 1, 0, gl.RED, gl.UNSIGNED_BYTE, new Uint8Array(partGroups)); gl.pixelStorei(gl.UNPACK_ALIGNMENT, 4); this.texParams(gl.NEAREST);
     this.arts.set(g, { lut, tex: t, mm: meta.mm, C: meta.C, rects: new Float32Array(V.flatMap(v => [v[0]!, v[1]!, v[2]!, v[3]!])), origins: new Float32Array(V.flatMap(v => [v[4]!, v[5]!])) }); }
   hasArt(g: GpuMesh): boolean { return this.arts.has(g); }
+  /** high-resolution albedo and normal for some layers (review 114): `layers` maps a layer (0 concrete .. 6 wood) to its
+   *  pictures; all drawn at `size` (2048 or 4096) into two texture arrays, mipmapped. null: back to the ordinary set */
+  private hiTex: { alb: WebGLTexture; nor: WebGLTexture; idx: Int32Array } | null = null;
+  setHiTextures(layers: Map<number, { alb: TexImageSource; nor: TexImageSource }> | null, size = 4096) { const gl = this.gl;
+    if (this.hiTex) { gl.deleteTexture(this.hiTex.alb); gl.deleteTexture(this.hiTex.nor); this.hiTex = null; } if (!layers || !layers.size) return;
+    const idx = new Int32Array(7).fill(-1), keys = [...layers.keys()]; keys.forEach((L, k) => { idx[L] = k; });
+    const arr = (pick: (v: { alb: TexImageSource; nor: TexImageSource }) => TexImageSource) => { const t = gl.createTexture()!; gl.bindTexture(gl.TEXTURE_2D_ARRAY, t); gl.texStorage3D(gl.TEXTURE_2D_ARRAY, Math.floor(Math.log2(size)) + 1, gl.RGBA8, size, size, keys.length);
+      keys.forEach((L, k) => { const src = pick(layers.get(L)!), c = document.createElement('canvas'); c.width = size; c.height = size; c.getContext('2d')!.drawImage(src as CanvasImageSource, 0, 0, size, size); gl.texSubImage3D(gl.TEXTURE_2D_ARRAY, 0, 0, 0, k, size, size, 1, gl.RGBA, gl.UNSIGNED_BYTE, c); c.width = c.height = 1; });
+      gl.generateMipmap(gl.TEXTURE_2D_ARRAY); gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR); gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_S, gl.REPEAT); gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_T, gl.REPEAT); const an = gl.getExtension('EXT_texture_filter_anisotropic'); if (an) gl.texParameterf(gl.TEXTURE_2D_ARRAY, an.TEXTURE_MAX_ANISOTROPY_EXT, 8); return t; };
+    this.hiTex = { alb: arr(v => v.alb), nor: arr(v => v.nor), idx }; }
   setGround(d: GroundData) { this.groundVao = this.vaoOf(d); this.groundN = d.n; }
   setFence(d: GroundData) { this.fenceVao = this.vaoOf(d); this.fenceN = d.n; }
   /** the GPU copy of a prop's mesh (by kind) or a car's (by its mesh object), made once */
@@ -390,7 +403,9 @@ export class LiveRenderer {
     for (const i of [0, 1, 2, 8, 9]) { gl.activeTexture(gl.TEXTURE0 + i); gl.bindTexture(gl.TEXTURE_2D, this.blank); }
     gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbo); gl.viewport(0, 0, v.W, v.H); gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.COLOR_ATTACHMENT1, gl.COLOR_ATTACHMENT2, gl.COLOR_ATTACHMENT3]);
     gl.clearBufferfv(gl.COLOR, 0, [0.36, 0.45, 0.28, 1]); gl.clearBufferfv(gl.COLOR, 1, [0, 0, 0, 0]); gl.clearBufferfv(gl.COLOR, 2, [0.5, 0.5, 1, 0]); gl.clearBufferfv(gl.COLOR, 3, [0.5, 0.5, 0, 1]); gl.clearBufferfi(gl.DEPTH_STENCIL, 0, 1, 0);
-    const texTo = (p: WebGLProgram) => { gl.uniform1i(this.loc(p, 'uTex'), this.tex ? 1 : 0); if (!this.tex) return; const t = this.tex;
+    const texTo = (p: WebGLProgram) => { gl.uniform1i(this.loc(p, 'uTex'), this.tex ? 1 : 0); const H = this.hiTex; gl.uniform1i(this.loc(p, 'uHi'), H ? 1 : 0);
+      gl.activeTexture(gl.TEXTURE10); gl.bindTexture(gl.TEXTURE_2D_ARRAY, H ? H.alb : this.tex?.alb ?? null); gl.uniform1i(this.loc(p, 'uHiAlb'), 10); gl.activeTexture(gl.TEXTURE11); gl.bindTexture(gl.TEXTURE_2D_ARRAY, H ? H.nor : this.tex?.nor ?? null); gl.uniform1i(this.loc(p, 'uHiNor'), 11);
+      gl.uniform1iv(this.loc(p, 'uHiIdx'), H ? H.idx : new Int32Array(7).fill(-1)); if (!this.tex) return; const t = this.tex;
       [t.alb, t.nor, t.rgh].forEach((x, i) => { gl.activeTexture(gl.TEXTURE3 + i); gl.bindTexture(gl.TEXTURE_2D_ARRAY, x); gl.uniform1i(this.loc(p, ['uAlb', 'uNor', 'uRgh'][i]!), 3 + i); });
       gl.uniform1fv(this.loc(p, 'uTSize'), t.size); gl.uniform1fv(this.loc(p, 'uTLuma'), t.luma); gl.uniform1fv(this.loc(p, 'uTRough'), t.rough); };
     const boxes = cars.slice().sort((a, b) => Math.hypot(a.x - v.x, a.y - v.y) - Math.hypot(b.x - v.x, b.y - v.y)).slice(0, 6), boxIdx = new Map(boxes.map((q, i) => [q, i]));

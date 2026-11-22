@@ -62,17 +62,43 @@ const SUN: V = norm([-0.45, 0.35, 0.82]);
  *  -y from a nose-left heading, so it draws the mirror image. Mirror once here so a car's left shows nose-left, as in 2D. */
 const mirrored = new WeakMap<Mesh, Mesh>();
 function asDrawn(M: Mesh): Mesh { let m = mirrored.get(M); if (!m) { const pos = Float32Array.from(M.pos); for (let i = 1; i < pos.length; i += 3) pos[i] = -pos[i]!; m = { ...M, pos }; mirrored.set(M, m); } return m; }
-export interface DrawOpts { outline?: number; shadow?: boolean; cy?: number; /** the car tilted on its ground point: roll (rad, its left side up +), pitch (rad, nose up +) */ roll?: number; pitch?: number; /** how much of what is behind glass it hides, 0..1 */ glass?: number; wear?: Wear }
+export interface DrawOpts { outline?: number; shadow?: boolean; cy?: number; /** the car tilted on its ground point: roll (rad, its left side up +), pitch (rad, nose up +) */ roll?: number; pitch?: number; /** front wheels turned (rad, to the car's left +), every wheel turned on its axle (rad) */ steer?: number; spin?: number; /** how much of what is behind glass it hides, 0..1 */ glass?: number; wear?: Wear }
 const PAINT = 1, METAL = 2, GLASS = 3, SHINE = 4, TYRE = 5, WOOD = 6, CANVAS = 7, LEATHER = 8, LENS = 9, GRILLE = 10;
 const GLASS_TINT: V = [150, 172, 182];
 const lum = (r: number, g: number, b: number) => 0.3 * r + 0.59 * g + 0.11 * b;
+/** a road wheel found in a mesh: its hub (car-file axes: x back, y to the right, z up), radius, half-width, and its triangles */
+export interface WheelGroup { hx: number; hy: number; hz: number; r: number; hw: number; front: boolean; tris: number[] }
+const wheelCache = new WeakMap<Mesh, WheelGroup[]>();
+/** the road wheels, found from the tyres (no list kept in the car files): the tyre triangles gathered into rings, the
+ *  rings that touch the ground kept (a spare stands clear of it), and every triangle lying wholly inside a ring's
+ *  cylinder taken as that wheel's (rim, spokes, hub) */
+export function wheelsOf(M: Mesh): WheelGroup[] { const have = wheelCache.get(M); if (have) return have; const p = M.pos, T = KINDS.indexOf('tyre');
+  const rings: { tris: number[]; x0: number; x1: number; y0: number; y1: number; z0: number; z1: number; cx: number; cy: number }[] = [];
+  for (let t = 0; t < M.n; t++) { if (M.kind[t] !== T) continue; let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+    for (let k = 0; k < 3; k++) { const x = p[t * 9 + k * 3]!, y = p[t * 9 + k * 3 + 1]!, z = p[t * 9 + k * 3 + 2]!; x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); z0 = Math.min(z0, z); z1 = Math.max(z1, z); }
+    const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2; let g = rings.find(r => Math.abs(r.cx - cx) < 700 && Math.abs(r.cy - cy) < 250);
+    if (!g) { g = { tris: [], x0, x1, y0, y1, z0, z1, cx, cy }; rings.push(g); } g.tris.push(t); g.x0 = Math.min(g.x0, x0); g.x1 = Math.max(g.x1, x1); g.y0 = Math.min(g.y0, y0); g.y1 = Math.max(g.y1, y1); g.z0 = Math.min(g.z0, z0); g.z1 = Math.max(g.z1, z1); g.cx = (g.x0 + g.x1) / 2; g.cy = (g.y0 + g.y1) / 2; }
+  const road = rings.filter(g => g.z0 < 40 && g.tris.length > 8), mid = road.reduce((a, g) => a + g.cx, 0) / Math.max(1, road.length);
+  const out: WheelGroup[] = road.map(g => ({ hx: g.cx, hy: g.cy, hz: (g.z0 + g.z1) / 2, r: (g.z1 - g.z0) / 2, hw: (g.y1 - g.y0) / 2, front: g.cx < mid, tris: [] }));
+  for (let t = 0; t < M.n; t++) for (const w of out) { let inside = true;
+    for (let k = 0; k < 3 && inside; k++) { const x = p[t * 9 + k * 3]! - w.hx, y = p[t * 9 + k * 3 + 1]! - w.hy, z = p[t * 9 + k * 3 + 2]! - w.hz; if (x * x + z * z > (w.r * 1.03) ** 2 || Math.abs(y) > w.hw + 90) inside = false; }
+    if (inside) { w.tris.push(t); break; } }
+  wheelCache.set(M, out); return out; }
+/** the mesh with its front wheels steered and every wheel turned on its axle */
+function posed(M: Mesh, steer: number, spin: number): Mesh { if (!steer && !spin) return M; const W = wheelsOf(M); if (!W.length) return M; const pos = Float32Array.from(M.pos);
+  const cs = Math.cos(spin), ss2 = Math.sin(spin), cd = Math.cos(steer), sd = Math.sin(steer);
+  for (const w of W) for (const t of w.tris) for (let k = 0; k < 3; k++) { const i = t * 9 + k * 3; let x = pos[i]! - w.hx, y = pos[i + 1]! - w.hy, z = pos[i + 2]! - w.hz;
+    if (spin) { const x1 = x * cs - z * ss2, z1 = x * ss2 + z * cs; x = x1; z = z1; }
+    if (w.front && steer) { const x2 = x * cd - y * sd, y2 = x * sd + y * cd; x = x2; y = y2; }   // about the upright: the wheel's front (x < 0) goes to the left (y < 0)
+    pos[i] = x + w.hx; pos[i + 1] = y + w.hy; pos[i + 2] = z + w.hz; }
+  return { ...M, pos }; }
 /** the mesh turned about its centre's ground point (x = half its length, y = 0, z = 0): roll about the length, then
  *  pitch about the width. In the drawn (mirrored) frame, so roll > 0 lifts the car's left side as seen */
 function tilted(M: Mesh, roll: number, pitch: number): Mesh { if (!roll && !pitch) return M; const pos = Float32Array.from(M.pos), cx = M.length / 2, cr = Math.cos(roll), sr = Math.sin(roll), cp = Math.cos(pitch), sp = Math.sin(pitch);
   for (let i = 0; i < pos.length; i += 3) { let x = pos[i]! - cx, y = pos[i + 1]!, z = pos[i + 2]!; const y1 = y * cr + z * sr, z1 = -y * sr + z * cr; y = y1; z = z1; const x2 = x * cp - z * sp, z2 = x * sp + z * cp; pos[i] = x2 + cx; pos[i + 1] = y; pos[i + 2] = z2; }
   return { ...M, pos }; }
 export function drawMesh(M0: Mesh, yaw: number, pitch: number, mm: number, w: number, h: number, o: DrawOpts = {}): Pic {
-  const M = tilted(asDrawn(M0), o.roll ?? 0, o.pitch ?? 0), W = o.wear ?? NEW, ga = o.glass ?? 0.8;
+  const M = tilted(asDrawn(posed(M0, o.steer ?? 0, o.spin ?? 0)), o.roll ?? 0, o.pitch ?? 0), W = o.wear ?? NEW, ga = o.glass ?? 0.8;
   const th = yaw * Math.PI / 180, ph = pitch * Math.PI / 180, ct = Math.cos(th), st = Math.sin(th), sp = Math.sin(ph), cp = Math.cos(ph), N = w * h, cx = M.length / 2, cy = h * (o.cy ?? 0.62);
   const zb = new Float32Array(N).fill(-1e9), tri = new Int32Array(N).fill(-1), rgba = new Uint8ClampedArray(N * 4), at = new Float32Array(N * 3);   // at: the point of the car each pixel shows
   const sun: V = [SUN[0] * ct + SUN[1] * st, -SUN[0] * st + SUN[1] * ct, SUN[2]], cam: V = [-cp * st, -cp * ct, sp];

@@ -52,13 +52,16 @@ export function viewDesign(m: CarModel, view: ViewName, only?: (p: CarPart) => b
   if (!only) only = opt.chassis ? (p => p.layer === 'chassis' || (RUNNING.has(p.element) && !p.id.startsWith('vis_'))) : (p => p.layer !== 'chassis');   // vis_: running gear drawn off the sheet for the body views only
   const key: OutlineKey = view === 'left' || view === 'right' ? 'side' : view, C = m.width / 2;
   const depth = (p: CarPart) => (key === 'side' ? Math.max(Math.abs(p.box.y[0]), Math.abs(p.box.y[1])) : key === 'front' ? -p.box.x[0] : key === 'rear' ? p.box.x[1] : p.box.z[1]) + (p.lift ?? 0) * 3;
+  // a part on one flank only (an outside exhaust, a filler on one side) lies on the far side of the car in one of the two
+  // side views: it is drawn first there, behind everything on the near side, whatever part it is laid on
+  const nearY = view === 'right' ? -1 : 1, far = (p: CarPart) => key === 'side' && !p.pair && (p.box.y[0] + p.box.y[1]) / 2 * nearY < -60 && Math.max(p.box.y[0] * nearY, p.box.y[1] * nearY) < 60;
   type Item = { d: number; n: number; p?: CarPart; sign?: 1 | -1; w?: number };
   const items: Item[] = []; let n = 0;
   for (const p of m.parts) { if (only && !only(p)) continue; if (!p.outlines[key] && !(p.wheel && key === 'rear')) continue;
-    items.push({ d: depth(p), n: n++, p, sign: 1 }); if (p.pair && key !== 'side') items.push({ d: depth(p), n: n++, p, sign: -1 }); }
+    items.push({ d: far(p) ? -1e4 + depth(p) : depth(p), n: n++, p, sign: 1 }); if (p.pair && key !== 'side') items.push({ d: depth(p), n: n++, p, sign: -1 }); }
   if (key === 'side' && (!only || opt.chassis || only({ element: 'body' } as unknown as CarPart))) m.wheels.forEach((w, i) => items.push({ d: w.y + 57, n: n++, w: i }));
   const byId = new Map(m.parts.map(p => [p.id, p]));
-  for (const it of items) { let q = it.p, k = 0; while (q?.on && byId.get(q.on) && k++ < 5) q = byId.get(q.on)!; if (q && q !== it.p) it.d = depth(q) + 0.01 * k + (it.p!.lift ?? 0) * 0.001; }
+  for (const it of items) { if (it.p && far(it.p)) continue; let q = it.p, k = 0; while (q?.on && byId.get(q.on) && k++ < 5) q = byId.get(q.on)!; if (q && q !== it.p) it.d = depth(q) + 0.01 * k + (it.p!.lift ?? 0) * 0.001; }
   items.sort((a, b) => a.d - b.d || a.n - b.n);
   const panels: Panel[] = [], wheels: WheelSpec[] = [], features: Feature[] = [];
   const W: WheelSpec = { x: 0, r: 0, rim: 0.6, style: 'disc', spokes: 0, rimMaterial: 'paint', ...m.wheel } as WheelSpec;

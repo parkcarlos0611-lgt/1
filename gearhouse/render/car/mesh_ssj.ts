@@ -47,9 +47,13 @@ export function ssjMesh(spin = 0): Mesh { const b = new Build();
   b.loft([section(560, 262, 498, 1172), section(494, 262, 498, 1172), section(494, 236, 518, 1150), section(530, 236, 518, 1150)], false);   // the shell: a bright ring round the grille
   b.mat(RED, 0.6).box(488, 494, -40, 40, 1152, 1170);   // the badge
   // ---- the screen: two panes meeting in a V on a centre post, a bright frame ----
-  for (const s of [1, -1]) { const bc: V = [2215, 0, 1275], bo: V = [2252, s * 535, 1262], to: V = [2388, s * 548, 1446], tc: V = [2352, 0, 1482];
-    b.mat(GLASS, 0.5).quad(bc, bo, to, tc); b.mat(CHROME, 0.9).bar(bo, to, 26).bar(tc, to, 22).bar(bc, bo, 22); }
-  b.mat(CHROME, 0.9).bar([2215, 0, 1275], [2352, 0, 1482], 26).box(2330, 2350, -55, 55, 1500, 1545);
+  // the panes' foot follows the scuttle's crown, so the glass and its frame stand on the body all the way across
+  const skin = (x: number, y: number) => { const w = at(HALF, x), zt = at(TOP, x), h = (zt - 440) / 2; return 440 + h + h * Math.max(0, 1 - Math.abs(y / w) ** 3.6) ** (1 / 3.6) - 8; };
+  for (const s of [1, -1]) { const foot: V[] = [0, 0.25, 0.5, 0.75, 1].map(f => { const x = 2205 + 40 * f, y = s * 520 * f; return [x, y, skin(x, y)]; }), to: V = [2388, s * 535, 1446], tc: V = [2352, 0, 1482];
+    const top = (f: number): V => [tc[0] + (to[0] - tc[0]) * f, tc[1] + (to[1] - tc[1]) * f, tc[2] + (to[2] - tc[2]) * f];
+    b.mat(GLASS, 0.5); for (let i = 0; i < 4; i++) b.quad(foot[i]!, foot[i + 1]!, top((i + 1) / 4), top(i / 4));
+    b.mat(CHROME, 0.9).bar(foot[4]!, to, 26).bar(tc, to, 22); for (let i = 0; i < 4; i++) b.bar(foot[i]!, foot[i + 1]!, 22); }
+  b.mat(CHROME, 0.9).bar([2205, 0, skin(2205, 0)], [2352, 0, 1482], 26);
   // ---- wings: one sweep from over the front wheel down to the sill, the rear wing over its wheel to the tail ----
   for (const s of [1, -1] as const) { b.mat(PAINT2, 0.45);
     wing(b, ([[48, 641, 560, 820], [112, 765, 540, 860], [258, 896, 535, 878], [526, 958, 535, 880], [790, 914, 520, 875], [1050, 790, 500, 855], [1316, 657, 500, 810], [1666, 518, 530, 765], [2105, 386, 575, 745], [2600, 370, 595, 745], [3122, 360, 597, 745]] as const).map(([x, z, yi, yo]) => [x, z, s * yi, s * yo] as [number, number, number, number]), [FX, R - 200]);

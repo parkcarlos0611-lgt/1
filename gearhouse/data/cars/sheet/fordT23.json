@@ -2293,8 +2293,9 @@
    },
    "slot": "grille",
    "detail": {
-    "kind": "cells",
-    "pitch": 24
+    "kind": "core",
+    "pattern": "honeycomb",
+    "pitch": 18
    },
    "on": "shell"
   },

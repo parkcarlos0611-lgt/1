@@ -58,7 +58,8 @@ export function viewDesign(m: CarModel, view: ViewName, only?: (p: CarPart) => b
   type Item = { d: number; n: number; p?: CarPart; sign?: 1 | -1; w?: number };
   const items: Item[] = []; let n = 0;
   for (const p of m.parts) { if (only && !only(p)) continue; if (!p.outlines[key] && !(p.wheel && key === 'rear')) continue;
-    items.push({ d: far(p) ? -1e4 + depth(p) : depth(p), n: n++, p, sign: 1 }); if (p.pair && key !== 'side') items.push({ d: depth(p), n: n++, p, sign: -1 }); }
+    const under = (key === 'front' || key === 'rear') && p.id.startsWith('vis_');   // running gear seen under the nose or tail: behind the body's own parts
+    items.push({ d: far(p) ? -1e4 + depth(p) : under ? -5e3 + depth(p) : depth(p), n: n++, p, sign: 1 }); if (p.pair && key !== 'side') items.push({ d: under ? -5e3 + depth(p) : depth(p), n: n++, p, sign: -1 }); }
   if (key === 'side' && (!only || opt.chassis || only({ element: 'body' } as unknown as CarPart))) m.wheels.forEach((w, i) => items.push({ d: w.y + 57, n: n++, w: i }));
   const byId = new Map(m.parts.map(p => [p.id, p]));
   for (const it of items) { if (it.p && far(it.p)) continue; let q = it.p, k = 0; while (q?.on && byId.get(q.on) && k++ < 5) q = byId.get(q.on)!; if (q && q !== it.p) it.d = depth(q) + 0.01 * k + (it.p!.lift ?? 0) * 0.001; }

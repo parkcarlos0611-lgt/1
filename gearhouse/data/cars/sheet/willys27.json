@@ -1572,8 +1572,9 @@
    },
    "slot": "grille",
    "detail": {
-    "kind": "cells",
-    "pitch": 24
+    "kind": "core",
+    "pattern": "diamond",
+    "pitch": 18
    },
    "on": "shell"
   },

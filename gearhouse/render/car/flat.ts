@@ -247,6 +247,19 @@ export function rasterizeFlat(d0: CarDesign, opt: { frameW?: number; shadow?: bo
           const lit = u < 0.5 && v < 0.25, blockGap = !rib && !ribEdge && !shoulder && (left ? fr : fr2) < 0.26 && Math.abs(v) < 0.97;
           let l = shoulder ? 1 : rib ? (lit ? 3 : 2) : ribEdge ? 0 : lit ? 3 : 2; if (blockGap) l = 0; if (shoulder && (left ? fr : fr2) < 0.2) l = 0; if (edge) l = Math.min(l, 1); if (x === a || x === b) l = 0;
           set(bx + x, by + y, 'rubber', l, ly); } } }
+    else if (dt.kind === 'core') { const p = Math.max(2, Math.round(dt.pitch / MM)); let top = bh, left = bw; for (let y = 0; y < bh; y++) for (let x = 0; x < bw; x++) if (M(x, y)) { top = Math.min(top, y); left = Math.min(left, x); }
+      // 2: a wire or bar catching the light, 1: its shaded side, 0: the dark gap behind
+      const at = (x: number, y: number): number => { const X = x - left, Y = y - top;
+        switch (dt.pattern) {
+          case 'square': return X % p === 0 || Y % p === 0 ? 2 : 0;
+          case 'honeycomb': { const r = Math.floor(Y / p), xo = X + (r % 2 ? Math.floor(p / 2) : 0); return Y % p === 0 || xo % p === 0 ? 2 : (Y % p === p - 1 || xo % p === p - 1) && p > 2 ? 1 : 0; }
+          case 'diamond': return (X + Y) % p === 0 || (X - Y + 1000 * p) % p === 0 ? 2 : 0;
+          case 'woven': { const c = (Math.floor(X / p) + Math.floor(Y / p)) % 2, u = X % p, v = Y % p; return c ? (v === 0 ? 0 : u === p - 1 ? 1 : 2) : (u === 0 ? 0 : v === p - 1 ? 1 : 2) === 2 ? 1 : 0; }
+          case 'slats': return X % p === 0 ? 2 : X % p === 1 ? 1 : 0;
+          case 'tubes': return Y % (p * 2) === 0 ? 1 : X % 2 === 0 ? 1 : 0; } return 0; };
+      for (let y = 0; y < bh; y++) for (let x = 0; x < bw; x++) { if (!M(x, y)) continue; const v = at(x, y), lit = y - top < bh * 0.35;
+        if (dt.metal && v) set(bx + x, by + y, 'chrome', v === 2 ? (lit ? 4 : 3) : 1, ly);
+        else set(bx + x, by + y, 'black', v === 2 ? (lit ? 3 : 2) : v === 1 ? 1 : 0, ly); } }
     else if (dt.kind === 'cells') { const p = Math.max(2, Math.round(dt.pitch / MM)); let top = bh; for (let y = 0; y < bh; y++) for (let x = 0; x < bw; x++) if (M(x, y)) top = Math.min(top, y);
       for (let y = 0; y < bh; y++) for (let x = 0; x < bw; x++) { if (!M(x, y)) continue; const row = Math.floor(y / p), off = row % 2 ? Math.floor(p / 2) : 0, cell = ((x + off) % p === 0) || (y % p === 0);
         set(bx + x, by + y, 'black', cell ? (y - top < bh * 0.3 ? 3 : 2) : y - top < 2 ? 2 : 0, ly); } }

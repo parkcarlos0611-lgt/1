@@ -2012,8 +2012,9 @@
    },
    "slot": "grille",
    "detail": {
-    "kind": "cells",
-    "pitch": 26
+    "kind": "core",
+    "pattern": "diamond",
+    "pitch": 24
    },
    "on": "shell",
    "color": "#1f1f1f"

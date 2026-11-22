@@ -59,6 +59,9 @@ export type Detail =
   | { kind: 'planks'; pitch: number }
   | { kind: 'ribs'; pitch: number }
   | { kind: 'vbars'; pitch: number; ring?: number }
+  /** a radiator core or grille as the sheet shows it (review 70): square wire, honeycomb cells, diamond wire, woven
+   *  gauze, upright slats (bright metal when `metal`), or the fine tubes and fins of a tube core; pitch in mm */
+  | { kind: 'core'; pattern: 'square' | 'honeycomb' | 'diamond' | 'woven' | 'slats' | 'tubes'; pitch: number; metal?: boolean }
   /** a wire mesh: bright wires both ways over a dark ground */
   | { kind: 'mesh'; pitch: number }
   /** a tyre seen face on: the tread blocks crowd together towards the top and bottom (the tread turns away), the

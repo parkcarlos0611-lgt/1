@@ -1570,8 +1570,9 @@
    },
    "slot": "grille",
    "detail": {
-    "kind": "cells",
-    "pitch": 22
+    "kind": "core",
+    "pattern": "honeycomb",
+    "pitch": 24
    },
    "on": "shell"
   },

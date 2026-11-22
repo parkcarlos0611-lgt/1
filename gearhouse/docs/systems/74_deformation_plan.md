@@ -1,0 +1,38 @@
+# 74 · Crash damage by deformation (plan, review 93)
+
+The darkened "dent" patch is gone (review 93). The user wants damage as BeamNG.drive does it: the car's body is a
+structure of nodes and beams that bends where it is struck, and parts that are knocked hard enough come away. This is
+the plan; the work comes after the 3D-first switch (review 92), since it needs the meshes' part names.
+
+## The structure (per car, built from its mesh)
+- Nodes: a few hundred points per car, placed on the mesh's parts (a lattice through each panel's stations, more on the
+  wings, bumpers, bonnet and screen), each with a mass from the part's weight (the part models' kg).
+- Beams between nearby nodes: a spring with damping, a yield length past which it bends for good (plastic), a break
+  length past which it parts. Stiff for the frame and the engine, soft for wings and bonnet, brittle for glass and lamps.
+- Every mesh vertex is bound to its nearest few nodes (weights by distance); when the nodes move, the skin follows.
+- Parts hang on their mounts: a wing on four beams to the body, a bumper on its irons, a lamp on its stand, a door on
+  hinges and a latch, a spare on its straps. When a part's mounts all break it comes away as its own body.
+
+## Simulation
+- Only while something touches: the car stays a rigid body (the present physics) until a contact (a car, a fence post,
+  a wall, the ground in a roll) exceeds a force; then the node structure near the contact runs for a few hundred
+  milliseconds at a fine step (2 kHz), the permanent bend is kept, and the rigid body takes the changed mass layout.
+- Contacts: node to track surface, node to other cars' node hulls, node to props (simple boxes).
+- Loose parts: rigid pieces with their own mesh, bouncing and sliding on the track (as the fence pieces do now), and
+  staying where they land until the race ends.
+
+## What damage does to the car
+- Bent front axle or a pushed-back wing: the wheel's toe and camber change (the car pulls to one side).
+- A crushed radiator: the cooling margin falls (brief 69's heat model), a holed one loses water.
+- A broken lamp, a lost bumper, a bent wing: shown at once, carried to the garage after the race as parts to repair or
+  replace (the builder's slots), with the part's condition.
+
+## Drawing
+- The baked pictures cannot bend: a damaged car is baked again (its own pictures, a few hundred ms in the background).
+- In the real-time renderer (brief 72) the deformed skin is simply drawn as it is each frame.
+
+## Steps
+1. Node structure from one car's mesh (the SSJ), shown as dots and lines on the model page; static load tests.
+2. A crash test page: the car into a wall at set speeds, the bend compared with period photographs of such accidents.
+3. Into the race: contacts, loose parts, re-baking, handling changes.
+4. Damage to the garage: parts and their condition after a race.

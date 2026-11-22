@@ -166,7 +166,7 @@ function silhouette(img: HTMLCanvasElement): HTMLCanvasElement { let s = silhoue
   c.drawImage(img, 0, 0); c.globalCompositeOperation = 'source-in'; c.fillStyle = '#ffe2a8'; c.fillRect(0, 0, s.width, s.height); silhouettes.set(img, s); return s; }
 /** the whole picture: the layer behind (blurred by the camera's motion), the player's car sharp, what stands before it, the hidden cars' outlines */
 // ---- the fence: a car that reaches it smashes a few metres of it into flying pieces ----
-const broken = new Set<string>(), debris: { x: number; y: number; z: number; vx: number; vy: number; vz: number; a: number; va: number; len: number; col: string; life: number }[] = [], sparks: { c: Vehicle; x: number; y: number; t: number; life: number; size: number }[] = [];
+const broken = new Set<string>(), debris: { x: number; y: number; z: number; vx: number; vy: number; vz: number; a: number; va: number; len: number; col: string; life: number }[] = [];
 const FENCE = T.spec.width / 2 + 1.5, fenceOk = (side: number, m: number) => !broken.has(`${side}:${((m % Math.round(T.length)) + Math.round(T.length)) % Math.round(T.length)}`);
 function fence(c: Vehicle) { const side = Math.sign(c.off), reach = Math.abs(c.off) + c.spec.track / 2 + 0.3; if (reach < FENCE || Math.abs(c.off) > FENCE + 3) return; const m = Math.floor(c.s); if (!fenceOk(side, m)) return;
   const sp = Math.hypot(c.vx, c.vy); if (sp < 2) return;
@@ -182,29 +182,23 @@ function drawDebris(el: number) { for (let k = debris.length - 1; k >= 0; k--) {
     if (d.z < floor) { d.z = floor; d.vz = Math.abs(d.vz) * 0.3; d.vx *= 0.6; d.vy *= 0.6; d.va *= 0.6; if (Math.abs(d.vz) < 0.5) { d.vz = 0; d.va *= 0.8; } }
     const [X, Y] = P(d.x, d.y, d.z), [X2, Y2] = P(d.x + Math.cos(d.a) * d.len, d.y + Math.sin(d.a) * d.len, d.z + Math.sin(d.a * 0.7) * d.len * 0.3);
     main.globalAlpha = Math.min(1, d.life / 1.5); main.strokeStyle = '#3a352c'; main.lineWidth = 3; main.beginPath(); main.moveTo(X, Y); main.lineTo(X2, Y2); main.stroke(); main.strokeStyle = d.col; main.lineWidth = 1.5; main.beginPath(); main.moveTo(X, Y); main.lineTo(X2, Y2); main.stroke(); main.globalAlpha = 1; } }
-function drawWorld(el: number) { const all = scene(), meI = all.findIndex(d => d.car === car), me = all[meI];
+function drawWorld(el: number) { const all = scene(), cars = all.filter(d => d.car), props = all.filter(d => !d.car);
   if (bg.width !== VW || bg.height !== VH) { bg.width = VW; bg.height = VH; } ctx = bgx; bgx.imageSmoothingEnabled = false; drawTrack();
-  const front: Drawn[] = []; for (const d of all) { if (d.car === car) continue; if (me && (d.over || d.Y > me.Y) && hits(d, me)) front.push(d); bgx.drawImage(d.img, d.X0, d.Y0); }
+  // the still world (ground and buildings) on the layer behind; what stands before a car is drawn again over it
+  const front = new Set<Drawn>(); for (const d of props) { bgx.drawImage(d.img, d.X0, d.Y0); for (const c of cars) if ((d.over || d.Y > c.Y) && hits(d, c)) front.add(d); }
   ctx = main;
-  // the smear: copies of the layer laid back along the way the ground streams past, fainter as they go
-  const vx = (camX - lastCamX) / Math.max(el, 1e-3), vy = (camY - lastCamY) / Math.max(el, 1e-3); lastCamX = camX; lastCamY = camY;
-  const [sx0, sy0] = P(camX, camY, camZ), [sx1, sy1] = P(camX + vx * 0.05, camY + vy * 0.05, camZ), bx = sx1 - sx0, by = sy1 - sy0, blur = blurOn ? Math.min(40, Math.hypot(bx, by)) : 0;
+  // motion blur by each thing's own motion across the picture: the ground by the camera's, a car by its speed against the camera's
+  const cvx = (camX - lastCamX) / Math.max(el, 1e-3), cvy = (camY - lastCamY) / Math.max(el, 1e-3); lastCamX = camX; lastCamY = camY;
+  const streak = (vx: number, vy: number): [number, number] => { const [x0, y0] = P(camX, camY, camZ), [x1, y1] = P(camX + vx * 0.05, camY + vy * 0.05, camZ); const bx = x1 - x0, by = y1 - y0, l = Math.hypot(bx, by); return l > 40 ? [bx / l * 40, by / l * 40] : [bx, by]; };
   shake = car.speed > 25 ? (car.speed - 25) * 0.012 + Math.min(1.5, Math.abs(car.vzb) * 3) : Math.min(1.5, Math.abs(car.vzb) * 3);
   const jx = Math.round((Math.random() - 0.5) * shake), jy = Math.round((Math.random() - 0.5) * shake);
-  main.clearRect(0, 0, VW, VH); main.drawImage(bg, jx, jy);
-  if (blur > 1.5) { const n = 6, ux = bx / Math.hypot(bx, by), uy = by / Math.hypot(bx, by); for (let k = 1; k <= n; k++) { main.globalAlpha = 0.42 * (1 - k / (n + 1)); const d = blur * k / n; main.drawImage(bg, Math.round(jx + ux * d), Math.round(jy + uy * d)); } main.globalAlpha = 1; }
-  if (me) { main.drawImage(me.img, me.X0 + jx, me.Y0 + jy); for (const d of front) main.drawImage(d.img, d.X0 + jx, d.Y0 + jy); }
+  const smear = (img: CanvasImageSource, x: number, y: number, b: [number, number]) => { main.drawImage(img, x + jx, y + jy); const l = Math.hypot(b[0], b[1]); if (!blurOn || l < 1.5) return;
+    const n = 6; for (let k = 1; k <= n; k++) { main.globalAlpha = 0.42 * (1 - k / (n + 1)); main.drawImage(img, Math.round(x + jx - b[0] * k / n), Math.round(y + jy - b[1] * k / n)); } main.globalAlpha = 1; };
+  main.clearRect(0, 0, VW, VH); { const b = streak(cvx, cvy); smear(bg, 0, 0, [-b[0], -b[1]]); }   // the ground streams back against the camera
+  for (const c of cars) { const v = c.car!, wx = v.vx * Math.cos(v.yaw) - v.vy * Math.sin(v.yaw), wy = v.vx * Math.sin(v.yaw) + v.vy * Math.cos(v.yaw); smear(c.img, c.X0, c.Y0, streak(wx - cvx, wy - cvy)); }
+  for (const d of [...front].sort((a, b) => (a.over ? 1 : 0) - (b.over ? 1 : 0) || a.Y - b.Y)) main.drawImage(d.img, d.X0 + jx, d.Y0 + jy);
   // a car a building hides: its outline over it, faint
-  for (const c of all) { if (!c.car) continue; const hidden = c === me ? front.length > 0 && front.some(d => !d.car) : all.some(d => !d.car && (d.over || d.Y > c.Y) && hits(d, c));
-    if (hidden) { main.globalAlpha = c === me ? 0.55 : 0.35; main.drawImage(silhouette(c.img), c.X0 + jx, c.Y0 + jy); main.globalAlpha = 1; } }
-  // sparkles: now and then the light catches a bright point and flashes, more as the car turns and moves
-  const where = new Map(all.filter(d => d.car).map(d => [d.car!, d]));
-  for (const d of all) { if (!d.car || !d.glints?.length) continue; const rate = 0.5 + Math.abs(d.car.r) * 6 + d.car.speed / 25; if (Math.random() < rate * el) { const g = d.glints[Math.floor(Math.random() * d.glints.length)]!; sparks.push({ c: d.car, x: g[0], y: g[1], t: 0, life: 0.18 + Math.random() * 0.2, size: 3 + Math.random() * 4 }); } }
-  main.globalCompositeOperation = 'lighter';
-  for (let k = sparks.length - 1; k >= 0; k--) { const sp = sparks[k]!; sp.t += el; const d = where.get(sp.c); if (sp.t > sp.life || !d) { sparks.splice(k, 1); continue; }
-    const a = Math.sin(sp.t / sp.life * Math.PI), X = d.X0 + sp.x + jx + 0.5, Y = d.Y0 + sp.y + jy + 0.5, r = sp.size * a; main.strokeStyle = `rgba(255,250,230,${a})`; main.lineWidth = 1;
-    main.beginPath(); main.moveTo(X - r, Y); main.lineTo(X + r, Y); main.moveTo(X, Y - r); main.lineTo(X, Y + r); main.stroke(); main.fillStyle = `rgba(255,255,255,${a})`; main.fillRect(Math.round(X) - 1, Math.round(Y) - 1, 2, 2); }
-  main.globalCompositeOperation = 'source-over';
+  for (const c of cars) { if (!props.some(d => (d.over || d.Y > c.Y) && hits(d, c))) continue; main.globalAlpha = c.car === car ? 0.55 : 0.35; main.drawImage(silhouette(c.img), c.X0 + jx, c.Y0 + jy); main.globalAlpha = 1; }
   drawDebris(el);
   // speed: the edges darken a little
   if (car.speed > 30) { const v = Math.min(1, (car.speed - 30) / 30) * 0.35, g = main.createRadialGradient(VW / 2, VH / 2, VH * 0.35, VW / 2, VH / 2, VW * 0.62); g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, `rgba(0,0,0,${v})`); main.fillStyle = g; main.fillRect(0, 0, VW, VH); } }

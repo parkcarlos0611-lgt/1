@@ -13,7 +13,7 @@ function frame() { if (st.spin) { st.yaw = (st.yaw + 0.8) % 360; $<HTMLInputElem
   requestAnimationFrame(frame); }
 const bind = (id: string, f: (v: string) => void) => $(id).addEventListener('input', e => { f((e.target as HTMLInputElement).value); dirty = true; });
 bind('yaw', v => { st.yaw = +v; }); bind('pitch', v => { st.pitch = +v; $('pitchv').textContent = `${v}°`; }); bind('res', v => { st.res = +v; $('resv').textContent = `${v}배`; }); bind('line', v => { st.line = +v; }); bind('glass', v => { st.glass = +v; $('glassv').textContent = `${Math.round(+v * 100)}%`; }); bind('rust', v => { st.rust = +v; }); bind('fade', v => { st.fade = +v; });
-$<HTMLInputElement>('dent').addEventListener('change', e => { st.dent = (e.target as HTMLInputElement).checked; dirty = true; }); $<HTMLInputElement>('lamp').addEventListener('change', e => { st.lamp = (e.target as HTMLInputElement).checked; dirty = true; });
+$<HTMLInputElement>('lamp').addEventListener('change', e => { st.lamp = (e.target as HTMLInputElement).checked; dirty = true; });
 bind('px', v => { st.px = +v; $('pxv').textContent = `${v}배`; });
 $<HTMLInputElement>('spin').addEventListener('change', e => { st.spin = (e.target as HTMLInputElement).checked; }); $<HTMLInputElement>('roll').addEventListener('change', e => { st.roll = (e.target as HTMLInputElement).checked; });
 let drag: [number, number] | null = null;

@@ -7,7 +7,7 @@ import { applyWear } from '../../render/car/wear';
 import { meshImage, type MeshView } from '../../render/car/mesh';
 import { mesh } from '../../render/car/mesh_ssj';
 import type { CarImage } from '../../render/car/raster';
-const mm = +(process.argv[3] ?? 5), m = JSON.parse(readFileSync('data/cars/sheet/dueSSJ35.json', 'utf8')) as CarModel, M = mesh(), aged = { rust: 0.6, fade: 0.5, dent: true, lamp: true };
+const mm = +(process.argv[3] ?? 5), m = JSON.parse(readFileSync('data/cars/sheet/dueSSJ35.json', 'utf8')) as CarModel, M = mesh(), aged = { rust: 0.6, fade: 0.5, dent: false, lamp: true };
 const flat = (v: 'left' | 'front' | 'rear' | 'top') => rasterizeFlat(viewDesign(m, v), { mm, shadow: true }), solid = (v: MeshView) => meshImage(M, v, mm);
 const rows: CarImage[][] = [[flat('left'), solid('left')], [applyWear(flat('left'), aged), applyWear(solid('left'), aged)], [flat('front'), solid('front'), flat('rear'), solid('rear')], [flat('top'), solid('top')]];
 const gap = 20, W = Math.max(...rows.map(r => r.reduce((a, im) => a + im.w + gap, gap))), H = rows.reduce((a, r) => a + Math.max(...r.map(im => im.h)) + gap, gap), img = new Uint8Array(W * H * 3);

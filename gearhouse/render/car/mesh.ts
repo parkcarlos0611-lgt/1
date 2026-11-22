@@ -184,8 +184,7 @@ export function drawMesh(M0: Mesh, yaw: number, pitch: number, mm: number, w: nu
       if (W.rust) { const nn = fbm(U / 30 + 7, V2 / 30) * 0.8 + (1 - ss(250, 950, Z)) * 0.25;
         if (nn > 1.05 - W.rust * 0.6) { const c = nn > 1.13 - W.rust * 0.5 ? rustAt(0.35 + hash(i, 1) * 0.35) : [168, 136, 96]; R = c[0]! * k; G = c[1]! * k; B = c[2]! * k; }   // the plate gone: the nickel under, then rust
         else if (hash(i, 5) < W.rust * 0.16) { const c = rustAt(0.45 + hash(i, 9) * 0.4); R = c[0] * k; G = c[1] * k; B = c[2] * k; } } }   // pitting
-    if (kd === PAINT && W.dent) { const dx = (X - M.length * 0.12) / 220, dy = (Y - ymax * 0.78) / 160, dz = (Z - 820) / 130, r = Math.hypot(dx, dy, dz);   // a dent in the right front wing
-      if (r < 1 && n[2] > 0.2) { const f = 0.6 + 0.4 * r; R *= f; G *= f; B *= f; } }
+    // (dents: none here; to come as node-based deformation, brief 74)
     if (kd === LENS && W.lamp && Y > 0) { const shard = hash(i, 11) < 0.3; R = shard ? 196 : 62; G = shard ? 196 : 60; B = shard ? 186 : 56; }   // the right lamp's glass broken
     rgba[i * 4] = R; rgba[i * 4 + 1] = G; rgba[i * 4 + 2] = B; rgba[i * 4 + 3] = 255; }
   // rust runs down the panel below it, on the upright faces, in streaks

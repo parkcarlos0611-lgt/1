@@ -7,12 +7,15 @@
 // pulls it down the slope and the turn presses it into the surface, so at the banking's own speed the tyres need
 // hardly any side force. Units SI; body axes x forward, y left, z up.
 import type { RaceSpec } from './cars';
-import { torqueAt } from './cars';
+import { torqueAt, steering } from './cars';
 import type { Track } from './track';
 import { Health, type Failure } from './health';
 
-export interface Controls { throttle: number; brake: number; steer: number; clutch?: number; gear?: number; handbrake?: number }   // steer -1 (right) .. 1 (left)
-const G = 9.81, RHO = 1.2;
+export interface Controls { throttle: number; brake: number; /** a share of the useful lock (usefulLock): 1 full for the grip; more (to catch a slide) up to the lock */ steer: number; clutch?: number; gear?: number; handbrake?: number }   // steer -1 (right) .. 1 (left)
+const G = 9.81, RHO = 1.2, HANDS = 5 * Math.PI;   // a driver's hands: two and a half turns of the wheel a second at most (a quick catch, hand over hand)
+/** the road-wheel angle (rad) a driver winds on for full steer at speed v: the lock, or what the tyres can use there
+ *  (the turn the grip holds, a / v², plus the slip angle they work at), whichever is less */
+export function usefulLock(c: RaceSpec, v: number, mu: number): number { const lock = c.steerLock * Math.PI / 180; return Math.min(lock, Math.atan(c.wheelbase * 1.15 * mu * G / Math.max(1, v * v)) + 0.1); }
 export interface Tyre { mu: number; B: number; C: number; E: number; loadSens: number; peakSlip: number; peakAngle: number }
 /** a 1920s-30s cross-ply on dry concrete: modest grip, a soft gradual peak, holding on well past it */
 export const CROSSPLY: Tyre = { mu: 0.9, B: 1.6, C: 1.45, E: 0.7, loadSens: 0.08, peakSlip: 0.12, peakAngle: 0.13 };   // review 89: grippier, and holding on past the peak rather than letting go
@@ -37,7 +40,7 @@ export class Vehicle {
   onGrass = [false, false, false, false]; over = false;
   /** the engine's heat and wear; the last failure that happened (for the page to tell) */
   health: Health; lastFailure: Failure | null = null;
-  rpm = 0; gear = 1; shift = 0; steer = 0; ax = 0; ay = 0; tax = 0; tay = 0; brakeT = [20, 20, 20, 20]; /** each wheel's spin-up rate last step (rad/s²): the stiff tyre's half-implicit step leans on it so a wheel keeps pace with the car rather than dragging (review 97) */ dw = [0, 0, 0, 0]; auto = true; tilt = 0;
+  rpm = 0; gear = 1; shift = 0; steer = 0; /** the steering wheel's angle (rad, left +): the road wheels' times the ratio */ sw = 0; ax = 0; ay = 0; tax = 0; tay = 0; brakeT = [20, 20, 20, 20]; /** each wheel's spin-up rate last step (rad/s²): the stiff tyre's half-implicit step leans on it so a wheel keeps pace with the car rather than dragging (review 97) */ dw = [0, 0, 0, 0]; auto = true; tilt = 0;
   private k: number; private c: number; private Ip: number; private Ir: number; private Iz: number; private Iw: number; private Ie: number;
   constructor(readonly spec: RaceSpec, readonly track: Track, readonly tyre: Tyre = TYRES[spec.tyreKind ?? 'crossply']) {
     const m = spec.mass, L = spec.wheelbase;
@@ -46,10 +49,13 @@ export class Vehicle {
     this.Iw = spec.inertia?.wheel ?? 1.2 + spec.tyreR * spec.tyreR * 10; this.Ie = spec.inertia?.engine ?? 0.25 + spec.hp / 400; /* kg m²: a period engine's heavy flywheel by default */ this.rpm = spec.idle; this.health = new Health(spec.hp, spec.cooling, Math.floor(Math.random() * 1e9)); }
   /** set the car down at distance s, offset off, running at v (m/s) along the track */
   place(s: number, off: number, v = 0): this { const p = this.track.point(s, off), n = this.track.at(s), c = this.spec; this.x = p.x; this.y = p.y; this.yaw = n.h; this.vx = v; this.vy = 0; this.r = v * n.k; this.s = s; this.off = off;
-    this.w = this.w.map(() => v / c.tyreR); this.dw = [0, 0, 0, 0]; this.gear = this.auto ? this.bestGear(v) : 1; this.rpm = Math.max(c.idle, v / c.tyreR * c.gears[this.gear - 1]! * c.final * 30 / Math.PI); return this; }
+    this.w = this.w.map(() => v / c.tyreR); this.dw = [0, 0, 0, 0]; this.sw = 0; this.steer = 0; this.gear = this.auto ? this.bestGear(v) : 1; this.rpm = Math.max(c.idle, v / c.tyreR * c.gears[this.gear - 1]! * c.final * 30 / Math.PI); return this; }
   private bestGear(v: number): number { const c = this.spec; for (let g = 1; g <= c.gears.length; g++) { const rpm = v / c.tyreR * c.gears[g - 1]! * c.final * 30 / Math.PI; if (rpm < c.hpRpm * 1.02) return g; } return c.gears.length; }
   get speed(): number { return Math.hypot(this.vx, this.vy); }
   /** wheel i's place in body axes [forward, left] from the centre of gravity */
+  /** a front wheel's own angle (rad, left +): the linkage turns the inner wheel more (Ackermann), by the car's share of it */
+  steerAt(i: number): number { if (i >= 2) return 0; const d = this.steer, a = Math.abs(d); if (a < 1e-5) return d; const c = this.spec, L = c.wheelbase, R = L / Math.tan(a), inner = (i === 0) === (d > 0);
+    const ideal = Math.atan(L / (inner ? R - c.track / 2 : R + c.track / 2)); return Math.sign(d) * (a + steering(c).ackermann * (ideal - a)); }
   wheelAt(i: number): [number, number] { const c = this.spec; return [i < 2 ? c.wheelbase * (1 - c.frontShare) : -c.wheelbase * c.frontShare, (i % 2 === 0 ? 1 : -1) * c.track / 2]; }
   private share(i: number): number { return (i < 2 ? this.spec.frontShare : 1 - this.spec.frontShare) / 2; }
   step(dt: number, u: Controls): void {
@@ -61,8 +67,13 @@ export class Vehicle {
     const tX = Math.atan(sl.along * cr + sl.across * sr), tY = Math.atan(sl.across * cr - sl.along * sr); this.tilt = tY;   // rise ahead, rise to the left
     // gravity into the surface, and what the turn adds (an acceleration toward the low side presses the car in)
     const gN = G * Math.cos(tX) * Math.cos(tY) - this.ax * Math.sin(tX) - this.ay * Math.sin(tY);
-    // ---- steering: the wheel follows the hands at a hand's pace; less lock at speed ----
-    const lock = c.steerLock * Math.PI / 180 / (1 + this.speed / 25), want = u.steer * lock; this.steer += Math.max(-dt * 1.4, Math.min(dt * 1.4, want - this.steer));
+    // ---- steering (review 100): the driver's hands turn the steering wheel, the box or rack turns the road wheels by
+    // its ratio. u.steer asks for a share of the lock the tyres can use at this speed (a driver does not wind on more);
+    // the hands go round at up to two and a half turns a second, slower when the car is heavy on its front wheels and barely
+    // rolling (no power steering: the tyres scrub round), and at speed the caster pulls the wheel back toward straight ----
+    { const S = steering(c), N = S.ratio, lockR = c.steerLock * Math.PI / 180, want = Math.max(-lockR, Math.min(lockR, u.steer * usefulLock(c, this.speed, this.tyre.mu))) * N,   /* beyond 1: more than the grip uses (catching a slide), up to the lock */ toCentre = Math.abs(want) < Math.abs(this.sw) && Math.sign(want - this.sw) === -Math.sign(this.sw);
+      const effort = (m * c.frontShare / 1000) / (1 + this.speed / 1.5) * 15 / N * (S.rack ? 1.0 : 1.4), hands = HANDS / (1 + effort), rate = hands + (toCentre ? this.speed * 0.25 : 0);
+      this.sw += Math.max(-rate * dt, Math.min(rate * dt, want - this.sw)); this.steer = this.sw / N; }
     // ---- the body on its four springs over the ground under each wheel (bumps, and the banking's curve against the car's plane) ----
     const z0 = T.bank(this.s, this.off), F = [0, 0, 0, 0];
     for (let i = 0; i < 4; i++) { const [px, py] = this.wheelAt(i), q = T.locate(this.x + px * cy - py * sy, this.y + px * sy + py * cy, this.s);
@@ -94,7 +105,7 @@ export class Vehicle {
     const Taxle = Tc * Gr * c.eff;
     // ---- tyres ----
     const Fx = [0, 0, 0, 0], Fy = [0, 0, 0, 0], brakeCap = c.brakeG * m * G * R, ty = this.tyre;
-    for (let i = 0; i < 4; i++) { const [px, py] = this.wheelAt(i), st = i < 2 ? this.steer : 0;
+    for (let i = 0; i < 4; i++) { const [px, py] = this.wheelAt(i), st = this.steerAt(i);
       const vwx = this.vx - this.r * py, vwy = this.vy + this.r * px, cs = Math.cos(st), sn = Math.sin(st), lx = vwx * cs + vwy * sn, ly = -vwx * sn + vwy * cs;
       const v0 = Math.max(Math.abs(lx), 3), kappa = (this.w[i]! * R - lx) / v0, alpha = Math.atan2(ly, v0); this.slipX[i] = kappa; this.slipA[i] = alpha;
       const Fz = F[i]!, mu = ty.mu * (1 - ty.loadSens * (Fz / (m * G / 4) - 1)) * (this.onGrass[i] ? 0.55 : 1);   // grass: little grip

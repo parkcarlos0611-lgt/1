@@ -32,6 +32,9 @@ export interface RaceSpec {
   /** the revs a standing start is made at (the clutch slipped until then; by default a gentle start from idle), and
    *  the engine's peak torque in Nm where a source gives it (by default about 1.22 times the torque at peak power) */
   launchRpm?: number; torquePeak?: number;
+  /** the steering (review 100): the overall ratio (steering-wheel degrees to road-wheel degrees), how much of true
+   *  Ackermann the linkage gives (the inner wheel turned more), a rack and pinion rather than a box (lighter, quicker) */
+  steer?: { ratio: number; ackermann: number; rack?: boolean };
   /** the turning masses (kg m²) where known: the engine with its flywheel, one wheel with its tyre and brake */
   inertia?: { engine: number; wheel: number };
   cdA: number; crr: number; steerLock: number;          // drag area m², rolling resistance, front wheels' lock (deg)
@@ -59,13 +62,27 @@ const KG: Record<string, number> = { fordT23: 990, chevAB28: 1160, plymU29: 1155
 // cooling: the Model T's thermosiphon boiled on long pulls; a supercharged eight runs hot; big luxury radiators had room
 const COOL: Record<string, { siphon: boolean; margin: number }> = { fordT23: { siphon: true, margin: 1.0 }, dueSSJ35: { siphon: false, margin: 0.92 }, dueA21: { siphon: false, margin: 1.2 }, fnTT33: { siphon: false, margin: 1.0 }, bmw315: { siphon: false, margin: 1.0 }, buick28: { siphon: false, margin: 1.15 } };
 export const RACE_CARS: string[] = Object.keys(PERIOD);
+// The steering (review 100): overall ratio and Ackermann share. Sources thin: [~] from the period's descriptions (turns
+// lock to lock), [?] typical of the class. Lock to lock = 2 x lock x ratio / 360 turns.
+//   fordT23 5:1 [~]: its planetary reduction made it quick (about a turn lock to lock) and heavy; chevAB28-buick28
+//   12-15:1 [?] worm and sector boxes, 2.5-3 turns; fnTT33 9:1 [~] (about 1.8 turns, known as quick); bmw315 13:1, rack
+//   and pinion [~] (BMW's 303 line had it); dueSSJ35 17:1 [?] (a heavy car, about 3.2 turns); dueA21 16:1 [?];
+//   napier33 12:1 [?]; jagD55 12:1, rack and pinion [~] (about 2 turns).
+const STEER: Record<string, { ratio: number; ackermann: number; rack?: boolean }> = {
+  fordT23: { ratio: 5, ackermann: 0.6 }, chevAB28: { ratio: 12, ackermann: 0.7 }, plymU29: { ratio: 14, ackermann: 0.75 }, pontiac29: { ratio: 14, ackermann: 0.75 },
+  dodgeV28: { ratio: 14, ackermann: 0.75 }, willys27: { ratio: 14, ackermann: 0.7 }, buick28: { ratio: 15, ackermann: 0.75 }, fnTT33: { ratio: 9, ackermann: 0.8 },
+  bmw315: { ratio: 13, ackermann: 0.8, rack: true }, dueSSJ35: { ratio: 17, ackermann: 0.8 }, dueA21: { ratio: 16, ackermann: 0.75 },
+  napier33: { ratio: 12, ackermann: 0.6 }, jagD55: { ratio: 12, ackermann: 0.9, rack: true } };
+/** a car's steering, its own or the class's */
+export const steering = (c: RaceSpec) => c.steer ?? STEER[c.id] ?? { ratio: 15, ackermann: 0.75 };
 
 // ---- experimental cars (review 94): outside the game's period, to try the features cars gained over the years ----
 //   napier33  1933 Napier-Railton, the Brooklands outer-circuit record car: Napier Lion W12, 23.944 L, 580 bhp at 2585
 //             rpm [v] (another source: 600 at 2200 [~]); about 2049 kg [v]; wheelbase 3302 [v], length 4724 [~]; Moss
 //             three-speed box, no reverse, no synchromesh [v]; drums [v] (one table: no front brakes [?], four kept);
 //             the outer-circuit lap record 143.44 mph (1935) [~, not confirmed by the sources read]; track 1500 [?];
-//             axle and gears [?]: set for about 270 km/h at the power peak. Racing cross-plies of the 1930s.
+//             axle and gears [?]: set for about 270 km/h at the power peak. Racing cross-plies of the 1930s. Centre of
+//             gravity 0.55 m [?] (review 100: at 0.66 the test driver could not hold it on the banking).
 //   jagD55    1955 Jaguar D-type, long-nose works car (review 97, set against the sources):
 //             engine 3442 cc six, dry sump, three Webers: 270 hp at 6000 [v Revs Institute, a 1955 car] (250 bhp at
 //             6000 [v Carfolio]); torque 328 Nm (242 lb-ft) at 4000 [v Carfolio]; 4470 x 1638 x 1118, wheelbase 2286
@@ -80,7 +97,7 @@ export const RACE_CARS: string[] = Object.keys(PERIOD);
 //             122.39 mph [v racingsportscars.com].
 const CDA_D = 0.6;   // set below against the Le Mans speed (see the D-type's notes)
 const EXP: Record<string, RaceSpec> = {
-  napier33: { id: 'napier33', name: '1933 Napier-Railton (실험)', mass: 2049 + 75, wheelbase: 3.302, track: 1.5, tyreR: 0.45, tyreW: 0.18, cgH: 0.66, frontShare: 0.52,
+  napier33: { id: 'napier33', name: '1933 Napier-Railton (실험)', mass: 2049 + 75, wheelbase: 3.302, track: 1.5, tyreR: 0.45, tyreW: 0.18, cgH: 0.55, frontShare: 0.52,
     hp: 580, hpRpm: 2585, torqueRpm: 1700, idle: 500, redline: 2900, gears: [2.2, 1.45, 1.0], final: 1.62, eff: 0.9,
     brakes: 'four', hydraulic: false, brakeG: 0.42, cdA: 1.2, crr: 0.016, steerLock: 24, topKmh: 270, check: false,
     cooling: { siphon: false, margin: 1.35 }, tyreKind: 'racing30', shiftT: 0.6, era: '1933 · 항공 엔진 기록차' },

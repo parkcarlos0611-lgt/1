@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { raceSpec, torqueAt } from '../race/cars';
-import { Vehicle } from '../race/vehicle';
+import { Vehicle, usefulLock } from '../race/vehicle';
 import { Driver } from '../race/driver';
 import { Track } from '../race/track';
 import { millbrook } from '../race/millbrook';
@@ -47,5 +47,14 @@ describe('on the Millbrook banking', () => {
       for (let n = 0; n < 6; n++) { car.place(car.s, 0, 160 / 3.6); let d = 0; for (let k = 0; k < 8000 && car.speed > 0.3; k++) { car.step(dt, { throttle: 0, brake: 1, steer: 0 }); d += car.speed * dt; } dist.push(d); }
       return dist[5]! / dist[0]!; };
     expect(fade('napier33')).toBeGreaterThan(fade('jagD55'));
+  });
+  it('steers as the period did (review 100): the inner wheel more, heavy hands at a standstill, less lock asked at speed', () => {
+    const car = new Vehicle(raceSpec('dueSSJ35'), flat).place(100, 0, 0);
+    for (let t = 0; t < 0.3; t += dt) car.step(dt, { throttle: 0, brake: 1, steer: 1 });
+    const parked = Math.abs(car.steer); expect(car.steerAt(0)).toBeGreaterThan(car.steerAt(1));   // a left turn: the left (inner) wheel turned more
+    const moving = new Vehicle(raceSpec('dueSSJ35'), flat).place(100, 0, 20 / 3.6); for (let t = 0; t < 0.3; t += dt) moving.step(dt, { throttle: 0.2, brake: 0, steer: 1 });
+    expect(Math.abs(moving.steer)).toBeGreaterThan(parked * 1.3);   // rolling, the tyres no longer scrub round: the hands go quicker
+    expect(usefulLock(raceSpec('dueSSJ35'), 50, 0.9)).toBeLessThan(usefulLock(raceSpec('dueSSJ35'), 10, 0.9));
+    expect(moving.sw / moving.steer).toBeCloseTo(17);   // the steering wheel turns by the ratio
   });
 });

@@ -10,7 +10,7 @@ import type { GroundData } from './ground';
 import type { Mesh } from '../car/mesh';
 
 export interface LiveView { x: number; y: number; z: number; /** the world heading that points up the screen */ ang: number; pitch: number; mm: number; W: number; H: number; /** the target's height on the screen (0 top .. 1 bottom) */ cy: number }
-export interface LiveCar { g: GpuMesh; x: number; y: number; z: number; yaw: number; roll: number; pitch: number; steer: number; spin: number; player: boolean }
+export interface LiveCar { g: GpuMesh; x: number; y: number; z: number; yaw: number; roll: number; pitch: number; /** each front wheel's own angle (rad, left +): the inner one more */ steerL: number; steerR: number; spin: number; player: boolean }
 export interface LiveProp { g: GpuMesh; x: number; y: number; z: number; h: number }
 export interface Skid { x: number; y: number; z: number; a: number }
 
@@ -191,7 +191,7 @@ export class LiveRenderer {
     const g = q.g, base = placeMesh(g.len, q.x, q.y, q.z, q.yaw), mid = translate(g.len / 2, 0, 0), back = translate(-g.len / 2, 0, 0);
     const body = mul(base, mul(mid, mul(rot('x', q.roll), mul(rot('y', q.pitch), back))));
     const opaque: [{ vao: WebGLVertexArrayObject; n: number }, M4][] = [[g.body, body]], glass: [{ vao: WebGLVertexArrayObject; n: number }, M4][] = [[g.glass, body]];
-    for (const w of g.wheels) { const M = mul(body, mul(translate(w.hub[0], w.hub[1], w.hub[2]), mul(w.front ? rot('z', -q.steer) : translate(0, 0, 0), rot('y', -q.spin))));
+    for (const w of g.wheels) { const M = mul(body, mul(translate(w.hub[0], w.hub[1], w.hub[2]), mul(w.front ? rot('z', -(w.hub[1] > 0 ? q.steerL : q.steerR)) : translate(0, 0, 0), rot('y', -q.spin))));
       opaque.push([w.part, M]); if (w.glass) glass.push([w.glass, M]); }
     return { body, opaque, glass }; }
 }

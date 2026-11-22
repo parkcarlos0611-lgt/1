@@ -3,7 +3,7 @@
 // carry there, eased in and out over a long stretch), looks ahead for the speed each stretch allows and brakes in
 // time, and steers by pure pursuit. It drives by the same controls as the player: no help from the physics.
 import type { Track } from './track';
-import type { Vehicle, Controls } from './vehicle';
+import { usefulLock, type Vehicle, type Controls } from './vehicle';
 const G = 9.81, OFFS = Array.from({ length: 45 }, (_, i) => -11 + i * 0.5);   // heights across the bank it may choose from
 export class Driver {
   private line: Float32Array | null = null; private vlim: Float32Array | null = null; private tilt: Float32Array[] = []; private off = 0; private lift = 0; private care = 1;
@@ -43,7 +43,7 @@ export class Driver {
     const dx = p.x - car.x, dy = p.y - car.y, a = Math.atan2(dy, dx) - car.yaw, al = Math.atan2(Math.sin(a), Math.cos(a));
     // pure pursuit; and when the tail swings out faster than the line turns, it steers into the slide
     const over = car.r - v * T.at(car.s).k, catchSlide = Math.abs(over) > 0.12 && Math.sign(over) === Math.sign(-car.vy) ? Math.atan2(car.vy, Math.max(5, car.vx)) * 0.9 : 0;
-    const delta = Math.atan(2 * car.spec.wheelbase * Math.sin(al) / Math.hypot(dx, dy)) + catchSlide, lock = car.spec.steerLock * Math.PI / 180 / (1 + v / 25);   // and it steers into a slide
+    const delta = Math.atan(2 * car.spec.wheelbase * Math.sin(al) / Math.hypot(dx, dy)) + catchSlide, lock = usefulLock(car.spec, v, car.tyre.mu);   // and it steers into a slide
     // a feel for the rear wheels: when they spin it eases off, and builds up again
     const spin = Math.max(car.slipX[2]!, car.slipX[3]!); const slide = Math.abs(Math.atan2(car.vy, Math.max(3, car.vx)));
     this.lift = Math.max(0, Math.min(0.95, this.lift + (spin > 0.14 || slide > 0.12 ? 0.3 : -0.015)));
@@ -52,5 +52,6 @@ export class Driver {
     const e = target - v, hold = Math.min(0.45, 0.04 + v * v * car.spec.cdA * 0.6 / (car.spec.hp * 745.7 / Math.max(v, 5)) );
     const throttle = e > 0 ? Math.min(1, hold + e / 3) : Math.max(0, hold + e / 2);
     const cool = car.health.water > 97 ? Math.max(0.55, 1 - (car.health.water - 97) / 10) : 1;   // it watches the water gauge and eases off
-    return { steer: Math.max(-1, Math.min(1, delta / lock)), throttle: throttle * cool * this.pace * (1 - this.lift) * (this.care < 1 && Math.abs(T.at(car.s).k) > 1e-3 ? this.care : 1), brake: e < -1.5 ? Math.min(1, (-e - 1.5) / 3) : 0 }; }
+    const most = car.spec.steerLock * Math.PI / 180 / lock;   // into a slide it may wind on more than the grip uses, up to the lock
+    return { steer: Math.max(-most, Math.min(most, delta / lock)), throttle: throttle * cool * this.pace * (1 - this.lift) * (this.care < 1 && Math.abs(T.at(car.s).k) > 1e-3 ? this.care : 1), brake: e < -1.5 ? Math.min(1, (-e - 1.5) / 3) : 0 }; }
 }

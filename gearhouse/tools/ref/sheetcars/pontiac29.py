@@ -20,12 +20,12 @@ from shapely.ops import unary_union
 
 # ---- scale: the wire wheels' rims are centred at 227 and 1536 on the 4x side view (measured on the cream rims), the wheelbase is 2794 mm ----
 K = 2794 / (1536 - 227)                                   # 2.134 mm per unit of the 4x side view (8.54 mm a pixel)
-L, H, W = round(1888 * K), round(828 * K), 1660           # side view 472x207 px; the width is between the plan's (1530) and the front and rear views' (1700-1750)
+L, H = round(1888 * K), round(828 * K); W = round(852 * H / 884)   # review 72: the front view keeps the sheet's proportions (was 1660)           # side view 472x207 px; the width is between the plan's (1530) and the front and rear views' (1700-1750)
 C = W / 2
 FX, RX, R = round(227 * K), round(1536 * K), 375
 S = lambda px, py: [round(px * L / 1888), round(H - py * H / 828)]            # side view (472x207 px)
-F = lambda dx, py: [round(dx * W / 852), round(H - py * H / 884)]             # front view (213x221 px): distance from the centre line, row
-B = lambda dx, py: [round(dx * W / 876), round(H - py * H / 896)]             # rear view (219x224 px)
+F = lambda dx, py: [round(dx * H / 884), round(H - py * H / 884)]             # front view (213x221 px): distance from the centre line, row
+B = lambda dx, py: [round(dx * H / 896), round(H - py * H / 896)]             # rear view (219x224 px)
 T = lambda px, dy: [round(px * L / 1860), round(dy * W / 708)]                # plan view (465x177 px): along, distance from the centre line
 def side(*p): return [S(*q) for q in p]
 def half(*p):

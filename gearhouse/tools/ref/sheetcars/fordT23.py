@@ -21,12 +21,12 @@ from shapely.ops import unary_union
 
 # ---- scale: the wheel centres are at 180 and 1250 on the 4x side view (1070 apart), the wheelbase is 2540 mm ----
 K = 2540 / 1070                                           # mm per unit of the 4x side view (9.50 mm a pixel)
-L, H, W = round(1464 * K), round(904 * K), 1740           # side view 366x226 px; width from the plan view (180/360 of the length)
+L, H = round(1464 * K), round(904 * K); W = round(776 * H / 888)   # review 72: the front view keeps the sheet's proportions (was 1740)           # side view 366x226 px; width from the plan view (180/360 of the length)
 C = W / 2
 FX, RX, R = round(180 * K), round(1250 * K), round(178 * K)
 S = lambda px, py: [round(px * L / 1464), round(H - py * H / 904)]            # side view (366x226 px)
-F = lambda dx, py: [round(dx * W / 776), round(H - py * H / 888)]             # front view (194x222 px): distance from the centre line (388), row
-B = lambda dx, py: [round(dx * W / 776), round(H - py * H / 868)]             # rear view (194x217 px)
+F = lambda dx, py: [round(dx * H / 888), round(H - py * H / 888)]             # front view (194x222 px): distance from the centre line (388), row
+B = lambda dx, py: [round(dx * H / 868), round(H - py * H / 868)]             # rear view (194x217 px)
 T = lambda px, dy: [round(px * L / 1440), round(dy * W / 720)]                # plan view (360x180 px): along, distance from the centre line (360)
 def side(*p): return [S(*q) for q in p]
 def half(*p):

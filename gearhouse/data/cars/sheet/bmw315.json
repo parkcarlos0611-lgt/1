@@ -31,14 +31,7 @@
   "capRings": 1,
   "holes": 16,
   "holeRing": 0.68,
-  "holeSize": 0.055,
-  "badge": {
-   "colors": [
-    "#2f63b6",
-    "#f2f1ea"
-   ],
-   "r": 0.78
-  }
+  "holeSize": 0.055
  },
  "parts": [
   {

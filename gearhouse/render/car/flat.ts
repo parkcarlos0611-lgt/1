@@ -159,14 +159,16 @@ export function rasterizeFlat(d0: CarDesign, opt: { frameW?: number; shadow?: bo
     for (const [x, y, m, l] of marks) { set(x, y, m, l, layer[y * w + x]!); noOutline[y * w + x] = 1; } }
 
   // ---- details on the skin ----
-  const FEAT = 1e6, onPaint = (x: number, y: number) => { const i = at(x, y); return i >= 0 && skinRGB[i]! < 0 && (mat[i] === 'paint' || mat[i] === 'paint2' || mat[i] === 'canvas' || mat[i] === 'wood'); };
+  // a part's marks (louvres, seams, creases) only on that part's own pixels, never on a wing drawn in front of it (review 72)
+  let featPart: string | null = null;
+  const FEAT = 1e6, onPaint = (x: number, y: number) => { const i = at(x, y); return i >= 0 && skinRGB[i]! < 0 && (mat[i] === 'paint' || mat[i] === 'paint2' || mat[i] === 'canvas' || mat[i] === 'wood') && (!featPart || (ids[owner[i]!] ?? '').replace(/~$/, '') === featPart); };
   const line = (pts: [number, number][], plot: (x: number, y: number, k: number, n: number) => void) => { const cells: [number, number][] = [];
     for (let i = 0; i + 1 < pts.length; i++) { let [xa, ya] = pts[i]!.map(Math.round) as [number, number]; const [xb, yb] = pts[i + 1]!.map(Math.round) as [number, number], dx = Math.abs(xb - xa), dy = -Math.abs(yb - ya), sx = xa < xb ? 1 : -1, sy = ya < yb ? 1 : -1; let e = dx + dy;
       for (;;) { if (!cells.length || cells.at(-1)![0] !== xa || cells.at(-1)![1] !== ya) cells.push([xa, ya]); if (xa === xb && ya === yb) break; const e2 = 2 * e; if (e2 >= dy) { e += dy; xa += sx; } if (e2 <= dx) { e += dx; ya += sy; } } }
     cells.forEach(([x, y], k) => plot(x, y, k, cells.length)); };
   const P2 = (pts: Pt[]) => smoothOpen(pts).map(([x, z]) => [X(x), Y(z)] as [number, number]);
   const darken = (x: number, y: number, by: number) => { const i = at(x, y); if (i >= 0 && mat[i] && skinRGB[i]! < 0) lv[i] = Math.max(0, lv[i]! - by); };
-  for (const f of d.features as Feature[]) switch (f.kind) {
+  for (const f of d.features as Feature[]) { featPart = (f as { part?: string }).part ?? null; switch (f.kind) {
     case 'seam': line(P2(f.pts), (x, y) => { if (!onPaint(x, y)) return; lv[y * w + x] = 0; if (f.lit && onPaint(x, y + 1)) lv[(y + 1) * w + x] = 4; }); break;
     case 'trim': line(P2(f.pts), (x, y, k, n) => { if (!onPaint(x, y)) return; const end = k < 2 || k > n - 3, streak = (x % 11) < 2 || ((x + 5) % 23) < 1; set(x, y, 'chrome', end ? 2 : streak ? 4 : 3, FEAT); noOutline[y * w + x] = 1; if (onPaint(x, y - 1)) darken(x, y - 1, 1);
       let yy = y + 1; if ((f.width ?? 2) > 1 && onPaint(x, yy) && !end) { set(x, yy, 'chrome', 1, FEAT); noOutline[yy * w + x] = 1; yy++; } if (onPaint(x, yy)) darken(x, yy, 1); }); break;
@@ -186,7 +188,7 @@ export function rasterizeFlat(d0: CarDesign, opt: { frameW?: number; shadow?: bo
       if (f.wheel != null) { const cx = X(f.wheel), cy = Y(f.belt + 110), rx = 30 / MM, ry = 190 / MM; for (let a = 0; a < 6.283; a += 0.04) { const x = Math.round(cx + Math.cos(a) * rx + Math.sin(a) * ry * 0.35), y = Math.round(cy + Math.sin(a) * ry * 0.55); if (isGlass(x, y)) lv[y * w + x] = 0; } }
       break; }
     case 'lamp': { const cx = X(f.at[0]), cy = Y(f.at[1]), r = f.r / MM; for (let y = Math.floor(cy - r); y <= cy + r; y++) for (let x = Math.floor(cx - r * 0.6); x <= cx + r * 0.6; x++) if (((x + 0.5 - cx) / (r * 0.6)) ** 2 + ((y + 0.5 - cy) / r) ** 2 <= 1) set(x, y, f.facing === 'front' ? 'lens' : 'lensR', y < cy - r * 0.3 ? 3 : 2, FEAT); break; }
-  }
+  } } featPart = null;
 
   // ---- overlap shadows: a part in front casts one pixel of shadow down and to the right onto what lies behind it ----
   { const dark: number[] = []; for (let y = 1; y < h; y++) for (let x = 1; x < w; x++) { const i = y * w + x, m = mat[i]; if (!m || skinRGB[i]! >= 0 || m === 'glass' || m === 'shadow' || layer[i]! >= FEAT || noOutline[i]) continue;

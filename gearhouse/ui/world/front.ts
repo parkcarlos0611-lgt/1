@@ -131,7 +131,7 @@ export function frontPlace(app: App) {
   // lamp post); the same car drawn at twice the detail is laid over it on the sharper layer, each of its pixels given the
   // light the scene gave the car at that spot, and left out wherever something nearer or the interface has covered it
   let hiSp: CarSprite | null = null, hiJob = -1, hiCv: HTMLCanvasElement | null = null;
-  function hiCar(cf: { sprite: CarSprite; x: number; y: number; scale: number }) {
+  function hiCar(cf: { sprite: CarSprite; x: number; y: number; scale: number }, wheelsOnly = false) {
     if (!hiSp || hiJob !== car!.job) { const v = app.world!.repair.view(car!.job); hiSp = carSprite(v.colour, v.state === 'collected' ? [] : v.damages, { mm: CAR_MM / 2 }); hiJob = car!.job; }
     if (!hiSp) return;
     const hi = spunSprite(hiSp, car!.m.wheel), lo = cf.sprite, sc = cf.scale, d = app.S.d;
@@ -153,7 +153,8 @@ export function frontPlace(app: App) {
       const L = sum / n; for (let c = 0; c < 3; c++) fac[q * 3 + c] = L * tint[c]!; }
     app.after(({ ctx }) => { const cv = (hiCv ??= document.createElement('canvas')); if (cv.width !== hi.w || cv.height !== hi.h) { cv.width = hi.w; cv.height = hi.h; }
       const c2 = cv.getContext('2d')!, img = c2.createImageData(hi.w, hi.h), D = app.S.d;
-      for (let hy = 0; hy < hi.h; hy++) for (let hx = 0; hx < hi.w; hx++) { const j = (hy * hi.w + hx) * 4; if (hi.rgba[j + 3]! < 128) continue;
+      const inWheel = (hx: number, hy: number) => hi.hubs.some(([cx, cy, r]) => Math.hypot(hx + 0.5 - cx, hy + 0.5 - cy) < r);
+      for (let hy = 0; hy < hi.h; hy++) for (let hx = 0; hx < hi.w; hx++) { const j = (hy * hi.w + hx) * 4; if (hi.rgba[j + 3]! < 128) continue; if (wheelsOnly && !inWheel(hx, hy)) continue;
         const X = Math.floor(cf.x + (lo.anchor[0] + (hx + 0.5 - hi.anchor[0]) / 2) * sc), Y = Math.floor(cf.y + (lo.anchor[1] + (hy + 0.5 - hi.anchor[1]) / 2) * sc), bx = X - x0, by = Y - y0;
         if (bx < 0 || by < 0 || bx >= bw || by >= bh) continue; const q = by * bw + bx; if (!ok[q]) continue; const o = (Y * 480 + X) * 4;
         if (D[o] !== snap[q * 3] || D[o + 1] !== snap[q * 3 + 1] || D[o + 2] !== snap[q * 3 + 2]) continue;   // covered since: the caller, a puff, the interface
@@ -206,7 +207,7 @@ export function frontPlace(app: App) {
     { const day = A.daylight; lantern(d, scene.P.lamp!, scene.C.lamp!.at as [number, number], day < 0.32 || (A.rain > 0 && day < 0.55) ? 1 : 0); }   // the street lamp's head, from its own picture
     if (cf && !gpu) { const sp = cf.sprite, ox = Math.round(cf.x), oy = Math.round(cf.y), k = 0.25 + 0.75 * A.daylight, sc = cf.scale;   // no GPU: the car laid in, lit by the hour only
       for (let y = 0; y < Math.round(sp.h * sc); y++) for (let x = 0; x < Math.round(sp.w * sc); x++) { const j = (Math.min(sp.h - 1, Math.floor(y / sc)) * sp.w + Math.min(sp.w - 1, Math.floor(x / sc))) * 4; if (sp.rgba[j + 3]! < 128) continue; const X = ox + x, Y = oy + y; if (X < 0 || X >= 480 || Y < 0 || Y >= 270) continue; const i = (Y * 480 + X) * 4; d[i] = sp.rgba[j]! * k; d[i + 1] = sp.rgba[j + 1]! * k; d[i + 2] = sp.rgba[j + 2]! * k; } }
-    if (cf && cf.side && car && app.hiCars) hiCar(cf);
+    if (cf && cf.side && car && app.hiCars !== 'off') hiCar(cf, app.hiCars === 'wheels');
     if (caller) drawCaller(d, caller, Math.max(A.daylight, door * (g.house?.kitchen.lamp ? 0.5 : 0)));
     if (car) for (const p of car.puffs) { const r = 1 + p.age * 2.2, a = 0.28 * (1 - p.age / 2.2); for (let y = Math.floor(p.y - r); y <= p.y + r; y++) for (let x = Math.floor(p.x - r); x <= p.x + r; x++) { if (x < 0 || y < 0 || x >= 480 || y >= 270) continue; const w = a * Math.max(0, 1 - Math.hypot(x - p.x, y - p.y) / (r + 0.5)), i = (y * 480 + x) * 4, lv = 150 + 60 * A.daylight; d[i] = d[i]! + (lv - d[i]!) * w; d[i + 1] = d[i + 1]! + (lv - d[i + 1]!) * w; d[i + 2] = d[i + 2]! + (lv + 6 - d[i + 2]!) * w; } }
     return true; }

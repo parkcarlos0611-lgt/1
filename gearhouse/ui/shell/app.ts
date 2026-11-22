@@ -27,8 +27,9 @@ export class App {
    *  interface or anything nearer has covered since. Draw in game pixels: the context is scaled by k. */
   after(job: (o: { ctx: CanvasRenderingContext2D; k: number }) => void) { this.overJob = job; }
   private overCv: HTMLCanvasElement | null = null; private overCtx: CanvasRenderingContext2D | null = null; private overJob: ((o: { ctx: CanvasRenderingContext2D; k: number }) => void) | null = null;
-  /** whether cars are drawn at their full resolution over the scene (a setting; off draws them on the scene's grid) */
-  hiCars = true;
+  /** cars at their full resolution over the scene (review 72, kept as a setting, off by default): 'off' draws them on the
+   *  scene's grid as before, 'wheels' only their wheels at full resolution, 'all' the whole car */
+  hiCars: 'off' | 'wheels' | 'all' = 'off';
   private over(): { ctx: CanvasRenderingContext2D; k: number } { if (!this.overCv) { const f = document.createElement('canvas'); f.style.position = 'absolute'; f.style.left = '0'; f.style.top = '0'; f.style.zIndex = '2'; f.style.pointerEvents = 'none';
       this.cv.parentElement!.appendChild(f); this.overCv = f; this.overCtx = f.getContext('2d')!; this.fit(); }
     const k = this.overCv.width / W; this.overCtx!.setTransform(1, 0, 0, 1, 0, 0); this.overCtx!.clearRect(0, 0, this.overCv.width, this.overCv.height); this.overCtx!.setTransform(k, 0, 0, k, 0, 0); return { ctx: this.overCtx!, k }; }

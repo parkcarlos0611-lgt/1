@@ -67,7 +67,7 @@ const PAINT = 1, METAL = 2, GLASS = 3, SHINE = 4, TYRE = 5, WOOD = 6, CANVAS = 7
 const GLASS_TINT: V = [150, 172, 182];
 const lum = (r: number, g: number, b: number) => 0.3 * r + 0.59 * g + 0.11 * b;
 export function drawMesh(M0: Mesh, yaw: number, pitch: number, mm: number, w: number, h: number, o: DrawOpts = {}): Pic {
-  const M = asDrawn(M0), W = o.wear ?? NEW, ga = o.glass ?? 0.7;
+  const M = asDrawn(M0), W = o.wear ?? NEW, ga = o.glass ?? 0.8;
   const th = yaw * Math.PI / 180, ph = pitch * Math.PI / 180, ct = Math.cos(th), st = Math.sin(th), sp = Math.sin(ph), cp = Math.cos(ph), N = w * h, cx = M.length / 2, cy = h * (o.cy ?? 0.62);
   const zb = new Float32Array(N).fill(-1e9), tri = new Int32Array(N).fill(-1), rgba = new Uint8ClampedArray(N * 4), at = new Float32Array(N * 3);   // at: the point of the car each pixel shows
   const sun: V = [SUN[0] * ct + SUN[1] * st, -SUN[0] * st + SUN[1] * ct, SUN[2]], cam: V = [-cp * st, -cp * ct, sp];

@@ -2,7 +2,7 @@
 import { drawMesh } from '../render/car/mesh';
 import { MESH_CARS } from '../render/car/meshcars';
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T, cv = $<HTMLCanvasElement>('view'), ctx = cv.getContext('2d')!;
-const st = { yaw: 30, pitch: 40, res: 0.85, line: 3, glass: 0.7, rust: 0, fade: 0, dent: false, lamp: false, spin: false, roll: false, px: 2 }; let dirty = true, wheel = 0, car = MESH_CARS[0]!, M = car.mesh();
+const st = { yaw: 30, pitch: 40, res: 0.85, line: 3, glass: 0.8, rust: 0, fade: 0, dent: false, lamp: false, spin: false, roll: false, px: 2 }; let dirty = true, wheel = 0, car = MESH_CARS[0]!, M = car.mesh();
 const pick = document.getElementById('car') as HTMLSelectElement; for (const c of MESH_CARS) pick.add(new Option(c.name, c.id));
 pick.addEventListener('change', () => { car = MESH_CARS.find(c => c.id === pick.value) ?? car; M = car.mesh(wheel); dirty = true; });
 function frame() { if (st.spin) { st.yaw = (st.yaw + 0.8) % 360; $<HTMLInputElement>('yaw').value = String(Math.round(st.yaw)); dirty = true; }

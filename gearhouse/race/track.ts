@@ -36,17 +36,21 @@ export class Track {
     return { s, off }; }
   /** how much of the banking stands at s, 0..1, and which */
   bankAt(s: number): { b: Banking | null; f: number } { const L = this.length, t = ((s % L) + L) % L;
-    for (const b of this.spec.banking) { if (t < b.s0 - b.ease || t > b.s1 + b.ease) continue; return { b, f: t < b.s0 ? smooth((t - b.s0 + b.ease) / b.ease) : t > b.s1 ? smooth((b.s1 + b.ease - t) / b.ease) : 1 }; }
+    for (const b of this.spec.banking) for (const u of [t, t + L, t - L]) { if (u < b.s0 - b.ease || u > b.s1 + b.ease) continue; return { b, f: u < b.s0 ? smooth((u - b.s0 + b.ease) / b.ease) : u > b.s1 ? smooth((b.s1 + b.ease - u) / b.ease) : 1 }; }
     return { b: null, f: 0 }; }
-  /** the surface's height at (s, off): the banking's rise from the inner edge, the bumps across */
-  height(s: number, off: number): number { const W = this.spec.width, { b, f } = this.bankAt(s); let z = 0;
-    if (b && f > 0) { const inLeft = this.at(s).k >= 0, u = Math.max(0, Math.min(W, (inLeft ? -off : off) + W / 2)); z = b.height * f * (u / W) ** b.curve; }
-    const L = this.length, t = ((s % L) + L) % L;
-    for (const q of this.spec.bumps) { let d = Math.abs(t - q.s); d = Math.min(d, L - d); if (d < q.len / 2) z += q.height * (1 + Math.cos(d / (q.len / 2) * Math.PI)) / 2; }
-    return z; }
+  /** the banking's rise at (s, off) above the inner edge: the cross-section's curve, outside the edges held level */
+  bank(s: number, off: number): number { const W = this.spec.width, { b, f } = this.bankAt(s); if (!b || f <= 0) return 0;
+    const inLeft = this.at(s).k >= 0, u = Math.max(0, Math.min(W, (inLeft ? -off : off) + W / 2)); return b.height * f * (u / W) ** b.curve; }
+  /** the bumps across the track at s */
+  bump(s: number): number { const L = this.length, t = ((s % L) + L) % L; let z = 0;
+    for (const q of this.spec.bumps) { let d = Math.abs(t - q.s); d = Math.min(d, L - d); if (d < q.len / 2) z += q.height * (1 + Math.cos(d / (q.len / 2) * Math.PI)) / 2; } return z; }
+  /** the surface's height at (s, off): the banking and the bumps */
+  height(s: number, off: number): number { return this.bank(s, off) + this.bump(s); }
   /** the surface's slope across the track (rise per metre to the left) and along it, at (s, off) */
-  slope(s: number, off: number): { across: number; along: number } { const e = 0.25;
-    return { across: (this.height(s, off + e) - this.height(s, off - e)) / (2 * e), along: (this.height(s + e, off) - this.height(s - e, off)) / (2 * e) }; }
+  slope(s: number, off: number): { across: number; along: number } { const e = 0.25;   // the banking's tilt (the bumps are felt by the springs)
+    return { across: (this.bank(s, off + e) - this.bank(s, off - e)) / (2 * e), along: (this.bank(s + e, off) - this.bank(s - e, off)) / (2 * e) }; }
+  /** the distance from a to b along the track, the short way round (-L/2..L/2) */
+  gap(a: number, b: number): number { const L = this.length; let d = ((b - a) % L + L) % L; if (d > L / 2) d -= L; return d; }
   /** a point at (s, off) in the world */
   point(s: number, off: number): { x: number; y: number; z: number } { const n = this.at(s); return { x: n.x - Math.sin(n.h) * off, y: n.y + Math.cos(n.h) * off, z: this.height(s, off) }; }
   /** the piece a distance falls in, by name */

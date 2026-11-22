@@ -42,3 +42,15 @@ rays of §1 carry the live picture.
 3. Smoke simulation and volumetric drawing; the 2D puffs and steam retired in the live picture.
 4. (later) The traced photo mode.
 Each with a switch on the page to compare, and checked for its cost.
+
+## Done (reviews 106-107)
+- Steps 1 and 2: the normal/mirror layer; ambient occlusion (eight short rays, near blockers only, an ordered 4 x 4
+  kernel), contact shadows (a short ray to the sun), reflections (the bounced eye ray marched across the picture,
+  faded at its edge and with distance, weighted by how mirror-like and by Fresnel). A switch on the page.
+- Step 3: race/smoke.ts (parcels with heat and density: buoyancy, cooling, drag to the wind, curl noise at two scales,
+  dissipation and spreading; dust settles) fed by tyre slides and spins, grass, a boiling radiator and a rich exhaust;
+  drawn in the live renderer as instanced cards ray-marched through a noise-broken sphere (seven steps), each step
+  lit through three steps toward the sun, multiple scattering by three octaves, a two-lobed phase, the sky from above,
+  sorted far to near, premultiplied over the scene, the scene's filmic curve. The 2D puffs and steam are left to the
+  baked picture.
+- Step 4 (the traced photo mode) is still to do.

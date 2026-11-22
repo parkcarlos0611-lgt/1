@@ -210,10 +210,39 @@ void main() { ivec2 p = ivec2(gl_FragCoord.xy), sz = textureSize(uCol, 0); vec4 
     c.rgb *= k; }
   o = vec4(c.rgb, 1.); }`;
 
+// ---- smoke (review 107, brief 75 §2): each parcel a sphere of gas, ray-marched through in its own fragment ----
+const SMOKE_VS = `#version 300 es
+layout(location=0) in vec2 aCorner; layout(location=1) in vec4 aPR; layout(location=2) in vec4 aGas;   // corner of the card; centre and radius; density, heat, kind, seed
+uniform mat4 uVP; uniform vec3 uRx, uUp; out vec2 vUv; flat out vec4 vGas; flat out float vR;
+void main() { vUv = aCorner; vGas = aGas; vR = aPR.w; vec3 w = aPR.xyz + (uRx * aCorner.x + uUp * aCorner.y) * aPR.w; gl_Position = uVP * vec4(w, 1.); }`;
+const SMOKE_FS = `#version 300 es
+precision highp float;
+in vec2 vUv; flat in vec4 vGas; flat in float vR; uniform vec3 uRx, uUp, uVd, uSun; uniform float uTime; out vec4 o;
+float h3(vec3 p) { p = fract(p * 0.3183099 + 0.1); p *= 17.; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
+float vn(vec3 x) { vec3 i = floor(x), f = fract(x); f = f * f * (3. - 2. * f);
+  return mix(mix(mix(h3(i), h3(i + vec3(1, 0, 0)), f.x), mix(h3(i + vec3(0, 1, 0)), h3(i + vec3(1, 1, 0)), f.x), f.y), mix(mix(h3(i + vec3(0, 0, 1)), h3(i + vec3(1, 0, 1)), f.x), mix(h3(i + vec3(0, 1, 1)), h3(i + vec3(1, 1, 1)), f.x), f.y), f.z); }
+/** the gas's density at a point of the unit sphere: the parcel's own, falling to its edge, broken by moving noise (its finer swirls) */
+float dens(vec3 q) { float r2 = dot(q, q); if (r2 > 1.) return 0.; vec3 n = q * 2.1 + vGas.w * 37. + vec3(0., 0., -uTime * 0.6);
+  float b = vn(n) * 0.55 + vn(n * 2.3 + 11.) * 0.3 + vn(n * 5.1 - 7.) * 0.15; return vGas.x * max(0., (1. - r2) * 1.6 - 0.35) * smoothstep(0.25, 0.75, b + (1. - r2) * 0.35); }
+float hg(float c, float g) { float g2 = g * g; return (1. - g2) / (4. * 3.14159 * pow(1. + g2 - 2. * g * c, 1.5)); }
+void main() { float r2 = dot(vUv, vUv); if (r2 > 1.) discard; float h = sqrt(1. - r2); int kind = int(vGas.z + 0.5);
+  vec3 alb = kind == 1 ? vec3(0.62, 0.55, 0.42) : kind == 2 ? vec3(0.95) : kind == 3 ? vec3(0.62, 0.66, 0.72) : vec3(0.86, 0.85, 0.83);
+  vec3 sunL = uSun, eyeIn = uVd, SUN = vec3(1., 0.95, 0.84) * 3., SKY = vec3(0.35, 0.42, 0.55);
+  float sigma = 3.2 * vR, cosT = dot(sunL, eyeIn);   // extinction over the sphere's size; the angle between the light's way and the eye's
+  float phase = mix(hg(cosT, 0.62), hg(cosT, -0.25), 0.3);   // two lobes: strong forward (a glow and bright rims with the sun behind), a little back
+  vec3 col = vec3(0.); float Tv = 1., dt = 2. * h / 7.;
+  for (int i = 0; i < 7; i++) { float t = -h + (float(i) + 0.5) * dt; vec3 q = uRx * vUv.x + uUp * vUv.y + eyeIn * t; float d = dens(q); if (d < 0.002) continue;
+    float s = 0.; for (int j = 1; j <= 3; j++) s += dens(q + sunL * float(j) * 0.28) * 0.28;   // toward the sun: how much gas the light crosses
+    // multiple scattering, by octaves: each a weaker extinction and a flatter phase (light bounced again inside the gas)
+    vec3 L = vec3(0.); float a = 1., b = 1., c = 1.; for (int k = 0; k < 3; k++) { L += a * SUN * exp(-sigma * s * b) * mix(1., phase * 12.566, c);   /* the phase measured against an even spread (1) */ a *= 0.5; b *= 0.45; c *= 0.5; }
+    L += SKY * (0.55 + 0.45 * q.z) * exp(-sigma * 0.5 * s);   // the sky from above
+    float ext = sigma * d * dt; col += Tv * (1. - exp(-ext)) * alb * L; Tv *= exp(-ext); if (Tv < 0.02) break; }
+  float A = 1. - Tv; if (A < 0.004) discard; vec3 x = col / max(A, 1e-3) * 0.55; vec3 c = pow(clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0., 1.), vec3(1. / 2.2)); o = vec4(c * A, A); }   /* the scene's filmic curve */`;
+
 interface WheelDraw { hubZ: number; spin: number; def: Float32Array; sx: number; sy: number; R: number; rim: number }
 type Piece = [{ vao: WebGLVertexArrayObject; n: number }, M4, WheelDraw?];
 export class LiveRenderer {
-  readonly gl: WebGL2RenderingContext; private obj: WebGLProgram; private ground: WebGLProgram; private depth: WebGLProgram; private post: WebGLProgram;
+  readonly gl: WebGL2RenderingContext; private obj: WebGLProgram; private smoke: WebGLProgram; private smokeVao: WebGLVertexArrayObject | null = null; private smokeBuf: WebGLBuffer | null = null; private ground: WebGLProgram; private depth: WebGLProgram; private post: WebGLProgram;
   private fbo: WebGLFramebuffer; private tCol: WebGLTexture; private tId: WebGLTexture; private tN: WebGLTexture; private tDepth: WebGLTexture; private W = 0; private H = 0;
   private sFbo: WebGLFramebuffer; private sTex: WebGLTexture; private S = 2048;
   private groundVao: WebGLVertexArrayObject | null = null; private groundN = 0; private fenceVao: WebGLVertexArrayObject | null = null; private fenceN = 0;
@@ -221,7 +250,7 @@ export class LiveRenderer {
   private u = new Map<WebGLProgram, Map<string, WebGLUniformLocation | null>>(); private blank: WebGLTexture; private arts = new Map<GpuMesh, { lut: WebGLTexture; tex: WebGLTexture; mm: number; C: number; rects: Float32Array; origins: Float32Array }>(); private tex: { alb: WebGLTexture; nor: WebGLTexture; rgh: WebGLTexture; size: Float32Array; luma: Float32Array; rough: Float32Array } | null = null;
   constructor(readonly canvas: HTMLCanvasElement) {
     const gl = canvas.getContext('webgl2', { antialias: false, alpha: false, depth: false, preserveDrawingBuffer: true }); if (!gl) throw new Error('no WebGL2'); this.gl = gl;
-    this.obj = program(gl, OBJ_VS, OBJ_FS); this.ground = program(gl, GROUND_VS, GROUND_FS); this.depth = program(gl, DEPTH_VS, DEPTH_FS); this.post = program(gl, POST_VS, POST_FS);
+    this.obj = program(gl, OBJ_VS, OBJ_FS); this.ground = program(gl, GROUND_VS, GROUND_FS); this.depth = program(gl, DEPTH_VS, DEPTH_FS); this.post = program(gl, POST_VS, POST_FS); this.smoke = program(gl, SMOKE_VS, SMOKE_FS);
     this.fbo = gl.createFramebuffer()!; this.tCol = gl.createTexture()!; this.tId = gl.createTexture()!; this.tN = gl.createTexture()!; this.tDepth = gl.createTexture()!;
     this.sFbo = gl.createFramebuffer()!; this.sTex = gl.createTexture()!; gl.bindTexture(gl.TEXTURE_2D, this.sTex);
     gl.texStorage2D(gl.TEXTURE_2D, 1, gl.DEPTH_COMPONENT24, this.S, this.S); this.texParams(gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_COMPARE_MODE, gl.COMPARE_REF_TO_TEXTURE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_COMPARE_FUNC, gl.LEQUAL);
@@ -261,7 +290,7 @@ export class LiveRenderer {
   car(M: Mesh): GpuMesh { let g = this.cars.get(M); if (!g) { g = gpuMesh(this.gl, M, true); this.cars.set(M, g); } return g; }
   forget(M: Mesh) { this.cars.delete(M); }
 
-  render(v: LiveView, cars: LiveCar[], props: LiveProp[], skids: Skid[], o: { glass?: number; /** 0 the baked look, 1 PBR stepped, 2 PBR smooth */ look?: number; /** lay the 2D art on (default yes) */ art?: boolean; /** the rays in the picture: occlusion, contact shadows, reflections (default yes) */ rays?: boolean } = {}) { const gl = this.gl; this.size(v.W, v.H);
+  render(v: LiveView, cars: LiveCar[], props: LiveProp[], skids: Skid[], o: { glass?: number; /** 0 the baked look, 1 PBR stepped, 2 PBR smooth */ look?: number; /** lay the 2D art on (default yes) */ art?: boolean; /** the rays in the picture: occlusion, contact shadows, reflections (default yes) */ rays?: boolean; /** smoke parcels: centre, radius, density, heat, kind (0 tyre 1 dust 2 steam 3 exhaust), seed; and the time */ smoke?: { p: Float32Array; n: number; time: number } } = {}) { const gl = this.gl; this.size(v.W, v.H);
     // ---- the camera: orthographic, turned to v.ang, tilted down by v.pitch, v.mm millimetres a pixel, snapped to whole pixels ----
     const a = v.ang - Math.PI / 2, cA = Math.cos(a), sA = Math.sin(a), SP = Math.sin(v.pitch * Math.PI / 180), CP = Math.cos(v.pitch * Math.PI / 180), k = 1000 / v.mm, R = 900;
     const rx = [cA, sA, 0], ry = [-sA, cA, 0], up = [ry[0]! * SP, ry[1]! * SP, CP], vd = [ry[0]! * CP, ry[1]! * CP, -SP], c = [v.x, v.y, v.z], dot = (p: number[], q: number[]) => p[0]! * q[0]! + p[1]! * q[1]! + p[2]! * q[2]!;
@@ -318,6 +347,16 @@ export class LiveRenderer {
     cars.forEach((q, i) => { gl.uniform4f(this.loc(this.obj, 'uSil'), 1, 226 / 255, 168 / 255, q.player ? 0.6 : 0.4); for (const [part, M, w] of carM[i]!.opaque) draw(part, M, w); });
     gl.disable(gl.STENCIL_TEST); gl.disable(gl.BLEND); gl.depthFunc(gl.LESS); gl.depthMask(true); gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.COLOR_ATTACHMENT1, gl.COLOR_ATTACHMENT2]); gl.uniform1f(this.loc(this.obj, 'uBias'), 0); gl.uniform1i(this.loc(this.obj, 'uMode'), 0);
     cars.forEach((q, i) => { objU(outlineC); const m = carM[i]!; gl.uniform3fv(this.loc(this.obj, 'uWear'), q.wear ?? [0, 0, 0]); gl.uniform1f(this.loc(this.obj, 'uCarH'), q.g.height); artTo(q.g); decals(q.g); draw(q.g.body, m.body); decals(null); for (const [part, M, w] of m.opaque.slice(1)) draw(part, M, w); });
+    // smoke: parcels far to near, blended over what is drawn, hidden behind what stands before them
+    if (o.smoke && o.smoke.n) { const S = o.smoke; if (!this.smokeVao) { this.smokeVao = gl.createVertexArray()!; gl.bindVertexArray(this.smokeVao); const corners = gl.createBuffer()!; gl.bindBuffer(gl.ARRAY_BUFFER, corners); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, 1, 1, -1, -1, 1, 1, -1, 1]), gl.STATIC_DRAW);
+        gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0); this.smokeBuf = gl.createBuffer()!; gl.bindBuffer(gl.ARRAY_BUFFER, this.smokeBuf);
+        gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1, 4, gl.FLOAT, false, 32, 0); gl.vertexAttribDivisor(1, 1); gl.enableVertexAttribArray(2); gl.vertexAttribPointer(2, 4, gl.FLOAT, false, 32, 16); gl.vertexAttribDivisor(2, 1); gl.bindVertexArray(null); }
+      const idx = Array.from({ length: S.n }, (_, k) => k).sort((a, b) => dot([S.p[b * 8]!, S.p[b * 8 + 1]!, S.p[b * 8 + 2]!], vd) - dot([S.p[a * 8]!, S.p[a * 8 + 1]!, S.p[a * 8 + 2]!], vd)), sorted = new Float32Array(S.n * 8);
+      idx.forEach((k, j) => sorted.set(S.p.subarray(k * 8, k * 8 + 8), j * 8));
+      gl.useProgram(this.smoke); gl.uniformMatrix4fv(this.loc(this.smoke, 'uVP'), false, VP); gl.uniform3fv(this.loc(this.smoke, 'uRx'), rx); gl.uniform3fv(this.loc(this.smoke, 'uUp'), up); gl.uniform3fv(this.loc(this.smoke, 'uVd'), vd); gl.uniform3fv(this.loc(this.smoke, 'uSun'), SUN_W); gl.uniform1f(this.loc(this.smoke, 'uTime'), S.time);
+      gl.bindVertexArray(this.smokeVao); gl.bindBuffer(gl.ARRAY_BUFFER, this.smokeBuf); gl.bufferData(gl.ARRAY_BUFFER, sorted, gl.DYNAMIC_DRAW);
+      gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false); gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.NONE, gl.NONE]); gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, S.n);
+      gl.disable(gl.BLEND); gl.depthMask(true); gl.useProgram(this.obj); }
     // glass over all, at its own strength, nothing else written
     gl.uniform1i(this.loc(this.obj, 'uMode'), 2); gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false); gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.NONE, gl.NONE]);
     gl.uniform3f(this.loc(this.obj, 'uWear'), 0, 0, 0); for (const p of ps) draw(p.g.glass, placeMesh(p.g.len, p.x, p.y, p.z, p.h)); for (const m of carM) for (const [part, M, w] of m.glass) draw(part, M, w);

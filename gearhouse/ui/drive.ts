@@ -12,6 +12,7 @@ import { PROPS } from '../render/props/index';
 import { renumber } from '../render/car/mesh';
 import { LiveRenderer } from '../render/live/renderer';
 import { groundData, fenceData } from '../render/live/ground';
+import { Smoke, type SmokeKind } from '../race/smoke';
 import texAlb from '../assets/textures/pbr/albedo.jpg';
 import texNor from '../assets/textures/pbr/normal.jpg';
 import texRgh from '../assets/textures/pbr/rough.jpg';
@@ -62,6 +63,7 @@ if (live) { const L = live, im = [texAlb, texNor, texRgh].map(src => { const i =
   void Promise.all(im.map(i => i.decode())).then(() => L.setTextures(im[0]!, im[1]!, im[2]!, (texMeta as { layers: { size_m: number; luma_mean: number; rough_mean: number }[] }).layers)).catch(e => console.warn('textures', e)); }
 // the cars' age in the live picture (review 104): the player's set on the page, its dirt growing as it is driven (fast on
 // the grass); the others' by their entry, a mixed field
+const smoke = new Smoke(); const SK: Record<SmokeKind, number> = { tyre: 0, dust: 1, steam: 2, exhaust: 3 };   /* the live picture's smoke (review 107) */
 const myWear: [number, number, number] = [0, 0, 0]; let dirtGrows = true, wearTick = 0;
 const wearOf = (c: Vehicle, k: number): [number, number, number] => { if (c === car) return myWear; const h = (n: number) => ((Math.sin(k * 127.1 + n * 311.7) * 43758.5453) % 1 + 1) % 1; return [h(1) * 0.35, h(2) * 0.6, 0.1 + h(3) * 0.35]; };
 // each car's 2D art (its part model's views), laid on its mesh in the live picture (review 105), loaded when first wanted
@@ -78,14 +80,18 @@ function drawLive(el: number) { const L = live!; void el;
   const list = race ? race.cars.map(e => ({ c: e.car, sp: e.driver ? others.get(e)! : sprites, turn: e.wheelTurn })) : [{ c: car, sp: sprites, turn: wheelTurn }];
   const cars = list.map(({ c, sp, turn }, k) => ({ wear: wearOf(c, k), g: (() => { const g = L.car(sp.mesh); artFor(L, g, c.spec.id, sp.mesh); return g; })(), tyres: c.rings, x: c.x, y: c.y, z: T.height(c.s, c.off) + c.zb - (c.rings[0]!.rest + c.rings[2]!.rest) / 2,   /* drawn lower by the tyres' standing give: the flattened tread on the road */ yaw: c.yaw, roll: c.tilt + c.roll * 1.5, pitch: c.pitch, steerL: c.steerAt(0), steerR: c.steerAt(1), spin: turn, player: c === car }));
   const props = [...SCN.props, ...trainCars()].flatMap(q => { const f = PROPS[q.kind]; return f ? [{ g: L.prop(q.kind, f), x: q.x, y: q.y, z: q.z ?? 0, h: q.heading }] : []; });
+  // the smoke: exhaust from the tail when the throttle is opened hard low in the revs (rich old engines); then a step
+  { const ex = (c0: Vehicle) => { const L = c0.spec.wheelbase * c0.spec.frontShare + 0.9, z = T.height(c0.s, c0.off); smoke.emit('exhaust', c0.x - Math.cos(c0.yaw) * L, c0.y - Math.sin(c0.yaw) * L, z + 0.35, -Math.cos(c0.yaw) * 2 + c0.vx * Math.cos(c0.yaw) * 0.6, -Math.sin(c0.yaw) * 2 + c0.vx * Math.sin(c0.yaw) * 0.6, 0.3, 1, z); };
+    if (input.throttle > 0.7 && car.rpm < car.spec.hpRpm * 0.6 && Math.random() < 0.25) ex(car); smoke.step(Math.min(0.05, el)); }
+  const sp8 = new Float32Array(smoke.parcels.length * 8); smoke.parcels.forEach((q, k) => sp8.set([q.x, q.y, q.z, q.r, q.rho, q.T, SK[q.kind], q.seed], k * 8));
   const view = { x: camX, y: camY, z: camZ, ang: turning() ? camAng : Math.PI / 2, pitch: pitchDeg, mm, W: VW, H: VH, cy: st.chase && !st.cine ? 0.66 : 0.55 };
   ctx = main; main.clearRect(0, 0, VW, VH);
   if (look === 'split') {   // the three looks side by side, the same moment: each a third of the picture, its name over it
     const w3 = Math.floor(VW / 3), names = ['기존 (단계 조명)', 'PBR 단계화', 'PBR 연속'];
-    for (let k = 0; k < 3; k++) { L.render(view, cars, props, skids, { glass: 0.8, look: k, art: artOn, rays: raysOn }); main.drawImage(glCanvas, k * w3, 0, w3, VH, k * w3, 0, w3, VH); }
+    for (let k = 0; k < 3; k++) { L.render(view, cars, props, skids, { glass: 0.8, look: k, art: artOn, rays: raysOn, smoke: { p: sp8, n: smoke.parcels.length, time: smoke.time } }); main.drawImage(glCanvas, k * w3, 0, w3, VH, k * w3, 0, w3, VH); }
     main.fillStyle = 'rgba(0,0,0,0.55)'; main.fillRect(0, VH - 20, VW, 20); main.fillStyle = '#f2ead6'; main.font = '11px sans-serif'; main.textAlign = 'center';
     for (let k = 0; k < 3; k++) main.fillText(names[k]!, k * w3 + w3 / 2, VH - 6); main.fillStyle = '#000'; for (let k = 1; k < 3; k++) main.fillRect(k * w3 - 1, 0, 2, VH); main.textAlign = 'left'; }
-  else { L.render(view, cars, props, skids, { glass: 0.8, look: look === 'stepped' ? 1 : look === 'pbr' ? 2 : 0, art: artOn, rays: raysOn }); main.drawImage(glCanvas, 0, 0); }
+  else { L.render(view, cars, props, skids, { glass: 0.8, look: look === 'stepped' ? 1 : look === 'pbr' ? 2 : 0, art: artOn, rays: raysOn, smoke: { p: sp8, n: smoke.parcels.length, time: smoke.time } }); main.drawImage(glCanvas, 0, 0); }
   drawDebris(el);
   if (car.speed > 30) { const v = Math.min(1, (car.speed - 30) / 30) * 0.35, g = main.createRadialGradient(VW / 2, VH / 2, VH * 0.35, VW / 2, VH / 2, VW * 0.62); g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, `rgba(0,0,0,${v})`); main.fillStyle = g; main.fillRect(0, 0, VW, VH); } }
 
@@ -171,9 +177,9 @@ function letterbox() { const b = Math.round(VH * 0.1); ctx.fillStyle = '#000'; c
   ctx.fillStyle = '#e9e4d8'; ctx.font = `${Math.max(7, Math.round(b * 0.42))}px Oswald, sans-serif`; ctx.textBaseline = 'middle';
   const me = race?.player, lap = me ? `${Math.min(race!.laps, me.lapAt.length)}/${race!.laps}바퀴 · ${race!.order().indexOf(me) + 1}위` : T.pieceAt(car.s);
   ctx.fillText(`${car.spec.name}  ·  ${(car.speed * 3.6).toFixed(0)} km/h  ·  ${lap}`, Math.round(b * 0.5), VH - b / 2); ctx.fillText('MILLBROOK', Math.round(b * 0.5), b / 2); }
-function drawSteam(el: number) { const h = car.health; if ((h.water >= WARN.boil || h.failed === 'gasket') && Math.random() < 0.5) { const f = car.spec.wheelbase * (1 - car.spec.frontShare) + 0.4; steam.push({ x: car.x + Math.cos(car.yaw) * f, y: car.y + Math.sin(car.yaw) * f, z: T.height(car.s, car.off) + 1.2, r: 0.3, a: 0.5 }); }
+function drawSteam(el: number) { const h = car.health; if ((h.water >= WARN.boil || h.failed === 'gasket') && Math.random() < 0.5) { const f = car.spec.wheelbase * (1 - car.spec.frontShare) + 0.4; steam.push({ x: car.x + Math.cos(car.yaw) * f, y: car.y + Math.sin(car.yaw) * f, z: T.height(car.s, car.off) + 1.2, r: 0.3, a: 0.5 }); smoke.emit('steam', car.x + Math.cos(car.yaw) * f, car.y + Math.sin(car.yaw) * f, T.height(car.s, car.off) + 1.1, car.vx * Math.cos(car.yaw) * 0.5, car.vx * Math.sin(car.yaw) * 0.5, 0.8, 1, T.height(car.s, car.off)); }
   for (const p of steam) { p.z += 1.2 * el; p.r += 0.8 * el; p.a -= 0.35 * el; } for (let i = steam.length - 1; i >= 0; i--) if (steam[i]!.a <= 0) steam.splice(i, 1);
-  for (const p of steam) { ctx.fillStyle = `rgba(245,245,245,${p.a})`; ctx.beginPath(); ctx.arc(...P(p.x, p.y, p.z), p.r * 1000 / mm, 0, Math.PI * 2); ctx.fill(); } }
+  if (!live) for (const p of steam) { ctx.fillStyle = `rgba(245,245,245,${p.a})`; ctx.beginPath(); ctx.arc(...P(p.x, p.y, p.z), p.r * 1000 / mm, 0, Math.PI * 2); ctx.fill(); } }
 // ---- sounds ----
 const ENGINE = (specsData as { cars: Record<string, { engine: { kind: string; layout: string } }> }).cars;
 const voiceOf = (id: string) => { const e = ENGINE[id]?.engine ?? EXP_ENGINE[id]!; return { cylinders: +e.layout.replace(/\D/g, '') || 4, kind: (e.kind === 'sleeve' ? 'sleeve' : e.kind === 'ohv' ? 'ohv' : 'sv') as 'sv' | 'ohv' | 'sleeve', supercharged: id === 'dueSSJ35' }; };
@@ -194,8 +200,12 @@ function sounds() { if (!snd) return; const me = race?.player, keep = new Set<un
 function skidOf(c: Vehicle, i: number): Skid { if (c.airborne[i] || c.onGrass[i]) return { amount: 0, kind: 'side', load: 0 }; const sx = c.slipX[i]!, sa = Math.abs(c.slipA[i]!), sl = Math.max(Math.abs(sx) / 0.15, sa / 0.12), a = Math.max(0, Math.min(1, (sl - 1) / 0.6));
   return { amount: a, kind: sx < -0.3 ? 'lock' : sx > 0.3 ? 'spin' : 'side', load: Math.min(1.5, c.load[i]! / (c.spec.mass * 9.81 / 4)) }; }
 let markTick = 0;
-function marks(c: Vehicle) { markTick++; for (let i = 0; i < 4; i++) { const k = skidOf(c, i), sl = 1 + k.amount * 0.6; if (k.amount <= 0 || markTick % 2) continue;
+function marks(c: Vehicle) { markTick++; for (let i = 0; i < 4; i++) { const k = skidOf(c, i), sl = 1 + k.amount * 0.6;
+    if (c.onGrass[i] && c.speed > 4 && markTick % 2 === 0 && Math.random() < Math.min(0.5, c.speed / 60)) { const [px, py] = c.wheelAt(i), cy = Math.cos(c.yaw), sy2 = Math.sin(c.yaw), x = c.x + px * cy - py * sy2, y = c.y + px * sy2 + py * cy;
+      smoke.emit('dust', x, y, 0.2, -cy * 1.5 + (Math.random() - 0.5) * 2, -sy2 * 1.5 + (Math.random() - 0.5) * 2, 1.2, Math.min(1, c.speed / 25), 0); }   /* dust thrown up off the grass */
+    if (k.amount <= 0 || markTick % 2) continue;
     const [px, py] = c.wheelAt(i), cy = Math.cos(c.yaw), sy2 = Math.sin(c.yaw), x = c.x + px * cy - py * sy2, y = c.y + px * sy2 + py * cy, q = T.locate(x, y, c.s), z = T.height(q.s, q.off);
+    if (Math.random() < 0.22 * k.amount) { const vx = c.vx * Math.cos(c.yaw) * 0.25, vy = c.vx * Math.sin(c.yaw) * 0.25; smoke.emit('tyre', x, y, z + 0.15, vx + (Math.random() - 0.5), vy + (Math.random() - 0.5), 0.6, k.amount, z); }   /* the live picture's tyre smoke */
     skids.push({ x, y, z, a: Math.min(0.6, 0.12 + 0.45 * k.amount) * (k.kind === 'lock' ? 1.2 : 1) }); if (skids.length > 9000) skids.shift(); if (Math.random() < 0.12 * (0.3 + k.amount)) puffs.push({ x, y, z: z + 0.2, r: 0.3, a: 0.35, vx: (Math.random() - 0.5) * 0.6, vy: (Math.random() - 0.5) * 0.6 }); } }
 /** every car in view, the farthest first */
 /** the scenery and the cars together, the farthest first; decks over the track after them all */
@@ -273,7 +283,7 @@ function drawCars() { if (!race) { drawCar(); return; } const a = (turning() ? c
   for (const { e, c, X, Y } of list) { const sp = e.driver ? others.get(e)! : sprites, f = sp.get(sp.key(c.yaw - a, c.tilt + c.roll * 1.5, c.steer, e.wheelTurn, c.speed)); ctx.drawImage(f.canvas, Math.round(X - f.ax), Math.round(Y - f.ay)); } }
 function drawCar() { const z = T.height(car.s, car.off) + car.zb, roll = car.tilt + car.roll * 1.5, a = (turning() ? camAng : Math.PI / 2) - Math.PI / 2;
   const f = sprites.get(sprites.key(car.yaw - a, roll, car.steer, wheelTurn, car.speed)), [X, Y] = P(car.x, car.y, z); ctx.drawImage(f.canvas, Math.round(X - f.ax), Math.round(Y - f.ay)); }
-function drawPuffs() { for (const p of puffs) { ctx.fillStyle = `rgba(205,200,190,${p.a})`; const r = p.r * 1000 / mm; ctx.beginPath(); ctx.arc(...P(p.x, p.y, p.z), r, 0, Math.PI * 2); ctx.fill(); } }
+function drawPuffs() { if (live) return; for (const p of puffs) { ctx.fillStyle = `rgba(205,200,190,${p.a})`; const r = p.r * 1000 / mm; ctx.beginPath(); ctx.arc(...P(p.x, p.y, p.z), r, 0, Math.PI * 2); ctx.fill(); } }
 const fmt = (t: number) => t > 0 ? `${Math.floor(t / 60)}:${(t % 60).toFixed(2).padStart(5, '0')}` : '-';
 function hud() { const kmh = car.speed * 3.6; $('spd').textContent = kmh.toFixed(0); $('gear').textContent = String(car.gear); $('rpm').textContent = car.rpm.toFixed(0);
   ($('rpmbar') as HTMLElement).style.width = `${Math.min(100, car.rpm / car.spec.redline * 100)}%`; ($('rpmbar') as HTMLElement).style.background = car.rpm > car.spec.hpRpm * 1.05 ? 'var(--warn)' : 'var(--accent)';

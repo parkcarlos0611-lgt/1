@@ -62,6 +62,25 @@ const SUN: V = norm([-0.45, 0.35, 0.82]);
  *  -y from a nose-left heading, so it draws the mirror image. Mirror once here so a car's left shows nose-left, as in 2D. */
 const mirrored = new WeakMap<Mesh, Mesh>();
 function asDrawn(M: Mesh): Mesh { let m = mirrored.get(M); if (!m) { const pos = Float32Array.from(M.pos); for (let i = 1; i < pos.length; i += 3) pos[i] = -pos[i]!; m = { ...M, pos }; mirrored.set(M, m); } return m; }
+// ---- light (review 90): a warm sun, the sky's blue from above and the ground's warmth from below on every face; bright
+//      metal and glass mirror a simple world (blue sky, a pale horizon, dark ground) by the way the eye's ray bounces off
+//      them, stronger at a glancing angle on glass; glossy paint takes a highlight sized by its gloss and a touch of sky.
+//      Steps kept coarse so the picture stays in the flat, few-toned manner ----
+const SUN_C: V = [1.0, 0.95, 0.84], SKY_C: V = [0.6, 0.68, 0.82], GROUND_C: V = [0.5, 0.45, 0.36];
+const ENV_TOP: V = [150, 176, 214], ENV_HOR: V = [236, 233, 224], ENV_GROUND: V = [92, 88, 68];
+/** what a mirror shows along the direction r (unit, z up) */
+export function envAt(rz: number): V { if (rz < -0.06) return ENV_GROUND; if (rz < 0.22) return ENV_HOR; const t = Math.min(1, (rz - 0.22) / 0.6); return [ENV_HOR[0] + (ENV_TOP[0] - ENV_HOR[0]) * t, ENV_HOR[1] + (ENV_TOP[1] - ENV_HOR[1]) * t, ENV_HOR[2] + (ENV_TOP[2] - ENV_HOR[2]) * t]; }
+/** a face's colour under the light: base colour, its normal (toward the eye), the sun and the eye in the same axes, its gloss */
+function lit(base: V, n: V, sun: V, eye: V, g: number): { c: V; spec: number } {
+  const d = Math.max(0, n[0] * sun[0] + n[1] * sun[1] + n[2] * sun[2]), dq = Math.round(d * 4) / 4, up = 0.5 + 0.5 * n[2];
+  const diff: V = [0, 1, 2].map(i => SUN_C[i]! * dq * 0.78 + (SKY_C[i]! * up + GROUND_C[i]! * (1 - up)) * 0.6) as V;
+  const ne = n[0] * eye[0] + n[1] * eye[1] + n[2] * eye[2], rz = 2 * ne * n[2] - eye[2];   // the eye's ray, bounced: its height decides what it sees
+  if (g > 0.7) { const env = envAt(rz), tint = 0.55 + 0.45 * Math.max(base[0], base[1], base[2]) / 255;   // metal: the world, tinted a little by the metal's own colour
+    return { c: [0, 1, 2].map(i => Math.min(255, env[i]! * 0.82 * (base[i]! / 255 * 0.5 + 0.5) * tint + base[i]! * diff[i]! * 0.15)) as V, spec: 0 }; }
+  const h: V = [sun[0] + eye[0], sun[1] + eye[1], sun[2] + eye[2]], hl = Math.hypot(...h) || 1, nh = Math.max(0, (n[0] * h[0] + n[1] * h[1] + n[2] * h[2]) / hl);
+  const sp = g > 0.2 ? nh ** (6 + g * 110) : 0, spec = sp > 0.65 ? 1 : sp > 0.3 ? 0.5 : 0;   // the highlight in two steps
+  const env = envAt(rz), refl = g > 0.3 ? 0.1 * g * (0.4 + 0.6 * up) : 0;
+  return { c: [0, 1, 2].map(i => Math.min(255, base[i]! * diff[i]! * (1 - refl) + env[i]! * refl)) as V, spec: spec * (40 + 80 * g) }; }
 export interface DrawOpts { outline?: number; shadow?: boolean; cy?: number; /** the car tilted on its ground point: roll (rad, its left side up +), pitch (rad, nose up +) */ roll?: number; pitch?: number; /** front wheels turned (rad, to the car's left +), every wheel turned on its axle (rad) */ steer?: number; spin?: number; /** how much of what is behind glass it hides, 0..1 */ glass?: number; wear?: Wear }
 const PAINT = 1, METAL = 2, GLASS = 3, SHINE = 4, TYRE = 5, WOOD = 6, CANVAS = 7, LEATHER = 8, LENS = 9, GRILLE = 10;
 const GLASS_TINT: V = [150, 172, 182];
@@ -122,8 +141,7 @@ export function drawMesh(M0: Mesh, yaw: number, pitch: number, mm: number, w: nu
   const edgeMM = W.rust ? paintEdges(tri, M, w, h, mm) : null;
   for (let i = 0; i < N; i++) { const t = tri[i]!; if (t < 0) { if (shadow[i]) { rgba[i * 4] = 24; rgba[i * 4 + 1] = 22; rgba[i * 4 + 2] = 20; rgba[i * 4 + 3] = 110; } continue; }
     const n = normal(t), kd = M.kind[t]!, X = at[i * 3]!, Y = at[i * 3 + 1]!, Z = at[i * 3 + 2]!;
-    const d = Math.max(0, n[0] * sun[0] + n[1] * sun[1] + n[2] * sun[2]), g = M.gloss[t]!; let k = Math.round((0.5 + 0.62 * d) * 5) / 5, s = 0;
-    if (g > 0.7) { k = n[2] > 0.5 ? 1.15 : n[2] > 0.1 ? 0.92 : n[2] > -0.2 ? 0.55 : 0.8; if (d > 0.88) s = 60; } else if (g > 0.3 && d > 0.95) s = 45;
+    const d = Math.max(0, n[0] * sun[0] + n[1] * sun[1] + n[2] * sun[2]), g = M.gloss[t]!, k = Math.round((0.5 + 0.62 * d) * 5) / 5;   // k: the old plain tone, for age's flat lacquer and rust
     // the plane a pattern is laid in: the two axes across the face's main direction
     const ax = Math.abs(n[0]), ay = Math.abs(n[1]), az = Math.abs(n[2]), [U, V2] = ay >= ax && ay >= az ? [X, Z] : ax >= az ? [Y, Z] : [X, Y];
     let tone = 1, cr = M.col[t * 3]!, cg = M.col[t * 3 + 1]!, cb = M.col[t * 3 + 2]!;
@@ -133,11 +151,12 @@ export function drawMesh(M0: Mesh, yaw: number, pitch: number, mm: number, w: nu
     else if (kd === CANVAS) { const v = fbm(U / 160, V2 / 160); tone = v > 0.66 ? 0.93 : v < 0.34 ? 1.05 : 1; }   // the cloth's uneven weathering
     else if (kd === LEATHER) { const v = fbm(U / 45, V2 / 45); tone = v > 0.62 ? 0.86 : v < 0.36 ? 1.1 : 1; }  // creased and polished by wear
     else if (kd === GRILLE) { const a = ((U + V2) / 26 % 1 + 1) % 1, b = ((U - V2) / 26 % 1 + 1) % 1; if (a < 0.28 || b < 0.28) { cr = 150; cg = 148; cb = 140; } }   // a diamond mesh of bright wire
-    let R = Math.min(255, cr * k * tone + s), G = Math.min(255, cg * k * tone + s), B = Math.min(255, cb * k * tone + s);
+    const L = lit([cr * tone, cg * tone, cb * tone], n, sun, cam, kd === TYRE || kd === CANVAS || kd === LEATHER ? Math.min(g, 0.25) : g);
+    let R = Math.min(255, L.c[0] + L.spec), G = Math.min(255, L.c[1] + L.spec * 0.97), B = Math.min(255, L.c[2] + L.spec * 0.9);
     // ---- age: the sun takes the paint's gloss and colour, rust comes up low and at the seams and runs down ----
     if (kd === PAINT && W.fade) { const sky = 0.45 + 0.55 * Math.max(0, n[2]), blot = ss(0.3, 0.7, fbm(U / 150, V2 / 150) * 0.75 + fbm(U / 14, V2 / 260) * 0.25 + (W.fade - 0.5) * 0.8);
       const a = Math.min(1, W.fade * sky * (0.3 + 0.7 * blot) * 1.45);
-      if (a > 0) { R = mix(R, Math.min(255, cr * k * tone), a); G = mix(G, Math.min(255, cg * k * tone), a); B = mix(B, Math.min(255, cb * k * tone), a);   // the lacquer goes flat: no highlight
+      if (a > 0) { R = mix(R, L.c[0], a); G = mix(G, L.c[1], a); B = mix(B, L.c[2], a);   // the lacquer goes flat: no highlight, no sheen
         let [hh, sa, li] = rgb2hsl(R, G, B); const red = hh < 25 || hh > 330, dark = sa < 0.12 || li < 0.09;
         if (red) hh = (hh + (hh > 330 ? 360 : 0) + 14 * a) % 360; else if (hh > 70 && hh < 170) hh -= 18 * a;
         sa *= 1 - a * (red ? 0.35 : 0.62); li = li + (0.62 - li) * a * (dark ? 0.42 : 0.5); li = Math.max(0, Math.min(1, li + (fbm(U / 20, V2 / 20) - 0.5) * 0.1 * a));
@@ -185,7 +204,8 @@ export function drawMesh(M0: Mesh, yaw: number, pitch: number, mm: number, w: nu
   glassTris.forEach((t, j) => { gz[j] = (prj(...vtx(t, 0))[2] + prj(...vtx(t, 1))[2] + prj(...vtx(t, 2))[2]) / 3; });
   const order = glassTris.map((t, j) => j).sort((a, b) => gz[a]! - gz[b]!);
   for (const j of order) { const t = glassTris[j]!, n = normal(t), d = Math.max(0, n[0] * sun[0] + n[1] * sun[1] + n[2] * sun[2]), shine = M.kind[t] === SHINE;
-    const k = 0.62 + 0.45 * d + (n[2] > 0.3 ? 0.1 : 0), c: V = shine ? [M.col[t * 3]!, M.col[t * 3 + 1]!, M.col[t * 3 + 2]!] : GLASS_TINT, a = shine ? Math.min(1, ga + 0.15) : ga;
+    const ne = Math.abs(n[0] * cam[0] + n[1] * cam[1] + n[2] * cam[2]), F = 0.06 + 0.94 * (1 - ne) ** 4, env = envAt(2 * ne * n[2] - cam[2]);   // glass mirrors more at a glancing angle
+    const k = 0.62 + 0.45 * d + (n[2] > 0.3 ? 0.1 : 0), base: V = shine ? [M.col[t * 3]!, M.col[t * 3 + 1]!, M.col[t * 3 + 2]!] : GLASS_TINT, c: V = [0, 1, 2].map(i => base[i]! * (1 - 0.55 * (0.4 + F)) + env[i]! / k * 0.55 * (0.4 + F)) as V, a = Math.min(1, (shine ? ga + 0.15 : ga) + (1 - ga) * F * 0.7);
     const A = prj(...vtx(t, 0)), B = prj(...vtx(t, 1)), C = prj(...vtx(t, 2));
     fill(A, B, C, (i, dd) => { if (dd <= zb[i]!) return; const q = i * 4, da = rgba[q + 3]! / 255, oa = a + da * (1 - a);
       for (let ch = 0; ch < 3; ch++) rgba[q + ch] = (Math.min(255, c[ch]! * k) * a + rgba[q + ch]! * da * (1 - a)) / oa; rgba[q + 3] = oa * 255; }); }

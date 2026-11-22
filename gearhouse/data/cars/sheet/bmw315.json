@@ -27,8 +27,18 @@
   "style": "disc",
   "spokes": 0,
   "rimMaterial": "paint",
-  "cap": 0.2,
-  "capRings": 1
+  "cap": 0.34,
+  "capRings": 1,
+  "holes": 16,
+  "holeRing": 0.68,
+  "holeSize": 0.055,
+  "badge": {
+   "colors": [
+    "#2f63b6",
+    "#f2f1ea"
+   ],
+   "r": 0.78
+  }
  },
  "parts": [
   {

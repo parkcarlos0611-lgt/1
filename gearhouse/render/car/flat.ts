@@ -301,5 +301,14 @@ export function rasterizeFlat(d0: CarDesign, opt: { frameW?: number; shadow?: bo
         else if (q < cap) { const u = q / cap; let l = u > 1 - 1.5 * pxq / cap ? 1 : u < 0.22 ? (dot > 0 ? 4 : 3) : dot > 0.35 ? 4 : dot > -0.3 ? 3 : 2;
           for (let k = 1; k <= rings; k++) if (Math.abs(u - (0.22 + 0.6 * k / (rings + 1))) < 0.7 * pxq / cap) l = dot > 0 ? 2 : 1;
           if (u < 0.12 && dx < 0 && dy < 0) l = 4; set(x, y, s.capMaterial ?? 'chrome', s.capMaterial === 'black' ? Math.max(0, l - 2) : l, ly, id); }
-        else set(x, y, rimM, dot > 0.3 ? 3 : 2, ly, id); } } }
+        else { let l = dot > 0.3 ? 3 : 2;
+          if (s.holes) { const n = s.holes, ring = (s.holeRing ?? 0.66) * ri, hr = Math.max(0.9, (s.holeSize ?? 0.07) * ri), k = Math.round((a / (Math.PI * 2)) * n), ha = k * Math.PI * 2 / n - SPIN,
+              hx = Math.cos(ha) * ring, hy = Math.sin(ha) * ring, e = Math.hypot(dx - hx, dy - hy);
+            if (e < hr) { set(x, y, 'black', e < hr - 0.8 ? 0 : 1, ly, id); continue; }                // the hole: the dark behind the disc
+            if (e < hr + 1) l = (dx - hx) * LX + (dy - hy) * LY > 0 ? 4 : 1; }                         // its pressed lip, lit on the side towards the light
+          set(x, y, rimM, l, ly, id); }
+        if (s.badge && q < (s.cap ?? 0.52) * (s.badge.r ?? 0.62)) { const u = q / ((s.cap ?? 0.52) * (s.badge.r ?? 0.62)), i = y * w + x;
+          if (u > 0.82) { set(x, y, 'black', 1, ly, id); continue; }
+          const cs = s.badge.colors, quad = ((dx >= 0 ? 1 : 0) + (dy >= 0 ? 1 : 0)) % 2, hex = cs[Math.min(cs.length - 1, quad)]!, v = parseInt(hex.slice(1), 16);
+          const lift = dx < 0 && dy < 0 && u > 0.3 && u < 0.6 ? 1.18 : 1; if (i >= 0 && i < w * h) skinRGB[i] = (Math.min(255, ((v >> 16) & 255) * lift) << 16) | (Math.min(255, ((v >> 8) & 255) * lift) << 8) | Math.min(255, (v & 255) * lift); } } } }
 }

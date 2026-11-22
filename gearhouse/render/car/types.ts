@@ -127,6 +127,11 @@ export interface WheelSpec {
   capMaterial?: Material;
   /** a chrome trim ring on the rim */
   trim?: boolean;
+  /** a pressed disc pierced by a ring of holes (review 72: the 1935 roadster's): how many, the ring's radius and each
+   *  hole's radius as shares of the rim */
+  holes?: number; holeRing?: number; holeSize?: number;
+  /** the hub cap's badge: a roundel quartered in two colours (or one), its radius a share of the cap */
+  badge?: { colors: string[]; r?: number };
 }
 
 export interface CarDesign {

@@ -7,7 +7,7 @@
 // steered or spun by the cars' wheel finder.
 import { Build, type Mesh, type V } from '../car/mesh';
 
-const LOCO = '#27452c', COACH = '#2f5234', BLACK = '#1d1d20', DARK = '#26242a', STEEL = '#6f7378', BUFFER = '#a3302a', BRASS = '#b08d3c', WHITE = '#efeee8', CREAM = '#ddd3bb', GREEN = '#3f5a3c', DARKG = '#2c3f2a';
+const LOCO = '#2c5132', COACH = '#35603c', BLACK = '#1d1d20', DARK = '#26242a', STEEL = '#6f7378', BUFFER = '#a3302a', BRASS = '#b08d3c', WHITE = '#efeee8', CREAM = '#ddd3bb', GREEN = '#3f5a3c', DARKG = '#2c3f2a';
 const BRICK = '#9a5b45', BRICK2 = '#7c4a3a', SLATE = '#555a61', ROOF = '#5a5f63', WOOD = '#8a6a48', CONCRETE = '#a7a29a', CONC2 = '#8f8a82', GLASS = '#9fb6c0', PANE = '#3b4850', IRON = '#4a4d52', ROOFGREY = '#74766f';
 const GAUGE = 750;   // a rail's centre from the centre line
 
@@ -37,8 +37,7 @@ function arcRoof(b: Build, x0: number, x1: number, w: number, z: number, h: numb
 export function locomotive(): Mesh { const b = new Build(), L = 12000, RP = 1520, BZ = 2650, DR = 1000, drivers = [5300, 7400, 9500], bogie = [1500, 3300];
   b.mat(BLACK, 0.2, 'metal').box(500, L - 100, -640, 640, 850, 1450).box(1000, 3800, -620, 620, 380, 850);         // the frames, the bogie's frame
   b.box(450, L - 50, -1330, 1330, 1450, RP);                                                                        // the running plate
-  b.mat(BUFFER, 0.3, 'paint').box(380, 500, -1250, 1250, 1000, 1480); buffers(380, -1, 1250);
-  function buffers(x: number, dir: number, z: number) { b.mat(STEEL, 0.4, 'metal'); for (const y of [-870, 870]) b.lathe('x', [x, y, z], [[0, 90], [dir * 320, 90], [dir * 320, 220], [dir * 380, 220]], 8); }
+  b.mat(BUFFER, 0.3, 'paint').box(380, 500, -1250, 1250, 1000, 1480); buffers(b, 380, -1, 1250);
   b.mat(BLACK, 0.2, 'metal').box(L - 200, L, -1250, 1250, 1000, 1450);                                              // the drag beam
   b.mat(STEEL, 0.4, 'metal'); for (const x of bogie) for (const s of [-1, 1]) wheel(b, x, s, 480);
   drivers.forEach((x, i) => { for (const s of [-1, 1]) driver(b, x, s, DR, i * 0 + (s > 0 ? 0.9 : 0.3)); });
@@ -93,7 +92,7 @@ export function carriage(): Mesh { const b = new Build(), L = 15000, X0 = 300, X
   const pillar = (s: number, x0: number, x1: number) => b.box(x0, x1, s * (HW - 45), s * (HW + 4), W0, W1);
   b.mat(COACH, 0.4, 'paint'); for (const s of [-1, 1]) { pillar(s, X0, X0 + 300); pillar(s, X0 + 700, C0 + 110); pillar(s, C0 + N * CP - 110, X1 - 700); pillar(s, X1 - 300, X1); }   // the vestibules' small windows
   for (let k = 0; k < N; k++) { const x = C0 + k * CP; if (k) { pillar(-1, x - 110, x + 110); pillar(1, x - 220, x + 220); } pillar(-1, x + 500, x + 610); pillar(-1, x + 1190, x + 1300); }   // -y: quarter light, door, quarter light; +y: one large window
-  b.mat('#2a4a2f', 0.4, 'paint'); for (let k = 0; k < N; k++) { const x = C0 + k * CP + 610; b.box(x, x + 580, -HW - 12, -HW, FL + 40, W0 - 20); }   // the compartment doors
+  b.mat('#2f5636', 0.4, 'paint'); for (let k = 0; k < N; k++) { const x = C0 + k * CP + 610; b.box(x, x + 580, -HW - 12, -HW, FL + 40, W0 - 20); }   // the compartment doors
   for (const x of [X0 + 300, X1 - 700]) for (const s of [-1, 1]) b.box(x, x + 400, s * (HW + 12), s * HW, FL + 40, W0 - 20);   // the vestibule doors
   b.mat(BRASS, 0.8, 'metal'); for (let k = 0; k < N; k++) { const x = C0 + k * CP + 1100; b.box(x, x + 60, -HW - 30, -HW - 12, 2000, 2130); }   // door handles
   arcRoof(b.mat(ROOFGREY, 0.2, 'paint'), X0 - 40, X1 + 40, HW + 40, TOP, 480);
@@ -136,9 +135,9 @@ export function stationBuilding(): Mesh { const b = new Build(), L = 14000, D = 
  *  at y = 0, the platform behind toward +y), a gas lamp on an iron post and a bench */
 export function platform(): Mesh { const b = new Build(), L = 15000, D = 4000, Z = 915;
   b.mat(BRICK2, 0.2, 'paint').box(0, L, 80, D, 0, Z - 70);                                                          // the face and the fill
-  b.mat('#716d66', 0.15, 'plain').box(0, L, 800, D, Z - 70, Z - 15);                                                // the rolled surface
-  for (let k = 0; k < 15; k++) b.mat(k % 2 ? CONCRETE : '#9c978f', 0.2, 'plain').box(k * 1000, k * 1000 + 1000, -120, 800, Z - 80, Z);   // the edge slabs
-  b.mat(WHITE, 0.3, 'paint').box(0, L, -125, 160, Z - 30, Z + 8);                                                   // the white edge
+  b.mat('#b3ada2', 0.15, 'plain').box(0, L, 800, D, Z - 70, Z - 15);                                                // the rolled surface
+  for (let k = 0; k < 15; k++) b.mat(k % 2 ? '#e0dbd0' : '#cdc8bd', 0.2, 'plain').box(k * 1000, k * 1000 + 1000, -120, 800, Z - 80, Z);   // the edge slabs
+  b.mat(WHITE, 0.3, 'paint').box(0, L, -130, 220, Z - 110, Z + 8);                                                   // the white edge
   const lx = 3800, ly = 3100; b.mat(DARKG, 0.35, 'paint').box(lx - 110, lx + 110, ly - 110, ly + 110, Z - 15, Z + 650).box(lx - 55, lx + 55, ly - 55, ly + 55, Z + 650, Z + 3000).bar([lx - 380, ly, Z + 2750], [lx + 380, ly, Z + 2750], 45);   // the lamp post and its ladder bar
   b.mat('#f1e2a8', 0.5, 'plain').box(lx - 60, lx + 60, ly - 60, ly + 60, Z + 3050, Z + 3300);                       // the mantle
   b.mat(GLASS, 0.5, 'glass').loft([[110, Z + 3000], [190, Z + 3420]].map(([r, z]) => [[lx - r!, ly - r!, z!], [lx + r!, ly - r!, z!], [lx + r!, ly + r!, z!], [lx - r!, ly + r!, z!]] as V[]));   // the lantern
@@ -153,7 +152,7 @@ export function signalBox(): Mesh { const b = new Build(), L = 7300, C = 6000, H
   b.mat(PANE, 0.5, 'paint'); for (const x of [1300, 3900]) b.box(x, x + 800, -HD - 25, -HD, 1000, 2000); b.mat(CREAM, 0.3, 'paint'); for (const x of [1300, 3900]) b.box(x - 100, x + 900, -HD - 45, -HD, 2000, 2180);   // the locking room's windows
   b.mat(CREAM, 0.3, 'wood').box(-80, C + 80, -HD - 80, HD + 80, F, S).box(-80, C + 80, -HD - 80, HD + 80, T, E);    // boarding below and above the windows
   b.mat(GLASS, 0.5, 'glass').box(-30, C + 30, -HD - 30, HD + 30, S, T); b.mat('#4a4540', 0.1).box(250, C - 250, -HD + 250, HD - 250, S - 100, T - 150);   // the glass, the room seen through
-  b.mat(GREEN, 0.3, 'paint'); for (let x = 0; x <= C; x += C / 6) b.box(x - 55, x + 55, -HD - 85, HD + 85, S, T); for (const y of [-HD, -HD / 3, HD / 3, HD]) b.box(-85, C + 85, y - 55, y + 55, S, T);   // the window posts
+  b.mat(GREEN, 0.3, 'paint'); for (let x = 0; x <= C; x += C / 6) b.box(x - 55, x + 55, -HD - 85, HD + 85, S, T); for (const y of [-HD / 3, HD / 3]) b.box(-85, C + 85, y - 55, y + 55, S, T);   // the window posts
   b.box(-90, C + 90, -HD - 90, HD + 90, S - 80, S).box(C + 30, C + 95, -HD + 250, -HD + 1100, F, T);                // the sill band, the door in the end
   b.mat(WHITE, 0.3, 'paint').box(1700, 4300, -HD - 110, -HD - 80, F + 250, F + 650); b.mat(DARK, 0.2, 'paint').box(1900, 4100, -HD - 125, -HD - 110, F + 380, F + 520);   // the name board (plain)
   b.mat(SLATE, 0.3, 'plain').loft([[[-450, -HD - 450, E], [C + 450, -HD - 450, E], [C + 450, HD + 450, E], [-450, HD + 450, E]], [[1700, 0, E + 1350], [C - 1700, 0, E + 1350], [C - 1700, 0, E + 1350], [1700, 0, E + 1350]]]);   // the hipped roof
@@ -170,7 +169,6 @@ export function signalBox(): Mesh { const b = new Build(), L = 7300, C = 6000, H
 export function telegraphPole(): Mesh { const b = new Build(), T = 240, H = 8200;
   b.mat('#4a3b2e', 0.15, 'wood').loft([[130, 0], [85, H]].map(([r, z]) => [[T / 2 - r!, -r!, z!], [T / 2 + r!, -r!, z!], [T / 2 + r!, r!, z!], [T / 2 - r!, r!, z!]] as V[]));
   b.mat('#3d3127', 0.15, 'wood'); [1150, 1000, 850].forEach((w, k) => b.box(T / 2 - 150, T / 2 - 60, -w, w, H - 500 - k * 600, H - 400 - k * 600));
-  b.mat(WHITE, 0.4, 'plain'); [1150, 1000, 850].forEach((w, k) => { for (const s of [-1, 1]) b.box(T / 2 - 150, T / 2 - 60, s * (w - 130) - 45, s * (w - 130) + 45, H - 400 - k * 600, H - 290 - k * 600); });   // the end insulators
   return b.mesh(T); }
 
 /** the river bridge: one 15 m side parapet of the concrete span (stood each side of the line, its outer face -y):

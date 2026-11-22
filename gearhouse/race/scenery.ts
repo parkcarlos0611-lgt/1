@@ -21,15 +21,15 @@ export function millbrookScenery(T: Track): Scenery { const L = T.length, W2 = T
   facing('timingBox', start, W2 + 6); facing('clockTower', start + 22, W2 + 9); facing('scoreboard', start + 130, -(W2 + 12));
   for (let k = 0; k < 5; k++) facing('hoarding', start + 170 + k * 10, -(W2 + 5));
   // ---- the paddock inside the straight: the clubhouse, garages, pumps, a tea hut on a gravel apron ----
-  { const s0 = start + 120, s1 = start + 380, apron: [number, number][] = []; for (let s = s0; s <= s1; s += 20) { const p = T.point(s, W2 + 30); apron.push([p.x, p.y]); } for (let s = s1; s >= s0; s -= 20) { const p = T.point(s, W2 + 95); apron.push([p.x, p.y]); } areas.push({ pts: apron, kind: 'apron' });
-    facing('clubhouseWing', s0 + 24, W2 + 85); facing('clubhouseCentre', s0 + 36, W2 + 85); facing('clubhouseWing', s0 + 48, W2 + 85);
-    for (let k = 0; k < 6; k++) facing('garageBay', s0 + 90 + k * 14.5, W2 + 80); facing('fuelPumps', s0 + 80, W2 + 45); facing('teaHut', s0 + 10, W2 + 45); }
+  { const s0 = start + 120, s1 = start + 380, apron: [number, number][] = []; for (let s = s0; s <= s1; s += 20) { const p = T.point(s, W2 + 8); apron.push([p.x, p.y]); } for (let s = s1; s >= s0; s -= 20) { const p = T.point(s, W2 + 52); apron.push([p.x, p.y]); } areas.push({ pts: apron, kind: 'apron' });
+    facing('clubhouseWing', s0 + 24, W2 + 40); facing('clubhouseCentre', s0 + 36, W2 + 40); facing('clubhouseWing', s0 + 48, W2 + 40);
+    for (let k = 0; k < 6; k++) facing('garageBay', s0 + 90 + k * 14.5, W2 + 34); facing('fuelPumps', s0 + 78, W2 + 14); facing('teaHut', s0 + 8, W2 + 14); }
   // ---- the Members' Bridge across the track ----
   { const s = T.spec.landmarks.find(l => l.name === "Members' Bridge")!.s, h = T.at(s).h, top = (o: number) => T.height(s, o);
     facing('bridgeAbutment', s, -(W2 + 3)); facing('bridgeAbutment', s, W2 + 3);
     for (const o of [-13, 0, 13]) { const p = T.point(s, o); props.push({ kind: 'bridgeDeck', x: p.x, y: p.y, heading: h - Math.PI / 2, z: Math.max(top(-W2), top(W2)) + 5.8, overhead: true }); } }
   // ---- the railway: a line outside the Railway Straight, running on past both ends; a station and signal box ----
-  const railway: [number, number][] = []; { const off = -(W2 + 70), a = T.point(rail.s0, off), b = T.point(rail.s1, off), dx = b.x - a.x, dy = b.y - a.y, l = Math.hypot(dx, dy), ux = dx / l, uy = dy / l;
+  const railway: [number, number][] = []; { const off = -(W2 + 26), a = T.point(rail.s0, off), b = T.point(rail.s1, off), dx = b.x - a.x, dy = b.y - a.y, l = Math.hypot(dx, dy), ux = dx / l, uy = dy / l;
     for (let d = -900; d <= l + 900; d += 30) railway.push([a.x + ux * d, a.y + uy * d]); lines.push({ pts: railway, width: 4, kind: 'rail' });
     const at = (d: number, side: number): Placed => ({ kind: '', x: a.x + ux * d - uy * side, y: a.y + uy * d + ux * side, heading: Math.atan2(uy, ux) + (side > 0 ? 0 : Math.PI) });
     for (let k = 0; k < 3; k++) props.push({ ...at(-500 + k * 15.2, 9), kind: 'platform' }); props.push({ ...at(-485, 16), kind: 'stationBuilding' }); props.push({ ...at(-300, -8), kind: 'signalBox' });
@@ -40,13 +40,15 @@ export function millbrookScenery(T: Track): Scenery { const L = T.length, W2 = T
   // ---- the aerodrome inside: a mown strip, hangars and works along the Railway Straight's inside, aeroplanes, a windsock ----
   { const mid = T.nodes.reduce((a, n) => [a[0]! + n.x / L, a[1]! + n.y / L], [0, 0]); const h = T.at((rail.s0 + rail.s1) / 2).h, ux = Math.cos(h), uy = Math.sin(h);
     areas.push({ pts: [[-500, -60], [500, -60], [500, 60], [-500, 60]].map(([a, b]) => [mid[0]! + ux * a! - uy * b!, mid[1]! + uy * a! + ux * b!] as [number, number]), kind: 'mown' });
-    const s0 = rail.s0 + 250; for (let k = 0; k < 4; k++) facing('hangarBay', s0 + k * 15.5, W2 + 70); for (let k = 0; k < 5; k++) facing('factoryBay', s0 + 120 + k * 15.5, W2 + 75);
-    for (let k = 0; k < 3; k++) { const p = T.point(s0 + 20 + k * 22, W2 + 45); props.push({ kind: 'biplane', x: p.x, y: p.y, heading: h + Math.PI / 2 + (rnd() - 0.5) * 0.4 }); }
+    const s0 = rail.s0 + 250; for (let k = 0; k < 4; k++) facing('hangarBay', s0 + k * 15.5, W2 + 30); for (let k = 0; k < 5; k++) facing('factoryBay', s0 + 120 + k * 15.5, W2 + 30);
+    for (let k = 0; k < 3; k++) { const p = T.point(s0 + 15 + k * 20, W2 + 16); props.push({ kind: 'biplane', x: p.x, y: p.y, heading: h + Math.PI / 2 + (rnd() - 0.5) * 0.4 }); }
     props.push({ kind: 'windsock', x: mid[0]! + 40, y: mid[1]! - 30, heading: 0 }); }
   // ---- straw bales on the corner entries, the woods round the outside and on the Members' hill ----
   for (const s of [mem.s0 - 30, byf.s0 - 30, home.s1 - 10]) for (let k = 0; k < 3; k++) facing('hayBales', s + k * 6, W2 + 3);
   const busy = (s: number) => Math.abs(T.gap(start + 100, s)) < 380;   // keep the stands' side open
-  for (let s = 0; s < L; s += 9) { if (busy(s)) continue; const k = rnd(); if (k < 0.45) { const kind = k < 0.2 ? 'treeRound' : k < 0.32 ? 'treePoplar' : 'treePine', p = T.point(s + rnd() * 8, -(W2 + 22 + rnd() * 50)); props.push({ kind, x: p.x, y: p.y, heading: rnd() * 6.28 }); }
-    if (s > mem.s0 + 60 && s < mem.s1 - 60 && rnd() < 0.6) { const p = T.point(s, W2 + 25 + rnd() * 120); props.push({ kind: rnd() < 0.6 ? 'treeRound' : 'bush', x: p.x, y: p.y, heading: rnd() * 6.28 }); }
-    if (rnd() < 0.08) { const p = T.point(s, -(W2 + 14 + rnd() * 6)); props.push({ kind: 'bush', x: p.x, y: p.y, heading: rnd() * 6.28 }); } }
+  const nearRail = (s: number) => s > rail.s0 - 120 && s < rail.s1 + 120, works = (s: number) => s > rail.s0 + 200 && s < rail.s0 + 230 + 9 * 15.5;
+  for (let s = 0; s < L; s += 6) { if (busy(s)) continue; const k = rnd(); if (k < 0.7 && !nearRail(s)) { const kind = k < 0.2 ? 'treeRound' : k < 0.32 ? 'treePoplar' : 'treePine', bank = T.bankAt(s).b ? T.height(s, -W2) * 2.4 : 0, p = T.point(s + rnd() * 6, -(W2 + 5 + bank + rnd() * 30)); props.push({ kind, x: p.x, y: p.y, heading: rnd() * 6.28 }); }
+    if (s > mem.s0 + 60 && s < mem.s1 - 60 && rnd() < 0.6) { const p = T.point(s, W2 + 7 + rnd() * 45); props.push({ kind: rnd() < 0.6 ? 'treeRound' : 'bush', x: p.x, y: p.y, heading: rnd() * 6.28 }); }
+    if (!works(s) && !(s > mem.s0 + 60 && s < mem.s1 - 60) && rnd() < 0.18) { const p = T.point(s, W2 + 12 + rnd() * 40); props.push({ kind: rnd() < 0.5 ? 'treeRound' : 'bush', x: p.x, y: p.y, heading: rnd() * 6.28 }); }   // inside the circuit, a few
+    if (rnd() < 0.08 && !nearRail(s) && !T.bankAt(s).b) { const p = T.point(s, -(W2 + 6 + rnd() * 4)); /* not on the earth bank behind a banking */ props.push({ kind: 'bush', x: p.x, y: p.y, heading: rnd() * 6.28 }); } }
   return { props, lines, areas, railway }; }

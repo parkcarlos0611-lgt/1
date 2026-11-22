@@ -172,10 +172,12 @@ export function drawMesh(M0: Mesh, yaw: number, pitch: number, mm: number, w: nu
   // ---- lines: thin and dark where two parts meet or one surface stands well before another; thick and black round the car
   //      (glass counts as the car: no thick line round what is seen through a window; the parts behind glass keep their
   //      thin lines, drawn before the glass so it dims them) ----
+  // a surface's own slope from one pixel to the next is not an edge: at a coarse scale a level top falls more than 60 mm a pixel
+  const step = 60 + 2 * mm / Math.tan(Math.max(0.35, ph));
   const ol = o.outline ?? 2, e = new Uint8Array(N); if (ol > 0) { const solid = (j: number) => tri[j]! >= 0 || gHit[j] === 1;
     for (let Y = 0; Y < h; Y++) for (let X = 0; X < w; X++) { const i = Y * w + X; if (!solid(i)) continue; const t = tri[i]!;
       for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) { const XX = X + dx, YY = Y + dy, j = YY * w + XX; if (XX < 0 || YY < 0 || XX >= w || YY >= h || !solid(j)) { e[i] = 2; break; }
-        if (t >= 0 && tri[j]! >= 0 && (zb[j]! - zb[i]! > 60 || (M.part[tri[j]!] !== M.part[t] && zb[j]! - zb[i]! > 4))) e[i] = Math.max(e[i]!, 1); } }
+        if (t >= 0 && tri[j]! >= 0 && (zb[j]! - zb[i]! > step || (M.part[tri[j]!] !== M.part[t] && zb[j]! - zb[i]! > 4))) e[i] = Math.max(e[i]!, 1); } }
     for (let pass = 2; pass <= ol; pass++) { const e2 = new Uint8Array(e); for (let Y = 1; Y < h - 1; Y++) for (let X = 1; X < w - 1; X++) { const i = Y * w + X; if (e[i] !== 2) continue; for (const j of [i - 1, i + 1, i - w, i + w]) if (solid(j) && !e[j]) e2[j] = 2; } e.set(e2); }
     for (let i = 0; i < N; i++) if (e[i]) { const k = e[i] === 2 ? 0.2 : 0.5; rgba[i * 4] = rgba[i * 4]! * k; rgba[i * 4 + 1] = rgba[i * 4 + 1]! * k; rgba[i * 4 + 2] = rgba[i * 4 + 2]! * k; if (e[i] === 2) rgba[i * 4 + 3] = 255; } }
   // ---- glass: where it lies before what is drawn, back panes first, laid over at its own strength ----

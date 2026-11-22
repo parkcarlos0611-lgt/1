@@ -47,7 +47,7 @@ export function willys27Mesh(spin = 0): Mesh { const b = new Build();
   b.mat(NICKEL, 0.9).bar([640, 0, at(TOP, 640) + 3], [1420, 0, at(TOP, 1420) + 3], 14, 8);                                               // the bonnet's centre hinge
   b.mat(SEAM, 0.1); for (const s of [1, -1]) { const q = (x: number, x1: number, z0: number, z1: number) => b.quad([x, s * (skin(x, z0) + 3), z0], [x1, s * (skin(x1, z0) + 3), z0], [x1, s * (skin(x1, z1) + 3), z1], [x, s * (skin(x, z1) + 3), z1]);
     for (let k = 0; k < 20; k++) { const x = 765 + k * 32.5; q(x, x + 11, 700, 985); }                                                    // 20 louvres
-    q(1862, 1871, 572, BELT); q(2600, 2612, 572, BELT); q(3298, 3307, 885, BELT); }                                                       // door shut lines
+    q(1862, 1871, 625, BELT); q(2600, 2612, 625, BELT); q(3298, 3307, 885, BELT); }                                                       // door shut lines
   b.mat(NICKEL, 0.9); for (const s of [1, -1]) { b.bar([2440, s * (W + 12), 1098], [2585, s * (W + 12), 1098], 16).bar([2630, s * (W + 12), 1112], [2775, s * (W + 12), 1112], 16);   // door handles
     for (const [x, z] of [[1863, 1070], [1863, 750], [3301, 1012]] as const) b.box(x - 16, x + 16, Math.min(s * (W - 2), s * (W + 9)), Math.max(s * (W - 2), s * (W + 9)), z - 36, z + 36);   // hinges
     const y = skin(1644, 1197); b.lathe('x', [0, s * (y + 22), 1197], [[1612, 10], [1622, 28], [1660, 30], [1676, 22]], 8); }                                                              // scuttle lamps
@@ -86,7 +86,7 @@ export function willys27Mesh(spin = 0): Mesh { const b = new Build();
     wing(b, m([[3061, 300, 640, 800], [3063, 497, 636, 812], [3078, 619, 632, 835], [3120, 735, 630, 852], [3202, 828, 630, 868], [3313, 886, 630, 870], [3462, 916, 630, 870], [3585, 916, 630, 870], [3709, 891, 630, 866], [3820, 832, 628, 850], [3907, 732, 620, 822], [3966, 616, 600, 790], [4015, 490, 570, 750], [4070, 400, 545, 705], [4110, 368, 530, 680]]), [RX, R - 150]);
     // the front wing's inner sweep down to the frame
     b.mat(WING, 0.3); for (let i = 0; i + 1 < 10; i++) { const p = front[i]!, q = front[i + 1]!, zv = (z: number) => Math.min(z - 90, 540); b.quad([p[0], s * (p[2] + 4), p[1] - 16], [q[0], s * (q[2] + 4), q[1] - 16], [q[0], s * 325, zv(q[1])], [p[0], s * 325, zv(p[1])]); }
-    b.mat('#1e1e20', 0.1); for (let i = 8; i < 12; i++) { const p = front[i]!, q = front[i + 1]!, y = (x: number, z: number) => s * (skin(x, z) + 4); b.quad([p[0], y(p[0], 566), 566], [q[0], y(q[0], 566), 566], [q[0], y(q[0], q[1] - 30), q[1] - 30], [p[0], y(p[0], p[1] - 30), p[1] - 30]); }   // the wheel house's dark on the bonnet side under the wing
+    b.mat('#1e1e20', 0.1); for (let i = 8; i < 11; i++) { const p = front[i]!, q = front[i + 1]!, v = (x: number, zt: number, j: number): V => { const z = 571 + (Math.max(576, zt - 30) - 571) * (j / 5) ** 2.5; return [x, s * (skin(x, z) + 8), z]; }; for (let j = 0; j < 5; j++) b.quad(v(p[0], p[1], j), v(q[0], q[1], j), v(q[0], q[1], j + 1), v(p[0], p[1], j + 1)); }   // the wheel house's dark on the bonnet side under the wing
     b.mat('#232325', 0.1).box(1738, 3061, Math.min(s * 640, s * 800), Math.max(s * 640, s * 800), 338, 378);                    // running board
     b.mat(NICKEL, 0.9).box(1740, 3058, Math.min(s * 792, s * 808), Math.max(s * 792, s * 808), 332, 374);                         // its bright edge
     // headlamp: a drum front on a bowl, on its post; the tail lamp on the rear wing

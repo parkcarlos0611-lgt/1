@@ -52,6 +52,16 @@ A raked screen seen from above shows only its frame's top edge: draw the plan ou
 where the top edge lies (its x read off the side view), and give the glass no plan outline. This holds for every car
 from now on, open or closed.
 
+## Spare wheels (decision 2026-11-22)
+A spare is the car's own wheel: give only the part `spare` (element `spare`) where it sits in each view and `wheel`,
+then run tools/ref/sparegen.py on the model. It takes the car's tyre radius and tyre width, draws the views that see it
+flat on with the car's wheel spec (so changing the wheels changes the spare), and the edge-on views as the tyre's section.
+Covers, straps and carriers stay the car's own parts.
+
+## Seats in open cars (decision 2026-11-22)
+Do not draw seats. Run tools/ref/seatgen.py (`--style bucket|bench --color <the sheet's leather>`) last: it makes the
+seat tops from the car's `cockpit` part.
+
 ## Element names (use these; the four builds are compared part by part)
 Existing elements, as the sedans use them: `body`, `hood`, `cowl`, `radiator`, `lamp`, `fenderF`, `fenderR`, `apron`,
 `board`, `bumperF`, `bumperR`, `tail` (the tail lamp), `screen`, `spare`, `wheel`, `house`, `tank`, `exhaust`, `axle`,

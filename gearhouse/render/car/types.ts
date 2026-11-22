@@ -146,6 +146,8 @@ export interface CarDesign {
   parts?: import('./parts').PartSpec[];
   /** tone steps added to the glass: 0 dark with reflections, 1 pale as on a studio drawing */
   glassLift?: number;
+  /** how glossy the paint is, 0 (flat) to 1 (new lacquer, polished): the sky and horizon it gives back, the light on its crowns */
+  gloss?: number;
   /** the bright metal's own colour (nickel is warmer and greyer than chrome); a cold blue-white chrome when not given */
   chrome?: string;
   /** pale period glass of this colour, drawn with a shadow under the frame and broad soft reflections; dark glass with streaks when not given */

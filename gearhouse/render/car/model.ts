@@ -40,7 +40,7 @@ export interface CarPart {
 }
 export interface CarModel {
   id: string; name: string; year: number; length: number; width: number; height: number; paint: string; paint2: string;
-  wheels: { x: number; r: number; y: number }[]; wheel: Partial<WheelSpec>; canvas?: string; chrome?: string; glassTint?: string;
+  wheels: { x: number; r: number; y: number }[]; wheel: Partial<WheelSpec>; canvas?: string; chrome?: string; glassTint?: string; gloss?: number;
   features?: Partial<Record<OutlineKey, Feature[]>>; parts: CarPart[];
 }
 
@@ -80,5 +80,5 @@ export function viewDesign(m: CarModel, view: ViewName, only?: (p: CarPart) => b
   });
   if (!opt.chassis) for (const f of m.features?.[key] ?? []) features.push(f);
   const top = key === 'top', across = key === 'front' || key === 'rear';
-  return { id: `${m.id}_${view}`, name: `${m.name} (${view})`, year: m.year, length: across ? m.width : m.length, height: top ? m.width : m.height, paint: m.paint, paint2: m.paint2, ...(m.canvas ? { canvas: m.canvas } : {}), ...(m.chrome ? { chrome: m.chrome } : {}), ...(m.glassTint ? { glassTint: m.glassTint } : {}), panels, features, wheels, frame: 'reveal' };
+  return { id: `${m.id}_${view}`, name: `${m.name} (${view})`, year: m.year, length: across ? m.width : m.length, height: top ? m.width : m.height, paint: m.paint, paint2: m.paint2, ...(m.canvas ? { canvas: m.canvas } : {}), ...(m.chrome ? { chrome: m.chrome } : {}), ...(m.glassTint ? { glassTint: m.glassTint } : {}), ...(m.gloss !== undefined ? { gloss: m.gloss } : {}), panels, features, wheels, frame: 'reveal' };
 }

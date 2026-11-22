@@ -29,7 +29,7 @@ export function autoRamp(base: string, { steps = 5, baseIdx = 2, dL = 0.1, shift
   return { c, o: fromLab([Math.max(0.06, L0 - 0.11), C0 * 0.9 * Math.cos(H0), C0 * 0.9 * Math.sin(H0)]) }; }
 const fixed = (c: string[], o: string): Ramp => ({ c: c.map(hex), o: hex(o) });
 /** a glossy paint gives back the sky: one more step above the ramp, pale and nearly grey, for reflection bands */
-function glossy(r: Ramp): Ramp { const t = r.c.at(-1)!, sky: RGB = [196, 204, 200]; return { c: [...r.c, t.map((v, i) => Math.round(v * 0.62 + sky[i]! * 0.38)) as RGB], o: r.o }; }
+function glossy(r: Ramp): Ramp { const t = r.c.at(-1)!, sky: RGB = [214, 220, 216]; return { c: [...r.c, t.map((v, i) => Math.round(v * 0.5 + sky[i]! * 0.5)) as RGB], o: r.o }; }
 /** the tone steps a paint colour is drawn with, darkest first (tools fit a reference view to these) */
 export const paintRamp = (paint: string): string[] => glossy(autoRamp(paint, { steps: 7, baseIdx: 3, dL: 0.075, shift: 0.06 })).c.map(c => '#' + c.map(v => v.toString(16).padStart(2, '0')).join(''));
 /** every material's tone steps for a paint colour, darkest first, as the renderer draws them (tools fit views to these) */
@@ -90,6 +90,19 @@ export function rasterizeFlat(d0: CarDesign, opt: { frameW?: number; shadow?: bo
   /** a level on the material's own ramp, top step included (reflections) */
   const setRaw = (i: number, l: number) => { const m = mat[i]; if (m) lv[i] = Math.max(0, Math.min(PAL[m].c.length - 1, l)); };
   const top = (i: number) => PAL[mat[i]!].c.length - 1;
+  // gloss (review 69): a lacquered panel gives back the sky above, a sharp dark horizon a third of the way down, the
+  // lighter ground under it; its crowns (wing tops, bonnet, roof, and every panel seen from above) carry a bright
+  // broken streak of sky. Laid over the panel's own shading (the sheet's light included), as many steps as GL asks.
+  const GL = Math.max(0, Math.min(1, d.gloss ?? 0.6)), plan = /_top$/.test(d.id ?? '');
+  const glossAt = (i: number, gx: number, gy: number, t: number, n: number, surf: string) => {
+    const crown = surf === 'fender' || surf === 'roof' || surf === 'hood' || plan;
+    let add = 0;
+    if (!plan && n > 8) add += GL * (1.9 * Math.exp(-(((t - 0.08) / 0.1) ** 2)) - 2.4 * Math.exp(-(((t - 0.37) / 0.035) ** 2)) + 0.9 * Math.exp(-(((t - 0.45) / 0.05) ** 2)) - 0.5 * ss01(t));
+    if (plan) add += GL * 1.6 * Math.exp(-(((t - 0.3) / 0.12) ** 2));
+    const f = add + (BAYER[(gy & 3) * 4 + (gx & 3)]! - 0.5) * 0.6, step = f > 0.5 ? Math.floor(f + 0.5) : f < -0.5 ? -Math.floor(-f + 0.5) : 0;
+    if (step) lv[i] = Math.max(0, Math.min(top(i), lv[i]! + step));
+    if (crown && GL > 0.25 && t > 0.05 && t < (plan ? 0.42 : 0.16) && ((gx * 7 + gy * 3) % 13) < 13 * GL * (plan ? 0.6 : 0.85) && (plan ? Math.abs(t - 0.3) < 0.05 : t < 0.12)) lv[i] = top(i); };
+  const ss01 = (t: number) => Math.max(0, Math.min(1, (t - 0.6) / 0.4));
   const at = (x: number, y: number) => (x < 0 || y < 0 || x >= w || y >= h ? -1 : y * w + x);
 
   const items: ({ k: 'p'; p: Panel } | { k: 'w'; s: WheelSpec })[] = [...d.panels.map(p => ({ k: 'p' as const, p })), ...d.wheels.map(s => ({ k: 'w' as const, s }))];
@@ -128,7 +141,7 @@ export function rasterizeFlat(d0: CarDesign, opt: { frameW?: number; shadow?: bo
         if (p.shade && (mt === 'paint' || mt === 'paint2')) { const S = p.shade, fu = Math.min(S.nx - 1, Math.max(0, (gx + 0.5 - x0) / Math.max(1, x1 - x0) * S.nx - 0.5)), ft = t * (S.nt - 1), u0 = Math.floor(fu), t0 = Math.floor(ft), u1 = Math.min(S.nx - 1, u0 + 1), t1 = Math.min(S.nt - 1, t0 + 1), au = fu - u0, bt = ft - t0;
           const g = (a: number, b: number) => S.v[b * S.nx + a]!, v = (g(u0, t0) * (1 - au) + g(u1, t0) * au) * (1 - bt) + (g(u0, t1) * (1 - au) + g(u1, t1) * au) * bt, f = Math.floor(v), fr = Math.min(1, Math.max(0, (v - f - 0.5) / 0.3 + 0.5));
           shaded = f + (fr > BAYER[(gyy & 3) * 4 + (gx & 3)]! ? 1 : 0); }
-        set(gx, gyy, mt, l, ly, id); if (shaded >= 0) setRaw(gyy * w + gx, shaded); if (tm && mt !== 'glass') { const tl = toneAt(gx, gyy); if (tl >= 0) setRaw(gyy * w + gx, tl); } if (p.clip) noOutline[gyy * w + gx] = 1; } } }
+        set(gx, gyy, mt, l, ly, id); if (shaded >= 0) setRaw(gyy * w + gx, shaded); if (GL > 0 && (mt === 'paint' || mt === 'paint2') && n > 3 && k > 0 && kb > 0) glossAt(gyy * w + gx, gx, gyy, t, n, p.surface); if (tm && mt !== 'glass') { const tl = toneAt(gx, gyy); if (tl >= 0) setRaw(gyy * w + gx, tl); } if (p.clip) noOutline[gyy * w + gx] = 1; } } }
     if (mt === 'glass') glassMasks.push({ m, bx, by, bw, bh, ly, id });
     if (p.detail) detail(p.detail, M, bx, by, bw, bh, ly, mt);
     const S = SK?.elements[p.id], D = DC?.[p.id]; if (S || D) { const b = boxMM(p.pts); if (S) applySkin(S, id, b[0], b[1], b[2], b[3]); if (D) applyDecals(D, id, b[0], b[1], b[2], b[3]); }
@@ -146,7 +159,7 @@ export function rasterizeFlat(d0: CarDesign, opt: { frameW?: number; shadow?: bo
     for (const [x, y, m, l] of marks) { set(x, y, m, l, layer[y * w + x]!); noOutline[y * w + x] = 1; } }
 
   // ---- details on the skin ----
-  const FEAT = 1e6, onPaint = (x: number, y: number) => { const i = at(x, y); return i >= 0 && skinRGB[i]! < 0 && (mat[i] === 'paint' || mat[i] === 'paint2' || mat[i] === 'canvas'); };
+  const FEAT = 1e6, onPaint = (x: number, y: number) => { const i = at(x, y); return i >= 0 && skinRGB[i]! < 0 && (mat[i] === 'paint' || mat[i] === 'paint2' || mat[i] === 'canvas' || mat[i] === 'wood'); };
   const line = (pts: [number, number][], plot: (x: number, y: number, k: number, n: number) => void) => { const cells: [number, number][] = [];
     for (let i = 0; i + 1 < pts.length; i++) { let [xa, ya] = pts[i]!.map(Math.round) as [number, number]; const [xb, yb] = pts[i + 1]!.map(Math.round) as [number, number], dx = Math.abs(xb - xa), dy = -Math.abs(yb - ya), sx = xa < xb ? 1 : -1, sy = ya < yb ? 1 : -1; let e = dx + dy;
       for (;;) { if (!cells.length || cells.at(-1)![0] !== xa || cells.at(-1)![1] !== ya) cells.push([xa, ya]); if (xa === xb && ya === yb) break; const e2 = 2 * e; if (e2 >= dy) { e += dy; xa += sx; } if (e2 <= dx) { e += dx; ya += sy; } } }

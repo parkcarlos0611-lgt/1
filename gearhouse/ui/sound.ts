@@ -25,6 +25,8 @@ export class Sound {
     this.grass.g.gain.setTargetAtTime(Math.min(0.4, grass * speed / 30 * 0.4), t, 0.05);
     this.wind.g.gain.setTargetAtTime(Math.min(0.45, (speed / 60) ** 2 * 0.45), t, 0.2); this.wind.f.frequency.setTargetAtTime(300 + speed * 6, t, 0.2);
     this.amb.update(where, speed); }
+  /** the train's nearness, 0..1 */
+  set train(v: number) { this.amb.trainNear = v; }
   /** one-off: a knock, a gear change, a bang */
   hit(kind: 'knock' | 'shift' | 'bang' | 'thud' | 'joint', strength = 1): void { const c = this.ctx, t = c.currentTime, s = c.createBufferSource(); s.buffer = this.noise; s.playbackRate.value = kind === 'bang' ? 0.5 : 1;
     const f = c.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = kind === 'shift' ? 1800 : kind === 'bang' ? 900 : kind === 'joint' ? 260 : 400; const g = c.createGain(); const dur = kind === 'bang' ? 0.9 : kind === 'shift' ? 0.06 : kind === 'joint' ? 0.05 : 0.18;
@@ -85,9 +87,9 @@ class Ambience {
     this.breeze.g.gain.setTargetAtTime(0.04 + 0.03 * Math.sin(t * 0.21), t, 1);
     // birds over the grass when it is quiet
     if (t > this.nextBird) { this.nextBird = t + 2 + Math.random() * 6; if (speed < 35) this.bird(); }
-    // a train on the line beside the Railway Straight, now and then
-    if (where.piece === 'Railway Straight' && this.train < 0 && Math.random() < 0.002) this.train = t;
-    if (this.train >= 0) { const age = t - this.train; if (age > 18) { this.train = -1; this.trainBus.gain.setTargetAtTime(0, t, 0.5); } else { this.trainBus.gain.setTargetAtTime(Math.sin(age / 18 * Math.PI) * 0.25, t, 0.3); if (Math.random() < 0.08) this.chuff(); } } }
+    // the train on the line, as near as it is (set by the page from the train it draws)
+    this.trainBus.gain.setTargetAtTime(this.trainNear * 0.3, t, 0.3); if (this.trainNear > 0.02 && Math.random() < 0.1) this.chuff(); void this.train; }
+  trainNear = 0;
   private bird(): void { const c = this.snd.ctx, t = c.currentTime, o = c.createOscillator(), g = c.createGain(); o.type = 'sine'; const f0 = 2800 + Math.random() * 1800; g.gain.value = 0; o.connect(g).connect(this.snd.master);
     for (let k = 0; k < 2 + Math.floor(Math.random() * 4); k++) { const a = t + k * 0.14; o.frequency.setValueAtTime(f0, a); o.frequency.exponentialRampToValueAtTime(f0 * 1.4, a + 0.08); g.gain.setValueAtTime(0, a); g.gain.linearRampToValueAtTime(0.05, a + 0.02); g.gain.linearRampToValueAtTime(0, a + 0.1); }
     o.start(t); o.stop(t + 1.2); }

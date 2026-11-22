@@ -39,3 +39,16 @@ export class CarSprites {
   get pending(): number { return this.queue.length; }
   get count(): number { return this.frames.size; }
 }
+
+/** a scenery prop's pictures: one per heading (32), baked as first needed and kept */
+export class PropSprites {
+  private frames = new Map<number, Frame>(); static readonly STEPS = 32;
+  private R = 0; private Z = 0;
+  constructor(readonly mesh: Mesh, readonly mm: number, readonly pitch: number) { const p = mesh.pos; for (let i = 0; i < p.length; i += 3) { this.R = Math.max(this.R, Math.hypot(p[i]! - mesh.length / 2, p[i + 1]!)); this.Z = Math.max(this.Z, p[i + 2]!); } }
+  /** the picture for a heading on screen (rad, 0 to the right, anticlockwise: where the prop's -x points) */
+  get(heading: number): Frame { const n = PropSprites.STEPS, h = ((Math.round(((180 + heading * 180 / Math.PI) % 360) / (360 / n)) % n) + n) % n, have = this.frames.get(h); if (have) return have;
+    const sp = Math.sin(this.pitch * Math.PI / 180), cp = Math.cos(this.pitch * Math.PI / 180), w = Math.ceil(2 * this.R / this.mm) + 12, hh = Math.ceil((2 * this.R * sp + this.Z * cp) / this.mm) + 12, top = (this.R * sp + this.Z * cp) / this.mm + 6;
+    const p = drawMesh(this.mesh, h * 360 / n, this.pitch, this.mm, w, hh, { outline: 2, glass: 0.85, cy: top / hh });
+    const c = document.createElement('canvas'); c.width = w; c.height = hh; c.getContext('2d')!.putImageData(new ImageData(new Uint8ClampedArray(p.rgba), w, hh), 0, 0);
+    const f = { canvas: c, ax: w / 2, ay: top }; this.frames.set(h, f); return f; }
+}

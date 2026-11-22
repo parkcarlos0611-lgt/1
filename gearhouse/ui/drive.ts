@@ -6,7 +6,9 @@
 import { millbrook } from '../race/millbrook';
 import { raceSpec, RACE_CARS } from '../race/cars';
 import { Vehicle, type Controls } from '../race/vehicle';
-import { CarSprites } from '../race/sprites';
+import { CarSprites, PropSprites } from '../race/sprites';
+import { millbrookScenery, type Placed } from '../race/scenery';
+import { PROPS } from '../render/props/index';
 import { MESH_CARS } from '../render/car/meshcars';
 import { Driver } from '../race/driver';
 import { Race, type Entrant } from '../race/race';
@@ -30,9 +32,11 @@ const keys = new Set<string>(), input = { steer: 0, throttle: 0, brake: 0, hand:
 const skids: { x: number; y: number; z: number; a: number }[] = [], puffs: { x: number; y: number; z: number; r: number; a: number; vx: number; vy: number }[] = [];
 let lapStart = -1, lastLap = 0, bestLap = 0, clock = 0, prevS = 0, msg = '', msgT = 0;
 // a race: the entrants and their pictures (the player's car is `car`, its pictures `sprites`)
+const SCN = millbrookScenery(T), propSprites = new Map<string, PropSprites>(); const train = { d: -1, wait: 40 };
+const propPic = (kind: string) => { let p = propSprites.get(kind); if (!p) { const f = PROPS[kind]; if (!f) return null; p = new PropSprites(f(), mm, pitchDeg); propSprites.set(kind, p); } return p; };
 let race: Race | null = null; const others = new Map<Entrant, CarSprites>(); let raceSeed = 7;
 
-function choose(id: string) { carId = id; const spec = raceSpec(id), m = MESH_CARS.find(c => c.id === id)!;
+function choose(id: string) { carId = id; propSprites.clear(); const spec = raceSpec(id), m = MESH_CARS.find(c => c.id === id)!;
   car = new Vehicle(spec, T); car.auto = st.auto; car.place(START + 30, 0, 0); manualGear = 1;
   sprites = new CarSprites(m.mesh(), mm, pitchDeg, spec.steerLock * Math.PI / 180, { outline: 3, glass: 0.8 }, matchMedia('(pointer: coarse)').matches ? 1200 : 2400); sprites.prepare([0]); sprites.work(500); sprites.prepare([-1, 1, -2, 2, -3, -4, -5]); camAng = car.yaw;
   pilot = new Driver(T); lapStart = -1; lastLap = 0; bestLap = 0; skids.length = 0; puffs.length = 0; say(`${spec.name} · 출발선 뒤에서 시작`); }
@@ -48,6 +52,15 @@ function drawTrack() {
   const cell = 2.4, reach = Math.hypot(VW, VH / SP) * mm / 2000 + 4, gx0 = Math.floor((camX - reach) / cell), gx1 = Math.ceil((camX + reach) / cell), rng = (a: number, b: number) => { let h = (a * 374761393 + b * 668265263) >>> 0; h = Math.imul(h ^ (h >>> 13), 1274126177) >>> 0; return (h >>> 8) / 16777216; };
   const vy0 = camY - reach, vy1 = camY + reach;
   for (let gx = gx0; gx <= gx1; gx++) for (let gy = Math.floor(vy0 / cell); gy <= Math.ceil(vy1 / cell); gy++) { const v = rng(gx, gy); if (v < 0.55) continue; const [X, Y] = P(gx * cell + rng(gy, gx) * cell, gy * cell, 0); if (X < -2 || Y < -2 || X > VW || Y > VH) continue; ctx.fillStyle = v > 0.85 ? '#6b8253' : '#53683f'; ctx.fillRect(Math.round(X), Math.round(Y), 2, 1); }
+  // the ground's own features: the paddock's gravel and the mown strip, the railway's ballast and rails, the river
+  const poly = (pts: [number, number][], fill: string) => { ctx.fillStyle = fill; ctx.beginPath(); pts.forEach(([x, y], i) => { const [X, Y] = P(x, y, 0); if (i) ctx.lineTo(X, Y); else ctx.moveTo(X, Y); }); ctx.closePath(); ctx.fill(); };
+  for (const a of SCN.areas) poly(a.pts, a.kind === 'apron' ? '#a49a83' : '#6a8452');
+  for (const l of SCN.lines) { const near = l.pts.some(([x, y]) => Math.abs(x - camX) < reach + 40 && Math.abs(y - camY) < reach + 40); if (!near) continue;
+    const band = (w: number, col: string) => { ctx.strokeStyle = col; ctx.lineWidth = w * 1000 / mm; ctx.lineJoin = 'round'; ctx.beginPath(); l.pts.forEach(([x, y], i) => { const [X, Y] = P(x, y, 0); if (i) ctx.lineTo(X, Y); else ctx.moveTo(X, Y); }); ctx.stroke(); };
+    if (l.kind === 'river') { band(l.width + 3, '#4b5c3b'); band(l.width, '#5b7a86'); band(l.width * 0.4, '#6c8c98'); }
+    else if (l.kind === 'rail') { band(l.width, '#8a7f6e'); for (let k = 0; k + 1 < l.pts.length; k++) { const [x0, y0] = l.pts[k]!, [x1, y1] = l.pts[k + 1]!, dx = x1 - x0, dy = y1 - y0, n = Math.hypot(dx, dy), ux = dx / n, uy = dy / n;
+        if (Math.abs(x0 - camX) > reach + 40 || Math.abs(y0 - camY) > reach + 40) continue; ctx.strokeStyle = '#5a4a3a'; ctx.lineWidth = 1; for (let d = 0; d < n; d += 0.9) { const a = P(x0 + ux * d - uy * 1.3, y0 + uy * d + ux * 1.3, 0), b = P(x0 + ux * d + uy * 1.3, y0 + uy * d - ux * 1.3, 0); ctx.beginPath(); ctx.moveTo(...a); ctx.lineTo(...b); ctx.stroke(); }
+        for (const g of [-0.72, 0.72]) { ctx.strokeStyle = '#3c3e42'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(...P(x0 - uy * g, y0 + ux * g, 0.15)); ctx.lineTo(...P(x1 - uy * g, y1 + ux * g, 0.15)); ctx.stroke(); } } } }
   // the concrete: strips across the track from far to near, every metre in view
   const near = T.locate(camX, camY, car.s).s, W2 = T.spec.width / 2, span = 70;
   const strips: { s: number; y: number }[] = []; for (let d = -span; d <= span; d += 1) { const s = near + d, n = T.at(s); strips.push({ s, y: -(n.x - camX) * sA + (n.y - camY) * cA }); }
@@ -57,6 +70,10 @@ function drawTrack() {
       const g = Math.round(156 + z * 5 - slope * 34);
       ctx.fillStyle = `rgb(${g},${g - 2},${g - 9})`; ctx.beginPath(); p.forEach((q, i) => { const [X, Y] = P(q.x, q.y, q.z); if (i) ctx.lineTo(X, Y); else ctx.moveTo(X, Y); }); ctx.closePath(); ctx.fill(); }
     if (Math.abs((s % T.spec.joints + T.spec.joints) % T.spec.joints) < 1) { const a = T.point(s, -W2), b = T.point(s, W2); ctx.strokeStyle = 'rgba(70,66,58,0.55)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(...P(a.x, a.y, a.z)); ctx.lineTo(...P(b.x, b.y, b.z)); ctx.stroke(); }   // the expansion joints across
+    // behind a banking, its earth bank falling away to the fields; the fence along both edges
+    { const out = T.at((s)).k >= 0 || T.bankAt(s).b ? (T.bankAt(s).b && T.at((T.bankAt(s).b!.s0 + T.bankAt(s).b!.s1) / 2).k < 0 ? 1 : -1) : -1, H = T.height(s, out * W2) - T.bump(s);
+      if (H > 0.3) { const q = [T.point(s, out * W2), T.point(s + 1.05, out * W2)], f = [T.point(s + 1.05, out * (W2 + H * 2.4)), T.point(s, out * (W2 + H * 2.4))]; ctx.fillStyle = '#4c6340'; ctx.beginPath(); ctx.moveTo(...P(q[0]!.x, q[0]!.y, H)); ctx.lineTo(...P(q[1]!.x, q[1]!.y, H)); ctx.lineTo(...P(f[0]!.x, f[0]!.y, 0)); ctx.lineTo(...P(f[1]!.x, f[1]!.y, 0)); ctx.closePath(); ctx.fill(); } }
+    if (Math.round(s) % 3 === 0) for (const o of [-(W2 + 1.5), W2 + 1.5]) { const z = T.height(s, o), [X, Y] = P(T.point(s, o).x, T.point(s, o).y, z), [, Yt] = P(T.point(s, o).x, T.point(s, o).y, z + 1); ctx.fillStyle = '#e8e3d6'; ctx.fillRect(Math.round(X), Math.round(Yt), 1, Math.max(1, Math.round(Y - Yt))); }
     for (const o of [-W2, W2]) { const a = T.point(s, o), b = T.point(s + 1.05, o); ctx.strokeStyle = '#3b3a35'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(...P(a.x, a.y, a.z)); ctx.lineTo(...P(b.x, b.y, b.z)); ctx.stroke(); } }
   // the start line
   { const a = T.point(START, -W2), b = T.point(START, W2); ctx.strokeStyle = '#f2efe6'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(...P(a.x, a.y, a.z)); ctx.lineTo(...P(b.x, b.y, b.z)); ctx.stroke(); }
@@ -108,6 +125,18 @@ function marks(c: Vehicle) { markTick++; for (let i = 0; i < 4; i++) { const k =
     const [px, py] = c.wheelAt(i), cy = Math.cos(c.yaw), sy2 = Math.sin(c.yaw), x = c.x + px * cy - py * sy2, y = c.y + px * sy2 + py * cy, q = T.locate(x, y, c.s), z = T.height(q.s, q.off);
     skids.push({ x, y, z, a: Math.min(0.6, 0.12 + 0.45 * k.amount) * (k.kind === 'lock' ? 1.2 : 1) }); if (skids.length > 9000) skids.shift(); if (Math.random() < 0.12 * (0.3 + k.amount)) puffs.push({ x, y, z: z + 0.2, r: 0.3, a: 0.35, vx: (Math.random() - 0.5) * 0.6, vy: (Math.random() - 0.5) * 0.6 }); } }
 /** every car in view, the farthest first */
+/** the scenery and the cars together, the farthest first; decks over the track after them all */
+function drawWorld() { const a = (turning() ? camAng : Math.PI / 2) - Math.PI / 2, reach = Math.hypot(VW, VH / SP) * mm / 2000 + 30, items: { Y: number; draw: () => void }[] = [], over: (() => void)[] = [];
+  const seen = (x: number, y: number) => Math.abs(x - camX) < reach && Math.abs(y - camY) < reach;
+  const prop = (q: Placed) => { if (!seen(q.x, q.y)) return; const ps = propPic(q.kind); if (!ps) return; const [X, Y] = P(q.x, q.y, q.z ?? 0), f = ps.get(q.heading - a), d = () => ctx.drawImage(f.canvas, Math.round(X - f.ax), Math.round(Y - f.ay)); if (q.overhead) over.push(d); else items.push({ Y: P(q.x, q.y, 0)[1], draw: d }); };
+  for (const q of SCN.props) prop(q); for (const q of trainCars()) prop(q);
+  const cars = race ? race.cars.map(e => ({ c: e.car, sp: e.driver ? others.get(e)! : sprites, turn: e.wheelTurn })) : [{ c: car, sp: sprites, turn: wheelTurn }];
+  for (const { c, sp, turn } of cars) { const z = T.height(c.s, c.off) + c.zb, [X, Y] = P(c.x, c.y, z); if (X < -150 || X > VW + 150 || Y < -150 || Y > VH + 150) continue;
+    items.push({ Y: P(c.x, c.y, 0)[1], draw: () => { const f = sp.get(sp.key(c.yaw - a, c.tilt + c.roll * 1.5, c.steer, turn, c.speed)); ctx.drawImage(f.canvas, Math.round(X - f.ax), Math.round(Y - f.ay)); } }); }
+  items.sort((p, q) => p.Y - q.Y); for (const it of items) it.draw(); for (const d of over) d(); }
+/** the train's pieces where it is on the line (locomotive, tender, three carriages), or none */
+function trainCars(): Placed[] { if (train.d < 0) return []; const R = SCN.railway, out: Placed[] = []; let acc = 0; const at = (d: number): Placed | null => { acc = 0; for (let k = 0; k + 1 < R.length; k++) { const [x0, y0] = R[k]!, [x1, y1] = R[k + 1]!, n = Math.hypot(x1 - x0, y1 - y0); if (acc + n >= d) { const f = (d - acc) / n; return { kind: '', x: x0 + (x1 - x0) * f, y: y0 + (y1 - y0) * f, heading: Math.atan2(y1 - y0, x1 - x0) }; } acc += n; } return null; };
+  for (const [kind, back] of [['locomotive', 0], ['tender', 11.5], ['carriage', 26], ['carriage', 41.5], ['carriage', 57]] as const) { const q = at(train.d - back); if (q) out.push({ ...q, kind }); } return out; }
 function drawCars() { if (!race) { drawCar(); return; } const a = (turning() ? camAng : Math.PI / 2) - Math.PI / 2;
   const list = race.cars.map(e => { const c = e.car, z = T.height(c.s, c.off) + c.zb, [X, Y] = P(c.x, c.y, z); return { e, c, X, Y }; }).filter(q => q.X > -150 && q.X < VW + 150 && q.Y > -150 && q.Y < VH + 150).sort((p, q) => p.Y - q.Y);
   for (const { e, c, X, Y } of list) { const sp = e.driver ? others.get(e)! : sprites, f = sp.get(sp.key(c.yaw - a, c.tilt + c.roll * 1.5, c.steer, e.wheelTurn, c.speed)); ctx.drawImage(f.canvas, Math.round(X - f.ax), Math.round(Y - f.ay)); } }
@@ -184,7 +213,10 @@ function frame(now: number) { const el = Math.min(0.1, (now - last) / 1000); las
     const want = shot.kind === 'side' && shot.cam ? Math.atan2(car.y - shot.cam.y, car.x - shot.cam.x) : shot.kind === 'top' ? Math.PI / 2 : car.yaw;
     const d = Math.atan2(Math.sin(want - camAng), Math.cos(want - camAng)); camAng = cut ? want : camAng + d * Math.min(1, el * 3); if (cut) { camX = car.x; camY = car.y; } cut = false; }
   turnCam();
-  drawTrack(); drawCars(); drawPuffs(); drawSteam(el); drawBridges(); if (st.cine) letterbox(); hud(); mini(); sounds(); sprites.work(5); for (const sp of others.values()) sp.work(2); requestAnimationFrame(frame); }
+  { const R = SCN.railway; let len = 0; for (let k = 0; k + 1 < R.length; k++) len += Math.hypot(R[k + 1]![0] - R[k]![0], R[k + 1]![1] - R[k]![1]);   // the train: now and then along the line
+    if (train.d < 0) { train.wait -= el; if (train.wait <= 0) train.d = 0; } else { train.d += 24 * el; if (train.d > len + 80) { train.d = -1; train.wait = 70 + Math.random() * 120; } }
+    if (snd) { const q = trainCars()[0]; snd.train = q ? Math.max(0, 1 - Math.hypot(q.x - car.x, q.y - car.y) / 400) : 0; } }
+  drawTrack(); drawWorld(); drawPuffs(); drawSteam(el); if (st.cine) letterbox(); hud(); mini(); sounds(); sprites.work(5); for (const sp of others.values()) sp.work(2); requestAnimationFrame(frame); }
 // ---- page ----
 const pick = $<HTMLSelectElement>('car'); for (const id of RACE_CARS) pick.add(new Option(raceSpec(id).name, id)); pick.value = carId;
 pick.addEventListener('change', () => { carId = pick.value; if (race) stopRace(); else choose(pick.value); pick.blur(); });

@@ -3,7 +3,7 @@
 // on the one width, 1703 mm); wheelbase 2794, track 1422 and the 5.00-20 tyre from data/cars/specs.json.
 import { Build, section, wing, type Mesh, type V } from './mesh';
 
-const PAINT = '#4a4b38', TOP = '#232326', CANVAS = '#34343a', WING = '#2b2c30', CHROME = '#c4c5c8', STEEL = '#8d8e92', GILT = '#b39a62', CREAM = '#d8cfae';
+const PAINT = '#585941', TOP = '#2c2c30', CANVAS = '#34343a', WING = '#34353a', FRAME = '#3f4046', CHROME = '#c4c5c8', STEEL = '#8d8e92', GILT = '#b39a62', CREAM = '#d8cfae';
 const GLASS = '#5d6870', SHINE = '#a3acb3', RUBBER = '#26242b', DARK = '#1c1b20', LENS = '#efe9cf', RED = '#c22c2b', SEAM = '#2c2d22', BOARD = '#2a2a2d';
 const FX = 485, RX = 3279, R = 378, WY = 711, TW = 132, L = 4030, BELT = 1189, SILL = 570;
 /** linear reading of a table of [x, value] */
@@ -35,7 +35,7 @@ function wheel(b: Build, x: number, s: 1 | -1, spin = 0) { const o: V = [x, s * 
 function sideWindow(b: Build, s: 1 | -1, x0: number, x1: number, z0: number, z1: number) { const p = (x: number, z: number, o: number): V => [x, s * (sideY(x, z) + o), z];
   b.mat(GLASS, 0.5).quad(p(x0, z0, 5), p(x1, z0, 5), p(x1, z1, 5), p(x0, z1, 5));
   const w = x1 - x0, h = z1 - z0; b.mat(SHINE, 0.5).quad(p(x0 + w * 0.12, z1 - 14, 7), p(x0 + w * 0.5, z1 - 14, 7), p(x0 + w * 0.26, z0 + h * 0.3, 7), p(x0 + w * 0.12, z0 + h * 0.52, 7));
-  b.mat(TOP, 0.3).bar(p(x0 - 12, z0 - 12, 8), p(x1 + 12, z0 - 12, 8), 26, 14).bar(p(x0 - 12, z1 + 12, 8), p(x1 + 12, z1 + 12, 8), 26, 14).bar(p(x0 - 12, z0 - 12, 8), p(x0 - 12, z1 + 12, 8), 14, 26).bar(p(x1 + 12, z0 - 12, 8), p(x1 + 12, z1 + 12, 8), 14, 26); }
+  b.mat(FRAME, 0.3).bar(p(x0 - 12, z0 - 12, 8), p(x1 + 12, z0 - 12, 8), 26, 14).bar(p(x0 - 12, z1 + 12, 8), p(x1 + 12, z1 + 12, 8), 26, 14).bar(p(x0 - 12, z0 - 12, 8), p(x0 - 12, z1 + 12, 8), 14, 26).bar(p(x1 + 12, z0 - 12, 8), p(x1 + 12, z1 + 12, 8), 14, 26); }
 
 export function mesh(spin = 0): Mesh { const b = new Build();
   // ---- bonnet and scuttle, the body to the belt, the cabin above it, the cloth roof ----

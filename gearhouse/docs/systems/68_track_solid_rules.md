@@ -31,6 +31,15 @@ change starts from here. Code: render/car/voxel.ts. Check: tools/ref/solidshot.t
 - **Corners** are rounded for every part at least 150 mm thick each way, whatever it is made of (glass too: an
   un-rounded pane in a rounded body looked swollen).
 - **Wheels** are made, not taken from parts: a tyre with rounded shoulders, a rim face each side.
+- **Symmetry** (review 74): a car is the same on both sides. Every cell of a part that is paired or drawn from the
+  centre line out gets its mirror image; only parts carried on one side (exhaust, one-sided spare, single mirror) keep
+  one side. Side-only parts whose box starts at the centre line are laid on both sides. Measured mirror mismatch after
+  this: 0.0–0.7 % of cells, all of it one-sided fittings (before: up to 8.4 %, the Model A's apron on one side only).
+- **Why bodies looked collapsed**: the solid is the intersection of the views, so wherever the sheet's views disagree
+  (the plan narrower than the front view by 100–300 mm, a wing's crown lower in the front view) the smaller wins and
+  the body thins. Professional car modelling meets the same problem and settles it the same way: pick one view as the
+  authority for each region, model one half and mirror it. Next step for us: per element, a chosen authority view for
+  width (the front view for bodies, the plan for wings) instead of the plain intersection.
 
 ## Rules of the colour (texOf, surfaceOf)
 - The car's own drawings are made **plain** for this (no gloss, no light read off the sheet): the solid gives the light,
@@ -50,8 +59,13 @@ change starts from here. Code: render/car/voxel.ts. Check: tools/ref/solidshot.t
   so black cars keep their form; bright metal gives back sky above, a dark horizon, the ground below.
 - A dark line round the car and where one surface stands well before another.
 
+## Picture, review 74
+- Wheels at game size take a face drawn for small size (wire wheels with 16 bold spokes at 11 mm a pixel).
+- A thin dark seam where a bright part meets another part in front of it (small fittings stand apart).
+- Lone pixels take their neighbours' colour.
+- A soft ground shadow: each cell dropped along the sun's ray.
+
 ## Known gaps (next)
 - Small bright parts at the nose (lamp stays, bumper irons) crowd together at game size.
-- Wire wheels read as grey discs at 1x; the wheel face needs its own small-size drawing.
-- No shadow under the car yet (the track scene will draw it).
-- A bake step is still to come: a fixed palette per material, lone pixels removed.
+- Authority view per element for width (above).
+- A bake step: a fixed palette per material.

@@ -59,6 +59,16 @@ change starts from here. Code: render/car/voxel.ts. Check: tools/ref/solidshot.t
   so black cars keep their form; bright metal gives back sky above, a dark horizon, the ground below.
 - A dark line round the car and where one surface stands well before another.
 
+## Review 75: nothing floats, no colour bleeds
+- Corners are rounded before the thin parts are laid on, so glass, lamps and strips sit on the rounded surface (laid on
+  the square hull first, they stood a cell or two proud of it: floating windows).
+- A part that touches no other part is moved the shortest way along one axis, up to 300 mm, until it touches (tail lamps
+  drawn behind wings that end short of them).
+- A face borrows another part's colour from a drawing only when that part lies on it (`on` chain: glass in its body, a
+  lens in its lamp), or a spare's face from the wheel drawing; never a neighbour drawn behind or beside it.
+- Sprite stacking (15 flat slices) was tried for cars and rejected: tall 1930s bodies need a slice every 13 cm, so the
+  sides turn to stripes. It suits flat track props (tyre stacks, hay bales, flags).
+
 ## Picture, review 74
 - Wheels at game size take a face drawn for small size (wire wheels with 16 bold spokes at 11 mm a pixel).
 - A thin dark seam where a bright part meets another part in front of it (small fittings stand apart).

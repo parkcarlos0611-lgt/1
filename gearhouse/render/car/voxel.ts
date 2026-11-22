@@ -80,6 +80,11 @@ export function solidOf(m: CarModel, c = 15, tyreW?: number): Solid {
         if (top) { const key = j * nx + i; let v = tm.get(key); if (v === undefined) { v = inPoly(top, u, vy); tm.set(key, v); } if (!v) continue; }
         if (fr) { const key = k * ny + j; let v = fm.get(key); if (v === undefined) { v = inPoly(fr, vy, vz); fm.set(key, v); } if (!v) continue; }
         const a = at(i, j, k); if (P >= pri[a]!) { pri[a] = P; owner[a] = id; } } } });
+  // corners rounded first (review 75): cells of parts thick enough to have corners go where a blur of the solid thins
+  // out. Done before the thin parts are laid on, so glass, lamps and strips sit on the rounded surface, not on the
+  // square one it was cut from (they stood proud of it by a cell or two: floating windows)
+  const S: Solid = { c, nx, ny, nz, x0, y0, owner, rgb, mat, ids, cx0: x0 + nx * c / 2, den: new Float32Array(0) };
+  { const d0 = density(S, 2); for (let i = 0; i < N; i++) { const o = owner[i]!; if (o >= 0 && thick[o] && d0[i]! < 0.42) owner[i] = -1; } }
   later.forEach(lay);
   // a part left standing free beside the car (the sheet's plan drawn wider than its front view: a running board, a sill
   // strip) is carried in towards the centre line until it meets the car, up to 300 mm
@@ -119,10 +124,15 @@ export function solidOf(m: CarModel, c = 15, tyreW?: number): Solid {
   { const oneSided = new Set<number>(); ids.forEach((id, o) => { const p = byId.get(id); if (p && !p.pair && Math.abs(p.box.y[0] + p.box.y[1]) > 80 && !(Math.abs(p.box.y[0]) <= 1)) oneSided.add(o); });
     const jm = (j: number) => Math.round((-2 * y0) / c - 1 - j);
     for (let k = 0; k < nz; k++) for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) { const a = at(i, j, k), o = owner[a]!; if (o < 0 || oneSided.has(o)) continue; const jj = jm(j); if (jj < 0 || jj >= ny) continue; const b = at(i, jj, k); if (owner[b]! < 0) { owner[b] = o; pri[b] = pri[a]!; } } }
-  const S: Solid = { c, nx, ny, nz, x0, y0, owner, rgb, mat, ids, cx0: x0 + nx * c / 2, den: new Float32Array(0) };
-  // corners rounded: cells of parts thick enough to have corners go where a blur of the solid thins out; then the blur
-  // of what is left is kept for outward directions and crevice shading
-  const d0 = density(S, 2); for (let i = 0; i < N; i++) { const o = owner[i]!; if (o >= 0 && thick[o] && d0[i]! < 0.42) owner[i] = -1; }
+  // nothing floats (review 75): a part that touches no other part (a tail lamp drawn behind a wing that ends short of
+  // it, a lamp on a stalk the model left out) is moved the shortest way, along one axis and up to 300 mm, until it touches
+  { const N6 = [1, -1, nx, -nx, nx * ny, -nx * ny], cellsOf = new Map<number, number[]>();
+    for (let a = 0; a < N; a++) { const o = owner[a]!; if (o >= 0) { let l = cellsOf.get(o); if (!l) cellsOf.set(o, l = []); l.push(a); } }
+    const touches = (o: number, cs: number[], off: number) => cs.some(a => N6.some(d => { const b = a + off + d; if (b < 0 || b >= N) return false; const u = owner[b]!; return u >= 0 && u !== o; }));
+    for (const [o, cs] of cellsOf) { if (ids[o] === 'wheel' || touches(o, cs, 0)) continue; let best: number | null = null;
+      for (let q = 1; q <= Math.ceil(300 / c) && best === null; q++) for (const d of N6) { const off = d * q; if (cs.every(a => { const b = a + off; return b >= 0 && b < N && (owner[b]! < 0 || owner[b] === o); }) && touches(o, cs, off)) { best = off; break; } }
+      if (best === null) continue; for (const a of cs) owner[a] = -1; for (const a of cs) { owner[a + best] = o; pri[a + best] = 1e7; } } }
+  // the blur of what is left is kept for outward directions and crevice shading
   S.den = density(S, 2); return S;
 }
 /** a box blur of the solid along each axis in turn (radius r cells) */
@@ -133,7 +143,7 @@ function density(S: Solid, r: number): Float32Array {
       for (let d = -r; d <= r; d++) { const q = p + d; if (q < 0 || q >= len) continue; sum += src[i + d * step]!; } dst[i] = sum / w; } };
   pass(a, b, nx, 1); pass(b, a, ny, nx); pass(a, b, nz, nx * ny); return b; }
 
-export type Tex = Partial<Record<ViewName, CarImage>> & { reach?: Map<string, { x: [number, number]; y: number; z: number }>; wheel?: CarImage };
+export type Tex = Partial<Record<ViewName, CarImage>> & { reach?: Map<string, { x: [number, number]; y: number; z: number }>; wheel?: CarImage; on?: Map<string, string> };
 /** the car's own drawings (review 73: "2D pictures laid over it"), at `mm` a pixel: the five views the flat renderer
  *  makes, drawn plain (no gloss, no light read off the sheet): the solid gives the light, the drawings give the marks */
 export function texOf(m0: CarModel, mm = 6, tyreW = 175): Tex { const m = { ...m0, gloss: 0 } as CarModel, t: Tex = {};
@@ -146,6 +156,7 @@ export function texOf(m0: CarModel, mm = 6, tyreW = 175): Tex { const m = { ...m
   // they are seen (a fine wheel drawn small turns to grey); the side drawing keeps its own wheels for close views
   const wf = { ...m, wheel: { ...m.wheel, spokes: m.wheel?.style === 'wire' ? 16 : m.wheel?.spokes } } as CarModel;
   t.wheel = rasterizeFlat(viewDesign(wf, 'left'), { mm: 11, shadow: false, plain: true });
+  t.on = new Map(m.parts.filter(p => (p as unknown as { on?: string }).on).map(p => [p.id, (p as unknown as { on: string }).on]));
   t.reach = reach; return t; }
 const lum = (r: number, g: number, b: number) => 0.3 * r + 0.59 * g + 0.11 * b;
 /** the colour the drawings give a cell's face: from the view that looks straight at it, where that view shows the cell's
@@ -159,7 +170,10 @@ function texel(T: Tex, W: number, part: string, x: number, y: number, z: number,
   for (const [v, w] of ([[side, ay], [end, ax], [top, az]] as const).slice().sort((p, q) => q[1] - p[1])) if (w > 0.15) order.push(v);
   for (const [v, u, h] of order) { const im = part === 'wheel' && (v === 'left' || v === 'right') && T.wheel ? T.wheel : T[v]; if (!im) continue; const px = Math.floor(im.X(u)), py = Math.floor(im.Y(h)); if (px < 0 || py < 0 || px >= im.w || py >= im.h) continue;
     const i = py * im.w + px; if (im.rgba[i * 4 + 3]! < 128) continue; const id = (im.ids?.[im.owner[i]!] ?? '').replace(/~$/, '');
-    if (id !== part) { const r = T.reach?.get(id), tol = 45; if (!r) continue;
+    // review 75: another part's colour only when it lies on this one (glass in its body, a lens in its lamp, a badge on
+    // its shell), never a neighbour drawn behind or beside it (colours bled from part to part)
+    if (id !== part && !(id === 'wheel' && /^spare/.test(part))) { let q = T.on?.get(id), k2 = 0; while (q && q !== part && k2++ < 6) q = T.on?.get(q); if (q !== part) continue; }
+    if (id !== part && !(id === 'wheel' && /^spare/.test(part))) { const r = T.reach?.get(id), tol = 45; if (!r) continue;
       const before = v === 'left' || v === 'right' ? r.y > Math.abs(y) + tol : v === 'top' ? r.z > z + tol : v === 'front' ? r.x[0] < x - tol : r.x[1] > x + tol; if (before) continue; }
     const o = im.owner[i], mean = (rad: number, step: number) => { let a = 0, b = 0, c = 0, k = 0;
       for (let dy = -rad; dy <= rad; dy += step) for (let dx = -rad; dx <= rad; dx += step) { const xx = px + dx, yy = py + dy; if (xx < 0 || yy < 0 || xx >= im.w || yy >= im.h) continue; const j = yy * im.w + xx;

@@ -97,12 +97,14 @@
     <div class="row"><label for="vol">음량</label><input type="range" id="vol" min="0" max="1" step="0.05" value="0.7"></div>
     <button type="button" id="repair" class="btn">엔진 수리 (연습)</button>
     <label class="check"><input type="checkbox" id="pilot"> 시험 운전자에게 맡기기</label>
-    <div class="row"><label for="pitch">카메라 높이 <span class="val" id="pitchv">30°</span></label><input type="range" id="pitch" min="20" max="50" step="5" value="30"></div>
+    <div class="row"><label for="pitch">카메라 높이 <span class="val" id="pitchv">30°</span></label><input type="range" id="pitch" min="15" max="85" step="5" value="30"></div>
     <label class="check"><input type="checkbox" id="chase"> 차를 따라 도는 카메라</label>
+    <label class="check"><input type="checkbox" id="free"> 자유 카메라 — 화면을 끌어 돌리기(좌우)·높이(위아래), 휠/두 손가락으로 확대·축소, 두 번 눌러 되돌리기</label>
+    <p class="note" id="camv"></p>
     <label class="check"><input type="checkbox" id="cine"> 시네마틱 뷰 (<kbd>C</kbd>) — 트랙 옆 카메라, 추격, 높은 시점을 오가며 중계 화면처럼</label>
-    <div class="row"><label for="scale">화면 축척</label><select id="scale"><option value="30">가깝게 (30 mm/픽셀)</option><option value="40">보통 (40 mm/픽셀)</option><option value="50" selected>넓게 (50 mm/픽셀)</option><option value="65">멀리 (65 mm/픽셀)</option></select></div>
+    <div class="row"><label for="scale">화면 축척</label><select id="scale"><option value="12">12 mm/픽셀</option><option value="16">16 mm/픽셀</option><option value="20">20 mm/픽셀</option><option value="25">25 mm/픽셀</option><option value="30">30 mm/픽셀</option><option value="40">40 mm/픽셀</option><option value="50" selected>50 mm/픽셀</option><option value="65">65 mm/픽셀</option><option value="80">80 mm/픽셀</option><option value="100">100 mm/픽셀</option><option value="130">130 mm/픽셀</option></select></div>
     <label class="check"><input type="checkbox" id="touch"> 화면 버튼 보이기</label>
-    <p class="note keys-help"><kbd>↑</kbd>/<kbd>W</kbd> 가속 · <kbd>↓</kbd>/<kbd>S</kbd> 브레이크 · <kbd>←</kbd><kbd>→</kbd>/<kbd>A</kbd><kbd>D</kbd> 조향 · <kbd>Space</kbd> 핸드브레이크<br>수동 변속: <kbd>Q</kbd> 내림 · <kbd>E</kbd> 올림 · <kbd>R</kbd> 트랙으로 복귀</p>
+    <p class="note keys-help"><kbd>↑</kbd>/<kbd>W</kbd> 가속 · <kbd>↓</kbd>/<kbd>S</kbd> 브레이크 · <kbd>←</kbd><kbd>→</kbd>/<kbd>A</kbd><kbd>D</kbd> 조향 · <kbd>Space</kbd> 핸드브레이크<br>수동 변속: <kbd>Q</kbd> 내림 · <kbd>E</kbd> 올림 · <kbd>R</kbd> 트랙으로 복귀<br>카메라: <kbd>,</kbd><kbd>.</kbd> 돌리기 · <kbd>PgUp</kbd><kbd>PgDn</kbd> 높이 · <kbd>-</kbd><kbd>=</kbd> 축소/확대 · <kbd>Home</kbd> 되돌리기</p>
     <p class="note">휴대폰에서는 화면 아래 버튼으로 조작합니다: 왼쪽 ◀ ▶ 조향, 오른쪽 브레이크와 가속, 가운데 Q/E 기어(수동일 때)와 R 복귀. 가로로 돌려 쓰면 화면이 커집니다.</p>
     <p class="note">뱅크 꼭대기 밖으로 나가면 실제처럼 넘어간 것으로 보고 트랙에 다시 올려 둡니다. Members' 다리 밑 요철에서는 빠른 차의 뒷바퀴가 뜹니다.</p>
   </form>

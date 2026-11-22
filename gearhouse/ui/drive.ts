@@ -22,8 +22,8 @@ const T = millbrook(), cv = $<HTMLCanvasElement>('view'), main = cv.getContext('
 const bg = document.createElement('canvas'), bgx = bg.getContext('2d')!; let blurOn = true, lastCamX = 0, lastCamY = 0, shake = 0;
 let SP = Math.sin(30 * Math.PI / 180), CP = Math.cos(30 * Math.PI / 180), pitchDeg = 30; const DT = 1 / 200, START = T.spec.landmarks.find(l => l.kind === 'line')!.s;
 let VW = 768, VH = 432, mm = 50;                                               // the picture's own pixels, millimetres a pixel
-const st = { auto: true, assist: false, pilot: false, chase: false, progressive: false, cine: false };
-const turning = () => st.chase || st.cine;
+const st = { auto: true, assist: false, pilot: false, chase: false, progressive: false, cine: false, free: false };
+const turning = () => st.chase || st.cine || st.free;
 // ---- the cinematic view: shots cut between trackside cameras (the world turned to look from the camera at the car), a
 //      low chase and a high fixed view; pixels twice the size, the gauges hidden, bars top and bottom with a caption ----
 const W2c = T.spec.width / 2, CAMS = Array.from({ length: Math.floor(T.length / 380) }, (_, i) => { const s = i * 380 + 60, side = i % 2 ? 1 : -1, p = T.point(s, side * (W2c + 16)); return { s, x: p.x, y: p.y }; });
@@ -273,7 +273,7 @@ function frame(now: number) { const el = Math.min(0.1, (now - last) / 1000); las
   // the camera: on the car, a little ahead of where it is going
   const lead = Math.min(10, car.speed * 0.2), tx = car.x + Math.cos(car.yaw) * lead, ty = car.y + Math.sin(car.yaw) * lead, tz = T.height(car.s, car.off);
   camX += (tx - camX) * Math.min(1, el * 5); camY += (ty - camY) * Math.min(1, el * 5); camZ += (tz - camZ) * Math.min(1, el * 5);
-  { const vh = car.speed > 2 ? Math.atan2(Math.sin(car.yaw) * car.vx + Math.cos(car.yaw) * car.vy, Math.cos(car.yaw) * car.vx - Math.sin(car.yaw) * car.vy) : car.yaw, d = Math.atan2(Math.sin(vh - camAng), Math.cos(vh - camAng)); camAng += d * Math.min(1, el * 2.5); }   // the turning camera follows where the car goes, gently
+  if (!st.free) { const vh = car.speed > 2 ? Math.atan2(Math.sin(car.yaw) * car.vx + Math.cos(car.yaw) * car.vy, Math.cos(car.yaw) * car.vx - Math.sin(car.yaw) * car.vy) : car.yaw, d = Math.atan2(Math.sin(vh - camAng), Math.cos(vh - camAng)); camAng += d * Math.min(1, el * 2.5); }   // the turning camera follows where the car goes, gently
   if (st.cine) { const kinds = ['side', 'chase', 'side', 'top'] as const, passed = shot.kind === 'side' && shot.cam && T.gap(shot.cam.s, car.s) > 160;
     if (clock > shot.until || passed) { const kind = kinds[shotN++ % kinds.length]!; let cam = undefined as typeof shot.cam;
       if (kind === 'side') { let best = Infinity; for (const c of CAMS) { const g = T.gap(car.s, c.s); if (g > 40 && g < best && g < 600) { best = g; cam = c; } } }
@@ -307,9 +307,40 @@ $<HTMLInputElement>('auto').addEventListener('change', e => { st.auto = (e.targe
 $<HTMLInputElement>('pilot').addEventListener('change', e => { st.pilot = (e.target as HTMLInputElement).checked; if (st.pilot) { car.auto = true; } else car.auto = st.auto; });
 $<HTMLInputElement>('assist').addEventListener('change', e => { st.assist = (e.target as HTMLInputElement).checked; });
 $<HTMLInputElement>('chase').addEventListener('change', e => { st.chase = (e.target as HTMLInputElement).checked; camAng = car.yaw; });
-$<HTMLInputElement>('pitch').addEventListener('change', e => { pitchDeg = +(e.target as HTMLInputElement).value; SP = Math.sin(pitchDeg * Math.PI / 180); CP = Math.cos(pitchDeg * Math.PI / 180); const s0 = car.s, o0 = car.off, v0 = car.speed; choose(carId); car.place(s0, o0, v0); (e.target as HTMLElement).blur(); });
+// ---- the free camera: drag to turn it round the car and tilt it, the wheel or a pinch to come closer or go further ----
+// The pictures are baked for one height and one scale, so a new height or scale bakes them again (a moment after the
+// gesture ends); turning needs nothing new (the pictures are kept for 64 headings).
+const ZOOM = [12, 16, 20, 25, 30, 40, 50, 65, 80, 100, 130], PMIN = 15, PMAX = 85;
+let bakeT = 0;
+function rebake() { SP = Math.sin(pitchDeg * Math.PI / 180); CP = Math.cos(pitchDeg * Math.PI / 180); propSprites.clear(); const small = matchMedia('(pointer: coarse)').matches;
+  sprites = new CarSprites(MESH_CARS.find(c => c.id === carId)!.mesh(), mm, pitchDeg, car.spec.steerLock * Math.PI / 180, { outline: 3, glass: 0.8 }, small ? 1200 : 2400); sprites.prepare([0]); sprites.work(300);
+  for (const e of [...others.keys()]) { const m = MESH_CARS.find(c => c.id === e.id)!, sp = new CarSprites(m.mesh(), mm, pitchDeg, e.car.spec.steerLock * Math.PI / 180, { outline: 3, glass: 0.8 }, small ? 400 : 900); sp.prepare([0]); others.set(e, sp); }
+  ($('pitch') as HTMLInputElement).value = String(pitchDeg); $('pitchv').textContent = `${pitchDeg}°`; camShow(); }
+const camShow = () => { $('camv').textContent = `${st.free ? '자유' : st.chase ? '따라 돎' : '북쪽 위'} · 높이 ${pitchDeg}° · ${mm} mm/픽셀 · 방향 ${Math.round(((90 - camAng * 180 / Math.PI) % 360 + 360) % 360)}°`; };
+/** a new height or scale, baked once the gesture has rested */
+function want(p: number, m: number) { p = Math.max(PMIN, Math.min(PMAX, Math.round(p / 5) * 5)); if (p === pitchDeg && m === mm) return; pitchDeg = p; mm = m; SP = Math.sin(p * Math.PI / 180); CP = Math.cos(p * Math.PI / 180);
+  ($('scale') as HTMLSelectElement).value = String(m); camShow(); clearTimeout(bakeT); bakeT = setTimeout(rebake, 250) as unknown as number; }
+const zoom = (step: number) => { const i = ZOOM.indexOf(mm), k = Math.max(0, Math.min(ZOOM.length - 1, (i < 0 ? ZOOM.findIndex(z => z >= mm) : i) + step)); want(pitchDeg, ZOOM[k]!); };
+const setFree = (on: boolean) => { st.free = on; ($('free') as HTMLInputElement).checked = on; if (!on) camAng = car.yaw; camShow(); };
+{ const ptrs = new Map<number, { x: number; y: number }>(); let pinch0 = 0, pitch0 = 0, dy0 = 0;
+  cv.style.touchAction = 'none';
+  cv.addEventListener('pointerdown', e => { cv.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY }); pitch0 = pitchDeg; dy0 = 0;
+    if (ptrs.size === 2) { const [a, b] = [...ptrs.values()]; pinch0 = Math.hypot(a!.x - b!.x, a!.y - b!.y); } });
+  cv.addEventListener('pointermove', e => { const p = ptrs.get(e.pointerId); if (!p) return; const dx = e.clientX - p.x, dy = e.clientY - p.y; p.x = e.clientX; p.y = e.clientY;
+    if (ptrs.size === 1) { if (st.cine) setCine(false); if (!st.free) setFree(true); camAng -= dx * 0.008; dy0 += dy; const np = Math.max(PMIN, Math.min(PMAX, pitch0 + dy0 * 0.25)); if (Math.round(np / 5) * 5 !== pitchDeg) want(np, mm); camShow(); }
+    else if (ptrs.size === 2 && pinch0 > 0) { const [a, b] = [...ptrs.values()], d = Math.hypot(a!.x - b!.x, a!.y - b!.y); if (d / pinch0 > 1.3) { zoom(-1); pinch0 = d; } else if (pinch0 / d > 1.3) { zoom(1); pinch0 = d; } } });
+  const up = (e: PointerEvent) => { ptrs.delete(e.pointerId); pinch0 = 0; };
+  cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
+  cv.addEventListener('wheel', e => { e.preventDefault(); zoom(e.deltaY > 0 ? 1 : -1); }, { passive: false });
+  cv.addEventListener('dblclick', () => setFree(false));
+  addEventListener('keydown', e => { if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) return; const k = e.key;
+    if (k === ',' || k === '<') { if (!st.free) setFree(true); camAng += 0.12; camShow(); } if (k === '.' || k === '>') { if (!st.free) setFree(true); camAng -= 0.12; camShow(); }
+    if (k === '-' || k === '_') zoom(1); if (k === '=' || k === '+') zoom(-1);
+    if (k === 'PageUp') { e.preventDefault(); want(pitchDeg + 5, mm); } if (k === 'PageDown') { e.preventDefault(); want(pitchDeg - 5, mm); } if (k === 'Home') setFree(false); }); }
+$<HTMLInputElement>('free').addEventListener('change', e => setFree((e.target as HTMLInputElement).checked));
+$<HTMLInputElement>('pitch').addEventListener('change', e => { want(+(e.target as HTMLInputElement).value, mm); (e.target as HTMLElement).blur(); });
 $<HTMLInputElement>('pitch').addEventListener('input', e => { $('pitchv').textContent = `${(e.target as HTMLInputElement).value}°`; });
-$<HTMLSelectElement>('scale').addEventListener('change', e => { mm = +(e.target as HTMLSelectElement).value; choose(carId); (e.target as HTMLElement).blur(); });
+$<HTMLSelectElement>('scale').addEventListener('change', e => { want(pitchDeg, +(e.target as HTMLSelectElement).value); (e.target as HTMLElement).blur(); });
 function fit() { if (document.fullscreenElement || document.body.classList.contains('fakefull')) { const k = Math.max(1, Math.round(innerWidth / 900)) * (st.cine ? 2 : 1); VW = Math.ceil(innerWidth / k / 2) * 2; VH = Math.ceil(innerHeight / k); cv.width = VW; cv.height = VH; cv.style.width = `${VW * k}px`; cv.style.height = `${VH * k}px`; ctx.imageSmoothingEnabled = false; return; }
   const box = document.querySelector('.track') as HTMLElement, room = Math.min(box.clientWidth - 14, 1600);
   // the height left on the screen below the picture's top (a phone on its side has little), at least a usable strip
@@ -319,4 +350,4 @@ function fit() { if (document.fullscreenElement || document.body.classList.conta
   else { VW = Math.max(300, Math.floor(room / 2) * 2); VH = Math.min(Math.round(VW * (innerHeight > innerWidth ? 0.8 : 0.56)), Math.floor(availH)); cv.style.width = `${VW}px`; cv.style.height = `${VH}px`; }
   if (st.cine) { VW = Math.floor(VW / 4) * 2; VH = Math.floor(VH / 2); }   // the cinematic view: pixels twice the size (closer)
   cv.width = VW; cv.height = VH; ctx.imageSmoothingEnabled = false; }
-addEventListener('resize', fit); addEventListener('orientationchange', () => setTimeout(fit, 200)); fit(); choose(carId); camX = car.x; camY = car.y; camZ = 0; requestAnimationFrame(frame);
+addEventListener('resize', fit); addEventListener('orientationchange', () => setTimeout(fit, 200)); fit(); choose(carId); camX = car.x; camY = car.y; camZ = 0; camShow(); requestAnimationFrame(frame);

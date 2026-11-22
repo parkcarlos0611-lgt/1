@@ -24,6 +24,11 @@ export class Build {
   mat(colour: string, gloss = 0.2, kind: Kind = 'plain'): this { this.c = hex(colour); this.g = gloss; this.k = KINDS.indexOf(kind); this.part++; this.N[this.part] = this.nm; return this; }
   tri(a: V, b: V, c: V): this { this.P.push(...a, ...b, ...c); this.C.push(...this.c); this.G.push(this.g); this.T.push(this.part); this.K.push(this.k); this.X.push(this.x); return this; }
   quad(a: V, b: V, c: V, d: V): this { return this.tri(a, b, c).tri(a, c, d); }
+  /** where the geometry has got to: pass it to tilt() to turn what is built after it */
+  mark(): number { return this.P.length; }
+  /** turn everything built since the mark about a line along y through o (degrees, +: the top goes forward, to -x) */
+  tilt(from: number, o: V, deg: number): this { const a = deg * Math.PI / 180, c = Math.cos(a), s = Math.sin(a);
+    for (let i = from; i < this.P.length; i += 3) { const dx = this.P[i]! - o[0], dz = this.P[i + 2]! - o[2]; this.P[i] = o[0] + dx * c - dz * s; this.P[i + 2] = o[2] + dx * s + dz * c; } return this; }
   /** rings of the same number of points joined into a skin; the ends closed */
   loft(rings: V[][], caps = true, tex?: (band: number, i: number) => number): this {
     for (let r = 0; r + 1 < rings.length; r++) { const A = rings[r]!, B = rings[r + 1]!, K = A.length; for (let i = 0; i < K; i++) { this.x = tex ? tex(r, i) : 0; this.quad(A[i]!, A[(i + 1) % K]!, B[(i + 1) % K]!, B[i]!); } }

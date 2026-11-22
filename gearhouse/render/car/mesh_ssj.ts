@@ -4,7 +4,7 @@
 import { Build, section, wing, type Mesh, type V } from './mesh';
 
 const PAINT = '#a9a8ae', PAINT2 = '#55585f', CHROME = '#c9cbcf', TAN = '#b98a52', LEATHER = '#a06c38', GLASS = '#a9c2cc', RUBBER = '#26242b', DARK = '#1c1b20', LENS = '#efe9cf', RED = '#c22c2b';
-const FX = 526, RX = 3701, R = 421, WY = 716, TW = 190, L = 4517, SW = 1.06;   // SW: the plan read 1700 wide, the car is 1800 (specs: track 1422)
+const FX = 526, RX = 3701, R = 421, WY = 716, WYR = 737, TW = 190, L = 4517, SW = 1.06;   // SW: the plan read 1700 wide, the car is 1800 (specs: track 1422)
 /** linear reading of a table of [x, value] */
 const at = (tab: [number, number][], x: number) => { if (x <= tab[0]![0]) return tab[0]![1]; for (let i = 1; i < tab.length; i++) if (x <= tab[i]![0]) { const [x0, v0] = tab[i - 1]!, [x1, v1] = tab[i]!; return v0 + (v1 - v0) * (x - x0) / (x1 - x0); } return tab[tab.length - 1]![1]; };
 // the body's half-width (plan view) and its top (side view) along the car
@@ -12,7 +12,8 @@ const HALF: [number, number][] = ([[516, 300], [700, 350], [1059, 398], [1783, 4
 const TOP: [number, number][] = [[516, 1175], [560, 1228], [700, 1245], [1150, 1245], [1832, 1263], [2140, 1265], [2210, 1240], [2296, 1150]];
 const BELT: [number, number][] = [[2298, 1079], [2544, 1070], [2807, 1052], [3043, 1017], [3508, 1009], [3859, 1035], [3921, 1017], [3982, 965], [4052, 860], [4105, 719], [4140, 561], [4290, 480]];
 
-function wheel(b: Build, x: number, s: 1 | -1, spin = 0) { const o: V = [x, s * WY, R], rim = R * 0.68, f = s * (TW / 2);
+const WY0 = WY;   // the tracks: 56 in at the front (1422), 58 in at the back (1473), as the Model J's
+function wheel(b: Build, x: number, s: 1 | -1, spin = 0) { const WY = x === FX ? WY0 : WYR, o: V = [x, s * WY, R], rim = R * 0.68, f = s * (TW / 2);
   b.name((x === FX ? 'tyreF' : 'tyreR')).mat(RUBBER, 0.05, 'tyre').lathe('y', o, [[-TW / 2, rim], [-TW / 2, R - 55], [-TW / 2 + 40, R], [TW / 2 - 40, R], [TW / 2, R - 55], [TW / 2, rim]], 20, false);
   b.name('wheel').mat(DARK, 0.05).lathe('y', o, [[f * 0.55, 0], [f * 0.55, rim]], 20, false);                     // the dark well behind the spokes
   b.name('rim').mat(CHROME, 0.9, 'metal').lathe('y', o, [[f, rim + 6], [f * 0.7, rim - 34]], 20, false).lathe('y', o, [[f * 0.6, 58], [f * 1.25, 34], [f * 1.25, 0]], 10, false);
@@ -78,13 +79,14 @@ export function ssjMesh(spin = 0): Mesh { const b = new Build();
   // ---- across the nose and tail: the lamp bar, bumpers, axles, the dark under the car ----
   b.name('bumperF').mat(CHROME, 0.9, 'metal').box(322, 350, -400, 400, 797, 821).box(0, 42, -720, 720, 455, 502).box(0, 42, -720, 720, 378, 425).box(4440, 4482, -735, 735, 420, 466);
   for (const y of [-345, 345]) b.box(-6, 48, y - 22, y + 22, 368, 512);
-  b.name('chassis').mat(DARK, 0.05).box(90, 600, -330, 330, 380, 500).box(600, 4150, -400, 400, 330, 445).bar([FX, -WY, R], [FX, WY, R], 60).bar([RX, -WY, R], [RX, WY, R], 80);
+  b.name('chassis').mat(DARK, 0.05).box(90, 600, -330, 330, 380, 500).box(600, 4150, -400, 400, 330, 445).bar([FX, -WY, R], [FX, WY, R], 60).bar([RX, -WYR, R], [RX, WYR, R], 80);
   // ---- the outside exhaust on the right: four bright pipes out of the bonnet side, down into the wing ----
   b.name('exhaust').mat(CHROME, 0.9, 'metal'); for (let k = 0; k < 4; k++) { const x = 1150 + k * 170, w = -(at(HALF, x)); b.bar([x, w + 20, 830], [x + 45, w - 75, 770], 56).bar([x + 45, w - 75, 770], [x + 150, w - 95, 610], 56).bar([x + 150, w - 95, 610], [x + 215, w - 70, 500], 56); }
   // ---- the spare on the tail, its strap ----
-  { const o: V = [4318, 0, 722], rim = R * 0.68; b.name('spare').mat(RUBBER, 0.05, 'tyre').lathe('x', o, [[-90, rim], [-90, R - 55], [-50, R], [50, R], [90, R - 55], [90, rim]], 20, false);
+  { const o: V = [4318, 0, 722], rim = R * 0.68, m0 = b.mark(); b.name('spare').mat(RUBBER, 0.05, 'tyre').lathe('x', o, [[-90, rim], [-90, R - 55], [-50, R], [50, R], [90, R - 55], [90, rim]], 20, false);
     b.name('spare').mat(DARK, 0.05).lathe('x', o, [[40, 0], [40, rim]], 20, false); b.mat(CHROME, 0.9, 'metal').lathe('x', o, [[92, rim + 6], [60, rim - 34]], 20, false).lathe('x', o, [[50, 58], [110, 34], [110, 0]], 10, false);
     b.name('spare').mat('#b9bbc0', 0.6, 'metal'); for (let k = 0; k < 14; k++) { const a = k / 14 * Math.PI * 2, c = Math.cos(a), q = Math.sin(a); b.bar([4318 + 86, c * 50, 722 + q * 50], [4318 + 55, c * (rim - 30), 722 + q * (rim - 30)], 13); }
-    b.name('spareStrap').mat(LEATHER, 0.2, 'leather'); for (const a of [90, 210, 330]) { const t = a * Math.PI / 180; b.bar([4318 + 100, 0, 722], [4318 + 96, Math.cos(t) * (R + 4), 722 + Math.sin(t) * (R + 4)], 22, 30); } }
+    b.name('spareStrap').mat(LEATHER, 0.2, 'leather'); for (const a of [90, 210, 330]) { const t = a * Math.PI / 180; b.bar([4318 + 100, 0, 722], [4318 + 96, Math.cos(t) * (R + 4), 722 + Math.sin(t) * (R + 4)], 22, 30); }
+    b.tilt(m0, [4300, 0, 500], 18); }   // the sheet's side view and the cars' photographs: the spare lies back on the sloping tail, its top forward
   return b.mesh(L); }
 export const mesh = ssjMesh;

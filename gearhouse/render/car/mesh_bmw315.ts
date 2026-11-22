@@ -36,19 +36,19 @@ const arch = (x: number, hx: number) => Math.abs(x - hx) < ARCH ? HUB + Math.sqr
 function pontoon(b: Build, s: 1 | -1, xs: number[], top: [number, number][], out: [number, number][], inn: [number, number][], skirt: (x: number) => number) {
   const R6 = xs.map(x => { const zt = at(top, x), yi = at(inn, x), yo = at(out, x), wd = yo - yi, sk = Math.min(skirt(x), zt - 22), dep = zt - sk;
     return [[x, s * yi, zt - 10], [x, s * (yi + 0.45 * wd), zt], [x, s * (yo - 0.15 * wd), zt - 0.1 * dep - 6], [x, s * yo, zt - 0.4 * dep - 10], [x, s * yo, sk], [x, s * yi, sk]] as V[]; });
-  b.mat(PAINT, 0.45).loft(R6);
+  b.mat(PAINT, 0.45, 'paint').loft(R6);
   b.mat(DARK, 0.05); for (let i = 0; i + 1 < R6.length; i++) { const A = R6[i]!, B = R6[i + 1]!, d = (p: V): V => [p[0], p[1] - s * 5, p[2] - 4]; if (A[4]![2] > 300 || B[4]![2] > 300) b.quad(d(A[4]!), A[5]!, B[5]!, d(B[4]!)); } }   // the dark under the arch
 
 function wheel(b: Build, x: number, wy: number, s: 1 | -1, spin = 0) { const o: V = [x, s * wy, R], rim = 222, f = s * (TW / 2);
-  b.mat(RUBBER, 0.05).lathe('y', o, [[-TW / 2, rim], [-TW / 2, R - 48], [-TW / 2 + 36, R], [TW / 2 - 36, R], [TW / 2, R - 48], [TW / 2, rim]], 20, false);
+  b.mat(RUBBER, 0.05, 'tyre').lathe('y', o, [[-TW / 2, rim], [-TW / 2, R - 48], [-TW / 2 + 36, R], [TW / 2 - 36, R], [TW / 2, R - 48], [TW / 2, rim]], 20, false);
   b.mat(DARK, 0.05).lathe('y', o, [[-f * 0.9, 0], [-f * 0.9, rim]], 12, false);
-  b.mat(PAINT, 0.45).lathe('y', o, [[f, rim + 5], [f * 0.55, rim - 16], [f * 0.55, rim * 0.84], [f * 0.95, 96]], 20, false);                // the pressed disc, dished to its rim
-  b.mat(CHROME, 0.9).lathe('y', o, [[f * 0.95, 96], [f * 1.3, 78], [f * 1.5, 40], [f * 1.5, 0]], 12, false);                                 // the plain cap
+  b.mat(PAINT, 0.45, 'paint').lathe('y', o, [[f, rim + 5], [f * 0.55, rim - 16], [f * 0.55, rim * 0.84], [f * 0.95, 96]], 20, false);                // the pressed disc, dished to its rim
+  b.mat(CHROME, 0.9, 'metal').lathe('y', o, [[f * 0.95, 96], [f * 1.3, 78], [f * 1.5, 40], [f * 1.5, 0]], 12, false);                                 // the plain cap
   b.mat(DARK, 0.05); for (let k = 0; k < 8; k++) { const P = (a: number, r: number): V => [x + Math.cos(a) * r, s * wy + f * (0.95 - 0.4 * (r - 96) / (rim * 0.84 - 96)) + s * 3, R + Math.sin(a) * r], a = spin + k / 8 * Math.PI * 2; b.quad(P(a - 0.13, 128), P(a + 0.13, 128), P(a + 0.11, 162), P(a - 0.11, 162)); } }   // the ring of holes
 
 export function mesh(spin = 0): Mesh { const b = new Low(); b.dz = DZ;
   // ---- the body: the raked nose, bonnet and scuttle, the tub cut down to the floor, the long tail ----
-  b.mat(PAINT, 0.45);
+  b.mat(PAINT, 0.45, 'paint');
   const xs = [62, 75, 100, 147, 200, 261, 340, 423, 500, 570, 651, 749, 847, 977, 1303, 1628, 1700, 1756, 1760, 2100, 2476, 2480, 2540, 2800, 3061, 3126, 3191, 3256, 3321, 3387, 3452, 3517, 3574, 3595];
   b.loft(xs.map(x => { const pit = x >= 1760 && x <= 2476; return section(x, at(HALF, x), at(BOT, x), pit ? FLOOR : at(TOP, x), pit ? 8 : at(SQ, x), 6); }));
   for (const s of [1, -1]) b.loft([1762, 1830, 1872, 1954, 2051, 2182, 2279, 2345, 2393, 2442, 2478].map(x => { const w = at(HALF, x), zt = at(BELT, x); return [[x, s * (w - 52), FLOOR], [x, s * (w - 2), FLOOR], [x, s * (w - 2), zt - 14], [x, s * (w - 20), zt], [x, s * (w - 52), zt - 6]] as V[]; }));
@@ -56,19 +56,19 @@ export function mesh(spin = 0): Mesh { const b = new Low(); b.dz = DZ;
   b.mat('#3a3330', 0.1).loft([section(1766, at(HALF, 1766) - 14, FLOOR, at(TOP, 1766) - 14, at(SQ, 1766), 8)]);   // the dash: the scuttle's back face
   b.mat('#d8d2bf', 0.4); for (const y of [-260, -120, 120, 260]) b.lathe('x', [0, y, 950], [[1767, 0], [1771, 42]], 8, false);
   // two seats: cushion and rounded back each
-  for (const s of [1, -1]) { b.mat(LEATHER, 0.25).box(2010, 2400, Math.min(s * 30, s * 445), Math.max(s * 30, s * 445), FLOOR, 610);
-    b.mat(LEATHER2, 0.25).loft(([[2370, 610, 800], [2410, 570, 880], [2450, 570, 925], [2474, 640, 915]] as const).map(([x, zb, zt]) => section(x, 215, zb, zt, 3, 6, 12).map(([px, py, pz]) => [px, py + s * 240, pz] as V)));
+  for (const s of [1, -1]) { b.mat(LEATHER, 0.25, 'leather').box(2010, 2400, Math.min(s * 30, s * 445), Math.max(s * 30, s * 445), FLOOR, 610);
+    b.mat(LEATHER2, 0.25, 'leather').loft(([[2370, 610, 800], [2410, 570, 880], [2450, 570, 925], [2474, 640, 915]] as const).map(([x, zb, zt]) => section(x, 215, zb, zt, 3, 6, 12).map(([px, py, pz]) => [px, py + s * 240, pz] as V)));
     b.mat('#5e331c', 0.1); for (const y of [100, 170, 240, 310, 380]) b.bar([2020, s * y, 612], [2365, s * y, 612], 8); }
   // the folded hood under its cover behind the seats
-  b.mat(CANVAS, 0.15).loft(([[2462, 470, 990], [2483, 484, 1060], [2540, 492, 1085], [2768, 490, 1085], [2914, 462, 1081], [2996, 395, 1060], [3040, 300, 1030], [3069, 160, 1005]] as const).map(([x, w, zt]) => section(x, w, 870, zt, 2.3, 6, 16)));
+  b.mat(CANVAS, 0.15, 'canvas').loft(([[2462, 470, 990], [2483, 484, 1060], [2540, 492, 1085], [2768, 490, 1085], [2914, 462, 1081], [2996, 395, 1060], [3040, 300, 1030], [3069, 160, 1005]] as const).map(([x, w, zt]) => section(x, w, 870, zt, 2.3, 6, 16)));
   // bonnet: centre hinge, top louvres, side slots, two straps with buckles; the doors' shut lines and hinges; the boot handle
-  b.mat(CHROME, 0.9).bar([600, 0, at(TOP, 600) + 5], [847, 0, at(TOP, 847) + 5], 14, 8).bar([847, 0, at(TOP, 847) + 5], [1700, 0, at(TOP, 1700) + 5], 14, 8);
+  b.mat(CHROME, 0.9, 'metal').bar([600, 0, at(TOP, 600) + 5], [847, 0, at(TOP, 847) + 5], 14, 8).bar([847, 0, at(TOP, 847) + 5], [1700, 0, at(TOP, 1700) + 5], 14, 8);
   b.mat(SEAM, 0.1); for (const s of [1, -1]) { for (let k = 0; k < 12; k++) { const x = 740 + k * 64, z = (y: number) => skinZ(x + 12, y) + 4; b.quad([x, s * 90, z(90)], [x + 24, s * 90, z(90)], [x + 24, s * 180, z(180)], [x, s * 180, z(180)]); }
     for (const z of [795, 824, 853, 883, 912]) { const y = (x: number) => s * (skinY(x, z + 6) + 3); b.quad([965, y(965), z], [1285, y(1285), z], [1285, y(1285), z + 11], [965, y(965), z + 11]); }
     const door: [number, number][] = [[1767, 919], [1726, 840], [1661, 710], [1604, 612], [1590, 547], [1604, 482], [1661, 441], [1791, 420], [2182, 425], [2222, 482], [2247, 580], [2271, 678], [2288, 780]], P = ([x, z]: [number, number]): V => [x, s * (skinY(x, z) + 2), z];
     for (let i = 0; i + 1 < door.length; i++) b.bar(P(door[i]!), P(door[i + 1]!), 9); }
-  b.mat(STRAP, 0.2); for (const x of [822, 1248]) b.loft([ring(x, 7), ring(x + 44, 7)].map(r => r.filter(p => p[2] > 600)), false);
-  b.mat(CHROME, 0.9); for (const s of [1, -1]) { for (const x of [822, 1248]) { const y = skinY(x + 22, 950) + 8; b.box(x - 10, x + 54, Math.min(s * y, s * (y + 10)), Math.max(s * y, s * (y + 10)), 928, 970); }
+  b.mat(STRAP, 0.2, 'leather'); for (const x of [822, 1248]) b.loft([ring(x, 7), ring(x + 44, 7)].map(r => r.filter(p => p[2] > 600)), false);
+  b.mat(CHROME, 0.9, 'metal'); for (const s of [1, -1]) { for (const x of [822, 1248]) { const y = skinY(x + 22, 950) + 8; b.box(x - 10, x + 54, Math.min(s * y, s * (y + 10)), Math.max(s * y, s * (y + 10)), 928, 970); }
     for (const [x, z] of [[1712, 815], [1656, 720]] as const) { const y = skinY(x, z) + 6; b.bar([x - 16, s * y, z + 22], [x + 16, s * y, z - 22], 16); } }
   b.bar([3470, 0, skinZ(3470, 0) + 8], [3540, 0, skinZ(3540, 0) + 8], 18);
   // ---- the nose: two tall kidney grilles laid on the raked prow, bright frames, dark cores, upright bars ----
@@ -76,29 +76,29 @@ export function mesh(spin = 0): Mesh { const b = new Low(); b.dz = DZ;
       for (let i = 0; i < rows; i++) for (let j = 0; j < cols; j++) { const P = (u: number, v: number, yc = 0, hw = 0): V => { const z = 598 + 270 * k * (2 * v - 1), t = Math.abs(2 * v - 1), half = 68 * k * (1 - (0.9 * t) ** 4) ** 0.25, y = bars ? yc + hw * (2 * u - 1) : 86 + half * (2 * u - 1); return [skinX(y, z) - off, s * y, z + off * 0.7]; };
         if (!bars) b.quad(P(j / cols, i / rows), P((j + 1) / cols, i / rows), P((j + 1) / cols, (i + 1) / rows), P(j / cols, (i + 1) / rows));
         else for (const yc of [52, 86, 120]) b.quad(P(0, 0.06 + 0.88 * i / rows, yc, 5), P(1, 0.06 + 0.88 * i / rows, yc, 5), P(1, 0.06 + 0.88 * (i + 1) / rows, yc, 5), P(0, 0.06 + 0.88 * (i + 1) / rows, yc, 5)); } };
-    b.mat(CHROME, 0.9); kid(1, 6); b.mat('#2a2824', 0.05); kid(0.86, 10); b.mat('#9a9c9e', 0.7); kid(0.84, 13, true); }
+    b.mat(CHROME, 0.9, 'metal'); kid(1, 6); b.mat('#2a2824', 0.05); kid(0.86, 10); b.mat('#9a9c9e', 0.7); kid(0.84, 13, true); }
   // the apron between the wings under the nose, its two upright bright bars
-  b.mat(PAINT2, 0.45).loft(([[150, 560], [300, 660], [470, 760]] as const).map(([x, zt]) => section(x, at(FW_IN, x) + 6, 300, zt, 5, 6, 12)));
-  b.mat(CHROME, 0.9); for (const s of [1, -1]) b.bar([140, s * 258, 345], [140, s * 258, 560], 24);
+  b.mat(PAINT2, 0.45, 'paint').loft(([[150, 560], [300, 660], [470, 760]] as const).map(([x, zt]) => section(x, at(FW_IN, x) + 6, 300, zt, 5, 6, 12)));
+  b.mat(CHROME, 0.9, 'metal'); for (const s of [1, -1]) b.bar([140, s * 258, 345], [140, s * 258, 560], 24);
   // ---- the screen: one raked bright frame, two panes either side of a centre bar, on a post each side ----
   { const sx = (z: number) => 1694 + (z - 1010) * 0.36, P = (y: number, z: number): V => [sx(z), y, z], bot = (y: number) => skinZ(sx(1040), y) + 8;
     for (const s of [1, -1]) { const p0 = P(0, bot(0)), p1 = P(s * 290, bot(290)), p2 = P(s * 428, bot(428) + 6), p3 = P(s * 424, 1290), p4 = P(s * 395, 1320), p5 = P(0, 1322);
-      b.mat(GLASS, 0.5).quad(p0, p1, p4, p5).quad(p1, p2, p3, p4);
-      b.mat(CHROME, 0.9).bar(p0, p1, 20).bar(p1, p2, 20).bar(p2, p3, 24).bar(p3, p4, 22).bar(p4, p5, 22).bar(p2, [sx(1000) - 6, s * 440, skinZ(1700, 440) - 20], 30); }
-    b.mat(CHROME, 0.9).bar(P(0, bot(0)), P(0, 1322), 18); }
+      b.mat(GLASS, 0.5, 'glass').quad(p0, p1, p4, p5).quad(p1, p2, p3, p4);
+      b.mat(CHROME, 0.9, 'metal').bar(p0, p1, 20).bar(p1, p2, 20).bar(p2, p3, 24).bar(p3, p4, 22).bar(p4, p5, 22).bar(p2, [sx(1000) - 6, s * 440, skinZ(1700, 440) - 20], 30); }
+    b.mat(CHROME, 0.9, 'metal').bar(P(0, bot(0)), P(0, 1322), 18); }
   // ---- wings: the front one sweeps from the nose over its wheel down to the sill, the rear one over its wheel to the tail's tip ----
   for (const s of [1, -1] as const) {
     pontoon(b, s, [8, 14, 23, 49, 85, 124, 130, 187, 252, 326, 407, 505, 602, 700, 798, 892, 898, 993, 1091, 1189, 1286, 1384, 1498, 1628, 1758, 1889, 2051, 2250], FW_TOP, FW_OUT, FW_IN, x => Math.max(x < FX ? 470 : 287, arch(x, FX)));
     pontoon(b, s, [2244, 2288, 2320, 2348, 2380, 2442, 2524, 2530, 2600, 2670, 2800, 2931, 2996, 3061, 3126, 3191, 3256, 3292, 3298, 3321, 3387, 3452, 3517, 3566, 3622], RW_TOP, RW_OUT, RW_IN, x => Math.max(x < RX ? 287 : at([[3298, 280], [3420, 295], [3574, 325], [3622, 335]], x), arch(x, RX)));
     b.mat(DARK, 0.05).box(FX - 200, FX + 260, Math.min(s * 200, s * 330), Math.max(s * 200, s * 330), 300, 690).box(RX - 370, RX + 370, Math.min(s * 300, s * 540), Math.max(s * 300, s * 540), 300, 740);   // the wheel houses
     // head lamps faired into the valley between wing and nose; tail lamps on the rear wings' tips
-    b.mat(PAINT, 0.45).lathe('x', [0, s * 322, 930], [[272, 98], [300, 102], [380, 95], [480, 70], [590, 20]], 14);
-    b.mat(CHROME, 0.9).lathe('x', [0, s * 322, 930], [[254, 94], [260, 106], [274, 106]], 14, false);
-    b.mat(LENS, 0.6).lathe('x', [0, s * 322, 930], [[244, 0], [249, 60], [257, 97]], 14, false);
-    b.mat(CHROME, 0.9).lathe('x', [0, s * 505, 470], [[3540, 30], [3575, 50], [3606, 50]], 10); b.mat(RED, 0.5).lathe('x', [0, s * 505, 470], [[3606, 42], [3618, 26], [3620, 0]], 10, false); }
+    b.mat(PAINT, 0.45, 'paint').lathe('x', [0, s * 322, 930], [[272, 98], [300, 102], [380, 95], [480, 70], [590, 20]], 14);
+    b.mat(CHROME, 0.9, 'metal').lathe('x', [0, s * 322, 930], [[254, 94], [260, 106], [274, 106]], 14, false);
+    b.mat(LENS, 0.6, 'lens').lathe('x', [0, s * 322, 930], [[244, 0], [249, 60], [257, 97]], 14, false);
+    b.mat(CHROME, 0.9, 'metal').lathe('x', [0, s * 505, 470], [[3540, 30], [3575, 50], [3606, 50]], 10); b.mat(RED, 0.5).lathe('x', [0, s * 505, 470], [[3606, 42], [3618, 26], [3620, 0]], 10, false); }
   // ---- under the car: the dark, the axles, the exhaust's end on the right ----
   b.mat(DARK, 0.05).box(200, 3350, -400, 400, 262, 330);
-  b.mat(CHROME, 0.9).lathe('x', [0, -383, 262], [[3300, 34], [3440, 34]], 8, false); b.mat(DARK, 0.05).lathe('x', [0, -383, 262], [[3436, 0], [3436, 30]], 8, false);
+  b.mat(CHROME, 0.9, 'metal').lathe('x', [0, -383, 262], [[3300, 34], [3440, 34]], 8, false); b.mat(DARK, 0.05).lathe('x', [0, -383, 262], [[3436, 0], [3436, 30]], 8, false);
   b.dz = 0;
   b.mat(DARK, 0.05).bar([FX, -WYF, R], [FX, WYF, R], 60).bar([RX, -WYR, R], [RX, WYR, R], 70);
   for (const s of [1, -1] as const) { wheel(b, FX, WYF, s, spin); wheel(b, RX, WYR, s, spin); }

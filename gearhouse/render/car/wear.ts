@@ -114,3 +114,5 @@ export function applyWear(im: CarImage, w: Wear): CarImage {
         carry *= fall * (0.985 + hash(x, y) * 0.015); } } }
   return { ...im, rgba };
 }
+/** the noise and colour helpers, shared with the mesh renderer (render/car/mesh.ts) */
+export { hash, fbm, ss, mix, rustAt, rgb2hsl, hsl2rgb, cells };

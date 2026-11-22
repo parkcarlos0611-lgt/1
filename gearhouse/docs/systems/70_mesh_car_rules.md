@@ -43,3 +43,18 @@ layout, helpers and level of detail.
   each car's paint colours from its sheet json (`paint` or the parts' colours) so it reads as the same car.
 - Budget: 3 000–8 000 triangles a car. Detail that does not show at game size (mm 19.6) is not worth triangles.
 - Preview defaults chosen by the user: resolution 0.85x (19.6 mm a pixel), outline 3 px.
+
+## Materials, glass, age (review 83)
+- `b.mat(colour, gloss, kind)`: kind is one of `paint`, `metal` (chrome, nickel, aluminium), `glass`, `shine` (a
+  reflection streak on glass), `tyre`, `wood`, `canvas` (roof cloth, cloth upholstery), `leather`, `lens`, `grille`
+  (a grille's mesh core), or `plain` (default: no texture, no age). The kind picks the texture (wood grain along the
+  part's longest edge, cloth and leather mottling, tread blocks on a tyre's outermost band, a diamond wire mesh on
+  `grille`) and how age shows (rust and fading on `paint`, a milky film and pitting on `metal`, a broken `lens`).
+- Glass is drawn see-through at the page's opacity (default 70 %) in one tint for every car; its own colour is not
+  used. What is behind it shows: closed cars need an interior.
+- Closed-car interior (behind every window): a dark floor, the door and side panels' inner faces in a trim colour,
+  front and rear seats (cushion and back, upholstery `canvas` or `leather`), a dark headliner under the roof, the
+  dash's back face, a parcel shelf behind the rear seat. No steering wheel for now (decision pending). The cabin must
+  be hollow between the glass panes so the seats show; check at `glass=0.7` and `glass=0.3`.
+- Check age with `rust=0.6 fade=0.5 dent=1 lamp=1` on meshshot: paint that should not rust (glass frames, roof cloth)
+  must not be `paint`.

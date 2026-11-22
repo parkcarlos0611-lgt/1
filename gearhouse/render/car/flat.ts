@@ -50,7 +50,7 @@ const OUTLINED = new Set<Material>(['paint', 'paint2', 'chrome', 'black', 'rubbe
 /** shading of a painted run, top to bottom, by kind of surface */
 const GRAD: Record<string, [number, number]> = { side: [2.75, 1.45], hood: [3.0, 1.6], roof: [3.5, 2.1], fender: [3.25, 0.45], flat: [2.2, 1.6] };
 
-export function rasterizeFlat(d0: CarDesign, opt: { frameW?: number; shadow?: boolean; mm?: number; outline?: number; wheelSpin?: number } = {}): CarImage {
+export function rasterizeFlat(d0: CarDesign, opt: { frameW?: number; shadow?: boolean; mm?: number; outline?: number; wheelSpin?: number; plain?: boolean } = {}): CarImage {
   const SPIN = opt.wheelSpin ?? 0;   // the wheels turned by this much (radians): their pictures at each angle are drawn, not turned afterwards
   const d = expandParts(d0);
   const MM = opt.mm ?? MM_PER_PX, t0 = performance.now(), PAL = palette(d), frameW = opt.frameW ?? Math.max(2, Math.round(20 / MM));
@@ -134,11 +134,11 @@ export function rasterizeFlat(d0: CarDesign, opt: { frameW?: number; shadow?: bo
         else if (mt === 'lens' || mt === 'lensR') l = t < 0.35 ? 3 : x - 0 < 2 ? 4 : 2;
         else if (mt === 'shadow') l = 0;
         else if (mt === 'paint' || mt === 'paint2' || mt === 'canvas' || mt === 'wood') { const g = GRAD[p.surface] ?? GRAD.side!; let v = g[0] + (g[1] - g[0]) * Math.pow(t, 1.15);
-          if (n > 10 && p.surface === 'side') v += -0.75 * Math.exp(-(((t - 0.36) / 0.045) ** 2)) + 0.45 * Math.exp(-(((t - 0.47) / 0.07) ** 2));      // horizon line and ground bounce
+          if (n > 10 && p.surface === 'side' && !opt.plain) v += -0.75 * Math.exp(-(((t - 0.36) / 0.045) ** 2)) + 0.45 * Math.exp(-(((t - 0.47) / 0.07) ** 2));      // horizon line and ground bounce
           l = dith(gx, gyy, v, 0.13); if (kb === 0 && n > 2) l = Math.max(0, l - 1);
           if (k === 0) { const above = at(gx, gyy - 1); l = above >= 0 && mat[above] === 'glass' ? 3 : 4; } else if (k === 1 && n > 3) l = Math.max(l, 3); }
         else { const base = mt === 'black' ? 1 : mt === 'white' ? 3 : 2; l = k === 0 && n > 1 ? base + 1 : kb === 0 && n > 1 ? base - 1 : base; }
-        if (p.shade && (mt === 'paint' || mt === 'paint2')) { const S = p.shade, fu = Math.min(S.nx - 1, Math.max(0, (gx + 0.5 - x0) / Math.max(1, x1 - x0) * S.nx - 0.5)), ft = t * (S.nt - 1), u0 = Math.floor(fu), t0 = Math.floor(ft), u1 = Math.min(S.nx - 1, u0 + 1), t1 = Math.min(S.nt - 1, t0 + 1), au = fu - u0, bt = ft - t0;
+        if (!opt.plain && p.shade && (mt === 'paint' || mt === 'paint2')) { const S = p.shade, fu = Math.min(S.nx - 1, Math.max(0, (gx + 0.5 - x0) / Math.max(1, x1 - x0) * S.nx - 0.5)), ft = t * (S.nt - 1), u0 = Math.floor(fu), t0 = Math.floor(ft), u1 = Math.min(S.nx - 1, u0 + 1), t1 = Math.min(S.nt - 1, t0 + 1), au = fu - u0, bt = ft - t0;
           const g = (a: number, b: number) => S.v[b * S.nx + a]!, v = (g(u0, t0) * (1 - au) + g(u1, t0) * au) * (1 - bt) + (g(u0, t1) * (1 - au) + g(u1, t1) * au) * bt, f = Math.floor(v), fr = Math.min(1, Math.max(0, (v - f - 0.5) / 0.3 + 0.5));
           shaded = f + (fr > BAYER[(gyy & 3) * 4 + (gx & 3)]! ? 1 : 0); }
         set(gx, gyy, mt, l, ly, id); if (shaded >= 0) setRaw(gyy * w + gx, shaded); if (GL > 0 && (mt === 'paint' || mt === 'paint2') && n > 3 && k > 0 && kb > 0) glossAt(gyy * w + gx, gx, gyy, t, n, p.surface); if (tm && mt !== 'glass') { const tl = toneAt(gx, gyy); if (tl >= 0) setRaw(gyy * w + gx, tl); } if (p.clip) noOutline[gyy * w + gx] = 1; } } }

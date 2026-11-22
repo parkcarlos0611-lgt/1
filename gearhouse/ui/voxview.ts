@@ -26,7 +26,7 @@ let solid: Solid | null = null, surf: Surface | null = null, slices: Record<stri
 function sel(): string { return `${st.car}|${st.cell}|${st.tex}`; }
 function ensure(): boolean {
   if (key === sel() && solid) return true; if (building) return false; building = true; stat.textContent = '입체를 만드는 중…';
-  setTimeout(() => { const t = performance.now(); const m = CARS[st.car]![1] as CarModel; solid = solidOf(m, st.cell); surf = surfaceOf(solid, st.tex ? texOf(m, 8) : undefined, m.width); slices = {}; key = sel();
+  setTimeout(() => { const t = performance.now(); const m = CARS[st.car]![1] as CarModel; solid = solidOf(m, st.cell); surf = surfaceOf(solid, st.tex ? texOf(m, 6) : undefined, m.width); slices = {}; key = sel();
     stat.dataset.build = `입체 ${Math.round(performance.now() - t)} ms, 겉면 칸 ${surf.n.toLocaleString()}개`; building = false; dirty = true; }, 30);
   return false; }
 function slicesFor(every: number, mm: number) { const k = `${every}|${mm}`; return (slices[k] ??= slicesOf(solid!, mm, every)); }

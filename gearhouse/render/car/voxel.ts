@@ -9,97 +9,154 @@ import { viewDesign, type CarModel, type CarPart, type ViewName } from './model'
 import { rasterizeFlat } from './flat';
 import type { CarImage } from './raster';
 
-export interface Solid { c: number; nx: number; ny: number; nz: number; x0: number; y0: number; owner: Int16Array; rgb: [number, number, number][]; mat: string[]; ids: string[]; cx0: number }
+export interface Solid { c: number; nx: number; ny: number; nz: number; x0: number; y0: number; owner: Int16Array; rgb: [number, number, number][]; mat: string[]; ids: string[]; cx0: number;
+  /** how solid the neighbourhood of each cell is (0..1, a blur of the cells): smooth outward directions and crevice shading come from it */
+  den: Float32Array }
 const MAT_RGB: Record<string, string> = { chrome: '#c4c6c8', glass: '#7f909a', black: '#24232b', rubber: '#25232b', iron: '#4f525d', wood: '#9a6a3a', lens: '#d9d5b6', lensR: '#c22c2b', white: '#d4d7dc', canvas: '#8c8270' };
 const hex = (h: string): [number, number, number] => { const v = parseInt(h.replace('#', ''), 16); return [(v >> 16) & 255, (v >> 8) & 255, v & 255]; };
 
 function inPoly(pts: number[][], u: number, v: number) { let ins = false; for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) { const [ui, vi] = pts[i]!, [uj, vj] = pts[j]!;
   if ((vi! > v) !== (vj! > v) && u < (uj! - ui!) * (v - vi!) / (vj! - vi! || 1e-9) + ui!) ins = !ins; } return ins; }
 
-/** the car as cells of `c` mm (default 15): the body's parts and the wheels; the chassis layer left out */
+/** The car as cells of `c` mm: the body's parts and the wheels; the chassis layer left out. The rules (docs/systems/68):
+ *  - the drawings' stand-ins stay out (tyres drawn as parts, wheel-well backs, dark backdrops drawn across the car);
+ *  - a part lying on another (`on`) is held inside that part's box, so glass and lenses sit flush, not proud;
+ *  - a screen's panes drawn only from in front follow the rake its side outline gives;
+ *  - an open car's cockpit is a hollow with a floor, its seats standing in it;
+ *  - corners are rounded for every part thick enough to have them, whatever it is made of. */
 export function solidOf(m: CarModel, c = 15, tyreW?: number): Solid {
   const L = m.length, W = m.width, H = m.height, x0 = -150, y0 = -W / 2 - 150, nx = Math.ceil((L + 300) / c), ny = Math.ceil((W + 300) / c), nz = Math.ceil((H + 150) / c);
-  const owner = new Int16Array(nx * ny * nz).fill(-1), pri = new Float32Array(nx * ny * nz).fill(-1e9), rgb: [number, number, number][] = [], mat: string[] = [], ids: string[] = [];
-  const at = (i: number, j: number, k: number) => (k * ny + j) * nx + i;
-  // left out: the drawings' own stand-ins that become blocks in a solid: tyres drawn as parts (the wheels are made below),
-  // the dark wheel-well backs, and dark fill panels drawn in one view only (a slab through the car in the others)
-  const vol = (p: CarPart) => (p.box.x[1] - p.box.x[0]) * (p.box.y[1] - p.box.y[0]) * (p.box.z[1] - p.box.z[0]) / 1e9;
-  const parts = m.parts.filter(p => p.layer !== 'chassis' && p.outlines && p.element !== 'wheel' && p.element !== 'house'
-    && !((p.material === 'black' || p.material === 'iron' || p.material === 'rubber') && Object.keys(p.outlines).length === 1 && vol(p) > 0.015));
-  parts.forEach((p: CarPart) => {
-    const r = p as unknown as { color?: string; lift?: number }, col = r.color ?? (p.material === 'paint' ? m.paint : p.material === 'paint2' ? m.paint2 : p.material === 'chrome' && (m as unknown as { chrome?: string }).chrome ? (m as unknown as { chrome: string }).chrome : MAT_RGB[p.material] ?? '#808080');
-    const id = rgb.push(hex(col)) - 1; mat.push(p.material); ids.push(p.id);
-    const o = p.outlines, b = p.box, side = o.side, top = o.top, fr = o.front ?? o.rear, P = Math.max(Math.abs(b.y[0]), Math.abs(b.y[1])) + (r.lift ?? 0) * 3;
-    for (const s of p.pair ? [1, -1] : [1]) {
-      const ya = s > 0 ? b.y[0] : -b.y[1], yb = s > 0 ? b.y[1] : -b.y[0];
-      const i0 = Math.max(0, Math.floor((b.x[0] - x0) / c)), i1 = Math.min(nx - 1, Math.ceil((b.x[1] - x0) / c)), j0 = Math.max(0, Math.floor((ya - y0) / c)), j1 = Math.min(ny - 1, Math.ceil((yb - y0) / c)), k0 = Math.max(0, Math.floor(b.z[0] / c)), k1 = Math.min(nz - 1, Math.ceil(b.z[1] / c));
+  const N = nx * ny * nz, owner = new Int16Array(N).fill(-1), pri = new Float32Array(N).fill(-1e9), rgb: [number, number, number][] = [], mat: string[] = [], ids: string[] = [], elem: string[] = [], thick: boolean[] = [];
+  const at = (i: number, j: number, k: number) => (k * ny + j) * nx + i, byId = new Map(m.parts.map(p => [p.id, p]));
+  const dark = (p: CarPart) => p.material === 'black' || p.material === 'iron' || p.material === 'rubber', vol = (p: CarPart) => (p.box.x[1] - p.box.x[0]) * (p.box.y[1] - p.box.y[0]) * (p.box.z[1] - p.box.z[0]) / 1e9;
+  const one = (p: CarPart) => Object.keys(p.outlines).length === 1 ? Object.keys(p.outlines)[0]! : '';
+  const parts = m.parts.filter(p => p.layer !== 'chassis' && p.outlines && p.element !== 'wheel' && p.element !== 'house' && p.element !== 'seat'
+    && !(dark(p) && one(p) !== '' && one(p) !== 'side' && vol(p) > 0.015));
+  // the rake of each element's parts that have a side outline (screens): parts of that element drawn only from in front follow it
+  const rake = new Map<string, CarPart[]>(); for (const p of parts) if (p.element === 'screen' && p.outlines.side) rake.set(p.element, [...(rake.get(p.element) ?? []), p]);
+  const newId = (p: CarPart) => { const r = p as unknown as { color?: string }, col = r.color ?? (p.material === 'paint' ? m.paint : p.material === 'paint2' ? m.paint2 : p.material === 'chrome' && (m as unknown as { chrome?: string }).chrome ? (m as unknown as { chrome: string }).chrome : MAT_RGB[p.material] ?? '#808080');
+    const id = rgb.push(hex(col)) - 1; mat.push(p.material); ids.push(p.id); elem.push(p.element); const b = p.box; thick.push(Math.min(b.x[1] - b.x[0], Math.abs(b.y[1] - b.y[0]) * (p.pair ? 1 : 1), b.z[1] - b.z[0]) >= 150); return id; };
+  // a part drawn in one view only (a sill strip, a handle, a badge, a lamp bar) has no depth of its own: it is laid on
+  // whatever solid lies just behind it along that view's line (within 250 mm), a few cells thick; else it stands where its box says
+  const later: CarPart[] = [];
+  const lay = (p: CarPart) => { const id = newId(p), v = one(p) as 'side' | 'front' | 'rear' | 'top', o = p.outlines[v]!, b = p.box, t = Math.max(1, Math.min(3, Math.round(45 / c))), far = Math.ceil(250 / c);
+    for (const s of p.pair ? [1, -1] : [1]) { const ya = s > 0 ? b.y[0] : -b.y[1], yb = s > 0 ? b.y[1] : -b.y[0];
       const U = (x: number) => (x - b.x[0]) / Math.max(1, b.x[1] - b.x[0]), Vz = (z: number) => (z - b.z[0]) / Math.max(1, b.z[1] - b.z[0]), Vy = (y: number) => ((s > 0 ? y : -y) - b.y[0]) / Math.max(1, b.y[1] - b.y[0]);
-      // each view's outline as a mask over its two axes, then a cell is in when it is in every view the part has
+      const I = (x: number) => Math.max(0, Math.min(nx - 1, Math.floor((x - x0) / c))), J = (y: number) => Math.max(0, Math.min(ny - 1, Math.floor((y - y0) / c))), K = (z: number) => Math.max(0, Math.min(nz - 1, Math.floor(z / c)));
+      // along the view's line: n0 the outer end of the box, dir the way out, len the box's own depth in cells
+      const run = (get: (n: number) => number, n0: number, n1: number, dir: number, lim: number, put: (n: number) => void) => { let hit = -1;
+        for (let n = n0 + dir * far, q = 0; q <= 2 * far + Math.abs(n1 - n0); q++, n -= dir) { if (n < 0 || n >= lim) continue; const a = get(n); if (owner[a]! >= 0 && owner[a] !== id) { hit = n; break; } }
+        if (hit >= 0 && Math.abs(hit - n0) <= far + Math.abs(n1 - n0)) { for (let q = 1; q <= t; q++) { const n = hit + dir * q; if (n >= 0 && n < lim) put(n); } } else for (let n = Math.min(n0, n1); n <= Math.max(n0, n1); n++) put(n); };
+      const set = (a: number) => { owner[a] = id; pri[a] = 1e7; };
+      if (v === 'side') { const mid = (ya + yb) / 2, dir = mid >= 0 ? 1 : -1, n0 = J(dir > 0 ? yb : ya), n1 = J(dir > 0 ? ya : yb);
+        for (let k = K(b.z[0]); k <= K(b.z[1]); k++) for (let i = I(b.x[0]); i <= I(b.x[1]); i++) { if (!inPoly(o, U(x0 + (i + 0.5) * c), Vz((k + 0.5) * c))) continue;
+          if (Math.abs(mid) < 30) { for (let j = n1; j <= n0; j++) set(at(i, j, k)); continue; } run(n => at(i, n, k), n0, n1, dir, ny, n => set(at(i, n, k))); } }
+      else if (v === 'top') { for (let j = J(ya); j <= J(yb); j++) for (let i = I(b.x[0]); i <= I(b.x[1]); i++) { if (!inPoly(o, U(x0 + (i + 0.5) * c), Vy(y0 + (j + 0.5) * c))) continue; run(n => at(i, j, n), K(b.z[1]), K(b.z[0]), 1, nz, n => set(at(i, j, n))); } }
+      else { const dir = v === 'front' ? -1 : 1, n0 = I(dir < 0 ? b.x[0] : b.x[1]), n1 = I(dir < 0 ? b.x[1] : b.x[0]);
+        for (let k = K(b.z[0]); k <= K(b.z[1]); k++) for (let j = J(ya); j <= J(yb); j++) { if (!inPoly(o, Vy(y0 + (j + 0.5) * c), Vz((k + 0.5) * c))) continue; run(n => at(n, j, k), n0, n1, dir, nx, n => set(at(n, j, k))); } } } };
+  parts.forEach((p: CarPart) => {
+    if (one(p) !== '' && !(dark(p) && vol(p) > 0.015) && !(p.element === 'screen' && rake.has('screen')) && p.element !== 'cockpit') { later.push(p); return; }
+    const r = p as unknown as { lift?: number; on?: string }, id = newId(p);
+    const o = p.outlines, b = p.box, side = o.side, top = o.top, fr = o.front ?? o.rear, P = Math.max(Math.abs(b.y[0]), Math.abs(b.y[1])) + (r.lift ?? 0) * 3;
+    const par = r.on ? byId.get(r.on) : undefined, rk = !side && fr ? rake.get(p.element) : undefined;
+    const inset = dark(p) && one(p) === 'side' && vol(p) > 0.015 ? 0.03 : 0;   // a dark mass drawn from the side only: kept inside the body's sides
+    for (const s of p.pair ? [1, -1] : [1]) {
+      let ya = s > 0 ? b.y[0] : -b.y[1], yb = s > 0 ? b.y[1] : -b.y[0], xa = b.x[0], xb = b.x[1], za = b.z[0], zb = b.z[1];
+      const half = !p.pair && b.y[0] >= -1 && b.y[1] > 100 && !!side && !top && !fr; if (half) ya = -yb;   // drawn from the side as a slab from the centre line out: it is the same on both sides
+      if (inset) { const d = (yb - ya) * inset; ya += d; yb -= d; }
+      if (par) { const q = par.box, t = c * 1.2, pa = par.pair ? (s > 0 ? q.y[0] : -q.y[1]) : q.y[0], pb = par.pair ? (s > 0 ? q.y[1] : -q.y[0]) : q.y[1];   // held inside what it lies on (where that leaves anything of it)
+        if (Math.min(xb, q.x[1] + t) > Math.max(xa, q.x[0] - t)) { xa = Math.max(xa, q.x[0] - t); xb = Math.min(xb, q.x[1] + t); }
+        if (Math.min(yb, pb + t) > Math.max(ya, pa - t)) { ya = Math.max(ya, pa - t); yb = Math.min(yb, pb + t); }
+        if (Math.min(zb, q.z[1] + t) > Math.max(za, q.z[0] - t)) { za = Math.max(za, q.z[0] - t); zb = Math.min(zb, q.z[1] + t); } }
+      const i0 = Math.max(0, Math.floor((xa - x0) / c)), i1 = Math.min(nx - 1, Math.ceil((xb - x0) / c)), j0 = Math.max(0, Math.floor((ya - y0) / c)), j1 = Math.min(ny - 1, Math.ceil((yb - y0) / c)), k0 = Math.max(0, Math.floor(za / c)), k1 = Math.min(nz - 1, Math.ceil(zb / c));
+      const U = (x: number) => (x - b.x[0]) / Math.max(1, b.x[1] - b.x[0]), Vz = (z: number) => (z - b.z[0]) / Math.max(1, b.z[1] - b.z[0]), Vy = (y: number) => half ? 0.5 : ((s > 0 ? y : -y) - b.y[0]) / Math.max(1, b.y[1] - b.y[0]);
       const sm = new Map<number, boolean>(), tm = new Map<number, boolean>(), fm = new Map<number, boolean>();
       for (let k = k0; k <= k1; k++) for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
         const x = x0 + (i + 0.5) * c, y = y0 + (j + 0.5) * c, z = (k + 0.5) * c, u = U(x), vz = Vz(z), vy = Vy(y);
-        if (u < 0 || u > 1 || vz < 0 || vz > 1 || vy < 0 || vy > 1) continue;
+        if (u < 0 || u > 1 || vz < 0 || vz > 1 || vy < 0 || vy > 1 || x < xa || x > xb || y < ya || y > yb || z < za || z > zb) continue;
         if (side) { const key = k * nx + i; let v = sm.get(key); if (v === undefined) { v = inPoly(side, u, vz); sm.set(key, v); } if (!v) continue; }
+        else if (rk) { const key = k * nx + i; let v = sm.get(key); if (v === undefined) { v = rk.some(q => { const qb = q.box, uu = (x - qb.x[0]) / Math.max(1, qb.x[1] - qb.x[0]), vv = (z - qb.z[0]) / Math.max(1, qb.z[1] - qb.z[0]); return uu >= 0 && uu <= 1 && vv >= 0 && vv <= 1 && inPoly(q.outlines.side!, uu, vv); }); sm.set(key, v); } if (!v) continue; }
         if (top) { const key = j * nx + i; let v = tm.get(key); if (v === undefined) { v = inPoly(top, u, vy); tm.set(key, v); } if (!v) continue; }
         if (fr) { const key = k * ny + j; let v = fm.get(key); if (v === undefined) { v = inPoly(fr, vy, vz); fm.set(key, v); } if (!v) continue; }
         const a = at(i, j, k); if (P >= pri[a]!) { pri[a] = P; owner[a] = id; } } } });
+  later.forEach(lay);
+  // a part left standing free beside the car (the sheet's plan drawn wider than its front view: a running board, a sill
+  // strip) is carried in towards the centre line until it meets the car, up to 300 mm
+  { const touch = new Uint8Array(rgb.length), has = new Uint8Array(rgb.length), step = [1, nx, nx * ny];
+    for (let k = 1; k < nz - 1; k++) for (let j = 1; j < ny - 1; j++) for (let i = 1; i < nx - 1; i++) { const a = at(i, j, k), o = owner[a]!; if (o < 0) continue; has[o] = 1; if (touch[o]) continue;
+      for (const d of step) { const u = owner[a + d]!, v = owner[a - d]!; if ((u >= 0 && u !== o) || (v >= 0 && v !== o)) { touch[o] = 1; break; } } }
+    const reach = Math.ceil(300 / c), jc = Math.round((0 - y0) / c), thin = new Set(later.map(p => p.id));
+    for (let o = 0; o < rgb.length; o++) { const gaps: number[] = []; if (!has[o] || (touch[o] && !(elem[o] === 'board' || /sill|strip/i.test(ids[o]!)))) continue; const add: number[] = [];   // boards and sill strips always (they touch the wings at their ends and still stand off the body)
+      for (let k = 0; k < nz; k++) for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) { if (owner[at(i, j, k)] !== o) continue; const dir = j > jc ? -1 : 1; if (Math.abs(j - jc) < 4 || owner[at(i, j + dir, k)] === o) continue;
+        scan: for (let q = 1; q <= reach; q++) { const jj = j + dir * q; if (jj < 0 || jj >= ny) break;   // the car at this height, or a little above (a strip under the body's edge)
+          for (let dz = 0; dz <= Math.ceil(150 / c) && k + dz < nz; dz++) { const u = owner[at(i, jj, k + dz)]!; if (u >= 0 && u !== o) { gaps.push(q - 1 + (dz ? 2 : 0)); for (let t = 1; t < q + (dz ? 2 : 0); t++) add.push(at(i, j + dir * t, k)); break scan; } } } }
+      if (thin.has(ids[o]!) && gaps.length) { gaps.sort((p, q) => p - q); const g = gaps[gaps.length >> 1]!, cells: [number, number, number][] = [];   // a thin strip is carried in whole, not widened
+        for (let k = 0; k < nz; k++) for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) if (owner[at(i, j, k)] === o) cells.push([i, j, k]);
+        for (const [i, j, k] of cells) owner[at(i, j, k)] = -1; for (const [i, j, k] of cells) { const jj = j + (j > jc ? -g : g); if (jj >= 0 && jj < ny) { owner[at(i, jj, k)] = o; pri[at(i, jj, k)] = 1e7; } } continue; }
+      for (const a of add) { owner[a] = o; pri[a] = 1e7; } } }
+  // an open car's cockpit: hollowed to a floor some way below its rim, the seats standing in the hollow
+  const HULL = new Set(['body', 'cowl', 'deck', 'cockpit', 'hood', 'apron']);
+  for (const ck of m.parts.filter(p => p.element === 'cockpit' && p.outlines.top)) { const b = ck.box, top = ck.outlines.top!, zTop = b.z[1], zf = Math.max(b.z[0] - 60, zTop - 330), cid = ids.indexOf(ck.id);
+    const i0 = Math.max(0, Math.floor((b.x[0] - x0) / c)), i1 = Math.min(nx - 1, Math.ceil((b.x[1] - x0) / c)), j0 = Math.max(0, Math.floor((b.y[0] - y0) / c)), j1 = Math.min(ny - 1, Math.ceil((b.y[1] - y0) / c));
+    const cell = (i: number, j: number) => { const x = x0 + (i + 0.5) * c, y = y0 + (j + 0.5) * c; return [(x - b.x[0]) / Math.max(1, b.x[1] - b.x[0]), (y - b.y[0]) / Math.max(1, b.y[1] - b.y[0])] as const; };
+    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) { const [u, v] = cell(i, j); if (!inPoly(top, u, v)) continue;
+      for (let k = 0; k < nz; k++) { const z = (k + 0.5) * c, a = at(i, j, k), o = owner[a]!; if (z > zf) { if (o >= 0 && HULL.has(elem[o]!)) owner[a] = -1; } else if (z > zf - 2.5 * c && cid >= 0) { owner[a] = cid; pri[a] = 1e8; } } }
+    for (const sp of m.parts.filter(p => p.element === 'seat' && p.outlines.top && (p as unknown as { clip?: string }).clip !== undefined)) { const id = newId(sp), back = /Back$/.test(sp.id), z1 = back ? zTop - 20 : zf + 150, st = sp.outlines.top!;
+      for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) { const [u, v] = cell(i, j); if (!inPoly(st, u, v) || !inPoly(top, u, v)) continue;
+        for (let k = 0; k < nz; k++) { const z = (k + 0.5) * c; if (z > zf - c && z <= z1) { const a = at(i, j, k); owner[a] = id; pri[a] = 1e8 + (back ? 1 : 0); } } } } }
   // the wheels: a tyre round a rim and its cap, on each side, axis across the car
-  const wi = m.wheel ?? {}, tw = tyreW ?? 175, tyre = rgb.push(hex('#25232b')) - 1; mat.push('rubber'); ids.push('wheel');
-  const rimC = rgb.push(hex(wi.rimMaterial === 'paint' ? m.paint : wi.rimMaterial === 'paint2' ? m.paint2 : '#c4c6c8')) - 1; mat.push(wi.rimMaterial === 'chrome' ? 'chrome' : 'paint'); ids.push('wheel');
+  const wi = m.wheel ?? {}, tw = tyreW ?? 175, tyre = rgb.push(hex('#25232b')) - 1; mat.push('rubber'); ids.push('wheel'); elem.push('wheel'); thick.push(false);
+  const rimC = rgb.push(hex(wi.rimMaterial === 'paint' ? m.paint : wi.rimMaterial === 'paint2' ? m.paint2 : '#c4c6c8')) - 1; mat.push(wi.rimMaterial === 'chrome' ? 'chrome' : 'paint'); ids.push('wheel'); elem.push('wheel'); thick.push(false);
   for (const w of m.wheels) for (const s of [1, -1]) { const yc = s * w.y, rim = w.r * (wi.rim ?? 0.6);
-    for (let k = 0; k < nz; k++) for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) { const x = x0 + (i + 0.5) * c, y = y0 + (j + 0.5) * c, z = (k + 0.5) * c, d = Math.hypot(x - w.x, z - w.r);
-      const e = Math.abs(y - yc) / (tw / 2);   // across the tread: its shoulders round off as a tyre's do (the section a squashed circle)
+    const i0 = Math.max(0, Math.floor((w.x - w.r - x0) / c)), i1 = Math.min(nx - 1, Math.ceil((w.x + w.r - x0) / c)), j0 = Math.max(0, Math.floor((yc - tw / 2 - y0) / c)), j1 = Math.min(ny - 1, Math.ceil((yc + tw / 2 - y0) / c)), k1 = Math.min(nz - 1, Math.ceil(2 * w.r / c));
+    for (let k = 0; k <= k1; k++) for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) { const x = x0 + (i + 0.5) * c, y = y0 + (j + 0.5) * c, z = (k + 0.5) * c, d = Math.hypot(x - w.x, z - w.r);
+      const e = Math.abs(y - yc) / (tw / 2);   // across the tread: its shoulders round off as a tyre's do
       if (e > 1 || d > w.r - w.r * 0.2 * (1 - Math.sqrt(Math.max(0, 1 - e * e)))) continue; const a = at(i, j, k), face = Math.abs(y - yc) > tw / 2 - c * 1.5;
       owner[a] = d > rim ? tyre : face ? rimC : tyre; pri[a] = 1e9; } }
-  const S: Solid = { c, nx, ny, nz, x0, y0, owner, rgb, mat, ids, cx0: x0 + nx * c / 2 };
-  rounded(S); return S;
+  const S: Solid = { c, nx, ny, nz, x0, y0, owner, rgb, mat, ids, cx0: x0 + nx * c / 2, den: new Float32Array(0) };
+  // corners rounded: cells of parts thick enough to have corners go where a blur of the solid thins out; then the blur
+  // of what is left is kept for outward directions and crevice shading
+  const d0 = density(S, 2); for (let i = 0; i < N; i++) { const o = owner[i]!; if (o >= 0 && thick[o] && d0[i]! < 0.42) owner[i] = -1; }
+  S.den = density(S, 2); return S;
 }
-/** review 73 (1): the edges a hull of straight extrusions leaves sharp, rounded off: the big painted and cloth panels'
- *  cells kept only where a blur of the solid stays solid (corners and ridges thin away); small or bright parts keep every cell */
-function rounded(S: Solid, r = 2) {
-  const { nx, ny, nz, owner } = S, N = nx * ny * nz, a = new Float32Array(N), b = new Float32Array(N);
+/** a box blur of the solid along each axis in turn (radius r cells) */
+function density(S: Solid, r: number): Float32Array {
+  const { nx, ny, nz, owner } = S, N = nx * ny * nz, a = new Float32Array(N), b = new Float32Array(N), w = 2 * r + 1;
   for (let i = 0; i < N; i++) a[i] = owner[i]! >= 0 ? 1 : 0;
-  // a box blur along each axis in turn (axis length, index stride)
   const pass = (src: Float32Array, dst: Float32Array, len: number, step: number) => { for (let i = 0; i < N; i++) { const p = Math.floor(i / step) % len; let sum = 0;
-      for (let d = -r; d <= r; d++) { const q = p + d; if (q < 0 || q >= len) continue; sum += src[i + d * step]!; } dst[i] = sum / (2 * r + 1); } };
-  pass(a, b, nx, 1); pass(b, a, ny, nx); pass(a, b, nz, nx * ny);
-  for (let i = 0; i < N; i++) { const o = owner[i]!; if (o < 0) continue; const m = S.mat[o]!; if ((m === 'paint' || m === 'paint2' || m === 'canvas') && b[i]! < 0.42) owner[i] = -1; } }
+      for (let d = -r; d <= r; d++) { const q = p + d; if (q < 0 || q >= len) continue; sum += src[i + d * step]!; } dst[i] = sum / w; } };
+  pass(a, b, nx, 1); pass(b, a, ny, nx); pass(a, b, nz, nx * ny); return b; }
 
-export type Tex = Partial<Record<ViewName, CarImage>> & { reach?: Map<string, { x: [number, number]; y: number; z: number }>; mean?: Partial<Record<ViewName, Map<string, number>>> };
-/** the car's own drawings (review 73: "2D pictures laid over it"), at `mm` a pixel: the five views the flat renderer makes */
-export function texOf(m: CarModel, mm = 8, tyreW = 175): Tex { const t: Tex = {}; for (const v of ['left', 'right', 'front', 'rear', 'top'] as ViewName[]) t[v] = rasterizeFlat(viewDesign(m, v), { mm, shadow: false });
+export type Tex = Partial<Record<ViewName, CarImage>> & { reach?: Map<string, { x: [number, number]; y: number; z: number }> };
+/** the car's own drawings (review 73: "2D pictures laid over it"), at `mm` a pixel: the five views the flat renderer
+ *  makes, drawn plain (no gloss, no light read off the sheet): the solid gives the light, the drawings give the marks */
+export function texOf(m0: CarModel, mm = 6, tyreW = 175): Tex { const m = { ...m0, gloss: 0 } as CarModel, t: Tex = {};
+  for (const v of ['left', 'right', 'front', 'rear', 'top'] as ViewName[]) t[v] = rasterizeFlat(viewDesign(m, v), { mm, shadow: false, plain: true });
   // how far out each part reaches (across, up, along), to tell whether the part a drawing shows stands in front of a cell
   const reach = new Map<string, { x: [number, number]; y: number; z: number }>();
   for (const p of m.parts) reach.set(p.id, { x: [p.box.x[0], p.box.x[1]], y: Math.max(Math.abs(p.box.y[0]), Math.abs(p.box.y[1])), z: p.box.z[1] });
   const ws = m.wheels; reach.set('wheel', { x: [Math.min(...ws.map(w => w.x - w.r)), Math.max(...ws.map(w => w.x + w.r))], y: Math.max(...ws.map(w => w.y)) + tyreW / 2, z: Math.max(...ws.map(w => w.r * 2)) });
-  // each part's mean brightness in each drawing: a painted face keeps the drawing's marks (louvres, seams, lines) as light
-  // and dark against that mean, and leaves its broad light to the solid's own (the drawings' baked light made patches)
-  const mean: Tex['mean'] = {};
-  for (const v of ['left', 'right', 'front', 'rear', 'top'] as ViewName[]) { const im = t[v]!, sum = new Map<string, [number, number]>();
-    for (let i = 0; i < im.w * im.h; i++) { if (im.rgba[i * 4 + 3]! < 128) continue; const id = (im.ids?.[im.owner[i]!] ?? '').replace(/~$/, ''), L = lum(im.rgba[i * 4]!, im.rgba[i * 4 + 1]!, im.rgba[i * 4 + 2]!), q = sum.get(id) ?? [0, 0]; q[0] += L; q[1]++; sum.set(id, q); }
-    mean[v] = new Map([...sum].map(([k, [a, n]]) => [k, a / n])); }
-  t.mean = mean; t.reach = reach; return t; }
+  t.reach = reach; return t; }
 const lum = (r: number, g: number, b: number) => 0.3 * r + 0.59 * g + 0.11 * b;
-/** the colour the drawings give a cell's face: from the view that looks straight at it, taken only where that view shows
- *  the same part there (a wing does not borrow the wheel standing before it); null when no view does */
-function texel(T: Tex, W: number, part: string, x: number, y: number, z: number, n: [number, number, number], flat?: [number, number, number], broad = false): [number, number, number] | null {
+/** the colour the drawings give a cell's face: from the view that looks straight at it, where that view shows the cell's
+ *  own part or one lying on the same face, never one standing in front. A broad painted face takes only the drawing's
+ *  marks (how much lighter or darker than its surroundings, within a hand's breadth) on the part's own colour; anything
+ *  else takes the drawing's colour, averaged over the cell. null when no view shows it. */
+function texel(T: Tex, W: number, part: string, x: number, y: number, z: number, n: [number, number, number], flat: [number, number, number], broad: boolean): [number, number, number] | null {
   const C = W / 2, order: [ViewName, number, number][] = [];
   const ax = Math.abs(n[0]), ay = Math.abs(n[1]), az = Math.abs(n[2]);
   const side: [ViewName, number, number] = [n[1] >= 0 ? 'left' : 'right', x, z], end: [ViewName, number, number] = n[0] < 0 ? ['front', C + y, z] : ['rear', C - y, z], top: [ViewName, number, number] = ['top', x, C + y];
   for (const [v, w] of ([[side, ay], [end, ax], [top, az]] as const).slice().sort((p, q) => q[1] - p[1])) if (w > 0.15) order.push(v);
   for (const [v, u, h] of order) { const im = T[v]; if (!im) continue; const px = Math.floor(im.X(u)), py = Math.floor(im.Y(h)); if (px < 0 || py < 0 || px >= im.w || py >= im.h) continue;
     const i = py * im.w + px; if (im.rgba[i * 4 + 3]! < 128) continue; const id = (im.ids?.[im.owner[i]!] ?? '').replace(/~$/, '');
-    // the drawing's part may be this cell's own, or one lying on the same face (glass in the body, a lens in its lamp);
-    // not one that stands out in front of it along the view's line (the wheel before the wing, the wing over the board)
     if (id !== part) { const r = T.reach?.get(id), tol = 45; if (!r) continue;
       const before = v === 'left' || v === 'right' ? r.y > Math.abs(y) + tol : v === 'top' ? r.z > z + tol : v === 'front' ? r.x[0] < x - tol : r.x[1] > x + tol; if (before) continue; }
-    let r0 = im.rgba[i * 4]!, g0 = im.rgba[i * 4 + 1]!, b0 = im.rgba[i * 4 + 2]!;
-    if (broad) { let a = 0, b = 0, c = 0, n = 0;   // a broad painted face: the drawing's dither smoothed out (its marks keep their weight)
-      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const xx = px + dx, yy = py + dy; if (xx < 0 || yy < 0 || xx >= im.w || yy >= im.h) continue; const j = yy * im.w + xx;
-        if (im.rgba[j * 4 + 3]! < 128 || im.owner[j] !== im.owner[i]) continue; a += im.rgba[j * 4]!; b += im.rgba[j * 4 + 1]!; c += im.rgba[j * 4 + 2]!; n++; }
-      if (n) { r0 = (r0 + a / n) / 2; g0 = (g0 + b / n) / 2; b0 = (b0 + c / n) / 2; } }
-    if (broad && flat && id === part) { const mu = T.mean?.[v]?.get(id) ?? 128, k = Math.max(0.55, Math.min(1.35, Math.pow((lum(r0, g0, b0) + 4) / (mu + 4), 0.7))); return [flat[0] * k, flat[1] * k, flat[2] * k]; }
-    return [r0, g0, b0]; }
+    const o = im.owner[i], mean = (rad: number, step: number) => { let a = 0, b = 0, c = 0, k = 0;
+      for (let dy = -rad; dy <= rad; dy += step) for (let dx = -rad; dx <= rad; dx += step) { const xx = px + dx, yy = py + dy; if (xx < 0 || yy < 0 || xx >= im.w || yy >= im.h) continue; const j = yy * im.w + xx;
+        if (im.rgba[j * 4 + 3]! < 128 || im.owner[j] !== o) continue; a += im.rgba[j * 4]!; b += im.rgba[j * 4 + 1]!; c += im.rgba[j * 4 + 2]!; k++; } return k ? [a / k, b / k, c / k] as const : null; };
+    const near = mean(1, 1) ?? [im.rgba[i * 4]!, im.rgba[i * 4 + 1]!, im.rgba[i * 4 + 2]!];
+    if (broad && id === part) { const far = mean(8, 2) ?? near, k = Math.max(0.5, Math.min(1.3, (lum(near[0], near[1], near[2]) + 6) / (lum(far[0], far[1], far[2]) + 6))); return [flat[0] * k, flat[1] * k, flat[2] * k]; }
+    return [near[0], near[1], near[2]]; }
   return null; }
 
 const SUN = (() => { const v = [-0.45, 0.35, 0.82], n = Math.hypot(...v); return v.map(q => q / n) as [number, number, number]; })();
@@ -152,27 +209,41 @@ export function drawStack(sl: { z: number; pic: Pic }[], S: Solid, yaw: number, 
 /** the solid's outer cells, ready to draw again and again (positions about the car's middle, outward directions, colours) */
 export interface Surface { n: number; pos: Float32Array; nrm: Float32Array; col: Uint8ClampedArray; gloss: Float32Array; c: number; tex: Uint8Array }
 export function surfaceOf(S: Solid, T?: Tex, W = 0): Surface {
-  const cx = S.x0 + S.nx * S.c / 2, pos: number[] = [], nrm: number[] = [], col: number[] = [], gl: number[] = [], tx: number[] = [];
-  for (let k = 0; k < S.nz; k++) for (let j = 0; j < S.ny; j++) for (let i = 0; i < S.nx; i++) { const id = S.owner[(k * S.ny + j) * S.nx + i]!; if (id < 0 || !surf(S, i, j, k)) continue;
-    const X = S.x0 + (i + 0.5) * S.c, Y = S.y0 + (j + 0.5) * S.c, Z = (k + 0.5) * S.c, nn = normal(S, i, j, k); pos.push(X - cx, Y, Z); nrm.push(...nn);
-    const mm = S.mat[id]!, broad = mm === 'paint' || mm === 'paint2' || mm === 'canvas' || mm === 'wood', tc = T ? texel(T, W, S.ids[id]!, X, Y, Z, nn, S.rgb[id]!, broad) : null;
-    // the crevices: a cell with much solid round it (under a wing, between parts) gets less of the sky
-    let fill = 0; for (let dk = -2; dk <= 2; dk++) for (let dj = -2; dj <= 2; dj++) for (let di = -2; di <= 2; di++) { const ii = i + di, jj = j + dj, kk = k + dk; if (ii >= 0 && jj >= 0 && kk >= 0 && ii < S.nx && jj < S.ny && kk < S.nz && S.owner[(kk * S.ny + jj) * S.nx + ii]! >= 0) fill++; }
-    const ao = 1 - 0.55 * Math.max(0, Math.min(1, (fill / 125 - 0.5) / 0.4)); const c0 = tc ?? S.rgb[id]!;
-    col.push(c0[0] * ao, c0[1] * ao, c0[2] * ao); tx.push(tc && !broad ? 1 : 0); const m = S.mat[id]!;
+  const cx = S.x0 + S.nx * S.c / 2, pos: number[] = [], nrm: number[] = [], col: number[] = [], gl: number[] = [], tx: number[] = [], { nx, ny, nz, den } = S, sx = 1, sy = nx, sz = nx * ny;
+  for (let k = 0; k < nz; k++) for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) { const a = (k * ny + j) * nx + i, id = S.owner[a]!; if (id < 0 || !surf(S, i, j, k)) continue;
+    const X = S.x0 + (i + 0.5) * S.c, Y = S.y0 + (j + 0.5) * S.c, Z = (k + 0.5) * S.c;
+    // outward: down the slope of the blurred solid (smooth over the cells' steps); the cells' own count where that is flat
+    let gx = (i > 0 ? den[a - sx]! : 0) - (i < nx - 1 ? den[a + sx]! : 0), gy = (j > 0 ? den[a - sy]! : 0) - (j < ny - 1 ? den[a + sy]! : 0), gz = (k > 0 ? den[a - sz]! : 0) - (k < nz - 1 ? den[a + sz]! : 0); const gn = Math.hypot(gx, gy, gz);
+    const nn: [number, number, number] = gn > 0.02 ? [gx / gn, gy / gn, gz / gn] : normal(S, i, j, k); pos.push(X - cx, Y, Z); nrm.push(...nn);
+    const m = S.mat[id]!, broad = m === 'paint' || m === 'paint2' || m === 'canvas', tc = T ? texel(T, W, S.ids[id]!, X, Y, Z, nn, S.rgb[id]!, broad) : null;
+    const ao = 1 - 0.6 * Math.max(0, Math.min(1, (den[a]! - 0.6) / 0.32)), c0 = tc ?? S.rgb[id]!;   // crevices get less of the sky
+    col.push(c0[0] * ao, c0[1] * ao, c0[2] * ao); tx.push(tc && !broad ? 1 : 0);
     gl.push(m === 'paint' || m === 'paint2' ? 0.35 : m === 'chrome' ? 0.8 : m === 'glass' ? 0.5 : 0.05); }
   return { n: gl.length, pos: new Float32Array(pos), nrm: new Float32Array(nrm), col: new Uint8ClampedArray(col), gloss: new Float32Array(gl), c: S.c, tex: new Uint8Array(tx) }; }
-/** A from a Surface: the same picture as drawWhole, quicker for turning it by hand */
+/** A from a Surface. Drawn in two steps: which cell shows at each pixel; then each pixel lit, its outward direction
+ *  first averaged with its neighbours on the same surface (the cells' steps go, the form's own edges stay), the light
+ *  in a few steps (flat tones, as pixel art has them), bright metal giving back sky, horizon and ground. */
 export function drawSurface(F: Surface, yaw: number, pitch: number, mmPx: number, w: number, h: number, outline = true): Pic {
-  const rgba = new Uint8ClampedArray(w * h * 4), zb = new Float32Array(w * h).fill(-1e9), th = yaw * Math.PI / 180, ph = pitch * Math.PI / 180, ct = Math.cos(th), st = Math.sin(th), sp = Math.sin(ph), cp = Math.cos(ph);
+  const rgba = new Uint8ClampedArray(w * h * 4), zb = new Float32Array(w * h).fill(-1e9), ix = new Int32Array(w * h).fill(-1), th = yaw * Math.PI / 180, ph = pitch * Math.PI / 180, ct = Math.cos(th), st = Math.sin(th), sp = Math.sin(ph), cp = Math.cos(ph);
   const sun: [number, number, number] = [SUN[0] * ct + SUN[1] * st, -SUN[0] * st + SUN[1] * ct, SUN[2]], q = Math.max(2, Math.ceil(F.c * 1.45 / mmPx)), half = q >> 1;   // big enough that no cell behind shows between
   for (let t = 0; t < F.n; t++) { const x = F.pos[t * 3]!, y = F.pos[t * 3 + 1]!, z = F.pos[t * 3 + 2]!, xr = x * ct - y * st, yr = x * st + y * ct;
     const px = Math.round(w / 2 + xr / mmPx), py = Math.round(h * 0.6 + (-yr * sp - z * cp) / mmPx), depth = -yr * cp + z * sp;
     if (px < -q || py < -q || px > w + q || py > h + q) continue;
-    const nx = F.nrm[t * 3]!, ny = F.nrm[t * 3 + 1]!, nz = F.nrm[t * 3 + 2]!, d = Math.max(0, nx * sun[0] + ny * sun[1] + nz * sun[2]), g = F.gloss[t]!, own = F.tex[t] === 1, k = own ? 0.72 + 0.36 * d + 0.06 * Math.max(0, nz) : 0.42 + 0.62 * d + 0.12 * Math.max(0, nz), s = g * Math.pow(d, g > 0.6 ? 6 : 14) * (own ? 140 : 255);
-    const r = Math.min(255, F.col[t * 3]! * k + s), gg = Math.min(255, F.col[t * 3 + 1]! * k + s), b = Math.min(255, F.col[t * 3 + 2]! * k + s);
-    for (let dy = 0; dy < q; dy++) for (let dx = 0; dx < q; dx++) { const X = px + dx - half, Y = py + dy - half; if (X < 0 || Y < 0 || X >= w || Y >= h) continue; const a = Y * w + X; if (depth < zb[a]!) continue; zb[a] = depth; rgba[a * 4] = r; rgba[a * 4 + 1] = gg; rgba[a * 4 + 2] = b; rgba[a * 4 + 3] = 255; } }
-  // review 73 (5): a pixel-art line round the car and where one surface stands well in front of another
+    for (let dy = 0; dy < q; dy++) for (let dx = 0; dx < q; dx++) { const X = px + dx - half, Y = py + dy - half; if (X < 0 || Y < 0 || X >= w || Y >= h) continue; const a = Y * w + X; if (depth < zb[a]!) continue; zb[a] = depth; ix[a] = t; } }
+  const R = Math.max(1, Math.min(3, Math.round(F.c * 1.6 / mmPx))), tol = 2.2 * F.c, STEPS = 9;
+  for (let Y = 0; Y < h; Y++) for (let X = 0; X < w; X++) { const a = Y * w + X, t = ix[a]!; if (t < 0) continue;
+    let nx = 0, ny = 0, nz = 0; const d0 = zb[a]!;
+    for (let dy = -R; dy <= R; dy++) for (let dx = -R; dx <= R; dx++) { const XX = X + dx, YY = Y + dy; if (XX < 0 || YY < 0 || XX >= w || YY >= h) continue; const b = YY * w + XX, u = ix[b]!; if (u < 0 || Math.abs(zb[b]! - d0) > tol) continue;
+      if (F.nrm[u * 3]! * F.nrm[t * 3]! + F.nrm[u * 3 + 1]! * F.nrm[t * 3 + 1]! + F.nrm[u * 3 + 2]! * F.nrm[t * 3 + 2]! < 0.35) continue;   // across a real edge: not averaged away
+      nx += F.nrm[u * 3]!; ny += F.nrm[u * 3 + 1]!; nz += F.nrm[u * 3 + 2]!; }
+    const nl = Math.hypot(nx, ny, nz) || 1; nx /= nl; ny /= nl; nz /= nl;
+    const d = Math.max(0, nx * sun[0] + ny * sun[1] + nz * sun[2]), g = F.gloss[t]!, own = F.tex[t] === 1;
+    let k = own ? 0.74 + 0.34 * d + 0.05 * Math.max(0, nz) : 0.46 + 0.6 * d + 0.1 * Math.max(0, nz), s = 0;
+    if (g > 0.6 && !own) { k = nz > 0.55 ? 1.18 : nz > 0.15 ? 0.95 : nz > -0.15 ? 0.5 : 0.78; if (d > 0.9) s = 70; }          // bright metal: sky above, the dark horizon round its middle, the ground below
+    else { k = Math.round(k * STEPS) / STEPS; if (g > 0.2 && d > (g > 0.4 ? 0.93 : 0.965)) s = g > 0.4 ? 90 : 55; }               // paint and glass: a small hard highlight where they face the sun
+    if (g > 0.2 && g <= 0.6 && !own) s += 34 * Math.max(0, k - 0.5);   // a dark paint still shows its form: the sky's light lies on it, not only in it
+    rgba[a * 4] = Math.min(255, F.col[t * 3]! * k + s); rgba[a * 4 + 1] = Math.min(255, F.col[t * 3 + 1]! * k + s); rgba[a * 4 + 2] = Math.min(255, F.col[t * 3 + 2]! * k + s * 1.05); rgba[a * 4 + 3] = 255; }
+  // a pixel-art line round the car and where one surface stands well in front of another
   if (outline) { const o = new Uint8Array(w * h), jump = 3 * F.c;
     for (let Y = 0; Y < h; Y++) for (let X = 0; X < w; X++) { const a = Y * w + X; if (!rgba[a * 4 + 3]) continue;
       for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) { const XX = X + dx, YY = Y + dy, b = YY * w + XX;

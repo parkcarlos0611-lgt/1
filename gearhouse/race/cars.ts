@@ -72,7 +72,7 @@ const STEER: Record<string, { ratio: number; ackermann: number; rack?: boolean }
   fordT23: { ratio: 5, ackermann: 0.6 }, chevAB28: { ratio: 12, ackermann: 0.7 }, plymU29: { ratio: 14, ackermann: 0.75 }, pontiac29: { ratio: 14, ackermann: 0.75 },
   dodgeV28: { ratio: 14, ackermann: 0.75 }, willys27: { ratio: 14, ackermann: 0.7 }, buick28: { ratio: 15, ackermann: 0.75 }, fnTT33: { ratio: 9, ackermann: 0.8 },
   bmw315: { ratio: 13, ackermann: 0.8, rack: true }, dueSSJ35: { ratio: 17, ackermann: 0.8 }, dueA21: { ratio: 16, ackermann: 0.75 },
-  napier33: { ratio: 12, ackermann: 0.6 }, jagD55: { ratio: 12, ackermann: 0.9, rack: true } };
+  napier33: { ratio: 12, ackermann: 0.6 }, jagD55: { ratio: 12, ackermann: 0.9, rack: true }, auburn851: { ratio: 16, ackermann: 0.8 }, mb540k: { ratio: 18, ackermann: 0.8 } };
 /** a car's steering, its own or the class's */
 export const steering = (c: RaceSpec) => c.steer ?? STEER[c.id] ?? { ratio: 15, ackermann: 0.75 };
 
@@ -105,9 +105,27 @@ const EXP: Record<string, RaceSpec> = {
     hp: 270, hpRpm: 6000, torqueRpm: 4000, torquePeak: 328, idle: 800, redline: 6300, launchRpm: 4000, inertia: { engine: 0.2, wheel: 1.1 }, gears: [2.14, 1.39, 1.1, 1.0], final: 2.79, eff: 0.92,
     brakes: 'disc', hydraulic: true, brakeG: 0.95, cdA: CDA_D, crr: 0.014, steerLock: 30, topKmh: 278, check: false,
     cooling: { siphon: false, margin: 1.25 }, tyreKind: 'racing50', shiftT: 0.25, era: '1955 · 후대 (디스크 브레이크, 모노코크)' } };
-export const EXP_CARS: string[] = Object.keys(EXP);
+// ---- the 3D-first cars (review 115), of the period, with their figures:
+//   auburn851 1935 Auburn 851 Supercharged Speedster: Lycoming straight eight, 4.6 L (280 cu in), Schwitzer-Cummins
+//             blower, 150 hp at 4000 [~]; about 1700 kg [~]; three speeds and Columbia's two-speed axle [~] (here its high
+//             ratio); every Speedster certified over 100 mph [~] (top about 165 km/h); hydraulic drums [~]; 6.50-16 [~];
+//             wheelbase 127 in (3226) [~], track 1470 [?].
+//   mb540k    1936 Mercedes-Benz 540 K Special Roadster: straight eight, 5.4 L, 115 PS, 180 PS with the blower engaged [~]
+//             (here: the blower's figure); about 2600 kg [~]; four speeds [~]; top about 170 km/h [~]; hydraulic drums,
+//             swing-axle independent suspension [~]; 7.00-17 [~]; wheelbase 3290 [~], track 1510 [~].
+const NEW: Record<string, RaceSpec> = {
+  auburn851: { id: 'auburn851', name: '1935 Auburn 851 Speedster', mass: 1700 + 75, wheelbase: 3.226, track: 1.47, tyreR: 0.365, tyreW: 0.165, cgH: 0.58, frontShare: 0.5,
+    hp: 150, hpRpm: 4000, torqueRpm: 2400, idle: 450, redline: 4400, gears: [2.47, 1.6, 1.0], final: 3.0, eff: 0.88,
+    brakes: 'four', hydraulic: true, brakeG: 0.6, cdA: 1.3, crr: 0.016, steerLock: 34, topKmh: 167, check: false, cooling: { siphon: false, margin: 1.05 }, tyreKind: 'crossply', era: '1935' },
+  mb540k: { id: 'mb540k', name: '1936 Mercedes-Benz 540 K', mass: 2600 + 75, wheelbase: 3.29, track: 1.51, tyreR: 0.392, tyreW: 0.18, cgH: 0.62, frontShare: 0.5,
+    hp: 177, hpRpm: 3400, torqueRpm: 2200, idle: 450, redline: 3700, gears: [3.4, 2.1, 1.4, 1.0], final: 3.08, eff: 0.88,
+    brakes: 'four', hydraulic: true, brakeG: 0.6, cdA: 1.15, crr: 0.016, steerLock: 33, topKmh: 170, check: false, cooling: { siphon: false, margin: 1.1 }, tyreKind: 'crossply', era: '1936' } };
+Object.assign(EXP, NEW);
+/** the new 3D-first cars, offered beside the period ones */
+export const NEW_CARS: string[] = Object.keys(NEW);
+export const EXP_CARS: string[] = Object.keys(EXP).filter(id => !NEW[id]);
 /** the engine for the sound: cylinders, valves, blower (the experimental cars are not in the game's data) */
-export const EXP_ENGINE: Record<string, { kind: string; layout: string; supercharged?: boolean }> = { napier33: { kind: 'ohv', layout: 'W12' }, jagD55: { kind: 'ohv', layout: 'I6' } };
+export const EXP_ENGINE: Record<string, { kind: string; layout: string; supercharged?: boolean }> = { napier33: { kind: 'ohv', layout: 'W12' }, jagD55: { kind: 'ohv', layout: 'I6' }, auburn851: { kind: 'sv', layout: 'I8', supercharged: true }, mb540k: { kind: 'ohv', layout: 'I8', supercharged: true } };
 export function raceSpec(id: string): RaceSpec {
   if (EXP[id]) return EXP[id]!;
   const s = (specs as { cars: Record<string, { car: string; engine: { hp: number }; wheelbase: number; track: number; tyre: string }> }).cars[id]!, p = PERIOD[id]!, t = tyre(s.tyre), hpRpm = p[0];

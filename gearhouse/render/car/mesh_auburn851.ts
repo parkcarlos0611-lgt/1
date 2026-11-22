@@ -48,7 +48,7 @@ function wheel(b: Build, x: number, s: 1 | -1, spin = 0) { const o: V = [x, s * 
   b.name(nm).mat(WHITE, 0.1, 'tyre').lathe('y', o, [[f * 1.03, rim + 4], [f * 1.08, rim + 50], [f * 1.04, R - 34]], 20, false);   // the whitewall
   b.name('wheel').mat(DARK, 0.05).lathe('y', o, [[f * 0.5, 0], [f * 0.5, rim]], 20, false);
   b.name('rim').mat(CHROME, 0.9, 'metal').lathe('y', o, [[f * 1.04, rim + 6], [f * 0.7, rim - 32]], 20, false).lathe('y', o, [[f * 0.6, 60], [f * 1.2, 40], [f * 1.2, 0]], 10, false);
-  b.name('spoke').mat('#c3c5c9', 0.6, 'metal'); for (let row = 0; row < 2; row++) for (let k = 0; k < 24; k++) { const a = spin + (k + row * 0.5) / 24 * Math.PI * 2, lean = (k % 2 ? 1 : -1) * 0.42, b0 = a + lean, rr = rim - 24;
+  b.name('spoke').mat('#c3c5c9', 0.6, 'metal'); for (let row = 0; row < 2; row++) for (let k = 0; k < 20; k++) { const a = spin + (k + row * 0.5) / 20 * Math.PI * 2, lean = (k % 2 ? 1 : -1) * 0.42, b0 = a + lean, rr = rim - 24;
     const yin = s * WY + f * (row ? 0.98 : 0.45), yout = s * WY + f * (row ? 0.7 : 0.62); wire(b, [x + Math.cos(a) * 62, yin, R + Math.sin(a) * 62], [x + Math.cos(b0) * rr, yout, R + Math.sin(b0) * rr], 8); }
   b.name('hub').mat(CHROME, 0.9, 'metal').lathe('y', o, [[f * 0.95, 92], [f * 1.2, 86], [f * 1.38, 62], [f * 1.5, 30], [f * 1.54, 0]], 14, false);   // the big domed cap
   for (const e of [0, Math.PI]) { const a = spin + e; b.bar([x + Math.cos(a) * 20, s * WY + f * 1.52, R + Math.sin(a) * 20], [x + Math.cos(a) * 70, s * WY + f * 1.42, R + Math.sin(a) * 70], 16, 10); } }
@@ -66,7 +66,7 @@ export function auburn851Mesh(spin = 0): Mesh { const b = new Build();
   for (const s of [1, -1]) { const y0 = Math.min(s * 30, s * 600), y1 = Math.max(s * 30, s * 600);
     b.name('seat').mat(LEATHER, 0.25, 'leather').box(2770, 3110, y0, y1, FLOOR, 740)
       .loft(([[3060, 740], [3130, 930], [3215, 1100], [3290, 1168], [3360, 1150], [3410, 1085]] as const).map(([x, z]) => [[x, y0, FLOOR], [x, y1, FLOOR], [x, y1 - 30, z], [x, y0 + 30, z]] as V[]));
-    b.name('seat').mat(SEAM, 0.1); for (let k = 0; k < 3; k++) { const y = s * (165 + k * 150); b.bar([2780, y, 742], [3075, y, 742], 8).bar([3112, y, 880], [3205, y, 1085], 8); } }
+    b.name('seat').mat(SEAM, 0.1); for (let k = 0; k < 3; k++) { const y = s * (165 + k * 150); wire(b, [2780, y, 744], [3075, y, 744], 12); wire(b, [3112, y, 880], [3205, y, 1085], 12); } }
   b.name('cockpit').mat(LEATHER, 0.25, 'leather').box(3410, C1 - 2, -600, 600, FLOOR, 1040);   // the padded shelf behind the seats
   b.name('cockpit').mat(LEATHER, 0.25, 'leather'); { const side = (s: number): V[] => [X(1045), X(1100), X(1170), X(1235), X(1300)].map(x => [x, s * (at(HALF, x) - 30), at(BELT, x) + 8] as V);
     tube(b, [...side(1), [C1 + 14, 520, at(BELT, C1) + 12], [C1 + 34, 300, at(BELT, C1) + 14], [C1 + 40, 0, at(BELT, C1) + 14], [C1 + 34, -300, at(BELT, C1) + 14], [C1 + 14, -520, at(BELT, C1) + 12], ...side(-1).reverse()], 24, 6); }

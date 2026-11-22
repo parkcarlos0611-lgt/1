@@ -4,7 +4,7 @@
 // Keys: up/W throttle, down/S brake, left/right or A/D steer, space handbrake, Q/E gears (manual), M automatic or
 // manual, R back on the track. Lap times on the start line.
 import { millbrook } from '../race/millbrook';
-import { raceSpec, RACE_CARS, EXP_CARS, EXP_ENGINE, steering } from '../race/cars';
+import { raceSpec, RACE_CARS, EXP_CARS, NEW_CARS, EXP_ENGINE, steering } from '../race/cars';
 import { Vehicle, usefulLock, type Controls } from '../race/vehicle';
 import { CarSprites, PropSprites } from '../race/sprites';
 import { millbrookScenery, type Placed } from '../race/scenery';
@@ -191,7 +191,7 @@ function drawSteam(el: number) { const h = car.health; if ((h.water >= WARN.boil
   if (!live) for (const p of steam) { ctx.fillStyle = `rgba(245,245,245,${p.a})`; ctx.beginPath(); ctx.arc(...P(p.x, p.y, p.z), p.r * 1000 / mm, 0, Math.PI * 2); ctx.fill(); } }
 // ---- sounds ----
 const ENGINE = (specsData as { cars: Record<string, { engine: { kind: string; layout: string } }> }).cars;
-const voiceOf = (id: string) => { const e = ENGINE[id]?.engine ?? EXP_ENGINE[id]!; return { cylinders: +e.layout.replace(/\D/g, '') || 4, kind: (e.kind === 'sleeve' ? 'sleeve' : e.kind === 'ohv' ? 'ohv' : 'sv') as 'sv' | 'ohv' | 'sleeve', supercharged: id === 'dueSSJ35' }; };
+const voiceOf = (id: string) => { const e = ENGINE[id]?.engine ?? EXP_ENGINE[id]!; return { cylinders: +e.layout.replace(/\D/g, '') || 4, kind: (e.kind === 'sleeve' ? 'sleeve' : e.kind === 'ohv' ? 'ohv' : 'sv') as 'sv' | 'ohv' | 'sleeve', supercharged: id === 'dueSSJ35' || !!EXP_ENGINE[id]?.supercharged }; };
 function sounds() { if (!snd) return; const me = race?.player, keep = new Set<unknown>(['me']);
   snd.voice('me', voiceOf(carId)).set(car.rpm, st.pilot ? 0.7 : input.throttle, 1, 0, car.health.running);
   if (race) for (const e of race.cars) { if (e === me) continue; const d = Math.hypot(e.car.x - car.x, e.car.y - car.y); if (d > 220) continue; keep.add(e); const [X] = P(e.car.x, e.car.y, 0);
@@ -380,6 +380,7 @@ function frame(now: number) { const el = Math.min(0.1, (now - last) / 1000); las
   drawWorld(el); drawPuffs(); drawSteam(el); if (st.cine) letterbox(); else dials(); hud(); mini(); sounds(); (live ? 0 : sprites.work(5)); if (!live) for (const sp of others.values()) sp.work(2); requestAnimationFrame(frame); }
 // ---- page ----
 const pick = $<HTMLSelectElement>('car'); for (const id of RACE_CARS) pick.add(new Option(raceSpec(id).name, id));
+{ const g = document.createElement('optgroup'); g.label = '새 3D 차 (레퍼런스 시트로 제작)'; for (const id of NEW_CARS) g.append(new Option(raceSpec(id).name, id)); pick.append(g); }
 { const g = document.createElement('optgroup'); g.label = '실험: 시대 밖의 차'; for (const id of EXP_CARS) g.append(new Option(`${raceSpec(id).name} — ${raceSpec(id).era}`, id)); pick.append(g); }
 pick.value = carId;
 pick.addEventListener('change', () => { carId = pick.value; if (race) stopRace(); else choose(pick.value); pick.blur(); });

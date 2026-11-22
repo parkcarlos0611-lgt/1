@@ -53,7 +53,7 @@ function drawLive(el: number) { const L = live!; void el;
   if (broken.size !== liveFence) { L.setFence(fenceData(T, fenceOk)); liveFence = broken.size; }
   glCanvas.width = VW; glCanvas.height = VH;
   const list = race ? race.cars.map(e => ({ c: e.car, sp: e.driver ? others.get(e)! : sprites, turn: e.wheelTurn })) : [{ c: car, sp: sprites, turn: wheelTurn }];
-  const cars = list.map(({ c, sp, turn }) => ({ g: L.car(sp.mesh), x: c.x, y: c.y, z: T.height(c.s, c.off) + c.zb, yaw: c.yaw, roll: c.tilt + c.roll * 1.5, pitch: c.pitch, steerL: c.steerAt(0), steerR: c.steerAt(1), spin: turn, player: c === car }));
+  const cars = list.map(({ c, sp, turn }) => ({ g: L.car(sp.mesh), tyres: c.rings, x: c.x, y: c.y, z: T.height(c.s, c.off) + c.zb - (c.rings[0]!.rest + c.rings[2]!.rest) / 2,   /* drawn lower by the tyres' standing give: the flattened tread on the road */ yaw: c.yaw, roll: c.tilt + c.roll * 1.5, pitch: c.pitch, steerL: c.steerAt(0), steerR: c.steerAt(1), spin: turn, player: c === car }));
   const props = [...SCN.props, ...trainCars()].flatMap(q => { const f = PROPS[q.kind]; return f ? [{ g: L.prop(q.kind, f), x: q.x, y: q.y, z: q.z ?? 0, h: q.heading }] : []; });
   L.render({ x: camX, y: camY, z: camZ, ang: turning() ? camAng : Math.PI / 2, pitch: pitchDeg, mm, W: VW, H: VH, cy: st.chase && !st.cine ? 0.66 : 0.55 }, cars, props, skids, { glass: 0.8 });
   ctx = main; main.clearRect(0, 0, VW, VH); main.drawImage(glCanvas, 0, 0); drawDebris(el);

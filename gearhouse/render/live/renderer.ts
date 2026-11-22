@@ -10,7 +10,9 @@ import type { GroundData } from './ground';
 import type { Mesh } from '../car/mesh';
 
 export interface LiveView { x: number; y: number; z: number; /** the world heading that points up the screen */ ang: number; pitch: number; mm: number; W: number; H: number; /** the target's height on the screen (0 top .. 1 bottom) */ cy: number }
-export interface LiveCar { g: GpuMesh; x: number; y: number; z: number; yaw: number; roll: number; pitch: number; /** each front wheel's own angle (rad, left +): the inner one more */ steerL: number; steerR: number; spin: number; player: boolean }
+/** a tyre's shape this moment (review 101): its ring's give at 32 angles from straight down toward the front (m), the patch's shift (m, along and across) */
+export interface LiveTyre { u: Float32Array; sx: number; sy: number }
+export interface LiveCar { /** FL FR RL RR */ tyres?: LiveTyre[]; g: GpuMesh; x: number; y: number; z: number; yaw: number; roll: number; pitch: number; /** each front wheel's own angle (rad, left +): the inner one more */ steerL: number; steerR: number; spin: number; player: boolean }
 export interface LiveProp { g: GpuMesh; x: number; y: number; z: number; h: number }
 export interface Skid { x: number; y: number; z: number; a: number }
 
@@ -25,8 +27,18 @@ float lightAt(vec3 w) { vec4 l = uLight * vec4(w, 1.); vec3 q = l.xyz * 0.5 + 0.
 const OBJ_VS = `#version 300 es
 layout(location=0) in vec3 aPos; layout(location=1) in vec3 aNor; layout(location=2) in vec3 aCol; layout(location=3) in float aGloss; layout(location=4) in float aKind; layout(location=5) in float aPart;
 uniform mat4 uVP, uModel; uniform float uBias;
+uniform int uWheel; uniform float uSpin, uDef[32], uTyreR, uRim; uniform vec2 uShift;
 out vec3 vWorld, vObj; flat out vec3 vN, vObjN, vCol; flat out float vGloss, vKind, vPart;
-void main() { vec4 w = uModel * vec4(aPos, 1.); vWorld = w.xyz; vObj = aPos; vObjN = aNor; vN = normalize(mat3(uModel) * aNor); vCol = aCol; vGloss = aGloss; vKind = aKind; vPart = aPart;
+void main() { vec3 p = aPos, nr = aNor;
+  if (uWheel == 1) {
+    if (int(aKind + 0.5) == 5) {   // the tyre, shaped by its ring in the hub's frame (the ring keeps to the road; it does not turn with the wheel)
+      float rho = length(p.xz), t = clamp((rho - uRim) / max(1., uTyreR - uRim), 0., 1.), a = atan(-p.x, -p.z);
+      float fi = mod(a / 6.2831853 * 32. + 32., 32.); int i0 = int(floor(fi)); float d = mix(uDef[i0], uDef[(i0 + 1) % 32], fract(fi)) * t;
+      vec2 dir = p.xz / max(rho, 1.); float low = max(0., dir.y * -1.); low *= low;
+      p.xz -= dir * d; p.y += sign(p.y) * d * 0.5 * (1. - abs(2. * t - 1.));   // the tread pressed in, the walls bulging out beside it
+      p.y += uShift.y * t * low; p.x -= uShift.x * t * low; }   // the patch pulled across and along by the forces
+    else { float c = cos(uSpin), s = sin(uSpin); p = vec3(c * p.x - s * p.z, p.y, s * p.x + c * p.z); nr = vec3(c * nr.x - s * nr.z, nr.y, s * nr.x + c * nr.z); } }
+  vec4 w = uModel * vec4(p, 1.); vWorld = w.xyz; vObj = p; vObjN = nr; vN = normalize(mat3(uModel) * nr); vCol = aCol; vGloss = aGloss; vKind = aKind; vPart = aPart;
   gl_Position = uVP * w; gl_Position.z -= uBias; }`;
 const OBJ_FS = `#version 300 es
 precision highp float;
@@ -91,6 +103,8 @@ void main() { ivec2 p = ivec2(gl_FragCoord.xy), sz = textureSize(uCol, 0); vec4 
     c.rgb *= k; }
   o = vec4(c.rgb, 1.); }`;
 
+interface WheelDraw { spin: number; def: Float32Array; sx: number; sy: number; R: number; rim: number }
+type Piece = [{ vao: WebGLVertexArrayObject; n: number }, M4, WheelDraw?];
 export class LiveRenderer {
   readonly gl: WebGL2RenderingContext; private obj: WebGLProgram; private ground: WebGLProgram; private depth: WebGLProgram; private post: WebGLProgram;
   private fbo: WebGLFramebuffer; private tCol: WebGLTexture; private tId: WebGLTexture; private tDepth: WebGLTexture; private W = 0; private H = 0;
@@ -162,7 +176,8 @@ export class LiveRenderer {
     gl.useProgram(this.obj); gl.uniformMatrix4fv(this.loc(this.obj, 'uVP'), false, VP); gl.uniform3fv(this.loc(this.obj, 'uEye'), eye); gl.uniform3fv(this.loc(this.obj, 'uSun'), SUN_W); gl.uniform1f(this.loc(this.obj, 'uGlass'), o.glass ?? 0.8); shadowTo(this.obj);
     gl.uniform1i(this.loc(this.obj, 'uDecTex'), 2);
     let id = 1; const objU = (outline: number) => { gl.uniform2f(this.loc(this.obj, 'uObj'), (id & 255) / 255, ((id >> 8) & 255) / 255); gl.uniform1f(this.loc(this.obj, 'uOutline'), outline); id++; };
-    const draw = (part: { vao: WebGLVertexArrayObject; n: number }, M: M4) => { if (!part.n) return; gl.uniformMatrix4fv(this.loc(this.obj, 'uModel'), false, M); gl.bindVertexArray(part.vao); gl.drawArrays(gl.TRIANGLES, 0, part.n); };
+    const draw = (part: { vao: WebGLVertexArrayObject; n: number }, M: M4, w?: WheelDraw) => { if (!part.n) return; gl.uniformMatrix4fv(this.loc(this.obj, 'uModel'), false, M); gl.uniform1i(this.loc(this.obj, 'uWheel'), w ? 1 : 0);
+      if (w) { gl.uniform1f(this.loc(this.obj, 'uSpin'), w.spin); gl.uniform1fv(this.loc(this.obj, 'uDef'), w.def); gl.uniform2f(this.loc(this.obj, 'uShift'), w.sx, w.sy); gl.uniform1f(this.loc(this.obj, 'uTyreR'), w.R); gl.uniform1f(this.loc(this.obj, 'uRim'), w.rim); } gl.bindVertexArray(part.vao); gl.drawArrays(gl.TRIANGLES, 0, part.n); };
     const decals = (g: GpuMesh | null) => { const n = g ? g.decals.length : 0; gl.uniform1i(this.loc(this.obj, 'uDecN'), n); gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, n ? g!.decalTex : this.blank); if (!g || !n) return;
       gl.uniform3fv(this.loc(this.obj, 'uDecO'), g.decals.flatMap(d => d.o)); gl.uniform3fv(this.loc(this.obj, 'uDecN_'), g.decals.flatMap(d => { const l = Math.hypot(...d.n); return d.n.map(x => x / l); }));
       gl.uniform3fv(this.loc(this.obj, 'uDecUp'), g.decals.flatMap(d => { const l = Math.hypot(...d.up); return d.up.map(x => x / l); })); gl.uniform1fv(this.loc(this.obj, 'uDecR'), g.decals.map(d => d.r)); };
@@ -172,12 +187,12 @@ export class LiveRenderer {
     // the cars a thing hides: their light outline first, tested against what stands before them (each pixel once), then the cars over it
     gl.uniform1i(this.loc(this.obj, 'uMode'), 1); gl.depthFunc(gl.GREATER); gl.depthMask(false); gl.enable(gl.STENCIL_TEST); gl.stencilFunc(gl.EQUAL, 0, 0xff); gl.stencilOp(gl.KEEP, gl.KEEP, gl.INCR);
     gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.NONE]); gl.uniform1f(this.loc(this.obj, 'uBias'), 0.25 / R);
-    cars.forEach((q, i) => { gl.uniform4f(this.loc(this.obj, 'uSil'), 1, 226 / 255, 168 / 255, q.player ? 0.6 : 0.4); for (const [part, M] of carM[i]!.opaque) draw(part, M); });
+    cars.forEach((q, i) => { gl.uniform4f(this.loc(this.obj, 'uSil'), 1, 226 / 255, 168 / 255, q.player ? 0.6 : 0.4); for (const [part, M, w] of carM[i]!.opaque) draw(part, M, w); });
     gl.disable(gl.STENCIL_TEST); gl.disable(gl.BLEND); gl.depthFunc(gl.LESS); gl.depthMask(true); gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.COLOR_ATTACHMENT1]); gl.uniform1f(this.loc(this.obj, 'uBias'), 0); gl.uniform1i(this.loc(this.obj, 'uMode'), 0);
-    cars.forEach((q, i) => { objU(outlineC); const m = carM[i]!; decals(q.g); draw(q.g.body, m.body); decals(null); for (const [part, M] of m.opaque.slice(1)) draw(part, M); });
+    cars.forEach((q, i) => { objU(outlineC); const m = carM[i]!; decals(q.g); draw(q.g.body, m.body); decals(null); for (const [part, M, w] of m.opaque.slice(1)) draw(part, M, w); });
     // glass over all, at its own strength, nothing else written
     gl.uniform1i(this.loc(this.obj, 'uMode'), 2); gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false); gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.NONE]);
-    for (const p of ps) draw(p.g.glass, placeMesh(p.g.len, p.x, p.y, p.z, p.h)); for (const m of carM) for (const [part, M] of m.glass) draw(part, M);
+    for (const p of ps) draw(p.g.glass, placeMesh(p.g.len, p.x, p.y, p.z, p.h)); for (const m of carM) for (const [part, M, w] of m.glass) draw(part, M, w);
     gl.disable(gl.BLEND); gl.depthMask(true);
     // ---- the outlines, onto the page's canvas ----
     gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.viewport(0, 0, v.W, v.H); gl.disable(gl.DEPTH_TEST); gl.useProgram(this.post);
@@ -187,11 +202,13 @@ export class LiveRenderer {
 
   /** a car's pieces with their matrices: the body on its springs (rolled and pitched about its middle), each wheel at its
    *  hub, turned on its axle and the front ones steered */
-  private carParts(q: LiveCar): { body: M4; opaque: [{ vao: WebGLVertexArrayObject; n: number }, M4][]; glass: [{ vao: WebGLVertexArrayObject; n: number }, M4][] } {
+  private carParts(q: LiveCar): { body: M4; opaque: Piece[]; glass: Piece[] } {
     const g = q.g, base = placeMesh(g.len, q.x, q.y, q.z, q.yaw), mid = translate(g.len / 2, 0, 0), back = translate(-g.len / 2, 0, 0);
     const body = mul(base, mul(mid, mul(rot('x', q.roll), mul(rot('y', q.pitch), back))));
-    const opaque: [{ vao: WebGLVertexArrayObject; n: number }, M4][] = [[g.body, body]], glass: [{ vao: WebGLVertexArrayObject; n: number }, M4][] = [[g.glass, body]];
-    for (const w of g.wheels) { const M = mul(body, mul(translate(w.hub[0], w.hub[1], w.hub[2]), mul(w.front ? rot('z', -(w.hub[1] > 0 ? q.steerL : q.steerR)) : translate(0, 0, 0), rot('y', -q.spin))));
-      opaque.push([w.part, M]); if (w.glass) glass.push([w.glass, M]); }
+    const opaque: Piece[] = [[g.body, body]], glass: Piece[] = [[g.glass, body]];
+    for (const w of g.wheels) { const left = w.hub[1] > 0, M = mul(body, mul(translate(w.hub[0], w.hub[1], w.hub[2]), w.front ? rot('z', -(left ? q.steerL : q.steerR)) : translate(0, 0, 0)));
+      const ty = q.tyres?.[(w.front ? 0 : 2) + (left ? 0 : 1)], def = new Float32Array(32); if (ty) for (let k = 0; k < 32; k++) def[k] = ty.u[k]! * 1000;
+      const wd: WheelDraw = { spin: q.spin, def, sx: (ty?.sx ?? 0) * 1000, sy: (ty?.sy ?? 0) * 1000, R: w.R, rim: w.rim };
+      opaque.push([w.part, M, wd]); if (w.glass) glass.push([w.glass, M, wd]); }
     return { body, opaque, glass }; }
 }

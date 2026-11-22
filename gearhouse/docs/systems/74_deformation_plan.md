@@ -36,3 +36,11 @@ the plan; the work comes after the 3D-first switch (review 92), since it needs t
 2. A crash test page: the car into a wall at set speeds, the bend compared with period photographs of such accidents.
 3. Into the race: contacts, loose parts, re-baking, handling changes.
 4. Damage to the garage: parts and their condition after a race.
+
+## Done first (review 101): the tyres as node rings
+`race/tyre.ts`: each tyre a ring of 32 nodes on radial springs to the rim, tied to its neighbours (the tread band),
+damped, four sub-steps a physics step. The road (the bumps' profile along the car under each node) pushes the nodes it
+reaches; the load sets the hub's height over it (a standing give of about 5 % of the radius, less on the Model T's
+high-pressure clinchers); the side and drive forces shear the patch across and along. The live renderer bends the tyre
+by it in the vertex shader (the tread pressed in, the walls bulging, the patch pulled), on tyres cut finer along their
+arcs. It shapes the tyres only: grip and springing stay the vehicle's, which already hold the tyre's give.

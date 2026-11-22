@@ -10,6 +10,7 @@ import type { RaceSpec } from './cars';
 import { torqueAt, steering } from './cars';
 import type { Track } from './track';
 import { Health, type Failure } from './health';
+import { TyreRing } from './tyre';
 
 export interface Controls { throttle: number; brake: number; /** a share of the useful lock (usefulLock): 1 full for the grip; more (to catch a slide) up to the lock */ steer: number; clutch?: number; gear?: number; handbrake?: number }   // steer -1 (right) .. 1 (left)
 const G = 9.81, RHO = 1.2, HANDS = 5 * Math.PI;   // a driver's hands: two and a half turns of the wheel a second at most (a quick catch, hand over hand)
@@ -40,10 +41,12 @@ export class Vehicle {
   onGrass = [false, false, false, false]; over = false;
   /** the engine's heat and wear; the last failure that happened (for the page to tell) */
   health: Health; lastFailure: Failure | null = null;
+  /** each tyre as a ring of nodes (FL FR RL RR): how it gives under its load, the road and its forces (review 101) */ rings: TyreRing[]; tfx = [0, 0, 0, 0]; tfy = [0, 0, 0, 0];
   rpm = 0; gear = 1; shift = 0; steer = 0; /** the steering wheel's angle (rad, left +): the road wheels' times the ratio */ sw = 0; ax = 0; ay = 0; tax = 0; tay = 0; brakeT = [20, 20, 20, 20]; /** each wheel's spin-up rate last step (rad/s²): the stiff tyre's half-implicit step leans on it so a wheel keeps pace with the car rather than dragging (review 97) */ dw = [0, 0, 0, 0]; auto = true; tilt = 0;
   private k: number; private c: number; private Ip: number; private Ir: number; private Iz: number; private Iw: number; private Ie: number;
   constructor(readonly spec: RaceSpec, readonly track: Track, readonly tyre: Tyre = TYRES[spec.tyreKind ?? 'crossply']) {
     const m = spec.mass, L = spec.wheelbase;
+    this.rings = [0, 1, 2, 3].map(i => new TyreRing(spec.tyreR, m * G * this.share(i), spec.id === 'fordT23' ? 0.035 : spec.tyreKind === 'racing50' ? 0.045 : 0.05));   /* high-pressure clinchers give least */
     this.k = m / 4 * (2 * Math.PI * 1.6) ** 2; this.c = 2 * 0.3 * Math.sqrt(this.k * m / 4);   // stiff leaves: about 1.6 Hz, a third of critical damping
     this.Iz = m * (L * L + spec.track * spec.track) / 12 * 1.15; this.Ip = m * L * L / 14; this.Ir = m * spec.track * spec.track / 10;
     this.Iw = spec.inertia?.wheel ?? 1.2 + spec.tyreR * spec.tyreR * 10; this.Ie = spec.inertia?.engine ?? 0.25 + spec.hp / 400; /* kg m²: a period engine's heavy flywheel by default */ this.rpm = spec.idle; this.health = new Health(spec.hp, spec.cooling, Math.floor(Math.random() * 1e9)); }
@@ -119,7 +122,9 @@ export class Vehicle {
       const w0 = this.w[i]!, wf = w0 + ((rear ? Taxle / 2 : 0) - fx * R - Fz * (this.onGrass[i] ? 0.07 : c.crr) * R * Math.tanh(w0) + K * this.dw[i]! * dt) / (this.Iw + K * dt) * dt, bs = bt / (this.Iw + K * dt) * dt;
       this.w[i] = Math.abs(wf) <= bs ? 0 : wf - Math.sign(wf) * bs; this.dw[i] = bs > 0 || this.airborne[i] ? 0 : (this.w[i]! - w0) / dt;                // brakes stop a wheel, never turn it back
       this.brakeT[i] = this.brakeT[i]! + (bt * Math.abs(this.w[i]!) / 9000 - (this.brakeT[i]! - 20) * (0.004 + this.speed * 0.0004) * (disc ? 2.2 : 1)) * dt;
-      Fx[i] = fx * cs - fy * sn; Fy[i] = fx * sn + fy * cs; }
+      Fx[i] = fx * cs - fy * sn; Fy[i] = fx * sn + fy * cs; this.tfx[i] = fx; this.tfy[i] = fy; }
+    // the tyres' rings: their give under the load, over the road's profile along the car (a bump rolls through the tread)
+    for (let i = 0; i < 4; i++) { const sW = this.s + this.wheelAt(i)[0] * cr, b0 = T.bump(sW); this.rings[i]!.step(dt, F[i]!, this.tfx[i]!, this.tfy[i]!, x => T.bump(sW + x * cr) - b0); }
     // ---- the whole car: tyres, the air, gravity down the slope; turning ----
     const v = this.speed, drag = 0.5 * RHO * c.cdA * v * v;
     let sx = -drag * (v > 0 ? this.vx / v : 0) - G * m * Math.sin(tX), sy2 = -drag * (v > 0 ? this.vy / v : 0) - G * m * Math.sin(tY), Mz = 0;

@@ -39,10 +39,21 @@ function upload(gl: WebGL2RenderingContext, M: Mesh, tris: number[], about?: [nu
   buf(ATTR.pos, P, 3, gl.FLOAT); buf(ATTR.nor, N, 3, gl.FLOAT); buf(ATTR.col, C, 3, gl.UNSIGNED_BYTE, true); buf(ATTR.gloss, G, 1, gl.FLOAT); buf(ATTR.kind, K, 1, gl.FLOAT); buf(ATTR.part, Q, 1, gl.FLOAT);
   gl.bindVertexArray(null); return { vao, n }; }
 
+/** a wheel's triangles about its hub, the tyre's cut finer (each into 16, the new corners on the arcs round the axle,
+ *  not on the chords), so the ring's give bends the tread smoothly (review 101) */
+function splitTyres(M: Mesh, tris: number[], hub: [number, number, number]): Mesh {
+  const P: number[] = [], C: number[] = [], G: number[] = [], T: number[] = [], K: number[] = [], X: number[] = [];
+  const polar = (v: number[]) => ({ r: Math.hypot(v[0]!, v[2]!), a: Math.atan2(v[2]!, v[0]!), y: v[1]! });
+  const mid = (a: number[], b: number[]) => { const A = polar(a), B = polar(b); let d = B.a - A.a; if (d > Math.PI) d -= 2 * Math.PI; if (d < -Math.PI) d += 2 * Math.PI; const r = (A.r + B.r) / 2, an = A.a + d / 2; return [Math.cos(an) * r, (A.y + B.y) / 2, Math.sin(an) * r]; };
+  const emit = (t: number, a: number[], b: number[], c: number[], depth: number): void => { if (depth === 0) { P.push(...a, ...b, ...c); C.push(M.col[t * 3]!, M.col[t * 3 + 1]!, M.col[t * 3 + 2]!); G.push(M.gloss[t]!); T.push(M.part[t]!); K.push(M.kind[t]!); X.push(M.tex[t]!); return; }
+    const ab = mid(a, b), bc = mid(b, c), ca = mid(c, a); emit(t, a, ab, ca, depth - 1); emit(t, ab, b, bc, depth - 1); emit(t, ca, bc, c, depth - 1); emit(t, ab, bc, ca, depth - 1); };
+  for (const t of tris) { const v = [0, 1, 2].map(k => [M.pos[t * 9 + k * 3]! - hub[0], M.pos[t * 9 + k * 3 + 1]! - hub[1], M.pos[t * 9 + k * 3 + 2]! - hub[2]]); emit(t, v[0]!, v[1]!, v[2]!, M.kind[t] === TYRE ? 2 : 0); }
+  return { n: G.length, pos: new Float32Array(P), col: new Uint8Array(C), gloss: new Float32Array(G), part: new Int16Array(T), kind: new Uint8Array(K), tex: new Uint8Array(X), length: M.length };
+}
 /** a mesh on the GPU: the body, each road wheel apart (to steer and turn it about its hub), the glass apart (drawn last),
  *  and its decals as pictures */
-export interface GpuMesh { len: number; body: Part; glass: Part; wheels: { part: Part; glass: Part | null; hub: [number, number, number]; front: boolean }[]; decals: Decal[]; decalTex: WebGLTexture | null; radius: number; height: number }
-const GLASS = KINDS.indexOf('glass'), SHINE = KINDS.indexOf('shine');
+export interface GpuMesh { len: number; body: Part; glass: Part; wheels: { part: Part; glass: Part | null; hub: [number, number, number]; front: boolean; /** the tyre's outer and inner radius (mm) */ R: number; rim: number }[]; decals: Decal[]; decalTex: WebGLTexture | null; radius: number; height: number }
+const GLASS = KINDS.indexOf('glass'), SHINE = KINDS.indexOf('shine'), TYRE = KINDS.indexOf('tyre');
 export function gpuMesh(gl: WebGL2RenderingContext, M: Mesh, wheels = true): GpuMesh {
   const W = wheels ? wheelsOf(M) : [], inWheel = new Int32Array(M.n).fill(-1); W.forEach((w, k) => { for (const t of w.tris) inWheel[t] = k; });
   const isGlass = (t: number) => M.kind[t] === GLASS || M.kind[t] === SHINE, body: number[] = [], glass: number[] = [];
@@ -55,4 +66,5 @@ export function gpuMesh(gl: WebGL2RenderingContext, M: Mesh, wheels = true): Gpu
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE); }
   return { len: M.length, body: upload(gl, M, body), glass: upload(gl, M, glass), decals, decalTex, radius: R / 1000, height: Z / 1000,
     wheels: W.map(w => { const hub: [number, number, number] = [w.hx, w.hy, w.hz], ts = w.tris.filter(t => !isGlass(t)), gs = w.tris.filter(isGlass);
-      return { part: upload(gl, M, ts, hub), glass: gs.length ? upload(gl, M, gs, hub) : null, hub, front: w.front }; }) }; }
+      let R = 0, rim = Infinity; for (const t of w.tris) { if (M.kind[t] !== TYRE) continue; for (let k = 0; k < 3; k++) { const q = t * 9 + k * 3, r = Math.hypot(M.pos[q]! - w.hx, M.pos[q + 2]! - w.hz); R = Math.max(R, r); rim = Math.min(rim, r); } }
+      const S = splitTyres(M, ts, hub); return { part: upload(gl, S, Array.from({ length: S.n }, (_, k) => k)), glass: gs.length ? upload(gl, M, gs, hub) : null, hub, front: w.front, R: R || w.r, rim: Number.isFinite(rim) ? rim : w.r * 0.7 }; }) }; }

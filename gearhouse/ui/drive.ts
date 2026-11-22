@@ -161,15 +161,18 @@ function scene(): Drawn[] { const a = (turning() ? camAng : Math.PI / 2) - Math.
 const boxes = (a: Drawn, b: Drawn) => a.X0 < b.X0 + b.img.width && b.X0 < a.X0 + a.img.width && a.Y0 < b.Y0 + b.img.height && b.Y0 < a.Y0 + a.img.height;
 const alphas = new WeakMap<HTMLCanvasElement, Uint8Array>();
 const alphaOf = (c: HTMLCanvasElement) => { let a = alphas.get(c); if (!a) { const d = c.getContext('2d')!.getImageData(0, 0, c.width, c.height).data; a = new Uint8Array(c.width * c.height); for (let i = 0; i < a.length; i++) a[i] = d[i * 4 + 3]!; alphas.set(c, a); } return a; };
-/** does b cover a fair part of what a shows (their pictures' solid pixels, not their boxes)? */
-function hits(a: Drawn, b: Drawn): boolean { if (!boxes(a, b)) return false; const A = alphaOf(a.img), B = alphaOf(b.img), aw = a.img.width, bw = b.img.width; let n = 0, m = 0;
+/** does b cover any of a at all (a few solid pixels: a tree's trunk across a car counts) */
+function covers(a: Drawn, b: Drawn): boolean { if (!boxes(a, b)) return false; const A = alphaOf(a.img), B = alphaOf(b.img), aw = a.img.width, bw = b.img.width; let n = 0;
   const x0 = Math.max(a.X0, b.X0), x1 = Math.min(a.X0 + aw, b.X0 + bw), y0 = Math.max(a.Y0, b.Y0), y1 = Math.min(a.Y0 + a.img.height, b.Y0 + b.img.height);
-  for (let y = y0; y < y1; y += 2) for (let x = x0; x < x1; x += 2) { if (A[(y - a.Y0) * aw + (x - a.X0)]! < 128) continue; m++; if (B[(y - b.Y0) * bw + (x - b.X0)]! > 128) n++; }
-  return n > 6 && n > m * 0.15; }
-/** a car's outline filled in one light colour (for when a building hides it) */
-const silhouettes = new WeakMap<HTMLCanvasElement, HTMLCanvasElement>();
-function silhouette(img: HTMLCanvasElement): HTMLCanvasElement { let s = silhouettes.get(img); if (s) return s; s = document.createElement('canvas'); s.width = img.width; s.height = img.height; const c = s.getContext('2d')!;
-  c.drawImage(img, 0, 0); c.globalCompositeOperation = 'source-in'; c.fillStyle = '#ffe2a8'; c.fillRect(0, 0, s.width, s.height); silhouettes.set(img, s); return s; }
+  for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) if (A[(y - a.Y0) * aw + (x - a.X0)]! > 128 && B[(y - b.Y0) * bw + (x - b.X0)]! > 128 && ++n > 3) return true;
+  return false; }
+/** the car's outline only where the things before it hide it (their solid pixels, not their shadows), in one light colour */
+const hidCv = document.createElement('canvas'), hidCx = hidCv.getContext('2d')!;
+function hiddenPart(c: Drawn, by: Drawn[]): HTMLCanvasElement | null { const w = c.img.width, h = c.img.height, A = alphaOf(c.img); if (hidCv.width < w || hidCv.height < h) { hidCv.width = Math.max(hidCv.width, w); hidCv.height = Math.max(hidCv.height, h); }
+  const im = hidCx.createImageData(w, h), d = im.data; let any = false;
+  for (const o of by) { const B = alphaOf(o.img), bw = o.img.width, x0 = Math.max(0, o.X0 - c.X0), x1 = Math.min(w, o.X0 + bw - c.X0), y0 = Math.max(0, o.Y0 - c.Y0), y1 = Math.min(h, o.Y0 + o.img.height - c.Y0);
+    for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) { const i = y * w + x; if (A[i]! > 128 && B[(y + c.Y0 - o.Y0) * bw + (x + c.X0 - o.X0)]! > 128) { d[i * 4] = 255; d[i * 4 + 1] = 226; d[i * 4 + 2] = 168; d[i * 4 + 3] = 255; any = true; } } }
+  if (!any) return null; hidCx.clearRect(0, 0, hidCv.width, hidCv.height); hidCx.putImageData(im, 0, 0); return hidCv; }
 /** the whole picture: the layer behind (blurred by the camera's motion), the player's car sharp, what stands before it, the hidden cars' outlines */
 // ---- the fence: a car that reaches it smashes a few metres of it into flying pieces ----
 const broken = new Set<string>(), debris: { x: number; y: number; z: number; vx: number; vy: number; vz: number; a: number; va: number; len: number; col: string; life: number }[] = [];
@@ -191,7 +194,7 @@ function drawDebris(el: number) { for (let k = debris.length - 1; k >= 0; k--) {
 function drawWorld(el: number) { const all = scene(), cars = all.filter(d => d.car), props = all.filter(d => !d.car);
   if (bg.width !== VW || bg.height !== VH) { bg.width = VW; bg.height = VH; } ctx = bgx; bgx.imageSmoothingEnabled = false; drawTrack();
   // the still world (ground and buildings) on the layer behind; what stands before a car is drawn again over it
-  const front = new Set<Drawn>(); for (const d of props) { bgx.drawImage(d.img, d.X0, d.Y0); for (const c of cars) if ((d.over || d.Y > c.Y) && hits(d, c)) front.add(d); }
+  const front = new Set<Drawn>(); for (const d of props) { bgx.drawImage(d.img, d.X0, d.Y0); for (const c of cars) if ((d.over || d.Y > c.Y) && covers(c, d)) front.add(d); }
   ctx = main;
   // motion blur by each thing's own motion across the picture: the ground by the camera's, a car by its speed against the camera's
   const cvx = (camX - lastCamX) / Math.max(el, 1e-3), cvy = (camY - lastCamY) / Math.max(el, 1e-3); lastCamX = camX; lastCamY = camY;
@@ -203,8 +206,10 @@ function drawWorld(el: number) { const all = scene(), cars = all.filter(d => d.c
   main.clearRect(0, 0, VW, VH); { const b = streak(cvx, cvy); smear(bg, 0, 0, [-b[0], -b[1]]); }   // the ground streams back against the camera
   for (const c of cars) { const v = c.car!, wx = v.vx * Math.cos(v.yaw) - v.vy * Math.sin(v.yaw), wy = v.vx * Math.sin(v.yaw) + v.vy * Math.cos(v.yaw); smear(c.img, c.X0, c.Y0, streak(wx - cvx, wy - cvy)); }
   for (const d of [...front].sort((a, b) => (a.over ? 1 : 0) - (b.over ? 1 : 0) || a.Y - b.Y)) main.drawImage(d.img, d.X0 + jx, d.Y0 + jy);
-  // a car a building hides: its outline over it, faint
-  for (const c of cars) { if (!props.some(d => (d.over || d.Y > c.Y) && hits(d, c))) continue; main.globalAlpha = c.car === car ? 0.55 : 0.35; main.drawImage(silhouette(c.img), c.X0 + jx, c.Y0 + jy); main.globalAlpha = 1; }
+  // a car hidden by anything that stands before it (a stand, a tree, a bush, the railway, a bridge): its outline, faint,
+  // over just the part that is hidden; the rest of the car shows as itself
+  for (const c of cars) { const by = props.filter(d => (d.over || d.Y > c.Y) && covers(c, d)); if (!by.length) continue; const s = hiddenPart(c, by); if (!s) continue;
+    main.globalAlpha = c.car === car ? 0.6 : 0.4; main.drawImage(s, 0, 0, c.img.width, c.img.height, c.X0 + jx, c.Y0 + jy, c.img.width, c.img.height); main.globalAlpha = 1; }
   drawDebris(el);
   // speed: the edges darken a little
   if (car.speed > 30) { const v = Math.min(1, (car.speed - 30) / 30) * 0.35, g = main.createRadialGradient(VW / 2, VH / 2, VH * 0.35, VW / 2, VH / 2, VW * 0.62); g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, `rgba(0,0,0,${v})`); main.fillStyle = g; main.fillRect(0, 0, VW, VH); } }
@@ -360,3 +365,4 @@ function fit() { if (document.fullscreenElement || document.body.classList.conta
   if (st.cine) { VW = Math.floor(VW / 4) * 2; VH = Math.floor(VH / 2); }   // the cinematic view: pixels twice the size (closer)
   cv.width = VW; cv.height = VH; ctx.imageSmoothingEnabled = false; }
 addEventListener('resize', fit); addEventListener('orientationchange', () => setTimeout(fit, 200)); fit(); choose(carId); camX = car.x; camY = car.y; camZ = 0; camShow(); requestAnimationFrame(frame);
+(globalThis as { __drive?: unknown }).__drive = { get car() { return car; }, SCN, T };   // for the page tests (tools): place the car, read the scenery

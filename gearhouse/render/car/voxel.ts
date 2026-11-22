@@ -21,7 +21,11 @@ export function solidOf(m: CarModel, c = 15, tyreW?: number): Solid {
   const L = m.length, W = m.width, H = m.height, x0 = -150, y0 = -W / 2 - 150, nx = Math.ceil((L + 300) / c), ny = Math.ceil((W + 300) / c), nz = Math.ceil((H + 150) / c);
   const owner = new Int16Array(nx * ny * nz).fill(-1), pri = new Float32Array(nx * ny * nz).fill(-1e9), rgb: [number, number, number][] = [], mat: string[] = [], ids: string[] = [];
   const at = (i: number, j: number, k: number) => (k * ny + j) * nx + i;
-  const parts = m.parts.filter(p => p.layer !== 'chassis' && p.outlines);
+  // left out: the drawings' own stand-ins that become blocks in a solid: tyres drawn as parts (the wheels are made below),
+  // the dark wheel-well backs, and dark fill panels drawn in one view only (a slab through the car in the others)
+  const vol = (p: CarPart) => (p.box.x[1] - p.box.x[0]) * (p.box.y[1] - p.box.y[0]) * (p.box.z[1] - p.box.z[0]) / 1e9;
+  const parts = m.parts.filter(p => p.layer !== 'chassis' && p.outlines && p.element !== 'wheel' && p.element !== 'house'
+    && !((p.material === 'black' || p.material === 'iron' || p.material === 'rubber') && Object.keys(p.outlines).length === 1 && vol(p) > 0.015));
   parts.forEach((p: CarPart) => {
     const r = p as unknown as { color?: string; lift?: number }, col = r.color ?? (p.material === 'paint' ? m.paint : p.material === 'paint2' ? m.paint2 : p.material === 'chrome' && (m as unknown as { chrome?: string }).chrome ? (m as unknown as { chrome: string }).chrome : MAT_RGB[p.material] ?? '#808080');
     const id = rgb.push(hex(col)) - 1; mat.push(p.material); ids.push(p.id);
@@ -44,7 +48,8 @@ export function solidOf(m: CarModel, c = 15, tyreW?: number): Solid {
   const rimC = rgb.push(hex(wi.rimMaterial === 'paint' ? m.paint : wi.rimMaterial === 'paint2' ? m.paint2 : '#c4c6c8')) - 1; mat.push(wi.rimMaterial === 'chrome' ? 'chrome' : 'paint'); ids.push('wheel');
   for (const w of m.wheels) for (const s of [1, -1]) { const yc = s * w.y, rim = w.r * (wi.rim ?? 0.6);
     for (let k = 0; k < nz; k++) for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) { const x = x0 + (i + 0.5) * c, y = y0 + (j + 0.5) * c, z = (k + 0.5) * c, d = Math.hypot(x - w.x, z - w.r);
-      if (d > w.r || Math.abs(y - yc) > tw / 2) continue; const a = at(i, j, k), face = Math.abs(y - yc) > tw / 2 - c * 1.5;
+      const e = Math.abs(y - yc) / (tw / 2);   // across the tread: its shoulders round off as a tyre's do (the section a squashed circle)
+      if (e > 1 || d > w.r - w.r * 0.2 * (1 - Math.sqrt(Math.max(0, 1 - e * e)))) continue; const a = at(i, j, k), face = Math.abs(y - yc) > tw / 2 - c * 1.5;
       owner[a] = d > rim ? tyre : face ? rimC : tyre; pri[a] = 1e9; } }
   const S: Solid = { c, nx, ny, nz, x0, y0, owner, rgb, mat, ids, cx0: x0 + nx * c / 2 };
   rounded(S); return S;
@@ -60,17 +65,24 @@ function rounded(S: Solid, r = 2) {
   pass(a, b, nx, 1); pass(b, a, ny, nx); pass(a, b, nz, nx * ny);
   for (let i = 0; i < N; i++) { const o = owner[i]!; if (o < 0) continue; const m = S.mat[o]!; if ((m === 'paint' || m === 'paint2' || m === 'canvas') && b[i]! < 0.42) owner[i] = -1; } }
 
-export type Tex = Partial<Record<ViewName, CarImage>> & { reach?: Map<string, { x: [number, number]; y: number; z: number }> };
+export type Tex = Partial<Record<ViewName, CarImage>> & { reach?: Map<string, { x: [number, number]; y: number; z: number }>; mean?: Partial<Record<ViewName, Map<string, number>>> };
 /** the car's own drawings (review 73: "2D pictures laid over it"), at `mm` a pixel: the five views the flat renderer makes */
 export function texOf(m: CarModel, mm = 8, tyreW = 175): Tex { const t: Tex = {}; for (const v of ['left', 'right', 'front', 'rear', 'top'] as ViewName[]) t[v] = rasterizeFlat(viewDesign(m, v), { mm, shadow: false });
   // how far out each part reaches (across, up, along), to tell whether the part a drawing shows stands in front of a cell
   const reach = new Map<string, { x: [number, number]; y: number; z: number }>();
   for (const p of m.parts) reach.set(p.id, { x: [p.box.x[0], p.box.x[1]], y: Math.max(Math.abs(p.box.y[0]), Math.abs(p.box.y[1])), z: p.box.z[1] });
   const ws = m.wheels; reach.set('wheel', { x: [Math.min(...ws.map(w => w.x - w.r)), Math.max(...ws.map(w => w.x + w.r))], y: Math.max(...ws.map(w => w.y)) + tyreW / 2, z: Math.max(...ws.map(w => w.r * 2)) });
-  t.reach = reach; return t; }
+  // each part's mean brightness in each drawing: a painted face keeps the drawing's marks (louvres, seams, lines) as light
+  // and dark against that mean, and leaves its broad light to the solid's own (the drawings' baked light made patches)
+  const mean: Tex['mean'] = {};
+  for (const v of ['left', 'right', 'front', 'rear', 'top'] as ViewName[]) { const im = t[v]!, sum = new Map<string, [number, number]>();
+    for (let i = 0; i < im.w * im.h; i++) { if (im.rgba[i * 4 + 3]! < 128) continue; const id = (im.ids?.[im.owner[i]!] ?? '').replace(/~$/, ''), L = lum(im.rgba[i * 4]!, im.rgba[i * 4 + 1]!, im.rgba[i * 4 + 2]!), q = sum.get(id) ?? [0, 0]; q[0] += L; q[1]++; sum.set(id, q); }
+    mean[v] = new Map([...sum].map(([k, [a, n]]) => [k, a / n])); }
+  t.mean = mean; t.reach = reach; return t; }
+const lum = (r: number, g: number, b: number) => 0.3 * r + 0.59 * g + 0.11 * b;
 /** the colour the drawings give a cell's face: from the view that looks straight at it, taken only where that view shows
  *  the same part there (a wing does not borrow the wheel standing before it); null when no view does */
-function texel(T: Tex, W: number, part: string, x: number, y: number, z: number, n: [number, number, number]): [number, number, number] | null {
+function texel(T: Tex, W: number, part: string, x: number, y: number, z: number, n: [number, number, number], flat?: [number, number, number], broad = false): [number, number, number] | null {
   const C = W / 2, order: [ViewName, number, number][] = [];
   const ax = Math.abs(n[0]), ay = Math.abs(n[1]), az = Math.abs(n[2]);
   const side: [ViewName, number, number] = [n[1] >= 0 ? 'left' : 'right', x, z], end: [ViewName, number, number] = n[0] < 0 ? ['front', C + y, z] : ['rear', C - y, z], top: [ViewName, number, number] = ['top', x, C + y];
@@ -81,7 +93,13 @@ function texel(T: Tex, W: number, part: string, x: number, y: number, z: number,
     // not one that stands out in front of it along the view's line (the wheel before the wing, the wing over the board)
     if (id !== part) { const r = T.reach?.get(id), tol = 45; if (!r) continue;
       const before = v === 'left' || v === 'right' ? r.y > Math.abs(y) + tol : v === 'top' ? r.z > z + tol : v === 'front' ? r.x[0] < x - tol : r.x[1] > x + tol; if (before) continue; }
-    return [im.rgba[i * 4]!, im.rgba[i * 4 + 1]!, im.rgba[i * 4 + 2]!]; }
+    let r0 = im.rgba[i * 4]!, g0 = im.rgba[i * 4 + 1]!, b0 = im.rgba[i * 4 + 2]!;
+    if (broad) { let a = 0, b = 0, c = 0, n = 0;   // a broad painted face: the drawing's dither smoothed out (its marks keep their weight)
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const xx = px + dx, yy = py + dy; if (xx < 0 || yy < 0 || xx >= im.w || yy >= im.h) continue; const j = yy * im.w + xx;
+        if (im.rgba[j * 4 + 3]! < 128 || im.owner[j] !== im.owner[i]) continue; a += im.rgba[j * 4]!; b += im.rgba[j * 4 + 1]!; c += im.rgba[j * 4 + 2]!; n++; }
+      if (n) { r0 = (r0 + a / n) / 2; g0 = (g0 + b / n) / 2; b0 = (b0 + c / n) / 2; } }
+    if (broad && flat && id === part) { const mu = T.mean?.[v]?.get(id) ?? 128, k = Math.max(0.55, Math.min(1.35, Math.pow((lum(r0, g0, b0) + 4) / (mu + 4), 0.7))); return [flat[0] * k, flat[1] * k, flat[2] * k]; }
+    return [r0, g0, b0]; }
   return null; }
 
 const SUN = (() => { const v = [-0.45, 0.35, 0.82], n = Math.hypot(...v); return v.map(q => q / n) as [number, number, number]; })();
@@ -137,13 +155,17 @@ export function surfaceOf(S: Solid, T?: Tex, W = 0): Surface {
   const cx = S.x0 + S.nx * S.c / 2, pos: number[] = [], nrm: number[] = [], col: number[] = [], gl: number[] = [], tx: number[] = [];
   for (let k = 0; k < S.nz; k++) for (let j = 0; j < S.ny; j++) for (let i = 0; i < S.nx; i++) { const id = S.owner[(k * S.ny + j) * S.nx + i]!; if (id < 0 || !surf(S, i, j, k)) continue;
     const X = S.x0 + (i + 0.5) * S.c, Y = S.y0 + (j + 0.5) * S.c, Z = (k + 0.5) * S.c, nn = normal(S, i, j, k); pos.push(X - cx, Y, Z); nrm.push(...nn);
-    const tc = T ? texel(T, W, S.ids[id]!, X, Y, Z, nn) : null; col.push(...(tc ?? S.rgb[id]!)); tx.push(tc ? 1 : 0); const m = S.mat[id]!;
+    const mm = S.mat[id]!, broad = mm === 'paint' || mm === 'paint2' || mm === 'canvas' || mm === 'wood', tc = T ? texel(T, W, S.ids[id]!, X, Y, Z, nn, S.rgb[id]!, broad) : null;
+    // the crevices: a cell with much solid round it (under a wing, between parts) gets less of the sky
+    let fill = 0; for (let dk = -2; dk <= 2; dk++) for (let dj = -2; dj <= 2; dj++) for (let di = -2; di <= 2; di++) { const ii = i + di, jj = j + dj, kk = k + dk; if (ii >= 0 && jj >= 0 && kk >= 0 && ii < S.nx && jj < S.ny && kk < S.nz && S.owner[(kk * S.ny + jj) * S.nx + ii]! >= 0) fill++; }
+    const ao = 1 - 0.55 * Math.max(0, Math.min(1, (fill / 125 - 0.5) / 0.4)); const c0 = tc ?? S.rgb[id]!;
+    col.push(c0[0] * ao, c0[1] * ao, c0[2] * ao); tx.push(tc && !broad ? 1 : 0); const m = S.mat[id]!;
     gl.push(m === 'paint' || m === 'paint2' ? 0.35 : m === 'chrome' ? 0.8 : m === 'glass' ? 0.5 : 0.05); }
   return { n: gl.length, pos: new Float32Array(pos), nrm: new Float32Array(nrm), col: new Uint8ClampedArray(col), gloss: new Float32Array(gl), c: S.c, tex: new Uint8Array(tx) }; }
 /** A from a Surface: the same picture as drawWhole, quicker for turning it by hand */
 export function drawSurface(F: Surface, yaw: number, pitch: number, mmPx: number, w: number, h: number, outline = true): Pic {
   const rgba = new Uint8ClampedArray(w * h * 4), zb = new Float32Array(w * h).fill(-1e9), th = yaw * Math.PI / 180, ph = pitch * Math.PI / 180, ct = Math.cos(th), st = Math.sin(th), sp = Math.sin(ph), cp = Math.cos(ph);
-  const sun: [number, number, number] = [SUN[0] * ct + SUN[1] * st, -SUN[0] * st + SUN[1] * ct, SUN[2]], q = Math.max(1, Math.ceil(F.c / mmPx)), half = q >> 1;
+  const sun: [number, number, number] = [SUN[0] * ct + SUN[1] * st, -SUN[0] * st + SUN[1] * ct, SUN[2]], q = Math.max(2, Math.ceil(F.c * 1.45 / mmPx)), half = q >> 1;   // big enough that no cell behind shows between
   for (let t = 0; t < F.n; t++) { const x = F.pos[t * 3]!, y = F.pos[t * 3 + 1]!, z = F.pos[t * 3 + 2]!, xr = x * ct - y * st, yr = x * st + y * ct;
     const px = Math.round(w / 2 + xr / mmPx), py = Math.round(h * 0.6 + (-yr * sp - z * cp) / mmPx), depth = -yr * cp + z * sp;
     if (px < -q || py < -q || px > w + q || py > h + q) continue;

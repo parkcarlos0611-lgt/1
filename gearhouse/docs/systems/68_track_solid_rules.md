@@ -59,6 +59,16 @@ change starts from here. Code: render/car/voxel.ts. Check: tools/ref/solidshot.t
   so black cars keep their form; bright metal gives back sky above, a dark horizon, the ground below.
 - A dark line round the car and where one surface stands well before another.
 
+## Review 76: whole-car silhouettes, windows set in
+- The 2D models were made to look right from the side; their parts' boxes across the car are loose, so built one by one
+  they leave gaps a solid shows (the first sedans most). The gaps are now closed from the whole car's silhouettes, which
+  the sheets draw surely: a cell inside the side, front (or rear) and plan silhouettes, within 120 mm of a part and clear
+  of the wheels, takes the nearest part (not glass, chrome or lenses).
+- Glass and the frames round windows are set into the surface, not laid on it: a frame takes the surface's own cells,
+  glass the cells one further in with the outer one cleared, so a window sits back in its frame (they stood out).
+- The game-size wheel face keeps the wheel's own pattern: two thirds of its spokes, drawn at 9 mm a pixel (a stock
+  16-spoke face changed how the grand roadster's wheels looked).
+
 ## Review 75: nothing floats, no colour bleeds
 - Corners are rounded before the thin parts are laid on, so glass, lamps and strips sit on the rounded surface (laid on
   the square hull first, they stood a cell or two proud of it: floating windows).

@@ -39,7 +39,9 @@ export function solidOf(m: CarModel, c = 15, tyreW?: number): Solid {
   // a part drawn in one view only (a sill strip, a handle, a badge, a lamp bar) has no depth of its own: it is laid on
   // whatever solid lies just behind it along that view's line (within 250 mm), a few cells thick; else it stands where its box says
   const later: CarPart[] = [];
-  const lay = (p: CarPart) => { const id = newId(p), v = one(p) as 'side' | 'front' | 'rear' | 'top', o = p.outlines[v]!, b = p.box, t = Math.max(1, Math.min(3, Math.round(45 / c))), far = Math.ceil(250 / c);
+  const thinIds = new Set<number>();
+  const lay = (p: CarPart) => { const inset = p.material === 'glass' ? 'glass' : /frame|reveal/i.test(p.id) && p.element !== 'screen' ? 'frame' : '';
+    const id = newId(p); thinIds.add(id); const v = one(p) as 'side' | 'front' | 'rear' | 'top', o = p.outlines[v]!, b = p.box, t = Math.max(1, Math.min(3, Math.round(45 / c))), far = Math.ceil(250 / c);
     const centred = !p.pair && v === 'side' && b.y[0] >= -1 && b.y[1] > 100;   // drawn from the centre line out: it lies on both sides
     for (const s of p.pair || centred ? [1, -1] : [1]) { const ya = centred ? (s > 0 ? b.y[1] - 1 : -b.y[1]) : s > 0 ? b.y[0] : -b.y[1], yb = centred ? (s > 0 ? b.y[1] : -b.y[1] + 1) : s > 0 ? b.y[1] : -b.y[0];
       const U = (x: number) => (x - b.x[0]) / Math.max(1, b.x[1] - b.x[0]), Vz = (z: number) => (z - b.z[0]) / Math.max(1, b.z[1] - b.z[0]), Vy = (y: number) => ((s > 0 ? y : -y) - b.y[0]) / Math.max(1, b.y[1] - b.y[0]);
@@ -47,8 +49,14 @@ export function solidOf(m: CarModel, c = 15, tyreW?: number): Solid {
       // along the view's line: n0 the outer end of the box, dir the way out, len the box's own depth in cells
       const run = (get: (n: number) => number, n0: number, n1: number, dir: number, lim: number, put: (n: number) => void) => { let hit = -1;
         for (let n = n0 + dir * far, q = 0; q <= 2 * far + Math.abs(n1 - n0); q++, n -= dir) { if (n < 0 || n >= lim) continue; const a = get(n); if (owner[a]! >= 0 && owner[a] !== id) { hit = n; break; } }
-        if (hit >= 0 && Math.abs(hit - n0) <= far + Math.abs(n1 - n0)) { for (let q = 1; q <= t; q++) { const n = hit + dir * q; if (n >= 0 && n < lim) put(n); } } else for (let n = Math.min(n0, n1); n <= Math.max(n0, n1); n++) put(n); };
+        if (hit >= 0 && Math.abs(hit - n0) <= far + Math.abs(n1 - n0)) {
+          // review 76: glass and the frames round it are set into the surface, not laid on it: a frame takes the surface's
+          // own cells, glass the cells one further in (the outer one cleared), so a window sits back in its frame
+          if (inset === 'glass') { const s0 = hit; if (s0 >= 0 && s0 < lim) { const a0 = get(s0); if (owner[a0] !== id && mat[owner[a0]!] !== 'glass') owner[a0] = -1; } for (let q = 1; q <= t; q++) { const n = hit - dir * q; if (n >= 0 && n < lim) put(n); } }
+          else if (inset === 'frame') { for (let q = 0; q < t; q++) { const n = hit - dir * q; if (n >= 0 && n < lim) put(n); } }
+          else for (let q = 1; q <= t; q++) { const n = hit + dir * q; if (n >= 0 && n < lim) put(n); } } else for (let n = Math.min(n0, n1); n <= Math.max(n0, n1); n++) put(n); };
       const set = (a: number) => { owner[a] = id; pri[a] = 1e7; };
+      void inset;
       if (v === 'side') { const mid = (ya + yb) / 2, dir = mid >= 0 ? 1 : -1, n0 = J(dir > 0 ? yb : ya), n1 = J(dir > 0 ? ya : yb);
         for (let k = K(b.z[0]); k <= K(b.z[1]); k++) for (let i = I(b.x[0]); i <= I(b.x[1]); i++) { if (!inPoly(o, U(x0 + (i + 0.5) * c), Vz((k + 0.5) * c))) continue;
           if (Math.abs(mid) < 30) { for (let j = n1; j <= n0; j++) set(at(i, j, k)); continue; } run(n => at(i, n, k), n0, n1, dir, ny, n => set(at(i, n, k))); } }
@@ -83,6 +91,21 @@ export function solidOf(m: CarModel, c = 15, tyreW?: number): Solid {
   // corners rounded first (review 75): cells of parts thick enough to have corners go where a blur of the solid thins
   // out. Done before the thin parts are laid on, so glass, lamps and strips sit on the rounded surface, not on the
   // square one it was cut from (they stood proud of it by a cell or two: floating windows)
+  // review 76: the gaps between parts closed from the whole car's silhouettes. The sheets draw the car whole in each
+  // view far more surely than any one part's box across the car; a cell inside the side, the front (or rear) and the
+  // plan silhouettes, within 120 mm of a part and clear of the wheels, takes the nearest part's ownership
+  { const sil = (v: ViewName) => rasterizeFlat(viewDesign(m, v), { mm: c, shadow: false });
+    const sd = sil('left'), fr = sil('front'), re = sil('rear'), tp = sil('top'), C = W / 2;
+    const inn = (im: CarImage, u: number, h: number) => { const px = Math.floor(im.X(u)), py = Math.floor(im.Y(h)); return px >= 0 && py >= 0 && px < im.w && py < im.h && im.rgba[(py * im.w + px) * 4 + 3]! > 128; };
+    const wheelZone = (x: number, y: number, z: number) => m.wheels.some(w => Math.hypot(x - w.x, z - w.r) < w.r + 40 && Math.abs(Math.abs(y) - w.y) < (tyreW ?? 175) / 2 + 60);
+    const hull = new Uint8Array(N);
+    for (let k = 0; k < nz; k++) for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) { const x = x0 + (i + 0.5) * c, y = y0 + (j + 0.5) * c, z = (k + 0.5) * c;
+      if (inn(sd, x, z) && (inn(fr, C + y, z) || inn(re, C - y, z)) && inn(tp, x, C + y) && !wheelZone(x, y, z)) hull[at(i, j, k)] = 1; }
+    let front: number[] = []; for (let a = 0; a < N; a++) if (owner[a]! >= 0 && !thinIds.has(owner[a]!)) front.push(a);
+    const N6 = [1, -1, nx, -nx, nx * ny, -nx * ny];
+    for (let step = 0; step < Math.ceil(120 / c) && front.length; step++) { const next: number[] = [];
+      for (const a of front) for (const d of N6) { const b = a + d; if (b < 0 || b >= N || owner[b]! >= 0 || !hull[b]) continue; const o = owner[a]!; if (mat[o] === 'glass' || mat[o] === 'chrome' || mat[o] === 'lens' || mat[o] === 'lensR') continue; owner[b] = o; pri[b] = -1; next.push(b); }
+      front = next; } }
   const S: Solid = { c, nx, ny, nz, x0, y0, owner, rgb, mat, ids, cx0: x0 + nx * c / 2, den: new Float32Array(0) };
   { const d0 = density(S, 2); for (let i = 0; i < N; i++) { const o = owner[i]!; if (o >= 0 && thick[o] && d0[i]! < 0.42) owner[i] = -1; } }
   later.forEach(lay);
@@ -154,8 +177,8 @@ export function texOf(m0: CarModel, mm = 6, tyreW = 175): Tex { const m = { ...m
   const ws = m.wheels; reach.set('wheel', { x: [Math.min(...ws.map(w => w.x - w.r)), Math.max(...ws.map(w => w.x + w.r))], y: Math.max(...ws.map(w => w.y)) + tyreW / 2, z: Math.max(...ws.map(w => w.r * 2)) });
   // the wheels' faces as they read at game size (review 74): wire wheels with fewer, bolder spokes, drawn at the scale
   // they are seen (a fine wheel drawn small turns to grey); the side drawing keeps its own wheels for close views
-  const wf = { ...m, wheel: { ...m.wheel, spokes: m.wheel?.style === 'wire' ? 16 : m.wheel?.spokes } } as CarModel;
-  t.wheel = rasterizeFlat(viewDesign(wf, 'left'), { mm: 11, shadow: false, plain: true });
+  const wf = { ...m, wheel: { ...m.wheel, spokes: m.wheel?.style === 'wire' ? Math.max(20, Math.round((m.wheel?.spokes ?? 32) * 0.66)) : m.wheel?.spokes } } as CarModel;
+  t.wheel = rasterizeFlat(viewDesign(wf, 'left'), { mm: 9, shadow: false, plain: true });   // review 76: the wheel's own pattern kept (two thirds of its spokes, drawn a little bolder), not a stock 16-spoke face
   t.on = new Map(m.parts.filter(p => (p as unknown as { on?: string }).on).map(p => [p.id, (p as unknown as { on: string }).on]));
   t.reach = reach; return t; }
 const lum = (r: number, g: number, b: number) => 0.3 * r + 0.59 * g + 0.11 * b;

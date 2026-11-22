@@ -17,14 +17,14 @@ REPO = sys.argv[4] if len(sys.argv) > 4 else '/home/user/1/gearhouse'
 # run 400..799 in height (40..430 across): radius 198 units ----
 K = 3404 / (1598 - 234)                                   # 2.496 mm per unit (9.98 mm a pixel)
 SW, SH, FW, FH, BW, BH, TW, TH = 1900, 800, 964, 992, 940, 912, 1896, 728   # the views in 4x units (475x200, 241x248, 235x228, 474x182 px)
-L, H, W = round(SW * K), round(SH * K), 1890            # width: the views disagree (front 1930 over the wings at the side's height scale, rear 2050, plan 1780); the draft's 1890 is kept
+L, H = round(SW * K), round(SH * K); W = round(FW * H / FH)   # review 70: the front view keeps the sheet's proportions            # width: the views disagree (front 1930 over the wings at the side's height scale, rear 2050, plan 1780); the draft's 1890 is kept
 C = W / 2
 FX, RX, R = round(234 * K), round(1598 * K), round(198 * K)
 # the plan's body lies 7 units off the middle of its cut (the wings do not): the model stays symmetric about the middle
 TC = 364                                                  # the plan's centre line (the car sits 7 units above the middle of its cut)
 S = lambda px, py: [round(px * L / SW), round(H - py * H / SH)]
-F = lambda dx, py: [round(dx * W / FW), round(H - py * H / FH)]
-B = lambda dx, py: [round(dx * W / BW), round(H - py * H / BH)]
+F = lambda dx, py: [round(dx * H / FH), round(H - py * H / FH)]
+B = lambda dx, py: [round(dx * H / BH), round(H - py * H / BH)]
 T = lambda px, dy: [round(px * L / TW), round(dy * W / TH)]
 def side(*p): return [S(*q) for q in p]
 def half(*p):
@@ -105,28 +105,45 @@ part('under', 'apron', 'black', 'flat', color=BLK, y=[0, 560],
      side=side((420, 480), (470, 530), (520, 575), (560, 600), (1370, 600), (1370, 648), (640, 652), (440, 640)))
 part('underTop', 'apron', 'black', 'flat', color=BLK, z=[S(0, 640)[1], S(0, 600)[1]], top=halfT((176, 0), (176, 230), (906, 240), (906, 0)))
 # the frame's front: horns and the cross tube ahead of the radiator (side: the horn ends; front: the tube under the shell; plan: the bar and the dark round the open arc)
-part('vis_crossF', 'frame', 'black', 'fender', color='#222226',
-     side=side((2, 578), (28, 566), (40, 600), (30, 642), (4, 640)), front=fhalf((0, 700), (170, 700), (170, 760), (0, 760)), top=halfT((40, 0), (40, 160), (66, 160), (66, 0)))
+part('vis_backF', 'frame', 'black', 'flat', color=BLK, x=[FX + 80, FX + 120], front=fhalf((0, 560), (322, 560), (322, 800), (0, 800)))
+part('vis_axleF', 'axle', 'black', 'fender', color='#33333a', x=[FX - 40, FX + 40], front=fhalf((0, 802), (200, 798), (322, 795), (322, 838), (250, 868), (200, 846), (0, 846)))
+part('vis_drumF', 'axle', 'black', 'fender', color='#2c2c31', pair=True, x=[FX - 60, FX + 60], front=fr((305, 690), (322, 685), (322, 836), (305, 830)))
+part('vis_dragF', 'axle', 'black', 'fender', color='#3a3a41', pair=True, x=[FX - 80, FX - 60], front=fr((212, 792), (308, 728), (312, 738), (218, 804)))
+part('vis_leafF', 'spring', 'black', 'flat', color='#3c3c44', pair=True, x=[S(30, 0)[0], FX - 100], detail={'kind': 'ribs', 'pitch': 14}, front=fr((162, 770), (202, 770), (202, 842), (162, 842)))
+part('vis_hornF', 'frame', 'black', 'fender', color='#5a5c66', pair=True,
+     side=side((2, 578), (28, 562), (62, 560), (62, 640), (4, 640)), front=fr((168, 670), (200, 670), (203, 762), (166, 762)), top=top((60, 150), (176, 150), (176, 176), (60, 176)),
+     feats={'front': [{'kind': 'bolt', 'at': F(170, 760)}, {'kind': 'bolt', 'at': F(200, 760)}], 'side': [{'kind': 'bolt', 'at': S(14, 580)}, {'kind': 'bolt', 'at': S(12, 630)}]})
+part('vis_crossF', 'frame', 'black', 'fender', color='#383840', x=[S(4, 0)[0], S(40, 0)[0]], front=fhalf((0, 700), (170, 700), (170, 755), (0, 755)), top=halfT((55, 0), (55, 150), (74, 150), (74, 0)),
+     feats={'front': [{'kind': 'highlight', 'pts': [F(-165, 722), F(165, 722)], 'width': 2}]})
+part('vis_knobF', 'frame', 'black', 'fender', color='#5a5c66', pair=True, z=[S(0, 620)[1], S(0, 580)[1]], top=top((42, 150), (48, 146), (76, 146), (82, 154), (82, 172), (76, 178), (48, 178), (42, 172)))
+part('vis_apronF', 'apron', 'black', 'flat', color='#17171a', x=[S(50, 0)[0], S(70, 0)[0]], front=fhalf((0, 755), (160, 755), (160, 822), (120, 843), (0, 847)))
+part('vis_crank', 'crank', 'chrome', 'flat', x=[S(2, 0)[0], S(6, 0)[0]], front=fell(0, 760, 7), smooth=('front',))
 part('vis_frameF', 'frame', 'black', 'flat', color=BLK, z=[S(0, 640)[1], S(0, 580)[1]], top=halfT((176, 0), (176, 200), (56, 200), (56, 150), (100, 125), (122, 85), (130, 0)))
 # from in front: the axle, springs and steering as one dark mass between the tyres under the cross tube
-part('vis_axleF', 'axle', 'black', 'flat', color=BLK, x=[FX - 60, FX + 60], front=fhalf((0, 700), (170, 700), (190, 570), (322, 560), (322, 840), (230, 862), (0, 850)))
 # from behind: the fuel tank between the frame horns with its two straps, the axle's dark mass under it; in the plan the tank and the frame's end behind the body
 part('vis_frameR', 'frame', 'black', 'flat', color=BLK, z=[S(0, 640)[1], S(0, 580)[1]], top=halfT((1551, 0), (1551, 214), (1786, 200), (1806, 185), (1806, 0)))
-part('vis_tank', 'tank', 'paint2', 'fender', color='#2a2a2e', rear=bhalf((0, 587), (208, 587), (208, 720), (0, 720)), top=halfT((1616, 0), (1616, 152), (1741, 152), (1741, 0)),
-     feats={'rear': [{'kind': 'crease', 'pts': [B(-208, 640), B(208, 640)]}, {'kind': 'crease', 'pts': [B(-208, 667), B(208, 667)]}, {'kind': 'seam', 'pts': [B(-180, 590), B(-180, 718)]}, {'kind': 'seam', 'pts': [B(180, 590), B(180, 718)]}],
-            'top': [{'kind': 'seam', 'pts': closed(trrect(1626, -140, 1731, 140, 20))}]})
-part('vis_axleR', 'axle', 'black', 'flat', color=BLK, x=[RX - 60, RX + 60], rear=bhalf((0, 587), (313, 587), (313, 790), (250, 802), (120, 810), (0, 800)))
+part('vis_backR', 'frame', 'black', 'flat', color=BLK, x=[RX - 120, RX - 80], rear=bhalf((0, 587), (313, 587), (313, 770), (0, 770)))
+part('vis_axleR', 'axle', 'black', 'fender', color='#33333a', x=[RX - 40, RX + 40], rear=bhalf((0, 762), (313, 758), (313, 800), (250, 810), (60, 800), (0, 800)))
+part('vis_diffR', 'axle', 'black', 'fender', color='#3a3a42', x=[RX + 40, RX + 70], smooth=('rear',), rear=bhalf((0, 735), (30, 740), (52, 760), (52, 785), (30, 804), (0, 808)))
+part('vis_leafR', 'spring', 'black', 'flat', color='#3c3c44', pair=True, x=[RX + 100, RX + 200], detail={'kind': 'ribs', 'pitch': 14}, rear=re((173, 720), (203, 720), (203, 792), (173, 792)))
+part('vis_tankBody', 'tank', 'paint2', 'fender', color='#1c1c20', x=[RX + 200, RX + 300], rear=bhalf((0, 642), (215, 642), (215, 700), (0, 700)))
+part('vis_tank', 'tank', 'paint2', 'fender', color='#3a3c44', x=[RX + 220, RX + 320], rear=bhalf((0, 608), (209, 608), (209, 642), (0, 642)), top=halfT((1616, 0), (1616, 152), (1741, 152), (1741, 0)),
+     feats={'rear': [{'kind': 'highlight', 'pts': [B(-200, 636), B(200, 636)], 'width': 2}], 'top': [{'kind': 'seam', 'pts': closed(trrect(1626, -140, 1731, 140, 20))}]})
+part('vis_barR', 'frame', 'black', 'fender', color='#34363d', x=[RX + 230, RX + 330], rear=bhalf((0, 700), (222, 700), (222, 716), (0, 716)))
+part('vis_rodR', 'axle', 'black', 'fender', color='#2e2e34', x=[RX + 60, RX + 80], rear=bhalf((0, 746), (180, 746), (180, 753), (0, 753)))
+part('vis_hornR', 'frame', 'black', 'fender', color='#5a5c66', pair=True, x=[RX + 260, RX + 360], rear=re((165, 606), (205, 606), (205, 718), (165, 718)),
+     feats={'rear': [{'kind': 'bolt', 'at': B(168, 652)}, {'kind': 'bolt', 'at': B(202, 652)}, {'kind': 'bolt', 'at': B(168, 712)}, {'kind': 'bolt', 'at': B(202, 712)}]})
 def tyre(y0, y1, n=6): return rrect(y0, 0, y1, 2 * R, round((y1 - y0) * 0.42), n)
 TF = (F(322, 0)[0], F(442, 0)[0]); TR = (B(313, 0)[0], B(440, 0)[0])
 part('tyreF', 'wheel', 'rubber', 'fender', x=[FX - R, FX + R], pair=True, front=tyre(*TF), smooth=('front',), detail={'kind': 'treadFace', 'pitch': 30})
 part('tyreR', 'wheel', 'rubber', 'fender', x=[RX - R, RX + R], pair=True, rear=tyre(*TR), smooth=('rear',), detail={'kind': 'treadFace', 'pitch': 30})
 
 # ---------------- radiator ----------------
-part('shell', 'radiator', 'chrome', 'fender', slot='grille', color=NICKEL, smooth=('front',),
-     side=side((182, 300), (184, 268), (200, 250), (216, 243), (268, 243), (268, 358), (190, 358)),
+part('shell', 'radiator', 'chrome', 'fender', slot='grille', color=NICKEL,
+     side=side((182, 300), (178, 258), (200, 248), (216, 243), (268, 243), (268, 374), (192, 374)),
      front=fhalf((0, 313), (60, 318), (110, 335), (135, 360), (145, 392), (145, 700), (0, 700)),
-     top=halfT((176, 0), (176, 122), (246, 130), (246, 0)))
-part('core', 'radiator', 'black', 'flat', slot='grille', on='shell', lift=1, color='#39332b', x=[S(184, 0)[0], S(190, 0)[0]], detail={'kind': 'cells', 'pitch': 20},
+     top=halfT((176, 0), (176, 120), (184, 131), (246, 136), (246, 0)))
+part('core', 'radiator', 'black', 'flat', slot='grille', on='shell', lift=1, color='#39332b', x=[S(184, 0)[0], S(190, 0)[0]], detail={'kind': 'core', 'pattern': 'slats', 'pitch': 14},
      front=fhalf((0, 368), (100, 368), (122, 380), (122, 693), (0, 693)))
 part('badge', 'radiator', 'chrome', 'flat', slot='grille', on='shell', lift=2, x=[S(180, 0)[0], S(184, 0)[0]], front=fell(0, 345, 13), smooth=('front',))
 # the filler cap with its winged mascot
@@ -135,7 +152,7 @@ part('cap', 'filler', 'chrome', 'fender', color=NICKEL, smooth=('top',),
      front=fhalf((0, 240), (18, 246), (38, 258), (22, 272), (10, 290), (14, 313), (0, 313)), top=tell(206, 0, 24))
 # ---------------- bonnet, cowl, body, roof ----------------
 part('hood', 'hood', 'paint', 'hood', smooth=('front',),
-     side=side((268, 236), (282, 226), (690, 226), (690, 556), (500, 556), (425, 470), (390, 432), (350, 405), (300, 390), (268, 385)),
+     side=side((268, 236), (282, 226), (690, 226), (690, 556), (500, 556), (425, 470), (390, 432), (350, 410), (300, 398), (268, 394)),
      front=fhalf((0, 306), (80, 310), (140, 332), (165, 370), (170, 440), (170, 700), (0, 700)),
      top=halfT((246, 0), (246, 130), (741, 202), (741, 0)),
      feats={'side': [{'kind': 'trim', 'pts': side((270, 310), (690, 310)), 'width': 1}, {'kind': 'highlight', 'pts': side((290, 262), (680, 262)), 'width': 2},
@@ -206,10 +223,16 @@ part('fenderR', 'fenderR', 'paint2', 'fender', slot='fenderR', pair=True, smooth
 # ---------------- lamps ----------------
 # drum headlamps in nickel on posts from the frame horns
 part('lamp', 'lamp', 'chrome', 'fender', slot='lamp', pair=True, smooth=SM, color=NICKEL,
-     side=side((88, 296), (100, 290), (122, 292), (150, 305), (172, 325), (176, 345), (160, 358), (120, 363), (95, 363), (86, 350)),
-     front=fell(202, 483, 73), top=top((84, 100), (110, 97), (150, 115), (196, 140), (196, 170), (150, 195), (110, 212), (84, 210)))
-part('lens', 'lamp', 'chrome', 'flat', slot='lamp', pair=True, on='lamp', lift=1, x=[S(84, 0)[0], S(90, 0)[0]], front=fell(202, 483, 62), smooth=('front',), detail={'kind': 'bowl'})
-part('lampStand', 'lamp', 'black', 'fender', slot='lamp', pair=True, color='#222226', x=[S(120, 0)[0], S(140, 0)[0]], front=fr((194, 556), (210, 556), (210, 720), (194, 720)))
+     side=side((98, 292), (120, 290), (140, 296), (158, 306), (172, 318), (180, 331), (184, 345), (181, 354), (170, 359), (140, 361), (98, 361)),
+     front=fell(202, 483, 73), top=top((96, 99), (120, 100), (150, 112), (175, 128), (192, 146), (199, 157), (199, 167), (192, 178), (175, 196), (150, 208), (120, 214), (96, 215)))
+part('lampRim', 'lamp', 'chrome', 'fender', slot='lamp', pair=True, color='#e8e0d2',
+     side=side((84, 294), (88, 289), (99, 289), (99, 364), (88, 364), (84, 358)), front=fell(202, 483, 73), top=top((83, 97), (96, 97), (96, 217), (83, 217)))
+part('lens', 'lamp', 'chrome', 'flat', slot='lamp', pair=True, on='lampRim', lift=1, smooth=SM, detail={'kind': 'bowl'},
+     side=side((84, 300), (79, 312), (78, 327), (79, 342), (84, 354)), front=fell(202, 483, 62), top=top((83, 104), (78, 120), (76, 157), (78, 194), (83, 210)))
+part('lampStand', 'lamp', 'black', 'fender', slot='lamp', pair=True, color='#2a2a30', y=[F(186, 0)[0], F(198, 0)[0]],
+     side=side((86, 362), (102, 362), (104, 394), (90, 398)), front=fr((186, 553), (198, 553), (198, 668), (186, 668)))
+part('lampStay', 'lamp', 'black', 'fender', slot='lamp', pair=True, color='#1d1d21', y=[F(150, 0)[0], F(186, 0)[0]],
+     side=side((150, 302), (164, 286), (180, 283), (186, 300), (192, 372), (150, 372), (176, 345), (172, 322)))
 # one red tail lamp in a nickel rim on the back of each rear wing
 part('tailRim', 'tail', 'chrome', 'fender', slot='tail', pair=True, on='fenderR', lift=1, smooth=('rear',), rear=bell(337, 547, 27),
      side=side((1812, 462), (1830, 466), (1837, 480), (1831, 494), (1815, 492)))

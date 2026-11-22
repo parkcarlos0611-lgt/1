@@ -56,3 +56,18 @@ steering wheel, dashboard, door trim, the wind wings' detail, the hood frame iro
 - Views disagree: lamps sit about 180 mm further forward in the plan than in the side view; bumper width plan 890 /
   front 1200 mm; see work/build.log.
 - With more time: tiles check of each part, the front axle and springs as vis_ parts, the spare's tilt, lamp shape.
+
+## Fix round 2 (after review)
+Kept the coordinator's changes (front/rear views one scale both ways, W = 2057; spare tilt 14, into 150; core detail).
+- Front view: screen frame (half width 84 px) now sits inside the cowl (84) and body (92); grille core runs to row 140,
+  the bumper's top edge, with the bright slats detail (`core`, slats, pitch 40, metal).
+- Under the radiator: the black block is now only the shadow under the wings (rows 100-168, element `house`); in
+  front of it vis_axleF (dropped beam), vis_leafF, vis_ironF (dumb irons), vis_brakeF, vis_damperF, read off a 6x crop.
+  Under the tail: vis_axleR with the final drive's bulge, vis_leafR, vis_shackleR, vis_brakeR.
+- Plan: front bumper with rounded ends, the seam between the two bars and a lit edge, irons out from the frame
+  (bumperFiron2, bolts), end knobs (bumperFend), the dark cross member with its studs (vis_crossF), the lamp bar and
+  the horns; rear bumper ends (bumperRend, a pair: the plan shows only the ends, the rest lies under the spare).
+- Scores now: side 0.94/0.80, front 0.91/0.85, rear 0.93/0.74, top 0.96/0.69.
+- Still weak: the running gear under the nose and tail is dark-on-dark on the sheet and read coarsely (blocks with
+  the right places, not fine shapes); the horns in the plan are indistinct on the sheet (placed where the bright
+  clamps show); the front bumper's irons in the plan are mostly under the cross member.

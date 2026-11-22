@@ -23,15 +23,15 @@ from shapely.ops import unary_union
 # ---- scale: hub caps at 60 and 422 on the side view (515x176), wheelbase 3175 mm ----
 K = 3175 / (422 - 60)                                     # 8.77 mm a pixel
 G = 172                                                   # ground row (hub row 124 + tyre radius 48)
-L, H, W = round(515 * K), round(G * K), 1800              # width: the plan gives about 1700, the front view (at its height's scale) 2050; 1800 puts the front track at 1430 (real 1422)
+L, H = round(515 * K), round(G * K); W = round(289 * H / 212)   # review 70: the front view keeps the sheet's proportions (one scale both ways, from its height)              # width: the plan gives about 1700, the front view (at its height's scale) 2050; 1800 puts the front track at 1430 (real 1422)
 C = W / 2
 FX, RX, R = round(60 * K), round(422 * K), round(48 * K)
 FG, FC, FW = 212, 144.5, 289                              # front view: ground row, centre column, width over the wings
 BG, BC, BW = 211, 147, 294                                # rear view
 TCEN, TL, TS = 94, 497, 513 / 497                         # plan: centre row, last column (the front bumper), stretch to the side view's length
 S = lambda px, py: [round(px * K), round((G - py) * K)]
-F = lambda dx, py: [round(dx * W / FW), round((FG - py) * H / FG)]
-B = lambda dx, py: [round(dx * W / BW), round((BG - py) * H / BG)]
+F = lambda dx, py: [round(dx * H / FG), round((FG - py) * H / FG)]
+B = lambda dx, py: [round(dx * H / BG), round((BG - py) * H / BG)]
 T = lambda px, d: [round((TL - px) * TS * K), round(d * TS * K)]
 def side(*p): return [S(*q) for q in p]
 def half(*p):
@@ -105,8 +105,20 @@ def tyre_face(fn, d0, d1, top_row, ground):
 part('tyreF', 'wheel', 'rubber', 'fender', x=[FX - R, FX + R], pair=True, front=tyre_face(F, 100, 130, 94, FG), smooth=('front',), detail={'kind': 'treadFace', 'pitch': 34})
 part('tyreR', 'wheel', 'rubber', 'fender', x=[RX - R, RX + R], pair=True, rear=tyre_face(B, 102, 134, 93, BG), smooth=('rear',), detail={'kind': 'treadFace', 'pitch': 34})
 # the dark underside seen from the front and the rear between the wheels (axle, springs, frame ends in shadow)
-part('vis_underF', 'frame', 'black', 'flat', x=[FX - 100, FX + 200], front=fhalf((0, 100), (100, 100), (100, 172), (60, 180), (36, 180), (0, 182)))
-part('vis_underR', 'frame', 'black', 'flat', x=[RX - 100, RX + 100], rear=bhalf((0, 150), (102, 150), (102, 172), (95, 185), (50, 182), (0, 180)))
+# under the radiator and under the tail (review round 2): the shadow under the wings as a dark part, and in front of it
+# the axle, springs, dumb irons and brake plates as the front and rear views show them, each its own vis_ part
+IRON = '#2e2f33'
+part('vis_underF', 'house', 'black', 'flat', x=[FX + 100, FX + 200], front=fhalf((0, 100), (100, 100), (100, 168), (0, 168)))
+part('vis_axleF', 'axle', 'iron', 'flat', color=IRON, x=[FX - 40, FX + 40], front=fhalf((0, 175), (30, 174), (46, 171), (60, 168), (100, 167), (100, 174), (62, 175), (50, 178), (34, 181), (0, 182)))   # the beam, dropped in the middle
+part('vis_leafF', 'spring', 'iron', 'flat', color='#1c1c20', pair=True, x=[FX - 300, FX + 300], front=fr((43, 160), (54, 160), (54, 172), (43, 172)))                 # the springs end on, under the dumb irons
+part('vis_ironF', 'frame', 'iron', 'flat', color=IRON, pair=True, x=[S(8, 0)[0], FX], front=fr((45, 117), (52, 117), (53, 160), (44, 160)))                              # the dumb irons up to the lamp bar
+part('vis_brakeF', 'axle', 'iron', 'flat', color='#1c1c20', pair=True, x=[FX - 150, FX + 150], front=fr((88, 128), (99, 126), (100, 184), (90, 182), (86, 170), (86, 140)))   # the brake plate inside each wheel
+part('vis_damperF', 'damper', 'iron', 'flat', color=IRON, pair=True, x=[FX - 120, FX - 40], front=fr((57, 148), (70, 146), (72, 160), (58, 162)))
+part('vis_underR', 'house', 'black', 'flat', x=[RX - 200, RX - 100], rear=bhalf((0, 150), (102, 150), (102, 170), (0, 170)))
+part('vis_axleR', 'axle', 'iron', 'flat', color=IRON, x=[RX - 40, RX + 40], rear=bhalf((0, 164), (12, 165), (18, 168), (100, 168), (100, 177), (18, 177), (13, 181), (0, 182)))   # the axle tube with the final drive's bulge
+part('vis_leafR', 'spring', 'iron', 'flat', color='#1c1c20', pair=True, x=[RX - 400, RX + 420], rear=re((82, 166), (96, 166), (96, 186), (84, 186)))                      # the springs and their shackles end on
+part('vis_shackleR', 'spring', 'iron', 'flat', color='#1c1c20', pair=True, x=[RX + 300, RX + 430], rear=re((33, 170), (47, 170), (47, 183), (35, 183)))
+part('vis_brakeR', 'axle', 'iron', 'flat', color='#1c1c20', pair=True, x=[RX - 150, RX + 150], rear=re((90, 150), (101, 150), (101, 186), (92, 186)))
 part('vis_archF', 'house', 'black', 'flat', y=[-600, 600], side=side((14, 100), (30, 82), (50, 76), (75, 78), (95, 92), (108, 120), (112, 142), (14, 142)))   # the dark arch behind each wheel (side view)
 part('vis_archR', 'house', 'black', 'flat', y=[-600, 600], side=side((370, 136), (374, 108), (385, 88), (403, 76), (420, 73), (440, 75), (462, 84), (478, 105), (484, 124), (486, 140), (370, 142)))
 
@@ -116,7 +128,7 @@ part('shell', 'radiator', 'paint', 'flat', slot='grille',
      front=fhalf((0, 38), (15, 40), (30, 46), (38, 54), (40.5, 70), (40.5, 140), (36, 147), (0, 148)), smooth=('front',),
      top=halfT((440, 0), (440, 37), (450, 31), (455, 12), (457, 0)),
      feats={'front': [{'kind': 'trim', 'pts': fr((-35, 140), (-35, 58), (-29, 52), (0, 51), (29, 52), (35, 58), (35, 140)), 'width': 2}]})
-part('core', 'radiator', 'black', 'flat', on='shell', slot='grille', x=[S(62, 0)[0], S(62, 0)[0] + 15], front=fhalf((0, 52), (28, 52), (33, 57), (34, 139), (0, 140)), detail={'kind': 'ribs', 'pitch': 26})
+part('core', 'radiator', 'black', 'flat', on='shell', slot='grille', x=[S(62, 0)[0], S(62, 0)[0] + 15], front=fhalf((0, 52), (28, 52), (33, 57), (34, 139), (0, 140)), detail={'kind': 'core', 'pattern': 'slats', 'pitch': 40, 'metal': True})
 part('coreBar', 'radiator', 'chrome', 'flat', on='core', slot='grille', lift=1, x=[S(62, 0)[0] - 4, S(62, 0)[0] + 10], front=fhalf((0, 50), (1.5, 50), (1.5, 140), (0, 140)))   # the bright centre bar
 part('radCap', 'filler', 'chrome', 'fender', on='shell', slot='grille', smooth=('side',),
      side=side((66, 33), (66, 30), (70, 28), (76, 29), (78, 32)), front=fhalf((0, 44), (6, 40), (3, 34), (0, 30)), top=tell(452, 0, 5, 5, 12))
@@ -197,20 +209,28 @@ part('lamp', 'lamp', 'chrome', 'fender', slot='lamp', pair=True, smooth=('side',
      top=top((472, 34), (475, 44), (472, 55), (462, 56), (450, 50), (442, 44), (450, 38), (462, 33)))
 part('lens', 'lamp', 'lens', 'flat', on='lamp', slot='lamp', pair=True, lift=1, x=[S(40, 0)[0], S(42, 0)[0]], smooth=('front',), front=fell(59.5, 78, 17))
 part('lampStand', 'lamp', 'chrome', 'flat', slot='lamp', pair=True, x=[S(48, 0)[0], S(54, 0)[0]], front=fr((55, 96), (64, 96), (64, 100), (62, 100), (62, 116), (57, 116), (57, 100), (55, 100)), side=side((48, 62), (54, 62), (54, 68), (48, 68)))
-part('lampBar', 'lamp', 'chrome', 'flat', slot='lamp', x=[S(48, 0)[0], S(52, 0)[0]], front=fhalf((0, 97), (72, 97), (72, 100), (0, 100)))
-part('horn', 'horn', 'chrome', 'fender', pair=True, x=[S(30, 0)[0], S(46, 0)[0]], smooth=('front',), front=fr((44, 126), (53, 126), (54, 132), (52, 140), (45, 140), (43, 132)))   # the small bells above the bumper irons (front view)
+part('lampBar', 'lamp', 'chrome', 'flat', slot='lamp', top=halfT((462, 0), (462, 44), (458, 44), (458, 0)), front=fhalf((0, 97), (72, 97), (72, 100), (0, 100)))
+part('horn', 'horn', 'chrome', 'fender', pair=True, smooth=('front', 'top'), top=top((477, 27), (470, 27), (466, 31), (470, 35), (477, 35)), front=fr((44, 126), (53, 126), (54, 132), (52, 140), (45, 140), (43, 132)))   # the small bells above the bumper irons (front view)
 
 # ---------------- bumpers ----------------
 part('bumperF', 'bumperF', 'chrome', 'fender', slot='bumperF', x=[S(0, 0)[0], S(8, 0)[0]],
-     front=fhalf((0, 141), (95, 141), (98, 144), (98, 156), (95, 159), (0, 159)), top=halfT((495, 0), (495, 49), (484, 49), (484, 0)),
+     front=fhalf((0, 141), (95, 141), (98, 144), (98, 156), (95, 159), (0, 159)), top=halfT((495, 0), (495, 44), (494, 48), (491, 49.5), (487, 50), (481, 49.5), (478, 48), (477, 44), (477, 0)),
      side=side((0, 119), (6, 117), (9, 121), (9, 132), (6, 136), (0, 134)),
      feats={'front': [{'kind': 'seam', 'pts': fr((-95, 147.5), (95, 147.5))}, {'kind': 'seam', 'pts': fr((-95, 152), (95, 152))},
-                      {'kind': 'highlight', 'pts': fr((-94, 143), (94, 143)), 'width': 1}, {'kind': 'highlight', 'pts': fr((-94, 154), (94, 154)), 'width': 1}]})
+                      {'kind': 'highlight', 'pts': fr((-94, 143), (94, 143)), 'width': 1}, {'kind': 'highlight', 'pts': fr((-94, 154), (94, 154)), 'width': 1}],
+            'top': [{'kind': 'seam', 'pts': top((487, -48), (487, 48))}, {'kind': 'highlight', 'pts': top((482, -46), (482, 46)), 'width': 2}]})
+part('bumperFiron2', 'bumperF', 'chrome', 'flat', slot='bumperF', pair=True, z=[S(0, 134)[1], S(0, 121)[1]], top=top((462, 29), (497, 29), (497, 33.5), (462, 33.5)),          # the irons from the frame out past the bars (plan)
+     feats={'top': [{'kind': 'bolt', 'at': T(481, 31)}, {'kind': 'bolt', 'at': T(492, 31)}]})
+part('bumperFend', 'bumperF', 'chrome', 'fender', slot='bumperF', pair=True, on='bumperF', lift=1, x=[S(0, 0)[0], S(8, 0)[0]], smooth=('front', 'top'), front=fell(96, 141, 3), top=tell(486, 47, 3, 3, 10))   # the knobs at the bars' ends
+part('vis_crossF', 'frame', 'black', 'flat', z=[S(0, 140)[1], S(0, 120)[1]], top=halfT((478, 0), (478, 47), (462, 47), (458, 30), (458, 0)),                     # the dark valance and cross member between lamps and bumper (plan), with its row of studs
+     feats={'top': [{'kind': 'bolt', 'at': T(473, d)} for d in (-22, -11, 0, 11, 22)]})
 part('bumperFgap', 'bumperF', 'black', 'flat', on='bumperF', lift=1, slot='bumperF', x=[S(0, 0)[0] - 2, S(4, 0)[0]], front=fhalf((0, 148), (95, 148), (95, 151.5), (0, 151.5)))   # the gap between the two bars
 part('bumperFiron', 'bumperF', 'chrome', 'flat', on='bumperFgap', lift=2, slot='bumperF', pair=True, x=[S(0, 0)[0] - 4, S(4, 0)[0]], front=fr((45, 139), (53, 139), (53, 161), (45, 161)))
 part('bumperR', 'bumperR', 'chrome', 'fender', slot='bumperR', x=[S(503, 0)[0], S(510, 0)[0]],
      rear=bhalf((0, 146), (100, 146), (102, 149), (100, 152), (0, 152)), side=side((503, 128), (511, 127), (513, 132), (511, 138), (503, 137)),
      feats={'rear': [{'kind': 'highlight', 'pts': re((-99, 147.5), (99, 147.5)), 'width': 1}]})
+part('bumperRend', 'bumperR', 'chrome', 'fender', slot='bumperR', pair=True, z=[S(0, 138)[1], S(0, 127)[1]], smooth=('top',),                           # the plan shows only the bar's ends, running in under the spare
+     top=top((10, 68), (15, 68), (17, 62), (23, 47), (19, 46), (13, 60)), feats={'top': [{'kind': 'bolt', 'at': T(13, 64)}]})
 part('bumperRiron', 'bumperR', 'chrome', 'flat', on='bumperR', lift=1, slot='bumperR', pair=True, x=[S(506, 0)[0], S(511, 0)[0]], rear=re((97, 138), (103, 138), (103, 158), (97, 158)))
 
 # ---------------- tail lamps on the rear wings; marker knobs on the wings' tails in the plan ----------------

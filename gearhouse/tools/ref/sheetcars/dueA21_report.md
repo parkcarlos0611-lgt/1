@@ -61,3 +61,29 @@ behind the body (frame horns, tank straps), a check of every outline at 8x.
 
 ## New elements
 None. The filler cap with mascot uses `filler`; the tank `tank`; cross tube and frame ends `frame`.
+
+## Fix round (review)
+Rebuilt on the coordinator's one-scale front and rear views (W is now 1940 from the front view's proportions).
+- Side nose: the shell runs down behind the wing crown (the sheet's shell ends at the crown, y 358; the outline now
+  goes to 374 so no gap can open), the bonnet's front lower edge follows the wing's underside, and a dark `lampStay`
+  closes the space between lamp, shell and wing.
+- Head lamp: drum body (rounder back), a separate bright `lampRim`, a `lens` that bulges forward in side and plan,
+  and the `lampStand` now has a side outline down to the wing. Read off 16x side and 12x plan crops.
+- Plan: lamps as above; shell at its read width (half 136 units at the back, 120 at the face); the dumb irons
+  (`vis_hornF`) under the lamps, the cross tube with its end knobs (`vis_knobF`). The bar ahead of the lamps in the
+  plan is the frame's front cross tube (the front view shows it under the radiator, y 700..755); the sheet shows no
+  separate tie bar between the lamps in the front or side view, so none is drawn.
+- Front, under the radiator: one black block replaced by `vis_backF` (the dark behind), `vis_axleF` (beam),
+  `vis_drumF`, `vis_dragF` (the slanting rods), `vis_leafF` (spring packs end on, ribbed), `vis_hornF` (irons with
+  bolts), `vis_crossF` (tube with its bright line), `vis_apronF` (the panel under it), `vis_crank` (the starting
+  handle boss).
+- Rear, under the body: `vis_backR`, `vis_axleR`, `vis_diffR`, `vis_rodR`, `vis_leafR`, `vis_tankBody`, `vis_tank`
+  (the bright upper tube), `vis_barR`, `vis_hornR` (the horn ends with four bolts each).
+- Core: `{'kind': 'core', 'pattern': 'slats', 'pitch': 14}`; the shell's front outline is no longer smoothed (its
+  foot bowed).
+- 78 parts. Scores after: side 0.965 / 0.876, front 0.952 / 0.804, rear 0.964 / 0.730, top 0.965 / 0.660.
+- Still thin: the running gear is drawn in the sheet's own near-black, so it reads faintly; shock absorbers, steering
+  arms and the spring shackles' true shapes are not parts; no bumper exists on this car.
+
+## New elements (fix round)
+- `crank`: the starting handle's boss on the front cross tube (front view). No existing element fits.

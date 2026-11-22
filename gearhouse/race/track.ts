@@ -40,7 +40,7 @@ export class Track {
     return { b: null, f: 0 }; }
   /** the banking's rise at (s, off) above the inner edge: the cross-section's curve, outside the edges held level */
   bank(s: number, off: number): number { const W = this.spec.width, { b, f } = this.bankAt(s); if (!b || f <= 0) return 0;
-    const inLeft = this.at(s).k >= 0, u = Math.max(0, Math.min(W, (inLeft ? -off : off) + W / 2)); return b.height * f * (u / W) ** b.curve; }
+    const inLeft = this.at((b.s0 + b.s1) / 2).k >= 0, u = Math.max(0, Math.min(W, (inLeft ? -off : off) + W / 2)); return b.height * f * (u / W) ** b.curve; }   // the banking's own turn sets its high side, also where it eases out into a bend the other way
   /** the bumps across the track at s */
   bump(s: number): number { const L = this.length, t = ((s % L) + L) % L; let z = 0;
     for (const q of this.spec.bumps) { let d = Math.abs(t - q.s); d = Math.min(d, L - d); if (d < q.len / 2) z += q.height * (1 + Math.cos(d / (q.len / 2) * Math.PI)) / 2; } return z; }

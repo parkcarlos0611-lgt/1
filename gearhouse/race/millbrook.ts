@@ -4,11 +4,12 @@
 // steepest), the Railway Straight beside the line, the Byfleet Banking (inner radius 1500 ft, 213 degrees, 6.4 m high,
 // gentler and longer) and the slight right-hand bend at the Fork, where the finishing straight branches off. Sources:
 // Historic England listing 1020137 (heights), Motor Sport March 1930 and Grand Prix Engines note 104B (radii, turns,
-// width, direction). The straights' lengths are fitted to the period plan with the radii held (mean error 14 m).
+// width, direction). The straights' lengths are fitted to the period plan with the radii held (mean error 14 m); the Fork's bend is
+// taken as gently as the plan allows (radius 450 m).
 import { Track, type TrackSpec } from './track';
 
 const W = 30.5, R1 = 305 + W / 2, R2 = 457 + W / 2;
-const HOME = 682.5, RAIL = 956.1, FORK = 44;
+const HOME = 659.1, RAIL = 956.3, FORK = 20;
 const ME = HOME + R1 * 165 * Math.PI / 180, RA = ME + RAIL, BY = RA + R2 * 213 * Math.PI / 180;
 export const MILLBROOK_OUTER: TrackSpec = {
   name: 'Millbrook Outer Circuit',
@@ -18,7 +19,7 @@ export const MILLBROOK_OUTER: TrackSpec = {
     { kind: 'straight', len: RAIL, name: 'Railway Straight' },
     { kind: 'arc', radius: R2, turn: 213, name: 'Byfleet Banking' },
     { kind: 'straight', len: FORK, name: 'The Fork' },
-    { kind: 'arc', radius: 300, turn: -18, name: 'The Fork' }],
+    { kind: 'arc', radius: 450, turn: -18, name: 'The Fork' }],
   start: { x: 0, y: 0, heading: 59 * Math.PI / 180 }, width: W, easing: 90,
   banking: [
     { s0: HOME, s1: ME, height: 9.5, curve: 2.2, ease: 140, name: "Members' Banking" },

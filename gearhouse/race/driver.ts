@@ -8,13 +8,13 @@ const G = 9.81, OFFS = Array.from({ length: 49 }, (_, i) => -12 + i * 0.5);   //
 export class Driver {
   private line: Float32Array | null = null; private vlim: Float32Array | null = null; private tilt: Float32Array[] = []; private off = 0; private lift = 0;
   /** dare: the share of the tyres' grip it will use; plannedBrake: the deceleration it plans its braking with (m/s²) */
-  constructor(readonly track: Track, public dare = 0.8, public plannedBrake = 3.5) {}
+  constructor(readonly track: Track, public dare = 0.7, public plannedBrake = 3.0) {}
   private prepare(car: Vehicle): void { const T = this.track, L = T.length, W = T.spec.width, vTop = car.spec.topKmh / 3.6, mu = car.tyre.mu * this.dare;
     const raw = new Float32Array(L), lim = new Float32Array(L);
-    for (let s = 0; s < L; s++) { const n = T.at(s), k = Math.abs(n.k), side = n.k >= 0 ? 1 : -1;   // side: +1 the inside is to the left
+    for (let s = 0; s < L; s++) { const n = T.at(s), k = Math.abs(n.k), side = n.k >= 0 ? 1 : -1;   // side: the inside of this bend (+1 left); a bank rising the other way is adverse camber   // side: +1 the inside is to the left
       // the fastest through here at each height on the bank, and where the bank itself carries the car at that speed
       // the fastest it can go at each height on the bank; then it runs where the bank alone would carry it at that speed
-      const at = (o: number) => { const th = Math.atan(Math.max(0, -side * T.slope(s, o).across)), den = k * (Math.cos(th) - mu * Math.sin(th)); return { th, v: Math.min(vTop, k < 1e-5 || den <= 0 ? vTop : Math.sqrt(G * (Math.sin(th) + mu * Math.cos(th)) / den)) }; };
+      const at = (o: number) => { const th = Math.atan(-side * T.slope(s, o).across), den = k * (Math.cos(th) - mu * Math.sin(th)); return { th, v: Math.min(vTop, k < 1e-5 || den <= 0 ? vTop : Math.sqrt(G * (Math.sin(th) + mu * Math.cos(th)) / den)) }; };
       let vMax = 0; for (let o = -W / 2 + 3; o <= W / 2 - 3; o += 0.5) vMax = Math.max(vMax, at(o).v);
       let best = 0, bd = Infinity; if (k > 1e-5) for (let o = -W / 2 + 3; o <= W / 2 - 3; o += 0.5) { const d = Math.abs(vMax * vMax * k - G * Math.tan(at(o).th)) + (at(o).v < vMax * 0.98 ? 1e3 : 0); if (d < bd) { bd = d; best = o; } }
       lim[s] = vMax; raw[s] = T.bankAt(s).b ? best : 0;
@@ -40,5 +40,5 @@ export class Driver {
     // a feel for the rear wheels: when they spin it eases off, and builds up again
     const spin = Math.max(car.slipX[2]!, car.slipX[3]!); const slide = Math.abs(Math.atan2(car.vy, Math.max(3, car.vx)));
     this.lift = Math.max(0, Math.min(0.95, this.lift + (spin > 0.14 || slide > 0.12 ? 0.3 : -0.015)));
-    const e = target - v; return { steer: Math.max(-1, Math.min(1, delta / lock)), throttle: e > 0 ? Math.min(1, e / 3) * (1 - this.lift) : 0, brake: e < -1 ? Math.min(1, -e / 6) : 0 }; }
+    const e = target - v; return { steer: Math.max(-1, Math.min(1, delta / lock)), throttle: e > 0 ? Math.min(1, e / 3) * (1 - this.lift) : 0, brake: e < -0.5 ? Math.min(1, -e / 3) : 0 }; }
 }

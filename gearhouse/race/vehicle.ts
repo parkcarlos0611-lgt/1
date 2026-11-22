@@ -22,6 +22,8 @@ export class Vehicle {
   zb = 0; vzb = 0; pitch = 0; vpitch = 0; roll = 0; vroll = 0;
   /** wheels FL FR RL RR */
   w = [0, 0, 0, 0]; load = [0, 0, 0, 0]; slipX = [0, 0, 0, 0]; slipA = [0, 0, 0, 0]; airborne = [false, false, false, false];
+  /** each wheel off the concrete (on the grass); `over`: the car has gone over the top of a banking */
+  onGrass = [false, false, false, false]; over = false;
   rpm = 0; gear = 1; shift = 0; steer = 0; ax = 0; ay = 0; tax = 0; tay = 0; brakeT = [20, 20, 20, 20]; auto = true; tilt = 0;
   private k: number; private c: number; private Ip: number; private Ir: number; private Iz: number; private Iw: number; private Ie: number;
   constructor(readonly spec: RaceSpec, readonly track: Track, readonly tyre: Tyre = CROSSPLY) {
@@ -41,6 +43,7 @@ export class Vehicle {
     const c = this.spec, m = c.mass, T = this.track, R = c.tyreR, cy = Math.cos(this.yaw), sy = Math.sin(this.yaw);
     // ---- where on the track, and the surface's tilt in the car's axes ----
     const loc = T.locate(this.x, this.y, this.s); this.s = loc.s; this.off = loc.off;
+    { const bk = T.bankAt(this.s); if (bk.b && bk.f > 0.5 && Math.abs(this.off) > T.spec.width / 2 + 1 && Math.sign(this.off) === -Math.sign(T.at((bk.b.s0 + bk.b.s1) / 2).k)) this.over = true; }
     const sl = T.slope(this.s, this.off), rel = this.yaw - T.at(this.s).h, cr = Math.cos(rel), sr = Math.sin(rel);
     const tX = Math.atan(sl.along * cr + sl.across * sr), tY = Math.atan(sl.across * cr - sl.along * sr); this.tilt = tY;   // rise ahead, rise to the left
     // gravity into the surface, and what the turn adds (an acceleration toward the low side presses the car in)
@@ -51,6 +54,7 @@ export class Vehicle {
     const z0 = T.bank(this.s, this.off), F = [0, 0, 0, 0];
     for (let i = 0; i < 4; i++) { const [px, py] = this.wheelAt(i), q = T.locate(this.x + px * cy - py * sy, this.y + px * sy + py * cy, this.s);
       const ground = T.bump(q.s) + T.bank(q.s, q.off) - (z0 + sl.across * (q.off - this.off) + sl.along * T.gap(this.s, q.s));
+      this.onGrass[i] = Math.abs(q.off) > T.spec.width / 2;
       const zc = this.zb + px * this.pitch + py * this.roll, vzc = this.vzb + px * this.vpitch + py * this.vroll;
       F[i] = Math.max(0, this.k * (ground - zc) - this.c * vzc + m * gN * this.share(i)); this.airborne[i] = F[i] === 0; }
     let sumF = 0, Mp = m * this.tax * c.cgH, Mr = m * this.tay * c.cgH;      // braking dips the nose; a left turn lifts the left side
@@ -60,7 +64,7 @@ export class Vehicle {
     // ---- drive line: gear changes, the engine, the clutch, the open differential ----
     this.shift -= dt;
     const wheelRpm = Math.max(0, this.vx) / c.tyreR * c.gears[this.gear - 1]! * c.final * 30 / Math.PI;   // the road speed in engine revs (the automatic does not count a wheel spinning)
-    if (this.shift <= 0) { if (this.auto) { if (wheelRpm > c.hpRpm * 1.04 && this.gear < c.gears.length) { this.gear++; this.shift = 0.5; } else if (this.gear > 1 && wheelRpm < c.hpRpm * 0.42) { this.gear--; this.shift = 0.5; } }
+    if (this.shift <= 0) { if (this.auto) { if (wheelRpm > c.hpRpm * 1.04 && this.gear < c.gears.length) { this.gear++; this.shift = 0.5; } else if (this.gear > 1 && wheelRpm * c.gears[this.gear - 2]! / c.gears[this.gear - 1]! < c.hpRpm * 0.8) { this.gear--; this.shift = 0.5; } }   // down only when the lower gear has room
       else if (u.gear && u.gear !== this.gear) { this.gear = Math.max(1, Math.min(c.gears.length, u.gear)); this.shift = 0.5; } }
     const Gr = c.gears[this.gear - 1]! * c.final, we = this.rpm * Math.PI / 30, wd = (this.w[2]! + this.w[3]!) / 2, idle = c.idle * Math.PI / 30;
     const thr = this.shift > 0 ? 0 : Math.max(0, Math.min(1, u.throttle)),   // off the throttle through a change
@@ -78,12 +82,12 @@ export class Vehicle {
     for (let i = 0; i < 4; i++) { const [px, py] = this.wheelAt(i), st = i < 2 ? this.steer : 0;
       const vwx = this.vx - this.r * py, vwy = this.vy + this.r * px, cs = Math.cos(st), sn = Math.sin(st), lx = vwx * cs + vwy * sn, ly = -vwx * sn + vwy * cs;
       const v0 = Math.max(Math.abs(lx), 3), kappa = (this.w[i]! * R - lx) / v0, alpha = Math.atan2(ly, v0); this.slipX[i] = kappa; this.slipA[i] = alpha;
-      const Fz = F[i]!, mu = ty.mu * (1 - ty.loadSens * (Fz / (m * G / 4) - 1));
+      const Fz = F[i]!, mu = ty.mu * (1 - ty.loadSens * (Fz / (m * G / 4) - 1)) * (this.onGrass[i] ? 0.55 : 1);   // grass: little grip
       const sx = kappa / ty.peakSlip, sa = Math.tan(alpha) / ty.peakAngle, sig = Math.hypot(sx, sa);
       let fx = 0, fy = 0; if (sig > 1e-9 && Fz > 0) { const Bs = ty.B * sig, f = Math.sin(ty.C * Math.atan(Bs - ty.E * (Bs - Math.atan(Bs)))); fx = mu * Fz * f * sx / sig; fy = -mu * Fz * f * sa / sig; }
       const rear = i >= 2, fade = 1 / (1 + Math.max(0, this.brakeT[i]! - 250) / 200);
       const bt = (u.brake * (c.brakes === 'rear' ? (rear ? 0.5 : 0) : rear ? 0.42 : 0.58) * brakeCap + (rear ? (u.handbrake ?? 0) * brakeCap * 0.35 : 0)) * fade;
-      const w0 = this.w[i]!, wf = w0 + ((rear ? Taxle / 2 : 0) - fx * R - Fz * c.crr * R * Math.tanh(w0)) / this.Iw * dt, bs = bt / this.Iw * dt;
+      const w0 = this.w[i]!, wf = w0 + ((rear ? Taxle / 2 : 0) - fx * R - Fz * (this.onGrass[i] ? 0.07 : c.crr) * R * Math.tanh(w0)) / this.Iw * dt, bs = bt / this.Iw * dt;
       this.w[i] = Math.abs(wf) <= bs ? 0 : wf - Math.sign(wf) * bs;                // brakes stop a wheel, never turn it back
       this.brakeT[i] = this.brakeT[i]! + (bt * Math.abs(this.w[i]!) / 9000 - (this.brakeT[i]! - 20) * (0.004 + this.speed * 0.0004)) * dt;
       Fx[i] = fx * cs - fy * sn; Fy[i] = fx * sn + fy * cs; }

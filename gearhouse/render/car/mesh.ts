@@ -9,7 +9,7 @@ export type V = [number, number, number];
 export const KINDS = ['plain', 'paint', 'metal', 'glass', 'shine', 'tyre', 'wood', 'canvas', 'leather', 'lens', 'grille'] as const;
 export type Kind = typeof KINDS[number];
 /** `kind` per triangle (KINDS index); `tex` per triangle: 1 or 2 on a tyre's tread, alternate blocks round the wheel */
-export interface Mesh { n: number; pos: Float32Array; col: Uint8Array; gloss: Float32Array; part: Int16Array; kind: Uint8Array; tex: Uint8Array; length: number }
+export interface Mesh { n: number; pos: Float32Array; col: Uint8Array; gloss: Float32Array; part: Int16Array; kind: Uint8Array; tex: Uint8Array; length: number; /** each part number's name (the parts' common names, as the 2D part models had: body, hood, fenderF, lamp, ...) */ names?: string[] }
 const hex = (h: string): V => { const v = parseInt(h.replace('#', ''), 16); return [(v >> 16) & 255, (v >> 8) & 255, v & 255]; };
 const sub = (a: V, b: V): V => [a[0] - b[0], a[1] - b[1], a[2] - b[2]], add = (a: V, b: V): V => [a[0] + b[0], a[1] + b[1], a[2] + b[2]], mul = (a: V, k: number): V => [a[0] * k, a[1] * k, a[2] * k];
 const cross = (a: V, b: V): V => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]], len = (a: V) => Math.hypot(a[0], a[1], a[2]), norm = (a: V): V => { const l = len(a) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };
@@ -17,9 +17,11 @@ const cross = (a: V, b: V): V => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] 
 /** the builder: every shape adds triangles in the colour, gloss and part number set at the time */
 export class Build {
   private P: number[] = []; private C: number[] = []; private G: number[] = []; private T: number[] = []; private K: number[] = []; private X: number[] = [];
-  private c: V = [128, 128, 128]; private g = 0.2; private part = 0; private k = 0; private x = 0;
+  private c: V = [128, 128, 128]; private g = 0.2; private part = 0; private k = 0; private x = 0; private nm = ''; private N: string[] = [];
+  /** the name of the part what follows belongs to (stays until named again) */
+  name(n: string): this { this.nm = n; return this; }
   /** the colour and gloss (0 flat .. 1 bright metal) of what follows; each call starts a new part (parts are outlined against each other) */
-  mat(colour: string, gloss = 0.2, kind: Kind = 'plain'): this { this.c = hex(colour); this.g = gloss; this.k = KINDS.indexOf(kind); this.part++; return this; }
+  mat(colour: string, gloss = 0.2, kind: Kind = 'plain'): this { this.c = hex(colour); this.g = gloss; this.k = KINDS.indexOf(kind); this.part++; this.N[this.part] = this.nm; return this; }
   tri(a: V, b: V, c: V): this { this.P.push(...a, ...b, ...c); this.C.push(...this.c); this.G.push(this.g); this.T.push(this.part); this.K.push(this.k); this.X.push(this.x); return this; }
   quad(a: V, b: V, c: V, d: V): this { return this.tri(a, b, c).tri(a, c, d); }
   /** rings of the same number of points joined into a skin; the ends closed */
@@ -37,7 +39,7 @@ export class Build {
     const ring = ([a, r]: [number, number]): V[] => Array.from({ length: seg }, (_, i) => { const t = i / seg * Math.PI * 2, c = Math.cos(t) * r, s = Math.sin(t) * r; return (axis === 'x' ? [o[0] + a, o[1] + c, o[2] + s] : [o[0] + c, o[1] + a, o[2] + s]) as V; });
     const top = Math.max(...prof.map(p => p[1]));   // the outermost band (a tyre's tread) is marked in alternate blocks
     return this.loft(prof.map(ring), caps, (b, i) => prof[b]![1] === top && prof[b + 1]![1] === top ? 1 + (i & 1) : 0); }
-  mesh(length: number): Mesh { return { n: this.G.length, pos: new Float32Array(this.P), col: new Uint8Array(this.C), gloss: new Float32Array(this.G), part: new Int16Array(this.T), kind: new Uint8Array(this.K), tex: new Uint8Array(this.X), length }; }
+  mesh(length: number): Mesh { return { n: this.G.length, pos: new Float32Array(this.P), col: new Uint8Array(this.C), gloss: new Float32Array(this.G), part: new Int16Array(this.T), kind: new Uint8Array(this.K), tex: new Uint8Array(this.X), length, names: this.N.slice() }; }
 }
 /** a body section at x: a closed ring, half-width w about y = 0, from zb up to zt; `top` and `bot` are how square the
  *  upper and lower halves are (2 a circle's roundness, 6 nearly a box); `k` points round */
@@ -54,7 +56,7 @@ export function wing(b: Build, path: [number, number, number, number][], hub: [n
   b.loft(rings); }
 
 /** glints: pixels where the light catches hardest (a highlight's peak, metal mirroring the bright horizon), for sparkles laid on at run time */
-export interface Pic { w: number; h: number; rgba: Uint8ClampedArray; glints?: number[] }
+export interface Pic { w: number; h: number; rgba: Uint8ClampedArray; glints?: number[]; /** the triangle each pixel shows (-1 none, glass not counted) */ tri?: Int32Array }
 const SUN: V = norm([-0.45, 0.35, 0.82]);
 /** The mesh drawn from heading `yaw` (0 = nose to the right) with the camera `pitch` degrees above the ground (0 = from
  *  the side), `mm` millimetres a pixel: flat tones in a few steps, a dark line round the car and between its parts,
@@ -67,13 +69,14 @@ function asDrawn(M: Mesh): Mesh { let m = mirrored.get(M); if (!m) { const pos =
 //      metal and glass mirror a simple world (blue sky, a pale horizon, dark ground) by the way the eye's ray bounces off
 //      them, stronger at a glancing angle on glass; glossy paint takes a highlight sized by its gloss and a touch of sky.
 //      Steps kept coarse so the picture stays in the flat, few-toned manner ----
+const BAYER4 = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map(v => (v + 0.5) / 16);
 const SUN_C: V = [1.0, 0.95, 0.84], SKY_C: V = [0.6, 0.68, 0.82], GROUND_C: V = [0.5, 0.45, 0.36];
 const ENV_TOP: V = [150, 176, 214], ENV_HOR: V = [236, 233, 224], ENV_GROUND: V = [92, 88, 68];
 /** what a mirror shows along the direction r (unit, z up) */
 export function envAt(rz: number): V { if (rz < -0.06) return ENV_GROUND; if (rz < 0.22) return ENV_HOR; const t = Math.min(1, (rz - 0.22) / 0.6); return [ENV_HOR[0] + (ENV_TOP[0] - ENV_HOR[0]) * t, ENV_HOR[1] + (ENV_TOP[1] - ENV_HOR[1]) * t, ENV_HOR[2] + (ENV_TOP[2] - ENV_HOR[2]) * t]; }
 /** a face's colour under the light: base colour, its normal (toward the eye), the sun and the eye in the same axes, its gloss */
-function lit(base: V, n: V, sun: V, eye: V, g: number): { c: V; spec: number } {
-  const d = Math.max(0, n[0] * sun[0] + n[1] * sun[1] + n[2] * sun[2]), dq = Math.round(d * 4) / 4, up = 0.5 + 0.5 * n[2];
+function lit(base: V, n: V, sun: V, eye: V, g: number, dither = -1): { c: V; spec: number } {
+  const d = Math.max(0, n[0] * sun[0] + n[1] * sun[1] + n[2] * sun[2]), dq = dither < 0 ? Math.round(d * 4) / 4 : Math.min(1, Math.floor(d * 6 + dither) / 6), up = 0.5 + 0.5 * n[2];   // smooth: finer steps, dithered between
   const diff: V = [0, 1, 2].map(i => SUN_C[i]! * dq * 0.78 + (SKY_C[i]! * up + GROUND_C[i]! * (1 - up)) * 0.6) as V;
   const ne = n[0] * eye[0] + n[1] * eye[1] + n[2] * eye[2], rz = 2 * ne * n[2] - eye[2];   // the eye's ray, bounced: its height decides what it sees
   if (g > 0.7) { const env = envAt(rz), tint = 0.55 + 0.45 * Math.max(base[0], base[1], base[2]) / 255;   // metal: the world, tinted a little by the metal's own colour
@@ -82,7 +85,7 @@ function lit(base: V, n: V, sun: V, eye: V, g: number): { c: V; spec: number } {
   const sp = g > 0.2 ? nh ** (6 + g * 110) : 0, spec = sp > 0.65 ? 1 : sp > 0.3 ? 0.5 : 0;   // the highlight in two steps
   const env = envAt(rz), refl = g > 0.3 ? 0.1 * g * (0.4 + 0.6 * up) : 0;
   return { c: [0, 1, 2].map(i => Math.min(255, base[i]! * diff[i]! * (1 - refl) + env[i]! * refl)) as V, spec: spec * (40 + 80 * g) }; }
-export interface DrawOpts { outline?: number; shadow?: boolean; cy?: number; /** the car tilted on its ground point: roll (rad, its left side up +), pitch (rad, nose up +) */ roll?: number; pitch?: number; /** front wheels turned (rad, to the car's left +), every wheel turned on its axle (rad) */ steer?: number; spin?: number; /** how much of what is behind glass it hides, 0..1 */ glass?: number; wear?: Wear }
+export interface DrawOpts { outline?: number; shadow?: boolean; cy?: number; /** the car tilted on its ground point: roll (rad, its left side up +), pitch (rad, nose up +) */ roll?: number; pitch?: number; /** front wheels turned (rad, to the car's left +), every wheel turned on its axle (rad) */ steer?: number; spin?: number; /** studio light: the key light from beside the camera and above (straight views for the builder), not the track's sun */ studio?: boolean; /** smooth shading: normals blended across a part's gently meeting faces and the light stepped with an ordered dither, as the 2D pictures shade a curve (for close views) */ smooth?: boolean; /** how much of what is behind glass it hides, 0..1 */ glass?: number; wear?: Wear }
 const PAINT = 1, METAL = 2, GLASS = 3, SHINE = 4, TYRE = 5, WOOD = 6, CANVAS = 7, LEATHER = 8, LENS = 9, GRILLE = 10;
 const GLASS_TINT: V = [150, 172, 182];
 const lum = (r: number, g: number, b: number) => 0.3 * r + 0.59 * g + 0.11 * b;
@@ -121,7 +124,7 @@ export function drawMesh(M0: Mesh, yaw: number, pitch: number, mm: number, w: nu
   const M = tilted(asDrawn(posed(M0, o.steer ?? 0, o.spin ?? 0)), o.roll ?? 0, o.pitch ?? 0), W = o.wear ?? NEW, ga = o.glass ?? 0.8;
   const th = yaw * Math.PI / 180, ph = pitch * Math.PI / 180, ct = Math.cos(th), st = Math.sin(th), sp = Math.sin(ph), cp = Math.cos(ph), N = w * h, cx = M.length / 2, cy = h * (o.cy ?? 0.62);
   const zb = new Float32Array(N).fill(-1e9), tri = new Int32Array(N).fill(-1), rgba = new Uint8ClampedArray(N * 4), at = new Float32Array(N * 3);   // at: the point of the car each pixel shows
-  const sun: V = [SUN[0] * ct + SUN[1] * st, -SUN[0] * st + SUN[1] * ct, SUN[2]], cam: V = [-cp * st, -cp * ct, sp];
+  const cam: V = [-cp * st, -cp * ct, sp], sun: V = o.studio ? norm([cam[0] * 0.8 + ct * 0.35, cam[1] * 0.8 - st * 0.35, cam[2] * 0.8 + 0.75]) : [SUN[0] * ct + SUN[1] * st, -SUN[0] * st + SUN[1] * ct, SUN[2]];
   const prj = (x: number, y: number, z: number): V => { const xr = (x - cx) * ct - y * st, yr = (x - cx) * st + y * ct; return [w / 2 + xr / mm, cy + (-yr * sp - z * cp) / mm, -yr * cp + z * sp]; };
   const fill = (a: V, b: V, c: V, f: (i: number, d: number, l0: number, l1: number, l2: number) => void) => { const x0 = Math.max(0, Math.floor(Math.min(a[0], b[0], c[0]))), x1 = Math.min(w - 1, Math.ceil(Math.max(a[0], b[0], c[0]))), y0 = Math.max(0, Math.floor(Math.min(a[1], b[1], c[1]))), y1 = Math.min(h - 1, Math.ceil(Math.max(a[1], b[1], c[1])));
     const den = (b[1] - c[1]) * (a[0] - c[0]) + (c[0] - b[0]) * (a[1] - c[1]); if (Math.abs(den) < 1e-9) return;
@@ -129,11 +132,13 @@ export function drawMesh(M0: Mesh, yaw: number, pitch: number, mm: number, w: nu
       if (l0 < 0 || l1 < 0 || l2 < 0) continue; f(Y * w + X, l0 * a[2] + l1 * b[2] + l2 * c[2], l0, l1, l2); } };
   const p = M.pos, vtx = (t: number, k: number): V => [p[t * 9 + k * 3]!, p[t * 9 + k * 3 + 1]!, p[t * 9 + k * 3 + 2]!];
   const normal = (t: number): V => { const a = vtx(t, 0); let n = norm(cross(sub(vtx(t, 1), a), sub(vtx(t, 2), a))); if (n[0] * cam[0] + n[1] * cam[1] + n[2] * cam[2] < 0) n = mul(n, -1); return n; };
+  // ---- smooth shading: a normal at each corner, the faces of its part that meet it gently averaged ----
+  const vn = o.smooth ? cornerNormals(M) : null, bary = o.smooth ? new Float32Array(N * 2) : null;
   // ---- pass 1: everything but glass, nearest wins; the shadow on the ground ----
   const shadow = new Uint8Array(N), glassTris: number[] = [];
   for (let t = 0; t < M.n; t++) { const A = prj(...vtx(t, 0)), B = prj(...vtx(t, 1)), C = prj(...vtx(t, 2)), kd = M.kind[t]!;
     if (kd === GLASS || kd === SHINE) glassTris.push(t);
-    else fill(A, B, C, (i, d, l0, l1, l2) => { if (d > zb[i]!) { zb[i] = d; tri[i] = t; const q = t * 9; at[i * 3] = l0 * p[q]! + l1 * p[q + 3]! + l2 * p[q + 6]!; at[i * 3 + 1] = l0 * p[q + 1]! + l1 * p[q + 4]! + l2 * p[q + 7]!; at[i * 3 + 2] = l0 * p[q + 2]! + l1 * p[q + 5]! + l2 * p[q + 8]!; } });
+    else fill(A, B, C, (i, d, l0, l1, l2) => { if (d > zb[i]!) { zb[i] = d; tri[i] = t; if (bary) { bary[i * 2] = l0; bary[i * 2 + 1] = l1; } const q = t * 9; at[i * 3] = l0 * p[q]! + l1 * p[q + 3]! + l2 * p[q + 6]!; at[i * 3 + 1] = l0 * p[q + 1]! + l1 * p[q + 4]! + l2 * p[q + 7]!; at[i * 3 + 2] = l0 * p[q + 2]! + l1 * p[q + 5]! + l2 * p[q + 8]!; } });
     if (o.shadow !== false && pitch > 5) { const q = t * 9, g = (k: number): V => { const z = p[q + k + 2]!; return prj(p[q + k]! - sun[0] / sun[2] * z, p[q + k + 1]! - sun[1] / sun[2] * z, 0); }; fill(g(0), g(3), g(6), i => { shadow[i] = 1; }); } }
   // ---- pass 2: flat tones, then each material's texture, then age ----
   let ymax = 1; for (let i = 1; i < p.length; i += 3) ymax = Math.max(ymax, Math.abs(p[i]!));
@@ -142,7 +147,9 @@ export function drawMesh(M0: Mesh, yaw: number, pitch: number, mm: number, w: nu
   const rusty = new Float32Array(N), isPaint = (i: number) => tri[i]! >= 0 && M.kind[tri[i]!] === PAINT;
   const edgeMM = W.rust ? paintEdges(tri, M, w, h, mm) : null;
   for (let i = 0; i < N; i++) { const t = tri[i]!; if (t < 0) { if (shadow[i]) { rgba[i * 4] = 24; rgba[i * 4 + 1] = 22; rgba[i * 4 + 2] = 20; rgba[i * 4 + 3] = 110; } continue; }
-    const n = normal(t), kd = M.kind[t]!, X = at[i * 3]!, Y = at[i * 3 + 1]!, Z = at[i * 3 + 2]!;
+    let n = normal(t); const kd = M.kind[t]!, X = at[i * 3]!, Y = at[i * 3 + 1]!, Z = at[i * 3 + 2]!;
+    if (vn && bary) { const l0 = bary[i * 2]!, l1 = bary[i * 2 + 1]!, l2 = 1 - l0 - l1, q = t * 9; let m: V = [vn[q]! * l0 + vn[q + 3]! * l1 + vn[q + 6]! * l2, vn[q + 1]! * l0 + vn[q + 4]! * l1 + vn[q + 7]! * l2, vn[q + 2]! * l0 + vn[q + 5]! * l1 + vn[q + 8]! * l2]; m = norm(m);
+      if (m[0] * n[0] + m[1] * n[1] + m[2] * n[2] < 0) m = mul(m, -1); n = m; }
     const d = Math.max(0, n[0] * sun[0] + n[1] * sun[1] + n[2] * sun[2]), g = M.gloss[t]!, k = Math.round((0.5 + 0.62 * d) * 5) / 5;   // k: the old plain tone, for age's flat lacquer and rust
     // the plane a pattern is laid in: the two axes across the face's main direction
     const ax = Math.abs(n[0]), ay = Math.abs(n[1]), az = Math.abs(n[2]), [U, V2] = ay >= ax && ay >= az ? [X, Z] : ax >= az ? [Y, Z] : [X, Y];
@@ -153,7 +160,7 @@ export function drawMesh(M0: Mesh, yaw: number, pitch: number, mm: number, w: nu
     else if (kd === CANVAS) { const v = fbm(U / 160, V2 / 160); tone = v > 0.66 ? 0.93 : v < 0.34 ? 1.05 : 1; }   // the cloth's uneven weathering
     else if (kd === LEATHER) { const v = fbm(U / 45, V2 / 45); tone = v > 0.62 ? 0.86 : v < 0.36 ? 1.1 : 1; }  // creased and polished by wear
     else if (kd === GRILLE) { const a = ((U + V2) / 26 % 1 + 1) % 1, b = ((U - V2) / 26 % 1 + 1) % 1; if (a < 0.28 || b < 0.28) { cr = 150; cg = 148; cb = 140; } }   // a diamond mesh of bright wire
-    const L = lit([cr * tone, cg * tone, cb * tone], n, sun, cam, kd === TYRE || kd === CANVAS || kd === LEATHER ? Math.min(g, 0.25) : g);
+    const L = lit([cr * tone, cg * tone, cb * tone], n, sun, cam, kd === TYRE || kd === CANVAS || kd === LEATHER ? Math.min(g, 0.25) : g, vn ? BAYER4[((i / w | 0) & 3) * 4 + (i % w & 3)]! : -1);
     let R = Math.min(255, L.c[0] + L.spec), G = Math.min(255, L.c[1] + L.spec * 0.97), B = Math.min(255, L.c[2] + L.spec * 0.9);
     if ((g > 0.7 && R + G + B > 640) || L.spec > 60) glintAt.push(i);   // where a sparkle may flash
     // ---- age: the sun takes the paint's gloss and colour, rust comes up low and at the seams and runs down ----
@@ -215,7 +222,7 @@ export function drawMesh(M0: Mesh, yaw: number, pitch: number, mm: number, w: nu
   if (ol > 0) for (let i = 0; i < N; i++) if (e[i] === 2 && gHit[i]) { rgba[i * 4] = rgba[i * 4]! * 0.2; rgba[i * 4 + 1] = rgba[i * 4 + 1]! * 0.2; rgba[i * 4 + 2] = rgba[i * 4 + 2]! * 0.2; rgba[i * 4 + 3] = 255; }   // the outline over a window's edge
   // a few of the brightest spots, spread over the picture, are kept for sparkles
   const glints: number[] = []; for (let k = 0; k < glintAt.length && glints.length < 24; k += Math.max(1, Math.floor(glintAt.length / 24))) glints.push(glintAt[k]!);
-  return { w, h, rgba, glints }; }
+  return { w, h, rgba, glints, tri }; }
 
 /** for each painted pixel, how far (mm) it lies from its part's edge on screen: seams and edges rust first */
 function paintEdges(tri: Int32Array, M: Mesh, w: number, h: number, mm: number): Float32Array {
@@ -225,3 +232,34 @@ function paintEdges(tri: Int32Array, M: Mesh, w: number, h: number, mm: number):
   for (let Y = 1; Y < h; Y++) for (let X = 1; X < w - 1; X++) { const i = Y * w + X; if (d[i]) d[i] = Math.min(d[i]!, d[i - 1]! + 1, d[i - w]! + 1, d[i - w - 1]! + 1.41, d[i - w + 1]! + 1.41); }
   for (let Y = h - 2; Y >= 0; Y--) for (let X = w - 2; X >= 1; X--) { const i = Y * w + X; if (d[i]) d[i] = Math.min(d[i]!, d[i + 1]! + 1, d[i + w]! + 1, d[i + w + 1]! + 1.41, d[i + w - 1]! + 1.41); }
   for (let i = 0; i < N; i++) d[i] = d[i]! * mm; return d; }
+
+// ---- the 3D model as the game's 2D pictures (review 92, the SSJ pilot): a straight view from a side, the front, the back or
+//      above at the builder's scale, in the 2D renderer's picture format (each pixel's material and part, the ground row,
+//      the length scale), so the wear marks, the builder and the garage scenes can take it as they take a drawn one ----
+import type { CarImage } from './raster';
+import type { Material } from './types';
+export type MeshView = 'left' | 'right' | 'front' | 'rear' | 'top';
+export function meshImage(M: Mesh, view: MeshView, mm: number, o: { outline?: number; wear?: Wear; glass?: number } = {}): CarImage { const t0 = performance.now();
+  let Rh = 0, Z = 0; for (let i = 0; i < M.pos.length; i += 3) { Rh = Math.max(Rh, Math.abs(M.pos[i]! - M.length / 2), Math.abs(M.pos[i + 1]!)); Z = Math.max(Z, M.pos[i + 2]!); }
+  const pad = 12, top = view === 'top', w = Math.ceil(2 * (view === 'front' || view === 'rear' ? Math.max(...Array.from({ length: M.n * 3 }, (_, k) => Math.abs(M.pos[k * 3 + 1]!))) : M.length / 2 + 120) / mm) + pad * 2;
+  const h = Math.ceil((top ? 2 * Rh : Z + 80) / mm) + pad * 2, gy = top ? h / 2 : h - pad;
+  const yaw = view === 'left' || view === 'top' ? 0 : view === 'right' ? 180 : view === 'front' ? 90 : 270;
+  const p = drawMesh(M, yaw, top ? 89.9 : 0, mm, w, h, { outline: o.outline ?? 2, wear: o.wear, glass: o.glass ?? 0.75, shadow: false, cy: gy / h, studio: true, smooth: true });
+  const names = M.names ?? [], ids: string[] = [], idOf = new Map<string, number>(), N = w * h, owner = new Int16Array(N).fill(-1), mat: (Material | null)[] = new Array(N).fill(null);
+  const matOf = (t: number): Material => { const k = KINDS[M.kind[t]!], nm = names[M.part[t]!] ?? '', c = M.col[t * 3]! + M.col[t * 3 + 1]! + M.col[t * 3 + 2]!;
+    return k === 'paint' ? (/^fender/.test(nm) ? 'paint2' : 'paint') : k === 'metal' ? 'chrome' : k === 'glass' || k === 'shine' ? 'glass' : k === 'tyre' ? 'rubber' : k === 'wood' ? 'wood' : k === 'canvas' || k === 'leather' ? 'canvas' : k === 'lens' ? (M.col[t * 3]! > 180 && M.col[t * 3 + 1]! < 90 ? 'lensR' : 'lens') : c > 600 ? 'white' : 'black'; };
+  for (let i = 0; i < N; i++) { const t = p.tri?.[i] ?? -1; if (t < 0) continue; const nm = names[M.part[t]!] || `part${M.part[t]}`; let id = idOf.get(nm); if (id === undefined) { id = ids.length; ids.push(nm); idOf.set(nm, id); } owner[i] = id; mat[i] = matOf(t); }
+  const cx = w / 2, X = (x: number) => cx + (x - M.length / 2) / mm * (view === 'right' ? -1 : 1), Y = (z: number) => gy - z / mm;
+  return { w, h, rgba: p.rgba, owner, ms: performance.now() - t0, groundY: gy, X, Y, mat, ids }; }
+
+/** each triangle corner's normal: the face normals of its part meeting at that point within 50 degrees, averaged */
+const cornerCache = new WeakMap<Mesh, Float32Array>();
+function cornerNormals(M: Mesh): Float32Array { const have = cornerCache.get(M); if (have) return have; const p = M.pos, fnm = new Float32Array(M.n * 3), at = new Map<string, number[]>();
+  for (let t = 0; t < M.n; t++) { const q = t * 9, a: V = [p[q]!, p[q + 1]!, p[q + 2]!], c = cross(sub([p[q + 3]!, p[q + 4]!, p[q + 5]!], a), sub([p[q + 6]!, p[q + 7]!, p[q + 8]!], a)), l = len(c) || 1; fnm.set([c[0] / l, c[1] / l, c[2] / l], t * 3);
+    for (let k = 0; k < 3; k++) { const key = `${M.part[t]}:${Math.round(p[q + k * 3]!)}:${Math.round(p[q + k * 3 + 1]!)}:${Math.round(p[q + k * 3 + 2]!)}`; let arr = at.get(key); if (!arr) { arr = []; at.set(key, arr); } arr.push(t); } }
+  const out = new Float32Array(M.n * 9);
+  for (let t = 0; t < M.n; t++) { const q = t * 9, f: V = [fnm[t * 3]!, fnm[t * 3 + 1]!, fnm[t * 3 + 2]!];
+    for (let k = 0; k < 3; k++) { const key = `${M.part[t]}:${Math.round(p[q + k * 3]!)}:${Math.round(p[q + k * 3 + 1]!)}:${Math.round(p[q + k * 3 + 2]!)}`; let s: V = [0, 0, 0];
+      for (const u of at.get(key)!) { let g: V = [fnm[u * 3]!, fnm[u * 3 + 1]!, fnm[u * 3 + 2]!], dt = g[0] * f[0] + g[1] * f[1] + g[2] * f[2]; if (dt < 0) { g = mul(g, -1); dt = -dt; } if (dt > 0.64) s = add(s, g); }
+      const sn = norm(len(s) > 0 ? s : f); out.set(sn, q + k * 3); } }
+  cornerCache.set(M, out); return out; }

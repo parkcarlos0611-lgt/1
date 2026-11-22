@@ -7,7 +7,7 @@ outside the opening the sheet gives.
 
 bucket: two separate seats, a gap between them (sports cars); bench: one seat across (roadsters, tourers)."""
 import sys, json, argparse
-ap = argparse.ArgumentParser(); ap.add_argument('model'); ap.add_argument('--style', default='bucket'); ap.add_argument('--color', default='#8a4a26'); ap.add_argument('--out')
+ap = argparse.ArgumentParser(); ap.add_argument('model'); ap.add_argument('--style', default='bucket'); ap.add_argument('--color', default='#7a4426'); ap.add_argument('--out')
 a = ap.parse_args(); m = json.load(open(a.model))
 ck = next((p for p in m['parts'] if p['element'] == 'cockpit' and p['id'] == 'cockpit'), None) or next(p for p in m['parts'] if p['element'] == 'cockpit')
 m['parts'] = [p for p in m['parts'] if p['element'] != 'seat']
@@ -24,21 +24,34 @@ def back_side():
     return [[0.30, 0.0, 1], [0.30, 0.28, 0], [0.36, 0.34, 0], [0.60, 0.36, 0], [0.66, 0.55, 0], [0.70, 0.80, 0], [0.74, 0.94, 0], [0.80, 1.0, 0],
             [0.88, 0.99, 0], [0.93, 0.92, 0], [0.92, 0.60, 0], [0.90, 0.0, 1]]
 seats = []
-rows = ([('seatL', 0.53, 0.94), ('seatR', 0.06, 0.47)] if a.style == 'bucket' else [('seat', 0.06, 0.94)])
+# each seat as the period sheets draw it from above: a square cushion with fore-and-aft pleats (a dark tuck with a lit
+# edge beside it), and behind it the back as its own rounded bolster, the two parted by a dark line; from the side the
+# back stands up with its rolled top lit; from behind, the backs' rolled tops show over the tail
+rows = ([('seatL', 0.515, 0.975), ('seatR', 0.025, 0.485)] if a.style == 'bucket' else [('seat', 0.03, 0.97)])
+npl = 6 if a.style == 'bucket' else 10
+def part(id, outl, sheet, feats, surface, on, lift, color):
+    return {'id': id, 'element': 'seat', 'material': 'wood', 'surface': surface, 'box': json.loads(json.dumps(ck['box'])), 'sheet': sheet, 'pair': False,
+            'outlines': outl, 'features': feats, 'on': on, 'lift': lift, 'clip': ck['id'], 'color': color}
+light = '#%02x%02x%02x' % tuple(min(255, int(int(a.color[i:i + 2], 16) * 1.12 + 8)) for i in (1, 3, 5))
 for sid, v0, v1 in rows:
-    top = rrect(0.28, 0.96, v0, v1, 0.22)
-    pleats = [{'kind': 'seam', 'pts': [[0.36, v0 + (v1 - v0) * f], [0.74, v0 + (v1 - v0) * f]]} for f in ((0.25, 0.5, 0.75) if a.style == 'bucket' else (0.15, 0.3, 0.45, 0.55, 0.7, 0.85))]
-    feats = {'top': [{'kind': 'seam', 'pts': [[0.76, v0 + 0.02], [0.76, v1 - 0.02]]}, *pleats, {'kind': 'highlight', 'pts': [[0.86, v0 + 0.04], [0.86, v1 - 0.04]], 'width': 1}],
-             'side': [{'kind': 'highlight', 'pts': [[0.74, 0.9], [0.86, 0.97]], 'width': 1}, {'kind': 'seam', 'pts': [[0.36, 0.33], [0.62, 0.35]]}]}
-    outl = {'top': top}; sheet = {'top': ck['sheet']['top']}
-    if sid != 'seatR' and 'side' in ck['sheet']: outl['side'] = back_side(); sheet['side'] = ck['sheet']['side']
-    if 'rear' in ck['sheet']:   # from behind: the back's rolled top over the tail, in its half
-        outl['rear'] = rrect(1 - v1, 1 - v0, 0.0, 1.0, 0.3); sheet['rear'] = ck['sheet']['rear']
-    # the back's rolled top seen from above: the same leather a shade darker, across the rear of the seat
-    dark = '#%02x%02x%02x' % tuple(max(0, int(int(a.color[i:i + 2], 16) * 0.72)) for i in (1, 3, 5))
-    seats.append({'id': sid + 'Back', 'element': 'seat', 'material': 'wood', 'surface': 'fender', 'box': json.loads(json.dumps(ck['box'])), 'sheet': {'top': ck['sheet']['top']}, 'pair': False,
-                  'outlines': {'top': rrect(0.78, 0.96, v0 + 0.01, v1 - 0.01, 0.4)}, 'on': sid, 'lift': 2, 'clip': sid, 'color': dark})
-    seats.append({'id': sid, 'element': 'seat', 'material': 'wood', 'surface': 'fender', 'box': json.loads(json.dumps(ck['box'])), 'sheet': sheet, 'pair': False,
-                  'outlines': outl, 'features': feats, 'on': ck['id'], 'lift': 1, 'clip': ck['id'], 'color': a.color})
-seats.sort(key=lambda q: q['id'].endswith('Back')); m['parts'] += seats
+    dv = v1 - v0
+    cush = rrect(0.20, 0.77, v0 + dv * 0.04, v1 - dv * 0.04, 0.2)
+    pleats = []
+    for k in range(1, npl):
+        v = v0 + dv * (0.04 + 0.92 * k / npl)
+        pleats.append({'kind': 'seam', 'pts': [[0.23, v], [0.75, v]], 'lit': True})
+        vm = v - dv * 0.46 / npl; pleats.append({'kind': 'highlight', 'pts': [[0.26, vm], [0.72, vm]], 'width': 1})   # each roll lit along its crown
+    cf = {'top': pleats + [{'kind': 'highlight', 'pts': [[0.215, v0 + dv * 0.08], [0.215, v1 - dv * 0.08]], 'width': 1}]}
+    seats.append(part(sid, {'top': cush}, {'top': ck['sheet']['top']}, cf, 'side', ck['id'], 1, a.color))
+    back = rrect(0.75, 0.985, v0, v1, 0.45)
+    bf = {'top': [{'kind': 'highlight', 'pts': [[0.80, v0 + dv * 0.12], [0.80, v1 - dv * 0.12]], 'width': 1}]}
+    outl = {'top': back}; sheet = {'top': ck['sheet']['top']}
+    if sid != 'seatR' and 'side' in ck['sheet']:
+        outl['side'] = back_side(); sheet['side'] = ck['sheet']['side']
+        bf['side'] = [{'kind': 'highlight', 'pts': [[0.74, 0.9], [0.80, 0.98], [0.88, 0.97]], 'width': 1}, {'kind': 'seam', 'pts': [[0.36, 0.33], [0.62, 0.35]], 'lit': True}]
+    if 'rear' in ck['sheet']:
+        outl['rear'] = rrect(1 - v1, 1 - v0, 0.0, 1.0, 0.35); sheet['rear'] = ck['sheet']['rear']
+        bf['rear'] = [{'kind': 'highlight', 'pts': [[1 - v1 + dv * 0.15, 0.8], [1 - v0 - dv * 0.15, 0.8]], 'width': 1}]
+    seats.append(part(sid + 'Back', outl, sheet, bf, 'fender', sid, 2, light))
+m['parts'] += seats
 json.dump(m, open(a.out or a.model, 'w'), indent=1); print(len(seats), 'seats on', ck['id'], a.style, a.color)

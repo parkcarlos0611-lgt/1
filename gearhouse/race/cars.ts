@@ -71,7 +71,7 @@ const EXP: Record<string, RaceSpec> = {
     hp: 580, hpRpm: 2585, torqueRpm: 1700, idle: 500, redline: 2900, gears: [2.2, 1.45, 1.0], final: 1.62, eff: 0.9,
     brakes: 'four', hydraulic: false, brakeG: 0.42, cdA: 1.2, crr: 0.016, steerLock: 24, topKmh: 270, check: false,
     cooling: { siphon: false, margin: 1.35 }, tyreKind: 'racing30', shiftT: 0.6, era: '1933 · 항공 엔진 기록차' },
-  jagD55: { id: 'jagD55', name: '1955 Jaguar D-type (실험)', mass: 900 + 75, wheelbase: 2.286, track: 1.27, tyreR: 0.368, tyreW: 0.165, cgH: 0.4, frontShare: 0.49,
+  jagD55: { id: 'jagD55', name: '1955 Jaguar D-type (실험)', mass: 900 + 75, wheelbase: 2.286, track: 1.27, tyreR: 0.36, tyreW: 0.165, cgH: 0.4, frontShare: 0.49,
     hp: 270, hpRpm: 6000, torqueRpm: 4500, idle: 800, redline: 6500, gears: [2.14, 1.39, 1.1, 1.0], final: 2.79, eff: 0.92,
     brakes: 'disc', hydraulic: true, brakeG: 0.95, cdA: 0.6, crr: 0.014, steerLock: 30, topKmh: 280, check: false,
     cooling: { siphon: false, margin: 1.25 }, tyreKind: 'racing50', shiftT: 0.25, era: '1955 · 후대 (디스크 브레이크, 모노코크)' } };

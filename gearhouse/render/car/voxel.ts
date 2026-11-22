@@ -332,3 +332,47 @@ export function drawSurface(F: Surface, yaw: number, pitch: number, mmPx: number
     for (let a = 0; a < w * h; a++) if (o[a]) { const k = o[a] === 2 ? 0.28 : 0.6; rgba[a * 4] = rgba[a * 4]! * k; rgba[a * 4 + 1] = rgba[a * 4 + 1]! * k; rgba[a * 4 + 2] = rgba[a * 4 + 2]! * k; } }
   for (let a = 0; a < w * h; a++) if (shadow[a] && !rgba[a * 4 + 3]) { rgba[a * 4] = 24; rgba[a * 4 + 1] = 22; rgba[a * 4 + 2] = 20; rgba[a * 4 + 3] = 110; }
   return { w, h, rgba }; }
+
+/** Review 79: the car as a set of level slices at the game's pixel size, for a run-time sprite-stacking renderer. Each
+ *  slice is one screen pixel of rise thick; each pixel keeps its colour (the drawings' colour on the solid), its outward
+ *  direction (for lighting at draw time, so the sun stays put while the car turns) and its gloss. Slices can be saved
+ *  as PNGs and edited. */
+export interface Slices { w: number; h: number; n: number; mm: number; dz: number; ox: number; oy: number; col: Uint8ClampedArray[]; nrm: Int8Array[]; gl: Uint8Array[] }
+export function slicesFor(F: Surface, mm: number, pitch = 40): Slices {
+  const G = F.grid, c = F.c, ph = pitch * Math.PI / 180, band = Math.max(1, Math.round(mm * Math.tan(ph) / c)), w = Math.ceil(G.nx * c / mm), h = Math.ceil(G.ny * c / mm);
+  const col: Uint8ClampedArray[] = [], nrm: Int8Array[] = [], gl: Uint8Array[] = [];
+  for (let k0 = 0; k0 < G.nz; k0 += band) { const C = new Uint8ClampedArray(w * h * 4), Nn = new Int8Array(w * h * 3), Gl = new Uint8Array(w * h); let any = false;
+    for (let Y = 0; Y < h; Y++) for (let X = 0; X < w; X++) { let best = -1;
+      // the pixel's footprint, sampled 3 x 3, the highest surface cell in the slice's band
+      for (let k = Math.min(G.nz - 1, k0 + band - 1); k >= k0 && best < 0; k--) for (let s = 0; s < 9; s++) { const i = Math.floor((X + (s % 3 + 0.5) / 3) * mm / c), j = Math.floor((Y + (Math.floor(s / 3) + 0.5) / 3) * mm / c);
+        if (i >= G.nx || j >= G.ny) continue; const t = G.at[(k * G.ny + j) * G.nx + i]!; if (t >= 0) { best = t; break; } }
+      if (best < 0) continue; const a = Y * w + X; C[a * 4] = F.col[best * 3]!; C[a * 4 + 1] = F.col[best * 3 + 1]!; C[a * 4 + 2] = F.col[best * 3 + 2]!; C[a * 4 + 3] = F.tex[best] ? 254 : 255;
+      for (let q = 0; q < 3; q++) Nn[a * 3 + q] = Math.round(F.nrm[best * 3 + q]! * 127); Gl[a] = Math.round(F.gloss[best]! * 255); any = true; }
+    if (any || col.length) { col.push(C); nrm.push(Nn); gl.push(Gl); } }
+  // drop empty slices at the top
+  while (col.length && !col[col.length - 1]!.some((v, i) => i % 4 === 3 && v > 0)) { col.pop(); nrm.pop(); gl.pop(); }
+  return { w, h, n: col.length, mm, dz: band * c, ox: (G.cx - G.x0) / mm, oy: -G.y0 / mm, col, nrm, gl }; }
+
+/** the run-time renderer: every slice turned to `yaw` and lifted by its height at the camera's slant, nearest pixel;
+ *  then each pixel lit by the sun (fixed in the world), a 2-pixel outline, and the car's shadow on the ground */
+export function drawSlices(L: Slices, yaw: number, pitch: number, w: number, h: number, outline = 2, roll = 0): Pic {
+  const th = yaw * Math.PI / 180, ph = pitch * Math.PI / 180, ct = Math.cos(th), st = Math.sin(th), sp = Math.sin(ph), cp = Math.cos(ph), N = w * h;
+  const top = new Int32Array(N).fill(-1), src = new Int32Array(N), rgba = new Uint8ClampedArray(N * 4), cy = h * 0.6;
+  const sun: [number, number, number] = [SUN[0] * ct + SUN[1] * st, -SUN[0] * st + SUN[1] * ct, SUN[2]];
+  // the shadow: the slices' footprints dropped along the sun's ray onto the ground
+  const shadow = new Uint8Array(N), sx = -SUN[0] / SUN[2], sy = -SUN[1] / SUN[2];
+  for (let s = 0; s < L.n; s++) { const z = (s + 0.5) * L.dz / L.mm, C = L.col[s]!, dxw = sx * z, dyw = sy * z;
+    for (let Y = 0; Y < h; Y++) for (let X = 0; X < w; X++) { const xr = X + 0.5 - w / 2 - dxw, yr = -(Y + 0.5 - cy) / sp - dyw, x = xr * ct + yr * st + L.ox, y = -xr * st + yr * ct + L.oy, i = Math.floor(x), j = Math.floor(y);
+      if (i >= 0 && j >= 0 && i < L.w && j < L.h && C[(j * L.w + i) * 4 + 3]) shadow[Y * w + X] = 1; } }
+  for (let s = 0; s < L.n; s++) { const up = (s + 0.5) * L.dz * cp / L.mm, side = roll * (s + 0.5) * L.dz / L.mm, C = L.col[s]!;
+    for (let Y = 0; Y < h; Y++) for (let X = 0; X < w; X++) { const xr = X + 0.5 - w / 2, yr = -(Y + 0.5 - cy + up) / sp, x = xr * ct + yr * st + L.ox, y = -xr * st + yr * ct + L.oy + side, i = Math.floor(x), j = Math.floor(y);
+      if (i < 0 || j < 0 || i >= L.w || j >= L.h) continue; const a = j * L.w + i; if (!C[a * 4 + 3]) continue; top[Y * w + X] = s; src[Y * w + X] = a; } }
+  for (let p = 0; p < N; p++) { const s = top[p]!; if (s < 0) { if (shadow[p]) { rgba[p * 4] = 24; rgba[p * 4 + 1] = 22; rgba[p * 4 + 2] = 20; rgba[p * 4 + 3] = 110; } continue; }
+    const a = src[p]!, C = L.col[s]!, Nn = L.nrm[s]!, nx = Nn[a * 3]! / 127, ny = Nn[a * 3 + 1]! / 127, nz = Nn[a * 3 + 2]! / 127, g = L.gl[s]![a]! / 255, own = C[a * 4 + 3] === 254;
+    const d = Math.max(0, nx * sun[0] + ny * sun[1] + nz * sun[2]); let k = own ? Math.round((0.74 + 0.34 * d) * 6) / 6 : Math.round((0.46 + 0.6 * d + 0.1 * Math.max(0, nz)) * 9) / 9, sh = 0;
+    if (g > 0.6 && !own) { k = nz > 0.55 ? 1.18 : nz > 0.15 ? 0.95 : nz > -0.15 ? 0.5 : 0.78; if (d > 0.9) sh = 70; } else if (g > 0.2 && d > (g > 0.4 ? 0.93 : 0.965)) sh = g > 0.4 ? 90 : 55;
+    rgba[p * 4] = Math.min(255, C[a * 4]! * k + sh); rgba[p * 4 + 1] = Math.min(255, C[a * 4 + 1]! * k + sh); rgba[p * 4 + 2] = Math.min(255, C[a * 4 + 2]! * k + sh); rgba[p * 4 + 3] = 255; }
+  for (let pass = 0; pass < outline; pass++) { const o = new Uint8Array(N);
+    for (let Y = 1; Y < h - 1; Y++) for (let X = 1; X < w - 1; X++) { const p = Y * w + X; if (rgba[p * 4 + 3] === 255) continue; if ([p - 1, p + 1, p - w, p + w].some(q => rgba[q * 4 + 3] === 255 || (pass > 0 && rgba[q * 4 + 3] === 253))) o[p] = 1; }
+    for (let p = 0; p < N; p++) if (o[p]) { rgba[p * 4] = 22; rgba[p * 4 + 1] = 20; rgba[p * 4 + 2] = 20; rgba[p * 4 + 3] = 253; } }
+  return { w, h, rgba }; }

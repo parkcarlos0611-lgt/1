@@ -5,9 +5,11 @@
 //   A  drawn whole from each heading (pre-rendered frames): every cell's face lit by the sun, nearest wins;
 //   B  sprite stacking: the solid cut into level slices, each a plan picture lit once, stacked at the camera's slant
 //      and turned at run time (here drawn the same way the game would).
-import type { CarModel, CarPart } from './model';
+import { viewDesign, type CarModel, type CarPart, type ViewName } from './model';
+import { rasterizeFlat } from './flat';
+import type { CarImage } from './raster';
 
-export interface Solid { c: number; nx: number; ny: number; nz: number; x0: number; y0: number; owner: Int16Array; rgb: [number, number, number][]; mat: string[] }
+export interface Solid { c: number; nx: number; ny: number; nz: number; x0: number; y0: number; owner: Int16Array; rgb: [number, number, number][]; mat: string[]; ids: string[]; cx0: number }
 const MAT_RGB: Record<string, string> = { chrome: '#c4c6c8', glass: '#7f909a', black: '#24232b', rubber: '#25232b', iron: '#4f525d', wood: '#9a6a3a', lens: '#d9d5b6', lensR: '#c22c2b', white: '#d4d7dc', canvas: '#8c8270' };
 const hex = (h: string): [number, number, number] => { const v = parseInt(h.replace('#', ''), 16); return [(v >> 16) & 255, (v >> 8) & 255, v & 255]; };
 
@@ -17,12 +19,12 @@ function inPoly(pts: number[][], u: number, v: number) { let ins = false; for (l
 /** the car as cells of `c` mm (default 15): the body's parts and the wheels; the chassis layer left out */
 export function solidOf(m: CarModel, c = 15, tyreW?: number): Solid {
   const L = m.length, W = m.width, H = m.height, x0 = -150, y0 = -W / 2 - 150, nx = Math.ceil((L + 300) / c), ny = Math.ceil((W + 300) / c), nz = Math.ceil((H + 150) / c);
-  const owner = new Int16Array(nx * ny * nz).fill(-1), pri = new Float32Array(nx * ny * nz).fill(-1e9), rgb: [number, number, number][] = [], mat: string[] = [];
+  const owner = new Int16Array(nx * ny * nz).fill(-1), pri = new Float32Array(nx * ny * nz).fill(-1e9), rgb: [number, number, number][] = [], mat: string[] = [], ids: string[] = [];
   const at = (i: number, j: number, k: number) => (k * ny + j) * nx + i;
   const parts = m.parts.filter(p => p.layer !== 'chassis' && p.outlines);
   parts.forEach((p: CarPart) => {
     const r = p as unknown as { color?: string; lift?: number }, col = r.color ?? (p.material === 'paint' ? m.paint : p.material === 'paint2' ? m.paint2 : p.material === 'chrome' && (m as unknown as { chrome?: string }).chrome ? (m as unknown as { chrome: string }).chrome : MAT_RGB[p.material] ?? '#808080');
-    const id = rgb.push(hex(col)) - 1; mat.push(p.material);
+    const id = rgb.push(hex(col)) - 1; mat.push(p.material); ids.push(p.id);
     const o = p.outlines, b = p.box, side = o.side, top = o.top, fr = o.front ?? o.rear, P = Math.max(Math.abs(b.y[0]), Math.abs(b.y[1])) + (r.lift ?? 0) * 3;
     for (const s of p.pair ? [1, -1] : [1]) {
       const ya = s > 0 ? b.y[0] : -b.y[1], yb = s > 0 ? b.y[1] : -b.y[0];
@@ -38,14 +40,49 @@ export function solidOf(m: CarModel, c = 15, tyreW?: number): Solid {
         if (fr) { const key = k * ny + j; let v = fm.get(key); if (v === undefined) { v = inPoly(fr, vy, vz); fm.set(key, v); } if (!v) continue; }
         const a = at(i, j, k); if (P >= pri[a]!) { pri[a] = P; owner[a] = id; } } } });
   // the wheels: a tyre round a rim and its cap, on each side, axis across the car
-  const wi = m.wheel ?? {}, tw = tyreW ?? 175, tyre = rgb.push(hex('#25232b')) - 1; mat.push('rubber');
-  const rimC = rgb.push(hex(wi.rimMaterial === 'paint' ? m.paint : wi.rimMaterial === 'paint2' ? m.paint2 : '#c4c6c8')) - 1; mat.push(wi.rimMaterial === 'chrome' ? 'chrome' : 'paint');
+  const wi = m.wheel ?? {}, tw = tyreW ?? 175, tyre = rgb.push(hex('#25232b')) - 1; mat.push('rubber'); ids.push('wheel');
+  const rimC = rgb.push(hex(wi.rimMaterial === 'paint' ? m.paint : wi.rimMaterial === 'paint2' ? m.paint2 : '#c4c6c8')) - 1; mat.push(wi.rimMaterial === 'chrome' ? 'chrome' : 'paint'); ids.push('wheel');
   for (const w of m.wheels) for (const s of [1, -1]) { const yc = s * w.y, rim = w.r * (wi.rim ?? 0.6);
     for (let k = 0; k < nz; k++) for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) { const x = x0 + (i + 0.5) * c, y = y0 + (j + 0.5) * c, z = (k + 0.5) * c, d = Math.hypot(x - w.x, z - w.r);
       if (d > w.r || Math.abs(y - yc) > tw / 2) continue; const a = at(i, j, k), face = Math.abs(y - yc) > tw / 2 - c * 1.5;
       owner[a] = d > rim ? tyre : face ? rimC : tyre; pri[a] = 1e9; } }
-  return { c, nx, ny, nz, x0, y0, owner, rgb, mat };
+  const S: Solid = { c, nx, ny, nz, x0, y0, owner, rgb, mat, ids, cx0: x0 + nx * c / 2 };
+  rounded(S); return S;
 }
+/** review 73 (1): the edges a hull of straight extrusions leaves sharp, rounded off: the big painted and cloth panels'
+ *  cells kept only where a blur of the solid stays solid (corners and ridges thin away); small or bright parts keep every cell */
+function rounded(S: Solid, r = 2) {
+  const { nx, ny, nz, owner } = S, N = nx * ny * nz, a = new Float32Array(N), b = new Float32Array(N);
+  for (let i = 0; i < N; i++) a[i] = owner[i]! >= 0 ? 1 : 0;
+  // a box blur along each axis in turn (axis length, index stride)
+  const pass = (src: Float32Array, dst: Float32Array, len: number, step: number) => { for (let i = 0; i < N; i++) { const p = Math.floor(i / step) % len; let sum = 0;
+      for (let d = -r; d <= r; d++) { const q = p + d; if (q < 0 || q >= len) continue; sum += src[i + d * step]!; } dst[i] = sum / (2 * r + 1); } };
+  pass(a, b, nx, 1); pass(b, a, ny, nx); pass(a, b, nz, nx * ny);
+  for (let i = 0; i < N; i++) { const o = owner[i]!; if (o < 0) continue; const m = S.mat[o]!; if ((m === 'paint' || m === 'paint2' || m === 'canvas') && b[i]! < 0.42) owner[i] = -1; } }
+
+export type Tex = Partial<Record<ViewName, CarImage>> & { reach?: Map<string, { x: [number, number]; y: number; z: number }> };
+/** the car's own drawings (review 73: "2D pictures laid over it"), at `mm` a pixel: the five views the flat renderer makes */
+export function texOf(m: CarModel, mm = 8, tyreW = 175): Tex { const t: Tex = {}; for (const v of ['left', 'right', 'front', 'rear', 'top'] as ViewName[]) t[v] = rasterizeFlat(viewDesign(m, v), { mm, shadow: false });
+  // how far out each part reaches (across, up, along), to tell whether the part a drawing shows stands in front of a cell
+  const reach = new Map<string, { x: [number, number]; y: number; z: number }>();
+  for (const p of m.parts) reach.set(p.id, { x: [p.box.x[0], p.box.x[1]], y: Math.max(Math.abs(p.box.y[0]), Math.abs(p.box.y[1])), z: p.box.z[1] });
+  const ws = m.wheels; reach.set('wheel', { x: [Math.min(...ws.map(w => w.x - w.r)), Math.max(...ws.map(w => w.x + w.r))], y: Math.max(...ws.map(w => w.y)) + tyreW / 2, z: Math.max(...ws.map(w => w.r * 2)) });
+  t.reach = reach; return t; }
+/** the colour the drawings give a cell's face: from the view that looks straight at it, taken only where that view shows
+ *  the same part there (a wing does not borrow the wheel standing before it); null when no view does */
+function texel(T: Tex, W: number, part: string, x: number, y: number, z: number, n: [number, number, number]): [number, number, number] | null {
+  const C = W / 2, order: [ViewName, number, number][] = [];
+  const ax = Math.abs(n[0]), ay = Math.abs(n[1]), az = Math.abs(n[2]);
+  const side: [ViewName, number, number] = [n[1] >= 0 ? 'left' : 'right', x, z], end: [ViewName, number, number] = n[0] < 0 ? ['front', C + y, z] : ['rear', C - y, z], top: [ViewName, number, number] = ['top', x, C + y];
+  for (const [v, w] of ([[side, ay], [end, ax], [top, az]] as const).slice().sort((p, q) => q[1] - p[1])) if (w > 0.15) order.push(v);
+  for (const [v, u, h] of order) { const im = T[v]; if (!im) continue; const px = Math.floor(im.X(u)), py = Math.floor(im.Y(h)); if (px < 0 || py < 0 || px >= im.w || py >= im.h) continue;
+    const i = py * im.w + px; if (im.rgba[i * 4 + 3]! < 128) continue; const id = (im.ids?.[im.owner[i]!] ?? '').replace(/~$/, '');
+    // the drawing's part may be this cell's own, or one lying on the same face (glass in the body, a lens in its lamp);
+    // not one that stands out in front of it along the view's line (the wheel before the wing, the wing over the board)
+    if (id !== part) { const r = T.reach?.get(id), tol = 45; if (!r) continue;
+      const before = v === 'left' || v === 'right' ? r.y > Math.abs(y) + tol : v === 'top' ? r.z > z + tol : v === 'front' ? r.x[0] < x - tol : r.x[1] > x + tol; if (before) continue; }
+    return [im.rgba[i * 4]!, im.rgba[i * 4 + 1]!, im.rgba[i * 4 + 2]!]; }
+  return null; }
 
 const SUN = (() => { const v = [-0.45, 0.35, 0.82], n = Math.hypot(...v); return v.map(q => q / n) as [number, number, number]; })();
 /** a cell's outward direction, from which of its neighbours are empty */
@@ -95,21 +132,28 @@ export function drawStack(sl: { z: number; pic: Pic }[], S: Solid, yaw: number, 
   return { w, h, rgba }; }
 
 /** the solid's outer cells, ready to draw again and again (positions about the car's middle, outward directions, colours) */
-export interface Surface { n: number; pos: Float32Array; nrm: Float32Array; col: Uint8ClampedArray; gloss: Float32Array; c: number }
-export function surfaceOf(S: Solid): Surface {
-  const cx = S.x0 + S.nx * S.c / 2, pos: number[] = [], nrm: number[] = [], col: number[] = [], gl: number[] = [];
+export interface Surface { n: number; pos: Float32Array; nrm: Float32Array; col: Uint8ClampedArray; gloss: Float32Array; c: number; tex: Uint8Array }
+export function surfaceOf(S: Solid, T?: Tex, W = 0): Surface {
+  const cx = S.x0 + S.nx * S.c / 2, pos: number[] = [], nrm: number[] = [], col: number[] = [], gl: number[] = [], tx: number[] = [];
   for (let k = 0; k < S.nz; k++) for (let j = 0; j < S.ny; j++) for (let i = 0; i < S.nx; i++) { const id = S.owner[(k * S.ny + j) * S.nx + i]!; if (id < 0 || !surf(S, i, j, k)) continue;
-    pos.push(S.x0 + (i + 0.5) * S.c - cx, S.y0 + (j + 0.5) * S.c, (k + 0.5) * S.c); nrm.push(...normal(S, i, j, k)); col.push(...S.rgb[id]!); const m = S.mat[id]!;
+    const X = S.x0 + (i + 0.5) * S.c, Y = S.y0 + (j + 0.5) * S.c, Z = (k + 0.5) * S.c, nn = normal(S, i, j, k); pos.push(X - cx, Y, Z); nrm.push(...nn);
+    const tc = T ? texel(T, W, S.ids[id]!, X, Y, Z, nn) : null; col.push(...(tc ?? S.rgb[id]!)); tx.push(tc ? 1 : 0); const m = S.mat[id]!;
     gl.push(m === 'paint' || m === 'paint2' ? 0.35 : m === 'chrome' ? 0.8 : m === 'glass' ? 0.5 : 0.05); }
-  return { n: gl.length, pos: new Float32Array(pos), nrm: new Float32Array(nrm), col: new Uint8ClampedArray(col), gloss: new Float32Array(gl), c: S.c }; }
+  return { n: gl.length, pos: new Float32Array(pos), nrm: new Float32Array(nrm), col: new Uint8ClampedArray(col), gloss: new Float32Array(gl), c: S.c, tex: new Uint8Array(tx) }; }
 /** A from a Surface: the same picture as drawWhole, quicker for turning it by hand */
-export function drawSurface(F: Surface, yaw: number, pitch: number, mmPx: number, w: number, h: number): Pic {
+export function drawSurface(F: Surface, yaw: number, pitch: number, mmPx: number, w: number, h: number, outline = true): Pic {
   const rgba = new Uint8ClampedArray(w * h * 4), zb = new Float32Array(w * h).fill(-1e9), th = yaw * Math.PI / 180, ph = pitch * Math.PI / 180, ct = Math.cos(th), st = Math.sin(th), sp = Math.sin(ph), cp = Math.cos(ph);
   const sun: [number, number, number] = [SUN[0] * ct + SUN[1] * st, -SUN[0] * st + SUN[1] * ct, SUN[2]], q = Math.max(1, Math.ceil(F.c / mmPx)), half = q >> 1;
   for (let t = 0; t < F.n; t++) { const x = F.pos[t * 3]!, y = F.pos[t * 3 + 1]!, z = F.pos[t * 3 + 2]!, xr = x * ct - y * st, yr = x * st + y * ct;
     const px = Math.round(w / 2 + xr / mmPx), py = Math.round(h * 0.6 + (-yr * sp - z * cp) / mmPx), depth = -yr * cp + z * sp;
     if (px < -q || py < -q || px > w + q || py > h + q) continue;
-    const nx = F.nrm[t * 3]!, ny = F.nrm[t * 3 + 1]!, nz = F.nrm[t * 3 + 2]!, d = Math.max(0, nx * sun[0] + ny * sun[1] + nz * sun[2]), g = F.gloss[t]!, k = 0.42 + 0.62 * d + 0.12 * Math.max(0, nz), s = g * Math.pow(d, g > 0.6 ? 6 : 14) * 255;
+    const nx = F.nrm[t * 3]!, ny = F.nrm[t * 3 + 1]!, nz = F.nrm[t * 3 + 2]!, d = Math.max(0, nx * sun[0] + ny * sun[1] + nz * sun[2]), g = F.gloss[t]!, own = F.tex[t] === 1, k = own ? 0.72 + 0.36 * d + 0.06 * Math.max(0, nz) : 0.42 + 0.62 * d + 0.12 * Math.max(0, nz), s = g * Math.pow(d, g > 0.6 ? 6 : 14) * (own ? 140 : 255);
     const r = Math.min(255, F.col[t * 3]! * k + s), gg = Math.min(255, F.col[t * 3 + 1]! * k + s), b = Math.min(255, F.col[t * 3 + 2]! * k + s);
     for (let dy = 0; dy < q; dy++) for (let dx = 0; dx < q; dx++) { const X = px + dx - half, Y = py + dy - half; if (X < 0 || Y < 0 || X >= w || Y >= h) continue; const a = Y * w + X; if (depth < zb[a]!) continue; zb[a] = depth; rgba[a * 4] = r; rgba[a * 4 + 1] = gg; rgba[a * 4 + 2] = b; rgba[a * 4 + 3] = 255; } }
+  // review 73 (5): a pixel-art line round the car and where one surface stands well in front of another
+  if (outline) { const o = new Uint8Array(w * h), jump = 3 * F.c;
+    for (let Y = 0; Y < h; Y++) for (let X = 0; X < w; X++) { const a = Y * w + X; if (!rgba[a * 4 + 3]) continue;
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) { const XX = X + dx, YY = Y + dy, b = YY * w + XX;
+        if (XX < 0 || YY < 0 || XX >= w || YY >= h || !rgba[b * 4 + 3]) { o[a] = 2; break; } if (zb[b]! - zb[a]! > jump) o[a] = Math.max(o[a]!, 1); } }
+    for (let a = 0; a < w * h; a++) if (o[a]) { const k = o[a] === 2 ? 0.28 : 0.6; rgba[a * 4] = rgba[a * 4]! * k; rgba[a * 4 + 1] = rgba[a * 4 + 1]! * k; rgba[a * 4 + 2] = rgba[a * 4 + 2]! * k; } }
   return { w, h, rgba }; }

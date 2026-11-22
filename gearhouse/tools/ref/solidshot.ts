@@ -11,7 +11,7 @@ const cell = +arg('cell', '15'), zoom = +arg('zoom', '1.5'), pitch = +arg('pitch
 const BG = [196, 190, 174]; const SHADOWED = true, W = tw * yaws.length, H = th * cars.length, img = new Uint8Array(W * H * 3); for (let i = 0; i < W * H; i++) img.set(BG, i * 3);
 cars.forEach((c, r) => { const m = JSON.parse(readFileSync(new URL(`../../data/cars/sheet/${c}.json`, import.meta.url), 'utf8')), t = performance.now();
   const S = solidOf(m, cell), F = surfaceOf(S, texOf(m, 6), m.width), t1 = performance.now();
-  yaws.forEach((y, k) => { const p = drawSurface(F, y, pitch, MM, tw, th); for (let j = 0; j < th; j++) for (let i = 0; i < tw; i++) { const a = (j * tw + i) * 4; if (!p.rgba[a + 3]) continue; const b = ((r * th + j) * W + k * tw + i) * 3, al = p.rgba[a + 3]! / 255; img[b] = img[b]! * (1 - al) + p.rgba[a]! * al; img[b + 1] = img[b + 1]! * (1 - al) + p.rgba[a + 1]! * al; img[b + 2] = img[b + 2]! * (1 - al) + p.rgba[a + 2]! * al; } });
+  yaws.forEach((y, k) => { const p = drawSurface(F, y, pitch, MM, tw, th, +arg('line', '1')); for (let j = 0; j < th; j++) for (let i = 0; i < tw; i++) { const a = (j * tw + i) * 4; if (!p.rgba[a + 3]) continue; const b = ((r * th + j) * W + k * tw + i) * 3, al = p.rgba[a + 3]! / 255; img[b] = img[b]! * (1 - al) + p.rgba[a]! * al; img[b + 1] = img[b + 1]! * (1 - al) + p.rgba[a + 1]! * al; img[b + 2] = img[b + 2]! * (1 - al) + p.rgba[a + 2]! * al; } });
   console.log(c, 'build', Math.round(t1 - t), 'ms, a frame', Math.round((performance.now() - t1) / yaws.length), 'ms, cells', F.n); });
 // PNG, enlarged by whole pixels
 const w2 = W * scale, h2 = H * scale, raw = Buffer.alloc((w2 * 3 + 1) * h2);

@@ -31,7 +31,7 @@ export function solidOf(m: CarModel, c = 15, tyreW?: number): Solid {
   const dark = (p: CarPart) => p.material === 'black' || p.material === 'iron' || p.material === 'rubber', vol = (p: CarPart) => (p.box.x[1] - p.box.x[0]) * (p.box.y[1] - p.box.y[0]) * (p.box.z[1] - p.box.z[0]) / 1e9;
   const one = (p: CarPart) => Object.keys(p.outlines).length === 1 ? Object.keys(p.outlines)[0]! : '';
   const parts = m.parts.filter(p => p.layer !== 'chassis' && p.outlines && p.element !== 'wheel' && p.element !== 'house' && p.element !== 'seat'
-    && !(dark(p) && one(p) !== '' && one(p) !== 'side' && vol(p) > 0.015));
+    && !(dark(p) && (one(p) === 'front' || one(p) === 'rear') && vol(p) > 0.015));   // a dark backdrop drawn across the car from in front or behind; the frame and pans seen from above stay
   // the rake of each element's parts that have a side outline (screens): parts of that element drawn only from in front follow it
   const rake = new Map<string, CarPart[]>(); for (const p of parts) if (p.element === 'screen' && p.outlines.side) rake.set(p.element, [...(rake.get(p.element) ?? []), p]);
   const newId = (p: CarPart) => { const r = p as unknown as { color?: string }, col = r.color ?? (p.material === 'paint' ? m.paint : p.material === 'paint2' ? m.paint2 : p.material === 'chrome' && (m as unknown as { chrome?: string }).chrome ? (m as unknown as { chrome: string }).chrome : MAT_RGB[p.material] ?? '#808080');
@@ -233,7 +233,7 @@ export function surfaceOf(S: Solid, T?: Tex, W = 0): Surface {
 /** A from a Surface. Drawn in two steps: which cell shows at each pixel; then each pixel lit, its outward direction
  *  first averaged with its neighbours on the same surface (the cells' steps go, the form's own edges stay), the light
  *  in a few steps (flat tones, as pixel art has them), bright metal giving back sky, horizon and ground. */
-export function drawSurface(F: Surface, yaw: number, pitch: number, mmPx: number, w: number, h: number, outline = true): Pic {
+export function drawSurface(F: Surface, yaw: number, pitch: number, mmPx: number, w: number, h: number, outline: boolean | number = true): Pic {
   const rgba = new Uint8ClampedArray(w * h * 4), zb = new Float32Array(w * h).fill(-1e9), ix = new Int32Array(w * h).fill(-1), th = yaw * Math.PI / 180, ph = pitch * Math.PI / 180, ct = Math.cos(th), st = Math.sin(th), sp = Math.sin(ph), cp = Math.cos(ph);
   const sun: [number, number, number] = [SUN[0] * ct + SUN[1] * st, -SUN[0] * st + SUN[1] * ct, SUN[2]], q = Math.max(2, Math.ceil(F.c * 1.45 / mmPx)), half = q >> 1;   // big enough that no cell behind shows between
   for (let t = 0; t < F.n; t++) { const x = F.pos[t * 3]!, y = F.pos[t * 3 + 1]!, z = F.pos[t * 3 + 2]!, xr = x * ct - y * st, yr = x * st + y * ct;
@@ -252,7 +252,7 @@ export function drawSurface(F: Surface, yaw: number, pitch: number, mmPx: number
       nx += F.nrm[u * 3]!; ny += F.nrm[u * 3 + 1]!; nz += F.nrm[u * 3 + 2]!; }
     const nl = Math.hypot(nx, ny, nz) || 1; nx /= nl; ny /= nl; nz /= nl;
     const d = Math.max(0, nx * sun[0] + ny * sun[1] + nz * sun[2]), g = F.gloss[t]!, own = F.tex[t] === 1;
-    let k = own ? 0.74 + 0.34 * d + 0.05 * Math.max(0, nz) : 0.46 + 0.6 * d + 0.1 * Math.max(0, nz), s = 0;
+    let k = own ? Math.round((0.74 + 0.34 * d + 0.05 * Math.max(0, nz)) * 6) / 6 : 0.46 + 0.6 * d + 0.1 * Math.max(0, nz), s = 0;   // drawn colours in six light steps (a fixed set of tones per colour)
     if (g > 0.6 && !own) { k = nz > 0.55 ? 1.18 : nz > 0.15 ? 0.95 : nz > -0.15 ? 0.5 : 0.78; if (d > 0.9) s = 70; }          // bright metal: sky above, the dark horizon round its middle, the ground below
     else { k = Math.round(k * STEPS) / STEPS; if (g > 0.2 && d > (g > 0.4 ? 0.93 : 0.965)) s = g > 0.4 ? 90 : 55; }               // paint and glass: a small hard highlight where they face the sun
     if (g > 0.2 && g <= 0.6 && !own) s += 34 * Math.max(0, k - 0.5);   // a dark paint still shows its form: the sky's light lies on it, not only in it
@@ -268,6 +268,7 @@ export function drawSurface(F: Surface, yaw: number, pitch: number, mmPx: number
         if (XX < 0 || YY < 0 || XX >= w || YY >= h || !rgba[b * 4 + 3]) { o[a] = 2; break; } if (zb[b]! - zb[a]! > jump) o[a] = Math.max(o[a]!, 1);
         // where a bright part meets another part in front of it: a thin dark seam, so small fittings stand apart
         else if (ix[b]! >= 0 && ix[a]! >= 0 && F.part[ix[a]!] !== F.part[ix[b]!] && zb[b]! - zb[a]! > 0.6 * F.c && (F.gloss[ix[a]!]! > 0.6 || F.gloss[ix[b]!]! > 0.6)) o[a] = Math.max(o[a]!, 1); } }
+    if (outline === 2) { const o2 = new Uint8Array(o); for (let Y = 1; Y < h - 1; Y++) for (let X = 1; X < w - 1; X++) { const a = Y * w + X; if (o[a] !== 2) continue; for (const b of [a - 1, a + 1, a - w, a + w]) if (rgba[b * 4 + 3] && !o[b]) o2[b] = 2; } o.set(o2); }   // a thicker outline: two pixels round the car
     for (let a = 0; a < w * h; a++) if (o[a]) { const k = o[a] === 2 ? 0.28 : 0.6; rgba[a * 4] = rgba[a * 4]! * k; rgba[a * 4 + 1] = rgba[a * 4 + 1]! * k; rgba[a * 4 + 2] = rgba[a * 4 + 2]! * k; } }
   for (let a = 0; a < w * h; a++) if (shadow[a] && !rgba[a * 4 + 3]) { rgba[a * 4] = 24; rgba[a * 4 + 1] = 22; rgba[a * 4 + 2] = 20; rgba[a * 4 + 3] = 110; }
   return { w, h, rgba }; }

@@ -2,7 +2,7 @@
 import { drawMesh } from '../render/car/mesh';
 import { ssjMesh } from '../render/car/mesh_ssj';
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T, cv = $<HTMLCanvasElement>('view'), ctx = cv.getContext('2d')!;
-const st = { yaw: 30, pitch: 40, res: 1, line: 2, spin: false, roll: false, px: 2 }; let dirty = true, wheel = 0, M = ssjMesh();
+const st = { yaw: 30, pitch: 40, res: 0.85, line: 3, spin: false, roll: false, px: 2 }; let dirty = true, wheel = 0, M = ssjMesh();
 function frame() { if (st.spin) { st.yaw = (st.yaw + 0.8) % 360; $<HTMLInputElement>('yaw').value = String(Math.round(st.yaw)); dirty = true; }
   if (st.roll) { wheel += 0.12; M = ssjMesh(wheel); dirty = true; }
   if (dirty) { dirty = false; const W = Math.round(400 * st.res), H = Math.round(260 * st.res), t = performance.now(), p = drawMesh(M, st.yaw, st.pitch, 16.7 / st.res, W, H, { outline: st.line });

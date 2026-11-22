@@ -8,10 +8,10 @@
 export interface EngineVoiceSpec { cylinders: number; kind: 'sv' | 'ohv' | 'sleeve'; supercharged: boolean }
 export class Sound {
   ctx: AudioContext; master: GainNode; private noise: AudioBuffer; private voices = new Map<unknown, Voice>(); private amb: Ambience;
-  private tyre: { g: GainNode; f: BiquadFilterNode }; private wind: { g: GainNode; f: BiquadFilterNode };
+  private squeal: Squeal[]; private wind: { g: GainNode; f: BiquadFilterNode }; private grass: { g: GainNode; f: BiquadFilterNode }; private others: Squeal;
   constructor() { this.ctx = new AudioContext(); this.master = this.ctx.createGain(); this.master.gain.value = 0.7; this.master.connect(this.ctx.destination);
     const n = this.ctx.createBuffer(1, this.ctx.sampleRate * 2, this.ctx.sampleRate), d = n.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; this.noise = n;
-    this.tyre = this.band(1100, 4, 'bandpass'); this.wind = this.band(420, 0.7, 'lowpass'); this.amb = new Ambience(this); }
+    this.squeal = [new Squeal(this, -0.5), new Squeal(this, 0.5)]; this.others = new Squeal(this, 0); this.wind = this.band(420, 0.7, 'lowpass'); this.grass = this.band(110, 0.8, 'lowpass'); this.amb = new Ambience(this); }
   /** a looping noise through a filter, silent until set */
   band(freq: number, q: number, type: BiquadFilterType, out: AudioNode = this.master): { g: GainNode; f: BiquadFilterNode } { const s = this.ctx.createBufferSource(); s.buffer = this.noise; s.loop = true; s.playbackRate.value = 0.8 + Math.random() * 0.4;
     const f = this.ctx.createBiquadFilter(); f.type = type; f.frequency.value = freq; f.Q.value = q; const g = this.ctx.createGain(); g.gain.value = 0; s.connect(f).connect(g).connect(out); s.start(); return { g, f }; }
@@ -19,17 +19,31 @@ export class Sound {
   voice(key: unknown, spec: EngineVoiceSpec): Voice { let v = this.voices.get(key); if (!v) { v = new Voice(this, spec); this.voices.set(key, v); } return v; }
   dropVoices(keep: Set<unknown>): void { for (const [k, v] of this.voices) if (!keep.has(k)) { v.stop(); this.voices.delete(k); } }
   /** the player's car each frame: tyres and wind; and the surroundings by where on the track */
-  update(slip: number, speed: number, where: { piece: string; s: number; startDist: number }): void { const t = this.ctx.currentTime;
-    this.tyre.g.gain.setTargetAtTime(Math.min(0.35, Math.max(0, slip - 0.8) * 0.25), t, 0.04); this.tyre.f.frequency.setTargetAtTime(900 + Math.min(600, speed * 8), t, 0.1);
+  /** skid: each side's tyres (left, right), the same strength that lays the marks, and how they slide (sideways, locked, spinning) */
+  update(skid: { left: Skid; right: Skid; others: number }, grass: number, speed: number, where: { piece: string; s: number; startDist: number }): void { const t = this.ctx.currentTime;
+    this.squeal[0]!.set(skid.left); this.squeal[1]!.set(skid.right); this.others.set({ amount: skid.others, kind: 'side', load: 1 });
+    this.grass.g.gain.setTargetAtTime(Math.min(0.4, grass * speed / 30 * 0.4), t, 0.05);
     this.wind.g.gain.setTargetAtTime(Math.min(0.45, (speed / 60) ** 2 * 0.45), t, 0.2); this.wind.f.frequency.setTargetAtTime(300 + speed * 6, t, 0.2);
     this.amb.update(where, speed); }
   /** one-off: a knock, a gear change, a bang */
-  hit(kind: 'knock' | 'shift' | 'bang' | 'thud', strength = 1): void { const c = this.ctx, t = c.currentTime, s = c.createBufferSource(); s.buffer = this.noise; s.playbackRate.value = kind === 'bang' ? 0.5 : 1;
-    const f = c.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = kind === 'shift' ? 1800 : kind === 'bang' ? 900 : 400; const g = c.createGain(); const dur = kind === 'bang' ? 0.9 : kind === 'shift' ? 0.06 : 0.18;
-    g.gain.setValueAtTime(Math.min(1, (kind === 'bang' ? 0.9 : kind === 'shift' ? 0.25 : 0.6) * strength), t); g.gain.exponentialRampToValueAtTime(0.001, t + dur); s.connect(f).connect(g).connect(this.master); s.start(t); s.stop(t + dur + 0.05); }
+  hit(kind: 'knock' | 'shift' | 'bang' | 'thud' | 'joint', strength = 1): void { const c = this.ctx, t = c.currentTime, s = c.createBufferSource(); s.buffer = this.noise; s.playbackRate.value = kind === 'bang' ? 0.5 : 1;
+    const f = c.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = kind === 'shift' ? 1800 : kind === 'bang' ? 900 : kind === 'joint' ? 260 : 400; const g = c.createGain(); const dur = kind === 'bang' ? 0.9 : kind === 'shift' ? 0.06 : kind === 'joint' ? 0.05 : 0.18;
+    g.gain.setValueAtTime(Math.min(1, (kind === 'bang' ? 0.9 : kind === 'shift' ? 0.25 : kind === 'joint' ? 0.12 : 0.6) * strength), t); g.gain.exponentialRampToValueAtTime(0.001, t + dur); s.connect(f).connect(g).connect(this.master); s.start(t); s.stop(t + dur + 0.05); }
   set volume(v: number) { this.master.gain.value = v; }
   close(): void { void this.ctx.close(); }
 }
+/** a skid: 0..1 (as the marks), how: sliding sideways (a high squeal), locked under brakes (a low groan), spinning (rough) */
+export interface Skid { amount: number; kind: 'side' | 'lock' | 'spin'; load: number }
+/** one side's tyre noise: a tone that wavers with the slide over a rasp of noise, panned to its side */
+class Squeal { private o: OscillatorNode; private bp: BiquadFilterNode; private g: GainNode; private n: { g: GainNode; f: BiquadFilterNode }; private wob: OscillatorNode; private wobD: GainNode;
+  constructor(readonly snd: Sound, pan: number) { const c = snd.ctx, p = c.createStereoPanner(); p.pan.value = pan; p.connect(snd.master);
+    this.g = c.createGain(); this.g.gain.value = 0; this.g.connect(p); this.o = c.createOscillator(); this.o.type = 'sawtooth'; this.bp = c.createBiquadFilter(); this.bp.type = 'bandpass'; this.bp.Q.value = 6; this.o.connect(this.bp).connect(this.g);
+    this.wob = c.createOscillator(); this.wob.frequency.value = 9; this.wobD = c.createGain(); this.wobD.gain.value = 60; this.wob.connect(this.wobD).connect(this.o.frequency);   // the squeal wavers
+    this.n = snd.band(1500, 2, 'bandpass', p); this.o.start(); this.wob.start(); }
+  set(k: Skid): void { const t = this.snd.ctx.currentTime, a = Math.min(1, k.amount), f = k.kind === 'lock' ? 520 + 180 * k.load : k.kind === 'spin' ? 850 : 1350 + 450 * a + 150 * k.load;
+    this.o.frequency.setTargetAtTime(f, t, 0.05); this.bp.frequency.setTargetAtTime(f * 1.2, t, 0.05); this.wob.frequency.setTargetAtTime(k.kind === 'lock' ? 5 : 9 + a * 6, t, 0.1);
+    const up = a > 0.01 ? 0.03 : 0.08;   // in with the marks, out a moment after them
+    this.g.gain.setTargetAtTime(a * (k.kind === 'spin' ? 0.1 : 0.22), t, up); this.n.g.gain.setTargetAtTime(a * (k.kind === 'spin' ? 0.25 : 0.1), t, up); this.n.f.frequency.setTargetAtTime(k.kind === 'lock' ? 700 : 1600, t, 0.05); } }
 /** one engine */
 export class Voice {
   private osc: OscillatorNode; private sub: OscillatorNode; private lp: BiquadFilterNode; private g: GainNode; private pan: StereoPannerNode; private tick: { g: GainNode; f: BiquadFilterNode }; private tickLfo: OscillatorNode; private tickDepth: GainNode;

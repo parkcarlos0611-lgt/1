@@ -11,7 +11,7 @@ import { MESH_CARS } from '../render/car/meshcars';
 import { Driver } from '../race/driver';
 import { Race, type Entrant } from '../race/race';
 import { Health, WARN } from '../race/health';
-import { Sound } from './sound';
+import { Sound, type Skid } from './sound';
 import specsData from '../data/cars/specs.json';
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -24,7 +24,7 @@ const turning = () => st.chase || st.cine;
 //      low chase and a high fixed view; pixels twice the size, the gauges hidden, bars top and bottom with a caption ----
 const W2c = T.spec.width / 2, CAMS = Array.from({ length: Math.floor(T.length / 380) }, (_, i) => { const s = i * 380 + 60, side = i % 2 ? 1 : -1, p = T.point(s, side * (W2c + 16)); return { s, x: p.x, y: p.y }; });
 let cut = false; let shot: { kind: 'side' | 'chase' | 'top'; cam?: { s: number; x: number; y: number }; until: number } = { kind: 'chase', until: 0 }, shotN = 0;
-let snd: Sound | null = null, lastGear = 1, lastV = 0, wasAir = false; const steam: { x: number; y: number; z: number; r: number; a: number }[] = []; let pilot = new Driver(T), camAng = Math.PI / 2, wheelTurn = 0;   // camAng: the world heading that shows as up the screen let pilot = new Driver(T);
+let snd: Sound | null = null, lastS = 0, lastGear = 1, lastV = 0, wasAir = false; const steam: { x: number; y: number; z: number; r: number; a: number }[] = []; let pilot = new Driver(T), camAng = Math.PI / 2, wheelTurn = 0;   // camAng: the world heading that shows as up the screen let pilot = new Driver(T);
 let car!: Vehicle, sprites!: CarSprites, carId = 'chevAB28', camX = 0, camY = 0, camZ = 0;
 const keys = new Set<string>(), input = { steer: 0, throttle: 0, brake: 0, hand: 0 }; let manualGear = 1;
 const skids: { x: number; y: number; z: number; a: number }[] = [], puffs: { x: number; y: number; z: number; r: number; a: number; vx: number; vy: number }[] = [];
@@ -92,13 +92,21 @@ function sounds() { if (!snd) return; const me = race?.player, keep = new Set<un
   if (race) for (const e of race.cars) { if (e === me) continue; const d = Math.hypot(e.car.x - car.x, e.car.y - car.y); if (d > 220) continue; keep.add(e); const [X] = P(e.car.x, e.car.y, 0);
     snd.voice(e, voiceOf(e.id)).set(e.car.rpm, 0.8, 1 / (1 + (d / 30) ** 2), (X - VW / 2) / (VW / 2), e.car.health.running); }
   snd.dropVoices(keep);
-  const slip = Math.max(...car.slipA.map(a => Math.abs(a) / 0.12), ...car.slipX.map(k => Math.abs(k) / 0.15)); snd.update(car.onGrass.some(Boolean) ? 0 : slip, car.speed, { piece: T.pieceAt(car.s), s: car.s, startDist: Math.abs(T.gap(START, car.s)) });
+  const sk = [0, 1, 2, 3].map(i => skidOf(car, i)), side = (a: Skid, b: Skid): Skid => (a.amount >= b.amount ? { ...a, amount: Math.max(a.amount, b.amount) } : { ...b });
+  let others = 0; if (race) for (const e of race.cars) { if (!e.driver) continue; const d = Math.hypot(e.car.x - car.x, e.car.y - car.y); if (d < 120) for (let i = 0; i < 4; i++) others = Math.max(others, skidOf(e.car, i).amount / (1 + (d / 20) ** 2)); }
+  snd.update({ left: side(sk[0]!, sk[2]!), right: side(sk[1]!, sk[3]!), others }, car.onGrass.filter(Boolean).length / 4, car.speed, { piece: T.pieceAt(car.s), s: car.s, startDist: Math.abs(T.gap(START, car.s)) });
+  // the concrete's joints under the front and then the rear wheels
+  { const J = T.spec.joints, a = Math.floor(car.s / J), b = Math.floor(lastS / J); if (a !== b && car.speed > 4 && !car.onGrass[0]) { snd.hit('joint', Math.min(1, car.speed / 30)); const delay = car.spec.wheelbase / car.speed * 1000; if (delay < 400) setTimeout(() => snd?.hit('joint', Math.min(1, car.speed / 30) * 0.8), delay); } lastS = car.s; }
   if (car.gear !== lastGear) { snd.hit('shift'); lastGear = car.gear; }
   if (Math.abs(car.speed - lastV) > 2.5) snd.hit('knock', Math.min(1.5, Math.abs(car.speed - lastV) / 4)); lastV = car.speed;
   const air = car.airborne.filter(Boolean).length >= 2; if (wasAir && !air && car.speed > 20) snd.hit('thud'); wasAir = air; }
-function marks(c: Vehicle) { for (let i = 0; i < 4; i++) { const sl = Math.max(Math.abs(c.slipX[i]!) / 0.15, Math.abs(c.slipA[i]!) / 0.12); if (sl < 1 || c.airborne[i] || c.onGrass[i]) continue; if (Math.random() > 0.35) continue;
+/** how hard a wheel skids, 0..1: what lays its mark and sounds its squeal; and how (sideways, locked, spinning) */
+function skidOf(c: Vehicle, i: number): Skid { if (c.airborne[i] || c.onGrass[i]) return { amount: 0, kind: 'side', load: 0 }; const sx = c.slipX[i]!, sa = Math.abs(c.slipA[i]!), sl = Math.max(Math.abs(sx) / 0.15, sa / 0.12), a = Math.max(0, Math.min(1, (sl - 1) / 0.6));
+  return { amount: a, kind: sx < -0.3 ? 'lock' : sx > 0.3 ? 'spin' : 'side', load: Math.min(1.5, c.load[i]! / (c.spec.mass * 9.81 / 4)) }; }
+let markTick = 0;
+function marks(c: Vehicle) { markTick++; for (let i = 0; i < 4; i++) { const k = skidOf(c, i), sl = 1 + k.amount * 0.6; if (k.amount <= 0 || markTick % 2) continue;
     const [px, py] = c.wheelAt(i), cy = Math.cos(c.yaw), sy2 = Math.sin(c.yaw), x = c.x + px * cy - py * sy2, y = c.y + px * sy2 + py * cy, q = T.locate(x, y, c.s), z = T.height(q.s, q.off);
-    skids.push({ x, y, z, a: Math.min(0.55, 0.15 * sl) }); if (skids.length > 9000) skids.shift(); if (Math.random() < 0.25) puffs.push({ x, y, z: z + 0.2, r: 0.3, a: 0.35, vx: (Math.random() - 0.5) * 0.6, vy: (Math.random() - 0.5) * 0.6 }); } }
+    skids.push({ x, y, z, a: Math.min(0.6, 0.12 + 0.45 * k.amount) * (k.kind === 'lock' ? 1.2 : 1) }); if (skids.length > 9000) skids.shift(); if (Math.random() < 0.12 * (0.3 + k.amount)) puffs.push({ x, y, z: z + 0.2, r: 0.3, a: 0.35, vx: (Math.random() - 0.5) * 0.6, vy: (Math.random() - 0.5) * 0.6 }); } }
 /** every car in view, the farthest first */
 function drawCars() { if (!race) { drawCar(); return; } const a = (turning() ? camAng : Math.PI / 2) - Math.PI / 2;
   const list = race.cars.map(e => { const c = e.car, z = T.height(c.s, c.off) + c.zb, [X, Y] = P(c.x, c.y, z); return { e, c, X, Y }; }).filter(q => q.X > -150 && q.X < VW + 150 && q.Y > -150 && q.Y < VH + 150).sort((p, q) => p.Y - q.Y);

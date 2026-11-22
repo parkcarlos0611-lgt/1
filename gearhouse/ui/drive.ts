@@ -38,7 +38,7 @@ const SCN = millbrookScenery(T), propSprites = new Map<string, PropSprites>(); c
 const propPic = (kind: string) => { let p = propSprites.get(kind); if (!p) { const f = PROPS[kind]; if (!f) return null; p = new PropSprites(f(), mm, pitchDeg); propSprites.set(kind, p); } return p; };
 let race: Race | null = null; const others = new Map<Entrant, CarSprites>(); let raceSeed = 7;
 
-function choose(id: string) { carId = id; propSprites.clear(); const spec = raceSpec(id), m = MESH_CARS.find(c => c.id === id)!;
+function choose(id: string) { carId = id; propSprites.clear(); broken.clear(); debris.length = 0; const spec = raceSpec(id), m = MESH_CARS.find(c => c.id === id)!;
   car = new Vehicle(spec, T); car.auto = st.auto; car.place(START + 30, 0, 0); manualGear = 1;
   sprites = new CarSprites(m.mesh(), mm, pitchDeg, spec.steerLock * Math.PI / 180, { outline: 3, glass: 0.8 }, matchMedia('(pointer: coarse)').matches ? 1200 : 2400); sprites.prepare([0]); sprites.work(500); sprites.prepare([-1, 1, -2, 2, -3, -4, -5]); camAng = car.yaw;
   pilot = new Driver(T); lapStart = -1; lastLap = 0; bestLap = 0; skids.length = 0; puffs.length = 0; say(`${spec.name} · 출발선 뒤에서 시작`); }
@@ -75,8 +75,8 @@ function drawTrack() {
     // behind a banking, its earth bank falling away to the fields; the fence along both edges
     { const out = T.at((s)).k >= 0 || T.bankAt(s).b ? (T.bankAt(s).b && T.at((T.bankAt(s).b!.s0 + T.bankAt(s).b!.s1) / 2).k < 0 ? 1 : -1) : -1, H = T.height(s, out * W2) - T.bump(s);
       if (H > 0.3) { const q = [T.point(s, out * W2), T.point(s + 1.05, out * W2)], f = [T.point(s + 1.05, out * (W2 + H * 2.4)), T.point(s, out * (W2 + H * 2.4))]; ctx.fillStyle = '#4c6340'; ctx.beginPath(); ctx.moveTo(...P(q[0]!.x, q[0]!.y, H)); ctx.lineTo(...P(q[1]!.x, q[1]!.y, H)); ctx.lineTo(...P(f[0]!.x, f[0]!.y, 0)); ctx.lineTo(...P(f[1]!.x, f[1]!.y, 0)); ctx.closePath(); ctx.fill(); } }
-    for (const o of [-(W2 + 1.5), W2 + 1.5]) { const a = T.point(s, o), b = T.point(s + 1.05, o), za = T.height(s, o) + 0.9, zb = T.height(s + 1.05, o) + 0.9; ctx.strokeStyle = 'rgba(232,227,214,0.9)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(...P(a.x, a.y, za)); ctx.lineTo(...P(b.x, b.y, zb)); ctx.stroke(); }   // the fence's rail
-    if (Math.round(s) % 3 === 0) for (const o of [-(W2 + 1.5), W2 + 1.5]) { const z = T.height(s, o), [X, Y] = P(T.point(s, o).x, T.point(s, o).y, z), [, Yt] = P(T.point(s, o).x, T.point(s, o).y, z + 1); ctx.fillStyle = '#e8e3d6'; ctx.fillRect(Math.round(X), Math.round(Yt), 1, Math.max(1, Math.round(Y - Yt))); }
+    for (const o of [-(W2 + 1.5), W2 + 1.5]) { if (!fenceOk(Math.sign(o), Math.floor(s))) continue; const a = T.point(s, o), b = T.point(s + 1.05, o), za = T.height(s, o) + 0.9, zb = T.height(s + 1.05, o) + 0.9; ctx.strokeStyle = 'rgba(232,227,214,0.9)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(...P(a.x, a.y, za)); ctx.lineTo(...P(b.x, b.y, zb)); ctx.stroke(); }   // the fence's rail
+    if (Math.round(s) % 3 === 0) for (const o of [-(W2 + 1.5), W2 + 1.5]) { if (!fenceOk(Math.sign(o), Math.floor(s))) continue; const z = T.height(s, o), [X, Y] = P(T.point(s, o).x, T.point(s, o).y, z), [, Yt] = P(T.point(s, o).x, T.point(s, o).y, z + 1); ctx.fillStyle = '#e8e3d6'; ctx.fillRect(Math.round(X), Math.round(Yt), 1, Math.max(1, Math.round(Y - Yt))); }
     for (const o of [-W2, W2]) { const a = T.point(s, o), b = T.point(s + 1.05, o); ctx.strokeStyle = '#3b3a35'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(...P(a.x, a.y, a.z)); ctx.lineTo(...P(b.x, b.y, b.z)); ctx.stroke(); } }
   // the start line
   { const a = T.point(START, -W2), b = T.point(START, W2); ctx.strokeStyle = '#f2efe6'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(...P(a.x, a.y, a.z)); ctx.lineTo(...P(b.x, b.y, b.z)); ctx.stroke(); }
@@ -142,7 +142,7 @@ function marks(c: Vehicle) { markTick++; for (let i = 0; i < 4; i++) { const k =
 /** every car in view, the farthest first */
 /** the scenery and the cars together, the farthest first; decks over the track after them all */
 /** what the scene holds this frame, each with its depth (screen Y of its ground point), its picture and where it lands */
-interface Drawn { Y: number; img: HTMLCanvasElement; X0: number; Y0: number; car?: Vehicle; over?: boolean }
+interface Drawn { Y: number; img: HTMLCanvasElement; X0: number; Y0: number; car?: Vehicle; over?: boolean; glints?: [number, number][] }
 function scene(): Drawn[] { const a = (turning() ? camAng : Math.PI / 2) - Math.PI / 2, reach = Math.hypot(VW, VH / SP) * mm / 2000 + 30, out: Drawn[] = [];
   const seen = (x: number, y: number) => Math.abs(x - camX) < reach && Math.abs(y - camY) < reach;
   const prop = (q: Placed) => { if (!seen(q.x, q.y)) return; const ps = propPic(q.kind); if (!ps) return; const [X, Y] = P(q.x, q.y, q.z ?? 0), f = ps.get(q.heading - a);
@@ -150,7 +150,7 @@ function scene(): Drawn[] { const a = (turning() ? camAng : Math.PI / 2) - Math.
   for (const q of SCN.props) prop(q); for (const q of trainCars()) prop(q);
   const cars = race ? race.cars.map(e => ({ c: e.car, sp: e.driver ? others.get(e)! : sprites, turn: e.wheelTurn })) : [{ c: car, sp: sprites, turn: wheelTurn }];
   for (const { c, sp, turn } of cars) { const z = T.height(c.s, c.off) + c.zb, [X, Y] = P(c.x, c.y, z); if (X < -150 || X > VW + 150 || Y < -150 || Y > VH + 150) continue;
-    const f = sp.get(sp.key(c.yaw - a, c.tilt + c.roll * 1.5, c.steer, turn, c.speed)); out.push({ Y: P(c.x, c.y, 0)[1], img: f.canvas, X0: Math.round(X - f.ax), Y0: Math.round(Y - f.ay), car: c }); }
+    const f = sp.get(sp.key(c.yaw - a, c.tilt + c.roll * 1.5, c.steer, turn, c.speed)); out.push({ Y: P(c.x, c.y, 0)[1], img: f.canvas, X0: Math.round(X - f.ax), Y0: Math.round(Y - f.ay), car: c, glints: f.glints }); }
   return out.sort((p, q) => (p.over ? 1 : 0) - (q.over ? 1 : 0) || p.Y - q.Y); }
 const boxes = (a: Drawn, b: Drawn) => a.X0 < b.X0 + b.img.width && b.X0 < a.X0 + a.img.width && a.Y0 < b.Y0 + b.img.height && b.Y0 < a.Y0 + a.img.height;
 const alphas = new WeakMap<HTMLCanvasElement, Uint8Array>();
@@ -165,6 +165,23 @@ const silhouettes = new WeakMap<HTMLCanvasElement, HTMLCanvasElement>();
 function silhouette(img: HTMLCanvasElement): HTMLCanvasElement { let s = silhouettes.get(img); if (s) return s; s = document.createElement('canvas'); s.width = img.width; s.height = img.height; const c = s.getContext('2d')!;
   c.drawImage(img, 0, 0); c.globalCompositeOperation = 'source-in'; c.fillStyle = '#ffe2a8'; c.fillRect(0, 0, s.width, s.height); silhouettes.set(img, s); return s; }
 /** the whole picture: the layer behind (blurred by the camera's motion), the player's car sharp, what stands before it, the hidden cars' outlines */
+// ---- the fence: a car that reaches it smashes a few metres of it into flying pieces ----
+const broken = new Set<string>(), debris: { x: number; y: number; z: number; vx: number; vy: number; vz: number; a: number; va: number; len: number; col: string; life: number }[] = [], sparks: { c: Vehicle; x: number; y: number; t: number; life: number; size: number }[] = [];
+const FENCE = T.spec.width / 2 + 1.5, fenceOk = (side: number, m: number) => !broken.has(`${side}:${((m % Math.round(T.length)) + Math.round(T.length)) % Math.round(T.length)}`);
+function fence(c: Vehicle) { const side = Math.sign(c.off), reach = Math.abs(c.off) + c.spec.track / 2 + 0.3; if (reach < FENCE || Math.abs(c.off) > FENCE + 3) return; const m = Math.floor(c.s); if (!fenceOk(side, m)) return;
+  const sp = Math.hypot(c.vx, c.vy); if (sp < 2) return;
+  for (let k = -2; k <= 3; k++) broken.add(`${side}:${((m + k) % Math.round(T.length) + Math.round(T.length)) % Math.round(T.length)}`);
+  const vxW = c.vx * Math.cos(c.yaw) - c.vy * Math.sin(c.yaw), vyW = c.vx * Math.sin(c.yaw) + c.vy * Math.cos(c.yaw), n = 10 + Math.floor(Math.min(14, sp / 3));
+  for (let k = 0; k < n; k++) { const p = T.point(c.s + (Math.random() - 0.3) * 5, side * FENCE), post = Math.random() < 0.3, f = 0.35 + Math.random() * 0.6;
+    debris.push({ x: p.x, y: p.y, z: T.height(c.s, side * FENCE) + 0.3 + Math.random() * 0.7, vx: vxW * f + (Math.random() - 0.5) * 5, vy: vyW * f + (Math.random() - 0.5) * 5, vz: 2 + Math.random() * sp * 0.22, a: Math.random() * 6, va: (Math.random() - 0.5) * 22, len: post ? 0.9 : 0.6 + Math.random() * 1.6, col: post ? '#d9d2bf' : '#efe9dc', life: 6 + Math.random() * 3 }); }
+  while (debris.length > 160) debris.shift();
+  c.vx *= 0.86; c.vy *= 0.9; c.r += (Math.random() - 0.5) * 0.4;   // the blow costs speed and turns the car a little
+  if (c === car) { snd?.crash(Math.min(1.3, sp / 20)); shake = 4; } else { const d = Math.hypot(c.x - car.x, c.y - car.y); if (d < 120) snd?.crash(Math.min(1, sp / 20) / (1 + (d / 25) ** 2)); } }
+function drawDebris(el: number) { for (let k = debris.length - 1; k >= 0; k--) { const d = debris[k]!; d.life -= el; if (d.life <= 0) { debris.splice(k, 1); continue; }
+    d.vz -= 9.81 * el; d.x += d.vx * el; d.y += d.vy * el; d.z += d.vz * el; d.a += d.va * el; const q = T.locate(d.x, d.y, car.s), floor = Math.abs(q.off) < T.spec.width / 2 ? T.height(q.s, q.off) : 0;
+    if (d.z < floor) { d.z = floor; d.vz = Math.abs(d.vz) * 0.3; d.vx *= 0.6; d.vy *= 0.6; d.va *= 0.6; if (Math.abs(d.vz) < 0.5) { d.vz = 0; d.va *= 0.8; } }
+    const [X, Y] = P(d.x, d.y, d.z), [X2, Y2] = P(d.x + Math.cos(d.a) * d.len, d.y + Math.sin(d.a) * d.len, d.z + Math.sin(d.a * 0.7) * d.len * 0.3);
+    main.globalAlpha = Math.min(1, d.life / 1.5); main.strokeStyle = '#3a352c'; main.lineWidth = 3; main.beginPath(); main.moveTo(X, Y); main.lineTo(X2, Y2); main.stroke(); main.strokeStyle = d.col; main.lineWidth = 1.5; main.beginPath(); main.moveTo(X, Y); main.lineTo(X2, Y2); main.stroke(); main.globalAlpha = 1; } }
 function drawWorld(el: number) { const all = scene(), meI = all.findIndex(d => d.car === car), me = all[meI];
   if (bg.width !== VW || bg.height !== VH) { bg.width = VW; bg.height = VH; } ctx = bgx; bgx.imageSmoothingEnabled = false; drawTrack();
   const front: Drawn[] = []; for (const d of all) { if (d.car === car) continue; if (me && (d.over || d.Y > me.Y) && hits(d, me)) front.push(d); bgx.drawImage(d.img, d.X0, d.Y0); }
@@ -180,6 +197,15 @@ function drawWorld(el: number) { const all = scene(), meI = all.findIndex(d => d
   // a car a building hides: its outline over it, faint
   for (const c of all) { if (!c.car) continue; const hidden = c === me ? front.length > 0 && front.some(d => !d.car) : all.some(d => !d.car && (d.over || d.Y > c.Y) && hits(d, c));
     if (hidden) { main.globalAlpha = c === me ? 0.55 : 0.35; main.drawImage(silhouette(c.img), c.X0 + jx, c.Y0 + jy); main.globalAlpha = 1; } }
+  // sparkles: now and then the light catches a bright point and flashes, more as the car turns and moves
+  const where = new Map(all.filter(d => d.car).map(d => [d.car!, d]));
+  for (const d of all) { if (!d.car || !d.glints?.length) continue; const rate = 0.5 + Math.abs(d.car.r) * 6 + d.car.speed / 25; if (Math.random() < rate * el) { const g = d.glints[Math.floor(Math.random() * d.glints.length)]!; sparks.push({ c: d.car, x: g[0], y: g[1], t: 0, life: 0.18 + Math.random() * 0.2, size: 3 + Math.random() * 4 }); } }
+  main.globalCompositeOperation = 'lighter';
+  for (let k = sparks.length - 1; k >= 0; k--) { const sp = sparks[k]!; sp.t += el; const d = where.get(sp.c); if (sp.t > sp.life || !d) { sparks.splice(k, 1); continue; }
+    const a = Math.sin(sp.t / sp.life * Math.PI), X = d.X0 + sp.x + jx + 0.5, Y = d.Y0 + sp.y + jy + 0.5, r = sp.size * a; main.strokeStyle = `rgba(255,250,230,${a})`; main.lineWidth = 1;
+    main.beginPath(); main.moveTo(X - r, Y); main.lineTo(X + r, Y); main.moveTo(X, Y - r); main.lineTo(X, Y + r); main.stroke(); main.fillStyle = `rgba(255,255,255,${a})`; main.fillRect(Math.round(X) - 1, Math.round(Y) - 1, 2, 2); }
+  main.globalCompositeOperation = 'source-over';
+  drawDebris(el);
   // speed: the edges darken a little
   if (car.speed > 30) { const v = Math.min(1, (car.speed - 30) / 30) * 0.35, g = main.createRadialGradient(VW / 2, VH / 2, VH * 0.35, VW / 2, VH / 2, VW * 0.62); g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, `rgba(0,0,0,${v})`); main.fillStyle = g; main.fillRect(0, 0, VW, VH); } }
 /** the train's pieces where it is on the line (locomotive, tender, three carriages), or none */
@@ -244,7 +270,7 @@ let last = performance.now(), acc = 0;
 function frame(now: number) { const el = Math.min(0.1, (now - last) / 1000); last = now; acc += el; clock += el; msgT -= el;
   while (acc >= DT) { acc -= DT; const u = st.pilot ? pilot.drive(car) : controls(DT);
     if (race) { race.step(DT, u); wheelTurn = race.player!.wheelTurn; if (race.done && !$('results').dataset.shown) results(); } else { car.step(DT, u); wheelTurn += (car.w[0]! + car.w[1]!) / 2 * DT; }
-    for (const c of race ? race.cars.map(e => e.car) : [car]) marks(c);
+    for (const c of race ? race.cars.map(e => e.car) : [car]) { marks(c); fence(c); }
     // lap: forward across the start line
     if (!race && T.gap(prevS, START) > 0 && T.gap(car.s, START) <= 0 && car.vx > 1) { if (lapStart >= 0) { lastLap = clock - lapStart; if (!bestLap || lastLap < bestLap) bestLap = lastLap; say(`한 바퀴 ${fmt(lastLap)}`); } lapStart = clock; }
     prevS = car.s;

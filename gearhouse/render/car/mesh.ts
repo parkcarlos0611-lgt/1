@@ -53,7 +53,8 @@ export function wing(b: Build, path: [number, number, number, number][], hub: [n
     return [at(yi, -t), at(yi, -crown * 0.4), at(ym, crown * 0.6), at(yo, -crown * 0.6), at(yo, -t - crown * 0.6)]; });
   b.loft(rings); }
 
-export interface Pic { w: number; h: number; rgba: Uint8ClampedArray }
+/** glints: pixels where the light catches hardest (a highlight's peak, metal mirroring the bright horizon), for sparkles laid on at run time */
+export interface Pic { w: number; h: number; rgba: Uint8ClampedArray; glints?: number[] }
 const SUN: V = norm([-0.45, 0.35, 0.82]);
 /** The mesh drawn from heading `yaw` (0 = nose to the right) with the camera `pitch` degrees above the ground (0 = from
  *  the side), `mm` millimetres a pixel: flat tones in a few steps, a dark line round the car and between its parts,
@@ -137,6 +138,7 @@ export function drawMesh(M0: Mesh, yaw: number, pitch: number, mm: number, w: nu
   // ---- pass 2: flat tones, then each material's texture, then age ----
   let ymax = 1; for (let i = 1; i < p.length; i += 3) ymax = Math.max(ymax, Math.abs(p[i]!));
   const grain = new Float32Array(M.n * 3); for (let t = 0; t < M.n; t++) { let best = -1; for (let k = 0; k < 3; k++) { const e = sub(vtx(t, (k + 1) % 3), vtx(t, k)), l = len(e); if (l > best) { best = l; grain.set(norm(e), t * 3); } } }   // wood runs along a part's longest edge
+  const glintAt: number[] = [];
   const rusty = new Float32Array(N), isPaint = (i: number) => tri[i]! >= 0 && M.kind[tri[i]!] === PAINT;
   const edgeMM = W.rust ? paintEdges(tri, M, w, h, mm) : null;
   for (let i = 0; i < N; i++) { const t = tri[i]!; if (t < 0) { if (shadow[i]) { rgba[i * 4] = 24; rgba[i * 4 + 1] = 22; rgba[i * 4 + 2] = 20; rgba[i * 4 + 3] = 110; } continue; }
@@ -153,6 +155,7 @@ export function drawMesh(M0: Mesh, yaw: number, pitch: number, mm: number, w: nu
     else if (kd === GRILLE) { const a = ((U + V2) / 26 % 1 + 1) % 1, b = ((U - V2) / 26 % 1 + 1) % 1; if (a < 0.28 || b < 0.28) { cr = 150; cg = 148; cb = 140; } }   // a diamond mesh of bright wire
     const L = lit([cr * tone, cg * tone, cb * tone], n, sun, cam, kd === TYRE || kd === CANVAS || kd === LEATHER ? Math.min(g, 0.25) : g);
     let R = Math.min(255, L.c[0] + L.spec), G = Math.min(255, L.c[1] + L.spec * 0.97), B = Math.min(255, L.c[2] + L.spec * 0.9);
+    if ((g > 0.7 && R + G + B > 640) || L.spec > 60) glintAt.push(i);   // where a sparkle may flash
     // ---- age: the sun takes the paint's gloss and colour, rust comes up low and at the seams and runs down ----
     if (kd === PAINT && W.fade) { const sky = 0.45 + 0.55 * Math.max(0, n[2]), blot = ss(0.3, 0.7, fbm(U / 150, V2 / 150) * 0.75 + fbm(U / 14, V2 / 260) * 0.25 + (W.fade - 0.5) * 0.8);
       const a = Math.min(1, W.fade * sky * (0.3 + 0.7 * blot) * 1.45);
@@ -210,7 +213,9 @@ export function drawMesh(M0: Mesh, yaw: number, pitch: number, mm: number, w: nu
     fill(A, B, C, (i, dd) => { if (dd <= zb[i]!) return; const q = i * 4, da = rgba[q + 3]! / 255, oa = a + da * (1 - a);
       for (let ch = 0; ch < 3; ch++) rgba[q + ch] = (Math.min(255, c[ch]! * k) * a + rgba[q + ch]! * da * (1 - a)) / oa; rgba[q + 3] = oa * 255; }); }
   if (ol > 0) for (let i = 0; i < N; i++) if (e[i] === 2 && gHit[i]) { rgba[i * 4] = rgba[i * 4]! * 0.2; rgba[i * 4 + 1] = rgba[i * 4 + 1]! * 0.2; rgba[i * 4 + 2] = rgba[i * 4 + 2]! * 0.2; rgba[i * 4 + 3] = 255; }   // the outline over a window's edge
-  return { w, h, rgba }; }
+  // a few of the brightest spots, spread over the picture, are kept for sparkles
+  const glints: number[] = []; for (let k = 0; k < glintAt.length && glints.length < 24; k += Math.max(1, Math.floor(glintAt.length / 24))) glints.push(glintAt[k]!);
+  return { w, h, rgba, glints }; }
 
 /** for each painted pixel, how far (mm) it lies from its part's edge on screen: seams and edges rust first */
 function paintEdges(tri: Int32Array, M: Mesh, w: number, h: number, mm: number): Float32Array {

@@ -70,7 +70,7 @@ export class Vehicle {
     if (this.shift <= 0) { if (this.auto) { if (wheelRpm > c.hpRpm * 1.04 && this.gear < c.gears.length) { this.gear++; this.shift = 0.5; } else if (this.gear > 1 && wheelRpm * c.gears[this.gear - 2]! / c.gears[this.gear - 1]! < c.hpRpm * 0.8) { this.gear--; this.shift = 0.5; } }   // down only when the lower gear has room
       else if (u.gear && u.gear !== this.gear) { this.gear = Math.max(1, Math.min(c.gears.length, u.gear)); this.shift = 0.5; } }
     const Gr = c.gears[this.gear - 1]! * c.final, we = this.rpm * Math.PI / 30, wd = (this.w[2]! + this.w[3]!) / 2, idle = c.idle * Math.PI / 30;
-    const thr = this.shift > 0 ? 0 : Math.max(0, Math.min(1, u.throttle)),   // off the throttle through a change
+    const thr = this.shift > 0 ? 0 : Math.max(0, Math.min(1, u.throttle)) * (this.auto && this.rpm > c.redline * 0.98 ? 0.25 : 1),   // off the throttle through a change; the automatic also eases off past the red line (a spinning wheel)
      fric = 0.06 * torqueAt(c, c.torqueRpm) * (0.3 + 0.7 * this.rpm / c.hpRpm);
     const hp = this.health.power, alive = this.health.running;
     const Te = alive ? (this.rpm < c.redline * 1.1 ? thr * torqueAt(c, this.rpm) * hp : 0) - fric * (1 - thr) + (this.rpm < c.idle ? fric * 2 : 0) : -fric * 3 - (this.rpm > 1 ? 30 : 0);   // below idle the hand throttle holds it; a dead engine only drags

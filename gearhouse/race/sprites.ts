@@ -6,7 +6,7 @@ import { drawMesh, type Mesh } from '../render/car/mesh';
 import type { Wear } from '../render/car/wear';
 
 export const HEADINGS = 64, ROLL_STEP = 0.1, ROLL_MAX = 0.6, STEER_STEPS = 2, SPINS = 3, BLUR = 3;
-export interface Frame { canvas: HTMLCanvasElement; ax: number; ay: number }   // ax, ay: where the car's centre ground point is
+export interface Frame { canvas: HTMLCanvasElement; ax: number; ay: number; glints?: [number, number][] }   // ax, ay: where the car's centre ground point is
 type Key = [h: number, r: number, st: number, sp: number];
 export class CarSprites {
   private frames = new Map<string, Frame>(); private queue: Key[] = [];
@@ -19,11 +19,11 @@ export class CarSprites {
     const sp = speed > 8 ? BLUR : ((Math.floor(wheelTurn / (Math.PI * 2 / 36)) % SPINS) + SPINS) % SPINS; return [h, r, st, sp]; }
   private id(k: Key): string { return k.join(':'); }
   private draw([h, r, st, sp]: Key): Frame { const L = this.mesh.length, w = Math.ceil(L * 1.3 / this.mm), hh = Math.ceil(L * 1.15 / this.mm), cy = 0.6;
-    const one = (turn: number) => drawMesh(this.mesh, h * 360 / HEADINGS, this.pitch, this.mm, w, hh, { outline: this.opts.outline, glass: this.opts.glass, wear: this.opts.wear, roll: r * ROLL_STEP, steer: st / STEER_STEPS * this.lock, spin: turn, cy }).rgba;
-    let rgba: Uint8ClampedArray; if (sp === BLUR) { const a = [0, 1, 2].map(k => one(k * Math.PI * 2 / 36 / SPINS * 4)); rgba = new Uint8ClampedArray(a[0]!.length); for (let i = 0; i < rgba.length; i++) rgba[i] = (a[0]![i]! + a[1]![i]! + a[2]![i]!) / 3; }   // the spokes smeared: three turns laid over each other
+    const one = (turn: number) => { const p = drawMesh(this.mesh, h * 360 / HEADINGS, this.pitch, this.mm, w, hh, { outline: this.opts.outline, glass: this.opts.glass, wear: this.opts.wear, roll: r * ROLL_STEP, steer: st / STEER_STEPS * this.lock, spin: turn, cy }); gl = p.glints ?? []; return p.rgba; };
+    let gl: number[] = []; let rgba: Uint8ClampedArray; if (sp === BLUR) { const a = [0, 1, 2].map(k => one(k * Math.PI * 2 / 36 / SPINS * 4)); rgba = new Uint8ClampedArray(a[0]!.length); for (let i = 0; i < rgba.length; i++) rgba[i] = (a[0]![i]! + a[1]![i]! + a[2]![i]!) / 3; }   // the spokes smeared: three turns laid over each other
     else rgba = one(sp * Math.PI * 2 / 36);
     const c = document.createElement('canvas'); c.width = w; c.height = hh; c.getContext('2d')!.putImageData(new ImageData(new Uint8ClampedArray(rgba), w, hh), 0, 0);
-    return { canvas: c, ax: w / 2, ay: hh * cy }; }
+    return { canvas: c, ax: w / 2, ay: hh * cy, glints: gl.map(i => [i % w, Math.floor(i / w)] as [number, number]) }; }
   private take(k: Key): Frame | undefined { const id = this.id(k), f = this.frames.get(id); if (f) { this.frames.delete(id); this.frames.set(id, f); } return f; }   // shown: to the back of the line
   bake(k: Key): Frame { const have = this.take(k); if (have) return have; const f = this.draw(k); this.frames.set(this.id(k), f);
     while (this.frames.size > this.limit) this.frames.delete(this.frames.keys().next().value!); return f; }

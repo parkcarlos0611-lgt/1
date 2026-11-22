@@ -31,6 +31,12 @@ export class Sound {
   hit(kind: 'knock' | 'shift' | 'bang' | 'thud' | 'joint', strength = 1): void { const c = this.ctx, t = c.currentTime, s = c.createBufferSource(); s.buffer = this.noise; s.playbackRate.value = kind === 'bang' ? 0.5 : 1;
     const f = c.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = kind === 'shift' ? 1800 : kind === 'bang' ? 900 : kind === 'joint' ? 260 : 400; const g = c.createGain(); const dur = kind === 'bang' ? 0.9 : kind === 'shift' ? 0.06 : kind === 'joint' ? 0.05 : 0.18;
     g.gain.setValueAtTime(Math.min(1, (kind === 'bang' ? 0.9 : kind === 'shift' ? 0.25 : kind === 'joint' ? 0.12 : 0.6) * strength), t); g.gain.exponentialRampToValueAtTime(0.001, t + dur); s.connect(f).connect(g).connect(this.master); s.start(t); s.stop(t + dur + 0.05); }
+  /** timber breaking: a thump, then a run of cracks and splinters, the bits landing */
+  crash(strength = 1): void { const c = this.ctx, t = c.currentTime, burst = (at: number, f: number, q: number, dur: number, vol: number, type: BiquadFilterType = 'bandpass') => { const s = c.createBufferSource(); s.buffer = this.noise; s.playbackRate.value = 0.7 + Math.random() * 0.6;
+      const fl = c.createBiquadFilter(); fl.type = type; fl.frequency.value = f; fl.Q.value = q; const g = c.createGain(); g.gain.setValueAtTime(0, t + at); g.gain.linearRampToValueAtTime(vol, t + at + 0.004); g.gain.exponentialRampToValueAtTime(0.001, t + at + dur); s.connect(fl).connect(g).connect(this.master); s.start(t + at); s.stop(t + at + dur + 0.05); };
+    const v = Math.min(1.3, strength); burst(0, 180, 0.7, 0.25, 0.9 * v, 'lowpass');                         // the blow
+    for (let k = 0; k < 7; k++) burst(0.01 + Math.random() * 0.12, 1800 + Math.random() * 2600, 3, 0.04 + Math.random() * 0.05, 0.5 * v);   // the timber cracking
+    for (let k = 0; k < 6; k++) burst(0.35 + Math.random() * 0.9, 900 + Math.random() * 900, 4, 0.03, 0.18 * v); }   // pieces landing
   set volume(v: number) { this.master.gain.value = v; }
   close(): void { void this.ctx.close(); }
 }

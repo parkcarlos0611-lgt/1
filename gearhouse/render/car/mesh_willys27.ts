@@ -8,6 +8,7 @@ import { Build, section, wing, type Mesh, type V } from './mesh';
 
 const PAINT = '#55573c', TOPC = '#20211a', WING = '#2b2c30', CANVAS = '#333235', VISOR = '#2a2b26', NICKEL = '#9f9683', WOOD = '#c8742e', GLASS = '#b4b1bc';
 const RUBBER = '#26242b', DARK = '#1c1b20', LENS = '#e6dfc4', RED = '#c22c2b', SEAM = '#35371f';
+const TRIM = '#6b5340', CLOTH = '#9a7a58', LINER = '#2a2520', FLOOR = '#1e1b19', DASH = '#5a3a22', DIAL = '#cfc8b2', FRAME = '#26271f';   // the inside: brown mohair, a dark headliner
 const FX = 653, RX = 3536, R = 390, WY = 711, TW = 135, L = 4322, ZS = 0.89, YS = 0.93;
 const W = 662, BELT = 1179, SILL = 1230, HEAD = 1646, INSET = 22;   // the cabin: half width, belt, the windows' bottom and top, how deep the glass sits
 type Tab = [number, number][];
@@ -31,19 +32,42 @@ const rect = (x: number, w: number, zb: number, zt: number): V[] => [[x, -w, zb]
 /** a roof ring: flat underneath, domed above */
 const dome = (x: number, w: number, zb: number, zt: number, n = 3.4, k = 10): V[] => Array.from({ length: k + 1 }, (_, i) => { const t = i / k * Math.PI, c = Math.cos(t), s = Math.sin(t); return [x, w * Math.sign(c) * Math.abs(c) ** (2 / n), zb + (zt - zb) * s ** (2 / n)] as V; });
 
+// ---- the inside of the cabin (review 83): what shows through the glass ----
+/** an open skin: rings joined as strips, not closed round */
+function strips(b: Build, rings: V[][]) { for (let r = 0; r + 1 < rings.length; r++) { const A = rings[r]!, B = rings[r + 1]!; for (let i = 0; i + 1 < A.length; i++) b.quad(A[i]!, A[i + 1]!, B[i + 1]!, B[i]!); } }
+/** a flat end over a ring */
+function fan(b: Build, R: V[]) { const m: V = [R[0]![0], 0, R.reduce((s, p) => s + p[2], 0) / R.length]; for (let i = 0; i < R.length; i++) b.tri(m, R[i]!, R[(i + 1) % R.length]!); }
+/** a wall along the car from lo(x) up to hi(x), standing at y(x, z), with window holes [x0, x1, z0, z1] */
+function wall(b: Build, xs: number[], y: (x: number, z: number) => number, lo: (x: number) => number, hi: (x: number) => number, holes: readonly (readonly [number, number, number, number])[] = []) {
+  const x0 = xs[0]!, xn = xs[xs.length - 1]!, cut = [...new Set([...xs, ...holes.flatMap(h => [h[0], h[1]])])].filter(x => x >= x0 && x <= xn).sort((a, c) => a - c);
+  for (let i = 0; i + 1 < cut.length; i++) { const a = cut[i]!, c = cut[i + 1]!, h = holes.find(h => h[0] <= a && h[1] >= c), q = (a0: number, c0: number, a1: number, c1: number) => b.quad([a, y(a, a0), a0], [c, y(c, c0), c0], [c, y(c, c1), c1], [a, y(a, a1), a1]);
+    if (h) { q(lo(a), lo(c), h[2], h[2]); q(h[3], h[3], hi(a), hi(c)); } else q(lo(a), lo(c), hi(a), hi(c)); } }
+/** a panel across the car at x, half width w, with a hole [half width, z0, z1] */
+function across(b: Build, x: number, w: number, z0: number, z1: number, hole?: readonly [number, number, number]) { const q = (ya: number, yb: number, za: number, zb: number) => b.quad([x, ya, za], [x, yb, za], [x, yb, zb], [x, ya, zb]);
+  if (!hole) { q(-w, w, z0, z1); return; } const [hw, h0, h1] = hole; q(-w, w, z0, h0); q(-w, w, h1, z1); q(-w, -hw, h0, h1); q(hw, w, h0, h1); }
+/** a side profile ([x, z] points) carried across the car */
+const slab = (b: Build, prof: [number, number][], hw: number) => b.loft([-hw, hw].map(y => prof.map(([x, z]) => [x, y, z] as V)));
+/** a bench seat: its dark base on the floor, the cushion, the raked back; x its front edge, top the cushion's height */
+function seat(b: Build, x: number, floor: number, top: number, hw: number) {
+  b.mat(FLOOR, 0.05).box(x + 30, x + 450, -hw + 20, hw - 20, floor, top - 150);
+  b.mat(CLOTH, 0.15, 'canvas'); slab(b, [[x, top - 150], [x + 470, top - 190], [x + 470, top - 40], [x + 40, top], [x, top - 30]], hw);
+  b.mat(CLOTH, 0.15, 'canvas'); slab(b, [[x + 420, top - 60], [x + 540, top - 80], [x + 600, top + 440], [x + 570, top + 480], [x + 500, top + 470]], hw); }
+
 function tyre(b: Build, axis: 'x' | 'y', o: V, f: number, spin: number) { const rim = R * 0.63, h = TW / 2, p = (u: number, v: number, a: number): V => { const c = Math.cos(a) * v, q = Math.sin(a) * v; return axis === 'y' ? [o[0] + c, o[1] + u, o[2] + q] : [o[0] + u, o[1] + c, o[2] + q]; };
   b.mat(RUBBER, 0.05, 'tyre').lathe(axis, o, [[-h, rim], [-h, R - 45], [-h + 32, R], [h - 32, R], [h, R - 45], [h, rim]], 20, false);
   b.mat(DARK, 0.05).lathe(axis, o, [[f * 0.5, 0], [f * 0.5, rim]], 20, false);                                      // the dark well behind the spokes
   b.mat(PAINT, 0.45, 'paint').lathe(axis, o, [[f, rim + 5], [f * 0.72, rim - 30]], 20, false);                                // the rim, in the body's olive
   b.mat(NICKEL, 0.9, 'metal').lathe(axis, o, [[f * 0.6, 50], [f * 1.3, 40], [f * 1.45, 0]], 10, false);                       // hub cap
-  b.mat('#8d8a72', 0.6); for (let k = 0; k < 20; k++) { const a = spin + k / 20 * Math.PI * 2; b.bar(p(f * 1.05, 42, a), p(f * 0.68, rim - 26, a + (k % 2 ? 0.3 : -0.3)), 10); } }   // wire spokes, crossed
+  b.mat('#8d8a72', 0.6, 'paint'); for (let k = 0; k < 20; k++) { const a = spin + k / 20 * Math.PI * 2; b.bar(p(f * 1.05, 42, a), p(f * 0.68, rim - 26, a + (k % 2 ? 0.3 : -0.3)), 10); } }   // wire spokes, crossed
 
 export function willys27Mesh(spin = 0): Mesh { const b = new Build();
   // ---- the skin: bonnet, scuttle, the body to the belt, cut up over the rear wheel and up the tail ----
   b.mat(PAINT, 0.45, 'paint');
   const xs = [607, 760, 1000, 1200, 1408, 1513, 1640, 1780, 1782, 2400, 3076, 3087, 3137, 3216, 3327, 3463, 3584, 3709, 3821, 3897, 3942, 4007, 4035, 4050];
-  b.loft(xs.map(x => { const s = sec(x); return section(x, s.w, s.zb, s.zt, s.top, s.bot); }));
-  b.mat('#4a4c34', 0.45).loft([1424, 1456].map(x => { const s = sec(x); return section(x, s.w + 7, s.zb, s.zt + 7, s.top, s.bot); }));   // the raised band between bonnet and scuttle
+  b.loft(xs.filter(x => x <= 1780).map(x => { const s = sec(x); return section(x, s.w, s.zb, s.zt, s.top, s.bot); }));
+  const open = (x: number): V[] => { const s = sec(x), r = section(x, s.w, s.zb, s.zt, s.top, s.bot); return [r[8]!, r[9]!, ...r.slice(10), r[0]!, r[1]!]; };   // the body behind the scuttle without its lid: the cabin is hollow
+  { const tub = xs.filter(x => x > 1780).map(open); strips(b, tub); fan(b, tub[0]!); fan(b, tub[tub.length - 1]!); }
+  b.mat('#4a4c34', 0.45, 'paint').loft([1424, 1456].map(x => { const s = sec(x); return section(x, s.w + 7, s.zb, s.zt + 7, s.top, s.bot); }));   // the raised band between bonnet and scuttle
   b.mat(NICKEL, 0.9, 'metal').bar([640, 0, at(TOP, 640) + 3], [1420, 0, at(TOP, 1420) + 3], 14, 8);                                               // the bonnet's centre hinge
   b.mat(SEAM, 0.1); for (const s of [1, -1]) { const q = (x: number, x1: number, z0: number, z1: number) => b.quad([x, s * (skin(x, z0) + 3), z0], [x1, s * (skin(x1, z0) + 3), z0], [x1, s * (skin(x1, z1) + 3), z1], [x, s * (skin(x, z1) + 3), z1]);
     for (let k = 0; k < 20; k++) { const x = 765 + k * 32.5; q(x, x + 11, 700, 985); }                                                    // 20 louvres
@@ -52,25 +76,41 @@ export function willys27Mesh(spin = 0): Mesh { const b = new Build();
     for (const [x, z] of [[1863, 1070], [1863, 750], [3301, 1012]] as const) b.box(x - 16, x + 16, Math.min(s * (W - 2), s * (W + 9)), Math.max(s * (W - 2), s * (W + 9)), z - 36, z + 36);   // hinges
     const y = skin(1644, 1197); b.lathe('x', [0, s * (y + 22), 1197], [[1612, 10], [1622, 28], [1660, 30], [1676, 22]], 8); }                                                              // scuttle lamps
   // ---- the cabin above the belt: solid ends, pillars and rails round the windows, the dark inside, the glass set in ----
-  b.mat(TOPC, 0.45, 'canvas').loft([1780, 1812, 1878, 1916].map(x => rect(x, W, BELT, at(RAIL, x))));
-  b.loft([3766, 3850, 3940, 4000, 4035, 4050].map(x => rect(x, at(HALF, x), BELT, at(RAIL, x))));
+  b.mat(TOPC, 0.45, 'paint');
+  // the cabin's front face: open behind the screen's bay and the narrow panes in the posts
+  const front = (x: number, w: number, zt: number) => { const q = (ya: number, yb: number, za: number, zb: number) => b.quad([x, ya, za], [x, yb, za], [x, yb, zb], [x, ya, zb]);
+    q(-w, w, BELT, 1284); q(-w, w, 1622, zt); for (const s of [1, -1]) { q(s * 495, s * 548, 1284, 1622); q(s * 630, s * w, 1284, 1622); q(s * 548, s * 630, 1284, 1290); q(s * 548, s * 630, 1600, 1622); } };
+  front(1780, W, 1630);
+  for (const s of [1, -1]) { wall(b, [1780, 1812, 1878, 1916], () => s * W, () => BELT, x => at(RAIL, x)); wall(b, [3766, 3850, 3940, 4000, 4035, 4050], x => s * at(HALF, x), () => BELT, x => at(RAIL, x));
+    b.quad([1748, s * 495, 1284], [1780, s * 495, 1284], [1780, s * 495, 1622], [1748, s * 495, 1622]); }                                   // the bay's cheeks, sill and head
+  for (const z of [1284, 1622]) b.quad([1748, -495, z], [1780, -495, z], [1780, 495, z], [1748, 495, z]);
+  strips(b, [1780, 1802].map(x => [[x, -W, at(RAIL, x)], [x, W, at(RAIL, x)]] as V[]));
+  across(b, 4050, at(HALF, 4050), BELT, at(RAIL, 4050), [318, 1372, 1600]);
   for (const s of [1, -1]) { const y0 = Math.min(s * (W - 40), s * W), y1 = Math.max(s * (W - 40), s * W);
     b.box(1916, 3766, y0, y1, BELT, SILL).box(1916, 3766, y0, y1, HEAD, 1708).box(2539, 2695, y0, y1, SILL, HEAD).box(3246, 3363, y0, y1, SILL, HEAD); }
-  b.mat(DARK, 0.05).box(1916, 3766, -(W - 30), W - 30, BELT + 6, 1702);
   for (const s of [1, -1]) { const y = s * (W - INSET);
     b.mat(GLASS, 0.5, 'glass'); for (const [x0, x1] of WIN) b.quad([x0, y, SILL], [x1, y, SILL], [x1, y, HEAD], [x0, y, HEAD]);
     b.mat(WOOD, 0.3, 'wood'); for (const [x0, x1] of WIN) { const yw = s * (W - 8), a = 12; b.bar([x0, yw, SILL + a], [x1, yw, SILL + a], 24).bar([x0, yw, HEAD - a], [x1, yw, HEAD - a], 24).bar([x0 + a, yw, SILL], [x0 + a, yw, HEAD], 24).bar([x1 - a, yw, SILL], [x1 - a, yw, HEAD], 24); } }
   // the back window: two panes in a wood frame
-  b.mat(DARK, 0.05).box(4046, 4052, -330, 330, 1360, 1612);
   b.mat(GLASS, 0.5, 'glass').quad([4054, -316, 1374], [4054, 316, 1374], [4054, 316, 1598], [4054, -316, 1598]);
   b.mat(WOOD, 0.3, 'wood').bar([4056, -328, 1372], [4056, 328, 1372], 24).bar([4056, -328, 1600], [4056, 328, 1600], 24).bar([4056, -317, 1362], [4056, -317, 1610], 24).bar([4056, 317, 1362], [4056, 317, 1610], 24);
   b.mat(DARK, 0.05).bar([4056, 0, 1384], [4056, 0, 1588], 18);
   // the windscreen standing ahead of the corner posts: wood frame, two panes; the narrow panes in the posts
-  b.mat(DARK, 0.05).box(1750, 1780, -495, 495, 1284, 1622);
   b.mat(GLASS, 0.5, 'glass').quad([1748, -482, 1300], [1748, 482, 1300], [1748, 482, 1606], [1748, -482, 1606]);
   b.mat(WOOD, 0.3, 'wood').bar([1744, -505, 1289], [1744, 505, 1289], 26).bar([1744, -505, 1616], [1744, 505, 1616], 26).bar([1744, -492, 1278], [1744, -492, 1628], 26).bar([1744, 492, 1278], [1744, 492, 1628], 26);
-  b.mat(TOPC, 0.3, 'canvas').bar([1742, 0, 1300], [1742, 0, 1606], 24);
+  b.mat(FRAME, 0.3).bar([1742, 0, 1300], [1742, 0, 1606], 24);
   b.mat(GLASS, 0.5, 'glass'); for (const s of [1, -1]) b.quad([1778, s * 548, 1290], [1778, s * 630, 1290], [1778, s * 630, 1600], [1778, s * 548, 1600]);
+  // ---- the inside: floor, toe board and dash, the panels' inner faces, headliner, seats, the shelf behind the rear seat ----
+  { const fl = (x: number) => Math.max(at(BOT, x), 572) + 6, hw = (x: number) => at(HALF, Math.max(x, 1780)) - 44, e = (x: number) => at(RAIL, x) - 4, LX = [1786, 1916, 2400, 3076, 3400, 3766, 3850, 3940, 4000, 4022];
+    b.mat(FLOOR, 0.05); strips(b, [1784, 3076, 3087, 3137, 3216, 3327, 3463, 3584, 3709, 3821, 3897, 3942, 4007, 4040].map(x => [[x, -hw(x) - 14, fl(x)], [x, hw(x) + 14, fl(x)]] as V[]));
+    across(b, 1780 + 4, 662 - 20, 572, 1284);                                                                    // the toe board
+    b.mat(DASH, 0.3, 'wood').box(1780 + 6, 1780 + 42, -662 + 46, 662 - 46, 1060, 1284);                                  // the dash's back face
+    b.mat(DIAL, 0.3).box(1780 + 42, 1780 + 46, -170, 170, 1060 + 50, 1284 - 50);                                                      // its instrument board
+    b.mat(TRIM, 0.12, 'canvas'); for (const s of [1, -1]) wall(b, LX, x => s * hw(x), fl, e, WIN.map(([x0, x1]) => [x0, x1, SILL, HEAD] as const));
+    front(1786, W - 44, e(1786)); across(b, 4022, hw(4022), 1340, e(4022), [318, 1372, 1600]);
+    strips(b, [3830, ...LX.filter(x => x > 3830)].map(x => [[x, -hw(x), 1340], [x, hw(x), 1340]] as V[]));   // the parcel shelf
+    b.mat(LINER, 0.05, 'canvas'); strips(b, [1786, 1812, 1878, 2571, 3882, 3980, 4022].map(x => [[x, -hw(x) - 6, e(x)], [x, hw(x) + 6, e(x)]] as V[]));   // the headliner
+    seat(b, 2010, 572, 930, 600); seat(b, 3830 - 580, 572, 960, 570); }
   // the roof: a cloth cap over the body's outline, the peak (visor) ahead of it
   b.mat(CANVAS, 0.15, 'canvas').loft([1800, 1872, 1977, 2571, 3008, 3585, 3809, 3933, 4007, 4041, 4052].map(x => dome(x, at(HALF, Math.max(x, 1780)) + 6, at(RAIL, x), at(ROOF, x))));
   b.mat(VISOR, 0.15, 'canvas').loft(([[1560, 565, 1593, 1620], [1607, 575, 1591, 1668], [1731, 605, 1622, 1734], [1800, 635, 1645, 1756], [1879, 645, 1703, 1774]] as const).map(([x, w, zb, zt]) => rect(x, w, zb, zt)));
@@ -100,7 +140,7 @@ export function willys27Mesh(spin = 0): Mesh { const b = new Build();
     tyre(b, 'y', [FX, s * WY, R], s * (TW / 2), spin); tyre(b, 'y', [RX, s * WY, R], s * (TW / 2), spin); }
   // ---- across the car: lamp bar, bumpers (two bars front and rear), axles, the dark under the car ----
   b.mat(NICKEL, 0.9, 'metal').box(322, 348, -425, 425, 836, 862).box(4, 40, -735, 735, 447, 504).box(4, 40, -735, 735, 354, 411).box(4284, 4320, -745, 745, 463, 520).box(4284, 4320, -745, 745, 370, 427);
-  b.mat(DARK, 0.05).box(200, 610, -330, 330, 400, 520).box(600, 1130, -330, 330, 380, 575).box(1125, 3071, -640, 640, 300, 572).box(3071, 3935, -560, 560, 380, 900).box(3935, 4040, -560, 560, 370, 700)
+  b.mat(DARK, 0.05).box(200, 610, -330, 330, 400, 520).box(600, 1130, -330, 330, 380, 575).box(1125, 3071, -640, 640, 300, 572).box(3071, 3200, -560, 560, 380, 600).box(3200, 3935, -560, 560, 380, 800).box(3935, 4040, -560, 560, 370, 700)
     .bar([FX, -WY, R], [FX, WY, R], 60).bar([RX, -WY, R], [RX, WY, R], 80).box(3960, 4078, -90, 90, 690, 900);
   // ---- the spare on the back ----
   tyre(b, 'x', [4142, 0, 798], TW / 2, 0);

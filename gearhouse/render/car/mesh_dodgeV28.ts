@@ -6,6 +6,8 @@ import { Build, section, wing, type Mesh, type V } from './mesh';
 
 const PAINT = '#2b3f61', BAND = '#44597a', TOP = '#2c2c30', CANVAS = '#313136', WING = '#45454d', CHROME = '#c4c5c8', NICKEL = '#b9b6b0', WOOD = '#5a463a', ALU = '#8c8a8a';
 const GLASS = '#5d6870', SHINE = '#b7bdc5', RUBBER = '#26242b', DARK = '#1c1b20', LENS = '#e6dfc4', RED = '#c22c2b', SEAM = '#16203a';
+const TRIM = '#5c626d', CLOTH = '#8b919b', LINER = '#26262a', FLOOR = '#1d1c1f', DASH = '#4a3526', DIAL = '#c9c7c0', FRAME = '#33333a';   // the inside: blue-grey broadcloth, a dark headliner
+const WINS = [[1797, 2323, 1280, 1613], [2560, 3050, 1280, 1613], [3265, 3563, 1280, 1613]] as const;   // the three side windows
 const FX = 565, RX = 3429, R = 376, WY = 711, TW = 150, L = 4225, BELT = 1236, SILL = 610, SW = 0.9;
 /** linear reading of a table of [x, value] */
 const at = (tab: [number, number][], x: number) => { if (x <= tab[0]![0]) return tab[0]![1]; for (let i = 1; i < tab.length; i++) if (x <= tab[i]![0]) { const [x0, v0] = tab[i - 1]!, [x1, v1] = tab[i]!; return v0 + (v1 - v0) * (x - x0) / (x1 - x0); } return tab[tab.length - 1]![1]; };
@@ -22,17 +24,40 @@ const bodyBottom = (x: number) => Math.max(x > 3760 ? 650 : SILL, R + Math.sqrt(
 const roofEdge = (x: number) => Math.min(1690, at(ROOF_T, x) - 12);
 /** a ring from its left half, bottom to top ([y, z] pairs), mirrored to the right */
 const ring = (x: number, half: [number, number][]): V[] => [...half.map(([y, z]) => [x, y, z] as V), ...half.slice().reverse().map(([y, z]) => [x, -y, z] as V)];
+/** a roof ring: flat underneath (the roof's edge), domed above */
+const dome = (x: number, w: number, zb: number, zt: number, n = 4.2, k = 8): V[] => Array.from({ length: k + 1 }, (_, i) => { const t = i / k * Math.PI, c = Math.cos(t), s = Math.sin(t); return [x, w * Math.sign(c) * Math.abs(c) ** (2 / n), zb + (zt - zb) * s ** (2 / n)] as V; });
 /** the body side's y at height z (a little tumblehome above the belt) */
 const sideY = (x: number, z: number) => at(BODY_W, x) - (z > BELT ? 22 * (z - BELT) / (1690 - BELT) : 0);
+
+// ---- the inside of the cabin (review 83): what shows through the glass ----
+/** an open skin: rings joined as strips, not closed round */
+function strips(b: Build, rings: V[][]) { for (let r = 0; r + 1 < rings.length; r++) { const A = rings[r]!, B = rings[r + 1]!; for (let i = 0; i + 1 < A.length; i++) b.quad(A[i]!, A[i + 1]!, B[i + 1]!, B[i]!); } }
+/** a flat end over a ring */
+function fan(b: Build, R: V[]) { const m: V = [R[0]![0], 0, R.reduce((s, p) => s + p[2], 0) / R.length]; for (let i = 0; i < R.length; i++) b.tri(m, R[i]!, R[(i + 1) % R.length]!); }
+/** a wall along the car from lo(x) up to hi(x), standing at y(x, z), with window holes [x0, x1, z0, z1] */
+function wall(b: Build, xs: number[], y: (x: number, z: number) => number, lo: (x: number) => number, hi: (x: number) => number, holes: readonly (readonly [number, number, number, number])[] = []) {
+  const x0 = xs[0]!, xn = xs[xs.length - 1]!, cut = [...new Set([...xs, ...holes.flatMap(h => [h[0], h[1]])])].filter(x => x >= x0 && x <= xn).sort((a, c) => a - c);
+  for (let i = 0; i + 1 < cut.length; i++) { const a = cut[i]!, c = cut[i + 1]!, h = holes.find(h => h[0] <= a && h[1] >= c), q = (a0: number, c0: number, a1: number, c1: number) => b.quad([a, y(a, a0), a0], [c, y(c, c0), c0], [c, y(c, c1), c1], [a, y(a, a1), a1]);
+    if (h) { q(lo(a), lo(c), h[2], h[2]); q(h[3], h[3], hi(a), hi(c)); } else q(lo(a), lo(c), hi(a), hi(c)); } }
+/** a panel across the car at x, half width w, with a hole [half width, z0, z1] */
+function across(b: Build, x: number, w: number, z0: number, z1: number, hole?: readonly [number, number, number]) { const q = (ya: number, yb: number, za: number, zb: number) => b.quad([x, ya, za], [x, yb, za], [x, yb, zb], [x, ya, zb]);
+  if (!hole) { q(-w, w, z0, z1); return; } const [hw, h0, h1] = hole; q(-w, w, z0, h0); q(-w, w, h1, z1); q(-w, -hw, h0, h1); q(hw, w, h0, h1); }
+/** a side profile ([x, z] points) carried across the car */
+const slab = (b: Build, prof: [number, number][], hw: number) => b.loft([-hw, hw].map(y => prof.map(([x, z]) => [x, y, z] as V)));
+/** a bench seat: its dark base on the floor, the cushion, the raked back; x its front edge, top the cushion's height */
+function seat(b: Build, x: number, floor: number, top: number, hw: number) {
+  b.mat(FLOOR, 0.05).box(x + 30, x + 450, -hw + 20, hw - 20, floor, top - 150);
+  b.mat(CLOTH, 0.15, 'canvas'); slab(b, [[x, top - 150], [x + 470, top - 190], [x + 470, top - 40], [x + 40, top], [x, top - 30]], hw);
+  b.mat(CLOTH, 0.15, 'canvas'); slab(b, [[x + 420, top - 60], [x + 540, top - 80], [x + 600, top + 440], [x + 570, top + 480], [x + 500, top + 470]], hw); }
 
 function tyre(b: Build, axis: 'x' | 'y', o: V, f: number) { const rim = 244, h = TW / 2;
   b.mat(RUBBER, 0.05, 'tyre').lathe(axis, o, [[-h, rim], [-h, R - 50], [-h + 36, R], [h - 36, R], [h, R - 50], [h, rim]], 20, false);
   b.mat(DARK, 0.05).lathe(axis, o, [[f * 0.4, 0], [f * 0.4, rim]], 20, false);                                       // the dark behind the spokes
-  b.mat(PAINT, 0.45, 'paint').lathe(axis, o, [[f * 0.94, rim + 2], [f * 0.55, rim - 36]], 20, false).lathe(axis, o, [[f * 0.5, 96], [f * 1.0, 80], [f * 1.0, 0]], 12, false);   // the painted felloe and hub
+  b.mat(PAINT, 0.45, 'wood').lathe(axis, o, [[f * 0.94, rim + 2], [f * 0.55, rim - 36]], 20, false); b.mat(PAINT, 0.45, 'paint').lathe(axis, o, [[f * 0.5, 96], [f * 1.0, 80], [f * 1.0, 0]], 12, false);   // the painted felloe and hub
   b.mat(CHROME, 0.9, 'metal').lathe(axis, o, [[f, rim + 12], [f * 0.94, rim + 1]], 20, false);                                  // the thin bright ring
   b.mat(NICKEL, 0.9, 'metal').lathe(axis, o, [[f * 1.0, 52], [f * 1.5, 44], [f * 1.6, 0]], 10, false); }                        // the nickel cap
 /** twelve wooden spokes: wide flat bars, painted */
-function spokes(b: Build, axis: 'x' | 'y', o: V, f: number, spin = 0) { b.mat(PAINT, 0.45, 'paint');
+function spokes(b: Build, axis: 'x' | 'y', o: V, f: number, spin = 0) { b.mat(PAINT, 0.45, 'wood');
   for (let k = 0; k < 12; k++) { const a = spin + k / 12 * Math.PI * 2, c = Math.cos(a), q = Math.sin(a), p = (r: number, d: number): V => axis === 'y' ? [o[0] + c * r, o[1] + d, o[2] + q * r] : [o[0] + d, o[1] + c * r, o[2] + q * r]; b.bar(p(70, f * 0.8), p(222, f * 0.62), axis === 'y' ? 40 : 22, axis === 'y' ? 22 : 40); } }
 function wheel(b: Build, x: number, s: 1 | -1, spin = 0) { const o: V = [x, s * WY, R], f = s * (TW / 2); tyre(b, 'y', o, f); spokes(b, 'y', o, f, spin); }
 /** a window in the body side: the pane a little proud of the skin, a pale reflection across its top corner, a wood garnish frame round it */
@@ -44,17 +69,31 @@ function sideWindow(b: Build, s: 1 | -1, x0: number, x1: number, z0: number, z1:
 export function mesh(spin = 0): Mesh { const b = new Build();
   // ---- bonnet and scuttle, the body to the belt, the cabin above it, the cloth roof, the visor ----
   b.mat(PAINT, 0.45, 'paint').loft([560, 660, 760, 960, 1170, 1385, 1401, 1500, 1640].map(x => section(x, at(NOSE_W, x), at(NOSE_B, x), at(NOSE_T, x), x < 1385 ? 3.6 + (x - 560) / 900 : 4.5, 6)));
-  b.loft(BX.map(x => { const w = at(BODY_W, x), zb = bodyBottom(x); return ring(x, [[w - 60, zb], [w, zb + 45], [w, BELT]]); }));
-  b.mat(BAND, 0.45, 'paint').loft(BX.map(x => { const w = at(BODY_W, x) + 7; return ring(x, [[w, at(BAND0, x)], [w, at(BAND1, x)]]); }));       // the broad belt moulding, sweeping up round the back
-  b.mat(TOP, 0.35, 'canvas').loft(BX.map(x => { const w = at(BODY_W, x), e = roofEdge(x); return ring(x, [[w, BELT], [w - 22, e]]); }));
-  b.mat(CANVAS, 0.12, 'canvas').loft([1640, 1727, 1953, 2250, 2511, 3100, 3780, 3866, 3893, 3900].map(x => { const e = roofEdge(x), t = at(ROOF_T, x); return section(x, at(BODY_W, x) - 2, 2 * e - t, t, 4.2, 4.2, 16); }));
-  b.loft(([[1546, 560, 1642, 1660], [1640, 600, 1632, 1722], [1727, 640, 1697, 1754]] as const).map(([x, w, z0, z1]) => [[x, -w, z0], [x, w, z0], [x, w, z1], [x, -w, z1]] as V[]));
+  { const tub = BX.map(x => { const w = at(BODY_W, x), zb = bodyBottom(x); return [[x, w, BELT], [x, w, zb + 45], [x, w - 60, zb], [x, -(w - 60), zb], [x, -w, zb + 45], [x, -w, BELT]] as V[]; });   // open above: the cabin is hollow
+    strips(b, tub); fan(b, tub[0]!); fan(b, tub[tub.length - 1]!); }
+  b.mat(BAND, 0.45, 'paint'); for (const s of [1, -1]) wall(b, BX, x => s * (at(BODY_W, x) + 7), x => at(BAND0, x), x => at(BAND1, x));           // the broad belt moulding, sweeping up round the back
+  across(b, 3902, at(BODY_W, 3900) + 7, at(BAND0, 3900), at(BAND1, 3900));
+  b.mat(TOP, 0.35, 'paint'); for (const s of [1, -1]) wall(b, BX, (x, z) => s * sideY(x, z), () => BELT, roofEdge, WINS);
+  across(b, 1640, at(BODY_W, 1640) - 10, BELT, roofEdge(1640), [470, 1326, 1650]); across(b, 3900, at(BODY_W, 3900), BELT, roofEdge(3900), [292, 1354, 1540]);
+  b.mat(CANVAS, 0.12, 'canvas').loft([1640, 1727, 1953, 2250, 2511, 3100, 3780, 3866, 3893, 3900].map(x => dome(x, at(BODY_W, x) - 2, roofEdge(x), at(ROOF_T, x))));
+  // ---- the inside: floor, toe board and dash, the panels' inner faces, headliner, seats, the shelf behind the rear seat ----
+  { const fl = (x: number) => Math.max(bodyBottom(x), 640) + 6, IX = BX.filter(x => x > 1640 + 20 && x < 3872 - 10), e = (x: number) => roofEdge(x) - 3;
+    b.mat(FLOOR, 0.05); strips(b, [1640 + 4, ...IX, 3872].map(x => { const w = at(BODY_W, x) - 20; return [[x, -w, fl(x)], [x, w, fl(x)]] as V[]; }));
+    across(b, 1640 + 5, 598 - 16, 640, 1310);                                                                    // the toe board
+    b.mat(DASH, 0.3, 'wood').box(1640 + 7, 1640 + 44, -598 + 30, 598 - 30, 1090, 1310);                                  // the dash's back face
+    b.mat(DIAL, 0.3).box(1640 + 44, 1640 + 48, -170, 170, 1090 + 50, 1310 - 50);                                                      // its instrument board
+    b.mat(TRIM, 0.12, 'canvas'); for (const s of [1, -1]) wall(b, [1640 + 9, ...IX, 3872], (x, z) => s * (sideY(x, z) - 28), fl, e, WINS);
+    across(b, 1640 + 9, 598 - 28, 1310, e(1640 + 9), [470, 1326, 1650]); across(b, 3872, at(BODY_W, 3872) - 28, 1325, e(3872), [292, 1354, 1540]);
+    strips(b, [3700, ...IX.filter(x => x > 3700), 3872].map(x => { const w = at(BODY_W, x) - 28; return [[x, -w, 1325], [x, w, 1325]] as V[]; }));   // the parcel shelf
+    b.mat(LINER, 0.05, 'canvas'); strips(b, [1640 + 9, ...IX, 3872].map(x => { const w = at(BODY_W, x) - 26; return [[x, -w, e(x)], [x, w, e(x)]] as V[]; }));   // the headliner
+    seat(b, 1900, 640, 1000, 615); seat(b, 3700 - 580, 640, 1010, 585); }
+  b.mat(CANVAS, 0.12, 'canvas').loft(([[1546, 560, 1642, 1660], [1640, 600, 1632, 1722], [1727, 640, 1697, 1754]] as const).map(([x, w, z0, z1]) => [[x, -w, z0], [x, w, z0], [x, w, z1], [x, -w, z1]] as V[]));
   // ---- glass: the screen, three windows a side, the back light ----
   b.mat(GLASS, 0.5, 'glass').quad([1632, -470, 1326], [1632, 470, 1326], [1632, 470, 1650], [1632, -470, 1650]);
   b.mat(SHINE, 0.5, 'shine').quad([1630, 120, 1640], [1630, 410, 1640], [1630, 410, 1500], [1630, 260, 1400]);
-  b.mat(TOP, 0.3, 'canvas').bar([1630, -488, 1314], [1630, 488, 1314], 16, 24).bar([1630, -484, 1314], [1630, -484, 1660], 16, 26).bar([1630, 484, 1314], [1630, 484, 1660], 16, 26);
+  b.mat(FRAME, 0.3).bar([1630, -488, 1314], [1630, 488, 1314], 16, 24).bar([1630, -484, 1314], [1630, -484, 1660], 16, 26).bar([1630, 484, 1314], [1630, 484, 1660], 16, 26);
   b.mat(CHROME, 0.9, 'metal').bar([1620, 300, 1636], [1620, 240, 1500], 10);                                                    // the wiper
-  for (const s of [1, -1] as const) { sideWindow(b, s, 1797, 2323, 1280, 1613); sideWindow(b, s, 2560, 3050, 1280, 1613); sideWindow(b, s, 3265, 3563, 1280, 1613); }
+  for (const s of [1, -1] as const) for (const [x0, x1, z0, z1] of WINS) sideWindow(b, s, x0, x1, z0, z1);
   b.mat(GLASS, 0.5, 'glass').quad([3906, -292, 1354], [3906, 292, 1354], [3906, 292, 1540], [3906, -292, 1540]);
   b.mat(SHINE, 0.5, 'shine').quad([3908, -250, 1530], [3908, -40, 1530], [3908, -150, 1420], [3908, -250, 1450]);
   b.mat(WOOD, 0.25, 'wood').bar([3908, -306, 1340], [3908, 306, 1340], 14, 28).bar([3908, -306, 1554], [3908, 306, 1554], 14, 28).bar([3908, -306, 1340], [3908, -306, 1554], 14, 28).bar([3908, 306, 1340], [3908, 306, 1554], 14, 28);
@@ -79,7 +118,7 @@ export function mesh(spin = 0): Mesh { const b = new Build();
     wing(b, side([[2800, 410, 620, 868], [2849, 556, 625, 874], [2891, 693, 625, 880], [2960, 804, 625, 880], [3038, 882, 625, 880], [3140, 934, 625, 880], [3265, 961, 625, 880], [3377, 964, 625, 880], [3492, 944, 625, 880], [3606, 896, 625, 880], [3699, 818, 620, 878], [3770, 715, 610, 872], [3834, 604, 600, 860], [3946, 377, 570, 800], [4004, 322, 560, 740]]), [RX, R - 200]);
     b.mat(ALU, 0.4, 'metal').box(1600, 2816, Math.min(s * 610, s * 866), Math.max(s * 610, s * 866), 352, 404);
     b.mat(CHROME, 0.9, 'metal').box(1640, 2812, Math.min(s * 862, s * 877), Math.max(s * 862, s * 877), 350, 410);
-    b.mat(DARK, 0.3).lathe('x', [0, s * 385, 996], [[330, 124], [400, 120], [450, 92], [486, 50], [492, 0]], 14);                              // the drum lamp: black bowl
+    b.mat(DARK, 0.3, 'paint').lathe('x', [0, s * 385, 996], [[330, 124], [400, 120], [450, 92], [486, 50], [492, 0]], 14);                              // the drum lamp: black bowl
     b.mat(CHROME, 0.9, 'metal').lathe('x', [0, s * 385, 996], [[296, 112], [296, 128], [336, 130], [342, 122]], 14, false);                            // its deep bright rim
     b.mat(LENS, 0.6, 'lens').lathe('x', [0, s * 385, 996], [[292, 0], [298, 112]], 14, false);
     b.mat(DARK, 0.05).bar([410, s * 385, 880], [410, s * 385, 832], 50).bar([420, s * 372, 820], [450, s * 340, 660], 34).bar([70, s * 300, 440], [360, s * 330, 480], 30);   // lamp stand, bumper iron

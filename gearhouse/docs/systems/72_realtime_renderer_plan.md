@@ -83,3 +83,14 @@ gloss, chrome 0.12, rubber 0.9, canvas 0.95...). The page has a selector and a s
   moves with them), in the world's on the ground; each at its real tile size. The albedo is used for its light and dark
   only, so the game keeps its own colours; roughness and normals as drawn. Each material its strength (paint and chrome
   barely; wood, leather and canvas fully).
+
+## PBR, step 3 (review 104): age in the material's terms
+Per car, rust, fading and dirt (0..1), in the live shader, by noise in the car's own axes (it stays put on the car):
+- Fading: most on what faces the sky; the clear coat goes, the paint pales and greys, roughness rises; a fine net of
+  cracks when far gone.
+- Rust on paint: low on the car (by its own height) and in patches; the scale rough, not metallic, its surface bumpy;
+  primer round its edge; streaks running down below it on the sides.
+- Bright metal: a milky film, then pitting through the plate (the nickel, then rust).
+- Dirt: thrown up low on the body and the wheels, dust settling on what faces up; dull and rough.
+The page sets the player's car's age; its dirt grows as it is driven (fast on the grass), a wash takes it off; the
+others in a race carry a mixed, fixed age.

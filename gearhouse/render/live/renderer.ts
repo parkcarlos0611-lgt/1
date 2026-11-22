@@ -12,7 +12,7 @@ import type { Mesh } from '../car/mesh';
 export interface LiveView { x: number; y: number; z: number; /** the world heading that points up the screen */ ang: number; pitch: number; mm: number; W: number; H: number; /** the target's height on the screen (0 top .. 1 bottom) */ cy: number }
 /** a tyre's shape this moment (review 101): its ring's give at 32 angles from straight down toward the front (m), the patch's shift (m, along and across) */
 export interface LiveTyre { u: Float32Array; sx: number; sy: number }
-export interface LiveCar { /** FL FR RL RR */ tyres?: LiveTyre[]; g: GpuMesh; x: number; y: number; z: number; yaw: number; roll: number; pitch: number; /** each front wheel's own angle (rad, left +): the inner one more */ steerL: number; steerR: number; spin: number; player: boolean }
+export interface LiveCar { /** age: rust, fading, dirt (0..1) (review 104) */ wear?: [number, number, number]; /** FL FR RL RR */ tyres?: LiveTyre[]; g: GpuMesh; x: number; y: number; z: number; yaw: number; roll: number; pitch: number; /** each front wheel's own angle (rad, left +): the inner one more */ steerL: number; steerR: number; spin: number; player: boolean }
 export interface LiveProp { g: GpuMesh; x: number; y: number; z: number; h: number }
 export interface Skid { x: number; y: number; z: number; a: number }
 
@@ -77,7 +77,13 @@ const OBJ_FS = `#version 300 es
 precision highp float;
 ${LIGHT}
 in vec3 vWorld, vObj; flat in vec3 vN, vObjN, vCol; flat in float vGloss, vKind, vPart;
-uniform mat4 uModel; uniform vec3 uEye, uSun; uniform vec2 uObj; uniform float uOutline; uniform int uMode; uniform vec4 uSil; uniform float uGlass;
+uniform mat4 uModel; uniform vec3 uEye, uSun; uniform vec2 uObj; uniform vec3 uWear; uniform float uObjZ, uCarH;
+// ---- age (review 104), the 2D wear system's rules in the material's terms: noise in the thing's own axes ----
+float h3(vec3 p) { p = fract(p * 0.3183099 + 0.1); p *= 17.; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
+float vnoise(vec3 x) { vec3 i = floor(x), f = fract(x); f = f * f * (3. - 2. * f);
+  return mix(mix(mix(h3(i), h3(i + vec3(1, 0, 0)), f.x), mix(h3(i + vec3(0, 1, 0)), h3(i + vec3(1, 1, 0)), f.x), f.y), mix(mix(h3(i + vec3(0, 0, 1)), h3(i + vec3(1, 0, 1)), f.x), mix(h3(i + vec3(0, 1, 1)), h3(i + vec3(1, 1, 1)), f.x), f.y), f.z); }
+float fbm(vec3 p) { float a = 0.5, s = 0.; for (int i = 0; i < 4; i++) { s += a * vnoise(p); p *= 2.03; a *= 0.5; } return s / 0.9375; }
+vec3 rustAt(float t) { vec3 R[6] = vec3[6](vec3(184, 104, 46), vec3(156, 80, 34), vec3(126, 60, 26), vec3(92, 42, 20), vec3(60, 30, 16), vec3(40, 21, 12)); float k = clamp(t, 0., 1.) * 4.999; int i = int(k); return mix(R[i], R[min(5, i + 1)], fract(k)) / 255.; } uniform float uOutline; uniform int uMode; uniform vec4 uSil; uniform float uGlass;
 uniform int uDecN; uniform vec3 uDecO[4], uDecN_[4], uDecUp[4]; uniform float uDecR[4]; uniform sampler2D uDecTex;
 layout(location=0) out vec4 oCol; layout(location=1) out vec4 oId;
 void main() {
@@ -106,7 +112,26 @@ void main() {
     else if (kind == 8) { L = 4; sa = 0.7; sn = 0.8; sr = 0.6; } else if (kind == 7) { L = 5; sa = 0.6; sn = 0.9; sr = 0.5; } else if (kind == 6) { L = 6; sa = 0.9; sn = 0.6; sr = 0.6; } else if (kind == 0) { L = 0; sa = 0.35; sn = 0.3; sr = 0.3; }
     vec3 no = vObjN; if (dot(normalize(mat3(uModel) * no), uEye) < 0.) no = -no;
     Detail dt = detail(L, vObj / 1000., no, sa, sn, sr); vec3 nw = normalize(mat3(uModel) * dt.n); if (dot(nw, uEye) < 0.) nw = n;
-    oCol = vec4(present(pbr(base * dt.tone, nw, uEye, uSun, sh, metal, clamp(rough + dt.rough, 0.04, 1.), coat)), 1.); oId = vec4(uObj, vPart / 255., uOutline / 8.); return; }
+    base *= dt.tone; rough = clamp(rough + dt.rough, 0.04, 1.);
+    if (uWear != vec3(0.)) { vec3 P = vObj / 1000.; float Z = (vObj.z + uObjZ) / 1000., low = 1. - smoothstep(0.17, 0.64, Z / max(0.8, uCarH));   /* low down: by the car's own height */
+      bool painted = kind == 1 || (kind == 0 && metal < 0.5);
+      if (painted && uWear.y > 0.) {   // the sun takes the lacquer: most on what faces the sky; flat, paler, greyer; crazed when far gone
+        float sky = 0.45 + 0.55 * max(0., nw.z), blot = smoothstep(0.3, 0.7, fbm(P * 6.7) * 0.75 + fbm(P * vec3(70., 4., 70.)) * 0.25 + (uWear.y - 0.5) * 0.8), a = min(1., uWear.y * sky * (0.5 + 0.5 * blot) * 1.6);
+        float lm = dot(base, vec3(0.3, 0.59, 0.11)); base = mix(base, mix(vec3(lm), base, 0.35) + (0.7 - lm) * 0.55, a); coat *= 1. - a; rough = mix(rough, 0.78, a);
+        if (a > 0.45) { vec3 q = P * 28.; float e = abs(fract(q.x + 0.3 * vnoise(q * 2.)) - 0.5) + abs(fract(q.y + q.z + 0.3 * vnoise(q * 2.3)) - 0.5); if (e < 0.08) base *= 0.82; } }   /* crazing: a fine net of cracks */
+      if (painted && uWear.x > 0.) {   // rust: low down and in patches, its edge lifting to primer, streaks running down below it
+        float field = fbm(P * 6.1 + 3.) * 0.8 + fbm(P * 45.) * 0.2, score = field * 0.62 + low * 0.52, t0 = 0.8 - uWear.x * 0.42;
+        if (score >= t0) { float depth = (score - t0) / 0.16; base = rustAt(0.22 + depth * 0.7 + (fbm(P * 110.) - 0.5) * 0.45); metal = 0.; rough = 0.93; coat = 0.;
+          vec3 g = vec3(fbm(P * 90. + vec3(0.02, 0, 0)), fbm(P * 90. + vec3(0, 0.02, 0)), fbm(P * 90. + vec3(0, 0, 0.02))) - fbm(P * 90.); nw = normalize(nw + normalize(mat3(uModel) * g + 1e-6) * min(0.6, length(g) * 2.) * min(1., depth)); }   /* the scale's rough surface */
+        else if (score > t0 - 0.06 * (0.5 + uWear.x)) { base = h3(floor(P * 400.)) < 0.5 ? vec3(118, 84, 70) / 255. : vec3(92, 70, 60) / 255.; coat = 0.; rough = 0.82; }
+        else if (abs(nw.z) < 0.6 && score > t0 - 0.16 && fbm(vec3(P.x * 60., P.z * 2.2, P.y * 60.)) > 0.66) base = mix(base, rustAt(0.5), 0.45 * uWear.x); }
+      if (metal > 0.5) {   // bright metal: a milky film, then pitting through the plate to the nickel and rust
+        rough = mix(rough, 0.45, uWear.y * 0.8); base = mix(base, vec3(0.62), uWear.y * 0.4);
+        float nn = fbm(P * 33. + 7.) * 0.8 + low * 0.25; if (uWear.x > 0. && nn > 1.05 - uWear.x * 0.6) { metal = 0.; rough = 0.9; base = nn > 1.13 - uWear.x * 0.5 ? rustAt(0.35 + h3(floor(P * 500.)) * 0.35) : vec3(168, 136, 96) / 255.; } }
+      if (uWear.z > 0.) {   // road dirt: thrown up low on the body and the wheels, dust settling on what faces up
+        float dz = uWear.z * (1.15 - smoothstep(0.1, 0.9, Z)) * (0.6 + 0.9 * fbm(P * vec3(9., 9., 3.))) + uWear.z * 0.3 * max(0., nw.z) * fbm(P * 3.1);
+        dz = clamp(dz, 0., 0.94); base = mix(base, mix(vec3(0.38, 0.31, 0.22), vec3(0.52, 0.46, 0.37), fbm(P * 21.)), dz); rough = mix(rough, 0.96, dz); coat *= 1. - dz; metal *= 1. - dz; } }
+    oCol = vec4(present(pbr(base, nw, uEye, uSun, sh, metal, rough, coat)), 1.); oId = vec4(uObj, vPart / 255., uOutline / 8.); return; }
   float dq = floor(d * 4. + 0.5) / 4.;
   vec3 diff = SUN_C * dq * 0.78 + (SKY_C * up + GROUND_C * (1. - up)) * 0.6, c;
   vec3 env = envAt(rz);
@@ -151,7 +176,7 @@ void main() { ivec2 p = ivec2(gl_FragCoord.xy), sz = textureSize(uCol, 0); vec4 
     c.rgb *= k; }
   o = vec4(c.rgb, 1.); }`;
 
-interface WheelDraw { spin: number; def: Float32Array; sx: number; sy: number; R: number; rim: number }
+interface WheelDraw { hubZ: number; spin: number; def: Float32Array; sx: number; sy: number; R: number; rim: number }
 type Piece = [{ vao: WebGLVertexArrayObject; n: number }, M4, WheelDraw?];
 export class LiveRenderer {
   readonly gl: WebGL2RenderingContext; private obj: WebGLProgram; private ground: WebGLProgram; private depth: WebGLProgram; private post: WebGLProgram;
@@ -236,22 +261,22 @@ export class LiveRenderer {
     gl.uniform1i(this.loc(this.obj, 'uDecTex'), 2);
     let id = 1; const objU = (outline: number) => { gl.uniform2f(this.loc(this.obj, 'uObj'), (id & 255) / 255, ((id >> 8) & 255) / 255); gl.uniform1f(this.loc(this.obj, 'uOutline'), outline); id++; };
     const draw = (part: { vao: WebGLVertexArrayObject; n: number }, M: M4, w?: WheelDraw) => { if (!part.n) return; gl.uniformMatrix4fv(this.loc(this.obj, 'uModel'), false, M); gl.uniform1i(this.loc(this.obj, 'uWheel'), w ? 1 : 0);
-      if (w) { gl.uniform1f(this.loc(this.obj, 'uSpin'), w.spin); gl.uniform1fv(this.loc(this.obj, 'uDef'), w.def); gl.uniform2f(this.loc(this.obj, 'uShift'), w.sx, w.sy); gl.uniform1f(this.loc(this.obj, 'uTyreR'), w.R); gl.uniform1f(this.loc(this.obj, 'uRim'), w.rim); } gl.bindVertexArray(part.vao); gl.drawArrays(gl.TRIANGLES, 0, part.n); };
+      if (!w) gl.uniform1f(this.loc(this.obj, 'uObjZ'), 0); if (w) { gl.uniform1f(this.loc(this.obj, 'uSpin'), w.spin); gl.uniform1f(this.loc(this.obj, 'uObjZ'), w.hubZ); gl.uniform1fv(this.loc(this.obj, 'uDef'), w.def); gl.uniform2f(this.loc(this.obj, 'uShift'), w.sx, w.sy); gl.uniform1f(this.loc(this.obj, 'uTyreR'), w.R); gl.uniform1f(this.loc(this.obj, 'uRim'), w.rim); } gl.bindVertexArray(part.vao); gl.drawArrays(gl.TRIANGLES, 0, part.n); };
     const decals = (g: GpuMesh | null) => { const n = g ? g.decals.length : 0; gl.uniform1i(this.loc(this.obj, 'uDecN'), n); gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, n ? g!.decalTex : this.blank); if (!g || !n) return;
       gl.uniform3fv(this.loc(this.obj, 'uDecO'), g.decals.flatMap(d => d.o)); gl.uniform3fv(this.loc(this.obj, 'uDecN_'), g.decals.flatMap(d => { const l = Math.hypot(...d.n); return d.n.map(x => x / l); }));
       gl.uniform3fv(this.loc(this.obj, 'uDecUp'), g.decals.flatMap(d => { const l = Math.hypot(...d.up); return d.up.map(x => x / l); })); gl.uniform1fv(this.loc(this.obj, 'uDecR'), g.decals.map(d => d.r)); };
     gl.uniform1i(this.loc(this.obj, 'uMode'), 0); gl.uniform1f(this.loc(this.obj, 'uBias'), 0); decals(null);
     const outlineP = Math.max(1, Math.min(2, Math.round(2 * 50 / v.mm))), outlineC = Math.max(1, Math.min(3, Math.round(3 * 50 / v.mm)));
-    for (const p of ps) { objU(outlineP); draw(p.g.body, placeMesh(p.g.len, p.x, p.y, p.z, p.h)); }
+    gl.uniform3f(this.loc(this.obj, 'uWear'), 0, 0, 0); for (const p of ps) { objU(outlineP); draw(p.g.body, placeMesh(p.g.len, p.x, p.y, p.z, p.h)); }
     // the cars a thing hides: their light outline first, tested against what stands before them (each pixel once), then the cars over it
     gl.uniform1i(this.loc(this.obj, 'uMode'), 1); gl.depthFunc(gl.GREATER); gl.depthMask(false); gl.enable(gl.STENCIL_TEST); gl.stencilFunc(gl.EQUAL, 0, 0xff); gl.stencilOp(gl.KEEP, gl.KEEP, gl.INCR);
     gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.NONE]); gl.uniform1f(this.loc(this.obj, 'uBias'), 0.25 / R);
     cars.forEach((q, i) => { gl.uniform4f(this.loc(this.obj, 'uSil'), 1, 226 / 255, 168 / 255, q.player ? 0.6 : 0.4); for (const [part, M, w] of carM[i]!.opaque) draw(part, M, w); });
     gl.disable(gl.STENCIL_TEST); gl.disable(gl.BLEND); gl.depthFunc(gl.LESS); gl.depthMask(true); gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.COLOR_ATTACHMENT1]); gl.uniform1f(this.loc(this.obj, 'uBias'), 0); gl.uniform1i(this.loc(this.obj, 'uMode'), 0);
-    cars.forEach((q, i) => { objU(outlineC); const m = carM[i]!; decals(q.g); draw(q.g.body, m.body); decals(null); for (const [part, M, w] of m.opaque.slice(1)) draw(part, M, w); });
+    cars.forEach((q, i) => { objU(outlineC); const m = carM[i]!; gl.uniform3fv(this.loc(this.obj, 'uWear'), q.wear ?? [0, 0, 0]); gl.uniform1f(this.loc(this.obj, 'uCarH'), q.g.height); decals(q.g); draw(q.g.body, m.body); decals(null); for (const [part, M, w] of m.opaque.slice(1)) draw(part, M, w); });
     // glass over all, at its own strength, nothing else written
     gl.uniform1i(this.loc(this.obj, 'uMode'), 2); gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false); gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.NONE]);
-    for (const p of ps) draw(p.g.glass, placeMesh(p.g.len, p.x, p.y, p.z, p.h)); for (const m of carM) for (const [part, M, w] of m.glass) draw(part, M, w);
+    gl.uniform3f(this.loc(this.obj, 'uWear'), 0, 0, 0); for (const p of ps) draw(p.g.glass, placeMesh(p.g.len, p.x, p.y, p.z, p.h)); for (const m of carM) for (const [part, M, w] of m.glass) draw(part, M, w);
     gl.disable(gl.BLEND); gl.depthMask(true);
     // ---- the outlines, onto the page's canvas ----
     gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.viewport(0, 0, v.W, v.H); gl.disable(gl.DEPTH_TEST); gl.useProgram(this.post);
@@ -267,7 +292,7 @@ export class LiveRenderer {
     const opaque: Piece[] = [[g.body, body]], glass: Piece[] = [[g.glass, body]];
     for (const w of g.wheels) { const left = w.hub[1] > 0, M = mul(body, mul(translate(w.hub[0], w.hub[1], w.hub[2]), w.front ? rot('z', -(left ? q.steerL : q.steerR)) : translate(0, 0, 0)));
       const ty = q.tyres?.[(w.front ? 0 : 2) + (left ? 0 : 1)], def = new Float32Array(32); if (ty) for (let k = 0; k < 32; k++) def[k] = ty.u[k]! * 1000;
-      const wd: WheelDraw = { spin: q.spin, def, sx: (ty?.sx ?? 0) * 1000, sy: (ty?.sy ?? 0) * 1000, R: w.R, rim: w.rim };
+      const wd: WheelDraw = { hubZ: w.hub[2], spin: q.spin, def, sx: (ty?.sx ?? 0) * 1000, sy: (ty?.sy ?? 0) * 1000, R: w.R, rim: w.rim };
       opaque.push([w.part, M, wd]); if (w.glass) glass.push([w.glass, M, wd]); }
     return { body, opaque, glass }; }
 }

@@ -55,12 +55,17 @@ try { live = new LiveRenderer(glCanvas); live.setGround(groundData(T, SCN, START
 // the PBR detail textures (Poly Haven, CC0): loaded once, laid on when ready
 if (live) { const L = live, im = [texAlb, texNor, texRgh].map(src => { const i = new Image(); i.src = src; return i; });
   void Promise.all(im.map(i => i.decode())).then(() => L.setTextures(im[0]!, im[1]!, im[2]!, (texMeta as { layers: { size_m: number; luma_mean: number; rough_mean: number }[] }).layers)).catch(e => console.warn('textures', e)); }
+// the cars' age in the live picture (review 104): the player's set on the page, its dirt growing as it is driven (fast on
+// the grass); the others' by their entry, a mixed field
+const myWear: [number, number, number] = [0, 0, 0]; let dirtGrows = true, wearTick = 0;
+const wearOf = (c: Vehicle, k: number): [number, number, number] => { if (c === car) return myWear; const h = (n: number) => ((Math.sin(k * 127.1 + n * 311.7) * 43758.5453) % 1 + 1) % 1; return [h(1) * 0.35, h(2) * 0.6, 0.1 + h(3) * 0.35]; };
 const liveOK = !!live; let liveR = live; let look: 'baked' | 'stepped' | 'pbr' | 'split' = 'pbr';   /* the light and materials: the baked pictures' stepped light, or physically based (review 102) */
 function drawLive(el: number) { const L = live!; void el;
+  if (++wearTick % 30 === 0 && document.activeElement?.id !== 'wdirt') $<HTMLInputElement>('wdirt').value = myWear[2].toFixed(2);   /* the dirt slider follows the dirt */
   if (broken.size !== liveFence) { L.setFence(fenceData(T, fenceOk)); liveFence = broken.size; }
   glCanvas.width = VW; glCanvas.height = VH;
   const list = race ? race.cars.map(e => ({ c: e.car, sp: e.driver ? others.get(e)! : sprites, turn: e.wheelTurn })) : [{ c: car, sp: sprites, turn: wheelTurn }];
-  const cars = list.map(({ c, sp, turn }) => ({ g: L.car(sp.mesh), tyres: c.rings, x: c.x, y: c.y, z: T.height(c.s, c.off) + c.zb - (c.rings[0]!.rest + c.rings[2]!.rest) / 2,   /* drawn lower by the tyres' standing give: the flattened tread on the road */ yaw: c.yaw, roll: c.tilt + c.roll * 1.5, pitch: c.pitch, steerL: c.steerAt(0), steerR: c.steerAt(1), spin: turn, player: c === car }));
+  const cars = list.map(({ c, sp, turn }, k) => ({ wear: wearOf(c, k), g: L.car(sp.mesh), tyres: c.rings, x: c.x, y: c.y, z: T.height(c.s, c.off) + c.zb - (c.rings[0]!.rest + c.rings[2]!.rest) / 2,   /* drawn lower by the tyres' standing give: the flattened tread on the road */ yaw: c.yaw, roll: c.tilt + c.roll * 1.5, pitch: c.pitch, steerL: c.steerAt(0), steerR: c.steerAt(1), spin: turn, player: c === car }));
   const props = [...SCN.props, ...trainCars()].flatMap(q => { const f = PROPS[q.kind]; return f ? [{ g: L.prop(q.kind, f), x: q.x, y: q.y, z: q.z ?? 0, h: q.heading }] : []; });
   const view = { x: camX, y: camY, z: camZ, ang: turning() ? camAng : Math.PI / 2, pitch: pitchDeg, mm, W: VW, H: VH, cy: st.chase && !st.cine ? 0.66 : 0.55 };
   ctx = main; main.clearRect(0, 0, VW, VH);
@@ -317,6 +322,7 @@ function frame(now: number) { const el = Math.min(0.1, (now - last) / 1000); las
     // lap: forward across the start line
     if (!race && T.gap(prevS, START) > 0 && T.gap(car.s, START) <= 0 && car.vx > 1) { if (lapStart >= 0) { lastLap = clock - lapStart; if (!bestLap || lastLap < bestLap) bestLap = lastLap; say(`한 바퀴 ${fmt(lastLap)}`); } lapStart = clock; }
     prevS = car.s;
+    if (dirtGrows && car.speed > 1) { const grass = car.onGrass.filter(Boolean).length / 4; myWear[2] = Math.min(1, myWear[2] + DT * car.speed * (grass * 0.0012 + 0.000004)); }   /* mud off the grass quickly, road dust slowly */
     if (car.over) { say('뱅크 꼭대기를 넘어갔습니다 — 트랙으로 복귀'); car.over = false; car.place(car.s, 0, 0); } }
   for (const p of puffs) { p.x += p.vx * el; p.y += p.vy * el; p.z += 0.4 * el; p.r += 0.9 * el; p.a -= 0.4 * el; } while (puffs.length && puffs[0]!.a <= 0) puffs.shift(); for (let i = puffs.length - 1; i >= 0; i--) if (puffs[i]!.a <= 0) puffs.splice(i, 1);
   // the camera: on the car, a little ahead of where it is going
@@ -392,6 +398,9 @@ const setFree = (on: boolean) => { st.free = on; ($('free') as HTMLInputElement)
 { const t = $<HTMLInputElement>('live'); t.checked = liveOK; t.disabled = !liveOK; if (!liveOK) $('livenote').textContent = '이 브라우저는 WebGL2가 없어 구운 그림으로 그립니다';
   t.addEventListener('change', () => { live = t.checked ? liveR : null; if (!live) rebake(true); t.blur(); }); }
 $<HTMLSelectElement>('look').addEventListener('change', e => { look = (e.target as HTMLSelectElement).value as typeof look; (e.target as HTMLElement).blur(); });
+for (const [id, k] of [['wrust', 0], ['wfade', 1], ['wdirt', 2]] as const) $<HTMLInputElement>(id).addEventListener('input', e => { myWear[k] = +(e.target as HTMLInputElement).value; });
+$<HTMLInputElement>('wgrow').addEventListener('change', e => { dirtGrows = (e.target as HTMLInputElement).checked; });
+$('wclean').addEventListener('click', e => { myWear[2] = 0; $<HTMLInputElement>('wdirt').value = '0'; say('차를 씻었습니다'); (e.target as HTMLElement).blur(); });
 $<HTMLInputElement>('num').addEventListener('change', e => { const el = e.target as HTMLInputElement, v = el.value.replace(/\D/g, '').slice(0, 3); el.value = v || myNum; if (v && v !== myNum) { myNum = v; rebake(true); say(`차 번호 ${v}`); } el.blur(); });
 $<HTMLInputElement>('free').addEventListener('change', e => setFree((e.target as HTMLInputElement).checked));
 $<HTMLInputElement>('pitch').addEventListener('change', e => { want(+(e.target as HTMLInputElement).value, mm); (e.target as HTMLElement).blur(); });

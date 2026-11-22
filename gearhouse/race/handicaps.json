@@ -1,57 +1,57 @@
 {
- "about": "Millbrook Outer Circuit handicapper's book (reviews 86, 89): the test driver's lap times in seconds, from rest to the end of the first lap (standing) and a lap at speed (flying), from tools/ref/handicaps.ts, with the review-89 tyres.",
+ "about": "Millbrook Outer Circuit handicapper's book (reviews 86, 89): the test driver's lap times in seconds, from rest to the end of the first lap (standing) and a lap at speed (flying), from tools/ref/handicaps.ts, with the review-89 tyres; retimed in review 97 (the free wheels no longer drag).",
  "cars": {
   "dueSSJ35": {
-   "standing": 96.4,
-   "flying": 86.3
+   "standing": 97,
+   "flying": 87.1
   },
   "bmw315": {
-   "standing": 154.2,
+   "standing": 153.7,
    "flying": 139.7
   },
   "fnTT33": {
-   "standing": 134.7,
+   "standing": 134.1,
    "flying": 122.2
   },
   "dueA21": {
-   "standing": 156.1,
+   "standing": 155.1,
    "flying": 142.5
   },
   "plymU29": {
-   "standing": 183.4,
+   "standing": 182.6,
    "flying": 171.8
   },
   "buick28": {
-   "standing": 172.3,
-   "flying": 160.1
+   "standing": 173.5,
+   "flying": 162.5
   },
   "chevAB28": {
-   "standing": 206.8,
+   "standing": 206,
    "flying": 195.6
   },
   "dodgeV28": {
-   "standing": 175.4,
+   "standing": 174.7,
    "flying": 164.9
   },
   "pontiac29": {
-   "standing": 178.3,
+   "standing": 177.7,
    "flying": 169
   },
   "willys27": {
-   "standing": 183.9,
-   "flying": 179.9
+   "standing": 191.3,
+   "flying": 183.4
   },
   "fordT23": {
-   "standing": 258.5,
+   "standing": 257.3,
    "flying": 245.9
   },
   "napier33": {
-   "standing": 87.2,
-   "flying": 78.7
+   "standing": 90.4,
+   "flying": 81.2
   },
   "jagD55": {
-   "standing": 82.0,
-   "flying": 72.0
+   "standing": 81.9,
+   "flying": 73.4
   }
  }
 }

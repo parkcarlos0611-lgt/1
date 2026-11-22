@@ -35,4 +35,17 @@ describe('on the Millbrook banking', () => {
     for (let t = 0; t < 4; t += dt) { car.step(dt, d.drive(car)); if (car.airborne[2] || car.airborne[3]) lifted = true; }
     expect(lifted).toBe(true);
   });
+  it('the D-type matches its period figures (review 97): Le Mans speed, and the road test within its axle', () => {
+    const run = (id: string, secs: number) => { const car = new Vehicle(raceSpec(id), flat).place(100, 0, 0); let t = 0, t60 = 0, vmax = 0;
+      for (; t < secs; t += dt) { car.step(dt, { throttle: 1, brake: 0, steer: 0 }); if (!t60 && car.speed * 2.23694 >= 60) t60 = t; vmax = Math.max(vmax, car.speed * 3.6); } return { t60, vmax }; };
+    const d = run('jagD55', 90);
+    expect(d.vmax).toBeGreaterThan(270); expect(d.vmax).toBeLessThan(290);   // 278 km/h on the Mulsanne, 1955
+    expect(d.t60).toBeGreaterThan(4.2); expect(d.t60).toBeLessThan(6.5);    // 4.7 s on a shorter axle (Road & Track 1956)
+  });
+  it('drums fade where discs hold on: six hard stops from 160 km/h', () => {
+    const fade = (id: string) => { const car = new Vehicle(raceSpec(id), flat).place(100, 0, 160 / 3.6); const dist: number[] = [];
+      for (let n = 0; n < 6; n++) { car.place(car.s, 0, 160 / 3.6); let d = 0; for (let k = 0; k < 8000 && car.speed > 0.3; k++) { car.step(dt, { throttle: 0, brake: 1, steer: 0 }); d += car.speed * dt; } dist.push(d); }
+      return dist[5]! / dist[0]!; };
+    expect(fade('napier33')).toBeGreaterThan(fade('jagD55'));
+  });
 });

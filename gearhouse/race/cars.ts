@@ -29,6 +29,11 @@ export interface RaceSpec {
   /** era features (review 94), absent on the period cars: the tyres' make, a gear change's time (a crash box about 0.5 s,
    *  synchromesh about 0.25), the era the car comes from (the page marks cars from outside the game's period) */
   tyreKind?: 'crossply' | 'racing30' | 'racing50' | 'radial'; shiftT?: number; era?: string;
+  /** the revs a standing start is made at (the clutch slipped until then; by default a gentle start from idle), and
+   *  the engine's peak torque in Nm where a source gives it (by default about 1.22 times the torque at peak power) */
+  launchRpm?: number; torquePeak?: number;
+  /** the turning masses (kg m²) where known: the engine with its flywheel, one wheel with its tyre and brake */
+  inertia?: { engine: number; wheel: number };
   cdA: number; crr: number; steerLock: number;          // drag area m², rolling resistance, front wheels' lock (deg)
   topKmh: number; check: boolean;
   cooling: { siphon: boolean; margin: number } }   // the water's circulation (no pump on the Model T [v]), the radiator against the engine's heat [?]
@@ -61,19 +66,27 @@ export const RACE_CARS: string[] = Object.keys(PERIOD);
 //             three-speed box, no reverse, no synchromesh [v]; drums [v] (one table: no front brakes [?], four kept);
 //             the outer-circuit lap record 143.44 mph (1935) [~, not confirmed by the sources read]; track 1500 [?];
 //             axle and gears [?]: set for about 270 km/h at the power peak. Racing cross-plies of the 1930s.
-//   jagD55    1955 Jaguar D-type, long nose: 3442 cc six, 250 [v] to 270 hp at 6000 [v, Revs Institute]; Dunlop discs
-//             all round with a servo [v]; 4470 x 1638 x 1118, wheelbase 2286 [v Encycarpedia]; 870-992 kg [~]; top
-//             162-174 mph [v, by version]; four speeds with synchromesh [v], ratios [~]; Le Mans axle 2.79 [~];
-//             track 1270 front [~]. Dunlop racing tyres 6.50-16 (cross-plies still: racing radials came in the late
-//             1960s). Its monocoque and low body: a low centre of gravity and a small drag area [~].
+//   jagD55    1955 Jaguar D-type, long-nose works car (review 97, set against the sources):
+//             engine 3442 cc six, dry sump, three Webers: 270 hp at 6000 [v Revs Institute, a 1955 car] (250 bhp at
+//             6000 [v Carfolio]); torque 328 Nm (242 lb-ft) at 4000 [v Carfolio]; 4470 x 1638 x 1118, wheelbase 2286
+//             [v Encycarpedia]; 1930 lb = 875 kg [v Revs] (864 kerb [v Carfolio]); Dunlop discs all round [v];
+//             four speeds, synchromesh [v], ratios [?] (2.14 / 1.39 / 1.10 / 1.00 assumed); axle [?]: 2.79 for Le Mans
+//             [~]; red line [?] 6300; tyres Dunlop racing cross-plies 6.50-16 [~]; turning masses [~].
+//             Checked against: Le Mans 1955, 172.8 mph (278 km/h) on the Mulsanne [v Wikipedia] -> 279 km/h here
+//             (the drag area set by it); Road & Track, May 1956 (XKD 528, a production car, its axle unknown):
+//             0-60 mph 4.7 s, 0-100 mph 12.0 s, quarter mile 13.7 s at 106 mph, timed 162.16 mph [v] -> here, on the
+//             Le Mans axle: 5.8 s, 11.6 s, 14.0 s at 112 mph, 173 mph (the tall axle slows the start: first gear
+//             runs to about 85 mph; on a 3.31 axle 5.0 s, 10.5 s, 13.3 s). Le Mans 1955 fastest lap Hawthorn 4:06.6,
+//             122.39 mph [v racingsportscars.com].
+const CDA_D = 0.6;   // set below against the Le Mans speed (see the D-type's notes)
 const EXP: Record<string, RaceSpec> = {
   napier33: { id: 'napier33', name: '1933 Napier-Railton (실험)', mass: 2049 + 75, wheelbase: 3.302, track: 1.5, tyreR: 0.45, tyreW: 0.18, cgH: 0.66, frontShare: 0.52,
     hp: 580, hpRpm: 2585, torqueRpm: 1700, idle: 500, redline: 2900, gears: [2.2, 1.45, 1.0], final: 1.62, eff: 0.9,
     brakes: 'four', hydraulic: false, brakeG: 0.42, cdA: 1.2, crr: 0.016, steerLock: 24, topKmh: 270, check: false,
     cooling: { siphon: false, margin: 1.35 }, tyreKind: 'racing30', shiftT: 0.6, era: '1933 · 항공 엔진 기록차' },
-  jagD55: { id: 'jagD55', name: '1955 Jaguar D-type (실험)', mass: 900 + 75, wheelbase: 2.286, track: 1.27, tyreR: 0.36, tyreW: 0.165, cgH: 0.4, frontShare: 0.49,
-    hp: 270, hpRpm: 6000, torqueRpm: 4500, idle: 800, redline: 6500, gears: [2.14, 1.39, 1.1, 1.0], final: 2.79, eff: 0.92,
-    brakes: 'disc', hydraulic: true, brakeG: 0.95, cdA: 0.6, crr: 0.014, steerLock: 30, topKmh: 280, check: false,
+  jagD55: { id: 'jagD55', name: '1955 Jaguar D-type (실험)', mass: 875 + 75, wheelbase: 2.286, track: 1.27, tyreR: 0.36, tyreW: 0.165, cgH: 0.4, frontShare: 0.49,
+    hp: 270, hpRpm: 6000, torqueRpm: 4000, torquePeak: 328, idle: 800, redline: 6300, launchRpm: 4000, inertia: { engine: 0.2, wheel: 1.1 }, gears: [2.14, 1.39, 1.1, 1.0], final: 2.79, eff: 0.92,
+    brakes: 'disc', hydraulic: true, brakeG: 0.95, cdA: CDA_D, crr: 0.014, steerLock: 30, topKmh: 278, check: false,
     cooling: { siphon: false, margin: 1.25 }, tyreKind: 'racing50', shiftT: 0.25, era: '1955 · 후대 (디스크 브레이크, 모노코크)' } };
 export const EXP_CARS: string[] = Object.keys(EXP);
 /** the engine for the sound: cylinders, valves, blower (the experimental cars are not in the game's data) */
@@ -88,7 +101,7 @@ export function raceSpec(id: string): RaceSpec {
 /** engine torque (Nm) at revs, full throttle: a hump peaking at torqueRpm, its power peaking at hpRpm, falling past it */
 export function torqueAt(c: RaceSpec, rpm: number): number {
   const P = c.hp * 745.7, wP = c.hpRpm * Math.PI / 30, Tp = P / wP;          // torque at the power peak
-  const Tmax = Tp * 1.22, x = rpm / c.torqueRpm;                            // the peak torque, a little above
+  const Tmax = Math.max(Tp, c.torquePeak ?? Tp * 1.22), x = rpm / c.torqueRpm;                            // the peak torque, a little above
   let T = rpm <= c.torqueRpm ? Tmax * (0.62 + 0.38 * (1 - (1 - x) ** 2)) : Tmax - (Tmax - Tp) * ((rpm - c.torqueRpm) / (c.hpRpm - c.torqueRpm)) ** 1.6;
   if (rpm > c.hpRpm) T = Tp * Math.max(0, 1 - ((rpm - c.hpRpm) / (c.redline * 1.15 - c.hpRpm)) ** 1.5 * 0.9);
   return Math.max(0, T); }

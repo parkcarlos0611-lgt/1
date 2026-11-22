@@ -54,3 +54,15 @@ Each with a switch on the page to compare, and checked for its cost.
   sorted far to near, premultiplied over the scene, the scene's filmic curve. The 2D puffs and steam are left to the
   baked picture.
 - Step 4 (the traced photo mode) is still to do.
+
+## The light after the scene (review 111)
+- A wide-range picture (half floats where the device draws them): the PBR look writes the light as it is, highlights
+  far above white, and is tone-mapped at the end.
+- Gloss: the sun's highlight scaled by the reflection strength; the lacquer a sharp glint and a broad sheen, its sky
+  reflection stronger; screen-space reflections softened over three taps and scaled too.
+- Shadows: nine filtered looks into the shadow map (soft edges).
+- Ambient occlusion: its own pass, twelve rays a pixel, then smoothed over 4 x 4 where the depth agrees.
+- Bloom: what is well above white (a soft knee) halved four times and spread back up, added before the tone curve.
+- Depth of field: focused at the car's middle height over the camera's target, sharp within 1.2 m of it, the rest
+  gathered over a disc by its distance (a tilt-shift look from this camera).
+Sliders on the page for reflection and gloss, occlusion, bloom and depth of field.

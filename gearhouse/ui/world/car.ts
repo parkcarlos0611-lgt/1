@@ -43,7 +43,8 @@ export function carSprite(colour: string, damages: Damage[], o: { mm?: number; d
   const glass0: number[] = []; for (let i = 0; i < w * h; i++) if (partOf(i) === 'glass0') glass0.push(i);
   if (glass0.length && drv && o.driver !== false) { let gx0 = w, gx1 = 0, gy1 = 0; for (const i of glass0) { const x = i % w, y = (i / w) | 0; gx0 = Math.min(gx0, x); gx1 = Math.max(gx1, x); gy1 = Math.max(gy1, y); }
     const ox = Math.round((gx0 + gx1) / 2 - DW / 2), oy = gy1 - 22, inG = new Set(glass0);
-    for (let y = 0; y < 42; y++) for (let x = 0; x < DW; x++) { const j = (y * DW + x) * 4; if (drv[j + 3]! < 128) continue; const X = ox + x, Y = oy + y, i = Y * w + X; if (X < 0 || Y < 0 || X >= w || Y >= h || !inG.has(i)) continue;
+    const ds = Math.max(1, Math.round(big < 1 ? 1 / big : 1)), ox2 = Math.round((gx0 + gx1) / 2 - DW * ds / 2), oy2 = gy1 - 22 * ds; void ox; void oy;   // at a finer scale the driver is drawn larger, pixel for pixel
+    for (let y = 0; y < 42 * ds; y++) for (let x = 0; x < DW * ds; x++) { const j = (Math.floor(y / ds) * DW + Math.floor(x / ds)) * 4; if (drv[j + 3]! < 128) continue; const X = ox2 + x, Y = oy2 + y, i = Y * w + X; if (X < 0 || Y < 0 || X >= w || Y >= h || !inG.has(i)) continue;
       rgba[i * 4] = rgba[i * 4]! * 0.35 + drv[j]! * 0.5; rgba[i * 4 + 1] = rgba[i * 4 + 1]! * 0.35 + drv[j + 1]! * 0.5; rgba[i * 4 + 2] = rgba[i * 4 + 2]! * 0.35 + drv[j + 2]! * 0.5; } }
   const hubs = m.wheels.map(wh => [im.X(wh.x), im.Y(wh.r), wh.r / MMx] as [number, number, number]);
   const tp = m.parts.find(p => p.id === 'tailpipe'), tail: [number, number] = tp ? [im.X(tp.box.x[1]), im.Y((tp.box.z[0] + tp.box.z[1]) / 2)] : [w - 6, im.groundY - 6];

@@ -328,7 +328,7 @@ export function drawSurface(F: Surface, yaw: number, pitch: number, mmPx: number
         if (XX < 0 || YY < 0 || XX >= w || YY >= h || !rgba[b * 4 + 3]) { o[a] = 2; break; } if (zb[b]! - zb[a]! > jump) o[a] = Math.max(o[a]!, 1);
         // where a bright part meets another part in front of it: a thin dark seam, so small fittings stand apart
         else if (ix[b]! >= 0 && ix[a]! >= 0 && F.part[ix[a]!] !== F.part[ix[b]!] && zb[b]! - zb[a]! > (stacked ? 1.5 : 0.6) * F.c && (F.gloss[ix[a]!]! > 0.6 || F.gloss[ix[b]!]! > 0.6)) o[a] = Math.max(o[a]!, 1); } }
-    if (outline === 2) { const o2 = new Uint8Array(o); for (let Y = 1; Y < h - 1; Y++) for (let X = 1; X < w - 1; X++) { const a = Y * w + X; if (o[a] !== 2) continue; for (const b of [a - 1, a + 1, a - w, a + w]) if (rgba[b * 4 + 3] && !o[b]) o2[b] = 2; } o.set(o2); }   // a thicker outline: two pixels round the car
+    for (let pass = 2; typeof outline === 'number' && pass <= outline; pass++) { const o2 = new Uint8Array(o); for (let Y = 1; Y < h - 1; Y++) for (let X = 1; X < w - 1; X++) { const a = Y * w + X; if (o[a] !== 2) continue; for (const b of [a - 1, a + 1, a - w, a + w]) if (rgba[b * 4 + 3] && !o[b]) o2[b] = 2; } o.set(o2); }   // a thicker outline: n pixels round the car   // a thicker outline: two pixels round the car
     for (let a = 0; a < w * h; a++) if (o[a]) { const k = o[a] === 2 ? 0.28 : 0.6; rgba[a * 4] = rgba[a * 4]! * k; rgba[a * 4 + 1] = rgba[a * 4 + 1]! * k; rgba[a * 4 + 2] = rgba[a * 4 + 2]! * k; } }
   for (let a = 0; a < w * h; a++) if (shadow[a] && !rgba[a * 4 + 3]) { rgba[a * 4] = 24; rgba[a * 4 + 1] = 22; rgba[a * 4 + 2] = 20; rgba[a * 4 + 3] = 110; }
   return { w, h, rgba }; }

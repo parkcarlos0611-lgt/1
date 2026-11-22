@@ -19,7 +19,7 @@ const CARS: [string, unknown][] = [['1935 그랜드 로드스터', ssj], ['1935 
 const BASE_MM = 16.7;   // the track game's scale: a 5 m car about 300 px long
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const cv = $<HTMLCanvasElement>('view'), ctx = cv.getContext('2d')!, stat = $('stat');
-const st = { car: 0, mode: 'B' as 'A' | 'B' | 'C' | 'AB', yaw: 30, pitch: 40, zoom: 0.75, cell: 15, spin: false, px: 2, tex: true, line: true, lineW: 2 };
+const st = { car: 0, mode: 'B' as 'A' | 'B' | 'C' | 'AB', yaw: 30, pitch: 40, zoom: 0.75, cell: 15, spin: false, px: 2, tex: true, line: true, lineW: 2, half: false };
 const W = 400, H = 260;
 let solid: Solid | null = null, surf: Surface | null = null, slices: Record<string, { z: number; pic: Pic }[]> = {}, key = '', dirty = true, building = false;
 
@@ -34,11 +34,12 @@ function put(p: Pic, x: number) { const img = new ImageData(new Uint8ClampedArra
 
 function frame() {
   if (st.spin) { st.yaw = (st.yaw + 0.6) % 360; ($<HTMLInputElement>('yaw')).value = String(Math.round(st.yaw)); dirty = true; }
-  if (dirty && ensure()) { dirty = false; const mm = BASE_MM / st.zoom, two = st.mode === 'AB', w = two ? W / 2 : W, t = performance.now();
+  if (dirty && ensure()) { dirty = false; const mm = BASE_MM / st.zoom * (st.half ? 2 : 1), two = st.mode === 'AB', w = two ? W / 2 : W, t = performance.now();
     cv.width = W; cv.height = H; ctx.clearRect(0, 0, W, H);
     const draw = (m: 'A' | 'B' | 'C', x: number) => { if (m === 'A' || m === 'B') put(drawSurface(surf!, st.yaw, st.pitch, mm, w, H, st.line ? st.lineW : false, m === 'B'), x); else put(drawStack(slicesFor(4, mm), solid!, st.yaw, st.pitch, mm, w, H), x); };
     if (two) { draw('A', 0); draw('B', W / 2); } else draw(st.mode as 'A' | 'B' | 'C', 0);
     if (two) { ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.fillRect(W / 2, 0, 1, H); }
+    if (st.half) { const c2 = document.createElement('canvas'); c2.width = W; c2.height = H; c2.getContext('2d')!.drawImage(cv, 0, 0); ctx.clearRect(0, 0, W, H); ctx.imageSmoothingEnabled = false; ctx.drawImage(c2, W / 4, H * 0.3, W / 2, H / 2, 0, 0, W, H); }   // the 0.5 filter: drawn at half the pixels, shown twice as big
     cv.style.width = `${W * st.px}px`; cv.style.height = `${H * st.px}px`;
     stat.textContent = `${stat.dataset.build ?? ''} · 한 장 ${Math.round(performance.now() - t)} ms · ${(mm).toFixed(1)} mm/칸`; }
   requestAnimationFrame(frame); }
@@ -53,7 +54,8 @@ document.querySelectorAll<HTMLInputElement>('input[name=mode]').forEach(r => r.a
 $<HTMLInputElement>('spin').addEventListener('change', e => { st.spin = (e.target as HTMLInputElement).checked; });
 $<HTMLInputElement>('tex').addEventListener('change', e => { st.tex = (e.target as HTMLInputElement).checked; dirty = true; });
 $<HTMLInputElement>('line').addEventListener('change', e => { st.line = (e.target as HTMLInputElement).checked; dirty = true; });
-$<HTMLInputElement>('line2').addEventListener('change', e => { st.lineW = (e.target as HTMLInputElement).checked ? 2 : 1; dirty = true; });
+$<HTMLSelectElement>('line2').addEventListener('change', e => { st.lineW = +(e.target as HTMLSelectElement).value; dirty = true; });
+$<HTMLInputElement>('half').addEventListener('change', e => { st.half = (e.target as HTMLInputElement).checked; dirty = true; });
 // turn by dragging, zoom with the wheel or a pinch-free +/- on the slider
 let drag: number | null = null;
 cv.addEventListener('pointerdown', e => { drag = e.clientX; cv.setPointerCapture(e.pointerId); st.spin = false; $<HTMLInputElement>('spin').checked = false; });

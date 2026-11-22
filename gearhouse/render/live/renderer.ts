@@ -32,14 +32,18 @@ float D_GGX(float nh, float a) { float a2 = a * a, d = nh * nh * (a2 - 1.) + 1.;
 float V_Smith(float nv, float nl, float a) { float k = a * 0.5; return 0.25 / ((nv * (1. - k) + k) * (nl * (1. - k) + k)); }
 vec2 envBRDF(float nv, float r) { vec4 rr = r * vec4(-1., -0.0275, -0.572, 0.022) + vec4(1., 0.0425, 1.04, -0.04); float a = min(rr.x * rr.x, exp2(-9.28 * nv)) * rr.x + rr.y; return vec2(-1.04, 1.04) * a + rr.zw; }
 /** metallic-roughness shading (GGX, Smith, Schlick; the sky as an analytic light: its irradiance, and its reflection blurred by roughness), a clear coat for paint */
-vec3 pbr(vec3 baseSrgb, vec3 n, vec3 v, vec3 l, float sh, float metal, float rough, float coat) {
+vec3 pbrX(vec3 baseSrgb, vec3 n, vec3 v, vec3 l, float sh, float metal, float rough, float coat, float ao, float sheen);
+vec3 pbr(vec3 baseSrgb, vec3 n, vec3 v, vec3 l, float sh, float metal, float rough, float coat) { return pbrX(baseSrgb, n, v, l, sh, metal, rough, coat, 1., 0.); }
+/** with the sky's light cut by occlusion (ao) and a soft sheen at grazing angles (cloth's fuzz, leather's and rubber's polish) */
+vec3 pbrX(vec3 baseSrgb, vec3 n, vec3 v, vec3 l, float sh, float metal, float rough, float coat, float ao, float sheen) {
   vec3 alb = toLin(baseSrgb); float a = max(0.02, rough * rough); vec3 h = normalize(l + v);
   float nl = max(0., dot(n, l)), nv = max(1e-3, dot(n, v)), nh = max(0., dot(n, h)), vh = max(0., dot(v, h));
   vec3 f0 = mix(vec3(0.04), alb, metal), F = f0 + (1. - f0) * pow(1. - vh, 5.), kd = (1. - F) * (1. - metal);
   vec3 col = (kd * alb / 3.14159 + D_GGX(nh, a) * V_Smith(nv, nl, a) * F * uSpecK) * SUN_E * nl * sh;
   vec3 r = reflect(-v, n); vec2 ab = envBRDF(nv, rough); vec3 envS = mix(toLin(envAt(r.z)), irradiance(r), clamp(rough * 1.4, 0., 1.));
-  col += kd * alb * irradiance(n) + envS * (f0 * ab.x + ab.y);
-  if (coat > 0.) { float Fc = (0.04 + 0.96 * pow(1. - nv, 5.)) * coat; col = col * (1. - Fc) + toLin(envAt(r.z)) * Fc * (0.6 + 0.4 * uSpecK)
+  col += (kd * alb * irradiance(n) + envS * (f0 * ab.x + ab.y)) * ao;
+  if (sheen > 0.) col += sheen * pow(1. - nv, 4.) * (alb * 0.6 + 0.4) * (irradiance(n) * ao + SUN_E * nl * sh * 0.25);
+  if (coat > 0.) { float Fc = (0.04 + 0.96 * pow(1. - nv, 5.)) * coat; col = col * (1. - Fc) + toLin(envAt(r.z)) * Fc * (0.6 + 0.4 * uSpecK) * mix(1., ao, 0.7)
       + (D_GGX(nh, 0.06) * V_Smith(nv, nl, 0.06) * 0.06 + D_GGX(nh, 0.32) * V_Smith(nv, nl, 0.32) * 0.05) * coat * uSpecK * SUN_E * nl * sh; }   /* the lacquer: a sharp glint and a broad sheen (review 111) */
   return col; }
 // ---- PBR detail textures (review 103): seven layers (concrete, grass, metal, rubber, leather, canvas, wood), each a
@@ -58,6 +62,17 @@ Detail detail(int L, vec3 p, vec3 n, float sa, float sn, float sr) { sa = max(sa
 /** the linear colour to the screen: exposure, filmic curve, gamma; stepped in brightness for the stepped look */
 uniform int uHDRo;   /* 1: write the light as it is (a wide range: highlights far above white, for the bloom), tone-mapped at the end */
 vec3 present(vec3 c) { if (uHDRo == 1) return min(c * 0.6, vec3(48.)); vec3 s = pow(aces(c * 0.6), vec3(1. / 2.2));   /* exposure set so the concrete reads as bright as in the baked look */ if (uLook == 1) { float L = dot(s, vec3(0.3, 0.59, 0.11)), q = floor(L * 7. + 0.5) / 7.; s *= q / max(L, 1e-3); } return min(s, vec3(1.)); }
+// ---- occlusion by rays against the cars' boxes (review 112): each car a box (body over its wheels); eight rays over the
+//      surface traced against them exactly, so a car darkens the road under it and its neighbour's flank, wherever the
+//      picture's own layers cannot see ----
+uniform int uBoxN, uSelf; uniform vec3 uBoxC[6], uBoxE[6]; uniform vec2 uBoxR[6];
+float rayBox(vec3 o, vec3 d, int i) { vec2 cs = uBoxR[i]; vec3 r = o - uBoxC[i]; vec3 lo = vec3(dot(r.xy, cs), dot(r.xy, vec2(-cs.y, cs.x)), r.z), ld = vec3(dot(d.xy, cs), dot(d.xy, vec2(-cs.y, cs.x)), d.z);
+  vec3 inv = 1. / (ld + vec3(1e-6)), t0 = (-uBoxE[i] - lo) * inv, t1 = (uBoxE[i] - lo) * inv, tn = min(t0, t1), tf = max(t0, t1);
+  float a = max(max(tn.x, tn.y), tn.z), b = min(min(tf.x, tf.y), tf.z); return b >= max(a, 0.) ? max(a, 0.) : -1.; }
+float rtao(vec3 p, vec3 n) { if (uBoxN == 0) return 1.; vec3 t1 = normalize(abs(n.z) < 0.9 ? cross(n, vec3(0., 0., 1.)) : cross(n, vec3(1., 0., 0.))), t2 = cross(n, t1); float occ = 0.;
+  for (int k = 0; k < 8; k++) { float a = float(k) * 2.39996 + 0.3, u = (float(k) + 0.5) / 8., st = sqrt(1. - u); vec3 d = (t1 * cos(a) + t2 * sin(a)) * sqrt(u) + n * st;   // cosine-weighted
+    for (int i = 0; i < 6; i++) { if (i >= uBoxN) break; if (i == uSelf) continue; float t = rayBox(p + n * 0.03, d, i); if (t >= 0. && t < 2.5) { occ += 1. - t / 2.5; break; } } }
+  return 1. - min(1., occ / 8. * 1.4) * 0.85; }
 float lightAt(vec3 w) { vec4 l = uLight * vec4(w, 1.); vec3 q = l.xyz * 0.5 + 0.5; if (q.x <= 0. || q.y <= 0. || q.x >= 1. || q.y >= 1. || q.z >= 1.) return 1.; float t = 0., px = 1.6 / float(textureSize(uShadow, 0).x); for (int i = -1; i <= 1; i++) for (int j = -1; j <= 1; j++) t += texture(uShadow, vec3(q.xy + vec2(i, j) * px, q.z - 0.0015)); return t / 9.; }   /* soft edges: nine filtered looks (review 111) */
 `;
 const OBJ_VS = `#version 300 es
@@ -97,6 +112,7 @@ vec4 artOn(vec3 p, vec3 n, float part) { vec3 w = pow(abs(n), vec3(4.)); w /= w.
 float h3(vec3 p) { p = fract(p * 0.3183099 + 0.1); p *= 17.; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
 float vnoise(vec3 x) { vec3 i = floor(x), f = fract(x); f = f * f * (3. - 2. * f);
   return mix(mix(mix(h3(i), h3(i + vec3(1, 0, 0)), f.x), mix(h3(i + vec3(0, 1, 0)), h3(i + vec3(1, 1, 0)), f.x), f.y), mix(mix(h3(i + vec3(0, 0, 1)), h3(i + vec3(1, 0, 1)), f.x), mix(h3(i + vec3(0, 1, 1)), h3(i + vec3(1, 1, 1)), f.x), f.y), f.z); }
+float vn3(vec3 x) { return vnoise(x); }
 float fbm(vec3 p) { float a = 0.5, s = 0.; for (int i = 0; i < 4; i++) { s += a * vnoise(p); p *= 2.03; a *= 0.5; } return s / 0.9375; }
 vec3 rustAt(float t) { vec3 R[6] = vec3[6](vec3(184, 104, 46), vec3(156, 80, 34), vec3(126, 60, 26), vec3(92, 42, 20), vec3(60, 30, 16), vec3(40, 21, 12)); float k = clamp(t, 0., 1.) * 4.999; int i = int(k); return mix(R[i], R[min(5, i + 1)], fract(k)) / 255.; } uniform float uOutline; uniform int uMode; uniform vec4 uSil; uniform float uGlass;
 uniform int uDecN; uniform vec3 uDecO[4], uDecN_[4], uDecUp[4]; uniform float uDecR[4]; uniform sampler2D uDecTex;
@@ -112,7 +128,8 @@ void main() {
   if (uMode == 2) {   // glass: mirrors more at a glancing angle, laid over at its own strength
     float F = 0.06 + 0.94 * pow(1. - abs(ne), 4.); vec3 env = envAt(rz), tint = kind == 4 ? base : vec3(150., 172., 182.) / 255.;
     float k = 0.62 + 0.45 * d + (n.z > 0.3 ? 0.1 : 0.); vec3 c = tint * (1. - 0.55 * (0.4 + F)) + env / k * 0.55 * (0.4 + F);
-    oCol = vec4(uHDRo == 1 ? toLin(min(vec3(1.), c * k)) * (1. + 2.5 * F) : min(vec3(1.), c * k), min(1., (kind == 4 ? uGlass + 0.15 : uGlass) + (1. - uGlass) * F * 0.7)); oId = vec4(0.); oN = vec4(0.); oV = velo(); return; }
+    vec3 hg = normalize(uSun + uEye); float glint = D_GGX(max(0., dot(n, hg)), 0.03) * 0.04 * max(0., dot(n, uSun)) * sh * uSpecK;   /* the sun caught in the glass */
+    oCol = vec4(uHDRo == 1 ? toLin(min(vec3(1.), c * k)) * (1. + 2.5 * F) + SUN_E * glint * 0.6 : min(vec3(1.), c * k), min(1., (kind == 4 ? uGlass + 0.15 : uGlass) + (1. - uGlass) * F * 0.7)); oId = vec4(0.); oN = vec4(0.); oV = velo(); return; }
   if (kind == 1 && uDecN > 0) for (int i = 0; i < 4; i++) { if (i >= uDecN) break;
     vec3 dd = vObj - uDecO[i]; float depth = dot(dd, uDecN_[i]); if (abs(depth) > uDecR[i] * 0.8 || abs(dot(vObjN, uDecN_[i])) < 0.45) continue;
     vec3 rt = normalize(cross(uDecN_[i], uDecUp[i])); vec2 uv = vec2(dot(dd, rt), dot(dd, uDecUp[i])) / uDecR[i] * 0.5 + 0.5; if (any(lessThan(uv, vec2(0.))) || any(greaterThan(uv, vec2(1.)))) continue;
@@ -148,7 +165,12 @@ void main() {
       if (uWear.z > 0.) {   // road dirt: thrown up low on the body and the wheels, dust settling on what faces up
         float dz = uWear.z * (1.15 - smoothstep(0.1, 0.9, Z)) * (0.6 + 0.9 * fbm(P * vec3(9., 9., 3.))) + uWear.z * 0.3 * max(0., nw.z) * fbm(P * 3.1);
         dz = clamp(dz, 0., 0.94); base = mix(base, mix(vec3(0.38, 0.31, 0.22), vec3(0.52, 0.46, 0.37), fbm(P * 21.)), dz); rough = mix(rough, 0.96, dz); coat *= 1. - dz; metal *= 1. - dz; } }
-    oCol = vec4(present(pbr(base, nw, uEye, uSun, sh, metal, rough, coat)), 1.); oId = vec4(uObj, vPart / 255., uOutline / 8.); oN = vec4(nw * 0.5 + 0.5, metal > 0.5 ? 1. - rough : coat * (1. - rough) * 0.5); oV = velo(); return; }
+    // each material's own (review 112): chrome nearly a mirror, the lacquer's faint orange peel, leather polished, cloth fuzzy, rubber's dull sheen, varnished wood
+    float sheen = 0.; if (metal > 0.5 && vGloss > 0.7) rough = min(rough, 0.07);
+    if (kind == 1) { vec3 q = vObj / 1000. * 45.; nw = normalize(nw + (vec3(vn3(q), vn3(q + 7.1), 0.) - 0.5) * 0.05); }
+    else if (kind == 8) { sheen = 0.35; coat = max(coat, 0.15); } else if (kind == 7) { sheen = 0.6; rough = 0.95; } else if (kind == 5) { sheen = 0.18; } else if (kind == 6) coat = max(coat, 0.55); else if (kind == 9) { coat = 1.; rough = 0.05; }
+    float ao = rtao(vWorld, nw);
+    oCol = vec4(present(pbrX(base, nw, uEye, uSun, sh, metal, rough, coat, ao, sheen)), 1.); oId = vec4(uObj, vPart / 255., uOutline / 8.); oN = vec4(nw * 0.5 + 0.5, metal > 0.5 ? 1. - rough : coat * (1. - rough) * 0.5); oV = velo(); return; }
   float dq = floor(d * 4. + 0.5) / 4.;
   vec3 diff = SUN_C * dq * 0.78 + (SKY_C * up + GROUND_C * (1. - up)) * 0.6, c;
   vec3 env = envAt(rz);
@@ -171,7 +193,7 @@ void main() { vec3 c = vCol.rgb;
   if (vFlag > 0.5 && uLook == 0) { vec2 cell = floor(vWorld.xy / vec2(uCell * 2., uCell)); float h = hash(cell); if (h > 0.955) c = vec3(107., 130., 83.) / 255.; else if (h > 0.91) c = vec3(83., 104., 63.) / 255.; }
   if (uLook > 0) { vec3 nn = normalize(cross(dFdx(vWorld), dFdy(vWorld))); if (nn.z < 0.) nn = -nn; float sh = lightAt(vWorld + vec3(0., 0., 0.02));   // the ground as a rough, dull surface
     Detail dt = detail(vFlag > 0.5 ? 1 : 0, vWorld, nn, vFlag > 0.5 ? 0.8 : 0.7, 0.6, 0.4);
-    oCol = vec4(present(pbr(c * dt.tone, dt.n, uEye, uSun, sh, 0., clamp(0.92 + dt.rough, 0.3, 1.), 0.)), vCol.a); oId = vec4(0.); oN = vec4(dt.n * 0.5 + 0.5, 0.); oV = velo(); return; }
+    oCol = vec4(present(pbrX(c * dt.tone, dt.n, uEye, uSun, sh, 0., clamp(0.92 + dt.rough, 0.3, 1.), 0., rtao(vWorld, dt.n), 0.)), vCol.a); oId = vec4(0.); oN = vec4(dt.n * 0.5 + 0.5, 0.); oV = velo(); return; }
   c = mix(c, vec3(24., 22., 20.) / 255., (1. - lightAt(vWorld + vec3(0., 0., 0.02))) * 0.43);
   oCol = vec4(c, vCol.a); oId = vec4(0.); oN = vec4(0.5, 0.5, 1., 0.); oV = velo(); }`;
 const DEPTH_VS = `#version 300 es
@@ -221,8 +243,8 @@ void main() { ivec2 p = ivec2(gl_FragCoord.xy), sz = textureSize(uDepth, 0); flo
   for (int k = 0; k < 12; k++) { float a = rot + float(k) * 2.399, r = 0.06 + 0.5 * fract(float(k) * 0.618 + float(bx) * 0.0625), up = 0.3 + 0.65 * fract(float(k) * 0.381);
     vec3 st = toScreen((t1 * cos(a) + t2 * sin(a)) * r * sqrt(1. - up * up) + n * r * up); ivec2 q = p + ivec2(st.xy); if (q.x < 0 || q.y < 0 || q.x >= sz.x || q.y >= sz.y) continue;
     float sd = texelFetch(uDepth, q, 0).r, rd = d0 + st.z; if (sd < rd - 0.05 * M && rd - sd < 0.7 * M) occ += 1. - (rd - sd) / (0.7 * M); }
-  float cs = 1.; if (dot(n, uSunD) > 0.15) { vec3 st = toScreen(uSunD); for (int k = 1; k <= 12; k++) { float t = float(k) * 0.03; ivec2 q = p + ivec2(st.xy * t); if (q.x < 0 || q.y < 0 || q.x >= sz.x || q.y >= sz.y) break;
-    float sd = texelFetch(uDepth, q, 0).r, rd = d0 + st.z * t; if (sd < rd - 0.02 * M && rd - sd < 0.3 * M) { cs = 0.68; break; } } }
+  float cs = 1.; if (dot(n, uSunD) > 0.1) { vec3 st = toScreen(uSunD); for (int k = 1; k <= 18; k++) { float t = float(k) * 0.04; ivec2 q = p + ivec2(st.xy * t); if (q.x < 0 || q.y < 0 || q.x >= sz.x || q.y >= sz.y) break;
+    float sd = texelFetch(uDepth, q, 0).r, rd = d0 + st.z * t; if (sd < rd - 0.02 * M && rd - sd < 0.45 * M) { cs = mix(0.42, 0.9, t / 0.72); break; } } }   /* nearer blockers, darker (review 112) */
   o = vec4(1. - min(1., occ / 12. * 1.6) * 0.75, cs, 0., 1.); }`;
 // ---- bloom (review 111): the light above white, halved four times and spread back up (a soft glow round highlights) ----
 const DOWN_FS = `#version 300 es
@@ -370,7 +392,11 @@ export class LiveRenderer {
     const texTo = (p: WebGLProgram) => { gl.uniform1i(this.loc(p, 'uTex'), this.tex ? 1 : 0); if (!this.tex) return; const t = this.tex;
       [t.alb, t.nor, t.rgh].forEach((x, i) => { gl.activeTexture(gl.TEXTURE3 + i); gl.bindTexture(gl.TEXTURE_2D_ARRAY, x); gl.uniform1i(this.loc(p, ['uAlb', 'uNor', 'uRgh'][i]!), 3 + i); });
       gl.uniform1fv(this.loc(p, 'uTSize'), t.size); gl.uniform1fv(this.loc(p, 'uTLuma'), t.luma); gl.uniform1fv(this.loc(p, 'uTRough'), t.rough); };
-    const shadowTo = (p: WebGLProgram) => { texTo(p); gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, this.sTex); gl.uniform1i(this.loc(p, 'uShadow'), 1); gl.uniformMatrix4fv(this.loc(p, 'uLight'), false, LV); };
+    const boxes = cars.slice().sort((a, b) => Math.hypot(a.x - v.x, a.y - v.y) - Math.hypot(b.x - v.x, b.y - v.y)).slice(0, 6), boxIdx = new Map(boxes.map((q, i) => [q, i]));
+    const boxTo = (p: WebGLProgram) => { gl.uniform1i(this.loc(p, 'uBoxN'), boxes.length); gl.uniform1i(this.loc(p, 'uSelf'), -1); if (!boxes.length) return;
+      gl.uniform3fv(this.loc(p, 'uBoxC'), boxes.flatMap(q => { const H = q.g.height; return [q.x, q.y, q.z + 0.18 + (H - 0.18) / 2]; }));
+      gl.uniform3fv(this.loc(p, 'uBoxE'), boxes.flatMap(q => [q.g.len / 2000 * 0.9, q.g.width / 2 * 0.85, (q.g.height - 0.18) / 2 * 0.8])); gl.uniform2fv(this.loc(p, 'uBoxR'), boxes.flatMap(q => [Math.cos(q.yaw), Math.sin(q.yaw)])); };
+    const shadowTo = (p: WebGLProgram) => { texTo(p); boxTo(p); gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, this.sTex); gl.uniform1i(this.loc(p, 'uShadow'), 1); gl.uniformMatrix4fv(this.loc(p, 'uLight'), false, LV); };
     gl.useProgram(this.ground); gl.uniformMatrix4fv(this.loc(this.ground, 'uVP'), false, VP); const hdrOn = this.hdr && (o.look ?? 0) === 2 ? 1 : 0; gl.uniform1i(this.loc(this.ground, 'uHDRo'), hdrOn); gl.uniform1f(this.loc(this.ground, 'uSpecK'), 1); gl.uniformMatrix4fv(this.loc(this.ground, 'uPrevVP'), false, this.prevVP ?? VP); gl.uniform2f(this.loc(this.ground, 'uSize'), v.W, v.H); gl.uniform1i(this.loc(this.ground, 'uLook'), o.look ?? 0); gl.uniform1f(this.loc(this.ground, 'uTexK'), o.texK ?? 1); gl.uniform1f(this.loc(this.ground, 'uLightK'), o.lightK ?? 1); gl.uniform3fv(this.loc(this.ground, 'uSun'), SUN_W); gl.uniform3fv(this.loc(this.ground, 'uEye'), eye); gl.uniform1f(this.loc(this.ground, 'uCell'), Math.max(0.03, v.mm / 1000)); gl.uniform1f(this.loc(this.ground, 'uBias'), 0); shadowTo(this.ground);
     if (this.groundVao) { gl.bindVertexArray(this.groundVao); gl.drawArrays(gl.TRIANGLES, 0, this.groundN); }
     if (this.fenceVao && this.fenceN) { gl.bindVertexArray(this.fenceVao); gl.drawArrays(gl.TRIANGLES, 0, this.fenceN); }
@@ -398,7 +424,7 @@ export class LiveRenderer {
     gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.NONE, gl.NONE, gl.NONE]); gl.uniform1f(this.loc(this.obj, 'uBias'), 0.25 / R);
     cars.forEach((q, i) => { gl.uniform4f(this.loc(this.obj, 'uSil'), 1, 226 / 255, 168 / 255, q.player ? 0.6 : 0.4); for (const [part, M, w] of carM[i]!.opaque) draw(part, M, w); });
     gl.disable(gl.STENCIL_TEST); gl.disable(gl.BLEND); gl.depthFunc(gl.LESS); gl.depthMask(true); gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.COLOR_ATTACHMENT1, gl.COLOR_ATTACHMENT2, gl.COLOR_ATTACHMENT3]); gl.uniform1f(this.loc(this.obj, 'uBias'), 0); gl.uniform1i(this.loc(this.obj, 'uMode'), 0);
-    cars.forEach((q, i) => { objU(outlineC); const m = carM[i]!; gl.uniform3fv(this.loc(this.obj, 'uWear'), q.wear ?? [0, 0, 0]); gl.uniform1f(this.loc(this.obj, 'uCarH'), q.g.height); artTo(q.g); decals(q.g); draw(q.g.body, m.body, undefined, `c${this.idOf(q.g)}:0`); decals(null); m.opaque.slice(1).forEach(([part, M, w], j) => draw(part, M, w, `c${this.idOf(q.g)}:${j + 1}`)); });
+    cars.forEach((q, i) => { objU(outlineC); const m = carM[i]!; gl.uniform1i(this.loc(this.obj, 'uSelf'), boxIdx.get(q) ?? -1); gl.uniform3fv(this.loc(this.obj, 'uWear'), q.wear ?? [0, 0, 0]); gl.uniform1f(this.loc(this.obj, 'uCarH'), q.g.height); artTo(q.g); decals(q.g); draw(q.g.body, m.body, undefined, `c${this.idOf(q.g)}:0`); decals(null); m.opaque.slice(1).forEach(([part, M, w], j) => draw(part, M, w, `c${this.idOf(q.g)}:${j + 1}`)); });
     // smoke: parcels far to near, blended over what is drawn, hidden behind what stands before them
     if (o.smoke && o.smoke.n) { const S = o.smoke; if (!this.smokeVao) { this.smokeVao = gl.createVertexArray()!; gl.bindVertexArray(this.smokeVao); const corners = gl.createBuffer()!; gl.bindBuffer(gl.ARRAY_BUFFER, corners); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, 1, 1, -1, -1, 1, 1, -1, 1]), gl.STATIC_DRAW);
         gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0); this.smokeBuf = gl.createBuffer()!; gl.bindBuffer(gl.ARRAY_BUFFER, this.smokeBuf);

@@ -52,19 +52,19 @@ function splitTyres(M: Mesh, tris: number[], hub: [number, number, number]): Mes
 }
 /** a mesh on the GPU: the body, each road wheel apart (to steer and turn it about its hub), the glass apart (drawn last),
  *  and its decals as pictures */
-export interface GpuMesh { len: number; body: Part; glass: Part; wheels: { part: Part; glass: Part | null; hub: [number, number, number]; front: boolean; /** the tyre's outer and inner radius (mm) */ R: number; rim: number }[]; decals: Decal[]; decalTex: WebGLTexture | null; radius: number; height: number }
+export interface GpuMesh { len: number; body: Part; glass: Part; wheels: { part: Part; glass: Part | null; hub: [number, number, number]; front: boolean; /** the tyre's outer and inner radius (mm) */ R: number; rim: number }[]; decals: Decal[]; decalTex: WebGLTexture | null; radius: number; height: number; width: number }
 const GLASS = KINDS.indexOf('glass'), SHINE = KINDS.indexOf('shine'), TYRE = KINDS.indexOf('tyre');
 export function gpuMesh(gl: WebGL2RenderingContext, M: Mesh, wheels = true): GpuMesh {
   const W = wheels ? wheelsOf(M) : [], inWheel = new Int32Array(M.n).fill(-1); W.forEach((w, k) => { for (const t of w.tris) inWheel[t] = k; });
   const isGlass = (t: number) => M.kind[t] === GLASS || M.kind[t] === SHINE, body: number[] = [], glass: number[] = [];
   for (let t = 0; t < M.n; t++) if (inWheel[t]! < 0) (isGlass(t) ? glass : body).push(t);
-  let R = 0, Z = 0; for (let i = 0; i < M.pos.length; i += 3) { R = Math.max(R, Math.hypot(M.pos[i]! - M.length / 2, M.pos[i + 1]!)); Z = Math.max(Z, M.pos[i + 2]!); }
+  let R = 0, Z = 0, Y = 0; for (let i = 0; i < M.pos.length; i += 3) { R = Math.max(R, Math.hypot(M.pos[i]! - M.length / 2, M.pos[i + 1]!)); Z = Math.max(Z, M.pos[i + 2]!); Y = Math.max(Y, Math.abs(M.pos[i + 1]!)); }
   const decals = (M.decals ?? []).slice(0, 4); let decalTex: WebGLTexture | null = null;
   if (decals.length) { const S = 128; decalTex = gl.createTexture()!; gl.bindTexture(gl.TEXTURE_2D, decalTex); const all = new Uint8Array(S * 4 * S * 4);
     decals.forEach((d, k) => { const pic = decalPicture(d, S); for (let j = 0; j < S; j++) all.set(pic.subarray(j * S * 4, (j + 1) * S * 4), (j * S * 4 + k * S) * 4); });
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, S * 4, S, 0, gl.RGBA, gl.UNSIGNED_BYTE, all); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE); }
-  return { len: M.length, body: upload(gl, M, body), glass: upload(gl, M, glass), decals, decalTex, radius: R / 1000, height: Z / 1000,
+  return { len: M.length, body: upload(gl, M, body), glass: upload(gl, M, glass), decals, decalTex, radius: R / 1000, height: Z / 1000, width: 2 * Y / 1000,
     wheels: W.map(w => { const hub: [number, number, number] = [w.hx, w.hy, w.hz], ts = w.tris.filter(t => !isGlass(t)), gs = w.tris.filter(isGlass);
       let R = 0, rim = Infinity; for (const t of w.tris) { if (M.kind[t] !== TYRE) continue; for (let k = 0; k < 3; k++) { const q = t * 9 + k * 3, r = Math.hypot(M.pos[q]! - w.hx, M.pos[q + 2]! - w.hz); R = Math.max(R, r); rim = Math.min(rim, r); } }
       const S = splitTyres(M, ts, hub); return { part: upload(gl, S, Array.from({ length: S.n }, (_, k) => k)), glass: gs.length ? upload(gl, M, gs, hub) : null, hub, front: w.front, R: R || w.r, rim: Number.isFinite(rim) ? rim : w.r * 0.7 }; }) }; }

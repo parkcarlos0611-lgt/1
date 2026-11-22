@@ -66,3 +66,13 @@ Each with a switch on the page to compare, and checked for its cost.
 - Depth of field: focused at the car's middle height over the camera's target, sharp within 1.2 m of it, the rest
   gathered over a disc by its distance (a tilt-shift look from this camera).
 Sliders on the page for reflection and gloss, occlusion, bloom and depth of field.
+
+## Review 112: motion, the fence, traced occlusion, materials
+- Motion blur from a velocity layer (each thing's own motion across the picture since the last frame), smeared only
+  through what moves alike.
+- The fence solid (posts and rails in chunks) and its broken pieces rigid bodies, under every effect.
+- Occlusion traced: each car a box; eight cosine-weighted rays from every surface traced against the boxes exactly
+  (the road under a car, a neighbour's flank), cutting the sky's light and the lacquer's sky reflection; the screen-space
+  occlusion and a longer, graded contact shadow on top.
+- Materials: chrome nearly a mirror (roughness 0.07 at most), the lacquer's faint orange peel, leather polished with a
+  sheen, cloth fuzzy (a grazing sheen), rubber's dull sheen, varnished wood, lamp glass coated, the sun caught in glass.

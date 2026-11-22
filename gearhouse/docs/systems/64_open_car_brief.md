@@ -47,6 +47,11 @@ width or height was found. Scale by the wheelbase; report how far the sheet's le
   the elements in the list below. Do not change the chassis layer (parts with `layer: 'chassis'`): it is generated for
   the under view and the engine swap. The game will hide a chassis part where a `vis_` part of the same element is drawn.
 
+## Screens in the plan view (decision 2026-11-22)
+A raked screen seen from above shows only its frame's top edge: draw the plan outline of the frame as a thin bar
+where the top edge lies (its x read off the side view), and give the glass no plan outline. This holds for every car
+from now on, open or closed.
+
 ## Element names (use these; the four builds are compared part by part)
 Existing elements, as the sedans use them: `body`, `hood`, `cowl`, `radiator`, `lamp`, `fenderF`, `fenderR`, `apron`,
 `board`, `bumperF`, `bumperR`, `tail` (the tail lamp), `screen`, `spare`, `wheel`, `house`, `tank`, `exhaust`, `axle`,
@@ -64,6 +69,11 @@ New elements for open cars:
 | `damper` | a shock absorber seen from outside | — |
 | `chain` | the chain case or sprockets of a chain-driven car | — |
 | `filler` | a fuel or radiator filler cap standing above the body | — |
+| `marker` | a small knob or lamp on a wing's crown (added after the first build) | — |
+| `mirror` | a mirror on its arm (added after the first build) | — |
+
+Small uprights or overriders on the front or rear valance belong to `bumperF` / `bumperR` (a car with no cross bar
+may still have them).
 
 - Cycle wings are `fenderF` / `fenderR` in the `fenderF` / `fenderR` slots (they mount at the wheel). A car with no
   running board has no `board` part.

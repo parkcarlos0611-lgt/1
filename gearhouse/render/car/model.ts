@@ -47,7 +47,7 @@ const lerp = (r: [number, number], u: number) => r[0] + (r[1] - r[0]) * u;
 export function viewDesign(m: CarModel, view: ViewName, only?: (p: CarPart) => boolean, opt: { chassis?: boolean } = {}): CarDesign {
   // the chassis views: the chassis parts with the frame, axles, springs, tyres and wheels; the body views leave the chassis out
   const RUNNING = new Set(['frame', 'axle', 'spring', 'wheel']);
-  if (!only) only = opt.chassis ? (p => p.layer === 'chassis' || RUNNING.has(p.element)) : (p => p.layer !== 'chassis');
+  if (!only) only = opt.chassis ? (p => p.layer === 'chassis' || (RUNNING.has(p.element) && !p.id.startsWith('vis_'))) : (p => p.layer !== 'chassis');   // vis_: running gear drawn off the sheet for the body views only
   const key: OutlineKey = view === 'left' || view === 'right' ? 'side' : view, C = m.width / 2;
   const depth = (p: CarPart) => (key === 'side' ? Math.max(Math.abs(p.box.y[0]), Math.abs(p.box.y[1])) : key === 'front' ? -p.box.x[0] : key === 'rear' ? p.box.x[1] : p.box.z[1]) + (p.lift ?? 0) * 3;
   type Item = { d: number; n: number; p?: CarPart; sign?: 1 | -1; w?: number };

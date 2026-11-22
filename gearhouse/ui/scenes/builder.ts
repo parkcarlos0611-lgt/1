@@ -19,9 +19,11 @@ import dodge from '../../data/cars/sheet/dodgeV28.json';
 import willys from '../../data/cars/sheet/willys27.json';
 import buick from '../../data/cars/sheet/buick28.json';
 import hudson from '../../data/cars/trial/hudson26_hudson_fable.json';
+import fnTT from '../../data/cars/sheet/fnTT33.json';
+import bmw from '../../data/cars/sheet/bmw315.json';
 
 const CARS: { m: CarModel; short: string }[] = [
-  [fordT, '1923 소형'], [chev, '1928 경세단'], [plym, '1929 경4기통'], [pontiac, '1929 6기통'], [dodge, '1928 6기통'], [willys, '1927 슬리브'], [buick, '1928 4도어'], [hudson, '1926 대형']]
+  [fordT, '1923 소형'], [chev, '1928 경세단'], [plym, '1929 경4기통'], [pontiac, '1929 6기통'], [dodge, '1928 6기통'], [willys, '1927 슬리브'], [buick, '1928 4도어'], [hudson, '1926 대형'], [fnTT, '1933 경스포츠'], [bmw, '1935 로드스터']]
   .map(([m, s]) => ({ m: m as unknown as CarModel, short: s as string }));
 const GRADE: Record<Grade, [string, RGB]> = { own: ['원래', hex('#8a8478')], fits: ['맞음', hex('#3f6e3a')], work: ['손봄', hex('#b07a1e')], no: ['안 맞음', hex('#a8402c')], none: ['없음', hex('#5a5550')] };
 const BG: RGB = hex('#e6e2d6'), TILE: RGB = hex('#efebe0');
@@ -114,7 +116,7 @@ export function builderScene(app: App): Scene {
       (['parts', 'engine', 'paint'] as const).forEach((md, i) => { if (ui.tab('mode' + md, { x: 184 + i * 64, y: 6, w: 60, h: 12 }, ({ parts: '부품', engine: '엔진', paint: '칠 · 낡음' } as const)[md], mode === md)) { mode = md; picker = false; } });
       // the base car
       const left = { x: 4, y: 24, w: 172, h: 222 }; ui.panel(left, 'card'); ui.label({ x: 10, y: 27, w: 160, h: 9 }, '바탕 차', COL.inkSoft);
-      CARS.forEach((c, k) => { const r = { x: 10 + (k % 2) * 81, y: 38 + Math.floor(k / 2) * 15, w: 78, h: 13 }; if (ui.tab('base' + k, r, c.short, base === k)) { base = k; for (const s in pick) delete pick[s as Slot]; for (const s in adj) delete adj[s as Slot]; grades.clear(); sel = null; picker = false; } });
+      CARS.forEach((c, k) => { const r = { x: 10 + (k % 2) * 81, y: 37 + Math.floor(k / 2) * 12, w: 78, h: 11 }; if (ui.tab('base' + k, r, c.short, base === k)) { base = k; for (const s in pick) delete pick[s as Slot]; for (const s in adj) delete adj[s as Slot]; grades.clear(); sel = null; picker = false; } });
       // the slots: click one to choose its part
       const c = build(); ui.label({ x: 10, y: 100, w: 160, h: 9 }, '자리 · 끼운 부품 · 맞음', COL.inkSoft);
       SLOTS.forEach((s, k) => { const y = 111 + k * 15, cur = pick[s.id], f = c.fits[s.id] ?? { grade: 'own' as Grade, notes: [], change: 0 };
@@ -126,13 +128,13 @@ export function builderScene(app: App): Scene {
         const slot = sel, name = SLOTS.find(q => q.id === slot)!.name; ui.label({ x: 186, y: 27, w: 220, h: 9 }, `${name}: 끼울 부품을 고른다`, COL.ink);
         if (ui.button('pclose', { x: 420, y: 26, w: 50, h: 12 }, '닫기')) picker = false;
         const opts: (number | null)[] = [...CARS.map((_, k) => k), null];
-        opts.forEach((k, i) => { const tx = 184 + (i % 3) * 97, ty = 40 + Math.floor(i / 3) * 68, tw = 94, th = 65;
+        opts.forEach((k, i) => { const tx = 184 + (i % 4) * 72, ty = 40 + Math.floor(i / 4) * 66, tw = 70, th = 63;
           const chosen = (pick[slot] === undefined ? base : pick[slot]) === k, hov = ui.pointer().x >= tx && ui.pointer().x < tx + tw && ui.pointer().y >= ty && ui.pointer().y < ty + th;
           S.fill(tx - 1, ty - 1, tw + 2, th + 2, chosen ? COL.ok : hov ? COL.lit : COL.card2);
-          if (k === null) { S.fill(tx, ty, tw, th - 12, TILE); ui.label({ x: tx, y: ty + 22, w: tw, h: 9 }, slot === 'wheel' ? '(뺄 수 없음)' : '달지 않기', COL.inkSoft, 'c'); }
-          else { const im = thumb(slot, k); if (im) blit(im, tx, ty, tw, th - 12, TILE); else { S.fill(tx, ty, tw, th - 12, TILE); ui.label({ x: tx, y: ty + 22, w: tw, h: 9 }, '이 차엔 없음', COL.inkSoft, 'c'); } }
+          if (k === null) { S.fill(tx, ty, tw, th - 21, TILE); ui.label({ x: tx, y: ty + 18, w: tw, h: 9 }, slot === 'wheel' ? '(뺄 수 없음)' : '달지 않기', COL.inkSoft, 'c'); }
+          else { const im = thumb(slot, k); if (im) blit(im, tx, ty, tw, th - 21, TILE); else { S.fill(tx, ty, tw, th - 21, TILE); ui.label({ x: tx, y: ty + 18, w: tw, h: 9 }, '이 차엔 없음', COL.inkSoft, 'c'); } }
           const gk = `${base}|${slot}|${k}`; let g = grades.get(gk); if (g === undefined) { g = k === null ? 'none' : k === base ? 'own' : fitSlot(CARS[base]!.m, CARS[k]!.m, slot).fit.grade; grades.set(gk, g); }
-          const [gl, gc] = GRADE[g]; S.fill(tx, ty + th - 11, tw, 11, gc); ui.label({ x: tx + 2, y: ty + th - 10, w: tw - 4, h: 9 }, `${k === null ? '없음' : CARS[k]!.short} · ${gl}`, COL.cream, 'c');
+          const [gl, gc] = GRADE[g]; S.fill(tx, ty + th - 21, tw, 10, TILE); ui.label({ x: tx, y: ty + th - 21, w: tw, h: 9 }, k === null ? '없음' : CARS[k]!.short, COL.ink, 'c'); S.fill(tx, ty + th - 11, tw, 11, gc); ui.label({ x: tx + 2, y: ty + th - 10, w: tw - 4, h: 9 }, gl, COL.cream, 'c');
           if (hov && ui.missed() && !(k === null && slot === 'wheel')) { if (k === base) delete pick[slot]; else pick[slot] = k; picker = false; app.sound.once('tick'); } });
         return;
       }

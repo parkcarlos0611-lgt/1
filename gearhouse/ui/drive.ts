@@ -13,6 +13,9 @@ import { renumber } from '../render/car/mesh';
 import { LiveRenderer } from '../render/live/renderer';
 import { groundData, fenceData } from '../render/live/ground';
 import { Smoke, type SmokeKind } from '../race/smoke';
+import { Debris } from '../race/debris';
+import { fenceChunk, pieceMesh, CHUNK } from '../render/live/fence';
+import { mul as m4mul, translate as m4t, rot as m4rot, scale as m4s } from '../render/live/gpu';
 import texAlb from '../assets/textures/pbr/albedo.jpg';
 import texNor from '../assets/textures/pbr/normal.jpg';
 import texRgh from '../assets/textures/pbr/rough.jpg';
@@ -75,11 +78,17 @@ function artFor(L: LiveRenderer, g: ReturnType<LiveRenderer['car']>, id: string,
 const liveOK = !!live; let liveR = live; let look: 'baked' | 'stepped' | 'pbr' | 'split' = 'pbr';   /* the light and materials: the baked pictures' stepped light, or physically based (review 102) */
 function drawLive(el: number) { const L = live!; void el;
   if (++wearTick % 30 === 0 && document.activeElement?.id !== 'wdirt') $<HTMLInputElement>('wdirt').value = myWear[2].toFixed(2);   /* the dirt slider follows the dirt */
-  if (broken.size !== liveFence) { L.setFence(fenceData(T, fenceOk)); liveFence = broken.size; }
+  if (broken.size !== liveFence) { liveFence = broken.size; for (const k of [...fenceGpu.keys()]) if (dirtyChunks.has(k)) fenceGpu.delete(k); dirtyChunks.clear(); }
   glCanvas.width = VW; glCanvas.height = VH;
   const list = race ? race.cars.map(e => ({ c: e.car, sp: e.driver ? others.get(e)! : sprites, turn: e.wheelTurn })) : [{ c: car, sp: sprites, turn: wheelTurn }];
   const cars = list.map(({ c, sp, turn }, k) => ({ wear: wearOf(c, k), g: (() => { const g = L.car(sp.mesh); artFor(L, g, c.spec.id, sp.mesh); return g; })(), tyres: c.rings, x: c.x, y: c.y, z: T.height(c.s, c.off) + c.zb - (c.rings[0]!.rest + c.rings[2]!.rest) / 2,   /* drawn lower by the tyres' standing give: the flattened tread on the road */ yaw: c.yaw, roll: c.tilt + c.roll * 1.5, pitch: c.pitch, steerL: c.steerAt(0), steerR: c.steerAt(1), spin: turn, player: c === car }));
-  const props = [...SCN.props, ...trainCars()].flatMap(q => { const f = PROPS[q.kind]; return f ? [{ g: L.prop(q.kind, f), x: q.x, y: q.y, z: q.z ?? 0, h: q.heading }] : []; });
+  const props: import('../render/live/renderer').LiveProp[] = [...SCN.props, ...trainCars()].flatMap(q => { const f = PROPS[q.kind]; return f ? [{ g: L.prop(q.kind, f), x: q.x, y: q.y, z: q.z ?? 0, h: q.heading }] : []; });
+  // the fence (review 112): solid, in chunks near the camera, lit, shadowed and outlined as everything else; its loose pieces
+  { const near = T.locate(camX, camY, car.s).s, nC = Math.ceil(T.length / CHUNK); for (let d = -5; d <= 5; d++) for (const side of [-1, 1]) { const c = ((Math.floor(near / CHUNK) + d) % nC + nC) % nC, key = `${side}:${c}`;
+      let f = fenceGpu.get(key); if (f === undefined) { const ch = fenceChunk(T, side, c, fenceOk); f = ch ? { g: L.car(ch.mesh), m: m4mul(m4t(...ch.origin), m4s(1 / 1000)), x: ch.origin[0], y: ch.origin[1] } : null; fenceGpu.set(key, f); }
+      if (f) props.push({ g: f.g, x: f.x, y: f.y, z: 0, h: 0, m: f.m, outline: 1 }); }
+    for (const p of debris3.pieces) { const g = L.prop(`fence_${p.kind}`, () => pieceMesh(p.kind)), shrink = Math.min(1, p.life / 1.5), sx = (p.kind === 'rail' ? p.len : 1) * shrink / 1000;
+      props.push({ g, x: p.x, y: p.y, z: p.z, h: 0, outline: 1, key: `d${p.id}`, m: m4mul(m4t(p.x, p.y, p.z), m4mul(m4rot('z', p.yaw), m4mul(m4rot('y', p.pitch), m4mul(m4rot('x', p.roll), new Float32Array([sx, 0, 0, 0, 0, shrink / 1000, 0, 0, 0, 0, shrink / 1000, 0, 0, 0, 0, 1]))))) }); } }
   // the smoke: exhaust from the tail when the throttle is opened hard low in the revs (rich old engines); then a step
   { const ex = (c0: Vehicle) => { const L = c0.spec.wheelbase * c0.spec.frontShare + 0.9, z = T.height(c0.s, c0.off); smoke.emit('exhaust', c0.x - Math.cos(c0.yaw) * L, c0.y - Math.sin(c0.yaw) * L, z + 0.35, -Math.cos(c0.yaw) * 2 + c0.vx * Math.cos(c0.yaw) * 0.6, -Math.sin(c0.yaw) * 2 + c0.vx * Math.sin(c0.yaw) * 0.6, 0.3, 1, z); };
     if (input.throttle > 0.7 && car.rpm < car.spec.hpRpm * 0.6 && Math.random() < 0.25) ex(car); smoke.step(Math.min(0.05, el)); }
@@ -95,7 +104,7 @@ function drawLive(el: number) { const L = live!; void el;
   drawDebris(el);
   if (car.speed > 30) { const v = Math.min(1, (car.speed - 30) / 30) * 0.35, g = main.createRadialGradient(VW / 2, VH / 2, VH * 0.35, VW / 2, VH / 2, VW * 0.62); g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, `rgba(0,0,0,${v})`); main.fillStyle = g; main.fillRect(0, 0, VW, VH); } }
 
-function choose(id: string) { carId = id; propSprites.clear(); broken.clear(); debris.length = 0; const spec = raceSpec(id), m = MESH_CARS.find(c => c.id === id)!;
+function choose(id: string) { carId = id; propSprites.clear(); broken.clear(); debris.length = 0; debris3.pieces.length = 0; fenceGpu.clear(); const spec = raceSpec(id), m = MESH_CARS.find(c => c.id === id)!;
   car = new Vehicle(spec, T); car.auto = st.auto; car.place(START + 30, 0, 0); manualGear = 1;
   sprites = new CarSprites(meshOf(id, myNum), mm, pitchDeg, spec.steerLock * Math.PI / 180, { outline: 3, glass: 0.8 }, matchMedia('(pointer: coarse)').matches ? 1200 : 2400); sprites.prepare([0]); (live ? 0 : sprites.work(500)); sprites.prepare([-1, 1, -2, 2, -3, -4, -5]); camAng = car.yaw;
   pilot = new Driver(T); lapStart = -1; lastLap = 0; bestLap = 0; skids.length = 0; puffs.length = 0; say(`${spec.name} · 출발선 뒤에서 시작`); }
@@ -237,18 +246,26 @@ function hiddenPart(c: Drawn, by: Drawn[]): HTMLCanvasElement | null { const w =
   if (!any) return null; hidCx.clearRect(0, 0, hidCv.width, hidCv.height); hidCx.putImageData(im, 0, 0); return hidCv; }
 /** the whole picture: the layer behind (blurred by the camera's motion), the player's car sharp, what stands before it, the hidden cars' outlines */
 // ---- the fence: a car that reaches it smashes a few metres of it into flying pieces ----
+const debris3 = new Debris(), dirtyChunks = new Set<string>(), fenceGpu = new Map<string, { g: ReturnType<LiveRenderer['car']>; m: Float32Array; x: number; y: number } | null>();   /* the fence as solid things, its pieces as bodies (review 112) */
 const broken = new Set<string>(), debris: { x: number; y: number; z: number; vx: number; vy: number; vz: number; a: number; va: number; len: number; col: string; life: number }[] = [];
 const FENCE = T.spec.width / 2 + 1.5, fenceOk = (side: number, m: number) => !broken.has(`${side}:${((m % Math.round(T.length)) + Math.round(T.length)) % Math.round(T.length)}`);
 function fence(c: Vehicle) { const side = Math.sign(c.off), reach = Math.abs(c.off) + c.spec.track / 2 + 0.3; if (reach < FENCE || Math.abs(c.off) > FENCE + 3) return; const m = Math.floor(c.s); if (!fenceOk(side, m)) return;
   const sp = Math.hypot(c.vx, c.vy); if (sp < 2) return;
   for (let k = -2; k <= 3; k++) broken.add(`${side}:${((m + k) % Math.round(T.length) + Math.round(T.length)) % Math.round(T.length)}`);
   const vxW = c.vx * Math.cos(c.yaw) - c.vy * Math.sin(c.yaw), vyW = c.vx * Math.sin(c.yaw) + c.vy * Math.cos(c.yaw), n = 10 + Math.floor(Math.min(14, sp / 3));
+  for (let k = -2; k <= 3; k++) dirtyChunks.add(`${side}:${Math.floor((((m + k) % Math.round(T.length)) + Math.round(T.length)) % Math.round(T.length) / CHUNK)}`);
   for (let k = 0; k < n; k++) { const p = T.point(c.s + (Math.random() - 0.3) * 5, side * FENCE), post = Math.random() < 0.3, f = 0.35 + Math.random() * 0.6;
+    debris3.add({ kind: post ? 'post' : 'rail', len: post ? 1 : 0.6 + Math.random() * 1.6, x: p.x, y: p.y, z: T.height(c.s, side * FENCE) + 0.4 + Math.random() * 0.6, vx: vxW * f + (Math.random() - 0.5) * 5, vy: vyW * f + (Math.random() - 0.5) * 5, vz: 2 + Math.random() * sp * 0.22,
+      yaw: T.at(c.s).h + (Math.random() - 0.5), pitch: post ? 0 : (Math.random() - 0.5) * 0.4, roll: 0, wy: (Math.random() - 0.5) * 16, wp: (Math.random() - 0.5) * 18, wr: (Math.random() - 0.5) * 18, life: 40 });
     debris.push({ x: p.x, y: p.y, z: T.height(c.s, side * FENCE) + 0.3 + Math.random() * 0.7, vx: vxW * f + (Math.random() - 0.5) * 5, vy: vyW * f + (Math.random() - 0.5) * 5, vz: 2 + Math.random() * sp * 0.22, a: Math.random() * 6, va: (Math.random() - 0.5) * 22, len: post ? 0.9 : 0.6 + Math.random() * 1.6, col: post ? '#d9d2bf' : '#efe9dc', life: 6 + Math.random() * 3 }); }
   while (debris.length > 160) debris.shift();
   c.vx *= 0.86; c.vy *= 0.9; c.r += (Math.random() - 0.5) * 0.4;   // the blow costs speed and turns the car a little
   if (c === car) { snd?.crash(Math.min(1.3, sp / 20)); shake = 4; } else { const d = Math.hypot(c.x - car.x, c.y - car.y); if (d < 120) snd?.crash(Math.min(1, sp / 20) / (1 + (d / 25) ** 2)); } }
-function drawDebris(el: number) { for (let k = debris.length - 1; k >= 0; k--) { const d = debris[k]!; d.life -= el; if (d.life <= 0) { debris.splice(k, 1); continue; }
+function stepDebris3(el: number) { const cs = (race ? race.cars.map(e => e.car) : [car]).map(c => ({ x: c.x, y: c.y, vx: c.vx * Math.cos(c.yaw) - c.vy * Math.sin(c.yaw), vy: c.vx * Math.sin(c.yaw) + c.vy * Math.cos(c.yaw), r: c.spec.wheelbase * 0.7 }));
+  debris3.step(Math.min(0.05, el), (x, y) => { const q = T.locate(x, y, car.s); return Math.abs(q.off) < T.spec.width / 2 ? T.height(q.s, q.off) : 0; }, cs); }
+function drawDebris(el: number) { stepDebris3(el); if (!live) for (const d of debris3.pieces) { const L2 = (d.kind === 'rail' ? d.len : 1) / 2, ex = Math.cos(d.yaw) * Math.cos(d.pitch) * L2, ey = Math.sin(d.yaw) * Math.cos(d.pitch) * L2, ez = (d.kind === 'post' ? Math.cos(d.pitch) : Math.sin(d.pitch)) * L2;
+    const [X, Y] = P(d.x - ex, d.y - ey, d.z - ez), [X2, Y2] = P(d.x + ex, d.y + ey, d.z + ez); main.globalAlpha = Math.min(1, d.life / 1.5); main.strokeStyle = '#3a352c'; main.lineWidth = 3; main.beginPath(); main.moveTo(X, Y); main.lineTo(X2, Y2); main.stroke(); main.strokeStyle = '#efe9dc'; main.lineWidth = 1.5; main.beginPath(); main.moveTo(X, Y); main.lineTo(X2, Y2); main.stroke(); main.globalAlpha = 1; }
+  return;  for (let k = debris.length - 1; k >= 0; k--) { const d = debris[k]!; d.life -= el; if (d.life <= 0) { debris.splice(k, 1); continue; }
     d.vz -= 9.81 * el; d.x += d.vx * el; d.y += d.vy * el; d.z += d.vz * el; d.a += d.va * el; const q = T.locate(d.x, d.y, car.s), floor = Math.abs(q.off) < T.spec.width / 2 ? T.height(q.s, q.off) : 0;
     if (d.z < floor) { d.z = floor; d.vz = Math.abs(d.vz) * 0.3; d.vx *= 0.6; d.vy *= 0.6; d.va *= 0.6; if (Math.abs(d.vz) < 0.5) { d.vz = 0; d.va *= 0.8; } }
     const [X, Y] = P(d.x, d.y, d.z), [X2, Y2] = P(d.x + Math.cos(d.a) * d.len, d.y + Math.sin(d.a) * d.len, d.z + Math.sin(d.a * 0.7) * d.len * 0.3);

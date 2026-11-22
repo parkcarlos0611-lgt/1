@@ -74,3 +74,4 @@ export function ssjMesh(spin = 0): Mesh { const b = new Build();
     b.mat('#b9bbc0', 0.6); for (let k = 0; k < 14; k++) { const a = k / 14 * Math.PI * 2, c = Math.cos(a), q = Math.sin(a); b.bar([4318 + 86, c * 50, 722 + q * 50], [4318 + 55, c * (rim - 30), 722 + q * (rim - 30)], 13); }
     b.mat(LEATHER, 0.2); for (const a of [90, 210, 330]) { const t = a * Math.PI / 180; b.bar([4318 + 100, 0, 722], [4318 + 96, Math.cos(t) * (R + 4), 722 + Math.sin(t) * (R + 4)], 22, 30); } }
   return b.mesh(L); }
+export const mesh = ssjMesh;

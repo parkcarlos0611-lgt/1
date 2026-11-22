@@ -59,6 +59,13 @@ change starts from here. Code: render/car/voxel.ts. Check: tools/ref/solidshot.t
   so black cars keep their form; bright metal gives back sky above, a dark horizon, the ground below.
 - A dark line round the car and where one surface stands well before another.
 
+## Review 77: the staircase
+- Surface cells are moved along their outward direction to where the blurred solid crosses one half (at most 0.7 of a
+  cell): the surface lies on a smooth sheet, so silhouettes and shading lose most of the cells' steps. No cost at run time.
+- 10 mm cells halve what is left, at about twice the build time (8 s a car): use them for the final bake.
+- A screen drawn as panes from in front drops the side-only glass slab that stood for it (it made a block).
+- What still reads as steps on broad panels is mostly the drawings' own vertical banding laid on as marks.
+
 ## Review 76: whole-car silhouettes, windows set in
 - The 2D models were made to look right from the side; their parts' boxes across the car are loose, so built one by one
   they leave gaps a solid shows (the first sedans most). The gaps are now closed from the whole car's silhouettes, which

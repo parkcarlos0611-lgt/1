@@ -1,14 +1,14 @@
 // A contact sheet of cars drawn as solids for the track game (review 73), straight to a PNG: one row a car, one
 // column a heading. The check for every change to render/car/voxel.ts (docs/systems/68_track_solid_rules.md).
 //   npx tsx tools/ref/solidshot.ts <out.png> [cars=dueSSJ35,bmw315,fnTT33,dueA21] [yaws=30,150,250] [cell=15] [zoom=1.5] [pitch=40] [scale=2]
-import { solidOf, surfaceOf, drawSurface, texOf } from '../../render/car/voxel';
+import { solidOf, surfaceOf, drawSurface, texOf, setSmooth } from '../../render/car/voxel';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { deflateSync } from 'node:zlib';
 
 const arg = (k: string, d: string) => (process.argv.slice(3).find(a => a.startsWith(k + '=')) ?? `${k}=${d}`).slice(k.length + 1);
 const out = process.argv[2]!, cars = arg('cars', 'dueSSJ35,bmw315,fnTT33,dueA21').split(','), yaws = arg('yaws', '30,150,250').split(',').map(Number);
 const cell = +arg('cell', '15'), zoom = +arg('zoom', '1.5'), pitch = +arg('pitch', '40'), scale = +arg('scale', '2'), MM = 16.7 / zoom, tw = Math.round(360 * zoom), th = Math.round(230 * zoom);
-const BG = [196, 190, 174]; const SHADOWED = true, W = tw * yaws.length, H = th * cars.length, img = new Uint8Array(W * H * 3); for (let i = 0; i < W * H; i++) img.set(BG, i * 3);
+setSmooth(+arg('smooth', '1')); const BG = [196, 190, 174]; const SHADOWED = true, W = tw * yaws.length, H = th * cars.length, img = new Uint8Array(W * H * 3); for (let i = 0; i < W * H; i++) img.set(BG, i * 3);
 cars.forEach((c, r) => { const m = JSON.parse(readFileSync(new URL(`../../data/cars/sheet/${c}.json`, import.meta.url), 'utf8')), t = performance.now();
   const S = solidOf(m, cell), F = surfaceOf(S, texOf(m, 6), m.width), t1 = performance.now();
   yaws.forEach((y, k) => { const p = drawSurface(F, y, pitch, MM, tw, th, +arg('line', '1')); for (let j = 0; j < th; j++) for (let i = 0; i < tw; i++) { const a = (j * tw + i) * 4; if (!p.rgba[a + 3]) continue; const b = ((r * th + j) * W + k * tw + i) * 3, al = p.rgba[a + 3]! / 255; img[b] = img[b]! * (1 - al) + p.rgba[a]! * al; img[b + 1] = img[b + 1]! * (1 - al) + p.rgba[a + 1]! * al; img[b + 2] = img[b + 2]! * (1 - al) + p.rgba[a + 2]! * al; } });

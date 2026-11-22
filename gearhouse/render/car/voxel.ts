@@ -30,7 +30,8 @@ export function solidOf(m: CarModel, c = 15, tyreW?: number): Solid {
   const at = (i: number, j: number, k: number) => (k * ny + j) * nx + i, byId = new Map(m.parts.map(p => [p.id, p]));
   const dark = (p: CarPart) => p.material === 'black' || p.material === 'iron' || p.material === 'rubber', vol = (p: CarPart) => (p.box.x[1] - p.box.x[0]) * (p.box.y[1] - p.box.y[0]) * (p.box.z[1] - p.box.z[0]) / 1e9;
   const one = (p: CarPart) => Object.keys(p.outlines).length === 1 ? Object.keys(p.outlines)[0]! : '';
-  const parts = m.parts.filter(p => p.layer !== 'chassis' && p.outlines && p.element !== 'wheel' && p.element !== 'house' && p.element !== 'seat'
+  const panes = m.parts.some(p => p.element === 'screen' && p.material === 'glass' && (p.outlines.front || p.outlines.rear));
+  const parts = m.parts.filter(p => !(panes && p.element === 'screen' && p.material === 'glass' && one(p) === 'side')).filter(p => p.layer !== 'chassis' && p.outlines && p.element !== 'wheel' && p.element !== 'house' && p.element !== 'seat'
     && !(dark(p) && (one(p) === 'front' || one(p) === 'rear') && vol(p) > 0.015));   // a dark backdrop drawn across the car from in front or behind; the frame and pans seen from above stay
   // the rake of each element's parts that have a side outline (screens): parts of that element drawn only from in front follow it
   const rake = new Map<string, CarPart[]>(); for (const p of parts) if (p.element === 'screen' && p.outlines.side) rake.set(p.element, [...(rake.get(p.element) ?? []), p]);
@@ -255,13 +256,20 @@ export function drawStack(sl: { z: number; pic: Pic }[], S: Solid, yaw: number, 
 
 /** the solid's outer cells, ready to draw again and again (positions about the car's middle, outward directions, colours) */
 export interface Surface { n: number; pos: Float32Array; nrm: Float32Array; col: Uint8ClampedArray; gloss: Float32Array; c: number; tex: Uint8Array; part: Int16Array }
+let SMOOTH = 1;
+/** how far surface cells are moved onto the smooth sheet (0 off, 1 full): for comparison */
+export function setSmooth(v: number) { SMOOTH = v; }
 export function surfaceOf(S: Solid, T?: Tex, W = 0): Surface {
   const cx = S.x0 + S.nx * S.c / 2, pos: number[] = [], nrm: number[] = [], col: number[] = [], gl: number[] = [], tx: number[] = [], pt: number[] = [], { nx, ny, nz, den } = S, sx = 1, sy = nx, sz = nx * ny;
   for (let k = 0; k < nz; k++) for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) { const a = (k * ny + j) * nx + i, id = S.owner[a]!; if (id < 0 || !surf(S, i, j, k)) continue;
     const X = S.x0 + (i + 0.5) * S.c, Y = S.y0 + (j + 0.5) * S.c, Z = (k + 0.5) * S.c;
     // outward: down the slope of the blurred solid (smooth over the cells' steps); the cells' own count where that is flat
     let gx = (i > 0 ? den[a - sx]! : 0) - (i < nx - 1 ? den[a + sx]! : 0), gy = (j > 0 ? den[a - sy]! : 0) - (j < ny - 1 ? den[a + sy]! : 0), gz = (k > 0 ? den[a - sz]! : 0) - (k < nz - 1 ? den[a + sz]! : 0); const gn = Math.hypot(gx, gy, gz);
-    const nn: [number, number, number] = gn > 0.02 ? [gx / gn, gy / gn, gz / gn] : normal(S, i, j, k); pos.push(X - cx, Y, Z); nrm.push(...nn);
+    const nn: [number, number, number] = gn > 0.02 ? [gx / gn, gy / gn, gz / gn] : normal(S, i, j, k);
+    // review 77: each surface cell moved along its outward direction to where the blurred solid crosses one half, so the
+    // surface lies on a smooth sheet instead of on the cells' steps (silhouettes and shading both lose the staircase)
+    const off = gn > 0.05 ? Math.max(-0.7, Math.min(0.7, (den[a]! - 0.5) / (gn / 2))) * S.c * SMOOTH : 0;
+    pos.push(X - cx + nn[0] * off, Y + nn[1] * off, Z + nn[2] * off); nrm.push(...nn);
     const m = S.mat[id]!, broad = m === 'paint' || m === 'paint2' || m === 'canvas', tc = T ? texel(T, W, S.ids[id]!, X, Y, Z, nn, S.rgb[id]!, broad) : null;
     const ao = 1 - 0.6 * Math.max(0, Math.min(1, (den[a]! - 0.6) / 0.32)), c0 = tc ?? S.rgb[id]!;   // crevices get less of the sky
     col.push(c0[0] * ao, c0[1] * ao, c0[2] * ao); tx.push(tc && !broad ? 1 : 0); pt.push(id);

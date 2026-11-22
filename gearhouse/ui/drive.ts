@@ -62,11 +62,21 @@ function hud() { const kmh = car.speed * 3.6; $('spd').textContent = kmh.toFixed
   $('lap').textContent = lapStart >= 0 ? fmt(clock - lapStart) : '-'; $('last').textContent = fmt(lastLap); $('best').textContent = fmt(bestLap); $('where').textContent = T.pieceAt(car.s);
   $('bake').textContent = sprites.pending ? `그림 굽는 중 ${sprites.count}장` : ''; $('msg').textContent = msgT > 0 ? msg : ''; }
 // ---- controls ----
-addEventListener('keydown', e => { const k = e.key.toLowerCase(); if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' '].includes(k)) e.preventDefault(); keys.add(k);
-  if (k === 'm') { st.auto = !st.auto; car.auto = st.auto; manualGear = car.gear; ($('auto') as HTMLInputElement).checked = st.auto; say(st.auto ? '자동 변속' : '수동 변속 (Q/E)'); }
+// one press, from a key or a screen button
+function press(k: string) { if (k === 'm') { st.auto = !st.auto; car.auto = st.auto; manualGear = car.gear; ($('auto') as HTMLInputElement).checked = st.auto; say(st.auto ? '자동 변속' : '수동 변속 (Q/E)'); }
   if (!st.auto && (k === 'e' || k === 'x')) manualGear = Math.min(car.spec.gears.length, manualGear + 1); if (!st.auto && (k === 'q' || k === 'z')) manualGear = Math.max(1, manualGear - 1);
-  if (k === 'r') { car.place(car.s, 0, 0); say('트랙으로 복귀'); } });
+  if (k === 'r') { car.place(car.s, 0, 0); say('트랙으로 복귀'); } }
+addEventListener('keydown', e => { const k = e.key.toLowerCase(); if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' '].includes(k)) e.preventDefault(); keys.add(k);
+  if (!e.repeat) press(k); });
 addEventListener('keyup', e => keys.delete(e.key.toLowerCase()));
+// the screen buttons: held while a finger is on them (several at once), a tap for gears and reset
+for (const b of Array.from(document.querySelectorAll<HTMLButtonElement>('#pad button'))) { const k = b.dataset.key!, hold = k.startsWith('arrow');
+  const on = (e: PointerEvent) => { e.preventDefault(); b.setPointerCapture(e.pointerId); b.classList.add('on'); if (hold) keys.add(k); else press(k); };
+  const off = (e: PointerEvent) => { e.preventDefault(); b.classList.remove('on'); if (hold) keys.delete(k); };
+  b.addEventListener('pointerdown', on); b.addEventListener('pointerup', off); b.addEventListener('pointercancel', off); b.addEventListener('lostpointercapture', () => { b.classList.remove('on'); if (hold) keys.delete(k); });
+  b.addEventListener('contextmenu', e => e.preventDefault()); }
+$<HTMLInputElement>('touch').checked = matchMedia('(pointer: coarse)').matches; document.body.classList.toggle('touch', $<HTMLInputElement>('touch').checked);
+$<HTMLInputElement>('touch').addEventListener('change', e => document.body.classList.toggle('touch', (e.target as HTMLInputElement).checked));
 const down = (...ks: string[]) => ks.some(k => keys.has(k));
 function controls(dt: number): Controls { const left = down('arrowleft', 'a'), right = down('arrowright', 'd'), want = left === right ? 0 : left ? 1 : -1;
   input.steer += want === 0 ? -Math.sign(input.steer) * Math.min(Math.abs(input.steer), dt * 4) : Math.max(-dt * 2.6, Math.min(dt * 2.6, want - input.steer));
@@ -97,6 +107,11 @@ $<HTMLInputElement>('auto').addEventListener('change', e => { st.auto = (e.targe
 $<HTMLInputElement>('pilot').addEventListener('change', e => { st.pilot = (e.target as HTMLInputElement).checked; if (st.pilot) { car.auto = true; } else car.auto = st.auto; });
 $<HTMLInputElement>('assist').addEventListener('change', e => { st.assist = (e.target as HTMLInputElement).checked; });
 $<HTMLSelectElement>('scale').addEventListener('change', e => { mm = +(e.target as HTMLSelectElement).value; choose(carId); (e.target as HTMLElement).blur(); });
-function fit() { const k = Math.max(1, Math.floor(Math.min((innerWidth - 32) / VW, (innerHeight * 0.8) / VH))); cv.width = VW; cv.height = VH; cv.style.width = `${VW * k}px`; cv.style.height = `${VH * k}px`;
-  if (innerWidth < VW + 32) { VW = Math.max(320, Math.floor((innerWidth - 32) / 2) * 2); VH = Math.round(VW * 9 / 16); cv.width = VW; cv.height = VH; cv.style.width = `${VW}px`; cv.style.height = `${VH}px`; } ctx.imageSmoothingEnabled = false; }
-addEventListener('resize', fit); fit(); choose(carId); camX = car.x; camY = car.y; camZ = 0; requestAnimationFrame(frame);
+function fit() { const box = document.querySelector('.track') as HTMLElement, room = Math.min(box.clientWidth - 14, 1600);
+  // the height left on the screen below the picture's top (a phone on its side has little), at least a usable strip
+  const availH = Math.max(200, innerHeight - Math.max(0, box.getBoundingClientRect().top + scrollY) - 16);
+  const k = Math.max(1, Math.floor(Math.min(room / 768, availH / 432)));
+  if (room >= 768 && availH >= 432) { VW = 768; VH = 432; cv.style.width = `${VW * k}px`; cv.style.height = `${VH * k}px`; }
+  else { VW = Math.max(300, Math.floor(room / 2) * 2); VH = Math.min(Math.round(VW * (innerHeight > innerWidth ? 0.8 : 0.56)), Math.floor(availH)); cv.style.width = `${VW}px`; cv.style.height = `${VH}px`; }
+  cv.width = VW; cv.height = VH; ctx.imageSmoothingEnabled = false; }
+addEventListener('resize', fit); addEventListener('orientationchange', () => setTimeout(fit, 200)); fit(); choose(carId); camX = car.x; camY = car.y; camZ = 0; requestAnimationFrame(frame);

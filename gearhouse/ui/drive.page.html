@@ -1,3 +1,4 @@
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Millbrook 시험 주행</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -13,7 +14,7 @@
   .lede { color: var(--soft); margin: 0 0 16px; max-width: 65ch; line-height: 1.5; }
   .bench { display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start; }
   .stage { min-width: 0; flex: 1 1 520px; display: grid; gap: 8px; }
-  .track { background: var(--ground); border: 1px solid var(--line); border-radius: 6px; overflow: auto; display: grid; place-items: center; padding: 12px; max-width: 100%; }
+  .track { background: var(--ground); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; display: grid; place-items: center; padding: 6px; max-width: 100%; }
   canvas { display: block; image-rendering: pixelated; image-rendering: crisp-edges; cursor: grab; touch-action: none; max-width: none; }
   canvas:active { cursor: grabbing; }
   #stat { color: var(--soft); font-size: 0.8rem; font-variant-numeric: tabular-nums; }
@@ -30,20 +31,36 @@
   .seg label:has(input:checked) { border-color: var(--accent); color: var(--accent); font-weight: 600; }
   .seg label:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
   .check { display: flex; gap: 8px; align-items: center; text-transform: none; letter-spacing: 0; color: var(--ink); font-size: 0.85rem; }
-  .hud { display: flex; flex-wrap: wrap; gap: 6px 18px; font-variant-numeric: tabular-nums; font-size: 0.9rem; align-items: baseline; }
-  .hud b { font-family: var(--display); font-weight: 500; font-size: 1.6rem; }
-  .bar { width: 160px; height: 8px; background: var(--line); border-radius: 4px; overflow: hidden; display: inline-block; vertical-align: middle; }
+  .hud { position: absolute; inset: 0 0 auto 0; display: flex; flex-wrap: wrap; gap: 2px 14px; padding: 4px 8px; font-variant-numeric: tabular-nums; font-size: 0.8rem; line-height: 1.3; align-items: baseline; color: #f4f1ea; background: linear-gradient(rgba(20,18,15,0.55), rgba(20,18,15,0)); pointer-events: none; }
+  .hud b { font-family: var(--display); font-weight: 500; font-size: 1.4rem; }
+  @media (pointer: coarse) and (orientation: landscape) { h1, .lede { display: none; } body { padding-block: 4px; } .hud { font-size: 0.7rem; } .hud b { font-size: 1.1rem; } }
+  .bar { width: 110px; height: 8px; background: rgba(255,255,255,0.3); border-radius: 4px; overflow: hidden; display: inline-block; vertical-align: middle; }
   #rpmbar { height: 100%; width: 0; background: var(--accent); }
   #msg { color: var(--accent); font-weight: 600; min-height: 1.4em; }
   kbd { font: inherit; border: 1px solid var(--line); border-radius: 3px; padding: 0 4px; background: var(--panel); }
+  .screen { position: relative; display: inline-block; line-height: 0; }
+  .pad { --b: clamp(44px, 13vw, 72px); position: absolute; inset: auto 0 0 0; display: none; justify-content: space-between; align-items: flex-end; padding: 6px; gap: 4px; pointer-events: none; }
+  .pad .side, .pad .mid { display: flex; gap: 6px; pointer-events: auto; }
+  .pad .mid { flex-direction: column; gap: 6px; align-self: center; }
+  .pad button { width: var(--b); height: var(--b); border-radius: 50%; border: 2px solid rgba(255,255,255,0.7); background: rgba(30,28,24,0.42); color: #fff; font: 600 0.95rem var(--body); line-height: 1; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+  .pad button.small { width: calc(var(--b) * 0.55); height: calc(var(--b) * 0.55); font-size: 0.75rem; }
+  .pad button.gas, .pad button.brake { font-size: 0.8rem; }
+  .pad button.gas { background: rgba(60,120,60,0.5); } .pad button.brake { background: rgba(150,50,40,0.5); }
+  .pad button.on { background: rgba(255,255,255,0.45); color: #222; }
+  @media (pointer: coarse) { .pad { display: flex; } .keys-help { display: none; } }
+  body.touch .pad { display: flex; }
   .note { font-size: 0.8rem; color: var(--soft); line-height: 1.5; margin: 0; }
 </style>
 <h1>Millbrook 시험 주행</h1>
 <p class="lede">Millbrook Outer Circuit(4.45 km, 반시계 방향)을 한 대로 돌아 봅니다. 뱅크가 높을수록 밝게 보이고, 빠를수록 위쪽을 달려야 뱅크가 차를 받쳐 줍니다.</p>
 <div class="bench">
   <div class="stage">
-    <div class="hud"><span><b id="spd">0</b> km/h</span><span>기어 <b id="gear">1</b></span><span><span class="bar"><span id="rpmbar"></span></span> <span id="rpm">0</span> rpm</span><span>이번 바퀴 <span id="lap">-</span></span><span>지난 <span id="last">-</span></span><span>최고 <span id="best">-</span></span><span id="where"></span></div>
-    <div class="track"><canvas id="view" width="768" height="432" aria-label="주행 화면"></canvas></div>
+    <div class="track"><div class="screen"><div class="hud"><span><b id="spd">0</b> km/h</span><span>기어 <b id="gear">1</b></span><span><span class="bar"><span id="rpmbar"></span></span> <span id="rpm">0</span> rpm</span><span>이번 바퀴 <span id="lap">-</span></span><span>지난 <span id="last">-</span></span><span>최고 <span id="best">-</span></span><span id="where"></span></div><canvas id="view" width="768" height="432" aria-label="주행 화면"></canvas>
+      <div class="pad" id="pad" aria-label="터치 조작">
+        <div class="side"><button type="button" data-key="arrowleft" aria-label="왼쪽">◀</button><button type="button" data-key="arrowright" aria-label="오른쪽">▶</button></div>
+        <div class="mid"><button type="button" data-key="q" class="small" aria-label="기어 내림">Q</button><button type="button" data-key="e" class="small" aria-label="기어 올림">E</button><button type="button" data-key="r" class="small" aria-label="트랙으로 복귀">R</button></div>
+        <div class="side"><button type="button" data-key="arrowdown" class="brake" aria-label="브레이크">브레이크</button><button type="button" data-key="arrowup" class="gas" aria-label="가속">가속</button></div>
+      </div></div></div>
     <div id="msg"></div><div id="bake" class="note"></div>
   </div>
   <form class="dials" onsubmit="return false">
@@ -52,7 +69,9 @@
     <label class="check"><input type="checkbox" id="assist"> 카운터스티어 보조</label>
     <label class="check"><input type="checkbox" id="pilot"> 시험 운전자에게 맡기기</label>
     <div class="row"><label for="scale">화면 축척</label><select id="scale"><option value="30">가깝게 (30 mm/픽셀)</option><option value="40">보통 (40 mm/픽셀)</option><option value="50" selected>넓게 (50 mm/픽셀)</option><option value="65">멀리 (65 mm/픽셀)</option></select></div>
-    <p class="note"><kbd>↑</kbd>/<kbd>W</kbd> 가속 · <kbd>↓</kbd>/<kbd>S</kbd> 브레이크 · <kbd>←</kbd><kbd>→</kbd>/<kbd>A</kbd><kbd>D</kbd> 조향 · <kbd>Space</kbd> 핸드브레이크<br>수동 변속: <kbd>Q</kbd> 내림 · <kbd>E</kbd> 올림 · <kbd>R</kbd> 트랙으로 복귀</p>
+    <label class="check"><input type="checkbox" id="touch"> 화면 버튼 보이기</label>
+    <p class="note keys-help"><kbd>↑</kbd>/<kbd>W</kbd> 가속 · <kbd>↓</kbd>/<kbd>S</kbd> 브레이크 · <kbd>←</kbd><kbd>→</kbd>/<kbd>A</kbd><kbd>D</kbd> 조향 · <kbd>Space</kbd> 핸드브레이크<br>수동 변속: <kbd>Q</kbd> 내림 · <kbd>E</kbd> 올림 · <kbd>R</kbd> 트랙으로 복귀</p>
+    <p class="note">휴대폰에서는 화면 아래 버튼으로 조작합니다: 왼쪽 ◀ ▶ 조향, 오른쪽 브레이크와 가속, 가운데 Q/E 기어(수동일 때)와 R 복귀. 가로로 돌려 쓰면 화면이 커집니다.</p>
     <p class="note">뱅크 꼭대기 밖으로 나가면 실제처럼 넘어간 것으로 보고 트랙에 다시 올려 둡니다. Members' 다리 밑 요철에서는 빠른 차의 뒷바퀴가 뜹니다.</p>
   </form>
 </div>

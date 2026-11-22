@@ -52,7 +52,12 @@ const SUN: V = norm([-0.45, 0.35, 0.82]);
 /** The mesh drawn from heading `yaw` (0 = nose to the right) with the camera `pitch` degrees above the ground (0 = from
  *  the side), `mm` millimetres a pixel: flat tones in a few steps, a dark line round the car and between its parts,
  *  its shadow on the ground. `spin` turns the wheels' parts (see `wheels` in the car's own file). */
-export function drawMesh(M: Mesh, yaw: number, pitch: number, mm: number, w: number, h: number, o: { outline?: number; shadow?: boolean; cy?: number } = {}): Pic {
+/** The car files keep the sheets' sides (+y = the car's right, as the part models have it); the projection below sees
+ *  -y from a nose-left heading, so it draws the mirror image. Mirror once here so a car's left shows nose-left, as in 2D. */
+const mirrored = new WeakMap<Mesh, Mesh>();
+function asDrawn(M: Mesh): Mesh { let m = mirrored.get(M); if (!m) { const pos = Float32Array.from(M.pos); for (let i = 1; i < pos.length; i += 3) pos[i] = -pos[i]!; m = { ...M, pos }; mirrored.set(M, m); } return m; }
+export function drawMesh(M0: Mesh, yaw: number, pitch: number, mm: number, w: number, h: number, o: { outline?: number; shadow?: boolean; cy?: number } = {}): Pic {
+  const M = asDrawn(M0);
   const th = yaw * Math.PI / 180, ph = pitch * Math.PI / 180, ct = Math.cos(th), st = Math.sin(th), sp = Math.sin(ph), cp = Math.cos(ph), N = w * h, cx = M.length / 2, cy = h * (o.cy ?? 0.62);
   const zb = new Float32Array(N).fill(-1e9), tri = new Int32Array(N).fill(-1), rgba = new Uint8ClampedArray(N * 4);
   const sun: V = [SUN[0] * ct + SUN[1] * st, -SUN[0] * st + SUN[1] * ct, SUN[2]], cam: V = [-cp * st, -cp * ct, sp];

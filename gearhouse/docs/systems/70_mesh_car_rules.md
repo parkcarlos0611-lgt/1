@@ -16,7 +16,8 @@ layout, helpers and level of detail.
   (tools/ref/sheetcars/<id>_report.md, _notes.md) say how it was read and its scale.
 
 ## Space and size
-- x from the front bumper backwards, y across (+ = the car's left, the exhaust side is chosen per car), z up from the
+- x from the front bumper backwards, y across (+ = the car's right, as in the sheets' part models; drawMesh mirrors so
+  the car's left shows when the nose points left), z up from the
   ground; mm. `mesh(length)` takes the overall length.
 - Real proportions first: wheelbase, track and tyre size from data/cars/specs.json (`cars.<id>`); length, height and
   the width from the sheet report. Check the width against real figures: the plan views were often read narrow (the

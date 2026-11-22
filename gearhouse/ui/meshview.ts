@@ -1,10 +1,12 @@
-// The 3D mesh trial as a page (review 80): the grand roadster as a low-polygon mesh, turned by hand, from any height.
+// The 3D mesh cars as a page (review 80-82): every car as a low-polygon mesh, turned by hand, from any height.
 import { drawMesh } from '../render/car/mesh';
-import { ssjMesh } from '../render/car/mesh_ssj';
+import { MESH_CARS } from '../render/car/meshcars';
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T, cv = $<HTMLCanvasElement>('view'), ctx = cv.getContext('2d')!;
-const st = { yaw: 30, pitch: 40, res: 0.85, line: 3, spin: false, roll: false, px: 2 }; let dirty = true, wheel = 0, M = ssjMesh();
+const st = { yaw: 30, pitch: 40, res: 0.85, line: 3, spin: false, roll: false, px: 2 }; let dirty = true, wheel = 0, car = MESH_CARS[0]!, M = car.mesh();
+const pick = document.getElementById('car') as HTMLSelectElement; for (const c of MESH_CARS) pick.add(new Option(c.name, c.id));
+pick.addEventListener('change', () => { car = MESH_CARS.find(c => c.id === pick.value) ?? car; M = car.mesh(wheel); dirty = true; });
 function frame() { if (st.spin) { st.yaw = (st.yaw + 0.8) % 360; $<HTMLInputElement>('yaw').value = String(Math.round(st.yaw)); dirty = true; }
-  if (st.roll) { wheel += 0.12; M = ssjMesh(wheel); dirty = true; }
+  if (st.roll) { wheel += 0.12; M = car.mesh(wheel); dirty = true; }
   if (dirty) { dirty = false; const W = Math.round(400 * st.res), H = Math.round(260 * st.res), t = performance.now(), p = drawMesh(M, st.yaw, st.pitch, 16.7 / st.res, W, H, { outline: st.line });
     cv.width = W; cv.height = H; ctx.putImageData(new ImageData(new Uint8ClampedArray(p.rgba), W, H), 0, 0); cv.style.width = `${400 * st.px}px`; cv.style.height = `${260 * st.px}px`;
     $('stat').textContent = `삼각형 ${M.n.toLocaleString()}개 · 한 장 ${Math.round(performance.now() - t)} ms · ${(16.7 / st.res).toFixed(1)} mm/픽셀`; }

@@ -33,13 +33,14 @@
   .note { font-size: 0.8rem; color: var(--soft); line-height: 1.5; margin: 0; }
 </style>
 <h1>3D 차 모델 시험</h1>
-<p class="lede">1935 그랜드 로드스터를 단면 로프트 방식의 로우폴리 3D로 만든 시제품입니다. 그림을 끌면 좌우로 돌고, 위아래로 끌면 내려다보는 각도가 바뀝니다.</p>
+<p class="lede">차 11대를 로우폴리 3D로 만든 모델입니다. 그림을 끌면 좌우로 돌고, 위아래로 끌면 내려다보는 각도가 바뀝니다.</p>
 <div class="bench">
   <div class="stage">
     <div class="track"><canvas id="view" width="400" height="260" aria-label="차 미리보기: 끌어서 돌리기"></canvas></div>
     <div id="stat">그리는 중…</div>
   </div>
   <form class="dials" onsubmit="return false">
+    <div class="row"><label for="car">차</label><select id="car"></select></div>
     <div class="row"><label for="yaw">방향</label><input type="range" id="yaw" min="0" max="359" value="30"></div>
     <label class="check"><input type="checkbox" id="spin"> 자동으로 돌리기</label>
     <label class="check"><input type="checkbox" id="roll"> 바퀴 굴리기</label>

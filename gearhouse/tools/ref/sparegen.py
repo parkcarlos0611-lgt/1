@@ -21,7 +21,11 @@ for f in sys.argv[1:]:
     for p in m['parts']:
         if p['id'] != 'spare' or 'wheel' not in p: continue
         sh = p['sheet']; c = lambda a, b: (a + b) / 2
-        if 'side' in sh: x = c(*sh['side'][:2]); z = c(*sh['side'][2:]); sh['side'] = [round(x - tw / 2), round(x + tw / 2), round(z - r), round(z + r)]; p['outlines']['side'] = tyre_section()
+        if 'side' in sh:   # a tail spare leans back with the tail (p['tilt'], degrees) and may be set into it (p['into'], mm)
+            x = c(*sh['side'][:2]) - p.get('into', 0); z = c(*sh['side'][2:]); a_ = math.radians(p.get('tilt', 0))
+            pts = [[(u - 0.5) * tw, (v - 0.5) * 2 * r] for u, v, _ in tyre_section()]; pts = [[px * math.cos(a_) + pz * math.sin(a_), -px * math.sin(a_) + pz * math.cos(a_)] for px, pz in pts]
+            x0, x1, z0, z1 = min(q[0] for q in pts), max(q[0] for q in pts), min(q[1] for q in pts), max(q[1] for q in pts)
+            sh['side'] = [round(x + x0), round(x + x1), round(z + z0), round(z + z1)]; p['outlines']['side'] = [[round((q[0] - x0) / (x1 - x0), 4), round((q[1] - z0) / (z1 - z0), 4), 0] for q in pts]
         if 'top' in sh: x = c(*sh['top'][:2]); y = c(*sh['top'][2:]); sh['top'] = [round(x - tw / 2), round(x + tw / 2), round(y - r), round(y + r)]; p['outlines']['top'] = [[q[1], q[0], 0] for q in tyre_section()]
         if 'rear' in sh: y = c(*sh['rear'][:2]); z = c(*sh['rear'][2:]); sh['rear'] = [round(y - r), round(y + r), round(z - r), round(z + r)]
         xc, zc = c(*p['box']['x']), c(*p['box']['z']); p['box'] = {'x': [round(xc - tw / 2), round(xc + tw / 2)], 'y': [-r, r], 'z': [round(zc - r), round(zc + r)]}

@@ -49,9 +49,10 @@ export function section(x: number, w: number, zb: number, zt: number, top = 3, b
   return out; }
 /** a wing: a crowned strip swept along a path seen from the side. Each point [x, z, yIn, yOut] is the top of the wing
  *  there and how far across it reaches; `hub` the wheel's centre [x, z] it stands over; `t` its thickness, `crown` how much its middle stands above its edges */
-export function wing(b: Build, path: [number, number, number, number][], hub: [number, number], t = 45, crown = 35): void {
+export function wing(b: Build, path: [number, number, number, number][], hub: [number, number], t = 45, crown = 35, round = false): void {
   const rings: V[][] = path.map((p, i) => { const a = path[Math.max(0, i - 1)]!, c = path[Math.min(path.length - 1, i + 1)]!, tx = c[0] - a[0], tz = c[1] - a[1], l = Math.hypot(tx, tz) || 1; let nx = -tz / l, nz = tx / l; if (nx * (p[0] - hub[0]) + nz * (p[1] - hub[1]) < 0) { nx = -nx; nz = -nz; }   // outward: away from the wheel it covers
     const [x, z, yi, yo] = p, ym = (yi + yo) / 2, at = (y: number, k: number): V => [x + nx * k, y, z + nz * k];
+    if (round) { const ring: V[] = [at(yi, -t)]; for (let k = 0; k <= 8; k++) { const u = k / 8, y = yi + (yo - yi) * u, c = Math.sin(Math.PI * (0.08 + 0.84 * u)); ring.push(at(y, crown * c - crown * 0.35 * u * u)); } ring.push(at(yo, -t - crown * 0.5)); return ring; }   // round: a full crown across, falling to the outer edge
     return [at(yi, -t), at(yi, -crown * 0.4), at(ym, crown * 0.6), at(yo, -crown * 0.6), at(yo, -t - crown * 0.6)]; });
   b.loft(rings); }
 
@@ -142,6 +143,7 @@ export function drawMesh(M0: Mesh, yaw: number, pitch: number, mm: number, w: nu
     if (o.shadow !== false && pitch > 5) { const q = t * 9, g = (k: number): V => { const z = p[q + k + 2]!; return prj(p[q + k]! - sun[0] / sun[2] * z, p[q + k + 1]! - sun[1] / sun[2] * z, 0); }; fill(g(0), g(3), g(6), i => { shadow[i] = 1; }); } }
   // ---- pass 2: flat tones, then each material's texture, then age ----
   let ymax = 1; for (let i = 1; i < p.length; i += 3) ymax = Math.max(ymax, Math.abs(p[i]!));
+  const names = M.names ?? [], wheelOfTri: (WheelGroup | undefined)[] = []; for (const wg of wheelsOf(M0)) for (const t of wg.tris) wheelOfTri[t] = { ...wg, hy: -wg.hy };   // the wheels, in the drawn (mirrored) frame
   const grain = new Float32Array(M.n * 3); for (let t = 0; t < M.n; t++) { let best = -1; for (let k = 0; k < 3; k++) { const e = sub(vtx(t, (k + 1) % 3), vtx(t, k)), l = len(e); if (l > best) { best = l; grain.set(norm(e), t * 3); } } }   // wood runs along a part's longest edge
   const glintAt: number[] = [];
   const rusty = new Float32Array(N), isPaint = (i: number) => tri[i]! >= 0 && M.kind[tri[i]!] === PAINT;
@@ -154,11 +156,19 @@ export function drawMesh(M0: Mesh, yaw: number, pitch: number, mm: number, w: nu
     // the plane a pattern is laid in: the two axes across the face's main direction
     const ax = Math.abs(n[0]), ay = Math.abs(n[1]), az = Math.abs(n[2]), [U, V2] = ay >= ax && ay >= az ? [X, Z] : ax >= az ? [Y, Z] : [X, Y];
     let tone = 1, cr = M.col[t * 3]!, cg = M.col[t * 3 + 1]!, cb = M.col[t * 3 + 2]!;
-    if (kd === TYRE && M.tex[t] === 2) tone = 0.72;                                                   // tread blocks
+    if (kd === TYRE) { const wg = wheelOfTri[t]; if (wg) { const dx = X - wg.hx, dz = Z - wg.hz, rr = Math.hypot(dx, dz), ang = Math.atan2(dz, dx), side = Math.abs(n[1]) > 0.6;   // a road wheel's tyre
+        if (!side) { const blk = ((ang * wg.r / 38) % 1 + 1) % 1; tone = blk < 0.2 ? 0.62 : Math.abs(Y - wg.hy) < 9 ? 0.75 : 1.05; }   // tread: grooves across, one round the middle
+        else { const f = rr / wg.r; tone = f > 0.83 && f < 0.865 ? 1.4 : f > 0.73 && f < 0.8 && ((ang * wg.r / 22) % 1 + 1) % 1 < 0.35 && hash(Math.floor(ang * 40), 3) < 0.7 ? 1.25 : 1; } }   // the wall: a rib, and the maker's lettering in a band
+      else if (M.tex[t] === 2) tone = 0.72; }
     else if (kd === WOOD) { const gx = grain[t * 3]!, gy = grain[t * 3 + 1]!, gz = grain[t * 3 + 2]!, along = X * gx + Y * gy + Z * gz, across = (X * 0.37 + Y * 0.61 + Z * 0.7) - along * (gx * 0.37 + gy * 0.61 + gz * 0.7);
       const v = fbm(across / 7, along / 160); tone = v > 0.62 ? 0.78 : v < 0.38 ? 1.12 : 1; }       // grain: dark lines and light streaks along the wood
-    else if (kd === CANVAS) { const v = fbm(U / 160, V2 / 160); tone = v > 0.66 ? 0.93 : v < 0.34 ? 1.05 : 1; }   // the cloth's uneven weathering
-    else if (kd === LEATHER) { const v = fbm(U / 45, V2 / 45); tone = v > 0.62 ? 0.86 : v < 0.36 ? 1.1 : 1; }  // creased and polished by wear
+    else if (kd === CANVAS) { const v = fbm(U / 160, V2 / 160); tone = v > 0.66 ? 0.93 : v < 0.34 ? 1.05 : 1;   // the cloth's uneven weathering
+      const sm = ((U % 160) + 160) % 160; if (sm < 5) tone *= 0.78; else if (sm < 11 && ((V2 % 14) + 14) % 14 < 6) tone *= 1.12;   // its seams, and the stitching beside them
+      if ((((U + V2) % 5) + 5) % 5 < 1) tone *= 0.97; }   // the weave
+    else if (kd === METAL && M.gloss[t]! > 0.7) { tone = 0.95 + 0.1 * fbm(U / 300, V2 / 9); }   // chrome's faint polishing streaks
+    else if (names[M.part[t]!] === 'core' || names[M.part[t]!] === 'radiatorCore') { const [, gap] = cells(U / 8, V2 / 8); tone = gap < 0.12 ? 2.2 : 0.8; }   // the radiator's honeycomb
+    else if (kd === LEATHER) { const v = fbm(U / 45, V2 / 45); tone = v > 0.62 ? 0.86 : v < 0.36 ? 1.1 : 1;   // creased and polished by wear
+      const a = (((U + V2) % 110) + 110) % 110, b2 = (((U - V2) % 110) + 110) % 110; if ((a < 4 || b2 < 4)) tone *= 0.86; if (a < 9 && b2 < 9) tone *= 0.6; }   // buttoned, the pleats running between
     else if (kd === GRILLE) { const a = ((U + V2) / 26 % 1 + 1) % 1, b = ((U - V2) / 26 % 1 + 1) % 1; if (a < 0.28 || b < 0.28) { cr = 150; cg = 148; cb = 140; } }   // a diamond mesh of bright wire
     const L = lit([cr * tone, cg * tone, cb * tone], n, sun, cam, kd === TYRE || kd === CANVAS || kd === LEATHER ? Math.min(g, 0.25) : g, vn ? BAYER4[((i / w | 0) & 3) * 4 + (i % w & 3)]! : -1);
     let R = Math.min(255, L.c[0] + L.spec), G = Math.min(255, L.c[1] + L.spec * 0.97), B = Math.min(255, L.c[2] + L.spec * 0.9);

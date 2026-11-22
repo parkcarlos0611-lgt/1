@@ -16,7 +16,12 @@ function wheel(b: Build, x: number, s: 1 | -1, spin = 0) { const o: V = [x, s * 
   b.name((x === FX ? 'tyreF' : 'tyreR')).mat(RUBBER, 0.05, 'tyre').lathe('y', o, [[-TW / 2, rim], [-TW / 2, R - 55], [-TW / 2 + 40, R], [TW / 2 - 40, R], [TW / 2, R - 55], [TW / 2, rim]], 20, false);
   b.name('wheel').mat(DARK, 0.05).lathe('y', o, [[f * 0.55, 0], [f * 0.55, rim]], 20, false);                     // the dark well behind the spokes
   b.name('rim').mat(CHROME, 0.9, 'metal').lathe('y', o, [[f, rim + 6], [f * 0.7, rim - 34]], 20, false).lathe('y', o, [[f * 0.6, 58], [f * 1.25, 34], [f * 1.25, 0]], 10, false);
-  b.name('spoke').mat('#b9bbc0', 0.6, 'metal'); for (let k = 0; k < 14; k++) { const a = spin + k / 14 * Math.PI * 2, c = Math.cos(a), q = Math.sin(a); b.bar([x + c * 50, s * WY + f * 0.95, R + q * 50], [x + c * (rim - 30), s * WY + f * 0.62, R + q * (rim - 30)], 13); } }
+  // the wire wheel, laced as the period's were: two rows of tangent spokes from the hub's flanges, crossing to the rim
+  b.name('spoke').mat('#c3c5c9', 0.6, 'metal'); for (let row = 0; row < 2; row++) for (let k = 0; k < 24; k++) { const a = spin + (k + row * 0.5) / 24 * Math.PI * 2, lean = (k % 2 ? 1 : -1) * 0.42, b0 = a + lean, rr = rim - 26;
+    const yin = s * WY + f * (row ? 0.98 : 0.45), yout = s * WY + f * (row ? 0.7 : 0.62); b.bar([x + Math.cos(a) * 62, yin, R + Math.sin(a) * 62], [x + Math.cos(b0) * rr, yout, R + Math.sin(b0) * rr], 7); }
+  b.name('hub').mat(CHROME, 0.9, 'metal').lathe('y', o, [[f * 1.0, 70], [f * 1.32, 64], [f * 1.38, 40], [f * 1.42, 0]], 12, false);   // the knock-off cap
+  for (const e of [0, Math.PI]) { const a = spin + e; b.bar([x + Math.cos(a) * 30, s * WY + f * 1.4, R + Math.sin(a) * 30], [x + Math.cos(a) * 95, s * WY + f * 1.36, R + Math.sin(a) * 95], 22, 14); }   // its two ears
+}
 
 const FLOOR = 610;   // the cockpit's floor: down by the frame, so the seat sits deep behind the doors
 export function ssjMesh(spin = 0): Mesh { const b = new Build();
@@ -56,13 +61,16 @@ export function ssjMesh(spin = 0): Mesh { const b = new Build();
   b.name('screenPost').mat(CHROME, 0.9, 'metal').bar([2205, 0, skin(2205, 0)], [2352, 0, 1482], 26);
   // ---- wings: one sweep from over the front wheel down to the sill, the rear wing over its wheel to the tail ----
   for (const s of [1, -1] as const) { b.name('fenderF').mat(PAINT2, 0.45, 'paint');
-    wing(b, ([[48, 641, 560, 820], [112, 765, 540, 860], [258, 896, 535, 878], [526, 958, 535, 880], [790, 914, 520, 875], [1050, 790, 500, 855], [1316, 657, 500, 810], [1666, 518, 530, 765], [2105, 386, 575, 745], [2600, 370, 595, 745], [3122, 360, 597, 745]] as const).map(([x, z, yi, yo]) => [x, z, s * yi, s * yo] as [number, number, number, number]), [FX, R - 200]);
+    wing(b, ([[48, 641, 560, 820], [112, 765, 540, 860], [258, 896, 535, 878], [526, 958, 535, 880], [790, 914, 520, 875], [1050, 790, 500, 855], [1316, 657, 500, 810], [1666, 518, 530, 765], [2105, 386, 575, 745], [2600, 370, 595, 745], [3122, 360, 597, 745]] as const).map(([x, z, yi, yo]) => [x, z, s * yi, s * yo] as [number, number, number, number]), [FX, R - 200], 45, 95, true);
     b.name('fenderR').mat(PAINT2, 0.45, 'paint');
-    wing(b, ([[3110, 300, 597, 745], [3149, 563, 597, 820], [3281, 815, 593, 870], [3508, 973, 575, 880], [3771, 987, 520, 875], [3996, 939, 475, 860], [4255, 693, 440, 765], [4412, 456, 460, 660], [4477, 324, 490, 600]] as const).map(([x, z, yi, yo]) => [x, z, s * yi, s * yo] as [number, number, number, number]), [RX, R - 200]);
+    wing(b, ([[3110, 300, 597, 745], [3149, 563, 597, 820], [3281, 815, 593, 870], [3508, 973, 575, 880], [3771, 987, 520, 875], [3996, 939, 475, 860], [4255, 693, 440, 765], [4412, 456, 460, 660], [4477, 324, 490, 600]] as const).map(([x, z, yi, yo]) => [x, z, s * yi, s * yo] as [number, number, number, number]), [RX, R - 200], 45, 95, true);
     b.name('board').mat(CHROME, 0.9, 'metal').box(2307, 3157, Math.min(s * 712, s * 748), Math.max(s * 712, s * 748), 322, 352);   // the bright sill strip
     // lamps: a bullet body, its lens; the tail lamp on the rear wing
-    b.name('lamp').mat(CHROME, 0.9, 'metal').lathe('x', [0, s * 395, 955], [[296, 118], [304, 127], [390, 123], [450, 92], [510, 22]], 14);
-    b.name('lens').mat(LENS, 0.6, 'lens').lathe('x', [0, s * 395, 955], [[288, 0], [294, 112]], 14, false);
+    b.name('lamp').mat(CHROME, 0.9, 'metal').lathe('x', [0, s * 395, 955], [[296, 118], [304, 127], [390, 123], [450, 92], [510, 22]], 14)
+      .lathe('x', [0, s * 395, 955], [[286, 128], [292, 132], [300, 118]], 16, false);                  // the bezel round the glass
+    b.name('lens').mat(CHROME, 0.95, 'metal').lathe('x', [0, s * 395, 955], [[300, 0], [312, 40], [330, 85], [345, 112]], 14, false);   // the reflector, a bowl behind the glass
+    b.mat('#f4ecd0', 0.6, 'lens').lathe('x', [0, s * 395, 955], [[318, 0], [322, 14]], 8, false);      // the bulb
+    b.mat(GLASS, 0.5, 'glass').lathe('x', [0, s * 395, 955], [[290, 0], [293, 70], [296, 118]], 14, false);   // the domed glass
     b.name('lampStand').mat(CHROME, 0.9, 'metal').box(400, 426, s * 395 - 13, s * 395 + 13, 690, 830).lathe('x', [0, s * 310, 562], [[181, 46], [240, 30], [281, 14]], 10);
     b.name('tailRim').mat(CHROME, 0.9, 'metal').lathe('x', [0, s * 640, 770], [[4215, 30], [4250, 56], [4300, 56]], 10); b.name('tail').mat(RED, 0.5).lathe('x', [0, s * 640, 770], [[4300, 50], [4318, 30], [4320, 0]], 10, false);
     b.name('bumperFiron').mat(DARK, 0.05).bar([60, s * 345, 440], [330, s * 345, 470], 34);                               // bumper irons

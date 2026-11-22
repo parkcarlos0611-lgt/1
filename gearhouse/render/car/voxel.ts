@@ -85,11 +85,31 @@ export function slicesOf(S: Solid, mmPx: number, every = 1): { z: number; pic: P
     if (any) out.push({ z: (k + every / 2) * S.c, pic: { w, h, rgba } }); }
   return out; }
 /** B: the slices stacked as the game would draw them, each turned to `yaw` and squashed by the camera's slant, lifted by its height */
-export function drawStack(sl: { z: number; pic: Pic }[], S: Solid, yaw: number, pitch: number, mmPx: number, size = 360): Pic {
-  const w = size, h = Math.round(size * 0.75), rgba = new Uint8ClampedArray(w * h * 4), th = yaw * Math.PI / 180, ph = pitch * Math.PI / 180, ct = Math.cos(th), st = Math.sin(th), sp = Math.sin(ph), cp = Math.cos(ph);
+export function drawStack(sl: { z: number; pic: Pic }[], S: Solid, yaw: number, pitch: number, mmPx: number, size = 360, hh?: number): Pic {
+  const w = size, h = hh ?? Math.round(size * 0.75), rgba = new Uint8ClampedArray(w * h * 4), th = yaw * Math.PI / 180, ph = pitch * Math.PI / 180, ct = Math.cos(th), st = Math.sin(th), sp = Math.sin(ph), cp = Math.cos(ph);
   for (const { z, pic } of sl) { const ox = pic.w / 2, oy = (-S.y0) / mmPx, lift = z * cp / mmPx;
     // each screen pixel looks back into the slice (turned the other way, unsquashed)
-    for (let Y = 0; Y < h; Y++) for (let X = 0; X < w; X++) { const sx = (X - w / 2) * mmPx, syp = (Y - h * 0.62 + lift) * mmPx / sp * -1;
+    for (let Y = 0; Y < h; Y++) for (let X = 0; X < w; X++) { const sx = (X - w / 2) * mmPx, syp = (Y - h * (hh ? 0.6 : 0.62) + lift) * mmPx / sp * -1;
       const x = sx * ct + syp * st, y = -sx * st + syp * ct, i = Math.floor(x / mmPx + ox), j = Math.floor(y / mmPx + oy);
       if (i < 0 || j < 0 || i >= pic.w || j >= pic.h) continue; const a = (j * pic.w + i) * 4; if (!pic.rgba[a + 3]) continue; const b = (Y * w + X) * 4; rgba[b] = pic.rgba[a]!; rgba[b + 1] = pic.rgba[a + 1]!; rgba[b + 2] = pic.rgba[a + 2]!; rgba[b + 3] = 255; } }
+  return { w, h, rgba }; }
+
+/** the solid's outer cells, ready to draw again and again (positions about the car's middle, outward directions, colours) */
+export interface Surface { n: number; pos: Float32Array; nrm: Float32Array; col: Uint8ClampedArray; gloss: Float32Array; c: number }
+export function surfaceOf(S: Solid): Surface {
+  const cx = S.x0 + S.nx * S.c / 2, pos: number[] = [], nrm: number[] = [], col: number[] = [], gl: number[] = [];
+  for (let k = 0; k < S.nz; k++) for (let j = 0; j < S.ny; j++) for (let i = 0; i < S.nx; i++) { const id = S.owner[(k * S.ny + j) * S.nx + i]!; if (id < 0 || !surf(S, i, j, k)) continue;
+    pos.push(S.x0 + (i + 0.5) * S.c - cx, S.y0 + (j + 0.5) * S.c, (k + 0.5) * S.c); nrm.push(...normal(S, i, j, k)); col.push(...S.rgb[id]!); const m = S.mat[id]!;
+    gl.push(m === 'paint' || m === 'paint2' ? 0.35 : m === 'chrome' ? 0.8 : m === 'glass' ? 0.5 : 0.05); }
+  return { n: gl.length, pos: new Float32Array(pos), nrm: new Float32Array(nrm), col: new Uint8ClampedArray(col), gloss: new Float32Array(gl), c: S.c }; }
+/** A from a Surface: the same picture as drawWhole, quicker for turning it by hand */
+export function drawSurface(F: Surface, yaw: number, pitch: number, mmPx: number, w: number, h: number): Pic {
+  const rgba = new Uint8ClampedArray(w * h * 4), zb = new Float32Array(w * h).fill(-1e9), th = yaw * Math.PI / 180, ph = pitch * Math.PI / 180, ct = Math.cos(th), st = Math.sin(th), sp = Math.sin(ph), cp = Math.cos(ph);
+  const sun: [number, number, number] = [SUN[0] * ct + SUN[1] * st, -SUN[0] * st + SUN[1] * ct, SUN[2]], q = Math.max(1, Math.ceil(F.c / mmPx)), half = q >> 1;
+  for (let t = 0; t < F.n; t++) { const x = F.pos[t * 3]!, y = F.pos[t * 3 + 1]!, z = F.pos[t * 3 + 2]!, xr = x * ct - y * st, yr = x * st + y * ct;
+    const px = Math.round(w / 2 + xr / mmPx), py = Math.round(h * 0.6 + (-yr * sp - z * cp) / mmPx), depth = -yr * cp + z * sp;
+    if (px < -q || py < -q || px > w + q || py > h + q) continue;
+    const nx = F.nrm[t * 3]!, ny = F.nrm[t * 3 + 1]!, nz = F.nrm[t * 3 + 2]!, d = Math.max(0, nx * sun[0] + ny * sun[1] + nz * sun[2]), g = F.gloss[t]!, k = 0.42 + 0.62 * d + 0.12 * Math.max(0, nz), s = g * Math.pow(d, g > 0.6 ? 6 : 14) * 255;
+    const r = Math.min(255, F.col[t * 3]! * k + s), gg = Math.min(255, F.col[t * 3 + 1]! * k + s), b = Math.min(255, F.col[t * 3 + 2]! * k + s);
+    for (let dy = 0; dy < q; dy++) for (let dx = 0; dx < q; dx++) { const X = px + dx - half, Y = py + dy - half; if (X < 0 || Y < 0 || X >= w || Y >= h) continue; const a = Y * w + X; if (depth < zb[a]!) continue; zb[a] = depth; rgba[a * 4] = r; rgba[a * 4 + 1] = gg; rgba[a * 4 + 2] = b; rgba[a * 4 + 3] = 255; } }
   return { w, h, rgba }; }

@@ -68,7 +68,7 @@ const myWear: [number, number, number] = [0, 0, 0]; let dirtGrows = true, wearTi
 const wearOf = (c: Vehicle, k: number): [number, number, number] => { if (c === car) return myWear; const h = (n: number) => ((Math.sin(k * 127.1 + n * 311.7) * 43758.5453) % 1 + 1) % 1; return [h(1) * 0.35, h(2) * 0.6, 0.1 + h(3) * 0.35]; };
 // each car's 2D art (its part model's views), laid on its mesh in the live picture (review 105), loaded when first wanted
 const ART: Record<string, string> = { bmw315: artBmw, buick28: artBuick, chevAB28: artChev, dodgeV28: artDodge, dueA21: artDueA, dueSSJ35: artSSJ, fnTT33: artFN, fordT23: artFord, plymU29: artPlym, pontiac29: artPont, willys27: artWillys };
-const artAsked = new WeakSet<object>(); let artOn = true, raysOn = true;
+const artAsked = new WeakSet<object>(); let artOn = true, raysOn = true, texK = 1, lightK = 1;
 function artFor(L: LiveRenderer, g: ReturnType<LiveRenderer['car']>, id: string, M: import('../render/car/mesh').Mesh) { if (artAsked.has(g) || !ART[id] || !M.names?.some(Boolean)) return; artAsked.add(g);   // only a mesh with its parts named can take it
   const meta = artMeta as unknown as { mm: number; groups: string[]; cars: Record<string, { C: number; views: Record<string, number[]> }> }, groups = M.names!.map(n => n ? meta.groups.indexOf(canonical(n)) + 1 : 0);
   void fetch(ART[id]!).then(r => r.blob()).then(b => createImageBitmap(b, { premultiplyAlpha: 'none', colorSpaceConversion: 'none' })).then(bm => L.setArt(g, bm, { mm: meta.mm, ...meta.cars[id]! }, groups)).catch(e => console.warn('art', e)); }
@@ -88,10 +88,10 @@ function drawLive(el: number) { const L = live!; void el;
   ctx = main; main.clearRect(0, 0, VW, VH);
   if (look === 'split') {   // the three looks side by side, the same moment: each a third of the picture, its name over it
     const w3 = Math.floor(VW / 3), names = ['기존 (단계 조명)', 'PBR 단계화', 'PBR 연속'];
-    for (let k = 0; k < 3; k++) { L.render(view, cars, props, skids, { glass: 0.8, look: k, art: artOn, rays: raysOn, smoke: { p: sp8, n: smoke.parcels.length, time: smoke.time } }); main.drawImage(glCanvas, k * w3, 0, w3, VH, k * w3, 0, w3, VH); }
+    for (let k = 0; k < 3; k++) { L.render(view, cars, props, skids, { glass: 0.8, look: k, art: artOn, rays: raysOn, texK, lightK, smoke: { p: sp8, n: smoke.parcels.length, time: smoke.time } }); main.drawImage(glCanvas, k * w3, 0, w3, VH, k * w3, 0, w3, VH); }
     main.fillStyle = 'rgba(0,0,0,0.55)'; main.fillRect(0, VH - 20, VW, 20); main.fillStyle = '#f2ead6'; main.font = '11px sans-serif'; main.textAlign = 'center';
     for (let k = 0; k < 3; k++) main.fillText(names[k]!, k * w3 + w3 / 2, VH - 6); main.fillStyle = '#000'; for (let k = 1; k < 3; k++) main.fillRect(k * w3 - 1, 0, 2, VH); main.textAlign = 'left'; }
-  else { L.render(view, cars, props, skids, { glass: 0.8, look: look === 'stepped' ? 1 : look === 'pbr' ? 2 : 0, art: artOn, rays: raysOn, smoke: { p: sp8, n: smoke.parcels.length, time: smoke.time } }); main.drawImage(glCanvas, 0, 0); }
+  else { L.render(view, cars, props, skids, { glass: 0.8, look: look === 'stepped' ? 1 : look === 'pbr' ? 2 : 0, art: artOn, rays: raysOn, texK, lightK, smoke: { p: sp8, n: smoke.parcels.length, time: smoke.time } }); main.drawImage(glCanvas, 0, 0); }
   drawDebris(el);
   if (car.speed > 30) { const v = Math.min(1, (car.speed - 30) / 30) * 0.35, g = main.createRadialGradient(VW / 2, VH / 2, VH * 0.35, VW / 2, VH / 2, VW * 0.62); g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, `rgba(0,0,0,${v})`); main.fillStyle = g; main.fillRect(0, 0, VW, VH); } }
 
@@ -420,6 +420,8 @@ const setFree = (on: boolean) => { st.free = on; ($('free') as HTMLInputElement)
   t.addEventListener('change', () => { live = t.checked ? liveR : null; if (!live) rebake(true); t.blur(); }); }
 $<HTMLSelectElement>('look').addEventListener('change', e => { look = (e.target as HTMLSelectElement).value as typeof look; (e.target as HTMLElement).blur(); });
 for (const [id, k] of [['wrust', 0], ['wfade', 1], ['wdirt', 2]] as const) $<HTMLInputElement>(id).addEventListener('input', e => { myWear[k] = +(e.target as HTMLInputElement).value; });
+$<HTMLInputElement>('texK').addEventListener('input', e => { texK = +(e.target as HTMLInputElement).value; });
+$<HTMLInputElement>('lightK').addEventListener('input', e => { lightK = +(e.target as HTMLInputElement).value; });
 $<HTMLInputElement>('raysOn').addEventListener('change', e => { raysOn = (e.target as HTMLInputElement).checked; });
 $<HTMLInputElement>('artOn').addEventListener('change', e => { artOn = (e.target as HTMLInputElement).checked; });
 $<HTMLInputElement>('wgrow').addEventListener('change', e => { dirtGrows = (e.target as HTMLInputElement).checked; });

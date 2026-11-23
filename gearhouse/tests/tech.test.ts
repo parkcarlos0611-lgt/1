@@ -40,3 +40,16 @@ describe('the EB110 GT', () => {
     for (let t = 0; t < 8; t += dt) c.step(dt, { throttle: 0, brake: 0.6, steer: 0 }); expect(c.wing).toBeLessThan(0.1);
   });
 });
+describe('the XJ220', () => {
+  const xj = raceSpec('xj220');
+  it('meets its figures: about 342 km/h; no ABS (its wheels lock), no power steering, a viscous rear differential', () => {
+    const c = new Vehicle(xj, flat).place(100, 0, 0); let vmax = 0; for (let t = 0; t < 80; t += dt) { c.step(dt, go); vmax = Math.max(vmax, c.speed * 3.6); } expect(vmax).toBeGreaterThan(330); expect(vmax).toBeLessThan(355);
+    expect(xj.tech!.abs).toBeFalsy(); expect(xj.tech!.power).toBeFalsy();
+    const s = new Vehicle(xj, flat).place(100, 0, 100 / 3.6); let locked = 0; for (let k = 0; k < 4000 && s.speed > 0.3; k++) { s.step(dt, { throttle: 0, brake: 1, steer: 0 }); if (s.w[0] === 0 && s.speed > 3) locked++; } expect(locked).toBeGreaterThan(0);
+    const v = new Vehicle(xj, flat).place(100, 0, 10); v.w[2] = v.w[2]! * 1.2; sync(v); v.step(1 / 1000, go); expect(v.Tw[3]!).toBeGreaterThan(v.Tw[2]!);
+  });
+  it('is pressed down by its venturis: some 300 kg at 200 mph, more the lower it rides', () => {
+    const c = new Vehicle(xj, flat).place(100, 0, 322 / 3.6); for (let t = 0; t < 1.5; t += dt) c.step(dt, { throttle: 0.9, brake: 0, steer: 0 }); const df = c.load.reduce((a, b) => a + b, 0) / 9.81 - xj.mass;
+    expect(df).toBeGreaterThan(220); expect(df).toBeLessThan(420);
+  });
+});

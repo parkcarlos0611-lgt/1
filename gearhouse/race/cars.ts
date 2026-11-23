@@ -42,7 +42,8 @@ export interface RaceSpec {
    *  rear differential (its bias ratio); anti-lock brakes; turbochargers (how many, the boost at full in bar, the revs
    *  where it comes fully, the spool's time in s); a speed-sensitive rear wing (up and down in km/h, its lift area
    *  pressing the rear, its drag area; the body's own downforce area); power steering; the tyres' widths front and rear (m) */
-  tech?: { drive?: { front: number; visc: number }; rearLsd?: number; abs?: boolean; turbo?: { n: number; boost: number; full: number; spool: number };
+  tech?: { drive?: { front: number; visc: number }; rearLsd?: number; /** a viscous-coupling rear differential instead (Nm per rad/s between the wheels) */ rearVisc?: number;
+    /** ground effect (review 126): the underbody's venturis, a lift area pressing the car down more the lower it rides (its share on the front) */ ground?: { clA: number; front: number }; abs?: boolean; turbo?: { n: number; boost: number; full: number; spool: number };
     wing?: { up: number; down: number; clA: number; cdA: number; body: number }; power?: boolean; tyreWF?: number; tyreWR?: number };
   cdA: number; crr: number; steerLock: number;          // drag area m², rolling resistance, front wheels' lock (deg)
   topKmh: number; check: boolean;
@@ -137,12 +138,24 @@ NEW.eb110 = { id: 'eb110', name: '1991 Bugatti EB110 GT (실험)', mass: 1620 + 
   brakes: 'disc', hydraulic: true, brakeG: 1.1, cdA: 0.58, crr: 0.012, steerLock: 30, topKmh: 342, check: false, cooling: { siphon: false, margin: 1.2 }, tyreKind: 'radial', era: '1991',
   shiftT: 0.22, launchRpm: 6000, steer: { ratio: 15, ackermann: 0.6, rack: true }, inertia: { engine: 0.22, wheel: 1.7 },
   tech: { drive: { front: 0.27, visc: 60 }, rearLsd: 2.5, abs: true, turbo: { n: 4, boost: 1.1, full: 3800, spool: 0.45 }, wing: { up: 120, down: 90, clA: 0.32, cdA: 0.06, body: 0.12 }, power: true, tyreWF: 0.245, tyreWR: 0.325 } };
+// review 126: the Jaguar XJ220 (1992), from the period's and later sources (Wikipedia, Supercars.net, PistonHeads,
+// Classic & Sports Car, Car & Classic): 3.5 twin-turbo V6 (JRV-6) 542 bhp at 7,200, 475 lb ft (644 Nm) at 4,500; an FF
+// Developments five-speed transaxle with a viscous limited-slip differential (3.00 1.95 1.42 1.09 0.85, final 2.88); rear
+// drive; AP Racing brakes, no ABS, no power steering (the prototype's both dropped), 2.6 turns lock to lock; double
+// wishbones; underbody venturis (318 kg at 200 mph in C&SC; Wikipedia's larger figure not used); 1,470 kg; 255/45 ZR17
+// and 345/35 ZR18; 0-62 mph 3.6 s; 212.3 mph (341.7 km/h) at Nardo in 1992. [~]: the drag area (fitted), the boost's
+// figures, the coupling's, the centre of gravity and the weight's split.
+NEW.xj220 = { id: 'xj220', name: '1992 Jaguar XJ220 (실험)', mass: 1470 + 75, wheelbase: 2.64, track: 1.65, tyreR: 0.345, tyreW: 0.3, cgH: 0.45, frontShare: 0.42,
+  hp: 542, hpRpm: 7200, torqueRpm: 4500, torquePeak: 644, idle: 900, redline: 7800, gears: [3.0, 1.95, 1.42, 1.09, 0.85], final: 2.88, eff: 0.88,
+  brakes: 'disc', hydraulic: true, brakeG: 1.05, cdA: 0.62, crr: 0.012, steerLock: 30, topKmh: 342, check: false, cooling: { siphon: false, margin: 1.15 }, tyreKind: 'radial', era: '1992',
+  shiftT: 0.32, launchRpm: 5000, steer: { ratio: 15.5, ackermann: 0.6, rack: true }, inertia: { engine: 0.2, wheel: 1.8 },
+  tech: { rearVisc: 40, turbo: { n: 2, boost: 1.0, full: 4000, spool: 0.5 }, ground: { clA: 0.55, front: 0.38 }, tyreWF: 0.255, tyreWR: 0.345 } };
 Object.assign(EXP, NEW);
 /** the new 3D-first cars, offered beside the period ones */
 export const NEW_CARS: string[] = Object.keys(NEW);
 export const EXP_CARS: string[] = Object.keys(EXP).filter(id => !NEW[id]);
 /** the engine for the sound: cylinders, valves, blower (the experimental cars are not in the game's data) */
-export const EXP_ENGINE: Record<string, { kind: string; layout: string; supercharged?: boolean }> = { napier33: { kind: 'ohv', layout: 'W12' }, jagD55: { kind: 'ohv', layout: 'I6' }, auburn851: { kind: 'sv', layout: 'I8', supercharged: true }, mb540k: { kind: 'ohv', layout: 'I8', supercharged: true }, eb110: { kind: 'ohv', layout: 'V12' } };
+export const EXP_ENGINE: Record<string, { kind: string; layout: string; supercharged?: boolean }> = { napier33: { kind: 'ohv', layout: 'W12' }, jagD55: { kind: 'ohv', layout: 'I6' }, auburn851: { kind: 'sv', layout: 'I8', supercharged: true }, mb540k: { kind: 'ohv', layout: 'I8', supercharged: true }, eb110: { kind: 'ohv', layout: 'V12' }, xj220: { kind: 'ohv', layout: 'V6' } };
 export function raceSpec(id: string): RaceSpec {
   if (EXP[id]) return EXP[id]!;
   const s = (specs as { cars: Record<string, { car: string; engine: { hp: number }; wheelbase: number; track: number; tyre: string }> }).cars[id]!, p = PERIOD[id]!, t = tyre(s.tyre), hpRpm = p[0];
@@ -166,5 +179,5 @@ export interface Suspension { front: AxleKind; rear: AxleKind; leafF: boolean; l
 const SUSP: Record<string, Partial<Suspension>> = {
   mb540k: { front: 'wishbone', rear: 'swing', leafF: false, leafR: false },
   bmw315: { front: 'wishbone', leafF: true },
-  jagD55: { front: 'wishbone', leafF: false, leafR: false }, eb110: { front: 'wishbone', rear: 'wishbone', leafF: false, leafR: false } };
+  jagD55: { front: 'wishbone', leafF: false, leafR: false }, eb110: { front: 'wishbone', rear: 'wishbone', leafF: false, leafR: false }, xj220: { front: 'wishbone', rear: 'wishbone', leafF: false, leafR: false } };
 export function suspension(c: RaceSpec): Suspension { return { front: 'beam', rear: 'beam', leafF: true, leafR: true, ...SUSP[c.id] }; }

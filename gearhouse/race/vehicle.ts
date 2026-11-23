@@ -206,7 +206,9 @@ export class Vehicle {
       // axle to the slower as they slip apart); each axle's own differential, the rear torque-sensing (up to its bias ratio)
       const Tv = X?.drive ? X.drive.visc * (wRa - wFa) : 0, TF = fF * Taxle + Tv, TR = (1 - fF) * Taxle - Tv, w = this.w;
       const split = (T: number, a: number, b: number, bias?: number): [number, number] => { let x = 0; if (bias) { const lim = Math.abs(T) / 2 * (bias - 1) / (bias + 1); x = Math.max(-lim, Math.min(lim, 300 * (w[b]! - w[a]!))); } return [T / 2 + x, T / 2 - x]; };
-      const [f0, f1] = split(TF, 0, 1), [r0, r1] = split(TR, 2, 3, X?.rearLsd); this.Tw = [f0, f1, r0, r1]; }
+      const [f0, f1] = split(TF, 0, 1); let [r0, r1] = split(TR, 2, 3, X?.rearLsd);
+      if (X?.rearVisc) { const v = X.rearVisc * (w[3]! - w[2]!); r0 += v; r1 -= v; }   /* a viscous rear differential: the faster wheel's spin passes torque to the slower */
+      this.Tw = [f0, f1, r0, r1]; }
     // ---- forces and turns on the body (world), gathered ----
     const F: V3 = [0, 0, -this.ms * G], Tb: V3 = [0, 0, 0];   // Tb: turning moment, body axes
     const addAt = (bp: V3, f: V3) => { F[0] += f[0]; F[1] += f[1]; F[2] += f[2]; const fb = invRotQ(this.q, f), t = cross(bp, fb); Tb[0] += t[0]; Tb[1] += t[1]; Tb[2] += t[2]; };
@@ -287,6 +289,8 @@ export class Vehicle {
     this.absOn = absNow;
     const Wg = X?.wing; if (Wg) { const kmh = this.speed * 3.6, to = kmh > Wg.up ? 1 : kmh < Wg.down ? 0 : this.wing > 0.5 ? 1 : 0; this.wing += Math.max(-dt / 1.2, Math.min(dt / 1.2, to - this.wing)); }   /* the wing rises and stows over a second or so */
     { const sp = this.speed, d = 0.5 * RHO * (c.cdA + (Wg ? Wg.cdA * this.wing : 0)) * sp; F[0] -= d * this.v[0]; F[1] -= d * this.v[1]; F[2] -= d * this.v[2];
+      if (X?.ground) { const q = 0.5 * RHO * sp * sp, low = Math.max(0.6, Math.min(1.5, 1 - this.zb * 6)), Fg = q * X.ground.clA * low;   /* the venturis: more downforce the lower the car rides (review 126) */
+        addAt([this.axles[0].x, 0, 0], rotQ(this.q, [0, 0, -Fg * X.ground.front])); addAt([this.axles[1].x, 0, 0], rotQ(this.q, [0, 0, -Fg * (1 - X.ground.front)])); }
       if (Wg) { const q = 0.5 * RHO * sp * sp, body = q * Wg.body, wingF = q * Wg.clA * this.wing;   /* downforce: the body's (shared by the axles) and the wing's (on the rear) */
         addAt([this.axles[0].x, 0, 0], rotQ(this.q, [0, 0, -body * 0.42])); addAt([this.axles[1].x, 0, 0], rotQ(this.q, [0, 0, -body * 0.58 - wingF])); } }
     // the whole car's weight across the body's up (the running gear goes where the body goes, sideways and along)

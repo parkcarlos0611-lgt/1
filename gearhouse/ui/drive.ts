@@ -85,7 +85,8 @@ function techHud(): string { const X = car.spec.tech; if (!X) return ''; let o =
   if (X.turbo) o += `<span>부스트 ${(car.boost * X.turbo.boost).toFixed(2)} bar</span>`;
   if (X.drive) o += `<span>4WD ${Math.round(X.drive.front * 100)}:${Math.round((1 - X.drive.front) * 100)}</span>`;
   if (X.abs) o += `<span class="${car.absOn ? 'hot' : ''}">ABS${car.absOn ? ' 작동' : ''}</span>`;
-  if (X.wing) o += `<span>윙 ${car.wing > 0.5 ? '올림' : '내림'}</span>`; return o; }
+  if (X.wing) o += `<span>윙 ${car.wing > 0.5 ? '올림' : '내림'}</span>`;
+  if (X.ground) o += `<span>다운포스 ${Math.round(0.5 * 1.2 * car.speed * car.speed * X.ground.clA / 9.81)} kg</span>`; return o; }
 /** where the cars' tyres lay their rubber (review 122): the test driver's line in a fast car, a metre at a time */
 function rubberLine(T: import('../race/track').Track): Float32Array { const d = new Driver(T), v = new Vehicle(raceSpec('dueSSJ35'), T).place(0, 0, 0); d.drive(v); return Float32Array.from({ length: Math.round(T.length) }, (_, s) => d.lineAt(s)); }
 const liveOK = !!live; let liveR = live; let look: 'baked' | 'stepped' | 'pbr' | 'split' = 'pbr';   /* the light and materials: the baked pictures' stepped light, or physically based (review 102) */

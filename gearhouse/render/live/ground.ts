@@ -5,11 +5,12 @@
 import type { Track } from '../../race/track';
 import type { Scenery } from '../../race/scenery';
 
-export interface GroundData { pos: Float32Array; col: Uint8Array; flag: Float32Array; n: number }
-class Tris { P: number[] = []; C: number[] = []; F: number[] = [];
-  tri(a: number[], b: number[], c: number[], col: number[], flag = 0) { this.P.push(...a, ...b, ...c); for (let k = 0; k < 3; k++) { this.C.push(col[0]!, col[1]!, col[2]!); this.F.push(flag); } }
-  quad(a: number[], b: number[], c: number[], d: number[], col: number[], flag = 0) { this.tri(a, b, c, col, flag); this.tri(a, c, d, col, flag); }
-  done(): GroundData { return { pos: new Float32Array(this.P), col: new Uint8Array(this.C), flag: new Float32Array(this.F), n: this.P.length / 3 }; } }
+/** trk (review 122): each vertex's place on the track (distance along, offset across, m) and what it is (1 the concrete), for the shader's concrete */
+export interface GroundData { pos: Float32Array; col: Uint8Array; flag: Float32Array; n: number; trk?: Float32Array }
+class Tris { P: number[] = []; C: number[] = []; F: number[] = []; K: number[] = [];
+  tri(a: number[], b: number[], c: number[], col: number[], flag = 0, t?: number[][]) { this.P.push(...a, ...b, ...c); for (let k = 0; k < 3; k++) { this.C.push(col[0]!, col[1]!, col[2]!); this.F.push(flag); this.K.push(...(t ? t[k]! : [0, 0, 0])); } }
+  quad(a: number[], b: number[], c: number[], d: number[], col: number[], flag = 0, t?: number[][]) { this.tri(a, b, c, col, flag, t && [t[0]!, t[1]!, t[2]!]); this.tri(a, c, d, col, flag, t && [t[0]!, t[2]!, t[3]!]); }
+  done(): GroundData { return { pos: new Float32Array(this.P), col: new Uint8Array(this.C), flag: new Float32Array(this.F), n: this.P.length / 3, trk: new Float32Array(this.K) }; } }
 const hex = (h: string) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
 
 /** a polygon cut into triangles (ear clipping; the scenery's areas are simple outlines) */
@@ -41,15 +42,12 @@ export function groundData(T: Track, S: Scenery, start: number): GroundData { co
   const P = (s: number, o: number, dz = 0) => { const p = T.point(s, o); return [p.x, p.y, p.z + dz]; };
   for (let s = 0; s < L; s++) { const s1 = s + 1;
     for (let k = 0; k < 9; k++) { const o0 = -W2 + k * 2 * W2 / 9, o1 = o0 + 2 * W2 / 9, z = (T.height(s, o0) + T.height(s, o1)) / 2, slope = Math.abs(T.slope(s, (o0 + o1) / 2).across), v = Math.round(156 + z * 5 - slope * 34);
-      g.quad(P(s, o0), P(s, o1), P(s1, o1), P(s1, o0), [v, v - 2, v - 9]); }
-    // the joints across: laid in the same nine pieces as the concrete, so they follow a banking's curve (one straight
-    // piece edge to edge would stand clear of the bowl's middle and cut through the cars, review 108)
-    if (s % T.spec.joints === 0) for (let k = 0; k < 9; k++) { const o0 = -W2 + k * 2 * W2 / 9, o1 = o0 + 2 * W2 / 9; g.quad(P(s - 0.04, o0, 0.005), P(s - 0.04, o1, 0.005), P(s + 0.04, o1, 0.005), P(s + 0.04, o0, 0.005), [92, 88, 80]); }
-    for (const o of [-W2, W2]) { const i = o < 0 ? 1 : -1; g.quad(P(s, o, 0.006), P(s, o + i * 0.18, 0.006), P(s1, o + i * 0.18, 0.006), P(s1, o, 0.006), hex('#3b3a35')); }
+      g.quad(P(s, o0), P(s, o1), P(s1, o1), P(s1, o0), [v, v - 2, v - 9], 0, [[s, o0, 1], [s, o1, 1], [s1, o1, 1], [s1, o0, 1]]); }
+    // the joints, the dark edges and the start line are the shader's now (review 122): drawn on the concrete itself,
+    // by its place on the track, they follow a banking's curve exactly
     const bk = T.bankAt(s).b, out = T.at(s).k >= 0 || bk ? (bk && T.at((bk.s0 + bk.s1) / 2).k < 0 ? 1 : -1) : -1, H = T.height(s, out * W2) - T.bump(s), H1 = T.height(s1, out * W2) - T.bump(s1);
     if (H > 0.3 || H1 > 0.3) { const a = T.point(s, out * W2), b = T.point(s1, out * W2), fa = T.point(s, out * (W2 + Math.max(H, 0.3) * 2.4)), fb = T.point(s1, out * (W2 + Math.max(H1, 0.3) * 2.4));
       g.quad([a.x, a.y, a.z], [b.x, b.y, b.z], [fb.x, fb.y, -0.025], [fa.x, fa.y, -0.025], hex('#4c6340'), 1); } }
-  for (let k = 0; k < 9; k++) { const o0 = -W2 + k * 2 * W2 / 9, o1 = o0 + 2 * W2 / 9; g.quad(P(start - 0.15, o0, 0.008), P(start - 0.15, o1, 0.008), P(start + 0.15, o1, 0.008), P(start + 0.15, o0, 0.008), hex('#f2efe6')); }
   return g.done(); }
 
 /** the fence along both edges: a rail at 0.9 m, a post every 3 m, the stretches not broken */

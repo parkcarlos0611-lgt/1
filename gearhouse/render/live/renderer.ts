@@ -253,21 +253,79 @@ void main() {
     float refl = g > 0.3 ? 0.1 * g * (0.4 + 0.6 * up) : 0.; c = min(vec3(1.), base * diff * (1. - refl) + env * refl) + spec * (40. + 80. * g) / 255. * vec3(1., 0.97, 0.9); }
   oCol = vec4(min(c, vec3(1.)), 1.); oId = vec4(uObj, vPart / 255., uOutline / 8.); oN = vec4(n * 0.5 + 0.5, 0.); oV = velo(); }`;
 const GROUND_VS = `#version 300 es
-layout(location=0) in vec3 aPos; layout(location=1) in vec4 aCol; layout(location=2) in float aFlag;
-uniform mat4 uVP, uPrevVP; uniform float uBias; out vec3 vWorld; out vec4 vCol; flat out float vFlag; out vec4 vCur, vPrev;
-void main() { vWorld = aPos; vCol = aCol; vFlag = aFlag; gl_Position = uVP * vec4(aPos, 1.); vCur = gl_Position; vPrev = uPrevVP * vec4(aPos, 1.); gl_Position.z -= uBias; }`;
+layout(location=0) in vec3 aPos; layout(location=1) in vec4 aCol; layout(location=2) in float aFlag; layout(location=3) in vec3 aTrk;
+uniform mat4 uVP, uPrevVP; uniform float uBias; out vec3 vWorld; out vec4 vCol; flat out float vFlag; out vec4 vCur, vPrev; out vec3 vTrk;
+void main() { vWorld = aPos; vCol = aCol; vFlag = aFlag; vTrk = aTrk; gl_Position = uVP * vec4(aPos, 1.); vCur = gl_Position; vPrev = uPrevVP * vec4(aPos, 1.); gl_Position.z -= uBias; }`;
 const GROUND_FS = `#version 300 es
 precision highp float;
 ${LIGHT}
-in vec3 vWorld; in vec4 vCol; flat in float vFlag; uniform float uCell; uniform vec3 uSun, uEye;
+in vec3 vWorld; in vec4 vCol; flat in float vFlag; uniform float uCell; uniform vec3 uSun, uEye; in vec3 vTrk;
+/* ---- the concrete of the period's speed bowls (review 122), drawn by each point's place on the track (s along, o across,
+   metres): laid in bays (nine strips across, a joint every uJoint m), each bay its own shade and finish (poured on its
+   own day), a little proud of or sunk below its neighbour; the joints sealed with tar, the tar smeared wider over them
+   in places; cracks across the bays, some sealed with tar, some open hairlines; patches where a bay was mended; the
+   tyres' rubber laid dark and polished along the line the cars drive, two bands for the two wheel tracks, and its
+   crumbs (marbles) beside it; oil dropped where cars stand by the start; grime and moss toward the edges; the start
+   line whitewashed on, worn through in the wheel tracks and cracked with the concrete under it. Returns the colour's
+   change, the roughness and a height (m) for the light's relief. ---- */
+uniform float uLen, uTW, uJoint, uStart; uniform highp sampler2D uLine; uniform int uLineOn;
+float hs(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
+float vn2(vec2 x) { vec2 i = floor(x), f = fract(x); f = f * f * (3. - 2. * f); return mix(mix(hs(i), hs(i + vec2(1, 0)), f.x), mix(hs(i + vec2(0, 1)), hs(i + vec2(1, 1)), f.x), f.y); }
+float fb2(vec2 p) { return vn2(p) * 0.5 + vn2(p * 2.1 + 3.) * 0.3 + vn2(p * 4.3 - 5.) * 0.2; }
+/** the distance to the nearest edge of a cell pattern (cracks), and the cell's own random */
+vec2 cracks(vec2 p) { vec2 i = floor(p), f = fract(p); float d1 = 9., d2 = 9.; float id = 0.;
+  for (int y = -1; y <= 1; y++) for (int x = -1; x <= 1; x++) { vec2 g = vec2(x, y), o = vec2(hs(i + g), hs(i + g + 17.)) * 0.9, r = g + o - f; float d = dot(r, r); if (d < d1) { d2 = d1; d1 = d; id = hs(i + g + 3.); } else if (d < d2) d2 = d; }
+  return vec2(sqrt(d2) - sqrt(d1), id); }
+struct Conc { vec3 tint; float rough; float h; float paint; };
+Conc concrete(float s, float o) { Conc C; C.tint = vec3(1.); C.rough = 0.9; C.h = 0.; C.paint = 0.;
+  float W2 = uTW / 2., sw = uTW / 9., u = mod(s, uJoint), v = o + W2, bi = floor(v / sw), bj = floor(s / uJoint), bv = mod(v, sw);
+  float hb = hs(vec2(bi, bj)), hb2 = hs(vec2(bj, bi) + 7.);
+  C.tint *= 1. + (hb - 0.5) * 0.08; C.tint *= mix(vec3(1.), vec3(1.03, 1.0, 0.95), hb2);   /* each bay its own pour */
+  C.rough = 0.86 + (hb2 - 0.5) * 0.1; C.h += (hb - 0.5) * 0.003;   /* a bay proud or sunk a millimetre or two */
+  // tar in the joints, and smeared over them here and there
+  float dj = min(u, uJoint - u), dl = min(bv, sw - bv), smear = 0.04 + 0.09 * smoothstep(0.45, 0.8, vn2(vec2(s * 0.8, o * 0.8) + 11.));
+  float tarJ = max(smoothstep(0.03, 0.012, dj), smoothstep(smear, smear - 0.025, dj) * 0.6), tarL = smoothstep(0.02, 0.008, dl) * (abs(o) < W2 - 0.1 ? 1. : 0.);
+  // cracks: a few bays cracked across; most sealed, some open
+  vec2 ck = cracks(vec2(s * 0.45, o * 0.7) + vec2(fb2(vec2(s, o) * 0.6) * 0.8)); float cracked = step(0.86, hs(vec2(bi + 31., bj))), crack = smoothstep(0.02, 0.006, ck.x) * cracked;   /* one bay in seven or so cracked */
+  float sealed = step(0.4, ck.y), tarC = crack * sealed, open = crack * (1. - sealed) * smoothstep(0.02, 0.006, ck.x);
+  // a mended patch in some bays
+  vec2 pc = vec2(u / uJoint, bv / sw), p0 = vec2(0.1 + hb * 0.4, 0.1 + hb2 * 0.3); float mend = step(0.93, hb2) * step(p0.x, pc.x) * step(pc.x, p0.x + 0.35) * step(p0.y, pc.y) * step(pc.y, p0.y + 0.45);   /* one patch, in a bay in fifteen */
+  if (mend > 0.) { C.tint *= vec3(0.84, 0.83, 0.82); C.rough = 0.78; C.h -= 0.0015; }
+  // the rubber of the line the cars drive, two wheel tracks; its crumbs beside it
+  float Lo = 0.; if (uLineOn == 1) { int i = int(mod(floor(s), uLen)); Lo = texelFetch(uLine, ivec2(i % 128, i / 128), 0).r; }
+  float d = o - Lo, rub = 0.55 * (exp(-pow((d - 0.68) / 0.33, 2.)) + exp(-pow((d + 0.68) / 0.33, 2.))) + 0.25 * exp(-pow(d / 1.6, 2.));
+  rub *= 0.7 + 0.6 * vn2(vec2(s * 0.05, 0.)); rub = clamp(rub, 0., 1.);
+  float marb = step(0.985, hs(floor(vec2(s, o) * 22.))) * smoothstep(1.3, 2., abs(d)) * smoothstep(3.6, 2.4, abs(d));
+  // oil where cars stand at the start, and dropped along the middle of the wheel tracks
+  float ds = abs(s - uStart), oil = smoothstep(0.72, 0.86, fb2(vec2(s, o) * 0.9 + 4.)) * (smoothstep(40., 5., ds) * 0.7 + 0.2 * exp(-pow(d / 0.5, 2.)));
+  // grime toward the edges, moss in the joints there
+  float edge = smoothstep(W2 - 1.6, W2, abs(o)), edgeDark = smoothstep(W2 - 0.2, W2 - 0.02, abs(o));
+  // ---- together ----
+  vec3 tar = vec3(0.18, 0.17, 0.16); float tarAll = clamp(max(max(tarJ, tarL), tarC), 0., 1.);
+  C.tint = mix(C.tint, C.tint * vec3(0.32, 0.31, 0.31), rub * 0.45); C.rough = mix(C.rough, 0.55, rub * 0.7);
+  C.tint = mix(C.tint, vec3(0.45, 0.44, 0.42), marb * 0.6);
+  C.tint = mix(C.tint, vec3(0.3, 0.28, 0.26), oil * 0.35); C.rough = mix(C.rough, 0.32, oil * 0.8);
+  C.tint = mix(C.tint, C.tint * vec3(0.9, 0.88, 0.8) + vec3(0.02, 0.025, 0.), edge * 0.5); C.tint = mix(C.tint, vec3(0.3, 0.33, 0.24), edge * tarAll * 0.6);
+  C.tint = mix(C.tint, vec3(0.28, 0.27, 0.25), edgeDark * 0.7);
+  C.tint = mix(C.tint, tar / 0.62, tarAll); C.rough = mix(C.rough, 0.38, tarAll); C.h += tarAll * 0.0015;   /* tar: dark, glossy, standing a little proud */
+  C.tint *= 1. - open * 0.55; C.h -= open * 0.003;
+  // the start line: whitewash, worn through where the wheels run, cracked with the concrete
+  float line = smoothstep(0.17, 0.15, ds) * (abs(o) < W2 - 0.05 ? 1. : 0.);
+  if (line > 0.) { float worn = clamp(rub * 1.1 + smoothstep(0.55, 0.8, fb2(vec2(s * 9., o * 3.))) * 0.6 + crack, 0., 1.), pnt = line * (1. - worn * 0.75);
+    C.tint = mix(C.tint, vec3(1.45, 1.43, 1.36), pnt); C.rough = mix(C.rough, 0.62, pnt); C.h += pnt * 0.0008; C.paint = pnt; }
+  return C; }
 layout(location=0) out vec4 oCol; layout(location=1) out vec4 oId; layout(location=2) out vec4 oN; layout(location=3) out vec4 oV; in vec4 vCur, vPrev; uniform vec2 uSize;
 vec4 velo() { vec2 d = (vCur.xy / vCur.w - vPrev.xy / vPrev.w) * 0.5 * uSize; return vec4(clamp(d / 128. + 0.5, 0., 1.), 0., 1.); }   /* pixels moved since the last frame, packed */   // oN: the normal and how mirror-like (for the traced reflections)
 float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 void main() { vec3 c = vCol.rgb;
   if (vFlag > 0.5 && uLook == 0) { vec2 cell = floor(vWorld.xy / vec2(uCell * 2., uCell)); float h = hash(cell); if (h > 0.955) c = vec3(107., 130., 83.) / 255.; else if (h > 0.91) c = vec3(83., 104., 63.) / 255.; }
+  bool conc = vTrk.z > 0.5; Conc C; if (conc) { C = concrete(vTrk.x, vTrk.y); c *= C.tint; }
   if (uLook > 0) { vec3 nn = normalize(cross(dFdx(vWorld), dFdy(vWorld))); if (nn.z < 0.) nn = -nn; float sh = lightAt(vWorld + vec3(0., 0., 0.02));   // the ground as a rough, dull surface
-    Detail dt = detail(vFlag > 0.5 ? 1 : 0, vWorld, nn, vFlag > 0.5 ? 0.8 : 0.7, 0.6, 0.4);
-    oCol = vec4(present(pbrX(c * dt.tone, dt.n, uEye, uSun, sh, 0., clamp(0.92 + dt.rough, 0.3, 1.), 0., rtao(vWorld, dt.n), 0.) + lampsAt(vWorld, dt.n) * toLin(c * dt.tone) / 3.14159), vCol.a); oId = vec4(0.); oN = vec4(dt.n * 0.5 + 0.5, 0.); oV = velo(); return; }
+    if (conc) { vec3 dpx = dFdx(vWorld), dpy = dFdy(vWorld), r1 = cross(dpy, nn), r2 = cross(nn, dpx); float det = dot(dpx, r1), k = clamp(1.6 - length(dpx) * 12., 0., 1.);   /* the relief by the height's change across the pixel (bump mapping), faded where a pixel spans more than the detail */
+      vec3 gr = sign(det) * (dFdx(C.h) * r1 + dFdy(C.h) * r2) * k; nn = normalize(abs(det) * nn - gr); }
+    Detail dt = detail(vFlag > 0.5 ? 1 : 0, vWorld, nn, vFlag > 0.5 ? 0.8 : 0.7, conc ? 0.75 : 0.6, 0.4);
+    float rough = conc ? clamp(C.rough + dt.rough, 0.25, 1.) : clamp(0.92 + dt.rough, 0.3, 1.);
+    oCol = vec4(present(pbrX(c * dt.tone, dt.n, uEye, uSun, sh, 0., rough, 0., rtao(vWorld, dt.n), 0.) + lampsAt(vWorld, dt.n) * toLin(c * dt.tone) / 3.14159), vCol.a); oId = vec4(0.); oN = vec4(dt.n * 0.5 + 0.5, conc ? max(0., 0.5 - rough) * 0.5 : 0.); oV = velo(); return; }
   c = mix(c, vec3(24., 22., 20.) / 255., (1. - lightAt(vWorld + vec3(0., 0., 0.02))) * 0.43);
   oCol = vec4(c, vCol.a); oId = vec4(0.); oN = vec4(0.5, 0.5, 1., 0.); oV = velo(); }`;
 const DEPTH_VS = `#version 300 es
@@ -419,7 +477,7 @@ export class LiveRenderer {
       gl.bindFramebuffer(gl.FRAMEBUFFER, r.f); gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, r.t, 0); }); gl.bindFramebuffer(gl.FRAMEBUFFER, null); }
   private vaoOf(d: GroundData): WebGLVertexArrayObject { const gl = this.gl, vao = gl.createVertexArray()!; gl.bindVertexArray(vao);
     const b = (loc: number, data: ArrayBufferView, size: number, type: number, norm: boolean) => { const buf = gl.createBuffer()!; gl.bindBuffer(gl.ARRAY_BUFFER, buf); gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, size, type, norm, 0, 0); };
-    b(0, d.pos, 3, gl.FLOAT, false); b(1, d.col, 3, gl.UNSIGNED_BYTE, true); b(2, d.flag, 1, gl.FLOAT, false); gl.bindVertexArray(null); return vao; }
+    b(0, d.pos, 3, gl.FLOAT, false); b(1, d.col, 3, gl.UNSIGNED_BYTE, true); b(2, d.flag, 1, gl.FLOAT, false); if (d.trk) b(3, d.trk, 3, gl.FLOAT, false); gl.bindVertexArray(null); return vao; }
   /** the PBR detail textures: three pictures of the layers stacked top to bottom (albedo, normal, roughness), each layer
    *  a square tile; its size (m), mean brightness and roughness. Mipmapped, repeating, as texture arrays */
   setTextures(alb: HTMLImageElement, nor: HTMLImageElement, rgh: HTMLImageElement, layers: { size_m: number; luma_mean: number; rough_mean: number }[]) { const gl = this.gl, n = layers.length;
@@ -448,6 +506,10 @@ export class LiveRenderer {
     this.hiTex = { alb: arr(v => v.alb), nor: arr(v => v.nor), idx }; }
   setGround(d: GroundData) { this.groundVao = this.vaoOf(d); this.groundN = d.n; }
   setFence(d: GroundData) { this.fenceVao = this.vaoOf(d); this.fenceN = d.n; }
+  /** the track for the concrete (review 122): its length and width, the joints' spacing, the start line's distance, and the line the cars drive (offset at each metre) */
+  private trackU = { len: 1, w: 30, joint: 12, start: 0 }; private lineTex: WebGLTexture | null = null;
+  setTrack(len: number, width: number, joint: number, start: number, line?: Float32Array) { this.trackU = { len, w: width, joint, start }; if (!line) return; const gl = this.gl, rows = Math.ceil(line.length / 128), data = new Float32Array(rows * 128); data.set(line);
+    const t = gl.createTexture()!; gl.bindTexture(gl.TEXTURE_2D, t); gl.texImage2D(gl.TEXTURE_2D, 0, gl.R32F, 128, rows, 0, gl.RED, gl.FLOAT, data); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST); this.lineTex = t; }
   /** the GPU copy of a prop's mesh (by kind) or a car's (by its mesh object), made once */
   prop(kind: string, make: () => Mesh): GpuMesh { let g = this.kinds.get(kind); if (!g) { g = gpuMesh(this.gl, make(), false); this.kinds.set(kind, g); } return g; }
   car(M: Mesh): GpuMesh { let g = this.cars.get(M); if (!g) { g = gpuMesh(this.gl, M, true); this.cars.set(M, g); } return g; }
@@ -498,7 +560,7 @@ export class LiveRenderer {
       gl.uniform3fv(this.loc(p, 'uBoxC'), boxes.flatMap(q => { const H = q.g.height; return [q.x, q.y, q.z + 0.18 + (H - 0.18) / 2]; }));
       gl.uniform3fv(this.loc(p, 'uBoxE'), boxes.flatMap(q => [q.g.len / 2000 * 0.9, q.g.width / 2 * 0.85, (q.g.height - 0.18) / 2 * 0.8])); gl.uniform2fv(this.loc(p, 'uBoxR'), boxes.flatMap(q => [Math.cos(q.yaw), Math.sin(q.yaw)])); };
     const shadowTo = (p: WebGLProgram) => { texTo(p); boxTo(p); gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, this.sTex); gl.uniform1i(this.loc(p, 'uShadow'), 1); gl.uniformMatrix4fv(this.loc(p, 'uLight'), false, LV); };
-    gl.useProgram(this.ground); lampsTo(this.ground); gl.uniform1f(this.loc(this.ground, 'uDay'), o.day ?? 1); gl.uniformMatrix4fv(this.loc(this.ground, 'uVP'), false, VP); const hdrOn = this.hdr && (o.look ?? 0) === 2 ? 1 : 0; gl.uniform1i(this.loc(this.ground, 'uHDRo'), hdrOn); gl.uniform1f(this.loc(this.ground, 'uSpecK'), 1); gl.uniformMatrix4fv(this.loc(this.ground, 'uPrevVP'), false, this.prevVP ?? VP); gl.uniform2f(this.loc(this.ground, 'uSize'), v.W, v.H); gl.uniform1i(this.loc(this.ground, 'uLook'), o.look ?? 0); gl.uniform1f(this.loc(this.ground, 'uTexK'), o.texK ?? 1); gl.uniform1f(this.loc(this.ground, 'uLightK'), o.lightK ?? 1); gl.uniform3fv(this.loc(this.ground, 'uSun'), SUN_W); gl.uniform3fv(this.loc(this.ground, 'uEye'), eye); gl.uniform1f(this.loc(this.ground, 'uCell'), Math.max(0.03, v.mm / 1000)); gl.uniform1f(this.loc(this.ground, 'uBias'), 0); shadowTo(this.ground);
+    gl.useProgram(this.ground); lampsTo(this.ground); { const g = this.ground, t = this.trackU; gl.uniform1f(this.loc(g, 'uLen'), t.len); gl.uniform1f(this.loc(g, 'uTW'), t.w); gl.uniform1f(this.loc(g, 'uJoint'), t.joint); gl.uniform1f(this.loc(g, 'uStart'), t.start); gl.uniform1i(this.loc(g, 'uLineOn'), this.lineTex ? 1 : 0); gl.activeTexture(gl.TEXTURE12); gl.bindTexture(gl.TEXTURE_2D, this.lineTex ?? this.blank); gl.uniform1i(this.loc(g, 'uLine'), 12); } gl.uniform1f(this.loc(this.ground, 'uDay'), o.day ?? 1); gl.uniformMatrix4fv(this.loc(this.ground, 'uVP'), false, VP); const hdrOn = this.hdr && (o.look ?? 0) === 2 ? 1 : 0; gl.uniform1i(this.loc(this.ground, 'uHDRo'), hdrOn); gl.uniform1f(this.loc(this.ground, 'uSpecK'), 1); gl.uniformMatrix4fv(this.loc(this.ground, 'uPrevVP'), false, this.prevVP ?? VP); gl.uniform2f(this.loc(this.ground, 'uSize'), v.W, v.H); gl.uniform1i(this.loc(this.ground, 'uLook'), o.look ?? 0); gl.uniform1f(this.loc(this.ground, 'uTexK'), o.texK ?? 1); gl.uniform1f(this.loc(this.ground, 'uLightK'), o.lightK ?? 1); gl.uniform3fv(this.loc(this.ground, 'uSun'), SUN_W); gl.uniform3fv(this.loc(this.ground, 'uEye'), eye); gl.uniform1f(this.loc(this.ground, 'uCell'), Math.max(0.03, v.mm / 1000)); gl.uniform1f(this.loc(this.ground, 'uBias'), 0); shadowTo(this.ground);
     if (this.groundVao) { gl.bindVertexArray(this.groundVao); gl.drawArrays(gl.TRIANGLES, 0, this.groundN); }
     if (this.fenceVao && this.fenceN) { gl.bindVertexArray(this.fenceVao); gl.drawArrays(gl.TRIANGLES, 0, this.fenceN); }
     // skid marks: dark patches on the concrete, blended, nothing else written

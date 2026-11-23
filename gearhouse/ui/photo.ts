@@ -14,7 +14,7 @@ import texRgh from '../assets/textures/pbr/rough.jpg';
 import texMeta from '../assets/textures/pbr/pbr.json';
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const cv = $<HTMLCanvasElement>('cv'), T = millbrook(), SCN = millbrookScenery(T), START = T.spec.landmarks.find(l => l.kind === 'line')!.s, L = new LiveRenderer(cv);
-L.setGround(groundData(T, SCN, START));
+L.setGround(groundData(T, SCN, START)); L.setTrack(T.length, T.spec.width, T.spec.joints, START);
 const load = (src: string) => new Promise<HTMLImageElement>((ok, no) => { const i = new Image(); i.onload = () => ok(i); i.onerror = no; i.src = src; });
 void Promise.all([texAlb, texNor, texRgh].map(load)).then(([a, n, r]) => { L.setTextures(a!, n!, r!, (texMeta as { layers: { size_m: number; luma_mean: number; rough_mean: number }[] }).layers); dirty = true; });
 // the high-resolution sets: layer (0 concrete, 2 metal, 4 leather, 5 canvas) -> its pictures beside the page

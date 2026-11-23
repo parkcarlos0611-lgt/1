@@ -61,7 +61,7 @@ const meshOf = (id: string, num: string) => renumber(MESH_CARS.find(c => c.id ==
 const numOf = (e: Entrant): string => { if (!race) return myNum; let k = 0; for (const x of race.cars) { if (x === race.player) continue; k++; if (String(k) === myNum) k++; if (x === e) return String(k); } return myNum; };
 // ---- the live renderer (review 99): the scene drawn every frame by WebGL2, where the browser has it; the baked pictures otherwise ----
 const glCanvas = document.createElement('canvas'); let live: LiveRenderer | null = null, liveFence = -1;
-try { live = new LiveRenderer(glCanvas); live.setGround(groundData(T, SCN, START)); } catch (e) { console.warn('live renderer unavailable', e); live = null; }
+try { live = new LiveRenderer(glCanvas); live.setGround(groundData(T, SCN, START)); live.setTrack(T.length, T.spec.width, T.spec.joints, START, rubberLine(T)); } catch (e) { console.warn('live renderer unavailable', e); live = null; }
 // the PBR detail textures (Poly Haven, CC0): loaded once, laid on when ready
 if (live) { const L = live, im = [texAlb, texNor, texRgh].map(src => { const i = new Image(); i.src = src; return i; });
   void Promise.all(im.map(i => i.decode())).then(() => L.setTextures(im[0]!, im[1]!, im[2]!, (texMeta as { layers: { size_m: number; luma_mean: number; rough_mean: number }[] }).layers)).catch(e => console.warn('textures', e)); }
@@ -76,6 +76,8 @@ const artAsked = new WeakSet<object>(); let artOn = true, raysOn = true, texK = 
 function artFor(L: LiveRenderer, g: ReturnType<LiveRenderer['car']>, id: string, M: import('../render/car/mesh').Mesh) { if (artAsked.has(g) || !ART[id] || !M.names?.some(Boolean)) return; artAsked.add(g);   // only a mesh with its parts named can take it
   const meta = artMeta as unknown as { mm: number; groups: string[]; cars: Record<string, { C: number; views: Record<string, number[]> }> }, groups = M.names!.map(n => n ? meta.groups.indexOf(canonical(n)) + 1 : 0);
   void fetch(ART[id]!).then(r => r.blob()).then(b => createImageBitmap(b, { premultiplyAlpha: 'none', colorSpaceConversion: 'none' })).then(bm => L.setArt(g, bm, { mm: meta.mm, ...meta.cars[id]! }, groups)).catch(e => console.warn('art', e)); }
+/** where the cars' tyres lay their rubber (review 122): the test driver's line in a fast car, a metre at a time */
+function rubberLine(T: import('../race/track').Track): Float32Array { const d = new Driver(T), v = new Vehicle(raceSpec('dueSSJ35'), T).place(0, 0, 0); d.drive(v); return Float32Array.from({ length: Math.round(T.length) }, (_, s) => d.lineAt(s)); }
 const liveOK = !!live; let liveR = live; let look: 'baked' | 'stepped' | 'pbr' | 'split' = 'pbr';   /* the light and materials: the baked pictures' stepped light, or physically based (review 102) */
 function drawLive(el: number) { const L = live!; void el;
   if (++wearTick % 30 === 0 && document.activeElement?.id !== 'wdirt') $<HTMLInputElement>('wdirt').value = myWear[2].toFixed(2);   /* the dirt slider follows the dirt */

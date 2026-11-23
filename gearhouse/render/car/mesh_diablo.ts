@@ -71,7 +71,7 @@ const A0: V = [XA, YP, zTopF(XA, YP)], A1: V = [XR0, YD, zRoof(XR0, YD)], pillar
 const ptE = (x: number): V => x <= XR0 ? pillar(x) : x <= XR1 ? [x, YD, zRoof(x, YD)] : [x, YRO(x), ZB(x)];
 const ptT = (x: number): V => { if (x <= XR0) return pillar(x); const e = ptE(x), k = lerp(1, 0.25, sm(XR1, S1, x)); return [x, e[1] + 25 * k, e[2] - 28 * k]; };
 /** the wheel arches: the front a half round, the rear a cut polygon (a raked front leg, a flat top, a steep back) */
-const ARCHR = lin([[3262, ZS], [3285, 300], [3330, 480], [3400, 620], [3450, 680], [3500, 706], [3800, 712], [3870, 690], [3950, 620], [4010, 480], [4035, 300], [4045, ZS]]), RAF = 350;
+const ARCHR = lin([[3262, ZS], [3285, 176], [3330, 304], [3400, 502], [3450, 640], [3500, 702], [3800, 712], [3870, 694], [3950, 628], [4010, 480], [4035, 300], [4045, ZS]]), RAF = 350;
 const archZ = (x: number) => Math.abs(x - FX) < RAF ? RF + 0.99 * Math.sqrt(RAF * RAF - (x - FX) ** 2) : x > 3262 && x < 4045 ? ARCHR(x) : 0;
 
 // ---- the stations ----
@@ -220,7 +220,7 @@ export function diabloMesh(spin = 0, lamps = 0, wing = 0): Mesh { const b = new 
     seam(RD[at(4150) - iR]!.slice(0, 3), () => UPV); }
 
   // ---- the scoop pressed into the door's foot: it deepens to the slanted intake ahead of the rear wheel ----
-  { const dep = (x: number) => 105 * Math.min(1, (x - SF[iH0]!) / (2800 - SF[iH0]!)), inn = (i: number, j: number): V => { const p = CH[i]![j]!; return [p[0], p[1] - dep(p[0]), p[2] + (j === 4 ? -8 : j === 6 ? 8 : 0)]; };
+  { const dep = (x: number) => 130 * Math.min(1, (x - SF[iH0]!) / (2800 - SF[iH0]!)), inn = (i: number, j: number): V => { const p = CH[i]![j]!; return [p[0], p[1] - dep(p[0]), p[2] + (j === 4 ? -8 : j === 6 ? 8 : 0)]; };
     const IN: V[][] = []; for (let i = iH0; i <= iH1; i++) IN.push([CH[i]![4]!, inn(i, 4), inn(i, 5), inn(i, 6), CH[i]![6]!]);
     b.name('scoop').mat(PAINT, GLOSS, 'paint'); cells(IN, (i, j) => j === 0 || j === 3 || i + iH0 < iH1 - 1);
     for (const sg of [1, -1]) { const m = (p: V) => mir(p, sg), a = IN[IN.length - 2]!, c = IN[IN.length - 1]!; tri(b, m(a[1]!), m(a[3]!), m(c[3]!), [0, sg, 0]);
@@ -250,20 +250,22 @@ export function diabloMesh(spin = 0, lamps = 0, wing = 0): Mesh { const b = new 
     b.name('tailBand'); { const r = [...TP[1]!.slice(0, jB + 1), ...TP[2]!.slice(0, jB + 1).reverse()], full = [...r, ...r.slice(1, -1).reverse().map(p => mir(p, -1))]; pocket(full, [-30, 0, 0], [1, 0, 0]); }
     const xb = (z: number) => S1 + (900 - z) * LEAN, slab = (y0: number, y1: number, z0: number, z1: number, lift: number): V[] => [[xb(z0) - lift, y0, z0], [xb(z0) - lift, y1, z0], [xb(z1) - lift, y1, z1], [xb(z1) - lift, y0, z1]];
     b.name('tailGrille').mat(DARK, 0.05, 'grille'); { const r = slab(-440, 440, ZT1 + 8, ZT0 - 8, 26); face(b, r[0]!, r[1]!, r[2]!, r[3]!, [1, 0, 0]); }
-    for (const sg of [1, -1]) for (const [y0, y1, col, kind] of [[462, 592, RED, 'lens'], [606, 736, RED, 'lens'], [750, 846, AMBER, 'plain']] as const) { const r = slab(sg * y0, sg * y1, ZT1 + 16, ZT0 - 16, 7);
-      b.name(kind === 'lens' ? 'tailLamp' : 'indicatorR').mat(col, 0.7, kind); face(b, r[0]!, r[1]!, r[2]!, r[3]!, [1, 0, 0]);
+    // the lamp clusters in the band: from the grille out, a clear reversing lamp, two red lamps, an amber indicator; each a round-cornered lens in a dark bezel
+    for (const sg of [1, -1]) for (const [y0, y1, col, kind, nm] of [[456, 530, WHITE, 'plain', 'lampR'], [542, 632, RED, 'lens', 'tailLamp'], [644, 734, RED, 'lens', 'stopLamp'], [746, 822, AMBER, 'plain', 'indicatorR']] as const) { const z0 = ZT1 + 34, z1 = ZT0 - 34, c = 20, P = (y: number, z: number): V => [xb(z) - 7, sg * y, z];
+      const r = [P(y0 + c, z0), P(y1 - c, z0), P(y1, z0 + c), P(y1, z1 - c), P(y1 - c, z1), P(y0 + c, z1), P(y0, z1 - c), P(y0, z0 + c)];
+      b.name(nm).mat(col, 0.7, kind); fan(b, r, [1, 0, 0]);
       b.name('tailLampRim').mat(FRAME, 0.2); tube(b, r, [-22, 0, 0]); }
     // the bumper: rows going round from the centre line to its front end on the flank; [height, its rearmost x, half-width]
     const YB = W(S1) + 4 - 126, OUT: [number, number, number, number][] = [...[4170, 4250, 4300, S1].map(x => [x, W(x) + 4, 0, 1] as [number, number, number, number]), ...[22.5, 45, 67.5, 90].map(d => { const a = d * Math.PI / 180; return [S1 + 126 * Math.sin(a), YB + 126 * Math.cos(a), Math.sin(a), Math.cos(a)] as [number, number, number, number]; }), [4456, 600, 1, 0], [4456, 300, 1, 0], [4456, 0, 1, 0]];
     const row = (lv: [number, number][]) => OUT.map(([x, y, nx, ny]) => lv.map(([z, inset]) => [x - nx * inset, Math.max(0, y - ny * inset), z] as V));
-    b.name('bumperR').mat(PAINT, GLOSS, 'paint'); cells(row([[612, 76], [610, 14], [590, 0], [352, 0], [336, 8]]));
-    b.name('valance').mat(PAINT, GLOSS, 'paint'); cells(row([[336, 14], [205, 26], [185, 76]]));
+    b.name('bumperR').mat(PAINT, GLOSS, 'paint'); cells(row([[602, 74], [566, 34], [528, 8], [500, 0], [352, 0], [336, 8]]));   // its top rounds out of the tail panel's foot: no shelf
+    b.name('valance').mat(TRIM, 0.15); cells(row([[336, 14], [205, 26], [185, 76]]));
     b.name('valanceGrille').mat(DARK, 0.05, 'grille'); face(b, [4445, -430, 322], [4445, 430, 322], [4432, 430, 212], [4432, -430, 212], [1, 0, 0]);
     for (const sg of [1, -1]) face(b, [S1, sg * 870, ZS], [4372, sg * 870, 185], [4372, 0, 185], [S1, 0, ZS], [0, 0, -1]);
     b.name('exhaust').mat(CHROME, 0.8, 'metal'); for (const y of [-190, -70, 70, 190]) b.lathe('x', [0, y, 262], [[4380, 38], [4452, 38], [4452, 30], [4400, 30]], 10, false);
     b.name('exhaust').mat(DARK, 0.05); for (const y of [-190, -70, 70, 190]) b.lathe('x', [0, y, 262], [[4402, 0], [4402, 30]], 10, false);
     b.name('plate').mat(WHITE, 0.3).box(4455, 4460, -260, 260, 405, 515);
-    b.name('lampR').mat(WHITE, 0.7); for (const sg of [1, -1]) { b.box(4418, 4442, Math.min(sg * 520, sg * 700), Math.max(sg * 520, sg * 700), 232, 292); } }
+    b.name('fogR').mat(RED, 0.7); for (const sg of [1, -1]) { b.box(4418, 4444, Math.min(sg * 560, sg * 700), Math.max(sg * 560, sg * 700), 236, 288); } }
 
   // ---- the back of the cabin: the upright rear window between the buttresses, over the engine cover's front edge ----
   { const rt = RFG[RFG.length - 1]!, zc = ZCV(XCV);
@@ -290,8 +292,8 @@ export function diabloMesh(spin = 0, lamps = 0, wing = 0): Mesh { const b = new 
 
   // ---- the fittings ----
   // the door mirrors, standing on the ledge at the side glass's front corner
-  for (const sg of [1, -1]) { const hs = (y: number, k: number): V[] => [[1350 + 18 * k, y, 700], [1500, y, 696 + 4 * k], [1505, y, 790 - 6 * k], [1385 + 22 * k, y, 800 - 8 * k], [1340 + 18 * k, y, 770 - 4 * k]];
-    b.name('mirror').mat(PAINT, GLOSS, 'paint').loft([hs(sg * 905, 1.4), hs(sg * 925, 0), hs(sg * 1075, 0), hs(sg * 1098, 1.6)]).bar([1400, sg * 850, 690], [1420, sg * 915, 730], 60, 36);
+  for (const sg of [1, -1]) { const hs = (y: number, k: number): V[] => [[1325 + 22 * k, y, 744 - 2 * k], [1500, y, 700 + 5 * k], [1506, y, 792 - 6 * k], [1425 + 16 * k, y, 800 - 9 * k]];
+    b.name('mirror').mat(PAINT, GLOSS, 'paint').loft([hs(sg * 918, 1.4), hs(sg * 936, 0), hs(sg * 1075, 0), hs(sg * 1098, 1.6)]).bar([1405, sg * 815, 700], [1425, sg * 930, 745], 44, 22);
     b.name('mirrorGlass').mat(SILVER, 0.9, 'metal'); face(b, [1507, sg * 935, 706], [1507, sg * 1070, 706], [1511, sg * 1070, 782], [1511, sg * 935, 782], [1, 0, 0]); }
   // the single wiper parked along the screen's foot
   { const onScr = (y: number, v: number, lift: number): V => { const f = Math.abs(y) / YP, x0 = xTop(XA, Math.abs(y)), p: V = [x0, y, zTopF(x0, Math.abs(y))], x1 = xRoof(XR0, f * YD), q: V = [x1, y * YD / YP, zRoof(x1, f * YD)], r = mix(p, q, v); return [r[0] - lift * 0.4, r[1], r[2] + lift * 0.92]; };

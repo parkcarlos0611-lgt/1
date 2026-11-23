@@ -111,8 +111,16 @@
     600
    ],
    [
-    4456,
-    590
+    4424,
+    566
+   ],
+   [
+    4450,
+    528
+   ],
+   [
+    4458,
+    500
    ],
    [
     4460,
@@ -404,7 +412,7 @@
   },
   "rear": {
    "centre": 3650,
-   "shape": "Gandini: a cut polygon, raked front leg, flat top, steeper back",
+   "shape": "Gandini: a cut polygon; the front leg a straight rake of 20 degrees from the upright (foot 3262, top corner 3480), flat top at 702-712, steeper back",
    "outline": [
     [
      3262,
@@ -412,23 +420,23 @@
     ],
     [
      3285,
-     300
+     176
     ],
     [
      3330,
-     480
+     304
     ],
     [
      3400,
-     620
+     502
     ],
     [
      3450,
-     680
+     640
     ],
     [
      3500,
-     706
+     702
     ],
     [
      3800,
@@ -436,11 +444,11 @@
     ],
     [
      3870,
-     690
+     694
     ],
     [
      3950,
-     620
+     628
     ],
     [
      4010,
@@ -471,7 +479,7 @@
   "9_buttresses": "the ridge from the roof's corner to the tail, and the slope outboard of it (quarter glass, upper intake)",
   "10_engineCover": "between the ridges, half-width 450, x 2725-4150; louvres two banks of 7; a short deck behind it to 4330",
   "11_tailPanel": "x 4330 at the top leaning back to 4384 at z 600; the black band z 650-848 sunk 30",
-  "12_rearBumper": "z 336-612, standing 70 proud, rear face at x 4456; valance z 185-336 with the grille and pipes",
+  "12_rearBumper": "body colour, z 336-602, wrapping the corners; its top rounds out of the tail panel's foot (no shelf), rear face at x 4456; under it a black valance z 185-336 with the mesh grille and the four pipes",
   "13_floor": "flat at z 110; wheel wells dark, inner walls at y 600/610",
   "14_wheels": "OZ five-hole, 17 in; rear much wider",
   "15_wing": "optional (wing = 1): blade x 4130-4430 at z 1104-1132, span 1760, two struts at y 572"
@@ -628,18 +636,18 @@
    "id": "mirror",
    "pair": true,
    "x": [
-    1340,
-    1505
+    1325,
+    1506
    ],
    "y": [
-    905,
+    918,
     1098
    ],
    "z": [
-    696,
+    700,
     800
    ],
-   "shape": "body colour housing on a short foot on the ledge at the side glass's front corner"
+   "shape": "body colour wedge head (thin at the front, the glass at the back) on a slim stalk from the ledge at the side glass's front corner"
   },
   {
    "id": "sideGlass",
@@ -690,7 +698,7 @@
     205,
     430
    ],
-   "shape": "a pressing in the door's foot and the quarter, deepening to 105"
+   "shape": "a pressing in the door's foot and the quarter, deepening to 130"
   },
   {
    "id": "intakeLower",
@@ -749,27 +757,40 @@
    "id": "tailLamp",
    "pair": true,
    "y": [
-    462,
-    736
+    542,
+    734
    ],
    "z": [
-    666,
-    832
+    684,
+    814
    ],
-   "shape": "two red lamps side by side in the band (y 462-592, 606-736)"
+   "shape": "two red lamps side by side in the band (y 542-632, 644-734), each a round-cornered lens in a dark bezel"
   },
   {
    "id": "indicatorR",
    "pair": true,
    "y": [
-    750,
-    846
+    746,
+    822
    ],
    "z": [
-    666,
-    832
+    684,
+    814
    ],
-   "shape": "amber, outboard of the red lamps"
+   "shape": "amber, outboard of the red lamps, same lens shape"
+  },
+  {
+   "id": "reverseLamp",
+   "pair": true,
+   "y": [
+    456,
+    530
+   ],
+   "z": [
+    684,
+    814
+   ],
+   "shape": "clear, inboard of the red lamps next to the band's grille"
   },
   {
    "id": "rearGrille",
@@ -803,17 +824,17 @@
    "shape": "on the bumper's face"
   },
   {
-   "id": "reverseFog",
+   "id": "fogR",
    "pair": true,
    "y": [
-    520,
+    560,
     700
    ],
    "z": [
-    232,
-    292
+    236,
+    288
    ],
-   "shape": "clear lamp each side in the valance"
+   "shape": "red fog lamp each side in the black valance"
   },
   {
    "id": "wheelF",

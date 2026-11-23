@@ -89,7 +89,7 @@ function artFor(L: LiveRenderer, g: ReturnType<LiveRenderer['car']>, id: string,
 /** a car with a rising wing drawn from its mesh built with the wing up (review 125), made once per car */
 const wingMeshes = new Map<Mesh, Mesh>();
 /** pop-up head lamps raised while the lamps are on (review 144): the cars whose mesh takes the lamps as its second argument */
-const POPUP = new Set(['diablo']), lampMeshes = new Map<Mesh, Mesh>();
+const POPUP = new Set(['diablo', 'nsx']), lampMeshes = new Map<Mesh, Mesh>();
 function lampsUp(id: string, base: Mesh): Mesh { let m = lampMeshes.get(base); if (!m) { const e = MESH_CARS.find(c => c.id === id), f = e?.mesh as ((spin?: number, lamps?: number) => Mesh) | undefined; m = f ? renumber(f(0, 1), myNum) : base; lampMeshes.set(base, m); } return m; }
 function wingUp(id: string, base: Mesh): Mesh { let m = wingMeshes.get(base); if (!m) { const e = MESH_CARS.find(c => c.id === id), f = e?.mesh as ((spin?: number, wing?: number) => Mesh) | undefined; m = f ? renumber(f(0, 1), myNum) : base; wingMeshes.set(base, m); } return m; }
 /** the later technology's readouts (review 125): boost, ABS working, the wing up, the drive's split */
@@ -98,6 +98,8 @@ function techHud(): string { const X = car.spec.tech; if (!X) return ''; let o =
   if (X.drive) o += `<span>4WD ${Math.round(X.drive.front * 100)}:${Math.round((1 - X.drive.front) * 100)}</span>`;
   if (X.abs) o += `<span class="${car.absOn ? 'hot' : ''}">ABS${car.absOn ? ' 작동' : ''}</span>`;
   if (X.wing) o += `<span>윙 ${car.wing > 0.5 ? '올림' : '내림'}</span>`;
+  if (X.tcs) o += `<span class="${car.tcsOn ? 'hot' : ''}">TCS${car.tcsOn ? ' 작동' : ''}</span>`;   /* review 153: the NSX's own traction control, and its VTEC cam */
+  if (X.vtec) o += `<span class="${car.vtecHigh ? 'hot' : ''}">VTEC${car.vtecHigh ? ' 고속 캠' : ''}</span>`;
   if (X.ground) o += `<span>다운포스 ${Math.round(0.5 * 1.2 * car.speed * car.speed * X.ground.clA / 9.81)} kg</span>`; return o; }
 /** where the cars' tyres lay their rubber (review 122): the test driver's line in a fast car, a metre at a time */
 function rubberLine(T: import('../race/track').Track): Float32Array { const d = new Driver(T), v = new Vehicle(raceSpec('dueSSJ35'), T).place(0, 0, 0); d.drive(v); return Float32Array.from({ length: Math.round(T.length) }, (_, s) => d.lineAt(s)); }

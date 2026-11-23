@@ -199,7 +199,8 @@ const NSX: RaceSpec = { id: 'nsx', name: '1990 Honda NSX (실험)', mass: 1365 +
  *  cars and the tests that carry one: about a quarter of the effort parking, most of it back by motorway speeds */
 export const EPS_SPEED_SENSITIVE = { low: 0.25, high: 0.8, fade: 50 };
 /** cars whose physics is ready but whose body mesh is not yet built: raceSpec finds them; the drive page does not list them */
-export const AWAITING_MESH: Record<string, RaceSpec> = { nsx: NSX };
+export const AWAITING_MESH: Record<string, RaceSpec> = {};
+NEW.nsx = NSX;   // review 153: its body mesh is built (render/car/mesh_nsx.ts) and registered
 Object.assign(EXP, NEW);
 /** the new 3D-first cars, offered beside the period ones */
 export const NEW_CARS: string[] = Object.keys(NEW);

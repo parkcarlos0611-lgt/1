@@ -7,7 +7,7 @@ import { readFileSync, writeFileSync, mkdirSync, rmSync, readdirSync, copyFileSy
 import { join, relative } from 'node:path';
 const [entry, tpl, out, page = 'index.html', extra] = process.argv.slice(2);
 rmSync(out, { recursive: true, force: true }); mkdirSync(out, { recursive: true });
-await build({ entryPoints: { app: entry }, bundle: true, minify: true, charset: 'utf8', format: 'iife', target: 'es2020', outdir: out, assetNames: 'assets/[name]-[hash]', publicPath: '', loader: { '.json': 'json', '.png': 'file', '.jpg': 'file' } });
+await build({ entryPoints: { app: entry }, bundle: true, minify: true, charset: 'utf8', format: 'iife', target: 'es2020', outdir: out, assetNames: 'assets/[name]-[hash]', publicPath: '', loader: { '.json': 'json', '.png': 'file', '.jpg': 'file', '.gltf': 'json', '.bin': 'file' } });
 const html = readFileSync(tpl, 'utf8'), tag = /<script>\s*\/\*BUNDLE\*\/\s*<\/script>/;
 if (!tag.test(html)) throw new Error('the template has no <script>/*BUNDLE*/</script>');
 writeFileSync(join(out, page), '<meta charset="utf-8">\n' + html.replace(tag, '<script src="app.js" charset="utf-8"></script>'));

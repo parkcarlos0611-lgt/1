@@ -22,3 +22,13 @@ import skyMeta from '../../assets/textures/sky/sky.json';
 /** the photographed sky (review 124) */
 export async function loadSky(L: LiveRenderer): Promise<void> { const b = await (await fetch(skyPng)).blob(), bm = await createImageBitmap(b, { premultiplyAlpha: 'none', colorSpaceConversion: 'none' });
   const m = skyMeta as { range: number; sh: number[][] }; L.setSky(bm, m.range, m.sh); }
+import { PROP_MODELS } from './propmodels';
+import { readGltf, materialUris } from './gltf';
+import { paddockProps, propMatrices } from './paddock';
+import type { Track } from '../../race/track';
+/** the photographed props (review 125): each model's glTF, buffer and pictures loaded, then its copies placed */
+export async function loadProps(L: LiveRenderer, T: Track): Promise<void> { const base: Record<string, { min: number[]; max: number[] }> = {};
+  await Promise.all(Object.entries(PROP_MODELS).map(async ([id, m]) => { const g = m.gltf, bin = await (await fetch(m.files[g.buffers[0]!.uri]!)).arrayBuffer(), geo = readGltf(g, bin), u = materialUris(g);
+    const pic = async (uri?: string) => createImageBitmap(await (await fetch(m.files[uri!]!)).blob(), { colorSpaceConversion: 'none', premultiplyAlpha: 'none' });
+    const [alb, nor, arm] = await Promise.all([pic(u.alb), pic(u.nor), pic(u.arm)]); L.addPropModel(id, geo, { alb, nor, arm }); base[id] = { min: geo.min, max: geo.max }; }));
+  let n = 0; for (const [id, mats] of propMatrices(T, paddockProps(), base)) { L.setPropInstances(id, mats); n += mats.length / 16; } console.info('props placed', n); }

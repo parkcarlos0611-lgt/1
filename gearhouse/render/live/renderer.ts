@@ -392,6 +392,27 @@ void main() { vec3 c = vCol.rgb;
     oCol = vec4(present(pbrX(c * dt.tone, dt.n, uEye, uSun, sh, 0., rough, 0., rtao(vWorld, dt.n) * (photo ? mix(1., pao, 0.8) : 1.), 0.) + lampsAt(vWorld, dt.n) * toLin(c * dt.tone) / 3.14159), vCol.a); oId = vec4(0.); oN = vec4(dt.n * 0.5 + 0.5, conc ? max(0., 0.5 - rough) * 0.5 : 0.); oV = velo(); return; }
   c = mix(c, vec3(24., 22., 20.) / 255., (1. - lightAt(vWorld + vec3(0., 0., 0.02))) * 0.43);
   oCol = vec4(c, vCol.a); oId = vec4(0.); oN = vec4(0.5, 0.5, 1., 0.); oV = velo(); }`;
+// ---- photographed props (review 125): Poly Haven CC0 glTF models with their own pictures (base colour, normal,
+//      ao-rough-metal), drawn many at once (instanced), lit, shadowed and outlined as everything else ----
+const PROP_VS = `#version 300 es
+layout(location=0) in vec3 aPos; layout(location=1) in vec3 aNor; layout(location=2) in vec2 aUV; layout(location=3) in vec4 aM0; layout(location=4) in vec4 aM1; layout(location=5) in vec4 aM2; layout(location=6) in vec4 aM3;
+uniform mat4 uVP, uPrevVP; out vec3 vWorld, vN; out vec2 vUV; out vec4 vCur, vPrev;
+void main() { mat4 M = mat4(aM0, aM1, aM2, aM3); vec4 w = M * vec4(aPos, 1.); vWorld = w.xyz; vN = normalize(mat3(M) * aNor); vUV = aUV; gl_Position = uVP * w; vCur = gl_Position; vPrev = uPrevVP * w; }`;
+const PROP_FS = `#version 300 es
+precision highp float;
+${LIGHT}
+in vec3 vWorld, vN; in vec2 vUV; in vec4 vCur, vPrev; uniform vec3 uSun, uEye; uniform vec2 uSize, uObj; uniform float uOutline; uniform highp sampler2D uPA, uPN, uPR;
+layout(location=0) out vec4 oCol; layout(location=1) out vec4 oId; layout(location=2) out vec4 oN; layout(location=3) out vec4 oV;
+vec4 velo() { vec2 d = (vCur.xy / vCur.w - vPrev.xy / vPrev.w) * 0.5 * uSize; return vec4(clamp(d / 128. + 0.5, 0., 1.), 0., 1.); }
+void main() { vec3 n = normalize(vN); if (dot(n, uEye) < 0.) n = -n;
+  vec3 dp1 = dFdx(vWorld), dp2 = dFdy(vWorld); vec2 du1 = dFdx(vUV), du2 = dFdy(vUV); vec3 a = cross(dp2, n), b = cross(n, dp1), T = a * du1.x + b * du2.x, B = a * du1.y + b * du2.y;   /* the surface's own axes from the picture's, per pixel */
+  float k = inversesqrt(max(1e-12, max(dot(T, T), dot(B, B)))); vec3 tn = texture(uPN, vUV).xyz * 2. - 1.; vec3 nw = normalize(T * k * tn.x + B * k * tn.y * -1. + n * tn.z); if (dot(nw, uEye) < 0.) nw = n;
+  vec3 alb = texture(uPA, vUV).rgb, arm = texture(uPR, vUV).rgb; float sh = lightAt(vWorld + n * 0.02), ao = rtao(vWorld, nw) * mix(1., arm.r, 0.8);
+  vec3 lit = pbrX(alb, nw, uEye, uSun, sh, arm.b, clamp(arm.g, 0.06, 1.), 0., ao, 0.) + lampsAt(vWorld, nw) * toLin(alb) / 3.14159;
+  oCol = vec4(present(lit), 1.); oId = vec4(uObj, 0., uOutline / 8.); oN = vec4(nw * 0.5 + 0.5, arm.b > 0.5 ? 1. - arm.g : 0.); oV = velo(); }`;
+const DEPTHI_VS = `#version 300 es
+layout(location=0) in vec3 aPos; layout(location=3) in vec4 aM0; layout(location=4) in vec4 aM1; layout(location=5) in vec4 aM2; layout(location=6) in vec4 aM3;
+uniform mat4 uVP; void main() { gl_Position = uVP * mat4(aM0, aM1, aM2, aM3) * vec4(aPos, 1.); }`;
 const DEPTH_VS = `#version 300 es
 layout(location=0) in vec3 aPos; uniform mat4 uVP, uModel; void main() { gl_Position = uVP * uModel * vec4(aPos, 1.); }`;
 const DEPTH_FS = `#version 300 es
@@ -518,7 +539,7 @@ export class LiveRenderer {
   private u = new Map<WebGLProgram, Map<string, WebGLUniformLocation | null>>(); private blank: WebGLTexture; private arts = new Map<GpuMesh, { lut: WebGLTexture; tex: WebGLTexture; mm: number; C: number; rects: Float32Array; origins: Float32Array }>(); private tex: { alb: WebGLTexture; nor: WebGLTexture; rgh: WebGLTexture; size: Float32Array; luma: Float32Array; rough: Float32Array } | null = null;
   constructor(readonly canvas: HTMLCanvasElement) {
     const gl = canvas.getContext('webgl2', { antialias: false, alpha: false, depth: false, preserveDrawingBuffer: true }); if (!gl) throw new Error('no WebGL2'); this.gl = gl;
-    this.obj = program(gl, OBJ_VS, OBJ_FS); this.ground = program(gl, GROUND_VS, GROUND_FS); this.depth = program(gl, DEPTH_VS, DEPTH_FS); this.post = program(gl, POST_VS, POST_FS); this.smoke = program(gl, SMOKE_VS, SMOKE_FS);
+    this.obj = program(gl, OBJ_VS, OBJ_FS); this.ground = program(gl, GROUND_VS, GROUND_FS); this.depth = program(gl, DEPTH_VS, DEPTH_FS); this.propP = program(gl, PROP_VS, PROP_FS); this.depthI = program(gl, DEPTHI_VS, DEPTH_FS); this.post = program(gl, POST_VS, POST_FS); this.smoke = program(gl, SMOKE_VS, SMOKE_FS);
     this.aoP = program(gl, POST_VS, AO_FS); this.downP = program(gl, POST_VS, DOWN_FS); this.upP = program(gl, POST_VS, UP_FS); this.finalP = program(gl, POST_VS, FINAL_FS);
     this.hdr = !!gl.getExtension('EXT_color_buffer_float'); gl.getExtension('OES_texture_float_linear');   /* a wide-range picture where the device can draw one */
     for (let k = 0; k < 6; k++) { this.rt.push({ t: gl.createTexture()!, f: gl.createFramebuffer()!, w: 0, h: 0 }); }
@@ -570,6 +591,19 @@ export class LiveRenderer {
     this.hiTex = { alb: arr(v => v.alb), nor: arr(v => v.nor), idx }; }
   setGround(d: GroundData) { this.groundVao = this.vaoOf(d); this.groundN = d.n; }
   setFence(d: GroundData) { this.fenceVao = this.vaoOf(d); this.fenceN = d.n; }
+  private propP!: WebGLProgram; private depthI!: WebGLProgram;
+  /** the photographed props (review 125): each model's buffers and pictures, and where its copies stand (their matrices) */
+  private propModels = new Map<string, { vao: WebGLVertexArrayObject; n: number; alb: WebGLTexture; nor: WebGLTexture; arm: WebGLTexture; inst: WebGLBuffer; count: number }>();
+  addPropModel(id: string, geo: { pos: Float32Array; nor: Float32Array; uv: Float32Array; idx: Uint32Array }, pics: { alb: TexImageSource; nor: TexImageSource; arm: TexImageSource }) { const gl = this.gl, vao = gl.createVertexArray()!; gl.bindVertexArray(vao);
+    const b = (loc: number, d: Float32Array, size: number) => { const buf = gl.createBuffer()!; gl.bindBuffer(gl.ARRAY_BUFFER, buf); gl.bufferData(gl.ARRAY_BUFFER, d, gl.STATIC_DRAW); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, size, gl.FLOAT, false, 0, 0); };
+    b(0, geo.pos, 3); b(1, geo.nor, 3); b(2, geo.uv, 2); const ib = gl.createBuffer()!; gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, geo.idx, gl.STATIC_DRAW);
+    const inst = gl.createBuffer()!; gl.bindBuffer(gl.ARRAY_BUFFER, inst); for (let k = 0; k < 4; k++) { gl.enableVertexAttribArray(3 + k); gl.vertexAttribPointer(3 + k, 4, gl.FLOAT, false, 64, k * 16); gl.vertexAttribDivisor(3 + k, 1); }
+    gl.bindVertexArray(null);
+    const tex = (img: TexImageSource) => { const t = gl.createTexture()!; gl.bindTexture(gl.TEXTURE_2D, t); gl.pixelStorei(gl.UNPACK_COLORSPACE_CONVERSION_WEBGL, gl.NONE); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, img); gl.generateMipmap(gl.TEXTURE_2D);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT); return t; };
+    this.propModels.set(id, { vao, n: geo.idx.length, alb: tex(pics.alb), nor: tex(pics.nor), arm: tex(pics.arm), inst, count: 0 }); }
+  /** where a model's copies stand: each a matrix (column-major, the model's metres to the world's) */
+  setPropInstances(id: string, mats: Float32Array) { const m = this.propModels.get(id); if (!m) return; const gl = this.gl; gl.bindBuffer(gl.ARRAY_BUFFER, m.inst); gl.bufferData(gl.ARRAY_BUFFER, mats, gl.STATIC_DRAW); m.count = mats.length / 16; }
   /** the photographed sky (review 124): its four levels stacked in one picture (RGBM, sqrt rgb), the range, the nine numbers of its light */
   private sky: { tex: WebGLTexture; range: number; sh: Float32Array } | null = null;
   setSky(img: TexImageSource & { width: number; height: number }, range: number, sh: number[][]) { const gl = this.gl, w = img.width, h = img.height / 4, t = gl.createTexture()!; gl.bindTexture(gl.TEXTURE_2D_ARRAY, t);
@@ -605,7 +639,7 @@ export class LiveRenderer {
     if (og) { const a = this.arts.get(og); if (a) { this.arts.set(g, a); this.arts.delete(og); } freeGpu(this.gl, og); this.cars.delete(old); } return g; }
   forget(M: Mesh) { this.cars.delete(M); }
 
-  render(v: LiveView, cars: LiveCar[], props: LiveProp[], skids: Skid[], o: { glass?: number; /** 0 the baked look, 1 PBR stepped, 2 PBR smooth */ look?: number; /** lay the 2D art on (default yes) */ art?: boolean; /** the rays in the picture: occlusion, contact shadows, reflections (default yes) */ rays?: boolean; /** strengths: the textures, the light (1: as set) */ texK?: number; /** the time of day: 1 day (default), toward 0 dusk and night (review 117) */ day?: number; /** the concrete from photographed materials (default yes, once loaded) (review 124) */ photoGround?: boolean; /** the photographed sky in the mirrors and the light (default yes, once loaded) */ hdri?: boolean; /** the colour's depth: deeper lacquer, the hue kept through the tone curve (0: as before; default 1) (review 116) */ deep?: number; lightK?: number; /** after the scene: occlusion and reflection strengths, bloom, depth of field (0 none; pixels of blur a metre from the focus) */ aoK?: number; reflK?: number; bloomK?: number; dof?: number; /** motion blur: the shutter, a share of a frame (0 none) */ mb?: number; /** the outline: width (times each thing's own; 0 none), darkness 0..1; the lines inside a thing (default: the baked look only), their darkness */ outW?: number; outK?: number; inner?: boolean; inK?: number; /** smoke parcels: centre, radius, density, heat, kind (0 tyre 1 dust 2 steam 3 exhaust), seed; and the time */ smoke?: { p: Float32Array; n: number; time: number } } = {}) { const gl = this.gl; this.size(v.W, v.H);
+  render(v: LiveView, cars: LiveCar[], props: LiveProp[], skids: Skid[], o: { glass?: number; /** 0 the baked look, 1 PBR stepped, 2 PBR smooth */ look?: number; /** lay the 2D art on (default yes) */ art?: boolean; /** the rays in the picture: occlusion, contact shadows, reflections (default yes) */ rays?: boolean; /** strengths: the textures, the light (1: as set) */ texK?: number; /** the time of day: 1 day (default), toward 0 dusk and night (review 117) */ day?: number; /** the concrete from photographed materials (default yes, once loaded) (review 124) */ photoGround?: boolean; /** the photographed sky in the mirrors and the light (default yes, once loaded) */ hdri?: boolean; /** the photographed props (review 125) */ props?: boolean; /** the colour's depth: deeper lacquer, the hue kept through the tone curve (0: as before; default 1) (review 116) */ deep?: number; lightK?: number; /** after the scene: occlusion and reflection strengths, bloom, depth of field (0 none; pixels of blur a metre from the focus) */ aoK?: number; reflK?: number; bloomK?: number; dof?: number; /** motion blur: the shutter, a share of a frame (0 none) */ mb?: number; /** the outline: width (times each thing's own; 0 none), darkness 0..1; the lines inside a thing (default: the baked look only), their darkness */ outW?: number; outK?: number; inner?: boolean; inK?: number; /** smoke parcels: centre, radius, density, heat, kind (0 tyre 1 dust 2 steam 3 exhaust), seed; and the time */ smoke?: { p: Float32Array; n: number; time: number } } = {}) { const gl = this.gl; this.size(v.W, v.H);
     // ---- the camera: orthographic, turned to v.ang, tilted down by v.pitch, v.mm millimetres a pixel, snapped to whole pixels ----
     const a = v.ang - Math.PI / 2, cA = Math.cos(a), sA = Math.sin(a), SP = Math.sin(v.pitch * Math.PI / 180), CP = Math.cos(v.pitch * Math.PI / 180), k = 1000 / v.mm, R = 900;
     const rx = [cA, sA, 0], ry = [-sA, cA, 0], up = [ry[0]! * SP, ry[1]! * SP, CP], vd = [ry[0]! * CP, ry[1]! * CP, -SP], c = [v.x, v.y, v.z], dot = (p: number[], q: number[]) => p[0]! * q[0]! + p[1]! * q[1]! + p[2]! * q[2]!;
@@ -633,6 +667,7 @@ export class LiveRenderer {
     gl.useProgram(this.depth); gl.uniformMatrix4fv(this.loc(this.depth, 'uVP'), false, LV);
     const drawD = (part: { vao: WebGLVertexArrayObject; n: number }, M: M4) => { if (!part.n) return; gl.uniformMatrix4fv(this.loc(this.depth, 'uModel'), false, M); gl.bindVertexArray(part.vao); gl.drawArrays(gl.TRIANGLES, 0, part.n); };
     for (const p of ps) drawD(p.g.body, (p.m ?? placeMesh(p.g.len, p.x, p.y, p.z, p.h))); for (const m of carM) for (const [part, M] of m.opaque) drawD(part, M);
+    if (this.propModels.size) { gl.useProgram(this.depthI); gl.uniformMatrix4fv(this.loc(this.depthI, 'uVP'), false, LV); for (const m of this.propModels.values()) if (m.count) { gl.bindVertexArray(m.vao); gl.drawElementsInstanced(gl.TRIANGLES, m.n, gl.UNSIGNED_INT, 0, m.count); } }
     // ---- the scene: colour, which thing, depth ----
     for (const i of [0, 1, 2, 8, 9]) { gl.activeTexture(gl.TEXTURE0 + i); gl.bindTexture(gl.TEXTURE_2D, this.blank); }
     gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbo); gl.viewport(0, 0, v.W, v.H); gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.COLOR_ATTACHMENT1, gl.COLOR_ATTACHMENT2, gl.COLOR_ATTACHMENT3]);
@@ -671,6 +706,12 @@ export class LiveRenderer {
     gl.uniform1i(this.loc(this.obj, 'uMode'), 0); gl.uniform1f(this.loc(this.obj, 'uBias'), 0); decals(null); gl.uniform1f(this.loc(this.obj, 'uLampOn'), 0); gl.uniform1f(this.loc(this.obj, 'uBrake'), 0);
     const outlineP = Math.max(1, Math.min(2, Math.round(2 * 50 / v.mm))), outlineC = Math.max(1, Math.min(3, Math.round(3 * 50 / v.mm)));
     gl.uniform3f(this.loc(this.obj, 'uWear'), 0, 0, 0); for (const p of ps) { objU(p.outline ?? outlineP); draw(p.g.body, (p.m ?? placeMesh(p.g.len, p.x, p.y, p.z, p.h)), undefined, p.key); }
+    if (this.propModels.size && o.props !== false) { const P = this.propP; gl.useProgram(P); lampsTo(P); gl.uniform1f(this.loc(P, 'uDay'), o.day ?? 1); gl.uniformMatrix4fv(this.loc(P, 'uVP'), false, VP); gl.uniform1i(this.loc(P, 'uHDRo'), hdrOn); gl.uniformMatrix4fv(this.loc(P, 'uPrevVP'), false, this.prevVP ?? VP); gl.uniform2f(this.loc(P, 'uSize'), v.W, v.H);
+      gl.uniform1f(this.loc(P, 'uSpecK'), o.reflK ?? 1); gl.uniform1f(this.loc(P, 'uDeep'), o.deep ?? 1); gl.uniform1i(this.loc(P, 'uLook'), Math.max(1, o.look ?? 0)); gl.uniform1f(this.loc(P, 'uTexK'), o.texK ?? 1); gl.uniform1f(this.loc(P, 'uLightK'), o.lightK ?? 1); gl.uniform3fv(this.loc(P, 'uEye'), eye); gl.uniform3fv(this.loc(P, 'uSun'), SUN_W); shadowTo(P);
+      gl.uniform1f(this.loc(P, 'uOutline'), outlineP);
+      for (const m of this.propModels.values()) { if (!m.count) continue; gl.uniform2f(this.loc(P, 'uObj'), (id & 255) / 255, ((id >> 8) & 255) / 255); id++; ([[m.alb, 'uPA', 17], [m.nor, 'uPN', 18], [m.arm, 'uPR', 19]] as const).forEach(([t, nm, u]) => { gl.activeTexture(gl.TEXTURE0 + u); gl.bindTexture(gl.TEXTURE_2D, t); gl.uniform1i(this.loc(P, nm), u); });
+        gl.bindVertexArray(m.vao); gl.drawElementsInstanced(gl.TRIANGLES, m.n, gl.UNSIGNED_INT, 0, m.count); }
+      gl.useProgram(this.obj); }
     // the cars a thing hides: their light outline first, tested against what stands before them (each pixel once), then the cars over it
     gl.uniform1i(this.loc(this.obj, 'uMode'), 1); gl.depthFunc(gl.GREATER); gl.depthMask(false); gl.enable(gl.STENCIL_TEST); gl.stencilFunc(gl.EQUAL, 0, 0xff); gl.stencilOp(gl.KEEP, gl.KEEP, gl.INCR);
     gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.NONE, gl.NONE, gl.NONE]); gl.uniform1f(this.loc(this.obj, 'uBias'), 0.25 / R);

@@ -11,7 +11,7 @@ import { millbrookScenery, type Placed } from '../race/scenery';
 import { PROPS } from '../render/props/index';
 import { renumber, wheelsOf, type Mesh } from '../render/car/mesh';
 import { Damage } from '../race/damage';
-import { loadGround, loadSky } from '../render/live/groundtex';
+import { loadGround, loadSky, loadProps } from '../render/live/groundtex';
 import { LiveRenderer } from '../render/live/renderer';
 import { groundData, fenceData } from '../render/live/ground';
 import { Smoke, type SmokeKind } from '../race/smoke';
@@ -62,7 +62,7 @@ const meshOf = (id: string, num: string) => renumber(MESH_CARS.find(c => c.id ==
 const numOf = (e: Entrant): string => { if (!race) return myNum; let k = 0; for (const x of race.cars) { if (x === race.player) continue; k++; if (String(k) === myNum) k++; if (x === e) return String(k); } return myNum; };
 // ---- the live renderer (review 99): the scene drawn every frame by WebGL2, where the browser has it; the baked pictures otherwise ----
 const glCanvas = document.createElement('canvas'); let live: LiveRenderer | null = null, liveFence = -1;
-try { live = new LiveRenderer(glCanvas); live.setGround(groundData(T, SCN, START)); live.setTrack(T.length, T.spec.width, T.spec.joints, START, rubberLine(T)); const L0 = live; void loadGround(L0, matchMedia('(pointer: coarse)').matches ? 512 : 1024).catch(e => console.warn('ground materials', e)); void loadSky(L0).catch(e => console.warn('sky', e)); } catch (e) { console.warn('live renderer unavailable', e); live = null; }
+try { live = new LiveRenderer(glCanvas); live.setGround(groundData(T, SCN, START)); live.setTrack(T.length, T.spec.width, T.spec.joints, START, rubberLine(T)); const L0 = live; void loadGround(L0, matchMedia('(pointer: coarse)').matches ? 512 : 1024).catch(e => console.warn('ground materials', e)); void loadSky(L0).catch(e => console.warn('sky', e)); void loadProps(L0, T).catch(e => console.warn('props', e)); } catch (e) { console.warn('live renderer unavailable', e); live = null; }
 // the PBR detail textures (Poly Haven, CC0): loaded once, laid on when ready
 if (live) { const L = live, im = [texAlb, texNor, texRgh].map(src => { const i = new Image(); i.src = src; return i; });
   void Promise.all(im.map(i => i.decode())).then(() => L.setTextures(im[0]!, im[1]!, im[2]!, (texMeta as { layers: { size_m: number; luma_mean: number; rough_mean: number }[] }).layers)).catch(e => console.warn('textures', e)); }
@@ -500,4 +500,4 @@ function fit() { if (document.fullscreenElement || document.body.classList.conta
   if (st.cine) { VW = Math.floor(VW / 4) * 2; VH = Math.floor(VH / 2); }   // the cinematic view: pixels twice the size (closer)
   cv.width = VW; cv.height = VH; ctx.imageSmoothingEnabled = false; }
 addEventListener('resize', fit); addEventListener('orientationchange', () => setTimeout(fit, 200)); fit(); choose(carId); camX = car.x; camY = car.y; camZ = 0; camShow(); requestAnimationFrame(frame);
-(globalThis as { __drive?: unknown }).__drive = { get car() { return car; }, get damage() { const e = dmg.get(car); return e ? { worst: e.D.worst, taken: e.D.taken } : null; }, SCN, T };   // for the page tests (tools): place the car, read the scenery
+(globalThis as { __drive?: unknown }).__drive = { get car() { return car; }, get L() { return live; }, get damage() { const e = dmg.get(car); return e ? { worst: e.D.worst, taken: e.D.taken } : null; }, SCN, T };   // for the page tests (tools): place the car, read the scenery

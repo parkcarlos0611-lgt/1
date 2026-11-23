@@ -60,6 +60,10 @@
   "mb540k": {
    "standing": 114.8,
    "flying": 99.3
+  },
+  "eb110": {
+   "standing": 82.5,
+   "flying": 77.4
   }
  }
 }

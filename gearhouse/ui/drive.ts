@@ -82,7 +82,7 @@ function drawLive(el: number) { const L = live!; void el;
   if (broken.size !== liveFence) { liveFence = broken.size; for (const k of [...fenceGpu.keys()]) if (dirtyChunks.has(k)) fenceGpu.delete(k); dirtyChunks.clear(); }
   glCanvas.width = VW; glCanvas.height = VH;
   const list = race ? race.cars.map(e => ({ c: e.car, sp: e.driver ? others.get(e)! : sprites, turn: e.wheelTurn })) : [{ c: car, sp: sprites, turn: wheelTurn }];
-  for (const { c, sp } of list) bend(c, sp.mesh, L);
+  if (DAMAGE) for (const { c, sp } of list) bend(c, sp.mesh, L); else for (const { c } of list) c.hits.length = 0;
   const cars = list.map(({ c, sp, turn }, k) => ({ wear: wearOf(c, k), g: (() => { const M = dmg.get(c)?.M ?? sp.mesh, g = L.car(M); artFor(L, g, c.spec.id, M); return g; })(), tyres: c.rings, ...(() => { const b = c.base; return { x: b[0], y: b[1], z: b[2] - (c.rings[0]!.rest + c.rings[2]!.rest) / 2 }; })(),   /* the body where it is in 3D (review 120), drawn lower by the tyres' standing give */ yaw: c.yaw, roll: c.rollW + c.roll * 0.5, pitch: c.pitchW, travel: c.travel, camber: c.camber, steerL: c.steerAt(0), steerR: c.steerAt(1), spin: turn, player: c === car, lamps: lampsOn ? 1 : 0, brake: c === car && input.brake > 0.1 }));
   const props: import('../render/live/renderer').LiveProp[] = [...SCN.props, ...trainCars()].flatMap(q => { const f = PROPS[q.kind]; return f ? [{ g: L.prop(q.arg ? `${q.kind}@${q.arg}` : q.kind, () => f(q.arg)), x: q.x, y: q.y, z: q.z ?? 0, h: q.heading }] : []; });
   // the fence (review 112): solid, in chunks near the camera, lit, shadowed and outlined as everything else; its loose pieces
@@ -252,6 +252,8 @@ function hiddenPart(c: Drawn, by: Drawn[]): HTMLCanvasElement | null { const w =
 // ---- crash damage (review 121): each car's structure of nodes and beams (race/damage.ts), built at its first blow; the
 // blows the physics recorded bend it, the skin drawn bent (rebuilt at most five times a second), a wheel knocked askew
 // steers the car off true, a crushed radiator cools less and leaks, a part come away flies off as a piece ----
+/** off for now (review 122): the driving, the pictures and the game come first; the structure comes back later as detail */
+const DAMAGE = false;
 const dmg = new WeakMap<Vehicle, { D: Damage; M: Mesh; t: number }>();
 function bend(c: Vehicle, base: Mesh, L: LiveRenderer) { let e = dmg.get(c);
   if (c.hits.length) { if (!e) { e = { D: new Damage(base), M: base, t: 0 }; dmg.set(c, e); } const D = e.D, len = base.length, rest = c.rings[0]!.rest, cg = c.spec.cgH;

@@ -75,8 +75,8 @@ vec3 pbrX(vec3 baseSrgb, vec3 n, vec3 v, vec3 l, float sh, float metal, float ro
   vec3 r = reflect(-v, n); vec2 ab = envBRDF(nv, rough); vec3 envS = mix(skyR(r, rough), irradiance(r), clamp(rough * 1.4 - 0.3, 0., 1.));
   col += (kd * alb * irradiance(n) * (1. - 0.35 * deep) + envS * (f0 * ab.x + ab.y)) * ao;
   if (sheen > 0.) col += sheen * pow(1. - nv, 4.) * (alb * 0.6 + 0.4) * (irradiance(n) * ao + SUN_E * nl * sh * 0.25);
-  if (coat > 0.) { float Fc = (0.04 + 0.96 * pow(1. - nv, 5.)) * coat; col = col * (1. - Fc) + skyR(r, 0.03) * Fc * (0.6 + 0.4 * uSpecK) * mix(1., ao, 0.7)
-      + (D_GGX(nh, 0.06) * V_Smith(nv, nl, 0.06) * 0.06 + D_GGX(nh, 0.32) * V_Smith(nv, nl, 0.32) * 0.05) * coat * uSpecK * SUN_E * nl * sh; }   /* the lacquer: a sharp glint and a broad sheen (review 111) */
+  if (coat > 0.) { float Fc = (0.05 + 0.95 * pow(1. - nv, 5.)) * coat; col = col * (1. - Fc) + skyR(r, 0.05) * Fc * (0.85 + 0.45 * uSpecK) * mix(1., ao, 0.7)
+      + (D_GGX(nh, 0.035) * V_Smith(nv, nl, 0.035) * 0.1 + D_GGX(nh, 0.2) * V_Smith(nv, nl, 0.2) * 0.06) * coat * uSpecK * SUN_E * nl * sh; }   /* the lacquer: a sharp glint and a broad sheen (review 111); a clearer mirror, sky a touch soft so its clouds don't break up the panels (review 132) */
   return col; }
 // ---- PBR detail textures (review 103): seven layers (concrete, grass, metal, rubber, leather, canvas, wood), each a
 // tile of known size; the albedo used for its light and dark only (the game keeps its colours), roughness and normals ----
@@ -215,16 +215,16 @@ void main() {
     vec4 t = texture(uDecTex, vec2((float(i) + uv.x) / 4., uv.y)); if (t.a > 0.5) base = t.rgb; }
   if (uLook > 0) {   // the physically based looks: each kind of material its metalness and roughness
     float metal = 0., rough = 0.6, coat = 0.;
-    if (kind == 1) { rough = 0.55 - 0.3 * vGloss; coat = vGloss; } else if (kind == 2 || kind == 10) { metal = 1.; rough = vGloss > 0.7 ? 0.12 : 0.42; }
+    if (kind == 1) { rough = 0.45 - 0.3 * vGloss; coat = min(1., vGloss * 1.25); } else if (kind == 2 || kind == 10) { metal = 1.; rough = vGloss > 0.7 ? 0.12 : 0.42; }
     else if (kind == 5) rough = 0.9; else if (kind == 7) rough = 0.95; else if (kind == 8) rough = 0.5; else if (kind == 6) rough = 0.65; else if (kind == 9) rough = 0.15;
     else if (vGloss > 0.7) { metal = 1.; rough = 0.15; } else rough = 0.85 - 0.6 * vGloss;
     // the material's detail, laid in the thing's own axes (it moves with it); bright metal and paint only a little
     int L = -1; float sa = 0., sn = 0., sr = 0.;
-    if (kind == 1) { L = 2; sa = 0.; sn = 0.18; sr = 0.35; } else if (metal > 0.5) { L = 2; sa = 0.12; sn = 0.3; sr = 0.5; } else if (kind == 5) { L = 3; sa = 0.5; sn = 0.6; sr = 0.3; }
+    if (kind == 1) { L = -1; } else if (metal > 0.5) { L = 2; sa = 0.12; sn = 0.3; sr = 0.5; } else if (kind == 5) { L = 3; sa = 0.5; sn = 0.6; sr = 0.3; }
     else if (kind == 8) { L = 4; sa = 0.7; sn = 0.8; sr = 0.6; } else if (kind == 7) { L = 5; sa = 0.6; sn = 0.9; sr = 0.5; } else if (kind == 6) { L = 6; sa = 0.9; sn = 0.6; sr = 0.6; } else if (kind == 0) { L = 0; sa = 0.35; sn = 0.3; sr = 0.3; }
     vec3 no = vObjN; if (dot(normalize(mat3(uModel) * no), uEye) < 0.) no = -no;
     Detail dt = detail(L, vObj / 1000., no, sa, sn, sr); vec3 nw = normalize(mat3(uModel) * dt.n); if (dot(nw, uEye) < 0.) nw = n;
-    { vec3 ns = normalize(vSN); if (dot(ns, n) < 0.) ns = -ns; if (dot(ns, uEye) > 0.02) nw = normalize(ns + nw - n); }   /* the smoothed surface, the detail's bend kept (review 116) */
+    { vec3 ns = normalize(vSN); if (dot(ns, n) < 0.) ns = -ns; if (dot(ns, uEye) > 0.02) nw = kind == 1 ? ns : normalize(ns + nw - n); }   /* paint: the smoothed surface alone, so its mirror runs unbroken (review 132) */   /* the smoothed surface, the detail's bend kept (review 116) */
     if (uArtOn == 1 && uWheel == 0 && uMode == 0 && (kind == 0 || kind == 1 || kind == 7 || kind == 8 || kind == 10)) { vec4 art = artOn(vObj, no, vPart); if (art.a > 0.) base = mix(base, art.rgb, 0.85 * art.a); }   /* the painted detail of the 2D art: badges, lines, louvres, pleats */
     base *= dt.tone; rough = clamp(rough + dt.rough, 0.04, 1.);
     if (uWear != vec3(0.)) { vec3 P = vObj / 1000.; float Z = (vObj.z + uObjZ) / 1000., low = 1. - smoothstep(0.17, 0.64, Z / max(0.8, uCarH));   /* low down: by the car's own height */
@@ -247,13 +247,13 @@ void main() {
         dz = clamp(dz, 0., 0.94); base = mix(base, mix(vec3(0.38, 0.31, 0.22), vec3(0.52, 0.46, 0.37), fbm(P * 21.)), dz); rough = mix(rough, 0.96, dz); coat *= 1. - dz; metal *= 1. - dz; } }
     // each material's own (review 112): chrome nearly a mirror, the lacquer's faint orange peel, leather polished, cloth fuzzy, rubber's dull sheen, varnished wood
     float sheen = 0.; if (metal > 0.5 && vGloss > 0.7) rough = min(rough, 0.07);
-    if (kind == 1) { vec3 q = vObj / 1000. * 45.; nw = normalize(nw + (vec3(vn3(q), vn3(q + 7.1), 0.) - 0.5) * 0.05); }
+    if (kind == 1) {}   /* the lacquer smooth: its orange peel (a noisy normal) mottled every mirrored cloud (review 132) */
     else if (kind == 8) { sheen = 0.35; coat = max(coat, 0.15); } else if (kind == 7) { sheen = 0.6; rough = 0.95; } else if (kind == 5) { sheen = 0.18; } else if (kind == 6) coat = max(coat, 0.55); else if (kind == 9) { coat = 1.; rough = 0.05; }
     float ao = rtao(vWorld, nw);
     vec3 lit = pbrX(base, nw, uEye, uSun, sh, metal, rough, coat, ao, sheen);
     if (kind == 9 && vLamp.z > 0.5) { vec3 ns = normalize(vSN); if (dot(ns, n) < 0.) ns = -ns; lit = lampFace(vLamp.xy, vLamp.z, vLAx, vLRt, vLUp, ns, sh); }   /* a lamp's lens: the lamp drawn on it (review 117) */
     else lit += lampsAt(vWorld, nw) * toLin(base) * (1. - metal) / 3.14159;   /* the head lamps' light */
-    oCol = vec4(present(lit), 1.); oId = vec4(uObj, vPart / 255., uOutline / 8.); oN = vec4(nw * 0.5 + 0.5, metal > 0.5 ? 1. - rough : coat * (1. - rough) * 0.5); oV = velo(); return; }
+    oCol = vec4(present(lit), 1.); oId = vec4(uObj, vPart / 255., uOutline / 8.); oN = vec4(nw * 0.5 + 0.5, metal > 0.5 ? 1. - rough : coat * (1. - rough) * 0.7); oV = velo(); return; }
   float dq = floor(d * 4. + 0.5) / 4.;
   vec3 diff = SUN_C * dq * 0.78 + (SKY_C * up + GROUND_C * (1. - up)) * 0.6, c;
   vec3 env = envAt(rz);

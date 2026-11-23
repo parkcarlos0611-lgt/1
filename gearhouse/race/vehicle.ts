@@ -85,6 +85,10 @@ export class Vehicle {
   /** later technology's state (review 125): the turbos' boost (0..1 of full), each wheel's anti-lock pressure (1 full),
    *  ABS working now, the rear wing's rise (0..1), each wheel's drive torque (Nm) */
   boost = 0; absP = [1, 1, 1, 1]; absOn = false; wing = 0; Tw = [0, 0, 0, 0];
+  /** review 149: the traction control's switch (the driver's button; on at the start), working now, and how far its
+   *  throttle actuator has closed (0..1 of the driver's opening); VTEC on the high cam; the steering's effort as the
+   *  driver's hands feel it (0 none; the hands' rate is HANDS / (1 + effort)) and the assistance's share of it (1 none) */
+  tcsEnabled = true; tcsOn = false; tcsCut = 0; vtecHigh = false; steerEffort = 0; steerAssist = 1;
   /** each tyre's side deflection (m): the side force builds as the tyre rolls (the relaxation length) */ private yd = [0, 0, 0, 0];
   readonly axles: [Axle, Axle];
   private ms: number; private Ix: number; private Iy: number; private Iz: number; private Iw: number; private Ie: number; private kt: number[];
@@ -184,7 +188,11 @@ export class Vehicle {
     const ex: V3 = rotQ(this.q, [1, 0, 0]), ey: V3 = rotQ(this.q, [0, 1, 0]), ez: V3 = rotQ(this.q, [0, 0, 1]);
     // ---- steering (review 100): the driver's hands turn the steering wheel, the box or rack turns the road wheels ----
     { const S = steering(c), N = S.ratio, lockR = c.steerLock * Math.PI / 180, want = Math.max(-lockR, Math.min(lockR, u.steer * usefulLock(c, this.speed, ty.mu))) * N, toCentre = Math.abs(want) < Math.abs(this.sw) && Math.sign(want - this.sw) === -Math.sign(this.sw);
-      const effort = (m * c.frontShare / 1000) / (1 + this.speed / 1.5) * 15 / N * (S.rack ? 1.0 : 1.4) * (c.tech?.power ? 0.3 : 1), hands = HANDS / (1 + effort), rate = hands + (toCentre ? this.speed * 0.25 : 0);
+      // the assistance (review 149): a hydraulic pump's fixed share; an electric motor's, speed-sensitive (most help
+      // parking, the effort, and with it the feel, coming back as the speed rises): low + (high - low) (v/fade)^2 / (1 + (v/fade)^2)
+      const P = c.tech, kmh = this.speed * 3.6, assist = P?.eps ? P.eps.high + (P.eps.low - P.eps.high) / (1 + (kmh / P.eps.fade) ** 2) : P?.power ? 0.3 : 1;
+      const effort = (m * c.frontShare / 1000) / (1 + this.speed / 1.5) * 15 / N * (S.rack ? 1.0 : 1.4) * assist, hands = HANDS / (1 + effort), rate = hands + (toCentre ? this.speed * 0.25 : 0);
+      this.steerEffort = effort; this.steerAssist = assist;
       this.sw += Math.max(-rate * dt, Math.min(rate * dt, want - this.sw)); this.steer = this.sw / N; }
     // ---- drive line: gear changes, the engine, the clutch, the open differential ----
     this.shift -= dt; const vxh = this.vx;
@@ -195,10 +203,21 @@ export class Vehicle {
     const Gr = c.gears[this.gear - 1]! * c.final, we = this.rpm * Math.PI / 30, wd = fF * wFa + (1 - fF) * wRa, idle = c.idle * Math.PI / 30;
     const thr = this.shift > 0 ? 0 : Math.max(0, Math.min(1, u.throttle)) * (this.auto && this.rpm > c.redline * 0.98 ? 0.25 : 1), fric = 0.06 * torqueAt(c, c.torqueRpm) * (0.3 + 0.7 * this.rpm / c.hpRpm);
     const hp = this.health.power, alive = this.health.running;
+    // VTEC (review 149): the high cam's oil passage opens above the switch-over revs and closes a little below them
+    if (X?.vtec) { if (!this.vtecHigh && this.rpm > X.vtec.rpm) this.vtecHigh = true; else if (this.vtecHigh && this.rpm < X.vtec.rpm - X.vtec.hyst) this.vtecHigh = false; }
+    const cam = X?.vtec ? (this.vtecHigh ? 'high' : 'low') : undefined;
+    // traction control (review 149, a period system): the faster rear wheel's speed against the undriven fronts' (the car's
+    // speed over the road), slip = (w_rear R - v_ref) / max(v_ref, 2 m/s). Past the threshold the throttle actuator closes
+    // toward cut x min(1, (slip - slip0) / slip0) of the driver's opening with a lag of tau (the sensors, the ECU, the
+    // actuator's travel), and opens again twice as slowly, so it overshoots and hunts a little as the real ones did.
+    let thrE = thr; if (X?.tcs && this.tcsEnabled && !fF) { const S = X.tcs, vref = Math.max(0, (this.w[0]! + this.w[1]!) / 2 * R), slip = (Math.max(this.w[2]!, this.w[3]!) * R - vref) / Math.max(vref, 2);
+      const want = thr > 0.02 ? S.cut * Math.max(0, Math.min(1, (slip - S.slip) / S.slip)) : 0, tau = want > this.tcsCut ? S.tau : S.tau * 1.5;
+      this.tcsCut += (want - this.tcsCut) * Math.min(1, dt / tau); thrE = thr * (1 - this.tcsCut); } else this.tcsCut = 0;
+    this.tcsOn = this.tcsCut > 0.03;
     // the turbos (review 125): boost builds with the exhaust's flow (revs and throttle) over the spool time, falls fast when the throttle shuts (the blow-off); off boost the engine makes what it would unblown
     let blow = 1; if (X?.turbo) { const T = X.turbo, want = thr * Math.min(1, Math.max(0, (this.rpm - T.full * 0.45) / (T.full * 0.55))), tau = want > this.boost ? T.spool * (1.6 - this.rpm / c.redline) * (this.boost > 0.4 ? 0.5 : 1) : 0.6;   /* the turbines keep turning through a short lift: the boost falls slowly and comes back quickly */
       this.boost += (want - this.boost) * Math.min(1, dt / Math.max(0.02, tau)); const base = 1 / (1 + T.boost * 0.95); blow = base + (1 - base) * this.boost; }
-    const Te = alive ? (this.rpm < c.redline * 1.1 ? thr * torqueAt(c, this.rpm) * hp * blow : 0) - fric * (1 - thr) + (this.rpm < c.idle ? fric * 2 : 0) : -fric * 3 - (this.rpm > 1 ? 30 : 0);
+    const Te = alive ? (this.rpm < c.redline * 1.1 ? thrE * torqueAt(c, this.rpm, cam) * hp * blow : 0) - fric * (1 - thrE) + (this.rpm < c.idle ? fric * 2 : 0) : -fric * 3 - (this.rpm > 1 ? 30 : 0);
     const autoC = this.shift > 0 ? 0 : Math.max(0, Math.min(1, wd * Gr > we * 0.97 ? 1 : (c.launchRpm ? (this.rpm - c.launchRpm * 0.8) / (c.launchRpm * 0.2) : (this.rpm - c.idle * 1.3) / (c.idle * 1.2))));
     const engaged = u.clutch === undefined ? autoC : Math.min(autoC, 1 - u.clutch), cap = engaged * torqueAt(c, c.torqueRpm) * 2.2;
     const need = (we - wd * Gr) / (dt * (1 / this.Ie + Gr * Gr * (fF * fF + (1 - fF) * (1 - fF)) / (2 * this.Iw))), Tc = Math.max(-cap, Math.min(cap, need));

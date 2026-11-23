@@ -45,7 +45,17 @@ export interface RaceSpec {
   tech?: { drive?: { front: number; visc: number }; rearLsd?: number; /** a viscous-coupling rear differential instead (Nm per rad/s between the wheels) */ rearVisc?: number;
     /** ground effect (review 126): the underbody's venturis, a lift area pressing the car down more the lower it rides (its share on the front) */ ground?: { clA: number; front: number }; abs?: boolean; turbo?: { n: number; boost: number; full: number; spool: number };
     wing?: { up: number; down: number; clA: number; cdA: number; body: number }; power?: boolean; tyreWF?: number; tyreWR?: number;
-    /** review 147: the front axle's share of the roll stiffness (an anti-roll bar added at the front to reach it); unset: the springs' own */ rollF?: number };
+    /** review 147: the front axle's share of the roll stiffness (an anti-roll bar added at the front to reach it); unset: the springs' own */ rollF?: number;
+    /** review 149: the car's own traction control: the driven wheels' slip against the undriven ones' speed; above `slip`
+     *  a second throttle closes (up to `cut` of the driver's opening) over `tau` s, and opens again twice as slowly */
+    tcs?: { slip: number; tau: number; cut: number };
+    /** review 149: variable valve timing and lift: two cam profiles, the low one below `rpm` (with `hyst` rpm of hysteresis
+     *  coming back down), the high one above. The low cam's torque peak (Nm, rpm); the high cam's torque peak revs (its
+     *  peak torque follows from the rated power at hpRpm, its power peaking there) */
+    vtec?: { rpm: number; hyst: number; low: { torque: number; rpm: number }; high: { rpm: number } };
+    /** review 149: electric power steering, speed-sensitive: the steering's effort times `low` at a standstill, rising to
+     *  `high` well above `fade` km/h (the hydraulic `power` is a fixed 0.3) */
+    eps?: { low: number; high: number; fade: number } };
   cdA: number; crr: number; steerLock: number;          // drag area m², rolling resistance, front wheels' lock (deg)
   topKmh: number; check: boolean;
   cooling: { siphon: boolean; margin: number } }   // the water's circulation (no pump on the Model T [v]), the radiator against the engine's heat [?]
@@ -162,26 +172,67 @@ NEW.diablo = { id: 'diablo', name: '1990 Lamborghini Diablo (실험)', mass: 157
   brakes: 'disc', hydraulic: true, brakeG: 1.0, cdA: 0.66, crr: 0.012, steerLock: 30, topKmh: 325, check: false, cooling: { siphon: false, margin: 1.1 }, tyreKind: 'radial', era: '1990',
   shiftT: 0.32, launchRpm: 4500, steer: { ratio: 15, ackermann: 0.6, rack: true }, inertia: { engine: 0.24, wheel: 1.8 },
   tech: { rollF: 0.47, rearLsd: 1.6, tyreWF: 0.245, tyreWR: 0.335 } };
+// review 149: the Honda NSX (1990, NA1), five-speed manual, from Honda's and Acura's figures (Acura's 1991 and 1992
+// specification sheets and feature lists, Honda's 1990 and 1995 factbooks, the J-Garage specification table) and the
+// period's tests: C30A 3.0 L V6, DOHC VTEC, 280 PS JIS / 274 PS (270 hp) at 7,100 rpm, 284 Nm (210 lb ft; Honda Japan 30.0
+// kgm at 5,400) at 5,300 rpm, red line 8,000; gears 3.071 1.727 1.230 0.967 0.771, final 4.062 (Acura 1991); 1,365 kg
+// (3,010 lb) kerb, 42:58; wheelbase 2,530, track 1,510 / 1,530; double wishbones all round; 205/50 ZR15 and 225/50 ZR16
+// (one secondary table gives 215/45 ZR16 at the rear; Acura's 225/50 kept); a variable-ratio rack, 18.2-20.8:1 and 3.24
+// turns lock to lock with the manual, no power assistance (the electric power steering was the automatic's, and came on
+// every NSX from the 1995 model year: Acura's 1995 press kit), so the manual car carries no `eps`; ABS, four channels;
+// traction control (TCS) standard: a throttle actuator on the throttle body reduces the engine's output when the rears
+// spin (Acura's service manual), switchable off; a limited-slip differential (to 1994 a wet multi-plate "torque control
+// differential", the torque-reactive one from 1995): here as a torque-sensing one. Period tests: 0-60 mph 5.2 s (Car and
+// Driver, quoted), 5.7 s (Road & Track), 5.8 s (Consumer Guide), 0-100 km/h 5.6 s; top 157-163 mph (253-262 km/h; the
+// European figure 270 km/h). [~]: the VTEC switch-over (about 5,800: owners' reports, no Honda figure found) and the
+// cams' curves, the drag area (fitted to 270 km/h; Cd 0.32 x about 1.8 m² is 0.58 before the cooling and the tyres),
+// the centre of gravity, the differential's bias (2.0), the TCS's threshold and time, the roll share.
+// Not in NEW: the car has no body mesh yet, and the drive page lists NEW_CARS and EXP_CARS with MESH_CARS.find(..)!.mesh()
+// (it would fail on choosing it). raceSpec finds it here; when its mesh is registered in render/car/meshcars.ts, move it
+// into NEW (NEW.nsx = ..., and delete it from AWAITING_MESH) and time it into race/handicaps.json.
+const NSX: RaceSpec = { id: 'nsx', name: '1990 Honda NSX (실험)', mass: 1365 + 75, wheelbase: 2.53, track: 1.52, tyreR: 0.316, tyreW: 0.215, cgH: 0.44, frontShare: 0.42,
+  hp: 270, hpRpm: 7100, torqueRpm: 5300, torquePeak: 284, idle: 800, redline: 8000, gears: [3.071, 1.727, 1.23, 0.967, 0.771], final: 4.062, eff: 0.9,
+  brakes: 'disc', hydraulic: true, brakeG: 1.0, cdA: 0.63, crr: 0.012, steerLock: 30, topKmh: 270, check: false, cooling: { siphon: false, margin: 1.2 }, tyreKind: 'radial', era: '1990',
+  shiftT: 0.22, launchRpm: 5000, steer: { ratio: 19.5, ackermann: 0.6, rack: true }, inertia: { engine: 0.12, wheel: 1.3 },
+  tech: { rollF: 0.47, rearLsd: 2.0, abs: true, tcs: { slip: 0.1, tau: 0.15, cut: 0.7 }, vtec: { rpm: 5800, hyst: 200, low: { torque: 284, rpm: 5300 }, high: { rpm: 6500 } }, tyreWF: 0.205, tyreWR: 0.225 } };
+/** review 149: an electric power steering of the NSX's kind (the automatic's, and every NSX's from 1995) [~], for the
+ *  cars and the tests that carry one: about a quarter of the effort parking, most of it back by motorway speeds */
+export const EPS_SPEED_SENSITIVE = { low: 0.25, high: 0.8, fade: 50 };
+/** cars whose physics is ready but whose body mesh is not yet built: raceSpec finds them; the drive page does not list them */
+export const AWAITING_MESH: Record<string, RaceSpec> = { nsx: NSX };
 Object.assign(EXP, NEW);
 /** the new 3D-first cars, offered beside the period ones */
 export const NEW_CARS: string[] = Object.keys(NEW);
 export const EXP_CARS: string[] = Object.keys(EXP).filter(id => !NEW[id]);
 /** the engine for the sound: cylinders, valves, blower (the experimental cars are not in the game's data) */
-export const EXP_ENGINE: Record<string, { kind: string; layout: string; supercharged?: boolean }> = { napier33: { kind: 'ohv', layout: 'W12' }, jagD55: { kind: 'ohv', layout: 'I6' }, auburn851: { kind: 'sv', layout: 'I8', supercharged: true }, mb540k: { kind: 'ohv', layout: 'I8', supercharged: true }, eb110: { kind: 'ohv', layout: 'V12' }, xj220: { kind: 'ohv', layout: 'V6' }, diablo: { kind: 'ohv', layout: 'V12' } };
+export const EXP_ENGINE: Record<string, { kind: string; layout: string; supercharged?: boolean }> = { napier33: { kind: 'ohv', layout: 'W12' }, jagD55: { kind: 'ohv', layout: 'I6' }, auburn851: { kind: 'sv', layout: 'I8', supercharged: true }, mb540k: { kind: 'ohv', layout: 'I8', supercharged: true }, eb110: { kind: 'ohv', layout: 'V12' }, xj220: { kind: 'ohv', layout: 'V6' }, diablo: { kind: 'ohv', layout: 'V12' }, nsx: { kind: 'ohv', layout: 'V6' } };
 export function raceSpec(id: string): RaceSpec {
-  if (EXP[id]) return EXP[id]!;
+  if (EXP[id]) return EXP[id]!; if (AWAITING_MESH[id]) return AWAITING_MESH[id]!;
   const s = (specs as { cars: Record<string, { car: string; engine: { hp: number }; wheelbase: number; track: number; tyre: string }> }).cars[id]!, p = PERIOD[id]!, t = tyre(s.tyre), hpRpm = p[0];
   return { id, name: s.car, mass: KG[id]! + 75, wheelbase: s.wheelbase / 1000, track: s.track / 1000, tyreR: t.r, tyreW: t.w, cgH: p[6], frontShare: p[7],
     hp: s.engine.hp, hpRpm, torqueRpm: hpRpm * 0.55, idle: Math.max(350, hpRpm * 0.18), redline: hpRpm * 1.12, gears: p[1], final: p[2], eff: 0.88,
     brakes: p[3], hydraulic: p[4], brakeG: p[3] === 'rear' ? 0.32 : p[4] ? 0.62 : 0.5, cdA: p[5], crr: 0.018, steerLock: p[8], topKmh: p[9], check: true, cooling: COOL[id] ?? { siphon: false, margin: 1.1 } }; }
 
-/** engine torque (Nm) at revs, full throttle: a hump peaking at torqueRpm, its power peaking at hpRpm, falling past it */
-export function torqueAt(c: RaceSpec, rpm: number): number {
+/** engine torque (Nm) at revs, full throttle: a hump peaking at torqueRpm, its power peaking at hpRpm, falling past it.
+ *  A VTEC engine (tech.vtec) has a curve for each cam; `cam` picks one, by default the one the switch-over revs give */
+export function torqueAt(c: RaceSpec, rpm: number, cam?: 'low' | 'high'): number {
+  const V = c.tech?.vtec; if (V) return Math.max(0, camTorque(c, V, rpm, cam ?? (rpm < V.rpm ? 'low' : 'high')));
   const P = c.hp * 745.7, wP = c.hpRpm * Math.PI / 30, Tp = P / wP;          // torque at the power peak
   const Tmax = Math.max(Tp, c.torquePeak ?? Tp * 1.22), x = rpm / c.torqueRpm;                            // the peak torque, a little above
   let T = rpm <= c.torqueRpm ? Tmax * (0.62 + 0.38 * (1 - (1 - x) ** 2)) : Tmax - (Tmax - Tp) * ((rpm - c.torqueRpm) / (c.hpRpm - c.torqueRpm)) ** 1.6;
   if (rpm > c.hpRpm) T = Tp * Math.max(0, 1 - ((rpm - c.hpRpm) / (c.redline * 1.15 - c.hpRpm)) ** 1.5 * 0.9);
   return Math.max(0, T); }
+
+/** review 149: the two cams' curves, each a parabola in the revs about its torque peak (flatter below it). The high cam's
+ *  is shaped so its power peaks at hpRpm with the rated power: with u = rpm / its peak revs and up = hpRpm / those,
+ *  d(u (1 - a (u - 1)^2)) / du = 0 at up gives a = 1 / ((up - 1)^2 + 2 up (up - 1)). The low cam falls past its peak so
+ *  that it meets the high cam at the switch-over (where Honda set it: no step in the pull, only a change of slope). */
+function camTorque(c: RaceSpec, V: NonNullable<NonNullable<RaceSpec['tech']>['vtec']>, rpm: number, cam: 'low' | 'high'): number {
+  const Tp = c.hp * 745.7 / (c.hpRpm * Math.PI / 30), up = c.hpRpm / V.high.rpm, a = 1 / ((up - 1) ** 2 + 2 * up * (up - 1)), Th = Tp / (1 - a * (up - 1) ** 2);
+  const high = (r: number) => { const u = r / V.high.rpm; return Th * Math.max(0.3, 1 - (u < 1 ? 1.5 : a) * (u - 1) ** 2); };   /* a long-duration cam: weak low down */
+  if (cam === 'high') return high(rpm);
+  const L = V.low, us = V.rpm / L.rpm, b = Math.max(0, 1 - high(V.rpm) / L.torque) / Math.max(1e-6, (us - 1) ** 2), u = rpm / L.rpm;
+  return L.torque * Math.max(0.3, 1 - (u < 1 ? 0.7 : b) * (u - 1) ** 2); }
 
 /** the suspension (review 120): what each axle is. A beam axle on leaf springs (nearly every car of the period, and the
  *  D-type's rear on trailing links); independent wheels on wishbones (the 540K's and the 315's front, the D-type's on
@@ -191,5 +242,6 @@ export interface Suspension { front: AxleKind; rear: AxleKind; leafF: boolean; l
 const SUSP: Record<string, Partial<Suspension>> = {
   mb540k: { front: 'wishbone', rear: 'swing', leafF: false, leafR: false },
   bmw315: { front: 'wishbone', leafF: true },
-  jagD55: { front: 'wishbone', leafF: false, leafR: false }, eb110: { front: 'wishbone', rear: 'wishbone', leafF: false, leafR: false }, xj220: { front: 'wishbone', rear: 'wishbone', leafF: false, leafR: false }, diablo: { front: 'wishbone', rear: 'wishbone', leafF: false, leafR: false } };
+  jagD55: { front: 'wishbone', leafF: false, leafR: false }, eb110: { front: 'wishbone', rear: 'wishbone', leafF: false, leafR: false }, xj220: { front: 'wishbone', rear: 'wishbone', leafF: false, leafR: false }, diablo: { front: 'wishbone', rear: 'wishbone', leafF: false, leafR: false },
+  nsx: { front: 'wishbone', rear: 'wishbone', leafF: false, leafR: false } };
 export function suspension(c: RaceSpec): Suspension { return { front: 'beam', rear: 'beam', leafF: true, leafR: true, ...SUSP[c.id] }; }

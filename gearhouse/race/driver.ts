@@ -25,6 +25,10 @@ export class Driver {
       lim[s] = vMax; raw[s] = T.bankAt(s).b ? best : 0;
       if (s % 5 === 0) { const row = new Float32Array(OFFS.length); OFFS.forEach((o, j) => { row[j] = Math.max(0, -side * T.slope(s, o).across); }); this.tilt[s / 5] = row; } }
     const sm = new Float32Array(L), h = 120; for (let s = 0; s < L; s++) { let a = 0; for (let j = -h; j <= h; j += 4) a += raw[(s + j + L) % L]!; sm[s] = a / (2 * h / 4 + 1); }
+    // crests (review 120): where the road falls away over a rise along its line (a banking's ease running out at its top; not the short bumps, taken flat out)
+    // the car goes light; up to 0.45 of its weight may lift (more and the D-type, at 250 km/h, drifts up Byfleet's ease light and over the top), so it is taken slower there, as a driver lifts
+    for (let s = 0; s < L; s++) { const e = 6; let kv = 0; for (let o = -W / 2 + 2; o <= W / 2 - 2; o += 2) { const hz = (q: number) => T.bank(q, o); kv = Math.min(kv, (hz(s + e) - 2 * hz(s) + hz(s - e)) / (e * e)); }   /* the worst across: the car may be anywhere up the bank */
+      if (kv < -1e-5) lim[s] = Math.min(lim[s]!, Math.sqrt(0.45 * G / -kv)); }
     this.line = sm; this.vlim = lim; }
   lineAt(s: number): number { const L = this.track.length; return this.line ? this.line[Math.floor(((s % L) + L) % L)]! : 0; }
   drive(car: Vehicle): Controls {

@@ -11,9 +11,11 @@ export class TyreRing {
   readonly u = new Float32Array(NODES); private v = new Float32Array(NODES);
   /** the contact patch's shift against the rim (m): across (+ to the car's left) and along (+ forward), as the walls shear */
   sy = 0; sx = 0;
+  /** how much of its tread lies on the road against standing on a flat road (1): less over a sharp crest or a ridge, more pressed into a dip (review 120) */
+  patch = 1; private readonly n0: number;
   private readonly wr: number; private readonly wc: number; private readonly kt: number;
   /** R: the tyre's radius (m), F0: the load it carries standing (N), sag: its give then as a share of the radius */
-  constructor(readonly R: number, readonly F0: number, readonly sag = 0.05) { this.wr = 2 * Math.PI * 32; this.wc = this.wr * 1.3; this.kt = F0 / (sag * R); }
+  constructor(readonly R: number, readonly F0: number, readonly sag = 0.05) { this.wr = 2 * Math.PI * 32; this.wc = this.wr * 1.3; this.kt = F0 / (sag * R); let c0 = 0; for (let k = 0; k < NODES; k++) if (Math.cos(k / NODES * Math.PI * 2) > 1 - sag) c0++; this.n0 = Math.max(1, c0); }
   /** the give at standstill (m): the car is drawn lower by it, so the flattened tyre sits on the road */
   get rest(): number { return this.F0 / this.kt; }
   /** one car step: the load on the wheel (N), the tyre's forces along and across (N, wheel axes), and the ground's
@@ -26,6 +28,7 @@ export class TyreRing {
       const acc = -this.wr * this.wr * uk - 2 * z * this.wr * this.v[k]! + this.wc * this.wc * (um + up - 2 * uk);
       this.v[k] = this.v[k]! + acc * d; this.u[k] = uk + this.v[k]! * d;
       const least = this.R - depth[k]!; if (this.u[k]! < least) { this.u[k] = least; if (this.v[k]! < 0) this.v[k] = 0; } }   // the road: no further out than it lets
+    { let on = 0; if (load > 0) for (let k = 0; k < n; k++) if (Number.isFinite(depth[k]!)) on += Math.max(0, Math.min(1, 1 - (this.u[k]! - (this.R - depth[k]!)) / 0.003)); this.patch = this.patch + (on / this.n0 - this.patch) * Math.min(1, dt / 0.02); }
     // the walls' shear: stiffer along than across, followed with a little lag
     const kl = this.F0 / 0.025, f = Math.min(1, dt / 0.03), on = load > 0 ? 1 : 0;
     this.sy += (Math.max(-0.05, Math.min(0.05, on * fy / kl)) - this.sy) * f; this.sx += (Math.max(-0.03, Math.min(0.03, on * fx / (kl * 2))) - this.sx) * f; }

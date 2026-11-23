@@ -27,9 +27,9 @@ export class Track {
   at(s: number): Node { const L = this.length, t = ((s % L) + L) % L, i = Math.floor(t), f = t - i, a = this.nodes[i]!, b = this.nodes[(i + 1) % L]!;
     return { s: t, x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f, h: a.h + (b.h - a.h) * f, k: a.k + (b.k - a.k) * f }; }
   /** the nearest point of the centre line to (x, y): its s and the lateral offset; `hint` (the last s) makes it a local search */
-  locate(x: number, y: number, hint?: number): { s: number; off: number } {
+  locate(x: number, y: number, hint?: number, win = 60): { s: number; off: number } {
     const L = this.length; let best = 0, bd = Infinity; const scan = (i0: number, i1: number) => { for (let i = i0; i <= i1; i++) { const n = this.nodes[((i % L) + L) % L]!, d = (n.x - x) ** 2 + (n.y - y) ** 2; if (d < bd) { bd = d; best = ((i % L) + L) % L; } } };
-    if (hint === undefined) scan(0, L - 1); else scan(Math.floor(hint) - 60, Math.floor(hint) + 60);
+    if (hint === undefined) scan(0, L - 1); else scan(Math.floor(hint) - win, Math.floor(hint) + win);
     // refine on the segment either side
     let s = best, off = 0; for (const j of [best - 1, best]) { const a = this.nodes[((j % L) + L) % L]!, b = this.nodes[(j + 1 + L) % L]!, dx = b.x - a.x, dy = b.y - a.y, l2 = dx * dx + dy * dy, t = Math.max(0, Math.min(1, ((x - a.x) * dx + (y - a.y) * dy) / l2));
       const px = a.x + dx * t, py = a.y + dy * t, d = (px - x) ** 2 + (py - y) ** 2; if (d <= bd + 1e-9) { bd = d; s = (((j + t) % L) + L) % L; off = (dx * (y - a.y) - dy * (x - a.x)) / Math.sqrt(l2); } }
@@ -46,6 +46,17 @@ export class Track {
     for (const q of this.spec.bumps) { let d = Math.abs(t - q.s); d = Math.min(d, L - d); if (d < q.len / 2) z += q.height * (1 + Math.cos(d / (q.len / 2) * Math.PI)) / 2; } return z; }
   /** the surface's height at (s, off): the banking and the bumps */
   height(s: number, off: number): number { return this.bank(s, off) + this.bump(s); }
+  /** which side a banking's outer edge is on at s (-1 right, 1 left): its earth bank falls away to the fields there */
+  outerSide(s: number): number { const bk = this.bankAt(s).b; return this.at(s).k >= 0 || bk ? (bk && this.at((bk.s0 + bk.s1) / 2).k < 0 ? 1 : -1) : -1; }
+  /** the ground's height anywhere (review 120): the concrete, and beyond its edges what the scenery shows: level ground
+   *  inside, and behind a banking's top the earth bank falling to the fields over 2.4 times its height */
+  ground(s: number, off: number): number { const W2 = this.spec.width / 2; if (Math.abs(off) <= W2) return this.height(s, off);
+    const side = Math.sign(off), edge = this.height(s, side * W2), H = edge - this.bump(s);
+    if (side === this.outerSide(s) && H > 0.3) { const t = (Math.abs(off) - W2) / (Math.max(H, 0.3) * 2.4); return t >= 1 ? this.bump(s) - 0.025 : this.bump(s) + H * (1 - t) - 0.025 * t; }
+    return edge; }
+  /** the ground's height and its upward normal at (s, off), in the world */
+  groundAt(s: number, off: number): { z: number; n: [number, number, number] } { const e = 0.3, z = this.ground(s, off), dA = (this.ground(s + e, off) - this.ground(s - e, off)) / (2 * e), dL = (this.ground(s, off + e) - this.ground(s, off - e)) / (2 * e), h = this.at(s).h, c = Math.cos(h), sn = Math.sin(h);
+    const gx = c * dA - sn * dL, gy = sn * dA + c * dL, l = Math.hypot(gx, gy, 1); return { z, n: [-gx / l, -gy / l, 1 / l] }; }
   /** the surface's slope across the track (rise per metre to the left) and along it, at (s, off) */
   slope(s: number, off: number): { across: number; along: number } { const e = 0.25;   // the banking's tilt (the bumps are felt by the springs)
     return { across: (this.bank(s, off + e) - this.bank(s, off - e)) / (2 * e), along: (this.bank(s + e, off) - this.bank(s - e, off)) / (2 * e) }; }

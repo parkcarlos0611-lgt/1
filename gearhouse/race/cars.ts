@@ -140,3 +140,14 @@ export function torqueAt(c: RaceSpec, rpm: number): number {
   let T = rpm <= c.torqueRpm ? Tmax * (0.62 + 0.38 * (1 - (1 - x) ** 2)) : Tmax - (Tmax - Tp) * ((rpm - c.torqueRpm) / (c.hpRpm - c.torqueRpm)) ** 1.6;
   if (rpm > c.hpRpm) T = Tp * Math.max(0, 1 - ((rpm - c.hpRpm) / (c.redline * 1.15 - c.hpRpm)) ** 1.5 * 0.9);
   return Math.max(0, T); }
+
+/** the suspension (review 120): what each axle is. A beam axle on leaf springs (nearly every car of the period, and the
+ *  D-type's rear on trailing links); independent wheels on wishbones (the 540K's and the 315's front, the D-type's on
+ *  torsion bars); a swing axle (the 540K's rear). Leaf springs rub, leaf on leaf (their friction damps small motions). */
+export type AxleKind = 'beam' | 'wishbone' | 'swing';
+export interface Suspension { front: AxleKind; rear: AxleKind; leafF: boolean; leafR: boolean }
+const SUSP: Record<string, Partial<Suspension>> = {
+  mb540k: { front: 'wishbone', rear: 'swing', leafF: false, leafR: false },
+  bmw315: { front: 'wishbone', leafF: true },
+  jagD55: { front: 'wishbone', leafF: false, leafR: false } };
+export function suspension(c: RaceSpec): Suspension { return { front: 'beam', rear: 'beam', leafF: true, leafR: true, ...SUSP[c.id] }; }

@@ -40,7 +40,7 @@ export class Race {
       const d = T.gap(e.prevS, c.s); e.dist += d; if (!waiting && T.gap(e.prevS, this.startS) > 0 && T.gap(c.s, this.startS) <= 0 && c.vx > 1) { e.lapAt.push(this.clock); if (e.lapAt.length > this.laps && !e.finish) e.finish = this.clock; }
       e.prevS = c.s;
       // over the top, or stopped off the concrete: back on the track (an opponent after a moment, as its crew would push it)
-      if (c.over) { c.over = false; c.place(c.s, 0, 0); }
+      if (c.over || (c.upset && c.speed < 3)) { c.over = false; c.place(c.s, 0, 0); }   // over the top, or on its side or roof and stopped
       if (e.driver && !waiting) { e.stuck = (c.speed < 2 || Math.abs(c.off) > T.spec.width / 2 + 1) ? e.stuck + dt : 0; if (e.stuck > 3) { c.place(c.s, 0, 0); e.stuck = 0; } } }
     this.collide(); void L;
     this.done = this.cars.every(e => e.finish > 0) || (!!this.player?.finish && this.clock > this.player.finish + 45); }
@@ -48,17 +48,26 @@ export class Race {
   private avoid(e: Entrant): number { const c = e.car, T = this.track; let push = 0;
     for (const o of this.cars) { if (o === e) continue; const ahead = T.gap(c.s, o.car.s), side = o.car.off - c.off; if (ahead > 0 && ahead < 25 && Math.abs(side) < 3.2) push += (side > 0 ? -1 : 1) * 0.06 * (1 - ahead / 25); }
     return push; }
-  /** cars touching: each car two circles along its length; overlapping pairs are pushed apart and their speeds traded along the push */
-  private collide(): void { const R = 0.9;
-    for (let i = 0; i < this.cars.length; i++) for (let j = i + 1; j < this.cars.length; j++) { const a = this.cars[i]!.car, b = this.cars[j]!.car;
-      if (Math.hypot(a.x - b.x, a.y - b.y) > 8) continue;
-      const pts = (c: Vehicle) => { const h = c.spec.wheelbase / 2; return [-h, h].map(k => [c.x + Math.cos(c.yaw) * k, c.y + Math.sin(c.yaw) * k] as const); };
-      for (const pa of pts(a)) for (const pb of pts(b)) { const dx = pb[0] - pa[0], dy = pb[1] - pa[1], d = Math.hypot(dx, dy); if (d >= 2 * R || d < 1e-6) continue;
-        const nx = dx / d, ny = dy / d, over = 2 * R - d, ma = a.spec.mass, mb = b.spec.mass;
-        a.x -= nx * over * mb / (ma + mb); a.y -= ny * over * mb / (ma + mb); b.x += nx * over * ma / (ma + mb); b.y += ny * over * ma / (ma + mb);
-        const va = world(a), vb = world(b), rel = (vb[0] - va[0]) * nx + (vb[1] - va[1]) * ny; if (rel >= 0) continue;
-        const J = -(1 + 0.25) * rel / (1 / ma + 1 / mb); setWorld(a, va[0] - J / ma * nx, va[1] - J / ma * ny); setWorld(b, vb[0] + J / mb * nx, vb[1] + J / mb * ny);
-        a.r += (Math.random() - 0.5) * J / ma * 0.3; b.r += (Math.random() - 0.5) * J / mb * 0.3; } } }   // a knock turns a car a little
+  /** cars touching (review 120): each car's body a box; a corner of one inside the other is pushed out along the face it
+   *  went in by, and the two take an impulse there (bouncing a little, rubbing), which turns them about every axis */
+  private collide(): void { for (let i = 0; i < this.cars.length; i++) for (let j = i + 1; j < this.cars.length; j++) { const a = this.cars[i]!.car, b = this.cars[j]!.car; if (Math.hypot(a.x - b.x, a.y - b.y) < 8) touch(a, b); } }
 }
-const world = (c: Vehicle): [number, number] => [c.vx * Math.cos(c.yaw) - c.vy * Math.sin(c.yaw), c.vx * Math.sin(c.yaw) + c.vy * Math.cos(c.yaw)];
-const setWorld = (c: Vehicle, wx: number, wy: number) => { c.vx = wx * Math.cos(c.yaw) + wy * Math.sin(c.yaw); c.vy = -wx * Math.sin(c.yaw) + wy * Math.cos(c.yaw); };
+/** two cars' bodies against each other (review 120): their footprints (boxes seen from above) tested on the four axes
+ *  of the two cars; the least overlap gives the push's direction and depth; they are pushed apart by it and take an
+ *  impulse at the corners that went in (bouncing a little, rubbing), which turns them about every axis */
+export function touch(a: Vehicle, b: Vehicle): number {
+  const ax = (c: Vehicle): [number, number][] => { const h = c.yaw; return [[Math.cos(h), Math.sin(h)], [-Math.sin(h), Math.cos(h)]]; };
+  const A = ax(a), B = ax(b), dX = b.x - a.x, dY = b.y - a.y, ext = (c: Vehicle, C: [number, number][], u: [number, number]) => c.box.hl * Math.abs(C[0]![0] * u[0] + C[0]![1] * u[1]) + c.box.hw * Math.abs(C[1]![0] * u[0] + C[1]![1] * u[1]);
+  let best = Infinity, n: [number, number] = [1, 0];
+  for (const u of [...A, ...B]) { const d = dX * u[0] + dY * u[1], o = ext(a, A, u) + ext(b, B, u) - Math.abs(d); if (o <= 0) return 0; if (o < best) { best = o; n = d >= 0 ? [u[0], u[1]] : [-u[0], -u[1]]; } }   // n: from a toward b
+  if (Math.abs(a.p[2] - b.p[2]) > 1.2) return 0;   // one far over the other
+  const ma = a.spec.mass, mb = b.spec.mass, sh = Math.min(best, 0.4);
+  a.p[0] -= n[0] * sh * mb / (ma + mb); a.p[1] -= n[1] * sh * mb / (ma + mb); b.p[0] += n[0] * sh * ma / (ma + mb); b.p[1] += n[1] * sh * ma / (ma + mb);
+  // where they touch: a's corner deepest toward b and b's deepest toward a, met halfway, at bumper height
+  const corner = (c: Vehicle, C: [number, number][], dir: [number, number]): [number, number] => { let bx = c.x, by = c.y, bd = -Infinity; for (const sx of [-1, 1]) for (const sy of [-1, 1]) { const x = c.x + C[0]![0] * c.box.hl * sx + C[1]![0] * c.box.hw * sy, y = c.y + C[0]![1] * c.box.hl * sx + C[1]![1] * c.box.hw * sy, d = x * dir[0] + y * dir[1]; if (d > bd) { bd = d; bx = x; by = y; } } return [bx, by]; };
+  const ca = corner(a, A, n), cb = corner(b, B, [-n[0], -n[1]]), w: [number, number, number] = [(ca[0] + cb[0]) / 2, (ca[1] + cb[1]) / 2, (a.base[2] + b.base[2]) / 2 + 0.5];
+  const N: [number, number, number] = [n[0], n[1], 0], va = a.velAt(w), vb = b.velAt(w), rel: [number, number, number] = [vb[0] - va[0], vb[1] - va[1], vb[2] - va[2]], vn = rel[0] * N[0] + rel[1] * N[1]; if (vn >= 0) return 1;
+  const k = a.invMassAt(w, N) + b.invMassAt(w, N), J = -(1 + 0.25) * vn / k;
+  const vt: [number, number, number] = [rel[0] - N[0] * vn, rel[1] - N[1] * vn, rel[2]], vtl = Math.hypot(...vt), t: [number, number, number] = vtl > 1e-6 ? [vt[0] / vtl, vt[1] / vtl, vt[2] / vtl] : [0, 0, 0];
+  const kt = vtl > 1e-6 ? a.invMassAt(w, t) + b.invMassAt(w, t) : 1, Jt = Math.min(0.4 * J, vtl / kt), imp: [number, number, number] = [N[0] * J - t[0] * Jt, N[1] * J - t[1] * Jt, -t[2] * Jt];   /* on b: pushed off, its sliding against a resisted */
+  b.applyImpulse(w, imp); a.applyImpulse(w, [-imp[0], -imp[1], -imp[2]]); return 1; }

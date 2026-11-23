@@ -1,65 +1,65 @@
 {
- "about": "Millbrook Outer Circuit handicapper's book (reviews 86, 89): the test driver's lap times in seconds, from rest to the end of the first lap (standing) and a lap at speed (flying), from tools/ref/handicaps.ts, with the review-89 tyres; retimed in review 97 (the free wheels no longer drag).",
+ "about": "Millbrook Outer Circuit handicapper's book (reviews 86, 89): the test driver's lap times in seconds, from rest to the end of the first lap (standing) and a lap at speed (flying), from tools/ref/handicaps.ts, with the review-89 tyres; retimed in review 97 (the free wheels no longer drag); retimed in review 120 (the car in 3D: its axles, the tyres' relaxation, crests felt).",
  "cars": {
   "dueSSJ35": {
    "standing": 97,
-   "flying": 87.1
+   "flying": 88.8
   },
   "bmw315": {
-   "standing": 153.7,
+   "standing": 153.4,
    "flying": 139.7
   },
   "fnTT33": {
-   "standing": 134.1,
+   "standing": 134,
    "flying": 122.2
   },
   "dueA21": {
-   "standing": 155.1,
+   "standing": 155,
    "flying": 142.5
   },
   "plymU29": {
-   "standing": 182.6,
-   "flying": 171.8
+   "standing": 182.4,
+   "flying": 171.7
   },
   "buick28": {
-   "standing": 173.5,
-   "flying": 162.5
+   "standing": 172,
+   "flying": 161.1
   },
   "chevAB28": {
-   "standing": 206,
-   "flying": 195.6
+   "standing": 205.6,
+   "flying": 195.4
   },
   "dodgeV28": {
-   "standing": 174.7,
+   "standing": 174.5,
    "flying": 164.9
   },
   "pontiac29": {
-   "standing": 177.7,
+   "standing": 177.4,
    "flying": 169
   },
   "willys27": {
-   "standing": 191.3,
-   "flying": 183.4
+   "standing": 189.5,
+   "flying": 181.9
   },
   "fordT23": {
-   "standing": 257.3,
-   "flying": 245.9
+   "standing": 257,
+   "flying": 245.6
   },
   "napier33": {
-   "standing": 88.5,
-   "flying": 78.2
+   "standing": 87.2,
+   "flying": 80.8
   },
   "jagD55": {
-   "standing": 81.9,
-   "flying": 73.4
+   "standing": 87.3,
+   "flying": 80.7
   },
   "auburn851": {
-   "standing": 116.6,
-   "flying": 103.4
+   "standing": 116.3,
+   "flying": 102
   },
   "mb540k": {
-   "standing": 115.4,
-   "flying": 100.2
+   "standing": 114.8,
+   "flying": 99.3
   }
  }
 }

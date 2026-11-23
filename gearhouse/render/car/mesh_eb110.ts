@@ -86,8 +86,8 @@ function half(s: number): V[] { const w = W(s), yB = FB(s) * w, fa = FA(s), yA =
   return out; }
 /** the stations: close at the nose's and tail's lips, every 18 degrees round an arch, about 110 mm apart between */
 const arcS = (hx: number, ra: number) => [hx - ra - 2, ...Array.from({ length: 11 }, (_, k) => Math.round(hx - ra * Math.cos(k * 18 * Math.PI / 180))), hx + ra + 2];
-const SS = [S0, 122, 150, 200, 280, 380, 480, 580, 665, ...arcS(FX, RAF), 1545, 1660, 1780, ST, 2010, 2130, 2250, 2370, 2490, 2610, SP, 2830, 2920, SC1, SC1 + 22, 3100, 3190, ...arcS(RX, RAR), 4090, 4170, 4240, 4290, 4325, 4337, S1];
-const IB = SS.indexOf(SB), IT = SS.indexOf(ST), IP = SS.indexOf(SP), IM = SS.indexOf(SC1);
+const SS = [S0, 122, 150, 200, 280, 355, 435, 515, 595, 665, ...arcS(FX, RAF), 1545, 1660, 1780, ST, 2010, 2130, 2250, 2370, 2490, 2610, SP, 2830, 2920, SC1, SC1 + 22, 3100, 3190, ...arcS(RX, RAR), 4090, 4170, 4240, 4290, 4325, 4337, S1];
+const IB = SS.indexOf(SB), IT = SS.indexOf(ST), IP = SS.indexOf(SP), IM = SS.indexOf(SC1), IL0 = SS.indexOf(355), IL1 = SS.indexOf(595), JL0 = 2;   // the head lamps' pockets: stations 355-595, the top's points 2 to the crest (review 134)
 
 type Tri = [V, V, V];
 /** where a line along axis `c` through (a, b) on the other two axes meets a set of triangles: the farthest (or nearest) hit; NaN if none */
@@ -117,9 +117,9 @@ function wheel(b: Build, x: number, s: 1 | -1, spin = 0) { const front = x === F
 export function eb110Mesh(spin = 0, wing = 0): Mesh { const b = new Build(); wing = Math.max(0, Math.min(1, wing));
   // ---- the body's grid ----
   const G = SS.map(half), NI = SS.length, g = (i: number, j: number, sg: number): V => { const p = G[i]![j]!; return [p[0], p[1] * sg, p[2]]; };
-  const arch = SS.map(s => archZ(s) > 0), cells: Record<'paint' | 'screen' | 'glass' | 'mouth' | 'under', V[][]> = { paint: [], screen: [], glass: [], mouth: [], under: [] }, TOP: Tri[] = [], SIDE: Tri[] = [];
+  const arch = SS.map(s => archZ(s) > 0), cells: Record<'paint' | 'screen' | 'glass' | 'mouth' | 'under' | 'pocket', V[][]> = { paint: [], screen: [], glass: [], mouth: [], under: [], pocket: [] }, TOP: Tri[] = [], SIDE: Tri[] = [];
   for (let i = 0; i + 1 < NI; i++) for (let j = 0; j + 1 < NJ; j++) for (const sg of [1, -1]) { const q = sg > 0 ? [g(i, j, sg), g(i + 1, j, sg), g(i + 1, j + 1, sg), g(i, j + 1, sg)] : [g(i, j, sg), g(i, j + 1, sg), g(i + 1, j + 1, sg), g(i + 1, j, sg)];
-    const kind = i >= IB && i < IT && j < JA ? 'screen' : i >= IB && i < IP && j >= JA && j < JB ? 'glass' : i === IM && j >= JB + SCK0 - 1 && j <= JB + SCK1 ? 'mouth' : j > JS || (j === JS && (arch[i]! || arch[i + 1]!)) ? 'under' : 'paint';
+    const kind = i >= IL0 && i < IL1 && j >= JL0 && j < JA ? 'pocket' : i >= IB && i < IT && j < JA ? 'screen' : i >= IB && i < IP && j >= JA && j < JB ? 'glass' : i === IM && j >= JB + SCK0 - 1 && j <= JB + SCK1 ? 'mouth' : j > JS || (j === JS && (arch[i]! || arch[i + 1]!)) ? 'under' : 'paint';
     cells[kind].push(q); if (j < JB) TOP.push([q[0]!, q[1]!, q[2]!], [q[0]!, q[2]!, q[3]!]); else if (j < JS && sg > 0) SIDE.push([q[0]!, q[1]!, q[2]!], [q[0]!, q[2]!, q[3]!]); }
   // each cell is cut along the diagonal that folds it less, so a highlight's edge runs straighter across the cells
   const un = (p: V, q: V, r: V): V => { const c = cross(sub(q, p), sub(r, p)), l = Math.hypot(c[0], c[1], c[2]) || 1; return [c[0] / l, c[1] / l, c[2] / l]; }, dot = (p: V, q: V) => p[0] * q[0] + p[1] * q[1] + p[2] * q[2];
@@ -181,10 +181,41 @@ export function eb110Mesh(spin = 0, wing = 0): Mesh { const b = new Build(); win
     for (const sg of [1, -1]) { b.name('grille').mat(DARK, 0.05); patch(b, (u, v) => nose(sg * lerp(100, 475, u), lerp(80, 245, v)), 3, 1, [-1, 0, 0]); patch(b, (u, v) => nose(sg * lerp(540, 640, u), lerp(100, 235, v)), 1, 1, [-1, 0, 0]);
       b.name('grille').mat(PAINT, GLOSS, 'paint'); for (const z of [114, 158, 202]) patch(b, (u, v) => nose(sg * lerp(100, 475, u), z + v * 13, 6), 3, 1, [-1, 0, 0]); }   /* three bars a side, as the sheet */
     b.name('badge').mat(RED, 0.5); { const o: [number, number][] = [[-30, 0], [-17, 12], [17, 12], [30, 0], [17, -12], [-17, -12]]; for (let i = 1; i + 1 < o.length; i++) b.tri(nose(o[0]![0], 307 + o[0]![1], 5), nose(o[i + 1]![0], 307 + o[i + 1]![1], 5), nose(o[i]![0], 307 + o[i]![1], 5)); }
-    for (const sg of [1, -1]) { const pk = (u: number, v: number, lift: number): V => { const x = lerp(278, 540, u); return top(x, sg * lerp(lerp(300, 262, u), lerp(688, 676, u), v), lift); };
-      b.name('lamp').mat(DARK, 0.05); patch(b, (u, v) => pk(u, v, 3), 3, 4, UP);
-      b.name('lens').mat(LENS, 0.6, 'lens'); for (const [v0, v1] of [[0.1, 0.48], [0.52, 0.92]] as const) patch(b, (u, v) => pk(lerp(0.12, 0.88, u), lerp(v0, v1, v), 7 + 34 * u), 2, 2, UP);   /* standing up toward the back of the pocket: the units face forward as on the sheet */
-      b.name('lampCover').mat(GLASS, 0.5, 'glass'); patch(b, (u, v) => pk(u, v, 12), 3, 4, UP);
+    // the head lamps (review 134, from the photographs and the 4-view drawing): a pocket cut into each front corner of the
+    // bonnet, from its slope's inner part out to the wing's crest, sharp-edged in the smooth body (the grid's own cells
+    // are left out there); flat glass flush over it; a dark tray sinking toward the back (14 mm at the front, 72 at the
+    // back); at the back the two units leaning back under the glass, the fluted halogen reflector inboard and the round
+    // projector outboard; black fins down the inner wall, the body-coloured outer wall up to the crest, the amber
+    // indicator in the outer front corner, two orange heater loops printed on the glass.
+    const NU = IL1 - IL0, NV = JA - JL0, dep = (u: number) => lerp(14, 72, u), RV = 0.22;   // RV: the inner side a black finned ramp down to the tray, so the pocket reads as a wedge from the front, as the car
+    for (const sg of [1, -1]) {
+      /** the pocket's opening at (u, v), 0..1 from front to back and from the inner edge to the crest, dz below it */
+      const P = (u: number, v: number, dz = 0): V => { const fi = u * NU, fj = v * NV, i = Math.min(NU - 1, Math.floor(fi)), j = Math.min(NV - 1, Math.floor(fj)), a = fi - i, c = fj - j;
+        const p00 = g(IL0 + i, JL0 + j, sg), p10 = g(IL0 + i + 1, JL0 + j, sg), p01 = g(IL0 + i, JL0 + j + 1, sg), p11 = g(IL0 + i + 1, JL0 + j + 1, sg);
+        return [0, 1, 2].map(k => (p00[k]! * (1 - a) + p10[k]! * a) * (1 - c) + (p01[k]! * (1 - a) + p11[k]! * a) * c + (k === 2 ? dz : 0)) as V; };
+      const N: V = [0, 0, 1], wall = (f: (t: number) => [number, number], n: number, nv: V) => { for (let k = 0; k < n; k++) { const [u0, v0] = f(k / n), [u1, v1] = f((k + 1) / n); face(b, P(u0, v0), P(u1, v1), P(u1, v1, -dep(u1)), P(u0, v0, -dep(u0)), nv); } };
+      b.name('lampTray').mat('#2c3038', 0.35); patch(b, (u, v) => P(u, lerp(RV, 1, v), -dep(u)), NU, NV - 1, N);
+      b.name('lampFin').mat(FRAME, 0.15); patch(b, (u, v) => P(u, v * RV, -dep(u) * v), NU, 2, [0, sg, 1]); wall(t => [0, lerp(RV, 1, t)], NV - 1, [1, 0, 0]); face(b, P(0, 0), P(0, RV), P(0, RV, -dep(0)), P(0, RV, -dep(0)), [1, 0, 0]);   /* the inner ramp and the shallow front wall */
+      b.name('body').mat(PAINT, GLOSS, 'paint'); wall(t => [t, 1], NU, [0, -sg, 0]);                                  /* the outer wall: the wing's inner face */
+      b.name('lampHousing').mat(DARK, 0.05); wall(t => [1, lerp(RV, 1, t)], NV - 1, [-1, 0, 0]); face(b, P(1, 0), P(1, RV), P(1, RV, -dep(1)), P(1, RV, -dep(1)), [-1, 0, 0]);
+      b.name('lampFin').mat('#3b3f47', 0.3); for (let k = 0; k < 7; k++) { const u = lerp(0.05, 0.7, k / 6); face(b, P(u, 0.02, -1), P(u + 0.03, 0.02, -1), P(u + 0.03, RV - 0.02, -dep(u) + 3), P(u, RV - 0.02, -dep(u) + 3), [0, sg, 1]); }   /* the fins: lighter blades across the ramp */
+      // the units: a face leaning back from the tray to just under the glass's back edge, set off from it by d toward the front and up
+      const W0 = 0.74, W1 = 0.985, F = (v: number, w: number, d = 0): V => { const u = lerp(W0, W1, w), p = P(u, v, lerp(-dep(W0) + 3, -7, w)); return [p[0] - d * 0.7, p[1], p[2] + d * 0.7]; };
+      b.name('lampHousing').mat(DARK, 0.05); patch(b, (v, w) => F(lerp(RV, 0.97, v), w), 2, 1, [-1, 0, 0.6]);
+      b.name('reflector').mat(SILVER, 0.75, 'metal'); patch(b, (v, w) => F(lerp(0.27, 0.6, v), lerp(0.08, 0.94, w), 2), 1, 1, [-1, 0, 0.6]);   /* the halogen unit's chrome bezel */
+      b.name('reflector').mat(LENS, 0.7); patch(b, (v, w) => F(lerp(0.29, 0.58, v), lerp(0.16, 0.86, w), 4), 1, 1, [-1, 0, 0.6]);
+      b.name('reflector').mat('#a9adb2', 0.6); for (let k = 1; k < 8; k++) { const v = lerp(0.29, 0.58, k / 8); patch(b, (a, w) => F(v - 0.005 + 0.01 * a, lerp(0.16, 0.86, w), 5), 1, 1, [-1, 0, 0.6]); }   /* the fluted glass */
+      b.name('reflector').mat(LENS, 0.7); patch(b, (v, w) => F(lerp(0.63, 0.96, v), lerp(0.16, 0.86, w), 3), 1, 1, [-1, 0, 0.6]);
+      b.name('reflector').mat('#a9adb2', 0.6); for (let k = 1; k < 5; k++) { const v = lerp(0.63, 0.96, k / 5); patch(b, (a, w) => F(v - 0.005 + 0.01 * a, lerp(0.16, 0.86, w), 4), 1, 1, [-1, 0, 0.6]); }
+      { // the projector: a chrome ring and its dark glass ball, round across the face
+        const c = F(0.8, 0.52, 6), e1 = sub(F(0.9, 0.52, 6), F(0.7, 0.52, 6)), e2 = sub(F(0.8, 0.86, 6), F(0.8, 0.18, 6)), l1 = Math.hypot(...e1), l2 = Math.hypot(...e2), a1: V = [e1[0] / l1, e1[1] / l1, e1[2] / l1], a2: V = [e2[0] / l2, e2[1] / l2, e2[2] / l2], cr = cross(a1, a2), nn: V = cr[0] > 0 ? [-cr[0], -cr[1], -cr[2]] : cr;
+        const r0 = Math.min(44, l2 * 0.3), at = (r: number, t: number, d: number): V => [0, 1, 2].map(k => c[k]! + a1[k]! * r * Math.cos(t) + a2[k]! * r * Math.sin(t) + nn[k]! * d) as V, n12 = 12;
+        b.name('reflector').mat(CHROME, 0.9, 'metal'); for (let i = 0; i < n12; i++) { const t0 = i / n12 * Math.PI * 2, t1 = (i + 1) / n12 * Math.PI * 2; face(b, at(r0, t0, 0), at(r0, t1, 0), at(r0 * 0.82, t1, 5), at(r0 * 0.82, t0, 5), nn); }
+        b.name('lens').mat('#3a4048', 0.9, 'lens'); for (let i = 0; i < n12; i++) { const t0 = i / n12 * Math.PI * 2, t1 = (i + 1) / n12 * Math.PI * 2, p = [at(0, 0, 12), at(r0 * 0.82, t0, 5), at(r0 * 0.82, t1, 5)] as const, cc = cross(sub(p[1], p[0]), sub(p[2], p[0])); if (cc[0] * nn[0] + cc[1] * nn[1] + cc[2] * nn[2] >= 0) b.tri(p[0], p[1], p[2]); else b.tri(p[0], p[2], p[1]); } }
+      b.name('indicator').mat(AMBER, 0.6); { const a = P(0.02, 0.8, -dep(0.02) + 2), c = P(0.02, 0.98, -dep(0.02) + 2), d = P(0.36, 0.98, -dep(0.36) + 2); face(b, a, c, d, d, N); }   /* a triangle in the outer front corner */
+      b.name('lampTray').mat('#c48a45', 0.4); for (const [u0, u1, v0, v1] of [[0.08, 0.25, 0.3, 0.9], [0.31, 0.48, 0.28, 0.95]] as const) { const t = 0.009, w = 0.006;   /* the heater loops, just under the glass */
+        for (const [a0, a1, c0, c1] of [[u0, u0 + t, v0, v1], [u1 - t, u1, v0, v1], [u0, u1, v0, v0 + w], [u0, u1, v1 - w, v1]] as const) patch(b, (u, v) => P(lerp(a0, a1, u), lerp(c0, c1, v), -4), 1, 1, N); }
+      b.name('headCover').mat(GLASS, 0.5, 'glass'); patch(b, (u, v) => P(u, v, -2), NU, NV, N);
       b.name('lamp').mat(AMBER, 0.5, 'lens'); face(b, flank(610, 372, sg), flank(700, 372, sg), flank(700, 398, sg), flank(610, 398, sg), [0, sg, 0]); } }                  // the side repeater
 
   // ---- the flanks: the doors' edges, the intake behind the front wheel, the vent behind the rear one ----

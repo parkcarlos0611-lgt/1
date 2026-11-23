@@ -87,7 +87,6 @@ const MATS: Record<string, Mat> = { body: ['body', PAINT, 0.6, 'paint'], hood: [
 class Bins { private q = new Map<string, V[][]>(); add(k: string, a: V, b: V, c: V, d: V) { let l = this.q.get(k); if (!l) this.q.set(k, l = []); l.push([a, b, c, d]); }
   flush(b: Build) { for (const [k, l] of this.q) { const m = MATS[k]!; b.name(m[0]).mat(m[1], m[2], m[3]); for (const [p, q, r, s] of l) b.quad(p!, q!, r!, s!); } } }
 
-const sub = (a: V, b: V): V => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 /** a flat patch from a loop of points (a fan about their middle) */
 function fan(b: Build, P: V[], lift: V = [0, 0, 0]): void { const m: V = [0, 0, 0]; for (const p of P) { m[0] += p[0] / P.length; m[1] += p[1] / P.length; m[2] += p[2] / P.length; } const c: V = [m[0] + lift[0], m[1] + lift[1], m[2] + lift[2]]; for (let i = 0; i < P.length; i++) b.tri(c, P[i]!, P[(i + 1) % P.length]!); }
 /** a point on the flank at sheet (px, row), `out` mm proud of the skin; a line of bars through such points */
@@ -120,12 +119,11 @@ export function xj220Mesh(spin = 0): Mesh { const b = new Build(), bins = new Bi
       else if (j >= NH - 5 && arch) k = 'chassis';
       else if (j >= NH - 4 && anyArch) k = 'chassis';
       else if (j >= NH - 3 && xm > RX + RAR) k = 'chassis';
-      else if (j >= NH - 4 && xm > X(1740)) k = 'chassis';
       else if (xm < X(60)) k = 'bumperF'; else if (xm > X(1800)) k = 'bumperR';
       else if (j >= NH - 4 && xm > FX && xm < RX) k = 'sill';
       else if (xm < XD0) k = j < 6 ? 'hood' : 'fenderF'; else if (xm < XD1) k = j < 3 ? 'body' : 'door'; else k = j < 6 ? 'body' : 'fenderR';
       for (const s of [1, -1]) { const p = (h: [number, number], x: number): V => [x, s * h[0], h[1]]; bins.add(k, p(A[j]!, xa), p(A[j + 1]!, xa), p(B[j + 1]!, xb), p(B[j]!, xb)); } } }
-  { const e = H[0]!, x = xs[0]!, f = H[NH - 1]!; void f; for (let j = 0; j + 1 < NH; j++) for (const s of [1, -1]) b.name('bumperF').mat(PAINT, 0.6, 'paint').tri([x, 0, (e[0]![1] + e[NH - 1]![1]) / 2], [x, s * e[j]![0], e[j]![1]], [x, s * e[j + 1]![0], e[j + 1]![1]]);
+  { const e = H[0]!, x = xs[0]!; for (let j = 0; j + 1 < NH; j++) for (const s of [1, -1]) b.name('bumperF').mat(PAINT, 0.6, 'paint').tri([x, 0, (e[0]![1] + e[NH - 1]![1]) / 2], [x, s * e[j]![0], e[j]![1]], [x, s * e[j + 1]![0], e[j + 1]![1]]);
     const t = H[H.length - 1]!, xt = xs[xs.length - 1]!; for (let j = 0; j + 1 < NH; j++) for (const s of [1, -1]) b.name('bumperR').mat(PAINT, 0.6, 'paint').tri([xt, 0, (t[0]![1] + t[NH - 1]![1]) / 2], [xt, s * t[j]![0], t[j]![1]], [xt, s * t[j + 1]![0], t[j + 1]![1]]); }
   // ---- the canopy: the wraparound screen, the side glass drawn to a point, the roof, the fastback with the louvred cover ----
   const cx = [392, 397, 407, 425, 448, 475, 508, 560, 612, 660, 715, 762, 817, 860, 900, 940, 1000, 1067, 1100, 1150, 1190, 1227, 1252, 1300, 1340, 1400, 1460, 1500, 1540, 1582].map(X), CN = cx.map(canopy);
@@ -175,23 +173,23 @@ export function xj220Mesh(spin = 0): Mesh { const b = new Build(), bins = new Bi
       b.name('mirror').mat('#3d4450', 0.6).quad([mx + 198, s * 925, mz - 4], [mx + 207, s * 1092, mz + 4], [mx + 207, s * 1092, mz + 112], [mx + 198, s * 925, mz + 114]); }
     wheel(b, FX, s, spin); wheel(b, RX, s, spin); }
   // ---- the tail: the dark panel across it, the lamps in two rows each side, the slats between them, the wing, the exhausts ----
-  { const XE = X(1830), P = (y: number, z: number, o = 4): V => [rearX(y, z) + o, y, z], ys = [-800, -700, -560, -280, 0, 280, 560, 700, 800], Z0 = 400, Z1 = 784;
+  { const XE = X(1826), P = (y: number, z: number, o = 4): V => [rearX(y, z) + o, y, z], ys = [-800, -700, -560, -280, 0, 280, 560, 700, 800], Z0 = 400, Z1 = 784;
     b.name('bumperR').mat(DARK, 0.05); for (let i = 0; i + 1 < ys.length; i++) for (const [za, zc] of [[Z0, 530], [530, 630], [630, Z1]] as const) b.quad(P(ys[i]!, za), P(ys[i + 1]!, za), P(ys[i + 1]!, zc), P(ys[i]!, zc));
     b.name('grille').mat('#34363d', 0.2); for (const z of [470, 510, 550, 590, 630]) line(b, [-540, -280, 0, 280, 540].map(y => P(y, z, 8)), 16, 6);
     for (const s of [1, -1]) { const lamp = (c: string, y0: number, y1: number, z0: number, z1: number) => { b.name('tail').mat(c, 0.5, 'lens'); const ym = (y0 + y1) / 2; for (const [ya, yb] of [[y0, ym], [ym, y1]] as const) b.quad(P(s * ya, z0, 8), P(s * yb, z0, 8), P(s * yb, z1, 8), P(s * ya, z1, 8)); };
       lamp(AMBER, 702, 835, 634, 722); lamp(RED, 610, 696, 634, 722); lamp('#e4e2da', 568, 604, 634, 722); lamp(RED, 706, 835, 538, 626); lamp('#a81f24', 568, 700, 538, 626);
       b.name('tailRim').mat(DARK, 0.05).bar(P(s * 560, 630, 9), P(s * 842, 630, 9), 8, 4);
       // the exhaust: one round pipe each side, low in the valance
-      b.name('exhaust').mat(CHROME, 0.9, 'metal').lathe('x', [0, s * 600, 250], [[XE - 260, 50], [XE - 22, 58], [XE, 58], [XE - 6, 46], [XE - 120, 44]], 14, false);
-      b.name('exhaust').mat(DARK, 0.05).lathe('x', [0, s * 600, 250], [[XE - 110, 44], [XE - 110, 0]], 10, false); }
+      b.name('exhaust').mat(CHROME, 0.9, 'metal').lathe('x', [0, s * 600, 318], [[XE - 260, 50], [XE - 22, 58], [XE, 58], [XE - 6, 46], [XE - 120, 44]], 14, false);
+      b.name('exhaust').mat(DARK, 0.05).lathe('x', [0, s * 600, 318], [[XE - 110, 44], [XE - 110, 0]], 10, false); }
     // the wing: a full-width blade between the tail's raised sides, two struts down to the deck
     const wx = [1742, 1765, 1792, 1816, 1834, 1846, 1852].map(X); b.name('wing').mat(PAINT, 0.6, 'paint').loft(wx.map((x, i) => { const w = at(HALF, x) * 0.9, zt = at(WING, x) - 6, th = [10, 30, 38, 36, 30, 24, 16][i]!; return [[x, -w, zt - th], [x, -w * 0.5, zt - th], [x, w * 0.5, zt - th], [x, w, zt - th], [x, w, zt], [x, w * 0.5, zt + 3], [x, -w * 0.5, zt + 3], [x, -w, zt]] as V[]; }));
     for (const s of [1, -1]) { const ex = [1690, 1742, 1792, 1816, 1834, 1846, 1852].map(X); b.name('wing').mat(PAINT, 0.6, 'paint'); for (let i = 0; i + 1 < ex.length; i++) { const q = (x: number, top: boolean): V => { const y = at(HALF, x) * 0.9; return [x, s * y, top ? at(WING, x) - 6 : skin(x, y) - 12]; }; b.quad(q(ex[i]!, false), q(ex[i + 1]!, false), q(ex[i + 1]!, true), q(ex[i]!, true)); } }
     for (const y of [-383, 383]) b.name('wing').mat(DARK, 0.2).box(X(1780), X(1822), y - 9, y + 9, skin(X(1800), y) - 10, at(WING, X(1800)) - 30); }
   // ---- under the car: the flat floor, the axles' lines, the keel and outer blocks that leave two venturi tunnels at the back ----
   b.name('chassis').mat(DARK, 0.05).bar([FX, -WYF, RF], [FX, WYF, RF], 50).bar([RX, -WYR, RR], [RX, WYR, RR], 70);
-  { const dx = [1560, 1620, 1700, 1780, 1816, 1828, 1840].map(X), low = (x: number) => 100 + (x - dx[0]!) / (dx[6]! - dx[0]!) * 85;
+  { const dx = [1560, 1620, 1700, 1780, 1816, 1828, 1840].map(X), low = (x: number) => Math.max(100, at(BOT, x) - 70);
     b.name('chassis').mat('#101114', 0.05).loft(dx.map(x => [[x, -145, low(x)], [x, 145, low(x)], [x, 145, at(BOT, x) + 12], [x, -145, at(BOT, x) + 12]] as V[]));
     for (const s of [1, -1]) b.loft(dx.map(x => { const w = at(HALF, x) * 0.88, yi = Math.min(487, 0.75 * w); return [[x, s * yi, low(x)], [x, s * w, low(x)], [x, s * w, at(BOT, x) + 12], [x, s * yi, at(BOT, x) + 12]] as V[]; })); }
-  void sub; return b.mesh(L); }
+  return b.mesh(L); }
 export const mesh = xj220Mesh;

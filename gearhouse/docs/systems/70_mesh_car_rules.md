@@ -58,3 +58,26 @@ layout, helpers and level of detail.
   be hollow between the glass panes so the seats show; check at `glass=0.7` and `glass=0.3`.
 - Check age with `rust=0.6 fade=0.5 dent=1 lamp=1` on meshshot: paint that should not rust (glass frames, roof cloth)
   must not be `paint`.
+
+## Surface quality (review 127) — every new car, and every brief to a modelling agent
+Lessons from the EB110 and XJ220 builds: the brief stressed matching the sheet and the figures, and named no quality
+bar, so the bodies came out right in outline but faceted, creased and boxy. These rules now stand beside the outline:
+- **The quality bar:** at least `mesh_ssj.ts` (wings, lamps, wheels) and, for one-piece bodies, `mesh_jagD55.ts`
+  (smooth envelope). A brief names both as the models to follow; a 1930s separate-wing car is never the example for a
+  modern one-piece body.
+- **Sections are curves, not polygons:** each body section a superellipse (or a smooth spline) of at least 16
+  points, the flanks curving in toward the top (tumblehome: the glasshouse's foot 6-12 % in from the widest point on a
+  modern car), no vertical walls except where the car has them.
+- **Measured tables are smoothed:** values read off a sheet's pixels are noisy; fit them with a smooth curve (a
+  moving average or a monotone spline, at least 5 points' span) before lofting. No step of more than 1 % of the height
+  between neighbouring stations unless the car has a real step (a shut line, a spoiler lip).
+- **Even stations:** sections every 80-150 mm along a smooth body; never two sections at the same x; arches cut by
+  moving section points, never by collapsing several to one point (no degenerate triangles).
+- **Check the surface, not just the outline:** a 3/4 view at pitch 30 and a top view at pitch 89 under the PBR look:
+  highlights must run as smooth bands along the wings and bonnet, not break into patches; any patch is a fold or a
+  step to fix. The outline comparison with the sheet comes after this, not instead of it.
+- **Colour from the real car**, not the sheet's flat drawing colour (the sheet's blue is a drawing's; Bleu Bugatti is
+  a deep metallic).
+- **Build afresh rather than patch** when the surface is wrong at the root (wrong section shape, unsmoothed tables): a
+  new build from the measured, smoothed tables costs less than many fix rounds.
+- Budget for modern one-piece bodies: 9 000-14 000 triangles.

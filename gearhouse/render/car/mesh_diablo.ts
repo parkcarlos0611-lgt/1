@@ -25,7 +25,7 @@ const PAINT = '#b0141c', GLOSS = 0.6, FRAME = '#14151a', DARK = '#131318', TRIM 
 const LENS = '#eef0f2', RED = '#c9221f', AMBER = '#e8901c', SEAT = '#8a6b47', SEAT2 = '#5e4a32', SEAM = '#3a080c', WHITE = '#e6e4dc';
 const L = 4460, FX = 1000, RX = 3650, RF = 314, RR = 333, WYF = 770, WYR = 820, TWF = 245, TWR = 335;   // the axles, the tyres' radii, half the tracks, the tyres' widths
 const XJ = 640, ZS = 110, ZTIP = 340, WJ = 900, YINF = 600, YINR = 610;                                    // the nose's last row (the front arch's leading edge), the sill, the nose's tip line, half the width there, the wells' inner walls
-const XA = 1150, XR0 = 1790, XR1 = 2690, S1 = 4330;                                                        // the screen's corner, the roof's front corner and its back edge, the deck's back edge
+const XA = 1150, XR0 = 1840, XR1 = 2690, S1 = 4330;                                                        // the screen's corner, the roof's front corner and its back edge, the deck's back edge
 type Tri = [V, V, V];
 const sub = (a: V, b: V): V => [a[0] - b[0], a[1] - b[1], a[2] - b[2]], add = (a: V, b: V): V => [a[0] + b[0], a[1] + b[1], a[2] + b[2]], cross = (a: V, b: V): V => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
 const dot = (a: V, b: V) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2], un = (a: V): V => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };
@@ -43,7 +43,7 @@ function curve(tab: [number, number][]): (x: number) => number { const n = tab.l
 
 // ---- the lines along the car ----
 /** the front's top face: two straight runs (28 degrees over the lamps, 12 behind them), falling a little toward the sides */
-const ZF = lin([[50, 385], [520, 632], [XA, 768]]), zTopF = (x: number, y: number) => ZF(x) - 28 * (y / 900) ** 2;
+const ZF = lin([[50, 385], [520, 632], [XA, 768]]), zTopF = (x: number, y: number) => ZF(x) - 30 * (Math.max(0, y - 430) / 470) ** 2;   // the lid dead flat, the wings falling a little
 /** the nose in plan: every line round it is a super-ellipse from its foremost point to the front arch (x XJ) */
 const NP = 5, g = (f: number) => 1 - (1 - Math.min(1, f) ** NP) ** (1 / NP), ginv = (v: number) => (1 - (1 - Math.max(0, Math.min(1, v))) ** NP) ** (1 / NP);
 const KX0 = 50, KW = WJ - 50, crestX = (y: number) => KX0 + (XJ - KX0) * g(y / KW);
@@ -52,16 +52,16 @@ const YC = [0, 170, 330, 430, 450, 600, 720, 770], NC = YC.length, YP = YC[NC - 
 const W = curve([[XJ, WJ], [1000, 915], [1400, 922], [2000, 945], [2500, 970], [3000, 1000], [3400, 1018], [RX, 1020], [3900, 1012], [4100, 992], [4250, 965], [4300, 948], [S1, 925]]);
 /** K: the flank's top edge (the wing's crest, the door's top, the rear shoulder): 50 in from the widest line */
 const yK = (x: number) => x <= XJ ? KW * ginv((x - KX0) / (XJ - KX0)) : W(x) - 50;
-const ZK1 = lin([[XA, zTopF(XA, W(XA) - 50)], [1240, 715], [1400, 635]]), ZK2 = curve([[1400, 635], [1560, 678], [1750, 730], [1900, 758], [2100, 775], [2300, 786], [2500, 800], [2700, 830], [3000, 862], [3550, 890], [4000, 895], [S1, 888]]);
+const ZK1 = lin([[XA, zTopF(XA, W(XA) - 50)], [1240, 712], [1400, 664]]), ZK2 = lin([[1400, 664], [1470, 670], [2500, 778], [2700, 795], [3000, 822], [3262, 842], [3650, 872], [4000, 884], [S1, 884]]);
 const zK = (x: number) => x <= XA ? zTopF(x, yK(x)) : x <= 1400 ? ZK1(x) : ZK2(x);
 /** Q: the crease on the widest line, this far below K */
-const dQ = (x: number) => 38 + 47 * sm(XA, 1400, x);
+const ZQ = lin([[1400, 575], [1500, 592], [2580, 730], [3250, 790], [4000, 800], [S1, 798]]), dQ = (x: number) => x <= XA ? 38 : x < 1400 ? lerp(38, zK(1400) - 575, sm(XA, 1400, x)) : zK(x) - ZQ(x);
 /** G: the side glass's foot, then the foot of the slope outboard of the buttress: inboard of K and a little above it */
-const gW = lin([[XA, W(XA) - 50 - YP], [1240, 80], [1400, 55], [2500, 55], [3000, 45], [S1, 45]]), DG0 = zTopF(XA, YP) - zTopF(XA, W(XA) - 50);
-const ptG = (x: number): V => [x, yK(x) - gW(x), zK(x) + lerp(DG0, 14, sm(XA, 1240, x))];
+const gW = lin([[XA, W(XA) - 50 - YP], [1240, 105], [1400, 120], [2500, 120], [3000, 100], [3650, 60], [S1, 45]]), DG0 = zTopF(XA, YP) - zTopF(XA, W(XA) - 50);
+const ptG = (x: number): V => [x, yK(x) - gW(x), zK(x) + lerp(DG0, 0.3 * gW(x), sm(XA, 1240, x))];
 /** the roof: its centre line, a slight crown, its front edge bowed forward at the centre */
-const ZR = curve([[1720, 1068], [1850, 1086], [2000, 1096], [2200, 1103], [2450, 1105], [2600, 1101], [XR1, 1094]]), YD = 490, zRoof = (x: number, y: number) => ZR(x) - 12 * (y / YD) ** 2;
-const xRoof = (s: number, y: number) => s - 70 * (1 - (y / YD) ** 2) * (1 - (s - XR0) / (XR1 - XR0));
+const ZR = curve([[1780, 1056], [1900, 1075], [2000, 1087], [2200, 1099], [2450, 1105], [2600, 1101], [XR1, 1094]]), YD = 490, zRoof = (x: number, y: number) => ZR(x) - 12 * (y / YD) ** 2;
+const xRoof = (s: number, y: number) => s - 60 * (1 - (y / YD) ** 2) * (1 - (s - XR0) / (XR1 - XR0));
 /** the buttress ridge (from the roof's edge to the tail), its outer edge in plan, and the engine cover between the ridges */
 const ZB = curve([[XR1, zRoof(XR1, YD)], [3000, 1060], [3500, 1018], [4000, 962], [S1, 905]]), YRO = curve([[XR1, YD], [3000, 505], [3400, 560], [4000, 700], [S1, 790]]), YRI = 458, YCV = 450, XCV = 2725;
 const ZCV = curve([[XCV, 955], [3300, 940], [4000, 915], [S1, 897]]);
@@ -145,13 +145,16 @@ export function diabloMesh(spin = 0, lamps = 0, wing = 0): Mesh { const b = new 
   // the ledge between G and K (from the screen's corner back), with a guard beside K
   const LG: V[][] = SF.slice(at(XA)).map((x, k) => { if (!k) return TF[NT - 1]!.slice(NC - 1); const G = ptG(x), K = CH[at(XA) + k]![0]!; return [G, mix(G, K, 1 - 15 / (K[1] - G[1])), K]; });
   // the upper side: E, the rail T, two points down the glass (or the slope), G
-  const upper = (x: number): V[] => { const E = ptE(x), T = ptT(x), G = ptG(x), bl = 12 * (1 - sm(2520, XR1, x)) * sm(XA, 1400, x), out = (u: number): V => { const p = mix(T, G, u); return [p[0], p[1] + bl * 0.7, p[2] + bl * 0.7]; }; const qg = x >= 2520 && x <= 2990; return [E, T, out(qg ? lerp(0.05, 0.9, ((x - 2520) / 470) ** 1.1) : 1 / 3), out(qg ? 0.92 : 2 / 3), G]; };
+  // (the door glass bulges a little; behind the door the slope is flat between a narrow strip at the rail and one at its foot)
+  const upper = (x: number): V[] => { const E = ptE(x), T = ptT(x), G = ptG(x), bl = 12 * (1 - sm(2450, 2520, x)) * sm(XA, 1400, x), out = (u: number): V => { const p = mix(T, G, u); return [p[0], p[1] + bl * 0.7, p[2] + bl * 0.7]; }, back = x >= 2520; return [E, T, out(back ? 0.12 : 1 / 3), out(back ? 0.88 : 2 / 3), G]; };
+  /** a point on the slope behind the door: u from the rail (0) to its foot (1), lifted off the surface */
+  const onSlope = (x: number, u: number, lift: number): V => { const T = ptT(x), G = ptG(x), n = un(cross(sub(ptT(x + 60), T), sub(G, T))), p = mix(T, G, u); return [p[0] + n[0] * lift, p[1] + n[1] * lift, p[2] + n[2] * lift]; };
   const US: V[][] = SF.slice(at(XA)).map(upper);
   // the roof: eight columns matching the screen's, rows at the stations
   const yRf = YC.map(y => y * YD / YP), SR = SF.slice(at(XR0), at(XR1) + 1), RFG: V[][] = SR.map(s => yRf.map(y => { const x = xRoof(s, y); return [x, y, zRoof(x, y)] as V; }));
   // the screen: from the front top's last row to the roof's first, bulging a little; its last column is the pillar
   const VS = [0, 0.07, 0.3, 0.55, 0.8, 0.95, 1], sFoot = TF[NT - 1]!.slice(0, NC), sTop = RFG[0]!;
-  const SCR: V[][] = VS.map(v => sFoot.map((p, j) => { const q = mix(p, sTop[j]!, v), bl = 26 * 4 * v * (1 - v) * (1 - (j / (NC - 1)) ** 2); return [q[0] - bl * 0.4, q[1], q[2] + bl * 0.92] as V; }));
+  const SCR: V[][] = VS.map(v => sFoot.map((p, j) => { const q = mix(p, sTop[j]!, v), bl = 10 * 4 * v * (1 - v) * (1 - (j / (NC - 1)) ** 2); return [q[0] - bl * 0.4, q[1], q[2] + bl * 0.92] as V; }));
   // the deck behind the roof: the engine cover (three points), the ridge (two)
   const SD = SF.slice(at(XR1)), RD: V[][] = SD.map((x, k) => { const xc = k ? x : XCV, zc = ZCV(xc); return [[xc, 0, zc], [xc, 235, zc], [xc, YCV, zc], [x, YRI, ZB(x) + 1.5 * (1 - sm(XR1, 3400, x))], ptE(x)]; });
 
@@ -173,16 +176,24 @@ export function diabloMesh(spin = 0, lamps = 0, wing = 0): Mesh { const b = new 
   b.name('screenPane').mat(GLASS, 0.5, 'glass'); cells(SCR, (i, j) => i >= 1 && i < 5 && j < NC - 2);
   b.name('screenFrame').mat(FRAME, 0.2); cells(SCR, (i, j) => !(i >= 1 && i < 5 && j < NC - 2)); cells(US, (i, j) => i + iA < at(1240) && j > 0);
   b.name('sidePane').mat(GLASS, 0.5, 'glass'); cells(US, (i, j) => i + iA >= at(1240) && i + iA < at(2450) && j > 0);
-  // the upper intake behind the quarter glass: cut out of the slope
-  const iU0 = at(3120) - iA, iU1 = at(3450) - iA, iQ0 = at(2520) - iA, iQ1 = at(2990) - iA, isQG = (i: number, j: number) => i >= iQ0 && i < iQ1 && j === 2, isUp = (i: number, j: number) => i >= iU0 && i < iU1 && (j === 1 || j === 2);
-  b.name('buttress').mat(PAINT, GLOSS, 'paint'); cells(US, (i, j) => i + iA >= at(2520) && (j > 0 || i + iA >= iR) && !isUp(i, j) && !isQG(i, j));
-  // the quarter glass on the slope behind the door glass, tapering to a point; a dark plate behind it
-  b.name('quarterPane').mat(GLASS, 0.5, 'glass'); cells(US, isQG);
-  b.name('quarterPane').mat(DARK, 0.05); cells(US.map(r => r.map(p => [p[0], p[1] - 30, p[2] - 40] as V)), isQG);
-  b.name('buttress').mat(PAINT, GLOSS, 'paint'); cells(RD, (_, j) => j >= 2);
+  // the slope outboard of each buttress ridge, with the upper intake's hole (a channel sinking back to a slanted mouth)
+  const iU0 = at(3120) - iA, iU1 = at(RX) - iA, iUM = at(3450) - iA, isUp = (i: number, j: number) => i >= iU0 && i < iU1 && j === 2;
+  b.name('buttress').mat(PAINT, GLOSS, 'paint'); cells(US, (i, j) => i + iA >= at(2520) && (j > 0 || i + iA >= iR) && !isUp(i, j)); cells(RD, (_, j) => j >= 2);
   b.name('engineCover').mat(PAINT, GLOSS, 'paint'); cells(RD, (i, j) => j < 2 && i + iR < at(4150)); b.name('deck').mat(PAINT, GLOSS, 'paint'); cells(RD, (i, j) => j < 2 && i + iR >= at(4150));
-  b.name('grille'); for (const sg of [1, -1]) { const r = border(US, iU0, iU1, 1, 3).map(p => mir(p, sg)); pocket(r, [0, -sg * 45, -75], [0, sg * 0.5, 0.86]);
-    b.name('grille').mat(FRAME, 0.2); for (const u of [0.3, 0.55, 0.8]) { const p = mix(US[iU0]![1]!, US[iU1]![1]!, u), q = mix(US[iU0]![3]!, US[iU1]![3]!, u), dn: V = [0, -sg * 14, -24]; b.bar(add(mir(p, sg), dn), add(mir(q, sg), dn), 16, 8); } }
+  for (const sg of [1, -1]) { const m = (p: V) => mir(p, sg), dn = (p: V, k: number): V => { const n = un(cross(sub(US[iU1]![2]!, US[iU0]![2]!), sub(US[iU0]![3]!, US[iU0]![2]!))); return [p[0] + n[0] * k, p[1] + n[1] * k, p[2] + n[2] * k]; };
+    const A2 = US[iU0]![2]!, A3 = US[iU0]![3]!, M2 = US[iUM]![2]!, M3 = US[iU1]![3]!, DEP = -85 * Math.sign(dn([0, 0, 0], 1)[2]), F2 = dn(M2, DEP), F3 = dn(M3, DEP), up: V = [0, sg * 0.4, 0.9];
+    const fl = (a: V, f: V, e: V, p: V): V => mix(a, f, Math.min(1, (p[0] - a[0]) / (e[0] - a[0])));   // the floor's edge under a point of the hole's border
+    b.name('intakeUpper').mat(PAINT, GLOSS, 'paint'); face(b, m(A2), m(A3), m(F3), m(F2), up);
+    for (let i = iU0; i < iU1; i++) { const p = US[i]![3]!, q = US[i + 1]![3]!; face(b, m(p), m(q), m(fl(A3, F3, M3, q)), m(fl(A3, F3, M3, p)), [0, -sg, 0]); }
+    for (let i = iU0; i < iUM; i++) { const p = US[i]![2]!, q = US[i + 1]![2]!; face(b, m(p), m(q), m(fl(A2, F2, M2, q)), m(fl(A2, F2, M2, p)), [0, sg, 0]); }
+    for (let i = iUM; i + 1 < iU1; i++) tri(b, m(US[i]![2]!), m(US[i + 1]![2]!), m(M3), up); tri(b, m(US[iU1 - 1]![2]!), m(US[iU1]![2]!), m(M3), up);
+    b.name('grille').mat(DARK, 0.05, 'grille'); face(b, m(M2), m(M3), m(F3), m(F2), [-1, 0, 0.3]);
+    b.name('grille').mat(FRAME, 0.2); for (const u of [0.33, 0.66]) b.bar(m(mix(mix(M2, F2, 0.1), mix(M3, F3, 0.1), u)), m(mix(mix(M2, F2, 0.95), mix(M3, F3, 0.95), u)), 14, 10);
+    // the quarter glass laid on the slope behind the door glass: a dark plate, the pane on it, its back edge raked
+    const QG: [number, number, number][] = [[2562, 0.1, 0.9], [XR1, 0.1, 0.9], [2800, 0.1, 0.9], [2990, 0.733, 0.9], [3040, 0.9, 0.9]];
+    for (const [nm, lift, grow] of [['quarterFrame', 3, 16], ['quarterPane', 6, 0]] as const) { if (grow) b.name(nm).mat(FRAME, 0.2); else b.name(nm).mat(GLASS, 0.5, 'glass');
+      const P = QG.map(([x, u0, u1], k) => { const gx = grow * (k === 0 ? -1 : k >= 3 ? 1.6 : 0), gu = grow / 330; return [onSlope(x + gx, Math.max(0.02, u0 - gu * (k >= 3 ? 2.2 : 1)), lift), onSlope(x + gx, Math.min(0.98, u1 + gu), lift)] as [V, V]; });
+      for (let k = 0; k + 1 < P.length; k++) { if (k + 2 < P.length) face(b, m(P[k]![0]), m(P[k + 1]![0]), m(P[k + 1]![1]), m(P[k]![1]), up); else tri(b, m(P[k]![0]), m(P[k + 1]![1]), m(P[k]![1]), up); } } }
 
   // ---- the front bumper's cuts: the centre intake, a brake duct each side ----
   b.name('grille'); { const r = border(NBP, 0, 2, 3, 4), full = [...r.slice(0, -1), ...r.slice(1, -1).reverse().map(p => mir(p, -1))]; pocket([...border(NBP, 0, 2, 3, 4).slice(1, 6), ...border(NBP, 0, 2, 3, 4).slice(1, 6).reverse().map(p => mir(p, -1))], [110, 0, 0], [-1, 0, 0], 'grille'); void full; }

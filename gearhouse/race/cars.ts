@@ -47,7 +47,7 @@ export interface RaceSpec {
     wing?: { up: number; down: number; clA: number; cdA: number; body: number }; power?: boolean; tyreWF?: number; tyreWR?: number;
     /** review 147: the front axle's share of the roll stiffness (an anti-roll bar added at the front to reach it); unset: the springs' own */ rollF?: number;
     /** review 149: the car's own traction control: the driven wheels' slip against the undriven ones' speed; above `slip`
-     *  a second throttle closes (up to `cut` of the driver's opening) over `tau` s, and opens again twice as slowly */
+     *  a second throttle closes (up to `cut` of the driver's opening) over `tau` s, and opens again over 1.5 tau */
     tcs?: { slip: number; tau: number; cut: number };
     /** review 149: variable valve timing and lift: two cam profiles, the low one below `rpm` (with `hyst` rpm of hysteresis
      *  coming back down), the high one above. The low cam's torque peak (Nm, rpm); the high cam's torque peak revs (its

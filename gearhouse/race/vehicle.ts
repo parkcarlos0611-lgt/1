@@ -209,7 +209,7 @@ export class Vehicle {
     // traction control (review 149, a period system): the faster rear wheel's speed against the undriven fronts' (the car's
     // speed over the road), slip = (w_rear R - v_ref) / max(v_ref, 2 m/s). Past the threshold the throttle actuator closes
     // toward cut x min(1, (slip - slip0) / slip0) of the driver's opening with a lag of tau (the sensors, the ECU, the
-    // actuator's travel), and opens again twice as slowly, so it overshoots and hunts a little as the real ones did.
+    // actuator's travel), and opens again over 1.5 tau, so it overshoots and hunts a little as the real ones did.
     let thrE = thr; if (X?.tcs && this.tcsEnabled && !fF) { const S = X.tcs, vref = Math.max(0, (this.w[0]! + this.w[1]!) / 2 * R), slip = (Math.max(this.w[2]!, this.w[3]!) * R - vref) / Math.max(vref, 2);
       const want = thr > 0.02 ? S.cut * Math.max(0, Math.min(1, (slip - S.slip) / S.slip)) : 0, tau = want > this.tcsCut ? S.tau : S.tau * 1.5;
       this.tcsCut += (want - this.tcsCut) * Math.min(1, dt / tau); thrE = thr * (1 - this.tcsCut); } else this.tcsCut = 0;

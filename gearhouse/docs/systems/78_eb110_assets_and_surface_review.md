@@ -153,3 +153,21 @@
 - 이 환경에서 polyhaven.com(dl.polyhaven.org), ambientcg.com 내려받기 허용
 - 렌더러: 지면용 재질 배열(텍스처 배열에 4~5 재질 × 4 맵), 높이 블렌드 셰이더, KTX2 디코더(또는 처음엔 JPG)
 - 페이지: 텍스처를 별도 파일로 올려 불러오는 구조
+
+## 진행 (검토 124): 여러 파일 페이지, 사진 콘크리트, HDRI 하늘
+- **여러 파일 페이지** (tools/ref/buildsite.mjs): 페이지, 스크립트(app.js), 그림 파일을 따로 낸다. 지금 38개 파일에
+  9.1 MB이고 가장 큰 파일은 0.6 MB다. 그림은 페이지가 뜬 뒤 불러온다.
+- **사진 콘크리트** (tools/ref/polyhaven.py, assets/textures/ground, 6.2 MB): Poly Haven CC0 1K 일곱 재질.
+  - 재질: granular_concrete, gravel_concrete, cracked_concrete, tarred_gravel, asphalt_track, concrete_moss,
+    rough_concrete
+  - 각 재질은 색, 노멀, 묶음(AO, 거칠기, 높이) 세 장이다. 트랙 좌표로 깔고, 구획마다 오프셋이 다르다.
+  - 셰이더의 그림은 마스크로만 쓴다: 이음매와 메운 균열의 타르(낮은 곳부터), 고무 라인, 오일, 가장자리 이끼(오목한
+    곳부터), 출발선 횟가루(골재 꼭대기에만).
+  - 사진의 색은 평균(가장 작은 밉)으로 나눠 디테일만 쓰고, 게임의 콘크리트 색을 지킨다.
+  - 휴대폰은 512로 내려 쓴다.
+- **HDRI 하늘** (tools/ref/sky.py, assets/textures/sky, 437 KB): Poly Haven CC0 kloofendal_48d_partly_cloudy.
+  - 해를 잘라 내고(렌더러의 해가 직접광과 반짝임을 맡는다), 렌더러의 해 방향으로 돌리고, 밝기를 맞췄다.
+  - 지평선 아래 바위 땅은 회녹색 들판으로 바꿨다(나무와 집이 있는 지평선은 남김).
+  - 거칠기 네 단계로 흐리게 해 반사에 쓰고, 9개 구면 조화 계수를 주변광에 쓴다.
+- 비교 스위치: 사진 콘크리트, HDRI 하늘
+- 이 환경에서 Poly Haven은 내려받을 수 있고, ambientCG와 Poly Haven 썸네일 서버는 막혀 있다.

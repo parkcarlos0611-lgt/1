@@ -11,6 +11,7 @@ import { millbrookScenery, type Placed } from '../race/scenery';
 import { PROPS } from '../render/props/index';
 import { renumber, wheelsOf, type Mesh } from '../render/car/mesh';
 import { Damage } from '../race/damage';
+import { loadGround, loadSky } from '../render/live/groundtex';
 import { LiveRenderer } from '../render/live/renderer';
 import { groundData, fenceData } from '../render/live/ground';
 import { Smoke, type SmokeKind } from '../race/smoke';
@@ -36,7 +37,7 @@ import specsData from '../data/cars/specs.json';
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const T = millbrook(), cv = $<HTMLCanvasElement>('view'), main = cv.getContext('2d')!; let ctx = main;
 // the layer behind the player's car: the ground, the scenery and the other cars, smeared along the motion; the car stays sharp
-const bg = document.createElement('canvas'), bgx = bg.getContext('2d')!; let lampsOn = false, blurOn = true, lastCamX = 0, lastCamY = 0, shake = 0;
+const bg = document.createElement('canvas'), bgx = bg.getContext('2d')!; let lampsOn = false, photoOn = true, hdriOn = true, blurOn = true, lastCamX = 0, lastCamY = 0, shake = 0;
 let SP = Math.sin(30 * Math.PI / 180), CP = Math.cos(30 * Math.PI / 180), pitchDeg = 30; const DT = 1 / 200, START = T.spec.landmarks.find(l => l.kind === 'line')!.s;
 let VW = 768, VH = 432, mm = 50;                                               // the picture's own pixels, millimetres a pixel
 const st = { auto: true, assist: false, pilot: false, chase: false, progressive: false, cine: false, free: false };
@@ -61,7 +62,7 @@ const meshOf = (id: string, num: string) => renumber(MESH_CARS.find(c => c.id ==
 const numOf = (e: Entrant): string => { if (!race) return myNum; let k = 0; for (const x of race.cars) { if (x === race.player) continue; k++; if (String(k) === myNum) k++; if (x === e) return String(k); } return myNum; };
 // ---- the live renderer (review 99): the scene drawn every frame by WebGL2, where the browser has it; the baked pictures otherwise ----
 const glCanvas = document.createElement('canvas'); let live: LiveRenderer | null = null, liveFence = -1;
-try { live = new LiveRenderer(glCanvas); live.setGround(groundData(T, SCN, START)); live.setTrack(T.length, T.spec.width, T.spec.joints, START, rubberLine(T)); } catch (e) { console.warn('live renderer unavailable', e); live = null; }
+try { live = new LiveRenderer(glCanvas); live.setGround(groundData(T, SCN, START)); live.setTrack(T.length, T.spec.width, T.spec.joints, START, rubberLine(T)); const L0 = live; void loadGround(L0, matchMedia('(pointer: coarse)').matches ? 512 : 1024).catch(e => console.warn('ground materials', e)); void loadSky(L0).catch(e => console.warn('sky', e)); } catch (e) { console.warn('live renderer unavailable', e); live = null; }
 // the PBR detail textures (Poly Haven, CC0): loaded once, laid on when ready
 if (live) { const L = live, im = [texAlb, texNor, texRgh].map(src => { const i = new Image(); i.src = src; return i; });
   void Promise.all(im.map(i => i.decode())).then(() => L.setTextures(im[0]!, im[1]!, im[2]!, (texMeta as { layers: { size_m: number; luma_mean: number; rough_mean: number }[] }).layers)).catch(e => console.warn('textures', e)); }
@@ -103,10 +104,10 @@ function drawLive(el: number) { const L = live!; void el;
   ctx = main; main.clearRect(0, 0, VW, VH);
   if (look === 'split') {   // the three looks side by side, the same moment: each a third of the picture, its name over it
     const w3 = Math.floor(VW / 3), names = ['기존 (단계 조명)', 'PBR 단계화', 'PBR 연속'];
-    for (let k = 0; k < 3; k++) { L.render(view, cars, props, skids, { glass: 0.8, look: k, art: artOn, rays: raysOn, texK, lightK, aoK, reflK, bloomK, deep, day, dof, mb: blurOn ? mbK : 0, outW, outK, inner: innerOn === 'auto' ? undefined : innerOn === 'on', inK, smoke: { p: sp8, n: smoke.parcels.length, time: smoke.time } }); main.drawImage(glCanvas, k * w3, 0, w3, VH, k * w3, 0, w3, VH); }
+    for (let k = 0; k < 3; k++) { L.render(view, cars, props, skids, { glass: 0.8, look: k, art: artOn, rays: raysOn, texK, lightK, aoK, reflK, bloomK, deep, day, photoGround: photoOn, hdri: hdriOn, dof, mb: blurOn ? mbK : 0, outW, outK, inner: innerOn === 'auto' ? undefined : innerOn === 'on', inK, smoke: { p: sp8, n: smoke.parcels.length, time: smoke.time } }); main.drawImage(glCanvas, k * w3, 0, w3, VH, k * w3, 0, w3, VH); }
     main.fillStyle = 'rgba(0,0,0,0.55)'; main.fillRect(0, VH - 20, VW, 20); main.fillStyle = '#f2ead6'; main.font = '11px sans-serif'; main.textAlign = 'center';
     for (let k = 0; k < 3; k++) main.fillText(names[k]!, k * w3 + w3 / 2, VH - 6); main.fillStyle = '#000'; for (let k = 1; k < 3; k++) main.fillRect(k * w3 - 1, 0, 2, VH); main.textAlign = 'left'; }
-  else { L.render(view, cars, props, skids, { glass: 0.8, look: look === 'stepped' ? 1 : look === 'pbr' ? 2 : 0, art: artOn, rays: raysOn, texK, lightK, aoK, reflK, bloomK, deep, day, dof, mb: blurOn ? mbK : 0, outW, outK, inner: innerOn === 'auto' ? undefined : innerOn === 'on', inK, smoke: { p: sp8, n: smoke.parcels.length, time: smoke.time } }); main.drawImage(glCanvas, 0, 0); }
+  else { L.render(view, cars, props, skids, { glass: 0.8, look: look === 'stepped' ? 1 : look === 'pbr' ? 2 : 0, art: artOn, rays: raysOn, texK, lightK, aoK, reflK, bloomK, deep, day, photoGround: photoOn, hdri: hdriOn, dof, mb: blurOn ? mbK : 0, outW, outK, inner: innerOn === 'auto' ? undefined : innerOn === 'on', inK, smoke: { p: sp8, n: smoke.parcels.length, time: smoke.time } }); main.drawImage(glCanvas, 0, 0); }
   drawDebris(el);
   if (car.speed > 30) { const v = Math.min(1, (car.speed - 30) / 30) * 0.35, g = main.createRadialGradient(VW / 2, VH / 2, VH * 0.35, VW / 2, VH / 2, VW * 0.62); g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, `rgba(0,0,0,${v})`); main.fillStyle = g; main.fillRect(0, 0, VW, VH); } }
 
@@ -411,6 +412,8 @@ const setCine = (on: boolean) => { st.cine = on; ($('cine') as HTMLInputElement)
 $<HTMLInputElement>('cine').addEventListener('change', e => setCine((e.target as HTMLInputElement).checked));
 $<HTMLInputElement>('blur').addEventListener('change', e => { blurOn = (e.target as HTMLInputElement).checked; });
 $<HTMLInputElement>('lamps').addEventListener('change', e => { lampsOn = (e.target as HTMLInputElement).checked; });   /* the head lamps (review 117) */
+$<HTMLInputElement>('photoGround').addEventListener('change', e => { photoOn = (e.target as HTMLInputElement).checked; });   /* review 124 */
+$<HTMLInputElement>('hdri').addEventListener('change', e => { hdriOn = (e.target as HTMLInputElement).checked; });
 $<HTMLInputElement>('progressive').addEventListener('change', e => { st.progressive = (e.target as HTMLInputElement).checked; document.body.classList.toggle('progressive', st.progressive); });
 $<HTMLInputElement>('sound').addEventListener('change', e => { if ((e.target as HTMLInputElement).checked) { snd = new Sound(); snd.volume = +$<HTMLInputElement>('vol').value; } else { snd?.close(); snd = null; } });
 $<HTMLInputElement>('vol').addEventListener('input', e => { if (snd) snd.volume = +(e.target as HTMLInputElement).value; });

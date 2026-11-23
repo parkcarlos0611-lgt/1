@@ -38,7 +38,16 @@ uniform int uLmpN; uniform vec3 uLmpP[8], uLmpD[8];   // the head lamps alight (
 vec3 lampsAt(vec3 p, vec3 n) { vec3 s = vec3(0.); for (int i = 0; i < 8; i++) { if (i >= uLmpN) break; vec3 d = p - uLmpP[i]; float l = length(d); vec3 dl = d / max(l, 1e-3); float c = dot(dl, uLmpD[i]);
     float cone = smoothstep(0.94, 0.99, c) * 0.75 + smoothstep(0.72, 0.95, c) * 0.25; s += vec3(1., 0.86, 0.66) * 26. * cone * max(0., dot(n, -dl)) / (l * l + 0.6); } return s; }
 uniform float uDeep;   // the colour's depth (review 116): 0 as before, 1 as set, 2 the most
-vec3 skyR(vec3 r, float rough) { float z = r.z, soft = 0.02 + rough * 0.5;
+/* the photographed sky (review 124): a CC0 HDRI, four levels by roughness, RGBM; and its light on a surface as nine
+   spherical-harmonic numbers per colour. Off (uSkyOn 0) the drawn sky below stands in */
+uniform highp sampler2DArray uSky; uniform int uSkyOn; uniform float uSkyR; uniform vec3 uSH[9];
+vec3 skyTex(vec3 r, float rough) { vec2 uv = vec2(atan(r.y, r.x) / 6.2831853 + 0.5, acos(clamp(r.z, -1., 1.)) / 3.14159265);
+  float lv = rough < 0.25 ? rough / 0.25 : rough < 0.5 ? 1. + (rough - 0.25) / 0.25 : 2. + min(1., (rough - 0.5) / 0.3); int l0 = int(floor(lv)), l1 = min(3, l0 + 1);
+  vec4 a = texture(uSky, vec3(uv, float(l0))), b = texture(uSky, vec3(uv, float(l1))); vec3 ca = a.rgb * a.rgb * a.a * uSkyR, cb = b.rgb * b.rgb * b.a * uSkyR; return mix(ca, cb, fract(lv)); }
+vec3 shIrr(vec3 n) { float x = n.x, y = n.y, z = n.z; vec3 e = 3.14159265 * 0.282095 * uSH[0] + 2.0943951 * 0.488603 * (uSH[1] * y + uSH[2] * z + uSH[3] * x)
+    + 0.785398 * (1.092548 * (uSH[4] * x * y + uSH[5] * y * z + uSH[7] * x * z) + 0.315392 * uSH[6] * (3. * z * z - 1.) + 0.546274 * uSH[8] * (x * x - y * y)); return max(e, vec3(0.)) / 3.14159265; }
+vec3 skyR(vec3 r, float rough) { if (uSkyOn == 1) return (0.025 + 0.975 * uDay) * mix(vec3(0.75, 0.82, 1.), vec3(1.), uDay) * skyTex(r, rough);
+  float z = r.z, soft = 0.02 + rough * 0.5;
   vec3 field = toLin(vec3(96., 104., 74.) / 255.), far = toLin(vec3(58., 66., 50.) / 255.), haze = toLin(vec3(222., 224., 220.) / 255.), top = toLin(vec3(120., 152., 200.) / 255.);
   vec3 sky = mix(haze, top, smoothstep(0.02, 0.7, z));
   float cl = vL(r.xy / (z + 0.12) * 1.7) * 0.6 + vL(r.xy / (z + 0.12) * 4.3 + 7.) * 0.4; cl = smoothstep(0.5, 0.78, cl) * smoothstep(0.03, 0.3, z) * (1. - smoothstep(0.05, 0.45, rough));
@@ -47,7 +56,7 @@ vec3 skyR(vec3 r, float rough) { float z = r.z, soft = 0.02 + rough * 0.5;
   vec3 low = mix(far, field, smoothstep(0., 0.35, -z));
   vec3 c = mix(low, sky, smoothstep(tree - soft, tree + soft, z));
   return (0.025 + 0.975 * uDay) * mix(vec3(0.75, 0.82, 1.), vec3(1.), uDay) * mix(c, mix(field, sky, smoothstep(-0.3, 0.5, z)), smoothstep(0.1, 0.6, rough)); }
-vec3 irradiance(vec3 n) { return (0.025 + 0.975 * uDay) * (1.3 - 0.3 * uLightK) * mix(toLin(ENV_GROUND), toLin(mix(ENV_HOR, ENV_TOP, 0.55)), 0.5 + 0.5 * n.z); }
+vec3 irradiance(vec3 n) { if (uSkyOn == 1) return (0.025 + 0.975 * uDay) * (1.3 - 0.3 * uLightK) * shIrr(n); return (0.025 + 0.975 * uDay) * (1.3 - 0.3 * uLightK) * mix(toLin(ENV_GROUND), toLin(mix(ENV_HOR, ENV_TOP, 0.55)), 0.5 + 0.5 * n.z); }
 float D_GGX(float nh, float a) { float a2 = a * a, d = nh * nh * (a2 - 1.) + 1.; return a2 / (3.14159 * d * d); }
 float V_Smith(float nv, float nl, float a) { float k = a * 0.5; return 0.25 / ((nv * (1. - k) + k) * (nl * (1. - k) + k)); }
 vec2 envBRDF(float nv, float r) { vec4 rr = r * vec4(-1., -0.0275, -0.572, 0.022) + vec4(1., 0.0425, 1.04, -0.04); float a = min(rr.x * rr.x, exp2(-9.28 * nv)) * rr.x + rr.y; return vec2(-1.04, 1.04) * a + rr.zw; }
@@ -276,11 +285,20 @@ float fb2(vec2 p) { return vn2(p) * 0.5 + vn2(p * 2.1 + 3.) * 0.3 + vn2(p * 4.3 
 vec2 cracks(vec2 p) { vec2 i = floor(p), f = fract(p); float d1 = 9., d2 = 9.; float id = 0.;
   for (int y = -1; y <= 1; y++) for (int x = -1; x <= 1; x++) { vec2 g = vec2(x, y), o = vec2(hs(i + g), hs(i + g + 17.)) * 0.9, r = g + o - f; float d = dot(r, r); if (d < d1) { d2 = d1; d1 = d; id = hs(i + g + 3.); } else if (d < d2) d2 = d; }
   return vec2(sqrt(d2) - sqrt(d1), id); }
-struct Conc { vec3 tint; float rough; float h; float paint; };
+/* ---- the photographed materials (review 124, Poly Haven CC0): 0 the slab, 1 a second pour, 2 cracked concrete, 3 tar,
+   4 rubbered track, 5 moss, 6 whitewash; each sampled in the track's own axes (metres along and across), each bay its
+   own offset (the pours differ, and the joint hides the seam); laid over one another by masks and by height (tar fills
+   the low ground first, moss grows in the hollows, whitewash keeps to the tops of the stones) ---- */
+uniform highp sampler2DArray uGAlb, uGNor, uGPack; uniform int uGTex; uniform float uGSize[7];
+struct GS { vec3 a; vec3 n; vec3 p; };
+/** a layer's picture as detail about its own mean (the smallest mip): 1 on average, its light and dark and a little of its colour; the game keeps its own colours */
+vec3 rel(vec3 a, int L) { vec3 m = textureLod(uGAlb, vec3(0.5, 0.5, float(L)), 12.).rgb; float lm = max(0.03, dot(m, vec3(0.3, 0.59, 0.11))), la = dot(a, vec3(0.3, 0.59, 0.11)); return mix(vec3(la), a, 0.15) / lm; }
+GS gs(int L, vec2 st, vec2 off) { vec3 q = vec3(st / uGSize[L] + off, float(L)); GS g; g.a = rel(texture(uGAlb, q).rgb, L); g.n = texture(uGNor, q).rgb * 2. - 1.; g.p = texture(uGPack, q).rgb; return g; }
+struct Conc { vec3 tint; float rough; float h; float paint; float hb; float hb2; float cracked; float sealed; float joint; float rub; float oil; float edge; float edgeDark; float line; float mend; float dl; vec3 bay; };
 Conc concrete(float s, float o) { Conc C; C.tint = vec3(1.); C.rough = 0.9; C.h = 0.; C.paint = 0.;
   float W2 = uTW / 2., sw = uTW / 9., u = mod(s, uJoint), v = o + W2, bi = floor(v / sw), bj = floor(s / uJoint), bv = mod(v, sw);
   float hb = hs(vec2(bi, bj)), hb2 = hs(vec2(bj, bi) + 7.);
-  C.tint *= 1. + (hb - 0.5) * 0.08; C.tint *= mix(vec3(1.), vec3(1.03, 1.0, 0.95), hb2);   /* each bay its own pour */
+  C.tint *= 1. + (hb - 0.5) * 0.08; C.tint *= mix(vec3(1.), vec3(1.03, 1.0, 0.95), hb2); C.bay = C.tint;   /* each bay its own pour */
   C.rough = 0.86 + (hb2 - 0.5) * 0.1; C.h += (hb - 0.5) * 0.003;   /* a bay proud or sunk a millimetre or two */
   // tar in the joints, and smeared over them here and there
   float dj = min(u, uJoint - u), dl = min(bv, sw - bv), smear = 0.04 + 0.09 * smoothstep(0.45, 0.8, vn2(vec2(s * 0.8, o * 0.8) + 11.));
@@ -313,19 +331,42 @@ Conc concrete(float s, float o) { Conc C; C.tint = vec3(1.); C.rough = 0.9; C.h 
   float line = smoothstep(0.17, 0.15, ds) * (abs(o) < W2 - 0.05 ? 1. : 0.);
   if (line > 0.) { float worn = clamp(rub * 1.1 + smoothstep(0.55, 0.8, fb2(vec2(s * 9., o * 3.))) * 0.6 + crack, 0., 1.), pnt = line * (1. - worn * 0.75);
     C.tint = mix(C.tint, vec3(1.45, 1.43, 1.36), pnt); C.rough = mix(C.rough, 0.62, pnt); C.h += pnt * 0.0008; C.paint = pnt; }
+  C.hb = hb; C.hb2 = hb2; C.cracked = cracked; C.sealed = sealed; C.joint = max(tarJ, tarL); C.rub = rub; C.oil = oil; C.edge = edge; C.edgeDark = edgeDark; C.line = line; C.mend = mend; C.dl = dl;
   return C; }
 layout(location=0) out vec4 oCol; layout(location=1) out vec4 oId; layout(location=2) out vec4 oN; layout(location=3) out vec4 oV; in vec4 vCur, vPrev; uniform vec2 uSize;
 vec4 velo() { vec2 d = (vCur.xy / vCur.w - vPrev.xy / vPrev.w) * 0.5 * uSize; return vec4(clamp(d / 128. + 0.5, 0., 1.), 0., 1.); }   /* pixels moved since the last frame, packed */   // oN: the normal and how mirror-like (for the traced reflections)
 float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 void main() { vec3 c = vCol.rgb;
   if (vFlag > 0.5 && uLook == 0) { vec2 cell = floor(vWorld.xy / vec2(uCell * 2., uCell)); float h = hash(cell); if (h > 0.955) c = vec3(107., 130., 83.) / 255.; else if (h > 0.91) c = vec3(83., 104., 63.) / 255.; }
-  bool conc = vTrk.z > 0.5; Conc C; if (conc) { C = concrete(vTrk.x, vTrk.y); c *= C.tint; }
+  bool conc = vTrk.z > 0.5; Conc C; bool photo = false; vec3 pa = vec3(0.), pn = vec3(0., 0., 1.); float pao = 1., prough = 0.9;
+  if (conc) { C = concrete(vTrk.x, vTrk.y);
+    if (uGTex == 1 && uLook > 0) { photo = true; vec2 st = vTrk.xy, bo = vec2(C.hb, C.hb2) * 7.31;
+      GS b = gs(C.hb2 > 0.55 ? 1 : 0, st, bo); if (C.cracked > 0.5) { GS k = gs(2, st, bo); b.a = k.a; b.n = k.n; b.p = k.p; }
+      float h = b.p.b; vec3 A = c * C.bay * b.a, N = b.n;   /* the concrete's own colour (lighter where it climbs), the bay's shade, the photograph's detail */ float R = b.p.g, O = b.p.r;
+      // tar: in the joints, smeared over them, and down the cracks of a cracked bay where sealed (the low ground first)
+      float tarCrack = C.cracked * C.sealed * smoothstep(0.42, 0.25, h);
+      float tm = clamp(max(C.joint, tarCrack) + (C.joint > 0.05 ? (0.5 - h) * 0.6 : 0.), 0., 1.);
+      if (tm > 0.) { GS t = gs(3, st, bo * 0.37); A = mix(A, t.a * vec3(0.17, 0.16, 0.15), tm); N = normalize(mix(N, t.n, tm)); R = mix(R, t.p.g * 0.7, tm); O = mix(O, t.p.r, tm); }
+      // the rubber laid by the tyres, and the oil
+      if (C.rub > 0.02) { GS r = gs(4, st, bo * 0.53); float rm = clamp(C.rub * 0.75 + (h - 0.5) * 0.3 * C.rub, 0., 1.); A = mix(A, A * r.a * 0.42, rm * 0.8); R = mix(R, r.p.g * 0.75, rm * 0.7); }
+      A = mix(A, A * vec3(0.42, 0.4, 0.38), C.oil * 0.5); R = mix(R, 0.3, C.oil * 0.7);
+      // moss and grime at the edges, in the hollows first
+      if (C.edge > 0.02) { GS m = gs(5, st, bo * 0.21); float mm = clamp(C.edge * (0.6 + (0.5 - h) * 1.2) * smoothstep(0.35, 0.6, fb2(st * 0.4 + 9.)), 0., 1.); A = mix(A, m.a * vec3(0.3, 0.34, 0.2), mm * 0.85); N = normalize(mix(N, m.n, mm)); R = mix(R, m.p.g, mm); }
+      A = mix(A, A * 0.55, C.edgeDark * 0.6);
+      // the start line's whitewash, on the tops, worn through in the wheel tracks
+      if (C.line > 0.) { GS w = gs(6, st, vec2(0.)); float pm = C.line * clamp(1. - C.rub * 1.2, 0., 1.) * smoothstep(0.25, 0.55, h + w.p.b * 0.3) * smoothstep(0.35, 0.6, fb2(st * vec2(7., 2.)) + 0.25);
+        A = mix(A, w.a * vec3(0.9, 0.89, 0.85), pm); R = mix(R, 0.7, pm); }
+      A *= C.mend > 0. ? 0.86 : 1.;   /* a mended patch darker */
+      pa = A; pn = N; pao = O; prough = R; c = A; }
+    else c *= C.tint; }
   if (uLook > 0) { vec3 nn = normalize(cross(dFdx(vWorld), dFdy(vWorld))); if (nn.z < 0.) nn = -nn; float sh = lightAt(vWorld + vec3(0., 0., 0.02));   // the ground as a rough, dull surface
     if (conc) { vec3 dpx = dFdx(vWorld), dpy = dFdy(vWorld), r1 = cross(dpy, nn), r2 = cross(nn, dpx); float det = dot(dpx, r1), k = clamp(1.6 - length(dpx) * 12., 0., 1.);   /* the relief by the height's change across the pixel (bump mapping), faded where a pixel spans more than the detail */
-      vec3 gr = sign(det) * (dFdx(C.h) * r1 + dFdy(C.h) * r2) * k; nn = normalize(abs(det) * nn - gr); }
-    Detail dt = detail(vFlag > 0.5 ? 1 : 0, vWorld, nn, vFlag > 0.5 ? 0.8 : 0.7, conc ? 0.75 : 0.6, 0.4);
-    float rough = conc ? clamp(C.rough + dt.rough, 0.25, 1.) : clamp(0.92 + dt.rough, 0.3, 1.);
-    oCol = vec4(present(pbrX(c * dt.tone, dt.n, uEye, uSun, sh, 0., rough, 0., rtao(vWorld, dt.n), 0.) + lampsAt(vWorld, dt.n) * toLin(c * dt.tone) / 3.14159), vCol.a); oId = vec4(0.); oN = vec4(dt.n * 0.5 + 0.5, conc ? max(0., 0.5 - rough) * 0.5 : 0.); oV = velo(); return; }
+      vec3 gr = sign(det) * (dFdx(C.h) * r1 + dFdy(C.h) * r2) * k; nn = normalize(abs(det) * nn - gr);
+      if (photo) { vec2 dux = dFdx(vTrk.xy), duy = dFdy(vTrk.xy); float id = dux.x * duy.y - dux.y * duy.x; vec3 T = normalize((dpx * duy.y - dpy * dux.y) * sign(id)), B = normalize((dpy * dux.x - dpx * duy.x) * sign(id));   /* the track's own axes on the surface: along (s) and across (o) */
+        T = normalize(T - nn * dot(T, nn)); B = cross(nn, T) * sign(dot(cross(nn, T), B)); nn = normalize(T * pn.x + B * pn.y + nn * max(0.2, pn.z)); } }
+    Detail dt; if (photo) { dt.tone = 1.; dt.rough = 0.; dt.n = nn; } else dt = detail(vFlag > 0.5 ? 1 : 0, vWorld, nn, vFlag > 0.5 ? 0.8 : 0.7, conc ? 0.75 : 0.6, 0.4);
+    float rough = photo ? clamp(prough, 0.2, 1.) : conc ? clamp(C.rough + dt.rough, 0.25, 1.) : clamp(0.92 + dt.rough, 0.3, 1.);
+    oCol = vec4(present(pbrX(c * dt.tone, dt.n, uEye, uSun, sh, 0., rough, 0., rtao(vWorld, dt.n) * (photo ? mix(1., pao, 0.8) : 1.), 0.) + lampsAt(vWorld, dt.n) * toLin(c * dt.tone) / 3.14159), vCol.a); oId = vec4(0.); oN = vec4(dt.n * 0.5 + 0.5, conc ? max(0., 0.5 - rough) * 0.5 : 0.); oV = velo(); return; }
   c = mix(c, vec3(24., 22., 20.) / 255., (1. - lightAt(vWorld + vec3(0., 0., 0.02))) * 0.43);
   oCol = vec4(c, vCol.a); oId = vec4(0.); oN = vec4(0.5, 0.5, 1., 0.); oV = velo(); }`;
 const DEPTH_VS = `#version 300 es
@@ -506,6 +547,22 @@ export class LiveRenderer {
     this.hiTex = { alb: arr(v => v.alb), nor: arr(v => v.nor), idx }; }
   setGround(d: GroundData) { this.groundVao = this.vaoOf(d); this.groundN = d.n; }
   setFence(d: GroundData) { this.fenceVao = this.vaoOf(d); this.fenceN = d.n; }
+  /** the photographed sky (review 124): its four levels stacked in one picture (RGBM, sqrt rgb), the range, the nine numbers of its light */
+  private sky: { tex: WebGLTexture; range: number; sh: Float32Array } | null = null;
+  setSky(img: TexImageSource & { width: number; height: number }, range: number, sh: number[][]) { const gl = this.gl, w = img.width, h = img.height / 4, t = gl.createTexture()!; gl.bindTexture(gl.TEXTURE_2D_ARRAY, t);
+    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false); gl.pixelStorei(gl.UNPACK_COLORSPACE_CONVERSION_WEBGL, gl.NONE);
+    gl.texImage3D(gl.TEXTURE_2D_ARRAY, 0, gl.RGBA8, w, h, 4, 0, gl.RGBA, gl.UNSIGNED_BYTE, img);   /* a stacked picture is cut into the layers */
+    gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MAG_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_S, gl.REPEAT); gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    this.sky = { tex: t, range, sh: new Float32Array(sh.flat()) }; }
+  /** the ground's photographed materials (review 124): per layer its albedo, normal and packed (ao, rough, height)
+   *  pictures, all of one size, and each layer's size on the ground (m) */
+  private gTex: { alb: WebGLTexture; nor: WebGLTexture; pack: WebGLTexture; size: Float32Array } | null = null;
+  setGroundMaterials(layers: { alb: TexImageSource; nor: TexImageSource; pack: TexImageSource }[], sizes: number[], res: number) { const gl = this.gl, n = layers.length, levels = Math.floor(Math.log2(res)) + 1, an = gl.getExtension('EXT_texture_filter_anisotropic');
+    const arr = (pick: (l: typeof layers[number]) => TexImageSource) => { const t = gl.createTexture()!; gl.bindTexture(gl.TEXTURE_2D_ARRAY, t); gl.texStorage3D(gl.TEXTURE_2D_ARRAY, levels, gl.RGBA8, res, res, n);
+      gl.pixelStorei(gl.UNPACK_COLORSPACE_CONVERSION_WEBGL, gl.NONE); layers.forEach((l, i) => gl.texSubImage3D(gl.TEXTURE_2D_ARRAY, 0, 0, 0, i, res, res, 1, gl.RGBA, gl.UNSIGNED_BYTE, pick(l))); gl.generateMipmap(gl.TEXTURE_2D_ARRAY);
+      gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR); gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MAG_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_S, gl.REPEAT); gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_T, gl.REPEAT);
+      if (an) gl.texParameterf(gl.TEXTURE_2D_ARRAY, an.TEXTURE_MAX_ANISOTROPY_EXT, Math.min(8, gl.getParameter(an.MAX_TEXTURE_MAX_ANISOTROPY_EXT))); return t; };
+    this.gTex = { alb: arr(l => l.alb), nor: arr(l => l.nor), pack: arr(l => l.pack), size: new Float32Array(sizes) }; }
   /** the track for the concrete (review 122): its length and width, the joints' spacing, the start line's distance, and the line the cars drive (offset at each metre) */
   private trackU = { len: 1, w: 30, joint: 12, start: 0 }; private lineTex: WebGLTexture | null = null;
   setTrack(len: number, width: number, joint: number, start: number, line?: Float32Array) { this.trackU = { len, w: width, joint, start }; if (!line) return; const gl = this.gl, rows = Math.ceil(line.length / 128), data = new Float32Array(rows * 128); data.set(line);
@@ -518,7 +575,7 @@ export class LiveRenderer {
     if (og) { const a = this.arts.get(og); if (a) { this.arts.set(g, a); this.arts.delete(og); } freeGpu(this.gl, og); this.cars.delete(old); } return g; }
   forget(M: Mesh) { this.cars.delete(M); }
 
-  render(v: LiveView, cars: LiveCar[], props: LiveProp[], skids: Skid[], o: { glass?: number; /** 0 the baked look, 1 PBR stepped, 2 PBR smooth */ look?: number; /** lay the 2D art on (default yes) */ art?: boolean; /** the rays in the picture: occlusion, contact shadows, reflections (default yes) */ rays?: boolean; /** strengths: the textures, the light (1: as set) */ texK?: number; /** the time of day: 1 day (default), toward 0 dusk and night (review 117) */ day?: number; /** the colour's depth: deeper lacquer, the hue kept through the tone curve (0: as before; default 1) (review 116) */ deep?: number; lightK?: number; /** after the scene: occlusion and reflection strengths, bloom, depth of field (0 none; pixels of blur a metre from the focus) */ aoK?: number; reflK?: number; bloomK?: number; dof?: number; /** motion blur: the shutter, a share of a frame (0 none) */ mb?: number; /** the outline: width (times each thing's own; 0 none), darkness 0..1; the lines inside a thing (default: the baked look only), their darkness */ outW?: number; outK?: number; inner?: boolean; inK?: number; /** smoke parcels: centre, radius, density, heat, kind (0 tyre 1 dust 2 steam 3 exhaust), seed; and the time */ smoke?: { p: Float32Array; n: number; time: number } } = {}) { const gl = this.gl; this.size(v.W, v.H);
+  render(v: LiveView, cars: LiveCar[], props: LiveProp[], skids: Skid[], o: { glass?: number; /** 0 the baked look, 1 PBR stepped, 2 PBR smooth */ look?: number; /** lay the 2D art on (default yes) */ art?: boolean; /** the rays in the picture: occlusion, contact shadows, reflections (default yes) */ rays?: boolean; /** strengths: the textures, the light (1: as set) */ texK?: number; /** the time of day: 1 day (default), toward 0 dusk and night (review 117) */ day?: number; /** the concrete from photographed materials (default yes, once loaded) (review 124) */ photoGround?: boolean; /** the photographed sky in the mirrors and the light (default yes, once loaded) */ hdri?: boolean; /** the colour's depth: deeper lacquer, the hue kept through the tone curve (0: as before; default 1) (review 116) */ deep?: number; lightK?: number; /** after the scene: occlusion and reflection strengths, bloom, depth of field (0 none; pixels of blur a metre from the focus) */ aoK?: number; reflK?: number; bloomK?: number; dof?: number; /** motion blur: the shutter, a share of a frame (0 none) */ mb?: number; /** the outline: width (times each thing's own; 0 none), darkness 0..1; the lines inside a thing (default: the baked look only), their darkness */ outW?: number; outK?: number; inner?: boolean; inK?: number; /** smoke parcels: centre, radius, density, heat, kind (0 tyre 1 dust 2 steam 3 exhaust), seed; and the time */ smoke?: { p: Float32Array; n: number; time: number } } = {}) { const gl = this.gl; this.size(v.W, v.H);
     // ---- the camera: orthographic, turned to v.ang, tilted down by v.pitch, v.mm millimetres a pixel, snapped to whole pixels ----
     const a = v.ang - Math.PI / 2, cA = Math.cos(a), sA = Math.sin(a), SP = Math.sin(v.pitch * Math.PI / 180), CP = Math.cos(v.pitch * Math.PI / 180), k = 1000 / v.mm, R = 900;
     const rx = [cA, sA, 0], ry = [-sA, cA, 0], up = [ry[0]! * SP, ry[1]! * SP, CP], vd = [ry[0]! * CP, ry[1]! * CP, -SP], c = [v.x, v.y, v.z], dot = (p: number[], q: number[]) => p[0]! * q[0]! + p[1]! * q[1]! + p[2]! * q[2]!;
@@ -559,8 +616,9 @@ export class LiveRenderer {
     const boxTo = (p: WebGLProgram) => { gl.uniform1i(this.loc(p, 'uBoxN'), boxes.length); gl.uniform1i(this.loc(p, 'uSelf'), -1); if (!boxes.length) return;
       gl.uniform3fv(this.loc(p, 'uBoxC'), boxes.flatMap(q => { const H = q.g.height; return [q.x, q.y, q.z + 0.18 + (H - 0.18) / 2]; }));
       gl.uniform3fv(this.loc(p, 'uBoxE'), boxes.flatMap(q => [q.g.len / 2000 * 0.9, q.g.width / 2 * 0.85, (q.g.height - 0.18) / 2 * 0.8])); gl.uniform2fv(this.loc(p, 'uBoxR'), boxes.flatMap(q => [Math.cos(q.yaw), Math.sin(q.yaw)])); };
-    const shadowTo = (p: WebGLProgram) => { texTo(p); boxTo(p); gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, this.sTex); gl.uniform1i(this.loc(p, 'uShadow'), 1); gl.uniformMatrix4fv(this.loc(p, 'uLight'), false, LV); };
-    gl.useProgram(this.ground); lampsTo(this.ground); { const g = this.ground, t = this.trackU; gl.uniform1f(this.loc(g, 'uLen'), t.len); gl.uniform1f(this.loc(g, 'uTW'), t.w); gl.uniform1f(this.loc(g, 'uJoint'), t.joint); gl.uniform1f(this.loc(g, 'uStart'), t.start); gl.uniform1i(this.loc(g, 'uLineOn'), this.lineTex ? 1 : 0); gl.activeTexture(gl.TEXTURE12); gl.bindTexture(gl.TEXTURE_2D, this.lineTex ?? this.blank); gl.uniform1i(this.loc(g, 'uLine'), 12); } gl.uniform1f(this.loc(this.ground, 'uDay'), o.day ?? 1); gl.uniformMatrix4fv(this.loc(this.ground, 'uVP'), false, VP); const hdrOn = this.hdr && (o.look ?? 0) === 2 ? 1 : 0; gl.uniform1i(this.loc(this.ground, 'uHDRo'), hdrOn); gl.uniform1f(this.loc(this.ground, 'uSpecK'), 1); gl.uniformMatrix4fv(this.loc(this.ground, 'uPrevVP'), false, this.prevVP ?? VP); gl.uniform2f(this.loc(this.ground, 'uSize'), v.W, v.H); gl.uniform1i(this.loc(this.ground, 'uLook'), o.look ?? 0); gl.uniform1f(this.loc(this.ground, 'uTexK'), o.texK ?? 1); gl.uniform1f(this.loc(this.ground, 'uLightK'), o.lightK ?? 1); gl.uniform3fv(this.loc(this.ground, 'uSun'), SUN_W); gl.uniform3fv(this.loc(this.ground, 'uEye'), eye); gl.uniform1f(this.loc(this.ground, 'uCell'), Math.max(0.03, v.mm / 1000)); gl.uniform1f(this.loc(this.ground, 'uBias'), 0); shadowTo(this.ground);
+    const shadowTo = (p: WebGLProgram) => { texTo(p); boxTo(p); { const S = o.hdri !== false ? this.sky : null; gl.uniform1i(this.loc(p, 'uSkyOn'), S ? 1 : 0); gl.activeTexture(gl.TEXTURE9); gl.bindTexture(gl.TEXTURE_2D_ARRAY, S?.tex ?? null); gl.uniform1i(this.loc(p, 'uSky'), 9); if (S) { gl.uniform1f(this.loc(p, 'uSkyR'), S.range); gl.uniform3fv(this.loc(p, 'uSH'), S.sh); } } gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, this.sTex); gl.uniform1i(this.loc(p, 'uShadow'), 1); gl.uniformMatrix4fv(this.loc(p, 'uLight'), false, LV); };
+    gl.useProgram(this.ground); lampsTo(this.ground); { const g = this.ground, t = this.trackU; gl.uniform1f(this.loc(g, 'uLen'), t.len); gl.uniform1f(this.loc(g, 'uTW'), t.w); gl.uniform1f(this.loc(g, 'uJoint'), t.joint); gl.uniform1f(this.loc(g, 'uStart'), t.start); gl.uniform1i(this.loc(g, 'uLineOn'), this.lineTex ? 1 : 0); gl.activeTexture(gl.TEXTURE12); gl.bindTexture(gl.TEXTURE_2D, this.lineTex ?? this.blank); gl.uniform1i(this.loc(g, 'uLine'), 12);
+      const G = this.gTex; gl.uniform1i(this.loc(g, 'uGTex'), G && o.photoGround !== false ? 1 : 0); if (G) gl.uniform1fv(this.loc(g, 'uGSize'), G.size); ([[G?.alb ?? null, 'uGAlb', 13], [G?.nor ?? null, 'uGNor', 14], [G?.pack ?? null, 'uGPack', 15]] as const).forEach(([t, nm, u]) => { gl.activeTexture(gl.TEXTURE0 + u); gl.bindTexture(gl.TEXTURE_2D_ARRAY, t); gl.uniform1i(this.loc(g, nm), u); }); } gl.uniform1f(this.loc(this.ground, 'uDay'), o.day ?? 1); gl.uniformMatrix4fv(this.loc(this.ground, 'uVP'), false, VP); const hdrOn = this.hdr && (o.look ?? 0) === 2 ? 1 : 0; gl.uniform1i(this.loc(this.ground, 'uHDRo'), hdrOn); gl.uniform1f(this.loc(this.ground, 'uSpecK'), 1); gl.uniformMatrix4fv(this.loc(this.ground, 'uPrevVP'), false, this.prevVP ?? VP); gl.uniform2f(this.loc(this.ground, 'uSize'), v.W, v.H); gl.uniform1i(this.loc(this.ground, 'uLook'), o.look ?? 0); gl.uniform1f(this.loc(this.ground, 'uTexK'), o.texK ?? 1); gl.uniform1f(this.loc(this.ground, 'uLightK'), o.lightK ?? 1); gl.uniform3fv(this.loc(this.ground, 'uSun'), SUN_W); gl.uniform3fv(this.loc(this.ground, 'uEye'), eye); gl.uniform1f(this.loc(this.ground, 'uCell'), Math.max(0.03, v.mm / 1000)); gl.uniform1f(this.loc(this.ground, 'uBias'), 0); shadowTo(this.ground);
     if (this.groundVao) { gl.bindVertexArray(this.groundVao); gl.drawArrays(gl.TRIANGLES, 0, this.groundN); }
     if (this.fenceVao && this.fenceN) { gl.bindVertexArray(this.fenceVao); gl.drawArrays(gl.TRIANGLES, 0, this.fenceN); }
     // skid marks: dark patches on the concrete, blended, nothing else written

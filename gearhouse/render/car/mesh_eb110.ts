@@ -43,7 +43,8 @@ function curve(tab: [number, number][]): (x: number) => number { const n = tab.l
 /** the bonnet's centre line (from the bumper's shut line to the screen's foot, carried on level to the screen's corners) */
 const ZH = curve([[105, 405], [142, 428], [236, 478], [331, 524], [425, 565], [520, 607], [614, 648], [709, 692], [803, 730], [898, 758], [990, 776], [1085, 789], [XC, 795]]);
 /** the bonnet's plateau: its height at (x, y), a slight crown */
-const zHood = (x: number, y: number) => ZH(x) - 24 * (y / 630) ** 2;
+/** the bonnet: flat across where the lamps are cut into it, so both lamps' top edges and the bonnet's edge between them lie on one straight line across the car (review 139, the photographs); its crown grows behind them */
+const zHood = (x: number, y: number) => ZH(x) - 24 * sm(640, 1000, x) * (y / 630) ** 2;
 /** the roof's and the deck's centre line */
 const ZC = curve([[XT, 1094], [2060, 1104], [2124, 1108], [2266, 1115], [2361, 1118], [2502, 1115], [2644, 1110], [2786, 1097], [2928, 1082], [3070, 1066], [3211, 1048], [3353, 1027], [3495, 1003], [3637, 975], [3778, 949], [3950, 925], [4150, 898], [4300, 872], [4400, 852]]);
 /** half the width at the widest line (the sheet's plan), and that line's height */

@@ -28,7 +28,7 @@
   "departureDeg": 28.2,
   "axleF": 1040,
   "axleR": 3590,
-  "widthWithMirrors": 2610
+  "widthWithMirrors": 2020
  },
  "profile": {
   "_": "the silhouette from the side, [x, z]; top: the centre line (bonnet, screen, roof, engine cover, tail); bottom: the body's lowest edge (arches excluded); the wing above the tail is not in the top line (see parts: wing)",
@@ -685,8 +685,8 @@
      1796
     ],
     "y": [
-     1160,
-     1305
+     880,
+     1010
     ],
     "z": [
      860,

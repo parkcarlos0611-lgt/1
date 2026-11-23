@@ -33,7 +33,8 @@ export class Driver {
   lineAt(s: number): number { const L = this.track.length; return this.line ? this.line[Math.floor(((s % L) + L) % L)]! : 0; }
   drive(car: Vehicle): Controls {
     if (!this.line) this.prepare(car); const T = this.track, L = T.length, v = car.speed, lim = this.vlim!;
-    let target = 200; for (let d = 0; d <= 400; d += 8) { const vl = lim[Math.floor(((car.s + d) % L + L) % L)]!; target = Math.min(target, Math.sqrt(vl * vl + 2 * this.plannedBrake * d)); }
+    const ahead = Math.min(1600, Math.max(400, v * v / (2 * this.plannedBrake) + 80));   // review 152: far enough to brake from its own speed (400 m was short of what a 1990s car needs at 240 km/h)
+    let target = 200; for (let d = 0; d <= ahead; d += 8) { const vl = lim[Math.floor(((car.s + d) % L + L) % L)]!; target = Math.min(target, Math.sqrt(vl * vl + 2 * this.plannedBrake * d)); }
     // how high on the bank: where the slope carries the speed it will have there, moved toward gently
     const Ld = 8 + v * 0.45 + Math.max(0, v - 35) * 0.6, s2 = car.s + Ld, vp = Math.min(v, target);
     // the height it wants here and over the next stretch: it climbs before the banking, not on it
@@ -54,7 +55,10 @@ export class Driver {
     // speed: build up to the target and hold it with part throttle (never snapping off the pedal in a bend: that swings the tail out);
     // brake only when well over it
     const e = target - v, hold = Math.min(0.45, 0.04 + v * v * car.spec.cdA * 0.6 / (car.spec.hp * 745.7 / Math.max(v, 5)) );
-    const throttle = e > 0 ? Math.min(1, hold + e / 3) : Math.max(0, hold + e / 2);
+    let throttle = e > 0 ? Math.min(1, hold + e / 3) : Math.max(0, hold + e / 2);
+    // review 152: in a bend near the grip it plans with, it no longer floors it: what the tyres give to the turn they cannot give to the drive
+    { const here = lim[Math.floor(((car.s % L) + L) % L)]!, use = Math.abs(T.at(car.s).k) > 1e-4 && here > 1 ? (v / here) ** 2 : 0; const aP = car.spec.hp * 745.7 / Math.max(v, 5) / car.spec.mass;   /* what the engine could add here (m/s²): a weak car cannot overpower its tyres, and is left alone */
+      if (use > 0.75 && aP > 0.22 * G) throttle = Math.min(throttle, hold + Math.max(0, (1 - use) / 0.25) * (1 - hold)); }
     const cool = car.health.water > 97 ? Math.max(0.55, 1 - (car.health.water - 97) / 10) : 1;   // it watches the water gauge and eases off
     const most = car.spec.steerLock * Math.PI / 180 / lock;   // into a slide it may wind on more than the grip uses, up to the lock
     return { steer: Math.max(-most, Math.min(most, delta / lock)), throttle: throttle * cool * this.pace * (1 - this.lift) * (this.care < 1 && Math.abs(T.at(car.s).k) > 1e-3 ? this.care : 1), brake: e < -1.5 ? Math.min(1, (-e - 1.5) / 3) : 0 }; }

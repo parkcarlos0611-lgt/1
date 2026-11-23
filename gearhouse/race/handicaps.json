@@ -1,9 +1,9 @@
 {
- "about": "Millbrook Outer Circuit handicapper's book (reviews 86, 89): the test driver's lap times in seconds, from rest to the end of the first lap (standing) and a lap at speed (flying), from tools/ref/handicaps.ts, with the review-89 tyres; retimed in review 97 (the free wheels no longer drag); retimed in review 120 (the car in 3D: its axles, the tyres' relaxation, crests felt).",
+ "about": "Millbrook Outer Circuit handicapper's book (reviews 86, 89): the test driver's lap times in seconds, from rest to the end of the first lap (standing) and a lap at speed (flying), from tools/ref/handicaps.ts, with the review-89 tyres; retimed in review 97 (the free wheels no longer drag); retimed in review 120 (the car in 3D: its axles, the tyres' relaxation, crests felt). Retimed in review 152 (the driver looks far enough ahead to brake from its own speed, and does not floor a powerful car near the grip in a bend).",
  "cars": {
   "dueSSJ35": {
-   "standing": 97,
-   "flying": 88.8
+   "standing": 97.8,
+   "flying": 89.7
   },
   "bmw315": {
    "standing": 153.4,
@@ -46,12 +46,12 @@
    "flying": 245.6
   },
   "napier33": {
-   "standing": 87.2,
-   "flying": 80.8
+   "standing": 88,
+   "flying": 81.5
   },
   "jagD55": {
-   "standing": 87.3,
-   "flying": 80.7
+   "standing": 87.6,
+   "flying": 81
   },
   "auburn851": {
    "standing": 116.3,
@@ -62,16 +62,16 @@
    "flying": 99.3
   },
   "eb110": {
-   "standing": 83.5,
-   "flying": 78.5
+   "standing": 83.3,
+   "flying": 78.2
   },
   "xj220": {
-   "standing": 84.9,
-   "flying": 79.3
+   "standing": 83.2,
+   "flying": 77.5
   },
   "diablo": {
-   "standing": 85.4,
-   "flying": 80.3
+   "standing": 83.7,
+   "flying": 78.4
   }
  }
 }

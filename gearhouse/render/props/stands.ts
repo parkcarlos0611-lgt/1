@@ -15,14 +15,14 @@ export function grandstandBay(): Mesh { const b = new Build(), L = 15000, D = 10
   b.mat(DARKG, 0.3, 'boards').box(-400, L + 400, -1300, -1150, 7600, 8250);                 // the fascia
   for (let x = 900; x < L; x += 2400) b.mat(RED, 0.3, 'boards').box(x, x + 1500, -1320, -1300, 7700, 8150);   // bunting panels
   return b.mesh(L); }
-/** the clock tower (review 126): an Edwardian brick clock tower of the kind the period's clubs and works built (red
+/** the clock tower (review 148): an Edwardian brick clock tower of the kind the period's clubs and works built (red
  *  brick with stone dressings; compare the square cupola and its ogee lead roof over the 1907 Brooklands clubhouse, and
  *  the brick clock towers of the 1900s with their stone quoins and copper caps). 3.6 m square, 16.6 m to the ball and 18.5 m to the top of the vane: a
  *  stone plinth; a brick shaft with stone quoins, a door under a fanlight, slit windows and a string course; the clock
  *  stage between two cornices, a white dial in a stone ring on each side; a louvred timber belfry; a copper ogee roof
  *  gone green, a gilt ball and weather vane. Its front (the door) faces -y. */
 export function clockTower(): Mesh { const b = new Build(), S = 3600, h = S / 2, cx = S / 2;
-  const STONE = '#cfc7b3', STONE2 = '#bdb5a1', LEAD = '#6f767a', COPPER = '#6fa893', GILT = '#c9a646', DIAL = '#efebdd', INK = '#1e1c20';
+  const STONE = '#d8ccae', STONE2 = '#c4b99c', LEAD = '#6f767a', COPPER = '#6fa893', GILT = '#c9a646', DIAL = '#efebdd', INK = '#1e1c20';
   const Z1 = 700, ZS = 4700, Z2 = 9000, Z3 = 12000, ZB = 12450, ZL = 14300;   // plinth top, string course, lower cornice, upper cornice, belfry floor, belfry eaves
   // the four sides: 0 the front (-y), then round; a point `u` along a side, `d` out from the tower's middle, at height z
   const at = (k: number, u: number, d: number, z: number): V => k === 0 ? [cx + u, -d, z] : k === 1 ? [cx + d, u, z] : k === 2 ? [cx - u, d, z] : [cx - d, -u, z];

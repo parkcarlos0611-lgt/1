@@ -28,7 +28,7 @@ import renderA from '../../assets/textures/buildings/render_alb.jpg'; import ren
 import concA from '../../assets/textures/buildings/concrete_alb.jpg'; import concN from '../../assets/textures/buildings/concrete_nor.jpg'; import concP from '../../assets/textures/buildings/concrete_pack.jpg';
 import sheetA from '../../assets/textures/buildings/sheet_alb.jpg'; import sheetN from '../../assets/textures/buildings/sheet_nor.jpg'; import sheetP from '../../assets/textures/buildings/sheet_pack.jpg';
 const B_URLS = [[brickA, brickN, brickP], [boardsA, boardsN, boardsP], [timberA, timberN, timberP], [corrA, corrN, corrP], [tileA, tileN, tileP], [slateA, slateN, slateP], [renderA, renderN, renderP], [concA, concN, concP], [sheetA, sheetN, sheetP]];
-/** the buildings' photographed materials (review 126; Poly Haven CC0, fetched by tools/ref/polyhaven_buildings.py): nine
+/** the buildings' photographed materials (review 148; Poly Haven CC0, fetched by tools/ref/polyhaven_buildings.py): nine
  *  layers in the order of the building kinds (render/car/mesh.ts KINDS from 'brick'), each three pictures at 512 */
 export async function loadBuildings(L: LiveRenderer): Promise<void> { const m = bMeta as { res: number; layers: { size: number; mean: number[] }[] }, res = m.res;
   const bm = async (u: string) => createImageBitmap(await (await fetch(u)).blob(), { resizeWidth: res, resizeHeight: res, colorSpaceConversion: 'none', premultiplyAlpha: 'none' });

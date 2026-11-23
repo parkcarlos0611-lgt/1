@@ -7,7 +7,7 @@ import { NEW, hash, fbm, ss, mix, rustAt, rgb2hsl, hsl2rgb, cells, type Wear } f
 export type V = [number, number, number];
 /** what each triangle is made of: it picks the texture and how age shows on it (glass is drawn see-through) */
 export const KINDS = ['plain', 'paint', 'metal', 'glass', 'shine', 'tyre', 'wood', 'canvas', 'leather', 'lens', 'grille',
-  /* the buildings' photographed materials (review 126), in the order of assets/textures/buildings: the live renderer lays each one's pictures on the faces by their own axes; elsewhere they are plain colour */
+  /* the buildings' photographed materials (review 148), in the order of assets/textures/buildings: the live renderer lays each one's pictures on the faces by their own axes; elsewhere they are plain colour */
   'brick', 'boards', 'timber', 'corrugated', 'tile', 'slate', 'render', 'concrete', 'sheet'] as const;
 export type Kind = typeof KINDS[number];
 /** `kind` per triangle (KINDS index); `tex` per triangle: 1 or 2 on a tyre's tread, alternate blocks round the wheel */

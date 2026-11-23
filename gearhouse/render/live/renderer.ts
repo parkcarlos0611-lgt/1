@@ -152,7 +152,7 @@ vec3 rustAt(float t) { vec3 R[6] = vec3[6](vec3(184, 104, 46), vec3(156, 80, 34)
 uniform int uDecN; uniform vec3 uDecO[4], uDecN_[4], uDecUp[4]; uniform float uDecR[4]; uniform sampler2D uDecTex;
 layout(location=0) out vec4 oCol; layout(location=1) out vec4 oId; layout(location=2) out vec4 oN; layout(location=3) out vec4 oV; in vec4 vCur, vPrev; uniform vec2 uSize;
 vec4 velo() { vec2 d = (vCur.xy / vCur.w - vPrev.xy / vPrev.w) * 0.5 * uSize; return vec4(clamp(d / 128. + 0.5, 0., 1.), 0., 1.); }   /* pixels moved since the last frame, packed */   // oN: the normal and how mirror-like (for the traced reflections)
-/* ---- the buildings' photographed materials (review 126, Poly Haven CC0): kinds 11.. (brick, painted boards, bare timber,
+/* ---- the buildings' photographed materials (review 148, Poly Haven CC0): kinds 11.. (brick, painted boards, bare timber,
    corrugated iron, clay tiles, slates, render, concrete, sheet metal), each a tile of known size laid on a face by the
    face's own axes (level along it, and up it: courses lie level on a wall, tiles and corrugations run up a roof's
    slope), so the meshes need no picture coordinates. The picture gives the pattern about its mean colour; the face
@@ -225,8 +225,9 @@ void main() {
       vec3 P = vObj / 1000., q = vec3(dot(P, T) / uBSize[L], -dot(P, B) / uBSize[L], float(L));
       vec3 a = texture(uBAlb, q).rgb, tn = texture(uBNor, q).xyz * 2. - 1., pk = texture(uBPack, q).rgb;
       base = vCol * clamp(a / uBMean[L], 0., 2.5) * (0.93 + 0.14 * vnoise(P * 0.6 + 3.));   /* and a broad unevenness, so a long wall is not one tile repeated */
+      if (L == 3) tn.xy *= mix(0.35, 2.5, clamp(1.6 - length(fwidth(q.xy)) / 0.006, 0., 1.));   /* the iron's corrugations are shallow in the photograph: deepened to read close to, and flattened where a pixel nears their pitch (no moire from afar) */
       vec3 nw = normalize(mat3(uModel) * normalize(T * tn.x + B * tn.y + no * max(0.25, tn.z))); if (dot(nw, uEye) < 0.) nw = n;
-      float metal = L == 3 ? 0.5 : 0., rough = clamp(pk.g, 0.25, 1.), ao = rtao(vWorld, nw) * mix(1., pk.r, 0.8);
+      float metal = L == 3 ? 0.2 : 0., rough = clamp(pk.g, 0.25, 1.), ao = rtao(vWorld, nw) * mix(1., pk.r, 0.55);
       vec3 lit = pbrX(base, nw, uEye, uSun, sh, metal, rough, 0., ao, 0.) + lampsAt(vWorld, nw) * toLin(base) * (1. - metal) / 3.14159;
       oCol = vec4(present(lit), 1.); oId = vec4(uObj, vPart / 255., uOutline / 8.); oN = vec4(nw * 0.5 + 0.5, 0.); oV = velo(); return; }
     float metal = 0., rough = 0.6, coat = 0.;
@@ -682,7 +683,7 @@ export class LiveRenderer {
       gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR); gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MAG_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_S, gl.REPEAT); gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_T, gl.REPEAT);
       if (an) gl.texParameterf(gl.TEXTURE_2D_ARRAY, an.TEXTURE_MAX_ANISOTROPY_EXT, Math.min(8, gl.getParameter(an.MAX_TEXTURE_MAX_ANISOTROPY_EXT))); return t; };
     this.gTex = { alb: arr(l => l.alb), nor: arr(l => l.nor), pack: arr(l => l.pack), size: new Float32Array(sizes) }; }
-  /** the buildings' photographed materials (review 126): as the ground's, each layer three pictures; its tile's size (m) and mean colour (0..1, sRGB) */
+  /** the buildings' photographed materials (review 148): as the ground's, each layer three pictures; its tile's size (m) and mean colour (0..1, sRGB) */
   private bTex: { alb: WebGLTexture; nor: WebGLTexture; pack: WebGLTexture; size: Float32Array; mean: Float32Array } | null = null;
   setBuildingMaterials(layers: { alb: TexImageSource; nor: TexImageSource; pack: TexImageSource }[], sizes: number[], means: number[][], res: number) { const keep = this.gTex; this.setGroundMaterials(layers, sizes, res);
     const t = this.gTex!; this.gTex = keep; this.bTex = { alb: t.alb, nor: t.nor, pack: t.pack, size: t.size, mean: new Float32Array(means.flatMap(m => m.map(v => Math.max(8, v) / 255))) }; }

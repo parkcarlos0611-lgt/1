@@ -1,4 +1,4 @@
-# The buildings' photographed materials (review 126): CC0 PBR sets from Poly Haven, fetched at 1K and packed at 512 for
+# The buildings' photographed materials (review 148): CC0 PBR sets from Poly Haven, fetched at 1K and packed at 512 for
 # the live renderer, as tools/ref/polyhaven.py does for the ground: per material an albedo (sRGB JPEG), a normal (OpenGL
 # convention) and one picture holding the ambient occlusion (red) and the roughness (green). Writes
 # assets/textures/buildings/<layer>_{alb,nor,pack}.jpg and buildings.json (the layers in the order of the building
@@ -23,4 +23,4 @@ for layer, pid in LAYERS:
     mean = [round(v) for v in ImageStat.Stat(alb).mean]
     meta.append({'layer': layer, 'source': f'https://polyhaven.com/a/{pid}', 'size': round(info['dimensions'][0] / 1000, 2), 'mean': mean, 'rough': round(ImageStat.Stat(rough).mean[0] / 255, 3), 'authors': list(info['authors'].keys()), 'license': 'CC0'})
     print(layer, pid, meta[-1]['size'], 'm', '#%02x%02x%02x' % tuple(mean), meta[-1]['rough'])
-json.dump({'about': 'Poly Haven CC0 materials for the buildings (review 126), packed at 512: alb, nor (GL), pack (R ao, G rough)', 'res': RES, 'layers': meta}, open(f'{OUT}/buildings.json', 'w'), indent=1)
+json.dump({'about': 'Poly Haven CC0 materials for the buildings (review 148), packed at 512: alb, nor (GL), pack (R ao, G rough)', 'res': RES, 'layers': meta}, open(f'{OUT}/buildings.json', 'w'), indent=1)

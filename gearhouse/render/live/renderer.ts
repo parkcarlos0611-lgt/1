@@ -294,7 +294,18 @@ struct GS { vec3 a; vec3 n; vec3 p; };
 /** a layer's picture as detail about its own mean (the smallest mip): 1 on average, its light and dark and a little of its colour; the game keeps its own colours */
 vec3 rel(vec3 a, int L) { vec3 m = textureLod(uGAlb, vec3(0.5, 0.5, float(L)), 12.).rgb; float lm = max(0.03, dot(m, vec3(0.3, 0.59, 0.11))), la = dot(a, vec3(0.3, 0.59, 0.11)); return mix(vec3(la), a, 0.15) / lm; }
 GS gs(int L, vec2 st, vec2 off) { vec3 q = vec3(st / uGSize[L] + off, float(L)); GS g; g.a = rel(texture(uGAlb, q).rgb, L); g.n = texture(uGNor, q).rgb * 2. - 1.; g.p = texture(uGPack, q).rgb; return g; }
-float W2t(float o) { return uTW / 2. - abs(o); }   /* how far inside the concrete's edge (m) */
+float W2t(float o) { return uTW / 2. - abs(o); }
+/* the scratch race's grid (review 125), painted as the start line is: pairs 5 m either side of the middle, rows 9 m
+   apart, each place an open box (a bar across in front, short lines back at its sides) and its number painted ahead of
+   it, upright to a driver coming up to it; uGridN places, the numbers from a picture of hand-painted figures */
+uniform highp sampler2D uDigits; uniform int uGridN;
+float gridPaint(float s, float o) { if (uGridN == 0) return 0.; float b = uStart - s; if (b < 1. || b > 6. + 9. * float((uGridN + 1) / 2) + 1.) return 0.;
+  float m = 0.; for (int r = 0; r < 8; r++) { if (2 * r >= uGridN) break; float front = uStart - 6. - 9. * float(r) + 2.7;
+    for (int k = 0; k < 2; k++) { int n = 2 * r + k; if (n >= uGridN) break; float oc = k == 1 ? 5. : -5., x = o - oc, y = s - front;
+      if (abs(x) < 1.25 && abs(y) < 0.07) m = 1.;   /* the bar across */
+      if (abs(abs(x) - 1.2) < 0.05 && y < 0. && y > -1.3) m = 1.;   /* the side lines */
+      if (y > 0.3 && y < 1.7 && abs(x) < 0.8) { vec2 uv = vec2((-x / 1.6 + 0.5 + float(n)) / 16., 1. - (y - 0.3) / 1.4); m = max(m, texture(uDigits, uv).r); } } }   /* the number */
+  return m; }   /* how far inside the concrete's edge (m) */
 struct Conc { vec3 tint; float rough; float h; float paint; float hb; float hb2; float cracked; float sealed; float joint; float rub; float oil; float edge; float edgeDark; float line; float mend; float dl; vec3 bay; };
 Conc concrete(float s, float o) { Conc C; C.tint = vec3(1.); C.rough = 0.9; C.h = 0.; C.paint = 0.;
   float W2 = uTW / 2., sw = uTW / 9., u = mod(s, uJoint), v = o + W2, bi = floor(v / sw), bj = floor(s / uJoint), bv = mod(v, sw);
@@ -329,7 +340,7 @@ Conc concrete(float s, float o) { Conc C; C.tint = vec3(1.); C.rough = 0.9; C.h 
   C.tint = mix(C.tint, tar / 0.62, tarAll); C.rough = mix(C.rough, 0.38, tarAll); C.h += tarAll * 0.0015;   /* tar: dark, glossy, standing a little proud */
   C.tint *= 1. - open * 0.55; C.h -= open * 0.003;
   // the start line: whitewash, worn through where the wheels run, cracked with the concrete
-  float line = smoothstep(0.17, 0.15, ds) * (abs(o) < W2 - 0.05 ? 1. : 0.);
+  float line = max(smoothstep(0.17, 0.15, ds) * (abs(o) < W2 - 0.05 ? 1. : 0.), gridPaint(s, o));
   if (line > 0.) { float worn = clamp(rub * 1.1 + smoothstep(0.55, 0.8, fb2(vec2(s * 9., o * 3.))) * 0.6 + crack, 0., 1.), pnt = line * (1. - worn * 0.75);
     C.tint = mix(C.tint, vec3(1.45, 1.43, 1.36), pnt); C.rough = mix(C.rough, 0.62, pnt); C.h += pnt * 0.0008; C.paint = pnt; }
   C.hb = hb; C.hb2 = hb2; C.cracked = cracked; C.sealed = sealed; C.joint = max(tarJ, tarL); C.rub = rub; C.oil = oil; C.edge = edge; C.edgeDark = edgeDark; C.line = line; C.mend = mend; C.dl = dl;
@@ -356,7 +367,7 @@ void main() { vec3 c = vCol.rgb;
       if (C.edgeDark > 0.01 || C.edge > 0.3) { GS e = gs(7, st, vec2(0.)); vec3 earth = c * e.a * vec3(0.9, 0.78, 0.6); float lip = C.edgeDark * smoothstep(0.55, 0.35, h); A = mix(A, earth, max(lip, C.edge * 0.18)); N = normalize(mix(N, e.n, lip)); R = mix(R, 0.95, lip);   /* the lip chipped back to earth, dust blown on */
         GS gr = gs(8, st, vec2(0.)); float over = smoothstep(0.62, 0.8, fb2(st * vec2(0.9, 3.) + 5.)) * smoothstep(0.18, 0.02, W2t(vTrk.y)); A = mix(A, vCol.rgb * 0.0 + vec3(0.36, 0.42, 0.26) * gr.a, over * 0.9); N = normalize(mix(N, gr.n, over)); R = mix(R, 0.9, over); }   /* grass creeping over the edge */
       // the start line's whitewash, on the tops, worn through in the wheel tracks
-      if (C.line > 0.) { GS w = gs(6, st, vec2(0.)); float pm = C.line * clamp(1. - C.rub * 1.2, 0., 1.) * smoothstep(0.25, 0.55, h + w.p.b * 0.3) * smoothstep(0.35, 0.6, fb2(st * vec2(7., 2.)) + 0.25);
+      if (C.line > 0.) { GS w = gs(6, st, vec2(0.)); float pm = C.line * clamp(1. - C.rub * 1.2, 0., 1.) * smoothstep(0.15, 0.45, h + w.p.b * 0.3) * smoothstep(0.25, 0.5, fb2(st * vec2(7., 2.)) + 0.3);
         A = mix(A, w.a * vec3(0.9, 0.89, 0.85), pm); R = mix(R, 0.7, pm); }
       A *= C.mend > 0. ? 0.86 : 1.;   /* a mended patch darker */
       pa = A; pn = N; pao = O; prough = R; c = A; }
@@ -577,7 +588,14 @@ export class LiveRenderer {
     this.gTex = { alb: arr(l => l.alb), nor: arr(l => l.nor), pack: arr(l => l.pack), size: new Float32Array(sizes) }; }
   /** the track for the concrete (review 122): its length and width, the joints' spacing, the start line's distance, and the line the cars drive (offset at each metre) */
   private trackU = { len: 1, w: 30, joint: 12, start: 0 }; private lineTex: WebGLTexture | null = null;
-  setTrack(len: number, width: number, joint: number, start: number, line?: Float32Array) { this.trackU = { len, w: width, joint, start }; if (!line) return; const gl = this.gl, rows = Math.ceil(line.length / 128), data = new Float32Array(rows * 128); data.set(line);
+  /** the grid's numbers (review 125): sixteen places' figures side by side, white on nothing, in a heavy hand-painted face */
+  private digits: WebGLTexture | null = null; gridN = 16;
+  private makeDigits() { if (this.digits || typeof document === 'undefined') return; const gl = this.gl, S = 128, c = document.createElement('canvas'); c.width = S * 16; c.height = S; const x = c.getContext('2d')!;
+    x.fillStyle = '#000'; x.fillRect(0, 0, c.width, c.height); x.fillStyle = '#fff'; x.textAlign = 'center'; x.textBaseline = 'middle';
+    for (let n = 0; n < 16; n++) { const t = String(n + 1); x.font = `900 ${t.length > 1 ? 100 : 124}px Rockwell, 'Clarendon', Georgia, 'Times New Roman', serif`; x.save(); x.translate(n * S + S / 2, S / 2 + 4); x.scale(t.length > 1 ? 0.78 : 1, 1); x.fillText(t, 0, 0); x.restore(); }
+    const t = gl.createTexture()!; gl.bindTexture(gl.TEXTURE_2D, t); gl.pixelStorei(gl.UNPACK_COLORSPACE_CONVERSION_WEBGL, gl.NONE); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, c); gl.generateMipmap(gl.TEXTURE_2D);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE); this.digits = t; }
+  setTrack(len: number, width: number, joint: number, start: number, line?: Float32Array) { this.trackU = { len, w: width, joint, start }; this.makeDigits(); if (!line) return; const gl = this.gl, rows = Math.ceil(line.length / 128), data = new Float32Array(rows * 128); data.set(line);
     const t = gl.createTexture()!; gl.bindTexture(gl.TEXTURE_2D, t); gl.texImage2D(gl.TEXTURE_2D, 0, gl.R32F, 128, rows, 0, gl.RED, gl.FLOAT, data); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST); this.lineTex = t; }
   /** the GPU copy of a prop's mesh (by kind) or a car's (by its mesh object), made once */
   prop(kind: string, make: () => Mesh): GpuMesh { let g = this.kinds.get(kind); if (!g) { g = gpuMesh(this.gl, make(), false); this.kinds.set(kind, g); } return g; }
@@ -630,6 +648,7 @@ export class LiveRenderer {
       gl.uniform3fv(this.loc(p, 'uBoxE'), boxes.flatMap(q => [q.g.len / 2000 * 0.9, q.g.width / 2 * 0.85, (q.g.height - 0.18) / 2 * 0.8])); gl.uniform2fv(this.loc(p, 'uBoxR'), boxes.flatMap(q => [Math.cos(q.yaw), Math.sin(q.yaw)])); };
     const shadowTo = (p: WebGLProgram) => { texTo(p); boxTo(p); { const S = o.hdri !== false ? this.sky : null; gl.uniform1i(this.loc(p, 'uSkyOn'), S ? 1 : 0); gl.activeTexture(gl.TEXTURE9); gl.bindTexture(gl.TEXTURE_2D_ARRAY, S?.tex ?? null); gl.uniform1i(this.loc(p, 'uSky'), 9); if (S) { gl.uniform1f(this.loc(p, 'uSkyR'), S.range); gl.uniform3fv(this.loc(p, 'uSH'), S.sh); } } gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, this.sTex); gl.uniform1i(this.loc(p, 'uShadow'), 1); gl.uniformMatrix4fv(this.loc(p, 'uLight'), false, LV); };
     gl.useProgram(this.ground); lampsTo(this.ground); { const g = this.ground, t = this.trackU; gl.uniform1f(this.loc(g, 'uLen'), t.len); gl.uniform1f(this.loc(g, 'uTW'), t.w); gl.uniform1f(this.loc(g, 'uJoint'), t.joint); gl.uniform1f(this.loc(g, 'uStart'), t.start); gl.uniform1i(this.loc(g, 'uLineOn'), this.lineTex ? 1 : 0); gl.activeTexture(gl.TEXTURE12); gl.bindTexture(gl.TEXTURE_2D, this.lineTex ?? this.blank); gl.uniform1i(this.loc(g, 'uLine'), 12);
+      gl.uniform1i(this.loc(g, 'uGridN'), this.digits ? this.gridN : 0); gl.activeTexture(gl.TEXTURE0 + 16); gl.bindTexture(gl.TEXTURE_2D, this.digits ?? this.blank); gl.uniform1i(this.loc(g, 'uDigits'), 16);
       const G = this.gTex; gl.uniform1i(this.loc(g, 'uGTex'), G && o.photoGround !== false ? 1 : 0); if (G) gl.uniform1fv(this.loc(g, 'uGSize'), G.size); ([[G?.alb ?? null, 'uGAlb', 13], [G?.nor ?? null, 'uGNor', 14], [G?.pack ?? null, 'uGPack', 15]] as const).forEach(([t, nm, u]) => { gl.activeTexture(gl.TEXTURE0 + u); gl.bindTexture(gl.TEXTURE_2D_ARRAY, t); gl.uniform1i(this.loc(g, nm), u); }); } gl.uniform1f(this.loc(this.ground, 'uDay'), o.day ?? 1); gl.uniformMatrix4fv(this.loc(this.ground, 'uVP'), false, VP); const hdrOn = this.hdr && (o.look ?? 0) === 2 ? 1 : 0; gl.uniform1i(this.loc(this.ground, 'uHDRo'), hdrOn); gl.uniform1f(this.loc(this.ground, 'uSpecK'), 1); gl.uniformMatrix4fv(this.loc(this.ground, 'uPrevVP'), false, this.prevVP ?? VP); gl.uniform2f(this.loc(this.ground, 'uSize'), v.W, v.H); gl.uniform1i(this.loc(this.ground, 'uLook'), o.look ?? 0); gl.uniform1f(this.loc(this.ground, 'uTexK'), o.texK ?? 1); gl.uniform1f(this.loc(this.ground, 'uLightK'), o.lightK ?? 1); gl.uniform3fv(this.loc(this.ground, 'uSun'), SUN_W); gl.uniform3fv(this.loc(this.ground, 'uEye'), eye); gl.uniform1f(this.loc(this.ground, 'uCell'), Math.max(0.03, v.mm / 1000)); gl.uniform1f(this.loc(this.ground, 'uBias'), 0); shadowTo(this.ground);
     if (this.groundVao) { gl.bindVertexArray(this.groundVao); gl.drawArrays(gl.TRIANGLES, 0, this.groundN); }
     if (this.fenceVao && this.fenceN) { gl.bindVertexArray(this.fenceVao); gl.drawArrays(gl.TRIANGLES, 0, this.fenceN); }

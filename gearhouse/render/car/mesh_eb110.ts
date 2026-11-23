@@ -1,212 +1,228 @@
-// The 1991-95 Bugatti EB110 GT as a low-polygon mesh (docs/systems/70_mesh_car_rules.md), rebuilt from the user's
-// reference sheet docs/reference/eb110_xj220_sheet.png (left column: front, rear, both sides, top, underside).
+// The 1991-95 Bugatti EB110 GT as a low-polygon mesh (docs/systems/70_mesh_car_rules.md), built afresh (review 128)
+// as one smooth envelope in the manner of mesh_jagD55.ts.
 //
-// Real figures (web search, the sources agreeing unless noted):
-//   length 4400, wheelbase 2550, front track 1550, rear track 1618 mm  - auto-data.net, carsales.com.au, cararac.com
-//     (supercars.net / conceptcarz give the front track as 1549; the often quoted 1600 rear track was not confirmed)
-//   width 1940 mm                                                       - auto-data.net, Wikipedia (1960 on carsales
-//     and ultimatespecs is the Super Sport's figure: "the same as the GT's except the width and the rear track")
-//   height 1125 mm                                                      - auto-data.net, carsales (Wikipedia 1114-1125,
-//     supercars.net 1115)
-//   tyres 245/40 ZR18 front, 325/30 ZR18 rear on 18x9 and 18x12 BBS wheels - carsales, conceptcarz (radius 326 mm)
-//   scissor doors, a glazed engine cover, a wing in the tail raised at speed or by a switch (GT; the SS's is fixed),
-//   fixed lamps instead of the prototypes' pop-ups                      - Wikipedia, supercars.net, Bugatti newsroom
-//   No source gave the overhangs or the ground clearance: those are the sheet's.
+// Proportions: the real car's only.
+//   length 4400, width 1940, height 1125, wheelbase 2550, front track 1550, rear track 1618 mm; tyres 245/40 ZR18
+//   and 325/30 ZR18 (radius 326)                      - auto-data.net, carsales.com.au, cararac.com, Wikipedia
+//   Not published anywhere found: the overhangs (taken 1090 front, 760 rear, from the car's side elevation in
+//   photographs: the sum is 4400 - 2550), the ground clearance (about 115), the main heights (wing crest 736 over the
+//   front axle, belt 745-860, engine deck 1100 falling to 790 at the tail): those are read from photographs.
+// Design: the user's sheet docs/reference/eb110_xj220_sheet.png (left column), for the shapes and their flow, each
+//   feature carried over as a share of the real dimensions, never as the sheet's pixels.
 //
-// Read off the sheet (pixels; X(), Y() and Z() turn them into mm): the side view's silhouette (TOP = DECK + WNG), the
-// shoulder line (EDGE) and the underside (BOT) at 2.667 mm a pixel along (4400 mm over 1650 px), the axles at 410 and
-// 1383 px (973 px = 2595 mm: closed up to the real 2550, the 45 mm shared between the overhangs: 1120 front, 730
-// rear), heights x1.031 (the sheet's roof stands 409 px = 1091 mm; the real 1125 is used); the plan's half-widths
-// (HALF: the plan is drawn 6 % narrow, 681 px = 1816 mm, so it is scaled to the real 1940, as the front view has it:
-// 737 px = 1966 mm); the screen's base arc, the roof panel, the louvred quarter lights, the slatted engine cover, the
-// panel line and the slot in the tail from the top view; the lamps, the horseshoe and the intakes from the front view;
-// the lamps, the grille band, the valance and the pipes from the rear view. The wheels are the real size (the sheet
-// draws the rims large). `wing` 0: the blade lies flush in the tail .. 1: 110 mm up, its trailing edge raised.
+// Construction: the body is one grid of points, a ring of 54 at each of some sixty stations. Five lines run the length
+// of the car and every ring passes through them: the centre line's top (C), the wing crest that becomes the screen
+// pillar, the roof's edge and the buttress's crest (A), the shoulder that is the side glass's foot (B), the widest
+// line (W) and the sill (S). Each line is a smooth curve (a monotone cubic through a short table), so no station
+// steps against its neighbour; between the lines a ring is a cubic (top), a parabola (glass, wing top) and two
+// Bezier arcs (shoulder, flank), so the flanks lean in to the glass and tuck under to the sill. A ring is not flat:
+// its top bows forward toward the centre line (BOW), so the nose and tail are round in plan and one ring lies along
+// the windscreen's curved foot. The glass is the grid's own cells between those lines (the cabin is hollow behind
+// it); the wheel arches are cut by sliding the flank's points up to the arch, none collapsed.
+// `wing` 0: the blade lies in the tail .. 1: raised 110 mm on its two struts, its trailing edge tilted up.
 import { Build, type Mesh, type V } from './mesh';
 
-const PAINT = '#1f3fb8', SEAM = '#0d1c5c', FRAME = '#17181c', TRIM = '#2a2c33', SEAT = '#9c9da2', SEAT2 = '#7d7e84', GLASS = '#a9c2cc', SILVER = '#c9ccd0', CHROME = '#d4d6d9', RUBBER = '#26242b', DARK = '#131318', LENS = '#eef0f2', RED = '#c9221f', AMBER = '#e8901c';
-const L = 4400, FX = 1120, RX = FX + 2550, R = 326, WYF = 775, WYR = 809, TWF = 245, TWR = 316;   // the axles, the tyres' radius, half the tracks, the tyres' widths
-const RAF = 356, RAR = 372, YINF = 620, YINR = 630;                                                 // the wheel arches' radii (132 and 140 px); the wells' inner walls
-/** the sheet's pixels to mm: along the car from the nose (the wheelbase closed up to the real one), up from the ground, across from the centre line (plan) */
-const X = (px: number) => px < 410 ? px * FX / 410 : px < 1383 ? FX + (px - 410) * 2550 / 973 : RX + (px - 1383) * (L - RX) / 267;
-const Z = (px: number) => px * 2.75, Y = (px: number) => px * 2.853;
-const tab = (t: [number, number][], fv: (v: number) => number) => t.map(([x, v]) => [X(x), fv(v)] as [number, number]);
-/** linear reading of a table of [x, value] */
-const at = (t: [number, number][], x: number) => { if (x <= t[0]![0]) return t[0]![1]; for (let i = 1; i < t.length; i++) if (x <= t[i]![0]) { const [x0, v0] = t[i - 1]!, [x1, v1] = t[i]!; return v0 + (v1 - v0) * (x - x0) / (x1 - x0); } return t[t.length - 1]![1]; };
-// the body along the car, in the sheet's pixels: half-width (plan); the shoulder (the widest line's height); the
-// underside; the top on the centre line (the nose's wedge, then the waist under the glass, then the tail's deck); how
-// far the front wings' crests stand above it
-const NOSE: [number, number][] = [[2, 126], [31, 230], [61, 256], [91, 277], [121, 290], [151, 305], [181, 310], [211, 322], [241, 330], [271, 335]];
-const TAIL: [number, number][] = [[1440, 340], [1470, 338], [1500, 333], [1530, 326], [1560, 318], [1590, 306], [1610, 290], [1630, 265]];
-const HALF = tab([...NOSE, [480, 335], [540, 333], [840, 333], [930, 338], [1000, 340], ...TAIL], Y);
-const EDGE = tab([[2, 98], [30, 110], [150, 170], [270, 222], [345, 245], [420, 258], [1000, 264], [1060, 280], [1200, 292], [1500, 295], [1590, 285], [1630, 268]], Z);
-const BOT = tab([[2, 29], [540, 29], [600, 35], [1250, 38], [1598, 40], [1630, 120]], Z);
-const DECK = tab([[2, 112], [30, 128], [345, 238], [455, 270], [600, 276], [880, 282], [1040, 295], [1060, 317], [1300, 326], [1380, 332], [1500, 332], [1530, 323], [1560, 315], [1590, 303], [1620, 281], [1630, 276]], Z);
-const WNG = tab([[2, 0], [30, 3], [150, 46], [270, 64], [345, 58], [420, 27], [455, 12], [520, 0], [1630, 0]], Z);
-const X0 = X(2), X1 = X(1630);                                           // the skin's first and last sections (the splitter and the bumper stand out to 0 and L)
-const FLOOR = 210, CX0 = X(548), CX1 = X(1040);                          // the cabin's hollow: its floor, front (behind the front arch) and back (the door's rear edge)
-const SX0 = X(625), SX1 = X(1128), ST = Z(164), SB = Z(69);              // the scallop along the flank into the intake ahead of the rear wheel
-const P = 6, FOOT = 0.87, WALL = 0.84;                                   // how square the shoulders are; where the glass stands and the cabin's wall, as parts of the half-width
-const sub = (a: V, b: V): V => [a[0] - b[0], a[1] - b[1], a[2] - b[2]], cross = (a: V, b: V): V => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]], norm = (a: V): V => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };
-const lerp = (a: V, b: V, f: number): V => [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, a[2] + (b[2] - a[2]) * f];
-/** the wheel arch's height at x: a half circle over each hub (0 away from the wheels) */
-const archZ = (x: number) => { for (const [hx, ra] of [[FX, RAF], [RX, RAR]] as const) { const dx = x - hx; if (Math.abs(dx) <= ra + 1e-6) return R + Math.sqrt(Math.max(0, ra * ra - dx * dx)); } return 0; };
-/** how deep the flank's scallop is at x: from nothing behind the front wheel to the intake's mouth */
-const dep = (x: number) => x < SX0 || x > SX1 ? 0 : Math.min(72, 24 + (x - SX0) * 48 / (X(1100) - SX0));
-/** the skin's height at y across the body at x: the centre line's and the wings' crests, rolled over to the shoulder */
-const skinZ = (x: number, y: number) => { const w = at(HALF, x), u = Math.min(1, Math.abs(y) / w), ze = Math.max(at(EDGE, x), archZ(x));
-  const h = at(DECK, x) + at(WNG, x) * Math.exp(-(((u - 0.93) / 0.07) ** 2)); return ze + (h - ze) * (1 - u ** P) ** (1 / P); };
-/** the skin's distance from the centre line at height z on the body's side at x (into the scallop where it runs) */
-const sideY = (x: number, z: number) => { const w = at(HALF, x), ze = at(EDGE, x); if (z <= ze) return w - (z < ST - 6 && z > SB + 6 ? dep(x) : 0);
-  let lo = 0.6 * w, hi = w; for (let i = 0; i < 18; i++) { const m = (lo + hi) / 2; if (skinZ(x, m) > z) lo = m; else hi = m; } return (lo + hi) / 2; };
-// where the body's sections have their points across the top, as parts of the half-width; the doubled one is the
-// cabin's wall, so it stands upright
-const U = [-1, -0.985, -0.95, -0.9, -WALL, -WALL, -0.5, 0, 0.5, WALL, WALL, 0.9, 0.95, 0.985, 1];
-const cab = (x: number) => x >= CX0 && x <= CX1;
-/** a body section at x: the top across, then down one side (flank, scallop, sill, floor) and up the other; at a wheel it rises into the arch outboard of the well's wall */
-function ring(x: number): V[] { const w = at(HALF, x), zb = at(BOT, x), ze = at(EDGE, x), arch = archZ(x), yin = x < 2400 ? YINF : YINR, c = cab(x), d = dep(x);
-  const top: V[] = U.map((u, i) => [x, u * w, c && i >= 5 && i <= 9 ? FLOOR : skinZ(x, u * w)]);
-  const sb = Math.max(Math.min(SB, ze - 20), zb + 60), st = Math.max(Math.min(ST, ze - 10), sb + 5);
-  const low: [number, number][] = arch ? [[w, arch], [w, arch], [w, arch], [w, arch], [w, arch], [yin, arch], [yin, zb]]
-    : [[w, st], [w - d, st - d * 0.25], [w - d, sb + d * 0.25], [w, sb], [0.995 * w, zb + 45], [0.97 * w, zb + 8], [0.9 * w, zb]];
-  return [...top, ...low.map(([y, z]) => [x, y, z] as V), ...low.slice().reverse().map(([y, z]) => [x, -y, z] as V)]; }
-/** the part a piece of the skin belongs to: `xm` the middle of its two sections, `i` its place round the section */
-function partOf(xm: number, i: number, open: boolean, arch: boolean): string {
-  if (arch && i >= 19 && i <= 23) return 'chassis'; if (i >= 20 && i <= 22) return xm > X(1598) ? 'bumperR' : 'chassis'; if (i === 18 || i === 19 || i === 23 || i === 24) return 'sill';
-  if (open && i >= 4 && i <= 9) return 'cockpit'; if (xm < X(31)) return 'bumperF'; if (xm > X(1610)) return 'bumperR';
-  const outer = i <= 3 || i >= 10; if (xm < X(345)) return outer ? 'fenderF' : 'hood'; if (xm < X(455)) return outer ? 'fenderF' : 'body'; if (xm < X(1040)) return outer ? 'door' : 'body'; return outer ? 'fenderR' : 'body'; }
-/** a patch lying on the body's top between x0..x1 and y0..y1, `lift` above the skin, in nx by ny pieces */
-function lay(b: Build, x0: number, x1: number, y0: number, y1: number, lift: number, nx = 2, ny = 2) { const p = (i: number, j: number): V => { const x = x0 + (x1 - x0) * i / nx, y = y0 + (y1 - y0) * j / ny; return [x, y, skinZ(x, y) + lift]; };
-  for (let i = 0; i < nx; i++) for (let j = 0; j < ny; j++) b.quad(p(i, j), p(i + 1, j), p(i + 1, j + 1), p(i, j + 1)); }
-/** a flat shape laid on the body's flank, `lift` off the skin: [x, z] points round it (side `s`) */
-function flank(b: Build, s: number, pts: [number, number][], lift = 4) { const q: V[] = pts.map(([x, z]) => [x, s * (sideY(x, z) + lift), z]), m: V = [0, 0, 0]; for (const p of q) { m[0] += p[0] / q.length; m[1] += p[1] / q.length; m[2] += p[2] / q.length; }
-  m[1] = s * (sideY(m[0], m[2]) + lift); for (let i = 0; i < q.length; i++) b.tri(m, q[i]!, q[(i + 1) % q.length]!); }
-/** a shut line on the flank through [x, z] points */
-function seam(b: Build, s: number, pts: [number, number][], wd = 9) { for (let i = 0; i + 1 < pts.length; i++) { const [xa, za] = pts[i]!, [xb, zb] = pts[i + 1]!, l = Math.hypot(xb - xa, zb - za) || 1, nx = -(zb - za) / l * wd / 2, nz = (xb - xa) / l * wd / 2;
-  const p = (x: number, z: number): V => [x, s * (sideY(x, z) + 2.5), z]; b.quad(p(xa - nx, za - nz), p(xb - nx, zb - nz), p(xb + nx, zb + nz), p(xa + nx, za + nz)); } }
-/** how far back the nose's skin stands at y across it; the same for the tail (from the plan) */
-const NOSEX = NOSE.map(([x, v]) => [Y(v), X(x)] as [number, number]), TAILX = TAIL.map(([x, v]) => [Y(v), X(x)] as [number, number]).reverse();
-const noseX = (y: number) => at(NOSEX, Math.abs(y)), tailX = (y: number) => at(TAILX, Math.abs(y));
-/** a panel on the nose's face (`end` 0) or the tail's (1), side `s`, y0..y1 from the centre line, z0..z1, `lift` proud of the skin: it follows the plan round the corners */
-function face(b: Build, end: 0 | 1, s: number, y0: number, y1: number, z0: number, z1: number, lift: number) { const T = end ? TAILX : NOSEX, fx = (y: number) => end ? tailX(y) + lift : noseX(y) - lift;
-  const ys = [y0, ...T.map(t => t[0]).filter(y => y > y0 + 1 && y < y1 - 1), y1]; for (let i = 0; i + 1 < ys.length; i++) { const ya = ys[i]!, yb = ys[i + 1]!; b.quad([fx(ya), s * ya, z0], [fx(yb), s * yb, z0], [fx(yb), s * yb, z1], [fx(ya), s * ya, z1]); } }
-/** the horseshoe's outline at x: half-width w, from zb up to zt (an arch over straight sides drawing in to the foot) */
-const shoe = (x: number, w: number, zb: number, zt: number): V[] => { const out: V[] = [[x, -w * 0.8, zb], [x, w * 0.8, zb]], zc = zt - w; for (let k = 0; k <= 8; k++) { const t = k / 8 * Math.PI; out.push([x, Math.cos(t) * w, zc + Math.sin(t) * w]); } return out; };
-/** an oval facing backwards at x */
-function oval(b: Build, x: number, y: number, z: number, ry: number, rz: number, seg = 12) { for (let i = 0; i < seg; i++) { const a = i / seg * Math.PI * 2, c = (i + 1) / seg * Math.PI * 2; b.tri([x, y, z], [x, y + Math.cos(a) * ry, z + Math.sin(a) * rz], [x, y + Math.cos(c) * ry, z + Math.sin(c) * rz]); } }
+const PAINT = '#1b3a8a', SEAM = '#0c1a45', FRAME = '#14151a', TRIM = '#25272d', SEAT = '#8d8e94', SEAT2 = '#6c6d73', GLASS = '#a9c2cc', SILVER = '#c4c7cc', CHROME = '#d4d6d9', RUBBER = '#26242b', DARK = '#131318', LENS = '#eef0f2', RED = '#c9221f', RED2 = '#8e1a1a', AMBER = '#e8901c';
+const GLOSS = 0.6;
+const L = 4400, FX = 1090, RX = FX + 2550, R = 326, WYF = 775, WYR = 809, TWF = 245, TWR = 310;   // the axles, the tyres' radius, half the tracks, the tyres' widths
+const RAF = 345, RAR = 362, YINF = 618, YINR = 628;                                                 // the wheel arches' radii; the wells' inner walls
+const S0 = 110, S1 = 4340;                                                                          // the first and last rings (where their flanks stand; their centres reach 0 and 4400)
+const SB = Math.round(FX - RAF * Math.cos(126 * Math.PI / 180)), ST = 1900, SP = 2720;              // the rings along the screen's foot, the screen's top, the door glass's back edge
+const PB = 2.2;                                                                        // the bow's shape across the car
+const sub = (a: V, b: V): V => [a[0] - b[0], a[1] - b[1], a[2] - b[2]], cross = (a: V, b: V): V => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+const sm = (a: number, b: number, x: number) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+/** a smooth curve through a table of [x, value]: a monotone cubic (it never overshoots a point, so a level run stays level) */
+function curve(tab: [number, number][]): (x: number) => number { const n = tab.length, h: number[] = [], d: number[] = [], m: number[] = [];
+  for (let i = 0; i + 1 < n; i++) { h[i] = tab[i + 1]![0] - tab[i]![0]; d[i] = (tab[i + 1]![1] - tab[i]![1]) / h[i]!; }
+  for (let i = 0; i < n; i++) { if (i === 0 || i === n - 1) { m[i] = d[i === 0 ? 0 : n - 2]!; continue; } const a = d[i - 1]!, c = d[i]!; if (a * c <= 0) { m[i] = 0; continue; } const w1 = 2 * h[i]! + h[i - 1]!, w2 = h[i]! + 2 * h[i - 1]!; m[i] = (w1 + w2) / (w1 / a + w2 / c); }
+  return x => { if (x <= tab[0]![0]) return tab[0]![1]; if (x >= tab[n - 1]![0]) return tab[n - 1]![1]; let i = 0; while (x > tab[i + 1]![0]) i++; const t = (x - tab[i]![0]) / h[i]!, t2 = t * t, t3 = t2 * t;
+    return (2 * t3 - 3 * t2 + 1) * tab[i]![1] + (t3 - 2 * t2 + t) * h[i]! * m[i]! + (3 * t2 - 2 * t3) * tab[i + 1]![1] + (t3 - t2) * h[i]! * m[i + 1]!; }; }
 
-/** an 18 inch BBS wheel as the sheet draws it: a bright lip, a ring of holes round a smooth dished centre, a small dark cap; a low tyre */
-function wheel(b: Build, x: number, s: 1 | -1, spin = 0) { const front = x === FX, wy = front ? WYF : WYR, tw = front ? TWF : TWR, o: V = [x, s * wy, R], rim = 246, h = tw / 2, f = s * h, N = 16;
-  b.name(front ? 'tyreF' : 'tyreR').mat(RUBBER, 0.05, 'tyre').lathe('y', o, [[-h, rim], [-h, R - 30], [-h + 28, R], [h - 28, R], [h, R - 30], [h, rim]], 24, false);
-  b.name('rim').mat(SILVER, 0.8, 'metal').lathe('y', o, [[f, rim + 5], [f - s * 8, rim - 8], [f - s * 30, rim - 22], [f - s * 36, rim - 30]], 24, false);                        // the lip and the barrel
-  b.name('wheel').mat(DARK, 0.05).lathe('y', o, [[f - s * 44, rim - 28], [f - s * 44, 0]], 16, false).lathe('y', o, [[-f * 0.7, 0], [-f * 0.7, rim]], 12, false);       // the dark behind the holes; the wheel's back
-  b.name('spoke').mat(SILVER, 0.5); for (let k = 0; k < N; k++) { const a = spin + (k + 0.5) / N * Math.PI * 2, c = Math.cos(a), q = Math.sin(a), y = s * wy + f - s * 36; b.bar([x + c * 160, y, R + q * 160], [x + c * (rim - 26), y, R + q * (rim - 26)], 10, 46); }   // the webs between the holes
-  b.name('spoke').mat(SILVER, 0.5).lathe('y', o, [[f - s * 37, 174], [f - s * 30, 118], [f - s * 33, 46]], 16, false);                                                         // the smooth dished centre
-  b.name('hub').mat(FRAME, 0.3).lathe('y', o, [[f - s * 33, 46], [f - s * 36, 0]], 12, false);
-  b.name('hub').mat(SILVER, 0.7).lathe('y', o, [[f - s * 37, 22], [f - s * 39, 0]], 8, false);
+// ---- the five lines, each against the ring's place s (the flank's x), but for the centre line's height, which is against its own x ----
+/** half the width at the widest line (plan) */
+const W = curve([[110, 700], [122, 728], [150, 775], [200, 822], [280, 868], [380, 900], [500, 920], [700, 935], [1090, 945], [1600, 950], [2400, 957], [3000, 966], [3640, 970], [4000, 963], [4170, 945], [4240, 925], [4290, 895], [4325, 862], [4337, 848], [4340, 840]]);
+/** how far the ring's centre stands ahead of its flank: the round nose, the screen's curved foot, the tail (behind: negative) */
+const BOW = curve([[110, 110], [600, 110], [900, 190], [SB, 350], [1500, 235], [ST, 30], [2300, 0], [4050, 0], [4200, -22], [4340, -60]]);
+/** the shoulder (the glass's foot) as a part of the half-width: the tumblehome; the crest/pillar/roof edge as a part of the shoulder's */
+const FB = curve([[110, 0.93], [1000, 0.93], [SB, 0.895], [2720, 0.885], [3300, 0.9], [3640, 0.915], [4340, 0.93]]);
+const FA = curve([[110, 0.8], [600, 0.84], [1000, 0.9], [SB, 0.943], [1500, 0.82], [1700, 0.71], [ST, 0.6], [2720, 0.595], [3100, 0.63], [3600, 0.72], [4340, 0.8]]);
+/** the centre line's top against x: the nose's lip, the bonnet (15 degrees), the screen (23), the roof, the engine cover (9) down to the tail's edge */
+const ZC = curve([[0, 410], [12, 432], [40, 448], [110, 464], [300, 508], [500, 556], [700, 607], [921, 665], [1100, 741], [1400, 868], [1700, 995], [1870, 1066], [2000, 1100], [2150, 1118], [2350, 1125], [2550, 1120], [2720, 1105], [2900, 1076], [3100, 1040], [3400, 982], [3700, 926], [4000, 875], [4250, 838], [4340, 826], [4385, 814], [4397, 800], [4400, 784]]);
+const xA = (s: number) => s - BOW(s) * (1 - FA(s) ** PB);
+/** the A line's height: the wing's crest; along the screen the pillar lies in the screen's own surface; the roof's edge; the buttress's crest */
+const ZA = curve([[110, 398], [122, 420], [150, 438], [220, 460], [410, 512], [610, 566], [860, 648], [1000, 706], [1090, 732],
+  ...[0, 1, 2, 3, 4, 5, 6].map(k => { const s = SB + (ST - SB) * k / 6; return [s, ZC(xA(s)) - 16 - k] as [number, number]; }),
+  [2010, 1080], [2150, 1097], [2350, 1103], [2550, 1099], [2720, 1086], [2900, 1064], [3100, 1028], [3400, 971], [3700, 916], [4000, 866], [4240, 832], [4290, 824], [4325, 812], [4337, 798], [4340, 780]]);
+const ZB = curve([[110, 366], [122, 386], [150, 402], [220, 424], [410, 478], [610, 536], [860, 626], [1000, 686], [1090, 712], [SB, 770], [1600, 778], [2000, 788], [2400, 800], [2720, 822], [3000, 852], [3300, 872], [3640, 876], [3900, 862], [4150, 836], [4240, 824], [4290, 815], [4325, 801], [4337, 785], [4340, 764]]);
+const ZW = curve([[110, 285], [300, 335], [600, 420], [1090, 510], [1600, 525], [2400, 545], [3000, 585], [3640, 615], [4100, 600], [4340, 560]]);
+const ZS = curve([[110, 150], [300, 130], [700, 120], [3640, 125], [3900, 150], [4150, 185], [4340, 205]]);
+/** how far the sill stands in from the widest line */
+const UND = curve([[110, 30], [700, 45], [2400, 55], [3640, 45], [4340, 25]]);
+/** the roof's fall at its edge (and the bonnet's and deck's at the crest) */
+const MAI = curve([[110, -0.04], [400, 0], [SB, -0.05], [ST, -0.1], [2720, -0.12], [3200, -0.06], [4340, -0.04]]);
+const YB = (s: number) => FB(s) * W(s), YA = (s: number) => FA(s) * YB(s);
+/** the wheel arch's height at s: a half circle over each hub (0 away from the wheels) */
+const archZ = (s: number) => { for (const [hx, ra] of [[FX, RAF], [RX, RAR]] as const) { const dx = s - hx; if (Math.abs(dx) <= ra + 1e-6) return R + Math.sqrt(Math.max(0, ra * ra - dx * dx)); } return 0; };
+/** the scoop in the door and the rear wing ahead of the side intake: its depth at s (it deepens to the intake's mouth) */
+const SC0 = FX + 0.24 * 2550, SC1 = 2990, scoop = (s: number) => s < SC0 || s > SC1 + 1 ? 0 : 58 * sm(SC0, 2640, s);
+
+// a ring's points, centre top to centre bottom: NCA across the top to the A line, NAB to the shoulder, the flank at TS, three underneath
+const NCA = 7, NAB = 4, TS = [0, 0.2, 0.4, 0.6, 0.8, 1, 1.12, 1.24, 1.3, 1.5, 1.72, 1.86, 1.92, 2], JA = NCA, JB = NCA + NAB, JS = JB + TS.length - 1, NJ = JS + 4, SCK0 = 8, SCK1 = 11;
+/** half a ring (y >= 0) at s */
+function half(s: number): V[] { const w = W(s), yB = FB(s) * w, fa = FA(s), yA = fa * yB, bow = BOW(s), zC = ZC(s - bow), zA = ZA(s), zB = ZB(s), zW = ZW(s), yS = w - UND(s), zS = ZS(s), zF = zS - 12;
+  const cr = sm(FX, SB, s) * (1 - sm(3300, 3900, s));                                                    // how sharp the edges at A and B are: the glass's edges, not the bonnet's or the tail's
+  // the top is laid on the slope the centre line has there (a), so a ring that bows across a flat bonnet or the screen stays in its plane
+  const a = Math.max(-0.3, Math.min(0.45, (ZC(s - bow + 15) - ZC(s - bow - 15)) / 30)) * sm(200, 450, s) * (1 - sm(4150, 4300, s)), xa = s - bow * (1 - fa ** PB), rA = zA - zC - a * (xa - s + bow);
+  const mAi = MAI(s), mean = (zB - zA - a * (s - xa)) / (yB - yA), mAo = mAi + (Math.min(mAi, 0.55 * mean) - mAi) * cr, mBi = 2 * mean - mAo, mBo = mBi + (-0.6 - mBi) * cr;
+  const xT = (y: number) => s - bow * (1 - (y / yB) ** PB), out: V[] = [];
+  for (let j = 0; j < NCA; j++) { const t = j / NCA, t2 = t * t, t3 = t2 * t, y = yA * t; out.push([xT(y), y, zC + a * (xT(y) - s + bow) + (3 * t2 - 2 * t3) * rA + (t3 - t2) * yA * mAi]); }
+  for (let j = 0; j < NAB; j++) { const d = (yB - yA) * j / NAB; out.push([xT(yA + d), yA + d, zA + a * (xT(yA + d) - xa) + mAo * d + (mean - mAo) / (yB - yA) * d * d]); }
+  const dy = w - yB, b1 = [[yB, zB], [yB + 0.6 * dy, zB + 0.6 * dy * mBo], [w, zW + 0.45 * (zB - zW)], [w, zW]], b2 = [[w, zW], [w, zW - 0.45 * (zW - zS)], [yS + 0.35 * (w - yS), zS + 0.2 * (zW - zS)], [yS, zS]];
+  const side = (tau: number): [number, number] => { const p = tau <= 1 ? b1 : b2, u = tau <= 1 ? tau : tau - 1, v = 1 - u, c = [v * v * v, 3 * v * v * u, 3 * v * u * u, u * u * u]; return [0, 1].map(k => c[0]! * p[0]![k]! + c[1]! * p[1]![k]! + c[2]! * p[2]![k]! + c[3]! * p[3]![k]!) as [number, number]; };
+  const az = archZ(s), dep = scoop(s); let tc = 2; if (az > zS) { let lo = 0, hi = 2; for (let k = 0; k < 28; k++) { const m = (lo + hi) / 2; if (side(m)[1] > az) lo = m; else hi = m; } tc = Math.max(0.08, lo); }   // at a wheel the flank stops at the arch: its points slide up, keeping their order
+  TS.forEach((t, k) => { const [y, z] = side(t * tc / 2); out.push([s, y - (k >= SCK0 && k <= SCK1 ? dep : 0), z]); });
+  const bb = s < 1000 ? bow * (1 - sm(300, 600, s)) : s > 4050 ? bow : 0, xU = (y: number) => s - bb * (1 - (y / yS) ** PB);
+  if (az > 0) { const yin = s < 2400 ? YINF : YINR; out.push([s, yin, az], [s, yin, zF], [s, 0, zF]); } else out.push([xU(yS - 45), yS - 45, zF], [xU(yS / 2), yS / 2, zF], [xU(0), 0, zF]);
+  return out; }
+/** the stations: close at the nose's and tail's lips, every 18 degrees round an arch, about 110 mm apart between */
+const arcS = (hx: number, ra: number) => [hx - ra - 2, ...Array.from({ length: 11 }, (_, k) => Math.round(hx - ra * Math.cos(k * 18 * Math.PI / 180))), hx + ra + 2];
+const SS = [S0, 122, 150, 200, 280, 380, 480, 580, 665, ...arcS(FX, RAF), 1545, 1660, 1780, ST, 2010, 2130, 2250, 2370, 2490, 2610, SP, 2830, 2920, SC1, SC1 + 22, 3100, 3190, ...arcS(RX, RAR), 4090, 4170, 4240, 4290, 4325, 4337, S1];
+const IB = SS.indexOf(SB), IT = SS.indexOf(ST), IP = SS.indexOf(SP), IM = SS.indexOf(SC1);
+
+type Tri = [V, V, V];
+/** where a line along axis `c` through (a, b) on the other two axes meets a set of triangles: the farthest (or nearest) hit; NaN if none */
+function probe(T: Tri[], ia: number, ib: number, ic: number, a: number, b: number, far = true): number { let best = NaN;
+  for (const [p, q, r] of T) { const den = (q[ib]! - r[ib]!) * (p[ia]! - r[ia]!) + (r[ia]! - q[ia]!) * (p[ib]! - r[ib]!); if (Math.abs(den) < 1e-9) continue;
+    const l0 = ((q[ib]! - r[ib]!) * (a - r[ia]!) + (r[ia]! - q[ia]!) * (b - r[ib]!)) / den, l1 = ((r[ib]! - p[ib]!) * (a - r[ia]!) + (p[ia]! - r[ia]!) * (b - r[ib]!)) / den, l2 = 1 - l0 - l1; if (l0 < -1e-6 || l1 < -1e-6 || l2 < -1e-6) continue;
+    const v = l0 * p[ic]! + l1 * q[ic]! + l2 * r[ic]!; if (!(far ? v <= best : v >= best)) best = v; } return best; }
+/** a four-sided face wound so that it looks along n */
+function face(b: Build, p: V, q: V, r: V, t: V, n: V) { const c = cross(sub(q, p), sub(t, p)); if (c[0] * n[0] + c[1] * n[1] + c[2] * n[2] >= 0) b.quad(p, q, r, t); else b.quad(p, t, r, q); }
+/** a patch of nu by nv faces over f(u, v), 0..1 each way */
+function patch(b: Build, f: (u: number, v: number) => V, nu: number, nv: number, n: V) { for (let i = 0; i < nu; i++) for (let j = 0; j < nv; j++) face(b, f(i / nu, j / nv), f((i + 1) / nu, j / nv), f((i + 1) / nu, (j + 1) / nv), f(i / nu, (j + 1) / nv), n); }
+const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+
+/** a flat disc across the axle at o */
+function disc(b: Build, o: V, r: number, seg: number) { for (let i = 0; i < seg; i++) { const a0 = i / seg * Math.PI * 2, a1 = (i + 1) / seg * Math.PI * 2; b.tri(o, [o[0] + Math.cos(a0) * r, o[1], o[2] + Math.sin(a0) * r], [o[0] + Math.cos(a1) * r, o[1], o[2] + Math.sin(a1) * r]); } }
+/** a pressed light-alloy wheel: a bright lip, a dished disc with a ring of holes, a dark centre */
+function wheel(b: Build, x: number, s: 1 | -1, spin = 0) { const front = x === FX, wy = front ? WYF : WYR, tw = front ? TWF : TWR, o: V = [x, s * wy, R], rim = 240, h = tw / 2, f = s * h;
+  b.name(front ? 'tyreF' : 'tyreR').mat(RUBBER, 0.05, 'tyre').lathe('y', o, [[-h, rim], [-h, R - 28], [-h + 26, R], [h - 26, R], [h, R - 28], [h, rim]], 20, false);
+  b.name('rim').mat(SILVER, 0.8, 'metal').lathe('y', o, [[f, rim + 4], [f - s * 10, rim - 10], [f - s * 34, rim - 24]], 20, false);
+  b.name('wheel').mat(SILVER, 0.5, 'metal').lathe('y', o, [[f - s * 34, rim - 24], [f - s * 30, 150], [f - s * 20, 62], [f - s * 20, 46]], 16, false);
+  b.name('wheel').mat(DARK, 0.05); disc(b, [x, s * wy - f * 0.7, R], rim, 12);
+  b.name('wheelHole').mat(DARK, 0.05); for (let k = 0; k < 12; k++) { const a = spin + k / 12 * Math.PI * 2, y = s * wy + f - s * 28, p = (r: number, da: number): V => [x + Math.cos(a + da) * r, y, R + Math.sin(a + da) * r];
+    face(b, p(152, -0.12), p(192, -0.15), p(192, 0.15), p(152, 0.12), [0, s, 0]); }
+  b.name('hub').mat(FRAME, 0.3); disc(b, [x, s * wy + f - s * 18, R], 46, 10); b.name('hub').mat(SILVER, 0.7, 'metal'); disc(b, [x, s * wy + f - s * 15, R], 20, 8);
 }
 
 export function eb110Mesh(spin = 0, wing = 0): Mesh { const b = new Build(); wing = Math.max(0, Math.min(1, wing));
-  // ---- the body: one skin from the nose to the tail, the arches cut up into it, the cabin hollowed; each panel its own part ----
-  const xs = [...NOSE.map(p => X(p[0])), ...TAIL.map(p => X(p[0])), CX0 - 2, CX0, X(600), SX0 - 2, SX0, X(700), X(790), X(880), X(960), X(1000), CX1, CX1 + 2, X(1060), X(1100), SX1, SX1 + 2, X(1200), X(1598)];
-  for (const [hx, ra] of [[FX, RAF], [RX, RAR]] as const) { xs.push(hx - ra - 2, hx + ra + 2); for (let d = 0; d <= 180; d += 15) xs.push(Math.round(hx - ra * Math.cos(d * Math.PI / 180))); }
-  xs.sort((p, q) => p - q);
-  { const rings = xs.map(x => ring(x)), K = rings[0]!.length, parts = new Map<string, [V, V, V, V][]>(), same = (p: V, q: V) => Math.abs(p[1] - q[1]) + Math.abs(p[2] - q[2]) < 0.01;
-    for (let r = 0; r + 1 < rings.length; r++) { const A = rings[r]!, B = rings[r + 1]!, xa = xs[r]!, xb = xs[r + 1]!, oc = cab(xa) || cab(xb), ar = archZ(xa) > 0 || archZ(xb) > 0;
-      for (let i = 0; i < K; i++) { const j = (i + 1) % K; if (same(A[i]!, A[j]!) && same(B[i]!, B[j]!)) continue; const nm = partOf((xa + xb) / 2, i, oc, ar); if (!parts.has(nm)) parts.set(nm, []); parts.get(nm)!.push([A[i]!, A[j]!, B[j]!, B[i]!]); } }
-    for (const [nm, qs] of parts) { if (nm === 'chassis') b.name(nm).mat(DARK, 0.05); else if (nm === 'cockpit') b.name(nm).mat(TRIM, 0.1); else b.name(nm).mat(PAINT, 0.6, 'paint');
-      for (const q of qs) b.quad(...q); }
-    for (const [nm, Rg] of [['bumperF', rings[0]!], ['bumperR', rings[rings.length - 1]!]] as const) { b.name(nm).mat(PAINT, 0.6, 'paint'); const m: V = [Rg[0]![0], 0, 0]; for (const p of Rg) m[2] += p[2] / Rg.length; for (let i = 0; i < K; i++) b.tri(m, Rg[i]!, Rg[(i + 1) % K]!); } }
-  b.name('chassis').mat(DARK, 0.05).bar([FX, -WYF, R], [FX, WYF, R], 60).bar([RX, -WYR, R], [RX, WYR, R], 80);   // the axles' lines through the wells
-  // ---- the nose (front view): the small horseshoe low at the tip between two barred intakes, a duct in each corner, the badge, the splitter ----
-  b.name('grille').mat(PAINT, 0.6, 'paint').loft([shoe(X0 - 4.5, 60, 118, 300), shoe(X0 + 1, 60, 118, 300)]);
-  b.name('core').mat(DARK, 0.1, 'grille').loft([shoe(X0 - 5, 46, 128, 288), shoe(X0 + 1, 46, 128, 288)]);
-  for (const s of [1, -1]) { b.name('grille').mat(DARK, 0.05); face(b, 0, s, 100, 527, 128, 268, 3); face(b, 0, s, 580, 790, 150, 282, 4);
-    b.name('grille').mat(PAINT, 0.6, 'paint'); for (const z of [221, 168]) face(b, 0, s, 100, 527, z - 7, z + 7, 5);                      // the intake's two bars
-    b.name('lens').mat(AMBER, 0.5, 'lens'); lay(b, 300, 350, s * 705, s * 750, 5, 1, 1); flank(b, s, [[X(200), Z(137)], [X(232), Z(137)], [X(232), Z(147)], [X(200), Z(147)]]); }   // the turn lamps beside the head lamps; the side repeaters
-  b.name('grille').mat(RED, 0.5); { const cx = X0 + 50, p = (i: number): V => { const a = i / 10 * Math.PI * 2, x = cx + Math.cos(a) * 22, y = Math.sin(a) * 44; return [x, y, skinZ(x, y) + 4]; }; for (let i = 0; i < 10; i++) b.tri([cx, 0, skinZ(cx, 0) + 4], p(i), p(i + 1)); }   // the red oval badge
-  b.name('bumperF').mat(PAINT, 0.6, 'paint').loft([-732, -656, -360, 360, 656, 732].map(y => { const x = noseX(y) - X0; return [[x, y, 72], [x + 70, y, 72], [x + 70, y, 90], [x, y, 90]] as V[]; }));   // the splitter's lip
-  // ---- the head lamps (top and front views): two square lamps side by side in each corner of the nose, under a clear cover flush with the skin ----
-  for (const s of [1, -1]) { b.name('lamp').mat(DARK, 0.05); lay(b, 306, 572, s * 335, s * 688, 3);
-    b.tri([306, s * 335, skinZ(306, 335) + 3], [306, s * 250, skinZ(306, 250) + 3], [420, s * 335, skinZ(420, 335) + 3]);                 // the pocket's dark point towards the centre
-    for (const [ya, yb] of [[350, 506], [516, 672]] as const) { b.name('lamp').mat(CHROME, 0.9, 'metal'); lay(b, 316, 562, s * ya, s * yb, 6, 1, 1); b.name('lens').mat(LENS, 0.6, 'lens'); lay(b, 328, 550, s * (ya + 12), s * (yb - 12), 9, 1, 1); }
-    b.name('lampCover').mat(GLASS, 0.5, 'glass'); lay(b, 306, 572, s * 335, s * 688, 15);
-    b.name('fenderF').mat(SEAM, 0.2); lay(b, X(248), X(302), s * Y(258), s * Y(298), 4, 2, 1); }                                         // the brake vents on the wings' tops
-  // ---- the glasshouse: sections from the screen's base over the roof and down the engine cover to the deck ----
-  // each: the centre's x, how far back its corners are swept, the cant rail's half-width and height, the crown's height, the foot's x
-  const G: [number, number, number, number, number, number][] = [[X(345), X(480) - X(345), 725, 0, 0, X(540)], [X(724), X(775) - X(724), 520, Z(378), Z(387), X(700)], [X(810), 0, 528, Z(384), Z(403), X(810)],
-    [X(900), 0, 532, Z(388), Z(409), X(900)], [X(1040), 0, 532, Z(387), Z(408), X(1040)], [X(1060), 0, 536, Z(396), Z(403), X(1060)], [X(1140), 0, 536, Z(389), Z(395), X(1140)],
-    [X(1260), 0, 536, Z(374), Z(379), X(1260)], [X(1330), 0, 536, Z(355), Z(358), X(1330)], [X(1382), 0, 536, 0, 0, X(1382)]];
-  const footY = (k: number, xf: number) => (k >= 5 ? [0.83, 0.8, 0.78, 0.775, 0.775][k - 5]! : FOOT) * at(HALF, xf);
-  const sec = ([x, bow, yt, zt, zc, xf]: [number, number, number, number, number, number], k: number): V[] => { const yf = footY(k, xf), foot = (s: number): V => [xf, s * yf, skinZ(xf, yf) - 2];
-    const top = [-1, -0.74, -0.4, 0, 0.4, 0.74, 1].map(u => { const y = u * yt, px = x + bow * Math.abs(u) ** 3; return [px, y, zt ? zt + (zc - zt) * (1 - u * u) : skinZ(px, y) + (k ? 6 : 3)] as V; }); return [foot(-1), ...top, foot(1)]; };
-  const C = G.map(sec), NC = C.length;
-  const band = (k: number, i: number, dz = 0) => { const A = C[k]!, B = C[k + 1]!, d = (p: V): V => [p[0], p[1], p[2] + dz]; b.quad(d(A[i]!), d(A[i + 1]!), d(B[i + 1]!), d(B[i]!)); };
-  b.name('screenPane').mat(GLASS, 0.5, 'glass'); for (let i = 1; i <= 6; i++) band(0, i);                                                    // the windscreen, wrapped round to the pillars
-  b.name('screenPane').mat(GLASS, 0.5, 'glass'); for (const k of [1, 2, 3]) for (const i of [0, 7]) band(k, i); for (const i of [0, 8]) b.tri(C[0]![i]!, C[1]![i ? 7 : 1]!, C[1]![i]!);   // the side windows, a point at the front
-  b.name('body').mat(PAINT, 0.6, 'paint'); for (let k = 1; k < NC - 1; k++) for (let i = 1; i <= 6; i++) band(k, i); for (const k of [4, 8]) for (const i of [0, 7]) band(k, i); for (const i of [0, 8]) b.tri(C[0]![i]!, C[0]![i ? 7 : 1]!, C[1]![i ? 7 : 1]!);   // the roof and the engine cover's frame; the pillar behind the door
-  b.name('cockpit').mat(DARK, 0.05); for (const k of [1, 2, 3]) for (let i = 1; i <= 6; i++) band(k, i, -14);                                // the headliner
-  // the louvred quarter lights: dark glass leaning in to the cover's edge, five panes between body-colour slats
-  { const q = (k: number, i: number, f: number, g: number, off: number): V => { const A = C[k]!, B = C[k + 1]!, lo = lerp(A[i ? 8 : 0]!, B[i ? 8 : 0]!, f), hi = lerp(A[i ? 7 : 1]!, B[i ? 7 : 1]!, f), p = lerp(lo, hi, g); return [p[0], p[1] + (i ? 1 : -1) * off, p[2] + off * 0.6]; };
-    b.name('screenPane').mat(DARK, 0.5); for (const k of [5, 6]) for (const i of [0, 7]) band(k, i); for (const i of [0, 1]) b.tri(q(7, i, 0, 0, 0), q(7, i, 0, 1, 0), q(7, i, 0.8, 0, 0));
-    b.name('body').mat(PAINT, 0.6, 'paint'); for (const i of [0, 1]) { b.quad(q(7, i, 0, 1, 0), q(7, i, 1, 1, 0), q(7, i, 1, 0, 0), q(7, i, 0.8, 0, 0));
-      for (const [k, f] of [[5, 0], [5, 0.56], [6, 0.08], [6, 0.46], [6, 0.83]] as const) b.bar(q(k, i, f, 0.03, 6), q(k, i, f, 0.97, 6), 22, 12); b.bar(q(7, i, 0.02, 0.03, 6), q(7, i, 0.02, 0.9, 6), 22, 12);
-      for (const k of [5, 6]) { b.bar(q(k, i, 0, 0, 6), q(k, i, 1, 0, 6), 20, 12); b.bar(q(k, i, 0, 1, 6), q(k, i, 1, 1, 6), 26, 12); } } }
-  // the slatted engine cover (top view): six dark slots across between body-colour slats, in a frame that widens to the back
-  { const ex0 = X(1090), ex1 = X(1345), hw = (x: number) => Y(128) + (Y(143) - Y(128)) * (x - ex0) / (ex1 - ex0);
-    const roof = (x: number, y: number, lift: number): V => { let k = 5; while (k < NC - 2 && C[k + 1]![4]![0] < x) k++; const f = (x - C[k]![4]![0]) / (C[k + 1]![4]![0] - C[k]![4]![0]); return [x, y, C[k]![4]![2] + (C[k + 1]![4]![2] - C[k]![4]![2]) * f + lift]; };
-    const xsE = [ex0, X(1140), X(1260), X(1330), ex1]; b.name('grille').mat(DARK, 0.05); for (let i = 0; i + 1 < xsE.length; i++) { const xa = xsE[i]!, xb = xsE[i + 1]!; b.quad(roof(xa, -hw(xa), 3), roof(xa, hw(xa), 3), roof(xb, hw(xb), 3), roof(xb, -hw(xb), 3)); }
-    b.name('body').mat(PAINT, 0.6, 'paint'); for (let i = 0; i <= 6; i++) { const x = ex0 + (ex1 - ex0) * i / 6; b.bar(roof(x, -hw(x) - 8, 7), roof(x, hw(x) + 8, 7), i === 0 || i === 6 ? 30 : 22, 12); }
-    for (const s of [1, -1]) for (let i = 0; i + 1 < xsE.length; i++) { const xa = xsE[i]!, xb = xsE[i + 1]!; b.bar(roof(xa, s * hw(xa), 7), roof(xb, s * hw(xb), 7), 24, 12); } }
-  // the frames: the screen's pillars and header, the rail over the doors, the waist under the glass, the door glass's divider
-  b.name('screenFrame').mat(FRAME, 0.2); for (const i of [1, 7]) { b.bar(C[0]![i]!, C[1]![i]!, 44, 22); for (let k = 1; k < 4; k++) b.bar(C[k]![i]!, C[k + 1]![i]!, 24, 14); }
-  for (let i = 1; i < 7; i++) { b.bar(C[1]![i]!, C[1]![i + 1]!, 30, 12); b.bar(C[0]![i]!, C[0]![i + 1]!, 26, 10); }
-  for (const i of [0, 8]) { for (let k = 0; k < 4; k++) b.bar(C[k]![i]!, C[k + 1]![i]!, 18, 14); b.bar(C[1]![i]!, C[1]![i ? 7 : 1]!, 22, 12); b.bar(C[4]![i]!, C[4]![i ? 7 : 1]!, 30, 14); }
-  // ---- the cabin: the dash under the screen, the tunnel, the doors' linings, two seats in grey leather, the wall behind them ----
-  { const w = WALL * at(HALF, X(800)) - 4, xb = (y: number) => G[0]![0] + G[0]![1] * Math.abs(y / 725) ** 3 + 14, ys = [-700, -537, -290, 0, 290, 537, 700];
-    b.name('cockpit').mat(DARK, 0.05); for (let i = 0; i + 1 < ys.length; i++) { const ya = ys[i]!, yb = ys[i + 1]!, p = (x: number, y: number): V => [x, y, skinZ(x, y) + 2]; b.quad(p(xb(ya), ya), p(xb(yb), yb), p(CX0 + 4, yb), p(CX0 + 4, ya)); }   // the dash top
-    b.name('cockpit').mat(TRIM, 0.1).box(CX0, CX0 + 190, -w, w, FLOOR, 735);                                                                 // the dash's face
-    b.name('cockpit').mat(TRIM, 0.15).box(CX0 + 190, CX1 - 20, -100, 100, FLOOR, 430); for (const s of [1, -1]) b.box(CX0 + 2, CX1 - 2, s * (w - 14), s * w, FLOOR, 730);   // the tunnel; the doors' inner faces
-    b.name('cockpit').mat(TRIM, 0.1).box(CX1 - 16, CX1 - 2, -w, w, FLOOR, 800);                                                              // the wall behind the seats
-    for (const s of [1, -1]) { const y0 = s * 125, y1 = s * 520;
-      b.name('seat').mat(SEAT, 0.25, 'leather').box(1930, 2400, y0, y1, FLOOR, 400).loft(([[2350, 400, 0], [2430, 600, 0], [2510, 800, 20], [2560, 900, 70], [2580, 960, 110]] as const).map(([x, z, n]) => [[x, y0 + s * n, FLOOR + 60], [x, y1 - s * n, FLOOR + 60], [x, y1 - s * n, z], [x, y0 + s * n, z]] as V[]));
-      b.name('seat').mat(SEAT2, 0.1); for (const y of [y0 + s * 130, y0 + s * 265]) b.bar([1950, y, 402], [2350, y, 402], 10).bar([2356, y, 410], [2506, y, 795], 10); } }
-  // ---- the flanks (side view): the doors' curved shut lines, the intake's dark mouth ahead of the rear wheel, the vent behind it, mirrors on stalks ----
-  for (const s of [1, -1]) { b.name('door').mat(SEAM, 0.3);
-    seam(b, s, ([[459, 274], [476, 256], [495, 236], [517, 210], [536, 182], [546, 155], [550, 125], [553, 80]] as const).map(([x, z]) => [X(x), Z(z)]));                    // the front edge, round the wheel arch
-    seam(b, s, ([[1040, 293], [1040, 239], [1036, 215], [1030, 194], [1015, 164], [985, 119], [960, 94], [940, 82]] as const).map(([x, z]) => [X(x), Z(z)]));               // the rear edge, curving forward to the sill
-    seam(b, s, [[X(553), Z(80)], [X(700), Z(80)], [X(940), Z(82)]], 7);
-    b.name('door').mat(DARK, 0.05); flank(b, s, [[X(1098), ST - 16], [SX1 - 3, ST - 16], [SX1 - 3, SB + 16], [X(1098), SB + 16]], 3); b.quad([SX1 + 0.5, s * (at(HALF, SX1) + 1), ST - 4], [SX1 + 0.5, s * (at(HALF, SX1) - 72), ST - 14], [SX1 + 0.5, s * (at(HALF, SX1) - 72), SB + 14], [SX1 + 0.5, s * (at(HALF, SX1) + 1), SB + 4]);
-    b.name('fenderR').mat(SEAM, 0.2); for (const [xa, xb] of [[1568, 1590], [1590, 1607]] as const) flank(b, s, [[X(xa), Z(184)], [X(xb), Z(184)], [X(xb), Z(108)], [X(xa), Z(108)]], 5);                          // the vent behind the rear wheel
-    b.name('bumperF').mat(SEAM, 0.2); flank(b, s, [[X(52), Z(96)], [X(96), Z(98)], [X(96), Z(50)], [X(52), Z(50)]]);                                                     // the corner duct, seen from the side
-    // the mirror (side view 632-712 px, 78-130 px down from the roof; the front view has it standing out past the body)
-    const mx = X(660), yb = FOOT * at(HALF, mx) + 20, zb = skinZ(mx, yb), my = MIRROR, mz = Z(305);
-    b.name('mirror').mat(PAINT, 0.6, 'paint').bar([mx - 20, s * yb, zb - 8], [mx - 20, s * (my - 30), mz - 40], 50, 34);
-    b.name('mirror').mat(PAINT, 0.6, 'paint').loft(([[mx - 100, 40, 34], [mx - 50, 70, 62], [mx + 85, 78, 72]] as const).map(([x, hy, hz]) => [[x, s * (my - hy), mz - hz], [x, s * (my + hy), mz - hz], [x, s * (my + hy), mz + hz], [x, s * (my - hy), mz + hz]] as V[]));
-    b.name('mirror').mat('#aeb9c2', 0.8, 'metal').box(mx + 85, mx + 88, s * (my - 66), s * (my + 66), mz - 60, mz + 60); }
-  // ---- the top's shut lines (top view): across the tail ahead of the wing, the engine cover's back edge ----
-  b.name('body').mat(SEAM, 0.3); lay(b, X(1483), X(1483) + 9, -Y(315), Y(315), 2.5, 1, 8); lay(b, X(1384), X(1384) + 8, -Y(205), Y(205), 2.5, 1, 4);
-  // ---- the tail (rear view): three square lamps a side (amber outermost, two red), a barred grille band between them with the oval badge, the bumper, the dark valance, four pipes in two pairs ----
-  for (const s of [1, -1]) { b.name('tailRim').mat(FRAME, 0.3).box(X1 - 4, X1 + 3, s * 438, s * 746, 580, 734);
-    for (const [ya, yb, col] of [[450, 540, RED], [548, 638, RED], [646, 736, AMBER]] as const) b.name('tail').mat(col, 0.5, 'lens').box(X1, X1 + 7, s * ya, s * yb, 592, 724); }
-  b.name('grille').mat(DARK, 0.1).box(X1 - 4, X1 + 3, -430, 430, 588, 728);
-  b.name('grille').mat(PAINT, 0.6, 'paint'); for (const z of [592, 635, 681, 724]) b.box(X1, X1 + 8, -432, 432, z - 6, z + 6); for (const y of [-430, 430]) b.box(X1, X1 + 8, y - 8, y + 8, 586, 730);
-  b.name('grille').mat(LENS, 0.4); oval(b, X1 + 9, 0, 658, 92, 46); b.name('grille').mat(RED, 0.5); oval(b, X1 + 11, 0, 658, 78, 34);
-  b.name('bumperR').mat(PAINT, 0.6, 'paint').loft([-805, -756, -500, 0, 500, 756, 805].map(y => { const x = Math.abs(y) > 756 ? tailX(y) - 4 : X1 - 4, o = Math.abs(y) > 756 ? 30 : 58.5; return [[x, y, 548], [x + o, y, 512], [x + o, y, 432], [x, y, 398]] as V[]; }));
-  { const vx = (z: number) => X(1598) + (z - at(BOT, X(1598))) * (X1 - X(1598)) / (at(BOT, X1) - at(BOT, X(1598))) + 5, vq = (y0: number, y1: number, z0: number, z1: number) => b.quad([vx(z0), y0, z0 - 2], [vx(z0), y1, z0 - 2], [vx(z1), y1, z1 - 2], [vx(z1), y0, z1 - 2]);
-    b.name('bumperR').mat(DARK, 0.05); vq(-181, 181, 112, 262); for (const s of [1, -1]) vq(s * 214, s * 668, 128, 322);                       // the diffuser in the middle, the pipes' dark panels
-    b.name('tail').mat('#7a1512', 0.4, 'lens'); vq(-88, 88, 282, 318);                                                                          // the third brake lamp (unlit)
-    for (const y of [-524, -411, 411, 524]) { b.name('exhaust').mat(CHROME, 0.9, 'metal').lathe('x', [0, y, 214], [[vx(214) - 60, 52], [vx(214) + 42, 52], [vx(214) + 42, 40], [vx(214) - 20, 40]], 10, false); b.name('exhaust').mat(DARK, 0.05).lathe('x', [0, y, 214], [[vx(214) - 20, 0], [vx(214) - 20, 40]], 8, false); } }
-  // ---- the wing: the tail's trailing blade behind the dark slot; up, it stands 110 mm higher on two struts, its trailing edge 12 degrees up ----
-  b.name('grille').mat(DARK, 0.05); lay(b, X(1555), X(1583), -Y(222), Y(222), 3, 1, 6);
-  { const x0 = X(1586), x1 = X1 + 6, z0 = skinZ(x0, 0), a = 12 * wing * Math.PI / 180, ca = Math.cos(a), sa = Math.sin(a), lift = 110 * wing, span = 730;
-    const T = (p: V): V => { const dx = p[0] - x0, dz = p[2] - z0; return [x0 + dx * ca - dz * sa, p[1], z0 + dx * sa + dz * ca + lift]; };
-    const top = (x: number, y: number) => skinZ(Math.min(x, X1), y) + 9 - Math.max(0, x - X1) * 0.8;
-    b.name('body').mat(DARK, 0.05); lay(b, x0 + 8, X1, -span + 12, span - 12, 2.5, 2, 4);                                                       // the bed it lies in
-    b.name('wing').mat(PAINT, 0.6, 'paint').loft([-span, -560, -380, -190, 0, 190, 380, 560, span].map(y => ([[x0, -7], [x0 + 40, 0], [(x0 + x1) / 2, 1], [x1 - 20, 0], [x1, -5], [x1 - 30, -15], [x0 + 40, -17]] as const).map(([x, dz]) => T([x, y, top(x, y) + dz]))));
-    if (wing > 0.02) { b.name('wing').mat(FRAME, 0.2); for (const y of [-330, 330]) { const x = (x0 + x1) / 2; b.bar([x, y, skinZ(x, y) - 10], T([x, y, top(x, y) - 14]), 50, 16); } } }
+  // ---- the body's grid ----
+  const G = SS.map(half), NI = SS.length, g = (i: number, j: number, sg: number): V => { const p = G[i]![j]!; return [p[0], p[1] * sg, p[2]]; };
+  const arch = SS.map(s => archZ(s) > 0), cells: Record<'paint' | 'screen' | 'glass' | 'mouth' | 'under', V[][]> = { paint: [], screen: [], glass: [], mouth: [], under: [] }, TOP: Tri[] = [], SIDE: Tri[] = [];
+  for (let i = 0; i + 1 < NI; i++) for (let j = 0; j + 1 < NJ; j++) for (const sg of [1, -1]) { const q = sg > 0 ? [g(i, j, sg), g(i + 1, j, sg), g(i + 1, j + 1, sg), g(i, j + 1, sg)] : [g(i, j, sg), g(i, j + 1, sg), g(i + 1, j + 1, sg), g(i + 1, j, sg)];
+    const kind = i >= IB && i < IT && j < JA ? 'screen' : i >= IB && i < IP && j >= JA && j < JB ? 'glass' : i === IM && j >= JB + SCK0 - 1 && j <= JB + SCK1 ? 'mouth' : j > JS || (j === JS && (arch[i]! || arch[i + 1]!)) ? 'under' : 'paint';
+    cells[kind].push(q); if (j < JB) TOP.push([q[0]!, q[1]!, q[2]!], [q[0]!, q[2]!, q[3]!]); else if (j < JS && sg > 0) SIDE.push([q[0]!, q[1]!, q[2]!], [q[0]!, q[2]!, q[3]!]); }
+  // each cell is cut along the diagonal that folds it less, so a highlight's edge runs straighter across the cells
+  const un = (p: V, q: V, r: V): V => { const c = cross(sub(q, p), sub(r, p)), l = Math.hypot(c[0], c[1], c[2]) || 1; return [c[0] / l, c[1] / l, c[2] / l]; }, dot = (p: V, q: V) => p[0] * q[0] + p[1] * q[1] + p[2] * q[2];
+  const emit = (qs: V[][]) => { for (const q of qs) { const [p0, p1, p2, p3] = q as [V, V, V, V]; if (dot(un(p0, p1, p2), un(p0, p2, p3)) >= dot(un(p1, p2, p3), un(p1, p3, p0)) - 1e-9) b.quad(p0, p1, p2, p3); else b.quad(p1, p2, p3, p0); } };
+  b.name('body').mat(PAINT, GLOSS, 'paint'); emit(cells.paint);
+  // the nose's and the tail's faces: upright strips between the ring's top and bottom edges, the corner fanned
+  const endFace = (i: number, n: V) => { const s = SS[i]!, yB = YB(s), bow = BOW(s), yS = W(s) - UND(s), zS = ZS(s), zF = zS - 12, foot = (y: number): V => [s - bow * (1 - (Math.abs(y) / yB) ** PB), y, Math.abs(y) < yS - 45 ? zF : zF + (Math.abs(y) - yS + 45) / 45 * 12];
+    for (const sg of [1, -1]) { for (let j = 0; j < JB; j++) { const p = g(i, j, sg), q = g(i, j + 1, sg); face(b, p, q, foot(q[1]), foot(p[1]), n); } const c = foot(g(i, JB, sg)[1]); for (let j = JB; j < JS; j++) b.tri(c, g(i, j, sg), g(i, j + 1, sg)); } };
+  endFace(0, [-1, 0, 0]); endFace(NI - 1, [1, 0, 0]);
+  b.name('chassis').mat(DARK, 0.05); emit(cells.under);
+  b.name('grille').mat(DARK, 0.05); emit(cells.mouth);
+  b.name('screenPane').mat(GLASS, 0.5, 'glass'); emit(cells.screen); b.name('screenPane').mat(GLASS, 0.5, 'glass'); emit(cells.glass);
+  // where the skin is: its height at (x, y) on top, its distance from the centre line at (x, z) on the flank, the nose's and tail's faces at y
+  const zTop = (x: number, y: number) => { const z = probe(TOP, 0, 1, 2, x, y); if (Number.isNaN(z)) throw new Error(`eb110: no skin at ${x}, ${y}`); return z; };
+  const ySide = (x: number, z: number) => { const y = probe(SIDE, 0, 2, 1, x, z); if (Number.isNaN(y)) throw new Error(`eb110: no flank at ${x}, ${z}`); return y; };
+  const top = (x: number, y: number, lift = 4): V => [x, y, zTop(x, y) + lift], flank = (x: number, z: number, sg: number, lift = 4): V => [x, sg * (ySide(x, z) + lift), z];
+  const noseX = (y: number) => S0 - BOW(S0) * (1 - (Math.abs(y) / YB(S0)) ** PB), tailX = (y: number) => S1 - BOW(S1) * (1 - (Math.abs(y) / YB(S1)) ** PB);
+  const nose = (y: number, z: number, lift = 4): V => [noseX(y) - lift, y, z], tail = (y: number, z: number, lift = 4): V => [tailX(y) + lift, y, z];
+  const UP: V = [0, 0, 1];
+  /** a line drawn on the top from one point to another; on the flank through points [x, z] */
+  const seamTop = (x0: number, y0: number, x1: number, y1: number, n = 8, t = 9) => { const l = Math.hypot(x1 - x0, y1 - y0) || 1, ox = -(y1 - y0) / l * t / 2, oy = (x1 - x0) / l * t / 2, p = (i: number, k: number): V => { const f = i / n; return top(lerp(x0, x1, f) + ox * k, lerp(y0, y1, f) + oy * k, 3); }; for (let i = 0; i < n; i++) face(b, p(i, -1), p(i + 1, -1), p(i + 1, 1), p(i, 1), UP); };
+  const seamSide = (pts: [number, number][], sg: number, t = 9) => { const e = pts.map(([x, z], i) => { const a = pts[Math.max(0, i - 1)]!, c = pts[Math.min(pts.length - 1, i + 1)]!, l = Math.hypot(c[0] - a[0], c[1] - a[1]) || 1, nx = -(c[1] - a[1]) / l * t / 2, nz = (c[0] - a[0]) / l * t / 2; return [flank(x + nx, z + nz, sg, 3), flank(x - nx, z - nz, sg, 3)] as [V, V]; });
+    for (let i = 0; i + 1 < e.length; i++) face(b, e[i]![0], e[i + 1]![0], e[i + 1]![1], e[i]![1], [0, sg, 0]); };
+
+  // ---- the wheel wells: dark over and behind each wheel ----
+  b.name('chassis').mat(DARK, 0.05); for (const sg of [1, -1]) for (const [hx, ra, yin] of [[FX, RAF, YINF], [RX, RAR, YINR]] as const) { const y = sg * (yin + 3), a = (i: number): V => { const t = i / 8 * Math.PI; return [hx - Math.cos(t) * (ra - 3), y, R + Math.sin(t) * (ra - 3)]; };
+    for (let i = 0; i < 8; i++) b.tri([hx, y, R], a(i), a(i + 1)); face(b, [hx - ra + 3, y, 110], [hx + ra - 3, y, 110], [hx + ra - 3, y, R], [hx - ra + 3, y, R], [0, sg, 0]); }
+  b.bar([FX, -WYF, R], [FX, WYF, R], 50).bar([RX, -WYR, R], [RX, WYR, R], 70);
+
+  // ---- the cabin behind the glass: floor, door panels, the wall behind the seats, dash, tunnel, two seats ----
+  { const FL = 150, xb = SP - 6;
+    b.name('cockpit').mat(DARK, 0.05); face(b, [SB + 30, -790, FL], [xb, -800, FL], [xb, 800, FL], [SB + 30, 790, FL], UP);
+    b.name('cockpit').mat(TRIM, 0.1); for (const sg of [1, -1]) { face(b, [SB + 40, sg * (YB(SB + 40) - 26), FL], [xb, sg * (YB(xb) - 26), FL], [xb, sg * (YB(xb) - 26), ZB(xb) - 8], [SB + 40, sg * (YB(SB + 40) - 26), ZB(SB + 40) - 8], [0, -sg, 0]);
+      for (let j = 0; j < JB; j++) { const p = g(IP, j, sg), q = g(IP, j + 1, sg), in2 = (v: V): V => [xb, v[1] * 0.985, v[2] - 5]; face(b, in2(p), in2(q), [xb, q[1] * 0.985, FL], [xb, p[1] * 0.985, FL], [-1, 0, 0]); } }
+    // the dash: its top from the screen's foot up to a crest, its face down to the floor
+    const crest = (y: number): V => [1560 - 300 * (y / 800) ** 2, y, 800 - 62 * (y / 800) ** 2];
+    b.name('cockpit').mat(TRIM, 0.15); for (const sg of [1, -1]) for (let j = 0; j < JA + 1; j++) { const p = g(IB, j, sg), q = g(IB, j + 1, sg), lo = (v: V): V => [v[0] + 12, v[1] * 0.985, v[2] - 10], c0 = crest(p[1] * 0.985), c1 = crest(q[1] * 0.985);
+      face(b, lo(p), lo(q), c1, c0, UP); face(b, c0, c1, [c1[0] + 50, c1[1], 430], [c0[0] + 50, c0[1], 430], [1, 0, 0.3]); }
+    b.name('cockpit').mat(TRIM, 0.15).box(1500, xb, -105, 105, FL, 355);
+    for (const sg of [1, -1]) { const y0 = sg * 170, y1 = sg * 560;
+      b.name('seat').mat(SEAT, 0.25, 'leather').box(2020, 2500, Math.min(y0, y1), Math.max(y0, y1), FL, 335).loft(([[2420, 335], [2490, 620], [2570, 850], [2640, 880]] as const).map(([x, z]) => [[x, y0 + sg * 15, FL], [x, y1 - sg * 15, FL], [x, y1 - sg * 15, z], [x, y0 + sg * 15, z]] as V[]));
+      b.name('seat').mat(SEAT2, 0.1); for (const y of [y0 + sg * 130, y0 + sg * 260]) b.bar([2040, y, 337], [2420, y, 337], 8).bar([2494, y, 624], [2572, y, 846], 8); } }
+
+  // ---- the glass's frames: dark bands lying on the grid's own lines ----
+  { const band = (line: [number, number][], din: [number, number], win: number, dout: [number, number], wout: number) => { for (const sg of [1, -1]) { const e = line.map(([i, j]) => { const p = g(i, j, sg), to = (d: [number, number], w: number): V => { const q = g(i + d[0], j + d[1], sg), l = Math.hypot(q[0] - p[0], q[1] - p[1], q[2] - p[2]) || 1, k = Math.min(0.9, w / l); return [p[0] + (q[0] - p[0]) * k, p[1] + (q[1] - p[1]) * k + sg * 2.5 * Math.min(1, j / JA), p[2] + (q[2] - p[2]) * k + 3.5]; }; return [to(din, win), to(din, 0), to(dout, wout)] as [V, V, V]; });
+        for (let k = 0; k + 1 < e.length; k++) for (const m of [0, 1]) face(b, e[k]![m]!, e[k + 1]![m]!, e[k + 1]![m + 1]!, e[k]![m + 1]!, [0, sg * 0.5, 1]); } };
+    const run = (a: number, c: number) => Array.from({ length: c - a + 1 }, (_, k) => a + k);
+    b.name('screenFrame').mat(FRAME, 0.2);
+    band(run(IB, IP).map(i => [i, JA]), [0, -1], 24, [0, 1], 22);                       // the pillar and the roof's edge
+    band(run(0, JA).map(j => [IB, j]), [1, 0], 34, [-1, 0], 8);                         // the screen's foot
+    band(run(0, JA).map(j => [IT, j]), [-1, 0], 26, [1, 0], 8);                         // its top
+    band(run(IB, IP).map(i => [i, JB]), [0, -1], 26, [0, 1], 7);                        // the belt
+    band(run(JA, JB).map(j => [IP, j]), [-1, 0], 34, [1, 0], 8); }                      // the door glass's back edge
+
+  // ---- the nose: the horseshoe low in its tip, the barred intakes beside it, the badge; the lamps under clear covers ----
+  { const shoe: [number, number][] = [[-42, 172], [-58, 250], [-55, 290], [-35, 312], [0, 320], [35, 312], [55, 290], [58, 250], [42, 172]], fan = (k: number, lift: number) => { for (let i = 0; i + 1 < shoe.length; i++) b.tri(nose(0, 240, lift), nose(shoe[i + 1]![0] * k, 245 + (shoe[i + 1]![1] - 245) * k, lift), nose(shoe[i]![0] * k, 245 + (shoe[i]![1] - 245) * k, lift)); };
+    b.name('grille').mat(SILVER, 0.8, 'metal'); fan(1.14, 2); b.name('grille').mat(DARK, 0.05, 'grille'); fan(1, 5);
+    for (const sg of [1, -1]) { b.name('grille').mat(DARK, 0.05); patch(b, (u, v) => nose(sg * lerp(100, 475, u), lerp(188, 300, v)), 3, 1, [-1, 0, 0]); patch(b, (u, v) => nose(sg * lerp(525, 628, u), lerp(196, 290, v)), 1, 1, [-1, 0, 0]);
+      b.name('grille').mat(PAINT, GLOSS, 'paint'); for (const z of [222, 256]) patch(b, (u, v) => nose(sg * lerp(100, 475, u), z + v * 12, 6), 3, 1, [-1, 0, 0]); }
+    b.name('badge').mat(RED, 0.5); { const o: [number, number][] = [[-30, 0], [-17, 12], [17, 12], [30, 0], [17, -12], [-17, -12]]; for (let i = 1; i + 1 < o.length; i++) b.tri(nose(o[0]![0], 352 + o[0]![1], 5), nose(o[i + 1]![0], 352 + o[i + 1]![1], 5), nose(o[i]![0], 352 + o[i]![1], 5)); }
+    for (const sg of [1, -1]) { const pk = (u: number, v: number, lift: number): V => { const x = lerp(278, 540, u); return top(x, sg * lerp(lerp(300, 262, u), lerp(688, 676, u), v), lift); };
+      b.name('lamp').mat(DARK, 0.05); patch(b, (u, v) => pk(u, v, 3), 3, 4, UP);
+      b.name('lens').mat(LENS, 0.6, 'lens'); for (const [v0, v1] of [[0.1, 0.48], [0.52, 0.92]] as const) patch(b, (u, v) => pk(lerp(0.12, 0.88, u), lerp(v0, v1, v), 7), 2, 2, UP);
+      b.name('lampCover').mat(GLASS, 0.5, 'glass'); patch(b, (u, v) => pk(u, v, 12), 3, 4, UP);
+      b.name('lamp').mat(AMBER, 0.5, 'lens'); face(b, flank(470, 392, sg), flank(560, 392, sg), flank(560, 418, sg), flank(470, 418, sg), [0, sg, 0]); } }                  // the side repeater
+
+  // ---- the flanks: the doors' edges, the intake behind the front wheel, the vent behind the rear one ----
+  for (const sg of [1, -1]) { b.name('door').mat(SEAM, 0.1);
+    seamSide([[1396, ZB(1396) - 14], [1402, 640], [1425, 500], [1478, 370], [1560, 250], [1650, 150]], sg);                                                    // the front edge, curving back round the wheel
+    seamSide([[SP + 6, ZB(SP + 6) - 14], [SP + 6, 640], [SP, 520], [2690, 440], [2640, 372], [2575, 290], [2520, 215], [2490, 150]], sg);                      // the back edge, curving forward to the sill
+    b.name('grille').mat(DARK, 0.05); face(b, flank(1470, 165, sg), flank(1530, 165, sg), flank(1570, 300, sg), flank(1500, 300, sg), [0, sg, 0]);
+    face(b, flank(4120, 235, sg), flank(4180, 235, sg), flank(4180, 450, sg), flank(4120, 450, sg), [0, sg, 0]); }
+
+  // ---- behind the cabin: the louvred quarter lights on the buttresses, the slots of the engine cover between them ----
+  b.name('louvre').mat(DARK, 0.05); for (const sg of [1, -1]) for (let k = 0; k < 6; k++) { const s0 = 2795 + k * 104, V4 = [0.14, 0.38, 0.62, 0.86], p = (s: number, v: number): V => { const lean = 60 * (1 - v), x = s + lean, f = lerp(0.14, 0.9 - 0.045 * k, v); return top(x, sg * lerp(YA(x), YB(x), f)); };
+    for (let i = 0; i + 1 < V4.length; i++) { const v0 = (V4[i]! - 0.14) / 0.72, v1 = (V4[i + 1]! - 0.14) / 0.72; face(b, p(s0, v0), p(s0 + 62, v0), p(s0 + 62, v1), p(s0, v1), UP); } }
+  b.name('engineCover').mat(DARK, 0.05); for (let k = 0; k < 6; k++) { const x0 = 2905 + k * 118, us = [-0.74, -0.5, -0.25, 0, 0.25, 0.5, 0.74]; for (let i = 0; i + 1 < us.length; i++) face(b, top(x0, us[i]! * YA(x0)), top(x0 + 66, us[i]! * YA(x0 + 66)), top(x0 + 66, us[i + 1]! * YA(x0 + 66)), top(x0, us[i + 1]! * YA(x0)), UP); }
+  b.name('engineCover').mat(SEAM, 0.1); for (const sg of [1, -1]) seamTop(2800, sg * 0.84 * YA(2800), 3660, sg * 0.84 * YA(3660), 8); seamTop(3660, -0.84 * YA(3660), 3660, 0.84 * YA(3660), 8); seamTop(2790, -0.84 * YA(2790), 2790, 0.84 * YA(2790), 8);
+  b.name('body').mat(SEAM, 0.1); seamTop(3985, -YB(3985) + 12, 3985, YB(3985) - 12, 14);                                                                       // the tail panel's shut line
+
+  // ---- the tail: three lamps a side (the outer amber), the grille band and badge between, the valance with its four pipes ----
+  { const lamps: [number, number, string][] = [[452, 548, RED], [554, 650, RED], [656, 752, AMBER]];
+    b.name('tailRim').mat(FRAME, 0.2); for (const sg of [1, -1]) patch(b, (u, v) => tail(sg * lerp(440, 764, u), lerp(575, 745, v), 3), 3, 1, [1, 0, 0]);
+    for (const sg of [1, -1]) for (const [y0, y1, c] of lamps) { b.name('tail').mat(c, 0.5, 'lens'); patch(b, (u, v) => tail(sg * lerp(y0, y1, u), lerp(585, 735, v), 7), 1, 1, [1, 0, 0]); }
+    b.name('grille').mat(DARK, 0.05); patch(b, (u, v) => tail(lerp(-425, 425, u), lerp(581, 739, v)), 6, 1, [1, 0, 0]);
+    b.name('grille').mat(PAINT, GLOSS, 'paint'); for (const z of [627, 681]) patch(b, (u, v) => tail(lerp(-425, 425, u), z + v * 12, 8), 6, 1, [1, 0, 0]);
+    b.name('badge').mat(RED, 0.5); { const n = 8, o = (i: number, k: number): V => { const a = i / n * Math.PI * 2; return tail(Math.cos(a) * 92 * k, 660 + Math.sin(a) * 40 * k, 11 + (k < 1 ? 1 : 0)); }; for (let i = 0; i < n; i++) b.tri(tail(0, 660, 12), o(i, 1), o(i + 1, 1)); }
+    b.name('tail').mat(RED2, 0.5, 'lens'); patch(b, (u, v) => tail(lerp(-72, 72, u), lerp(366, 400, v)), 1, 1, [1, 0, 0]);
+    b.name('bumperR').mat(DARK, 0.05); for (const sg of [1, -1]) patch(b, (u, v) => tail(sg * lerp(250, 715, u), lerp(204, 345, v)), 3, 1, [1, 0, 0]); patch(b, (u, v) => tail(lerp(-190, 190, u), lerp(198, 285, v)), 2, 1, [1, 0, 0]);
+    b.name('exhaust').mat(CHROME, 0.9, 'metal'); for (const sg of [1, -1]) for (const y of [415, 515]) b.lathe('x', [tailX(y), sg * y, 268], [[-40, 44], [12, 44], [12, 36], [-30, 33]], 8, false); }
+
+  // ---- the mirrors on their stalks ----
+  for (const sg of [1, -1]) { const ring = (x: number, k: number): V[] => { const yc = 925, zc = 838, hw = 86 * k, hh = 50 * k; return ([[-1, -0.6], [-1, 0.6], [-0.6, 1], [0.6, 1], [1, 0.6], [1, -0.6], [0.6, -1], [-0.6, -1]] as const).map(([u, v]) => [x, sg * (yc + u * hw), zc + v * hh] as V); };
+    b.name('mirror').mat(PAINT, GLOSS, 'paint').loft([ring(1480, 0.55), ring(1520, 0.92), ring(1600, 1), ring(1636, 0.96)]).bar([1556, sg * (YB(1556) - 6), ZB(1556) - 26], [1562, sg * 880, 800], 56, 26);
+    b.name('mirror').mat(CHROME, 0.9, 'metal'); const r = ring(1639, 0.84); for (let i = 1; i + 1 < r.length; i++) b.tri(r[0]!, r[i]!, r[i + 1]!); }
+
+  // ---- the wing: the tail's trailing blade in its dark bed, a slot of it showing ahead of the blade; raised, it stands on two struts, its trailing edge up ----
+  { const x0 = 4212, se = 4322, xe = (y: number) => se - BOW(se) * (1 - (Math.abs(y) / YB(se)) ** PB) - 4, xp = 4300, zp = zTop(xp, 0), a = 10 * wing * Math.PI / 180, ca = Math.cos(a), sa = Math.sin(a), lift = 110 * wing;
+    const T = (p: V): V => { const dx = p[0] - xp, dz = p[2] - zp; return [xp + dx * ca - dz * sa, p[1], zp + dx * sa + dz * ca + lift]; };
+    b.name('wing').mat(FRAME, 0.1); for (let i = 0; i < 8; i++) { const y0 = lerp(-690, 690, i / 8), y1 = lerp(-690, 690, (i + 1) / 8); for (const [u0, u1] of [[0, 0.3], [0.3, 0.65], [0.65, 1]] as const) { const x = (y: number, u: number) => lerp(4172, xe(y) - 8, u); face(b, top(x(y0, u0), y0, 3), top(x(y0, u1), y0, 3), top(x(y1, u1), y1, 3), top(x(y1, u0), y1, 3), UP); } }
+    b.name('wing').mat(PAINT, GLOSS, 'paint').loft([-745, -600, -450, -300, -150, 0, 150, 300, 450, 600, 745].map(y => { const x1 = xe(y), xm = (x0 + x1) / 2; return ([[x0, -4], [x0 + 28, 5], [xm, 7], [x1 - 26, 6], [x1, 1], [xm, -12]] as const).map(([x, dz]) => T([x, y, zTop(x, y) + dz])); }));
+    if (wing > 0.02) { b.name('wing').mat(FRAME, 0.2); for (const y of [-340, 340]) b.bar([xp, y, zTop(xp, y) - 12], T([xp, y, zTop(xp, y) - 8]), 54, 16); } }
+
   for (const s of [1, -1] as const) { wheel(b, FX, s, spin); wheel(b, RX, s, spin); }
   return b.mesh(L); }
-/** how far out the mirrors' middles stand (the sheet has them 1037 mm out at their tips: 2075 mm over the mirrors) */
-const MIRROR = 962;
 export const mesh = eb110Mesh;

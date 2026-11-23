@@ -76,3 +76,16 @@ Sliders on the page for reflection and gloss, occlusion, bloom and depth of fiel
   occlusion and a longer, graded contact shadow on top.
 - Materials: chrome nearly a mirror (roughness 0.07 at most), the lacquer's faint orange peel, leather polished with a
   sheen, cloth fuzzy (a grazing sheen), rubber's dull sheen, varnished wood, lamp glass coated, the sun caught in glass.
+
+## Review 116: deep paint, glass as glass, lamps
+- The white streaks were the sky the mirrors saw: a hard white band from the horizon up (envAt). The physically based
+  looks now mirror a world: fields, a dark treeline of varying height along the horizon, a hazy sky deepening upward,
+  clouds; all softened by roughness.
+- Smoothed normals (each corner averaged over the faces of its part and kind bent under 40 degrees): rounded wings and
+  windscreens shade and mirror without facets; creases stay.
+- The lacquer's depth (a slider, 0 as before): the pigment darkened and saturated, more at a glancing view; less dull sky
+  light scattered from it; the tone curve mixed toward one on brightness alone, so strong colours keep their hue.
+- Glass: near black in itself, green toward its edge, what is behind showing through (premultiplied), the world
+  mirrored by Fresnel, the sun a hard glint, a film of dust in patches.
+- Lamps: a silvered concave bowl (mirroring the world turned about) behind fluted glass whose ribs catch the light,
+  faded where finer than a pixel; each lens domed from its middle.

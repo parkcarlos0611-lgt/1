@@ -27,6 +27,21 @@ uniform float uTexK, uLightK, uSpecK;   // the strengths set on the page (review
 #define SUN_E (vec3(1.0, 0.95, 0.84) * 3.0 * uLightK)
 vec3 toLin(vec3 c) { return pow(max(c, vec3(0.)), vec3(2.2)); }
 vec3 aces(vec3 x) { return clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0., 1.); }
+/* ---- the world as a mirror sees it (review 116), for the physically based looks: not a hard white band at the horizon
+   but the fields below, a dark line of trees and stands along it, a hazy sky over it deepening upward, and clouds; all
+   softened by roughness. Linear light. (The baked look keeps envAt.) ---- */
+float hL(vec2 p) { return fract(sin(dot(p, vec2(41.3, 289.1))) * 43758.55); }
+float vL(vec2 x) { vec2 i = floor(x), f = fract(x); f = f * f * (3. - 2. * f); return mix(mix(hL(i), hL(i + vec2(1, 0)), f.x), mix(hL(i + vec2(0, 1)), hL(i + vec2(1, 1)), f.x), f.y); }
+uniform float uDeep;   // the colour's depth (review 116): 0 as before, 1 as set, 2 the most
+vec3 skyR(vec3 r, float rough) { float z = r.z, soft = 0.02 + rough * 0.5;
+  vec3 field = toLin(vec3(96., 104., 74.) / 255.), far = toLin(vec3(58., 66., 50.) / 255.), haze = toLin(vec3(222., 224., 220.) / 255.), top = toLin(vec3(120., 152., 200.) / 255.);
+  vec3 sky = mix(haze, top, smoothstep(0.02, 0.7, z));
+  float cl = vL(r.xy / (z + 0.12) * 1.7) * 0.6 + vL(r.xy / (z + 0.12) * 4.3 + 7.) * 0.4; cl = smoothstep(0.5, 0.78, cl) * smoothstep(0.03, 0.3, z) * (1. - smoothstep(0.05, 0.45, rough));
+  sky = mix(sky, toLin(vec3(248., 246., 240.) / 255.) * 1.15, cl * 0.8);
+  vec2 hd = r.xy / max(1e-3, length(r.xy)); float tree = 0.03 + 0.045 * vL(hd * 3.5 + 1.) + 0.025 * vL(hd * 14. + 5.);   /* the treeline's height, by bearing */
+  vec3 low = mix(far, field, smoothstep(0., 0.35, -z));
+  vec3 c = mix(low, sky, smoothstep(tree - soft, tree + soft, z));
+  return mix(c, mix(field, sky, smoothstep(-0.3, 0.5, z)), smoothstep(0.1, 0.6, rough)); }
 vec3 irradiance(vec3 n) { return (1.3 - 0.3 * uLightK) * mix(toLin(ENV_GROUND), toLin(mix(ENV_HOR, ENV_TOP, 0.55)), 0.5 + 0.5 * n.z); }
 float D_GGX(float nh, float a) { float a2 = a * a, d = nh * nh * (a2 - 1.) + 1.; return a2 / (3.14159 * d * d); }
 float V_Smith(float nv, float nl, float a) { float k = a * 0.5; return 0.25 / ((nv * (1. - k) + k) * (nl * (1. - k) + k)); }
@@ -38,12 +53,15 @@ vec3 pbr(vec3 baseSrgb, vec3 n, vec3 v, vec3 l, float sh, float metal, float rou
 vec3 pbrX(vec3 baseSrgb, vec3 n, vec3 v, vec3 l, float sh, float metal, float rough, float coat, float ao, float sheen) {
   vec3 alb = toLin(baseSrgb); float a = max(0.02, rough * rough); vec3 h = normalize(l + v);
   float nl = max(0., dot(n, l)), nv = max(1e-3, dot(n, v)), nh = max(0., dot(n, h)), vh = max(0., dot(v, h));
+  /* the lacquer's depth (review 116): light crosses the clear coat and the pigment twice, longer the more glancing the
+     view, so the colour deepens and saturates toward the edges, and the dull sky light it scatters is less */
+  float deep = coat > 0. && metal < 0.5 ? uDeep * coat : 0.; alb = pow(alb, vec3(1. + deep * (0.3 + 1.2 * (1. - nv) * (1. - nv))));
   vec3 f0 = mix(vec3(0.04), alb, metal), F = f0 + (1. - f0) * pow(1. - vh, 5.), kd = (1. - F) * (1. - metal);
   vec3 col = (kd * alb / 3.14159 + D_GGX(nh, a) * V_Smith(nv, nl, a) * F * uSpecK) * SUN_E * nl * sh;
-  vec3 r = reflect(-v, n); vec2 ab = envBRDF(nv, rough); vec3 envS = mix(toLin(envAt(r.z)), irradiance(r), clamp(rough * 1.4, 0., 1.));
-  col += (kd * alb * irradiance(n) + envS * (f0 * ab.x + ab.y)) * ao;
+  vec3 r = reflect(-v, n); vec2 ab = envBRDF(nv, rough); vec3 envS = mix(skyR(r, rough), irradiance(r), clamp(rough * 1.4 - 0.3, 0., 1.));
+  col += (kd * alb * irradiance(n) * (1. - 0.35 * deep) + envS * (f0 * ab.x + ab.y)) * ao;
   if (sheen > 0.) col += sheen * pow(1. - nv, 4.) * (alb * 0.6 + 0.4) * (irradiance(n) * ao + SUN_E * nl * sh * 0.25);
-  if (coat > 0.) { float Fc = (0.04 + 0.96 * pow(1. - nv, 5.)) * coat; col = col * (1. - Fc) + toLin(envAt(r.z)) * Fc * (0.6 + 0.4 * uSpecK) * mix(1., ao, 0.7)
+  if (coat > 0.) { float Fc = (0.04 + 0.96 * pow(1. - nv, 5.)) * coat; col = col * (1. - Fc) + skyR(r, 0.03) * Fc * (0.6 + 0.4 * uSpecK) * mix(1., ao, 0.7)
       + (D_GGX(nh, 0.06) * V_Smith(nv, nl, 0.06) * 0.06 + D_GGX(nh, 0.32) * V_Smith(nv, nl, 0.32) * 0.05) * coat * uSpecK * SUN_E * nl * sh; }   /* the lacquer: a sharp glint and a broad sheen (review 111) */
   return col; }
 // ---- PBR detail textures (review 103): seven layers (concrete, grass, metal, rubber, leather, canvas, wood), each a
@@ -78,12 +96,12 @@ float rtao(vec3 p, vec3 n) { if (uBoxN == 0) return 1.; vec3 t1 = normalize(abs(
 float lightAt(vec3 w) { vec4 l = uLight * vec4(w, 1.); vec3 q = l.xyz * 0.5 + 0.5; if (q.x <= 0. || q.y <= 0. || q.x >= 1. || q.y >= 1. || q.z >= 1.) return 1.; float t = 0., px = 1.6 / float(textureSize(uShadow, 0).x); for (int i = -1; i <= 1; i++) for (int j = -1; j <= 1; j++) t += texture(uShadow, vec3(q.xy + vec2(i, j) * px, q.z - 0.0015)); return t / 9.; }   /* soft edges: nine filtered looks (review 111) */
 `;
 const OBJ_VS = `#version 300 es
-layout(location=0) in vec3 aPos; layout(location=1) in vec3 aNor; layout(location=2) in vec3 aCol; layout(location=3) in float aGloss; layout(location=4) in float aKind; layout(location=5) in float aPart;
-uniform mat4 uVP, uModel, uPrevVP, uPrevModel; uniform float uBias;
+layout(location=0) in vec3 aPos; layout(location=1) in vec3 aNor; layout(location=2) in vec3 aCol; layout(location=3) in float aGloss; layout(location=4) in float aKind; layout(location=5) in float aPart; layout(location=6) in vec3 aSmo;
+uniform mat4 uVP, uModel, uPrevVP, uPrevModel; uniform float uBias; out vec3 vSN;   // the smoothed normal (review 116; none where a piece has no such layer)
 out vec4 vCur, vPrev;   // where this point is now and was a frame ago (the velocity layer, review 112)
 uniform int uWheel; uniform float uSpin, uDef[32], uTyreR, uRim; uniform vec2 uShift;
 out vec3 vWorld, vObj; flat out vec3 vN, vObjN, vCol; flat out float vGloss, vKind, vPart;
-void main() { vec3 p = aPos, nr = aNor;
+void main() { vec3 p = aPos, nr = aNor, ns = dot(aSmo, aSmo) > 0.25 ? aSmo : aNor;
   if (uWheel == 1) {
     if (int(aKind + 0.5) == 5) {   // the tyre, shaped by its ring in the hub's frame (the ring keeps to the road; it does not turn with the wheel)
       float rho = length(p.xz), t = clamp((rho - uRim) / max(1., uTyreR - uRim), 0., 1.), a = atan(-p.x, -p.z);
@@ -91,13 +109,13 @@ void main() { vec3 p = aPos, nr = aNor;
       vec2 dir = p.xz / max(rho, 1.); float low = max(0., dir.y * -1.); low *= low;
       p.xz -= dir * d; p.y += sign(p.y) * d * 0.5 * (1. - abs(2. * t - 1.));   // the tread pressed in, the walls bulging out beside it
       p.y += uShift.y * t * low; p.x -= uShift.x * t * low; }   // the patch pulled across and along by the forces
-    else { float c = cos(uSpin), s = sin(uSpin); p = vec3(c * p.x - s * p.z, p.y, s * p.x + c * p.z); nr = vec3(c * nr.x - s * nr.z, nr.y, s * nr.x + c * nr.z); } }
-  vec4 w = uModel * vec4(p, 1.); vWorld = w.xyz; vObj = p; vObjN = nr; vN = normalize(mat3(uModel) * nr); vCol = aCol; vGloss = aGloss; vKind = aKind; vPart = aPart;
+    else { float c = cos(uSpin), s = sin(uSpin); p = vec3(c * p.x - s * p.z, p.y, s * p.x + c * p.z); nr = vec3(c * nr.x - s * nr.z, nr.y, s * nr.x + c * nr.z); ns = vec3(c * ns.x - s * ns.z, ns.y, s * ns.x + c * ns.z); } }
+  vec4 w = uModel * vec4(p, 1.); vWorld = w.xyz; vObj = p; vObjN = nr; vN = normalize(mat3(uModel) * nr); vSN = mat3(uModel) * ns; vCol = aCol; vGloss = aGloss; vKind = aKind; vPart = aPart;
   gl_Position = uVP * w; vCur = gl_Position; vPrev = uPrevVP * (uPrevModel * vec4(p, 1.)); gl_Position.z -= uBias; }`;
 const OBJ_FS = `#version 300 es
 precision highp float;
 ${LIGHT}
-in vec3 vWorld, vObj; flat in vec3 vN, vObjN, vCol; flat in float vGloss, vKind, vPart;
+in vec3 vWorld, vObj, vSN; flat in vec3 vN, vObjN, vCol; flat in float vGloss, vKind, vPart;
 uniform mat4 uModel; uniform vec3 uEye, uSun; uniform vec2 uObj; uniform vec3 uWear; uniform float uObjZ, uCarH;
 // ---- the 2D art laid on (review 105, PBR step 4): the part model's views of this car, each face taking the view it looks along ----
 uniform sampler2D uArt, uArtLut; uniform int uArtOn; uniform highp int uWheel; uniform float uArtMM, uArtC; uniform vec4 uArtR[5]; uniform vec2 uArtO[5];
@@ -128,10 +146,23 @@ void main() {
   float d = max(0., dot(n, uSun)) * sh, up = 0.5 + 0.5 * n.z;
   float ne = dot(n, uEye), rz = 2. * ne * n.z - uEye.z;
   if (uMode == 2) {   // glass: mirrors more at a glancing angle, laid over at its own strength
+    if (uLook > 0) {   /* review 116: glass as glass. Nearly black in itself, a little green toward its edge (seen through its
+         thickness); what lies behind shows through; the world mirrored by Fresnel off the smoothed surface (no white band,
+         no facets); the sun a hard glint; a faint film of dust dulling the mirror in patches */
+      vec3 ns = normalize(vSN); if (dot(ns, n) < 0.) ns = -ns; if (dot(ns, uEye) < 0.02) ns = n;
+      float nv = max(0., dot(ns, uEye)), F = 0.04 + 0.96 * pow(1. - nv, 5.), edge = (1. - nv) * (1. - nv);
+      vec3 P = vObj / 1000.; float dust = smoothstep(0.45, 0.85, fbm(P * 7.) * 0.7 + fbm(P * 40.) * 0.3) * 0.6;
+      vec3 r = reflect(-uEye, ns), hg = normalize(uSun + uEye);
+      vec3 mir = mix(skyR(r, 0.015), skyR(r, 0.35), dust) * (0.75 + 0.25 * uSpecK);
+      float glint = D_GGX(max(0., dot(ns, hg)), mix(0.012, 0.06, dust)) * 0.25 * max(0., dot(ns, uSun)) * sh * uSpecK;
+      vec3 tint = kind == 4 ? toLin(base) * 0.5 : mix(vec3(0.012, 0.014, 0.014), vec3(0.03, 0.06, 0.045), edge) + toLin(vec3(0.55, 0.52, 0.46)) * dust * 0.08 * (0.4 + 0.6 * sh);
+      float absorb = kind == 4 ? 0.55 : uGlass * (0.3 + 0.4 * edge) + dust * 0.1;
+      vec3 rgb = (mir + SUN_E * glint) * F + tint * (1. - F); float A = clamp(F + absorb * (1. - F), 0., 1.);
+      oCol = vec4(present(rgb / max(A, 1e-3)) * A, A); oId = vec4(0.); oN = vec4(0.); oV = velo(); return; }
     float F = 0.06 + 0.94 * pow(1. - abs(ne), 4.); vec3 env = envAt(rz), tint = kind == 4 ? base : vec3(150., 172., 182.) / 255.;
     float k = 0.62 + 0.45 * d + (n.z > 0.3 ? 0.1 : 0.); vec3 c = tint * (1. - 0.55 * (0.4 + F)) + env / k * 0.55 * (0.4 + F);
     vec3 hg = normalize(uSun + uEye); float glint = D_GGX(max(0., dot(n, hg)), 0.03) * 0.04 * max(0., dot(n, uSun)) * sh * uSpecK;   /* the sun caught in the glass */
-    oCol = vec4(uHDRo == 1 ? toLin(min(vec3(1.), c * k)) * (1. + 2.5 * F) + SUN_E * glint * 0.6 : min(vec3(1.), c * k), min(1., (kind == 4 ? uGlass + 0.15 : uGlass) + (1. - uGlass) * F * 0.7)); oId = vec4(0.); oN = vec4(0.); oV = velo(); return; }
+    float gA = min(1., (kind == 4 ? uGlass + 0.15 : uGlass) + (1. - uGlass) * F * 0.7); oCol = vec4((uHDRo == 1 ? toLin(min(vec3(1.), c * k)) * (1. + 2.5 * F) + SUN_E * glint * 0.6 : min(vec3(1.), c * k)) * gA, gA);   /* premultiplied */ oId = vec4(0.); oN = vec4(0.); oV = velo(); return; }
   if (kind == 1 && uDecN > 0) for (int i = 0; i < 4; i++) { if (i >= uDecN) break;
     vec3 dd = vObj - uDecO[i]; float depth = dot(dd, uDecN_[i]); if (abs(depth) > uDecR[i] * 0.8 || abs(dot(vObjN, uDecN_[i])) < 0.45) continue;
     vec3 rt = normalize(cross(uDecN_[i], uDecUp[i])); vec2 uv = vec2(dot(dd, rt), dot(dd, uDecUp[i])) / uDecR[i] * 0.5 + 0.5; if (any(lessThan(uv, vec2(0.))) || any(greaterThan(uv, vec2(1.)))) continue;
@@ -147,6 +178,7 @@ void main() {
     else if (kind == 8) { L = 4; sa = 0.7; sn = 0.8; sr = 0.6; } else if (kind == 7) { L = 5; sa = 0.6; sn = 0.9; sr = 0.5; } else if (kind == 6) { L = 6; sa = 0.9; sn = 0.6; sr = 0.6; } else if (kind == 0) { L = 0; sa = 0.35; sn = 0.3; sr = 0.3; }
     vec3 no = vObjN; if (dot(normalize(mat3(uModel) * no), uEye) < 0.) no = -no;
     Detail dt = detail(L, vObj / 1000., no, sa, sn, sr); vec3 nw = normalize(mat3(uModel) * dt.n); if (dot(nw, uEye) < 0.) nw = n;
+    { vec3 ns = normalize(vSN); if (dot(ns, n) < 0.) ns = -ns; if (dot(ns, uEye) > 0.02) nw = normalize(ns + nw - n); }   /* the smoothed surface, the detail's bend kept (review 116) */
     if (uArtOn == 1 && uWheel == 0 && uMode == 0 && (kind == 0 || kind == 1 || kind == 7 || kind == 8 || kind == 10)) { vec4 art = artOn(vObj, no, vPart); if (art.a > 0.) base = mix(base, art.rgb, 0.85 * art.a); }   /* the painted detail of the 2D art: badges, lines, louvres, pleats */
     base *= dt.tone; rough = clamp(rough + dt.rough, 0.04, 1.);
     if (uWear != vec3(0.)) { vec3 P = vObj / 1000.; float Z = (vObj.z + uObjZ) / 1000., low = 1. - smoothstep(0.17, 0.64, Z / max(0.8, uCarH));   /* low down: by the car's own height */
@@ -170,9 +202,17 @@ void main() {
     // each material's own (review 112): chrome nearly a mirror, the lacquer's faint orange peel, leather polished, cloth fuzzy, rubber's dull sheen, varnished wood
     float sheen = 0.; if (metal > 0.5 && vGloss > 0.7) rough = min(rough, 0.07);
     if (kind == 1) { vec3 q = vObj / 1000. * 45.; nw = normalize(nw + (vec3(vn3(q), vn3(q + 7.1), 0.) - 0.5) * 0.05); }
-    else if (kind == 8) { sheen = 0.35; coat = max(coat, 0.15); } else if (kind == 7) { sheen = 0.6; rough = 0.95; } else if (kind == 5) { sheen = 0.18; } else if (kind == 6) coat = max(coat, 0.55); else if (kind == 9) { coat = 1.; rough = 0.05; }
+    else if (kind == 8) { sheen = 0.35; coat = max(coat, 0.15); } else if (kind == 7) { sheen = 0.6; rough = 0.95; } else if (kind == 5) { sheen = 0.18; } else if (kind == 6) coat = max(coat, 0.55); else if (kind == 9) { coat = 1.; rough = 0.05; metal = 1.; base = mix(vec3(0.93, 0.92, 0.9), base, 0.2); }
     float ao = rtao(vWorld, nw);
-    oCol = vec4(present(pbrX(base, nw, uEye, uSun, sh, metal, rough, coat, ao, sheen)), 1.); oId = vec4(uObj, vPart / 255., uOutline / 8.); oN = vec4(nw * 0.5 + 0.5, metal > 0.5 ? 1. - rough : coat * (1. - rough) * 0.5); oV = velo(); return; }
+    vec3 lit = pbrX(base, nw, uEye, uSun, sh, metal, rough, coat, ao, sheen);
+    if (kind == 9) {   /* a lamp of the 1930s (review 116): a silvered bowl behind fluted glass. The bowl is concave, so it
+         mirrors the world turned about (its normal leaning the other way from the domed glass's); the glass's ribs, upright,
+         catch the sky and the sun in lines, faded out where they are finer than a pixel */
+      vec3 nf = normalize(vN); if (dot(nf, uEye) < 0.) nf = -nf; vec3 bowl = normalize(2. * nf - nw);
+      float fq = vObj.y * 1.05, amp = 0.35 * clamp(1.2 - fwidth(fq) * 0.5, 0., 1.); vec3 ax = normalize(mat3(uModel) * vec3(0., 1., 0.)), nr = normalize(nw + (ax - dot(ax, nw) * nw) * sin(fq) * amp);
+      lit = pbrX(base, bowl, uEye, uSun, sh, 1., 0.12, 0., ao, 0.) * 0.9; float nv = max(0., dot(nr, uEye)), Fc = 0.04 + 0.96 * pow(1. - nv, 5.); vec3 hh = normalize(uSun + uEye);
+      lit = lit * (1. - Fc) + skyR(reflect(-uEye, nr), 0.02) * Fc + SUN_E * D_GGX(max(0., dot(nr, hh)), 0.015) * 0.06 * max(0., dot(nr, uSun)) * sh * uSpecK; }
+    oCol = vec4(present(lit), 1.); oId = vec4(uObj, vPart / 255., uOutline / 8.); oN = vec4(nw * 0.5 + 0.5, metal > 0.5 ? 1. - rough : coat * (1. - rough) * 0.5); oV = velo(); return; }
   float dq = floor(d * 4. + 0.5) / 4.;
   vec3 diff = SUN_C * dq * 0.78 + (SKY_C * up + GROUND_C * (1. - up)) * 0.6, c;
   vec3 env = envAt(rz);
@@ -264,7 +304,7 @@ void main() { vec2 t = 1. / vec2(textureSize(uSrc, 0)); vec3 c = texture(uSrc, v
 //      its distance from it, gathered over a disc), the bloom added, the filmic curve and gamma ----
 const FINAL_FS = `#version 300 es
 precision highp float;
-uniform sampler2D uSrc, uDepth, uBloom, uVel; uniform float uBloomK, uDof, uRange, uFocus, uMB; uniform int uHDR; in vec2 vUv; out vec4 o;
+uniform sampler2D uSrc, uDepth, uBloom, uVel; uniform float uBloomK, uDof, uRange, uFocus, uMB, uDeep; uniform int uHDR; in vec2 vUv; out vec4 o;
 vec3 aces(vec3 x) { return clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0., 1.); }
 float coc(float d) { return min(9., max(0., abs(d - uFocus) * 2. * uRange - 1.2) * uDof); }   /* sharp within 1.2 m of the focus */
 void main() { ivec2 p = ivec2(gl_FragCoord.xy); vec2 sz = vec2(textureSize(uSrc, 0)); vec3 c = texelFetch(uSrc, p, 0).rgb; float r0 = coc(texelFetch(uDepth, p, 0).r);
@@ -278,7 +318,11 @@ void main() { ivec2 p = ivec2(gl_FragCoord.xy); vec2 sz = vec2(textureSize(uSrc,
       vec2 mq = (texelFetch(uVel, qi, 0).rg - 0.5) * 128. * uMB; if (length(mq - mv) > 0.35 * ml + 1.) continue;   /* only what moves as this pixel does: a car is not smeared into the road */
       acc += texture(uSrc, (q + 0.5) / sz).rgb; n += 1.; } c = mix(c, acc / n, clamp(ml / 3., 0., 1.)); }
   c += texture(uBloom, vUv).rgb * uBloomK;
-  if (uHDR == 1) c = pow(aces(c), vec3(1. / 2.2)); o = vec4(min(c, vec3(1.)), 1.); }`;
+  if (uHDR == 1) {   /* the filmic curve on each channel bleaches a strong colour toward white as it brightens; on the
+       brightness alone it keeps the hue: the two mixed by the colour's depth (review 116) */
+    float L = dot(c, vec3(0.2126, 0.7152, 0.0722)); vec3 byL = c * (aces(vec3(L)).r / max(L, 1e-4)); float over = max(byL.r, max(byL.g, byL.b));
+    if (over > 1.) byL = mix(byL / over, vec3(1.), clamp((over - 1.) * 0.5, 0., 1.));   /* past white: toward white, not clipped to another hue */
+    c = pow(mix(aces(c), byL, clamp(uDeep * 0.55, 0., 0.85)), vec3(1. / 2.2)); } o = vec4(min(c, vec3(1.)), 1.); }`;
 // ---- smoke (review 107, brief 75 §2): each parcel a sphere of gas, ray-marched through in its own fragment ----
 const SMOKE_VS = `#version 300 es
 layout(location=0) in vec2 aCorner; layout(location=1) in vec4 aPR; layout(location=2) in vec4 aGas;   // corner of the card; centre and radius; density, heat, kind, seed
@@ -377,7 +421,7 @@ export class LiveRenderer {
   car(M: Mesh): GpuMesh { let g = this.cars.get(M); if (!g) { g = gpuMesh(this.gl, M, true); this.cars.set(M, g); } return g; }
   forget(M: Mesh) { this.cars.delete(M); }
 
-  render(v: LiveView, cars: LiveCar[], props: LiveProp[], skids: Skid[], o: { glass?: number; /** 0 the baked look, 1 PBR stepped, 2 PBR smooth */ look?: number; /** lay the 2D art on (default yes) */ art?: boolean; /** the rays in the picture: occlusion, contact shadows, reflections (default yes) */ rays?: boolean; /** strengths: the textures, the light (1: as set) */ texK?: number; lightK?: number; /** after the scene: occlusion and reflection strengths, bloom, depth of field (0 none; pixels of blur a metre from the focus) */ aoK?: number; reflK?: number; bloomK?: number; dof?: number; /** motion blur: the shutter, a share of a frame (0 none) */ mb?: number; /** the outline: width (times each thing's own; 0 none), darkness 0..1; the lines inside a thing (default: the baked look only), their darkness */ outW?: number; outK?: number; inner?: boolean; inK?: number; /** smoke parcels: centre, radius, density, heat, kind (0 tyre 1 dust 2 steam 3 exhaust), seed; and the time */ smoke?: { p: Float32Array; n: number; time: number } } = {}) { const gl = this.gl; this.size(v.W, v.H);
+  render(v: LiveView, cars: LiveCar[], props: LiveProp[], skids: Skid[], o: { glass?: number; /** 0 the baked look, 1 PBR stepped, 2 PBR smooth */ look?: number; /** lay the 2D art on (default yes) */ art?: boolean; /** the rays in the picture: occlusion, contact shadows, reflections (default yes) */ rays?: boolean; /** strengths: the textures, the light (1: as set) */ texK?: number; /** the colour's depth: deeper lacquer, the hue kept through the tone curve (0: as before; default 1) (review 116) */ deep?: number; lightK?: number; /** after the scene: occlusion and reflection strengths, bloom, depth of field (0 none; pixels of blur a metre from the focus) */ aoK?: number; reflK?: number; bloomK?: number; dof?: number; /** motion blur: the shutter, a share of a frame (0 none) */ mb?: number; /** the outline: width (times each thing's own; 0 none), darkness 0..1; the lines inside a thing (default: the baked look only), their darkness */ outW?: number; outK?: number; inner?: boolean; inK?: number; /** smoke parcels: centre, radius, density, heat, kind (0 tyre 1 dust 2 steam 3 exhaust), seed; and the time */ smoke?: { p: Float32Array; n: number; time: number } } = {}) { const gl = this.gl; this.size(v.W, v.H);
     // ---- the camera: orthographic, turned to v.ang, tilted down by v.pitch, v.mm millimetres a pixel, snapped to whole pixels ----
     const a = v.ang - Math.PI / 2, cA = Math.cos(a), sA = Math.sin(a), SP = Math.sin(v.pitch * Math.PI / 180), CP = Math.cos(v.pitch * Math.PI / 180), k = 1000 / v.mm, R = 900;
     const rx = [cA, sA, 0], ry = [-sA, cA, 0], up = [ry[0]! * SP, ry[1]! * SP, CP], vd = [ry[0]! * CP, ry[1]! * CP, -SP], c = [v.x, v.y, v.z], dot = (p: number[], q: number[]) => p[0]! * q[0]! + p[1]! * q[1]! + p[2]! * q[2]!;
@@ -421,7 +465,7 @@ export class LiveRenderer {
       S.forEach((m, i) => { const q = [[-r, -r], [r, -r], [r, r], [-r, -r], [r, r], [-r, r]]; q.forEach(([dx, dy], j) => f.set([m.x + dx!, m.y + dy!, m.z + 0.01, 30 / 255, 28 / 255, 26 / 255, m.a, 0], (i * 6 + j) * 8)); });
       gl.bindBuffer(gl.ARRAY_BUFFER, this.skidBuf); gl.bufferData(gl.ARRAY_BUFFER, f, gl.DYNAMIC_DRAW); gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false); gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.NONE, gl.NONE, gl.NONE]);
       gl.uniform1f(this.loc(this.ground, 'uBias'), 0.00002); gl.bindVertexArray(this.skidVao); gl.drawArrays(gl.TRIANGLES, 0, S.length * 6); gl.disable(gl.BLEND); gl.depthMask(true); gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.COLOR_ATTACHMENT1, gl.COLOR_ATTACHMENT2, gl.COLOR_ATTACHMENT3]); }
-    gl.useProgram(this.obj); gl.uniformMatrix4fv(this.loc(this.obj, 'uVP'), false, VP); gl.uniform1i(this.loc(this.obj, 'uHDRo'), hdrOn); gl.uniformMatrix4fv(this.loc(this.obj, 'uPrevVP'), false, this.prevVP ?? VP); gl.uniform2f(this.loc(this.obj, 'uSize'), v.W, v.H); gl.uniform1f(this.loc(this.obj, 'uSpecK'), o.reflK ?? 1); gl.uniform1i(this.loc(this.obj, 'uLook'), o.look ?? 0); gl.uniform1f(this.loc(this.obj, 'uTexK'), o.texK ?? 1); gl.uniform1f(this.loc(this.obj, 'uLightK'), o.lightK ?? 1); gl.uniform3fv(this.loc(this.obj, 'uEye'), eye); gl.uniform3fv(this.loc(this.obj, 'uSun'), SUN_W); gl.uniform1f(this.loc(this.obj, 'uGlass'), o.glass ?? 0.8); shadowTo(this.obj);
+    gl.useProgram(this.obj); gl.uniformMatrix4fv(this.loc(this.obj, 'uVP'), false, VP); gl.uniform1i(this.loc(this.obj, 'uHDRo'), hdrOn); gl.uniformMatrix4fv(this.loc(this.obj, 'uPrevVP'), false, this.prevVP ?? VP); gl.uniform2f(this.loc(this.obj, 'uSize'), v.W, v.H); gl.uniform1f(this.loc(this.obj, 'uSpecK'), o.reflK ?? 1); gl.uniform1f(this.loc(this.obj, 'uDeep'), o.deep ?? 1); gl.uniform1i(this.loc(this.obj, 'uLook'), o.look ?? 0); gl.uniform1f(this.loc(this.obj, 'uTexK'), o.texK ?? 1); gl.uniform1f(this.loc(this.obj, 'uLightK'), o.lightK ?? 1); gl.uniform3fv(this.loc(this.obj, 'uEye'), eye); gl.uniform3fv(this.loc(this.obj, 'uSun'), SUN_W); gl.uniform1f(this.loc(this.obj, 'uGlass'), o.glass ?? 0.8); shadowTo(this.obj);
     gl.uniform1i(this.loc(this.obj, 'uDecTex'), 2);
     const artTo = (g: GpuMesh | null) => { const a = g && o.art !== false ? this.arts.get(g) : undefined; gl.uniform1i(this.loc(this.obj, 'uArtOn'), a ? 1 : 0); gl.activeTexture(gl.TEXTURE6); gl.bindTexture(gl.TEXTURE_2D, a ? a.tex : this.blank); gl.uniform1i(this.loc(this.obj, 'uArt'), 6); gl.activeTexture(gl.TEXTURE7); gl.bindTexture(gl.TEXTURE_2D, a ? a.lut : this.blank); gl.uniform1i(this.loc(this.obj, 'uArtLut'), 7); if (!a) return;
       gl.uniform1f(this.loc(this.obj, 'uArtMM'), a.mm); gl.uniform1f(this.loc(this.obj, 'uArtC'), a.C); gl.uniform4fv(this.loc(this.obj, 'uArtR'), a.rects); gl.uniform2fv(this.loc(this.obj, 'uArtO'), a.origins); };
@@ -452,7 +496,7 @@ export class LiveRenderer {
       gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false); gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.NONE, gl.NONE, gl.NONE]); gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, S.n);
       gl.disable(gl.BLEND); gl.depthMask(true); gl.useProgram(this.obj); }
     // glass over all, at its own strength, nothing else written
-    gl.uniform1i(this.loc(this.obj, 'uMode'), 2); gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false); gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.NONE, gl.NONE, gl.NONE]);
+    gl.uniform1i(this.loc(this.obj, 'uMode'), 2); gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);   /* premultiplied (review 116) */ gl.depthMask(false); gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.NONE, gl.NONE, gl.NONE]);
     gl.uniform3f(this.loc(this.obj, 'uWear'), 0, 0, 0); for (const p of ps) draw(p.g.glass, (p.m ?? placeMesh(p.g.len, p.x, p.y, p.z, p.h))); for (const m of carM) for (const [part, M, w] of m.glass) draw(part, M, w);
     gl.disable(gl.BLEND); gl.depthMask(true);
     // ---- after the scene (review 111): occlusion, then the picture composed (reflections, occlusion, outlines), the bloom, the end ----
@@ -473,7 +517,7 @@ export class LiveRenderer {
       for (let k = 4; k >= 2; k--) { to(k); tex(this.upP, 'uSrc', 0, RT[k + 1]!.t); gl.drawArrays(gl.TRIANGLES, 0, 3); gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, this.blank); }
       gl.disable(gl.BLEND); }
     to(null); gl.useProgram(this.finalP); tex(this.finalP, 'uSrc', 0, RT[1]!.t); tex(this.finalP, 'uDepth', 1, this.tDepth); tex(this.finalP, 'uBloom', 2, RT[2]!.t); tex(this.finalP, 'uVel', 3, this.tV); gl.uniform1f(this.loc(this.finalP, 'uMB'), o.mb ?? 0);
-    gl.uniform1f(this.loc(this.finalP, 'uBloomK'), bloomK > 0 ? bloomK * (hdrOn ? 0.55 : 0.4) : 0); gl.uniform1f(this.loc(this.finalP, 'uDof'), (o.dof ?? 0) * 0.8); gl.uniform1f(this.loc(this.finalP, 'uRange'), R); gl.uniform1f(this.loc(this.finalP, 'uFocus'), 0.5 + 0.6 * vd[2]! / (2 * R));   /* focused at the car's middle height over the target */ gl.uniform1i(this.loc(this.finalP, 'uHDR'), hdrOn);
+    gl.uniform1f(this.loc(this.finalP, 'uBloomK'), bloomK > 0 ? bloomK * (hdrOn ? 0.55 : 0.4) : 0); gl.uniform1f(this.loc(this.finalP, 'uDof'), (o.dof ?? 0) * 0.8); gl.uniform1f(this.loc(this.finalP, 'uDeep'), o.deep ?? 1); gl.uniform1f(this.loc(this.finalP, 'uRange'), R); gl.uniform1f(this.loc(this.finalP, 'uFocus'), 0.5 + 0.6 * vd[2]! / (2 * R));   /* focused at the car's middle height over the target */ gl.uniform1i(this.loc(this.finalP, 'uHDR'), hdrOn);
     gl.drawArrays(gl.TRIANGLES, 0, 3); for (let i = 0; i < 4; i++) { gl.activeTexture(gl.TEXTURE0 + i); gl.bindTexture(gl.TEXTURE_2D, this.blank); }
     this.prevVP = VP; this.prevM = this.nextM; this.nextM = new Map(); }
 

@@ -26,7 +26,7 @@ export function program(gl: WebGL2RenderingContext, vs: string, fs: string): Web
 
 /** one drawable piece: a vertex array (position, face normal, colour, gloss, kind, part) and its count */
 export interface Part { vao: WebGLVertexArrayObject; n: number }
-export const ATTR = { pos: 0, nor: 1, col: 2, gloss: 3, kind: 4, part: 5 } as const;
+export const ATTR = { pos: 0, nor: 1, col: 2, gloss: 3, kind: 4, part: 5, smooth: 6 } as const;
 /** triangles of a mesh (by index) into a vertex array; `glass`: only the glass and shine, else everything but them */
 function upload(gl: WebGL2RenderingContext, M: Mesh, tris: number[], about?: [number, number, number]): Part {
   const n = tris.length * 3, P = new Float32Array(n * 3), N = new Float32Array(n * 3), C = new Uint8Array(n * 3), G = new Float32Array(n), K = new Float32Array(n), Q = new Float32Array(n);
@@ -34,10 +34,28 @@ function upload(gl: WebGL2RenderingContext, M: Mesh, tris: number[], about?: [nu
     let nx = ay * bz - az * by, ny = az * bx - ax * bz, nz = ax * by - ay * bx; const l = Math.hypot(nx, ny, nz) || 1; nx /= l; ny /= l; nz /= l;
     for (let k = 0; k < 3; k++) { const v = j * 3 + k; P[v * 3] = p[q + k * 3]! - (about?.[0] ?? 0); P[v * 3 + 1] = p[q + k * 3 + 1]! - (about?.[1] ?? 0); P[v * 3 + 2] = p[q + k * 3 + 2]! - (about?.[2] ?? 0);
       N[v * 3] = nx; N[v * 3 + 1] = ny; N[v * 3 + 2] = nz; C[v * 3] = M.col[t * 3]!; C[v * 3 + 1] = M.col[t * 3 + 1]!; C[v * 3 + 2] = M.col[t * 3 + 2]!; G[v] = M.gloss[t]!; K[v] = M.kind[t]!; Q[v] = M.part[t]!; } });
+  const S = smoothNormals(P, N, K, Q);
   const vao = gl.createVertexArray()!; gl.bindVertexArray(vao);
   const buf = (loc: number, data: ArrayBufferView, size: number, type: number, normalized = false) => { const b = gl.createBuffer()!; gl.bindBuffer(gl.ARRAY_BUFFER, b); gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, size, type, normalized, 0, 0); };
-  buf(ATTR.pos, P, 3, gl.FLOAT); buf(ATTR.nor, N, 3, gl.FLOAT); buf(ATTR.col, C, 3, gl.UNSIGNED_BYTE, true); buf(ATTR.gloss, G, 1, gl.FLOAT); buf(ATTR.kind, K, 1, gl.FLOAT); buf(ATTR.part, Q, 1, gl.FLOAT);
+  buf(ATTR.pos, P, 3, gl.FLOAT); buf(ATTR.nor, N, 3, gl.FLOAT); buf(ATTR.col, C, 3, gl.UNSIGNED_BYTE, true); buf(ATTR.gloss, G, 1, gl.FLOAT); buf(ATTR.kind, K, 1, gl.FLOAT); buf(ATTR.part, Q, 1, gl.FLOAT); buf(ATTR.smooth, S, 3, gl.FLOAT);
   gl.bindVertexArray(null); return { vao, n }; }
+/** each corner's normal averaged over the faces that meet there, of the same part and kind, bent less than 40 degrees
+ *  from its own face (review 116): a rounded wing or windscreen shades and mirrors smoothly, a crease stays sharp */
+function smoothNormals(P: Float32Array, N: Float32Array, K: Float32Array, Q: Float32Array): Float32Array {
+  const n = P.length / 3, S = new Float32Array(n * 3), at = new Map<string, number[]>(), key = (v: number) => `${Math.round(P[v * 3]! * 2)},${Math.round(P[v * 3 + 1]! * 2)},${Math.round(P[v * 3 + 2]! * 2)},${K[v]},${Q[v]}`;
+  for (let v = 0; v < n; v++) { const k = key(v); const l = at.get(k); if (l) l.push(v); else at.set(k, [v]); }
+  for (const l of at.values()) for (const v of l) { let x = 0, y = 0, z = 0; for (const u of l) { const d = N[v * 3]! * N[u * 3]! + N[v * 3 + 1]! * N[u * 3 + 1]! + N[v * 3 + 2]! * N[u * 3 + 2]!; if (d > 0.766) { x += N[u * 3]!; y += N[u * 3 + 1]!; z += N[u * 3 + 2]!; } }
+    const h = Math.hypot(x, y, z) || 1; S[v * 3] = x / h; S[v * 3 + 1] = y / h; S[v * 3 + 2] = z / h; }
+  // a lamp's lens (often a flat disc in the mesh) domed: each lens, found as the lens faces that touch, its normal leaning
+  // out from its middle, so the glass and the bowl behind it shade from centre to rim
+  const lens = (v: number) => K[v] === LENS, up = Array.from({ length: n / 3 }, (_, i) => i), root = (i: number): number => { while (up[i] !== i) i = up[i] = up[up[i]!]!; return i; };
+  for (const l of at.values()) if (lens(l[0]!)) for (const v of l) up[root(Math.floor(v / 3))] = root(Math.floor(l[0]! / 3));
+  const grp = new Map<number, number[]>(); for (let t = 0; t < n / 3; t++) if (lens(t * 3)) { const r = root(t), g = grp.get(r); if (g) g.push(t); else grp.set(r, [t]); }
+  for (const ts of grp.values()) { let cx = 0, cy = 0, cz = 0; for (const t of ts) for (let k = 0; k < 3; k++) { cx += P[(t * 3 + k) * 3]!; cy += P[(t * 3 + k) * 3 + 1]!; cz += P[(t * 3 + k) * 3 + 2]!; } const m = ts.length * 3; cx /= m; cy /= m; cz /= m;
+    let R = 1; for (const t of ts) for (let k = 0; k < 3; k++) { const v = t * 3 + k; R = Math.max(R, Math.hypot(P[v * 3]! - cx, P[v * 3 + 1]! - cy, P[v * 3 + 2]! - cz)); }
+    for (const t of ts) for (let k = 0; k < 3; k++) { const v = t * 3 + k, nx = N[v * 3]!, ny = N[v * 3 + 1]!, nz = N[v * 3 + 2]!; let dx = (P[v * 3]! - cx) / R, dy = (P[v * 3 + 1]! - cy) / R, dz = (P[v * 3 + 2]! - cz) / R; const d = dx * nx + dy * ny + dz * nz; dx -= d * nx; dy -= d * ny; dz -= d * nz;
+      const x = nx + dx * 0.6, y = ny + dy * 0.6, z = nz + dz * 0.6, h = Math.hypot(x, y, z) || 1; S[v * 3] = x / h; S[v * 3 + 1] = y / h; S[v * 3 + 2] = z / h; } }
+  return S; }
 
 /** a wheel's triangles about its hub, the tyre's cut finer (each into 16, the new corners on the arcs round the axle,
  *  not on the chords), so the ring's give bends the tread smoothly (review 101) */
@@ -53,7 +71,7 @@ function splitTyres(M: Mesh, tris: number[], hub: [number, number, number]): Mes
 /** a mesh on the GPU: the body, each road wheel apart (to steer and turn it about its hub), the glass apart (drawn last),
  *  and its decals as pictures */
 export interface GpuMesh { len: number; body: Part; glass: Part; wheels: { part: Part; glass: Part | null; hub: [number, number, number]; front: boolean; /** the tyre's outer and inner radius (mm) */ R: number; rim: number }[]; decals: Decal[]; decalTex: WebGLTexture | null; radius: number; height: number; width: number }
-const GLASS = KINDS.indexOf('glass'), SHINE = KINDS.indexOf('shine'), TYRE = KINDS.indexOf('tyre');
+const GLASS = KINDS.indexOf('glass'), SHINE = KINDS.indexOf('shine'), TYRE = KINDS.indexOf('tyre'), LENS = KINDS.indexOf('lens');
 export function gpuMesh(gl: WebGL2RenderingContext, M: Mesh, wheels = true): GpuMesh {
   const W = wheels ? wheelsOf(M) : [], inWheel = new Int32Array(M.n).fill(-1); W.forEach((w, k) => { for (const t of w.tris) inWheel[t] = k; });
   const isGlass = (t: number) => M.kind[t] === GLASS || M.kind[t] === SHINE, body: number[] = [], glass: number[] = [];

@@ -9,16 +9,12 @@
     --display: 'Oswald', 'Arial Narrow', sans-serif; --body: 'Noto Sans KR', system-ui, sans-serif; }
   @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #1b1a18; --panel: #24231f; --ink: #ebe7de; --soft: #a39d90; --line: #3a3832; --accent: #d78a5c; --ground: #3a372f; color-scheme: dark; } }
   :root[data-theme="dark"] { --bg: #1b1a18; --panel: #24231f; --ink: #ebe7de; --soft: #a39d90; --line: #3a3832; --accent: #d78a5c; --ground: #3a372f; color-scheme: dark; }
-  body { background: var(--bg); color: var(--ink); font-family: var(--body); padding-block: 20px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
-  h1 { font-family: var(--display); font-weight: 500; letter-spacing: 0.04em; font-size: 1.5rem; margin: 0 0 4px; text-wrap: balance; }
-  .lede { color: var(--soft); margin: 0 0 16px; max-width: 65ch; line-height: 1.5; }
-  .bench { display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start; }
-  .stage { min-width: 0; flex: 1 1 520px; display: grid; gap: 8px; }
-  .track { background: var(--ground); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; display: grid; place-items: center; padding: 6px; max-width: 100%; }
+  /* review 145: the picture fills the window; the settings live in a drawer, sorted into tabs */
+  html, body { height: 100%; }
+  body { margin: 0; background: #111; color: var(--ink); font-family: var(--body); overflow: hidden; }
   canvas { display: block; image-rendering: pixelated; image-rendering: crisp-edges; cursor: grab; touch-action: none; max-width: none; }
   canvas:active { cursor: grabbing; }
   #stat { color: var(--soft); font-size: 0.8rem; font-variant-numeric: tabular-nums; }
-  .dials { flex: 1 1 260px; max-width: 360px; display: grid; gap: 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 16px; }
   label, legend { font-size: 0.75rem; letter-spacing: 0.06em; color: var(--soft); text-transform: uppercase; }
   .row { display: grid; gap: 6px; }
   .val { font-variant-numeric: tabular-nums; color: var(--ink); text-transform: none; letter-spacing: 0; float: right; }
@@ -33,12 +29,10 @@
   .check { display: flex; gap: 8px; align-items: center; text-transform: none; letter-spacing: 0; color: var(--ink); font-size: 0.85rem; }
   .hud { position: absolute; inset: 0 0 auto 0; display: flex; flex-wrap: wrap; gap: 2px 14px; padding: 4px 8px; font-variant-numeric: tabular-nums; font-size: 0.8rem; line-height: 1.3; align-items: baseline; color: #f4f1ea; background: linear-gradient(rgba(20,18,15,0.55), rgba(20,18,15,0)); pointer-events: none; }
   .hud b { font-family: var(--display); font-weight: 500; font-size: 1.4rem; }
-  @media (pointer: coarse) and (orientation: landscape) { h1, .lede { display: none; } body { padding-block: 4px; } .hud { font-size: 0.7rem; } .hud b { font-size: 1.1rem; } }
   .bar { width: 110px; height: 8px; background: rgba(255,255,255,0.3); border-radius: 4px; overflow: hidden; display: inline-block; vertical-align: middle; }
   #rpmbar { height: 100%; width: 0; background: var(--accent); }
   #msg { color: var(--accent); font-weight: 600; min-height: 1.4em; }
   kbd { font: inherit; border: 1px solid var(--line); border-radius: 3px; padding: 0 4px; background: var(--panel); }
-  .screen { position: relative; display: inline-block; line-height: 0; }
   .pad { --b: clamp(44px, 13vw, 72px); position: absolute; inset: auto 0 0 0; display: none; justify-content: space-between; align-items: flex-end; padding: 6px; gap: 4px; pointer-events: none; }
   .pad .side, .pad .mid { display: flex; gap: 6px; pointer-events: auto; }
   .pad .mid { flex-direction: column; gap: 6px; align-self: center; }
@@ -53,7 +47,7 @@
   .btn:first-child { border-color: var(--accent); color: var(--accent); font-weight: 600; }
   .board { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; font-size: 0.85rem; font-variant-numeric: tabular-nums; }
   .board li { display: flex; justify-content: space-between; gap: 8px; } .board li.me { color: var(--accent); font-weight: 600; } .board span { color: var(--soft); }
-  .fsbtn { position: absolute; top: 6px; right: 6px; width: 32px; height: 32px; border: 1px solid rgba(255,255,255,0.6); border-radius: 4px; background: rgba(20,18,15,0.45); color: #fff; font-size: 1.1rem; line-height: 1; cursor: pointer; z-index: 3; }
+  .fsbtn { position: absolute; top: 6px; right: 6px; width: 36px; height: 32px; border: 1px solid rgba(255,255,255,0.6); border-radius: 4px; background: rgba(20,18,15,0.45); color: #fff; font-size: 1.1rem; line-height: 1; cursor: pointer; z-index: 3; }
   .mini { position: absolute; top: 44px; right: 6px; width: 120px; height: 120px; background: rgba(20,18,15,0.35); border-radius: 6px; z-index: 2; pointer-events: none; }
   .pedals { position: absolute; right: 8px; top: 172px; display: none; gap: 4px; z-index: 2; pointer-events: none; }
   .pedals div { width: 10px; height: 90px; background: rgba(255,255,255,0.25); border-radius: 3px; position: relative; overflow: hidden; }
@@ -61,28 +55,56 @@
   body.progressive .pedals { display: flex; }
   .heat { display: inline-flex; gap: 10px; } .heat .hot { color: #ffcf5a; font-weight: 600; } .heat .boil { color: #ff6b5a; font-weight: 700; animation: blink 0.6s steps(2) infinite; }
   @keyframes blink { 50% { opacity: 0.3; } } @media (prefers-reduced-motion: reduce) { .heat .boil { animation: none; } }
-  .screen:fullscreen { display: flex; align-items: center; justify-content: center; background: #111; width: 100vw; height: 100vh; }
-  body.fakefull .screen { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; background: #111; }
   body.cine .hud, body.cine .mini, body.cine .pedals { display: none; }
   .note { font-size: 0.8rem; color: var(--soft); line-height: 1.5; margin: 0; }
+  @media (pointer: coarse) and (orientation: landscape) { .hud { font-size: 0.7rem; } .hud b { font-size: 1.1rem; } }
+  .screen { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: #111; line-height: 0; overflow: hidden; }
+  .setbtn { right: 48px; }
+  .mini { top: 48px; }
+  .notes { position: absolute; left: 10px; top: 52px; max-width: min(60ch, 60vw); line-height: 1.4; display: grid; gap: 4px; pointer-events: none; z-index: 2; }
+  .notes #msg { color: #ffd9a8; text-shadow: 0 1px 2px #000; } .notes #bake { color: #ddd; text-shadow: 0 1px 2px #000; }
+  .drawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(380px, 92vw); background: var(--panel); border-left: 1px solid var(--line); z-index: 20; display: flex; flex-direction: column; transform: translateX(100%); transition: transform 0.2s ease; line-height: 1.4; box-shadow: -6px 0 18px rgba(0,0,0,0.3); }
+  body.drawer-open .drawer { transform: none; }
+  @media (prefers-reduced-motion: reduce) { .drawer { transition: none; } }
+  .drawer header { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 14px 8px; }
+  .drawer h1 { font-family: var(--display); font-weight: 500; letter-spacing: 0.04em; font-size: 1.2rem; margin: 0; }
+  .drawer .close { font: inherit; font-size: 1.2rem; width: 34px; height: 34px; border: 1px solid var(--line); border-radius: 4px; background: var(--bg); color: var(--ink); cursor: pointer; }
+  .tabs { display: flex; flex-wrap: wrap; gap: 4px; padding: 0 14px 10px; border-bottom: 1px solid var(--line); }
+  .tabs button { font: inherit; font-size: 0.8rem; padding: 6px 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--bg); color: var(--ink); cursor: pointer; }
+  .tabs button[aria-selected="true"] { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+  .dials { flex: 1; overflow-y: auto; padding: 14px; display: block; }
+  .dials section { display: none; gap: 14px; } .dials section.on { display: grid; }
+  .dials h2 { font-size: 0.8rem; font-weight: 600; margin: 4px 0 0; color: var(--ink); }
 </style>
-<h1>Millbrook 시험 주행</h1>
-<p class="lede">Millbrook Outer Circuit(4.45 km, 반시계 방향)을 한 대로 돌아 봅니다. 뱅크가 높을수록 밝게 보이고, 빠를수록 위쪽을 달려야 뱅크가 차를 받쳐 줍니다.</p>
-<div class="bench">
-  <div class="stage">
-    <div class="track"><div class="screen"><div class="hud"><span><b id="spd">0</b> km/h</span><span>기어 <b id="gear">1</b></span><span><span class="bar"><span id="rpmbar"></span></span> <span id="rpm">0</span> rpm</span><span><span id="lap">-</span></span><span><span id="last">-</span></span><span><span id="best">-</span></span><span id="where"></span><span id="heat" class="heat"></span></div>
-      <button type="button" id="fs" class="fsbtn" aria-label="전체화면">⛶</button><canvas id="mini" class="mini" width="150" height="150" aria-label="미니맵"></canvas>
-      <div class="pedals" id="pedals" aria-hidden="true"><div><i id="gasbar"></i></div><div><i id="brakebar"></i></div></div><canvas id="view" width="768" height="432" aria-label="주행 화면"></canvas>
-      <div class="pad" id="pad" aria-label="터치 조작">
-        <div class="side"><button type="button" data-key="arrowleft" aria-label="왼쪽">◀</button><button type="button" data-key="arrowright" aria-label="오른쪽">▶</button></div>
-        <div class="mid"><button type="button" data-key="q" class="small" aria-label="기어 내림">Q</button><button type="button" data-key="e" class="small" aria-label="기어 올림">E</button><button type="button" data-key="r" class="small" aria-label="트랙으로 복귀">R</button></div>
-        <div class="side"><button type="button" data-key="arrowdown" class="brake" aria-label="브레이크">브레이크</button><button type="button" data-key="arrowup" class="gas" aria-label="가속">가속</button></div>
-      </div></div></div>
-    <div id="msg"></div><div id="bake" class="note"></div>
+<div class="screen"><div class="hud"><span><b id="spd">0</b> km/h</span><span>기어 <b id="gear">1</b></span><span><span class="bar"><span id="rpmbar"></span></span> <span id="rpm">0</span> rpm</span><span><span id="lap">-</span></span><span><span id="last">-</span></span><span><span id="best">-</span></span><span id="where"></span><span id="heat" class="heat"></span></div>
+  <button type="button" id="fs" class="fsbtn" aria-label="전체화면">⛶</button><button type="button" id="setbtn" class="fsbtn setbtn" aria-label="설정" aria-expanded="false" aria-controls="drawer">⚙</button><canvas id="mini" class="mini" width="150" height="150" aria-label="미니맵"></canvas>
+  <div class="pedals" id="pedals" aria-hidden="true"><div><i id="gasbar"></i></div><div><i id="brakebar"></i></div></div><canvas id="view" width="768" height="432" aria-label="주행 화면"></canvas>
+  <div class="pad" id="pad" aria-label="터치 조작">
+    <div class="side"><button type="button" data-key="arrowleft" aria-label="왼쪽">◀</button><button type="button" data-key="arrowright" aria-label="오른쪽">▶</button></div>
+    <div class="mid"><button type="button" data-key="q" class="small" aria-label="기어 내림">Q</button><button type="button" data-key="e" class="small" aria-label="기어 올림">E</button><button type="button" data-key="r" class="small" aria-label="트랙으로 복귀">R</button></div>
+    <div class="side"><button type="button" data-key="arrowdown" class="brake" aria-label="브레이크">브레이크</button><button type="button" data-key="arrowup" class="gas" aria-label="가속">가속</button></div>
+  </div>
+  <div class="notes"><div id="msg"></div><div id="bake" class="note"></div></div></div>
+<aside class="drawer" id="drawer" aria-label="설정">
+  <header><h1>Millbrook 시험 주행</h1><button type="button" class="close" id="setclose" aria-label="설정 닫기">✕</button></header>
+  <div class="tabs" role="tablist">
+    <button type="button" role="tab" data-tab="drive" aria-selected="true">주행</button><button type="button" role="tab" data-tab="race" aria-selected="false">레이스</button><button type="button" role="tab" data-tab="track" aria-selected="false">트랙·환경</button><button type="button" role="tab" data-tab="camera" aria-selected="false">카메라</button><button type="button" role="tab" data-tab="gfx" aria-selected="false">그래픽</button><button type="button" role="tab" data-tab="fx" aria-selected="false">효과</button><button type="button" role="tab" data-tab="wear" aria-selected="false">차 상태</button><button type="button" role="tab" data-tab="sound" aria-selected="false">소리</button>
   </div>
   <form class="dials" onsubmit="return false">
+  <section data-tab="drive" class="on">
     <div class="row"><label for="car">차</label><select id="car"></select></div>
     <div class="row"><label for="num">차 번호 (번호판이 있는 차)</label><input type="text" id="num" value="6" maxlength="3" inputmode="numeric" pattern="[0-9]*" style="width:5em"></div>
+    <label class="check"><input type="checkbox" id="auto" checked> 자동 변속 (<kbd>M</kbd>)</label>
+    <label class="check"><input type="checkbox" id="assist"> 카운터스티어 보조</label>
+    <label class="check"><input type="checkbox" id="progressive"> 가속 게이지 모드 (오래 누를수록 가속이 차오름)</label>
+    <label class="check"><input type="checkbox" id="pilot"> 시험 운전자에게 맡기기</label>
+    <label class="check"><input type="checkbox" id="lamps"> 헤드라이트 켜기 (팝업 램프는 올라옴, 브레이크등은 브레이크를 밟으면)</label>
+    <button type="button" id="repair" class="btn">엔진 수리 (연습)</button>
+    <label class="check"><input type="checkbox" id="touch"> 화면 버튼 보이기</label>
+    <p class="note keys-help"><kbd>↑</kbd>/<kbd>W</kbd> 가속 · <kbd>↓</kbd>/<kbd>S</kbd> 브레이크 · <kbd>←</kbd><kbd>→</kbd>/<kbd>A</kbd><kbd>D</kbd> 조향 · <kbd>Space</kbd> 핸드브레이크<br>수동 변속: <kbd>Q</kbd> 내림 · <kbd>E</kbd> 올림 · <kbd>R</kbd> 트랙으로 복귀<br>카메라: <kbd>,</kbd><kbd>.</kbd> 돌리기 · <kbd>PgUp</kbd><kbd>PgDn</kbd> 높이 · <kbd>-</kbd><kbd>=</kbd> 축소/확대 · <kbd>Home</kbd> 되돌리기 · 설정 <kbd>Tab</kbd></p>
+    <p class="note">휴대폰에서는 화면 아래 버튼으로 조작합니다: 왼쪽 ◀ ▶ 조향, 오른쪽 브레이크와 가속, 가운데 Q/E 기어(수동일 때)와 R 복귀.</p>
+  </section>
+  <section data-tab="race">
     <fieldset><legend>레이스</legend>
       <div class="row"><label for="mode">출발 방식</label><select id="mode"><option value="handicap">핸디캡 (느린 차 먼저)</option><option value="scratch">동시 출발 (그리드)</option></select></div>
       <div class="row"><label for="laps">바퀴 수</label><select id="laps"><option value="1">1바퀴</option><option value="2" selected>2바퀴</option><option value="3">3바퀴</option></select></div>
@@ -90,52 +112,61 @@
       <p class="note">상대 3대가 무작위로 나옵니다. 핸디캡: 느린 차가 먼저, 빠른 차가 나중에 출발해 계산대로라면 모두 같이 들어옵니다. 동시 출발: 두 대씩 줄을 서서(느린 차가 앞줄) 신호와 함께 한꺼번에 출발합니다.</p>
       <ol id="board" class="board"></ol><div id="results"></div>
     </fieldset>
-    <label class="check"><input type="checkbox" id="auto" checked> 자동 변속 (<kbd>M</kbd>)</label>
-    <label class="check"><input type="checkbox" id="assist"> 카운터스티어 보조</label>
+  </section>
+  <section data-tab="track">
+    <div class="row"><label for="surface">노면</label><select id="surface"><option value="period" selected>1930년대 원형 (요철 다섯 곳)</option><option value="smooth">재포장 (요철 없음, 고속 시험용)</option></select></div>
+    <p class="note">원형 노면: Members' 다리 밑 요철(높이 16 cm)에서는 빠른 차의 뒷바퀴가 뜹니다. 시속 300 km가 넘는 차는 재포장을 고르세요.</p>
+    <label class="check"><input type="checkbox" id="photoGround" checked> 사진 콘크리트 (Poly Haven CC0 텍스처, 끄면 셰이더만)</label>
+    <label class="check"><input type="checkbox" id="hdri" checked> HDRI 하늘 (사진 하늘의 반사와 빛, 끄면 계산된 하늘)</label>
+    <div class="row"><label for="day">시간대 (1 낮 · 0.4 해질녘 · 0 밤)</label><input type="range" id="day" min="0" max="1" step="0.05" value="1"></div>
+    <p class="note">뱅크 꼭대기 밖으로 나가면 실제처럼 넘어간 것으로 보고 트랙에 다시 올려 둡니다.</p>
+  </section>
+  <section data-tab="camera">
+    <div class="row"><label for="scale">화면 축척</label><select id="scale"><option value="4">4 mm/픽셀 (가까이)</option><option value="6">6 mm/픽셀</option><option value="8">8 mm/픽셀</option><option value="12">12 mm/픽셀</option><option value="16">16 mm/픽셀</option><option value="20">20 mm/픽셀</option><option value="25">25 mm/픽셀</option><option value="30">30 mm/픽셀</option><option value="40">40 mm/픽셀</option><option value="50" selected>50 mm/픽셀</option><option value="65">65 mm/픽셀</option><option value="80">80 mm/픽셀</option><option value="100">100 mm/픽셀</option><option value="130">130 mm/픽셀</option></select></div>
+    <div class="row"><label for="pitch">카메라 높이 <span class="val" id="pitchv">30°</span></label><input type="range" id="pitch" min="15" max="85" step="1" value="30"></div>
+    <label class="check"><input type="checkbox" id="chase"> 차를 따라 도는 카메라</label>
+    <label class="check"><input type="checkbox" id="free"> 자유 카메라 — 화면을 끌어 돌리기(좌우)·높이(위아래), 휠/두 손가락으로 확대·축소, 두 번 눌러 되돌리기</label>
+    <label class="check"><input type="checkbox" id="cine"> 시네마틱 뷰 (<kbd>C</kbd>) — 트랙 옆 카메라, 추격, 높은 시점을 오가며 중계 화면처럼</label>
+    <p class="note" id="camv"></p>
+  </section>
+  <section data-tab="gfx">
     <label class="check"><input type="checkbox" id="live" checked> 실시간 렌더러 (WebGL2: 매 프레임 직접 그림, 그림자, 굽기 없음) <span class="note" id="livenote"></span></label>
-    <div class="row"><label for="look">조명·재질 (실시간)</label><select id="look"><option value="pbr" selected>PBR (사실적, 재질 텍스처)</option><option value="stepped">PBR 단계화</option><option value="baked">기존: 단계 조명</option><option value="split">세 가지 나란히 비교</option></select></div>
-    <div class="row"><label for="mbK">모션 블러 세기 (셔터)</label><input type="range" id="mbK" min="0" max="4" step="0.1" value="1.6"></div>
+    <div class="row"><label for="look">조명·재질</label><select id="look"><option value="pbr" selected>PBR (사실적, 재질 텍스처)</option><option value="stepped">PBR 단계화</option><option value="baked">기존: 단계 조명</option><option value="split">세 가지 나란히 비교</option></select></div>
+    <h2>빛과 재질</h2>
+    <div class="row"><label for="lightK">광원 세기 (햇빛·반사·그늘)</label><input type="range" id="lightK" min="0.5" max="2.5" step="0.1" value="1"></div>
     <div class="row"><label for="reflK">반사·광택 세기</label><input type="range" id="reflK" min="0" max="2" step="0.1" value="1.3"></div>
     <div class="row"><label for="aoK">그늘진 구석 (AO)</label><input type="range" id="aoK" min="0" max="2" step="0.1" value="1"></div>
-    <div class="row"><label for="day">시간대 (1 낮 · 0.4 해질녘 · 0 밤)</label><input type="range" id="day" min="0" max="1" step="0.05" value="1"></div>
     <div class="row"><label for="deep">색 깊이 (도장의 깊고 진한 색, 0 = 이전)</label><input type="range" id="deep" min="0" max="2" step="0.1" value="1"></div>
-    <div class="row"><label for="bloomK">블룸 (밝은 빛 번짐)</label><input type="range" id="bloomK" min="0" max="3" step="0.1" value="1"></div>
-    <div class="row"><label for="dof">피사계 심도 (초점 밖 흐림)</label><input type="range" id="dof" min="0" max="3" step="0.1" value="0.5"></div>
+    <div class="row"><label for="texK">재질 텍스처 세기</label><input type="range" id="texK" min="0" max="3" step="0.1" value="1"></div>
+    <label class="check"><input type="checkbox" id="raysOn" checked> 화면 광선 추적 (반사, 그늘진 구석, 접촉 그림자)</label>
+    <label class="check"><input type="checkbox" id="artOn" checked> 2D 그림의 칠 디테일 입히기 (배지, 줄, 루버, 주름)</label>
+    <h2>선</h2>
     <div class="row"><label for="outW">테두리 굵기 (0: 없음)</label><input type="range" id="outW" min="0" max="2" step="0.25" value="1"></div>
     <div class="row"><label for="outK">테두리 진하기</label><input type="range" id="outK" min="0" max="1" step="0.05" value="1"></div>
     <div class="row"><label for="innerOn">안쪽 선 (부품 사이)</label><select id="innerOn"><option value="auto" selected>자동 (기존 조명에서만)</option><option value="on">켜기</option><option value="off">끄기</option></select></div>
     <div class="row"><label for="inK">안쪽 선 진하기</label><input type="range" id="inK" min="0" max="1" step="0.05" value="1"></div>
-    <div class="row"><label for="texK">재질 텍스처 세기</label><input type="range" id="texK" min="0" max="3" step="0.1" value="1"></div>
-    <div class="row"><label for="lightK">광원 세기 (햇빛·반사·그늘)</label><input type="range" id="lightK" min="0.5" max="2.5" step="0.1" value="1"></div>
-    <label class="check"><input type="checkbox" id="raysOn" checked> 화면 광선 추적 (반사, 그늘진 구석, 접촉 그림자)</label>
-    <label class="check"><input type="checkbox" id="artOn" checked> 2D 그림의 칠 디테일 입히기 (배지, 줄, 루버, 주름)</label>
+    <p class="note">재질 텍스처: Poly Haven (CC0) — brushed concrete 03, sparse grass, blue metal plate, rubberized track, brown leather, waffle pique cotton, oak wood planks</p>
+  </section>
+  <section data-tab="fx">
+    <label class="check"><input type="checkbox" id="blur" checked> 모션 블러 (배경이 속도에 따라 흐려짐)</label>
+    <div class="row"><label for="mbK">모션 블러 세기 (셔터)</label><input type="range" id="mbK" min="0" max="4" step="0.1" value="1.6"></div>
+    <div class="row"><label for="bloomK">블룸 (밝은 빛 번짐)</label><input type="range" id="bloomK" min="0" max="3" step="0.1" value="1"></div>
+    <div class="row"><label for="dof">피사계 심도 (초점 밖 흐림)</label><input type="range" id="dof" min="0" max="3" step="0.1" value="0.5"></div>
+    <h2>시대감</h2>
+    <div class="row"><label for="fx">화면 시대감</label><select id="fx"><option value="0">없음</option><option value="1">1930년대 뉴스릴 (35 mm 흑백 필름)</option><option value="2">1990년대 TV 중계 (PAL 비디오)</option></select></div>
+    <div class="row"><label for="fxK">시대감 세기</label><input type="range" id="fxK" min="0" max="1" step="0.05" value="1"></div>
+    <label class="check"><input type="checkbox" id="filmRate" checked> 뉴스릴을 초당 18프레임으로 (손으로 돌리는 카메라)</label>
+  </section>
+  <section data-tab="wear">
     <div class="row"><label for="wrust">녹</label><input type="range" id="wrust" min="0" max="1" step="0.05" value="0"></div>
     <div class="row"><label for="wfade">도장 바램</label><input type="range" id="wfade" min="0" max="1" step="0.05" value="0"></div>
     <div class="row"><label for="wdirt">먼지·진흙</label><input type="range" id="wdirt" min="0" max="1" step="0.05" value="0"></div>
     <label class="check"><input type="checkbox" id="wgrow" checked> 달리면 먼지가 쌓임 (잔디에서 빨리)</label> <button type="button" id="wclean" class="btn">세차</button>
-    <p class="note">재질 텍스처: Poly Haven (CC0) — brushed concrete 03, sparse grass, blue metal plate, rubberized track, brown leather, waffle pique cotton, oak wood planks</p>
-    <label class="check"><input type="checkbox" id="photoGround" checked> 사진 콘크리트 (Poly Haven CC0 텍스처, 끄면 셰이더만)</label>
-    <label class="check"><input type="checkbox" id="hdri" checked> HDRI 하늘 (사진 하늘의 반사와 빛, 끄면 계산된 하늘)</label>
-    <label class="check"><input type="checkbox" id="lamps"> 헤드라이트 켜기 (실시간 렌더러, 브레이크등은 브레이크를 밟으면)</label>
-    <label class="check"><input type="checkbox" id="blur" checked> 모션 블러 (배경이 속도에 따라 흐려짐)</label>
-    <label class="check"><input type="checkbox" id="progressive"> 가속 게이지 모드 (오래 누를수록 가속이 차오름)</label>
+  </section>
+  <section data-tab="sound">
     <label class="check"><input type="checkbox" id="sound"> 소리 켜기 (엔진, 타이어, 바람, 주변음)</label>
     <div class="row"><label for="vol">음량</label><input type="range" id="vol" min="0" max="1" step="0.05" value="0.7"></div>
-    <button type="button" id="repair" class="btn">엔진 수리 (연습)</button>
-    <label class="check"><input type="checkbox" id="pilot"> 시험 운전자에게 맡기기</label>
-    <div class="row"><label for="pitch">카메라 높이 <span class="val" id="pitchv">30°</span></label><input type="range" id="pitch" min="15" max="85" step="1" value="30"></div>
-    <label class="check"><input type="checkbox" id="chase"> 차를 따라 도는 카메라</label>
-    <label class="check"><input type="checkbox" id="free"> 자유 카메라 — 화면을 끌어 돌리기(좌우)·높이(위아래), 휠/두 손가락으로 확대·축소, 두 번 눌러 되돌리기</label>
-    <p class="note" id="camv"></p>
-    <div class="row"><label for="fx">화면 시대감</label><select id="fx"><option value="0">없음</option><option value="1">1930년대 뉴스릴 (35 mm 흑백 필름)</option><option value="2">1990년대 TV 중계 (PAL 비디오)</option></select></div>
-    <div class="row"><label for="fxK">시대감 세기</label><input type="range" id="fxK" min="0" max="1" step="0.05" value="1"></div>
-    <label class="check"><input type="checkbox" id="filmRate" checked> 뉴스릴을 초당 18프레임으로 (손으로 돌리는 카메라)</label>
-    <label class="check"><input type="checkbox" id="cine"> 시네마틱 뷰 (<kbd>C</kbd>) — 트랙 옆 카메라, 추격, 높은 시점을 오가며 중계 화면처럼</label>
-    <div class="row"><label for="scale">화면 축척</label><select id="scale"><option value="4">4 mm/픽셀 (가까이)</option><option value="6">6 mm/픽셀</option><option value="8">8 mm/픽셀</option><option value="12">12 mm/픽셀</option><option value="16">16 mm/픽셀</option><option value="20">20 mm/픽셀</option><option value="25">25 mm/픽셀</option><option value="30">30 mm/픽셀</option><option value="40">40 mm/픽셀</option><option value="50" selected>50 mm/픽셀</option><option value="65">65 mm/픽셀</option><option value="80">80 mm/픽셀</option><option value="100">100 mm/픽셀</option><option value="130">130 mm/픽셀</option></select></div>
-    <label class="check"><input type="checkbox" id="touch"> 화면 버튼 보이기</label>
-    <p class="note keys-help"><kbd>↑</kbd>/<kbd>W</kbd> 가속 · <kbd>↓</kbd>/<kbd>S</kbd> 브레이크 · <kbd>←</kbd><kbd>→</kbd>/<kbd>A</kbd><kbd>D</kbd> 조향 · <kbd>Space</kbd> 핸드브레이크<br>수동 변속: <kbd>Q</kbd> 내림 · <kbd>E</kbd> 올림 · <kbd>R</kbd> 트랙으로 복귀<br>카메라: <kbd>,</kbd><kbd>.</kbd> 돌리기 · <kbd>PgUp</kbd><kbd>PgDn</kbd> 높이 · <kbd>-</kbd><kbd>=</kbd> 축소/확대 · <kbd>Home</kbd> 되돌리기</p>
-    <p class="note">휴대폰에서는 화면 아래 버튼으로 조작합니다: 왼쪽 ◀ ▶ 조향, 오른쪽 브레이크와 가속, 가운데 Q/E 기어(수동일 때)와 R 복귀. 가로로 돌려 쓰면 화면이 커집니다.</p>
-    <p class="note">뱅크 꼭대기 밖으로 나가면 실제처럼 넘어간 것으로 보고 트랙에 다시 올려 둡니다. Members' 다리 밑 요철에서는 빠른 차의 뒷바퀴가 뜹니다.</p>
+  </section>
   </form>
-</div>
+</aside>
 <script>/*BUNDLE*/</script>

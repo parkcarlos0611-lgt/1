@@ -42,8 +42,10 @@ export class Track {
   bank(s: number, off: number): number { const W = this.spec.width, { b, f } = this.bankAt(s); if (!b || f <= 0) return 0;
     const inLeft = this.at((b.s0 + b.s1) / 2).k >= 0, u = Math.max(0, Math.min(W, (inLeft ? -off : off) + W / 2)); return b.height * f * (u / W) ** b.curve; }   // the banking's own turn sets its high side, also where it eases out into a bend the other way
   /** the bumps across the track at s */
-  bump(s: number): number { const L = this.length, t = ((s % L) + L) % L; let z = 0;
-    for (const q of this.spec.bumps) { let d = Math.abs(t - q.s); d = Math.min(d, L - d); if (d < q.len / 2) z += q.height * (1 + Math.cos(d / (q.len / 2) * Math.PI)) / 2; } return z; }
+  /** the bumps' strength (review 145): 1 the period's concrete, 0 resurfaced (smooth, for the fast cars) */
+  bumpK = 1;
+  bump(s: number): number { if (this.bumpK <= 0) return 0; const L = this.length, t = ((s % L) + L) % L; let z = 0;
+    for (const q of this.spec.bumps) { let d = Math.abs(t - q.s); d = Math.min(d, L - d); if (d < q.len / 2) z += q.height * (1 + Math.cos(d / (q.len / 2) * Math.PI)) / 2; } return z * this.bumpK; }
   /** the surface's height at (s, off): the banking and the bumps */
   height(s: number, off: number): number { return this.bank(s, off) + this.bump(s); }
   /** which side a banking's outer edge is on at s (-1 right, 1 left): its earth bank falls away to the fields there */

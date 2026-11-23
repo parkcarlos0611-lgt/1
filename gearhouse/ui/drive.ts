@@ -453,10 +453,18 @@ $<HTMLInputElement>('sound').addEventListener('change', e => { if ((e.target as 
 $<HTMLInputElement>('vol').addEventListener('input', e => { if (snd) snd.volume = +(e.target as HTMLInputElement).value; });
 $('repair').addEventListener('click', e => { car.health = new Health(car.spec.hp, car.spec.cooling, Math.floor(Math.random() * 1e9)); say('엔진을 새것처럼 고쳤습니다'); (e.target as HTMLElement).blur(); });
 // full screen: the picture alone; where the browser cannot (an iPhone), the page itself fills the screen
-$('fs').addEventListener('click', () => { const el = document.querySelector('.screen') as HTMLElement & { webkitRequestFullscreen?: () => void };
-  if (document.fullscreenElement) void document.exitFullscreen(); else if (document.body.classList.contains('fakefull')) document.body.classList.remove('fakefull');
-  else if (el.requestFullscreen) void el.requestFullscreen().catch(() => document.body.classList.add('fakefull')); else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen(); else document.body.classList.add('fakefull');
+$('fs').addEventListener('click', () => { const el = document.documentElement as HTMLElement & { webkitRequestFullscreen?: () => void };   /* the whole page, so the settings drawer comes along (review 145) */
+  if (document.fullscreenElement) void document.exitFullscreen(); else if (el.requestFullscreen) void el.requestFullscreen().catch(() => {}); else el.webkitRequestFullscreen?.();
   setTimeout(fit, 150); });
+// the settings drawer, sorted into tabs (review 145): opened by the gear button or Tab, closed by its cross, Esc or Tab
+const drawer = (open?: boolean) => { const on = open ?? !document.body.classList.contains('drawer-open'); document.body.classList.toggle('drawer-open', on); $('setbtn').setAttribute('aria-expanded', String(on)); if (!on) (document.activeElement as HTMLElement | null)?.blur(); };
+$('setbtn').addEventListener('click', () => drawer()); $('setclose').addEventListener('click', () => drawer(false));
+addEventListener('keydown', e => { if (e.key === 'Tab' && !(e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement || e.target instanceof HTMLButtonElement)) { e.preventDefault(); drawer(); } else if (e.key === 'Escape' && document.body.classList.contains('drawer-open')) drawer(false); });
+document.querySelectorAll<HTMLButtonElement>('.tabs button').forEach(b => b.addEventListener('click', () => { const t = b.dataset.tab;
+  document.querySelectorAll<HTMLButtonElement>('.tabs button').forEach(x => x.setAttribute('aria-selected', String(x === b)));
+  document.querySelectorAll<HTMLElement>('.dials section').forEach(sec => sec.classList.toggle('on', sec.dataset.tab === t)); }));
+// the surface (review 145): the period's concrete with its five bumps, or resurfaced smooth for the fast cars; the drawn ground follows
+$<HTMLSelectElement>('surface').addEventListener('change', e => { T.bumpK = (e.target as HTMLSelectElement).value === 'smooth' ? 0 : 1; live?.setGround(groundData(T, SCN, START)); say(T.bumpK ? '노면: 1930년대 원형 (요철 있음)' : '노면: 재포장 (요철 없음)'); });
 document.addEventListener('fullscreenchange', () => setTimeout(fit, 100));
 $('race').addEventListener('click', e => { startRace(); (e.target as HTMLElement).blur(); });
 $('practice').addEventListener('click', e => { stopRace(); $('race').textContent = '레이스 시작'; (e.target as HTMLElement).blur(); });
@@ -515,14 +523,8 @@ $<HTMLInputElement>('free').addEventListener('change', e => setFree((e.target as
 $<HTMLInputElement>('pitch').addEventListener('change', e => { want(+(e.target as HTMLInputElement).value, mm); (e.target as HTMLElement).blur(); });
 $<HTMLInputElement>('pitch').addEventListener('input', e => { $('pitchv').textContent = `${(e.target as HTMLInputElement).value}°`; if (live) want(+(e.target as HTMLInputElement).value, mm); });
 $<HTMLSelectElement>('scale').addEventListener('change', e => { want(pitchDeg, +(e.target as HTMLSelectElement).value); (e.target as HTMLElement).blur(); });
-function fit() { if (document.fullscreenElement || document.body.classList.contains('fakefull')) { const k = Math.max(1, Math.round(innerWidth / 900)) * (st.cine ? 2 : 1); VW = Math.ceil(innerWidth / k / 2) * 2; VH = Math.ceil(innerHeight / k); cv.width = VW; cv.height = VH; cv.style.width = `${VW * k}px`; cv.style.height = `${VH * k}px`; ctx.imageSmoothingEnabled = false; return; }
-  const box = document.querySelector('.track') as HTMLElement, room = Math.min(box.clientWidth - 14, 1600);
-  // the height left on the screen below the picture's top (a phone on its side has little), at least a usable strip
-  const availH = Math.max(200, innerHeight - Math.max(0, box.getBoundingClientRect().top + scrollY) - 16);
-  const k = Math.max(1, Math.floor(Math.min(room / 768, availH / 432)));
-  if (room >= 768 && availH >= 432) { VW = 768; VH = 432; cv.style.width = `${VW * k}px`; cv.style.height = `${VH * k}px`; }
-  else { VW = Math.max(300, Math.floor(room / 2) * 2); VH = Math.min(Math.round(VW * (innerHeight > innerWidth ? 0.8 : 0.56)), Math.floor(availH)); cv.style.width = `${VW}px`; cv.style.height = `${VH}px`; }
-  if (st.cine) { VW = Math.floor(VW / 4) * 2; VH = Math.floor(VH / 2); }   // the cinematic view: pixels twice the size (closer)
-  cv.width = VW; cv.height = VH; ctx.imageSmoothingEnabled = false; }
+function fit() {   // the picture fills the window (review 145), in big pixels: one picture pixel to k screen pixels
+  const k = Math.max(1, Math.round(innerWidth / 900)) * (st.cine ? 2 : 1); VW = Math.ceil(innerWidth / k / 2) * 2; VH = Math.ceil(innerHeight / k);
+  cv.width = VW; cv.height = VH; cv.style.width = `${VW * k}px`; cv.style.height = `${VH * k}px`; ctx.imageSmoothingEnabled = false; }
 addEventListener('resize', fit); addEventListener('orientationchange', () => setTimeout(fit, 200)); fit(); choose(carId); camX = car.x; camY = car.y; camZ = 0; camShow(); requestAnimationFrame(frame);
 (globalThis as { __drive?: unknown }).__drive = { get car() { return car; }, get L() { return live; }, get damage() { const e = dmg.get(car); return e ? { worst: e.D.worst, taken: e.D.taken } : null; }, SCN, T };   // for the page tests (tools): place the car, read the scenery

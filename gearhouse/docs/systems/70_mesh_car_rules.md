@@ -81,3 +81,20 @@ bar, so the bodies came out right in outline but faceted, creased and boxy. Thes
 - **Build afresh rather than patch** when the surface is wrong at the root (wrong section shape, unsmoothed tables): a
   new build from the measured, smoothed tables costs less than many fix rounds.
 - Budget for modern one-piece bodies: 9 000-14 000 triangles.
+
+## Proportions, budget, consistency (review 128)
+- **Sheets are design references, not measurements.** The user's sheets are drawings: their wheelbase, widths and
+  view heights are off by a few per cent (the EB110 sheet's wheelbase drawn 2595 for 2550, its front and rear views
+  squashed; the XJ220 sheet's wheelbase 3 % long, plan 5 % wide). Proportions come from the real car only: length,
+  width, height, wheelbase, tracks, overhangs, ground clearance, and the main heights (bonnet, belt, roof, deck) from
+  sources or photographs. The sheet gives the design: the shapes of the grille, lamps, intakes, louvres, the lines'
+  flow, the colours' layout; a feature's place is carried over as a share of the real dimensions (e.g. "the intake
+  starts at 62 % of the wheelbase"), never as the sheet's pixels.
+- **Budget like the others:** 9 000-10 500 triangles, about 1 800-2 200 per metre of length (the period cars run
+  1 570-2 190; the SSJ, the most detailed, 2 190). A car far above the rest looks foreign beside them.
+- **Spend on the body's curves:** a modern one-piece body has few parts; about 60 % of its triangles go into the
+  envelope (points per section, sections along). Louvres, grilles and lamp clusters are a few panels with dark
+  colours, not many small pieces; the interior only what shows through the glass at game size (seats, dash, tunnel).
+- **Check beside the others:** after the surface check, render the new car beside the SSJ and the D-type at game
+  scale (mm 16-20) and compare: the faces as smooth, the outline as busy, the colours as saturated. Then compare the
+  design features with the sheet.

@@ -37,14 +37,22 @@ import specsData from '../data/cars/specs.json';
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const T = millbrook(), cv = $<HTMLCanvasElement>('view'), main = cv.getContext('2d')!; let ctx = main;
 // the layer behind the player's car: the ground, the scenery and the other cars, smeared along the motion; the car stays sharp
-const bg = document.createElement('canvas'), bgx = bg.getContext('2d')!; let lampsOn = false, photoOn = true, hdriOn = true, blurOn = true, lastCamX = 0, lastCamY = 0, shake = 0;
+const bg = document.createElement('canvas'), bgx = bg.getContext('2d')!; /** the period's pictures (review 129): 0 none, 1 a 1930s newsreel, 2 a 1990s broadcast; strength; the newsreel at 18 frames a second */
+let fxMode = 0, fxK = 1, filmRate = true, heldAt = -1; const held = document.createElement('canvas');
+let lampsOn = false, photoOn = true, hdriOn = true, blurOn = true, lastCamX = 0, lastCamY = 0, shake = 0;
 let SP = Math.sin(30 * Math.PI / 180), CP = Math.cos(30 * Math.PI / 180), pitchDeg = 30; const DT = 1 / 200, START = T.spec.landmarks.find(l => l.kind === 'line')!.s;
 let VW = 768, VH = 432, mm = 50;                                               // the picture's own pixels, millimetres a pixel
 const st = { auto: true, assist: false, pilot: false, chase: false, progressive: false, cine: false, free: false };
 const turning = () => st.chase || st.cine || st.free;
 // ---- the cinematic view: shots cut between trackside cameras (the world turned to look from the camera at the car), a
 //      low chase and a high fixed view; pixels twice the size, the gauges hidden, bars top and bottom with a caption ----
-const W2c = T.spec.width / 2, CAMS = Array.from({ length: Math.floor(T.length / 380) }, (_, i) => { const s = i * 380 + 60, side = i % 2 ? 1 : -1, p = T.point(s, side * (W2c + 16)); return { s, x: p.x, y: p.y }; });
+const W2c = T.spec.width / 2, CAMS: { s: number; x: number; y: number }[] = Array.from({ length: Math.floor(T.length / 380) }, (_, i) => { const s = i * 380 + 60, side = i % 2 ? 1 : -1, p = T.point(s, side * (W2c + 16)); return { s, x: p.x, y: p.y }; });
+/* review 129: where the newsreel men stood: on the outside of each bend, a little before its apex (the cars come at them
+   and swing past), and at the banking's top; added to the straights' cameras */
+{ const L = Math.round(T.length); let last = -1e9; for (let s = 0; s < L; s += 5) { const k = T.at(s).k; if (Math.abs(k) < 1 / 900 || s - last < 280) continue; let peak = s; for (let q = s; q < s + 200 && q < L; q += 5) if (Math.abs(T.at(q).k) > Math.abs(T.at(peak).k)) peak = q;
+    const at = peak - 40, out = T.at(at).k >= 0 ? -1 : 1, p = T.point(at, out * (W2c + (T.bankAt(at).b ? 9 : 14))); CAMS.push({ s: at, x: p.x, y: p.y }); last = peak; } }
+/** the camera operator (review 129): a pan head's spring (the man lags the car, swings past and settles); its state */
+const op = { va: 0, vx: 0, vy: 0, pitch0: 0 }, setView = (p: number, m: number) => want(p, m);
 let cut = false; let shot: { kind: 'side' | 'chase' | 'top'; cam?: { s: number; x: number; y: number }; until: number } = { kind: 'chase', until: 0 }, shotN = 0;
 let snd: Sound | null = null, lastS = 0, lastGear = 1, lastV = 0, wasAir = false; const steam: { x: number; y: number; z: number; r: number; a: number }[] = []; let pilot = new Driver(T), camAng = Math.PI / 2, wheelTurn = 0;   // camAng: the world heading that shows as up the screen let pilot = new Driver(T);
 let car!: Vehicle, sprites!: CarSprites, carId = 'chevAB28', camX = 0, camY = 0, camZ = 0;
@@ -117,7 +125,9 @@ function drawLive(el: number) { const L = live!; void el;
     for (let k = 0; k < 3; k++) { L.render(view, cars, props, skids, { glass: 0.8, look: k, art: artOn, rays: raysOn, texK, lightK, aoK, reflK, bloomK, deep, day, photoGround: photoOn, hdri: hdriOn, dof, mb: blurOn ? mbK : 0, outW, outK, inner: innerOn === 'auto' ? undefined : innerOn === 'on', inK, smoke: { p: sp8, n: smoke.parcels.length, time: smoke.time } }); main.drawImage(glCanvas, k * w3, 0, w3, VH, k * w3, 0, w3, VH); }
     main.fillStyle = 'rgba(0,0,0,0.55)'; main.fillRect(0, VH - 20, VW, 20); main.fillStyle = '#f2ead6'; main.font = '11px sans-serif'; main.textAlign = 'center';
     for (let k = 0; k < 3; k++) main.fillText(names[k]!, k * w3 + w3 / 2, VH - 6); main.fillStyle = '#000'; for (let k = 1; k < 3; k++) main.fillRect(k * w3 - 1, 0, 2, VH); main.textAlign = 'left'; }
-  else { L.render(view, cars, props, skids, { glass: 0.8, look: look === 'stepped' ? 1 : look === 'pbr' ? 2 : 0, art: artOn, rays: raysOn, texK, lightK, aoK, reflK, bloomK, deep, day, photoGround: photoOn, hdri: hdriOn, dof, mb: blurOn ? mbK : 0, outW, outK, inner: innerOn === 'auto' ? undefined : innerOn === 'on', inK, smoke: { p: sp8, n: smoke.parcels.length, time: smoke.time } }); main.drawImage(glCanvas, 0, 0); }
+  else if (fxMode === 1 && filmRate && clock - heldAt < 1 / 18 && held.width === VW && heldAt <= clock) { /* the hand-cranked camera: 18 frames a second, the picture held between */ }
+  else { L.render(view, cars, props, skids, { glass: 0.8, look: look === 'stepped' ? 1 : look === 'pbr' ? 2 : 0, art: artOn, rays: raysOn, texK, lightK, aoK, reflK, bloomK, deep, day, photoGround: photoOn, hdri: hdriOn, dof, mb: blurOn ? mbK : 0, outW, outK, inner: innerOn === 'auto' ? undefined : innerOn === 'on', inK, smoke: { p: sp8, n: smoke.parcels.length, time: smoke.time }, fx: fxMode, fxK, fxPx: Math.max(1, Math.round(VH / 480)) }); held.width = VW; held.height = VH; held.getContext('2d')!.drawImage(glCanvas, 0, 0); heldAt = clock; }
+  if (look !== 'split') main.drawImage(held, 0, 0);
   drawDebris(el);
   if (car.speed > 30) { const v = Math.min(1, (car.speed - 30) / 30) * 0.35, g = main.createRadialGradient(VW / 2, VH / 2, VH * 0.35, VW / 2, VH / 2, VW * 0.62); g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, `rgba(0,0,0,${v})`); main.fillStyle = g; main.fillRect(0, 0, VW, VH); } }
 
@@ -399,14 +409,22 @@ function frame(now: number) { const el = Math.min(0.1, (now - last) / 1000); las
   for (const p of puffs) { p.x += p.vx * el; p.y += p.vy * el; p.z += 0.4 * el; p.r += 0.9 * el; p.a -= 0.4 * el; } while (puffs.length && puffs[0]!.a <= 0) puffs.shift(); for (let i = puffs.length - 1; i >= 0; i--) if (puffs[i]!.a <= 0) puffs.splice(i, 1);
   // the camera: on the car, a little ahead of where it is going
   const lead = Math.min(10, car.speed * 0.2), tx = car.x + Math.cos(car.yaw) * lead, ty = car.y + Math.sin(car.yaw) * lead, tz = T.height(car.s, car.off);
-  camX += (tx - camX) * Math.min(1, el * 5); camY += (ty - camY) * Math.min(1, el * 5); camZ += (tz - camZ) * Math.min(1, el * 5);
-  if (!st.free) { const vh = car.speed > 2 ? Math.atan2(Math.sin(car.yaw) * car.vx + Math.cos(car.yaw) * car.vy, Math.cos(car.yaw) * car.vx - Math.sin(car.yaw) * car.vy) : car.yaw, d = Math.atan2(Math.sin(vh - camAng), Math.cos(vh - camAng)); camAng += d * Math.min(1, el * 2.5); }   // the turning camera follows where the car goes, gently
+  const opShot = st.cine && shot.kind === 'side' && !!shot.cam;   /* a trackside man's shot: his own pan and follow, below */
+  if (!opShot) { camX += (tx - camX) * Math.min(1, el * 5); camY += (ty - camY) * Math.min(1, el * 5); } camZ += (tz - camZ) * Math.min(1, el * 5);
+  if (!st.free && !opShot) { const vh = car.speed > 2 ? Math.atan2(Math.sin(car.yaw) * car.vx + Math.cos(car.yaw) * car.vy, Math.cos(car.yaw) * car.vx - Math.sin(car.yaw) * car.vy) : car.yaw, d = Math.atan2(Math.sin(vh - camAng), Math.cos(vh - camAng)); camAng += d * Math.min(1, el * 2.5); }   // the turning camera follows where the car goes, gently
   if (st.cine) { const kinds = ['side', 'chase', 'side', 'top'] as const, passed = shot.kind === 'side' && shot.cam && T.gap(shot.cam.s, car.s) > 160;
     if (clock > shot.until || passed) { const kind = kinds[shotN++ % kinds.length]!; let cam = undefined as typeof shot.cam;
       if (kind === 'side') { let best = Infinity; for (const c of CAMS) { const g = T.gap(car.s, c.s); if (g > 40 && g < best && g < 600) { best = g; cam = c; } } }
       shot = { kind: kind === 'side' && !cam ? 'chase' : kind, cam, until: clock + (kind === 'side' ? 14 : kind === 'chase' ? 6 : 5) }; cut = true; }
     const want = shot.kind === 'side' && shot.cam ? Math.atan2(car.y - shot.cam.y, car.x - shot.cam.x) : shot.kind === 'top' ? Math.PI / 2 : car.yaw;
-    const d = Math.atan2(Math.sin(want - camAng), Math.cos(want - camAng)); camAng = cut ? want : camAng + d * Math.min(1, el * 3); if (cut) { camX = car.x; camY = car.y; } cut = false; }
+    const d = Math.atan2(Math.sin(want - camAng), Math.cos(want - camAng));
+    if (shot.kind === 'side' && shot.cam && !cut) { // the operator: second order, a little under-damped; a newsreel man on a tripod also trembles
+      const w = fxMode === 1 ? 3.2 : 4.2, z = fxMode === 1 ? 0.5 : 0.62, h = Math.min(el, 0.05); op.va += (w * w * d - 2 * z * w * op.va) * h; camAng += op.va * h;
+      const ex = car.x - camX, ey = car.y - camY, wp = 4.5; op.vx += (wp * wp * ex - 2 * 0.65 * wp * op.vx) * h; op.vy += (wp * wp * ey - 2 * 0.65 * wp * op.vy) * h; camX += op.vx * h; camY += op.vy * h;
+      if (fxMode === 1) camAng += (Math.sin(clock * 7.3) * 0.6 + Math.sin(clock * 13.1) * 0.4) * 0.0025; }
+    else { camAng = cut ? want : camAng + d * Math.min(1, el * 3); op.va = 0; op.vx = 0; op.vy = 0; }
+    if (cut) { camX = car.x; camY = car.y; if (live) { if (shot.kind === 'side') { if (!op.pitch0) op.pitch0 = pitchDeg; setView(Math.max(PMIN, fxMode ? 18 : 22), mm); } else if (op.pitch0) { setView(op.pitch0, mm); op.pitch0 = 0; } } }   /* a man on the ground: a low view */
+    cut = false; }
   turnCam();
   { const R = SCN.railway; let len = 0; for (let k = 0; k + 1 < R.length; k++) len += Math.hypot(R[k + 1]![0] - R[k]![0], R[k + 1]![1] - R[k]![1]);   // the train: now and then along the line
     if (train.d < 0) { train.wait -= el; if (train.wait <= 0) train.d = 0; } else { train.d += 24 * el; if (train.d > len + 80) { train.d = -1; train.wait = 70 + Math.random() * 120; } }
@@ -422,6 +440,9 @@ const setCine = (on: boolean) => { st.cine = on; ($('cine') as HTMLInputElement)
 $<HTMLInputElement>('cine').addEventListener('change', e => setCine((e.target as HTMLInputElement).checked));
 $<HTMLInputElement>('blur').addEventListener('change', e => { blurOn = (e.target as HTMLInputElement).checked; });
 $<HTMLInputElement>('lamps').addEventListener('change', e => { lampsOn = (e.target as HTMLInputElement).checked; });   /* the head lamps (review 117) */
+$<HTMLSelectElement>('fx').addEventListener('change', e => { fxMode = +(e.target as HTMLSelectElement).value; heldAt = -1; (e.target as HTMLElement).blur(); });
+$<HTMLInputElement>('fxK').addEventListener('input', e => { fxK = +(e.target as HTMLInputElement).value; });
+$<HTMLInputElement>('filmRate').addEventListener('change', e => { filmRate = (e.target as HTMLInputElement).checked; });
 $<HTMLInputElement>('photoGround').addEventListener('change', e => { photoOn = (e.target as HTMLInputElement).checked; });   /* review 124 */
 $<HTMLInputElement>('hdri').addEventListener('change', e => { hdriOn = (e.target as HTMLInputElement).checked; });
 $<HTMLInputElement>('progressive').addEventListener('change', e => { st.progressive = (e.target as HTMLInputElement).checked; document.body.classList.toggle('progressive', st.progressive); });

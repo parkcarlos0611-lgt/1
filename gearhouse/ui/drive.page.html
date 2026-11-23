@@ -127,6 +127,9 @@
     <label class="check"><input type="checkbox" id="chase"> 차를 따라 도는 카메라</label>
     <label class="check"><input type="checkbox" id="free"> 자유 카메라 — 화면을 끌어 돌리기(좌우)·높이(위아래), 휠/두 손가락으로 확대·축소, 두 번 눌러 되돌리기</label>
     <p class="note" id="camv"></p>
+    <div class="row"><label for="fx">화면 시대감</label><select id="fx"><option value="0">없음</option><option value="1">1930년대 뉴스릴 (35 mm 흑백 필름)</option><option value="2">1990년대 TV 중계 (PAL 비디오)</option></select></div>
+    <div class="row"><label for="fxK">시대감 세기</label><input type="range" id="fxK" min="0" max="1" step="0.05" value="1"></div>
+    <label class="check"><input type="checkbox" id="filmRate" checked> 뉴스릴을 초당 18프레임으로 (손으로 돌리는 카메라)</label>
     <label class="check"><input type="checkbox" id="cine"> 시네마틱 뷰 (<kbd>C</kbd>) — 트랙 옆 카메라, 추격, 높은 시점을 오가며 중계 화면처럼</label>
     <div class="row"><label for="scale">화면 축척</label><select id="scale"><option value="4">4 mm/픽셀 (가까이)</option><option value="6">6 mm/픽셀</option><option value="8">8 mm/픽셀</option><option value="12">12 mm/픽셀</option><option value="16">16 mm/픽셀</option><option value="20">20 mm/픽셀</option><option value="25">25 mm/픽셀</option><option value="30">30 mm/픽셀</option><option value="40">40 mm/픽셀</option><option value="50" selected>50 mm/픽셀</option><option value="65">65 mm/픽셀</option><option value="80">80 mm/픽셀</option><option value="100">100 mm/픽셀</option><option value="130">130 mm/픽셀</option></select></div>
     <label class="check"><input type="checkbox" id="touch"> 화면 버튼 보이기</label>

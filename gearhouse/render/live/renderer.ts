@@ -480,9 +480,24 @@ void main() { vec2 t = 1. / vec2(textureSize(uSrc, 0)); vec3 c = texture(uSrc, v
 const FINAL_FS = `#version 300 es
 precision highp float;
 uniform sampler2D uSrc, uDepth, uBloom, uVel; uniform float uBloomK, uDof, uRange, uFocus, uMB, uDeep; uniform int uHDR; in vec2 vUv; out vec4 o;
+/* ---- the period's pictures (review 129): uFx 1, a 1930s newsreel on 35 mm nitrate (panchromatic black and white, a
+   soft lens, grain that changes every frame and thickens in the shadows, the projector's flicker, the gate's weave, the
+   print's scratches and dust, a darkened edge, the highlights' halation, a faint warm tone of the print); uFx 2, a 1990s
+   television outside broadcast (a 625-line PAL picture: interlaced fields combing what moves, the colour carried at
+   half the sharpness and bleeding sideways, the camera's edge enhancement ringing at hard edges, video's lifted blacks
+   and hot reds, faint scanlines, a little tape noise). uFxK the strength 0..1, uFrame the frame (for the grain and
+   scratches), uFxPx the size of a film or video pixel in screen pixels ---- */
+uniform int uFx, uFrame; uniform float uFxK, uFxPx;
+float hf(vec2 q) { return fract(sin(dot(q, vec2(12.9898, 78.233))) * 43758.5453); }
+float hf1(float x) { return fract(sin(x * 91.3458) * 47453.5453); }
+/** film grain: clumps of silver a pixel or two across (value noise, two sizes), not a pixel's own speck */
+float grain(vec2 q, float f) { vec2 o = vec2(hf1(f) * 97., hf1(f + 3.) * 61.); float a = 0.; for (int i = 0; i < 2; i++) { vec2 x = (q + o) / (i == 0 ? 1.7 : 0.9), b = floor(x), t = fract(x); t = t * t * (3. - 2. * t);
+  a += mix(mix(hf(b), hf(b + vec2(1, 0)), t.x), mix(hf(b + vec2(0, 1)), hf(b + vec2(1, 1)), t.x), t.y) * (i == 0 ? 0.65 : 0.35); } return a - 0.5; }
 vec3 aces(vec3 x) { return clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0., 1.); }
 float coc(float d) { return min(9., max(0., abs(d - uFocus) * 2. * uRange - 1.2) * uDof); }   /* sharp within 1.2 m of the focus */
-void main() { ivec2 p = ivec2(gl_FragCoord.xy); vec2 sz = vec2(textureSize(uSrc, 0)); vec3 c = texelFetch(uSrc, p, 0).rgb; float r0 = coc(texelFetch(uDepth, p, 0).r);
+void main() { vec2 sz = vec2(textureSize(uSrc, 0)), wv = vec2(0.);
+  if (uFx == 1) { float f = float(uFrame); wv = vec2(hf1(f) - 0.5, (hf1(f + 7.) - 0.5) * 1.6 + sin(f * 0.21) * 0.6) * 1.6 * uFxK; }   /* the gate's weave: the frame not quite where the last one was */
+  ivec2 p = clamp(ivec2(gl_FragCoord.xy + wv), ivec2(0), ivec2(sz) - 1); vec2 vUv2 = (vec2(p) + 0.5) / sz; vec3 c = texelFetch(uSrc, p, 0).rgb; float r0 = coc(texelFetch(uDepth, p, 0).r);
   if (uDof > 0. && r0 > 0.6) { vec3 acc = c; float wsum = 1.; for (int i = 0; i < 20; i++) { float a = float(i) * 2.39996, rr = sqrt((float(i) + 0.5) / 20.) * r0; vec2 q = vec2(p) + vec2(cos(a), sin(a)) * rr;
       float rq = coc(texelFetch(uDepth, ivec2(clamp(q, vec2(0.), sz - 1.)), 0).r), w = rq >= rr * 0.7 ? 1. : 0.15; acc += texture(uSrc, (q + 0.5) / sz).rgb * w; wsum += w; } c = acc / wsum; }
   // motion blur: each pixel smeared along its own motion across the picture since the last frame (the camera's for the
@@ -492,12 +507,43 @@ void main() { ivec2 p = ivec2(gl_FragCoord.xy); vec2 sz = vec2(textureSize(uSrc,
     for (int i = 0; i < 20; i++) { float t = (float(i) + j) / 20. - 0.5; vec2 q = vec2(p) + mv * t; ivec2 qi = ivec2(clamp(q, vec2(0.), sz - 1.));
       vec2 mq = (texelFetch(uVel, qi, 0).rg - 0.5) * 128. * uMB; if (length(mq - mv) > 0.35 * ml + 1.) continue;   /* only what moves as this pixel does: a car is not smeared into the road */
       acc += texture(uSrc, (q + 0.5) / sz).rgb; n += 1.; } c = mix(c, acc / n, clamp(ml / 3., 0., 1.)); }
-  c += texture(uBloom, vUv).rgb * uBloomK;
+  if (uFx == 1) {   /* the period's soft lens: a little of the neighbours mixed in, more toward the edge */
+    float e = length(vUv2 - 0.5), k = (0.25 + e * 0.6) * uFxK; vec3 b = (texelFetch(uSrc, clamp(p + ivec2(1, 0), ivec2(0), ivec2(sz) - 1), 0).rgb + texelFetch(uSrc, clamp(p - ivec2(1, 0), ivec2(0), ivec2(sz) - 1), 0).rgb + texelFetch(uSrc, clamp(p + ivec2(0, 1), ivec2(0), ivec2(sz) - 1), 0).rgb + texelFetch(uSrc, clamp(p - ivec2(0, 1), ivec2(0), ivec2(sz) - 1), 0).rgb) / 4.; c = mix(c, b, k); }
+  if (uFx == 2) {   /* the colour at half the sharpness and late: chroma from a wider, shifted sample, the brightness kept */
+    vec3 a = vec3(0.); for (int i = -3; i <= 3; i++) a += texelFetch(uSrc, clamp(p + ivec2(i * 2 - 2, 0), ivec2(0), ivec2(sz) - 1), 0).rgb; a /= 7.;
+    float Lc = dot(c, vec3(0.299, 0.587, 0.114)), La = dot(a, vec3(0.299, 0.587, 0.114)); c = mix(c, a - La + Lc, 0.85 * uFxK);
+    // the interlace: on alternate lines what moves is shown where it was a field earlier (half a frame of its motion back)
+    vec2 mv = (texelFetch(uVel, p, 0).rg - 0.5) * 128.; if (((p.y / max(1, int(uFxPx))) & 1) == (uFrame & 1) && length(mv) > 1.) c = mix(c, texture(uSrc, (vec2(p) + 0.5 - mv * 0.5) / sz).rgb, 0.8 * uFxK); }
+  c += texture(uBloom, vUv2).rgb * uBloomK * (uFx == 1 ? 1. + 0.8 * uFxK : 1.);
   if (uHDR == 1) {   /* the filmic curve on each channel bleaches a strong colour toward white as it brightens; on the
        brightness alone it keeps the hue: the two mixed by the colour's depth (review 116) */
     float L = dot(c, vec3(0.2126, 0.7152, 0.0722)); vec3 byL = c * (aces(vec3(L)).r / max(L, 1e-4)); float over = max(byL.r, max(byL.g, byL.b));
     if (over > 1.) byL = mix(byL / over, vec3(1.), clamp((over - 1.) * 0.5, 0., 1.));   /* past white: toward white, not clipped to another hue */
-    c = pow(mix(aces(c), byL, clamp(uDeep * 0.55, 0., 0.85)), vec3(1. / 2.2)); } o = vec4(min(c, vec3(1.)), 1.); }`;
+    c = pow(mix(aces(c), byL, clamp(uDeep * 0.55, 0., 0.85)), vec3(1. / 2.2)); }
+  c = min(c, vec3(1.));
+  if (uFx == 1) { float K = uFxK, f = float(uFrame); vec2 q = floor(gl_FragCoord.xy / max(1., uFxPx));
+    // panchromatic film: red, green and blue to grey (a little less red than the eye: skies a shade light, red paint dark)
+    float g = dot(c, vec3(0.24, 0.66, 0.10));
+    g = mix(g, smoothstep(-0.05, 1.05, g), 0.55);   /* the film's S-curve: shoulders and toe */
+    g *= 1. + (hf1(f * 1.37) - 0.5) * 0.09 * K;   /* the projector's flicker, frame to frame */
+    float gr = grain(gl_FragCoord.xy / max(1., uFxPx), f) * (0.07 + 0.08 * (1. - g) * g * 4.) * K; g += gr;   /* grain, most in the middle tones */
+    // scratches: a few running down the print, wandering a little, lasting a while; and dust: dark specks for a frame
+    for (int i = 0; i < 3; i++) { float life = floor(f / (18. + float(i) * 11.)), on = step(0.55, hf1(life * 3.7 + float(i))), x = hf1(life + float(i) * 13.) * sz.x + sin(gl_FragCoord.y * 0.02 + f * 0.3) * 3.;
+      g = mix(g, (i == 1 ? 0.92 : 0.12), on * K * 0.55 * smoothstep(1.2, 0., abs(gl_FragCoord.x - x))); }
+    vec2 dq = floor(gl_FragCoord.xy / (3. * max(1., uFxPx))); if (hf(dq + f * 0.917) > 0.99985) g = mix(g, 0.05, K * 0.8);
+    float v = length((vUv - 0.5) * vec2(1.15, 1.)); g *= 1. - smoothstep(0.38, 0.78, v) * 0.55 * K;   /* the lens's darkened edge */
+    vec3 tone = mix(vec3(g), g * vec3(1.06, 1.0, 0.9) + vec3(0.02, 0.012, 0.), 0.6);   /* a faint warmth of the old print */
+    c = mix(c, clamp(tone, 0., 1.), K); }
+  if (uFx == 2) { float K = uFxK, f = float(uFrame);
+    // edge enhancement: the camera's sharpening, a light ring at a dark edge and a dark one at a light edge
+    vec3 l = texelFetch(uSrc, clamp(p - ivec2(2, 0), ivec2(0), ivec2(sz) - 1), 0).rgb, r = texelFetch(uSrc, clamp(p + ivec2(2, 0), ivec2(0), ivec2(sz) - 1), 0).rgb; float Lr = dot(l + r, vec3(0.15, 0.29, 0.06));
+    float L0 = dot(c, vec3(0.299, 0.587, 0.114)); c = clamp(c + (L0 - Lr) * 0.35 * K, 0., 1.);
+    // video's colour: blacks lifted, reds hot, a slight blue cast in the shade
+    c = mix(c, c * vec3(1.02, 1.0, 0.985) * 0.93 + vec3(0.03, 0.03, 0.034), K * 0.8); float s = dot(c, vec3(0.299, 0.587, 0.114)); c = mix(vec3(s), c, 1. + 0.12 * K);
+    float line = mod(floor(gl_FragCoord.y / max(1., uFxPx)), 2.); c *= 1. - line * 0.06 * K;   /* the scanlines */
+    c += (hf(floor(gl_FragCoord.xy / max(1., uFxPx)) + f * 1.3) - 0.5) * 0.035 * K;   /* tape noise */
+    float v = length(vUv - 0.5); c *= 1. - smoothstep(0.55, 0.85, v) * 0.25 * K; }
+  o = vec4(clamp(c, 0., 1.), 1.); }`;
 // ---- smoke (review 107, brief 75 §2): each parcel a sphere of gas, ray-marched through in its own fragment ----
 const SMOKE_VS = `#version 300 es
 layout(location=0) in vec2 aCorner; layout(location=1) in vec4 aPR; layout(location=2) in vec4 aGas;   // corner of the card; centre and radius; density, heat, kind, seed
@@ -591,7 +637,7 @@ export class LiveRenderer {
     this.hiTex = { alb: arr(v => v.alb), nor: arr(v => v.nor), idx }; }
   setGround(d: GroundData) { this.groundVao = this.vaoOf(d); this.groundN = d.n; }
   setFence(d: GroundData) { this.fenceVao = this.vaoOf(d); this.fenceN = d.n; }
-  private propP!: WebGLProgram; private depthI!: WebGLProgram;
+  private frameN = 0; private propP!: WebGLProgram; private depthI!: WebGLProgram;
   /** the photographed props (review 125): each model's buffers and pictures, and where its copies stand (their matrices) */
   private propModels = new Map<string, { vao: WebGLVertexArrayObject; n: number; alb: WebGLTexture; nor: WebGLTexture; arm: WebGLTexture; inst: WebGLBuffer; count: number }>();
   addPropModel(id: string, geo: { pos: Float32Array; nor: Float32Array; uv: Float32Array; idx: Uint32Array }, pics: { alb: TexImageSource; nor: TexImageSource; arm: TexImageSource }) { const gl = this.gl, vao = gl.createVertexArray()!; gl.bindVertexArray(vao);
@@ -639,7 +685,7 @@ export class LiveRenderer {
     if (og) { const a = this.arts.get(og); if (a) { this.arts.set(g, a); this.arts.delete(og); } freeGpu(this.gl, og); this.cars.delete(old); } return g; }
   forget(M: Mesh) { this.cars.delete(M); }
 
-  render(v: LiveView, cars: LiveCar[], props: LiveProp[], skids: Skid[], o: { glass?: number; /** 0 the baked look, 1 PBR stepped, 2 PBR smooth */ look?: number; /** lay the 2D art on (default yes) */ art?: boolean; /** the rays in the picture: occlusion, contact shadows, reflections (default yes) */ rays?: boolean; /** strengths: the textures, the light (1: as set) */ texK?: number; /** the time of day: 1 day (default), toward 0 dusk and night (review 117) */ day?: number; /** the concrete from photographed materials (default yes, once loaded) (review 124) */ photoGround?: boolean; /** the photographed sky in the mirrors and the light (default yes, once loaded) */ hdri?: boolean; /** the photographed props (review 125) */ props?: boolean; /** the colour's depth: deeper lacquer, the hue kept through the tone curve (0: as before; default 1) (review 116) */ deep?: number; lightK?: number; /** after the scene: occlusion and reflection strengths, bloom, depth of field (0 none; pixels of blur a metre from the focus) */ aoK?: number; reflK?: number; bloomK?: number; dof?: number; /** motion blur: the shutter, a share of a frame (0 none) */ mb?: number; /** the outline: width (times each thing's own; 0 none), darkness 0..1; the lines inside a thing (default: the baked look only), their darkness */ outW?: number; outK?: number; inner?: boolean; inK?: number; /** smoke parcels: centre, radius, density, heat, kind (0 tyre 1 dust 2 steam 3 exhaust), seed; and the time */ smoke?: { p: Float32Array; n: number; time: number } } = {}) { const gl = this.gl; this.size(v.W, v.H);
+  render(v: LiveView, cars: LiveCar[], props: LiveProp[], skids: Skid[], o: { glass?: number; /** 0 the baked look, 1 PBR stepped, 2 PBR smooth */ look?: number; /** lay the 2D art on (default yes) */ art?: boolean; /** the rays in the picture: occlusion, contact shadows, reflections (default yes) */ rays?: boolean; /** strengths: the textures, the light (1: as set) */ texK?: number; /** the time of day: 1 day (default), toward 0 dusk and night (review 117) */ day?: number; /** the concrete from photographed materials (default yes, once loaded) (review 124) */ photoGround?: boolean; /** the photographed sky in the mirrors and the light (default yes, once loaded) */ hdri?: boolean; /** the photographed props (review 125) */ props?: boolean; /** the period's pictures (review 129): 1 a 1930s newsreel, 2 a 1990s television broadcast; their strength; the size of a film or video pixel on screen */ fx?: number; fxK?: number; fxPx?: number; /** the colour's depth: deeper lacquer, the hue kept through the tone curve (0: as before; default 1) (review 116) */ deep?: number; lightK?: number; /** after the scene: occlusion and reflection strengths, bloom, depth of field (0 none; pixels of blur a metre from the focus) */ aoK?: number; reflK?: number; bloomK?: number; dof?: number; /** motion blur: the shutter, a share of a frame (0 none) */ mb?: number; /** the outline: width (times each thing's own; 0 none), darkness 0..1; the lines inside a thing (default: the baked look only), their darkness */ outW?: number; outK?: number; inner?: boolean; inK?: number; /** smoke parcels: centre, radius, density, heat, kind (0 tyre 1 dust 2 steam 3 exhaust), seed; and the time */ smoke?: { p: Float32Array; n: number; time: number } } = {}) { const gl = this.gl; this.size(v.W, v.H);
     // ---- the camera: orthographic, turned to v.ang, tilted down by v.pitch, v.mm millimetres a pixel, snapped to whole pixels ----
     const a = v.ang - Math.PI / 2, cA = Math.cos(a), sA = Math.sin(a), SP = Math.sin(v.pitch * Math.PI / 180), CP = Math.cos(v.pitch * Math.PI / 180), k = 1000 / v.mm, R = 900;
     const rx = [cA, sA, 0], ry = [-sA, cA, 0], up = [ry[0]! * SP, ry[1]! * SP, CP], vd = [ry[0]! * CP, ry[1]! * CP, -SP], c = [v.x, v.y, v.z], dot = (p: number[], q: number[]) => p[0]! * q[0]! + p[1]! * q[1]! + p[2]! * q[2]!;
@@ -750,7 +796,7 @@ export class LiveRenderer {
       for (let k = 4; k >= 2; k--) { to(k); tex(this.upP, 'uSrc', 0, RT[k + 1]!.t); gl.drawArrays(gl.TRIANGLES, 0, 3); gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, this.blank); }
       gl.disable(gl.BLEND); }
     to(null); gl.useProgram(this.finalP); tex(this.finalP, 'uSrc', 0, RT[1]!.t); tex(this.finalP, 'uDepth', 1, this.tDepth); tex(this.finalP, 'uBloom', 2, RT[2]!.t); tex(this.finalP, 'uVel', 3, this.tV); gl.uniform1f(this.loc(this.finalP, 'uMB'), o.mb ?? 0);
-    gl.uniform1f(this.loc(this.finalP, 'uBloomK'), bloomK > 0 ? bloomK * (hdrOn ? 0.55 : 0.4) : 0); gl.uniform1f(this.loc(this.finalP, 'uDof'), (o.dof ?? 0) * 0.8); gl.uniform1f(this.loc(this.finalP, 'uDeep'), o.deep ?? 1); gl.uniform1f(this.loc(this.finalP, 'uRange'), R); gl.uniform1f(this.loc(this.finalP, 'uFocus'), 0.5 + 0.6 * vd[2]! / (2 * R));   /* focused at the car's middle height over the target */ gl.uniform1i(this.loc(this.finalP, 'uHDR'), hdrOn);
+    gl.uniform1f(this.loc(this.finalP, 'uBloomK'), bloomK > 0 ? bloomK * (hdrOn ? 0.55 : 0.4) : 0); gl.uniform1f(this.loc(this.finalP, 'uDof'), (o.dof ?? 0) * 0.8); gl.uniform1f(this.loc(this.finalP, 'uDeep'), o.deep ?? 1); gl.uniform1i(this.loc(this.finalP, 'uFx'), o.fx ?? 0); gl.uniform1f(this.loc(this.finalP, 'uFxK'), o.fxK ?? 1); gl.uniform1i(this.loc(this.finalP, 'uFrame'), this.frameN++); gl.uniform1f(this.loc(this.finalP, 'uFxPx'), o.fxPx ?? 1); gl.uniform1f(this.loc(this.finalP, 'uRange'), R); gl.uniform1f(this.loc(this.finalP, 'uFocus'), 0.5 + 0.6 * vd[2]! / (2 * R));   /* focused at the car's middle height over the target */ gl.uniform1i(this.loc(this.finalP, 'uHDR'), hdrOn);
     gl.drawArrays(gl.TRIANGLES, 0, 3); for (let i = 0; i < 4; i++) { gl.activeTexture(gl.TEXTURE0 + i); gl.bindTexture(gl.TEXTURE_2D, this.blank); }
     this.prevVP = VP; this.prevM = this.nextM; this.nextM = new Map(); }
 

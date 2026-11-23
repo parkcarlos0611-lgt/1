@@ -37,6 +37,13 @@ export interface RaceSpec {
   steer?: { ratio: number; ackermann: number; rack?: boolean };
   /** the turning masses (kg m²) where known: the engine with its flywheel, one wheel with its tyre and brake */
   inertia?: { engine: number; wheel: number };
+  /** later technology (review 125), for the cars that had it: all-wheel drive through a centre differential (the front's
+   *  share of the torque, and a viscous coupling across it: Nm per rad/s between the axles); a torque-sensing limited-slip
+   *  rear differential (its bias ratio); anti-lock brakes; turbochargers (how many, the boost at full in bar, the revs
+   *  where it comes fully, the spool's time in s); a speed-sensitive rear wing (up and down in km/h, its lift area
+   *  pressing the rear, its drag area; the body's own downforce area); power steering; the tyres' widths front and rear (m) */
+  tech?: { drive?: { front: number; visc: number }; rearLsd?: number; abs?: boolean; turbo?: { n: number; boost: number; full: number; spool: number };
+    wing?: { up: number; down: number; clA: number; cdA: number; body: number }; power?: boolean; tyreWF?: number; tyreWR?: number };
   cdA: number; crr: number; steerLock: number;          // drag area m², rolling resistance, front wheels' lock (deg)
   topKmh: number; check: boolean;
   cooling: { siphon: boolean; margin: number } }   // the water's circulation (no pump on the Model T [v]), the radiator against the engine's heat [?]
@@ -120,12 +127,22 @@ const NEW: Record<string, RaceSpec> = {
   mb540k: { id: 'mb540k', name: '1936 Mercedes-Benz 540 K', mass: 2600 + 75, wheelbase: 3.29, track: 1.51, tyreR: 0.392, tyreW: 0.18, cgH: 0.62, frontShare: 0.5,
     hp: 177, hpRpm: 3400, torqueRpm: 2200, idle: 450, redline: 3700, gears: [3.4, 2.1, 1.4, 1.0], final: 3.08, eff: 0.88,
     brakes: 'four', hydraulic: true, brakeG: 0.6, cdA: 1.15, crr: 0.016, steerLock: 33, topKmh: 170, check: false, cooling: { siphon: false, margin: 1.1 }, tyreKind: 'crossply', era: '1936' } };
+// review 125: a 1990s technology test (docs/systems/78): the Bugatti EB110 GT. Bugatti: 3.5 V12, four IHI turbos with
+// intercoolers at 1.05-1.2 bar, 560 hp at 8,000 rpm, 611 Nm; six speeds; permanent four-wheel drive, a viscous-locking
+// centre differential, 27:73; a rear limited-slip differential (Torsen in one source); ABS; a speed-sensitive rear wing;
+// double wishbones; 245/40 ZR18 and 325/30 ZR18; 0-100 km/h 3.5 s; 342 km/h. [~]: the gear ratios (fitted to 342 km/h at
+// the power peak), the coupling's and the differential's figures, the wing's speeds and areas, the drag area (fitted).
+NEW.eb110 = { id: 'eb110', name: '1991 Bugatti EB110 GT (실험)', mass: 1620 + 75, wheelbase: 2.55, track: 1.575, tyreR: 0.326, tyreW: 0.285, cgH: 0.44, frontShare: 0.4,
+  hp: 553, hpRpm: 8000, torqueRpm: 3750, torquePeak: 611, idle: 900, redline: 8250, gears: [3.4, 2.25, 1.65, 1.27, 1.03, 0.84], final: 3.4, eff: 0.85,
+  brakes: 'disc', hydraulic: true, brakeG: 1.1, cdA: 0.58, crr: 0.012, steerLock: 30, topKmh: 342, check: false, cooling: { siphon: false, margin: 1.2 }, tyreKind: 'radial', era: '1991',
+  shiftT: 0.22, launchRpm: 6000, steer: { ratio: 15, ackermann: 0.6, rack: true }, inertia: { engine: 0.22, wheel: 1.7 },
+  tech: { drive: { front: 0.27, visc: 60 }, rearLsd: 2.5, abs: true, turbo: { n: 4, boost: 1.1, full: 3800, spool: 0.45 }, wing: { up: 120, down: 90, clA: 0.32, cdA: 0.06, body: 0.12 }, power: true, tyreWF: 0.245, tyreWR: 0.325 } };
 Object.assign(EXP, NEW);
 /** the new 3D-first cars, offered beside the period ones */
 export const NEW_CARS: string[] = Object.keys(NEW);
 export const EXP_CARS: string[] = Object.keys(EXP).filter(id => !NEW[id]);
 /** the engine for the sound: cylinders, valves, blower (the experimental cars are not in the game's data) */
-export const EXP_ENGINE: Record<string, { kind: string; layout: string; supercharged?: boolean }> = { napier33: { kind: 'ohv', layout: 'W12' }, jagD55: { kind: 'ohv', layout: 'I6' }, auburn851: { kind: 'sv', layout: 'I8', supercharged: true }, mb540k: { kind: 'ohv', layout: 'I8', supercharged: true } };
+export const EXP_ENGINE: Record<string, { kind: string; layout: string; supercharged?: boolean }> = { napier33: { kind: 'ohv', layout: 'W12' }, jagD55: { kind: 'ohv', layout: 'I6' }, auburn851: { kind: 'sv', layout: 'I8', supercharged: true }, mb540k: { kind: 'ohv', layout: 'I8', supercharged: true }, eb110: { kind: 'ohv', layout: 'V12' } };
 export function raceSpec(id: string): RaceSpec {
   if (EXP[id]) return EXP[id]!;
   const s = (specs as { cars: Record<string, { car: string; engine: { hp: number }; wheelbase: number; track: number; tyre: string }> }).cars[id]!, p = PERIOD[id]!, t = tyre(s.tyre), hpRpm = p[0];
@@ -149,5 +166,5 @@ export interface Suspension { front: AxleKind; rear: AxleKind; leafF: boolean; l
 const SUSP: Record<string, Partial<Suspension>> = {
   mb540k: { front: 'wishbone', rear: 'swing', leafF: false, leafR: false },
   bmw315: { front: 'wishbone', leafF: true },
-  jagD55: { front: 'wishbone', leafF: false, leafR: false } };
+  jagD55: { front: 'wishbone', leafF: false, leafR: false }, eb110: { front: 'wishbone', rear: 'wishbone', leafF: false, leafR: false } };
 export function suspension(c: RaceSpec): Suspension { return { front: 'beam', rear: 'beam', leafF: true, leafR: true, ...SUSP[c.id] }; }

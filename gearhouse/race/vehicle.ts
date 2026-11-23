@@ -82,6 +82,9 @@ export class Vehicle {
   toeDmg = [0, 0, 0, 0]; camDmg = [0, 0, 0, 0]; private bodyHitT = 0;
   /** record a blow at a world point along a world direction into the car, of E joules (r: the size of what struck, m) */
   blow(at: V3, dir: V3, E: number, r = 0.32): void { if (E < 150) return; const b = this.toBody(at), d = invRotQ(this.q, dir); this.hits.push({ at: b, dir: norm(d), E, r }); if (this.hits.length > 12) this.hits.shift(); }
+  /** later technology's state (review 125): the turbos' boost (0..1 of full), each wheel's anti-lock pressure (1 full),
+   *  ABS working now, the rear wing's rise (0..1), each wheel's drive torque (Nm) */
+  boost = 0; absP = [1, 1, 1, 1]; absOn = false; wing = 0; Tw = [0, 0, 0, 0];
   /** each tyre's side deflection (m): the side force builds as the tyre rolls (the relaxation length) */ private yd = [0, 0, 0, 0];
   readonly axles: [Axle, Axle];
   private ms: number; private Ix: number; private Iy: number; private Iz: number; private Iw: number; private Ie: number; private kt: number[];
@@ -178,29 +181,38 @@ export class Vehicle {
     const ex: V3 = rotQ(this.q, [1, 0, 0]), ey: V3 = rotQ(this.q, [0, 1, 0]), ez: V3 = rotQ(this.q, [0, 0, 1]);
     // ---- steering (review 100): the driver's hands turn the steering wheel, the box or rack turns the road wheels ----
     { const S = steering(c), N = S.ratio, lockR = c.steerLock * Math.PI / 180, want = Math.max(-lockR, Math.min(lockR, u.steer * usefulLock(c, this.speed, ty.mu))) * N, toCentre = Math.abs(want) < Math.abs(this.sw) && Math.sign(want - this.sw) === -Math.sign(this.sw);
-      const effort = (m * c.frontShare / 1000) / (1 + this.speed / 1.5) * 15 / N * (S.rack ? 1.0 : 1.4), hands = HANDS / (1 + effort), rate = hands + (toCentre ? this.speed * 0.25 : 0);
+      const effort = (m * c.frontShare / 1000) / (1 + this.speed / 1.5) * 15 / N * (S.rack ? 1.0 : 1.4) * (c.tech?.power ? 0.3 : 1), hands = HANDS / (1 + effort), rate = hands + (toCentre ? this.speed * 0.25 : 0);
       this.sw += Math.max(-rate * dt, Math.min(rate * dt, want - this.sw)); this.steer = this.sw / N; }
     // ---- drive line: gear changes, the engine, the clutch, the open differential ----
     this.shift -= dt; const vxh = this.vx;
     const wheelRpm = Math.max(0, vxh) / R * c.gears[this.gear - 1]! * c.final * 30 / Math.PI;
     if (this.shift <= 0) { if (this.auto) { if (wheelRpm > Math.min(c.hpRpm * 1.04, c.redline * 0.92) && this.gear < c.gears.length) { this.gear++; this.shift = c.shiftT ?? 0.5; } else if (this.gear > 1 && wheelRpm * c.gears[this.gear - 2]! / c.gears[this.gear - 1]! < c.hpRpm * 0.8) { this.gear--; this.shift = c.shiftT ?? 0.5; } }
       else if (u.gear && u.gear !== this.gear) { this.gear = Math.max(1, Math.min(c.gears.length, u.gear)); this.shift = c.shiftT ?? 0.5; } }
-    const Gr = c.gears[this.gear - 1]! * c.final, we = this.rpm * Math.PI / 30, wd = (this.w[2]! + this.w[3]!) / 2, idle = c.idle * Math.PI / 30;
+    const X = c.tech, fF = X?.drive ? X.drive.front : 0, wFa = (this.w[0]! + this.w[1]!) / 2, wRa = (this.w[2]! + this.w[3]!) / 2;   /* the centre differential: the shaft turns at the axles' speeds weighted by their torque shares */
+    const Gr = c.gears[this.gear - 1]! * c.final, we = this.rpm * Math.PI / 30, wd = fF * wFa + (1 - fF) * wRa, idle = c.idle * Math.PI / 30;
     const thr = this.shift > 0 ? 0 : Math.max(0, Math.min(1, u.throttle)) * (this.auto && this.rpm > c.redline * 0.98 ? 0.25 : 1), fric = 0.06 * torqueAt(c, c.torqueRpm) * (0.3 + 0.7 * this.rpm / c.hpRpm);
     const hp = this.health.power, alive = this.health.running;
-    const Te = alive ? (this.rpm < c.redline * 1.1 ? thr * torqueAt(c, this.rpm) * hp : 0) - fric * (1 - thr) + (this.rpm < c.idle ? fric * 2 : 0) : -fric * 3 - (this.rpm > 1 ? 30 : 0);
+    // the turbos (review 125): boost builds with the exhaust's flow (revs and throttle) over the spool time, falls fast when the throttle shuts (the blow-off); off boost the engine makes what it would unblown
+    let blow = 1; if (X?.turbo) { const T = X.turbo, want = thr * Math.min(1, Math.max(0, (this.rpm - T.full * 0.45) / (T.full * 0.55))), tau = want > this.boost ? T.spool * (1.6 - this.rpm / c.redline) * (this.boost > 0.4 ? 0.5 : 1) : 0.6;   /* the turbines keep turning through a short lift: the boost falls slowly and comes back quickly */
+      this.boost += (want - this.boost) * Math.min(1, dt / Math.max(0.02, tau)); const base = 1 / (1 + T.boost * 0.95); blow = base + (1 - base) * this.boost; }
+    const Te = alive ? (this.rpm < c.redline * 1.1 ? thr * torqueAt(c, this.rpm) * hp * blow : 0) - fric * (1 - thr) + (this.rpm < c.idle ? fric * 2 : 0) : -fric * 3 - (this.rpm > 1 ? 30 : 0);
     const autoC = this.shift > 0 ? 0 : Math.max(0, Math.min(1, wd * Gr > we * 0.97 ? 1 : (c.launchRpm ? (this.rpm - c.launchRpm * 0.8) / (c.launchRpm * 0.2) : (this.rpm - c.idle * 1.3) / (c.idle * 1.2))));
     const engaged = u.clutch === undefined ? autoC : Math.min(autoC, 1 - u.clutch), cap = engaged * torqueAt(c, c.torqueRpm) * 2.2;
-    const need = (we - wd * Gr) / (dt * (1 / this.Ie + Gr * Gr / (2 * this.Iw))), Tc = Math.max(-cap, Math.min(cap, need));
+    const need = (we - wd * Gr) / (dt * (1 / this.Ie + Gr * Gr * (fF * fF + (1 - fF) * (1 - fF)) / (2 * this.Iw))), Tc = Math.max(-cap, Math.min(cap, need));
     this.rpm = Math.max(alive ? idle * 0.5 : 0, we + (Te - Tc) / this.Ie * dt) * 30 / Math.PI;
     { const f = this.health.step(dt, this.rpm, c.redline, Math.max(0, Te) * this.rpm * Math.PI / 30, this.speed); if (f) this.lastFailure = f; }
     const Taxle = Tc * Gr * c.eff;
+    { // to the wheels: the centre differential's shares and the viscous coupling across it (it passes torque from the faster
+      // axle to the slower as they slip apart); each axle's own differential, the rear torque-sensing (up to its bias ratio)
+      const Tv = X?.drive ? X.drive.visc * (wRa - wFa) : 0, TF = fF * Taxle + Tv, TR = (1 - fF) * Taxle - Tv, w = this.w;
+      const split = (T: number, a: number, b: number, bias?: number): [number, number] => { let x = 0; if (bias) { const lim = Math.abs(T) / 2 * (bias - 1) / (bias + 1); x = Math.max(-lim, Math.min(lim, 300 * (w[b]! - w[a]!))); } return [T / 2 + x, T / 2 - x]; };
+      const [f0, f1] = split(TF, 0, 1), [r0, r1] = split(TR, 2, 3, X?.rearLsd); this.Tw = [f0, f1, r0, r1]; }
     // ---- forces and turns on the body (world), gathered ----
     const F: V3 = [0, 0, -this.ms * G], Tb: V3 = [0, 0, 0];   // Tb: turning moment, body axes
     const addAt = (bp: V3, f: V3) => { F[0] += f[0]; F[1] += f[1]; F[2] += f[2]; const fb = invRotQ(this.q, f), t = cross(bp, fb); Tb[0] += t[0]; Tb[1] += t[1]; Tb[2] += t[2]; };
     // the unsprung masses' weight and inertia along the body's up (their own up and down is their own); across it the whole car's
     const gz = -G * ez[2], az = dot(this.aPrev, ez);
-    const Fz = [0, 0, 0, 0], fxs = [0, 0, 0, 0], fys = [0, 0, 0, 0], brakeCap = c.brakeG * m * G * R;
+    const Fz = [0, 0, 0, 0], fxs = [0, 0, 0, 0], fys = [0, 0, 0, 0], brakeCap = c.brakeG * m * G * R; let absNow = false;
     let tyreH: V3 = [0, 0, 0];
     for (let ai = 0; ai < 2; ai++) { const A = this.axles[ai]!, beam = A.kind === 'beam', Q: [number, number] = [0, 0]; let tbAx = 0; const zh0 = R - this.rings[ai * 2]!.rest - c.cgH;
       const wind = A.drive && beam ? A.wu * 0.12 : 0;   // a beam axle wound up lifts (or drops) a little on its springs' twist
@@ -224,14 +236,17 @@ export class Vehicle {
         this.yd[i] = Math.max(-sig, Math.min(sig, this.yd[i]!));
         const kappa = (this.w[i]! * R - lx) / v0, tanA = this.yd[i]! / sig; this.slipX[i] = kappa; this.slipA[i] = Math.atan(tanA);
         const patch = Math.min(1.15, this.rings[i]!.patch);
-        const mu = ty.mu * (1 - ty.loadSens * (fz / (m * G / 4) - 1)) * (this.onGrass[i] ? 0.55 : 1) * (0.85 + 0.15 * patch);
+        const wide = X?.tyreWF && X.tyreWR ? ((i < 2 ? X.tyreWF : X.tyreWR) / ((X.tyreWF + X.tyreWR) / 2)) ** 0.15 : 1;   /* a wider tyre a little more grip */
+        const mu = ty.mu * wide * (1 - ty.loadSens * (fz / (m * G / 4) - 1)) * (this.onGrass[i] ? 0.55 : 1) * (0.85 + 0.15 * patch);
         const sx = kappa / ty.peakSlip, sa = tanA / ty.peakAngle, sg = Math.hypot(sx, sa);
         let fx = 0, fy = 0; if (sg > 1e-9 && fz > 0) { const Bs = ty.B * sg, f = Math.sin(ty.C * Math.atan(Bs - ty.E * (Bs - Math.atan(Bs)))); fx = mu * fz * f * sx / sg; fy = -mu * fz * f * sa / sg; }
         fy += 0.35 * this.camber[i]! * fz; { const l = Math.hypot(fx, fy), cap2 = mu * fz * 1.02; if (l > cap2) { fx *= cap2 / l; fy *= cap2 / l; } }   // camber thrust, within the grip
         const rear = i >= 2, disc = c.brakes === 'disc', fade = 1 / (1 + Math.max(0, this.brakeT[i]! - (disc ? 550 : 250)) / (disc ? 400 : 200));
-        const bt = (u.brake * (c.brakes === 'rear' ? (rear ? 0.5 : 0) : rear ? 0.42 : 0.58) * brakeCap + (rear ? (u.handbrake ?? 0) * brakeCap * 0.35 : 0)) * fade;
+        let bt = (u.brake * (c.brakes === 'rear' ? (rear ? 0.5 : 0) : rear ? 0.42 : 0.58) * brakeCap + (rear ? (u.handbrake ?? 0) * brakeCap * 0.35 : 0)) * fade;
+        if (X?.abs && u.brake > 0.05 && this.speed > 2) {   /* anti-lock (review 125): a wheel slipping toward locking has its pressure let off, then built again, about a dozen times a second */
+          const k = this.slipX[i]!; this.absP[i] = Math.max(0.15, Math.min(1, this.absP[i]! + (k < -0.13 ? -28 : k > -0.07 ? 14 : 0) * dt)); bt *= this.absP[i]!; if (this.absP[i]! < 0.97) absNow = true; } else this.absP[i] = 1;
         const K = mu * Math.max(fz, 1) * ty.C * ty.B / ty.peakSlip * R * R / v0;
-        const w0 = this.w[i]!, drv = A.drive ? Taxle / 2 : 0, wf = w0 + (drv - fx * R - fz * (this.onGrass[i] ? 0.07 : c.crr) * R * Math.tanh(w0) + K * this.dw[i]! * dt) / (this.Iw + K * dt) * dt, bs = bt / (this.Iw + K * dt) * dt;
+        const w0 = this.w[i]!, drv = this.Tw[i]!, wf = w0 + (drv - fx * R - fz * (this.onGrass[i] ? 0.07 : c.crr) * R * Math.tanh(w0) + K * this.dw[i]! * dt) / (this.Iw + K * dt) * dt, bs = bt / (this.Iw + K * dt) * dt;
         this.w[i] = Math.abs(wf) <= bs ? 0 : wf - Math.sign(wf) * bs; this.dw[i] = bs > 0 || fz === 0 ? 0 : (this.w[i]! - w0) / dt; tbAx += (wf - this.w[i]!) * (this.Iw + K * dt) / dt;   /* the brake's torque, felt by the axle's housing */
         this.brakeT[i] = this.brakeT[i]! + (bt * Math.abs(this.w[i]!) / 9000 - (this.brakeT[i]! - 20) * (0.004 + this.speed * 0.0004) * (disc ? 2.2 : 1)) * dt;
         this.tfx[i] = fx; this.tfy[i] = fy; fxs[i] = fx; fys[i] = fy;
@@ -260,7 +275,7 @@ export class Vehicle {
       if (beam) { A.da = [Q[0] / A.mu, Q[1] / A.Ia]; } else { A.da = [Q[0] / (A.mu / 2), Q[1] / (A.mu / 2)]; }
       A.dv = [A.dv[0] + A.da[0] * dt, A.dv[1] + A.da[1] * dt]; A.d = [A.d[0] + A.dv[0] * dt, A.d[1] + A.dv[1] * dt];
       // a driven beam axle's wind-up: the drive's reaction (and the brakes') against the springs' twist
-      if (beam && A.drive) { const Tw = -Taxle + tbAx, ta = (Tw - A.kw * A.wu - A.cw * A.wv) / A.Iw; A.wv += ta * dt; A.wu += A.wv * dt; Tb[1] += A.kw * A.wu + A.cw * A.wv; } }
+      if (beam && A.drive) { const Tw = -(this.Tw[ai * 2]! + this.Tw[ai * 2 + 1]!) + tbAx, ta = (Tw - A.kw * A.wu - A.cw * A.wv) / A.Iw; A.wv += ta * dt; A.wu += A.wv * dt; Tb[1] += A.kw * A.wu + A.cw * A.wv; } }
     // ---- the body's own corners on the ground (on its side, on its roof, bellying over a crest): upright, only the bottom ones ----
     { const bx = this.box, upright = ez[2] > 0.75, pts: V3[] = []; for (const xx of [-bx.hl, 0, bx.hl]) for (const yy of [-bx.hw, bx.hw]) for (const zz of upright ? [-bx.bottom] : [-bx.bottom, bx.top]) pts.push([xx, yy, zz]);
       for (const bp of pts) { const wp = this.toWorld(bp), q = this.near(wp[0], wp[1]), gz0 = T.ground(q.s, q.off); if (wp[2] > gz0 + 0.02) continue; const gr = this.groundFast(q.s, q.off), pen = (gr.z - wp[2]) * gr.n[2]; if (pen <= 0) continue;
@@ -269,7 +284,11 @@ export class Vehicle {
         addAt(bp, [gr.n[0] * fn - vt[0] * fr, gr.n[1] * fn - vt[1] * fr, gr.n[2] * fn - vt[2] * fr]); } }
     this.bodyHitT -= dt;
     // ---- the air ----
-    { const sp = this.speed, d = 0.5 * RHO * c.cdA * sp; F[0] -= d * this.v[0]; F[1] -= d * this.v[1]; F[2] -= d * this.v[2]; }
+    this.absOn = absNow;
+    const Wg = X?.wing; if (Wg) { const kmh = this.speed * 3.6, to = kmh > Wg.up ? 1 : kmh < Wg.down ? 0 : this.wing > 0.5 ? 1 : 0; this.wing += Math.max(-dt / 1.2, Math.min(dt / 1.2, to - this.wing)); }   /* the wing rises and stows over a second or so */
+    { const sp = this.speed, d = 0.5 * RHO * (c.cdA + (Wg ? Wg.cdA * this.wing : 0)) * sp; F[0] -= d * this.v[0]; F[1] -= d * this.v[1]; F[2] -= d * this.v[2];
+      if (Wg) { const q = 0.5 * RHO * sp * sp, body = q * Wg.body, wingF = q * Wg.clA * this.wing;   /* downforce: the body's (shared by the axles) and the wing's (on the rear) */
+        addAt([this.axles[0].x, 0, 0], rotQ(this.q, [0, 0, -body * 0.42])); addAt([this.axles[1].x, 0, 0], rotQ(this.q, [0, 0, -body * 0.58 - wingF])); } }
     // the whole car's weight across the body's up (the running gear goes where the body goes, sideways and along)
     { const g: V3 = [0, 0, -(m - this.ms) * G], gu = dot(g, ez); F[0] += g[0] - ez[0] * gu; F[1] += g[1] - ez[1] * gu; F[2] += g[2] - ez[2] * gu; }
     // what the tyres and the air do, in the heading's frame (the old readers' tax, tay)

@@ -108,3 +108,19 @@ bar, so the bodies came out right in outline but faceted, creased and boxy. Thes
   exhausts: real geometry (props on the body), not only painted on. Small flat marks (lines, lettering) may stay 2D art.
 - **Graphics stay realistic.** PBR lacquer, HDRI sky, reflections, shadows, period camera effects as now. The
   stylisation is in the shapes, not in the lighting.
+
+## Wedge cars: flat faces and narrow fillets (review 137)
+For cars drawn as flat planes meeting at edges (Lamborghini Diablo, Countach-school wedges), the "sections are curves"
+rule above is replaced by:
+- **Sections are straight runs with narrow fillets:** each panel's section is a few straight segments; where two
+  faces meet the corner is a fillet of 2-3 points over 20-60 mm, not a broad curve. The renderer keeps a bend over 40
+  degrees crisp and smooths below it, so the fillet's steps must each stay under 40 degrees while the faces either
+  side differ by more.
+- **The profile is a polyline first:** the side view is set out as straight runs (nose to screen top as near one line
+  on a wedge) with short rounded joints; smooth only the joints, never the runs.
+- **Arches are cut polygons:** a trapezoid or a flattened arc with rounded corners where the car has one (Gandini's
+  slanted rear arch), not a half circle.
+- **Panels are separate volumes:** bonnet, wings, doors, quarters, buttresses, engine cover, tail panel, bumpers,
+  each its own surface meeting the next at a shared edge or a few-mm overlap; intakes are cut, not painted.
+- **Drawings are often squashed vertically:** check a drawing's wheel diameter against the real tyre before using its
+  heights; scale x by the wheelbase and z by the real height separately when they disagree.

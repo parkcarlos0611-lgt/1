@@ -73,8 +73,9 @@ export function auburn851Mesh(spin = 0): Mesh { const b = new Build();
   // ---- bonnet and doors: the centre hinge, the bright vent strips, the top louvres, the shut lines, the handles ----
   b.name('hood').mat(CHROME, 0.9, 'metal').bar([X(310), 0, at(TOP, X(310)) + 3], [X(420), 0, at(TOP, X(420)) + 3], 14, 8).bar([X(420), 0, at(TOP, X(420)) + 3], [X(900), 0, at(TOP, X(900)) + 3], 14, 8);
   for (const s of [1, -1]) { const z0 = Z(240), z1 = Z(222), xa = X(505), xb = X(855), ya = s * (sideY(xa, z0) + 4), yb = s * (sideY(xb, z0) + 4);
-    b.name('hood').mat(CHROME, 0.9, 'metal').loft([[[xa, ya - s * 6, z0 - 8], [xa, ya + s * 8, z0 - 8], [xa, ya + s * 8, z1 + 8], [xa, ya - s * 6, z1 + 8]], [[xb, yb - s * 6, z0 - 8], [xb, yb + s * 8, z0 - 8], [xb, yb + s * 8, z1 + 8], [xb, yb - s * 6, z1 + 8]]]);
-    b.name('hood').mat('#3c3a36', 0.1).quad([xa + 14, ya + s * 9, z0], [xb - 14, yb + s * 9, z0], [xb - 14, yb + s * 9, z1], [xa + 14, ya + s * 9, z1]);
+    const xm = xa + (xb - xa) * 0.22, ym = s * (sideY(xm, z0) + 4), zc = (z0 + z1) / 2;   /* the spear comes to a point at its front (review 117: its square end showed beside the lamps) */
+    b.name('hood').mat(CHROME, 0.9, 'metal').loft([[[xa, ya - s * 6, zc - 2], [xa, ya - s * 4, zc - 2], [xa, ya - s * 4, zc + 2], [xa, ya - s * 6, zc + 2]], [[xm, ym - s * 6, z0 - 8], [xm, ym + s * 8, z0 - 8], [xm, ym + s * 8, z1 + 8], [xm, ym - s * 6, z1 + 8]], [[xb, yb - s * 6, z0 - 8], [xb, yb + s * 8, z0 - 8], [xb, yb + s * 8, z1 + 8], [xb, yb - s * 6, z1 + 8]]]);
+    b.name('hood').mat('#3c3a36', 0.1).quad([xm + 14, ym + s * 9, z0], [xb - 14, yb + s * 9, z0], [xb - 14, yb + s * 9, z1], [xm + 14, ym + s * 9, z1]);
     b.name('hood').mat(LINE, 0.1); for (const [p0, p1] of [[480, 580], [640, 760]] as const) for (let x = X(p0); x < X(p1); x += 38) { const y0 = s * 150, y1 = s * 265; b.quad([x, y0, skin(x, y0) + 3], [x + 12, y0, skin(x, y0) + 3], [x + 12, y1, skin(x, y1) + 3], [x, y1, skin(x, y1) + 3]); }
     // shut lines: bonnet front and back, the door (hinged at the back), the sill
     b.name('body').mat(LINE, 0.1); const seam = (px: number, zl: number, zh: number) => { const x = X(px); for (let k = 0; k < 5; k++) { const za = zl + (zh - zl) * k / 5, zc = zl + (zh - zl) * (k + 1) / 5; b.quad([x, s * (sideY(x, za) + 3), za], [x + 9, s * (sideY(x + 9, za) + 3), za], [x + 9, s * (sideY(x + 9, zc) + 3), zc], [x, s * (sideY(x, zc) + 3), zc]); } };
@@ -103,7 +104,7 @@ export function auburn851Mesh(spin = 0): Mesh { const b = new Build();
   // ---- wings, lamps, wheels ----
   for (const s of [1, -1] as const) {
     b.name('fenderF').mat(PAINT, 0.45, 'paint');
-    fender(b, ([[150, 400, 640, 740, 40], [175, 345, 520, 810, 70], [215, 312, 430, 868, 120], [280, 290, 385, 890, 150], [350, 280, 372, 895, 160], [425, 278, 375, 895, 160], [505, 288, 392, 890, 150], [585, 312, 420, 872, 130], [665, 350, 455, 842, 100], [740, 395, 500, 800, 70], [810, 436, 545, 760, 40], [880, 462, 590, 715, 20]] as const)
+    fender(b, ([[150, 400, 610, 790, 40], [175, 345, 500, 850, 70], [215, 312, 420, 885, 120], [280, 290, 385, 890, 150], [350, 280, 372, 895, 160], [425, 278, 375, 895, 160], [505, 288, 392, 890, 150], [585, 312, 420, 872, 130], [665, 350, 455, 842, 100], [740, 395, 500, 800, 70], [810, 436, 545, 760, 40], [880, 462, 590, 715, 20]] as const)
       .map(([px, py, yi, yo, sk]) => [X(px), Z(py), s * yi, s * yo, sk] as [number, number, number, number, number]), [FX, R - 250]);
     b.name('fenderR').mat(PAINT, 0.45, 'paint');
     fender(b, ([[1325, 448, 640, 715, 20], [1345, 392, 600, 800, 60], [1385, 340, 520, 862, 120], [1440, 310, 450, 890, 160], [1510, 298, 400, 895, 175], [1585, 304, 340, 890, 165], [1655, 326, 300, 868, 135], [1715, 356, 290, 820, 95], [1765, 388, 310, 740, 55], [1800, 414, 380, 660, 25]] as const)
@@ -111,12 +112,12 @@ export function auburn851Mesh(spin = 0): Mesh { const b = new Build();
     b.name('body').mat(PAINT, 0.45, 'paint').loft(([[205, 318, 450], [270, 294, 400], [345, 282, 385], [425, 280, 388], [520, 292, 405]] as const).map(([px, py, yi]) => { const x = X(px), z = Z(py) - 28, w = at(HALF, x) - 30; return [[x, s * w, z + 10], [x, s * (yi + 40), z], [x, s * (yi + 40), z - 130], [x, s * w, z - 150]] as V[]; }));   // the apron between bonnet and wing
     b.name('board').mat(CHROME, 0.9, 'metal').box(X(880), X(1328), Math.min(s * 655, s * 700), Math.max(s * 655, s * 700), 372, 398);   // the bright sill strip
     // head lamps: bullets on the wing valances; tail lamps at the rear wings' ends
-    const ly = s * 455, lz = Z(250), lx = X(318);
+    const ly = s * 565, lz = Z(236), lx = X(300);   /* out on the wings' inner crown, standing clear of the grille and the apron (review 117: they sat squeezed in the gap) */
     b.name('lamp').mat(CHROME, 0.9, 'metal').lathe('x', [0, ly, lz], [[lx + 10, 104], [lx + 18, 112], [lx + 90, 108], [lx + 160, 82], [lx + 225, 40], [lx + 262, 0]], 12).lathe('x', [0, ly, lz], [[lx, 112], [lx + 6, 117], [lx + 14, 104]], 16, false);
     b.name('lens').mat(CHROME, 0.95, 'metal').lathe('x', [0, ly, lz], [[lx + 14, 0], [lx + 26, 36], [lx + 44, 76], [lx + 58, 100]], 12, false);
     b.mat('#f4ecd0', 0.6, 'lens').lathe('x', [0, ly, lz], [[lx + 30, 0], [lx + 34, 14]], 8, false);
     b.mat(GLASS, 0.5, 'glass').lathe('x', [0, ly, lz], [[lx + 3, 0], [lx + 6, 62], [lx + 10, 104]], 14, false);
-    b.name('lampStand').mat(CHROME, 0.9, 'metal').box(lx + 80, lx + 110, ly - 14, ly + 14, lz - 190, lz - 100);
+    b.name('lampStand').mat(CHROME, 0.9, 'metal').box(lx + 80, lx + 110, ly - 14, ly + 14, lz - 215, lz - 100);
     const tx = X(1800), tz = Z(414) - 10, ty = s * 520;
     b.name('tailRim').mat(CHROME, 0.9, 'metal').lathe('x', [0, ty, tz], [[tx - 40, 26], [tx, 48], [tx + 46, 48]], 10); b.name('tail').mat(RED, 0.5, 'lens').lathe('x', [0, ty, tz], [[tx + 46, 42], [tx + 66, 26], [tx + 70, 0]], 10, false);
     b.name('bumperFiron').mat(DARK, 0.05).bar([60, s * 330, 445], [X(300), s * 300, 470], 32);

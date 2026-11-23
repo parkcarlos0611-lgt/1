@@ -8,9 +8,11 @@ import tarA from '../../assets/textures/ground/tar_alb.jpg'; import tarN from '.
 import rubA from '../../assets/textures/ground/rubber_alb.jpg'; import rubN from '../../assets/textures/ground/rubber_nor.jpg'; import rubP from '../../assets/textures/ground/rubber_pack.jpg';
 import mossA from '../../assets/textures/ground/moss_alb.jpg'; import mossN from '../../assets/textures/ground/moss_nor.jpg'; import mossP from '../../assets/textures/ground/moss_pack.jpg';
 import paintA from '../../assets/textures/ground/paint_alb.jpg'; import paintN from '../../assets/textures/ground/paint_nor.jpg'; import paintP from '../../assets/textures/ground/paint_pack.jpg';
+import vergeA from '../../assets/textures/ground/verge_alb.jpg'; import vergeN from '../../assets/textures/ground/verge_nor.jpg'; import vergeP from '../../assets/textures/ground/verge_pack.jpg';
+import grassA from '../../assets/textures/ground/grass_alb.jpg'; import grassN from '../../assets/textures/ground/grass_nor.jpg'; import grassP from '../../assets/textures/ground/grass_pack.jpg';
 import type { LiveRenderer } from './renderer';
-const URLS = [[slabA, slabN, slabP], [slab2A, slab2N, slab2P], [crackA, crackN, crackP], [tarA, tarN, tarP], [rubA, rubN, rubP], [mossA, mossN, mossP], [paintA, paintN, paintP]];
-/** load the seven materials (each three pictures) at `res` (1024 full; 512 on small devices) and give them to the renderer */
+const URLS = [[slabA, slabN, slabP], [slab2A, slab2N, slab2P], [crackA, crackN, crackP], [tarA, tarN, tarP], [rubA, rubN, rubP], [mossA, mossN, mossP], [paintA, paintN, paintP], [vergeA, vergeN, vergeP], [grassA, grassN, grassP]];
+/** load the nine materials (each three pictures) at `res` (1024 full; 512 on small devices) and give them to the renderer */
 export async function loadGround(L: LiveRenderer, res = (meta as { res: number }).res): Promise<void> {
   const bm = async (u: string) => { const b = await (await fetch(u)).blob(); return createImageBitmap(b, { resizeWidth: res, resizeHeight: res, colorSpaceConversion: 'none', premultiplyAlpha: 'none' }); };
   const layers = await Promise.all(URLS.map(async ([a, n, p]) => { const [alb, nor, pack] = await Promise.all([bm(a!), bm(n!), bm(p!)]); return { alb, nor, pack }; }));

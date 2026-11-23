@@ -286,14 +286,15 @@ vec2 cracks(vec2 p) { vec2 i = floor(p), f = fract(p); float d1 = 9., d2 = 9.; f
   for (int y = -1; y <= 1; y++) for (int x = -1; x <= 1; x++) { vec2 g = vec2(x, y), o = vec2(hs(i + g), hs(i + g + 17.)) * 0.9, r = g + o - f; float d = dot(r, r); if (d < d1) { d2 = d1; d1 = d; id = hs(i + g + 3.); } else if (d < d2) d2 = d; }
   return vec2(sqrt(d2) - sqrt(d1), id); }
 /* ---- the photographed materials (review 124, Poly Haven CC0): 0 the slab, 1 a second pour, 2 cracked concrete, 3 tar,
-   4 rubbered track, 5 moss, 6 whitewash; each sampled in the track's own axes (metres along and across), each bay its
+   4 rubbered track, 5 moss, 6 whitewash, 7 the verge's earth and gravel, 8 worn grass; each sampled in the track's own axes (metres along and across), each bay its
    own offset (the pours differ, and the joint hides the seam); laid over one another by masks and by height (tar fills
    the low ground first, moss grows in the hollows, whitewash keeps to the tops of the stones) ---- */
-uniform highp sampler2DArray uGAlb, uGNor, uGPack; uniform int uGTex; uniform float uGSize[7];
+uniform highp sampler2DArray uGAlb, uGNor, uGPack; uniform int uGTex; uniform float uGSize[9];
 struct GS { vec3 a; vec3 n; vec3 p; };
 /** a layer's picture as detail about its own mean (the smallest mip): 1 on average, its light and dark and a little of its colour; the game keeps its own colours */
 vec3 rel(vec3 a, int L) { vec3 m = textureLod(uGAlb, vec3(0.5, 0.5, float(L)), 12.).rgb; float lm = max(0.03, dot(m, vec3(0.3, 0.59, 0.11))), la = dot(a, vec3(0.3, 0.59, 0.11)); return mix(vec3(la), a, 0.15) / lm; }
 GS gs(int L, vec2 st, vec2 off) { vec3 q = vec3(st / uGSize[L] + off, float(L)); GS g; g.a = rel(texture(uGAlb, q).rgb, L); g.n = texture(uGNor, q).rgb * 2. - 1.; g.p = texture(uGPack, q).rgb; return g; }
+float W2t(float o) { return uTW / 2. - abs(o); }   /* how far inside the concrete's edge (m) */
 struct Conc { vec3 tint; float rough; float h; float paint; float hb; float hb2; float cracked; float sealed; float joint; float rub; float oil; float edge; float edgeDark; float line; float mend; float dl; vec3 bay; };
 Conc concrete(float s, float o) { Conc C; C.tint = vec3(1.); C.rough = 0.9; C.h = 0.; C.paint = 0.;
   float W2 = uTW / 2., sw = uTW / 9., u = mod(s, uJoint), v = o + W2, bi = floor(v / sw), bj = floor(s / uJoint), bv = mod(v, sw);
@@ -317,14 +318,14 @@ Conc concrete(float s, float o) { Conc C; C.tint = vec3(1.); C.rough = 0.9; C.h 
   // oil where cars stand at the start, and dropped along the middle of the wheel tracks
   float ds = abs(s - uStart), oil = smoothstep(0.72, 0.86, fb2(vec2(s, o) * 0.9 + 4.)) * (smoothstep(40., 5., ds) * 0.7 + 0.2 * exp(-pow(d / 0.5, 2.)));
   // grime toward the edges, moss in the joints there
-  float edge = smoothstep(W2 - 1.6, W2, abs(o)), edgeDark = smoothstep(W2 - 0.2, W2 - 0.02, abs(o));
+  float ein = W2 - abs(o), edgeN = fb2(vec2(s * 1.3, o * 1.3) + 21.), edge = smoothstep(1.6, 0., ein), edgeDark = smoothstep(0.06 + 0.14 * edgeN, 0.0, ein);   /* edgeDark now: the worn, chipped lip where the verge's earth shows */
   // ---- together ----
   vec3 tar = vec3(0.18, 0.17, 0.16); float tarAll = clamp(max(max(tarJ, tarL), tarC), 0., 1.);
   C.tint = mix(C.tint, C.tint * vec3(0.32, 0.31, 0.31), rub * 0.45); C.rough = mix(C.rough, 0.55, rub * 0.7);
   C.tint = mix(C.tint, vec3(0.45, 0.44, 0.42), marb * 0.6);
   C.tint = mix(C.tint, vec3(0.3, 0.28, 0.26), oil * 0.35); C.rough = mix(C.rough, 0.32, oil * 0.8);
-  C.tint = mix(C.tint, C.tint * vec3(0.9, 0.88, 0.8) + vec3(0.02, 0.025, 0.), edge * 0.5); C.tint = mix(C.tint, vec3(0.3, 0.33, 0.24), edge * tarAll * 0.6);
-  C.tint = mix(C.tint, vec3(0.28, 0.27, 0.25), edgeDark * 0.7);
+  C.tint = mix(C.tint, C.tint * vec3(0.9, 0.88, 0.8) + vec3(0.02, 0.025, 0.), edge * 0.5); C.tint = mix(C.tint, vec3(0.45, 0.47, 0.36), edge * tarAll * 0.4);
+  C.tint = mix(C.tint, vec3(0.52, 0.46, 0.36), edgeDark * 0.75);   /* earth in the chipped lip, not a black line (review 125) */
   C.tint = mix(C.tint, tar / 0.62, tarAll); C.rough = mix(C.rough, 0.38, tarAll); C.h += tarAll * 0.0015;   /* tar: dark, glossy, standing a little proud */
   C.tint *= 1. - open * 0.55; C.h -= open * 0.003;
   // the start line: whitewash, worn through where the wheels run, cracked with the concrete
@@ -338,7 +339,7 @@ vec4 velo() { vec2 d = (vCur.xy / vCur.w - vPrev.xy / vPrev.w) * 0.5 * uSize; re
 float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 void main() { vec3 c = vCol.rgb;
   if (vFlag > 0.5 && uLook == 0) { vec2 cell = floor(vWorld.xy / vec2(uCell * 2., uCell)); float h = hash(cell); if (h > 0.955) c = vec3(107., 130., 83.) / 255.; else if (h > 0.91) c = vec3(83., 104., 63.) / 255.; }
-  bool conc = vTrk.z > 0.5; Conc C; bool photo = false; vec3 pa = vec3(0.), pn = vec3(0., 0., 1.); float pao = 1., prough = 0.9;
+  bool verge = vTrk.z > 1.5; bool conc = vTrk.z > 0.5 && !verge; Conc C; bool photo = false; vec3 pa = vec3(0.), pn = vec3(0., 0., 1.); float pao = 1., prough = 0.9;
   if (conc) { C = concrete(vTrk.x, vTrk.y);
     if (uGTex == 1 && uLook > 0) { photo = true; vec2 st = vTrk.xy, bo = vec2(C.hb, C.hb2) * 7.31;
       GS b = gs(C.hb2 > 0.55 ? 1 : 0, st, bo); if (C.cracked > 0.5) { GS k = gs(2, st, bo); b.a = k.a; b.n = k.n; b.p = k.p; }
@@ -352,16 +353,27 @@ void main() { vec3 c = vCol.rgb;
       A = mix(A, A * vec3(0.42, 0.4, 0.38), C.oil * 0.5); R = mix(R, 0.3, C.oil * 0.7);
       // moss and grime at the edges, in the hollows first
       if (C.edge > 0.02) { GS m = gs(5, st, bo * 0.21); float mm = clamp(C.edge * (0.6 + (0.5 - h) * 1.2) * smoothstep(0.35, 0.6, fb2(st * 0.4 + 9.)), 0., 1.); A = mix(A, m.a * vec3(0.3, 0.34, 0.2), mm * 0.85); N = normalize(mix(N, m.n, mm)); R = mix(R, m.p.g, mm); }
-      A = mix(A, A * 0.55, C.edgeDark * 0.6);
+      if (C.edgeDark > 0.01 || C.edge > 0.3) { GS e = gs(7, st, vec2(0.)); vec3 earth = c * e.a * vec3(0.9, 0.78, 0.6); float lip = C.edgeDark * smoothstep(0.55, 0.35, h); A = mix(A, earth, max(lip, C.edge * 0.18)); N = normalize(mix(N, e.n, lip)); R = mix(R, 0.95, lip);   /* the lip chipped back to earth, dust blown on */
+        GS gr = gs(8, st, vec2(0.)); float over = smoothstep(0.62, 0.8, fb2(st * vec2(0.9, 3.) + 5.)) * smoothstep(0.18, 0.02, W2t(vTrk.y)); A = mix(A, vCol.rgb * 0.0 + vec3(0.36, 0.42, 0.26) * gr.a, over * 0.9); N = normalize(mix(N, gr.n, over)); R = mix(R, 0.9, over); }   /* grass creeping over the edge */
       // the start line's whitewash, on the tops, worn through in the wheel tracks
       if (C.line > 0.) { GS w = gs(6, st, vec2(0.)); float pm = C.line * clamp(1. - C.rub * 1.2, 0., 1.) * smoothstep(0.25, 0.55, h + w.p.b * 0.3) * smoothstep(0.35, 0.6, fb2(st * vec2(7., 2.)) + 0.25);
         A = mix(A, w.a * vec3(0.9, 0.89, 0.85), pm); R = mix(R, 0.7, pm); }
       A *= C.mend > 0. ? 0.86 : 1.;   /* a mended patch darker */
       pa = A; pn = N; pao = O; prough = R; c = A; }
     else c *= C.tint; }
+  if (verge) {   /* the verge (review 125): worn earth and gravel by the concrete, grass coming back over it outward, the field's own colour by two metres */
+    float d = abs(vTrk.y) - uTW / 2., n1 = fb2(vTrk.xy * vec2(0.35, 1.1) + 3.), g = smoothstep(0.15, 1.5, d + (n1 - 0.5) * 1.3), ruts = smoothstep(0.55, 0.85, fb2(vTrk.xy * vec2(0.08, 2.5)));
+    vec3 earthC = vec3(0.5, 0.44, 0.34), grassC = vCol.rgb * vec3(1.02, 1.0, 0.95);
+    if (uGTex == 1 && uLook > 0) { photo = true; vec2 st = vTrk.xy; GS e = gs(7, st, vec2(0.)), gr = gs(8, st, vec2(0.37)); float gm = clamp(g + (gr.p.b - e.p.b) * 0.6 - ruts * 0.25 * (1. - g), 0., 1.);   /* the grass wins where it stands higher */
+      vec3 A = mix(earthC * e.a, grassC * gr.a * 1.05, gm); A = mix(A, grassC, smoothstep(1.4, 2.1, d)); pa = A; pn = normalize(mix(e.n, gr.n, gm)); pn = normalize(mix(pn, vec3(0., 0., 1.), smoothstep(1.4, 2.1, d))); pao = mix(e.p.r, gr.p.r, gm); prough = mix(0.95, 0.9, gm); c = A; }
+    else c = mix(mix(earthC, grassC, g), grassC, smoothstep(1.4, 2.1, d)); }
+  else if (!conc && vFlag > 0.5 && uGTex == 1 && uLook > 0) {   /* the fields and the banks' grass: the photographed grass, laid on the world's own axes, two sizes mixed so it does not repeat */
+    vec2 st = vWorld.xy; GS g1 = gs(8, st, vec2(0.)), g2 = gs(8, st * 0.37, vec2(0.51)); float m = smoothstep(0.35, 0.65, fb2(st * 0.05));
+    photo = true; pa = c * mix(g1.a, g2.a, m) * mix(vec3(1.), vec3(1.06, 1.0, 0.9), fb2(st * 0.013)); pn = normalize(mix(g1.n, g2.n, m)); pao = mix(g1.p.r, g2.p.r, m); prough = 0.92; c = pa; }
   if (uLook > 0) { vec3 nn = normalize(cross(dFdx(vWorld), dFdy(vWorld))); if (nn.z < 0.) nn = -nn; float sh = lightAt(vWorld + vec3(0., 0., 0.02));   // the ground as a rough, dull surface
-    if (conc) { vec3 dpx = dFdx(vWorld), dpy = dFdy(vWorld), r1 = cross(dpy, nn), r2 = cross(nn, dpx); float det = dot(dpx, r1), k = clamp(1.6 - length(dpx) * 12., 0., 1.);   /* the relief by the height's change across the pixel (bump mapping), faded where a pixel spans more than the detail */
-      vec3 gr = sign(det) * (dFdx(C.h) * r1 + dFdy(C.h) * r2) * k; nn = normalize(abs(det) * nn - gr);
+    if (photo && !conc && !verge) { vec3 T = normalize(vec3(1., 0., 0.) - nn * nn.x), B = cross(nn, T); nn = normalize(T * pn.x + B * pn.y + nn * max(0.2, pn.z)); }
+    if (conc || verge) { vec3 dpx = dFdx(vWorld), dpy = dFdy(vWorld), r1 = cross(dpy, nn), r2 = cross(nn, dpx); float det = dot(dpx, r1), k = clamp(1.6 - length(dpx) * 12., 0., 1.);   /* the relief by the height's change across the pixel (bump mapping), faded where a pixel spans more than the detail */
+      if (conc) { vec3 gr = sign(det) * (dFdx(C.h) * r1 + dFdy(C.h) * r2) * k; nn = normalize(abs(det) * nn - gr); }
       if (photo) { vec2 dux = dFdx(vTrk.xy), duy = dFdy(vTrk.xy); float id = dux.x * duy.y - dux.y * duy.x; vec3 T = normalize((dpx * duy.y - dpy * dux.y) * sign(id)), B = normalize((dpy * dux.x - dpx * duy.x) * sign(id));   /* the track's own axes on the surface: along (s) and across (o) */
         T = normalize(T - nn * dot(T, nn)); B = cross(nn, T) * sign(dot(cross(nn, T), B)); nn = normalize(T * pn.x + B * pn.y + nn * max(0.2, pn.z)); } }
     Detail dt; if (photo) { dt.tone = 1.; dt.rough = 0.; dt.n = nn; } else dt = detail(vFlag > 0.5 ? 1 : 0, vWorld, nn, vFlag > 0.5 ? 0.8 : 0.7, conc ? 0.75 : 0.6, 0.4);

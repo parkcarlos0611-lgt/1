@@ -46,8 +46,16 @@ export function groundData(T: Track, S: Scenery, start: number): GroundData { co
     // the joints, the dark edges and the start line are the shader's now (review 122): drawn on the concrete itself,
     // by its place on the track, they follow a banking's curve exactly
     const bk = T.bankAt(s).b, out = T.at(s).k >= 0 || bk ? (bk && T.at((bk.s0 + bk.s1) / 2).k < 0 ? 1 : -1) : -1, H = T.height(s, out * W2) - T.bump(s), H1 = T.height(s1, out * W2) - T.bump(s1);
-    if (H > 0.3 || H1 > 0.3) { const a = T.point(s, out * W2), b = T.point(s1, out * W2), fa = T.point(s, out * (W2 + Math.max(H, 0.3) * 2.4)), fb = T.point(s1, out * (W2 + Math.max(H1, 0.3) * 2.4));
-      g.quad([a.x, a.y, a.z], [b.x, b.y, b.z], [fb.x, fb.y, -0.025], [fa.x, fa.y, -0.025], hex('#4c6340'), 1); } }
+    const bank = H > 0.3 || H1 > 0.3;
+    if (bank) { const ra = W2 + Math.max(H, 0.3) * 2.4, rb = W2 + Math.max(H1, 0.3) * 2.4, a = T.point(s, out * W2), b = T.point(s1, out * W2), fa = T.point(s, out * ra), fb = T.point(s1, out * rb);
+      g.quad([a.x, a.y, a.z], [b.x, b.y, b.z], [fb.x, fb.y, -0.025], [fa.x, fa.y, -0.025], hex('#4c6340'), 1, [[s, out * W2, 2], [s1, out * W2, 2], [s1, out * rb, 2], [s, out * ra, 2]]); }   /* the earth bank, its top a verge too (review 125) */
+    // the verge (review 125): a strip of worn earth and gravel along the concrete's edge, a few centimetres below it,
+    // grass coming back over it outward, the shader laying it by its distance from the edge
+    for (const side of [-1, 1]) { if (bank && side === out) continue; const o0 = side * W2, o1 = side * (W2 + 2.2), e0 = T.height(s, o0), e1 = T.height(s1, o0);
+      const A = T.point(s, o0), B = T.point(s1, o0), C = T.point(s1, o1), D = T.point(s, o1), m = [A.x + (D.x - A.x) * 0.2, A.y + (D.y - A.y) * 0.2], n2 = [B.x + (C.x - B.x) * 0.2, B.y + (C.y - B.y) * 0.2];
+      const zo = (e: number) => Math.min(e - 0.035, -0.012), zm = (e: number) => e - 0.03;
+      g.quad([A.x, A.y, e0 - 0.004], [B.x, B.y, e1 - 0.004], [n2[0]!, n2[1]!, zm(e1)], [m[0]!, m[1]!, zm(e0)], hex('#6a7a55'), 1, [[s, o0, 2], [s1, o0, 2], [s1, side * (W2 + 0.44), 2], [s, side * (W2 + 0.44), 2]]);
+      g.quad([m[0]!, m[1]!, zm(e0)], [n2[0]!, n2[1]!, zm(e1)], [C.x, C.y, zo(e1)], [D.x, D.y, zo(e0)], hex('#5d7348'), 1, [[s, side * (W2 + 0.44), 2], [s1, side * (W2 + 0.44), 2], [s1, o1, 2], [s, o1, 2]]); } }
   return g.done(); }
 
 /** the fence along both edges: a rail at 0.9 m, a post every 3 m, the stretches not broken */

@@ -5,7 +5,7 @@
 #   python3 tools/ref/polyhaven.py
 import json, io, urllib.request, os
 from PIL import Image
-LAYERS = [('slab', 'granular_concrete'), ('slab2', 'gravel_concrete'), ('cracks', 'cracked_concrete'), ('tar', 'tarred_gravel'), ('rubber', 'asphalt_track'), ('moss', 'concrete_moss'), ('paint', 'rough_concrete')]
+LAYERS = [('slab', 'granular_concrete'), ('slab2', 'gravel_concrete'), ('cracks', 'cracked_concrete'), ('tar', 'tarred_gravel'), ('rubber', 'asphalt_track'), ('moss', 'concrete_moss'), ('paint', 'rough_concrete'), ('verge', 'grass_path_3'), ('grass', 'grass_ground')]
 OUT, RES = 'assets/textures/ground', 1024
 os.makedirs(OUT, exist_ok=True)
 get = lambda u: urllib.request.urlopen(urllib.request.Request(u, headers={'User-Agent': 'gearhouse-texture-fetch/1.0'}), timeout=60).read()

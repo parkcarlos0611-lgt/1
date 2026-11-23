@@ -66,6 +66,24 @@
     "Dimitrios Savva"
    ],
    "license": "CC0"
+  },
+  {
+   "layer": "verge",
+   "source": "https://polyhaven.com/a/grass_path_3",
+   "size": 1.0,
+   "authors": [
+    "Rob Tuytel"
+   ],
+   "license": "CC0"
+  },
+  {
+   "layer": "grass",
+   "source": "https://polyhaven.com/a/grass_ground",
+   "size": 2.51,
+   "authors": [
+    "Charlotte Baglioni"
+   ],
+   "license": "CC0"
   }
  ]
 }

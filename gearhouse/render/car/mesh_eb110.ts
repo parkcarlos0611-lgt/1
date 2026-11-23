@@ -57,7 +57,7 @@ const YE = curve([[440, 616], [600, 616], [XC, 652], [1392, 672], [XG, 688], [20
 const ZEB = curve([[XC, zHood(XC, 652)], [1392, 781], [XG, 791], [2000, 792], [SP, 806], [2800, 850], [3200, 885], [3600, 895], [4000, 872], [S1, 800]]);
 const ZE = (x: number) => x <= XC ? zHood(x, YE(x)) : ZEB(x);
 /** F: the foot of the wall that drops from the bonnet's edge into the trough (its height below the edge) */
-const WALL = curve([[440, 0], [490, 14], [545, 30], [600, 42], [XJ, 40], [767, 30], [858, 16], [949, 6], [FX, 0]]);
+const WALL = curve([[440, 0], [490, 18], [545, 38], [600, 54], [XJ, 52], [767, 40], [858, 24], [949, 10], [FX, 0]]);
 /** R: the wing's crest (from the indicator's tip), the door's shoulder, the rear wing's top */
 const YR = curve([[440, 729], [490, 748], [545, 763], [600, 775], [645, 784], [XJ, 792], [767, 804], [858, 812], [949, 818], [FX, 824], [1148, 830], [XC, 833], [1392, 822], [XG, 800], [2000, 790], [SP, 800], [2800, 840], [3200, 880], [3600, 885], [4000, 860], [S1, 818]]);
 const ZR = curve([[440, zHood(440, 729)], [490, 560], [545, 576], [600, 592], [645, 608], [XJ, 625], [767, 662], [858, 702], [949, 730], [FX, 745], [1148, 752], [XC, 757], [1392, 768], [XG, 783], [2000, 782], [SP, 795], [2800, 840], [3200, 872], [3600, 880], [4000, 850], [S1, 760]]);
@@ -90,7 +90,7 @@ function band(Rp: V, H: V, g: number, t: number): V { const dz = Rp[2] - H[2], P
   return [0, 1, 2].map(k => v * v * v * Rp[k]! + 3 * v * v * t * P1[k]! + 3 * v * t * t * P2[k]! + t * t * t * H[k]!) as V; }
 /** the stations behind the nose: every 18 degrees round an arch, about 100 mm apart between */
 const arcS = (hx: number, ra: number) => [...Array.from({ length: 11 }, (_, k) => Math.round(hx - ra * Math.cos(k * 18 * Math.PI / 180))), hx + ra + 2];
-const SS = [XJ, ...arcS(FX, RAF), 1470, XG, 1700, 1845, XT, 2100, 2210, 2320, 2430, SP, 2620, 2710, 2800, SC1, SC1 + 22, 3010, 3120, RX - RAR - 2, ...arcS(RX, RAR), 4050, 4130, 4200, 4260, 4300, S1];
+const SS = [XJ, ...arcS(FX, RAF), 1470, XG, 1700, 1845, XT, 2100, 2210, 2320, 2430, SP, 2620, 2710, 2800, SC1, SC1 + 22, 2980, 3120, RX - RAR - 2, ...arcS(RX, RAR), 4050, 4130, 4200, 4260, 4300, S1];
 const ROWX = [...CREST.map(c => c[0]), ...SS], NR = ROWX.length;          // every row's place on the crest (the nose's rows, then the stations)
 const rowOf = (x: number) => { const i = ROWX.indexOf(x, NCR); if (i < 0) throw new Error(`eb110: no station at ${x}`); return i; };
 
@@ -137,16 +137,16 @@ export function eb110Mesh(spin = 0, wing = 0): Mesh { const b = new Build(); win
   const TOP: Tri[] = [], SIDE: Tri[] = [];
   /** the cells of a grid of points (given for the car's right half) laid on both sides, wound outward (rows going back,
    *  columns going out and down); each cell cut along the diagonal that folds it less; `pick` chooses the cells */
-  const cells = (P: V[][], pick: (i: number, j: number) => boolean = () => true, keep?: Tri[]) => { for (let i = 0; i + 1 < P.length; i++) for (let j = 0; j + 1 < Math.min(P[i]!.length, P[i + 1]!.length); j++) { if (!pick(i, j)) continue;
-    const q = [P[i]![j]!, P[i + 1]![j]!, P[i + 1]![j + 1]!, P[i]![j + 1]!] as [V, V, V, V], nn = (p: V, r: V, s: V) => un(cross(sub(r, p), sub(s, p))), alt = dot(nn(q[0], q[1], q[2]), nn(q[0], q[2], q[3])) < dot(nn(q[1], q[2], q[3]), nn(q[1], q[3], q[0])) - 1e-9;
+  const cells = (P: V[][], pick: (i: number, j: number) => boolean = () => true, keep?: Tri[], force?: boolean) => { for (let i = 0; i + 1 < P.length; i++) for (let j = 0; j + 1 < Math.min(P[i]!.length, P[i + 1]!.length); j++) { if (!pick(i, j)) continue;
+    const q = [P[i]![j]!, P[i + 1]![j]!, P[i + 1]![j + 1]!, P[i]![j + 1]!] as [V, V, V, V], nn = (p: V, r: V, s: V) => un(cross(sub(r, p), sub(s, p))), alt = force ?? dot(nn(q[0], q[1], q[2]), nn(q[0], q[2], q[3])) < dot(nn(q[1], q[2], q[3]), nn(q[1], q[3], q[0])) - 1e-9;
     const ts: Tri[] = alt ? [[q[1], q[2], q[3]], [q[1], q[3], q[0]]] : [[q[0], q[1], q[2]], [q[0], q[2], q[3]]];
     for (const t of ts) { const c = cross(sub(t[1], t[0]), sub(t[2], t[0])); if (Math.hypot(c[0], c[1], c[2]) < 0.5) continue; keep?.push(t, [mir(t[0], -1), mir(t[2], -1), mir(t[1], -1)]); b.tri(t[0], t[1], t[2]); b.tri(mir(t[0], -1), mir(t[2], -1), mir(t[1], -1)); } } };
 
   // ---- the points ----
   const CH = Array.from({ length: NR }, (_, i) => chain(i));                                             // the outer chains
   /** the trough beside the bonnet: the bonnet's edge E, the wall's foot F, the floor's middle M (rows from the indicator's tip back) */
-  const TR = (i: number): V[] => { const x = ROWX[i]!, yE = YE(x), zE = ZE(x), h = WALL(x), Rp = CH[i]![0]!, F: V = [x, yE + (h > 0 ? 10 : 6), zE - h], M = mix(F, Rp, 0.5); M[2] -= 7 * sm(440, 520, x) * (1 - sm(900, 1300, x)); return [[x, yE, zE], F, M, Rp]; };
-  const r6 = NCR - 2, rC = rowOf(XC), rT = rowOf(XT), rG = rowOf(XG), rP = rowOf(SP), rM = rowOf(SC1);
+  const TR = (i: number): V[] => { const x = ROWX[i]!, yE = YE(x), zE = ZE(x), h = WALL(x), Rp = CH[i]![0]!, F: V = [x, yE + (h > 0 ? 10 : 6), zE - h], M = mix(F, Rp, 0.5); M[2] -= 12 * sm(440, 520, x) * (1 - sm(900, 1300, x)); return [[x, yE, zE], F, M, Rp]; };
+  const rC = rowOf(XC), rT = rowOf(XT), rG = rowOf(XG), rP = rowOf(SP), rM = rowOf(SC1);
   // the bonnet: seven points across (four over the tongue, three more behind the lamp), rows bowing forward to the screen's curved foot
   const FT = [0, 70 / 181, 140 / 181, 1], yTng = (xe: number) => xe < 600 ? 181 + 93 * (xe - 355) / 245 : 274 * YE(xe) / 616;
   const hoodRow = (xe: number): V[] => { const yE = YE(xe), yT = yTng(xe), bw = xe <= 600 ? 0 : (XC - 1085) * ((xe - 600) / (XC - 600)) ** 1.5; return Array.from({ length: 7 }, (_, j) => { const y = j <= 3 ? FT[j]! * yT : yT + (yE - yT) * (j - 3) / 3, x = xe - bw * (1 - (y / yE) ** 2.2); return [x, y, j === 6 ? ZE(xe) : zHood(x, y)] as V; }); };
@@ -169,11 +169,14 @@ export function eb110Mesh(spin = 0, wing = 0): Mesh { const b = new Build(); win
   for (let i = 0; i < NCR; i++) for (let k = 0; k < NB; k++) for (const sg of [1, -1]) { const q = [CH[i]![k]!, CH[i + 1]![k]!, CH[i + 1]![k + 1]!, CH[i]![k + 1]!].map(p => mir(p, sg)) as [V, V, V, V]; TOP.push([q[0], q[1], q[2]], [q[0], q[2], q[3]]); }
   b.name('bumperF').mat(PAINT, GLOSS, 'paint'); cells(chainRows(0, NCR), (i, j) => j >= NB && !(i >= 1 && i < 6 && j >= NB + 2 && j < NB + 5));
   b.name('hood').mat(PAINT, GLOSS, 'paint'); cells(TONGUE, undefined, TOP); cells(HOOD, undefined, TOP);
+  // the bumper's shut line: a thin dark seam along the nose from arch to arch
+  b.name('bumperF').mat(SEAM, 0.1); for (const sg of [1, -1]) { const e = CH.slice(0, NCR + 1).map((c, i) => { const p = c[NB]!, up = un(sub(c[NB - 1]!, p)), dn = un(sub(c[NB + 1]!, p)), a = CH[Math.max(0, i - 1)]![NB]!, d = CH[Math.min(NCR, i + 1)]![NB]!, n = un(cross(sub(d, a), up)), o = (v: V, k: number): V => mir([p[0] + v[0] * k + n[0] * 3, p[1] + v[1] * k + n[1] * 3, p[2] + v[2] * k + n[2] * 3], sg); return [o(up, 7), o(dn, 7)] as [V, V]; });
+    for (let i = 0; i < NCR; i++) face(b, e[i]![0], e[i + 1]![0], e[i + 1]![1], e[i]![1], [-1, sg, 0.3]); }
   b.name('door').mat(PAINT, GLOSS, 'paint'); cells(chainRows(rG - 1, rP), undefined, SIDE); cells(trRows(rG - 1, rP), undefined, TOP);
   b.name('quarter').mat(PAINT, GLOSS, 'paint'); cells(chainRows(rP, NR - 1), (i, j) => !(rP + i === rM && j >= NB + 2 && j < NB + 5), SIDE); cells(trRows(rP, NR - 1), undefined, TOP);
   b.name('grille').mat(DARK, 0.05); cells(chainRows(rM, rM + 1), (_, j) => j >= NB + 2 && j < NB + 5);                 // the side intake's mouth: the recess's slanting end
-  const iE0 = rowOf(2710) - rT, iE1 = rowOf(Math.round(RX - RAR * Math.cos(108 * Math.PI / 180))) - rT, isCover = (i: number, j: number) => i >= iE0 && i < iE1 && j < 3;
-  b.name('roof').mat(PAINT, GLOSS, 'paint'); cells(UP, (i, j) => (j < 6 || rT + i >= rP) && !isCover(i, j), TOP);
+  const rH0 = rowOf(2620), rH1 = rowOf(2980), iE0 = rowOf(2710) - rT, iE1 = rowOf(Math.round(RX - RAR * Math.cos(108 * Math.PI / 180))) - rT, isCover = (i: number, j: number) => i >= iE0 && i < iE1 && j < 3;
+  b.name('roof').mat(PAINT, GLOSS, 'paint'); cells(UP, (i, j) => j < 6 && !isCover(i, j), TOP); cells(UP, (i, j) => j === 6 && rT + i >= rP && !(rT + i >= rH0 && rT + i < rH1), TOP, false);
   b.name('engineCover').mat(GLASS, 0.5, 'glass'); cells(UP, isCover, TOP);
   b.name('screenPane').mat(GLASS, 0.5, 'glass'); cells(SCREEN, undefined, TOP);
   b.name('sidePane').mat(GLASS, 0.5, 'glass'); cells(UP, (i, j) => j === 6 && rT + i < rP); cells(SIDEF, (i, j) => j === 1 && rC + i >= rG);
@@ -184,7 +187,8 @@ export function eb110Mesh(spin = 0, wing = 0): Mesh { const b = new Build(); win
   const ySide = (x: number, z: number) => { const y = probe(SIDE, 0, 2, 1, x, z); if (Number.isNaN(y)) throw new Error(`eb110: no flank at ${x}, ${z}`); return y; };
   const top = (x: number, y: number, lift = 4): V => [x, y, zTop(x, y) + lift], flank = (x: number, z: number, sg: number, lift = 4): V => [x, sg * (ySide(x, z) + lift), z];
   const UPV: V = [0, 0, 1];
-  const seamSide = (pts: [number, number][], sg: number, t = 9) => { const e = pts.map(([x, z], i) => { const a = pts[Math.max(0, i - 1)]!, c = pts[Math.min(pts.length - 1, i + 1)]!, l = Math.hypot(c[0] - a[0], c[1] - a[1]) || 1, nx = -(c[1] - a[1]) / l * t / 2, nz = (c[0] - a[0]) / l * t / 2; return [flank(x + nx, z + nz, sg, 3), flank(x - nx, z - nz, sg, 3)] as [V, V]; });
+  const seamSide = (pts0: [number, number][], sg: number, t = 9) => { const pts: [number, number][] = [pts0[0]!]; for (let i = 1; i < pts0.length; i++) { const a = pts0[i - 1]!, c = pts0[i]!, n = Math.max(1, Math.ceil(Math.hypot(c[0] - a[0], c[1] - a[1]) / 70)); for (let k = 1; k <= n; k++) pts.push([lerp(a[0], c[0], k / n), lerp(a[1], c[1], k / n)]); }
+    const e = pts.map(([x, z], i) => { const a = pts[Math.max(0, i - 1)]!, c = pts[Math.min(pts.length - 1, i + 1)]!, l = Math.hypot(c[0] - a[0], c[1] - a[1]) || 1, nx = -(c[1] - a[1]) / l * t / 2, nz = (c[0] - a[0]) / l * t / 2; return [flank(x + nx, z + nz, sg, 3), flank(x - nx, z - nz, sg, 3)] as [V, V]; });
     for (let i = 0; i + 1 < e.length; i++) face(b, e[i]![0], e[i + 1]![0], e[i + 1]![1], e[i]![1], [0, sg, 0]); };
 
   // ---- the tail: the panel leaning back to its foot (the crease over the valance), the black valance, the floor and the diffuser ----
@@ -208,7 +212,7 @@ export function eb110Mesh(spin = 0, wing = 0): Mesh { const b = new Build(); win
   b.name('splitter').mat(FRAME, 0.15); { const edge = (i: number): V => { const [x, y] = sup(4, 852, Math.min(FR[i]!, 0.9)); return [x, y, 92]; }, P = Array.from({ length: 9 }, (_, i) => [edge(i), [CH[i]![NK]![0], CH[i]![NK]![1], 92] as V]); cells(P); cells(P.map(r => [[r[0]![0], r[0]![1], 84] as V, r[0]!])); }
 
   // ---- the cabin behind the glass: floor, door panels, the wall behind the seats, dash, tunnel, two seats ----
-  { const FL = 150, xa = XC + 40, xb = SP - 6, ring = UP[rP - rT]!;
+  { const FL = 150, xa = 1396, xb = SP - 6, ring = UP[rP - rT]!;
     b.name('cockpit').mat(DARK, 0.05); face(b, [xa, -700, FL], [xb, -700, FL], [xb, 700, FL], [xa, 700, FL], UPV);
     b.name('cockpit').mat(TRIM, 0.1); for (const sg of [1, -1]) { face(b, [xa, sg * (YE(xa) - 14), FL], [xb, sg * (YE(xb) - 14), FL], [xb, sg * (YE(xb) - 14), ZE(xb) - 6], [xa, sg * (YE(xa) - 14), ZE(xa) - 6], [0, -sg, 0]);
       for (let j = 0; j + 1 < ring.length; j++) { const p = ring[j]!, q = ring[j + 1]!, in2 = (v: V): V => [xb, sg * v[1] * 0.985, v[2] - 5]; face(b, in2(p), in2(q), [xb, sg * q[1] * 0.985, FL], [xb, sg * p[1] * 0.985, FL], [-1, 0, 0]); } }
@@ -279,10 +283,16 @@ export function eb110Mesh(spin = 0, wing = 0): Mesh { const b = new Build(); win
     const sf = SIDEF.slice(rG - rC); strip(sf.map(r => r[2]!), sf.map(r => r[1]!), 24);
     b.name('wiper').mat(FRAME, 0.1); { const a = mix(SCREEN[0]![4]!, SCREEN[1]![4]!, 0.45), c = mix(SCREEN[0]![2]!, SCREEN[1]![2]!, 0.3); b.bar([a[0], -a[1], a[2] + 16], [c[0], c[1], c[2] + 16], 16, 10).bar([1120, 0, 800], [(a[0] + c[0]) / 2, (c[1] - a[1]) / 2, (a[2] + c[2]) / 2 + 16], 18, 10); } }
 
-  // ---- behind the cabin: six sunk oval holes in each buttress (two columns of three), the engine cover's louvre bars ----
-  b.name('louvre').mat(DEEP, 0.2); for (const sg of [1, -1]) for (const xc of [2745, 2915]) for (const f of [0.17, 0.41, 0.65]) { const on = (x: number, g: number, d = 0): V => { const u = upper(x), t = u[6]!, e = u[7]!, q = mix(t, e, g), n = un(cross([1, 0, 0], sub(e, t))); return [x, sg * (q[1] + n[1] * (4 - d)), q[2] + n[2] * (4 - d)]; };
-    const o = (k: number): V => { const t = k / 8 * Math.PI * 2; return on(xc + 64 * Math.cos(t), f + 0.095 * Math.sin(t)); }, c = on(xc + 6, f + 0.02, 34);
-    for (let k = 0; k < 8; k++) { const p = o(k), q = o(k + 1); if (dot(cross(sub(p, c), sub(q, c)), [0, sg, 1]) >= 0) b.tri(c, p, q); else b.tri(c, q, p); } }
+  // ---- behind the cabin: the buttress panel with its six sunk oval holes (two columns of three), cut into the slope itself ----
+  for (const sg of [1, -1]) { const SL = 330, S = (x: number, f: number, d = 0): V => { const u = upper(x), t = u[6]!, e = u[7]!, q = mix(t, e, f), n = un(cross([1, 0, 0], sub(e, t))); return [x, sg * (q[1] - n[1] * d), q[2] - n[2] * d]; }, NS: V = [0, sg * 0.7, 0.7];
+    const tri3 = (p: V, q: V, r: V) => { if (dot(cross(sub(q, p), sub(r, p)), NS) >= 0) b.tri(p, q, r); else b.tri(p, r, q); }, fr = [0, 0.29, 0.55, 1], fc = [0.155, 0.42, 0.7];
+    for (const xs of [[2620, 2710, 2800], [2800, SC1, SC1 + 22, 2980]]) for (let r = 0; r < 3; r++) { const xa = xs[0]!, xb = xs[xs.length - 1]!, xc = (xa + xb) / 2, c: [number, number] = [xc, fc[r]!];
+      const outer: [number, number][] = [...(r === 0 ? xs : [xa, xb]).map(x => [x, fr[r]!] as [number, number]), ...(r === 2 ? xs : [xa, xb]).slice().reverse().map(x => [x, fr[r + 1]!] as [number, number])];
+      const inner: [number, number][] = Array.from({ length: 8 }, (_, k) => { const t = (k + 0.5) / 8 * Math.PI * 2; return [xc + 64 * Math.cos(t), c[1] + 0.105 * Math.sin(t)] as [number, number]; });
+      const ang = (q: [number, number]) => Math.atan2((q[1] - c[1]) * SL, q[0] - c[0]), O = outer.slice().sort((p, q) => ang(p) - ang(q)), I = inner.slice().sort((p, q) => ang(p) - ang(q)), P3 = (q: [number, number]) => S(q[0], q[1]);
+      b.name('buttress').mat(PAINT, GLOSS, 'paint'); let i = 0, k = 0; const A = (L2: [number, number][], n: number) => ang(L2[n % L2.length]!) + (n >= L2.length ? 2 * Math.PI : 0);
+      while (i < O.length || k < I.length) { if (k >= I.length || (i < O.length && A(O, i + 1) <= A(I, k + 1))) { tri3(P3(O[i % O.length]!), P3(O[(i + 1) % O.length]!), P3(I[k % I.length]!)); i++; } else { tri3(P3(O[i % O.length]!), P3(I[(k + 1) % I.length]!), P3(I[k % I.length]!)); k++; } }
+      b.name('louvre').mat(DEEP, 0.2); const m = S(xc + 8, c[1] + 0.02, 38); for (let n = 0; n < 8; n++) tri3(m, P3(I[n]!), P3(I[(n + 1) % 8]!)); } }
   b.name('engineCover').mat(FRAME, 0.1); for (let k = 0; k < 6; k++) { const x0 = 2775 + k * 150, us = [-0.9, -0.45, 0, 0.45, 0.9], yc = (x: number) => Math.min(450, 0.78 * YD(x)); for (let i = 0; i + 1 < us.length; i++) face(b, top(x0, us[i]! * yc(x0), 5), top(x0 + 64, us[i]! * yc(x0 + 64), 5), top(x0 + 64, us[i + 1]! * yc(x0 + 64), 5), top(x0, us[i + 1]! * yc(x0), 5), UPV); }
 
   // ---- the tail: a capsule of lamps a side (clear inboard, red, amber outboard, a red block low in it), six mesh slots across the top with two more
@@ -296,6 +306,7 @@ export function eb110Mesh(spin = 0, wing = 0): Mesh { const b = new Build(); win
     b.name('tail').mat(RED2, 0.5, 'lens'); for (const sg of [1, -1]) patch(b, (u, v) => tail(sg * lerp(566, 660, u), lerp(636, 668, v), 10), 1, 1, R1);
     b.name('grille').mat(DARK, 0.05, 'grille'); for (let k = 0; k < 6; k++) { const y0 = -426 + k * 146; patch(b, (u, v) => tail(lerp(y0, y0 + 122, u), lerp(742, 770, v)), 1, 1, R1); }
     for (const sg of [1, -1]) for (const z of [690, 638]) patch(b, (u, v) => tail(sg * lerp(304, 426, u), z + v * 26), 1, 1, R1);
+    b.name('wingBed').mat(FRAME, 0.1); patch(b, (u, v) => tail(lerp(-690, 690, u), lerp(806, 842, v)), 6, 1, R1);
     b.name('plate').mat('#16307a', 0.3); patch(b, (u, v) => tail(lerp(-250, 250, u), lerp(572, 668, v)), 2, 1, R1);
     b.name('plate').mat('#d9a514', 0.35); patch(b, (u, v) => tail(lerp(-222, 222, u), lerp(582, 658, v), 7), 2, 1, R1);
     b.name('tail').mat(RED2, 0.5, 'lens'); patch(b, (u, v) => [lerp(4285, 4318, v) + 5, lerp(-74, 74, u), ZS(lerp(4285, 4318, v)) - 5] as V, 1, 1, [1, 0, -1]);

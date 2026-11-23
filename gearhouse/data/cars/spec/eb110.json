@@ -996,5 +996,85 @@
  "versions": {
   "GT": "retracting wing; four exhaust pipes; multi-hole disc wheels; engine cover glass",
   "SS": "fixed wing on struts; two large pipes; seven-spoke wheels; body-colour louvred engine cover; lighter"
+ },
+ "corrections_138": {
+  "_": "found while building the panel model (review 138): the renders are perspective (side camera ~21 m, eye at ground; front/rear ~18.8 m from the car's end), so the front widths above are 6-7 % too large. Use these values over the ones above where they differ.",
+  "renderScale": {
+   "front": "1.259 mm/px at x 0, ground row 994",
+   "rear": "1.331 mm/px at x 4400, ground row 1000"
+  },
+  "headlamp": {
+   "yOuter": 614,
+   "yInnerFoot": 181,
+   "yInnerTop": 274,
+   "z": [
+    521,
+    629
+   ]
+  },
+  "indicatorF": {
+   "tip": [
+    440,
+    729
+   ]
+  },
+  "bonnetEdge": "y 616 at the lamps rising to 652 at the screen",
+  "wingF": "beside the lamp the wing is LOWER than the bonnet edge (crest z 586 at x 585, 625 at 676, 704 at 858, 732 at 949; bonnet edge about 629 at x 600); it rises above the bonnet edge only from about x 900, topping out at 745-750 over the wheel",
+  "screenTopHalfWidth": 412,
+  "bumperShutLine": "z 405 on the centre line (x about 105), rising to about 450 at the arches",
+  "intakeF": {
+   "y": [
+    80,
+    500
+   ],
+   "z": [
+    130,
+    285
+   ]
+  },
+  "archF": {
+   "from": 677,
+   "to": 1391,
+   "radius": 357
+  },
+  "archR": {
+   "from": 3230,
+   "to": 3954,
+   "radius": 362,
+   "top": 715
+  },
+  "tailPlan": "rounder: corners at x 4330-4340, centre at 4400",
+  "lowerRearEdge": [
+   [
+    3970,
+    190
+   ],
+   [
+    4061,
+    248
+   ],
+   [
+    4175,
+    345
+   ],
+   [
+    4266,
+    452
+   ],
+   [
+    4323,
+    531
+   ]
+  ],
+  "tailLamp": {
+   "y": [
+    456,
+    783
+   ],
+   "z": [
+    632,
+    768
+   ]
+  }
  }
 }

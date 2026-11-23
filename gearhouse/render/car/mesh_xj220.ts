@@ -125,6 +125,8 @@ function wheel(b: Build, hx: number, s: 1 | -1, spin: number) { const front = hx
   b.name('hub').mat(ALLOY, 0.8, 'metal').lathe('y', o, [[yf(62), 62], [yf(62) + s * 14, 52], [yf(62) + s * 20, 26]], 10, false); disc(b, [hx, s * wy + yf(62) + s * 20, R], 26, 10);
   b.name('wheelHole').mat(DARK, 0.05); for (let k = 0; k < 5; k++) { const a = spin + k / 5 * Math.PI * 2 + 0.3, rr = rim * 0.58; disc(b, [hx + Math.cos(a) * rr, s * wy + yf(rr) + s * 3, R + Math.sin(a) * rr], 20, 8); } }
 
+/** the head lamps' ovals (review 130): centre along and across, half-sizes along and across (mm) */
+const XHL = 600, YHL = 665, RHX = 265, RHY = 190;
 export function xj220Mesh(spin = 0): Mesh { const b = new Build(), bins = new Bins();
   // ---- the body: one skin from the nose to the tail, the arches cut up into it, the cabin hollowed ----
   const xs: number[] = [0, 12, 30, 55, 95, 140, 200, 270, 350, 440, 530, 620, 710, 800, 870, C0 - 2, C0, 1850, 1960, 2070, 2180, 2290, 2400, 2510, 2620, 2730, 2815, C1, C1 + 2, 3000, 3100, 3200, 3300, 3400, 3480, 4370, 4440, 4520, 4600, 4680, 4760, 4830, 4880, 4912, L];
@@ -154,18 +156,25 @@ export function xj220Mesh(spin = 0): Mesh { const b = new Build(), bins = new Bi
       b.name('seat').mat(LEATHER, 0.25, 'leather').box(2200, 2680, y0, y1, FLOOR, 350).loft(([[2630, 350], [2710, 600], [2790, 860], [2832, 930]] as const).map(([x, z]) => [[x, y0 + 20, FLOOR + 40], [x, y1 - 20, FLOOR + 40], [x, y1 - 50, z], [x, y0 + 50, z]] as V[])); } }
   // ---- the nose: the wide oval mouth with its mesh and the leaping cat, the low slot, the amber indicators ----
   { const MW = 555, MZ = 262, MH = 78, ys = [-1, -0.92, -0.72, -0.4, 0, 0.4, 0.72, 0.92, 1].map(u => u * MW), hz = (y: number) => MH * Math.sqrt(Math.max(0, 1 - (y / MW) ** 2)) * 0.96 + 3, P = (y: number, z: number, o = 5): V => [faceX(y, z, false) - o, y, z];
-    b.name('core').mat(DARK, 0.05, 'grille'); for (let i = 0; i + 1 < ys.length; i++) { const ya = ys[i]!, yb = ys[i + 1]!; b.quad(P(ya, MZ - hz(ya)), P(yb, MZ - hz(yb)), P(yb, MZ), P(ya, MZ)).quad(P(ya, MZ), P(yb, MZ), P(yb, MZ + hz(yb)), P(ya, MZ + hz(ya))); }
-    b.name('grille').mat(CHROME, 0.9, 'metal'); fan(b, [P(-70, MZ + 6, 8), P(-20, MZ + 34, 8), P(48, MZ + 16, 8), P(74, MZ - 22, 8), P(30, MZ - 12, 8), P(-30, MZ - 14, 8)]);   // the leaping cat: a bright shape
+    b.name('core').mat('#0c0d10', 0.05); for (let i = 0; i + 1 < ys.length; i++) { const ya = ys[i]!, yb = ys[i + 1]!; b.quad(P(ya, MZ - hz(ya)), P(yb, MZ - hz(yb)), P(yb, MZ), P(ya, MZ)).quad(P(ya, MZ), P(yb, MZ), P(yb, MZ + hz(yb)), P(ya, MZ + hz(ya))); }
+    // review 130 (against the sheet): the mouth's horizontal slats, dark grey on black, five across its height, each following the oval
+    b.name('coreBar').mat('#70747e', 0.5, 'metal'); for (let k = 1; k <= 5; k++) { const z = MZ - MH + k * 2 * MH / 6, w = MW * Math.sqrt(Math.max(0, 1 - ((z - MZ) / MH) ** 2)) * 0.96; b.quad(P(-w, z - 9, 12), P(w, z - 9, 12), P(w, z + 9, 12), P(-w, z + 9, 12)); }
+    // the leaping cat in silver at the mouth's top middle, leaping to the car's left as seen from ahead
+    // the leaping cat: a long body stretched in a leap, head forward (to the car's left seen from ahead), tail trailing; small convex pieces
+    b.name('grille').mat(CHROME, 0.95, 'metal'); { const C = (y: number, z: number): V => P(y, MZ + 40 + z, 16), piece = (q: [number, number][]) => b.quad(C(q[0]![0], q[0]![1]), C(q[1]![0], q[1]![1]), C(q[2]![0], q[2]![1]), C(q[3]![0], q[3]![1]));
+      piece([[-70, -6], [60, 6], [60, 26], [-70, 12]]); piece([[60, 6], [100, 14], [100, 34], [60, 26]]); piece([[100, 18], [122, 24], [118, 36], [100, 34]]);   /* body, shoulders, head */
+      piece([[-70, -6], [-120, -22], [-124, -12], [-70, 12]]); piece([[40, 4], [78, -16], [84, -10], [52, 10]]); piece([[-50, -2], [-92, -26], [-86, -30], [-40, 4]]); }
     b.name('bumperF').mat(DARK, 0.05); { const sl = [-600, -300, 0, 300, 600]; for (let i = 0; i + 1 < sl.length; i++) b.quad(P(sl[i]!, 118, 4), P(sl[i + 1]!, 118, 4), P(sl[i + 1]!, 152, 4), P(sl[i]!, 152, 4)); }
-    for (const s of [1, -1]) { b.name('lamp').mat(AMBER, 0.5, 'lens'); const yi = [630, 730, 830]; for (let i = 0; i < 2; i++) b.quad(P(s * yi[i]!, 236), P(s * yi[i + 1]!, 236), P(s * yi[i + 1]!, 300), P(s * yi[i]!, 300));
+    for (const s of [1, -1]) { b.name('lamp').mat(AMBER, 0.5, 'lens'); const yi = [650, 690, 790, 830], zz = (i: number) => i === 0 || i === 3 ? [252, 284] : [240, 296]; for (let i = 0; i < 3; i++) { if (i === 0) b.mat('#e9e6dc', 0.6, 'lens'); else b.mat(AMBER, 0.5, 'lens'); const [za, zb] = zz(i) as [number, number], [zc, zd] = zz(i + 1) as [number, number]; b.quad(P(s * yi[i]!, za), P(s * yi[i + 1]!, zc), P(s * yi[i + 1]!, zd), P(s * yi[i]!, zb)); }   /* a pill, its inner end white */
       b.quad(onSide(s, 640, 400), onSide(s, 715, 400), onSide(s, 715, 436), onSide(s, 640, 436)); b.quad(onSide(s, 1688, 468), onSide(s, 1736, 468), onSide(s, 1736, 500), onSide(s, 1688, 500)); } }
   // ---- head lamps: the large oval cover on each corner of the nose (its edge a fine line in the paint), and in it a
   //      clear window over two lamps in a dark bucket ----
-  for (const s of [1, -1]) { const cxl = 350, cy = s * 640;
-    b.name('lampCover').mat(LINE, 0.1); oval(b, cxl, cy, 215, 240, 4, 18, 0.91);
-    b.name('lamp').mat(DARK, 0.1); oval(b, cxl - 25, cy, 112, 156, 5, 12);
-    b.name('lens').mat('#f1f0e2', 0.6, 'lens'); for (const oy of [-70, 70]) oval(b, cxl - 20, cy + oy, 46, 48, 9, 8, 0.01);
-    b.name('lampCover').mat(GLASS, 0.5, 'glass'); oval(b, cxl - 25, cy, 114, 158, 15, 12); }
+  // review 130 (against the sheet): wide horizontal ovals flush with the paint, a fine dark outline; under the clear cover
+  // the lamps sit low and small in a silvered recess, so the cover reads in the body's own colour as on the sheet
+  for (const s of [1, -1]) { const cxl = XHL, cy = s * YHL;
+    b.name('lampCover').mat(LINE, 0.1); oval(b, cxl, cy, RHX, RHY, 4, 24, 0.94);
+    b.name('lamp').mat('#c4c7ce', 0.6, 'paint'); oval(b, cxl, cy, RHX * 0.94, RHY * 0.94, 2, 20);   /* the cover in the body's colour, as the sheet draws it */
+    b.name('lens').mat('#f1f0e2', 0.6, 'lens'); for (const oy of [-0.36, 0.36]) oval(b, cxl + RHX * 0.25, cy + oy * RHY, RHX * 0.24, RHY * 0.22, 6, 10, 0.01); }
   // ---- the flanks: shut lines, the blade-shaped intake behind the door, the round fillers, the mirrors on their stalks ----
   for (const s of [1, -1] as const) {
     b.name('door').mat(LINE, 0.1); sideLine(b, s, [[1795, 770], [1795, 590], [1798, 400], [1812, 280], [1865, 215], [2030, 202], [2400, 202], [2663, 208]], 9);
@@ -181,11 +190,15 @@ export function xj220Mesh(spin = 0): Mesh { const b = new Build(), bins = new Bi
       b.name('mirror').mat('#3d4450', 0.6).quad([mx + 199, s * 945, mz - 4], [mx + 204, s * 1100, mz + 4], [mx + 204, s * 1100, mz + 108], [mx + 199, s * 945, mz + 110]); }
     wheel(b, FX, s, spin); wheel(b, RX, s, spin); }
   // ---- the tail: the dark band across it, two lamp units each side, the slats between them, the wing, the exhausts ----
-  { const P = (y: number, z: number, o = 4): V => [faceX(y, z, true) + o, y, z], ys = [-810, -700, -560, -280, 0, 280, 560, 700, 810], Z0 = 455, Z1 = 790;
-    b.name('bumperR').mat(DARK, 0.05); for (let i = 0; i + 1 < ys.length; i++) for (const [za, zc] of [[Z0, 600], [600, Z1]] as const) b.quad(P(ys[i]!, za), P(ys[i + 1]!, za), P(ys[i + 1]!, zc), P(ys[i]!, zc));
-    b.name('grille').mat('#34363d', 0.2); for (const z of [500, 560, 620]) b.quad(P(-540, z - 9, 7), P(540, z - 9, 7), P(540, z + 9, 7), P(-540, z + 9, 7));
-    for (const s of [1, -1]) { const lamp = (c: string, y0: number, y1: number, z0: number, z1: number) => { b.name('tail').mat(c, 0.5, 'lens').quad(P(s * y0, z0, 8), P(s * y1, z0, 8), P(s * y1, z1, 8), P(s * y0, z1, 8)); };
-      lamp(AMBER, 712, 825, 636, 722); lamp(RED, 600, 704, 636, 722); lamp(RED, 712, 825, 540, 628); lamp('#a81f24', 600, 704, 540, 628); }
+  // review 130 (against the sheet): the black band from lamp to lamp at the lamps' height, fine horizontal slats across
+  // it, a bright strip where the JAGUAR letters stand; each lamp cluster two rows: amber outside and clear inside above,
+  // red the full width below; under the band the dark valance with two recesses and the big round exhausts out wide
+  { const P = (y: number, z: number, o = 4): V => [faceX(y, z, true) + o, y, z], ys = [-466, -350, -175, 0, 175, 350, 466], Z0 = 470, Z1 = 680;
+    b.name('bumperR').mat('#121316', 0.1); for (let i = 0; i + 1 < ys.length; i++) for (let za = Z0; za < Z1; za += 30) { const zc = Math.min(Z1, za + 30); b.quad(P(ys[i]!, za), P(ys[i + 1]!, za), P(ys[i + 1]!, zc), P(ys[i]!, zc)); }   /* between the clusters, in strips that follow the tail */
+    b.name('grille').mat('#2b2d33', 0.25); for (let z = 500; z <= 620; z += 24) b.quad(P(-450, z - 5, 7), P(450, z - 5, 7), P(450, z + 5, 7), P(-450, z + 5, 7));
+    b.name('grille').mat('#c9ccd2', 0.8, 'metal').quad(P(-190, 648, 7), P(190, 648, 7), P(190, 664, 7), P(-190, 664, 7));   /* the badge's letters, as a bright strip */
+    for (const s of [1, -1]) { const lamp = (c: string, y0: number, y1: number, z0: number, z1: number) => { b.name('tail').mat(c, 0.5, 'lens'); const n = Math.max(2, Math.ceil((z1 - z0) / 20)), m = Math.max(2, Math.ceil((y1 - y0) / 45)); for (let k = 0; k < n; k++) for (let j = 0; j < m; j++) { const za = z0 + (z1 - z0) * k / n, zb = z0 + (z1 - z0) * (k + 1) / n, ya = y0 + (y1 - y0) * j / m, yb = y0 + (y1 - y0) * (j + 1) / m; b.quad(P(s * ya, za, 12), P(s * yb, za, 12), P(s * yb, zb, 12), P(s * ya, zb, 12)); } };   /* in strips, so it follows the tail's curve and stands proud of the band */
+      lamp('#e9e4dc', 470, 560, 588, 668); lamp(AMBER, 566, 740, 588, 668); lamp(RED, 470, 740, 502, 582); }   /* on the tail's flat face, where the sheet puts them in from its corners */
     // the wing: a full-width blade between the tail's raised sides, two struts down to the deck
     const wx = [4690, 4760, 4830, 4890, L]; b.name('wing').mat(PAINT, 0.6, 'paint').loft(wx.map((x, i) => { const w = HALF(x) * 0.86, zt = WING(x) - 5, th = [10, 30, 36, 30, 16][i]!; return [[x, -w, zt - th], [x, 0, zt - th], [x, w, zt - th], [x, w, zt], [x, 0, zt + 4], [x, -w, zt]] as V[]; }));
     b.name('wing').mat(DARK, 0.1); { const sx = [4735, 4800, 4860, 4915], sy = [-0.8, -0.4, 0, 0.4, 0.8], q = (x: number, u: number): V => { const y = u * HALF(x); return [x, y, skin(x, y) + 5]; }; for (let i = 0; i + 1 < sx.length; i++) for (let j = 0; j + 1 < sy.length; j++) b.quad(q(sx[i]!, sy[j]!), q(sx[i + 1]!, sy[j]!), q(sx[i + 1]!, sy[j + 1]!), q(sx[i]!, sy[j + 1]!)); }   // the shadow in the gap under the blade
@@ -193,8 +206,9 @@ export function xj220Mesh(spin = 0): Mesh { const b = new Build(), bins = new Bi
     // under the tail: the dark venturi block rising to the back, one round exhaust each side low in it
     const dx = [4310, 4500, 4700, 4850, L - 30], low = (x: number) => 100 + 110 * ((x - 4310) / 620) ** 1.5;
     b.name('chassis').mat('#101114', 0.05).loft(dx.map(x => { const w = Math.min(840, HALF(x) - 70); return [[x, -w, low(x)], [x, w, low(x)], [x, w, BOT(x) + 14], [x, -w, BOT(x) + 14]] as V[]; }));
-    for (const s of [1, -1]) { b.name('exhaust').mat(CHROME, 0.9, 'metal').lathe('x', [0, s * 600, 285], [[L - 90, 50], [L - 20, 56], [L - 8, 56], [L - 14, 44], [L - 90, 42]], 12, false);
-      b.name('exhaust').mat(DARK, 0.05); fan(b, Array.from({ length: 10 }, (_, i) => { const t = i / 10 * Math.PI * 2; return [L - 70, s * 600 + Math.cos(t) * 43, 285 + Math.sin(t) * 43] as V; })); } }
+    b.name('bumperR').mat('#1d1f24', 0.15); for (const y of [-430, 430]) b.quad(P(y - 160, 150, 5), P(y + 160, 150, 5), P(y + 160, 400, 5), P(y - 160, 400, 5));   /* the valance's two recesses */
+    for (const s of [1, -1]) { b.name('exhaust').mat(CHROME, 0.9, 'metal').lathe('x', [0, s * 700, 230], [[L - 90, 62], [L - 20, 70], [L - 8, 70], [L - 14, 56], [L - 90, 54]], 14, false);
+      b.name('exhaust').mat(DARK, 0.05); fan(b, Array.from({ length: 12 }, (_, i) => { const t = i / 12 * Math.PI * 2; return [L - 70, s * 700 + Math.cos(t) * 55, 230 + Math.sin(t) * 55] as V; })); } }
   b.name('chassis').mat(DARK, 0.05).bar([FX, -WYF, RF], [FX, WYF, RF], 50).bar([RX, -WYR, RR], [RX, WYR, RR], 70);   // the axles' lines through the wells
   return b.mesh(L); }
 export const mesh = xj220Mesh;

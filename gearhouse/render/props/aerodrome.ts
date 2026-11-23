@@ -16,34 +16,34 @@ function blob(b: Build, c: V, r: V, seed: number, seg = 6, lats = [-0.75, -0.2, 
 /** one 15 m bay of the big hangar: a barrel roof of corrugated iron on iron walls, the sliding doors part open on the dark inside; bays stand side by side */
 export function hangarBay(): Mesh { const b = new Build(), L = 15000, D = 22000, H = 6000, RISE = 3600, N = 14, DH = 5400;
   const arch = (i: number): [number, number] => { const t = i / N * Math.PI; return [L / 2 - L / 2 * Math.cos(t), H + RISE * Math.sin(t)]; };
-  b.mat('#a2a8a0', 0.3, 'metal').box(0, 160, 0, D, 0, H).box(L - 160, L, 0, D, 0, H).box(0, L, D - 160, D, 0, H);   // the side and back walls
-  b.mat(CREAM, 0.3, 'paint').box(0, 900, -60, 160, 0, H).box(L - 900, L, -60, 160, 0, H).box(900, L - 900, -60, 160, DH + 250, H);   // the front's piers and lintel
+  b.mat('#a2a8a0', 0.3, 'corrugated').box(0, 160, 0, D, 0, H).box(L - 160, L, 0, D, 0, H).box(0, L, D - 160, D, 0, H);   // the side and back walls
+  b.mat(CREAM, 0.3, 'render').box(0, 900, -60, 160, 0, H).box(L - 900, L, -60, 160, 0, H).box(900, L - 900, -60, 160, DH + 250, H);   // the front's piers and lintel
   for (const y of [-60, D]) for (let i = 0; i < N; i++) { const [x0, z0] = arch(i), [x1, z1] = arch(i + 1); b.quad([x0, y, H], [x1, y, H], [x1, y, z1], [x0, y, z0]); }   // the gables under the arch
-  b.mat(GREEN, 0.3, 'paint').box(L / 2 - 2600, L / 2 + 2600, -110, -60, H + 900, H + 2000); b.mat(CREAM, 0.3, 'paint').box(L / 2 - 2400, L / 2 + 2400, -130, -110, H + 1080, H + 1820);   // a plain name board
+  b.mat(GREEN, 0.3, 'boards').box(L / 2 - 2600, L / 2 + 2600, -110, -60, H + 900, H + 2000); b.mat(CREAM, 0.3, 'render').box(L / 2 - 2400, L / 2 + 2400, -130, -110, H + 1080, H + 1820);   // a plain name board
   b.mat(DARK, 0.05).box(900, L - 900, 0, 700, 0, DH + 250);                                  // the dark inside
   b.mat(IRON, 0.4, 'metal').box(300, L - 300, -330, -60, DH, DH + 250);                      // the door rail
   for (const [x, y] of [[900, -150], [2000, -260], [L - 4200, -150], [L - 5300, -260]] as const) { const w = 3300;   // four leaves, pushed back in pairs
-    b.mat(y < -200 ? GREEN : DARKG, 0.35, 'paint').box(x, x + w, y, y + 90, 0, DH);
+    b.mat(y < -200 ? GREEN : DARKG, 0.35, 'boards').box(x, x + w, y, y + 90, 0, DH);
     b.mat(DARK, 0.1).box(x + 300, x + w - 300, y - 15, y, 3000, 4300); b.mat(GLASS, 0.5, 'glass').box(x + 300, x + w - 300, y - 30, y - 15, 3000, 4300);
-    b.mat(CREAM, 0.3, 'paint').box(x + w / 2 - 50, x + w / 2 + 50, y - 45, y - 30, 3000, 4300).box(x + 300, x + w - 300, y - 45, y - 30, 3610, 3690); }
-  for (let i = 0; i < N; i++) { const [x0, z0] = arch(i), [x1, z1] = arch(i + 1); b.mat(i % 2 ? '#a3abac' : '#b3bbbc', 0.4, 'metal').quad([x0, D + 200, z0], [x1, D + 200, z1], [x1, -500, z1], [x0, -500, z0]); }   // the roof sheets
-  b.mat(DARKG, 0.3, 'paint'); for (let i = 0; i < N; i++) { const [x0, z0] = arch(i), [x1, z1] = arch(i + 1); b.quad([x0, -510, z0 - 350], [x1, -510, z1 - 350], [x1, -510, z1], [x0, -510, z0]); }   // the barge board
+    b.mat(CREAM, 0.3, 'render').box(x + w / 2 - 50, x + w / 2 + 50, y - 45, y - 30, 3000, 4300).box(x + 300, x + w - 300, y - 45, y - 30, 3610, 3690); }
+  for (let i = 0; i < N; i++) { const [x0, z0] = arch(i), [x1, z1] = arch(i + 1); b.mat(i % 2 ? '#a3abac' : '#b3bbbc', 0.4, 'corrugated').quad([x0, D + 200, z0], [x1, D + 200, z1], [x1, -500, z1], [x0, -500, z0]); }   // the roof sheets
+  b.mat(DARKG, 0.3, 'boards'); for (let i = 0; i < N; i++) { const [x0, z0] = arch(i), [x1, z1] = arch(i + 1); b.quad([x0, -510, z0 - 350], [x1, -510, z1 - 350], [x1, -510, z1], [x0, -510, z0]); }   // the barge board
   return b.mesh(L); }
 
 /** one 15 m bay of the aircraft works: brick walls and tall windows under three teeth of a saw-tooth north-light roof (glass on the steep faces, slate on the long ones) */
 export function factoryBay(): Mesh { const b = new Build(), L = 15000, D = 14000, H = 5600, T = L / 3, UP = 2400, RUN = 1000;
-  b.mat(BRICK, 0.2, 'paint').box(0, L, 0, 300, 0, H).box(0, L, D - 300, D, 0, H).box(0, 300, 0, D, 0, H).box(L - 300, L, 0, D, 0, H);
+  b.mat(BRICK, 0.2, 'brick').box(0, L, 0, 300, 0, H).box(0, L, D - 300, D, 0, H).box(0, 300, 0, D, 0, H).box(L - 300, L, 0, D, 0, H);
   for (const y of [0, D]) for (let k = 0; k < 3; k++) b.tri([k * T, y, H], [k * T + T, y, H], [k * T + RUN, y, H + UP]);   // the gables of the teeth
-  b.mat(BRICK2, 0.2, 'paint').box(0, L, -70, 0, 0, 600); for (let x = 0; x <= L; x += 3000) b.box(Math.max(0, x - 260), Math.min(L, x + 260), -70, 0, 600, H);   // the plinth and piers
-  b.mat(CREAM, 0.3, 'paint').box(0, L, -110, 20, H - 150, H + 150);                          // the stone band at the eaves
+  b.mat(BRICK2, 0.2, 'brick').box(0, L, -70, 0, 0, 600); for (let x = 0; x <= L; x += 3000) b.box(Math.max(0, x - 260), Math.min(L, x + 260), -70, 0, 600, H);   // the plinth and piers
+  b.mat(CREAM, 0.3, 'render').box(0, L, -110, 20, H - 150, H + 150);                          // the stone band at the eaves
   for (let x = 600; x < L; x += 3000) { const w = 1800, z0 = 1500, z1 = 4300;                // the windows
     b.mat(DARK, 0.1).box(x, x + w, -20, 0, z0, z1); b.mat(GLASS, 0.5, 'glass').box(x, x + w, -40, -20, z0, z1);
-    b.mat(CREAM, 0.3, 'paint').box(x + w / 2 - 45, x + w / 2 + 45, -60, -40, z0, z1).box(x, x + w, -60, -40, z0 + 880, z0 + 960).box(x, x + w, -60, -40, z0 + 1840, z0 + 1920).box(x - 120, x + w + 120, -110, 0, z0 - 160, z0).box(x - 120, x + w + 120, -90, 0, z1, z1 + 220); }
-  b.mat(GREEN, 0.35, 'paint').box(L - 2000, L - 800, -60, 0, 0, 1300);                        // a low hatch door under the last window
+    b.mat(CREAM, 0.3, 'render').box(x + w / 2 - 45, x + w / 2 + 45, -60, -40, z0, z1).box(x, x + w, -60, -40, z0 + 880, z0 + 960).box(x, x + w, -60, -40, z0 + 1840, z0 + 1920).box(x - 120, x + w + 120, -110, 0, z0 - 160, z0).box(x - 120, x + w + 120, -90, 0, z1, z1 + 220); }
+  b.mat(GREEN, 0.35, 'boards').box(L - 2000, L - 800, -60, 0, 0, 1300);                        // a low hatch door under the last window
   for (let k = 0; k < 3; k++) { const x = k * T, f = (y: number, s: number, o = 0): V => [x + RUN * s + o, y, H + UP * s];
-    b.mat(SLATE, 0.25, 'plain').quad([x + RUN, -250, H + UP], [x + T, -250, H], [x + T, D + 250, H], [x + RUN, D + 250, H + UP]);   // the slates
+    b.mat(SLATE, 0.25, 'slate').quad([x + RUN, -250, H + UP], [x + T, -250, H], [x + T, D + 250, H], [x + RUN, D + 250, H + UP]);   // the slates
     b.mat(DARK, 0.1).quad(f(0, 0.12, 20), f(D, 0.12, 20), f(D, 0.92, 20), f(0, 0.92, 20)); b.mat(GLASS, 0.5, 'glass').quad(f(0, 0.12), f(D, 0.12), f(D, 0.92), f(0, 0.92));   // the north light
-    b.mat(CREAM, 0.3, 'paint').quad(f(-250, 0), f(D + 250, 0), f(D + 250, 0.12), f(-250, 0.12)).quad(f(-250, 0.92), f(D + 250, 0.92), f(D + 250, 1), f(-250, 1));
+    b.mat(CREAM, 0.3, 'render').quad(f(-250, 0), f(D + 250, 0), f(D + 250, 0.12), f(-250, 0.12)).quad(f(-250, 0.92), f(D + 250, 0.92), f(D + 250, 1), f(-250, 1));
     for (let y = 0; y <= D; y += 2000) b.bar(f(y, 0.12, -30), f(y, 0.92, -30), 110); }
   b.mat(IRON, 0.4, 'metal'); for (const x of [T, 2 * T]) b.box(x - 90, x + 90, -260, -70, 0, H + 100);   // the valleys' downpipes
   return b.mesh(L); }
@@ -74,7 +74,7 @@ export function biplane(): Mesh { const b = new Build(), FUS = '#8d2f2b';
 
 /** the windsock: a white mast on a concrete foot (the anchor is the mast), the red-and-white sock flying out along +x */
 export function windsock(): Mesh { const b = new Build(), L = 1200, X = L / 2, H = 8000;
-  b.mat(CONCRETE, 0.2, 'paint').box(X - 500, X + 500, -500, 500, 0, 250);
+  b.mat(CONCRETE, 0.2, 'concrete').box(X - 500, X + 500, -500, 500, 0, 250);
   b.mat(WHITE, 0.35, 'paint').loft([[130, 0], [100, 3000], [70, H]].map(([r, z]) => [[X - r!, -r!, z!], [X + r!, -r!, z!], [X + r!, r!, z!], [X - r!, r!, z!]] as V[]));
   b.mat(RED, 0.3, 'paint').box(X - 125, X + 125, -125, 125, 900, 1900);
   b.mat(IRON, 0.4, 'metal').bar([X, 0, H - 500], [X + 500, 0, H - 500], 50).lathe('x', [X + 260, 0, H - 500], [[0, 500], [60, 500]], 8, false);   // the swivel arm and hoop
@@ -86,7 +86,7 @@ export function windsock(): Mesh { const b = new Build(), L = 1200, X = L / 2, H
 
 /** a round-headed tree (oak, elm), 12 m: a short trunk and three faceted lumps of crown */
 export function treeRound(): Mesh { const b = new Build(), L = 9000, X = L / 2;
-  b.mat('#5d4a38', 0.15, 'wood').bar([X, 0, 0], [X + 150, 0, 5200], 620, 560).bar([X + 100, 0, 3600], [X - 1500, 500, 6000], 300).bar([X + 100, 0, 3800], [X + 1700, -400, 6200], 300);
+  b.mat('#5d4a38', 0.15, 'timber').bar([X, 0, 0], [X + 150, 0, 5200], 620, 560).bar([X + 100, 0, 3600], [X - 1500, 500, 6000], 300).bar([X + 100, 0, 3800], [X + 1700, -400, 6200], 300);
   b.mat('#4c6b35', 0.15, 'canvas'); blob(b, [X - 1500, 600, 6800], [3000, 2900, 2900], 3, 7);
   b.mat('#3f5c2e', 0.15, 'canvas'); blob(b, [X + 1700, -500, 7000], [2800, 2900, 2800], 11, 7);
   b.mat('#587a3c', 0.15, 'canvas'); blob(b, [X + 100, 200, 9000], [3300, 3200, 3000], 23, 7);
@@ -94,14 +94,14 @@ export function treeRound(): Mesh { const b = new Build(), L = 9000, X = L / 2;
 
 /** a poplar, 17 m: a tall narrow spire of leaf almost to the ground */
 export function treePoplar(): Mesh { const b = new Build(), L = 3600, X = L / 2;
-  b.mat('#5a4c3c', 0.15, 'wood').bar([X, 0, 0], [X, 0, 3000], 420);
+  b.mat('#5a4c3c', 0.15, 'timber').bar([X, 0, 0], [X, 0, 3000], 420);
   const prof: [number, number][] = [[1400, 500], [3200, 1500], [6500, 1800], [10500, 1600], [14000, 1100], [16200, 550], [17000, 120]];
   b.mat('#4a6a34', 0.15, 'canvas').loft(prof.map(([z, r], j) => Array.from({ length: 6 }, (_, i): V => { const t = (i + (j % 2) * 0.5) / 6 * Math.PI * 2, k = 0.82 + 0.36 * rnd(j * 13 + i * 2.1); return [X + Math.cos(t) * r * k, Math.sin(t) * r * k, z + 500 * (rnd(j * 7 + i) - 0.5)]; })));
   return b.mesh(L); }
 
 /** a Scots pine, 15 m: a tall bare reddish trunk, flat dark heads of needles at the top */
 export function treePine(): Mesh { const b = new Build(), L = 7000, X = L / 2;
-  b.mat('#8a5a40', 0.15, 'wood').loft([[260, 0, 0], [200, 150, 7000], [110, -100, 13000]].map(([r, dx, z]) => [[X + dx! - r!, -r!, z!], [X + dx! + r!, -r!, z!], [X + dx! + r!, r!, z!], [X + dx! - r!, r!, z!]] as V[]));
+  b.mat('#8a5a40', 0.15, 'timber').loft([[260, 0, 0], [200, 150, 7000], [110, -100, 13000]].map(([r, dx, z]) => [[X + dx! - r!, -r!, z!], [X + dx! + r!, -r!, z!], [X + dx! + r!, r!, z!], [X + dx! - r!, r!, z!]] as V[]));
   b.bar([X + 150, 0, 8200], [X - 1900, 300, 10600], 200).bar([X + 100, 0, 9600], [X + 2000, -300, 11600], 200).bar([X + 150, 0, 6500], [X + 1500, 500, 7300], 150);
   const flat = [-0.7, -0.15, 0.4, 0.85];
   b.mat('#2f4b3a', 0.15, 'canvas'); blob(b, [X - 1900, 300, 11200], [1900, 1800, 1000], 5, 6, flat);

@@ -11,7 +11,7 @@ import { millbrookScenery, type Placed } from '../race/scenery';
 import { PROPS } from '../render/props/index';
 import { renumber, wheelsOf, type Mesh } from '../render/car/mesh';
 import { Damage } from '../race/damage';
-import { loadGround, loadSky, loadProps } from '../render/live/groundtex';
+import { loadGround, loadSky, loadProps, loadBuildings } from '../render/live/groundtex';
 import { LiveRenderer } from '../render/live/renderer';
 import { groundData, fenceData } from '../render/live/ground';
 import { Smoke, type SmokeKind } from '../race/smoke';
@@ -42,7 +42,7 @@ let fxMode = 0, fxK = 1, filmRate = true, heldAt = -1; const held = document.cre
 let lampsOn = false, photoOn = true, hdriOn = true, blurOn = true, lastCamX = 0, lastCamY = 0, shake = 0;
 let SP = Math.sin(30 * Math.PI / 180), CP = Math.cos(30 * Math.PI / 180), pitchDeg = 30; const DT = 1 / 200, START = T.spec.landmarks.find(l => l.kind === 'line')!.s;
 let VW = 768, VH = 432, mm = 50;                                               // the picture's own pixels, millimetres a pixel
-const st = { auto: true, assist: false, pilot: false, chase: false, progressive: false, cine: false, free: false };
+const st = { auto: true, assist: false, tcs: true, pilot: false, chase: false, progressive: false, cine: false, free: false };
 const turning = () => st.chase || st.cine || st.free;
 // ---- the cinematic view: shots cut between trackside cameras (the world turned to look from the camera at the car), a
 //      low chase and a high fixed view; pixels twice the size, the gauges hidden, bars top and bottom with a caption ----
@@ -70,7 +70,7 @@ const meshOf = (id: string, num: string) => renumber(MESH_CARS.find(c => c.id ==
 const numOf = (e: Entrant): string => { if (!race) return myNum; let k = 0; for (const x of race.cars) { if (x === race.player) continue; k++; if (String(k) === myNum) k++; if (x === e) return String(k); } return myNum; };
 // ---- the live renderer (review 99): the scene drawn every frame by WebGL2, where the browser has it; the baked pictures otherwise ----
 const glCanvas = document.createElement('canvas'); let live: LiveRenderer | null = null, liveFence = -1;
-try { live = new LiveRenderer(glCanvas); live.setGround(groundData(T, SCN, START)); live.setTrack(T.length, T.spec.width, T.spec.joints, START, rubberLine(T)); const L0 = live; void loadGround(L0, matchMedia('(pointer: coarse)').matches ? 512 : 1024).catch(e => console.warn('ground materials', e)); void loadSky(L0).catch(e => console.warn('sky', e)); void loadProps(L0, T).catch(e => console.warn('props', e)); } catch (e) { console.warn('live renderer unavailable', e); live = null; }
+try { live = new LiveRenderer(glCanvas); live.setGround(groundData(T, SCN, START)); live.setTrack(T.length, T.spec.width, T.spec.joints, START, rubberLine(T)); const L0 = live; void loadGround(L0, matchMedia('(pointer: coarse)').matches ? 512 : 1024).catch(e => console.warn('ground materials', e)); void loadSky(L0).catch(e => console.warn('sky', e)); void loadProps(L0, T).catch(e => console.warn('props', e)); void loadBuildings(L0).catch(e => console.warn('building materials', e)); } catch (e) { console.warn('live renderer unavailable', e); live = null; }
 // the PBR detail textures (Poly Haven, CC0): loaded once, laid on when ready
 if (live) { const L = live, im = [texAlb, texNor, texRgh].map(src => { const i = new Image(); i.src = src; return i; });
   void Promise.all(im.map(i => i.decode())).then(() => L.setTextures(im[0]!, im[1]!, im[2]!, (texMeta as { layers: { size_m: number; luma_mean: number; rough_mean: number }[] }).layers)).catch(e => console.warn('textures', e)); }
@@ -393,11 +393,13 @@ $<HTMLInputElement>('touch').addEventListener('change', e => document.body.class
 const down = (...ks: string[]) => ks.some(k => keys.has(k));
 function controls(dt: number): Controls { const left = down('arrowleft', 'a'), right = down('arrowright', 'd'), want = left === right ? 0 : left ? 1 : -1;
   input.steer += want === 0 ? -Math.sign(input.steer) * Math.min(Math.abs(input.steer), dt * 4) : Math.max(-dt * 2.6, Math.min(dt * 2.6, want - input.steer));
-  input.throttle = Math.max(0, Math.min(1, input.throttle + (down('arrowup', 'w') ? (st.progressive ? 0.55 : 4) : (st.progressive ? -3 : -6)) * dt));   /* the gauge mode: the pedal goes down as long as it is held */
+  input.throttle = Math.max(0, Math.min(1, input.throttle + (down('arrowup', 'w') ? (st.progressive ? 0.55 : 2.2) : (st.progressive ? -3 : -6)) * dt));   /* review 147: a key opens the throttle over about half a second, not a quarter */   /* the gauge mode: the pedal goes down as long as it is held */
   input.brake = Math.max(0, Math.min(1, input.brake + (down('arrowdown', 's') ? 5 : -8) * dt)); input.hand = down(' ') ? 1 : 0;
   let steer = input.steer; if (st.assist) { const over = car.r - car.speed * T.at(car.s).k; if (Math.abs(over) > 0.1 && Math.sign(over) === Math.sign(-car.vy)) steer += Math.atan2(car.vy, Math.max(5, car.vx)) / usefulLock(car.spec, car.speed, car.tyre.mu) * 0.7; }
   const most = car.spec.steerLock * Math.PI / 180 / usefulLock(car.spec, car.speed, car.tyre.mu);
-  return { steer: Math.max(-most, Math.min(most, steer)), throttle: input.throttle, brake: input.brake, handbrake: input.hand, gear: manualGear }; }
+  // the traction assist (review 147, for the keyboard, which cannot feather a pedal): the throttle eased while a driven wheel spins past about 10 %
+  let thr = input.throttle; if (st.tcs && car.speed > 2) { const f = car.spec.tech?.drive?.front ?? 0, sx = Math.max(...[0, 1, 2, 3].filter(i => (i < 2 ? f : 1 - f) > 0).map(i => car.slipX[i]!)); if (sx > 0.08) thr *= Math.max(0.15, 1 - (sx - 0.08) / 0.12); }
+  return { steer: Math.max(-most, Math.min(most, steer)), throttle: thr, brake: input.brake, handbrake: input.hand, gear: manualGear }; }
 // ---- the loop ----
 let last = performance.now(), acc = 0;
 function frame(now: number) { const el = Math.min(0.1, (now - last) / 1000); last = now; acc += el; clock += el; msgT -= el;
@@ -471,6 +473,7 @@ $('practice').addEventListener('click', e => { stopRace(); $('race').textContent
 $<HTMLInputElement>('auto').addEventListener('change', e => { st.auto = (e.target as HTMLInputElement).checked; car.auto = st.auto; manualGear = car.gear; });
 $<HTMLInputElement>('pilot').addEventListener('change', e => { st.pilot = (e.target as HTMLInputElement).checked; if (st.pilot) { car.auto = true; } else car.auto = st.auto; });
 $<HTMLInputElement>('assist').addEventListener('change', e => { st.assist = (e.target as HTMLInputElement).checked; });
+$<HTMLInputElement>('tcs').addEventListener('change', e => { st.tcs = (e.target as HTMLInputElement).checked; });
 $<HTMLInputElement>('chase').addEventListener('change', e => { st.chase = (e.target as HTMLInputElement).checked; camAng = car.yaw; });
 // ---- the free camera: drag to turn it round the car and tilt it, the wheel or a pinch to come closer or go further ----
 // The pictures are baked for one height and one scale, so a new height or scale bakes them again (a moment after the

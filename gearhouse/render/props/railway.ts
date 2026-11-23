@@ -104,81 +104,81 @@ export function carriage(): Mesh { const b = new Build(), L = 15000, X0 = 300, X
 /** the station building, 14 m: brick under a slate roof with two chimneys, doors and windows to the platform (-y),
  *  and a canopy on iron columns over the platform, a cut valance along its edge. Its front wall is at y = 0 */
 export function stationBuilding(): Mesh { const b = new Build(), L = 14000, D = 5200, H = 3600, R = 5700, CY = -3200, CZ = 3150;
-  b.mat(BRICK, 0.2, 'paint').box(0, L, 0, D, 0, H).loft([0, L].map(x => [[x, 0, H], [x, D, H], [x, D / 2, R]] as V[]));   // the walls and gables
-  b.mat(BRICK2, 0.2, 'paint').box(-40, L + 40, -40, D + 40, 0, 450);                                                // the plinth
-  b.mat(SLATE, 0.3, 'plain'); for (const s of [0, 1]) { const y = (v: number) => s ? D - v : v;
+  b.mat(BRICK, 0.2, 'brick').box(0, L, 0, D, 0, H).loft([0, L].map(x => [[x, 0, H], [x, D, H], [x, D / 2, R]] as V[]));   // the walls and gables
+  b.mat(BRICK2, 0.2, 'brick').box(-40, L + 40, -40, D + 40, 0, 450);                                                // the plinth
+  b.mat(SLATE, 0.3, 'slate'); for (const s of [0, 1]) { const y = (v: number) => s ? D - v : v;
     b.loft([-300, L + 300].map(x => [[x, y(-380), H - 250], [x, y(D / 2), R + 60], [x, y(D / 2), R + 180], [x, y(-380), H - 130]] as V[])); }   // the roof's two slopes
-  b.mat(BRICK2, 0.2, 'paint'); for (const x of [3200, 10200]) b.box(x, x + 800, D / 2 - 380, D / 2 + 380, R - 500, R + 1100);   // chimney stacks
-  b.mat(CREAM, 0.3, 'paint'); for (const x of [3200, 10200]) b.box(x - 60, x + 860, D / 2 - 440, D / 2 + 440, R + 1100, R + 1220);
-  b.mat('#b06a48', 0.2, 'paint'); for (const x of [3200, 10200]) for (const dx of [200, 600]) b.box(x + dx - 110, x + dx + 110, D / 2 - 110, D / 2 + 110, R + 1220, R + 1560);   // the pots
+  b.mat(BRICK2, 0.2, 'brick'); for (const x of [3200, 10200]) b.box(x, x + 800, D / 2 - 380, D / 2 + 380, R - 500, R + 1100);   // chimney stacks
+  b.mat(CREAM, 0.3, 'render'); for (const x of [3200, 10200]) b.box(x - 60, x + 860, D / 2 - 440, D / 2 + 440, R + 1100, R + 1220);
+  b.mat('#b06a48', 0.2, 'tile'); for (const x of [3200, 10200]) for (const dx of [200, 600]) b.box(x + dx - 110, x + dx + 110, D / 2 - 110, D / 2 + 110, R + 1220, R + 1560);   // the pots
   const doors: [number, number][] = [[1900, 2800], [6300, 7700], [11400, 12300]], wins: [number, number][] = [[3700, 4900], [8900, 10100]], back: [number, number][] = [[1500, 2700], [4700, 5900], [8100, 9300], [11300, 12500]];
-  b.mat(CREAM, 0.3, 'paint'); for (const [x0, x1] of doors) b.box(x0 - 150, x1 + 150, -50, 0, 2350, 2600); for (const [x0, x1] of wins) b.box(x0 - 150, x1 + 150, -50, 0, 2350, 2600).box(x0 - 100, x1 + 100, -90, 0, 1020, 1120);   // lintels and sills
+  b.mat(CREAM, 0.3, 'render'); for (const [x0, x1] of doors) b.box(x0 - 150, x1 + 150, -50, 0, 2350, 2600); for (const [x0, x1] of wins) b.box(x0 - 150, x1 + 150, -50, 0, 2350, 2600).box(x0 - 100, x1 + 100, -90, 0, 1020, 1120);   // lintels and sills
   for (const [x0, x1] of back) b.box(x0 - 150, x1 + 150, D, D + 50, 2350, 2600).box(x0 - 100, x1 + 100, D, D + 90, 1020, 1120);
   for (const x of [0, L]) b.box(x - 50, x + 50, D / 2 - 750, D / 2 + 750, 2350, 2600).box(x - 90, x + 90, D / 2 - 700, D / 2 + 700, 1020, 1120);
-  b.mat(DARKG, 0.35, 'paint'); for (const [x0, x1] of doors) b.box(x0, x1, -30, 0, 0, 2350);                        // the doors
+  b.mat(DARKG, 0.35, 'boards'); for (const [x0, x1] of doors) b.box(x0, x1, -30, 0, 0, 2350);                        // the doors
   b.mat(PANE, 0.5, 'paint'); for (const [x0, x1] of wins) b.box(x0, x1, -30, 0, 1120, 2350); for (const [x0, x1] of back) b.box(x0, x1, D, D + 30, 1120, 2350); for (const x of [0, L]) b.box(x - 30, x + 30, D / 2 - 600, D / 2 + 600, 1120, 2350);   // the windows' dark glass
   b.box(doors[1]![0] + 150, doors[1]![1] - 150, -45, -30, 1200, 2100);                                              // the booking hall door's lights
-  b.mat(CREAM, 0.3, 'paint'); for (const [x0, x1] of wins) b.box((x0 + x1) / 2 - 35, (x0 + x1) / 2 + 35, -45, -30, 1120, 2350).box(x0, x1, -45, -30, 1700, 1760);   // glazing bars
+  b.mat(CREAM, 0.3, 'render'); for (const [x0, x1] of wins) b.box((x0 + x1) / 2 - 35, (x0 + x1) / 2 + 35, -45, -30, 1120, 2350).box(x0, x1, -45, -30, 1700, 1760);   // glazing bars
   for (const [x0, x1] of back) b.box((x0 + x1) / 2 - 35, (x0 + x1) / 2 + 35, D + 30, D + 45, 1120, 2350).box(x0, x1, D + 30, D + 45, 1700, 1760);
-  b.mat(DARKG, 0.3, 'paint').box(450, 1500, -45, 0, 950, 2250).box(12700, 13600, -45, 0, 950, 2250);                // poster boards: plain panels
-  b.mat('#c9b56a', 0.3, 'paint').box(520, 1430, -60, -45, 1020, 2180); b.mat('#7f2f2a', 0.3, 'paint').box(12770, 13530, -60, -45, 1020, 2180); b.mat(CREAM, 0.3, 'paint').box(620, 1330, -70, -60, 1700, 1900).box(12870, 13430, -70, -60, 1250, 1450);
-  b.mat(ROOF, 0.4, 'metal').loft([-300, L + 300].map(x => [[x, 0, 3520], [x, CY, CZ], [x, CY, CZ + 80], [x, 0, 3600]] as V[]));   // the canopy
-  b.mat(GREEN, 0.35, 'paint'); for (let x = 1400; x < L; x += 3733) { b.box(x - 80, x + 80, CY + 380, CY + 540, 0, CZ + 40);   // its columns and their brackets
+  b.mat(DARKG, 0.3, 'boards').box(450, 1500, -45, 0, 950, 2250).box(12700, 13600, -45, 0, 950, 2250);                // poster boards: plain panels
+  b.mat('#c9b56a', 0.3, 'paint').box(520, 1430, -60, -45, 1020, 2180); b.mat('#7f2f2a', 0.3, 'paint').box(12770, 13530, -60, -45, 1020, 2180); b.mat(CREAM, 0.3, 'render').box(620, 1330, -70, -60, 1700, 1900).box(12870, 13430, -70, -60, 1250, 1450);
+  b.mat(ROOF, 0.4, 'corrugated').loft([-300, L + 300].map(x => [[x, 0, 3520], [x, CY, CZ], [x, CY, CZ + 80], [x, 0, 3600]] as V[]));   // the canopy
+  b.mat(GREEN, 0.35, 'sheet'); for (let x = 1400; x < L; x += 3733) { b.box(x - 80, x + 80, CY + 380, CY + 540, 0, CZ + 40);   // its columns and their brackets
     b.bar([x, CY + 460, 2500], [x - 700, CY + 460, CZ + 20], 70).bar([x, CY + 460, 2500], [x + 700, CY + 460, CZ + 20], 70).bar([x, CY + 460, 2600], [x, CY + 1300, CZ + 120], 70); }
   b.box(-300, L + 300, CY + 420, CY + 500, CZ - 60, CZ + 40);                                                       // the beam along them
-  b.mat(CREAM, 0.3, 'wood').box(-300, L + 300, CY - 50, CY, CZ - 230, CZ + 90).box(-300, -250, CY, 0, CZ - 150, CZ + 60).box(L + 250, L + 300, CY, 0, CZ - 150, CZ + 60);   // the valance
+  b.mat(CREAM, 0.3, 'boards').box(-300, L + 300, CY - 50, CY, CZ - 230, CZ + 90).box(-300, -250, CY, 0, CZ - 150, CZ + 60).box(L + 250, L + 300, CY, 0, CZ - 150, CZ + 60);   // the valance
   for (let x = -300; x < L + 300; x += 400) b.tri([x, CY - 25, CZ - 230], [x + 400, CY - 25, CZ - 230], [x + 200, CY - 25, CZ - 420]);   // its cut edge
-  b.mat(DARKG, 0.35, 'paint').box(L / 2 - 1700, L / 2 + 1700, CY - 110, CY - 50, CZ + 120, CZ + 620); b.mat(WHITE, 0.3, 'paint').box(L / 2 - 1500, L / 2 + 1500, CY - 130, CY - 110, CZ + 300, CZ + 440);   // the name board: a white bar on green
+  b.mat(DARKG, 0.35, 'boards').box(L / 2 - 1700, L / 2 + 1700, CY - 110, CY - 50, CZ + 120, CZ + 620); b.mat(WHITE, 0.3, 'boards').box(L / 2 - 1500, L / 2 + 1500, CY - 130, CY - 110, CZ + 300, CZ + 440);   // the name board: a white bar on green
   return b.mesh(L); }
 
 /** a 15 m length of platform: a brick face under paving slabs with a white edge line along the track side (its edge
  *  at y = 0, the platform behind toward +y), a gas lamp on an iron post and a bench */
 export function platform(): Mesh { const b = new Build(), L = 15000, D = 4000, Z = 915;
-  b.mat(BRICK2, 0.2, 'paint').box(0, L, 80, D, 0, Z - 70);                                                          // the face and the fill
+  b.mat(BRICK2, 0.2, 'brick').box(0, L, 80, D, 0, Z - 70);                                                          // the face and the fill
   b.mat('#b3ada2', 0.15, 'plain').box(0, L, 800, D, Z - 70, Z - 15);                                                // the rolled surface
-  for (let k = 0; k < 15; k++) b.mat(k % 2 ? '#e0dbd0' : '#cdc8bd', 0.2, 'plain').box(k * 1000, k * 1000 + 1000, -120, 800, Z - 80, Z);   // the edge slabs
-  b.mat(WHITE, 0.3, 'paint').box(0, L, -130, 220, Z - 110, Z + 8);                                                   // the white edge
-  const lx = 3800, ly = 3100; b.mat(DARKG, 0.35, 'paint').box(lx - 110, lx + 110, ly - 110, ly + 110, Z - 15, Z + 650).box(lx - 55, lx + 55, ly - 55, ly + 55, Z + 650, Z + 3000).bar([lx - 380, ly, Z + 2750], [lx + 380, ly, Z + 2750], 45);   // the lamp post and its ladder bar
+  for (let k = 0; k < 15; k++) b.mat(k % 2 ? '#e0dbd0' : '#cdc8bd', 0.2, 'concrete').box(k * 1000, k * 1000 + 1000, -120, 800, Z - 80, Z);   // the edge slabs
+  b.mat(WHITE, 0.3, 'concrete').box(0, L, -130, 220, Z - 110, Z + 8);                                                   // the white edge
+  const lx = 3800, ly = 3100; b.mat(DARKG, 0.35, 'boards').box(lx - 110, lx + 110, ly - 110, ly + 110, Z - 15, Z + 650).box(lx - 55, lx + 55, ly - 55, ly + 55, Z + 650, Z + 3000).bar([lx - 380, ly, Z + 2750], [lx + 380, ly, Z + 2750], 45);   // the lamp post and its ladder bar
   b.mat('#f1e2a8', 0.5, 'plain').box(lx - 60, lx + 60, ly - 60, ly + 60, Z + 3050, Z + 3300);                       // the mantle
   b.mat(GLASS, 0.5, 'glass').loft([[110, Z + 3000], [190, Z + 3420]].map(([r, z]) => [[lx - r!, ly - r!, z!], [lx + r!, ly - r!, z!], [lx + r!, ly + r!, z!], [lx - r!, ly + r!, z!]] as V[]));   // the lantern
-  b.mat(DARKG, 0.35, 'paint').loft([[230, Z + 3420], [40, Z + 3640]].map(([r, z]) => [[lx - r!, ly - r!, z!], [lx + r!, ly - r!, z!], [lx + r!, ly + r!, z!], [lx - r!, ly + r!, z!]] as V[]));   // its cap
-  const bx = 9300, bl = 1900, by = 3000; b.mat(WOOD, 0.2, 'wood').box(bx, bx + bl, by, by + 480, Z + 400, Z + 450).box(bx, bx + bl, by + 470, by + 520, Z + 560, Z + 900);   // the bench: seat and back
+  b.mat(DARKG, 0.35, 'boards').loft([[230, Z + 3420], [40, Z + 3640]].map(([r, z]) => [[lx - r!, ly - r!, z!], [lx + r!, ly - r!, z!], [lx + r!, ly + r!, z!], [lx - r!, ly + r!, z!]] as V[]));   // its cap
+  const bx = 9300, bl = 1900, by = 3000; b.mat(WOOD, 0.2, 'timber').box(bx, bx + bl, by, by + 480, Z + 400, Z + 450).box(bx, bx + bl, by + 470, by + 520, Z + 560, Z + 900);   // the bench: seat and back
   b.mat(IRON, 0.3, 'metal'); for (const x of [bx + 60, bx + bl / 2 - 30, bx + bl - 120]) b.box(x, x + 60, by + 30, by + 520, Z - 15, Z + 400).box(x, x + 60, by + 470, by + 540, Z + 400, Z + 900);
   return b.mesh(L); }
 
 /** the signal box: a timber cabin, windows all round, on a brick base, a slate hipped roof, steps up one end to its door */
 export function signalBox(): Mesh { const b = new Build(), L = 7300, C = 6000, HD = 1800, F = 2700, S = 3600, T = 4800, E = 5050;
-  b.mat(BRICK, 0.2, 'paint').box(0, C, -HD, HD, 0, F); b.mat(BRICK2, 0.2, 'paint').box(-40, C + 40, -HD - 40, HD + 40, 0, 400);
-  b.mat(PANE, 0.5, 'paint'); for (const x of [1300, 3900]) b.box(x, x + 800, -HD - 25, -HD, 1000, 2000); b.mat(CREAM, 0.3, 'paint'); for (const x of [1300, 3900]) b.box(x - 100, x + 900, -HD - 45, -HD, 2000, 2180);   // the locking room's windows
-  b.mat(CREAM, 0.3, 'wood').box(-80, C + 80, -HD - 80, HD + 80, F, S).box(-80, C + 80, -HD - 80, HD + 80, T, E);    // boarding below and above the windows
+  b.mat(BRICK, 0.2, 'brick').box(0, C, -HD, HD, 0, F); b.mat(BRICK2, 0.2, 'brick').box(-40, C + 40, -HD - 40, HD + 40, 0, 400);
+  b.mat(PANE, 0.5, 'paint'); for (const x of [1300, 3900]) b.box(x, x + 800, -HD - 25, -HD, 1000, 2000); b.mat(CREAM, 0.3, 'boards'); for (const x of [1300, 3900]) b.box(x - 100, x + 900, -HD - 45, -HD, 2000, 2180);   // the locking room's windows
+  b.mat(CREAM, 0.3, 'boards').box(-80, C + 80, -HD - 80, HD + 80, F, S).box(-80, C + 80, -HD - 80, HD + 80, T, E);    // boarding below and above the windows
   b.mat(GLASS, 0.5, 'glass').box(-30, C + 30, -HD - 30, HD + 30, S, T); b.mat('#4a4540', 0.1).box(250, C - 250, -HD + 250, HD - 250, S - 100, T - 150);   // the glass, the room seen through
-  b.mat(GREEN, 0.3, 'paint'); for (let x = 0; x <= C; x += C / 6) b.box(x - 55, x + 55, -HD - 85, HD + 85, S, T); for (const y of [-HD / 3, HD / 3]) b.box(-85, C + 85, y - 55, y + 55, S, T);   // the window posts
+  b.mat(GREEN, 0.3, 'boards'); for (let x = 0; x <= C; x += C / 6) b.box(x - 55, x + 55, -HD - 85, HD + 85, S, T); for (const y of [-HD / 3, HD / 3]) b.box(-85, C + 85, y - 55, y + 55, S, T);   // the window posts
   b.box(-90, C + 90, -HD - 90, HD + 90, S - 80, S).box(C + 30, C + 95, -HD + 250, -HD + 1100, F, T);                // the sill band, the door in the end
-  b.mat(WHITE, 0.3, 'paint').box(1700, 4300, -HD - 110, -HD - 80, F + 250, F + 650); b.mat(DARK, 0.2, 'paint').box(1900, 4100, -HD - 125, -HD - 110, F + 380, F + 520);   // the name board (plain)
-  b.mat(SLATE, 0.3, 'plain').loft([[[-450, -HD - 450, E], [C + 450, -HD - 450, E], [C + 450, HD + 450, E], [-450, HD + 450, E]], [[1700, 0, E + 1350], [C - 1700, 0, E + 1350], [C - 1700, 0, E + 1350], [1700, 0, E + 1350]]]);   // the hipped roof
-  b.mat(BRICK2, 0.2, 'paint').box(700, 1250, HD - 500, HD + 50, E, E + 1500); b.mat(DARKG, 0.3, 'paint').bar([1700, 0, E + 1300], [1700, 0, E + 1800], 70).bar([C - 1700, 0, E + 1300], [C - 1700, 0, E + 1800], 70);   // the stack, the finials
+  b.mat(WHITE, 0.3, 'boards').box(1700, 4300, -HD - 110, -HD - 80, F + 250, F + 650); b.mat(DARK, 0.2, 'paint').box(1900, 4100, -HD - 125, -HD - 110, F + 380, F + 520);   // the name board (plain)
+  b.mat(SLATE, 0.3, 'slate').loft([[[-450, -HD - 450, E], [C + 450, -HD - 450, E], [C + 450, HD + 450, E], [-450, HD + 450, E]], [[1700, 0, E + 1350], [C - 1700, 0, E + 1350], [C - 1700, 0, E + 1350], [1700, 0, E + 1350]]]);   // the hipped roof
+  b.mat(BRICK2, 0.2, 'brick').box(700, 1250, HD - 500, HD + 50, E, E + 1500); b.mat(DARKG, 0.3, 'boards').bar([1700, 0, E + 1300], [1700, 0, E + 1800], 70).bar([C - 1700, 0, E + 1300], [C - 1700, 0, E + 1800], 70);   // the stack, the finials
   const sx0 = C + 100, sx1 = L - 60, y0 = -HD + 1250, n = 10, rise = F / n;
-  b.mat(WOOD, 0.2, 'wood').box(C, L, -HD, y0, F - 90, F).box(L - 150, L - 30, -HD + 30, -HD + 150, 0, F - 90);      // the landing and its post
+  b.mat(WOOD, 0.2, 'timber').box(C, L, -HD, y0, F - 90, F).box(L - 150, L - 30, -HD + 30, -HD + 150, 0, F - 90);      // the landing and its post
   for (let k = 1; k < n; k++) b.box(sx0, sx1, y0 + (k - 1) * 300, y0 + k * 300 + 40, F - k * rise - 60, F - k * rise);   // the treads
   for (const x of [sx0 - 40, sx1 + 40]) b.bar([x, y0, F - 180], [x, y0 + (n - 1) * 300 + 150, 0], 60, 240);         // the strings
-  b.mat(CREAM, 0.3, 'paint').bar([L - 30, -HD, F + 1000], [L - 30, y0, F + 1000], 60).bar([L - 30, y0, F + 1000], [L - 30, y0 + (n - 1) * 300, rise + 1000], 60);   // the handrail
+  b.mat(CREAM, 0.3, 'boards').bar([L - 30, -HD, F + 1000], [L - 30, y0, F + 1000], 60).bar([L - 30, y0, F + 1000], [L - 30, y0 + (n - 1) * 300, rise + 1000], 60);   // the handrail
   for (const [y, z] of [[-HD + 30, F], [y0, F], [y0 + (n - 1) * 300, rise]] as const) b.bar([L - 30, y, z - 60], [L - 30, y, z + 1000], 60); b.bar([C, -HD, F + 1000], [L - 30, -HD, F + 1000], 60);
   return b.mesh(L); }
 
 /** a telegraph pole: a tarred pole with three cross-arms (across the line; the wires run along x) */
 export function telegraphPole(): Mesh { const b = new Build(), T = 240, H = 8200;
-  b.mat('#4a3b2e', 0.15, 'wood').loft([[130, 0], [85, H]].map(([r, z]) => [[T / 2 - r!, -r!, z!], [T / 2 + r!, -r!, z!], [T / 2 + r!, r!, z!], [T / 2 - r!, r!, z!]] as V[]));
-  b.mat('#3d3127', 0.15, 'wood'); [1150, 1000, 850].forEach((w, k) => b.box(T / 2 - 150, T / 2 - 60, -w, w, H - 500 - k * 600, H - 400 - k * 600));
+  b.mat('#4a3b2e', 0.15, 'timber').loft([[130, 0], [85, H]].map(([r, z]) => [[T / 2 - r!, -r!, z!], [T / 2 + r!, -r!, z!], [T / 2 + r!, r!, z!], [T / 2 - r!, r!, z!]] as V[]));
+  b.mat('#3d3127', 0.15, 'timber'); [1150, 1000, 850].forEach((w, k) => b.box(T / 2 - 150, T / 2 - 60, -w, w, H - 500 - k * 600, H - 400 - k * 600));
   return b.mesh(T); }
 
 /** the river bridge: one 15 m side parapet of the concrete span (stood each side of the line, its outer face -y):
  *  the deck's edge beam, solid ends, a middle pier and balusters between under a coping. All of it at or above the
  *  ground: the river and the span's shadow are drawn on the ground */
 export function riverBridge(): Mesh { const b = new Build(), L = 15000, E = 2200, P = 500;
-  b.mat(CONC2, 0.2, 'paint').box(0, L, -330, 260, 0, 320);                                                          // the deck's edge beam
-  b.mat(CONCRETE, 0.25, 'paint').box(0, E, -280, 280, 320, 1250).box(L - E, L, -280, 280, 320, 1250).box(L / 2 - P, L / 2 + P, -260, 260, 320, 1130);   // the solid ends, the middle pier
+  b.mat(CONC2, 0.2, 'concrete').box(0, L, -330, 260, 0, 320);                                                          // the deck's edge beam
+  b.mat(CONCRETE, 0.25, 'concrete').box(0, E, -280, 280, 320, 1250).box(L - E, L, -280, 280, 320, 1250).box(L / 2 - P, L / 2 + P, -260, 260, 320, 1130);   // the solid ends, the middle pier
   for (const [x0, x1] of [[E + 380, L / 2 - P - 300], [L / 2 + P + 380, L - E - 300]] as const) for (let x = x0; x < x1; x += 780) b.box(x, x + 240, -120, 120, 320, 960);   // balusters
   b.box(E, L - E, -230, 230, 960, 1130);                                                                            // the rail over them
-  b.mat(CONC2, 0.2, 'paint').box(-60, E + 60, -340, 340, 1250, 1400).box(L - E - 60, L + 60, -340, 340, 1250, 1400);   // the ends' caps
+  b.mat(CONC2, 0.2, 'concrete').box(-60, E + 60, -340, 340, 1250, 1400).box(L - E - 60, L + 60, -340, 340, 1250, 1400);   // the ends' caps
   b.box(300, E - 300, -300, -280, 520, 1050).box(L - E + 300, L - 300, -300, -280, 520, 1050);                      // a sunk panel each end
   return b.mesh(L); }

@@ -17,6 +17,23 @@ export async function loadGround(L: LiveRenderer, res = (meta as { res: number }
   const bm = async (u: string) => { const b = await (await fetch(u)).blob(); return createImageBitmap(b, { resizeWidth: res, resizeHeight: res, colorSpaceConversion: 'none', premultiplyAlpha: 'none' }); };
   const layers = await Promise.all(URLS.map(async ([a, n, p]) => { const [alb, nor, pack] = await Promise.all([bm(a!), bm(n!), bm(p!)]); return { alb, nor, pack }; }));
   L.setGroundMaterials(layers, (meta as { layers: { size: number }[] }).layers.map(l => l.size), res); }
+import bMeta from '../../assets/textures/buildings/buildings.json';
+import brickA from '../../assets/textures/buildings/brick_alb.jpg'; import brickN from '../../assets/textures/buildings/brick_nor.jpg'; import brickP from '../../assets/textures/buildings/brick_pack.jpg';
+import boardsA from '../../assets/textures/buildings/boards_alb.jpg'; import boardsN from '../../assets/textures/buildings/boards_nor.jpg'; import boardsP from '../../assets/textures/buildings/boards_pack.jpg';
+import timberA from '../../assets/textures/buildings/timber_alb.jpg'; import timberN from '../../assets/textures/buildings/timber_nor.jpg'; import timberP from '../../assets/textures/buildings/timber_pack.jpg';
+import corrA from '../../assets/textures/buildings/corrugated_alb.jpg'; import corrN from '../../assets/textures/buildings/corrugated_nor.jpg'; import corrP from '../../assets/textures/buildings/corrugated_pack.jpg';
+import tileA from '../../assets/textures/buildings/tile_alb.jpg'; import tileN from '../../assets/textures/buildings/tile_nor.jpg'; import tileP from '../../assets/textures/buildings/tile_pack.jpg';
+import slateA from '../../assets/textures/buildings/slate_alb.jpg'; import slateN from '../../assets/textures/buildings/slate_nor.jpg'; import slateP from '../../assets/textures/buildings/slate_pack.jpg';
+import renderA from '../../assets/textures/buildings/render_alb.jpg'; import renderN from '../../assets/textures/buildings/render_nor.jpg'; import renderP from '../../assets/textures/buildings/render_pack.jpg';
+import concA from '../../assets/textures/buildings/concrete_alb.jpg'; import concN from '../../assets/textures/buildings/concrete_nor.jpg'; import concP from '../../assets/textures/buildings/concrete_pack.jpg';
+import sheetA from '../../assets/textures/buildings/sheet_alb.jpg'; import sheetN from '../../assets/textures/buildings/sheet_nor.jpg'; import sheetP from '../../assets/textures/buildings/sheet_pack.jpg';
+const B_URLS = [[brickA, brickN, brickP], [boardsA, boardsN, boardsP], [timberA, timberN, timberP], [corrA, corrN, corrP], [tileA, tileN, tileP], [slateA, slateN, slateP], [renderA, renderN, renderP], [concA, concN, concP], [sheetA, sheetN, sheetP]];
+/** the buildings' photographed materials (review 126; Poly Haven CC0, fetched by tools/ref/polyhaven_buildings.py): nine
+ *  layers in the order of the building kinds (render/car/mesh.ts KINDS from 'brick'), each three pictures at 512 */
+export async function loadBuildings(L: LiveRenderer): Promise<void> { const m = bMeta as { res: number; layers: { size: number; mean: number[] }[] }, res = m.res;
+  const bm = async (u: string) => createImageBitmap(await (await fetch(u)).blob(), { resizeWidth: res, resizeHeight: res, colorSpaceConversion: 'none', premultiplyAlpha: 'none' });
+  const layers = await Promise.all(B_URLS.map(async ([a, n, p]) => { const [alb, nor, pack] = await Promise.all([bm(a!), bm(n!), bm(p!)]); return { alb, nor, pack }; }));
+  L.setBuildingMaterials(layers, m.layers.map(l => l.size), m.layers.map(l => l.mean), res); }
 import skyPng from '../../assets/textures/sky/sky.png';
 import skyMeta from '../../assets/textures/sky/sky.json';
 /** the photographed sky (review 124) */

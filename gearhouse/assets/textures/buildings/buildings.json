@@ -1,0 +1,143 @@
+{
+ "about": "Poly Haven CC0 materials for the buildings (review 126), packed at 512: alb, nor (GL), pack (R ao, G rough)",
+ "res": 512,
+ "layers": [
+  {
+   "layer": "brick",
+   "source": "https://polyhaven.com/a/red_brick",
+   "size": 1.4,
+   "mean": [
+    142,
+    103,
+    80
+   ],
+   "rough": 0.923,
+   "authors": [
+    "Rob Tuytel"
+   ],
+   "license": "CC0"
+  },
+  {
+   "layer": "boards",
+   "source": "https://polyhaven.com/a/white_planks_clean",
+   "size": 1.8,
+   "mean": [
+    180,
+    166,
+    157
+   ],
+   "rough": 0.524,
+   "authors": [
+    "Rob Tuytel"
+   ],
+   "license": "CC0"
+  },
+  {
+   "layer": "timber",
+   "source": "https://polyhaven.com/a/weathered_planks",
+   "size": 2.0,
+   "mean": [
+    80,
+    67,
+    59
+   ],
+   "rough": 0.736,
+   "authors": [
+    "Dario Barresi",
+    "Dimitrios Savva"
+   ],
+   "license": "CC0"
+  },
+  {
+   "layer": "corrugated",
+   "source": "https://polyhaven.com/a/corrugated_iron_03",
+   "size": 2.0,
+   "mean": [
+    108,
+    118,
+    118
+   ],
+   "rough": 0.757,
+   "authors": [
+    "Charlotte Baglioni"
+   ],
+   "license": "CC0"
+  },
+  {
+   "layer": "tile",
+   "source": "https://polyhaven.com/a/clay_roof_tiles_03",
+   "size": 2.6,
+   "mean": [
+    141,
+    85,
+    55
+   ],
+   "rough": 0.85,
+   "authors": [
+    "Amal Kumar"
+   ],
+   "license": "CC0"
+  },
+  {
+   "layer": "slate",
+   "source": "https://polyhaven.com/a/roof_slates_03",
+   "size": 3.0,
+   "mean": [
+    113,
+    110,
+    104
+   ],
+   "rough": 1.0,
+   "authors": [
+    "Rob Tuytel"
+   ],
+   "license": "CC0"
+  },
+  {
+   "layer": "render",
+   "source": "https://polyhaven.com/a/painted_plaster_wall",
+   "size": 2.0,
+   "mean": [
+    171,
+    163,
+    160
+   ],
+   "rough": 0.919,
+   "authors": [
+    "Amal Kumar"
+   ],
+   "license": "CC0"
+  },
+  {
+   "layer": "concrete",
+   "source": "https://polyhaven.com/a/concrete_wall_008",
+   "size": 2.71,
+   "mean": [
+    141,
+    133,
+    112
+   ],
+   "rough": 0.737,
+   "authors": [
+    "Dario Barresi",
+    "Charlotte Baglioni"
+   ],
+   "license": "CC0"
+  },
+  {
+   "layer": "sheet",
+   "source": "https://polyhaven.com/a/green_metal_rust",
+   "size": 1.0,
+   "mean": [
+    63,
+    77,
+    52
+   ],
+   "rough": 0.503,
+   "authors": [
+    "Rob Tuytel"
+   ],
+   "license": "CC0"
+  }
+ ]
+}

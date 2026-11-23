@@ -152,6 +152,12 @@ vec3 rustAt(float t) { vec3 R[6] = vec3[6](vec3(184, 104, 46), vec3(156, 80, 34)
 uniform int uDecN; uniform vec3 uDecO[4], uDecN_[4], uDecUp[4]; uniform float uDecR[4]; uniform sampler2D uDecTex;
 layout(location=0) out vec4 oCol; layout(location=1) out vec4 oId; layout(location=2) out vec4 oN; layout(location=3) out vec4 oV; in vec4 vCur, vPrev; uniform vec2 uSize;
 vec4 velo() { vec2 d = (vCur.xy / vCur.w - vPrev.xy / vPrev.w) * 0.5 * uSize; return vec4(clamp(d / 128. + 0.5, 0., 1.), 0., 1.); }   /* pixels moved since the last frame, packed */   // oN: the normal and how mirror-like (for the traced reflections)
+/* ---- the buildings' photographed materials (review 126, Poly Haven CC0): kinds 11.. (brick, painted boards, bare timber,
+   corrugated iron, clay tiles, slates, render, concrete, sheet metal), each a tile of known size laid on a face by the
+   face's own axes (level along it, and up it: courses lie level on a wall, tiles and corrugations run up a roof's
+   slope), so the meshes need no picture coordinates. The picture gives the pattern about its mean colour; the face
+   keeps the colour the building was given. Normal (GL), occlusion (red) and roughness (green) as photographed ---- */
+uniform highp sampler2DArray uBAlb, uBNor, uBPack; uniform int uBTex; uniform float uBSize[9]; uniform vec3 uBMean[9];
 uniform float uLampOn, uBrake;   // this car's lamps alight, its brakes on (review 117)
 /* ---- a lamp seen through its glass (review 117): what a real head lamp shows, drawn at its depth on the lamp's face.
    uv: across the face to its rim; A, Rt, Up: its axis and face; nG: the glass's (domed) normal. Behind the glass a
@@ -214,6 +220,15 @@ void main() {
     vec3 rt = normalize(cross(uDecN_[i], uDecUp[i])); vec2 uv = vec2(dot(dd, rt), dot(dd, uDecUp[i])) / uDecR[i] * 0.5 + 0.5; if (any(lessThan(uv, vec2(0.))) || any(greaterThan(uv, vec2(1.)))) continue;
     vec4 t = texture(uDecTex, vec2((float(i) + uv.x) / 4., uv.y)); if (t.a > 0.5) base = t.rgb; }
   if (uLook > 0) {   // the physically based looks: each kind of material its metalness and roughness
+    if (kind >= 11 && uBTex == 1) { int L = min(kind - 11, 8); vec3 no = normalize(vObjN); if (dot(mat3(uModel) * no, uEye) < 0.) no = -no;
+      float hl = length(no.xy); vec3 T = hl > 0.08 ? vec3(-no.y, no.x, 0.) / hl : vec3(1., 0., 0.), B = hl > 0.08 ? cross(no, T) : vec3(0., 1., 0.);   /* level along the face, and up it */
+      vec3 P = vObj / 1000., q = vec3(dot(P, T) / uBSize[L], -dot(P, B) / uBSize[L], float(L));
+      vec3 a = texture(uBAlb, q).rgb, tn = texture(uBNor, q).xyz * 2. - 1., pk = texture(uBPack, q).rgb;
+      base = vCol * clamp(a / uBMean[L], 0., 2.5) * (0.93 + 0.14 * vnoise(P * 0.6 + 3.));   /* and a broad unevenness, so a long wall is not one tile repeated */
+      vec3 nw = normalize(mat3(uModel) * normalize(T * tn.x + B * tn.y + no * max(0.25, tn.z))); if (dot(nw, uEye) < 0.) nw = n;
+      float metal = L == 3 ? 0.5 : 0., rough = clamp(pk.g, 0.25, 1.), ao = rtao(vWorld, nw) * mix(1., pk.r, 0.8);
+      vec3 lit = pbrX(base, nw, uEye, uSun, sh, metal, rough, 0., ao, 0.) + lampsAt(vWorld, nw) * toLin(base) * (1. - metal) / 3.14159;
+      oCol = vec4(present(lit), 1.); oId = vec4(uObj, vPart / 255., uOutline / 8.); oN = vec4(nw * 0.5 + 0.5, 0.); oV = velo(); return; }
     float metal = 0., rough = 0.6, coat = 0.;
     if (kind == 1) { rough = 0.45 - 0.3 * vGloss; coat = min(1., vGloss * 1.25); } else if (kind == 2 || kind == 10) { metal = 1.; rough = vGloss > 0.7 ? 0.12 : 0.42; }
     else if (kind == 5) rough = 0.9; else if (kind == 7) rough = 0.95; else if (kind == 8) rough = 0.5; else if (kind == 6) rough = 0.65; else if (kind == 9) rough = 0.15;
@@ -667,6 +682,10 @@ export class LiveRenderer {
       gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR); gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MAG_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_S, gl.REPEAT); gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_T, gl.REPEAT);
       if (an) gl.texParameterf(gl.TEXTURE_2D_ARRAY, an.TEXTURE_MAX_ANISOTROPY_EXT, Math.min(8, gl.getParameter(an.MAX_TEXTURE_MAX_ANISOTROPY_EXT))); return t; };
     this.gTex = { alb: arr(l => l.alb), nor: arr(l => l.nor), pack: arr(l => l.pack), size: new Float32Array(sizes) }; }
+  /** the buildings' photographed materials (review 126): as the ground's, each layer three pictures; its tile's size (m) and mean colour (0..1, sRGB) */
+  private bTex: { alb: WebGLTexture; nor: WebGLTexture; pack: WebGLTexture; size: Float32Array; mean: Float32Array } | null = null;
+  setBuildingMaterials(layers: { alb: TexImageSource; nor: TexImageSource; pack: TexImageSource }[], sizes: number[], means: number[][], res: number) { const keep = this.gTex; this.setGroundMaterials(layers, sizes, res);
+    const t = this.gTex!; this.gTex = keep; this.bTex = { alb: t.alb, nor: t.nor, pack: t.pack, size: t.size, mean: new Float32Array(means.flatMap(m => m.map(v => Math.max(8, v) / 255))) }; }
   /** the track for the concrete (review 122): its length and width, the joints' spacing, the start line's distance, and the line the cars drive (offset at each metre) */
   private trackU = { len: 1, w: 30, joint: 12, start: 0 }; private lineTex: WebGLTexture | null = null;
   /** the grid's numbers (review 125): sixteen places' figures side by side, white on nothing, in a heavy hand-painted face */
@@ -741,6 +760,8 @@ export class LiveRenderer {
       gl.uniform1f(this.loc(this.ground, 'uBias'), 0.00002); gl.bindVertexArray(this.skidVao); gl.drawArrays(gl.TRIANGLES, 0, S.length * 6); gl.disable(gl.BLEND); gl.depthMask(true); gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.COLOR_ATTACHMENT1, gl.COLOR_ATTACHMENT2, gl.COLOR_ATTACHMENT3]); }
     gl.useProgram(this.obj); lampsTo(this.obj); gl.uniform1f(this.loc(this.obj, 'uDay'), o.day ?? 1); gl.uniformMatrix4fv(this.loc(this.obj, 'uVP'), false, VP); gl.uniform1i(this.loc(this.obj, 'uHDRo'), hdrOn); gl.uniformMatrix4fv(this.loc(this.obj, 'uPrevVP'), false, this.prevVP ?? VP); gl.uniform2f(this.loc(this.obj, 'uSize'), v.W, v.H); gl.uniform1f(this.loc(this.obj, 'uSpecK'), o.reflK ?? 1); gl.uniform1f(this.loc(this.obj, 'uDeep'), o.deep ?? 1); gl.uniform1i(this.loc(this.obj, 'uLook'), o.look ?? 0); gl.uniform1f(this.loc(this.obj, 'uTexK'), o.texK ?? 1); gl.uniform1f(this.loc(this.obj, 'uLightK'), o.lightK ?? 1); gl.uniform3fv(this.loc(this.obj, 'uEye'), eye); gl.uniform3fv(this.loc(this.obj, 'uSun'), SUN_W); gl.uniform1f(this.loc(this.obj, 'uGlass'), o.glass ?? 0.8); shadowTo(this.obj);
     gl.uniform1i(this.loc(this.obj, 'uDecTex'), 2);
+    { const B = o.photoGround !== false ? this.bTex : null; gl.uniform1i(this.loc(this.obj, 'uBTex'), B ? 1 : 0); if (B) { gl.uniform1fv(this.loc(this.obj, 'uBSize'), B.size); gl.uniform3fv(this.loc(this.obj, 'uBMean'), B.mean); }
+      ([[B?.alb ?? null, 'uBAlb', 20], [B?.nor ?? null, 'uBNor', 21], [B?.pack ?? null, 'uBPack', 22]] as const).forEach(([t, nm, u]) => { gl.activeTexture(gl.TEXTURE0 + u); gl.bindTexture(gl.TEXTURE_2D_ARRAY, t); gl.uniform1i(this.loc(this.obj, nm), u); }); }
     const artTo = (g: GpuMesh | null) => { const a = g && o.art !== false ? this.arts.get(g) : undefined; gl.uniform1i(this.loc(this.obj, 'uArtOn'), a ? 1 : 0); gl.activeTexture(gl.TEXTURE6); gl.bindTexture(gl.TEXTURE_2D, a ? a.tex : this.blank); gl.uniform1i(this.loc(this.obj, 'uArt'), 6); gl.activeTexture(gl.TEXTURE7); gl.bindTexture(gl.TEXTURE_2D, a ? a.lut : this.blank); gl.uniform1i(this.loc(this.obj, 'uArtLut'), 7); if (!a) return;
       gl.uniform1f(this.loc(this.obj, 'uArtMM'), a.mm); gl.uniform1f(this.loc(this.obj, 'uArtC'), a.C); gl.uniform4fv(this.loc(this.obj, 'uArtR'), a.rects); gl.uniform2fv(this.loc(this.obj, 'uArtO'), a.origins); };
     artTo(null);

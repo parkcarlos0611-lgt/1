@@ -35,7 +35,7 @@ import specsData from '../data/cars/specs.json';
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const T = millbrook(), cv = $<HTMLCanvasElement>('view'), main = cv.getContext('2d')!; let ctx = main;
 // the layer behind the player's car: the ground, the scenery and the other cars, smeared along the motion; the car stays sharp
-const bg = document.createElement('canvas'), bgx = bg.getContext('2d')!; let blurOn = true, lastCamX = 0, lastCamY = 0, shake = 0;
+const bg = document.createElement('canvas'), bgx = bg.getContext('2d')!; let lampsOn = false, blurOn = true, lastCamX = 0, lastCamY = 0, shake = 0;
 let SP = Math.sin(30 * Math.PI / 180), CP = Math.cos(30 * Math.PI / 180), pitchDeg = 30; const DT = 1 / 200, START = T.spec.landmarks.find(l => l.kind === 'line')!.s;
 let VW = 768, VH = 432, mm = 50;                                               // the picture's own pixels, millimetres a pixel
 const st = { auto: true, assist: false, pilot: false, chase: false, progressive: false, cine: false, free: false };
@@ -71,7 +71,7 @@ const myWear: [number, number, number] = [0, 0, 0]; let dirtGrows = true, wearTi
 const wearOf = (c: Vehicle, k: number): [number, number, number] => { if (c === car) return myWear; const h = (n: number) => ((Math.sin(k * 127.1 + n * 311.7) * 43758.5453) % 1 + 1) % 1; return [h(1) * 0.35, h(2) * 0.6, 0.1 + h(3) * 0.35]; };
 // each car's 2D art (its part model's views), laid on its mesh in the live picture (review 105), loaded when first wanted
 const ART: Record<string, string> = { bmw315: artBmw, buick28: artBuick, chevAB28: artChev, dodgeV28: artDodge, dueA21: artDueA, dueSSJ35: artSSJ, fnTT33: artFN, fordT23: artFord, plymU29: artPlym, pontiac29: artPont, willys27: artWillys };
-const artAsked = new WeakSet<object>(); let artOn = true, raysOn = true, texK = 1, lightK = 1, mbK = 1.6, aoK = 1, reflK = 1.3, bloomK = 1, deep = 1, dof = 0.5, outW = 1, outK = 1, inK = 1, innerOn: 'auto' | 'on' | 'off' = 'auto';   /* the outline (review 110) */
+const artAsked = new WeakSet<object>(); let artOn = true, raysOn = true, texK = 1, lightK = 1, mbK = 1.6, aoK = 1, reflK = 1.3, bloomK = 1, deep = 1, day = 1, dof = 0.5, outW = 1, outK = 1, inK = 1, innerOn: 'auto' | 'on' | 'off' = 'auto';   /* the outline (review 110) */
 function artFor(L: LiveRenderer, g: ReturnType<LiveRenderer['car']>, id: string, M: import('../render/car/mesh').Mesh) { if (artAsked.has(g) || !ART[id] || !M.names?.some(Boolean)) return; artAsked.add(g);   // only a mesh with its parts named can take it
   const meta = artMeta as unknown as { mm: number; groups: string[]; cars: Record<string, { C: number; views: Record<string, number[]> }> }, groups = M.names!.map(n => n ? meta.groups.indexOf(canonical(n)) + 1 : 0);
   void fetch(ART[id]!).then(r => r.blob()).then(b => createImageBitmap(b, { premultiplyAlpha: 'none', colorSpaceConversion: 'none' })).then(bm => L.setArt(g, bm, { mm: meta.mm, ...meta.cars[id]! }, groups)).catch(e => console.warn('art', e)); }
@@ -81,7 +81,7 @@ function drawLive(el: number) { const L = live!; void el;
   if (broken.size !== liveFence) { liveFence = broken.size; for (const k of [...fenceGpu.keys()]) if (dirtyChunks.has(k)) fenceGpu.delete(k); dirtyChunks.clear(); }
   glCanvas.width = VW; glCanvas.height = VH;
   const list = race ? race.cars.map(e => ({ c: e.car, sp: e.driver ? others.get(e)! : sprites, turn: e.wheelTurn })) : [{ c: car, sp: sprites, turn: wheelTurn }];
-  const cars = list.map(({ c, sp, turn }, k) => ({ wear: wearOf(c, k), g: (() => { const g = L.car(sp.mesh); artFor(L, g, c.spec.id, sp.mesh); return g; })(), tyres: c.rings, x: c.x, y: c.y, z: T.height(c.s, c.off) + c.zb - (c.rings[0]!.rest + c.rings[2]!.rest) / 2,   /* drawn lower by the tyres' standing give: the flattened tread on the road */ yaw: c.yaw, roll: c.tilt + c.roll * 1.5, pitch: c.pitch, steerL: c.steerAt(0), steerR: c.steerAt(1), spin: turn, player: c === car }));
+  const cars = list.map(({ c, sp, turn }, k) => ({ wear: wearOf(c, k), g: (() => { const g = L.car(sp.mesh); artFor(L, g, c.spec.id, sp.mesh); return g; })(), tyres: c.rings, x: c.x, y: c.y, z: T.height(c.s, c.off) + c.zb - (c.rings[0]!.rest + c.rings[2]!.rest) / 2,   /* drawn lower by the tyres' standing give: the flattened tread on the road */ yaw: c.yaw, roll: c.tilt + c.roll * 1.5, pitch: c.pitch, steerL: c.steerAt(0), steerR: c.steerAt(1), spin: turn, player: c === car, lamps: lampsOn ? 1 : 0, brake: c === car && input.brake > 0.1 }));
   const props: import('../render/live/renderer').LiveProp[] = [...SCN.props, ...trainCars()].flatMap(q => { const f = PROPS[q.kind]; return f ? [{ g: L.prop(q.arg ? `${q.kind}@${q.arg}` : q.kind, () => f(q.arg)), x: q.x, y: q.y, z: q.z ?? 0, h: q.heading }] : []; });
   // the fence (review 112): solid, in chunks near the camera, lit, shadowed and outlined as everything else; its loose pieces
   { const near = T.locate(camX, camY, car.s).s, nC = Math.ceil(T.length / CHUNK); for (let d = -5; d <= 5; d++) for (const side of [-1, 1]) { const c = ((Math.floor(near / CHUNK) + d) % nC + nC) % nC, key = `${side}:${c}`;
@@ -97,10 +97,10 @@ function drawLive(el: number) { const L = live!; void el;
   ctx = main; main.clearRect(0, 0, VW, VH);
   if (look === 'split') {   // the three looks side by side, the same moment: each a third of the picture, its name over it
     const w3 = Math.floor(VW / 3), names = ['기존 (단계 조명)', 'PBR 단계화', 'PBR 연속'];
-    for (let k = 0; k < 3; k++) { L.render(view, cars, props, skids, { glass: 0.8, look: k, art: artOn, rays: raysOn, texK, lightK, aoK, reflK, bloomK, deep, dof, mb: blurOn ? mbK : 0, outW, outK, inner: innerOn === 'auto' ? undefined : innerOn === 'on', inK, smoke: { p: sp8, n: smoke.parcels.length, time: smoke.time } }); main.drawImage(glCanvas, k * w3, 0, w3, VH, k * w3, 0, w3, VH); }
+    for (let k = 0; k < 3; k++) { L.render(view, cars, props, skids, { glass: 0.8, look: k, art: artOn, rays: raysOn, texK, lightK, aoK, reflK, bloomK, deep, day, dof, mb: blurOn ? mbK : 0, outW, outK, inner: innerOn === 'auto' ? undefined : innerOn === 'on', inK, smoke: { p: sp8, n: smoke.parcels.length, time: smoke.time } }); main.drawImage(glCanvas, k * w3, 0, w3, VH, k * w3, 0, w3, VH); }
     main.fillStyle = 'rgba(0,0,0,0.55)'; main.fillRect(0, VH - 20, VW, 20); main.fillStyle = '#f2ead6'; main.font = '11px sans-serif'; main.textAlign = 'center';
     for (let k = 0; k < 3; k++) main.fillText(names[k]!, k * w3 + w3 / 2, VH - 6); main.fillStyle = '#000'; for (let k = 1; k < 3; k++) main.fillRect(k * w3 - 1, 0, 2, VH); main.textAlign = 'left'; }
-  else { L.render(view, cars, props, skids, { glass: 0.8, look: look === 'stepped' ? 1 : look === 'pbr' ? 2 : 0, art: artOn, rays: raysOn, texK, lightK, aoK, reflK, bloomK, deep, dof, mb: blurOn ? mbK : 0, outW, outK, inner: innerOn === 'auto' ? undefined : innerOn === 'on', inK, smoke: { p: sp8, n: smoke.parcels.length, time: smoke.time } }); main.drawImage(glCanvas, 0, 0); }
+  else { L.render(view, cars, props, skids, { glass: 0.8, look: look === 'stepped' ? 1 : look === 'pbr' ? 2 : 0, art: artOn, rays: raysOn, texK, lightK, aoK, reflK, bloomK, deep, day, dof, mb: blurOn ? mbK : 0, outW, outK, inner: innerOn === 'auto' ? undefined : innerOn === 'on', inK, smoke: { p: sp8, n: smoke.parcels.length, time: smoke.time } }); main.drawImage(glCanvas, 0, 0); }
   drawDebris(el);
   if (car.speed > 30) { const v = Math.min(1, (car.speed - 30) / 30) * 0.35, g = main.createRadialGradient(VW / 2, VH / 2, VH * 0.35, VW / 2, VH / 2, VW * 0.62); g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, `rgba(0,0,0,${v})`); main.fillStyle = g; main.fillRect(0, 0, VW, VH); } }
 
@@ -387,6 +387,7 @@ pick.addEventListener('change', () => { carId = pick.value; if (race) stopRace()
 const setCine = (on: boolean) => { st.cine = on; ($('cine') as HTMLInputElement).checked = on; document.body.classList.toggle('cine', on); shot.until = 0; fit(); };
 $<HTMLInputElement>('cine').addEventListener('change', e => setCine((e.target as HTMLInputElement).checked));
 $<HTMLInputElement>('blur').addEventListener('change', e => { blurOn = (e.target as HTMLInputElement).checked; });
+$<HTMLInputElement>('lamps').addEventListener('change', e => { lampsOn = (e.target as HTMLInputElement).checked; });   /* the head lamps (review 117) */
 $<HTMLInputElement>('progressive').addEventListener('change', e => { st.progressive = (e.target as HTMLInputElement).checked; document.body.classList.toggle('progressive', st.progressive); });
 $<HTMLInputElement>('sound').addEventListener('change', e => { if ((e.target as HTMLInputElement).checked) { snd = new Sound(); snd.volume = +$<HTMLInputElement>('vol').value; } else { snd?.close(); snd = null; } });
 $<HTMLInputElement>('vol').addEventListener('input', e => { if (snd) snd.volume = +(e.target as HTMLInputElement).value; });
@@ -406,7 +407,7 @@ $<HTMLInputElement>('chase').addEventListener('change', e => { st.chase = (e.tar
 // ---- the free camera: drag to turn it round the car and tilt it, the wheel or a pinch to come closer or go further ----
 // The pictures are baked for one height and one scale, so a new height or scale bakes them again (a moment after the
 // gesture ends); turning needs nothing new (the pictures are kept for 64 headings).
-const ZOOM = [12, 16, 20, 25, 30, 40, 50, 65, 80, 100, 130], PMIN = 15, PMAX = 85;
+const ZOOM = [4, 6, 8, 12, 16, 20, 25, 30, 40, 50, 65, 80, 100, 130], PMIN = 15, PMAX = 85;
 let bakeT = 0;
 function rebake(full = !live) { SP = Math.sin(pitchDeg * Math.PI / 180); CP = Math.cos(pitchDeg * Math.PI / 180); ($('pitch') as HTMLInputElement).value = String(pitchDeg); $('pitchv').textContent = `${pitchDeg}°`; camShow(); if (!full) return;   // live: nothing to bake
   propSprites.clear(); const small = matchMedia('(pointer: coarse)').matches;
@@ -438,7 +439,7 @@ const setFree = (on: boolean) => { st.free = on; ($('free') as HTMLInputElement)
   t.addEventListener('change', () => { live = t.checked ? liveR : null; if (!live) rebake(true); t.blur(); }); }
 $<HTMLSelectElement>('look').addEventListener('change', e => { look = (e.target as HTMLSelectElement).value as typeof look; (e.target as HTMLElement).blur(); });
 for (const [id, k] of [['wrust', 0], ['wfade', 1], ['wdirt', 2]] as const) $<HTMLInputElement>(id).addEventListener('input', e => { myWear[k] = +(e.target as HTMLInputElement).value; });
-for (const [id, set] of [['mbK', (v: number) => { mbK = v; }], ['aoK', (v: number) => { aoK = v; }], ['reflK', (v: number) => { reflK = v; }], ['bloomK', (v: number) => { bloomK = v; }], ['deep', (v: number) => { deep = v; }], ['dof', (v: number) => { dof = v; }]] as const) $<HTMLInputElement>(id).addEventListener('input', e => set(+(e.target as HTMLInputElement).value));
+for (const [id, set] of [['mbK', (v: number) => { mbK = v; }], ['aoK', (v: number) => { aoK = v; }], ['reflK', (v: number) => { reflK = v; }], ['bloomK', (v: number) => { bloomK = v; }], ['deep', (v: number) => { deep = v; }], ['day', (v: number) => { day = v; }], ['dof', (v: number) => { dof = v; }]] as const) $<HTMLInputElement>(id).addEventListener('input', e => set(+(e.target as HTMLInputElement).value));
 $<HTMLInputElement>('outW').addEventListener('input', e => { outW = +(e.target as HTMLInputElement).value; });
 $<HTMLInputElement>('outK').addEventListener('input', e => { outK = +(e.target as HTMLInputElement).value; });
 $<HTMLInputElement>('inK').addEventListener('input', e => { inK = +(e.target as HTMLInputElement).value; });

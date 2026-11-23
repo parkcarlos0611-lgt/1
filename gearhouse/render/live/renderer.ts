@@ -12,7 +12,7 @@ import type { Mesh } from '../car/mesh';
 export interface LiveView { x: number; y: number; z: number; /** the world heading that points up the screen */ ang: number; pitch: number; mm: number; W: number; H: number; /** the target's height on the screen (0 top .. 1 bottom) */ cy: number }
 /** a tyre's shape this moment (review 101): its ring's give at 32 angles from straight down toward the front (m), the patch's shift (m, along and across) */
 export interface LiveTyre { u: Float32Array; sx: number; sy: number }
-export interface LiveCar { /** age: rust, fading, dirt (0..1) (review 104) */ wear?: [number, number, number]; /** FL FR RL RR */ tyres?: LiveTyre[]; g: GpuMesh; x: number; y: number; z: number; yaw: number; roll: number; pitch: number; /** each front wheel's own angle (rad, left +): the inner one more */ steerL: number; steerR: number; spin: number; player: boolean }
+export interface LiveCar { /** age: rust, fading, dirt (0..1) (review 104) */ wear?: [number, number, number]; /** FL FR RL RR */ tyres?: LiveTyre[]; g: GpuMesh; x: number; y: number; z: number; yaw: number; roll: number; pitch: number; /** each front wheel's own angle (rad, left +): the inner one more */ steerL: number; steerR: number; spin: number; player: boolean; /** head lamps alight 0..1, brakes on (review 117) */ lamps?: number; brake?: boolean }
 export interface LiveProp { g: GpuMesh; x: number; y: number; z: number; h: number; /** its own placing (else by x, y, z, h), its outline's width, a name to follow it frame to frame (a moving piece) */ m?: M4; outline?: number; key?: string }
 export interface Skid { x: number; y: number; z: number; a: number }
 
@@ -24,7 +24,8 @@ vec3 envAt(float rz) { if (rz < -0.06) return ENV_GROUND; if (rz < 0.22) return 
 uniform highp sampler2DShadow uShadow; uniform mat4 uLight;
 uniform int uLook;   // 0: the baked pictures' stepped light; 1: physically based, its brightness stepped; 2: physically based, smooth
 uniform float uTexK, uLightK, uSpecK;   // the strengths set on the page (review 109): textures, and the light (sun against sky, highlights, rays)
-#define SUN_E (vec3(1.0, 0.95, 0.84) * 3.0 * uLightK)
+uniform float uDay;   // the time of day (review 117): 1 full day, toward 0 dusk then night (the sun lower, redder, dimmer; the sky darker)
+#define SUN_E (mix(vec3(1.0, 0.52, 0.26), vec3(1.0, 0.95, 0.84), smoothstep(0.2, 0.8, uDay)) * 3.0 * uLightK * uDay * uDay)
 vec3 toLin(vec3 c) { return pow(max(c, vec3(0.)), vec3(2.2)); }
 vec3 aces(vec3 x) { return clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0., 1.); }
 /* ---- the world as a mirror sees it (review 116), for the physically based looks: not a hard white band at the horizon
@@ -32,6 +33,10 @@ vec3 aces(vec3 x) { return clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59
    softened by roughness. Linear light. (The baked look keeps envAt.) ---- */
 float hL(vec2 p) { return fract(sin(dot(p, vec2(41.3, 289.1))) * 43758.55); }
 float vL(vec2 x) { vec2 i = floor(x), f = fract(x); f = f * f * (3. - 2. * f); return mix(mix(hL(i), hL(i + vec2(1, 0)), f.x), mix(hL(i + vec2(0, 1)), hL(i + vec2(1, 1)), f.x), f.y); }
+uniform int uLmpN; uniform vec3 uLmpP[8], uLmpD[8];   // the head lamps alight (review 117): where, and the way they shine
+/** the head lamps' light on a surface at p facing n: a beam a little below level, bright in its middle, spilling wider; by the square of the distance */
+vec3 lampsAt(vec3 p, vec3 n) { vec3 s = vec3(0.); for (int i = 0; i < 8; i++) { if (i >= uLmpN) break; vec3 d = p - uLmpP[i]; float l = length(d); vec3 dl = d / max(l, 1e-3); float c = dot(dl, uLmpD[i]);
+    float cone = smoothstep(0.94, 0.99, c) * 0.75 + smoothstep(0.72, 0.95, c) * 0.25; s += vec3(1., 0.86, 0.66) * 26. * cone * max(0., dot(n, -dl)) / (l * l + 0.6); } return s; }
 uniform float uDeep;   // the colour's depth (review 116): 0 as before, 1 as set, 2 the most
 vec3 skyR(vec3 r, float rough) { float z = r.z, soft = 0.02 + rough * 0.5;
   vec3 field = toLin(vec3(96., 104., 74.) / 255.), far = toLin(vec3(58., 66., 50.) / 255.), haze = toLin(vec3(222., 224., 220.) / 255.), top = toLin(vec3(120., 152., 200.) / 255.);
@@ -41,8 +46,8 @@ vec3 skyR(vec3 r, float rough) { float z = r.z, soft = 0.02 + rough * 0.5;
   vec2 hd = r.xy / max(1e-3, length(r.xy)); float tree = 0.03 + 0.045 * vL(hd * 3.5 + 1.) + 0.025 * vL(hd * 14. + 5.);   /* the treeline's height, by bearing */
   vec3 low = mix(far, field, smoothstep(0., 0.35, -z));
   vec3 c = mix(low, sky, smoothstep(tree - soft, tree + soft, z));
-  return mix(c, mix(field, sky, smoothstep(-0.3, 0.5, z)), smoothstep(0.1, 0.6, rough)); }
-vec3 irradiance(vec3 n) { return (1.3 - 0.3 * uLightK) * mix(toLin(ENV_GROUND), toLin(mix(ENV_HOR, ENV_TOP, 0.55)), 0.5 + 0.5 * n.z); }
+  return (0.025 + 0.975 * uDay) * mix(vec3(0.75, 0.82, 1.), vec3(1.), uDay) * mix(c, mix(field, sky, smoothstep(-0.3, 0.5, z)), smoothstep(0.1, 0.6, rough)); }
+vec3 irradiance(vec3 n) { return (0.025 + 0.975 * uDay) * (1.3 - 0.3 * uLightK) * mix(toLin(ENV_GROUND), toLin(mix(ENV_HOR, ENV_TOP, 0.55)), 0.5 + 0.5 * n.z); }
 float D_GGX(float nh, float a) { float a2 = a * a, d = nh * nh * (a2 - 1.) + 1.; return a2 / (3.14159 * d * d); }
 float V_Smith(float nv, float nl, float a) { float k = a * 0.5; return 0.25 / ((nv * (1. - k) + k) * (nl * (1. - k) + k)); }
 vec2 envBRDF(float nv, float r) { vec4 rr = r * vec4(-1., -0.0275, -0.572, 0.022) + vec4(1., 0.0425, 1.04, -0.04); float a = min(rr.x * rr.x, exp2(-9.28 * nv)) * rr.x + rr.y; return vec2(-1.04, 1.04) * a + rr.zw; }
@@ -96,7 +101,7 @@ float rtao(vec3 p, vec3 n) { if (uBoxN == 0) return 1.; vec3 t1 = normalize(abs(
 float lightAt(vec3 w) { vec4 l = uLight * vec4(w, 1.); vec3 q = l.xyz * 0.5 + 0.5; if (q.x <= 0. || q.y <= 0. || q.x >= 1. || q.y >= 1. || q.z >= 1.) return 1.; float t = 0., px = 1.6 / float(textureSize(uShadow, 0).x); for (int i = -1; i <= 1; i++) for (int j = -1; j <= 1; j++) t += texture(uShadow, vec3(q.xy + vec2(i, j) * px, q.z - 0.0015)); return t / 9.; }   /* soft edges: nine filtered looks (review 111) */
 `;
 const OBJ_VS = `#version 300 es
-layout(location=0) in vec3 aPos; layout(location=1) in vec3 aNor; layout(location=2) in vec3 aCol; layout(location=3) in float aGloss; layout(location=4) in float aKind; layout(location=5) in float aPart; layout(location=6) in vec3 aSmo;
+layout(location=0) in vec3 aPos; layout(location=1) in vec3 aNor; layout(location=2) in vec3 aCol; layout(location=3) in float aGloss; layout(location=4) in float aKind; layout(location=5) in float aPart; layout(location=6) in vec3 aSmo; layout(location=7) in vec4 aLamp; layout(location=8) in vec3 aLAx; layout(location=9) in vec3 aLRt; out vec4 vLamp; flat out vec3 vLAx, vLRt, vLUp;
 uniform mat4 uVP, uModel, uPrevVP, uPrevModel; uniform float uBias; out vec3 vSN;   // the smoothed normal (review 116; none where a piece has no such layer)
 out vec4 vCur, vPrev;   // where this point is now and was a frame ago (the velocity layer, review 112)
 uniform int uWheel; uniform float uSpin, uDef[32], uTyreR, uRim; uniform vec2 uShift;
@@ -110,12 +115,12 @@ void main() { vec3 p = aPos, nr = aNor, ns = dot(aSmo, aSmo) > 0.25 ? aSmo : aNo
       p.xz -= dir * d; p.y += sign(p.y) * d * 0.5 * (1. - abs(2. * t - 1.));   // the tread pressed in, the walls bulging out beside it
       p.y += uShift.y * t * low; p.x -= uShift.x * t * low; }   // the patch pulled across and along by the forces
     else { float c = cos(uSpin), s = sin(uSpin); p = vec3(c * p.x - s * p.z, p.y, s * p.x + c * p.z); nr = vec3(c * nr.x - s * nr.z, nr.y, s * nr.x + c * nr.z); ns = vec3(c * ns.x - s * ns.z, ns.y, s * ns.x + c * ns.z); } }
-  vec4 w = uModel * vec4(p, 1.); vWorld = w.xyz; vObj = p; vObjN = nr; vN = normalize(mat3(uModel) * nr); vSN = mat3(uModel) * ns; vCol = aCol; vGloss = aGloss; vKind = aKind; vPart = aPart;
+  vec4 w = uModel * vec4(p, 1.); vWorld = w.xyz; vObj = p; vObjN = nr; vN = normalize(mat3(uModel) * nr); vSN = mat3(uModel) * ns; vLamp = aLamp; vLAx = normalize(mat3(uModel) * aLAx + 1e-9); vLRt = normalize(mat3(uModel) * aLRt + 1e-9); vLUp = normalize(mat3(uModel) * cross(aLAx, aLRt) + 1e-9); vCol = aCol; vGloss = aGloss; vKind = aKind; vPart = aPart;
   gl_Position = uVP * w; vCur = gl_Position; vPrev = uPrevVP * (uPrevModel * vec4(p, 1.)); gl_Position.z -= uBias; }`;
 const OBJ_FS = `#version 300 es
 precision highp float;
 ${LIGHT}
-in vec3 vWorld, vObj, vSN; flat in vec3 vN, vObjN, vCol; flat in float vGloss, vKind, vPart;
+in vec3 vWorld, vObj, vSN; in vec4 vLamp; flat in vec3 vLAx, vLRt, vLUp; flat in vec3 vN, vObjN, vCol; flat in float vGloss, vKind, vPart;
 uniform mat4 uModel; uniform vec3 uEye, uSun; uniform vec2 uObj; uniform vec3 uWear; uniform float uObjZ, uCarH;
 // ---- the 2D art laid on (review 105, PBR step 4): the part model's views of this car, each face taking the view it looks along ----
 uniform sampler2D uArt, uArtLut; uniform int uArtOn; uniform highp int uWheel; uniform float uArtMM, uArtC; uniform vec4 uArtR[5]; uniform vec2 uArtO[5];
@@ -138,6 +143,36 @@ vec3 rustAt(float t) { vec3 R[6] = vec3[6](vec3(184, 104, 46), vec3(156, 80, 34)
 uniform int uDecN; uniform vec3 uDecO[4], uDecN_[4], uDecUp[4]; uniform float uDecR[4]; uniform sampler2D uDecTex;
 layout(location=0) out vec4 oCol; layout(location=1) out vec4 oId; layout(location=2) out vec4 oN; layout(location=3) out vec4 oV; in vec4 vCur, vPrev; uniform vec2 uSize;
 vec4 velo() { vec2 d = (vCur.xy / vCur.w - vPrev.xy / vPrev.w) * 0.5 * uSize; return vec4(clamp(d / 128. + 0.5, 0., 1.), 0., 1.); }   /* pixels moved since the last frame, packed */   // oN: the normal and how mirror-like (for the traced reflections)
+uniform float uLampOn, uBrake;   // this car's lamps alight, its brakes on (review 117)
+/* ---- a lamp seen through its glass (review 117): what a real head lamp shows, drawn at its depth on the lamp's face.
+   uv: across the face to its rim; A, Rt, Up: its axis and face; nG: the glass's (domed) normal. Behind the glass a
+   parabolic bowl, silvered, deepest in the middle (the view through it shifts with the angle: parallax); the bulb and
+   its socket standing in it; the bezel's shadow in the bowl where the sun is cut off; the glass's inner face fluted
+   upright above, cut in prism blocks below, a ring at the rim, each bending the view a little and edged with a fine dark
+   line; the outer face smooth, mirroring the world by Fresnel, the sun a hard glint. Alight: the filament white hot, the
+   bowl filled with light, the flutes drawing it into upright streaks. Tail lamps the same behind red glass. ---- */
+vec3 lampFace(vec2 uv, float flag, vec3 A, vec3 Rt, vec3 Up, vec3 nG, float sh) {
+  float r = length(uv), D = 0.45; vec3 E = uEye; float vn = max(0.45, dot(E, A)); vec2 vt = vec2(dot(E, Rt), dot(E, Up)) / vn;
+  float px = fwidth(uv.x) + fwidth(uv.y), keep = clamp(1.5 - px * 9., 0., 1.);   /* the fine work faded where it is finer than a pixel */
+  float fx = uv.x * 11., fl = fract(fx) - 0.5; vec2 bend = vec2(fl * 0.12, 0.); float line = smoothstep(0.38, 0.5, abs(fl));
+  if (uv.y < -0.2) { vec2 c = vec2(uv.x * 6., (uv.y + 0.2) * 7.), f = fract(c) - 0.5; bend = f * vec2(0.14, 0.12); line = max(smoothstep(0.4, 0.5, abs(f.x)), smoothstep(0.4, 0.5, abs(f.y))); }
+  float ring = smoothstep(0.8, 0.83, r) * (1. - smoothstep(0.9, 0.93, r)); bend -= uv / max(r, 1e-3) * ring * 0.07; line = max(line, smoothstep(0.02, 0., abs(r - 0.815)) + smoothstep(0.02, 0., abs(r - 0.915)));
+  bend *= keep; line *= keep * 0.35;
+  vec2 q = uv + bend, p = q; for (int i = 0; i < 3; i++) p = q - vt * D * (1. - min(1., dot(p, p))); if (length(p) > 0.97) p *= 0.97 / length(p);   /* past the rim: the bowl's wall by the bezel */   /* where the eye's ray meets the bowl */
+  float pr = length(p), h = D * (1. - min(1., pr * pr)); vec3 nb = normalize(A - (Rt * p.x + Up * p.y) * 2. * D);
+  vec2 sv = vec2(dot(uSun, Rt), dot(uSun, Up)) / max(0.08, dot(uSun, A)); float inSun = dot(uSun, A) > 0. ? 1. - smoothstep(0.92, 1.04, length(p + sv * h)) : 0.;
+  float ao = 0.55 + 0.45 * min(1., pr * pr);
+  vec3 rr = reflect(-E, nb), hh = normalize(uSun + E);
+  vec3 bowl = (skyR(rr, 0.08) * 0.75 + irradiance(A) * 0.9) * vec3(0.9, 0.9, 0.88) * ao * mix(0.6, 1., inSun * sh) + SUN_E * D_GGX(max(0., dot(nb, hh)), 0.05) * 0.05 * inSun * sh;   /* the bowl mirrors the world and, many times over, its own bright inside */
+  bowl *= 0.94 + 0.06 * sin(pr * 48.);   /* the spinning's faint rings */
+  vec2 sk = q - vt * D; float ds = length(sk); if (ds < 0.24 && ds > 0.11) bowl = mix(bowl, vec3(0.025, 0.024, 0.022), smoothstep(0.24, 0.2, ds));   /* the socket */
+  vec2 pb = q - vt * D * 0.4; float db = length(pb) / 0.12; float glow = flag < 1.5 ? uLampOn : max(uLampOn * 0.35, uBrake);
+  if (db < 1.) { vec3 ns = normalize(A * sqrt(1. - db * db) + (Rt * pb.x + Up * pb.y) / 0.12); bowl = mix(vec3(0.7, 0.68, 0.62) * (0.4 + 0.6 * max(0., dot(ns, uSun)) * sh), skyR(reflect(-E, ns), 0.02), 0.35) + vec3(1., 0.85, 0.6) * 40. * glow * (1. - db * db); }   /* the bulb */
+  vec3 lit = flag < 1.5 ? vec3(1., 0.88, 0.7) : vec3(1., 0.12, 0.06);
+  bowl += lit * glow * (flag < 1.5 ? 1.6 : 1.2) * (0.45 + 0.55 * pr) * (0.35 + 1.3 * pow(abs(sin(fx * 3.14159)), 3.) * keep + (1. - keep) * 0.5) * pow(vn, 0.7);   /* the bowl full of light, drawn into upright streaks by the flutes */
+  vec3 col = bowl * (1. - line) * (flag < 1.5 ? vec3(0.95, 0.97, 1.) : vec3(0.85, 0.05, 0.035) + lit * glow * 2.);
+  vec3 ng = normalize(nG); float nv = max(0., dot(ng, E)), F = 0.04 + 0.96 * pow(1. - nv, 5.);
+  return col * (1. - F) + skyR(reflect(-E, ng), 0.01) * F * (0.8 + 0.2 * uSpecK) + SUN_E * D_GGX(max(0., dot(ng, hh)), 0.012) * 0.25 * F * max(0., dot(ng, uSun)) * sh * uSpecK; }
 void main() {
   if (uMode == 1) { oCol = uSil; oId = vec4(0.); oN = vec4(0.); oV = velo(); return; }
   vec3 n = vN; if (dot(n, uEye) < 0.) n = -n;
@@ -146,6 +181,7 @@ void main() {
   float d = max(0., dot(n, uSun)) * sh, up = 0.5 + 0.5 * n.z;
   float ne = dot(n, uEye), rz = 2. * ne * n.z - uEye.z;
   if (uMode == 2) {   // glass: mirrors more at a glancing angle, laid over at its own strength
+    if (uLook > 0 && vLamp.z > 0.5) { vec3 ns = normalize(vSN); if (dot(ns, n) < 0.) ns = -ns; oCol = vec4(present(lampFace(vLamp.xy, vLamp.z, vLAx, vLRt, vLUp, ns, sh)), 1.); oId = vec4(0.); oN = vec4(0.); oV = velo(); return; }   /* a lamp's glass: the lamp drawn on it (review 117) */
     if (uLook > 0) {   /* review 116: glass as glass. Nearly black in itself, a little green toward its edge (seen through its
          thickness); what lies behind shows through; the world mirrored by Fresnel off the smoothed surface (no white band,
          no facets); the sun a hard glint; a faint film of dust dulling the mirror in patches */
@@ -202,16 +238,11 @@ void main() {
     // each material's own (review 112): chrome nearly a mirror, the lacquer's faint orange peel, leather polished, cloth fuzzy, rubber's dull sheen, varnished wood
     float sheen = 0.; if (metal > 0.5 && vGloss > 0.7) rough = min(rough, 0.07);
     if (kind == 1) { vec3 q = vObj / 1000. * 45.; nw = normalize(nw + (vec3(vn3(q), vn3(q + 7.1), 0.) - 0.5) * 0.05); }
-    else if (kind == 8) { sheen = 0.35; coat = max(coat, 0.15); } else if (kind == 7) { sheen = 0.6; rough = 0.95; } else if (kind == 5) { sheen = 0.18; } else if (kind == 6) coat = max(coat, 0.55); else if (kind == 9) { coat = 1.; rough = 0.05; metal = 1.; base = mix(vec3(0.93, 0.92, 0.9), base, 0.2); }
+    else if (kind == 8) { sheen = 0.35; coat = max(coat, 0.15); } else if (kind == 7) { sheen = 0.6; rough = 0.95; } else if (kind == 5) { sheen = 0.18; } else if (kind == 6) coat = max(coat, 0.55); else if (kind == 9) { coat = 1.; rough = 0.05; }
     float ao = rtao(vWorld, nw);
     vec3 lit = pbrX(base, nw, uEye, uSun, sh, metal, rough, coat, ao, sheen);
-    if (kind == 9) {   /* a lamp of the 1930s (review 116): a silvered bowl behind fluted glass. The bowl is concave, so it
-         mirrors the world turned about (its normal leaning the other way from the domed glass's); the glass's ribs, upright,
-         catch the sky and the sun in lines, faded out where they are finer than a pixel */
-      vec3 nf = normalize(vN); if (dot(nf, uEye) < 0.) nf = -nf; vec3 bowl = normalize(2. * nf - nw);
-      float fq = vObj.y * 1.05, amp = 0.35 * clamp(1.2 - fwidth(fq) * 0.5, 0., 1.); vec3 ax = normalize(mat3(uModel) * vec3(0., 1., 0.)), nr = normalize(nw + (ax - dot(ax, nw) * nw) * sin(fq) * amp);
-      lit = pbrX(base, bowl, uEye, uSun, sh, 1., 0.12, 0., ao, 0.) * 0.9; float nv = max(0., dot(nr, uEye)), Fc = 0.04 + 0.96 * pow(1. - nv, 5.); vec3 hh = normalize(uSun + uEye);
-      lit = lit * (1. - Fc) + skyR(reflect(-uEye, nr), 0.02) * Fc + SUN_E * D_GGX(max(0., dot(nr, hh)), 0.015) * 0.06 * max(0., dot(nr, uSun)) * sh * uSpecK; }
+    if (kind == 9 && vLamp.z > 0.5) { vec3 ns = normalize(vSN); if (dot(ns, n) < 0.) ns = -ns; lit = lampFace(vLamp.xy, vLamp.z, vLAx, vLRt, vLUp, ns, sh); }   /* a lamp's lens: the lamp drawn on it (review 117) */
+    else lit += lampsAt(vWorld, nw) * toLin(base) * (1. - metal) / 3.14159;   /* the head lamps' light */
     oCol = vec4(present(lit), 1.); oId = vec4(uObj, vPart / 255., uOutline / 8.); oN = vec4(nw * 0.5 + 0.5, metal > 0.5 ? 1. - rough : coat * (1. - rough) * 0.5); oV = velo(); return; }
   float dq = floor(d * 4. + 0.5) / 4.;
   vec3 diff = SUN_C * dq * 0.78 + (SKY_C * up + GROUND_C * (1. - up)) * 0.6, c;
@@ -235,7 +266,7 @@ void main() { vec3 c = vCol.rgb;
   if (vFlag > 0.5 && uLook == 0) { vec2 cell = floor(vWorld.xy / vec2(uCell * 2., uCell)); float h = hash(cell); if (h > 0.955) c = vec3(107., 130., 83.) / 255.; else if (h > 0.91) c = vec3(83., 104., 63.) / 255.; }
   if (uLook > 0) { vec3 nn = normalize(cross(dFdx(vWorld), dFdy(vWorld))); if (nn.z < 0.) nn = -nn; float sh = lightAt(vWorld + vec3(0., 0., 0.02));   // the ground as a rough, dull surface
     Detail dt = detail(vFlag > 0.5 ? 1 : 0, vWorld, nn, vFlag > 0.5 ? 0.8 : 0.7, 0.6, 0.4);
-    oCol = vec4(present(pbrX(c * dt.tone, dt.n, uEye, uSun, sh, 0., clamp(0.92 + dt.rough, 0.3, 1.), 0., rtao(vWorld, dt.n), 0.)), vCol.a); oId = vec4(0.); oN = vec4(dt.n * 0.5 + 0.5, 0.); oV = velo(); return; }
+    oCol = vec4(present(pbrX(c * dt.tone, dt.n, uEye, uSun, sh, 0., clamp(0.92 + dt.rough, 0.3, 1.), 0., rtao(vWorld, dt.n), 0.) + lampsAt(vWorld, dt.n) * toLin(c * dt.tone) / 3.14159), vCol.a); oId = vec4(0.); oN = vec4(dt.n * 0.5 + 0.5, 0.); oV = velo(); return; }
   c = mix(c, vec3(24., 22., 20.) / 255., (1. - lightAt(vWorld + vec3(0., 0., 0.02))) * 0.43);
   oCol = vec4(c, vCol.a); oId = vec4(0.); oN = vec4(0.5, 0.5, 1., 0.); oV = velo(); }`;
 const DEPTH_VS = `#version 300 es
@@ -421,7 +452,7 @@ export class LiveRenderer {
   car(M: Mesh): GpuMesh { let g = this.cars.get(M); if (!g) { g = gpuMesh(this.gl, M, true); this.cars.set(M, g); } return g; }
   forget(M: Mesh) { this.cars.delete(M); }
 
-  render(v: LiveView, cars: LiveCar[], props: LiveProp[], skids: Skid[], o: { glass?: number; /** 0 the baked look, 1 PBR stepped, 2 PBR smooth */ look?: number; /** lay the 2D art on (default yes) */ art?: boolean; /** the rays in the picture: occlusion, contact shadows, reflections (default yes) */ rays?: boolean; /** strengths: the textures, the light (1: as set) */ texK?: number; /** the colour's depth: deeper lacquer, the hue kept through the tone curve (0: as before; default 1) (review 116) */ deep?: number; lightK?: number; /** after the scene: occlusion and reflection strengths, bloom, depth of field (0 none; pixels of blur a metre from the focus) */ aoK?: number; reflK?: number; bloomK?: number; dof?: number; /** motion blur: the shutter, a share of a frame (0 none) */ mb?: number; /** the outline: width (times each thing's own; 0 none), darkness 0..1; the lines inside a thing (default: the baked look only), their darkness */ outW?: number; outK?: number; inner?: boolean; inK?: number; /** smoke parcels: centre, radius, density, heat, kind (0 tyre 1 dust 2 steam 3 exhaust), seed; and the time */ smoke?: { p: Float32Array; n: number; time: number } } = {}) { const gl = this.gl; this.size(v.W, v.H);
+  render(v: LiveView, cars: LiveCar[], props: LiveProp[], skids: Skid[], o: { glass?: number; /** 0 the baked look, 1 PBR stepped, 2 PBR smooth */ look?: number; /** lay the 2D art on (default yes) */ art?: boolean; /** the rays in the picture: occlusion, contact shadows, reflections (default yes) */ rays?: boolean; /** strengths: the textures, the light (1: as set) */ texK?: number; /** the time of day: 1 day (default), toward 0 dusk and night (review 117) */ day?: number; /** the colour's depth: deeper lacquer, the hue kept through the tone curve (0: as before; default 1) (review 116) */ deep?: number; lightK?: number; /** after the scene: occlusion and reflection strengths, bloom, depth of field (0 none; pixels of blur a metre from the focus) */ aoK?: number; reflK?: number; bloomK?: number; dof?: number; /** motion blur: the shutter, a share of a frame (0 none) */ mb?: number; /** the outline: width (times each thing's own; 0 none), darkness 0..1; the lines inside a thing (default: the baked look only), their darkness */ outW?: number; outK?: number; inner?: boolean; inK?: number; /** smoke parcels: centre, radius, density, heat, kind (0 tyre 1 dust 2 steam 3 exhaust), seed; and the time */ smoke?: { p: Float32Array; n: number; time: number } } = {}) { const gl = this.gl; this.size(v.W, v.H);
     // ---- the camera: orthographic, turned to v.ang, tilted down by v.pitch, v.mm millimetres a pixel, snapped to whole pixels ----
     const a = v.ang - Math.PI / 2, cA = Math.cos(a), sA = Math.sin(a), SP = Math.sin(v.pitch * Math.PI / 180), CP = Math.cos(v.pitch * Math.PI / 180), k = 1000 / v.mm, R = 900;
     const rx = [cA, sA, 0], ry = [-sA, cA, 0], up = [ry[0]! * SP, ry[1]! * SP, CP], vd = [ry[0]! * CP, ry[1]! * CP, -SP], c = [v.x, v.y, v.z], dot = (p: number[], q: number[]) => p[0]! * q[0]! + p[1]! * q[1]! + p[2]! * q[2]!;
@@ -438,6 +469,12 @@ export class LiveRenderer {
     LV[2] = lz[0]! / LR; LV[6] = lz[1]! / LR; LV[10] = lz[2]! / LR; LV[14] = -dot(c, lz) / LR; LV[15] = 1;
     const near = (x: number, y: number, r: number) => Math.abs(x - v.x) < reach + r + 20 && Math.abs(y - v.y) < reach + r + 20;
     const ps = props.filter(p => near(p.x, p.y, p.g.radius)), carM = cars.map(q => this.carParts(q));
+    // the head lamps alight (review 117): each lamp's middle and beam in the world, the nearest eight
+    const lmpP: number[] = [], lmpD: number[] = []; cars.forEach((q, i) => { if (!q.lamps) return; const B = carM[i]!.body; for (const l of q.g.lamps) { if (l.flag !== 1 || lmpP.length >= 24) continue;
+        const [x, y, z] = l.c, [a, b, c] = l.ax, wx = B[0]! * x + B[4]! * y + B[8]! * z + B[12]!, wy = B[1]! * x + B[5]! * y + B[9]! * z + B[13]!, wz = B[2]! * x + B[6]! * y + B[10]! * z + B[14]!;
+        let dx = B[0]! * a + B[4]! * b + B[8]! * c, dy = B[1]! * a + B[5]! * b + B[9]! * c, dz = B[2]! * a + B[6]! * b + B[10]! * c; const hl = Math.hypot(dx, dy) || 1; dx /= hl; dy /= hl; dz = -0.1; const dl = Math.hypot(dx, dy, dz);
+        lmpP.push(wx + dx * 0.15, wy + dy * 0.15, wz); lmpD.push(dx / dl, dy / dl, dz / dl); } });
+    const lampsTo = (p: WebGLProgram) => { gl.uniform1i(this.loc(p, 'uLmpN'), lmpP.length / 3); if (lmpP.length) { gl.uniform3fv(this.loc(p, 'uLmpP'), lmpP); gl.uniform3fv(this.loc(p, 'uLmpD'), lmpD); } };
     // ---- the shadow map ----
     gl.bindFramebuffer(gl.FRAMEBUFFER, this.sFbo); gl.viewport(0, 0, this.S, this.S); gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LESS); gl.depthMask(true); gl.clear(gl.DEPTH_BUFFER_BIT); gl.disable(gl.BLEND); gl.disable(gl.STENCIL_TEST);
     gl.useProgram(this.depth); gl.uniformMatrix4fv(this.loc(this.depth, 'uVP'), false, LV);
@@ -457,7 +494,7 @@ export class LiveRenderer {
       gl.uniform3fv(this.loc(p, 'uBoxC'), boxes.flatMap(q => { const H = q.g.height; return [q.x, q.y, q.z + 0.18 + (H - 0.18) / 2]; }));
       gl.uniform3fv(this.loc(p, 'uBoxE'), boxes.flatMap(q => [q.g.len / 2000 * 0.9, q.g.width / 2 * 0.85, (q.g.height - 0.18) / 2 * 0.8])); gl.uniform2fv(this.loc(p, 'uBoxR'), boxes.flatMap(q => [Math.cos(q.yaw), Math.sin(q.yaw)])); };
     const shadowTo = (p: WebGLProgram) => { texTo(p); boxTo(p); gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, this.sTex); gl.uniform1i(this.loc(p, 'uShadow'), 1); gl.uniformMatrix4fv(this.loc(p, 'uLight'), false, LV); };
-    gl.useProgram(this.ground); gl.uniformMatrix4fv(this.loc(this.ground, 'uVP'), false, VP); const hdrOn = this.hdr && (o.look ?? 0) === 2 ? 1 : 0; gl.uniform1i(this.loc(this.ground, 'uHDRo'), hdrOn); gl.uniform1f(this.loc(this.ground, 'uSpecK'), 1); gl.uniformMatrix4fv(this.loc(this.ground, 'uPrevVP'), false, this.prevVP ?? VP); gl.uniform2f(this.loc(this.ground, 'uSize'), v.W, v.H); gl.uniform1i(this.loc(this.ground, 'uLook'), o.look ?? 0); gl.uniform1f(this.loc(this.ground, 'uTexK'), o.texK ?? 1); gl.uniform1f(this.loc(this.ground, 'uLightK'), o.lightK ?? 1); gl.uniform3fv(this.loc(this.ground, 'uSun'), SUN_W); gl.uniform3fv(this.loc(this.ground, 'uEye'), eye); gl.uniform1f(this.loc(this.ground, 'uCell'), Math.max(0.03, v.mm / 1000)); gl.uniform1f(this.loc(this.ground, 'uBias'), 0); shadowTo(this.ground);
+    gl.useProgram(this.ground); lampsTo(this.ground); gl.uniform1f(this.loc(this.ground, 'uDay'), o.day ?? 1); gl.uniformMatrix4fv(this.loc(this.ground, 'uVP'), false, VP); const hdrOn = this.hdr && (o.look ?? 0) === 2 ? 1 : 0; gl.uniform1i(this.loc(this.ground, 'uHDRo'), hdrOn); gl.uniform1f(this.loc(this.ground, 'uSpecK'), 1); gl.uniformMatrix4fv(this.loc(this.ground, 'uPrevVP'), false, this.prevVP ?? VP); gl.uniform2f(this.loc(this.ground, 'uSize'), v.W, v.H); gl.uniform1i(this.loc(this.ground, 'uLook'), o.look ?? 0); gl.uniform1f(this.loc(this.ground, 'uTexK'), o.texK ?? 1); gl.uniform1f(this.loc(this.ground, 'uLightK'), o.lightK ?? 1); gl.uniform3fv(this.loc(this.ground, 'uSun'), SUN_W); gl.uniform3fv(this.loc(this.ground, 'uEye'), eye); gl.uniform1f(this.loc(this.ground, 'uCell'), Math.max(0.03, v.mm / 1000)); gl.uniform1f(this.loc(this.ground, 'uBias'), 0); shadowTo(this.ground);
     if (this.groundVao) { gl.bindVertexArray(this.groundVao); gl.drawArrays(gl.TRIANGLES, 0, this.groundN); }
     if (this.fenceVao && this.fenceN) { gl.bindVertexArray(this.fenceVao); gl.drawArrays(gl.TRIANGLES, 0, this.fenceN); }
     // skid marks: dark patches on the concrete, blended, nothing else written
@@ -465,7 +502,7 @@ export class LiveRenderer {
       S.forEach((m, i) => { const q = [[-r, -r], [r, -r], [r, r], [-r, -r], [r, r], [-r, r]]; q.forEach(([dx, dy], j) => f.set([m.x + dx!, m.y + dy!, m.z + 0.01, 30 / 255, 28 / 255, 26 / 255, m.a, 0], (i * 6 + j) * 8)); });
       gl.bindBuffer(gl.ARRAY_BUFFER, this.skidBuf); gl.bufferData(gl.ARRAY_BUFFER, f, gl.DYNAMIC_DRAW); gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false); gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.NONE, gl.NONE, gl.NONE]);
       gl.uniform1f(this.loc(this.ground, 'uBias'), 0.00002); gl.bindVertexArray(this.skidVao); gl.drawArrays(gl.TRIANGLES, 0, S.length * 6); gl.disable(gl.BLEND); gl.depthMask(true); gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.COLOR_ATTACHMENT1, gl.COLOR_ATTACHMENT2, gl.COLOR_ATTACHMENT3]); }
-    gl.useProgram(this.obj); gl.uniformMatrix4fv(this.loc(this.obj, 'uVP'), false, VP); gl.uniform1i(this.loc(this.obj, 'uHDRo'), hdrOn); gl.uniformMatrix4fv(this.loc(this.obj, 'uPrevVP'), false, this.prevVP ?? VP); gl.uniform2f(this.loc(this.obj, 'uSize'), v.W, v.H); gl.uniform1f(this.loc(this.obj, 'uSpecK'), o.reflK ?? 1); gl.uniform1f(this.loc(this.obj, 'uDeep'), o.deep ?? 1); gl.uniform1i(this.loc(this.obj, 'uLook'), o.look ?? 0); gl.uniform1f(this.loc(this.obj, 'uTexK'), o.texK ?? 1); gl.uniform1f(this.loc(this.obj, 'uLightK'), o.lightK ?? 1); gl.uniform3fv(this.loc(this.obj, 'uEye'), eye); gl.uniform3fv(this.loc(this.obj, 'uSun'), SUN_W); gl.uniform1f(this.loc(this.obj, 'uGlass'), o.glass ?? 0.8); shadowTo(this.obj);
+    gl.useProgram(this.obj); lampsTo(this.obj); gl.uniform1f(this.loc(this.obj, 'uDay'), o.day ?? 1); gl.uniformMatrix4fv(this.loc(this.obj, 'uVP'), false, VP); gl.uniform1i(this.loc(this.obj, 'uHDRo'), hdrOn); gl.uniformMatrix4fv(this.loc(this.obj, 'uPrevVP'), false, this.prevVP ?? VP); gl.uniform2f(this.loc(this.obj, 'uSize'), v.W, v.H); gl.uniform1f(this.loc(this.obj, 'uSpecK'), o.reflK ?? 1); gl.uniform1f(this.loc(this.obj, 'uDeep'), o.deep ?? 1); gl.uniform1i(this.loc(this.obj, 'uLook'), o.look ?? 0); gl.uniform1f(this.loc(this.obj, 'uTexK'), o.texK ?? 1); gl.uniform1f(this.loc(this.obj, 'uLightK'), o.lightK ?? 1); gl.uniform3fv(this.loc(this.obj, 'uEye'), eye); gl.uniform3fv(this.loc(this.obj, 'uSun'), SUN_W); gl.uniform1f(this.loc(this.obj, 'uGlass'), o.glass ?? 0.8); shadowTo(this.obj);
     gl.uniform1i(this.loc(this.obj, 'uDecTex'), 2);
     const artTo = (g: GpuMesh | null) => { const a = g && o.art !== false ? this.arts.get(g) : undefined; gl.uniform1i(this.loc(this.obj, 'uArtOn'), a ? 1 : 0); gl.activeTexture(gl.TEXTURE6); gl.bindTexture(gl.TEXTURE_2D, a ? a.tex : this.blank); gl.uniform1i(this.loc(this.obj, 'uArt'), 6); gl.activeTexture(gl.TEXTURE7); gl.bindTexture(gl.TEXTURE_2D, a ? a.lut : this.blank); gl.uniform1i(this.loc(this.obj, 'uArtLut'), 7); if (!a) return;
       gl.uniform1f(this.loc(this.obj, 'uArtMM'), a.mm); gl.uniform1f(this.loc(this.obj, 'uArtC'), a.C); gl.uniform4fv(this.loc(this.obj, 'uArtR'), a.rects); gl.uniform2fv(this.loc(this.obj, 'uArtO'), a.origins); };
@@ -476,7 +513,7 @@ export class LiveRenderer {
     const decals = (g: GpuMesh | null) => { const n = g ? g.decals.length : 0; gl.uniform1i(this.loc(this.obj, 'uDecN'), n); gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, n ? g!.decalTex : this.blank); if (!g || !n) return;
       gl.uniform3fv(this.loc(this.obj, 'uDecO'), g.decals.flatMap(d => d.o)); gl.uniform3fv(this.loc(this.obj, 'uDecN_'), g.decals.flatMap(d => { const l = Math.hypot(...d.n); return d.n.map(x => x / l); }));
       gl.uniform3fv(this.loc(this.obj, 'uDecUp'), g.decals.flatMap(d => { const l = Math.hypot(...d.up); return d.up.map(x => x / l); })); gl.uniform1fv(this.loc(this.obj, 'uDecR'), g.decals.map(d => d.r)); };
-    gl.uniform1i(this.loc(this.obj, 'uMode'), 0); gl.uniform1f(this.loc(this.obj, 'uBias'), 0); decals(null);
+    gl.uniform1i(this.loc(this.obj, 'uMode'), 0); gl.uniform1f(this.loc(this.obj, 'uBias'), 0); decals(null); gl.uniform1f(this.loc(this.obj, 'uLampOn'), 0); gl.uniform1f(this.loc(this.obj, 'uBrake'), 0);
     const outlineP = Math.max(1, Math.min(2, Math.round(2 * 50 / v.mm))), outlineC = Math.max(1, Math.min(3, Math.round(3 * 50 / v.mm)));
     gl.uniform3f(this.loc(this.obj, 'uWear'), 0, 0, 0); for (const p of ps) { objU(p.outline ?? outlineP); draw(p.g.body, (p.m ?? placeMesh(p.g.len, p.x, p.y, p.z, p.h)), undefined, p.key); }
     // the cars a thing hides: their light outline first, tested against what stands before them (each pixel once), then the cars over it
@@ -484,7 +521,7 @@ export class LiveRenderer {
     gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.NONE, gl.NONE, gl.NONE]); gl.uniform1f(this.loc(this.obj, 'uBias'), 0.25 / R);
     cars.forEach((q, i) => { gl.uniform4f(this.loc(this.obj, 'uSil'), 1, 226 / 255, 168 / 255, q.player ? 0.6 : 0.4); for (const [part, M, w] of carM[i]!.opaque) draw(part, M, w); });
     gl.disable(gl.STENCIL_TEST); gl.disable(gl.BLEND); gl.depthFunc(gl.LESS); gl.depthMask(true); gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.COLOR_ATTACHMENT1, gl.COLOR_ATTACHMENT2, gl.COLOR_ATTACHMENT3]); gl.uniform1f(this.loc(this.obj, 'uBias'), 0); gl.uniform1i(this.loc(this.obj, 'uMode'), 0);
-    cars.forEach((q, i) => { objU(outlineC); const m = carM[i]!; gl.uniform1i(this.loc(this.obj, 'uSelf'), boxIdx.get(q) ?? -1); gl.uniform3fv(this.loc(this.obj, 'uWear'), q.wear ?? [0, 0, 0]); gl.uniform1f(this.loc(this.obj, 'uCarH'), q.g.height); artTo(q.g); decals(q.g); draw(q.g.body, m.body, undefined, `c${this.idOf(q.g)}:0`); decals(null); m.opaque.slice(1).forEach(([part, M, w], j) => draw(part, M, w, `c${this.idOf(q.g)}:${j + 1}`)); });
+    cars.forEach((q, i) => { objU(outlineC); const m = carM[i]!; gl.uniform1f(this.loc(this.obj, 'uLampOn'), q.lamps ?? 0); gl.uniform1f(this.loc(this.obj, 'uBrake'), q.brake ? 1 : 0); gl.uniform1i(this.loc(this.obj, 'uSelf'), boxIdx.get(q) ?? -1); gl.uniform3fv(this.loc(this.obj, 'uWear'), q.wear ?? [0, 0, 0]); gl.uniform1f(this.loc(this.obj, 'uCarH'), q.g.height); artTo(q.g); decals(q.g); draw(q.g.body, m.body, undefined, `c${this.idOf(q.g)}:0`); decals(null); m.opaque.slice(1).forEach(([part, M, w], j) => draw(part, M, w, `c${this.idOf(q.g)}:${j + 1}`)); });
     // smoke: parcels far to near, blended over what is drawn, hidden behind what stands before them
     if (o.smoke && o.smoke.n) { const S = o.smoke; if (!this.smokeVao) { this.smokeVao = gl.createVertexArray()!; gl.bindVertexArray(this.smokeVao); const corners = gl.createBuffer()!; gl.bindBuffer(gl.ARRAY_BUFFER, corners); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, 1, 1, -1, -1, 1, 1, -1, 1]), gl.STATIC_DRAW);
         gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0); this.smokeBuf = gl.createBuffer()!; gl.bindBuffer(gl.ARRAY_BUFFER, this.smokeBuf);
@@ -497,7 +534,7 @@ export class LiveRenderer {
       gl.disable(gl.BLEND); gl.depthMask(true); gl.useProgram(this.obj); }
     // glass over all, at its own strength, nothing else written
     gl.uniform1i(this.loc(this.obj, 'uMode'), 2); gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);   /* premultiplied (review 116) */ gl.depthMask(false); gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.NONE, gl.NONE, gl.NONE]);
-    gl.uniform3f(this.loc(this.obj, 'uWear'), 0, 0, 0); for (const p of ps) draw(p.g.glass, (p.m ?? placeMesh(p.g.len, p.x, p.y, p.z, p.h))); for (const m of carM) for (const [part, M, w] of m.glass) draw(part, M, w);
+    gl.uniform3f(this.loc(this.obj, 'uWear'), 0, 0, 0); for (const p of ps) draw(p.g.glass, (p.m ?? placeMesh(p.g.len, p.x, p.y, p.z, p.h))); cars.forEach((q, i) => { gl.uniform1f(this.loc(this.obj, 'uLampOn'), q.lamps ?? 0); gl.uniform1f(this.loc(this.obj, 'uBrake'), q.brake ? 1 : 0); for (const [part, M, w] of carM[i]!.glass) draw(part, M, w); }); gl.uniform1f(this.loc(this.obj, 'uLampOn'), 0); gl.uniform1f(this.loc(this.obj, 'uBrake'), 0);
     gl.disable(gl.BLEND); gl.depthMask(true);
     // ---- after the scene (review 111): occlusion, then the picture composed (reflections, occlusion, outlines), the bloom, the end ----
     gl.disable(gl.DEPTH_TEST); gl.disable(gl.STENCIL_TEST); gl.disable(gl.BLEND); gl.bindVertexArray(null); const rays = (o.look ?? 0) > 0 && o.rays !== false, RT = this.rt;

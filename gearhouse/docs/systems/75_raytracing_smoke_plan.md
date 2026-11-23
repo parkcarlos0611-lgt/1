@@ -89,3 +89,15 @@ Sliders on the page for reflection and gloss, occlusion, bloom and depth of fiel
   mirrored by Fresnel, the sun a hard glint, a film of dust in patches.
 - Lamps: a silvered concave bowl (mirroring the world turned about) behind fluted glass whose ribs catch the light,
   faded where finer than a pixel; each lens domed from its middle.
+
+## Review 117: lamps with depth, alight, and the time of day
+- Most head lamps in the meshes are glass over a chrome bowl with a small bulb; the light of review 116 only reached the
+  bulb. Now each lamp's face (glass in a part called a lens or lamp, or a lens) is found on upload, with its own flat
+  coordinates, axis and radius, and the shader draws the lamp on it, a procedural PBR lamp rather than a picture: a
+  silvered parabolic bowl at its depth (parallax), the bulb and socket in it, the bezel's shadow, the inner face fluted
+  above and cut in prism blocks below with a ring at the rim (bending the view, fine dark edges, faded under a pixel),
+  the smooth outer face mirroring the world by Fresnel with the sun's hard glint. Tail lamps the same behind red glass.
+- Alight (a switch on the page): the filament white hot, the bowl filled, the flutes drawing the light into upright
+  streaks; the brake lights with the brake; each head lamp a beam on the road and on whatever stands in front.
+- The time of day (a slider): the sun lower, redder and dimmer, the sky darker, toward night, where the beams show.
+- Closer zooms: 4, 6 and 8 mm a pixel.

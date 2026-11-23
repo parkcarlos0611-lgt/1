@@ -10,7 +10,8 @@
   "CAD-Block.com EB110 4-view (feature check)",
   "renders of a 3D model (side, front, rear; the user's, from the Sketchfab model '1992 Bugatti EB110 Super Sport'): profiles, features",
   "photographs: head lamp close-ups (2), GT silver and blue, SS blue, front; the panel set laid out (exploded)",
-  "makers' data (auto-data.net, Wikipedia): tracks 1550/1618, tyres 245/40 ZR18 front, 325/30 ZR18 rear"
+  "makers' data (auto-data.net, Wikipedia): tracks 1550/1618, tyres 245/40 ZR18 front, 325/30 ZR18 rear",
+  "more photographs (front three-quarter: GT blue x2, SS silver): the lamp trough, the bonnet's edges, the wing volumes"
  ],
  "overall": {
   "length": 4400,
@@ -969,7 +970,17 @@
   }
  ],
  "panels": {
-  "_": "from the exploded set: how the body breaks into panels (for shut lines and later for damage)",
+  "_": "the body is separate volumes meeting at crisp edges (from the exploded set and the photographs); inside a panel the surface is smooth. Numbers here are read from photographs and the front render: about +-40 mm, to be refined against the images",
+  "bonnet": "a nearly flat panel, sharp-edged: its sides run straight back at y about 650 from the lamps' outer back corners (x 595) to the screen's corners (x about 1300); between the lamps it reaches forward as a tongue to the bumper's shut line (x about 255, z about 500); the two lamp slots are cut out of its front corners",
+  "wingF": "each front wing is its own rounded volume outboard of the bonnet's edge: it rises from that edge (a valley, a sharp inside corner along y 650) to a crest at y about 800-870, 40-70 mm above the bonnet's edge, highest over the wheel (z about 750 at x 1040), and runs back into the screen pillar and the door's top; ahead of the wheel it falls to the lamp: its inner face is the lamp slot's outer wall",
+  "lampTrough": "beside each head lamp, outboard: the wing's front is scooped - a concave channel from the lamp's outer end (the amber indicator sits at its mouth, y 690-800, z 600-635) running back and up between the bonnet's edge and the wing's crest, dying out toward the screen's corner; clearly visible in every front three-quarter photograph",
+  "bumperF": "a separate volume below the shut line (z about 500 across the nose, running back along the sides at z about 470 to the wheel arch): rounded in plan, its face holding the horseshoe, the two three-slot intakes and the corner ducts; a thin splitter under it",
+  "door": "scissor door; front edge behind the wing vent, back edge sweeping down and forward; its foot at z about 300 above the skirt's recess",
+  "skirt": "under the door a deep recess with a sharp upper shelf (z about 412) from x 1420 to the intake's mouth at x 2890; the sill stands out below it (z 124-300)",
+  "quarter": "the rear wing: widest of the car (y 970-975 at x 3000-3600), a slot along its top behind the door, six oval holes (2 by 3) in the buttress panel above it, the vent at the tail's corner",
+  "roof": "a narrow glasshouse: wrap-round screen, the side glass leaning in strongly (tumblehome), buttresses running back from the roof to the tail",
+  "engineCover": "between the buttresses, x 2700-3700, y +-450: glass with black louvre bars (GT)",
+  "tail": "the tail panel leans: widest at its foot (z about 556); lamps in capsule bezels, slots between; below it the black valance and the rising diffuser",
   "list": [
    "bonnet with the two lamp slots",
    "front bumper with the intakes and the splitter",

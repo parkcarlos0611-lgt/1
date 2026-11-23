@@ -53,3 +53,11 @@ describe('the XJ220', () => {
     expect(df).toBeGreaterThan(220); expect(df).toBeLessThan(420);
   });
 });
+describe('the Diablo (1990)', () => {
+  const db = raceSpec('diablo');
+  it('meets its figures: about 325 km/h, rear drive, 0-100 in about 4.5 s; no ABS, no power steering', () => {
+    const c = new Vehicle(db, flat).place(100, 0, 0); let vmax = 0, t100 = 0; for (let t = 0; t < 90; t += dt) { c.step(dt, go); vmax = Math.max(vmax, c.speed * 3.6); if (!t100 && c.speed * 3.6 >= 100) t100 = t; }
+    expect(vmax).toBeGreaterThan(312); expect(vmax).toBeLessThan(338); expect(t100).toBeGreaterThan(3.6); expect(t100).toBeLessThan(5.8);
+    expect(db.tech!.drive).toBeFalsy(); expect(db.tech!.abs).toBeFalsy(); expect(db.tech!.power).toBeFalsy();
+  });
+});

@@ -17,6 +17,7 @@ import { mesh as auburn851 } from './mesh_auburn851';
 import { mesh as mb540k } from './mesh_mb540k';
 import { mesh as eb110 } from './mesh_eb110';
 import { mesh as xj220 } from './mesh_xj220';
+import { mesh as diablo } from './mesh_diablo';
 export const MESH_CARS: { id: string; name: string; mesh: (spin?: number) => Mesh }[] = [
   { id: 'dueSSJ35', name: '1935 Duesenberg SSJ', mesh: dueSSJ35 }, { id: 'dueA21', name: '1921 Duesenberg Model A', mesh: dueA21 },
   { id: 'fnTT33', name: '1933 Frazer Nash TT Replica', mesh: fnTT33 }, { id: 'bmw315', name: '1935 BMW 315/1', mesh: bmw315 },
@@ -30,4 +31,6 @@ export const MESH_CARS: { id: string; name: string; mesh: (spin?: number) => Mes
   { id: 'auburn851', name: '1935 Auburn 851 Speedster', mesh: auburn851 }, { id: 'mb540k', name: '1936 Mercedes-Benz 540 K Special Roadster', mesh: mb540k },
   // review 125: 1990s technology test
   { id: 'eb110', name: '1991 Bugatti EB110 GT (실험)', mesh: eb110 },
-  { id: 'xj220', name: '1992 Jaguar XJ220 (실험)', mesh: xj220 }];
+  { id: 'xj220', name: '1992 Jaguar XJ220 (실험)', mesh: xj220 },
+  // review 141: the wedge, built panel by panel
+  { id: 'diablo', name: '1990 Lamborghini Diablo (실험)', mesh: diablo }];

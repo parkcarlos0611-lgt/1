@@ -150,12 +150,23 @@ NEW.xj220 = { id: 'xj220', name: '1992 Jaguar XJ220 (실험)', mass: 1470 + 75, 
   brakes: 'disc', hydraulic: true, brakeG: 1.05, cdA: 0.62, crr: 0.012, steerLock: 30, topKmh: 342, check: false, cooling: { siphon: false, margin: 1.15 }, tyreKind: 'radial', era: '1992',
   shiftT: 0.32, launchRpm: 5000, steer: { ratio: 15, ackermann: 0.6, rack: true }, inertia: { engine: 0.2, wheel: 1.8 },
   tech: { rearVisc: 40, turbo: { n: 2, boost: 1.0, full: 4000, spool: 0.5 }, ground: { clA: 0.55, front: 0.38 }, tyreWF: 0.255, tyreWR: 0.345 } };
+// review 141: the Lamborghini Diablo (1990), the original rear-drive car (lambocars.com, supercars.net, auto-data.net):
+// 5.7 L V12 (four valves a cylinder), 492 hp at 7,000 rpm, 580 Nm at 5,200; five speeds; rear drive, a limited-slip
+// differential; no ABS, no power steering (both came later: ABS with the SV/VT updates, power steering on the VT);
+// double wishbones; 245/40 ZR17 and 335/35 ZR17; about 1,576 kg; 0-100 km/h about 4.5 s; 325 km/h.
+// [~]: the steering ratio (15: at 16 the handicap driver weaved off at 170 km/h, as the XJ220 did), the gear ratios (2.31 1.52 1.12 0.88 0.71, final 3.83: fitted to 325 km/h near the power peak), the drag area
+// (fitted to 325 km/h with the power), the centre of gravity and the weight's split, the differential's locking.
+NEW.diablo = { id: 'diablo', name: '1990 Lamborghini Diablo (실험)', mass: 1576 + 75, wheelbase: 2.65, track: 1.59, tyreR: 0.333, tyreW: 0.29, cgH: 0.46, frontShare: 0.41,
+  hp: 492, hpRpm: 7000, torqueRpm: 5200, torquePeak: 580, idle: 900, redline: 7300, gears: [2.31, 1.52, 1.12, 0.88, 0.71], final: 3.83, eff: 0.86,
+  brakes: 'disc', hydraulic: true, brakeG: 1.0, cdA: 0.66, crr: 0.012, steerLock: 30, topKmh: 325, check: false, cooling: { siphon: false, margin: 1.1 }, tyreKind: 'radial', era: '1990',
+  shiftT: 0.32, launchRpm: 4500, steer: { ratio: 15, ackermann: 0.6, rack: true }, inertia: { engine: 0.24, wheel: 1.8 },
+  tech: { rearLsd: 1.6, tyreWF: 0.245, tyreWR: 0.335 } };
 Object.assign(EXP, NEW);
 /** the new 3D-first cars, offered beside the period ones */
 export const NEW_CARS: string[] = Object.keys(NEW);
 export const EXP_CARS: string[] = Object.keys(EXP).filter(id => !NEW[id]);
 /** the engine for the sound: cylinders, valves, blower (the experimental cars are not in the game's data) */
-export const EXP_ENGINE: Record<string, { kind: string; layout: string; supercharged?: boolean }> = { napier33: { kind: 'ohv', layout: 'W12' }, jagD55: { kind: 'ohv', layout: 'I6' }, auburn851: { kind: 'sv', layout: 'I8', supercharged: true }, mb540k: { kind: 'ohv', layout: 'I8', supercharged: true }, eb110: { kind: 'ohv', layout: 'V12' }, xj220: { kind: 'ohv', layout: 'V6' } };
+export const EXP_ENGINE: Record<string, { kind: string; layout: string; supercharged?: boolean }> = { napier33: { kind: 'ohv', layout: 'W12' }, jagD55: { kind: 'ohv', layout: 'I6' }, auburn851: { kind: 'sv', layout: 'I8', supercharged: true }, mb540k: { kind: 'ohv', layout: 'I8', supercharged: true }, eb110: { kind: 'ohv', layout: 'V12' }, xj220: { kind: 'ohv', layout: 'V6' }, diablo: { kind: 'ohv', layout: 'V12' } };
 export function raceSpec(id: string): RaceSpec {
   if (EXP[id]) return EXP[id]!;
   const s = (specs as { cars: Record<string, { car: string; engine: { hp: number }; wheelbase: number; track: number; tyre: string }> }).cars[id]!, p = PERIOD[id]!, t = tyre(s.tyre), hpRpm = p[0];
@@ -179,5 +190,5 @@ export interface Suspension { front: AxleKind; rear: AxleKind; leafF: boolean; l
 const SUSP: Record<string, Partial<Suspension>> = {
   mb540k: { front: 'wishbone', rear: 'swing', leafF: false, leafR: false },
   bmw315: { front: 'wishbone', leafF: true },
-  jagD55: { front: 'wishbone', leafF: false, leafR: false }, eb110: { front: 'wishbone', rear: 'wishbone', leafF: false, leafR: false }, xj220: { front: 'wishbone', rear: 'wishbone', leafF: false, leafR: false } };
+  jagD55: { front: 'wishbone', leafF: false, leafR: false }, eb110: { front: 'wishbone', rear: 'wishbone', leafF: false, leafR: false }, xj220: { front: 'wishbone', rear: 'wishbone', leafF: false, leafR: false }, diablo: { front: 'wishbone', rear: 'wishbone', leafF: false, leafR: false } };
 export function suspension(c: RaceSpec): Suspension { return { front: 'beam', rear: 'beam', leafF: true, leafR: true, ...SUSP[c.id] }; }

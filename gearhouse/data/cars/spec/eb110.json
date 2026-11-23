@@ -1,0 +1,989 @@
+{
+ "id": "eb110",
+ "name": "Bugatti EB110 GT (1991-95); SS differences noted",
+ "doc": "docs/systems/80_eb110_spec_sheet.md",
+ "axes": "mm; x from the nose tip (0) back to the tail (4400); y half-width from the centre line (symmetric, positive); z from the ground at static ride height",
+ "tolerance": "overall: from the makers' figures and the dimensioned drawing, exact; profile and part positions: read from orthographic-looking renders (side, front, rear) and the-blueprints 4-view, about +-30 mm (the renders have a little perspective, corrected for)",
+ "sources": [
+  "dimensioned side drawing: length 4400, wheelbase 2550, front overhang 1040, rear overhang 810, height 1114, approach 9deg10', departure 28deg13'",
+  "the-blueprints.com EB110 SS 4-view: width 1940, height 1125 (plan read for half-widths)",
+  "CAD-Block.com EB110 4-view (feature check)",
+  "renders of a 3D model (side, front, rear; the user's, from the Sketchfab model '1992 Bugatti EB110 Super Sport'): profiles, features",
+  "photographs: head lamp close-ups (2), GT silver and blue, SS blue, front; the panel set laid out (exploded)",
+  "makers' data (auto-data.net, Wikipedia): tracks 1550/1618, tyres 245/40 ZR18 front, 325/30 ZR18 rear"
+ ],
+ "overall": {
+  "length": 4400,
+  "width": 1940,
+  "height": 1114,
+  "wheelbase": 2550,
+  "overhangF": 1040,
+  "overhangR": 810,
+  "trackF": 1550,
+  "trackR": 1618,
+  "tyreF": "245/40 ZR18 (radius 324)",
+  "tyreR": "325/30 ZR18 (radius 326)",
+  "groundClearance": 100,
+  "approachDeg": 9.17,
+  "departureDeg": 28.2,
+  "axleF": 1040,
+  "axleR": 3590,
+  "widthWithMirrors": 2610
+ },
+ "profile": {
+  "_": "the silhouette from the side, [x, z]; top: the centre line (bonnet, screen, roof, engine cover, tail); bottom: the body's lowest edge (arches excluded); the wing above the tail is not in the top line (see parts: wing)",
+  "top": [
+   [
+    0,
+    300
+   ],
+   [
+    45,
+    362
+   ],
+   [
+    92,
+    416
+   ],
+   [
+    187,
+    468
+   ],
+   [
+    281,
+    515
+   ],
+   [
+    376,
+    558
+   ],
+   [
+    470,
+    600
+   ],
+   [
+    565,
+    640
+   ],
+   [
+    659,
+    685
+   ],
+   [
+    754,
+    721
+   ],
+   [
+    848,
+    754
+   ],
+   [
+    943,
+    770
+   ],
+   [
+    1085,
+    789
+   ],
+   [
+    1179,
+    839
+   ],
+   [
+    1321,
+    891
+   ],
+   [
+    1463,
+    938
+   ],
+   [
+    1604,
+    985
+   ],
+   [
+    1746,
+    1030
+   ],
+   [
+    1888,
+    1068
+   ],
+   [
+    1983,
+    1094
+   ],
+   [
+    2124,
+    1108
+   ],
+   [
+    2266,
+    1115
+   ],
+   [
+    2361,
+    1120
+   ],
+   [
+    2502,
+    1115
+   ],
+   [
+    2644,
+    1111
+   ],
+   [
+    2786,
+    1096
+   ],
+   [
+    2928,
+    1087
+   ],
+   [
+    3070,
+    1073
+   ],
+   [
+    3211,
+    1059
+   ],
+   [
+    3353,
+    1040
+   ],
+   [
+    3495,
+    1018
+   ],
+   [
+    3637,
+    990
+   ],
+   [
+    3778,
+    959
+   ],
+   [
+    3950,
+    945
+   ],
+   [
+    4150,
+    925
+   ],
+   [
+    4300,
+    905
+   ],
+   [
+    4360,
+    880
+   ],
+   [
+    4395,
+    800
+   ],
+   [
+    4400,
+    560
+   ]
+  ],
+  "bottom": [
+   [
+    45,
+    118
+   ],
+   [
+    187,
+    111
+   ],
+   [
+    376,
+    104
+   ],
+   [
+    565,
+    97
+   ],
+   [
+    3259,
+    137
+   ],
+   [
+    4015,
+    210
+   ],
+   [
+    4157,
+    260
+   ],
+   [
+    4251,
+    336
+   ],
+   [
+    4346,
+    458
+   ],
+   [
+    4393,
+    527
+   ]
+  ],
+  "archF": {
+   "x": 1040,
+   "top": 692,
+   "from": 690,
+   "to": 1330
+  },
+  "archR": {
+   "x": 3590,
+   "top": 725,
+   "from": 3250,
+   "to": 3990
+  },
+  "screenFoot": [
+   1085,
+   789
+  ],
+  "screenTop": [
+   1983,
+   1100
+  ],
+  "roofPeak": [
+   2361,
+   1120
+  ],
+  "roofEnd": [
+   2530,
+   1112
+  ]
+ },
+ "plan": {
+  "_": "half-width at x, from the plan (mirrors excluded); the nose is round, widest over the rear wheels",
+  "half": [
+   [
+    0,
+    134
+   ],
+   [
+    25,
+    317
+   ],
+   [
+    50,
+    445
+   ],
+   [
+    100,
+    582
+   ],
+   [
+    150,
+    652
+   ],
+   [
+    200,
+    698
+   ],
+   [
+    300,
+    768
+   ],
+   [
+    400,
+    818
+   ],
+   [
+    500,
+    823
+   ],
+   [
+    600,
+    870
+   ],
+   [
+    800,
+    888
+   ],
+   [
+    1000,
+    896
+   ],
+   [
+    1200,
+    908
+   ],
+   [
+    1500,
+    908
+   ],
+   [
+    2100,
+    925
+   ],
+   [
+    2400,
+    934
+   ],
+   [
+    2600,
+    954
+   ],
+   [
+    2800,
+    963
+   ],
+   [
+    3000,
+    975
+   ],
+   [
+    3200,
+    970
+   ],
+   [
+    3400,
+    970
+   ],
+   [
+    3600,
+    965
+   ],
+   [
+    3800,
+    960
+   ],
+   [
+    4000,
+    950
+   ],
+   [
+    4100,
+    930
+   ],
+   [
+    4200,
+    885
+   ],
+   [
+    4300,
+    832
+   ],
+   [
+    4350,
+    821
+   ],
+   [
+    4400,
+    300
+   ]
+  ]
+ },
+ "sections": {
+  "_": "heights of the main lines at stations: belt = the side glass's foot / the wing crest; shoulder = the widest line's height; sill = the side skirt's foot",
+  "crestF": [
+   [
+    300,
+    560
+   ],
+   [
+    600,
+    650
+   ],
+   [
+    900,
+    740
+   ],
+   [
+    1085,
+    800
+   ]
+  ],
+  "belt": [
+   [
+    1085,
+    800
+   ],
+   [
+    1500,
+    795
+   ],
+   [
+    2000,
+    790
+   ],
+   [
+    2500,
+    805
+   ],
+   [
+    2750,
+    820
+   ]
+  ],
+  "shoulder": [
+   [
+    600,
+    430
+   ],
+   [
+    1040,
+    500
+   ],
+   [
+    2000,
+    520
+   ],
+   [
+    3000,
+    590
+   ],
+   [
+    3590,
+    620
+   ],
+   [
+    4100,
+    600
+   ]
+  ],
+  "sill": [
+   [
+    700,
+    120
+   ],
+   [
+    2000,
+    124
+   ],
+   [
+    3250,
+    130
+   ]
+  ],
+  "frontCrease": {
+   "_": "the sharp line across the nose below the lamps, from wing to wing, bowed down a little at the centre",
+   "z": 500,
+   "zCentre": 470,
+   "x": [
+    200,
+    60
+   ]
+  },
+  "sideCrease": {
+   "_": "the top of the side skirt's recess: a crisp horizontal edge from behind the front wheel to the side intake",
+   "z": 412,
+   "x": [
+    1330,
+    2900
+   ]
+  },
+  "tailCrease": {
+   "z": 556,
+   "_": "the rear face's lower edge over the black valance"
+  }
+ },
+ "parts": [
+  {
+   "id": "headlamp",
+   "pair": true,
+   "kind": "lamp, cut in",
+   "x": [
+    355,
+    595
+   ],
+   "yOuter": 670,
+   "yInnerTop": 300,
+   "yInnerFoot": 200,
+   "z": [
+    567,
+    682
+   ],
+   "shape": "a slot in the bonnet's corner; flat flush glass; inner end a black finned ramp (the wedge seen from the front); outer wall body colour up to the wing crest",
+   "inside": "units at the back: projector (round, d 80, outboard at y 612, z 630) and fluted halogen reflector (inboard, y 330-560); heater lines printed on the glass",
+   "src": "front render, photos, plan"
+  },
+  {
+   "id": "indicatorF",
+   "pair": true,
+   "kind": "amber lens",
+   "x": [
+    360,
+    420
+   ],
+   "y": [
+    690,
+    800
+   ],
+   "z": [
+    600,
+    635
+   ],
+   "shape": "a small wedge at the head lamp's outer foot, its tip the slot's outer point"
+  },
+  {
+   "id": "sideMarker",
+   "pair": true,
+   "kind": "red lens",
+   "x": 1140,
+   "z": 706,
+   "d": 22,
+   "shape": "a small round reflector on the wing ahead of the screen pillar"
+  },
+  {
+   "id": "badgeF",
+   "kind": "oval badge, red",
+   "x": 40,
+   "y": [
+    -49,
+    49
+   ],
+   "z": [
+    450,
+    475
+   ],
+   "src": "front render"
+  },
+  {
+   "id": "horseshoe",
+   "kind": "grille",
+   "x": 30,
+   "y": [
+    -58,
+    58
+   ],
+   "z": [
+    216,
+    349
+   ],
+   "shape": "Bugatti horseshoe, black mesh in a thin body-colour rim"
+  },
+  {
+   "id": "intakeF",
+   "pair": true,
+   "kind": "grille",
+   "x": 60,
+   "y": [
+    80,
+    556
+   ],
+   "z": [
+    127,
+    316
+   ],
+   "shape": "three slots one above another, body-colour bars between, mesh behind; outer end rounded",
+   "slots": [
+    [
+     127,
+     170
+    ],
+    [
+     190,
+     236
+    ],
+    [
+     255,
+     300
+    ]
+   ]
+  },
+  {
+   "id": "ductF",
+   "pair": true,
+   "kind": "brake duct",
+   "x": 120,
+   "y": [
+    760,
+    851
+   ],
+   "z": [
+    160,
+    311
+   ],
+   "shape": "upright slot, mesh, at the bumper's outer corner"
+  },
+  {
+   "id": "splitter",
+   "kind": "lip",
+   "x": [
+    0,
+    60
+   ],
+   "y": [
+    -760,
+    760
+   ],
+   "z": [
+    85,
+    100
+   ],
+   "shape": "a thin blade under the nose, black edge"
+  },
+  {
+   "id": "plateF",
+   "kind": "plate (optional)",
+   "x": 15,
+   "y": [
+    -264,
+    264
+   ],
+   "z": [
+    132,
+    240
+   ]
+  },
+  {
+   "id": "sideIntakeNose",
+   "pair": true,
+   "kind": "vent",
+   "x": [
+    45,
+    235
+   ],
+   "z": [
+    150,
+    240
+   ],
+   "shape": "a slot in the nose's side, ahead of the front wheel"
+  },
+  {
+   "id": "screen",
+   "kind": "glass",
+   "x": [
+    1085,
+    1983
+   ],
+   "y": [
+    680,
+    560
+   ],
+   "shape": "wrap-round, its foot bowed forward; black frame; one long wiper"
+  },
+  {
+   "id": "wiper",
+   "kind": "arm",
+   "x": [
+    1000,
+    1110
+   ],
+   "z": [
+    800,
+    835
+   ],
+   "shape": "single arm parked across the screen's foot"
+  },
+  {
+   "id": "mirror",
+   "pair": true,
+   "kind": "body colour",
+   "head": {
+    "x": [
+     1626,
+     1796
+    ],
+    "y": [
+     1160,
+     1305
+    ],
+    "z": [
+     860,
+     941
+    ]
+   },
+   "stalk": "an upright stalk from the door's top front corner (x 1650, z 757), the head standing well out",
+   "src": "front and side render"
+  },
+  {
+   "id": "sideGlass",
+   "pair": true,
+   "kind": "glass",
+   "x": [
+    1534,
+    2503
+   ],
+   "z": [
+    791,
+    1056
+   ],
+   "shape": "the door glass and a fixed rear part, dark frame"
+  },
+  {
+   "id": "door",
+   "pair": true,
+   "kind": "shut lines",
+   "front": "along the wing's rear edge behind the front wheel",
+   "rear": [
+    [
+     2510,
+     791
+    ],
+    [
+     2469,
+     561
+    ],
+    [
+     2378,
+     400
+    ],
+    [
+     2264,
+     308
+    ]
+   ],
+   "bottom": {
+    "z": 300,
+    "x": [
+     2264,
+     1420
+    ]
+   },
+   "shape": "scissor door; its rear edge sweeps down and forward (the car's signature curve)"
+  },
+  {
+   "id": "wingVent",
+   "pair": true,
+   "kind": "vent",
+   "x": [
+    1215,
+    1420
+   ],
+   "z": [
+    308,
+    745
+   ],
+   "shape": "the curved slot behind the front wheel arch, following its rim from the belt down to the skirt"
+  },
+  {
+   "id": "sideScoop",
+   "pair": true,
+   "kind": "recess",
+   "x": [
+    1420,
+    2890
+   ],
+   "z": [
+    124,
+    412
+   ],
+   "shape": "the side skirt's long recess under the doors, opening into the intake ahead of the rear wheel (x 2900-3000)"
+  },
+  {
+   "id": "quarterHoles",
+   "pair": true,
+   "kind": "vents",
+   "x": [
+    2674,
+    2993
+   ],
+   "z": [
+    895,
+    1044
+   ],
+   "count": 6,
+   "shape": "six oval holes, 2 columns by 3 rows, in the panel behind the side glass (the buttress)"
+  },
+  {
+   "id": "buttressSlot",
+   "pair": true,
+   "kind": "intake",
+   "x": [
+    2491,
+    2776
+   ],
+   "z": [
+    814,
+    860
+   ],
+   "shape": "a slot along the top of the rear wing, behind the door"
+  },
+  {
+   "id": "engineCover",
+   "kind": "glass/louvres",
+   "x": [
+    2700,
+    3700
+   ],
+   "y": [
+    -450,
+    450
+   ],
+   "shape": "glass over the engine with black louvre bars (SS: body colour with louvres)"
+  },
+  {
+   "id": "spoilerSlot",
+   "kind": "channel",
+   "x": [
+    3780,
+    3900
+   ],
+   "y": [
+    -725,
+    725
+   ],
+   "z": [
+    808,
+    856
+   ],
+   "shape": "a dark channel across the tail's top edge, the GT's wing bed"
+  },
+  {
+   "id": "wing",
+   "kind": "aerofoil",
+   "x": [
+    3802,
+    4346
+   ],
+   "y": [
+    -745,
+    745
+   ],
+   "z": [
+    972,
+    1061
+   ],
+   "shape": "GT: retracts flush into its bed, rises at speed on two struts; SS: fixed on two struts at y +-576, end plates",
+   "struts": {
+    "y": 576,
+    "z": [
+     880,
+     1000
+    ]
+   }
+  },
+  {
+   "id": "tailLamp",
+   "pair": true,
+   "kind": "lens cluster",
+   "x": 4370,
+   "y": [
+    468,
+    813
+   ],
+   "z": [
+    649,
+    798
+   ],
+   "shape": "a capsule (rounded ends) in a body-colour bezel: amber outer third, red middle, clear inner (reverse); a small red rectangle low in its middle",
+   "redBlock": {
+    "y": [
+     573,
+     677
+    ],
+    "z": [
+     641,
+     677
+    ]
+   }
+  },
+  {
+   "id": "grilleR",
+   "kind": "vents",
+   "x": 4390,
+   "shape": "six mesh slots in a row across the top (y -443..440, z 755-788); two more rows of two at each side below them (z 707-730, 652-679)"
+  },
+  {
+   "id": "plateR",
+   "kind": "plate recess",
+   "x": 4395,
+   "y": [
+    -239,
+    240
+   ],
+   "z": [
+    569,
+    663
+   ]
+  },
+  {
+   "id": "valanceR",
+   "kind": "black",
+   "x": [
+    4250,
+    4395
+   ],
+   "y": [
+    -898,
+    898
+   ],
+   "z": [
+    207,
+    545
+   ],
+   "shape": "black lower panel: a diffuser with a mesh panel in the middle (y +-176, z 252-418)"
+  },
+  {
+   "id": "fogR",
+   "kind": "red lens",
+   "x": 4380,
+   "y": [
+    -76,
+    76
+   ],
+   "z": [
+    452,
+    507
+   ]
+  },
+  {
+   "id": "exhaust",
+   "pair": true,
+   "kind": "chrome pipe",
+   "x": 4390,
+   "y": 269,
+   "z": 362,
+   "d": 97,
+   "shape": "one round pipe a side (SS); the GT four in two pairs"
+  },
+  {
+   "id": "ventR",
+   "pair": true,
+   "kind": "vent",
+   "x": 4300,
+   "y": 965,
+   "z": [
+    290,
+    497
+   ],
+   "shape": "an upright slot at the tail's corner, behind the rear wheel"
+  },
+  {
+   "id": "wheel",
+   "pair": true,
+   "kind": "wheel",
+   "front": {
+    "x": 1040,
+    "y": 775,
+    "radius": 324,
+    "rim": 18
+   },
+   "rear": {
+    "x": 3590,
+    "y": 809,
+    "radius": 326,
+    "rim": 18
+   },
+   "shape": "GT: multi-hole cast disc (BBS); SS: seven spokes"
+  }
+ ],
+ "panels": {
+  "_": "from the exploded set: how the body breaks into panels (for shut lines and later for damage)",
+  "list": [
+   "bonnet with the two lamp slots",
+   "front bumper with the intakes and the splitter",
+   "front wings (with the vent behind the wheel)",
+   "doors (scissor)",
+   "rear quarters with the side intake",
+   "engine cover",
+   "tail panel with the lamps",
+   "rear valance",
+   "the carbon tub and roof (structure)"
+  ]
+ },
+ "versions": {
+  "GT": "retracting wing; four exhaust pipes; multi-hole disc wheels; engine cover glass",
+  "SS": "fixed wing on struts; two large pipes; seven-spoke wheels; body-colour louvred engine cover; lighter"
+ }
+}

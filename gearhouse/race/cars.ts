@@ -141,14 +141,14 @@ NEW.eb110 = { id: 'eb110', name: '1991 Bugatti EB110 GT (실험)', mass: 1620 + 
 // review 126: the Jaguar XJ220 (1992), from the period's and later sources (Wikipedia, Supercars.net, PistonHeads,
 // Classic & Sports Car, Car & Classic): 3.5 twin-turbo V6 (JRV-6) 542 bhp at 7,200, 475 lb ft (644 Nm) at 4,500; an FF
 // Developments five-speed transaxle with a viscous limited-slip differential (3.00 1.95 1.42 1.09 0.85, final 2.88); rear
-// drive; AP Racing brakes, no ABS, no power steering (the prototype's both dropped), 2.6 turns lock to lock; double
+// drive; AP Racing brakes, no ABS, no power steering (the prototype's both dropped), 2.6 turns lock to lock (ratio 15 [~]); double
 // wishbones; underbody venturis (318 kg at 200 mph in C&SC; Wikipedia's larger figure not used); 1,470 kg; 255/45 ZR17
 // and 345/35 ZR18; 0-62 mph 3.6 s; 212.3 mph (341.7 km/h) at Nardo in 1992. [~]: the drag area (fitted), the boost's
 // figures, the coupling's, the centre of gravity and the weight's split.
 NEW.xj220 = { id: 'xj220', name: '1992 Jaguar XJ220 (실험)', mass: 1470 + 75, wheelbase: 2.64, track: 1.65, tyreR: 0.345, tyreW: 0.3, cgH: 0.45, frontShare: 0.42,
   hp: 542, hpRpm: 7200, torqueRpm: 4500, torquePeak: 644, idle: 900, redline: 7800, gears: [3.0, 1.95, 1.42, 1.09, 0.85], final: 2.88, eff: 0.88,
   brakes: 'disc', hydraulic: true, brakeG: 1.05, cdA: 0.62, crr: 0.012, steerLock: 30, topKmh: 342, check: false, cooling: { siphon: false, margin: 1.15 }, tyreKind: 'radial', era: '1992',
-  shiftT: 0.32, launchRpm: 5000, steer: { ratio: 15.5, ackermann: 0.6, rack: true }, inertia: { engine: 0.2, wheel: 1.8 },
+  shiftT: 0.32, launchRpm: 5000, steer: { ratio: 15, ackermann: 0.6, rack: true }, inertia: { engine: 0.2, wheel: 1.8 },
   tech: { rearVisc: 40, turbo: { n: 2, boost: 1.0, full: 4000, spool: 0.5 }, ground: { clA: 0.55, front: 0.38 }, tyreWF: 0.255, tyreWR: 0.345 } };
 Object.assign(EXP, NEW);
 /** the new 3D-first cars, offered beside the period ones */

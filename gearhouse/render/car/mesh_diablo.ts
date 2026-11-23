@@ -47,7 +47,7 @@ const ZF = lin([[50, 385], [520, 632], [XA, 768]]), zTopF = (x: number, y: numbe
 /** the nose in plan: every line round it is a super-ellipse from its foremost point to the front arch (x XJ) */
 const NP = 5, g = (f: number) => 1 - (1 - Math.min(1, f) ** NP) ** (1 / NP), ginv = (v: number) => (1 - (1 - Math.max(0, Math.min(1, v))) ** NP) ** (1 / NP);
 const KX0 = 50, KW = WJ - 50, crestX = (y: number) => KX0 + (XJ - KX0) * g(y / KW);
-const YC = [0, 170, 330, 430, 450, 600, 720, 770], NC = YC.length, YP = YC[NC - 1]!, S0 = crestX(YP), SL = 215, SC = 450;   // the top's columns (lid edge 430, lamp cover 450-770, the pillar's foot 770); the cover's front and back rows
+const YC = [0, 170, 330, 430, 450, 600, 720, 770], NC = YC.length, YP = YC[NC - 1]!, S0 = crestX(YP), SL = 215, SC = 485;   // the top's columns (lid edge 430, lamp cover 450-770, the pillar's foot 770); the cover's front and back rows
 /** half the width at the widest line (the plan) */
 const W = curve([[XJ, WJ], [1000, 915], [1400, 922], [2000, 945], [2500, 970], [3000, 1000], [3400, 1018], [RX, 1020], [3900, 1012], [4100, 992], [4250, 965], [4300, 948], [S1, 925]]);
 /** K: the flank's top edge (the wing's crest, the door's top, the rear shoulder): 50 in from the widest line */
@@ -75,7 +75,7 @@ const ARCHR = lin([[3262, ZS], [3285, 300], [3330, 480], [3400, 620], [3450, 680
 const archZ = (x: number) => Math.abs(x - FX) < RAF ? RF + 0.99 * Math.sqrt(RAF * RAF - (x - FX) ** 2) : x > 3262 && x < 4045 ? ARCHR(x) : 0;
 
 // ---- the stations ----
-const SN = [S0, 185, SL, 255, 300, 350, 400, SC, 505, 520, 535, 580, XJ];                                  // the nose's rows behind its front edge (the bend at 520 between guard rows)
+const SN = [S0, 185, SL, 255, 300, 350, 420, SC, 505, 520, 535, 580, XJ];                                  // the nose's rows behind its front edge (the bend at 520 between guard rows)
 const SF = [XJ, ...[1, 2, 3, 4, 5, 6].map(k => Math.round(FX - RAF * Math.cos(k * 18 * Math.PI / 180))), XA, 1206, 1240, 1283, 1333, 1350, 1400, 1470, 1560, XR0, 1900, 2100, 2300, 2450, 2520, 2560, XR1, 2800, 2990, 3120,
   3262, 3285, 3330, 3400, 3450, 3500, RX, 3800, 3870, 3950, 4010, 4035, 4045, 4150, 4250, 4300, S1], NS = SF.length;
 const at = (x: number) => { const i = SF.indexOf(x); if (i < 0) throw new Error(`diablo: no station at ${x}`); return i; };
@@ -104,13 +104,12 @@ function wheel(b: Build, x: number, s: 1 | -1, spin = 0) { const front = x === F
   b.name(front ? 'tyreF' : 'tyreR').mat(RUBBER, 0.05, 'tyre').lathe('y', o, [[-h, rim], [-h, R - 30], [-h + 14, R - 9], [-h + 34, R], [h - 34, R], [h - 14, R - 9], [h, R - 30], [h, rim]], SEG, false);
   b.name('rim').mat(SILVER, 0.8, 'metal').lathe('y', o, [[f, rim + 3], [f - s * 6, rim - 6], [f - s * 30, rim - 16], [f - s * (front ? 70 : 150), rim - 20]], SEG, false);
   b.name('wheel').mat(DARK, 0.05); disc(b, [x, s * wy + f - s * (front ? 68 : 148), R], rim - 18, 12);
-  // the face: five spokes, each a slab widening to the rim, dished in toward the hub
-  const yo = s * wy + f - s * 30, yi = s * wy + f - s * (front ? 40 : 66), P = (r: number, a: number, y: number): V => [x + Math.cos(a) * r, y, R + Math.sin(a) * r], out: V = [0, s, 0];
-  b.name('wheel').mat(SILVER, 0.55, 'metal');
-  for (let k = 0; k < 5; k++) { const a = spin + (k / 5 + 0.25) * Math.PI * 2, r0 = 58, r1 = rim - 16, w0 = 0.52, w1 = 0.2, m = 0.5 * (r0 + r1), wm = 0.24, ym = lerp(yi, yo, 0.6);
-    const A = [P(r0, a - w0, yi), P(m, a - wm, ym), P(r1, a - w1, yo)], B = [P(r0, a + w0, yi), P(m, a + wm, ym), P(r1, a + w1, yo)], back = (p: V): V => [p[0], p[1] - s * 26, p[2]];
-    for (let q = 0; q < 2; q++) { face(b, A[q]!, A[q + 1]!, B[q + 1]!, B[q]!, out); face(b, A[q]!, A[q + 1]!, back(A[q + 1]!), back(A[q]!), sub(A[q]!, B[q]!)); face(b, B[q]!, B[q + 1]!, back(B[q + 1]!), back(B[q]!), sub(B[q]!, A[q]!)); } }
-  b.lathe('y', o, [[yi - s * wy - s * 4, 74], [yi - s * wy + s * 2, 66], [yi - s * wy + s * 4, 0]], 10, false);
+  // the face: a dished disc from the hub out to the rim, five round holes through it (dark, laid on the dish)
+  const yo = s * wy + f - s * 30, yi = s * wy + f - s * (front ? 40 : 66), r0 = 44, r1 = rim - 14, yAt = (r: number) => lerp(yi, yo, Math.max(0, Math.min(1, (r - r0) / (r1 - r0))) ** 0.8);
+  b.name('wheel').mat(SILVER, 0.55, 'metal').lathe('y', o, [[yAt(r1) - s * wy, r1], [yAt(150) - s * wy, 150], [yAt(95) - s * wy, 95], [yi - s * wy, r0], [yi - s * wy + s * 5, 0]], 20, false);
+  b.name('wheel').mat(DARK, 0.05); for (let k = 0; k < 5; k++) { const a = spin + (k / 5 + 0.25) * Math.PI * 2, rc = 134, hr = 44, P = (px: number, pz: number): V => [x + px, yAt(Math.hypot(px, pz)) + s * 2.5, R + pz], cx = Math.cos(a) * rc, cz = Math.sin(a) * rc;
+    for (let q = 0; q < 10; q++) { const t0 = q / 10 * Math.PI * 2, t1 = (q + 1) / 10 * Math.PI * 2, wd = 1.12;   // a little wider round the wheel than along the spoke
+      const e = (t: number): V => { const u = Math.cos(t) * hr, v = Math.sin(t) * hr * wd; return P(cx + u * Math.cos(a) - v * Math.sin(a), cz + u * Math.sin(a) + v * Math.cos(a)); }; tri(b, P(cx, cz), e(t0), e(t1), [0, s, 0]); } }
   b.name('hub').mat(FRAME, 0.3); disc(b, [x, yi + s * 5, R], 30, 8);
   b.name('hub').mat(CHROME, 0.8, 'metal'); for (let k = 0; k < 5; k++) { const a = spin + (k / 5 + 0.05) * Math.PI * 2; disc(b, [x + Math.cos(a) * 50, yi + s * 3, R + Math.sin(a) * 50], 8, 5); }
 }
@@ -159,7 +158,7 @@ export function diabloMesh(spin = 0, lamps = 0, wing = 0): Mesh { const b = new 
   const SD = SF.slice(at(XR1)), RD: V[][] = SD.map((x, k) => { const xc = k ? x : XCV, zc = ZCV(xc); return [[xc, 0, zc], [xc, 235, zc], [xc, YCV, zc], [x, YRI, ZB(x) + 1.5 * (1 - sm(XR1, 3400, x))], ptE(x)]; });
 
   // ---- the panels ----
-  const iA = at(XA), iDF = at(1470), iDR = at(2560), iR = at(XR1), iH0 = at(2300), iH1 = at(2800), iAR = at(3262), iCW = STOP.indexOf(1108);
+  const iA = at(XA), iDF = at(1470), iDR = at(2560), iR = at(XR1), iH0 = at(2450), iH1 = at(2990), iAR = at(3262), iCW = STOP.indexOf(1108);
   const hole = (i: number, j: number) => i >= iH0 && i < iH1 && (j === 4 || j === 5);
   const isCover = (i: number, j: number) => i >= STOP.indexOf(SL) && i < STOP.indexOf(SC) && j >= 4 && j < 7;
   b.name('bumperF').mat(PAINT, GLOSS, 'paint'); cells(TF.slice(0, 2), (_, j) => j < NC - 1); cells(NU.slice(0, NC)); cells(NBP, (i, j) => !(j === 3 && (i < 2 || (i >= 4 && i < 6))) && !(j === 1 && i >= 4 && i < 10));
@@ -221,7 +220,7 @@ export function diabloMesh(spin = 0, lamps = 0, wing = 0): Mesh { const b = new 
     seam(RD[at(4150) - iR]!.slice(0, 3), () => UPV); }
 
   // ---- the scoop pressed into the door's foot: it deepens to the slanted intake ahead of the rear wheel ----
-  { const dep = (x: number) => 95 * Math.min(1, (x - SF[iH0]!) / (2620 - SF[iH0]!)), inn = (i: number, j: number): V => { const p = CH[i]![j]!; return [p[0], p[1] - dep(p[0]), p[2] + (j === 4 ? -8 : j === 6 ? 8 : 0)]; };
+  { const dep = (x: number) => 105 * Math.min(1, (x - SF[iH0]!) / (2800 - SF[iH0]!)), inn = (i: number, j: number): V => { const p = CH[i]![j]!; return [p[0], p[1] - dep(p[0]), p[2] + (j === 4 ? -8 : j === 6 ? 8 : 0)]; };
     const IN: V[][] = []; for (let i = iH0; i <= iH1; i++) IN.push([CH[i]![4]!, inn(i, 4), inn(i, 5), inn(i, 6), CH[i]![6]!]);
     b.name('scoop').mat(PAINT, GLOSS, 'paint'); cells(IN, (i, j) => j === 0 || j === 3 || i + iH0 < iH1 - 1);
     for (const sg of [1, -1]) { const m = (p: V) => mir(p, sg), a = IN[IN.length - 2]!, c = IN[IN.length - 1]!; tri(b, m(a[1]!), m(a[3]!), m(c[3]!), [0, sg, 0]);
@@ -268,8 +267,7 @@ export function diabloMesh(spin = 0, lamps = 0, wing = 0): Mesh { const b = new 
 
   // ---- the back of the cabin: the upright rear window between the buttresses, over the engine cover's front edge ----
   { const rt = RFG[RFG.length - 1]!, zc = ZCV(XCV);
-    b.name('rearPane').mat(GLASS, 0.5, 'glass'); for (let j = 0; j + 2 < NC; j++) for (const sg of [1, -1]) face(b, mir(rt[j]!, sg), mir(rt[j + 1]!, sg), [XCV, sg * rt[j + 1]![1] * YCV / YRI, zc], [XCV, sg * rt[j]![1] * YCV / YRI, zc], [1, 0, 0.3]);
-    b.name('screenFrame').mat(FRAME, 0.2); for (const sg of [1, -1]) tri(b, mir(rt[NC - 2]!, sg), [XCV, sg * YCV, zc], mir(RD[0]![3]!, sg), [1, 0, 0]); }
+    b.name('rearPane').mat(GLASS, 0.5, 'glass'); for (let j = 0; j + 2 < NC; j++) for (const sg of [1, -1]) face(b, mir(rt[j]!, sg), mir(rt[j + 1]!, sg), [XCV, sg * rt[j + 1]![1] * YCV / YRI, zc], [XCV, sg * rt[j]![1] * YCV / YRI, zc], [1, 0, 0.3]); }
   // the engine cover's louvres (two banks of raised slats, open to the back) and its centre rib
   b.name('louvre').mat(PAINT, GLOSS, 'paint'); for (const sg of [1, -1]) for (let k = 0; k < 7; k++) { const x0 = 2850 + k * 150, x1 = x0 + 95, ya = sg * 95, yb = sg * 405, z0 = ZCV(x0) + 1, z1 = ZCV(x1) + 24;
     face(b, [x0, ya, z0], [x0, yb, z0], [x1, yb, z1], [x1, ya, z1], [0, 0, 1]); tri(b, [x0, ya, z0], [x1, ya, z1], [x1, ya, ZCV(x1)], [0, -sg, 0]); tri(b, [x0, yb, z0], [x1, yb, z1], [x1, yb, ZCV(x1)], [0, sg, 0]); }
@@ -278,7 +276,7 @@ export function diabloMesh(spin = 0, lamps = 0, wing = 0): Mesh { const b = new 
 
   // ---- the cabin behind the glass: floor, door panels, bulkheads, dash, tunnel, wheel, two seats ----
   { const FL = 150, xa = 1180, xb = XR1 + 6, UPV: V = [0, 0, 1];
-    b.name('cockpit').mat(DARK, 0.05); face(b, [xa, -800, FL], [xb, -800, FL], [xb, 800, FL], [xa, 800, FL], UPV); face(b, [xb, -800, FL], [xb, 800, FL], [xb, 800, ZCV(XCV) - 4], [xb, -800, ZCV(XCV) - 4], [-1, 0, 0]);
+    b.name('cockpit').mat(DARK, 0.05); face(b, [xa, -800, FL], [xb, -800, FL], [xb, 800, FL], [xa, 800, FL], UPV); fan(b, [[xb, -780, FL], [xb, 780, FL], [xb, 780, 790], [xb, 520, ZCV(XCV) - 4], [xb, -520, ZCV(XCV) - 4], [xb, -780, 790]], [-1, 0, 0]);
     b.name('cockpit').mat(TRIM, 0.1); for (const sg of [1, -1]) { const xs = [1240, 1400, XR0, 2300, xb]; for (let k = 0; k + 1 < xs.length; k++) { const p = ptG(Math.min(XR1, xs[k]!)), q = ptG(Math.min(XR1, xs[k + 1]!)); face(b, [xs[k]!, sg * (p[1] - 14), FL], [xs[k + 1]!, sg * (q[1] - 14), FL], [xs[k + 1]!, sg * (q[1] - 14), q[2] - 6], [xs[k]!, sg * (p[1] - 14), p[2] - 6], [0, -sg, 0]); } }
     // the dash: its top from the screen's foot back to a crest, its face down to the floor
     const crest = (y: number): V => [1290 + 150 * (Math.abs(y) / YP) ** 2, y * 0.96, 800 - 60 * (Math.abs(y) / YP) ** 2];

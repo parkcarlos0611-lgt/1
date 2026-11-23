@@ -1,0 +1,856 @@
+{
+ "id": "diablo",
+ "name": "Lamborghini Diablo (1990, the first rear-drive car: pop-up head lamps, no rear wing)",
+ "doc": "docs/systems/81_diablo_panel_plan.md",
+ "axes": "mm; x from the nose tip (0) back to the tail (4460); y half-width from the centre line (symmetric, positive); z from the ground at static ride height",
+ "tolerance": {
+  "overall": "makers' figures: exact (length, width, height, wheelbase, tracks, tyres)",
+  "overhangs": "+-30: read on the GT/GTR drawings (952 and 930 front for 4430 long cars with their own bumpers), set to 1000/810 for the 4460 long 1990 car",
+  "profile": "+-25 in z, +-30 in x: read on the kit side drawing (4.07 mm/px, isotropic)",
+  "plan": "+-30: read on the blueprint plan (about 10.2 mm/px along, 10.4 across) and the kit plan (4.2 mm/px along, 3.9 across)",
+  "parts": "+-40; the 1990 car's own parts (pop-up lamps, bumpers, tail band, engine cover louvres, wheels) are from memory of the car and the 3D model picture, placed on the measured body: +-60"
+ },
+ "sources": [
+  "makers' data: length 4460, width 2040, height 1105, wheelbase 2650, tracks 1540/1640, tyres 245/40 ZR17 and 335/35 ZR17 on 8.5x17 and 13x17 wheels",
+  "kit instruction sheet, Diablo GT, four line views (kit_4view.png): side read for the profile, the glass, the door, the creases; plan read for the screen, roof, glass, ridges; its front and rear views are perspective drawings (used for layout only)",
+  "the-blueprints.com Diablo GTR 4-view (blueprint_gtr.png): plan half-widths, front and rear outline; core body only (the race kit ignored)",
+  "a 3D model of a Diablo VT/SV with the lamps raised, panel edges shown (model_3dsmax.png): how the body splits into panels"
+ ],
+ "drawingChecks": {
+  "_": "how each drawing was scaled, and what was found (the lesson of eb110.json corrections_138: check before trusting one scale)",
+  "kitSide": "wheel centres found by circle fit at px (301.8, 1087) and (952.2, 1085.8): wheelbase 650.4 px = 2650 -> 4.074 mm/px; front tyre radius 78 px = 318 mm (real 314): isotropic within 2 %, no correction; ground row 1165",
+  "kitPlan": "photographed at an angle: 4.2 mm/px along (nose px 70 to tail px 1125 = 4430), 3.9 mm/px across (widest 2040), centre line tilted (row 470 at the nose, 445 at the tail); widths read with the cross scale",
+  "kitFrontRear": "perspective (the near end larger): not measured",
+  "blueprintSide": "wheel centres px 128.5 and 392.5: 10.04 mm/px along; tyres 62 px wide and 60 px tall (round within 3 %), roof 108 px above the ground = 1084 at that scale against 1115 real: squashed about 3 % in z (not 18 %); z scaled by the height (10.3 mm/px)",
+  "blueprintPlan": "centre row 360, widest half 98 px = 1020 -> 10.41 mm/px across; nose px 35, tail px 470",
+  "gtVs1990": "the GT and GTR have their own bumpers (shorter nose), fixed lamps, wide arches, a roof scoop and a wing: none carried over; the body between the axles and the upper lines are common"
+ },
+ "overall": {
+  "length": 4460,
+  "width": 2040,
+  "height": 1105,
+  "wheelbase": 2650,
+  "overhangF": 1000,
+  "overhangR": 810,
+  "axleF": 1000,
+  "axleR": 3650,
+  "trackF": 1540,
+  "trackR": 1640,
+  "tyreF": "245/40 ZR17 (radius 314)",
+  "tyreR": "335/35 ZR17 (radius 333)",
+  "wheelF": "8.5x17",
+  "wheelR": "13x17",
+  "groundClearance": 110,
+  "widthWithMirrors": 2196
+ },
+ "profile": {
+  "_": "the silhouette from the side as a polyline [x, z]: straight runs, the joints rounded over 20-60 mm only",
+  "top": [
+   [
+    0,
+    340
+   ],
+   [
+    50,
+    385
+   ],
+   [
+    520,
+    632
+   ],
+   [
+    900,
+    714
+   ],
+   [
+    1780,
+    1056
+   ],
+   [
+    1900,
+    1075
+   ],
+   [
+    2000,
+    1087
+   ],
+   [
+    2200,
+    1099
+   ],
+   [
+    2450,
+    1105
+   ],
+   [
+    2600,
+    1101
+   ],
+   [
+    2690,
+    1094
+   ],
+   [
+    3000,
+    1060
+   ],
+   [
+    3500,
+    1018
+   ],
+   [
+    4000,
+    962
+   ],
+   [
+    4330,
+    905
+   ],
+   [
+    4384,
+    600
+   ],
+   [
+    4456,
+    590
+   ],
+   [
+    4460,
+    352
+   ],
+   [
+    4372,
+    185
+   ]
+  ],
+  "runs": {
+   "nose": "0-50: the lip, tip line at z 340",
+   "lampSlope": "50-520 at 28 degrees (over the pop-up covers)",
+   "bonnet": "520-900 at 12 degrees",
+   "screen": "900-1780 at 21 degrees (centre line; the corners' foot at x 1150)",
+   "roof": "1780-2690, highest 1105 at 2450",
+   "ridge": "2690-4330 falling 6-10 degrees (the buttress ridges; the engine cover lies 110-10 below, see edges.engineCover)",
+   "tail": "4330-4384 leaning back 10 degrees down to z 600, then the bumper"
+  },
+  "bottom": [
+   [
+    30,
+    105
+   ],
+   [
+    640,
+    105
+   ],
+   [
+    1350,
+    110
+   ],
+   [
+    3262,
+    110
+   ],
+   [
+    4045,
+    110
+   ],
+   [
+    4330,
+    110
+   ],
+   [
+    4372,
+    185
+   ]
+  ],
+  "wedge": "nose tip to screen top: 0/340 to 1780/1056, the bonnet within 60 of that line"
+ },
+ "plan": {
+  "_": "half-width at x at the widest line (mirrors excluded); the nose square with round corners, widest over the rear wheels",
+  "half": [
+   [
+    0,
+    0
+   ],
+   [
+    6,
+    500
+   ],
+   [
+    60,
+    760
+   ],
+   [
+    200,
+    850
+   ],
+   [
+    640,
+    900
+   ],
+   [
+    1000,
+    915
+   ],
+   [
+    1400,
+    922
+   ],
+   [
+    2000,
+    945
+   ],
+   [
+    2500,
+    970
+   ],
+   [
+    3000,
+    1000
+   ],
+   [
+    3400,
+    1018
+   ],
+   [
+    3650,
+    1020
+   ],
+   [
+    3900,
+    1012
+   ],
+   [
+    4100,
+    992
+   ],
+   [
+    4250,
+    965
+   ],
+   [
+    4330,
+    925
+   ],
+   [
+    4456,
+    800
+   ]
+  ],
+  "screenFoot": [
+   [
+    900,
+    0
+   ],
+   [
+    930,
+    400
+   ],
+   [
+    1000,
+    600
+   ],
+   [
+    1080,
+    700
+   ],
+   [
+    1150,
+    770
+   ]
+  ],
+  "roof": {
+   "frontCentre": 1780,
+   "frontCorner": [
+    1840,
+    490
+   ],
+   "halfWidth": 490,
+   "back": 2690
+  },
+  "ridge": "the roof's edge runs straight back as the buttress ridge: outer edge y 490 at 2690, 505 at 3000, 560 at 3400, 700 at 4000, 790 at 4330; inner wall y 458",
+  "glassFoot": "y 867 at 1150 (the wing), 757 at 1400, 775 at 2000, 800 at 2500: 170 inboard of the widest line along the door (kit plan 776, blueprint 750)"
+ },
+ "edges": {
+  "_": "the lines along the flank, [x, z]",
+  "wedgeLine": [
+   [
+    0,
+    340
+   ],
+   [
+    520,
+    632
+   ],
+   [
+    1150,
+    768
+   ],
+   [
+    1840,
+    1068
+   ]
+  ],
+  "glassFoot": [
+   [
+    1150,
+    768
+   ],
+   [
+    1240,
+    744
+   ],
+   [
+    1400,
+    700
+   ],
+   [
+    1500,
+    712
+   ],
+   [
+    2000,
+    762
+   ],
+   [
+    2450,
+    810
+   ],
+   [
+    3000,
+    843
+   ],
+   [
+    3250,
+    860
+   ],
+   [
+    3650,
+    890
+   ],
+   [
+    4330,
+    898
+   ]
+  ],
+  "doorTopKink": "the glass's foot drops from the wing's crest (768 at x 1150) to its lowest, 700 at x 1400 behind the mirror, then climbs 0.105 per mm to 810 at the door's back edge",
+  "ledge": "from the glass's foot out and down to the flank's top edge 120 outboard and 36 lower (a 17 degree shelf), then a rounded shoulder 50 wide to the crease",
+  "crease": [
+   [
+    1150,
+    704
+   ],
+   [
+    1400,
+    575
+   ],
+   [
+    1500,
+    592
+   ],
+   [
+    2580,
+    730
+   ],
+   [
+    3250,
+    790
+   ],
+   [
+    4000,
+    800
+   ],
+   [
+    4330,
+    798
+   ]
+  ],
+  "sill": [
+   [
+    1350,
+    110
+   ],
+   [
+    3262,
+    110
+   ]
+  ],
+  "engineCover": [
+   [
+    2725,
+    955
+   ],
+   [
+    3300,
+    940
+   ],
+   [
+    4000,
+    915
+   ],
+   [
+    4330,
+    897
+   ]
+  ],
+  "noseLine": "the bumper's top line round the nose at z 340 (a shut line from arch to arch)"
+ },
+ "arches": {
+  "front": {
+   "centre": 1000,
+   "shape": "half round",
+   "radius": 350,
+   "top": 661,
+   "tyreRadius": 314
+  },
+  "rear": {
+   "centre": 3650,
+   "shape": "Gandini: a cut polygon, raked front leg, flat top, steeper back",
+   "outline": [
+    [
+     3262,
+     110
+    ],
+    [
+     3285,
+     300
+    ],
+    [
+     3330,
+     480
+    ],
+    [
+     3400,
+     620
+    ],
+    [
+     3450,
+     680
+    ],
+    [
+     3500,
+     706
+    ],
+    [
+     3800,
+     712
+    ],
+    [
+     3870,
+     690
+    ],
+    [
+     3950,
+     620
+    ],
+    [
+     4010,
+     480
+    ],
+    [
+     4035,
+     300
+    ],
+    [
+     4045,
+     110
+    ]
+   ],
+   "tyreRadius": 333
+  }
+ },
+ "panels": {
+  "_": "15 volumes (plan 81 section 3), each its own surface, sharing border points",
+  "1_frontBumper": "x 0-640 below the nose line z 340: lamp strip z 262-300, three intakes z 160-250, chin z 105-135",
+  "2_bonnet": "the lid: flat, x 185-1108, half-width 430; ahead of the screen a black cowl 1108-1150",
+  "3_lampCovers": "x 215-485, y 450-770 each side, on the 28 degree slope; hinge at the back edge, 31 degrees up",
+  "4_frontWings": "from the nose round to the door's front edge x 1470; crest 50 in from the widest line",
+  "5_cabin": "screen 900/1150-1780/1840, pillars leaning in 45 degrees, roof 1840-2690 half-width 490; interior: dash, tunnel, two seats, wheel",
+  "6_doors": "x 1470-2560, from the glass's foot to the scoop's top edge z 310-430; scissor doors, closed",
+  "7_sills": "z 110-310 under the doors, the scoop pressed in from x 2450",
+  "8_rearQuarters": "x 2560-4330: the widest shoulder, the rear arch, the lower intake",
+  "9_buttresses": "the ridge from the roof's corner to the tail, and the slope outboard of it (quarter glass, upper intake)",
+  "10_engineCover": "between the ridges, half-width 450, x 2725-4150; louvres two banks of 7; a short deck behind it to 4330",
+  "11_tailPanel": "x 4330 at the top leaning back to 4384 at z 600; the black band z 650-848 sunk 30",
+  "12_rearBumper": "z 336-612, standing 70 proud, rear face at x 4456; valance z 185-336 with the grille and pipes",
+  "13_floor": "flat at z 110; wheel wells dark, inner walls at y 600/610",
+  "14_wheels": "OZ five-hole, 17 in; rear much wider",
+  "15_wing": "optional (wing = 1): blade x 4130-4430 at z 1104-1132, span 1760, two struts at y 572"
+ },
+ "parts": [
+  {
+   "id": "popupLamp",
+   "pair": true,
+   "x": [
+    215,
+    485
+   ],
+   "y": [
+    450,
+    770
+   ],
+   "z": [
+    470,
+    615
+   ],
+   "shape": "cover flush in the slope; raised: a wedge pod with two rectangular lamps side by side on its front face",
+   "source": "3D model picture, kit plan (lamp recess 210-520)"
+  },
+  {
+   "id": "lampWell",
+   "pair": true,
+   "x": [
+    215,
+    485
+   ],
+   "y": [
+    450,
+    770
+   ],
+   "depth": 70,
+   "shape": "dark well under the cover"
+  },
+  {
+   "id": "frontLid",
+   "x": [
+    185,
+    1108
+   ],
+   "yHalf": 430,
+   "shape": "flat trapezoid lid; shut lines only"
+  },
+  {
+   "id": "cowl",
+   "x": [
+    1108,
+    1150
+   ],
+   "shape": "black strip under the screen's foot"
+  },
+  {
+   "id": "indicatorF",
+   "pair": true,
+   "x": [
+    20,
+    120
+   ],
+   "y": [
+    560,
+    800
+   ],
+   "z": [
+    262,
+    300
+   ],
+   "shape": "amber, wrapping the corner, in the strip under the nose line"
+  },
+  {
+   "id": "sideLightF",
+   "pair": true,
+   "y": [
+    330,
+    560
+   ],
+   "z": [
+    262,
+    300
+   ],
+   "shape": "clear, inboard of the indicator in the same strip"
+  },
+  {
+   "id": "intakeFrontCentre",
+   "yHalf": 330,
+   "z": [
+    160,
+    250
+   ],
+   "depth": 110,
+   "shape": "wide slot, dark mesh"
+  },
+  {
+   "id": "brakeDuct",
+   "pair": true,
+   "y": [
+    450,
+    720
+   ],
+   "z": [
+    160,
+    250
+   ],
+   "depth": 110,
+   "shape": "slot each side of the centre intake"
+  },
+  {
+   "id": "chin",
+   "z": [
+    105,
+    135
+   ],
+   "shape": "the bumper's foot, 30 back from the face"
+  },
+  {
+   "id": "badgeF",
+   "x": [
+    150,
+    212
+   ],
+   "y": 0,
+   "shape": "the bull's shield on the lid's nose"
+  },
+  {
+   "id": "repeater",
+   "pair": true,
+   "x": 560,
+   "z": 470,
+   "shape": "round amber repeater on the front wing ahead of the arch"
+  },
+  {
+   "id": "windscreen",
+   "x": [
+    900,
+    1840
+   ],
+   "shape": "one pane, 21 degrees, a black band round it; a little crown"
+  },
+  {
+   "id": "wiper",
+   "x": [
+    905,
+    1010
+   ],
+   "y": [
+    -420,
+    330
+   ],
+   "shape": "single arm parked along the screen's foot"
+  },
+  {
+   "id": "mirror",
+   "pair": true,
+   "x": [
+    1340,
+    1505
+   ],
+   "y": [
+    905,
+    1098
+   ],
+   "z": [
+    696,
+    800
+   ],
+   "shape": "body colour housing on a short foot on the ledge at the side glass's front corner"
+  },
+  {
+   "id": "sideGlass",
+   "pair": true,
+   "x": [
+    1240,
+    2450
+   ],
+   "zFoot": "edges.glassFoot",
+   "shape": "a long triangle: front point at the pillar's foot, back edge upright at the B post 2450-2520"
+  },
+  {
+   "id": "quarterGlass",
+   "pair": true,
+   "x": [
+    2562,
+    3040
+   ],
+   "shape": "on the slope behind the B post: foot 2562-3040, top 2562-2800, back edge raked; black frame",
+   "source": "kit side and plan"
+  },
+  {
+   "id": "intakeUpper",
+   "pair": true,
+   "x": [
+    3120,
+    3650
+   ],
+   "y": [
+    580,
+    840
+   ],
+   "z": [
+    880,
+    1005
+   ],
+   "shape": "a channel sinking back along the slope behind the quarter glass to a slanted mouth (inner end x 3450, outer end x 3650), 85 deep",
+   "source": "kit plan (mouth 3500-3680), kit side"
+  },
+  {
+   "id": "doorScoop",
+   "pair": true,
+   "x": [
+    2450,
+    2990
+   ],
+   "z": [
+    205,
+    430
+   ],
+   "shape": "a pressing in the door's foot and the quarter, deepening to 105"
+  },
+  {
+   "id": "intakeLower",
+   "pair": true,
+   "x": 2990,
+   "z": [
+    205,
+    430
+   ],
+   "shape": "the dark mouth ahead of the rear wheel that the scoop runs into; two slats",
+   "source": "3D model picture"
+  },
+  {
+   "id": "doorLines",
+   "pair": true,
+   "front": 1470,
+   "back": 2560,
+   "shape": "front edge upright from the ledge to the sill; back edge upright to the scoop"
+  },
+  {
+   "id": "rearWindow",
+   "x": [
+    2690,
+    2725
+   ],
+   "yHalf": 450,
+   "z": [
+    955,
+    1090
+   ],
+   "shape": "upright pane between the ridges over the engine cover's front edge"
+  },
+  {
+   "id": "louvres",
+   "x": [
+    2850,
+    3845
+   ],
+   "y": [
+    95,
+    405
+   ],
+   "shape": "two banks of seven raised slats open to the back, a rib between them on the centre line"
+  },
+  {
+   "id": "tailBand",
+   "x": 4345,
+   "yHalf": 850,
+   "z": [
+    650,
+    848
+   ],
+   "shape": "black band across the tail, sunk 30; a mesh grille in its middle (yHalf 440)"
+  },
+  {
+   "id": "tailLamp",
+   "pair": true,
+   "y": [
+    462,
+    736
+   ],
+   "z": [
+    666,
+    832
+   ],
+   "shape": "two red lamps side by side in the band (y 462-592, 606-736)"
+  },
+  {
+   "id": "indicatorR",
+   "pair": true,
+   "y": [
+    750,
+    846
+   ],
+   "z": [
+    666,
+    832
+   ],
+   "shape": "amber, outboard of the red lamps"
+  },
+  {
+   "id": "rearGrille",
+   "yHalf": 430,
+   "z": [
+    212,
+    322
+   ],
+   "shape": "dark mesh in the valance round the pipes"
+  },
+  {
+   "id": "exhaust",
+   "count": 4,
+   "y": [
+    -190,
+    -70,
+    70,
+    190
+   ],
+   "z": 262,
+   "radius": 38,
+   "shape": "four pipes in a row on the centre"
+  },
+  {
+   "id": "plate",
+   "yHalf": 260,
+   "z": [
+    405,
+    515
+   ],
+   "shape": "on the bumper's face"
+  },
+  {
+   "id": "reverseFog",
+   "pair": true,
+   "y": [
+    520,
+    700
+   ],
+   "z": [
+    232,
+    292
+   ],
+   "shape": "clear lamp each side in the valance"
+  },
+  {
+   "id": "wheelF",
+   "pair": true,
+   "x": 1000,
+   "y": 770,
+   "radius": 314,
+   "width": 245,
+   "shape": "OZ: polished lip, dished disc with five round holes (radius 44 on a 134 circle), five bolts, centre cap"
+  },
+  {
+   "id": "wheelR",
+   "pair": true,
+   "x": 3650,
+   "y": 820,
+   "radius": 333,
+   "width": 335,
+   "shape": "as the front, deeper dish (the face 66 in from the tyre's wall)"
+  },
+  {
+   "id": "wing",
+   "optional": true,
+   "x": [
+    4130,
+    4430
+   ],
+   "z": [
+    1104,
+    1132
+   ],
+   "span": 1760,
+   "shape": "blade on two struts; not on the 1990 car as standard"
+  }
+ ],
+ "colours": {
+  "paint": "#b0141c (Rosso), gloss 0.6",
+  "black": "tail band, lower grilles, glass frames, cowl",
+  "interior": "tan leather seats, dark trim"
+ }
+}

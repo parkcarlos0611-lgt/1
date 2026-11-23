@@ -145,7 +145,9 @@ export function diabloMesh(spin = 0, lamps = 0, wing = 0): Mesh { const b = new 
   const LG: V[][] = SF.slice(at(XA)).map((x, k) => { if (!k) return TF[NT - 1]!.slice(NC - 1); const G = ptG(x), K = CH[at(XA) + k]![0]!; return [G, mix(G, K, 1 - 15 / (K[1] - G[1])), K]; });
   // the upper side: E, the rail T, two points down the glass (or the slope), G
   // (the door glass bulges a little; behind the door the slope is flat between a narrow strip at the rail and one at its foot)
-  const upper = (x: number): V[] => { const E = ptE(x), T = ptT(x), G = ptG(x), bl = 12 * (1 - sm(2450, 2520, x)) * sm(XA, 1400, x), out = (u: number): V => { const p = mix(T, G, u); return [p[0], p[1] + bl * 0.7, p[2] + bl * 0.7]; }, back = x >= 2520; return [E, T, out(back ? 0.12 : 1 / 3), out(back ? 0.88 : 2 / 3), G]; };
+  /** the glass's top at x: ahead of the roof the A pillar is a broad body-coloured band (about 110 mm across its face, review 143), so the glass starts that far down the side from the pillar's line; it eases into the roof's rail behind */
+  const glassTop = (x: number, E: V, G: V): V => { const T = ptT(x); if (x >= XR0) return T; const d = sub(G, E), l = Math.hypot(d[0], d[1], d[2]) || 1, w = 110 * (1 - sm(XR0 - 220, XR0, x)), f = Math.min(0.45, w / l), P = mix(E, G, f); return mix(P, T, sm(XR0 - 220, XR0, x)); };
+  const upper = (x: number): V[] => { const E = ptE(x), G = ptG(x), T = glassTop(x, E, G), bl = 12 * (1 - sm(2450, 2520, x)) * sm(XA, 1400, x), out = (u: number): V => { const p = mix(T, G, u); return [p[0], p[1] + bl * 0.7, p[2] + bl * 0.7]; }, back = x >= 2520; return [E, T, out(back ? 0.12 : 1 / 3), out(back ? 0.88 : 2 / 3), G]; };
   /** a point on the slope behind the door: u from the rail (0) to its foot (1), lifted off the surface */
   const onSlope = (x: number, u: number, lift: number): V => { const T = ptT(x), G = ptG(x), n = un(cross(sub(ptT(x + 60), T), sub(G, T))), p = mix(T, G, u); return [p[0] + n[0] * lift, p[1] + n[1] * lift, p[2] + n[2] * lift]; };
   const US: V[][] = SF.slice(at(XA)).map(upper);
@@ -173,8 +175,10 @@ export function diabloMesh(spin = 0, lamps = 0, wing = 0): Mesh { const b = new 
   b.name('indicatorF').mat(AMBER, 0.7); cells(NBP, (i, j) => j === 1 && i >= 7 && i < 10);
   b.name('roof').mat(PAINT, GLOSS, 'paint'); cells(RFG); cells(US, (i, j) => i + iA >= at(XR0) && i + iA < iR && j === 0); cells(US, (i, j) => i + iA >= at(2450) && i + iA < at(2520) && j > 0);
   b.name('screenPane').mat(GLASS, 0.5, 'glass'); cells(SCR, (i, j) => i >= 1 && i < 5 && j < NC - 2);
-  b.name('screenFrame').mat(FRAME, 0.2); cells(SCR, (i, j) => !(i >= 1 && i < 5 && j < NC - 2)); cells(US, (i, j) => i + iA < at(1240) && j > 0);
-  b.name('sidePane').mat(GLASS, 0.5, 'glass'); cells(US, (i, j) => i + iA >= at(1240) && i + iA < at(2450) && j > 0);
+  // the A pillar (review 143, the photographs): broad and body-coloured between the screen and the door glass, a black rubber edge only at the door glass
+  b.name('screenFrame').mat(FRAME, 0.2); cells(SCR, (i, j) => !(i >= 1 && i < 5)); cells(US, (i, j) => i + iA >= at(1283) && i + iA < at(1333) && j > 0);
+  b.name('pillarA').mat(PAINT, GLOSS, 'paint'); cells(SCR, (i, j) => i >= 1 && i < 5 && j >= NC - 2); cells(US, (i, j) => i + iA < at(1283) && j > 0); cells(US, (i, j) => i + iA < at(XR0) && j === 0);
+  b.name('sidePane').mat(GLASS, 0.5, 'glass'); cells(US, (i, j) => i + iA >= at(1333) && i + iA < at(2450) && j > 0);
   // the slope outboard of each buttress ridge, with the upper intake's hole (a channel sinking back to a slanted mouth)
   const iU0 = at(3120) - iA, iU1 = at(RX) - iA, iUM = at(3450) - iA, isUp = (i: number, j: number) => i >= iU0 && i < iU1 && j === 2;
   b.name('buttress').mat(PAINT, GLOSS, 'paint'); cells(US, (i, j) => i + iA >= at(2520) && (j > 0 || i + iA >= iR) && !isUp(i, j)); cells(RD, (_, j) => j >= 2);

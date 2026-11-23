@@ -44,3 +44,19 @@ reaches; the load sets the hub's height over it (a standing give of about 5 % of
 high-pressure clinchers); the side and drive forces shear the patch across and along. The live renderer bends the tyre
 by it in the vertex shader (the tread pressed in, the walls bulging, the patch pulled), on tyres cut finer along their
 arcs. It shapes the tyres only: grip and springing stay the vehicle's, which already hold the tyre's give.
+
+## Done (review 121): steps 1 to 3
+- race/damage.ts: the structure built from a car's mesh at its first blow: nodes in 28 cm cells through its skin, each
+  named for the part most there, and (as most meshes are only their outside) a ladder frame and the engine block added
+  from the wheels' places; beams to every node within 1.8 cells, of the weaker end's stuff (frame, panel, bright work,
+  glass, engine, upholstery), weaker between parts (the mounts). A blow presses a flat impactor into the car along it,
+  the structure relaxing (by stiffness) about it, until the beams' elastic and plastic work has taken the blow's energy;
+  past yield a beam's rest length follows (the bend kept), past breaking it parts. The skin follows its four nearest
+  nodes. A part whose every mount has parted comes away and flies off as a piece of its own (the 540K's lamps).
+- The blows: cars meeting (the energy their impact takes out, halved between them), the fence (a share of the speed it
+  costs), the body landing on or rolling onto the ground.
+- What it does to the car: a wheel's mounting knocked askew sets its toe and camber (the car pulls, the tyre leans); a
+  crushed radiator cools less and, past half, leaks.
+- The crash test (tools/dev/crash.ts): the SSJ crushes 5 cm at 15 km/h into a wall, about 27 cm at 50; a door struck at
+  30 km/h goes in about 35 cm. 40-100 ms a blow.
+- The baked pictures do not bend (the live renderer draws the bent skin); the garage's repair of the damage is still to do.

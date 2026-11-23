@@ -5,7 +5,7 @@
 // from a shadow map; then a pass draws the dark outline round each thing and the thin lines between its parts from those
 // layers, as the baked pictures have them. A car something stands before shows its light outline over just the hidden
 // part. The picture is enlarged by whole pixels on the page.
-import { gpuMesh, program, placeMesh, mul, translate, rot, ATTR, type GpuMesh, type M4 } from './gpu';
+import { freeGpu, gpuMesh, program, placeMesh, mul, translate, rot, ATTR, type GpuMesh, type M4 } from './gpu';
 import type { GroundData } from './ground';
 import type { Mesh } from '../car/mesh';
 
@@ -451,6 +451,9 @@ export class LiveRenderer {
   /** the GPU copy of a prop's mesh (by kind) or a car's (by its mesh object), made once */
   prop(kind: string, make: () => Mesh): GpuMesh { let g = this.kinds.get(kind); if (!g) { g = gpuMesh(this.gl, make(), false); this.kinds.set(kind, g); } return g; }
   car(M: Mesh): GpuMesh { let g = this.cars.get(M); if (!g) { g = gpuMesh(this.gl, M, true); this.cars.set(M, g); } return g; }
+  /** a car's mesh replaced by another (its deformed self, review 121): the new one on the GPU with the old one's art, the old one freed */
+  swapCar(old: Mesh, M: Mesh): GpuMesh { const og = this.cars.get(old), g = gpuMesh(this.gl, M, true); this.cars.set(M, g);
+    if (og) { const a = this.arts.get(og); if (a) { this.arts.set(g, a); this.arts.delete(og); } freeGpu(this.gl, og); this.cars.delete(old); } return g; }
   forget(M: Mesh) { this.cars.delete(M); }
 
   render(v: LiveView, cars: LiveCar[], props: LiveProp[], skids: Skid[], o: { glass?: number; /** 0 the baked look, 1 PBR stepped, 2 PBR smooth */ look?: number; /** lay the 2D art on (default yes) */ art?: boolean; /** the rays in the picture: occlusion, contact shadows, reflections (default yes) */ rays?: boolean; /** strengths: the textures, the light (1: as set) */ texK?: number; /** the time of day: 1 day (default), toward 0 dusk and night (review 117) */ day?: number; /** the colour's depth: deeper lacquer, the hue kept through the tone curve (0: as before; default 1) (review 116) */ deep?: number; lightK?: number; /** after the scene: occlusion and reflection strengths, bloom, depth of field (0 none; pixels of blur a metre from the focus) */ aoK?: number; reflK?: number; bloomK?: number; dof?: number; /** motion blur: the shutter, a share of a frame (0 none) */ mb?: number; /** the outline: width (times each thing's own; 0 none), darkness 0..1; the lines inside a thing (default: the baked look only), their darkness */ outW?: number; outK?: number; inner?: boolean; inK?: number; /** smoke parcels: centre, radius, density, heat, kind (0 tyre 1 dust 2 steam 3 exhaust), seed; and the time */ smoke?: { p: Float32Array; n: number; time: number } } = {}) { const gl = this.gl; this.size(v.W, v.H);

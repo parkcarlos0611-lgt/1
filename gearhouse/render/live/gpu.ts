@@ -25,7 +25,7 @@ export function program(gl: WebGL2RenderingContext, vs: string, fs: string): Web
   gl.linkProgram(p); if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error('link: ' + gl.getProgramInfoLog(p)); return p; }
 
 /** one drawable piece: a vertex array (position, face normal, colour, gloss, kind, part) and its count */
-export interface Part { vao: WebGLVertexArrayObject; n: number; lamps?: LampAt[] }
+export interface Part { vao: WebGLVertexArrayObject; n: number; lamps?: LampAt[]; /** its buffers, to free them */ bufs?: WebGLBuffer[] }
 export const ATTR = { pos: 0, nor: 1, col: 2, gloss: 3, kind: 4, part: 5, smooth: 6, lamp: 7, lampAx: 8, lampRt: 9 } as const;
 /** a lamp's face found in a mesh (review 117): its middle and the way it looks (mm, the file's axes), its radius; 1 a head lamp, 2 a tail lamp */
 export interface LampAt { c: [number, number, number]; ax: [number, number, number]; R: number; flag: number }
@@ -37,10 +37,10 @@ function upload(gl: WebGL2RenderingContext, M: Mesh, tris: number[], about?: [nu
     for (let k = 0; k < 3; k++) { const v = j * 3 + k; P[v * 3] = p[q + k * 3]! - (about?.[0] ?? 0); P[v * 3 + 1] = p[q + k * 3 + 1]! - (about?.[1] ?? 0); P[v * 3 + 2] = p[q + k * 3 + 2]! - (about?.[2] ?? 0);
       N[v * 3] = nx; N[v * 3 + 1] = ny; N[v * 3 + 2] = nz; C[v * 3] = M.col[t * 3]!; C[v * 3 + 1] = M.col[t * 3 + 1]!; C[v * 3 + 2] = M.col[t * 3 + 2]!; G[v] = M.gloss[t]!; K[v] = M.kind[t]!; Q[v] = M.part[t]!; } });
   const S = smoothNormals(P, N, K, Q), LP = lampFaces(P, N, K, Q, C, M.names);
-  const vao = gl.createVertexArray()!; gl.bindVertexArray(vao);
-  const buf = (loc: number, data: ArrayBufferView, size: number, type: number, normalized = false) => { const b = gl.createBuffer()!; gl.bindBuffer(gl.ARRAY_BUFFER, b); gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, size, type, normalized, 0, 0); };
+  const vao = gl.createVertexArray()!; gl.bindVertexArray(vao); const bufs: WebGLBuffer[] = [];
+  const buf = (loc: number, data: ArrayBufferView, size: number, type: number, normalized = false) => { const b = gl.createBuffer()!; bufs.push(b); gl.bindBuffer(gl.ARRAY_BUFFER, b); gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, size, type, normalized, 0, 0); };
   buf(ATTR.pos, P, 3, gl.FLOAT); buf(ATTR.nor, N, 3, gl.FLOAT); buf(ATTR.col, C, 3, gl.UNSIGNED_BYTE, true); buf(ATTR.gloss, G, 1, gl.FLOAT); buf(ATTR.kind, K, 1, gl.FLOAT); buf(ATTR.part, Q, 1, gl.FLOAT); buf(ATTR.smooth, S, 3, gl.FLOAT); buf(ATTR.lamp, LP.uv, 4, gl.FLOAT); buf(ATTR.lampAx, LP.ax, 3, gl.FLOAT); buf(ATTR.lampRt, LP.rt, 3, gl.FLOAT);
-  gl.bindVertexArray(null); return { vao, n, lamps: LP.lamps }; }
+  gl.bindVertexArray(null); return { vao, n, lamps: LP.lamps, bufs }; }
 /** the faces of the lamps (review 117): the glass over a head lamp (glass in a part called a lens or lamp) or a lamp's
  *  lens; each lamp found as such faces that touch; for each corner the lamp's own flat coordinates (u, v across its face,
  *  -1..1 to its rim), which lamp (1 head, 2 tail: a red lens or a part called tail), its axis and its 'right', so the
@@ -111,3 +111,7 @@ export function gpuMesh(gl: WebGL2RenderingContext, M: Mesh, wheels = true): Gpu
     wheels: W.map(w => { const hub: [number, number, number] = [w.hx, w.hy, w.hz], ts = w.tris.filter(t => !isGlass(t)), gs = w.tris.filter(isGlass);
       let R = 0, rim = Infinity; for (const t of w.tris) { if (M.kind[t] !== TYRE) continue; for (let k = 0; k < 3; k++) { const q = t * 9 + k * 3, r = Math.hypot(M.pos[q]! - w.hx, M.pos[q + 2]! - w.hz); R = Math.max(R, r); rim = Math.min(rim, r); } }
       const S = splitTyres(M, ts, hub); return { part: upload(gl, S, Array.from({ length: S.n }, (_, k) => k)), glass: gs.length ? upload(gl, M, gs, hub) : null, hub, front: w.front, R: R || w.r, rim: Number.isFinite(rim) ? rim : w.r * 0.7 }; }) }; }
+
+/** a mesh's GPU side freed (review 121: a car's deformed mesh replaces the last) */
+export function freeGpu(gl: WebGL2RenderingContext, g: GpuMesh): void { const parts: Part[] = [g.body, g.glass, ...g.wheels.flatMap(w => w.glass ? [w.part, w.glass] : [w.part])];
+  for (const p of parts) { gl.deleteVertexArray(p.vao); for (const b of p.bufs ?? []) gl.deleteBuffer(b); } if (g.decalTex) gl.deleteTexture(g.decalTex); }

@@ -75,6 +75,13 @@ export class Vehicle {
   health: Health; lastFailure: Failure | null = null;
   /** each tyre as a ring of nodes (FL FR RL RR): how it gives under its load, the road and its forces (review 101) */ rings: TyreRing[]; tfx = [0, 0, 0, 0]; tfy = [0, 0, 0, 0];
   rpm = 0; gear = 1; shift = 0; steer = 0; /** the steering wheel's angle (rad, left +): the road wheels' times the ratio */ sw = 0; ax = 0; ay = 0; tax = 0; tay = 0; brakeT = [20, 20, 20, 20]; /** each wheel's spin-up rate last step (rad/s²) */ dw = [0, 0, 0, 0]; auto = true; tilt = 0;
+  /** blows the body has taken, for its structure to be bent by (review 121): where (body axes from the centre of
+   *  gravity, m), which way into the car, and the energy (J); taken away by whoever bends it */
+  readonly hits: { at: V3; dir: V3; E: number; r: number }[] = [];
+  /** each wheel knocked askew by damage (rad): toe (front of the wheel to the left +) and camber (top to the left +) */
+  toeDmg = [0, 0, 0, 0]; camDmg = [0, 0, 0, 0]; private bodyHitT = 0;
+  /** record a blow at a world point along a world direction into the car, of E joules (r: the size of what struck, m) */
+  blow(at: V3, dir: V3, E: number, r = 0.32): void { if (E < 150) return; const b = this.toBody(at), d = invRotQ(this.q, dir); this.hits.push({ at: b, dir: norm(d), E, r }); if (this.hits.length > 12) this.hits.shift(); }
   /** each tyre's side deflection (m): the side force builds as the tyre rolls (the relaxation length) */ private yd = [0, 0, 0, 0];
   readonly axles: [Axle, Axle];
   private ms: number; private Ix: number; private Iy: number; private Iz: number; private Iw: number; private Ie: number; private kt: number[];
@@ -124,8 +131,8 @@ export class Vehicle {
   get vzb(): number { return this.v[2]; }
   get speed(): number { return Math.hypot(this.v[0], this.v[1], this.v[2]); }
   /** a front wheel's own angle (rad, left +): the linkage turns the inner wheel more (Ackermann), by the car's share of it */
-  steerAt(i: number): number { if (i >= 2) return 0; const d = this.steer, a = Math.abs(d); if (a < 1e-5) return d; const c = this.spec, L = c.wheelbase, R = L / Math.tan(a), inner = (i === 0) === (d > 0);
-    const ideal = Math.atan(L / (inner ? R - c.track / 2 : R + c.track / 2)); return Math.sign(d) * (a + steering(c).ackermann * (ideal - a)); }
+  steerAt(i: number): number { if (i >= 2) return this.toeDmg[i]!; const d = this.steer, a = Math.abs(d); if (a < 1e-5) return d + this.toeDmg[i]!; const c = this.spec, L = c.wheelbase, R = L / Math.tan(a), inner = (i === 0) === (d > 0);
+    const ideal = Math.atan(L / (inner ? R - c.track / 2 : R + c.track / 2)); return Math.sign(d) * (a + steering(c).ackermann * (ideal - a)) + this.toeDmg[i]!; }
   /** wheel i's place in body axes [forward, left] from the centre of gravity */
   wheelAt(i: number): [number, number] { const c = this.spec; return [i < 2 ? c.wheelbase * (1 - c.frontShare) : -c.wheelbase * c.frontShare, (i % 2 === 0 ? 1 : -1) * c.track / 2]; }
   private share(i: number): number { return (i < 2 ? this.spec.frontShare : 1 - this.spec.frontShare) / 2; }
@@ -201,7 +208,7 @@ export class Vehicle {
         const t = beam ? A.d[0] + sy * A.d[1] * A.tw / 2 + wind : A.d[side]!, tv = beam ? A.dv[0] + sy * A.dv[1] * A.tw / 2 : A.dv[side]!;
         this.travel[i] = t;
         // the wheel's lean against the body: a beam axle's roll; a swing axle's arm; a wishbone's small gain
-        const lean = beam ? A.d[1] : A.kind === 'swing' ? -sy * t / (A.tw / 2) : -sy * t * 0.5;
+        const lean = (beam ? A.d[1] : A.kind === 'swing' ? -sy * t / (A.tw / 2) : -sy * t * 0.5) + this.camDmg[i]!;
         const st = this.steerAt(i), hubB: V3 = [A.x, yW, zh0 + t], hub = this.toWorld(hubB);
         const axB: V3 = [-Math.sin(st) * Math.cos(lean), Math.cos(st) * Math.cos(lean), Math.sin(lean)], axW = rotQ(this.q, axB);   // the spin axis, pointing left
         const q = this.near(hub[0], hub[1]), gr = this.groundFast(q.s, q.off), gn = gr.n; this.onGrass[i] = Math.abs(q.off) > T.spec.width / 2;
@@ -257,8 +264,10 @@ export class Vehicle {
     // ---- the body's own corners on the ground (on its side, on its roof, bellying over a crest): upright, only the bottom ones ----
     { const bx = this.box, upright = ez[2] > 0.75, pts: V3[] = []; for (const xx of [-bx.hl, 0, bx.hl]) for (const yy of [-bx.hw, bx.hw]) for (const zz of upright ? [-bx.bottom] : [-bx.bottom, bx.top]) pts.push([xx, yy, zz]);
       for (const bp of pts) { const wp = this.toWorld(bp), q = this.near(wp[0], wp[1]), gz0 = T.ground(q.s, q.off); if (wp[2] > gz0 + 0.02) continue; const gr = this.groundFast(q.s, q.off), pen = (gr.z - wp[2]) * gr.n[2]; if (pen <= 0) continue;
-        const vp = this.velAt(wp), vn = dot(vp, gr.n), fn = Math.max(0, 1.5e5 * pen - 6e3 * vn), vt: V3 = [vp[0] - gr.n[0] * vn, vp[1] - gr.n[1] * vn, vp[2] - gr.n[2] * vn], vtl = Math.hypot(vt[0], vt[1], vt[2]), fr = 0.55 * fn * Math.tanh(vtl / 0.3) / Math.max(vtl, 1e-6);
+        const vp = this.velAt(wp), vn = dot(vp, gr.n); if (vn < -4 && this.bodyHitT <= 0) { this.blow(wp, [-gr.n[0], -gr.n[1], -gr.n[2]], 0.5 * this.spec.mass * vn * vn * 0.35, 0.45); this.bodyHitT = 0.3; }   /* landing on it, rolling onto it: a blow */
+        const fn = Math.max(0, 1.5e5 * pen - 6e3 * vn), vt: V3 = [vp[0] - gr.n[0] * vn, vp[1] - gr.n[1] * vn, vp[2] - gr.n[2] * vn], vtl = Math.hypot(vt[0], vt[1], vt[2]), fr = 0.55 * fn * Math.tanh(vtl / 0.3) / Math.max(vtl, 1e-6);
         addAt(bp, [gr.n[0] * fn - vt[0] * fr, gr.n[1] * fn - vt[1] * fr, gr.n[2] * fn - vt[2] * fr]); } }
+    this.bodyHitT -= dt;
     // ---- the air ----
     { const sp = this.speed, d = 0.5 * RHO * c.cdA * sp; F[0] -= d * this.v[0]; F[1] -= d * this.v[1]; F[2] -= d * this.v[2]; }
     // the whole car's weight across the body's up (the running gear goes where the body goes, sideways and along)

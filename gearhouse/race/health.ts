@@ -9,7 +9,7 @@ export type Failure = 'gasket' | 'valve' | 'bearing' | 'seized';
 export interface Cooling { siphon: boolean; margin: number }   // siphon: no water pump (thermosiphon); margin: radiator size against the engine's rated heat
 export const WARN = { water: 95, boil: 100, oil: 115, over: 1 } as const;
 export class Health {
-  water = 20; oil = 20; level = 1; failed: Failure | null = null; overRev = 0; rough = 0;
+  water = 20; oil = 20; level = 1; /** the radiator's share still working, crushed in a crash (review 121); below half it leaks */ radiator = 1; failed: Failure | null = null; overRev = 0; rough = 0;
   private C: number; private G0: number; private rnd: () => number;
   constructor(readonly hp: number, readonly cool: Cooling, seed = 1, readonly ambient = 18) { let r = (seed * 2654435761) % 2147483647 || 1; this.rnd = () => { r = (r * 16807) % 2147483647; return r / 2147483647; };
     this.C = 60000 + hp * 900;                                   // water and iron, J/K
@@ -23,7 +23,8 @@ export class Health {
   step(dt: number, rpm: number, redline: number, power: number, speed: number): Failure | null {
     const heat = Math.max(0, power) * 0.95 * (this.failed === 'gasket' ? 1.35 : 1) + 2500 * (rpm / redline) * (this.running ? 1 : 0);
     const air = Math.min(1.05, 0.2 + speed / 40 + (rpm / redline) * 0.25 * (this.cool.siphon ? 0.4 : 1)), flow = this.cool.siphon ? Math.min(1, 0.45 + (this.water - 40) / 80) : 1;   // a thermosiphon only moves water once it is hot
-    const shed = this.G0 * air * Math.max(0.15, flow) * (0.35 + 0.65 * this.level) * (this.water - this.ambient);
+    if (this.radiator < 0.5) this.level = Math.max(0, this.level - (0.5 - this.radiator) * 0.004 * dt);
+    const shed = this.G0 * this.radiator * air * Math.max(0.15, flow) * (0.35 + 0.65 * this.level) * (this.water - this.ambient);
     this.water += (heat - shed) / (this.C * (0.55 + 0.45 * this.level)) * dt;
     if (this.water > WARN.boil) { this.level = Math.max(0, this.level - (this.water - WARN.boil) * 0.0009 * dt - 0.0006 * dt); this.water = Math.min(this.water, 140); }
     this.oil += ((this.water + 4 + 10 * Math.max(0, power) / (this.hp * 745.7) + 6 * rpm / redline) - this.oil) / 90 * dt;

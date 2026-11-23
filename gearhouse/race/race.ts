@@ -67,7 +67,8 @@ export function touch(a: Vehicle, b: Vehicle): number {
   const corner = (c: Vehicle, C: [number, number][], dir: [number, number]): [number, number] => { let bx = c.x, by = c.y, bd = -Infinity; for (const sx of [-1, 1]) for (const sy of [-1, 1]) { const x = c.x + C[0]![0] * c.box.hl * sx + C[1]![0] * c.box.hw * sy, y = c.y + C[0]![1] * c.box.hl * sx + C[1]![1] * c.box.hw * sy, d = x * dir[0] + y * dir[1]; if (d > bd) { bd = d; bx = x; by = y; } } return [bx, by]; };
   const ca = corner(a, A, n), cb = corner(b, B, [-n[0], -n[1]]), w: [number, number, number] = [(ca[0] + cb[0]) / 2, (ca[1] + cb[1]) / 2, (a.base[2] + b.base[2]) / 2 + 0.5];
   const N: [number, number, number] = [n[0], n[1], 0], va = a.velAt(w), vb = b.velAt(w), rel: [number, number, number] = [vb[0] - va[0], vb[1] - va[1], vb[2] - va[2]], vn = rel[0] * N[0] + rel[1] * N[1]; if (vn >= 0) return 1;
-  const k = a.invMassAt(w, N) + b.invMassAt(w, N), J = -(1 + 0.25) * vn / k;
+  const k = a.invMassAt(w, N) + b.invMassAt(w, N), J = -(1 + 0.25) * vn / k, E = 0.5 * vn * vn / k * (1 - 0.25 * 0.25);   /* the energy the blow takes out of the pair: it goes into bending them (review 121) */
+  a.blow(w, N, E / 2); b.blow(w, [-N[0], -N[1], -N[2]], E / 2);
   const vt: [number, number, number] = [rel[0] - N[0] * vn, rel[1] - N[1] * vn, rel[2]], vtl = Math.hypot(...vt), t: [number, number, number] = vtl > 1e-6 ? [vt[0] / vtl, vt[1] / vtl, vt[2] / vtl] : [0, 0, 0];
   const kt = vtl > 1e-6 ? a.invMassAt(w, t) + b.invMassAt(w, t) : 1, Jt = Math.min(0.4 * J, vtl / kt), imp: [number, number, number] = [N[0] * J - t[0] * Jt, N[1] * J - t[1] * Jt, -t[2] * Jt];   /* on b: pushed off, its sliding against a resisted */
   b.applyImpulse(w, imp); a.applyImpulse(w, [-imp[0], -imp[1], -imp[2]]); return 1; }

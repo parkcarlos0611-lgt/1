@@ -9,7 +9,8 @@ import { Vehicle, usefulLock, type Controls } from '../race/vehicle';
 import { CarSprites, PropSprites } from '../race/sprites';
 import { millbrookScenery, type Placed } from '../race/scenery';
 import { PROPS } from '../render/props/index';
-import { renumber } from '../render/car/mesh';
+import { renumber, wheelsOf, type Mesh } from '../render/car/mesh';
+import { Damage } from '../race/damage';
 import { LiveRenderer } from '../render/live/renderer';
 import { groundData, fenceData } from '../render/live/ground';
 import { Smoke, type SmokeKind } from '../race/smoke';
@@ -81,13 +82,16 @@ function drawLive(el: number) { const L = live!; void el;
   if (broken.size !== liveFence) { liveFence = broken.size; for (const k of [...fenceGpu.keys()]) if (dirtyChunks.has(k)) fenceGpu.delete(k); dirtyChunks.clear(); }
   glCanvas.width = VW; glCanvas.height = VH;
   const list = race ? race.cars.map(e => ({ c: e.car, sp: e.driver ? others.get(e)! : sprites, turn: e.wheelTurn })) : [{ c: car, sp: sprites, turn: wheelTurn }];
-  const cars = list.map(({ c, sp, turn }, k) => ({ wear: wearOf(c, k), g: (() => { const g = L.car(sp.mesh); artFor(L, g, c.spec.id, sp.mesh); return g; })(), tyres: c.rings, ...(() => { const b = c.base; return { x: b[0], y: b[1], z: b[2] - (c.rings[0]!.rest + c.rings[2]!.rest) / 2 }; })(),   /* the body where it is in 3D (review 120), drawn lower by the tyres' standing give */ yaw: c.yaw, roll: c.rollW + c.roll * 0.5, pitch: c.pitchW, travel: c.travel, camber: c.camber, steerL: c.steerAt(0), steerR: c.steerAt(1), spin: turn, player: c === car, lamps: lampsOn ? 1 : 0, brake: c === car && input.brake > 0.1 }));
+  for (const { c, sp } of list) bend(c, sp.mesh, L);
+  const cars = list.map(({ c, sp, turn }, k) => ({ wear: wearOf(c, k), g: (() => { const M = dmg.get(c)?.M ?? sp.mesh, g = L.car(M); artFor(L, g, c.spec.id, M); return g; })(), tyres: c.rings, ...(() => { const b = c.base; return { x: b[0], y: b[1], z: b[2] - (c.rings[0]!.rest + c.rings[2]!.rest) / 2 }; })(),   /* the body where it is in 3D (review 120), drawn lower by the tyres' standing give */ yaw: c.yaw, roll: c.rollW + c.roll * 0.5, pitch: c.pitchW, travel: c.travel, camber: c.camber, steerL: c.steerAt(0), steerR: c.steerAt(1), spin: turn, player: c === car, lamps: lampsOn ? 1 : 0, brake: c === car && input.brake > 0.1 }));
   const props: import('../render/live/renderer').LiveProp[] = [...SCN.props, ...trainCars()].flatMap(q => { const f = PROPS[q.kind]; return f ? [{ g: L.prop(q.arg ? `${q.kind}@${q.arg}` : q.kind, () => f(q.arg)), x: q.x, y: q.y, z: q.z ?? 0, h: q.heading }] : []; });
   // the fence (review 112): solid, in chunks near the camera, lit, shadowed and outlined as everything else; its loose pieces
   { const near = T.locate(camX, camY, car.s).s, nC = Math.ceil(T.length / CHUNK); for (let d = -5; d <= 5; d++) for (const side of [-1, 1]) { const c = ((Math.floor(near / CHUNK) + d) % nC + nC) % nC, key = `${side}:${c}`;
       let f = fenceGpu.get(key); if (f === undefined) { const ch = fenceChunk(T, side, c, fenceOk); f = ch ? { g: L.car(ch.mesh), m: m4mul(m4t(...ch.origin), m4s(1 / 1000)), x: ch.origin[0], y: ch.origin[1] } : null; fenceGpu.set(key, f); }
       if (f) props.push({ g: f.g, x: f.x, y: f.y, z: 0, h: 0, m: f.m, outline: 1 }); }
-    for (const p of debris3.pieces) { const g = L.prop(`fence_${p.kind}`, () => pieceMesh(p.kind)), shrink = Math.min(1, p.life / 1.5), sx = (p.kind === 'rail' ? p.len : 1) * shrink / 1000;
+    for (const p of debris3.pieces) { if (p.kind === 'part') { const g = L.prop(p.key!, () => p.mesh!), sh = Math.min(1, p.life / 1.5) / 1000;   /* a part come off a car: its own mesh (the mesh's x runs back from the nose) */
+        props.push({ g, x: p.x, y: p.y, z: p.z, h: 0, outline: 1, key: `d${p.id}`, m: m4mul(m4t(p.x, p.y, p.z), m4mul(m4rot('z', p.yaw), m4mul(m4rot('y', p.pitch), m4mul(m4rot('x', p.roll), new Float32Array([-sh, 0, 0, 0, 0, sh, 0, 0, 0, 0, sh, 0, 0, 0, 0, 1]))))) }); continue; }
+      const g = L.prop(`fence_${p.kind}`, () => pieceMesh(p.kind as 'post' | 'rail')), shrink = Math.min(1, p.life / 1.5), sx = (p.kind === 'rail' ? p.len : 1) * shrink / 1000;
       props.push({ g, x: p.x, y: p.y, z: p.z, h: 0, outline: 1, key: `d${p.id}`, m: m4mul(m4t(p.x, p.y, p.z), m4mul(m4rot('z', p.yaw), m4mul(m4rot('y', p.pitch), m4mul(m4rot('x', p.roll), new Float32Array([sx, 0, 0, 0, 0, shrink / 1000, 0, 0, 0, 0, shrink / 1000, 0, 0, 0, 0, 1]))))) }); } }
   // the smoke: exhaust from the tail when the throttle is opened hard low in the revs (rich old engines); then a step
   { const ex = (c0: Vehicle) => { const L = c0.spec.wheelbase * c0.spec.frontShare + 0.9, z = T.height(c0.s, c0.off); smoke.emit('exhaust', c0.x - Math.cos(c0.yaw) * L, c0.y - Math.sin(c0.yaw) * L, z + 0.35, -Math.cos(c0.yaw) * 2 + c0.vx * Math.cos(c0.yaw) * 0.6, -Math.sin(c0.yaw) * 2 + c0.vx * Math.sin(c0.yaw) * 0.6, 0.3, 1, z); };
@@ -245,6 +249,20 @@ function hiddenPart(c: Drawn, by: Drawn[]): HTMLCanvasElement | null { const w =
     for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) { const i = y * w + x; if (A[i]! > 128 && B[(y + c.Y0 - o.Y0) * bw + (x + c.X0 - o.X0)]! > 128) { d[i * 4] = 255; d[i * 4 + 1] = 226; d[i * 4 + 2] = 168; d[i * 4 + 3] = 255; any = true; } } }
   if (!any) return null; hidCx.clearRect(0, 0, hidCv.width, hidCv.height); hidCx.putImageData(im, 0, 0); return hidCv; }
 /** the whole picture: the layer behind (blurred by the camera's motion), the player's car sharp, what stands before it, the hidden cars' outlines */
+// ---- crash damage (review 121): each car's structure of nodes and beams (race/damage.ts), built at its first blow; the
+// blows the physics recorded bend it, the skin drawn bent (rebuilt at most five times a second), a wheel knocked askew
+// steers the car off true, a crushed radiator cools less and leaks, a part come away flies off as a piece ----
+const dmg = new WeakMap<Vehicle, { D: Damage; M: Mesh; t: number }>();
+function bend(c: Vehicle, base: Mesh, L: LiveRenderer) { let e = dmg.get(c);
+  if (c.hits.length) { if (!e) { e = { D: new Damage(base), M: base, t: 0 }; dmg.set(c, e); } const D = e.D, len = base.length, rest = c.rings[0]!.rest, cg = c.spec.cgH;
+    for (const h of c.hits.splice(0)) D.impact([len / 2 - h.at[0] * 1000, h.at[1] * 1000, (h.at[2] + cg + rest) * 1000], [-h.dir[0], h.dir[1], h.dir[2]], h.E, h.r * 1000);
+    for (const w of wheelsOf(base)) { const i = (w.front ? 0 : 2) + (w.hy > 0 ? 0 : 1), a = D.askew([w.hx, w.hy, w.hz]); c.toeDmg[i] = a.toe; c.camDmg[i] = a.camber; }
+    c.health.radiator = 1 - 0.9 * D.radiator;
+    for (const l of D.loose.splice(0)) { const m = D.piece(l), wp = c.toWorld([(len / 2 - l.centre[0]) / 1000, l.centre[1] / 1000, l.centre[2] / 1000 - cg - rest]), v = c.velAt(wp); let ext = 0; for (let q = 0; q < m.pos.length; q++) ext = Math.max(ext, Math.abs(m.pos[q]!));
+      debris3.add({ kind: 'part', len: ext / 500, mesh: m, key: `loose${c.spec.id}${l.part}${Math.random()}`, x: wp[0], y: wp[1], z: wp[2], vx: v[0] * 0.8 + (Math.random() - 0.5) * 3, vy: v[1] * 0.8 + (Math.random() - 0.5) * 3, vz: 1.5 + Math.random() * 3,
+        yaw: c.yaw + Math.PI, pitch: 0, roll: 0, wy: (Math.random() - 0.5) * 8, wp: (Math.random() - 0.5) * 8, wr: (Math.random() - 0.5) * 8, life: 120 }); } }
+  if (e && e.D.dirty && performance.now() - e.t > 200) { const old = e.M; e.M = e.D.rebuild(); L.swapCar(old, e.M); e.t = performance.now(); } }
+
 // ---- the fence: a car that reaches it smashes a few metres of it into flying pieces ----
 const debris3 = new Debris(), dirtyChunks = new Set<string>(), fenceGpu = new Map<string, { g: ReturnType<LiveRenderer['car']>; m: Float32Array; x: number; y: number } | null>();   /* the fence as solid things, its pieces as bodies (review 112) */
 const broken = new Set<string>(), debris: { x: number; y: number; z: number; vx: number; vy: number; vz: number; a: number; va: number; len: number; col: string; life: number }[] = [];
@@ -260,6 +278,7 @@ function fence(c: Vehicle) { const side = Math.sign(c.off), reach = Math.abs(c.o
     debris.push({ x: p.x, y: p.y, z: T.height(c.s, side * FENCE) + 0.3 + Math.random() * 0.7, vx: vxW * f + (Math.random() - 0.5) * 5, vy: vyW * f + (Math.random() - 0.5) * 5, vz: 2 + Math.random() * sp * 0.22, a: Math.random() * 6, va: (Math.random() - 0.5) * 22, len: post ? 0.9 : 0.6 + Math.random() * 1.6, col: post ? '#d9d2bf' : '#efe9dc', life: 6 + Math.random() * 3 }); }
   while (debris.length > 160) debris.shift();
   c.vx *= 0.86; c.vy *= 0.9; c.r += (Math.random() - 0.5) * 0.4;   // the blow costs speed and turns the car a little
+  { const h = T.at(c.s).h, into: [number, number, number] = [Math.sin(h) * side, -Math.cos(h) * side, 0], at = c.toWorld([0.3, side * c.box.hw * Math.sign(Math.cos(c.yaw - h) || 1), 0.1]); c.blow(at, into, Math.min(25000, 0.5 * c.spec.mass * sp * sp * 0.03), 0.6); }   /* the rails and posts dent its flank (review 121) */
   if (c === car) { snd?.crash(Math.min(1.3, sp / 20)); shake = 4; } else { const d = Math.hypot(c.x - car.x, c.y - car.y); if (d < 120) snd?.crash(Math.min(1, sp / 20) / (1 + (d / 25) ** 2)); } }
 function stepDebris3(el: number) { const cs = (race ? race.cars.map(e => e.car) : [car]).map(c => ({ x: c.x, y: c.y, vx: c.vx * Math.cos(c.yaw) - c.vy * Math.sin(c.yaw), vy: c.vx * Math.sin(c.yaw) + c.vy * Math.cos(c.yaw), r: c.spec.wheelbase * 0.7 }));
   debris3.step(Math.min(0.05, el), (x, y) => { const q = T.locate(x, y, car.s); return Math.abs(q.off) < T.spec.width / 2 ? T.height(q.s, q.off) : 0; }, cs); }
@@ -465,4 +484,4 @@ function fit() { if (document.fullscreenElement || document.body.classList.conta
   if (st.cine) { VW = Math.floor(VW / 4) * 2; VH = Math.floor(VH / 2); }   // the cinematic view: pixels twice the size (closer)
   cv.width = VW; cv.height = VH; ctx.imageSmoothingEnabled = false; }
 addEventListener('resize', fit); addEventListener('orientationchange', () => setTimeout(fit, 200)); fit(); choose(carId); camX = car.x; camY = car.y; camZ = 0; camShow(); requestAnimationFrame(frame);
-(globalThis as { __drive?: unknown }).__drive = { get car() { return car; }, SCN, T };   // for the page tests (tools): place the car, read the scenery
+(globalThis as { __drive?: unknown }).__drive = { get car() { return car; }, get damage() { const e = dmg.get(car); return e ? { worst: e.D.worst, taken: e.D.taken } : null; }, SCN, T };   // for the page tests (tools): place the car, read the scenery

@@ -1,7 +1,9 @@
 // The fence's broken pieces as small rigid bodies (review 112): each a post or a length of rail, flung by the car that
 // broke it, turning about all three axes, falling, bouncing and sliding to rest on the road or the grass, kicked again
 // by any car that runs into it. World axes, metres, seconds.
-export interface Piece { id: number; kind: 'post' | 'rail'; len: number; x: number; y: number; z: number; vx: number; vy: number; vz: number;
+import type { Mesh } from '../render/car/mesh';
+/** a post or a rail of the fence, or a part come off a car (review 121: its own mesh, about its middle, mm) */
+export interface Piece { id: number; kind: 'post' | 'rail' | 'part'; len: number; mesh?: Mesh; key?: string; x: number; y: number; z: number; vx: number; vy: number; vz: number;
   yaw: number; pitch: number; roll: number; wy: number; wp: number; wr: number; life: number; still: number }
 export class Debris {
   readonly pieces: Piece[] = []; private n = 0; max = 220;

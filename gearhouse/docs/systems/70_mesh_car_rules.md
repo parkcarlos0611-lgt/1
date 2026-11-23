@@ -98,3 +98,13 @@ bar, so the bodies came out right in outline but faceted, creased and boxy. Thes
 - **Check beside the others:** after the surface check, render the new car beside the SSJ and the D-type at game
   scale (mm 16-20) and compare: the faces as smooth, the outline as busy, the colours as saturated. Then compare the
   design features with the sheet.
+
+## Style direction (review 133) — set by the planner
+- **Models: clean, in the FR Legends manner.** Simple, tidy surfaces and clear colour fields; no noise or busy
+  detail on the body. The outline comes from the per-part drawing (doc 79 §2), at real dimensions.
+- **Curves where the car has them.** A car whose body is curved (EB110 flanks, XJ220 tail, the 1930s wings) gets
+  enough sections to read as curved at game size; a boxy car stays boxy. Clean does not mean flat-panelled.
+- **Lamps and such are modelled.** Head and tail lamps, grilles, mirrors, intakes, badges that stand proud, wipers,
+  exhausts: real geometry (props on the body), not only painted on. Small flat marks (lines, lettering) may stay 2D art.
+- **Graphics stay realistic.** PBR lacquer, HDRI sky, reflections, shadows, period camera effects as now. The
+  stylisation is in the shapes, not in the lighting.

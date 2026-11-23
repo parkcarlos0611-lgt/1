@@ -118,7 +118,10 @@ export function wheelsOf(M: Mesh): WheelGroup[] { const have = wheelCache.get(M)
   const road = rings.filter(g => g.z0 < 40 && g.tris.length > 8), mid = road.reduce((a, g) => a + g.cx, 0) / Math.max(1, road.length);
   const out: WheelGroup[] = road.map(g => ({ hx: g.cx, hy: g.cy, hz: (g.z0 + g.z1) / 2, r: (g.z1 - g.z0) / 2, hw: (g.y1 - g.y0) / 2, front: g.cx < mid, tris: [] }));
   // a wing's skirt or a valance that dips into the wheel's round is the body's, not the wheel's: it must not turn with it (review 118)
-  const bodyPart = (t: number) => /^(fender|wing|body|board|skirt|valance|apron|sill|step|chassis|bumper)/i.test(M.names?.[M.part[t]!] ?? '');
+  // review 146: a named part turns with the wheel only if it is a wheel's (tyre, rim, disc, spokes, hub, drum, brake, axle); any
+  // other named panel (a quarter, a door, an arch's lip) stays with the body however close it dips. Unnamed parts (the
+  // sheet-built cars) keep the old rule.
+  const bodyPart = (t: number) => { const n = M.names?.[M.part[t]!] ?? ''; return n ? !/^(tyre|tire|rim|wheel|spoke|hub|drum|brake|disc|caliper|axle|nut|spinner|knock)/i.test(n) : false; };
   for (let t = 0; t < M.n; t++) for (const w of out) { if (bodyPart(t)) break; let inside = true;
     for (let k = 0; k < 3 && inside; k++) { const x = p[t * 9 + k * 3]! - w.hx, y = p[t * 9 + k * 3 + 1]! - w.hy, z = p[t * 9 + k * 3 + 2]! - w.hz; if (x * x + z * z > (w.r * 1.03) ** 2 || Math.abs(y) > w.hw + 90) inside = false; }
     if (inside) { w.tris.push(t); break; } }

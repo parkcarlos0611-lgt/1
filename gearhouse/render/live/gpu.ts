@@ -69,7 +69,7 @@ function smoothNormals(P: Float32Array, N: Float32Array, K: Float32Array, Q: Flo
   const n = P.length / 3, S = new Float32Array(n * 3), at = new Map<string, number[]>(), key = (v: number) => `${Math.round(P[v * 3]! * 2)},${Math.round(P[v * 3 + 1]! * 2)},${Math.round(P[v * 3 + 2]! * 2)},${K[v]},${Q[v]}`;
   for (let v = 0; v < n; v++) { const k = key(v); const l = at.get(k); if (l) l.push(v); else at.set(k, [v]); }
   for (const l of at.values()) for (const v of l) { let x = 0, y = 0, z = 0; for (const u of l) { const d = N[v * 3]! * N[u * 3]! + N[v * 3 + 1]! * N[u * 3 + 1]! + N[v * 3 + 2]! * N[u * 3 + 2]!; if (d > 0.766) { x += N[u * 3]!; y += N[u * 3 + 1]!; z += N[u * 3 + 2]!; } }
-    const h = Math.hypot(x, y, z) || 1; S[v * 3] = x / h; S[v * 3 + 1] = y / h; S[v * 3 + 2] = z / h; }
+    const h = Math.hypot(x, y, z); if (!(h > 1e-6)) { S[v * 3 + 2] = 1; continue; } S[v * 3] = x / h; S[v * 3 + 1] = y / h; S[v * 3 + 2] = z / h; }   /* never a zero normal (review 146) */
   // a lamp's lens (often a flat disc in the mesh) domed: each lens, found as the lens faces that touch, its normal leaning
   // out from its middle, so the glass and the bowl behind it shade from centre to rim
   const lens = (v: number) => K[v] === LENS, up = Array.from({ length: n / 3 }, (_, i) => i), root = (i: number): number => { while (up[i] !== i) i = up[i] = up[up[i]!]!; return i; };
@@ -99,7 +99,11 @@ const GLASS = KINDS.indexOf('glass'), SHINE = KINDS.indexOf('shine'), TYRE = KIN
 export function gpuMesh(gl: WebGL2RenderingContext, M: Mesh, wheels = true): GpuMesh {
   const W = wheels ? wheelsOf(M) : [], inWheel = new Int32Array(M.n).fill(-1); W.forEach((w, k) => { for (const t of w.tris) inWheel[t] = k; });
   const isGlass = (t: number) => M.kind[t] === GLASS || M.kind[t] === SHINE, body: number[] = [], glass: number[] = [];
-  for (let t = 0; t < M.n; t++) if (inWheel[t]! < 0) (isGlass(t) ? glass : body).push(t);
+  // a triangle with no area has no normal: on some GPUs (phones) normalising it gives NaN, drawn as white specks that the
+  // bloom spreads (review 146). Such slivers (the centres of turned parts, caps, lens fans) are dropped here for every car.
+  const P0 = M.pos, flat = (t: number) => { const i = t * 9, ux = P0[i + 3]! - P0[i]!, uy = P0[i + 4]! - P0[i + 1]!, uz = P0[i + 5]! - P0[i + 2]!, vx = P0[i + 6]! - P0[i]!, vy = P0[i + 7]! - P0[i + 1]!, vz = P0[i + 8]! - P0[i + 2]!;
+    return Math.hypot(uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx) < 0.5; };
+  for (let t = 0; t < M.n; t++) if (inWheel[t]! < 0 && !flat(t)) (isGlass(t) ? glass : body).push(t);
   let R = 0, Z = 0, Y = 0; for (let i = 0; i < M.pos.length; i += 3) { R = Math.max(R, Math.hypot(M.pos[i]! - M.length / 2, M.pos[i + 1]!)); Z = Math.max(Z, M.pos[i + 2]!); Y = Math.max(Y, Math.abs(M.pos[i + 1]!)); }
   const decals = (M.decals ?? []).slice(0, 4); let decalTex: WebGLTexture | null = null;
   if (decals.length) { const S = 128; decalTex = gl.createTexture()!; gl.bindTexture(gl.TEXTURE_2D, decalTex); const all = new Uint8Array(S * 4 * S * 4);
@@ -108,7 +112,7 @@ export function gpuMesh(gl: WebGL2RenderingContext, M: Mesh, wheels = true): Gpu
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE); }
   const bodyP = upload(gl, M, body), glassP = upload(gl, M, glass), lamps = [...(glassP.lamps ?? [])]; for (const l of bodyP.lamps ?? []) if (!lamps.some(k => Math.hypot(k.c[0] - l.c[0], k.c[1] - l.c[1], k.c[2] - l.c[2]) < Math.max(k.R, l.R))) lamps.push(l);
   return { len: M.length, body: bodyP, glass: glassP, lamps, decals, decalTex, radius: R / 1000, height: Z / 1000, width: 2 * Y / 1000,
-    wheels: W.map(w => { const hub: [number, number, number] = [w.hx, w.hy, w.hz], ts = w.tris.filter(t => !isGlass(t)), gs = w.tris.filter(isGlass);
+    wheels: W.map(w => { const hub: [number, number, number] = [w.hx, w.hy, w.hz], ts = w.tris.filter(t => !isGlass(t) && !flat(t)), gs = w.tris.filter(t => isGlass(t) && !flat(t));
       let R = 0, rim = Infinity; for (const t of w.tris) { if (M.kind[t] !== TYRE) continue; for (let k = 0; k < 3; k++) { const q = t * 9 + k * 3, r = Math.hypot(M.pos[q]! - w.hx, M.pos[q + 2]! - w.hz); R = Math.max(R, r); rim = Math.min(rim, r); } }
       const S = splitTyres(M, ts, hub); return { part: upload(gl, S, Array.from({ length: S.n }, (_, k) => k)), glass: gs.length ? upload(gl, M, gs, hub) : null, hub, front: w.front, R: R || w.r, rim: Number.isFinite(rim) ? rim : w.r * 0.7 }; }) }; }
 

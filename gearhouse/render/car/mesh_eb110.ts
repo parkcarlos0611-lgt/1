@@ -41,7 +41,7 @@ function curve(tab: [number, number][]): (x: number) => number { const n = tab.l
 
 // ---- the lines along the car ----
 /** the bonnet's centre line (from the bumper's shut line to the screen's foot, carried on level to the screen's corners) */
-const ZH = curve([[142, 428], [236, 478], [331, 524], [425, 565], [520, 607], [614, 648], [709, 692], [803, 730], [898, 758], [990, 776], [1085, 789], [XC, 795]]);
+const ZH = curve([[105, 405], [142, 428], [236, 478], [331, 524], [425, 565], [520, 607], [614, 648], [709, 692], [803, 730], [898, 758], [990, 776], [1085, 789], [XC, 795]]);
 /** the bonnet's plateau: its height at (x, y), a slight crown */
 const zHood = (x: number, y: number) => ZH(x) - 24 * (y / 630) ** 2;
 /** the roof's and the deck's centre line */
@@ -50,7 +50,7 @@ const ZC = curve([[XT, 1094], [2060, 1104], [2124, 1108], [2266, 1115], [2361, 1
 const WID = curve([[XJ, 880], [800, 888], [1000, 896], [1200, 908], [1500, 908], [2100, 925], [2400, 934], [2600, 954], [2800, 963], [3000, 975], [3200, 970], [3600, 965], [3800, 960], [4000, 950], [4100, 930], [4200, 890], [4300, 838], [S1, 826]]);
 const ZW = curve([[XJ, 450], [FX, 500], [2000, 520], [3000, 590], [RX, 620], [4100, 600], [S1, 560]]);
 /** the sill (rising behind the rear wheel: the diffuser), and how far it stands in from the widest line */
-const ZS = curve([[XJ, 100], [760, 118], [1400, 122], [RX, 128], [3960, 150], [4015, 215], [4150, 262], [4250, 340], [S1, 440]]);
+const ZS = curve([[XJ, 100], [760, 118], [1400, 122], [RX, 128], [3960, 185], [4061, 248], [4175, 345], [4266, 452], [S1, 535]]);
 const UND = curve([[XJ, 45], [2400, 55], [3640, 45], [S1, 25]]);
 /** E: the bonnet's edge, then the side glass's foot (the belt), then the foot of the buttress's slope */
 const YE = curve([[440, 616], [600, 616], [XC, 652], [1392, 672], [XG, 688], [2000, 695], [SP, 700], [2800, 745], [3200, 790], [3600, 800], [4000, 800], [S1, 808]]);
@@ -79,10 +79,10 @@ const CREST: [number, number][] = [[352, 0], [352, 70], [353, 140], [355, 181], 
 const IA = 3, IB = 7, IT = 9, I6 = 12;                                    // rows: the lamp's inner foot, its outer foot, the indicator's tip, the lamp's back corner
 const sup = (xf: number, w: number, f: number, p = 2.6): [number, number] => [xf + (XJ - xf) * (1 - (1 - f ** p) ** (1 / p)), w * f];
 /** the bumper's lines under the shut line: height, how far back the line starts on the centre line, half-width at the arch */
-const BUMP: [number, number, number][] = [[385, 116, 880], [285, 66, 877], [235, 44, 873], [185, 36, 867], [130, 36, 858], [108, 46, 850], [100, 64, 835]];
+const BUMP: [number, number, number][] = [[368, 82, 880], [285, 48, 877], [235, 26, 873], [185, 16, 867], [130, 14, 858], [108, 24, 850], [100, 42, 835]];
 const NB = 5, NL = BUMP.length, NK = NB + NL;                             // the chain's cells from the crest to the widest line, and below it
 /** a point of the bumper's face at (y, z) (z between 100 and 428), for what is laid on it */
-const BXF = curve(([[100, 64], [108, 46], [130, 36], [185, 36], [235, 44], [285, 66], [385, 116], [428, 142]] as [number, number][])), BW = curve([[100, 835], [108, 850], [130, 858], [185, 867], [235, 873], [285, 877], [385, 880], [450, 880]]);
+const BXF = curve(([[100, 42], [108, 24], [130, 14], [185, 16], [235, 26], [285, 48], [368, 82], [405, 105]] as [number, number][])), BW = curve([[100, 835], [108, 850], [130, 858], [185, 867], [235, 873], [285, 877], [368, 880], [450, 880]]);
 const bump = (y: number, z: number, lift = 0): V => { const f = Math.min(0.999, Math.abs(y) / BW(z)), xf = BXF(z), x = xf + (XJ - xf) * (1 - (1 - f ** 2.6) ** (1 / 2.6)); return [x - lift * (1 - 0.6 * f), y + Math.sign(y) * lift * 0.8 * f, z]; };
 
 /** the arc from the crest (or the indicator's edge) R down to the widest line H: g 0 a straight band (the nose's middle), 1 the wing's roll */
@@ -96,13 +96,14 @@ const rowOf = (x: number) => { const i = ROWX.indexOf(x, NCR); if (i < 0) throw 
 
 /** the outer chain of a row: NK + 1 points from the crest R (k 0) over the widest line (k NB) to the sill or the arch's lip (k NK) */
 function chain(i: number): V[] {
-  if (i <= NCR) { const f = FR[i]!, [cx, cy] = i < NCR ? CREST[i]! : [XJ, YR(XJ)], Rp: V = [cx, cy, i <= IT ? zHood(cx, cy) : ZR(cx)], [hx, hy] = sup(142, 880, f), H: V = [hx, hy, 428 + 22 * f * f];
+  if (i <= NCR) { const f = FR[i]!, [cx, cy] = i < NCR ? CREST[i]! : [XJ, YR(XJ)], Rp: V = [cx, cy, i <= IT ? zHood(cx, cy) : ZR(cx)], [hx, hy] = sup(105, 880, f), H: V = [hx, hy, 405 + 45 * f ** 1.5];
     const g = Math.max(0.1, sm(420, 760, cy)), out: V[] = []; for (let k = 0; k <= NB; k++) out.push(band(Rp, H, g, k / NB));
     for (const [z, xf, w] of BUMP) { const [x, y] = sup(xf, w, f); out.push([x, y, z]); } return out; }
   const x = ROWX[i]!, w = WID(x), zW = ZW(x), zS = ZS(x), Rp: V = [x, YR(x), ZR(x)], H: V = [x, w, zW], yAt = (z: number) => w - UND(x) * ((zW - z) / (zW - zS)) ** 2, az = archZ(x), out: V[] = [];
   if (az > 0) { const at = (tau: number): V => tau <= 1 ? band(Rp, H, 1, tau) : [x, yAt(lerp(zW, zS, tau - 1)), lerp(zW, zS, tau - 1)]; let lo = 0, hi = 2; for (let k = 0; k < 30; k++) { const m = (lo + hi) / 2; if (at(m)[2] > az) lo = m; else hi = m; }
     for (let k = 0; k <= NK; k++) out.push(at(lo * k / NK)); return out; }
   for (let k = 0; k <= NB; k++) out.push(band(Rp, H, 1, k / NB));
+  if (zS > 200) { for (let k = 1; k <= NL; k++) { const z = lerp(zW, zS, k / NL); out.push([x, yAt(z), z]); } return out; }   // behind the rear wheel the flank ends at the rising diffuser
   const d = DEP(x), zl = ZL(x), zm = (zW + ZSH) / 2;
   out.push([x, yAt(zm), zm], [x, yAt(ZSH), ZSH], [x, yAt(ZSH) - d, ZSH - (d > 0 ? 10 : 8)], [x, yAt(zl) - d, zl + (d > 0 ? 10 : 8)], [x, yAt(zl), zl], [x, yAt((zl + zS) / 2), (zl + zS) / 2], [x, yAt(zS), zS]); return out; }
 
@@ -139,7 +140,7 @@ export function eb110Mesh(spin = 0, wing = 0): Mesh { const b = new Build(); win
   const cells = (P: V[][], pick: (i: number, j: number) => boolean = () => true, keep?: Tri[]) => { for (let i = 0; i + 1 < P.length; i++) for (let j = 0; j + 1 < Math.min(P[i]!.length, P[i + 1]!.length); j++) { if (!pick(i, j)) continue;
     const q = [P[i]![j]!, P[i + 1]![j]!, P[i + 1]![j + 1]!, P[i]![j + 1]!] as [V, V, V, V], nn = (p: V, r: V, s: V) => un(cross(sub(r, p), sub(s, p))), alt = dot(nn(q[0], q[1], q[2]), nn(q[0], q[2], q[3])) < dot(nn(q[1], q[2], q[3]), nn(q[1], q[3], q[0])) - 1e-9;
     const ts: Tri[] = alt ? [[q[1], q[2], q[3]], [q[1], q[3], q[0]]] : [[q[0], q[1], q[2]], [q[0], q[2], q[3]]];
-    for (const t of ts) { const c = cross(sub(t[1], t[0]), sub(t[2], t[0])); if (Math.hypot(c[0], c[1], c[2]) < 0.5) continue; keep?.push(t); b.tri(t[0], t[1], t[2]); b.tri(mir(t[0], -1), mir(t[2], -1), mir(t[1], -1)); } } };
+    for (const t of ts) { const c = cross(sub(t[1], t[0]), sub(t[2], t[0])); if (Math.hypot(c[0], c[1], c[2]) < 0.5) continue; keep?.push(t, [mir(t[0], -1), mir(t[2], -1), mir(t[1], -1)]); b.tri(t[0], t[1], t[2]); b.tri(mir(t[0], -1), mir(t[2], -1), mir(t[1], -1)); } } };
 
   // ---- the points ----
   const CH = Array.from({ length: NR }, (_, i) => chain(i));                                             // the outer chains
@@ -173,14 +174,14 @@ export function eb110Mesh(spin = 0, wing = 0): Mesh { const b = new Build(); win
   b.name('grille').mat(DARK, 0.05); cells(chainRows(rM, rM + 1), (_, j) => j >= NB + 2 && j < NB + 5);                 // the side intake's mouth: the recess's slanting end
   const iE0 = rowOf(2710) - rT, iE1 = rowOf(Math.round(RX - RAR * Math.cos(108 * Math.PI / 180))) - rT, isCover = (i: number, j: number) => i >= iE0 && i < iE1 && j < 3;
   b.name('roof').mat(PAINT, GLOSS, 'paint'); cells(UP, (i, j) => (j < 6 || rT + i >= rP) && !isCover(i, j), TOP);
-  b.name('engineCover').mat(GLASS, 0.5, 'glass'); cells(UP, isCover);
+  b.name('engineCover').mat(GLASS, 0.5, 'glass'); cells(UP, isCover, TOP);
   b.name('screenPane').mat(GLASS, 0.5, 'glass'); cells(SCREEN, undefined, TOP);
   b.name('sidePane').mat(GLASS, 0.5, 'glass'); cells(UP, (i, j) => j === 6 && rT + i < rP); cells(SIDEF, (i, j) => j === 1 && rC + i >= rG);
   b.name('screenFrame').mat(FRAME, 0.2); cells(SIDEF, (i, j) => j === 0 || rC + i < rG);
 
   // where the skin is: its height at (x, y) on top, its distance from the centre line at (x, z) on the flank
-  const zTop = (x: number, y: number) => { const z = probe(TOP, 0, 1, 2, x, y, false); if (Number.isNaN(z)) throw new Error(`eb110: no skin at ${x}, ${y}`); return z; };
-  const ySide = (x: number, z: number) => { const y = probe(SIDE, 0, 2, 1, x, z, false); if (Number.isNaN(y)) throw new Error(`eb110: no flank at ${x}, ${z}`); return y; };
+  const zTop = (x: number, y: number) => { const z = probe(TOP, 0, 1, 2, x, y); if (Number.isNaN(z)) throw new Error(`eb110: no skin at ${x}, ${y}`); return z; };
+  const ySide = (x: number, z: number) => { const y = probe(SIDE, 0, 2, 1, x, z); if (Number.isNaN(y)) throw new Error(`eb110: no flank at ${x}, ${z}`); return y; };
   const top = (x: number, y: number, lift = 4): V => [x, y, zTop(x, y) + lift], flank = (x: number, z: number, sg: number, lift = 4): V => [x, sg * (ySide(x, z) + lift), z];
   const UPV: V = [0, 0, 1];
   const seamSide = (pts: [number, number][], sg: number, t = 9) => { const e = pts.map(([x, z], i) => { const a = pts[Math.max(0, i - 1)]!, c = pts[Math.min(pts.length - 1, i + 1)]!, l = Math.hypot(c[0] - a[0], c[1] - a[1]) || 1, nx = -(c[1] - a[1]) / l * t / 2, nz = (c[0] - a[0]) / l * t / 2; return [flank(x + nx, z + nz, sg, 3), flank(x - nx, z - nz, sg, 3)] as [V, V]; });
@@ -188,14 +189,14 @@ export function eb110Mesh(spin = 0, wing = 0): Mesh { const b = new Build(); win
 
   // ---- the tail: the panel leaning back to its foot (the crease over the valance), the black valance, the floor and the diffuser ----
   const LEAN = 40, ZF = ZW(S1), tailTop = [...UP[UP.length - 1]!, ...CH[NR - 1]!.slice(0, NB + 1)], NT = tailTop.length, yFoot = WID(S1);
-  const footX = (y: number) => S1 + 30 * (1 - (Math.abs(y) / yFoot) ** 2.5) + LEAN;
+  const footX = (y: number) => S1 + (30 + LEAN) * (1 - (Math.abs(y) / yFoot) ** 2.5);
   const TAIL: V[][] = [0, 0.5, 1].map(v => tailTop.map((p, j) => { const y = j <= 5 ? p[1] : lerp(tailTop[5]![1], yFoot, ((j - 5) / (NT - 6)) ** 0.8), f: V = j === NT - 1 ? p : [footX(y), y, ZF]; return mix(p, f, v); }));
   b.name('tailPanel').mat(PAINT, GLOSS, 'paint'); cells(TAIL);
   /** a point of the tail panel at (y, z), set off it by lift */
   const tail = (y: number, z: number, lift = 4): V => { const ay = Math.min(Math.abs(y), YD(S1)), xt = S1 + 30 * (1 - (ay / YE(S1)) ** 2.5), zt = ZC(xt) - 14 * (ay / YD(S1)) ** 2; return [lerp(xt, footX(y), Math.max(0, Math.min(1, (zt - z) / (zt - ZF)))) + lift, y, z]; };
   b.name('valance').mat(DARK, 0.05); { const ys = [0, 200, 400, 600, 740, yFoot], lo = (y: number): V => [S1 + 20 * (1 - (y / yFoot) ** 2.5), Math.min(y, yFoot - UND(S1)), ZS(S1)]; cells([0, 0.5, 1].map(v => ys.map(y => mix([footX(y), y, ZF], lo(y), v)))); }
   b.name('chassis').mat(DARK, 0.05); for (let i = 0; i + 1 < NR; i++) { const az0 = archZ(ROWX[i]!) > 0 && i > NCR, az1 = archZ(ROWX[i + 1]!) > 0 && i + 1 > NCR, yin = ROWX[i]! < 2400 ? YINF : YINR;
-    const pt = (r: number, arch: boolean): V => arch ? [ROWX[r]!, yin, ZS(ROWX[r]!)] : CH[r]![NK]!, p = pt(i, az0), q = pt(i + 1, az1), cx = (r: number) => r < NCR ? 64 : ROWX[r]!;
+    const pt = (r: number, arch: boolean): V => arch ? [ROWX[r]!, yin, ZS(ROWX[r]!)] : CH[r]![NK]!, p = pt(i, az0), q = pt(i + 1, az1), cx = (r: number) => r < NCR ? 42 : ROWX[r]!;
     for (const sg of [1, -1]) face(b, mir(p, sg), mir(q, sg), [cx(i + 1), 0, q[2]], [cx(i), 0, p[2]], [0, 0, -1]); }
   // ---- the wheel wells: a dark roof from the arch's lip in to the inner wall, the wall itself, the ends ----
   for (const sg of [1, -1]) for (const [hx, ra, yin] of [[FX, RAF, YINF], [RX, RAR, YINR]] as const) { const i0 = rowOf(hx - ra), i1 = rowOf(hx + ra), inn = (i: number): V => [ROWX[i]!, sg * yin, CH[i]![NK]![2]];
@@ -222,7 +223,96 @@ export function eb110Mesh(spin = 0, wing = 0): Mesh { const b = new Build(); win
   // the engine under its glass: a dark tray
   b.name('engine').mat(DARK, 0.1); face(b, [2700, -440, 900], [3720, -440, 800], [3720, 440, 800], [2700, 440, 900], UPV);
 
+  // ---- the head lamps: flat glass flush with the bonnet over a dark pocket; at the back the fluted halogen unit inboard
+  //      and the round projector outboard, a black finned ramp down the inner side; the amber indicator at the trough's mouth ----
+  for (const sg of [1, -1]) { const m = (p: V) => mir(p, sg), A = CH[IA]![0]!, B = CH[IB]![0]!, C = TR(I6)[0]!, Dd = HOOD[0]![3]!, N: V = [0, 0, 1];
+    const rimPts = [...CH.slice(IA, IB + 1).map(c => c[0]!), ...[IT, IT + 1, IT + 2, I6].map(i => TR(i)[0]!), HOOD[0]![5]!, HOOD[0]![4]!, Dd, TONGUE[2]![3]!, TONGUE[1]![3]!].map(m);
+    const dep = (x: number) => lerp(14, 72, Math.max(0, Math.min(1, (x - 355) / 245))), down = (p: V): V => [p[0], p[1], p[2] - dep(p[0])];
+    /** the pocket's opening at (u, v), 0..1 from front to back and from the inner edge out, dz below the glass */
+    const P = (u: number, v: number, dz = 0): V => { const q = mix(mix(A, B, v), mix(Dd, C, v), u); return m([q[0], q[1], q[2] + dz]); }, RV = 0.2;
+    b.name('lampHousing').mat(DARK, 0.05); for (let i = 0; i < rimPts.length; i++) { const p = rimPts[i]!, q = rimPts[(i + 1) % rimPts.length]!; b.quad(p, q, down(q), down(p)); }
+    b.name('lampTray').mat('#2c3038', 0.35); fan(b, rimPts.map(down), N);
+    b.name('lampFin').mat(FRAME, 0.15); patch(b, (u, v) => P(u, v * RV, -dep(lerp(355, 600, u)) * v - 2), 3, 1, [0, sg, 1]);
+    b.name('lampFin').mat('#3b3f47', 0.3); for (let k = 0; k < 6; k++) { const u = lerp(0.06, 0.72, k / 5), d = dep(lerp(355, 600, u)); face(b, P(u, 0.02, -3), P(u + 0.035, 0.02, -3), P(u + 0.035, RV - 0.02, -d + 4), P(u, RV - 0.02, -d + 4), [0, sg, 1]); }
+    // the units: a face leaning back from the tray to just under the glass's back edge
+    const W0 = 0.72, W1 = 0.98, F = (v: number, w: number, d = 0): V => { const u = lerp(W0, W1, w), p = P(u, v, lerp(-dep(lerp(355, 600, W0)) + 3, -7, w)); return [p[0] - d * 0.7, p[1], p[2] + d * 0.7]; }, NF: V = [-1, 0, 0.6];
+    b.name('lampHousing').mat(DARK, 0.05); patch(b, (v, w) => F(lerp(RV, 0.98, v), w), 1, 1, NF);
+    b.name('reflector').mat(SILVER, 0.75, 'metal'); patch(b, (v, w) => F(lerp(0.26, 0.6, v), lerp(0.08, 0.94, w), 2), 1, 1, NF);
+    b.name('reflector').mat(LENS, 0.7); patch(b, (v, w) => F(lerp(0.28, 0.58, v), lerp(0.16, 0.86, w), 4), 1, 1, NF);
+    b.name('reflector').mat('#a9adb2', 0.6); for (let k = 1; k < 7; k++) { const v = lerp(0.28, 0.58, k / 7); patch(b, (a, w) => F(v - 0.006 + 0.012 * a, lerp(0.16, 0.86, w), 5), 1, 1, NF); }
+    b.name('reflector').mat(LENS, 0.7); patch(b, (v, w) => F(lerp(0.63, 0.96, v), lerp(0.16, 0.86, w), 3), 1, 1, NF);
+    { const c = F(0.8, 0.52, 6), e1 = un(sub(F(0.9, 0.52, 6), F(0.7, 0.52, 6))), e2v = sub(F(0.8, 0.86, 6), F(0.8, 0.18, 6)), e2 = un(e2v), cr = cross(e1, e2), nn: V = cr[0] > 0 ? [-cr[0], -cr[1], -cr[2]] : cr;
+      const r0 = Math.min(44, Math.hypot(e2v[0], e2v[1], e2v[2]) * 0.34), at = (r: number, t: number, d: number): V => [0, 1, 2].map(k => c[k]! + e1[k]! * r * Math.cos(t) + e2[k]! * r * Math.sin(t) + nn[k]! * d) as V, n10 = 10;
+      b.name('reflector').mat(CHROME, 0.9, 'metal'); for (let i = 0; i < n10; i++) { const t0 = i / n10 * Math.PI * 2, t1 = (i + 1) / n10 * Math.PI * 2; face(b, at(r0, t0, 0), at(r0, t1, 0), at(r0 * 0.82, t1, 5), at(r0 * 0.82, t0, 5), nn); }
+      b.name('lens').mat('#3a4048', 0.9, 'lens'); for (let i = 0; i < n10; i++) { const t0 = i / n10 * Math.PI * 2, t1 = (i + 1) / n10 * Math.PI * 2, q = [at(0, 0, 12), at(r0 * 0.82, t0, 5), at(r0 * 0.82, t1, 5)] as const; if (dot(cross(sub(q[1], q[0]), sub(q[2], q[0])), nn) >= 0) b.tri(q[0], q[1], q[2]); else b.tri(q[0], q[2], q[1]); } }
+    b.name('headCover').mat(GLASS, 0.5, 'glass'); fan(b, rimPts, N);
+    b.name('indicator').mat(AMBER, 0.7); fan(b, [CH[IB]![0]!, CH[IB + 1]![0]!, CH[IT]![0]!, TR(IT)[2]!, TR(IT)[1]!, TR(IT)[0]!].map(m), N);
+    b.name('marker').mat(RED, 0.6); face(b, flank(1130, 702, sg), flank(1154, 702, sg), flank(1154, 724, sg), flank(1130, 724, sg), [0, sg, 0]); }
+
+  // ---- the nose: the intakes' depths behind the bumper's openings and their bars, the horseshoe, the corner ducts, the badge ----
+  { const k0 = NB + 2, k1 = NB + 5, back = (p: V): V => [p[0] + 75, p[1] * 0.96, p[2]];
+    for (const sg of [1, -1]) { const m = (p: V) => mir(p, sg);
+      b.name('grille').mat(DARK, 0.05, 'grille'); for (let i = 1; i < 6; i++) face(b, m(back(CH[i]![k0]!)), m(back(CH[i + 1]![k0]!)), m(back(CH[i + 1]![k1]!)), m(back(CH[i]![k1]!)), [-1, 0, 0]);
+      b.name('grille').mat(DARK, 0.05); for (let i = 1; i < 6; i++) for (const k of [k0, k1]) face(b, m(CH[i]![k]!), m(CH[i + 1]![k]!), m(back(CH[i + 1]![k]!)), m(back(CH[i]![k]!)), [0, 0, k === k0 ? -1 : 1]);
+      for (const i of [1, 6]) face(b, m(CH[i]![k0]!), m(CH[i]![k1]!), m(back(CH[i]![k1]!)), m(back(CH[i]![k0]!)), [0, i === 1 ? sg : -sg, 0]);
+      b.name('bumperF').mat(PAINT, GLOSS, 'paint'); for (const k of [k0 + 1, k0 + 2]) for (let i = 1; i < 6; i++) { const z = CH[i]![k]![2], p = (r: number, dz: number, dx = 0): V => { const q = bump(sg * CH[r]![k]![1], z + dz); return [q[0] + dx, q[1], q[2]]; };
+        face(b, p(i, -9), p(i + 1, -9), p(i + 1, 9), p(i, 9), [-1, 0, 0]); face(b, p(i, 9), p(i + 1, 9), p(i + 1, 9, 30), p(i, 9, 30), [0, 0, 1]); }
+      b.name('grille').mat(DARK, 0.05, 'grille'); patch(b, (u, v) => bump(sg * lerp(700, 772, u), lerp(152, 280, v), 5), 2, 1, [-1, sg, 0]); }
+    const shoe: [number, number][] = [[-34, 150], [-50, 225], [-48, 262], [-32, 284], [0, 292], [32, 284], [48, 262], [50, 225], [34, 150]], hs = (k: number, lift: number) => fan(b, shoe.map(([y, z]) => bump(y * k, 222 + (z - 222) * k, lift)), [-1, 0, 0]);
+    b.name('grille').mat(PAINT, GLOSS, 'paint'); hs(1.14, 3); b.name('grille').mat(DARK, 0.05, 'grille'); hs(1, 6);
+    b.name('badge').mat(RED, 0.5); fan(b, ([[-48, 0], [-30, 11], [30, 11], [48, 0], [30, -11], [-30, -11]] as const).map(([y, dx]) => top(165 + dx, y, 5)), UPV); }
+
+  // ---- the flanks: the doors' edges, the curved vent behind the front wheel, the slot on the rear wing's top, the vent at the tail's corner ----
+  for (const sg of [1, -1]) { b.name('door').mat(SEAM, 0.1);
+    seamSide([[1520, 772], [1500, 650], [1462, 450], [1425, 305]], sg);                                                               // the front edge
+    seamSide([[SP - 12, 786], [2500, 700], [2469, 561], [2425, 470], [2378, 400], [2320, 345], [2264, 305]], sg);                     // the back edge, sweeping down and forward
+    seamSide([[1425, 302], [1700, 300], [2000, 300], [2264, 302]], sg, 7);                                                            // the foot
+    b.name('grille').mat(DARK, 0.05); { const arc = (r: number, k: number): V => { const t = lerp(2, 66, k) * Math.PI / 180; return flank(FX + r * Math.cos(t), R + r * Math.sin(t), sg); }; for (let k = 0; k < 6; k++) face(b, arc(384, k / 6), arc(412, k / 6), arc(412, (k + 1) / 6), arc(384, (k + 1) / 6), [0, sg, 0]); }   /* the vent following the arch's rim */
+    patch(b, (u, v) => { const x = lerp(2560, 2790, u); return top(x, sg * lerp(YE(x) + 22, lerp(YE(x), YR(x), 0.5 + 0.35 * (1 - u)), v)); }, 3, 1, UPV);        // the slot along the rear wing's top
+    face(b, flank(4195, ZS(4195) + 22, sg), flank(4250, ZS(4250) + 22, sg), flank(4250, 500, sg), flank(4195, 500, sg), [0, sg, 0]); }                              // the tail's corner vent
+
+  // ---- the glass's frames, the wiper ----
+  { const strip = (ps: V[], to: V[], w: number) => { for (const sg of [1, -1]) { const e = ps.map((p, k) => { const d = un(sub(to[k]!, p)); return [mir([p[0], p[1] + 2.5, p[2] + 3.5], sg), mir([p[0] + d[0] * w, p[1] + d[1] * w + 2.5, p[2] + d[2] * w + 3.5], sg)] as [V, V]; }); for (let k = 0; k + 1 < e.length; k++) face(b, e[k]![0], e[k + 1]![0], e[k + 1]![1], e[k]![1], [0, sg * 0.5, 1]); } };
+    b.name('screenFrame').mat(FRAME, 0.2); strip(sFoot, SCREEN[1]!, 34); strip(sTop, SCREEN[SCREEN.length - 2]!, 26);
+    const cab = UP.slice(0, rP - rT + 1); strip(cab.map(r => r[7]!), cab.map(r => r[6]!), 24); strip(cab.map(r => r[6]!), cab.map(r => r[7]!), 20); strip(cab.map(r => r[6]!), cab.map(r => r[5]!), 10);
+    { const r = cab[cab.length - 1]!; strip([r[6]!, r[7]!], [cab[cab.length - 2]![6]!, cab[cab.length - 2]![7]!], 34); }
+    const sf = SIDEF.slice(rG - rC); strip(sf.map(r => r[2]!), sf.map(r => r[1]!), 24);
+    b.name('wiper').mat(FRAME, 0.1); { const a = mix(SCREEN[0]![4]!, SCREEN[1]![4]!, 0.45), c = mix(SCREEN[0]![2]!, SCREEN[1]![2]!, 0.3); b.bar([a[0], -a[1], a[2] + 16], [c[0], c[1], c[2] + 16], 16, 10).bar([1120, 0, 800], [(a[0] + c[0]) / 2, (c[1] - a[1]) / 2, (a[2] + c[2]) / 2 + 16], 18, 10); } }
+
+  // ---- behind the cabin: six sunk oval holes in each buttress (two columns of three), the engine cover's louvre bars ----
+  b.name('louvre').mat(DEEP, 0.2); for (const sg of [1, -1]) for (const xc of [2745, 2915]) for (const f of [0.17, 0.41, 0.65]) { const on = (x: number, g: number, d = 0): V => { const u = upper(x), t = u[6]!, e = u[7]!, q = mix(t, e, g), n = un(cross([1, 0, 0], sub(e, t))); return [x, sg * (q[1] + n[1] * (4 - d)), q[2] + n[2] * (4 - d)]; };
+    const o = (k: number): V => { const t = k / 8 * Math.PI * 2; return on(xc + 64 * Math.cos(t), f + 0.095 * Math.sin(t)); }, c = on(xc + 6, f + 0.02, 34);
+    for (let k = 0; k < 8; k++) { const p = o(k), q = o(k + 1); if (dot(cross(sub(p, c), sub(q, c)), [0, sg, 1]) >= 0) b.tri(c, p, q); else b.tri(c, q, p); } }
+  b.name('engineCover').mat(FRAME, 0.1); for (let k = 0; k < 6; k++) { const x0 = 2775 + k * 150, us = [-0.9, -0.45, 0, 0.45, 0.9], yc = (x: number) => Math.min(450, 0.78 * YD(x)); for (let i = 0; i + 1 < us.length; i++) face(b, top(x0, us[i]! * yc(x0), 5), top(x0 + 64, us[i]! * yc(x0 + 64), 5), top(x0 + 64, us[i + 1]! * yc(x0 + 64), 5), top(x0, us[i + 1]! * yc(x0), 5), UPV); }
+
+  // ---- the tail: a capsule of lamps a side (clear inboard, red, amber outboard, a red block low in it), six mesh slots across the top with two more
+  //      at each side below, the plate's recess, the fog lamp on the valance, four pipes through the diffuser ----
+  { const R1: V = [1, 0, 0], ZC0 = 700, HH = 60, cap = (lift: number, grow: number, y0: number, y1: number, endIn: boolean, endOut: boolean) => { for (const sg of [1, -1]) { patch(b, (u, v) => tail(sg * lerp(y0, y1, u), ZC0 + (HH + grow) * (2 * v - 1), lift), 2, 1, R1);
+        for (const [on, yc, dir] of [[endIn, y0, -1], [endOut, y1, 1]] as const) if (on) { const r = HH + grow, pts = Array.from({ length: 6 }, (_, k) => { const t = -Math.PI / 2 + k / 5 * Math.PI; return tail(sg * (yc + dir * r * 0.9 * Math.cos(t)), ZC0 + r * Math.sin(t), lift); }); for (let k = 1; k + 1 < pts.length; k++) face(b, pts[0]!, pts[k]!, pts[k + 1]!, pts[k + 1]!, R1); } } };
+    b.name('tailRim').mat(FRAME, 0.2); cap(3, 9, 512, 724, true, true);
+    b.name('reverse').mat('#e9e4dc', 0.7); cap(7, 0, 512, 566, true, false);
+    b.name('tail').mat(RED, 0.5, 'lens'); cap(7, 0, 566, 672, false, false);
+    b.name('indicator').mat(AMBER, 0.7); cap(7, 0, 672, 724, false, true);
+    b.name('tail').mat(RED2, 0.5, 'lens'); for (const sg of [1, -1]) patch(b, (u, v) => tail(sg * lerp(566, 660, u), lerp(636, 668, v), 10), 1, 1, R1);
+    b.name('grille').mat(DARK, 0.05, 'grille'); for (let k = 0; k < 6; k++) { const y0 = -426 + k * 146; patch(b, (u, v) => tail(lerp(y0, y0 + 122, u), lerp(742, 770, v)), 1, 1, R1); }
+    for (const sg of [1, -1]) for (const z of [690, 638]) patch(b, (u, v) => tail(sg * lerp(304, 426, u), z + v * 26), 1, 1, R1);
+    b.name('plate').mat('#16307a', 0.3); patch(b, (u, v) => tail(lerp(-250, 250, u), lerp(572, 668, v)), 2, 1, R1);
+    b.name('plate').mat('#d9a514', 0.35); patch(b, (u, v) => tail(lerp(-222, 222, u), lerp(582, 658, v), 7), 2, 1, R1);
+    b.name('tail').mat(RED2, 0.5, 'lens'); patch(b, (u, v) => [lerp(4285, 4318, v) + 5, lerp(-74, 74, u), ZS(lerp(4285, 4318, v)) - 5] as V, 1, 1, [1, 0, -1]);
+    b.name('exhaust').mat(CHROME, 0.9, 'metal'); for (const sg of [1, -1]) for (const y of [225, 320]) b.lathe('x', [4262, sg * y, 372], [[-150, 44], [12, 44], [12, 36], [-140, 33]], 8, false); }   /* the GT's two pairs */
+
+  // ---- the mirrors: heads standing out on upright stalks from the doors' top front corners ----
+  for (const sg of [1, -1]) { const ring = (x: number, k: number): V[] => { const yc = 873, zc = 914, hw = 66 * k, hh = 50 * k; return ([[-1, -0.6], [-1, 0.6], [-0.6, 1], [0.6, 1], [1, 0.6], [1, -0.6], [0.6, -1], [-0.6, -1]] as const).map(([u, v]) => [x, sg * (yc + u * hw), zc + v * hh] as V); };
+    b.name('mirror').mat(PAINT, GLOSS, 'paint').loft([ring(1640, 0.55), ring(1676, 0.92), ring(1750, 1), ring(1784, 0.96)]).bar([1700, sg * 790, 775], [1712, sg * 826, 880], 52, 26);
+    b.name('mirror').mat(CHROME, 0.9, 'metal'); const r = ring(1787, 0.84); for (let i = 1; i + 1 < r.length; i++) b.tri(r[0]!, r[i]!, r[i + 1]!); }
+
+  // ---- the wing (GT): the tail's trailing blade in its dark bed; raised, it stands on two struts, its trailing edge up ----
+  { const x0 = 4085, xe = (y: number) => S1 + 30 * (1 - (Math.abs(y) / YE(S1)) ** 2.5) - 12, xp = 4240, zp = zTop(xp, 0), a = 10 * wing * Math.PI / 180, ca = Math.cos(a), sa = Math.sin(a), lift = 110 * wing;
+    const T = (p: V): V => { const dx = p[0] - xp, dz = p[2] - zp; return [xp + dx * ca - dz * sa, p[1], zp + dx * sa + dz * ca + lift]; };
+    b.name('wing').mat(FRAME, 0.1); for (let i = 0; i < 8; i++) { const y0 = lerp(-690, 690, i / 8), y1 = lerp(-690, 690, (i + 1) / 8); for (const [u0, u1] of [[0, 0.5], [0.5, 1]] as const) { const x = (y: number, u: number) => lerp(4040, xe(y) - 6, u); face(b, top(x(y0, u0), y0, 3), top(x(y0, u1), y0, 3), top(x(y1, u1), y1, 3), top(x(y1, u0), y1, 3), UPV); } }
+    b.name('wing').mat(PAINT, GLOSS, 'paint').loft([-725, -600, -450, -300, -150, 0, 150, 300, 450, 600, 725].map(y => { const x1 = xe(y), xm = (x0 + x1) / 2; return ([[x0, -4], [x0 + 28, 6], [xm, 9], [x1 - 26, 8], [x1, 2], [xm, -12]] as const).map(([x, dz]) => T([x, y, zTop(x, Math.min(Math.abs(y), 700)) + dz])); }));
+    if (wing > 0.02) { b.name('wing').mat(FRAME, 0.2); for (const y of [-576, 576]) b.bar([xp, y, zTop(xp, y) - 12], T([xp, y, zTop(xp, y) - 8]), 54, 16); } }
+
   for (const s of [1, -1] as const) { wheel(b, FX, s, spin); wheel(b, RX, s, spin); }
-  void [seamSide, top, flank, tail, bump, patch, fan, AMBER, RED, RED2, LENS, CHROME, SEAM, DEEP, r6, wing, WYF];
   return b.mesh(L); }
 export const mesh = eb110Mesh;

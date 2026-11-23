@@ -181,6 +181,7 @@ void main() {
   float d = max(0., dot(n, uSun)) * sh, up = 0.5 + 0.5 * n.z;
   float ne = dot(n, uEye), rz = 2. * ne * n.z - uEye.z;
   if (uMode == 2) {   // glass: mirrors more at a glancing angle, laid over at its own strength
+    if (uLook > 0 && kind == 4) discard;   /* the painted glints the baked pictures put on windows: the glass now mirrors the world itself (review 118) */
     if (uLook > 0 && vLamp.z > 0.5) { vec3 ns = normalize(vSN); if (dot(ns, n) < 0.) ns = -ns; oCol = vec4(present(lampFace(vLamp.xy, vLamp.z, vLAx, vLRt, vLUp, ns, sh)), 1.); oId = vec4(0.); oN = vec4(0.); oV = velo(); return; }   /* a lamp's glass: the lamp drawn on it (review 117) */
     if (uLook > 0) {   /* review 116: glass as glass. Nearly black in itself, a little green toward its edge (seen through its
          thickness); what lies behind shows through; the world mirrored by Fresnel off the smoothed surface (no white band,

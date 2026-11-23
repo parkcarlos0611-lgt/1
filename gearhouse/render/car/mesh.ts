@@ -117,7 +117,9 @@ export function wheelsOf(M: Mesh): WheelGroup[] { const have = wheelCache.get(M)
     if (!g) { g = { tris: [], x0, x1, y0, y1, z0, z1, cx, cy }; rings.push(g); } g.tris.push(t); g.x0 = Math.min(g.x0, x0); g.x1 = Math.max(g.x1, x1); g.y0 = Math.min(g.y0, y0); g.y1 = Math.max(g.y1, y1); g.z0 = Math.min(g.z0, z0); g.z1 = Math.max(g.z1, z1); g.cx = (g.x0 + g.x1) / 2; g.cy = (g.y0 + g.y1) / 2; }
   const road = rings.filter(g => g.z0 < 40 && g.tris.length > 8), mid = road.reduce((a, g) => a + g.cx, 0) / Math.max(1, road.length);
   const out: WheelGroup[] = road.map(g => ({ hx: g.cx, hy: g.cy, hz: (g.z0 + g.z1) / 2, r: (g.z1 - g.z0) / 2, hw: (g.y1 - g.y0) / 2, front: g.cx < mid, tris: [] }));
-  for (let t = 0; t < M.n; t++) for (const w of out) { let inside = true;
+  // a wing's skirt or a valance that dips into the wheel's round is the body's, not the wheel's: it must not turn with it (review 118)
+  const bodyPart = (t: number) => /^(fender|wing|body|board|skirt|valance|apron|sill|step|chassis|bumper)/i.test(M.names?.[M.part[t]!] ?? '');
+  for (let t = 0; t < M.n; t++) for (const w of out) { if (bodyPart(t)) break; let inside = true;
     for (let k = 0; k < 3 && inside; k++) { const x = p[t * 9 + k * 3]! - w.hx, y = p[t * 9 + k * 3 + 1]! - w.hy, z = p[t * 9 + k * 3 + 2]! - w.hz; if (x * x + z * z > (w.r * 1.03) ** 2 || Math.abs(y) > w.hw + 90) inside = false; }
     if (inside) { w.tris.push(t); break; } }
   wheelCache.set(M, out); return out; }

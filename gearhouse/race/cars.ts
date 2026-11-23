@@ -44,7 +44,8 @@ export interface RaceSpec {
    *  pressing the rear, its drag area; the body's own downforce area); power steering; the tyres' widths front and rear (m) */
   tech?: { drive?: { front: number; visc: number }; rearLsd?: number; /** a viscous-coupling rear differential instead (Nm per rad/s between the wheels) */ rearVisc?: number;
     /** ground effect (review 126): the underbody's venturis, a lift area pressing the car down more the lower it rides (its share on the front) */ ground?: { clA: number; front: number }; abs?: boolean; turbo?: { n: number; boost: number; full: number; spool: number };
-    wing?: { up: number; down: number; clA: number; cdA: number; body: number }; power?: boolean; tyreWF?: number; tyreWR?: number };
+    wing?: { up: number; down: number; clA: number; cdA: number; body: number }; power?: boolean; tyreWF?: number; tyreWR?: number;
+    /** review 147: the front axle's share of the roll stiffness (an anti-roll bar added at the front to reach it); unset: the springs' own */ rollF?: number };
   cdA: number; crr: number; steerLock: number;          // drag area m², rolling resistance, front wheels' lock (deg)
   topKmh: number; check: boolean;
   cooling: { siphon: boolean; margin: number } }   // the water's circulation (no pump on the Model T [v]), the radiator against the engine's heat [?]
@@ -137,7 +138,7 @@ NEW.eb110 = { id: 'eb110', name: '1991 Bugatti EB110 GT (실험)', mass: 1620 + 
   hp: 553, hpRpm: 8000, torqueRpm: 3750, torquePeak: 611, idle: 900, redline: 8250, gears: [3.4, 2.25, 1.65, 1.27, 1.03, 0.84], final: 3.4, eff: 0.85,
   brakes: 'disc', hydraulic: true, brakeG: 1.1, cdA: 0.58, crr: 0.012, steerLock: 30, topKmh: 342, check: false, cooling: { siphon: false, margin: 1.2 }, tyreKind: 'radial', era: '1991',
   shiftT: 0.22, launchRpm: 6000, steer: { ratio: 15, ackermann: 0.6, rack: true }, inertia: { engine: 0.22, wheel: 1.7 },
-  tech: { drive: { front: 0.27, visc: 60 }, rearLsd: 2.5, abs: true, turbo: { n: 4, boost: 1.1, full: 3800, spool: 0.45 }, wing: { up: 120, down: 90, clA: 0.32, cdA: 0.06, body: 0.12 }, power: true, tyreWF: 0.245, tyreWR: 0.325 } };
+  tech: { rollF: 0.47, drive: { front: 0.27, visc: 60 }, rearLsd: 2.5, abs: true, turbo: { n: 4, boost: 1.1, full: 3800, spool: 0.45 }, wing: { up: 120, down: 90, clA: 0.32, cdA: 0.06, body: 0.12 }, power: true, tyreWF: 0.245, tyreWR: 0.325 } };
 // review 126: the Jaguar XJ220 (1992), from the period's and later sources (Wikipedia, Supercars.net, PistonHeads,
 // Classic & Sports Car, Car & Classic): 3.5 twin-turbo V6 (JRV-6) 542 bhp at 7,200, 475 lb ft (644 Nm) at 4,500; an FF
 // Developments five-speed transaxle with a viscous limited-slip differential (3.00 1.95 1.42 1.09 0.85, final 2.88); rear
@@ -149,7 +150,7 @@ NEW.xj220 = { id: 'xj220', name: '1992 Jaguar XJ220 (실험)', mass: 1470 + 75, 
   hp: 542, hpRpm: 7200, torqueRpm: 4500, torquePeak: 644, idle: 900, redline: 7800, gears: [3.0, 1.95, 1.42, 1.09, 0.85], final: 2.88, eff: 0.88,
   brakes: 'disc', hydraulic: true, brakeG: 1.05, cdA: 0.62, crr: 0.012, steerLock: 30, topKmh: 342, check: false, cooling: { siphon: false, margin: 1.15 }, tyreKind: 'radial', era: '1992',
   shiftT: 0.32, launchRpm: 5000, steer: { ratio: 15, ackermann: 0.6, rack: true }, inertia: { engine: 0.2, wheel: 1.8 },
-  tech: { rearVisc: 40, turbo: { n: 2, boost: 1.0, full: 4000, spool: 0.5 }, ground: { clA: 0.55, front: 0.38 }, tyreWF: 0.255, tyreWR: 0.345 } };
+  tech: { rollF: 0.47, rearVisc: 40, turbo: { n: 2, boost: 1.0, full: 4000, spool: 0.5 }, ground: { clA: 0.55, front: 0.38 }, tyreWF: 0.255, tyreWR: 0.345 } };
 // review 141: the Lamborghini Diablo (1990), the original rear-drive car (lambocars.com, supercars.net, auto-data.net):
 // 5.7 L V12 (four valves a cylinder), 492 hp at 7,000 rpm, 580 Nm at 5,200; five speeds; rear drive, a limited-slip
 // differential; no ABS, no power steering (both came later: ABS with the SV/VT updates, power steering on the VT);
@@ -160,7 +161,7 @@ NEW.diablo = { id: 'diablo', name: '1990 Lamborghini Diablo (실험)', mass: 157
   hp: 492, hpRpm: 7000, torqueRpm: 5200, torquePeak: 580, idle: 900, redline: 7300, gears: [2.31, 1.52, 1.12, 0.88, 0.71], final: 3.83, eff: 0.86,
   brakes: 'disc', hydraulic: true, brakeG: 1.0, cdA: 0.66, crr: 0.012, steerLock: 30, topKmh: 325, check: false, cooling: { siphon: false, margin: 1.1 }, tyreKind: 'radial', era: '1990',
   shiftT: 0.32, launchRpm: 4500, steer: { ratio: 15, ackermann: 0.6, rack: true }, inertia: { engine: 0.24, wheel: 1.8 },
-  tech: { rearLsd: 1.6, tyreWF: 0.245, tyreWR: 0.335 } };
+  tech: { rollF: 0.47, rearLsd: 1.6, tyreWF: 0.245, tyreWR: 0.335 } };
 Object.assign(EXP, NEW);
 /** the new 3D-first cars, offered beside the period ones */
 export const NEW_CARS: string[] = Object.keys(NEW);

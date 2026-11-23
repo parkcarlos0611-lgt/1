@@ -55,7 +55,7 @@ function frameQ(h: number, n: V3): Q { const f0: V3 = [Math.cos(h), Math.sin(h),
 const SUB = 0.001;   // the inner step (s)
 
 /** one axle's running gear: its kind, where it is, its masses and springs */
-interface Axle { kind: AxleKind; x: number; tw: number; ts: number; mu: number; Ia: number; k: number; c: number; fric: number; F0: number; rc: number; drive: boolean;
+interface Axle { /** an anti-roll bar's stiffness (N/m of the two sides' difference) */ arb: number; kind: AxleKind; x: number; tw: number; ts: number; mu: number; Ia: number; k: number; c: number; fric: number; F0: number; rc: number; drive: boolean;
   /** beam: heave (m, up) and roll (rad, left up); independent: each wheel's rise (m) */ d: [number, number]; dv: [number, number]; da: [number, number];
   /** a driven beam axle's wind-up (rad, its housing turned as the wheels roll forward) */ wu: number; wv: number; Iw: number; kw: number; cw: number }
 
@@ -99,8 +99,11 @@ export class Vehicle {
       const tw = spec.track, ts = kind === 'beam' ? tw * 0.8 : tw, Ia = mu * tw * tw / 8;
       return { kind, x: front ? L * (1 - spec.frontShare) : -L * spec.frontShare, tw, ts, mu, Ia, k, c: 2 * 0.28 * Math.sqrt(k * msc), fric: leaf ? 0.05 * msc * G : 0, F0: msc * G,
         rc: kind === 'beam' ? spec.tyreR + 0.06 : kind === 'swing' ? spec.tyreR + 0.02 : 0.1, drive: !front, d: [0, 0], dv: [0, 0], da: [0, 0],
-        wu: 0, wv: 0, Iw: 6 + mu * 0.05, kw: 0, cw: 0 }; };
+        wu: 0, wv: 0, Iw: 6 + mu * 0.05, kw: 0, cw: 0, arb: 0 }; };
     this.axles = [mk(true), mk(false)]; { const Tmax = torqueAt(spec, spec.torqueRpm) * spec.gears[0]! * spec.final * spec.eff; for (const a of this.axles) { a.kw = Math.max(a.Iw * (2 * Math.PI * 20) ** 2, Tmax / 0.02); a.cw = 2 * 0.25 * Math.sqrt(a.kw * a.Iw); } }   /* the leaves twist about a fortieth of a radian under first gear's full torque */
+    { // review 147: the roll stiffness shared as the car's makers set it, by an anti-roll bar at the front (mid-engined cars
+      // carry a stiff front bar so the heavier, wider-tyred rear does not let go first). A spring's roll stiffness k ts^2 / 2, a bar's arb ts^2.
+      const rf = spec.tech?.rollF, F = this.axles[0], Rr = this.axles[1]; if (rf && F.kind !== 'beam') { const kF = F.k * F.ts * F.ts / 2, kR = Rr.k * Rr.ts * Rr.ts / 2; F.arb = Math.max(0, (rf * (kF + kR) - kF) / (F.ts * F.ts * (1 - rf))); } }
     this.ms = m - this.axles[0].mu - this.axles[1].mu;
     this.Iz = m * (L * L + spec.track * spec.track) / 12 * 1.15; this.Iy = this.ms * L * L / 14; this.Ix = this.ms * spec.track * spec.track / 10;
     this.Iw = spec.inertia?.wheel ?? 1.2 + spec.tyreR * spec.tyreR * 10; this.Ie = spec.inertia?.engine ?? 0.25 + spec.hp / 400; this.rpm = spec.idle; this.health = new Health(spec.hp, spec.cooling, Math.floor(Math.random() * 1e9));
@@ -238,8 +241,8 @@ export class Vehicle {
         this.yd[i] = Math.max(-sig, Math.min(sig, this.yd[i]!));
         const kappa = (this.w[i]! * R - lx) / v0, tanA = this.yd[i]! / sig; this.slipX[i] = kappa; this.slipA[i] = Math.atan(tanA);
         const patch = Math.min(1.15, this.rings[i]!.patch);
-        const wide = X?.tyreWF && X.tyreWR ? ((i < 2 ? X.tyreWF : X.tyreWR) / ((X.tyreWF + X.tyreWR) / 2)) ** 0.15 : 1;   /* a wider tyre a little more grip */
-        const mu = ty.mu * wide * (1 - ty.loadSens * (fz / (m * G / 4) - 1)) * (this.onGrass[i] ? 0.55 : 1) * (0.85 + 0.15 * patch);
+        const wr = X?.tyreWF && X.tyreWR ? (i < 2 ? X.tyreWF : X.tyreWR) / ((X.tyreWF + X.tyreWR) / 2) : 1, wide = wr ** 0.3;   /* a wider tyre more grip, and (review 147) it bears a heavier load before its grip falls off: its load sensitivity is against its own rated load */
+        const mu = ty.mu * wide * (1 - ty.loadSens * (fz / (m * G / 4 * wr) - 1)) * (this.onGrass[i] ? 0.55 : 1) * (0.85 + 0.15 * patch);
         const sx = kappa / ty.peakSlip, sa = tanA / ty.peakAngle, sg = Math.hypot(sx, sa);
         let fx = 0, fy = 0; if (sg > 1e-9 && fz > 0) { const Bs = ty.B * sg, f = Math.sin(ty.C * Math.atan(Bs - ty.E * (Bs - Math.atan(Bs)))); fx = mu * fz * f * sx / sg; fy = -mu * fz * f * sa / sg; }
         fy += 0.35 * this.camber[i]! * fz; { const l = Math.hypot(fx, fy), cap2 = mu * fz * 1.02; if (l > cap2) { fx *= cap2 / l; fy *= cap2 / l; } }   // camber thrust, within the grip
@@ -269,7 +272,8 @@ export class Vehicle {
       // the springs (with the leaves' rubbing) and dampers between the running gear and the body
       for (let side = 0; side < 2; side++) { const sy = side === 0 ? 1 : -1, yS = sy * A.ts / 2;
         const t = beam ? A.d[0] + sy * A.d[1] * A.ts / 2 + (A.drive ? A.wu * 0.12 : 0) : A.d[side]!, tv = beam ? A.dv[0] + sy * A.dv[1] * A.ts / 2 : A.dv[side]!;
-        const fs = -(A.F0 + A.k * t + A.c * tv + A.fric * Math.tanh(tv / 0.01));   // on the running gear (pushing it down); the bump stop past 9 cm
+        const bar = !beam && A.arb ? A.arb * (A.d[side]! - A.d[1 - side]!) : 0;   /* the anti-roll bar: each side pushed by the difference */
+        const fs = -(A.F0 + A.k * t + bar + A.c * tv + A.fric * Math.tanh(tv / 0.01));   // on the running gear (pushing it down); the bump stop past 9 cm
         const stop = t > 0.09 ? -(t - 0.09) * A.k * 12 : t < -0.12 ? -(t + 0.12) * A.k * 12 : 0, f = fs + stop;
         if (beam) { Q[0] += f; Q[1] += f * yS; } else Q[side as 0 | 1] += f;
         addAt([A.x, yS, 0], rotQ(this.q, [0, 0, -f])); }

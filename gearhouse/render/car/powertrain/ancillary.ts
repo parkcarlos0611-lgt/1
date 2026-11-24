@@ -8,17 +8,23 @@ import { floorAt, type Ctx } from './layout';
 
 const ALU = '#c3c6ca', CORE = '#2c2f33', HOSE = '#1c1c1f', FRAME = '#3b3e43', TANK = '#34373b', RUBBER = '#141416', STEEL = '#b9bcc1';
 
+/** the nose's places: the radiator's width and station, the battery's corner behind it (the bay's other fittings stand beside it: bay.ts) */
+export function nosePlace(x: Ctx): { W: number; rx: number; bx: number; by: number; bz: number } { const { S, site } = x, wf = site.wheels.f;
+  const W = clamp(520 + 45 * (S.litres - 3) + 35 * S.turbos, 480, 2 * (wf.y - wf.w / 2) - 420), rx = Math.max(170, wf.x - wf.r - 230);
+  return { W, rx, bx: rx + 170, by: -Math.min(W / 2 - 100, 230), bz: site.foot + 90 }; }
+
 export function cooling(x: Ctx): void {
   const { g, S, site, det, E } = x, wf = site.wheels.f, cab = site.cabin;
   // ---- the radiator: leaning forward ahead of the front wheels, a tank each side, the fans behind it ----
-  const W = clamp(520 + 45 * (S.litres - 3) + 35 * S.turbos, 480, 2 * (wf.y - wf.w / 2) - 420), H = 240, rx = Math.max(170, wf.x - wf.r - 230), rz = site.foot + 75 + H / 2;
+  const { W, rx } = nosePlace(x), H = 240, rz = site.foot + 75 + H / 2;
   const lean = 0.3, e1: V = [Math.cos(lean), 0, Math.sin(lean)], e3: V = [-Math.sin(lean), 0, Math.cos(lean)], rc: V = [rx, 0, rz], at = (a: number, yy: number, c: number): V => [rc[0] + e1[0] * a + e3[0] * c, yy, rc[2] + e1[2] * a + e3[2] * c];
   g.part('radiator', CORE, 0.25, 'metal').obox(rc, e1, 16, [0, 1, 0], W / 2, e3, H / 2);
   for (const s of [1, -1]) g.part('radiator', ALU, 0.6, 'metal').obox(at(0, s * (W / 2 + 14), 0), e1, 20, [0, 1, 0], 14, e3, H / 2 + 6);
-  if (det === 2) { g.part('radiator', '#4a4e54', 0.3, 'metal'); for (let k = 1; k < 6; k++) { const c = -H / 2 + k * H / 6; g.quad(at(-17.5, -W / 2, c - 3), at(-17.5, W / 2, c - 3), at(-17.5, W / 2, c + 3), at(-17.5, -W / 2, c + 3)); } }   // the core's rows
+  if (det === 2 && g.drift) for (let k = 1; k < 6; k++) { const c = -H / 2 + k * H / 6; g.line('vent', [at(-18.5, -W / 2 + 10, c), at(-18.5, W / 2 - 10, c)]); }   // the drift look: the core's rows drawn, not built
+  if (det === 2 && !g.drift) { g.part('radiator', '#4a4e54', 0.3, 'metal'); for (let k = 1; k < 6; k++) { const c = -H / 2 + k * H / 6; g.quad(at(-17.5, -W / 2, c - 3), at(-17.5, W / 2, c - 3), at(-17.5, W / 2, c + 3), at(-17.5, -W / 2, c + 3)); } }   // the core's rows
   if (det > 0) { const nf = det === 2 && W > 540 ? 2 : 1; for (let k = 0; k < nf; k++) { const yy = nf === 1 ? 0 : (k - 0.5) * W * 0.5, r = Math.min(H * 0.44, W / (2 * nf) - 14), c = at(18, yy, 0), fwd = (d: number): V => add(c, [e1[0] * d, 0, e1[2] * d]);
       g.part('radiatorFan', '#17181a', 0.2).lathe(c, e1, [[0, r], [26, r]], 8, false, [0, 1, 0]); g.part('radiatorFan', '#2a2c30', 0.3).lathe(fwd(12), e1, [[0, r * 0.3], [16, r * 0.3]], 6, 'b', [0, 1, 0]);
-      if (det === 2) for (let q = 0; q < 5; q++) { const a = q / 5 * Math.PI * 2, rad = (b: number, k2: number, d: number): V => { const cb = Math.cos(a + b), sb = Math.sin(a + b), p = fwd(d); return [p[0] + e3[0] * sb * r * k2, p[1] + cb * r * k2, p[2] + e3[2] * sb * r * k2]; };
+      if (det === 2 && !g.drift) for (let q = 0; q < 5; q++) { const a = q / 5 * Math.PI * 2, rad = (b: number, k2: number, d: number): V => { const cb = Math.cos(a + b), sb = Math.sin(a + b), p = fwd(d); return [p[0] + e3[0] * sb * r * k2, p[1] + cb * r * k2, p[2] + e3[2] * sb * r * k2]; };
           g.quad(rad(-0.2, 0.3, 16), rad(0.2, 0.3, 24), rad(0.32, 0.9, 24), rad(-0.12, 0.9, 16)); } } }
   // ---- the water: out of each tank, back under the cabin (in the tunnel) and up to the engine's ports ----
   const tun = cab?.tunnel, zt = cab ? cab.floor + (tun ? (tun[2] - cab.floor) * 0.3 : 40) : site.foot + 60, x1 = cab ? cab.x[0] + 60 : wf.x + wf.r + 80, x2 = cab ? cab.x[1] - 30 : x.eb.min[0] - 150, pr = det === 0 ? 20 : 15, ps = 4;
@@ -30,19 +36,20 @@ export function cooling(x: Ctx): void {
   // ---- the header tank: pale plastic, high in the bay's corner ----
   if (det > 0) { const ey = (x.eb.min[1] + x.eb.max[1]) / 2, side = x.long ? -1 : Math.sign(x.U[1]) || 1, bh = site.bay?.half ?? 600;
     const c: V = x.long ? [x.eb.min[0] + 110, side * Math.min(bh - 70, Math.max(-x.eb.min[1], x.eb.max[1]) + 95), x.eb.max[2] - 90] : [x.o[0] - 150, clamp(ey + side * ((x.eb.max[1] - x.eb.min[1]) / 2 + 95), -bh + 70, bh - 70), x.eb.max[2] - 110];
-    g.part('expansionTank', '#d6d2c2', 0.35).prism(add(c, [-62, 0, 0]), add(c, [62, 0, 0]), rsec(52, 58, 8, 3.5), [0, 0, 1]); g.part('expansionTank', '#17181a', 0.3).cyl(add(c, [0, 0, 58]), add(c, [0, 0, 76]), 22, 6, true, [1, 0, 0]);
+    g.part('expansionTank', '#d6d2c2', 0.35).prism(add(c, [-62, 0, 0]), add(c, [62, 0, 0]), rsec(52, 58, 8, 3.5), [0, 0, 1]); g.part('expansionTank', '#17181a', 0.3).cyl(add(c, [0, 0, 58]), add(c, [0, 0, g.drift ? 82 : 76]), g.drift ? 30 : 22, g.drift ? 8 : 6, true, [1, 0, 0]);
     if (det === 2) g.part('coolantHose', HOSE, 0.15).bend(add(c, [0, 0, -56]), [0, 0, -1], ports[0]!, [0, c[1] > ports[0]![1] ? -1 : 1, -0.3], 9, 4, 4, 0.5); }
   // ---- the battery: in the nose behind the radiator ----
-  { const bx = rx + 170, by = -Math.min(W / 2 - 100, 230), bz = site.foot + 90;
+  { const { bx, by, bz } = nosePlace(x);
     g.part('battery', '#1d1e21', 0.25).box(bx, bx + 240, by - 88, by + 88, bz, bz + 175); if (det > 0) { g.part('battery', '#3a3c40', 0.2).box(bx + 6, bx + 234, by - 82, by + 82, bz + 175, bz + 190, '-3');
-      g.part('battery', '#b3261e', 0.4).box(bx + 30, bx + 56, by + 40, by + 66, bz + 190, bz + 204, '-3'); g.part('battery', '#22262b', 0.4).box(bx + 184, bx + 210, by + 40, by + 66, bz + 190, bz + 204, '-3'); } }
+      g.part('battery', '#b3261e', 0.4).box(bx + 30, bx + 56, by + 40, by + 66, bz + 190, bz + 204, '-3'); g.part('battery', '#22262b', 0.4).box(bx + 184, bx + 210, by + 40, by + 66, bz + 190, bz + 204, '-3');
+      if (det === 2 && g.drift) { for (const k of [0.3, 0.5, 0.7]) g.line('vent', [[bx + 240 * k, by - 70, bz + 191.5], [bx + 240 * k, by + 20, bz + 191.5]]); } } }   // the drift look's: the cells' caps drawn on the lid
 }
 
 export function fuelAndOil(x: Ctx): void {
   const { g, S, site, det, E, o } = x, wr = site.wheels.r, bh = site.bay?.half ?? wr.y - wr.w / 2 - 80, eh = Math.max(-x.eb.min[1], x.eb.max[1]);
   // ---- the fuel tank ----
   const z0 = Math.max(site.foot + 60, (site.bay?.floor ?? 0) + 8), wall = (site.cabin ? site.cabin.x[1] : x.eb.min[0] - 400) + 24, roomAhead = x.eb.min[0] - 25 - wall;
-  const strap = (a: V, b: V, hw: number, hh: number, up: V) => { if (det === 2) { g.part('fuelTank', '#8d9094', 0.5, 'metal'); for (const k of [0.25, 0.75]) { const c = mix(a, b, k), d: V = [(b[0] - a[0]) / 60, (b[1] - a[1]) / 60, 0]; const l = Math.hypot(...d) || 1; g.prism(add(c, [d[0] / l * -7, d[1] / l * -7, 0]), add(c, [d[0] / l * 7, d[1] / l * 7, 0]), rsec(hw + 2, hh + 2, 8, 4), up, false); } } };
+  const strap = (a: V, b: V, hw: number, hh: number, up: V) => { if (det === 2 && !g.drift) { g.part('fuelTank', '#8d9094', 0.5, 'metal'); for (const k of [0.25, 0.75]) { const c = mix(a, b, k), d: V = [(b[0] - a[0]) / 60, (b[1] - a[1]) / 60, 0]; const l = Math.hypot(...d) || 1; g.prism(add(c, [d[0] / l * -7, d[1] / l * -7, 0]), add(c, [d[0] / l * 7, d[1] / l * 7, 0]), rsec(hw + 2, hh + 2, 8, 4), up, false); } } };
   if (!x.long && roomAhead >= 90) { const xa = Math.max(wall, x.eb.min[0] - 25 - 230), xb = x.eb.min[0] - 25, hw = (xb - xa) / 2, hh = 125, yy = Math.min(bh - 40, 430), a: V = [(xa + xb) / 2, -yy, z0 + hh], b: V = [(xa + xb) / 2, yy, z0 + hh];
     g.part('fuelTank', TANK, 0.35).prism(a, b, rsec(hw, hh, det === 0 ? 6 : 8, 4), [0, 0, 1]); strap(a, b, hw, hh, [0, 0, 1]);
     if (det > 0) g.part('fuelFiller', STEEL, 0.6, 'metal').tube([[a[0], yy * 0.7, z0 + 2 * hh - 10], [a[0], yy + 20, z0 + 2 * hh + 60], [a[0] + 40, Math.min(bh + 60, yy + 110), z0 + 2 * hh + 150]], 24, 5); }

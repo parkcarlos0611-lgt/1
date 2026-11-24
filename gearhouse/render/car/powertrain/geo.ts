@@ -71,7 +71,7 @@ export class Geo {
   /** a box on three axes about its centre: half sizes along e1, e2, e3; `open` leaves faces off ('-3' the bottom) */
   obox(c: V, e1: V, h1: number, e2: V, h2: number, e3: V, h3: number, open = ''): this {
     if (h1 < 0.5 || h2 < 0.5 || h3 < 0.5) return this;
-    if (this.st) { const u = this.rule!, lo = u.minPx * REF / 2 / this.k; h1 = Math.max(h1, lo); h2 = Math.max(h2, lo); h3 = Math.max(h3, lo);
+    if (this.st) { const u = this.rule!, lo = u.seg ? 0 : u.minPx * REF / 2 / this.k;   /* a plate's least thickness (kinds drawn as tubes keep their boxes) */ h1 = Math.max(h1, lo); h2 = Math.max(h2, lo); h3 = Math.max(h3, lo);
       const ch = Math.min(u.bevel / this.k, 0.3 * Math.min(h1, h2, h3)); this.ref = c; if (ch * this.k >= 2) this.cbox(c, [e1, e2, e3], [h1, h2, h3], ch, open); else this.faces(c, e1, h1, e2, h2, e3, h3, open); this.ref = null; return this; }
     return this.faces(c, e1, h1, e2, h2, e3, h3, open); }
   private faces(c: V, e1: V, h1: number, e2: V, h2: number, e3: V, h3: number, open: string): this {

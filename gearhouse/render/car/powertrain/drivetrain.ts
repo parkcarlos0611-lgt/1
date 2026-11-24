@@ -46,7 +46,7 @@ export function drivetrain(x: Ctx): void {
   if (!long) g.part('gearbox', CASE, 0.35, 'metal').prism(behind ? [dc[0], g0[1], g0[2]] : [dc[0], 0, gw - 20], dc, rsec(74, 86, det === 0 ? 6 : 8, 3), [1, 0, 0], false);
   const dr = S.lsd ? 100 : 90, dh = 105, dseg = det === 0 ? 6 : 8;
   g.part('differential', CASE2, 0.35, 'metal').lathe(sub(dc, mul(yAx, dh)), yAx, [[0, dr * 0.55], [22, dr], [2 * dh - 22, dr], [2 * dh, dr * 0.55]], dseg, true, [0, 0, 1]);
-  if (S.lsd && det > 0) { g.part('differential', CASE, 0.3, 'metal'); for (const k of det === 2 ? [-0.45, 0, 0.45] : [0]) g.lathe(add(dc, mul(yAx, k * dh - 4)), yAx, [[0, dr + 9], [8, dr + 9]], dseg, false, [0, 0, 1]); }   // a limited-slip unit's finned housing
+  if (S.lsd && det > 0) { g.part('differential', CASE, 0.3, 'metal'); for (const k of det === 2 && !g.drift ? [-0.45, 0, 0.45] : [0]) g.lathe(add(dc, mul(yAx, k * dh - 4)), yAx, [[0, dr + 9], [8, dr + 9]], dseg, false, [0, 0, 1]); }   // a limited-slip unit's finned housing
   g.frame(null);
   // ---- the driveshafts: from the differential's flanges to the hubs, a joint and its boot at each end ----
   const shaft = (from: V, to: V, front: boolean) => { const d = norm(sub(to, from)), L = Math.hypot(...sub(to, from)), at = (k: number) => add(from, mul(d, k)); x.out.shafts.push({ from, to, front });

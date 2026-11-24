@@ -24,7 +24,7 @@ export function exhaust(x: Ctx): void {
     g.part('tailpipe', PIPE, 0.6, 'metal').bend(from, ta, end, [1, 0, 0], tr, ps, ta[1] ? n + 1 : Math.abs(from[1] - y) + Math.abs(from[2] - T.z) < 12 ? 1 : Math.max(2, n - 1), 0.5); x.out.tails.push(end); };
   const can = (c: V, ax: V, half: number, ha: number, hz: number) => { const side: V = [ax[1], ax[0], 0], ring = (t: number, k: number): V[] => rsec(ha * k, hz * k, det === 0 ? 6 : half > 190 ? 10 : 8, 2.8).map(([a, b]) => [c[0] + ax[0] * t + side[0] * a, c[1] + ax[1] * t + side[1] * a, c[2] + b] as V);
     g.part('muffler', MUFF, 0.55, 'metal').loft(det === 0 ? [ring(-half, 1), ring(half, 1)] : [ring(-half, 0.72), ring(-half + 30, 1), ring(half - 30, 1), ring(half, 0.72)], true);
-    if (det === 2) { g.part('muffler', '#7c7f84', 0.45, 'metal'); if (half > 190) for (const k of [-0.5, 0.5]) g.loft([ring(k * half - 5, 1.03), ring(k * half + 5, 1.03)], false); } };
+    if (det === 2 && !g.drift) { g.part('muffler', '#7c7f84', 0.45, 'metal'); if (half > 190) for (const k of [-0.5, 0.5]) g.loft([ring(k * half - 5, 1.03), ring(k * half + 5, 1.03)], false); } };
   let into: (sy: number, y: number) => { p: V; d: V };
   if (across) { const room = T.x - 30 - (long ? gbEnd : catX + catL), hx = clamp(room / 2 - 15, 55, 78), fl = floorOver(site, T.x - 60 - 2 * hx, T.x - 60), hz = clamp(T.z + 20 - fl - 12, 50, 66), mc: V = [T.x - 60 - hx, 0, Math.max(T.z + 20, fl + hz + 12)];
     // a can of a real silencer's size (to 640 mm long); tips further out than its ends are reached by pipes out of its ends, turned back to the tail
@@ -43,6 +43,6 @@ export function exhaust(x: Ctx): void {
       pre = q.p[0] < o[0] ? [...bendPath(q.p, q.d, [o[0] - 150, y, zUnder], [1, 0, 0], n, 0.5), a] : bendPath(q.p, q.d, a, [1, 0, 0], n, 0.5); }
     g.part('exhaustPipe', HOT, 0.4, 'metal').tube(pre, q.r, ps);
     g.part('catalyst', CAT, 0.45, 'metal').lathe(a, [1, 0, 0], [[0, q.r], [26, catR], [catL - 26, catR], [catL, q.r]], det === 2 ? 8 : 6, false, [0, 0, 1], 0.86);
-    if (det === 2) g.part('catalyst', '#8a8474', 0.3, 'metal').lathe(add(a, [catL * 0.3, 0, 0]), [1, 0, 0], [[0, catR + 3], [catL * 0.4, catR + 3]], 8, false, [0, 0, 1], 0.86);   // its heat shield's band
+    if (det === 2 && !g.drift) g.part('catalyst', '#8a8474', 0.3, 'metal').lathe(add(a, [catL * 0.3, 0, 0]), [1, 0, 0], [[0, catR + 3], [catL * 0.4, catR + 3]], 8, false, [0, 0, 1], 0.86);   // its heat shield's band
     const m = into(sy, a[1]); g.part('exhaustPipe', PIPE, 0.55, 'metal').bend([a[0] + catL, a[1], a[2]], [1, 0, 0], m.p, m.d, q.r, ps, n, 0.45); });
 }

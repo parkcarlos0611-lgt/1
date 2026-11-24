@@ -65,6 +65,7 @@ export function buildEngine(g: Geo, S0: PowertrainSpec, det: Detail, transverse 
   const inner = (s: number, along: number) => P(s, 0, -hw, along);                     // the head's inner edge at that height
   const camTop = Math.max(...S.map(s => P(s, 0, -hw, topA)[2]), P(1, 0, hw, topA)[2]);
   const vee = banks > 1 && S0.layout === 'V', vin = vee ? Math.abs(inner(1, Hd + Hh)[1]) : 0;   // half the vee's opening at the heads' tops
+  const dr = g.drift;   // the drift-game look (style.ts): the small fittings left off, the covers one big bevelled box a bank, lines drawn where the fins were
   const crinkle = S0.crinkle ? 0.1 : 0.32, twin = S0.valves >= 4, turbos = S0.turbos, dry = S0.sump === 'dry';
 
   // ---- the block: crankcase, a block for each bank, the valley's floor, the flange the clutch housing bolts to ----
@@ -73,16 +74,16 @@ export function buildEngine(g: Geo, S0: PowertrainSpec, det: Detail, transverse 
   for (const s of S) { const [ua, ub] = bankU(s); bankBox(s, ua, ub, -0.95 * B, 0.95 * B, 0.2 * B, Hd, '-3'); }
   if (vee) g.box(u0, Lb - 10, -vin * 0.55, vin * 0.55, 0.6 * B, inner(1, Hd)[2] - 0.1 * B, '-3');
   g.part('engineBlock', C.block, 0.25).prism([0, 0, 0.05 * B], [u0 - 20, 0, 0.05 * B], rsec(1.5 * B, 1.3 * B, det === 0 ? 6 : 8, 2.6), [0, 0, 1]);
-  if (det === 2 && nb <= 4 && turbos < 3) { g.part('engineBlock', C.block, 0.2); for (const s of S) for (let i = 0; i + 1 < nb; i++) { const u = cylU(s, i) + pitch / 2; bankBox(s, u - 3, u + 3, 0.95 * B, 1.02 * B, 0.3 * B, Hd - 0.2 * B, '-2'); } }   // the block's ribs between the bores
+  if (det === 2 && nb <= 4 && turbos < 3 && !dr) { g.part('engineBlock', C.block, 0.2); for (const s of S) for (let i = 0; i + 1 < nb; i++) { const u = cylU(s, i) + pitch / 2; bankBox(s, u - 3, u + 3, 0.95 * B, 1.02 * B, 0.3 * B, Hd - 0.2 * B, '-2'); } }   // the block's ribs between the bores
 
   // ---- the sump: a wet sump's deep stepped pan, a dry sump's shallow pan (the crank sits lower over it), its pump and tank ----
   const floor = dry ? -(1.45 - DRY_DROP) * B : -1.45 * B;
   if (dry) { g.part('sump', C.block, 0.22).box(u0, Lb - 30, -0.95 * B, 0.95 * B, floor, -0.55 * B, '+3');
-    if (det > 0) { g.part('oilPump', STEEL, 0.5, 'metal').cyl([Lb - 3.2 * B, -1.42 * B, -0.72 * B], [Lb - 0.2 * B, -1.42 * B, -0.72 * B], 0.3 * B, seg2); if (det === 2) for (let k = 0; k < 3; k++) g.cyl([Lb - (2.9 - k * 0.9) * B, -1.42 * B, -0.72 * B], [Lb - (2.7 - k * 0.9) * B, -1.42 * B, -0.72 * B], 0.36 * B, 6, false); }
+    if (det > 0) { g.part('oilPump', STEEL, 0.5, 'metal').cyl([Lb - 3.2 * B, -1.42 * B, -0.72 * B], [Lb - 0.2 * B, -1.42 * B, -0.72 * B], 0.3 * B, seg2); if (det === 2 && !dr) for (let k = 0; k < 3; k++) g.cyl([Lb - (2.9 - k * 0.9) * B, -1.42 * B, -0.72 * B], [Lb - (2.7 - k * 0.9) * B, -1.42 * B, -0.72 * B], 0.36 * B, 6, false); }
   }
   else { const step = u0 + 0.42 * (Lb - 30 - u0);
     g.part('sump', C.block, 0.22).box(u0, step, -0.95 * B, 0.95 * B, floor, -0.55 * B, '+3').box(step, Lb - 30, -0.95 * B, 0.95 * B, -1.0 * B, -0.55 * B, '+3-1');
-    if (det === 2) g.part('sump', '#2a2b2e', 0.4).cyl([u0 + 0.5 * (step - u0), -0.95 * B, floor + 0.2 * B], [u0 + 0.5 * (step - u0), -1.05 * B, floor + 0.2 * B], 0.12 * B, 6); }   // the drain plug
+    if (det === 2 && !dr) g.part('sump', '#2a2b2e', 0.4).cyl([u0 + 0.5 * (step - u0), -0.95 * B, floor + 0.2 * B], [u0 + 0.5 * (step - u0), -1.05 * B, floor + 0.2 * B], 0.12 * B, 6); }   // the drain plug
   // the filter: low on the timing case's corner
   const ue = Lb + 42, oil: V = [ue, 1.02 * B, -1.02 * B];
   if (det > 0) g.part('oilFilter', '#23427a', 0.45).lathe(oil, [1, 0, 0], [[0, 0.3 * B], [0.3 * B, 0.3 * B], [0.38 * B, 0.2 * B]], seg2, 'b');
@@ -93,8 +94,11 @@ export function buildEngine(g: Geo, S0: PowertrainSpec, det: Detail, transverse 
   for (const s of S) { const [ua, ub] = bankU(s);
     g.part('cylinderHead', C.heads, 0.35); bankBox(s, ua, ub, -hw, hw, Hd, Hd + Hh, '-3');
     if (det === 0) { g.part('camCover', C.covers, crinkle); bankBox(s, ua + 8, ub - 8, -hw * 0.92, hw * 0.92, Hd + Hh, topA, '-3'); continue; }
+    // the drift look: one big bevelled cover a bank over both cams, a line along it between them and two ribs across
+    if (dr) { g.part('camCover', C.covers, crinkle); bankBox(s, ua + 10, ub - 10, -hw * 0.94, hw * 0.94, Hd + Hh, topA, '-3');
+      if (det === 2) { const z = topA + 2, m = (ua + ub) / 2, q = (ub - ua) / 2 - 30; for (const k of [-0.55, 0.55]) g.line('crease', [P(s, m + k * q, -hw * 0.7, z), P(s, m + k * q, hw * 0.7, z)]); } }
     for (const k of twin ? [-1, 1] : [0]) { const off = k * 0.5 * B, wd = twin ? 0.36 * B : 0.7 * B, c0 = P(s, ua + 10, off, Hd + Hh + Hc / 2), c1 = P(s, ub - 10, off, Hd + Hh + Hc / 2);
-      g.part('camCover', C.covers, crinkle).prism(c0, c1, rsec(wd, Hc / 2, twin ? 6 : 8, 3), ax(s));
+      if (!dr) g.part('camCover', C.covers, crinkle).prism(c0, c1, rsec(wd, Hc / 2, twin ? 6 : 8, 3), ax(s));
       g.part('camCover', C.accent, 0.4).quad(P(s, ua + 40, off - 0.11 * B, topA + 1.5), P(s, ub - 40, off - 0.11 * B, topA + 1.5), P(s, ub - 40, off + 0.11 * B, topA + 1.5), P(s, ua + 40, off + 0.11 * B, topA + 1.5)); }
     // the plugs: between the two covers; under one cover on the exhaust side
     const pa = twin ? 0 : 0.86 * B;
@@ -209,7 +213,8 @@ export function buildEngine(g: Geo, S0: PowertrainSpec, det: Detail, transverse 
       if (S0.intercooler) { const i0 = Lb - 1.9 * B, i1 = Lb + 0.3 * B, ic: V = [(i0 + i1) / 2, s * reach, mine[0]!.top[2] + 0.5 * B], ih = 0.85 * B, it = 0.26 * B;
         g.part('intercooler', '#4b4f55', 0.3, 'metal').box(i0, i1, ic[1] - it, ic[1] + it, ic[2] - ih, ic[2] + ih);
         if (det > 0) { g.part('intercooler', ALU, 0.65, 'metal').box(i0 - 0.3 * B, i0, ic[1] - it * 1.15, ic[1] + it * 1.15, ic[2] - ih, ic[2] + ih).box(i1, i1 + 0.3 * B, ic[1] - it * 1.15, ic[1] + it * 1.15, ic[2] - ih, ic[2] + ih);
-          if (det === 2) { g.part('intercooler', '#2c2f33', 0.3, 'metal'); for (let k = 1; k < 5; k++) { const w = ic[2] - ih + k * ih * 0.4, yo = ic[1] + s * (it + 1.5); g.quad([i0, yo, w - 3], [i1, yo, w - 3], [i1, yo, w + 3], [i0, yo, w + 3]); } } }
+          if (det === 2 && dr) for (let k = 1; k < 5; k++) { const w = ic[2] - ih + k * ih * 0.4, yo = ic[1] + s * (it + 2); g.line('vent', [[i0 + 8, yo, w], [i1 - 8, yo, w]]); }   // the core's rows drawn, not built
+          if (det === 2 && !dr) { g.part('intercooler', '#2c2f33', 0.3, 'metal'); for (let k = 1; k < 5; k++) { const w = ic[2] - ih + k * ih * 0.4, yo = ic[1] + s * (it + 1.5); g.quad([i0, yo, w - 3], [i1, yo, w - 3], [i1, yo, w + 3], [i0, yo, w + 3]); } } }
         g.part('boostPipe', ALU, 0.75, 'metal');
         for (const m of mine) { const tank: V = [i0 - 0.15 * B, ic[1], ic[2] - ih * 0.5]; if (det === 0) g.tube([m.top, tank], 0.18 * B, 4); else g.bend(m.top, add(mul(acr(s), -0.2), [0.2, 0, 1]), tank, [0.6, s * 0.8, 0.2], 0.18 * B, 4, 3, 0.45); }
         const out: V = [i1 + 0.15 * B, ic[1], ic[2] + ih * 0.6]; if (det === 0) g.tube([out, end], 0.2 * B, 4); else g.bend(out, [0.3, 0, 1], end, [-1, 0, 0], 0.2 * B, pseg, det === 2 ? 5 : 4, 0.6); }

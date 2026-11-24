@@ -58,21 +58,35 @@
   textarea { width: 100%; box-sizing: border-box; min-height: 90px; font-family: ui-monospace, monospace; font-size: 0.72rem; border: 1px solid var(--line); border-radius: 4px; background: var(--solid); padding: 6px; }
   .btns { display: flex; flex-wrap: wrap; gap: 6px; }
   /* the figures */
-  .figs { position: fixed; top: 52px; right: 12px; width: 230px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; z-index: 4; box-shadow: 0 6px 20px rgba(0,0,0,0.25); max-height: calc(100% - 64px); overflow-y: auto; box-sizing: border-box; }
+  .figs { position: fixed; top: 52px; right: 12px; width: 270px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; z-index: 4; box-shadow: 0 6px 20px rgba(0,0,0,0.25); max-height: calc(100% - 64px); overflow-y: auto; box-sizing: border-box; }
   .figs h2 { margin: 0 0 6px; font-family: var(--display); font-weight: 500; letter-spacing: 0.05em; font-size: 0.95rem; }
   .figs dl { display: grid; grid-template-columns: auto auto; gap: 4px 10px; margin: 0; font-variant-numeric: tabular-nums; }
   .figs dt { color: var(--soft); font-size: 0.8rem; } .figs dd { margin: 0; text-align: right; font-weight: 600; }
   .figs dd small { font-weight: 400; color: var(--soft); font-size: 0.72rem; }
   .figs dd.up { color: var(--good); } .figs dd.down { color: var(--warn); }
-  .figs .warn { margin-top: 8px; padding: 6px 8px; border-left: 3px solid var(--warn); background: color-mix(in srgb, var(--warn) 12%, transparent); font-size: 0.78rem; line-height: 1.45; }
-  .figs .warn[hidden] { display: none; }
+  .figs .cls { margin: 8px 0 0; font-size: 0.82rem; } .figs .cls small { color: var(--soft); }
+  /* the fit's checks (race/fit.ts): a list under a summary line, the fixes as small buttons */
+  .fit { margin-top: 8px; border-top: 1px solid var(--line); padding-top: 6px; }
+  .fit summary { cursor: pointer; font-size: 0.8rem; font-weight: 600; list-style-position: inside; }
+  .fit summary .sum { font-weight: 400; color: var(--soft); margin-left: 4px; }
+  .fit ul { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 6px; }
+  .fit li { display: flex; gap: 6px; font-size: 0.74rem; line-height: 1.4; }
+  .fit li .ic { flex: none; }
+  .fit li > div { min-width: 0; } .fit li b { font-weight: 600; } .fit li span { color: var(--soft); }
+  .fit li.modified { border-left: 3px solid #d39b1f; padding-left: 5px; } .fit li.blocked { border-left: 3px solid var(--warn); padding-left: 5px; }
+  .fit li.blocked span { color: var(--ink); }
+  .fit .fixes { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+  .fit .fix { padding: 3px 7px; font-size: 0.72rem; white-space: normal; text-align: left; border-color: var(--accent); }
+  .lock { font-size: 0.7rem; color: var(--soft); line-height: 1.4; } .lock[hidden] { display: none; }
+  .seg button:disabled { opacity: 0.4; cursor: not-allowed; text-decoration: line-through; }
+  input:disabled { opacity: 0.45; }
   .figs .meas { margin-top: 10px; border-top: 1px solid var(--line); padding-top: 8px; }
   /* the view's own controls, bottom middle */
-  .viewbar { position: fixed; bottom: 12px; left: 354px; right: 254px; display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; z-index: 3; pointer-events: none; }
+  .viewbar { position: fixed; bottom: 12px; left: 354px; right: 294px; display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; z-index: 3; pointer-events: none; }
   .viewbar > * { pointer-events: auto; }
   .viewbar .btn, .viewbar select { background: rgba(20,18,15,0.6); color: #f4f1ea; border-color: rgba(255,255,255,0.35); width: auto; }
   .viewbar .btn[aria-pressed="true"] { border-color: var(--accent); color: #ffcf9e; }
-  .hint { position: fixed; bottom: 54px; left: 354px; right: 254px; text-align: center; font-size: 0.74rem; color: #d8d2c4; text-shadow: 0 1px 2px #000; pointer-events: none; z-index: 2; }
+  .hint { position: fixed; bottom: 54px; left: 354px; right: 294px; text-align: center; font-size: 0.74rem; color: #d8d2c4; text-shadow: 0 1px 2px #000; pointer-events: none; z-index: 2; }
   .toggle { display: none; }
   /* a phone: the choices a drawer from the bottom, the figures a strip under the bar */
   @media (max-width: 760px) {
@@ -81,7 +95,8 @@
     .figs { top: 48px; left: 8px; right: 8px; width: auto; padding: 6px 8px; max-height: none; }
     .figs h2 { display: none; }
     .figs dl { grid-template-columns: auto 1fr auto 1fr; gap: 1px 8px; font-size: 0.8rem; white-space: nowrap; } .figs dt { font-size: 0.7rem; } .figs .rpm { display: none; }
-    .figs .meas { margin-top: 4px; padding-top: 4px; font-size: 0.72rem; } .figs .warn { margin-top: 4px; padding: 3px 6px; font-size: 0.72rem; }
+    .figs .meas { margin-top: 4px; padding-top: 4px; font-size: 0.72rem; }
+    .figs .cls { margin-top: 3px; font-size: 0.74rem; } .fit { margin-top: 4px; padding-top: 4px; } .fit ul { max-height: 34vh; overflow-y: auto; }
     .side { top: auto; left: 0; right: 0; bottom: 0; width: auto; height: min(62vh, 520px); border-radius: 12px 12px 0 0; transform: translateY(100%); transition: transform 0.2s ease; }
     body.open .side { transform: none; }
     .toggle { display: inline-flex; position: fixed; left: 8px; bottom: 10px; z-index: 6; }
@@ -109,7 +124,8 @@
 <section class="figs" aria-label="수치">
   <h2>수치 (계산)</h2>
   <dl id="figs"></dl>
-  <div id="warn" class="warn" role="status" hidden></div>
+  <p id="cls" class="cls" aria-label="차종 (성능 등급)"></p>
+  <div id="fit" class="fit" aria-live="polite"></div>
   <div id="meas" class="meas"></div>
 </section>
 <div class="viewbar">

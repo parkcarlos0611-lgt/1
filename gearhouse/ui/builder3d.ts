@@ -1,9 +1,11 @@
 // The parts builder (docs/systems/98_alpha_interface_and_builder_plan.md, B3 and B4): a car's design (core/design.ts)
 // edited on a studio turntable. The live renderer (render/live/renderer.ts, as the drive page and the photo mode use it:
 // its sun and shadows, the photographed sky, the PBR textures, the looks) draws the design's car (render/car/design.ts),
-// built again only when the body's fields change and a moment after a slider rests. Left: the choices in tabs; right:
-// the figures worked out from the design (race/design.ts) as it changes, a warning when the tyres stand out of the
-// arches, and what the drive page measured of it. Designs are kept in this browser, carried as JSON files, and sent to
+// built again only when the body's fields change and a moment after a slider rests. Left: the choices in tabs (the
+// engine's details greyed out, with the reason, where its development grade does not allow them); right: the figures
+// worked out from the design (race/design.ts) as it changes, its class from them, its cost and reliability
+// (placeholders until B5), the fit of its parts (race/fit.ts: each check's verdict and the fixes, applied by a click),
+// and what the drive page measured of it. Designs are kept in this browser, carried as JSON files, and sent to
 // the drive page in its link ("시험 주행"), which drives them with the physics made from them and records its runs.
 import { LiveRenderer } from '../render/live/renderer';
 import { loadSky } from '../render/live/groundtex';
@@ -11,8 +13,10 @@ import { studioFloor } from '../render/live/studio';
 import type { Mesh } from '../render/car/mesh';
 import { designMesh, designChoices, withoutParts } from '../render/car/design';
 import { designSpec, designFigures, type DesignFigures } from '../race/design';
-import { LIMITS, type BaseId, type Design, type NoseKind, type FrontKind, type TailKind, type WheelKind } from '../core/design';
-import { currentDesign, keepCurrent, savedDesigns, saveDesign, deleteDesign, fromPreset, encodeDesign, designJson, parseDesign, measured, designSig, tyreWarning, newId, KEYS, type KeyStore } from '../core/designstore';
+import type { FitResult } from '../race/fit';
+import { LIMITS, GRADE_NAME, GRADES, gradeLock, gradeBoost, gradeRedline, normalise, applyPatch, type BaseId, type Design, type NoseKind, type FrontKind, type TailKind, type WheelKind,
+  type Grade, type Structure, type Panels, type Intake, type Compression, type Sump, type Block, type Turbos, type Interior } from '../core/design';
+import { currentDesign, keepCurrent, savedDesigns, saveDesign, deleteDesign, fromPreset, encodeDesign, designJson, parseDesign, measured, designSig, newId, KEYS, type KeyStore } from '../core/designstore';
 import texAlb from '../assets/textures/pbr/albedo.jpg';
 import texNor from '../assets/textures/pbr/normal.jpg';
 import texRgh from '../assets/textures/pbr/rough.jpg';
@@ -31,11 +35,15 @@ const PAINTS = ['#b0121b', '#f5c300', '#1d3f8f', '#f2f0ea', '#151515', '#2f6b3a'
 // ---- the controls: each reads its value from the design and writes it back; all are refreshed when a design is loaded ----
 const syncs: (() => void)[] = [];
 const field = (label: string, el: HTMLElement, out?: HTMLElement) => { const r = document.createElement('div'); r.className = 'row'; const l = document.createElement('label'); l.textContent = label; if (out) l.append(out); r.append(l, el); return r; };
-function seg<T extends string | number>(label: string, opts: [T, string][], get: () => T, set: (v: T) => void): HTMLElement {
+/** a choice of buttons; `lock` greys a value out with its reason (shown under the buttons: a phone has no hover) */
+function seg<T extends string | number>(label: string, opts: [T, string][], get: () => T, set: (v: T) => void, lock?: (v: T) => string | null): HTMLElement {
   const box = document.createElement('div'); box.className = 'seg'; box.setAttribute('role', 'group'); box.setAttribute('aria-label', label);
-  const bs = opts.map(([v, t]) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = t; b.addEventListener('click', () => { set(v); changed(); }); box.append(b); return [v, b] as const; });
-  syncs.push(() => { for (const [v, b] of bs) b.setAttribute('aria-pressed', String(v === get())); });
-  const r = document.createElement('div'); r.className = 'row'; const l = document.createElement('span'); l.className = 'lab'; l.textContent = label; r.append(l, box); return r; }
+  const bs = opts.map(([v, t]) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = t; b.addEventListener('click', () => { if (lock?.(v)) return; set(v); changed(); }); box.append(b); return [v, t, b] as const; });
+  const why = document.createElement('small'); why.className = 'lock';
+  syncs.push(() => { const locked: string[] = [];
+    for (const [v, t, b] of bs) { const L = lock?.(v) ?? null; b.setAttribute('aria-pressed', String(v === get())); b.disabled = !!L; b.title = L ?? ''; if (L) locked.push(`${t}: ${L}`); }
+    why.textContent = locked.join(' · '); why.hidden = !locked.length; });
+  const r = document.createElement('div'); r.className = 'row'; const l = document.createElement('span'); l.className = 'lab'; l.textContent = label; r.append(l, box, why); return r; }
 function range(label: string, [a, b]: readonly [number, number], step: number, get: () => number, set: (v: number) => void, show: (v: number) => string, id?: string): HTMLElement {
   const i = document.createElement('input'); i.type = 'range'; i.min = String(a); i.max = String(b); i.step = String(step); if (id) i.id = id; const v = document.createElement('span'); v.className = 'v';
   i.addEventListener('input', () => { set(+i.value); v.textContent = show(+i.value); changed(); }); syncs.push(() => { i.value = String(get()); v.textContent = show(get()); }); return field(label, i, v); }
@@ -62,8 +70,10 @@ add('chassis', seg<BaseId>('바탕 차대', [['nsx', BASE_NAME.nsx], ['f355', BA
   note('바탕은 차체 패널의 치수를 정합니다. 코·앞면·꼬리·휠은 두 바탕 모두에 끼울 수 있습니다.'),
   range('휠베이스', LIMITS.wheelbase, 10, () => D.body.wheelbase, v => { D.body.wheelbase = v; }, v => sign(v, 'mm'), 'wheelbase'),
   range('폭 (한쪽)', LIMITS.width, 5, () => D.body.width, v => { D.body.width = v; }, v => sign(v, 'mm'), 'width'),
-  seg('차체 소재', [['steel', '강철'], ['aluminium', '알루미늄']], () => D.body.material, v => { D.body.material = v; }),
-  note('알루미늄 구조는 같은 강성에서 강철보다 40 % 가볍습니다.'));
+  seg<Structure>('구조 소재 (모노코크·프레임)', [['steel', '강철'], ['hss', '고장력강'], ['aluminium', '알루미늄'], ['honeycomb', '알루미늄 허니콤'], ['cfrp', '탄소섬유']], () => D.body.structure, v => { D.body.structure = v; }),
+  note('같은 강성에서 강철 대비 무게: 고장력강 0.9, 알루미늄 0.6, 허니콤 0.5, 탄소섬유 0.45. 가벼울수록 비싸고, 탄소섬유는 수작업입니다.'),
+  seg<Panels>('패널 소재', [['steel', '강철'], ['aluminium', '알루미늄'], ['frp', 'FRP'], ['cfrp', '탄소섬유']], () => D.body.panels, v => { D.body.panels = v; }),
+  note('패널 무게: 알루미늄 0.55, FRP 0.6 (소량 생산에 싸다), 탄소섬유 0.4. 강철은 수리가 쉽습니다.'));
 // 차체: the panels' kinds, the paint
 { const ch = designChoices('nsx'), kinds = <T extends string>(ks: T[]) => ks.map(k => [k, KIND_NAME[k] ?? k] as [T, string]);
   add('body', seg<NoseKind>('코', kinds(ch.nose), () => D.body.nose, v => { D.body.nose = v; }), seg<FrontKind>('앞면', kinds(ch.front), () => D.body.front, v => { D.body.front = v; }),
@@ -73,14 +83,25 @@ add('chassis', seg<BaseId>('바탕 차대', [['nsx', BASE_NAME.nsx], ['f355', BA
   pick.addEventListener('input', () => { D.body.paint = pick.value; changed(); }); sw.append(pick);
   syncs.push(() => { pick.value = D.body.paint; for (const [c, b] of bs) b.setAttribute('aria-pressed', String(c === D.body.paint.toLowerCase())); });
   add('body', field('도장 색', sw), range('광택', [0, 1], 0.05, () => D.body.gloss, v => { D.body.gloss = v; }, v => v.toFixed(2), 'gloss')); }
-// 엔진
-add('engine', seg('배열', [['V6', 'V6'], ['V8', 'V8'], ['V12', 'V12']], () => D.engine.layout, v => { D.engine.layout = v; }),
-  range('배기량', LIMITS.cc, 50, () => D.engine.cc, v => { D.engine.cc = v; }, v => `${v.toLocaleString()} cc`, 'cc'),
-  seg('실린더당 밸브', [[2, '2'], [3, '3'], [4, '4'], [5, '5']], () => D.engine.valves, v => { D.engine.valves = v; }),
-  range('레드라인', LIMITS.redline, 100, () => D.engine.redline, v => { D.engine.redline = v; }, v => `${v.toLocaleString()} rpm`, 'redline'),
-  seg('과급', [[0, '없음'], [1, '싱글 터보'], [2, '트윈 터보']], () => D.engine.turbo, v => { D.engine.turbo = v; }),
-  check('VTEC (두 가지 캠 프로필)', () => D.engine.vtec, v => { D.engine.vtec = v; }, 'vtec'),
-  note('출력은 배기량 × 회전수 × 밸브가 정하는 평균 유효 압력으로 계산합니다. 피스톤 속도가 초당 21 m를 넘으면 숨이 막혀 출력이 줄어듭니다.'));
+// 엔진: the grade first; the details it does not allow greyed out with the reason
+{ const E = () => D.engine, lk = <K extends 'intake' | 'compression' | 'sump' | 'block' | 'valves' | 'turbo'>(k: K) => (v: Design['engine'][K]) => gradeLock(E().grade, k, v);
+  const boost = range('부스트', LIMITS.boost, 0.05, () => E().boost, v => { E().boost = v; }, v => `${v.toFixed(2)} bar`, 'boost'), redline = range('레드라인', LIMITS.redline, 100, () => E().redline, v => { E().redline = v; }, v => `${v.toLocaleString()} rpm`, 'redline');
+  const vtec = check('VTEC (두 가지 캠 프로필)', () => E().vtec, v => { E().vtec = v; }, 'vtec'), ic = check('인터쿨러', () => E().intercooler, v => { E().intercooler = v; }, 'intercooler');
+  const gradeNote = note('');
+  add('engine', seg<Grade>('개발 등급', GRADES.map(g => [g, `${g} ${GRADE_NAME[g]}`] as [Grade, string]), () => E().grade, v => { E().grade = v; D = normalise(D); }), gradeNote,
+    seg('배열', [['V6', 'V6'], ['V8', 'V8'], ['V12', 'V12']], () => E().layout, v => { E().layout = v; }),
+    range('배기량', LIMITS.cc, 50, () => E().cc, v => { E().cc = v; }, v => `${v.toLocaleString()} cc`, 'cc'),
+    seg('실린더당 밸브', [[2, '2'], [3, '3'], [4, '4'], [5, '5']], () => E().valves, v => { E().valves = v; }, lk('valves')), redline,
+    seg<Intake>('흡기', [['single', '단일 스로틀'], ['variable', '가변 흡기'], ['itb', '개별 스로틀']], () => E().intake, v => { E().intake = v; }, lk('intake')),
+    seg<Compression>('압축비', [['low', '낮음 (8.5)'], ['mid', '보통 (10)'], ['high', '높음 (11+)']], () => E().compression, v => { E().compression = v; }, lk('compression')),
+    seg<Sump>('윤활', [['wet', '웨트 섬프'], ['dry', '드라이 섬프']], () => E().sump, v => { E().sump = v; }, lk('sump')),
+    seg<Block>('블록 소재', [['iron', '주철'], ['aluminium', '알루미늄'], ['magnesium', '마그네슘']], () => E().block, v => { E().block = v; }, lk('block')),
+    seg<Turbos>('터보', [[0, '없음'], [1, '1'], [2, '2'], [3, '3'], [4, '4']], () => E().turbo, v => { E().turbo = v; }, lk('turbo')), boost, ic, vtec,
+    note('등급이 높으면 고회전에서 출력이 크게 늘지만 저속 토크가 약해지고, 비싸지고, 정비 주기가 짧아집니다. 압축비가 높은 과급 엔진은 부스트를 많이 올리면 노킹이 나서 출력이 거의 늘지 않습니다.'));
+  syncs.push(() => { const g = E().grade, R = gradeRedline(g), Bm = gradeBoost(g), ri = redline.querySelector('input')!, bi = boost.querySelector('input')!;
+    ri.max = String(R); bi.max = String(Bm); bi.disabled = !E().turbo; (ic.querySelector('input')!).disabled = !E().turbo;
+    const vi = vtec.querySelector('input')!, vl = gradeLock(g, 'vtec', true); vi.disabled = !!vl; vtec.title = vl ?? '';
+    gradeNote.textContent = `${g}등급: 레드라인 ${R.toLocaleString()} rpm, 부스트 ${Bm.toFixed(1)} bar까지${vl ? ` · VTEC는 ${vl.replace(' 고를 수 있습니다', '')}` : ''}`; }); }
 // 구동계
 { const fin = range('종감속비', LIMITS.final, 0.01, () => D.drive.final || designSpec(D).final, v => { D.drive.final = v; }, v => v.toFixed(2), 'final');
   add('drive', seg('기어', [[5, '5단'], [6, '6단']], () => D.drive.gears, v => { D.drive.gears = v; }),
@@ -97,6 +118,8 @@ add('kit', check('ABS', () => D.kit.abs, v => { D.kit.abs = v; }, 'abs'), check(
   range('앞 타이어 폭', LIMITS.tyre, 5, () => D.kit.tyres[0], v => { D.kit.tyres = [v, D.kit.tyres[1]]; }, v => `${v} mm`, 'tyreF'),
   range('뒤 타이어 폭', LIMITS.tyre, 5, () => D.kit.tyres[1], v => { D.kit.tyres = [D.kit.tyres[0], v]; }, v => `${v} mm`, 'tyreR'),
   seg('림', [[16, '16″'], [17, '17″'], [18, '18″']], () => D.kit.rim, v => { D.kit.rim = v; }),
+  h2('실내'),
+  seg<Interior>('실내 사양', [['light', '경량 (얇은 유리, 가벼운 시트)'], ['standard', '표준'], ['luxury', '고급 (가죽, 에어컨)']], () => D.kit.interior, v => { D.kit.interior = v; }),
   note('윙과 디퓨저는 아직 차체에 그려지지 않고 물리(다운포스, 공기 저항)에만 들어갑니다.'));
 // 저장: the saved designs, new ones, files
 { const list = document.createElement('ul'); list.className = 'list'; list.id = 'list';
@@ -121,7 +144,7 @@ function showList() { const list = $('list'), all = savedDesigns(store); list.te
 // ---- the design changed: kept, the figures, the car (when its body changed), the link ----
 const bodyKey = (d: Design) => JSON.stringify([d.body.base, d.body.nose, d.body.front, d.body.tail, d.body.wheel, d.body.wheelbase, d.body.width, d.body.paint, d.body.gloss, d.kit.tyres, d.kit.rim]);
 let meshT = 0, figT = 0;
-function changed() { for (const s of syncs) s(); keepCurrent(store, D); savedState(); driveLink();
+function changed() { D = normalise(D); for (const s of syncs) s(); keepCurrent(store, D); savedState(); driveLink();
   clearTimeout(figT); figT = setTimeout(figures, 40) as unknown as number;
   if (bodyKey(D) !== meshKey) { clearTimeout(meshT); meshT = setTimeout(rebuild, 150) as unknown as number; } }
 /** another design on the bench */
@@ -135,11 +158,14 @@ function driveLink() { const a = $<HTMLAnchorElement>('drive'); a.href = `drive.
 $('drive').addEventListener('click', () => { keepCurrent(store, D); try { store?.setItem(KEYS.testDrive, encodeDesign(D)); } catch { /* not kept: the link carries it */ } });
 
 // ---- the figures ----
-let lastFigs: DesignFigures | null = null;
+let lastFigs: DesignFigures | null = null, fitOpen: boolean | null = null;
 const fmtLap = (t: number) => `${Math.floor(t / 60)}:${(t % 60).toFixed(2).padStart(5, '0')}`;
+type NumKey = { [K in keyof DesignFigures]: DesignFigures[K] extends number ? K : never }[keyof DesignFigures];
+const ICON = { ok: '✅', modified: '⚠️', blocked: '⛔' } as const;
+const esc = (t: string) => t.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 function figures() { const f = designFigures(D), s = designSpec(D), was = lastFigs; lastFigs = f;
   /** a figure, marked when it moved since the last change: better (up) or worse (down); `more`: is more better */
-  const cell = (k: keyof DesignFigures, text: string, more: boolean | null) => { const a = was?.[k], b = f[k], moved = more !== null && a !== undefined && Math.abs(b - a) > 1e-9; return `<dd${moved ? ` class="${(b > a) === more ? 'up' : 'down'}"` : ''}>${text}</dd>`; };
+  const cell = (k: NumKey, text: string, more: boolean | null) => { const a = was?.[k], b = f[k], moved = more !== null && a !== undefined && Math.abs(b - a) > 1e-9; return `<dd${moved ? ` class="${(b > a) === more ? 'up' : 'down'}"` : ''}>${text}</dd>`; };
   $('figs').innerHTML = `<dt>무게</dt>${cell('mass', `${f.mass.toLocaleString()} <small>kg</small>`, false)}`
     + `<dt>출력</dt>${cell('hp', `${f.hp} <small>hp<span class="rpm"> · ${s.hpRpm.toLocaleString()}</span></small>`, true)}`
     + `<dt>토크</dt>${cell('torque', `${f.torque} <small>Nm<span class="rpm"> · ${s.torqueRpm.toLocaleString()}</span></small>`, true)}`
@@ -147,9 +173,23 @@ function figures() { const f = designFigures(D), s = designSpec(D), was = lastFi
     + `<dt>앞 배분</dt>${cell('front', `${Math.round(f.front * 100)} <small>%</small>`, null)}`
     + `<dt>최고 속도</dt>${cell('topKmh', `${f.topKmh} <small>km/h</small>`, true)}`
     + `<dt>0→100</dt>${cell('zeroTo100', `${f.zeroTo100.toFixed(1)} <small>s</small>`, false)}`
-    + `<dt>종감속</dt><dd>${s.final.toFixed(2)}${D.drive.final ? '' : ' <small>자동</small>'}</dd>`;
-  const w = tyreWarning(D); $('warn').hidden = !w; $('warn').textContent = w ?? '';
-  meas(); }
+    + `<dt>종감속</dt><dd>${s.final.toFixed(2)}${D.drive.final ? '' : ' <small>자동</small>'}</dd>`
+    + `<dt>원가 지수</dt>${cell('cost', `${f.cost} <small>NSX=100</small>`, false)}`
+    + `<dt>신뢰성</dt>${cell('reliability', `${f.reliability} <small>· ${(f.serviceKm / 1000).toLocaleString()}천 km</small>`, true)}`;
+  $('cls').innerHTML = `<b>${esc(f.perfLabel)}</b> <small>· ${esc(f.form)}</small>`;
+  showFit(f.fit); meas(); }
+/** the fit's checks: the ones needing work or blocked first, each with its fixes as buttons that apply them */
+function showFit(r: FitResult[]) {
+  const bad = r.filter(x => x.verdict !== 'ok').sort((a, b) => (a.verdict === 'blocked' ? 0 : 1) - (b.verdict === 'blocked' ? 0 : 1)), ok = r.filter(x => x.verdict === 'ok');
+  const nb = bad.filter(x => x.verdict === 'blocked').length, nm = bad.length - nb, el = $('fit');
+  const open = fitOpen ?? (nb > 0 || (nm > 0 && innerWidth > 760));
+  const item = (x: FitResult) => `<li class="${x.verdict}"><span class="ic" aria-hidden="true">${ICON[x.verdict]}</span><div><b>${esc(x.name)}</b> <span>${esc(x.reason)}</span>`
+    + (x.fixes.length ? `<div class="fixes">${x.fixes.map((fx, i) => `<button type="button" class="btn fix" data-part="${x.part}" data-i="${i}">${esc(fx.label)}</button>`).join('')}</div>` : '') + '</div></li>';
+  el.innerHTML = `<details${open ? ' open' : ''}><summary>장착 검사 <span class="sum">${nb ? `⛔ ${nb} ` : ''}${nm ? `⚠️ ${nm} ` : ''}${!bad.length ? '✅ 모두 장착' : `✅ ${ok.length}`}</span></summary>`
+    + `<ul>${bad.map(item).join('')}${ok.map(item).join('')}</ul></details>`;
+  const d = el.querySelector('details')!; d.querySelector('summary')!.addEventListener('click', () => { fitOpen = !d.open; dirty = true; });
+  for (const b of Array.from(el.querySelectorAll<HTMLButtonElement>('button.fix'))) b.addEventListener('click', () => {
+    const fx = r.find(x => x.part === b.dataset.part)?.fixes[+b.dataset.i!]; if (!fx) return; D = applyPatch(D, fx.patch); changed(); flash(`적용: ${fx.label}`); }); }
 /** what the drive page measured (its runs recorded under the design's id) */
 function meas() { const m = measured(store, D.id), el = $('meas');
   if (!m) { el.innerHTML = '<div class="lab">측정</div><p class="note">시험 주행을 하면 낸 최고 속도와 랩 타임이 여기 기록됩니다.</p>'; return; }

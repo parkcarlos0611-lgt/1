@@ -34,8 +34,17 @@ for s in range(0,L,10):
   if ok and cur is None: cur=s
   if not ok and cur is not None: segs.append((cur,s)); cur=None
 if cur is not None: segs.append((cur,L))
-for a,b in segs: o.append(poly(band(a,b,-(W2+55),-(W2+150)),T1,fill='#5f8f4e',fill_opacity='0.55',stroke='#3d6b32',stroke_dasharray='4 3'))
+for a,b in segs: o.append(poly(band(a,b,-(W2+30),-(W2+150)),T1,fill='#5f8f4e',fill_opacity='0.55',stroke='#3d6b32',stroke_dasharray='4 3'))
 o.append(poly(band(rail[0],rail[1],-(W2+60),-(W2+130)),T1,fill='#5f8f4e',fill_opacity='0.35',stroke='#3d6b32',stroke_dasharray='4 3'))
+def trees_band(s0,s1,o0,o1,spacing):
+  for s in range(int(s0),int(s1),spacing):
+    for oo in range(int(min(o0,o1)),int(max(o0,o1)),spacing):
+      if random.random()<0.85:
+        x,y=T1(*pt(s+random.uniform(-3,3),oo+random.uniform(-3,3))); o.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="{random.uniform(2.2,3.6):.1f}" fill="#2f5e2a" fill-opacity="0.9"/>')
+DENSE=[]
+for a_,b_ in segs: trees_band(a_,b_,-(W2+150),-(W2+30),9); DENSE.append((a_,b_))
+trees_band(rail[0],rail[1],-(W2+130),-(W2+45),10)
+
 # track
 o.append(poly(Lft+Rgt[::-1],T1,fill='#b9b3a6',stroke='#7a746a',stroke_width='0.8'))
 # existing props
@@ -46,8 +55,15 @@ for p in P:
   elif k in ('hayBales',): o.append(f'<rect x="{x-1.5:.1f}" y="{y-1.5:.1f}" width="3" height="3" fill="#d9b44a"/>')
   else: o.append(f'<rect x="{x-2.5:.1f}" y="{y-2.5:.1f}" width="5" height="5" fill="#333"/>')
 # PROPOSED: inner groves (Members' hill already has trees; add groves inside Byfleet & around aerodrome edge)
-for (s,off,r) in [(RA+500,W2+110,45),(RA+1100,W2+130,55),(BY-300,W2+90,40),(ME-300,W2+140,40),(HOME+300,W2+180,35)]:
-  c=pt(s,off); x,y=T1(*c); o.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="{r*S:.1f}" fill="#5f8f4e" fill-opacity="0.55" stroke="#3d6b32" stroke-dasharray="4 3"/>')
+GROVES=[(RA+500,W2+110,70),(RA+1100,W2+140,85),(BY-300,W2+95,60),(ME-300,W2+150,65),(HOME+300,W2+190,55),(RA+1500,W2+80,50),(ME+300,W2+120,60),(ME+700,W2+110,55)]
+for (s_,off,r) in GROVES:
+  c=pt(s_,off); x,y=T1(*c); o.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="{r*S:.1f}" fill="#5f8f4e" fill-opacity="0.45" stroke="#3d6b32" stroke-dasharray="4 3"/>')
+  for k in range(int(r*r/40)):
+    a_=random.uniform(0,6.283); rr=r*math.sqrt(random.random()); xx,yy=T1(c[0]+rr*math.cos(a_),c[1]+rr*math.sin(a_)); o.append(f'<circle cx="{xx:.1f}" cy="{yy:.1f}" r="{random.uniform(2.2,3.6):.1f}" fill="#2f5e2a" fill-opacity="0.9"/>')
+# a tree line along the inside of every straight and banking (behind the verge, leaving the start area and the aerodrome open)
+for s_ in range(0,L,8):
+  if (start-100<=s_<=start+420) or (ME+200<=s_<=RA-200): continue
+  if random.random()<0.8: x,y=T1(*pt(s_+random.uniform(-2,2),W2+22+random.uniform(0,10))); o.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="{random.uniform(2.2,3.4):.1f}" fill="#2f5e2a" fill-opacity="0.85"/>')
 # PROPOSED: marshal posts and hay bales at corner entries/exits
 corners=[HOME+20, (HOME+ME)/2, ME-20, RA+20, (RA+BY)/2, BY-20, BY+60]
 for s in corners:
@@ -144,13 +160,16 @@ for u in range(220,U1,22): q.append(R(u,u+9,-(W2+5.3),-(W2+4.7),fill='#2f6fb5'))
 for u in [-62,-30,150]: x,y=T2(u,-(W2+6)); q.append(f'<circle cx="{x:.0f}" cy="{y:.0f}" r="3" fill="#555"/>')
 for k in range(3): q.append(R(-40+k*6,-36+k*6,W2+2.6,W2+4.6,fill='#f2c94c',stroke='#8a6d1c'))
 # PROPOSED tree line behind the paddock and plaza
-for u in range(-60,U1,9):
-  x,y=T2(u+random.uniform(-2,2),W2+62+random.uniform(0,18)); q.append(f'<circle cx="{x:.0f}" cy="{y:.0f}" r="{random.uniform(9,14):.0f}" fill="#5f8f4e" opacity="0.75" stroke="#3d6b32" stroke-dasharray="3 2"/>')
+for u2 in [(u,row) for u in range(-60,U1,6) for row in range(4)]:
+  u,row=u2; x,y=T2(u+random.uniform(-2,2)+row*3,W2+58+row*9+random.uniform(0,4)); q.append(f'<circle cx="{x:.0f}" cy="{y:.0f}" r="{random.uniform(9,14):.0f}" fill="#5f8f4e" opacity="0.75" stroke="#3d6b32" stroke-dasharray="3 2"/>')
+for u in range(-66,U1,6):
+  for row in range(2):
+    x,y=T2(u+random.uniform(-2,2)+row*3,-(W2+113)-row*6); q.append(f'<circle cx="{x:.0f}" cy="{y:.0f}" r="{random.uniform(9,13):.0f}" fill="#5f8f4e" opacity="0.75" stroke="#3d6b32" stroke-dasharray="3 2"/>') if not (0<=u<=20) else None
 svg2=f'<svg xmlns="http://www.w3.org/2000/svg" width="{W2p:.0f}" height="{H2p:.0f}" viewBox="0 0 {W2p:.0f} {H2p:.0f}">{"".join(q)}</svg>'
 def key(c,shape,t): return f'<li><svg width="22" height="14">{shape.replace("C",c)}</svg>{t}</li>'
 sq='<rect x="4" y="2" width="12" height="10" fill="C"/>'; ci='<circle cx="10" cy="7" r="5" fill="C"/>'; tr='<polygon points="10,1 3,13 17,13" fill="C"/>'
-legend1=''.join([key('#333',sq,'기존 건물'),key('#4d7a3a',ci,'기존 나무'),key('#5f8f4e',sq,'<b>제안</b> 숲 띠·나무 군락'),key('#9b6fc9',sq,'<b>제안</b> 관람 구역(울타리, 벤치, 천막)'),key('#a9a39a',sq,'<b>제안</b> 주차장(시대 차)'),key('#2f6fb5',sq,'<b>제안</b> 광고 간판'),key('#f2c94c',sq,'<b>제안</b> 짚단(코너 출입구)'),key('#d0342c',tr,'<b>제안</b> 진행 요원 초소(깃발 판)')])
-legend2=''.join([key('#cdbfa6',sq,'<b>제안</b> 시계탑 광장(석재 포장)과 길'),key('#9c4a32',sq,'<b>제안</b> 낮은 벽돌 담'),key('#d0607a',ci,'<b>제안</b> 화단'),key('#8a5a2b',sq,'<b>제안</b> 벤치'),key('#f5d76e',ci,'<b>제안</b> 가로등'),key('#c0392b',sq,'<b>제안</b> 깃대(3)·안내판'),key('#e2574c',sq,'<b>제안</b> 줄 장식(번팅)'),key('#bdb7ac',sq,'<b>제안</b> 주차장·진입로·전신주'),key('#f3efe4',sq,'<b>제안</b> 천막·매점'),key('#5f8f4e',ci,'<b>제안</b> 패독 뒤 나무 줄')])
+legend1=''.join([key('#333',sq,'기존 건물'),key('#4d7a3a',ci,'기존 나무'),key('#2f5e2a',ci,'<b>제안</b> 빽빽한 숲 띠·나무 군락·트랙 안쪽 나무 줄'),key('#9b6fc9',sq,'<b>제안</b> 관람 구역(울타리, 벤치, 천막)'),key('#a9a39a',sq,'<b>제안</b> 주차장(시대 차)'),key('#2f6fb5',sq,'<b>제안</b> 광고 간판'),key('#f2c94c',sq,'<b>제안</b> 짚단(코너 출입구)'),key('#d0342c',tr,'<b>제안</b> 진행 요원 초소(깃발 판)')])
+legend2=''.join([key('#cdbfa6',sq,'<b>제안</b> 시계탑 광장(석재 포장)과 길'),key('#9c4a32',sq,'<b>제안</b> 낮은 벽돌 담'),key('#d0607a',ci,'<b>제안</b> 화단'),key('#8a5a2b',sq,'<b>제안</b> 벤치'),key('#f5d76e',ci,'<b>제안</b> 가로등'),key('#c0392b',sq,'<b>제안</b> 깃대(3)·안내판'),key('#e2574c',sq,'<b>제안</b> 줄 장식(번팅)'),key('#bdb7ac',sq,'<b>제안</b> 주차장·진입로·전신주'),key('#f3efe4',sq,'<b>제안</b> 천막·매점'),key('#5f8f4e',ci,'<b>제안</b> 패독 뒤 숲(4열)')])
 html=f'''<!doctype html><meta charset="utf-8"><link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;600;700&display=swap" rel="stylesheet">
 <style>body{{margin:0;padding:24px;background:#f4f1ea;font-family:'Noto Sans KR',sans-serif;color:#222}} h1{{font-size:24px;margin:0 0 4px}} h2{{font-size:18px;margin:22px 0 8px}} p{{margin:0 0 10px;color:#555;font-size:14px}} .row{{display:flex;gap:20px;align-items:flex-start}} ul{{list-style:none;padding:0;margin:0;font-size:13px;line-height:1.9}} li svg{{vertical-align:middle;margin-right:6px}} .box{{background:#fff;border:1px solid #d8d2c4;border-radius:6px;padding:10px}}</style>
 <h1>Millbrook 배경 보강 계획 — 조감 평면도 (사람 제외)</h1><p>위가 북쪽 방향 아님 · 실제 트랙 좌표(미터)로 그림 · 회색·짙은 표시는 지금 있는 것, 색 표시는 제안</p>

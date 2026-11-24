@@ -8,7 +8,7 @@ import { join, relative } from 'node:path';
 const args = process.argv.slice(2), opt = (k) => args.find(a => a.startsWith(`--${k}`)), [entry, tpl, out, page = 'index.html', extra] = args.filter(a => !a.startsWith('--'));
 const script = opt('script=')?.slice(9) || 'app';
 if (!opt('keep')) rmSync(out, { recursive: true, force: true }); mkdirSync(out, { recursive: true });
-await build({ entryPoints: { [script]: entry }, bundle: true, minify: true, charset: 'utf8', format: 'iife', target: 'es2020', outdir: out, assetNames: 'assets/[name]-[hash]', publicPath: '', loader: { '.json': 'json', '.png': 'file', '.jpg': 'file', '.gltf': 'json', '.bin': 'dataurl' }   /* the host serves no .bin files: the models' buffers go inside the script */ });
+await build({ entryPoints: { [script]: entry }, bundle: true, minify: true, charset: 'utf8', format: 'iife', target: 'es2020', outdir: out, assetNames: 'assets/[name]-[hash]', publicPath: '', loader: { '.json': 'json', '.png': 'file', '.jpg': 'file', '.gltf': 'json', '.bin': 'dataurl', '.html': 'text' }   /* the host serves no .bin files: the models' buffers go inside the script */ });
 const html = readFileSync(tpl, 'utf8'), tag = /<script>\s*\/\*BUNDLE\*\/\s*<\/script>/;
 if (!tag.test(html)) throw new Error('the template has no <script>/*BUNDLE*/</script>');
 writeFileSync(join(out, page), '<meta charset="utf-8">\n' + html.replace(tag, `<script src="${script}.js" charset="utf-8"></script>`));

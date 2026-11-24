@@ -129,8 +129,9 @@ const wingMeshes = new Map<Mesh, Mesh>();
 /** pop-up head lamps raised while the lamps are on (review 144): the cars whose mesh takes the lamps as its second argument */
 const POPUP = new Set(['diablo', 'nsx', 'f355', 'f355f1']), lampMeshes = new Map<Mesh, Mesh>();
 function lampsUp(id: string, base: Mesh): Mesh { let m = lampMeshes.get(base); if (!m) { const e = MESH_CARS.find(c => c.id === id), f = e?.mesh as ((spin?: number, lamps?: number) => Mesh) | undefined; m = f ? renumber(f(0, 1), myNum) : base; lampMeshes.set(base, m); } return m; }
-function wingUp(id: string, base: Mesh): Mesh { if (DESIGN && id === DESIGN.id) return base;   /* a design's wing is not drawn yet (its mesh's second argument is the lamps) */
-  let m = wingMeshes.get(base); if (!m) { const e = MESH_CARS.find(c => c.id === id), f = e?.mesh as ((spin?: number, wing?: number) => Mesh) | undefined; m = f ? renumber(f(0, 1), myNum) : base; wingMeshes.set(base, m); } return m; }
+function wingUp(id: string, base: Mesh): Mesh {   /* a design's mesh takes the lamps second, its active wing fourth (render/car/design.ts) */
+  let m = wingMeshes.get(base); if (!m) { const des = DESIGN && id === DESIGN.id ? DESIGN.d : null, e = MESH_CARS.find(c => c.id === id), f = e?.mesh as ((spin?: number, wing?: number) => Mesh) | undefined;
+    m = des ? renumber(designMesh(des, 0, 0, 1), myNum) : f ? renumber(f(0, 1), myNum) : base; wingMeshes.set(base, m); } return m; }
 // ---- a design from the parts builder (docs/systems/98, B4): ?design=<the design as base64url JSON>, or ?design=stored
 // (the builder's last test drive kept in this browser). Its physics made from it (race/design.ts), its body from the car
 // kit (render/car/design.ts, pop-up lamps on both bases); offered first in the car list and chosen; its runs (its best

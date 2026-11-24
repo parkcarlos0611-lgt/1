@@ -15,9 +15,9 @@ import { loadSky } from '../render/live/groundtex';
 import { studioFloor } from '../render/live/studio';
 import type { Mesh } from '../render/car/mesh';
 import { designMesh, designChoices, withoutParts } from '../render/car/design';
-import { designSpec, designFigures, type DesignFigures } from '../race/design';
-import type { FitResult } from '../race/fit';
-import { LIMITS, GRADE_NAME, GRADES, gradeLock, gradeBoost, gradeRedline, normalise, applyPatch, type BaseId, type Design, type NoseKind, type FrontKind, type TailKind, type WheelKind,
+import { designSpec, designFigures, designHeight, type DesignFigures } from '../race/design';
+import { CLEARANCE, type FitResult } from '../race/fit';
+import { LIMITS, BASES, BODY_LIMITS, DIMS, type DimKey, GRADE_NAME, GRADES, gradeLock, gradeBoost, gradeRedline, normalise, applyPatch, type BaseId, type Design, type NoseKind, type FrontKind, type TailKind, type WheelKind,
   type Grade, type Structure, type Panels, type Intake, type Compression, type Sump, type Block, type Turbos, type Interior } from '../core/design';
 import { currentDesign, keepCurrent, savedDesigns, saveDesign, deleteDesign, fromPreset, encodeDesign, designJson, parseDesign, measured, designSig, newId, KEYS, type KeyStore } from '../core/designstore';
 import texAlb from '../assets/textures/pbr/albedo.jpg';
@@ -40,8 +40,8 @@ const store: KeyStore | null = (() => { try { return localStorage; } catch { ret
 let D: Design = host.design ? structuredClone(host.design) : currentDesign(store) ?? fromPreset('nsx');
 
 // ---- the names on the page ----
-const BASE_NAME: Record<BaseId, string> = { nsx: 'NSX 바탕', f355: 'F355 바탕' };
-const KIND_NAME: Record<string, string> = { round: '둥근 코', pointed: '뾰족한 코', plain: '평평한 앞면', sunk: '램프가 들어간 앞면', frame: '테두리 꼬리', roundLamps: '둥근 램프 꼬리', ducktail: '덕테일',
+const BASE_NAME: Record<BaseId, string> = { nsx: 'NSX 바탕', f355: 'F355 바탕', eb110: 'EB110 바탕' };
+const KIND_NAME: Record<string, string> = { round: '둥근 코', pointed: '뾰족한 코', mass: '덩어리 범퍼 코', capsule: '캡슐 꼬리', plain: '평평한 앞면', sunk: '램프가 들어간 앞면', frame: '테두리 꼬리', roundLamps: '둥근 램프 꼬리', ducktail: '덕테일',
   fiveSpoke: '5스포크', disc: '디스크', star: '스타' };
 const PAINTS = ['#b0121b', '#f5c300', '#1d3f8f', '#f2f0ea', '#151515', '#2f6b3a', '#9aa1a6', '#d8661c'];
 
@@ -75,7 +75,7 @@ type StepId = 'chassis' | 'engine' | 'body' | 'kit' | 'paint' | 'check';
 const STEPS: [StepId, string][] = [['chassis', '차대'], ['engine', '엔진·구동계'], ['body', '차체 형태'], ['kit', '장비'], ['paint', '칠·마감'], ['check', '검사·시험 주행']];
 /** the step each fit check answers to: the engine bay, its mounts and the gearbox the engine's and the drive's, the
  *  arches the tyres' (their fixes may reach into other steps: a longer wheelbase, a wider body) */
-const FIT_STEP: Record<FitResult['part'], StepId> = { bayLength: 'engine', bayWidth: 'engine', bayHeight: 'engine', gearboxPlace: 'engine', mount: 'engine', gearbox: 'engine', archF: 'kit', archR: 'kit' };
+const FIT_STEP: Record<FitResult['part'], StepId> = { bayLength: 'engine', bayWidth: 'engine', bayHeight: 'engine', gearboxPlace: 'engine', mount: 'engine', gearbox: 'engine', archF: 'kit', archR: 'kit', clearance: 'chassis' };
 const stepNo = (id: StepId) => STEPS.findIndex(s => s[0] === id);
 const pane = new Map<string, HTMLElement>(), stepBtn = new Map<StepId, HTMLButtonElement>();
 for (const id of [...STEPS.map(s => s[0]), 'files']) { const p = document.createElement('section'); p.className = 'pane'; p.dataset.tab = id; $('panes').append(p); pane.set(id, p); }
@@ -110,17 +110,32 @@ $('next').addEventListener('click', () => go(STEPS[Math.min(STEPS.length - 1, st
 $('openFiles').addEventListener('click', () => { if (onFiles) go(step); else { go('files'); drawer(true); } });
 
 // 차대: the base, its stretch, its structure
-add('chassis', seg<BaseId>('바탕 차대', [['nsx', BASE_NAME.nsx], ['f355', BASE_NAME.f355]], () => D.body.base, v => { if (v === D.body.base) return;
+add('chassis', seg<BaseId>('바탕 차대', BASES.map(b => [b, BASE_NAME[b]] as [BaseId, string]), () => D.body.base, v => { if (v === D.body.base) return;
     // the tyres and the rims follow the base where they were its own
     const was = fromPreset(D.body.base), to = fromPreset(v); if (D.kit.tyres[0] === was.kit.tyres[0] && D.kit.tyres[1] === was.kit.tyres[1]) D.kit.tyres = [...to.kit.tyres]; if (D.kit.rim === was.kit.rim) D.kit.rim = to.kit.rim; D.body.base = v; }),
-  note('바탕은 차체 패널의 치수를 정합니다. 코·앞면·꼬리·휠은 두 바탕 모두에 끼울 수 있습니다.'),
-  range('휠베이스', LIMITS.wheelbase, 10, () => D.body.wheelbase, v => { D.body.wheelbase = v; }, v => sign(v, 'mm'), 'wheelbase'),
-  range('폭 (한쪽)', LIMITS.width, 5, () => D.body.width, v => { D.body.width = v; }, v => sign(v, 'mm'), 'width'),
+  note('바탕은 차체 패널의 치수와 치수를 바꿀 수 있는 범위를 정합니다. 코·앞면·꼬리·휠은 세 바탕 모두에 끼울 수 있습니다.'),
+  ...dimSliders(),
   seg<Structure>('구조 소재 (모노코크·프레임)', [['steel', '강철'], ['hss', '고장력강'], ['aluminium', '알루미늄'], ['honeycomb', '알루미늄 허니콤'], ['cfrp', '탄소섬유']], () => D.body.structure, v => { D.body.structure = v; }),
   note('같은 강성에서 강철 대비 무게: 고장력강 0.9, 알루미늄 0.6, 허니콤 0.5, 탄소섬유 0.45. 가벼울수록 비싸고, 탄소섬유는 수작업입니다.'),
   seg<Panels>('패널 소재', [['steel', '강철'], ['aluminium', '알루미늄'], ['frp', 'FRP'], ['cfrp', '탄소섬유']], () => D.body.panels, v => { D.body.panels = v; }),
   note('패널 무게: 알루미늄 0.55, FRP 0.6 (소량 생산에 싸다), 탄소섬유 0.4. 강철은 수리가 쉽습니다.'),
   seg<Interior>('실내 사양', [['light', '경량 (얇은 유리, 가벼운 시트)'], ['standard', '표준'], ['luxury', '고급 (가죽, 에어컨)']], () => D.kit.interior, v => { D.kit.interior = v; }));
+/** ① 치수: the body's dimensions against the base's own (core/design.ts BodyDims), each slider's range its base's
+ *  (BODY_LIMITS, set again when the base changes); the car is built again a moment after a slider rests */
+function dimSliders(): HTMLElement[] {
+  const mm = (v: number) => sign(v, 'mm'), H = () => Math.round((designHeight(D) + 0) * 1000);
+  const rows: [DimKey, string, number, (v: number) => string][] = [['wheelbase', '휠베이스', 10, mm], ['width', '폭 (한쪽)', 5, mm], ['track', '윤거', 10, mm],
+    ['roof', '전고', 5, v => `${mm(v)} · ${H().toLocaleString()} mm`], ['overhangF', '앞 오버행', 10, mm], ['overhangR', '뒤 오버행', 10, mm],
+    ['ride', '지상고', 5, v => `${mm(v)} · ${CLEARANCE[D.body.base] + v} mm`], ['cabin', '캐빈 위치 (+ 앞으로)', 10, mm],
+    ['rake', '앞유리 각도 (+ 눕힘)', 0.5, v => `${v > 0 ? '+' : ''}${v}°`]];
+  const out: HTMLElement[] = [h2('치수')];
+  for (const [k, name, step, show] of rows) { const r = range(name, BODY_LIMITS(D.body.base)[k], step, () => D.body[k], v => { D.body[k] = v; }, show, `dim-${k}`), i = r.querySelector('input')!;
+    // the range first (the value's own sync, pushed by range(), comes after it)
+    syncs.splice(syncs.length - 1, 0, () => { const [a, b] = BODY_LIMITS(D.body.base)[k]; i.min = String(a); i.max = String(b); }); out.push(r); }
+  out.push(note('전고는 벨트라인 위 캐빈을 늘이고 줄입니다. 캐빈을 앞으로 옮기면 뒤의 엔진룸이 그만큼 길어집니다(긴 V12가 들어갈 수 있습니다). 지상고가 100 mm보다 낮으면 바닥이 닿을 위험이 있다는 경고가 나옵니다.'),
+    btnRow('치수 원래대로', () => { for (const k of DIMS) D.body[k] = 0; changed(); }));
+  return out; }
+function btnRow(t: string, f: () => void): HTMLElement { const d = document.createElement('div'); d.className = 'btns'; const b = document.createElement('button'); b.type = 'button'; b.className = 'btn'; b.textContent = t; b.addEventListener('click', f); d.append(b); return d; }
 // ③ 차체 형태: the panels' kinds; ⑤ 칠·마감: the paint
 { const ch = designChoices('nsx'), kinds = <T extends string>(ks: T[]) => ks.map(k => [k, KIND_NAME[k] ?? k] as [T, string]);
   add('body', seg<NoseKind>('코', kinds(ch.nose), () => D.body.nose, v => { D.body.nose = v; }), seg<FrontKind>('앞면', kinds(ch.front), () => D.body.front, v => { D.body.front = v; }),
@@ -165,7 +180,7 @@ add('kit', check('ABS', () => D.kit.abs, v => { D.kit.abs = v; }, 'abs'), check(
   range('앞 타이어 폭', LIMITS.tyre, 5, () => D.kit.tyres[0], v => { D.kit.tyres = [v, D.kit.tyres[1]]; }, v => `${v} mm`, 'tyreF'),
   range('뒤 타이어 폭', LIMITS.tyre, 5, () => D.kit.tyres[1], v => { D.kit.tyres = [D.kit.tyres[0], v]; }, v => `${v} mm`, 'tyreR'),
   seg('림', [[16, '16″'], [17, '17″'], [18, '18″']], () => D.kit.rim, v => { D.kit.rim = v; }),
-  note('윙과 디퓨저는 아직 차체에 그려지지 않고 물리(다운포스, 공기 저항)에만 들어갑니다.'));
+  note('윙은 꼬리에 맞춰 차체에 달립니다(EB110 캡슐 꼬리는 능동 윙: 달리면 올라옵니다). 디퓨저는 뒤 바닥 아래에 그려집니다.'));
 // ⑥ 검사·시험 주행: the fit's checks with their fixes and the step each belongs to, the class, the cost and the
 // reliability, what was measured, the test drive and the save
 { const div = (id: string, cls: string) => { const d = document.createElement('div'); d.id = id; d.className = cls; return d; };
@@ -182,7 +197,7 @@ add('kit', check('ABS', () => D.kit.abs, v => { D.kit.abs = v; }, 'abs'), check(
   const file = document.createElement('input'); file.type = 'file'; file.accept = '.json,application/json'; file.hidden = true; file.id = 'file';
   file.addEventListener('change', () => { const f = file.files?.[0]; if (!f) return; void f.text().then(t => { const d = parseDesign(t); if (d) { use(d); flash(`불러옴: ${d.name}`); } else flash('설계 파일이 아닙니다'); file.value = ''; }); });
   add('files', h2('저장된 설계'), list,
-    h2('새 설계'), row(btn('NSX 바탕으로', () => { use(fromPreset('nsx')); flash('새 설계 (NSX 바탕)'); }), btn('F355 바탕으로', () => { use(fromPreset('f355')); flash('새 설계 (F355 바탕)'); }), btn('지금 설계 복사', () => { use({ ...structuredClone(D), id: newId(), name: `${D.name} 사본`.slice(0, 40) }); flash('사본을 만들었습니다 (아직 저장 전)'); })),
+    h2('새 설계'), row(btn('NSX 바탕으로', () => { use(fromPreset('nsx')); flash('새 설계 (NSX 바탕)'); }), btn('F355 바탕으로', () => { use(fromPreset('f355')); flash('새 설계 (F355 바탕)'); }), btn('EB110 바탕으로', () => { use(fromPreset('eb110')); flash('새 설계 (EB110 바탕)'); }), btn('지금 설계 복사', () => { use({ ...structuredClone(D), id: newId(), name: `${D.name} 사본`.slice(0, 40) }); flash('사본을 만들었습니다 (아직 저장 전)'); })),
     h2('파일'), row(btn('JSON 파일 받기', download), btn('파일 열기', () => file.click()), btn('JSON 보기', () => { ta.value = designJson(D); ta.select(); try { void navigator.clipboard?.writeText(ta.value).catch(() => {}); } catch { /* no clipboard */ } }),
       btn('붙여넣은 JSON 불러오기', () => { const d = parseDesign(ta.value); if (d) { use(d); flash(`불러옴: ${d.name}`); } else flash('JSON이 설계가 아닙니다'); })), ta, file,
     note('설계는 이 브라우저에만 저장됩니다. 다른 기기로 옮기려면 JSON 파일을 받거나 복사하세요.')); }
@@ -195,11 +210,11 @@ function showList() { const list = $('list'), all = savedDesigns(store); list.te
     li.append(s, sm, load, del); list.append(li); } }
 
 // ---- the design changed: kept, the figures, the car (when its body changed), the link ----
-const bodyKey = (d: Design) => JSON.stringify([d.body.base, d.body.nose, d.body.front, d.body.tail, d.body.wheel, d.body.wheelbase, d.body.width, d.body.paint, d.body.gloss, d.kit.tyres, d.kit.rim]);
+const bodyKey = (d: Design) => JSON.stringify([d.body.base, d.body.nose, d.body.front, d.body.tail, d.body.wheel, ...DIMS.map(k => d.body[k]), d.body.paint, d.body.gloss, d.kit.tyres, d.kit.rim, d.kit.wing, d.kit.diffuser]);
 let meshT = 0, figT = 0;
 function changed() { D = normalise(D); for (const s of syncs) s(); keepCurrent(store, D); savedState(); driveLink();
   clearTimeout(figT); figT = setTimeout(figures, 40) as unknown as number;
-  if (bodyKey(D) !== meshKey) { clearTimeout(meshT); meshT = setTimeout(rebuild, 150) as unknown as number; } }
+  if (bodyKey(D) !== meshKey) { clearTimeout(meshT); meshT = setTimeout(rebuild, 90) as unknown as number; } }
 /** another design on the bench */
 function use(d: Design) { D = structuredClone(d); $<HTMLInputElement>('name').value = D.name; lastFigs = null; restoreStep(); changed(); showList(); }
 let flashT = 0; function flash(t: string) { $('saved').textContent = t; clearTimeout(flashT); flashT = setTimeout(savedState, 2500) as unknown as number; }
@@ -275,8 +290,8 @@ let meshKey = '', down: Mesh | null = null, up: Mesh | null = null, onGpu: Mesh 
 const open = new WeakMap<Mesh, Mesh>();
 const view = { spin: false, lamps: false, engine: false, look: 2, yaw: 0, ang: 0, pitch: 0, zoom: 1 };
 let dirty = true, g: ReturnType<LiveRenderer['car']> | null = null, awake = true;   // awake: on screen (a page of its own always)
-function rebuild() { const key = bodyKey(D); if (key === meshKey && down) return; const t0 = performance.now(); meshKey = key; down = designMesh(D, 0, 0); up = null; builds++; dirty = true; console.info(`design mesh ${D.body.base}: ${down.n} triangles, ${Math.round(performance.now() - t0)} ms`); }
-function shown(): Mesh { let M = view.lamps ? (up ??= designMesh(D, 0, 1)) : down!; if (view.engine) { let o = open.get(M); if (!o) { o = withoutParts(M, DECK); open.set(M, o); } M = o; } return M; }
+function rebuild() { const key = bodyKey(D); if (key === meshKey && down) return; const t0 = performance.now(); meshKey = key; down = designMesh(D, 0, 0, 1); up = null; builds++; dirty = true; console.info(`design mesh ${D.body.base}: ${down.n} triangles, ${Math.round(performance.now() - t0)} ms`); }
+function shown(): Mesh { let M = view.lamps ? (up ??= designMesh(D, 0, 1, 1)) : down!; if (view.engine) { let o = open.get(M); if (!o) { o = withoutParts(M, DECK); open.set(M, o); } M = o; } return M; }
 const home = () => { view.ang = Math.PI - 0.7; view.pitch = 17; view.zoom = 1; view.yaw = 0; dirty = true; }; home();
 const press = (id: string, k: 'spin' | 'lamps' | 'engine') => $(id).addEventListener('click', () => { view[k] = !view[k]; $(id).setAttribute('aria-pressed', String(view[k])); dirty = true; });
 press('spin', 'spin'); press('lamps', 'lamps'); press('engine', 'engine');

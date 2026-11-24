@@ -24,7 +24,7 @@ export interface EngineOut {
   /** where the exhaust leaves: a point and the way the gas goes, for each bank (or the one pipe of an in-line engine) */
   outlets: { p: V; d: V; r: number; side: number }[];
   /** the water's ports at the accessory end: out to the radiator, back from it */
-  water: [V, V]; /** the oil's take-off (the filter's place) */ oil: V;
+  water: [V, V]; /** the oil's take-off (the filter's place), a dry sump's pump */ oil: V; pump: V | null;
   /** the mounts' places on the block, low at each side */ mounts: V[];
   /** half the width across the banks at the heads (without the exhaust), the cam covers' top, the sump's floor (w) */
   half: number; top: number; floor: number;
@@ -70,21 +70,16 @@ export function buildEngine(g: Geo, S0: PowertrainSpec, det: Detail, transverse 
   // ---- the sump: a wet sump's deep stepped pan, a dry sump's shallow pan (the crank sits lower over it), its pump and tank ----
   const floor = dry ? -(1.45 - DRY_DROP) * B : -1.45 * B;
   if (dry) { g.part('sump', C.block, 0.22).box(u0, Lb - 30, -0.95 * B, 0.95 * B, floor, -0.55 * B, '+3');
-    if (det > 0) { g.part('oilPump', STEEL, 0.5, 'metal').cyl([Lb - 3.2 * B, -1.42 * B, -0.72 * B], [Lb - 0.2 * B, -1.42 * B, -0.72 * B], 0.3 * B, seg2); if (det === 2) for (let k = 0; k < 3; k++) g.cyl([Lb - (2.9 - k * 0.9) * B, -1.42 * B, -0.72 * B], [Lb - (2.7 - k * 0.9) * B, -1.42 * B, -0.72 * B], 0.36 * B, seg2); }
-    // the tank: a tall can beside the clutch housing, its lines to the pump and the block
-    const tk: V = [-1.0 * B, -2.0 * B, -0.7 * B];
-    g.part('oilTank', ALU, 0.6, 'metal').lathe(tk, [0, 0, 1], [[0, 0.5 * B], [0.15 * B, 0.62 * B], [3.1 * B, 0.62 * B], [3.3 * B, 0.45 * B]], seg2, true, [1, 0, 0]);
-    g.part('oilTank', '#17171a', 0.3).cyl(add(tk, [0, 0, 3.3 * B]), add(tk, [0, 0, 3.48 * B]), 0.22 * B, 6, true, [1, 0, 0]);
-    if (det > 0) { g.part('oilLine', '#3a3d42', 0.55, 'metal').bend(add(tk, [0, 0.3 * B, 0.3 * B]), [1, 0.4, 0], [Lb - 3.2 * B, -1.42 * B, -0.72 * B], [1, 0, 0], 0.11 * B, 4, det === 2 ? 5 : 3, 0.35);
-      if (det === 2) g.bend(add(tk, [0.3 * B, 0.3 * B, 2.6 * B]), [1, 0.5, 0], [u0 + 0.5 * B, -1.15 * B, 0.3 * B], [0.6, 1, 0], 0.11 * B, 4, 4, 0.4); } }
+    if (det > 0) { g.part('oilPump', STEEL, 0.5, 'metal').cyl([Lb - 3.2 * B, -1.42 * B, -0.72 * B], [Lb - 0.2 * B, -1.42 * B, -0.72 * B], 0.3 * B, seg2); if (det === 2) for (let k = 0; k < 3; k++) g.cyl([Lb - (2.9 - k * 0.9) * B, -1.42 * B, -0.72 * B], [Lb - (2.7 - k * 0.9) * B, -1.42 * B, -0.72 * B], 0.36 * B, 6, false); }
+  }
   else { const step = u0 + 0.42 * (Lb - 30 - u0);
     g.part('sump', C.block, 0.22).box(u0, step, -0.95 * B, 0.95 * B, floor, -0.55 * B, '+3').box(step, Lb - 30, -0.95 * B, 0.95 * B, -1.0 * B, -0.55 * B, '+3-1');
     if (det === 2) g.part('sump', '#2a2b2e', 0.4).cyl([u0 + 0.5 * (step - u0), -0.95 * B, floor + 0.2 * B], [u0 + 0.5 * (step - u0), -1.05 * B, floor + 0.2 * B], 0.12 * B, 6); }   // the drain plug
   // the filter: low on the timing case's corner
   const ue = Lb + 42, oil: V = [ue, 1.02 * B, -1.02 * B];
-  if (det > 0) g.part('oilFilter', '#23427a', 0.45).lathe(oil, [1, 0, 0], [[0, 0.3 * B], [0.75 * B, 0.3 * B], [0.85 * B, 0.2 * B]], seg2, 'b');
+  if (det > 0) g.part('oilFilter', '#23427a', 0.45).lathe(oil, [1, 0, 0], [[0, 0.3 * B], [0.3 * B, 0.3 * B], [0.38 * B, 0.2 * B]], seg2, 'b');
   // the starter: against the flange, low on the side away from the pump
-  if (det > 0) { g.part('starter', '#2b2c2f', 0.35).cyl([0.1 * B, 1.42 * B, -0.86 * B], [1.7 * B, 1.42 * B, -0.86 * B], 0.33 * B, seg2); if (det === 2) g.part('starter', STEEL, 0.5, 'metal').cyl([0.3 * B, 1.42 * B, -0.42 * B], [1.2 * B, 1.42 * B, -0.42 * B], 0.17 * B, 6); }
+  if (det > 0) { g.part('starter', '#2b2c2f', 0.35).cyl([0.1 * B, 1.3 * B, -0.45 * B], [1.7 * B, 1.3 * B, -0.45 * B], 0.33 * B, seg2); if (det === 2) g.part('starter', STEEL, 0.5, 'metal').cyl([0.3 * B, 1.52 * B, -0.05 * B], [1.2 * B, 1.52 * B, -0.05 * B], 0.17 * B, 6); }
 
   // ---- heads, cam covers (two a bank over two cams, one over one), the coils over the plugs ----
   for (const s of S) { const [ua, ub] = bankU(s);
@@ -123,7 +118,7 @@ export function buildEngine(g: Geo, S0: PowertrainSpec, det: Detail, transverse 
     g.part('exhaustManifold', tubular ? (S0.grade >= 3 ? BLUED : C.pipes) : '#4a4643', tubular ? 0.5 : 0.2, tubular ? 'metal' : 'plain');
     if (!tubular || det === 0 || (det === 1 && nb > 4)) g.obox(P(s, mid, hw + 0.35 * B, Hd * 0.75), [1, 0, 0], (cu1 - cu0) / 2, acr(s), 0.35 * B, ax(s), 0.3 * Hd);   // one casting
     else for (let i = 0; i < nb; i++) { const u = cylU(s, i), toward = mid - u, a = P(s, u, hw - 2, Hd + 0.4 * Hh), c = P(s, u + toward * 0.25, colX, colA);
-      if (det === 2) g.tube([a, P(s, u, hw + 0.5 * B, Hd + 0.25 * Hh), P(s, u + toward * 0.12, colX + 0.05 * B, colA + 0.55 * B), c], pipeR, nb > 4 ? 4 : pseg); else g.tube([a, c], pipeR, 4); }
+      if (det === 2) g.tube(nb > 4 ? [a, P(s, u + toward * 0.06, hw + 0.62 * B, Hd + 0.2 * Hh), c] : [a, P(s, u, hw + 0.5 * B, Hd + 0.25 * Hh), P(s, u + toward * 0.12, colX + 0.05 * B, colA + 0.55 * B), c], pipeR, nb > 4 ? 4 : pseg); else g.tube([a, c], pipeR, 4); }
     if (det > 0) { g.part('exhaustManifold', tubular ? HOT : '#4a4643', 0.35, tubular ? 'metal' : 'plain').cyl(P(s, cu0, colX, colA), P(s, cu1, colX, colA), colR, 6, true);
       g.part('heatShield', SHIELD, 0.8, 'metal'); bankBox(s, cu0 + 15, cu1 - 15, colX - 0.45 * B, colX + 0.45 * B, colA + 0.4 * B, colA + 0.46 * B); }
     // where the gas leaves the bank: with no turbo, the collector's end by the flange (straight back), or under its middle on an engine set across the car
@@ -133,18 +128,18 @@ export function buildEngine(g: Geo, S0: PowertrainSpec, det: Detail, transverse 
     const tr = 0.5 * B, cr = 0.56 * B; let far = Infinity;
     for (let k = 0; k < nt; k++) { const u = nt === 1 ? Math.max(mid, cu0 + 1.9 * B) : cu0 + 0.9 * B + (cu1 - cu0 - 1.4 * B) * (0.12 + 0.76 * k), c = P(s, u, colX + 0.62 * B, colA + 0.55 * B), X = (du: number, r = 0, a = 0): V => add(add(c, [du, 0, 0]), add(mul(acr(s), r * Math.cos(a)), mul(ax(s), r * Math.sin(a))));
       if (det === 0) { g.part('turbo', CAST, 0.5, 'metal').cyl(X(-0.5 * B), X(0.5 * B), 0.55 * B, 5); }
-      else { const ts = det === 2 ? 8 : 6;
-        g.part('turbo', HOT, 0.35, 'metal').lathe(X(-0.6 * B), [1, 0, 0], [[0, tr * 0.55], [0.08 * B, tr], [0.48 * B, tr], [0.56 * B, tr * 0.6]], ts, true);        // the turbine's housing
+      else { const ts = det === 2 && turbos <= 2 ? 8 : 6;
+        g.part('turbo', HOT, 0.35, 'metal').lathe(X(-0.6 * B), [1, 0, 0], [[0, tr * 0.55], [0.08 * B, tr], [0.5 * B, tr]], ts, true);        // the turbine's housing
         g.part('turbo', CAST, 0.4, 'metal').cyl(X(-0.06 * B), X(0.1 * B), 0.26 * B, 6, false);                                                                       // the bearings between
-        g.part('turbo', ALU, 0.7, 'metal').lathe(X(0.08 * B), [1, 0, 0], [[0, cr * 0.6], [0.06 * B, cr], [0.36 * B, cr], [0.46 * B, cr * 0.5], [0.72 * B, cr * 0.46]], ts, true);   // the compressor's, its inlet's stub
+        g.part('turbo', ALU, 0.7, 'metal').lathe(X(0.08 * B), [1, 0, 0], [[0, cr], [0.36 * B, cr], [0.46 * B, cr * 0.48], [0.72 * B, cr * 0.46]], ts, true);   // the compressor's, its inlet's stub
         g.part('exhaustManifold', HOT, 0.35, 'metal').tube([P(s, u - 0.32 * B, colX, colA), X(-0.32 * B, tr * 0.8, -1.9)], colR * 0.8, 4);                           // the collector up into the turbine
-        if (det === 2) { g.part('wastegate', STEEL, 0.6, 'metal').lathe(X(-0.35 * B, tr + 0.2 * B, 0.5), acr(s), [[0, 0.12 * B], [0.05 * B, 0.2 * B], [0.3 * B, 0.2 * B], [0.36 * B, 0.1 * B]], 6, true);
-          g.part('airFilter', '#9b2a22', 0.25).lathe(X(0.8 * B), [1, 0, 0], [[0, cr * 0.5], [0.1 * B, cr * 0.72], [0.75 * B, cr * 0.55]], 6, 'b'); g.part('airFilter', STEEL, 0.6, 'metal').cyl(X(1.55 * B), X(1.6 * B), cr * 0.56, 6); } }
+        if (det === 2) { if (turbos <= 2) g.part('wastegate', STEEL, 0.6, 'metal').lathe(X(-0.35 * B, tr + 0.2 * B, 0.5), acr(s), [[0, 0.2 * B], [0.3 * B, 0.2 * B], [0.36 * B, 0.1 * B]], 6, true);
+          g.part('airFilter', '#9b2a22', 0.25).lathe(X(0.8 * B), [1, 0, 0], [[0, cr * 0.5], [0.1 * B, cr * 0.72], [0.75 * B, cr * 0.55]], 6, 'b'); } }
       comp.push({ top: X(0.26 * B, cr * 0.85, Math.PI * 0.75), s });
       // the turbine's pipe: out along the shaft, then down to the bank's line under the turbos
       const e0 = X(-0.6 * B), e1 = line(u - 2.1 * B); far = Math.min(far, u - 2.1 * B);
-      g.part('exhaustDownpipe', HOT, 0.35, 'metal'); if (det === 0) g.tube([e0, e1], colR, 4); else g.bend(e0, [-1, 0, 0], e1, [-1, 0, 0], colR * 0.95, pseg + 1, det === 2 ? 4 : 3, 0.5);
-      if (k > 0) g.tube([line(u - 2.1 * B), line(far + 0.01)], colR * 0.95, pseg + 1); }
+      g.part('exhaustDownpipe', HOT, 0.35, 'metal'); if (det === 0) g.tube([e0, e1], colR, 4); else g.bend(e0, [-1, 0, 0], e1, [-1, 0, 0], colR * 0.95, pseg, 3, 0.5);
+      if (k > 0) g.tube([line(u - 2.1 * B), line(far + 0.01)], colR * 0.95, pseg); }
     outlets.push({ p: line(far), d: [-1, 0, 0], r: colR, side: s }); });
   // a bank with no turbo of its own (one turbo, or three): its collector's pipe goes across behind the flange to the other bank's turbine
   if (turbos > 0 && S.length > 1) S.forEach((s, bi) => { if (perBank[bi]! > 0) return; const i = outlets.findIndex(o => o.side === s), o = outlets[i]!; outlets.splice(i, 1);
@@ -205,10 +200,10 @@ export function buildEngine(g: Geo, S0: PowertrainSpec, det: Detail, transverse 
       if (S0.intercooler) { const i0 = Lb - 1.9 * B, i1 = Lb + 0.3 * B, ic: V = [(i0 + i1) / 2, s * reach, mine[0]!.top[2] + 0.5 * B], ih = 0.85 * B, it = 0.26 * B;
         g.part('intercooler', '#4b4f55', 0.3, 'metal').box(i0, i1, ic[1] - it, ic[1] + it, ic[2] - ih, ic[2] + ih);
         if (det > 0) { g.part('intercooler', ALU, 0.65, 'metal').box(i0 - 0.3 * B, i0, ic[1] - it * 1.15, ic[1] + it * 1.15, ic[2] - ih, ic[2] + ih).box(i1, i1 + 0.3 * B, ic[1] - it * 1.15, ic[1] + it * 1.15, ic[2] - ih, ic[2] + ih);
-          if (det === 2) { g.part('intercooler', '#33363b', 0.3, 'metal'); for (let k = 1; k < 5; k++) { const w = ic[2] - ih + k * ih * 0.4; g.box(i0, i1, ic[1] - it - 1.5, ic[1] + it + 1.5, w - 2, w + 2); } } }
+          if (det === 2) { g.part('intercooler', '#2c2f33', 0.3, 'metal'); for (let k = 1; k < 5; k++) { const w = ic[2] - ih + k * ih * 0.4, yo = ic[1] + s * (it + 1.5); g.quad([i0, yo, w - 3], [i1, yo, w - 3], [i1, yo, w + 3], [i0, yo, w + 3]); } } }
         g.part('boostPipe', ALU, 0.75, 'metal');
-        for (const m of mine) { const tank: V = [i0 - 0.15 * B, ic[1], ic[2] - ih * 0.5]; if (det === 0) g.tube([m.top, tank], 0.18 * B, 4); else g.bend(m.top, add(mul(acr(s), -0.2), [0.2, 0, 1]), tank, [0.6, s * 0.8, 0.2], 0.18 * B, pseg, det === 2 ? 4 : 3, 0.45); }
-        const out: V = [i1 + 0.15 * B, ic[1], ic[2] + ih * 0.6]; if (det === 0) g.tube([out, end], 0.2 * B, 4); else g.bend(out, [0.3, 0, 1], end, [-1, 0, 0], 0.2 * B, pseg + 1, det === 2 ? 6 : 4, 0.6); }
+        for (const m of mine) { const tank: V = [i0 - 0.15 * B, ic[1], ic[2] - ih * 0.5]; if (det === 0) g.tube([m.top, tank], 0.18 * B, 4); else g.bend(m.top, add(mul(acr(s), -0.2), [0.2, 0, 1]), tank, [0.6, s * 0.8, 0.2], 0.18 * B, 4, 3, 0.45); }
+        const out: V = [i1 + 0.15 * B, ic[1], ic[2] + ih * 0.6]; if (det === 0) g.tube([out, end], 0.2 * B, 4); else g.bend(out, [0.3, 0, 1], end, [-1, 0, 0], 0.2 * B, pseg, det === 2 ? 5 : 4, 0.6); }
       else { g.part('boostPipe', ALU, 0.75, 'metal'); for (const m of mine) { if (det === 0) g.tube([m.top, end], 0.18 * B, 4); else g.bend(m.top, [0.3, s * 0.3, 1], end, [-1, 0, 0], 0.19 * B, pseg + 1, det === 2 ? 6 : 4, 0.7); } } }
     // a throttle no intercooler feeds (one turbo under two plenums): a pipe across from the other
     if (tbAt.length === 2 && sides.length === 1 && det > 0) { const a = into(sides[0]!), c = into(-sides[0]!); g.part('boostPipe', ALU, 0.75, 'metal').tube([a, [a[0] + 0.35 * B, a[1] * 0.6, a[2]], [c[0] + 0.35 * B, c[1] * 0.6, c[2]], c], 0.19 * B, pseg + 1); }
@@ -224,5 +219,5 @@ export function buildEngine(g: Geo, S0: PowertrainSpec, det: Detail, transverse 
     g.part('oilFiller', '#d0c020', 0.4); { const c = P(1, cylU(1, nb - 1), twin ? 0.5 * B : 0, topA); g.cyl(c, add(c, mul(ax(1), 0.25 * B)), 0.28 * B, 6, true, [1, 0, 0]); }
     if (!dry) { g.part('dipstick', '#e2a21a', 0.4); const c = P(S[S.length - 1]!, cylU(S[S.length - 1]!, 0), hw + 0.2 * B, Hd * 0.9); g.bar(c, add(c, [0, 0, 0.35 * B]), 0.12 * B); } }
   const mounts: V[] = [1, -1].map(s => [u0 + 0.35 * (Lb - u0), s * 1.15 * B, -0.2 * B]);
-  return { B, Lb, ue, outlets, water: [wOut, wIn], oil, mounts, half: Math.max(...S.map(s => Math.abs(P(s, 0, hw, Hd + Hh)[1])), 1.15 * B), top: plTop, floor, throttles: tbAt };
+  return { B, Lb, ue, outlets, water: [wOut, wIn], oil, pump: dry ? [Lb - 3.2 * B, -1.42 * B, -0.72 * B] : null, mounts, half: Math.max(...S.map(s => Math.abs(P(s, 0, hw, Hd + Hh)[1])), 1.15 * B), top: plTop, floor, throttles: tbAt };
 }

@@ -120,3 +120,25 @@ export const F355_FRAME_TAIL: Pick<CarKit, 'tail' | 'tailLamps' | 'deck'> = {
 };
 /** swap tests: the kit's flat cast five-spoke wheel on this car */
 export const F355_FIVE_SPOKE: Pick<CarKit, 'wheel'> = { wheel: { ...F355_KIT.wheel, kind: 'fiveSpoke', dish: { f: 30, r: 40 } } };
+
+// ---- the builder's swaps (core/design.ts, render/car/design.ts): the kinds native to the NSX, sized for this car ----
+/** a round nose: the plan a super-ellipse from the tip to the front arch (full enough, power 4, that the crest is clear
+ *  ahead of the top's first row at 200 out to the lamp covers' edge), the bumper's lines round it, one piece with the top */
+export const F355_ROUND_NOSE: Pick<CarKit, 'lines' | 'nose'> = {
+  lines: { ...F355_KIT.lines, nose: { kind: 'round', tip: 'X0', pow: 4 } },
+  nose: { ...F355_KIT.nose, kind: 'round', seam: false },
+};
+/** a plain front: the turn lamps' strip flush on the bumper (clear lens outboard), the fog lamps behind the outer grilles
+ *  (under the strip, a row clear of the oval grille so their pockets' walls do not meet) */
+export const F355_PLAIN_FRONT: Pick<CarKit, 'intakes' | 'bumperLamps'> = {
+  intakes: { centre: F355_KIT.intakes.centre, outer: { rows: [4, 6], cols: [6, 8], depth: 80, fog: [5, 0, 0.85, 0.1, 0.9, 40] } },
+  bumperLamps: { from: 4, split: 5, to: 6, col: 5 },
+};
+/** the frame tail with the lamp panel in the body's colour, two round lamps a side */
+export const F355_ROUND_TAIL: Pick<CarKit, 'tail' | 'tailLamps' | 'deck'> = {
+  deck: F355_FRAME_TAIL.deck,
+  tail: { ...F355_FRAME_TAIL.tail, kind: 'roundLamps' },
+  tailLamps: { ...F355_FRAME_TAIL.tailLamps, round: { y: [640, 410], z: 707, r: 64, rim: 9, lift: [4, 6], seg: 16, names: ['tailLamp', 'stopLamp'], colours: ['red', 'red'] } },
+};
+/** a dished plate with eight round vents (the face sits as the five-spoke's; the vents on the 18 in rim's larger circle) */
+export const F355_DISC_WHEEL: Pick<CarKit, 'wheel'> = { wheel: { ...F355_KIT.wheel, kind: 'disc', spokes: 8, dish: { f: 30, r: 40 }, vents: { r: 145, size: 30, seg: 8, lift: 2.5 } } };

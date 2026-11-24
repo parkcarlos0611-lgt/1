@@ -101,8 +101,9 @@ export function makeSkin(L: Lines, K: CarKit): Skin {
   if (duck) return { L, F, SF, CH, CJ, CT, zTop, yK, zK, crestX, TFG, iXJ, iA, NSG, RFG, SCR, US, RGL, RGX, SU, glassPt, upper, TLG, LG, VG, DKG, BT: [], BU: [], iBl: DKG.length, iDk };
   const Bl = TL.blade; if (!Bl) throw new Error('kit: a frame tail needs its blade');
   const BC = DC.slice(0, Bl.cols), bx = L.X(Bl.from);
-  const BT: Grid = [...[bx, XT1].map(s => BC.map(t => [s, t * yK(s), zK(s)] as V)), BC.map((_, j) => TLG[NR - 1 - j]![0]!)];
-  const BU: Grid = [BC.map((_, j) => TLG[NR - 1 - j]![2]!), BC.map(t => [XT1, t * yK(XT1), Bl.under] as V), BC.map(t => [bx + Bl.lead[0], t * yK(bx), Bl.lead[1]] as V)];
+  const by = (s: number) => deckRow(s).slice(0, BC.length).map(p => p[1]);   // the blade's columns are the deck's
+  const BT: Grid = [...[bx, XT1].map(s => by(s).map(y => [s, y, zK(s)] as V)), BC.map((_, j) => TLG[NR - 1 - j]![0]!)];
+  const BU: Grid = [BC.map((_, j) => TLG[NR - 1 - j]![2]!), by(XT1).map(y => [XT1, y, Bl.under] as V), by(bx).map(y => [bx + Bl.lead[0], y, Bl.lead[1]] as V)];
   const iBl = L.at(Bl.from) - iDk;
   return { L, F, SF, CH, CJ, CT, zTop, yK, zK, crestX, TFG, iXJ, iA, NSG, RFG, SCR, US, RGL, RGX, SU, glassPt, upper, TLG, LG, VG, DKG, BT, BU, iBl, iDk };
 }

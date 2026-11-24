@@ -32,7 +32,7 @@ function louvre(x: Ctx): void {
       const strip = (ya0: number, ya1: number, yb0: number, yb1: number) => e.cells([[at(a, ya0), at(a, ya1)], [at(b, yb0), at(b, yb1)]]);
       if (!sl) strip(0, ea, 0, eb); else { strip(0, sl.y, 0, sl.y); strip(yo, ea, yo, eb); } }
     // each slot's front and back walls (the slats' thickness)
-    e.name('engineCover').mat(c.shade, 0.2, 'paint'); for (const o of slots) for (const [px, n] of [[o.a, 1], [o.b, -1]] as const) { const A = [at(px, o.y), at(px, yo)], B = A.map(p => [p[0] + n * S.wall * 0.5, p[1], p[2] - S.wall] as V); e.wall(A, B, [n, 0, 0.3]); }
+    e.name('engineCover').mat(c.shade, 0.2, 'paint'); for (const o of slots) for (const [px, n] of [[o.a, 1], [o.b, -1]] as const) { const A = [at(px, o.y), at(px, yo)], B = A.map(p => [p[0] + n * S.wall * 0.15, p[1], p[2] - S.wall] as V); e.wall(A, B, [n, 0, 0.3]); }
     if (pn) { const h = L.my(pn.half), ins = pn.inset, cx = (px0 + px1) / 2, ring = (dx: number, dy: number, dz: number): V[] => ([[px0 + dx, -h * 0.6], [px0 + dx, h * 0.6], [px0 + dx + (h - dy) * 0.3, h - dy], [px1 - dx - (h - dy) * 0.3, h - dy], [px1 - dx, h * 0.6], [px1 - dx, -h * 0.6], [px1 - dx - (h - dy) * 0.3, -(h - dy)], [px0 + dx + (h - dy) * 0.3, -(h - dy)]] as [number, number][]).map(([qx, qy]) => [qx, qy, at(qx, Math.abs(qy))[2] + dz + (dz ? 0 : 0.5)] as V);
       void cx; e.name('engineCover').mat(c.paint, c.gloss, 'paint'); e.b.loft([ring(0, 0, 0), ring(ins, ins, pn.rise)]); } });
 }

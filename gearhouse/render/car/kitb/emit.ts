@@ -51,9 +51,12 @@ export class Emit {
   porthole(outer: V[], inner: V[], n: V): this { const c = centroid(inner), nn = un(n), u = un(sub(inner[0]!, c)), v = cross(nn, u);
     const ang = (p: V) => { const d = sub(p, c); return Math.atan2(dot(d, v), dot(d, u)); }, turn = (R: V[]) => { const a = R.map(ang); let k = 0; for (let i = 1; i < R.length; i++) if (a[i]! < a[k]!) k = i;
       const rise = ((a[(k + 1) % R.length]! - a[k]! + 4 * Math.PI) % (2 * Math.PI)) < Math.PI, P = R.map((_, i) => R[(k + (rise ? i : R.length - i)) % R.length]!); return { P, a: P.map(ang) }; };
-    const O = turn(outer), I = turn(inner), no = O.P.length, ni = I.P.length; let i = 0, j = 0;
-    while (i < no || j < ni) { const ao = i < no ? (i + 1 < no ? O.a[i + 1]! : O.a[0]! + 2 * Math.PI) : Infinity, ai = j < ni ? (j + 1 < ni ? I.a[j + 1]! : I.a[0]! + 2 * Math.PI) : Infinity;
-      if (ao <= ai) { this.tri(O.P[i % no]!, O.P[(i + 1) % no]!, I.P[j % ni]!, n); i++; } else { this.tri(O.P[i % no]!, I.P[(j + 1) % ni]!, I.P[j % ni]!, n); j++; } }
+    // walk both rings round together: a step is allowed only if its new edge clears the hole (the border point lies outside
+    // the hole's edge at the hole point it joins); of two allowed steps the shorter new edge wins
+    const O = turn(outer), I = turn(inner), no = O.P.length, ni = I.P.length, d = (p: V, q: V) => len(sub(p, q)), sees = (o: V, h: V) => dot(sub(o, h), sub(h, c)) >= 0; let i = 0, j = 0;
+    while (i < no || j < ni) { const o0 = O.P[i % no]!, o1 = O.P[(i + 1) % no]!, i0 = I.P[j % ni]!, i1 = I.P[(j + 1) % ni]!, okO = i < no && sees(o1, i0), okI = j < ni && sees(o0, i1);
+      const stepO = j >= ni || (i < no && (okO && okI ? d(o1, i0) <= d(o0, i1) : okO || !okI));
+      if (stepO) { this.tri(o0, o1, i0, n); i++; } else { this.tri(o0, i1, i0, n); j++; } }
     return this; }
 
   // ---- both sides ----

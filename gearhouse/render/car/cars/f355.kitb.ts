@@ -76,7 +76,7 @@ export const F355_KIT: CarKit = {
     // the round push button high on the door's rear, the lock under it
     handle: { pull: [2566, 2594, 734, 734, 706, 706], lock: [2604, 2616, 726, 726, 714, 714] } },
   // the long side scoop: from the door's front third, deepening back to the dark intake ahead of the rear wheel; a sharp top edge under the crease, its foot a ramp
-  intake: { from: 1560, to: 2640, full: 2450, depth: 105, lip: 14, footLip: 80, span: [5, 6], paintRows: 8, fillets: [['to', 5, -1, 1], ['to', 6, -1, -1]], fillet: 0.5, fins: 2, fin: [8, -6, 12, 6] },
+  intake: { from: 1560, to: 2640, full: 2450, depth: 105, lip: 14, footLip: 80, span: [5, 6], paintRows: 9, fillets: [['to', 5, -1, 1], ['to', 6, -1, -1]], fillet: 0.5, fins: 2, fin: [8, -6, 12, 6] },
   deck: { kind: 'louvre', from: 'XG', edge: { y0: [700, 700], y1: [770, 760], blend: [3900, 4010] }, lidCols: 4, shut: 3970, rail: { col: 5, line: 'gutter', until: 'XQ', ease: 'XT1' },
     // 12 slots a side at a pitch of 77, the long ones clear of the raised centre panel; the V8 under them
     louvre: { open: [2975, 3970], depth: 620, slots: { from: 3085, pitch: 77, n: 12, width: 35, y: [190, 450], long: 60, wall: 26 }, panel: { x: [3200, 3580], half: 205, rise: 22, inset: 30 } } },
@@ -110,3 +110,13 @@ export const F355_KIT: CarKit = {
     spokes: 5, phase: 0.05, openings: { lift: 2.5, rim: 10, r: [104, 116, 12], a: [0.17, 0.36, 0.3] }, vents: { r: 120, size: 26, seg: 8, lift: 2.5 }, star: { r: [78, 135], a: [0.2, 0.13], well: 95, thick: 30, brake: 150 },
     hub: { cap: [6, 40, 10], nuts: 5, nut: [58, 8, 9, 6] } },
 };
+
+/** swap tests: the kit's other tail on this car (one frame round a smoked lamp band, a blade over an open slot) */
+export const F355_FRAME_TAIL: Pick<CarKit, 'tail' | 'tailLamps' | 'deck'> = {
+  // the deck's edge rises to the wings' ridges ahead of the blade (the gutter beside the lid runs under it)
+  deck: { ...F355_KIT.deck, edge: { y0: [700, 515], y1: [770, 560], blend: [3800, 3960] } },
+  tail: { ...F355_KIT.tail, kind: 'frame', frameRows: 5, blade: { from: 3970, cols: 6, under: 850, lead: [7, 862] }, plateRows: [8, 9] },
+  tailLamps: { indicator: { y: 700, z: 707, rim: 56, lens: 49, lift: [4, 6], seg: 14 }, patches: [['tailLamp', 'red', 0.7, 'lens', 420, 630, 650, 765, 3], ['stopLamp', 'red', 0.7, 'lens', 200, 410, 650, 765, 3]], badge: { dark: [88, 650, 765, 3], bright: [34, 676, 740, 5] } },
+};
+/** swap tests: the kit's flat cast five-spoke wheel on this car */
+export const F355_FIVE_SPOKE: Pick<CarKit, 'wheel'> = { wheel: { ...F355_KIT.wheel, kind: 'fiveSpoke', dish: { f: 30, r: 40 } } };

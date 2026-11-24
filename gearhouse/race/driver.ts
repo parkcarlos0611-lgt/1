@@ -55,7 +55,7 @@ export class Driver {
     const spin = Math.max(car.slipX[2]!, car.slipX[3]!); const slide = Math.abs(Math.atan2(car.vy, Math.max(3, car.vx)));
     this.lift = Math.max(0, Math.min(0.95, this.lift + (spin > 0.14 || slide > 0.12 ? 0.3 : -0.015)));
     // speed: build up to the target and hold it with part throttle (never snapping off the pedal in a bend: that swings the tail out);
-    // brake only when well over it
+    // brake only when well over it; review 162: and for a slow corner (a hairpin) it puts the pedal down to what its planned braking needs, not only to what it is over (weak 1920s brakes fell behind and ran wide)
     const e = target - v, hold = Math.min(0.45, 0.04 + v * v * car.spec.cdA * 0.6 / (car.spec.hp * 745.7 / Math.max(v, 5)) );
     let throttle = e > 0 ? Math.min(1, hold + e / 3) : Math.max(0, hold + e / 2);
     // review 152: in a bend near the grip it plans with, it no longer floors it: what the tyres give to the turn they cannot give to the drive
@@ -63,5 +63,5 @@ export class Driver {
       if (use > 0.75 && aP > 0.22 * G) throttle = Math.min(throttle, hold + Math.max(0, (1 - use) / 0.25) * (1 - hold)); }
     const cool = car.health.water > 97 ? Math.max(0.55, 1 - (car.health.water - 97) / 10) : 1;   // it watches the water gauge and eases off
     const most = car.spec.steerLock * Math.PI / 180 / lock;   // into a slide it may wind on more than the grip uses, up to the lock
-    return { steer: Math.max(-most, Math.min(most, delta / lock)), throttle: throttle * cool * this.pace * (1 - this.lift) * (this.care < 1 && Math.abs(T.at(car.s).k) > 1e-3 ? this.care : 1), brake: e < -1.5 ? Math.min(1, (-e - 1.5) / 3) : 0 }; }
+    return { steer: Math.max(-most, Math.min(most, delta / lock)), throttle: throttle * cool * this.pace * (1 - this.lift) * (this.care < 1 && Math.abs(T.at(car.s).k) > 1e-3 ? this.care : 1), brake: e < -1.5 ? Math.min(1, (-e - 1.5) / 3 + (e < -2 && target < 25 ? Math.min(0.6, this.plannedBrake / (car.spec.brakeG * G)) * Math.min(1, (-e - 2) / 2) : 0)) : 0 }; }
 }

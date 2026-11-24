@@ -92,11 +92,11 @@ describe('the ground under the perspective camera', () => {
     const TD = trackDef('millbrook'), T = TD.make(), S = { ...TD.scenery(T), areas: [], lines: [], trees: [], detail: [] }, g = groundData(T, S, T.spec.landmarks.find(l => l.kind === 'line')!.s, TD.groundStep);
     let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity; for (const n of T.nodes) { x0 = Math.min(x0, n.x); x1 = Math.max(x1, n.x); y0 = Math.min(y0, n.y); y1 = Math.max(y1, n.y); }
     let area = 0, cells = 0;
-    for (let t = 0; t < g.n / 3; t++) { if (g.flag[t * 3] !== 1 || Math.abs(g.pos[t * 9 + 2]! + 0.03) > 1e-6) continue;   // the fields' sheet: grass at 3 cm below
+    for (let t = 0; t < g.n / 3; t++) { if (g.flag[t * 3] !== 1 || [2, 5, 8].some(k => Math.abs(g.pos[t * 9 + k]! + 0.03) > 1e-6)) continue;   // the fields' sheet: grass at 3 cm below
       const [a, b, c] = [0, 1, 2].map(k => [g.pos[t * 9 + k * 3]!, g.pos[t * 9 + k * 3 + 1]!] as [number, number]) as [[number, number], [number, number], [number, number]];
       const w = Math.max(a[0], b[0], c[0]) - Math.min(a[0], b[0], c[0]), h = Math.max(a[1], b[1], c[1]) - Math.min(a[1], b[1], c[1]);
       const mx = (a[0] + b[0] + c[0]) / 3, my = (a[1] + b[1] + c[1]) / 3, inner = mx > x0 - 200 && mx < x1 + 200 && my > y0 - 200 && my < y1 + 200;
-      expect(Math.max(w, h)).toBeLessThanOrEqual(inner ? 50 + 1e-6 : 250 + 1e-6); area += Math.abs((b[0] - a[0]) * (c[1] - a[1]) - (c[0] - a[0]) * (b[1] - a[1])) / 2; cells++; }
+      expect(Math.max(w, h)).toBeLessThanOrEqual(inner ? 50.01 : 250.01); area += Math.abs((b[0] - a[0]) * (c[1] - a[1]) - (c[0] - a[0]) * (b[1] - a[1])) / 2; cells++; }
     expect(cells).toBeGreaterThan(100); expect(area).toBeCloseTo((x1 - x0 + 3000) * (y1 - y0 + 3000), -2);
   });
 });

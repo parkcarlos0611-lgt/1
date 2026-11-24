@@ -264,8 +264,12 @@ export function nsxMesh(spin = 0, lamps = 0): Mesh { const b = new Build(); lamp
 
   // ---- the tail's lamps in the smoked red band (review 154): amber at the ends, red, small clear reversing lamps either side of the H badge ----
   for (const sg of [1, -1]) { const N: V = [1, 0, 0.15];
-    b.name('indicatorR').mat(AMBER, 0.7); inCell(TLG, 2, 4, 0.1, 1, 0.12, 0.88, 3, N, sg); inCell(TLG, 1, 4, 0.5, 1, 0.12, 0.88, 3, N, sg);
-    for (const i of [3, 4, 5, 6]) { b.name(i < 5 ? 'tailLamp' : 'stopLamp').mat(RED, 0.7, 'lens'); inCell(TLG, i, 4, 0, 1, 0.12, 0.88, 3, N, sg); }   /* touching: one continuous red run */
+    { // review 156: the amber indicator a round lamp at the band's outer end (the photographs), in a dark ring
+      const bandAt = (y: number, v: number, lift: number): V => { let lo = 0, hi = 5; for (let k = 0; k < 30; k++) { const m = (lo + hi) / 2, i = Math.min(4, Math.floor(m)), u = m - i, yy = mix(TLG[i]![4]!, TLG[i + 1]![4]!, u)[1]; if (yy > y) lo = m; else hi = m; }
+        const m = (lo + hi) / 2, i = Math.min(4, Math.floor(m)), u = m - i, p = mix(mix(TLG[i]![4]!, TLG[i + 1]![4]!, u), mix(TLG[i]![5]!, TLG[i + 1]![5]!, u), v); return mir([p[0] + N[0] * lift, p[1] + N[1] * lift, p[2] + N[2] * lift], sg); };
+      const yc = 715, rY = 62, ring = (k: number, r: number, lift: number) => Array.from({ length: 14 }, (_, t) => { const a = t / 14 * Math.PI * 2; return bandAt(yc + rY * r * Math.cos(a), 0.5 + 0.4 * r * Math.sin(a), lift); });
+      b.name('indicatorR').mat(DARK, 0.3); fan(b, ring(0, 1.12, 3.5), mir(N, sg)); b.name('indicatorR').mat(AMBER, 0.75); fan(b, ring(0, 1, 5), mir(N, sg)); void ring; }
+    for (const i of [4, 5, 6]) { b.name(i < 5 ? 'tailLamp' : 'stopLamp').mat(RED, 0.7, 'lens'); inCell(TLG, i, 4, 0, 1, 0.12, 0.88, 3, N, sg); }   /* touching: one continuous red run */
     b.name('reverseLamp').mat(WHITE, 0.7); inCell(TLG, 7, 4, 0.2, 0.85, 0.3, 0.72, 4, N, sg);   /* small square reversing lamps beside the badge */
     b.name('badge').mat(CHROME, 0.85, 'metal'); inCell(TLG, 8, 4, 0.55, 1, 0.28, 0.74, 5, N, sg); }   // the H badge in the middle of the red band
   // the band runs round the corner onto the flank and dies out in a point; the indicator wraps with it

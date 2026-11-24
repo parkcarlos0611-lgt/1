@@ -18,7 +18,7 @@ import { mesh as mb540k } from './mesh_mb540k';
 import { mesh as eb110 } from './mesh_eb110';
 import { mesh as xj220 } from './mesh_xj220';
 import { mesh as diablo } from './mesh_diablo';
-import { mesh as nsx } from './mesh_nsx';
+import { mesh as nsx } from './mesh_nsx_kit';   // review 171: the NSX now from the shared car kit (closed shell; the hand-built mesh_nsx.ts kept as the reference)
 import { mesh as f355 } from './mesh_f355';
 export const MESH_CARS: { id: string; name: string; mesh: (spin?: number) => Mesh }[] = [
   { id: 'dueSSJ35', name: '1935 Duesenberg SSJ', mesh: dueSSJ35 }, { id: 'dueA21', name: '1921 Duesenberg Model A', mesh: dueA21 },

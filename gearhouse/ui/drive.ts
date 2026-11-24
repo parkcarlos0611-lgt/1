@@ -70,8 +70,8 @@ const keys = new Set<string>(), input = { steer: 0, throttle: 0, brake: 0, hand:
 let wheelHeld = false, wheelSteer = 0;
 { const tw = document.getElementById('tw') as HTMLElement | null; if (tw) { let a0 = 0, s0 = 0; const ang = (e: PointerEvent) => { const r = tw.getBoundingClientRect(); return Math.atan2(e.clientX - (r.left + r.width / 2), -(e.clientY - (r.top + r.height / 2))); };
   const show = () => { tw.style.setProperty('--a', `${(-wheelSteer * 135).toFixed(1)}deg`); tw.setAttribute('aria-valuenow', (-wheelSteer).toFixed(2)); };
-  tw.addEventListener('pointerdown', e => { e.preventDefault(); tw.setPointerCapture(e.pointerId); wheelHeld = true; a0 = ang(e); s0 = wheelSteer; });
-  tw.addEventListener('pointermove', e => { if (!wheelHeld) return; let d = ang(e) - a0; d = Math.atan2(Math.sin(d), Math.cos(d)); wheelSteer = Math.max(-1, Math.min(1, s0 - d / (135 * Math.PI / 180))); show(); });
+  tw.addEventListener('pointerdown', e => { e.preventDefault(); tw.setPointerCapture(e.pointerId); wheelHeld = true; a0 = ang(e); s0 = wheelSteer; });   /* a0: the last angle seen; the turn is added up a step at a time, so going past half a turn does not flip it */
+  tw.addEventListener('pointermove', e => { if (!wheelHeld) return; const a = ang(e); let d = a - a0; d = Math.atan2(Math.sin(d), Math.cos(d)); a0 = a; s0 = Math.max(-1, Math.min(1, s0 - d / (135 * Math.PI / 180))); wheelSteer = s0; show(); });   /* review 171: stops at the lock and stays there; turning back moves it at once */
   const up = () => { wheelHeld = false; const back = () => { if (wheelHeld) return; wheelSteer *= 0.7; if (Math.abs(wheelSteer) < 0.01) wheelSteer = 0; show(); if (wheelSteer) requestAnimationFrame(back); }; requestAnimationFrame(back); };
   tw.addEventListener('pointerup', up); tw.addEventListener('pointercancel', up); tw.addEventListener('lostpointercapture', up); tw.addEventListener('contextmenu', e => e.preventDefault()); } }
 const skids: { x: number; y: number; z: number; a: number }[] = [], puffs: { x: number; y: number; z: number; r: number; a: number; vx: number; vy: number }[] = [];

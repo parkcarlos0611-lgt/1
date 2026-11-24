@@ -4,8 +4,8 @@
 // the designs saved in this browser; and what the drive page measured of a design (its best laps, the top speed it
 // reached), kept per design and read by the builder. Pure: the storage is passed in (the browser's localStorage, or a
 // map in the tests), and a storage that throws (a private window, storage refused) keeps nothing and reads empty.
-import { BASES, NOSES, FRONTS, TAILS, WHEELS, GRADES, INTAKES, COMPRESSIONS, SUMPS, BLOCKS, STRUCTURES, PANELS, INTERIORS, DESIGN_NSX, DESIGN_F355, DESIGN_EB110, DIMS, normalise,
-  type BaseId, type BodyDims, type Design, type DesignV1 } from './design';
+import { BASES, NOSES, FRONTS, FACE_KEYS, FACE_KINDS, faceOf3, TAILS, WHEELS, GRADES, INTAKES, COMPRESSIONS, SUMPS, BLOCKS, STRUCTURES, PANELS, INTERIORS, DESIGN_NSX, DESIGN_F355, DESIGN_EB110, DIMS, normalise,
+  type BaseId, type BodyDims, type Design, type DesignV1, type Face, type FrontKind } from './design';
 
 /** what the helpers need of a storage (the browser's Storage has these) */
 export interface KeyStore { getItem(k: string): string | null; setItem(k: string, v: string): void; removeItem(k: string): void }
@@ -32,8 +32,11 @@ export function asDesign(v: unknown): Design | null {
   const old = o.v === 1 || (o.v === undefined && 'material' in b);
   const head = { id: typeof o.id === 'string' && /^[\w-]{1,40}$/.test(o.id) ? o.id : newId(), name: typeof o.name === 'string' && o.name.trim() ? o.name.trim().slice(0, 40) : P.name };
   const dims = Object.fromEntries(DIMS.map(k => [k, Math.round(num(b[k], 0) * 10) / 10])) as unknown as BodyDims;
-  const body = { base: P.body.base, nose: one(b.nose, NOSES, P.body.nose), front: one(b.front, FRONTS, P.body.front), tail: one(b.tail, TAILS, P.body.tail), wheel: one(b.wheel, WHEELS, P.body.wheel),
+  const body = { base: P.body.base, nose: one(b.nose, NOSES, P.body.nose), tail: one(b.tail, TAILS, P.body.tail), wheel: one(b.wheel, WHEELS, P.body.wheel),
     ...dims, paint, gloss: num(b.gloss, P.body.gloss) };
+  // the face: its slots where the value has them; a format-3 value's (and older) from its front, the rest its base's own
+  const front: FrontKind = one(b.front, FRONTS, P.body.aux === 'round' ? 'sunk' : 'plain'), f0: Face = FRONTS.includes(b.front as FrontKind) ? faceOf3(P.body.base, front) : P.body;
+  const face = Object.fromEntries(FACE_KEYS.map(k => [k, one(b[k], FACE_KINDS[k] as readonly string[], f0[k])])) as unknown as Face;
   const machine = { layout: one(e.layout, ['V6', 'V8', 'V12'] as const, P.engine.layout), cc: Math.round(num(e.cc, P.engine.cc)), valves: one(e.valves, [2, 3, 4, 5] as const, P.engine.valves),
     redline: Math.round(num(e.redline, P.engine.redline)), vtec: bool(e.vtec, P.engine.vtec) };
   const rest = { drive: { gears: one(r.gears, [5, 6] as const, P.drive.gears), gearbox: one(r.gearbox, ['manual', 'f1'] as const, P.drive.gearbox), final: num(r.final, P.drive.final), lsd: bool(r.lsd, P.drive.lsd), awd: bool(r.awd, P.drive.awd) },
@@ -41,8 +44,8 @@ export function asDesign(v: unknown): Design | null {
       wing: bool(k.wing, P.kit.wing), diffuser: bool(k.diffuser, P.kit.diffuser), tyres: [Math.round(num(ty[0], P.kit.tyres[0])), Math.round(num(ty[1], P.kit.tyres[1]))] as [number, number], rim: one(k.rim, [16, 17, 18] as const, P.kit.rim) } };
   const interior = one(k.interior, INTERIORS, P.kit.interior);
   if (old) { const mat = one(b.material, ['steel', 'aluminium'] as const, P.body.structure === 'steel' ? 'steel' : 'aluminium');
-    return normalise({ v: 1, ...head, body: { ...body, material: mat }, engine: { ...machine, turbo: one(e.turbo, [0, 1, 2] as const, 0) }, ...rest } satisfies DesignV1); }
-  const d: Design = { v: 3, ...head, body: { ...body, structure: one(b.structure, STRUCTURES, P.body.structure), panels: one(b.panels, PANELS, P.body.panels) },
+    return normalise({ v: 1, ...head, body: { ...body, front, material: mat }, engine: { ...machine, turbo: one(e.turbo, [0, 1, 2] as const, 0) }, ...rest } satisfies DesignV1); }
+  const d: Design = { v: 4, ...head, body: { ...body, ...face, structure: one(b.structure, STRUCTURES, P.body.structure), panels: one(b.panels, PANELS, P.body.panels) },
     engine: { grade: one(e.grade, GRADES, P.engine.grade), ...machine, intake: one(e.intake, INTAKES, P.engine.intake), compression: one(e.compression, COMPRESSIONS, P.engine.compression),
       sump: one(e.sump, SUMPS, P.engine.sump), block: one(e.block, BLOCKS, P.engine.block), turbo: one(e.turbo, [0, 1, 2, 3, 4] as const, P.engine.turbo),
       boost: num(e.boost, P.engine.boost), intercooler: bool(e.intercooler, P.engine.intercooler) }, drive: rest.drive, kit: { ...rest.kit, interior } };

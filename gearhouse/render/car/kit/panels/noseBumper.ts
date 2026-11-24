@@ -5,11 +5,12 @@ import type { Ctx } from '../ctx';
 import { FLANK } from '../section';
 import { border } from '../emit';
 import { cross, gp, gridProbe, mir, mix, sub, type V } from '../geom';
+import type { OuterIntake } from '../spec';
 
 export function noseBumper(x: Ctx): void {
-  const { e, s, c, k } = x, bl = k.bumperLamps, ic = k.intakes.centre, oc = k.intakes.outer, fg = k.intakes.fog, lc = bl.col ?? FLANK.H;
+  const { e, s, c, k } = x, bl = k.bumperLamps, ic = k.intakes.centre, fg = k.intakes.fog, lc = bl.col ?? FLANK.H, outs = [k.intakes.outer, k.intakes.side].filter((o): o is OuterIntake => !!o);
   const lampCell = (i: number, q: number) => q === lc && i >= bl.from && i < bl.to, fogCell = (i: number, q: number) => !!fg && i >= fg.rows[0] && i < fg.rows[1] && q >= fg.cols[0] && q < fg.cols[1];
-  const mouthC = (i: number, q: number) => i < ic.rows && q >= ic.cols[0] && q < ic.cols[1], mouthO = (i: number, q: number) => !!oc && i >= oc.rows[0] && i < oc.rows[1] && q >= oc.cols[0] && q < oc.cols[1];
+  const mouthC = (i: number, q: number) => i < ic.rows && q >= ic.cols[0] && q < ic.cols[1], mouthO = (i: number, q: number) => outs.some(oc => i >= oc.rows[0] && i < oc.rows[1] && q >= oc.cols[0] && q < oc.cols[1]);
   const clear = (i: number) => bl.amberFirst ? i >= bl.split : i < bl.split;
   e.name('bumperF').mat(c.paint, c.gloss, 'paint'); e.cells(s.NSG, (i, q) => q >= FLANK.H && !lampCell(i, q) && !mouthC(i, q) && !mouthO(i, q) && !fogCell(i, q));
   const N = s.NSG;
@@ -26,12 +27,24 @@ export function noseBumper(x: Ctx): void {
   r.push(...rows.slice().reverse().map(p => p[ic.cols[1]]!));
   const full = [...r, ...r.slice(1, -1).reverse().map(p => mir(p, -1))];
   e.name('grille'); e.pocket(full, [ic.depth, 0, 0], [-1, 0, 0], c.dark, 'grille');
-  e.with('part', () => { e.name('grille').mat(c.frame, 0.2); for (const y of ic.bars) e.b.bar([ic.barX, y, ic.barZ[0]], [ic.barX, y, ic.barZ[1]], 12, 16);
-    if (ic.slats) for (const z of ic.slats.z) e.b.bar([ic.barX, -x.L.my(ic.slats.half), z], [ic.barX, x.L.my(ic.slats.half), z], 12, 10);
-    if (ic.badge) { const [h, z0, z1] = ic.badge, bx = ic.barX - 10; e.name('badge').mat(c.chrome, 0.85, 'metal'); e.face([bx, -h, z0], [bx, h, z0], [bx, h, z1], [bx, -h, z1], [-1, 0, 0]); }
+  // the face's x at y across the mouth's middle line (the rows' own points joined), for bars that follow it
+  const qm = (ic.cols[0] + ic.cols[1]) >> 1, fx = (y: number) => { const a = Math.abs(y); let i = 0; while (i + 1 < ic.rows && rows[i + 1]![qm]![1] < a) i++; const p = rows[i]![qm]!, q = rows[i + 1]![qm]!; return p[0] + (q[0] - p[0]) * Math.max(0, Math.min(1, (a - p[1]) / Math.max(1, q[1] - p[1]))); };
+  const bx0 = (y: number) => ic.follow ? fx(y) + ic.barX : ic.barX;
+  e.with('part', () => { e.name('grille').mat(c.frame, 0.2); if (!ic.mesh) for (const y of ic.bars) e.b.bar([bx0(y), y, ic.barZ[0]], [bx0(y), y, ic.barZ[1]], 12, 16);
+    if (ic.slats && !ic.follow) for (const z of ic.slats.z) e.b.bar([ic.barX, -x.L.my(ic.slats.half), z], [ic.barX, x.L.my(ic.slats.half), z], 12, 10);
+    // slats following the face: straight between the rows' places, from one end to the other
+    if (ic.slats && ic.follow) { const h = x.L.my(ic.slats.half), ys = [...new Set([...rows.map(p => p[qm]![1]).filter(y => y < h - 1), h])].sort((a, b) => a - b), all = [...ys.slice(1).reverse().map(y => -y), ...ys];
+      for (const z of ic.slats.z) for (let i = 0; i + 1 < all.length; i++) e.b.bar([bx0(all[i]!), all[i]!, z], [bx0(all[i + 1]!), all[i + 1]!, z], 12, 10); }
+    // a mesh: thin strips across and up each cell of the mouth, behind the face
+    if (ic.mesh) { const [nu, nv] = ic.mesh.n, w = ic.mesh.w / 2, back = (p: V): V => [p[0] + ic.barX, p[1], p[2]];
+      for (const sg of [1, -1]) for (let i = 0; i < ic.rows; i++) for (let q = ic.cols[0]; q < ic.cols[1]; q++) { const S = (u: number, v: number) => mir(back(mix(mix(N[i]![q]!, N[i + 1]![q]!, u), mix(N[i]![q + 1]!, N[i + 1]![q + 1]!, u), v)), sg);
+        const du = w / Math.max(1, N[i + 1]![q]![1] - N[i]![q]![1]), dv = w / Math.max(1, N[i]![q]![2] - N[i]![q + 1]![2]);
+        for (let a = 0; a < nu; a++) { const u = (a + 0.5) / nu; e.face(S(u - du, 0), S(u + du, 0), S(u + du, 1), S(u - du, 1), [-1, 0, 0]); }
+        for (let a = 0; a < nv; a++) { const v = (a + 0.5) / nv; e.face(S(0, v - dv), S(1, v - dv), S(1, v + dv), S(0, v + dv), [-1, 0, 0]); } } }
+    if (ic.badge) { const [h, z0, z1] = ic.badge, bx = bx0(0) - 10; e.name('badge').mat(c.chrome, 0.85, 'metal'); e.face([bx, -h, z0], [bx, h, z0], [bx, h, z1], [bx, -h, z1], [-1, 0, 0]); }
     // its corners rounded: fillets of the skin left across them
     e.name('bumperF').mat(c.paint, c.gloss, 'paint'); for (const [i, q, di, dq] of ic.fillets ?? []) { const cp = N[i]![q]!; e.tri2(cp, mix(cp, N[i + di]![q]!, ic.fillet ?? 0.5), mix(cp, N[i]![q + dq]!, ic.fillet ?? 0.5), [-1, 0, 0]); } }); }
-  if (oc) for (const sg of [1, -1]) { e.name('grille'); e.pocket(border(N, oc.rows[0], oc.rows[1], oc.cols[0], oc.cols[1]).map(p => mir(p, sg)), [oc.depth, 0, 0], [-1, 0, 0], c.dark, 'grille');
+  for (const oc of outs) for (const sg of [1, -1]) { e.name('grille'); e.pocket(border(N, oc.rows[0], oc.rows[1], oc.cols[0], oc.cols[1]).map(p => mir(p, sg)), [oc.depth, 0, 0], [-1, 0, 0], c.dark, 'grille');
     e.with('part', () => { const f = oc.fog; if (f) { e.name('fogF').mat(c.lens, 0.7); e.inCell(N, f[0], oc.cols[0], f[1], f[2], f[3], f[4], -f[5], [-1, 0, 0], sg); }
       // body-coloured bars across the opening on the bumper's own lines: a face and a ledge running back from its top
       e.name('bumperF').mat(c.paint, c.gloss, 'paint'); for (const q of oc.slats ?? []) for (let i = oc.rows[0]; i < oc.rows[1]; i++) { const a = mir(N[i]![q]!, sg), b = mir(N[i + 1]![q]!, sg), o = (p: V, dx: number, dz: number): V => [p[0] + dx, p[1], p[2] + dz];

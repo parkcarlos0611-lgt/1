@@ -1,6 +1,6 @@
 // A design made into the car kit (render/car/design.ts, docs/systems/98_alpha_interface_and_builder_plan.md B1): the
-// three cars the kit was made from come out exactly as their own specs; every combination of base, nose, front, tail and
-// wheel the builder offers closes at every seam, and so do the body's dimensions at the ends of each base's ranges (alpha
+// three cars the kit was made from come out exactly as their own specs; every combination of base, nose, tail and
+// wheel the builder offers closes (the face's other slots: tests/car_face.test.ts) at every seam, and so do the body's dimensions at the ends of each base's ranges (alpha
 // 0.11, E1: one at a time on every kind, and a few random designs with all of them at once); the wing and the diffuser
 // are drawn when the kit has them.
 import { describe, it, expect } from 'vitest';
@@ -12,15 +12,16 @@ import { F355_KIT } from '../render/car/cars/f355.kit';
 import { EB110_KIT } from '../render/car/cars/eb110.kit';
 import { Rng } from '../core/rng';
 import { NSX_KIT } from '../render/car/cars/nsx.kit';
-import { BASES, BODY_LIMITS, DESIGN_EB110, DESIGN_F355, DESIGN_NSX, DIMS, FRONTS, LIMITS, NOSES, TAILS, WHEELS, type BaseId, type Design } from '../core/design';
+import { BASES, BODY_LIMITS, DESIGN_EB110, DESIGN_F355, DESIGN_NSX, DIMS, AUXES, BUMPERS, GRILLES, HEADS, PODS, FACE_KEYS, FACE_KINDS, fitFace, LIMITS, NOSES, TAILS, WHEELS, type BaseId, type Design } from '../core/design';
 
 const closed = (r: ReturnType<typeof seamCheck>, what: string) => { expect(r.open.map(e => `${e.names} ${e.a.map(Math.round)}`), what).toEqual([]); expect(r.nonManifold.length, what).toBe(0); expect(r.duplicates, what).toBe(0); expect(r.overlaps, what).toBe(0); expect(r.seams, what).toBeGreaterThan(300); };
 const sameShape = (a: Mesh, b: Mesh) => { expect(a.n).toBe(b.n); expect(a.length).toBe(b.length); let worst = 0; for (let i = 0; i < a.pos.length; i++) worst = Math.max(worst, Math.abs(a.pos[i]! - b.pos[i]!)); expect(worst).toBe(0); };
 const own = (b: BaseId) => ({ nsx: DESIGN_NSX, f355: DESIGN_F355, eb110: DESIGN_EB110 })[b];
 const names = (M: Mesh) => new Set(M.names);
-const body = (d: Design, b: Partial<Design['body']>): Design => ({ ...d, body: { ...d.body, ...b } });
+/** the design with these body fields (a face the rules do not allow put right, as the builder does) */
+const body = (d: Design, b: Partial<Design['body']>): Design => ({ ...d, body: fitFace({ ...d.body, ...b }) });
 const check = (d: Design, lamps = 0) => { const { kit, tweak } = designKit(d); return seamCheck(assemble(kit, { lamps, tweak })); };
-const label = (d: Design) => `${d.body.base} ${d.body.nose} ${d.body.front} ${d.body.tail} ${d.body.wheel} ${DIMS.map(k => `${k} ${d.body[k]}`).join(' ')}`;
+const label = (d: Design) => `${d.body.base} ${d.body.nose} ${FACE_KEYS.map(k => d.body[k]).join(' ')} ${d.body.tail} ${d.body.wheel} ${DIMS.map(k => `${k} ${d.body[k]}`).join(' ')}`;
 
 describe('design: the kit\'s own cars', () => {
   it('the NSX\'s design is the NSX\'s spec (the same triangles at the same places, lamps down and up)', () => {
@@ -49,18 +50,18 @@ describe('design: the kit\'s own cars', () => {
     expect(W.f.w).toBe(245); expect(W.r.w).toBe(295); expect(W.f.rim).toBeLessThan(F355_KIT.lines.wheels.f.rim); expect(W.f.r).toBe(F355_KIT.lines.wheels.f.r);
     expect(wheelsOf(designMesh({ ...DESIGN_NSX, kit: { ...DESIGN_NSX.kit, rim: 18, tyres: [335, 335] } })).length).toBe(4);
   });
-  it('offers every kind on every base', () => { for (const b of BASES) expect(designChoices(b)).toEqual({ nose: NOSES, front: FRONTS, tail: TAILS, wheel: WHEELS }); });
+  it('offers every kind on every base', () => { for (const b of BASES) expect(designChoices(b)).toEqual({ nose: NOSES, ...FACE_KINDS, tail: TAILS, wheel: WHEELS }); });
 });
 
 describe('design: every combination closes', () => {
-  for (const b of BASES) it(`on the ${b}: every nose, front, tail and wheel (lamps down; up with each base's own wheel)`, () => {
-    const C = designChoices(b);
-    for (const nose of C.nose) for (const front of C.front) for (const tail of C.tail) for (const wheel of C.wheel) {
-      const d = body(own(b), { nose, front, tail, wheel }); closed(check(d), label(d)); if (wheel === own(b).body.wheel) closed(check(d, 1), `${label(d)} lamps up`); }
+  for (const b of BASES) it(`on the ${b}: every nose, tail and wheel, the auxiliary lamps stepped through (lamps down; up with each base's own wheel)`, () => {
+    const C = designChoices(b); let i = 0;
+    for (const nose of C.nose) for (const tail of C.tail) for (const wheel of C.wheel) {
+      const d = body(own(b), { nose, aux: AUXES[i++ % AUXES.length]!, tail, wheel }); closed(check(d), label(d)); if (wheel === own(b).body.wheel) closed(check(d, 1), `${label(d)} lamps up`); }
   }, 60000);
   for (const b of BASES) it(`on the ${b}: the wheelbase and the width at the ends of their ranges, its own kinds and the other base's`, () => {
     const other = own(BASES[(BASES.indexOf(b) + 1) % BASES.length]!).body;
-    for (const wheelbase of LIMITS.wheelbase) for (const width of LIMITS.width) for (const kinds of [{}, { nose: other.nose, front: other.front, tail: other.tail, wheel: other.wheel }]) {
+    for (const wheelbase of LIMITS.wheelbase) for (const width of LIMITS.width) for (const kinds of [{}, { nose: other.nose, bumper: other.bumper, grille: other.grille, head: other.head, aux: other.aux, tail: other.tail, wheel: other.wheel }]) {
       const d = body(own(b), { ...kinds, wheelbase, width }); closed(check(d), label(d)); }
     closed(check(body(own(b), { wheelbase: LIMITS.wheelbase[1], width: LIMITS.width[1], tail: 'roundLamps' }), 1), 'long and wide, round lamps, lamps up');
   }, 60000);
@@ -68,7 +69,7 @@ describe('design: every combination closes', () => {
 
 describe('design: the body\'s dimensions (E1) close at the ends of each base\'s ranges', () => {
   // every kind of every slot comes round as each end of each dimension is tried (the kinds stepped through together)
-  const kinds = (i: number) => ({ nose: NOSES[i % NOSES.length]!, front: FRONTS[(i >> 1) % FRONTS.length]!, tail: TAILS[i % TAILS.length]!, wheel: WHEELS[(i + 1) % WHEELS.length]! });
+  const kinds = (i: number) => ({ nose: NOSES[i % NOSES.length]!, bumper: BUMPERS[i % BUMPERS.length]!, grille: GRILLES[i % GRILLES.length]!, head: HEADS[(i >> 1) % HEADS.length]!, pod: PODS[i % PODS.length]!, aux: AUXES[(i >> 1) % AUXES.length]!, tail: TAILS[i % TAILS.length]!, wheel: WHEELS[(i + 1) % WHEELS.length]! });
   for (const b of BASES) it(`on the ${b}: each dimension at each end, one at a time, the kinds stepped through; the wing and the diffuser on`, () => {
     const lim = BODY_LIMITS(b); let i = 0;
     for (const k of DIMS) for (const v of lim[k]) { const d = body({ ...own(b), kit: { ...own(b).kit, wing: true, diffuser: true } }, { ...kinds(i++), [k]: v }); closed(check(d), label(d)); }

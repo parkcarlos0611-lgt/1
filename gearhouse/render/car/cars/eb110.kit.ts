@@ -130,7 +130,7 @@ export const EB110_KIT: CarKit = {
   // no centre mouth: the horseshoe on the bumper's middle, a barred intake each side (285-130), the corner ducts, the splitter
   splitter: { reach: 4, half: 852, z: [92, 84], until: 0.9 },
   intakes: { shield: { pts: [[-34, 150], [-50, 225], [-48, 262], [-32, 284], [0, 292], [32, 284], [48, 262], [50, 225], [34, 150]], grow: 1.14 }, patches: [[700, 772, 152, 280]],
-    centre: { rows: 0, cols: [6, 9], depth: 75, bars: [], barX: 0, barZ: [0, 0] }, outer: { rows: [1, 5], cols: [6, 9], depth: 75, slats: [7, 8] } },
+    centre: { rows: 0, cols: [6, 9], depth: 75, bars: [], barX: 0, barZ: [0, 0] }, side: { rows: [1, 5], cols: [6, 9], depth: 75, slats: [7, 8] } },
   bumperLamps: { from: 0, split: 0, to: 0 },
   plate: [4388, 4402, -235, 235, 580, 660],
   // the GT's two pairs of pipes through the diffuser

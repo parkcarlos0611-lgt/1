@@ -7,7 +7,7 @@ export type Piece = { kind: 'straight'; len: number; name: string } | { kind: 'a
 export interface Banking { s0: number; s1: number; height: number; curve: number; ease: number; name: string }
 /** a bump across the track: a rise of `height` m over `len` m, centred at s */
 export interface Bump { s: number; height: number; len: number; name?: string }
-export interface Landmark { s: number; name: string; kind: 'bridge' | 'line' | 'fork' }
+export interface Landmark { s: number; name: string; kind: 'bridge' | 'line' | 'fork' | 'mark' }
 export interface TrackSpec { /** a short key (the handicap books, the saved records) */ id?: string; name: string; pieces: Piece[]; start: { x: number; y: number; heading: number }; width: number; easing: number; banking: Banking[]; bumps: Bump[]; landmarks: Landmark[]; joints: number }
 export interface Node { s: number; x: number; y: number; h: number; k: number }
 

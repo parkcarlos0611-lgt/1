@@ -47,7 +47,7 @@ const yr = (k: keyof typeof TECH_YEAR) => ` · ${TECH_YEAR[k].year}`;
 function partSpec(n: string, d: Design, s: EngineSheet, rig?: StandModel['rig']): string {
   const E = d.engine, mm = (v: number) => `${v.toFixed(1)} mm`;
   if (rig) switch (n) {   // the cutaway's insides: what they are drawn at (the bore held under the block's pitch)
-    case 'crankshaft': return `${rig.crank === 'flat' ? '평면(180°) 크랭크' : rig.crank === 'cross' ? '십자(90°) 크랭크' : rig.crank === 'split' ? '분할 핀 크랭크' : rig.crank === 'common' ? '공용 핀 크랭크' : '크랭크'} · 행정 ${mm(rig.stroke)} · 점화 순서 ${rig.order}`;
+    case 'crankshaft': return `${rig.crank === 'flat' ? '평면(180°) 크랭크' : rig.crank === 'cross' ? '십자(90°) 크랭크' : rig.crank === 'split' ? '분할 핀 크랭크' : rig.crank === 'common' ? '공용 핀 크랭크' : '크랭크'} · 행정 ${mm(rig.stroke)} · 점화 순서 ${rig.order}`; if (readout.textContent !== txt) readout.textContent = txt;   // the page repainted only where it changes
     case 'conRod': return `길이 ${mm(rig.l)} · 로드/행정 ${(rig.l / rig.stroke).toFixed(2)}`;
     case 'piston': case 'pistonRing': case 'cylinderBore': return `보어 ${mm(rig.bore)} · 링 3개 (압축 2, 오일 1)`;
     case 'camshaft': return `크랭크 두 바퀴에 한 바퀴 · ${E.valves >= 4 ? 'DOHC' : 'SOHC'}`;
@@ -321,10 +321,10 @@ export function engineScreen(ctx: ShellCtx): Screen<EngineParams> & { readonly a
       if (rig) for (const c of [...rig.cyl].sort((a, b) => a.no - b.no)) { const ch = el('span', 'gh-cyl'); ch.dataset.no = String(c.no); ch.title = `${c.no}번 실린더`; cylBox.append(ch); cut.chips.push(ch); } } }
   /** the angle, the order, each cylinder's stroke (its plug's flash) */
   function drawCut() { const rig = cut.model?.rig; if (!rig) return; const th = cut.theta;
-    readout.textContent = `크랭크 ${Math.round(th)}° / 720° · ${Math.round(rev.rpm / 10) * 10} rpm${cut.speed === 'real' ? ' · 실제 속도라 흐려 보임' : cut.speed === 'manual' ? '' : ` · 화면 ${cut.speed === '10' ? '1/10' : '1/50'}`} · 점화 순서 ${rig.order}`;
+    const txt = `크랭크 ${Math.round(th)}° / 720° · ${Math.round(rev.rpm / 10) * 10} rpm${cut.speed === 'real' ? ' · 실제 속도라 흐려 보임' : cut.speed === 'manual' ? '' : ` · 화면 ${cut.speed === '10' ? '1/10' : '1/50'}`} · 점화 순서 ${rig.order}`;
     const byNo = new Map(rig.cyl.map(c => [c.no, c]));
     for (const ch of cut.chips) { const c = byNo.get(+ch.dataset.no!)!, k = String(strokeOf(c, th)), sp = plugGlint(c, th) > 0.25;
-      if (ch.dataset.k !== k) { ch.dataset.k = k; ch.innerHTML = `<b>${c.no}</b>${STROKES[+k]}`; } ch.classList.toggle('gh-spark', sp); } }
+      if (ch.dataset.k !== k) { ch.dataset.k = k; ch.innerHTML = `<b>${c.no}</b>${STROKES[+k]}`; } if (ch.classList.contains('gh-spark') !== sp) ch.classList.toggle('gh-spark', sp); } }
   /** the plugs' flashes over the picture */
   function drawGlints() { const c = glint, box = viewBox.getBoundingClientRect(), dpr = Math.min(2, devicePixelRatio || 1), W = Math.round(box.width * dpr), H = Math.round(box.height * dpr); if (c.width !== W || c.height !== H) { c.width = W; c.height = H; }
     const g = c.getContext('2d'); if (!g) return; g.clearRect(0, 0, W, H); const rig = cut.model?.rig, v = lastView; if (!cut.on || !rig || !v || !cut.model) return;

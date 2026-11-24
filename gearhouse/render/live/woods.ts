@@ -88,7 +88,7 @@ export class Woods {
     let P = PROGS.get(gl); if (!P) { P = [program(gl, VS, fsOf(light)), program(gl, DEPTH_VS, DEPTH_FS), program(gl, CARD_VS, cardFsOf(light))]; PROGS.set(gl, P); } [this.P3, this.PD, this.PC] = P;
     MESHES.forEach((f, k) => { const M = f(), g = treeGeometry(M), bufs: WebGLBuffer[] = [];
       let lr = 0, lg = 0, lb = 0, ln = 0; for (let t = 0; t < M.n; t++) if (M.kind[t] === 7) { lr += M.col[t * 3]!; lg += M.col[t * 3 + 1]!; lb += M.col[t * 3 + 2]!; ln++; } this.leaf.push(lr / ln / 255, lg / ln / 255, lb / ln / 255);
-      this.W[k] = g.w * 0.92; this.H[k] = g.h * 1.04;
+      this.W[k] = g.w; this.H[k] = g.h * 1.04;
       const inst = gl.createBuffer()!; bufs.push(inst);
       const vao = (depth: boolean) => { const a = gl.createVertexArray()!; gl.bindVertexArray(a);
         const b = (loc: number, d: Float32Array, size: number) => { const buf = gl.createBuffer()!; bufs.push(buf); gl.bindBuffer(gl.ARRAY_BUFFER, buf); gl.bufferData(gl.ARRAY_BUFFER, d, gl.STATIC_DRAW); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, size, gl.FLOAT, false, 0, 0); };

@@ -157,16 +157,17 @@ function millbrookPlan(T: Track, c: { props: Placed[]; lines: GroundLine[]; area
   // ---- the advertising boards along the straights (blue), outside, the firms in turn ----
   { let k = 0; for (let s = start + 220; s < HOME - 40; s += 30) put('adBoard', s, -(W2 + 5), k++); for (let s = ME + 120; s < RA - 120; s += 45) put('adBoard', s, -(W2 + 5), k++); }
   // ---- the woods: the belt outside (but along the stands and the car park, and thinner beyond the railway), the
-  //      groves inside, the line along the inside. The candidates stand 1/0.6 as thick as the plan's trees, so the
-  //      middle density (보통) has the plan's own; a 7.5 m grid jittered 3 m (the plan's: 9 m, 85 %) ----
+  //      groves inside, the line along the inside (two rows). Tightened on review (the plan's belt read thin and far
+  //      from the driver's seat): the belt from W2+15 m (the plan's drawing from W2+30), on a 6 m grid jittered 3 m,
+  //      the inner line from W2+14 m; the middle density (보통) about 1.6 times the plan's own count ----
   const segs: [number, number][] = []; { let cur: number | null = null; for (let s = 0; s < L; s += 10) { const ok = !(s >= start - 160 && s <= start + 420) && !(s >= ME - 60 && s <= RA + 60); if (ok && cur === null) cur = s; if (!ok && cur !== null) { segs.push([cur, s]); cur = null; } } if (cur !== null) segs.push([cur, L]); }
   const belt = (s0: number, s1: number, o0: number, o1: number, step: number) => { for (let s = s0; s < s1; s += step) for (let o = o0; o < o1; o += step) { const ss = s + (rnd() - 0.5) * 6, oo = o + (rnd() - 0.5) * 6; treeAt(ss, -oo, BELT); } };
-  for (const [a, b] of segs) belt(a, b, W2 + 30, W2 + 150, 7.5);
-  belt(ME - 60, RA + 60, W2 + 45, W2 + 130, 8.4);
+  for (const [a, b] of segs) belt(a, b, W2 + 15, W2 + 150, 6);
+  belt(ME - 60, RA + 60, W2 + 40, W2 + 130, 6.5);
   for (const [s, off, R] of [[RA + 500, W2 + 110, 70], [RA + 1100, W2 + 140, 85], [BY - 300, W2 + 95, 60], [ME - 300, W2 + 150, 65], [HOME + 300, W2 + 190, 55], [RA + 1500, W2 + 80, 50], [ME + 300, W2 + 120, 60], [ME + 700, W2 + 110, 55]] as const) {
     const m = T.point(s, off), n = Math.round(R * R / 40 / 0.6); for (let k = 0; k < n; k++) { const a = rnd() * 6.283, d = R * Math.sqrt(rnd()); tree(m.x + d * Math.cos(a), m.y + d * Math.sin(a), -0.03, GROVE); } }
   for (let s = 0; s < L; s += 6) { if ((s >= start - 100 && s <= start + 420) || (s >= ME + 200 && s <= RA - 200)) continue;
-    const e = c.encl.find(q => s > q.s0 - 6 && s < q.s1 + 6), o = e ? e.o1 + 6 + rnd() * 8 : W2 + 22 + rnd() * 10; treeAt(s + (rnd() - 0.5) * 3, o, LINE); }
+    const e = c.encl.find(q => s > q.s0 - 6 && s < q.s1 + 6); for (const row of [0, 1]) { const o = e ? e.o1 + 6 + row * 6 + rnd() * 3 : W2 + 14 + row * 7 + rnd() * 4; treeAt(s + (rnd() - 0.5) * 3 + row * 3, o, LINE); } }
   return { trees, detail }; }
 
 /** where a named piece of the track runs (the first piece of that name) */

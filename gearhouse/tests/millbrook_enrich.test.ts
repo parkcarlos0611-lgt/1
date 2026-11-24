@@ -34,17 +34,17 @@ describe('Millbrook site plan (review 181)', () => {
     const encl = enclosures(T); let miss = 0;
     for (const t of S.trees!) { const { s, off } = T.locate(t.x, t.y), u = T.gap(start, s);
       // (the belt runs to the end of the lap; past the Fork's bend its last trees fall a few metres past the line when measured square to the track, and inside that right-hand bend nearer it)
-      const belt = off <= -(W2 + 18) && off >= -(W2 + 150 + 4) && !within(s, start - 80, start + 410) && !within(s, ME - 50, RA + 50);
-      const railBelt = off <= -(W2 + 45 - 4) && off >= -(W2 + 130 + 4) && within(s, ME - 60, RA + 60);
+      const belt = off <= -(W2 + 11) && off >= -(W2 + 150 + 4) && !within(s, start - 80, start + 410) && !within(s, ME - 45, RA + 45);
+      const railBelt = off <= -(W2 + 40 - 4) && off >= -(W2 + 130 + 4) && within(s, ME - 60, RA + 60);
       const grove = groves.some(g => Math.hypot(g.p.x - t.x, g.p.y - t.y) <= g.r + 1);
-      const line = (off >= W2 + 20 && off <= W2 + 33) || encl.some(e => within(s, e.s0 - 6, e.s1 + 6) && off >= e.o1 + 5 && off <= e.o1 + 15);
+      const line = (off >= W2 + 11 && off <= W2 + 27) || encl.some(e => within(s, e.s0 - 6, e.s1 + 6) && off >= e.o1 + 5 && off <= e.o1 + 16);
       const paddock = u >= -64 && u <= 275 && off >= W2 + 56 && off <= W2 + 92, park = u >= -70 && u <= 275 && off <= -(W2 + 111) && off >= -(W2 + 122);
       if (!(belt || railBelt || grove || line || paddock || park)) miss++; }
     expect(miss).toBe(0);
   });
   it('has the plan\'s woods at the middle density, fewer at low, more at high; the setting held', () => {
     const n = (d: 'low' | 'mid' | 'high') => treesAt(S, d).length, lo = n('low'), mid = n('mid'), hi = n('high');
-    expect(mid).toBeGreaterThan(4800); expect(mid).toBeLessThan(7000);   // the plan's script drew about 5 700 (9 m grid, 85 %)
+    expect(mid).toBeGreaterThan(8000); expect(mid).toBeLessThan(13000);   // the plan's script drew about 5 700 (9 m grid, 85 %); tightened on review to about 1.6 times
     expect(hi).toBe(S.trees!.length); expect(lo / mid).toBeGreaterThan(0.4); expect(lo / mid).toBeLessThan(0.65); expect(hi / mid).toBeGreaterThan(1.5);
     for (const t of S.trees!) expect(t.rank).toBeLessThan(1);
     expect(DEFAULTS.graphics.scenery).toBe('mid'); expect(asSettings({ graphics: { scenery: 'high' } }).graphics.scenery).toBe('high'); expect(asSettings({ graphics: { scenery: 'dense!' } }).graphics.scenery).toBe('mid');

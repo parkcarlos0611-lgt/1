@@ -18,7 +18,7 @@ const edge = (at: number, w: number, x: number) => w <= 0 ? (x >= at ? 1 : 0) : 
 /** the steps' heights in e (the reflected ray's tilted height): the ground below GROUND_E, the band to SKY_E, the sky above */
 export const GROUND_E = 0, SKY_E = 0.2;
 /** how much the pane's height on the car moves e (per share of the car's height), the share where it is nothing */
-export const BEND = 1.3, BEND_AT = 0.78;
+export const BEND = 2.2, BEND_AT = 0.95;
 /** the sun glint: the cosine where it starts */
 export const SUN_COS = 0.996;
 
@@ -34,7 +34,8 @@ export function bandAngle(no: V3, carH = 1.2): number { const up = Math.hypot(no
 export interface BandIn {
   /** the pane's normal in the world, toward the eye; toward the eye; toward the sun (all unit) */
   n: V3; v: V3; sun: V3;
-  /** the pane's normal in the car's own axes (toward the eye), the point in them (mm), the car's height (m); a prop's glass: carH 0 (no bend) */
+  /** the pane's normal in the car's own axes (toward the eye); the point in them (mm), measured from the middle of the car's length (the
+   *  car's own x starts at its tail: the shader takes half its length off); the car's height (m); a prop's glass: carH 0 (no bend) */
   no: V3; p: V3; carH: number;
   /** the setting (0 off, 0.5 weak, 1 as made), the day (1 noon .. 0 night), the edge's half width in e (0: hard steps), lit by the sun (0..1) */
   k: number; day?: number; w?: number; sh?: number;
@@ -60,7 +61,7 @@ export function glassBand(i: BandIn): BandOut {
   const A0 = clamp(0.3 + 0.62 * (i.glass ?? 0.8), 0, 1) * (i.clear ?? 1) * (0.45 + 0.55 * smooth(0.1, 0.8, g));   // the tint: clear head-on, the cabin seen
   const lit = 0.25 + 0.75 * day;
   const cG: V3 = [0.16, 0.17, 0.19], cB: V3 = [0.95 * lit, 0.97 * lit, 1 * lit], cS: V3 = [0.55 * lit, 0.72 * lit, 0.92 * lit];
-  const aG = 0.55 * fres, aB = 0.3 + 0.65 * fres, aS = 0.15 + 0.6 * fres;
+  const aG = 0.55 * fres, aB = 0.45 + 0.5 * fres, aS = 0.15 + 0.6 * fres;
   const mixv = (a: V3, b: V3, t: number): V3 => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
   const c = mixv(mixv(cG, cB, up), cS, sky), lerp = (a: number, b: number, t: number) => a + (b - a) * t, ar = lerp(lerp(aG, aB, up), aS, sky) * clamp(i.k, 0, 1);
   const nvR = dot(i.n, i.v), R: V3 = [2 * nvR * i.n[0] - i.v[0], 2 * nvR * i.n[1] - i.v[1], 2 * nvR * i.n[2] - i.v[2]];

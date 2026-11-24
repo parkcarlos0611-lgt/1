@@ -212,7 +212,7 @@ float vnoise(vec3 x) { vec3 i = floor(x), f = fract(x); f = f * f * (3. - 2. * f
   return mix(mix(mix(h3(i), h3(i + vec3(1, 0, 0)), f.x), mix(h3(i + vec3(0, 1, 0)), h3(i + vec3(1, 1, 0)), f.x), f.y), mix(mix(h3(i + vec3(0, 0, 1)), h3(i + vec3(1, 0, 1)), f.x), mix(h3(i + vec3(0, 1, 1)), h3(i + vec3(1, 1, 1)), f.x), f.y), f.z); }
 float vn3(vec3 x) { return vnoise(x); }
 float fbm(vec3 p) { float a = 0.5, s = 0.; for (int i = 0; i < 4; i++) { s += a * vnoise(p); p *= 2.03; a *= 0.5; } return s / 0.9375; }
-vec3 rustAt(float t) { vec3 R[6] = vec3[6](vec3(184, 104, 46), vec3(156, 80, 34), vec3(126, 60, 26), vec3(92, 42, 20), vec3(60, 30, 16), vec3(40, 21, 12)); float k = clamp(t, 0., 1.) * 4.999; int i = int(k); return mix(R[i], R[min(5, i + 1)], fract(k)) / 255.; } uniform float uOutline; uniform int uMode; uniform vec4 uSil; uniform float uGlass, uGlassR;
+vec3 rustAt(float t) { vec3 R[6] = vec3[6](vec3(184, 104, 46), vec3(156, 80, 34), vec3(126, 60, 26), vec3(92, 42, 20), vec3(60, 30, 16), vec3(40, 21, 12)); float k = clamp(t, 0., 1.) * 4.999; int i = int(k); return mix(R[i], R[min(5, i + 1)], fract(k)) / 255.; } uniform float uOutline; uniform int uMode; uniform vec4 uSil; uniform float uGlass, uGlassR, uCarL;
 uniform int uDecN; uniform vec3 uDecO[4], uDecN_[4], uDecUp[4]; uniform float uDecR[4]; uniform sampler2D uDecTex;
 layout(location=0) out vec4 oCol; layout(location=1) out vec4 oId; layout(location=2) out vec4 oN; layout(location=3) out vec4 oV; in vec4 vCur, vPrev; uniform vec2 uSize;
 vec4 velo() { vec2 d = (vCur.xy / vCur.w - vPrev.xy / vPrev.w) * 0.5 * uSize; return vec4(clamp(d / 128. + 0.5, 0., 1.), 0., 1.); }   /* pixels moved since the last frame, packed */   // oN: the normal and how mirror-like (for the traced reflections)
@@ -275,12 +275,13 @@ void main() { uEye = uCamP.w > 0.5 ? normalize(uCamP.xyz - vWorld) : uEyeD;
       vec3 sn = normalize(vSN); if (dot(sn, uEye) < 0.) sn = -sn; if (dot(sn, n) < 0.3) sn = n;   /* the smoothed normal: a curved pane's reflection bends over it */
       vec3 no = normalize(vObjN); if (dot(mat3(uModel) * no, uEye) < 0.) no = -no;
       vec3 R = reflect(-uEye, sn), tw = length(sn.xy) < 1e-4 ? vec3(1., 0., 0.) : normalize(vec3(-sn.y, sn.x, 0.)), to = length(no.xy) < 1e-4 ? vec3(1., 0., 0.) : normalize(vec3(-no.y, no.x, 0.));
-      float sl = 0.8 * (1. - smoothstep(0.3, 0.7, abs(no.z))), bend = uIsCar == 1 ? 1.3 * (vObj.z / 1000. / max(0.8, uCarH) - 0.78) : 0.;
-      float e = R.z + 0.35 * sl * dot(R, tw) + bend + sl * dot(vObj, to) / 1000., we = clamp(fwidth(e) * 0.75, 1e-4, 0.1);
+      float sl = 0.8 * (1. - smoothstep(0.3, 0.7, abs(no.z))), bend = uIsCar == 1 ? 2.2 * (vObj.z / 1000. / max(0.8, uCarH) - 0.95) : 0.;
+      vec3 pc = vObj - vec3(uIsCar == 1 ? uCarL * 0.5 : 0., 0., 0.);   /* from the car's middle (its x starts at the tail) */
+      float e = R.z + 0.35 * sl * dot(R, tw) + bend + sl * dot(pc, to) / 1000., we = clamp(fwidth(e) * 0.75, 1e-4, 0.1);
       float up = smoothstep(-we, we, e), sky = smoothstep(0.2 - we, 0.2 + we, e), g = 1. - clamp(dot(sn, uEye), 0., 1.), fres = 0.1 + 0.9 * g * g, lit = 0.25 + 0.75 * uDay;
       float clear = vGloss < 0.5 ? max(0.25, vGloss * 2.) : 1., A0 = clamp(0.3 + 0.62 * uGlass, 0., 1.) * clear * (0.45 + 0.55 * smoothstep(0.1, 0.8, g));
       vec3 c = mix(mix(vec3(0.16, 0.17, 0.19), vec3(0.95, 0.97, 1.) * lit, up), vec3(0.55, 0.72, 0.92) * lit, sky);
-      float ar = mix(mix(0.55 * fres, 0.3 + 0.65 * fres, up), 0.15 + 0.6 * fres, sky) * clamp(uGlassR, 0., 1.);
+      float ar = mix(mix(0.55 * fres, 0.45 + 0.5 * fres, up), 0.15 + 0.6 * fres, sky) * clamp(uGlassR, 0., 1.);
       float rs = dot(R, uSun), ws = clamp(fwidth(rs), 1e-4, 0.01), sun = smoothstep(0.996 - ws, 0.996 + ws, rs) * sh * clamp(uGlassR * 2., 0., 1.) * uDay;
       vec3 rgb = c * ar + vec3(0.12, 0.16, 0.24) * (0.3 + 0.7 * uDay) * A0 * (1. - ar); float A = ar + A0 * (1. - ar);
       oCol = vec4(mix(rgb, vec3(1.), sun), mix(A, 1., sun)); oId = vec4(0.); oN = vec4(0.); oV = velo(); return; }
@@ -956,7 +957,7 @@ export class LiveRenderer {
     if (this.vol?.active) { this.vol.draw({ VP, W: v.W, H: v.H, depth: this.tDepth, col: this.tCol, fbo: this.fbo, hdr: hdrOn === 1, toon, toonBands: o.toonBands, sun: SUN_W, day: o.day ?? 1 }); gl.useProgram(this.obj); }   // the volumetric smoke (docs/systems/104 B: render/live/volume), its grid run by the drive
     // glass over all, at its own strength, nothing else written
     gl.uniform1i(this.loc(this.obj, 'uMode'), 2); gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);   /* premultiplied (review 116) */ gl.depthMask(false); gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.NONE, gl.NONE, gl.NONE]);
-    gl.uniform3f(this.loc(this.obj, 'uWear'), 0, 0, 0); gl.uniform1i(this.loc(this.obj, 'uIsCar'), 0); for (const p of ps) draw(p.g.glass, (p.m ?? placeMesh(p.g.len, p.x, p.y, p.z, p.h))); gl.uniform1i(this.loc(this.obj, 'uIsCar'), 1); cars.forEach((q, i) => { gl.uniform1f(this.loc(this.obj, 'uLampOn'), q.lamps ?? 0); gl.uniform1f(this.loc(this.obj, 'uBrake'), q.brake ? 1 : 0); gl.uniform1f(this.loc(this.obj, 'uCarH'), q.g.height); for (const [part, M, w] of carM[i]!.glass) draw(part, M, w); }); gl.uniform1f(this.loc(this.obj, 'uLampOn'), 0); gl.uniform1f(this.loc(this.obj, 'uBrake'), 0);
+    gl.uniform3f(this.loc(this.obj, 'uWear'), 0, 0, 0); gl.uniform1i(this.loc(this.obj, 'uIsCar'), 0); for (const p of ps) draw(p.g.glass, (p.m ?? placeMesh(p.g.len, p.x, p.y, p.z, p.h))); gl.uniform1i(this.loc(this.obj, 'uIsCar'), 1); cars.forEach((q, i) => { gl.uniform1f(this.loc(this.obj, 'uLampOn'), q.lamps ?? 0); gl.uniform1f(this.loc(this.obj, 'uBrake'), q.brake ? 1 : 0); gl.uniform1f(this.loc(this.obj, 'uCarH'), q.g.height); gl.uniform1f(this.loc(this.obj, 'uCarL'), q.g.len); for (const [part, M, w] of carM[i]!.glass) draw(part, M, w); }); gl.uniform1f(this.loc(this.obj, 'uLampOn'), 0); gl.uniform1f(this.loc(this.obj, 'uBrake'), 0);
     gl.disable(gl.BLEND); gl.depthMask(true);
     // ---- after the scene (review 111): occlusion, then the picture composed (reflections, occlusion, outlines), the bloom, the end ----
     gl.disable(gl.DEPTH_TEST); gl.disable(gl.STENCIL_TEST); gl.disable(gl.BLEND); gl.bindVertexArray(null); const rays = (o.look ?? 0) > 0 && !toon && o.rays !== false && !pv, RT = this.rt;   /* toon: no traced reflections or occlusion (its shade is in bands) */

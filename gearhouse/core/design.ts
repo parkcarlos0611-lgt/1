@@ -30,7 +30,7 @@ export const NOSES: NoseKind[] = ['round', 'pointed'];
 export const FRONTS: FrontKind[] = ['plain', 'sunk'];
 export const TAILS: TailKind[] = ['frame', 'roundLamps', 'ducktail'];
 export const WHEELS: WheelKind[] = ['fiveSpoke', 'disc', 'star'];
-export const LIMITS = { wheelbase: [-150, 250], width: [-40, 60], cc: [2000, 6500], redline: [6000, 9000], tyre: [195, 335], final: [2.8, 4.8] } as const;
+export const LIMITS = { wheelbase: [-150, 250], width: [-40, 60], cc: [1000, 8000], redline: [5000, 10000], tyre: [195, 335], final: [2.8, 4.8] } as const;
 
 /** the two cars the kit was made from, as designs (the generators are checked against their real figures) */
 export const DESIGN_NSX: Design = { v: 1, id: 'nsx', name: 'NSX', body: { base: 'nsx', nose: 'round', front: 'plain', tail: 'frame', wheel: 'fiveSpoke', wheelbase: 0, width: 0, paint: '#b0121b', gloss: 0.6, material: 'aluminium' },

@@ -2,7 +2,7 @@
 // back, anything else turned away or mended, the saved list and the measurements in a fake storage; format 1's designs
 // (before review 177) brought to format 2 (core/design.ts), and the engine's grade keeping its details in bounds.
 import { describe, it, expect } from 'vitest';
-import { DESIGN_NSX, DESIGN_F355, LIMITS, normalise, migrate, gradeFor, gradeLock, GRADE_RULES, type Design, type DesignV1 } from '../core/design';
+import { DESIGN_NSX, DESIGN_F355, LIMITS, BODY_LIMITS, normalise, migrate, gradeFor, gradeLock, GRADE_RULES, type Design, type DesignV1 } from '../core/design';
 import { encodeDesign, decodeDesign, parseDesign, designJson, asDesign, savedDesigns, saveDesign, deleteDesign, currentDesign, keepCurrent,
   measured, recordRun, fromPreset, designSig, KEYS, type KeyStore } from '../core/designstore';
 
@@ -93,4 +93,17 @@ describe('the engine view', () => {
     expect(count(M, 'engineCover')).toBeGreaterThan(0); expect(count(O, 'engineCover')).toBe(0); expect(count(O, 'engineBlock')).toBe(count(M, 'engineBlock'));
     expect(O.n).toBe(M.n - count(M, 'bootLid') - count(M, 'engineCover') - count(M, 'rearPane')); expect(O.pos.length).toBe(O.n * 9); expect(O.col.length).toBe(O.n * 3);
     expect(withoutParts(M, []).pos).toEqual(M.pos); });
+});
+
+describe('format 2 (alpha 0.10) designs in format 3', () => {
+  it('a format-2 design (no dimensions past the wheelbase and the width) loads with its base\'s own, from a link, a file and normalise()', () => {
+    const v2 = { ...structuredClone(DESIGN_F355), v: 2, body: { ...DESIGN_F355.body, wheelbase: 120 } } as Record<string, unknown> & { body: Record<string, unknown> };
+    for (const k of ['track', 'roof', 'overhangF', 'overhangR', 'ride', 'cabin', 'rake']) delete v2.body[k];
+    const want = { ...DESIGN_F355, body: { ...DESIGN_F355.body, wheelbase: 120 } };
+    expect(decodeDesign(v1Link(v2))).toEqual(want); expect(parseDesign(JSON.stringify(v2))).toEqual(want); expect(normalise(v2 as never)).toEqual(want);
+  });
+  it('the dimensions brought inside their base\'s ranges; the EB110 a base of its own', () => {
+    const d = asDesign({ body: { base: 'eb110', roof: -999, cabin: 40, rake: 99 } })!;
+    expect(d.body.roof).toBe(BODY_LIMITS('eb110').roof[0]); expect(d.body.cabin).toBe(40); expect(d.body.rake).toBe(BODY_LIMITS('eb110').rake[1]); expect(d.body.tail).toBe('capsule'); expect(d.v).toBe(3);
+  });
 });

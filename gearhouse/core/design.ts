@@ -101,7 +101,7 @@ export const NO_DIMS: BodyDims = { wheelbase: 0, width: 0, track: 0, roof: 0, ov
 const BODY_RANGES: Record<BaseId, Record<NewDims, readonly [number, number]>> = {
   nsx: { track: [-60, 80], roof: [-80, 60], overhangF: [-100, 200], overhangR: [-120, 200], ride: [-30, 50], cabin: [-80, 120], rake: [-5, 8] },
   f355: { track: [-60, 80], roof: [-80, 60], overhangF: [-120, 200], overhangR: [-100, 200], ride: [-30, 50], cabin: [-80, 150], rake: [-5, 8] },
-  eb110: { track: [-60, 60], roof: [-60, 60], overhangF: [-120, 160], overhangR: [-80, 200], ride: [-25, 60], cabin: [-100, 120], rake: [-4, 5] } };
+  eb110: { track: [-50, 60], roof: [-60, 60], overhangF: [-120, 160], overhangR: [-80, 200], ride: [-25, 60], cabin: [-100, 120], rake: [-4, 5] } };
 export const BODY_LIMITS = (b: BaseId): Record<DimKey, readonly [number, number]> => ({ wheelbase: LIMITS.wheelbase, width: LIMITS.width, ...BODY_RANGES[b] });
 
 // ---- the engine's grade and what it allows ----
@@ -140,8 +140,8 @@ export const DESIGN_F355: Design = { v: 3, id: 'f355', name: 'F355', body: { bas
   kit: { abs: true, tcs: false, steering: 'hydraulic', dampers: 'adaptive', wing: false, diffuser: true, tyres: [225, 265], rim: 18, interior: 'standard' } };
 
 // ---- four more cars as designs: the figures' check (docs/systems/99, 1-8), not used to set them ----
-// Each is built on one of the two bases (the base is only the body: its panels' shapes and sizes), stretched toward
-// the real car's wheelbase and width; the machinery as the real car's. Real figures in race/cars.ts (NEW.diablo,
+// Each is built on one of the bases (the base is only the body: its panels' shapes and sizes), stretched toward the real
+// car's wheelbase, width, height and overhangs (the EB110 on its own base); the machinery as the real car's. Real figures in race/cars.ts (NEW.diablo,
 // NEW.eb110, NEW.xj220, with their sources) and, for the McLaren F1 (no RaceSpec), below.
 /** the 1990 Lamborghini Diablo: 5.7 V12 four valves, 492 hp at 7,000, five speeds, rear drive; a tubular steel frame
  *  with aluminium and composite panels; 2,650 wheelbase, 2,040 wide; 245/40 ZR17 and 335/35 ZR17 */
@@ -171,10 +171,11 @@ export const DESIGN_XJ220: Design = { v: 3, id: 'xj220', name: 'XJ220', body: { 
  *  cylinder, 10.5:1, a dry sump, 627 hp (468 kW) at 7,400 rpm, 650 Nm at 5,600, the limiter about 7,500; six speeds,
  *  rear drive, no limited-slip differential; no ABS, no power steering, no traction control; a carbon-fibre monocoque
  *  and carbon panels, a stripped interior (Murray's weight budget: thin glass, light seats, no deadening); 2,718
- *  wheelbase, 1,820 wide (here 1,860: the F355's arches need the room for its 315 mm rears), 1,140 high; Cd 0.32; ground-effect venturis with fans (here the
+ *  wheelbase, 1,820 wide (here 1,860: the F355's arches need the room for its 315 mm rears), 1,140 high (the F355's roof 30
+ *  lower), 4,287 long (both overhangs 100 shorter than the F355's), its screen laid well back (4 degrees past the F355's); Cd 0.32; ground-effect venturis with fans (here the
  *  undertray); 235/45 ZR17 and 315/45 ZR17; kerb 1,138 kg (about 1,140); 372 km/h on its production limiter, 386 km/h
  *  (240 mph, Ehra-Lessien 1998) with it raised; 0-100 km/h 3.2 s */
-export const DESIGN_MCLAREN_F1: Design = { v: 3, id: 'mclarenf1', name: 'McLaren F1', body: { base: 'f355', nose: 'pointed', front: 'plain', tail: 'frame', wheel: 'disc', ...NO_DIMS, wheelbase: 270, width: -20, paint: '#c9c3b6', gloss: 0.6, structure: 'cfrp', panels: 'cfrp' },
+export const DESIGN_MCLAREN_F1: Design = { v: 3, id: 'mclarenf1', name: 'McLaren F1', body: { base: 'f355', nose: 'pointed', front: 'plain', tail: 'frame', wheel: 'disc', ...NO_DIMS, wheelbase: 270, width: -20, roof: -30, overhangF: -100, overhangR: -100, rake: 4, paint: '#c9c3b6', gloss: 0.6, structure: 'cfrp', panels: 'cfrp' },
   engine: { grade: 4, layout: 'V12', cc: 6064, valves: 4, redline: 7500, intake: 'itb', compression: 'high', sump: 'dry', block: 'aluminium', turbo: 0, boost: 0.8, intercooler: true, vtec: false },
   drive: { gears: 6, gearbox: 'manual', final: 0, lsd: false, awd: false },
   kit: { abs: false, tcs: false, steering: 'manual', dampers: 'fixed', wing: false, diffuser: true, tyres: [235, 315], rim: 17, interior: 'light' } };

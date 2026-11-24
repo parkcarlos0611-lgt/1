@@ -137,8 +137,8 @@ export function makeLines(S: LineSheet, tweak: Tweak = {}): Lines {
 export interface BodyWarp {
   /** nothing to do (every dimension the base's own) */ none: boolean;
   /** a point of the body (the shell, its closures, the parts laid on it) moved */ body(p: V): V;
-  /** how far a part moved whole goes: the wheels (with the overhang ahead, never with the ride), the engine (and the ride),
-   *  the cabin's inside (and the cabin's move) */ wheel: V; engine: V; inside: V;
+  /** the cabin's inside: moved whole with the cabin, then warped as the body (a lower roof brings its bulkhead down) */ inside(p: V): V;
+  /** how far a part moved whole goes: the wheels (with the overhang ahead, never with the ride), the engine (and the ride) */ wheel: V; engine: V;
   /** the mesh's length after it */ length: number;
   /** the screen's top's move back (mm) for the rake asked */ rakeX: number;
 }
@@ -164,12 +164,12 @@ export function makeWarp(L: Lines, roofEdges: [At, At], t: Tweak): BodyWarp {
   const rakeX = deg ? (zTop - zFoot) / Math.tan(a1) - run : 0, none = !dC && !dH && !dF && !dR && !up && !rakeX;
   // the cabin's slide along the car, and how much of it a point takes by its height
   const slide = (x: number) => x <= XA ? dC * ramp(fx, XA, x) : x <= XR1 ? dC : dC * (1 - ramp(XR1, xRa, x)), over = (z: number) => ramp(zBelt - 110, zBelt, z);
-  const body = (p: V): V => { let [x, y, z] = p;
-    if (dC) x += slide(x) * over(z);
+  const warp = (p: V, whole: boolean): V => { let [x, y, z] = p;
+    if (dC) x += whole ? dC : slide(x) * over(z);
     const A = XA + dC, R0 = XR0 + dC, R1 = XR1 + dC, G = XG + dC;
     if (rakeX) x += rakeX * (x <= A ? ramp(A - 150, A, x) : 1 - ramp(R0, R1, x)) * ramp(zFoot, zTop, z);
     if (dH) z += dH * ramp(zBelt, zRoof, z) * (x <= G ? ramp(A - 250, A, x) : 1 - ramp(G, Math.min(G + 300, len), x));
     x = x < xF ? x * (xF + dF) / xF : x > xR ? xR + dF + (x - xR) * (len - xR + dR) / (len - xR) : x + dF;
     return [x, y, z + up]; };
-  return { none, body, wheel: [dF, 0, 0], engine: [dF, 0, up], inside: [dF + dC, 0, up], length: len + dF + dR, rakeX };
+  return { none, body: p => warp(p, false), inside: p => warp(p, true), wheel: [dF, 0, 0], engine: [dF, 0, up], length: len + dF + dR, rakeX };
 }

@@ -262,6 +262,8 @@ export interface CarKit {
   shelf?: ShelfSpec;
   /** a rear wing over the deck */
   wing?: WingSpec;
+  /** a diffuser under the tail (parts/diffuser.ts): fins across it, how far below the floor it starts at the rear axle */
+  diffuser?: { fins: number; depth: number };
   /** a dark vent on the flank following the front arch's rim: its radii about the hub, its span (degrees from the back, upward), cells */
   archVent?: { r: [number, number]; deg: [number, number]; n: number };
   popup: PopupSpec;

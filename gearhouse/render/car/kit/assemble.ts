@@ -64,13 +64,13 @@ export function assemble(k: CarKit, o: AssembleOpts = {}): Assembled {
   return { mesh, lines: L, skin: s, role: r.role, panelOf: r.panelOf, panels: r.panel };
 }
 
-/** the warp laid on a built mesh: the wheels (and the axles' bars between them), the engine and the cabin's inside moved
- *  whole, every other point through the body's warp */
+/** the warp laid on a built mesh: the wheels (and the axles' bars between them) and the engine moved whole, the cabin's
+ *  inside with the cabin (then as the body), every other point through the body's warp */
 function warp(M: Mesh, role: Uint8Array, panelOf: Int16Array, panels: string[], W: BodyWarp): void {
   const P = M.pos, part = ROLES.indexOf('part'), inside = ROLES.indexOf('inside');
   for (let t = 0; t < M.n; t++) { const pn = panels[panelOf[t]!], rl = role[t]!;
-    const d = rl === part && (pn === 'wheel' || pn === 'underbody') ? W.wheel : rl === inside && pn === 'engine' ? W.engine : rl === inside && pn === 'cabin' ? W.inside : null;
-    for (let i = t * 9; i < t * 9 + 9; i += 3) { if (d) { P[i] += d[0]; P[i + 1] += d[1]; P[i + 2] += d[2]; continue; }
-      const q = W.body([P[i]!, P[i + 1]!, P[i + 2]!]); P[i] = q[0]; P[i + 1] = q[1]; P[i + 2] = q[2]; } }
+    const d = rl === part && (pn === 'wheel' || pn === 'underbody') ? W.wheel : rl === inside && pn === 'engine' ? W.engine : null, f = rl === inside && pn === 'cabin' ? W.inside : W.body;
+    for (let i = t * 9; i < t * 9 + 9; i += 3) { if (d) { P[i] = P[i]! + d[0]; P[i + 1] = P[i + 1]! + d[1]; P[i + 2] = P[i + 2]! + d[2]; continue; }
+      const q = f([P[i]!, P[i + 1]!, P[i + 2]!]); P[i] = q[0]; P[i + 1] = q[1]; P[i + 2] = q[2]; } }
   M.length = W.length;
 }

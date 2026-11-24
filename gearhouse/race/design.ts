@@ -100,7 +100,7 @@ const REST: Record<BaseId, { m: number; x: number; z: number }> = Object.fromEnt
   const x = ((1 - B.front) * M * L - p.reduce((s, q) => s + q.m * q.x, 0)) / m / L, z = (B.cgH * M - p.reduce((s, q) => s + q.m * q.z, 0)) / m; return [b, { m, x, z }]; })) as Record<BaseId, { m: number; x: number; z: number }>;
 function massing(d: Design) {
   const B = BASES[d.body.base], L = wheelbase(d), p = parts(d, L), area = sizeOf(d, L), rest = REST[d.body.base];
-  const restM = rest.m * area ** 0.3 * (1 - SECONDARY + SECONDARY * STRUCTURE_K[d.body.structure] / STRUCTURE_K[B.ref.body.structure]) * INTERIOR_K[d.kit.interior];
+  const restM = rest.m * area ** 0.3 * (1 - SECONDARY + SECONDARY * STRUCTURE_K[d.body.structure] / STRUCTURE_K[B.ref.body.structure]) * INTERIOR_K[d.kit.interior] / INTERIOR_K[B.ref.kit.interior];
   // the fit's work: at the engine (its bay, its mounts, its gearbox) or at an axle (the arches)
   const mods = fitPenalty(d).mass.map(q => ({ m: q.m, x: q.at === 'front' ? 0 : q.at === 'rear' ? L : L - 0.75, z: q.at === 'engine' ? engineZ(d) : 0.5 + lift(d) }));
   const all = [...p, ...mods, { m: restM, x: rest.x * L - d.body.cabin / 2000, z: rest.z + lift(d) + d.body.roof / 4000 }];

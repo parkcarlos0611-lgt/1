@@ -89,3 +89,39 @@ describe('the fit: the fixes and the figures', () => {
     expect(F.mass.reduce((s, x) => s + x.m, 0)).toBeGreaterThan(0); expect(designFigures(t).reliability).toBeLessThan(100 - 8 + 1e-9);
   });
 });
+
+describe('the EB110 base and the body\'s dimensions (alpha 0.11: K1, E1)', () => {
+  it('the EB110 builds on its own base: its quad-turbo V12 in its lengthwise bay, its tyres under its arches', () => {
+    expect(fit(DESIGN_EB110).every(r => r.verdict === 'ok'), fit(DESIGN_EB110).filter(r => r.verdict !== 'ok').map(r => r.reason).join('; ')).toBe(true);
+    expect(BAYS.eb110.orient).toBe('mid-longitudinal');
+  });
+  it('the cabin moved forward lengthens the bay behind it: a long V12 that does not fit the F355 fits a cab-forward F355', () => {
+    const v12 = tweak(DESIGN_F355, d => { d.engine.layout = 'V12'; d.engine.cc = 6000; }), fwd = tweak(v12, d => { d.body.cabin = 150; });
+    expect(rank[part(fwd, 'bayLength').verdict]).toBeLessThan(rank[part(v12, 'bayLength').verdict]);
+    const fx = part(v12, 'bayLength').fixes.find(f => f.patch.body?.cabin !== undefined); expect(fx).toBeTruthy();
+    expect(rank[part(applyPatch(v12, fx!.patch), 'bayLength').verdict]).toBeLessThan(rank[part(v12, 'bayLength').verdict]);
+  });
+  it('the ground clearance: a body let down warns of grounding (its fix raises it), every base\'s own clears', () => {
+    for (const d of [DESIGN_NSX, DESIGN_F355, DESIGN_EB110]) expect(part(d, 'clearance').verdict).toBe('ok');
+    const low = tweak(DESIGN_EB110, d => { d.body.ride = -20; }); expect(part(low, 'clearance').verdict).toBe('modified');
+    expect(part(applyPatch(low, part(low, 'clearance').fixes[0]!.patch), 'clearance').verdict).toBe('ok');
+    expect(designSpec(low).mass).toBeGreaterThan(designSpec(DESIGN_EB110).mass);
+  });
+  it('a wider track and a lower body crowd the arches', () => {
+    expect(rank[part(tweak(DESIGN_F355, d => { d.body.track = 80; }), 'archR').verdict]).toBeGreaterThan(rank[part(DESIGN_F355, 'archR').verdict]);
+    expect(rank[part(tweak(DESIGN_F355, d => { d.body.ride = -30; }), 'archR').verdict]).toBeGreaterThan(rank[part(DESIGN_F355, 'archR').verdict]);
+  });
+});
+
+describe('the body\'s dimensions in the physics (E1)', () => {
+  const S = (f: (d: Design) => void, d0 = DESIGN_NSX) => designSpec(tweak(d0, f)), n = designSpec(DESIGN_NSX);
+  it('a lower roof less drag and a lower centre of gravity; a higher ride more of both; a raked screen and a long tail less drag', () => {
+    expect(dragArea(S(d => { d.body.roof = -60; }))).toBeLessThan(dragArea(n)); expect(S(d => { d.body.roof = -60; }).cgH).toBeLessThan(n.cgH);
+    expect(dragArea(S(d => { d.body.ride = 40; }))).toBeGreaterThan(dragArea(n)); expect(S(d => { d.body.ride = 40; }).cgH).toBeGreaterThan(n.cgH + 0.03);
+    expect(dragArea(S(d => { d.body.rake = 6; }))).toBeLessThan(dragArea(n)); expect(dragArea(S(d => { d.body.overhangR = 200; }))).toBeLessThan(dragArea(n));
+  });
+  it('a bigger body is heavier; the track goes into the physics; the cabin forward moves the weight forward', () => {
+    expect(S(d => { d.body.overhangF = 150; d.body.overhangR = 150; }).mass).toBeGreaterThan(n.mass); expect(S(d => { d.body.roof = 60; }).mass).toBeGreaterThan(n.mass);
+    expect(S(d => { d.body.track = 60; }).track).toBeCloseTo(n.track + 0.06, 6); expect(S(d => { d.body.cabin = 120; }).frontShare).toBeGreaterThan(n.frontShare);
+  });
+});

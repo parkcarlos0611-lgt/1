@@ -312,7 +312,7 @@ export function engineScreen(ctx: ShellCtx): Screen<EngineParams> & { readonly a
   function setCut(on: boolean) { cut.on = on; cutBtn.setAttribute('aria-pressed', String(on)); viewBox.classList.toggle('gh-cutting', on); cutBar.hidden = !on; tip.hidden = true;
     if (on) { if (view.explode) { view.explode = false; view.k = 0; exBtn.setAttribute('aria-pressed', 'false'); }
       if (!cut.crank) cut.crank = E().redline >= 8000 ? 'flat' : 'cross';
-      const flat = E().layout[0] === 'F'; view.ang = flat ? 1.0 : 1.35; view.pitch = flat ? 46 : 24; view.zoom = 1.0; }   // an in-line engine or a V from the open side (a V's near bank opened to its crankcase), a flat one from above
+      const flat = E().layout[0] === 'F'; view.ang = flat ? 1.0 : 1.35; view.pitch = flat ? 46 : 24; view.zoom = 0.8; }   // an in-line engine or a V from the open side (a V's near bank opened to its crankcase), a flat one from above
     syncCut(); dirty = true; }
   function syncCut() { for (const b of speedBtns) b.setAttribute('aria-pressed', String(b.dataset.speed === cut.speed)); handRow.hidden = cut.speed !== 'manual'; handRow.style.display = cut.speed === 'manual' ? '' : 'none';
     const v8 = E().layout === 'V8'; crankRow.style.display = v8 ? '' : 'none'; for (const b of crankBtns) b.setAttribute('aria-pressed', String(b.dataset.crank === cut.crank));

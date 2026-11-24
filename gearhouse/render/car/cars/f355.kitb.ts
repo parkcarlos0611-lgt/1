@@ -51,7 +51,7 @@ export const F355_KIT: CarKit = {
   },
   section: {
     // the door's two points are the side scoop's top and foot edges
-    shoulder: { reach: 0.6, drop: 0.12, lift: 0.45 }, door: [0.12, 0.75], step: 238, face: 190, tuck: 108,
+    shoulder: { reach: 0.6, drop: 0.12, lift: 0.45 }, door: [0.12, 0.8], step: 238, face: 190, tuck: 108,
     inset: [[250, 14], [238, 26], [190, 36], [118, 46], [108, 90]],
     // the tail's lines: the lip's top edge, its trailing roll and under-edge, the lamp panel's top, middle and foot, the
     // bumper's top edge, the plate's top and foot, the lower grille's top, its foot, the tuck
@@ -82,7 +82,7 @@ export const F355_KIT: CarKit = {
     louvre: { open: [2975, 3970], depth: 620, slots: { from: 3085, pitch: 77, n: 12, width: 35, y: [190, 450], long: 60, wall: 26 }, panel: { x: [3200, 3580], half: 205, rise: 22, inset: 30 } } },
   // rows across: the corner, the opening's slanting end (3 rows), the lamps' blocks (0.92-0.735, 0.735-0.545), the band's end 0.69, the plate 0.33
   tail: { kind: 'ducktail', shares: [1, 0.985, 0.96, 0.92, 0.735, 0.69, 0.545, 0.33, 0.2, 0], reach: [4075, 4118, 4137, 4140, 4184, 4199, 4250, 4255, 4225, 4205, 4183, 4150],
-    pow: [5, 3.8], split: 5, frameRows: 6, opening: [3, 2, 1], lampIn: 22, valIn: 30, plateRows: [7, 9], plateDepth: 14, band: [5, 9] },
+    pow: [5, 3.8], split: 5, frameRows: 6, opening: [3, 2, 1], lampIn: 22, valIn: 30, plateRows: [7, 9], plateDepth: 14, band: [5, 9], cutouts: [6, 7] },
   // two round lamps a side sunk in the panel (the outer bright red, the inner dark), the horse between
   tailLamps: { badge: { dark: [0, 690, 760, 3], bright: [17, 690, 752, 4] },
     sunk: { blocks: [[3, 4], [4, 6]], y: [730, 565], z: 707, r: 64, depth: 30, seg: 14, rim: 8, names: ['tailLamp', 'stopLamp'], colours: ['red', 'smoke'] } },
@@ -94,13 +94,13 @@ export const F355_KIT: CarKit = {
     bulkhead: { dx: 6, at: 0.3, inset: [0.985, 7], col: 6, window: [905, 1090], hub: 955, shelf: 190 } },
   repeater: [1396, 1426, 598, 628],
   // the dark sill slot under the scoop
-  flankPatches: [['sillSlot', 'dark', 0.05, 1900, 2600, 202, 236]],
+  flankPatches: [['sillSlot', 'seam', 0.2, 1900, 2600, 202, 236]],
   // the oval grille (rows 0-3, lines 462-308) with its bars and the horse, the round fog lamps under the turn lamps' slots
   intakes: { centre: { rows: 3, cols: [5, 7], depth: 90, bars: [-285, -140, 0, 140, 285], barX: 46, barZ: [314, 456], slats: { z: [348, 386, 424], half: 400 }, badge: [15, 356, 416], fillets: [[3, 7, -1, -1]], fillet: 0.92 },
     fog: { rows: [3, 5], cols: [6, 8], y: 505, z: 292, r: 50, depth: 28, seg: 12 } },
   bumperLamps: { from: 4, split: 5, to: 6, col: 5, depth: 32, amberFirst: true },
   plate: [4243, 4249, -255, 255, 432, 540],
-  exhaust: { x: [4150, 4262, 4200], r: [40, 33], y: [-490, -360, 360, 490], z: 268, seg: 10, cap: 2 },
+  exhaust: { x: [4150, 4242, 4192], r: [40, 33], y: [-490, -360, 360, 490], z: 268, seg: 10, cap: 2 },
   // the longitudinal V8: bellhousing at 3800, pulleys forward, the red intakes under the slats
   engine: { spec: ENGINES.f355!, at: [3800, 0, 418], opts: { dir: '-x', box: { len: 600, wid: 880, hgt: 560 }, detail: 2 } },
   mirror: { at: [1745, 890, 905], head: [[1660, 870], [1700, 838], [1810, 832], [1846, 900], [1836, 968], [1740, 978]], loft: [[830, 0.55, -20], [870, 0.95, -6], [985, 1, 0], [1005, 0.8, 0]], stalk: [[1640, 770, 800], [1720, 835, 870], 50, 24], glass: [[1847, 870, 846], [1850, 990, 962]] },

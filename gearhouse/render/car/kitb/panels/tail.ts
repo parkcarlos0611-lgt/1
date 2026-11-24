@@ -52,8 +52,10 @@ export function tail(x: Ctx): void {
   e.name('bumperR'); paint(); e.cells(TLG.slice(0, a5 + 1).map(r => [r[P.LAMP_FOOT]!, r[P.BUMPER]!])); e.cells(TLG.slice(a5).map((r, i) => [LG[i + a5]![P.LAMP_FOOT]!, r[P.BUMPER]!])); e.tri2(TLG[a5]![P.LAMP_FOOT]!, LG[a5]![P.LAMP_FOOT]!, TLG[a5]![P.BUMPER]!, [0, -1, 0.5]);
   e.cells(TLG, (i, q) => (q >= P.BUMPER && q < P.VALANCE && !plate(i, q)) || (q >= P.VALANCE && i < FR));
   e.wall(TLG.slice(FR).map(r => r[P.VALANCE]!), VG.slice(FR).map(r => r[P.VALANCE]!), [0, 0, -1]); e.wall(TLG[FR]!.slice(P.VALANCE), VG[FR]!.slice(P.VALANCE), [0, -1, 0]);
-  e.name('valance').mat(c.trim, 0.15); e.cells(VG, (i, q) => q >= P.VALANCE && i >= FR && !(q === P.VALANCE && i > FR));
-  e.name('valance').mat(c.dark, 0.05, 'grille'); e.cells(VG, (i, q) => q === P.VALANCE && i > FR);
+  // the valance: dark trim with a grille across it; or, with cut-outs, in the body's colour and dark only in those rows (round the exhausts)
+  const cut2 = T.cutouts, hole = (i: number, q: number) => q === P.VALANCE && (cut2 ? i >= cut2[0] && i < cut2[1] : i > FR);
+  e.name('valance'); if (cut2) paint(); else e.mat(c.trim, 0.15); e.cells(VG, (i, q) => q >= P.VALANCE && i >= FR && !hole(i, q));
+  e.name('valance').mat(c.dark, 0.05, 'grille'); e.cells(VG, hole);
   // the plate's recess in the bumper's face
   const rows = TLG.slice(p0, p1 + 1), r: V[] = [...rows.map(q => q[P.PLATE_TOP]!).reverse(), ...rows.map(q => q[P.PLATE_FOOT]!)]; e.name('bumperR'); e.pocket([...r, ...r.slice(1, -1).reverse().map(q => mir(q, -1))], [-T.plateDepth, 0, 0], [1, 0, 0], c.dark);
 }

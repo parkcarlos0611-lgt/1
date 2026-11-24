@@ -110,6 +110,8 @@ export interface TailSpec {
    *  swept up into a lip across the tail, the body-coloured lamp panel set in under it between the wings' ends: no blade,
    *  no slot; its lamps sunk in round recesses, see TailLampSpec.sunk); 'capsule', 'cut' for later cars */
   kind: 'frame' | 'roundLamps' | 'ducktail' | 'capsule' | 'cut';
+  /** the valance in the body's colour, dark only in the tail rows from..to (cut-outs round the exhausts) */
+  cutouts?: [number, number];
   /** 'ducktail': a dark band along the lip's trailing face, tail rows from..to */
   band?: [number, number];
   /** the tail's rows going round from the last chain to the centre line (shares of its half-width) */

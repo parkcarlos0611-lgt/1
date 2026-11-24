@@ -21,7 +21,7 @@ export const M = 17, RING = 2 * M;
 /** the section's landmarks: the crest, the arch's lip (the sill's foot elsewhere) */
 export const JK = 6, JLIP = 14;
 /** the end faces' rings: their stations (beyond 0 and 3), how far in the last one is drawn, how far the face bulges */
-const FACE = [0.25, 0.5, 0.75, 1], KMIN = 0.2, BULGE = 30;
+const FACE = [0.12, 0.3, 0.55, 0.8, 1], KMIN = 0.2;
 
 export interface Mat { name: string; colour: string; gloss: number; kind: Kind }
 /** the body's colours by role */
@@ -40,7 +40,10 @@ export class Shell { pos: V[] = []; tri: number[] = []; tmat: number[] = []; mat
   v(p: V): number { this.pos.push(p); return this.pos.length - 1; }
   t(a: number, b: number, c: number, m: number): void { this.tri.push(a, b, c); this.tmat.push(m); }
   /** a quad cut along its shorter diagonal */
-  q(a: number, b: number, c: number, d: number, m: number): void { const P = this.pos; if (len(sub(P[a]!, P[c]!)) <= len(sub(P[b]!, P[d]!))) { this.t(a, b, c, m); this.t(a, c, d, m); } else { this.t(a, b, d, m); this.t(b, c, d, m); } }
+  q(a: number, b: number, c: number, d: number, m: number): void { const P = this.pos, nn = (p: V, q: V, r: V) => un(cross(sub(q, p), sub(r, p)));
+    // cut along the diagonal that folds the quad less (as the kit's cells are), so a gently curved panel shades evenly
+    const ac = dot(nn(P[a]!, P[b]!, P[c]!), nn(P[a]!, P[c]!, P[d]!)), bd = dot(nn(P[a]!, P[b]!, P[d]!), nn(P[b]!, P[c]!, P[d]!));
+    if (ac >= bd - 1e-6 || len(sub(P[b]!, P[d]!)) < 1e-6) { this.t(a, b, c, m); this.t(a, c, d, m); } else { this.t(a, b, d, m); this.t(b, c, d, m); } }
 }
 
 export class Body {
@@ -53,8 +56,8 @@ export class Body {
   constructor(readonly sil: Silhouette, readonly col: Colours = COLOURS) {
     const ch = sil.chassis; this.R = resolve(sil); this.L = lengthOf(ch);
     const hwAt = (s: number) => Math.max(260, this.R.half(s));
-    this.wheels = [1, 2].map(s => { const w = ch.tyreW, y = hwAt(s) - w / 2 - 12; return { x: xOf(ch, s), y, r: ch.r, w, rim: ch.rim, front: s === 1 }; });
-    this.arches = this.wheels.map(w => ({ x: w.x, hz: w.r, ra: w.r + 48, yin: Math.max(150, w.y - w.w / 2 - 32) }));
+    this.wheels = [1, 2].map(s => { const w = ch.tyreW, y = hwAt(s) - w / 2 - 4; return { x: xOf(ch, s), y, r: ch.r, w, rim: ch.rim, front: s === 1 }; });
+    this.arches = this.wheels.map(w => ({ x: w.x, hz: w.r, ra: w.r + 30, yin: Math.max(150, w.y - w.w / 2 - 30) }));
     for (const f of [...FACE].reverse()) this.ringS.push(-f);
     for (const x of this.stationXs()) this.ringS.push(sOf(ch, x));
     for (const f of FACE) this.ringS.push(3 + f);
@@ -70,7 +73,7 @@ export class Body {
   /** the stations along the car (mm): close at the nose and tail, every 15 degrees round each arch with the arch's
    *  ends doubled 1 mm apart, the landmarks, and no gap longer than 160 mm */
   private stationXs(): number[] { const L = this.L, a = this.arches, xs: number[] = [], m = this.sil.marks, ch = this.sil.chassis;
-    const fill = (x0: number, x1: number, step = 160) => { const n = Math.max(1, Math.ceil((x1 - x0) / step)); for (let k = 0; k <= n; k++) xs.push(x0 + (x1 - x0) * k / n); };
+    const fill = (x0: number, x1: number, step = 125) => { const n = Math.max(1, Math.ceil((x1 - x0) / step)); for (let k = 0; k <= n; k++) xs.push(x0 + (x1 - x0) * k / n); };
     const n0 = a[0]!.x - a[0]!.ra - 0.5, t0 = a[1]!.x + a[1]!.ra + 0.5;
     let x0 = 0; for (const x of [0, 18, 50, 100, 170, 260]) if (x < n0 - 60) { xs.push(x); x0 = x; } fill(x0, n0);
     for (const A of a) { xs.push(A.x - A.ra - 0.5, A.x - A.ra + 0.5, A.x + A.ra - 0.5, A.x + A.ra + 0.5); for (let d = 15; d < 180; d += 15) xs.push(A.x - A.ra * Math.cos(d * Math.PI / 180)); }
@@ -114,7 +117,7 @@ export class Body {
 
   /** a ring's section at any station: the true section on the body, drawn in toward the end face's middle beyond it */
   ring(s: number): Sect { if (s >= 0 && s <= 3) return this.sect(s);
-    const S = this.sect(s < 0 ? 0 : 3), f = s < 0 ? -s : s - 3, k = 1 - f * (1 - KMIN), dx = (s < 0 ? -1 : 1) * BULGE * Math.sqrt(1 - k) / Math.sqrt(1 - KMIN);
+    const S = this.sect(s < 0 ? 0 : 3), f = s < 0 ? -s : s - 3, k = 1 - f * (1 - KMIN), bulge = Math.max(30, Math.min(160, 40 + (6 - this.R.round(s < 0 ? 0 : 3)) * 32)), dx = (s < 0 ? -1 : 1) * bulge * Math.sqrt(1 - k * k) / Math.sqrt(1 - KMIN * KMIN);
     return { ...S, arch: false, clamped: S.pts.map(() => false), pts: S.pts.map(p => [p[0] + dx, p[1] * k, S.zc + (p[2] - S.zc) * k] as V) }; }
 
   /** the skin's point at station s (-1..4) and share a round the right half (0 the top's centre, 1 the floor's) */
@@ -136,8 +139,8 @@ export class Body {
   cellMat(i: number, jr: number): number { const sh = this.shell, c = this.col, A = this.sects[i]!, B = this.sects[i + 1]!, s = (this.ringS[i]! + this.ringS[i + 1]!) / 2, m = this.sil.marks, cap = Math.min(A.cap, B.cap) > 0.5;
     const paint = sh.mat('paint', c.paint, 0.35, 'paint'), glass = sh.mat('glass', c.glass, 0.6, 'glass'), black = sh.mat('black', c.black, 0.3, 'paint'), dark = sh.mat('well', c.dark, 0.05), under = sh.mat('under', c.under, 0.05);
     const face = this.ringS[i]! < 0 || this.ringS[i + 1]! > 3;
-    if (jr >= JLIP) return !face && (A.arch || B.arch) && jr < M - 1 ? dark : under;
-    if (face) return paint;
+    if (face) return jr >= M - 1 ? under : paint;
+    if (jr >= JLIP) return (A.arch || B.arch) && jr < M - 1 ? dark : under;
     if (jr <= 2) return cap && s > m.screen && s < m.roofF ? glass : cap && s >= m.roofF && s <= m.roofB ? (this.sil.roofBlack ? black : paint) : cap && s > m.roofB && s < m.glass ? glass : paint;
     if (jr <= JK - 1) return cap && s > m.screen && s < m.sideEnd ? glass : cap && this.sil.roofBlack && s >= m.sideEnd && s < m.glass ? black : paint;
     // the arch's upright edge: the cells between its two close stations, below the lip, are the well's end wall
@@ -149,7 +152,7 @@ export class Body {
     for (let i = 0; i + 1 < n; i++) for (let j = 0; j < RING; j++) { if (this.removed.has(i * RING + j)) continue; const jr = j < M ? j : RING - 1 - j;
       sh.q(this.vid(i, j), this.vid(i + 1, j), this.vid(i + 1, j + 1), this.vid(i, j + 1), this.cellMat(i, jr)); }
     const pf = sh.mat('paint', this.col.paint, 0.35, 'paint'), un0 = sh.mat('under', this.col.under, 0.05);
-    for (let j = 0; j < RING; j++) { const jr = j < M ? j : RING - 1 - j, m = jr >= JLIP ? un0 : pf; sh.t(this.noseC, this.vid(0, j), this.vid(0, j + 1), m); sh.t(this.tailC, this.vid(n - 1, j), this.vid(n - 1, j + 1), m); } }
+    for (let j = 0; j < RING; j++) { const jr = j < M ? j : RING - 1 - j, m = jr >= M - 1 ? un0 : pf; sh.t(this.noseC, this.vid(0, j), this.vid(0, j + 1), m); sh.t(this.tailC, this.vid(n - 1, j), this.vid(n - 1, j + 1), m); } }
 }
 
 /** the shell's edges: those one triangle uses (open) and those more than two use (over-used) */

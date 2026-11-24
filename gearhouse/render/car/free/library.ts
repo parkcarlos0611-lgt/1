@@ -18,8 +18,8 @@ function band(b: Build, c: FixCtx, p: number, q: number, r0: number, w0: number,
   b.quad(c.at(p + Math.cos(a0) * r0, q + Math.sin(a0) * r0, w0), c.at(p + Math.cos(a1) * r0, q + Math.sin(a1) * r0, w0), c.at(p + Math.cos(a1) * r1, q + Math.sin(a1) * r1, w1), c.at(p + Math.cos(a0) * r1, q + Math.sin(a0) * r1, w1)); } }
 
 // ---- the EB110's head lamp ----
-const EB_FP = rounded([[-215, -80], [-240, 88], [205, 70], [190, -38]], 48, 4), ebDepth = (p: number) => 48 + 22 * sm(-200, 200, p);
-export const EB110_LAMP: FixtureDef = { id: 'eb110Lamp', name: 'EB110 헤드램프 포켓', source: 'EB110', category: '헤드램프', kind: 'cut', defaults: { s: 0.46, a: 0.25, scale: 1.15, mirror: true },
+const EB_FP = rounded([[-215, -80], [-240, 88], [205, 70], [190, -38]], 48, 4), ebDepth = (p: number) => 66 + 30 * sm(-200, 200, p);
+export const EB110_LAMP: FixtureDef = { id: 'eb110Lamp', name: 'EB110 헤드램프 포켓', source: 'EB110', category: '헤드램프', kind: 'cut', defaults: { s: 0.46, a: 0.25, scale: 1.3, mirror: true },
   cuts: () => [{ footprint: EB_FP, depth: p => ebDepth(p), taper: 0.07, wall: ['#161616', 0.1], back: ['#232628', 0.2] }],
   parts: (c, b) => { const d = (p: number) => -ebDepth(p) * c.depth;
     for (const [p, r] of [[-115, 60], [55, 52]] as const) { b.name('lampF').mat('#cfd3d6', 0.85, 'metal'); band(b, c, p, 8, r + 10, d(p) + 2, r, d(p) + 16);
@@ -28,12 +28,12 @@ export const EB110_LAMP: FixtureDef = { id: 'eb110Lamp', name: 'EB110 헤드램�
     b.name('lampCover').mat('#d8e4ea', 0.9, 'glass'); const o = c.at(-10, 10, 1.5); for (let k = 0; k < EB_FP.length; k++) { const A = EB_FP[k]!, B = EB_FP[(k + 1) % EB_FP.length]!; b.tri(o, c.at(A[0], A[1], 1.5), c.at(B[0], B[1], 1.5)); } } };
 
 // ---- the F355's round tail lamps ----
-const TL = { cx: 95, r: 66, pod: 86, podDepth: 12, well: 42 };
+const TL = { cx: 95, r: 66, pod: 86, podDepth: 16, well: 55 };
 /** the pod's outline: two half circles joined by straight runs, its top and bottom middles points of their own */
 function stadium(cx: number, R: number): { fp: P2[]; top: number; bot: number } { const fp: P2[] = []; const arc = (x: number, a0: number, a1: number, n: number) => { for (let k = 0; k <= n; k++) { const a = a0 + (a1 - a0) * k / n; fp.push([x + Math.cos(a) * R, Math.sin(a) * R]); } };
   arc(cx, -Math.PI / 2, Math.PI / 2, 8); fp.push([cx / 2, R]); const top = fp.length; fp.push([0, R], [-cx / 2, R]); arc(-cx, Math.PI / 2, Math.PI * 1.5, 8); fp.push([-cx / 2, -R]); const bot = fp.length; fp.push([0, -R], [cx / 2, -R]); return { fp, top, bot }; }
 const TL_FP = stadium(TL.cx, TL.pod);
-export const F355_TAIL_LAMPS: FixtureDef = { id: 'f355TailLamps', name: 'F355 둥근 테일램프', source: 'F355', category: '테일램프', kind: 'cut', defaults: { face: 'tail', y: 0.6, z: 0.6, scale: 1.1, mirror: true },
+export const F355_TAIL_LAMPS: FixtureDef = { id: 'f355TailLamps', name: 'F355 둥근 테일램프', source: 'F355', category: '테일램프', kind: 'cut', defaults: { face: 'tail', y: 0.6, z: 0.6, scale: 1.2, mirror: true },
   cuts: () => [{ footprint: TL_FP.fp, plug: (c, rim, fp) => { const k = 0.96, w0 = -TL.podDepth * c.depth, wall = c.mat('pod', '#141414', 0.15), back = c.mat('pod', '#141414', 0.15), dark = c.mat('well', '#0e0e0e', 0.1), lens = c.mat('lensR', '#b0161a', 0.65, 'lens');
     // the pod: its wall sunk from the rim, its back split down the middle into two halves, each zipped round its well
     const ring = fp.map(([p, q]) => c.vtx(p * k, q * k, w0)); for (let i = 0; i < rim.length; i++) { const j = (i + 1) % rim.length; c.tri(rim[i]!, rim[j]!, ring[j]!, wall); c.tri(rim[i]!, ring[j]!, ring[i]!, wall); }
@@ -50,8 +50,8 @@ export const F355_TAIL_LAMPS: FixtureDef = { id: 'f355TailLamps', name: 'F355 �
     b.name('reverse').mat('#f2f2ee', 0.7, 'lens'); disc(b, c, -TL.cx, 0, w0 - TL.well * c.depth + 10, 20, 10); } };
 
 // ---- the NSX's side intake ----
-const DUCT_FP = rounded([[-255, 112], [-135, -112], [232, -112], [232, 112]], 46, 4), ductDepth = (p: number) => 22 + 150 * sm(-255, 232, p);
-export const NSX_DUCT: FixtureDef = { id: 'nsxDuct', name: 'NSX 측면 흡기 덕트', source: 'NSX', category: '흡기·덕트', kind: 'cut', defaults: { s: 1.68, a: 0.5, mirror: true },
+const DUCT_FP = rounded([[-255, 112], [-135, -112], [232, -112], [232, 112]], 46, 4), ductDepth = (p: number) => 40 + 190 * sm(-255, 232, p);
+export const NSX_DUCT: FixtureDef = { id: 'nsxDuct', name: 'NSX 측면 흡기 덕트', source: 'NSX', category: '흡기·덕트', kind: 'cut', defaults: { s: 1.66, a: 0.58, scale: 1.2, mirror: true },
   cuts: () => [{ footprint: DUCT_FP, depth: p => ductDepth(p), taper: 0.12, wall: ['#2a2826', 0.05], back: ['#111111', 0.05, 'grille'] }],
   parts: (c, b) => { b.name('ductFin').mat('#191919', 0.1); for (const q of [-52, 0, 52]) { const a = c.at(-30, q, -ductDepth(-30) * c.depth * 0.55), e = c.at(215, q, -ductDepth(215) * c.depth * 0.5); b.bar(a, e, 12, 36); } } };
 

@@ -24,7 +24,7 @@ export interface Chassis { front: number; wheelbase: number; rear: number; r: nu
 /** landmarks along the car (stations s): the screen's foot, the roof's front and back, the rear glass's foot, where the
  *  side glass ends, the door's front and back */
 export interface Marks { screen: number; roofF: number; roofB: number; glass: number; sideEnd: number; door: [number, number] }
-export interface Silhouette { name: string; chassis: Chassis; curves: Record<CurveName, Tab>; marks: Marks; /** a black roof panel (the NSX's) */ roofBlack?: boolean }
+export interface Silhouette { name: string; chassis: Chassis; curves: Record<CurveName, Tab>; marks: Marks; /** a black roof panel (the NSX's) */ roofBlack?: boolean; /** whose wheels it wears */ wheel?: 'nsx' | 'f355' | 'eb110' }
 
 export const lengthOf = (c: Chassis) => c.front + c.wheelbase + c.rear;
 /** a station's place along the car (mm from the nose) */
@@ -48,13 +48,13 @@ const lerpChassis = (a: Chassis, b: Chassis, t: number): Chassis => ({ front: le
 /** a silhouette between two: t 0 is a, 1 is b */
 export function blend(a: Silhouette, b: Silhouette, t: number): Silhouette { const A = resolve(a), B = resolve(b), curves = {} as Record<CurveName, Tab>;
   for (const n of CURVES) curves[n] = union([a.curves[n], b.curves[n]]).map(s => [s, lerp(A[n](s), B[n](s), t)]);
-  return { name: `${a.name} ${Math.round((1 - t) * 100)}% + ${b.name} ${Math.round(t * 100)}%`, chassis: lerpChassis(a.chassis, b.chassis, t), curves, marks: lerpMarks(a.marks, b.marks, t), roofBlack: t < 0.5 ? a.roofBlack : b.roofBlack }; }
+  return { name: `${a.name} ${Math.round((1 - t) * 100)}% + ${b.name} ${Math.round(t * 100)}%`, chassis: lerpChassis(a.chassis, b.chassis, t), curves, marks: lerpMarks(a.marks, b.marks, t), roofBlack: t < 0.5 ? a.roofBlack : b.roofBlack, wheel: t < 0.5 ? a.wheel : b.wheel }; }
 
 // ---- shape pieces ----
 export type PieceKind = 'nose' | 'cabin' | 'tail';
 /** a shape piece: a silhouette's curves over its window (kept a margin beyond it, so the blend at a join reads the
  *  piece's own shape), and, for a cabin, the glasshouse's landmarks */
-export interface ShapePiece { id: string; name: string; source: string; kind: PieceKind; window: [number, number]; curves: Record<CurveName, Tab>; marks?: Marks; roofBlack?: boolean; chassis: Chassis }
+export interface ShapePiece { id: string; name: string; source: string; kind: PieceKind; window: [number, number]; curves: Record<CurveName, Tab>; marks?: Marks; roofBlack?: boolean; wheel?: Silhouette['wheel']; chassis: Chassis }
 /** where the pieces meet by default: the nose ends behind the front axle, the tail starts ahead of the rear axle */
 export const JOINS: [number, number] = [1.2, 2.05];
 const WINDOW: Record<PieceKind, (j: [number, number]) => [number, number]> = { nose: j => [0, j[0]], cabin: j => [j[0], j[1]], tail: j => [j[1], 3] };
@@ -63,7 +63,7 @@ const PIECE_NAMES: Record<PieceKind, string> = { nose: '앞코', cabin: '캐빈'
 export function pieceOf(sil: Silhouette, kind: PieceKind, joins = JOINS, margin = 0.45): ShapePiece { const R = resolve(sil), w = WINDOW[kind](joins), curves = {} as Record<CurveName, Tab>;
   for (const n of CURVES) { const lo = w[0] - margin, hi = w[1] + margin, inside = sil.curves[n].filter(p => p[0] >= lo && p[0] <= hi);
     curves[n] = union([inside], [Math.max(-0.01, lo), Math.min(3.01, hi)]).filter(s => s >= lo - 1e-9 && s <= hi + 1e-9).map(s => [s, R[n](s)]); }
-  return { id: `${sil.name}:${kind}`, name: `${sil.name} ${PIECE_NAMES[kind]}`, source: sil.name, kind, window: w, curves, marks: kind === 'cabin' ? sil.marks : undefined, roofBlack: sil.roofBlack, chassis: sil.chassis }; }
+  return { id: `${sil.name}:${kind}`, name: `${sil.name} ${PIECE_NAMES[kind]}`, source: sil.name, kind, window: w, curves, marks: kind === 'cabin' ? sil.marks : undefined, roofBlack: sil.roofBlack, wheel: sil.wheel, chassis: sil.chassis }; }
 /** pieces joined into one silhouette: each curve the sum of the pieces' curves weighed by smooth windows that cross
  *  over `width` (in s) at each join; the landmarks from the cabin; the running gear given, or the cabin's */
 export function joinPieces(nose: ShapePiece, cabin: ShapePiece, tail: ShapePiece, o: { chassis?: Chassis; width?: number } = {}): Silhouette { const bw = o.width ?? 0.3, j0 = cabin.window[0], j1 = cabin.window[1];
@@ -72,7 +72,7 @@ export function joinPieces(nose: ShapePiece, cabin: ShapePiece, tail: ShapePiece
   for (const n of CURVES) { const f = ps.map(p => p.curves[n].length > 1 ? curve(p.curves[n]) : () => p.curves[n][0]![1]);
     curves[n] = union([nose.curves[n].filter(p => p[0] <= j0 + bw), cabin.curves[n].filter(p => p[0] >= j0 - bw && p[0] <= j1 + bw), tail.curves[n].filter(p => p[0] >= j1 - bw)], extra)
       .map(s => { const a = wN(s), c = wT(s), b = Math.max(0, 1 - a - c); return [s, a * f[0]!(s) + b * f[1]!(s) + c * f[2]!(s)]; }); }
-  return { name: `${nose.name} + ${cabin.name} + ${tail.name}`, chassis: o.chassis ?? cabin.chassis, curves, marks: cabin.marks!, roofBlack: cabin.roofBlack }; }
+  return { name: `${nose.name} + ${cabin.name} + ${tail.name}`, chassis: o.chassis ?? cabin.chassis, curves, marks: cabin.marks!, roofBlack: cabin.roofBlack, wheel: cabin.wheel }; }
 
 // ---- dragging ----
 /** the curve pushed by dv at station s under a smooth bump `width` wide (in s); a keypoint is added at s when none is near */

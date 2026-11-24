@@ -14,15 +14,17 @@
 //   flank       a chain of twelve points at every station: the belt (or the wing's crest) K, a rounded shoulder down to
 //               the widest line H (the door's soft crease, which runs into the side intake), the sill's crease, the foot;
 //               the arches are cut by clamping the chain to the arch's height; the intake is cut in behind the door
-//   tail        the flank's chain carried round the corner: the spoiler's trailing edge bridging the wings, the dark slot
-//               under it, the full-width black lamp band leaning forward, the ledge, the bumper, the black valance
+//   tail        ONE frame seen from behind: the spoiler's blade across the top runs into the rear wings' tops, the wings'
+//               rear faces come down the sides, and in the opening they frame the full-width lamp panel sits recessed
+//               and upright, an open slot between its top and the blade (the deck shows through); under it the
+//               bumper, a wide box standing proud with a crisp ledge and a plate recess; a dark valance let into its foot
 //   inside      the cabin (dash, tunnel, two seats, the bulkhead with its small window) and, under the rear glass, a
 //               dark engine bay with the transverse V6 of render/car/enginemesh.ts
 // Axes: x from the nose back, y across, z up; mm. Axles at 930 and 3460. `lamps` 0..1 raises the head lamp pods.
 import { Build, type Mesh, type V } from './mesh';
 import { addEngine, ENGINES } from './enginemesh';
 
-const PAINT = '#c8141e', GLOSS = 0.6, SMOKE = '#5a0c10', BLACK = '#0c0c0f', FRAME = '#14151a', DARK = '#131318', TRIM = '#25272d', GLASS = '#a9c2cc', SILVER = '#c9ccd0', CHROME = '#d4d6d9', RUBBER = '#26242b';
+const PAINT = '#c8141e', GLOSS = 0.6, SMOKE = '#5a0c10', SHADE = '#1e0508', BLACK = '#0c0c0f', FRAME = '#14151a', DARK = '#131318', TRIM = '#25272d', GLASS = '#a9c2cc', SILVER = '#c9ccd0', CHROME = '#d4d6d9', RUBBER = '#26242b';
 const LENS = '#eef0f2', RED = '#c9221f', AMBER = '#e8901c', SEAT = '#3a3a40', SEAT2 = '#63636b', SEAM = '#3d070b', WHITE = '#e6e4dc';
 const L = 4405, FX = 930, RX = 3460, RF = 293, RR = 316, WYF = 755, WYR = 765, TWF = 205, TWR = 225;       // the axles, the tyres' radii, half the tracks, the tyres' widths
 const RAF = 355, RAR = 352, YINF = 560, YINR = 630;                                                          // the arches' radii, the wells' inner walls
@@ -69,9 +71,10 @@ const YS = curve([[XR1, YD], [2750, 600], [2820, 672], [2890, 722], [XQ, 752]]),
 const GY = curve([[XQ, 752], [3040, 712], [3108, 694], [3200, 675], [3300, 645], [3400, 590], [3460, 520], [3495, 440], [3512, 350], [XG, 230]]);
 const glassEdge = (x: number): V => x <= XQ ? [x, YS(x), ZS(x)] : [x, GY(x), zK(x)];
 const glassPt = (x: number, sh: number): V => { const e = glassEdge(x); return [x, e[1] * sh, ZR(x) - (ZR(x) - e[2]) * sh ** CP]; };
-/** the deck: the boot lid a shallow trough between the wings' ridges, rising into the spoiler's flat top */
-const ZD = curve([[XG, 880], [3600, 876], [3700, 874], [3800, 875], [3900, 879], [4000, 886], [4100, 893], [4200, 897], [4300, 897]]);   // review 155: no trough between the glass's foot and the spoiler: the line runs on smoothly into the spoiler's top
-const zDeck = (x: number, y: number) => { const zc = x <= XG ? zK(x) : ZD(x); return zc + (zK(x) - zc) * sm(600, 715, y); };
+/** the deck: the boot lid a flat floor between the wings, sinking a little toward the tail (the wings' ridges rise past it into the
+ *  spoiler's ends, so the side view keeps the ridge's line); its edge up to the ridge steepens backward into the spoiler's end */
+const ZD = curve([[XG, 880], [3600, 875], [3700, 866], [3850, 855], [4000, 845], [4150, 838], [4300, 828]]);
+const zDeck = (x: number, y: number) => { const zc = x <= XG ? zK(x) : ZD(x), u = sm(3900, 4150, x); return zc + (zK(x) - zc) * sm(lerp(600, 590, u), lerp(715, 604, u), y); };
 /** the wheel arches: round, over each hub */
 const archZ = (x: number) => Math.abs(x - FX) < RAF - 0.5 ? RF + Math.sqrt(RAF * RAF - (x - FX) ** 2) : Math.abs(x - RX) < RAR - 0.5 ? RR + Math.sqrt(RAR * RAR - (x - RX) ** 2) : 0;
 
@@ -86,8 +89,10 @@ const inset = (x: number, z: number, zH: number) => { const std = z >= 355 ? 14 
 /** the flank's skin at station x and height z */
 function surf(x: number, z: number): V { const K: V = [x, yK(x), zK(x)], H: V = [x, W(x), ZW(x)]; if (z >= K[2]) return K; if (z < H[2]) return [x, H[1] - inset(x, z, H[2]), z];
   let lo = 0, hi = 1; for (let k = 0; k < 24; k++) { const m = (lo + hi) / 2; if (band(K, H, m)[2] > z) lo = m; else hi = m; } return band(K, H, (lo + hi) / 2); }
-/** the heights of the tail's lines (the spoiler's top edge, its lip, its under-edge, the slot's back, the lamp band's top and foot, the bumper's top edge and face, the valance) and how far back each reaches on the centre line */
-const TAILZ = [897, 885, 848, 846, 815, 640, 580, 555, 385, 350, 290, 210], TAILX = [4300, 4303, 4292, 4254, 4258, 4290, 4335, 4396, 4402, 4380, 4340, 4300];
+/** the heights of the tail's lines (the spoiler's top edge, its trailing roll, its under-edge, the lamp panel's top, middle and foot, the
+ *  bumper's top edge, the plate's top and foot, the valance's top, middle and foot) and how far back each reaches on the centre line */
+const TAILZ = [897, 890, 872, 820, 745, 668, 655, 550, 425, 395, 290, 210], TAILX = [4300, 4308, 4298, 4296, 4302, 4310, 4390, 4402, 4403, 4398, 4370, 4320];
+const LAMPIN = 22, VALIN = 35;                                                                               // how far the lamp panel and the valance stand in from the frame
 /** the chain at station x: NK + 1 points from K down to the tuck under the sill (behind the rear wheel its levels move to the tail's); cut by the arches */
 function chain(x: number): V[] { const K: V = [x, yK(x), zK(x)], H: V = [x, W(x), ZW(x)], zH = H[2], u = sm(3700, XT1, x), az = archZ(x), out: V[] = [K];
   const zs = [lerp(zH, 355, 0.38), lerp(zH, 355, 0.72), 355, 338, 230, 125, 118];
@@ -161,9 +166,11 @@ export function nsxMesh(spin = 0, lamps = 0): Mesh { const b = new Build(); lamp
   const NSG: V[][] = noseK.map((K, i) => { const f = i === NN - 1 ? 1 : K[1] / KW, t = sm(0.93, 1, f), ys = f ** lerp(1.15, 1, t), row: V[] = [K, K, K, K];
     for (let k = 4; k <= NK; k++) { const z = lerp(NOSEZ[k]! + (k === 4 ? 10 * f : 0), CJ[k]![2], t); row.push([NOSEX[k]! + (XJ - NOSEX[k]!) * gp(ys, 2.4), CJ[k]![1] * ys, z]); }
     for (let k = 1; k < 4; k++) row[k] = band(K, row[4]!, k / 4); return row; });
-  // the tail: the last chain carried round the corner to the centre line (the upper lines nearly square in plan, the bumper round)
-  const TFR = [1, 0.985, 0.95, 0.88, 0.78, 0.6, 0.45, 0.33, 0.19, 0], NR = TFR.length;
-  const TLG: V[][] = TFR.map(f => CT.map((c, k) => { const p = k <= 5 ? 7 : 2.7; return [XT1 + (TAILX[k]! - XT1) * (1 - f ** p) ** (1 / p), c[1] * f, c[2]] as V; }));
+  // the tail's shell: the last chain carried round the corner to the centre line (the upper lines nearly square in plan, the bumper
+  // rounder); rows 0-5 are the corner and the frame's side, the opening lies inboard; the same shell stood in is the lamp panel and the valance
+  const TFR = [1, 0.985, 0.95, 0.88, 0.8, 0.78, 0.6, 0.45, 0.33, 0.24, 0], NR = TFR.length, tailP = (k: number) => k <= 5 ? 7 : 3.4;
+  const TLG: V[][] = TFR.map(f => CT.map((c, k) => { const p = tailP(k); return [XT1 + (TAILX[k]! - XT1) * (1 - f ** p) ** (1 / p), c[1] * f, c[2]] as V; }));
+  const LG: V[][] = TLG.map(r => r.map(p => [p[0] - LAMPIN, p[1], p[2]] as V)), VG: V[][] = TLG.map(r => r.map(p => [p[0] - VALIN, p[1], p[2]] as V));
   // the canopy: the roof (rows at the stations, bowed forward at the centre), the screen from the front top's last row up to it
   const SR = SF.slice(at(XR0), at(XR1) + 1), RFG: V[][] = SR.map(s => SH.map(sh => { const x = xRoof(s, sh); return [x, sh * YD, ZR(x) - CROWN * sh ** CP] as V; }));
   const VS = [0, 0.07, 0.3, 0.55, 0.8, 0.94, 1], sFoot = TFG[NT - 1]!, sTop = RFG[0]!;
@@ -177,8 +184,11 @@ export function nsxMesh(spin = 0, lamps = 0): Mesh { const b = new Build(); lamp
   const US: V[][] = SU.map(upper);
   // the rear glass: rows from the roof's back edge to its foot, each from the centre line to its edge
   const RGX = [XR1, 2750, 2820, 2890, XQ, 3040, 3108, 3200, 3300, 3400, 3460, 3495, 3512, XG], RGL: V[][] = RGX.map(x => SH.map(sh => glassPt(x, sh)));
-  // the deck behind the glass: rows at the stations, the tail's shares across; its last row is the spoiler's trailing edge
-  const SDK = SF.slice(at(3569)), DC = TFR.slice().reverse(), DKG: V[][] = [...SDK.map(s => DC.map(t => [s, t * yK(s), zDeck(s, t * yK(s))] as V)), TLG.map(r => r[0]!).reverse()];
+  // the deck behind the glass: rows at the stations, the tail's shares across; the lid's last row is the lamp panel's top edge, the wings' the frame's
+  const SDK = SF.slice(at(3569)), DC = TFR.slice().reverse(), DKG: V[][] = [...SDK.map(s => DC.map(t => [s, t * yK(s), zDeck(s, t * yK(s))] as V)), TLG.map((r, i) => i >= 5 ? LG[i]![3]! : r[0]!).reverse()];
+  // the spoiler's blade bridging the wings over the deck's last 150 mm: its top (level with the ridges), its underside, its leading edge
+  const BC = DC.slice(0, 7), BT: V[][] = [...[4150, XT1].map(s => BC.map(t => [s, t * yK(s), zK(s)] as V)), BC.map((_, j) => TLG[NR - 1 - j]![0]!)];
+  const BU: V[][] = [BC.map((_, j) => TLG[NR - 1 - j]![2]!), BC.map(t => [XT1, t * yK(XT1), 878] as V), BC.map(t => [4157, t * yK(4150), 888] as V)];
 
   // ---- the panels: the red body ----
   const iCW = iXJ + at(FX + RAF), iC0 = 3, iC1 = iXJ + at(630), isCowl = (i: number, j: number) => j < 6 && (i > iCW || (i === iCW && j < 3)), isCover = (i: number, j: number) => i >= iC0 && i < iC1 && j >= 4 && j < 6;
@@ -192,13 +202,27 @@ export function nsxMesh(spin = 0, lamps = 0): Mesh { const b = new Build(); lamp
   b.name('sill').mat(PAINT, GLOSS, 'paint'); cells(CH, (i, k) => isSill(i, k));
   b.name('quarter').mat(PAINT, GLOSS, 'paint'); cells(CH, (i, k) => i >= iI0 && !isDoor(i, k) && !isSill(i, k) && !hole(i, k));
   zip([...RGL.slice(4).map(r => r[NC - 1]!), ...RGL[RGL.length - 1]!.slice(0, NC - 1).reverse()], [...SF.slice(at(XQ), at(3569)).map(s => [s, yK(s), zK(s)] as V), ...DKG[0]!.slice().reverse()], UPV);
-  cells(DKG, (i, j) => j >= (i < at(3950) - at(3569) ? 5 : 6));
-  b.name('bootLid').mat(PAINT, GLOSS, 'paint'); cells(DKG, (i, j) => j < 5 && i < at(3950) - at(3569));
-  b.name('spoiler').mat(PAINT, GLOSS, 'paint'); cells(DKG, (i, j) => j < 6 && i >= at(3950) - at(3569)); cells(TLG, (_, k) => k < 2);
-  b.name('bumperR').mat(PAINT, GLOSS, 'paint'); cells(TLG, (i, k) => (k >= 5 && k < 9) || (k >= 9 && i < 3));
-  b.name('valance').mat(TRIM, 0.15); cells(TLG, (i, k) => k >= 9 && i >= 3);
-  b.name('tailSlot').mat(DARK, 0.05); cells(TLG, (_, k) => k === 2 || k === 3);
-  b.name('tailBand').mat(SMOKE, 0.85); cells(TLG, (_, k) => k === 4);   /* review 154: the band is smoked red lens across the full width (the photographs), not black */
+  const iBl = at(4150) - at(3569);   // the deck's rows under the blade lie in its shade
+  cells(DKG, (i, j) => j >= 6 || (j === 5 && i < iBl));
+  b.name('bootLid').mat(PAINT, GLOSS, 'paint'); cells(DKG, (i, j) => j < 5 && i < iBl);
+  b.name('tailSlot').mat(SHADE, 0.3, 'paint'); cells(DKG, (i, j) => j < 6 && i >= iBl);
+  // the tail, volume by volume. The frame: the blade (top, trailing edge, underside, leading edge) and the wings' rear faces down to the bumper
+  const wall = (A: V[], B: V[], n: V) => { for (const sg of [1, -1]) for (let i = 0; i + 1 < A.length; i++) face(b, mir(A[i]!, sg), mir(A[i + 1]!, sg), mir(B[i + 1]!, sg), mir(B[i]!, sg), mir(n, sg)); };
+  const tri2 = (p: V, q: V, r: V, n: V) => { for (const sg of [1, -1]) tri(b, mir(p, sg), mir(q, sg), mir(r, sg), mir(n, sg)); };
+  b.name('spoiler').mat(PAINT, GLOSS, 'paint'); cells(BT); cells([BU[2]!, BT[0]!]); cells(TLG, (i, k) => k < 2 && i >= 5);
+  b.name('tailSlot').mat(SHADE, 0.3, 'paint'); cells(BU);
+  b.name('quarter').mat(PAINT, GLOSS, 'paint'); cells(TLG, (i, k) => (k < 2 && i < 5) || (k === 2 && i < 5) || (k === 3 && i < 2) || (k === 4 && i < 1));
+  tri2(TLG[2]![3]!, TLG[3]![3]!, TLG[2]![4]!, [1, 0, 0]); tri2(TLG[1]![4]!, TLG[2]![4]!, TLG[1]![5]!, [1, 0, 0]);
+  wall([TLG[3]![3]!, TLG[2]![4]!, TLG[1]![5]!], [LG[3]![3]!, LG[2]![4]!, LG[1]![5]!], [0, -1, -1]); wall([TLG[5]![3]!, TLG[4]![3]!, TLG[3]![3]!], [LG[5]![3]!, LG[4]![3]!, LG[3]![3]!], [0, 0, -1]);   // the opening's reveal
+  for (const sg of [1, -1]) fan(b, [TLG[5]![2]!, TLG[5]![3]!, LG[5]![3]!, DKG[DKG.length - 2]![5]!, BU[1]![5]!].map(p => mir(p, sg)), [0, -sg, 0]);   // the slot's end under the blade
+  // the lamp panel: one smoked red lens across the opening, its outer ends cut slanting by the wings
+  b.name('tailBand').mat(SMOKE, 0.85); cells(LG, (i, k) => (k === 3 && i >= 3) || (k === 4 && i >= 2)); tri2(LG[3]![3]!, LG[3]![4]!, LG[2]![4]!, [1, 0, 0]); tri2(LG[2]![4]!, LG[2]![5]!, LG[1]![5]!, [1, 0, 0]);
+  // the bumper: the ledge from the lamp panel's foot out to its top edge, the face with the plate's recess, the corners; the valance let into its foot
+  b.name('bumperR').mat(PAINT, GLOSS, 'paint'); cells(TLG.map((r, i) => [i >= 1 ? LG[i]![5]! : r[5]!, r[6]!])); tri2(TLG[1]![5]!, LG[1]![5]!, TLG[1]![6]!, [0, -1, 0.5]);
+  cells(TLG, (i, k) => (k >= 6 && k < 9 && !(k === 7 && i >= 9)) || (k >= 9 && i < 5));
+  wall(TLG.slice(5).map(r => r[9]!), VG.slice(5).map(r => r[9]!), [0, 0, -1]); wall(TLG[5]!.slice(9), VG[5]!.slice(9), [0, -1, 0]);
+  b.name('valance').mat(TRIM, 0.15); cells(VG, (i, k) => k >= 9 && i >= 5 && !(k === 9 && i >= 6));
+  b.name('valance').mat(DARK, 0.05, 'grille'); cells(VG, (i, k) => k === 9 && i >= 6);
 
   // ---- the canopy: one black glasshouse ----
   const iQ0 = at(2890) - iA, iB0 = at(XR1) - iA;   // review 154: the B pillar a broad black sail behind the door glass (about 200 mm, the photographs), the quarter glass behind it
@@ -218,7 +242,7 @@ export function nsxMesh(spin = 0, lamps = 0): Mesh { const b = new Build(); lamp
     b.name('fogF').mat(LENS, 0.7); inCell(NSG, 5, 7, 0.0, 0.85, 0.1, 0.9, -45, [-1, 0, 0], sg); }
   // the under-side: the nose's floor, a flat floor between the sills, the tail's
   b.name('chassis').mat(DARK, 0.05); for (let i = 0; i + 1 < NN; i++) for (const sg of [1, -1]) tri(b, mir(NSG[i]![NK]!, sg), mir(NSG[i + 1]![NK]!, sg), [XJ, 0, 112], [0, 0, -1]);
-  for (let i = 0; i + 1 < NR; i++) for (const sg of [1, -1]) tri(b, mir(TLG[i]![NK]!, sg), mir(TLG[i + 1]![NK]!, sg), [XT1, 0, 205], [0, 0, -1]);
+  { const foot = [...TLG.slice(0, 6).map(r => r[NK]!), ...VG.slice(5).map(r => r[NK]!)]; for (let i = 0; i + 1 < foot.length; i++) for (const sg of [1, -1]) tri(b, mir(foot[i]!, sg), mir(foot[i + 1]!, sg), [XT1, 0, 205], [0, 0, -1]); }
   for (const [x0, x1, y, z0, z1] of [[XJ, FX + RAF, YINF, 118, 118], [FX + RAF, RX - RAR, 775, 118, 118], [RX - RAR, RX + RAR, YINR, 118, 118], [RX + RAR, XT1, 740, 122, 205]] as const) face(b, [x0, -y, z0], [x0, y, z0], [x1, y, z1], [x1, -y, z1], [0, 0, -1]);
   // the wheel wells: a dark roof from the arch's lip in to the inner wall, the wall itself, the ends
   for (const sg of [1, -1]) for (const [hx, ra, yin] of [[FX, RAF, YINF], [RX, RAR, YINR]] as const) { const i0 = at(hx - ra), i1 = at(hx + ra), inn = (i: number): V => [SF[i]!, sg * yin, CH[i]![NK]![2]];
@@ -262,26 +286,24 @@ export function nsxMesh(spin = 0, lamps = 0): Mesh { const b = new Build(); lamp
         const P = (u: number, v: number, lift: number): V => { const p = mix(mix(f0, f1, u), mix(g0, g1, u), v); return [p[0] - lift, p[1], p[2]]; };
         b.name('headlamp').mat(LENS, 0.7, 'lens'); for (const [u0, u1] of [[0.06, 0.48], [0.52, 0.94]] as const) face(b, P(u0, 0.12, 5), P(u1, 0.12, 5), P(u1, 0.8, 5), P(u0, 0.8, 5), fwd); } } }
 
-  // ---- the tail's lamps in the smoked red band (review 154): amber at the ends, red, small clear reversing lamps either side of the H badge ----
-  for (const sg of [1, -1]) { const N: V = [1, 0, 0.15];
-    { // review 156: the amber indicator a round lamp at the band's outer end (the photographs), in a dark ring
-      const bandAt = (y: number, v: number, lift: number): V => { let lo = 0, hi = 5; for (let k = 0; k < 30; k++) { const m = (lo + hi) / 2, i = Math.min(4, Math.floor(m)), u = m - i, yy = mix(TLG[i]![4]!, TLG[i + 1]![4]!, u)[1]; if (yy > y) lo = m; else hi = m; }
-        const m = (lo + hi) / 2, i = Math.min(4, Math.floor(m)), u = m - i, p = mix(mix(TLG[i]![4]!, TLG[i + 1]![4]!, u), mix(TLG[i]![5]!, TLG[i + 1]![5]!, u), v); return mir([p[0] + N[0] * lift, p[1] + N[1] * lift, p[2] + N[2] * lift], sg); };
-      const yc = 715, rY = 62, ring = (k: number, r: number, lift: number) => Array.from({ length: 14 }, (_, t) => { const a = t / 14 * Math.PI * 2; return bandAt(yc + rY * r * Math.cos(a), 0.5 + 0.4 * r * Math.sin(a), lift); });
-      b.name('indicatorR').mat(DARK, 0.3); fan(b, ring(0, 1.12, 3.5), mir(N, sg)); b.name('indicatorR').mat(AMBER, 0.75); fan(b, ring(0, 1, 5), mir(N, sg)); void ring; }
-    for (const i of [4, 5, 6]) { b.name(i < 5 ? 'tailLamp' : 'stopLamp').mat(RED, 0.7, 'lens'); inCell(TLG, i, 4, 0, 1, 0.12, 0.88, 3, N, sg); }   /* touching: one continuous red run */
-    b.name('reverseLamp').mat(WHITE, 0.7); inCell(TLG, 7, 4, 0.2, 0.85, 0.3, 0.72, 4, N, sg);   /* small square reversing lamps beside the badge */
-    b.name('badge').mat(CHROME, 0.85, 'metal'); inCell(TLG, 8, 4, 0.55, 1, 0.28, 0.74, 5, N, sg); }   // the H badge in the middle of the red band
-  // the band runs round the corner onto the flank and dies out in a point; the indicator wraps with it
-  for (const sg of [1, -1]) { const E: [number, number, number][] = [[XT1, 815, 640], [4190, 813, 690], [4120, 808, 748], [4040, 798, 798]], P = (x: number, z: number, lift = 3): V => mir(add(surf(x, z), [0, lift, 0]), sg);
-    b.name('tailBand').mat(SMOKE, 0.85); for (let k = 0; k + 1 < E.length; k++) face(b, P(E[k]![0], E[k]![1]), P(E[k + 1]![0], E[k + 1]![1]), P(E[k + 1]![0], E[k + 1]![2]), P(E[k]![0], E[k]![2]), [0, sg, 0]);
-    b.name('indicatorR').mat(AMBER, 0.7); face(b, P(XT1 - 4, 800, 5), P(4196, 800, 5), P(4196, 700, 5), P(XT1 - 4, 662, 5), [0, sg, 0]); }
+  // ---- the tail's lamps in the smoked red panel: a round amber indicator at each end, the red run, a square clear reversing lamp either side of the badge's dark square ----
+  { const CY = curve(([3, 4, 5] as const).map(k => [-TAILZ[k]!, CT[k]![1]] as [number, number])), TX = lin(([3, 4, 5] as const).map(k => [TAILZ[k]!, TAILX[k]!] as [number, number]));
+    const lampAt = (y: number, z: number, lift: number, sg: number): V => { const f = Math.min(1, y / CY(-z)); return [XT1 + (TX(z) - XT1) * (1 - f ** 7) ** (1 / 7) - LAMPIN + lift, sg * y, z]; };
+    const patch = (y0: number, y1: number, z0: number, z1: number, lift: number, sg: number) => face(b, lampAt(y0, z0, lift, sg), lampAt(y1, z0, lift, sg), lampAt(y1, z1, lift, sg), lampAt(y0, z1, lift, sg), [1, 0, 0]);
+    for (const sg of [1, -1]) { const ring = (r: number, lift: number) => Array.from({ length: 14 }, (_, t) => { const a = t / 14 * Math.PI * 2; return [lampAt(662, 748 + r * Math.sin(a), lift, sg)[0], sg * (662 + r * Math.cos(a)), 748 + r * Math.sin(a)] as V; });   /* a flat disc standing just proud of the panel */
+      b.name('indicatorR').mat(DARK, 0.3); fan(b, ring(56, 4), [1, 0, 0]); b.name('indicatorR').mat(AMBER, 0.75); fan(b, ring(49, 6), [1, 0, 0]);
+      b.name('tailLamp').mat(RED, 0.7, 'lens'); patch(398, 598, 690, 806, 3, sg); b.name('stopLamp').mat(RED, 0.7, 'lens'); patch(194, 394, 690, 806, 3, sg);
+      b.name('reverseLamp').mat(WHITE, 0.7); patch(98, 184, 700, 796, 4, sg); }
+    b.name('badge').mat(DARK, 0.3); face(b, lampAt(88, 690, 3, -1), lampAt(88, 690, 3, 1), lampAt(88, 806, 3, 1), lampAt(88, 806, 3, -1), [1, 0, 0]);
+    b.name('badge').mat(CHROME, 0.85, 'metal'); face(b, lampAt(34, 716, 5, -1), lampAt(34, 716, 5, 1), lampAt(34, 780, 5, 1), lampAt(34, 780, 5, -1), [1, 0, 0]); }
   // the flush door pulls under the glass's back corner, the lock beside them
   for (const sg of [1, -1]) { const P = (x: number, z: number): V => mir(add(surf(x, z), [0, 3, 1]), sg); b.name('handle').mat(FRAME, 0.3); face(b, P(2540, 726), P(2640, 730), P(2640, 704), P(2540, 700), [0, sg, 0.4]);
     b.name('handle').mat(CHROME, 0.8, 'metal'); face(b, P(2655, 726), P(2677, 727), P(2677, 707), P(2655, 706), [0, sg, 0.4]); }
-  b.name('plate').mat(WHITE, 0.3).box(4400, 4405, -190, 190, 410, 512);
-  b.name('exhaust').mat(CHROME, 0.8, 'metal'); for (const y of [-600, 600]) b.lathe('x', [0, y, 238], [[4290, 44], [4396, 44], [4396, 36], [4330, 36]], 10, false);
-  b.name('exhaust').mat(DARK, 0.05); for (const y of [-600, 600]) fan(b, Array.from({ length: 10 }, (_, k) => [4332, y + 36 * Math.cos(k * Math.PI / 5), 238 + 36 * Math.sin(k * Math.PI / 5)] as V), [1, 0, 0]);
+  // the plate in its recess in the bumper's face; one round exhaust tip at each end of the valance
+  { const r = [TLG[10]![7]!, TLG[9]![7]!, TLG[9]![8]!, TLG[10]![8]!]; b.name('bumperR'); pocket([...r, mir(r[2]!, -1), mir(r[1]!, -1)], [-26, 0, 0], [1, 0, 0]); }
+  b.name('plate').mat(WHITE, 0.3).box(4383, 4390, -165, 165, 436, 538);
+  b.name('exhaust').mat(CHROME, 0.8, 'metal'); for (const y of [-515, 515]) b.lathe('x', [0, y, 268], [[4270, 42], [4392, 42], [4392, 35], [4326, 35]], 10, false);
+  b.name('exhaust').mat(DARK, 0.05); for (const y of [-515, 515]) fan(b, Array.from({ length: 10 }, (_, k) => [4328, y + 35 * Math.cos(k * Math.PI / 5), 268 + 35 * Math.sin(k * Math.PI / 5)] as V), [1, 0, 0]);
   for (const sg of [1, -1]) { b.name('markerR').mat(RED, 0.6); face(b, mir(add(surf(3990, 462), [0, 3, 0]), sg), mir(add(surf(4080, 462), [0, 3, 0]), sg), mir(add(surf(4080, 498), [0, 3, 0]), sg), mir(add(surf(3990, 498), [0, 3, 0]), sg), [0, sg, 0]);
     b.name('repeater').mat(AMBER, 0.7); face(b, mir(add(surf(1300, 568), [0, 3, 0]), sg), mir(add(surf(1372, 568), [0, 3, 0]), sg), mir(add(surf(1372, 598), [0, 3, 0]), sg), mir(add(surf(1300, 598), [0, 3, 0]), sg), [0, sg, 0]); }
 

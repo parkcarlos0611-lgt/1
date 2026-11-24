@@ -13,7 +13,7 @@ export function quarter(x: Ctx): void {
   e.name('quarter').mat(c.paint, c.gloss, 'paint'); e.cells(s.CH, (i, q) => i >= z.iI0 && !z.isDoor(i, q) && !z.isSill(i, q) && !z.isIntake(i, q));
   // the ridge between the rear glass's edge (from the slant's foot round the tongue to the centre line) and the crest (to the deck's first row)
   const A: V[] = [...s.RGL.slice(slant).map(r => r[TOP.N - 1]!), ...s.RGL[s.RGL.length - 1]!.slice(0, TOP.N - 1).reverse()];
-  const B: V[] = [...s.SF.slice(L.at(k.canopy.slantFoot), s.iDk).map(px => s.CH[s.SF.indexOf(px)]![0]!), ...s.DKG[0]!.slice().reverse()];
+  const B: V[] = [...s.CH.slice(L.at(k.canopy.slantFoot), s.iDk).map(r => r[0]!), ...s.DKG[0]!.slice().reverse()];
   e.zip(A, B, UP);
   e.cells(s.DKG, (i, j) => j > k.deck.lidCols || (j === k.deck.lidCols && i < s.iBl));
 }

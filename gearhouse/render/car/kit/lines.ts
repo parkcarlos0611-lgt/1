@@ -72,8 +72,10 @@ export interface Lines {
   /** the arches' height at x (0 clear of them) */
   archZ(x: number): number;
   stations: number[];
-  /** the index of the station at x (a landmark or mm), which must exist */
-  at(x: At): number;
+  /** the index of the station at a (a landmark or the sheet's mm), which must exist */
+  at(a: At): number;
+  /** the index of the station at x (mm in the car's frame, already through mx), which must exist */
+  atX(x: number): number;
   /** the stations from a to b (both included) */
   span(a: At, b: At): number[];
 }
@@ -97,7 +99,7 @@ export function makeLines(S: LineSheet, tweak: Tweak = {}): Lines {
   const arc = (a: Arch) => { const n = Math.round(180 / st.arcDeg), out = [Math.round(a.x - a.r)]; for (let k = 1; k < n; k++) { const v = Math.round(a.x - a.r * Math.cos(k * st.arcDeg * Math.PI / 180)), p = pins.find(q => Math.abs(q - v) <= snap); out.push(p ?? v); } out.push(Math.round(a.x + a.r)); return out; };
   const stations = [...st.front.map(X), ...arc(arches.f), ...st.mid.map(X), ...arc(arches.r), ...st.rear.map(X)];
   for (let i = 1; i < stations.length; i++) if (!(stations[i]! > stations[i - 1]!)) throw new Error(`lines: stations out of order at ${stations[i]}`);
-  const at = (a: At) => { const x = X(a); let best = -1, bd = 1; stations.forEach((s, i) => { const d = Math.abs(s - x); if (d < bd) { bd = d; best = i; } }); if (best < 0) throw new Error(`lines: no station at ${a} (${x})`); return best; };
+  const atX = (x: number) => { let best = -1, bd = 1; stations.forEach((s, i) => { const d = Math.abs(s - x); if (d < bd) { bd = d; best = i; } }); if (best < 0) throw new Error(`lines: no station at ${x}`); return best; }, at = (a: At) => atX(X(a));
   // the crest: round the nose along its plan, then its own line
   const xJ = stations[st.front.length]!, kw = w('crest')(xJ), tip = X(S.nose.tip), np = S.nose.pow;
   const crestY = (x: number) => x < xJ ? kw * ginv((x - tip) / (xJ - tip), np) : w('crest')(x);
@@ -105,5 +107,5 @@ export function makeLines(S: LineSheet, tweak: Tweak = {}): Lines {
   return { sheet: S, tweak, length: S.length + dW, mx, my, X, Y, z, w, zTab: n => zT[n]!, wTab: n => wT[n]!,
     centre: x => x <= screen ? z('bonnet')(x) : x <= gfoot ? z('roof')(x) : z('deck')(x), half: x => w('half')(x),
     crest: x => [crestY(x), z('crest')(x)], belt: x => x >= b0 && x <= b1 ? [crestY(x), z('crest')(x)] : null, shoulder: x => [w('half')(x), z('shoulder')(x)],
-    sill: S.levels.sill, foot: S.levels.foot, wheels, arches, archZ, stations, at, span: (a, b) => stations.slice(at(a), at(b) + 1) };
+    sill: S.levels.sill, foot: S.levels.foot, wheels, arches, archZ, stations, at, atX, span: (a, b) => stations.slice(at(a), at(b) + 1) };
 }

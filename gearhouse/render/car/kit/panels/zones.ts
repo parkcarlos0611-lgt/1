@@ -13,8 +13,8 @@ export interface Zones {
 }
 export function zones(x: Ctx): Zones {
   const { L, k } = x, iCW = x.topRow(k.bonnet.cowl), iC0 = x.topRow(k.popup.from), iC1 = x.topRow(k.popup.to);
-  const iD0 = L.at(k.door.from), iD1 = L.at(k.door.to), iI0 = L.at(k.intake.from), iI1 = L.at(k.intake.to), iFA = L.at(L.arches.f.x + L.arches.f.r), iRA = L.at(L.arches.r.x - L.arches.r.r);
-  const [c0, c1] = [TOP.COVER[0], TOP.COVER[TOP.COVER.length - 1]];
+  const iD0 = L.at(k.door.from), iD1 = L.at(k.door.to), iI0 = L.at(k.intake.from), iI1 = L.at(k.intake.to), iFA = L.atX(L.arches.f.x + L.arches.f.r), iRA = L.atX(L.arches.r.x - L.arches.r.r);
+  const [c0, c1] = [TOP.COVER[0], TOP.COVER[2]];
   return { iCW, iC0, iC1, iD0, iD1, iI0, iI1, iFA, iRA,
     isCowl: (i, j) => j < k.bonnet.cowlCols && (i > iCW || (i === iCW && j < TOP.SHUT)),
     isCover: (i, j) => i >= iC0 && i < iC1 && j >= c0 && j < c1,

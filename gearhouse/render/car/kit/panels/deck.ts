@@ -6,7 +6,7 @@ import { UP } from '../ctx';
 export function deck(x: Ctx): void {
   const { e, s, c, k } = x, D = k.deck; if (D.kind !== 'lid') throw new Error(`kit: deck kind ${D.kind} is not built yet`);
   e.name('bootLid').mat(c.paint, c.gloss, 'paint'); e.cells(s.DKG, (i, j) => j < D.lidCols && i < s.iBl);
-  e.name('tailSlot').mat(c.shade, 0.3, 'paint'); e.cells(s.DKG, (i, j) => j <= D.lidCols && i >= s.iBl);
+  e.name('tailSlot').mat(c.shade, 0.3, 'paint'); e.cells(s.DKG, (i, j) => j < D.lidCols && i >= s.iBl);   // the gutter under the blade lies inside the wing (tail.ts closes it)
 }
 export function deckTrim(x: Ctx): void {
   const { e, s, c, k, L } = x, iS = L.at(k.deck.shut) - s.iDk;

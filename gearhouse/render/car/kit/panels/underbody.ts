@@ -7,7 +7,7 @@ import { NK } from '../section';
 import { lerp, clamp01, mir, type V } from '../geom';
 
 export function underbody(x: Ctx): void {
-  const { e, s, c, L } = x, SF = s.SF, { f: AF, r: AR } = L.arches, iF0 = L.at(AF.x - AF.r), iF1 = L.at(AF.x + AF.r), iR0 = L.at(AR.x - AR.r), iR1 = L.at(AR.x + AR.r);
+  const { e, s, c, L } = x, SF = s.SF, { f: AF, r: AR } = L.arches, iF0 = L.atX(AF.x - AF.r), iF1 = L.atX(AF.x + AF.r), iR0 = L.atX(AR.x - AR.r), iR1 = L.atX(AR.x + AR.r);
   const yin = (px: number) => px <= AF.x + AF.r ? AF.yin : px >= AR.x - AR.r ? AR.yin : lerp(AF.yin, AR.yin, clamp01((px - AF.x - AF.r) / (AR.x - AR.r - AF.x - AF.r)));
   const zf = SF.map(px => s.F.chain(px, true)[NK]![2]);   // the floor's height: the tuck's, as if no arch cut it
   // its columns go in from the tuck (so the cells face down): the tuck, the wells' inner wall, the centre line

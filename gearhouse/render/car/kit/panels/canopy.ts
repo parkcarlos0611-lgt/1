@@ -8,12 +8,12 @@ import type { V } from '../geom';
 
 export function canopy(x: Ctx): void {
   const { e, s, c, k, L } = x, C = k.canopy, B = C.screenBand, iQ0 = L.at(C.quarter) - s.iA, iB0 = L.at(C.bPillar) - s.iA, iR0 = L.at(C.roof.from) - s.iA, nR = s.RGX.length, edge = TOP.N - 1 - B.cols;
-  e.name('canopy').mat(c.black, 0.75, 'paint'); e.cells(s.RFG); e.cells(s.SCR, (i, j) => i < B.foot || i >= B.top || j >= edge);
+  e.name('canopy').mat(c.black, 0.75, 'paint'); e.cells(s.RFG); e.cells(s.SCR, (i, j) => (i < B.foot || i >= B.top || j >= edge) && j < TOP.N - 2);
   // the A pillar's band: its outer line is the screen's edge (on the same straight line), so it takes the screen's points too
   const D: V[] = s.US.slice(0, iR0 + 1).map(r => r[0]!), T: V[] = s.US.slice(0, iR0 + 1).map(r => r[1]!), scr = s.SCR.map(r => r[TOP.N - 1]!);
   const a0 = D[0]!, a1 = D[D.length - 1]!, d2 = (p: V) => (p[0] - a0[0]) ** 2 + (p[1] - a0[1]) ** 2 + (p[2] - a0[2]) ** 2, Lt = d2(a1);
   const merged = [...D, ...scr.slice(1, -1)].sort((p, q) => d2(p) - d2(q)).filter((p, i, a) => i === 0 || d2(p) - d2(a[i - 1]!) > 1e-6 * Lt);
-  e.strip(merged, T);
+  e.strip(merged, T); e.strip(s.SCR.map(r => r[TOP.N - 2]!), merged);   // the screen's last column, joined to the same points
   e.cells(s.US, (i, j) => (j === 0 && i >= iR0) || (i >= iB0 && i < iQ0 && j > 0) || (i === 0 && j > 0));
   e.cells(s.RGL, (i, j) => j >= TOP.N - 1 - C.rearBlackCols || i >= nR - 1 - C.rearBlackRows);
   e.name('screenPane').mat(c.glass, 0.5, 'glass'); e.cells(s.SCR, (i, j) => i >= B.foot && i < B.top && j < edge);

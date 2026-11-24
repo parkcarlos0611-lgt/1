@@ -39,7 +39,7 @@ export function makeSkin(L: Lines, K: CarKit): Skin {
   const zKt = L.zTab('crest'), ZKB = curve([[zKt[0]![0], zTop(zKt[0]![0], yK(zKt[0]![0]))], ...zKt.slice(1)]);
   const zK = (x: number) => x <= XA ? zTop(x, yK(x)) : ZKB(x);
   const F = flank(L, K.section, x => [x, yK(x), zK(x)]);
-  const CH = SF.map(x => F.chain(x)), CJ = CH[0]!, CT = CH[CH.length - 1]!, iA = L.at(XA);
+  const CH = SF.map(x => F.chain(x)), CJ = CH[0]!, CT = CH[CH.length - 1]!, iA = L.at(K.lines.centre.screen);
 
   // ---- the front top ----
   const SH = [0, ...T.shares], FC = [0, ...T.noseCols].map(f => f * KW), S0 = crestX(FC[TOP.EDGE]!), SL = L.X(T.rows[0]!), capTo = L.X(T.capTo);
@@ -69,7 +69,7 @@ export function makeSkin(L: Lines, K: CarKit): Skin {
     const w = sm(ra0, ra1, x), dE = sub(E, Dp), lE = len(dE) || 1, r = x <= XR1 ? w : 1 - sm(XR1, rEnd, x), k = x <= XR1 ? Math.min(Sd.pillar, lE) * (1 - w) : Math.min(Sd.edge, lE * 0.5);
     const Tp: V = [Dp[0] + dE[0] / lE * k, Dp[1] + dE[1] / lE * k + L.my(Sd.rail[0]) * r, Dp[2] + dE[2] / lE * k + Sd.rail[1] * r];
     const bl = Sd.blow * sm(bi0, bi1, x) * (1 - sm(bo0, bo1, x)), out = (v: number): V => { const p = mix(Tp, E, v); return [p[0], p[1] + bl * 0.9 * 4 * v * (1 - v), p[2] + bl * 0.4 * 4 * v * (1 - v)]; }; return [Dp, Tp, out(1 / 3), out(2 / 3), E]; };
-  const SU = L.span(XA, Sd.to), US: Grid = SU.map(upper);
+  const SU = L.span(K.lines.centre.screen, Sd.to), US: Grid = SU.map(upper);
   const RGX = C.rear.map(L.X), RGL: Grid = RGX.map(x => SH.map(sh => glassPt(x, sh)));
 
   // ---- the tail's shell: the last chain carried round the corner to the centre line ----

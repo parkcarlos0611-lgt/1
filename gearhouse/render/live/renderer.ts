@@ -118,8 +118,9 @@ vec3 rgb2hsv(vec3 c) { vec4 K = vec4(0., -1. / 3., 2. / 3., -1.), p = mix(vec4(c
 vec3 hsv2rgb(vec3 c) { vec3 p = abs(fract(c.xxx + vec3(1., 2. / 3., 1. / 3.)) * 6. - 3.); return c.z * mix(vec3(1.), clamp(p - 1., 0., 1.), c.y); }
 /** a colour's shade at brightness dark: its hue turned toward blue-violet by the short way round, a grey given a blue cast */
 vec3 toonShadeOf(vec3 c, float dark) { vec3 h = rgb2hsv(clamp(c, 0., 1.)); float d = 0.69 - h.x; d -= floor(d + 0.5);
-  float hx = fract(h.x + clamp(d * 0.32, -0.1, 0.1) * uToonS); hx = mix(0.61, hx, smoothstep(0.05, 0.22, h.y));
-  vec3 s = hsv2rgb(vec3(hx, clamp(h.y * (1. + 0.25 * uToonS) + 0.16 * uToonS * (1. - h.y), 0., 1.), h.z * dark * (1. - 0.06 * uToonS)));
+  float hx = fract(h.x + clamp(d * 0.32, -0.1, 0.1) * uToonS), ws = smoothstep(0.25, 0.5, h.y); hx = mix(0.61, hx, ws);   /* the dull colours (concrete, earth, grey) all to blue-grey */
+  vec3 s = hsv2rgb(vec3(hx, clamp(mix(0.2 + 0.1 * h.y, h.y * (1. + 0.25 * uToonS), ws) * min(1., uToonS + 0.2), 0., 1.), h.z * dark * (1. - 0.06 * uToonS)));
+  s *= mix(vec3(1.), vec3(0.9, 0.93, 1.08), min(1., uToonS));   /* a cool cast over all the shade */
   return mix(c * dark, s, clamp(uToonS, 0., 1.)); }
 /** a value to a few levels, each step about a pixel soft */
 float poster(float x, float lv) { float y = x * lv, w = clamp(fwidth(y) * 0.7, 0.03, 0.5); return (floor(y) + smoothstep(0.5 - w, 0.5 + w, fract(y))) / lv; }
@@ -133,7 +134,7 @@ float toonBand(float t) { float w = clamp(fwidth(t) * 0.8, 0.008, 0.12);
 vec3 toonLight(vec3 c, vec3 n, vec3 l, float sh, float ao, vec3 p) {
   float b = toonBand(max(0., dot(n, l)) * sh * smoothstep(0.3, 0.65, ao));
   vec3 sunT = mix(vec3(1., 0.62, 0.42), vec3(1., 0.98, 0.94), smoothstep(0.2, 0.8, uDay)), lit = c * sunT * (0.2 + 0.8 * uDay) * (0.9 + 0.1 * uLightK);
-  vec3 shade = toonShadeOf(c, 0.6) * (0.14 + 0.86 * uDay), mid = mix(shade, lit, 0.6);
+  vec3 shade = toonShadeOf(c, 0.6) * (0.14 + 0.86 * uDay), mid = mix(shade, lit, 0.7);
   vec3 col = uToonB < 2.5 ? mix(shade, lit, b) : b < 0.5 ? mix(shade, mid, b * 2.) : mix(mid, lit, b * 2. - 1.);
   return col + c * min(vec3(1.), lampsAt(p, n) * 0.12); }
 /** bright metal as a two-tone ramp: the sky above the mirrored horizon, the ground under it, a dark line between, the sun a white spot */
@@ -143,7 +144,7 @@ vec3 toonChrome(vec3 base, vec3 n, vec3 v, vec3 l, float sh) { vec3 r = reflect(
   float nh = dot(n, normalize(l + v)), wh = clamp(fwidth(nh), 0.002, 0.05); c = mix(c, vec3(1.), smoothstep(0.975 - wh, 0.975 + wh, nh) * step(0.5, sh));
   return c * (0.15 + 0.85 * uDay); }
 /** gloss as one or two crisp white shapes: the sun's spot, and a streak where the body's shoulder mirrors the sky just over the horizon on the sun's side */
-float toonGloss(vec3 n, vec3 v, vec3 l, float sh, float g) { float nh = dot(n, normalize(l + v)), w = clamp(fwidth(nh), 0.002, 0.05), e = 0.993 - 0.014 * g;
+float toonGloss(vec3 n, vec3 v, vec3 l, float sh, float g) { float nh = dot(n, normalize(l + v)), w = clamp(fwidth(nh), 0.002, 0.05), e = 0.9975 - 0.004 * g;
   float spot = smoothstep(e - w, e + w, nh) * step(0.5, sh);
   vec3 r = reflect(-v, n); float wz = clamp(fwidth(r.z), 0.003, 0.06), side = smoothstep(-0.25, 0.1, dot(normalize(r.xy + 1e-5), normalize(l.xy)));
   float streak = smoothstep(0.1 - wz, 0.1 + wz, r.z) * (1. - smoothstep(0.19 - wz, 0.19 + wz, r.z)) * side * step(0.35, g);
@@ -376,7 +377,7 @@ uniform highp sampler2DArray uGAlb, uGNor, uGPack; uniform int uGTex; uniform fl
 struct GS { vec3 a; vec3 n; vec3 p; };
 /** a layer's picture as detail about its own mean (the smallest mip): 1 on average, its light and dark and a little of its colour; the game keeps its own colours */
 vec3 rel(vec3 a, int L) { vec3 m = textureLod(uGAlb, vec3(0.5, 0.5, float(L)), 12.).rgb; float lm = max(0.03, dot(m, vec3(0.3, 0.59, 0.11))), la = dot(a, vec3(0.3, 0.59, 0.11)); return mix(vec3(la), a, 0.15) / lm; }
-GS gs(int L, vec2 st, vec2 off) { vec3 q = vec3(st / uGSize[L] + off, float(L)); float tb = uLook == 3 ? 2. : 0.;   /* toon: the photograph softened to patches of colour */
+GS gs(int L, vec2 st, vec2 off) { vec3 q = vec3(st / uGSize[L] + off, float(L)); float tb = uLook == 3 ? 3. : 0.;   /* toon: the photograph softened to patches of colour */
   GS g; g.a = rel(texture(uGAlb, q, tb).rgb, L); g.n = texture(uGNor, q, tb).rgb * 2. - 1.; g.p = texture(uGPack, q).rgb; return g; }
 float W2t(float o) { return uTW / 2. - abs(o); }
 /* the scratch race's grid (review 125), painted as the start line is: pairs 5 m either side of the middle, rows 9 m
@@ -474,7 +475,7 @@ void main() { vec3 c = vCol.rgb;
         T = normalize(T - nn * dot(T, nn)); B = cross(nn, T) * sign(dot(cross(nn, T), B)); nn = normalize(T * pn.x + B * pn.y + nn * max(0.2, pn.z)); } }
     Detail dt; if (photo) { dt.tone = 1.; dt.rough = 0.; dt.n = nn; } else dt = detail(vFlag > 0.5 ? 1 : 0, vWorld, nn, vFlag > 0.5 ? 0.8 : 0.7, conc ? 0.75 : 0.6, 0.4);
     float rough = photo ? clamp(prough, 0.2, 1.) : conc ? clamp(C.rough + dt.rough, 0.25, 1.) : clamp(0.92 + dt.rough, 0.3, 1.);
-    if (uLook == 3) { vec3 tc = photo ? posterC(c, 6.) : c; oCol = vec4(clamp(toonLight(tc, dt.n, uSun, sh, rtao(vWorld, dt.n), vWorld), 0., 1.), vCol.a); oId = vec4(0.); oN = vec4(dt.n * 0.5 + 0.5, 0.); oV = velo(); return; }   /* toon: the ground in flat bands, its shadows blue-grey */
+    if (uLook == 3) { vec3 tc = c; if (photo && !conc) { float lv = max(1e-3, dot(vCol.rgb, vec3(0.3, 0.59, 0.11))), r = dot(c, vec3(0.3, 0.59, 0.11)) / lv; tc = c / max(r, 1e-3) * mix(1., r, 0.3); } if (photo) tc = posterC(tc, 6.);   /* the grass's photographed patchiness mostly flattened away */ oCol = vec4(clamp(toonLight(tc, dt.n, uSun, sh, rtao(vWorld, dt.n), vWorld), 0., 1.), vCol.a); oId = vec4(0.); oN = vec4(dt.n * 0.5 + 0.5, 0.); oV = velo(); return; }   /* toon: the ground in flat bands, its shadows blue-grey */
     oCol = vec4(present(pbrX(c * dt.tone, dt.n, uEye, uSun, sh, 0., rough, 0., rtao(vWorld, dt.n) * (photo ? mix(1., pao, 0.8) : 1.), 0.) + lampsAt(vWorld, dt.n) * toLin(c * dt.tone) / 3.14159), vCol.a); oId = vec4(0.); oN = vec4(dt.n * 0.5 + 0.5, conc ? max(0., 0.5 - rough) * 0.5 : 0.); oV = velo(); return; }
   c = mix(c, vec3(24., 22., 20.) / 255., (1. - lightAt(vWorld + vec3(0., 0., 0.02))) * 0.43);
   oCol = vec4(c, vCol.a); oId = vec4(0.); oN = vec4(0.5, 0.5, 1., 0.); oV = velo(); }`;

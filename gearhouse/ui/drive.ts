@@ -102,7 +102,7 @@ const wearOf = (c: Vehicle, k: number): [number, number, number] => { if (c === 
 // each car's 2D art (its part model's views), laid on its mesh in the live picture (review 105), loaded when first wanted
 const ART: Record<string, string> = { bmw315: artBmw, buick28: artBuick, chevAB28: artChev, dodgeV28: artDodge, dueA21: artDueA, dueSSJ35: artSSJ, fnTT33: artFN, fordT23: artFord, plymU29: artPlym, pontiac29: artPont, willys27: artWillys };
 const artAsked = new WeakSet<object>(); let artOn = true, raysOn = true, texK = 1, lightK = 1, mbK = 1.6, aoK = 1, reflK = 1.3, bloomK = 1, deep = 1, day = 1, dof = 0.5, outW = 1, outK = 1, inK = 1, innerOn: 'auto' | 'on' | 'off' = 'auto';   /* the outline (review 110) */
-let toonB = 3, toonS = 1;   /* the toon look (review 92): its bands, how far its shade's hue moves */
+let toonB = 3, toonS = 0.55;   /* the toon look (review 92): its bands, how far its shade's hue moves */
 function artFor(L: LiveRenderer, g: ReturnType<LiveRenderer['car']>, id: string, M: import('../render/car/mesh').Mesh) { if (artAsked.has(g) || !ART[id] || !M.names?.some(Boolean)) return; artAsked.add(g);   // only a mesh with its parts named can take it
   const meta = artMeta as unknown as { mm: number; groups: string[]; cars: Record<string, { C: number; views: Record<string, number[]> }> }, groups = M.names!.map(n => n ? meta.groups.indexOf(canonical(n)) + 1 : 0);
   void fetch(ART[id]!).then(r => r.blob()).then(b => createImageBitmap(b, { premultiplyAlpha: 'none', colorSpaceConversion: 'none' })).then(bm => L.setArt(g, bm, { mm: meta.mm, ...meta.cars[id]! }, groups)).catch(e => console.warn('art', e)); }

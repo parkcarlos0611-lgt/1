@@ -2,7 +2,7 @@
 
 Decision (2026-11-21): the first open bodies, two cars from one clear sheet, each built twice at the same time (one Opus
 agent, one Fable agent) to compare the models on shapes the sedans never had. The sedans' guide and brief still hold:
-docs/systems/62_direct_model_guide.md and docs/systems/63_sedan_batch_brief.md (method, tools, hand-in, rules, notes).
+docs/archive/2d/62_direct_model_guide.md and docs/archive/2d/63_sedan_batch_brief.md (method, tools, hand-in, rules, notes).
 This brief adds what is new for open cars and names the parts so the four builds can be compared and merged.
 
 | id | car (real name stays in docs/reference) | side on the sheet | wheelbase (approx.) | year | game name |

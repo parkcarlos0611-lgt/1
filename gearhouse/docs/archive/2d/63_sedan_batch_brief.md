@@ -2,7 +2,7 @@
 
 Decision (2026-11-21): the sheet cars are made by hand by Fable agents (the planner judged the Fable trial's detail far
 ahead of Opus and of the automatic converter). This brief adds what the trial taught to the common guide,
-docs/systems/62_direct_model_guide.md, which still holds (goal, tools, hand-in, rules). Read both.
+docs/archive/2d/62_direct_model_guide.md, which still holds (goal, tools, hand-in, rules). Read both.
 
 ## What the trial taught (follow it)
 - Write the car's script from scratch in the structure of tools/ref/sedan29_model.py (its `part()`, `snap()`, `half()`

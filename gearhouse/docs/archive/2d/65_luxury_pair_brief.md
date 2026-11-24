@@ -1,7 +1,7 @@
 # 65. Two luxury cars (sheet 94e0a997) — brief for each car's agent
 
 Decision (2026-11-22): two cars from one clear sheet with all six views, each built once by a Fable agent. The rules of
-docs/systems/62_direct_model_guide.md, 63_sedan_batch_brief.md and 64_open_car_brief.md hold (method, element names,
+docs/archive/2d/62_direct_model_guide.md, 63_sedan_batch_brief.md and 64_open_car_brief.md hold (method, element names,
 what is not drawn, seamless joins, screens in plan, spares, seats); this adds what is particular to these two.
 
 | id | car (real name stays in docs/reference) | column on the sheet | wheelbase | year | game name | body |

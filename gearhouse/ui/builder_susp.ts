@@ -30,13 +30,13 @@ export function suspFigures(d: Design): SuspFigures | null {
 const fmt = (v: number, n = 0) => (Math.abs(v) < 0.5 * 10 ** -n ? 0 : v).toFixed(n);
 /** a small line graph: series of points (front solid, rear dashed), the x and y ranges, the axes' labels */
 export function lineSvg(title: string, series: { name: string; pts: [number, number][]; dash?: boolean }[], x: [number, number], y: [number, number], xl: string, yl: string): string {
-  const W = 280, H = 120, L = 34, R = 8, T = 8, B = 22, px = (v: number) => L + (v - x[0]) / (x[1] - x[0]) * (W - L - R), py = (v: number) => T + (1 - (Math.max(y[0], Math.min(y[1], v)) - y[0]) / (y[1] - y[0])) * (H - T - B);
+  const W = 280, H = 126, L = 34, R = 8, T = 16, B = 22, px = (v: number) => L + (v - x[0]) / (x[1] - x[0]) * (W - L - R), py = (v: number) => T + (1 - (Math.max(y[0], Math.min(y[1], v)) - y[0]) / (y[1] - y[0])) * (H - T - B);
   const grid = [y[0], (y[0] + y[1]) / 2, y[1]].map(v => `<line x1="${L}" x2="${W - R}" y1="${py(v)}" y2="${py(v)}" class="g"/><text x="${L - 4}" y="${py(v) + 3}" text-anchor="end">${fmt(v, Math.abs(y[1] - y[0]) < 8 ? 1 : 0)}</text>`).join('')
     + [x[0], 0, x[1]].map(v => `<line x1="${px(v)}" x2="${px(v)}" y1="${T}" y2="${H - B}" class="g"/><text x="${px(v)}" y="${H - B + 12}" text-anchor="middle">${fmt(v)}</text>`).join('');
   const lines = series.filter(s => s.pts.length).map((s, i) => `<polyline class="s${i}"${s.dash ? ' stroke-dasharray="5 3"' : ''} points="${s.pts.map(([a, b]) => `${px(a).toFixed(1)},${py(b).toFixed(1)}`).join(' ')}"/>`).join('');
   const key = series.map((s, i) => `<tspan class="k${i}">${s.dash ? '╌' : '━'} ${s.name}</tspan>`).join(' ');
-  return `<figure class="graph"><figcaption>${title}</figcaption><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${title}">${grid}${lines}<text x="${W - R}" y="${T + 10}" text-anchor="end" class="key">${key}</text>`
-    + `<text x="${(L + W - R) / 2}" y="${H - 2}" text-anchor="middle" class="ax">${xl}</text><text x="4" y="${T + 6}" class="ax">${yl}</text></svg></figure>`; }
+  return `<figure class="graph"><figcaption>${title}</figcaption><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${title}">${grid}${lines}<text x="${W - R}" y="10" text-anchor="end" class="key">${key}</text>`
+    + `<text x="${(L + W - R) / 2}" y="${H - 2}" text-anchor="middle" class="ax">${xl}</text><text x="4" y="10" class="ax">${yl}</text></svg></figure>`; }
 /** the wheels' frequencies as two bars on a 0.8..2.8 Hz scale, the old physics' 1.35 / 1.5 marked */
 export function hzSvg(f: number, r: number): string {
   const W = 280, H = 62, L = 34, R = 8, px = (v: number) => L + (v - 0.8) / 2 * (W - L - R);

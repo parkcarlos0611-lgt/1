@@ -9,9 +9,12 @@
 import type { Ctx } from '../ctx';
 import { TAILP as P } from '../section';
 import { mir } from '../geom';
+import { frameOf } from '../spec';
+import { duckTail } from './ducktail';
 
 export function tail(x: Ctx): void {
-  const { e, s, c, k } = x, T = k.tail, { TLG, LG, VG, DKG, BT, BU } = s, FR = T.frameRows, [a3, a4, a5] = T.opening;
+  if (x.k.tail.kind === 'ducktail') { duckTail(x); return; }
+  const { e, s, c, k } = x, T = { ...k.tail, ...frameOf(k.tail) }, { TLG, LG, VG, DKG, BT, BU } = s, FR = T.frameRows, [a3, a4, a5] = T.opening;
   if (T.kind !== 'frame' && T.kind !== 'roundLamps') throw new Error(`kit: tail kind ${T.kind} is not built yet`);
   if (a3 !== a4 + 1 || a4 !== a5 + 1 || a3 >= FR) throw new Error('kit: the frame tail cuts its opening one row a step');
   const paint = () => e.mat(c.paint, c.gloss, 'paint');

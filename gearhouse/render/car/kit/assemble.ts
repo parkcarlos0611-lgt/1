@@ -47,7 +47,7 @@ export function assemble(k: CarKit, o: AssembleOpts = {}): Assembled {
   run('shell', 'sideIntake', () => sideIntake(x)); run('shell', 'popupLamp', () => popupLamp(x));
   // what is laid on it: shut lines, lamps, small fittings
   run('part', 'trim', () => { bonnetTrim(x); popupTrim(x); doorTrim(x); deckTrim(x); quarterTrim(x); flankPatch(x, 'repeater', c.amber, 0.7, k.repeater); });
-  run('part', 'lampCluster', () => lampCluster(x, k.tail.kind === 'roundLamps' ? 'round' : 'band'));
+  run('part', 'lampCluster', () => lampCluster(x, k.tail.kind === 'ducktail' ? 'sunk' : k.tail.kind === 'roundLamps' ? 'round' : 'band'));
   run('part', 'plate', () => plate(x, k.plate)); run('part', 'exhaust', () => exhaust(x, k.exhaust));
   // inside
   run('inside', 'cabin', () => cabin(x)); run('inside', 'engineBay', () => engineBay(x)); run('inside', 'engine', () => engine(x, k.engine.spec, k.engine.at, k.engine.opts));

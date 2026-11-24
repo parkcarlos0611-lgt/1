@@ -10,7 +10,7 @@ import type { CarKit } from './spec';
 import type { V } from './geom';
 import { bonnet, bonnetTrim } from './panels/bonnet';
 import { frontWing, flankPatch } from './panels/frontWing';
-import { noseBumper } from './panels/noseBumper';
+import { noseBumper, noseTrim } from './panels/noseBumper';
 import { door, doorTrim } from './panels/door';
 import { sill } from './panels/sill';
 import { quarter, quarterTrim } from './panels/quarter';
@@ -46,8 +46,8 @@ export function assemble(k: CarKit, o: AssembleOpts = {}): Assembled {
   run('shell', 'noseBumper', () => noseBumper(x)); run('shell', 'underbody', () => underbody(x));
   run('shell', 'sideIntake', () => sideIntake(x)); run('shell', 'popupLamp', () => popupLamp(x));
   // what is laid on it: shut lines, lamps, small fittings
-  run('part', 'trim', () => { bonnetTrim(x); popupTrim(x); doorTrim(x); deckTrim(x); quarterTrim(x); flankPatch(x, 'repeater', c.amber, 0.7, k.repeater); });
-  run('part', 'lampCluster', () => lampCluster(x, k.tail.kind === 'roundLamps' ? 'round' : 'band'));
+  run('part', 'trim', () => { bonnetTrim(x); noseTrim(x); popupTrim(x); doorTrim(x); deckTrim(x); quarterTrim(x); flankPatch(x, 'repeater', c.amber, 0.7, k.repeater); });
+  run('part', 'lampCluster', () => lampCluster(x, k.tail.kind === 'roundLamps' ? 'round' : k.tail.kind === 'ducktail' ? 'sunk' : 'band'));
   run('part', 'plate', () => plate(x, k.plate)); run('part', 'exhaust', () => exhaust(x, k.exhaust));
   // inside
   run('inside', 'cabin', () => cabin(x)); run('inside', 'engineBay', () => engineBay(x)); run('inside', 'engine', () => engine(x, k.engine.spec, k.engine.at, k.engine.opts));

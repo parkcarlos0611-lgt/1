@@ -34,9 +34,30 @@ export interface FrontTopSpec {
   crown: number; crownAt: [At, At]; roll: number;
 }
 /** the nose's cap: rows going round from the centre line to the front arch, in the standard section */
+/** an opening cut into a face of the shell (the nose's, the tail's): a block of the grid's cells is taken out and
+ *  filled again round an outline (a super-ellipse on the face, seen along x), the outline sunk by `depth` into a
+ *  pocket; inside it lenses, bars and an emblem */
+export interface HoleSpec {
+  name: string;
+  /** the block: the grid's rows (for `centre`, from the centre line's row out to this row) and its chain points */
+  rows: [number, number] | number; pts: [number, number];
+  /** one opening across the centre line, or one each side */
+  centre?: boolean;
+  /** the outline on the face: its centre (y, z), half-sizes (y, z), the super-ellipse's power, points round */
+  at: [number, number]; size: [number, number]; pow: number; seg: number;
+  depth: number; wall: Colour; back: Kind;
+  /** lenses laid on the pocket's back: centre (y, z, relative to the opening's), half-sizes, power, points, colour, gloss, kind, name */
+  lenses?: { at: [number, number]; size: [number, number]; pow: number; seg: number; colour: Colour; gloss: number; kind: Kind; name: string }[];
+  /** bars across the opening at these heights (share of its depth in), their thickness */
+  bars?: { z: number[]; at: number; t: number; colour: Colour };
+  /** a small flat emblem on the back: outline (y, z, relative to the centre) */
+  emblem?: { pts: [number, number][]; colour: Colour; gloss: number };
+}
 export interface NoseSpec {
-  /** 'round': a super-ellipse in plan ('pointed', 'wedge' for later cars) */
+  /** 'round': a super-ellipse in plan, the openings cut along the grid ('pointed': the same plan, the openings cut as outlines, `holes`; 'wedge' for later cars) */
   kind: 'round' | 'pointed' | 'wedge';
+  /** 'pointed': the openings in the bumper (cut from the nose's grid) */
+  holes?: HoleSpec[];
   /** the bumper's lines on the centre line, one height per chain point from H down */
   levels: number[];
   /** how far back each of those lines sits on the centre line */
@@ -48,16 +69,34 @@ export interface NoseSpec {
 }
 export interface BonnetSpec { /** the cowl from this station (the bonnet's own columns end a row earlier) */ cowl: At; /** the cowl's columns from the centre */ cowlCols: number }
 export interface PopupSpec { kind: 'popup' | 'pocket' | 'fixed'; /** the cover's first and last rows (stations) */ from: At; to: At; /** degrees it opens; the well's depth */ open: number; depth: number; /** the lenses across the pod's face (shares) and their height (shares) and lift */ lens: [number, number][]; lensV: [number, number, number] }
+/** the flying buttresses (canopy option): behind the roof ONE grid from the roof's back edge to the tail, TOP.N columns
+ *  from the centre line to the buttress's outer top edge (the side strip's top, `slant`, which meets the crest at
+ *  `slantFoot`; the crest behind it). Between the buttresses the rear glass stands sunk (the canopy's `rear` rows), then
+ *  the deck. Each inner column is a width line and a height (a height line's name, or mm under the centre line); the
+ *  roof's back edge eases into them by `ease`. */
+export interface ButtressSpec {
+  /** TOP.N - 2 columns between the centre line and the outer top edge: [width line or mm, height line or mm under the centre] */
+  cols: [string | number, string | number][];
+  ease: At;
+  /** the rear glass's columns (from the centre), the buttress's inner face's column (its foot) */
+  glassCols: number; foot: number;
+}
 export interface CanopySpec {
-  /** 'canopy': one black glasshouse ('wedge', 'bubble' for later cars) */
+  /** 'canopy': one glasshouse on the body ('wedge', 'bubble' for later cars) */
   kind: 'canopy' | 'wedge' | 'bubble';
+  /** the roof and the pillars black (the default) or in the body's colour */
+  pillars?: 'black' | 'body';
+  /** flying buttresses behind the roof (the rear glass sunk between them) */
+  buttress?: ButtressSpec;
   /** the roof: its front corner and back edge (stations), half-width, crown and its power; its front edge bowed forward by `bow` at the centre */
   roof: { from: At; to: At; half: At; crown: number; pow: number; bow: number };
   /** the screen: its rows as shares from the foot up, how much it bows out */
   screen: { rows: number[]; bow: number };
   /** the side strip (to `to`): the pillar's band ahead of the roof `pillar` wide, giving way to the rail over `railAt`;
    *  the rail (y, z offsets) narrowing to `edge` by `railEnd`; the glass blown out by `blow` between `blowIn` and `blowOut` */
-  side: { pillar: number; railAt: [At, At]; rail: [number, number]; railEnd: At; edge: number; blow: number; blowIn: [At, At]; blowOut: [At, At]; to: At };
+  side: { pillar: number; railAt: [At, At]; rail: [number, number]; railEnd: At; edge: number; blow: number; blowIn: [At, At]; blowOut: [At, At]; to: At;
+    /** the quarter glass running to a point: its top edge falls onto the belt between these stations (painted behind) */
+    taper?: [At, At] };
   /** the quarter glass's slanting edge ends on the crest here */
   slantFoot: At;
   /** the rear glass's rows (stations) from the roof's back edge to its foot */
@@ -74,13 +113,30 @@ export interface CanopySpec {
 export interface DoorSpec { /** the door's front (station), its top's rear edge, its lower part's rear edge (the intake's front) */ from: At; to: At;
   /** the shut lines on the flank ([x, z]) */ frontSeam: [number, number][]; rearSeam: [number, number][][];
   /** the flush pull and the lock: x0, x1 and the corners' heights (x0 top, x1 top, x1 foot, x0 foot) */ handle: { pull: [number, number, number, number, number, number]; lock: [number, number, number, number, number, number] } }
-export interface IntakeSpec { /** its front and back stations; the depth grows from `from` to `full` */ from: At; to: At; full: At; depth: number;
+export interface IntakeSpec {
+  /** 'pocket': a short pocket deepening back to a grille; 'scoop': a long channel, its floor curved across (`profile`),
+   *  its inner edges closing toward the middle near its back end (`close`); the depth grows along a smooth step */
+  kind?: 'pocket' | 'scoop';
+  /** its front and back stations; the depth grows from `from` to `full` */ from: At; to: At; full: At; depth: number;
+  /** scoop: each inner point's share of the depth (top to foot); the share its edges close toward the middle, from this station to the back */
+  profile?: number[]; close?: [At, number];
   /** the inner lips' rise at top and foot (at full depth); the rows whose inner faces are body coloured */ lip: number; paintRows: number;
   /** rounded corners: [front or back edge, chain point, row step, point step]; the fillet's share */ fillets: ['from' | 'to', number, number, number][]; fillet: number;
   /** the grille's fins: how many, and [out, back, width, thickness] */ fins: number; fin: [number, number, number, number] }
+/** a louvred engine cover (on the buttress grid): slots through the cover between two of its columns, each a deep
+ *  pocket down into the bay (the engine shows through it); a raised panel on the centre columns */
+export interface LouvreSpec {
+  /** the slots: their columns (the inner and the outer edge), the first slot's front, the pitch, the width, how many; their depth */
+  cols: [number, number]; x: number; pitch: number; width: number; count: number; depth: number;
+  /** the raised centre panel: columns from the centre, its front and back stations (eased over `ease` mm), its rise */
+  panel: { cols: number; from: number; to: number; ease: number; rise: number };
+  /** the cover's columns (from the centre), the shelf between the rear glass's foot and the cover (stations) */
+  coverCols: number; shelf: [At, At];
+}
 export interface DeckSpec {
-  /** 'lid': a painted boot lid ('glass', 'louvre' for later cars) */
+  /** 'lid': a painted boot lid; 'louvre': the louvred engine cover over a buttress grid ('glass' for later cars) */
   kind: 'lid' | 'glass' | 'louvre';
+  louvre?: LouvreSpec;
   /** the deck's first station (behind the glass's foot) */
   from: At;
   /** its edge up to the ridge: y where it starts and ends rising, at the front and at the back; the change over `blend` */
@@ -89,8 +145,10 @@ export interface DeckSpec {
   lidCols: number; shut: At;
 }
 export interface TailSpec {
-  /** 'frame' (one integrated frame round a smoked lamp band), 'roundLamps' (the same frame, round lamps); 'capsule', 'cut' for later cars */
-  kind: 'frame' | 'roundLamps' | 'capsule' | 'cut';
+  /** 'frame' (one integrated frame round a smoked lamp band), 'roundLamps' (the same frame, round lamps), 'ducktail' (the
+   *  deck rising into a sharp lip, the tail panel set in under it with sunk round lamps, the bumper standing out below);
+   *  'capsule', 'cut' for later cars */
+  kind: 'frame' | 'roundLamps' | 'ducktail' | 'capsule' | 'cut';
   /** the tail's rows going round from the last chain to the centre line (shares of its half-width) */
   shares: number[];
   /** how far back each chain point's line reaches on the centre line */
@@ -98,25 +156,38 @@ export interface TailSpec {
   /** the plan's power above and below chain point `split` */
   pow: [number, number]; split: number;
   /** the frame's rows from the corner (beside the slot) */
-  frameRows: number;
+  frameRows?: number;
   /** the opening's slanting end: the tail row it crosses at the lamp panel's top, middle and foot */
-  opening: [number, number, number];
+  opening?: [number, number, number];
   /** how far the lamp panel and the valance stand in from the frame */
-  lampIn: number; valIn: number;
+  lampIn?: number; valIn?: number;
   /** the spoiler's blade: from this station over the deck's first `cols` columns; its underside's height; its leading edge (back from `from`, height) */
-  blade: { from: At; cols: number; under: number; lead: [number, number] };
+  blade?: { from: At; cols: number; under: number; lead: [number, number] };
   /** the plate's recess: tail rows; its depth */
-  plateRows: [number, number]; plateDepth: number;
+  plateRows?: [number, number]; plateDepth?: number;
+  /** ducktail: the bands across the tail (chain points): the black slot under the lip (to half-width y), the lamp panel,
+   *  the bumper's ledge, its face, the dark lower grille (to half-width y), the valance; openings cut in it (the plate) */
+  duck?: { /** each band's (chain cell's) name, from the lip's top down */ bands: string[]; slot: [number, number]; grille: [number, number]; valance: number;
+    /** a black line along this chain point, to this half-width */ line: [number, number]; holes: HoleSpec[] };
 }
+/** the frame tail's own numbers (they must be given for the frame kinds) */
+export type FrameTail = Required<Pick<TailSpec, 'frameRows' | 'opening' | 'lampIn' | 'valIn' | 'blade' | 'plateRows' | 'plateDepth'>>;
+export function frameOf(T: TailSpec): FrameTail { const { frameRows, opening, lampIn, valIn, blade, plateRows, plateDepth } = T;
+  if (frameRows === undefined || !opening || lampIn === undefined || valIn === undefined || !blade || !plateRows || plateDepth === undefined) throw new Error(`kit: the ${T.kind} tail needs its frame's numbers`);
+  return { frameRows, opening, lampIn, valIn, blade, plateRows, plateDepth }; }
 export interface TailLampSpec {
   /** the round indicator at each end: centre, the rim's and the lens's radius, their lifts, points round */
-  indicator: { y: number; z: number; rim: number; lens: number; lift: [number, number]; seg: number };
+  indicator?: { y: number; z: number; rim: number; lens: number; lift: [number, number]; seg: number };
   /** the rectangular lenses: name, colour, gloss, kind, y0, y1, z0, z1, lift */
-  patches: [string, Colour, number, Kind, number, number, number, number, number][];
+  patches?: [string, Colour, number, Kind, number, number, number, number, number][];
   /** the centre badge: the dark square and the bright badge on it (half-width, z0, z1, lift) */
-  badge: { dark: [number, number, number, number]; bright: [number, number, number, number] };
+  badge: { dark?: [number, number, number, number]; bright: [number, number, number, number] };
   /** the round kind: lamps each side (centres across), their height, radius, rim, lifts, points round, names, colours */
-  round?: { y: number[]; z: number; r: number; rim: number; lift: [number, number]; seg: number; names: string[]; colours: Colour[] };
+  round?: { y: number[]; z: number; r: number; rim: number; lift: [number, number]; seg: number; names: string[]; colours: Colour[];
+    /** sunk (the ducktail): each lamp in its own round recess `depth` deep, cut from the tail's rows given (one block per lamp) between chain points `pts` */
+    depth?: number; rows?: [number, number][]; pts?: [number, number] };
+  /** a script beside the badge: y0, y1, z0, z1, lift (on the tail's face) */
+  script?: [number, number, number, number, number];
 }
 export interface CabinSpec { floor: number; x: [number, number]; floorHalf: number;
   /** the door cards: their stations, standing in from the crest by [y, z] */ cards: { x: At[]; inset: [number, number] };
@@ -141,6 +212,9 @@ export interface WheelLook {
   /** the face's profile radii: centre, middle, hub; how far along its middle sits; its gloss */ face: [number, number, number]; faceMid: number; faceGloss: number;
   spokes: number; phase: number;
   /** fiveSpoke: the dark openings between spokes */ openings: { lift: number; rim: number; r: [number, number, number]; a: [number, number, number] };
+  /** star: tapering spokes standing proud of a dark dished barrel: half-widths (radians) at the hub, the middle and the
+   *  rim, the middle's radius, how far proud, the ridge along each spoke's middle */
+  star?: { a: [number, number, number]; mid: number; proud: number; ridge: number };
   /** disc: the round vents */ vents: { r: number; size: number; seg: number; lift: number };
   hub: { cap: [number, number, number]; nuts: number; nut: [number, number, number, number] };
 }
@@ -166,11 +240,13 @@ export interface CarKit {
   /** the fuel flap's outline on the flank ([x, z]) and its side */
   fuelFlap?: { pts: [number, number][]; side: 1 | -1 };
   /** flank lamps: x0, x1, z0, z1 */
-  marker: [number, number, number, number]; repeater: [number, number, number, number];
+  marker?: [number, number, number, number]; repeater: [number, number, number, number];
+  /** a dark slot in the sill: from, to (stations), the chain point whose cell it darkens */
+  sillSlot?: [At, At, number];
   /** the front bumper's intakes: the centre one (nose rows from the centre, chain points), the outer ones with the fog lamps [row, u0, u1, v0, v1, depth] */
-  intakes: { centre: { rows: number; cols: [number, number]; depth: number; bars: number[]; barX: number; barZ: [number, number] }; outer: { rows: [number, number]; cols: [number, number]; depth: number; fog: [number, number, number, number, number, number] } };
+  intakes?: { centre: { rows: number; cols: [number, number]; depth: number; bars: number[]; barX: number; barZ: [number, number] }; outer: { rows: [number, number]; cols: [number, number]; depth: number; fog: [number, number, number, number, number, number] } };
   /** the front bumper's lamp strip: nose rows from, the clear lamp's end (the amber one's start), to */
-  bumperLamps: { from: number; split: number; to: number };
+  bumperLamps?: { from: number; split: number; to: number };
   plate: [number, number, number, number, number, number];
   exhaust: ExhaustSpec;
   engine: { spec: EngineSpec; at: V; opts: EngineOpts };

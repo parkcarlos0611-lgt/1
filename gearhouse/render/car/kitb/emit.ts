@@ -46,6 +46,16 @@ export class Emit {
   /** a pocket sunk from a ring by d: walls in `wall`, a back of the kind given (fanned from its first point, so it shares the walls' points) */
   pocket(ring: V[], d: V, n: V, wall: string, back: Kind = 'plain'): this { this.mat(wall, 0.05); this.tube(ring, d); this.mat(wall, 0.05, back); return this.fan(ring.map(p => add(p, d)), n); }
 
+  /** the skin between a ring of border points and a hole's ring inside it (both going round the hole's middle, any number
+   *  of points each, the border seen whole from the middle), looking along n: a port cut in a block of cells */
+  porthole(outer: V[], inner: V[], n: V): this { const c = centroid(inner), nn = un(n), u = un(sub(inner[0]!, c)), v = cross(nn, u);
+    const ang = (p: V) => { const d = sub(p, c); return Math.atan2(dot(d, v), dot(d, u)); }, turn = (R: V[]) => { const a = R.map(ang); let k = 0; for (let i = 1; i < R.length; i++) if (a[i]! < a[k]!) k = i;
+      const rise = ((a[(k + 1) % R.length]! - a[k]! + 4 * Math.PI) % (2 * Math.PI)) < Math.PI, P = R.map((_, i) => R[(k + (rise ? i : R.length - i)) % R.length]!); return { P, a: P.map(ang) }; };
+    const O = turn(outer), I = turn(inner), no = O.P.length, ni = I.P.length; let i = 0, j = 0;
+    while (i < no || j < ni) { const ao = i < no ? (i + 1 < no ? O.a[i + 1]! : O.a[0]! + 2 * Math.PI) : Infinity, ai = j < ni ? (j + 1 < ni ? I.a[j + 1]! : I.a[0]! + 2 * Math.PI) : Infinity;
+      if (ao <= ai) { this.tri(O.P[i % no]!, O.P[(i + 1) % no]!, I.P[j % ni]!, n); i++; } else { this.tri(O.P[i % no]!, I.P[(j + 1) % ni]!, I.P[j % ni]!, n); j++; } }
+    return this; }
+
   // ---- both sides ----
   /** the cells of a grid laid on both sides, wound outward (rows going back, columns going out and down); each cell cut
    *  along the diagonal that folds it less; `pick` chooses the cells */

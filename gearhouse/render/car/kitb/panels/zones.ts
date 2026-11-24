@@ -13,12 +13,12 @@ export interface Zones {
 }
 export function zones(x: Ctx): Zones {
   const { L, k } = x, iCW = x.topRow(k.bonnet.cowl), iC0 = x.topRow(k.popup.from), iC1 = x.topRow(k.popup.to);
-  const iD0 = L.at(k.door.from), iD1 = L.at(k.door.to), iI0 = L.at(k.intake.from), iI1 = L.at(k.intake.to), iFA = L.atX(L.arches.f.x + L.arches.f.r), iRA = L.atX(L.arches.r.x - L.arches.r.r);
+  const iD0 = L.at(k.door.from), iD1 = L.at(k.door.to), iI0 = L.at(k.intake.from), iI1 = L.at(k.intake.to), iDL = k.door.lowerTo !== undefined ? L.at(k.door.lowerTo) : iI0, [q0, q1] = k.intake.span ?? [FLANK.H, FLANK.SILL], iFA = L.atX(L.arches.f.x + L.arches.f.r), iRA = L.atX(L.arches.r.x - L.arches.r.r);
   const [c0, c1] = [TOP.COVER[0], TOP.COVER[2]];
   return { iCW, iC0, iC1, iD0, iD1, iI0, iI1, iFA, iRA,
     isCowl: (i, j) => j < k.bonnet.cowlCols && (i > iCW || (i === iCW && j < TOP.SHUT)),
     isCover: (i, j) => i >= iC0 && i < iC1 && j >= c0 && j < c1,
-    isDoor: (i, q) => i >= iD0 && q < FLANK.SILL && (q < FLANK.H ? i < iD1 : i < iI0),
+    isDoor: (i, q) => i >= iD0 && q < FLANK.SILL && (q < FLANK.H ? i < iD1 : i < iDL) && !(i >= iI0 && i < iI1 && q >= q0 && q < q1),
     isSill: (i, q) => q >= FLANK.SILL && i >= iFA && i < iRA,
-    isIntake: (i, q) => i >= iI0 && i < iI1 && q >= FLANK.H && q < FLANK.SILL };
+    isIntake: (i, q) => i >= iI0 && i < iI1 && q >= q0 && q < q1 };
 }

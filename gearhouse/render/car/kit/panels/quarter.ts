@@ -11,6 +11,7 @@ import { flankPatch } from './frontWing';
 export function quarter(x: Ctx): void {
   const { e, s, c, k, L } = x, z = zones(x), slant = s.RGX.indexOf(L.X(k.canopy.slantFoot));
   e.name('quarter').mat(c.paint, c.gloss, 'paint'); e.cells(s.CH, (i, q) => i >= z.iI0 && !z.isDoor(i, q) && !z.isSill(i, q) && !z.isIntake(i, q));
+  if (k.canopy.buttress) return;   // the buttress grid runs on into the deck: the deck panel takes it
   // the ridge between the rear glass's edge (from the slant's foot round the tongue to the centre line) and the crest (to the deck's first row)
   const A: V[] = [...s.RGL.slice(slant).map(r => r[TOP.N - 1]!), ...s.RGL[s.RGL.length - 1]!.slice(0, TOP.N - 1).reverse()];
   const B: V[] = [...s.CH.slice(L.at(k.canopy.slantFoot), s.iDk).map(r => r[0]!), ...s.DKG[0]!.slice().reverse()];
@@ -20,5 +21,5 @@ export function quarter(x: Ctx): void {
 export function quarterTrim(x: Ctx): void {
   const { e, c, k } = x;
   if (k.fuelFlap) { e.name('seam').mat(c.seam, 0.1); flankSeam(x, k.fuelFlap.pts, [k.fuelFlap.side]); }
-  const m = k.marker; flankPatch(x, 'markerR', c.red, 0.6, m);
+  if (k.marker) flankPatch(x, 'markerR', c.red, 0.6, k.marker);
 }

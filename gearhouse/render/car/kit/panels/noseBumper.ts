@@ -1,13 +1,19 @@
 // The nose's bumper panel: below the shut line, in the standard section going round from the centre line to the front
 // arch; the lamp strip at its top corners (cells of the same grid), the centre intake and the two outer ones with the
-// fog lamps, cut in as pockets.
+// fog lamps, cut in as pockets. Kind 'pointed': the openings cut as outlines (an oval mouth across the centre line, lamp
+// slots and round fog lamps each side) from blocks of the same grid (panels/holes.ts).
 import type { Ctx } from '../ctx';
 import { FLANK } from '../section';
 import { border } from '../emit';
 import { mir, type V } from '../geom';
+import { cutHoles, inHoles } from './holes';
 
 export function noseBumper(x: Ctx): void {
-  const { e, s, c, k } = x, bl = k.bumperLamps, ic = k.intakes.centre, oc = k.intakes.outer;
+  const { e, s, c, k } = x;
+  if (k.nose.kind === 'pointed') { const hs = k.nose.holes ?? [], skip = inHoles(hs, 0);
+    e.name('bumperF').mat(c.paint, c.gloss, 'paint'); e.cells(s.NSG, (i, q) => q >= FLANK.H && !skip(i, q)); cutHoles(x, s.NSG, hs, [-1, 0, 0], 0, 1); return; }
+  if (!k.intakes || !k.bumperLamps) throw new Error('kit: the round nose needs its intakes and lamp strip');
+  const bl = k.bumperLamps, ic = k.intakes.centre, oc = k.intakes.outer;
   const lampCell = (i: number, q: number) => q === FLANK.H && i >= bl.from && i < bl.to;
   const mouthC = (i: number, q: number) => i < ic.rows && q >= ic.cols[0] && q < ic.cols[1], mouthO = (i: number, q: number) => i >= oc.rows[0] && i < oc.rows[1] && q >= oc.cols[0] && q < oc.cols[1];
   e.name('bumperF').mat(c.paint, c.gloss, 'paint'); e.cells(s.NSG, (i, q) => q >= FLANK.H && !lampCell(i, q) && !mouthC(i, q) && !mouthO(i, q));

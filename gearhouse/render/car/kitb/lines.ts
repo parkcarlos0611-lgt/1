@@ -12,7 +12,7 @@
 //                arches, and every few degrees round each arch
 // The sheet is in the drawing's frame; a `Tweak` stretches it (the wheelbase between the arches, the half-width
 // across) and every line, landmark and station follows, so a panel built from the lines follows too.
-import { curve, clamp01, ginv, type Tab } from './geom';
+import { curve, clamp01, ginv, gp, inv01, type Tab } from './geom';
 
 export interface WheelSpec { /** the axle's station */ x: number; /** the tyre's radius */ r: number; /** half the track */ y: number; /** the tyre's width */ w: number; /** the rim's radius */ rim: number }
 export interface ArchSpec { /** the arch's radius about the hub */ r: number; /** the well's inner wall (half-width) */ yin: number }
@@ -27,7 +27,13 @@ export interface StationSpec {
   pins?: At[]; snap?: number;
 }
 /** the plan of the nose ahead of the front arch: the crest's line round it */
-export interface NosePlan { /** 'round': a super-ellipse from the tip to the front arch */ kind: 'round' | 'pointed' | 'wedge'; /** the crest's foremost point (station) */ tip: At; /** the super-ellipse's power */ pow: number }
+export interface NosePlan {
+  /** 'round': a super-ellipse from the tip to the front arch; 'pointed': a prow drawn from the car's own table (straight
+   *  tapering sides running forward to a tight corner and a blunt tip), the bumper's lines following the same plan */
+  kind: 'round' | 'pointed' | 'wedge';
+  /** the crest's foremost point (station) */ tip: At; /** the super-ellipse's power */ pow: number;
+  /** 'pointed': the plan as shares, [along from the tip to the front arch, across from the centre line to the crest there], from [0, 0] to [1, 1] */
+  plan?: Tab }
 export interface LineSheet {
   /** overall length (the mesh's length) */
   length: number;
@@ -69,6 +75,8 @@ export interface Lines {
   crest(x: number): [number, number]; belt(x: number): [number, number] | null; shoulder(x: number): [number, number];
   sill: number; foot: number;
   wheels: { f: Wheel; r: Wheel }; arches: { f: Arch; r: Arch };
+  /** the nose's plan as shares: how far along (tip to front arch) the crest is at a share across, and its inverse */
+  nose: { along(f: number): number; across(v: number): number };
   /** the arches' height at x (0 clear of them) */
   archZ(x: number): number;
   stations: number[];
@@ -102,10 +110,14 @@ export function makeLines(S: LineSheet, tweak: Tweak = {}): Lines {
   const atX = (x: number) => { let best = -1, bd = 1; stations.forEach((s, i) => { const d = Math.abs(s - x); if (d < bd) { bd = d; best = i; } }); if (best < 0) throw new Error(`lines: no station at ${x}`); return best; }, at = (a: At) => atX(X(a));
   // the crest: round the nose along its plan, then its own line
   const xJ = stations[st.front.length]!, kw = w('crest')(xJ), tip = X(S.nose.tip), np = S.nose.pow;
-  const crestY = (x: number) => x < xJ ? kw * ginv((x - tip) / (xJ - tip), np) : w('crest')(x);
+  if (S.nose.kind === 'wedge') throw new Error('lines: nose plan wedge is not built yet');
+  if (S.nose.kind === 'pointed' && !S.nose.plan) throw new Error('lines: a pointed nose needs its plan table');
+  const planC = S.nose.kind === 'pointed' ? curve(S.nose.plan!) : null;
+  const nose = planC ? { across: (v: number) => planC(clamp01(v)), along: inv01(planC) } : { across: (v: number) => ginv(v, np), along: (f: number) => gp(f, np) };
+  const crestY = (x: number) => x < xJ ? kw * nose.across((x - tip) / (xJ - tip)) : w('crest')(x);
   const screen = X(S.centre.screen), gfoot = X(S.centre.glassFoot), b0 = X(S.belt[0]), b1 = X(S.belt[1]);
   return { sheet: S, tweak, length: S.length + dW, mx, my, X, Y, z, w, zTab: n => zT[n]!, wTab: n => wT[n]!,
     centre: x => x <= screen ? z('bonnet')(x) : x <= gfoot ? z('roof')(x) : z('deck')(x), half: x => w('half')(x),
     crest: x => [crestY(x), z('crest')(x)], belt: x => x >= b0 && x <= b1 ? [crestY(x), z('crest')(x)] : null, shoulder: x => [w('half')(x), z('shoulder')(x)],
-    sill: S.levels.sill, foot: S.levels.foot, wheels, arches, archZ, stations, at, atX, span: (a, b) => stations.slice(at(a), at(b) + 1) };
+    sill: S.levels.sill, foot: S.levels.foot, wheels, arches, nose, archZ, stations, at, atX, span: (a, b) => stations.slice(at(a), at(b) + 1) };
 }

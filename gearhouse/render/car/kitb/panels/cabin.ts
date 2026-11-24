@@ -24,11 +24,12 @@ export function cabin(x: Ctx): void {
   e.name('bulkhead').mat(c.dark, 0.08); for (const sg of [1, -1]) { for (let j = 0; j < n5; j++) e.face(mir(sec[j]!, sg), mir(sec[j + 1]!, sg), [xw, sg * sec[j + 1]![1], wz1], [xw, sg * sec[j]![1], wz1], [1, 0, 0]);
     const out = [...sec.slice(n5), [xw, sec[sec.length - 1]![1], FL] as V, [xw, wyb, FL] as V]; for (let j = 0; j + 1 < out.length; j++) e.tri([xw, sg * wyb, B.hub], mir(out[j]!, sg), mir(out[j + 1]!, sg), [1, 0, 0]); }
   e.face([xw, -wyb, FL], [xw, wyb, FL], [xw, wyb, wz0], [xw, -wyb, wz0], [1, 0, 0]);
+  if (B.shelf) { e.name('bulkhead').mat(c.trim, 0.1); e.face([xw, -wyb, wz0], [xw, wyb, wz0], [xw + B.shelf, wyb, wz0], [xw + B.shelf, -wyb, wz0], UP); }
   e.name('cabinPane').mat(c.glass, 0.5, 'glass'); e.face([xw, -wyb, wz0], [xw, wyb, wz0], [xw, wyb, wz1], [xw, -wyb, wz1], [1, 0, 0]);
 }
 /** the engine bay: a dark tub under the rear glass (floor, front wall, the sides stepping out to the deck's edge) */
 export function engineBay(x: Ctx): void {
-  const { e, c, k, L } = x, B = k.bay, x0 = L.mx(B.x[0]), x1 = L.mx(B.x[1]), yb = L.my(B.y[0]), yt = L.my(B.y[1]), [zf, zs, zt] = B.z;
+  const { e, c, k, L } = x, B = k.bay; if (!B) return; const x0 = L.mx(B.x[0]), x1 = L.mx(B.x[1]), yb = L.my(B.y[0]), yt = L.my(B.y[1]), [zf, zs, zt] = B.z;
   e.name('engineBay').mat(c.dark, 0.05); e.face([x0, -yb, zf], [x1, -yb, zf], [x1, yb, zf], [x0, yb, zf], UP); e.face([x1, -yb, zf], [x1, yb, zf], [x1, yb, zs], [x1, -yb, zs], [-1, 0, 0]); e.face([x1, -yb, zs], [x1, yb, zs], [x1, yt, zt], [x1, -yt, zt], [-1, 0, 0]);
   for (const sg of [1, -1]) { e.face([x0, sg * yb, zf], [x1, sg * yb, zf], [x1, sg * yb, zs], [x0, sg * yb, zs], [0, -sg, 0]); e.face([x0, sg * yb, zs], [x1, sg * yb, zs], [x1, sg * yt, zt], [x0, sg * yt, zt], [0, -sg, 0.5]); }
 }

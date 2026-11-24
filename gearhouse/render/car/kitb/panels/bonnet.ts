@@ -6,8 +6,10 @@ import type { V } from '../geom';
 import { zones } from './zones';
 
 export function bonnet(x: Ctx): void {
-  const { e, s, c } = x, z = zones(x);
-  e.name('hood').mat(c.paint, c.gloss, 'paint'); e.cells(s.TFG, (i, j) => j < TOP.SHUT && !z.isCowl(i, j)); e.cells(s.NSG, (i, q) => i < TOP.SHUT && q < FLANK.H);
+  const { e, s, c, k } = x, z = zones(x);
+  const v = k.bonnet.vents, v0 = v ? x.topRow(v.from) : 0, v1 = v ? x.topRow(v.to) : 0, isVent = (i: number, j: number) => !!v && i >= v0 && i < v1 && j >= v.cols[0] && j < v.cols[1];
+  e.name('hood').mat(c.paint, c.gloss, 'paint'); e.cells(s.TFG, (i, j) => j < TOP.SHUT && !z.isCowl(i, j) && !isVent(i, j));
+  if (v) { e.name('bonnetVent').mat(c.dark, 0.05, 'grille'); e.cells(s.TFG, isVent); } e.cells(s.NSG, (i, q) => i < TOP.SHUT && q < FLANK.H);
   e.name('cowl').mat(c.frame, 0.15); e.cells(s.TFG, z.isCowl);
 }
 /** the bonnet's shut lines and the badge on its nose (laid on the skin) */

@@ -53,8 +53,13 @@ export function locate(body: Body, pl: Placement): { s: number; a: number } { if
 
 /** a fixture's context on side sg */
 function context(body: Body, f: Frame, sg: 1 | -1, scale: number, depth: number, rot0: [number, number] = [0, 0]): FixCtx { const sh = body.shell, cache = new Map<string, { p: V; n: V }>();
+  const h = 1e-3, ds = sub(body.point(f.s + h, f.a), body.point(f.s - h, f.a)).map(v => v / (2 * h)) as V, da = sub(body.point(f.s, f.a + h), body.point(f.s, f.a - h)).map(v => v / (2 * h)) as V, js = { ds, da, ss: dot(ds, ds), sa: dot(ds, da), aa: dot(da, da) };
   const surf = (P: number, Q: number) => { const k = `${P.toFixed(2)},${Q.toFixed(2)}`; let r = cache.get(k); if (r) return r;
-    const T = add(add(f.o, f.e1.map(v => v * P) as V), add(f.e2.map(v => v * Q) as V, f.n.map(v => v * 300) as V)), j = body.project(T, f.n, f.s, f.a);
+    // start from the surface's own first-order map (the offset in the frame's plane through the derivatives at the
+    // origin), so a point far out on a curved end face still lands where it should
+    const off = add(f.e1.map(v => v * P) as V, f.e2.map(v => v * Q) as V), A = js.ss + 1e-6, B = js.sa, C = js.aa + 1e-6, g0 = dot(js.ds, off), g1 = dot(js.da, off), det = A * C - B * B;
+    const s0 = f.s + (C * g0 - B * g1) / det, a0 = f.a + (A * g1 - B * g0) / det;
+    const T = add(add(f.o, off), f.n.map(v => v * 300) as V), j = body.project(T, f.n, Math.max(-1, Math.min(4, s0)), Math.max(0.01, Math.min(0.99, a0)));
     r = { p: j.p, n: body.normal(j.s, j.a) }; cache.set(k, r); return r; };
   const at = (p: number, q: number, w = 0): V => { const r = surf(p * scale + rot0[0], q * scale + rot0[1]); return mirV(add(r.p, r.n.map(v => v * w * scale) as V), sg); };
   return { frame: f, sg, scale, depth, body, at, nAt: (p, q) => mirV(surf(p * scale + rot0[0], q * scale + rot0[1]).n, sg),

@@ -127,9 +127,9 @@ export class Body {
   /** where the line through T along d meets the skin, from (s0, a0): Gauss-Newton on the miss across the line */
   project(T: V, d: V, s0: number, a0: number, lo = -1, hi = 4): { s: number; a: number; p: V } { let s = s0, a = a0; const dd = un(d);
     const miss = (s1: number, a1: number): V => { const r = sub(this.point(s1, a1), T); return sub(r, [dd[0] * dot(r, dd), dd[1] * dot(r, dd), dd[2] * dot(r, dd)]); };
-    for (let it = 0; it < 10; it++) { const r = miss(s, a), h = 1e-3, Js = sub(miss(s + h, a), r).map(v => v / h) as V, Ja = sub(miss(s, a + h), r).map(v => v / h) as V;
+    for (let it = 0; it < 24; it++) { const r = miss(s, a), h = 1e-3, Js = sub(miss(s + h, a), r).map(v => v / h) as V, Ja = sub(miss(s, a + h), r).map(v => v / h) as V;
       const A = dot(Js, Js) + 1e-3, B = dot(Js, Ja), C = dot(Ja, Ja) + 1e-3, g0 = dot(Js, r), g1 = dot(Ja, r), det = A * C - B * B; if (Math.abs(det) < 1e-12) break;
-      const dS = -(C * g0 - B * g1) / det, dA = -(A * g1 - B * g0) / det, lim = 0.35; s = Math.max(lo, Math.min(hi, s + Math.max(-lim, Math.min(lim, dS)))); a = Math.max(0.01, Math.min(0.99, a + Math.max(-lim, Math.min(lim, dA))));
+      const dS = -(C * g0 - B * g1) / det, dA = -(A * g1 - B * g0) / det, lim = 0.2; s = Math.max(lo, Math.min(hi, s + Math.max(-lim, Math.min(lim, dS)))); a = Math.max(0.01, Math.min(0.99, a + Math.max(-lim, Math.min(lim, dA))));
       if (Math.abs(dS) < 1e-6 && Math.abs(dA) < 1e-6) break; }
     return { s, a, p: this.point(s, a) }; }
   /** a station's x along the car */

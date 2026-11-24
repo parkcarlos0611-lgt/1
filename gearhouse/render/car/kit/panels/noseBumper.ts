@@ -4,7 +4,7 @@
 import type { Ctx } from '../ctx';
 import { FLANK } from '../section';
 import { border } from '../emit';
-import { cross, mir, mix, sub, type V } from '../geom';
+import { cross, gp, gridProbe, mir, mix, sub, type V } from '../geom';
 
 export function noseBumper(x: Ctx): void {
   const { e, s, c, k } = x, bl = k.bumperLamps, ic = k.intakes.centre, oc = k.intakes.outer, fg = k.intakes.fog, lc = bl.col ?? FLANK.H;
@@ -19,8 +19,9 @@ export function noseBumper(x: Ctx): void {
     e.with('part', () => { for (let i = bl.from; i < bl.to; i++) { if (clear(i)) e.name('sidelightF').mat(c.lens, 0.7, 'lens'); else e.name('indicatorF').mat(c.amber, 0.7, 'lens'); e.inCell(N, i, lc, 0.04, 0.96, 0.14, 0.86, 3 - ld, [-1, 0, 0], sg); } }); }
   else { e.name('sidelightF').mat(c.lens, 0.7); e.cells(N, (i, q) => lampCell(i, q) && clear(i));
     e.name('indicatorF').mat(c.amber, 0.7); e.cells(N, (i, q) => lampCell(i, q) && !clear(i)); }
-  // the centre intake: one pocket across the centre line
+  // the centre intake: one pocket across the centre line (none when it has no rows)
   const rows = N.slice(0, ic.rows + 1), r: V[] = [...rows.map(p => p[ic.cols[0]]!)];
+  if (ic.rows > 0) {
   for (let q = ic.cols[0] + 1; q < ic.cols[1]; q++) r.push(N[ic.rows]![q]!);
   r.push(...rows.slice().reverse().map(p => p[ic.cols[1]]!));
   const full = [...r, ...r.slice(1, -1).reverse().map(p => mir(p, -1))];
@@ -29,15 +30,28 @@ export function noseBumper(x: Ctx): void {
     if (ic.slats) for (const z of ic.slats.z) e.b.bar([ic.barX, -x.L.my(ic.slats.half), z], [ic.barX, x.L.my(ic.slats.half), z], 12, 10);
     if (ic.badge) { const [h, z0, z1] = ic.badge, bx = ic.barX - 10; e.name('badge').mat(c.chrome, 0.85, 'metal'); e.face([bx, -h, z0], [bx, h, z0], [bx, h, z1], [bx, -h, z1], [-1, 0, 0]); }
     // its corners rounded: fillets of the skin left across them
-    e.name('bumperF').mat(c.paint, c.gloss, 'paint'); for (const [i, q, di, dq] of ic.fillets ?? []) { const cp = N[i]![q]!; e.tri2(cp, mix(cp, N[i + di]![q]!, ic.fillet ?? 0.5), mix(cp, N[i]![q + dq]!, ic.fillet ?? 0.5), [-1, 0, 0]); } });
+    e.name('bumperF').mat(c.paint, c.gloss, 'paint'); for (const [i, q, di, dq] of ic.fillets ?? []) { const cp = N[i]![q]!; e.tri2(cp, mix(cp, N[i + di]![q]!, ic.fillet ?? 0.5), mix(cp, N[i]![q + dq]!, ic.fillet ?? 0.5), [-1, 0, 0]); } }); }
   if (oc) for (const sg of [1, -1]) { e.name('grille'); e.pocket(border(N, oc.rows[0], oc.rows[1], oc.cols[0], oc.cols[1]).map(p => mir(p, sg)), [oc.depth, 0, 0], [-1, 0, 0], c.dark, 'grille');
-    e.with('part', () => { const f = oc.fog; e.name('fogF').mat(c.lens, 0.7); e.inCell(N, f[0], oc.cols[0], f[1], f[2], f[3], f[4], -f[5], [-1, 0, 0], sg); }); }
+    e.with('part', () => { const f = oc.fog; if (f) { e.name('fogF').mat(c.lens, 0.7); e.inCell(N, f[0], oc.cols[0], f[1], f[2], f[3], f[4], -f[5], [-1, 0, 0], sg); }
+      // body-coloured bars across the opening on the bumper's own lines: a face and a ledge running back from its top
+      e.name('bumperF').mat(c.paint, c.gloss, 'paint'); for (const q of oc.slats ?? []) for (let i = oc.rows[0]; i < oc.rows[1]; i++) { const a = mir(N[i]![q]!, sg), b = mir(N[i + 1]![q]!, sg), o = (p: V, dx: number, dz: number): V => [p[0] + dx, p[1], p[2] + dz];
+        e.face(o(a, 0, -9), o(b, 0, -9), o(b, 0, 9), o(a, 0, 9), [-1, 0, 0]); e.face(o(a, 0, 9), o(b, 0, 9), o(b, 30, 9), o(a, 30, 9), [0, 0, 1]); } }); }
   // a round lamp sunk in a recess: its block of cells cut round a port
   if (fg) { const [r0, r1] = fg.rows, [c0, c1] = fg.cols, P = (i: number, q: number) => N[i]![q]!, yc = x.L.my(fg.y), d: V = [fg.depth, 0, 0];
     const xa = (y: number, z: number) => { const u = (y - (P(r0, c0)[1] + P(r0, c1)[1]) / 2) / ((P(r1, c0)[1] + P(r1, c1)[1] - P(r0, c0)[1] - P(r0, c1)[1]) / 2), v = (P(r0, c0)[2] - z) / (P(r0, c0)[2] - P(r0, c1)[2]); return mix(mix(P(r0, c0), P(r1, c0), u), mix(P(r0, c1), P(r1, c1), u), v)[0]; };
     for (const sg of [1, -1]) { const hole = Array.from({ length: fg.seg }, (_, t) => { const a = t / fg.seg * Math.PI * 2, y = yc + fg.r * Math.cos(a), z = fg.z + fg.r * Math.sin(a); return [xa(y, z), sg * y, z] as V; });
       e.name('bumperF').mat(c.paint, c.gloss, 'paint'); e.porthole(border(N, r0, r1, c0, c1).map(p => mir(p, sg)), hole, [-1, 0, 0]);
       e.name('fogF').mat(c.dark, 0.2); e.tube(hole, d); e.mat(c.frame, 0.7, 'lens'); e.fan(hole.map(p => [p[0] + d[0], p[1], p[2]] as V), [-1, 0, 0]); } }
+}
+/** what is laid on the bumper's face: a small shield grille in its middle, dark ducts at its corners; the splitter under it */
+export function noseFittings(x: Ctx): void {
+  const { e, s, c, k, L } = x, N = s.NSG, I = k.intakes, on = (y: number, z: number, lift: number): V => { const px = gridProbe(N, 1, 2, 0, Math.abs(y), z, false, (_, q) => q >= FLANK.H); return [(Number.isNaN(px) ? N[0]![FLANK.H]![0] : px) - lift, y, z]; };
+  if (I.shield) { const P = I.shield.pts, zc = P.reduce((a, p) => a + p[1], 0) / P.length, hs = (g: number, lift: number) => e.fan(P.map(([y, z]) => on(L.my(y) * g, zc + (z - zc) * g, lift)), [-1, 0, 0]);
+    e.name('grille').mat(c.paint, c.gloss, 'paint'); hs(I.shield.grow, 3); e.name('grille').mat(c.dark, 0.05, 'grille'); hs(1, 6); }
+  e.name('grille').mat(c.dark, 0.05, 'grille'); for (const [y0, y1, z0, z1] of I.patches ?? []) for (const sg of [1, -1]) { const m = (y0 + y1) / 2; e.face(on(sg * L.my(y0), z0, 5), on(sg * L.my(m), z0, 5), on(sg * L.my(m), z1, 5), on(sg * L.my(y0), z1, 5), [-1, sg, 0]); e.face(on(sg * L.my(m), z0, 5), on(sg * L.my(y1), z0, 5), on(sg * L.my(y1), z1, 5), on(sg * L.my(m), z1, 5), [-1, sg, 0]); }
+  const S = k.splitter; if (!S) return; const XJ = s.SF[0]!, yw = s.CJ[s.CJ.length - 1]![1], rows = N.map(r => r[r.length - 1]!).filter(p => p[1] / yw <= S.until + 1e-9);
+  const P = rows.map(p => { const f = Math.min(p[1] / yw, S.until), ex = L.mx(S.reach) + (XJ - L.mx(S.reach)) * gp(f, k.nose.pow); return [[ex, L.my(S.half) * f, S.z[0]] as V, [p[0], p[1], S.z[0]] as V]; });
+  e.name('splitter').mat(c.frame, 0.15); e.cells(P); e.cells(P.map(r => [[r[0]![0], r[0]![1], S.z[1]] as V, r[0]!]));
 }
 /** the bumper's shut line along its top edge, round the nose to the front arch */
 export function noseTrim(x: Ctx): void {

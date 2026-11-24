@@ -11,7 +11,7 @@ export function sideIntake(x: Ctx): void {
   const dep = (px: number) => I.depth * sm(x0, x1, px), inn = (i: number, q: number): V => { const p = CH[i]![q]!, d = dep(p[0]), lip = I.lip * d / I.depth; return [p[0], p[1] - d, p[2] + (q === top ? -lip : q === bot ? (I.footLip ?? I.lip) * d / I.depth : 0)]; };
   const IN: Grid = []; for (let i = z.iI0; i <= z.iI1; i++) { const r: V[] = [CH[i]![top]!]; for (let q = top; q <= bot; q++) r.push(inn(i, q)); r.push(CH[i]![bot]!); IN.push(r); }
   const nc = bot - top + 3;   // the pocket's columns: the skin's top edge, the inner points top..bot, the skin's foot edge
-  const ramp = I.footLip !== undefined, dark = (i: number, j: number) => j === 0 || (j === nc - 2 && !ramp) || i >= I.paintRows;   // a foot with its own rise is a ramp in the body's colour
+  const ramp = I.footLip !== undefined, dark = (i: number, j: number) => I.paintWalls ? i >= I.paintRows : j === 0 || (j === nc - 2 && !ramp) || i >= I.paintRows;   // a foot with its own rise is a ramp in the body's colour
   e.name('intake').mat(c.paint, c.gloss, 'paint'); e.cells(IN, (i, j) => !dark(i, j));
   e.name('intake').mat(c.dark, 0.05); e.cells(IN, dark);
   // the back wall: from the last inner row out to the skin

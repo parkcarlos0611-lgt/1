@@ -10,7 +10,7 @@ export function flankSeam(x: Ctx, pts: [number, number][], sgs: number[]): void 
 export function doorTrim(x: Ctx): void {
   const { e, s, c, k, L } = x, d = k.door;
   e.name('seam').mat(c.seam, 0.1); flankSeam(x, d.frontSeam, [1, -1]); for (const p of d.rearSeam) flankSeam(x, p, [1, -1]);
-  const h = d.handle; for (const sg of [1, -1]) { const P = (px: number, pz: number): V => mir(add(s.F.surf(L.mx(px), pz), [0, 3, 1]), sg), n: V = [0, sg, 0.4];
+  const h = d.handle; if (!d.noHandle) for (const sg of [1, -1]) { const P = (px: number, pz: number): V => mir(add(s.F.surf(L.mx(px), pz), [0, 3, 1]), sg), n: V = [0, sg, 0.4];
     e.name('handle').mat(c.frame, 0.3); e.face(P(h.pull[0], h.pull[2]), P(h.pull[1], h.pull[3]), P(h.pull[1], h.pull[4]), P(h.pull[0], h.pull[5]), n);
     e.name('handle').mat(c.chrome, 0.8, 'metal'); e.face(P(h.lock[0], h.lock[2]), P(h.lock[1], h.lock[3]), P(h.lock[1], h.lock[4]), P(h.lock[0], h.lock[5]), n); }
 }

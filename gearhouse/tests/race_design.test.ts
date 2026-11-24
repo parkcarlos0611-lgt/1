@@ -64,7 +64,7 @@ describe('any design inside the limits', () => {
   it('makes a finite, sensible spec the driving game runs for a few seconds', () => {
     const r = new Rng(98); for (let i = 0; i < 40; i++) { const d = random(r, i), s = designSpec(d), f = designFigures(d);
       for (const [k, v] of Object.entries(s)) if (typeof v === 'number') expect(Number.isFinite(v), `${d.id} ${k}`).toBe(true);
-      expect(s.mass).toBeGreaterThan(1000); expect(s.mass).toBeLessThan(2100); expect(s.hp).toBeGreaterThan(100); expect(s.hp).toBeLessThan(1100);
+      expect(s.mass).toBeGreaterThan(1000); expect(s.mass).toBeLessThan(2100); expect(s.hp).toBeGreaterThan(100); expect(s.hp).toBeLessThan(2000); // no power cap at the design stage (docs/systems/98 section 9)
       expect(s.frontShare).toBeGreaterThan(0.3); expect(s.frontShare).toBeLessThan(0.55); expect(s.torqueRpm).toBeLessThan(s.hpRpm); expect(s.hpRpm).toBeLessThanOrEqual(s.redline);
       expect(s.final).toBeGreaterThanOrEqual(LIMITS.final[0]); expect(s.final).toBeLessThanOrEqual(LIMITS.final[1]);
       for (const v of Object.values(f)) expect(Number.isFinite(v)).toBe(true); expect(f.topKmh).toBeGreaterThan(180); expect(f.topKmh).toBeLessThan(450);

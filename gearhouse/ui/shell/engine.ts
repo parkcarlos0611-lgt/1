@@ -277,7 +277,7 @@ export function engineScreen(ctx: ShellCtx): Screen<EngineParams> & { readonly a
     const rx = Math.sin(view.ang), ry = -Math.cos(view.ang), zc = ((b.min[2] + b.max[2]) / 2 + 120 * view.k) / 1000;
     lastView = { x: rx * ox, y: ry * ox, z: zc, ang: view.ang, pitch: view.pitch, mm, W, H, cy: cyPx / H };
     R.render(lastView, [{ g: g!, x: 0, y: 0, z: 0, yaw: 0, roll: 0, pitch: 0, steerL: 0, steerR: 0, spin: 0, player: true, lamps: 0 }], [], [],
-      { look: ctx.settings.graphics.look === 'toon' ? 3 : ctx.settings.graphics.look === 'baked' ? 0 : ctx.settings.graphics.look === 'stepped' ? 1 : 2, glass: 0.8, rays: false, bloomK: 0.8, reflK: 1.2, dof: 0, outW: 0.5, outK: 0.6 }); }
+      { look: ctx.settings.graphics.look === 'toon' ? 3 : ctx.settings.graphics.look === 'baked' ? 0 : ctx.settings.graphics.look === 'stepped' ? 1 : 2, glass: 0.8, rays: true, bloomK: 0.8, reflK: 1.2, dof: 0, outW: 0.5, outK: 0.6 }); }
   // the orbit: drag to turn, the wheel or two fingers to zoom; a tap (no drag) names the part under it, hovering too
   { const ptrs = new Map<number, { x: number; y: number; x0: number; y0: number }>(); let pinch = 0, hoverT = 0;
     const name = (cx: number, cy: number, pin: boolean) => { const M = shown(); if (!M || !lastView) return; const cv = ctx.stage.canvas.getBoundingClientRect(), dpr = lastView.W / Math.max(1, cv.width);

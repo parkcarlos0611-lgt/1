@@ -17,7 +17,7 @@ import { savedDesigns, saveDesign } from '../../core/designstore';
 import { withEngine } from '../../core/engines';
 import { lapTimes } from '../../race/race';
 import { trackDef } from '../../race/tracks';
-import type { Settings } from './settings';
+import { GLASS_REFL, type Settings } from './settings';
 import { CAM_VIEWS, type CamView } from '../drivecam';
 
 const LOOK_B: Record<Settings['graphics']['look'], string> = { pbr: '2', toon: '3', stepped: '0', baked: '0' };
@@ -33,7 +33,7 @@ export function builderScreen(ctx: ShellCtx): Screen<BuilderParams> & { readonly
   let page: PageScreen | null = null, api: BuilderApi | null = null;
   return { get api() { return api; },
     enter(p, how) { ctx.backdrop.stop(); page ??= new PageScreen('builder', builderPage, { dropCanvas: !!ctx.stage.L }); ctx.stage.use('builder', true); page.show(ctx.pages);
-      if (!api) { api = mountBuilder({ root: page.root, renderer: ctx.stage.L, design: p?.design, onTestDrive: d => void ctx.router.go('drive', { design: d, from: 'builder' }),
+      if (!api) { api = mountBuilder({ root: page.root, renderer: ctx.stage.L, design: p?.design, glassRefl: () => GLASS_REFL[ctx.settings.graphics.glassRefl], onTestDrive: d => void ctx.router.go('drive', { design: d, from: 'builder' }),
           // step ②: the engine designer with this car's engine, handed back to the car here
           onEngineShop: d => void ctx.router.go('engine', { design: d, onApply: (e: Design['engine']) => { if (api) api.use(withEngine(api.design, e)); } }) });
         // the way back to the garage, at the bar's start
@@ -51,7 +51,7 @@ export function driveScreen(ctx: ShellCtx): Screen<DriveParams> & { readonly api
   let page: PageScreen | null = null, api: DriveApi | null = null, params: DriveParams = {}, pause: HTMLElement | null = null, menuOn = false, poll = 0, raceSeen: unknown = null;
   const R = () => page!.root;
   /** the game's settings put on the drive's own fields */
-  const apply = () => { if (!page) return; const s = ctx.settings, r = R(); setField(r, 'live', s.graphics.live); setField(r, 'look', s.graphics.look); setField(r, 'photoGround', s.graphics.photoGround); setField(r, 'hdri', s.graphics.hdri); setField(r, 'blur', s.graphics.blur);
+  const apply = () => { if (!page) return; const s = ctx.settings, r = R(); setField(r, 'live', s.graphics.live); setField(r, 'look', s.graphics.look); setField(r, 'photoGround', s.graphics.photoGround); setField(r, 'hdri', s.graphics.hdri); setField(r, 'blur', s.graphics.blur); setField(r, 'glassRefl', s.graphics.glassRefl);
     setField(r, 'touch', s.controls.touch === 'auto' ? matchMedia('(pointer: coarse)').matches : s.controls.touch === 'on'); setField(r, 'auto', s.controls.auto); setField(r, 'tcs', s.controls.tcs); setField(r, 'assist', s.controls.assist); setField(r, 'progressive', s.controls.progressive);
     setField(r, 'vol', s.sound.volume); setField(r, 'sound', s.sound.on); if (api) api.camera = s.camera.view; };
   /** the drive's drawer for the game: what the pause menu and the settings now hold taken out of it, the effects folded under 개발자 */

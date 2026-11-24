@@ -37,7 +37,9 @@ import texMeta from '../assets/textures/pbr/pbr.json';
  *  own (builder3d.page.html) gives nothing */
 export interface BuilderHost { root?: ParentNode; renderer?: LiveRenderer | null; design?: Design; onTestDrive?: (d: Design) => void;
   /** step ②'s "엔진 공방에서 편집": the engine designer opened with this car (the game's page; it hands the engine back through use()) */
-  onEngineShop?: (d: Design) => void }
+  onEngineShop?: (d: Design) => void;
+  /** the toon glass's reflection, as the game's settings hold it now (0 off .. 1 as made; a page of its own: as made) */
+  glassRefl?: () => number }
 export interface BuilderApi { /** shown again (with another design, or as it was left: the same step) */ enter(d?: Design): void; /** hidden: it stops drawing */ leave(): void;
   readonly design: Design; readonly step: string; use(d: Design): void }
 // The builder below is one function's body, mounted once on its markup; it is not indented, so its lines read as before.
@@ -398,14 +400,14 @@ function frame(now: number) { const el = Math.min(0.1, (now - last) / 1000); las
     const rx = Math.sin(view.ang), ry = -Math.cos(view.ang);   // the screen's right, in the world
     L.render({ x: rx * ox, y: ry * ox, z: 0.55, ang: view.ang, pitch: view.pitch, mm, W, H, cy: phone ? (top + bottom) / 2 / r.height : 0.55 },
       [{ g: g!, x: 0, y: 0, z: -0.015, yaw: view.yaw, roll: 0, pitch: 0, steerL: 0.14, steerR: 0.12, spin: 0, player: true, lamps: view.lamps ? 1 : 0, ...(view.susp ? bounce(now / 1000) : {}) }], [], [],
-      { look: view.look, glass: 0.8, rays: true, bloomK: 1, reflK: 1.3, dof: 0, outW: 0.5, outK: 0.6 }); }
+      { look: view.look, glass: 0.8, glassRefl: host.glassRefl?.() ?? 1, rays: true, bloomK: 1, reflK: 1.3, dof: 0, outW: 0.5, outK: 0.6 }); }
   requestAnimationFrame(frame); }
 // the phone's drawer
 function drawer(on: boolean) { if (on === document.body.classList.contains('open')) return; document.body.classList.toggle('open', on); $('toggle').setAttribute('aria-expanded', String(on)); $('toggle').textContent = on ? '✕ 닫기' : '⚙ 설계'; dirty = true; if (on) showStep(); }
 $('toggle').addEventListener('click', () => drawer(!document.body.classList.contains('open')));
 
 $<HTMLInputElement>('name').value = D.name; for (const s of syncs) s(); restoreStep(); rebuild(); figures(); showList(); savedState(); driveLink(); requestAnimationFrame(frame);
-(globalThis as { __builder?: unknown }).__builder = { get design() { return D; }, use, get builds() { return builds; }, get frames() { return frames; }, get triangles() { return onGpu?.n ?? 0; }, get step() { return onFiles ? 'files' : step; }, go };   // for the page tests (tools)
+(globalThis as { __builder?: unknown }).__builder = { get design() { return D; }, use, get builds() { return builds; }, get frames() { return frames; }, get triangles() { return onGpu?.n ?? 0; }, get step() { return onFiles ? 'files' : step; }, go, /** a base's preset opened; the view (its angle, pitch, the car's yaw) set and drawn again */ preset: (id: BaseId) => use(fromPreset(id)), view, redraw() { dirty = true; } };   // for the page tests (tools)
 return { enter(d?: Design) { if (d && JSON.stringify(d) !== JSON.stringify(D)) use(d); awake = true; dirty = true; meas(); }, leave() { awake = false; drawer(false); },
   get design() { return D; }, get step() { return onFiles ? 'files' : step; }, use };
 }

@@ -92,6 +92,7 @@ export function settingsScreen(ctx: ShellCtx): Screen<never> {
     const pane = (...kids: HTMLElement[]) => el('div', 'gh-form', ...kids);
     const gfx = pane(toggle('실시간 렌더러 (WebGL2)', S().graphics.live, v => set(s => { s.graphics.live = v; }), '끄면 구운 그림으로 그립니다 (느린 기기)'),
       chips('조명·재질', [['pbr', 'PBR'], ['stepped', 'PBR 단계화'], ['toon', '툰'], ['baked', '단계 조명']], S().graphics.look, v => set(s => { s.graphics.look = v; })),
+      chips('유리 반사 (툰)', [['off', '끔'], ['weak', '약함'], ['mid', '보통']], S().graphics.glassRefl, v => set(s => { s.graphics.glassRefl = v; })),
       toggle('사진 콘크리트 (Poly Haven 텍스처)', S().graphics.photoGround, v => set(s => { s.graphics.photoGround = v; })),
       toggle('HDRI 하늘 (사진 하늘의 반사와 빛)', S().graphics.hdri, v => set(s => { s.graphics.hdri = v; })),
       toggle('모션 블러', S().graphics.blur, v => set(s => { s.graphics.blur = v; })),

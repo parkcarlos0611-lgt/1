@@ -39,6 +39,7 @@ import { Race, lapTimes, bestOf, bookFor, type Entrant, type Skill } from '../ra
 import { Health, WARN } from '../race/health';
 import { Sound, designVoice, type Skid, type EngineVoiceSpec } from './sound';
 import specsData from '../data/cars/specs.json';
+import { GLASS_REFL, type GlassRefl } from './shell/settings';
 import { DriveCam, carEyes, nextView, perspective, pedalValue, isCamView, CAM_VIEWS, CAM_DEFAULT, type CamView, type CarEyes, type CamShot } from './drivecam';
 
 /** what a page holding the drive gives it (the game's one page, ui/shell): the root its markup is in (found there even
@@ -127,7 +128,7 @@ const wearOf = (c: Vehicle, k: number): [number, number, number] => { if (c === 
 // each car's 2D art (its part model's views), laid on its mesh in the live picture (review 105), loaded when first wanted
 const ART: Record<string, string> = { bmw315: artBmw, buick28: artBuick, chevAB28: artChev, dodgeV28: artDodge, dueA21: artDueA, dueSSJ35: artSSJ, fnTT33: artFN, fordT23: artFord, plymU29: artPlym, pontiac29: artPont, willys27: artWillys };
 const artAsked = new WeakSet<object>(); let artOn = true, raysOn = true, texK = 1, lightK = 1, mbK = 1.6, aoK = 1, reflK = 1.3, bloomK = 1, deep = 1, day = 1, dof = 0.5, outW = 1, outK = 1, inK = 1, innerOn: 'auto' | 'on' | 'off' = 'auto';   /* the outline (review 110) */
-let toonB = 3, toonS = 0.55;   /* the toon look (review 92): its bands, how far its shade's hue moves */
+let toonB = 3, toonS = 0.55, glassRefl = 1;   /* the toon look (review 92): its bands, how far its shade's hue moves; its glass's reflection (doc 104 A) */
 function artFor(L: LiveRenderer, g: ReturnType<LiveRenderer['car']>, id: string, M: import('../render/car/mesh').Mesh) { if (artAsked.has(g) || !ART[id] || !M.names?.some(Boolean)) return; artAsked.add(g);   // only a mesh with its parts named can take it
   const meta = artMeta as unknown as { mm: number; groups: string[]; cars: Record<string, { C: number; views: Record<string, number[]> }> }, groups = M.names!.map(n => n ? meta.groups.indexOf(canonical(n)) + 1 : 0);
   void fetch(ART[id]!).then(r => r.blob()).then(b => createImageBitmap(b, { premultiplyAlpha: 'none', colorSpaceConversion: 'none' })).then(bm => L.setArt(g, bm, { mm: meta.mm, ...meta.cars[id]! }, groups)).catch(e => console.warn('art', e)); }
@@ -200,7 +201,7 @@ function drawLive(el: number) { const L = live!; void el;
     main.fillStyle = 'rgba(0,0,0,0.55)'; main.fillRect(0, VH - 20, VW, 20); main.fillStyle = '#f2ead6'; main.font = '11px sans-serif'; main.textAlign = 'center';
     for (let k = 0; k < 3; k++) main.fillText(names[k]!, k * w3 + w3 / 2, VH - 6); main.fillStyle = '#000'; for (let k = 1; k < 3; k++) main.fillRect(k * w3 - 1, 0, 2, VH); main.textAlign = 'left'; }
   else if (fxMode === 1 && filmRate && clock - heldAt < 1 / 18 && held.width === VW && heldAt <= clock) { /* the hand-cranked camera: 18 frames a second, the picture held between */ }
-  else { L.render(view, cars, props, skids, { glass: 0.8, look: look === 'stepped' ? 1 : look === 'pbr' ? 2 : look === 'toon' ? 3 : 0, toonBands: toonB, toonShade: toonS, art: artOn, rays: raysOn, texK, lightK, aoK, reflK, bloomK, deep, day, photoGround: photoOn, hdri: hdriOn, dof, mb: blurOn ? mbK * (S ? 0.5 : 1) : 0, outW, outK, inner: innerOn === 'auto' ? undefined : innerOn === 'on', inK, smoke: { p: sp8, n: smoke.parcels.length, time: smoke.time }, fx: fxMode, fxK, fxPx: Math.max(1, Math.round(VH / 480)) }); held.width = VW; held.height = VH; held.getContext('2d')!.drawImage(glCanvas, 0, 0); heldAt = clock; }
+  else { L.render(view, cars, props, skids, { glass: 0.8, look: look === 'stepped' ? 1 : look === 'pbr' ? 2 : look === 'toon' ? 3 : 0, toonBands: toonB, toonShade: toonS, glassRefl, art: artOn, rays: raysOn, texK, lightK, aoK, reflK, bloomK, deep, day, photoGround: photoOn, hdri: hdriOn, dof, mb: blurOn ? mbK * (S ? 0.5 : 1) : 0, outW, outK, inner: innerOn === 'auto' ? undefined : innerOn === 'on', inK, smoke: { p: sp8, n: smoke.parcels.length, time: smoke.time }, fx: fxMode, fxK, fxPx: Math.max(1, Math.round(VH / 480)) }); held.width = VW; held.height = VH; held.getContext('2d')!.drawImage(glCanvas, 0, 0); heldAt = clock; }
   if (look !== 'split') main.drawImage(held, 0, 0);
   drawDebris(el);
   if (car.speed > 30) { const v = Math.min(1, (car.speed - 30) / 30) * 0.35, g = main.createRadialGradient(VW / 2, VH / 2, VH * 0.35, VW / 2, VH / 2, VW * 0.62); g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, `rgba(0,0,0,${v})`); main.fillStyle = g; main.fillRect(0, 0, VW, VH); } }
@@ -707,9 +708,10 @@ const setFree = (on: boolean) => { st.free = on; ($('free') as HTMLInputElement)
     if (k === 'PageUp') { e.preventDefault(); want(pitchDeg + 5, mm); } if (k === 'PageDown') { e.preventDefault(); want(pitchDeg - 5, mm); } if (k === 'Home') setFree(false); }); }
 { const t = $<HTMLInputElement>('live'); t.checked = liveOK; t.disabled = !liveOK; if (!liveOK) $('livenote').textContent = '이 브라우저는 WebGL2가 없어 구운 그림으로 그립니다';
   t.addEventListener('change', () => { live = t.checked ? liveR : null; if (!live) rebake(true); t.blur(); }); }
-const toonRows = () => { for (const id of ['toonBRow', 'toonSRow']) $(id).hidden = look !== 'toon'; };
+const toonRows = () => { for (const id of ['toonBRow', 'toonSRow', 'glassReflRow']) $(id).hidden = look !== 'toon'; };
 $<HTMLSelectElement>('look').addEventListener('change', e => { look = (e.target as HTMLSelectElement).value as typeof look; toonRows(); (e.target as HTMLElement).blur(); }); toonRows();
 $<HTMLInputElement>('toonB').addEventListener('input', e => { toonB = +(e.target as HTMLInputElement).value; $('toonBv').textContent = String(toonB); });
+$<HTMLSelectElement>('glassRefl').addEventListener('change', e => { glassRefl = GLASS_REFL[(e.target as HTMLSelectElement).value as GlassRefl] ?? 1; (e.target as HTMLElement).blur(); });
 $<HTMLInputElement>('toonS').addEventListener('input', e => { toonS = +(e.target as HTMLInputElement).value; });
 for (const [id, k] of [['wrust', 0], ['wfade', 1], ['wdirt', 2]] as const) $<HTMLInputElement>(id).addEventListener('input', e => { myWear[k] = +(e.target as HTMLInputElement).value; });
 for (const [id, set] of [['mbK', (v: number) => { mbK = v; }], ['aoK', (v: number) => { aoK = v; }], ['reflK', (v: number) => { reflK = v; }], ['bloomK', (v: number) => { bloomK = v; }], ['deep', (v: number) => { deep = v; }], ['day', (v: number) => { day = v; }], ['dof', (v: number) => { dof = v; }]] as const) $<HTMLInputElement>(id).addEventListener('input', e => set(+(e.target as HTMLInputElement).value));

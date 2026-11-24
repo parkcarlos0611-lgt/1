@@ -18,6 +18,7 @@
 // ② with that car's engine: "빌더에 적용" hands the engine back to the builder.
 import type { Screen, Move } from './router';
 import type { ShellCtx } from './ctx';
+import { GLASS_REFL } from './settings';
 import { el, button, chips, slider, toggle, tabs, dialog, toast } from './ui';
 import { studioFloor } from '../../render/live/studio';
 import type { LiveRenderer } from '../../render/live/renderer';
@@ -351,7 +352,7 @@ export function engineScreen(ctx: ShellCtx): Screen<EngineParams> & { readonly a
     const rx = Math.sin(view.ang), ry = -Math.cos(view.ang), zc = ((b.min[2] + b.max[2]) / 2 + 120 * view.k) / 1000;
     lastView = { x: rx * ox, y: ry * ox, z: zc, ang: view.ang, pitch: view.pitch, mm, W, H, cy: cyPx / H };
     R.render(lastView, [{ g: g!, x: 0, y: 0, z: 0, yaw: 0, roll: 0, pitch: 0, steerL: 0, steerR: 0, spin: 0, player: true, lamps: 0, crank: cut.on ? cut.theta : 0 }], [], [],
-      { look: ctx.settings.graphics.look === 'toon' ? 3 : ctx.settings.graphics.look === 'baked' ? 0 : ctx.settings.graphics.look === 'stepped' ? 1 : 2, glass: 0.8, rays: true, bloomK: 0.8, reflK: 1.2, dof: 0, outW: 0.5, outK: 0.6,
+      { look: ctx.settings.graphics.look === 'toon' ? 3 : ctx.settings.graphics.look === 'baked' ? 0 : ctx.settings.graphics.look === 'stepped' ? 1 : 2, glass: 0.8, glassRefl: GLASS_REFL[ctx.settings.graphics.glassRefl], rays: true, bloomK: 0.8, reflK: 1.2, dof: 0, outW: 0.5, outK: 0.6,
         texK: 0.3 });
     const ms = performance.now() - t1; drawGap = coarse ? Math.max(33, ms * 1.5) : ms > 30 ? ms : 0; drawGlints(); }   // the material textures calm: they are sized for a car's panels, and an engine seen this close shows them coarse
   // the orbit: drag to turn, the wheel or two fingers to zoom; a tap (no drag) names the part under it, hovering too

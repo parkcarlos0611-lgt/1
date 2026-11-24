@@ -16,7 +16,10 @@ const m4of = (R: number[][]): M4 => { const m = new Float32Array(16); for (let r
 import type { GroundData } from './ground';
 import type { Mesh } from '../car/mesh';
 
-export interface LiveView { x: number; y: number; z: number; /** the world heading that points up the screen */ ang: number; pitch: number; mm: number; W: number; H: number; /** the target's height on the screen (0 top .. 1 bottom) */ cy: number }
+export interface LiveView { x: number; y: number; z: number; /** the world heading that points up the screen */ ang: number; pitch: number; mm: number; W: number; H: number; /** the target's height on the screen (0 top .. 1 bottom) */ cy: number;
+  /** a perspective camera instead (the drive's chase, bonnet and cabin views): the eye, the vertical field of view (degrees), the
+   *  near plane (m); turned by ang and tilted by pitch as the orthographic one, x, y, z then only where the shadows and the props gather */
+  eye?: [number, number, number]; fov?: number; near?: number }
 /** a tyre's shape this moment (review 101): its ring's give at 32 angles from straight down toward the front (m), the patch's shift (m, along and across) */
 export interface LiveTyre { u: Float32Array; sx: number; sy: number }
 export interface LiveCar { /** age: rust, fading, dirt (0..1) (review 104) */ wear?: [number, number, number]; /** FL FR RL RR */ tyres?: LiveTyre[]; g: GpuMesh; x: number; y: number; z: number; yaw: number; roll: number; pitch: number; /** each front wheel's own angle (rad, left +): the inner one more */ steerL: number; steerR: number; spin: number; player: boolean; /** head lamps alight 0..1, brakes on (review 117) */ lamps?: number; brake?: boolean; /** the crank's angle (degrees, 0..720): an engine's insides posed (the workshop's cutaway) */ crank?: number; /** each wheel's rise against the body (m) and lean (rad, top to the left +): the suspension's travel (review 120) */ travel?: number[]; camber?: number[] }
@@ -181,7 +184,7 @@ void main() { vec3 p = aPos, nr = aNor, ns = dot(aSmo, aSmo) > 0.25 ? aSmo : aNo
   if (uWheel == 2) { int b = int(aBone + 0.5) * 3; vec4 q = vec4(p, 1.); vec3 r0 = uBone[b].xyz, r1 = uBone[b + 1].xyz, r2 = uBone[b + 2].xyz;   // a suspension part carried by its bone
     p = vec3(dot(uBone[b], q), dot(uBone[b + 1], q), dot(uBone[b + 2], q)); nr = normalize(vec3(dot(r0, nr), dot(r1, nr), dot(r2, nr))); ns = normalize(vec3(dot(r0, ns), dot(r1, ns), dot(r2, ns))); }
   vec4 w = uModel * vec4(p, 1.); vWorld = w.xyz; vObj = p; vObjN = nr; vN = normalize(mat3(uModel) * nr); vSN = mat3(uModel) * ns; vLamp = aLamp; vLAx = normalize(mat3(uModel) * aLAx + 1e-9); vLRt = normalize(mat3(uModel) * aLRt + 1e-9); vLUp = normalize(mat3(uModel) * cross(aLAx, aLRt) + 1e-9); vCol = aCol; vGloss = aGloss; vKind = aKind; vPart = aPart;
-  gl_Position = uVP * w; vCur = gl_Position; vPrev = uPrevVP * (uPrevModel * vec4(p, 1.)); gl_Position.z -= uBias; }`;
+  gl_Position = uVP * w; vCur = gl_Position; vPrev = uPrevVP * (uPrevModel * vec4(p, 1.)); gl_Position.z -= uBias * gl_Position.w; }`;
 const OBJ_FS = `#version 300 es
 precision highp float;
 ${LIGHT}
@@ -360,7 +363,7 @@ void main() {
 const GROUND_VS = `#version 300 es
 layout(location=0) in vec3 aPos; layout(location=1) in vec4 aCol; layout(location=2) in float aFlag; layout(location=3) in vec3 aTrk;
 uniform mat4 uVP, uPrevVP; uniform float uBias; out vec3 vWorld; out vec4 vCol; flat out float vFlag; out vec4 vCur, vPrev; out vec3 vTrk;
-void main() { vWorld = aPos; vCol = aCol; vFlag = aFlag; vTrk = aTrk; gl_Position = uVP * vec4(aPos, 1.); vCur = gl_Position; vPrev = uPrevVP * vec4(aPos, 1.); gl_Position.z -= uBias; }`;
+void main() { vWorld = aPos; vCol = aCol; vFlag = aFlag; vTrk = aTrk; gl_Position = uVP * vec4(aPos, 1.); vCur = gl_Position; vPrev = uPrevVP * vec4(aPos, 1.); gl_Position.z -= uBias * gl_Position.w; }`;
 const GROUND_FS = `#version 300 es
 precision highp float;
 ${LIGHT}
@@ -523,6 +526,14 @@ out vec2 vUv; void main() { vec2 p = vec2((gl_VertexID << 1) & 2, gl_VertexID & 
 const POST_FS = `#version 300 es
 precision highp float;
 uniform sampler2D uCol, uId, uDepth, uN, uAO; uniform float uRange, uStep, uAOK, uReflK; uniform int uInner, uRays, uToon;   /* uToon: the toon look's lines (a darker tone of the thing's own colour; inner lines only at strong breaks) */ uniform float uRayK, uOutW, uOutK, uInK;   /* the outline: its width (times the thing's own), how dark; the lines inside, how dark */ uniform mat4 uVP; uniform vec3 uVd, uSunD; in vec2 vUv; out vec4 o;
+/* the perspective camera (uLin: its near and far planes; 0 the orthographic one): the depth layer's value as metres from
+   the eye, and where nothing was drawn the sky (the view's ray from uRx, uUpV and uTan), the far ground hazed toward it */
+uniform vec2 uLin, uTan; uniform vec3 uRx, uUpV; uniform int uSky; uniform float uDay;
+float dm(float d) { return uLin.x > 0. ? 2. * uLin.x * uLin.y / (uLin.y + uLin.x - (d * 2. - 1.) * (uLin.y - uLin.x)) : d * 2. * uRange; }
+vec3 acesP(vec3 x) { return clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0., 1.); }
+vec3 skyAt(vec3 r) { float e = r.z, k = 0.25 + 0.75 * uDay; vec3 hz = vec3(0.70, 0.74, 0.76), zen = vec3(0.24, 0.40, 0.66), fld = vec3(0.30, 0.36, 0.25);
+  vec3 c = e > 0. ? mix(hz, zen, pow(clamp(e, 0., 1.), 0.55)) : mix(hz, fld, clamp(-e * 14., 0., 1.)); c += vec3(1., 0.92, 0.75) * pow(max(0., dot(r, uSunD)), 24.) * 0.35;
+  c *= k; return uSky == 2 ? c : pow(acesP(c), vec3(1. / 2.2)); }
 float obj(vec4 id) { return floor(id.r * 255. + 0.5) + floor(id.g * 255. + 0.5) * 256.; }
 /** the toon line's ink: the colour squared (deeper, more saturated), held dark */
 vec3 toonInk(vec3 c) { vec3 d = c * c * 0.55; float L = dot(d, vec3(0.3, 0.59, 0.11)); return d * min(1., 0.13 / max(L, 1e-4)); }
@@ -531,7 +542,8 @@ vec3 toonInk(vec3 c) { vec3 d = c * c * 0.55; float L = dot(d, vec3(0.3, 0.59, 0
 vec3 toScreen(vec3 d) { vec4 c = uVP * vec4(d, 0.); vec2 sz = vec2(textureSize(uCol, 0)); return vec3(c.x * sz.x * 0.5, c.y * sz.y * 0.5, c.z * 0.5); }
 float hsh(vec2 q) { return fract(sin(dot(q, vec2(12.9898, 78.233))) * 43758.5453); }
 void main() { ivec2 p = ivec2(gl_FragCoord.xy), sz = textureSize(uCol, 0); vec4 c = texelFetch(uCol, p, 0), id = texelFetch(uId, p, 0); float me = obj(id);
-  float d0 = texelFetch(uDepth, p, 0).r; vec4 G = texelFetch(uN, p, 0); 
+  float d0 = texelFetch(uDepth, p, 0).r; vec4 G = texelFetch(uN, p, 0); vec3 ray = vec3(0.);
+  if (uSky > 0) { vec2 q = (vec2(p) + 0.5) / vec2(sz) * 2. - 1.; ray = normalize(uVd + uRx * q.x * uTan.x + uUpV * q.y * uTan.y); if (d0 > 0.9999) { o = vec4(skyAt(ray), 1.); return; } } 
   if (uRays == 1 && d0 < 0.9999) { vec3 n = normalize(G.xyz * 2. - 1.); float M = 0.5 / uRange;   // M: a metre in the depth layer
     // occlusion and contact shadow, from their own layer, smoothed over 4 x 4 where the depth agrees (no pattern, no halo)
     vec2 aoS = vec2(0.); float aw = 0.; for (int i = -2; i <= 1; i++) for (int j = -2; j <= 1; j++) { ivec2 q = clamp(p + ivec2(i, j), ivec2(0), sz - 1); float w = exp(-abs(texelFetch(uDepth, q, 0).r - d0) / (0.15 * M)); aoS += texelFetch(uAO, q, 0).rg * w; aw += w; }
@@ -542,10 +554,10 @@ void main() { ivec2 p = ivec2(gl_FragCoord.xy), sz = textureSize(uCol, 0); vec4 
           if (q.x < 0 || q.y < 0 || q.x >= sz.x || q.y >= sz.y) break; float rd = d0 + st.z * t, sd = texelFetch(uDepth, q, 0).r;
           if (rd > sd + 0.03 * M && rd - sd < 0.6 * M + abs(st.z) * stepM) { vec3 hc = (texelFetch(uCol, q, 0).rgb * 2. + texelFetch(uCol, clamp(q + ivec2(1, 0), ivec2(0), sz - 1), 0).rgb + texelFetch(uCol, clamp(q - ivec2(0, 1), ivec2(0), sz - 1), 0).rgb) / 4.; vec2 e = min(qf, vec2(sz) - qf) / vec2(sz) * 8.;
             float fade = clamp(min(e.x, e.y), 0., 1.) * (1. - float(k) / 56.); float F = G.a * (0.5 + 0.5 * pow(1. - max(0., dot(-uVd, n)), 3.)); c.rgb = mix(c.rgb, hc, clamp(F * fade * uRayK * uReflK, 0., 0.97)); break; } } } } }
-  if (me > 0.) { float dp = texelFetch(uDepth, p, 0).r * 2. * uRange; int w = int(floor(floor(id.a * 8. + 0.5) * uOutW + 0.5)); float k = 1., ko = 1. - 0.8 * uOutK, ki = 1. - 0.5 * uInK;
+  if (me > 0.) { float dp = dm(texelFetch(uDepth, p, 0).r); int w = int(floor(floor(id.a * 8. + 0.5) * uOutW + 0.5)); float k = 1., ko = 1. - 0.8 * uOutK, ki = 1. - 0.5 * uInK;
     ivec2 dirs[4] = ivec2[4](ivec2(1, 0), ivec2(-1, 0), ivec2(0, 1), ivec2(0, -1));
     for (int s = 1; s <= 6; s++) { if (s > max(w, uInner)) break; for (int j = 0; j < 4; j++) { ivec2 q = p + dirs[j] * s; if (q.x < 0 || q.y < 0 || q.x >= sz.x || q.y >= sz.y) { if (s <= w) k = ko; continue; }
-      vec4 iq = texelFetch(uId, q, 0); float oq = obj(iq), dq = texelFetch(uDepth, q, 0).r * 2. * uRange;
+      vec4 iq = texelFetch(uId, q, 0); float oq = obj(iq), dq = dm(texelFetch(uDepth, q, 0).r);
       if (s <= w && oq != me && (oq == 0. || dq > dp)) k = min(k, ko);
       else if (uInner == 1 && s == 1 && oq == me && k > ki) {
         bool brk; if (uToon == 1) { float nd = dot(G.xyz * 2. - 1., texelFetch(uN, q, 0).xyz * 2. - 1.), dz = dp - dq; bool part = abs(iq.b - id.b) > 0.001;   /* toon: only strong breaks, a part's edge standing proud, a fold, a big step */
@@ -553,6 +565,7 @@ void main() { ivec2 p = ivec2(gl_FragCoord.xy), sz = textureSize(uCol, 0); vec4 
         else brk = (abs(iq.b - id.b) > 0.001 && dp - dq > 0.004) || dp - dq > uStep;
         if (brk) k = min(k, ki); } } }
     if (uToon == 1) c.rgb = mix(c.rgb, toonInk(c.rgb), clamp((1. - k) / 0.8, 0., 1.)); else c.rgb *= k; }
+  if (uSky > 0) c.rgb = mix(c.rgb, skyAt(vec3(ray.xy, max(ray.z, 0.))), smoothstep(90., 2600., dm(d0)) * 0.7);   /* the air between: the far ground toward the horizon's colour */
   o = vec4(c.rgb, 1.); }`;
 
 // ---- the occlusion layer (review 111): twelve short rays over each surface against the depth layer; and a short ray to
@@ -812,18 +825,22 @@ export class LiveRenderer {
     // ---- the camera: orthographic, turned to v.ang, tilted down by v.pitch, v.mm millimetres a pixel, snapped to whole pixels ----
     const a = v.ang - Math.PI / 2, cA = Math.cos(a), sA = Math.sin(a), SP = Math.sin(v.pitch * Math.PI / 180), CP = Math.cos(v.pitch * Math.PI / 180), k = 1000 / v.mm, R = 900;
     const rx = [cA, sA, 0], ry = [-sA, cA, 0], up = [ry[0]! * SP, ry[1]! * SP, CP], vd = [ry[0]! * CP, ry[1]! * CP, -SP], c = [v.x, v.y, v.z], dot = (p: number[], q: number[]) => p[0]! * q[0]! + p[1]! * q[1]! + p[2]! * q[2]!;
-    const VP = new Float32Array(16); VP[0] = rx[0]! * 2 * k / v.W; VP[4] = rx[1]! * 2 * k / v.W; VP[12] = Math.round(v.W / 2 - dot(c, rx) * k) * 2 / v.W - 1;
+    const VP = new Float32Array(16), pv = v.fov && v.eye ? { e: v.eye, n: v.near ?? 0.2, f: 3000, ty: Math.tan(v.fov * Math.PI / 360) } : null;
+    if (pv) { const sy = 1 / pv.ty, sx = sy * v.H / v.W, A = (pv.f + pv.n) / (pv.f - pv.n), B = -2 * pv.f * pv.n / (pv.f - pv.n);   // the perspective camera: a frustum from the eye
+      for (let i = 0; i < 3; i++) { VP[i * 4] = rx[i]! * sx; VP[i * 4 + 1] = up[i]! * sy; VP[i * 4 + 2] = vd[i]! * A; VP[i * 4 + 3] = vd[i]!; }
+      VP[12] = -dot(pv.e, rx) * sx; VP[13] = -dot(pv.e, up) * sy; VP[14] = -dot(pv.e, vd) * A + B; VP[15] = -dot(pv.e, vd); } else {
+    VP[0] = rx[0]! * 2 * k / v.W; VP[4] = rx[1]! * 2 * k / v.W; VP[12] = Math.round(v.W / 2 - dot(c, rx) * k) * 2 / v.W - 1;
     VP[1] = up[0]! * 2 * k / v.H; VP[5] = up[1]! * 2 * k / v.H; VP[9] = up[2]! * 2 * k / v.H; VP[13] = 1 - 2 * Math.round(v.H * v.cy + dot(c, up) * k) / v.H;
-    VP[2] = vd[0]! / R; VP[6] = vd[1]! / R; VP[10] = vd[2]! / R; VP[14] = -dot(c, vd) / R; VP[15] = 1;
+    VP[2] = vd[0]! / R; VP[6] = vd[1]! / R; VP[10] = vd[2]! / R; VP[14] = -dot(c, vd) / R; VP[15] = 1; }
     const eye = [-vd[0]!, -vd[1]!, -vd[2]!];
     if (this.prevCam && Math.hypot(v.x - this.prevCam[0], v.y - this.prevCam[1]) > 15) { this.prevVP = null; this.prevM.clear(); }   /* a cut (the car put back, a new shot): no smear from the jump */ this.prevCam = [v.x, v.y];
     // ---- the sun's view for the shadows: around the camera's target, as far as the picture reaches ----
-    const reach = Math.min(160, Math.hypot(v.W, v.H / Math.max(0.2, SP)) * v.mm / 2000 + 12), lz = SUN_W.map(x => -x), lx0 = [lz[1]!, -lz[0]!, 0], ll = Math.hypot(lx0[0]!, lx0[1]!), lx = [lx0[0]! / ll, lx0[1]! / ll, 0];
+    const reach = pv ? 75 : Math.min(160, Math.hypot(v.W, v.H / Math.max(0.2, SP)) * v.mm / 2000 + 12), lz = SUN_W.map(x => -x), lx0 = [lz[1]!, -lz[0]!, 0], ll = Math.hypot(lx0[0]!, lx0[1]!), lx = [lx0[0]! / ll, lx0[1]! / ll, 0];
     const ly = [lz[1]! * lx[2]! - lz[2]! * lx[1]!, lz[2]! * lx[0]! - lz[0]! * lx[2]!, lz[0]! * lx[1]! - lz[1]! * lx[0]!], LR = 200, LV = new Float32Array(16);
     const tx = Math.round(dot(c, lx) / (2 * reach / this.S)) * (2 * reach / this.S), ty = Math.round(dot(c, ly) / (2 * reach / this.S)) * (2 * reach / this.S);   // snapped to the map's texels: shadows hold still
     LV[0] = lx[0]! / reach; LV[4] = lx[1]! / reach; LV[8] = lx[2]! / reach; LV[12] = -tx / reach; LV[1] = ly[0]! / reach; LV[5] = ly[1]! / reach; LV[9] = ly[2]! / reach; LV[13] = -ty / reach;
     LV[2] = lz[0]! / LR; LV[6] = lz[1]! / LR; LV[10] = lz[2]! / LR; LV[14] = -dot(c, lz) / LR; LV[15] = 1;
-    const near = (x: number, y: number, r: number) => Math.abs(x - v.x) < reach + r + 20 && Math.abs(y - v.y) < reach + r + 20;
+    const seen = pv ? 650 : reach, near = (x: number, y: number, r: number) => Math.abs(x - v.x) < seen + r + 20 && Math.abs(y - v.y) < seen + r + 20;
     const ps = props.filter(p => near(p.x, p.y, p.g.radius)), carM = cars.map(q => this.carParts(q));
     // the head lamps alight (review 117): each lamp's middle and beam in the world, the nearest eight
     const lmpP: number[] = [], lmpD: number[] = []; cars.forEach((q, i) => { if (!q.lamps) return; const B = carM[i]!.body; for (const l of q.g.lamps) { if (l.flag !== 1 || lmpP.length >= 24) continue;
@@ -905,14 +922,14 @@ export class LiveRenderer {
     gl.uniform3f(this.loc(this.obj, 'uWear'), 0, 0, 0); gl.uniform1i(this.loc(this.obj, 'uIsCar'), 0); for (const p of ps) draw(p.g.glass, (p.m ?? placeMesh(p.g.len, p.x, p.y, p.z, p.h))); gl.uniform1i(this.loc(this.obj, 'uIsCar'), 1); cars.forEach((q, i) => { gl.uniform1f(this.loc(this.obj, 'uLampOn'), q.lamps ?? 0); gl.uniform1f(this.loc(this.obj, 'uBrake'), q.brake ? 1 : 0); for (const [part, M, w] of carM[i]!.glass) draw(part, M, w); }); gl.uniform1f(this.loc(this.obj, 'uLampOn'), 0); gl.uniform1f(this.loc(this.obj, 'uBrake'), 0);
     gl.disable(gl.BLEND); gl.depthMask(true);
     // ---- after the scene (review 111): occlusion, then the picture composed (reflections, occlusion, outlines), the bloom, the end ----
-    gl.disable(gl.DEPTH_TEST); gl.disable(gl.STENCIL_TEST); gl.disable(gl.BLEND); gl.bindVertexArray(null); const rays = (o.look ?? 0) > 0 && !toon && o.rays !== false, RT = this.rt;   /* toon: no traced reflections or occlusion (its shade is in bands) */
+    gl.disable(gl.DEPTH_TEST); gl.disable(gl.STENCIL_TEST); gl.disable(gl.BLEND); gl.bindVertexArray(null); const rays = (o.look ?? 0) > 0 && !toon && o.rays !== false && !pv, RT = this.rt;   /* toon: no traced reflections or occlusion (its shade is in bands) */
     const tex = (p: WebGLProgram, name: string, unit: number, t: WebGLTexture) => { gl.activeTexture(gl.TEXTURE0 + unit); gl.bindTexture(gl.TEXTURE_2D, t); gl.uniform1i(this.loc(p, name), unit); };
     const to = (k: number | null) => { if (k === null) { gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.viewport(0, 0, v.W, v.H); } else { gl.bindFramebuffer(gl.FRAMEBUFFER, RT[k]!.f); gl.viewport(0, 0, RT[k]!.w, RT[k]!.h); } };
     if (rays) { to(0); gl.useProgram(this.aoP); tex(this.aoP, 'uDepth', 0, this.tDepth); tex(this.aoP, 'uN', 1, this.tN); gl.uniformMatrix4fv(this.loc(this.aoP, 'uVP'), false, VP); gl.uniform3fv(this.loc(this.aoP, 'uSunD'), SUN_W); gl.uniform1f(this.loc(this.aoP, 'uRange'), R); gl.drawArrays(gl.TRIANGLES, 0, 3); }
     to(1); gl.useProgram(this.post); tex(this.post, 'uAO', 9, RT[0]!.t); gl.uniform1f(this.loc(this.post, 'uAOK'), o.aoK ?? 1); gl.uniform1f(this.loc(this.post, 'uReflK'), o.reflK ?? 1);
     [this.tCol, this.tId, this.tDepth].forEach((t, i) => { gl.activeTexture(gl.TEXTURE0 + i); gl.bindTexture(gl.TEXTURE_2D, t); gl.uniform1i(this.loc(this.post, ['uCol', 'uId', 'uDepth'][i]!), i); });
     gl.uniform1i(this.loc(this.post, 'uInner'), (o.inner ?? ((o.look ?? 0) === 0 || toon)) ? 1 : 0); gl.uniform1i(this.loc(this.post, 'uToon'), toon ? 1 : 0); gl.uniform1f(this.loc(this.post, 'uOutW'), o.outW ?? 1); gl.uniform1f(this.loc(this.post, 'uOutK'), o.outK ?? 1); gl.uniform1f(this.loc(this.post, 'uInK'), o.inK ?? 1); gl.uniform1f(this.loc(this.post, 'uRayK'), Math.min(1.8, o.lightK ?? 1)); gl.uniform1i(this.loc(this.post, 'uRays'), rays ? 1 : 0); gl.uniformMatrix4fv(this.loc(this.post, 'uVP'), false, VP); gl.uniform3fv(this.loc(this.post, 'uVd'), vd); gl.uniform3fv(this.loc(this.post, 'uSunD'), SUN_W);
-    gl.activeTexture(gl.TEXTURE8); gl.bindTexture(gl.TEXTURE_2D, this.tN); gl.uniform1i(this.loc(this.post, 'uN'), 8); gl.uniform1f(this.loc(this.post, 'uRange'), R);   /* PBR: no lines over the shading inside a thing, its outline only */ gl.uniform1f(this.loc(this.post, 'uStep'), (60 + 2 * v.mm / Math.tan(Math.max(5, v.pitch) * Math.PI / 180)) / 1000);
+    gl.activeTexture(gl.TEXTURE8); gl.bindTexture(gl.TEXTURE_2D, this.tN); gl.uniform1i(this.loc(this.post, 'uN'), 8); gl.uniform1f(this.loc(this.post, 'uRange'), R); gl.uniform2f(this.loc(this.post, 'uLin'), pv ? pv.n : 0, pv ? pv.f : 0); gl.uniform1i(this.loc(this.post, 'uSky'), pv ? (hdrOn ? 2 : 1) : 0); gl.uniform1f(this.loc(this.post, 'uDay'), o.day ?? 1); gl.uniform3fv(this.loc(this.post, 'uRx'), rx); gl.uniform3fv(this.loc(this.post, 'uUpV'), up); gl.uniform2f(this.loc(this.post, 'uTan'), pv ? pv.ty * v.W / v.H : 0, pv ? pv.ty : 0);   /* PBR: no lines over the shading inside a thing, its outline only */ gl.uniform1f(this.loc(this.post, 'uStep'), (60 + 2 * v.mm / Math.tan(Math.max(5, v.pitch) * Math.PI / 180)) / 1000);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
     for (let i = 0; i < 6; i++) { gl.activeTexture(gl.TEXTURE0 + i); gl.bindTexture(gl.TEXTURE_2D, this.blank); }
     const bloomK = o.bloomK ?? 1;
@@ -922,7 +939,7 @@ export class LiveRenderer {
       for (let k = 4; k >= 2; k--) { to(k); tex(this.upP, 'uSrc', 0, RT[k + 1]!.t); gl.drawArrays(gl.TRIANGLES, 0, 3); gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, this.blank); }
       gl.disable(gl.BLEND); }
     to(null); gl.useProgram(this.finalP); tex(this.finalP, 'uSrc', 0, RT[1]!.t); tex(this.finalP, 'uDepth', 1, this.tDepth); tex(this.finalP, 'uBloom', 2, RT[2]!.t); tex(this.finalP, 'uVel', 3, this.tV); gl.uniform1f(this.loc(this.finalP, 'uMB'), o.mb ?? 0);
-    gl.uniform1f(this.loc(this.finalP, 'uBloomK'), bloomK > 0 ? bloomK * (hdrOn ? 0.55 : 0.4) : 0); gl.uniform1f(this.loc(this.finalP, 'uDof'), (o.dof ?? 0) * 0.8); gl.uniform1f(this.loc(this.finalP, 'uDeep'), o.deep ?? 1); gl.uniform1i(this.loc(this.finalP, 'uFx'), o.fx ?? 0); gl.uniform1f(this.loc(this.finalP, 'uFxK'), o.fxK ?? 1); gl.uniform1i(this.loc(this.finalP, 'uFrame'), this.frameN++); gl.uniform1f(this.loc(this.finalP, 'uFxPx'), o.fxPx ?? 1); gl.uniform1f(this.loc(this.finalP, 'uRange'), R); gl.uniform1f(this.loc(this.finalP, 'uFocus'), 0.5 + 0.6 * vd[2]! / (2 * R));   /* focused at the car's middle height over the target */ gl.uniform1i(this.loc(this.finalP, 'uHDR'), hdrOn);
+    gl.uniform1f(this.loc(this.finalP, 'uBloomK'), bloomK > 0 ? bloomK * (hdrOn ? 0.55 : 0.4) : 0); gl.uniform1f(this.loc(this.finalP, 'uDof'), pv ? 0 : (o.dof ?? 0) * 0.8); gl.uniform1f(this.loc(this.finalP, 'uDeep'), o.deep ?? 1); gl.uniform1i(this.loc(this.finalP, 'uFx'), o.fx ?? 0); gl.uniform1f(this.loc(this.finalP, 'uFxK'), o.fxK ?? 1); gl.uniform1i(this.loc(this.finalP, 'uFrame'), this.frameN++); gl.uniform1f(this.loc(this.finalP, 'uFxPx'), o.fxPx ?? 1); gl.uniform1f(this.loc(this.finalP, 'uRange'), R); gl.uniform1f(this.loc(this.finalP, 'uFocus'), 0.5 + 0.6 * vd[2]! / (2 * R));   /* focused at the car's middle height over the target */ gl.uniform1i(this.loc(this.finalP, 'uHDR'), hdrOn);
     gl.drawArrays(gl.TRIANGLES, 0, 3); for (let i = 0; i < 4; i++) { gl.activeTexture(gl.TEXTURE0 + i); gl.bindTexture(gl.TEXTURE_2D, this.blank); }
     this.prevVP = VP; this.prevM = this.nextM; this.nextM = new Map(); }
 

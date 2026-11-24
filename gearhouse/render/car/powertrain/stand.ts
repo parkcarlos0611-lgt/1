@@ -6,10 +6,12 @@
 // renderer's orthographic camera worked backward: the tap and hover labels). Pure: meshes in, meshes out.
 // The stand's frame is the car's (x along the crank, from the flange to the pulleys; y across; z up; mm), the mesh's
 // middle at x = length / 2 as the renderer places a car.
-// The cutaway (절단 보기): the block, the heads, the sump, the timing case and the bores cut open by the planes through the
+// The cutaway (절단 보기): the block, the heads, the sump and the bores cut open by the planes through the
 // crank and each bank's axis (a V: the wedge between its banks taken out, from a little under the crank; a flat engine:
 // its upper half; an in-line one: the intake's half), the decks and the heads' tops left off, the covers, the intake and
-// what feeds it taken away, the engine's insides (internals.ts) put in on their bones.
+// what feeds it taken away, the timing case and the belt drive too, the engine's insides (internals.ts) put in on their bones. A V's near bank
+// (-v) is opened down to the crankcase as well, its exhaust with it and its valve gear left out, so its pistons, the rods
+// and the crank show first, the far bank's valves and cams past them.
 import { Build, type Mesh } from '../mesh';
 import { powertrainMesh, type PowertrainBuilt } from './index';
 import { fromDesign } from './spec';
@@ -52,14 +54,19 @@ export function standModel(d: Design, detail: 0 | 1 | 2 = 2, cut?: { crank?: Cra
   const face = (name: string, p: Float32Array, i: number) => { const h = name === 'engineBlock' ? D.Hd : name === 'cylinderHead' ? D.Hd + D.Hh : -1; if (h < 0) return false;
     return D.S.some(s => { const a = D.ax(s); for (let k = 0; k < 3; k++) { const q = i + k * 3; if (Math.abs((p[q]! - off[0]) * a[0] + (p[q + 1]! - off[1]) * a[1] + (p[q + 2]! - off[2]) * a[2] - h) > 1) return false; } return true; }); };
   const rule = (n: string): 'keep' | 'clip' | 'drop' => CUT_CLIP.has(n) ? 'clip' : CUT_DROP.has(n) ? 'drop' : 'keep';
-  const Ec = cutMesh({ ...E, pos }, rule, planes, face), ib = new Build(), still = new Geo(), { rig, bone } = buildInternals(ib, still, S, { cc: d.engine.cc, bs: d.engine.bs, crank: cut.crank, det: detail, off });
-  const sb = new Build(); still.emit(sb); const Sm = cutMesh(sb.mesh(STAND_LEN), rule, planes), Im = ib.mesh(STAND_LEN); Im.bone = Uint8Array.from(bone);
+  // a V's near bank (the -v one, toward the view) opened down to the crankcase too, its exhaust with it, its valve gear left out:
+  // its pistons and rods, the crank and the far bank's valves seen past it
+  const vee = S.layout === 'V', near: { o: V; n: V }[] = [{ o: [off[0], off[1] + D.ax(-1)[1] * 0.3 * D.B, off[2] + D.ax(-1)[2] * 0.3 * D.B], n: D.ax(-1) }, { o: off, n: [0, -1, 0] }];
+  const rule2 = (n: string): 'keep' | 'clip' | 'drop' => CUT_CLIP.has(n) || CUT_NEAR.has(n) ? 'clip' : 'keep';
+  const Ec0 = cutMesh({ ...E, pos }, rule, planes, face), Ec = vee ? cutMesh(Ec0, rule2, near) : Ec0, ib = new Build(), still = new Geo(), { rig, bone } = buildInternals(ib, still, S, { cc: d.engine.cc, bs: d.engine.bs, crank: cut.crank, det: detail, off, ...(vee ? { bare: -1 } : {}) });
+  const sb = new Build(); still.emit(sb); const Sm0 = cutMesh(sb.mesh(STAND_LEN), rule, planes), Sm = vee ? cutMesh(Sm0, rule2, near) : Sm0, Im = ib.mesh(STAND_LEN); Im.bone = Uint8Array.from(bone);
   const all = mergeAll([Ec, Sm, Im, b.mesh(STAND_LEN)]); all.inner = rig;
   return { mesh: all, built, min, max, rig }; }
 
-/** what the cutaway cuts open, and what it takes away */
-const CUT_CLIP = new Set(['engineBlock', 'cylinderHead', 'sump', 'timingCover', 'cylinderBore']);
-const CUT_DROP = new Set(['camCover', 'coilPack', 'oilFiller', 'intakePlenum', 'intakeRunner', 'intakeTrumpet', 'throttleBody', 'throttleLinkage', 'intakeActuator', 'intakeLabel', 'airbox', 'intakeHose', 'fuelRail', 'boostPipe', 'intercooler', 'coolantHose']);
+/** what the cutaway cuts open, what else it cuts on a V's near bank, and what it takes away (the timing case and the belt drive too: they hid the front cylinder) */
+const CUT_CLIP = new Set(['engineBlock', 'cylinderHead', 'sump', 'cylinderBore']);
+const CUT_NEAR = new Set(['exhaustManifold', 'exhaustDownpipe', 'heatShield', 'turbo', 'wastegate', 'airFilter']);
+const CUT_DROP = new Set(['timingCover', 'oilFilter', 'pulley', 'belt', 'alternator', 'waterPump', 'camCover', 'coilPack', 'oilFiller', 'intakePlenum', 'intakeRunner', 'intakeTrumpet', 'throttleBody', 'throttleLinkage', 'intakeActuator', 'intakeLabel', 'airbox', 'intakeHose', 'fuelRail', 'boostPipe', 'intercooler', 'coolantHose']);
 /** a mesh with the region where every plane's dot(p - o, n) > 0 taken out of its clipped parts (the triangles cut along
  *  the planes), its dropped parts and the faces `face` names left off */
 export function cutMesh(M: Mesh, rule: (name: string) => 'keep' | 'clip' | 'drop', planes: { o: V; n: V }[], face?: (name: string, pos: Float32Array, i: number) => boolean): Mesh {

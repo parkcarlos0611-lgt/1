@@ -90,7 +90,7 @@ const STEEL = '#8d9196', FORGED = '#6f7378', ALU = '#c6c8cb', RING = '#2f3134', 
 
 /** the insides built into `b` (each bone's parts in turn: `boneOf` gets each triangle's bone), the still parts (bores, plugs)
  *  into `still`, and the rig that poses them; `off` the engine frame's origin in the mesh */
-export function buildInternals(b: Build, still: Geo, S: PowertrainSpec, o: { cc: number; bs: number; crank?: CrankKind; det?: Detail; off: V }): { rig: EngineRig; bone: number[] } {
+export function buildInternals(b: Build, still: Geo, S: PowertrainSpec, o: { cc: number; bs: number; crank?: CrankKind; det?: Detail; off: V; /** a bank drawn without its valve gear (the cutaway's near bank, opened to its pistons) */ bare?: number }): { rig: EngineRig; bone: number[] } {
   const D = engineDims(S), { B, pitch, st, Hd, Hh, P, ax, acr, nb } = D, n = S.cylinders, det = o.det ?? 2;
   const seg = n >= 10 ? 8 : n >= 8 ? 10 : 12, sseg = n >= 10 ? 5 : 6, lseg = det === 2 ? (n >= 10 ? 14 : 18) : 12;
   const real = boreStroke(o.cc, n, o.bs), bore = Math.min(real.bore, 0.86 * pitch), R = bore / 2, ch = 0.3 * bore, gap = 0.035 * bore;
@@ -160,16 +160,16 @@ export function buildInternals(b: Build, still: Geo, S: PowertrainSpec, o: { cc:
         g.part(side < 0 ? 'intakeValve' : 'exhaustValve', VALVE, 0.55, 'metal').lathe(seatC, d, [[0, v.rv], [0.03 * bore, v.rv * 0.9], [0.1 * bore, 0.06 * bore], [Ls, 0.035 * bore]], sseg + 2, 'a');
         g.part(side < 0 ? 'intakeValve' : 'exhaustValve', BUCKET, 0.5, 'metal').lathe(add(seatC, mul(d, Ls)), d, [[0, 0.13 * bore], [bh, 0.13 * bore]], sseg + 2, true);
         if (side < 0) c.inD = mul(d, -1); else c.exD = mul(d, -1); }
-      const k = nextBone++; if (side < 0) c.bones.inV = k; else c.bones.exV = k; emit(g, k); }
+      const k = nextBone++; if (side < 0) c.bones.inV = k; else c.bones.exV = k; if (s !== o.bare) emit(g, k); }
     // the plug: in the chamber's middle between two cams; beside the valves, short of the cam, under one
-    { const tip = twin ? P(s, c.u, 0, Hd + 0.06 * bore) : P(s, c.u + 0.3 * bore, 0.05 * bore, Hd + 0.06 * bore), d = ax(s), top = twin ? Hh * 0.95 : camAlong - rc - 0.06 * bore - Hd; c.plug = T(tip);
+    { const tip = twin ? P(s, c.u, 0, Hd + 0.06 * bore) : P(s, c.u + 0.3 * bore, 0.05 * bore, Hd + 0.06 * bore), d = ax(s), top = twin ? Hh * 0.95 : camAlong - rc - 0.06 * bore - Hd; c.plug = T(tip); if (s !== o.bare) {
       still.part('sparkPlug', '#5a5a5a', 0.5, 'metal').cyl(tip, add(tip, mul(d, 0.1 * bore)), 0.05 * bore, 5, true);
       still.part('sparkPlug', HEX, 0.55, 'metal').cyl(add(tip, mul(d, 0.1 * bore)), add(tip, mul(d, 0.3 * bore)), 0.13 * bore, 6, true);
-      still.part('sparkPlug', PLUG, 0.45).cyl(add(tip, mul(d, 0.3 * bore)), add(tip, mul(d, top)), 0.075 * bore, 6, true); } }
+      still.part('sparkPlug', PLUG, 0.45).cyl(add(tip, mul(d, 0.3 * bore)), add(tip, mul(d, top)), 0.075 * bore, 6, true); } } }
   // ---- the camshafts (a bone each): the shaft, a lobe at each valve, its nose where that valve's lift peaks (the cam
   // turning at half the crank's speed) ----
   const cams: EngineRig['cams'] = [];
-  for (const s of D.S) for (const side of (twin ? [-1, 1] : [0]) as (-1 | 0 | 1)[]) { const g = geo().part('camshaft', CAM, 0.6, 'metal'), [ca, cl] = side === 0 ? [0, camAlong] : camAt(side), cc = P(s, 0, ca, cl), mine = cyls.filter(c => c.s === s);
+  for (const s of D.S) for (const side of (twin ? [-1, 1] : [0]) as (-1 | 0 | 1)[]) { if (s === o.bare) continue; const g = geo().part('camshaft', CAM, 0.6, 'metal'), [ca, cl] = side === 0 ? [0, camAlong] : camAt(side), cc = P(s, 0, ca, cl), mine = cyls.filter(c => c.s === s);
     const u0 = Math.min(...mine.map(c => c.u)) - 0.5 * pitch, u1 = Math.max(...mine.map(c => c.u)) + 0.5 * pitch + 30;
     g.cyl([u0, cc[1], cc[2]], [u1, cc[1], cc[2]], 0.1 * bore, sseg + 2, true);
     for (const c of mine) for (const sd of (side === 0 ? [-1, 1] : [side]) as (-1 | 1)[]) { const vs = lay(sd), d = sd < 0 ? c.inD : c.exD, delta = Math.atan2(d[1], d[2]) / RAD;

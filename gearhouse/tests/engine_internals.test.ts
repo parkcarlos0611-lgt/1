@@ -79,7 +79,7 @@ describe('the motion', () => {
     const m = cutOf('V8', 4, 1, 'flat'), rig = m.rig!, cam = rig.cams[0]!, p: V = [1000, rig.off[1] + cam.c[1] + 30, rig.off[2] + cam.c[2]];
     expect(near(ap(poseInternals(rig, 720), cam.bone, p), p)).toBe(true); expect(near(ap(poseInternals(rig, 360), cam.bone, p), p)).toBe(false);
     const camOf = (c: EngineRig['cyl'][number], side: number) => rig.cams.find(k => k.s === c.s && k.side === side)!;
-    for (const c of rig.cyl.slice(0, 4)) for (const side of [-1, 1]) { const k = camOf(c, side), d = side < 0 ? c.inD : c.exD, at = (th: number) => { const B = poseInternals(rig, th); let r = 0;
+    for (const c of rig.cyl.filter(c => rig.cams.some(k => k.s === c.s))) for (const side of [-1, 1]) { const k = camOf(c, side), d = side < 0 ? c.inD : c.exD, at = (th: number) => { const B = poseInternals(rig, th); let r = 0;
         for (let t = 0; t < m.mesh.n; t++) { if (m.mesh.bone![t] !== k.bone) continue; for (let j = 0; j < 3; j++) { const q = t * 9 + j * 3, P: V = [m.mesh.pos[q]!, m.mesh.pos[q + 1]!, m.mesh.pos[q + 2]!]; if (Math.abs(P[0] - rig.off[0] - c.u) > 0.4 * rig.bore) continue;
           const w = ap(B, k.bone, P); r = Math.max(r, dot([w[0] - rig.off[0] - k.c[0], w[1] - rig.off[1] - k.c[1], w[2] - rig.off[2] - k.c[2]], d)); } } return r; };
       const peak = c.fire + (side < 0 ? (TIMING.inOpen + TIMING.inClose) / 2 : (TIMING.exOpen + TIMING.exClose) / 2), shut = peak + 360;
@@ -98,7 +98,7 @@ describe('the cutaway and the bones', () => {
       // no housing left inside the opened region (each cut triangle's middle outside one of its planes at least), and the cut made
       const D = engineDimsOf(l), o = rig.off, at = (k: number): V => [o[0], o[1], o[2] + k * D.B];
       const planes: { o: V; n: V }[] = l[0] === 'I' ? [{ o: at(0), n: [0, -1, 0] }] : l[0] === 'F' ? [{ o: at(-0.15), n: [0, 0, 1] }] : [{ o: at(-0.12), n: [0, -D.cs, D.sn] }, { o: at(-0.12), n: [0, D.cs, D.sn] }];
-      let inside = 0, onCut = 0; for (let t = 0; t < M.n; t++) { const nm = N[M.part[t]!]!; if (!['engineBlock', 'cylinderHead', 'sump', 'timingCover', 'cylinderBore'].includes(nm)) continue;
+      let inside = 0, onCut = 0; for (let t = 0; t < M.n; t++) { const nm = N[M.part[t]!]!; if (!['engineBlock', 'cylinderHead', 'sump', 'cylinderBore'].includes(nm)) continue;
         const c: V = [0, 1, 2].map(k => (M.pos[t * 9 + k]! + M.pos[t * 9 + 3 + k]! + M.pos[t * 9 + 6 + k]!) / 3) as V, f = (p: V, q: { o: V; n: V }) => dot([p[0] - q.o[0], p[1] - q.o[1], p[2] - q.o[2]], q.n);
         if (planes.every(q => f(c, q) > 0.5)) inside++; for (let j = 0; j < 3; j++) { const p: V = [M.pos[t * 9 + j * 3]!, M.pos[t * 9 + j * 3 + 1]!, M.pos[t * 9 + j * 3 + 2]!]; if (planes.some(q => Math.abs(f(p, q)) < 0.01)) onCut++; } }
       const hit = inside; expect(onCut, l).toBeGreaterThan(50);
@@ -108,10 +108,10 @@ describe('the cutaway and the bones', () => {
     const C = cutMesh(M, () => 'clip', [{ o: [0, 0, 0], n: [1, 0, 0] }]); let maxX = -Infinity, area = 0; for (let i = 0; i < C.pos.length; i += 3) maxX = Math.max(maxX, C.pos[i]!);
     for (let t = 0; t < C.n; t++) { const p = C.pos.subarray(t * 9, t * 9 + 9); area += Math.abs((p[3]! - p[0]!) * (p[7]! - p[1]!) - (p[6]! - p[0]!) * (p[4]! - p[1]!)) / 2; }
     expect(maxX).toBeCloseTo(0, 5); expect(area).toBeCloseTo(50, 3); });
-  it('the bones: within the shader\'s limit for every layout and valve count, a V12 with four valves the most; the vertex rows within what WebGL2 promises', () => {
+  it('the bones: within the shader\'s limit for every layout and valve count, a V12 with four valves the most (ENGINE_BONES counts its near bank\'s two cams the cutaway leaves out); the vertex rows within what WebGL2 promises', () => {
     let most = 0; for (const l of LAYOUTS_ALL) for (const v of [2, 3, 4, 5] as const) { const rig = cutOf(l, v).rig!; expect(rig.bones).toBeLessThanOrEqual(ENGINE_BONES); most = Math.max(most, rig.bones);
       expect(Math.max(...cutOf(l, v).mesh.bone!)).toBeLessThan(rig.bones); }
-    expect(cutOf('V12', 4).rig!.bones).toBe(ENGINE_BONES); expect(most).toBe(ENGINE_BONES);
+    expect(cutOf('V12', 4).rig!.bones).toBe(ENGINE_BONES - 2); expect(most).toBe(ENGINE_BONES - 2);   // the cutaway leaves out a V's near-bank cams (their bones too)
     expect(Math.max(RIG_BONES, ENGINE_BONES) * 3 + 32 + 16 + 4).toBeLessThanOrEqual(256); });
   it('the V8\'s crank by choice, the firing order shown from cylinder 1; the NSX\'s V6 split-pinned', () => {
     const flat = cutOf('V8', 4, 1, 'flat').rig!, cross = cutOf('V8', 4, 1, 'cross').rig!;

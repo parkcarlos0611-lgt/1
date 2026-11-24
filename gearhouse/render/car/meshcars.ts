@@ -19,6 +19,7 @@ import { mesh as eb110 } from './mesh_eb110';
 import { mesh as xj220 } from './mesh_xj220';
 import { mesh as diablo } from './mesh_diablo';
 import { mesh as nsx } from './mesh_nsx';
+import { mesh as f355 } from './mesh_f355';
 export const MESH_CARS: { id: string; name: string; mesh: (spin?: number) => Mesh }[] = [
   { id: 'dueSSJ35', name: '1935 Duesenberg SSJ', mesh: dueSSJ35 }, { id: 'dueA21', name: '1921 Duesenberg Model A', mesh: dueA21 },
   { id: 'fnTT33', name: '1933 Frazer Nash TT Replica', mesh: fnTT33 }, { id: 'bmw315', name: '1935 BMW 315/1', mesh: bmw315 },
@@ -36,4 +37,6 @@ export const MESH_CARS: { id: string; name: string; mesh: (spin?: number) => Mes
   // review 141: the wedge, built panel by panel
   { id: 'diablo', name: '1990 Lamborghini Diablo (실험)', mesh: diablo },
   // review 153: the floating canopy, the engine under the rear glass
-  { id: 'nsx', name: '1990 Honda NSX (실험)', mesh: nsx }];
+  { id: 'nsx', name: '1990 Honda NSX (실험)', mesh: nsx },
+  // review 158: the F355 (and the F1-gearbox car on the same body)
+  { id: 'f355', name: '1994 Ferrari F355 (실험)', mesh: f355 }, { id: 'f355f1', name: '1997 Ferrari F355 F1 (실험)', mesh: f355 }];

@@ -1,5 +1,5 @@
 {
- "about": "Millbrook Outer Circuit handicapper's book (reviews 86, 89): the test driver's lap times in seconds, from rest to the end of the first lap (standing) and a lap at speed (flying), from tools/ref/handicaps.ts, with the review-89 tyres; retimed in review 97 (the free wheels no longer drag); retimed in review 120 (the car in 3D: its axles, the tyres' relaxation, crests felt). Retimed in review 152 (the driver looks far enough ahead to brake from its own speed, and does not floor a powerful car near the grip in a bend). The NSX (review 153) timed on the resurfaced track: on the period concrete its tail swings out after landing from the Members' Bridge bump.",
+ "about": "Millbrook Outer Circuit handicapper's book (reviews 86, 89): the test driver's lap times in seconds, from rest to the end of the first lap (standing) and a lap at speed (flying), from tools/ref/handicaps.ts, with the review-89 tyres; retimed in review 97 (the free wheels no longer drag); retimed in review 120 (the car in 3D: its axles, the tyres' relaxation, crests felt). Retimed in review 152 (the driver looks far enough ahead to brake from its own speed, and does not floor a powerful car near the grip in a bend). The NSX (review 153) timed on the resurfaced track: on the period concrete its tail swings out after landing from the Members' Bridge bump. The F355 and F355 F1 (review 158) timed on the resurfaced track, like the NSX.",
  "cars": {
   "dueSSJ35": {
    "standing": 97.8,
@@ -76,6 +76,14 @@
   "nsx": {
    "standing": 88.9,
    "flying": 82.5
+  },
+  "f355": {
+   "standing": 85.6,
+   "flying": 80.0
+  },
+  "f355f1": {
+   "standing": 85.4,
+   "flying": 79.9
   }
  }
 }

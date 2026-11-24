@@ -89,7 +89,7 @@ function artFor(L: LiveRenderer, g: ReturnType<LiveRenderer['car']>, id: string,
 /** a car with a rising wing drawn from its mesh built with the wing up (review 125), made once per car */
 const wingMeshes = new Map<Mesh, Mesh>();
 /** pop-up head lamps raised while the lamps are on (review 144): the cars whose mesh takes the lamps as its second argument */
-const POPUP = new Set(['diablo', 'nsx']), lampMeshes = new Map<Mesh, Mesh>();
+const POPUP = new Set(['diablo', 'nsx', 'f355', 'f355f1']), lampMeshes = new Map<Mesh, Mesh>();
 function lampsUp(id: string, base: Mesh): Mesh { let m = lampMeshes.get(base); if (!m) { const e = MESH_CARS.find(c => c.id === id), f = e?.mesh as ((spin?: number, lamps?: number) => Mesh) | undefined; m = f ? renumber(f(0, 1), myNum) : base; lampMeshes.set(base, m); } return m; }
 function wingUp(id: string, base: Mesh): Mesh { let m = wingMeshes.get(base); if (!m) { const e = MESH_CARS.find(c => c.id === id), f = e?.mesh as ((spin?: number, wing?: number) => Mesh) | undefined; m = f ? renumber(f(0, 1), myNum) : base; wingMeshes.set(base, m); } return m; }
 /** the later technology's readouts (review 125): boost, ABS working, the wing up, the drive's split */
@@ -99,6 +99,8 @@ function techHud(): string { const X = car.spec.tech; if (!X) return ''; let o =
   if (X.abs) o += `<span class="${car.absOn ? 'hot' : ''}">ABS${car.absOn ? ' 작동' : ''}</span>`;
   if (X.wing) o += `<span>윙 ${car.wing > 0.5 ? '올림' : '내림'}</span>`;
   if (X.tcs) o += `<span class="${car.tcsOn ? 'hot' : ''}">TCS${car.tcsOn ? ' 작동' : ''}</span>`;   /* review 153: the NSX's own traction control, and its VTEC cam */
+  if (X.gearbox === 'f1') o += `<span class="${car.shifting ? 'hot' : ''}">F1${car.shifting ? ' 변속' : ''}</span>`;   /* review 158 */
+  if (X.damp) o += `<span>댐퍼 ${car.damperMode === 'sport' ? '스포츠' : '컴포트'}</span>`;
   if (X.vtec) o += `<span class="${car.vtecHigh ? 'hot' : ''}">VTEC${car.vtecHigh ? ' 고속 캠' : ''}</span>`;
   if (X.ground) o += `<span>다운포스 ${Math.round(0.5 * 1.2 * car.speed * car.speed * X.ground.clA / 9.81)} kg</span>`; return o; }
 /** where the cars' tyres lay their rubber (review 122): the test driver's line in a fast car, a metre at a time */
@@ -140,7 +142,7 @@ function drawLive(el: number) { const L = live!; void el;
 function choose(id: string) { carId = id; propSprites.clear(); broken.clear(); debris.length = 0; debris3.pieces.length = 0; fenceGpu.clear(); const spec = raceSpec(id), m = MESH_CARS.find(c => c.id === id)!;
   car = new Vehicle(spec, T); car.auto = st.auto; car.place(START + 30, 0, 0); manualGear = 1;
   sprites = new CarSprites(meshOf(id, myNum), mm, pitchDeg, spec.steerLock * Math.PI / 180, { outline: 3, glass: 0.8 }, matchMedia('(pointer: coarse)').matches ? 1200 : 2400); sprites.prepare([0]); (live ? 0 : sprites.work(500)); sprites.prepare([-1, 1, -2, 2, -3, -4, -5]); camAng = car.yaw;
-  pilot = new Driver(T); lapStart = -1; lastLap = 0; bestLap = 0; skids.length = 0; puffs.length = 0; say(`${spec.name} · 출발선 뒤에서 시작`); }
+  car.damperMode = $<HTMLSelectElement>('damper').value as 'sport' | 'comfort'; pilot = new Driver(T); lapStart = -1; lastLap = 0; bestLap = 0; skids.length = 0; puffs.length = 0; say(`${spec.name} · 출발선 뒤에서 시작`); }
 function say(t: string) { msg = t; msgT = 3; }
 // ---- the world to the picture ----
 // world to picture: the camera turned so that the heading camAng points up the screen (fixed camera: north up)
@@ -477,6 +479,7 @@ $('practice').addEventListener('click', e => { stopRace(); $('race').textContent
 $<HTMLInputElement>('auto').addEventListener('change', e => { st.auto = (e.target as HTMLInputElement).checked; car.auto = st.auto; manualGear = car.gear; });
 $<HTMLInputElement>('pilot').addEventListener('change', e => { st.pilot = (e.target as HTMLInputElement).checked; if (st.pilot) { car.auto = true; } else car.auto = st.auto; });
 $<HTMLInputElement>('assist').addEventListener('change', e => { st.assist = (e.target as HTMLInputElement).checked; });
+$<HTMLSelectElement>('damper').addEventListener('change', e => { car.damperMode = (e.target as HTMLSelectElement).value as 'sport' | 'comfort'; });   /* review 158 */
 $<HTMLInputElement>('tcs').addEventListener('change', e => { st.tcs = (e.target as HTMLInputElement).checked; });
 $<HTMLInputElement>('chase').addEventListener('change', e => { st.chase = (e.target as HTMLInputElement).checked; camAng = car.yaw; });
 // ---- the free camera: drag to turn it round the car and tilt it, the wheel or a pinch to come closer or go further ----

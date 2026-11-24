@@ -241,8 +241,8 @@ const F355: RaceSpec = { id: 'f355', name: '1994 Ferrari F355 (실험)', mass: 1
   tech: { rollF: 0.47, rearLsd: 1.8, abs: true, power: true, gearbox: 'manual', damp: { comfort: 0.65, sport: 1.3, speedK: 0.3 }, underbody: { clA: 0.13, front: 0.5, cdA: 0.01 }, tyreWF: 0.225, tyreWR: 0.265 } };
 /** the F355 with the 1997 F1 gearbox: the same body (mesh 'f355'), the shift of the automated manual */
 export function withF1Gearbox(s: RaceSpec): RaceSpec { return { ...s, id: s.id + 'f1', body: s.body ?? s.id, shiftT: 0.2, tech: { ...s.tech, gearbox: 'f1' } }; }
-AWAITING_MESH.f355 = F355;
-AWAITING_MESH.f355f1 = { ...withF1Gearbox(F355), name: '1997 Ferrari F355 F1 (실험)', era: '1997' };
+NEW.f355 = F355;   // review 158: its body is built (render/car/mesh_f355.ts) and registered
+NEW.f355f1 = { ...withF1Gearbox(F355), name: '1997 Ferrari F355 F1 (실험)', era: '1997' };
 // When the F355's mesh is registered (render/car/meshcars.ts), move both into NEW (as the NSX was, review 153), the F1
 // on the same mesh id ('f355', its `body`), and time them into race/handicaps.json.
 NEW.nsx = NSX;   // review 153: its body mesh is built (render/car/mesh_nsx.ts) and registered

@@ -19,6 +19,11 @@
 // lamps (and their units' layout) and the auxiliary lamps, each swapped on every base; what cannot go together is said
 // by faceLock (the builder greys it out with the reason). Format 3's designs take their base's own bumper and head lamps
 // and the auxiliary lamps their `front` stood for (FRONT_AS): the same look.
+// Format 5 (alpha 0.13, M4: the kinematic suspension): the suspension in a part of its own (`susp`): each axle's kind
+// (double wishbones, a MacPherson strut, a multilink rear; the 1930s' beam axle on leaf springs named for the
+// restoration work and not offered on the 1990s bases), the upper arm's length against the lower's, the roll centre's
+// height, the springs as the wheel's frequency, the dampers' bump and rebound, the anti-roll bar, the static camber and
+// toe, the front's caster. Format 4's designs take their base's own (SUSP_OWN), as a new design on that base has.
 // The two halves of format 4 were made apart (M2 and E2) and are one format; neither half alone was published (alpha
 // 0.11 wrote format 3), but a format-4 file written with only one of them (the engine's fields with a `front`, or the
 // face's slots with no bore/stroke or quality) is read as format 3 is for the half it lacks (toV4).
@@ -84,8 +89,22 @@ export type DimKey = keyof BodyDims;
 /** the face's slots (format 4): the prow is `nose` */
 export interface Face { bumper: BumperKind; grille: GrilleKind; head: HeadKind; pod: PodKind; aux: AuxKind }
 export type FaceKey = keyof Face;
+/** an axle's kind (alpha 0.13): double wishbones, a MacPherson strut, a multilink (the rear), a beam axle on leaf springs
+ *  (the 1930s' bases, for the restoration work: not offered on the 1990s bases) */
+export type SuspKind = 'doubleWishbone' | 'macpherson' | 'multilink' | 'beamLeaf';
+/** the roll centre's height: the arms' inner pivots set lower or higher (low: a softer start to the roll's geometric share, high: less roll, more jacking) */
+export type RcPreset = 'low' | 'mid' | 'high';
+/** one axle's suspension (format 5) */
+export interface SuspAxle { type: SuspKind;
+  /** the upper arm's length over the lower's (a strut has none) */ arm: number; rc: RcPreset;
+  /** the springs as the wheel's natural frequency on them (Hz) */ hz: number;
+  /** the dampers: a share of the critical damping going up (bump) and coming back (rebound) */ bump: number; rebound: number;
+  /** the anti-roll bar, times the base's own (0: none) */ bar: number;
+  /** degrees: the static camber (- the top in), the toe (+ in) */ camber: number; toe: number }
+export interface SuspDesign { front: SuspAxle & { /** degrees */ caster: number }; rear: SuspAxle }
+export type SuspField = keyof SuspAxle | 'caster';
 export interface Design {
-  /** the format's version */ v: 4;
+  /** the format's version */ v: 5;
   id: string; name: string;
   body: { base: BaseId; nose: NoseKind; tail: TailKind; wheel: WheelKind; paint: string; gloss: number; structure: Structure; panels: Panels } & Face & BodyDims;
   engine: { grade: Grade; layout: Layout; /** cc */ cc: number; /** valves a cylinder */ valves: Valves;
@@ -97,7 +116,10 @@ export interface Design {
   drive: { gears: 5 | 6; gearbox: 'manual' | 'f1'; /** the final drive's ratio; 0: chosen for the top speed */ final: number; lsd: boolean; awd: boolean };
   kit: { abs: boolean; tcs: boolean; steering: 'manual' | 'hydraulic' | 'electric'; dampers: 'fixed' | 'adaptive'; wing: boolean; diffuser: boolean;
     /** tyres' widths front and rear (mm) and the rims (in) */ tyres: [number, number]; rim: 16 | 17 | 18; interior: Interior };
+  /** the suspension (format 5) */ susp: SuspDesign;
 }
+/** format 4 (alpha 0.12): no suspension of its own (its base's) */
+export interface DesignV4 extends Omit<Design, 'v' | 'susp'> { v: 4 }
 /** the dimensions format 3 added (format 2's designs and older have the base's own: zero) */
 type NewDims = Exclude<DimKey, 'wheelbase' | 'width'>;
 /** the engine's fields format 4 added (format 3's designs and older: a bore 1.12 times the stroke, every quality 0) */
@@ -106,18 +128,18 @@ type NewEngine = 'bs' | 'quality';
 export type Body3 = Omit<Design['body'], FaceKey> & { front: FrontKind };
 /** format 3 (alpha 0.11): V engines only, no bore/stroke or part quality; the face a nose and a front (a body that has the
  *  face's slots already keeps them) */
-export interface DesignV3 extends Omit<Design, 'v' | 'body' | 'engine'> { v: 3; body: Body3 | Design['body']; engine: Omit<Design['engine'], NewEngine | 'layout'> & { layout: 'V6' | 'V8' | 'V12' } }
+export interface DesignV3 extends Omit<Design, 'v' | 'body' | 'engine' | 'susp'> { v: 3; body: Body3 | Design['body']; engine: Omit<Design['engine'], NewEngine | 'layout'> & { layout: 'V6' | 'V8' | 'V12' } }
 /** format 2 (review 177 to alpha 0.10): the wheelbase and the width the body's only dimensions */
 export interface DesignV2 extends Omit<DesignV3, 'v' | 'body'> { v: 2; body: Omit<Body3, NewDims> }
 /** format 1 (before review 177): one material for the whole body, a turbo count that fixed the boost, no grade */
-export interface DesignV1 extends Omit<Design, 'v' | 'body' | 'engine' | 'kit'> {
+export interface DesignV1 extends Omit<Design, 'v' | 'body' | 'engine' | 'kit' | 'susp'> {
   v: 1; kit: Omit<Design['kit'], 'interior'>; body: Omit<Body3, 'structure' | 'panels' | NewDims> & { material: 'steel' | 'aluminium' };
   engine: { layout: 'V6' | 'V8' | 'V12'; cc: number; valves: Valves; redline: number; turbo: 0 | 1 | 2; vtec: boolean };
 }
 /** a change to a design, part by part (a fix offered by the fit check, race/fit.ts) */
-export type DesignPatch = { [K in 'body' | 'engine' | 'drive' | 'kit']?: Partial<Design[K]> };
+export type DesignPatch = { [K in 'body' | 'engine' | 'drive' | 'kit']?: Partial<Design[K]> } & { susp?: { front?: Partial<SuspDesign['front']>; rear?: Partial<SuspAxle> } };
 export const applyPatch = (d: Design, p: DesignPatch): Design =>
-  normalise({ ...d, body: { ...d.body, ...p.body }, engine: { ...d.engine, ...p.engine }, drive: { ...d.drive, ...p.drive }, kit: { ...d.kit, ...p.kit } });
+  normalise({ ...d, body: { ...d.body, ...p.body }, engine: { ...d.engine, ...p.engine }, drive: { ...d.drive, ...p.drive }, kit: { ...d.kit, ...p.kit }, susp: { front: { ...d.susp.front, ...p.susp?.front }, rear: { ...d.susp.rear, ...p.susp?.rear } } });
 
 export const BASES: BaseId[] = ['nsx', 'f355', 'eb110'];
 export const NOSES: NoseKind[] = ['round', 'pointed', 'mass'];
@@ -190,6 +212,30 @@ const BODY_RANGES: Record<BaseId, Record<NewDims, readonly [number, number]>> = 
   eb110: { track: [-50, 60], roof: [-60, 60], overhangF: [-120, 160], overhangR: [-80, 200], ride: [-25, 60], cabin: [-100, 120], rake: [-4, 5] } };
 export const BODY_LIMITS = (b: BaseId): Record<DimKey, readonly [number, number]> => ({ wheelbase: LIMITS.wheelbase, width: LIMITS.width, ...BODY_RANGES[b] });
 
+// ---- the suspension (format 5) ----
+export const SUSP_KINDS: SuspKind[] = ['doubleWishbone', 'macpherson', 'multilink', 'beamLeaf'];
+export const SUSP_KIND_NAME: Record<SuspKind, string> = { doubleWishbone: '더블 위시본', macpherson: '맥퍼슨 스트럿', multilink: '멀티링크', beamLeaf: '일체 차축·판스프링' };
+export const RC_PRESETS: RcPreset[] = ['low', 'mid', 'high'];
+/** the settings' ranges: the arms' ratio, the wheel's frequency (a soft road car's 1 Hz to a stiff racer's 2.6), the
+ *  dampers' shares of critical, the bar's times its base's own, the static camber, the toe and the caster (degrees) */
+export const SUSP_LIMITS = { arm: [0.5, 1.0], hz: [1.0, 2.6], bump: [0.1, 0.6], rebound: [0.1, 0.8], bar: [0, 2.5], camber: [-3.5, 1], toe: [-0.5, 0.5], caster: [0, 10] } as const;
+/** each base's own suspension (its real car's: double wishbones all round; the arms' ratio and the caster its hardpoints',
+ *  render/car/suspension/hardpoints.ts; the springs at the frequencies the physics had before format 5, 1.35 and 1.5 Hz,
+ *  the dampers at the 0.28 of critical it had both ways split into a softer bump and a firmer rebound) */
+const OWN_AXLE = (arm: number, hz: number, camber: number, toe: number): SuspAxle => ({ type: 'doubleWishbone', arm, rc: 'mid', hz, bump: 0.24, rebound: 0.32, bar: 1, camber, toe });
+export const SUSP_OWN: Record<BaseId, SuspDesign> = {
+  nsx: { front: { ...OWN_AXLE(0.7, 1.35, -0.5, 0), caster: 3.4 }, rear: OWN_AXLE(0.72, 1.5, -1, 0.1) },
+  f355: { front: { ...OWN_AXLE(0.7, 1.35, -0.5, 0), caster: 3.0 }, rear: OWN_AXLE(0.71, 1.5, -1, 0.1) },
+  eb110: { front: { ...OWN_AXLE(0.7, 1.35, -0.5, 0), caster: 2.9 }, rear: OWN_AXLE(0.7, 1.5, -1, 0.1) } };
+/** why an axle's kind cannot be chosen (Korean), null when it can: the beam axle is the 1930s bases' (the restoration
+ *  work's), a multilink is a rear's */
+export function suspLock(front: boolean, k: SuspKind): string | null {
+  if (k === 'beamLeaf') return '1930년대 차대용입니다 (복원 작업에서 쓸 수 있게 됩니다)';
+  if (k === 'multilink' && front) return '멀티링크는 뒤 차축에만 씁니다';
+  return null; }
+/** why a setting does not apply to this kind (null when it does): a strut has no upper arm */
+export function suspFieldLock(a: SuspAxle, f: SuspField): string | null { return f === 'arm' && a.type === 'macpherson' ? '스트럿에는 위 팔이 없습니다' : null; }
+
 // ---- the engine's grade and what it allows ----
 export const GRADE_NAME: Record<Grade, string> = { 1: '양산', 2: '양산 고성능', 3: '스포츠', 4: '경주 파생', 5: '경주' };
 /** what each grade allows: the details in order from the plainest (a detail the grade does not allow falls back to
@@ -216,14 +262,14 @@ export const gradeRedline = (g: Grade) => Math.min(LIMITS.redline[1], GRADE_RULE
 /** the two cars the kit was made from, as designs (the generators are checked against their real figures). The NSX:
  *  an aluminium monocoque and panels, the C30A's variable intake, 10.2:1, a wet sump; the F355: a steel structure and
  *  panels, the F129B's 11:1, a dry sump */
-export const DESIGN_NSX: Design = { v: 4, id: 'nsx', name: 'NSX', body: { base: 'nsx', nose: 'round', ...faceOf3('nsx', 'plain'), tail: 'frame', wheel: 'fiveSpoke', ...NO_DIMS, wheelbase: 0, width: 0, paint: '#b0121b', gloss: 0.6, structure: 'aluminium', panels: 'aluminium' },
+export const DESIGN_NSX: Design = { v: 5, id: 'nsx', name: 'NSX', body: { base: 'nsx', nose: 'round', ...faceOf3('nsx', 'plain'), tail: 'frame', wheel: 'fiveSpoke', ...NO_DIMS, wheelbase: 0, width: 0, paint: '#b0121b', gloss: 0.6, structure: 'aluminium', panels: 'aluminium' },
   engine: { grade: 2, layout: 'V6', cc: 2977, valves: 4, redline: 8000, intake: 'variable', compression: 'mid', sump: 'wet', block: 'aluminium', turbo: 0, boost: 0.8, intercooler: true, vtec: true, bs: BS_DEFAULT, quality: { ...NO_QUALITY } },
   drive: { gears: 5, gearbox: 'manual', final: 4.062, lsd: true, awd: false },
-  kit: { abs: true, tcs: true, steering: 'manual', dampers: 'fixed', wing: false, diffuser: false, tyres: [205, 225], rim: 16, interior: 'standard' } };
-export const DESIGN_F355: Design = { v: 4, id: 'f355', name: 'F355', body: { base: 'f355', nose: 'pointed', ...faceOf3('f355', 'sunk'), tail: 'ducktail', wheel: 'star', ...NO_DIMS, wheelbase: 0, width: 0, paint: '#f5c300', gloss: 0.6, structure: 'steel', panels: 'steel' },
+  kit: { abs: true, tcs: true, steering: 'manual', dampers: 'fixed', wing: false, diffuser: false, tyres: [205, 225], rim: 16, interior: 'standard' }, susp: structuredClone(SUSP_OWN.nsx) };
+export const DESIGN_F355: Design = { v: 5, id: 'f355', name: 'F355', body: { base: 'f355', nose: 'pointed', ...faceOf3('f355', 'sunk'), tail: 'ducktail', wheel: 'star', ...NO_DIMS, wheelbase: 0, width: 0, paint: '#f5c300', gloss: 0.6, structure: 'steel', panels: 'steel' },
   engine: { grade: 2, layout: 'V8', cc: 3496, valves: 5, redline: 8500, intake: 'single', compression: 'high', sump: 'dry', block: 'aluminium', turbo: 0, boost: 0.8, intercooler: true, vtec: false, bs: BS_DEFAULT, quality: { ...NO_QUALITY } },
   drive: { gears: 6, gearbox: 'manual', final: 4.1, lsd: true, awd: false },
-  kit: { abs: true, tcs: false, steering: 'hydraulic', dampers: 'adaptive', wing: false, diffuser: true, tyres: [225, 265], rim: 18, interior: 'standard' } };
+  kit: { abs: true, tcs: false, steering: 'hydraulic', dampers: 'adaptive', wing: false, diffuser: true, tyres: [225, 265], rim: 18, interior: 'standard' }, susp: structuredClone(SUSP_OWN.f355) };
 
 // ---- four more cars as designs: the figures' check (docs/systems/99, 1-8), not used to set them ----
 // Each is built on one of the bases (the base is only the body: its panels' shapes and sizes), stretched toward the real
@@ -231,27 +277,27 @@ export const DESIGN_F355: Design = { v: 4, id: 'f355', name: 'F355', body: { bas
 // NEW.eb110, NEW.xj220, with their sources) and, for the McLaren F1 (no RaceSpec), below.
 /** the 1990 Lamborghini Diablo: 5.7 V12 four valves, 492 hp at 7,000, five speeds, rear drive; a tubular steel frame
  *  with aluminium and composite panels; 2,650 wheelbase, 2,040 wide; 245/40 ZR17 and 335/35 ZR17 */
-export const DESIGN_DIABLO: Design = { v: 4, id: 'diablo', name: 'Diablo', body: { base: 'f355', nose: 'pointed', ...faceOf3('f355', 'plain'), tail: 'frame', wheel: 'star', ...NO_DIMS, wheelbase: 200, width: 70, paint: '#7a1fa2', gloss: 0.6, structure: 'steel', panels: 'aluminium' },
+export const DESIGN_DIABLO: Design = { v: 5, id: 'diablo', name: 'Diablo', body: { base: 'f355', nose: 'pointed', ...faceOf3('f355', 'plain'), tail: 'frame', wheel: 'star', ...NO_DIMS, wheelbase: 200, width: 70, paint: '#7a1fa2', gloss: 0.6, structure: 'steel', panels: 'aluminium' },
   engine: { grade: 3, layout: 'V12', cc: 5707, valves: 4, redline: 7300, intake: 'single', compression: 'mid', sump: 'wet', block: 'aluminium', turbo: 0, boost: 0.8, intercooler: true, vtec: false, bs: BS_DEFAULT, quality: { ...NO_QUALITY } },
   drive: { gears: 5, gearbox: 'manual', final: 0, lsd: true, awd: false },
-  kit: { abs: false, tcs: false, steering: 'manual', dampers: 'fixed', wing: false, diffuser: false, tyres: [245, 335], rim: 17, interior: 'standard' } };
+  kit: { abs: false, tcs: false, steering: 'manual', dampers: 'fixed', wing: false, diffuser: false, tyres: [245, 335], rim: 17, interior: 'standard' }, susp: structuredClone(SUSP_OWN.f355) };
 /** the 1991 Bugatti EB110 GT, on its own base (the kit's EB110: render/car/cars/eb110.kit.ts, the real car's 2,550 mm
  *  wheelbase and 1,940 mm width): 3.5 V12 five valves, four IHI turbos with intercoolers at about 1.05 bar, 553 hp at
  *  8,000, 7.5:1, a dry sump; six speeds, four-wheel drive; a carbon-fibre monocoque (Aérospatiale's) with aluminium
  *  panels; a luxurious interior (leather, air conditioning: heavy for its materials); its active rear wing; 245/40 ZR18
  *  and 325/30 ZR18; 1,620 kg; 342 km/h */
-export const DESIGN_EB110: Design = { v: 4, id: 'eb110', name: 'EB110', body: { base: 'eb110', nose: 'mass', ...faceOf3('eb110', 'plain'), tail: 'capsule', wheel: 'disc', ...NO_DIMS, paint: '#1b3a8a', gloss: 0.6, structure: 'cfrp', panels: 'aluminium' },
+export const DESIGN_EB110: Design = { v: 5, id: 'eb110', name: 'EB110', body: { base: 'eb110', nose: 'mass', ...faceOf3('eb110', 'plain'), tail: 'capsule', wheel: 'disc', ...NO_DIMS, paint: '#1b3a8a', gloss: 0.6, structure: 'cfrp', panels: 'aluminium' },
   engine: { grade: 3, layout: 'V12', cc: 3499, valves: 5, redline: 8250, intake: 'single', compression: 'low', sump: 'dry', block: 'aluminium', turbo: 4, boost: 1.0, intercooler: true, vtec: false, bs: BS_DEFAULT, quality: { ...NO_QUALITY } },
   drive: { gears: 6, gearbox: 'manual', final: 0, lsd: true, awd: true },
-  kit: { abs: true, tcs: false, steering: 'hydraulic', dampers: 'fixed', wing: true, diffuser: false, tyres: [245, 325], rim: 18, interior: 'luxury' } };
+  kit: { abs: true, tcs: false, steering: 'hydraulic', dampers: 'fixed', wing: true, diffuser: false, tyres: [245, 325], rim: 18, interior: 'luxury' }, susp: structuredClone(SUSP_OWN.eb110) };
 /** the 1992 Jaguar XJ220: the JRV-6, a 3.5 V6 from the Group C engine, four valves, two Garrett turbos with
  *  intercoolers at about 1.0 bar, 8.3:1, a dry sump, 542 hp at 7,200; five speeds, rear drive; a bonded aluminium
  *  honeycomb tub and aluminium panels, underbody venturis; 2,640 wheelbase, 2,220 wide (here as wide as the NSX's base
  *  stretches, 1,970); 255/45 ZR17 and 345/35 ZR18 (here 335 on 18 at both ends: the builder's one rim size); 1,470 kg */
-export const DESIGN_XJ220: Design = { v: 4, id: 'xj220', name: 'XJ220', body: { base: 'nsx', nose: 'round', ...faceOf3('nsx', 'plain'), tail: 'roundLamps', wheel: 'disc', ...NO_DIMS, wheelbase: 110, width: 80, paint: '#9aa1a6', gloss: 0.6, structure: 'honeycomb', panels: 'aluminium' },
+export const DESIGN_XJ220: Design = { v: 5, id: 'xj220', name: 'XJ220', body: { base: 'nsx', nose: 'round', ...faceOf3('nsx', 'plain'), tail: 'roundLamps', wheel: 'disc', ...NO_DIMS, wheelbase: 110, width: 80, paint: '#9aa1a6', gloss: 0.6, structure: 'honeycomb', panels: 'aluminium' },
   engine: { grade: 4, layout: 'V6', cc: 3498, valves: 4, redline: 7800, intake: 'single', compression: 'low', sump: 'dry', block: 'aluminium', turbo: 2, boost: 1.0, intercooler: true, vtec: false, bs: BS_DEFAULT, quality: { ...NO_QUALITY } },
   drive: { gears: 5, gearbox: 'manual', final: 0, lsd: true, awd: false },
-  kit: { abs: false, tcs: false, steering: 'manual', dampers: 'fixed', wing: false, diffuser: true, tyres: [255, 335], rim: 18, interior: 'standard' } };
+  kit: { abs: false, tcs: false, steering: 'manual', dampers: 'fixed', wing: false, diffuser: true, tyres: [255, 335], rim: 18, interior: 'standard' }, susp: structuredClone(SUSP_OWN.nsx) };
 /** the 1994 McLaren F1, from McLaren's published figures (as quoted by Wikipedia's article and Road & Track's 1994
  *  test; Gordon Murray's design notes for the materials): BMW S70/2 6,064 cc 60-degree V12, four valves, a throttle a
  *  cylinder, 10.5:1, a dry sump, 627 hp (468 kW) at 7,400 rpm, 650 Nm at 5,600, the limiter about 7,500; six speeds,
@@ -261,10 +307,10 @@ export const DESIGN_XJ220: Design = { v: 4, id: 'xj220', name: 'XJ220', body: { 
  *  lower), 4,287 long (both overhangs 100 shorter than the F355's), its screen laid well back (4 degrees past the F355's); Cd 0.32; ground-effect venturis with fans (here the
  *  undertray); 235/45 ZR17 and 315/45 ZR17; kerb 1,138 kg (about 1,140); 372 km/h on its production limiter, 386 km/h
  *  (240 mph, Ehra-Lessien 1998) with it raised; 0-100 km/h 3.2 s */
-export const DESIGN_MCLAREN_F1: Design = { v: 4, id: 'mclarenf1', name: 'McLaren F1', body: { base: 'f355', nose: 'pointed', ...faceOf3('f355', 'plain'), tail: 'frame', wheel: 'disc', ...NO_DIMS, wheelbase: 270, width: -20, roof: -30, overhangF: -100, overhangR: -100, rake: 4, paint: '#c9c3b6', gloss: 0.6, structure: 'cfrp', panels: 'cfrp' },
+export const DESIGN_MCLAREN_F1: Design = { v: 5, id: 'mclarenf1', name: 'McLaren F1', body: { base: 'f355', nose: 'pointed', ...faceOf3('f355', 'plain'), tail: 'frame', wheel: 'disc', ...NO_DIMS, wheelbase: 270, width: -20, roof: -30, overhangF: -100, overhangR: -100, rake: 4, paint: '#c9c3b6', gloss: 0.6, structure: 'cfrp', panels: 'cfrp' },
   engine: { grade: 4, layout: 'V12', cc: 6064, valves: 4, redline: 7500, intake: 'itb', compression: 'high', sump: 'dry', block: 'aluminium', turbo: 0, boost: 0.8, intercooler: true, vtec: false, bs: BS_DEFAULT, quality: { ...NO_QUALITY } },
   drive: { gears: 6, gearbox: 'manual', final: 0, lsd: false, awd: false },
-  kit: { abs: false, tcs: false, steering: 'manual', dampers: 'fixed', wing: false, diffuser: true, tyres: [235, 315], rim: 17, interior: 'light' } };
+  kit: { abs: false, tcs: false, steering: 'manual', dampers: 'fixed', wing: false, diffuser: true, tyres: [235, 315], rim: 17, interior: 'light' }, susp: structuredClone(SUSP_OWN.f355) };
 
 const clamp = (v: number, [a, b]: readonly [number, number]) => Math.min(b, Math.max(a, v));
 /** a value the grade allows: the asked one, else the best allowed one below it in the list's order */
@@ -279,20 +325,30 @@ export function migrate(d: DesignV1): DesignV3 {
     engine: { grade: 2, layout: E.layout, cc: E.cc, valves: E.valves, redline: E.redline, intake: P.engine.intake, compression: E.turbo ? 'mid' : P.engine.compression,
       sump: P.engine.sump, block: P.engine.block, turbo: E.turbo, boost: E.turbo === 2 ? 1.0 : 0.8, intercooler: true, vtec: E.vtec } };
 }
-/** any format brought to format 4: format 1 through migrate(), format 2 with its base's own dimensions, format 3 with
+/** any format brought to format 4 (toV5 then adds the suspension): format 1 through migrate(), format 2 with its base's own dimensions, format 3 with
  *  the old bore/stroke and every part's quality 0 (the fields read where a newer file has them) and its front as the
  *  face's slots (faceOf3). A format-4 file made while its halves were apart gets the half it lacks the same way */
-export function toV4(d0: Design | DesignV3 | DesignV2 | DesignV1): Design {
+export function toV4(d0: DesignV4 | DesignV3 | DesignV2 | DesignV1): DesignV4 {
   const d1 = d0.v === 1 ? migrate(d0) : d0;
-  const d3: Design | DesignV3 = d1.v === 2 ? { ...d1, v: 3, body: { ...NO_DIMS, ...d1.body } } : d1;
+  const d3: DesignV4 | DesignV3 = d1.v === 2 ? { ...d1, v: 3, body: { ...NO_DIMS, ...d1.body } } : d1;
   const e = d3.engine as DesignV3['engine'] & Partial<Pick<Design['engine'], NewEngine>>, b = d3.body;
   const body: Design['body'] = 'bumper' in b ? b : (({ front, ...rest }) => ({ ...rest, ...faceOf3(rest.base, front) }))(b);
   return { ...d3, v: 4, body, engine: { ...e, bs: e.bs ?? BS_DEFAULT, quality: { ...NO_QUALITY, ...e.quality } } };
 }
+/** any format brought to format 5: an older one through toV4, then its base's own suspension (SUSP_OWN) */
+export function toV5(d0: Design | DesignV4 | DesignV3 | DesignV2 | DesignV1): Design {
+  if (d0.v === 5) return d0; const d4 = toV4(d0), base = BASES.includes(d4.body.base) ? d4.body.base : 'nsx';
+  return { ...d4, v: 5, susp: structuredClone(SUSP_OWN[base]) }; }
+/** an axle's suspension inside its ranges (a kind it cannot have: the base's own) */
+function fitAxle<A extends SuspAxle>(a: A, own: A, front: boolean): A { const L = SUSP_LIMITS, n = (k: keyof typeof L, v: unknown, d: number, q = 100) => Math.round(clamp(typeof v === 'number' && Number.isFinite(v) ? v : d, L[k]) * q) / q;
+  const out = { ...own, ...a, type: SUSP_KINDS.includes(a.type) && !suspLock(front, a.type) ? a.type : own.type, rc: RC_PRESETS.includes(a.rc) ? a.rc : own.rc,
+    arm: n('arm', a.arm, own.arm), hz: n('hz', a.hz, own.hz), bump: n('bump', a.bump, own.bump), rebound: n('rebound', a.rebound, own.rebound), bar: n('bar', a.bar, own.bar), camber: n('camber', a.camber, own.camber, 10), toe: n('toe', a.toe, own.toe, 100) };
+  if ('caster' in own) (out as unknown as SuspDesign['front']).caster = n('caster', (a as unknown as SuspDesign['front']).caster, (own as unknown as SuspDesign['front']).caster, 10);
+  return out; }
 /** a design brought inside the limits and what its engine's grade allows (a loaded file, a slider's value); an older
  *  format is brought to format 4 first (toV4); a face the rules do not allow is put right (fitFace) */
-export function normalise(d0: Design | DesignV3 | DesignV2 | DesignV1): Design {
-  const d = toV4(d0), E = d.engine, g: Grade = GRADES.includes(E.grade) ? E.grade : 2, R = GRADE_RULES[g];
+export function normalise(d0: Design | DesignV4 | DesignV3 | DesignV2 | DesignV1): Design {
+  const d = toV5(d0), E = d.engine, g: Grade = GRADES.includes(E.grade) ? E.grade : 2, R = GRADE_RULES[g];
   const lim = BODY_LIMITS(BASES.includes(d.body.base) ? d.body.base : 'nsx'), dims = Object.fromEntries(DIMS.map(k => [k, clamp(Number.isFinite(d.body[k]) ? d.body[k] : 0, lim[k])])) as unknown as BodyDims;
   const q = (k: QualityPart) => { const v = E.quality?.[k]; return Number.isFinite(v) ? Math.round(clamp(v!, LIMITS.quality)) : 0; };
   return { ...d, body: fitFace({ ...d.body, ...dims, gloss: clamp(d.body.gloss, [0, 1]) }),
@@ -303,5 +359,6 @@ export function normalise(d0: Design | DesignV3 | DesignV2 | DesignV1): Design {
       bs: Math.round(clamp(Number.isFinite(E.bs) ? E.bs : BS_DEFAULT, LIMITS.bs) * 100) / 100,
       quality: Object.fromEntries(QUALITY_PARTS.map(k => [k, q(k)])) as EngineQuality },
     drive: { ...d.drive, final: d.drive.final ? clamp(d.drive.final, LIMITS.final) : 0 },
-    kit: { ...d.kit, tyres: [clamp(d.kit.tyres[0], LIMITS.tyre), clamp(d.kit.tyres[1], LIMITS.tyre)] } };
+    kit: { ...d.kit, tyres: [clamp(d.kit.tyres[0], LIMITS.tyre), clamp(d.kit.tyres[1], LIMITS.tyre)] },
+    susp: (o => ({ front: fitAxle(d.susp?.front ?? o.front, o.front, true), rear: fitAxle(d.susp?.rear ?? o.rear, o.rear, false) }))(SUSP_OWN[BASES.includes(d.body.base) ? d.body.base : 'nsx']) };
 }

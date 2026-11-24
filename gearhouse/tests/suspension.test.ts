@@ -17,7 +17,8 @@ const built = new Map<string, Assembled>(), car = (id: string) => { let A = buil
 const WHEEL: SuspWheel = { x: 1000, y: 760, r: 300, w: 215, rim: 200, back: 65 };
 const NAMES = ['wishboneUpper', 'wishboneLower', 'upright', 'hubFlange', 'spring', 'damper', 'damperRod', 'antiRollBar', 'dropLink', 'tieRod', 'toeLink', 'brakeDisc', 'caliper', 'steeringRack'];
 /** the lengths a corner's rigid parts must keep */
-const lengths = (H: Hardpoints, P: ReturnType<typeof solve>) => [dist(P.lbj, H.lower.f), dist(P.lbj, H.lower.r), dist(P.ubj, H.upper.f), dist(P.ubj, H.upper.r), dist(P.lbj, P.ubj), dist(P.outer, P.inner), dist(P.outer, P.lbj), dist(P.outer, P.ubj)];
+const shimmed = (H: Hardpoints, p: V): V => [p[0], p[1] + H.side * (H.adj?.camber ?? 0), p[2]];   // the upper pivots as the static camber's shims set them (alpha 0.13)
+const lengths = (H: Hardpoints, P: ReturnType<typeof solve>) => [dist(P.lbj, H.lower.f), dist(P.lbj, H.lower.r), dist(P.ubj, shimmed(H, H.upper.f)), dist(P.ubj, shimmed(H, H.upper.r)), dist(P.lbj, P.ubj), dist(P.outer, P.inner), dist(P.outer, P.lbj), dist(P.outer, P.ubj)];
 
 describe('suspension: the hardpoints', () => {
   it('every kit base has a double wishbone at both ends, its two sides mirrored', () => {
@@ -34,7 +35,7 @@ describe('suspension: the hardpoints', () => {
     // the EB110's pair of coil-overs a side at the rear, either side of the driveshaft
     const eb = axlePoints(SUSPENSION.eb110!.rear, WHEEL, false)[0]; expect(eb.dampers.length).toBe(2); expect(eb.dampers[0]!.bot[0]).toBeLessThan(WHEEL.x - 50); expect(eb.dampers[1]!.bot[0]).toBeGreaterThan(WHEEL.x + 50);
   });
-  it('the other kinds are named and not built yet', () => { for (const type of ['macpherson', 'multilink', 'beamLeaf'] as const) expect(() => axlePoints({ type }, WHEEL, true)).toThrow(/not built yet/); });
+  it('the beam axle on leaves is named and not built yet (the restoration work\'s)', () => { expect(() => axlePoints({ type: 'beamLeaf' }, WHEEL, true)).toThrow(/not built yet/); });
 });
 
 describe('suspension: the linkage', () => {
@@ -83,7 +84,7 @@ describe('suspension: the parts in the car', () => {
       expect(count(n1)).toBeLessThanOrEqual(1600); expect(count(n0)).toBeLessThanOrEqual(520); expect(count(n0)).toBeGreaterThan(200); }
   });
   it('the rig poses: at rest every bone leaves the mesh as built; no number goes missing through the bounce', () => {
-    for (const [id] of BASES) { const rig = car(id).mesh.susp!, P = poseRig(rig); expect(P.bones.length).toBe(RIG_BONES * 12);
+    for (const [id] of BASES) { const rig = car(id).mesh.susp!, P = poseRig(rig, [0, 0, 0, 0], rig.toe?.[0] ?? 0, rig.toe?.[1] ?? 0); expect(P.bones.length).toBe(RIG_BONES * 12);   // at rest: the front wheels at their static toe
       for (let b = 0; b < RIG_BONES; b++) [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0].forEach((v, i) => expect(Math.abs(P.bones[b * 12 + i]! - v), `${id} bone ${b}`).toBeLessThan(i % 4 === 3 ? 2e-3 : 1e-5));
       P.wheels.forEach((w, k) => { expect(dist(w.wc, w.from)).toBeLessThan(0.06); expect(dist(w.wc, rig.corners[k]!.wc) ).toBeLessThan(0.06); });
       for (let t = 0; t < 12; t += 0.37) { const b = bounce(t), Q = poseRig(rig, b.travel.map(v => v * 1000), b.steerL, b.steerR, b.spin); for (const v of Q.bones) expect(Number.isFinite(v)).toBe(true); for (const c of Q.corners) expect(c.ok).toBe(true); } }

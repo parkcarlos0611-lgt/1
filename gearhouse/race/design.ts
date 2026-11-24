@@ -29,6 +29,7 @@ import { DESIGN_NSX, DESIGN_F355, DESIGN_EB110 } from '../core/design';
 import { type RaceSpec, torqueAt, EPS_SPEED_SENSITIVE } from './cars';
 import { HP, engineMass, enginePackage, tyreR, engineFigures, engineCost, engineReliability } from './designparts';
 import { fit, fitPenalty, type FitResult } from './fit';
+import { designSusp } from '../render/car/designsusp';
 export { pistonSpeed } from './designparts';
 
 const G = 9.81, RHO = 1.2, DRIVER = 75;
@@ -178,8 +179,10 @@ export function designSpec(d: Design): RaceSpec {
     steer: { ratio: K.steering === 'manual' ? 19.5 : 19, ackermann: 0.6, rack: true },
     // the engine's turning mass: its size, a V12's longer crank, a racing engine's lighter flywheel and internals
     inertia: { engine: (0.06 + E.cc * 0.00002 + (E.layout === 'V12' ? 0.02 : 0)) * (E.grade >= 4 ? 0.85 : 1), wheel: 1.3 + 0.0025 * (rearW - 225) + 0.02 * (K.rim - 16) },
-    // the base's wishbones all round (race/cars.ts suspension(), found by the body's id)
+    // the base's wishbones all round (race/cars.ts suspension(), found by the body's id; the kinematic physics reads its linkage, s.kin)
     body: d.body.base, tech };
+  // alpha 0.13 (M4): the suspension's linkage as the car's mesh is built with it, for the kinematic physics (race/kin.ts)
+  { const k = designSusp(d); if (k) s.kin = k; }
   if (!D.final) {   // the final drive for the top speed: the power peak in top gear where the power meets the resistance
     const P = s.hp * HP * s.eff, cd = dragArea(s); let v = 50; for (let k = 0; k < 60; k++) v = Math.cbrt(Math.max(1, P - s.crr * s.mass * G * v) / (0.5 * RHO * cd));
     s.final = Math.min(4.8, Math.max(2.8, s.hpRpm * Math.PI / 30 * R / (v * gears[gears.length - 1]!))); }

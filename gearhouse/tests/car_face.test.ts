@@ -39,12 +39,12 @@ describe('face: format 3\'s nose and front as slots', () => {
   for (const b of BASES) it(`on the ${b}: every nose and front of alpha 0.11 loads as the same body`, () => {
     for (const nose of NOSES) for (const front of FRONTS) { const d = normalise(v3(b, nose, front)), O = OLD[b]; let kit: CarKit = { ...O.kit, wing: undefined };
       for (const p of [O.nose[nose], O.front[front]]) if (p) kit = { ...kit, ...p };
-      expect(d.v).toBe(4); expect('front' in d.body).toBe(false);
+      expect(d.v).toBe(5); expect('front' in d.body).toBe(false);
       expect(shell(build(d)), `${b} ${nose} ${front}`).toEqual(shell(assemble(kit))); }
   }, 60000);
   it('the slots a format-3 design had no say in are its base\'s own; a saved value and a link load the same', () => {
     for (const b of BASES) { const d = normalise(v3(b, 'round', 'sunk')); expect({ ...d.body }).toMatchObject({ ...FACE_OWN[b], aux: 'round', nose: 'round' });
-      const s = asDesign(JSON.parse(JSON.stringify(v3(b, 'mass', 'plain'))))!; expect(s.v).toBe(4); expect({ ...s.body }).toMatchObject({ ...FACE_OWN[b], aux: b === 'eb110' ? 'none' : 'strip', nose: 'mass' }); }
+      const s = asDesign(JSON.parse(JSON.stringify(v3(b, 'mass', 'plain'))))!; expect(s.v).toBe(5); expect({ ...s.body }).toMatchObject({ ...FACE_OWN[b], aux: b === 'eb110' ? 'none' : 'strip', nose: 'mass' }); }
     const kept = asDesign(JSON.parse(JSON.stringify(made('nsx', { bumper: 'wedge', grille: 'oval', head: 'pocket', pod: 'round', aux: 'none' }))))!;
     expect({ ...kept.body }).toMatchObject({ bumper: 'wedge', grille: 'oval', head: 'pocket', pod: 'round', aux: 'none' });
     expect(asDesign({ ...made('f355', {}), body: { ...made('f355', {}).body, grille: 'teeth', head: 7 } })!.body).toMatchObject({ grille: 'oval', head: 'popup' });
@@ -54,7 +54,7 @@ describe('face: format 3\'s nose and front as slots', () => {
       const engineHalf = { ...v3(b, 'pointed', 'sunk'), v: 4, engine: { ...P.engine, layout: 'I6', bs: 0.9, quality: { ...P.engine.quality, head: 2 } } };
       const faceHalf = { ...P, body: { ...P.body, bumper: 'airdam', grille: 'mesh', aux: 'none' }, engine };
       for (const d of [normalise(engineHalf as unknown as Design), asDesign(JSON.parse(JSON.stringify(engineHalf)))!]) {
-        expect(d.v).toBe(4); expect('front' in d.body).toBe(false); expect({ ...d.body }).toMatchObject({ ...FACE_OWN[b], aux: 'round', nose: 'pointed' });
+        expect(d.v).toBe(5); expect('front' in d.body).toBe(false); expect({ ...d.body }).toMatchObject({ ...FACE_OWN[b], aux: 'round', nose: 'pointed' });
         expect(d.engine).toMatchObject({ layout: 'I6', bs: 0.9 }); expect(d.engine.quality.head).toBe(2); }
       for (const d of [normalise(faceHalf as unknown as Design), asDesign(JSON.parse(JSON.stringify(faceHalf)))!]) {
         expect({ ...d.body }).toMatchObject({ bumper: 'airdam', grille: 'mesh', aux: 'none' }); expect(d.engine).toEqual(P.engine); } }

@@ -70,6 +70,9 @@ export interface RaceSpec {
     underbody?: { clA: number; front: number; cdA?: number } };
   /** the body mesh's id where a spec shares another's body (a variant: another gearbox in the same car) */
   body?: string;
+  /** alpha 0.13 (M4): the suspension's makings for the kinematic physics (race/kin.ts): a design's (race/design.ts);
+   *  the kit's own cars find their base's (kinOf) */
+  kin?: import('./kin').KinSpec;
   cdA: number; crr: number; steerLock: number;          // drag area m², rolling resistance, front wheels' lock (deg)
   topKmh: number; check: boolean;
   cooling: { siphon: boolean; margin: number } }   // the water's circulation (no pump on the Model T [v]), the radiator against the engine's heat [?]

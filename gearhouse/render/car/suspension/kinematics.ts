@@ -4,6 +4,12 @@
 // upper arm about its own, to where its ball joint keeps the upright's length from the lower one; the tie rod (the toe
 // link at the rear) keeps its length from the rack's end, which sets the upright's turn. So the wheel's camber, toe and
 // path through its travel come out of the hardpoints, as they do on the car.
+// A MacPherson strut (alpha 0.13, M4) is the same linkage with the upper arm taken away: the upright's top is clamped
+// to the strut, whose top mount turns on the body, so the upright turns about its lower ball joint to keep its strut
+// pointing at the mount (a point of the upright on that line stands where the upper ball joint would).
+// A corner's static setting (Hardpoints.adj, alpha 0.13): the upper arm's pivots (a strut's top mount) moved across by
+// shims, which leans the wheel (its static camber), and the toe link's inner end moved across (a rear wheel's static
+// toe; a front wheel's toe is its rack's, set by the steer asked for).
 // The car's frame: x from the nose back, y across, z up, millimetres. A corner's `side` is the sign of its y.
 import type { Hardpoints } from './hardpoints';
 
@@ -62,13 +68,14 @@ function sideOf(p1: V, p2: V, p3: V, q: V): number { const ex = norm(sub(p2, p1)
 function angleAbout(a: V, u: V, v: V): number { const p = sub(u, mul(a, dot(u, a))), q = sub(v, mul(a, dot(v, a))); return Math.atan2(dot(cross(p, q), a), dot(p, q)); }
 
 /** what a corner's hardpoints keep fixed: the arms' axes, the links' lengths, the upright's own frame */
-interface Prep { aL: V; aU: V; cU: V; rU: number; dLU: number; dTL: number; dTU: number; dTI: number; sgn: number; E0: M3; lenL: number; up: number }
+interface Prep { aL: V; aU: V; cU: V; /** the upper arm's centre in the hardpoints' own pose (before the shims) */ cU0: V; /** the upper pivots' shift (the shims) */ shim: V; strut: boolean; top: V; rU: number; dLU: number; dTL: number; dTU: number; dTI: number; sgn: number; E0: M3; lenL: number; up: number }
 const preps = new WeakMap<Hardpoints, Prep>();
 function prep(H: Hardpoints): Prep { let P = preps.get(H); if (P) return P;
-  const aL = norm(sub(H.lower.r, H.lower.f)), aU = norm(sub(H.upper.r, H.upper.f)), cU = add(H.upper.f, mul(aU, dot(sub(H.upper.bj, H.upper.f), aU)));
+  const strut = H.type === 'macpherson', shim: V = [0, H.side * (H.adj?.camber ?? 0), 0];
+  const aL = norm(sub(H.lower.r, H.lower.f)), aU: V = strut ? [1, 0, 0] : norm(sub(H.upper.r, H.upper.f)), cU0 = strut ? H.upper.f : add(H.upper.f, mul(aU, dot(sub(H.upper.bj, H.upper.f), aU))), cU = add(cU0, shim);
   // which way the lower arm turns to lift its ball joint
   const out = sub(H.lower.bj, add(H.lower.f, mul(aL, dot(sub(H.lower.bj, H.lower.f), aL)))), up = cross(aL, out)[2] >= 0 ? 1 : -1;
-  P = { aL, aU, cU, rU: dist(H.upper.bj, cU), dLU: dist(H.lower.bj, H.upper.bj), dTL: dist(H.steer.outer, H.lower.bj), dTU: dist(H.steer.outer, H.upper.bj), dTI: dist(H.steer.outer, H.steer.inner),
+  P = { aL, aU, cU, cU0, shim, strut, top: add(H.upper.f, shim), rU: dist(H.upper.bj, cU0), dLU: dist(H.lower.bj, H.upper.bj), dTL: dist(H.steer.outer, H.lower.bj), dTU: dist(H.steer.outer, H.upper.bj), dTI: dist(H.steer.outer, H.steer.inner),
     sgn: sideOf(H.lower.bj, H.upper.bj, H.steer.inner, H.steer.outer), E0: frameOf(H.lower.bj, H.upper.bj, H.steer.outer), lenL: len(out), up };
   preps.set(H, P); return P; }
 
@@ -82,11 +89,11 @@ export interface Pose {
 /** the corner with its lower arm turned by theta and its rack shifted: null where the linkage cannot close */
 export function forward(H: Hardpoints, theta: number, rack: number): Pose | null {
   const P = prep(H), RL = rotAxis(P.aL, theta), lbj = add(H.lower.f, m3v(RL, sub(H.lower.bj, H.lower.f)));
-  const ubj = circleSphere(P.cU, P.aU, P.rU, lbj, P.dLU, add(H.upper.bj, sub(lbj, H.lower.bj))); if (!ubj) return null;
-  const inner: V = [H.steer.inner[0], H.steer.inner[1] + rack, H.steer.inner[2]];
+  const ubj = P.strut ? add(lbj, mul(norm(sub(P.top, lbj)), P.dLU)) : circleSphere(P.cU, P.aU, P.rU, lbj, P.dLU, add(H.upper.bj, sub(lbj, H.lower.bj))); if (!ubj) return null;
+  const inner: V = [H.steer.inner[0], H.steer.inner[1] + rack + (H.adj?.toe ?? 0), H.steer.inner[2]];
   const outer = threeSpheres(lbj, P.dTL, ubj, P.dTU, inner, P.dTI, P.sgn); if (!outer) return null;
   const R = frames(frameOf(lbj, ubj, outer), P.E0), wc = add(lbj, m3v(R, sub(H.wc, H.lower.bj)));
-  return { theta, phi: angleAbout(P.aU, sub(H.upper.bj, P.cU), sub(ubj, P.cU)), rack, lbj, ubj, inner, outer, R, wc, ok: true }; }
+  return { theta, phi: P.strut ? 0 : angleAbout(P.aU, sub(H.upper.bj, P.cU0), sub(ubj, P.cU)), rack, lbj, ubj, inner, outer, R, wc, ok: true }; }
 
 /** the wheel's steer as the renderer turns it (rad: the wheel's front toward +y), its camber (rad: the top toward +y) */
 export const steerOf = (R: M3): number => Math.atan2(R[0][1], R[1][1]);
@@ -130,12 +137,13 @@ export function barAt(H: Hardpoints, P: Pose): { end: V; link: V; angle: number 
 /** each bone's map from the pose the hardpoints are given in to pose P (`spin`: the wheel's turn on its axle, as the
  *  renderer turns it); a damper's three bones are the first damper's (a second stands beside it and moves the same) */
 export function bones(H: Hardpoints, P: Pose, spin = 0): Aff[] {
-  const Q = prep(H), lower = affAbout(rotAxis(Q.aL, P.theta), H.lower.f, H.lower.f), upper = affAbout(rotAxis(Q.aU, P.phi), H.upper.f, H.upper.f), upright = affAbout(P.R, H.lower.bj, P.lbj);
+  const Q = prep(H), lower = affAbout(rotAxis(Q.aL, P.theta), H.lower.f, H.lower.f), upper = Q.strut ? AFF_ID : affAbout(rotAxis(Q.aU, P.phi), Q.cU0, Q.cU), upright = affAbout(P.R, H.lower.bj, P.lbj);
   // the disc: turned about the axle as the wheel's shader turns it (about y through the hub), then carried by the upright
   const c = Math.cos(spin), s = Math.sin(spin), disc = affMul(upright, affAbout([[c, 0, -s], [0, 1, 0], [s, 0, c]], H.wc, H.wc));
   const rod = affAbout(rotBetween(norm(sub(H.steer.outer, H.steer.inner)), norm(sub(P.outer, P.inner))), H.steer.inner, P.inner);
   let damper = AFF_ID, damperRod = AFF_ID, spring = AFF_ID; const D = H.dampers[0];
-  if (D) { const bot = affPt(lower, D.bot), u0 = norm(sub(D.top, D.bot)), u = norm(sub(D.top, bot)), Rm = rotBetween(u0, u), L0 = dist(D.top, D.bot), L = dist(D.top, bot);
+  // a coil-over stands on the lower arm; a strut's is the upright's own (its body clamped in the upright)
+  if (D) { const bot = affPt(Q.strut ? upright : lower, D.bot), u0 = norm(sub(D.top, D.bot)), u = norm(sub(D.top, bot)), Rm = rotBetween(u0, u), L0 = dist(D.top, D.bot), L = dist(D.top, bot);
     damper = affAbout(Rm, D.bot, bot); damperRod = affAbout(Rm, D.top, D.top);
     // the spring: from its seat on the body (which the arm carries) to the one under the top mount, its length what is left
     const l0 = L0 - D.seat[0] - D.seat[1], k = Math.max(0.2, (L - D.seat[0] - D.seat[1]) / l0), S: M3 = [0, 1, 2].map(r => [0, 1, 2].map(q => (r === q ? 1 : 0) + (k - 1) * u0[r]! * u0[q]!)) as M3;

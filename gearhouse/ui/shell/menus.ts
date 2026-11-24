@@ -108,7 +108,9 @@ export function settingsScreen(ctx: ShellCtx): Screen<never> {
     const scr = pane(chips('화면 밝기', [['auto', '기기 설정대로'], ['light', '밝게'], ['dark', '어둡게']], S().screen.theme, v => set(s => { s.screen.theme = v; })),
       toggle('움직임 줄이기 (전환 효과, 턴테이블)', S().screen.calm, v => set(s => { s.screen.calm = v; })),
       row('전체화면', button('전체화면 켜기·끄기', () => { const e = document.documentElement; if (document.fullscreenElement) void document.exitFullscreen().catch(() => {}); else void e.requestFullscreen?.().catch(() => toast('이 브라우저는 전체화면을 허락하지 않습니다')); })));
-    const game = pane(toggle('연도 제한 (기술의 등장 연도)', S().sandbox.eraLimit, v => set(s => { s.sandbox.eraLimit = v; }), '켜면 엔진 공방이 설계한 해보다 늦게 나온 기술을 표시합니다. 0.12에서는 정보로만 보여 주고 막지는 않습니다(0.20 연구 체계와 함께 적용).'));
+    const game = pane(toggle('연도 제한 (기술의 등장 연도)', S().sandbox.eraLimit, v => set(s => { s.sandbox.eraLimit = v; }), '켜면 엔진 공방이 설계한 해보다 늦게 나온 기술을 표시합니다. 0.12에서는 정보로만 보여 주고 막지는 않습니다(0.20 연구 체계와 함께 적용).'),
+      chips('개발자 · 주행 물리', [['kinematic', '기구학 물리'], ['old', '옛 물리']], S().sandbox.physics, v => set(s => { s.sandbox.physics = v; })),
+      el('p', 'gh-note', '기구학 물리: 키트 바탕 차(1990년대)는 서스펜션 장착점에서 계산한 캠버·토·롤 센터로 달립니다. 옛 물리: 0.12까지의 근사식(비교용). 다음 주행부터 적용됩니다.'));
     const save = pane(el('p', 'gh-note', '설계, 측정 기록, 최고 랩, 설정은 이 브라우저에만 저장됩니다. 다른 기기로 옮기려면 전체를 파일로 내보내고 그 기기에서 가져오세요.'),
       el('div', 'gh-actions', button('전체 내보내기', () => { const t = exportAll(ctx.store); if (t === null) { toast('이 브라우저는 저장소를 읽게 하지 않습니다'); return; } download(`gearhouse_save_${new Date().toISOString().slice(0, 10)}.json`, t); toast('저장 파일을 내보냈습니다'); }),
         button('가져오기', () => void pickFile().then(t => { if (t === null) return; const n = importAll(ctx.store, t); if (n === null) { toast('GEARHOUSE 저장 파일이 아닙니다'); return; } Object.assign(ctx.settings, loadSettings(ctx.store)); ctx.changed(); toast(`가져왔습니다 (${n}개 항목)`); })),

@@ -7,7 +7,7 @@ import { raceSpec, type RaceSpec } from '../race/cars';
 import { designSpec, designFigures, dragArea, zeroTo100, perfClass, perfLabel } from '../race/design';
 import { enginePackage } from '../race/designparts';
 import { DESIGN_NSX, DESIGN_F355, DESIGN_DIABLO, DESIGN_EB110, DESIGN_XJ220, DESIGN_MCLAREN_F1, LIMITS, BASES, NOSES, FRONTS, faceOf3, TAILS, WHEELS, GRADES, INTAKES, COMPRESSIONS, SUMPS, BLOCKS,
-  STRUCTURES, PANELS, INTERIORS, BODY_LIMITS, DIMS, LAYOUTS, QUALITY_PARTS, normalise, type BodyDims, type Design, type EngineQuality } from '../core/design';
+  STRUCTURES, PANELS, INTERIORS, BODY_LIMITS, DIMS, LAYOUTS, QUALITY_PARTS, SUSP_LIMITS, RC_PRESETS, normalise, type BodyDims, type Design, type EngineQuality, type SuspKind } from '../core/design';
 import { Vehicle } from '../race/vehicle';
 import { Track } from '../race/track';
 import { Rng } from '../core/rng';
@@ -121,14 +121,18 @@ describe('the rules run the right way', () => {
 
 describe('any design inside the limits', () => {
   const pick = <T>(r: Rng, a: readonly T[]) => a[Math.floor(r.float() * a.length)]!, span = (r: Rng, [a, b]: readonly [number, number]) => a + (b - a) * r.float();
-  const random = (r: Rng, i: number): Design => { const base = pick(r, BASES), lim = BODY_LIMITS(base); return { v: 4, id: 'r' + i, name: 'random ' + i,
+  const random = (r: Rng, i: number): Design => { const base = pick(r, BASES), lim = BODY_LIMITS(base); return { v: 5, id: 'r' + i, name: 'random ' + i,
     body: { base, nose: pick(r, NOSES), ...faceOf3(base, pick(r, FRONTS)), tail: pick(r, TAILS), wheel: pick(r, WHEELS), ...Object.fromEntries(DIMS.map(k => [k, span(r, lim[k])])) as unknown as BodyDims, paint: '#808080', gloss: 0.5, structure: pick(r, STRUCTURES), panels: pick(r, PANELS) },
     engine: { grade: pick(r, GRADES), layout: pick(r, LAYOUTS), cc: span(r, LIMITS.cc), valves: pick(r, [2, 3, 4, 5] as const), redline: span(r, LIMITS.redline), intake: pick(r, INTAKES), compression: pick(r, COMPRESSIONS),
       sump: pick(r, SUMPS), block: pick(r, BLOCKS), turbo: pick(r, [0, 1, 2, 3, 4] as const), boost: span(r, LIMITS.boost), intercooler: r.float() < 0.8, vtec: r.float() < 0.3,
       bs: span(r, LIMITS.bs), quality: Object.fromEntries(QUALITY_PARTS.map(k => [k, Math.round(span(r, LIMITS.quality))])) as EngineQuality },
     drive: { gears: pick(r, [5, 6] as const), gearbox: pick(r, ['manual', 'f1'] as const), final: r.float() < 0.5 ? 0 : span(r, LIMITS.final), lsd: r.float() < 0.5, awd: r.float() < 0.3 },
     kit: { abs: r.float() < 0.5, tcs: r.float() < 0.5, steering: pick(r, ['manual', 'hydraulic', 'electric'] as const), dampers: pick(r, ['fixed', 'adaptive'] as const), wing: r.float() < 0.3, diffuser: r.float() < 0.3,
-      tyres: [span(r, LIMITS.tyre), span(r, LIMITS.tyre)], rim: pick(r, [16, 17, 18] as const), interior: pick(r, INTERIORS) } }; };
+      tyres: [span(r, LIMITS.tyre), span(r, LIMITS.tyre)], rim: pick(r, [16, 17, 18] as const), interior: pick(r, INTERIORS) },
+    // alpha 0.13: a suspension anywhere in its ranges, of any kind the axle may have
+    susp: (() => { const ax = (front: boolean) => ({ type: pick(r, (front ? ['doubleWishbone', 'macpherson'] : ['doubleWishbone', 'macpherson', 'multilink']) as SuspKind[]), arm: span(r, SUSP_LIMITS.arm), rc: pick(r, RC_PRESETS),
+      hz: span(r, SUSP_LIMITS.hz), bump: span(r, SUSP_LIMITS.bump), rebound: span(r, SUSP_LIMITS.rebound), bar: span(r, SUSP_LIMITS.bar), camber: span(r, SUSP_LIMITS.camber), toe: span(r, SUSP_LIMITS.toe) });
+      return { front: { ...ax(true), caster: span(r, SUSP_LIMITS.caster) }, rear: ax(false) }; })() }; };
   it('makes a finite, sensible spec the driving game runs for a few seconds', () => {
     const r = new Rng(98); for (let i = 0; i < 40; i++) { const d = normalise(random(r, i)), s = designSpec(d), f = designFigures(d);
       for (const [k, v] of Object.entries(s)) if (typeof v === 'number') expect(Number.isFinite(v), `${d.id} ${k}`).toBe(true);

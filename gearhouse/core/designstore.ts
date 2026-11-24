@@ -5,7 +5,7 @@
 // reached), kept per design and read by the builder. Pure: the storage is passed in (the browser's localStorage, or a
 // map in the tests), and a storage that throws (a private window, storage refused) keeps nothing and reads empty.
 import { BASES, NOSES, FRONTS, FACE_KEYS, FACE_KINDS, faceOf3, TAILS, WHEELS, GRADES, INTAKES, COMPRESSIONS, SUMPS, BLOCKS, STRUCTURES, PANELS, INTERIORS, DESIGN_NSX, DESIGN_F355, DESIGN_EB110, DIMS, LAYOUTS, QUALITY_PARTS, BS_DEFAULT, normalise,
-  type BaseId, type BodyDims, type Design, type DesignV1, type EngineQuality, type Face, type FrontKind } from './design';
+  SUSP_OWN, SUSP_KINDS, RC_PRESETS, type BaseId, type BodyDims, type Design, type DesignV1, type EngineQuality, type Face, type FrontKind, type SuspAxle } from './design';
 
 /** what the helpers need of a storage (the browser's Storage has these) */
 export interface KeyStore { getItem(k: string): string | null; setItem(k: string, v: string): void; removeItem(k: string): void }
@@ -47,11 +47,16 @@ export function asDesign(v: unknown): Design | null {
     return normalise({ v: 1, ...head, body: { ...body, front, material: mat }, engine: { ...machine, layout: one(machine.layout, ['V6', 'V8', 'V12'] as const, 'V6'), turbo: one(e.turbo, [0, 1, 2] as const, 0) }, ...rest } satisfies DesignV1); }
   // format 4's engine fields (a format-3 file has neither: the old bore/stroke, every quality 0)
   const q = obj(e.quality), quality = Object.fromEntries(QUALITY_PARTS.map(k => [k, Math.round(num(q[k], 0))])) as EngineQuality;
-  const d: Design = { v: 4, ...head, body: { ...body, ...face, structure: one(b.structure, STRUCTURES, P.body.structure), panels: one(b.panels, PANELS, P.body.panels) },
+  // format 5's suspension (an older file has none: its base's own, SUSP_OWN)
+  const su = obj(o.susp), own = SUSP_OWN[P.body.base], axle = <A extends SuspAxle>(v: unknown, d: A): A => { const a = obj(v);
+    return { ...d, type: one(a.type, SUSP_KINDS, d.type), rc: one(a.rc, RC_PRESETS, d.rc), arm: num(a.arm, d.arm), hz: num(a.hz, d.hz), bump: num(a.bump, d.bump), rebound: num(a.rebound, d.rebound), bar: num(a.bar, d.bar),
+      camber: num(a.camber, d.camber), toe: num(a.toe, d.toe), ...('caster' in d ? { caster: num(a.caster, (d as { caster: number }).caster) } : {}) }; };
+  const susp = { front: axle(su.front, own.front), rear: axle(su.rear, own.rear) };
+  const d: Design = { v: 5, ...head, body: { ...body, ...face, structure: one(b.structure, STRUCTURES, P.body.structure), panels: one(b.panels, PANELS, P.body.panels) },
     engine: { grade: one(e.grade, GRADES, P.engine.grade), ...machine, intake: one(e.intake, INTAKES, P.engine.intake), compression: one(e.compression, COMPRESSIONS, P.engine.compression),
       sump: one(e.sump, SUMPS, P.engine.sump), block: one(e.block, BLOCKS, P.engine.block), turbo: one(e.turbo, [0, 1, 2, 3, 4] as const, P.engine.turbo),
       boost: num(e.boost, P.engine.boost), intercooler: bool(e.intercooler, P.engine.intercooler),
-      bs: num(e.bs, BS_DEFAULT), quality }, drive: rest.drive, kit: { ...rest.kit, interior } };
+      bs: num(e.bs, BS_DEFAULT), quality }, drive: rest.drive, kit: { ...rest.kit, interior }, susp };
   return normalise(d); }
 
 /** a new design's id: short, unlikely to meet another in one browser */
@@ -59,7 +64,7 @@ export function newId(): string { return 'd' + Date.now().toString(36) + Math.fl
 /** a new design from a base's own car: a fresh id, its name */
 export function fromPreset(base: BaseId, name?: string): Design { const P = structuredClone(PRESET[base]); return { ...P, id: newId(), name: name ?? `${P.name} 개조` }; }
 /** the parts that make the car (not its id or name): two designs with the same signature drive alike */
-export const designSig = (d: Design): string => JSON.stringify([d.body, d.engine, d.drive, d.kit]);
+export const designSig = (d: Design): string => JSON.stringify([d.body, d.engine, d.drive, d.kit, d.susp]);
 
 // ---- a design in a link: JSON as base64url (UTF-8, the names may be Korean) ----
 export function encodeDesign(d: Design): string {

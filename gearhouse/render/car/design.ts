@@ -61,6 +61,8 @@ export function designKit(d: Design, detail?: Detail): { kit: CarKit; tweak: Twe
   if (rk !== 1 || tf !== W.f.w || tr !== W.r.w) kit.lines = { ...kit.lines, wheels: { f: { ...W.f, w: tf, rim: Math.round(W.f.rim * rk) }, r: { ...W.r, w: tr, rim: Math.round(W.r.rim * rk) } } };
   // the rear wing and the diffuser
   kit.wing = d.kit.wing ? B.wing[b.tail] : undefined; kit.diffuser = d.kit.diffuser ? DIFFUSER : undefined;
+  // the suspension's settings (format 5: render/car/suspension/setup.ts; the physics builds the same corners)
+  kit.susp = d.susp;
   const tweak: Tweak = {}; if (b.wheelbase) tweak.wheelbase = b.wheelbase; if (b.width) tweak.halfWidth = b.width; if (b.track) tweak.halfTrack = b.track / 2;
   for (const k of ['roof', 'overhangF', 'overhangR', 'ride', 'cabin', 'rake'] as const) if (b[k]) tweak[k] = b[k];
   // the powertrain: the design's engine and drive in the base's bay (render/car/powertrain)

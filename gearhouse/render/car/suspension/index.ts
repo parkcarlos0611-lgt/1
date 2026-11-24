@@ -8,7 +8,9 @@
 import type { Build, Mesh } from '../mesh';
 import { wheelsOf } from '../mesh';
 import { Geo, type Bounds } from '../powertrain/geo';
-import { axlePoints, movePoints, type Hardpoints, type SuspSpec, type SuspWheel } from './hardpoints';
+import { movePoints, type Hardpoints, type SuspSpec, type SuspWheel } from './hardpoints';
+import { frontToe, rigCorners } from './setup';
+import type { SuspDesign } from '../../../core/design';
 import { AFF_ID, NB, affInv, affMul, affPt, bones, m3m, m3t, m3v, solve, sub, type Aff, type M3, type Pose, type V } from './kinematics';
 import { axleParts, cornerParts, type Detail } from './parts';
 import { PART_BONE } from './names';
@@ -22,21 +24,21 @@ export type { Detail } from './parts';
 /** a car's suspension as its mesh carries it: the four corners' hardpoints in the car's frame (+y front, -y front, +y rear,
  *  -y rear: the renderer's order), each wheel's centre at the static ride over the hardpoints' own pose (mm), each
  *  corner's bones at the static ride undone (the mesh is drawn there), the station between the axles */
-export interface SuspRig { corners: Hardpoints[]; ride: number[]; undo: Aff[][]; midX: number; /** the names of the chassis' other parts in the mesh (the powertrain's): what stays when the body is taken off */ chassis?: string[] }
+export interface SuspRig { corners: Hardpoints[]; ride: number[]; undo: Aff[][]; midX: number; /** each front corner's steer at its static toe (rad, the renderer's way; 0 at the rear) */ toe?: number[]; /** the names of the chassis' other parts in the mesh (the powertrain's): what stays when the body is taken off */ chassis?: string[] }
 /** the bones of a rig: one that stands still, then each corner's */
 export const RIG_BONES = 1 + 4 * NB;
 export interface SuspBuilt { rig: SuspRig; tris: number; parts: Map<string, Bounds> }
 
 /** the suspension built into a car's mesh at its static ride: `ride` how far the body is raised over its wheels from the
  *  base's own height (the wheels then hang that much lower on their arms) */
-export function addSuspension(b: Build, spec: SuspSpec, wheels: { f: SuspWheel; r: SuspWheel }, opts: { detail?: Detail; ride?: number } = {}): SuspBuilt {
-  const det = opts.detail ?? 2, ride = opts.ride ?? 0, g = new Geo(), corners: Hardpoints[] = [], undo: Aff[][] = [];
-  for (const front of [true, false]) { const [L, R] = axlePoints(front ? spec.front : spec.rear, front ? wheels.f : wheels.r, front);
-    for (const H of [L, R]) { const P = solve(H, -ride), at = bones(H, P); if (!P.ok) throw new Error(`suspension: the ${front ? 'front' : 'rear'} linkage does not reach its static ride`);
-      cornerParts(g, H, spec.look, det, at); corners.push(H); undo.push(at.map(affInv)); }
-    axleParts(g, L, R, det); }
+export function addSuspension(b: Build, spec: SuspSpec, wheels: { f: SuspWheel; r: SuspWheel }, opts: { detail?: Detail; ride?: number; setup?: SuspDesign } = {}): SuspBuilt {
+  const det = opts.detail ?? 2, ride = opts.ride ?? 0, g = new Geo(), corners = rigCorners(spec, wheels, opts.setup, ride), undo: Aff[][] = [];
+  // the parts are drawn in the hardpoints' own pose and carried to the static ride (with its toe) by their bones
+  const toe = corners.map(H => H.steer.rack && opts.setup ? frontToe(H.side, opts.setup.front.toe) : 0);
+  corners.forEach((H, k) => { const P = solve(H, -ride, toe[k]), at = bones(H, P); if (!P.ok) throw new Error(`suspension: the ${H.front ? 'front' : 'rear'} linkage does not reach its static ride`);
+    cornerParts(g, H, spec.look, det, at); undo.push(at.map(affInv)); if (k % 2) axleParts(g, corners[k - 1]!, H, det); });
   const parts = g.emit(b);
-  return { rig: { corners, ride: corners.map(() => -ride), undo, midX: (wheels.f.x + wheels.r.x) / 2 }, tris: g.count(), parts };
+  return { rig: { corners, ride: corners.map(() => -ride), undo, midX: (wheels.f.x + wheels.r.x) / 2, toe }, tris: g.count(), parts };
 }
 /** the rig moved whole with the mesh it stands in */
 export function moveRig(r: SuspRig, d: V): SuspRig { const to: Aff = [1, 0, 0, d[0], 0, 1, 0, d[1], 0, 0, 1, d[2]], back: Aff = [1, 0, 0, -d[0], 0, 1, 0, -d[1], 0, 0, 1, -d[2]];
@@ -50,16 +52,19 @@ export function boneAt(rig: SuspRig, name: string, cx: number, cy: number): numb
  *  centre and its turn from the static ride, the corners as solved */
 export interface RigPose { bones: Float32Array; wheels: { wc: V; R: M3; from: V }[]; corners: Pose[] }
 /** the rig with each wheel `travel` mm above its static ride (within the stops), the front wheels steered (rad, the
- *  renderer's way: the +y one, the -y one), every wheel turned `spin` on its axle */
+ *  renderer's way: the +y one, the -y one), every wheel turned `spin` on its axle. Each wheel's turn is the upright's
+ *  from the hardpoints' own pose (the wheel is drawn upright): its camber and toe are the linkage's */
 export function poseRig(rig: SuspRig, travel: ArrayLike<number> = [0, 0, 0, 0], steerL = 0, steerR = 0, spin = 0): RigPose {
   const out = new Float32Array(RIG_BONES * 12), wheels: RigPose['wheels'] = [], poses: Pose[] = []; out.set(AFF_ID, 0);
-  rig.corners.forEach((H, k) => { const t = Math.max(-H.travel.droop, Math.min(H.travel.bump, travel[k] ?? 0)), st = H.steer.rack ? (k % 2 === 0 ? steerL : steerR) : 0;
+  rig.corners.forEach((H, k) => { const t = Math.max(-H.travel.droop, Math.min(H.travel.bump, travel[k] ?? 0)), st = H.steer.rack ? (k % 2 === 0 ? steerL : steerR) : 0;   // a front wheel's steer as asked (the drive's carries its static toe and bump steer: race/kin.ts)
     const S = staticPose(rig, k), P = solve(H, rig.ride[k]! + t, st), B = bones(H, P, spin), U = rig.undo[k]!;
     for (let j = 0; j < NB; j++) out.set(affMul(B[j]!, U[j]!), (1 + k * NB + j) * 12);
-    wheels.push({ wc: P.wc, R: m3m(P.R, m3t(S.R)), from: S.wc }); poses.push(P); });
+    // the wheel is drawn upright at its static place: it turns by the upright's whole turn from the hardpoints' pose
+    // (alpha 0.13: so its static camber and toe, and a raised body's droop, show as the physics has them)
+    wheels.push({ wc: P.wc, R: P.R, from: S.wc }); poses.push(P); });
   return { bones: out, wheels, corners: poses }; }
 const statics = new WeakMap<SuspRig, Pose[]>();
-function staticPose(rig: SuspRig, k: number): Pose { let S = statics.get(rig); if (!S) { S = rig.corners.map((H, i) => solve(H, rig.ride[i]!)); statics.set(rig, S); } return S[k]!; }
+function staticPose(rig: SuspRig, k: number): Pose { let S = statics.get(rig); if (!S) { S = rig.corners.map((H, i) => solve(H, rig.ride[i]!, rig.toe?.[i] ?? 0)); statics.set(rig, S); } return S[k]!; }
 
 /** the mesh with its suspension and its wheels in a pose (for pictures and checks; the live renderer does this on the GPU) */
 export function poseMesh(M: Mesh, pose: RigPose): Mesh { const rig = M.susp; if (!rig) return M; const pos = Float32Array.from(M.pos), N = M.names ?? [], inWheel = new Int8Array(M.n).fill(-1);

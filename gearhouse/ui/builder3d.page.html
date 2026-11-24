@@ -4,8 +4,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500&family=Noto+Sans+KR:wght@400;600&display=swap">
 <style>
-  /* the parts builder (docs/systems/98, B3): the car on a turntable fills the window; the choices on the left in six
-     steps (a step bar at the top, back and next at the bottom), the figures on the right; on a phone the choices come up from the bottom as a drawer and the figures sit in a strip */
+  /* the parts builder (docs/systems/98, B3): the car on a turntable fills the window; the choices on the left in seven
+     steps (alpha 0.13: ③ the suspension, with its small graphs) (a step bar at the top, back and next at the bottom), the figures on the right; on a phone the choices come up from the bottom as a drawer and the figures sit in a strip */
   :root { --bg: #e9e6df; --panel: rgba(246,244,239,0.94); --solid: #f6f4ef; --ink: #23211d; --soft: #6b665c; --line: #cfc9bc; --accent: #a0522d; --warn: #b3361f; --good: #3f7a3a;
     --display: 'Oswald', 'Arial Narrow', sans-serif; --body: 'Noto Sans KR', system-ui, sans-serif; }
   @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #1b1a18; --panel: rgba(36,35,31,0.92); --solid: #24231f; --ink: #ebe7de; --soft: #a39d90; --line: #3a3832; --accent: #d78a5c; --warn: #ff8a6e; --good: #9fd08f; color-scheme: dark; } }
@@ -59,6 +59,19 @@
   .sumfig dl, .meas6 dl { display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; margin: 0; font-variant-numeric: tabular-nums; font-size: 0.85rem; }
   .sumfig dt, .meas6 dt { color: var(--soft); } .sumfig dd, .meas6 dd { margin: 0; font-weight: 600; text-align: right; } .sumfig small, .meas6 small { font-weight: 400; color: var(--soft); }
   .meas6 { border-top: 1px solid var(--line); padding-top: 8px; }
+  /* ③: the suspension's small graphs (ui/builder_susp.ts): the front a solid line, the rear dashed */
+  .suspgraphs { display: grid; gap: 8px; }
+  .graph { margin: 0; border: 1px solid var(--line); border-radius: 6px; background: var(--solid); padding: 4px 6px 2px; }
+  .graph figcaption { font-size: 0.72rem; color: var(--soft); letter-spacing: 0.03em; }
+  .graph svg { display: block; width: 100%; height: auto; font-size: 9px; fill: var(--soft); font-family: var(--body); font-variant-numeric: tabular-nums; }
+  .graph .g { stroke: var(--line); stroke-width: 1; }
+  .graph polyline { fill: none; stroke-width: 2; stroke-linejoin: round; } .graph .s0 { stroke: var(--accent); } .graph .s1 { stroke: #3d6fa8; }
+  .graph .k0 { fill: var(--accent); } .graph .k1 { fill: #3d6fa8; } .graph .key { font-size: 9px; } .graph .ax { font-size: 8px; }
+  .graph .b0 { fill: var(--accent); } .graph .b1 { fill: #3d6fa8; }
+  .suspfig { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; margin: 0; font-size: 0.76rem; font-variant-numeric: tabular-nums; }
+  .suspfig dt { color: var(--soft); } .suspfig dd { margin: 0; text-align: right; font-weight: 600; } .suspfig small { font-weight: 400; color: var(--soft); }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .graph .s1, :root:not([data-theme="light"]) .graph .k1, :root:not([data-theme="light"]) .graph .b1 { stroke: #8fb6e6; fill: #8fb6e6; } :root:not([data-theme="light"]) .graph polyline.s1 { fill: none; } }
+  :root[data-theme="dark"] .graph .s1 { stroke: #8fb6e6; } :root[data-theme="dark"] .graph .k1, :root[data-theme="dark"] .graph .b1 { fill: #8fb6e6; }
   body.at-check .figs .fit { display: none; }
   .panes { flex: 1; overflow-y: auto; padding: 12px; }
   .pane { display: none; gap: 12px; } .pane.on { display: grid; }

@@ -39,8 +39,9 @@ const CARD_VS = `#version 300 es
 layout(location=0) in vec2 aQ; layout(location=3) in vec4 aI; layout(location=4) in vec2 aJ;
 uniform mat4 uVP, uPrevVP; uniform vec3 uEyeP; uniform vec4 uW, uH; out vec3 vWorld, vRt, vTo; out vec2 vQ; out vec4 vCur, vPrev; flat out float vKind, vSeed;
 void main() { int k = int(aJ.y + 0.5); float w = uW[k] * aJ.x, h = uH[k] * aJ.x; vec2 to = uEyeP.xy - aI.xy; float l = length(to); to = l > 1e-3 ? to / l : vec2(1., 0.);
-  vec3 rt = vec3(-to.y, to.x, 0.); vec3 p = aI.xyz + rt * aQ.x * w * 0.5 + vec3(0., 0., aQ.y * h);
-  vWorld = p; vRt = rt; vTo = vec3(to, 0.); vQ = aQ; vKind = aJ.y; vSeed = fract(sin(dot(aI.xy, vec2(12.9898, 78.233))) * 43758.5453);
+  vec3 rt = vec3(-to.y, to.x, 0.), d3 = normalize(uEyeP - aI.xyz - vec3(0., 0., h * 0.5)), nf = normalize(mix(vec3(to, 0.), d3, 0.85)), up = normalize(cross(nf, rt));   /* seen from above, the card leans back to face the eye (its foot kept) */
+  vec3 p = aI.xyz + rt * aQ.x * w * 0.5 + up * (aQ.y * h);
+  vWorld = p; vRt = rt; vTo = nf; vQ = aQ; vKind = aJ.y; vSeed = fract(sin(dot(aI.xy, vec2(12.9898, 78.233))) * 43758.5453);
   gl_Position = uVP * vec4(p, 1.); vCur = gl_Position; vPrev = uPrevVP * vec4(p, 1.); }`;
 const cardFsOf = (light: string) => `#version 300 es
 precision highp float;
@@ -56,7 +57,7 @@ void main() { int k = int(vKind + 0.5); vec2 q = vQ; vec3 nl = vec3(0., 0., 1.);
   else if (k == 2) { float t = clamp((q.y - 0.08) / 0.92, 0., 1.), hw = 0.92 * pow(sin(3.14159 * t), 0.75) * (1. - 0.35 * t); e = hw > 0.01 ? abs(q.x) / hw : 2.; nl = vec3(q.x / max(hw, 0.01), (t - 0.5) * 0.6, sqrt(max(0., 1. - e * e))); trunk = abs(q.x) < 0.06 && q.y < 0.12; }
   else { e = lumps(q, vec2(0., 0.), vec2(1., 0.95), 3., nl); if (q.y < 0.) e = 2.; }
   if (e > 1. && !trunk) discard;
-  vec3 base = e <= 1. ? uLeaf[k] * mix(0.86, 1.1, vSeed) : vec3(0.36, 0.29, 0.22); vec3 n = e <= 1. ? normalize(vRt * nl.x + vec3(0., 0., 1.) * nl.y + vTo * nl.z * 0.9 + vec3(0., 0., 0.25)) : vTo;
+  vec3 base = e <= 1. ? uLeaf[k] * mix(0.86, 1.1, vSeed) : vec3(0.36, 0.29, 0.22); vec3 upv = normalize(cross(vTo, vRt)), n = e <= 1. ? normalize(vRt * nl.x + upv * nl.y + vTo * nl.z * 0.9 + vec3(0., 0., 0.25)) : vTo;
   float sh = lightAt(vWorld + vTo * 0.5), ao = e <= 1. ? 0.7 + 0.3 * clamp(nl.y * 0.5 + 0.5, 0., 1.) : 0.6;
   vec3 col = uLook == 3 ? toonLight(base, n, uSun, sh, ao, vWorld) : present(pbrX(base, n, uEye, uSun, sh, 0., 0.85, 0., ao, 0.3));
   oCol = vec4(clamp(col, 0., uHDRo == 1 && uLook != 3 ? 48. : 1.), 1.); oId = vec4(uObj, 0., uOutline / 8.); oN = vec4(n * 0.5 + 0.5, 0.); vec2 dv = (vCur.xy / vCur.w - vPrev.xy / vPrev.w) * 0.5 * uSize; oV = vec4(clamp(dv / 128. + 0.5, 0., 1.), 0., 1.); }`;

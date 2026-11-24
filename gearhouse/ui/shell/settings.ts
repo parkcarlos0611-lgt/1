@@ -16,7 +16,7 @@ export interface Settings {
   screen: { theme: 'auto' | 'light' | 'dark'; /** fewer moving things (the fades, the turntable) */ calm: boolean };
   /** the sandbox's rules (alpha 0.12): the technologies held to their years (docs/systems/101 1-2 ⑦; off, and in 0.12
    *  only shown as the engine designer's year tags) */
-  sandbox: { eraLimit: boolean };
+  sandbox: { eraLimit: boolean; /** alpha 0.13 (M4): the developers' physics switch: the kinematic suspension (race/kin.ts) or the rules before it */ physics: 'kinematic' | 'old' };
   /** the drive's camera (alpha 0.12, ui/drivecam.ts): the view last chosen, by the C key, its button or the pause menu */
   camera: { view: CamView };
 }
@@ -26,7 +26,7 @@ export const DEFAULTS: Settings = {
   sound: { on: false, volume: 0.7, ui: false },
   controls: { touch: 'auto', auto: true, tcs: true, assist: false, progressive: false },
   screen: { theme: 'auto', calm: false },
-  sandbox: { eraLimit: false },
+  sandbox: { eraLimit: false, physics: 'kinematic' },
   camera: { view: CAM_DEFAULT },
 };
 
@@ -41,7 +41,7 @@ export function asSettings(v: unknown): Settings { const o = obj(v), g = obj(o.g
     sound: { on: bool(s.on, D.sound.on), volume: unit(s.volume, D.sound.volume), ui: bool(s.ui, D.sound.ui) },
     controls: { touch: one(c.touch, ['auto', 'on', 'off'] as const, D.controls.touch), auto: bool(c.auto, D.controls.auto), tcs: bool(c.tcs, D.controls.tcs), assist: bool(c.assist, D.controls.assist), progressive: bool(c.progressive, D.controls.progressive) },
     screen: { theme: one(sc.theme, ['auto', 'light', 'dark'] as const, D.screen.theme), calm: bool(sc.calm, D.screen.calm) },
-    sandbox: { eraLimit: bool(sb.eraLimit, D.sandbox.eraLimit) }, camera: { view: isCamView(cm.view) ? cm.view : D.camera.view } }; }
+    sandbox: { eraLimit: bool(sb.eraLimit, D.sandbox.eraLimit), physics: one(sb.physics, ['kinematic', 'old'] as const, D.sandbox.physics) }, camera: { view: isCamView(cm.view) ? cm.view : D.camera.view } }; }
 export function loadSettings(st: KeyStore | null): Settings { try { const t = st?.getItem(SETTINGS_KEY); return asSettings(t ? JSON.parse(t) : null); } catch { return asSettings(null); } }
 /** kept; false when the storage keeps nothing */
 export function saveSettings(st: KeyStore | null, s: Settings): boolean { try { if (!st) return false; st.setItem(SETTINGS_KEY, JSON.stringify(s)); return true; } catch { return false; } }

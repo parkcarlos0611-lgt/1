@@ -7,6 +7,12 @@
 // spring under its hub, pressed onto the ground's surface along its normal (the concrete, the banking, the earth banks),
 // its side force building over a short roll of the tyre (the relaxation length) rather than at once, its camber
 // leaning it into a turn, its grip read from how much of its tread the ring of nodes (race/tyre.ts) lays on the road.
+// Alpha 0.13 (M4, docs/systems/102): a car with a kinematic rig (race/kin.ts: the kit's bases) reads each wheel's
+// camber, toe (the bump steer), path, spring (its motion ratio) and the share of the road's forces its links carry
+// (the roll centre's and the anti-dive's) from its own linkage's tables; the tyres' side forces then act at the road,
+// split between the links (the geometric load transfer) and the springs (the elastic). Its springs are set by the wheel's
+// frequency, its dampers by bump and rebound, its bars at both ends, as its design sets them. Without a rig, or with the
+// switch on 'old', everything below runs as before.
 // The drive line as before: engine, a clutch that slips when it must, the gearbox, an open differential; tyres a
 // simplified Pacejka curve with a friction ellipse. Stepped at a millisecond inside each call (stiff springs).
 // Units SI; world axes x east, y north, z up; body axes x forward, y left, z up.
@@ -15,6 +21,8 @@ import { torqueAt, steering, suspension, type AxleKind } from './cars';
 import type { Track } from './track';
 import { Health, type Failure } from './health';
 import { TyreRing } from './tyre';
+import { kinOf, kinOn, kinRig, camberAt, toeAt, pathAt, springAt, jackAt, type KinRig } from './kin';
+import type { CornerTable } from '../render/car/suspension/tables';
 
 export interface Controls { throttle: number; brake: number; /** a share of the useful lock (usefulLock): 1 full for the grip; more (to catch a slide) up to the lock */ steer: number; clutch?: number; gear?: number; handbrake?: number }   // steer -1 (right) .. 1 (left)
 const G = 9.81, RHO = 1.2, HANDS = 5 * Math.PI;   // a driver's hands: two and a half turns of the wheel a second at most (a quick catch, hand over hand)
@@ -57,7 +65,9 @@ const SUB = 0.001;   // the inner step (s)
 /** one axle's running gear: its kind, where it is, its masses and springs */
 interface Axle { /** an anti-roll bar's stiffness (N/m of the two sides' difference) */ arb: number; kind: AxleKind; x: number; tw: number; ts: number; mu: number; Ia: number; k: number; c: number; fric: number; F0: number; rc: number; drive: boolean;
   /** beam: heave (m, up) and roll (rad, left up); independent: each wheel's rise (m) */ d: [number, number]; dv: [number, number]; da: [number, number];
-  /** a driven beam axle's wind-up (rad, its housing turned as the wheels roll forward) */ wu: number; wv: number; Iw: number; kw: number; cw: number }
+  /** a driven beam axle's wind-up (rad, its housing turned as the wheels roll forward) */ wu: number; wv: number; Iw: number; kw: number; cw: number;
+  /** the kinematic rig's (alpha 0.13): each side's table, the motion ratio at the static ride, the dampers going up and coming back (N s/m at the wheel there) */
+  tab?: [CornerTable, CornerTable]; mr0?: [number, number]; cb?: number; cr?: number }
 
 export class Vehicle {
   /** the body's centre of gravity (world), its velocity (world), its turn (body to world), its turning rate (body axes) */
@@ -101,21 +111,31 @@ export class Vehicle {
   readonly axles: [Axle, Axle];
   private ms: number; private Ix: number; private Iy: number; private Iz: number; private Iw: number; private Ie: number; private kt: number[];
   private aPrev: V3 = [0, 0, 0]; private hl: number; private hwd: number; private hh: number; private upsetT = 0;
+  /** the kinematic rig the car drives on (null: the old rules) */ readonly kin: KinRig | null;
   constructor(readonly spec: RaceSpec, readonly track: Track, readonly tyre: Tyre = TYRES[spec.tyreKind ?? 'crossply']) {
-    const m = spec.mass, L = spec.wheelbase, S = suspension(spec), sag = spec.id === 'fordT23' ? 0.035 : spec.tyreKind === 'racing50' ? 0.045 : 0.05;
+    const m = spec.mass, L = spec.wheelbase, S0 = suspension(spec), sag = spec.id === 'fordT23' ? 0.035 : spec.tyreKind === 'racing50' ? 0.045 : 0.05;
+    const KS = kinOn(spec) ? kinOf(spec) : null, K = KS ? kinRig(KS, spec.cgH, L, spec.tech?.drive?.front ?? 0) : null; this.kin = K;
+    // a kinematic rig's beam axle on leaves (the restoration work's stub) drives on the old beam axle's physics
+    const S = K ? { ...S0, ...(K.front.set.type === 'beamLeaf' ? { front: 'beam' as const, leafF: true } : {}), ...(K.rear.set.type === 'beamLeaf' ? { rear: 'beam' as const, leafR: true } : {}) } : S0;
     this.rings = [0, 1, 2, 3].map(i => new TyreRing(spec.tyreR, m * G * this.share(i), sag));
     this.kt = this.rings.map(r => r.F0 / (sag * spec.tyreR));
     const mk = (front: boolean): Axle => { const kind = front ? S.front : S.rear, leaf = front ? S.leafF : S.leafR, share = front ? spec.frontShare : 1 - spec.frontShare;
       const mu = m * (kind === 'beam' ? (front ? 0.06 : 0.085) : kind === 'swing' ? 0.05 : 0.04), msc = (m * share - mu) / 2, kt = m * G * share / 2 / (sag * spec.tyreR);
-      const f = front ? 1.35 : 1.5, keq = msc * (2 * Math.PI * f) ** 2, k = 1 / Math.max(1e-9, 1 / keq - 1 / kt);   // the spring, with the tyre in series, sets the body's ride at f Hz
+      const KA = K ? (front ? K.front : K.rear) : null, f = KA ? KA.set.hz : front ? 1.35 : 1.5, keq = msc * (2 * Math.PI * f) ** 2, k = 1 / Math.max(1e-9, 1 / keq - 1 / kt);   // the spring, with the tyre in series, sets the body's ride at f Hz
       const tw = spec.track, ts = kind === 'beam' ? tw * 0.8 : tw, Ia = mu * tw * tw / 8;
+      const own = KA?.tables && kind !== 'beam' ? { tab: KA.tables, mr0: KA.mr0, cb: 2 * KA.set.bump * Math.sqrt(k * msc), cr: 2 * KA.set.rebound * Math.sqrt(k * msc) } : {};
       return { kind, x: front ? L * (1 - spec.frontShare) : -L * spec.frontShare, tw, ts, mu, Ia, k, c: 2 * 0.28 * Math.sqrt(k * msc), fric: leaf ? 0.05 * msc * G : 0, F0: msc * G,
         rc: kind === 'beam' ? spec.tyreR + 0.06 : kind === 'swing' ? spec.tyreR + 0.02 : 0.1, drive: !front, d: [0, 0], dv: [0, 0], da: [0, 0],
-        wu: 0, wv: 0, Iw: 6 + mu * 0.05, kw: 0, cw: 0, arb: 0 }; };
+        wu: 0, wv: 0, Iw: 6 + mu * 0.05, kw: 0, cw: 0, arb: 0, ...own }; };
     this.axles = [mk(true), mk(false)]; { const Tmax = torqueAt(spec, spec.torqueRpm) * spec.gears[0]! * spec.final * spec.eff; for (const a of this.axles) { a.kw = Math.max(a.Iw * (2 * Math.PI * 20) ** 2, Tmax / 0.02); a.cw = 2 * 0.25 * Math.sqrt(a.kw * a.Iw); } }   /* the leaves twist about a fortieth of a radian under first gear's full torque */
     { // review 147: the roll stiffness shared as the car's makers set it, by an anti-roll bar at the front (mid-engined cars
       // carry a stiff front bar so the heavier, wider-tyred rear does not let go first). A spring's roll stiffness k ts^2 / 2, a bar's arb ts^2.
-      const rf = spec.tech?.rollF, F = this.axles[0], Rr = this.axles[1]; if (rf && F.kind !== 'beam') { const kF = F.k * F.ts * F.ts / 2, kR = Rr.k * Rr.ts * Rr.ts / 2; F.arb = Math.max(0, (rf * (kF + kR) - kF) / (F.ts * F.ts * (1 - rf))); } }
+      const rf = spec.tech?.rollF, F = this.axles[0], Rr = this.axles[1]; if (rf && F.kind !== 'beam') { const kF = F.k * F.ts * F.ts / 2, kR = Rr.k * Rr.ts * Rr.ts / 2;
+        if (!K) F.arb = Math.max(0, (rf * (kF + kR) - kF) / (F.ts * F.ts * (1 - rf)));
+        else { // the kinematic rig (alpha 0.13): a bar at each end, the base's own (1) a rear bar of a fifth of its springs' roll
+          // stiffness and a front one that keeps the makers' share; each times its setting
+          const bR = Rr.kind !== 'beam' ? 0.2 * kR : 0, bF = Math.max(0, (rf * (kF + kR + bR) - kF) / (1 - rf));
+          F.arb = bF / (F.ts * F.ts) * K.front.set.bar; if (Rr.kind !== 'beam') Rr.arb = bR / (Rr.ts * Rr.ts) * K.rear.set.bar; } } }
     this.ms = m - this.axles[0].mu - this.axles[1].mu;
     this.Iz = m * (L * L + spec.track * spec.track) / 12 * 1.15; this.Iy = this.ms * L * L / 14; this.Ix = this.ms * spec.track * spec.track / 10;
     this.Iw = spec.inertia?.wheel ?? 1.2 + spec.tyreR * spec.tyreR * 10; this.Ie = spec.inertia?.engine ?? 0.25 + spec.hp / 400; this.rpm = spec.idle; this.health = new Health(spec.hp, spec.cooling, Math.floor(Math.random() * 1e9));
@@ -149,8 +169,12 @@ export class Vehicle {
   get vzb(): number { return this.v[2]; }
   get speed(): number { return Math.hypot(this.v[0], this.v[1], this.v[2]); }
   /** a front wheel's own angle (rad, left +): the linkage turns the inner wheel more (Ackermann), by the car's share of it */
-  steerAt(i: number): number { if (i >= 2) return this.toeDmg[i]!; const d = this.steer, a = Math.abs(d); if (a < 1e-5) return d + this.toeDmg[i]!; const c = this.spec, L = c.wheelbase, R = L / Math.tan(a), inner = (i === 0) === (d > 0);
+  steerAt(i: number): number { return this.linkSteer(i) + this.kinToe(i); }
+  /** the steering's own angle at wheel i (the Ackermann's), with the damage's toe */
+  private linkSteer(i: number): number { if (i >= 2) return this.toeDmg[i]!; const d = this.steer, a = Math.abs(d); if (a < 1e-5) return d + this.toeDmg[i]!; const c = this.spec, L = c.wheelbase, R = L / Math.tan(a), inner = (i === 0) === (d > 0);
     const ideal = Math.atan(L / (inner ? R - c.track / 2 : R + c.track / 2)); return Math.sign(d) * (a + steering(c).ackermann * (ideal - a)) + this.toeDmg[i]!; }
+  /** a kinematic rig's toe at wheel i as a steer (rad, left +): its static toe and its bump steer at the wheel's travel (a toe-in turns a left wheel's front to the right) */
+  private kinToe(i: number): number { const A = this.axles[i < 2 ? 0 : 1]!, T = A.tab?.[i % 2]; return T ? -(i % 2 === 0 ? 1 : -1) * toeAt(T, A.d[i % 2]!) : 0; }
   /** wheel i's place in body axes [forward, left] from the centre of gravity */
   wheelAt(i: number): [number, number] { const c = this.spec; return [i < 2 ? c.wheelbase * (1 - c.frontShare) : -c.wheelbase * c.frontShare, (i % 2 === 0 ? 1 : -1) * c.track / 2]; }
   private share(i: number): number { return (i < 2 ? this.spec.frontShare : 1 - this.spec.frontShare) / 2; }
@@ -277,9 +301,11 @@ export class Vehicle {
       for (let side = 0; side < 2; side++) { const i = ai * 2 + side, sy = side === 0 ? 1 : -1, yW = sy * A.tw / 2;
         const t = beam ? A.d[0] + sy * A.d[1] * A.tw / 2 + wind : A.d[side]!, tv = beam ? A.dv[0] + sy * A.dv[1] * A.tw / 2 : A.dv[side]!;
         this.travel[i] = t;
-        // the wheel's lean against the body: a beam axle's roll; a swing axle's arm; a wishbone's small gain
-        const lean = (beam ? A.d[1] : A.kind === 'swing' ? -sy * t / (A.tw / 2) : -sy * t * 0.5) + this.camDmg[i]!;
-        const st = this.steerAt(i), hubB: V3 = [A.x, yW, zh0 + t], hub = this.toWorld(hubB);
+        // the wheel's lean against the body (top to the right +): a beam axle's roll; a swing axle's arm; a wishbone's small gain; a kinematic
+        // rig's its linkage's (with its static camber and the steer's change), the wheel's centre moved along its path
+        const KT = A.tab?.[side], st = this.steerAt(i);
+        const lean = (KT ? -sy * camberAt(KT, t, st) : beam ? A.d[1] : A.kind === 'swing' ? -sy * t / (A.tw / 2) : -sy * t * 0.5) + this.camDmg[i]!;
+        const path = KT ? pathAt(KT, t) : null, hubB: V3 = path ? [A.x - path[0], yW + sy * path[1], zh0 + t] : [A.x, yW, zh0 + t], hub = this.toWorld(hubB);
         const axB: V3 = [-Math.sin(st) * Math.cos(lean), Math.cos(st) * Math.cos(lean), Math.sin(lean)], axW = rotQ(this.q, axB);   // the spin axis, pointing left
         const q = this.near(hub[0], hub[1]), gr = this.groundFast(q.s, q.off), gn = gr.n; this.onGrass[i] = Math.abs(q.off) > T.spec.width / 2;
         const dist = (hub[2] - gr.z) * gn[2], dlt = R - dist;   // the tyre pressed in (m)
@@ -312,6 +338,12 @@ export class Vehicle {
         // the tyre's force on the running gear (world), split: along the body's up into the springs, the rest straight to the body at the roll centre
         const ft: V3 = [gn[0] * fz + fwd[0] * fx + lat[0] * fy, gn[1] * fz + fwd[1] * fx + lat[1] * fy, gn[2] * fz + fwd[2] * fx + lat[2] * fy];
         const fb = invRotQ(this.q, ft), fUp = fb[2]; tyreH = [tyreH[0] + fb[0], tyreH[1] + fb[1], tyreH[2]];
+        if (KT) { // the kinematic rig: the road's forces at the contact point; what each does to the wheel's rise (its push along the
+          // point's path, or the wheel centre's for a driven wheel's pull: the differential on the body) goes through the
+          // spring, the rest through the links straight into the body
+          const zc = zh0 + t - (R - Math.max(0, dlt)), [jy, jx, jxW] = jackAt(KT, t), jack = fb[1] * sy * jy - fb[0] * (fb[0] > 0 && this.Tw[i]! > 0 ? jxW : jx);
+          addAt([hubB[0], hubB[1], zc], rotQ(this.q, [fb[0], fb[1], 0])); Q[side as 0 | 1] += fUp + jack; addAt([A.x, yW, 0], rotQ(this.q, [0, 0, -jack]));
+          Q[side as 0 | 1] += A.mu / 2 * (gz - az); continue; }
         addAt([A.x, beam ? 0 : yW * 0.5, A.rc - c.cgH], rotQ(this.q, [0, fb[1], 0]));   /* across: at the roll centre */
         addAt([A.x, yW, A.drive && beam ? zh0 + t : -c.cgH], rotQ(this.q, [fb[0], 0, 0]));   /* along: at the road, or at the hub of a driven beam axle (whose housing passes the rest through its springs' wind-up) */
         // the side force at the road, under the roll centre: it rolls a beam axle, jacks independent wheels
@@ -326,7 +358,11 @@ export class Vehicle {
       for (let side = 0; side < 2; side++) { const sy = side === 0 ? 1 : -1, yS = sy * A.ts / 2;
         const t = beam ? A.d[0] + sy * A.d[1] * A.ts / 2 + (A.drive ? A.wu * 0.12 : 0) : A.d[side]!, tv = beam ? A.dv[0] + sy * A.dv[1] * A.ts / 2 : A.dv[side]!;
         const bar = !beam && A.arb ? A.arb * (A.d[side]! - A.d[1 - side]!) : 0;   /* the anti-roll bar: each side pushed by the difference */
-        const fs = -(A.F0 + A.k * t + bar + A.c * this.dampK * tv + A.fric * Math.tanh(tv / 0.01));   // on the running gear (pushing it down); the bump stop past 9 cm
+        const KT = A.tab?.[side];
+        // a kinematic rig's coil-over: its own rate (the wheel's at the static ride over the motion ratio squared) on its own
+        // compression, felt at the wheel through the ratio there; its damper the same, firmer coming back than going up
+        const fs = KT ? (() => { const [sp, r] = springAt(KT, t), r0 = A.mr0![side]!, ks = A.k / (r0 * r0); return -(A.F0 * r / r0 + ks * sp * r + bar + (tv > 0 ? A.cb! : A.cr!) * this.dampK * tv * (r * r) / (r0 * r0)); })()
+          : -(A.F0 + A.k * t + bar + A.c * this.dampK * tv + A.fric * Math.tanh(tv / 0.01));   // on the running gear (pushing it down); the bump stop past 9 cm
         const stop = t > 0.09 ? -(t - 0.09) * A.k * 12 : t < -0.12 ? -(t + 0.12) * A.k * 12 : 0, f = fs + stop;
         if (beam) { Q[0] += f; Q[1] += f * yS; } else Q[side as 0 | 1] += f;
         addAt([A.x, yS, 0], rotQ(this.q, [0, 0, -f])); }

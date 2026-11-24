@@ -70,7 +70,7 @@ describe('format 3 brought to format 4', () => {
   const v3 = (d: Design): DesignV3 => { const { bs: _b, quality: _q, ...engine } = structuredClone(d.engine); void _b; void _q; return { ...structuredClone(d), v: 3, engine: engine as DesignV3['engine'] }; };
   it('a format-3 design, file and link load as format 4 with the old bore/stroke and every quality 0, and drive the same', () => {
     for (const d of SIX) { const old = v3(d), n = normalise(old);
-      expect(n.v).toBe(4); expect(n.engine.bs).toBe(BS_DEFAULT); expect(n.engine.quality).toEqual({ block: 0, head: 0, intake: 0, exhaust: 0, turbo: 0 }); expect(n).toEqual(d);
+      expect(n.v).toBe(5); expect(n.engine.bs).toBe(BS_DEFAULT); expect(n.engine.quality).toEqual({ block: 0, head: 0, intake: 0, exhaust: 0, turbo: 0 }); expect(n).toEqual(d);
       expect(parseDesign(JSON.stringify(old))).toEqual(d);
       const bytes = new TextEncoder().encode(JSON.stringify(old)); let bin = ''; for (const b of bytes) bin += String.fromCharCode(b);
       expect(decodeDesign(btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''))).toEqual(d);

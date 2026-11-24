@@ -22,6 +22,7 @@ import { TIPS } from './tips';
 import { VERSION_NAME } from '../../core/version';
 import { currentDesign, savedDesigns, fromPreset } from '../../core/designstore';
 import type { Design } from '../../core/design';
+import { PHYSICS } from '../../race/kin';
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const store: ListStore | null = (() => { try { return localStorage; } catch { return null; } })();
@@ -57,6 +58,7 @@ const ctx: ShellCtx = { router, stage, backdrop, store, settings, layer: $('gh-l
   recent() { return currentDesign(store) ?? savedDesigns(store)[0] ?? (preset ??= fromPreset('f355', 'F355 프리셋')); } };
 /** the settings at work: the theme, the menus' sounds, the calm screen, the drive's own fields */
 function applySettings() { const t = settings.screen.theme; if (t === 'auto') delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = t;
+  PHYSICS.kinematic = settings.sandbox.physics !== 'old';   // the developers' physics switch (race/kin.ts), for the next car made
   uiSounds(settings.sound.ui); setSceneryDensity(settings.graphics.scenery); backdrop.calm = settings.screen.calm || matchMedia('(prefers-reduced-motion: reduce)').matches; backdrop.redraw(); screens.drive?.apply?.(); }
 
 const drive = driveScreen(ctx), builder = builderScreen(ctx), engine = engineScreen(ctx);

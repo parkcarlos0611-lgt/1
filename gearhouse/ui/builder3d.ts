@@ -1,9 +1,10 @@
 // The parts builder (docs/systems/98_alpha_interface_and_builder_plan.md, B3 and B4): a car's design (core/design.ts)
 // edited on a studio turntable. The live renderer (render/live/renderer.ts, as the drive page and the photo mode use it:
 // its sun and shadows, the photographed sky, the PBR textures, the looks) draws the design's car (render/car/design.ts),
-// built again only when the body's fields change and a moment after a slider rests. Left: the choices in six steps,
+// built again only when the body's fields change and a moment after a slider rests. Left: the choices in seven steps,
 // taken in a guided order with any step open at any time (docs/systems/98 section 11: the base, the engine and drive,
-// the body's shapes, the kit, the paint, then the check and the test drive; the engine's details greyed out, with the
+// the suspension (alpha 0.13: docs/systems/102, its own step, with its small graphs and the suspension view on), the
+// body's shapes, the kit, the paint, then the check and the test drive; the engine's details greyed out, with the
 // reason, where its development grade does not allow them; a step marked where a fit check concerning it is not
 // clean, so a change upstream shows what it broke further on); right: the figures
 // worked out from the design (race/design.ts) as it changes, its class from them, its cost and reliability
@@ -19,7 +20,10 @@ import { bareMesh, bounce } from '../render/car/suspension/view';
 import { designSpec, designFigures, designHeight, type DesignFigures } from '../race/design';
 import { CLEARANCE, type FitResult } from '../race/fit';
 import { LIMITS, BASES, BODY_LIMITS, DIMS, LAYOUTS, LAYOUT_NAME, type DimKey, GRADE_NAME, GRADES, gradeLock, gradeBoost, gradeRedline, normalise, applyPatch, type BaseId, type Design, type NoseKind, type TailKind, type WheelKind, FACE_KEYS, faceLock, type Face, type FaceKey,
-  type Grade, type Structure, type Panels, type Intake, type Compression, type Sump, type Block, type Turbos, type Interior } from '../core/design';
+  type Grade, type Structure, type Panels, type Intake, type Compression, type Sump, type Block, type Turbos, type Interior,
+  SUSP_KINDS, SUSP_KIND_NAME, SUSP_LIMITS, SUSP_OWN, suspLock, suspFieldLock, type SuspKind, type RcPreset, type SuspAxle } from '../core/design';
+import { STEPS, FIT_STEP, stepNo, isStep, stepFrom, seenFrom, type StepId } from './builder_steps';
+import { suspFigures, suspPanel } from './builder_susp';
 import { savedEngines, joinEngine, withEngine } from '../core/engines';
 import { currentDesign, keepCurrent, savedDesigns, saveDesign, deleteDesign, fromPreset, encodeDesign, designJson, parseDesign, measured, designSig, newId, KEYS, type KeyStore } from '../core/designstore';
 import texAlb from '../assets/textures/pbr/albedo.jpg';
@@ -75,29 +79,28 @@ const sign = (v: number, u: string) => `${v > 0 ? '+' : ''}${v} ${u}`;
 
 // ---- the steps: the design in a guided order (going back always allowed, and so is going ahead); the saved designs
 // and the files on a page of their own, opened from the bar at the top ----
-type StepId = 'chassis' | 'engine' | 'body' | 'kit' | 'paint' | 'check';
-const STEPS: [StepId, string][] = [['chassis', '차대'], ['engine', '엔진·구동계'], ['body', '차체 형태'], ['kit', '장비'], ['paint', '칠·마감'], ['check', '검사·시험 주행']];
-/** the step each fit check answers to: the engine bay, its mounts and the gearbox the engine's and the drive's, the
- *  arches the tyres' (their fixes may reach into other steps: a longer wheelbase, a wider body) */
-const FIT_STEP: Record<FitResult['part'], StepId> = { bayLength: 'engine', bayWidth: 'engine', bayHeight: 'engine', gearboxPlace: 'engine', mount: 'engine', gearbox: 'engine', archF: 'kit', archR: 'kit', clearance: 'chassis' };
-const stepNo = (id: StepId) => STEPS.findIndex(s => s[0] === id);
+// (the steps, their order and the fit checks' steps: ui/builder_steps.ts)
 const pane = new Map<string, HTMLElement>(), stepBtn = new Map<StepId, HTMLButtonElement>();
 for (const id of [...STEPS.map(s => s[0]), 'files']) { const p = document.createElement('section'); p.className = 'pane'; p.dataset.tab = id; $('panes').append(p); pane.set(id, p); }
 for (const [id, name] of STEPS) { const li = document.createElement('li'), b = document.createElement('button'); b.type = 'button'; b.dataset.step = id;
   b.innerHTML = `<span class="n">${stepNo(id) + 1}</span><span class="t">${name.replace('·', '·<wbr>')}</span><span class="badge" hidden></span>`;
   b.addEventListener('click', () => go(id)); li.append(b); $('steps').append(li); stepBtn.set(id, b); }
 const add = (tab: string, ...els: HTMLElement[]) => pane.get(tab)!.append(...els);
-/** where each design was left (its step, the steps seen), kept in this browser */
+/** where each design was left (its step, the steps seen), kept in this browser (a step kept by the six-step builder
+ *  before alpha 0.13 is read by stepFrom: by its id, or a number as the six steps') */
 const STEP_KEY = 'gearhouse.builder.step.v1';
 let step: StepId = 'chassis', onFiles = false, seen = new Set<StepId>(['chassis']);
-const isStep = (x: unknown): x is StepId => STEPS.some(s => s[0] === x);
 function keptSteps(): Record<string, { step: StepId; seen: StepId[] }> { try { const o: unknown = JSON.parse(store?.getItem(STEP_KEY) ?? '{}'); return o && typeof o === 'object' ? o as Record<string, { step: StepId; seen: StepId[] }> : {}; } catch { return {}; } }
 function keepStep() { try { const rest = Object.entries(keptSteps()).filter(([k]) => k !== D.id).slice(0, 99); store?.setItem(STEP_KEY, JSON.stringify(Object.fromEntries([[D.id, { step, seen: [...seen] }], ...rest]))); } catch { /* not kept */ } }
 /** the step a design was left at (a new one starts at the first) */
-function restoreStep() { const k = keptSteps()[D.id]; step = k && isStep(k.step) ? k.step : 'chassis'; seen = new Set([...(Array.isArray(k?.seen) ? k.seen.filter(isStep) : []), step]); onFiles = false; showStep(); }
+function restoreStep() { const k = keptSteps()[D.id]; step = stepFrom(k?.step) ?? 'chassis'; seen = new Set([...seenFrom(k?.seen), step]); onFiles = false; showStep(); }
 function go(id: StepId | 'files') { if (id === 'files') onFiles = true; else { onFiles = false; step = id; seen.add(id); keepStep(); } showStep(); $('panes').scrollTop = 0; }
+/** the suspension view put on by step ③ (and off again when it is left, unless the viewer had it on already) */
+let suspAuto = false;
 function showStep() { const at = onFiles ? 'files' : step;
-  document.body.classList.toggle('at-check', at === 'check');   // the figures' own fit list folded away while ⑥ shows it in full
+  document.body.classList.toggle('at-check', at === 'check');   // the figures' own fit list folded away while ⑦ shows it in full
+  if (at === 'susp' && !view.susp) { suspAuto = true; setSuspView(true); } else if (at !== 'susp' && suspAuto) { suspAuto = false; setSuspView(false); }
+  if (at === 'susp') suspGraphs();
   for (const [k, q] of pane) q.classList.toggle('on', k === at);
   for (const [id, b] of stepBtn) { const now = !onFiles && id === step, done = seen.has(id) && !now;
     if (now) b.setAttribute('aria-current', 'step'); else b.removeAttribute('aria-current'); b.classList.toggle('done', done); b.classList.toggle('unseen', !seen.has(id)); b.dataset.state = now ? '지금 단계' : done ? '본 단계' : '아직 안 본 단계'; label(id); }
@@ -116,7 +119,9 @@ $('openFiles').addEventListener('click', () => { if (onFiles) go(step); else { g
 // 차대: the base, its stretch, its structure
 add('chassis', seg<BaseId>('바탕 차대', BASES.map(b => [b, BASE_NAME[b]] as [BaseId, string]), () => D.body.base, v => { if (v === D.body.base) return;
     // the tyres and the rims follow the base where they were its own
-    const was = fromPreset(D.body.base), to = fromPreset(v); if (D.kit.tyres[0] === was.kit.tyres[0] && D.kit.tyres[1] === was.kit.tyres[1]) D.kit.tyres = [...to.kit.tyres]; if (D.kit.rim === was.kit.rim) D.kit.rim = to.kit.rim; D.body.base = v; }),
+    const was = fromPreset(D.body.base), to = fromPreset(v); if (D.kit.tyres[0] === was.kit.tyres[0] && D.kit.tyres[1] === was.kit.tyres[1]) D.kit.tyres = [...to.kit.tyres]; if (D.kit.rim === was.kit.rim) D.kit.rim = to.kit.rim;
+    if (JSON.stringify(D.susp) === JSON.stringify(SUSP_OWN[D.body.base])) D.susp = structuredClone(SUSP_OWN[v]);   // and the suspension, where it was the old base's own
+    D.body.base = v; }),
   note('바탕은 차체 패널의 치수와 치수를 바꿀 수 있는 범위를 정합니다. 코·앞면·꼬리·휠은 세 바탕 모두에 끼울 수 있습니다.'),
   ...dimSliders(),
   seg<Structure>('구조 소재 (모노코크·프레임)', [['steel', '강철'], ['hss', '고장력강'], ['aluminium', '알루미늄'], ['honeycomb', '알루미늄 허니콤'], ['cfrp', '탄소섬유']], () => D.body.structure, v => { D.body.structure = v; }),
@@ -140,7 +145,7 @@ function dimSliders(): HTMLElement[] {
     btnRow('치수 원래대로', () => { for (const k of DIMS) D.body[k] = 0; changed(); }));
   return out; }
 function btnRow(t: string, f: () => void): HTMLElement { const d = document.createElement('div'); d.className = 'btns'; const b = document.createElement('button'); b.type = 'button'; b.className = 'btn'; b.textContent = t; b.addEventListener('click', f); d.append(b); return d; }
-// ③ 차체 형태: the panels' kinds; ⑤ 칠·마감: the paint
+// ④ 차체 형태: the panels' kinds; ⑥ 칠·마감: the paint
 { const ch = designChoices('nsx'), kinds = <T extends string>(ks: T[]) => ks.map(k => [k, KIND_NAME[k] ?? k] as [T, string]);
   // the face in slots (core/design.ts Face; render/car/face.ts): chips with a small drawing each, a value the rules do not
   // allow greyed out with its reason (faceLock), the car built again at each choice
@@ -211,7 +216,32 @@ function btnRow(t: string, f: () => void): HTMLElement { const d = document.crea
     check('종감속 자동 (최고 속도가 출력 정점에서 나오게)', () => !D.drive.final, v => { D.drive.final = v ? 0 : +designSpec(D).final.toFixed(2); }, 'autofinal'), fin,
     check('LSD (차동 제한)', () => D.drive.lsd, v => { D.drive.lsd = v; }, 'lsd'), check('4륜 구동 (점성 센터 커플링, 앞 30 %)', () => D.drive.awd, v => { D.drive.awd = v; }, 'awd'));
   syncs.push(() => { (fin.querySelector('input') as HTMLInputElement).disabled = !D.drive.final; }); }
-// ④ 장비
+// ③ 서스펜션 (alpha 0.13): each axle's kind, its arms, its springs and dampers, its bar, its static camber and toe, the
+// front's caster, the ride; the small graphs from the linkage as the physics reads it (ui/builder_susp.ts)
+{ const deg = (n: number) => (v: number) => `${v > 0 ? '+' : ''}${v.toFixed(n)}°`, pct = (v: number) => `${Math.round(v * 100)} %`;
+  const RC_NAME: [RcPreset, string][] = [['low', '낮음'], ['mid', '보통'], ['high', '높음']];
+  const axle = (front: boolean): HTMLElement[] => { const A = (): SuspAxle => front ? D.susp.front : D.susp.rear, k = front ? 'F' : 'R';
+    const lockF = (f: 'arm') => { const r = range('팔 길이 비 (위 / 아래)', SUSP_LIMITS.arm, 0.01, () => A().arm, v => { A().arm = v; }, v => v.toFixed(2), `susp-arm${k}`); syncs.push(() => { const L = suspFieldLock(A(), f), i = r.querySelector('input')!; i.disabled = !!L; r.title = L ?? ''; }); return r; };
+    return [h2(front ? '앞 차축' : '뒤 차축'),
+      seg<SuspKind>('형식', SUSP_KINDS.map(t => [t, SUSP_KIND_NAME[t]] as [SuspKind, string]), () => A().type, v => { A().type = v; }, v => suspLock(front, v)),
+      lockF('arm'), seg<RcPreset>('롤 센터 높이', RC_NAME, () => A().rc, v => { A().rc = v; }),
+      range('스프링 (바퀴 고유 진동수)', SUSP_LIMITS.hz, 0.05, () => A().hz, v => { A().hz = v; }, v => `${v.toFixed(2)} Hz`, `susp-hz${k}`),
+      range('댐퍼 압축 (범프)', SUSP_LIMITS.bump, 0.01, () => A().bump, v => { A().bump = v; }, pct, `susp-bump${k}`),
+      range('댐퍼 반발 (리바운드)', SUSP_LIMITS.rebound, 0.01, () => A().rebound, v => { A().rebound = v; }, pct, `susp-reb${k}`),
+      range('스태빌라이저 (기본의 몇 배)', SUSP_LIMITS.bar, 0.05, () => A().bar, v => { A().bar = v; }, v => v ? `× ${v.toFixed(2)}` : '없음', `susp-bar${k}`),
+      range('정지 캠버', SUSP_LIMITS.camber, 0.1, () => A().camber, v => { A().camber = v; }, deg(1), `susp-cam${k}`),
+      range('토 (+ 토인)', SUSP_LIMITS.toe, 0.01, () => A().toe, v => { A().toe = v; }, deg(2), `susp-toe${k}`),
+      ...(front ? [range('캐스터', SUSP_LIMITS.caster, 0.1, () => D.susp.front.caster, v => { D.susp.front.caster = v; }, deg(1), 'susp-caster')] : [])]; };
+  const graphs = document.createElement('div'); graphs.id = 'suspGraphs'; graphs.className = 'suspgraphs'; graphs.setAttribute('aria-live', 'polite');
+  add('susp', note('장착점(하드포인트)에서 링크를 풀어 바퀴가 오르내릴 때의 캠버·토·롤 센터를 계산합니다. 시험 주행의 물리도 같은 표를 씁니다. 이 단계에서는 서스펜션 보기가 켜집니다.'), graphs,
+    ...axle(true), ...axle(false),
+    h2('차고'), range('지상고 (① 치수와 같은 값)', BODY_LIMITS(D.body.base).ride, 5, () => D.body.ride, v => { D.body.ride = v; }, v => `${sign(v, 'mm')} · ${CLEARANCE[D.body.base] + v} mm`, 'susp-ride'),
+    note('스프링이 단단할수록(진동수가 높을수록) 덜 기울고 덜 숙이지만 요철에서 접지가 흔들립니다. 롤 센터가 높으면 롤이 줄지만 바퀴가 옆으로 밀리며 차가 들립니다. 음의 캠버는 코너에서 바깥 바퀴를 세웁니다. 일체 차축·판스프링은 1930년대 차대(복원 작업)용입니다.'),
+    btnRow('서스펜션 원래대로', () => { D.susp = structuredClone(SUSP_OWN[D.body.base]); changed(); }));
+  syncs.push(() => { const r = $('susp-ride') as HTMLInputElement | null; if (r) { const [a, b] = BODY_LIMITS(D.body.base).ride; r.min = String(a); r.max = String(b); } }); }
+/** the step's graphs drawn again (with the figures, a moment after a change) */
+function suspGraphs() { const el = $('suspGraphs'); if (!el || (step !== 'susp' && el.innerHTML)) return; try { el.innerHTML = suspPanel(suspFigures(D)); } catch (e) { console.warn('suspension graphs', e); el.innerHTML = ''; } }
+// ⑤ 장비
 add('kit', check('ABS', () => D.kit.abs, v => { D.kit.abs = v; }, 'abs'), check('TCS (트랙션 컨트롤)', () => D.kit.tcs, v => { D.kit.tcs = v; }, 'tcs'),
   select('스티어링', [['manual', '수동'], ['hydraulic', '유압 파워'], ['electric', '전동 파워']], () => D.kit.steering, v => { D.kit.steering = v; }, 'steering'),
   seg('댐퍼', [['fixed', '고정'], ['adaptive', '가변 (두 가지 모드)']], () => D.kit.dampers, v => { D.kit.dampers = v; }),
@@ -221,7 +251,7 @@ add('kit', check('ABS', () => D.kit.abs, v => { D.kit.abs = v; }, 'abs'), check(
   range('뒤 타이어 폭', LIMITS.tyre, 5, () => D.kit.tyres[1], v => { D.kit.tyres = [D.kit.tyres[0], v]; }, v => `${v} mm`, 'tyreR'),
   seg('림', [[16, '16″'], [17, '17″'], [18, '18″']], () => D.kit.rim, v => { D.kit.rim = v; }),
   note('윙은 꼬리에 맞춰 차체에 달립니다(EB110 캡슐 꼬리는 능동 윙: 달리면 올라옵니다). 디퓨저는 뒤 바닥 아래에 그려집니다.'));
-// ⑥ 검사·시험 주행: the fit's checks with their fixes and the step each belongs to, the class, the cost and the
+// ⑦ 검사·시험 주행: the fit's checks with their fixes and the step each belongs to, the class, the cost and the
 // reliability, what was measured, the test drive and the save
 { const div = (id: string, cls: string) => { const d = document.createElement('div'); d.id = id; d.className = cls; return d; };
   const drv = document.createElement('a'); drv.id = 'drive6'; drv.className = 'btn main'; drv.target = '_blank'; drv.rel = 'opener'; drv.textContent = '시험 주행 ▶'; drv.href = 'drive.html';
@@ -251,7 +281,9 @@ function showList() { const list = $('list'), all = savedDesigns(store); list.te
 
 // ---- the design changed: kept, the figures, the car (when its body changed), the link ----
 // the engine's shape is in the key too (the car carries its powertrain: the engine view shows it)
-const bodyKey = (d: Design) => JSON.stringify([d.engine.layout, d.engine.cc, d.engine.bs, d.engine.valves, d.engine.block, d.engine.grade, d.engine.intake, d.engine.sump, d.engine.turbo, d.engine.intercooler, d.drive.gears, d.drive.gearbox, d.drive.awd, d.body.base, d.body.nose, ...FACE_KEYS.map(k => d.body[k]), d.body.tail, d.body.wheel, ...DIMS.map(k => d.body[k]), d.body.paint, d.body.gloss, d.kit.tyres, d.kit.rim, d.kit.wing, d.kit.diffuser]);
+const bodyKey = (d: Design) => JSON.stringify([d.engine.layout, d.engine.cc, d.engine.bs, d.engine.valves, d.engine.block, d.engine.grade, d.engine.intake, d.engine.sump, d.engine.turbo, d.engine.intercooler, d.drive.gears, d.drive.gearbox, d.drive.awd, d.body.base, d.body.nose, ...FACE_KEYS.map(k => d.body[k]), d.body.tail, d.body.wheel, ...DIMS.map(k => d.body[k]), d.body.paint, d.body.gloss, d.kit.tyres, d.kit.rim, d.kit.wing, d.kit.diffuser,
+  // the suspension's linkage (its kind, arms, roll centre, caster, static camber and toe: the rig is built with them; not the springs, the dampers or the bars)
+  ...[d.susp.front, d.susp.rear].map(a => [a.type, a.arm, a.rc, a.camber, a.toe]), d.susp.front.caster]);
 let meshT = 0, figT = 0;
 function changed() { D = normalise(D); for (const s of syncs) s(); keepCurrent(store, D); savedState(); driveLink();
   clearTimeout(figT); figT = setTimeout(figures, 40) as unknown as number;
@@ -290,7 +322,7 @@ function figures() { const f = designFigures(D), s = designSpec(D), was = lastFi
   $('cls').innerHTML = $('cls6').innerHTML = `<b>${esc(f.perfLabel)}</b> <small>· ${esc(f.form)}</small>`;
   $('cost6').innerHTML = `<dl><dt>원가 지수</dt><dd>${f.cost} <small>NSX=100</small></dd><dt>신뢰성</dt><dd>${f.reliability}</dd><dt>정비 주기</dt><dd>${(f.serviceKm / 1000).toLocaleString()}천 <small>km</small></dd>`
     + `<dt>무게</dt><dd>${f.mass.toLocaleString()} <small>kg</small></dd><dt>출력</dt><dd>${f.hp} <small>hp</small></dd><dt>최고 속도</dt><dd>${f.topKmh} <small>km/h</small></dd></dl>`;
-  showFit(f.fit); stepMarks(f.fit); meas(); }
+  showFit(f.fit); stepMarks(f.fit); meas(); suspGraphs(); }
 /** each step marked with the fit checks that concern it and are not clean */
 function stepMarks(r: FitResult[]) { for (const [id, b] of stepBtn) { const mine = r.filter(x => FIT_STEP[x.part] === id), nb = mine.filter(x => x.verdict === 'blocked').length, nm = mine.filter(x => x.verdict === 'modified').length, badge = b.querySelector<HTMLElement>('.badge')!;
   badge.hidden = !nb && !nm; badge.className = `badge${nb ? ' blocked' : ''}`; badge.textContent = nb ? `⛔${nb > 1 ? nb : ''}` : `⚠️${nm > 1 ? nm : ''}`;
@@ -336,6 +368,9 @@ function shown(): Mesh { let M = view.lamps ? (up ??= designMesh(D, 0, 1, 1)) : 
 const home = () => { view.ang = Math.PI - 0.7; view.pitch = 17; view.zoom = 1; view.yaw = 0; dirty = true; }; home();
 const press = (id: string, k: 'spin' | 'lamps' | 'engine' | 'susp') => $(id).addEventListener('click', () => { view[k] = !view[k]; $(id).setAttribute('aria-pressed', String(view[k])); dirty = true; });
 press('spin', 'spin'); press('lamps', 'lamps'); press('engine', 'engine'); press('susp', 'susp');
+$('susp').addEventListener('click', () => { suspAuto = false; });   // the viewer's own choice from now on
+/** the suspension view on or off (step ③ puts it on) */
+function setSuspView(on: boolean) { view.susp = on; $('susp').setAttribute('aria-pressed', String(on)); dirty = true; }
 $('engine').addEventListener('click', () => { if (view.engine) { view.ang = view.yaw + 0.6; view.pitch = 42; view.zoom = 0.8; } });   // the engine bay seen from behind and above
 $<HTMLSelectElement>('look').addEventListener('change', e => { view.look = +(e.target as HTMLSelectElement).value; dirty = true; });
 $('home').addEventListener('click', home); cv.addEventListener('dblclick', home);

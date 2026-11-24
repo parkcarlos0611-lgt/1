@@ -844,7 +844,7 @@ export class LiveRenderer {
     VP[0] = rx[0]! * 2 * k / v.W; VP[4] = rx[1]! * 2 * k / v.W; VP[12] = Math.round(v.W / 2 - dot(c, rx) * k) * 2 / v.W - 1;
     VP[1] = up[0]! * 2 * k / v.H; VP[5] = up[1]! * 2 * k / v.H; VP[9] = up[2]! * 2 * k / v.H; VP[13] = 1 - 2 * Math.round(v.H * v.cy + dot(c, up) * k) / v.H;
     VP[2] = vd[0]! / R; VP[6] = vd[1]! / R; VP[10] = vd[2]! / R; VP[14] = -dot(c, vd) / R; VP[15] = 1; }
-    const eye = [-vd[0]!, -vd[1]!, -vd[2]!], eyeTo = (p: WebGLProgram) => { gl.uniform3fv(this.loc(p, 'uEyeD'), eye); eyeTo(p);   /* a shader with the one direction only (the woods') */ gl.uniform4f(this.loc(p, 'uCamP'), pv ? pv.e[0] : 0, pv ? pv.e[1] : 0, pv ? pv.e[2] : 0, pv ? 1 : 0); };
+    const eye = [-vd[0]!, -vd[1]!, -vd[2]!], eyeTo = (p: WebGLProgram) => { gl.uniform3fv(this.loc(p, 'uEyeD'), eye); gl.uniform3fv(this.loc(p, 'uEye'), eye);   /* a shader with the one direction only (the woods') */ gl.uniform4f(this.loc(p, 'uCamP'), pv ? pv.e[0] : 0, pv ? pv.e[1] : 0, pv ? pv.e[2] : 0, pv ? 1 : 0); };
     if (this.prevCam && Math.hypot(v.x - this.prevCam[0], v.y - this.prevCam[1]) > 15) { this.prevVP = null; this.prevM.clear(); }   /* a cut (the car put back, a new shot): no smear from the jump */ this.prevCam = [v.x, v.y];
     // ---- the sun's view for the shadows: around the camera's target, as far as the picture reaches ----
     const reach = pv ? 75 : Math.min(160, Math.hypot(v.W, v.H / Math.max(0.2, SP)) * v.mm / 2000 + 12), lz = SUN_W.map(x => -x), lx0 = [lz[1]!, -lz[0]!, 0], ll = Math.hypot(lx0[0]!, lx0[1]!), lx = [lx0[0]! / ll, lx0[1]! / ll, 0];

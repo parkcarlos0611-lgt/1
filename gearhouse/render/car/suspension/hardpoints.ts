@@ -6,9 +6,13 @@
 // (Hardpoints) that the kinematics (kinematics.ts), the parts (parts.ts) and, from M4, the physics all read.
 //   doubleWishbone   two A-arms and a coil-over on the lower one: the NSX (forged aluminium arms all round), the F355
 //                    (steel wishbones all round), the EB110 (wishbones all round, two coil-overs a side at the rear)
-//   macpherson, multilink, beamLeaf (the 1930s' beam axle on leaf springs): named here, not built yet
+//   macpherson       (alpha 0.13, M4) a strut: the lower arm, and the coil-over's body clamped in the upright, its top
+//                    mount on the body (no upper arm); made from a base's wishbone (its lower arm, its brake, its tie rod)
+//   multilink        (alpha 0.13, M4: the rear) the upper arm and the lower one each as two separate links, solved as
+//                    the wishbones they amount to: a longer upper link, its pivots tilted for more anti-squat
+//   beamLeaf         (the 1930s' beam axle on leaf springs, for the restoration work): named here, not built yet
 import type { V } from './kinematics';
-import { add, mix, mul, sub } from './kinematics';
+import { add, dist, mix, mul, sub } from './kinematics';
 
 export type SuspType = 'doubleWishbone' | 'macpherson' | 'multilink' | 'beamLeaf';
 /** the wheel a corner carries: the axle's station, half the track, the tyre's radius and width, the rim's radius,
@@ -23,6 +27,10 @@ export interface WishboneSpec {
   /** the upper arm: the same; its ball joint this far inboard of the lower one (the kingpin's lean) and behind it (the
    *  caster), over the hub by `lift` (0: as high as the rim lets it), its pivots `fall` lower than the joint */
   upper: { len: number; span: [number, number]; lift?: number; fall: number; inset: number; trail: number };
+  /** the caster (degrees: the upper ball joint behind the lower one), in place of the upper arm's trail where set */
+  caster?: number;
+  /** what the linkage is drawn and solved as: the wishbones themselves, or a multilink rear's links (solved alike) */
+  kind?: 'doubleWishbone' | 'multilink';
   /** the coil-overs: each one's x from the axle, where along the lower arm it stands (0 the pivots, 1 the ball joint),
    *  the top mount (inboard of the tyre's inner wall, over the hub), the spring's radius and wire */
   damper: { dx: number[]; at: number; top: [number, number]; spring: [number, number]; body: number };
@@ -37,8 +45,13 @@ export interface WishboneSpec {
    *  straight ahead of the hub, upward) */
   brake: { r: number; t: number; caliper: number; at: number };
 }
-export interface OtherSpec { type: 'macpherson' | 'multilink' | 'beamLeaf' }
-export type AxleSpec = WishboneSpec | OtherSpec;
+/** a MacPherson strut: the lower arm as a wishbone's; the strut's top mount inboard of the tyre's inner wall and over
+ *  the hub (as a coil-over's), the upright's clamp on the strut `foot` mm over the hub; the caster; the spring and its
+ *  body; the bar, the tie rod and the brake as a wishbone's */
+export interface StrutSpec { type: 'macpherson'; lower: WishboneSpec['lower']; top: [number, number]; foot: number; caster: number;
+  damper: { spring: [number, number]; body: number }; bar?: WishboneSpec['bar']; steer: WishboneSpec['steer']; brake: WishboneSpec['brake'] }
+export interface OtherSpec { type: 'beamLeaf' }
+export type AxleSpec = WishboneSpec | StrutSpec | OtherSpec;
 /** a base's suspension: its two axles and how its parts are finished */
 export interface SuspSpec { front: AxleSpec; rear: AxleSpec; look: SuspLook }
 export interface SuspLook { arms: string; armGloss: number; /** tubes (a fabricated arm) or forged blades */ armKind: 'tube' | 'forged'; upright: string; spring: string; damper: string; caliper: string; disc: string }
@@ -59,6 +72,9 @@ export interface Hardpoints {
   brake: { r: number; t: number; caliper: number; at: number };
   /** the travel the linkage is drawn through (mm from the static ride): up to the bump stop, down to full droop */
   travel: { bump: number; droop: number };
+  /** the static setting (alpha 0.13): the upper pivots (a strut's top mount) moved outward by shims (mm: the wheel's
+   *  top goes out, more positive camber), the toe link's inner end moved along +y (mm) */
+  adj?: { camber: number; toe: number };
 }
 
 /** the travel drawn: the physics' stops (race/vehicle.ts: the bump stop past 90 mm up, the droop stop past 120 mm down) */
@@ -69,8 +85,9 @@ export function wishbonePoints(S: WishboneSpec, w: SuspWheel, side: 1 | -1, fron
   // across the car: `inb` mm inboard of the wheel's middle
   const P = (dx: number, inb: number, z: number): V => [w.x + dx, side * (w.y - inb), z];
   const bjIn = w.back + 24, lowZ = w.r - (S.lower.drop ?? Math.min(w.rim - 58, w.r - 150)), upZ = w.r + (S.upper.lift ?? w.rim - 66);
-  const lower = { f: P(S.lower.span[0], bjIn + S.lower.len, lowZ + S.lower.rise), r: P(S.lower.span[1], bjIn + S.lower.len, lowZ + S.lower.rise), bj: P(-S.upper.trail / 2, bjIn, lowZ) };
-  const ui = bjIn + S.upper.inset, upper = { f: P(S.upper.span[0], ui + S.upper.len, upZ - S.upper.fall), r: P(S.upper.span[1], ui + S.upper.len, upZ - S.upper.fall), bj: P(S.upper.trail / 2, ui, upZ) };
+  const trail = S.caster === undefined ? S.upper.trail : Math.tan(S.caster * Math.PI / 180) * (upZ - lowZ);
+  const lower = { f: P(S.lower.span[0], bjIn + S.lower.len, lowZ + S.lower.rise), r: P(S.lower.span[1], bjIn + S.lower.len, lowZ + S.lower.rise), bj: P(-trail / 2, bjIn, lowZ) };
+  const ui = bjIn + S.upper.inset, upper = { f: P(S.upper.span[0], ui + S.upper.len, upZ - S.upper.fall), r: P(S.upper.span[1], ui + S.upper.len, upZ - S.upper.fall), bj: P(trail / 2, ui, upZ) };
   // the tie rod: its outer end on the upright's arm; its inner end between the two arms' pivot axes, as far up between
   // them as the outer end is between the ball joints (the rod then swings with the arms and the wheel keeps its toe)
   const outer = add(lower.bj, [S.steer.dx, side * -6, S.steer.up]), k = S.steer.up / (upper.bj[2] - lower.bj[2]);
@@ -81,13 +98,31 @@ export function wishbonePoints(S: WishboneSpec, w: SuspWheel, side: 1 | -1, fron
     return { top, bot, seat: [L * 0.5, 30] as [number, number], spring: S.damper.spring, body: S.damper.body }; });
   let bar: Hardpoints['bar'];
   if (S.bar) { const B = S.bar, leg = B.dx < 0 ? lower.f : lower.r, link = mix(leg, lower.bj, B.at), end = add(link, [0, 0, B.link]); bar = { pivot: [w.x + B.dx, end[1], B.z], end, link, r: B.r }; }
-  return { type: 'doubleWishbone', side, front, wheel: w, wc: [w.x, side * w.y, w.r], lower, upper, steer: { inner, outer, rack: S.steer.rack }, dampers, ...(bar ? { bar } : {}), brake: S.brake, travel: { ...TRAVEL } };
+  return { type: S.kind ?? 'doubleWishbone', side, front, wheel: w, wc: [w.x, side * w.y, w.r], lower, upper, steer: { inner, outer, rack: S.steer.rack }, dampers, ...(bar ? { bar } : {}), brake: S.brake, travel: { ...TRAVEL } };
+}
+
+/** a MacPherson corner's points about its wheel: the lower arm as a wishbone's; the strut from the upright's clamp (on
+ *  the line from the lower ball joint to the top mount: the steering axis) up to the mount. Its `upper` is that line:
+ *  the mount (both pivots) and the clamp's point (where an upper ball joint would be) */
+export function strutPoints(S: StrutSpec, w: SuspWheel, side: 1 | -1, front: boolean): Hardpoints {
+  const P = (dx: number, inb: number, z: number): V => [w.x + dx, side * (w.y - inb), z];
+  const bjIn = w.back + 24, lowZ = w.r - (S.lower.drop ?? Math.min(w.rim - 58, w.r - 150)), topZ = w.r + S.top[1], tan = Math.tan(S.caster * Math.PI / 180);
+  const bj = P(0, bjIn, lowZ), top = P(tan * (topZ - lowZ), w.w / 2 + S.top[0], topZ), k = (w.r + S.foot - lowZ) / (topZ - lowZ), foot = mix(bj, top, k);
+  const lower = { f: P(S.lower.span[0], bjIn + S.lower.len, lowZ + S.lower.rise), r: P(S.lower.span[1], bjIn + S.lower.len, lowZ + S.lower.rise), bj };
+  // the tie rod: its inner end between the lower arm's pivot axis and the top mount, as far up as its outer end stands
+  const outer = add(bj, [S.steer.dx, side * -6, S.steer.up]), q = S.steer.up / (top[2] - bj[2]);
+  const inner: V = [outer[0], side * (Math.abs(lower.f[1]) + (Math.abs(top[1]) - Math.abs(lower.f[1])) * q), lower.f[2] + (top[2] - lower.f[2]) * q];
+  const L = dist(top, foot), dampers = [{ top, bot: foot, seat: [L * 0.42, 34] as [number, number], spring: S.damper.spring, body: S.damper.body }];
+  let bar: Hardpoints['bar'];
+  if (S.bar) { const B = S.bar, leg = B.dx < 0 ? lower.f : lower.r, link = mix(leg, lower.bj, B.at), end = add(link, [0, 0, B.link]); bar = { pivot: [w.x + B.dx, end[1], B.z], end, link, r: B.r }; }
+  return { type: 'macpherson', side, front, wheel: w, wc: [w.x, side * w.y, w.r], lower, upper: { f: top, r: top, bj: foot }, steer: { inner, outer, rack: S.steer.rack }, dampers, ...(bar ? { bar } : {}), brake: S.brake, travel: { ...TRAVEL } };
 }
 
 /** an axle's two corners (+y first) */
 export function axlePoints(S: AxleSpec, w: SuspWheel, front: boolean): [Hardpoints, Hardpoints] {
-  if (S.type !== 'doubleWishbone') throw new Error(`suspension: ${S.type} is not built yet`);
-  return [wishbonePoints(S, w, 1, front), wishbonePoints(S, w, -1, front)]; }
+  if (S.type === 'doubleWishbone') return [wishbonePoints(S, w, 1, front), wishbonePoints(S, w, -1, front)];
+  if (S.type === 'macpherson') return [strutPoints(S, w, 1, front), strutPoints(S, w, -1, front)];
+  throw new Error(`suspension: ${S.type} is not built yet`); }
 
 /** the hardpoints moved whole (the chassis' place in a car whose body is warped) */
 export function movePoints(H: Hardpoints, d: V): Hardpoints { const m = (p: V) => add(p, d), arm = (a: { f: V; r: V; bj: V }) => ({ f: m(a.f), r: m(a.r), bj: m(a.bj) });

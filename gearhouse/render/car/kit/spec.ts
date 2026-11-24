@@ -256,6 +256,8 @@ export interface OuterIntake { rows: [number, number]; cols: [number, number]; d
 export interface CarKit {
   id: string;
   lines: LineSheet;
+  /** the suspension's settings (a design's, core/design.ts format 5: its kind, its arms, its static camber and toe); unset: the base's own hardpoints as drawn */
+  susp?: import('../../../core/design').SuspDesign;
   section: SectionSpec;
   colours: Palette;
   top: FrontTopSpec;

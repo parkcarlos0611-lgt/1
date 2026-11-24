@@ -33,7 +33,8 @@ export function cornerParts(g: Geo, H: Hardpoints, look: SuspLook, det: Detail, 
     if (det === 2 && brace > 0) { const a = mix(A.f, A.bj, brace), b = mix(A.r, A.bj, brace); if (tube) g.cyl(a, b, r * 0.85, 4, false); else g.bar(a, b, r * 2.4, r * 1.3, false); }
     if (det > 0) g.cyl(add(A.bj, [0, 0, -r * 1.3]), add(A.bj, [0, 0, r * 1.3]), r * 1.55, det === 2 ? 5 : 4, true, [1, 0, 0]);
     if (det === 2) { g.part(name, RUBBER, 0.1); for (const p of [A.f, A.r]) g.cyl(add(p, [-20, 0, 0]), add(p, [20, 0, 0]), r * 1.6, 5, false); } };
-  arm('wishboneLower', 0, H.lower, 11, H.dampers.length ? 0.5 : 0); arm('wishboneUpper', 1, H.upper, 9, 0);
+  // a strut has no upper arm: its coil-over's body is clamped in the upright (below)
+  arm('wishboneLower', 0, H.lower, 11, H.dampers.length && H.type !== 'macpherson' ? 0.5 : 0); if (H.type !== 'macpherson') arm('wishboneUpper', 1, H.upper, 9, 0);
   // ---- the upright: the bearing's housing inboard of the wheel's back, a leg to each ball joint, the steering arm ----
   on(2); g.part('upright', look.upright, 0.45, 'metal');
   const inY = Math.abs(wc[1] - H.lower.bj[1]), housing = Math.min(52, w.rim * 0.26);

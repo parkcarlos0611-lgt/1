@@ -9,8 +9,10 @@ import { program } from './gpu';
 import { DENSITY_SHARE, sceneryDensity, type Tree, type Density } from '../../race/scenery';
 import type { Mesh } from '../car/mesh';
 
-/** how near (m) a tree is drawn in 3D with the perspective camera; and how far any is drawn at all */
-export const NEAR_3D = 140, FAR_CARD = 2600;
+/** how near (m) a tree is drawn in 3D with the perspective camera, by the density (the belt closed along the fence put
+ *  twice the trees near the eye, review 184: the nearer cut keeps the 3D trees' triangles about where they were); and
+ *  how far any is drawn at all */
+export const NEAR_3D: Record<Density, number> = { low: 90, mid: 110, high: 140 }, FAR_CARD = 2600;
 const MESHES: (() => Mesh)[] = [treeRound, treePine, treePoplar, bush];
 
 const VS = `#version 300 es
@@ -103,7 +105,7 @@ export class Woods {
    *  changed. ortho: the overhead camera, every tree within `seen` (m, a square about the eye) in 3D and none as cards */
   update(x: number, y: number, ortho: boolean, seen: number): void { const d = sceneryDensity();
     if (this.at && this.ortho === ortho && this.dens === d && Math.hypot(x - this.at[0], y - this.at[1]) < 6) return; this.at = [x, y]; this.ortho = ortho; this.dens = d;
-    const share = DENSITY_SHARE[d], near: number[][] = [[], [], [], []], far: number[] = [], R2 = NEAR_3D * NEAR_3D, F2 = FAR_CARD * FAR_CARD, reach = seen + 40; let all = 0;
+    const share = DENSITY_SHARE[d], near: number[][] = [[], [], [], []], far: number[] = [], R2 = NEAR_3D[d] ** 2, F2 = FAR_CARD * FAR_CARD, reach = seen + 40; let all = 0;
     for (const t of this.trees) { if (t.rank >= share) continue; all++; const dx = t.x - x, dy = t.y - y;
       if (ortho) { if (Math.abs(dx) < reach && Math.abs(dy) < reach) near[t.kind]!.push(t.x, t.y, t.z, t.heading, t.size, t.kind); continue; }
       const r2 = dx * dx + dy * dy; if (r2 < R2) near[t.kind]!.push(t.x, t.y, t.z, t.heading, t.size, t.kind); else if (r2 < F2) far.push(t.x, t.y, t.z, t.heading, t.size, t.kind); }

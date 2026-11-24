@@ -73,7 +73,7 @@ export const F355_KIT: CarKit = {
         bars: { z: [330, 357, 384, 411, 438], at: 0.6, t: 8, colour: 'frame' },
         emblem: { pts: [[-30, 0], [-10, 35], [12, 33], [22, -5], [8, -33], [-14, -35]], colour: 'silver', gloss: 0.8 } },
       // the lamp slots: a clear lens and an amber one
-      { name: 'turnLamp', rows: [3, 6], pts: [4, 6], at: [615, 427], size: [148, 28], pow: 4, seg: 16, depth: 18, wall: 'frame', back: 'plain',
+      { name: 'turnLamp', rows: [3, 6], pts: [4, 6], at: [600, 427], size: [135, 28], pow: 4, seg: 16, depth: 18, wall: 'frame', back: 'plain',
         lenses: [{ at: [-55, 0], size: [80, 20], pow: 4, seg: 12, colour: 'lens', gloss: 0.75, kind: 'lens', name: 'turnLamp' }, { at: [85, 0], size: [44, 18], pow: 4, seg: 10, colour: 'amber', gloss: 0.7, kind: 'lens', name: 'sideLamp' }] },
       // the round fog lamps
       { name: 'fogLamp', rows: [3, 5], pts: [6, 8], at: [480, 290], size: [50, 50], pow: 2, seg: 14, depth: 26, wall: 'frame', back: 'plain',
@@ -84,7 +84,7 @@ export const F355_KIT: CarKit = {
   popup: { kind: 'popup', from: 160, to: 460, open: 24, depth: 70, lens: [[0.08, 0.46], [0.54, 0.92]], lensV: [0.15, 0.8, 4] },
   canopy: { kind: 'canopy', pillars: 'body',
     // behind the roof: the cover's columns (a raised panel's edge, the slots' edges, the cover's edge), the gutter, the buttress's inner top
-    buttress: { cols: [[160, 2], [230, 4], [450, 9], ['cover', 12], ['bFoot', 20], ['bInner', 'bInnerZ']], ease: 'XG', glassCols: 5, foot: 5 },
+    buttress: { cols: [[140, 2], [190, 3], [450, 9], ['cover', 12], ['bFoot', 20], ['bInner', 'bInnerZ']], ease: 'XG', glassCols: 5, foot: 5 },
     roof: { from: 'XR0', to: 'XR1', half: 'YD', crown: 40, pow: 3, bow: -89 }, screen: { rows: [0, 0.07, 0.3, 0.55, 0.8, 0.94, 1], bow: 14 },
     side: { pillar: 30, railAt: [2000, 2150], rail: [26, -26], railEnd: 2840, edge: 16, blow: 6, blowIn: ['XA', 1700], blowOut: [2450, 2600], to: 'XQ', taper: [2840, 3250] },
     slantFoot: 'XQ', rear: ['XR1', 2780, 2840, 'XG'], bPillar: 2600, quarter: 2680, rearGloss: 0.3, rearBlackRows: 0, rearBlackCols: 0, screenBand: { foot: 1, top: 6, cols: 1 } },
@@ -119,7 +119,7 @@ export const F355_KIT: CarKit = {
   mirror: { at: [1760, 930, 905], head: [[1660, 880], [1700, 846], [1800, 838], [1838, 900], [1830, 962], [1730, 972]], loft: [[850, 0.55, -30], [880, 0.95, -8], [985, 1, 0], [1008, 0.8, 0]], stalk: [[1540, 760, 800], [1720, 860, 880], 30, 18], glass: [[1836, 885, 860], [1840, 985, 948]] },
   wiper: { row: 1, arms: [[-600, -80], [20, 520]], lift: [12, 14], bar: [14, 10] },
   // the deep five-spoke star: a dark dish, five tapering spokes standing proud, a cap with five nuts
-  wheel: { kind: 'star', seg: 20, tyre: { shoulder: 34, tread: 0.74, bulge: 0.95, roll: 12 }, lip: [6, 8, 9, 30, 14], back: [0.6, 20, 10], dish: { f: 72, r: 82 }, face: [40, 120, 50], faceMid: 0.4, faceGloss: 0.45,
+  wheel: { kind: 'star', seg: 18, tyre: { shoulder: 34, tread: 0.74, bulge: 0.95, roll: 12 }, lip: [6, 8, 9, 30, 14], back: [0.6, 20, 10], dish: { f: 72, r: 82 }, face: [40, 120, 50], faceMid: 0.4, faceGloss: 0.45,
     spokes: 5, phase: 0.05, openings: { lift: 2.5, rim: 10, r: [104, 116, 12], a: [0.17, 0.36, 0.3] }, vents: { r: 120, size: 26, seg: 8, lift: 2.5 },
     star: { a: [0.32, 0.12, 0.16], mid: 125, proud: 16, ridge: 7 }, hub: { cap: [6, 62, 10], nuts: 5, nut: [42, 9, 9, 5] } },
 };

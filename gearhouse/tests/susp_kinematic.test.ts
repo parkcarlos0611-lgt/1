@@ -2,7 +2,7 @@
 // bump, the roll centre where it should be, nothing missing at the settings' ends), the design's format 5 and its
 // migration, the physics reading the same linkage the picture moves, and the builder's seven steps.
 import { describe, it, expect } from 'vitest';
-import { DESIGN_NSX, DESIGN_F355, DESIGN_EB110, DESIGN_XJ220, SUSP_OWN, SUSP_LIMITS, SUSP_KINDS, RC_PRESETS, normalise, suspLock, applyPatch, type Design, type DesignV4, type SuspKind } from '../core/design';
+import { DESIGN_NSX, DESIGN_F355, DESIGN_EB110, DESIGN_XJ220, SUSP_OWN, SUSP_LIMITS, SUSP_KINDS, RC_PRESETS, normalise, toV4, suspLock, applyPatch, type Design, type DesignV4, type DesignV3, type DesignV2, type SuspKind } from '../core/design';
 import { asDesign } from '../core/designstore';
 import { designSusp } from '../render/car/designsusp';
 import { designMesh } from '../render/car/design';
@@ -73,6 +73,12 @@ describe('the design (format 5)', () => {
       const f = asDesign(JSON.parse(JSON.stringify(v4)))!; expect(f.susp).toEqual(SUSP_OWN[id as 'nsx']);
       expect(JSON.stringify(designSpec(f).kin?.setup)).toBe(JSON.stringify(designSpec(d).kin?.setup)); }
   });
+  it('a design of format 1, 2 or 3 comes up to format 5 on its base\'s own suspension, the rest as format 4 brings it', () => {
+    for (const [id, d] of BASES) { const { susp: _s, ...rest } = structuredClone(d); void _s; const v4: DesignV4 = { ...rest, v: 4 }, own = SUSP_OWN[id as 'nsx'];
+      const { bs: _b, quality: _q, ...engine } = v4.engine; void _b; void _q;
+      const v3 = { ...v4, v: 3, engine: { ...engine, layout: 'V8' } } as unknown as DesignV3, v2 = { ...v3, v: 2 } as unknown as DesignV2;
+      for (const old of [v3, v2]) { const n = normalise(old); expect(n.v, `${id} v${old.v}`).toBe(5); expect(n.susp, `${id} v${old.v}`).toEqual(own); expect(n.susp).not.toBe(own); expect(n).toEqual(normalise(toV4(old))); } }
+  });
   it('the settings are held to their ranges; the beam axle and a front multilink are not offered on the 1990s bases', () => {
     const n = normalise({ ...DESIGN_NSX, susp: { front: { ...DESIGN_NSX.susp.front, type: 'beamLeaf', hz: 9, camber: -40, caster: 99 }, rear: { ...DESIGN_NSX.susp.rear, type: 'multilink', bar: -3, toe: 4 } } });
     expect(n.susp.front.type).toBe('doubleWishbone'); expect(n.susp.front.hz).toBe(SUSP_LIMITS.hz[1]); expect(n.susp.front.camber).toBe(SUSP_LIMITS.camber[0]); expect(n.susp.front.caster).toBe(SUSP_LIMITS.caster[1]);
@@ -103,6 +109,17 @@ describe('the physics on the linkage', () => {
     expect(toe(2)).toBeGreaterThan(0.05); expect(toe(3)).toBeGreaterThan(0.05); expect(Math.abs(toe(0) - DESIGN_F355.susp.front.toe)).toBeLessThan(0.05);
     // the lean against the road (top to the left +): the rears' negative static camber leans each top in
     expect(c.camber[2]!).toBeLessThan(-0.008); expect(c.camber[3]!).toBeGreaterThan(0.008);
+  });
+});
+
+describe('the extremes', () => {
+  it('a car at every setting\'s end drives, brakes and turns on the linkage with no number lost (no NaN)', () => {
+    for (const [id, d] of BASES) for (const end of [0, 1] as const) {
+      const e = tweak(d, x => { for (const a of [x.susp.front, x.susp.rear]) { a.arm = SUSP_LIMITS.arm[end]; a.camber = SUSP_LIMITS.camber[end]; a.toe = SUSP_LIMITS.toe[1 - end]!; a.hz = SUSP_LIMITS.hz[end]; a.bar = SUSP_LIMITS.bar[end]; a.bump = SUSP_LIMITS.bump[end]; a.rebound = SUSP_LIMITS.rebound[1 - end]!; a.rc = end ? 'high' : 'low'; }
+        x.susp.rear.type = end ? 'multilink' : 'macpherson'; x.susp.front.caster = SUSP_LIMITS.caster[end]; x.body.ride = end ? 40 : -25; });
+      const s = designSpec(e), c = new Vehicle(s, new Track(FLAT)).place(100, 0, 0), tag = `${id} end ${end}`; expect(c.kin, tag).not.toBeNull();
+      for (let t = 0; t < 8; t += 1 / 200) c.step(1 / 200, t < 4 ? { throttle: 1, brake: 0, steer: t > 2 ? 0.6 : 0 } : t < 6 ? { throttle: 0, brake: 1, steer: -0.6 } : { throttle: 0.5, brake: 0, steer: 0.3 });
+      for (const v of [...c.p, ...c.q, ...c.v, ...c.om, ...c.w, ...c.camber]) expect(Number.isFinite(v), tag).toBe(true); }
   });
 });
 

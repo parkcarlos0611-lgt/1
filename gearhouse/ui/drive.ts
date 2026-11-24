@@ -42,7 +42,7 @@ import specsData from '../data/cars/specs.json';
 import { GLASS_REFL, type GlassRefl } from './shell/settings';
 import { smokeTier, gpuCaps, type SmokeSetting, type GpuCaps } from '../render/live/volume/caps';
 import { VolumeSmoke, type VolCar } from '../render/live/volume/volume';
-import { DriveCam, carEyes, nextView, perspective, pedalValue, pedalStep, isCamView, CAM_VIEWS, CAM_DEFAULT, type CamView, type CarEyes, type CamShot } from './drivecam';
+import { DriveCam, carEyes, nextView, perspective, pedalValue, pedalStep, dialPlace, isCamView, CAM_VIEWS, CAM_DEFAULT, type CamView, type CarEyes, type CamShot } from './drivecam';
 
 /** what a page holding the drive gives it (the game's one page, ui/shell): the root its markup is in (found there even
  *  while it is taken off the page), the one renderer shared by the screens (its sky and car textures loaded by the
@@ -277,9 +277,10 @@ function mini() { mctx.clearRect(0, 0, 150, 150); mctx.strokeStyle = 'rgba(235,2
 /** the dials (temporary): a speedometer and a revolution counter, bottom left, period faces */
 function dials() { const pad = document.getElementById('pad'), padOn = !!pad && getComputedStyle(pad).display !== 'none', tw = document.getElementById('tw');
   // review 169: with the touch controls on, the gauges move right of the on-screen wheel, and its own drawn wheel is left out
-  let x0 = 8; if (padOn && tw) { const cr = cv.getBoundingClientRect(), k = cr.width / VW || 1; x0 = Math.max(8, Math.round((tw.getBoundingClientRect().right - cr.left) / k) + 10); }
-  const r = Math.max(26, Math.min(46, Math.round(VH * 0.11))), y = VH - r - 8, top = Math.ceil(car.spec.topKmh / 20) * 20 + 20, maxR = Math.ceil(car.spec.redline * 1.2 / 500) * 500;
-  const dial = (cx: number, v: number, max: number, step: number, label: string, red: number, sub: string) => { const a0 = Math.PI * 0.75, a1 = Math.PI * 2.25, ang = (x: number) => a0 + (a1 - a0) * Math.min(1, Math.max(0, x / max));
+  let x0 = 8, right = VW - 8; if (padOn && tw) { const cr = cv.getBoundingClientRect(), k = cr.width / VW || 1, pd = pad!.querySelector('.pedal.brake'); x0 = Math.max(8, Math.round((tw.getBoundingClientRect().right - cr.left) / k) + 10); if (pd) right = Math.round((pd.getBoundingClientRect().left - cr.left) / k) - 8; }
+  const at = dialPlace(x0, right, VH - 8, Math.max(26, Math.min(46, Math.round(VH * 0.11))));   // a phone held upright: one above the other between the wheel and the pedals (ui/drivecam.ts)
+  const r = at.r, y = VH - r - 8, top = Math.ceil(car.spec.topKmh / 20) * 20 + 20, maxR = Math.ceil(car.spec.redline * 1.2 / 500) * 500;
+  const dial = (cx: number, y: number, v: number, max: number, step: number, label: string, red: number, sub: string) => { const a0 = Math.PI * 0.75, a1 = Math.PI * 2.25, ang = (x: number) => a0 + (a1 - a0) * Math.min(1, Math.max(0, x / max));
     main.fillStyle = 'rgba(18,16,14,0.82)'; main.beginPath(); main.arc(cx, y, r, 0, Math.PI * 2); main.fill(); main.strokeStyle = '#b9a77e'; main.lineWidth = 2; main.stroke();
     if (red < max) { main.strokeStyle = '#c0392b'; main.lineWidth = 3; main.beginPath(); main.arc(cx, y, r - 4, ang(red), ang(max)); main.stroke(); }
     main.strokeStyle = '#efe7d2'; main.fillStyle = '#efe7d2'; main.font = `${Math.max(6, Math.round(r * 0.22))}px Oswald, sans-serif`; main.textAlign = 'center'; main.textBaseline = 'middle';
@@ -287,8 +288,8 @@ function dials() { const pad = document.getElementById('pad'), padOn = !!pad && 
       if (big && r > 30) main.fillText(String(Math.round(x / (label === 'rpm' ? 1000 : 1))), cx + Math.cos(a) * (r - 15), y + Math.sin(a) * (r - 15)); }
     const a = ang(v); main.strokeStyle = '#ff9f40'; main.lineWidth = 2; main.beginPath(); main.moveTo(cx - Math.cos(a) * 5, y - Math.sin(a) * 5); main.lineTo(cx + Math.cos(a) * (r - 6), y + Math.sin(a) * (r - 6)); main.stroke();
     main.fillStyle = '#d8c9a3'; main.beginPath(); main.arc(cx, y, 3, 0, Math.PI * 2); main.fill(); main.fillStyle = '#efe7d2'; main.fillText(sub, cx, y + r * 0.45); main.font = `${Math.max(5, Math.round(r * 0.16))}px Oswald, sans-serif`; main.fillText(label === 'rpm' ? 'RPM ×1000' : 'KM/H', cx, y - r * 0.38); main.textAlign = 'left'; };
-  dial(x0 + r, car.speed * 3.6, top, top > 160 ? 40 : 20, 'km/h', top, `${(car.speed * 3.6).toFixed(0)}`);
-  dial(x0 + r * 3 + 8, car.rpm, maxR, 1000, 'rpm', car.spec.redline, car.reverse ? 'R' : `${car.gear}단`);
+  dial(at.speed[0], at.speed[1], car.speed * 3.6, top, top > 160 ? 40 : 20, 'km/h', top, `${(car.speed * 3.6).toFixed(0)}`);
+  dial(at.rpm[0], at.rpm[1], car.rpm, maxR, 1000, 'rpm', car.spec.redline, car.reverse ? 'R' : `${car.gear}단`);
   if (padOn) return;
   // the steering wheel as the driver's hands have it (review 100): turned by the road wheels' angle times the ratio
   { const cx = 8 + r * 5 + 16, rr = r * 0.8, a = -car.sw, S = steering(car.spec), l2l = 2 * car.spec.steerLock * S.ratio / 360;

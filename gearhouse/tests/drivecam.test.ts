@@ -1,6 +1,6 @@
 // The drive's cameras and touch pedals (alpha 0.12, ui/drivecam.ts) and the camera kept in the game's settings.
 import { describe, it, expect } from 'vitest';
-import { pedalValue, pedalStep, type PedalState, type PedalIn, spring, angSpring, fovTan, aimPitch, nextView, carEyes, DriveCam, CAM_DEFAULT, type CamCar } from '../ui/drivecam';
+import { pedalValue, pedalStep, dialPlace, type PedalState, type PedalIn, spring, angSpring, fovTan, aimPitch, nextView, carEyes, DriveCam, CAM_DEFAULT, type CamCar } from '../ui/drivecam';
 import { loadSettings, saveSettings, asSettings, DEFAULTS, SETTINGS_KEY, type KeyStore } from '../ui/shell/settings';
 import { Build } from '../render/car/mesh';
 import { groundData } from '../render/live/ground';
@@ -48,6 +48,17 @@ describe('the pedals step by step (analog, keys, reverse)', () => {
     run(s, { ...none, brakeA: 0.9, speed: 3 }, 2); expect(s.reverse).toBe(false);
     run(s, { ...none, brakeA: 0.9, gasA: 0.5, speed: 0 }, 2); expect(s.reverse).toBe(false);   // both pressed: no
     run(s, { ...none, brakeKey: true, speed: 0 }, 0.6); expect(s.reverse).toBe(true);           // the key the same
+  });
+});
+
+describe('the gauges between the wheel and the pedals', () => {
+  it('side by side where they fit, one above the other in a narrow gap, never over the pedals', () => {
+    const wide = dialPlace(150, 700, 400, 40); expect(wide.r).toBe(40); expect(wide.speed[1]).toBe(wide.rpm[1]); expect(wide.rpm[0] + 40).toBeLessThanOrEqual(700);
+    const narrow = dialPlace(140, 240, 800, 40);   // a phone upright: 100 px between
+    expect(narrow.speed[0]).toBe(narrow.rpm[0]); expect(narrow.rpm[1]).toBeLessThan(narrow.speed[1] - 2 * narrow.r);
+    expect(narrow.speed[0] - narrow.r).toBeGreaterThanOrEqual(140); expect(narrow.speed[0] + narrow.r).toBeLessThanOrEqual(240); expect(narrow.speed[1] + narrow.r).toBeLessThanOrEqual(800);
+    const tight = dialPlace(140, 190, 800, 40); expect(tight.r).toBe(25); expect(tight.speed[0] + tight.r).toBeLessThanOrEqual(190);
+    expect(dialPlace(140, 150, 800, 40).r).toBe(18);   // no room at all: the smallest still drawn
   });
 });
 

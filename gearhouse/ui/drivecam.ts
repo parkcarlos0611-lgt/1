@@ -47,6 +47,15 @@ export function pedalStep(s: PedalState, i: PedalIn, dt: number): '후진' | '�
   if (stopA >= 0 && !stopKey) s.brake = toward(s.brake, stopA, 10, 12); else s.brake = Math.max(0, Math.min(1, s.brake + (stopK ? 5 : -8) * dt));
   return said; }
 
+// ---- the gauges' place ----
+/** where the two dials go (picture pixels): from x0 (right of the on-screen wheel) to right (left of the pedals, or the
+ *  picture's edge), their foot at bottom, r their wanted radius. Side by side where they fit; else one above the other (a
+ *  phone held upright: the wheel and the pedals leave a narrow gap), smaller if even one does not fit; never under 18 */
+export function dialPlace(x0: number, right: number, bottom: number, r: number): { r: number; speed: [number, number]; rpm: [number, number] } {
+  const room = right - x0; if (room >= 4 * r + 8) return { r, speed: [x0 + r, bottom - r], rpm: [x0 + 3 * r + 8, bottom - r] };
+  const rr = Math.max(18, Math.min(r, Math.floor(room / 2))), cx = x0 + Math.max(rr, room / 2);
+  return { r: rr, speed: [cx, bottom - rr], rpm: [cx, bottom - 3 * rr - 6] }; }
+
 // ---- springs ----
 /** one step of a critically damped spring (natural frequency w, rad/s) from x moving at v toward target: [x, v]. Exact
  *  for a still target, so it neither overshoots nor goes unstable at a long frame */

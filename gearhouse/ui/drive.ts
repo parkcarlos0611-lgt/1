@@ -565,7 +565,7 @@ let last = performance.now(), acc = 0, running = true, looping = true;   // runn
 function frame(now: number) { const el = Math.min(0.1, (now - last) / 1000); last = now; acc += el; clock += el; msgT -= el; readPad();
   while (acc >= DT) { acc -= DT; const u = burn ? { ...controls(DT), throttle: 1, brake: 0, steer: 0, gear: 1 } : st.pilot ? pilot.drive(car) : controls(DT);
     if (race) { race.step(DT, u); wheelTurn = race.player!.wheelTurn; if (race.done && !$('results').dataset.shown) results(); } else { car.step(DT, u); wheelTurn += (car.w[0]! + car.w[1]!) / 2 * DT; }
-    if (burn) { car.p.splice(0, 3, ...burn.p); car.q.splice(0, 4, ...burn.q); car.v.fill(0); car.om.fill(0); if ((burn.t -= DT) <= 0) burn = null; }
+    if (burn) { car.p.splice(0, 3, ...burn.p); car.q.splice(0, 4, ...burn.q); car.v.fill(0); car.om.fill(0); car.w[2] = car.w[3] = 32; if ((burn.t -= DT) <= 0) burn = null; }   /* the rear tyres spinning on the spot */
     for (const c of race ? race.cars.map(e => e.car) : [car]) { marks(c); fence(c); }
     // lap: forward across the start line
     if (!race && T.gap(prevS, START) > 0 && T.gap(car.s, START) <= 0 && car.vx > 1) { if (lapStart >= 0) { lastLap = clock - lapStart; const before = bestLap; if (!bestLap || lastLap < bestLap) bestLap = lastLap; say(`한 바퀴 ${fmt(lastLap)}`); designRun(lastLap); if (!st.pilot) onLap(lastLap, before); } lapStart = clock; }

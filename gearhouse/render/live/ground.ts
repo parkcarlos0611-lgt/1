@@ -37,7 +37,13 @@ export function stepAt(T: Track, s: number, maxStep: number): number { if (maxSt
 export function groundData(T: Track, S: Scenery, start: number, maxStep = 1): GroundData { const g = new Tris(), W2 = T.spec.width / 2, L = Math.round(T.length);
   // the fields: one wide sheet a little below the concrete's foot
   { let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity; for (const n of T.nodes) { x0 = Math.min(x0, n.x); x1 = Math.max(x1, n.x); y0 = Math.min(y0, n.y); y1 = Math.max(y1, n.y); }
-    const m = 1500, z = -0.03; g.quad([x0 - m, y0 - m, z], [x1 + m, y0 - m, z], [x1 + m, y1 + m, z], [x0 - m, y1 + m, z], hex('#5d7348'), 1); }
+    // in cells, not one quad: a triangle kilometres across, clipped close to a perspective camera's eye, has its depth
+    // too coarse to stay under the concrete 3 cm above it (a software GPU showed the fields over the straight from
+    // about 20 m ahead); 50 m cells round the track, 250 m ones out to the edge
+    const m = 1500, z = -0.03, col = hex('#5d7348');
+    const cuts = (a: number, b: number) => { const o: number[] = []; for (let v = a - m; v < a - 200; v += 250) o.push(v); for (let v = a - 200; v < b + 200; v += 50) o.push(v); for (let v = b + 200; v < b + m; v += 250) o.push(v); o.push(b + m); return o; };
+    const xs = cuts(x0, x1), ys = cuts(y0, y1);
+    for (let i = 0; i + 1 < xs.length; i++) for (let j = 0; j + 1 < ys.length; j++) g.quad([xs[i]!, ys[j]!, z], [xs[i + 1]!, ys[j]!, z], [xs[i + 1]!, ys[j + 1]!, z], [xs[i]!, ys[j + 1]!, z], col, 1); }
   for (const a of S.areas) { const A = AREA[a.kind] ?? AREA.mown!, col = hex(A.col), z = A.z; for (const [i, j, k] of earcut(a.pts)) g.tri([...a.pts[i]!, z], [...a.pts[j]!, z], [...a.pts[k]!, z], col, A.grass); }
   const band = (pts: [number, number][], w: number, col: number[], z: number) => { for (let k = 0; k + 1 < pts.length; k++) { const [xa, ya] = pts[k]!, [xb, yb] = pts[k + 1]!, dx = xb - xa, dy = yb - ya, l = Math.hypot(dx, dy) || 1, nx = -dy / l * w / 2, ny = dx / l * w / 2;
       g.quad([xa + nx, ya + ny, z], [xb + nx, yb + ny, z], [xb - nx, yb - ny, z], [xa - nx, ya - ny, z], col); } };

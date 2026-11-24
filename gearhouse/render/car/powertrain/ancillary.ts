@@ -15,7 +15,7 @@ export function cooling(x: Ctx): void {
   const lean = 0.3, e1: V = [Math.cos(lean), 0, Math.sin(lean)], e3: V = [-Math.sin(lean), 0, Math.cos(lean)], rc: V = [rx, 0, rz], at = (a: number, yy: number, c: number): V => [rc[0] + e1[0] * a + e3[0] * c, yy, rc[2] + e1[2] * a + e3[2] * c];
   g.part('radiator', CORE, 0.25, 'metal').obox(rc, e1, 16, [0, 1, 0], W / 2, e3, H / 2);
   for (const s of [1, -1]) g.part('radiator', ALU, 0.6, 'metal').obox(at(0, s * (W / 2 + 14), 0), e1, 20, [0, 1, 0], 14, e3, H / 2 + 6);
-  if (det === 2) { g.part('radiator', '#4a4e54', 0.3, 'metal'); for (let k = 1; k < 6; k++) g.obox(at(-17, 0, -H / 2 + k * H / 6), e1, 1.5, [0, 1, 0], W / 2, e3, 2.5); }   // the core's rows
+  if (det === 2) { g.part('radiator', '#4a4e54', 0.3, 'metal'); for (let k = 1; k < 6; k++) { const c = -H / 2 + k * H / 6; g.quad(at(-17.5, -W / 2, c - 3), at(-17.5, W / 2, c - 3), at(-17.5, W / 2, c + 3), at(-17.5, -W / 2, c + 3)); } }   // the core's rows
   if (det > 0) { const nf = det === 2 && W > 540 ? 2 : 1; for (let k = 0; k < nf; k++) { const yy = nf === 1 ? 0 : (k - 0.5) * W * 0.5, r = Math.min(H * 0.44, W / (2 * nf) - 14), c = at(18, yy, 0), fwd = (d: number): V => add(c, [e1[0] * d, 0, e1[2] * d]);
       g.part('radiatorFan', '#17181a', 0.2).lathe(c, e1, [[0, r], [26, r]], 8, false, [0, 1, 0]); g.part('radiatorFan', '#2a2c30', 0.3).lathe(fwd(12), e1, [[0, r * 0.3], [16, r * 0.3]], 6, 'b', [0, 1, 0]);
       if (det === 2) for (let q = 0; q < 5; q++) { const a = q / 5 * Math.PI * 2, rad = (b: number, k2: number, d: number): V => { const cb = Math.cos(a + b), sb = Math.sin(a + b), p = fwd(d); return [p[0] + e3[0] * sb * r * k2, p[1] + cb * r * k2, p[2] + e3[2] * sb * r * k2]; };
@@ -71,14 +71,14 @@ export function chassis(x: Ctx): void {
   for (const xx of det === 0 ? [xa, xb] : [xa, xm, xb]) g.bar([xx, -ry, rz - 4], [xx, ry, rz - 4], t, t, false);
   const tw = (w: typeof wr, railY: number, railZ: number, rise: number) => { for (const s of [1, -1]) { const top: V = [w.x, s * (w.y - w.w / 2 - 105), w.r + rise];
       g.part(w === wr ? 'subframe' : 'subframeFront', FRAME, 0.3);
-      if (det === 0) { g.bar([w.x, s * railY, railZ], top, 36, 36, false); continue; }
+      if (det < 2) { g.bar([w.x, s * railY, railZ], top, 36, 36, false); continue; }
       for (const dx of [-150, 150]) g.tube([[w.x + dx, s * railY, railZ + 10], [w.x + dx * 0.45, s * (railY + (Math.abs(top[1]) - railY) * 0.75), w.r + rise * 0.72], top], 17, 4);
-      g.prism(add(top, [0, 0, -8]), add(top, [0, 0, 8]), rsec(62, 48, 8, 3), [1, 0, 0]); } };
+      g.box(top[0] - 58, top[0] + 58, top[1] - 44, top[1] + 44, top[2] - 8, top[2] + 8); } };
   tw(wr, ry, rz, 330);
   // a brace between the towers when it clears the engine
   if (det > 0 && (wr.x > x.eb.max[0] + 25 || x.eb.max[2] < wr.r + 300)) { const y = wr.y - wr.w / 2 - 105, z = wr.r + 330 + 16; g.part('strutBrace', '#d8dadc', 0.85, 'metal').prism([wr.x, -y, z], [wr.x, y, z], rsec(15, 10, 6, 3), [0, 0, 1]); }
   // ---- the mounts: a bracket from the block down to each rail on its rubber, one under the gearbox's end ----
-  if (det > 0) { const M = E.mounts.map(x.T);
+  if (det === 2) { const M = E.mounts.map(x.T);
     for (const m of M) { const s = x.long ? Math.sign(m[1]) || 1 : 0, foot: V = x.long ? [m[0], s * ry, rz + t * 0.65 + 14] : [m[0] < o[0] ? Math.max(xa + 30, m[0] - 60) : m[0] + 60, clamp(m[1], -ry + 60, ry - 60), rz + t / 2 + 14];
       if (!x.long) { foot[0] = m[0] < o[0] ? xa : xm; foot[2] = rz - 4 + t / 2 + 14; }
       g.part('engineMount', RUBBER, 0.12).lathe(add(foot, [0, 0, -14]), [0, 0, 1], [[0, 30], [28, 30]], 6, 'b', [1, 0, 0]);

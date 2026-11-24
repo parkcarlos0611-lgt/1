@@ -65,7 +65,7 @@ export function buildEngine(g: Geo, S0: PowertrainSpec, det: Detail, transverse 
   for (const s of S) { const [ua, ub] = bankU(s); bankBox(s, ua, ub, -0.95 * B, 0.95 * B, 0.2 * B, Hd, '-3'); }
   if (vee) g.box(u0, Lb - 10, -vin * 0.55, vin * 0.55, 0.6 * B, inner(1, Hd)[2] - 0.1 * B, '-3');
   g.part('engineBlock', C.block, 0.25).prism([0, 0, 0.05 * B], [u0 - 20, 0, 0.05 * B], rsec(1.5 * B, 1.3 * B, det === 0 ? 6 : 8, 2.6), [0, 0, 1]);
-  if (det === 2) { g.part('engineBlock', C.block, 0.2); for (const s of S) for (let i = 0; i + 1 < nb; i++) { const u = cylU(s, i) + pitch / 2; bankBox(s, u - 3, u + 3, 0.95 * B, 1.02 * B, 0.3 * B, Hd - 0.2 * B, '-2'); } }   // the block's ribs between the bores
+  if (det === 2 && nb <= 4 && turbos < 3) { g.part('engineBlock', C.block, 0.2); for (const s of S) for (let i = 0; i + 1 < nb; i++) { const u = cylU(s, i) + pitch / 2; bankBox(s, u - 3, u + 3, 0.95 * B, 1.02 * B, 0.3 * B, Hd - 0.2 * B, '-2'); } }   // the block's ribs between the bores
 
   // ---- the sump: a wet sump's deep stepped pan, a dry sump's shallow pan (the crank sits lower over it), its pump and tank ----
   const floor = dry ? -(1.45 - DRY_DROP) * B : -1.45 * B;
@@ -90,7 +90,7 @@ export function buildEngine(g: Geo, S0: PowertrainSpec, det: Detail, transverse 
       g.part('camCover', C.accent, 0.4).quad(P(s, ua + 40, off - 0.11 * B, topA + 1.5), P(s, ub - 40, off - 0.11 * B, topA + 1.5), P(s, ub - 40, off + 0.11 * B, topA + 1.5), P(s, ua + 40, off + 0.11 * B, topA + 1.5)); }
     // the plugs: between the two covers; under one cover on the exhaust side
     const pa = twin ? 0 : 0.86 * B;
-    if (det === 2) { g.part('coilPack', '#121214', 0.2); for (let i = 0; i < nb; i++) { const u = cylU(s, i); bankBox(s, u - 0.22 * B, u + 0.22 * B, pa - 0.12 * B, pa + 0.12 * B, Hd + Hh - 4, twin ? topA + 6 : Hd + Hh + 0.3 * B, '-3'); } }
+    if (det === 2 && nb <= 4 && turbos < 3) { g.part('coilPack', '#121214', 0.2); for (let i = 0; i < nb; i++) { const u = cylU(s, i); bankBox(s, u - 0.22 * B, u + 0.22 * B, pa - 0.12 * B, pa + 0.12 * B, Hd + Hh - 4, twin ? topA + 6 : Hd + Hh + 0.3 * B, '-3'); } }
     else { g.part('coilPack', '#121214', 0.1).quad(P(s, ua + 15, pa - 0.12 * B, Hd + Hh + 1), P(s, ub - 15, pa - 0.12 * B, Hd + Hh + 1), P(s, ub - 15, pa + 0.12 * B, Hd + Hh + 1), P(s, ua + 15, pa + 0.12 * B, Hd + Hh + 1)); } }
 
   // ---- the accessory end: timing covers, pulleys, the belt, what the belt drives ----
@@ -101,7 +101,7 @@ export function buildEngine(g: Geo, S0: PowertrainSpec, det: Detail, transverse 
   if (det > 0) { pul.push({ c: P(1, 0, hw + 0.15 * B, 0.9 * Hd), r: 0.45 * B }); if (banks > 1 || det === 2) pul.push({ c: banks > 1 ? P(-1, 0, hw + 0.05 * B, 0.55 * Hd) : P(1, 0, -hw - 0.3 * B, 0.5 * Hd), r: 0.55 * B }); }
   if (det === 2) pul.push({ c: [0, 0, banks > 1 ? inner(1, Hd)[2] - 0.2 * B : 0.9 * Hd], r: 0.38 * B });
   const pu0 = ue, pu1 = ue + 0.38 * B;
-  g.part('pulley', STEEL, 0.6, 'metal'); for (const p of pul) g.cyl([pu0, p.c[1], p.c[2]], [pu1, p.c[1], p.c[2]], p.r, p === pul[0] ? seg : seg2, true, [0, 0, 1]);
+  g.part('pulley', STEEL, 0.6, 'metal'); for (const p of pul) g.cyl([pu0, p.c[1], p.c[2]], [pu1, p.c[1], p.c[2]], p.r, p === pul[0] ? seg : 6, true, [0, 0, 1]);
   if (pul.length > 1) { g.part('belt', BELT, 0.1);   // the belt round the pulleys' outsides, in the order round their middle
     const mv = pul.reduce((a, p) => a + p.c[1], 0) / pul.length, mw = pul.reduce((a, p) => a + p.c[2], 0) / pul.length, ring = [...pul].sort((a, c) => Math.atan2(a.c[2] - mw, a.c[1] - mv) - Math.atan2(c.c[2] - mw, c.c[1] - mv));
     for (let i = 0; i < ring.length; i++) { const a = ring[i]!, c = ring[(i + 1) % ring.length]!, dv = c.c[1] - a.c[1], dw = c.c[2] - a.c[2], l = Math.hypot(dv, dw) || 1;
@@ -128,7 +128,8 @@ export function buildEngine(g: Geo, S0: PowertrainSpec, det: Detail, transverse 
     const tr = 0.5 * B, cr = 0.56 * B; let far = Infinity;
     for (let k = 0; k < nt; k++) { const u = nt === 1 ? Math.max(mid, cu0 + 1.9 * B) : cu0 + 0.9 * B + (cu1 - cu0 - 1.4 * B) * (0.12 + 0.76 * k), c = P(s, u, colX + 0.62 * B, colA + 0.55 * B), X = (du: number, r = 0, a = 0): V => add(add(c, [du, 0, 0]), add(mul(acr(s), r * Math.cos(a)), mul(ax(s), r * Math.sin(a))));
       if (det === 0) { g.part('turbo', CAST, 0.5, 'metal').cyl(X(-0.5 * B), X(0.5 * B), 0.55 * B, 5); }
-      else { const ts = det === 2 && turbos <= 2 ? 8 : 6;
+      else if (det === 1) { g.part('turbo', HOT, 0.35, 'metal').cyl(X(-0.6 * B), X(-0.04 * B), tr, 5); g.part('turbo', ALU, 0.7, 'metal').cyl(X(0.04 * B), X(0.6 * B), cr, 5); }
+      else { const ts = turbos <= 2 ? 8 : 6;
         g.part('turbo', HOT, 0.35, 'metal').lathe(X(-0.6 * B), [1, 0, 0], [[0, tr * 0.55], [0.08 * B, tr], [0.5 * B, tr]], ts, true);        // the turbine's housing
         g.part('turbo', CAST, 0.4, 'metal').cyl(X(-0.06 * B), X(0.1 * B), 0.26 * B, 6, false);                                                                       // the bearings between
         g.part('turbo', ALU, 0.7, 'metal').lathe(X(0.08 * B), [1, 0, 0], [[0, cr], [0.36 * B, cr], [0.46 * B, cr * 0.48], [0.72 * B, cr * 0.46]], ts, true);   // the compressor's, its inlet's stub
@@ -181,7 +182,7 @@ export function buildEngine(g: Geo, S0: PowertrainSpec, det: Detail, transverse 
       labels.push([[pl0 + 0.2 * (pl1 - pl0), vc - 0.2 * B, plTop + 1.5], [pl0 + 0.8 * (pl1 - pl0), vc - 0.2 * B, plTop + 1.5], [pl0 + 0.8 * (pl1 - pl0), vc + 0.2 * B, plTop + 1.5], [pl0 + 0.2 * (pl1 - pl0), vc + 0.2 * B, plTop + 1.5]]);
       if (det > 0) for (let i = 0; i < nb; i++) { const e = port(s, i), a: V = [e[0], vc - s * 0.3 * B, wc], arc: V = [e[0], (vc + e[1]) / 2 - s * 0.25 * B, (wc + e[2]) / 2];
         g.part('intakeRunner', C.plenum, crinkle).tube(det === 1 ? [a, e] : [a, arc, e], 0.22 * B, 4);
-        if (itb && det === 2) g.part('throttleBody', STEEL, 0.55, 'metal').cyl(add(e, mul(norm([0, a[1] - e[1], a[2] - e[2]]), 0.15 * B)), add(e, mul(norm([0, a[1] - e[1], a[2] - e[2]]), 0.45 * B)), 0.28 * B, 5, false); }
+        if (itb && det === 2 && nb <= 4) g.part('throttleBody', STEEL, 0.55, 'metal').cyl(add(e, mul(norm([0, a[1] - e[1], a[2] - e[2]]), 0.15 * B)), add(e, mul(norm([0, a[1] - e[1], a[2] - e[2]]), 0.45 * B)), 0.28 * B, 5, false); }
       tbAt.push([pl1, vc, wc]); } }
   if (S0.label) { g.part('intakeLabel', C.label, 0.3); for (const q of labels) g.quad(...q); }
   // the throttle at the accessory end of each plenum; the air's way in with no turbo: a hose to an airbox beside one plenum, an airbox between two

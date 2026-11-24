@@ -52,8 +52,8 @@ export function drivetrain(x: Ctx): void {
   const shaft = (from: V, to: V, front: boolean) => { const d = norm(sub(to, from)), L = Math.hypot(...sub(to, from)), at = (k: number) => add(from, mul(d, k)); x.out.shafts.push({ from, to, front });
     g.part('driveshaft', STEEL, 0.6, 'metal').cyl(at(40), at(L - 40), det === 0 ? 18 : 14, det === 2 ? 6 : 4, false);
     if (det === 0) return;
-    for (const [a, b] of [[0, 62], [L, L - 62]] as const) { g.part('cvJoint', '#55585d', 0.5, 'metal').lathe(at(a), mul(d, Math.sign(b - a)), [[0, 30], [4, 46], [38, 44]], 6, 'a');
-      g.part('cvBoot', RUBBER, 0.12).lathe(at(a + Math.sign(b - a) * 40), mul(d, Math.sign(b - a)), det === 2 ? [[0, 40], [16, 27], [26, 30], [46, 16]] : [[0, 38], [46, 16]], 6, false); } };
+    for (const [a, b] of [[0, 62], [L, L - 62]] as const) { g.part('cvJoint', '#55585d', 0.5, 'metal').lathe(at(a), mul(d, Math.sign(b - a)), [[0, 46], [38, 44]], 6, 'a');
+      if (det === 2) g.part('cvBoot', RUBBER, 0.12).lathe(at(a + Math.sign(b - a) * 40), mul(d, Math.sign(b - a)), det === 2 ? [[0, 40], [18, 28], [46, 16]] : [[0, 38], [46, 16]], 6, false); } };
   const dC = x.T1(dc), hub = (w: typeof wr, s: number): V => [w.x, s * (w.y - w.w / 2 - 12), w.z];
   for (const s of [1, -1]) shaft([dC[0], dC[1] + s * (dh + 4), dC[2]], hub(wr, s), false);
   // a long shaft's steady bearing on the block (the differential off the centre line)

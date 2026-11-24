@@ -6,7 +6,9 @@
 // elsewhere (the wheels' hubs, the tips, the nose) is found where the warp will leave it, less that move.
 import type { Ctx } from '../ctx';
 import type { EngineOpts, EngineSpec } from '../../enginemesh';
-import { makeWarp } from '../lines';
+import { makeLines, makeWarp, type Tweak } from '../lines';
+import { makeSkin } from '../skin';
+import type { CarKit } from '../spec';
 import type { V } from '../geom';
 import { NK } from '../section';
 import { addPowertrain, fromEngineSpec, type PowertrainBuilt, type Site } from '../../powertrain';
@@ -31,3 +33,6 @@ export function siteOf(x: Ctx, at: V, opts: EngineOpts): Site {
 
 export function engine(x: Ctx, spec: EngineSpec, at: V, opts: EngineOpts): PowertrainBuilt {
   return addPowertrain(x.e.b, opts.powertrain ?? fromEngineSpec(spec), siteOf(x, at, opts), { detail: opts.detail ?? 2 }); }
+
+/** a kit car's site without building the car (the engine designer's pedestal, the checks): its lines and skin only */
+export function kitSite(k: CarKit, tweak: Tweak = {}): Site { const L = makeLines(k.lines, tweak), s = makeSkin(L, k); return siteOf({ L, k, s } as Ctx, k.engine.at, k.engine.opts); }

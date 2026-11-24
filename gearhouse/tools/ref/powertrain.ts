@@ -28,7 +28,7 @@ if (process.argv.includes('engine')) {
   const base = fromEngineSpec(ENGINES.nsx!);
   const vars: PowertrainSpec[] = [base, { ...fromEngineSpec(ENGINES.f355!) }, fromEngineSpec(ENGINES.eb110!), { ...base, intake: 'itb', grade: 3 }, { ...base, intake: 'single', turbos: 1 }, { ...fromEngineSpec(ENGINES.f355!), turbos: 2, intake: 'itb' }, { ...fromEngineSpec(ENGINES.diablo!), intake: 'itb' }, { ...base, turbos: 3, sump: 'dry', valves: 2, grade: 1 }];
   for (const v of vars) { pics.push(eng(v, 35, 28)); pics.push(eng(v, 215, 28)); pics.push(eng(v, 90, 10)); }
-  save('pt_engine_dev', pics, 3, W, H);
+  save('powertrain_engines', pics, 3, W, H);
 }
 
 // ---- the powertrain in a car ----

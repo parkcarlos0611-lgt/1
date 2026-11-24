@@ -20,19 +20,21 @@ export function exhaust(x: Ctx): void {
   //      reaching the tail) a can each side of the gearbox ----
   const gbEnd = x.out.gearboxEnd[0], catR = 56, zUnder = clamp(o[2] + E.floor * x.scale - 42, site.foot + 48, wr.z - 60);
   const catX = long ? o[0] + 150 : wr.x + 120, across = T.x - 30 - (long ? gbEnd : catX + 190) >= 150, catL = across || !long ? 190 : clamp(T.x - catX - 420, 110, 190);
-  const tr = Math.max(14, T.r - 3), tail = (from: V, y: number) => { const end: V = [T.x + 10, y, T.z];
-    g.part('tailpipe', PIPE, 0.6, 'metal').bend(from, [1, 0, 0], end, [1, 0, 0], tr, ps, Math.abs(from[1] - y) + Math.abs(from[2] - T.z) < 12 ? 1 : Math.max(2, n - 1), 0.5); x.out.tails.push(end); };
-  const can = (c: V, ax: V, half: number, ha: number, hz: number) => { const side: V = [ax[1], ax[0], 0], ring = (t: number, k: number): V[] => rsec(ha * k, hz * k, det === 0 ? 6 : 10, 2.8).map(([a, b]) => [c[0] + ax[0] * t + side[0] * a, c[1] + ax[1] * t + side[1] * a, c[2] + b] as V);
+  const tr = Math.max(14, T.r - 3), tail = (from: V, y: number, ta: V = [1, 0, 0]) => { const end: V = [T.x + 10, y, T.z];
+    g.part('tailpipe', PIPE, 0.6, 'metal').bend(from, ta, end, [1, 0, 0], tr, ps, ta[1] ? n + 1 : Math.abs(from[1] - y) + Math.abs(from[2] - T.z) < 12 ? 1 : Math.max(2, n - 1), 0.5); x.out.tails.push(end); };
+  const can = (c: V, ax: V, half: number, ha: number, hz: number) => { const side: V = [ax[1], ax[0], 0], ring = (t: number, k: number): V[] => rsec(ha * k, hz * k, det === 0 ? 6 : half > 190 ? 10 : 8, 2.8).map(([a, b]) => [c[0] + ax[0] * t + side[0] * a, c[1] + ax[1] * t + side[1] * a, c[2] + b] as V);
     g.part('muffler', MUFF, 0.55, 'metal').loft(det === 0 ? [ring(-half, 1), ring(half, 1)] : [ring(-half, 0.72), ring(-half + 30, 1), ring(half - 30, 1), ring(half, 0.72)], true);
-    if (det === 2) { g.part('muffler', '#7c7f84', 0.45, 'metal'); for (const k of half > 250 ? [-0.5, 0, 0.5] : [0]) g.loft([ring(k * half - 5, 1.03), ring(k * half + 5, 1.03)], false); } };
+    if (det === 2) { g.part('muffler', '#7c7f84', 0.45, 'metal'); if (half > 190) for (const k of [-0.5, 0.5]) g.loft([ring(k * half - 5, 1.03), ring(k * half + 5, 1.03)], false); } };
   let into: (sy: number, y: number) => { p: V; d: V };
-  if (across) { const room = T.x - 30 - (long ? gbEnd : catX + catL), hx = clamp(room / 2 - 15, 60, 105), fl = floorOver(site, T.x - 45 - 2 * hx, T.x - 45), hz = clamp(T.z + 20 - fl - 12, 55, 85), mc: V = [T.x - 45 - hx, 0, Math.max(T.z + 20, fl + hz + 12)], Ym = tipY + 45;
-    can(mc, [0, 1, 0], Ym, hx, hz); for (const y of T.y) tail([mc[0] + hx * 0.7, y, mc[2]], y);
+  if (across) { const room = T.x - 30 - (long ? gbEnd : catX + catL), hx = clamp(room / 2 - 15, 55, 78), fl = floorOver(site, T.x - 60 - 2 * hx, T.x - 60), hz = clamp(T.z + 20 - fl - 12, 50, 66), mc: V = [T.x - 60 - hx, 0, Math.max(T.z + 20, fl + hz + 12)];
+    // a can of a real silencer's size (to 640 mm long); tips further out than its ends are reached by pipes out of its ends, turned back to the tail
+    const Ym = clamp(tipY - 70, 200, 320);
+    can(mc, [0, 1, 0], Ym, hx, hz); for (const y of T.y) { if (Math.abs(y) <= Ym - 40) tail([mc[0] + hx * 0.7, y, mc[2]], y); else tail([mc[0], Math.sign(y) * (Ym - 8), mc[2]], y, [0.15, Math.sign(y), 0]); }
     into = (sy, y) => ({ p: [mc[0] - hx * 0.9, sy * Math.min(Math.abs(y), Ym - 70), mc[2]], d: [1, 0, 0] }); }
   else { const x0 = catX + catL + 100, x1 = T.x - 35, cy = (s: number) => { const ys = T.y.filter(y => (y >= 0 ? 1 : -1) === s).map(Math.abs); return ys.length ? ys.reduce((a, b) => a + b, 0) / ys.length : tipY; };
-    for (const s of [1, -1]) { const yc = Math.max(cy(s), 104 + 80 + 14), ha = Math.min(105, yc - 104 - 12), fl = floorOver(site, x0, x1), hz = clamp(T.z - fl - 12, 50, 92), c: V = [(x0 + x1) / 2, s * yc, Math.max(T.z, fl + hz + 12)];
+    for (const s of [1, -1]) { const yc = Math.max(cy(s), 104 + 80 + 14), ha = Math.min(88, yc - 104 - 12), fl = floorOver(site, x0, x1), hz = clamp(T.z - fl - 12, 50, 70), c: V = [(x0 + x1) / 2, s * yc, Math.max(T.z, fl + hz + 12)];
       can(c, [1, 0, 0], (x1 - x0) / 2, ha, hz); for (const y of T.y) if ((y >= 0 ? 1 : -1) === s) tail([x1 - 14, y, c[2]], y); }
-    into = (sy) => { const s = sy >= 0 ? 1 : -1; return { p: [x0 + 12, s * Math.max(cy(s), 104 + 80 + 14), Math.max(T.z, floorOver(site, x0, x1) + clamp(T.z - floorOver(site, x0, x1) - 12, 50, 92) + 12)], d: [1, 0, 0] }; }; }
+    into = (sy) => { const s = sy >= 0 ? 1 : -1; return { p: [x0 + 12, s * Math.max(cy(s), 104 + 80 + 14), Math.max(T.z, floorOver(site, x0, x1) + clamp(T.z - floorOver(site, x0, x1) - 12, 50, 70) + 12)], d: [1, 0, 0] }; }; }
   // ---- each stream: the pipe from the engine, the catalyst, the middle pipe into the silencer ----
   outs.forEach((q, k) => { const sy = outs.length === 1 ? (across ? 0 : 1) : long && Math.abs(q.p[1]) > 40 ? Math.sign(q.p[1]) : k === 0 ? 1 : -1;
     let a: V, pre: V[];

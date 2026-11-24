@@ -26,10 +26,11 @@ const top = (M: Mesh, part: string) => { let z = -1e9; for (let i = 0; i < M.n *
 
 describe('kit: the EB110', () => {
   const M = eb110KitMesh(0, 0);
-  it('stays in budget (11,000 triangles with the engine) and keeps the sheet\'s length', () => { expect(M.n).toBeLessThanOrEqual(11000); expect(M.length).toBe(4400); });
+  // (alpha 0.11, M1: the engine part is now the whole powertrain, four turbos and all-wheel drive: 11,000 became 14,000)
+  it('stays in budget (14,000 triangles with the powertrain) and keeps the sheet\'s length', () => { expect(M.n).toBeLessThanOrEqual(14000); expect(M.length).toBe(4400); });
   it('has four wheels made of wheel parts only, on the sheet\'s axles', () => { const w = wheelsOf(M); expect(w.length).toBe(4); expect(wheelParts(M)).toBe(true); expect(w[0]!.hx).toBeCloseTo(sheet.overall.axleF, 3); expect(w[1]!.hx - w[0]!.hx).toBeCloseTo(sheet.overall.wheelbase, 3); });
   it('carries the parts the user approved', () => { const n = names(M);
-    for (const p of ['hood', 'wingF', 'bumperF', 'grille', 'splitter', 'badge', 'headCover', 'lampHousing', 'lampFin', 'reflector', 'headlamp', 'indicatorF', 'door', 'intake', 'quarter', 'roof', 'buttress', 'louvre', 'engineCover', 'enginePlenum', 'screenPane', 'sidePane',
+    for (const p of ['hood', 'wingF', 'bumperF', 'grille', 'splitter', 'badge', 'headCover', 'lampHousing', 'lampFin', 'reflector', 'headlamp', 'indicatorF', 'door', 'intake', 'quarter', 'roof', 'buttress', 'louvre', 'engineCover', 'intakePlenum', 'turbo', 'propShaft', 'screenPane', 'sidePane',
       'screenFrame', 'tailPanel', 'tailRim', 'tailLamp', 'indicatorR', 'reverseLamp', 'tailMesh', 'valance', 'wing', 'wingBed', 'exhaust', 'mirror', 'wheel', 'hub']) expect(n.has(p), p).toBe(true); });
   it('keeps the head lamps\' tops and the bonnet between them on one straight line across', () => { const zs: number[] = []; for (let t = 0; t < M.n; t++) if (M.names![M.part[t]!] === 'headCover') for (let k = 0; k < 3; k++) { const i = t * 9 + k * 3; if (Math.abs(M.pos[i]! - 600) < 1) zs.push(M.pos[i + 2]!); }
     expect(zs.length).toBeGreaterThan(4); expect(Math.max(...zs) - Math.min(...zs)).toBeLessThan(0.5); expect(extent(M, 0, 600, 2, true)).toBeCloseTo(zs[0]!, 0); });

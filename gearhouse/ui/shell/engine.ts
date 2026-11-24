@@ -181,7 +181,7 @@ export function engineScreen(ctx: ShellCtx): Screen<EngineParams> & { readonly a
     clearTimeout(figT); figT = setTimeout(figures, 40) as unknown as number;
     const k = JSON.stringify([E().layout, E().cc, E().bs, E().valves, E().block, E().grade, E().intake, E().sump, E().turbo, E().intercooler]);
     if (k !== meshKey) { clearTimeout(meshT); meshT = setTimeout(() => { meshKey = k; rebuild(); }, 160) as unknown as number; }
-    applyBtn.hidden = !onApply; voiceAgain(); }
+    applyBtn.hidden = !onApply; applyBtn.style.display = onApply ? '' : 'none'; voiceAgain(); }
   function figures() { spec = designSpec(car); curve = dynoCurve(car); sheet = engineSheet(car, curve); sweep = performance.now(); drawSheet(); drawTechs(); drawSoundRow(); dirtyDyno = true; }
   const dd = (t: string, v: string, u = '') => [el('dt', '', t), (() => { const x = el('dd', '', v); if (u) x.append(' ', el('small', '', u)); return x; })()];
   function drawSheet() { const s = sheet; sheetBox.textContent = '';
@@ -199,7 +199,7 @@ export function engineScreen(ctx: ShellCtx): Screen<EngineParams> & { readonly a
   const css = (n: string, d: string) => getComputedStyle(document.documentElement).getPropertyValue(n).trim() || d;
   function drawDyno(now: number) { const c = dyno, dpr = Math.min(2, devicePixelRatio || 1), W = Math.max(10, Math.round(c.clientWidth * dpr)), H = Math.max(10, Math.round(c.clientHeight * dpr)); if (c.width !== W || c.height !== H) { c.width = W; c.height = H; }
     const g = c.getContext('2d'); if (!g) return; const C = curve, ink = css('--gh-ink', '#222'), soft = css('--gh-soft', '#777'), line = css('--gh-line', '#ccc'), acc = css('--gh-accent', '#a0522d'), pw = css('--gh-good', '#3f7a3a');
-    g.clearRect(0, 0, W, H); const L = 38 * dpr, R = W - 38 * dpr, T = 14 * dpr, B = H - 24 * dpr, r0 = 0, r1 = Math.ceil(C.redline / 1000) * 1000;
+    g.clearRect(0, 0, W, H); const L = 38 * dpr, R = W - 38 * dpr, T = 14 * dpr, B = H - 34 * dpr, r0 = 0, r1 = Math.ceil(C.redline / 1000) * 1000;
     const tMax = Math.ceil(Math.max(...C.torque) * 1.15 / 50) * 50, pMax = Math.ceil(Math.max(...C.hp) * 1.15 / 50) * 50;
     const X = (r: number) => L + (R - L) * (r - r0) / (r1 - r0), YT = (t: number) => B - (B - T) * t / tMax, YP = (p: number) => B - (B - T) * p / pMax;
     g.font = `${10 * dpr}px ${css('--gh-body', 'sans-serif')}`; g.lineWidth = dpr; g.strokeStyle = line; g.fillStyle = soft; g.textAlign = 'center';
@@ -255,7 +255,7 @@ export function engineScreen(ctx: ShellCtx): Screen<EngineParams> & { readonly a
   // ---- the 3D view: the stand on the studio floor, the orbit, the exploded view, the part pointed at ----
   const L = (): LiveRenderer | null => ctx.stage.L;
   let model: StandModel | null = null, onGpu: Mesh | null = null, g: ReturnType<LiveRenderer['car']> | null = null, dirty = true, raf = 0, last = 0;
-  const view = { ang: Math.PI - 0.75, pitch: 22, zoom: 1, explode: false, anim: 0, k: 0 }; const home = () => { view.ang = Math.PI - 0.75; view.pitch = 22; view.zoom = 1; dirty = true; };
+  const view = { ang: 0.8, pitch: 24, zoom: 1.15, explode: false, anim: 0, k: 0 }; const home = () => { view.ang = 0.8; view.pitch = 24; view.zoom = 1.15; dirty = true; };   // from the pulleys' end, the stand behind
   const shownCache = new Map<number, Mesh>();
   function rebuild() { const t0 = performance.now(); try { model = standModel(car, 2); } catch (e) { console.warn('engine stand', e); return; } shownCache.clear(); dirty = true; tip.hidden = true;
     console.info(`engine stand ${E().layout}: ${model.mesh.n} triangles, ${Math.round(performance.now() - t0)} ms`); }

@@ -83,6 +83,7 @@ function keepStep() { try { const rest = Object.entries(keptSteps()).filter(([k]
 function restoreStep() { const k = keptSteps()[D.id]; step = k && isStep(k.step) ? k.step : 'chassis'; seen = new Set([...(Array.isArray(k?.seen) ? k.seen.filter(isStep) : []), step]); onFiles = false; showStep(); }
 function go(id: StepId | 'files') { if (id === 'files') onFiles = true; else { onFiles = false; step = id; seen.add(id); keepStep(); } showStep(); $('panes').scrollTop = 0; }
 function showStep() { const at = onFiles ? 'files' : step;
+  document.body.classList.toggle('at-check', at === 'check');   // the figures' own fit list folded away while ⑥ shows it in full
   for (const [k, q] of pane) q.classList.toggle('on', k === at);
   for (const [id, b] of stepBtn) { const now = !onFiles && id === step, done = seen.has(id) && !now;
     if (now) b.setAttribute('aria-current', 'step'); else b.removeAttribute('aria-current'); b.classList.toggle('done', done); b.classList.toggle('unseen', !seen.has(id)); b.dataset.state = now ? '지금 단계' : done ? '본 단계' : '아직 안 본 단계'; label(id); }
@@ -161,8 +162,8 @@ add('kit', check('ABS', () => D.kit.abs, v => { D.kit.abs = v; }, 'abs'), check(
   const drv = document.createElement('a'); drv.id = 'drive6'; drv.className = 'btn main'; drv.target = '_blank'; drv.rel = 'opener'; drv.textContent = '시험 주행 ▶'; drv.href = 'drive.html';
   const b = (t: string, f: () => void, id: string) => { const x = document.createElement('button'); x.type = 'button'; x.className = 'btn'; x.id = id; x.textContent = t; x.addEventListener('click', f); return x; };
   const row = document.createElement('div'); row.className = 'btns'; row.append(drv, b('저장', saveNow, 'save6'), b('저장·불러오기', () => go('files'), 'files6'));
-  add('check', note('앞 단계를 바꾸면 이 검사는 바로 다시 계산됩니다. 문제가 생긴 단계는 위 단계 표시에 ⚠️·⛔로 나옵니다.'),
-    h2('장착 검사'), div('fit6', 'fit6'), h2('차종'), div('cls6', 'cls6'), h2('원가와 신뢰성'), div('cost6', 'sumfig'), div('meas6', 'meas6'), row); }
+  add('check', row, note('앞 단계를 바꾸면 이 검사는 바로 다시 계산됩니다. 문제가 생긴 단계는 위 단계 표시에 ⚠️·⛔로 나옵니다.'),
+    h2('장착 검사'), div('fit6', 'fit6'), h2('차종'), div('cls6', 'cls6'), h2('원가와 신뢰성'), div('cost6', 'sumfig'), div('meas6', 'meas6')); }
 // 저장·불러오기: the saved designs, new ones, files
 { const list = document.createElement('ul'); list.className = 'list'; list.id = 'list';
   const btn = (t: string, f: () => void, cls = 'btn') => { const b = document.createElement('button'); b.type = 'button'; b.className = cls; b.textContent = t; b.addEventListener('click', f); return b; };
@@ -235,7 +236,7 @@ function showFit(r: FitResult[]) {
   // in ⑥ each check also names its step, a button that goes there
   const item = (x: FitResult, toStep = false) => `<li class="${x.verdict}"><span class="ic" aria-hidden="true">${ICON[x.verdict]}</span><div><b>${esc(x.name)}</b> <span>${esc(x.reason)}</span>`
     + (x.fixes.length || (toStep && x.verdict !== 'ok') ? `<div class="fixes">${x.fixes.map((fx, i) => `<button type="button" class="btn fix" data-part="${x.part}" data-i="${i}">${esc(fx.label)}</button>`).join('')}`
-      + (toStep && x.verdict !== 'ok' ? `<button type="button" class="btn go" data-step="${FIT_STEP[x.part]}">${stepNo(FIT_STEP[x.part]) + 1}단계 ${STEPS[stepNo(FIT_STEP[x.part])]![1]}로 ◀</button>` : '') + '</div>' : '') + '</div></li>';
+      + (toStep && x.verdict !== 'ok' ? `<button type="button" class="btn go" data-step="${FIT_STEP[x.part]}">◀ ${stepNo(FIT_STEP[x.part]) + 1}단계 ${STEPS[stepNo(FIT_STEP[x.part])]![1]}로</button>` : '') + '</div>' : '') + '</div></li>';
   el.innerHTML = `<details${open ? ' open' : ''}><summary>장착 검사 <span class="sum">${nb ? `⛔ ${nb} ` : ''}${nm ? `⚠️ ${nm} ` : ''}${!bad.length ? '✅ 모두 장착' : `✅ ${ok.length}`}</span></summary>`
     + `<ul>${bad.map(x => item(x)).join('')}${ok.map(x => item(x)).join('')}</ul></details>`;
   const el6 = $('fit6'); el6.innerHTML = `<p class="note">${nb ? `⛔ 장착 불가 ${nb} · ` : ''}${nm ? `⚠️ 개조 필요 ${nm} · ` : ''}✅ 장착 ${ok.length}</p><ul>${bad.map(x => item(x, true)).join('')}${ok.map(x => item(x)).join('')}</ul>`;

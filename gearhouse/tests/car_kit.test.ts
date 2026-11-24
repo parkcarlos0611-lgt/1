@@ -23,7 +23,7 @@ function extent(M: Mesh, on: number, c: number, out: number, max: boolean, abs =
 describe('kit: the F355', () => {
   const M = f355KitMesh(0, 0);
   // (alpha 0.11, M1: the engine part is now the whole powertrain, render/car/powertrain: the budget went from 10,500 to 14,000)
-  it('stays in budget (14,000 triangles with the powertrain) and keeps the sheet\'s length', () => { expect(M.n).toBeLessThanOrEqual(14000); expect(M.length).toBe(4250); });
+  it('stays in budget (16,600 triangles with the powertrain and the suspension) and keeps the sheet\'s length', () => { expect(M.n).toBeLessThanOrEqual(16600); expect(M.length).toBe(4250); });
   it('has four wheels made of wheel parts only, on the sheet\'s axles', () => { const w = wheelsOf(M); expect(w.length).toBe(4); expect(wheelParts(M)).toBe(true); expect(w[1]!.hx - w[0]!.hx).toBeCloseTo(sheet.overall.wheelbase, 3); });
   it('carries the parts of the detail list', () => { const n = names(f355KitMesh(0, 1));
     for (const p of ['grille', 'fogF', 'indicatorF', 'sidelightF', 'badge', 'tailLamp', 'stopLamp', 'tailSlot', 'spoiler', 'intake', 'intakeGrille', 'engineCover', 'engineBay', 'intakePlenum', 'engineBlock', 'gearbox', 'buttress', 'rearPane', 'quarterPane', 'lampLid', 'lampPod', 'headlamp', 'bonnetVent', 'exhaust', 'wheel', 'hub']) expect(n.has(p), p).toBe(true); });
@@ -64,8 +64,8 @@ describe('kit: parity of the NSX on this copy of the kit', () => {
   const orig = nsxMesh(0, 0), A0 = assemble(NSX_KIT), kit = A0.mesh, MM = 6, W = Math.round(5600 / MM), H = Math.round(3000 / MM);
   it('matches the original mesh\'s silhouette at six views (IoU >= 0.9995) and its triangle count within 10 %', () => {
     for (const v of VIEWS) expect(iou(silhouette(orig, v, MM, W, H).mask, silhouette(kit, v, MM, W, H).mask), v.name).toBeGreaterThanOrEqual(0.9995);
-    // (the original has only an engine: the kit build's powertrain is left out of the count; M1)
-    const body = kit.n - A0.panelOf.reduce((a, p) => a + (A0.panels[p] === 'engine' ? 1 : 0), 0); expect(Math.abs((body + 1062) / orig.n - 1)).toBeLessThan(0.1); expect(body).toBe(9436 - 1062);
+    // (the original has only an engine: the kit build's powertrain and suspension are left out of the count; M1, M3)
+    const body = kit.n - A0.panelOf.reduce((a, p) => a + (A0.panels[p] === 'engine' || A0.panels[p] === 'suspension' ? 1 : 0), 0); expect(Math.abs((body + 1062) / orig.n - 1)).toBeLessThan(0.1); expect(body).toBe(9436 - 1062);
   });
   it('still closes, with its own swaps', () => { closed(seamCheck(assemble(NSX_KIT))); closed(seamCheck(assemble({ ...NSX_KIT, ...NSX_ROUND_TAIL }))); closed(seamCheck(assemble({ ...NSX_KIT, ...NSX_DISC_WHEEL }))); });
 });

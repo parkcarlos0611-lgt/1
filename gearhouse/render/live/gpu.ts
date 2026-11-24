@@ -2,6 +2,7 @@
 // Meshes keep the car files' axes (x back from the nose, y to the car's right, z up, mm); a model matrix puts them in
 // the world (x east, y north, z up, metres).
 import { KINDS, wheelsOf, type Mesh, type Decal, decalPicture } from '../car/mesh';
+import { boneAt, type SuspRig } from '../car/suspension';
 
 export type M4 = Float32Array;
 export const m4 = (): M4 => { const m = new Float32Array(16); m[0] = m[5] = m[10] = m[15] = 1; return m; };
@@ -26,11 +27,11 @@ export function program(gl: WebGL2RenderingContext, vs: string, fs: string): Web
 
 /** one drawable piece: a vertex array (position, face normal, colour, gloss, kind, part) and its count */
 export interface Part { vao: WebGLVertexArrayObject; n: number; lamps?: LampAt[]; /** its buffers, to free them */ bufs?: WebGLBuffer[] }
-export const ATTR = { pos: 0, nor: 1, col: 2, gloss: 3, kind: 4, part: 5, smooth: 6, lamp: 7, lampAx: 8, lampRt: 9 } as const;
+export const ATTR = { pos: 0, nor: 1, col: 2, gloss: 3, kind: 4, part: 5, smooth: 6, lamp: 7, lampAx: 8, lampRt: 9, /** the suspension's parts only: the bone each corner hangs on */ bone: 10 } as const;
 /** a lamp's face found in a mesh (review 117): its middle and the way it looks (mm, the file's axes), its radius; 1 a head lamp, 2 a tail lamp */
 export interface LampAt { c: [number, number, number]; ax: [number, number, number]; R: number; flag: number }
 /** triangles of a mesh (by index) into a vertex array; `glass`: only the glass and shine, else everything but them */
-function upload(gl: WebGL2RenderingContext, M: Mesh, tris: number[], about?: [number, number, number]): Part {
+function upload(gl: WebGL2RenderingContext, M: Mesh, tris: number[], about?: [number, number, number], bone?: number[]): Part {
   const n = tris.length * 3, P = new Float32Array(n * 3), N = new Float32Array(n * 3), C = new Uint8Array(n * 3), G = new Float32Array(n), K = new Float32Array(n), Q = new Float32Array(n);
   tris.forEach((t, j) => { const q = t * 9, p = M.pos, ax = p[q + 3]! - p[q]!, ay = p[q + 4]! - p[q + 1]!, az = p[q + 5]! - p[q + 2]!, bx = p[q + 6]! - p[q]!, by = p[q + 7]! - p[q + 1]!, bz = p[q + 8]! - p[q + 2]!;
     let nx = ay * bz - az * by, ny = az * bx - ax * bz, nz = ax * by - ay * bx; const l = Math.hypot(nx, ny, nz) || 1; nx /= l; ny /= l; nz /= l;
@@ -40,6 +41,7 @@ function upload(gl: WebGL2RenderingContext, M: Mesh, tris: number[], about?: [nu
   const vao = gl.createVertexArray()!; gl.bindVertexArray(vao); const bufs: WebGLBuffer[] = [];
   const buf = (loc: number, data: ArrayBufferView, size: number, type: number, normalized = false) => { const b = gl.createBuffer()!; bufs.push(b); gl.bindBuffer(gl.ARRAY_BUFFER, b); gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, size, type, normalized, 0, 0); };
   buf(ATTR.pos, P, 3, gl.FLOAT); buf(ATTR.nor, N, 3, gl.FLOAT); buf(ATTR.col, C, 3, gl.UNSIGNED_BYTE, true); buf(ATTR.gloss, G, 1, gl.FLOAT); buf(ATTR.kind, K, 1, gl.FLOAT); buf(ATTR.part, Q, 1, gl.FLOAT); buf(ATTR.smooth, S, 3, gl.FLOAT); buf(ATTR.lamp, LP.uv, 4, gl.FLOAT); buf(ATTR.lampAx, LP.ax, 3, gl.FLOAT); buf(ATTR.lampRt, LP.rt, 3, gl.FLOAT);
+  if (bone) { const B = new Float32Array(n); bone.forEach((b, j) => { B[j * 3] = B[j * 3 + 1] = B[j * 3 + 2] = b; }); buf(ATTR.bone, B, 1, gl.FLOAT); }
   gl.bindVertexArray(null); return { vao, n, lamps: LP.lamps, bufs }; }
 /** the faces of the lamps (review 117): the glass over a head lamp (glass in a part called a lens or lamp) or a lamp's
  *  lens; each lamp found as such faces that touch; for each corner the lamp's own flat coordinates (u, v across its face,
@@ -94,7 +96,7 @@ function splitTyres(M: Mesh, tris: number[], hub: [number, number, number]): Mes
 }
 /** a mesh on the GPU: the body, each road wheel apart (to steer and turn it about its hub), the glass apart (drawn last),
  *  and its decals as pictures */
-export interface GpuMesh { len: number; body: Part; glass: Part; wheels: { part: Part; glass: Part | null; hub: [number, number, number]; front: boolean; /** the tyre's outer and inner radius (mm) */ R: number; rim: number }[]; decals: Decal[]; decalTex: WebGLTexture | null; radius: number; height: number; width: number; /** its lamps (review 117) */ lamps: LampAt[] }
+export interface GpuMesh { len: number; body: Part; glass: Part; wheels: { part: Part; glass: Part | null; hub: [number, number, number]; front: boolean; /** the tyre's outer and inner radius (mm) */ R: number; rim: number }[]; decals: Decal[]; decalTex: WebGLTexture | null; /** the suspension's moving parts apart, each corner with its bone, and the rig that poses them (render/car/suspension) */ susp?: { part: Part; rig: SuspRig }; radius: number; height: number; width: number; /** its lamps (review 117) */ lamps: LampAt[] }
 const GLASS = KINDS.indexOf('glass'), SHINE = KINDS.indexOf('shine'), TYRE = KINDS.indexOf('tyre'), LENS = KINDS.indexOf('lens');
 export function gpuMesh(gl: WebGL2RenderingContext, M: Mesh, wheels = true): GpuMesh {
   const W = wheels ? wheelsOf(M) : [], inWheel = new Int32Array(M.n).fill(-1); W.forEach((w, k) => { for (const t of w.tris) inWheel[t] = k; });
@@ -103,7 +105,9 @@ export function gpuMesh(gl: WebGL2RenderingContext, M: Mesh, wheels = true): Gpu
   // bloom spreads (review 146). Such slivers (the centres of turned parts, caps, lens fans) are dropped here for every car.
   const P0 = M.pos, flat = (t: number) => { const i = t * 9, ux = P0[i + 3]! - P0[i]!, uy = P0[i + 4]! - P0[i + 1]!, uz = P0[i + 5]! - P0[i + 2]!, vx = P0[i + 6]! - P0[i]!, vy = P0[i + 7]! - P0[i + 1]!, vz = P0[i + 8]! - P0[i + 2]!;
     return Math.hypot(uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx) < 0.5; };
-  for (let t = 0; t < M.n; t++) if (inWheel[t]! < 0 && !flat(t)) (isGlass(t) ? glass : body).push(t);
+  const rig = wheels ? M.susp : undefined, susp: number[] = [], bone: number[] = [];
+  for (let t = 0; t < M.n; t++) if (inWheel[t]! < 0 && !flat(t)) { const i = t * 9, b = rig ? boneAt(rig, M.names?.[M.part[t]!] ?? '', (P0[i]! + P0[i + 3]! + P0[i + 6]!) / 3, (P0[i + 1]! + P0[i + 4]! + P0[i + 7]!) / 3) : -1;
+    if (b > 0) { susp.push(t); bone.push(b); } else (isGlass(t) ? glass : body).push(t); }
   let R = 0, Z = 0, Y = 0; for (let i = 0; i < M.pos.length; i += 3) { R = Math.max(R, Math.hypot(M.pos[i]! - M.length / 2, M.pos[i + 1]!)); Z = Math.max(Z, M.pos[i + 2]!); Y = Math.max(Y, Math.abs(M.pos[i + 1]!)); }
   const decals = (M.decals ?? []).slice(0, 4); let decalTex: WebGLTexture | null = null;
   if (decals.length) { const S = 128; decalTex = gl.createTexture()!; gl.bindTexture(gl.TEXTURE_2D, decalTex); const all = new Uint8Array(S * 4 * S * 4);
@@ -111,11 +115,11 @@ export function gpuMesh(gl: WebGL2RenderingContext, M: Mesh, wheels = true): Gpu
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, S * 4, S, 0, gl.RGBA, gl.UNSIGNED_BYTE, all); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE); }
   const bodyP = upload(gl, M, body), glassP = upload(gl, M, glass), lamps = [...(glassP.lamps ?? [])]; for (const l of bodyP.lamps ?? []) if (!lamps.some(k => Math.hypot(k.c[0] - l.c[0], k.c[1] - l.c[1], k.c[2] - l.c[2]) < Math.max(k.R, l.R))) lamps.push(l);
-  return { len: M.length, body: bodyP, glass: glassP, lamps, decals, decalTex, radius: R / 1000, height: Z / 1000, width: 2 * Y / 1000,
+  return { len: M.length, body: bodyP, glass: glassP, lamps, ...(rig && susp.length ? { susp: { part: upload(gl, M, susp, undefined, bone), rig } } : {}), decals, decalTex, radius: R / 1000, height: Z / 1000, width: 2 * Y / 1000,
     wheels: W.map(w => { const hub: [number, number, number] = [w.hx, w.hy, w.hz], ts = w.tris.filter(t => !isGlass(t) && !flat(t)), gs = w.tris.filter(t => isGlass(t) && !flat(t));
       let R = 0, rim = Infinity; for (const t of w.tris) { if (M.kind[t] !== TYRE) continue; for (let k = 0; k < 3; k++) { const q = t * 9 + k * 3, r = Math.hypot(M.pos[q]! - w.hx, M.pos[q + 2]! - w.hz); R = Math.max(R, r); rim = Math.min(rim, r); } }
       const S = splitTyres(M, ts, hub); return { part: upload(gl, S, Array.from({ length: S.n }, (_, k) => k)), glass: gs.length ? upload(gl, M, gs, hub) : null, hub, front: w.front, R: R || w.r, rim: Number.isFinite(rim) ? rim : w.r * 0.7 }; }) }; }
 
 /** a mesh's GPU side freed (review 121: a car's deformed mesh replaces the last) */
-export function freeGpu(gl: WebGL2RenderingContext, g: GpuMesh): void { const parts: Part[] = [g.body, g.glass, ...g.wheels.flatMap(w => w.glass ? [w.part, w.glass] : [w.part])];
+export function freeGpu(gl: WebGL2RenderingContext, g: GpuMesh): void { const parts: Part[] = [g.body, g.glass, ...(g.susp ? [g.susp.part] : []), ...g.wheels.flatMap(w => w.glass ? [w.part, w.glass] : [w.part])];
   for (const p of parts) { gl.deleteVertexArray(p.vao); for (const b of p.bufs ?? []) gl.deleteBuffer(b); } if (g.decalTex) gl.deleteTexture(g.decalTex); }

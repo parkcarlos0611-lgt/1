@@ -25,7 +25,7 @@ const ALWAYS = ['engineBlock', 'cylinderHead', 'camCover', 'sump', 'timingCover'
   'exhaustPipe', 'catalyst', 'muffler', 'tailpipe', 'radiator', 'coolantPipe', 'coolantHose', 'fuelTank', 'battery', 'subframe', 'subframeFront', 'engineMount', 'cvBoot'];
 const WHEELISH = /^(tyre|tire|rim|wheel|spoke|hub|drum|brake|disc|caliper|axle|nut|spinner|knock)/i;
 /** the budgets: the powertrain alone at each detail, the whole car at the builder's */
-const BUDGET = { 2: 4900, 1: 2800, 0: 1250 } as const, CAR = 14200;
+const BUDGET = { 2: 4900, 1: 2800, 0: 1250 } as const, CAR = 16600;   // with the suspension's parts (alpha 0.12, M3: about 2,500 to 2,900 of them)
 
 const build = (d: Design, detail: 0 | 1 | 2 = 2): { M: Mesh; R: PowertrainBuilt; site: Site } => { const { kit, tweak } = designKit(d), site = kitSite(kit, tweak), r = powertrainMesh(designPowertrain(d), site, { detail }); return { M: r.mesh, R: r.built, site }; };
 const finite = (M: Mesh) => { for (let i = 0; i < M.pos.length; i++) if (!Number.isFinite(M.pos[i]!)) return false; return true; };

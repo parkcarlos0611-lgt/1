@@ -15,6 +15,7 @@ import { loadSettings, saveSettings, type ListStore } from './settings';
 import type { ShellCtx, Last } from './ctx';
 import { titleScreen, garageScreen, pickScreen, settingsScreen, aboutScreen } from './menus';
 import { builderScreen, driveScreen, resultsScreen } from './play';
+import { engineScreen } from './engine';
 import { closeDialog, dialogBox, navKey, padKeys, uiSounds, blip } from './ui';
 import { TIPS } from './tips';
 import { VERSION_NAME } from '../../core/version';
@@ -57,9 +58,9 @@ const ctx: ShellCtx = { router, stage, backdrop, store, settings, layer: $('gh-l
 function applySettings() { const t = settings.screen.theme; if (t === 'auto') delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = t;
   uiSounds(settings.sound.ui); backdrop.calm = settings.screen.calm || matchMedia('(prefers-reduced-motion: reduce)').matches; backdrop.redraw(); screens.drive?.apply?.(); }
 
-const drive = driveScreen(ctx), builder = builderScreen(ctx);
-Object.assign(screens, { title: titleScreen(ctx), garage: garageScreen(ctx), pick: pickScreen(ctx), settings: settingsScreen(ctx), about: aboutScreen(ctx), builder, drive, results: resultsScreen(ctx) });
-router.onChange = s => { if (s.id !== 'builder' && s.id !== 'drive') document.title = s.id === 'title' ? 'GEARHOUSE' : `GEARHOUSE · ${({ garage: '차고', pick: '시험장', settings: '설정', about: '정보', results: '레이스 결과' } as Record<string, string>)[s.id] ?? ''}`;
+const drive = driveScreen(ctx), builder = builderScreen(ctx), engine = engineScreen(ctx);
+Object.assign(screens, { title: titleScreen(ctx), garage: garageScreen(ctx), pick: pickScreen(ctx), settings: settingsScreen(ctx), about: aboutScreen(ctx), builder, drive, engine, results: resultsScreen(ctx) });
+router.onChange = s => { if (s.id !== 'builder' && s.id !== 'drive' && s.id !== 'engine') document.title = s.id === 'title' ? 'GEARHOUSE' : `GEARHOUSE · ${({ garage: '차고', pick: '시험장', settings: '설정', about: '정보', results: '레이스 결과' } as Record<string, string>)[s.id] ?? ''}`;
   if (s.id === 'garage') ctx.keepLast({ screen: 'garage' }); };
 
 // ---- keys: Esc back (a dialog first, a text field let go of), the arrows through the menus; a pad's cross the same ----
@@ -88,4 +89,4 @@ async function boot() { loading(true, '불러오는 중', 0.02); applySettings()
   await Promise.all(jobs); const left = 900 - (performance.now() - t0); if (left > 0) await wait(left);   // the cover long enough to read its tip
   await router.reset('title'); loading(false); }
 void boot();
-(globalThis as { __shell?: unknown }).__shell = { router, stage, backdrop, ctx, get builder() { return builder.api; }, get drive() { return drive.api; } };   // for the page tests (tools)
+(globalThis as { __shell?: unknown }).__shell = { router, stage, backdrop, ctx, get builder() { return builder.api; }, get drive() { return drive.api; }, get engine() { return engine.api; } };   // for the page tests (tools)

@@ -35,7 +35,7 @@ export function titleScreen(ctx: ShellCtx): Screen<never> {
       if (l?.screen === 'builder' || l?.screen === 'drive') await r.go('builder', { design: des });
       if (l?.screen === 'drive') await r.go('drive', { design: des, track: l.track, from: 'builder' }); })(); };
     const nav = el('nav', 'gh-menu', button('이어하기', cont, { kind: 'menu', sub: last ? `${SCREEN_NAME[last.screen] ?? ''} · ${cur?.name ?? d.name}` : cur ? `차 빌더 · ${cur.name}` : '아직 이어 할 것이 없습니다', disabled: !last && !cur }),
-      button('자유 설계', go('garage'), { kind: 'menu', sub: '차고: 설계 목록, 새 차 설계' }), button('시험장', go('pick', { mode: 'test' }), { kind: 'menu', sub: '트랙을 골라 시험 주행' }),
+      button('자유 설계', go('garage'), { kind: 'menu', sub: '차고: 설계 목록, 새 차 설계, 엔진 공방' }), button('시험장', go('pick', { mode: 'test' }), { kind: 'menu', sub: '트랙을 골라 시험 주행' }),
       button('레이스', go('pick', { mode: 'race' }), { kind: 'menu', sub: '트랙, 상대, 바퀴 수' }), button('설정', go('settings'), { kind: 'menu', sub: '그래픽, 소리, 조작, 화면, 저장' }), button('정보', go('about'), { kind: 'menu', sub: `${VERSION_NAME}, 바뀐 점, 출처` }));
     nav.setAttribute('aria-label', '메인 메뉴'); (nav.querySelector('button:not([disabled])') as HTMLElement | null)?.setAttribute('data-first', '');
     root.append(el('div', 'gh-brand', el('h1', 'gh-logo', 'GEARHOUSE'), el('span', 'gh-ver', VERSION_NAME), el('p', 'gh-tagline', '설계하고, 만들고, 시험하는 자동차')), nav,
@@ -60,6 +60,7 @@ export function garageScreen(ctx: ShellCtx): Screen<never> {
           button('내보내기', () => download(`${d.name.replace(/[^\w가-힣-]+/g, '_') || 'design'}.json`, designJson(d)))] })); }
     if (!list.length) grid.append(el('p', 'gh-empty', '아직 설계가 없습니다. "새 차 설계"로 시작하세요.'));
     root.append(topbar('차고', () => ctx.router.back()), el('div', 'gh-body', el('div', 'gh-actions', button('새 차 설계', () => void fresh(), { kind: 'main' }),
+      button('엔진 공방', () => void ctx.router.go('engine', {}), { id: 'gh-engineshop', title: '엔진 설계와 엔진 보관함' }),
       button('가져오기', () => void pickFile().then(t => { if (t === null) return; const d = parseDesign(t); if (!d) { toast('설계 파일이 아닙니다'); return; } saveDesign(s, d); toast(`가져왔습니다: ${d.name}`); fill(); })),
       el('span', 'gh-note', `설계 ${all.length}개 · 이 브라우저에 저장`)), grid));
     root.querySelector('.gh-actions .gh-main')?.setAttribute('data-first', ''); };
@@ -104,12 +105,13 @@ export function settingsScreen(ctx: ShellCtx): Screen<never> {
     const scr = pane(chips('화면 밝기', [['auto', '기기 설정대로'], ['light', '밝게'], ['dark', '어둡게']], S().screen.theme, v => set(s => { s.screen.theme = v; })),
       toggle('움직임 줄이기 (전환 효과, 턴테이블)', S().screen.calm, v => set(s => { s.screen.calm = v; })),
       row('전체화면', button('전체화면 켜기·끄기', () => { const e = document.documentElement; if (document.fullscreenElement) void document.exitFullscreen().catch(() => {}); else void e.requestFullscreen?.().catch(() => toast('이 브라우저는 전체화면을 허락하지 않습니다')); })));
+    const game = pane(toggle('연도 제한 (기술의 등장 연도)', S().sandbox.eraLimit, v => set(s => { s.sandbox.eraLimit = v; }), '켜면 엔진 공방이 설계한 해보다 늦게 나온 기술을 표시합니다. 0.12에서는 정보로만 보여 주고 막지는 않습니다(0.20 연구 체계와 함께 적용).'));
     const save = pane(el('p', 'gh-note', '설계, 측정 기록, 최고 랩, 설정은 이 브라우저에만 저장됩니다. 다른 기기로 옮기려면 전체를 파일로 내보내고 그 기기에서 가져오세요.'),
       el('div', 'gh-actions', button('전체 내보내기', () => { const t = exportAll(ctx.store); if (t === null) { toast('이 브라우저는 저장소를 읽게 하지 않습니다'); return; } download(`gearhouse_save_${new Date().toISOString().slice(0, 10)}.json`, t); toast('저장 파일을 내보냈습니다'); }),
         button('가져오기', () => void pickFile().then(t => { if (t === null) return; const n = importAll(ctx.store, t); if (n === null) { toast('GEARHOUSE 저장 파일이 아닙니다'); return; } Object.assign(ctx.settings, loadSettings(ctx.store)); ctx.changed(); toast(`가져왔습니다 (${n}개 항목)`); })),
         button('초기화', () => void dialog('저장 초기화', ['이 브라우저에 저장된 설계, 측정 기록, 최고 랩, 설정을 모두 지웁니다. 되돌릴 수 없습니다. 먼저 내보내기를 해 두세요.'], [['reset', '모두 지우기', { kind: 'danger' }], ['', '취소', { kind: 'ghost' }]]).then(v => {
           if (!v) return; const n = resetAll(ctx.store); Object.assign(ctx.settings, structuredClone(DEFAULTS)); saveSettings(ctx.store, ctx.settings); ctx.changed(); toast(`초기화했습니다 (${n}개 항목)`); }), { kind: 'danger' })));
-    const t = tabs([['gfx', '그래픽', gfx], ['sound', '소리', snd], ['controls', '조작', ctl], ['screen', '화면', scr], ['save', '저장 관리', save]]);
+    const t = tabs([['gfx', '그래픽', gfx], ['sound', '소리', snd], ['controls', '조작', ctl], ['screen', '화면', scr], ['game', '샌드박스', game], ['save', '저장 관리', save]]);
     root.append(topbar('설정', () => ctx.router.back()), el('div', 'gh-body gh-narrow', t.el)); root.querySelector('.gh-tab')?.setAttribute('data-first', ''); }); }
 
 // ---- about: the version, what changed, where the pictures come from ----

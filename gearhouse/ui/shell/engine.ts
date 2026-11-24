@@ -262,12 +262,13 @@ export function engineScreen(ctx: ShellCtx): Screen<EngineParams> & { readonly a
   const shown = (): Mesh | null => { if (!model) return null; const k = Math.round(view.k * 6) / 6; let M = shownCache.get(k); if (!M) { M = exploded(model.mesh, k); shownCache.set(k, M); } return M; };
   let lastView: { x: number; y: number; z: number; ang: number; pitch: number; mm: number; W: number; H: number; cy: number } | null = null;
   let frames = 0, draws = 0;
-  function frame(now: number) { raf = requestAnimationFrame(frame); frames++; const dt = Math.min(0.05, (now - last) / 1000); last = now;
-    revStep(dt);
+  function frame(now: number) { raf = requestAnimationFrame(frame); frames++; const el = Math.max(0, Math.min(0.5, (now - last) / 1000)); last = now;
+    for (let n = Math.max(1, Math.ceil(el / 0.01)), i = 0; i < n; i++) revStep(el / n);   // in small steps, however slow the frames
     const want = view.explode ? 1 : 0; if (view.k !== want) { const t = ctx.settings.screen.calm ? 1 : Math.min(1, (now - view.anim) / 450); view.k = want ? Math.max(view.k, t) : Math.min(view.k, 1 - t); dirty = true; }   // over 0.45 s, however slow the frames
     if (dirtyDyno) drawDyno(now);
     const R = L(), M = shown(); if (!R || !M || !dirty) return; dirty = false; draws++;
-    const cv = ctx.stage.canvas, dpr = Math.min(1.75, devicePixelRatio || 1), W = Math.max(2, Math.round(cv.clientWidth * dpr)), H = Math.max(2, Math.round(cv.clientHeight * dpr)); if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
+    // at most about two million pixels (as the backdrop: a large window at a high density drawn a little softer)
+    const cv = ctx.stage.canvas, dpr = Math.min(1.75, devicePixelRatio || 1, Math.sqrt(2.1e6 / Math.max(1, cv.clientWidth * cv.clientHeight))), W = Math.max(2, Math.round(cv.clientWidth * dpr)), H = Math.max(2, Math.round(cv.clientHeight * dpr)); if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
     if (M !== onGpu) { g = onGpu ? R.swapCar(onGpu, M) : R.car(M); onGpu = M; }
     // the engine framed in the view's box: its size (spread out, bigger), the box's middle
     const box = viewBox.getBoundingClientRect(), cr = cv.getBoundingClientRect(), b = model!, sz = Math.max(b.max[0] - b.min[0], b.max[1] - b.min[1], b.max[2] - b.min[2]) * (1 + 0.55 * view.k);
@@ -276,7 +277,7 @@ export function engineScreen(ctx: ShellCtx): Screen<EngineParams> & { readonly a
     const rx = Math.sin(view.ang), ry = -Math.cos(view.ang), zc = ((b.min[2] + b.max[2]) / 2 + 120 * view.k) / 1000;
     lastView = { x: rx * ox, y: ry * ox, z: zc, ang: view.ang, pitch: view.pitch, mm, W, H, cy: cyPx / H };
     R.render(lastView, [{ g: g!, x: 0, y: 0, z: 0, yaw: 0, roll: 0, pitch: 0, steerL: 0, steerR: 0, spin: 0, player: true, lamps: 0 }], [], [],
-      { look: ctx.settings.graphics.look === 'toon' ? 3 : ctx.settings.graphics.look === 'baked' ? 0 : ctx.settings.graphics.look === 'stepped' ? 1 : 2, glass: 0.8, rays: true, bloomK: 0.8, reflK: 1.2, dof: 0, outW: 0.5, outK: 0.6 }); }
+      { look: ctx.settings.graphics.look === 'toon' ? 3 : ctx.settings.graphics.look === 'baked' ? 0 : ctx.settings.graphics.look === 'stepped' ? 1 : 2, glass: 0.8, rays: false, bloomK: 0.8, reflK: 1.2, dof: 0, outW: 0.5, outK: 0.6 }); }
   // the orbit: drag to turn, the wheel or two fingers to zoom; a tap (no drag) names the part under it, hovering too
   { const ptrs = new Map<number, { x: number; y: number; x0: number; y0: number }>(); let pinch = 0, hoverT = 0;
     const name = (cx: number, cy: number, pin: boolean) => { const M = shown(); if (!M || !lastView) return; const cv = ctx.stage.canvas.getBoundingClientRect(), dpr = lastView.W / Math.max(1, cv.width);

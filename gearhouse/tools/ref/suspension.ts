@@ -24,12 +24,14 @@ if (process.argv.includes('parts')) for (const [id, d] of CARS) for (const det o
   for (let t = 0; t < A.mesh.n; t++) if (isSuspPart(name(A, t))) { n++; c[name(A, t)] = (c[name(A, t)] ?? 0) + 1; }
   console.log(`${id} detail ${det}: car ${A.mesh.n}, suspension ${n}  ` + Object.entries(c).map(([a, b]) => a + ':' + b).join(' ')); }
 
-if (process.argv.includes('corners')) for (const [id, d] of CARS) { const A = build(d), M = bare(A), rig = A.mesh.susp!, W = 620, H = 560, pics: Uint8Array[] = [];
+/** a corner's own neighbours: the suspension, the subframe it hangs on, the driveshaft, the tyre and the rim's barrel */
+const NEAR = /^(subframe|subframeFront|driveshaft|cvJoint|cvBoot|strutBrace|tyre|rim)/;
+if (process.argv.includes('corners')) for (const [id, d] of CARS) { const A = build(d), M = pickTris(bare(A), t => { const n = A.mesh.names![bare(A).part[t]!]!; return isSuspPart(n) || NEAR.test(n); }), rig = A.mesh.susp!, W = 640, H = 600, pics: Uint8Array[] = [];
   for (const k of [0, 2]) { const Hk = rig.corners[k]!;
-    for (const t of [-Hk.travel.droop, 0, Hk.travel.bump]) { const tr = [0, 0, 0, 0]; tr[k] = t; const P = poseMesh(M, poseRig(rig, tr, 0, 0)), C = corner(P, Hk.wc, 620);
+    for (const t of [-Hk.travel.droop, 0, Hk.travel.bump]) { const tr = [0, 0, 0, 0]; tr[k] = t; const P = poseMesh(M, poseRig(rig, tr, 0, 0)), C = corner(P, Hk.wc, 640);
       // the picture's middle is the mesh's (half its length): the corner is set there
-      const sh = C.length / 2 - Hk.wc[0], pos = Float32Array.from(C.pos); for (let i = 0; i < pos.length; i += 3) { pos[i] = pos[i]! + sh; pos[i + 1] = pos[i + 1]! - Hk.wc[1] * 0.55; }
-      pics.push(flat({ ...C, pos }, k === 0 ? 232 : 128, 16, W, H, 1.45, 0.66)); } }
+      const sh = C.length / 2 - Hk.wc[0], pos = Float32Array.from(C.pos); for (let i = 0; i < pos.length; i += 3) { pos[i] = pos[i]! + sh; pos[i + 1] = pos[i + 1]! - Hk.wc[1] * 0.6; }
+      pics.push(flat({ ...C, pos }, k === 0 ? 232 : 128, 14, W, H, 1.75, 0.8)); } }
   save(`suspension_corner_${id}`, pics, 3, W, H); }
 
 if (process.argv.includes('bare')) { const W = 1000, H = 560, pics: Uint8Array[] = [];

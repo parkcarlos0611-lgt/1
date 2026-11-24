@@ -99,25 +99,25 @@ void mul; void sub;
 const DISC = '#8d9094';
 /** the NSX (1990): forged aluminium double wishbones front and rear, a coil-over on each lower arm, bars both ends; 282 mm discs */
 const NSX: SuspSpec = {
-  front: { type: 'doubleWishbone', lower: { len: 330, span: [-150, 170], rise: 14 }, upper: { len: 232, span: [-185, 185], fall: 22, inset: 22, trail: 16 },
-    damper: { dx: [0], at: 0.46, top: [105, 215], spring: [38, 6], body: 23 }, bar: { dx: -235, z: 250, r: 10, at: 0.62, link: 70 }, steer: { dx: -112, up: 52, rack: true }, brake: { r: 141, t: 24, caliper: 110, at: 180 } },
-  rear: { type: 'doubleWishbone', lower: { len: 300, span: [-160, 170], rise: 16 }, upper: { len: 215, span: [-150, 200], fall: 24, inset: 20, trail: 0 },
-    damper: { dx: [64], at: 0.5, top: [105, 275], spring: [38, 6], body: 23 }, bar: { dx: 225, z: 168, r: 8.5, at: 0.62, link: -44 }, steer: { dx: 118, up: 50, rack: false }, brake: { r: 141, t: 22, caliper: 96, at: 0 } },
+  front: { type: 'doubleWishbone', lower: { len: 330, span: [-150, 170], rise: 14 }, upper: { len: 232, span: [-175, 175], fall: 22, inset: 22, trail: 16 },
+    damper: { dx: [0], at: 0.46, top: [135, 215], spring: [38, 6], body: 23 }, bar: { dx: -235, z: 250, r: 10, at: 0.62, link: 70 }, steer: { dx: -112, up: 52, rack: true }, brake: { r: 141, t: 24, caliper: 110, at: 180 } },
+  rear: { type: 'doubleWishbone', lower: { len: 300, span: [-160, 170], rise: 16 }, upper: { len: 215, span: [-150, 280], fall: 24, inset: 20, trail: 0 },
+    damper: { dx: [64], at: 0.5, top: [150, 275], spring: [38, 6], body: 23 }, bar: { dx: 225, z: 168, r: 8.5, at: 0.62, link: -44 }, steer: { dx: 118, up: 50, rack: false }, brake: { r: 141, t: 22, caliper: 96, at: 0 } },
   look: { arms: '#b4b7bb', armGloss: 0.55, armKind: 'forged', upright: '#9da0a4', spring: '#c9342b', damper: '#2a2c30', caliper: '#1b1b1e', disc: DISC } };
 /** the F355 (1994): unequal-length steel wishbones all round, coil-overs with electronic dampers, bars both ends; 300 / 310 mm discs */
 const F355: SuspSpec = {
-  front: { type: 'doubleWishbone', lower: { len: 335, span: [-150, 170], rise: 14 }, upper: { len: 236, span: [-185, 185], fall: 22, inset: 22, trail: 18 },
-    damper: { dx: [0], at: 0.46, top: [105, 215], spring: [38, 6], body: 23 }, bar: { dx: -235, z: 245, r: 10, at: 0.62, link: 70 }, steer: { dx: -112, up: 52, rack: true }, brake: { r: 150, t: 26, caliper: 118, at: 180 } },
-  rear: { type: 'doubleWishbone', lower: { len: 320, span: [-160, 170], rise: 16 }, upper: { len: 226, span: [-150, 200], fall: 24, inset: 20, trail: 0 },
-    damper: { dx: [64], at: 0.5, top: [105, 275], spring: [38, 6], body: 23 }, bar: { dx: 225, z: 162, r: 9, at: 0.62, link: -44 }, steer: { dx: 118, up: 50, rack: false }, brake: { r: 155, t: 26, caliper: 110, at: 0 } },
+  front: { type: 'doubleWishbone', lower: { len: 335, span: [-150, 170], rise: 14 }, upper: { len: 236, span: [-175, 175], fall: 22, inset: 22, trail: 18 },
+    damper: { dx: [0], at: 0.46, top: [135, 215], spring: [38, 6], body: 23 }, bar: { dx: -235, z: 245, r: 10, at: 0.62, link: 70 }, steer: { dx: -112, up: 52, rack: true }, brake: { r: 150, t: 26, caliper: 118, at: 180 } },
+  rear: { type: 'doubleWishbone', lower: { len: 320, span: [-160, 170], rise: 16 }, upper: { len: 226, span: [-150, 280], fall: 24, inset: 20, trail: 0 },
+    damper: { dx: [64], at: 0.5, top: [150, 275], spring: [38, 6], body: 23 }, bar: { dx: 225, z: 162, r: 9, at: 0.62, link: -44 }, steer: { dx: 118, up: 50, rack: false }, brake: { r: 155, t: 26, caliper: 110, at: 0 } },
   look: { arms: '#232427', armGloss: 0.35, armKind: 'tube', upright: '#8f9296', spring: '#d8b21c', damper: '#c9c2a2', caliper: '#b3161b', disc: DISC } };
 /** the EB110 (1991): double wishbones all round, a pull of two coil-overs a side at the rear (one ahead of the driveshaft,
  *  one behind), one at the front beside the front driveshaft; 332 mm discs */
 const EB110: SuspSpec = {
-  front: { type: 'doubleWishbone', lower: { len: 335, span: [-150, 180], rise: 14 }, upper: { len: 236, span: [-150, 200], fall: 22, inset: 22, trail: 18 },
-    damper: { dx: [64], at: 0.5, top: [105, 215], spring: [38, 6], body: 23 }, bar: { dx: -235, z: 250, r: 10, at: 0.62, link: 70 }, steer: { dx: -112, up: 52, rack: true }, brake: { r: 166, t: 28, caliper: 124, at: 180 } },
-  rear: { type: 'doubleWishbone', lower: { len: 330, span: [-200, 200], rise: 16 }, upper: { len: 232, span: [-235, 235], fall: 24, inset: 20, trail: 0 },
-    damper: { dx: [-84, 84], at: 0.46, top: [105, 275], spring: [33, 5.5], body: 20 }, bar: { dx: 255, z: 165, r: 9, at: 0.62, link: -44 }, steer: { dx: 128, up: 50, rack: false }, brake: { r: 166, t: 28, caliper: 124, at: 0 } },
+  front: { type: 'doubleWishbone', lower: { len: 335, span: [-150, 180], rise: 14 }, upper: { len: 236, span: [-150, 300], fall: 22, inset: 22, trail: 18 },
+    damper: { dx: [64], at: 0.5, top: [135, 215], spring: [38, 6], body: 23 }, bar: { dx: -235, z: 250, r: 10, at: 0.62, link: 70 }, steer: { dx: -112, up: 52, rack: true }, brake: { r: 166, t: 28, caliper: 124, at: 180 } },
+  rear: { type: 'doubleWishbone', lower: { len: 330, span: [-200, 200], rise: 16 }, upper: { len: 232, span: [-270, 270], fall: 24, inset: 20, trail: 0 },
+    damper: { dx: [-84, 84], at: 0.46, top: [150, 275], spring: [33, 5.5], body: 20 }, bar: { dx: 255, z: 165, r: 9, at: 0.62, link: -44 }, steer: { dx: 128, up: 50, rack: false }, brake: { r: 166, t: 28, caliper: 124, at: 0 } },
   look: { arms: '#2a2c30', armGloss: 0.35, armKind: 'tube', upright: '#a2a5a9', spring: '#1f4fa3', damper: '#2a2c30', caliper: '#3a3d42', disc: DISC } };
 /** each kit base's suspension, by the kit's id */
 export const SUSPENSION: Record<string, SuspSpec> = { nsx: NSX, f355: F355, eb110: EB110 };

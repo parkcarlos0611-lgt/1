@@ -33,6 +33,11 @@ describe('the kinematic tables', () => {
         // the spring's motion ratio a coil-over's on a lower arm, a little under half
         for (const m of t.mr) { expect(m, tag).toBeGreaterThan(0.3); expect(m, tag).toBeLessThan(0.7); } } }
   });
+  it('the bump steer is small, a little toe-out at the front and a little toe-in at the rear (the tie rods trimmed: under 1.2 mrad for 40 mm)', () => {
+    // alpha 0.13: untrimmed it was about 2 mrad each way, and its roll understeer pushed the heavy cars wide on the Byfleet Banking (docs/systems/102 7-1)
+    for (const [id, d] of BASES) for (const t of tablesOf(d).T) { const b = (lookup(t, t.toe, 40) - lookup(t, t.toe, 0)) * 1000, tag = `${id} ${t.front ? 'front' : 'rear'}`;
+      expect(Math.abs(b), tag).toBeLessThan(1.2); if (t.front) expect(b, tag).toBeLessThan(0); else expect(b, tag).toBeGreaterThan(0); }
+  });
   it('the roll centre stands inside the car and near the ground, and moves within it as the body rises, falls and rolls', () => {
     for (const [id, d] of BASES) { const { T } = tablesOf(d);
       for (const a of [0, 2]) { const L = T[a]!, R = T[a + 1]!, z0 = rollCentre(L, R, 0, 0), tag = `${id} ${a ? 'rear' : 'front'}`;

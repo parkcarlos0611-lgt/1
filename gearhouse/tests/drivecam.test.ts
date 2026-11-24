@@ -3,6 +3,8 @@ import { describe, it, expect } from 'vitest';
 import { pedalValue, spring, angSpring, fovTan, aimPitch, nextView, carEyes, DriveCam, CAM_DEFAULT, type CamCar } from '../ui/drivecam';
 import { loadSettings, saveSettings, asSettings, DEFAULTS, SETTINGS_KEY, type KeyStore } from '../ui/shell/settings';
 import { Build } from '../render/car/mesh';
+import { groundData } from '../render/live/ground';
+import { trackDef } from '../race/tracks';
 
 describe('touch pedals', () => {
   it('maps the finger\'s height on the pedal to its opening', () => {
@@ -81,5 +83,19 @@ describe('the camera kept in the settings', () => {
   it('survives a storage that throws', () => {
     const bad: KeyStore = { getItem: () => { throw new Error('denied'); }, setItem: () => { throw new Error('full'); }, removeItem: () => {} };
     expect(loadSettings(bad).camera.view).toBe('far'); expect(saveSettings(bad, loadSettings(null))).toBe(false);
+  });
+});
+
+describe('the ground under the perspective camera', () => {
+  it('lays the fields in cells, none far across, still under the concrete and covering the track\'s surroundings', () => {
+    // one quad kilometres across lost its depth's precision near the chase camera and showed over the straight
+    const TD = trackDef('millbrook'), T = TD.make(), S = { ...TD.scenery(T), areas: [], lines: [], trees: [], detail: [] }, g = groundData(T, S, T.spec.landmarks.find(l => l.kind === 'line')!.s, TD.groundStep);
+    let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity; for (const n of T.nodes) { x0 = Math.min(x0, n.x); x1 = Math.max(x1, n.x); y0 = Math.min(y0, n.y); y1 = Math.max(y1, n.y); }
+    let area = 0, cells = 0;
+    for (let t = 0; t < g.n / 3; t++) { if (g.flag[t * 3] !== 1 || Math.abs(g.pos[t * 9 + 2]! + 0.03) > 1e-6) continue;   // the fields' sheet: grass at 3 cm below
+      const P = [0, 1, 2].map(k => [g.pos[t * 9 + k * 3]!, g.pos[t * 9 + k * 3 + 1]!] as const), w = Math.max(...P.map(p => p[0])) - Math.min(...P.map(p => p[0])), h = Math.max(...P.map(p => p[1])) - Math.min(...P.map(p => p[1]));
+      const mx = (P[0][0] + P[1][0] + P[2][0]) / 3, my = (P[0][1] + P[1][1] + P[2][1]) / 3, inner = mx > x0 - 200 && mx < x1 + 200 && my > y0 - 200 && my < y1 + 200;
+      expect(Math.max(w, h)).toBeLessThanOrEqual(inner ? 50 + 1e-6 : 250 + 1e-6); area += Math.abs((P[1][0] - P[0][0]) * (P[2][1] - P[0][1]) - (P[2][0] - P[0][0]) * (P[1][1] - P[0][1])) / 2; cells++; }
+    expect(cells).toBeGreaterThan(100); expect(area).toBeCloseTo((x1 - x0 + 3000) * (y1 - y0 + 3000), -2);
   });
 });

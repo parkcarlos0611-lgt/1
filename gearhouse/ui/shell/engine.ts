@@ -8,6 +8,12 @@
 // held button or a throttle slider, after a tap (a browser lets sound start only then) and only with the game's sound on.
 // The model is built again a moment after a choice rests; the exploded view spreads the parts, and a part pointed at or
 // tapped shows its name and what of the design it carries.
+// The cutaway (절단 보기): the engine cut open with its insides moving (render/car/powertrain/internals.ts: the crank,
+// rods, pistons, cams and valves on their bones, posed by the crank's angle on the GPU), turned by the rev control's own
+// revs at the real speed, a tenth, a fiftieth, or by hand through one cycle (0-720 degrees); the crank's angle, the
+// firing order, each cylinder's stroke and its plug's flash shown over it. The voice keeps the real revs whatever the
+// picture's speed. A V8's crank, flat or cross plane, is the view's choice (by the red line at first: 8,000 and over
+// flat, as the F355's); the stand's V6 is a 60-degree one on split pins.
 // Opened from the garage (a new engine from the car on the turntable, or one from the library) or from the builder's step
 // ② with that car's engine: "빌더에 적용" hands the engine back to the builder.
 import type { Screen, Move } from './router';
@@ -16,7 +22,8 @@ import { el, button, chips, slider, toggle, tabs, dialog, toast } from './ui';
 import { studioFloor } from '../../render/live/studio';
 import type { LiveRenderer } from '../../render/live/renderer';
 import type { Mesh } from '../../render/car/mesh';
-import { standModel, exploded, pickPart, partName, PART_INFO, type StandModel } from '../../render/car/powertrain/stand';
+import { standModel, exploded, pickPart, partName, onPicture, PART_INFO, type StandModel } from '../../render/car/powertrain/stand';
+import { STROKES, strokeOf, plugGlint, type CrankKind } from '../../render/car/powertrain/internals';
 import { LAYOUTS, LAYOUT_NAME, LIMITS, GRADES, GRADE_NAME, QUALITY_PARTS, INTAKES, COMPRESSIONS, SUMPS, BLOCKS, CYLINDERS, gradeLock, gradeBoost, gradeRedline, normalise,
   type Design, type Grade, type Intake, type Compression, type Sump, type Block, type Valves, type Turbos, type Layout, type QualityPart } from '../../core/design';
 import { savedEngines, saveEngine, deleteEngine, duplicateEngine, engineEntry, joinEngine, withEngine, familyRange, engineTechs, engineYear, TECH_YEAR, type SavedEngine } from '../../core/engines';
@@ -37,8 +44,16 @@ const KO = {
 const yr = (k: keyof typeof TECH_YEAR) => ` · ${TECH_YEAR[k].year}`;
 
 /** the design's figures as the part pointed at carries them (Korean) */
-function partSpec(n: string, d: Design, s: EngineSheet): string {
-  const E = d.engine, q = PART_INFO[n]?.q, qs = q && (q !== 'turbo' || E.turbo) ? ` · 품질 ${E.quality[q] > 0 ? '+' : ''}${E.quality[q]}` : '';
+function partSpec(n: string, d: Design, s: EngineSheet, rig?: StandModel['rig']): string {
+  const E = d.engine, mm = (v: number) => `${v.toFixed(1)} mm`;
+  if (rig) switch (n) {   // the cutaway's insides: what they are drawn at (the bore held under the block's pitch)
+    case 'crankshaft': return `${rig.crank === 'flat' ? '평면(180°) 크랭크' : rig.crank === 'cross' ? '십자(90°) 크랭크' : rig.crank === 'split' ? '분할 핀 크랭크' : rig.crank === 'common' ? '공용 핀 크랭크' : '크랭크'} · 행정 ${mm(rig.stroke)} · 점화 순서 ${rig.order}`;
+    case 'conRod': return `길이 ${mm(rig.l)} · 로드/행정 ${(rig.l / rig.stroke).toFixed(2)}`;
+    case 'piston': case 'pistonRing': case 'cylinderBore': return `보어 ${mm(rig.bore)} · 링 3개 (압축 2, 오일 1)`;
+    case 'camshaft': return `크랭크 두 바퀴에 한 바퀴 · ${E.valves >= 4 ? 'DOHC' : 'SOHC'}`;
+    case 'intakeValve': case 'exhaustValve': return `실린더당 ${E.valves}밸브 · 최대 양정 ${mm(rig.lift)} · 흡기 345~590°, 배기 130~375° (점화 상사점 0°)`;
+    case 'sparkPlug': return `점화: 상사점 전 20°`; }
+  const q = PART_INFO[n]?.q, qs = q && (q !== 'turbo' || E.turbo) ? ` · 품질 ${E.quality[q] > 0 ? '+' : ''}${E.quality[q]}` : '';
   const line = (() => { switch (PART_INFO[n]?.q) {
     case 'block': return n === 'engineBlock' ? `${LAYOUT_NAME[E.layout]} · ${KO.block[E.block]} · 보어 ${s.bore} × 행정 ${s.stroke} mm · ${E.cc.toLocaleString()} cc` : KO.sump[E.sump];
     case 'head': return `실린더당 ${E.valves}밸브 · ${E.valves >= 4 ? 'DOHC' : 'SOHC'} · 캠 ${E.vtec ? '두 프로필' : '일반'} · 레드라인 ${E.redline.toLocaleString()} rpm`;
@@ -48,6 +63,7 @@ function partSpec(n: string, d: Design, s: EngineSheet): string {
     default: return n === 'stand' ? '작업대: 엔진을 플랜지로 붙잡습니다' : '보조 장치'; } })();
   return line + qs; }
 
+type Speed = 'real' | '10' | '50' | 'manual';
 let styled = false;
 function style() { if (styled) return; styled = true; const s = document.createElement('style'); s.dataset.screen = 'engine'; s.textContent = `
   .gh-eng { display: grid; grid-template-columns: minmax(300px, 340px) minmax(0, 1fr) minmax(320px, 390px); grid-template-rows: auto minmax(0, 1fr); overflow: hidden; background: transparent; }
@@ -82,6 +98,20 @@ function style() { if (styled) return; styled = true; const s = document.createE
   .gh-elist .gh-actions .gh-btn { min-height: 34px; padding: 4px 10px; font-size: 0.82rem; }
   .gh-name { font: inherit; font-size: 0.95rem; padding: 7px 10px; border: 1px solid var(--gh-line); border-radius: 6px; background: var(--gh-solid); color: var(--gh-ink); width: 100%; }
   .gh-chip:disabled { opacity: 0.4; cursor: not-allowed; }
+  .gh-eng-cut { position: absolute; left: 8px; right: 8px; bottom: 8px; display: grid; gap: 6px; padding: 8px 10px; border-radius: 8px; background: color-mix(in srgb, var(--gh-panel) 88%, transparent); border: 1px solid var(--gh-line); font-size: 0.8rem; }
+  .gh-eng-cut[hidden] { display: none; }
+  .gh-eng-cut .gh-row2 { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .gh-eng-cut .gh-btn { min-height: 30px; padding: 3px 9px; font-size: 0.8rem; background: var(--gh-solid); }
+  .gh-eng-cut .gh-btn[aria-pressed="true"] { border-color: var(--gh-accent); color: var(--gh-accent); font-weight: 600; }
+  .gh-eng-cut input[type=range] { flex: 1 1 160px; min-width: 120px; }
+  .gh-eng-read { font-variant-numeric: tabular-nums; }
+  .gh-cyls { display: flex; flex-wrap: wrap; gap: 3px; }
+  .gh-cyl { min-width: 38px; padding: 2px 4px; border-radius: 5px; text-align: center; font-size: 0.72rem; line-height: 1.15; color: #fff; font-variant-numeric: tabular-nums; }
+  .gh-cyl b { display: block; font-size: 0.78rem; }
+  .gh-cyl[data-k="0"] { background: #b23a1e; } .gh-cyl[data-k="1"] { background: #6b6e73; } .gh-cyl[data-k="2"] { background: #2f6aa8; } .gh-cyl[data-k="3"] { background: #b8860b; }
+  .gh-cyl.gh-spark { box-shadow: 0 0 0 2px #fff6c0, 0 0 10px 3px #ffd84a; }
+  .gh-eng-glint { position: absolute; inset: 0; pointer-events: none; width: 100%; height: 100%; }
+  .gh-eng-view.gh-cutting .gh-eng-hint { display: none; }
   @media (max-width: 760px) {
     .gh-eng { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 40vh minmax(0, 1fr); }
     .gh-eng-view { grid-row: 2; }
@@ -165,9 +195,20 @@ export function engineScreen(ctx: ShellCtx): Screen<EngineParams> & { readonly a
     el('h3', 'gh-h2', '엔진 평가표'), sheetBox, el('h3', 'gh-h2', '기술과 연도'), techs, yearNote);
   // ---- the middle: the view ----
   const tip = el('div', 'gh-eng-tip'); tip.hidden = true;
-  const exBtn = button('분해도', () => { view.explode = !view.explode; exBtn.setAttribute('aria-pressed', String(view.explode)); view.anim = performance.now(); dirty = true; }, { id: 'gh-explode' }); exBtn.setAttribute('aria-pressed', 'false');
+  const exBtn = button('분해도', () => { if (cut.on) setCut(false); view.explode = !view.explode; exBtn.setAttribute('aria-pressed', String(view.explode)); view.anim = performance.now(); dirty = true; }, { id: 'gh-explode' }); exBtn.setAttribute('aria-pressed', 'false');
   const homeBtn = button('시점 초기화', () => { home(); });
-  const viewBox = el('div', 'gh-eng-view', el('div', 'gh-eng-tools', exBtn, homeBtn), tip, el('span', 'gh-eng-hint', '끌어서 돌리기 · 휠·두 손가락으로 확대 · 부품을 눌러 이름 보기'));
+  const cutBtn = button('절단 보기', () => setCut(!cut.on), { id: 'gh-cutaway' }); cutBtn.setAttribute('aria-pressed', 'false');
+  // ---- the cutaway's bar: the speed, the crank (a V8's), the hand's slider, the angle and the order, each cylinder's stroke ----
+  const SPEEDS: [Speed, string][] = [['real', '실제 속도'], ['10', '1/10'], ['50', '1/50'], ['manual', '한 사이클 수동']];
+  const speedBtns = SPEEDS.map(([k, t]) => { const b = button(t, () => { cut.speed = k; syncCut(); }); b.dataset.speed = k; return b; });
+  const crankBtns = (['flat', 'cross'] as const).map(k => { const b = button(k === 'flat' ? '평면 크랭크 (180°)' : '십자 크랭크 (90°)', () => { cut.crank = k; cut.model = null; syncCut(); dirty = true; }); b.dataset.crank = k; return b; });
+  const crankRow = el('div', 'gh-row2', el('span', 'gh-label', 'V8 크랭크'), ...crankBtns);
+  const hand = el('input', 'gh-slider'); hand.type = 'range'; hand.min = '0'; hand.max = '720'; hand.step = '1'; hand.value = '0'; hand.setAttribute('aria-label', '크랭크 각도 (한 사이클 0~720°)'); hand.id = 'gh-crank';
+  hand.addEventListener('input', () => { cut.theta = +hand.value; dirty = true; });
+  const readout = el('span', 'gh-eng-read'), cylBox = el('div', 'gh-cyls'), handRow = el('div', 'gh-row2', el('span', 'gh-label', '크랭크 각도'), hand);
+  const cutBar = el('div', 'gh-eng-cut', el('div', 'gh-row2', ...speedBtns), crankRow, handRow, readout, cylBox); cutBar.hidden = true;
+  const glint = el('canvas', 'gh-eng-glint');
+  const viewBox = el('div', 'gh-eng-view', glint, el('div', 'gh-eng-tools', exBtn, cutBtn, homeBtn), tip, el('span', 'gh-eng-hint', '끌어서 돌리기 · 휠·두 손가락으로 확대 · 부품을 눌러 이름 보기'), cutBar);
   const side = el('div', 'gh-eng-side', tb.el);
   const applyBtn = button('빌더에 적용 ◀', () => apply(), { kind: 'main', id: 'gh-eng-apply' });
   const bar = el('header', 'gh-bar', button('◀ 뒤로', () => ctx.router.back(), { kind: 'ghost', title: '뒤로 (Esc)' }), el('h1', 'gh-bar-t', '엔진 공방'), el('span', 'gh-grow'), applyBtn);
@@ -255,18 +296,50 @@ export function engineScreen(ctx: ShellCtx): Screen<EngineParams> & { readonly a
   // ---- the 3D view: the stand on the studio floor, the orbit, the exploded view, the part pointed at ----
   const L = (): LiveRenderer | null => ctx.stage.L;
   let model: StandModel | null = null, onGpu: Mesh | null = null, g: ReturnType<LiveRenderer['car']> | null = null, dirty = true, raf = 0, last = 0;
+  const cut = { on: false, speed: 'real' as Speed, theta: 0, crank: null as CrankKind | null, model: null as StandModel | null, chips: [] as HTMLElement[], rigOf: null as StandModel['rig'] | null };
+  const coarse = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
+  let lastDraw = 0, drawGap = 0;
   const view = { ang: 0.8, pitch: 24, zoom: 1.15, explode: false, anim: 0, k: 0 }; const home = () => { view.ang = 0.8; view.pitch = 24; view.zoom = 1.15; dirty = true; };   // from the pulleys' end, the stand behind
   const shownCache = new Map<number, Mesh>();
-  function rebuild() { const t0 = performance.now(); try { model = standModel(car, 2); } catch (e) { console.warn('engine stand', e); return; } shownCache.clear(); dirty = true; tip.hidden = true;
+  function rebuild() { const t0 = performance.now(); try { model = standModel(car, 2); } catch (e) { console.warn('engine stand', e); return; } shownCache.clear(); cut.model = null; dirty = true; tip.hidden = true;
     console.info(`engine stand ${E().layout}: ${model.mesh.n} triangles, ${Math.round(performance.now() - t0)} ms`); }
-  const shown = (): Mesh | null => { if (!model) return null; const k = Math.round(view.k * 6) / 6; let M = shownCache.get(k); if (!M) { M = exploded(model.mesh, k); shownCache.set(k, M); } return M; };
+  const shown = (): Mesh | null => { if (!model) return null; if (cut.on) { const c = cutModel(); if (c) return c.mesh; } const k = Math.round(view.k * 6) / 6; let M = shownCache.get(k); if (!M) { M = exploded(model.mesh, k); shownCache.set(k, M); } return M; };
   let lastView: { x: number; y: number; z: number; ang: number; pitch: number; mm: number; W: number; H: number; cy: number } | null = null;
   let frames = 0, draws = 0;
+  // ---- the cutaway: its model (built when first shown), the crank turned by the revs at the chosen speed or by hand ----
+  function cutModel(): StandModel | null { if (!cut.model) { const t0 = performance.now(); try { cut.model = standModel(car, 2, { crank: cut.crank ?? undefined }); } catch (e) { console.warn('engine cutaway', e); return null; }
+      console.info(`engine cutaway ${E().layout}: ${cut.model.mesh.n} triangles, ${cut.model.rig?.bones} bones, ${Math.round(performance.now() - t0)} ms`); syncCut(); } return cut.model; }
+  function setCut(on: boolean) { cut.on = on; cutBtn.setAttribute('aria-pressed', String(on)); viewBox.classList.toggle('gh-cutting', on); cutBar.hidden = !on; tip.hidden = true;
+    if (on) { if (view.explode) { view.explode = false; view.k = 0; exBtn.setAttribute('aria-pressed', 'false'); }
+      if (!cut.crank) cut.crank = E().redline >= 8000 ? 'flat' : 'cross';
+      const I = E().layout[0] === 'I'; view.ang = I ? 1.35 : 1.0; view.pitch = I ? 22 : 46; view.zoom = 1.0; }   // an in-line engine seen from its open side, the others from above into the vee
+    syncCut(); dirty = true; }
+  function syncCut() { for (const b of speedBtns) b.setAttribute('aria-pressed', String(b.dataset.speed === cut.speed)); handRow.hidden = cut.speed !== 'manual'; handRow.style.display = cut.speed === 'manual' ? '' : 'none';
+    const v8 = E().layout === 'V8'; crankRow.style.display = v8 ? '' : 'none'; for (const b of crankBtns) b.setAttribute('aria-pressed', String(b.dataset.crank === cut.crank));
+    if (cut.speed === 'manual') hand.value = String(Math.round(cut.theta));
+    const rig = cut.model?.rig ?? null; if (rig !== cut.rigOf) { cut.rigOf = rig; cylBox.textContent = ''; cut.chips = [];
+      if (rig) for (const c of [...rig.cyl].sort((a, b) => a.no - b.no)) { const ch = el('span', 'gh-cyl'); ch.dataset.no = String(c.no); ch.title = `${c.no}번 실린더`; cylBox.append(ch); cut.chips.push(ch); } } }
+  /** the angle, the order, each cylinder's stroke (its plug's flash) */
+  function drawCut() { const rig = cut.model?.rig; if (!rig) return; const th = cut.theta;
+    readout.textContent = `크랭크 ${Math.round(th)}° / 720° · ${Math.round(rev.rpm / 10) * 10} rpm${cut.speed === 'real' ? ' (실제 속도: 너무 빨라 흐려 보입니다)' : cut.speed === 'manual' ? '' : ` · 화면은 ${cut.speed === '10' ? '1/10' : '1/50'} 속도`} · 점화 순서 ${rig.order}`;
+    const byNo = new Map(rig.cyl.map(c => [c.no, c]));
+    for (const ch of cut.chips) { const c = byNo.get(+ch.dataset.no!)!, k = String(strokeOf(c, th)), sp = plugGlint(c, th) > 0.25;
+      if (ch.dataset.k !== k) { ch.dataset.k = k; ch.innerHTML = `<b>${c.no}</b>${STROKES[+k]}`; } ch.classList.toggle('gh-spark', sp); } }
+  /** the plugs' flashes over the picture */
+  function drawGlints() { const c = glint, box = viewBox.getBoundingClientRect(), dpr = Math.min(2, devicePixelRatio || 1), W = Math.round(box.width * dpr), H = Math.round(box.height * dpr); if (c.width !== W || c.height !== H) { c.width = W; c.height = H; }
+    const g = c.getContext('2d'); if (!g) return; g.clearRect(0, 0, W, H); const rig = cut.model?.rig, v = lastView; if (!cut.on || !rig || !v || !cut.model) return;
+    const cr = ctx.stage.canvas.getBoundingClientRect(), k = v.W / Math.max(1, cr.width);
+    for (const cy of rig.cyl) { const a = plugGlint(cy, cut.theta); if (a <= 0) continue; const [px, py] = onPicture(cut.model.mesh.length, v, cy.plug), x = (px / k + cr.left - box.left) * dpr, y = (py / k + cr.top - box.top) * dpr, r = (6 + 10 * a) * dpr;
+      const gr = g.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, `rgba(255,255,240,${a})`); gr.addColorStop(0.35, `rgba(150,190,255,${0.8 * a})`); gr.addColorStop(1, 'rgba(120,160,255,0)'); g.fillStyle = gr; g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill(); } }
   function frame(now: number) { raf = requestAnimationFrame(frame); frames++; const el = Math.max(0, Math.min(0.5, (now - last) / 1000)); last = now;
     for (let n = Math.max(1, Math.ceil(el / 0.01)), i = 0; i < n; i++) revStep(el / n);   // in small steps, however slow the frames
+    // the picture's crank: the revs (the voice's own, ui/sound) at the chosen share of their speed, or the hand's angle
+    if (cut.on) { if (cut.speed !== 'manual' && rev.rpm > 0) { const k = cut.speed === 'real' ? 1 : cut.speed === '10' ? 0.1 : 0.02; cut.theta = (cut.theta + rev.rpm / 60 * 360 * el * k) % 720; dirty = true; } drawCut(); }
     const want = view.explode ? 1 : 0; if (view.k !== want) { const t = ctx.settings.screen.calm ? 1 : Math.min(1, (now - view.anim) / 450); view.k = want ? Math.max(view.k, t) : Math.min(view.k, 1 - t); dirty = true; }   // over 0.45 s, however slow the frames
     if (dirtyDyno) drawDyno(now);
-    const R = L(), M = shown(); if (!R || !M || !dirty) return; dirty = false; draws++;
+    const R = L(), M = shown(); if (!R || !M || !dirty) return;
+    if (cut.on && now - lastDraw < drawGap) return;   // the moving cutaway drawn as often as the device keeps up with (a phone: 30 a second at most)
+    dirty = false; draws++; lastDraw = now; const t1 = performance.now();
     // at most about two million pixels (as the backdrop: a large window at a high density drawn a little softer)
     const cv = ctx.stage.canvas, dpr = Math.min(1.75, devicePixelRatio || 1, Math.sqrt(2.1e6 / Math.max(1, cv.clientWidth * cv.clientHeight))), W = Math.max(2, Math.round(cv.clientWidth * dpr)), H = Math.max(2, Math.round(cv.clientHeight * dpr)); if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
     if (M !== onGpu) { g = onGpu ? R.swapCar(onGpu, M) : R.car(M); onGpu = M; }
@@ -276,14 +349,15 @@ export function engineScreen(ctx: ShellCtx): Screen<EngineParams> & { readonly a
     const cx = (box.left + box.width / 2 - cr.left) * dpr, cyPx = (box.top + box.height * 0.55 - cr.top) * dpr, shift = cx - W / 2, ox = -shift * mm / 1000;
     const rx = Math.sin(view.ang), ry = -Math.cos(view.ang), zc = ((b.min[2] + b.max[2]) / 2 + 120 * view.k) / 1000;
     lastView = { x: rx * ox, y: ry * ox, z: zc, ang: view.ang, pitch: view.pitch, mm, W, H, cy: cyPx / H };
-    R.render(lastView, [{ g: g!, x: 0, y: 0, z: 0, yaw: 0, roll: 0, pitch: 0, steerL: 0, steerR: 0, spin: 0, player: true, lamps: 0 }], [], [],
+    R.render(lastView, [{ g: g!, x: 0, y: 0, z: 0, yaw: 0, roll: 0, pitch: 0, steerL: 0, steerR: 0, spin: 0, player: true, lamps: 0, crank: cut.on ? cut.theta : 0 }], [], [],
       { look: ctx.settings.graphics.look === 'toon' ? 3 : ctx.settings.graphics.look === 'baked' ? 0 : ctx.settings.graphics.look === 'stepped' ? 1 : 2, glass: 0.8, rays: true, bloomK: 0.8, reflK: 1.2, dof: 0, outW: 0.5, outK: 0.6,
-        texK: 0.3 }); }   // the material textures calm: they are sized for a car's panels, and an engine seen this close shows them coarse
+        texK: 0.3 });
+    const ms = performance.now() - t1; drawGap = coarse ? Math.max(33, ms * 1.5) : ms > 30 ? ms : 0; drawGlints(); }   // the material textures calm: they are sized for a car's panels, and an engine seen this close shows them coarse
   // the orbit: drag to turn, the wheel or two fingers to zoom; a tap (no drag) names the part under it, hovering too
   { const ptrs = new Map<number, { x: number; y: number; x0: number; y0: number }>(); let pinch = 0, hoverT = 0;
     const name = (cx: number, cy: number, pin: boolean) => { const M = shown(); if (!M || !lastView) return; const cv = ctx.stage.canvas.getBoundingClientRect(), dpr = lastView.W / Math.max(1, cv.width);
       const n = pickPart(M, lastView, (cx - cv.left) * dpr, (cy - cv.top) * dpr), box = viewBox.getBoundingClientRect();
-      if (!n) { if (pin) tip.hidden = true; return; } tip.innerHTML = ''; tip.append(el('b', '', partName(n)), el('span', '', partSpec(n, car, sheet))); tip.hidden = false;
+      if (!n) { if (pin) tip.hidden = true; return; } tip.innerHTML = ''; tip.append(el('b', '', partName(n)), el('span', '', partSpec(n, car, sheet, cut.on ? cut.model?.rig : undefined))); tip.hidden = false;
       tip.style.left = `${Math.min(box.width - 220, Math.max(6, cx - box.left + 14))}px`; tip.style.top = `${Math.max(46, cy - box.top - 10)}px`; tip.dataset.part = n; };
     viewBox.addEventListener('pointerdown', e => { if ((e.target as HTMLElement).closest('button')) return; viewBox.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY, x0: e.clientX, y0: e.clientY });
       if (ptrs.size === 2) { const [a, b] = [...ptrs.values()]; pinch = Math.hypot(a!.x - b!.x, a!.y - b!.y); } });
@@ -301,12 +375,12 @@ export function engineScreen(ctx: ShellCtx): Screen<EngineParams> & { readonly a
   function apply() { if (!onApply) return; onApply(structuredClone(E())); start = sig(); toast('빌더의 차에 엔진을 얹었습니다'); ctx.router.back(); }
   let asking = false;
   const api = { get design() { return car; }, get entry() { return entry; }, get curve() { return curve; }, get sheet() { return sheet; }, get rpm() { return rev.rpm; }, get triangles() { return onGpu?.n ?? 0; },
-    get exploded() { return view.k; }, get frames() { return frames; }, get draws() { return draws; }, get on() { return on; }, set(f: (e: Design['engine']) => void) { f(E()); changed(); }, pick: (x: number, y: number) => { const M = shown(); return M && lastView ? pickPart(M, lastView, x, y) : null; }, get view() { return lastView; } };
+    get exploded() { return view.k; }, get cutaway() { return { on: cut.on, theta: cut.theta, speed: cut.speed, crank: cut.crank, order: cut.model?.rig?.order ?? '', bones: cut.model?.rig?.bones ?? 0, triangles: cut.model?.mesh.n ?? 0 }; }, get frames() { return frames; }, get draws() { return draws; }, get on() { return on; }, set(f: (e: Design['engine']) => void) { f(E()); changed(); }, pick: (x: number, y: number) => { const M = shown(); return M && lastView ? pickPart(M, lastView, x, y) : null; }, get view() { return lastView; } };
   return { api,
     enter(p: EngineParams, how: Move) { style(); ctx.backdrop.stop(); ctx.stage.use('engine', true, R => { R.setGround(studioFloor()); R.setTrack(1, 30, 12, 0); });
       if (how !== 'back') { onApply = p?.onApply; const base = p?.design ?? ctx.recent(); car = normalise(structuredClone(base)); entry = null; range = familyRange(car.engine.cc);
         if (p?.entry) { car = withEngine(car, joinEngine(p.entry.family, p.entry.variant, car)); range = [...p.entry.family.cc]; entry = { id: p.entry.id, name: p.entry.name }; }
-        nameIn.value = entry?.name ?? (p?.design ? `${car.name}의 엔진` : `${LAYOUT_NAME[car.engine.layout]} ${(car.engine.cc / 1000).toFixed(1)}`); start = sig(); meshKey = ''; rev.rpm = 0; view.explode = false; view.k = 0; exBtn.setAttribute('aria-pressed', 'false'); }
+        nameIn.value = entry?.name ?? (p?.design ? `${car.name}의 엔진` : `${LAYOUT_NAME[car.engine.layout]} ${(car.engine.cc / 1000).toFixed(1)}`); start = sig(); meshKey = ''; rev.rpm = 0; view.explode = false; view.k = 0; exBtn.setAttribute('aria-pressed', 'false'); cut.crank = null; cut.model = null; setCut(false); }
       document.title = `GEARHOUSE · 엔진 공방${onApply ? ` · ${car.name}` : ''}`;
       ctx.layer.append(root); on = true; changed(); figures(); drawSoundRow(); fillList(); dirty = true; last = performance.now(); cancelAnimationFrame(raf); raf = requestAnimationFrame(frame); addEventListener('resize', onResize);
       requestAnimationFrame(() => { if (!root.contains(document.activeElement)) (root.querySelector<HTMLElement>('.gh-tab[aria-selected="true"]'))?.focus({ preventScroll: true }); }); },

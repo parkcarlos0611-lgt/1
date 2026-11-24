@@ -36,11 +36,13 @@ const STEEL = '#b9bcc1', BELT = '#1a1a1a', HOSE = '#232326', SHIELD = '#c2c4c6',
 /** how far the crank sits under a wet-sump engine's when the sump is dry (in bores) */
 export const DRY_DROP = 0.65;
 
-export function buildEngine(g: Geo, S0: PowertrainSpec, det: Detail, transverse = false): EngineOut {
-  const C = S0.colours, seg = det === 2 ? 10 : det === 1 ? 6 : 5, seg2 = det === 2 ? 8 : 5, pseg = det === 2 ? 5 : 4;   // round parts: large, small, pipes
+/** the engine's frame as its proportions set it (shared with the internals of the cutaway, internals.ts): the bore
+ *  that sizes everything (not the design's own bore: the look keeps to rule of thumb), the banks, the pitch and the
+ *  second bank's offset along the crank, the deck along a bank's axis (from the crank), the head's and covers' heights,
+ *  the head's half width, each cylinder's place along the crank, a point in a bank's frame and its axes */
+export function engineDims(S0: PowertrainSpec) {
   const banks = S0.layout === 'I' ? 1 : 2, nb = Math.ceil(S0.cylinders / banks);
   const half = (S0.layout === 'flat' ? 180 : S0.layout === 'V' ? S0.bankDeg : 0) / 2 * Math.PI / 180, cs = Math.cos(half), sn = Math.sin(half);
-  // ---- proportions from the bore ----
   const B = 10.8 * Math.cbrt(S0.litres * 1000 / S0.cylinders);                       // a 500 cc cylinder: 86 mm
   const pitch = Math.min(118, Math.max(78, B * 1.12 + 4)), st = banks > 1 ? 0.3 * pitch : 0;
   const Hd = 2.5 * B, Hh = 1.25 * B, Hc = 0.42 * B, hw = 1.05 * B;                    // deck along the bank's axis, head and cover heights, head half width
@@ -50,6 +52,12 @@ export function buildEngine(g: Geo, S0: PowertrainSpec, det: Detail, transverse 
   const P = (s: number, u: number, across: number, along: number): V => [u, s * (across * cs + along * sn), -across * sn + along * cs];
   const ax = (s: number): V => [0, s * sn, cs], acr = (s: number): V => [0, s * cs, -sn];
   const S = banks > 1 ? [1, -1] : [1];
+  return { banks, nb, half, cs, sn, B, pitch, st, Hd, Hh, Hc, hw, u0, Lb, cylU, P, ax, acr, S };
+}
+
+export function buildEngine(g: Geo, S0: PowertrainSpec, det: Detail, transverse = false): EngineOut {
+  const C = S0.colours, seg = det === 2 ? 10 : det === 1 ? 6 : 5, seg2 = det === 2 ? 8 : 5, pseg = det === 2 ? 5 : 4;   // round parts: large, small, pipes
+  const { banks, nb, B, pitch, st, Hd, Hh, Hc, hw, u0, Lb, cylU, P, ax, acr, S } = engineDims(S0);
   const bankBox = (s: number, ua: number, ub: number, a0: number, a1: number, al0: number, al1: number, open = '') =>
     g.obox(P(s, (ua + ub) / 2, (a0 + a1) / 2, (al0 + al1) / 2), [1, 0, 0], (ub - ua) / 2, acr(s), (a1 - a0) / 2, ax(s), (al1 - al0) / 2, open);
   const bankU = (s: number): [number, number] => [u0 - 15 + (s < 0 ? st : 0), u0 + (s < 0 ? st : 0) + nb * pitch + 12];

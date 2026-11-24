@@ -7,6 +7,10 @@
 // part. The picture is enlarged by whole pixels on the page.
 import { freeGpu, gpuMesh, program, placeMesh, mul, translate, rot, ATTR, type GpuMesh, type M4 } from './gpu';
 import { RIG_BONES, poseRig } from '../car/suspension';
+import { ENGINE_BONES, poseInternals } from '../car/powertrain/internals';
+/** the bones the shaders hold: a suspension's or an engine's insides, whichever needs more (three rows each; with the
+ *  tyres' 32 and the four matrices about 220 of the 256 vertex rows WebGL2 promises) */
+export const BONE_SLOTS = Math.max(RIG_BONES, ENGINE_BONES);
 /** a rotation (three rows) as a matrix */
 const m4of = (R: number[][]): M4 => { const m = new Float32Array(16); for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) m[c * 4 + r] = R[r]![c]!; m[15] = 1; return m; };
 import type { GroundData } from './ground';
@@ -15,7 +19,7 @@ import type { Mesh } from '../car/mesh';
 export interface LiveView { x: number; y: number; z: number; /** the world heading that points up the screen */ ang: number; pitch: number; mm: number; W: number; H: number; /** the target's height on the screen (0 top .. 1 bottom) */ cy: number }
 /** a tyre's shape this moment (review 101): its ring's give at 32 angles from straight down toward the front (m), the patch's shift (m, along and across) */
 export interface LiveTyre { u: Float32Array; sx: number; sy: number }
-export interface LiveCar { /** age: rust, fading, dirt (0..1) (review 104) */ wear?: [number, number, number]; /** FL FR RL RR */ tyres?: LiveTyre[]; g: GpuMesh; x: number; y: number; z: number; yaw: number; roll: number; pitch: number; /** each front wheel's own angle (rad, left +): the inner one more */ steerL: number; steerR: number; spin: number; player: boolean; /** head lamps alight 0..1, brakes on (review 117) */ lamps?: number; brake?: boolean; /** each wheel's rise against the body (m) and lean (rad, top to the left +): the suspension's travel (review 120) */ travel?: number[]; camber?: number[] }
+export interface LiveCar { /** age: rust, fading, dirt (0..1) (review 104) */ wear?: [number, number, number]; /** FL FR RL RR */ tyres?: LiveTyre[]; g: GpuMesh; x: number; y: number; z: number; yaw: number; roll: number; pitch: number; /** each front wheel's own angle (rad, left +): the inner one more */ steerL: number; steerR: number; spin: number; player: boolean; /** head lamps alight 0..1, brakes on (review 117) */ lamps?: number; brake?: boolean; /** the crank's angle (degrees, 0..720): an engine's insides posed (the workshop's cutaway) */ crank?: number; /** each wheel's rise against the body (m) and lean (rad, top to the left +): the suspension's travel (review 120) */ travel?: number[]; camber?: number[] }
 export interface LiveProp { g: GpuMesh; x: number; y: number; z: number; h: number; /** its own placing (else by x, y, z, h), its outline's width, a name to follow it frame to frame (a moving piece) */ m?: M4; outline?: number; key?: string }
 export interface Skid { x: number; y: number; z: number; a: number }
 /** a scene's set pieces off the renderer (LiveRenderer.takeScene): opaque to the screens that keep it */
@@ -163,7 +167,7 @@ const OBJ_VS = `#version 300 es
 layout(location=0) in vec3 aPos; layout(location=1) in vec3 aNor; layout(location=2) in vec3 aCol; layout(location=3) in float aGloss; layout(location=4) in float aKind; layout(location=5) in float aPart; layout(location=6) in vec3 aSmo; layout(location=7) in vec4 aLamp; layout(location=8) in vec3 aLAx; layout(location=9) in vec3 aLRt; layout(location=10) in float aBone; out vec4 vLamp; flat out vec3 vLAx, vLRt, vLUp;
 uniform mat4 uVP, uModel, uPrevVP, uPrevModel; uniform float uBias; out vec3 vSN;   // the smoothed normal (review 116; none where a piece has no such layer)
 out vec4 vCur, vPrev;   // where this point is now and was a frame ago (the velocity layer, review 112)
-uniform int uWheel; uniform float uSpin, uDef[32], uTyreR, uRim; uniform vec2 uShift; uniform vec4 uBone[${RIG_BONES * 3}];   // the suspension's bones (uWheel 2): three rows each
+uniform int uWheel; uniform float uSpin, uDef[32], uTyreR, uRim; uniform vec2 uShift; uniform vec4 uBone[${BONE_SLOTS * 3}];   // the suspension's or the engine's bones (uWheel 2): three rows each
 out vec3 vWorld, vObj; flat out vec3 vN, vObjN, vCol; flat out float vGloss, vKind, vPart;
 void main() { vec3 p = aPos, nr = aNor, ns = dot(aSmo, aSmo) > 0.25 ? aSmo : aNor;
   if (uWheel == 1) {
@@ -510,7 +514,8 @@ const DEPTHI_VS = `#version 300 es
 layout(location=0) in vec3 aPos; layout(location=3) in vec4 aM0; layout(location=4) in vec4 aM1; layout(location=5) in vec4 aM2; layout(location=6) in vec4 aM3;
 uniform mat4 uVP; void main() { gl_Position = uVP * mat4(aM0, aM1, aM2, aM3) * vec4(aPos, 1.); }`;
 const DEPTH_VS = `#version 300 es
-layout(location=0) in vec3 aPos; uniform mat4 uVP, uModel; void main() { gl_Position = uVP * uModel * vec4(aPos, 1.); }`;
+layout(location=0) in vec3 aPos; layout(location=10) in float aBone; uniform mat4 uVP, uModel; uniform int uSkin; uniform vec4 uBone[${BONE_SLOTS * 3}];   // a piece on bones casts its shadow where it is posed
+void main() { vec3 p = aPos; if (uSkin == 1) { int b = int(aBone + 0.5) * 3; vec4 q = vec4(p, 1.); p = vec3(dot(uBone[b], q), dot(uBone[b + 1], q), dot(uBone[b + 2], q)); } gl_Position = uVP * uModel * vec4(p, 1.); }`;
 const DEPTH_FS = `#version 300 es
 precision mediump float; out vec4 o; void main() { o = vec4(1.); }`;
 const POST_VS = `#version 300 es
@@ -829,8 +834,8 @@ export class LiveRenderer {
     // ---- the shadow map ----
     gl.bindFramebuffer(gl.FRAMEBUFFER, this.sFbo); gl.viewport(0, 0, this.S, this.S); gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LESS); gl.depthMask(true); gl.clear(gl.DEPTH_BUFFER_BIT); gl.disable(gl.BLEND); gl.disable(gl.STENCIL_TEST);
     gl.useProgram(this.depth); gl.uniformMatrix4fv(this.loc(this.depth, 'uVP'), false, LV);
-    const drawD = (part: { vao: WebGLVertexArrayObject; n: number }, M: M4) => { if (!part.n) return; gl.uniformMatrix4fv(this.loc(this.depth, 'uModel'), false, M); gl.bindVertexArray(part.vao); gl.drawArrays(gl.TRIANGLES, 0, part.n); };
-    for (const p of ps) drawD(p.g.body, (p.m ?? placeMesh(p.g.len, p.x, p.y, p.z, p.h))); for (const m of carM) for (const [part, M] of m.opaque) drawD(part, M);
+    const drawD = (part: { vao: WebGLVertexArrayObject; n: number }, M: M4, bones?: Float32Array) => { if (!part.n) return; gl.uniform1i(this.loc(this.depth, 'uSkin'), bones ? 1 : 0); if (bones) gl.uniform4fv(this.loc(this.depth, 'uBone'), bones); gl.uniformMatrix4fv(this.loc(this.depth, 'uModel'), false, M); gl.bindVertexArray(part.vao); gl.drawArrays(gl.TRIANGLES, 0, part.n); };
+    for (const p of ps) drawD(p.g.body, (p.m ?? placeMesh(p.g.len, p.x, p.y, p.z, p.h))); for (const m of carM) for (const [part, M, , b] of m.opaque) drawD(part, M, b);
     if (this.propModels.size) { gl.useProgram(this.depthI); gl.uniformMatrix4fv(this.loc(this.depthI, 'uVP'), false, LV); for (const m of this.propModels.values()) if (m.count) { gl.bindVertexArray(m.vao); gl.drawElementsInstanced(gl.TRIANGLES, m.n, gl.UNSIGNED_INT, 0, m.count); } }
     // ---- the scene: colour, which thing, depth ----
     for (const i of [0, 1, 2, 8, 9]) { gl.activeTexture(gl.TEXTURE0 + i); gl.bindTexture(gl.TEXTURE_2D, this.blank); }
@@ -930,6 +935,7 @@ export class LiveRenderer {
     // a car with a suspension rig: the linkage solved for each wheel's travel and steer (render/car/suspension), its parts by their
     // bones in one draw, each wheel where its upright carries it (the camber and the toe are the linkage's own)
     const pose = g.susp ? poseRig(g.susp.rig, (q.travel ?? [0, 0, 0, 0]).map(t => t * 1000), q.steerL, q.steerR, q.spin) : null; if (pose) opaque.push([g.susp!.part, body, undefined, pose.bones]);
+    if (g.inner) opaque.push([g.inner.part, body, undefined, poseInternals(g.inner.rig, q.crank ?? 0)]);   // an engine's insides at the crank's angle, on their bones in one draw
     for (const w of g.wheels) { const left = w.hub[1] > 0, wi = (w.front ? 0 : 2) + (left ? 0 : 1), pw = pose?.wheels[wi];
       const M = pw ? mul(body, mul(translate(w.hub[0] + pw.wc[0] - pw.from[0], w.hub[1] + pw.wc[1] - pw.from[1], w.hub[2] + pw.wc[2] - pw.from[2]), m4of(pw.R))) : mul(body, mul(translate(w.hub[0], w.hub[1], w.hub[2] + (q.travel?.[wi] ?? 0) * 1000), mul(w.front ? rot('z', -(left ? q.steerL : q.steerR)) : translate(0, 0, 0), rot('x', -(q.camber?.[wi] ?? 0)))));
       const ty = q.tyres?.[(w.front ? 0 : 2) + (left ? 0 : 1)], def = new Float32Array(32); if (ty) for (let k = 0; k < 32; k++) def[k] = ty.u[k]! * 1000;

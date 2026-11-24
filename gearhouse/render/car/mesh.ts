@@ -7,6 +7,7 @@ import { NEW, hash, fbm, ss, mix, rustAt, rgb2hsl, hsl2rgb, cells, type Wear } f
 export type V = [number, number, number];
 /** what each triangle is made of: it picks the texture and how age shows on it (glass is drawn see-through) */
 import type { SuspRig } from './suspension';
+import type { EngineRig } from './powertrain/internals';
 import { isSuspPart } from './suspension/names';
 export const KINDS = ['plain', 'paint', 'metal', 'glass', 'shine', 'tyre', 'wood', 'canvas', 'leather', 'lens', 'grille',
   /* the buildings' photographed materials (review 148), in the order of assets/textures/buildings: the live renderer lays each one's pictures on the faces by their own axes; elsewhere they are plain colour */
@@ -18,7 +19,7 @@ export type Kind = typeof KINDS[number];
  *  `r` in `col`, and `text` (digits and capitals) in `ink` across it, upright along `up`. The face keeps its own part,
  *  gloss and lighting, so the decal shades, ages and rusts with the panel under it, and has no outline of its own. */
 export interface Decal { o: V; n: V; up: V; r: number; col: string; text?: string; ink?: string; /** this decal carries the car's race number (renumber() changes it) */ num?: boolean }
-export interface Mesh { decals?: Decal[]; n: number; pos: Float32Array; col: Uint8Array; gloss: Float32Array; part: Int16Array; kind: Uint8Array; tex: Uint8Array; length: number; /** the suspension's rig, when the mesh has one that moves (render/car/suspension) */ susp?: SuspRig; /** each part number's name (the parts' common names, as the 2D part models had: body, hood, fenderF, lamp, ...) */ names?: string[] }
+export interface Mesh { decals?: Decal[]; n: number; pos: Float32Array; col: Uint8Array; gloss: Float32Array; part: Int16Array; kind: Uint8Array; tex: Uint8Array; length: number; /** the suspension's rig, when the mesh has one that moves (render/car/suspension) */ susp?: SuspRig; /** an engine's insides that move (the workshop's cutaway, render/car/powertrain/internals.ts): each triangle's bone (0: still) and the rig that poses them */ bone?: Uint8Array; inner?: EngineRig; /** each part number's name (the parts' common names, as the 2D part models had: body, hood, fenderF, lamp, ...) */ names?: string[] }
 const hex = (h: string): V => { const v = parseInt(h.replace('#', ''), 16); return [(v >> 16) & 255, (v >> 8) & 255, v & 255]; };
 const sub = (a: V, b: V): V => [a[0] - b[0], a[1] - b[1], a[2] - b[2]], add = (a: V, b: V): V => [a[0] + b[0], a[1] + b[1], a[2] + b[2]], mul = (a: V, k: number): V => [a[0] * k, a[1] * k, a[2] * k];
 const cross = (a: V, b: V): V => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]], len = (a: V) => Math.hypot(a[0], a[1], a[2]), norm = (a: V): V => { const l = len(a) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };

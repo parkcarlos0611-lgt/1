@@ -89,6 +89,95 @@
      "flying": 79.9
     }
    }
+  },
+  "road": {
+   "about": "Ashcombe Park road course (review 162), timed with tools/ref/handicaps.ts <id> road: flat, 3.77 km. Every car laps at the test driver's usual dare (0.7) except the Model T, which runs off at the Hairpin and is timed at 0.63. The driver now plans its braking within the car's brakes and brakes sooner and firmer for slow corners (Millbrook's times unchanged by it).",
+   "cars": {
+    "dueSSJ35": {
+     "standing": 135.4,
+     "flying": 129
+    },
+    "bmw315": {
+     "standing": 163.6,
+     "flying": 153.1
+    },
+    "fnTT33": {
+     "standing": 148.5,
+     "flying": 139.7
+    },
+    "dueA21": {
+     "standing": 161.8,
+     "flying": 151.8
+    },
+    "plymU29": {
+     "standing": 175.1,
+     "flying": 165.1
+    },
+    "buick28": {
+     "standing": 169.5,
+     "flying": 159.4
+    },
+    "chevAB28": {
+     "standing": 189.6,
+     "flying": 179.5
+    },
+    "dodgeV28": {
+     "standing": 168.5,
+     "flying": 159.3
+    },
+    "pontiac29": {
+     "standing": 168.4,
+     "flying": 160.1
+    },
+    "willys27": {
+     "standing": 174.9,
+     "flying": 167.2
+    },
+    "fordT23": {
+     "standing": 228.6,
+     "flying": 217.2
+    },
+    "napier33": {
+     "standing": 126,
+     "flying": 120.6
+    },
+    "jagD55": {
+     "standing": 123.7,
+     "flying": 118.5
+    },
+    "auburn851": {
+     "standing": 142,
+     "flying": 133.1
+    },
+    "mb540k": {
+     "standing": 143.5,
+     "flying": 134.5
+    },
+    "eb110": {
+     "standing": 119,
+     "flying": 115.1
+    },
+    "xj220": {
+     "standing": 118.7,
+     "flying": 114.4
+    },
+    "diablo": {
+     "standing": 119.2,
+     "flying": 115.1
+    },
+    "nsx": {
+     "standing": 124.7,
+     "flying": 119.5
+    },
+    "f355": {
+     "standing": 121.2,
+     "flying": 116.8
+    },
+    "f355f1": {
+     "standing": 120.6,
+     "flying": 116.2
+    }
+   }
   }
  }
 }

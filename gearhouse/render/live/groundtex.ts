@@ -41,11 +41,15 @@ export async function loadSky(L: LiveRenderer): Promise<void> { const b = await 
   const m = skyMeta as { range: number; sh: number[][] }; L.setSky(bm, m.range, m.sh); }
 import { PROP_MODELS } from './propmodels';
 import { readGltf, materialUris } from './gltf';
-import { paddockProps, propMatrices } from './paddock';
+import { propMatrices, type PropPlace } from './paddock';
 import type { Track } from '../../race/track';
-/** the photographed props (review 125): each model's glTF, buffer and pictures loaded, then its copies placed */
-export async function loadProps(L: LiveRenderer, T: Track): Promise<void> { const base: Record<string, { min: number[]; max: number[] }> = {};
+/** the photographed props (review 125): each model's glTF, buffer and pictures loaded, then its copies placed where
+ *  `where` says at that moment (review 162: the track may have changed while they loaded); returns the models' sizes */
+export async function loadProps(L: LiveRenderer, where: () => { T: Track; places: PropPlace[] }): Promise<Record<string, { min: number[]; max: number[] }>> { const base: Record<string, { min: number[]; max: number[] }> = {};
   await Promise.all(Object.entries(PROP_MODELS).map(async ([id, m]) => { const g = m.gltf, bin = await (await fetch(m.files[g.buffers[0]!.uri]!)).arrayBuffer(), geo = readGltf(g, bin), u = materialUris(g);
     const pic = async (uri?: string) => createImageBitmap(await (await fetch(m.files[uri!]!)).blob(), { colorSpaceConversion: 'none', premultiplyAlpha: 'none' });
     const [alb, nor, arm] = await Promise.all([pic(u.alb), pic(u.nor), pic(u.arm)]); L.addPropModel(id, geo, { alb, nor, arm }); base[id] = { min: geo.min, max: geo.max }; }));
-  let n = 0; for (const [id, mats] of propMatrices(T, paddockProps(), base)) { L.setPropInstances(id, mats); n += mats.length / 16; } console.info('props placed', n); }
+  const w = where(); console.info('props placed', placeProps(L, w.T, w.places, base)); return base; }
+/** the props' copies placed for a track (every model's earlier copies cleared); how many */
+export function placeProps(L: LiveRenderer, T: Track, places: PropPlace[], base: Record<string, { min: number[]; max: number[] }>): number { const by = propMatrices(T, places, base); let n = 0;
+  for (const id of Object.keys(base)) { const mats = by.get(id) ?? new Float32Array(0); L.setPropInstances(id, mats); n += mats.length / 16; } return n; }

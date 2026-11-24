@@ -36,7 +36,7 @@ export class Driver {
   drive(car: Vehicle): Controls {
     if (!this.line) this.prepare(car); const T = this.track, L = T.length, v = car.speed, lim = this.vlim!;
     const ahead = Math.min(1600, Math.max(400, v * v / (2 * this.plannedBrake) + 80));   // review 152: far enough to brake from its own speed (400 m was short of what a 1990s car needs at 240 km/h)
-    let target = 200; for (let d = 0; d <= ahead; d += 8) { const vl = lim[Math.floor(((car.s + d) % L + L) % L)]!; target = Math.min(target, Math.sqrt(vl * vl + 2 * this.plannedBrake * d)); }
+    let target = 200; for (let d = 0; d <= ahead; d += 8) { const vl = lim[Math.floor(((car.s + d) % L + L) % L)]!; target = Math.min(target, Math.sqrt(vl * vl + 2 * this.plannedBrake * (vl < 25 ? Math.max(0, d - v * 0.8) : d))); }   // review 162: a slow corner's braking begun 0.8 s sooner (the feet are slower than the plan)
     // how high on the bank: where the slope carries the speed it will have there, moved toward gently
     const Ld = 8 + v * 0.45 + Math.max(0, v - 35) * 0.6, s2 = car.s + Ld, vp = Math.min(v, target);
     // the height it wants here and over the next stretch: it climbs before the banking, not on it

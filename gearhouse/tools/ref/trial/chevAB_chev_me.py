@@ -1,4 +1,4 @@
-"""The 1928 Chevrolet National AB sedan, made by hand (conversion trial, docs/systems/62_direct_model_guide.md).
+"""The 1928 Chevrolet National AB sedan, made by hand (conversion trial, docs/archive/2d/62_direct_model_guide.md).
 Starts from the automatic draft (draft/chevAB_auto.json) and redraws the parts the draft has wrong. Each part is
 traced off the sheet: a seed point inside the part on the 4x enlarged view (the same pixel coordinates as the overlay
 ov_side.png), the region of like colour round it, clipped to the part's own reach, its outline simplified; a symmetric

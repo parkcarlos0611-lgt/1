@@ -182,7 +182,7 @@ export function engineScreen(ctx: ShellCtx): Screen<EngineParams> & { readonly a
     const k = JSON.stringify([E().layout, E().cc, E().bs, E().valves, E().block, E().grade, E().intake, E().sump, E().turbo, E().intercooler]);
     if (k !== meshKey) { clearTimeout(meshT); meshT = setTimeout(() => { meshKey = k; rebuild(); }, 160) as unknown as number; }
     applyBtn.hidden = !onApply; voiceAgain(); }
-  function figures() { spec = designSpec(car); curve = dynoCurve(car); sheet = engineSheet(car, curve); sweep = performance.now(); drawSheet(); drawTechs(); dirtyDyno = true; }
+  function figures() { spec = designSpec(car); curve = dynoCurve(car); sheet = engineSheet(car, curve); sweep = performance.now(); drawSheet(); drawTechs(); drawSoundRow(); dirtyDyno = true; }
   const dd = (t: string, v: string, u = '') => [el('dt', '', t), (() => { const x = el('dd', '', v); if (u) x.append(' ', el('small', '', u)); return x; })()];
   function drawSheet() { const s = sheet; sheetBox.textContent = '';
     sheetBox.append(...dd('최고 출력', `${s.hp}`, `hp · ${s.hpRpm.toLocaleString()} rpm`), ...dd('최대 토크', `${s.torque}`, `Nm · ${s.torqueRpm.toLocaleString()} rpm`), ...dd('리터당 출력', `${s.specific}`, 'hp/L'),
@@ -261,11 +261,12 @@ export function engineScreen(ctx: ShellCtx): Screen<EngineParams> & { readonly a
     console.info(`engine stand ${E().layout}: ${model.mesh.n} triangles, ${Math.round(performance.now() - t0)} ms`); }
   const shown = (): Mesh | null => { if (!model) return null; const k = Math.round(view.k * 6) / 6; let M = shownCache.get(k); if (!M) { M = exploded(model.mesh, k); shownCache.set(k, M); } return M; };
   let lastView: { x: number; y: number; z: number; ang: number; pitch: number; mm: number; W: number; H: number; cy: number } | null = null;
-  function frame(now: number) { raf = requestAnimationFrame(frame); const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  let frames = 0, draws = 0;
+  function frame(now: number) { raf = requestAnimationFrame(frame); frames++; const dt = Math.min(0.05, (now - last) / 1000); last = now;
     revStep(dt);
-    const want = view.explode ? 1 : 0; if (view.k !== want) { view.k = ctx.settings.screen.calm ? want : Math.max(0, Math.min(1, view.k + (want ? 1 : -1) * dt / 0.45)); dirty = true; }
+    const want = view.explode ? 1 : 0; if (view.k !== want) { const t = ctx.settings.screen.calm ? 1 : Math.min(1, (now - view.anim) / 450); view.k = want ? Math.max(view.k, t) : Math.min(view.k, 1 - t); dirty = true; }   // over 0.45 s, however slow the frames
     if (dirtyDyno) drawDyno(now);
-    const R = L(), M = shown(); if (!R || !M || !dirty) return; dirty = false;
+    const R = L(), M = shown(); if (!R || !M || !dirty) return; dirty = false; draws++;
     const cv = ctx.stage.canvas, dpr = Math.min(1.75, devicePixelRatio || 1), W = Math.max(2, Math.round(cv.clientWidth * dpr)), H = Math.max(2, Math.round(cv.clientHeight * dpr)); if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
     if (M !== onGpu) { g = onGpu ? R.swapCar(onGpu, M) : R.car(M); onGpu = M; }
     // the engine framed in the view's box: its size (spread out, bigger), the box's middle
@@ -298,7 +299,7 @@ export function engineScreen(ctx: ShellCtx): Screen<EngineParams> & { readonly a
   function apply() { if (!onApply) return; onApply(structuredClone(E())); start = sig(); toast('빌더의 차에 엔진을 얹었습니다'); ctx.router.back(); }
   let asking = false;
   const api = { get design() { return car; }, get entry() { return entry; }, get curve() { return curve; }, get sheet() { return sheet; }, get rpm() { return rev.rpm; }, get triangles() { return onGpu?.n ?? 0; },
-    get exploded() { return view.k; }, set(f: (e: Design['engine']) => void) { f(E()); changed(); }, pick: (x: number, y: number) => { const M = shown(); return M && lastView ? pickPart(M, lastView, x, y) : null; }, get view() { return lastView; } };
+    get exploded() { return view.k; }, get frames() { return frames; }, get draws() { return draws; }, get on() { return on; }, set(f: (e: Design['engine']) => void) { f(E()); changed(); }, pick: (x: number, y: number) => { const M = shown(); return M && lastView ? pickPart(M, lastView, x, y) : null; }, get view() { return lastView; } };
   return { api,
     enter(p: EngineParams, how: Move) { style(); ctx.backdrop.stop(); ctx.stage.use('engine', true, R => { R.setGround(studioFloor()); R.setTrack(1, 30, 12, 0); });
       if (how !== 'back') { onApply = p?.onApply; const base = p?.design ?? ctx.recent(); car = normalise(structuredClone(base)); entry = null; range = familyRange(car.engine.cc);

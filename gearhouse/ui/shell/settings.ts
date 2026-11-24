@@ -3,6 +3,7 @@
 // browser. Pure: the storage is passed in, and one that throws or holds rubbish reads as the defaults. Also the save as
 // a whole: every key of the game's carried out as one file, read back, or cleared.
 import { CAM_DEFAULT, isCamView, type CamView } from '../drivecam';
+import type { SmokeSetting } from '../../render/live/volume/caps';
 
 /** what the helpers need of a storage (the browser's Storage has these) */
 export interface KeyStore { getItem(k: string): string | null; setItem(k: string, v: string): void; removeItem(k: string): void }
@@ -14,7 +15,8 @@ export type GlassRefl = 'off' | 'weak' | 'mid';
 export const GLASS_REFL: Record<GlassRefl, number> = { off: 0, weak: 0.5, mid: 1 };
 export interface Settings {
   graphics: { /** the live renderer (WebGL2) where the browser has it */ live: boolean; look: Look; photoGround: boolean; hdri: boolean; blur: boolean; /** 풍경 밀도: how many trees the woods have (review 181) */ scenery: 'low' | 'mid' | 'high';
-    /** 유리 반사: the toon look's glass mirroring its drawn sky (docs/systems/104 A) */ glassRefl: GlassRefl };
+    /** 유리 반사: the toon look's glass mirroring its drawn sky (docs/systems/104 A) */ glassRefl: GlassRefl;
+    /** 연기 품질 (docs/systems/104 B, V0): none, the parcels (덩어리), the volume (보통, 높음); the volume falls back to the parcels where the device has no float render targets */ smoke: SmokeSetting };
   sound: { /** the engine and the place in the drive */ on: boolean; volume: number; /** the menus' short sounds */ ui: boolean };
   controls: { /** the drive's screen buttons: by the screen's kind (a touch screen shows them), always, never */ touch: 'auto' | 'on' | 'off'; auto: boolean; tcs: boolean; assist: boolean; progressive: boolean };
   screen: { theme: 'auto' | 'light' | 'dark'; /** fewer moving things (the fades, the turntable) */ calm: boolean };
@@ -26,7 +28,7 @@ export interface Settings {
 }
 export const SETTINGS_KEY = 'gearhouse.settings.v1';
 export const DEFAULTS: Settings = {
-  graphics: { live: true, look: 'pbr', photoGround: true, hdri: true, blur: true, scenery: 'mid', glassRefl: 'mid' },
+  graphics: { live: true, look: 'pbr', photoGround: true, hdri: true, blur: true, scenery: 'mid', glassRefl: 'mid', smoke: 'mid' },
   sound: { on: false, volume: 0.7, ui: false },
   controls: { touch: 'auto', auto: true, tcs: true, assist: false, progressive: false },
   screen: { theme: 'auto', calm: false },
@@ -41,7 +43,7 @@ const unit = (v: unknown, d: number) => typeof v === 'number' && Number.isFinite
 /** any value made into settings: the fields it has right, the rest the defaults */
 export function asSettings(v: unknown): Settings { const o = obj(v), g = obj(o.graphics), s = obj(o.sound), c = obj(o.controls), sc = obj(o.screen), sb = obj(o.sandbox), cm = obj(o.camera), D = DEFAULTS;
   return {
-    graphics: { live: bool(g.live, D.graphics.live), look: one(g.look, ['pbr', 'stepped', 'baked', 'toon'] as const, D.graphics.look), photoGround: bool(g.photoGround, D.graphics.photoGround), hdri: bool(g.hdri, D.graphics.hdri), blur: bool(g.blur, D.graphics.blur), scenery: one(g.scenery, ['low', 'mid', 'high'] as const, D.graphics.scenery), glassRefl: one(g.glassRefl, ['off', 'weak', 'mid'] as const, D.graphics.glassRefl) },
+    graphics: { live: bool(g.live, D.graphics.live), look: one(g.look, ['pbr', 'stepped', 'baked', 'toon'] as const, D.graphics.look), photoGround: bool(g.photoGround, D.graphics.photoGround), hdri: bool(g.hdri, D.graphics.hdri), blur: bool(g.blur, D.graphics.blur), scenery: one(g.scenery, ['low', 'mid', 'high'] as const, D.graphics.scenery), glassRefl: one(g.glassRefl, ['off', 'weak', 'mid'] as const, D.graphics.glassRefl), smoke: one(g.smoke, ['off', 'parcels', 'mid', 'high'] as const, D.graphics.smoke) },
     sound: { on: bool(s.on, D.sound.on), volume: unit(s.volume, D.sound.volume), ui: bool(s.ui, D.sound.ui) },
     controls: { touch: one(c.touch, ['auto', 'on', 'off'] as const, D.controls.touch), auto: bool(c.auto, D.controls.auto), tcs: bool(c.tcs, D.controls.tcs), assist: bool(c.assist, D.controls.assist), progressive: bool(c.progressive, D.controls.progressive) },
     screen: { theme: one(sc.theme, ['auto', 'light', 'dark'] as const, D.screen.theme), calm: bool(sc.calm, D.screen.calm) },

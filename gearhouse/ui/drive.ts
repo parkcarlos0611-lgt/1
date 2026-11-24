@@ -40,6 +40,7 @@ import { Health, WARN } from '../race/health';
 import { Sound, designVoice, type Skid, type EngineVoiceSpec } from './sound';
 import specsData from '../data/cars/specs.json';
 import { GLASS_REFL, type GlassRefl } from './shell/settings';
+import { smokeTier, gpuCaps, type SmokeSetting, type GpuCaps } from '../render/live/volume/caps';
 import { DriveCam, carEyes, nextView, perspective, pedalValue, isCamView, CAM_VIEWS, CAM_DEFAULT, type CamView, type CarEyes, type CamShot } from './drivecam';
 
 /** what a page holding the drive gives it (the game's one page, ui/shell): the root its markup is in (found there even
@@ -123,6 +124,8 @@ if (live && !H.renderer) { const L = live, im = [texAlb, texNor, texRgh].map(src
 // the cars' age in the live picture (review 104): the player's set on the page, its dirt growing as it is driven (fast on
 // the grass); the others' by their entry, a mixed field
 const smoke = new Smoke(); const SK: Record<SmokeKind, number> = { tyre: 0, dust: 1, steam: 2, exhaust: 3 };   /* the live picture's smoke (review 107) */
+/** 연기 품질 (docs/systems/104 B): the setting, the device's float targets (a test may take them away: __drive.smokeCaps), the tier it gets */
+let smokeQ: SmokeSetting = 'mid', smokeCaps: GpuCaps | null = null; const smokeNow = () => smokeTier(smokeQ, smokeCaps ??= gpuCaps(live?.gl ?? null));
 const myWear: [number, number, number] = [0, 0, 0]; let dirtGrows = true, wearTick = 0;
 const wearOf = (c: Vehicle, k: number): [number, number, number] => { if (c === car) return myWear; const h = (n: number) => ((Math.sin(k * 127.1 + n * 311.7) * 43758.5453) % 1 + 1) % 1; return [h(1) * 0.35, h(2) * 0.6, 0.1 + h(3) * 0.35]; };
 // each car's 2D art (its part model's views), laid on its mesh in the live picture (review 105), loaded when first wanted
@@ -197,11 +200,11 @@ function drawLive(el: number) { const L = live!; void el;
   ctx = main; main.clearRect(0, 0, VW, VH);
   if (look === 'split') {   // the three looks side by side, the same moment: each a third of the picture, its name over it
     const w3 = Math.floor(VW / 3), names = ['기존 (단계 조명)', 'PBR 단계화', 'PBR 연속'];
-    for (let k = 0; k < 3; k++) { L.render(view, cars, props, skids, { glass: 0.8, look: k, art: artOn, rays: raysOn, texK, lightK, aoK, reflK, bloomK, deep, day, photoGround: photoOn, hdri: hdriOn, dof, mb: blurOn ? mbK : 0, outW, outK, inner: innerOn === 'auto' ? undefined : innerOn === 'on', inK, smoke: { p: sp8, n: smoke.parcels.length, time: smoke.time } }); main.drawImage(glCanvas, k * w3, 0, w3, VH, k * w3, 0, w3, VH); }
+    for (let k = 0; k < 3; k++) { L.render(view, cars, props, skids, { glass: 0.8, look: k, art: artOn, rays: raysOn, texK, lightK, aoK, reflK, bloomK, deep, day, photoGround: photoOn, hdri: hdriOn, dof, mb: blurOn ? mbK : 0, outW, outK, inner: innerOn === 'auto' ? undefined : innerOn === 'on', inK, smoke: smokeNow() === 'off' ? undefined : { p: sp8, n: smoke.parcels.length, time: smoke.time } }); main.drawImage(glCanvas, k * w3, 0, w3, VH, k * w3, 0, w3, VH); }
     main.fillStyle = 'rgba(0,0,0,0.55)'; main.fillRect(0, VH - 20, VW, 20); main.fillStyle = '#f2ead6'; main.font = '11px sans-serif'; main.textAlign = 'center';
     for (let k = 0; k < 3; k++) main.fillText(names[k]!, k * w3 + w3 / 2, VH - 6); main.fillStyle = '#000'; for (let k = 1; k < 3; k++) main.fillRect(k * w3 - 1, 0, 2, VH); main.textAlign = 'left'; }
   else if (fxMode === 1 && filmRate && clock - heldAt < 1 / 18 && held.width === VW && heldAt <= clock) { /* the hand-cranked camera: 18 frames a second, the picture held between */ }
-  else { L.render(view, cars, props, skids, { glass: 0.8, look: look === 'stepped' ? 1 : look === 'pbr' ? 2 : look === 'toon' ? 3 : 0, toonBands: toonB, toonShade: toonS, glassRefl, art: artOn, rays: raysOn, texK, lightK, aoK, reflK, bloomK, deep, day, photoGround: photoOn, hdri: hdriOn, dof, mb: blurOn ? mbK * (S ? 0.5 : 1) : 0, outW, outK, inner: innerOn === 'auto' ? undefined : innerOn === 'on', inK, smoke: { p: sp8, n: smoke.parcels.length, time: smoke.time }, fx: fxMode, fxK, fxPx: Math.max(1, Math.round(VH / 480)) }); held.width = VW; held.height = VH; held.getContext('2d')!.drawImage(glCanvas, 0, 0); heldAt = clock; }
+  else { L.render(view, cars, props, skids, { glass: 0.8, look: look === 'stepped' ? 1 : look === 'pbr' ? 2 : look === 'toon' ? 3 : 0, toonBands: toonB, toonShade: toonS, glassRefl, art: artOn, rays: raysOn, texK, lightK, aoK, reflK, bloomK, deep, day, photoGround: photoOn, hdri: hdriOn, dof, mb: blurOn ? mbK * (S ? 0.5 : 1) : 0, outW, outK, inner: innerOn === 'auto' ? undefined : innerOn === 'on', inK, smoke: smokeNow() === 'off' ? undefined : { p: sp8, n: smoke.parcels.length, time: smoke.time }, fx: fxMode, fxK, fxPx: Math.max(1, Math.round(VH / 480)) }); held.width = VW; held.height = VH; held.getContext('2d')!.drawImage(glCanvas, 0, 0); heldAt = clock; }
   if (look !== 'split') main.drawImage(held, 0, 0);
   drawDebris(el);
   if (car.speed > 30) { const v = Math.min(1, (car.speed - 30) / 30) * 0.35, g = main.createRadialGradient(VW / 2, VH / 2, VH * 0.35, VW / 2, VH / 2, VW * 0.62); g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, `rgba(0,0,0,${v})`); main.fillStyle = g; main.fillRect(0, 0, VW, VH); } }
@@ -711,6 +714,7 @@ const setFree = (on: boolean) => { st.free = on; ($('free') as HTMLInputElement)
 const toonRows = () => { for (const id of ['toonBRow', 'toonSRow', 'glassReflRow']) $(id).hidden = look !== 'toon'; };
 $<HTMLSelectElement>('look').addEventListener('change', e => { look = (e.target as HTMLSelectElement).value as typeof look; toonRows(); (e.target as HTMLElement).blur(); }); toonRows();
 $<HTMLInputElement>('toonB').addEventListener('input', e => { toonB = +(e.target as HTMLInputElement).value; $('toonBv').textContent = String(toonB); });
+$<HTMLSelectElement>('smokeQ').addEventListener('change', e => { smokeQ = (e.target as HTMLSelectElement).value as SmokeSetting; const t = smokeNow(); $('smokeNote').textContent = (smokeQ === 'mid' || smokeQ === 'high') && t === 'parcels' ? '이 기기는 부동소수 렌더 타깃이 없어 덩어리로 그립니다' : ''; (e.target as HTMLElement).blur(); });
 $<HTMLSelectElement>('glassRefl').addEventListener('change', e => { glassRefl = GLASS_REFL[(e.target as HTMLSelectElement).value as GlassRefl] ?? 1; (e.target as HTMLElement).blur(); });
 $<HTMLInputElement>('toonS').addEventListener('input', e => { toonS = +(e.target as HTMLInputElement).value; });
 for (const [id, k] of [['wrust', 0], ['wfade', 1], ['wdirt', 2]] as const) $<HTMLInputElement>(id).addEventListener('input', e => { myWear[k] = +(e.target as HTMLInputElement).value; });
@@ -739,7 +743,7 @@ addEventListener('resize', fit); addEventListener('orientationchange', () => set
 { const sel = $<HTMLSelectElement>('camview'); for (const c of CAM_VIEWS) sel.add(new Option(c.name, c.id)); sel.addEventListener('change', () => { useView(sel.value as CamView); sel.blur(); }); }
 $('cambtn').addEventListener('click', e => { useView(nextView(camView, viewOk), true); (e.currentTarget as HTMLElement).blur(); });
 useView(camView); camShow(); requestAnimationFrame(frame);
-(globalThis as { __drive?: unknown }).__drive = { set look(v: [number, number, number] | null) { lookAt = v; }, get car() { return car; }, get L() { return live; }, get damage() { const e = dmg.get(car); return e ? { worst: e.D.worst, taken: e.D.taken } : null; }, get race() { return race; }, /** run the world on by t seconds at once, the test driver at the wheel (page tests on slow software GL) */ advance(t: number) { for (let k = 0; k < t / DT; k++) { const u = pilot.drive(car); if (race) race.step(DT, u); else car.step(DT, u); } }, get SCN() { return SCN; }, get T() { return T; }, /** the controls as the car gets them, the touch pedals' own amounts, the camera's last shot (alpha 0.12) */ get input() { return input; }, get pedal() { return pedal; }, get shot() { return camShot; } };   // for the page tests (tools): place the car, read the scenery
+(globalThis as { __drive?: unknown }).__drive = { set look(v: [number, number, number] | null) { lookAt = v; }, get car() { return car; }, get L() { return live; }, get damage() { const e = dmg.get(car); return e ? { worst: e.D.worst, taken: e.D.taken } : null; }, get race() { return race; }, /** run the world on by t seconds at once, the test driver at the wheel (page tests on slow software GL) */ advance(t: number) { for (let k = 0; k < t / DT; k++) { const u = pilot.drive(car); if (race) race.step(DT, u); else car.step(DT, u); } }, get SCN() { return SCN; }, get T() { return T; }, /** the controls as the car gets them, the touch pedals' own amounts, the camera's last shot (alpha 0.12) */ get input() { return input; }, /** the smoke's tier now; the device's capabilities as the smoke sees them (a test sets them to try the fallback) */ get smokeTier() { return smokeNow(); }, set smokeCaps(c: GpuCaps | null) { smokeCaps = c; }, get pedal() { return pedal; }, get shot() { return camShot; } };   // for the page tests (tools): place the car, read the scenery
 const ready = Promise.all(loads).then(() => undefined);
 return {
   pause() { if (!running) return; running = false; keys.clear(); input.throttle = 0; input.brake = 0; input.hand = 0; void snd?.ctx.suspend().catch(() => {}); },

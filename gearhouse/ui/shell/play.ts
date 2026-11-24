@@ -51,12 +51,12 @@ export function driveScreen(ctx: ShellCtx): Screen<DriveParams> & { readonly api
   let page: PageScreen | null = null, api: DriveApi | null = null, params: DriveParams = {}, pause: HTMLElement | null = null, menuOn = false, poll = 0, raceSeen: unknown = null;
   const R = () => page!.root;
   /** the game's settings put on the drive's own fields */
-  const apply = () => { if (!page) return; const s = ctx.settings, r = R(); setField(r, 'live', s.graphics.live); setField(r, 'look', s.graphics.look); setField(r, 'photoGround', s.graphics.photoGround); setField(r, 'hdri', s.graphics.hdri); setField(r, 'blur', s.graphics.blur); setField(r, 'glassRefl', s.graphics.glassRefl);
+  const apply = () => { if (!page) return; const s = ctx.settings, r = R(); setField(r, 'live', s.graphics.live); setField(r, 'look', s.graphics.look); setField(r, 'photoGround', s.graphics.photoGround); setField(r, 'hdri', s.graphics.hdri); setField(r, 'blur', s.graphics.blur); setField(r, 'glassRefl', s.graphics.glassRefl); setField(r, 'smokeQ', s.graphics.smoke);
     setField(r, 'touch', s.controls.touch === 'auto' ? matchMedia('(pointer: coarse)').matches : s.controls.touch === 'on'); setField(r, 'auto', s.controls.auto); setField(r, 'tcs', s.controls.tcs); setField(r, 'assist', s.controls.assist); setField(r, 'progressive', s.controls.progressive);
     setField(r, 'vol', s.sound.volume); setField(r, 'sound', s.sound.on); if (api) api.camera = s.camera.view; };
   /** the drive's drawer for the game: what the pause menu and the settings now hold taken out of it, the effects folded under 개발자 */
   const shellize = (r: HTMLElement) => { const hide = (id: string) => { const f = r.querySelector(`#${id}`); const box = f?.closest<HTMLElement>('.row, label.check'); if (box) box.style.display = 'none'; };
-    for (const id of ['auto', 'assist', 'tcs', 'pilot', 'progressive', 'touch', 'damper', 'chase', 'cine', 'live', 'look', 'photoGround', 'hdri', 'blur', 'sound', 'vol']) hide(id);
+    for (const id of ['auto', 'assist', 'tcs', 'pilot', 'progressive', 'touch', 'damper', 'chase', 'cine', 'live', 'look', 'photoGround', 'hdri', 'blur', 'sound', 'vol', 'smokeQ']) hide(id);
     const tabBar = r.querySelector('.tabs')!, dials = r.querySelector('.dials')!, dev = el('section'); dev.dataset.tab = 'dev'; dev.append(el('p', 'note', '개발자용 세부 효과입니다. 게임 설정은 타이틀의 "설정"에 있습니다.'));
     for (const [tab, name] of [['gfx', '빛과 재질, 선'], ['fx', '효과와 시대감'], ['wear', '차 상태 (녹, 바램, 먼지)']] as const) { const sec = r.querySelector<HTMLElement>(`.dials section[data-tab="${tab}"]`), b = r.querySelector<HTMLElement>(`.tabs button[data-tab="${tab}"]`); if (!sec) continue;
       const d = el('details', 'gh-dev', el('summary', '', name)); d.append(...Array.from(sec.childNodes)); dev.append(d); sec.remove(); b?.remove(); }

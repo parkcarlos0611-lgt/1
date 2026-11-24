@@ -86,7 +86,7 @@ describe('suspension: the parts in the car', () => {
   it('the rig poses: at rest every bone leaves the mesh as built; no number goes missing through the bounce', () => {
     for (const [id] of BASES) { const rig = car(id).mesh.susp!, P = poseRig(rig, [0, 0, 0, 0], rig.toe?.[0] ?? 0, rig.toe?.[1] ?? 0); expect(P.bones.length).toBe(RIG_BONES * 12);   // at rest: the front wheels at their static toe
       for (let b = 0; b < RIG_BONES; b++) [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0].forEach((v, i) => expect(Math.abs(P.bones[b * 12 + i]! - v), `${id} bone ${b}`).toBeLessThan(i % 4 === 3 ? 2e-3 : 1e-5));
-      P.wheels.forEach((w, k) => { expect(dist(w.wc, w.from)).toBeLessThan(0.06); expect(dist(w.wc, rig.corners[k]!.wc) ).toBeLessThan(0.06); });
+      P.wheels.forEach((w, k) => { expect(dist(w.wc, w.from)).toBeLessThan(0.06); expect(dist(w.wc, rig.corners[k]!.wc)).toBeLessThan(5); });   // the static camber's shims lean the wheel about its lower ball joint: its centre a millimetre or so off the drawn hardpoints
       for (let t = 0; t < 12; t += 0.37) { const b = bounce(t), Q = poseRig(rig, b.travel.map(v => v * 1000), b.steerL, b.steerR, b.spin); for (const v of Q.bones) expect(Number.isFinite(v)).toBe(true); for (const c of Q.corners) expect(c.ok).toBe(true); } }
   });
   it('a body raised or lowered over its wheels keeps the wheels on the ground and hangs them on the arms', () => {

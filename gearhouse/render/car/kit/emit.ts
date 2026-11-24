@@ -46,6 +46,19 @@ export class Emit {
   /** a pocket sunk from a ring by d: walls in `wall`, a back of the kind given (fanned from its first point, so it shares the walls' points) */
   pocket(ring: V[], d: V, n: V, wall: string, back: Kind = 'plain'): this { this.mat(wall, 0.05); this.tube(ring, d); this.mat(wall, 0.05, back); return this.fan(ring.map(p => add(p, d)), n); }
 
+  /** the skin between a ring of border points and a hole's ring inside it (both going round the hole's middle, any number
+   *  of points each, the border seen whole from the middle), looking along n: a port cut in a block of cells */
+  porthole(outer: V[], inner: V[], n: V): this { const c = centroid(inner), nn = un(n), u = un(sub(inner[0]!, c)), v = cross(nn, u);
+    const ang = (p: V) => { const d = sub(p, c); return Math.atan2(dot(d, v), dot(d, u)); }, turn = (R: V[]) => { const a = R.map(ang); let k = 0; for (let i = 1; i < R.length; i++) if (a[i]! < a[k]!) k = i;
+      const rise = ((a[(k + 1) % R.length]! - a[k]! + 4 * Math.PI) % (2 * Math.PI)) < Math.PI, P = R.map((_, i) => R[(k + (rise ? i : R.length - i)) % R.length]!); return { P, a: P.map(ang) }; };
+    // walk both rings round together: a step is allowed only if its new edge clears the hole (the border point lies outside
+    // the hole's edge at the hole point it joins); of two allowed steps the shorter new edge wins
+    const O = turn(outer), I = turn(inner), no = O.P.length, ni = I.P.length, d = (p: V, q: V) => len(sub(p, q)), sees = (o: V, h: V) => dot(sub(o, h), sub(h, c)) >= 0; let i = 0, j = 0;
+    while (i < no || j < ni) { const o0 = O.P[i % no]!, o1 = O.P[(i + 1) % no]!, i0 = I.P[j % ni]!, i1 = I.P[(j + 1) % ni]!, okO = i < no && sees(o1, i0), okI = j < ni && sees(o0, i1);
+      const stepO = j >= ni || (i < no && (okO && okI ? d(o1, i0) <= d(o0, i1) : okO || !okI));
+      if (stepO) { this.tri(o0, o1, i0, n); i++; } else { this.tri(o0, i1, i0, n); j++; } }
+    return this; }
+
   // ---- both sides ----
   /** the cells of a grid laid on both sides, wound outward (rows going back, columns going out and down); each cell cut
    *  along the diagonal that folds it less; `pick` chooses the cells */

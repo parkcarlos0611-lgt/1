@@ -19,7 +19,7 @@ import { mesh as eb110 } from './mesh_eb110';
 import { mesh as xj220 } from './mesh_xj220';
 import { mesh as diablo } from './mesh_diablo';
 import { mesh as nsx } from './mesh_nsx_kit';   // review 171: the NSX now from the shared car kit (closed shell; the hand-built mesh_nsx.ts kept as the reference)
-import { mesh as f355 } from './mesh_f355';
+import { mesh as f355 } from './mesh_f355_kit';   // review 175: the F355 from the car kit (the Fable build, chosen over the Opus build; the hand-built mesh_f355.ts kept as the reference)
 export const MESH_CARS: { id: string; name: string; mesh: (spin?: number) => Mesh }[] = [
   { id: 'dueSSJ35', name: '1935 Duesenberg SSJ', mesh: dueSSJ35 }, { id: 'dueA21', name: '1921 Duesenberg Model A', mesh: dueA21 },
   { id: 'fnTT33', name: '1933 Frazer Nash TT Replica', mesh: fnTT33 }, { id: 'bmw315', name: '1935 BMW 315/1', mesh: bmw315 },

@@ -1,4 +1,4 @@
-// The 1990 NSX (NA1: pop-up head lamps, the black roof) as an assembly spec for the car kit (render/car/kit,
+// The 1990 NSX (NA1: pop-up head lamps, the black roof) as an assembly spec for the car kit (render/car/kit; the same data as nsx.kit.ts,
 // docs/systems/95_nsx_kit_breakdown.md): its sheet's lines (data/cars/spec/nsx.json, docs/systems/85_nsx_sheet.md),
 // the standard section's levels, the panels' kinds and shapes, the parts and their places, the colours. Data only.
 // Axes: x from the nose back, y across, z up; mm. Axles at 930 and 3460.
@@ -106,3 +106,22 @@ export const NSX_ROUND_TAIL: Pick<CarKit, 'tail' | 'tailLamps'> = {
 };
 /** the swap test's second wheel: a dished plate with eight round vents */
 export const NSX_DISC_WHEEL: Pick<CarKit, 'wheel'> = { wheel: { ...NSX_KIT.wheel, kind: 'disc', spokes: 8 } };
+
+// ---- swaps with the kinds added for the F355 (docs/systems/97_model_benchmark.md): each must assemble and close on this car too ----
+/** a ducktail in place of the frame and blade, two round lamps a side sunk in the panel */
+export const NSX_DUCKTAIL: Pick<CarKit, 'tail' | 'tailLamps'> = {
+  tail: { ...NSX_KIT.tail, kind: 'ducktail', band: [5, 10] },
+  tailLamps: { badge: NSX_KIT.tailLamps.badge, sunk: { blocks: [[3, 6], [6, 8]], y: [588, 370], z: 744, r: 55, depth: 28, seg: 14, rim: 8, names: ['tailLamp', 'stopLamp'], colours: ['red', 'red'] } },
+};
+/** the star wheel: spokes over a deep well */
+export const NSX_STAR_WHEEL: Pick<CarKit, 'wheel'> = { wheel: { ...NSX_KIT.wheel, kind: 'star', star: { r: [70, 120], a: [0.2, 0.13], well: 80, thick: 26, brake: 125 } } };
+/** a pointed prow: the nose's plan from a table (a blunt tip, a tight corner, straight tapering sides) */
+export const NSX_POINTED_NOSE: Pick<CarKit, 'lines' | 'nose'> = {
+  lines: { ...NSX_KIT.lines, nose: { kind: 'pointed', tip: 'X0', pow: 3, plan: [[0, 0], [0.03, 0.4], [0.08, 0.66], [0.16, 0.8], [0.3, 0.88], [0.6, 0.95], [1, 1]] } },
+  nose: { ...NSX_KIT.nose, kind: 'pointed', seam: true },
+};
+/** a fog lamp sunk in a round recess, the turn lamps' strip sunk as a slot, the intake's corner rounded */
+export const NSX_SUNK_FRONT: Pick<CarKit, 'intakes' | 'bumperLamps'> = {
+  intakes: { centre: { ...NSX_KIT.intakes.centre, fillets: [[3, 9, -1, -1]], fillet: 0.6, badge: [20, 250, 300] }, fog: { rows: [4, 6], cols: [7, 9], y: 520, z: 262, r: 40, depth: 30, seg: 10 } },
+  bumperLamps: { ...NSX_KIT.bumperLamps, depth: 25, amberFirst: true },
+};

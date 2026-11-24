@@ -26,6 +26,8 @@ export const centroid = (pts: V[]): V => { const c: V = [0, 0, 0]; for (const p 
 /** the super-ellipse's quarter: the share along at share f across (p the power; 2 a circle) and its inverse */
 export const gp = (f: number, p: number) => 1 - (1 - clamp01(f) ** p) ** (1 / p);
 export const ginv = (v: number, p: number) => (1 - (1 - clamp01(v)) ** p) ** (1 / p);
+/** the inverse of a rising function on 0..1 (by halving) */
+export const inv01 = (f: (t: number) => number) => (v: number) => { let lo = 0, hi = 1; for (let i = 0; i < 40; i++) { const m = (lo + hi) / 2; if (f(m) < v) lo = m; else hi = m; } return (lo + hi) / 2; };
 /** a cubic Bezier from a to d through the controls b and c */
 export const bez = (a: V, b: V, c: V, d: V, t: number): V => { const v = 1 - t; return [0, 1, 2].map(k => v * v * v * a[k]! + 3 * v * v * t * b[k]! + 3 * v * t * t * c[k]! + t * t * t * d[k]!) as V; };
 

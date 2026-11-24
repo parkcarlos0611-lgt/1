@@ -39,6 +39,10 @@ export interface SectionSpec {
   tail: { from: At; to: At; levels: number[]; pow: number };
 }
 
+export interface BandSpec { reach: number; drop: number; lift: number }
+/** the arc from a top edge K (level there) down to a widest line H (upright there), by its shape */
+export const bandOf = (b: BandSpec) => (K: V, H: V, t: number): V => { const dz = K[2] - H[2], P1: V = [lerp(K[0], H[0], b.reach), lerp(K[1], H[1], b.reach), K[2] - b.drop * dz], P2: V = [H[0], H[1], H[2] + b.lift * dz]; return bez(K, P1, P2, H, t); };
+
 export interface Flank {
   K(x: number): V; H(x: number): V;
   /** the shoulder's arc from K to H at t */
@@ -57,7 +61,7 @@ export function flank(L: Lines, s: SectionSpec, K: (x: number) => V): Flank {
   const INS = lin(s.inset), sill = L.sill, foot = L.foot, insSill = INS(sill), insFoot = INS(foot), t0 = L.X(s.tail.from), t1 = L.X(s.tail.to);
   const H = (x: number): V => [x, L.half(x), L.z('shoulder')(x)];
   const tailShare = (x: number) => sm(t0, t1, x);
-  const band = (K: V, H: V, t: number): V => { const dz = K[2] - H[2], P1: V = [lerp(K[0], H[0], s.shoulder.reach), lerp(K[1], H[1], s.shoulder.reach), K[2] - s.shoulder.drop * dz], P2: V = [H[0], H[1], H[2] + s.shoulder.lift * dz]; return bez(K, P1, P2, H, t); };
+  const band = bandOf(s.shoulder);
   const inset = (x: number, z: number, zH: number) => { const std = z >= sill ? insSill * (zH - z) / (zH - sill) : INS(z), u = tailShare(x); return u > 0 ? lerp(std, insFoot * Math.max(0, (zH - z) / (zH - foot)) ** s.tail.pow, u) : std; };
   const surf = (x: number, z: number): V => { const k = K(x), h = H(x); if (z >= k[2]) return k; if (z < h[2]) return [x, h[1] - inset(x, z, h[2]), z];
     let lo = 0, hi = 1; for (let i = 0; i < 24; i++) { const m = (lo + hi) / 2; if (band(k, h, m)[2] > z) lo = m; else hi = m; } return band(k, h, (lo + hi) / 2); };

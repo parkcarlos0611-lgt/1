@@ -22,7 +22,7 @@ export function underbody(x: Ctx): void {
   const nose = s.NSG.map(r => r[NK]!), m0 = FG[0]![1]!;
   for (const sg of [1, -1]) { const t = (p: V, q: V, r: V) => e.tri(mir(p, sg), mir(q, sg), mir(r, sg), [0, 0, -1]); t(m0, FG[0]![2]!, nose[0]!); for (let i = 0; i + 1 < nose.length; i++) t(m0, nose[i]!, nose[i + 1]!); }
   // under the tail: from the last station's inner point round the tail's tuck (the frame's rows, then the valance's)
-  const FR = x.k.tail.frameRows ?? s.TLG.length - 1, foot = x.k.tail.kind === 'ducktail' ? s.TLG.map(r => r[NK]!) : [...s.TLG.slice(0, FR + 1).map(r => r[NK]!), ...s.VG.slice(FR).map(r => r[NK]!)], last = FG[FG.length - 1]!, mt = last[1]!;
+  const FR = x.k.tail.frameRows, foot = [...s.TLG.slice(0, FR + 1).map(r => r[NK]!), ...s.VG.slice(FR).map(r => r[NK]!)], last = FG[FG.length - 1]!, mt = last[1]!;
   for (const sg of [1, -1]) { const t = (p: V, q: V, r: V) => e.tri(mir(p, sg), mir(q, sg), mir(r, sg), [0, 0, -1]); for (let i = 0; i + 1 < foot.length; i++) t(mt, foot[i]!, foot[i + 1]!); t(mt, foot[foot.length - 1]!, last[2]!); }
   e.with('part', () => { e.name('chassis').mat(c.dark, 0.05); for (const w of [L.wheels.f, L.wheels.r]) e.b.bar([w.x, -w.y, w.r], [w.x, w.y, w.r], x.k.under.axle[w === L.wheels.f ? 0 : 1]); });
 }

@@ -30,6 +30,8 @@ export type Turbos = 0 | 1 | 2 | 3 | 4;
 export type Structure = 'steel' | 'hss' | 'aluminium' | 'honeycomb' | 'cfrp';
 /** the panels hung on it: steel, aluminium, glass fibre, carbon fibre */
 export type Panels = 'steel' | 'aluminium' | 'frp' | 'cfrp';
+/** the interior: stripped for lightness, as the base's own car, luxurious */
+export type Interior = 'light' | 'standard' | 'luxury';
 
 export interface Design {
   /** the format's version */ v: 2;
@@ -43,11 +45,11 @@ export interface Design {
     /** two cam profiles */ vtec: boolean };
   drive: { gears: 5 | 6; gearbox: 'manual' | 'f1'; /** the final drive's ratio; 0: chosen for the top speed */ final: number; lsd: boolean; awd: boolean };
   kit: { abs: boolean; tcs: boolean; steering: 'manual' | 'hydraulic' | 'electric'; dampers: 'fixed' | 'adaptive'; wing: boolean; diffuser: boolean;
-    /** tyres' widths front and rear (mm) and the rims (in) */ tyres: [number, number]; rim: 16 | 17 | 18 };
+    /** tyres' widths front and rear (mm) and the rims (in) */ tyres: [number, number]; rim: 16 | 17 | 18; interior: Interior };
 }
 /** format 1 (before review 177): one material for the whole body, a turbo count that fixed the boost, no grade */
-export interface DesignV1 extends Omit<Design, 'v' | 'body' | 'engine'> {
-  v: 1; body: Omit<Design['body'], 'structure' | 'panels'> & { material: 'steel' | 'aluminium' };
+export interface DesignV1 extends Omit<Design, 'v' | 'body' | 'engine' | 'kit'> {
+  v: 1; kit: Omit<Design['kit'], 'interior'>; body: Omit<Design['body'], 'structure' | 'panels'> & { material: 'steel' | 'aluminium' };
   engine: { layout: Layout; cc: number; valves: Valves; redline: number; turbo: 0 | 1 | 2; vtec: boolean };
 }
 /** a change to a design, part by part (a fix offered by the fit check, race/fit.ts) */
@@ -67,6 +69,7 @@ export const SUMPS: Sump[] = ['wet', 'dry'];
 export const BLOCKS: Block[] = ['iron', 'aluminium', 'magnesium'];
 export const STRUCTURES: Structure[] = ['steel', 'hss', 'aluminium', 'honeycomb', 'cfrp'];
 export const PANELS: Panels[] = ['steel', 'aluminium', 'frp', 'cfrp'];
+export const INTERIORS: Interior[] = ['light', 'standard', 'luxury'];
 /** the parts' physical ranges (no power cap: docs/systems/98 section 9). The wheelbase runs to +300 so the F355's
  *  platform can carry a long V12 (the McLaren F1's 2,718 mm, +268), the width to +80 a side (the Diablo's 2,040 mm) */
 export const LIMITS = { wheelbase: [-150, 300], width: [-40, 80], cc: [1000, 8000], redline: [5000, 10000], tyre: [195, 335], final: [2.8, 4.8], boost: [0.3, 1.5] } as const;
@@ -100,11 +103,11 @@ export const gradeRedline = (g: Grade) => Math.min(LIMITS.redline[1], GRADE_RULE
 export const DESIGN_NSX: Design = { v: 2, id: 'nsx', name: 'NSX', body: { base: 'nsx', nose: 'round', front: 'plain', tail: 'frame', wheel: 'fiveSpoke', wheelbase: 0, width: 0, paint: '#b0121b', gloss: 0.6, structure: 'aluminium', panels: 'aluminium' },
   engine: { grade: 2, layout: 'V6', cc: 2977, valves: 4, redline: 8000, intake: 'variable', compression: 'mid', sump: 'wet', block: 'aluminium', turbo: 0, boost: 0.8, intercooler: true, vtec: true },
   drive: { gears: 5, gearbox: 'manual', final: 4.062, lsd: true, awd: false },
-  kit: { abs: true, tcs: true, steering: 'manual', dampers: 'fixed', wing: false, diffuser: false, tyres: [205, 225], rim: 16 } };
+  kit: { abs: true, tcs: true, steering: 'manual', dampers: 'fixed', wing: false, diffuser: false, tyres: [205, 225], rim: 16, interior: 'standard' } };
 export const DESIGN_F355: Design = { v: 2, id: 'f355', name: 'F355', body: { base: 'f355', nose: 'pointed', front: 'sunk', tail: 'ducktail', wheel: 'star', wheelbase: 0, width: 0, paint: '#f5c300', gloss: 0.6, structure: 'steel', panels: 'steel' },
   engine: { grade: 2, layout: 'V8', cc: 3496, valves: 5, redline: 8500, intake: 'single', compression: 'high', sump: 'dry', block: 'aluminium', turbo: 0, boost: 0.8, intercooler: true, vtec: false },
   drive: { gears: 6, gearbox: 'manual', final: 4.1, lsd: true, awd: false },
-  kit: { abs: true, tcs: false, steering: 'hydraulic', dampers: 'adaptive', wing: false, diffuser: true, tyres: [225, 265], rim: 18 } };
+  kit: { abs: true, tcs: false, steering: 'hydraulic', dampers: 'adaptive', wing: false, diffuser: true, tyres: [225, 265], rim: 18, interior: 'standard' } };
 
 // ---- four more cars as designs: the figures' check (docs/systems/99, 1-8), not used to set them ----
 // Each is built on one of the two bases (the base is only the body: its panels' shapes and sizes), stretched toward
@@ -115,14 +118,15 @@ export const DESIGN_F355: Design = { v: 2, id: 'f355', name: 'F355', body: { bas
 export const DESIGN_DIABLO: Design = { v: 2, id: 'diablo', name: 'Diablo', body: { base: 'f355', nose: 'pointed', front: 'plain', tail: 'frame', wheel: 'star', wheelbase: 200, width: 70, paint: '#7a1fa2', gloss: 0.6, structure: 'steel', panels: 'aluminium' },
   engine: { grade: 3, layout: 'V12', cc: 5707, valves: 4, redline: 7300, intake: 'single', compression: 'mid', sump: 'wet', block: 'aluminium', turbo: 0, boost: 0.8, intercooler: true, vtec: false },
   drive: { gears: 5, gearbox: 'manual', final: 0, lsd: true, awd: false },
-  kit: { abs: false, tcs: false, steering: 'manual', dampers: 'fixed', wing: false, diffuser: false, tyres: [245, 335], rim: 17 } };
+  kit: { abs: false, tcs: false, steering: 'manual', dampers: 'fixed', wing: false, diffuser: false, tyres: [245, 335], rim: 17, interior: 'standard' } };
 /** the 1991 Bugatti EB110 GT: 3.5 V12 five valves, four IHI turbos with intercoolers at about 1.05 bar, 553 hp at
  *  8,000, 7.5:1, a dry sump; six speeds, four-wheel drive; a carbon-fibre monocoque (Aérospatiale's) with aluminium
- *  panels; 2,550 wheelbase, 1,940 wide; 245/40 ZR18 and 325/30 ZR18; 1,620 kg; 342 km/h */
+ *  panels; a luxurious interior (leather, air conditioning: heavy for its materials); 2,550 wheelbase, 1,940 wide;
+ *  245/40 ZR18 and 325/30 ZR18; 1,620 kg; 342 km/h */
 export const DESIGN_EB110: Design = { v: 2, id: 'eb110', name: 'EB110', body: { base: 'f355', nose: 'pointed', front: 'plain', tail: 'frame', wheel: 'disc', wheelbase: 100, width: 20, paint: '#1f5fbf', gloss: 0.6, structure: 'cfrp', panels: 'aluminium' },
   engine: { grade: 3, layout: 'V12', cc: 3499, valves: 5, redline: 8250, intake: 'single', compression: 'low', sump: 'dry', block: 'aluminium', turbo: 4, boost: 1.0, intercooler: true, vtec: false },
   drive: { gears: 6, gearbox: 'manual', final: 0, lsd: true, awd: true },
-  kit: { abs: true, tcs: false, steering: 'hydraulic', dampers: 'fixed', wing: true, diffuser: false, tyres: [245, 325], rim: 18 } };
+  kit: { abs: true, tcs: false, steering: 'hydraulic', dampers: 'fixed', wing: true, diffuser: false, tyres: [245, 325], rim: 18, interior: 'luxury' } };
 /** the 1992 Jaguar XJ220: the JRV-6, a 3.5 V6 from the Group C engine, four valves, two Garrett turbos with
  *  intercoolers at about 1.0 bar, 8.3:1, a dry sump, 542 hp at 7,200; five speeds, rear drive; a bonded aluminium
  *  honeycomb tub and aluminium panels, underbody venturis; 2,640 wheelbase, 2,220 wide (here as wide as the NSX's base
@@ -130,18 +134,19 @@ export const DESIGN_EB110: Design = { v: 2, id: 'eb110', name: 'EB110', body: { 
 export const DESIGN_XJ220: Design = { v: 2, id: 'xj220', name: 'XJ220', body: { base: 'nsx', nose: 'round', front: 'plain', tail: 'roundLamps', wheel: 'disc', wheelbase: 110, width: 80, paint: '#9aa1a6', gloss: 0.6, structure: 'honeycomb', panels: 'aluminium' },
   engine: { grade: 4, layout: 'V6', cc: 3498, valves: 4, redline: 7800, intake: 'single', compression: 'low', sump: 'dry', block: 'aluminium', turbo: 2, boost: 1.0, intercooler: true, vtec: false },
   drive: { gears: 5, gearbox: 'manual', final: 0, lsd: true, awd: false },
-  kit: { abs: false, tcs: false, steering: 'manual', dampers: 'fixed', wing: false, diffuser: true, tyres: [255, 335], rim: 18 } };
+  kit: { abs: false, tcs: false, steering: 'manual', dampers: 'fixed', wing: false, diffuser: true, tyres: [255, 335], rim: 18, interior: 'standard' } };
 /** the 1994 McLaren F1, from McLaren's published figures (as quoted by Wikipedia's article and Road & Track's 1994
  *  test; Gordon Murray's design notes for the materials): BMW S70/2 6,064 cc 60-degree V12, four valves, a throttle a
  *  cylinder, 10.5:1, a dry sump, 627 hp (468 kW) at 7,400 rpm, 650 Nm at 5,600, the limiter about 7,500; six speeds,
  *  rear drive, no limited-slip differential; no ABS, no power steering, no traction control; a carbon-fibre monocoque
- *  and carbon panels; 2,718 wheelbase, 1,820 wide, 1,140 high; Cd 0.32; ground-effect venturis with fans (here the
+ *  and carbon panels, a stripped interior (Murray's weight budget: thin glass, light seats, no deadening); 2,718
+ *  wheelbase, 1,820 wide (here 1,860: the F355's arches need the room for its 315 mm rears), 1,140 high; Cd 0.32; ground-effect venturis with fans (here the
  *  undertray); 235/45 ZR17 and 315/45 ZR17; kerb 1,138 kg (about 1,140); 372 km/h on its production limiter, 386 km/h
  *  (240 mph, Ehra-Lessien 1998) with it raised; 0-100 km/h 3.2 s */
-export const DESIGN_MCLAREN_F1: Design = { v: 2, id: 'mclarenf1', name: 'McLaren F1', body: { base: 'f355', nose: 'pointed', front: 'plain', tail: 'frame', wheel: 'disc', wheelbase: 270, width: -40, paint: '#c9c3b6', gloss: 0.6, structure: 'cfrp', panels: 'cfrp' },
+export const DESIGN_MCLAREN_F1: Design = { v: 2, id: 'mclarenf1', name: 'McLaren F1', body: { base: 'f355', nose: 'pointed', front: 'plain', tail: 'frame', wheel: 'disc', wheelbase: 270, width: -20, paint: '#c9c3b6', gloss: 0.6, structure: 'cfrp', panels: 'cfrp' },
   engine: { grade: 4, layout: 'V12', cc: 6064, valves: 4, redline: 7500, intake: 'itb', compression: 'high', sump: 'dry', block: 'aluminium', turbo: 0, boost: 0.8, intercooler: true, vtec: false },
   drive: { gears: 6, gearbox: 'manual', final: 0, lsd: false, awd: false },
-  kit: { abs: false, tcs: false, steering: 'manual', dampers: 'fixed', wing: false, diffuser: true, tyres: [235, 315], rim: 17 } };
+  kit: { abs: false, tcs: false, steering: 'manual', dampers: 'fixed', wing: false, diffuser: true, tyres: [235, 315], rim: 17, interior: 'light' } };
 
 const clamp = (v: number, [a, b]: readonly [number, number]) => Math.min(b, Math.max(a, v));
 /** a value the grade allows: the asked one, else the best allowed one below it in the list's order */
@@ -152,7 +157,7 @@ const allowed = <T>(v: T, order: readonly T[], ok: readonly T[]): T => { for (le
  *  fixed (one 0.8 bar, two 1.0) */
 export function migrate(d: DesignV1): Design {
   const { material, ...body } = d.body, P = d.body.base === 'f355' ? DESIGN_F355 : DESIGN_NSX, E = d.engine;
-  return { ...d, v: 2, body: { ...body, structure: material, panels: material },
+  return { ...d, v: 2, body: { ...body, structure: material, panels: material }, kit: { ...d.kit, interior: 'standard' },
     engine: { grade: 2, layout: E.layout, cc: E.cc, valves: E.valves, redline: E.redline, intake: P.engine.intake, compression: E.turbo ? 'mid' : P.engine.compression,
       sump: P.engine.sump, block: P.engine.block, turbo: E.turbo, boost: E.turbo === 2 ? 1.0 : 0.8, intercooler: true, vtec: E.vtec } };
 }

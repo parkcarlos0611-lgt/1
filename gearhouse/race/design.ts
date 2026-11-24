@@ -20,7 +20,7 @@
 //           where the power meets the drag and the rolling resistance, comes at the power peak in top gear.
 //   class, cost, reliability: designFigures (the class from the figures, doc 99 6-2; cost and reliability placeholders
 //           until B5).
-import type { Design, BaseId, Structure, Panels, Grade } from '../core/design';
+import type { Design, BaseId, Structure, Panels, Grade, Interior } from '../core/design';
 import { DESIGN_NSX, DESIGN_F355 } from '../core/design';
 import { type RaceSpec, torqueAt, EPS_SPEED_SENSITIVE } from './cars';
 import { HP, CYL, engineFigures, engineMass, enginePackage, pistonSpeed, tyreR } from './designparts';
@@ -44,6 +44,10 @@ export const PANEL_K: Record<Panels, number> = { steel: 1, aluminium: 0.55, frp:
 /** the share of a base's rest that is secondary structure (subframes, crash beams, brackets, seat frames) and follows the
  *  structure's material */
 const SECONDARY = 0.15;
+/** the interior and its comforts against the base's own car's: stripped (light seats, thin glass, no sound deadening,
+ *  the McLaren F1's way: some 95 kg off the F355's rest) or luxurious (leather, air conditioning, deadening, power
+ *  everything: the EB110 GT's) */
+export const INTERIOR_K: Record<Interior, number> = { light: 0.82, standard: 1, luxury: 1.2 };
 /** the gearboxes' ratios: the NSX's five-speed (Acura 1991) and the F355's six-speed */
 export const GEARSETS: Record<5 | 6, number[]> = { 5: [3.071, 1.727, 1.23, 0.967, 0.771], 6: [3.07, 2.16, 1.61, 1.27, 1.03, 0.84] };
 
@@ -57,7 +61,8 @@ const engineZ = (d: Design) => BASES[d.body.base].floor + (d.engine.sump === 'dr
 function parts(d: Design, L: number): { m: number; x: number; z: number }[] {
   const K = d.kit, D = d.drive, B = BASES[d.body.base];
   // the transaxle: 52 kg as a five-speed, 60 as a six; the F1's hydraulics 10; a limited-slip differential 4;
-  // four-wheel drive 65 (a centre differential and its coupling, a propeller shaft, the front differential and shafts)
+  // four-wheel drive 80 (a centre differential and its coupling with its transfer gears, a propeller shaft, the front
+  // differential and shafts)
   const box = (D.gears === 5 ? 52 : 60) + (D.gearbox === 'f1' ? 10 : 0) + (D.lsd ? 4 : 0);
   // a wheel with its tyre: about 0.0055 kg per mm of width per inch of rim (the NSX's 225/50 R16 about 20 kg)
   const wheel = (w: number) => w * K.rim * 0.0055, rF = tyreR(K.tyres[0], K.rim), rR = tyreR(K.tyres[1], K.rim);
@@ -65,7 +70,7 @@ function parts(d: Design, L: number): { m: number; x: number; z: number }[] {
   const out = [{ m: DRIVER, x: 1.15, z: 0.42 }, { m: engineMass(d), x: L - 0.75, z: engineZ(d) }, { m: box, x: L - 0.05, z: 0.33 }, { m: 2 * wheel(K.tyres[0]), x: 0, z: rF }, { m: 2 * wheel(K.tyres[1]), x: L, z: rR },
     { m: K.abs ? 9 : 0, x: 0.4, z: 0.5 }, { m: K.tcs ? 3 : 0, x: L - 0.75, z: 0.5 }, { m: steer, x: 0.1, z: 0.45 }, { m: K.dampers === 'adaptive' ? 5 : 0, x: L / 2, z: 0.45 },
     { m: K.wing ? 14 : 0, x: L + 0.6, z: 1.05 }, { m: K.diffuser ? 9 : 0, x: L * 0.6, z: 0.15 }];
-  if (D.awd) out.push({ m: 30, x: 0.05, z: 0.3 }, { m: 35, x: L * 0.6, z: 0.3 });   // the front differential at the front axle; the rest along the tunnel
+  if (D.awd) out.push({ m: 35, x: 0.05, z: 0.3 }, { m: 45, x: L * 0.6, z: 0.3 });   // the front differential at the front axle; the rest along the tunnel
   // the structure and the panels, sized by their length and width against the base's, centred between the axles
   const size = sizeOf(d, L);
   out.push({ m: B.structure * STRUCTURE_K[d.body.structure] * size, x: L / 2, z: 0.4 }, { m: B.panels * PANEL_K[d.body.panels] * size, x: L / 2, z: 0.7 });
@@ -80,10 +85,9 @@ const wheelbase = (d: Design) => BASES[d.body.base].wheelbase + d.body.wheelbase
 const REST: Record<BaseId, { m: number; x: number; z: number }> = Object.fromEntries((Object.keys(BASES) as BaseId[]).map(b => {
   const B = BASES[b], L = B.wheelbase, p = parts(B.ref, L), M = B.kerb + DRIVER, m = M - p.reduce((s, q) => s + q.m, 0);
   const x = ((1 - B.front) * M * L - p.reduce((s, q) => s + q.m * q.x, 0)) / m / L, z = (B.cgH * M - p.reduce((s, q) => s + q.m * q.z, 0)) / m; return [b, { m, x, z }]; })) as Record<BaseId, { m: number; x: number; z: number }>;
-export const _REST = () => REST;
 function massing(d: Design) {
   const B = BASES[d.body.base], L = wheelbase(d), p = parts(d, L), area = sizeOf(d, L), rest = REST[d.body.base];
-  const restM = rest.m * area ** 0.3 * (1 - SECONDARY + SECONDARY * STRUCTURE_K[d.body.structure] / STRUCTURE_K[B.ref.body.structure]);
+  const restM = rest.m * area ** 0.3 * (1 - SECONDARY + SECONDARY * STRUCTURE_K[d.body.structure] / STRUCTURE_K[B.ref.body.structure]) * INTERIOR_K[d.kit.interior];
   // the fit's work: at the engine (its bay, its mounts, its gearbox) or at an axle (the arches)
   const mods = fitPenalty(d).mass.map(q => ({ m: q.m, x: q.at === 'front' ? 0 : q.at === 'rear' ? L : L - 0.75, z: q.at === 'engine' ? engineZ(d) : 0.5 }));
   const all = [...p, ...mods, { m: restM, x: rest.x * L, z: rest.z }];
@@ -205,7 +209,7 @@ function rawCost(d: Design): number {
     + E.turbo * 4 + (E.turbo && E.intercooler ? 1.5 * Math.ceil(E.turbo / 2) : 0) + (E.vtec ? 3 : 0);
   const body = 25 * STRUCTURE_COST[d.body.structure] * size + 10 * PANEL_COST[d.body.panels] * size + 10;
   const drive = (D.gears === 5 ? 7 : 8) + (D.gearbox === 'f1' ? 4 : 0) + (D.lsd ? 1.5 : 0) + (D.awd ? 8 : 0);
-  const kit = (K.abs ? 3 : 0) + (K.tcs ? 2 : 0) + { manual: 0, hydraulic: 1.5, electric: 2 }[K.steering] + (K.dampers === 'adaptive' ? 3 : 0) + (K.wing ? 1.5 : 0) + (K.diffuser ? 2 : 0)
+  const kit = { light: 5, standard: 0, luxury: 6 }[K.interior] + (K.abs ? 3 : 0) + (K.tcs ? 2 : 0) + { manual: 0, hydraulic: 1.5, electric: 2 }[K.steering] + (K.dampers === 'adaptive' ? 3 : 0) + (K.wing ? 1.5 : 0) + (K.diffuser ? 2 : 0)
     + (K.tyres[0] + K.tyres[1]) * K.rim / 8000;
   return engine + body + drive + kit + fitPenalty(d).cost; }
 const COST_NSX = rawCost(DESIGN_NSX);

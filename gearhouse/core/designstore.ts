@@ -4,7 +4,7 @@
 // the designs saved in this browser; and what the drive page measured of a design (its best laps, the top speed it
 // reached), kept per design and read by the builder. Pure: the storage is passed in (the browser's localStorage, or a
 // map in the tests), and a storage that throws (a private window, storage refused) keeps nothing and reads empty.
-import { BASES, NOSES, FRONTS, TAILS, WHEELS, GRADES, INTAKES, COMPRESSIONS, SUMPS, BLOCKS, STRUCTURES, PANELS, DESIGN_NSX, DESIGN_F355, normalise,
+import { BASES, NOSES, FRONTS, TAILS, WHEELS, GRADES, INTAKES, COMPRESSIONS, SUMPS, BLOCKS, STRUCTURES, PANELS, INTERIORS, DESIGN_NSX, DESIGN_F355, normalise,
   type BaseId, type Design, type DesignV1 } from './design';
 
 /** what the helpers need of a storage (the browser's Storage has these) */
@@ -38,12 +38,13 @@ export function asDesign(v: unknown): Design | null {
   const rest = { drive: { gears: one(r.gears, [5, 6] as const, P.drive.gears), gearbox: one(r.gearbox, ['manual', 'f1'] as const, P.drive.gearbox), final: num(r.final, P.drive.final), lsd: bool(r.lsd, P.drive.lsd), awd: bool(r.awd, P.drive.awd) },
     kit: { abs: bool(k.abs, P.kit.abs), tcs: bool(k.tcs, P.kit.tcs), steering: one(k.steering, ['manual', 'hydraulic', 'electric'] as const, P.kit.steering), dampers: one(k.dampers, ['fixed', 'adaptive'] as const, P.kit.dampers),
       wing: bool(k.wing, P.kit.wing), diffuser: bool(k.diffuser, P.kit.diffuser), tyres: [Math.round(num(ty[0], P.kit.tyres[0])), Math.round(num(ty[1], P.kit.tyres[1]))] as [number, number], rim: one(k.rim, [16, 17, 18] as const, P.kit.rim) } };
+  const interior = one(k.interior, INTERIORS, P.kit.interior);
   if (old) { const mat = one(b.material, ['steel', 'aluminium'] as const, P.body.structure === 'steel' ? 'steel' : 'aluminium');
     return normalise({ v: 1, ...head, body: { ...body, material: mat }, engine: { ...machine, turbo: one(e.turbo, [0, 1, 2] as const, 0) }, ...rest } satisfies DesignV1); }
   const d: Design = { v: 2, ...head, body: { ...body, structure: one(b.structure, STRUCTURES, P.body.structure), panels: one(b.panels, PANELS, P.body.panels) },
     engine: { grade: one(e.grade, GRADES, P.engine.grade), ...machine, intake: one(e.intake, INTAKES, P.engine.intake), compression: one(e.compression, COMPRESSIONS, P.engine.compression),
       sump: one(e.sump, SUMPS, P.engine.sump), block: one(e.block, BLOCKS, P.engine.block), turbo: one(e.turbo, [0, 1, 2, 3, 4] as const, P.engine.turbo),
-      boost: num(e.boost, P.engine.boost), intercooler: bool(e.intercooler, P.engine.intercooler) }, ...rest };
+      boost: num(e.boost, P.engine.boost), intercooler: bool(e.intercooler, P.engine.intercooler) }, drive: rest.drive, kit: { ...rest.kit, interior } };
   return normalise(d); }
 
 /** a new design's id: short, unlikely to meet another in one browser */

@@ -139,12 +139,12 @@ let lastFigs: DesignFigures | null = null;
 const fmtLap = (t: number) => `${Math.floor(t / 60)}:${(t % 60).toFixed(2).padStart(5, '0')}`;
 function figures() { const f = designFigures(D), s = designSpec(D), was = lastFigs; lastFigs = f;
   /** a figure, marked when it moved since the last change: better (up) or worse (down); `more`: is more better */
-  const cell = (k: keyof DesignFigures, text: string, more: boolean) => { const a = was?.[k], b = f[k], moved = a !== undefined && Math.abs(b - a) > 1e-9; return `<dd${moved ? ` class="${(b > a) === more ? 'up' : 'down'}"` : ''}>${text}</dd>`; };
+  const cell = (k: keyof DesignFigures, text: string, more: boolean | null) => { const a = was?.[k], b = f[k], moved = more !== null && a !== undefined && Math.abs(b - a) > 1e-9; return `<dd${moved ? ` class="${(b > a) === more ? 'up' : 'down'}"` : ''}>${text}</dd>`; };
   $('figs').innerHTML = `<dt>무게</dt>${cell('mass', `${f.mass.toLocaleString()} <small>kg</small>`, false)}`
-    + `<dt>출력</dt>${cell('hp', `${f.hp} <small>hp · ${s.hpRpm.toLocaleString()}</small>`, true)}`
-    + `<dt>토크</dt>${cell('torque', `${f.torque} <small>Nm · ${s.torqueRpm.toLocaleString()}</small>`, true)}`
+    + `<dt>출력</dt>${cell('hp', `${f.hp} <small>hp<span class="rpm"> · ${s.hpRpm.toLocaleString()}</span></small>`, true)}`
+    + `<dt>토크</dt>${cell('torque', `${f.torque} <small>Nm<span class="rpm"> · ${s.torqueRpm.toLocaleString()}</span></small>`, true)}`
     + `<dt>마력당 무게</dt>${cell('kgPerHp', `${f.kgPerHp.toFixed(2)} <small>kg/hp</small>`, false)}`
-    + `<dt>앞 배분</dt>${cell('front', `${Math.round(f.front * 100)} <small>%</small>`, true)}`
+    + `<dt>앞 배분</dt>${cell('front', `${Math.round(f.front * 100)} <small>%</small>`, null)}`
     + `<dt>최고 속도</dt>${cell('topKmh', `${f.topKmh} <small>km/h</small>`, true)}`
     + `<dt>0→100</dt>${cell('zeroTo100', `${f.zeroTo100.toFixed(1)} <small>s</small>`, false)}`
     + `<dt>종감속</dt><dd>${s.final.toFixed(2)}${D.drive.final ? '' : ' <small>자동</small>'}</dd>`;
@@ -193,11 +193,13 @@ function frame(now: number) { const el = Math.min(0.1, (now - last) / 1000); las
     const dpr = Math.min(2, devicePixelRatio || 1), W = Math.max(2, Math.round(cv.clientWidth * dpr)), H = Math.max(2, Math.round(cv.clientHeight * dpr)); if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
     const M = shown(); if (M !== onGpu) { g = onGpu ? L.swapCar(onGpu, M) : L.car(M); onGpu = M; }
     // the free middle between the panels (a phone: the strip above, the drawer below when open): the car framed in it
-    const r = cv.getBoundingClientRect(), sideR = document.body.classList.contains('open') || innerWidth <= 760 ? 0 : $('side').getBoundingClientRect().right, figL = innerWidth <= 760 ? r.width : $('figs').closest('section')!.getBoundingClientRect().left;
-    const free = Math.max(160, figL - sideR) * dpr, shift = ((sideR + figL) / 2 - r.width / 2) * dpr, len = M.length;
-    const mm = Math.max(len * 1.3 / free, len * 0.62 / H) * view.zoom, ox = -shift * mm / 1000;
+    const r = cv.getBoundingClientRect(), phone = innerWidth <= 760, sideR = phone ? 0 : $('side').getBoundingClientRect().right, figs = $('figs').closest('section')!.getBoundingClientRect(), figL = phone ? r.width : figs.left;
+    // on a phone the band between the figures' strip and the drawer (or the view's buttons)
+    const top = phone ? figs.bottom : 0, bottom = phone ? (document.body.classList.contains('open') ? $('side').getBoundingClientRect().top : r.height - 60) : r.height;
+    const free = Math.max(160, figL - sideR) * dpr, band = Math.max(120, bottom - top) * dpr, shift = ((sideR + figL) / 2 - r.width / 2) * dpr, len = M.length;
+    const mm = Math.max(len * 1.3 / free, len * 0.62 / band) * view.zoom, ox = -shift * mm / 1000;
     const rx = Math.sin(view.ang), ry = -Math.cos(view.ang);   // the screen's right, in the world
-    L.render({ x: rx * ox, y: ry * ox, z: 0.55, ang: view.ang, pitch: view.pitch, mm, W, H, cy: innerWidth <= 760 ? 0.5 : 0.55 },
+    L.render({ x: rx * ox, y: ry * ox, z: 0.55, ang: view.ang, pitch: view.pitch, mm, W, H, cy: phone ? (top + bottom) / 2 / r.height : 0.55 },
       [{ g: g!, x: 0, y: 0, z: -0.015, yaw: view.yaw, roll: 0, pitch: 0, steerL: 0.14, steerR: 0.12, spin: 0, player: true, lamps: view.lamps ? 1 : 0 }], [], [],
       { look: view.look, glass: 0.8, rays: true, bloomK: 1, reflK: 1.3, dof: 0, outW: 0.5, outK: 0.6 }); }
   requestAnimationFrame(frame); }

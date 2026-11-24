@@ -65,11 +65,14 @@ console.log(`edges: ${use.length}, open ${use.filter(u => u === 1).length}, over
 // ---- the silhouettes laid over the blueprint (docs/reference/959/bp_canepa_4view.jpg), at twice its scale: a mask per
 //      view in the blueprint's own frame (side: x along, z up; plan: x along, y across; front: y across, z up)
 if (process.argv.includes('masks')) { const K = 4260 / 730 / 2;
-  const mask = (w: number, h: number, pr: (x: number, y: number, z: number) => [number, number]) => { const m = new Uint8Array(w * h * 3).fill(255), p = M.pos;
+  const mask = (w: number, h: number, pr: (x: number, y: number, z: number) => [number, number], keep: (p: number[]) => boolean = () => true) => { const m = new Uint8Array(w * h * 3).fill(255), p = M.pos;
     for (let t = 0; t < M.n; t++) { const q = [0, 1, 2].map(k => pr(p[t * 9 + k * 3]!, p[t * 9 + k * 3 + 1]!, p[t * 9 + k * 3 + 2]!)), [A, B, C] = q as [[number, number], [number, number], [number, number]];
       const x0 = Math.max(0, Math.floor(Math.min(A[0], B[0], C[0]))), x1 = Math.min(w - 1, Math.ceil(Math.max(A[0], B[0], C[0]))), y0 = Math.max(0, Math.floor(Math.min(A[1], B[1], C[1]))), y1 = Math.min(h - 1, Math.ceil(Math.max(A[1], B[1], C[1]))), den = (B[1] - C[1]) * (A[0] - C[0]) + (C[0] - B[0]) * (A[1] - C[1]); if (Math.abs(den) < 1e-9) continue;
       for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { const X = x + 0.5, Y = y + 0.5, l0 = ((B[1] - C[1]) * (X - C[0]) + (C[0] - B[0]) * (Y - C[1])) / den, l1 = ((C[1] - A[1]) * (X - C[0]) + (A[0] - C[0]) * (Y - C[1])) / den; if (l0 < 0 || l1 < 0 || l0 + l1 > 1) continue; m[(y * w + x) * 3] = m[(y * w + x) * 3 + 1] = m[(y * w + x) * 3 + 2] = 0; } }
+    for (const l of M.lines ?? []) { const n = l.pts.length; for (let q = 0; q + 1 < n || (l.closed && q < n); q++) { const a = l.pts[q]!, b = l.pts[(q + 1) % n]!; if (!keep(a) || !keep(b)) continue; const A = pr(a[0], a[1], a[2]), B = pr(b[0], b[1], b[2]), st = Math.ceil(Math.hypot(B[0] - A[0], B[1] - A[1]));
+      for (let i = 0; i <= st; i++) { const x = Math.round(A[0] + (B[0] - A[0]) * i / Math.max(1, st)), y = Math.round(A[1] + (B[1] - A[1]) * i / Math.max(1, st)); if (x >= 0 && y >= 0 && x < w && y < h) { m[(y * w + x) * 3] = 128; m[(y * w + x) * 3 + 1] = 0; m[(y * w + x) * 3 + 2] = 0; } } } }
     return m; };
-  png(`${out}/mask_side.png`, 1640, 560, mask(1640, 560, (x, _y, z) => [40 + x / K, 500 - z / K]));
+  png(`${out}/mask_side.png`, 1640, 560, mask(1640, 560, (x, _y, z) => [40 + x / K, 500 - z / K], p => p[1]! >= 0));
   png(`${out}/mask_plan.png`, 1640, 760, mask(1640, 760, (x, y) => [40 + x / K, 380 - y / (1840 / 319 / 2)]));
-  png(`${out}/mask_front.png`, 760, 560, mask(760, 560, (_x, y, z) => [380 + y / K, 500 - z / K])); }
+  png(`${out}/mask_front.png`, 760, 560, mask(760, 560, (_x, y, z) => [380 + y / K, 500 - z / K], p => p[0]! < 1700));
+  png(`${out}/mask_rear.png`, 760, 560, mask(760, 560, (_x, y, z) => [380 + y / K, 500 - z / K], p => p[0]! > 2800)); }

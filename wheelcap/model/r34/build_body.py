@@ -1,7 +1,7 @@
 """R34 body shell v1 in Blender (bpy): flat faces between the character lines, real and chibi from one table.
 
 usage: python build_body.py OUT_DIR            (python with the bpy module)
-writes OUT_DIR/r34_<real|chibi>.glb and render PNGs, plus a combined sheet r34_body_v1.png
+writes OUT_DIR/r34_<real|chibi>.glb and render PNGs, plus a combined sheet r34_body_v2.png
 
 Topology (left half, mirrored):
   wall   4 rows (bottom, crease, upper flank, shoulder) x columns (3 front, side stations, 3 rear)
@@ -150,7 +150,7 @@ def build(name, params):
     me = bpy.data.meshes.new(name + "_body"); bm.to_mesh(me); bm.free()
     ob = bpy.data.objects.new(name + "_body", me); bpy.context.collection.objects.link(ob)
     for m in (mat("paint", (0.05, 0.16, 0.55)), mat("glass", (0.03, 0.04, 0.06)), mat("dark", (0.02, 0.02, 0.02))): me.materials.append(m)
-    objs = [ob]
+    objs = [ob] + fittings(name, d, cols, params)
 
     # dark block inside, so the arches do not show the far wall
     x0, x1 = arches["F"][0] - arches["F"][2], arches["R"][0] + arches["R"][2]
@@ -163,6 +163,59 @@ def build(name, params):
             objs.append(cyl(f"{name}_tyre_{k}{s}", cx, y, cz, r, w, 20, "tyre", (0.03, 0.03, 0.035)))
             objs.append(cyl(f"{name}_rim_{k}{s}", cx, y + s * 6, cz, r * 0.66, w, 10, "rim", (0.55, 0.56, 0.6)))
     return objs, len(me.polygons)
+
+
+def part(name, faces, m, rgb, mirror=True):
+    """A separate part mesh from explicit polygons (mm), mirrored across the centre plane."""
+    bm = bmesh.new()
+    for pts in faces:
+        bm.faces.new([bm.verts.new((p[0] / 1000, p[1] / 1000, p[2] / 1000)) for p in pts])
+    bmesh.ops.remove_doubles(bm, verts=bm.verts[:], dist=0.0005)
+    if mirror:
+        bmesh.ops.mirror(bm, geom=bm.verts[:] + bm.edges[:] + bm.faces[:], axis="Y", merge_dist=0.0005)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
+    me = bpy.data.meshes.new(name); bm.to_mesh(me); bm.free(); me.materials.append(mat(m, rgb))
+    ob = bpy.data.objects.new(name, me); bpy.context.collection.objects.link(ob)
+    return ob
+
+
+def inset(quad, k, out):
+    """The quad shrunk towards its centre by k and pushed `out` mm along +/-x (front faces negative x)."""
+    c = [sum(p[i] for p in quad) / len(quad) for i in range(3)]
+    return [(c[0] + (p[0] - c[0]) * k + out, c[1] + (p[1] - c[1]) * k, c[2] + (p[2] - c[2]) * k) for p in quad]
+
+
+def boxf(a, b):
+    x0, y0, z0 = a; x1, y1, z1 = b
+    v = [(x0, y0, z0), (x1, y0, z0), (x1, y1, z0), (x0, y1, z0), (x0, y0, z1), (x1, y0, z1), (x1, y1, z1), (x0, y1, z1)]
+    return [[v[i] for i in f] for f in ((0, 1, 2, 3), (4, 5, 6, 7), (0, 1, 5, 4), (1, 2, 6, 5), (2, 3, 7, 6), (3, 0, 4, 7))]
+
+
+def fittings(name, d, cols, params):
+    """Face parts as their own meshes: lamps, grille, intake, tail lamps, wing, mirrors."""
+    o = []
+    f0, f1, f2 = cols[0], cols[1], cols[2]            # front columns: centre, mid, corner (rows bottom..shoulder)
+    o.append(part(name + "_headlight", [inset([f1[2], f2[2], f2[3], f1[3]], 0.86, -8)], "lamp", (0.85, 0.87, 0.9)))
+    g = [f0[2], (f1[2][0], f1[2][1] * 0.8, f1[2][2]), (f1[3][0], f1[3][1] * 0.8, f1[3][2]), f0[3]]
+    o.append(part(name + "_grille", [inset(g, 0.9, -8)], "dark", (0.02, 0.02, 0.02)))
+    lo = [f0[0], f1[0], f1[1], f0[1]]
+    o.append(part(name + "_intake", [inset(lo, 0.8, -8)], "dark", (0.02, 0.02, 0.02)))
+    r0 = cols[-1]
+    for nm, y, py, r in (("outer", 678, 118, 95), ("inner", 420, 121, 86)):
+        px = 1466 - max(y - 400, 0) / 390 * 20
+        cx, cy, cz = d.point((R.sx(px) + 12, y * SW, R.sz(py)))
+        rr = r * params["width"]
+        ring = [(cx, cy + rr * math.cos(i * math.pi / 6), cz + rr * math.sin(i * math.pi / 6)) for i in range(12)]
+        core = [(cx + 6, cy + 0.5 * rr * math.cos(i * math.pi / 6), cz + 0.5 * rr * math.sin(i * math.pi / 6)) for i in range(12)]
+        o.append(part(f"{name}_tail_{nm}", [ring], "tail", (0.5, 0.03, 0.03)))
+        o.append(part(f"{name}_tail_{nm}_core", [core], "tailcore", (0.9, 0.35, 0.2)))
+    a = d.point((R.sx(1392), 0, R.sz(52)), "glass"); b = d.point((R.sx(1462), 770 * SW, R.sz(44)), "glass")
+    o.append(part(name + "_wing", boxf((a[0], 0, a[2]), (b[0], b[1], b[2])), "paint", (0.05, 0.16, 0.55)))
+    s0 = d.point((R.sx(1405), 560 * SW, R.sz(88)), "glass"); s1 = d.point((R.sx(1440), 600 * SW, R.sz(52)), "glass")
+    o.append(part(name + "_wing_stand", boxf(s0, s1), "paint", (0.05, 0.16, 0.55)))
+    m0 = d.point((R.sx(835), 835 * SW, R.sz(104)), "glass"); m1 = d.point((R.sx(868), 960 * SW, R.sz(84)), "glass")
+    o.append(part(name + "_mirror", boxf(m0, m1), "paint", (0.05, 0.16, 0.55)))
+    return o
 
 
 _mats = {}
@@ -226,6 +279,7 @@ def main(out):
         sc = bpy.context.scene
         objs, nf = build("r34_" + name, params)
         tris = sum(len(p.vertices) - 2 for o in objs for p in o.data.polygons)
+        print("parts:", len(objs))
         print(name, "body faces", nf, "total tris", tris)
         bpy.ops.object.select_all(action="SELECT")
         bpy.ops.export_scene.gltf(filepath=os.path.join(out, f"r34_{name}.glb"), use_selection=True)
@@ -248,9 +302,9 @@ def main(out):
     im = Image.new("RGB", (W * 2, H * 4 + 30), (255, 255, 255)); dr = ImageDraw.Draw(im)
     for i, name in enumerate(("real", "chibi")):
         files, tris = sheets[name]
-        dr.text((i * W + 10, 8), f"R34 body v1 - {name.upper()}  ({tris} triangles incl. wheels)", fill=(0, 0, 0))
+        dr.text((i * W + 10, 8), f"R34 body v2 - {name.upper()}  ({tris} triangles incl. wheels)", fill=(0, 0, 0))
         for j, f in enumerate(files): im.paste(Image.open(f).convert("RGB"), (i * W, 30 + j * H))
-    im.save(os.path.join(out, "r34_body_v1.png"))
+    im.save(os.path.join(out, "r34_body_v2.png"))
 
 
 if __name__ == "__main__":

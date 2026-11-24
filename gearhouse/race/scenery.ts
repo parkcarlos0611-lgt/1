@@ -7,8 +7,25 @@ import type { Track } from './track';
 
 export interface Placed { kind: string; x: number; y: number; heading: number; z?: number; overhead?: boolean; /** a size the prop's mesh takes (an abutment's height, mm) */ arg?: number }
 export interface GroundLine { pts: [number, number][]; width: number; kind: 'rail' | 'river' | 'road' }
-export interface GroundArea { pts: [number, number][]; kind: 'apron' | 'mown' }
-export interface Scenery { props: Placed[]; lines: GroundLine[]; areas: GroundArea[]; railway: [number, number][] }
+/** the ground's patches: the paddock's gravel apron, the mown strip; the stone paving and paths of a square, a gravel
+ *  car park, the trodden grass of a spectators' enclosure (review 181) */
+export interface GroundArea { pts: [number, number][]; kind: 'apron' | 'mown' | 'paving' | 'gravel' | 'trodden' }
+/** a tree of the woods (review 181): drawn many at once by the renderer, near as a low-poly tree, far as a card. kind:
+ *  0 round-headed (oak, elm), 1 Scots pine, 2 poplar, 3 bush; size: times the tree's mesh; rank 0..1: a density keeps
+ *  the trees whose rank is under its share (DENSITY_SHARE), so the thinner woods are the denser ones thinned */
+export interface Tree { x: number; y: number; z: number; kind: number; size: number; heading: number; rank: number }
+/** props: drawn one by one (and in the baked pictures); detail: the many small things of the site plan (review 181),
+ *  which the live renderer gathers into a few meshes by place; trees: the woods, instanced */
+export interface Scenery { props: Placed[]; lines: GroundLine[]; areas: GroundArea[]; railway: [number, number][]; trees?: Tree[]; detail?: Placed[] }
+/** the graphics setting 풍경 밀도 (scenery density): how many of the woods' trees stand */
+export type Density = 'low' | 'mid' | 'high';
+export const DENSITY_SHARE: Record<Density, number> = { low: 0.3, mid: 0.6, high: 1 };
+let density: Density = 'mid';
+/** the setting as the shell holds it (ui/shell/settings.ts); the renderer reads it each frame */
+export function setSceneryDensity(d: Density): void { if (d in DENSITY_SHARE) density = d; }
+export function sceneryDensity(): Density { return density; }
+/** the trees that stand at a density */
+export function treesAt(S: Scenery, d: Density = density): Tree[] { const k = DENSITY_SHARE[d]; return (S.trees ?? []).filter(t => t.rank < k); }
 
 export function millbrookScenery(T: Track): Scenery { const L = T.length, W2 = T.spec.width / 2, props: Placed[] = [], lines: GroundLine[] = [], areas: GroundArea[] = [];
   let r = 20251122; const rnd = () => { r = (r * 16807) % 2147483647; return r / 2147483647; };
@@ -47,13 +64,110 @@ export function millbrookScenery(T: Track): Scenery { const L = T.length, W2 = T
     props.push({ kind: 'windsock', x: mid[0]! + 40, y: mid[1]! - 30, heading: 0 }); }
   // ---- straw bales on the corner entries, the woods round the outside and on the Members' hill ----
   for (const s of [mem.s0 - 30, byf.s0 - 30, home.s1 - 10]) for (let k = 0; k < 3; k++) facing('hayBales', s + k * 6, W2 + 3);
+  const encl = enclosures(T), inEnclosure = (s: number, o: number) => encl.some(e => s > e.s0 - 5 && s < e.s1 + 5 && o > e.o0 - 3 && o < e.o1 + 3);
   const busy = (s: number) => Math.abs(T.gap(start + 100, s)) < 380;   // keep the stands' side open
   const nearRail = (s: number) => s > rail.s0 - 120 && s < rail.s1 + 120, works = (s: number) => s > rail.s0 + 200 && s < rail.s0 + 230 + 9 * 15.5;
   for (let s = 0; s < L; s += 6) { if (busy(s)) continue; const k = rnd(); if (k < 0.7 && !nearRail(s)) { const kind = k < 0.2 ? 'treeRound' : k < 0.32 ? 'treePoplar' : 'treePine', bank = T.bankAt(s).b ? T.height(s, -W2) * 2.4 : 0, p = T.point(s + rnd() * 6, -(W2 + 5 + bank + rnd() * 30)); props.push({ kind, x: p.x, y: p.y, heading: rnd() * 6.28 }); }
-    if (s > mem.s0 + 60 && s < mem.s1 - 60 && rnd() < 0.6) { const p = T.point(s, W2 + 7 + rnd() * 45); props.push({ kind: rnd() < 0.6 ? 'treeRound' : 'bush', x: p.x, y: p.y, heading: rnd() * 6.28 }); }
-    if (!works(s) && !(s > mem.s0 + 60 && s < mem.s1 - 60) && rnd() < 0.18) { const p = T.point(s, W2 + 12 + rnd() * 40); props.push({ kind: rnd() < 0.5 ? 'treeRound' : 'bush', x: p.x, y: p.y, heading: rnd() * 6.28 }); }   // inside the circuit, a few
+    if (s > mem.s0 + 60 && s < mem.s1 - 60 && rnd() < 0.6) { const o = W2 + 7 + rnd() * 45, p = T.point(s, o), q: Placed = { kind: rnd() < 0.6 ? 'treeRound' : 'bush', x: p.x, y: p.y, heading: rnd() * 6.28 }; if (!inEnclosure(s, o)) props.push(q); }   // (none inside a spectators' enclosure, review 181; the draws kept so the rest stand where they stood)
+    if (!works(s) && !(s > mem.s0 + 60 && s < mem.s1 - 60) && rnd() < 0.18) { const o = W2 + 12 + rnd() * 40, p = T.point(s, o), q: Placed = { kind: rnd() < 0.5 ? 'treeRound' : 'bush', x: p.x, y: p.y, heading: rnd() * 6.28 }; if (!inEnclosure(s, o)) props.push(q); }   // inside the circuit, a few
     if (rnd() < 0.08 && !nearRail(s) && !T.bankAt(s).b) { const p = T.point(s, -(W2 + 6 + rnd() * 4)); /* not on the earth bank behind a banking */ props.push({ kind: 'bush', x: p.x, y: p.y, heading: rnd() * 6.28 }); } }
-  return { props, lines, areas, railway }; }
+  const mown = areas.find(a => a.kind === 'mown')!.pts;
+  const { trees, detail } = millbrookPlan(T, { props, lines, areas, start, HOME: home.s1, ME: mem.s1, RA: rail.s1, BY: byf.s1, mown, encl });
+  return { props, lines, areas, railway, trees, detail }; }
+
+/** the spectators' enclosures of the site plan (review 165, purple): inside the Members' Banking, and twice inside the
+ *  Byfleet Banking (that by the river cut in two either side of it); along the track from s0 to s1, from o0 to o1 to its left */
+export function enclosures(T: Track): { s0: number; s1: number; o0: number; o1: number }[] { const W2 = T.spec.width / 2, HOME = pieceSpan(T, 'Home Straight').s1, RA = pieceSpan(T, 'Railway Straight').s1, BY = pieceSpan(T, 'Byfleet Banking').s1, river = RA + 420;
+  return [{ s0: HOME + 120, s1: HOME + 420, o0: W2 + 8, o1: W2 + 40 }, { s0: RA + 200, s1: river - 28, o0: W2 + 8, o1: W2 + 35 }, { s0: river + 28, s1: RA + 700, o0: W2 + 8, o1: W2 + 35 }, { s0: BY - 700, s1: BY - 250, o0: W2 + 8, o1: W2 + 35 }]; }
+
+// ---- the site plan carried out (review 181: tools/ref/plan/millbrook_enrich_plan.py, docs/reference/millbrook_enrich_plan_165.png):
+// the plan's every place by distance along the track and offset to its left, as its script drew them. The woods: a
+// dense belt outside the track (W2+30..150 m out) but along the stands and the car park, thinner beyond the railway;
+// eight groves inside; a line of trees along the inside of every straight and banking (but the start and the
+// aerodrome), a wood four rows deep behind the paddock and two rows behind the car park. The spectators' enclosures,
+// marshals' posts at the corners, straw bales at their entries, advertising boards along the straights; at the start the
+// clock tower's square (paving, a low brick wall, flower beds, benches, lamps, three flagpoles and a notice board),
+// paths to the timing box and the paddock, bunting along both fences, marquees and a kiosk, the car park with the
+// period's cars, its road and telegraph poles. Each tree is kept clear of the concrete (W2 + 12 m), the railway, the
+// river, the roads, the buildings, the mown strip and the plan's squares and enclosures. Seeded.
+function millbrookPlan(T: Track, c: { props: Placed[]; lines: GroundLine[]; areas: GroundArea[]; start: number; HOME: number; ME: number; RA: number; BY: number; mown: [number, number][]; encl: { s0: number; s1: number; o0: number; o1: number }[] }): { trees: Tree[]; detail: Placed[] } {
+  const W2 = T.spec.width / 2, L = T.length, { start, HOME, ME, RA, BY } = c, trees: Tree[] = [], detail: Placed[] = [];
+  let r = 16501651; const rnd = () => { r = (r * 16807) % 2147483647; return r / 2147483647; };
+  const zAt = (s: number, o: number) => Math.abs(o) < W2 + 40 ? T.ground(s, o) : -0.03;
+  /** a thing at (s, o); its front toward the track (as `facing`), turned by `turn` more */
+  const put = (kind: string, s: number, o: number, arg?: number, turn = 0) => { const p = T.point(s, o), h = T.at(s).h; detail.push({ kind, x: p.x, y: p.y, z: zAt(s, o), heading: (o < 0 ? h + Math.PI : h) + turn, arg }); };
+  /** a run of a fence or wall from (s0, o0) to (s1, o1), in pieces up to `piece` m: each piece's mesh `kind` its length long */
+  const run = (kind: string, s0: number, o0: number, s1: number, o1: number, piece = 10) => { const a = T.point(s0, o0), b = T.point(s1, o1), len = Math.hypot(b.x - a.x, b.y - a.y), n = Math.max(1, Math.ceil(len / piece));
+    for (let k = 0; k < n; k++) { const t0 = k / n, t1 = (k + 1) / n, sa = s0 + (s1 - s0) * t0, sb = s0 + (s1 - s0) * t1, oa = o0 + (o1 - o0) * t0, ob = o0 + (o1 - o0) * t1, p = T.point(sa, oa), q = T.point(sb, ob), sm = (sa + sb) / 2, om = (oa + ob) / 2;
+      detail.push({ kind, x: (p.x + q.x) / 2, y: (p.y + q.y) / 2, z: zAt(sm, om), heading: Math.atan2(p.y - q.y, p.x - q.x), arg: Math.round(Math.hypot(q.x - p.x, q.y - p.y) * 1000) }); } };
+  const band = (s0: number, s1: number, o0: number, o1: number, step = 10): [number, number][] => { const a: [number, number][] = [], b: [number, number][] = [];
+    for (let s = s0; s < s1; s += step) { const p = T.point(s, o0), q = T.point(s, o1); a.push([p.x, p.y]); b.push([q.x, q.y]); } const p = T.point(s1, o0), q = T.point(s1, o1); a.push([p.x, p.y]); b.push([q.x, q.y]); return [...a, ...b.reverse()]; };
+  // ---- what keeps the trees away: the concrete, the lines, the buildings, the mown strip, the plan's own squares ----
+  const cell = 30, grid = new Map<string, [number, number][]>(); for (const n of T.nodes) { const k = `${Math.floor(n.x / cell)},${Math.floor(n.y / cell)}`; (grid.get(k) ?? grid.set(k, []).get(k)!).push([n.x, n.y]); }
+  const trackGap = (x: number, y: number) => { let d = Infinity; const i = Math.floor(x / cell), j = Math.floor(y / cell); for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) for (const [nx, ny] of grid.get(`${i + a},${j + b}`) ?? []) d = Math.min(d, (nx - x) ** 2 + (ny - y) ** 2); return Math.sqrt(d); };
+  const segGap = (pts: [number, number][], x: number, y: number) => { let d = Infinity; for (let k = 0; k + 1 < pts.length; k++) { const [ax, ay] = pts[k]!, [bx, by] = pts[k + 1]!, dx = bx - ax, dy = by - ay, t = Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / (dx * dx + dy * dy || 1))); d = Math.min(d, Math.hypot(ax + dx * t - x, ay + dy * t - y)); } return d; };
+  const inPoly = (pts: [number, number][], x: number, y: number) => { let ins = false; for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) { const [xi, yi] = pts[i]!, [xj, yj] = pts[j]!; if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) ins = !ins; } return ins; };
+  const BIG: Record<string, number> = { grandstandBay: 13, clubhouseWing: 10, clubhouseCentre: 10, garageBay: 11, hangarBay: 19, factoryBay: 14, stationBuilding: 11, platform: 10, signalBox: 6, biplane: 9, windsock: 5, bridgeAbutment: 7, riverBridge: 10, clockTower: 5, timingBox: 5, scoreboard: 9, hoarding: 6, teaHut: 5, fuelPumps: 5, telegraphPole: 2.5 };
+  const big = c.props.filter(p => BIG[p.kind]), keepOut: [number, number][][] = [];
+  const clear = (x: number, y: number) => { if (trackGap(x, y) < W2 + 12 || inPoly(c.mown, x, y)) return false;
+    for (const l of c.lines) if (segGap(l.pts, x, y) < (l.kind === 'rail' ? 9 : l.kind === 'river' ? l.width / 2 + 6 : l.width / 2 + 4)) return false;
+    for (const p of big) if (Math.hypot(p.x - x, p.y - y) < BIG[p.kind]! + 3) return false; for (const k of keepOut) if (inPoly(k, x, y)) return false; return true; };
+  const tree = (x: number, y: number, z: number, mix: number[], rank = rnd()) => { const k = rnd(); let kind = 0; for (let i = 0, acc = 0; i < mix.length; i++) { acc += mix[i]!; if (k < acc) { kind = i; break; } kind = i; }
+    const size = 0.82 + rnd() * 0.45, heading = rnd() * 6.283; if (clear(x, y)) trees.push({ x, y, z, kind, size: kind === 3 ? size * 1.1 : size, heading, rank }); };
+  const treeAt = (s: number, o: number, mix: number[], rank?: number) => { const p = T.point(s, o); tree(p.x, p.y, zAt(s, o), mix, rank); };
+  const BELT = [0.42, 0.3, 0.1, 0.18], LINE = [0.55, 0.05, 0.3, 0.1], GROVE = [0.62, 0.28, 0.04, 0.06];
+  // ---- the start (the plan's detail, review 165): along the track from the line (u) and to its left (v) ----
+  const S = (u: number) => start + u, cu = 22, V = W2;
+  // the clock tower's square: paving, a low brick wall round three sides (a gate in the back, the paths through the
+  // sides), two flower beds, four benches, five lamps, three flagpoles, the notice board; the paths to the timing box and the paddock
+  c.areas.push({ pts: band(S(cu - 24), S(cu + 30), V + 3.5, V + 30, 6), kind: 'paving' }, { pts: band(S(cu + 30), S(140), V + 15, V + 19, 10), kind: 'paving' }, { pts: band(S(-10), S(cu - 24), V + 15, V + 19, 6), kind: 'paving' });
+  keepOut.push(band(S(cu - 28), S(cu + 34), V, V + 34, 6), band(S(-14), S(150), V + 12, V + 22, 10));
+  run('lowWall', S(cu - 24), V + 30.5, S(cu - 3), V + 30.5, 7); run('lowWall', S(cu + 3), V + 30.5, S(cu + 30), V + 30.5, 7);
+  for (const u of [cu - 24, cu + 30]) { run('lowWall', S(u), V + 3.5, S(u), V + 15, 12); run('lowWall', S(u), V + 19, S(u), V + 30.5, 12); }
+  for (const u of [cu - 16, cu + 16]) put('flowerBed', S(u), V + 20);
+  for (const [u, v, t] of [[cu - 10, V + 27, 0], [cu + 10, V + 27, 0], [cu - 20, V + 12, Math.PI], [cu + 24, V + 12, Math.PI]] as const) put('parkBench', S(u), v, undefined, t);
+  for (const [u, v] of [[cu - 22, V + 5], [cu + 28, V + 5], [cu - 22, V + 28], [cu + 28, V + 28], [cu, V + 28]] as const) put('streetLamp', S(u), v);
+  for (let k = 0; k < 3; k++) put('flagpole', S(cu + 6 + k * 4), V + 7, k);
+  put('noticeBoard', S(cu - 6.5), V + 5.3);
+  // bunting along both fences; straw bales before the line; marquees and a kiosk across the track; the telegraph poles
+  for (const v of [V + 3, -(V + 3)]) for (let u = -60; u < 140; u += 10) run('bunting', S(u), v, S(u + 10), v, 10);
+  for (const u of [-38, -32, -26]) put('hayBales', S(u), V + 3.6);
+  for (const [u, a] of [[-55, 0], [105, 1], [125, 0]] as const) put('marquee', S(u), -(V + 26), a);
+  keepOut.push(band(S(-64), S(134), -(V + 36), -(V + 20), 10));
+  for (const u of [-62, -30, 150]) put('telegraphPole', S(u), -(V + 6));
+  // the car park: gravel; four rows of nine of the period's cars, nose to tail along the track; its road out and poles beside it
+  c.areas.push({ pts: band(S(-60), S(140), -(V + 45), -(V + 110), 10), kind: 'gravel' }); keepOut.push(band(S(-64), S(144), -(V + 41), -(V + 112), 10));
+  for (let row = 0; row < 4; row++) for (let k = 0; k < 9; k++) { const u = -50 + k * 20 + (row % 2) * 6 + 2.3, v = [-(V + 55), -(V + 72), -(V + 88), -(V + 102)][row]! - 0.9, p = T.point(S(u), v), h = T.at(S(u)).h;
+    detail.push({ kind: 'parkedCar', x: p.x, y: p.y, z: -0.02, heading: h + (rnd() < 0.5 ? 0 : Math.PI) + (rnd() - 0.5) * 0.06, arg: Math.floor(rnd() * 11) }); }
+  { const road: [number, number][] = []; for (let k = 0; k <= 5; k++) { const p = T.point(S(10), -(V + 110 + k * 40)); road.push([p.x, p.y]); } c.lines.push({ pts: road, width: 8, kind: 'road' });
+    for (let k = 0; k < 4; k++) put('telegraphPole', S(19), -(V + 112) - k * 8); for (let d = 150; d <= 310; d += 35) put('telegraphPole', S(19), -(V + d)); }
+  // the wood behind the paddock, four rows; two rows behind the car park, the road kept open (always there: rank under 0.6)
+  for (let u = -60; u < 260; u += 6) for (let row = 0; row < 4; row++) treeAt(S(u + (rnd() - 0.5) * 4 + row * 3), V + 58 + row * 9 + rnd() * 4, BELT.map((m, i) => i === 3 ? 0.05 : m), rnd() * 0.6);
+  for (let u = -66; u < 260; u += 6) for (let row = 0; row < 2; row++) { if (u >= 0 && u <= 20) continue; treeAt(S(u + (rnd() - 0.5) * 4 + row * 3), -(V + 113) - row * 6, BELT, rnd() * 0.6); }
+  // ---- the spectators' enclosures: trodden grass, a white fence round, benches in two rows, marquees and a kiosk ----
+  for (const e of c.encl) { c.areas.push({ pts: band(e.s0, e.s1, e.o0, e.o1, 10), kind: 'trodden' }); keepOut.push(band(e.s0 - 4, e.s1 + 4, e.o0 - 3, e.o1 + 4, 10));
+    run('railFence', e.s0, e.o0, e.s1, e.o0); run('railFence', e.s0, e.o1, e.s1, e.o1); run('railFence', e.s0, e.o0, e.s0, e.o1); run('railFence', e.s1, e.o0, e.s1, e.o1);
+    const tents: number[] = []; for (let s = e.s0 + 40; s < e.s1 - 20; s += 90) tents.push(s);
+    tents.forEach((s, k) => put('marquee', s, e.o1 - 10, k % 3 === 1 ? 1 : 0));
+    for (let s = e.s0 + 6; s < e.s1 - 4; s += 7) { if (tents.some(t => Math.abs(t - s) < 9)) continue; put('parkBench', s, e.o0 + 4); if ((s - e.s0) % 14 < 7) put('parkBench', s + 3.5, e.o0 + 10); } }
+  // ---- the corners: a marshal's post at each (red), straw bales at the entries (yellow; none on the bales there already) ----
+  for (const s of [HOME + 20, (HOME + ME) / 2, ME - 20, RA + 20, (RA + BY) / 2, BY - 20, BY + 60]) put('marshalPost', s, W2 + 5);
+  const bales = c.props.filter(p => p.kind === 'hayBales');
+  for (const s of [ME + 30, BY + 30, BY + 90, RA - 40, HOME - 60]) for (let k = 0; k < 3; k++) { const p = T.point(s + k * 8, W2 + 3); if (bales.some(b => Math.hypot(b.x - p.x, b.y - p.y) < 4)) continue; put('hayBales', s + k * 8, W2 + 3); }
+  // ---- the advertising boards along the straights (blue), outside, the firms in turn ----
+  { let k = 0; for (let s = start + 220; s < HOME - 40; s += 30) put('adBoard', s, -(W2 + 5), k++); for (let s = ME + 120; s < RA - 120; s += 45) put('adBoard', s, -(W2 + 5), k++); }
+  // ---- the woods: the belt outside (but along the stands and the car park, and thinner beyond the railway), the
+  //      groves inside, the line along the inside. The candidates stand 1/0.6 as thick as the plan's trees, so the
+  //      middle density (보통) has the plan's own; a 7.5 m grid jittered 3 m (the plan's: 9 m, 85 %) ----
+  const segs: [number, number][] = []; { let cur: number | null = null; for (let s = 0; s < L; s += 10) { const ok = !(s >= start - 160 && s <= start + 420) && !(s >= ME - 60 && s <= RA + 60); if (ok && cur === null) cur = s; if (!ok && cur !== null) { segs.push([cur, s]); cur = null; } } if (cur !== null) segs.push([cur, L]); }
+  const belt = (s0: number, s1: number, o0: number, o1: number, step: number) => { for (let s = s0; s < s1; s += step) for (let o = o0; o < o1; o += step) { const ss = s + (rnd() - 0.5) * 6, oo = o + (rnd() - 0.5) * 6; treeAt(ss, -oo, BELT); } };
+  for (const [a, b] of segs) belt(a, b, W2 + 30, W2 + 150, 7.5);
+  belt(ME - 60, RA + 60, W2 + 45, W2 + 130, 8.4);
+  for (const [s, off, R] of [[RA + 500, W2 + 110, 70], [RA + 1100, W2 + 140, 85], [BY - 300, W2 + 95, 60], [ME - 300, W2 + 150, 65], [HOME + 300, W2 + 190, 55], [RA + 1500, W2 + 80, 50], [ME + 300, W2 + 120, 60], [ME + 700, W2 + 110, 55]] as const) {
+    const m = T.point(s, off), n = Math.round(R * R / 40 / 0.6); for (let k = 0; k < n; k++) { const a = rnd() * 6.283, d = R * Math.sqrt(rnd()); tree(m.x + d * Math.cos(a), m.y + d * Math.sin(a), -0.03, GROVE); } }
+  for (let s = 0; s < L; s += 6) { if ((s >= start - 100 && s <= start + 420) || (s >= ME + 200 && s <= RA - 200)) continue;
+    const e = c.encl.find(q => s > q.s0 - 6 && s < q.s1 + 6), o = e ? e.o1 + 6 + rnd() * 8 : W2 + 22 + rnd() * 10; treeAt(s + (rnd() - 0.5) * 3, o, LINE); }
+  return { trees, detail }; }
 
 /** where a named piece of the track runs (the first piece of that name) */
 export function pieceSpan(T: Track, name: string): { s0: number; s1: number } { let acc = 0; for (const p of T.spec.pieces) { const len = p.kind === 'straight' ? p.len : Math.abs(p.radius * p.turn * Math.PI / 180); if (p.name === name) return { s0: acc, s1: acc + len }; acc += len; } return { s0: 0, s1: 0 }; }

@@ -6,7 +6,11 @@ import type { Track } from '../../race/track';
 import type { Scenery } from '../../race/scenery';
 
 /** trk (review 122): each vertex's place on the track (distance along, offset across, m) and what it is (1 the concrete), for the shader's concrete */
-export interface GroundData { pos: Float32Array; col: Uint8Array; flag: Float32Array; n: number; trk?: Float32Array }
+export interface GroundData { pos: Float32Array; col: Uint8Array; flag: Float32Array; n: number; trk?: Float32Array;
+  /** the scenery the renderer draws with this ground (review 181): the woods and the site plan's small things, kept by the renderer as long as the same scenery is set */
+  layer?: { T: Track; S: Scenery } }
+/** each kind of ground patch: its colour, its height (the ones laid over others a little higher), grass-speckled or not */
+const AREA: Record<string, { col: string; z: number; grass: number }> = { apron: { col: '#a49a83', z: -0.02, grass: 0 }, mown: { col: '#6a8452', z: -0.02, grass: 1 }, trodden: { col: '#73845a', z: -0.019, grass: 1 }, gravel: { col: '#9b958a', z: -0.018, grass: 0 }, paving: { col: '#bcae94', z: -0.016, grass: 0 } };
 class Tris { P: number[] = []; C: number[] = []; F: number[] = []; K: number[] = [];
   tri(a: number[], b: number[], c: number[], col: number[], flag = 0, t?: number[][]) { this.P.push(...a, ...b, ...c); for (let k = 0; k < 3; k++) { this.C.push(col[0]!, col[1]!, col[2]!); this.F.push(flag); this.K.push(...(t ? t[k]! : [0, 0, 0])); } }
   quad(a: number[], b: number[], c: number[], d: number[], col: number[], flag = 0, t?: number[][]) { this.tri(a, b, c, col, flag, t && [t[0]!, t[1]!, t[2]!]); this.tri(a, c, d, col, flag, t && [t[0]!, t[2]!, t[3]!]); }
@@ -34,7 +38,7 @@ export function groundData(T: Track, S: Scenery, start: number, maxStep = 1): Gr
   // the fields: one wide sheet a little below the concrete's foot
   { let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity; for (const n of T.nodes) { x0 = Math.min(x0, n.x); x1 = Math.max(x1, n.x); y0 = Math.min(y0, n.y); y1 = Math.max(y1, n.y); }
     const m = 1500, z = -0.03; g.quad([x0 - m, y0 - m, z], [x1 + m, y0 - m, z], [x1 + m, y1 + m, z], [x0 - m, y1 + m, z], hex('#5d7348'), 1); }
-  for (const a of S.areas) { const col = hex(a.kind === 'apron' ? '#a49a83' : '#6a8452'), z = -0.02; for (const [i, j, k] of earcut(a.pts)) g.tri([...a.pts[i]!, z], [...a.pts[j]!, z], [...a.pts[k]!, z], col, a.kind === 'mown' ? 1 : 0); }
+  for (const a of S.areas) { const A = AREA[a.kind] ?? AREA.mown!, col = hex(A.col), z = A.z; for (const [i, j, k] of earcut(a.pts)) g.tri([...a.pts[i]!, z], [...a.pts[j]!, z], [...a.pts[k]!, z], col, A.grass); }
   const band = (pts: [number, number][], w: number, col: number[], z: number) => { for (let k = 0; k + 1 < pts.length; k++) { const [xa, ya] = pts[k]!, [xb, yb] = pts[k + 1]!, dx = xb - xa, dy = yb - ya, l = Math.hypot(dx, dy) || 1, nx = -dy / l * w / 2, ny = dx / l * w / 2;
       g.quad([xa + nx, ya + ny, z], [xb + nx, yb + ny, z], [xb - nx, yb - ny, z], [xa - nx, ya - ny, z], col); } };
   for (const l of S.lines) {
@@ -62,7 +66,7 @@ export function groundData(T: Track, S: Scenery, start: number, maxStep = 1): Gr
       const zo = (e: number) => Math.min(e - 0.035, -0.012), zm = (e: number) => e - 0.03;
       g.quad([A.x, A.y, e0 - 0.004], [B.x, B.y, e1 - 0.004], [n2[0]!, n2[1]!, zm(e1)], [m[0]!, m[1]!, zm(e0)], hex('#6a7a55'), 1, [[s, o0, 2], [s1, o0, 2], [s1, side * (W2 + 0.44), 2], [s, side * (W2 + 0.44), 2]]);
       g.quad([m[0]!, m[1]!, zm(e0)], [n2[0]!, n2[1]!, zm(e1)], [C.x, C.y, zo(e1)], [D.x, D.y, zo(e0)], hex('#5d7348'), 1, [[s, side * (W2 + 0.44), 2], [s1, side * (W2 + 0.44), 2], [s1, o1, 2], [s, o1, 2]]); } }
-  return g.done(); }
+  const d = g.done(); if (S.trees?.length || S.detail?.length) d.layer = { T, S }; return d; }
 
 /** the fence along both edges: a rail at 0.9 m, a post every 3 m, the stretches not broken */
 export function fenceData(T: Track, ok: (side: number, m: number) => boolean): GroundData { const g = new Tris(), W2 = T.spec.width / 2, L = Math.round(T.length), white = hex('#e8e3d6');

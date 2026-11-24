@@ -9,7 +9,7 @@ export interface ListStore extends KeyStore { readonly length: number; key(i: nu
 
 export type Look = 'pbr' | 'stepped' | 'baked' | 'toon';
 export interface Settings {
-  graphics: { /** the live renderer (WebGL2) where the browser has it */ live: boolean; look: Look; photoGround: boolean; hdri: boolean; blur: boolean };
+  graphics: { /** the live renderer (WebGL2) where the browser has it */ live: boolean; look: Look; photoGround: boolean; hdri: boolean; blur: boolean; /** 풍경 밀도: how many trees the woods have (review 181) */ scenery: 'low' | 'mid' | 'high' };
   sound: { /** the engine and the place in the drive */ on: boolean; volume: number; /** the menus' short sounds */ ui: boolean };
   controls: { /** the drive's screen buttons: by the screen's kind (a touch screen shows them), always, never */ touch: 'auto' | 'on' | 'off'; auto: boolean; tcs: boolean; assist: boolean; progressive: boolean };
   screen: { theme: 'auto' | 'light' | 'dark'; /** fewer moving things (the fades, the turntable) */ calm: boolean };
@@ -19,7 +19,7 @@ export interface Settings {
 }
 export const SETTINGS_KEY = 'gearhouse.settings.v1';
 export const DEFAULTS: Settings = {
-  graphics: { live: true, look: 'pbr', photoGround: true, hdri: true, blur: true },
+  graphics: { live: true, look: 'pbr', photoGround: true, hdri: true, blur: true, scenery: 'mid' },
   sound: { on: false, volume: 0.7, ui: false },
   controls: { touch: 'auto', auto: true, tcs: true, assist: false, progressive: false },
   screen: { theme: 'auto', calm: false },
@@ -33,7 +33,7 @@ const unit = (v: unknown, d: number) => typeof v === 'number' && Number.isFinite
 /** any value made into settings: the fields it has right, the rest the defaults */
 export function asSettings(v: unknown): Settings { const o = obj(v), g = obj(o.graphics), s = obj(o.sound), c = obj(o.controls), sc = obj(o.screen), sb = obj(o.sandbox), D = DEFAULTS;
   return {
-    graphics: { live: bool(g.live, D.graphics.live), look: one(g.look, ['pbr', 'stepped', 'baked', 'toon'] as const, D.graphics.look), photoGround: bool(g.photoGround, D.graphics.photoGround), hdri: bool(g.hdri, D.graphics.hdri), blur: bool(g.blur, D.graphics.blur) },
+    graphics: { live: bool(g.live, D.graphics.live), look: one(g.look, ['pbr', 'stepped', 'baked', 'toon'] as const, D.graphics.look), photoGround: bool(g.photoGround, D.graphics.photoGround), hdri: bool(g.hdri, D.graphics.hdri), blur: bool(g.blur, D.graphics.blur), scenery: one(g.scenery, ['low', 'mid', 'high'] as const, D.graphics.scenery) },
     sound: { on: bool(s.on, D.sound.on), volume: unit(s.volume, D.sound.volume), ui: bool(s.ui, D.sound.ui) },
     controls: { touch: one(c.touch, ['auto', 'on', 'off'] as const, D.controls.touch), auto: bool(c.auto, D.controls.auto), tcs: bool(c.tcs, D.controls.tcs), assist: bool(c.assist, D.controls.assist), progressive: bool(c.progressive, D.controls.progressive) },
     screen: { theme: one(sc.theme, ['auto', 'light', 'dark'] as const, D.screen.theme), calm: bool(sc.calm, D.screen.calm) },

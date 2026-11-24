@@ -12,6 +12,7 @@ import texMeta from '../../assets/textures/pbr/pbr.json';
 import { Router, type Screen } from './router';
 import { Stage, Backdrop } from './stage';
 import { loadSettings, saveSettings, type ListStore } from './settings';
+import { setSceneryDensity } from '../../race/scenery';
 import type { ShellCtx, Last } from './ctx';
 import { titleScreen, garageScreen, pickScreen, settingsScreen, aboutScreen } from './menus';
 import { builderScreen, driveScreen, resultsScreen } from './play';
@@ -56,7 +57,7 @@ const ctx: ShellCtx = { router, stage, backdrop, store, settings, layer: $('gh-l
   recent() { return currentDesign(store) ?? savedDesigns(store)[0] ?? (preset ??= fromPreset('f355', 'F355 프리셋')); } };
 /** the settings at work: the theme, the menus' sounds, the calm screen, the drive's own fields */
 function applySettings() { const t = settings.screen.theme; if (t === 'auto') delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = t;
-  uiSounds(settings.sound.ui); backdrop.calm = settings.screen.calm || matchMedia('(prefers-reduced-motion: reduce)').matches; backdrop.redraw(); screens.drive?.apply?.(); }
+  uiSounds(settings.sound.ui); setSceneryDensity(settings.graphics.scenery); backdrop.calm = settings.screen.calm || matchMedia('(prefers-reduced-motion: reduce)').matches; backdrop.redraw(); screens.drive?.apply?.(); }
 
 const drive = driveScreen(ctx), builder = builderScreen(ctx), engine = engineScreen(ctx);
 Object.assign(screens, { title: titleScreen(ctx), garage: garageScreen(ctx), pick: pickScreen(ctx), settings: settingsScreen(ctx), about: aboutScreen(ctx), builder, drive, engine, results: resultsScreen(ctx) });

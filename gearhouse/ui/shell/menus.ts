@@ -94,6 +94,7 @@ export function settingsScreen(ctx: ShellCtx): Screen<never> {
       toggle('사진 콘크리트 (Poly Haven 텍스처)', S().graphics.photoGround, v => set(s => { s.graphics.photoGround = v; })),
       toggle('HDRI 하늘 (사진 하늘의 반사와 빛)', S().graphics.hdri, v => set(s => { s.graphics.hdri = v; })),
       toggle('모션 블러', S().graphics.blur, v => set(s => { s.graphics.blur = v; })),
+      chips('풍경 밀도 (나무 수)', [['low', '낮음'], ['mid', '보통'], ['high', '높음']], S().graphics.scenery, v => set(s => { s.graphics.scenery = v; })),
       el('p', 'gh-note', '빛 세기, 반사, 블룸, 선, 시대감 같은 세부 효과는 주행 화면의 ⚙ 서랍 "개발자" 탭에 있습니다.'));
     const snd = pane(toggle('주행 소리 (엔진, 타이어, 바람, 주변음)', S().sound.on, v => set(s => { s.sound.on = v; })),
       slider('음량', [0, 1, 0.05], S().sound.volume, v => set(s => { s.sound.volume = v; }), v => `${Math.round(v * 100)} %`),

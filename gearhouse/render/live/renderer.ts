@@ -5,7 +5,7 @@
 // from a shadow map; then a pass draws the dark outline round each thing and the thin lines between its parts from those
 // layers, as the baked pictures have them. A car something stands before shows its light outline over just the hidden
 // part. The picture is enlarged by whole pixels on the page.
-import { freeGpu, gpuMesh, program, placeMesh, mul, translate, rot, ATTR, type GpuMesh, type M4 } from './gpu';
+import { freeGpu, gpuMesh, program, placeMesh, mul, translate, rot, scale, ATTR, type GpuMesh, type M4 } from './gpu';
 import { RIG_BONES, poseRig } from '../car/suspension';
 import { ENGINE_BONES, poseInternals } from '../car/powertrain/internals';
 /** the bones the shaders hold: a suspension's or an engine's insides, whichever needs more (three rows each; with the
@@ -14,6 +14,9 @@ export const BONE_SLOTS = Math.max(RIG_BONES, ENGINE_BONES);
 /** a rotation (three rows) as a matrix */
 const m4of = (R: number[][]): M4 => { const m = new Float32Array(16); for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) m[c * 4 + r] = R[r]![c]!; m[15] = 1; return m; };
 import type { GroundData } from './ground';
+import { Woods } from './woods';
+import { staticChunks } from './scenerylayer';
+import type { Scenery } from '../../race/scenery';
 import type { Mesh } from '../car/mesh';
 
 export interface LiveView { x: number; y: number; z: number; /** the world heading that points up the screen */ ang: number; pitch: number; mm: number; W: number; H: number; /** the target's height on the screen (0 top .. 1 bottom) */ cy: number;
@@ -27,7 +30,7 @@ export interface LiveProp { g: GpuMesh; x: number; y: number; z: number; h: numb
 export interface Skid { x: number; y: number; z: number; a: number }
 /** a scene's set pieces off the renderer (LiveRenderer.takeScene): opaque to the screens that keep it */
 export interface LiveScene { readonly ground: [WebGLVertexArrayObject | null, number]; readonly fence: [WebGLVertexArrayObject | null, number]; readonly track: { len: number; w: number; joint: number; start: number };
-  readonly line: WebGLTexture | null; readonly gTex: unknown; readonly bTex: unknown; readonly props: Map<string, number> }
+  readonly line: WebGLTexture | null; readonly gTex: unknown; readonly bTex: unknown; readonly props: Map<string, number>; readonly layer?: unknown }
 
 const SUN_W = (() => { const v = [-0.45, 0.35, 0.82], l = Math.hypot(...v); return v.map(c => c / l) as [number, number, number]; })();   // toward the sun, world axes: from the upper left of the default view
 const LIGHT = `
@@ -756,7 +759,15 @@ export class LiveRenderer {
       gl.generateMipmap(gl.TEXTURE_2D_ARRAY); gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR); gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
       gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_S, gl.REPEAT); gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_T, gl.REPEAT); const an = gl.getExtension('EXT_texture_filter_anisotropic'); if (an) gl.texParameterf(gl.TEXTURE_2D_ARRAY, an.TEXTURE_MAX_ANISOTROPY_EXT, 8); return t; };
     this.hiTex = { alb: arr(v => v.alb), nor: arr(v => v.nor), idx }; }
-  setGround(d: GroundData) { this.groundVao = this.vaoOf(d); this.groundN = d.n; }
+  setGround(d: GroundData) { this.groundVao = this.vaoOf(d); this.groundN = d.n; this.setLayer(d.layer?.S ?? null); }
+  /** the scenery's woods and still small things (review 181): built when another scenery comes (the old one freed), kept for the same one */
+  private layer: { S: Scenery; woods: Woods | null; statics: LiveProp[] } | null = null;
+  private setLayer(S: Scenery | null) { if (this.layer?.S === S) return; if (this.layer) { this.layer.woods?.free(); for (const p of this.layer.statics) freeGpu(this.gl, p.g); } this.layer = null; if (!S) return;
+    const statics = staticChunks(S.detail ?? []).map(c => ({ g: gpuMesh(this.gl, c.mesh, false), x: c.origin[0], y: c.origin[1], z: 0, h: 0, m: mul(translate(...c.origin), scale(1 / 1000)), outline: 1 }));
+    let woods: Woods | null = null; try { woods = S.trees?.length ? new Woods(this.gl, LIGHT, S.trees) : null; } catch (e) { console.warn('woods', e); }   /* the drive goes on without them */
+    this.layer = { S, woods, statics }; }
+  /** the woods drawn now (trees in 3D, as cards, triangles), for the page tests */
+  get woodsStats() { return this.layer?.woods?.stats ?? null; }
   setFence(d: GroundData) { this.fenceVao = this.vaoOf(d); this.fenceN = d.n; }
   private frameN = 0; private propP!: WebGLProgram; private depthI!: WebGLProgram;
   /** the photographed props (review 125): each model's buffers and pictures, and where its copies stand (their matrices) */
@@ -813,12 +824,12 @@ export class LiveRenderer {
    *  buildings' materials), to be put back later: one renderer shows the game page's screens in turn (ui/shell), each
    *  its own scene, while the sky, the car textures and the GPU copies of the meshes stay loaded */
   takeScene(): LiveScene { const s: LiveScene = { ground: [this.groundVao, this.groundN], fence: [this.fenceVao, this.fenceN], track: { ...this.trackU }, line: this.lineTex, gTex: this.gTex, bTex: this.bTex,
-      props: new Map([...this.propModels].map(([id, m]) => [id, m.count])) };
+      props: new Map([...this.propModels].map(([id, m]) => [id, m.count])), layer: this.layer }; this.layer = null;
     this.groundVao = null; this.groundN = 0; this.fenceVao = null; this.fenceN = 0; this.lineTex = null; this.gTex = null; this.bTex = null; for (const m of this.propModels.values()) m.count = 0;
     this.prevVP = null; this.prevM.clear(); return s; }
   /** a scene taken off put back (what was set meanwhile is dropped; props loaded meanwhile keep no copies) */
   putScene(s: LiveScene) { [this.groundVao, this.groundN] = s.ground; [this.fenceVao, this.fenceN] = s.fence; this.trackU = { ...s.track }; this.lineTex = s.line; this.gTex = s.gTex as typeof this.gTex; this.bTex = s.bTex as typeof this.bTex;
-    for (const [id, m] of this.propModels) m.count = s.props.get(id) ?? 0; this.prevVP = null; this.prevM.clear(); }
+    for (const [id, m] of this.propModels) m.count = s.props.get(id) ?? 0; this.layer = (s.layer as typeof this.layer) ?? null; this.prevVP = null; this.prevM.clear(); }
 
   render(v: LiveView, cars: LiveCar[], props: LiveProp[], skids: Skid[], o: { glass?: number; /** 0 the baked look, 1 PBR stepped, 2 PBR smooth, 3 toon (review 92) */ look?: number; /** the toon look: its bands (2 or 3), how far its shade's hue moves (0 plain darker, 1 as set, up to 1.5) */ toonBands?: number; toonShade?: number; /** lay the 2D art on (default yes) */ art?: boolean; /** the rays in the picture: occlusion, contact shadows, reflections (default yes) */ rays?: boolean; /** strengths: the textures, the light (1: as set) */ texK?: number; /** the time of day: 1 day (default), toward 0 dusk and night (review 117) */ day?: number; /** the concrete from photographed materials (default yes, once loaded) (review 124) */ photoGround?: boolean; /** the photographed sky in the mirrors and the light (default yes, once loaded) */ hdri?: boolean; /** the photographed props (review 125) */ props?: boolean; /** the period's pictures (review 129): 1 a 1930s newsreel, 2 a 1990s television broadcast; their strength; the size of a film or video pixel on screen */ fx?: number; fxK?: number; fxPx?: number; /** the colour's depth: deeper lacquer, the hue kept through the tone curve (0: as before; default 1) (review 116) */ deep?: number; lightK?: number; /** after the scene: occlusion and reflection strengths, bloom, depth of field (0 none; pixels of blur a metre from the focus) */ aoK?: number; reflK?: number; bloomK?: number; dof?: number; /** motion blur: the shutter, a share of a frame (0 none) */ mb?: number; /** the outline: width (times each thing's own; 0 none), darkness 0..1; the lines inside a thing (default: the baked look only), their darkness */ outW?: number; outK?: number; inner?: boolean; inK?: number; /** smoke parcels: centre, radius, density, heat, kind (0 tyre 1 dust 2 steam 3 exhaust), seed; and the time */ smoke?: { p: Float32Array; n: number; time: number } } = {}) { const gl = this.gl; this.size(v.W, v.H);
     const toon = (o.look ?? 0) === 3, toonTo = (p: WebGLProgram) => { gl.uniform1f(this.loc(p, 'uToonB'), o.toonBands ?? 3); gl.uniform1f(this.loc(p, 'uToonS'), o.toonShade ?? 1); };
@@ -841,7 +852,8 @@ export class LiveRenderer {
     LV[0] = lx[0]! / reach; LV[4] = lx[1]! / reach; LV[8] = lx[2]! / reach; LV[12] = -tx / reach; LV[1] = ly[0]! / reach; LV[5] = ly[1]! / reach; LV[9] = ly[2]! / reach; LV[13] = -ty / reach;
     LV[2] = lz[0]! / LR; LV[6] = lz[1]! / LR; LV[10] = lz[2]! / LR; LV[14] = -dot(c, lz) / LR; LV[15] = 1;
     const seen = pv ? 650 : reach, near = (x: number, y: number, r: number) => Math.abs(x - v.x) < seen + r + 20 && Math.abs(y - v.y) < seen + r + 20;
-    const ps = props.filter(p => near(p.x, p.y, p.g.radius)), carM = cars.map(q => this.carParts(q));
+    const W = this.layer?.woods; W?.update(pv ? pv.e[0] : v.x, pv ? pv.e[1] : v.y, !pv, seen);
+    const ps = (this.layer ? props.concat(this.layer.statics) : props).filter(p => near(p.x, p.y, p.g.radius)), carM = cars.map(q => this.carParts(q));
     // the head lamps alight (review 117): each lamp's middle and beam in the world, the nearest eight
     const lmpP: number[] = [], lmpD: number[] = []; cars.forEach((q, i) => { if (!q.lamps) return; const B = carM[i]!.body; for (const l of q.g.lamps) { if (l.flag !== 1 || lmpP.length >= 24) continue;
         const [x, y, z] = l.c, [a, b, c] = l.ax, wx = B[0]! * x + B[4]! * y + B[8]! * z + B[12]!, wy = B[1]! * x + B[5]! * y + B[9]! * z + B[13]!, wz = B[2]! * x + B[6]! * y + B[10]! * z + B[14]!;
@@ -854,6 +866,7 @@ export class LiveRenderer {
     const drawD = (part: { vao: WebGLVertexArrayObject; n: number }, M: M4, bones?: Float32Array) => { if (!part.n) return; gl.uniform1i(this.loc(this.depth, 'uSkin'), bones ? 1 : 0); if (bones) gl.uniform4fv(this.loc(this.depth, 'uBone'), bones); gl.uniformMatrix4fv(this.loc(this.depth, 'uModel'), false, M); gl.bindVertexArray(part.vao); gl.drawArrays(gl.TRIANGLES, 0, part.n); };
     for (const p of ps) drawD(p.g.body, (p.m ?? placeMesh(p.g.len, p.x, p.y, p.z, p.h))); for (const m of carM) for (const [part, M, , b] of m.opaque) drawD(part, M, b);
     if (this.propModels.size) { gl.useProgram(this.depthI); gl.uniformMatrix4fv(this.loc(this.depthI, 'uVP'), false, LV); for (const m of this.propModels.values()) if (m.count) { gl.bindVertexArray(m.vao); gl.drawElementsInstanced(gl.TRIANGLES, m.n, gl.UNSIGNED_INT, 0, m.count); } }
+    W?.drawDepth(LV);
     // ---- the scene: colour, which thing, depth ----
     for (const i of [0, 1, 2, 8, 9]) { gl.activeTexture(gl.TEXTURE0 + i); gl.bindTexture(gl.TEXTURE_2D, this.blank); }
     gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbo); gl.viewport(0, 0, v.W, v.H); gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.COLOR_ATTACHMENT1, gl.COLOR_ATTACHMENT2, gl.COLOR_ATTACHMENT3]);
@@ -901,6 +914,9 @@ export class LiveRenderer {
       for (const m of this.propModels.values()) { if (!m.count) continue; gl.uniform2f(this.loc(P, 'uObj'), (id & 255) / 255, ((id >> 8) & 255) / 255); id++; ([[m.alb, 'uPA', 17], [m.nor, 'uPN', 18], [m.arm, 'uPR', 19]] as const).forEach(([t, nm, u]) => { gl.activeTexture(gl.TEXTURE0 + u); gl.bindTexture(gl.TEXTURE_2D, t); gl.uniform1i(this.loc(P, nm), u); });
         gl.bindVertexArray(m.vao); gl.drawElementsInstanced(gl.TRIANGLES, m.n, gl.UNSIGNED_INT, 0, m.count); }
       gl.useProgram(this.obj); }
+    if (W) { W.draw((P, ow) => { gl.useProgram(P); lampsTo(P); gl.uniform1f(this.loc(P, 'uDay'), o.day ?? 1); gl.uniformMatrix4fv(this.loc(P, 'uVP'), false, VP); gl.uniform1i(this.loc(P, 'uHDRo'), hdrOn); gl.uniformMatrix4fv(this.loc(P, 'uPrevVP'), false, this.prevVP ?? VP); gl.uniform2f(this.loc(P, 'uSize'), v.W, v.H);   /* the woods (review 181) */
+        gl.uniform1i(this.loc(P, 'uLook'), Math.max(1, o.look ?? 0)); gl.uniform1f(this.loc(P, 'uLightK'), o.lightK ?? 1); gl.uniform1f(this.loc(P, 'uSpecK'), o.reflK ?? 1); gl.uniform3fv(this.loc(P, 'uEye'), eye); gl.uniform3fv(this.loc(P, 'uSun'), SUN_W); shadowTo(P); toonTo(P);
+        gl.uniform1f(this.loc(P, 'uOutline'), ow); gl.uniform2f(this.loc(P, 'uObj'), (id & 255) / 255, ((id >> 8) & 255) / 255); id++; }, pv ? pv.e : [v.x, v.y, v.z]); gl.useProgram(this.obj); }
     // the cars a thing hides: their light outline first, tested against what stands before them (each pixel once), then the cars over it
     gl.uniform1i(this.loc(this.obj, 'uMode'), 1); gl.depthFunc(gl.GREATER); gl.depthMask(false); gl.enable(gl.STENCIL_TEST); gl.stencilFunc(gl.EQUAL, 0, 0xff); gl.stencilOp(gl.KEEP, gl.KEEP, gl.INCR);
     gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.NONE, gl.NONE, gl.NONE]); gl.uniform1f(this.loc(this.obj, 'uBias'), 0.25 / R);

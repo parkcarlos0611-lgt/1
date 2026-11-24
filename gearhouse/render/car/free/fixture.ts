@@ -124,6 +124,8 @@ export function placeFixture(body: Body, pl: Placed, parts: ((b: Build) => void)
     for (const spec of specs) { const fp = spec.footprint.map(([p, q]) => [p * scale, q * scale] as P2); let u = cellsUnder(body, f, fp);
       // a footprint that ends up too near the cells' border takes a wider ring of cells
       for (const g of [1.8, 2.8]) if ('why' in u && u.why.includes('테두리')) u = cellsUnder(body, f, fp, g); if ('why' in u) return { ...rep, ok: false, why: u.why }; plans.push({ spec, fp, under: u }); }
+    // a hole lies in one material (a cut across the glass's edge would leave the zipped band half glass)
+    for (const pn of plans) if (new Set(pn.under.cells.map(([i, j]) => body.cellMat(i, j))).size > 1) return { ...rep, ok: false, why: '유리와 차체의 경계에 걸침' };
     // two cuts of one fixture must not share cells either
     const all = new Set<number>(); for (const pn of plans) for (const [i, j] of pn.under.cells) { const k = i * RING + j; if (all.has(k)) return { ...rep, ok: false, why: '부품의 구멍끼리 겹침' }; all.add(k); }
     for (const { spec, fp, under } of plans) for (const sg of sides) { const c = context(body, f, sg, scale, depth), mj = (j: number) => sg > 0 ? j : (RING - j) % RING;

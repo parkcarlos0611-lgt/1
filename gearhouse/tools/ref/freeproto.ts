@@ -34,7 +34,7 @@ if (want('pieces')) { const mixd = joinPieces(pieceOf(WEDGE, 'nose'), pieceOf(CA
   save('pieces', [...views(note('wedge nose + canopy cabin + coke tail', buildFree(mixd, { colours: { paint: '#2f7a4a' } }))), flat(buildFree(WEDGE).mesh, 0, 0), flat(buildFree(CANOPY).mesh, 0, 0), flat(buildFree(COKE).mesh, 0, 0)], 3); }
 const set = (): Placed[] => FIXTURE_SET.map(f => ({ fixture: f }));
 if (want('fixtures')) save('fixtures', [WEDGE, CANOPY, LONGTAIL].flatMap((s, k) => { const c = note(`fixtures on ${s.name}`, buildFree(s, { fixtures: set(), colours: { paint: PAINTS[[0, 2, 3][k]!]! } })); return [flat(c.mesh, 32, 20), flat(c.mesh, 212, 22), flat(c.mesh, 150, 16)]; }), 3);
-if (want('drag')) save('drag', [1.3, 1.5, 1.68].flatMap((s, k) => { const c = note(`duct at s=${s}`, buildFree(COKE, { fixtures: [{ fixture: NSX_DUCT, s, a: [0.5, 0.56, 0.46][k]! }], colours: { paint: '#e2b21c' } })); return [flat(c.mesh, 0, 0), flat(c.mesh, 300, 14)]; }), 2);
+if (want('drag')) save('drag', [1.3, 1.5, 1.68].flatMap((s, k) => { const c = note(`duct at s=${s}`, buildFree(COKE, { fixtures: [{ fixture: NSX_DUCT, s, a: [0.5, 0.58, 0.52][k]! }], colours: { paint: '#e2b21c' } })); return [flat(c.mesh, 0, 0), flat(c.mesh, 300, 14)]; }), 2);
 if (want('lamps')) { const c = note('lamps close', buildFree(CANOPY, { fixtures: [{ fixture: EB110_LAMP }, { fixture: F355_TAIL_LAMPS }, { fixture: REAR_WING }] })); save('lamps', [flat(c.mesh, 40, 30), flat(c.mesh, 230, 18)], 2); }
 if (want('morph')) save('morph', [-120, 0, 120].map(dv => flat(note(`roof dragged ${dv}`, buildFree(dragCurve(LONGTAIL, 'top', 2.3, dv, 0.35), { colours: { paint: '#1f4f9c' } })).mesh, 0, 0)), 3);
 console.log(log.join('\n'));

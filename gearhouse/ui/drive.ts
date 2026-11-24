@@ -3,15 +3,17 @@
 // its joints and edges, the bridges); the car is its 3D mesh baked at the track's scale; the physics runs at 200 Hz.
 // Keys: up/W throttle, down/S brake, left/right or A/D steer, space handbrake, Q/E gears (manual), M automatic or
 // manual, R back on the track. Lap times on the start line.
-import { millbrook } from '../race/millbrook';
+import { TRACKS, trackDef, type TrackDef } from '../race/tracks';
+import type { Track } from '../race/track';
 import { raceSpec, RACE_CARS, EXP_CARS, NEW_CARS, EXP_ENGINE, steering } from '../race/cars';
 import { Vehicle, usefulLock, type Controls } from '../race/vehicle';
 import { CarSprites, PropSprites } from '../race/sprites';
-import { millbrookScenery, type Placed } from '../race/scenery';
+import type { Placed, Scenery } from '../race/scenery';
 import { PROPS } from '../render/props/index';
 import { renumber, wheelsOf, type Mesh } from '../render/car/mesh';
 import { Damage } from '../race/damage';
-import { loadGround, loadSky, loadProps, loadBuildings } from '../render/live/groundtex';
+import { loadGround, loadSky, loadProps, placeProps, loadBuildings } from '../render/live/groundtex';
+import { paddockProps, pitProps, type PropPlace } from '../render/live/paddock';
 import { LiveRenderer } from '../render/live/renderer';
 import { groundData, fenceData } from '../render/live/ground';
 import { Smoke, type SmokeKind } from '../race/smoke';
@@ -35,22 +37,28 @@ import { Sound, type Skid } from './sound';
 import specsData from '../data/cars/specs.json';
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
-const T = millbrook(), cv = $<HTMLCanvasElement>('view'), main = cv.getContext('2d')!; let ctx = main;
+// the track (review 162): Millbrook, the Ashcombe Park road course or the Speed Bowl, chosen on the page (kept in this browser)
+const TRACK_KEY = 'gearhouse.drive.track';
+let TD: TrackDef = trackDef((() => { try { return localStorage.getItem(TRACK_KEY) ?? 'millbrook'; } catch { return 'millbrook'; } })()), T: Track = TD.make();
+const startOf = (t: Track) => t.spec.landmarks.find(l => l.kind === 'line')!.s;
+const cv = $<HTMLCanvasElement>('view'), main = cv.getContext('2d')!; let ctx = main;
 // the layer behind the player's car: the ground, the scenery and the other cars, smeared along the motion; the car stays sharp
 const bg = document.createElement('canvas'), bgx = bg.getContext('2d')!; /** the period's pictures (review 129): 0 none, 1 a 1930s newsreel, 2 a 1990s broadcast; strength; the newsreel at 18 frames a second */
 let fxMode = 0, fxK = 1, filmRate = true, heldAt = -1; const held = document.createElement('canvas');
 let lampsOn = false, photoOn = true, hdriOn = true, blurOn = true, lastCamX = 0, lastCamY = 0, shake = 0;
-let SP = Math.sin(30 * Math.PI / 180), CP = Math.cos(30 * Math.PI / 180), pitchDeg = 30; const DT = 1 / 200, START = T.spec.landmarks.find(l => l.kind === 'line')!.s;
+let SP = Math.sin(30 * Math.PI / 180), CP = Math.cos(30 * Math.PI / 180), pitchDeg = 30; const DT = 1 / 200; let START = startOf(T);
 let VW = 768, VH = 432, mm = 50;                                               // the picture's own pixels, millimetres a pixel
 const st = { auto: true, assist: false, tcs: true, pilot: false, chase: false, progressive: false, cine: false, free: false };
 const turning = () => st.chase || st.cine || st.free;
 // ---- the cinematic view: shots cut between trackside cameras (the world turned to look from the camera at the car), a
 //      low chase and a high fixed view; pixels twice the size, the gauges hidden, bars top and bottom with a caption ----
-const W2c = T.spec.width / 2, CAMS: { s: number; x: number; y: number }[] = Array.from({ length: Math.floor(T.length / 380) }, (_, i) => { const s = i * 380 + 60, side = i % 2 ? 1 : -1, p = T.point(s, side * (W2c + 16)); return { s, x: p.x, y: p.y }; });
+function cameras(): { s: number; x: number; y: number }[] { const W2c = T.spec.width / 2, CAMS: { s: number; x: number; y: number }[] = Array.from({ length: Math.floor(T.length / 380) }, (_, i) => { const s = i * 380 + 60, side = i % 2 ? 1 : -1, p = T.point(s, side * (W2c + 16)); return { s, x: p.x, y: p.y }; });
 /* review 129: where the newsreel men stood: on the outside of each bend, a little before its apex (the cars come at them
    and swing past), and at the banking's top; added to the straights' cameras */
 { const L = Math.round(T.length); let last = -1e9; for (let s = 0; s < L; s += 5) { const k = T.at(s).k; if (Math.abs(k) < 1 / 900 || s - last < 280) continue; let peak = s; for (let q = s; q < s + 200 && q < L; q += 5) if (Math.abs(T.at(q).k) > Math.abs(T.at(peak).k)) peak = q;
     const at = peak - 40, out = T.at(at).k >= 0 ? -1 : 1, p = T.point(at, out * (W2c + (T.bankAt(at).b ? 9 : 14))); CAMS.push({ s: at, x: p.x, y: p.y }); last = peak; } }
+  return CAMS; }
+let CAMS = cameras();
 /** the camera operator (review 129): a pan head's spring (the man lags the car, swings past and settles); its state */
 const op = { va: 0, vx: 0, vy: 0, pitch0: 0 }, setView = (p: number, m: number) => want(p, m);
 let cut = false; let shot: { kind: 'side' | 'chase' | 'top'; cam?: { s: number; x: number; y: number }; until: number } = { kind: 'chase', until: 0 }, shotN = 0;
@@ -61,7 +69,7 @@ const keys = new Set<string>(), input = { steer: 0, throttle: 0, brake: 0, hand:
 const skids: { x: number; y: number; z: number; a: number }[] = [], puffs: { x: number; y: number; z: number; r: number; a: number; vx: number; vy: number }[] = [];
 let lapStart = -1, lastLap = 0, bestLap = 0, clock = 0, prevS = 0, msg = '', msgT = 0;
 // a race: the entrants and their pictures (the player's car is `car`, its pictures `sprites`)
-const SCN = millbrookScenery(T), propSprites = new Map<string, PropSprites>(); const train = { d: -1, wait: 40 };
+let SCN: Scenery = TD.scenery(T); const propSprites = new Map<string, PropSprites>(); const train = { d: -1, wait: 40 };
 const propPic = (kind: string, arg?: number) => { const key = arg ? `${kind}@${arg}` : kind; let p = propSprites.get(key); if (!p) { const f = PROPS[kind]; if (!f) return null; p = new PropSprites(f(arg), mm, pitchDeg); propSprites.set(key, p); } return p; };
 let race: Race | null = null; const others = new Map<Entrant, CarSprites>(); let raceSeed = 7;
 // race numbers (review 96): the player's from the page, the others' 1, 2, 3... by the entry list, skipping the player's;
@@ -71,7 +79,10 @@ const meshOf = (id: string, num: string) => renumber(MESH_CARS.find(c => c.id ==
 const numOf = (e: Entrant): string => { if (!race) return myNum; let k = 0; for (const x of race.cars) { if (x === race.player) continue; k++; if (String(k) === myNum) k++; if (x === e) return String(k); } return myNum; };
 // ---- the live renderer (review 99): the scene drawn every frame by WebGL2, where the browser has it; the baked pictures otherwise ----
 const glCanvas = document.createElement('canvas'); let live: LiveRenderer | null = null, liveFence = -1;
-try { live = new LiveRenderer(glCanvas); live.setGround(groundData(T, SCN, START)); live.setTrack(T.length, T.spec.width, T.spec.joints, START, rubberLine(T)); const L0 = live; void loadGround(L0, matchMedia('(pointer: coarse)').matches ? 512 : 1024).catch(e => console.warn('ground materials', e)); void loadSky(L0).catch(e => console.warn('sky', e)); void loadProps(L0, T).catch(e => console.warn('props', e)); void loadBuildings(L0).catch(e => console.warn('building materials', e)); } catch (e) { console.warn('live renderer unavailable', e); live = null; }
+/** where the photographed props (drums, tyres, tables) stand at this track's pits */
+const propPlaces = (): PropPlace[] => { const W2 = T.spec.width / 2; return TD.id === 'millbrook' ? paddockProps() : TD.id === 'road' ? pitProps(1938, { s0: START - 200, n: 8, off: W2 + 30 }, { s: START - 215, off: W2 + 12 }, { s: START, off: W2 + 4 }) : pitProps(1991, { s0: START - 120, n: 4, off: W2 + 30 }, { s: START - 140, off: W2 + 12 }, { s: START, off: W2 + 4 }); };
+let propBase: Record<string, { min: number[]; max: number[] }> | null = null;
+try { live = new LiveRenderer(glCanvas); live.setGround(groundData(T, SCN, START, TD.groundStep)); live.setTrack(T.length, T.spec.width, T.spec.joints, START, rubberLine(T)); const L0 = live; void loadGround(L0, matchMedia('(pointer: coarse)').matches ? 512 : 1024).catch(e => console.warn('ground materials', e)); void loadSky(L0).catch(e => console.warn('sky', e)); void loadProps(L0, () => ({ T, places: propPlaces() })).then(b => { propBase = b; }).catch(e => console.warn('props', e)); void loadBuildings(L0).catch(e => console.warn('building materials', e)); } catch (e) { console.warn('live renderer unavailable', e); live = null; }
 // the PBR detail textures (Poly Haven, CC0): loaded once, laid on when ready
 if (live) { const L = live, im = [texAlb, texNor, texRgh].map(src => { const i = new Image(); i.src = src; return i; });
   void Promise.all(im.map(i => i.decode())).then(() => L.setTextures(im[0]!, im[1]!, im[2]!, (texMeta as { layers: { size_m: number; luma_mean: number; rough_mean: number }[] }).layers)).catch(e => console.warn('textures', e)); }
@@ -191,9 +202,10 @@ function drawBridges() { for (const l of T.spec.landmarks) { if (l.kind !== 'bri
   ctx.fillStyle = '#7d756a'; ctx.strokeStyle = '#2a2622'; ctx.lineWidth = 2; ctx.beginPath(); for (const [s, o] of [[l.s - 1.5, -W2], [l.s - 1.5, W2], [l.s + 1.5, W2], [l.s + 1.5, -W2]] as const) { const p = q(s, o); ctx.lineTo(...P(p.x, p.y, h + Math.max(a.z, b.z))); } ctx.closePath(); ctx.fill(); ctx.stroke(); void d; } }
 // ---- the minimap: the circuit, the line, every car ----
 const MINI = $<HTMLCanvasElement>('mini'), mctx = MINI.getContext('2d')!; let mbox = { x0: 0, y0: 0, k: 1 };
-{ let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity; for (const n of T.nodes) { x0 = Math.min(x0, n.x); x1 = Math.max(x1, n.x); y0 = Math.min(y0, n.y); y1 = Math.max(y1, n.y); } const k = 130 / Math.max(x1 - x0, y1 - y0); mbox = { x0: x0 - (150 / k - (x1 - x0)) / 2, y0: y1 + (150 / k - (y1 - y0)) / 2, k }; }
+function miniBox() { let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity; for (const n of T.nodes) { x0 = Math.min(x0, n.x); x1 = Math.max(x1, n.x); y0 = Math.min(y0, n.y); y1 = Math.max(y1, n.y); } const k = 130 / Math.max(x1 - x0, y1 - y0); mbox = { x0: x0 - (150 / k - (x1 - x0)) / 2, y0: y1 + (150 / k - (y1 - y0)) / 2, k }; }
+miniBox();
 const mp = (x: number, y: number): [number, number] => [(x - mbox.x0) * mbox.k, (mbox.y0 - y) * mbox.k];
-function mini() { mctx.clearRect(0, 0, 150, 150); mctx.strokeStyle = 'rgba(235,230,220,0.85)'; mctx.lineWidth = 3; mctx.beginPath(); T.nodes.forEach((n, i) => { if (i % 8) return; const [X, Y] = mp(n.x, n.y); if (i) mctx.lineTo(X, Y); else mctx.moveTo(X, Y); }); mctx.closePath(); mctx.stroke();
+function mini() { mctx.clearRect(0, 0, 150, 150); mctx.strokeStyle = 'rgba(235,230,220,0.85)'; mctx.lineWidth = 3; mctx.beginPath(); const every = Math.max(8, Math.round(T.length / 600)); T.nodes.forEach((n, i) => { if (i % every) return; const [X, Y] = mp(n.x, n.y); if (i) mctx.lineTo(X, Y); else mctx.moveTo(X, Y); }); mctx.closePath(); mctx.stroke();
   { const a = T.point(START, -18), b = T.point(START, 18), [ax, ay] = mp(a.x, a.y), [bx, by] = mp(b.x, b.y); mctx.strokeStyle = '#fff'; mctx.lineWidth = 2; mctx.beginPath(); mctx.moveTo(ax, ay); mctx.lineTo(bx, by); mctx.stroke(); }
   const dots = race ? race.cars.map(e => ({ c: e.car, me: !e.driver })) : [{ c: car, me: true }];
   for (const d of dots) { const [X, Y] = mp(d.c.x, d.c.y); mctx.fillStyle = d.me ? '#ffb347' : '#9fc3ff'; mctx.beginPath(); mctx.arc(X, Y, d.me ? 4 : 3, 0, Math.PI * 2); mctx.fill(); if (d.me) { mctx.strokeStyle = '#000'; mctx.lineWidth = 1; mctx.stroke(); } } }
@@ -220,7 +232,7 @@ function dials() { const r = Math.max(26, Math.min(46, Math.round(VH * 0.11))), 
 function letterbox() { const b = Math.round(VH * 0.1); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, VW, b); ctx.fillRect(0, VH - b, VW, b);
   ctx.fillStyle = '#e9e4d8'; ctx.font = `${Math.max(7, Math.round(b * 0.42))}px Oswald, sans-serif`; ctx.textBaseline = 'middle';
   const me = race?.player, lap = me ? `${Math.min(race!.laps, me.lapAt.length)}/${race!.laps}바퀴 · ${race!.order().indexOf(me) + 1}위` : T.pieceAt(car.s);
-  ctx.fillText(`${car.spec.name}  ·  ${(car.speed * 3.6).toFixed(0)} km/h  ·  ${lap}`, Math.round(b * 0.5), VH - b / 2); ctx.fillText('MILLBROOK', Math.round(b * 0.5), b / 2); }
+  ctx.fillText(`${car.spec.name}  ·  ${(car.speed * 3.6).toFixed(0)} km/h  ·  ${lap}`, Math.round(b * 0.5), VH - b / 2); ctx.fillText(TD.title, Math.round(b * 0.5), b / 2); }
 function drawSteam(el: number) { const h = car.health; if ((h.water >= WARN.boil || h.failed === 'gasket') && Math.random() < 0.5) { const f = car.spec.wheelbase * (1 - car.spec.frontShare) + 0.4; steam.push({ x: car.x + Math.cos(car.yaw) * f, y: car.y + Math.sin(car.yaw) * f, z: T.height(car.s, car.off) + 1.2, r: 0.3, a: 0.5 }); smoke.emit('steam', car.x + Math.cos(car.yaw) * f, car.y + Math.sin(car.yaw) * f, T.height(car.s, car.off) + 1.1, car.vx * Math.cos(car.yaw) * 0.5, car.vx * Math.sin(car.yaw) * 0.5, 0.8, 1, T.height(car.s, car.off)); }
   for (const p of steam) { p.z += 1.2 * el; p.r += 0.8 * el; p.a -= 0.35 * el; } for (let i = steam.length - 1; i >= 0; i--) if (steam[i]!.a <= 0) steam.splice(i, 1);
   if (!live) for (const p of steam) { ctx.fillStyle = `rgba(245,245,245,${p.a})`; ctx.beginPath(); ctx.arc(...P(p.x, p.y, p.z), p.r * 1000 / mm, 0, Math.PI * 2); ctx.fill(); } }
@@ -299,7 +311,7 @@ function bend(c: Vehicle, base: Mesh, L: LiveRenderer) { let e = dmg.get(c);
 // ---- the fence: a car that reaches it smashes a few metres of it into flying pieces ----
 const debris3 = new Debris(), dirtyChunks = new Set<string>(), fenceGpu = new Map<string, { g: ReturnType<LiveRenderer['car']>; m: Float32Array; x: number; y: number } | null>();   /* the fence as solid things, its pieces as bodies (review 112) */
 const broken = new Set<string>(), debris: { x: number; y: number; z: number; vx: number; vy: number; vz: number; a: number; va: number; len: number; col: string; life: number }[] = [];
-const FENCE = T.spec.width / 2 + 1.5, fenceOk = (side: number, m: number) => !broken.has(`${side}:${((m % Math.round(T.length)) + Math.round(T.length)) % Math.round(T.length)}`);
+let FENCE = T.spec.width / 2 + 1.5; const fenceOk = (side: number, m: number) => !broken.has(`${side}:${((m % Math.round(T.length)) + Math.round(T.length)) % Math.round(T.length)}`);
 function fence(c: Vehicle) { const side = Math.sign(c.off), reach = Math.abs(c.off) + c.spec.track / 2 + 0.3; if (reach < FENCE || Math.abs(c.off) > FENCE + 3) return; const m = Math.floor(c.s); if (!fenceOk(side, m)) return;
   const sp = Math.hypot(c.vx, c.vy); if (sp < 2) return;
   for (let k = -2; k <= 3; k++) broken.add(`${side}:${((m + k) % Math.round(T.length) + Math.round(T.length)) % Math.round(T.length)}`);
@@ -366,7 +378,7 @@ function hud() { const kmh = car.speed * 3.6; $('spd').textContent = kmh.toFixed
     $('lap').textContent = wait > 0 ? (race.mode === 'scratch' ? `출발 신호 ${Math.ceil(wait)}` : `출발까지 ${Math.ceil(wait)}초`) : race.clock - me.start < 1.2 && race.mode === 'scratch' ? '출발!' : me.finish ? `완주 ${fmt(me.finish - me.start)}` : `${Math.min(race.laps, me.lapAt.length)}/${race.laps}바퀴 · ${fmt(race.clock - me.start)}`;
     $('last').textContent = `${pos}/${race.cars.length}위`; $('best').textContent = '';
     if (++boardTick % 6 === 0) { $('board').innerHTML = ord.map((e, k) => `<li${e === me ? ' class="me"' : ''}>${k + 1}. ${e.name}${e === me ? ' (나)' : ''} <span>${e.finish ? fmt(e.finish - e.start) : race!.clock < e.start ? `출발 ${Math.ceil(e.start - race!.clock)}초 뒤` : `${(e.dist / 1000).toFixed(2)} km`}</span></li>`).join(''); raceOverlay(); }
-    { const laps = lapTimes(me); if (laps.length > seenLaps) { seenLaps = laps.length; if (!st.pilot) onLap(laps[laps.length - 1]!, bestOf(laps.slice(0, -1))); } } }
+    myLaps(); }
   $('pbnote').textContent = clock < pbT ? pbMsg : ''; }
 // ---- the race on the picture (review 162): the standings, my times; a best lap's notice; the results ----
 /** the cars' names cut short for the standings */
@@ -374,6 +386,8 @@ const SHORT: Record<string, string> = { fordT23: 'Ford T', chevAB28: 'Chevrolet 
 const shortName = (id: string) => SHORT[id] ?? raceSpec(id).name.replace(/^\d{4}\s+/, '').replace(/\s*\(.*\)$/, '').slice(0, 16);
 const fmtGap = (g: { s: number; laps: number }) => g.laps ? `+${g.laps}랩` : `+${g.s.toFixed(1)}`;
 let boardTick = 0, seenLaps = 0, pbMsg = '', pbT = 0;
+/** my laps in a race, each taken once as it is done (its notice, the record) */
+function myLaps() { const me = race?.player; if (!me) return; const laps = lapTimes(me); if (laps.length > seenLaps) { seenLaps = laps.length; if (!st.pilot) onLap(laps[laps.length - 1]!, bestOf(laps.slice(0, -1))); } }
 function raceOverlay() { const r = race; $('raceovl').hidden = !r; if (!r) return; const me = r.player!, rows = r.standings();
   $('stand').innerHTML = rows.map(q => { const e = q.e, wait = r.clock < e.start, gap = q.pos === 1 ? (e.finish ? '완주' : '선두') : wait ? `출발 ${Math.ceil(e.start - r.clock)}s` : fmtGap(q.leader);
     return `<tr${e === me ? ' class="me"' : ''}><td class="n">${q.pos}</td><td>${shortName(e.id)}</td><td class="g">${gap}</td><td class="l">${e.finish ? '✓' : `${q.lap}/${r.laps}`}</td></tr>`; }).join('');
@@ -398,7 +412,7 @@ function resultsTable(r: Race): string { const me = r.player!, ord = r.order(), 
   const rec = recordOf(carId);
   return `<table class="restab"><thead><tr><th>순위</th><th>차</th><th>총 시간</th><th>차이</th><th>최고 랩</th><th>랩별</th></tr></thead><tbody>${rows}</tbody></table>`
     + `<p class="note">${r.mode === 'scratch' ? '동시 출발' : '핸디캡'} ${r.laps}바퀴 · ${trackTitle()} · 총 시간은 각 차의 출발부터${rec ? ` · 이 브라우저의 ${raceSpec(carId).name} 최고 랩: ${fmt(rec)}` : ''}</p>`; }
-function results() { const r = race!, me = r.player!, ord = r.order(); $('results').dataset.shown = '1';
+function results() { const r = race!, me = r.player!, ord = r.order(); $('results').dataset.shown = '1'; myLaps();
   const html = resultsTable(r); $('results').innerHTML = html; $('restable').innerHTML = html; $('restitle').textContent = `레이스 결과 — ${ord.indexOf(me) + 1}위`; $('resmodal').hidden = false;
   say(`결승 ${ord.indexOf(me) + 1}위 — ${ord[0]!.name} 우승`); }
 /** every car that can race, and the two eras' (the period's before 1945, the later cars from 1980) */
@@ -524,7 +538,19 @@ document.querySelectorAll<HTMLButtonElement>('.tabs button').forEach(b => b.addE
   document.querySelectorAll<HTMLButtonElement>('.tabs button').forEach(x => x.setAttribute('aria-selected', String(x === b)));
   document.querySelectorAll<HTMLElement>('.dials section').forEach(sec => sec.classList.toggle('on', sec.dataset.tab === t)); }));
 // the surface (review 145): the period's concrete with its five bumps, or resurfaced smooth for the fast cars; the drawn ground follows
-$<HTMLSelectElement>('surface').addEventListener('change', e => { T.bumpK = (e.target as HTMLSelectElement).value === 'smooth' ? 0 : 1; live?.setGround(groundData(T, SCN, START)); say(T.bumpK ? '노면: 1930년대 원형 (요철 있음)' : '노면: 재포장 (요철 없음)'); });
+// the track (review 162): everything that hangs on it built again: the scenery, the ground, the fence, the cameras,
+// the minimap, the rubbered line, the props at the pits; the car put back behind the line; a race stopped
+const TRACK_NOTE: Record<string, string> = { millbrook: '1907년 콘크리트 오벌을 본뜬 트랙. 두 뱅크와 요철이 있습니다. 핸디캡 기록이 있습니다.', road: '가상의 1930년대 로드 코스: 3.77 km, 폭 13 m, 완전히 평평합니다(뱅크·요철 없음). 느린 헤어핀(반지름 25 m), 빠른 스위퍼(250 m), S자, 채플 복합 코너, 긴 직선 둘. 핸디캡 기록이 있습니다.', speed: '최고 속도 시험장: 15 km 직선 둘과 반지름 1.2 km의 평평한 180° 곡선 둘, 폭 16 m, 한 바퀴 37.5 km. 출발선에서 400 m, 1 km, 1 km마다 거리판, 11~12 km에 플라잉 1 km 계측 기둥. 핸디캡 기록이 없어 레이스는 동시 출발만 됩니다.' };
+function showTrack() { const name = TD.label.replace(/\s*\(.*$/, ''); $('title').textContent = `${name} 시험 주행`; document.title = `${name} 시험 주행`; $('tracknote').textContent = TRACK_NOTE[TD.id] ?? '';
+  $('surfaceBox').hidden = !T.spec.bumps.length; const ok = handicapOK(), mode = $<HTMLSelectElement>('mode'); (mode.options[0] as HTMLOptionElement).disabled = !ok; if (!ok) mode.value = 'scratch'; }
+function useTrack(id: string) { if (race) { race = null; others.clear(); $('board').innerHTML = ''; $('raceovl').hidden = true; $('resmodal').hidden = true; $('race').textContent = '레이스 시작'; }
+  TD = trackDef(id); T = TD.make(); T.bumpK = $<HTMLSelectElement>('surface').value === 'smooth' ? 0 : 1; START = startOf(T); SCN = TD.scenery(T); CAMS = cameras(); FENCE = T.spec.width / 2 + 1.5; miniBox();
+  broken.clear(); dirtyChunks.clear(); fenceGpu.clear(); debris.length = 0; debris3.pieces.length = 0; skids.length = 0; puffs.length = 0; train.d = -1; train.wait = 40; shot.until = 0;
+  if (liveR) { const t0 = performance.now(), g = groundData(T, SCN, START, TD.groundStep); liveR.setGround(g); liveR.setTrack(T.length, T.spec.width, T.spec.joints, START, rubberLine(T)); if (propBase) placeProps(liveR, T, propPlaces(), propBase); console.info(`track ${TD.id}: ${T.length} m, ground ${g.n} vertices, ${Math.round(performance.now() - t0)} ms`); }
+  try { localStorage.setItem(TRACK_KEY, TD.id); } catch { /* not kept */ }
+  showTrack(); choose(carId); camX = car.x; camY = car.y; camZ = 0; camAng = car.yaw; }
+{ const sel = $<HTMLSelectElement>('trackSel'); for (const t of TRACKS) sel.add(new Option(t.label, t.id)); sel.value = TD.id; sel.addEventListener('change', () => { useTrack(sel.value); sel.blur(); say(`트랙: ${TD.label}`); }); }
+$<HTMLSelectElement>('surface').addEventListener('change', e => { T.bumpK = (e.target as HTMLSelectElement).value === 'smooth' ? 0 : 1; liveR?.setGround(groundData(T, SCN, START, TD.groundStep)); say(T.bumpK ? '노면: 1930년대 원형 (요철 있음)' : '노면: 재포장 (요철 없음)'); });
 document.addEventListener('fullscreenchange', () => setTimeout(fit, 100));
 $('race').addEventListener('click', e => { startRace(); (e.target as HTMLElement).blur(); });
 $('practice').addEventListener('click', e => { stopRace(); $('race').textContent = '레이스 시작'; (e.target as HTMLElement).blur(); });
@@ -588,5 +614,5 @@ $<HTMLSelectElement>('scale').addEventListener('change', e => { want(pitchDeg, +
 function fit() {   // the picture fills the window (review 145), in big pixels: one picture pixel to k screen pixels
   const k = Math.max(1, Math.round(innerWidth / 900)) * (st.cine ? 2 : 1); VW = Math.ceil(innerWidth / k / 2) * 2; VH = Math.ceil(innerHeight / k);
   cv.width = VW; cv.height = VH; cv.style.width = `${VW * k}px`; cv.style.height = `${VH * k}px`; ctx.imageSmoothingEnabled = false; }
-addEventListener('resize', fit); addEventListener('orientationchange', () => setTimeout(fit, 200)); fit(); choose(carId); camX = car.x; camY = car.y; camZ = 0; camShow(); requestAnimationFrame(frame);
+addEventListener('resize', fit); addEventListener('orientationchange', () => setTimeout(fit, 200)); fit(); showTrack(); choose(carId); camX = car.x; camY = car.y; camZ = 0; camShow(); requestAnimationFrame(frame);
 (globalThis as { __drive?: unknown }).__drive = { set look(v: [number, number, number] | null) { lookAt = v; }, get car() { return car; }, get L() { return live; }, get damage() { const e = dmg.get(car); return e ? { worst: e.D.worst, taken: e.D.taken } : null; }, get race() { return race; }, /** run the world on by t seconds at once, the test driver at the wheel (page tests on slow software GL) */ advance(t: number) { for (let k = 0; k < t / DT; k++) { const u = pilot.drive(car); if (race) race.step(DT, u); else car.step(DT, u); } }, get SCN() { return SCN; }, get T() { return T; } };   // for the page tests (tools): place the car, read the scenery

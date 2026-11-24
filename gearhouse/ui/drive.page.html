@@ -112,7 +112,7 @@
   <div class="lcol"><div id="raceovl" class="raceovl" hidden><table class="stand" aria-label="순위"><tbody id="stand"></tbody></table><div id="mytime" class="mytime"></div></div><div id="pbnote" class="pbnote" aria-live="polite"></div><div class="notes"><div id="msg"></div><div id="bake" class="note"></div></div></div>
   <div id="resmodal" class="resmodal" role="dialog" aria-label="레이스 결과" hidden><div class="resbox"><header><h2 id="restitle">레이스 결과</h2><button type="button" class="close" id="resclose" aria-label="결과 닫기">✕</button></header><div id="restable"></div></div></div></div>
 <aside class="drawer" id="drawer" aria-label="설정">
-  <header><h1>Millbrook 시험 주행</h1><button type="button" class="close" id="setclose" aria-label="설정 닫기">✕</button></header>
+  <header><h1 id="title">Millbrook 시험 주행</h1><button type="button" class="close" id="setclose" aria-label="설정 닫기">✕</button></header>
   <div class="tabs" role="tablist">
     <button type="button" role="tab" data-tab="drive" aria-selected="true">주행</button><button type="button" role="tab" data-tab="race" aria-selected="false">레이스</button><button type="button" role="tab" data-tab="track" aria-selected="false">트랙·환경</button><button type="button" role="tab" data-tab="camera" aria-selected="false">카메라</button><button type="button" role="tab" data-tab="gfx" aria-selected="false">그래픽</button><button type="button" role="tab" data-tab="fx" aria-selected="false">효과</button><button type="button" role="tab" data-tab="wear" aria-selected="false">차 상태</button><button type="button" role="tab" data-tab="sound" aria-selected="false">소리</button>
   </div>
@@ -146,8 +146,11 @@
     </fieldset>
   </section>
   <section data-tab="track">
+    <div class="row"><label for="trackSel">트랙</label><select id="trackSel"></select></div>
+    <p class="note" id="tracknote"></p>
+    <div id="surfaceBox" class="row">
     <div class="row"><label for="surface">노면</label><select id="surface"><option value="period" selected>1930년대 원형 (요철 다섯 곳)</option><option value="smooth">재포장 (요철 없음, 고속 시험용)</option></select></div>
-    <p class="note">원형 노면: Members' 다리 밑 요철(높이 16 cm)에서는 빠른 차의 뒷바퀴가 뜹니다. 시속 300 km가 넘는 차는 재포장을 고르세요.</p>
+    <p class="note">원형 노면: Members' 다리 밑 요철(높이 16 cm)에서는 빠른 차의 뒷바퀴가 뜹니다. 시속 300 km가 넘는 차는 재포장을 고르세요.</p></div>
     <label class="check"><input type="checkbox" id="photoGround" checked> 사진 콘크리트 (Poly Haven CC0 텍스처, 끄면 셰이더만)</label>
     <label class="check"><input type="checkbox" id="hdri" checked> HDRI 하늘 (사진 하늘의 반사와 빛, 끄면 계산된 하늘)</label>
     <div class="row"><label for="day">시간대 (1 낮 · 0.4 해질녘 · 0 밤)</label><input type="range" id="day" min="0" max="1" step="0.05" value="1"></div>

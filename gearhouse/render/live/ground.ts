@@ -24,7 +24,13 @@ function earcut(pts: [number, number][]): [number, number, number][] { const idx
     if (!cut) break; }
   if (idx.length === 3) out.push([idx[0]!, idx[1]!, idx[2]!]); return out; }
 
-export function groundData(T: Track, S: Scenery, start: number): GroundData { const g = new Tris(), W2 = T.spec.width / 2, L = Math.round(T.length);
+/** the next step along the track from s (review 162): a metre where the surface has any shape (banking, bumps), and up
+ *  to `maxStep` on level concrete, short enough in a bend that its chords stand within 2 cm of the arc */
+export function stepAt(T: Track, s: number, maxStep: number): number { if (maxStep <= 1) return 1; const L = Math.round(T.length);
+  if (T.spec.banking.length || T.spec.bumps.length && T.bumpK > 0) { for (const b of T.spec.banking) if (s >= b.s0 - b.ease - maxStep && s <= b.s1 + b.ease) return 1; for (const q of T.spec.bumps) if (T.bumpK > 0 && Math.abs(T.gap(s, q.s)) < q.len + maxStep) return 1; }
+  let k = 0; for (let d = 0; d <= maxStep; d++) k = Math.max(k, Math.abs(T.at(s + d).k));
+  return Math.max(1, Math.min(maxStep, L - s, k > 1e-6 ? Math.floor(Math.sqrt(8 * 0.02 / k)) : maxStep)); }
+export function groundData(T: Track, S: Scenery, start: number, maxStep = 1): GroundData { const g = new Tris(), W2 = T.spec.width / 2, L = Math.round(T.length);
   // the fields: one wide sheet a little below the concrete's foot
   { let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity; for (const n of T.nodes) { x0 = Math.min(x0, n.x); x1 = Math.max(x1, n.x); y0 = Math.min(y0, n.y); y1 = Math.max(y1, n.y); }
     const m = 1500, z = -0.03; g.quad([x0 - m, y0 - m, z], [x1 + m, y0 - m, z], [x1 + m, y1 + m, z], [x0 - m, y1 + m, z], hex('#5d7348'), 1); }
@@ -40,7 +46,7 @@ export function groundData(T: Track, S: Scenery, start: number): GroundData { co
     else band(l.pts, l.width, hex('#9b9384'), -0.012); }
   // the concrete, a metre at a time, nine strips across; the joints, the dark edges; the earth bank behind a banking
   const P = (s: number, o: number, dz = 0) => { const p = T.point(s, o); return [p.x, p.y, p.z + dz]; };
-  for (let s = 0; s < L; s++) { const s1 = s + 1;
+  for (let s = 0, s1 = 0; s < L; s = s1) { s1 = s + stepAt(T, s, maxStep);
     for (let k = 0; k < 9; k++) { const o0 = -W2 + k * 2 * W2 / 9, o1 = o0 + 2 * W2 / 9, z = (T.height(s, o0) + T.height(s, o1)) / 2, slope = Math.abs(T.slope(s, (o0 + o1) / 2).across), v = Math.round(156 + z * 5 - slope * 34);
       g.quad(P(s, o0), P(s, o1), P(s1, o1), P(s1, o0), [v, v - 2, v - 9], 0, [[s, o0, 1], [s, o1, 1], [s1, o1, 1], [s1, o0, 1]]); }
     // the joints, the dark edges and the start line are the shader's now (review 122): drawn on the concrete itself,

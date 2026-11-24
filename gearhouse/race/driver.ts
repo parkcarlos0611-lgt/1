@@ -14,6 +14,8 @@ export class Driver {
     // respect for power: a car with more than about 80 hp a tonne on these tyres is driven with a lighter foot and less grip used
     const hpt = car.spec.hp / (car.spec.mass / 1000), care = hpt > 80 ? Math.max(0.75, 1 - (hpt - 80) / 400) : 1; this.dare *= care; this.care = care;
     const mu = car.tyre.mu * this.dare;
+    // review 162: it plans its braking within what the brakes can do (a Model T's rear drums manage about a third of a g; the road course's hairpin found it out)
+    this.plannedBrake = Math.min(this.plannedBrake, car.spec.brakeG * G * 0.75);
     const raw = new Float32Array(L), lim = new Float32Array(L);
     for (let s = 0; s < L; s++) { const n = T.at(s), k = Math.abs(n.k), side = n.k >= 0 ? 1 : -1;   // side: the inside of this bend (+1 left); a bank rising the other way is adverse camber   // side: +1 the inside is to the left
       // the fastest through here at each height on the bank, and where the bank itself carries the car at that speed

@@ -54,3 +54,58 @@ export function millbrookScenery(T: Track): Scenery { const L = T.length, W2 = T
     if (!works(s) && !(s > mem.s0 + 60 && s < mem.s1 - 60) && rnd() < 0.18) { const p = T.point(s, W2 + 12 + rnd() * 40); props.push({ kind: rnd() < 0.5 ? 'treeRound' : 'bush', x: p.x, y: p.y, heading: rnd() * 6.28 }); }   // inside the circuit, a few
     if (rnd() < 0.08 && !nearRail(s) && !T.bankAt(s).b) { const p = T.point(s, -(W2 + 6 + rnd() * 4)); /* not on the earth bank behind a banking */ props.push({ kind: 'bush', x: p.x, y: p.y, heading: rnd() * 6.28 }); } }
   return { props, lines, areas, railway }; }
+
+/** where a named piece of the track runs (the first piece of that name) */
+export function pieceSpan(T: Track, name: string): { s0: number; s1: number } { let acc = 0; for (const p of T.spec.pieces) { const len = p.kind === 'straight' ? p.len : Math.abs(p.radius * p.turn * Math.PI / 180); if (p.name === name) return { s0: acc, s1: acc + len }; acc += len; } return { s0: 0, s1: 0 }; }
+/** the common placing helpers for a track's surroundings: a prop beside the track facing it, a gravel apron, and a
+ *  check that a point keeps clear of every part of the concrete (a tree must not stand on another stretch of road) */
+function placer(T: Track, props: Placed[]) { const W2 = T.spec.width / 2;
+  const facing = (kind: string, s: number, off: number) => { const p = T.point(s, off), h = T.at(s).h; props.push({ kind, x: p.x, y: p.y, heading: off < 0 ? h + Math.PI : h }); };
+  const apron = (s0: number, s1: number, o0: number, o1: number): GroundArea => { const pts: [number, number][] = []; for (let s = s0; s <= s1; s += 10) { const p = T.point(s, o0); pts.push([p.x, p.y]); } for (let s = s1; s >= s0; s -= 10) { const p = T.point(s, o1); pts.push([p.x, p.y]); } return { pts, kind: 'apron' }; };
+  const clear = (x: number, y: number, margin: number) => { let d = Infinity; for (let i = 0; i < T.nodes.length; i += 2) { const n = T.nodes[i]!; d = Math.min(d, (n.x - x) ** 2 + (n.y - y) ** 2); } return Math.sqrt(d) > W2 + margin; };
+  return { facing, apron, clear }; }
+
+// Ashcombe Park's surroundings (review 162): the period's buildings put to the road course: the pits and the paddock
+// inside the main straight (garages, the clubhouse, fuel pumps, a tea hut on a gravel apron), the timing box and the
+// clock on the pit side of the line, one grandstand and the scoreboard across the road, straw bales on the slow
+// corners' outsides, and tree lines round the park, kept clear of every stretch of the road. Seeded.
+export function roadScenery(T: Track): Scenery { const W2 = T.spec.width / 2, L = T.length, props: Placed[] = [], areas: GroundArea[] = [], { facing, apron, clear } = placer(T, props);
+  let r = 19340611; const rnd = () => { r = (r * 16807) % 2147483647; return r / 2147483647; };
+  const start = T.spec.landmarks.find(l => l.kind === 'line')!.s;
+  // the pits and paddock: inside (to the left of) the main straight
+  areas.push(apron(start - 230, start + 150, W2 + 5, W2 + 48));
+  for (let k = 0; k < 8; k++) facing('garageBay', start - 200 + k * 14.5, W2 + 30);
+  facing('fuelPumps', start - 215, W2 + 12); facing('teaHut', start + 125, W2 + 16);
+  facing('clubhouseWing', start + 40, W2 + 36); facing('clubhouseCentre', start + 52, W2 + 36); facing('clubhouseWing', start + 64, W2 + 36);
+  facing('timingBox', start, W2 + 5); facing('clockTower', start + 18, W2 + 8);
+  // across the road: one grandstand of five bays on the line, the scoreboard and the hoardings past it
+  for (let k = 0; k < 5; k++) facing('grandstandBay', start - 31 + k * 15.6, -(W2 + 9));
+  facing('scoreboard', start + 95, -(W2 + 12)); for (let k = 0; k < 4; k++) facing('hoarding', start + 135 + k * 10, -(W2 + 5));
+  // straw bales on the outside of the slow corners' entries (the outside of a left-hander is to the right)
+  for (const name of ['Paddock Bend', 'Hairpin', 'Chapel', 'Last Corner']) { const p = pieceSpan(T, name), turn = T.at((p.s0 + p.s1) / 2).k, side = turn > 0 ? -1 : 1;
+    for (let k = 0; k < 4; k++) facing('hayBales', p.s0 - 12 + k * 7, side * (W2 + 3)); }
+  facing('windsock', start - 260, W2 + 40);
+  // tree lines: both sides of the road, thicker on the outside; none in the paddock or before the stands
+  const busy = (s: number, side: number) => (side > 0 ? Math.abs(T.gap(start - 40, s)) < 220 : Math.abs(T.gap(start + 40, s)) < 120);
+  for (let s = 0; s < L; s += 7) for (const side of [-1, 1]) { if (busy(s, side) || rnd() > (side < 0 ? 0.75 : 0.35)) continue;
+    const off = side * (W2 + 9 + rnd() * (side < 0 ? 40 : 25)), p = T.point(s + rnd() * 5, off); if (!clear(p.x, p.y, 7)) continue;
+    const k = rnd(); props.push({ kind: k < 0.4 ? 'treeRound' : k < 0.6 ? 'treePoplar' : k < 0.85 ? 'treePine' : 'bush', x: p.x, y: p.y, heading: rnd() * 6.28 }); }
+  return { props, lines: [], areas, railway: [] }; }
+
+// The Speed Bowl's surroundings (review 162): open, level fields; a pit hut, garages and the timing box on the inside
+// at the line; boards at 400 m, 1 km and every kilometre after along the south straight; the flying kilometre's
+// photocell posts (poles) either side at 11 and 12 km; a windsock; a few rows and clumps of trees well back.
+export function speedwayScenery(T: Track): Scenery { const W2 = T.spec.width / 2, L = T.length, props: Placed[] = [], areas: GroundArea[] = [], { facing, apron } = placer(T, props);
+  let r = 19910523; const rnd = () => { r = (r * 16807) % 2147483647; return r / 2147483647; };
+  const start = T.spec.landmarks.find(l => l.kind === 'line')!.s;
+  areas.push(apron(start - 160, start + 60, W2 + 5, W2 + 45));
+  facing('timingBox', start, W2 + 5); for (let k = 0; k < 4; k++) facing('garageBay', start - 120 + k * 14.5, W2 + 30); facing('fuelPumps', start - 140, W2 + 12); facing('teaHut', start + 40, W2 + 16);
+  facing('windsock', start - 200, W2 + 50); facing('scoreboard', start + 20, -(W2 + 12));
+  // the distance boards on the outside: the marks, then each kilometre to the turn
+  const boards = new Set<number>(T.spec.landmarks.filter(l => l.kind === 'mark').map(l => Math.round(l.s))); for (let d = 2000; d < 14500; d += 1000) boards.add(start + d);
+  for (const s of boards) facing('hoarding', s, -(W2 + 6));
+  for (const l of T.spec.landmarks) if (l.kind === 'mark' && /Flying/.test(l.name)) for (const side of [-1, 1]) facing('telegraphPole', l.s, side * (W2 + 2.5));
+  // trees: rows well back from the straights and round the turns, thin; a few clumps on the infield
+  for (let s = 0; s < L; s += 45) { if (Math.abs(T.gap(start, s)) < 250) continue; if (rnd() < 0.55) { const p = T.point(s + rnd() * 30, -(W2 + 45 + rnd() * 90)), k = rnd(); props.push({ kind: k < 0.5 ? 'treeRound' : k < 0.8 ? 'treePoplar' : 'bush', x: p.x, y: p.y, heading: rnd() * 6.28 }); } }
+  for (let c = 0; c < 14; c++) { const cx = -6500 + c * 1000 + rnd() * 400, cy = (rnd() - 0.5) * 1400; for (let k = 0; k < 6; k++) props.push({ kind: rnd() < 0.6 ? 'treeRound' : 'treePine', x: cx + (rnd() - 0.5) * 60, y: cy + (rnd() - 0.5) * 60, heading: rnd() * 6.28 }); }
+  return { props, lines: [], areas, railway: [] }; }

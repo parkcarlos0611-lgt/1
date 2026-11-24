@@ -62,7 +62,7 @@ export function glassBand(i: BandIn): BandOut {
   const cG: V3 = [0.16, 0.17, 0.19], cB: V3 = [0.95 * lit, 0.97 * lit, 1 * lit], cS: V3 = [0.55 * lit, 0.72 * lit, 0.92 * lit];
   const aG = 0.55 * fres, aB = 0.3 + 0.65 * fres, aS = 0.15 + 0.6 * fres;
   const mixv = (a: V3, b: V3, t: number): V3 => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
-  const c = mixv(mixv(cG, cB, up), cS, sky), ar = (aG + (aB - aG) * up + (aS - aB) * sky) * clamp(i.k, 0, 1);
+  const c = mixv(mixv(cG, cB, up), cS, sky), lerp = (a: number, b: number, t: number) => a + (b - a) * t, ar = lerp(lerp(aG, aB, up), aS, sky) * clamp(i.k, 0, 1);
   const nvR = dot(i.n, i.v), R: V3 = [2 * nvR * i.n[0] - i.v[0], 2 * nvR * i.n[1] - i.v[1], 2 * nvR * i.n[2] - i.v[2]];
   const sun = edge(SUN_COS, w * 0.05, dot(R, i.sun)) * sh * clamp(i.k * 2, 0, 1) * day;
   let rgb: [number, number, number] = [c[0] * ar + tint[0] * A0 * (1 - ar), c[1] * ar + tint[1] * A0 * (1 - ar), c[2] * ar + tint[2] * A0 * (1 - ar)];

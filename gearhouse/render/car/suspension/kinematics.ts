@@ -105,7 +105,10 @@ export const camberOf = (R: M3): number => -Math.asin(Math.max(-1, Math.min(1, R
 export function solve(H: Hardpoints, z: number, steer = 0, from?: { theta: number; rack: number }): Pose {
   const P = prep(H), steered = H.steer.rack, zT = H.wc[2] + z;
   let th = from?.theta ?? P.up * Math.asin(Math.max(-0.9, Math.min(0.9, z / P.lenL))), rk = steered ? from?.rack ?? 0 : 0;
-  let cur = forward(H, th, rk); if (!cur) { th = 0; rk = 0; cur = forward(H, 0, 0)!; }
+  let cur = forward(H, th, rk);
+  // a start that opens the linkage: the drawing's pose, else the nearest turn either way that closes it
+  for (let q = 0; !cur && q < 24; q++) { th = q === 0 ? 0 : (q % 2 ? 1 : -1) * Math.ceil(q / 2) * 0.03; rk = 0; cur = forward(H, th, rk); }
+  if (!cur) throw new Error(`suspension: the ${H.front ? 'front' : 'rear'} linkage does not close`);
   let ok = false;
   for (let it = 0; it < 14; it++) {
     const f1 = cur.wc[2] - zT, f2 = steered ? steerOf(cur.R) - steer : 0; if (Math.abs(f1) < 0.02 && Math.abs(f2) < 5e-5) { ok = true; break; }

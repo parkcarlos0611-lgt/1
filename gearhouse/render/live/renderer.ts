@@ -18,6 +18,7 @@ import { Woods } from './woods';
 import { staticChunks } from './scenerylayer';
 import type { Scenery } from '../../race/scenery';
 import type { Mesh } from '../car/mesh';
+import type { VolumeSmoke } from './volume/volume';
 
 export interface LiveView { x: number; y: number; z: number; /** the world heading that points up the screen */ ang: number; pitch: number; mm: number; W: number; H: number; /** the target's height on the screen (0 top .. 1 bottom) */ cy: number;
   /** a perspective camera instead (the drive's chase, bonnet and cabin views): the eye, the vertical field of view (degrees), the
@@ -724,6 +725,7 @@ export class LiveRenderer {
   private groundVao: WebGLVertexArrayObject | null = null; private groundN = 0; private fenceVao: WebGLVertexArrayObject | null = null; private fenceN = 0;
   private skidVao: WebGLVertexArrayObject; private skidBuf: WebGLBuffer; private kinds = new Map<string, GpuMesh>(); private cars = new Map<Mesh, GpuMesh>();
   private u = new Map<WebGLProgram, Map<string, WebGLUniformLocation | null>>(); private blank: WebGLTexture; private arts = new Map<GpuMesh, { lut: WebGLTexture; tex: WebGLTexture; mm: number; C: number; rects: Float32Array; origins: Float32Array }>(); private tex: { alb: WebGLTexture; nor: WebGLTexture; rgh: WebGLTexture; size: Float32Array; luma: Float32Array; rough: Float32Array } | null = null;
+  /** the volumetric smoke (docs/systems/104 B), set by the drive where the setting asks for it */ vol: VolumeSmoke | null = null;
   constructor(readonly canvas: HTMLCanvasElement) {
     const gl = canvas.getContext('webgl2', { antialias: false, alpha: false, depth: false, preserveDrawingBuffer: true }); if (!gl) throw new Error('no WebGL2'); this.gl = gl;
     this.obj = program(gl, OBJ_VS, OBJ_FS); this.ground = program(gl, GROUND_VS, GROUND_FS); this.depth = program(gl, DEPTH_VS, DEPTH_FS); this.propP = program(gl, PROP_VS, PROP_FS); this.depthI = program(gl, DEPTHI_VS, DEPTH_FS); this.post = program(gl, POST_VS, POST_FS); this.smoke = program(gl, SMOKE_VS, SMOKE_FS);
@@ -951,6 +953,7 @@ export class LiveRenderer {
       gl.bindVertexArray(this.smokeVao); gl.bindBuffer(gl.ARRAY_BUFFER, this.smokeBuf); gl.bufferData(gl.ARRAY_BUFFER, sorted, gl.DYNAMIC_DRAW);
       gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false); gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.NONE, gl.NONE, gl.NONE]); gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, S.n);
       gl.disable(gl.BLEND); gl.depthMask(true); gl.useProgram(this.obj); }
+    if (this.vol?.active) { this.vol.draw({ VP, W: v.W, H: v.H, depth: this.tDepth, col: this.tCol, fbo: this.fbo, hdr: hdrOn === 1, toon, toonBands: o.toonBands, sun: SUN_W, day: o.day ?? 1 }); gl.useProgram(this.obj); }   // the volumetric smoke (docs/systems/104 B: render/live/volume), its grid run by the drive
     // glass over all, at its own strength, nothing else written
     gl.uniform1i(this.loc(this.obj, 'uMode'), 2); gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);   /* premultiplied (review 116) */ gl.depthMask(false); gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.NONE, gl.NONE, gl.NONE]);
     gl.uniform3f(this.loc(this.obj, 'uWear'), 0, 0, 0); gl.uniform1i(this.loc(this.obj, 'uIsCar'), 0); for (const p of ps) draw(p.g.glass, (p.m ?? placeMesh(p.g.len, p.x, p.y, p.z, p.h))); gl.uniform1i(this.loc(this.obj, 'uIsCar'), 1); cars.forEach((q, i) => { gl.uniform1f(this.loc(this.obj, 'uLampOn'), q.lamps ?? 0); gl.uniform1f(this.loc(this.obj, 'uBrake'), q.brake ? 1 : 0); gl.uniform1f(this.loc(this.obj, 'uCarH'), q.g.height); for (const [part, M, w] of carM[i]!.glass) draw(part, M, w); }); gl.uniform1f(this.loc(this.obj, 'uLampOn'), 0); gl.uniform1f(this.loc(this.obj, 'uBrake'), 0);

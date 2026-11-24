@@ -36,10 +36,13 @@ const DEG = Math.PI / 180;
 /** a corner with its static camber and toe (degrees: - the top in; + in) set at its static ride z0: the upper pivots
  *  shimmed across for the camber, a rear's toe link's inner end moved for the toe (a front's toe is its steer: frontToe) */
 export function setCorner(H: Hardpoints, z0: number, camber: number, toe: number): Hardpoints {
-  const s = H.side, camOf = (c: number, t: number) => { const P = solve({ ...H, adj: { camber: c, toe: t } }, z0); return { cam: s * camberOf(P.R), toe: -s * steerOf(P.R) }; };
-  let c = 0, t = 0;
-  for (let it = 0; it < 6; it++) { const a = camOf(c, t), dc = 0.5, b = camOf(c + dc, t), j = (b.cam - a.cam) / dc; if (Math.abs(j) > 1e-9) c -= (a.cam - camber * DEG) / j;
-    if (!H.steer.rack) { const e = camOf(c, t + 0.5), jt = (e.toe - a.toe) / 0.5; if (Math.abs(jt) > 1e-9) t -= (a.toe - toe * DEG) / jt; } }
+  // a shim that would open the linkage (an arm too short to reach at that ride) is not taken: the step is halved
+  const s = H.side, camOf = (c: number, t: number) => { try { const P = solve({ ...H, adj: { camber: c, toe: t } }, z0); return P.ok ? { cam: s * camberOf(P.R), toe: -s * steerOf(P.R) } : null; } catch { return null; } };
+  let c = 0, t = 0, a = camOf(0, 0); if (!a) return H;
+  const toward = (f: (k: number) => [number, number]) => { for (let k = 1; k > 1 / 64; k /= 2) { const [cc, tt] = f(k), n = camOf(cc, tt); if (n) { c = cc; t = tt; a = n; return; } } };
+  for (let it = 0; it < 6; it++) { const dc = 0.5, b = camOf(c + dc, t) ?? camOf(c - dc, t), j = b ? (b.cam - a!.cam) / (camOf(c + dc, t) ? dc : -dc) : 0;
+    if (Math.abs(j) > 1e-9) { const d = -(a!.cam - camber * DEG) / j; toward(k => [c + d * k, t]); }
+    if (!H.steer.rack) { const e = camOf(c, t + 0.5), jt = e ? (e.toe - a!.toe) / 0.5 : 0; if (Math.abs(jt) > 1e-9) { const d = -(a!.toe - toe * DEG) / jt; toward(k => [c, t + d * k]); } } }
   return { ...H, adj: { camber: c, toe: H.steer.rack ? 0 : t } }; }
 /** a front corner's steer (rad, the renderer's way) that gives its static toe (degrees, + in) */
 export const frontToe = (side: 1 | -1, toe: number): number => -side * toe * DEG;

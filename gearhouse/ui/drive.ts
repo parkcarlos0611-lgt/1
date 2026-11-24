@@ -41,6 +41,7 @@ import { Sound, designVoice, type Skid, type EngineVoiceSpec } from './sound';
 import specsData from '../data/cars/specs.json';
 import { GLASS_REFL, type GlassRefl } from './shell/settings';
 import { smokeTier, gpuCaps, type SmokeSetting, type GpuCaps } from '../render/live/volume/caps';
+import { VolumeSmoke, type VolCar } from '../render/live/volume/volume';
 import { DriveCam, carEyes, nextView, perspective, pedalValue, isCamView, CAM_VIEWS, CAM_DEFAULT, type CamView, type CarEyes, type CamShot } from './drivecam';
 
 /** what a page holding the drive gives it (the game's one page, ui/shell): the root its markup is in (found there even
@@ -125,7 +126,9 @@ if (live && !H.renderer) { const L = live, im = [texAlb, texNor, texRgh].map(src
 // the grass); the others' by their entry, a mixed field
 const smoke = new Smoke(); const SK: Record<SmokeKind, number> = { tyre: 0, dust: 1, steam: 2, exhaust: 3 };   /* the live picture's smoke (review 107) */
 /** 연기 품질 (docs/systems/104 B): the setting, the device's float targets (a test may take them away: __drive.smokeCaps), the tier it gets */
-let smokeQ: SmokeSetting = 'mid', smokeCaps: GpuCaps | null = null; const smokeNow = () => smokeTier(smokeQ, smokeCaps ??= gpuCaps(live?.gl ?? null));
+let smokeQ: SmokeSetting = 'mid', smokeCaps: GpuCaps | null = null; const smokeNow = () => { if (!live) return smokeTier(smokeQ, gpuCaps(null)); const V = live.vol ??= new VolumeSmoke(live.gl); return V.set(smokeQ, smokeCaps ?? V.caps); };
+smoke.tap = (k, x, y, z, vx, vy, vz, a) => !!live?.vol?.sim && live.vol.take(k, x, y, z, vx, vy, vz, a);   /* the puffs in the grid go to the volume, the rest stay parcels */
+let burn: { t: number; p: number[]; q: number[] } | null = null;   /* a test's burnout (__drive.burnout): the car held still, full throttle */
 const myWear: [number, number, number] = [0, 0, 0]; let dirtGrows = true, wearTick = 0;
 const wearOf = (c: Vehicle, k: number): [number, number, number] => { if (c === car) return myWear; const h = (n: number) => ((Math.sin(k * 127.1 + n * 311.7) * 43758.5453) % 1 + 1) % 1; return [h(1) * 0.35, h(2) * 0.6, 0.1 + h(3) * 0.35]; };
 // each car's 2D art (its part model's views), laid on its mesh in the live picture (review 105), loaded when first wanted
@@ -194,6 +197,8 @@ function drawLive(el: number) { const L = live!; void el;
   { const ex = (c0: Vehicle) => { const L = c0.spec.wheelbase * c0.spec.frontShare + 0.9, z = T.height(c0.s, c0.off); smoke.emit('exhaust', c0.x - Math.cos(c0.yaw) * L, c0.y - Math.sin(c0.yaw) * L, z + 0.35, -Math.cos(c0.yaw) * 2 + c0.vx * Math.cos(c0.yaw) * 0.6, -Math.sin(c0.yaw) * 2 + c0.vx * Math.sin(c0.yaw) * 0.6, 0.3, 1, z); };
     if (input.throttle > 0.7 && car.rpm < car.spec.hpRpm * 0.6 && Math.random() < 0.25) ex(car); smoke.step(Math.min(0.05, el)); }
   const sp8 = new Float32Array(smoke.parcels.length * 8); smoke.parcels.forEach((q, k) => sp8.set([q.x, q.y, q.z, q.r, q.rho, q.T, SK[q.kind], q.seed], k * 8));
+  if (smokeNow() !== 'off' && live?.vol?.sim) { const z0 = T.height(car.s, car.off), vc: VolCar[] = list.map(({ c }, k) => ({ x: c.x, y: c.y, z: cars[k]!.z, yaw: c.yaw, vx: c.v[0], vy: c.v[1], len: cars[k]!.g.len / 1000, width: cars[k]!.g.width, height: cars[k]!.g.height }));   /* the volumetric smoke's step */
+    live.vol.poll(); live.vol.step(Math.min(0.1, el), [car.x, car.y, z0], vc, (x, y) => { const q = T.locate(x, y, car.s), g = T.ground(q.s, q.off); return Math.abs(Math.abs(q.off) - FENCE) < 0.2 && fenceOk(Math.sign(q.off), Math.floor(q.s)) ? g + 1.0 : g; }); }
   const S = camShot, view = S ? { x: S.at[0], y: S.at[1], z: S.at[2], ang: S.ang, pitch: S.pitch, W: VW, H: VH, cy: 0.5, eye: S.eye, fov: S.fov, near: S.near,
       /* the scale at the car (the outlines' and the ground's specks' size by it) */ mm: Math.max(4, Math.min(130, Math.round(Math.max(4, Math.hypot(S.eye[0] - car.x, S.eye[1] - car.y)) * 2 * Math.tan(S.fov * Math.PI / 360) / VH * 1000))) }
     : { x: camX, y: camY, z: camZ, ang: turning() ? camAng : Math.PI / 2, pitch: pitchDeg, mm, W: VW, H: VH, cy: st.chase && !st.cine ? 0.66 : 0.55 };
@@ -558,8 +563,9 @@ function controls(dt: number): Controls { const left = down('arrowleft', 'a'), r
 // ---- the loop ----
 let last = performance.now(), acc = 0, running = true, looping = true;   // running: wanted on (a host pauses it); looping: a frame asked for
 function frame(now: number) { const el = Math.min(0.1, (now - last) / 1000); last = now; acc += el; clock += el; msgT -= el; readPad();
-  while (acc >= DT) { acc -= DT; const u = st.pilot ? pilot.drive(car) : controls(DT);
+  while (acc >= DT) { acc -= DT; const u = burn ? { ...controls(DT), throttle: 1, brake: 0, steer: 0, gear: 1 } : st.pilot ? pilot.drive(car) : controls(DT);
     if (race) { race.step(DT, u); wheelTurn = race.player!.wheelTurn; if (race.done && !$('results').dataset.shown) results(); } else { car.step(DT, u); wheelTurn += (car.w[0]! + car.w[1]!) / 2 * DT; }
+    if (burn) { car.p.splice(0, 3, ...burn.p); car.q.splice(0, 4, ...burn.q); car.v.fill(0); car.om.fill(0); if ((burn.t -= DT) <= 0) burn = null; }
     for (const c of race ? race.cars.map(e => e.car) : [car]) { marks(c); fence(c); }
     // lap: forward across the start line
     if (!race && T.gap(prevS, START) > 0 && T.gap(car.s, START) <= 0 && car.vx > 1) { if (lapStart >= 0) { lastLap = clock - lapStart; const before = bestLap; if (!bestLap || lastLap < bestLap) bestLap = lastLap; say(`한 바퀴 ${fmt(lastLap)}`); designRun(lastLap); if (!st.pilot) onLap(lastLap, before); } lapStart = clock; }
@@ -743,7 +749,7 @@ addEventListener('resize', fit); addEventListener('orientationchange', () => set
 { const sel = $<HTMLSelectElement>('camview'); for (const c of CAM_VIEWS) sel.add(new Option(c.name, c.id)); sel.addEventListener('change', () => { useView(sel.value as CamView); sel.blur(); }); }
 $('cambtn').addEventListener('click', e => { useView(nextView(camView, viewOk), true); (e.currentTarget as HTMLElement).blur(); });
 useView(camView); camShow(); requestAnimationFrame(frame);
-(globalThis as { __drive?: unknown }).__drive = { set look(v: [number, number, number] | null) { lookAt = v; }, get car() { return car; }, get L() { return live; }, get damage() { const e = dmg.get(car); return e ? { worst: e.D.worst, taken: e.D.taken } : null; }, get race() { return race; }, /** run the world on by t seconds at once, the test driver at the wheel (page tests on slow software GL) */ advance(t: number) { for (let k = 0; k < t / DT; k++) { const u = pilot.drive(car); if (race) race.step(DT, u); else car.step(DT, u); } }, get SCN() { return SCN; }, get T() { return T; }, /** the controls as the car gets them, the touch pedals' own amounts, the camera's last shot (alpha 0.12) */ get input() { return input; }, /** the smoke's tier now; the device's capabilities as the smoke sees them (a test sets them to try the fallback) */ get smokeTier() { return smokeNow(); }, set smokeCaps(c: GpuCaps | null) { smokeCaps = c; }, get pedal() { return pedal; }, get shot() { return camShot; } };   // for the page tests (tools): place the car, read the scenery
+(globalThis as { __drive?: unknown }).__drive = { set look(v: [number, number, number] | null) { lookAt = v; }, get car() { return car; }, get L() { return live; }, get damage() { const e = dmg.get(car); return e ? { worst: e.D.worst, taken: e.D.taken } : null; }, get race() { return race; }, /** run the world on by t seconds at once, the test driver at the wheel (page tests on slow software GL) */ advance(t: number) { for (let k = 0; k < t / DT; k++) { const u = pilot.drive(car); if (race) race.step(DT, u); else car.step(DT, u); } }, get SCN() { return SCN; }, get T() { return T; }, /** the controls as the car gets them, the touch pedals' own amounts, the camera's last shot (alpha 0.12) */ get input() { return input; }, /** the smoke's tier now; the device's capabilities as the smoke sees them (a test sets them to try the fallback) */ get smokeTier() { return smokeNow(); }, /** spin the rear wheels at a standstill for t seconds (the burnout's smoke) */ burnout(t: number) { burn = { t, p: [...car.p], q: [...car.q] }; }, set smokeCaps(c: GpuCaps | null) { smokeCaps = c; }, get pedal() { return pedal; }, get shot() { return camShot; } };   // for the page tests (tools): place the car, read the scenery
 const ready = Promise.all(loads).then(() => undefined);
 return {
   pause() { if (!running) return; running = false; keys.clear(); input.throttle = 0; input.brake = 0; input.hand = 0; void snd?.ctx.suspend().catch(() => {}); },

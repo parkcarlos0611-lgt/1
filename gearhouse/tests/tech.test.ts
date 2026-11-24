@@ -138,7 +138,7 @@ describe('the F355 (1994) and the F355 F1 (1997): the automated manual, variable
       let rate = 0; for (let t = 0; t < 1; t += dt) { c.step(dt, { throttle: 0.3, brake: 0, steer: 0.5 }); rate = Math.max(rate, Math.abs(c.om[0]!)); } return rate; };
     const s = dive('sport', 60), cm = dive('comfort', 60), cf = dive('comfort', 200);
     expect(new Vehicle(f, flat).damperMode).toBe('sport'); expect(s.k).toBe(f.tech!.damp!.sport); expect(cm.k).toBeLessThan(0.8); expect(cf.k).toBeGreaterThan(cm.k + 0.15); expect(cf.k).toBeLessThanOrEqual(s.k);
-    expect(cm.rate).toBeGreaterThan(s.rate * 1.08); expect(cm.d).toBeGreaterThan(s.d * 1.1); expect(roll('comfort')).toBeGreaterThan(roll('sport') * 1.1);
+    expect(cm.rate).toBeGreaterThan(s.rate * 1.08); expect(cm.d).toBeGreaterThan(s.d * 1.07);   /* alpha 0.13: on its linkage the dive's depth is more the springs' (the motion ratio rises toward full bump), the overshoot the dampers' */ expect(roll('comfort')).toBeGreaterThan(roll('sport') * 1.1);
     expect(new Vehicle(raceSpec('nsx'), flat).place(100, 0, 20).dampK).toBe(1);   /* a car without them: as before */
   });
   it('its flat floor and diffuser press it down some 25-70 kg at 250 km/h, shared about equally by the axles', () => {

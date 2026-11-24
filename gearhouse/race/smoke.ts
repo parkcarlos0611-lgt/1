@@ -25,8 +25,10 @@ export function curl(x: number, y: number, z: number): [number, number, number] 
 
 export class Smoke {
   readonly parcels: Parcel[] = []; wind: [number, number] = [1.2, 0.5]; time = 0; max = 700; private n = 0;
+  /** where a puff may go instead (the volumetric smoke's grid, docs/systems/104 B): true when it took it (no parcel made) */
+  tap: ((kind: SmokeKind, x: number, y: number, z: number, vx: number, vy: number, vz: number, amount: number) => boolean) | null = null;
   /** a parcel of `kind` at (x, y, z) over the ground at `floor`, moving at (vx, vy, vz), `amount` 0..1 its share of a full one */
-  emit(kind: SmokeKind, x: number, y: number, z: number, vx: number, vy: number, vz: number, amount = 1, floor = 0): void { const K = KIND[kind];
+  emit(kind: SmokeKind, x: number, y: number, z: number, vx: number, vy: number, vz: number, amount = 1, floor = 0): void { if (this.tap?.(kind, x, y, z, vx, vy, vz, amount)) return; const K = KIND[kind];
     if (this.parcels.length >= this.max) this.parcels.shift();
     this.parcels.push({ x, y, z, vx, vy, vz, T: K.T * (0.7 + 0.3 * amount), rho: K.rho * Math.min(1, amount), r: K.r * (0.8 + 0.4 * Math.random()), age: 0, kind, seed: (this.n++ * 0.6180339) % 1, floor }); }
   step(dt: number): void { this.time += dt; const t = this.time;

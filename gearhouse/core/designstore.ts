@@ -1,0 +1,89 @@
+// The parts builder's designs kept and carried (docs/systems/98_alpha_interface_and_builder_plan.md, B3 and B4): a
+// design written into a link (the test drive opens the drive page with it) and read back, checked against the format;
+// the designs saved in this browser; and what the drive page measured of a design (its best laps, the top speed it
+// reached), kept per design and read by the builder. Pure: the storage is passed in (the browser's localStorage, or a
+// map in the tests), and a storage that throws (a private window, storage refused) keeps nothing and reads empty.
+import { BASES, NOSES, FRONTS, TAILS, WHEELS, DESIGN_NSX, DESIGN_F355, normalise, type BaseId, type Design } from './design';
+
+/** what the helpers need of a storage (the browser's Storage has these) */
+export interface KeyStore { getItem(k: string): string | null; setItem(k: string, v: string): void; removeItem(k: string): void }
+export const KEYS = { designs: 'gearhouse.builder.designs.v1', current: 'gearhouse.builder.current.v1', testDrive: 'gearhouse.builder.testdrive.v1',
+  /** one key a design: what the drive page measured of it */ measure: (id: string) => `gearhouse.design.measure.v1.${id}` } as const;
+
+const read = (s: KeyStore | null, k: string): string | null => { try { return s ? s.getItem(k) : null; } catch { return null; } };
+const write = (s: KeyStore | null, k: string, v: string | null): boolean => { try { if (!s) return false; if (v === null) s.removeItem(k); else s.setItem(k, v); return true; } catch { return false; } };
+
+// ---- a design checked: a loaded file, a pasted text or a link may be anything ----
+const PRESET: Record<BaseId, Design> = { nsx: DESIGN_NSX, f355: DESIGN_F355 };
+const num = (v: unknown, d: number) => typeof v === 'number' && Number.isFinite(v) ? v : d;
+const one = <T>(v: unknown, of: readonly T[], d: T): T => of.includes(v as T) ? v as T : d;
+const bool = (v: unknown, d: boolean) => typeof v === 'boolean' ? v : d;
+const obj = (v: unknown): Record<string, unknown> => v && typeof v === 'object' && !Array.isArray(v) ? v as Record<string, unknown> : {};
+/** any value made into a design: the fields it has kept where they are of the format, the rest from its base's own car
+ *  (the NSX's or the F355's), then brought inside the limits; null when it is not a design at all (no body or base) */
+export function asDesign(v: unknown): Design | null {
+  const o = obj(v), b = obj(o.body); if (!o.body || !BASES.includes(b.base as BaseId)) return null;
+  const P = PRESET[b.base as BaseId], e = obj(o.engine), r = obj(o.drive), k = obj(o.kit), ty = Array.isArray(k.tyres) ? k.tyres : [];
+  const paint = typeof b.paint === 'string' && /^#[0-9a-f]{6}$/i.test(b.paint) ? b.paint.toLowerCase() : P.body.paint;
+  const d: Design = { v: 1, id: typeof o.id === 'string' && /^[\w-]{1,40}$/.test(o.id) ? o.id : newId(), name: typeof o.name === 'string' && o.name.trim() ? o.name.trim().slice(0, 40) : P.name,
+    body: { base: P.body.base, nose: one(b.nose, NOSES, P.body.nose), front: one(b.front, FRONTS, P.body.front), tail: one(b.tail, TAILS, P.body.tail), wheel: one(b.wheel, WHEELS, P.body.wheel),
+      wheelbase: Math.round(num(b.wheelbase, 0)), width: Math.round(num(b.width, 0)), paint, gloss: num(b.gloss, P.body.gloss), material: one(b.material, ['steel', 'aluminium'] as const, P.body.material) },
+    engine: { layout: one(e.layout, ['V6', 'V8', 'V12'] as const, P.engine.layout), cc: Math.round(num(e.cc, P.engine.cc)), valves: one(e.valves, [2, 3, 4, 5] as const, P.engine.valves),
+      redline: Math.round(num(e.redline, P.engine.redline)), turbo: one(e.turbo, [0, 1, 2] as const, P.engine.turbo), vtec: bool(e.vtec, P.engine.vtec) },
+    drive: { gears: one(r.gears, [5, 6] as const, P.drive.gears), gearbox: one(r.gearbox, ['manual', 'f1'] as const, P.drive.gearbox), final: num(r.final, P.drive.final), lsd: bool(r.lsd, P.drive.lsd), awd: bool(r.awd, P.drive.awd) },
+    kit: { abs: bool(k.abs, P.kit.abs), tcs: bool(k.tcs, P.kit.tcs), steering: one(k.steering, ['manual', 'hydraulic', 'electric'] as const, P.kit.steering), dampers: one(k.dampers, ['fixed', 'adaptive'] as const, P.kit.dampers),
+      wing: bool(k.wing, P.kit.wing), diffuser: bool(k.diffuser, P.kit.diffuser), tyres: [Math.round(num(ty[0], P.kit.tyres[0])), Math.round(num(ty[1], P.kit.tyres[1]))], rim: one(k.rim, [16, 17, 18] as const, P.kit.rim) } };
+  return normalise(d); }
+
+/** a new design's id: short, unlikely to meet another in one browser */
+export function newId(): string { return 'd' + Date.now().toString(36) + Math.floor(Math.random() * 36 ** 4).toString(36).padStart(4, '0'); }
+/** a new design from a base's own car: a fresh id, its name */
+export function fromPreset(base: BaseId, name?: string): Design { const P = structuredClone(PRESET[base]); return { ...P, id: newId(), name: name ?? `${P.name} 개조` }; }
+/** the parts that make the car (not its id or name): two designs with the same signature drive alike */
+export const designSig = (d: Design): string => JSON.stringify([d.body, d.engine, d.drive, d.kit]);
+
+// ---- a design in a link: JSON as base64url (UTF-8, the names may be Korean) ----
+export function encodeDesign(d: Design): string {
+  const bytes = new TextEncoder().encode(JSON.stringify(d)); let bin = ''; for (const b of bytes) bin += String.fromCharCode(b);
+  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); }
+export function decodeDesign(s: string): Design | null {
+  try { const b64 = s.replace(/-/g, '+').replace(/_/g, '/'), bin = atob(b64 + '='.repeat((4 - b64.length % 4) % 4));
+    return asDesign(JSON.parse(new TextDecoder().decode(Uint8Array.from(bin, c => c.charCodeAt(0))))); } catch { return null; } }
+/** a design as a file's text, and back (null when it is not one) */
+export const designJson = (d: Design): string => JSON.stringify(d, null, 2);
+export function parseDesign(text: string): Design | null { try { return asDesign(JSON.parse(text)); } catch { return null; } }
+
+// ---- the designs saved in this browser ----
+/** every saved design, the last saved first */
+export function savedDesigns(s: KeyStore | null): Design[] {
+  let all: unknown; try { all = JSON.parse(read(s, KEYS.designs) ?? '[]'); } catch { return []; }
+  return Array.isArray(all) ? all.map(asDesign).filter((d): d is Design => !!d) : []; }
+/** a design saved (replacing one of its id); false when the storage keeps nothing */
+export function saveDesign(s: KeyStore | null, d: Design): boolean { const rest = savedDesigns(s).filter(x => x.id !== d.id); return write(s, KEYS.designs, JSON.stringify([d, ...rest].slice(0, 100))); }
+export function deleteDesign(s: KeyStore | null, id: string): boolean { return write(s, KEYS.designs, JSON.stringify(savedDesigns(s).filter(x => x.id !== id))); }
+/** the design on the bench (kept as it is edited, so a reload finds it) */
+export function currentDesign(s: KeyStore | null): Design | null { const t = read(s, KEYS.current); return t ? parseDesign(t) : null; }
+export function keepCurrent(s: KeyStore | null, d: Design): boolean { return write(s, KEYS.current, JSON.stringify(d)); }
+
+// ---- what the drive page measured ----
+/** a design's measurements: the top speed reached (km/h), its best lap at each track (s, with the track's name), for
+ *  the design as it was (its signature: a design changed since is measured afresh) */
+export interface Measured { sig: string; topKmh: number; laps: Record<string, { t: number; track: string }>; at: number }
+export function measured(s: KeyStore | null, id: string): Measured | null {
+  try { const m = JSON.parse(read(s, KEYS.measure(id)) ?? 'null'); return m && typeof m.sig === 'string' && typeof m.topKmh === 'number' && m.laps && typeof m.laps === 'object' ? m as Measured : null; } catch { return null; } }
+/** a run's figures kept: the better of these and what was kept (a record for another version of the design is replaced) */
+export function recordRun(s: KeyStore | null, d: Design, run: { topKmh?: number; lap?: { trackId: string; track: string; t: number } }, now = Date.now()): Measured {
+  const sig = designSig(d), had = measured(s, d.id), m: Measured = had && had.sig === sig ? { ...had, laps: { ...had.laps } } : { sig, topKmh: 0, laps: {}, at: now };
+  if (run.topKmh && run.topKmh > m.topKmh) m.topKmh = Math.round(run.topKmh);
+  if (run.lap && run.lap.t > 0) { const L = m.laps[run.lap.trackId]; if (!L || run.lap.t < L.t) m.laps[run.lap.trackId] = { t: +run.lap.t.toFixed(3), track: run.lap.track }; }
+  m.at = now; write(s, KEYS.measure(d.id), JSON.stringify(m)); return m; }
+
+// ---- the tyres against the arches ----
+/** how much wider than its base's own tyres a tyre may be before it stands out of the arch (mm): the base's own car has
+ *  room for about this much more, and the body widened (half its width each side) makes room for as much again */
+export const ARCH_ROOM = 40;
+/** a warning (Korean, for the readout) when a tyre is noticeably wider than the arch over it holds; null when it fits */
+export function tyreWarning(d: Design): string | null {
+  const own = PRESET[d.body.base].kit.tyres, room = ARCH_ROOM + d.body.width, [f, r] = d.kit.tyres, out: string[] = [];
+  if (f > own[0] + room) out.push(`앞 ${f} mm (기본 ${own[0]} mm)`); if (r > own[1] + room) out.push(`뒤 ${r} mm (기본 ${own[1]} mm)`);
+  return out.length ? `타이어가 휠아치보다 넓습니다: ${out.join(', ')}. 차체 폭을 넓히면 들어갑니다.` : null; }

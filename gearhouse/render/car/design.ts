@@ -55,3 +55,11 @@ export function designChoices(base: BaseId): { nose: NoseKind[]; front: FrontKin
   const B = BASE[base]; if (!B) throw new Error(`design: no base ${base}`);
   return { nose: NOSES.filter(k => k in B.nose), front: FRONTS.filter(k => k in B.front), tail: TAILS.filter(k => k in B.tail), wheel: WHEELS.filter(k => k in B.wheel) };
 }
+
+/** the mesh without the parts of these names (the builder's engine view: the deck's lids and glass lifted off) */
+export function withoutParts(M: Mesh, names: readonly string[]): Mesh {
+  const N = M.names ?? [], drop = new Set(N.flatMap((n, k) => names.includes(n) ? [k] : [])), keep: number[] = [];
+  for (let t = 0; t < M.n; t++) if (!drop.has(M.part[t]!)) keep.push(t);
+  const pick = <A extends Float32Array | Uint8Array | Int16Array>(a: A, w: number, make: (n: number) => A): A => { const o = make(keep.length * w); keep.forEach((t, i) => o.set(a.subarray(t * w, t * w + w), i * w)); return o; };
+  return { ...M, n: keep.length, pos: pick(M.pos, 9, n => new Float32Array(n)), col: pick(M.col, 3, n => new Uint8Array(n)), gloss: pick(M.gloss, 1, n => new Float32Array(n)),
+    part: pick(M.part, 1, n => new Int16Array(n)), kind: pick(M.kind, 1, n => new Uint8Array(n)), tex: pick(M.tex, 1, n => new Uint8Array(n)) }; }

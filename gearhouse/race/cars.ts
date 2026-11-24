@@ -252,6 +252,9 @@ export const NEW_CARS: string[] = Object.keys(NEW);
 export const EXP_CARS: string[] = Object.keys(EXP).filter(id => !NEW[id]);
 /** the engine for the sound: cylinders, valves, blower (the experimental cars are not in the game's data) */
 export const EXP_ENGINE: Record<string, { kind: string; layout: string; supercharged?: boolean }> = { napier33: { kind: 'ohv', layout: 'W12' }, jagD55: { kind: 'ohv', layout: 'I6' }, auburn851: { kind: 'sv', layout: 'I8', supercharged: true }, mb540k: { kind: 'ohv', layout: 'I8', supercharged: true }, eb110: { kind: 'ohv', layout: 'V12' }, xj220: { kind: 'ohv', layout: 'V6' }, diablo: { kind: 'ohv', layout: 'V12' }, nsx: { kind: 'ohv', layout: 'V6' }, f355: { kind: 'ohv', layout: 'V8' }, f355f1: { kind: 'ohv', layout: 'V8' } };
+/** a car made outside this file (the parts builder's design on the drive page, docs/systems/98 B4) offered under its own
+ *  id: raceSpec finds it as it finds the experimental cars; the period's and the new cars' lists are not changed */
+export function addRaceCar(s: RaceSpec): void { EXP[s.id] = s; }
 export function raceSpec(id: string): RaceSpec {
   if (EXP[id]) return EXP[id]!; if (AWAITING_MESH[id]) return AWAITING_MESH[id]!;
   const s = (specs as { cars: Record<string, { car: string; engine: { hp: number }; wheelbase: number; track: number; tyre: string }> }).cars[id]!, p = PERIOD[id]!, t = tyre(s.tyre), hpRpm = p[0];

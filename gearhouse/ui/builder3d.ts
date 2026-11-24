@@ -1,8 +1,11 @@
 // The parts builder (docs/systems/98_alpha_interface_and_builder_plan.md, B3 and B4): a car's design (core/design.ts)
 // edited on a studio turntable. The live renderer (render/live/renderer.ts, as the drive page and the photo mode use it:
 // its sun and shadows, the photographed sky, the PBR textures, the looks) draws the design's car (render/car/design.ts),
-// built again only when the body's fields change and a moment after a slider rests. Left: the choices in tabs (the
-// engine's details greyed out, with the reason, where its development grade does not allow them); right: the figures
+// built again only when the body's fields change and a moment after a slider rests. Left: the choices in six steps,
+// taken in a guided order with any step open at any time (docs/systems/98 section 11: the base, the engine and drive,
+// the body's shapes, the kit, the paint, then the check and the test drive; the engine's details greyed out, with the
+// reason, where its development grade does not allow them; a step marked where a fit check concerning it is not
+// clean, so a change upstream shows what it broke further on); right: the figures
 // worked out from the design (race/design.ts) as it changes, its class from them, its cost and reliability
 // (placeholders until B5), the fit of its parts (race/fit.ts: each check's verdict and the fixes, applied by a click),
 // and what the drive page measured of it. Designs are kept in this browser, carried as JSON files, and sent to
@@ -56,12 +59,44 @@ const note = (t: string) => { const p = document.createElement('p'); p.className
 const h2 = (t: string) => { const h = document.createElement('h2'); h.textContent = t; return h; };
 const sign = (v: number, u: string) => `${v > 0 ? '+' : ''}${v} ${u}`;
 
-const TABS: [string, string][] = [['chassis', '차대'], ['body', '차체'], ['engine', '엔진'], ['drive', '구동계'], ['kit', '장비'], ['files', '저장']];
-const pane = new Map<string, HTMLElement>();
-for (const [id, name] of TABS) { const b = document.createElement('button'); b.type = 'button'; b.setAttribute('role', 'tab'); b.dataset.tab = id; b.textContent = name; b.setAttribute('aria-selected', String(id === 'chassis')); $('tabs').append(b);
-  const p = document.createElement('section'); p.className = 'pane' + (id === 'chassis' ? ' on' : ''); p.dataset.tab = id; $('panes').append(p); pane.set(id, p);
-  b.addEventListener('click', () => { for (const x of Array.from($('tabs').children)) x.setAttribute('aria-selected', String(x === b)); for (const [k, q] of pane) q.classList.toggle('on', k === id); }); }
+// ---- the steps: the design in a guided order (going back always allowed, and so is going ahead); the saved designs
+// and the files on a page of their own, opened from the bar at the top ----
+type StepId = 'chassis' | 'engine' | 'body' | 'kit' | 'paint' | 'check';
+const STEPS: [StepId, string][] = [['chassis', '차대'], ['engine', '엔진·구동계'], ['body', '차체 형태'], ['kit', '장비'], ['paint', '칠·마감'], ['check', '검사·시험 주행']];
+/** the step each fit check answers to: the engine bay, its mounts and the gearbox the engine's and the drive's, the
+ *  arches the tyres' (their fixes may reach into other steps: a longer wheelbase, a wider body) */
+const FIT_STEP: Record<FitResult['part'], StepId> = { bayLength: 'engine', bayWidth: 'engine', bayHeight: 'engine', gearboxPlace: 'engine', mount: 'engine', gearbox: 'engine', archF: 'kit', archR: 'kit' };
+const stepNo = (id: StepId) => STEPS.findIndex(s => s[0] === id);
+const pane = new Map<string, HTMLElement>(), stepBtn = new Map<StepId, HTMLButtonElement>();
+for (const id of [...STEPS.map(s => s[0]), 'files']) { const p = document.createElement('section'); p.className = 'pane'; p.dataset.tab = id; $('panes').append(p); pane.set(id, p); }
+for (const [id, name] of STEPS) { const li = document.createElement('li'), b = document.createElement('button'); b.type = 'button'; b.dataset.step = id;
+  b.innerHTML = `<span class="n">${stepNo(id) + 1}</span><span class="t">${name.replace('·', '·<wbr>')}</span><span class="badge" hidden></span>`;
+  b.addEventListener('click', () => go(id)); li.append(b); $('steps').append(li); stepBtn.set(id, b); }
 const add = (tab: string, ...els: HTMLElement[]) => pane.get(tab)!.append(...els);
+/** where each design was left (its step, the steps seen), kept in this browser */
+const STEP_KEY = 'gearhouse.builder.step.v1';
+let step: StepId = 'chassis', onFiles = false, seen = new Set<StepId>(['chassis']);
+const isStep = (x: unknown): x is StepId => STEPS.some(s => s[0] === x);
+function keptSteps(): Record<string, { step: StepId; seen: StepId[] }> { try { const o: unknown = JSON.parse(store?.getItem(STEP_KEY) ?? '{}'); return o && typeof o === 'object' ? o as Record<string, { step: StepId; seen: StepId[] }> : {}; } catch { return {}; } }
+function keepStep() { try { const rest = Object.entries(keptSteps()).filter(([k]) => k !== D.id).slice(0, 99); store?.setItem(STEP_KEY, JSON.stringify(Object.fromEntries([[D.id, { step, seen: [...seen] }], ...rest]))); } catch { /* not kept */ } }
+/** the step a design was left at (a new one starts at the first) */
+function restoreStep() { const k = keptSteps()[D.id]; step = k && isStep(k.step) ? k.step : 'chassis'; seen = new Set([...(Array.isArray(k?.seen) ? k.seen.filter(isStep) : []), step]); onFiles = false; showStep(); }
+function go(id: StepId | 'files') { if (id === 'files') onFiles = true; else { onFiles = false; step = id; seen.add(id); keepStep(); } showStep(); $('panes').scrollTop = 0; }
+function showStep() { const at = onFiles ? 'files' : step;
+  for (const [k, q] of pane) q.classList.toggle('on', k === at);
+  for (const [id, b] of stepBtn) { const now = !onFiles && id === step, done = seen.has(id) && !now;
+    if (now) b.setAttribute('aria-current', 'step'); else b.removeAttribute('aria-current'); b.classList.toggle('done', done); b.classList.toggle('unseen', !seen.has(id)); b.dataset.state = now ? '지금 단계' : done ? '본 단계' : '아직 안 본 단계'; label(id); }
+  const i = stepNo(step), prev = $<HTMLButtonElement>('prev'), next = $<HTMLButtonElement>('next');
+  prev.textContent = onFiles ? '◀ 설계로 돌아가기' : '◀ 이전'; prev.disabled = !onFiles && i === 0; next.hidden = onFiles || i === STEPS.length - 1;
+  $('stepof').textContent = onFiles ? '저장·불러오기' : `${i + 1} / ${STEPS.length} · ${STEPS[i]![1]}`;
+  $('openFiles').setAttribute('aria-pressed', String(onFiles));
+  // the step in sight in its bar (the bar scrolls by itself on a narrow drawer)
+  const bar = $('steps'), b = stepBtn.get(step)!.parentElement!; if (bar.scrollWidth > bar.clientWidth) bar.scrollLeft = b.offsetLeft - (bar.clientWidth - b.offsetWidth) / 2; }
+/** a step's name for a screen reader: its number, its state and its fit marks */
+function label(id: StepId) { const b = stepBtn.get(id)!, badge = b.querySelector<HTMLElement>('.badge')!; b.setAttribute('aria-label', `${stepNo(id) + 1}단계 ${STEPS[stepNo(id)]![1]} (${b.dataset.state}${badge.hidden ? '' : `, ${badge.title}`})`); }
+$('prev').addEventListener('click', () => { if (onFiles) go(step); else go(STEPS[Math.max(0, stepNo(step) - 1)]![0]); });
+$('next').addEventListener('click', () => go(STEPS[Math.min(STEPS.length - 1, stepNo(step) + 1)]![0]));
+$('openFiles').addEventListener('click', () => { if (onFiles) go(step); else { go('files'); drawer(true); } });
 
 // 차대: the base, its stretch, its structure
 add('chassis', seg<BaseId>('바탕 차대', [['nsx', BASE_NAME.nsx], ['f355', BASE_NAME.f355]], () => D.body.base, v => { if (v === D.body.base) return;
@@ -73,8 +108,9 @@ add('chassis', seg<BaseId>('바탕 차대', [['nsx', BASE_NAME.nsx], ['f355', BA
   seg<Structure>('구조 소재 (모노코크·프레임)', [['steel', '강철'], ['hss', '고장력강'], ['aluminium', '알루미늄'], ['honeycomb', '알루미늄 허니콤'], ['cfrp', '탄소섬유']], () => D.body.structure, v => { D.body.structure = v; }),
   note('같은 강성에서 강철 대비 무게: 고장력강 0.9, 알루미늄 0.6, 허니콤 0.5, 탄소섬유 0.45. 가벼울수록 비싸고, 탄소섬유는 수작업입니다.'),
   seg<Panels>('패널 소재', [['steel', '강철'], ['aluminium', '알루미늄'], ['frp', 'FRP'], ['cfrp', '탄소섬유']], () => D.body.panels, v => { D.body.panels = v; }),
-  note('패널 무게: 알루미늄 0.55, FRP 0.6 (소량 생산에 싸다), 탄소섬유 0.4. 강철은 수리가 쉽습니다.'));
-// 차체: the panels' kinds, the paint
+  note('패널 무게: 알루미늄 0.55, FRP 0.6 (소량 생산에 싸다), 탄소섬유 0.4. 강철은 수리가 쉽습니다.'),
+  seg<Interior>('실내 사양', [['light', '경량 (얇은 유리, 가벼운 시트)'], ['standard', '표준'], ['luxury', '고급 (가죽, 에어컨)']], () => D.kit.interior, v => { D.kit.interior = v; }));
+// ③ 차체 형태: the panels' kinds; ⑤ 칠·마감: the paint
 { const ch = designChoices('nsx'), kinds = <T extends string>(ks: T[]) => ks.map(k => [k, KIND_NAME[k] ?? k] as [T, string]);
   add('body', seg<NoseKind>('코', kinds(ch.nose), () => D.body.nose, v => { D.body.nose = v; }), seg<FrontKind>('앞면', kinds(ch.front), () => D.body.front, v => { D.body.front = v; }),
     seg<TailKind>('꼬리', kinds(ch.tail), () => D.body.tail, v => { D.body.tail = v; }), seg<WheelKind>('휠', kinds(ch.wheel), () => D.body.wheel, v => { D.body.wheel = v; }));
@@ -82,13 +118,13 @@ add('chassis', seg<BaseId>('바탕 차대', [['nsx', BASE_NAME.nsx], ['f355', BA
   const bs = PAINTS.map(c => { const b = document.createElement('button'); b.type = 'button'; b.style.background = c; b.setAttribute('aria-label', c); b.addEventListener('click', () => { D.body.paint = c; changed(); }); sw.append(b); return [c, b] as const; });
   pick.addEventListener('input', () => { D.body.paint = pick.value; changed(); }); sw.append(pick);
   syncs.push(() => { pick.value = D.body.paint; for (const [c, b] of bs) b.setAttribute('aria-pressed', String(c === D.body.paint.toLowerCase())); });
-  add('body', field('도장 색', sw), range('광택', [0, 1], 0.05, () => D.body.gloss, v => { D.body.gloss = v; }, v => v.toFixed(2), 'gloss')); }
-// 엔진: the grade first; the details it does not allow greyed out with the reason
+  add('paint', field('도장 색', sw), range('광택', [0, 1], 0.05, () => D.body.gloss, v => { D.body.gloss = v; }, v => v.toFixed(2), 'gloss')); }
+// ② 엔진·구동계: the grade first; the details it does not allow greyed out with the reason
 { const E = () => D.engine, lk = <K extends 'intake' | 'compression' | 'sump' | 'block' | 'valves' | 'turbo'>(k: K) => (v: Design['engine'][K]) => gradeLock(E().grade, k, v);
   const boost = range('부스트', LIMITS.boost, 0.05, () => E().boost, v => { E().boost = v; }, v => `${v.toFixed(2)} bar`, 'boost'), redline = range('레드라인', LIMITS.redline, 100, () => E().redline, v => { E().redline = v; }, v => `${v.toLocaleString()} rpm`, 'redline');
   const vtec = check('VTEC (두 가지 캠 프로필)', () => E().vtec, v => { E().vtec = v; }, 'vtec'), ic = check('인터쿨러', () => E().intercooler, v => { E().intercooler = v; }, 'intercooler');
   const gradeNote = note('');
-  add('engine', seg<Grade>('개발 등급', GRADES.map(g => [g, `${g} ${GRADE_NAME[g]}`] as [Grade, string]), () => E().grade, v => { E().grade = v; D = normalise(D); }), gradeNote,
+  add('engine', h2('엔진'), seg<Grade>('개발 등급', GRADES.map(g => [g, `${g} ${GRADE_NAME[g]}`] as [Grade, string]), () => E().grade, v => { E().grade = v; D = normalise(D); }), gradeNote,
     seg('배열', [['V6', 'V6'], ['V8', 'V8'], ['V12', 'V12']], () => E().layout, v => { E().layout = v; }),
     range('배기량', LIMITS.cc, 50, () => E().cc, v => { E().cc = v; }, v => `${v.toLocaleString()} cc`, 'cc'),
     seg('실린더당 밸브', [[2, '2'], [3, '3'], [4, '4'], [5, '5']], () => E().valves, v => { E().valves = v; }, lk('valves')), redline,
@@ -102,14 +138,14 @@ add('chassis', seg<BaseId>('바탕 차대', [['nsx', BASE_NAME.nsx], ['f355', BA
     ri.max = String(R); bi.max = String(Bm); bi.disabled = !E().turbo; (ic.querySelector('input')!).disabled = !E().turbo;
     const vi = vtec.querySelector('input')!, vl = gradeLock(g, 'vtec', true); vi.disabled = !!vl; vtec.title = vl ?? '';
     gradeNote.textContent = `${g}등급: 레드라인 ${R.toLocaleString()} rpm, 부스트 ${Bm.toFixed(1)} bar까지${vl ? ` · VTEC는 ${vl.replace(' 고를 수 있습니다', '')}` : ''}`; }); }
-// 구동계
+// ② (on): the drive
 { const fin = range('종감속비', LIMITS.final, 0.01, () => D.drive.final || designSpec(D).final, v => { D.drive.final = v; }, v => v.toFixed(2), 'final');
-  add('drive', seg('기어', [[5, '5단'], [6, '6단']], () => D.drive.gears, v => { D.drive.gears = v; }),
+  add('engine', h2('구동계'), seg('기어', [[5, '5단'], [6, '6단']], () => D.drive.gears, v => { D.drive.gears = v; }),
     seg('변속기', [['manual', '수동'], ['f1', 'F1 (반자동)']], () => D.drive.gearbox, v => { D.drive.gearbox = v; }),
     check('종감속 자동 (최고 속도가 출력 정점에서 나오게)', () => !D.drive.final, v => { D.drive.final = v ? 0 : +designSpec(D).final.toFixed(2); }, 'autofinal'), fin,
     check('LSD (차동 제한)', () => D.drive.lsd, v => { D.drive.lsd = v; }, 'lsd'), check('4륜 구동 (점성 센터 커플링, 앞 30 %)', () => D.drive.awd, v => { D.drive.awd = v; }, 'awd'));
   syncs.push(() => { (fin.querySelector('input') as HTMLInputElement).disabled = !D.drive.final; }); }
-// 장비
+// ④ 장비
 add('kit', check('ABS', () => D.kit.abs, v => { D.kit.abs = v; }, 'abs'), check('TCS (트랙션 컨트롤)', () => D.kit.tcs, v => { D.kit.tcs = v; }, 'tcs'),
   select('스티어링', [['manual', '수동'], ['hydraulic', '유압 파워'], ['electric', '전동 파워']], () => D.kit.steering, v => { D.kit.steering = v; }, 'steering'),
   seg('댐퍼', [['fixed', '고정'], ['adaptive', '가변 (두 가지 모드)']], () => D.kit.dampers, v => { D.kit.dampers = v; }),
@@ -118,10 +154,16 @@ add('kit', check('ABS', () => D.kit.abs, v => { D.kit.abs = v; }, 'abs'), check(
   range('앞 타이어 폭', LIMITS.tyre, 5, () => D.kit.tyres[0], v => { D.kit.tyres = [v, D.kit.tyres[1]]; }, v => `${v} mm`, 'tyreF'),
   range('뒤 타이어 폭', LIMITS.tyre, 5, () => D.kit.tyres[1], v => { D.kit.tyres = [D.kit.tyres[0], v]; }, v => `${v} mm`, 'tyreR'),
   seg('림', [[16, '16″'], [17, '17″'], [18, '18″']], () => D.kit.rim, v => { D.kit.rim = v; }),
-  h2('실내'),
-  seg<Interior>('실내 사양', [['light', '경량 (얇은 유리, 가벼운 시트)'], ['standard', '표준'], ['luxury', '고급 (가죽, 에어컨)']], () => D.kit.interior, v => { D.kit.interior = v; }),
   note('윙과 디퓨저는 아직 차체에 그려지지 않고 물리(다운포스, 공기 저항)에만 들어갑니다.'));
-// 저장: the saved designs, new ones, files
+// ⑥ 검사·시험 주행: the fit's checks with their fixes and the step each belongs to, the class, the cost and the
+// reliability, what was measured, the test drive and the save
+{ const div = (id: string, cls: string) => { const d = document.createElement('div'); d.id = id; d.className = cls; return d; };
+  const drv = document.createElement('a'); drv.id = 'drive6'; drv.className = 'btn main'; drv.target = '_blank'; drv.rel = 'opener'; drv.textContent = '시험 주행 ▶'; drv.href = 'drive.html';
+  const b = (t: string, f: () => void, id: string) => { const x = document.createElement('button'); x.type = 'button'; x.className = 'btn'; x.id = id; x.textContent = t; x.addEventListener('click', f); return x; };
+  const row = document.createElement('div'); row.className = 'btns'; row.append(drv, b('저장', saveNow, 'save6'), b('저장·불러오기', () => go('files'), 'files6'));
+  add('check', note('앞 단계를 바꾸면 이 검사는 바로 다시 계산됩니다. 문제가 생긴 단계는 위 단계 표시에 ⚠️·⛔로 나옵니다.'),
+    h2('장착 검사'), div('fit6', 'fit6'), h2('차종'), div('cls6', 'cls6'), h2('원가와 신뢰성'), div('cost6', 'sumfig'), div('meas6', 'meas6'), row); }
+// 저장·불러오기: the saved designs, new ones, files
 { const list = document.createElement('ul'); list.className = 'list'; list.id = 'list';
   const btn = (t: string, f: () => void, cls = 'btn') => { const b = document.createElement('button'); b.type = 'button'; b.className = cls; b.textContent = t; b.addEventListener('click', f); return b; };
   const row = (...els: HTMLElement[]) => { const d = document.createElement('div'); d.className = 'btns'; d.append(...els); return d; };
@@ -148,14 +190,15 @@ function changed() { D = normalise(D); for (const s of syncs) s(); keepCurrent(s
   clearTimeout(figT); figT = setTimeout(figures, 40) as unknown as number;
   if (bodyKey(D) !== meshKey) { clearTimeout(meshT); meshT = setTimeout(rebuild, 150) as unknown as number; } }
 /** another design on the bench */
-function use(d: Design) { D = structuredClone(d); $<HTMLInputElement>('name').value = D.name; lastFigs = null; changed(); showList(); }
+function use(d: Design) { D = structuredClone(d); $<HTMLInputElement>('name').value = D.name; lastFigs = null; restoreStep(); changed(); showList(); }
 let flashT = 0; function flash(t: string) { $('saved').textContent = t; clearTimeout(flashT); flashT = setTimeout(savedState, 2500) as unknown as number; }
 function savedState() { const had = savedDesigns(store).find(x => x.id === D.id); $('saved').textContent = !had ? '저장 안 됨' : JSON.stringify(had) === JSON.stringify(D) ? '저장됨' : '바뀐 내용 저장 안 됨'; }
 $<HTMLInputElement>('name').addEventListener('input', e => { D.name = (e.target as HTMLInputElement).value.slice(0, 40) || '이름 없는 설계'; keepCurrent(store, D); savedState(); driveLink(); });
-$('save').addEventListener('click', () => { flash(saveDesign(store, D) ? `저장했습니다: ${D.name}` : '이 브라우저는 저장을 허락하지 않습니다'); showList(); });
+function saveNow() { flash(saveDesign(store, D) ? `저장했습니다: ${D.name}` : '이 브라우저는 저장을 허락하지 않습니다'); showList(); }
+$('save').addEventListener('click', saveNow);
 // the test drive (B4): the drive page opened with this design in its link
-function driveLink() { const a = $<HTMLAnchorElement>('drive'); a.href = `drive.html?design=${encodeDesign(D)}`; }
-$('drive').addEventListener('click', () => { keepCurrent(store, D); try { store?.setItem(KEYS.testDrive, encodeDesign(D)); } catch { /* not kept: the link carries it */ } });
+function driveLink() { for (const id of ['drive', 'drive6']) $<HTMLAnchorElement>(id).href = `drive.html?design=${encodeDesign(D)}`; }
+for (const id of ['drive', 'drive6']) $(id).addEventListener('click', () => { keepCurrent(store, D); try { store?.setItem(KEYS.testDrive, encodeDesign(D)); } catch { /* not kept: the link carries it */ } });
 
 // ---- the figures ----
 let lastFigs: DesignFigures | null = null, fitOpen: boolean | null = null;
@@ -176,26 +219,36 @@ function figures() { const f = designFigures(D), s = designSpec(D), was = lastFi
     + `<dt>종감속</dt><dd>${s.final.toFixed(2)}${D.drive.final ? '' : ' <small>자동</small>'}</dd>`
     + `<dt>원가 지수</dt>${cell('cost', `${f.cost} <small>NSX=100</small>`, false)}`
     + `<dt>신뢰성</dt>${cell('reliability', `${f.reliability} <small>· ${(f.serviceKm / 1000).toLocaleString()}천 km</small>`, true)}`;
-  $('cls').innerHTML = `<b>${esc(f.perfLabel)}</b> <small>· ${esc(f.form)}</small>`;
-  showFit(f.fit); meas(); }
+  $('cls').innerHTML = $('cls6').innerHTML = `<b>${esc(f.perfLabel)}</b> <small>· ${esc(f.form)}</small>`;
+  $('cost6').innerHTML = `<dl><dt>원가 지수</dt><dd>${f.cost} <small>NSX=100</small></dd><dt>신뢰성</dt><dd>${f.reliability}</dd><dt>정비 주기</dt><dd>${(f.serviceKm / 1000).toLocaleString()}천 <small>km</small></dd>`
+    + `<dt>무게</dt><dd>${f.mass.toLocaleString()} <small>kg</small></dd><dt>출력</dt><dd>${f.hp} <small>hp</small></dd><dt>최고 속도</dt><dd>${f.topKmh} <small>km/h</small></dd></dl>`;
+  showFit(f.fit); stepMarks(f.fit); meas(); }
+/** each step marked with the fit checks that concern it and are not clean */
+function stepMarks(r: FitResult[]) { for (const [id, b] of stepBtn) { const mine = r.filter(x => FIT_STEP[x.part] === id), nb = mine.filter(x => x.verdict === 'blocked').length, nm = mine.filter(x => x.verdict === 'modified').length, badge = b.querySelector<HTMLElement>('.badge')!;
+  badge.hidden = !nb && !nm; badge.className = `badge${nb ? ' blocked' : ''}`; badge.textContent = nb ? `⛔${nb > 1 ? nb : ''}` : `⚠️${nm > 1 ? nm : ''}`;
+  badge.title = [nb ? `장착 불가 ${nb}` : '', nm ? `개조 필요 ${nm}` : ''].filter(Boolean).join(', '); label(id); } }
 /** the fit's checks: the ones needing work or blocked first, each with its fixes as buttons that apply them */
 function showFit(r: FitResult[]) {
   const bad = r.filter(x => x.verdict !== 'ok').sort((a, b) => (a.verdict === 'blocked' ? 0 : 1) - (b.verdict === 'blocked' ? 0 : 1)), ok = r.filter(x => x.verdict === 'ok');
   const nb = bad.filter(x => x.verdict === 'blocked').length, nm = bad.length - nb, el = $('fit');
   const open = fitOpen ?? (nb > 0 || (nm > 0 && innerWidth > 760));
-  const item = (x: FitResult) => `<li class="${x.verdict}"><span class="ic" aria-hidden="true">${ICON[x.verdict]}</span><div><b>${esc(x.name)}</b> <span>${esc(x.reason)}</span>`
-    + (x.fixes.length ? `<div class="fixes">${x.fixes.map((fx, i) => `<button type="button" class="btn fix" data-part="${x.part}" data-i="${i}">${esc(fx.label)}</button>`).join('')}</div>` : '') + '</div></li>';
+  // in ⑥ each check also names its step, a button that goes there
+  const item = (x: FitResult, toStep = false) => `<li class="${x.verdict}"><span class="ic" aria-hidden="true">${ICON[x.verdict]}</span><div><b>${esc(x.name)}</b> <span>${esc(x.reason)}</span>`
+    + (x.fixes.length || (toStep && x.verdict !== 'ok') ? `<div class="fixes">${x.fixes.map((fx, i) => `<button type="button" class="btn fix" data-part="${x.part}" data-i="${i}">${esc(fx.label)}</button>`).join('')}`
+      + (toStep && x.verdict !== 'ok' ? `<button type="button" class="btn go" data-step="${FIT_STEP[x.part]}">${stepNo(FIT_STEP[x.part]) + 1}단계 ${STEPS[stepNo(FIT_STEP[x.part])]![1]}로 ◀</button>` : '') + '</div>' : '') + '</div></li>';
   el.innerHTML = `<details${open ? ' open' : ''}><summary>장착 검사 <span class="sum">${nb ? `⛔ ${nb} ` : ''}${nm ? `⚠️ ${nm} ` : ''}${!bad.length ? '✅ 모두 장착' : `✅ ${ok.length}`}</span></summary>`
-    + `<ul>${bad.map(item).join('')}${ok.map(item).join('')}</ul></details>`;
+    + `<ul>${bad.map(x => item(x)).join('')}${ok.map(x => item(x)).join('')}</ul></details>`;
+  const el6 = $('fit6'); el6.innerHTML = `<p class="note">${nb ? `⛔ 장착 불가 ${nb} · ` : ''}${nm ? `⚠️ 개조 필요 ${nm} · ` : ''}✅ 장착 ${ok.length}</p><ul>${bad.map(x => item(x, true)).join('')}${ok.map(x => item(x)).join('')}</ul>`;
   const d = el.querySelector('details')!; d.querySelector('summary')!.addEventListener('click', () => { fitOpen = !d.open; dirty = true; });
-  for (const b of Array.from(el.querySelectorAll<HTMLButtonElement>('button.fix'))) b.addEventListener('click', () => {
-    const fx = r.find(x => x.part === b.dataset.part)?.fixes[+b.dataset.i!]; if (!fx) return; D = applyPatch(D, fx.patch); changed(); flash(`적용: ${fx.label}`); }); }
+  for (const b of [...Array.from(el.querySelectorAll<HTMLButtonElement>('button.fix')), ...Array.from(el6.querySelectorAll<HTMLButtonElement>('button.fix'))]) b.addEventListener('click', () => {
+    const fx = r.find(x => x.part === b.dataset.part)?.fixes[+b.dataset.i!]; if (!fx) return; D = applyPatch(D, fx.patch); changed(); flash(`적용: ${fx.label}`); });
+  for (const b of Array.from(el6.querySelectorAll<HTMLButtonElement>('button.go'))) b.addEventListener('click', () => { if (isStep(b.dataset.step)) go(b.dataset.step); }); }
 /** what the drive page measured (its runs recorded under the design's id) */
-function meas() { const m = measured(store, D.id), el = $('meas');
-  if (!m) { el.innerHTML = '<div class="lab">측정</div><p class="note">시험 주행을 하면 낸 최고 속도와 랩 타임이 여기 기록됩니다.</p>'; return; }
-  if (m.sig !== designSig(D)) { el.innerHTML = '<div class="lab">측정</div><p class="note">설계가 바뀐 뒤로는 아직 측정이 없습니다 (전 설계의 기록은 시험 주행을 다시 하면 지워집니다).</p>'; return; }
+function meas() { const m = measured(store, D.id), put = (h: string) => { $('meas').innerHTML = h; $('meas6').innerHTML = h; };
+  if (!m) { put('<div class="lab">측정</div><p class="note">시험 주행을 하면 낸 최고 속도와 랩 타임이 여기 기록됩니다.</p>'); return; }
+  if (m.sig !== designSig(D)) { put('<div class="lab">측정</div><p class="note">설계가 바뀐 뒤로는 아직 측정이 없습니다 (전 설계의 기록은 시험 주행을 다시 하면 지워집니다).</p>'); return; }
   const laps = Object.values(m.laps).map(l => `<dt>${l.track.replace(/\s*\(.*$/, '')}</dt><dd>${fmtLap(l.t)}</dd>`).join('');
-  el.innerHTML = `<div class="lab">측정 (시험 주행)</div><dl><dt>낸 최고 속도</dt><dd>${m.topKmh || '-'} <small>km/h</small></dd>${laps || '<dt>최고 랩</dt><dd>-</dd>'}</dl>`; }
+  put(`<div class="lab">측정 (시험 주행)</div><dl><dt>낸 최고 속도</dt><dd>${m.topKmh || '-'} <small>km/h</small></dd>${laps || '<dt>최고 랩</dt><dd>-</dd>'}</dl>`); }
 addEventListener('storage', e => { if (e.key === KEYS.measure(D.id)) meas(); }); addEventListener('focus', meas); document.addEventListener('visibilitychange', () => { if (!document.hidden) meas(); });
 
 // ---- the view: the live renderer on the studio floor ----
@@ -244,7 +297,8 @@ function frame(now: number) { const el = Math.min(0.1, (now - last) / 1000); las
       { look: view.look, glass: 0.8, rays: true, bloomK: 1, reflK: 1.3, dof: 0, outW: 0.5, outK: 0.6 }); }
   requestAnimationFrame(frame); }
 // the phone's drawer
-$('toggle').addEventListener('click', () => { const on = !document.body.classList.contains('open'); document.body.classList.toggle('open', on); $('toggle').setAttribute('aria-expanded', String(on)); $('toggle').textContent = on ? '✕ 닫기' : '⚙ 설계'; dirty = true; });
+function drawer(on: boolean) { if (on === document.body.classList.contains('open')) return; document.body.classList.toggle('open', on); $('toggle').setAttribute('aria-expanded', String(on)); $('toggle').textContent = on ? '✕ 닫기' : '⚙ 설계'; dirty = true; if (on) showStep(); }
+$('toggle').addEventListener('click', () => drawer(!document.body.classList.contains('open')));
 
-$<HTMLInputElement>('name').value = D.name; for (const s of syncs) s(); rebuild(); figures(); showList(); savedState(); driveLink(); requestAnimationFrame(frame);
-(globalThis as { __builder?: unknown }).__builder = { get design() { return D; }, use, get builds() { return builds; }, get frames() { return frames; }, get triangles() { return onGpu?.n ?? 0; } };   // for the page tests (tools)
+$<HTMLInputElement>('name').value = D.name; for (const s of syncs) s(); restoreStep(); rebuild(); figures(); showList(); savedState(); driveLink(); requestAnimationFrame(frame);
+(globalThis as { __builder?: unknown }).__builder = { get design() { return D; }, use, get builds() { return builds; }, get frames() { return frames; }, get triangles() { return onGpu?.n ?? 0; }, get step() { return onFiles ? 'files' : step; }, go };   // for the page tests (tools)

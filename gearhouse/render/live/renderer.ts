@@ -5,7 +5,8 @@
 // from a shadow map; then a pass draws the dark outline round each thing and the thin lines between its parts from those
 // layers, as the baked pictures have them. A car something stands before shows its light outline over just the hidden
 // part. The picture is enlarged by whole pixels on the page.
-import { freeGpu, gpuMesh, program, placeMesh, mul, translate, rot, scale, ATTR, type GpuMesh, type M4 } from './gpu';
+import { freeGpu, gpuMesh, program, placeMesh, mul, translate, rot, scale, ATTR, styleUp, styleLines, type GpuMesh, type M4 } from './gpu';
+import { STYLE, screenPx, makeAtlas, type Atlas } from './style';
 import { RIG_BONES, poseRig } from '../car/suspension';
 import { ENGINE_BONES, poseInternals } from '../car/powertrain/internals';
 /** the bones the shaders hold: a suspension's or an engine's insides, whichever needs more (three rows each; with the
@@ -28,6 +29,10 @@ export interface LiveView { x: number; y: number; z: number; /** the world headi
 export interface LiveTyre { u: Float32Array; sx: number; sy: number }
 export interface LiveCar { /** age: rust, fading, dirt (0..1) (review 104) */ wear?: [number, number, number]; /** FL FR RL RR */ tyres?: LiveTyre[]; g: GpuMesh; x: number; y: number; z: number; yaw: number; roll: number; pitch: number; /** each front wheel's own angle (rad, left +): the inner one more */ steerL: number; steerR: number; spin: number; player: boolean; /** head lamps alight 0..1, brakes on (review 117) */ lamps?: number; brake?: boolean; /** the crank's angle (degrees, 0..720): an engine's insides posed (the workshop's cutaway) */ crank?: number; /** each wheel's rise against the body (m) and lean (rad, top to the left +): the suspension's travel (review 120) */ travel?: number[]; camber?: number[] }
 export interface LiveProp { g: GpuMesh; x: number; y: number; z: number; h: number; /** its own placing (else by x, y, z, h), its outline's width, a name to follow it frame to frame (a moving piece) */ m?: M4; outline?: number; key?: string }
+/** the drift-game style's switches (look 4, docs/systems/109 §5): the inverted hull's outline and the drawn lines
+ *  (default on), the outline pass filling the gaps (default on); their widths (px at 1080 high: STYLE), the picture's
+ *  device pixel ratio, the ink; the atlas (default on) */
+export interface LiveStyle { outline?: boolean; lines?: boolean; post?: boolean; outPx?: number; linePx?: number; dpr?: number; ink?: [number, number, number]; atlas?: boolean }
 export interface Skid { x: number; y: number; z: number; a: number }
 /** a scene's set pieces off the renderer (LiveRenderer.takeScene): opaque to the screens that keep it */
 export interface LiveScene { readonly ground: [WebGLVertexArrayObject | null, number]; readonly fence: [WebGLVertexArrayObject | null, number]; readonly track: { len: number; w: number; joint: number; start: number };
@@ -172,11 +177,13 @@ vec3 toonRim(vec3 c, vec3 n, vec3 v) { float nv = dot(n, v), w = clamp(fwidth(nv
 `;
 const OBJ_VS = `#version 300 es
 layout(location=0) in vec3 aPos; layout(location=1) in vec3 aNor; layout(location=2) in vec3 aCol; layout(location=3) in float aGloss; layout(location=4) in float aKind; layout(location=5) in float aPart; layout(location=6) in vec3 aSmo; layout(location=7) in vec4 aLamp; layout(location=8) in vec3 aLAx; layout(location=9) in vec3 aLRt; layout(location=10) in float aBone; out vec4 vLamp; flat out vec3 vLAx, vLRt, vLUp;
+/* the drift-game style's layers (look 4, docs/systems/109 §5): the inverted hull's normal and the part's share of the outline; the normal smoothed per surface; the atlas's coordinates. uHull: the hull's width (px; 0: an ordinary draw), uVpx the picture's size */
+layout(location=11) in vec4 aHull; layout(location=12) in vec3 aSurf; layout(location=13) in vec3 aAtl; uniform float uHull; uniform vec2 uVpx; out vec3 vFS, vAtl; flat out float vHS;
 uniform mat4 uVP, uModel, uPrevVP, uPrevModel; uniform float uBias; out vec3 vSN;   // the smoothed normal (review 116; none where a piece has no such layer)
 out vec4 vCur, vPrev;   // where this point is now and was a frame ago (the velocity layer, review 112)
 uniform int uWheel; uniform float uSpin, uDef[32], uTyreR, uRim; uniform vec2 uShift; uniform vec4 uBone[${BONE_SLOTS * 3}];   // the suspension's or the engine's bones (uWheel 2): three rows each
 out vec3 vWorld, vObj; flat out vec3 vN, vObjN, vCol; flat out float vGloss, vKind, vPart;
-void main() { vec3 p = aPos, nr = aNor, ns = dot(aSmo, aSmo) > 0.25 ? aSmo : aNor;
+void main() { vec3 p = aPos, nr = aNor, ns = dot(aSmo, aSmo) > 0.25 ? aSmo : aNor, hn = aHull.xyz, sf = aSurf;
   if (uWheel == 1) {
     if (int(aKind + 0.5) == 5) {   // the tyre, shaped by its ring in the hub's frame (the ring keeps to the road; it does not turn with the wheel)
       float rho = length(p.xz), t = clamp((rho - uRim) / max(1., uTyreR - uRim), 0., 1.), a = atan(-p.x, -p.z);
@@ -184,11 +191,17 @@ void main() { vec3 p = aPos, nr = aNor, ns = dot(aSmo, aSmo) > 0.25 ? aSmo : aNo
       vec2 dir = p.xz / max(rho, 1.); float low = max(0., dir.y * -1.); low *= low;
       p.xz -= dir * d; p.y += sign(p.y) * d * 0.5 * (1. - abs(2. * t - 1.));   // the tread pressed in, the walls bulging out beside it
       p.y += uShift.y * t * low; p.x -= uShift.x * t * low; }   // the patch pulled across and along by the forces
-    else { float c = cos(uSpin), s = sin(uSpin); p = vec3(c * p.x - s * p.z, p.y, s * p.x + c * p.z); nr = vec3(c * nr.x - s * nr.z, nr.y, s * nr.x + c * nr.z); ns = vec3(c * ns.x - s * ns.z, ns.y, s * ns.x + c * ns.z); } }
+    else { float c = cos(uSpin), s = sin(uSpin); p = vec3(c * p.x - s * p.z, p.y, s * p.x + c * p.z); nr = vec3(c * nr.x - s * nr.z, nr.y, s * nr.x + c * nr.z); ns = vec3(c * ns.x - s * ns.z, ns.y, s * ns.x + c * ns.z); hn = vec3(c * hn.x - s * hn.z, hn.y, s * hn.x + c * hn.z); sf = vec3(c * sf.x - s * sf.z, sf.y, s * sf.x + c * sf.z); } }
   if (uWheel == 2) { int b = int(aBone + 0.5) * 3; vec4 q = vec4(p, 1.); vec3 r0 = uBone[b].xyz, r1 = uBone[b + 1].xyz, r2 = uBone[b + 2].xyz;   // a suspension part carried by its bone
-    p = vec3(dot(uBone[b], q), dot(uBone[b + 1], q), dot(uBone[b + 2], q)); nr = normalize(vec3(dot(r0, nr), dot(r1, nr), dot(r2, nr))); ns = normalize(vec3(dot(r0, ns), dot(r1, ns), dot(r2, ns))); }
+    p = vec3(dot(uBone[b], q), dot(uBone[b + 1], q), dot(uBone[b + 2], q)); nr = normalize(vec3(dot(r0, nr), dot(r1, nr), dot(r2, nr))); ns = normalize(vec3(dot(r0, ns), dot(r1, ns), dot(r2, ns))); hn = vec3(dot(r0, hn), dot(r1, hn), dot(r2, hn)); sf = vec3(dot(r0, sf), dot(r1, sf), dot(r2, sf)); }
   vec4 w = uModel * vec4(p, 1.); vWorld = w.xyz; vObj = p; vObjN = nr; vN = normalize(mat3(uModel) * nr); vSN = mat3(uModel) * ns; vLamp = aLamp; vLAx = normalize(mat3(uModel) * aLAx + 1e-9); vLRt = normalize(mat3(uModel) * aLRt + 1e-9); vLUp = normalize(mat3(uModel) * cross(aLAx, aLRt) + 1e-9); vCol = aCol; vGloss = aGloss; vKind = aKind; vPart = aPart;
-  gl_Position = uVP * w; vCur = gl_Position; vPrev = uPrevVP * (uPrevModel * vec4(p, 1.)); gl_Position.z -= uBias * gl_Position.w; }`;
+  vFS = mat3(uModel) * sf; vAtl = aAtl; vHS = aHull.w;
+  gl_Position = uVP * w; vCur = gl_Position; vPrev = uPrevVP * (uPrevModel * vec4(p, 1.));
+  /* the inverted hull (look 4): each corner pushed out along its hull normal by uHull pixels times its part's share, the
+     push measured on the screen (the normal's way there, normalised), so the outline keeps its width near and far */
+  if (uHull > 0.) { vec3 hw = mat3(uModel) * hn; if (dot(hw, hw) > 1e-12 && aHull.w > 0.) { vec4 c1 = uVP * vec4(w.xyz + normalize(hw) * 0.05, 1.); vec2 d = (c1.xy / c1.w - gl_Position.xy / gl_Position.w) * uVpx; float L = length(d);
+    if (L > 1e-5) gl_Position.xy += d / L * uHull * aHull.w * 2. / uVpx * gl_Position.w; } }
+  gl_Position.z -= uBias * gl_Position.w; }`;
 const OBJ_FS = `#version 300 es
 precision highp float;
 ${LIGHT}
@@ -257,8 +270,27 @@ vec3 lampFace(vec2 uv, float flag, vec3 A, vec3 Rt, vec3 Up, vec3 nG, float sh) 
 vec3 toonLamp(vec2 uv, float flag) { float r = length(uv), w = clamp(fwidth(r), 0.01, 0.2), glow = flag < 1.5 ? uLampOn : max(uLampOn * 0.35, uBrake);
   vec3 c = mix(flag < 1.5 ? vec3(0.74, 0.8, 0.86) * (0.3 + 0.7 * uDay) : vec3(0.6, 0.07, 0.06) * (0.35 + 0.65 * uDay), flag < 1.5 ? vec3(1., 0.97, 0.84) : vec3(1., 0.32, 0.22), glow);
   c *= 1. - 0.3 * smoothstep(0.82 - w, 0.82 + w, r); float g = length(uv - vec2(-0.3, 0.34)); return mix(c, vec3(1.), 1. - smoothstep(0.17 - w, 0.17 + w, g)); }
+/* ---- the drift-game style (look 4: the toon look's ground and props, these on the cars; docs/systems/109 §5): two bands
+   of light with a soft edge between them, the shade the colour a little darker and bluer, one small crisp highlight
+   and no mirrored world on the paint; the normals smoothed per surface and split at the creases (vFS, render/car/edges.ts);
+   lamps, grilles and other painted detail from one atlas (render/live/style.ts); the outline an inverted hull (uMode 3)
+   and the panel lines ribbons drawn after (LINE_VS) ---- */
+in vec3 vFS, vAtl; flat in float vHS; uniform int uFR, uSeamOff, uAtlOn; uniform sampler2D uAtlas; uniform vec4 uAtl[6]; uniform vec3 uInk;
+/** a corner's atlas coordinates (u, v repeating over the cell, the cell + 1) to its picture; nothing where there is none */
+vec4 atlasAt(vec3 a) { if (uAtlOn == 0 || a.z < 0.5) return vec4(0.); int i = clamp(int(a.z + 0.5) - 1, 0, 5); vec4 r = uAtl[i]; return texture(uAtlas, r.xy + (0.004 + fract(a.xy) * 0.992) * r.zw); }
+vec3 frLight(vec3 c, vec3 n, vec3 l, float sh, float ao, vec3 p) { float t = max(0., dot(n, l)) * sh * smoothstep(0.3, 0.65, ao), w = clamp(fwidth(t), 0.004, 0.08) + 0.035, b = smoothstep(0.13 - w, 0.13 + w, t);
+  vec3 sunT = mix(vec3(1., 0.62, 0.42), vec3(1., 0.985, 0.95), smoothstep(0.2, 0.8, uDay)), lit = c * sunT * (0.2 + 0.8 * uDay) * (0.94 + 0.06 * uLightK);
+  vec3 shade = (c * vec3(0.6, 0.63, 0.76) + vec3(0.01, 0.014, 0.03)) * (0.14 + 0.86 * uDay);   /* darker, a little bluer; a black part a dark blue-grey */
+  return mix(shade, lit, b) + c * min(vec3(1.), lampsAt(p, n) * 0.12); }
+/** the one highlight: a small round spot where the sun mirrors, its edge a pixel */
+float frGloss(vec3 n, vec3 v, vec3 l, float sh, float g) { float nh = dot(n, normalize(l + v)), w = clamp(fwidth(nh), 0.001, 0.03), e = 0.9965 - 0.003 * g; return smoothstep(e - w, e + w, nh) * step(0.5, sh) * (0.2 + 0.8 * uDay); }
+/** a lamp from the atlas (its face's own coordinates -1..1), lit when alight; the toon lamp where the atlas is off */
+vec3 frLamp(vec2 uv, float flag) { if (uAtlOn == 0) return toonLamp(uv, flag); vec4 a = atlasAt(vec3(uv * 0.5 + 0.5, flag < 1.5 ? 1. : 2.)); float glow = flag < 1.5 ? uLampOn : max(uLampOn * 0.35, uBrake);
+  vec3 c = a.a > 0.5 ? a.rgb * (0.35 + 0.65 * uDay) : toonLamp(uv, flag); return mix(c, flag < 1.5 ? vec3(1., 0.97, 0.86) : vec3(1., 0.3, 0.2), glow * 0.85); }
 void main() { uEye = uCamP.w > 0.5 ? normalize(uCamP.xyz - vWorld) : uEyeD;
   if (uMode == 1) { oCol = uSil; oId = vec4(0.); oN = vec4(0.); oV = velo(); return; }
+  if (uMode == 3) { oCol = vec4(uInk, 1.); oId = vec4(uObj, vPart / 255., 1.); oN = vec4(0.5, 0.5, 1., 0.); oV = velo(); return; }   /* the hull: ink, marked (alpha 1) so the outline pass leaves it be */
+  if (uFR == 1 && uSeamOff == 1 && vHS < -0.5) discard;   /* the raised seam strips: the drawn lines stand in for them */
   vec3 n = vN; if (dot(n, uEye) < 0.) n = -n;
   vec3 base = vCol; int kind = int(vKind + 0.5);
   float sh = lightAt(vWorld);
@@ -271,7 +303,7 @@ void main() { uEye = uCamP.w > 0.5 ? normalize(uCamP.xyz - vWorld) : uEyeD;
          the sky's blue; the edges a pixel or two. The steps slide over the glass as the car or the eye moves. Fresnel for
          their strength, a small sun glint; uGlassR the setting (0 off). render/live/glassband.ts is the same in numbers */
       if (kind == 4) discard;
-      if (vLamp.z > 0.5) { oCol = vec4(toonLamp(vLamp.xy, vLamp.z), 1.); oId = vec4(0.); oN = vec4(0.); oV = velo(); return; }
+      if (vLamp.z > 0.5) { oCol = vec4(uFR == 1 ? frLamp(vLamp.xy, vLamp.z) : toonLamp(vLamp.xy, vLamp.z), 1.); oId = vec4(0.); oN = vec4(0.); oV = velo(); return; }
       vec3 sn = normalize(vSN); if (dot(sn, uEye) < 0.) sn = -sn; if (dot(sn, n) < 0.3) sn = n;   /* the smoothed normal: a curved pane's reflection bends over it */
       vec3 no = normalize(vObjN); if (dot(mat3(uModel) * no, uEye) < 0.) no = -no;
       vec3 R = reflect(-uEye, sn), tw = length(sn.xy) < 1e-4 ? vec3(1., 0., 0.) : normalize(vec3(-sn.y, sn.x, 0.)), to = length(no.xy) < 1e-4 ? vec3(1., 0., 0.) : normalize(vec3(-no.y, no.x, 0.));
@@ -359,6 +391,12 @@ void main() { uEye = uCamP.w > 0.5 ? normalize(uCamP.xyz - vWorld) : uEyeD;
     if (kind == 1) {}   /* the lacquer smooth: its orange peel (a noisy normal) mottled every mirrored cloud (review 132) */
     else if (kind == 8) { sheen = 0.35; coat = max(coat, 0.15); } else if (kind == 7) { sheen = 0.6; rough = 0.95; } else if (kind == 5) { sheen = 0.18; } else if (kind == 6) coat = max(coat, 0.55); else if (kind == 9) { coat = 1.; rough = 0.05; }
     float ao = rtao(vWorld, nw);
+    if (uLook == 3 && uFR == 1) { vec3 fs = dot(vFS, vFS) > 1e-14 ? normalize(vFS) : nw; if (dot(fs, n) < 0.) fs = -fs;   /* the surface's normal (look 4) */
+      vec4 at = atlasAt(vAtl); base = mix(base, at.rgb, at.a); vec3 col;
+      if (kind == 9 && vLamp.z > 0.5) col = frLamp(vLamp.xy, vLamp.z);
+      else if (metal > 0.5 && at.a < 0.5) col = toonChrome(base, fs, uEye, uSun, sh);
+      else { col = frLight(base, fs, uSun, sh, ao, vWorld); float g = kind == 1 ? coat : kind == 9 ? 1. : kind == 6 ? 0.3 : 0.; if (g > 0.05) col = mix(col, vec3(1.), frGloss(fs, uEye, uSun, sh, g)); }
+      oCol = vec4(clamp(col, 0., 1.), 1.); oId = vec4(uObj, vPart / 255., uOutline / 8.); oN = vec4(fs * 0.5 + 0.5, 0.); oV = velo(); return; }
     if (uLook == 3) {   /* toon: bands and coloured shade; paint's gloss as crisp white shapes; chrome a two-tone ramp; the cars rimmed with sky blue */
       vec3 col;
       if (kind == 9 && vLamp.z > 0.5) col = toonLamp(vLamp.xy, vLamp.z);
@@ -544,11 +582,26 @@ layout(location=0) in vec3 aPos; layout(location=10) in float aBone; uniform mat
 void main() { vec3 p = aPos; if (uSkin == 1) { int b = int(aBone + 0.5) * 3; vec4 q = vec4(p, 1.); p = vec3(dot(uBone[b], q), dot(uBone[b + 1], q), dot(uBone[b + 2], q)); } gl_Position = uVP * uModel * vec4(p, 1.); }`;
 const DEPTH_FS = `#version 300 es
 precision mediump float; out vec4 o; void main() { o = vec4(1.); }`;
+// ---- the drift-game style's drawn lines (look 4, docs/systems/109 §5.2): each segment a ribbon uW pixels wide on the
+//      screen, its ends pushed out by half that (the joins close), lifted uLift metres toward the eye so it never fights
+//      the surface it lies on, tested against the depth so a hidden line is hidden; a line on a suspension part posed
+//      by that part's bone. The edge a pixel soft ----
+const LINE_VS = `#version 300 es
+layout(location=0) in vec3 aP; layout(location=1) in vec3 aQ; layout(location=2) in vec2 aS; layout(location=3) in float aBone;
+uniform mat4 uVP, uModel; uniform vec2 uVpx; uniform float uW, uLift; uniform int uSkin; uniform vec4 uBone[${BONE_SLOTS * 3}]; uniform vec3 uEyeD; uniform vec4 uCamP; out float vD; flat out float vH;
+vec3 posed(vec3 p) { if (uSkin == 0) return p; int b = int(aBone + 0.5) * 3; vec4 q = vec4(p, 1.); return vec3(dot(uBone[b], q), dot(uBone[b + 1], q), dot(uBone[b + 2], q)); }
+void main() { vec3 wp = (uModel * vec4(posed(aP), 1.)).xyz, wq = (uModel * vec4(posed(aQ), 1.)).xyz, e = uCamP.w > 0.5 ? normalize(uCamP.xyz - wp) : uEyeD;
+  vec4 cp = uVP * vec4(wp + e * uLift, 1.), cq = uVP * vec4(wq + e * uLift, 1.); vec2 d = (cq.xy / max(cq.w, 1e-4) - cp.xy / cp.w) * uVpx; float L = length(d); d = L > 1e-5 ? d / L : vec2(1., 0.);
+  float hw = uW * aS.y * 0.5, h = hw + 0.5; vec2 off = vec2(-d.y, d.x) * aS.x * h - d * h;
+  gl_Position = cp; gl_Position.xy += off * 2. / uVpx * cp.w; vD = aS.x * h; vH = hw; }`;
+const LINE_FS = `#version 300 es
+precision highp float; in float vD; flat in float vH; uniform vec3 uInk; layout(location=0) out vec4 oCol;
+void main() { float a = clamp(vH + 0.5 - abs(vD), 0., 1.); if (a < 0.01) discard; oCol = vec4(uInk, a); }`;
 const POST_VS = `#version 300 es
 out vec2 vUv; void main() { vec2 p = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2); vUv = p; gl_Position = vec4(p * 2. - 1., 0., 1.); }`;
 const POST_FS = `#version 300 es
 precision highp float;
-uniform sampler2D uCol, uId, uDepth, uN, uAO; uniform float uRange, uStep, uAOK, uReflK; uniform int uInner, uRays, uToon;   /* uToon: the toon look's lines (a darker tone of the thing's own colour; inner lines only at strong breaks) */ uniform float uRayK, uOutW, uOutK, uInK;   /* the outline: its width (times the thing's own), how dark; the lines inside, how dark */ uniform mat4 uVP; uniform vec3 uVd, uSunD; in vec2 vUv; out vec4 o;
+uniform sampler2D uCol, uId, uDepth, uN, uAO; uniform float uRange, uStep, uAOK, uReflK; uniform int uInner, uRays, uToon; uniform int uFR; uniform vec3 uInk;   /* uFR: the drift-game style (look 4): the hull and the drawn lines make the lines; this pass only fills the gaps (a part standing proud of the one behind, a big step), in the same ink, and never beside a line already drawn (alpha 1 in the id layer) */   /* uToon: the toon look's lines (a darker tone of the thing's own colour; inner lines only at strong breaks) */ uniform float uRayK, uOutW, uOutK, uInK;   /* the outline: its width (times the thing's own), how dark; the lines inside, how dark */ uniform mat4 uVP; uniform vec3 uVd, uSunD; in vec2 vUv; out vec4 o;
 /* the perspective camera (uLin: its near and far planes; 0 the orthographic one): the depth layer's value as metres from
    the eye, and where nothing was drawn the sky (the view's ray from uRx, uUpV and uTan), the far ground hazed toward it */
 uniform vec2 uLin, uTan; uniform vec3 uRx, uUpV; uniform int uSky; uniform float uDay;
@@ -577,17 +630,19 @@ void main() { ivec2 p = ivec2(gl_FragCoord.xy), sz = textureSize(uCol, 0); vec4 
           if (q.x < 0 || q.y < 0 || q.x >= sz.x || q.y >= sz.y) break; float rd = d0 + st.z * t, sd = texelFetch(uDepth, q, 0).r;
           if (rd > sd + 0.03 * M && rd - sd < 0.6 * M + abs(st.z) * stepM) { vec3 hc = (texelFetch(uCol, q, 0).rgb * 2. + texelFetch(uCol, clamp(q + ivec2(1, 0), ivec2(0), sz - 1), 0).rgb + texelFetch(uCol, clamp(q - ivec2(0, 1), ivec2(0), sz - 1), 0).rgb) / 4.; vec2 e = min(qf, vec2(sz) - qf) / vec2(sz) * 8.;
             float fade = clamp(min(e.x, e.y), 0., 1.) * (1. - float(k) / 56.); float F = G.a * (0.5 + 0.5 * pow(1. - max(0., dot(-uVd, n)), 3.)); c.rgb = mix(c.rgb, hc, clamp(F * fade * uRayK * uReflK, 0., 0.97)); break; } } } } }
-  if (me > 0.) { float dp = dm(texelFetch(uDepth, p, 0).r); int w = int(floor(floor(id.a * 8. + 0.5) * uOutW + 0.5)); float k = 1., ko = 1. - 0.8 * uOutK, ki = 1. - 0.5 * uInK;
+  if (me > 0. && !(uFR == 1 && id.a > 0.99)) { float dp = dm(texelFetch(uDepth, p, 0).r); int w = int(floor(floor(id.a * 8. + 0.5) * uOutW + 0.5)); float k = 1., ko = 1. - 0.8 * uOutK, ki = 1. - 0.5 * uInK; bool nearInk = false;
     ivec2 dirs[4] = ivec2[4](ivec2(1, 0), ivec2(-1, 0), ivec2(0, 1), ivec2(0, -1));
     for (int s = 1; s <= 6; s++) { if (s > max(w, uInner)) break; for (int j = 0; j < 4; j++) { ivec2 q = p + dirs[j] * s; if (q.x < 0 || q.y < 0 || q.x >= sz.x || q.y >= sz.y) { if (s <= w) k = ko; continue; }
-      vec4 iq = texelFetch(uId, q, 0); float oq = obj(iq), dq = dm(texelFetch(uDepth, q, 0).r);
+      vec4 iq = texelFetch(uId, q, 0); float oq = obj(iq), dq = dm(texelFetch(uDepth, q, 0).r); if (uFR == 1 && s == 1 && iq.a > 0.99) nearInk = true;
       if (s <= w && oq != me && (oq == 0. || dq > dp)) k = min(k, ko);
       else if (uInner == 1 && s == 1 && oq == me && k > ki) {
-        bool brk; if (uToon == 1) { float nd = dot(G.xyz * 2. - 1., texelFetch(uN, q, 0).xyz * 2. - 1.), dz = dp - dq; bool part = abs(iq.b - id.b) > 0.001;   /* toon: only strong breaks, a part's edge standing proud, a fold, a big step */
+        bool brk; if (uFR == 1) { float dz = dp - dq; brk = iq.a < 0.99 && ((abs(iq.b - id.b) > 0.001 && dz > 0.015) || dz > uStep * 1.6); }
+        else if (uToon == 1) { float nd = dot(G.xyz * 2. - 1., texelFetch(uN, q, 0).xyz * 2. - 1.), dz = dp - dq; bool part = abs(iq.b - id.b) > 0.001;   /* toon: only strong breaks, a part's edge standing proud, a fold, a big step */
           brk = (part && (dz > 0.015 || (j % 2 == 0 && nd < 0.75))) || dz > uStep * 1.6 || (j % 2 == 0 && nd < 0.3 && dz > -0.002); }
         else brk = (abs(iq.b - id.b) > 0.001 && dp - dq > 0.004) || dp - dq > uStep;
         if (brk) k = min(k, ki); } } }
-    if (uToon == 1) c.rgb = mix(c.rgb, toonInk(c.rgb), clamp((1. - k) / 0.8, 0., 1.)); else c.rgb *= k; }
+    if (uFR == 1) { if (nearInk && k > ko + 0.001) k = 1.; c.rgb = mix(c.rgb, uInk, clamp((1. - k) / 0.8, 0., 1.) * 0.9); }
+    else if (uToon == 1) c.rgb = mix(c.rgb, toonInk(c.rgb), clamp((1. - k) / 0.8, 0., 1.)); else c.rgb *= k; }
   if (uSky > 0) c.rgb = mix(c.rgb, skyAt(vec3(ray.xy, max(ray.z, 0.))), smoothstep(90., 2600., dm(d0)) * 0.7);   /* the air between: the far ground toward the horizon's colour */
   o = vec4(c.rgb, 1.); }`;
 
@@ -729,7 +784,7 @@ export class LiveRenderer {
   /** the volumetric smoke (docs/systems/104 B), set by the drive where the setting asks for it */ vol: VolumeSmoke | null = null;
   constructor(readonly canvas: HTMLCanvasElement) {
     const gl = canvas.getContext('webgl2', { antialias: false, alpha: false, depth: false, preserveDrawingBuffer: true }); if (!gl) throw new Error('no WebGL2'); this.gl = gl;
-    this.obj = program(gl, OBJ_VS, OBJ_FS); this.ground = program(gl, GROUND_VS, GROUND_FS); this.depth = program(gl, DEPTH_VS, DEPTH_FS); this.propP = program(gl, PROP_VS, PROP_FS); this.depthI = program(gl, DEPTHI_VS, DEPTH_FS); this.post = program(gl, POST_VS, POST_FS); this.smoke = program(gl, SMOKE_VS, SMOKE_FS);
+    this.obj = program(gl, OBJ_VS, OBJ_FS); this.ground = program(gl, GROUND_VS, GROUND_FS); this.depth = program(gl, DEPTH_VS, DEPTH_FS); this.propP = program(gl, PROP_VS, PROP_FS); this.depthI = program(gl, DEPTHI_VS, DEPTH_FS); this.post = program(gl, POST_VS, POST_FS); this.lineP = program(gl, LINE_VS, LINE_FS); this.smoke = program(gl, SMOKE_VS, SMOKE_FS);
     this.aoP = program(gl, POST_VS, AO_FS); this.downP = program(gl, POST_VS, DOWN_FS); this.upP = program(gl, POST_VS, UP_FS); this.finalP = program(gl, POST_VS, FINAL_FS);
     this.hdr = !!gl.getExtension('EXT_color_buffer_float'); gl.getExtension('OES_texture_float_linear');   /* a wide-range picture where the device can draw one */
     for (let k = 0; k < 6; k++) { this.rt.push({ t: gl.createTexture()!, f: gl.createFramebuffer()!, w: 0, h: 0 }); }
@@ -790,7 +845,12 @@ export class LiveRenderer {
   /** the woods drawn now (trees in 3D, as cards, triangles), for the page tests */
   get woodsStats() { return this.layer?.woods?.stats ?? null; }
   setFence(d: GroundData) { this.fenceVao = this.vaoOf(d); this.fenceN = d.n; }
-  private frameN = 0; private propP!: WebGLProgram; private depthI!: WebGLProgram;
+  private frameN = 0; private propP!: WebGLProgram; private depthI!: WebGLProgram; private lineP!: WebGLProgram;
+  /** the drift-game style's atlas (render/live/style.ts): the placeholder drawn by rule until a painted one is set */
+  private atlas: { tex: WebGLTexture; rects: Float32Array } | null = null;
+  setAtlas(a: Atlas) { const gl = this.gl; if (this.atlas) gl.deleteTexture(this.atlas.tex); const t = gl.createTexture()!; gl.bindTexture(gl.TEXTURE_2D, t); gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, a.S, a.S, 0, gl.RGBA, gl.UNSIGNED_BYTE, a.data); gl.generateMipmap(gl.TEXTURE_2D); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE); this.atlas = { tex: t, rects: a.rects }; }
   /** the photographed props (review 125): each model's buffers and pictures, and where its copies stand (their matrices) */
   private propModels = new Map<string, { vao: WebGLVertexArrayObject; n: number; alb: WebGLTexture; nor: WebGLTexture; arm: WebGLTexture; inst: WebGLBuffer; count: number }>();
   addPropModel(id: string, geo: { pos: Float32Array; nor: Float32Array; uv: Float32Array; idx: Uint32Array }, pics: { alb: TexImageSource; nor: TexImageSource; arm: TexImageSource }) { const gl = this.gl, vao = gl.createVertexArray()!; gl.bindVertexArray(vao);
@@ -852,8 +912,12 @@ export class LiveRenderer {
   putScene(s: LiveScene) { [this.groundVao, this.groundN] = s.ground; [this.fenceVao, this.fenceN] = s.fence; this.trackU = { ...s.track }; this.lineTex = s.line; this.gTex = s.gTex as typeof this.gTex; this.bTex = s.bTex as typeof this.bTex;
     for (const [id, m] of this.propModels) m.count = s.props.get(id) ?? 0; this.layer = (s.layer as typeof this.layer) ?? null; this.prevVP = null; this.prevM.clear(); }
 
-  render(v: LiveView, cars: LiveCar[], props: LiveProp[], skids: Skid[], o: { glass?: number; /** 0 the baked look, 1 PBR stepped, 2 PBR smooth, 3 toon (review 92) */ look?: number; /** the toon look: its bands (2 or 3), how far its shade's hue moves (0 plain darker, 1 as set, up to 1.5) */ toonBands?: number; toonShade?: number; /** the toon glass's reflection: 0 off, 0.5 weak, 1 as made (default) (docs/systems/104 A) */ glassRefl?: number; /** lay the 2D art on (default yes) */ art?: boolean; /** the rays in the picture: occlusion, contact shadows, reflections (default yes) */ rays?: boolean; /** strengths: the textures, the light (1: as set) */ texK?: number; /** the time of day: 1 day (default), toward 0 dusk and night (review 117) */ day?: number; /** the concrete from photographed materials (default yes, once loaded) (review 124) */ photoGround?: boolean; /** the photographed sky in the mirrors and the light (default yes, once loaded) */ hdri?: boolean; /** the photographed props (review 125) */ props?: boolean; /** the period's pictures (review 129): 1 a 1930s newsreel, 2 a 1990s television broadcast; their strength; the size of a film or video pixel on screen */ fx?: number; fxK?: number; fxPx?: number; /** the colour's depth: deeper lacquer, the hue kept through the tone curve (0: as before; default 1) (review 116) */ deep?: number; lightK?: number; /** after the scene: occlusion and reflection strengths, bloom, depth of field (0 none; pixels of blur a metre from the focus) */ aoK?: number; reflK?: number; bloomK?: number; dof?: number; /** motion blur: the shutter, a share of a frame (0 none) */ mb?: number; /** the outline: width (times each thing's own; 0 none), darkness 0..1; the lines inside a thing (default: the baked look only), their darkness */ outW?: number; outK?: number; inner?: boolean; inK?: number; /** smoke parcels: centre, radius, density, heat, kind (0 tyre 1 dust 2 steam 3 exhaust), seed; and the time */ smoke?: { p: Float32Array; n: number; time: number } } = {}) { const gl = this.gl; this.size(v.W, v.H);
-    const toon = (o.look ?? 0) === 3, toonTo = (p: WebGLProgram) => { gl.uniform1f(this.loc(p, 'uToonB'), o.toonBands ?? 3); gl.uniform1f(this.loc(p, 'uToonS'), o.toonShade ?? 1); };
+  render(v: LiveView, cars: LiveCar[], props: LiveProp[], skids: Skid[], o: { glass?: number; /** 0 the baked look, 1 PBR stepped, 2 PBR smooth, 3 toon (review 92) */ look?: number; /** the toon look: its bands (2 or 3), how far its shade's hue moves (0 plain darker, 1 as set, up to 1.5) */ toonBands?: number; toonShade?: number; /** the toon glass's reflection: 0 off, 0.5 weak, 1 as made (default) (docs/systems/104 A) */ glassRefl?: number; /** lay the 2D art on (default yes) */ art?: boolean; /** the rays in the picture: occlusion, contact shadows, reflections (default yes) */ rays?: boolean; /** strengths: the textures, the light (1: as set) */ texK?: number; /** the time of day: 1 day (default), toward 0 dusk and night (review 117) */ day?: number; /** the concrete from photographed materials (default yes, once loaded) (review 124) */ photoGround?: boolean; /** the photographed sky in the mirrors and the light (default yes, once loaded) */ hdri?: boolean; /** the photographed props (review 125) */ props?: boolean; /** the period's pictures (review 129): 1 a 1930s newsreel, 2 a 1990s television broadcast; their strength; the size of a film or video pixel on screen */ fx?: number; fxK?: number; fxPx?: number; /** the colour's depth: deeper lacquer, the hue kept through the tone curve (0: as before; default 1) (review 116) */ deep?: number; lightK?: number; /** after the scene: occlusion and reflection strengths, bloom, depth of field (0 none; pixels of blur a metre from the focus) */ aoK?: number; reflK?: number; bloomK?: number; dof?: number; /** motion blur: the shutter, a share of a frame (0 none) */ mb?: number; /** the outline: width (times each thing's own; 0 none), darkness 0..1; the lines inside a thing (default: the baked look only), their darkness */ outW?: number; outK?: number; inner?: boolean; inK?: number; /** smoke parcels: centre, radius, density, heat, kind (0 tyre 1 dust 2 steam 3 exhaust), seed; and the time */ smoke?: { p: Float32Array; n: number; time: number };
+    /** the sun's direction (toward it, world axes; default from the upper left of the default view) */ sun?: [number, number, number];
+    /** the drift-game style (look 4, docs/systems/109 §5): the inverted hull's outline and the drawn lines (default on), the outline pass filling the gaps (default on); their widths (px at 1080 high: 2.5 and 1.75), the picture's device pixel ratio, the ink; the atlas (default on) */
+    style?: LiveStyle } = {}) { const gl = this.gl; this.size(v.W, v.H);
+    const fr = o.look === 4, look = fr ? 3 : o.look ?? 0, SUN = o.sun ? (() => { const l = Math.hypot(...o.sun!) || 1; return o.sun!.map(c => c / l) as [number, number, number]; })() : SUN_W, st = o.style ?? {}, ink = st.ink ?? [0.045, 0.045, 0.055];   /* look 4: the toon look's world, the style's cars */
+    const toon = (look) === 3, toonTo = (p: WebGLProgram) => { gl.uniform1f(this.loc(p, 'uToonB'), o.toonBands ?? 3); gl.uniform1f(this.loc(p, 'uToonS'), o.toonShade ?? 1); };
     // ---- the camera: orthographic, turned to v.ang, tilted down by v.pitch, v.mm millimetres a pixel, snapped to whole pixels ----
     const a = v.ang - Math.PI / 2, cA = Math.cos(a), sA = Math.sin(a), SP = Math.sin(v.pitch * Math.PI / 180), CP = Math.cos(v.pitch * Math.PI / 180), k = 1000 / v.mm, R = 900;
     const rx = [cA, sA, 0], ry = [-sA, cA, 0], up = [ry[0]! * SP, ry[1]! * SP, CP], vd = [ry[0]! * CP, ry[1]! * CP, -SP], c = [v.x, v.y, v.z], dot = (p: number[], q: number[]) => p[0]! * q[0]! + p[1]! * q[1]! + p[2]! * q[2]!;
@@ -867,7 +931,7 @@ export class LiveRenderer {
     const eye = [-vd[0]!, -vd[1]!, -vd[2]!], eyeTo = (p: WebGLProgram) => { gl.uniform3fv(this.loc(p, 'uEyeD'), eye); gl.uniform3fv(this.loc(p, 'uEye'), eye);   /* a shader with the one direction only (the woods') */ gl.uniform4f(this.loc(p, 'uCamP'), pv ? pv.e[0] : 0, pv ? pv.e[1] : 0, pv ? pv.e[2] : 0, pv ? 1 : 0); };
     if (this.prevCam && Math.hypot(v.x - this.prevCam[0], v.y - this.prevCam[1]) > 15) { this.prevVP = null; this.prevM.clear(); }   /* a cut (the car put back, a new shot): no smear from the jump */ this.prevCam = [v.x, v.y];
     // ---- the sun's view for the shadows: around the camera's target, as far as the picture reaches ----
-    const reach = pv ? 75 : Math.min(160, Math.hypot(v.W, v.H / Math.max(0.2, SP)) * v.mm / 2000 + 12), lz = SUN_W.map(x => -x), lx0 = [lz[1]!, -lz[0]!, 0], ll = Math.hypot(lx0[0]!, lx0[1]!), lx = [lx0[0]! / ll, lx0[1]! / ll, 0];
+    const reach = pv ? 75 : Math.min(160, Math.hypot(v.W, v.H / Math.max(0.2, SP)) * v.mm / 2000 + 12), lz = SUN.map(x => -x), lx0 = [lz[1]!, -lz[0]!, 0], ll = Math.hypot(lx0[0]!, lx0[1]!), lx = [lx0[0]! / ll, lx0[1]! / ll, 0];
     const ly = [lz[1]! * lx[2]! - lz[2]! * lx[1]!, lz[2]! * lx[0]! - lz[0]! * lx[2]!, lz[0]! * lx[1]! - lz[1]! * lx[0]!], LR = 200, LV = new Float32Array(16);
     const tx = Math.round(dot(c, lx) / (2 * reach / this.S)) * (2 * reach / this.S), ty = Math.round(dot(c, ly) / (2 * reach / this.S)) * (2 * reach / this.S);   // snapped to the map's texels: shadows hold still
     LV[0] = lx[0]! / reach; LV[4] = lx[1]! / reach; LV[8] = lx[2]! / reach; LV[12] = -tx / reach; LV[1] = ly[0]! / reach; LV[5] = ly[1]! / reach; LV[9] = ly[2]! / reach; LV[13] = -ty / reach;
@@ -875,6 +939,7 @@ export class LiveRenderer {
     const seen = pv ? 650 : reach, near = (x: number, y: number, r: number) => Math.abs(x - v.x) < seen + r + 20 && Math.abs(y - v.y) < seen + r + 20;
     const W = this.layer?.woods; W?.update(pv ? pv.e[0] : v.x, pv ? pv.e[1] : v.y, !pv, seen);
     const ps = (this.layer ? props.concat(this.layer.statics) : props).filter(p => near(p.x, p.y, p.g.radius)), carM = cars.map(q => this.carParts(q));
+    if (fr) { for (const q of cars) { const g = q.g; for (const p of [g.body, g.glass, ...(g.susp ? [g.susp.part] : []), ...(g.inner ? [g.inner.part] : []), ...g.wheels.flatMap(w => w.glass ? [w.part, w.glass] : [w.part])]) styleUp(gl, p); } if (!this.atlas && st.atlas !== false) this.setAtlas(makeAtlas(1024)); }   /* look 4: each car's style layers, made once */
     // the head lamps alight (review 117): each lamp's middle and beam in the world, the nearest eight
     const lmpP: number[] = [], lmpD: number[] = []; cars.forEach((q, i) => { if (!q.lamps) return; const B = carM[i]!.body; for (const l of q.g.lamps) { if (l.flag !== 1 || lmpP.length >= 24) continue;
         const [x, y, z] = l.c, [a, b, c] = l.ax, wx = B[0]! * x + B[4]! * y + B[8]! * z + B[12]!, wy = B[1]! * x + B[5]! * y + B[9]! * z + B[13]!, wz = B[2]! * x + B[6]! * y + B[10]! * z + B[14]!;
@@ -904,7 +969,7 @@ export class LiveRenderer {
     const shadowTo = (p: WebGLProgram) => { texTo(p); boxTo(p); { const S = o.hdri !== false ? this.sky : null; gl.uniform1i(this.loc(p, 'uSkyOn'), S ? 1 : 0); gl.activeTexture(gl.TEXTURE9); gl.bindTexture(gl.TEXTURE_2D_ARRAY, S?.tex ?? null); gl.uniform1i(this.loc(p, 'uSky'), 9); if (S) { gl.uniform1f(this.loc(p, 'uSkyR'), S.range); gl.uniform3fv(this.loc(p, 'uSH'), S.sh); } } gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, this.sTex); gl.uniform1i(this.loc(p, 'uShadow'), 1); gl.uniformMatrix4fv(this.loc(p, 'uLight'), false, LV); };
     gl.useProgram(this.ground); lampsTo(this.ground); { const g = this.ground, t = this.trackU; gl.uniform1f(this.loc(g, 'uLen'), t.len); gl.uniform1f(this.loc(g, 'uTW'), t.w); gl.uniform1f(this.loc(g, 'uJoint'), t.joint); gl.uniform1f(this.loc(g, 'uStart'), t.start); gl.uniform1i(this.loc(g, 'uLineOn'), this.lineTex ? 1 : 0); gl.activeTexture(gl.TEXTURE12); gl.bindTexture(gl.TEXTURE_2D, this.lineTex ?? this.blank); gl.uniform1i(this.loc(g, 'uLine'), 12);
       gl.uniform1i(this.loc(g, 'uGridN'), this.digits ? this.gridN : 0); gl.activeTexture(gl.TEXTURE0 + 16); gl.bindTexture(gl.TEXTURE_2D, this.digits ?? this.blank); gl.uniform1i(this.loc(g, 'uDigits'), 16);
-      const G = this.gTex; gl.uniform1i(this.loc(g, 'uGTex'), G && o.photoGround !== false ? 1 : 0); if (G) gl.uniform1fv(this.loc(g, 'uGSize'), G.size); ([[G?.alb ?? null, 'uGAlb', 13], [G?.nor ?? null, 'uGNor', 14], [G?.pack ?? null, 'uGPack', 15]] as const).forEach(([t, nm, u]) => { gl.activeTexture(gl.TEXTURE0 + u); gl.bindTexture(gl.TEXTURE_2D_ARRAY, t); gl.uniform1i(this.loc(g, nm), u); }); } gl.uniform1f(this.loc(this.ground, 'uDay'), o.day ?? 1); gl.uniformMatrix4fv(this.loc(this.ground, 'uVP'), false, VP); const hdrOn = this.hdr && (o.look ?? 0) === 2 ? 1 : 0; gl.uniform1i(this.loc(this.ground, 'uHDRo'), hdrOn); gl.uniform1f(this.loc(this.ground, 'uSpecK'), 1); gl.uniformMatrix4fv(this.loc(this.ground, 'uPrevVP'), false, this.prevVP ?? VP); gl.uniform2f(this.loc(this.ground, 'uSize'), v.W, v.H); gl.uniform1i(this.loc(this.ground, 'uLook'), o.look ?? 0); gl.uniform1f(this.loc(this.ground, 'uTexK'), o.texK ?? 1); gl.uniform1f(this.loc(this.ground, 'uLightK'), o.lightK ?? 1); gl.uniform3fv(this.loc(this.ground, 'uSun'), SUN_W); eyeTo(this.ground); gl.uniform2f(this.loc(this.ground, 'uLinG'), pv ? pv.n : 0, pv ? pv.f : 0); gl.uniform1f(this.loc(this.ground, 'uCell'), Math.max(0.03, v.mm / 1000)); gl.uniform1f(this.loc(this.ground, 'uBias'), 0); shadowTo(this.ground); toonTo(this.ground);
+      const G = this.gTex; gl.uniform1i(this.loc(g, 'uGTex'), G && o.photoGround !== false ? 1 : 0); if (G) gl.uniform1fv(this.loc(g, 'uGSize'), G.size); ([[G?.alb ?? null, 'uGAlb', 13], [G?.nor ?? null, 'uGNor', 14], [G?.pack ?? null, 'uGPack', 15]] as const).forEach(([t, nm, u]) => { gl.activeTexture(gl.TEXTURE0 + u); gl.bindTexture(gl.TEXTURE_2D_ARRAY, t); gl.uniform1i(this.loc(g, nm), u); }); } gl.uniform1f(this.loc(this.ground, 'uDay'), o.day ?? 1); gl.uniformMatrix4fv(this.loc(this.ground, 'uVP'), false, VP); const hdrOn = this.hdr && (look) === 2 ? 1 : 0; gl.uniform1i(this.loc(this.ground, 'uHDRo'), hdrOn); gl.uniform1f(this.loc(this.ground, 'uSpecK'), 1); gl.uniformMatrix4fv(this.loc(this.ground, 'uPrevVP'), false, this.prevVP ?? VP); gl.uniform2f(this.loc(this.ground, 'uSize'), v.W, v.H); gl.uniform1i(this.loc(this.ground, 'uLook'), look); gl.uniform1f(this.loc(this.ground, 'uTexK'), o.texK ?? 1); gl.uniform1f(this.loc(this.ground, 'uLightK'), o.lightK ?? 1); gl.uniform3fv(this.loc(this.ground, 'uSun'), SUN); eyeTo(this.ground); gl.uniform2f(this.loc(this.ground, 'uLinG'), pv ? pv.n : 0, pv ? pv.f : 0); gl.uniform1f(this.loc(this.ground, 'uCell'), Math.max(0.03, v.mm / 1000)); gl.uniform1f(this.loc(this.ground, 'uBias'), 0); shadowTo(this.ground); toonTo(this.ground);
     if (this.groundVao) { gl.bindVertexArray(this.groundVao); gl.drawArrays(gl.TRIANGLES, 0, this.groundN); }
     if (this.fenceVao && this.fenceN) { gl.bindVertexArray(this.fenceVao); gl.drawArrays(gl.TRIANGLES, 0, this.fenceN); }
     // skid marks: dark patches on the concrete, blended, nothing else written
@@ -912,8 +977,10 @@ export class LiveRenderer {
       S.forEach((m, i) => { const q = [[-r, -r], [r, -r], [r, r], [-r, -r], [r, r], [-r, r]]; q.forEach(([dx, dy], j) => f.set([m.x + dx!, m.y + dy!, m.z + 0.01, 30 / 255, 28 / 255, 26 / 255, m.a, 0], (i * 6 + j) * 8)); });
       gl.bindBuffer(gl.ARRAY_BUFFER, this.skidBuf); gl.bufferData(gl.ARRAY_BUFFER, f, gl.DYNAMIC_DRAW); gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false); gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.NONE, gl.NONE, gl.NONE]);
       gl.uniform1f(this.loc(this.ground, 'uBias'), 0.00002); gl.bindVertexArray(this.skidVao); gl.drawArrays(gl.TRIANGLES, 0, S.length * 6); gl.disable(gl.BLEND); gl.depthMask(true); gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.COLOR_ATTACHMENT1, gl.COLOR_ATTACHMENT2, gl.COLOR_ATTACHMENT3]); }
-    gl.useProgram(this.obj); lampsTo(this.obj); gl.uniform1f(this.loc(this.obj, 'uDay'), o.day ?? 1); gl.uniformMatrix4fv(this.loc(this.obj, 'uVP'), false, VP); gl.uniform1i(this.loc(this.obj, 'uHDRo'), hdrOn); gl.uniformMatrix4fv(this.loc(this.obj, 'uPrevVP'), false, this.prevVP ?? VP); gl.uniform2f(this.loc(this.obj, 'uSize'), v.W, v.H); gl.uniform1f(this.loc(this.obj, 'uSpecK'), o.reflK ?? 1); gl.uniform1f(this.loc(this.obj, 'uDeep'), o.deep ?? 1); gl.uniform1i(this.loc(this.obj, 'uLook'), o.look ?? 0); gl.uniform1f(this.loc(this.obj, 'uTexK'), o.texK ?? 1); gl.uniform1f(this.loc(this.obj, 'uLightK'), o.lightK ?? 1); eyeTo(this.obj); gl.uniform3fv(this.loc(this.obj, 'uSun'), SUN_W); gl.uniform1f(this.loc(this.obj, 'uGlass'), o.glass ?? 0.8); gl.uniform1f(this.loc(this.obj, 'uGlassR'), o.glassRefl ?? 1); shadowTo(this.obj); toonTo(this.obj); gl.uniform1i(this.loc(this.obj, 'uIsCar'), 0);
+    gl.useProgram(this.obj); lampsTo(this.obj); gl.uniform1f(this.loc(this.obj, 'uDay'), o.day ?? 1); gl.uniformMatrix4fv(this.loc(this.obj, 'uVP'), false, VP); gl.uniform1i(this.loc(this.obj, 'uHDRo'), hdrOn); gl.uniformMatrix4fv(this.loc(this.obj, 'uPrevVP'), false, this.prevVP ?? VP); gl.uniform2f(this.loc(this.obj, 'uSize'), v.W, v.H); gl.uniform1f(this.loc(this.obj, 'uSpecK'), o.reflK ?? 1); gl.uniform1f(this.loc(this.obj, 'uDeep'), o.deep ?? 1); gl.uniform1i(this.loc(this.obj, 'uLook'), look); gl.uniform1f(this.loc(this.obj, 'uTexK'), o.texK ?? 1); gl.uniform1f(this.loc(this.obj, 'uLightK'), o.lightK ?? 1); eyeTo(this.obj); gl.uniform3fv(this.loc(this.obj, 'uSun'), SUN); gl.uniform1f(this.loc(this.obj, 'uGlass'), o.glass ?? 0.8); gl.uniform1f(this.loc(this.obj, 'uGlassR'), o.glassRefl ?? 1); shadowTo(this.obj); toonTo(this.obj); gl.uniform1i(this.loc(this.obj, 'uIsCar'), 0);
     gl.uniform1i(this.loc(this.obj, 'uDecTex'), 2);
+    { const A = fr && st.atlas !== false ? this.atlas : null; gl.uniform1i(this.loc(this.obj, 'uFR'), fr ? 1 : 0); gl.uniform1i(this.loc(this.obj, 'uSeamOff'), fr && st.lines !== false ? 1 : 0); gl.uniform1i(this.loc(this.obj, 'uAtlOn'), A ? 1 : 0); gl.uniform1f(this.loc(this.obj, 'uHull'), 0); gl.uniform2f(this.loc(this.obj, 'uVpx'), v.W, v.H); gl.uniform3fv(this.loc(this.obj, 'uInk'), ink);
+      gl.activeTexture(gl.TEXTURE23); gl.bindTexture(gl.TEXTURE_2D, A ? A.tex : this.blank); gl.uniform1i(this.loc(this.obj, 'uAtlas'), 23); if (A) gl.uniform4fv(this.loc(this.obj, 'uAtl'), A.rects); }
     { const B = o.photoGround !== false ? this.bTex : null; gl.uniform1i(this.loc(this.obj, 'uBTex'), B ? 1 : 0); if (B) { gl.uniform1fv(this.loc(this.obj, 'uBSize'), B.size); gl.uniform3fv(this.loc(this.obj, 'uBMean'), B.mean); }
       ([[B?.alb ?? null, 'uBAlb', 20], [B?.nor ?? null, 'uBNor', 21], [B?.pack ?? null, 'uBPack', 22]] as const).forEach(([t, nm, u]) => { gl.activeTexture(gl.TEXTURE0 + u); gl.bindTexture(gl.TEXTURE_2D_ARRAY, t); gl.uniform1i(this.loc(this.obj, nm), u); }); }
     const artTo = (g: GpuMesh | null) => { const a = g && o.art !== false ? this.arts.get(g) : undefined; gl.uniform1i(this.loc(this.obj, 'uArtOn'), a ? 1 : 0); gl.activeTexture(gl.TEXTURE6); gl.bindTexture(gl.TEXTURE_2D, a ? a.tex : this.blank); gl.uniform1i(this.loc(this.obj, 'uArt'), 6); gl.activeTexture(gl.TEXTURE7); gl.bindTexture(gl.TEXTURE_2D, a ? a.lut : this.blank); gl.uniform1i(this.loc(this.obj, 'uArtLut'), 7); if (!a) return;
@@ -930,43 +997,44 @@ export class LiveRenderer {
     const outlineC = toon ? Math.max(1, Math.min(5, Math.round(3.2 * tw))) : Math.max(1, Math.min(3, Math.round(3 * 50 / v.mm))), outlineP = toon ? Math.max(1, Math.min(3, Math.round(2 * tw))) : Math.max(1, Math.min(2, Math.round(2 * 50 / v.mm)));
     gl.uniform3f(this.loc(this.obj, 'uWear'), 0, 0, 0); for (const p of ps) { objU(p.outline ?? outlineP); draw(p.g.body, (p.m ?? placeMesh(p.g.len, p.x, p.y, p.z, p.h)), undefined, p.key); }
     if (this.propModels.size && o.props !== false) { const P = this.propP; gl.useProgram(P); lampsTo(P); gl.uniform1f(this.loc(P, 'uDay'), o.day ?? 1); gl.uniformMatrix4fv(this.loc(P, 'uVP'), false, VP); gl.uniform1i(this.loc(P, 'uHDRo'), hdrOn); gl.uniformMatrix4fv(this.loc(P, 'uPrevVP'), false, this.prevVP ?? VP); gl.uniform2f(this.loc(P, 'uSize'), v.W, v.H);
-      gl.uniform1f(this.loc(P, 'uSpecK'), o.reflK ?? 1); gl.uniform1f(this.loc(P, 'uDeep'), o.deep ?? 1); gl.uniform1i(this.loc(P, 'uLook'), Math.max(1, o.look ?? 0)); gl.uniform1f(this.loc(P, 'uTexK'), o.texK ?? 1); gl.uniform1f(this.loc(P, 'uLightK'), o.lightK ?? 1); eyeTo(P); gl.uniform3fv(this.loc(P, 'uSun'), SUN_W); shadowTo(P); toonTo(P);
+      gl.uniform1f(this.loc(P, 'uSpecK'), o.reflK ?? 1); gl.uniform1f(this.loc(P, 'uDeep'), o.deep ?? 1); gl.uniform1i(this.loc(P, 'uLook'), Math.max(1, look)); gl.uniform1f(this.loc(P, 'uTexK'), o.texK ?? 1); gl.uniform1f(this.loc(P, 'uLightK'), o.lightK ?? 1); eyeTo(P); gl.uniform3fv(this.loc(P, 'uSun'), SUN); shadowTo(P); toonTo(P);
       gl.uniform1f(this.loc(P, 'uOutline'), outlineP);
       for (const m of this.propModels.values()) { if (!m.count) continue; gl.uniform2f(this.loc(P, 'uObj'), (id & 255) / 255, ((id >> 8) & 255) / 255); id++; ([[m.alb, 'uPA', 17], [m.nor, 'uPN', 18], [m.arm, 'uPR', 19]] as const).forEach(([t, nm, u]) => { gl.activeTexture(gl.TEXTURE0 + u); gl.bindTexture(gl.TEXTURE_2D, t); gl.uniform1i(this.loc(P, nm), u); });
         gl.bindVertexArray(m.vao); gl.drawElementsInstanced(gl.TRIANGLES, m.n, gl.UNSIGNED_INT, 0, m.count); }
       gl.useProgram(this.obj); }
     if (W) { W.draw((P, ow) => { gl.useProgram(P); lampsTo(P); gl.uniform1f(this.loc(P, 'uDay'), o.day ?? 1); gl.uniformMatrix4fv(this.loc(P, 'uVP'), false, VP); gl.uniform1i(this.loc(P, 'uHDRo'), hdrOn); gl.uniformMatrix4fv(this.loc(P, 'uPrevVP'), false, this.prevVP ?? VP); gl.uniform2f(this.loc(P, 'uSize'), v.W, v.H);   /* the woods (review 181) */
-        gl.uniform1i(this.loc(P, 'uLook'), Math.max(1, o.look ?? 0)); gl.uniform1f(this.loc(P, 'uLightK'), o.lightK ?? 1); gl.uniform1f(this.loc(P, 'uSpecK'), o.reflK ?? 1); eyeTo(P); gl.uniform3fv(this.loc(P, 'uSun'), SUN_W); shadowTo(P); toonTo(P);
+        gl.uniform1i(this.loc(P, 'uLook'), Math.max(1, look)); gl.uniform1f(this.loc(P, 'uLightK'), o.lightK ?? 1); gl.uniform1f(this.loc(P, 'uSpecK'), o.reflK ?? 1); eyeTo(P); gl.uniform3fv(this.loc(P, 'uSun'), SUN); shadowTo(P); toonTo(P);
         gl.uniform1f(this.loc(P, 'uOutline'), ow); gl.uniform2f(this.loc(P, 'uObj'), (id & 255) / 255, ((id >> 8) & 255) / 255); id++; }, pv ? pv.e : [v.x, v.y, v.z]); gl.useProgram(this.obj); }
     // the cars a thing hides: their light outline first, tested against what stands before them (each pixel once), then the cars over it
     gl.uniform1i(this.loc(this.obj, 'uMode'), 1); gl.depthFunc(gl.GREATER); gl.depthMask(false); gl.enable(gl.STENCIL_TEST); gl.stencilFunc(gl.EQUAL, 0, 0xff); gl.stencilOp(gl.KEEP, gl.KEEP, gl.INCR);
     gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.NONE, gl.NONE, gl.NONE]); gl.uniform1f(this.loc(this.obj, 'uBias'), 0.25 / R);
     cars.forEach((q, i) => { gl.uniform4f(this.loc(this.obj, 'uSil'), 1, 226 / 255, 168 / 255, q.player ? 0.6 : 0.4); for (const [part, M, w, b] of carM[i]!.opaque) draw(part, M, w, undefined, b); });
     gl.disable(gl.STENCIL_TEST); gl.disable(gl.BLEND); gl.depthFunc(gl.LESS); gl.depthMask(true); gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.COLOR_ATTACHMENT1, gl.COLOR_ATTACHMENT2, gl.COLOR_ATTACHMENT3]); gl.uniform1f(this.loc(this.obj, 'uBias'), 0); gl.uniform1i(this.loc(this.obj, 'uMode'), 0);
-    gl.uniform1i(this.loc(this.obj, 'uIsCar'), 1); cars.forEach((q, i) => { objU(outlineC); const m = carM[i]!; gl.uniform1f(this.loc(this.obj, 'uLampOn'), q.lamps ?? 0); gl.uniform1f(this.loc(this.obj, 'uBrake'), q.brake ? 1 : 0); gl.uniform1i(this.loc(this.obj, 'uSelf'), boxIdx.get(q) ?? -1); gl.uniform3fv(this.loc(this.obj, 'uWear'), q.wear ?? [0, 0, 0]); gl.uniform1f(this.loc(this.obj, 'uCarH'), q.g.height); artTo(q.g); decals(q.g); draw(q.g.body, m.body, undefined, `c${this.idOf(q.g)}:0`); decals(null); m.opaque.slice(1).forEach(([part, M, w, b], j) => draw(part, M, w, `c${this.idOf(q.g)}:${j + 1}`, b)); });
+    gl.uniform1i(this.loc(this.obj, 'uIsCar'), 1); const carIds: number[] = []; cars.forEach((q, i) => { carIds[i] = id; objU(fr ? 0 : outlineC);   /* look 4: the hull draws the cars' outline, not the outline pass */ const m = carM[i]!; gl.uniform1f(this.loc(this.obj, 'uLampOn'), q.lamps ?? 0); gl.uniform1f(this.loc(this.obj, 'uBrake'), q.brake ? 1 : 0); gl.uniform1i(this.loc(this.obj, 'uSelf'), boxIdx.get(q) ?? -1); gl.uniform3fv(this.loc(this.obj, 'uWear'), q.wear ?? [0, 0, 0]); gl.uniform1f(this.loc(this.obj, 'uCarH'), q.g.height); artTo(q.g); decals(q.g); draw(q.g.body, m.body, undefined, `c${this.idOf(q.g)}:0`); decals(null); m.opaque.slice(1).forEach(([part, M, w, b], j) => draw(part, M, w, `c${this.idOf(q.g)}:${j + 1}`, b)); });
+    if (fr && cars.length) this.styleInk(v, cars, carM, carIds, VP, st, ink, pv ? pv.ty : 0, eyeTo, draw);
     // smoke: parcels far to near, blended over what is drawn, hidden behind what stands before them
     if (o.smoke && o.smoke.n) { const S = o.smoke; if (!this.smokeVao) { this.smokeVao = gl.createVertexArray()!; gl.bindVertexArray(this.smokeVao); const corners = gl.createBuffer()!; gl.bindBuffer(gl.ARRAY_BUFFER, corners); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, 1, 1, -1, -1, 1, 1, -1, 1]), gl.STATIC_DRAW);
         gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0); this.smokeBuf = gl.createBuffer()!; gl.bindBuffer(gl.ARRAY_BUFFER, this.smokeBuf);
         gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1, 4, gl.FLOAT, false, 32, 0); gl.vertexAttribDivisor(1, 1); gl.enableVertexAttribArray(2); gl.vertexAttribPointer(2, 4, gl.FLOAT, false, 32, 16); gl.vertexAttribDivisor(2, 1); gl.bindVertexArray(null); }
       const idx = Array.from({ length: S.n }, (_, k) => k).sort((a, b) => dot([S.p[b * 8]!, S.p[b * 8 + 1]!, S.p[b * 8 + 2]!], vd) - dot([S.p[a * 8]!, S.p[a * 8 + 1]!, S.p[a * 8 + 2]!], vd)), sorted = new Float32Array(S.n * 8);
       idx.forEach((k, j) => sorted.set(S.p.subarray(k * 8, k * 8 + 8), j * 8));
-      gl.useProgram(this.smoke); gl.uniformMatrix4fv(this.loc(this.smoke, 'uVP'), false, VP); gl.uniform3fv(this.loc(this.smoke, 'uRx'), rx); gl.uniform3fv(this.loc(this.smoke, 'uUp'), up); gl.uniform3fv(this.loc(this.smoke, 'uVd'), vd); gl.uniform3fv(this.loc(this.smoke, 'uSun'), SUN_W); gl.uniform1f(this.loc(this.smoke, 'uTime'), S.time); gl.uniform1i(this.loc(this.smoke, 'uHDR'), hdrOn);
+      gl.useProgram(this.smoke); gl.uniformMatrix4fv(this.loc(this.smoke, 'uVP'), false, VP); gl.uniform3fv(this.loc(this.smoke, 'uRx'), rx); gl.uniform3fv(this.loc(this.smoke, 'uUp'), up); gl.uniform3fv(this.loc(this.smoke, 'uVd'), vd); gl.uniform3fv(this.loc(this.smoke, 'uSun'), SUN); gl.uniform1f(this.loc(this.smoke, 'uTime'), S.time); gl.uniform1i(this.loc(this.smoke, 'uHDR'), hdrOn);
       gl.bindVertexArray(this.smokeVao); gl.bindBuffer(gl.ARRAY_BUFFER, this.smokeBuf); gl.bufferData(gl.ARRAY_BUFFER, sorted, gl.DYNAMIC_DRAW);
       gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false); gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.NONE, gl.NONE, gl.NONE]); gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, S.n);
       gl.disable(gl.BLEND); gl.depthMask(true); gl.useProgram(this.obj); }
-    if (this.vol?.active) { this.vol.draw({ VP, W: v.W, H: v.H, depth: this.tDepth, col: this.tCol, fbo: this.fbo, hdr: hdrOn === 1, toon, toonBands: o.toonBands, sun: SUN_W, day: o.day ?? 1 }); gl.useProgram(this.obj); }   // the volumetric smoke (docs/systems/104 B: render/live/volume), its grid run by the drive
+    if (this.vol?.active) { this.vol.draw({ VP, W: v.W, H: v.H, depth: this.tDepth, col: this.tCol, fbo: this.fbo, hdr: hdrOn === 1, toon, toonBands: o.toonBands, sun: SUN, day: o.day ?? 1 }); gl.useProgram(this.obj); }   // the volumetric smoke (docs/systems/104 B: render/live/volume), its grid run by the drive
     // glass over all, at its own strength, nothing else written
     gl.uniform1i(this.loc(this.obj, 'uMode'), 2); gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);   /* premultiplied (review 116) */ gl.depthMask(false); gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.NONE, gl.NONE, gl.NONE]);
     gl.uniform3f(this.loc(this.obj, 'uWear'), 0, 0, 0); gl.uniform1i(this.loc(this.obj, 'uIsCar'), 0); for (const p of ps) draw(p.g.glass, (p.m ?? placeMesh(p.g.len, p.x, p.y, p.z, p.h))); gl.uniform1i(this.loc(this.obj, 'uIsCar'), 1); cars.forEach((q, i) => { gl.uniform1f(this.loc(this.obj, 'uLampOn'), q.lamps ?? 0); gl.uniform1f(this.loc(this.obj, 'uBrake'), q.brake ? 1 : 0); gl.uniform1f(this.loc(this.obj, 'uCarH'), q.g.height); gl.uniform1f(this.loc(this.obj, 'uCarL'), q.g.len); for (const [part, M, w] of carM[i]!.glass) draw(part, M, w); }); gl.uniform1f(this.loc(this.obj, 'uLampOn'), 0); gl.uniform1f(this.loc(this.obj, 'uBrake'), 0);
     gl.disable(gl.BLEND); gl.depthMask(true);
     // ---- after the scene (review 111): occlusion, then the picture composed (reflections, occlusion, outlines), the bloom, the end ----
-    gl.disable(gl.DEPTH_TEST); gl.disable(gl.STENCIL_TEST); gl.disable(gl.BLEND); gl.bindVertexArray(null); const rays = (o.look ?? 0) > 0 && !toon && o.rays !== false && !pv, RT = this.rt;   /* toon: no traced reflections or occlusion (its shade is in bands) */
+    gl.disable(gl.DEPTH_TEST); gl.disable(gl.STENCIL_TEST); gl.disable(gl.BLEND); gl.bindVertexArray(null); const rays = (look) > 0 && !toon && o.rays !== false && !pv, RT = this.rt;   /* toon: no traced reflections or occlusion (its shade is in bands) */
     const tex = (p: WebGLProgram, name: string, unit: number, t: WebGLTexture) => { gl.activeTexture(gl.TEXTURE0 + unit); gl.bindTexture(gl.TEXTURE_2D, t); gl.uniform1i(this.loc(p, name), unit); };
     const to = (k: number | null) => { if (k === null) { gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.viewport(0, 0, v.W, v.H); } else { gl.bindFramebuffer(gl.FRAMEBUFFER, RT[k]!.f); gl.viewport(0, 0, RT[k]!.w, RT[k]!.h); } };
-    if (rays) { to(0); gl.useProgram(this.aoP); tex(this.aoP, 'uDepth', 0, this.tDepth); tex(this.aoP, 'uN', 1, this.tN); gl.uniformMatrix4fv(this.loc(this.aoP, 'uVP'), false, VP); gl.uniform3fv(this.loc(this.aoP, 'uSunD'), SUN_W); gl.uniform1f(this.loc(this.aoP, 'uRange'), R); gl.drawArrays(gl.TRIANGLES, 0, 3); }
+    if (rays) { to(0); gl.useProgram(this.aoP); tex(this.aoP, 'uDepth', 0, this.tDepth); tex(this.aoP, 'uN', 1, this.tN); gl.uniformMatrix4fv(this.loc(this.aoP, 'uVP'), false, VP); gl.uniform3fv(this.loc(this.aoP, 'uSunD'), SUN); gl.uniform1f(this.loc(this.aoP, 'uRange'), R); gl.drawArrays(gl.TRIANGLES, 0, 3); }
     to(1); gl.useProgram(this.post); tex(this.post, 'uAO', 9, RT[0]!.t); gl.uniform1f(this.loc(this.post, 'uAOK'), o.aoK ?? 1); gl.uniform1f(this.loc(this.post, 'uReflK'), o.reflK ?? 1);
     [this.tCol, this.tId, this.tDepth].forEach((t, i) => { gl.activeTexture(gl.TEXTURE0 + i); gl.bindTexture(gl.TEXTURE_2D, t); gl.uniform1i(this.loc(this.post, ['uCol', 'uId', 'uDepth'][i]!), i); });
-    gl.uniform1i(this.loc(this.post, 'uInner'), (o.inner ?? ((o.look ?? 0) === 0 || toon)) ? 1 : 0); gl.uniform1i(this.loc(this.post, 'uToon'), toon ? 1 : 0); gl.uniform1f(this.loc(this.post, 'uOutW'), o.outW ?? 1); gl.uniform1f(this.loc(this.post, 'uOutK'), o.outK ?? 1); gl.uniform1f(this.loc(this.post, 'uInK'), o.inK ?? 1); gl.uniform1f(this.loc(this.post, 'uRayK'), Math.min(1.8, o.lightK ?? 1)); gl.uniform1i(this.loc(this.post, 'uRays'), rays ? 1 : 0); gl.uniformMatrix4fv(this.loc(this.post, 'uVP'), false, VP); gl.uniform3fv(this.loc(this.post, 'uVd'), vd); gl.uniform3fv(this.loc(this.post, 'uSunD'), SUN_W);
+    gl.uniform1i(this.loc(this.post, 'uInner'), (fr ? st.post !== false : o.inner ?? (look === 0 || toon)) ? 1 : 0); gl.uniform1i(this.loc(this.post, 'uFR'), fr ? 1 : 0); gl.uniform3fv(this.loc(this.post, 'uInk'), ink); gl.uniform1i(this.loc(this.post, 'uToon'), toon ? 1 : 0); gl.uniform1f(this.loc(this.post, 'uOutW'), o.outW ?? 1); gl.uniform1f(this.loc(this.post, 'uOutK'), o.outK ?? 1); gl.uniform1f(this.loc(this.post, 'uInK'), o.inK ?? 1); gl.uniform1f(this.loc(this.post, 'uRayK'), Math.min(1.8, o.lightK ?? 1)); gl.uniform1i(this.loc(this.post, 'uRays'), rays ? 1 : 0); gl.uniformMatrix4fv(this.loc(this.post, 'uVP'), false, VP); gl.uniform3fv(this.loc(this.post, 'uVd'), vd); gl.uniform3fv(this.loc(this.post, 'uSunD'), SUN);
     gl.activeTexture(gl.TEXTURE8); gl.bindTexture(gl.TEXTURE_2D, this.tN); gl.uniform1i(this.loc(this.post, 'uN'), 8); gl.uniform1f(this.loc(this.post, 'uRange'), R); gl.uniform2f(this.loc(this.post, 'uLin'), pv ? pv.n : 0, pv ? pv.f : 0); gl.uniform1i(this.loc(this.post, 'uSky'), pv ? (hdrOn ? 2 : 1) : 0); gl.uniform1f(this.loc(this.post, 'uDay'), o.day ?? 1); gl.uniform3fv(this.loc(this.post, 'uRx'), rx); gl.uniform3fv(this.loc(this.post, 'uUpV'), up); gl.uniform2f(this.loc(this.post, 'uTan'), pv ? pv.ty * v.W / v.H : 0, pv ? pv.ty : 0);   /* PBR: no lines over the shading inside a thing, its outline only */ gl.uniform1f(this.loc(this.post, 'uStep'), (60 + 2 * v.mm / Math.tan(Math.max(5, v.pitch) * Math.PI / 180)) / 1000);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
     for (let i = 0; i < 6; i++) { gl.activeTexture(gl.TEXTURE0 + i); gl.bindTexture(gl.TEXTURE_2D, this.blank); }
@@ -981,6 +1049,24 @@ export class LiveRenderer {
     gl.drawArrays(gl.TRIANGLES, 0, 3); for (let i = 0; i < 4; i++) { gl.activeTexture(gl.TEXTURE0 + i); gl.bindTexture(gl.TEXTURE_2D, this.blank); }
     this.prevVP = VP; this.prevM = this.nextM; this.nextM = new Map(); }
 
+  /** look 4's ink over the cars just drawn (docs/systems/109 §5.1-5.2): the inverted hull (each piece again, its faces
+   *  toward the eye culled, pushed out along its hull normals by the outline's width on the screen, in ink, marked for
+   *  the outline pass), then the drawn lines as ribbons, blended into the colour only */
+  private styleInk(v: LiveView, cars: LiveCar[], carM: { body: M4; opaque: Piece[] }[], carIds: number[], VP: Float32Array, st: LiveStyle, ink: [number, number, number], ty: number,
+    eyeTo: (p: WebGLProgram) => void, draw: (part: { vao: WebGLVertexArrayObject; n: number }, M: M4, w?: WheelDraw, key?: string, bones?: Float32Array) => void) { const gl = this.gl, dpr = st.dpr ?? 1;
+    const det = (m: M4) => m[0]! * (m[5]! * m[10]! - m[6]! * m[9]!) - m[4]! * (m[1]! * m[10]! - m[2]! * m[9]!) + m[8]! * (m[1]! * m[6]! - m[2]! * m[5]!);
+    if (st.outline !== false) { gl.uniform1i(this.loc(this.obj, 'uMode'), 3); gl.uniform1f(this.loc(this.obj, 'uHull'), screenPx(st.outPx ?? STYLE.outlinePx, v.H, dpr)); gl.enable(gl.CULL_FACE);
+      cars.forEach((q, i) => { const cid = carIds[i]!; gl.uniform2f(this.loc(this.obj, 'uObj'), (cid & 255) / 255, ((cid >> 8) & 255) / 255);
+        for (const [part, M, w, b] of carM[i]!.opaque) { gl.cullFace(det(M) < 0 ? gl.BACK : gl.FRONT); draw(part, M, w, undefined, b); } });   /* a mirrored placing turns the winding over: cull what then faces the eye */
+      gl.disable(gl.CULL_FACE); gl.uniform1f(this.loc(this.obj, 'uHull'), 0); gl.uniform1i(this.loc(this.obj, 'uMode'), 0); }
+    if (st.lines === false) return; const P = this.lineP; gl.useProgram(P); gl.uniformMatrix4fv(this.loc(P, 'uVP'), false, VP); gl.uniform2f(this.loc(P, 'uVpx'), v.W, v.H); gl.uniform3fv(this.loc(P, 'uInk'), ink); eyeTo(P);
+    gl.uniform1f(this.loc(P, 'uW'), screenPx(st.linePx ?? STYLE.linePx, v.H, dpr)); gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false); gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.NONE, gl.NONE, gl.NONE]);
+    cars.forEach((q, i) => { const L = styleLines(gl, q.g), m = carM[i]!; if (!L.body && !L.susp) return;
+      const wpp = v.eye && ty ? 2 * Math.hypot(q.x - v.eye[0], q.y - v.eye[1], q.z - v.eye[2]) * ty / v.H : v.mm / 1000; gl.uniform1f(this.loc(P, 'uLift'), Math.max(STYLE.lift, Math.min(0.03, wpp * 1.5)));   /* a pixel and a half toward the eye, at least 4 mm */
+      gl.uniformMatrix4fv(this.loc(P, 'uModel'), false, m.body);
+      if (L.body) { gl.uniform1i(this.loc(P, 'uSkin'), 0); gl.bindVertexArray(L.body.vao); gl.drawArrays(gl.TRIANGLES, 0, L.body.n); }
+      const sp = q.g.susp ? m.opaque.find(x => x[0] === q.g.susp!.part) : undefined; if (L.susp && sp?.[3]) { gl.uniform1i(this.loc(P, 'uSkin'), 1); gl.uniform4fv(this.loc(P, 'uBone'), sp[3]); gl.bindVertexArray(L.susp.vao); gl.drawArrays(gl.TRIANGLES, 0, L.susp.n); } });
+    gl.disable(gl.BLEND); gl.depthMask(true); gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.COLOR_ATTACHMENT1, gl.COLOR_ATTACHMENT2, gl.COLOR_ATTACHMENT3]); gl.useProgram(this.obj); }
   /** a car's pieces with their matrices: the body on its springs (rolled and pitched about its middle), each wheel at its
    *  hub, turned on its axle and the front ones steered */
   private carParts(q: LiveCar): { body: M4; opaque: Piece[]; glass: Piece[] } {

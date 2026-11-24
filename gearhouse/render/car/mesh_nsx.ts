@@ -55,22 +55,22 @@ const YKB = curve([[XJ, KW], [700, 812], [1217, 812], [1300, 796], [XA, 760], [2
 const yK = (x: number) => x < XJ ? yKn(x) : YKB(x);
 /** the front top: nearly flat across, the wings' tops a touch proud, rolling off toward the crest */
 const zF = (x: number, y: number) => { const sh = Math.min(1, y / (x < XJ ? KW : YKB(x))); return ZH(x) + 10 * sm(400, 800, x) * sh * sh - 28 * sh ** 4; };
-const ZKB = curve([[XA, zF(XA, 760)], [1500, 734], [1750, 748], [2000, 757], [2250, 772], [2500, 790], [2750, 805], [2890, 818], [XQ, 836], [3040, 866], [3108, 877], [3175, 880], [XG, 880], [3700, 868], [3850, 862], [3950, 870], [4050, 888], [4150, 897], [XT1, 897]]);
+const ZKB = curve([[XA, zF(XA, 760)], [1500, 734], [1750, 748], [2000, 757], [2250, 772], [2500, 790], [2750, 805], [2890, 826], [XQ, 858], [3040, 870], [3108, 877], [3175, 880], [XG, 880], [3700, 868], [3850, 862], [3950, 870], [4050, 888], [4150, 897], [XT1, 897]]);
 const zK = (x: number) => x <= XA ? zF(x, yK(x)) : ZKB(x);
 /** H: the widest line's height (the shoulder, then the door's soft crease that runs into the intake) */
 const ZW = curve([[XJ, 500], [700, 520], [930, 540], [1450, 590], [2000, 597], [2500, 610], [XR1, 614], [XQ, 618], [3460, 610], [3900, 596], [XT1, 580]]);
 /** the roof's and the rear glass's centre line; the roof's half-width; the canopy's cross-section (flat on top, rolling off to its edge) */
-const ZR = curve([[1975, 1136], [XR0, 1152], [2100, 1160], [2250, 1169], [2400, 1170], [2550, 1165], [2650, 1156], [2700, 1149], [2800, 1126], [2900, 1102], [3000, 1073], [3200, 1003], [3400, 927], [XG, 880]]), YD = 490, CROWN = 18, CP = 2.4;
+const ZR = curve([[1975, 1136], [XR0, 1152], [2100, 1160], [2250, 1169], [2400, 1170], [2550, 1165], [2650, 1156], [2700, 1149], [2800, 1126], [2900, 1102], [3000, 1073], [3200, 1003], [3400, 930], [3470, 902], [XG, 882]]), YD = 490, CROWN = 18, CP = 2.4;
 const SH = [0, 0.2, 0.4, 0.6, 0.72, 0.84, 0.94, 1], NC = SH.length;                                         // the top's columns as shares of its half-width (the bonnet's shut line at 0.6)
 const xRoof = (s: number, sh: number) => s - 75 * (1 - sh * sh) * (1 - (s - XR0) / (XR1 - XR0));
 /** the slanting edge between the quarter glass and the rear glass, from the roof's back corner down to the belt */
-const YS = curve([[XR1, YD], [2750, 600], [2820, 672], [2890, 722], [XQ, 752]]), ZS = curve([[XR1, ZR(XR1) - CROWN], [2750, 1088], [2820, 1000], [2890, 915], [XQ, 836]]);
+const YS = curve([[XR1, YD], [2750, 600], [2820, 672], [2890, 722], [XQ, 752]]), ZS = curve([[XR1, ZR(XR1) - CROWN], [2750, 1092], [2820, 1018], [2890, 940], [2935, 888], [XQ, 858]]);   // review 155: eased into the belt at its foot, so the canopy's edge runs down in one sweep (no V where it meets the ridge)
 /** the rear glass's edge behind the quarter glass: along the wing's ridge, then round its foot (the tongue) */
 const GY = curve([[XQ, 752], [3040, 712], [3108, 694], [3200, 675], [3300, 645], [3400, 590], [3460, 520], [3495, 440], [3512, 350], [XG, 230]]);
 const glassEdge = (x: number): V => x <= XQ ? [x, YS(x), ZS(x)] : [x, GY(x), zK(x)];
 const glassPt = (x: number, sh: number): V => { const e = glassEdge(x); return [x, e[1] * sh, ZR(x) - (ZR(x) - e[2]) * sh ** CP]; };
 /** the deck: the boot lid a shallow trough between the wings' ridges, rising into the spoiler's flat top */
-const ZD = curve([[XG, 880], [3600, 872], [3700, 861], [3850, 855], [3950, 864], [4050, 886], [4150, 897], [4300, 897]]);
+const ZD = curve([[XG, 880], [3600, 876], [3700, 874], [3800, 875], [3900, 879], [4000, 886], [4100, 893], [4200, 897], [4300, 897]]);   // review 155: no trough between the glass's foot and the spoiler: the line runs on smoothly into the spoiler's top
 const zDeck = (x: number, y: number) => { const zc = x <= XG ? zK(x) : ZD(x); return zc + (zK(x) - zc) * sm(600, 715, y); };
 /** the wheel arches: round, over each hub */
 const archZ = (x: number) => Math.abs(x - FX) < RAF - 0.5 ? RF + Math.sqrt(RAF * RAF - (x - FX) ** 2) : Math.abs(x - RX) < RAR - 0.5 ? RR + Math.sqrt(RAR * RAR - (x - RX) ** 2) : 0;

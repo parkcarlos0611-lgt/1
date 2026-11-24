@@ -15,7 +15,7 @@ import { mesh as napier33 } from './mesh_napier33';
 import { mesh as jagD55 } from './mesh_jagD55';
 import { mesh as auburn851 } from './mesh_auburn851';
 import { mesh as mb540k } from './mesh_mb540k';
-import { mesh as eb110 } from './mesh_eb110';
+import { mesh as eb110 } from './mesh_eb110_kit';   // the EB110 from the car kit (docs/systems/96, step 2; closed shell, its engine under the glass; the panel-built mesh_eb110.ts kept as the reference)
 import { mesh as xj220 } from './mesh_xj220';
 import { mesh as diablo } from './mesh_diablo';
 import { mesh as nsx } from './mesh_nsx_kit';   // review 171: the NSX now from the shared car kit (closed shell; the hand-built mesh_nsx.ts kept as the reference)

@@ -22,7 +22,7 @@ const vec3 SUN_C = vec3(1.0, 0.95, 0.84), SKY_C = vec3(0.6, 0.68, 0.82), GROUND_
 const vec3 ENV_TOP = vec3(150., 176., 214.) / 255., ENV_HOR = vec3(236., 233., 224.) / 255., ENV_GROUND = vec3(92., 88., 68.) / 255.;
 vec3 envAt(float rz) { if (rz < -0.06) return ENV_GROUND; if (rz < 0.22) return ENV_HOR; float t = min(1., (rz - 0.22) / 0.6); return mix(ENV_HOR, ENV_TOP, t); }
 uniform highp sampler2DShadow uShadow; uniform mat4 uLight;
-uniform int uLook;   // 0: the baked pictures' stepped light; 1: physically based, its brightness stepped; 2: physically based, smooth
+uniform int uLook;   // 0: the baked pictures' stepped light; 1: physically based, its brightness stepped; 2: physically based, smooth; 3: toon (review 92)
 uniform float uTexK, uLightK, uSpecK;   // the strengths set on the page (review 109): textures, and the light (sun against sky, highlights, rays)
 uniform float uDay;   // the time of day (review 117): 1 full day, toward 0 dusk then night (the sun lower, redder, dimmer; the sky darker)
 #define SUN_E (mix(vec3(1.0, 0.52, 0.26), vec3(1.0, 0.95, 0.84), smoothstep(0.2, 0.8, uDay)) * 3.0 * uLightK * uDay * uDay)
@@ -83,7 +83,7 @@ vec3 pbrX(vec3 baseSrgb, vec3 n, vec3 v, vec3 l, float sh, float metal, float ro
 uniform highp sampler2DArray uAlb, uNor, uRgh, uHiAlb, uHiNor; uniform int uTex, uHi; uniform int uHiIdx[7]; uniform float uTSize[7], uTLuma[7], uTRough[7];   /* uHi: the high-resolution layers (2K/4K) for some materials (review 114) */
 struct Detail { float tone; float rough; vec3 n; };
 /** a layer laid three ways (by the normal's main axes) at point p (m), on normal n: its tone, roughness offset, bent normal */
-Detail detail(int L, vec3 p, vec3 n, float sa, float sn, float sr) { sa = max(sa, 0.12 * (uTexK - 1.)) * uTexK; sn *= uTexK; sr *= uTexK; Detail d; d.tone = 1.; d.rough = 0.; d.n = n; if (uTex == 0 || L < 0) return d;
+Detail detail(int L, vec3 p, vec3 n, float sa, float sn, float sr) { sa = max(sa, 0.12 * (uTexK - 1.)) * uTexK; sn *= uTexK; sr *= uTexK; Detail d; d.tone = 1.; d.rough = 0.; d.n = n; if (uTex == 0 || L < 0 || uLook == 3) return d;   /* toon: flat colour, no photographed grain */
   vec3 q = p / uTSize[L], w = pow(abs(n), vec3(4.)); w /= (w.x + w.y + w.z); float fl = float(L);
   vec3 ax = vec3(q.zy, fl), ay = vec3(q.xz, fl), az = vec3(q.xy, fl);
   vec3 a = texture(uAlb, ax).rgb * w.x + texture(uAlb, ay).rgb * w.y + texture(uAlb, az).rgb * w.z;
@@ -108,6 +108,49 @@ float rtao(vec3 p, vec3 n) { if (uBoxN == 0) return 1.; vec3 t1 = normalize(abs(
     for (int i = 0; i < 6; i++) { if (i >= uBoxN) break; if (i == uSelf) continue; float t = rayBox(p + n * 0.03, d, i); if (t >= 0. && t < 2.5) { occ += 1. - t / 2.5; break; } } }
   return 1. - min(1., occ / 8. * 1.4) * 0.85; }
 float lightAt(vec3 w) { vec4 l = uLight * vec4(w, 1.); vec3 q = l.xyz * 0.5 + 0.5; if (q.x <= 0. || q.y <= 0. || q.x >= 1. || q.y >= 1. || q.z >= 1.) return 1.; float t = 0., px = 1.6 / float(textureSize(uShadow, 0).x); for (int i = -1; i <= 1; i++) for (int j = -1; j <= 1; j++) t += texture(uShadow, vec3(q.xy + vec2(i, j) * px, q.z - 0.0015)); return t / 9.; }   /* soft edges: nine filtered looks (review 111) */
+/* ---- the toon look (review 92, items 1 and 2): uLook 3. The light in two or three flat bands of N·L (the cast shadow
+   and the cars' occlusion folded in), each edge about a pixel soft; the shade not grey but the colour turned cooler
+   (red to purple, yellow to orange, green to teal, grey to blue-grey), deeper and a little more saturated; no mirrors,
+   no filmic curve: the colour is written as it is meant to be seen. uToonB: the bands (2 or 3); uToonS: how far the
+   shade's hue moves (0: plain darker) ---- */
+uniform float uToonB, uToonS;
+vec3 rgb2hsv(vec3 c) { vec4 K = vec4(0., -1. / 3., 2. / 3., -1.), p = mix(vec4(c.bg, K.wz), vec4(c.gb, K.xy), step(c.b, c.g)), q = mix(vec4(p.xyw, c.r), vec4(c.r, p.yzx), step(p.x, c.r)); float d = q.x - min(q.w, q.y); return vec3(abs(q.z + (q.w - q.y) / (6. * d + 1e-10)), d / (q.x + 1e-10), q.x); }
+vec3 hsv2rgb(vec3 c) { vec3 p = abs(fract(c.xxx + vec3(1., 2. / 3., 1. / 3.)) * 6. - 3.); return c.z * mix(vec3(1.), clamp(p - 1., 0., 1.), c.y); }
+/** a colour's shade at brightness `dark`: its hue turned toward blue-violet by the short way round, a grey given a blue cast */
+vec3 toonShadeOf(vec3 c, float dark) { vec3 h = rgb2hsv(clamp(c, 0., 1.)); float d = 0.69 - h.x; d -= floor(d + 0.5);
+  float hx = fract(h.x + clamp(d * 0.32, -0.1, 0.1) * uToonS); hx = mix(0.61, hx, smoothstep(0.05, 0.22, h.y));
+  vec3 s = hsv2rgb(vec3(hx, clamp(h.y * (1. + 0.25 * uToonS) + 0.16 * uToonS * (1. - h.y), 0., 1.), h.z * dark * (1. - 0.06 * uToonS)));
+  return mix(c * dark, s, clamp(uToonS, 0., 1.)); }
+/** a value to a few levels, each step about a pixel soft */
+float poster(float x, float lv) { float y = x * lv, w = clamp(fwidth(y) * 0.7, 0.03, 0.5); return (floor(y) + smoothstep(0.5 - w, 0.5 + w, fract(y))) / lv; }
+/** a photographed colour flattened: its brightness to a few levels, its hue kept */
+vec3 posterC(vec3 c, float lv) { float L = max(1e-3, dot(c, vec3(0.3, 0.59, 0.11))); return c * mix(1., poster(L, lv) / L, 0.8); }
+/** the light's strength t (0..1) to a band: 0 the shade, (0.5 the middle,) 1 the light */
+float toonBand(float t) { float w = clamp(fwidth(t) * 0.8, 0.008, 0.12);
+  if (uToonB < 2.5) return smoothstep(0.16 - w, 0.16 + w, t);
+  return 0.5 * smoothstep(0.1 - w, 0.1 + w, t) + 0.5 * smoothstep(0.5 - w, 0.5 + w, t); }
+/** a surface of colour c (sRGB) at p facing n, in bands: the sun's colour by the time of day, the head lamps' light added */
+vec3 toonLight(vec3 c, vec3 n, vec3 l, float sh, float ao, vec3 p) {
+  float b = toonBand(max(0., dot(n, l)) * sh * smoothstep(0.3, 0.65, ao));
+  vec3 sunT = mix(vec3(1., 0.62, 0.42), vec3(1., 0.98, 0.94), smoothstep(0.2, 0.8, uDay)), lit = c * sunT * (0.2 + 0.8 * uDay) * (0.9 + 0.1 * uLightK);
+  vec3 shade = toonShadeOf(c, 0.6) * (0.14 + 0.86 * uDay), mid = mix(shade, lit, 0.6);
+  vec3 col = uToonB < 2.5 ? mix(shade, lit, b) : b < 0.5 ? mix(shade, mid, b * 2.) : mix(mid, lit, b * 2. - 1.);
+  return col + c * min(vec3(1.), lampsAt(p, n) * 0.12); }
+/** bright metal as a two-tone ramp: the sky above the mirrored horizon, the ground under it, a dark line between, the sun a white spot */
+vec3 toonChrome(vec3 base, vec3 n, vec3 v, vec3 l, float sh) { vec3 r = reflect(-v, n); float w = clamp(fwidth(r.z), 0.004, 0.1);
+  vec3 tint = mix(vec3(1.), base / max(1e-3, max(base.r, max(base.g, base.b))), 0.3), hi = vec3(0.84, 0.91, 1.) * tint, lo = vec3(0.42, 0.37, 0.32) * tint;
+  vec3 c = mix(lo, hi, smoothstep(0.04 - w, 0.04 + w, r.z)); c *= 1. - 0.5 * (smoothstep(-0.06 - w, -0.06 + w, r.z) - smoothstep(0.04 - w, 0.04 + w, r.z));
+  float nh = dot(n, normalize(l + v)), wh = clamp(fwidth(nh), 0.002, 0.05); c = mix(c, vec3(1.), smoothstep(0.975 - wh, 0.975 + wh, nh) * step(0.5, sh));
+  return c * (0.15 + 0.85 * uDay); }
+/** gloss as one or two crisp white shapes: the sun's spot, and a streak where the body's shoulder mirrors the sky just over the horizon on the sun's side */
+float toonGloss(vec3 n, vec3 v, vec3 l, float sh, float g) { float nh = dot(n, normalize(l + v)), w = clamp(fwidth(nh), 0.002, 0.05), e = 0.993 - 0.014 * g;
+  float spot = smoothstep(e - w, e + w, nh) * step(0.5, sh);
+  vec3 r = reflect(-v, n); float wz = clamp(fwidth(r.z), 0.003, 0.06), side = smoothstep(-0.25, 0.1, dot(normalize(r.xy + 1e-5), normalize(l.xy)));
+  float streak = smoothstep(0.1 - wz, 0.1 + wz, r.z) * (1. - smoothstep(0.19 - wz, 0.19 + wz, r.z)) * side * step(0.35, g);
+  return max(spot, streak * 0.9) * (0.2 + 0.8 * uDay); }
+/** the cars' rim light: a sky-blue band where the surface turns away from the eye, most along the top */
+vec3 toonRim(vec3 c, vec3 n, vec3 v) { float nv = dot(n, v), w = clamp(fwidth(nv), 0.005, 0.1), rim = 1. - smoothstep(0.3 - w, 0.3 + w, nv);
+  return mix(c, vec3(0.62, 0.82, 1.) * (0.25 + 0.75 * uDay), rim * (0.35 + 0.3 * smoothstep(-0.3, 0.6, n.z))); }
 `;
 const OBJ_VS = `#version 300 es
 layout(location=0) in vec3 aPos; layout(location=1) in vec3 aNor; layout(location=2) in vec3 aCol; layout(location=3) in float aGloss; layout(location=4) in float aKind; layout(location=5) in float aPart; layout(location=6) in vec3 aSmo; layout(location=7) in vec4 aLamp; layout(location=8) in vec3 aLAx; layout(location=9) in vec3 aLRt; out vec4 vLamp; flat out vec3 vLAx, vLRt, vLUp;
@@ -159,6 +202,7 @@ vec4 velo() { vec2 d = (vCur.xy / vCur.w - vPrev.xy / vPrev.w) * 0.5 * uSize; re
    keeps the colour the building was given. Normal (GL), occlusion (red) and roughness (green) as photographed ---- */
 uniform highp sampler2DArray uBAlb, uBNor, uBPack; uniform int uBTex; uniform float uBSize[9]; uniform vec3 uBMean[9];
 uniform float uLampOn, uBrake;   // this car's lamps alight, its brakes on (review 117)
+uniform int uIsCar;   // a car's piece (the toon look's rim light)
 /* ---- a lamp seen through its glass (review 117): what a real head lamp shows, drawn at its depth on the lamp's face.
    uv: across the face to its rim; A, Rt, Up: its axis and face; nG: the glass's (domed) normal. Behind the glass a
    parabolic bowl, silvered, deepest in the middle (the view through it shifts with the angle: parallax); the bulb and
@@ -188,6 +232,10 @@ vec3 lampFace(vec2 uv, float flag, vec3 A, vec3 Rt, vec3 Up, vec3 nG, float sh) 
   vec3 col = bowl * (1. - line) * (flag < 1.5 ? vec3(0.95, 0.97, 1.) : vec3(0.85, 0.05, 0.035) + lit * glow * 2.);
   vec3 ng = normalize(nG); float nv = max(0., dot(ng, E)), F = 0.04 + 0.96 * pow(1. - nv, 5.);
   return col * (1. - F) + skyR(reflect(-E, ng), 0.01) * F * (0.8 + 0.2 * uSpecK) + SUN_E * D_GGX(max(0., dot(ng, hh)), 0.012) * 0.25 * F * max(0., dot(ng, uSun)) * sh * uSpecK; }
+/** a lamp in the toon look: a flat pale (or red) face, a darker ring at the rim, one round white glint; alight, near white */
+vec3 toonLamp(vec2 uv, float flag) { float r = length(uv), w = clamp(fwidth(r), 0.01, 0.2), glow = flag < 1.5 ? uLampOn : max(uLampOn * 0.35, uBrake);
+  vec3 c = mix(flag < 1.5 ? vec3(0.74, 0.8, 0.86) * (0.3 + 0.7 * uDay) : vec3(0.6, 0.07, 0.06) * (0.35 + 0.65 * uDay), flag < 1.5 ? vec3(1., 0.97, 0.84) : vec3(1., 0.32, 0.22), glow);
+  c *= 1. - 0.3 * smoothstep(0.82 - w, 0.82 + w, r); float g = length(uv - vec2(-0.3, 0.34)); return mix(c, vec3(1.), 1. - smoothstep(0.17 - w, 0.17 + w, g)); }
 void main() {
   if (uMode == 1) { oCol = uSil; oId = vec4(0.); oN = vec4(0.); oV = velo(); return; }
   vec3 n = vN; if (dot(n, uEye) < 0.) n = -n;
@@ -196,6 +244,14 @@ void main() {
   float d = max(0., dot(n, uSun)) * sh, up = 0.5 + 0.5 * n.z;
   float ne = dot(n, uEye), rz = 2. * ne * n.z - uEye.z;
   if (uMode == 2) {   // glass: mirrors more at a glancing angle, laid over at its own strength
+    if (uLook == 3) {   /* toon glass: a flat dark tint, one crisp streak across it (and a thin one beside it) */
+      if (kind == 4) discard;
+      if (vLamp.z > 0.5) { oCol = vec4(toonLamp(vLamp.xy, vLamp.z), 1.); oId = vec4(0.); oN = vec4(0.); oV = velo(); return; }
+      float q = fract((vObj.x * 0.75 + vObj.z) / 1300. + 0.31), dq = abs(q - 0.5), w = clamp(fwidth(dq), 0.002, 0.05);
+      float streak = 1. - smoothstep(0.05 - w, 0.05 + w, dq), thin = smoothstep(0.075 - w, 0.075 + w, dq) * (1. - smoothstep(0.092 - w, 0.092 + w, dq)), st = max(streak, thin * 0.8) * (0.25 + 0.75 * uDay);
+      float clear = vGloss < 0.5 ? max(0.25, vGloss * 2.) : 1., A = mix(clamp(0.3 + 0.62 * uGlass, 0., 1.) * clear, 0.92, st);
+      vec3 rgb = mix(vec3(0.12, 0.16, 0.24) * (0.3 + 0.7 * uDay) + toonRim(vec3(0.), n, uEye) * 0.4 * float(uIsCar), vec3(0.93, 0.97, 1.), st);
+      oCol = vec4(rgb * A, A); oId = vec4(0.); oN = vec4(0.); oV = velo(); return; }
     if (uLook > 0 && kind == 4) discard;   /* the painted glints the baked pictures put on windows: the glass now mirrors the world itself (review 118) */
     if (uLook > 0 && vLamp.z > 0.5) { vec3 ns = normalize(vSN); if (dot(ns, n) < 0.) ns = -ns; oCol = vec4(present(lampFace(vLamp.xy, vLamp.z, vLAx, vLRt, vLUp, ns, sh)), 1.); oId = vec4(0.); oN = vec4(0.); oV = velo(); return; }   /* a lamp's glass: the lamp drawn on it (review 117) */
     if (uLook > 0) {   /* review 116: glass as glass. Nearly black in itself, a little green toward its edge (seen through its
@@ -224,11 +280,14 @@ void main() {
     if (kind >= 11 && uBTex == 1) { int L = min(kind - 11, 8); vec3 no = normalize(vObjN); if (dot(mat3(uModel) * no, uEye) < 0.) no = -no;
       float hl = length(no.xy); vec3 T = hl > 0.08 ? vec3(-no.y, no.x, 0.) / hl : vec3(1., 0., 0.), B = hl > 0.08 ? cross(no, T) : vec3(0., 1., 0.);   /* level along the face, and up it */
       vec3 P = vObj / 1000., q = vec3(dot(P, T) / uBSize[L], -dot(P, B) / uBSize[L], float(L));
-      vec3 a = texture(uBAlb, q).rgb, tn = texture(uBNor, q).xyz * 2. - 1., pk = texture(uBPack, q).rgb;
+      float tb = uLook == 3 ? 1.5 : 0.;   /* toon: the photograph softened, so its pattern reads as shapes, not grain */
+      vec3 a = texture(uBAlb, q, tb).rgb, tn = texture(uBNor, q, tb).xyz * 2. - 1., pk = texture(uBPack, q).rgb;
       base = vCol * clamp(a / uBMean[L], 0., 2.5) * (0.93 + 0.14 * vnoise(P * 0.6 + 3.));   /* and a broad unevenness, so a long wall is not one tile repeated */
+      if (uLook == 3) { vec3 rr = clamp(a / uBMean[L], 0., 2.5); float lr = dot(rr, vec3(0.3, 0.59, 0.11)); base = vCol * mix(vec3(1.), rr / max(lr, 1e-3), 0.5) * mix(1., poster(lr * 0.5, 8.) * 2., 0.7); tn.xy *= 0.3; }   /* its tones to steps of a quarter, its relief shallow */
       if (L == 3) tn.xy *= mix(0.35, 2.5, clamp(1.6 - length(fwidth(q.xy)) / 0.006, 0., 1.));   /* the iron's corrugations are shallow in the photograph: deepened to read close to, and flattened where a pixel nears their pitch (no moire from afar) */
       vec3 nw = normalize(mat3(uModel) * normalize(T * tn.x + B * tn.y + no * max(0.25, tn.z))); if (dot(nw, uEye) < 0.) nw = n;
       float metal = L == 3 ? 0.2 : 0., rough = clamp(pk.g, 0.25, 1.), ao = rtao(vWorld, nw) * mix(1., pk.r, 0.55);
+      if (uLook == 3) { oCol = vec4(clamp(toonLight(base, nw, uSun, sh, ao, vWorld), 0., 1.), 1.); oId = vec4(uObj, vPart / 255., uOutline / 8.); oN = vec4(nw * 0.5 + 0.5, 0.); oV = velo(); return; }
       vec3 lit = pbrX(base, nw, uEye, uSun, sh, metal, rough, 0., ao, 0.) + lampsAt(vWorld, nw) * toLin(base) * (1. - metal) / 3.14159;
       oCol = vec4(present(lit), 1.); oId = vec4(uObj, vPart / 255., uOutline / 8.); oN = vec4(nw * 0.5 + 0.5, 0.); oV = velo(); return; }
     float metal = 0., rough = 0.6, coat = 0.;
@@ -267,6 +326,13 @@ void main() {
     if (kind == 1) {}   /* the lacquer smooth: its orange peel (a noisy normal) mottled every mirrored cloud (review 132) */
     else if (kind == 8) { sheen = 0.35; coat = max(coat, 0.15); } else if (kind == 7) { sheen = 0.6; rough = 0.95; } else if (kind == 5) { sheen = 0.18; } else if (kind == 6) coat = max(coat, 0.55); else if (kind == 9) { coat = 1.; rough = 0.05; }
     float ao = rtao(vWorld, nw);
+    if (uLook == 3) {   /* toon: bands and coloured shade; paint's gloss as crisp white shapes; chrome a two-tone ramp; the cars rimmed with sky blue */
+      vec3 col;
+      if (kind == 9 && vLamp.z > 0.5) col = toonLamp(vLamp.xy, vLamp.z);
+      else if (metal > 0.5) col = toonChrome(base, nw, uEye, uSun, sh);
+      else { col = toonLight(base, nw, uSun, sh, ao, vWorld); float g = kind == 1 ? coat : kind == 9 ? 1. : kind == 6 ? 0.3 : 0.; if (g > 0.05) col = mix(col, vec3(1.), toonGloss(nw, uEye, uSun, sh, g)); }
+      if (uIsCar == 1) col = toonRim(col, nw, uEye);
+      oCol = vec4(clamp(col, 0., 1.), 1.); oId = vec4(uObj, vPart / 255., uOutline / 8.); oN = vec4(nw * 0.5 + 0.5, 0.); oV = velo(); return; }
     vec3 lit = pbrX(base, nw, uEye, uSun, sh, metal, rough, coat, ao, sheen);
     if (kind == 9 && vLamp.z > 0.5) { vec3 ns = normalize(vSN); if (dot(ns, n) < 0.) ns = -ns; lit = lampFace(vLamp.xy, vLamp.z, vLAx, vLRt, vLUp, ns, sh); }   /* a lamp's lens: the lamp drawn on it (review 117) */
     else lit += lampsAt(vWorld, nw) * toLin(base) * (1. - metal) / 3.14159;   /* the head lamps' light */
@@ -310,7 +376,8 @@ uniform highp sampler2DArray uGAlb, uGNor, uGPack; uniform int uGTex; uniform fl
 struct GS { vec3 a; vec3 n; vec3 p; };
 /** a layer's picture as detail about its own mean (the smallest mip): 1 on average, its light and dark and a little of its colour; the game keeps its own colours */
 vec3 rel(vec3 a, int L) { vec3 m = textureLod(uGAlb, vec3(0.5, 0.5, float(L)), 12.).rgb; float lm = max(0.03, dot(m, vec3(0.3, 0.59, 0.11))), la = dot(a, vec3(0.3, 0.59, 0.11)); return mix(vec3(la), a, 0.15) / lm; }
-GS gs(int L, vec2 st, vec2 off) { vec3 q = vec3(st / uGSize[L] + off, float(L)); GS g; g.a = rel(texture(uGAlb, q).rgb, L); g.n = texture(uGNor, q).rgb * 2. - 1.; g.p = texture(uGPack, q).rgb; return g; }
+GS gs(int L, vec2 st, vec2 off) { vec3 q = vec3(st / uGSize[L] + off, float(L)); float tb = uLook == 3 ? 2. : 0.;   /* toon: the photograph softened to patches of colour */
+  GS g; g.a = rel(texture(uGAlb, q, tb).rgb, L); g.n = texture(uGNor, q, tb).rgb * 2. - 1.; g.p = texture(uGPack, q).rgb; return g; }
 float W2t(float o) { return uTW / 2. - abs(o); }
 /* the scratch race's grid (review 125), painted as the start line is: pairs 5 m either side of the middle, rows 9 m
    apart, each place an open box (a bar across in front, short lines back at its sides) and its number painted ahead of
@@ -399,13 +466,15 @@ void main() { vec3 c = vCol.rgb;
     vec2 st = vWorld.xy; GS g1 = gs(8, st, vec2(0.)), g2 = gs(8, st * 0.37, vec2(0.51)); float m = smoothstep(0.35, 0.65, fb2(st * 0.05));
     photo = true; pa = c * mix(g1.a, g2.a, m) * mix(vec3(1.), vec3(1.06, 1.0, 0.9), fb2(st * 0.013)); pn = normalize(mix(g1.n, g2.n, m)); pao = mix(g1.p.r, g2.p.r, m); prough = 0.92; c = pa; }
   if (uLook > 0) { vec3 nn = normalize(cross(dFdx(vWorld), dFdy(vWorld))); if (nn.z < 0.) nn = -nn; float sh = lightAt(vWorld + vec3(0., 0., 0.02));   // the ground as a rough, dull surface
+    if (uLook == 3) pn = normalize(vec3(pn.xy * 0.25, max(0.2, pn.z)));   /* toon: the photographed relief shallow */
     if (photo && !conc && !verge) { vec3 T = normalize(vec3(1., 0., 0.) - nn * nn.x), B = cross(nn, T); nn = normalize(T * pn.x + B * pn.y + nn * max(0.2, pn.z)); }
     if (conc || verge) { vec3 dpx = dFdx(vWorld), dpy = dFdy(vWorld), r1 = cross(dpy, nn), r2 = cross(nn, dpx); float det = dot(dpx, r1), k = clamp(1.6 - length(dpx) * 12., 0., 1.);   /* the relief by the height's change across the pixel (bump mapping), faded where a pixel spans more than the detail */
-      if (conc) { vec3 gr = sign(det) * (dFdx(C.h) * r1 + dFdy(C.h) * r2) * k; nn = normalize(abs(det) * nn - gr); }
+      if (conc) { vec3 gr = sign(det) * (dFdx(C.h) * r1 + dFdy(C.h) * r2) * k * (uLook == 3 ? 0.3 : 1.); nn = normalize(abs(det) * nn - gr); }
       if (photo) { vec2 dux = dFdx(vTrk.xy), duy = dFdy(vTrk.xy); float id = dux.x * duy.y - dux.y * duy.x; vec3 T = normalize((dpx * duy.y - dpy * dux.y) * sign(id)), B = normalize((dpy * dux.x - dpx * duy.x) * sign(id));   /* the track's own axes on the surface: along (s) and across (o) */
         T = normalize(T - nn * dot(T, nn)); B = cross(nn, T) * sign(dot(cross(nn, T), B)); nn = normalize(T * pn.x + B * pn.y + nn * max(0.2, pn.z)); } }
     Detail dt; if (photo) { dt.tone = 1.; dt.rough = 0.; dt.n = nn; } else dt = detail(vFlag > 0.5 ? 1 : 0, vWorld, nn, vFlag > 0.5 ? 0.8 : 0.7, conc ? 0.75 : 0.6, 0.4);
     float rough = photo ? clamp(prough, 0.2, 1.) : conc ? clamp(C.rough + dt.rough, 0.25, 1.) : clamp(0.92 + dt.rough, 0.3, 1.);
+    if (uLook == 3) { vec3 tc = photo ? posterC(c, 6.) : c; oCol = vec4(clamp(toonLight(tc, dt.n, uSun, sh, rtao(vWorld, dt.n), vWorld), 0., 1.), vCol.a); oId = vec4(0.); oN = vec4(dt.n * 0.5 + 0.5, 0.); oV = velo(); return; }   /* toon: the ground in flat bands, its shadows blue-grey */
     oCol = vec4(present(pbrX(c * dt.tone, dt.n, uEye, uSun, sh, 0., rough, 0., rtao(vWorld, dt.n) * (photo ? mix(1., pao, 0.8) : 1.), 0.) + lampsAt(vWorld, dt.n) * toLin(c * dt.tone) / 3.14159), vCol.a); oId = vec4(0.); oN = vec4(dt.n * 0.5 + 0.5, conc ? max(0., 0.5 - rough) * 0.5 : 0.); oV = velo(); return; }
   c = mix(c, vec3(24., 22., 20.) / 255., (1. - lightAt(vWorld + vec3(0., 0., 0.02))) * 0.43);
   oCol = vec4(c, vCol.a); oId = vec4(0.); oN = vec4(0.5, 0.5, 1., 0.); oV = velo(); }`;
@@ -423,8 +492,9 @@ layout(location=0) out vec4 oCol; layout(location=1) out vec4 oId; layout(locati
 vec4 velo() { vec2 d = (vCur.xy / vCur.w - vPrev.xy / vPrev.w) * 0.5 * uSize; return vec4(clamp(d / 128. + 0.5, 0., 1.), 0., 1.); }
 void main() { vec3 n = normalize(vN); if (dot(n, uEye) < 0.) n = -n;
   vec3 dp1 = dFdx(vWorld), dp2 = dFdy(vWorld); vec2 du1 = dFdx(vUV), du2 = dFdy(vUV); vec3 a = cross(dp2, n), b = cross(n, dp1), T = a * du1.x + b * du2.x, B = a * du1.y + b * du2.y;   /* the surface's own axes from the picture's, per pixel */
-  float k = inversesqrt(max(1e-12, max(dot(T, T), dot(B, B)))); vec3 tn = texture(uPN, vUV).xyz * 2. - 1.; vec3 nw = normalize(T * k * tn.x + B * k * tn.y * -1. + n * tn.z); if (dot(nw, uEye) < 0.) nw = n;
-  vec3 alb = texture(uPA, vUV).rgb, arm = texture(uPR, vUV).rgb; float sh = lightAt(vWorld + n * 0.02), ao = rtao(vWorld, nw) * mix(1., arm.r, 0.8);
+  float k = inversesqrt(max(1e-12, max(dot(T, T), dot(B, B)))), tb = uLook == 3 ? 1.5 : 0.; vec3 tn = texture(uPN, vUV, tb).xyz * 2. - 1.; if (uLook == 3) tn.xy *= 0.3; vec3 nw = normalize(T * k * tn.x + B * k * tn.y * -1. + n * tn.z); if (dot(nw, uEye) < 0.) nw = n;
+  vec3 alb = texture(uPA, vUV, tb).rgb, arm = texture(uPR, vUV).rgb; float sh = lightAt(vWorld + n * 0.02), ao = rtao(vWorld, nw) * mix(1., arm.r, 0.8);
+  if (uLook == 3) { vec3 col = arm.b > 0.5 && arm.g < 0.35 ? toonChrome(alb, nw, uEye, uSun, sh) : toonLight(posterC(alb, 6.), nw, uSun, sh, ao, vWorld); oCol = vec4(clamp(col, 0., 1.), 1.); oId = vec4(uObj, 0., uOutline / 8.); oN = vec4(nw * 0.5 + 0.5, 0.); oV = velo(); return; }   /* toon */
   vec3 lit = pbrX(alb, nw, uEye, uSun, sh, arm.b, clamp(arm.g, 0.06, 1.), 0., ao, 0.) + lampsAt(vWorld, nw) * toLin(alb) / 3.14159;
   oCol = vec4(present(lit), 1.); oId = vec4(uObj, 0., uOutline / 8.); oN = vec4(nw * 0.5 + 0.5, arm.b > 0.5 ? 1. - arm.g : 0.); oV = velo(); }`;
 const DEPTHI_VS = `#version 300 es

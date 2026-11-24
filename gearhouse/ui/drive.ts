@@ -131,14 +131,14 @@ const POPUP = new Set(['diablo', 'nsx', 'f355', 'f355f1']), lampMeshes = new Map
 function lampsUp(id: string, base: Mesh): Mesh { let m = lampMeshes.get(base); if (!m) { const e = MESH_CARS.find(c => c.id === id), f = e?.mesh as ((spin?: number, lamps?: number) => Mesh) | undefined; m = f ? renumber(f(0, 1), myNum) : base; lampMeshes.set(base, m); } return m; }
 function wingUp(id: string, base: Mesh): Mesh {   /* a design's mesh takes the lamps second, its active wing fourth (render/car/design.ts) */
   let m = wingMeshes.get(base); if (!m) { const des = DESIGN && id === DESIGN.id ? DESIGN.d : null, e = MESH_CARS.find(c => c.id === id), f = e?.mesh as ((spin?: number, wing?: number) => Mesh) | undefined;
-    m = des ? renumber(designMesh(des, 0, 0, 1), myNum) : f ? renumber(f(0, 1), myNum) : base; wingMeshes.set(base, m); } return m; }
+    m = des ? renumber(designMesh(des, 0, 0, 1, 1), myNum) : f ? renumber(f(0, 1), myNum) : base; wingMeshes.set(base, m); } return m; }
 // ---- a design from the parts builder (docs/systems/98, B4): ?design=<the design as base64url JSON>, or ?design=stored
 // (the builder's last test drive kept in this browser). Its physics made from it (race/design.ts), its body from the car
 // kit (render/car/design.ts, pop-up lamps on both bases); offered first in the car list and chosen; its runs (its best
 // lap at each track, the top speed it reached) recorded under the design for the builder's readouts ----
 const STORE: KeyStore | null = (() => { try { return localStorage; } catch { return null; } })();
 /** a design made a car of the lists (the same design again: its car replaced) */
-function addDesign(d: Design): { d: Design; id: string } { const spec = designSpec(d), mc = { id: spec.id, name: d.name, mesh: (spin?: number, lamps?: number) => designMesh(d, spin, lamps) }; addRaceCar(spec);
+function addDesign(d: Design): { d: Design; id: string } { const spec = designSpec(d), mc = { id: spec.id, name: d.name, mesh: (spin?: number, lamps?: number) => designMesh(d, spin, lamps, 0, 1) }   /* the powertrain at detail 1: the driving scene kept light (the builder draws 2) */; addRaceCar(spec);
   const i = MESH_CARS.findIndex(c => c.id === spec.id); if (i >= 0) MESH_CARS[i] = mc; else MESH_CARS.push(mc);
   EXP_ENGINE[spec.id] = { kind: 'ohv', layout: d.engine.layout }; POPUP.add(spec.id); carId = spec.id; return { d, id: spec.id }; }
 let DESIGN: { d: Design; id: string } | null = H.design !== undefined ? (H.design ? addDesign(H.design) : null) : (() => { let q: string | null = null; try { q = new URLSearchParams(location.search).get('design'); if (q === 'stored' || q === '') q = STORE?.getItem(KEYS.testDrive) ?? null; } catch { q = null; }

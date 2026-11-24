@@ -192,7 +192,8 @@ const OBJ_FS = `#version 300 es
 precision highp float;
 ${LIGHT}
 in vec3 vWorld, vObj, vSN; in vec4 vLamp; flat in vec3 vLAx, vLRt, vLUp; flat in vec3 vN, vObjN, vCol; flat in float vGloss, vKind, vPart;
-uniform mat4 uModel; uniform vec3 uEye, uSun; uniform vec2 uObj; uniform vec3 uWear; uniform float uObjZ, uCarH;
+uniform mat4 uModel; uniform vec3 uEyeD, uSun; uniform vec4 uCamP; vec3 uEye;   /* toward the eye: one direction for the orthographic camera, from each point for the perspective one (set first in main) */
+ uniform vec2 uObj; uniform vec3 uWear; uniform float uObjZ, uCarH;
 // ---- the 2D art laid on (review 105, PBR step 4): the part model's views of this car, each face taking the view it looks along ----
 uniform sampler2D uArt, uArtLut; uniform int uArtOn; uniform highp int uWheel; uniform float uArtMM, uArtC; uniform vec4 uArtR[5]; uniform vec2 uArtO[5];
 vec4 artAt(int v, float h, float vv) { vec4 r = uArtR[v]; vec2 px = vec2(uArtO[v].x + h / uArtMM, uArtO[v].y - vv / uArtMM);
@@ -255,7 +256,7 @@ vec3 lampFace(vec2 uv, float flag, vec3 A, vec3 Rt, vec3 Up, vec3 nG, float sh) 
 vec3 toonLamp(vec2 uv, float flag) { float r = length(uv), w = clamp(fwidth(r), 0.01, 0.2), glow = flag < 1.5 ? uLampOn : max(uLampOn * 0.35, uBrake);
   vec3 c = mix(flag < 1.5 ? vec3(0.74, 0.8, 0.86) * (0.3 + 0.7 * uDay) : vec3(0.6, 0.07, 0.06) * (0.35 + 0.65 * uDay), flag < 1.5 ? vec3(1., 0.97, 0.84) : vec3(1., 0.32, 0.22), glow);
   c *= 1. - 0.3 * smoothstep(0.82 - w, 0.82 + w, r); float g = length(uv - vec2(-0.3, 0.34)); return mix(c, vec3(1.), 1. - smoothstep(0.17 - w, 0.17 + w, g)); }
-void main() {
+void main() { uEye = uCamP.w > 0.5 ? normalize(uCamP.xyz - vWorld) : uEyeD;
   if (uMode == 1) { oCol = uSil; oId = vec4(0.); oN = vec4(0.); oV = velo(); return; }
   vec3 n = vN; if (dot(n, uEye) < 0.) n = -n;
   vec3 base = vCol; int kind = int(vKind + 0.5);
@@ -370,7 +371,7 @@ void main() { vWorld = aPos; vCol = aCol; vFlag = aFlag; vTrk = aTrk; gl_Positio
 const GROUND_FS = `#version 300 es
 precision highp float;
 ${LIGHT}
-in vec3 vWorld; in vec4 vCol; flat in float vFlag; uniform float uCell; uniform vec3 uSun, uEye; in vec3 vTrk;
+in vec3 vWorld; in vec4 vCol; flat in float vFlag; uniform float uCell; uniform vec3 uSun, uEyeD; uniform vec4 uCamP; vec3 uEye; in vec3 vTrk;
 /* ---- the concrete of the period's speed bowls (review 122), drawn by each point's place on the track (s along, o across,
    metres): laid in bays (nine strips across, a joint every uJoint m), each bay its own shade and finish (poured on its
    own day), a little proud of or sunk below its neighbour; the joints sealed with tar, the tar smeared wider over them
@@ -451,7 +452,7 @@ Conc concrete(float s, float o) { Conc C; C.tint = vec3(1.); C.rough = 0.9; C.h 
 layout(location=0) out vec4 oCol; layout(location=1) out vec4 oId; layout(location=2) out vec4 oN; layout(location=3) out vec4 oV; in vec4 vCur, vPrev; uniform vec2 uSize;
 vec4 velo() { vec2 d = (vCur.xy / vCur.w - vPrev.xy / vPrev.w) * 0.5 * uSize; return vec4(clamp(d / 128. + 0.5, 0., 1.), 0., 1.); }   /* pixels moved since the last frame, packed */   // oN: the normal and how mirror-like (for the traced reflections)
 float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
-void main() { vec3 c = vCol.rgb;
+void main() { uEye = uCamP.w > 0.5 ? normalize(uCamP.xyz - vWorld) : uEyeD; vec3 c = vCol.rgb;
   if (vFlag > 0.5 && uLook == 0) { vec2 cell = floor(vWorld.xy / vec2(uCell * 2., uCell)); float h = hash(cell); if (h > 0.955) c = vec3(107., 130., 83.) / 255.; else if (h > 0.91) c = vec3(83., 104., 63.) / 255.; }
   bool verge = vTrk.z > 1.5; bool conc = vTrk.z > 0.5 && !verge; Conc C; bool photo = false; vec3 pa = vec3(0.), pn = vec3(0., 0., 1.); float pao = 1., prough = 0.9;
   if (conc) { C = concrete(vTrk.x, vTrk.y);
@@ -506,10 +507,10 @@ void main() { mat4 M = mat4(aM0, aM1, aM2, aM3); vec4 w = M * vec4(aPos, 1.); vW
 const PROP_FS = `#version 300 es
 precision highp float;
 ${LIGHT}
-in vec3 vWorld, vN; in vec2 vUV; in vec4 vCur, vPrev; uniform vec3 uSun, uEye; uniform vec2 uSize, uObj; uniform float uOutline; uniform highp sampler2D uPA, uPN, uPR;
+in vec3 vWorld, vN; in vec2 vUV; in vec4 vCur, vPrev; uniform vec3 uSun, uEyeD; uniform vec4 uCamP; vec3 uEye; uniform vec2 uSize, uObj; uniform float uOutline; uniform highp sampler2D uPA, uPN, uPR;
 layout(location=0) out vec4 oCol; layout(location=1) out vec4 oId; layout(location=2) out vec4 oN; layout(location=3) out vec4 oV;
 vec4 velo() { vec2 d = (vCur.xy / vCur.w - vPrev.xy / vPrev.w) * 0.5 * uSize; return vec4(clamp(d / 128. + 0.5, 0., 1.), 0., 1.); }
-void main() { vec3 n = normalize(vN); if (dot(n, uEye) < 0.) n = -n;
+void main() { uEye = uCamP.w > 0.5 ? normalize(uCamP.xyz - vWorld) : uEyeD; vec3 n = normalize(vN); if (dot(n, uEye) < 0.) n = -n;
   vec3 dp1 = dFdx(vWorld), dp2 = dFdy(vWorld); vec2 du1 = dFdx(vUV), du2 = dFdy(vUV); vec3 a = cross(dp2, n), b = cross(n, dp1), T = a * du1.x + b * du2.x, B = a * du1.y + b * du2.y;   /* the surface's own axes from the picture's, per pixel */
   float k = inversesqrt(max(1e-12, max(dot(T, T), dot(B, B)))), tb = uLook == 3 ? 1.5 : 0.; vec3 tn = texture(uPN, vUV, tb).xyz * 2. - 1.; if (uLook == 3) tn.xy *= 0.3; vec3 nw = normalize(T * k * tn.x + B * k * tn.y * -1. + n * tn.z); if (dot(nw, uEye) < 0.) nw = n;
   vec3 alb = texture(uPA, vUV, tb).rgb, arm = texture(uPR, vUV).rgb; float sh = lightAt(vWorld + n * 0.02), ao = rtao(vWorld, nw) * mix(1., arm.r, 0.8);
@@ -843,7 +844,7 @@ export class LiveRenderer {
     VP[0] = rx[0]! * 2 * k / v.W; VP[4] = rx[1]! * 2 * k / v.W; VP[12] = Math.round(v.W / 2 - dot(c, rx) * k) * 2 / v.W - 1;
     VP[1] = up[0]! * 2 * k / v.H; VP[5] = up[1]! * 2 * k / v.H; VP[9] = up[2]! * 2 * k / v.H; VP[13] = 1 - 2 * Math.round(v.H * v.cy + dot(c, up) * k) / v.H;
     VP[2] = vd[0]! / R; VP[6] = vd[1]! / R; VP[10] = vd[2]! / R; VP[14] = -dot(c, vd) / R; VP[15] = 1; }
-    const eye = [-vd[0]!, -vd[1]!, -vd[2]!];
+    const eye = [-vd[0]!, -vd[1]!, -vd[2]!], eyeTo = (p: WebGLProgram) => { gl.uniform3fv(this.loc(p, 'uEyeD'), eye); eyeTo(p);   /* a shader with the one direction only (the woods') */ gl.uniform4f(this.loc(p, 'uCamP'), pv ? pv.e[0] : 0, pv ? pv.e[1] : 0, pv ? pv.e[2] : 0, pv ? 1 : 0); };
     if (this.prevCam && Math.hypot(v.x - this.prevCam[0], v.y - this.prevCam[1]) > 15) { this.prevVP = null; this.prevM.clear(); }   /* a cut (the car put back, a new shot): no smear from the jump */ this.prevCam = [v.x, v.y];
     // ---- the sun's view for the shadows: around the camera's target, as far as the picture reaches ----
     const reach = pv ? 75 : Math.min(160, Math.hypot(v.W, v.H / Math.max(0.2, SP)) * v.mm / 2000 + 12), lz = SUN_W.map(x => -x), lx0 = [lz[1]!, -lz[0]!, 0], ll = Math.hypot(lx0[0]!, lx0[1]!), lx = [lx0[0]! / ll, lx0[1]! / ll, 0];
@@ -883,7 +884,7 @@ export class LiveRenderer {
     const shadowTo = (p: WebGLProgram) => { texTo(p); boxTo(p); { const S = o.hdri !== false ? this.sky : null; gl.uniform1i(this.loc(p, 'uSkyOn'), S ? 1 : 0); gl.activeTexture(gl.TEXTURE9); gl.bindTexture(gl.TEXTURE_2D_ARRAY, S?.tex ?? null); gl.uniform1i(this.loc(p, 'uSky'), 9); if (S) { gl.uniform1f(this.loc(p, 'uSkyR'), S.range); gl.uniform3fv(this.loc(p, 'uSH'), S.sh); } } gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, this.sTex); gl.uniform1i(this.loc(p, 'uShadow'), 1); gl.uniformMatrix4fv(this.loc(p, 'uLight'), false, LV); };
     gl.useProgram(this.ground); lampsTo(this.ground); { const g = this.ground, t = this.trackU; gl.uniform1f(this.loc(g, 'uLen'), t.len); gl.uniform1f(this.loc(g, 'uTW'), t.w); gl.uniform1f(this.loc(g, 'uJoint'), t.joint); gl.uniform1f(this.loc(g, 'uStart'), t.start); gl.uniform1i(this.loc(g, 'uLineOn'), this.lineTex ? 1 : 0); gl.activeTexture(gl.TEXTURE12); gl.bindTexture(gl.TEXTURE_2D, this.lineTex ?? this.blank); gl.uniform1i(this.loc(g, 'uLine'), 12);
       gl.uniform1i(this.loc(g, 'uGridN'), this.digits ? this.gridN : 0); gl.activeTexture(gl.TEXTURE0 + 16); gl.bindTexture(gl.TEXTURE_2D, this.digits ?? this.blank); gl.uniform1i(this.loc(g, 'uDigits'), 16);
-      const G = this.gTex; gl.uniform1i(this.loc(g, 'uGTex'), G && o.photoGround !== false ? 1 : 0); if (G) gl.uniform1fv(this.loc(g, 'uGSize'), G.size); ([[G?.alb ?? null, 'uGAlb', 13], [G?.nor ?? null, 'uGNor', 14], [G?.pack ?? null, 'uGPack', 15]] as const).forEach(([t, nm, u]) => { gl.activeTexture(gl.TEXTURE0 + u); gl.bindTexture(gl.TEXTURE_2D_ARRAY, t); gl.uniform1i(this.loc(g, nm), u); }); } gl.uniform1f(this.loc(this.ground, 'uDay'), o.day ?? 1); gl.uniformMatrix4fv(this.loc(this.ground, 'uVP'), false, VP); const hdrOn = this.hdr && (o.look ?? 0) === 2 ? 1 : 0; gl.uniform1i(this.loc(this.ground, 'uHDRo'), hdrOn); gl.uniform1f(this.loc(this.ground, 'uSpecK'), 1); gl.uniformMatrix4fv(this.loc(this.ground, 'uPrevVP'), false, this.prevVP ?? VP); gl.uniform2f(this.loc(this.ground, 'uSize'), v.W, v.H); gl.uniform1i(this.loc(this.ground, 'uLook'), o.look ?? 0); gl.uniform1f(this.loc(this.ground, 'uTexK'), o.texK ?? 1); gl.uniform1f(this.loc(this.ground, 'uLightK'), o.lightK ?? 1); gl.uniform3fv(this.loc(this.ground, 'uSun'), SUN_W); gl.uniform3fv(this.loc(this.ground, 'uEye'), eye); gl.uniform1f(this.loc(this.ground, 'uCell'), Math.max(0.03, v.mm / 1000)); gl.uniform1f(this.loc(this.ground, 'uBias'), 0); shadowTo(this.ground); toonTo(this.ground);
+      const G = this.gTex; gl.uniform1i(this.loc(g, 'uGTex'), G && o.photoGround !== false ? 1 : 0); if (G) gl.uniform1fv(this.loc(g, 'uGSize'), G.size); ([[G?.alb ?? null, 'uGAlb', 13], [G?.nor ?? null, 'uGNor', 14], [G?.pack ?? null, 'uGPack', 15]] as const).forEach(([t, nm, u]) => { gl.activeTexture(gl.TEXTURE0 + u); gl.bindTexture(gl.TEXTURE_2D_ARRAY, t); gl.uniform1i(this.loc(g, nm), u); }); } gl.uniform1f(this.loc(this.ground, 'uDay'), o.day ?? 1); gl.uniformMatrix4fv(this.loc(this.ground, 'uVP'), false, VP); const hdrOn = this.hdr && (o.look ?? 0) === 2 ? 1 : 0; gl.uniform1i(this.loc(this.ground, 'uHDRo'), hdrOn); gl.uniform1f(this.loc(this.ground, 'uSpecK'), 1); gl.uniformMatrix4fv(this.loc(this.ground, 'uPrevVP'), false, this.prevVP ?? VP); gl.uniform2f(this.loc(this.ground, 'uSize'), v.W, v.H); gl.uniform1i(this.loc(this.ground, 'uLook'), o.look ?? 0); gl.uniform1f(this.loc(this.ground, 'uTexK'), o.texK ?? 1); gl.uniform1f(this.loc(this.ground, 'uLightK'), o.lightK ?? 1); gl.uniform3fv(this.loc(this.ground, 'uSun'), SUN_W); eyeTo(this.ground); gl.uniform1f(this.loc(this.ground, 'uCell'), Math.max(0.03, v.mm / 1000)); gl.uniform1f(this.loc(this.ground, 'uBias'), 0); shadowTo(this.ground); toonTo(this.ground);
     if (this.groundVao) { gl.bindVertexArray(this.groundVao); gl.drawArrays(gl.TRIANGLES, 0, this.groundN); }
     if (this.fenceVao && this.fenceN) { gl.bindVertexArray(this.fenceVao); gl.drawArrays(gl.TRIANGLES, 0, this.fenceN); }
     // skid marks: dark patches on the concrete, blended, nothing else written
@@ -891,7 +892,7 @@ export class LiveRenderer {
       S.forEach((m, i) => { const q = [[-r, -r], [r, -r], [r, r], [-r, -r], [r, r], [-r, r]]; q.forEach(([dx, dy], j) => f.set([m.x + dx!, m.y + dy!, m.z + 0.01, 30 / 255, 28 / 255, 26 / 255, m.a, 0], (i * 6 + j) * 8)); });
       gl.bindBuffer(gl.ARRAY_BUFFER, this.skidBuf); gl.bufferData(gl.ARRAY_BUFFER, f, gl.DYNAMIC_DRAW); gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false); gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.NONE, gl.NONE, gl.NONE]);
       gl.uniform1f(this.loc(this.ground, 'uBias'), 0.00002); gl.bindVertexArray(this.skidVao); gl.drawArrays(gl.TRIANGLES, 0, S.length * 6); gl.disable(gl.BLEND); gl.depthMask(true); gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.COLOR_ATTACHMENT1, gl.COLOR_ATTACHMENT2, gl.COLOR_ATTACHMENT3]); }
-    gl.useProgram(this.obj); lampsTo(this.obj); gl.uniform1f(this.loc(this.obj, 'uDay'), o.day ?? 1); gl.uniformMatrix4fv(this.loc(this.obj, 'uVP'), false, VP); gl.uniform1i(this.loc(this.obj, 'uHDRo'), hdrOn); gl.uniformMatrix4fv(this.loc(this.obj, 'uPrevVP'), false, this.prevVP ?? VP); gl.uniform2f(this.loc(this.obj, 'uSize'), v.W, v.H); gl.uniform1f(this.loc(this.obj, 'uSpecK'), o.reflK ?? 1); gl.uniform1f(this.loc(this.obj, 'uDeep'), o.deep ?? 1); gl.uniform1i(this.loc(this.obj, 'uLook'), o.look ?? 0); gl.uniform1f(this.loc(this.obj, 'uTexK'), o.texK ?? 1); gl.uniform1f(this.loc(this.obj, 'uLightK'), o.lightK ?? 1); gl.uniform3fv(this.loc(this.obj, 'uEye'), eye); gl.uniform3fv(this.loc(this.obj, 'uSun'), SUN_W); gl.uniform1f(this.loc(this.obj, 'uGlass'), o.glass ?? 0.8); shadowTo(this.obj); toonTo(this.obj); gl.uniform1i(this.loc(this.obj, 'uIsCar'), 0);
+    gl.useProgram(this.obj); lampsTo(this.obj); gl.uniform1f(this.loc(this.obj, 'uDay'), o.day ?? 1); gl.uniformMatrix4fv(this.loc(this.obj, 'uVP'), false, VP); gl.uniform1i(this.loc(this.obj, 'uHDRo'), hdrOn); gl.uniformMatrix4fv(this.loc(this.obj, 'uPrevVP'), false, this.prevVP ?? VP); gl.uniform2f(this.loc(this.obj, 'uSize'), v.W, v.H); gl.uniform1f(this.loc(this.obj, 'uSpecK'), o.reflK ?? 1); gl.uniform1f(this.loc(this.obj, 'uDeep'), o.deep ?? 1); gl.uniform1i(this.loc(this.obj, 'uLook'), o.look ?? 0); gl.uniform1f(this.loc(this.obj, 'uTexK'), o.texK ?? 1); gl.uniform1f(this.loc(this.obj, 'uLightK'), o.lightK ?? 1); eyeTo(this.obj); gl.uniform3fv(this.loc(this.obj, 'uSun'), SUN_W); gl.uniform1f(this.loc(this.obj, 'uGlass'), o.glass ?? 0.8); shadowTo(this.obj); toonTo(this.obj); gl.uniform1i(this.loc(this.obj, 'uIsCar'), 0);
     gl.uniform1i(this.loc(this.obj, 'uDecTex'), 2);
     { const B = o.photoGround !== false ? this.bTex : null; gl.uniform1i(this.loc(this.obj, 'uBTex'), B ? 1 : 0); if (B) { gl.uniform1fv(this.loc(this.obj, 'uBSize'), B.size); gl.uniform3fv(this.loc(this.obj, 'uBMean'), B.mean); }
       ([[B?.alb ?? null, 'uBAlb', 20], [B?.nor ?? null, 'uBNor', 21], [B?.pack ?? null, 'uBPack', 22]] as const).forEach(([t, nm, u]) => { gl.activeTexture(gl.TEXTURE0 + u); gl.bindTexture(gl.TEXTURE_2D_ARRAY, t); gl.uniform1i(this.loc(this.obj, nm), u); }); }
@@ -909,13 +910,13 @@ export class LiveRenderer {
     const outlineC = toon ? Math.max(1, Math.min(5, Math.round(3.2 * tw))) : Math.max(1, Math.min(3, Math.round(3 * 50 / v.mm))), outlineP = toon ? Math.max(1, Math.min(3, Math.round(2 * tw))) : Math.max(1, Math.min(2, Math.round(2 * 50 / v.mm)));
     gl.uniform3f(this.loc(this.obj, 'uWear'), 0, 0, 0); for (const p of ps) { objU(p.outline ?? outlineP); draw(p.g.body, (p.m ?? placeMesh(p.g.len, p.x, p.y, p.z, p.h)), undefined, p.key); }
     if (this.propModels.size && o.props !== false) { const P = this.propP; gl.useProgram(P); lampsTo(P); gl.uniform1f(this.loc(P, 'uDay'), o.day ?? 1); gl.uniformMatrix4fv(this.loc(P, 'uVP'), false, VP); gl.uniform1i(this.loc(P, 'uHDRo'), hdrOn); gl.uniformMatrix4fv(this.loc(P, 'uPrevVP'), false, this.prevVP ?? VP); gl.uniform2f(this.loc(P, 'uSize'), v.W, v.H);
-      gl.uniform1f(this.loc(P, 'uSpecK'), o.reflK ?? 1); gl.uniform1f(this.loc(P, 'uDeep'), o.deep ?? 1); gl.uniform1i(this.loc(P, 'uLook'), Math.max(1, o.look ?? 0)); gl.uniform1f(this.loc(P, 'uTexK'), o.texK ?? 1); gl.uniform1f(this.loc(P, 'uLightK'), o.lightK ?? 1); gl.uniform3fv(this.loc(P, 'uEye'), eye); gl.uniform3fv(this.loc(P, 'uSun'), SUN_W); shadowTo(P); toonTo(P);
+      gl.uniform1f(this.loc(P, 'uSpecK'), o.reflK ?? 1); gl.uniform1f(this.loc(P, 'uDeep'), o.deep ?? 1); gl.uniform1i(this.loc(P, 'uLook'), Math.max(1, o.look ?? 0)); gl.uniform1f(this.loc(P, 'uTexK'), o.texK ?? 1); gl.uniform1f(this.loc(P, 'uLightK'), o.lightK ?? 1); eyeTo(P); gl.uniform3fv(this.loc(P, 'uSun'), SUN_W); shadowTo(P); toonTo(P);
       gl.uniform1f(this.loc(P, 'uOutline'), outlineP);
       for (const m of this.propModels.values()) { if (!m.count) continue; gl.uniform2f(this.loc(P, 'uObj'), (id & 255) / 255, ((id >> 8) & 255) / 255); id++; ([[m.alb, 'uPA', 17], [m.nor, 'uPN', 18], [m.arm, 'uPR', 19]] as const).forEach(([t, nm, u]) => { gl.activeTexture(gl.TEXTURE0 + u); gl.bindTexture(gl.TEXTURE_2D, t); gl.uniform1i(this.loc(P, nm), u); });
         gl.bindVertexArray(m.vao); gl.drawElementsInstanced(gl.TRIANGLES, m.n, gl.UNSIGNED_INT, 0, m.count); }
       gl.useProgram(this.obj); }
     if (W) { W.draw((P, ow) => { gl.useProgram(P); lampsTo(P); gl.uniform1f(this.loc(P, 'uDay'), o.day ?? 1); gl.uniformMatrix4fv(this.loc(P, 'uVP'), false, VP); gl.uniform1i(this.loc(P, 'uHDRo'), hdrOn); gl.uniformMatrix4fv(this.loc(P, 'uPrevVP'), false, this.prevVP ?? VP); gl.uniform2f(this.loc(P, 'uSize'), v.W, v.H);   /* the woods (review 181) */
-        gl.uniform1i(this.loc(P, 'uLook'), Math.max(1, o.look ?? 0)); gl.uniform1f(this.loc(P, 'uLightK'), o.lightK ?? 1); gl.uniform1f(this.loc(P, 'uSpecK'), o.reflK ?? 1); gl.uniform3fv(this.loc(P, 'uEye'), eye); gl.uniform3fv(this.loc(P, 'uSun'), SUN_W); shadowTo(P); toonTo(P);
+        gl.uniform1i(this.loc(P, 'uLook'), Math.max(1, o.look ?? 0)); gl.uniform1f(this.loc(P, 'uLightK'), o.lightK ?? 1); gl.uniform1f(this.loc(P, 'uSpecK'), o.reflK ?? 1); eyeTo(P); gl.uniform3fv(this.loc(P, 'uSun'), SUN_W); shadowTo(P); toonTo(P);
         gl.uniform1f(this.loc(P, 'uOutline'), ow); gl.uniform2f(this.loc(P, 'uObj'), (id & 255) / 255, ((id >> 8) & 255) / 255); id++; }, pv ? pv.e : [v.x, v.y, v.z]); gl.useProgram(this.obj); }
     // the cars a thing hides: their light outline first, tested against what stands before them (each pixel once), then the cars over it
     gl.uniform1i(this.loc(this.obj, 'uMode'), 1); gl.depthFunc(gl.GREATER); gl.depthMask(false); gl.enable(gl.STENCIL_TEST); gl.stencilFunc(gl.EQUAL, 0, 0xff); gl.stencilOp(gl.KEEP, gl.KEEP, gl.INCR);

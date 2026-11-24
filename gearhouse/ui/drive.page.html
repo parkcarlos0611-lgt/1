@@ -35,16 +35,19 @@
   kbd { font: inherit; border: 1px solid var(--line); border-radius: 3px; padding: 0 4px; background: var(--panel); }
   .pad { --b: clamp(44px, 13vw, 72px); position: absolute; inset: auto 0 0 0; display: none; justify-content: space-between; align-items: flex-end; padding: 6px; gap: 4px; pointer-events: none; }
   .pad .side, .pad .mid { display: flex; gap: 6px; pointer-events: auto; }
-  .pad .mid { flex-direction: row; gap: 6px; position: absolute; right: 6px; bottom: calc(var(--b) * 1.9 + 16px); }   /* review 169: the gear buttons above the pedals, the bottom middle left for the gauges */
+  .pad .mid { flex-direction: row; gap: 6px; position: absolute; right: 6px; bottom: calc(var(--b) * 2.5 + 16px); }   /* review 169: the gear buttons above the pedals, the bottom middle left for the gauges */
   .pad button { width: var(--b); height: var(--b); border-radius: 50%; border: 2px solid rgba(255,255,255,0.7); background: rgba(30,28,24,0.42); color: #fff; font: 600 0.95rem var(--body); line-height: 1; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
   .pad button.small { width: calc(var(--b) * 0.55); height: calc(var(--b) * 0.55); font-size: 0.75rem; }
-  .pad button.gas, .pad button.brake { font-size: 1rem; width: calc(var(--b) * 1.45); height: calc(var(--b) * 1.9); border-radius: 18px; }   /* review 169: big pedals */
+  .pad button.gas, .pad button.brake { font-size: 1rem; width: calc(var(--b) * 1.45); height: calc(var(--b) * 2.5); border-radius: 18px; position: relative; overflow: hidden; display: flex; align-items: flex-start; justify-content: center; padding-top: 10px; }   /* review 169: big pedals; alpha 0.12: upright, a throttle slid along */
+  .pad .pedal i { position: absolute; left: 0; right: 0; bottom: 0; height: 0; background: rgba(140,230,120,0.55); pointer-events: none; }   /* the pedal's opening: filled from the bottom as far as the finger is */
+  .pad .pedal.brake i { background: rgba(255,120,100,0.55); } .pad .pedal span { position: relative; pointer-events: none; }
+  .pad .pedal::after { content: ''; position: absolute; left: 18%; right: 18%; bottom: 8%; top: 30%; pointer-events: none; background: repeating-linear-gradient(transparent 0 9px, rgba(255,255,255,0.28) 9px 11px); }   /* the scale's ticks */
   .pad .wheel { --w: calc(var(--b) * 2.3); width: var(--w); height: var(--w); border-radius: 50%; border: calc(var(--w) * 0.09) solid rgba(30,28,24,0.6); box-shadow: 0 0 0 2px rgba(255,255,255,0.7) inset, 0 0 0 2px rgba(255,255,255,0.7); background: rgba(30,28,24,0.18); position: relative; touch-action: none; pointer-events: auto; transform: rotate(var(--a, 0deg)); }
   .pad .wheel i { position: absolute; left: 8%; right: 8%; top: 46%; height: 8%; background: rgba(30,28,24,0.6); border-radius: 4px; }
   .pad .wheel b { position: absolute; left: 46%; width: 8%; top: 50%; bottom: 8%; background: rgba(30,28,24,0.6); border-radius: 4px; }
   .pad .wheel::after { content: ''; position: absolute; left: 50%; top: -2px; width: 6px; height: 14%; margin-left: -3px; background: #e2574c; border-radius: 3px; }
   .pad button.gas { background: rgba(60,120,60,0.5); } .pad button.brake { background: rgba(150,50,40,0.5); }
-  .pad button.on { background: rgba(255,255,255,0.45); color: #222; }
+  .pad button.on { background: rgba(255,255,255,0.45); color: #222; } .pad .pedal.on { background: rgba(30,28,24,0.5); color: #fff; }
   @media (pointer: coarse) { .pad { display: flex; } .keys-help { display: none; } .mini { width: 92px; height: 92px; } }
   body.touch .pad { display: flex; }
   .btn { font: inherit; padding: 8px 14px; border: 1px solid var(--line); border-radius: 4px; background: var(--bg); color: var(--ink); cursor: pointer; }
@@ -63,7 +66,7 @@
   .note { font-size: 0.8rem; color: var(--soft); line-height: 1.5; margin: 0; }
   @media (pointer: coarse) and (orientation: landscape) { .hud { font-size: 0.7rem; } .hud b { font-size: 1.1rem; } }
   .screen { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: #111; line-height: 0; overflow: hidden; }
-  .setbtn { right: 48px; }
+  .setbtn { right: 48px; } .cambtn { right: 90px; font: 600 0.9rem var(--display); }
   .mini { top: 48px; }
   .lcol { position: absolute; left: 8px; top: 52px; max-width: min(60ch, 62vw); display: grid; gap: 6px; justify-items: start; pointer-events: none; z-index: 2; }
   .notes { line-height: 1.4; display: grid; gap: 4px; }
@@ -106,12 +109,12 @@
   .dials h2 { font-size: 0.8rem; font-weight: 600; margin: 4px 0 0; color: var(--ink); }
 </style>
 <div class="screen"><div class="hud"><span><b id="spd">0</b> km/h</span><span>기어 <b id="gear">1</b></span><span><span class="bar"><span id="rpmbar"></span></span> <span id="rpm">0</span> rpm</span><span><span id="lap">-</span></span><span><span id="last">-</span></span><span><span id="best">-</span></span><span id="where"></span><span id="heat" class="heat"></span></div>
-  <button type="button" id="fs" class="fsbtn" aria-label="전체화면">⛶</button><button type="button" id="setbtn" class="fsbtn setbtn" aria-label="설정" aria-expanded="false" aria-controls="drawer">⚙</button><canvas id="mini" class="mini" width="150" height="150" aria-label="미니맵"></canvas>
+  <button type="button" id="fs" class="fsbtn" aria-label="전체화면">⛶</button><button type="button" id="setbtn" class="fsbtn setbtn" aria-label="설정" aria-expanded="false" aria-controls="drawer">⚙</button><button type="button" id="cambtn" class="fsbtn cambtn" aria-label="카메라 바꾸기 (C)" title="카메라 바꾸기 (C)">C</button><canvas id="mini" class="mini" width="150" height="150" aria-label="미니맵"></canvas>
   <div class="pedals" id="pedals" aria-hidden="true"><div><i id="gasbar"></i></div><div><i id="brakebar"></i></div></div><canvas id="view" width="768" height="432" aria-label="주행 화면"></canvas>
   <div class="pad" id="pad" aria-label="터치 조작">
     <div class="side"><div class="wheel" id="tw" role="slider" aria-label="핸들 (돌려서 조향)" aria-valuemin="-1" aria-valuemax="1" aria-valuenow="0"><i></i><b></b></div></div>
-    <div class="mid"><button type="button" data-key="q" class="small" aria-label="기어 내림">Q</button><button type="button" data-key="e" class="small" aria-label="기어 올림">E</button><button type="button" data-key="r" class="small" aria-label="트랙으로 복귀">R</button></div>
-    <div class="side"><button type="button" data-key="arrowdown" class="brake" aria-label="브레이크">브레이크</button><button type="button" data-key="arrowup" class="gas" aria-label="가속">가속</button></div>
+    <div class="mid"><button type="button" data-key="c" class="small" aria-label="카메라 바꾸기">C</button><button type="button" data-key="q" class="small" aria-label="기어 내림">Q</button><button type="button" data-key="e" class="small" aria-label="기어 올림">E</button><button type="button" data-key="r" class="small" aria-label="트랙으로 복귀">R</button></div>
+    <div class="side"><button type="button" class="pedal brake" role="slider" aria-valuemin="0" aria-valuemax="1" aria-valuenow="0" aria-label="브레이크 (위로 갈수록 세게)"><i></i><span>브레이크</span></button><button type="button" class="pedal gas" role="slider" aria-valuemin="0" aria-valuemax="1" aria-valuenow="0" aria-label="가속 (위로 갈수록 많이)"><i></i><span>가속</span></button></div>
   </div>
   <div class="lcol"><div id="raceovl" class="raceovl" hidden><table class="stand" aria-label="순위"><tbody id="stand"></tbody></table><div id="mytime" class="mytime"></div></div><div id="pbnote" class="pbnote" aria-live="polite"></div><div class="notes"><div id="msg"></div><div id="bake" class="note"></div></div></div>
   <div id="resmodal" class="resmodal" role="dialog" aria-label="레이스 결과" hidden><div class="resbox"><header><h2 id="restitle">레이스 결과</h2><button type="button" class="close" id="resclose" aria-label="결과 닫기">✕</button></header><div id="restable"></div></div></div></div>
@@ -133,8 +136,8 @@
     <label class="check"><input type="checkbox" id="lamps"> 헤드라이트 켜기 (팝업 램프는 올라옴, 브레이크등은 브레이크를 밟으면)</label>
     <button type="button" id="repair" class="btn">엔진 수리 (연습)</button>
     <label class="check"><input type="checkbox" id="touch"> 화면 버튼 보이기</label>
-    <p class="note keys-help"><kbd>↑</kbd>/<kbd>W</kbd> 가속 · <kbd>↓</kbd>/<kbd>S</kbd> 브레이크 · <kbd>←</kbd><kbd>→</kbd>/<kbd>A</kbd><kbd>D</kbd> 조향 · <kbd>Space</kbd> 핸드브레이크 · 멈춘 채 <kbd>↓</kbd> 길게: 후진<br>수동 변속: <kbd>Q</kbd> 내림 · <kbd>E</kbd> 올림 · <kbd>R</kbd> 트랙으로 복귀<br>카메라: <kbd>,</kbd><kbd>.</kbd> 돌리기 · <kbd>PgUp</kbd><kbd>PgDn</kbd> 높이 · <kbd>-</kbd><kbd>=</kbd> 축소/확대 · <kbd>Home</kbd> 되돌리기 · 설정 <kbd>Tab</kbd></p>
-    <p class="note">휴대폰에서는 화면 아래로 조작합니다: 왼쪽 핸들을 돌려 조향, 오른쪽 브레이크와 가속 페달, 가운데 Q/E 기어(수동일 때)와 R 복귀. 멈춘 채 브레이크를 0.5초 넘게 누르면 후진(R)이 되고, 다시 가속을 누르면 전진합니다.</p>
+    <p class="note keys-help"><kbd>↑</kbd>/<kbd>W</kbd> 가속 · <kbd>↓</kbd>/<kbd>S</kbd> 브레이크 · <kbd>←</kbd><kbd>→</kbd>/<kbd>A</kbd><kbd>D</kbd> 조향 · <kbd>Space</kbd> 핸드브레이크 · 멈춘 채 <kbd>↓</kbd> 길게: 후진<br>수동 변속: <kbd>Q</kbd> 내림 · <kbd>E</kbd> 올림 · <kbd>R</kbd> 트랙으로 복귀<br>카메라: <kbd>,</kbd><kbd>.</kbd> 돌리기 · <kbd>PgUp</kbd><kbd>PgDn</kbd> 높이 · <kbd>-</kbd><kbd>=</kbd> 축소/확대 · <kbd>Home</kbd> 되돌리기 · <kbd>C</kbd> 시점 바꾸기 · <kbd>Shift</kbd>+<kbd>↑</kbd> 반 가속 · 설정 <kbd>Tab</kbd></p>
+    <p class="note">휴대폰에서는 화면 아래로 조작합니다: 왼쪽 핸들을 돌려 조향, 오른쪽 브레이크와 가속 페달(손가락을 올릴수록 더 많이: 아래 끝 0 %, 위 끝 100 %, 떼면 0), 가운데 Q/E 기어(수동일 때)와 R 복귀. 멈춘 채 브레이크를 0.5초 넘게 누르면 후진(R)이 되고, 다시 가속을 누르면 전진합니다.</p>
   </section>
   <section data-tab="race">
     <fieldset><legend>레이스</legend>
@@ -161,11 +164,12 @@
     <p class="note">뱅크 꼭대기 밖으로 나가면 실제처럼 넘어간 것으로 보고 트랙에 다시 올려 둡니다.</p>
   </section>
   <section data-tab="camera">
+    <div class="row"><label for="camview">시점 (<kbd>C</kbd>로 차례로)</label><select id="camview"></select></div>
     <div class="row"><label for="scale">화면 축척</label><select id="scale"><option value="4">4 mm/픽셀 (가까이)</option><option value="6">6 mm/픽셀</option><option value="8">8 mm/픽셀</option><option value="12">12 mm/픽셀</option><option value="16">16 mm/픽셀</option><option value="20">20 mm/픽셀</option><option value="25">25 mm/픽셀</option><option value="30">30 mm/픽셀</option><option value="40">40 mm/픽셀</option><option value="50" selected>50 mm/픽셀</option><option value="65">65 mm/픽셀</option><option value="80">80 mm/픽셀</option><option value="100">100 mm/픽셀</option><option value="130">130 mm/픽셀</option></select></div>
     <div class="row"><label for="pitch">카메라 높이 <span class="val" id="pitchv">30°</span></label><input type="range" id="pitch" min="15" max="85" step="1" value="30"></div>
     <label class="check"><input type="checkbox" id="chase"> 차를 따라 도는 카메라</label>
     <label class="check"><input type="checkbox" id="free"> 자유 카메라 — 화면을 끌어 돌리기(좌우)·높이(위아래), 휠/두 손가락으로 확대·축소, 두 번 눌러 되돌리기</label>
-    <label class="check"><input type="checkbox" id="cine"> 시네마틱 뷰 (<kbd>C</kbd>) — 트랙 옆 카메라, 추격, 높은 시점을 오가며 중계 화면처럼</label>
+    <label class="check"><input type="checkbox" id="cine"> 시네마틱 뷰 — 트랙 옆 카메라, 추격, 높은 시점을 오가며 중계 화면처럼</label>
     <p class="note" id="camv"></p>
   </section>
   <section data-tab="gfx">

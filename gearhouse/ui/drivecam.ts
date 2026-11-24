@@ -1,0 +1,100 @@
+// The drive's cameras (alpha 0.12, the players' "the camera feels cramped"): a perspective chase from behind the car,
+// near or far, the bonnet's view and the driver's seat, beside the older orthographic views (from above, turning with
+// the car, and the cinematic trackside shots). Pure: the drive gives each frame the car's state and a ground height,
+// and gets back an eye, a heading, a tilt and a field of view for the live renderer (render/live/renderer.ts LiveView).
+// Also the touch pedals' mapping (a finger's height on the pedal to its opening) and the cycle of the views.
+import type { Mesh } from '../render/car/mesh';
+
+export type CamView = 'far' | 'near' | 'hood' | 'cabin' | 'cine' | 'top';
+/** the views in the order the C key and the camera button go through them (the cabin only for a car with a seat) */
+export const CAM_VIEWS: readonly { id: CamView; name: string }[] = [
+  { id: 'far', name: '추격 (멀리)' }, { id: 'near', name: '추격 (가까이)' }, { id: 'hood', name: '보닛' }, { id: 'cabin', name: '운전석' },
+  { id: 'cine', name: '시네마틱' }, { id: 'top', name: '위에서 (기존)' }];
+export const CAM_DEFAULT: CamView = 'far';
+export const isCamView = (v: unknown): v is CamView => CAM_VIEWS.some(c => c.id === v);
+/** the perspective views (the rest are the orthographic renderer's own) */
+export const perspective = (v: CamView) => v === 'far' || v === 'near' || v === 'hood' || v === 'cabin';
+/** the next view after v, skipping those the car cannot have */
+export function nextView(v: CamView, ok: (v: CamView) => boolean = () => true): CamView {
+  const i = CAM_VIEWS.findIndex(c => c.id === v); for (let k = 1; k <= CAM_VIEWS.length; k++) { const c = CAM_VIEWS[(i + k) % CAM_VIEWS.length]!.id; if (ok(c)) return c; } return v; }
+
+// ---- the touch pedals ----
+/** a finger's place on an upright pedal as its opening 0..1: the bottom (dead) 0, the top 1, straight between. y is the
+ *  finger's height on the screen (down +), top and h the pedal's; a finger that slides off it holds the end it left by */
+export function pedalValue(y: number, top: number, h: number, dead = 0.08): number {
+  if (!(h > 0)) return 0; const t = (top + h - y) / h; return Math.max(0, Math.min(1, (t - dead) / (1 - 2 * dead))); }
+
+// ---- springs ----
+/** one step of a critically damped spring (natural frequency w, rad/s) from x moving at v toward target: [x, v]. Exact
+ *  for a still target, so it neither overshoots nor goes unstable at a long frame */
+export function spring(x: number, v: number, target: number, w: number, dt: number): [number, number] {
+  const d = x - target, e = Math.exp(-w * dt), a = v + w * d; return [target + (d + a * dt) * e, (v - w * a * dt) * e]; }
+/** the same for an angle: the short way round */
+export function angSpring(x: number, v: number, target: number, w: number, dt: number): [number, number] {
+  const d = Math.atan2(Math.sin(target - x), Math.cos(target - x)); const [y, u] = spring(0, v, d, w, dt); return [x + y, u]; }
+
+// ---- the field of view ----
+/** the vertical half-angle's tangent for a picture of this aspect (width / height): the base vertical angle in a wide
+ *  picture, widened in a tall one so the picture is at least minH degrees across (a phone held upright still shows the
+ *  road beside the car), never past maxV */
+export function fovTan(aspect: number, baseV: number, minH = 62, maxV = 96): number {
+  const t = Math.tan(baseV * Math.PI / 360), tH = Math.tan(minH * Math.PI / 360) / Math.max(0.2, aspect); return Math.min(Math.tan(maxV * Math.PI / 360), Math.max(t, tH)); }
+/** the tilt (degrees down) that puts a point drop metres below the eye and dist ahead at carY of the picture's height
+ *  (0 top .. 1 bottom), the vertical half-angle's tangent being tv */
+export function aimPitch(drop: number, dist: number, tv: number, carY: number): number {
+  return (Math.atan2(drop, dist) - Math.atan((2 * carY - 1) * tv)) * 180 / Math.PI; }
+
+// ---- where on a car the bonnet's and the driver's eyes are (mesh millimetres: x back from the nose, y to the left, z up) ----
+export interface CarEyes { len: number; height: number; /** the bonnet's eye: x back from the nose, z */ hood: [number, number]; /** the driver's eye (none: no seat in the mesh) */ seat: [number, number, number] | null }
+export function carEyes(M: Mesh): CarEyes {
+  const P = M.pos, n = M.n, len = M.length; let top = 0; for (let i = 2; i < n * 9; i += 3) top = Math.max(top, P[i]!);
+  // the bonnet: the highest point of the car's front 40 % within 45 cm of the middle (its mascot, its scuttle), the eye a little above it at its back end
+  const hx = len * 0.4; let hz = 0; for (let i = 0; i < n * 9; i += 3) { const x = P[i]!, y = P[i + 1]!, z = P[i + 2]!; if (x <= hx && Math.abs(y) < 450) hz = Math.max(hz, z); }
+  if (!hz) for (let i = 0; i < n * 9; i += 3) if (P[i]! <= hx) hz = Math.max(hz, P[i + 2]!);   /* nothing near the middle (a plain box): the front's top */
+  // the seat: the triangles of a part named so; the eye over its back half, the height of a sitting driver's eyes, under the roof
+  let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity, z0 = Infinity;
+  if (M.names) for (let t = 0; t < n; t++) { if (M.names[M.part[t]!] !== 'seat') continue; for (let k = 0; k < 3; k++) { const j = t * 9 + k * 3, x = P[j]!, y = P[j + 1]!, z = P[j + 2]!; x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); z0 = Math.min(z0, z); } }
+  let seat: CarEyes['seat'] = null;
+  if (x0 < x1) { const sx = x0 + (x1 - x0) * 0.62, sy = y1 - y0 > 700 ? y1 - 260 : (y0 + y1) / 2; let sz = z0 + 840, roof = Infinity;
+    for (let i = 0; i < n * 9; i += 3) { const x = P[i]!, y = P[i + 1]!, z = P[i + 2]!; if (Math.abs(x - sx) < 250 && Math.abs(y - sy) < 200 && z > z0 + 500) roof = Math.min(roof, z); }
+    if (roof < Infinity) sz = Math.min(sz, roof - 90); seat = [sx, sy, sz]; }
+  return { len, height: top, hood: [hx, hz + 170], seat }; }
+
+// ---- the camera rig ----
+export interface CamCar { x: number; y: number; /** the body's foot (m) */ z: number; yaw: number; /** the world velocity */ vx: number; vy: number; speed: number; /** yaw rate (rad/s, left +) */ r: number; pitch: number; roll: number }
+export interface CamShot { eye: [number, number, number]; /** heading up the picture (rad), tilt down (deg), vertical field of view (deg), near plane (m) */ ang: number; pitch: number; fov: number; near: number;
+  /** the point the shadows gather round */ at: [number, number, number] }
+/** the chase rigs: distance behind the car's middle beyond its half length, height over its foot, the base vertical
+ *  field of view, how quickly the heading and the height follow (rad/s), where the car sits on the picture */
+export const RIGS = { far: { back: 6.2, up: 2.45, fov: 62, wYaw: 3.0, wZ: 3.6, carY: 0.64 }, near: { back: 3.4, up: 1.6, fov: 66, wYaw: 4.2, wZ: 4.8, carY: 0.68 } } as const;
+export class DriveCam {
+  yaw = 0; yawV = 0; z = 0; zV = 0; dist = 0; distV = 0; fov = 62; fovV = 0; /** a drag's turn round the car (rad), and its tilt (deg) */ orbit = 0; tilt = 0; private held = 0;
+  private fresh = true;
+  /** put straight behind the car (a new car, a jump back on the track) */
+  reset() { this.fresh = true; }
+  /** a drag on the picture: turn round the car and tilt; let go, it comes back after a moment */
+  drag(dx: number, dy: number) { this.orbit = Math.max(-Math.PI, Math.min(Math.PI, this.orbit - dx * 0.008)); this.tilt = Math.max(-8, Math.min(25, this.tilt + dy * 0.12)); this.held = 1.2; }
+  step(view: CamView, c: CamCar, E: CarEyes, ground: (x: number, y: number) => number, aspect: number, dt: number, carY?: number): CamShot {
+    const L = E.len / 1000, fw = Math.min(1, c.speed / 55);   // fw: how fast, 0 standing .. 1 about 200 km/h
+    const heading = c.speed > 2 ? Math.atan2(c.vy, c.vx) : c.yaw;
+    if (this.held > 0) this.held -= dt; else { this.orbit *= Math.exp(-2.5 * dt); this.tilt *= Math.exp(-2.5 * dt); }
+    if (view === 'hood' || view === 'cabin') {   // on the car: its heading, a little of its pitch and roll's swing
+      const [ex, ez] = view === 'cabin' && E.seat ? [E.seat[0], E.seat[2]] : E.hood, ey = view === 'cabin' && E.seat ? E.seat[1] : 0, f = (E.len / 2 - ex) / 1000, s = ey / 1000, ch = Math.cos(c.yaw), sh = Math.sin(c.yaw);
+      const eye: [number, number, number] = [c.x + ch * f - sh * s, c.y + sh * f + ch * s, c.z + ez / 1000]; this.fresh = true;
+      const fov = (view === 'cabin' ? 70 : 64) + 6 * fw, tv = fovTan(aspect, fov);
+      return { eye, ang: c.yaw + this.orbit, pitch: (view === 'cabin' ? 7 : 4.5) - c.pitch * 180 / Math.PI * 0.5 + this.tilt, fov: Math.atan(tv) * 360 / Math.PI, near: 0.06, at: [c.x + ch * 25, c.y + sh * 25, c.z] }; }
+    const R = view === 'near' ? RIGS.near : RIGS.far;
+    // the heading: where the car goes, a little ahead into a turn (by the yaw rate), followed on a spring
+    const lead = Math.max(-0.32, Math.min(0.32, c.r * 0.22)), want = heading + lead;
+    const dist = L / 2 + R.back + 1.6 * fw, zWant = c.z + R.up + 0.35 * fw, fov = R.fov + 7 * fw;
+    if (this.fresh) { this.yaw = want; this.yawV = 0; this.z = zWant; this.zV = 0; this.dist = dist; this.distV = 0; this.fov = fov; this.fovV = 0; this.fresh = false; }
+    [this.yaw, this.yawV] = angSpring(this.yaw, this.yawV, want, R.wYaw, dt);
+    [this.dist, this.distV] = spring(this.dist, this.distV, dist, 2.2, dt);
+    [this.fov, this.fovV] = spring(this.fov, this.fovV, fov, 1.8, dt);
+    const a = this.yaw + this.orbit, ex = c.x - Math.cos(a) * this.dist, ey = c.y - Math.sin(a) * this.dist;
+    // the height on its own spring over the car's, never nearer the ground there than 70 cm (a banking's slope behind the car)
+    [this.z, this.zV] = spring(this.z, this.zV, zWant, R.wZ, dt); const gz = ground(ex, ey) + 0.7; if (this.z < gz) { this.z = gz; this.zV = Math.max(0, this.zV); }
+    const tv = fovTan(aspect, this.fov), drop = this.z - (c.z + 0.55);
+    const pitch = aimPitch(drop, this.dist, tv, carY ?? R.carY) + this.tilt;
+    return { eye: [ex, ey, this.z], ang: a, pitch, fov: Math.atan(tv) * 360 / Math.PI, near: 0.25, at: [c.x + Math.cos(a) * 30, c.y + Math.sin(a) * 30, c.z] }; }
+}

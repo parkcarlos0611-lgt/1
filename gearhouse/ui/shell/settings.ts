@@ -2,6 +2,7 @@
 // drive page's drawer (its graphics, its sound, the controls) with the screen's (the theme, motion) and kept in this
 // browser. Pure: the storage is passed in, and one that throws or holds rubbish reads as the defaults. Also the save as
 // a whole: every key of the game's carried out as one file, read back, or cleared.
+import { CAM_DEFAULT, isCamView, type CamView } from '../drivecam';
 
 /** what the helpers need of a storage (the browser's Storage has these) */
 export interface KeyStore { getItem(k: string): string | null; setItem(k: string, v: string): void; removeItem(k: string): void }
@@ -16,6 +17,8 @@ export interface Settings {
   /** the sandbox's rules (alpha 0.12): the technologies held to their years (docs/systems/101 1-2 ⑦; off, and in 0.12
    *  only shown as the engine designer's year tags) */
   sandbox: { eraLimit: boolean };
+  /** the drive's camera (alpha 0.12, ui/drivecam.ts): the view last chosen, by the C key, its button or the pause menu */
+  camera: { view: CamView };
 }
 export const SETTINGS_KEY = 'gearhouse.settings.v1';
 export const DEFAULTS: Settings = {
@@ -24,6 +27,7 @@ export const DEFAULTS: Settings = {
   controls: { touch: 'auto', auto: true, tcs: true, assist: false, progressive: false },
   screen: { theme: 'auto', calm: false },
   sandbox: { eraLimit: false },
+  camera: { view: CAM_DEFAULT },
 };
 
 const obj = (v: unknown): Record<string, unknown> => v && typeof v === 'object' && !Array.isArray(v) ? v as Record<string, unknown> : {};
@@ -31,13 +35,13 @@ const bool = (v: unknown, d: boolean) => typeof v === 'boolean' ? v : d;
 const one = <T>(v: unknown, of: readonly T[], d: T): T => of.includes(v as T) ? v as T : d;
 const unit = (v: unknown, d: number) => typeof v === 'number' && Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : d;
 /** any value made into settings: the fields it has right, the rest the defaults */
-export function asSettings(v: unknown): Settings { const o = obj(v), g = obj(o.graphics), s = obj(o.sound), c = obj(o.controls), sc = obj(o.screen), sb = obj(o.sandbox), D = DEFAULTS;
+export function asSettings(v: unknown): Settings { const o = obj(v), g = obj(o.graphics), s = obj(o.sound), c = obj(o.controls), sc = obj(o.screen), sb = obj(o.sandbox), cm = obj(o.camera), D = DEFAULTS;
   return {
     graphics: { live: bool(g.live, D.graphics.live), look: one(g.look, ['pbr', 'stepped', 'baked', 'toon'] as const, D.graphics.look), photoGround: bool(g.photoGround, D.graphics.photoGround), hdri: bool(g.hdri, D.graphics.hdri), blur: bool(g.blur, D.graphics.blur), scenery: one(g.scenery, ['low', 'mid', 'high'] as const, D.graphics.scenery) },
     sound: { on: bool(s.on, D.sound.on), volume: unit(s.volume, D.sound.volume), ui: bool(s.ui, D.sound.ui) },
     controls: { touch: one(c.touch, ['auto', 'on', 'off'] as const, D.controls.touch), auto: bool(c.auto, D.controls.auto), tcs: bool(c.tcs, D.controls.tcs), assist: bool(c.assist, D.controls.assist), progressive: bool(c.progressive, D.controls.progressive) },
     screen: { theme: one(sc.theme, ['auto', 'light', 'dark'] as const, D.screen.theme), calm: bool(sc.calm, D.screen.calm) },
-    sandbox: { eraLimit: bool(sb.eraLimit, D.sandbox.eraLimit) } }; }
+    sandbox: { eraLimit: bool(sb.eraLimit, D.sandbox.eraLimit) }, camera: { view: isCamView(cm.view) ? cm.view : D.camera.view } }; }
 export function loadSettings(st: KeyStore | null): Settings { try { const t = st?.getItem(SETTINGS_KEY); return asSettings(t ? JSON.parse(t) : null); } catch { return asSettings(null); } }
 /** kept; false when the storage keeps nothing */
 export function saveSettings(st: KeyStore | null, s: Settings): boolean { try { if (!st) return false; st.setItem(SETTINGS_KEY, JSON.stringify(s)); return true; } catch { return false; } }

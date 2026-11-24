@@ -39,17 +39,20 @@ import { Race, lapTimes, bestOf, bookFor, type Entrant, type Skill } from '../ra
 import { Health, WARN } from '../race/health';
 import { Sound, designVoice, type Skid, type EngineVoiceSpec } from './sound';
 import specsData from '../data/cars/specs.json';
+import { DriveCam, carEyes, nextView, perspective, pedalValue, isCamView, CAM_VIEWS, CAM_DEFAULT, type CamView, type CarEyes, type CamShot } from './drivecam';
 
 /** what a page holding the drive gives it (the game's one page, ui/shell): the root its markup is in (found there even
  *  while it is taken off the page), the one renderer shared by the screens (its sky and car textures loaded by the
  *  shell), the design to drive (null: none; left out: the link's), and what going back to the design does. A page of
  *  its own (drive.page.html) gives nothing */
-export interface DriveHost { root?: ParentNode; renderer?: LiveRenderer | null; design?: Design | null; onDesign?: () => void }
+export interface DriveHost { root?: ParentNode; renderer?: LiveRenderer | null; design?: Design | null; onDesign?: () => void;
+  /** the camera to start with (else the one kept in this browser), and told of each change (the shell keeps it in its settings) */ camera?: CamView; onCamera?: (v: CamView) => void }
 export interface DriveApi { /** the world held still (its picture kept) and on again */ pause(): void; resume(): void; readonly paused: boolean;
   /** the car put back behind the line (a race started again) */ restart(): void; /** another design driven (null: the car list's first) */ useDesign(d: Design | null): void;
   setTrack(id: string): void; readonly track: string; /** a race with these entrants and laps (the race tab's own fields) */ race(o: { opp?: number; lineup?: string; laps?: number; mode?: string }): void;
   /** the race on (or done), null in practice */ readonly raceNow: Race | null;
-  /** the track's materials and props loaded (or failed) */ readonly ready: Promise<void>; readonly drawerOpen: boolean; drawer(open: boolean): void }
+  /** the track's materials and props loaded (or failed) */ readonly ready: Promise<void>; readonly drawerOpen: boolean; drawer(open: boolean): void;
+  /** the camera (drivecam.ts): the view now, and the views this car can have */ camera: CamView; readonly cameras: CamView[] }
 // The drive below is one function's body, mounted once on its markup; it is not indented, so its lines read as before.
 export function mountDrive(H: DriveHost = {}): DriveApi {
 const R = H.root ?? document;
@@ -67,6 +70,10 @@ let SP = Math.sin(30 * Math.PI / 180), CP = Math.cos(30 * Math.PI / 180), pitchD
 let VW = 768, VH = 432, mm = 50;                                               // the picture's own pixels, millimetres a pixel
 const st = { auto: true, assist: false, tcs: true, pilot: false, chase: false, progressive: false, cine: false, free: false };
 const turning = () => st.chase || st.cine || st.free;
+// ---- the cameras (alpha 0.12): the perspective chase (far, the default; near), the bonnet, the driver's seat, beside the
+// orthographic views (the cinematic shots; from above, turning with the car). C or the camera button goes round them ----
+const CAM_KEY = 'gearhouse.drive.camera', dcam = new DriveCam(), eyesOf = new WeakMap<Mesh, CarEyes>();
+let camView: CamView = H.camera ?? (() => { try { const v = localStorage.getItem(CAM_KEY); return isCamView(v) ? v : CAM_DEFAULT; } catch { return CAM_DEFAULT; } })(), camShot: CamShot | null = null;
 // ---- the cinematic view: shots cut between trackside cameras (the world turned to look from the camera at the car), a
 //      low chase and a high fixed view; pixels twice the size, the gauges hidden, bars top and bottom with a caption ----
 function cameras(): { s: number; x: number; y: number }[] { const W2c = T.spec.width / 2, CAMS: { s: number; x: number; y: number }[] = Array.from({ length: Math.floor(T.length / 380) }, (_, i) => { const s = i * 380 + 60, side = i % 2 ? 1 : -1, p = T.point(s, side * (W2c + 16)); return { s, x: p.x, y: p.y }; });
@@ -183,7 +190,9 @@ function drawLive(el: number) { const L = live!; void el;
   { const ex = (c0: Vehicle) => { const L = c0.spec.wheelbase * c0.spec.frontShare + 0.9, z = T.height(c0.s, c0.off); smoke.emit('exhaust', c0.x - Math.cos(c0.yaw) * L, c0.y - Math.sin(c0.yaw) * L, z + 0.35, -Math.cos(c0.yaw) * 2 + c0.vx * Math.cos(c0.yaw) * 0.6, -Math.sin(c0.yaw) * 2 + c0.vx * Math.sin(c0.yaw) * 0.6, 0.3, 1, z); };
     if (input.throttle > 0.7 && car.rpm < car.spec.hpRpm * 0.6 && Math.random() < 0.25) ex(car); smoke.step(Math.min(0.05, el)); }
   const sp8 = new Float32Array(smoke.parcels.length * 8); smoke.parcels.forEach((q, k) => sp8.set([q.x, q.y, q.z, q.r, q.rho, q.T, SK[q.kind], q.seed], k * 8));
-  const view = { x: camX, y: camY, z: camZ, ang: turning() ? camAng : Math.PI / 2, pitch: pitchDeg, mm, W: VW, H: VH, cy: st.chase && !st.cine ? 0.66 : 0.55 };
+  const S = camShot, view = S ? { x: S.at[0], y: S.at[1], z: S.at[2], ang: S.ang, pitch: S.pitch, W: VW, H: VH, cy: 0.5, eye: S.eye, fov: S.fov, near: S.near,
+      /* the scale at the car (the outlines' and the ground's specks' size by it) */ mm: Math.max(4, Math.min(130, Math.round(Math.max(4, Math.hypot(S.eye[0] - car.x, S.eye[1] - car.y)) * 2 * Math.tan(S.fov * Math.PI / 360) / VH * 1000))) }
+    : { x: camX, y: camY, z: camZ, ang: turning() ? camAng : Math.PI / 2, pitch: pitchDeg, mm, W: VW, H: VH, cy: st.chase && !st.cine ? 0.66 : 0.55 };
   ctx = main; main.clearRect(0, 0, VW, VH);
   if (look === 'split') {   // the three looks side by side, the same moment: each a third of the picture, its name over it
     const w3 = Math.floor(VW / 3), names = ['기존 (단계 조명)', 'PBR 단계화', 'PBR 연속'];
@@ -191,12 +200,12 @@ function drawLive(el: number) { const L = live!; void el;
     main.fillStyle = 'rgba(0,0,0,0.55)'; main.fillRect(0, VH - 20, VW, 20); main.fillStyle = '#f2ead6'; main.font = '11px sans-serif'; main.textAlign = 'center';
     for (let k = 0; k < 3; k++) main.fillText(names[k]!, k * w3 + w3 / 2, VH - 6); main.fillStyle = '#000'; for (let k = 1; k < 3; k++) main.fillRect(k * w3 - 1, 0, 2, VH); main.textAlign = 'left'; }
   else if (fxMode === 1 && filmRate && clock - heldAt < 1 / 18 && held.width === VW && heldAt <= clock) { /* the hand-cranked camera: 18 frames a second, the picture held between */ }
-  else { L.render(view, cars, props, skids, { glass: 0.8, look: look === 'stepped' ? 1 : look === 'pbr' ? 2 : look === 'toon' ? 3 : 0, toonBands: toonB, toonShade: toonS, art: artOn, rays: raysOn, texK, lightK, aoK, reflK, bloomK, deep, day, photoGround: photoOn, hdri: hdriOn, dof, mb: blurOn ? mbK : 0, outW, outK, inner: innerOn === 'auto' ? undefined : innerOn === 'on', inK, smoke: { p: sp8, n: smoke.parcels.length, time: smoke.time }, fx: fxMode, fxK, fxPx: Math.max(1, Math.round(VH / 480)) }); held.width = VW; held.height = VH; held.getContext('2d')!.drawImage(glCanvas, 0, 0); heldAt = clock; }
+  else { L.render(view, cars, props, skids, { glass: 0.8, look: look === 'stepped' ? 1 : look === 'pbr' ? 2 : look === 'toon' ? 3 : 0, toonBands: toonB, toonShade: toonS, art: artOn, rays: raysOn, texK, lightK, aoK, reflK, bloomK, deep, day, photoGround: photoOn, hdri: hdriOn, dof, mb: blurOn ? mbK * (S ? 0.5 : 1) : 0, outW, outK, inner: innerOn === 'auto' ? undefined : innerOn === 'on', inK, smoke: { p: sp8, n: smoke.parcels.length, time: smoke.time }, fx: fxMode, fxK, fxPx: Math.max(1, Math.round(VH / 480)) }); held.width = VW; held.height = VH; held.getContext('2d')!.drawImage(glCanvas, 0, 0); heldAt = clock; }
   if (look !== 'split') main.drawImage(held, 0, 0);
   drawDebris(el);
   if (car.speed > 30) { const v = Math.min(1, (car.speed - 30) / 30) * 0.35, g = main.createRadialGradient(VW / 2, VH / 2, VH * 0.35, VW / 2, VH / 2, VW * 0.62); g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, `rgba(0,0,0,${v})`); main.fillStyle = g; main.fillRect(0, 0, VW, VH); } }
 
-function choose(id: string) { carId = id; propSprites.clear(); broken.clear(); debris.length = 0; debris3.pieces.length = 0; fenceGpu.clear(); const spec = raceSpec(id), m = MESH_CARS.find(c => c.id === id)!;
+function choose(id: string) { carId = id; dcam.reset(); propSprites.clear(); broken.clear(); debris.length = 0; debris3.pieces.length = 0; fenceGpu.clear(); const spec = raceSpec(id), m = MESH_CARS.find(c => c.id === id)!;
   car = new Vehicle(spec, T); car.auto = st.auto; car.place(START + 30, 0, 0); manualGear = 1;
   sprites = new CarSprites(meshOf(id, myNum), mm, pitchDeg, spec.steerLock * Math.PI / 180, { outline: 3, glass: 0.8 }, matchMedia('(pointer: coarse)').matches ? 1200 : 2400); sprites.prepare([0]); (live ? 0 : sprites.work(500)); sprites.prepare([-1, 1, -2, 2, -3, -4, -5]); camAng = car.yaw;
   car.damperMode = $<HTMLSelectElement>('damper').value as 'sport' | 'comfort'; pilot = new Driver(T); lapStart = -1; lastLap = 0; bestLap = 0; skids.length = 0; puffs.length = 0; say(`${spec.name} · 출발선 뒤에서 시작`); }
@@ -494,13 +503,13 @@ const trackTitle = () => T.spec.name;
 // one press, from a key or a screen button
 function press(k: string) { if (k === 'm') { st.auto = !st.auto; car.auto = st.auto; manualGear = car.gear; ($('auto') as HTMLInputElement).checked = st.auto; say(st.auto ? '자동 변속' : '수동 변속 (Q/E)'); }
   if (!st.auto && (k === 'e' || k === 'x')) manualGear = Math.min(car.spec.gears.length, manualGear + 1); if (!st.auto && (k === 'q' || k === 'z')) manualGear = Math.max(1, manualGear - 1);
-  if (k === 'r') { car.place(car.s, 0, 0); say('트랙으로 복귀'); }
-  if (k === 'c') setCine(!st.cine); }
+  if (k === 'r') { car.place(car.s, 0, 0); dcam.reset(); say('트랙으로 복귀'); }
+  if (k === 'c') useView(nextView(camView, viewOk), true); }
 addEventListener('keydown', e => { if (!running) return; const k = e.key.toLowerCase(); if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' '].includes(k)) e.preventDefault(); keys.add(k);
   if (!e.repeat) press(k); });
 addEventListener('keyup', e => keys.delete(e.key.toLowerCase()));
 // the screen buttons: held while a finger is on them (several at once), a tap for gears and reset
-for (const b of Array.from(R.querySelectorAll<HTMLButtonElement>('#pad button'))) { const k = b.dataset.key!, hold = k.startsWith('arrow');
+for (const b of Array.from(R.querySelectorAll<HTMLButtonElement>('#pad button[data-key]'))) { const k = b.dataset.key!, hold = k.startsWith('arrow');
   const on = (e: PointerEvent) => { e.preventDefault(); b.setPointerCapture(e.pointerId); b.classList.add('on'); if (hold) keys.add(k); else press(k); };
   const off = (e: PointerEvent) => { e.preventDefault(); b.classList.remove('on'); if (hold) keys.delete(k); };
   b.addEventListener('pointerdown', on); b.addEventListener('pointerup', off); b.addEventListener('pointercancel', off); b.addEventListener('lostpointercapture', () => { b.classList.remove('on'); if (hold) keys.delete(k); });
@@ -508,17 +517,34 @@ for (const b of Array.from(R.querySelectorAll<HTMLButtonElement>('#pad button'))
 $<HTMLInputElement>('touch').checked = matchMedia('(pointer: coarse)').matches; document.body.classList.toggle('touch', $<HTMLInputElement>('touch').checked);
 $<HTMLInputElement>('touch').addEventListener('change', e => document.body.classList.toggle('touch', (e.target as HTMLInputElement).checked));
 const down = (...ks: string[]) => ks.some(k => keys.has(k));
+// the touch pedals (alpha 0.12): upright throttles, pressed and slid; the finger's height on a pedal is its opening (the
+// bottom closed, the top wide open), its fill showing how far; let go, it closes. -1: no finger on it
+const pedal = { gas: -1, brake: -1 }, padIn = { gas: 0, brake: 0, steer: 0 };   /* padIn: a gamepad's triggers and stick, read each frame */
+for (const b of Array.from(R.querySelectorAll<HTMLElement>('#pad .pedal'))) { const which = b.classList.contains('gas') ? 'gas' : 'brake', fill = b.querySelector<HTMLElement>('i');
+  const show = () => { const v = Math.max(0, pedal[which]); if (fill) fill.style.height = `${(v * 100).toFixed(0)}%`; b.setAttribute('aria-valuenow', v.toFixed(2)); };
+  const at = (e: PointerEvent) => { const r = b.getBoundingClientRect(); pedal[which] = pedalValue(e.clientY, r.top, r.height); show(); };
+  b.addEventListener('pointerdown', e => { e.preventDefault(); b.setPointerCapture(e.pointerId); b.classList.add('on'); at(e); });
+  b.addEventListener('pointermove', e => { if (b.hasPointerCapture(e.pointerId)) at(e); });
+  const off = () => { b.classList.remove('on'); pedal[which] = -1; show(); };
+  b.addEventListener('pointerup', off); b.addEventListener('pointercancel', off); b.addEventListener('lostpointercapture', off); b.addEventListener('contextmenu', e => e.preventDefault()); }
+/** a gamepad's right and left triggers (throttle and brake, as far as pressed) and left stick (steering), where the browser has one */
+function readPad() { padIn.gas = 0; padIn.brake = 0; padIn.steer = 0; let g: Gamepad | null | undefined; try { g = Array.from(navigator.getGamepads?.() ?? []).find(q => q?.connected); } catch { g = null; } if (!g) return;
+  padIn.gas = g.buttons[7]?.value ?? 0; padIn.brake = g.buttons[6]?.value ?? 0; const a = g.axes[0] ?? 0; padIn.steer = Math.abs(a) > 0.08 ? -a : 0; }
 function controls(dt: number): Controls { const left = down('arrowleft', 'a'), right = down('arrowright', 'd'), want = left === right ? 0 : left ? 1 : -1;
-  if (wheelHeld) input.steer = wheelSteer; else
+  if (wheelHeld) input.steer = wheelSteer; else if (padIn.steer && !left && !right) input.steer = padIn.steer; else
   input.steer += want === 0 ? -Math.sign(input.steer) * Math.min(Math.abs(input.steer), dt * 4) : Math.max(-dt * 2.6, Math.min(dt * 2.6, want - input.steer));
   // review 169: reverse. Holding the brake at a standstill for half a second engages it; then the brake drives backwards
   // (capped about 20 km/h) and the accelerator brakes; the accelerator at a standstill puts it back in first
-  const gasK = down('arrowup', 'w'), brakeK = down('arrowdown', 's');
+  const gasA = Math.max(pedal.gas, padIn.gas > 0.02 ? padIn.gas : -1), brakeA = Math.max(pedal.brake, padIn.brake > 0.02 ? padIn.brake : -1);   // the analog pedals' own amounts (-1: none)
+  const gasKey = down('arrowup', 'w'), brakeKey = down('arrowdown', 's'), gasK = gasKey || gasA > 0.12, brakeK = brakeKey || brakeA > 0.25;   /* the reverse's hold: a brake pressed past a quarter */
   if (!car.reverse) { revHold = brakeK && !gasK && car.speed < 0.4 ? revHold + dt : 0; if (revHold > 0.5) { car.reverse = true; revHold = 0; say('후진'); } }
   else if (gasK && car.speed < 0.4) { car.reverse = false; say('전진'); }
-  const fwdK = car.reverse ? brakeK : gasK, stopK = car.reverse ? gasK : brakeK;
-  input.throttle = Math.max(0, Math.min(1, input.throttle + (fwdK ? (st.progressive ? 0.55 : 2.2) : (st.progressive ? -3 : -6)) * dt));   /* review 147: a key opens the throttle over about half a second, not a quarter */   /* the gauge mode: the pedal goes down as long as it is held */
-  input.brake = Math.max(0, Math.min(1, input.brake + (stopK ? 5 : -8) * dt)); input.hand = down(' ') ? 1 : 0;
+  const fwdK = car.reverse ? brakeK : gasK, stopK = car.reverse ? gasK : brakeK, fwdA = car.reverse ? brakeA : gasA, stopA = car.reverse ? gasA : brakeA, fwdKey = car.reverse ? brakeKey : gasKey, stopKey = car.reverse ? gasKey : brakeKey;
+  const toward = (x: number, to: number, up: number, dn: number) => x < to ? Math.min(to, x + up * dt) : Math.max(to, x - dn * dt);
+  if (fwdA >= 0 && !fwdKey) input.throttle = toward(input.throttle, fwdA, 8, 10);   // a pedal: as far as it is pressed (quickly, not in one step)
+  else if (fwdK && down('shift')) input.throttle = toward(input.throttle, 0.5, st.progressive ? 0.55 : 2.2, 6);   /* Shift: half throttle from the keyboard */
+  else input.throttle = Math.max(0, Math.min(1, input.throttle + (fwdK ? (st.progressive ? 0.55 : 2.2) : (st.progressive ? -3 : -6)) * dt));   /* review 147: a key opens the throttle over about half a second, not a quarter */   /* the gauge mode: the pedal goes down as long as it is held */
+  if (stopA >= 0 && !stopKey) input.brake = toward(input.brake, stopA, 10, 12); else input.brake = Math.max(0, Math.min(1, input.brake + (stopK ? 5 : -8) * dt)); input.hand = down(' ') ? 1 : 0;
   let steer = input.steer; if (st.assist) { const over = car.r - car.speed * T.at(car.s).k; if (Math.abs(over) > 0.1 && Math.sign(over) === Math.sign(-car.vy)) steer += Math.atan2(car.vy, Math.max(5, car.vx)) / usefulLock(car.spec, car.speed, car.tyre.mu) * 0.7; }
   const most = car.spec.steerLock * Math.PI / 180 / usefulLock(car.spec, car.speed, car.tyre.mu);
   // the traction assist (review 147, for the keyboard, which cannot feather a pedal): the throttle eased while a driven wheel spins past about 10 %
@@ -527,7 +553,7 @@ function controls(dt: number): Controls { const left = down('arrowleft', 'a'), r
   return { steer: Math.max(-most, Math.min(most, steer)), throttle: thr, brake: input.brake, handbrake: input.hand, gear: manualGear }; }
 // ---- the loop ----
 let last = performance.now(), acc = 0, running = true, looping = true;   // running: wanted on (a host pauses it); looping: a frame asked for
-function frame(now: number) { const el = Math.min(0.1, (now - last) / 1000); last = now; acc += el; clock += el; msgT -= el;
+function frame(now: number) { const el = Math.min(0.1, (now - last) / 1000); last = now; acc += el; clock += el; msgT -= el; readPad();
   while (acc >= DT) { acc -= DT; const u = st.pilot ? pilot.drive(car) : controls(DT);
     if (race) { race.step(DT, u); wheelTurn = race.player!.wheelTurn; if (race.done && !$('results').dataset.shown) results(); } else { car.step(DT, u); wheelTurn += (car.w[0]! + car.w[1]!) / 2 * DT; }
     for (const c of race ? race.cars.map(e => e.car) : [car]) { marks(c); fence(c); }
@@ -558,6 +584,10 @@ function frame(now: number) { const el = Math.min(0.1, (now - last) / 1000); las
     if (cut) { camX = car.x; camY = car.y; if (live) { if (shot.kind === 'side') { if (!op.pitch0) op.pitch0 = pitchDeg; setView(Math.max(PMIN, fxMode ? 18 : 22), mm); } else if (op.pitch0) { setView(op.pitch0, mm); op.pitch0 = 0; } } }   /* a man on the ground: a low view */
     cut = false; }
   turnCam();
+  camShot = null;
+  if (live && perspective(camView) && !lookAt && !st.free && !st.cine) { const b = car.base, E = eyes(), W2 = T.spec.width / 2;
+    const ground = (x: number, y: number) => { const q = T.locate(x, y, car.s); return T.height(q.s, Math.max(-W2, Math.min(W2, q.off))); };
+    camShot = dcam.step(camView === 'cabin' && !E.seat ? 'hood' : camView, { x: b[0], y: b[1], z: b[2] - (car.rings[0]!.rest + car.rings[2]!.rest) / 2, yaw: car.yaw, vx: car.v[0], vy: car.v[1], speed: car.speed, r: car.r, pitch: car.pitchW, roll: car.rollW }, E, ground, VW / VH, el, carAim()); }
   { const R = SCN.railway; let len = 0; for (let k = 0; k + 1 < R.length; k++) len += Math.hypot(R[k + 1]![0] - R[k]![0], R[k + 1]![1] - R[k]![1]);   // the train: now and then along the line
     if (train.d < 0) { train.wait -= el; if (train.wait <= 0) train.d = 0; } else { train.d += 24 * el; if (train.d > len + 80) { train.d = -1; train.wait = 70 + Math.random() * 120; } }
     if (snd) { const q = trainCars()[0]; snd.train = q ? Math.max(0, 1 - Math.hypot(q.x - car.x, q.y - car.y) / 400) : 0; } }
@@ -580,8 +610,23 @@ pick.value = carId;
 $<HTMLSelectElement>('lineup').addEventListener('change', e => { $('pickbox').hidden = (e.target as HTMLSelectElement).value !== 'pick'; ($('opp').closest('.row') as HTMLElement).hidden = !$('pickbox').hidden; });
 $('resclose').addEventListener('click', () => { $('resmodal').hidden = true; });
 pick.addEventListener('change', () => { carId = pick.value; if (race) stopRace(); else choose(pick.value); pick.blur(); });
+/** where the bonnet's and the driver's eyes are on this car's mesh (worked out once a mesh) */
+const eyes = (): CarEyes => { const M = sprites.mesh; let e = eyesOf.get(M); if (!e) { e = carEyes(M); eyesOf.set(M, e); } return e; };
+/** a view this car and browser can have: the perspective ones need the live renderer, the driver's seat a seat */
+const viewOk = (v: CamView) => v === 'cabin' ? !!live && !!eyes().seat : perspective(v) ? !!live : true;
+/** a view taken (kept in this browser, told to the host); announce: a line on the picture */
+function useView(v: CamView, announce = false) { if (perspective(v) && !live) v = 'top';   /* a seatless car's driver's seat: the bonnet's eye, the choice kept */ camView = v; if (st.free) setFree(false);
+  if ((v === 'cine') !== st.cine) setCine(v === 'cine'); $<HTMLSelectElement>('camview').value = v; dcam.reset(); camAng = car.yaw;
+  try { localStorage.setItem(CAM_KEY, v); } catch { /* not kept */ } H.onCamera?.(v); if (announce) say(`카메라: ${CAM_VIEWS.find(c => c.id === v)!.name}`); camShow(); }
+/** where the car sits on the picture (0 top .. 1 bottom) so the screen's controls and the gauges below the middle of the
+ *  picture leave it clear (none: the rig's own); measured again after each resize */
+let aimY: number | undefined, aimAt = -1;
+function carAim(): number | undefined { if (aimAt === fitN) return aimY; aimAt = fitN; aimY = undefined; const W = innerWidth, Hh = innerHeight, x0 = W * 0.32, x1 = W * 0.68; let top = 0;
+  const pad = document.getElementById('pad'); if (pad && getComputedStyle(pad).display !== 'none') for (const e of Array.from(pad.querySelectorAll<HTMLElement>('button, .wheel'))) { const r = e.getBoundingClientRect(); if (r.width && r.right > x0 && r.left < x1) top = Math.max(top, (Hh - r.top) / Hh); }
+  if (!st.cine) { const r = Math.max(26, Math.min(46, Math.round(VH * 0.11))); top = Math.max(top, (2 * r + 12) / VH); }   /* the gauges, bottom left of the middle */
+  if (top > 0) aimY = Math.min(0.66, Math.max(0.52, 1 - top - 0.12)); return aimY; }
 const setCine = (on: boolean) => { st.cine = on; ($('cine') as HTMLInputElement).checked = on; document.body.classList.toggle('cine', on); shot.until = 0; fit(); };
-$<HTMLInputElement>('cine').addEventListener('change', e => setCine((e.target as HTMLInputElement).checked));
+$<HTMLInputElement>('cine').addEventListener('change', e => useView((e.target as HTMLInputElement).checked ? 'cine' : CAM_DEFAULT));
 $<HTMLInputElement>('blur').addEventListener('change', e => { blurOn = (e.target as HTMLInputElement).checked; });
 $<HTMLInputElement>('lamps').addEventListener('change', e => { lampsOn = (e.target as HTMLInputElement).checked; });   /* the head lamps (review 117) */
 $<HTMLSelectElement>('fx').addEventListener('change', e => { fxMode = +(e.target as HTMLSelectElement).value; heldAt = -1; (e.target as HTMLElement).blur(); });
@@ -626,7 +671,7 @@ $<HTMLInputElement>('pilot').addEventListener('change', e => { st.pilot = (e.tar
 $<HTMLInputElement>('assist').addEventListener('change', e => { st.assist = (e.target as HTMLInputElement).checked; });
 $<HTMLSelectElement>('damper').addEventListener('change', e => { car.damperMode = (e.target as HTMLSelectElement).value as 'sport' | 'comfort'; });   /* review 158 */
 $<HTMLInputElement>('tcs').addEventListener('change', e => { st.tcs = (e.target as HTMLInputElement).checked; });
-$<HTMLInputElement>('chase').addEventListener('change', e => { st.chase = (e.target as HTMLInputElement).checked; camAng = car.yaw; });
+$<HTMLInputElement>('chase').addEventListener('change', e => { st.chase = (e.target as HTMLInputElement).checked; camAng = car.yaw; if (camView !== 'top') useView('top'); });
 // ---- the free camera: drag to turn it round the car and tilt it, the wheel or a pinch to come closer or go further ----
 // The pictures are baked for one height and one scale, so a new height or scale bakes them again (a moment after the
 // gesture ends); turning needs nothing new (the pictures are kept for 64 headings).
@@ -637,7 +682,7 @@ function rebake(full = !live) { SP = Math.sin(pitchDeg * Math.PI / 180); CP = Ma
   sprites = new CarSprites(meshOf(carId, myNum), mm, pitchDeg, car.spec.steerLock * Math.PI / 180, { outline: 3, glass: 0.8 }, small ? 1200 : 2400); sprites.prepare([0]); (live ? 0 : sprites.work(300));
   for (const e of [...others.keys()]) { const sp = new CarSprites(meshOf(e.id, numOf(e)), mm, pitchDeg, e.car.spec.steerLock * Math.PI / 180, { outline: 3, glass: 0.8 }, small ? 400 : 900); sp.prepare([0]); others.set(e, sp); }
   ($('pitch') as HTMLInputElement).value = String(pitchDeg); $('pitchv').textContent = `${pitchDeg}°`; camShow(); }
-const camShow = () => { $('camv').textContent = `${st.free ? '자유' : st.chase ? '따라 돎' : '북쪽 위'} · 높이 ${pitchDeg}° · ${mm} mm/픽셀 · 방향 ${Math.round(((90 - camAng * 180 / Math.PI) % 360 + 360) % 360)}°`; };
+const camShow = () => { $('camv').textContent = perspective(camView) && live ? `${CAM_VIEWS.find(c => c.id === camView)!.name} · 화면을 끌어 차 둘레로 돌리기, 놓으면 돌아옴 · C로 시점 바꾸기` : `${st.free ? '자유' : st.chase ? '따라 돎' : '북쪽 위'} · 높이 ${pitchDeg}° · ${mm} mm/픽셀 · 방향 ${Math.round(((90 - camAng * 180 / Math.PI) % 360 + 360) % 360)}°`; };
 /** a new height or scale, baked once the gesture has rested */
 function want(p: number, m: number) { p = Math.max(PMIN, Math.min(PMAX, Math.round(p / (live ? 1 : 5)) * (live ? 1 : 5)));   /* live: any whole degree, at once */ if (p === pitchDeg && m === mm) return; pitchDeg = p; mm = m; SP = Math.sin(p * Math.PI / 180); CP = Math.cos(p * Math.PI / 180);
   ($('scale') as HTMLSelectElement).value = String(m); camShow(); clearTimeout(bakeT); if (live) rebake(); else bakeT = setTimeout(rebake, 250) as unknown as number; }
@@ -648,13 +693,15 @@ const setFree = (on: boolean) => { st.free = on; ($('free') as HTMLInputElement)
   cv.addEventListener('pointerdown', e => { cv.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY }); pitch0 = pitchDeg; dy0 = 0;
     if (ptrs.size === 2) { const [a, b] = [...ptrs.values()]; pinch0 = Math.hypot(a!.x - b!.x, a!.y - b!.y); } });
   cv.addEventListener('pointermove', e => { const p = ptrs.get(e.pointerId); if (!p) return; const dx = e.clientX - p.x, dy = e.clientY - p.y; p.x = e.clientX; p.y = e.clientY;
-    if (ptrs.size === 1) { if (st.cine) setCine(false); if (!st.free) setFree(true); camAng -= dx * 0.008; dy0 += dy; const np = Math.max(PMIN, Math.min(PMAX, pitch0 + dy0 * 0.25)); if (Math.round(np / (live ? 1 : 5)) * (live ? 1 : 5) !== pitchDeg) want(np, mm); camShow(); }
+    if (ptrs.size === 1 && camShot) { dcam.drag(dx, dy); return; }   /* the perspective views: turned round the car while held */
+    if (ptrs.size === 1) { if (st.cine) useView('top'); if (!st.free) setFree(true); camAng -= dx * 0.008; dy0 += dy; const np = Math.max(PMIN, Math.min(PMAX, pitch0 + dy0 * 0.25)); if (Math.round(np / (live ? 1 : 5)) * (live ? 1 : 5) !== pitchDeg) want(np, mm); camShow(); }
     else if (ptrs.size === 2 && pinch0 > 0) { const [a, b] = [...ptrs.values()], d = Math.hypot(a!.x - b!.x, a!.y - b!.y); if (d / pinch0 > 1.3) { zoom(-1); pinch0 = d; } else if (pinch0 / d > 1.3) { zoom(1); pinch0 = d; } } });
   const up = (e: PointerEvent) => { ptrs.delete(e.pointerId); pinch0 = 0; };
   cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
   cv.addEventListener('wheel', e => { e.preventDefault(); zoom(e.deltaY > 0 ? 1 : -1); }, { passive: false });
   cv.addEventListener('dblclick', () => setFree(false));
   addEventListener('keydown', e => { if (!running || e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) return; const k = e.key;
+    if (camShot && (k === ',' || k === '<' || k === '.' || k === '>')) { dcam.drag(k === ',' || k === '<' ? -15 : 15, 0); return; }
     if (k === ',' || k === '<') { if (!st.free) setFree(true); camAng += 0.12; camShow(); } if (k === '.' || k === '>') { if (!st.free) setFree(true); camAng -= 0.12; camShow(); }
     if (k === '-' || k === '_') zoom(1); if (k === '=' || k === '+') zoom(-1);
     if (k === 'PageUp') { e.preventDefault(); want(pitchDeg + 5, mm); } if (k === 'PageDown') { e.preventDefault(); want(pitchDeg - 5, mm); } if (k === 'Home') setFree(false); }); }
@@ -681,11 +728,16 @@ $<HTMLInputElement>('free').addEventListener('change', e => setFree((e.target as
 $<HTMLInputElement>('pitch').addEventListener('change', e => { want(+(e.target as HTMLInputElement).value, mm); (e.target as HTMLElement).blur(); });
 $<HTMLInputElement>('pitch').addEventListener('input', e => { $('pitchv').textContent = `${(e.target as HTMLInputElement).value}°`; if (live) want(+(e.target as HTMLInputElement).value, mm); });
 $<HTMLSelectElement>('scale').addEventListener('change', e => { want(pitchDeg, +(e.target as HTMLSelectElement).value); (e.target as HTMLElement).blur(); });
+let fitN = 0;
 function fit() {   // the picture fills the window (review 145), in big pixels: one picture pixel to k screen pixels
+  fitN++;
   const k = Math.max(1, Math.round(innerWidth / 900)) * (st.cine ? 2 : 1); VW = Math.ceil(innerWidth / k / 2) * 2; VH = Math.ceil(innerHeight / k);
   cv.width = VW; cv.height = VH; cv.style.width = `${VW * k}px`; cv.style.height = `${VH * k}px`; ctx.imageSmoothingEnabled = false; }
-addEventListener('resize', fit); addEventListener('orientationchange', () => setTimeout(fit, 200)); fit(); showTrack(); choose(carId); camX = car.x; camY = car.y; camZ = 0; camShow(); requestAnimationFrame(frame);
-(globalThis as { __drive?: unknown }).__drive = { set look(v: [number, number, number] | null) { lookAt = v; }, get car() { return car; }, get L() { return live; }, get damage() { const e = dmg.get(car); return e ? { worst: e.D.worst, taken: e.D.taken } : null; }, get race() { return race; }, /** run the world on by t seconds at once, the test driver at the wheel (page tests on slow software GL) */ advance(t: number) { for (let k = 0; k < t / DT; k++) { const u = pilot.drive(car); if (race) race.step(DT, u); else car.step(DT, u); } }, get SCN() { return SCN; }, get T() { return T; } };   // for the page tests (tools): place the car, read the scenery
+addEventListener('resize', fit); addEventListener('orientationchange', () => setTimeout(fit, 200)); fit(); showTrack(); choose(carId); camX = car.x; camY = car.y; camZ = 0;
+{ const sel = $<HTMLSelectElement>('camview'); for (const c of CAM_VIEWS) sel.add(new Option(c.name, c.id)); sel.addEventListener('change', () => { useView(sel.value as CamView); sel.blur(); }); }
+$('cambtn').addEventListener('click', e => { useView(nextView(camView, viewOk), true); (e.currentTarget as HTMLElement).blur(); });
+useView(camView); camShow(); requestAnimationFrame(frame);
+(globalThis as { __drive?: unknown }).__drive = { set look(v: [number, number, number] | null) { lookAt = v; }, get car() { return car; }, get L() { return live; }, get damage() { const e = dmg.get(car); return e ? { worst: e.D.worst, taken: e.D.taken } : null; }, get race() { return race; }, /** run the world on by t seconds at once, the test driver at the wheel (page tests on slow software GL) */ advance(t: number) { for (let k = 0; k < t / DT; k++) { const u = pilot.drive(car); if (race) race.step(DT, u); else car.step(DT, u); } }, get SCN() { return SCN; }, get T() { return T; }, /** the controls as the car gets them, the touch pedals' own amounts, the camera's last shot (alpha 0.12) */ get input() { return input; }, get pedal() { return pedal; }, get shot() { return camShot; } };   // for the page tests (tools): place the car, read the scenery
 const ready = Promise.all(loads).then(() => undefined);
 return {
   pause() { if (!running) return; running = false; keys.clear(); input.throttle = 0; input.brake = 0; input.hand = 0; void snd?.ctx.suspend().catch(() => {}); },
@@ -698,6 +750,7 @@ return {
   get track() { return TD.id; },
   race(o) { const set = (id: string, v: unknown) => { if (v !== undefined) $<HTMLSelectElement>(id).value = String(v); }; set('opp', o.opp); set('lineup', o.lineup); set('laps', o.laps); set('mode', o.mode);
     $('pickbox').hidden = $<HTMLSelectElement>('lineup').value !== 'pick'; startRace(); $('race').textContent = '다시 시작'; },
+  get camera() { return camView; }, set camera(v: CamView) { if (v !== camView) useView(v); }, get cameras() { return CAM_VIEWS.map(c => c.id).filter(viewOk); },
   get raceNow() { return race; }, ready, get drawerOpen() { return document.body.classList.contains('drawer-open'); }, drawer(open: boolean) { drawer(open); } };
 }
 // a page of its own: the drive's markup is on it (the game's page mounts it on a screen instead)

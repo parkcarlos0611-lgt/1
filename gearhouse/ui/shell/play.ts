@@ -18,6 +18,7 @@ import { withEngine } from '../../core/engines';
 import { lapTimes } from '../../race/race';
 import { trackDef } from '../../race/tracks';
 import type { Settings } from './settings';
+import { CAM_VIEWS, type CamView } from '../drivecam';
 
 const LOOK_B: Record<Settings['graphics']['look'], string> = { pbr: '2', toon: '3', stepped: '0', baked: '0' };
 /** a page field set as a person would (its own listeners told), only when it differs */
@@ -52,7 +53,7 @@ export function driveScreen(ctx: ShellCtx): Screen<DriveParams> & { readonly api
   /** the game's settings put on the drive's own fields */
   const apply = () => { if (!page) return; const s = ctx.settings, r = R(); setField(r, 'live', s.graphics.live); setField(r, 'look', s.graphics.look); setField(r, 'photoGround', s.graphics.photoGround); setField(r, 'hdri', s.graphics.hdri); setField(r, 'blur', s.graphics.blur);
     setField(r, 'touch', s.controls.touch === 'auto' ? matchMedia('(pointer: coarse)').matches : s.controls.touch === 'on'); setField(r, 'auto', s.controls.auto); setField(r, 'tcs', s.controls.tcs); setField(r, 'assist', s.controls.assist); setField(r, 'progressive', s.controls.progressive);
-    setField(r, 'vol', s.sound.volume); setField(r, 'sound', s.sound.on); };
+    setField(r, 'vol', s.sound.volume); setField(r, 'sound', s.sound.on); if (api) api.camera = s.camera.view; };
   /** the drive's drawer for the game: what the pause menu and the settings now hold taken out of it, the effects folded under 개발자 */
   const shellize = (r: HTMLElement) => { const hide = (id: string) => { const f = r.querySelector(`#${id}`); const box = f?.closest<HTMLElement>('.row, label.check'); if (box) box.style.display = 'none'; };
     for (const id of ['auto', 'assist', 'tcs', 'pilot', 'progressive', 'touch', 'damper', 'chase', 'cine', 'live', 'look', 'photoGround', 'hdri', 'blur', 'sound', 'vol']) hide(id);
@@ -69,12 +70,11 @@ export function driveScreen(ctx: ShellCtx): Screen<DriveParams> & { readonly api
   const openPause = () => { if (!api || menuOn) return; api.pause(); api.drawer(false); menuOn = true; buildPause(); };
   const closePause = () => { if (!menuOn) return; menuOn = false; pause?.remove(); pause = null; api?.resume(); (document.activeElement as HTMLElement | null)?.blur(); };
   const buildPause = () => { pause?.remove(); const r = R(), f = (id: string) => r.querySelector<HTMLInputElement & HTMLSelectElement>(`#${id}`)!;
-    const cam = f('cine').checked ? 'cine' : f('chase').checked ? 'chase' : 'north';
     const keepCtl = (k: 'auto' | 'tcs' | 'assist', v: boolean) => { ctx.settings.controls[k] = v; ctx.changed(); };
     const nav = el('nav', 'gh-menu gh-pausemenu', button('계속', closePause, { kind: 'menu', id: 'gh-resume' }), button('다시 시작', () => { closePause(); api!.restart(); }, { kind: 'menu' }),
       params.design ? button('설계로 돌아가기', toDesign, { kind: 'menu', sub: params.design.name }) : null, button('설정', () => void ctx.router.go('settings'), { kind: 'menu' }), button('타이틀로', () => void ctx.router.reset('title'), { kind: 'menu' }));
     const quick = el('div', 'gh-form gh-quick', el('h3', 'gh-h3', '주행 중 조절'),
-      chips('카메라', [['north', '북쪽 위'], ['chase', '따라 돎'], ['cine', '시네마틱']], cam, v => { setField(r, 'cine', v === 'cine'); setField(r, 'chase', v === 'chase'); }),
+      chips('카메라 (C)', CAM_VIEWS.filter(c => api!.cameras.includes(c.id)).map(c => [c.id, c.name] as [CamView, string]), api!.camera, v => { api!.camera = v; }),
       chips('댐퍼 (가변 댐퍼가 있는 차)', [['sport', '스포츠'], ['comfort', '컴포트']], f('damper').value, v => setField(r, 'damper', v)),
       toggle('자동 변속 (M)', f('auto').checked, v => { setField(r, 'auto', v); keepCtl('auto', v); }), toggle('트랙션 보조', f('tcs').checked, v => { setField(r, 'tcs', v); keepCtl('tcs', v); }),
       toggle('카운터스티어 보조', f('assist').checked, v => { setField(r, 'assist', v); keepCtl('assist', v); }), toggle('시험 운전자에게 맡기기', f('pilot').checked, v => setField(r, 'pilot', v)));
@@ -89,7 +89,8 @@ export function driveScreen(ctx: ShellCtx): Screen<DriveParams> & { readonly api
     async enter(p, how: Move) { ctx.backdrop.stop(); page ??= new PageScreen('drive', drivePage); ctx.stage.use('drive', false); page.show(ctx.pages); if (how !== 'back') params = p ?? {};
       document.title = `GEARHOUSE · 시험 주행${params.design ? ` · ${params.design.name}` : ''}`;
       if (!api) { ctx.loading(true, '트랙을 준비하는 중', 0.2); await nextFrame();
-        api = mountDrive({ root: page.root, renderer: ctx.stage.L, design: params.design ?? null, onDesign: toDesign }); shellize(page.root); apply(); ctx.loading(true, '트랙 재질과 소품을 불러오는 중', 0.6);
+        api = mountDrive({ root: page.root, renderer: ctx.stage.L, design: params.design ?? null, onDesign: toDesign, camera: ctx.settings.camera.view,
+          onCamera: v => { if (ctx.settings.camera.view !== v) { ctx.settings.camera.view = v; ctx.changed(); } } }); shellize(page.root); apply(); ctx.loading(true, '트랙 재질과 소품을 불러오는 중', 0.6);
         await Promise.race([api.ready, new Promise(r => setTimeout(r, 20000))]); ctx.loading(false);
         if (params.track) api.setTrack(params.track); if (params.race) api.race(params.race); }
       else if (how !== 'back') { menuOn = false; pause?.remove(); pause = null; api.useDesign(params.design ?? null); if (params.track) api.setTrack(params.track); if (params.race) api.race(params.race); apply(); api.resume(); }

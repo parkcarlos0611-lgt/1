@@ -4,6 +4,7 @@
 import type { Screen } from './router';
 import type { ShellCtx } from './ctx';
 import { el, button, card, chips, toggle, slider, tabs, row, dialog, toast, download, pickFile, topbar, carPic, focusables } from './ui';
+import { CAM_VIEWS, type CamView } from '../drivecam';
 import { saveSettings, exportAll, importAll, resetAll, loadSettings, DEFAULTS, type Settings } from './settings';
 import { VERSION_NAME, CHANGES } from '../../core/version';
 import { BASES, type BaseId, type Design } from '../../core/design';
@@ -102,6 +103,7 @@ export function settingsScreen(ctx: ShellCtx): Screen<never> {
     const ctl = pane(chips('화면 버튼 (핸들, 페달)', [['auto', '자동 (터치 화면)'], ['on', '항상'], ['off', '끄기']], S().controls.touch, v => set(s => { s.controls.touch = v; })),
       toggle('자동 변속', S().controls.auto, v => set(s => { s.controls.auto = v; })), toggle('트랙션 보조 (키보드용)', S().controls.tcs, v => set(s => { s.controls.tcs = v; })),
       toggle('카운터스티어 보조', S().controls.assist, v => set(s => { s.controls.assist = v; })), toggle('가속 게이지 모드 (오래 누를수록 차오름)', S().controls.progressive, v => set(s => { s.controls.progressive = v; })),
+      chips('주행 카메라 (주행 중 C로 바꿈)', CAM_VIEWS.map(c => [c.id, c.name] as [CamView, string]), S().camera.view, v => set(s => { s.camera.view = v; })),
       el('p', 'gh-note', '주행: ↑/W 가속 · ↓/S 브레이크 · ←→/A D 조향 · Space 핸드브레이크 · Q/E 기어 · M 자동/수동 · R 복귀 · C 시네마틱 · Esc 일시정지. 메뉴: 화살표, Enter, Esc (게임패드의 십자키, A, B도 됩니다).'));
     const scr = pane(chips('화면 밝기', [['auto', '기기 설정대로'], ['light', '밝게'], ['dark', '어둡게']], S().screen.theme, v => set(s => { s.screen.theme = v; })),
       toggle('움직임 줄이기 (전환 효과, 턴테이블)', S().screen.calm, v => set(s => { s.screen.calm = v; })),

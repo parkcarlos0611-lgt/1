@@ -89,6 +89,13 @@ export class Vehicle {
    *  throttle actuator has closed (0..1 of the driver's opening); VTEC on the high cam; the steering's effort as the
    *  driver's hands feel it (0 none; the hands' rate is HANDS / (1 + effort)) and the assistance's share of it (1 none) */
   tcsEnabled = true; tcsOn = false; tcsCut = 0; vtecHigh = false; steerEffort = 0; steerAssist = 1;
+  /** review 158: the dampers' setting (the driver's switch, sport for racing) and the multiplier on the damping it gives
+   *  now; the automated manual's state: the clutch's engagement (0..1, the control unit's own), the throttle it blips on a
+   *  downshift (0..1); the air pressing each axle down (N: front, rear) from every aerodynamic source */
+  damperMode: 'comfort' | 'sport' = 'sport'; dampK = 1; clutchF1 = 0; blip = 0; downF = 0; downR = 0;
+  /** the gear the current shift came from, and the shift's whole time (s) */ private gearFrom = 1; private shiftDur = 0.5;
+  /** a gear change under way (for the HUD) */ get shifting(): boolean { return this.shift > 0; }
+  /** how the gearbox is worked (for the HUD) */ get gearboxType(): 'manual' | 'f1' { return this.spec.tech?.gearbox ?? 'manual'; }
   /** each tyre's side deflection (m): the side force builds as the tyre rolls (the relaxation length) */ private yd = [0, 0, 0, 0];
   readonly axles: [Axle, Axle];
   private ms: number; private Ix: number; private Iy: number; private Iz: number; private Iw: number; private Ie: number; private kt: number[];
@@ -195,13 +202,25 @@ export class Vehicle {
       this.steerEffort = effort; this.steerAssist = assist;
       this.sw += Math.max(-rate * dt, Math.min(rate * dt, want - this.sw)); this.steer = this.sw / N; }
     // ---- drive line: gear changes, the engine, the clutch, the open differential ----
-    this.shift -= dt; const vxh = this.vx;
+    this.shift -= dt; const vxh = this.vx, F1 = c.tech?.gearbox === 'f1';
     const wheelRpm = Math.max(0, vxh) / R * c.gears[this.gear - 1]! * c.final * 30 / Math.PI;
-    if (this.shift <= 0) { if (this.auto) { if (wheelRpm > Math.min(c.hpRpm * 1.04, c.redline * 0.92) && this.gear < c.gears.length) { this.gear++; this.shift = c.shiftT ?? 0.5; } else if (this.gear > 1 && wheelRpm * c.gears[this.gear - 2]! / c.gears[this.gear - 1]! < c.hpRpm * 0.8) { this.gear--; this.shift = c.shiftT ?? 0.5; } }
-      else if (u.gear && u.gear !== this.gear) { this.gear = Math.max(1, Math.min(c.gears.length, u.gear)); this.shift = c.shiftT ?? 0.5; } }
+    if (this.shift <= 0) { let to = this.gear;
+      if (this.auto) { if (wheelRpm > Math.min(c.hpRpm * 1.04, c.redline * 0.92) && this.gear < c.gears.length) to = this.gear + 1; else if (this.gear > 1 && wheelRpm * c.gears[this.gear - 2]! / c.gears[this.gear - 1]! < c.hpRpm * 0.8) to = this.gear - 1; }
+      else if (u.gear && u.gear !== this.gear) to = F1 ? this.gear + Math.sign(u.gear - this.gear) : Math.max(1, Math.min(c.gears.length, u.gear));   /* the paddles step one gear a pull */
+      if (F1 && to < this.gear && wheelRpm * c.gears[to - 1]! / c.gears[this.gear - 1]! > c.redline) to = this.gear;   /* the control unit refuses a downshift that would over-rev */
+      if (to !== this.gear) { this.gearFrom = this.gear; this.gear = to; this.shift = this.shiftDur = c.shiftT ?? 0.5; } }
+    // the automated manual's shift (review 158), by its progress p (0..1): the clutch opens as the torque is cut (to 0.25),
+    // stays open while the gear is swapped (at 0.45), closes as the torque refills (from 0.65); `env` the clutch's and the
+    // torque's share through it. A manual shift is one dead time: no drive, no clutch
+    const p = this.shift > 0 ? 1 - this.shift / this.shiftDur : 1, env = p < 0.25 ? 1 - p / 0.25 : p < 0.65 ? 0 : (p - 0.65) / 0.35, down = this.gear < this.gearFrom;
+    const gi = F1 && this.shift > 0 && p < 0.45 ? this.gearFrom : this.gear;   /* the old gear until the clutch is open */
     const X = c.tech, fF = X?.drive ? X.drive.front : 0, wFa = (this.w[0]! + this.w[1]!) / 2, wRa = (this.w[2]! + this.w[3]!) / 2;   /* the centre differential: the shaft turns at the axles' speeds weighted by their torque shares */
-    const Gr = c.gears[this.gear - 1]! * c.final, we = this.rpm * Math.PI / 30, wd = fF * wFa + (1 - fF) * wRa, idle = c.idle * Math.PI / 30;
-    const thr = this.shift > 0 ? 0 : Math.max(0, Math.min(1, u.throttle)) * (this.auto && this.rpm > c.redline * 0.98 ? 0.25 : 1), fric = 0.06 * torqueAt(c, c.torqueRpm) * (0.3 + 0.7 * this.rpm / c.hpRpm);
+    const Gr = c.gears[gi - 1]! * c.final, we = this.rpm * Math.PI / 30, wd = fF * wFa + (1 - fF) * wRa, idle = c.idle * Math.PI / 30;
+    const thrD = Math.max(0, Math.min(1, u.throttle)) * (this.auto && this.rpm > c.redline * 0.98 ? 0.25 : 1);
+    // the blip: on a downshift, with the clutch opening and open, the control unit opens the throttle to bring the revs to
+    // what the lower gear will turn them at (a proportional opening, full 1,500 rpm short), and lets it close as it nears them
+    this.blip = F1 && this.shift > 0 && down && p < 0.8 ? Math.max(0, Math.min(1, (wd * c.gears[this.gear - 1]! * c.final * 30 / Math.PI - this.rpm) / 1500)) : 0;
+    const thr = this.shift <= 0 ? thrD : F1 ? Math.max(thrD * env, this.blip) : 0, fric = 0.06 * torqueAt(c, c.torqueRpm) * (0.3 + 0.7 * this.rpm / c.hpRpm);
     const hp = this.health.power, alive = this.health.running;
     // VTEC (review 149): the high cam's oil passage opens above the switch-over revs and closes a little below them
     if (X?.vtec) { if (!this.vtecHigh && this.rpm > X.vtec.rpm) this.vtecHigh = true; else if (this.vtecHigh && this.rpm < X.vtec.rpm - X.vtec.hyst) this.vtecHigh = false; }
@@ -218,8 +237,19 @@ export class Vehicle {
     let blow = 1; if (X?.turbo) { const T = X.turbo, want = thr * Math.min(1, Math.max(0, (this.rpm - T.full * 0.45) / (T.full * 0.55))), tau = want > this.boost ? T.spool * (1.6 - this.rpm / c.redline) * (this.boost > 0.4 ? 0.5 : 1) : 0.6;   /* the turbines keep turning through a short lift: the boost falls slowly and comes back quickly */
       this.boost += (want - this.boost) * Math.min(1, dt / Math.max(0.02, tau)); const base = 1 / (1 + T.boost * 0.95); blow = base + (1 - base) * this.boost; }
     const Te = alive ? (this.rpm < c.redline * 1.1 ? thrE * torqueAt(c, this.rpm, cam) * hp * blow : 0) - fric * (1 - thrE) + (this.rpm < c.idle ? fric * 2 : 0) : -fric * 3 - (this.rpm > 1 ? 30 : 0);
-    const autoC = this.shift > 0 ? 0 : Math.max(0, Math.min(1, wd * Gr > we * 0.97 ? 1 : (c.launchRpm ? (this.rpm - c.launchRpm * 0.8) / (c.launchRpm * 0.2) : (this.rpm - c.idle * 1.3) / (c.idle * 1.2))));
-    const engaged = u.clutch === undefined ? autoC : Math.min(autoC, 1 - u.clutch), cap = engaged * torqueAt(c, c.torqueRpm) * 2.2;
+    let engaged: number;
+    if (!F1) { const autoC = this.shift > 0 ? 0 : Math.max(0, Math.min(1, wd * Gr > we * 0.97 ? 1 : (c.launchRpm ? (this.rpm - c.launchRpm * 0.8) / (c.launchRpm * 0.2) : (this.rpm - c.idle * 1.3) / (c.idle * 1.2))));
+      engaged = u.clutch === undefined ? autoC : Math.min(autoC, 1 - u.clutch); }
+    else { // the automated manual (review 158): no clutch pedal. Moving off, the control unit's launch curve: the clutch's
+      // aim rises with the revs over idle (squared: a soft first bite, firm by the launch revs at full throttle, sooner at part) and with how near the
+      // shaft has come to the engine's speed at part throttle (it closes the slip rather than hold it), the clutch following it over a
+      // quarter second; it lets go at once near idle (it never stalls) and is locked once the shaft has caught the engine.
+      // In a shift: the shift's envelope
+      const L = c.launchRpm ?? c.hpRpm * 0.6, ratio = wd * Gr / Math.max(1, we), i0 = c.idle * 1.15, x = Math.max(0, Math.min(1, (this.rpm - i0) / ((L - i0) * Math.max(0.25, thrD))));   /* the revs it bites at scale with the pedal */
+      const aim = this.rpm < c.idle * 1.1 ? 0 : ratio > 0.97 ? 1 : thrD < 0.03 ? 0 : Math.min(1, Math.max(x * x, (ratio - 0.4) / 0.57 * (1 - 0.7 * thrD)));   /* at full throttle the revs govern (no dumped clutch) */
+      this.clutchF1 = aim < this.clutchF1 ? aim : this.clutchF1 + Math.min(aim - this.clutchF1, dt / 0.25);
+      engaged = this.shift > 0 ? env : this.clutchF1; if (this.shift > 0) this.clutchF1 = 1; }
+    const cap = engaged * torqueAt(c, c.torqueRpm) * 2.2;
     const need = (we - wd * Gr) / (dt * (1 / this.Ie + Gr * Gr * (fF * fF + (1 - fF) * (1 - fF)) / (2 * this.Iw))), Tc = Math.max(-cap, Math.min(cap, need));
     this.rpm = Math.max(alive ? idle * 0.5 : 0, we + (Te - Tc) / this.Ie * dt) * 30 / Math.PI;
     { const f = this.health.step(dt, this.rpm, c.redline, Math.max(0, Te) * this.rpm * Math.PI / 30, this.speed); if (f) this.lastFailure = f; }
@@ -233,6 +263,8 @@ export class Vehicle {
       this.Tw = [f0, f1, r0, r1]; }
     // ---- forces and turns on the body (world), gathered ----
     const F: V3 = [0, 0, -this.ms * G], Tb: V3 = [0, 0, 0];   // Tb: turning moment, body axes
+    // the variable dampers (review 158): sport a fixed firmer setting; comfort soft in town, firming with the speed
+    { const D = X?.damp, kmh = this.speed * 3.6; this.dampK = !D ? 1 : this.damperMode === 'sport' ? D.sport : Math.min(D.sport, D.comfort * (1 + (D.speedK ?? 0) * kmh / 100)); }
     const addAt = (bp: V3, f: V3) => { F[0] += f[0]; F[1] += f[1]; F[2] += f[2]; const fb = invRotQ(this.q, f), t = cross(bp, fb); Tb[0] += t[0]; Tb[1] += t[1]; Tb[2] += t[2]; };
     // the unsprung masses' weight and inertia along the body's up (their own up and down is their own); across it the whole car's
     const gz = -G * ez[2], az = dot(this.aPrev, ez);
@@ -292,7 +324,7 @@ export class Vehicle {
       for (let side = 0; side < 2; side++) { const sy = side === 0 ? 1 : -1, yS = sy * A.ts / 2;
         const t = beam ? A.d[0] + sy * A.d[1] * A.ts / 2 + (A.drive ? A.wu * 0.12 : 0) : A.d[side]!, tv = beam ? A.dv[0] + sy * A.dv[1] * A.ts / 2 : A.dv[side]!;
         const bar = !beam && A.arb ? A.arb * (A.d[side]! - A.d[1 - side]!) : 0;   /* the anti-roll bar: each side pushed by the difference */
-        const fs = -(A.F0 + A.k * t + bar + A.c * tv + A.fric * Math.tanh(tv / 0.01));   // on the running gear (pushing it down); the bump stop past 9 cm
+        const fs = -(A.F0 + A.k * t + bar + A.c * this.dampK * tv + A.fric * Math.tanh(tv / 0.01));   // on the running gear (pushing it down); the bump stop past 9 cm
         const stop = t > 0.09 ? -(t - 0.09) * A.k * 12 : t < -0.12 ? -(t + 0.12) * A.k * 12 : 0, f = fs + stop;
         if (beam) { Q[0] += f; Q[1] += f * yS; } else Q[side as 0 | 1] += f;
         addAt([A.x, yS, 0], rotQ(this.q, [0, 0, -f])); }
@@ -311,11 +343,16 @@ export class Vehicle {
     // ---- the air ----
     this.absOn = absNow;
     const Wg = X?.wing; if (Wg) { const kmh = this.speed * 3.6, to = kmh > Wg.up ? 1 : kmh < Wg.down ? 0 : this.wing > 0.5 ? 1 : 0; this.wing += Math.max(-dt / 1.2, Math.min(dt / 1.2, to - this.wing)); }   /* the wing rises and stows over a second or so */
-    { const sp = this.speed, d = 0.5 * RHO * (c.cdA + (Wg ? Wg.cdA * this.wing : 0)) * sp; F[0] -= d * this.v[0]; F[1] -= d * this.v[1]; F[2] -= d * this.v[2];
-      if (X?.ground) { const q = 0.5 * RHO * sp * sp, low = Math.max(0.6, Math.min(1.5, 1 - this.zb * 6)), Fg = q * X.ground.clA * low;   /* the venturis: more downforce the lower the car rides (review 126) */
-        addAt([this.axles[0].x, 0, 0], rotQ(this.q, [0, 0, -Fg * X.ground.front])); addAt([this.axles[1].x, 0, 0], rotQ(this.q, [0, 0, -Fg * (1 - X.ground.front)])); }
-      if (Wg) { const q = 0.5 * RHO * sp * sp, body = q * Wg.body, wingF = q * Wg.clA * this.wing;   /* downforce: the body's (shared by the axles) and the wing's (on the rear) */
-        addAt([this.axles[0].x, 0, 0], rotQ(this.q, [0, 0, -body * 0.42])); addAt([this.axles[1].x, 0, 0], rotQ(this.q, [0, 0, -body * 0.58 - wingF])); } }
+    { const sp = this.speed, U = X?.underbody, d = 0.5 * RHO * (c.cdA + (Wg ? Wg.cdA * this.wing : 0) + (U?.cdA ?? 0)) * sp; F[0] -= d * this.v[0]; F[1] -= d * this.v[1]; F[2] -= d * this.v[2];
+      let dF = 0, dR = 0; const q = 0.5 * RHO * sp * sp;
+      if (X?.ground) { const low = Math.max(0.6, Math.min(1.5, 1 - this.zb * 6)), Fg = q * X.ground.clA * low;   /* the venturis: more downforce the lower the car rides (review 126) */
+        dF += Fg * X.ground.front; dR += Fg * (1 - X.ground.front); }
+      if (U) { const low = Math.max(0.85, Math.min(1.15, 1 - this.zb * 2)), Fu = q * U.clA * low;   /* the flat floor and diffuser (review 158): mildly ride-height sensitive */
+        dF += Fu * U.front; dR += Fu * (1 - U.front); }
+      if (Wg) { const body = q * Wg.body, wingF = q * Wg.clA * this.wing;   /* downforce: the body's (shared by the axles) and the wing's (on the rear) */
+        dF += body * 0.42; dR += body * 0.58 + wingF; }
+      if (dF || dR) { addAt([this.axles[0].x, 0, 0], rotQ(this.q, [0, 0, -dF])); addAt([this.axles[1].x, 0, 0], rotQ(this.q, [0, 0, -dR])); }
+      this.downF = dF; this.downR = dR; }
     // the whole car's weight across the body's up (the running gear goes where the body goes, sideways and along)
     { const g: V3 = [0, 0, -(m - this.ms) * G], gu = dot(g, ez); F[0] += g[0] - ez[0] * gu; F[1] += g[1] - ez[1] * gu; F[2] += g[2] - ez[2] * gu; }
     // what the tyres and the air do, in the heading's frame (the old readers' tax, tay)

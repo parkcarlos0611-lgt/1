@@ -55,7 +55,21 @@ export interface RaceSpec {
     vtec?: { rpm: number; hyst: number; low: { torque: number; rpm: number }; high: { rpm: number } };
     /** review 149: electric power steering, speed-sensitive: the steering's effort times `low` at a standstill, rising to
      *  `high` well above `fade` km/h (the hydraulic `power` is a fixed 0.3) */
-    eps?: { low: number; high: number; fade: number } };
+    eps?: { low: number; high: number; fade: number };
+    /** review 158: how the gearbox is worked. 'manual' (the default): the driver's clutch and lever, the drive cut for the
+     *  whole of shiftT. 'f1': an electro-hydraulic automated manual (the same gears, a robotised single-plate clutch and
+     *  shift, paddles, no clutch pedal): a shift of shiftT cuts the torque as the clutch opens, swaps the gear with it open,
+     *  and refills it as the clutch closes; downshifts blip the throttle to the new gear's revs; the control unit refuses a
+     *  downshift that would over-rev, steps one gear a pull, and makes the standing start on its own launch-clutch curve */
+    gearbox?: 'manual' | 'f1';
+    /** review 158: electronically controlled dampers: multipliers on the damping coefficient. 'sport' fixed; 'comfort'
+     *  softer at low speed, firming by speedK of itself per 100 km/h (up to the sport setting) */
+    damp?: { comfort: number; sport: number; speedK?: number };
+    /** review 158: a flat floor and a rear diffuser: a lift area pressing the car down (q clA, a little more the lower it
+     *  rides, much less sensitive to it than venturis), its share on the front axle, and the drag it adds (m²) */
+    underbody?: { clA: number; front: number; cdA?: number } };
+  /** the body mesh's id where a spec shares another's body (a variant: another gearbox in the same car) */
+  body?: string;
   cdA: number; crr: number; steerLock: number;          // drag area m², rolling resistance, front wheels' lock (deg)
   topKmh: number; check: boolean;
   cooling: { siphon: boolean; margin: number } }   // the water's circulation (no pump on the Model T [v]), the radiator against the engine's heat [?]
@@ -200,13 +214,44 @@ const NSX: RaceSpec = { id: 'nsx', name: '1990 Honda NSX (실험)', mass: 1365 +
 export const EPS_SPEED_SENSITIVE = { low: 0.25, high: 0.8, fade: 50 };
 /** cars whose physics is ready but whose body mesh is not yet built: raceSpec finds them; the drive page does not list them */
 export const AWAITING_MESH: Record<string, RaceSpec> = {};
+// review 158: the Ferrari F355 Berlinetta (1994), six-speed manual, and the F1 (1997), the same car with the
+// electro-hydraulic automated manual (docs/systems/87). Checked 2026-11-24 against: Ferrari's own model pages (as quoted
+// in search results: the site itself was not reachable), Wikipedia, auto-data.net, cars-data.com, supercars.net, evo,
+// PistonHeads' buying guide, Eurospares' parts catalogue, Automotive News Europe (4 Aug 1997), FerrariChat threads.
+//   engine: 3,496 cc 90-degree V8, five valves a cylinder [v]; 380 PS = 375 hp at 8,250 rpm [v], 268 lb ft = 363 Nm at
+//   6,000 [v], red line 8,500 (the limiter about 8,750) [v]; dry weight 1,350 kg [v]; kerb 1,483-1,497 (Wikipedia) or
+//   about 1,450 with fluids (evo) [~]: 1,450 kept; weight split 42:58 [?] (remembered, no source found); 0-100 km/h
+//   4.7 s, top 295 km/h [v]; gears 3.07 2.16 1.61 1.27 1.03 0.84 [~] (a GTS table "identical to the Berlinetta"), final
+//   4.35 [~] (forum figures 4.35-4.41, one says 3.56: not used); 225/40 ZR18 and 265/40 ZR18 [v]; double wishbones [v];
+//   electronic dampers with two settings (Comfort, Sport), reading road speed, brake pressure, the suspension's load and
+//   the steering [v]; a full undertray with a rear diffuser, shaped to share the downforce equally between the axles
+//   [v, Ferrari's page] (its amount: a forum figure of about 75 lb at 150 mph [~] -> lift area 0.13); ABS, switchable
+//   off [v]; no traction control [~] (none listed; Ferrari's ASR came with the 360); hydraulic power steering standard
+//   (a manual rack by special order) [v], about 3.2 turns lock to lock [~] -> ratio 19 at 30 degrees' lock; a limited-
+//   slip differential [~] (bias 1.8 [?]). The F1 gearbox (1997): Ferrari's own claim, 150 ms from the clutch fully
+//   opening to its closing against 270 ms for a conventional shift [v, Automotive News Europe]; Magneti Marelli's
+//   electro-hydraulics on the same six-speed and its single-plate clutch [v]; the throttle blipped on downshifts [~].
+//   [~] fitted: the drag area (to 295 km/h; Cx about 0.33 x some 1.9 m² before the cooling and the tyres), the
+//   dampers' multipliers, the F1 shift's phases (0.2 s overall: the clutch opening 50 ms, open 80 ms, closing 70 ms),
+//   the launch revs, the turning masses, the centre of gravity.
+const F355: RaceSpec = { id: 'f355', name: '1994 Ferrari F355 (실험)', mass: 1450 + 75, wheelbase: 2.45, track: 1.565, tyreR: 0.335, tyreW: 0.245, cgH: 0.44, frontShare: 0.42,
+  hp: 375, hpRpm: 8250, torqueRpm: 6000, torquePeak: 363, idle: 1000, redline: 8500, gears: [3.07, 2.16, 1.61, 1.27, 1.03, 0.84], final: 4.1, eff: 0.88,
+  brakes: 'disc', hydraulic: true, brakeG: 1.0, cdA: 0.66, crr: 0.012, steerLock: 30, topKmh: 295, check: false, cooling: { siphon: false, margin: 1.15 }, tyreKind: 'radial', era: '1994',
+  shiftT: 0.27, launchRpm: 5500, steer: { ratio: 19, ackermann: 0.6, rack: true }, inertia: { engine: 0.13, wheel: 1.4 },
+  tech: { rollF: 0.47, rearLsd: 1.8, abs: true, power: true, gearbox: 'manual', damp: { comfort: 0.65, sport: 1.3, speedK: 0.3 }, underbody: { clA: 0.13, front: 0.5, cdA: 0.01 }, tyreWF: 0.225, tyreWR: 0.265 } };
+/** the F355 with the 1997 F1 gearbox: the same body (mesh 'f355'), the shift of the automated manual */
+export function withF1Gearbox(s: RaceSpec): RaceSpec { return { ...s, id: s.id + 'f1', body: s.body ?? s.id, shiftT: 0.2, tech: { ...s.tech, gearbox: 'f1' } }; }
+AWAITING_MESH.f355 = F355;
+AWAITING_MESH.f355f1 = { ...withF1Gearbox(F355), name: '1997 Ferrari F355 F1 (실험)', era: '1997' };
+// When the F355's mesh is registered (render/car/meshcars.ts), move both into NEW (as the NSX was, review 153), the F1
+// on the same mesh id ('f355', its `body`), and time them into race/handicaps.json.
 NEW.nsx = NSX;   // review 153: its body mesh is built (render/car/mesh_nsx.ts) and registered
 Object.assign(EXP, NEW);
 /** the new 3D-first cars, offered beside the period ones */
 export const NEW_CARS: string[] = Object.keys(NEW);
 export const EXP_CARS: string[] = Object.keys(EXP).filter(id => !NEW[id]);
 /** the engine for the sound: cylinders, valves, blower (the experimental cars are not in the game's data) */
-export const EXP_ENGINE: Record<string, { kind: string; layout: string; supercharged?: boolean }> = { napier33: { kind: 'ohv', layout: 'W12' }, jagD55: { kind: 'ohv', layout: 'I6' }, auburn851: { kind: 'sv', layout: 'I8', supercharged: true }, mb540k: { kind: 'ohv', layout: 'I8', supercharged: true }, eb110: { kind: 'ohv', layout: 'V12' }, xj220: { kind: 'ohv', layout: 'V6' }, diablo: { kind: 'ohv', layout: 'V12' }, nsx: { kind: 'ohv', layout: 'V6' } };
+export const EXP_ENGINE: Record<string, { kind: string; layout: string; supercharged?: boolean }> = { napier33: { kind: 'ohv', layout: 'W12' }, jagD55: { kind: 'ohv', layout: 'I6' }, auburn851: { kind: 'sv', layout: 'I8', supercharged: true }, mb540k: { kind: 'ohv', layout: 'I8', supercharged: true }, eb110: { kind: 'ohv', layout: 'V12' }, xj220: { kind: 'ohv', layout: 'V6' }, diablo: { kind: 'ohv', layout: 'V12' }, nsx: { kind: 'ohv', layout: 'V6' }, f355: { kind: 'ohv', layout: 'V8' }, f355f1: { kind: 'ohv', layout: 'V8' } };
 export function raceSpec(id: string): RaceSpec {
   if (EXP[id]) return EXP[id]!; if (AWAITING_MESH[id]) return AWAITING_MESH[id]!;
   const s = (specs as { cars: Record<string, { car: string; engine: { hp: number }; wheelbase: number; track: number; tyre: string }> }).cars[id]!, p = PERIOD[id]!, t = tyre(s.tyre), hpRpm = p[0];
@@ -244,5 +289,5 @@ const SUSP: Record<string, Partial<Suspension>> = {
   mb540k: { front: 'wishbone', rear: 'swing', leafF: false, leafR: false },
   bmw315: { front: 'wishbone', leafF: true },
   jagD55: { front: 'wishbone', leafF: false, leafR: false }, eb110: { front: 'wishbone', rear: 'wishbone', leafF: false, leafR: false }, xj220: { front: 'wishbone', rear: 'wishbone', leafF: false, leafR: false }, diablo: { front: 'wishbone', rear: 'wishbone', leafF: false, leafR: false },
-  nsx: { front: 'wishbone', rear: 'wishbone', leafF: false, leafR: false } };
-export function suspension(c: RaceSpec): Suspension { return { front: 'beam', rear: 'beam', leafF: true, leafR: true, ...SUSP[c.id] }; }
+  nsx: { front: 'wishbone', rear: 'wishbone', leafF: false, leafR: false }, f355: { front: 'wishbone', rear: 'wishbone', leafF: false, leafR: false } };
+export function suspension(c: RaceSpec): Suspension { return { front: 'beam', rear: 'beam', leafF: true, leafR: true, ...SUSP[c.id] ?? (c.body ? SUSP[c.body] : undefined) }; }

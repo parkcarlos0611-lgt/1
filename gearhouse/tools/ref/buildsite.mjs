@@ -5,12 +5,13 @@
 import { build } from 'esbuild';
 import { readFileSync, writeFileSync, mkdirSync, rmSync, readdirSync, copyFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
-const [entry, tpl, out, page = 'index.html', extra] = process.argv.slice(2);
-rmSync(out, { recursive: true, force: true }); mkdirSync(out, { recursive: true });
-await build({ entryPoints: { app: entry }, bundle: true, minify: true, charset: 'utf8', format: 'iife', target: 'es2020', outdir: out, assetNames: 'assets/[name]-[hash]', publicPath: '', loader: { '.json': 'json', '.png': 'file', '.jpg': 'file', '.gltf': 'json', '.bin': 'dataurl' }   /* the host serves no .bin files: the models' buffers go inside the script */ });
+const args = process.argv.slice(2), opt = (k) => args.find(a => a.startsWith(`--${k}`)), [entry, tpl, out, page = 'index.html', extra] = args.filter(a => !a.startsWith('--'));
+const script = opt('script=')?.slice(9) || 'app';
+if (!opt('keep')) rmSync(out, { recursive: true, force: true }); mkdirSync(out, { recursive: true });
+await build({ entryPoints: { [script]: entry }, bundle: true, minify: true, charset: 'utf8', format: 'iife', target: 'es2020', outdir: out, assetNames: 'assets/[name]-[hash]', publicPath: '', loader: { '.json': 'json', '.png': 'file', '.jpg': 'file', '.gltf': 'json', '.bin': 'dataurl' }   /* the host serves no .bin files: the models' buffers go inside the script */ });
 const html = readFileSync(tpl, 'utf8'), tag = /<script>\s*\/\*BUNDLE\*\/\s*<\/script>/;
 if (!tag.test(html)) throw new Error('the template has no <script>/*BUNDLE*/</script>');
-writeFileSync(join(out, page), '<meta charset="utf-8">\n' + html.replace(tag, '<script src="app.js" charset="utf-8"></script>'));
+writeFileSync(join(out, page), '<meta charset="utf-8">\n' + html.replace(tag, `<script src="${script}.js" charset="utf-8"></script>`));
 if (extra) { const walk = (d, to) => { mkdirSync(to, { recursive: true }); for (const f of readdirSync(d)) { const p = join(d, f); if (statSync(p).isDirectory()) walk(p, join(to, f)); else copyFileSync(p, join(to, f)); } }; walk(extra, join(out, 'tex')); }
 const files = []; const list = (d) => { for (const f of readdirSync(d)) { const p = join(d, f); if (statSync(p).isDirectory()) list(p); else files.push(relative(out, p)); } }; list(out);
 let total = 0; for (const f of files) total += statSync(join(out, f)).size;

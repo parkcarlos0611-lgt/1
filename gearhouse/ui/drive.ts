@@ -5,7 +5,11 @@
 // manual, R back on the track. Lap times on the start line.
 import { TRACKS, trackDef, type TrackDef } from '../race/tracks';
 import type { Track } from '../race/track';
-import { raceSpec, RACE_CARS, EXP_CARS, NEW_CARS, EXP_ENGINE, steering } from '../race/cars';
+import { raceSpec, RACE_CARS, EXP_CARS, NEW_CARS, EXP_ENGINE, steering, addRaceCar } from '../race/cars';
+import { designSpec } from '../race/design';
+import { designMesh } from '../render/car/design';
+import type { Design } from '../core/design';
+import { decodeDesign, recordRun, KEYS, type KeyStore } from '../core/designstore';
 import { Vehicle, usefulLock, type Controls } from '../race/vehicle';
 import { CarSprites, PropSprites } from '../race/sprites';
 import type { Placed, Scenery } from '../race/scenery';
@@ -111,7 +115,22 @@ const wingMeshes = new Map<Mesh, Mesh>();
 /** pop-up head lamps raised while the lamps are on (review 144): the cars whose mesh takes the lamps as its second argument */
 const POPUP = new Set(['diablo', 'nsx', 'f355', 'f355f1']), lampMeshes = new Map<Mesh, Mesh>();
 function lampsUp(id: string, base: Mesh): Mesh { let m = lampMeshes.get(base); if (!m) { const e = MESH_CARS.find(c => c.id === id), f = e?.mesh as ((spin?: number, lamps?: number) => Mesh) | undefined; m = f ? renumber(f(0, 1), myNum) : base; lampMeshes.set(base, m); } return m; }
-function wingUp(id: string, base: Mesh): Mesh { let m = wingMeshes.get(base); if (!m) { const e = MESH_CARS.find(c => c.id === id), f = e?.mesh as ((spin?: number, wing?: number) => Mesh) | undefined; m = f ? renumber(f(0, 1), myNum) : base; wingMeshes.set(base, m); } return m; }
+function wingUp(id: string, base: Mesh): Mesh { if (DESIGN && id === DESIGN.id) return base;   /* a design's wing is not drawn yet (its mesh's second argument is the lamps) */
+  let m = wingMeshes.get(base); if (!m) { const e = MESH_CARS.find(c => c.id === id), f = e?.mesh as ((spin?: number, wing?: number) => Mesh) | undefined; m = f ? renumber(f(0, 1), myNum) : base; wingMeshes.set(base, m); } return m; }
+// ---- a design from the parts builder (docs/systems/98, B4): ?design=<the design as base64url JSON>, or ?design=stored
+// (the builder's last test drive kept in this browser). Its physics made from it (race/design.ts), its body from the car
+// kit (render/car/design.ts, pop-up lamps on both bases); offered first in the car list and chosen; its runs (its best
+// lap at each track, the top speed it reached) recorded under the design for the builder's readouts ----
+const STORE: KeyStore | null = (() => { try { return localStorage; } catch { return null; } })();
+const DESIGN: { d: Design; id: string } | null = (() => { let q: string | null = null; try { q = new URLSearchParams(location.search).get('design'); if (q === 'stored' || q === '') q = STORE?.getItem(KEYS.testDrive) ?? null; } catch { q = null; }
+  if (!q) return null; const d = decodeDesign(q); if (!d) { console.warn('design: the link holds no design'); return null; }
+  const spec = designSpec(d); addRaceCar(spec); MESH_CARS.push({ id: spec.id, name: d.name, mesh: (spin?: number, lamps?: number) => designMesh(d, spin, lamps) });
+  EXP_ENGINE[spec.id] = { kind: 'ohv', layout: d.engine.layout }; POPUP.add(spec.id); carId = spec.id; return { d, id: spec.id }; })();
+let dTop = 0, dTopKept = 0, dTopAt = 0;
+/** the design's run recorded: a lap done (s), or the top speed now and then as it climbs */
+function designRun(lap?: number) { if (!DESIGN || carId !== DESIGN.id) return; dTop = Math.max(dTop, car.speed * 3.6);
+  if (lap) { recordRun(STORE, DESIGN.d, { topKmh: dTop, lap: { trackId: trackKey(), track: TD.label, t: lap } }); dTopKept = dTop; }
+  else if (dTop > dTopKept + 1 && clock - dTopAt > 2) { recordRun(STORE, DESIGN.d, { topKmh: dTop }); dTopKept = dTop; dTopAt = clock; } }
 /** the later technology's readouts (review 125): boost, ABS working, the wing up, the drive's split */
 function techHud(): string { const X = car.spec.tech; if (!X) return ''; let o = '';
   if (X.turbo) o += `<span>부스트 ${(car.boost * X.turbo.boost).toFixed(2)} bar</span>`;
@@ -400,7 +419,7 @@ const shortName = (id: string) => SHORT[id] ?? raceSpec(id).name.replace(/^\d{4}
 const fmtGap = (g: { s: number; laps: number }) => g.laps ? `+${g.laps}랩` : `+${g.s.toFixed(1)}`;
 let boardTick = 0, seenLaps = 0, pbMsg = '', pbT = 0;
 /** my laps in a race, each taken once as it is done (its notice, the record) */
-function myLaps() { const me = race?.player; if (!me) return; const laps = lapTimes(me); if (laps.length > seenLaps) { seenLaps = laps.length; if (!st.pilot) onLap(laps[laps.length - 1]!, bestOf(laps.slice(0, -1))); } }
+function myLaps() { const me = race?.player; if (!me) return; const laps = lapTimes(me); if (laps.length > seenLaps) { seenLaps = laps.length; designRun(laps[laps.length - 1]!); if (!st.pilot) onLap(laps[laps.length - 1]!, bestOf(laps.slice(0, -1))); } }
 function raceOverlay() { const r = race; $('raceovl').hidden = !r; if (!r) return; const me = r.player!, rows = r.standings();
   $('stand').innerHTML = rows.map(q => { const e = q.e, wait = r.clock < e.start, gap = q.pos === 1 ? (e.finish ? '완주' : '선두') : wait ? `출발 ${Math.ceil(e.start - r.clock)}s` : fmtGap(q.leader);
     return `<tr${e === me ? ' class="me"' : ''}><td class="n">${q.pos}</td><td>${shortName(e.id)}</td><td class="g">${gap}</td><td class="l">${e.finish ? '✓' : `${q.lap}/${r.laps}`}</td></tr>`; }).join('');
@@ -494,10 +513,11 @@ function frame(now: number) { const el = Math.min(0.1, (now - last) / 1000); las
     if (race) { race.step(DT, u); wheelTurn = race.player!.wheelTurn; if (race.done && !$('results').dataset.shown) results(); } else { car.step(DT, u); wheelTurn += (car.w[0]! + car.w[1]!) / 2 * DT; }
     for (const c of race ? race.cars.map(e => e.car) : [car]) { marks(c); fence(c); }
     // lap: forward across the start line
-    if (!race && T.gap(prevS, START) > 0 && T.gap(car.s, START) <= 0 && car.vx > 1) { if (lapStart >= 0) { lastLap = clock - lapStart; const before = bestLap; if (!bestLap || lastLap < bestLap) bestLap = lastLap; say(`한 바퀴 ${fmt(lastLap)}`); if (!st.pilot) onLap(lastLap, before); } lapStart = clock; }
+    if (!race && T.gap(prevS, START) > 0 && T.gap(car.s, START) <= 0 && car.vx > 1) { if (lapStart >= 0) { lastLap = clock - lapStart; const before = bestLap; if (!bestLap || lastLap < bestLap) bestLap = lastLap; say(`한 바퀴 ${fmt(lastLap)}`); designRun(lastLap); if (!st.pilot) onLap(lastLap, before); } lapStart = clock; }
     prevS = car.s;
     if (dirtGrows && car.speed > 1) { const grass = car.onGrass.filter(Boolean).length / 4; myWear[2] = Math.min(1, myWear[2] + DT * car.speed * (grass * 0.0012 + 0.000004)); }   /* mud off the grass quickly, road dust slowly */
     if (car.over) { say('뱅크 꼭대기를 넘어갔습니다 — 트랙으로 복귀'); car.over = false; car.place(car.s, 0, 0); } if (car.upset && car.speed < 3) { say('차가 뒤집혔습니다 — 트랙으로 복귀'); car.place(car.s, 0, 0); } }
+  designRun();
   for (const p of puffs) { p.x += p.vx * el; p.y += p.vy * el; p.z += 0.4 * el; p.r += 0.9 * el; p.a -= 0.4 * el; } while (puffs.length && puffs[0]!.a <= 0) puffs.shift(); for (let i = puffs.length - 1; i >= 0; i--) if (puffs[i]!.a <= 0) puffs.splice(i, 1);
   // the camera: on the car, a little ahead of where it is going
   const lead = Math.min(10, car.speed * 0.2), tx = car.x + Math.cos(car.yaw) * lead, ty = car.y + Math.sin(car.yaw) * lead, tz = T.height(car.s, car.off);
@@ -527,6 +547,9 @@ function frame(now: number) { const el = Math.min(0.1, (now - last) / 1000); las
 const pick = $<HTMLSelectElement>('car'); for (const id of RACE_CARS) pick.add(new Option(raceSpec(id).name, id));
 { const g = document.createElement('optgroup'); g.label = '새 3D 차 (레퍼런스 시트로 제작)'; for (const id of NEW_CARS) g.append(new Option(raceSpec(id).name, id)); pick.append(g); }
 { const g = document.createElement('optgroup'); g.label = '실험: 시대 밖의 차'; for (const id of EXP_CARS) g.append(new Option(`${raceSpec(id).name} — ${raceSpec(id).era}`, id)); pick.append(g); }
+if (DESIGN) { const g = document.createElement('optgroup'); g.label = '부품 빌더의 설계'; g.append(new Option(`${DESIGN.d.name} (설계)`, DESIGN.id)); pick.prepend(g); SHORT[DESIGN.id] = DESIGN.d.name.slice(0, 16);
+  const a = document.createElement('a'); a.className = 'btn'; a.href = 'builder.html'; a.textContent = '← 부품 빌더로'; const n = document.createElement('p'); n.className = 'note'; n.textContent = `설계 "${DESIGN.d.name}"을 시험 주행합니다. 랩 타임과 낸 최고 속도가 설계에 기록되어 빌더의 "측정"에 나옵니다.`;
+  document.querySelector('section[data-tab="drive"]')?.prepend(a, n); }
 pick.value = carId;
 // the race tab's own list of cars to pick as opponents (review 162)
 { const box = $('picklist'); for (const id of ALL_CARS) { const l = document.createElement('label'); l.className = 'check'; const c = document.createElement('input'); c.type = 'checkbox'; c.value = id; c.checked = ['dueSSJ35', 'fnTT33', 'bmw315'].includes(id); l.append(c, ` ${shortName(id)}`); box.append(l); }

@@ -2,7 +2,7 @@
 // back, anything else turned away or mended, the saved list and the measurements in a fake storage; format 1's designs
 // (before review 177) brought to format 2 (core/design.ts), and the engine's grade keeping its details in bounds.
 import { describe, it, expect } from 'vitest';
-import { DESIGN_NSX, DESIGN_F355, LIMITS, BODY_LIMITS, normalise, migrate, gradeFor, gradeLock, GRADE_RULES, type Design, type DesignV1 } from '../core/design';
+import { DESIGN_NSX, DESIGN_F355, LIMITS, BODY_LIMITS, normalise, migrate, toV4, gradeFor, gradeLock, GRADE_RULES, type Design, type DesignV1 } from '../core/design';
 import { encodeDesign, decodeDesign, parseDesign, designJson, asDesign, savedDesigns, saveDesign, deleteDesign, currentDesign, keepCurrent,
   measured, recordRun, fromPreset, designSig, KEYS, type KeyStore } from '../core/designstore';
 
@@ -60,7 +60,7 @@ const v1Link = (d: unknown) => { const bytes = new TextEncoder().encode(JSON.str
 
 describe('format 1 brought to format 2', () => {
   it('the two cars as format 1 wrote them come back as format 2\'s own, through normalise, a file, a link and the saved list', () => {
-    expect(normalise(V1_NSX)).toEqual(DESIGN_NSX); expect(normalise(V1_F355)).toEqual(DESIGN_F355); expect(migrate(V1_F355)).toEqual(DESIGN_F355);
+    expect(normalise(V1_NSX)).toEqual(DESIGN_NSX); expect(normalise(V1_F355)).toEqual(DESIGN_F355); expect(toV4(migrate(V1_F355))).toEqual(DESIGN_F355);
     expect(parseDesign(JSON.stringify(V1_NSX))).toEqual(DESIGN_NSX); expect(decodeDesign(v1Link(V1_F355))).toEqual(DESIGN_F355);
     const s = fake(); s.m.set(KEYS.designs, JSON.stringify([{ ...V1_NSX, id: 'old', name: '예전 설계' }, DESIGN_F355])); s.m.set(KEYS.current, JSON.stringify(V1_F355));
     expect(savedDesigns(s)).toEqual([{ ...DESIGN_NSX, id: 'old', name: '예전 설계' }, DESIGN_F355]); expect(currentDesign(s)).toEqual(DESIGN_F355); });
@@ -104,6 +104,6 @@ describe('format 2 (alpha 0.10) designs in format 3', () => {
   });
   it('the dimensions brought inside their base\'s ranges; the EB110 a base of its own', () => {
     const d = asDesign({ body: { base: 'eb110', roof: -999, cabin: 40, rake: 99 } })!;
-    expect(d.body.roof).toBe(BODY_LIMITS('eb110').roof[0]); expect(d.body.cabin).toBe(40); expect(d.body.rake).toBe(BODY_LIMITS('eb110').rake[1]); expect(d.body.tail).toBe('capsule'); expect(d.v).toBe(3);
+    expect(d.body.roof).toBe(BODY_LIMITS('eb110').roof[0]); expect(d.body.cabin).toBe(40); expect(d.body.rake).toBe(BODY_LIMITS('eb110').rake[1]); expect(d.body.tail).toBe('capsule'); expect(d.v).toBe(4);
   });
 });

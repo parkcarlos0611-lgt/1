@@ -24,10 +24,10 @@
 //           where the power meets the drag and the rolling resistance, comes at the power peak in top gear.
 //   class, cost, reliability: designFigures (the class from the figures, doc 99 6-2; cost and reliability placeholders
 //           until B5).
-import type { Design, BaseId, Structure, Panels, Grade, Interior } from '../core/design';
+import type { Design, BaseId, Structure, Panels, Interior } from '../core/design';
 import { DESIGN_NSX, DESIGN_F355, DESIGN_EB110 } from '../core/design';
 import { type RaceSpec, torqueAt, EPS_SPEED_SENSITIVE } from './cars';
-import { HP, CYL, engineFigures, engineMass, enginePackage, pistonSpeed, tyreR } from './designparts';
+import { HP, engineMass, enginePackage, tyreR, engineFigures, engineCost, engineReliability } from './designparts';
 import { fit, fitPenalty, type FitResult } from './fit';
 export { pistonSpeed } from './designparts';
 
@@ -215,16 +215,11 @@ export const BODY_FORM = '2도어 쿠페';
 // index too (the NSX's 100, the period's most dependable supercar): the grade, the boost (each turbo's heat; past the
 // knock limit), the piston speed past the grade's, magnesium, the fit's work. The service interval (km) follows the
 // grade. None of these is final: B5 sets the real costs, the research and the wear.
-const GRADE_COST: Record<Grade, number> = { 1: 0.6, 2: 1, 3: 1.6, 4: 2.6, 5: 4.2 };
-const GRADE_RELIABLE: Record<Grade, number> = { 1: 1.1, 2: 1, 3: 0.85, 4: 0.65, 5: 0.35 };
-const GRADE_SERVICE: Record<Grade, number> = { 1: 15000, 2: 10000, 3: 7500, 4: 5000, 5: 1500 };
 export const STRUCTURE_COST: Record<Structure, number> = { steel: 1, hss: 1.2, aluminium: 2, honeycomb: 3.2, cfrp: 6 };
 export const PANEL_COST: Record<Panels, number> = { steel: 1, aluminium: 1.6, frp: 0.8, cfrp: 4 };
 function rawCost(d: Design): number {
-  const E = d.engine, D = d.drive, K = d.kit, L = wheelbase(d), size = sizeOf(d, L);
-  const engine = 30 * GRADE_COST[E.grade] * Math.sqrt(CYL[E.layout] / 6) * (E.cc / 3000) ** 0.4 * (E.valves === 5 ? 1.08 : 1)
-    + { single: 0, variable: 1.5, itb: 4 }[E.intake] + (E.compression === 'high' ? 0.5 : 0) + (E.sump === 'dry' ? 3 : 0) + { iron: -2, aluminium: 0, magnesium: 8 }[E.block]
-    + E.turbo * 4 + (E.turbo && E.intercooler ? 1.5 * Math.ceil(E.turbo / 2) : 0) + (E.vtec ? 3 : 0);
+  const D = d.drive, K = d.kit, L = wheelbase(d), size = sizeOf(d, L);
+  const engine = engineCost(d);   // race/designparts.ts: the grade, the size, the details, the parts' quality
   const body = 25 * STRUCTURE_COST[d.body.structure] * size + 10 * PANEL_COST[d.body.panels] * size + 10;
   const drive = (D.gears === 5 ? 7 : 8) + (D.gearbox === 'f1' ? 4 : 0) + (D.lsd ? 1.5 : 0) + (D.awd ? 8 : 0);
   const kit = { light: 5, standard: 0, luxury: 6 }[K.interior] + (K.abs ? 3 : 0) + (K.tcs ? 2 : 0) + { manual: 0, hydraulic: 1.5, electric: 2 }[K.steering] + (K.dampers === 'adaptive' ? 3 : 0) + (K.wing ? 1.5 : 0) + (K.diffuser ? 2 : 0)
@@ -232,10 +227,8 @@ function rawCost(d: Design): number {
   return engine + body + drive + kit + fitPenalty(d).cost; }
 const COST_NSX = rawCost(DESIGN_NSX);
 export function designCost(d: Design): { cost: number; reliability: number; serviceKm: number } {
-  const E = d.engine, en = engineFigures(d), over = Math.max(0, pistonSpeed(d, en.hpRpm) - 21 - 1.5 * (E.grade - 2));
-  const reliability = Math.max(5, Math.min(110, 100 * GRADE_RELIABLE[E.grade] - 4 * E.turbo - 25 * en.overKnock - 3 * over - (E.block === 'magnesium' ? 5 : 0) - fitPenalty(d).reliability));
-  const serviceKm = Math.round(GRADE_SERVICE[E.grade] * (E.turbo ? 0.85 : 1) * (en.overKnock > 0 ? 0.7 : 1) / 500) * 500;
-  return { cost: rawCost(d) / COST_NSX * 100, reliability, serviceKm }; }
+  const e = engineReliability(d);
+  return { cost: rawCost(d) / COST_NSX * 100, reliability: Math.max(5, Math.min(110, e.reliability - fitPenalty(d).reliability)), serviceKm: e.serviceKm }; }
 
 /** what the builder screen shows: the figures, the class's shares and its label, the body's form, the cost and the
  *  reliability (placeholders), the fit (race/fit.ts) */

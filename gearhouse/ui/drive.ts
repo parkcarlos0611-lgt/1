@@ -65,7 +65,15 @@ let cut = false; let shot: { kind: 'side' | 'chase' | 'top'; cam?: { s: number; 
 let snd: Sound | null = null, lastS = 0, lastGear = 1, lastV = 0, wasAir = false; const steam: { x: number; y: number; z: number; r: number; a: number }[] = []; let pilot = new Driver(T), camAng = Math.PI / 2, wheelTurn = 0;   // camAng: the world heading that shows as up the screen let pilot = new Driver(T);
 let lookAt: [number, number, number] | null = null;   // a fixed point the camera looks at (page tests: tools set it through __drive.look)
 let car!: Vehicle, sprites!: CarSprites, carId = 'chevAB28', camX = 0, camY = 0, camZ = 0;
-const keys = new Set<string>(), input = { steer: 0, throttle: 0, brake: 0, hand: 0 }; let manualGear = 1;
+const keys = new Set<string>(), input = { steer: 0, throttle: 0, brake: 0, hand: 0 }; let manualGear = 1, revHold = 0;
+// the on-screen steering wheel (review 169): dragged round like a wheel, ±135° to full lock; let go, it springs back
+let wheelHeld = false, wheelSteer = 0;
+{ const tw = document.getElementById('tw') as HTMLElement | null; if (tw) { let a0 = 0, s0 = 0; const ang = (e: PointerEvent) => { const r = tw.getBoundingClientRect(); return Math.atan2(e.clientX - (r.left + r.width / 2), -(e.clientY - (r.top + r.height / 2))); };
+  const show = () => { tw.style.setProperty('--a', `${(-wheelSteer * 135).toFixed(1)}deg`); tw.setAttribute('aria-valuenow', (-wheelSteer).toFixed(2)); };
+  tw.addEventListener('pointerdown', e => { e.preventDefault(); tw.setPointerCapture(e.pointerId); wheelHeld = true; a0 = ang(e); s0 = wheelSteer; });
+  tw.addEventListener('pointermove', e => { if (!wheelHeld) return; let d = ang(e) - a0; d = Math.atan2(Math.sin(d), Math.cos(d)); wheelSteer = Math.max(-1, Math.min(1, s0 - d / (135 * Math.PI / 180))); show(); });
+  const up = () => { wheelHeld = false; const back = () => { if (wheelHeld) return; wheelSteer *= 0.7; if (Math.abs(wheelSteer) < 0.01) wheelSteer = 0; show(); if (wheelSteer) requestAnimationFrame(back); }; requestAnimationFrame(back); };
+  tw.addEventListener('pointerup', up); tw.addEventListener('pointercancel', up); tw.addEventListener('lostpointercapture', up); tw.addEventListener('contextmenu', e => e.preventDefault()); } }
 const skids: { x: number; y: number; z: number; a: number }[] = [], puffs: { x: number; y: number; z: number; r: number; a: number; vx: number; vy: number }[] = [];
 let lapStart = -1, lastLap = 0, bestLap = 0, clock = 0, prevS = 0, msg = '', msgT = 0;
 // a race: the entrants and their pictures (the player's car is `car`, its pictures `sprites`)
@@ -211,7 +219,10 @@ function mini() { mctx.clearRect(0, 0, 150, 150); mctx.strokeStyle = 'rgba(235,2
   for (const d of dots) { const [X, Y] = mp(d.c.x, d.c.y); mctx.fillStyle = d.me ? '#ffb347' : '#9fc3ff'; mctx.beginPath(); mctx.arc(X, Y, d.me ? 4 : 3, 0, Math.PI * 2); mctx.fill(); if (d.me) { mctx.strokeStyle = '#000'; mctx.lineWidth = 1; mctx.stroke(); } } }
 // ---- steam from a boiling radiator or a blown gasket ----
 /** the dials (temporary): a speedometer and a revolution counter, bottom left, period faces */
-function dials() { const r = Math.max(26, Math.min(46, Math.round(VH * 0.11))), y = VH - r - 8, top = Math.ceil(car.spec.topKmh / 20) * 20 + 20, maxR = Math.ceil(car.spec.redline * 1.2 / 500) * 500;
+function dials() { const pad = document.getElementById('pad'), padOn = !!pad && getComputedStyle(pad).display !== 'none', tw = document.getElementById('tw');
+  // review 169: with the touch controls on, the gauges move right of the on-screen wheel, and its own drawn wheel is left out
+  let x0 = 8; if (padOn && tw) { const cr = cv.getBoundingClientRect(), k = cr.width / VW || 1; x0 = Math.max(8, Math.round((tw.getBoundingClientRect().right - cr.left) / k) + 10); }
+  const r = Math.max(26, Math.min(46, Math.round(VH * 0.11))), y = VH - r - 8, top = Math.ceil(car.spec.topKmh / 20) * 20 + 20, maxR = Math.ceil(car.spec.redline * 1.2 / 500) * 500;
   const dial = (cx: number, v: number, max: number, step: number, label: string, red: number, sub: string) => { const a0 = Math.PI * 0.75, a1 = Math.PI * 2.25, ang = (x: number) => a0 + (a1 - a0) * Math.min(1, Math.max(0, x / max));
     main.fillStyle = 'rgba(18,16,14,0.82)'; main.beginPath(); main.arc(cx, y, r, 0, Math.PI * 2); main.fill(); main.strokeStyle = '#b9a77e'; main.lineWidth = 2; main.stroke();
     if (red < max) { main.strokeStyle = '#c0392b'; main.lineWidth = 3; main.beginPath(); main.arc(cx, y, r - 4, ang(red), ang(max)); main.stroke(); }
@@ -220,8 +231,9 @@ function dials() { const r = Math.max(26, Math.min(46, Math.round(VH * 0.11))), 
       if (big && r > 30) main.fillText(String(Math.round(x / (label === 'rpm' ? 1000 : 1))), cx + Math.cos(a) * (r - 15), y + Math.sin(a) * (r - 15)); }
     const a = ang(v); main.strokeStyle = '#ff9f40'; main.lineWidth = 2; main.beginPath(); main.moveTo(cx - Math.cos(a) * 5, y - Math.sin(a) * 5); main.lineTo(cx + Math.cos(a) * (r - 6), y + Math.sin(a) * (r - 6)); main.stroke();
     main.fillStyle = '#d8c9a3'; main.beginPath(); main.arc(cx, y, 3, 0, Math.PI * 2); main.fill(); main.fillStyle = '#efe7d2'; main.fillText(sub, cx, y + r * 0.45); main.font = `${Math.max(5, Math.round(r * 0.16))}px Oswald, sans-serif`; main.fillText(label === 'rpm' ? 'RPM ×1000' : 'KM/H', cx, y - r * 0.38); main.textAlign = 'left'; };
-  dial(8 + r, car.speed * 3.6, top, top > 160 ? 40 : 20, 'km/h', top, `${(car.speed * 3.6).toFixed(0)}`);
-  dial(8 + r * 3 + 8, car.rpm, maxR, 1000, 'rpm', car.spec.redline, `${car.gear}단`);
+  dial(x0 + r, car.speed * 3.6, top, top > 160 ? 40 : 20, 'km/h', top, `${(car.speed * 3.6).toFixed(0)}`);
+  dial(x0 + r * 3 + 8, car.rpm, maxR, 1000, 'rpm', car.spec.redline, car.reverse ? 'R' : `${car.gear}단`);
+  if (padOn) return;
   // the steering wheel as the driver's hands have it (review 100): turned by the road wheels' angle times the ratio
   { const cx = 8 + r * 5 + 16, rr = r * 0.8, a = -car.sw, S = steering(car.spec), l2l = 2 * car.spec.steerLock * S.ratio / 360;
     main.save(); main.translate(cx, y); main.fillStyle = 'rgba(18,16,14,0.55)'; main.beginPath(); main.arc(0, 0, rr + 4, 0, Math.PI * 2); main.fill();
@@ -366,7 +378,7 @@ function drawCar() { const z = T.height(car.s, car.off) + car.zb, roll = car.til
   const f = sprites.get(sprites.key(car.yaw - a, roll, car.steer, wheelTurn, car.speed)), [X, Y] = P(car.x, car.y, z); ctx.drawImage(f.canvas, Math.round(X - f.ax), Math.round(Y - f.ay)); }
 function drawPuffs() { if (live) return; for (const p of puffs) { ctx.fillStyle = `rgba(205,200,190,${p.a})`; const r = p.r * 1000 / mm; ctx.beginPath(); ctx.arc(...P(p.x, p.y, p.z), r, 0, Math.PI * 2); ctx.fill(); } }
 const fmt = (t: number) => t > 0 ? `${Math.floor(t / 60)}:${(t % 60).toFixed(2).padStart(5, '0')}` : '-';
-function hud() { const kmh = car.speed * 3.6; $('spd').textContent = kmh.toFixed(0); $('gear').textContent = String(car.gear); $('rpm').textContent = car.rpm.toFixed(0);
+function hud() { const kmh = car.speed * 3.6; $('spd').textContent = kmh.toFixed(0); $('gear').textContent = car.reverse ? 'R' : String(car.gear); $('rpm').textContent = car.rpm.toFixed(0);
   ($('rpmbar') as HTMLElement).style.width = `${Math.min(100, car.rpm / car.spec.redline * 100)}%`; ($('rpmbar') as HTMLElement).style.background = car.rpm > car.spec.hpRpm * 1.05 ? 'var(--warn)' : 'var(--accent)';
   $('lap').textContent = `이번 바퀴 ${lapStart >= 0 ? fmt(clock - lapStart) : '-'}`; $('last').textContent = `지난 ${fmt(lastLap)}`; $('best').textContent = `최고 ${fmt(bestLap)}`; $('where').textContent = T.pieceAt(car.s);
   { const h = car.health, w = h.warnings(car.rpm, car.spec.redline), cls = (k: string) => w.includes(k) ? (k === 'boil' ? 'boil' : 'hot') : '';
@@ -458,13 +470,21 @@ $<HTMLInputElement>('touch').checked = matchMedia('(pointer: coarse)').matches; 
 $<HTMLInputElement>('touch').addEventListener('change', e => document.body.classList.toggle('touch', (e.target as HTMLInputElement).checked));
 const down = (...ks: string[]) => ks.some(k => keys.has(k));
 function controls(dt: number): Controls { const left = down('arrowleft', 'a'), right = down('arrowright', 'd'), want = left === right ? 0 : left ? 1 : -1;
+  if (wheelHeld) input.steer = wheelSteer; else
   input.steer += want === 0 ? -Math.sign(input.steer) * Math.min(Math.abs(input.steer), dt * 4) : Math.max(-dt * 2.6, Math.min(dt * 2.6, want - input.steer));
-  input.throttle = Math.max(0, Math.min(1, input.throttle + (down('arrowup', 'w') ? (st.progressive ? 0.55 : 2.2) : (st.progressive ? -3 : -6)) * dt));   /* review 147: a key opens the throttle over about half a second, not a quarter */   /* the gauge mode: the pedal goes down as long as it is held */
-  input.brake = Math.max(0, Math.min(1, input.brake + (down('arrowdown', 's') ? 5 : -8) * dt)); input.hand = down(' ') ? 1 : 0;
+  // review 169: reverse. Holding the brake at a standstill for half a second engages it; then the brake drives backwards
+  // (capped about 20 km/h) and the accelerator brakes; the accelerator at a standstill puts it back in first
+  const gasK = down('arrowup', 'w'), brakeK = down('arrowdown', 's');
+  if (!car.reverse) { revHold = brakeK && !gasK && car.speed < 0.4 ? revHold + dt : 0; if (revHold > 0.5) { car.reverse = true; revHold = 0; say('후진'); } }
+  else if (gasK && car.speed < 0.4) { car.reverse = false; say('전진'); }
+  const fwdK = car.reverse ? brakeK : gasK, stopK = car.reverse ? gasK : brakeK;
+  input.throttle = Math.max(0, Math.min(1, input.throttle + (fwdK ? (st.progressive ? 0.55 : 2.2) : (st.progressive ? -3 : -6)) * dt));   /* review 147: a key opens the throttle over about half a second, not a quarter */   /* the gauge mode: the pedal goes down as long as it is held */
+  input.brake = Math.max(0, Math.min(1, input.brake + (stopK ? 5 : -8) * dt)); input.hand = down(' ') ? 1 : 0;
   let steer = input.steer; if (st.assist) { const over = car.r - car.speed * T.at(car.s).k; if (Math.abs(over) > 0.1 && Math.sign(over) === Math.sign(-car.vy)) steer += Math.atan2(car.vy, Math.max(5, car.vx)) / usefulLock(car.spec, car.speed, car.tyre.mu) * 0.7; }
   const most = car.spec.steerLock * Math.PI / 180 / usefulLock(car.spec, car.speed, car.tyre.mu);
   // the traction assist (review 147, for the keyboard, which cannot feather a pedal): the throttle eased while a driven wheel spins past about 10 %
   let thr = input.throttle; if (st.tcs && car.speed > 2) { const f = car.spec.tech?.drive?.front ?? 0, sx = Math.max(...[0, 1, 2, 3].filter(i => (i < 2 ? f : 1 - f) > 0).map(i => car.slipX[i]!)); if (sx > 0.08) thr *= Math.max(0.15, 1 - (sx - 0.08) / 0.12); }
+  if (car.reverse && car.speed * 3.6 > 20) thr = 0;
   return { steer: Math.max(-most, Math.min(most, steer)), throttle: thr, brake: input.brake, handbrake: input.hand, gear: manualGear }; }
 // ---- the loop ----
 let last = performance.now(), acc = 0;

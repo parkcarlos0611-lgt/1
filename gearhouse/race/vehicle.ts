@@ -88,6 +88,7 @@ export class Vehicle {
   /** review 149: the traction control's switch (the driver's button; on at the start), working now, and how far its
    *  throttle actuator has closed (0..1 of the driver's opening); VTEC on the high cam; the steering's effort as the
    *  driver's hands feel it (0 none; the hands' rate is HANDS / (1 + effort)) and the assistance's share of it (1 none) */
+  /** reverse gear engaged (review 169): selected only at a standstill */ reverse = false;
   tcsEnabled = true; tcsOn = false; tcsCut = 0; vtecHigh = false; steerEffort = 0; steerAssist = 1;
   /** review 158: the dampers' setting (the driver's switch, sport for racing) and the multiplier on the damping it gives
    *  now; the automated manual's state: the clutch's engagement (0..1, the control unit's own), the throttle it blips on a
@@ -204,7 +205,8 @@ export class Vehicle {
     // ---- drive line: gear changes, the engine, the clutch, the open differential ----
     this.shift -= dt; const vxh = this.vx, F1 = c.tech?.gearbox === 'f1';
     const wheelRpm = Math.max(0, vxh) / R * c.gears[this.gear - 1]! * c.final * 30 / Math.PI;
-    if (this.shift <= 0) { let to = this.gear;
+    if (this.reverse) { this.gear = 1; this.shift = 0; }   /* review 169: in reverse the box stays put */
+    if (this.shift <= 0 && !this.reverse) { let to = this.gear;
       if (this.auto) { if (wheelRpm > Math.min(c.hpRpm * 1.04, c.redline * 0.92) && this.gear < c.gears.length) to = this.gear + 1; else if (this.gear > 1 && wheelRpm * c.gears[this.gear - 2]! / c.gears[this.gear - 1]! < c.hpRpm * 0.8) to = this.gear - 1; }
       else if (u.gear && u.gear !== this.gear) to = F1 ? this.gear + Math.sign(u.gear - this.gear) : Math.max(1, Math.min(c.gears.length, u.gear));   /* the paddles step one gear a pull */
       if (F1 && to < this.gear && wheelRpm * c.gears[to - 1]! / c.gears[this.gear - 1]! > c.redline) to = this.gear;   /* the control unit refuses a downshift that would over-rev */
@@ -215,7 +217,7 @@ export class Vehicle {
     const p = this.shift > 0 ? 1 - this.shift / this.shiftDur : 1, env = p < 0.25 ? 1 - p / 0.25 : p < 0.65 ? 0 : (p - 0.65) / 0.35, down = this.gear < this.gearFrom;
     const gi = F1 && this.shift > 0 && p < 0.45 ? this.gearFrom : this.gear;   /* the old gear until the clutch is open */
     const X = c.tech, fF = X?.drive ? X.drive.front : 0, wFa = (this.w[0]! + this.w[1]!) / 2, wRa = (this.w[2]! + this.w[3]!) / 2;   /* the centre differential: the shaft turns at the axles' speeds weighted by their torque shares */
-    const Gr = c.gears[gi - 1]! * c.final, we = this.rpm * Math.PI / 30, wd = fF * wFa + (1 - fF) * wRa, idle = c.idle * Math.PI / 30;
+    const Gr = (this.reverse ? -c.gears[0]! * 1.1 : c.gears[gi - 1]!) * c.final,   /* review 169: reverse a little lower than first, turning the shaft the other way */ we = this.rpm * Math.PI / 30, wd = fF * wFa + (1 - fF) * wRa, idle = c.idle * Math.PI / 30;
     const thrD = Math.max(0, Math.min(1, u.throttle)) * (this.auto && this.rpm > c.redline * 0.98 ? 0.25 : 1);
     // the blip: on a downshift, with the clutch opening and open, the control unit opens the throttle to bring the revs to
     // what the lower gear will turn them at (a proportional opening, full 1,500 rpm short), and lets it close as it nears them

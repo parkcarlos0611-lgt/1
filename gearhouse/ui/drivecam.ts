@@ -24,6 +24,29 @@ export function nextView(v: CamView, ok: (v: CamView) => boolean = () => true): 
 export function pedalValue(y: number, top: number, h: number, dead = 0.08): number {
   if (!(h > 0)) return 0; const t = (top + h - y) / h; return Math.max(0, Math.min(1, (t - dead) / (1 - 2 * dead))); }
 
+/** the pedals' state carried from step to step: the throttle and brake the car gets (0..1), the gear's direction, how long
+ *  the brake has been held at a standstill */
+export interface PedalState { throttle: number; brake: number; reverse: boolean; revHold: number }
+/** one step's pedals: the analog amounts (a touch pedal's or a gamepad trigger's, -1 none), the keys held, Shift (half
+ *  throttle from the keyboard), the gauge mode (a key opens it slowly) and the car's speed (m/s) */
+export interface PedalIn { gasA: number; brakeA: number; gasKey: boolean; brakeKey: boolean; shift?: boolean; progressive?: boolean; speed: number }
+/** the pedals for one step (review 169's reverse, alpha 0.12's analog pedals): an analog pedal sets its opening as far as
+ *  it is pressed (quickly, not in one step), a key opens and closes it over time. Holding the brake (a key, or a pedal past
+ *  a quarter) at a standstill for half a second engages reverse; then the brake drives backwards and the accelerator
+ *  brakes; the accelerator (past an eighth) at a standstill puts it back in first. Changes s; returns what to tell the
+ *  driver when the direction changes */
+export function pedalStep(s: PedalState, i: PedalIn, dt: number): '후진' | '전진' | null {
+  const gasK = i.gasKey || i.gasA > 0.12, brakeK = i.brakeKey || i.brakeA > 0.25; let said: '후진' | '전진' | null = null;
+  if (!s.reverse) { s.revHold = brakeK && !gasK && i.speed < 0.4 ? s.revHold + dt : 0; if (s.revHold > 0.5) { s.reverse = true; s.revHold = 0; said = '후진'; } }
+  else if (gasK && i.speed < 0.4) { s.reverse = false; said = '전진'; }
+  const r = s.reverse, fwdK = r ? brakeK : gasK, stopK = r ? gasK : brakeK, fwdA = r ? i.brakeA : i.gasA, stopA = r ? i.gasA : i.brakeA, fwdKey = r ? i.brakeKey : i.gasKey, stopKey = r ? i.gasKey : i.brakeKey;
+  const toward = (x: number, to: number, up: number, dn: number) => x < to ? Math.min(to, x + up * dt) : Math.max(to, x - dn * dt);
+  if (fwdA >= 0 && !fwdKey) s.throttle = toward(s.throttle, fwdA, 8, 10);
+  else if (fwdK && i.shift) s.throttle = toward(s.throttle, 0.5, i.progressive ? 0.55 : 2.2, 6);
+  else s.throttle = Math.max(0, Math.min(1, s.throttle + (fwdK ? (i.progressive ? 0.55 : 2.2) : (i.progressive ? -3 : -6)) * dt));   /* review 147: a key opens the throttle over about half a second */
+  if (stopA >= 0 && !stopKey) s.brake = toward(s.brake, stopA, 10, 12); else s.brake = Math.max(0, Math.min(1, s.brake + (stopK ? 5 : -8) * dt));
+  return said; }
+
 // ---- springs ----
 /** one step of a critically damped spring (natural frequency w, rad/s) from x moving at v toward target: [x, v]. Exact
  *  for a still target, so it neither overshoots nor goes unstable at a long frame */

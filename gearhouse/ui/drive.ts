@@ -42,7 +42,7 @@ import specsData from '../data/cars/specs.json';
 import { GLASS_REFL, type GlassRefl } from './shell/settings';
 import { smokeTier, gpuCaps, type SmokeSetting, type GpuCaps } from '../render/live/volume/caps';
 import { VolumeSmoke, type VolCar } from '../render/live/volume/volume';
-import { DriveCam, carEyes, nextView, perspective, pedalValue, isCamView, CAM_VIEWS, CAM_DEFAULT, type CamView, type CarEyes, type CamShot } from './drivecam';
+import { DriveCam, carEyes, nextView, perspective, pedalValue, pedalStep, isCamView, CAM_VIEWS, CAM_DEFAULT, type CamView, type CarEyes, type CamShot } from './drivecam';
 
 /** what a page holding the drive gives it (the game's one page, ui/shell): the root its markup is in (found there even
  *  while it is taken off the page), the one renderer shared by the screens (its sky and car textures loaded by the
@@ -545,15 +545,8 @@ function controls(dt: number): Controls { const left = down('arrowleft', 'a'), r
   // review 169: reverse. Holding the brake at a standstill for half a second engages it; then the brake drives backwards
   // (capped about 20 km/h) and the accelerator brakes; the accelerator at a standstill puts it back in first
   const gasA = Math.max(pedal.gas, padIn.gas > 0.02 ? padIn.gas : -1), brakeA = Math.max(pedal.brake, padIn.brake > 0.02 ? padIn.brake : -1);   // the analog pedals' own amounts (-1: none)
-  const gasKey = down('arrowup', 'w'), brakeKey = down('arrowdown', 's'), gasK = gasKey || gasA > 0.12, brakeK = brakeKey || brakeA > 0.25;   /* the reverse's hold: a brake pressed past a quarter */
-  if (!car.reverse) { revHold = brakeK && !gasK && car.speed < 0.4 ? revHold + dt : 0; if (revHold > 0.5) { car.reverse = true; revHold = 0; say('후진'); } }
-  else if (gasK && car.speed < 0.4) { car.reverse = false; say('전진'); }
-  const fwdK = car.reverse ? brakeK : gasK, stopK = car.reverse ? gasK : brakeK, fwdA = car.reverse ? brakeA : gasA, stopA = car.reverse ? gasA : brakeA, fwdKey = car.reverse ? brakeKey : gasKey, stopKey = car.reverse ? gasKey : brakeKey;
-  const toward = (x: number, to: number, up: number, dn: number) => x < to ? Math.min(to, x + up * dt) : Math.max(to, x - dn * dt);
-  if (fwdA >= 0 && !fwdKey) input.throttle = toward(input.throttle, fwdA, 8, 10);   // a pedal: as far as it is pressed (quickly, not in one step)
-  else if (fwdK && down('shift')) input.throttle = toward(input.throttle, 0.5, st.progressive ? 0.55 : 2.2, 6);   /* Shift: half throttle from the keyboard */
-  else input.throttle = Math.max(0, Math.min(1, input.throttle + (fwdK ? (st.progressive ? 0.55 : 2.2) : (st.progressive ? -3 : -6)) * dt));   /* review 147: a key opens the throttle over about half a second, not a quarter */   /* the gauge mode: the pedal goes down as long as it is held */
-  if (stopA >= 0 && !stopKey) input.brake = toward(input.brake, stopA, 10, 12); else input.brake = Math.max(0, Math.min(1, input.brake + (stopK ? 5 : -8) * dt)); input.hand = down(' ') ? 1 : 0;
+  const ps = { throttle: input.throttle, brake: input.brake, reverse: car.reverse, revHold }, said = pedalStep(ps, { gasA, brakeA, gasKey: down('arrowup', 'w'), brakeKey: down('arrowdown', 's'), shift: down('shift'), progressive: st.progressive, speed: car.speed }, dt);   // ui/drivecam.ts
+  input.throttle = ps.throttle; input.brake = ps.brake; car.reverse = ps.reverse; revHold = ps.revHold; if (said) say(said); input.hand = down(' ') ? 1 : 0;
   let steer = input.steer; if (st.assist) { const over = car.r - car.speed * T.at(car.s).k; if (Math.abs(over) > 0.1 && Math.sign(over) === Math.sign(-car.vy)) steer += Math.atan2(car.vy, Math.max(5, car.vx)) / usefulLock(car.spec, car.speed, car.tyre.mu) * 0.7; }
   const most = car.spec.steerLock * Math.PI / 180 / usefulLock(car.spec, car.speed, car.tyre.mu);
   // the traction assist (review 147, for the keyboard, which cannot feather a pedal): the throttle eased while a driven wheel spins past about 10 %

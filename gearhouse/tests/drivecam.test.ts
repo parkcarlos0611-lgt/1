@@ -1,6 +1,6 @@
 // The drive's cameras and touch pedals (alpha 0.12, ui/drivecam.ts) and the camera kept in the game's settings.
 import { describe, it, expect } from 'vitest';
-import { pedalValue, spring, angSpring, fovTan, aimPitch, nextView, carEyes, DriveCam, CAM_DEFAULT, type CamCar } from '../ui/drivecam';
+import { pedalValue, pedalStep, type PedalState, type PedalIn, spring, angSpring, fovTan, aimPitch, nextView, carEyes, DriveCam, CAM_DEFAULT, type CamCar } from '../ui/drivecam';
 import { loadSettings, saveSettings, asSettings, DEFAULTS, SETTINGS_KEY, type KeyStore } from '../ui/shell/settings';
 import { Build } from '../render/car/mesh';
 import { groundData } from '../render/live/ground';
@@ -16,6 +16,38 @@ describe('touch pedals', () => {
   });
   it('holds the end a finger slid off by, and a pedal with no size gives nothing', () => {
     expect(pedalValue(-50, 100, 200)).toBe(1); expect(pedalValue(900, 100, 200)).toBe(0); expect(pedalValue(150, 100, 0)).toBe(0);
+  });
+});
+
+describe('the pedals step by step (analog, keys, reverse)', () => {
+  const run = (s: PedalState, i: PedalIn, t: number, dt = 1 / 120) => { const said: string[] = []; for (let k = 0; k < Math.round(t / dt); k++) { const w = pedalStep(s, i, dt); if (w) said.push(w); } return said; };
+  const S = (o: Partial<PedalState> = {}): PedalState => ({ throttle: 0, brake: 0, reverse: false, revHold: 0, ...o });
+  const none = { gasA: -1, brakeA: -1, gasKey: false, brakeKey: false, speed: 10 };
+  it('an analog pedal sets the opening as far as pressed, quickly, and closes when let go', () => {
+    const s = S(); run(s, { ...none, gasA: 0.5 }, 0.03); expect(s.throttle).toBeGreaterThan(0.2); expect(s.throttle).toBeLessThan(0.5);
+    run(s, { ...none, gasA: 0.5 }, 0.2); expect(s.throttle).toBeCloseTo(0.5, 6);
+    run(s, { ...none, gasA: 0.3 }, 0.2); expect(s.throttle).toBeCloseTo(0.3, 6);
+    run(s, none, 0.2); expect(s.throttle).toBe(0);
+    run(s, { ...none, brakeA: 0.7 }, 0.2); expect(s.brake).toBeCloseTo(0.7, 6); run(s, none, 0.2); expect(s.brake).toBe(0);
+  });
+  it('a key opens it over time, Shift holds it at half', () => {
+    const s = S(); run(s, { ...none, gasKey: true }, 0.2); expect(s.throttle).toBeGreaterThan(0.3); expect(s.throttle).toBeLessThan(0.6);
+    run(s, { ...none, gasKey: true }, 0.5); expect(s.throttle).toBe(1);
+    run(s, { ...none, gasKey: true, shift: true }, 0.5); expect(s.throttle).toBeCloseTo(0.5, 6);
+    const g = S(); run(g, { ...none, gasKey: true, progressive: true }, 0.5); expect(g.throttle).toBeCloseTo(0.275, 2);   // the gauge mode: slower
+  });
+  it('holding the brake pedal still at a standstill engages reverse; then it drives back and the accelerator brakes', () => {
+    const s = S(); expect(run(s, { ...none, brakeA: 0.8, speed: 0 }, 0.4)).toEqual([]); expect(s.reverse).toBe(false);
+    expect(run(s, { ...none, brakeA: 0.8, speed: 0 }, 0.2)).toEqual(['후진']); expect(s.reverse).toBe(true);
+    run(s, { ...none, brakeA: 0.6, speed: 0 }, 0.3); expect(s.throttle).toBeCloseTo(0.6, 6); expect(s.brake).toBe(0);
+    run(s, { ...none, gasA: 0.4, speed: 2 }, 0.3); expect(s.brake).toBeCloseTo(0.4, 6); expect(s.reverse).toBe(true);   // moving: the accelerator brakes
+    expect(run(s, { ...none, gasA: 0.4, speed: 0 }, 0.05)).toEqual(['전진']); expect(s.reverse).toBe(false);
+  });
+  it('a light brake, or the brake while moving, does not engage reverse', () => {
+    const s = S(); run(s, { ...none, brakeA: 0.2, speed: 0 }, 2); expect(s.reverse).toBe(false);
+    run(s, { ...none, brakeA: 0.9, speed: 3 }, 2); expect(s.reverse).toBe(false);
+    run(s, { ...none, brakeA: 0.9, gasA: 0.5, speed: 0 }, 2); expect(s.reverse).toBe(false);   // both pressed: no
+    run(s, { ...none, brakeKey: true, speed: 0 }, 0.6); expect(s.reverse).toBe(true);           // the key the same
   });
 });
 

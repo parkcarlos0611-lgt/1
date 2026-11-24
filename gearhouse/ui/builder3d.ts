@@ -25,9 +25,19 @@ import texNor from '../assets/textures/pbr/normal.jpg';
 import texRgh from '../assets/textures/pbr/rough.jpg';
 import texMeta from '../assets/textures/pbr/pbr.json';
 
-const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
+/** what a page holding the builder gives it (the game's one page, ui/shell): the root its markup is in (found there even
+ *  while it is taken off the page), the one renderer shared by the screens (its sky and textures loaded by the shell),
+ *  the design to open, and what the test drive does (a screen of the same page instead of a new window). A page of its
+ *  own (builder3d.page.html) gives nothing */
+export interface BuilderHost { root?: ParentNode; renderer?: LiveRenderer | null; design?: Design; onTestDrive?: (d: Design) => void }
+export interface BuilderApi { /** shown again (with another design, or as it was left: the same step) */ enter(d?: Design): void; /** hidden: it stops drawing */ leave(): void;
+  readonly design: Design; readonly step: string; use(d: Design): void }
+// The builder below is one function's body, mounted once on its markup; it is not indented, so its lines read as before.
+export function mountBuilder(host: BuilderHost = {}): BuilderApi {
+const R = host.root ?? document;
+const $ = <T extends HTMLElement>(id: string) => (R === document ? document.getElementById(id) : R.querySelector(`#${id}`)) as T;
 const store: KeyStore | null = (() => { try { return localStorage; } catch { return null; } })();
-let D: Design = currentDesign(store) ?? fromPreset('nsx');
+let D: Design = host.design ? structuredClone(host.design) : currentDesign(store) ?? fromPreset('nsx');
 
 // ---- the names on the page ----
 const BASE_NAME: Record<BaseId, string> = { nsx: 'NSX 바탕', f355: 'F355 바탕' };
@@ -199,7 +209,8 @@ function saveNow() { flash(saveDesign(store, D) ? `저장했습니다: ${D.name}
 $('save').addEventListener('click', saveNow);
 // the test drive (B4): the drive page opened with this design in its link
 function driveLink() { for (const id of ['drive', 'drive6']) $<HTMLAnchorElement>(id).href = `drive.html?design=${encodeDesign(D)}`; }
-for (const id of ['drive', 'drive6']) $(id).addEventListener('click', () => { keepCurrent(store, D); try { store?.setItem(KEYS.testDrive, encodeDesign(D)); } catch { /* not kept: the link carries it */ } });
+for (const id of ['drive', 'drive6']) $(id).addEventListener('click', e => { keepCurrent(store, D); try { store?.setItem(KEYS.testDrive, encodeDesign(D)); } catch { /* not kept: the link carries it */ }
+  if (host.onTestDrive) { e.preventDefault(); host.onTestDrive(structuredClone(D)); } });   // in the game's page: its drive screen
 
 // ---- the figures ----
 let lastFigs: DesignFigures | null = null, fitOpen: boolean | null = null;
@@ -253,17 +264,17 @@ function meas() { const m = measured(store, D.id), put = (h: string) => { $('mea
 addEventListener('storage', e => { if (e.key === KEYS.measure(D.id)) meas(); }); addEventListener('focus', meas); document.addEventListener('visibilitychange', () => { if (!document.hidden) meas(); });
 
 // ---- the view: the live renderer on the studio floor ----
-const cv = $<HTMLCanvasElement>('view'); let L: LiveRenderer | null = null;
-try { L = new LiveRenderer(cv); L.setGround(studioFloor()); L.setTrack(1, 30, 12, 0); const L0 = L; void loadSky(L0).then(() => { dirty = true; }).catch(e => console.warn('sky', e));
+const cv = host.renderer?.canvas ?? $<HTMLCanvasElement>('view'); let L: LiveRenderer | null = null;
+try { L = host.renderer ?? new LiveRenderer(cv); L.setGround(studioFloor()); L.setTrack(1, 30, 12, 0); const L0 = L; if (!host.renderer) { void loadSky(L0).then(() => { dirty = true; }).catch(e => console.warn('sky', e));
   const im = [texAlb, texNor, texRgh].map(src => { const i = new Image(); i.src = src; return i; });
-  void Promise.all(im.map(i => i.decode())).then(() => { L0.setTextures(im[0]!, im[1]!, im[2]!, (texMeta as { layers: { size_m: number; luma_mean: number; rough_mean: number }[] }).layers); dirty = true; }).catch(e => console.warn('textures', e)); }
+  void Promise.all(im.map(i => i.decode())).then(() => { L0.setTextures(im[0]!, im[1]!, im[2]!, (texMeta as { layers: { size_m: number; luma_mean: number; rough_mean: number }[] }).layers); dirty = true; }).catch(e => console.warn('textures', e)); } }
 catch (e) { console.warn('live renderer unavailable', e); L = null; const p = document.createElement('p'); p.className = 'nogl'; p.textContent = '이 브라우저는 WebGL2가 없어 3D 미리보기를 띄울 수 없습니다. 설계와 수치는 그대로 쓸 수 있습니다.'; document.body.append(p); }
 /** the parts lifted off for the engine view: the deck's lids and its glass */
 const DECK = ['bootLid', 'engineCover', 'rearPane'];
 let meshKey = '', down: Mesh | null = null, up: Mesh | null = null, onGpu: Mesh | null = null, builds = 0;
 const open = new WeakMap<Mesh, Mesh>();
 const view = { spin: false, lamps: false, engine: false, look: 2, yaw: 0, ang: 0, pitch: 0, zoom: 1 };
-let dirty = true, g: ReturnType<LiveRenderer['car']> | null = null;
+let dirty = true, g: ReturnType<LiveRenderer['car']> | null = null, awake = true;   // awake: on screen (a page of its own always)
 function rebuild() { const key = bodyKey(D); if (key === meshKey && down) return; const t0 = performance.now(); meshKey = key; down = designMesh(D, 0, 0); up = null; builds++; dirty = true; console.info(`design mesh ${D.body.base}: ${down.n} triangles, ${Math.round(performance.now() - t0)} ms`); }
 function shown(): Mesh { let M = view.lamps ? (up ??= designMesh(D, 0, 1)) : down!; if (view.engine) { let o = open.get(M); if (!o) { o = withoutParts(M, DECK); open.set(M, o); } M = o; } return M; }
 const home = () => { view.ang = Math.PI - 0.7; view.pitch = 17; view.zoom = 1; view.yaw = 0; dirty = true; }; home();
@@ -283,7 +294,7 @@ addEventListener('resize', () => { dirty = true; });
 let last = performance.now(), frames = 0;
 function frame(now: number) { const el = Math.min(0.1, (now - last) / 1000); last = now;
   if (view.spin) { view.yaw += el * 0.35; dirty = true; }
-  if (L && down && dirty) { dirty = false; frames++;
+  if (L && down && dirty && awake) { dirty = false; frames++;
     const dpr = Math.min(2, devicePixelRatio || 1), W = Math.max(2, Math.round(cv.clientWidth * dpr)), H = Math.max(2, Math.round(cv.clientHeight * dpr)); if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
     const M = shown(); if (M !== onGpu) { g = onGpu ? L.swapCar(onGpu, M) : L.car(M); onGpu = M; }
     // the free middle between the panels (a phone: the strip above, the drawer below when open): the car framed in it
@@ -303,3 +314,8 @@ $('toggle').addEventListener('click', () => drawer(!document.body.classList.cont
 
 $<HTMLInputElement>('name').value = D.name; for (const s of syncs) s(); restoreStep(); rebuild(); figures(); showList(); savedState(); driveLink(); requestAnimationFrame(frame);
 (globalThis as { __builder?: unknown }).__builder = { get design() { return D; }, use, get builds() { return builds; }, get frames() { return frames; }, get triangles() { return onGpu?.n ?? 0; }, get step() { return onFiles ? 'files' : step; }, go };   // for the page tests (tools)
+return { enter(d?: Design) { if (d && JSON.stringify(d) !== JSON.stringify(D)) use(d); awake = true; dirty = true; meas(); }, leave() { awake = false; drawer(false); },
+  get design() { return D; }, get step() { return onFiles ? 'files' : step; }, use };
+}
+// a page of its own: the builder's markup is on it (the game's page mounts it on a screen instead)
+if (typeof document !== 'undefined' && document.getElementById('panes') && !document.getElementById('gh-app')) mountBuilder();

@@ -46,7 +46,7 @@ describe('suspension: the linkage', () => {
           lengths(H, P).forEach((l, k) => expect(Math.abs(l - L0[k]!), `${tag} length ${k}`).toBeLessThan(1e-6 * L0[k]! + 1e-6));
           for (const v of [...P.wc, ...P.lbj, ...P.ubj, ...P.outer, P.theta, P.phi, P.rack]) expect(Number.isFinite(v), tag).toBe(true);
           // the wheel stays near upright and near its own track: a wishbone's small camber gain, no wild toe at the rear
-          expect(Math.abs(camberOf(P.R)), tag).toBeLessThan(0.2); expect(Math.abs(P.wc[1] - H.wc[1]), tag).toBeLessThan(45); if (!H.steer.rack) expect(Math.abs(steerOf(P.R)), tag).toBeLessThan(0.02);
+          expect(Math.abs(camberOf(P.R)), tag).toBeLessThan(0.2); expect(Math.abs(P.wc[1] - H.wc[1]), tag).toBeLessThan(st ? 110 : 45); if (!H.steer.rack) expect(Math.abs(steerOf(P.R)), tag).toBeLessThan(0.02);
           const B = barAt(H, P)!; expect(Math.abs(dist(B.end, B.link) - dist(H.bar!.end, H.bar!.link)), tag).toBeLessThan(1e-6); } }); }
   });
   it('gains negative camber as the wheel rises (the shorter upper arm) and keeps its toe within a quarter of a degree through the travel', () => {

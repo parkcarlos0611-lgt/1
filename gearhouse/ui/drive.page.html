@@ -61,7 +61,31 @@
   .screen { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: #111; line-height: 0; overflow: hidden; }
   .setbtn { right: 48px; }
   .mini { top: 48px; }
-  .notes { position: absolute; left: 10px; top: 52px; max-width: min(60ch, 60vw); line-height: 1.4; display: grid; gap: 4px; pointer-events: none; z-index: 2; }
+  .lcol { position: absolute; left: 8px; top: 52px; max-width: min(60ch, 62vw); display: grid; gap: 6px; justify-items: start; pointer-events: none; z-index: 2; }
+  .notes { line-height: 1.4; display: grid; gap: 4px; }
+  /* the race on the picture: the standings, my times, a best lap's notice (hidden with the HUD in the cinematic view) */
+  .raceovl { display: grid; gap: 4px; color: #f4f1ea; font-variant-numeric: tabular-nums; font-size: 0.74rem; line-height: 1.25; }
+  .raceovl[hidden] { display: none; }
+  .stand { border-collapse: collapse; background: rgba(20,18,15,0.62); border-radius: 4px; }
+  .stand td { padding: 1px 6px; white-space: nowrap; } .stand td.n { text-align: right; color: #cfc6b4; } .stand td.g { text-align: right; } .stand td.l { color: #cfc6b4; text-align: right; }
+  .stand tr.me td { color: #ffcf8a; font-weight: 600; background: rgba(160,82,45,0.45); }
+  .mytime { background: rgba(20,18,15,0.62); border-radius: 4px; padding: 3px 6px; display: grid; grid-template-columns: auto auto; gap: 0 10px; }
+  .mytime span { color: #cfc6b4; } .mytime b { font-weight: 600; text-align: right; } .mytime b.pb { color: #b8f08a; }
+  .pbnote { font-family: var(--display); font-size: 1.1rem; letter-spacing: 0.05em; color: #b8f08a; text-shadow: 0 1px 3px #000; min-height: 0; }
+  @media (max-width: 600px), (max-height: 480px) { .raceovl { font-size: 0.66rem; } .stand td { padding: 0 4px; } .lcol { top: 46px; } }
+  body.cine .raceovl, body.cine .pbnote { display: none; }
+  .resmodal { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(10,9,8,0.55); z-index: 12; line-height: 1.4; padding: 16px; box-sizing: border-box; }
+  .resmodal[hidden] { display: none; }
+  .resbox { background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; max-width: min(760px, 100%); max-height: 100%; overflow: auto; padding: 10px 14px 14px; box-sizing: border-box; }
+  .resbox header { display: flex; justify-content: space-between; align-items: center; gap: 10px; } .resbox h2 { font-family: var(--display); font-weight: 500; font-size: 1.2rem; margin: 0; }
+  .resbox .close { font: inherit; font-size: 1.1rem; width: 34px; height: 34px; border: 1px solid var(--line); border-radius: 4px; background: var(--bg); color: var(--ink); cursor: pointer; }
+  .restab { border-collapse: collapse; font-size: 0.8rem; font-variant-numeric: tabular-nums; width: 100%; margin-top: 8px; }
+  .restab th { text-align: left; font-weight: 600; color: var(--soft); border-bottom: 1px solid var(--line); padding: 3px 6px; white-space: nowrap; }
+  .restab td { padding: 3px 6px; border-bottom: 1px solid var(--line); vertical-align: top; } .restab td.t { white-space: nowrap; text-align: right; } .restab td.laps { color: var(--soft); font-size: 0.72rem; }
+  .restab tr.me td { color: var(--accent); font-weight: 600; } .restab .best { color: var(--accent); font-weight: 600; }
+  .results { overflow-x: auto; } .results .restab { font-size: 0.72rem; } .results p { font-size: 0.8rem; margin: 6px 0 0; }
+  .picks .picklist { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 8px; } .picks .check { font-size: 0.78rem; }
+  .picks[hidden], .row[hidden] { display: none; }
   .notes #msg { color: #ffd9a8; text-shadow: 0 1px 2px #000; } .notes #bake { color: #ddd; text-shadow: 0 1px 2px #000; }
   .drawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(380px, 92vw); background: var(--panel); border-left: 1px solid var(--line); z-index: 20; display: flex; flex-direction: column; transform: translateX(100%); transition: transform 0.2s ease; line-height: 1.4; box-shadow: -6px 0 18px rgba(0,0,0,0.3); }
   body.drawer-open .drawer { transform: none; }
@@ -84,7 +108,8 @@
     <div class="mid"><button type="button" data-key="q" class="small" aria-label="기어 내림">Q</button><button type="button" data-key="e" class="small" aria-label="기어 올림">E</button><button type="button" data-key="r" class="small" aria-label="트랙으로 복귀">R</button></div>
     <div class="side"><button type="button" data-key="arrowdown" class="brake" aria-label="브레이크">브레이크</button><button type="button" data-key="arrowup" class="gas" aria-label="가속">가속</button></div>
   </div>
-  <div class="notes"><div id="msg"></div><div id="bake" class="note"></div></div></div>
+  <div class="lcol"><div id="raceovl" class="raceovl" hidden><table class="stand" aria-label="순위"><tbody id="stand"></tbody></table><div id="mytime" class="mytime"></div></div><div id="pbnote" class="pbnote" aria-live="polite"></div><div class="notes"><div id="msg"></div><div id="bake" class="note"></div></div></div>
+  <div id="resmodal" class="resmodal" role="dialog" aria-label="레이스 결과" hidden><div class="resbox"><header><h2 id="restitle">레이스 결과</h2><button type="button" class="close" id="resclose" aria-label="결과 닫기">✕</button></header><div id="restable"></div></div></div></div>
 <aside class="drawer" id="drawer" aria-label="설정">
   <header><h1>Millbrook 시험 주행</h1><button type="button" class="close" id="setclose" aria-label="설정 닫기">✕</button></header>
   <div class="tabs" role="tablist">
@@ -108,11 +133,15 @@
   </section>
   <section data-tab="race">
     <fieldset><legend>레이스</legend>
+      <div class="row"><label for="opp">상대 차 수</label><select id="opp"><option value="1">1대</option><option value="2">2대</option><option value="3" selected>3대</option><option value="4">4대</option><option value="5">5대</option><option value="6">6대</option><option value="7">7대</option></select></div>
+      <div class="row"><label for="lineup">상대 구성</label><select id="lineup"><option value="period" selected>1930년대 차</option><option value="modern">1990년대 차</option><option value="mix">섞기 (모든 차)</option><option value="pick">직접 고르기</option></select></div>
+      <fieldset id="pickbox" class="picks" hidden><legend>상대 고르기 (최대 7대, 고른 순서와 관계없이)</legend><div id="picklist" class="picklist"></div></fieldset>
+      <div class="row"><label for="skill">AI 실력</label><select id="skill"><option value="easy">쉬움 (접지를 덜 쓰고 덜 밟음)</option><option value="normal" selected>보통</option><option value="hard">어려움 (핸디캡 기록을 잰 시험 운전자만큼)</option></select></div>
       <div class="row"><label for="mode">출발 방식</label><select id="mode"><option value="handicap">핸디캡 (느린 차 먼저)</option><option value="scratch">동시 출발 (그리드)</option></select></div>
-      <div class="row"><label for="laps">바퀴 수</label><select id="laps"><option value="1">1바퀴</option><option value="2" selected>2바퀴</option><option value="3">3바퀴</option></select></div>
+      <div class="row"><label for="laps">바퀴 수</label><select id="laps"><option value="1">1바퀴</option><option value="2" selected>2바퀴</option><option value="3">3바퀴</option><option value="4">4바퀴</option><option value="5">5바퀴</option><option value="6">6바퀴</option><option value="7">7바퀴</option><option value="8">8바퀴</option><option value="9">9바퀴</option><option value="10">10바퀴</option></select></div>
       <div class="seg"><button type="button" id="race" class="btn">레이스 시작</button><button type="button" id="practice" class="btn">연습 주행</button></div>
-      <p class="note">상대 3대가 무작위로 나옵니다. 핸디캡: 느린 차가 먼저, 빠른 차가 나중에 출발해 계산대로라면 모두 같이 들어옵니다. 동시 출발: 두 대씩 줄을 서서(느린 차가 앞줄) 신호와 함께 한꺼번에 출발합니다.</p>
-      <ol id="board" class="board"></ol><div id="results"></div>
+      <p class="note" id="racenote">핸디캡: 느린 차가 먼저, 빠른 차가 나중에 출발해 계산대로라면 모두 같이 들어옵니다. 동시 출발: 두 대씩 줄을 서서(느린 차가 앞줄) 신호와 함께 한꺼번에 출발합니다. 쉬움·보통 상대는 핸디캡 기록보다 느리게 달립니다.</p>
+      <ol id="board" class="board"></ol><div id="results" class="results"></div>
     </fieldset>
   </section>
   <section data-tab="track">

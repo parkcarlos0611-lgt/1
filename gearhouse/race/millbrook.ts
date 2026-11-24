@@ -12,7 +12,7 @@ const W = 30.5, R1 = 305 + W / 2, R2 = 457 + W / 2;
 const HOME = 659.1, RAIL = 956.3, FORK = 20;
 const ME = HOME + R1 * 165 * Math.PI / 180, RA = ME + RAIL, BY = RA + R2 * 213 * Math.PI / 180;
 export const MILLBROOK_OUTER: TrackSpec = {
-  name: 'Millbrook Outer Circuit',
+  id: 'millbrook', name: 'Millbrook Outer Circuit',
   pieces: [
     { kind: 'straight', len: HOME, name: 'Home Straight' },
     { kind: 'arc', radius: R1, turn: 165, name: "Members' Banking" },

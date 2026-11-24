@@ -29,7 +29,7 @@ import artDueA from '../assets/art/dueA21.png'; import artSSJ from '../assets/ar
 import artPlym from '../assets/art/plymU29.png'; import artPont from '../assets/art/pontiac29.png'; import artWillys from '../assets/art/willys27.png';
 import { MESH_CARS } from '../render/car/meshcars';
 import { Driver } from '../race/driver';
-import { Race, type Entrant } from '../race/race';
+import { Race, lapTimes, bestOf, bookFor, type Entrant, type Skill } from '../race/race';
 import { Health, WARN } from '../race/health';
 import { Sound, type Skid } from './sound';
 import specsData from '../data/cars/specs.json';
@@ -365,19 +365,66 @@ function hud() { const kmh = car.speed * 3.6; $('spd').textContent = kmh.toFixed
   if (race) { const me = race.player!, ord = race.order(), pos = ord.indexOf(me) + 1, wait = me.start - race.clock;
     $('lap').textContent = wait > 0 ? (race.mode === 'scratch' ? `출발 신호 ${Math.ceil(wait)}` : `출발까지 ${Math.ceil(wait)}초`) : race.clock - me.start < 1.2 && race.mode === 'scratch' ? '출발!' : me.finish ? `완주 ${fmt(me.finish - me.start)}` : `${Math.min(race.laps, me.lapAt.length)}/${race.laps}바퀴 · ${fmt(race.clock - me.start)}`;
     $('last').textContent = `${pos}/${race.cars.length}위`; $('best').textContent = '';
-    $('board').innerHTML = ord.map((e, k) => `<li${e === me ? ' class="me"' : ''}>${k + 1}. ${e.name}${e === me ? ' (나)' : ''} <span>${e.finish ? fmt(e.finish - e.start) : race!.clock < e.start ? `출발 ${Math.ceil(e.start - race!.clock)}초 뒤` : `${(e.dist / 1000).toFixed(2)} km`}</span></li>`).join(''); } }
+    if (++boardTick % 6 === 0) { $('board').innerHTML = ord.map((e, k) => `<li${e === me ? ' class="me"' : ''}>${k + 1}. ${e.name}${e === me ? ' (나)' : ''} <span>${e.finish ? fmt(e.finish - e.start) : race!.clock < e.start ? `출발 ${Math.ceil(e.start - race!.clock)}초 뒤` : `${(e.dist / 1000).toFixed(2)} km`}</span></li>`).join(''); raceOverlay(); }
+    { const laps = lapTimes(me); if (laps.length > seenLaps) { seenLaps = laps.length; if (!st.pilot) onLap(laps[laps.length - 1]!, bestOf(laps.slice(0, -1))); } } }
+  $('pbnote').textContent = clock < pbT ? pbMsg : ''; }
+// ---- the race on the picture (review 162): the standings, my times; a best lap's notice; the results ----
+/** the cars' names cut short for the standings */
+const SHORT: Record<string, string> = { fordT23: 'Ford T', chevAB28: 'Chevrolet AB', plymU29: 'Plymouth U', pontiac29: 'Pontiac 6-29', dodgeV28: 'Dodge Victory', willys27: 'Willys 70A', buick28: 'Buick Six', fnTT33: 'Frazer Nash', bmw315: 'BMW 315', dueSSJ35: 'Duesenberg SSJ', dueA21: 'Duesenberg A', auburn851: 'Auburn 851', mb540k: 'Mercedes 540K', eb110: 'EB110', xj220: 'XJ220', diablo: 'Diablo', f355: 'F355', f355f1: 'F355 F1', nsx: 'NSX', napier33: 'Napier-Railton', jagD55: 'Jaguar D' };
+const shortName = (id: string) => SHORT[id] ?? raceSpec(id).name.replace(/^\d{4}\s+/, '').replace(/\s*\(.*\)$/, '').slice(0, 16);
+const fmtGap = (g: { s: number; laps: number }) => g.laps ? `+${g.laps}랩` : `+${g.s.toFixed(1)}`;
+let boardTick = 0, seenLaps = 0, pbMsg = '', pbT = 0;
+function raceOverlay() { const r = race; $('raceovl').hidden = !r; if (!r) return; const me = r.player!, rows = r.standings();
+  $('stand').innerHTML = rows.map(q => { const e = q.e, wait = r.clock < e.start, gap = q.pos === 1 ? (e.finish ? '완주' : '선두') : wait ? `출발 ${Math.ceil(e.start - r.clock)}s` : fmtGap(q.leader);
+    return `<tr${e === me ? ' class="me"' : ''}><td class="n">${q.pos}</td><td>${shortName(e.id)}</td><td class="g">${gap}</td><td class="l">${e.finish ? '✓' : `${q.lap}/${r.laps}`}</td></tr>`; }).join('');
+  const laps = lapTimes(me), best = bestOf(laps), started = r.clock >= me.start, cur = me.finish ? 0 : !started ? 0 : r.clock - (me.lapAt.length <= 1 ? me.start : me.lapAt[me.lapAt.length - 1]!);
+  const i = rows.findIndex(q => q.e === me), ahead = rows[i]!.ahead, behind = rows[i + 1]?.ahead;
+  $('mytime').innerHTML = `<span>이번 랩</span><b>${fmt(cur)}</b><span>지난 랩</span><b>${fmt(laps[laps.length - 1] ?? 0)}</b><span>최고 랩</span><b class="${best ? 'pb' : ''}">${fmt(best)}</b>`
+    + `<span>앞차</span><b>${ahead && started ? `−${ahead.laps ? `${ahead.laps}랩` : ahead.s.toFixed(1)}` : '-'}</b><span>뒤차</span><b>${behind && r.clock >= rows[i + 1]!.e.start ? fmtGap(behind) : '-'}</b>`; }
+// the best laps kept in this browser, per track and car
+const REC_KEY = 'gearhouse.drive.bestlaps.v1';
+function records(): Record<string, Record<string, number>> { try { const v = JSON.parse(localStorage.getItem(REC_KEY) ?? '{}'); return v && typeof v === 'object' ? v : {}; } catch { return {}; } }
+const trackKey = () => T.spec.id ?? 'millbrook';
+function recordOf(id: string): number { return records()[trackKey()]?.[id] ?? 0; }
+/** a lap of mine done: its notice on a best, and the record kept if it beats this browser's */
+function onLap(t: number, before: number) { const rec = recordOf(carId); let note = '';
+  if (before && t < before) note = `최고 랩 ${fmt(t)}`;
+  if (!rec || t < rec) { try { const all = records(), k = trackKey(); all[k] = { ...all[k], [carId]: +t.toFixed(3) }; localStorage.setItem(REC_KEY, JSON.stringify(all)); } catch { /* storage refused: the record is not kept */ }
+    if (rec) note = `트랙 기록 갱신 ${fmt(t)} (전 ${fmt(rec)})`; }
+  if (note) { pbMsg = note; pbT = clock + 3.5; } }
+function resultsTable(r: Race): string { const me = r.player!, ord = r.order(), win = ord[0]!, all = ord.map(e => lapTimes(e)), fastest = bestOf(all.flat());
+  const rows = ord.map((e, k) => { const laps = all[k]!, best = bestOf(laps), g = k === 0 ? '' : e.finish && win.finish ? `+${(e.finish - win.finish).toFixed(2)}` : (() => { const q = Math.floor((win.dist - e.dist) / r.track.length); return q >= 1 ? `+${q}랩` : '주행 중'; })();
+    return `<tr${e === me ? ' class="me"' : ''}><td>${k + 1}</td><td>${e.name}${e === me ? ' (나)' : ''}</td><td class="t">${e.finish ? fmt(e.finish - e.start) : '-'}</td><td class="t">${g}</td><td class="t${best && best === fastest ? ' best' : ''}">${fmt(best)}</td><td class="laps">${laps.map((t, i) => `${i + 1}: ${fmt(t)}`).join(' · ')}</td></tr>`; }).join('');
+  const rec = recordOf(carId);
+  return `<table class="restab"><thead><tr><th>순위</th><th>차</th><th>총 시간</th><th>차이</th><th>최고 랩</th><th>랩별</th></tr></thead><tbody>${rows}</tbody></table>`
+    + `<p class="note">${r.mode === 'scratch' ? '동시 출발' : '핸디캡'} ${r.laps}바퀴 · ${trackTitle()} · 총 시간은 각 차의 출발부터${rec ? ` · 이 브라우저의 ${raceSpec(carId).name} 최고 랩: ${fmt(rec)}` : ''}</p>`; }
 function results() { const r = race!, me = r.player!, ord = r.order(); $('results').dataset.shown = '1';
+  const html = resultsTable(r); $('results').innerHTML = html; $('restable').innerHTML = html; $('restitle').textContent = `레이스 결과 — ${ord.indexOf(me) + 1}위`; $('resmodal').hidden = false;
   say(`결승 ${ord.indexOf(me) + 1}위 — ${ord[0]!.name} 우승`); }
-function startRace() { const laps = +$<HTMLSelectElement>('laps').value, pool = RACE_CARS.filter(id => id !== carId); raceSeed = (raceSeed * 48271) % 2147483647;
-  const pick: string[] = []; let r = raceSeed; while (pick.length < 3) { r = (r * 16807) % 2147483647; const id = pool[r % pool.length]!; if (!pick.includes(id)) pick.push(id); }
-  const mode = $<HTMLSelectElement>('mode').value as 'handicap' | 'scratch'; race = new Race(T, [carId, ...pick], laps, carId, raceSeed, mode); const me = race.player!; car = me.car; car.auto = st.auto; manualGear = 1; pilot = new Driver(T);
+/** every car that can race, and the two eras' (the period's before 1945, the later cars from 1980) */
+const ALL_CARS = [...RACE_CARS, ...NEW_CARS, ...EXP_CARS], yearOf = (id: string) => parseInt(raceSpec(id).name, 10) || 1930;
+const ERA = { period: ALL_CARS.filter(id => yearOf(id) < 1945), modern: ALL_CARS.filter(id => yearOf(id) >= 1980), mix: ALL_CARS };
+/** the opponents as the race tab sets them: so many, from an era, mixed, or picked by hand */
+function opponents(seed: number): { ids: string[]; note: string } { const n = +$<HTMLSelectElement>('opp').value, how = $<HTMLSelectElement>('lineup').value as keyof typeof ERA | 'pick';
+  if (how === 'pick') { const ids = Array.from(document.querySelectorAll<HTMLInputElement>('#picklist input:checked')).map(i => i.value).filter(id => id !== carId).slice(0, 7);
+    if (ids.length) return { ids, note: '' }; }
+  const pool = (how === 'pick' ? ERA.period : ERA[how]).filter(id => id !== carId), want = Math.min(n, pool.length), out: string[] = []; let r = seed;
+  while (out.length < want) { r = (r * 16807) % 2147483647; const id = pool[r % pool.length]!; if (!out.includes(id)) out.push(id); }
+  return { ids: out, note: how === 'pick' ? '고른 차가 없어 1930년대 차로 채웠습니다' : want < n ? `이 구성에는 ${want}대뿐입니다` : '' }; }
+function startRace() { const laps = +$<HTMLSelectElement>('laps').value; raceSeed = (raceSeed * 48271) % 2147483647;
+  const { ids: pick, note } = opponents(raceSeed), skill = $<HTMLSelectElement>('skill').value as Skill;
+  const mode = handicapOK() ? $<HTMLSelectElement>('mode').value as 'handicap' | 'scratch' : 'scratch'; race = new Race(T, [carId, ...pick], laps, carId, raceSeed, mode, skill); const me = race.player!; car = me.car; car.auto = st.auto; manualGear = 1; pilot = new Driver(T);
+  seenLaps = 0; boardTick = 0; $('resmodal').hidden = true; $('results').innerHTML = ''; raceOverlay();
   others.clear(); const small = matchMedia('(pointer: coarse)').matches;
   for (const e of race.cars) if (e.driver) { const sp = new CarSprites(meshOf(e.id, numOf(e)), mm, pitchDeg, e.car.spec.steerLock * Math.PI / 180, { outline: 3, glass: 0.8 }, small ? 400 : 900); sp.prepare([0]); others.set(e, sp); }
   sprites = new CarSprites(meshOf(carId, myNum), mm, pitchDeg, car.spec.steerLock * Math.PI / 180, { outline: 3, glass: 0.8 }, small ? 800 : 1800); sprites.prepare([0]); (live ? 0 : sprites.work(300));
   skids.length = 0; puffs.length = 0; delete $('results').dataset.shown; camX = car.x; camY = car.y; camAng = car.yaw;
   const starts = [...race.cars].sort((a, b) => a.start - b.start).map(e => `${e.name}${e.driver ? '' : ' (나)'} ${e.start ? `+${e.start.toFixed(0)}초` : '맨 먼저'}`).join(' · ');
-  say(mode === 'scratch' ? `동시 출발 ${laps}바퀴 · 5초 뒤 출발` : `핸디캡 ${laps}바퀴 · ${starts}`); msgT = 8; $('race').textContent = '레이스 다시'; }
-function stopRace() { race = null; others.clear(); $('board').innerHTML = ''; choose(carId); }
+  say(`${mode === 'scratch' ? `동시 출발 ${laps}바퀴 · 5초 뒤 출발` : `핸디캡 ${laps}바퀴 · ${starts}`}${note ? ` · ${note}` : ''}`); msgT = 8; $('race').textContent = '레이스 다시'; }
+function stopRace() { race = null; others.clear(); $('board').innerHTML = ''; $('raceovl').hidden = true; $('resmodal').hidden = true; choose(carId); }
+/** a handicap needs the track's book (the speed track has none: its races are scratch) */
+const handicapOK = () => !!bookFor(trackKey());
+const trackTitle = () => T.spec.name;
 // ---- controls ----
 // one press, from a key or a screen button
 function press(k: string) { if (k === 'm') { st.auto = !st.auto; car.auto = st.auto; manualGear = car.gear; ($('auto') as HTMLInputElement).checked = st.auto; say(st.auto ? '자동 변속' : '수동 변속 (Q/E)'); }
@@ -412,7 +459,7 @@ function frame(now: number) { const el = Math.min(0.1, (now - last) / 1000); las
     if (race) { race.step(DT, u); wheelTurn = race.player!.wheelTurn; if (race.done && !$('results').dataset.shown) results(); } else { car.step(DT, u); wheelTurn += (car.w[0]! + car.w[1]!) / 2 * DT; }
     for (const c of race ? race.cars.map(e => e.car) : [car]) { marks(c); fence(c); }
     // lap: forward across the start line
-    if (!race && T.gap(prevS, START) > 0 && T.gap(car.s, START) <= 0 && car.vx > 1) { if (lapStart >= 0) { lastLap = clock - lapStart; if (!bestLap || lastLap < bestLap) bestLap = lastLap; say(`한 바퀴 ${fmt(lastLap)}`); } lapStart = clock; }
+    if (!race && T.gap(prevS, START) > 0 && T.gap(car.s, START) <= 0 && car.vx > 1) { if (lapStart >= 0) { lastLap = clock - lapStart; const before = bestLap; if (!bestLap || lastLap < bestLap) bestLap = lastLap; say(`한 바퀴 ${fmt(lastLap)}`); if (!st.pilot) onLap(lastLap, before); } lapStart = clock; }
     prevS = car.s;
     if (dirtGrows && car.speed > 1) { const grass = car.onGrass.filter(Boolean).length / 4; myWear[2] = Math.min(1, myWear[2] + DT * car.speed * (grass * 0.0012 + 0.000004)); }   /* mud off the grass quickly, road dust slowly */
     if (car.over) { say('뱅크 꼭대기를 넘어갔습니다 — 트랙으로 복귀'); car.over = false; car.place(car.s, 0, 0); } if (car.upset && car.speed < 3) { say('차가 뒤집혔습니다 — 트랙으로 복귀'); car.place(car.s, 0, 0); } }
@@ -446,6 +493,11 @@ const pick = $<HTMLSelectElement>('car'); for (const id of RACE_CARS) pick.add(n
 { const g = document.createElement('optgroup'); g.label = '새 3D 차 (레퍼런스 시트로 제작)'; for (const id of NEW_CARS) g.append(new Option(raceSpec(id).name, id)); pick.append(g); }
 { const g = document.createElement('optgroup'); g.label = '실험: 시대 밖의 차'; for (const id of EXP_CARS) g.append(new Option(`${raceSpec(id).name} — ${raceSpec(id).era}`, id)); pick.append(g); }
 pick.value = carId;
+// the race tab's own list of cars to pick as opponents (review 162)
+{ const box = $('picklist'); for (const id of ALL_CARS) { const l = document.createElement('label'); l.className = 'check'; const c = document.createElement('input'); c.type = 'checkbox'; c.value = id; c.checked = ['dueSSJ35', 'fnTT33', 'bmw315'].includes(id); l.append(c, ` ${shortName(id)}`); box.append(l); }
+  box.addEventListener('change', () => { const on = Array.from(box.querySelectorAll<HTMLInputElement>('input:checked')); if (on.length > 7) (on.find(i => i !== document.activeElement) ?? on[0]!).checked = false; }); }
+$<HTMLSelectElement>('lineup').addEventListener('change', e => { $('pickbox').hidden = (e.target as HTMLSelectElement).value !== 'pick'; ($('opp').closest('.row') as HTMLElement).hidden = !$('pickbox').hidden; });
+$('resclose').addEventListener('click', () => { $('resmodal').hidden = true; });
 pick.addEventListener('change', () => { carId = pick.value; if (race) stopRace(); else choose(pick.value); pick.blur(); });
 const setCine = (on: boolean) => { st.cine = on; ($('cine') as HTMLInputElement).checked = on; document.body.classList.toggle('cine', on); shot.until = 0; fit(); };
 $<HTMLInputElement>('cine').addEventListener('change', e => setCine((e.target as HTMLInputElement).checked));
@@ -537,4 +589,4 @@ function fit() {   // the picture fills the window (review 145), in big pixels: 
   const k = Math.max(1, Math.round(innerWidth / 900)) * (st.cine ? 2 : 1); VW = Math.ceil(innerWidth / k / 2) * 2; VH = Math.ceil(innerHeight / k);
   cv.width = VW; cv.height = VH; cv.style.width = `${VW * k}px`; cv.style.height = `${VH * k}px`; ctx.imageSmoothingEnabled = false; }
 addEventListener('resize', fit); addEventListener('orientationchange', () => setTimeout(fit, 200)); fit(); choose(carId); camX = car.x; camY = car.y; camZ = 0; camShow(); requestAnimationFrame(frame);
-(globalThis as { __drive?: unknown }).__drive = { set look(v: [number, number, number] | null) { lookAt = v; }, get car() { return car; }, get L() { return live; }, get damage() { const e = dmg.get(car); return e ? { worst: e.D.worst, taken: e.D.taken } : null; }, SCN, T };   // for the page tests (tools): place the car, read the scenery
+(globalThis as { __drive?: unknown }).__drive = { set look(v: [number, number, number] | null) { lookAt = v; }, get car() { return car; }, get L() { return live; }, get damage() { const e = dmg.get(car); return e ? { worst: e.D.worst, taken: e.D.taken } : null; }, get race() { return race; }, get SCN() { return SCN; }, get T() { return T; } };   // for the page tests (tools): place the car, read the scenery

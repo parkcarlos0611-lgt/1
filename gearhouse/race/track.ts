@@ -8,7 +8,7 @@ export interface Banking { s0: number; s1: number; height: number; curve: number
 /** a bump across the track: a rise of `height` m over `len` m, centred at s */
 export interface Bump { s: number; height: number; len: number; name?: string }
 export interface Landmark { s: number; name: string; kind: 'bridge' | 'line' | 'fork' }
-export interface TrackSpec { name: string; pieces: Piece[]; start: { x: number; y: number; heading: number }; width: number; easing: number; banking: Banking[]; bumps: Bump[]; landmarks: Landmark[]; joints: number }
+export interface TrackSpec { /** a short key (the handicap books, the saved records) */ id?: string; name: string; pieces: Piece[]; start: { x: number; y: number; heading: number }; width: number; easing: number; banking: Banking[]; bumps: Bump[]; landmarks: Landmark[]; joints: number }
 export interface Node { s: number; x: number; y: number; h: number; k: number }
 
 const smooth = (t: number) => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t));

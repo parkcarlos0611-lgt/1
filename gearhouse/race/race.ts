@@ -8,25 +8,52 @@ import { Vehicle, type Controls } from './vehicle';
 import { Driver } from './driver';
 import type { Track } from './track';
 
-export interface Entrant { id: string; name: string; car: Vehicle; driver: Driver | null; start: number; laps: number; lapAt: number[]; finish: number; dist: number; prevS: number; stuck: number; wheelTurn: number; grid: number }
-const BOOK = (book as { cars: Record<string, { standing: number; flying: number }> }).cars;
+/** trail: [clock, dist] pairs every tenth of a second from its start, for the gaps in time between cars */
+export interface Entrant { id: string; name: string; car: Vehicle; driver: Driver | null; start: number; laps: number; lapAt: number[]; finish: number; dist: number; prevS: number; stuck: number; wheelTurn: number; grid: number; trail: number[] }
+type Book = Record<string, { standing: number; flying: number }>;
+/** the handicapper's books, one per track (by the track's id; Millbrook's the first) */
+const BOOKS = (book as unknown as { tracks: Record<string, { cars: Book }> }).tracks;
+export const bookFor = (track = 'millbrook'): Book | null => BOOKS[track]?.cars ?? null;
 /** a car's time for the race on the book: a standing lap, then flying ones */
-export const bookTime = (id: string, laps: number) => { const b = BOOK[id] ?? { standing: 200, flying: 190 }; return b.standing + (laps - 1) * b.flying; };
+export const bookTime = (id: string, laps: number, track = 'millbrook') => { const b = bookFor(track)?.[id] ?? { standing: 200, flying: 190 }; return b.standing + (laps - 1) * b.flying; };
+/** the opponents' skill: the share of grip they dare use and how hard they press on (each a range, drawn per car);
+ *  'normal' is the field as it always was; the book is timed at dare 0.7 and full pace, about 'hard' */
+export type Skill = 'easy' | 'normal' | 'hard';
+export const SKILL: Record<Skill, { dare: [number, number]; pace: [number, number] }> = {
+  easy: { dare: [0.56, 0.62], pace: [0.8, 0.88] }, normal: { dare: [0.64, 0.72], pace: [0.9, 1] }, hard: { dare: [0.69, 0.73], pace: [0.98, 1] } };
+/** an entrant's lap times: the first from its own start (a standing lap), then line to line */
+export const lapTimes = (e: Pick<Entrant, 'lapAt' | 'start'>): number[] => e.lapAt.slice(1).map((t, i) => t - (i === 0 ? e.start : e.lapAt[i]!));
+/** its best lap (0 before one is done) */
+export const bestOf = (laps: number[]): number => laps.length ? Math.min(...laps) : 0;
+/** when an entrant had run `d` metres (by its trail, interpolated); NaN if it has not run that far */
+export function timeAt(e: Pick<Entrant, 'trail'>, d: number): number { const T = e.trail, n = T.length / 2; if (!n || d > T[T.length - 1]!) return NaN; if (d <= T[1]!) return T[0]!;
+  let lo = 0, hi = n - 1; while (hi - lo > 1) { const m = (lo + hi) >> 1; if (T[m * 2 + 1]! < d) lo = m; else hi = m; }
+  const t0 = T[lo * 2]!, d0 = T[lo * 2 + 1]!, t1 = T[hi * 2]!, d1 = T[hi * 2 + 1]!; return d1 > d0 ? t0 + (t1 - t0) * (d - d0) / (d1 - d0) : t1; }
+/** how far `b` trails `a` (a ahead): in seconds (the time since a passed where b is now), or whole laps when a lap or more behind */
+export function gapBetween(a: Pick<Entrant, 'trail' | 'dist' | 'finish'>, b: Pick<Entrant, 'trail' | 'dist' | 'finish'>, clock: number, L: number): { s: number; laps: number } {
+  if (a.finish && b.finish) return { s: b.finish - a.finish, laps: 0 };
+  const laps = Math.floor((a.dist - b.dist) / L); if (laps >= 1) return { s: NaN, laps };
+  const t = timeAt(a, b.dist); return { s: Number.isFinite(t) ? Math.max(0, (b.finish || clock) - t) : 0, laps: 0 }; }
 
 export class Race {
   readonly cars: Entrant[] = []; clock = -5; done = false; readonly startS: number; readonly limitTime: number;
   /** mode: 'handicap' (the limit first, scratch last, by the book) or 'scratch' (all at once from a grid in pairs, the slowest at the front) */
-  constructor(readonly track: Track, ids: string[], readonly laps: number, player: string | null, seed = 1, readonly mode: 'handicap' | 'scratch' = 'handicap') {
-    this.startS = track.spec.landmarks.find(l => l.kind === 'line')!.s;
-    this.limitTime = Math.max(...ids.map(id => bookTime(id, laps)));
+  constructor(readonly track: Track, ids: string[], readonly laps: number, player: string | null, seed = 1, readonly mode: 'handicap' | 'scratch' = 'handicap', skill: Skill = 'normal') {
+    this.startS = track.spec.landmarks.find(l => l.kind === 'line')!.s; const tk = track.spec.id ?? 'millbrook', bt = (id: string) => bookTime(id, laps, tk);
+    this.limitTime = Math.max(...ids.map(bt));
     // across the line, each in its own place; the start each is given
     let r = seed; const rnd = () => { r = (r * 16807) % 2147483647; return r / 2147483647; };
-    const order = mode === 'scratch' ? [...ids].sort((a, b) => bookTime(b, laps) - bookTime(a, laps)) : ids;   // scratch: the slowest on the front row
+    const order = mode === 'scratch' ? [...ids].sort((a, b) => bt(b) - bt(a)) : ids, K = SKILL[skill], pick = ([a, b]: [number, number]) => a + rnd() * (b - a);   // scratch: the slowest on the front row
     ids.forEach((id, k) => { const spec = raceSpec(id), car = new Vehicle(spec, track), at = order.indexOf(id);
       const grid = mode === 'scratch' ? (at % 2 ? 5 : -5) : -10 + k * (20 / Math.max(1, ids.length - 1)), back = mode === 'scratch' ? 6 + Math.floor(at / 2) * 9 : 6;
       car.place(this.startS - back, grid, 0);
-      this.cars.push({ id, name: spec.name, car, driver: id === player ? null : new Driver(track, 0.64 + rnd() * 0.08, 3.0, 0.9 + rnd() * 0.1), start: mode === 'scratch' ? 0 : this.limitTime - bookTime(id, laps), laps: 0, lapAt: [], finish: 0, dist: 0, prevS: car.s, stuck: 0, wheelTurn: 0, grid }); }); }
+      const driver = id === player ? null : (() => { const dare = pick(K.dare), pace = pick(K.pace); return new Driver(track, dare, 3.0, pace); })();   // the draws in this order: 'normal' gives the field it always did
+      this.cars.push({ id, name: spec.name, car, driver, start: mode === 'scratch' ? 0 : this.limitTime - bt(id), laps: 0, lapAt: [], finish: 0, dist: -back, prevS: car.s, stuck: 0, wheelTurn: 0, grid, trail: [] }); }); }   /* dist from the line: a back row starts behind it */
   get player(): Entrant | undefined { return this.cars.find(c => !c.driver); }
+  /** the standings: each car in order, its lap (the one it is on, or done), its gap to the leader and to the car ahead */
+  standings(): { e: Entrant; pos: number; lap: number; leader: { s: number; laps: number }; ahead: { s: number; laps: number } | null }[] {
+    const ord = this.order(), L = this.track.length;
+    return ord.map((e, i) => ({ e, pos: i + 1, lap: Math.max(1, Math.min(this.laps, e.lapAt.length)), leader: i ? gapBetween(ord[0]!, e, this.clock, L) : { s: 0, laps: 0 }, ahead: i ? gapBetween(ord[i - 1]!, e, this.clock, L) : null })); }
   /** the order: finished by time, then by distance run */
   order(): Entrant[] { return [...this.cars].sort((a, b) => (a.finish && b.finish ? a.finish - b.finish : a.finish ? -1 : b.finish ? 1 : b.dist - a.dist)); }
   step(dt: number, playerControls: Controls): void {
@@ -38,7 +65,7 @@ export class Race {
       c.step(dt, u); e.wheelTurn += (c.w[0]! + c.w[1]!) / 2 * dt;
       // distance and laps: forward over the line
       const d = T.gap(e.prevS, c.s); e.dist += d; if (!waiting && T.gap(e.prevS, this.startS) > 0 && T.gap(c.s, this.startS) <= 0 && c.vx > 1) { e.lapAt.push(this.clock); if (e.lapAt.length > this.laps && !e.finish) e.finish = this.clock; }
-      e.prevS = c.s;
+      e.prevS = c.s; if (!waiting && (!e.trail.length || this.clock - e.trail[e.trail.length - 2]! >= 0.1) && (!e.trail.length || e.dist > e.trail[e.trail.length - 1]!)) e.trail.push(this.clock, e.dist);
       // over the top, or stopped off the concrete: back on the track (an opponent after a moment, as its crew would push it)
       if (c.over || (c.upset && c.speed < 3)) { c.over = false; c.place(c.s, 0, 0); }   // over the top, or on its side or roof and stopped
       if (e.driver && !waiting) { e.stuck = (c.speed < 2 || Math.abs(c.off) > T.spec.width / 2 + 1) ? e.stuck + dt : 0; if (e.stuck > 3) { c.place(c.s, 0, 0); e.stuck = 0; } } }

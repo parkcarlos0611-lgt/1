@@ -65,11 +65,13 @@ export interface BonnetSpec { /** the cowl from this station (the bonnet's own c
   /** dark vents across the lid: the top's rows from..to, its columns c0..c1 */ vents?: { from: At; to: At; cols: [number, number] } }
 /** the head lamps, a block of the front top's cells. 'popup': a cover hinged at its back edge over a dark well, the pod on its
  *  front; 'pocket': fixed lamps sunk in a scooped pocket (shallow at its front edge, `depth` at its back, the units on a
- *  face leaning back under the back edge), a flat glass cover flush with the top; 'fixed': a lens flush in the skin */
+ *  face leaning back under the back edge), a flat glass cover flush with the top; 'fixed': a dark lens flush in the skin, the units seen in it */
 export interface PopupSpec { kind: 'popup' | 'pocket' | 'fixed'; /** the cover's first and last rows (stations; '@front' the top's front edge) */ from: At; to: At; /** degrees it opens; the well's depth */ open: number; depth: number; /** the lenses across the pod's face (shares) and their height (shares) and lift */ lens: [number, number][]; lensV: [number, number, number];
   /** the block's columns (default the cover's, TOP.COVER) */ cols?: [number, number];
   /** 'pocket': the depth at its front edge; the units' face from this share of its length; the lenses drawn as round projectors (indices);
    *  a dark finned ramp down its inner side (its share of the width, the fins) */
+  /** 'popup': `round` draws those lenses of the pod round too (a bright rim, the lens in it) */
+  /** 'fixed': the units seen in the dark lens are `lens` across the block (round ones: `round`) */
   shallow?: number; faceFrom?: number; round?: number[]; ramp?: { share: number; fins: number } }
 /** the shelf between an edge line standing in from the crest and the crest itself (a bubble cabin's foot, a plateau bonnet's
  *  edge): rows of four points, the edge E, the foot F of a wall dropping from it, the floor's middle M, the crest K */
@@ -249,6 +251,8 @@ export interface WheelLook {
   star?: { r: [number, number]; a: [number, number]; well: number; thick: number; brake: number };
   hub: { cap: [number, number, number]; nuts: number; nut: [number, number, number, number] };
 }
+/** an intake each side of the bumper (nose rows, chain points), a fog lamp's lens in it [row, u0, u1, v0, v1, depth], body-coloured bars across it */
+export interface OuterIntake { rows: [number, number]; cols: [number, number]; depth: number; fog?: [number, number, number, number, number, number]; slats?: number[] }
 export interface CarKit {
   id: string;
   lines: LineSheet;
@@ -292,8 +296,14 @@ export interface CarKit {
     centre: { rows: number; cols: [number, number]; depth: number; bars: number[]; barX: number; barZ: [number, number];
       /** bars across it: their heights and half-length; a bright badge in its middle (half-width, z0, z1); its corners rounded by
        *  fillets of the skin: [nose row, chain point, row step, point step] and the fillet's share */
-      slats?: { z: number[]; half: number }; badge?: [number, number, number]; fillets?: [number, number, number, number][]; fillet?: number };
-    outer?: { rows: [number, number]; cols: [number, number]; depth: number; fog?: [number, number, number, number, number, number]; slats?: number[] };
+      slats?: { z: number[]; half: number }; badge?: [number, number, number]; fillets?: [number, number, number, number][]; fillet?: number;
+      /** `follow`: the bars and the slats stand `barX` behind the bumper's face wherever they are (a face that curves or
+       *  leans: `barX` is then a depth, not a place); `mesh`: a lattice across the whole mouth instead, [strips across, strips
+       *  up] each cell, standing `barX` behind the face, the strips' breadth (mm) */
+      follow?: boolean; mesh?: { n: [number, number]; w: number } };
+    outer?: OuterIntake;
+    /** a second pair of intakes beside the centre (a shield grille's barred intakes), cut as the outer ones */
+    side?: OuterIntake;
     /** a round lamp sunk in a recess cut from a block of the bumper's cells (nose rows, chain points): centre, radius, depth, points round */
     fog?: { rows: [number, number]; cols: [number, number]; y: number; z: number; r: number; depth: number; seg: number } };
   /** the front bumper's lamp strip: nose rows from, the clear lamp's end (the amber one's start), to */

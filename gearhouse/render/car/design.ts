@@ -1,11 +1,13 @@
 // A car's design (core/design.ts) made into the car kit's assembly spec and its mesh (docs/systems/98_alpha_interface_and_builder_plan.md,
 // B1). The body is a base (a platform of the kit: render/car/cars/<id>.kit.ts, its lines and its panels sized for it) with
-// the swap patches for the chosen kinds laid over it; a kind that is the base's own needs no patch. The paint goes into
+// the swap patches for the chosen kinds laid over it; a kind that is the base's own needs no patch. The face (the prow, the
+// bumper, the grille, the head lamps, the auxiliary lamps) is render/car/face.ts's. The paint goes into
 // the colours, the body's dimensions into the lines' tweak (the wheelbase, the width and the track stretch the lines; the
 // roof, the overhangs, the ride, the cabin and the rake warp the built body: kit/lines.ts makeWarp), the tyres' widths and
 // the rims' size into the wheels, the wing (the base's own for the tail chosen) and the diffuser when the kit has them.
-import type { BaseId, Design, FrontKind, NoseKind, TailKind, WheelKind } from '../../core/design';
-import { FRONTS, NOSES, TAILS, WHEELS } from '../../core/design';
+import type { BaseId, Design, Face, NoseKind, TailKind, WheelKind } from '../../core/design';
+import { FACE_KINDS, NOSES, TAILS, WHEELS } from '../../core/design';
+import { faceKit } from './face';
 import type { Mesh } from './mesh';
 import { assemble } from './kit/assemble';
 import type { Tweak } from './kit/lines';
@@ -13,27 +15,26 @@ import type { CarKit } from './kit/spec';
 import { fromDesign, fromEngineSpec, type Detail, type PowertrainSpec } from './powertrain';
 import { BAYS } from '../../race/fit';
 import { enginePackage } from '../../race/designparts';
-import { F355_CAPSULE_TAIL, F355_DISC_WHEEL, F355_FIVE_SPOKE, F355_FIXED_WING, F355_FRAME_TAIL, F355_KIT, F355_MASS_NOSE, F355_PLAIN_FRONT, F355_ROUND_NOSE, F355_ROUND_TAIL } from './cars/f355.kit';
-import { NSX_ACTIVE_WING, NSX_CAPSULE_TAIL, NSX_DISC_WHEEL, NSX_DUCKTAIL, NSX_KIT, NSX_MASS_NOSE, NSX_POINTED_NOSE, NSX_ROUND_TAIL, NSX_STAR_WHEEL, NSX_SUNK_FRONT } from './cars/nsx.kit';
-import { EB110_DUCKTAIL, EB110_FIVE_SPOKE, EB110_FIXED_WING, EB110_FRAME_TAIL, EB110_KIT, EB110_POINTED_NOSE, EB110_ROUND_NOSE, EB110_ROUND_TAIL, EB110_STAR_WHEEL, EB110_SUNK_FRONT } from './cars/eb110.kit';
+import { F355_CAPSULE_TAIL, F355_DISC_WHEEL, F355_FIVE_SPOKE, F355_FIXED_WING, F355_FRAME_TAIL, F355_KIT, F355_ROUND_TAIL } from './cars/f355.kit';
+import { NSX_ACTIVE_WING, NSX_CAPSULE_TAIL, NSX_DISC_WHEEL, NSX_DUCKTAIL, NSX_KIT, NSX_ROUND_TAIL, NSX_STAR_WHEEL } from './cars/nsx.kit';
+import { EB110_DUCKTAIL, EB110_FIVE_SPOKE, EB110_FIXED_WING, EB110_FRAME_TAIL, EB110_KIT, EB110_ROUND_TAIL, EB110_STAR_WHEEL } from './cars/eb110.kit';
 
-/** a base: its kit, its own kinds and rim (in), the patch for every other kind, its rear wing for each tail (a tail's
+/** a base: its kit, its own rim (in), the patch for every other tail and wheel (the face's: face.ts), its rear wing for each tail (a tail's
  *  patch that carries a wing of its own, or none, is overridden: the design's kit says whether there is one) */
 interface Base {
   kit: CarKit; rim: number;
-  nose: Record<NoseKind, Partial<CarKit> | null>; front: Record<FrontKind, Partial<CarKit> | null>;
   tail: Record<TailKind, Partial<CarKit> | null>; wheel: Record<WheelKind, Partial<CarKit> | null>;
   wing: Record<TailKind, NonNullable<CarKit['wing']>>;
 }
 const each = <T>(w: T): Record<TailKind, T> => ({ frame: w, roundLamps: w, ducktail: w, capsule: w });
 const BASE: Record<BaseId, Base> = {
-  nsx: { kit: NSX_KIT, rim: 16, nose: { round: null, pointed: NSX_POINTED_NOSE, mass: NSX_MASS_NOSE }, front: { plain: null, sunk: NSX_SUNK_FRONT },
+  nsx: { kit: NSX_KIT, rim: 16,
     tail: { frame: null, roundLamps: NSX_ROUND_TAIL, ducktail: NSX_DUCKTAIL, capsule: NSX_CAPSULE_TAIL }, wheel: { fiveSpoke: null, disc: NSX_DISC_WHEEL, star: NSX_STAR_WHEEL },
     wing: each(NSX_ACTIVE_WING.wing!) },
-  f355: { kit: F355_KIT, rim: 18, nose: { round: F355_ROUND_NOSE, pointed: null, mass: F355_MASS_NOSE }, front: { plain: F355_PLAIN_FRONT, sunk: null },
+  f355: { kit: F355_KIT, rim: 18,
     tail: { frame: F355_FRAME_TAIL, roundLamps: F355_ROUND_TAIL, ducktail: null, capsule: F355_CAPSULE_TAIL }, wheel: { fiveSpoke: F355_FIVE_SPOKE, disc: F355_DISC_WHEEL, star: null },
     wing: each(F355_FIXED_WING.wing!) },
-  eb110: { kit: EB110_KIT, rim: 18, nose: { round: EB110_ROUND_NOSE, pointed: EB110_POINTED_NOSE, mass: null }, front: { plain: null, sunk: EB110_SUNK_FRONT },
+  eb110: { kit: EB110_KIT, rim: 18,
     tail: { frame: EB110_FRAME_TAIL, roundLamps: EB110_ROUND_TAIL, ducktail: EB110_DUCKTAIL, capsule: null }, wheel: { fiveSpoke: EB110_FIVE_SPOKE, disc: null, star: EB110_STAR_WHEEL },
     wing: { ...each(EB110_FIXED_WING.wing!), capsule: EB110_KIT.wing! } },
 };
@@ -49,8 +50,9 @@ function darken(hex: string, k: number): string {
 /** the design's body as the kit's assembly spec and the tweak to its lines */
 export function designKit(d: Design, detail?: Detail): { kit: CarKit; tweak: Tweak } {
   const B = BASE[d.body.base], b = d.body; if (!B) throw new Error(`design: no base ${b.base}`);
-  let kit: CarKit = { ...B.kit };
-  for (const p of [B.nose[b.nose], B.front[b.front], B.tail[b.tail], B.wheel[b.wheel]]) if (p) kit = { ...kit, ...p };
+  // the face first (a tail's patch may carry lines of its own over the prow's: the deck's)
+  let kit: CarKit = faceKit(b.base, b);
+  for (const p of [B.tail[b.tail], B.wheel[b.wheel]]) if (p) kit = { ...kit, ...p };
   // the paint: its own shut lines' shadow unless it is the base's own colour
   const c = B.kit.colours;
   kit.colours = { ...c, paint: b.paint, gloss: b.gloss, seam: b.paint.toLowerCase() === c.paint.toLowerCase() ? c.seam : darken(b.paint, 0.3) };
@@ -80,9 +82,9 @@ export function designMesh(d: Design, spin = 0, lamps = 0, wing = 0, powertrain?
 }
 
 /** the kinds the builder offers on a base: every one closes on every base (tests/car_design.test.ts tries every combination) */
-export function designChoices(base: BaseId): { nose: NoseKind[]; front: FrontKind[]; tail: TailKind[]; wheel: WheelKind[] } {
+export function designChoices(base: BaseId): { nose: NoseKind[]; tail: TailKind[]; wheel: WheelKind[] } & { [K in keyof Face]: Face[K][] } {
   const B = BASE[base]; if (!B) throw new Error(`design: no base ${base}`);
-  return { nose: NOSES.filter(k => k in B.nose), front: FRONTS.filter(k => k in B.front), tail: TAILS.filter(k => k in B.tail), wheel: WHEELS.filter(k => k in B.wheel) };
+  return { nose: NOSES, ...FACE_KINDS, tail: TAILS.filter(k => k in B.tail), wheel: WHEELS.filter(k => k in B.wheel) };
 }
 
 /** the mesh without the parts of these names (the builder's engine view: the deck's lids and glass lifted off) */

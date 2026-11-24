@@ -6,7 +6,7 @@ import { describe, it, expect } from 'vitest';
 import { raceSpec, type RaceSpec } from '../race/cars';
 import { designSpec, designFigures, dragArea, zeroTo100, perfClass, perfLabel } from '../race/design';
 import { enginePackage } from '../race/designparts';
-import { DESIGN_NSX, DESIGN_F355, DESIGN_DIABLO, DESIGN_EB110, DESIGN_XJ220, DESIGN_MCLAREN_F1, LIMITS, BASES, NOSES, FRONTS, TAILS, WHEELS, GRADES, INTAKES, COMPRESSIONS, SUMPS, BLOCKS,
+import { DESIGN_NSX, DESIGN_F355, DESIGN_DIABLO, DESIGN_EB110, DESIGN_XJ220, DESIGN_MCLAREN_F1, LIMITS, BASES, NOSES, FRONTS, faceOf3, TAILS, WHEELS, GRADES, INTAKES, COMPRESSIONS, SUMPS, BLOCKS,
   STRUCTURES, PANELS, INTERIORS, BODY_LIMITS, DIMS, LAYOUTS, QUALITY_PARTS, normalise, type BodyDims, type Design, type EngineQuality } from '../core/design';
 import { Vehicle } from '../race/vehicle';
 import { Track } from '../race/track';
@@ -122,7 +122,7 @@ describe('the rules run the right way', () => {
 describe('any design inside the limits', () => {
   const pick = <T>(r: Rng, a: readonly T[]) => a[Math.floor(r.float() * a.length)]!, span = (r: Rng, [a, b]: readonly [number, number]) => a + (b - a) * r.float();
   const random = (r: Rng, i: number): Design => { const base = pick(r, BASES), lim = BODY_LIMITS(base); return { v: 4, id: 'r' + i, name: 'random ' + i,
-    body: { base, nose: pick(r, NOSES), front: pick(r, FRONTS), tail: pick(r, TAILS), wheel: pick(r, WHEELS), ...Object.fromEntries(DIMS.map(k => [k, span(r, lim[k])])) as unknown as BodyDims, paint: '#808080', gloss: 0.5, structure: pick(r, STRUCTURES), panels: pick(r, PANELS) },
+    body: { base, nose: pick(r, NOSES), ...faceOf3(base, pick(r, FRONTS)), tail: pick(r, TAILS), wheel: pick(r, WHEELS), ...Object.fromEntries(DIMS.map(k => [k, span(r, lim[k])])) as unknown as BodyDims, paint: '#808080', gloss: 0.5, structure: pick(r, STRUCTURES), panels: pick(r, PANELS) },
     engine: { grade: pick(r, GRADES), layout: pick(r, LAYOUTS), cc: span(r, LIMITS.cc), valves: pick(r, [2, 3, 4, 5] as const), redline: span(r, LIMITS.redline), intake: pick(r, INTAKES), compression: pick(r, COMPRESSIONS),
       sump: pick(r, SUMPS), block: pick(r, BLOCKS), turbo: pick(r, [0, 1, 2, 3, 4] as const), boost: span(r, LIMITS.boost), intercooler: r.float() < 0.8, vtec: r.float() < 0.3,
       bs: span(r, LIMITS.bs), quality: Object.fromEntries(QUALITY_PARTS.map(k => [k, Math.round(span(r, LIMITS.quality))])) as EngineQuality },

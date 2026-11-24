@@ -18,7 +18,7 @@ import { designMesh, designChoices, withoutParts } from '../render/car/design';
 import { bareMesh, bounce } from '../render/car/suspension/view';
 import { designSpec, designFigures, designHeight, type DesignFigures } from '../race/design';
 import { CLEARANCE, type FitResult } from '../race/fit';
-import { LIMITS, BASES, BODY_LIMITS, DIMS, LAYOUTS, LAYOUT_NAME, type DimKey, GRADE_NAME, GRADES, gradeLock, gradeBoost, gradeRedline, normalise, applyPatch, type BaseId, type Design, type NoseKind, type FrontKind, type TailKind, type WheelKind,
+import { LIMITS, BASES, BODY_LIMITS, DIMS, LAYOUTS, LAYOUT_NAME, type DimKey, GRADE_NAME, GRADES, gradeLock, gradeBoost, gradeRedline, normalise, applyPatch, type BaseId, type Design, type NoseKind, type TailKind, type WheelKind, FACE_KEYS, faceLock, type Face, type FaceKey,
   type Grade, type Structure, type Panels, type Intake, type Compression, type Sump, type Block, type Turbos, type Interior } from '../core/design';
 import { savedEngines, joinEngine, withEngine } from '../core/engines';
 import { currentDesign, keepCurrent, savedDesigns, saveDesign, deleteDesign, fromPreset, encodeDesign, designJson, parseDesign, measured, designSig, newId, KEYS, type KeyStore } from '../core/designstore';
@@ -142,8 +142,34 @@ function dimSliders(): HTMLElement[] {
 function btnRow(t: string, f: () => void): HTMLElement { const d = document.createElement('div'); d.className = 'btns'; const b = document.createElement('button'); b.type = 'button'; b.className = 'btn'; b.textContent = t; b.addEventListener('click', f); d.append(b); return d; }
 // ③ 차체 형태: the panels' kinds; ⑤ 칠·마감: the paint
 { const ch = designChoices('nsx'), kinds = <T extends string>(ks: T[]) => ks.map(k => [k, KIND_NAME[k] ?? k] as [T, string]);
-  add('body', seg<NoseKind>('코', kinds(ch.nose), () => D.body.nose, v => { D.body.nose = v; }), seg<FrontKind>('앞면', kinds(ch.front), () => D.body.front, v => { D.body.front = v; }),
-    seg<TailKind>('꼬리', kinds(ch.tail), () => D.body.tail, v => { D.body.tail = v; }), seg<WheelKind>('휠', kinds(ch.wheel), () => D.body.wheel, v => { D.body.wheel = v; }));
+  // the face in slots (core/design.ts Face; render/car/face.ts): chips with a small drawing each, a value the rules do not
+  // allow greyed out with its reason (faceLock), the car built again at each choice
+  const I = (d: string) => `<svg viewBox="0 0 26 16" width="26" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+  const NOSE: [NoseKind, string, string][] = [['round', '둥근 코', I('<path d="M3 14 C3 5 8 3 13 3 C18 3 23 5 23 14"/>')], ['pointed', '뾰족한 코', I('<path d="M2 14 L6 5 L10 3 H16 L20 5 L24 14"/>')], ['mass', '덩어리 코', I('<path d="M6 8 C6 4 10 2 13 2 C16 2 20 4 20 8"/><path d="M2 14 C2 9 6 8 13 8 C20 8 24 9 24 14"/>')]];
+  const FACE: { [K in FaceKey]: [string, [Face[K], string, string][]] } = {
+    bumper: ['범퍼', [['upright', '직립형', I('<path d="M23 2 H9 Q5 2 5 5 V10 Q5 13 9 14 H23"/>')], ['crease', '주름선형', I('<path d="M23 2 H9 L4 5 L5 9 L11 14 H23"/>')],
+      ['wedge', '쐐기형', I('<path d="M23 2 H13 L3 12 V14 H23"/>')], ['airdam', '에어댐', I('<path d="M23 2 H9 V6 H6 V13"/><path d="M1 14 H23"/>')]]],
+    grille: ['그릴', [['slot', '슬롯', I('<rect x="3" y="5" width="20" height="6"/><path d="M9 5 V11 M13 5 V11 M17 5 V11"/>')], ['oval', '타원 격자', I('<ellipse cx="13" cy="8" rx="10" ry="4.5"/><path d="M3 8 H23 M13 3.5 V12.5 M8 4.2 V11.8 M18 4.2 V11.8"/>')],
+      ['horseshoe', '말굽', I('<path d="M11 13 V7 Q11 4 13 4 Q15 4 15 7 V13 Z"/><path d="M2 7 H8 M2 11 H8 M18 7 H24 M18 11 H24"/>')], ['mesh', '와이드 메시', I('<rect x="1" y="5" width="24" height="6"/><path d="M5 5 V11 M9 5 V11 M13 5 V11 M17 5 V11 M21 5 V11 M1 8 H25"/>')],
+      ['none', '없음', I('<path d="M3 5 H23 M3 11 H23" stroke-dasharray="2 3"/>')]]],
+    head: ['헤드라이트', [['popup', '팝업', I('<path d="M2 13 H24 M6 13 L8 5 H19 V13"/><rect x="10" y="7" width="6" height="4"/>')], ['pocket', '포켓 (투명 덮개)', I('<path d="M3 4 H23 L20 12 H6 Z"/><circle cx="16" cy="9" r="2"/><rect x="8" y="7" width="4" height="3.5"/>')],
+      ['fixed', '매립 렌즈', I('<path d="M3 5 H23 L20 11 H6 Z"/>')]]],
+    pod: ['램프 유닛', [['twin', '사각 2등', I('<rect x="3" y="5" width="8" height="6"/><rect x="15" y="5" width="8" height="6"/>')], ['single', '넓은 1등', I('<rect x="3" y="5" width="20" height="6"/>')],
+      ['round', '원형 2등', I('<circle cx="8" cy="8" r="4"/><circle cx="18" cy="8" r="4"/>')]]],
+    aux: ['보조등', [['strip', '띠형', I('<rect x="3" y="6" width="20" height="4"/><path d="M16 6 V10"/>')], ['round', '원형 안개등', I('<circle cx="13" cy="8" r="4.5"/><path d="M3 5 H7 M19 5 H23"/>')], ['none', '없음', I('<path d="M3 8 H23" stroke-dasharray="2 3"/>')]]] };
+  /** a slot's chips: a drawing and a name each; a locked value is greyed out and its reason written under the row */
+  function chips<T extends string>(label: string, opts: [T, string, string][], get: () => T, set: (v: T) => void, lock?: (v: T) => string | null): HTMLElement {
+    const box = document.createElement('div'); box.className = 'seg chips'; box.setAttribute('role', 'group'); box.setAttribute('aria-label', label);
+    const bs = opts.map(([v, t, icon]) => { const b = document.createElement('button'); b.type = 'button'; b.innerHTML = icon; b.append(t); b.dataset.v = v; b.addEventListener('click', () => { if (lock?.(v)) return; set(v); changed(); }); box.append(b); return [v, t, b] as const; });
+    const why = document.createElement('small'); why.className = 'lock';
+    syncs.push(() => { const locked: string[] = [];
+      for (const [v, t, b] of bs) { const L = lock?.(v) ?? null; b.setAttribute('aria-pressed', String(v === get())); b.disabled = !!L; b.title = L ?? ''; if (L) locked.push(`${t}: ${L}`); }
+      why.textContent = locked.join(' · '); why.hidden = !locked.length; });
+    const r = document.createElement('div'); r.className = 'row'; r.dataset.slot = label; const l = document.createElement('span'); l.className = 'lab'; l.textContent = label; r.append(l, box, why); return r; }
+  const slot = <K extends FaceKey>(k: K) => chips<Face[K]>(FACE[k][0], FACE[k][1], () => D.body[k], v => { (D.body as Face)[k] = v; }, v => faceLock(D.body, k, v));
+  add('body', h2('앞모습'), chips<NoseKind>('코 모양', NOSE, () => D.body.nose, v => { D.body.nose = v; }), ...FACE_KEYS.map(slot),
+    note('앞모습의 다섯 칸은 세 바탕 모두에서 따로 바꿀 수 있습니다. 그릴과 보조등은 고른 범퍼의 선에 맞춰 자리를 다시 잡습니다. 함께 쓸 수 없는 조합은 흐리게 표시하고 이유를 적습니다.'),
+    h2('뒷모습·휠'), seg<TailKind>('꼬리', kinds(ch.tail), () => D.body.tail, v => { D.body.tail = v; }), seg<WheelKind>('휠', kinds(ch.wheel), () => D.body.wheel, v => { D.body.wheel = v; }));
   const sw = document.createElement('div'); sw.className = 'swatches'; const pick = document.createElement('input'); pick.type = 'color'; pick.id = 'paint'; pick.setAttribute('aria-label', '직접 고르기');
   const bs = PAINTS.map(c => { const b = document.createElement('button'); b.type = 'button'; b.style.background = c; b.setAttribute('aria-label', c); b.addEventListener('click', () => { D.body.paint = c; changed(); }); sw.append(b); return [c, b] as const; });
   pick.addEventListener('input', () => { D.body.paint = pick.value; changed(); }); sw.append(pick);
@@ -225,7 +251,7 @@ function showList() { const list = $('list'), all = savedDesigns(store); list.te
 
 // ---- the design changed: kept, the figures, the car (when its body changed), the link ----
 // the engine's shape is in the key too (the car carries its powertrain: the engine view shows it)
-const bodyKey = (d: Design) => JSON.stringify([d.engine.layout, d.engine.cc, d.engine.bs, d.engine.valves, d.engine.block, d.engine.grade, d.engine.intake, d.engine.sump, d.engine.turbo, d.engine.intercooler, d.drive.gears, d.drive.gearbox, d.drive.awd, d.body.base, d.body.nose, d.body.front, d.body.tail, d.body.wheel, ...DIMS.map(k => d.body[k]), d.body.paint, d.body.gloss, d.kit.tyres, d.kit.rim, d.kit.wing, d.kit.diffuser]);
+const bodyKey = (d: Design) => JSON.stringify([d.engine.layout, d.engine.cc, d.engine.bs, d.engine.valves, d.engine.block, d.engine.grade, d.engine.intake, d.engine.sump, d.engine.turbo, d.engine.intercooler, d.drive.gears, d.drive.gearbox, d.drive.awd, d.body.base, d.body.nose, ...FACE_KEYS.map(k => d.body[k]), d.body.tail, d.body.wheel, ...DIMS.map(k => d.body[k]), d.body.paint, d.body.gloss, d.kit.tyres, d.kit.rim, d.kit.wing, d.kit.diffuser]);
 let meshT = 0, figT = 0;
 function changed() { D = normalise(D); for (const s of syncs) s(); keepCurrent(store, D); savedState(); driveLink();
   clearTimeout(figT); figT = setTimeout(figures, 40) as unknown as number;

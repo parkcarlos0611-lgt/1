@@ -30,7 +30,7 @@ const slide = (id: string, key: 'outPx' | 'linePx' | 'az' | 'el' | 'pitch' | 'zo
   el.addEventListener('input', () => { st[key] = +el.value; out.textContent = show(st[key]); dirty = true; }); };
 slide('outPx', 'outPx', v => `${v.toFixed(1)} px`); slide('linePx', 'linePx', v => `${v.toFixed(2)} px`); slide('az', 'az', v => `${Math.round(v)}°`); slide('el', 'el', v => `${Math.round(v)}°`);
 slide('pitch', 'pitch', v => `${Math.round(v)}°`); slide('zoom', 'zoom', v => `${v.toFixed(2)}배`);
-for (const r of document.querySelectorAll<HTMLInputElement>('input[name=look]')) { r.checked = +r.value === st.look; r.addEventListener('change', () => { if (r.checked) { st.look = +r.value; dirty = true; } }); }
+for (const r of Array.from(document.querySelectorAll<HTMLInputElement>('input[name=look]'))) { r.checked = +r.value === st.look; r.addEventListener('change', () => { if (r.checked) { st.look = +r.value; dirty = true; } }); }
 $('reset').addEventListener('click', () => { st.outPx = STYLE.outlinePx; st.linePx = STYLE.linePx; st.az = 142; st.el = 55; for (const id of ['outPx', 'linePx', 'az', 'el'] as const) { const el = $<HTMLInputElement>(id); el.value = String(st[id]); el.dispatchEvent(new Event('input')); } });
 // ---- turning the car by hand ----
 let drag: number | null = null;

@@ -1,0 +1,64 @@
+<title>드리프트 화풍 시험대</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500&family=Noto+Sans+KR:wght@400;600&display=swap">
+<style>
+  /* layout: the turntable fills the left, the switches stand in a narrow rack beside it like a lighting desk (under it on a phone) */
+  :root { --bg: #e7e5e0; --panel: #f5f4f0; --ink: #1f1f22; --soft: #66646a; --line: #cbc8c0; --accent: #c2410c; --stage: #3d3c39;
+    --display: 'Oswald', 'Arial Narrow', sans-serif; --body: 'Noto Sans KR', system-ui, sans-serif; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #18181a; --panel: #222225; --ink: #ecebe7; --soft: #a19fa6; --line: #38373b; --accent: #f08a4b; --stage: #2c2b29; color-scheme: dark; } }
+  :root[data-theme="dark"] { --bg: #18181a; --panel: #222225; --ink: #ecebe7; --soft: #a19fa6; --line: #38373b; --accent: #f08a4b; --stage: #2c2b29; color-scheme: dark; }
+  html, body { height: 100%; }
+  body { background: var(--bg); color: var(--ink); font-family: var(--body); padding-block: 14px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); box-sizing: border-box; display: flex; flex-direction: column; gap: 10px; }
+  header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; }
+  h1 { font-family: var(--display); font-weight: 500; letter-spacing: 0.04em; font-size: 1.35rem; margin: 0; text-wrap: balance; }
+  .lede { color: var(--soft); margin: 0; font-size: 0.85rem; max-width: 70ch; line-height: 1.45; }
+  .bench { flex: 1 1 auto; min-height: 0; display: flex; gap: 14px; align-items: stretch; }
+  .stage { flex: 1 1 auto; min-width: 0; display: grid; grid-template-rows: 1fr auto; gap: 6px; }
+  canvas { width: 100%; height: 100%; min-height: 300px; display: block; background: var(--stage); border-radius: 6px; cursor: grab; touch-action: none; }
+  canvas:active { cursor: grabbing; }
+  #stat { color: var(--soft); font-size: 0.78rem; font-variant-numeric: tabular-nums; min-height: 1.2em; }
+  .rack { flex: 0 0 280px; overflow-y: auto; display: grid; align-content: start; gap: 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 14px; }
+  .row { display: grid; gap: 5px; }
+  label.cap, legend { font-size: 0.72rem; letter-spacing: 0.06em; color: var(--soft); text-transform: uppercase; }
+  .val { float: right; font-variant-numeric: tabular-nums; color: var(--ink); text-transform: none; letter-spacing: 0; }
+  select, input[type=range] { width: 100%; accent-color: var(--accent); }
+  select { font: inherit; padding: 6px 8px; border: 1px solid var(--line); border-radius: 4px; background: var(--bg); color: var(--ink); }
+  fieldset { border: 0; padding: 0; margin: 0; display: grid; gap: 6px; }
+  .seg { display: flex; flex-wrap: wrap; gap: 6px; }
+  .seg label { font-size: 0.85rem; border: 1px solid var(--line); border-radius: 4px; padding: 5px 10px; cursor: pointer; position: relative; }
+  .seg input { position: absolute; opacity: 0; }
+  .seg label:has(input:checked) { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+  .seg label:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .tog { display: flex; align-items: center; gap: 8px; font-size: 0.88rem; }
+  .tog input { accent-color: var(--accent); width: 16px; height: 16px; }
+  button { font: inherit; font-size: 0.85rem; padding: 6px 10px; border: 1px solid var(--line); border-radius: 4px; background: var(--bg); color: var(--ink); cursor: pointer; }
+  button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  @media (max-width: 760px) { body { height: auto; } .bench { flex-direction: column; } canvas { height: 62vh; } .rack { flex: none; } }
+</style>
+<header><h1>드리프트 화풍 시험대</h1><p class="lede">FR Legends식 선처리(뒤집은 껍질 외곽선, 표시한 선, 후처리 보조)와 2단 음영을 차 한 대씩 돌려 본다. 끌어서 돌리고, 휠로 확대한다.</p></header>
+<div class="bench">
+  <div class="stage"><canvas id="cv" aria-label="돌아가는 차"></canvas><div id="stat">준비 중…</div></div>
+  <aside class="rack">
+    <div class="row"><label class="cap" for="car">차</label><select id="car"></select></div>
+    <fieldset><legend>화풍</legend><div class="seg">
+      <label><input type="radio" name="look" value="4">드리프트</label><label><input type="radio" name="look" value="3">카툰</label><label><input type="radio" name="look" value="2">PBR</label></div></fieldset>
+    <fieldset><legend>선 세 겹</legend>
+      <label class="tog"><input type="checkbox" id="outline">실루엣 외곽선 (뒤집은 껍질)</label>
+      <label class="tog"><input type="checkbox" id="lines">패널선·주름선</label>
+      <label class="tog"><input type="checkbox" id="post">후처리 보조 윤곽 (빈틈)</label>
+      <label class="tog"><input type="checkbox" id="atlas">아틀라스 (램프·그릴)</label></fieldset>
+    <div class="row"><label class="cap" for="outPx">외곽선 굵기 <span class="val" id="outPxv"></span></label><input type="range" id="outPx" min="0.5" max="6" step="0.1"></div>
+    <div class="row"><label class="cap" for="linePx">선 굵기 <span class="val" id="linePxv"></span></label><input type="range" id="linePx" min="0.5" max="4" step="0.05"></div>
+    <div class="row"><label class="cap" for="az">빛 방위 <span class="val" id="azv"></span></label><input type="range" id="az" min="0" max="360" step="1"></div>
+    <div class="row"><label class="cap" for="el">빛 높이 <span class="val" id="elv"></span></label><input type="range" id="el" min="5" max="88" step="1"></div>
+    <fieldset><legend>보기</legend>
+      <label class="tog"><input type="checkbox" id="spin">돌리기</label>
+      <label class="tog"><input type="checkbox" id="persp">원근 카메라 (끄면 빌더의 평행 투영)</label></fieldset>
+    <div class="row"><label class="cap" for="pitch">시점 높이 <span class="val" id="pitchv"></span></label><input type="range" id="pitch" min="0" max="60" step="1"></div>
+    <div class="row"><label class="cap" for="zoom">확대 <span class="val" id="zoomv"></span></label><input type="range" id="zoom" min="0.5" max="2.5" step="0.01"></div>
+    <button id="reset" type="button">굵기와 빛을 기본값으로</button>
+    <p class="lede">굵기는 1080픽셀 높이 화면 기준이다. 화면 크기와 기기 픽셀 비율에 맞춰 늘어난다.</p>
+  </aside>
+</div>
+<script>/*BUNDLE*/</script>

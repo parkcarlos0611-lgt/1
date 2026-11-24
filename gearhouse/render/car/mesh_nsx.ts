@@ -22,7 +22,7 @@
 import { Build, type Mesh, type V } from './mesh';
 import { addEngine, ENGINES } from './enginemesh';
 
-const PAINT = '#c8141e', GLOSS = 0.6, BLACK = '#0c0c0f', FRAME = '#14151a', DARK = '#131318', TRIM = '#25272d', GLASS = '#a9c2cc', SILVER = '#c9ccd0', CHROME = '#d4d6d9', RUBBER = '#26242b';
+const PAINT = '#c8141e', GLOSS = 0.6, SMOKE = '#5a0c10', BLACK = '#0c0c0f', FRAME = '#14151a', DARK = '#131318', TRIM = '#25272d', GLASS = '#a9c2cc', SILVER = '#c9ccd0', CHROME = '#d4d6d9', RUBBER = '#26242b';
 const LENS = '#eef0f2', RED = '#c9221f', AMBER = '#e8901c', SEAT = '#3a3a40', SEAT2 = '#63636b', SEAM = '#3d070b', WHITE = '#e6e4dc';
 const L = 4405, FX = 930, RX = 3460, RF = 293, RR = 316, WYF = 755, WYR = 765, TWF = 205, TWR = 225;       // the axles, the tyres' radii, half the tracks, the tyres' widths
 const RAF = 355, RAR = 352, YINF = 560, YINR = 630;                                                          // the arches' radii, the wells' inner walls
@@ -198,16 +198,16 @@ export function nsxMesh(spin = 0, lamps = 0): Mesh { const b = new Build(); lamp
   b.name('bumperR').mat(PAINT, GLOSS, 'paint'); cells(TLG, (i, k) => (k >= 5 && k < 9) || (k >= 9 && i < 3));
   b.name('valance').mat(TRIM, 0.15); cells(TLG, (i, k) => k >= 9 && i >= 3);
   b.name('tailSlot').mat(DARK, 0.05); cells(TLG, (_, k) => k === 2 || k === 3);
-  b.name('tailBand').mat(BLACK, 0.7); cells(TLG, (_, k) => k === 4);
+  b.name('tailBand').mat(SMOKE, 0.85); cells(TLG, (_, k) => k === 4);   /* review 154: the band is smoked red lens across the full width (the photographs), not black */
 
   // ---- the canopy: one black glasshouse ----
-  const iQ0 = at(2750) - iA, iB0 = at(XR1) - iA;
+  const iQ0 = at(2890) - iA, iB0 = at(XR1) - iA;   // review 154: the B pillar a broad black sail behind the door glass (about 200 mm, the photographs), the quarter glass behind it
   b.name('canopy').mat(BLACK, 0.75, 'paint'); cells(RFG); cells(SCR, (i, j) => i === 0 || i >= 5 || j >= 6); cells(US, (i, j) => j === 0 || (i >= iB0 && i < iQ0) || i === 0);
   cells(RGL, (i, j) => j >= 6 || i >= RGX.length - 3);
   b.name('screenPane').mat(GLASS, 0.5, 'glass'); cells(SCR, (i, j) => i > 0 && i < 5 && j < 6);
   b.name('sidePane').mat(GLASS, 0.5, 'glass'); cells(US, (i, j) => j > 0 && i > 0 && i < iB0);
   b.name('quarterPane').mat(GLASS, 0.5, 'glass'); cells(US, (i, j) => j > 0 && i >= iQ0);
-  b.name('rearPane').mat(GLASS, 0.5, 'glass'); cells(RGL, (i, j) => j < 6 && i < RGX.length - 3);
+  b.name('rearPane').mat(GLASS, 0.2, 'glass');   /* review 154: a clearer pane (glass gloss under 0.5 = less tint), so the engine shows */ cells(RGL, (i, j) => j < 6 && i < RGX.length - 3);
 
   // ---- the front bumper: the combination lamps, the intakes with the fog lamps ----
   b.name('sidelightF').mat(LENS, 0.7); cells(NSG, (i, k) => lampCell(i, k) && i < 6);
@@ -262,14 +262,15 @@ export function nsxMesh(spin = 0, lamps = 0): Mesh { const b = new Build(); lamp
         const P = (u: number, v: number, lift: number): V => { const p = mix(mix(f0, f1, u), mix(g0, g1, u), v); return [p[0] - lift, p[1], p[2]]; };
         b.name('headlamp').mat(LENS, 0.7, 'lens'); for (const [u0, u1] of [[0.06, 0.48], [0.52, 0.94]] as const) face(b, P(u0, 0.12, 5), P(u1, 0.12, 5), P(u1, 0.8, 5), P(u0, 0.8, 5), fwd); } } }
 
-  // ---- the tail's lamps in the black band: amber at the ends, red, a clear reversing lamp, the black centre ----
+  // ---- the tail's lamps in the smoked red band (review 154): amber at the ends, red, small clear reversing lamps either side of the H badge ----
   for (const sg of [1, -1]) { const N: V = [1, 0, 0.15];
     b.name('indicatorR').mat(AMBER, 0.7); inCell(TLG, 2, 4, 0.1, 1, 0.12, 0.88, 3, N, sg); inCell(TLG, 1, 4, 0.5, 1, 0.12, 0.88, 3, N, sg);
-    for (const i of [3, 4, 5, 6]) { b.name(i < 5 ? 'tailLamp' : 'stopLamp').mat(RED, 0.7, 'lens'); inCell(TLG, i, 4, 0.05, 0.95, 0.12, 0.88, 3, N, sg); }
-    b.name('reverseLamp').mat(WHITE, 0.7); inCell(TLG, 7, 4, 0.1, 0.9, 0.25, 0.75, 3, N, sg); }
+    for (const i of [3, 4, 5, 6]) { b.name(i < 5 ? 'tailLamp' : 'stopLamp').mat(RED, 0.7, 'lens'); inCell(TLG, i, 4, 0, 1, 0.12, 0.88, 3, N, sg); }   /* touching: one continuous red run */
+    b.name('reverseLamp').mat(WHITE, 0.7); inCell(TLG, 7, 4, 0.2, 0.85, 0.3, 0.72, 4, N, sg);   /* small square reversing lamps beside the badge */
+    b.name('badge').mat(CHROME, 0.85, 'metal'); inCell(TLG, 8, 4, 0.55, 1, 0.28, 0.74, 5, N, sg); }   // the H badge in the middle of the red band
   // the band runs round the corner onto the flank and dies out in a point; the indicator wraps with it
   for (const sg of [1, -1]) { const E: [number, number, number][] = [[XT1, 815, 640], [4190, 813, 690], [4120, 808, 748], [4040, 798, 798]], P = (x: number, z: number, lift = 3): V => mir(add(surf(x, z), [0, lift, 0]), sg);
-    b.name('tailBand').mat(BLACK, 0.7); for (let k = 0; k + 1 < E.length; k++) face(b, P(E[k]![0], E[k]![1]), P(E[k + 1]![0], E[k + 1]![1]), P(E[k + 1]![0], E[k + 1]![2]), P(E[k]![0], E[k]![2]), [0, sg, 0]);
+    b.name('tailBand').mat(SMOKE, 0.85); for (let k = 0; k + 1 < E.length; k++) face(b, P(E[k]![0], E[k]![1]), P(E[k + 1]![0], E[k + 1]![1]), P(E[k + 1]![0], E[k + 1]![2]), P(E[k]![0], E[k]![2]), [0, sg, 0]);
     b.name('indicatorR').mat(AMBER, 0.7); face(b, P(XT1 - 4, 800, 5), P(4196, 800, 5), P(4196, 700, 5), P(XT1 - 4, 662, 5), [0, sg, 0]); }
   // the flush door pulls under the glass's back corner, the lock beside them
   for (const sg of [1, -1]) { const P = (x: number, z: number): V => mir(add(surf(x, z), [0, 3, 1]), sg); b.name('handle').mat(FRAME, 0.3); face(b, P(2540, 726), P(2640, 730), P(2640, 704), P(2540, 700), [0, sg, 0.4]);

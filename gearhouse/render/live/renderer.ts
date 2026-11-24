@@ -208,13 +208,14 @@ void main() {
       vec3 mir = mix(skyR(r, 0.015), skyR(r, 0.35), dust) * (0.75 + 0.25 * uSpecK);
       float glint = D_GGX(max(0., dot(ns, hg)), mix(0.012, 0.06, dust)) * 0.25 * max(0., dot(ns, uSun)) * sh * uSpecK;
       vec3 tint = kind == 4 ? toLin(base) * 0.5 : mix(vec3(0.012, 0.014, 0.014), vec3(0.03, 0.06, 0.045), edge) + toLin(vec3(0.55, 0.52, 0.46)) * dust * 0.08 * (0.4 + 0.6 * sh);
-      float absorb = kind == 4 ? 0.55 : uGlass * (0.3 + 0.4 * edge) + dust * 0.1;
+      float clear = vGloss < 0.5 ? max(0.25, vGloss * 2.) : 1.;   /* review 154: a glass part given gloss under 0.5 is a clearer pane (an engine's cover) */
+      float absorb = kind == 4 ? 0.55 : uGlass * clear * (0.3 + 0.4 * edge) + dust * 0.1;
       vec3 rgb = (mir + SUN_E * glint) * F + tint * (1. - F); float A = clamp(F + absorb * (1. - F), 0., 1.);
       oCol = vec4(present(rgb / max(A, 1e-3)) * A, A); oId = vec4(0.); oN = vec4(0.); oV = velo(); return; }
     float F = 0.06 + 0.94 * pow(1. - abs(ne), 4.); vec3 env = envAt(rz), tint = kind == 4 ? base : vec3(150., 172., 182.) / 255.;
     float k = 0.62 + 0.45 * d + (n.z > 0.3 ? 0.1 : 0.); vec3 c = tint * (1. - 0.55 * (0.4 + F)) + env / k * 0.55 * (0.4 + F);
     vec3 hg = normalize(uSun + uEye); float glint = D_GGX(max(0., dot(n, hg)), 0.03) * 0.04 * max(0., dot(n, uSun)) * sh * uSpecK;   /* the sun caught in the glass */
-    float gA = min(1., (kind == 4 ? uGlass + 0.15 : uGlass) + (1. - uGlass) * F * 0.7); oCol = vec4((uHDRo == 1 ? toLin(min(vec3(1.), c * k)) * (1. + 2.5 * F) + SUN_E * glint * 0.6 : min(vec3(1.), c * k)) * gA, gA);   /* premultiplied */ oId = vec4(0.); oN = vec4(0.); oV = velo(); return; }
+    float gC = kind == 4 || vGloss >= 0.5 ? 1. : max(0.25, vGloss * 2.), gA = min(1., (kind == 4 ? uGlass + 0.15 : uGlass * gC) + (1. - uGlass * gC) * F * 0.7); oCol = vec4((uHDRo == 1 ? toLin(min(vec3(1.), c * k)) * (1. + 2.5 * F) + SUN_E * glint * 0.6 : min(vec3(1.), c * k)) * gA, gA);   /* premultiplied */ oId = vec4(0.); oN = vec4(0.); oV = velo(); return; }
   if (kind == 1 && uDecN > 0) for (int i = 0; i < 4; i++) { if (i >= uDecN) break;
     vec3 dd = vObj - uDecO[i]; float depth = dot(dd, uDecN_[i]); if (abs(depth) > uDecR[i] * 0.8 || abs(dot(vObjN, uDecN_[i])) < 0.45) continue;
     vec3 rt = normalize(cross(uDecN_[i], uDecUp[i])); vec2 uv = vec2(dot(dd, rt), dot(dd, uDecUp[i])) / uDecR[i] * 0.5 + 0.5; if (any(lessThan(uv, vec2(0.))) || any(greaterThan(uv, vec2(1.)))) continue;

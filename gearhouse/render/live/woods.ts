@@ -64,6 +64,9 @@ void main() { int k = int(vKind + 0.5); vec2 q = vQ; vec3 nl = vec3(0., 0., 1.);
   vec3 col = uLook == 3 ? toonLight(base, n, uSun, sh, ao, vWorld) : present(pbrX(base, n, uEye, uSun, sh, 0., 0.85, 0., ao, 0.3));
   oCol = vec4(clamp(col, 0., uHDRo == 1 && uLook != 3 ? 48. : 1.), 1.); oId = vec4(uObj, 0., uOutline / 8.); oN = vec4(n * 0.5 + 0.5, 0.); vec2 dv = (vCur.xy / vCur.w - vPrev.xy / vPrev.w) * 0.5 * uSize; oV = vec4(clamp(dv / 128. + 0.5, 0., 1.), 0., 1.); }`;
 
+/** how far a crown's normals lean from each facet's own toward the way out from the tree's middle (0 flat facets, 1 a
+ *  ball): rounded a little more on review so the near trees' low-poly crowns read calm, their facets still faintly there */
+export const LEAF_ROUND = 0.7;
 /** a tree mesh as triangles in metres about its foot (the mesh's middle of its length), with normals rounded outward (a crown shades as a lump, not as facets) and its colours */
 export function treeGeometry(M: Mesh): { pos: Float32Array; nor: Float32Array; col: Float32Array; n: number; w: number; h: number } {
   const n = M.pos.length / 9, pos = new Float32Array(n * 9), nor = new Float32Array(n * 9), col = new Float32Array(n * 9), half = M.length / 2; let zc = 0, w = 0, h = 0;
@@ -73,7 +76,7 @@ export function treeGeometry(M: Mesh): { pos: Float32Array; nor: Float32Array; c
     let nx = ay * bz - az * by, ny = az * bx - ax * bz, nz = ax * by - ay * bx; const l = Math.hypot(nx, ny, nz) || 1; nx /= l; ny /= l; nz /= l;
     const cx = (P[0]![0] + P[1]![0] + P[2]![0]) / 3, cy = (P[0]![1] + P[1]![1] + P[2]![1]) / 3, cz = (P[0]![2] + P[1]![2] + P[2]![2]) / 3; if (nx * cx + ny * cy + nz * (cz - zc) < 0) { nx = -nx; ny = -ny; nz = -nz; }
     const leaf = M.kind[t] === 7; for (let v = 0; v < 3; v++) { const p = P[v]!; pos.set(p, q + v * 3); let rx = p[0], ry = p[1], rz = p[2] - zc; const rl = Math.hypot(rx, ry, rz) || 1; rx /= rl; ry /= rl; rz /= rl;
-      const m = leaf ? 0.55 : 0, mx = nx * (1 - m) + rx * m, my = ny * (1 - m) + ry * m, mz = nz * (1 - m) + rz * m, ml = Math.hypot(mx, my, mz) || 1; nor.set([mx / ml, my / ml, mz / ml], q + v * 3);
+      const m = leaf ? LEAF_ROUND : 0, mx = nx * (1 - m) + rx * m, my = ny * (1 - m) + ry * m, mz = nz * (1 - m) + rz * m, ml = Math.hypot(mx, my, mz) || 1; nor.set([mx / ml, my / ml, mz / ml], q + v * 3);
       col.set([M.col[t * 3]! / 255, M.col[t * 3 + 1]! / 255, M.col[t * 3 + 2]! / 255], q + v * 3); w = Math.max(w, Math.abs(p[0]), Math.abs(p[1])); h = Math.max(h, p[2]); } }
   return { pos, nor, col, n: n * 3, w: w * 2, h }; }
 

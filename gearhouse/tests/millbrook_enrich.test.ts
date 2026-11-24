@@ -48,6 +48,11 @@ describe('Millbrook site plan (review 181)', () => {
     let gaps = 0, n = 0; for (let s = 0; s + 20 < L; s += 20) { if (within(s, start - 160, start + 430) || within(s, ME - 60, RA + 60)) continue; n++; if (!hits.has(Math.floor(s / 20))) gaps++; }
     expect(n).toBeGreaterThan(100); expect(gaps).toBe(0);
   });
+  it('keeps the near trees even and not too large (review: the belt dense but calm): within 25 m of the fence on both sides', () => {
+    const near = S.trees!.filter(t => { const { off } = T.locate(t.x, t.y); return Math.abs(off) <= W2 + 24; }), size = near.map(t => t.kind === 3 ? t.size / 1.1 : t.size);
+    expect(near.length).toBeGreaterThan(3000); expect(Math.max(...size)).toBeLessThanOrEqual(1.1 + 1e-9); expect(Math.min(...size)).toBeGreaterThanOrEqual(0.92 - 1e-9);
+    const far = S.trees!.filter(t => -T.locate(t.x, t.y).off > W2 + 60); expect(Math.max(...far.map(t => t.size))).toBeGreaterThan(1.2);   // out of reach the woods keep their spread
+  });
   it('has the plan\'s woods at the middle density, fewer at low, more at high; the setting held', () => {
     const n = (d: 'low' | 'mid' | 'high') => treesAt(S, d).length, lo = n('low'), mid = n('mid'), hi = n('high');
     expect(mid).toBeGreaterThan(10000); expect(mid).toBeLessThan(15000);   // the plan's script drew about 5 700 (9 m grid, 85 %); tightened on review to about twice

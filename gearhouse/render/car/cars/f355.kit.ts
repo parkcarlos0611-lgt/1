@@ -142,3 +142,11 @@ export const F355_ROUND_TAIL: Pick<CarKit, 'tail' | 'tailLamps' | 'deck'> = {
 };
 /** a dished plate with eight round vents (the face sits as the five-spoke's; the vents on the 18 in rim's larger circle) */
 export const F355_DISC_WHEEL: Pick<CarKit, 'wheel'> = { wheel: { ...F355_KIT.wheel, kind: 'disc', spokes: 8, dish: { f: 30, r: 40 }, vents: { r: 145, size: 30, seg: 8, lift: 2.5 } } };
+
+// ---- the kinds added for the EB110 (docs/systems/96_kit_conversion_plan.md), sized for this car ----
+/** a glass engine cover with six dark ribs in place of the louvres (the same opening and bay) */
+export const F355_GLASS_DECK: Pick<CarKit, 'deck'> = { deck: { ...F355_KIT.deck, kind: 'glass', glass: { open: [2975, 3970], depth: 620, ribs: { from: 3090, pitch: 150, n: 6, width: 56, span: 0.86 } } } };
+/** a fixed rear wing standing on two struts over the ducktail */
+export const F355_FIXED_WING: Pick<CarKit, 'wing'> = { wing: { kind: 'fixed', from: 3820, back: 8, half: 720, sit: 560, across: [0, 0.25, 0.5, 0.75, 1], section: [[0, 0, -2], [0, 26, 8], [0.5, 0, 11], [1, -24, 9], [1, 0, 3], [0.5, 0, -8]], rise: 150, tilt: 7, pivot: 3930, struts: { y: [470], w: 50, t: 16 } } };
+/** fixed head lamps sunk in scooped pockets under flush glass, where the pop-up covers lie */
+export const F355_POCKET_LAMPS: Pick<CarKit, 'popup'> = { popup: { ...F355_KIT.popup, kind: 'pocket', depth: 66, shallow: 12, faceFrom: 0.7, lens: [[0.2, 0.52], [0.6, 0.92]], lensV: [0.16, 0.86, 4], round: [1], ramp: { share: 0.14, fins: 4 } } };

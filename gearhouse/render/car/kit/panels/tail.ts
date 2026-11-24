@@ -17,6 +17,8 @@ import { lampSurface } from '../parts/lampCluster';
 
 export function tail(x: Ctx): void {
   const { e, s, c, k } = x, T = k.tail, { TLG, LG, VG, DKG, BT, BU } = s, FR = T.frameRows, [a3, a4, a5] = T.opening;
+  // 'capsule': one plain panel from the deck's edge down to its foot line, the dark valance under it (its lamps and slots are laid on by parts/lampCluster)
+  if (T.kind === 'capsule') { e.name('tailPanel').mat(c.paint, c.gloss, 'paint'); e.cells(TLG, (_, q) => q < T.split); e.name('valance').mat(c.dark, 0.05); e.cells(TLG, (_, q) => q >= T.split); return; }
   if (T.kind !== 'frame' && T.kind !== 'roundLamps' && T.kind !== 'ducktail') throw new Error(`kit: tail kind ${T.kind} is not built yet`);
   const duck = T.kind === 'ducktail', FRt = duck ? TLG.length - 1 : FR, band = (i: number, q: number) => duck && !!T.band && q === P.ROLL && i >= T.band[0] && i < T.band[1];
   if (a3 !== a4 + 1 || a4 !== a5 + 1 || a3 >= FR) throw new Error('kit: the frame tail cuts its opening one row a step');

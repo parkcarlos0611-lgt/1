@@ -4,10 +4,13 @@
 // The pillar's band ahead of the roof shares every point of the screen's edge (a strip joins the two spacings).
 import type { Ctx } from '../ctx';
 import { TOP } from '../section';
-import type { Grid, V } from '../geom';
+import { cross, dot, mir, mix, sub, un, type Grid, type V } from '../geom';
+import { border } from '../emit';
+import { glassRibs } from './deck';
 
 export function canopy(x: Ctx): void {
   if (x.k.canopy.kind === 'buttress') return buttress(x);
+  if (x.k.canopy.kind === 'bubble') return bubble(x);
   const { e, s, c, k, L } = x, C = k.canopy, B = C.screenBand, iQ0 = L.at(C.quarter) - s.iA, iB0 = L.at(C.bPillar) - s.iA, iR0 = L.at(C.roof.from) - s.iA, nR = s.RGX.length, edge = TOP.N - 1 - B.cols;
   e.name('canopy').mat(c.black, 0.75, 'paint'); e.cells(s.RFG); e.cells(s.SCR, (i, j) => (i < B.foot || i >= B.top || j >= edge) && j < TOP.N - 2);
   // the A pillar's band: its outer line is the screen's edge (on the same straight line), so it takes the screen's points too
@@ -54,4 +57,39 @@ function buttress(x: Ctx): void {
   e.name('sidePane'); glass(); e.cells(US, (i, j) => j > 0 && i > 0 && i < iB0);
   e.name('quarterPane'); glass(); e.cells(US, pane); for (let i = Math.max(iQ0, iQ1 - nt); i < iQ1; i++) { const j = cutCol(i); e.both([US[i]![j]!, US[i + 1]![j + 1]!, US[i]![j + 1]!]); }
   e.name('rearPane'); glass(C.rearGloss); e.cells(s.RGL as Grid, rearPane);
+}
+
+// Kind 'bubble': a cabin standing on its own belt line inboard of the crest (the shelf panel runs from the belt out to
+// the crest). The roof in the body's colour, its last column the rail down to the side glass's top; behind the cabin it
+// runs on as a fastback to the glass's foot, its flanks (the side strip carried on behind the B pillar) in the body's
+// colour with sunk oval ports, a glass engine cover in its middle. Dark frames: the screen's band, the pillar (wide at
+// its foot, where the door glass has not yet begun), the band under the rail.
+function bubble(x: Ctx): void {
+  const { e, s, c, k, L } = x, C = k.canopy, Bb = C.bubble!, B = C.screenBand, at = (a: number | string) => L.at(a) - s.iA, iR0 = at(C.roof.from), iG = at(Bb.glassFrom), iB0 = at(C.bPillar), edge = TOP.N - 1 - B.cols, US = s.US, RG = s.RGL;
+  const paint = () => e.mat(c.paint, c.gloss, 'paint'), frame = () => e.mat(c.frame, 0.2), glass = () => e.mat(c.glass, 0.5, 'glass');
+  const cv = Bb.cover, r0 = cv ? s.RGX.indexOf(L.X(cv.from)) : 0, r1 = cv ? s.RGX.indexOf(L.X(cv.to)) : 0, isCover = (i: number, j: number) => !!cv && i >= r0 && i < r1 && j < cv.cols;
+  if (r0 < 0 || r1 < 0) throw new Error('kit: the glass cover\'s ends lie on stations behind the roof');
+  const P = Bb.ports, pr = (P?.rows ?? []).map(([a, b]) => [at(a), at(b)] as [number, number]), inPort = (i: number) => pr.some(([a, b]) => i >= a && i < b);
+  e.name('roof'); paint(); e.cells(s.RFG); e.cells(RG, (i, j) => !isCover(i, j)); e.cells(US, (i, j) => j === 0 && i >= iB0);
+  e.name('buttress'); paint(); e.cells(US, (i, j) => j > 0 && i >= iB0 && !inPort(i));
+  // the ports: each cell of a block cut round an oval, a dished floor sunk behind it
+  if (P) for (const [a, b] of pr) for (let j = 1; j + 1 < US[a]!.length; j++) { const p00 = US[a]![j]!, p10 = US[b]![j]!, p01 = US[a]![j + 1]!, p11 = US[b]![j + 1]!, uv = (u: number, v: number) => mix(mix(p00, p10, u), mix(p01, p11, u), v);
+    let n = un(cross(sub(p10, p00), sub(p01, p00))); if (dot(n, [0, 1, 1]) < 0) n = [-n[0], -n[1], -n[2]];
+    const hole = Array.from({ length: P.seg }, (_, q) => { const t = (q + 0.5) / P.seg * Math.PI * 2; return uv(0.5 + P.r[0] * Math.cos(t), 0.5 + P.r[1] * Math.sin(t)); }), mid = uv(0.5, 0.5), sunk: V = [mid[0] - n[0] * P.depth, mid[1] - n[1] * P.depth, mid[2] - n[2] * P.depth];
+    for (const sg of [1, -1]) { const m = (p: V) => mir(p, sg), h = hole.map(m), nn = mir(n, sg);
+      e.name('buttress'); paint(); e.porthole(border(US, a, b, j, j + 1).map(m), h, nn);
+      e.name('louvre').mat(c.shade, 0.2); for (let q = 0; q < h.length; q++) e.tri(m(sunk), h[q]!, h[(q + 1) % h.length]!, nn); } }
+  e.name('engineCover'); glass(); e.cells(RG, isCover);
+  if (cv?.ribs) e.with('part', () => glassRibs(x, RG, r0, r1, cv.cols, cv.ribs!));
+  // the pillar's band ahead of the roof shares the screen's edge points (a strip joins the two spacings)
+  const D: V[] = US.slice(0, iR0 + 1).map(r => r[0]!), T: V[] = US.slice(0, iR0 + 1).map(r => r[1]!), scr = s.SCR.map(r => r[TOP.N - 1]!);
+  const a0 = D[0]!, a1 = D[D.length - 1]!, d2 = (p: V) => (p[0] - a0[0]) ** 2 + (p[1] - a0[1]) ** 2 + (p[2] - a0[2]) ** 2, Lt = d2(a1);
+  const merged = [...D, ...scr.slice(1, -1)].sort((p, q) => d2(p) - d2(q)).filter((p, i, a) => i === 0 || d2(p) - d2(a[i - 1]!) > 1e-6 * Lt);
+  e.name('screenFrame'); frame(); e.strip(merged, T); e.strip(s.SCR.map(r => r[TOP.N - 2]!), merged);
+  e.cells(s.SCR, (i, j) => (i < B.foot || i >= B.top || j >= edge) && j < TOP.N - 2);
+  e.cells(US, (i, j) => (j === 0 && i >= iR0 && i < iB0) || (j > 0 && i < iG));
+  e.name('screenPane'); glass(); e.cells(s.SCR, (i, j) => i >= B.foot && i < B.top && j < edge);
+  e.name('sidePane'); glass(); e.cells(US, (i, j) => j > 0 && i >= iG && i < iB0);
+  // the rubber along the belt under the side glass
+  e.with('part', () => { e.name('screenFrame'); frame(); e.seam(US.slice(iG, iB0 + 1).map(r => r[4]!), () => [0, 0.6, 0.8], 2 * C.side.edge, 3)([1, -1]); });
 }

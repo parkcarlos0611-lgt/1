@@ -5,10 +5,11 @@
 //             shows, a raised panel in its middle
 import type { Ctx } from '../ctx';
 import { UP } from '../ctx';
-import { lerp, mir, type V } from '../geom';
+import { gridProbe, lerp, mir, type Grid, type V } from '../geom';
+import type { RibSpec } from '../spec';
 
 export function deck(x: Ctx): void {
-  const { e, s, c, k } = x, D = k.deck; if (D.kind === 'louvre') return louvre(x); if (D.kind !== 'lid') throw new Error(`kit: deck kind ${D.kind} is not built yet`);
+  const { e, s, c, k } = x, D = k.deck; if (D.kind === 'louvre') return louvre(x); if (D.kind === 'glass') return glass(x);
   e.name('bootLid').mat(c.paint, c.gloss, 'paint'); e.cells(s.DKG, (i, j) => j < D.lidCols && i < s.iBl);
   e.name('tailSlot').mat(c.shade, 0.3, 'paint'); e.cells(s.DKG, (i, j) => j < D.lidCols && i >= s.iBl);   // the gutter under the blade lies inside the wing (tail.ts closes it)
 }
@@ -36,8 +37,26 @@ function louvre(x: Ctx): void {
     if (pn) { const h = L.my(pn.half), ins = pn.inset, cx = (px0 + px1) / 2, ring = (dx: number, dy: number, dz: number): V[] => ([[px0 + dx, -h * 0.6], [px0 + dx, h * 0.6], [px0 + dx + (h - dy) * 0.3, h - dy], [px1 - dx - (h - dy) * 0.3, h - dy], [px1 - dx, h * 0.6], [px1 - dx, -h * 0.6], [px1 - dx - (h - dy) * 0.3, -(h - dy)], [px0 + dx + (h - dy) * 0.3, -(h - dy)]] as [number, number][]).map(([qx, qy]) => [qx, qy, at(qx, Math.abs(qy))[2] + dz + (dz ? 0 : 0.5)] as V);
       void cx; e.name('engineCover').mat(c.paint, c.gloss, 'paint'); e.b.loft([ring(0, 0, 0), ring(ins, ins, pn.rise)]); } });
 }
+//   'glass'   the same opening and bay, closed by a glass pane (a closure) with dark ribs across it
+function glass(x: Ctx): void {
+  const { e, s, c, k, L } = x, D = k.deck, V = D.glass, G = D.lidCols, P = s.DKG; if (!V) throw new Error('kit: a glass deck needs its opening');
+  const i0 = L.at(V.open[0]) - s.iDk, i1 = L.at(V.open[1]) - s.iDk;
+  e.name('bootLid').mat(c.paint, c.gloss, 'paint'); e.cells(P, (i, j) => j < G && (i < i0 || i >= i1));
+  const right: V[] = [...P[i0]!.slice(0, G + 1), ...P.slice(i0 + 1, i1).map(r => r[G]!), ...P[i1]!.slice(0, G + 1).reverse()], ring = [...right, ...right.slice(1, -1).reverse().map(p => mir(p, -1))];
+  e.name('engineBay'); e.pocket(ring, [0, 0, -V.depth], UP, c.dark);
+  e.with('closure', () => { e.name('engineCover').mat(c.glass, 0.5, 'glass'); e.cells(P, (i, j) => j < G && i >= i0 && i < i1); });
+  if (V.ribs) e.with('part', () => glassRibs(x, P, i0, i1, G, V.ribs!));
+}
+/** the dark ribs across a glass cover lying on a block of a grid's cells (rows i0..i1, its first `cols` columns) */
+export function glassRibs(x: Ctx, G: Grid, i0: number, i1: number, cols: number, R: RibSpec): void {
+  const { e, c, L } = x, xs = G.slice(i0, i1 + 1).map(r => r[0]![0]), pick = (i: number, j: number) => i >= i0 && i < i1 && j < cols;
+  const edgeY = (px: number) => { let i = 0; while (i + 2 < xs.length && xs[i + 1]! < px) i++; return lerp(G[i0 + i]![cols]![1], G[i0 + i + 1]![cols]![1], (px - xs[i]!) / (xs[i + 1]! - xs[i]!)); };
+  const top = (px: number, y: number): V => [px, y, gridProbe(G, 0, 1, 2, px, Math.abs(y), true, pick) + 5], us = [-1, -0.5, 0, 0.5, 1].map(u => u * R.span);
+  e.name('engineCover').mat(c.frame, 0.1); for (let q = 0; q < R.n; q++) { const a = L.mx(R.from + q * R.pitch), b = a + R.width; if (a <= xs[0]! || b >= xs[xs.length - 1]!) continue;
+    for (let i = 0; i + 1 < us.length; i++) e.face(top(a, us[i]! * edgeY(a)), top(b, us[i]! * edgeY(b)), top(b, us[i + 1]! * edgeY(b)), top(a, us[i + 1]! * edgeY(a)), UP); }
+}
 export function deckTrim(x: Ctx): void {
-  const { e, s, c, k, L } = x; if (k.deck.kind === 'louvre') { const V = k.deck.louvre!, i0 = L.at(V.open[0]) - s.iDk, i1 = L.at(V.open[1]) - s.iDk, G = k.deck.lidCols;
+  const { e, s, c, k, L } = x; if (k.deck.noSeam) return; if (k.deck.kind !== 'lid') { const V = k.deck.kind === 'louvre' ? k.deck.louvre! : k.deck.glass!, i0 = L.at(V.open[0]) - s.iDk, i1 = L.at(V.open[1]) - s.iDk, G = k.deck.lidCols;
     e.name('seam').mat(c.seam, 0.1); e.seam(s.DKG.slice(i0, i1 + 1).map(r => r[G]!), () => UP)([1, -1]); return; }
   const iS = L.at(k.deck.shut) - s.iDk;
   e.name('seam').mat(c.seam, 0.1); e.seam(s.DKG.slice(0, iS + 1).map(r => r[k.deck.lidCols]!), () => UP)([1, -1]); e.seam(s.DKG[iS]!.slice(0, k.deck.lidCols + 1), () => UP)([1, -1]);

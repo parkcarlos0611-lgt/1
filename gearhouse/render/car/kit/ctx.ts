@@ -9,6 +9,8 @@ export interface Ctx {
   e: Emit; s: Skin; L: Lines; k: CarKit; c: Palette;
   /** the pop-up lamps raised 0..1; the wheels turned (radians) */
   lamps: number; spin: number;
+  /** an active rear wing raised 0..1 */
+  wing: number;
   /** the front top's row for a station (a landmark, mm, or one of the rows ahead of the arch) */
   topRow(x: number | string): number;
   /** the place of a sheet point in the car's frame */

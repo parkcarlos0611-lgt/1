@@ -125,3 +125,11 @@ export const NSX_SUNK_FRONT: Pick<CarKit, 'intakes' | 'bumperLamps'> = {
   intakes: { centre: { ...NSX_KIT.intakes.centre, fillets: [[3, 9, -1, -1]], fillet: 0.6, badge: [20, 250, 300] }, fog: { rows: [4, 6], cols: [7, 9], y: 520, z: 262, r: 40, depth: 30, seg: 10 } },
   bumperLamps: { ...NSX_KIT.bumperLamps, depth: 25, amberFirst: true },
 };
+
+// ---- the kinds added for the EB110 (docs/systems/96_kit_conversion_plan.md), sized for this car ----
+/** fixed head lamps sunk in scooped pockets under flush glass, where the pop-up covers lie */
+export const NSX_POCKET_LAMPS: Pick<CarKit, 'popup'> = { popup: { ...NSX_KIT.popup, kind: 'pocket', depth: 70, shallow: 12, faceFrom: 0.7, lens: [[0.2, 0.52], [0.6, 0.92]], lensV: [0.16, 0.86, 4], round: [1], ramp: { share: 0.14, fins: 4 } } };
+/** lenses flush in the skin in the same place */
+export const NSX_FIXED_LAMPS: Pick<CarKit, 'popup'> = { popup: { ...NSX_KIT.popup, kind: 'fixed' } };
+/** a rear wing over the spoiler's blade: 'active' (it lies on the tail and rises with `wing`) */
+export const NSX_ACTIVE_WING: Pick<CarKit, 'wing'> = { wing: { kind: 'active', from: 4040, back: 10, half: 690, sit: 560, across: [0, 0.25, 0.5, 0.75, 1], section: [[0, 0, -2], [0, 26, 8], [0.5, 0, 11], [1, -24, 9], [1, 0, 3], [0.5, 0, -8]], rise: 130, tilt: 8, pivot: 4160, struts: { y: [430], w: 50, t: 16 } } };

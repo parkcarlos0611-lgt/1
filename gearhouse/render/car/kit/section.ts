@@ -38,7 +38,7 @@ export interface SectionSpec {
   /** how far the flank stands in from the widest line by height, [z, inset], z falling from the sill's crease to the tuck */
   inset: Tab;
   /** behind the rear wheel the chain's levels move to the tail's (one per chain point) and its inset deepens toward the foot */
-  tail: { from: At; to: At; levels: number[]; pow: number; /** the levels move in a straight run (default: eased in and out) */ linear?: boolean };
+  tail: { from: At; to: At; levels: number[]; pow: number; /** the levels move in a run of this power, 1 straight (default: eased in and out) */ run?: number };
 }
 
 export interface BandSpec { reach: number; drop: number; lift: number }
@@ -62,7 +62,7 @@ export function flank(L: Lines, s: SectionSpec, K: (x: number) => V): Flank {
   if (s.tail.levels.length !== FLANK.N) throw new Error('section: the tail needs a level per chain point');
   const INS = lin(s.inset), sill = L.sill, foot = L.foot, insSill = INS(sill), insFoot = INS(foot), t0 = L.X(s.tail.from), t1 = L.X(s.tail.to);
   const H = (x: number): V => [x, L.half(x), L.z('shoulder')(x)];
-  const tailShare = (x: number) => s.tail.linear ? Math.max(0, Math.min(1, (x - t0) / (t1 - t0))) : sm(t0, t1, x);
+  const tailShare = (x: number) => s.tail.run ? Math.max(0, Math.min(1, (x - t0) / (t1 - t0))) ** s.tail.run : sm(t0, t1, x);
   const dz = s.doorZ ? [L.z(s.doorZ[0]), L.z(s.doorZ[1])] : null;
   const band = bandOf(s.shoulder);
   const inset = (x: number, z: number, zH: number) => { const std = z >= sill ? insSill * (zH - z) / (zH - sill) : INS(z), u = tailShare(x); return u > 0 ? lerp(std, insFoot * Math.max(0, (zH - z) / (zH - foot)) ** s.tail.pow, u) : std; };

@@ -13,6 +13,9 @@ export function quarter(x: Ctx): void {
   e.name('quarter').mat(c.paint, c.gloss, 'paint'); e.cells(s.CH, (i, q) => i >= z.iD0 && !z.isDoor(i, q) && !z.isSill(i, q) && !z.isIntake(i, q));
   // a buttress car: the wing's top behind the buttress's tip, the gutter beside the lid (the canopy panel builds the buttress on the rail)
   if (k.canopy.kind === 'buttress') { const col = k.deck.rail!.col, iT = L.at(k.canopy.slantFoot) - s.iDk; e.cells(s.DKG, (i, j) => j >= k.deck.lidCols && (j < col || i >= iT) && !(j === k.deck.lidCols && i >= s.iBl)); return; }
+  // a bubble car: the fastback's last row (the roof's, the side strip's and the shelf's points across) joined to the deck's first
+  if (k.canopy.kind === 'bubble') { const A: V[] = [...s.RGL[s.RGL.length - 1]!, ...s.US[s.US.length - 1]!.slice(1), ...s.SHF[s.SHF.length - 1]!.slice(1)];
+    e.zip(A, s.DKG[0]!, UP); e.cells(s.DKG, (i, j) => j > k.deck.lidCols || (j === k.deck.lidCols && i < s.iBl)); return; }
   // the ridge between the rear glass's edge (from the slant's foot round the tongue to the centre line) and the crest (to the deck's first row)
   const A: V[] = [...s.RGL.slice(slant).map(r => r[TOP.N - 1]!), ...s.RGL[s.RGL.length - 1]!.slice(0, TOP.N - 1).reverse()];
   const B: V[] = [...s.CH.slice(L.at(k.canopy.slantFoot), s.iDk).map(r => r[0]!), ...s.DKG[0]!.slice().reverse()];

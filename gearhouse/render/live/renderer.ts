@@ -283,7 +283,7 @@ vec3 frLight(vec3 c, vec3 n, vec3 l, float sh, float ao, vec3 p) { float t = max
   vec3 shade = (c * vec3(0.6, 0.63, 0.76) + vec3(0.01, 0.014, 0.03)) * (0.14 + 0.86 * uDay);   /* darker, a little bluer; a black part a dark blue-grey */
   return mix(shade, lit, b) + c * min(vec3(1.), lampsAt(p, n) * 0.12); }
 /** the one highlight: a small round spot where the sun mirrors, its edge a pixel */
-float frGloss(vec3 n, vec3 v, vec3 l, float sh, float g) { float nh = dot(n, normalize(l + v)), w = clamp(fwidth(nh), 0.001, 0.03), e = 0.9965 - 0.003 * g; return smoothstep(e - w, e + w, nh) * step(0.5, sh) * (0.2 + 0.8 * uDay); }
+float frGloss(vec3 n, vec3 v, vec3 l, float sh, float g) { float nh = dot(n, normalize(l + v)), w = clamp(fwidth(nh), 0.001, 0.03), e = 0.9994 - 0.0008 * g; return smoothstep(e - w, e + w, nh) * step(0.5, sh) * (0.2 + 0.8 * uDay); }
 /** a lamp from the atlas (its face's own coordinates -1..1), lit when alight; the toon lamp where the atlas is off */
 vec3 frLamp(vec2 uv, float flag) { if (uAtlOn == 0) return toonLamp(uv, flag); vec4 a = atlasAt(vec3(uv * 0.5 + 0.5, flag < 1.5 ? 1. : 2.)); float glow = flag < 1.5 ? uLampOn : max(uLampOn * 0.35, uBrake);
   vec3 c = a.a > 0.5 ? a.rgb * (0.35 + 0.65 * uDay) : toonLamp(uv, flag); return mix(c, flag < 1.5 ? vec3(1., 0.97, 0.86) : vec3(1., 0.3, 0.2), glow * 0.85); }

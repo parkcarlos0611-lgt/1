@@ -16,7 +16,7 @@ import type { GpuMesh } from '../render/live/gpu';
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T, Q = new URLSearchParams(location.search);
 const cv = $<HTMLCanvasElement>('cv');
 const st = { car: Q.get('car') ?? STYLE_CARS[0]!.id, look: 4, outline: true, lines: true, post: true, atlas: true, outPx: STYLE.outlinePx as number, linePx: STYLE.linePx as number,
-  az: 142, el: 55, spin: !Q.has('still'), persp: true, pitch: 14, yaw: +(Q.get('yaw') ?? 35), zoom: 1 };
+  az: +(Q.get('az') ?? 70), el: +(Q.get('el') ?? 40), spin: !Q.has('still'), persp: true, pitch: 14, yaw: +(Q.get('yaw') ?? 160), zoom: +(Q.get('zoom') ?? 1) };
 let L: LiveRenderer | null = null, g: GpuMesh | null = null, M: Mesh | null = null, dirty = true, frames = 0, lineN = 0, last = performance.now();
 try { L = new LiveRenderer(cv); L.setGround(studioFloor()); L.setTrack(1, 30, 12, 0); void loadSky(L).then(() => { dirty = true; }).catch(e => console.warn('sky', e)); }
 catch (e) { $('stat').textContent = `이 기기에서 WebGL2를 쓸 수 없다: ${String(e)}`; }
@@ -31,7 +31,7 @@ const slide = (id: string, key: 'outPx' | 'linePx' | 'az' | 'el' | 'pitch' | 'zo
 slide('outPx', 'outPx', v => `${v.toFixed(1)} px`); slide('linePx', 'linePx', v => `${v.toFixed(2)} px`); slide('az', 'az', v => `${Math.round(v)}°`); slide('el', 'el', v => `${Math.round(v)}°`);
 slide('pitch', 'pitch', v => `${Math.round(v)}°`); slide('zoom', 'zoom', v => `${v.toFixed(2)}배`);
 for (const r of Array.from(document.querySelectorAll<HTMLInputElement>('input[name=look]'))) { r.checked = +r.value === st.look; r.addEventListener('change', () => { if (r.checked) { st.look = +r.value; dirty = true; } }); }
-$('reset').addEventListener('click', () => { st.outPx = STYLE.outlinePx; st.linePx = STYLE.linePx; st.az = 142; st.el = 55; for (const id of ['outPx', 'linePx', 'az', 'el'] as const) { const el = $<HTMLInputElement>(id); el.value = String(st[id]); el.dispatchEvent(new Event('input')); } });
+$('reset').addEventListener('click', () => { st.outPx = STYLE.outlinePx; st.linePx = STYLE.linePx; st.az = 70; st.el = 40; for (const id of ['outPx', 'linePx', 'az', 'el'] as const) { const el = $<HTMLInputElement>(id); el.value = String(st[id]); el.dispatchEvent(new Event('input')); } });
 // ---- turning the car by hand ----
 let drag: number | null = null;
 cv.addEventListener('pointerdown', e => { drag = e.clientX; cv.setPointerCapture(e.pointerId); st.spin = false; $<HTMLInputElement>('spin').checked = false; });

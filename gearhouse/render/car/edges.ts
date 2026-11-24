@@ -75,14 +75,14 @@ export function chain(segs: { a: number; b: number; kind: LineKind }[], at: (v: 
 const PAINT = KINDS.indexOf('paint'), PLAIN = KINDS.indexOf('plain'), GRILLE = KINDS.indexOf('grille'), LENS = KINDS.indexOf('lens');
 /** the lines found at a mesh's hard edges (for a mesh with no lines of its own), over the triangles `tris` (default all):
  *  where two named panels of paint meet ('panel'), where paint meets trim, a lamp or a grille ('trim'), where paint
- *  folds over `crease` degrees ('crease'); the raised seam strips of the kit cars and lines shorter than `minLen` mm left out */
+ *  folds over `crease` degrees (default 40; 'crease', those under twice `minLen` dropped); the raised seam strips of the kit cars and lines shorter than `minLen` mm left out */
 export function hardEdgeLines(M: Mesh, opts: { tris?: number[]; crease?: number; minLen?: number } = {}): MeshLine[] {
   const T = opts.tris ?? Array.from({ length: M.n }, (_, i) => i), nt = T.length, P = new Float32Array(nt * 9); T.forEach((t, j) => P.set(M.pos.subarray(t * 9, t * 9 + 9), j * 9));
-  const w = weld(P, nt), E = edgesOf(w, nt), thr = opts.crease ?? 35, name = (j: number) => M.names?.[M.part[T[j]!]!] ?? '', kind = (j: number) => M.kind[T[j]!]!;
+  const w = weld(P, nt), E = edgesOf(w, nt), thr = opts.crease ?? 40, name = (j: number) => M.names?.[M.part[T[j]!]!] ?? '', kind = (j: number) => M.kind[T[j]!]!;
   const pt = new Map<number, V>(); for (let c = 0; c < nt * 3; c++) if (!pt.has(w.vid[c]!)) pt.set(w.vid[c]!, [P[c * 3]!, P[c * 3 + 1]!, P[c * 3 + 2]!]);
   const lineable = (k: number) => k === PAINT || k === PLAIN || k === GRILLE || k === LENS, segs: { a: number; b: number; kind: LineKind }[] = [];
   for (const e of E.values()) { if (e.tris.length !== 2) continue; const [f, g] = e.tris as [number, number], kf = kind(f), kg = kind(g);
     if (!lineable(kf) || !lineable(kg) || (kf !== PAINT && kg !== PAINT) || name(f) === 'seam' || name(g) === 'seam') continue;
     const k: LineKind | null = kf !== kg ? 'trim' : name(f) !== name(g) ? 'panel' : foldDeg(w, f, g) > thr ? 'crease' : null; if (k) segs.push({ a: e.a, b: e.b, kind: k }); }
   const minLen = opts.minLen ?? 40, len = (l: MeshLine) => { let s = 0; for (let i = 1; i < l.pts.length; i++) s += Math.hypot(l.pts[i]![0] - l.pts[i - 1]![0], l.pts[i]![1] - l.pts[i - 1]![1], l.pts[i]![2] - l.pts[i - 1]![2]); return s; };
-  return chain(segs, v => pt.get(v)!).filter(l => len(l) >= minLen); }
+  return chain(segs, v => pt.get(v)!).filter(l => len(l) >= (l.kind === 'crease' ? minLen * 2 : minLen)); }   /* a short fold is noise on a curved panel; a short seam still marks a lamp or a vent */

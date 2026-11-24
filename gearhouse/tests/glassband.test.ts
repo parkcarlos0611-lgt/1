@@ -26,7 +26,18 @@ describe('the toon glass reflection (docs/systems/104 A-3)', () => {
     const p: V3 = [0, -700, 1100], head = glassBand(at(SIDE, SIDE, p)), glance = glassBand(at(SIDE, norm([0.85, -0.45, 0.28]), p));
     expect(head.a).toBeLessThan(0.7); expect(glance.a).toBeGreaterThan(head.a + 0.1);
     expect(glassBand(at(SIDE, SIDE, p, { k: 0 })).a).toBeLessThan(0.4);   // the tint alone: the cabin seen through
-    expect(head.fres).toBeLessThan(0.15); expect(glance.fres).toBeGreaterThan(0.3);
+    expect(head.fres).toBeLessThan(0.06); expect(glance.fres).toBeGreaterThan(0.15);
+    // the falloff is hard: a ray 78 degrees off the pane mirrors strongly, one 58 degrees off much less
+    const skim = glassBand(at(SIDE, norm([0.97, -0.2, 0.1]), p)); expect(skim.fres).toBeGreaterThan(0.45); expect(skim.fres).toBeGreaterThan(2 * glance.fres);
+  });
+  test('head-on the sky and the ground cover little, the white band is narrow and not a white sheet (coordinator review)', () => {
+    // the reflection's own cover (the setting's part, the tint apart): head-on, sky and ground under a tenth
+    const cover = (v: V3, z: number) => { const r = glassBand(at(SIDE, v, [0, -700, z], { sh: 0 })), t = glassBand(at(SIDE, v, [0, -700, z], { sh: 0, k: 0 })); return { step: r.step, extra: r.a - t.a, lum: (r.rgb[0] + r.rgb[1] + r.rgb[2]) / 3 }; };
+    for (let z = 600; z <= 1300; z += 10) { const c = cover(SIDE, z); if (c.step === 0 || c.step === 2) expect(c.extra).toBeLessThan(0.1); }
+    // over the pane's height at a glancing view the band takes a minority of the samples, and its white is dimmed
+    const v = norm([0.9, -0.38, 0.2]); let band = 0, n = 0, peak = 0;
+    for (let z = 700; z <= 1200; z += 5) { const c = cover(v, z); n++; if (c.step === 1) { band++; peak = Math.max(peak, c.lum); } }
+    expect(band / n).toBeLessThan(0.45); expect(peak).toBeLessThan(0.8);
   });
   test('the windscreen and the side window put the band at different angles', () => {
     expect(paneSlant(SCREEN)).toBeLessThan(0.05); expect(paneSlant(SIDE)).toBeGreaterThan(0.5);

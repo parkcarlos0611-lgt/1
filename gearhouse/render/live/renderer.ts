@@ -278,10 +278,10 @@ void main() { uEye = uCamP.w > 0.5 ? normalize(uCamP.xyz - vWorld) : uEyeD;
       float sl = 0.8 * (1. - smoothstep(0.3, 0.7, abs(no.z))), bend = uIsCar == 1 ? 2.2 * (vObj.z / 1000. / max(0.8, uCarH) - 0.95) : 0.;
       vec3 pc = vObj - vec3(uIsCar == 1 ? uCarL * 0.5 : 0., 0., 0.);   /* from the car's middle (its x starts at the tail) */
       float e = R.z + 0.35 * sl * dot(R, tw) + bend + sl * dot(pc, to) / 1000., we = clamp(fwidth(e) * 0.75, 1e-4, 0.1);
-      float up = smoothstep(-we, we, e), sky = smoothstep(0.2 - we, 0.2 + we, e), g = 1. - clamp(dot(sn, uEye), 0., 1.), fres = 0.1 + 0.9 * g * g, lit = 0.25 + 0.75 * uDay;
+      float up = smoothstep(-we, we, e), sky = smoothstep(0.12 - we, 0.12 + we, e), g = 1. - clamp(dot(sn, uEye), 0., 1.), fres = 0.04 + 0.96 * g * g * sqrt(g), lit = 0.25 + 0.75 * uDay;   /* a narrow band; fresnel falling off hard toward head-on */
       float clear = vGloss < 0.5 ? max(0.25, vGloss * 2.) : 1., A0 = clamp(0.3 + 0.62 * uGlass, 0., 1.) * clear * (0.45 + 0.55 * smoothstep(0.1, 0.8, g));
-      vec3 c = mix(mix(vec3(0.16, 0.17, 0.19), vec3(0.95, 0.97, 1.) * lit, up), vec3(0.55, 0.72, 0.92) * lit, sky);
-      float ar = mix(mix(0.55 * fres, 0.45 + 0.5 * fres, up), 0.15 + 0.6 * fres, sky) * clamp(uGlassR, 0., 1.);
+      vec3 c = mix(mix(vec3(0.16, 0.17, 0.19), vec3(0.86, 0.89, 0.93) * lit, up), vec3(0.55, 0.72, 0.92) * lit, sky);
+      float ar = mix(mix(0.5 * fres, 0.25 + 0.5 * fres, up), 0.03 + 0.62 * fres, sky) * clamp(uGlassR, 0., 1.);   /* the band a little dimmer, the sky and the ground little head-on */
       float rs = dot(R, uSun), ws = clamp(fwidth(rs), 1e-4, 0.01), sun = smoothstep(0.996 - ws, 0.996 + ws, rs) * sh * clamp(uGlassR * 2., 0., 1.) * uDay;
       vec3 rgb = c * ar + vec3(0.12, 0.16, 0.24) * (0.3 + 0.7 * uDay) * A0 * (1. - ar); float A = ar + A0 * (1. - ar);
       oCol = vec4(mix(rgb, vec3(1.), sun), mix(A, 1., sun)); oId = vec4(0.); oN = vec4(0.); oV = velo(); return; }

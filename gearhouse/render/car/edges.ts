@@ -48,7 +48,7 @@ export function surfaceNormals(P: ArrayLike<number>, nt: number, group: ArrayLik
     if (marked.size) { const p = keyOf(e.a, f), q = keyOf(e.b, f); if (marked.has(p < q ? `${p}|${q}` : `${q}|${p}`)) continue; }
     join(cornerAt(f, e.a), cornerAt(g, e.a)); join(cornerAt(f, e.b), cornerAt(g, e.b)); }
   const S = new Float64Array(nt * 9);
-  for (let c = 0; c < nt * 3; c++) { const t = Math.floor(c / 3), r = root(c), a = w.ang[c]!; S[r * 3] += w.fn[t * 3]! * a; S[r * 3 + 1] += w.fn[t * 3 + 1]! * a; S[r * 3 + 2] += w.fn[t * 3 + 2]! * a; }
+  for (let c = 0; c < nt * 3; c++) { const t = Math.floor(c / 3), r = root(c), a = w.ang[c]!; S[r * 3]! += w.fn[t * 3]! * a; S[r * 3 + 1]! += w.fn[t * 3 + 1]! * a; S[r * 3 + 2]! += w.fn[t * 3 + 2]! * a; }
   for (let c = 0; c < nt * 3; c++) { const r = root(c), t = Math.floor(c / 3); let x = S[r * 3]!, y = S[r * 3 + 1]!, z = S[r * 3 + 2]!; let l = Math.hypot(x, y, z);
     if (!(l > 1e-9)) { x = w.fn[t * 3]!; y = w.fn[t * 3 + 1]!; z = w.fn[t * 3 + 2]!; l = Math.hypot(x, y, z); if (!(l > 1e-9)) { x = 0; y = 0; z = 1; l = 1; } }
     N[c * 3] = x / l; N[c * 3 + 1] = y / l; N[c * 3 + 2] = z / l; }
@@ -58,7 +58,7 @@ export function surfaceNormals(P: ArrayLike<number>, nt: number, group: ArrayLik
  *  there (a thin sheet whose two sides cancel takes its own face's normal) */
 export function hullNormals(P: ArrayLike<number>, nt: number): Float32Array {
   const w = weld(P, nt), S = new Float64Array(w.nv * 3), N = new Float32Array(nt * 9);
-  for (let c = 0; c < nt * 3; c++) { const t = Math.floor(c / 3), v = w.vid[c]!, a = w.ang[c]!; S[v * 3] += w.fn[t * 3]! * a; S[v * 3 + 1] += w.fn[t * 3 + 1]! * a; S[v * 3 + 2] += w.fn[t * 3 + 2]! * a; }
+  for (let c = 0; c < nt * 3; c++) { const t = Math.floor(c / 3), v = w.vid[c]!, a = w.ang[c]!; S[v * 3]! += w.fn[t * 3]! * a; S[v * 3 + 1]! += w.fn[t * 3 + 1]! * a; S[v * 3 + 2]! += w.fn[t * 3 + 2]! * a; }
   for (let c = 0; c < nt * 3; c++) { const t = Math.floor(c / 3), v = w.vid[c]!; let x = S[v * 3]!, y = S[v * 3 + 1]!, z = S[v * 3 + 2]!, l = Math.hypot(x, y, z);
     if (!(l > 0.2)) { x = w.fn[t * 3]!; y = w.fn[t * 3 + 1]!; z = w.fn[t * 3 + 2]!; l = Math.hypot(x, y, z) || 1; }
     N[c * 3] = x / l; N[c * 3 + 1] = y / l; N[c * 3 + 2] = z / l; }

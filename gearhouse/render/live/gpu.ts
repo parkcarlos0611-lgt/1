@@ -1,7 +1,9 @@
 // The live renderer's GPU side (review 99, brief 72 steps 1-3): WebGL2 programs, a mesh's buffers, matrices.
 // Meshes keep the car files' axes (x back from the nose, y to the car's right, z up, mm); a model matrix puts them in
 // the world (x east, y north, z up, metres).
-import { KINDS, wheelsOf, type Mesh, type Decal, decalPicture } from '../car/mesh';
+import { KINDS, wheelsOf, type Mesh, type Decal, type V, decalPicture } from '../car/mesh';
+import { surfaceNormals, hullNormals, hardEdgeLines } from '../car/edges';
+import { outlineShare, autoAtlasUV } from './style';
 import { boneAt, type SuspRig } from '../car/suspension';
 import type { EngineRig } from '../car/powertrain/internals';
 
@@ -27,8 +29,9 @@ export function program(gl: WebGL2RenderingContext, vs: string, fs: string): Web
   gl.linkProgram(p); if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error('link: ' + gl.getProgramInfoLog(p)); return p; }
 
 /** one drawable piece: a vertex array (position, face normal, colour, gloss, kind, part) and its count */
-export interface Part { vao: WebGLVertexArrayObject; n: number; lamps?: LampAt[]; /** its buffers, to free them */ bufs?: WebGLBuffer[] }
-export const ATTR = { pos: 0, nor: 1, col: 2, gloss: 3, kind: 4, part: 5, smooth: 6, lamp: 7, lampAx: 8, lampRt: 9, /** the suspension's parts only: the bone each corner hangs on */ bone: 10 } as const;
+export interface Part { vao: WebGLVertexArrayObject; n: number; lamps?: LampAt[]; /** its buffers, to free them */ bufs?: WebGLBuffer[]; /** what it was made from, for the drift-game style's layers added when first drawn so (styleUp) */ src?: { M: Mesh; tris: number[] }; styled?: boolean }
+export const ATTR = { pos: 0, nor: 1, col: 2, gloss: 3, kind: 4, part: 5, smooth: 6, lamp: 7, lampAx: 8, lampRt: 9, /** the suspension's parts only: the bone each corner hangs on */ bone: 10,
+  /** the drift-game style's layers (docs/systems/109 §5, styleUp): the inverted hull's normal and the part's share of the outline (-1: a raised seam strip, hidden while the drawn lines are on); the normal smoothed per surface; the atlas's coordinates */ hull: 11, surf: 12, atl: 13 } as const;
 /** a lamp's face found in a mesh (review 117): its middle and the way it looks (mm, the file's axes), its radius; 1 a head lamp, 2 a tail lamp */
 export interface LampAt { c: [number, number, number]; ax: [number, number, number]; R: number; flag: number }
 /** triangles of a mesh (by index) into a vertex array; `glass`: only the glass and shine, else everything but them */
@@ -43,7 +46,7 @@ function upload(gl: WebGL2RenderingContext, M: Mesh, tris: number[], about?: [nu
   const buf = (loc: number, data: ArrayBufferView, size: number, type: number, normalized = false) => { const b = gl.createBuffer()!; bufs.push(b); gl.bindBuffer(gl.ARRAY_BUFFER, b); gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, size, type, normalized, 0, 0); };
   buf(ATTR.pos, P, 3, gl.FLOAT); buf(ATTR.nor, N, 3, gl.FLOAT); buf(ATTR.col, C, 3, gl.UNSIGNED_BYTE, true); buf(ATTR.gloss, G, 1, gl.FLOAT); buf(ATTR.kind, K, 1, gl.FLOAT); buf(ATTR.part, Q, 1, gl.FLOAT); buf(ATTR.smooth, S, 3, gl.FLOAT); buf(ATTR.lamp, LP.uv, 4, gl.FLOAT); buf(ATTR.lampAx, LP.ax, 3, gl.FLOAT); buf(ATTR.lampRt, LP.rt, 3, gl.FLOAT);
   if (bone) { const B = new Float32Array(n); bone.forEach((b, j) => { B[j * 3] = B[j * 3 + 1] = B[j * 3 + 2] = b; }); buf(ATTR.bone, B, 1, gl.FLOAT); }
-  gl.bindVertexArray(null); return { vao, n, lamps: LP.lamps, bufs }; }
+  gl.bindVertexArray(null); return { vao, n, lamps: LP.lamps, bufs, src: { M, tris } }; }
 /** the faces of the lamps (review 117): the glass over a head lamp (glass in a part called a lens or lamp) or a lamp's
  *  lens; each lamp found as such faces that touch; for each corner the lamp's own flat coordinates (u, v across its face,
  *  -1..1 to its rim), which lamp (1 head, 2 tail: a red lens or a part called tail), its axis and its 'right', so the
@@ -97,7 +100,7 @@ function splitTyres(M: Mesh, tris: number[], hub: [number, number, number]): Mes
 }
 /** a mesh on the GPU: the body, each road wheel apart (to steer and turn it about its hub), the glass apart (drawn last),
  *  and its decals as pictures */
-export interface GpuMesh { len: number; body: Part; glass: Part; wheels: { part: Part; glass: Part | null; hub: [number, number, number]; front: boolean; /** the tyre's outer and inner radius (mm) */ R: number; rim: number }[]; decals: Decal[]; decalTex: WebGLTexture | null; /** the suspension's moving parts apart, each corner with its bone, and the rig that poses them (render/car/suspension) */ susp?: { part: Part; rig: SuspRig }; /** an engine's moving insides (the workshop's cutaway), each part on its bone */ inner?: { part: Part; rig: EngineRig }; radius: number; height: number; width: number; /** its lamps (review 117) */ lamps: LampAt[] }
+export interface GpuMesh { len: number; body: Part; glass: Part; wheels: { part: Part; glass: Part | null; hub: [number, number, number]; front: boolean; /** the tyre's outer and inner radius (mm) */ R: number; rim: number }[]; decals: Decal[]; decalTex: WebGLTexture | null; /** the suspension's moving parts apart, each corner with its bone, and the rig that poses them (render/car/suspension) */ susp?: { part: Part; rig: SuspRig }; /** an engine's moving insides (the workshop's cutaway), each part on its bone */ inner?: { part: Part; rig: EngineRig }; radius: number; height: number; width: number; /** its lamps (review 117) */ lamps: LampAt[]; /** the drift-game style's drawn lines, made when first drawn (styleLines) */ lines?: { body: LinePart | null; susp: LinePart | null } }
 const GLASS = KINDS.indexOf('glass'), SHINE = KINDS.indexOf('shine'), TYRE = KINDS.indexOf('tyre'), LENS = KINDS.indexOf('lens');
 export function gpuMesh(gl: WebGL2RenderingContext, M: Mesh, wheels = true): GpuMesh {
   const W = wheels ? wheelsOf(M) : [], inWheel = new Int32Array(M.n).fill(-1); W.forEach((w, k) => { for (const t of w.tris) inWheel[t] = k; });
@@ -123,4 +126,39 @@ export function gpuMesh(gl: WebGL2RenderingContext, M: Mesh, wheels = true): Gpu
 
 /** a mesh's GPU side freed (review 121: a car's deformed mesh replaces the last) */
 export function freeGpu(gl: WebGL2RenderingContext, g: GpuMesh): void { const parts: Part[] = [g.body, g.glass, ...(g.susp ? [g.susp.part] : []), ...(g.inner ? [g.inner.part] : []), ...g.wheels.flatMap(w => w.glass ? [w.part, w.glass] : [w.part])];
-  for (const p of parts) { gl.deleteVertexArray(p.vao); for (const b of p.bufs ?? []) gl.deleteBuffer(b); } if (g.decalTex) gl.deleteTexture(g.decalTex); }
+  for (const p of parts) { gl.deleteVertexArray(p.vao); for (const b of p.bufs ?? []) gl.deleteBuffer(b); } if (g.decalTex) gl.deleteTexture(g.decalTex);
+  for (const l of [g.lines?.body, g.lines?.susp]) if (l) { gl.deleteVertexArray(l.vao); for (const b of l.bufs) gl.deleteBuffer(b); } }
+
+// ---- the drift-game style's layers (docs/systems/109 §5), made the first time a piece is drawn in that look, so the
+//      other looks cost nothing: the hull's normals and widths, the surface's normals, the atlas's coordinates ----
+const PAINT_K = KINDS.indexOf('paint'), PLAIN_K = KINDS.indexOf('plain');
+/** a piece's style layers added to its vertex array (once) */
+export function styleUp(gl: WebGL2RenderingContext, p: Part): void { if (p.styled || !p.src) return; p.styled = true; const { M, tris } = p.src, nt = tris.length; if (!nt) return;
+  const P = new Float32Array(nt * 9), K = new Uint8Array(nt), grp = new Int32Array(nt); tris.forEach((t, j) => { P.set(M.pos.subarray(t * 9, t * 9 + 9), j * 9); K[j] = M.kind[t]!; grp[j] = K[j] === PLAIN_K ? PAINT_K : K[j]!; });   /* paint and the plain trim beside it shade as one surface where they meet flush; any fold still splits them */
+  const S = surfaceNormals(P, nt, grp, { creases: M.creases }), Hn = hullNormals(P, nt), H = new Float32Array(nt * 12);
+  tris.forEach((t, j) => { const nm = M.names?.[M.part[t]!] ?? '', w = nm === 'seam' ? -1 : outlineShare(nm, M.kind[t]!); for (let k = 0; k < 3; k++) H.set([Hn[j * 9 + k * 3]!, Hn[j * 9 + k * 3 + 1]!, Hn[j * 9 + k * 3 + 2]!, w], (j * 3 + k) * 4); });
+  let A: Float32Array | null = null; if (M.uv && M.uv.length === M.n * 9) { A = new Float32Array(nt * 9); tris.forEach((t, j) => A!.set(M.uv!.subarray(t * 9, t * 9 + 9), j * 9)); } else A = autoAtlasUV(P, K, nt);
+  gl.bindVertexArray(p.vao); const bufs = p.bufs ?? (p.bufs = []);
+  const buf = (loc: number, data: Float32Array, size: number) => { const b = gl.createBuffer()!; bufs.push(b); gl.bindBuffer(gl.ARRAY_BUFFER, b); gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, size, gl.FLOAT, false, 0, 0); };
+  buf(ATTR.hull, H, 4); buf(ATTR.surf, S, 3); if (A) buf(ATTR.atl, A, 3); gl.bindVertexArray(null); }
+/** the drawn lines on the GPU: each segment a quad of six corners (its end, the other end, the side, the width's share, the bone) */
+export interface LinePart { vao: WebGLVertexArrayObject; n: number; bufs: WebGLBuffer[] }
+/** the ribbons' corners for polylines (mm, the mesh's axes): each segment two triangles, each corner its own end, the
+ *  segment's other end and which side of the line it stands (the shader turns that into pixels on the screen) */
+export function lineQuads(lines: { pts: V[]; closed?: boolean; w?: number; bone?: number }[]): { P: Float32Array; Q: Float32Array; S: Float32Array; B: Float32Array; n: number } {
+  const P: number[] = [], Q: number[] = [], S: number[] = [], B: number[] = [];
+  for (const l of lines) { const pts = l.closed && l.pts.length > 2 && Math.hypot(l.pts[0]![0] - l.pts[l.pts.length - 1]![0], l.pts[0]![1] - l.pts[l.pts.length - 1]![1], l.pts[0]![2] - l.pts[l.pts.length - 1]![2]) > 0.5 ? [...l.pts, l.pts[0]!] : l.pts;
+    for (let i = 0; i + 1 < pts.length; i++) { const a = pts[i]!, b = pts[i + 1]!; if (Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]) < 0.01) continue;
+      for (const [p, q, s] of [[a, b, 1], [a, b, -1], [b, a, 1], [a, b, 1], [b, a, 1], [b, a, -1]] as [V, V, number][]) { P.push(...p); Q.push(...q); S.push(s, l.w ?? 1); B.push(l.bone ?? 0); } } }
+  return { P: new Float32Array(P), Q: new Float32Array(Q), S: new Float32Array(S), B: new Float32Array(B), n: S.length / 2 }; }
+function linePart(gl: WebGL2RenderingContext, lines: { pts: V[]; closed?: boolean; w?: number; bone?: number }[]): LinePart | null { const L = lineQuads(lines); if (!L.n) return null;
+  const vao = gl.createVertexArray()!, bufs: WebGLBuffer[] = []; gl.bindVertexArray(vao);
+  ([[0, L.P, 3], [1, L.Q, 3], [2, L.S, 2], [3, L.B, 1]] as const).forEach(([loc, d, size]) => { const b = gl.createBuffer()!; bufs.push(b); gl.bindBuffer(gl.ARRAY_BUFFER, b); gl.bufferData(gl.ARRAY_BUFFER, d, gl.STATIC_DRAW); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, size, gl.FLOAT, false, 0, 0); });
+  gl.bindVertexArray(null); return { vao, n: L.n, bufs }; }
+/** a mesh's drawn lines on the GPU (made once): its own (Mesh.lines) or, without them, those found at its body's hard
+ *  edges; a line on a suspension part on that part's bone (the wheels carry none) */
+export function styleLines(gl: WebGL2RenderingContext, g: GpuMesh): { body: LinePart | null; susp: LinePart | null } {
+  if (g.lines) return g.lines; const M = g.body.src?.M; if (!M) return g.lines = { body: null, susp: null };
+  const own = M.lines?.length ? M.lines : hardEdgeLines(M, { tris: g.body.src!.tris }), rig = g.susp?.rig, body: typeof own = [], susp: (typeof own[number] & { bone: number })[] = [];
+  for (const l of own) { const m = l.pts[Math.floor(l.pts.length / 2)]!, b = rig && l.part ? boneAt(rig, l.part, m[0], m[1]) : -1; if (b > 0) susp.push({ ...l, bone: b }); else body.push(l); }
+  return g.lines = { body: linePart(gl, body), susp: linePart(gl, susp) }; }

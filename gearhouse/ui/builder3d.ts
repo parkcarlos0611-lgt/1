@@ -165,7 +165,7 @@ try { L = new LiveRenderer(cv); L.setGround(studioFloor()); L.setTrack(1, 30, 12
   void Promise.all(im.map(i => i.decode())).then(() => { L0.setTextures(im[0]!, im[1]!, im[2]!, (texMeta as { layers: { size_m: number; luma_mean: number; rough_mean: number }[] }).layers); dirty = true; }).catch(e => console.warn('textures', e)); }
 catch (e) { console.warn('live renderer unavailable', e); L = null; const p = document.createElement('p'); p.className = 'nogl'; p.textContent = '이 브라우저는 WebGL2가 없어 3D 미리보기를 띄울 수 없습니다. 설계와 수치는 그대로 쓸 수 있습니다.'; document.body.append(p); }
 /** the parts lifted off for the engine view: the deck's lids and its glass */
-const DECK = ['bootLid', 'engineCover', 'rearPane', 'tailSlot'];
+const DECK = ['bootLid', 'engineCover', 'rearPane'];
 let meshKey = '', down: Mesh | null = null, up: Mesh | null = null, onGpu: Mesh | null = null, builds = 0;
 const open = new WeakMap<Mesh, Mesh>();
 const view = { spin: false, lamps: false, engine: false, look: 2, yaw: 0, ang: 0, pitch: 0, zoom: 1 };
@@ -175,6 +175,7 @@ function shown(): Mesh { let M = view.lamps ? (up ??= designMesh(D, 0, 1)) : dow
 const home = () => { view.ang = Math.PI - 0.7; view.pitch = 17; view.zoom = 1; view.yaw = 0; dirty = true; }; home();
 const press = (id: string, k: 'spin' | 'lamps' | 'engine') => $(id).addEventListener('click', () => { view[k] = !view[k]; $(id).setAttribute('aria-pressed', String(view[k])); dirty = true; });
 press('spin', 'spin'); press('lamps', 'lamps'); press('engine', 'engine');
+$('engine').addEventListener('click', () => { if (view.engine) { view.ang = view.yaw + 0.6; view.pitch = 42; view.zoom = 0.8; } });   // the engine bay seen from behind and above
 $<HTMLSelectElement>('look').addEventListener('change', e => { view.look = +(e.target as HTMLSelectElement).value; dirty = true; });
 $('home').addEventListener('click', home); cv.addEventListener('dblclick', home);
 { const ptrs = new Map<number, { x: number; y: number }>(); let pinch = 0;

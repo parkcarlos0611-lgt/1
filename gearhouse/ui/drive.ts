@@ -126,11 +126,12 @@ const DESIGN: { d: Design; id: string } | null = (() => { let q: string | null =
   if (!q) return null; const d = decodeDesign(q); if (!d) { console.warn('design: the link holds no design'); return null; }
   const spec = designSpec(d); addRaceCar(spec); MESH_CARS.push({ id: spec.id, name: d.name, mesh: (spin?: number, lamps?: number) => designMesh(d, spin, lamps) });
   EXP_ENGINE[spec.id] = { kind: 'ohv', layout: d.engine.layout }; POPUP.add(spec.id); carId = spec.id; return { d, id: spec.id }; })();
-let dTop = 0, dTopKept = 0, dTopAt = 0;
+let dTop = 0, dTopKept = 0, dTopAt = -Infinity;
 /** the design's run recorded: a lap done (s), or the top speed now and then as it climbs */
 function designRun(lap?: number) { if (!DESIGN || carId !== DESIGN.id) return; dTop = Math.max(dTop, car.speed * 3.6);
   if (lap) { recordRun(STORE, DESIGN.d, { topKmh: dTop, lap: { trackId: trackKey(), track: TD.label, t: lap } }); dTopKept = dTop; }
-  else if (dTop > dTopKept + 1 && clock - dTopAt > 2) { recordRun(STORE, DESIGN.d, { topKmh: dTop }); dTopKept = dTop; dTopAt = clock; } }
+  else if (dTop > dTopKept + 1 && performance.now() - dTopAt > 2000) { recordRun(STORE, DESIGN.d, { topKmh: dTop }); dTopKept = dTop; dTopAt = performance.now(); } }
+addEventListener('pagehide', () => { if (DESIGN && dTop > dTopKept) recordRun(STORE, DESIGN.d, { topKmh: dTop }); });
 /** the later technology's readouts (review 125): boost, ABS working, the wing up, the drive's split */
 function techHud(): string { const X = car.spec.tech; if (!X) return ''; let o = '';
   if (X.turbo) o += `<span>부스트 ${(car.boost * X.turbo.boost).toFixed(2)} bar</span>`;

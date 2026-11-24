@@ -22,9 +22,13 @@ const dt = 1 / 200;
 const flat = new Track({ name: 'flat', pieces: [{ kind: 'straight', len: 8000, name: 'a' }, { kind: 'arc', radius: 400, turn: 180, name: 'b' }, { kind: 'straight', len: 8000, name: 'c' }, { kind: 'arc', radius: 400, turn: 180, name: 'd' }], start: { x: 0, y: 0, heading: 0 }, width: 30, easing: 30, banking: [], bumps: [], landmarks: [], joints: 12 });
 const RAD = 60, pad = new Track({ name: 'pad', pieces: [{ kind: 'arc', radius: RAD, turn: 180, name: 'a' }, { kind: 'arc', radius: RAD, turn: 180, name: 'b' }], start: { x: 0, y: 0, heading: 0 }, width: 40, easing: 2, banking: [], bumps: [], landmarks: [], joints: 12 });
 
-/** full throttle from rest on the flat: the top speed (km/h) and the time to 100 km/h (s) */
+/** full throttle from rest on the flat: the top speed (km/h) and the time to 100 km/h (s). The driver holds the line
+ *  with a light hand (the heading's error and the offset fed back): a car that spins its rear wheels in first gear (the
+ *  McLaren F1's 627 hp, no traction control) is not stable on its own, and with the hands off it went where the last
+ *  bit of rounding sent it (on either physics) */
 export function straight(s: RaceSpec): { top: number; t100: number } { const c = new Vehicle(s, flat).place(100, 0, 0); let vmax = 0, t100 = 0;
-  for (let t = 0; t < 80; t += dt) { c.step(dt, { throttle: 1, brake: 0, steer: 0 }); vmax = Math.max(vmax, c.speed * 3.6); if (!t100 && c.speed * 3.6 >= 100) t100 = t; } return { top: vmax, t100 }; }
+  for (let t = 0; t < 80; t += dt) { const he = Math.atan2(Math.sin(c.yaw - flat.at(c.s).h), Math.cos(c.yaw - flat.at(c.s).h)), lock = usefulLock(s, c.speed, c.tyre.mu);
+    c.step(dt, { throttle: 1, brake: 0, steer: Math.max(-1, Math.min(1, (-0.02 * c.off - 0.6 * he - 0.1 * c.r) / lock)) }); vmax = Math.max(vmax, c.speed * 3.6); if (!t100 && c.speed * 3.6 >= 100) t100 = t; } return { top: vmax, t100 }; }
 /** the skidpad: round the circle, the speed raised 0.08 m/s each second; the most lateral acceleration (g, a second's mean)
  *  held while the car stays within 1.5 m of the line and its slip angle under 6 degrees */
 export function skidpad(s: RaceSpec): number { const c = new Vehicle(s, pad).place(0, 0, 12); let vT = 12, best = 0, acc = 0, n = 0, I = 0;

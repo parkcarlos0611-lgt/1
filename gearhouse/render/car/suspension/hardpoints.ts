@@ -39,8 +39,10 @@ export interface WishboneSpec {
    *  or under it when negative) */
   bar?: { dx: number; z: number; r: number; at: number; link: number };
   /** the tie rod (front, on the rack) or the toe link (rear, on the chassis): its outer end from the lower ball joint
-   *  (x, up); its inner end is set between the arms' pivot axes as far up as the outer end is between the ball joints, so the wheel keeps its toe through its travel */
-  steer: { dx: number; up: number; rack: boolean };
+   *  (x, up); its inner end is set between the arms' pivot axes as far up as the outer end is between the ball joints, so the wheel keeps its toe through its travel,
+   *  then `trim` mm lower (alpha 0.13, M4: that rule leaves the toe turning about 2 mrad in 40 mm, out at the front and in
+   *  at the rear, on these arms; a millimetre and a half lower leaves a little of each, as the makers set it) */
+  steer: { dx: number; up: number; rack: boolean; trim?: number };
   /** the brake: the disc's radius and thickness, the caliper's length round the disc and where it sits (degrees from
    *  straight ahead of the hub, upward) */
   brake: { r: number; t: number; caliper: number; at: number };
@@ -91,7 +93,7 @@ export function wishbonePoints(S: WishboneSpec, w: SuspWheel, side: 1 | -1, fron
   // the tie rod: its outer end on the upright's arm; its inner end between the two arms' pivot axes, as far up between
   // them as the outer end is between the ball joints (the rod then swings with the arms and the wheel keeps its toe)
   const outer = add(lower.bj, [S.steer.dx, side * -6, S.steer.up]), k = S.steer.up / (upper.bj[2] - lower.bj[2]);
-  const inner: V = [outer[0], side * (Math.abs(lower.f[1]) + (Math.abs(upper.f[1]) - Math.abs(lower.f[1])) * k), lower.f[2] + (upper.f[2] - lower.f[2]) * k];
+  const inner: V = [outer[0], side * (Math.abs(lower.f[1]) + (Math.abs(upper.f[1]) - Math.abs(lower.f[1])) * k), lower.f[2] + (upper.f[2] - lower.f[2]) * k - (S.steer.trim ?? 0)];
   // the coil-overs: each stands in a plane across the car (so two side by side move as one)
   const mid = mix(lower.f, lower.r, 0.5), foot = mix([w.x, mid[1], mid[2]], [w.x, lower.bj[1], lower.bj[2]], S.damper.at);
   const dampers = S.damper.dx.map(dx => { const bot: V = [w.x + dx, foot[1], foot[2] + 22], top = P(dx, w.w / 2 + S.damper.top[0], w.r + S.damper.top[1]), L = Math.hypot(top[1] - bot[1], top[2] - bot[2]);
@@ -135,24 +137,24 @@ const DISC = '#8d9094';
 /** the NSX (1990): forged aluminium double wishbones front and rear, a coil-over on each lower arm, bars both ends; 282 mm discs */
 const NSX: SuspSpec = {
   front: { type: 'doubleWishbone', lower: { len: 330, span: [-150, 170], rise: 14 }, upper: { len: 232, span: [-175, 175], fall: 22, inset: 22, trail: 16 },
-    damper: { dx: [0], at: 0.46, top: [135, 215], spring: [38, 6], body: 23 }, bar: { dx: -235, z: 250, r: 10, at: 0.62, link: 70 }, steer: { dx: -112, up: 52, rack: true }, brake: { r: 141, t: 24, caliper: 110, at: 180 } },
+    damper: { dx: [0], at: 0.46, top: [135, 215], spring: [38, 6], body: 23 }, bar: { dx: -235, z: 250, r: 10, at: 0.62, link: 70 }, steer: { dx: -112, up: 52, rack: true, trim: 1.5 }, brake: { r: 141, t: 24, caliper: 110, at: 180 } },
   rear: { type: 'doubleWishbone', lower: { len: 300, span: [-160, 170], rise: 16 }, upper: { len: 215, span: [-150, 280], fall: 24, inset: 20, trail: 0 },
-    damper: { dx: [64], at: 0.5, top: [150, 275], spring: [38, 6], body: 23 }, bar: { dx: 225, z: 168, r: 8.5, at: 0.62, link: -44 }, steer: { dx: 118, up: 50, rack: false }, brake: { r: 141, t: 22, caliper: 96, at: 0 } },
+    damper: { dx: [64], at: 0.5, top: [150, 275], spring: [38, 6], body: 23 }, bar: { dx: 225, z: 168, r: 8.5, at: 0.62, link: -44 }, steer: { dx: 118, up: 50, rack: false, trim: 1.5 }, brake: { r: 141, t: 22, caliper: 96, at: 0 } },
   look: { arms: '#b4b7bb', armGloss: 0.55, armKind: 'forged', upright: '#9da0a4', spring: '#c9342b', damper: '#2a2c30', caliper: '#1b1b1e', disc: DISC } };
 /** the F355 (1994): unequal-length steel wishbones all round, coil-overs with electronic dampers, bars both ends; 300 / 310 mm discs */
 const F355: SuspSpec = {
   front: { type: 'doubleWishbone', lower: { len: 335, span: [-150, 170], rise: 14 }, upper: { len: 236, span: [-175, 175], fall: 22, inset: 22, trail: 18 },
-    damper: { dx: [0], at: 0.46, top: [135, 215], spring: [38, 6], body: 23 }, bar: { dx: -235, z: 245, r: 10, at: 0.62, link: 70 }, steer: { dx: -112, up: 52, rack: true }, brake: { r: 150, t: 26, caliper: 118, at: 180 } },
+    damper: { dx: [0], at: 0.46, top: [135, 215], spring: [38, 6], body: 23 }, bar: { dx: -235, z: 245, r: 10, at: 0.62, link: 70 }, steer: { dx: -112, up: 52, rack: true, trim: 1.5 }, brake: { r: 150, t: 26, caliper: 118, at: 180 } },
   rear: { type: 'doubleWishbone', lower: { len: 320, span: [-160, 170], rise: 16 }, upper: { len: 226, span: [-150, 280], fall: 24, inset: 20, trail: 0 },
-    damper: { dx: [64], at: 0.5, top: [150, 275], spring: [38, 6], body: 23 }, bar: { dx: 225, z: 162, r: 9, at: 0.62, link: -44 }, steer: { dx: 118, up: 50, rack: false }, brake: { r: 155, t: 26, caliper: 110, at: 0 } },
+    damper: { dx: [64], at: 0.5, top: [150, 275], spring: [38, 6], body: 23 }, bar: { dx: 225, z: 162, r: 9, at: 0.62, link: -44 }, steer: { dx: 118, up: 50, rack: false, trim: 1.5 }, brake: { r: 155, t: 26, caliper: 110, at: 0 } },
   look: { arms: '#232427', armGloss: 0.35, armKind: 'tube', upright: '#8f9296', spring: '#d8b21c', damper: '#c9c2a2', caliper: '#b3161b', disc: DISC } };
 /** the EB110 (1991): double wishbones all round, a pull of two coil-overs a side at the rear (one ahead of the driveshaft,
  *  one behind), one at the front beside the front driveshaft; 332 mm discs */
 const EB110: SuspSpec = {
   front: { type: 'doubleWishbone', lower: { len: 335, span: [-150, 180], rise: 14 }, upper: { len: 236, span: [-150, 300], fall: 22, inset: 22, trail: 18 },
-    damper: { dx: [64], at: 0.5, top: [135, 215], spring: [38, 6], body: 23 }, bar: { dx: -235, z: 250, r: 10, at: 0.62, link: 70 }, steer: { dx: -112, up: 52, rack: true }, brake: { r: 166, t: 28, caliper: 124, at: 180 } },
+    damper: { dx: [64], at: 0.5, top: [135, 215], spring: [38, 6], body: 23 }, bar: { dx: -235, z: 250, r: 10, at: 0.62, link: 70 }, steer: { dx: -112, up: 52, rack: true, trim: 1.5 }, brake: { r: 166, t: 28, caliper: 124, at: 180 } },
   rear: { type: 'doubleWishbone', lower: { len: 330, span: [-200, 200], rise: 16 }, upper: { len: 232, span: [-270, 270], fall: 24, inset: 20, trail: 0 },
-    damper: { dx: [-84, 84], at: 0.46, top: [150, 275], spring: [33, 5.5], body: 20 }, bar: { dx: 255, z: 165, r: 9, at: 0.62, link: -44 }, steer: { dx: 128, up: 50, rack: false }, brake: { r: 166, t: 28, caliper: 124, at: 0 } },
+    damper: { dx: [-84, 84], at: 0.46, top: [150, 275], spring: [33, 5.5], body: 20 }, bar: { dx: 255, z: 165, r: 9, at: 0.62, link: -44 }, steer: { dx: 128, up: 50, rack: false, trim: 1.5 }, brake: { r: 166, t: 28, caliper: 124, at: 0 } },
   look: { arms: '#2a2c30', armGloss: 0.35, armKind: 'tube', upright: '#a2a5a9', spring: '#1f4fa3', damper: '#2a2c30', caliper: '#3a3d42', disc: DISC } };
 /** each kit base's suspension, by the kit's id */
 export const SUSPENSION: Record<string, SuspSpec> = { nsx: NSX, f355: F355, eb110: EB110 };

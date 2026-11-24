@@ -57,3 +57,13 @@ describe('the tyres against the arches', () => {
     expect(tyreWarning(tweak(DESIGN_NSX, d => { d.kit.tyres = [205, 295]; d.body.width = 40; }))).toBeNull();
     expect(tyreWarning(tweak(DESIGN_F355, d => { d.body.width = -40; }))).toBeNull(); expect(tyreWarning(tweak(DESIGN_F355, d => { d.body.width = -40; d.kit.tyres = [230, 265]; }))).toContain('앞 230'); });
 });
+
+describe('the engine view', () => {
+  it('lifts off the named parts and keeps every other triangle as it was', async () => {
+    const { designMesh, withoutParts } = await import('../render/car/design');
+    const M = designMesh(DESIGN_F355), O = withoutParts(M, ['bootLid', 'engineCover', 'rearPane']), N = M.names!;
+    const count = (m: typeof M, n: string) => { let k = 0; for (let t = 0; t < m.n; t++) if (N[m.part[t]!] === n) k++; return k; };
+    expect(count(M, 'engineCover')).toBeGreaterThan(0); expect(count(O, 'engineCover')).toBe(0); expect(count(O, 'engineBlock')).toBe(count(M, 'engineBlock'));
+    expect(O.n).toBe(M.n - count(M, 'bootLid') - count(M, 'engineCover') - count(M, 'rearPane')); expect(O.pos.length).toBe(O.n * 9); expect(O.col.length).toBe(O.n * 3);
+    expect(withoutParts(M, []).pos).toEqual(M.pos); });
+});

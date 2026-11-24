@@ -13,6 +13,9 @@ export interface Settings {
   sound: { /** the engine and the place in the drive */ on: boolean; volume: number; /** the menus' short sounds */ ui: boolean };
   controls: { /** the drive's screen buttons: by the screen's kind (a touch screen shows them), always, never */ touch: 'auto' | 'on' | 'off'; auto: boolean; tcs: boolean; assist: boolean; progressive: boolean };
   screen: { theme: 'auto' | 'light' | 'dark'; /** fewer moving things (the fades, the turntable) */ calm: boolean };
+  /** the sandbox's rules (alpha 0.12): the technologies held to their years (docs/systems/101 1-2 ⑦; off, and in 0.12
+   *  only shown as the engine designer's year tags) */
+  sandbox: { eraLimit: boolean };
 }
 export const SETTINGS_KEY = 'gearhouse.settings.v1';
 export const DEFAULTS: Settings = {
@@ -20,6 +23,7 @@ export const DEFAULTS: Settings = {
   sound: { on: false, volume: 0.7, ui: false },
   controls: { touch: 'auto', auto: true, tcs: true, assist: false, progressive: false },
   screen: { theme: 'auto', calm: false },
+  sandbox: { eraLimit: false },
 };
 
 const obj = (v: unknown): Record<string, unknown> => v && typeof v === 'object' && !Array.isArray(v) ? v as Record<string, unknown> : {};
@@ -27,12 +31,13 @@ const bool = (v: unknown, d: boolean) => typeof v === 'boolean' ? v : d;
 const one = <T>(v: unknown, of: readonly T[], d: T): T => of.includes(v as T) ? v as T : d;
 const unit = (v: unknown, d: number) => typeof v === 'number' && Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : d;
 /** any value made into settings: the fields it has right, the rest the defaults */
-export function asSettings(v: unknown): Settings { const o = obj(v), g = obj(o.graphics), s = obj(o.sound), c = obj(o.controls), sc = obj(o.screen), D = DEFAULTS;
+export function asSettings(v: unknown): Settings { const o = obj(v), g = obj(o.graphics), s = obj(o.sound), c = obj(o.controls), sc = obj(o.screen), sb = obj(o.sandbox), D = DEFAULTS;
   return {
     graphics: { live: bool(g.live, D.graphics.live), look: one(g.look, ['pbr', 'stepped', 'baked', 'toon'] as const, D.graphics.look), photoGround: bool(g.photoGround, D.graphics.photoGround), hdri: bool(g.hdri, D.graphics.hdri), blur: bool(g.blur, D.graphics.blur) },
     sound: { on: bool(s.on, D.sound.on), volume: unit(s.volume, D.sound.volume), ui: bool(s.ui, D.sound.ui) },
     controls: { touch: one(c.touch, ['auto', 'on', 'off'] as const, D.controls.touch), auto: bool(c.auto, D.controls.auto), tcs: bool(c.tcs, D.controls.tcs), assist: bool(c.assist, D.controls.assist), progressive: bool(c.progressive, D.controls.progressive) },
-    screen: { theme: one(sc.theme, ['auto', 'light', 'dark'] as const, D.screen.theme), calm: bool(sc.calm, D.screen.calm) } }; }
+    screen: { theme: one(sc.theme, ['auto', 'light', 'dark'] as const, D.screen.theme), calm: bool(sc.calm, D.screen.calm) },
+    sandbox: { eraLimit: bool(sb.eraLimit, D.sandbox.eraLimit) } }; }
 export function loadSettings(st: KeyStore | null): Settings { try { const t = st?.getItem(SETTINGS_KEY); return asSettings(t ? JSON.parse(t) : null); } catch { return asSettings(null); } }
 /** kept; false when the storage keeps nothing */
 export function saveSettings(st: KeyStore | null, s: Settings): boolean { try { if (!st) return false; st.setItem(SETTINGS_KEY, JSON.stringify(s)); return true; } catch { return false; } }

@@ -37,7 +37,7 @@ import { MESH_CARS } from '../render/car/meshcars';
 import { Driver } from '../race/driver';
 import { Race, lapTimes, bestOf, bookFor, type Entrant, type Skill } from '../race/race';
 import { Health, WARN } from '../race/health';
-import { Sound, type Skid } from './sound';
+import { Sound, designVoice, type Skid, type EngineVoiceSpec } from './sound';
 import specsData from '../data/cars/specs.json';
 
 /** what a page holding the drive gives it (the game's one page, ui/shell): the root its markup is in (found there even
@@ -288,7 +288,8 @@ function drawSteam(el: number) { const h = car.health; if ((h.water >= WARN.boil
   if (!live) for (const p of steam) { ctx.fillStyle = `rgba(245,245,245,${p.a})`; ctx.beginPath(); ctx.arc(...P(p.x, p.y, p.z), p.r * 1000 / mm, 0, Math.PI * 2); ctx.fill(); } }
 // ---- sounds ----
 const ENGINE = (specsData as { cars: Record<string, { engine: { kind: string; layout: string } }> }).cars;
-const voiceOf = (id: string) => { const e = ENGINE[id]?.engine ?? EXP_ENGINE[id]!; return { cylinders: +e.layout.replace(/\D/g, '') || 4, kind: (e.kind === 'sleeve' ? 'sleeve' : e.kind === 'ohv' ? 'ohv' : 'sv') as 'sv' | 'ohv' | 'sleeve', supercharged: id === 'dueSSJ35' || !!EXP_ENGINE[id]?.supercharged }; };
+const voiceOf = (id: string): EngineVoiceSpec => { if (DESIGN && id === DESIGN.id) return designVoice(DESIGN.d.engine);   /* a designed engine's own voice (alpha 0.12) */
+  const e = ENGINE[id]?.engine ?? EXP_ENGINE[id]!; return { cylinders: +e.layout.replace(/\D/g, '') || 4, kind: (e.kind === 'sleeve' ? 'sleeve' : e.kind === 'ohv' ? 'ohv' : 'sv') as 'sv' | 'ohv' | 'sleeve', supercharged: id === 'dueSSJ35' || !!EXP_ENGINE[id]?.supercharged }; };
 function sounds() { if (!snd) return; const me = race?.player, keep = new Set<unknown>(['me']);
   snd.voice('me', voiceOf(carId)).set(car.rpm, st.pilot ? 0.7 : input.throttle, 1, 0, car.health.running);
   if (race) for (const e of race.cars) { if (e === me) continue; const d = Math.hypot(e.car.x - car.x, e.car.y - car.y); if (d > 220) continue; keep.add(e); const [X] = P(e.car.x, e.car.y, 0);

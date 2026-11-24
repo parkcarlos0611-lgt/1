@@ -7,7 +7,7 @@ import { raceSpec, type RaceSpec } from '../race/cars';
 import { designSpec, designFigures, dragArea, zeroTo100, perfClass, perfLabel } from '../race/design';
 import { enginePackage } from '../race/designparts';
 import { DESIGN_NSX, DESIGN_F355, DESIGN_DIABLO, DESIGN_EB110, DESIGN_XJ220, DESIGN_MCLAREN_F1, LIMITS, BASES, NOSES, FRONTS, faceOf3, TAILS, WHEELS, GRADES, INTAKES, COMPRESSIONS, SUMPS, BLOCKS,
-  STRUCTURES, PANELS, INTERIORS, BODY_LIMITS, DIMS, normalise, type BodyDims, type Design } from '../core/design';
+  STRUCTURES, PANELS, INTERIORS, BODY_LIMITS, DIMS, LAYOUTS, QUALITY_PARTS, normalise, type BodyDims, type Design, type EngineQuality } from '../core/design';
 import { Vehicle } from '../race/vehicle';
 import { Track } from '../race/track';
 import { Rng } from '../core/rng';
@@ -123,8 +123,9 @@ describe('any design inside the limits', () => {
   const pick = <T>(r: Rng, a: readonly T[]) => a[Math.floor(r.float() * a.length)]!, span = (r: Rng, [a, b]: readonly [number, number]) => a + (b - a) * r.float();
   const random = (r: Rng, i: number): Design => { const base = pick(r, BASES), lim = BODY_LIMITS(base); return { v: 4, id: 'r' + i, name: 'random ' + i,
     body: { base, nose: pick(r, NOSES), ...faceOf3(base, pick(r, FRONTS)), tail: pick(r, TAILS), wheel: pick(r, WHEELS), ...Object.fromEntries(DIMS.map(k => [k, span(r, lim[k])])) as unknown as BodyDims, paint: '#808080', gloss: 0.5, structure: pick(r, STRUCTURES), panels: pick(r, PANELS) },
-    engine: { grade: pick(r, GRADES), layout: pick(r, ['V6', 'V8', 'V12'] as const), cc: span(r, LIMITS.cc), valves: pick(r, [2, 3, 4, 5] as const), redline: span(r, LIMITS.redline), intake: pick(r, INTAKES), compression: pick(r, COMPRESSIONS),
-      sump: pick(r, SUMPS), block: pick(r, BLOCKS), turbo: pick(r, [0, 1, 2, 3, 4] as const), boost: span(r, LIMITS.boost), intercooler: r.float() < 0.8, vtec: r.float() < 0.3 },
+    engine: { grade: pick(r, GRADES), layout: pick(r, LAYOUTS), cc: span(r, LIMITS.cc), valves: pick(r, [2, 3, 4, 5] as const), redline: span(r, LIMITS.redline), intake: pick(r, INTAKES), compression: pick(r, COMPRESSIONS),
+      sump: pick(r, SUMPS), block: pick(r, BLOCKS), turbo: pick(r, [0, 1, 2, 3, 4] as const), boost: span(r, LIMITS.boost), intercooler: r.float() < 0.8, vtec: r.float() < 0.3,
+      bs: span(r, LIMITS.bs), quality: Object.fromEntries(QUALITY_PARTS.map(k => [k, Math.round(span(r, LIMITS.quality))])) as EngineQuality },
     drive: { gears: pick(r, [5, 6] as const), gearbox: pick(r, ['manual', 'f1'] as const), final: r.float() < 0.5 ? 0 : span(r, LIMITS.final), lsd: r.float() < 0.5, awd: r.float() < 0.3 },
     kit: { abs: r.float() < 0.5, tcs: r.float() < 0.5, steering: pick(r, ['manual', 'hydraulic', 'electric'] as const), dampers: pick(r, ['fixed', 'adaptive'] as const), wing: r.float() < 0.3, diffuser: r.float() < 0.3,
       tyres: [span(r, LIMITS.tyre), span(r, LIMITS.tyre)], rim: pick(r, [16, 17, 18] as const), interior: pick(r, INTERIORS) } }; };

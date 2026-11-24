@@ -33,6 +33,8 @@ import { exhaust } from './parts/exhaust';
 import { plate } from './parts/small';
 import { engine } from './parts/engine';
 import { diffuser } from './parts/diffuser';
+import { suspension } from './parts/suspension';
+import { moveRig, type SuspRig } from '../suspension';
 
 export interface AssembleOpts { /** the wheels turned (radians) */ spin?: number; /** the pop-up lamps raised 0..1 */ lamps?: number; /** an active rear wing raised 0..1 */ wing?: number; /** a change to the sheet's lines */ tweak?: Tweak }
 export interface Assembled { mesh: Mesh; lines: Lines; skin: Skin;
@@ -58,9 +60,13 @@ export function assemble(k: CarKit, o: AssembleOpts = {}): Assembled {
   run('inside', 'cabin', () => cabin(x)); run('inside', 'engineBay', () => engineBay(x)); run('inside', 'engine', () => engine(x, k.engine.spec, k.engine.at, k.engine.opts));
   // the fittings and the wheels
   run('part', 'mirror', () => mirror(x, k.mirror)); run('part', 'wiper', () => wiper(x, k.wiper)); run('part', 'wing', () => wing(x)); run('part', 'diffuser', () => diffuser(x));
+  // the suspension (render/car/suspension): the chassis' part, moved with the engine by the warp; its rig goes with the mesh
+  let rig: SuspRig | undefined; run('part', 'suspension', () => { rig = suspension(x, k.engine.opts.detail ?? 2)?.rig; });
   for (const sg of [1, -1] as const) { run('part', 'wheel', () => { wheel(x, L.wheels.f, sg, true, k.wheel); wheel(x, L.wheels.r, sg, false, k.wheel); }); }
   const mesh = e.b.mesh(L.length), r = e.roles(mesh.n), W = makeWarp(L, [k.canopy.roof.from, k.canopy.roof.to], o.tweak ?? {});
   if (!W.none) warp(mesh, r.role, r.panelOf, r.panel, W);
+  if (rig) { const N = mesh.names ?? [], eng = r.panel.indexOf('engine'), own = new Set<string>(), other = new Set<string>();   // the powertrain's own part names
+    for (let t = 0; t < mesh.n; t++) (r.panelOf[t] === eng ? own : other).add(N[mesh.part[t]!] ?? ''); mesh.susp = { ...moveRig(rig, W.engine), chassis: [...own].filter(n => !other.has(n)) }; }
   return { mesh, lines: L, skin: s, role: r.role, panelOf: r.panelOf, panels: r.panel };
 }
 
@@ -69,7 +75,7 @@ export function assemble(k: CarKit, o: AssembleOpts = {}): Assembled {
 function warp(M: Mesh, role: Uint8Array, panelOf: Int16Array, panels: string[], W: BodyWarp): void {
   const P = M.pos, part = ROLES.indexOf('part'), inside = ROLES.indexOf('inside');
   for (let t = 0; t < M.n; t++) { const pn = panels[panelOf[t]!], rl = role[t]!;
-    const d = rl === part && (pn === 'wheel' || pn === 'underbody') ? W.wheel : rl === inside && pn === 'engine' ? W.engine : null, f = rl === inside && pn === 'cabin' ? W.inside : W.body;
+    const d = rl === part && (pn === 'wheel' || pn === 'underbody') ? W.wheel : (rl === inside && pn === 'engine') || pn === 'suspension' ? W.engine : null, f = rl === inside && pn === 'cabin' ? W.inside : W.body;
     for (let i = t * 9; i < t * 9 + 9; i += 3) { if (d) { P[i] = P[i]! + d[0]; P[i + 1] = P[i + 1]! + d[1]; P[i + 2] = P[i + 2]! + d[2]; continue; }
       const q = f([P[i]!, P[i + 1]!, P[i + 2]!]); P[i] = q[0]; P[i + 1] = q[1]; P[i + 2] = q[2]; } }
   M.length = W.length;

@@ -27,7 +27,7 @@ const top = (M: Mesh, part: string) => { let z = -1e9; for (let i = 0; i < M.n *
 describe('kit: the EB110', () => {
   const M = eb110KitMesh(0, 0);
   // (alpha 0.11, M1: the engine part is now the whole powertrain, four turbos and all-wheel drive: 11,000 became 14,000)
-  it('stays in budget (14,000 triangles with the powertrain) and keeps the sheet\'s length', () => { expect(M.n).toBeLessThanOrEqual(14000); expect(M.length).toBe(4400); });
+  it('stays in budget (16,600 triangles with the powertrain and the suspension) and keeps the sheet\'s length', () => { expect(M.n).toBeLessThanOrEqual(16600); expect(M.length).toBe(4400); });
   it('has four wheels made of wheel parts only, on the sheet\'s axles', () => { const w = wheelsOf(M); expect(w.length).toBe(4); expect(wheelParts(M)).toBe(true); expect(w[0]!.hx).toBeCloseTo(sheet.overall.axleF, 3); expect(w[1]!.hx - w[0]!.hx).toBeCloseTo(sheet.overall.wheelbase, 3); });
   it('carries the parts the user approved', () => { const n = names(M);
     for (const p of ['hood', 'wingF', 'bumperF', 'grille', 'splitter', 'badge', 'headCover', 'lampHousing', 'lampFin', 'reflector', 'headlamp', 'indicatorF', 'door', 'intake', 'quarter', 'roof', 'buttress', 'louvre', 'engineCover', 'intakePlenum', 'turbo', 'propShaft', 'screenPane', 'sidePane',

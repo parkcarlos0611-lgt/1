@@ -14,6 +14,7 @@ import builderPage from '../builder3d.page.html';
 import drivePage from '../drive.page.html';
 import type { Design } from '../../core/design';
 import { savedDesigns, saveDesign } from '../../core/designstore';
+import { withEngine } from '../../core/engines';
 import { lapTimes } from '../../race/race';
 import { trackDef } from '../../race/tracks';
 import type { Settings } from './settings';
@@ -31,7 +32,9 @@ export function builderScreen(ctx: ShellCtx): Screen<BuilderParams> & { readonly
   let page: PageScreen | null = null, api: BuilderApi | null = null;
   return { get api() { return api; },
     enter(p, how) { ctx.backdrop.stop(); page ??= new PageScreen('builder', builderPage, { dropCanvas: !!ctx.stage.L }); ctx.stage.use('builder', true); page.show(ctx.pages);
-      if (!api) { api = mountBuilder({ root: page.root, renderer: ctx.stage.L, design: p?.design, onTestDrive: d => void ctx.router.go('drive', { design: d, from: 'builder' }) });
+      if (!api) { api = mountBuilder({ root: page.root, renderer: ctx.stage.L, design: p?.design, onTestDrive: d => void ctx.router.go('drive', { design: d, from: 'builder' }),
+          // step ②: the engine designer with this car's engine, handed back to the car here
+          onEngineShop: d => void ctx.router.go('engine', { design: d, onApply: (e: Design['engine']) => { if (api) api.use(withEngine(api.design, e)); } }) });
         // the way back to the garage, at the bar's start
         page.root.querySelector('.top')?.prepend(button('◀ 차고', () => ctx.router.back(), { title: '차고로 (Esc)' })); }
       else api.enter(how === 'back' ? undefined : p?.design);

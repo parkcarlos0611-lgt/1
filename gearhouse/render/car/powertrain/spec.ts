@@ -1,7 +1,7 @@
 // What a powertrain is built from (docs/systems/101, part 1-3): the engine's layout and details, the gearbox and the
 // drive, as plain data. A design gives one (core/design.ts, the builder's cars), and so does an engine's short
 // specification (render/car/enginemesh.ts ENGINES, the registered kit cars: their colours and labels kept).
-import type { Design, Grade } from '../../../core/design';
+import { CYLINDERS, BANKS, type Design, type Grade } from '../../../core/design';
 import type { EngineSpec } from '../enginemesh';
 
 export type Detail = 0 | 1 | 2;
@@ -38,10 +38,11 @@ export function fromEngineSpec(e: EngineSpec): PowertrainSpec {
     gears: e.gears ?? 5, gearbox: e.gearbox ?? 'manual', lsd: e.lsd ?? true, awd: e.awd ?? false,
     colours: { ...gradeColours(grade, block), ...e.colours }, crinkle: e.crinkle ?? grade >= 2, ...(e.label ? { label: e.label } : {}) }; }
 
-const CYL = { V6: 6, V8: 8, V12: 12 } as const;
-/** a design's powertrain; `own` the base's own engine (its bank angle is kept for the same number of cylinders) */
+/** a design's powertrain; `own` the base's own engine (its bank angle is kept for the same number of cylinders). A V8
+ *  or V6 stands at 90 degrees, a V10 at 72 (its even firing), a V12 at 60; an in-line engine one bank, a flat one two at 180 */
 export function fromDesign(d: Design, own?: EngineSpec): PowertrainSpec {
-  const E = d.engine, D = d.drive, n = CYL[E.layout];
-  return { layout: 'V', cylinders: n, bankDeg: own && own.layout === 'V' && own.cylinders === n ? own.bankDeg ?? 90 : n === 8 ? 90 : 60, litres: Math.round(E.cc / 10) / 100,
+  const E = d.engine, D = d.drive, n = CYLINDERS[E.layout], kind = BANKS(E.layout);
+  const bankDeg = kind === 'I' ? 0 : kind === 'flat' ? 180 : own && own.layout === 'V' && own.cylinders === n ? own.bankDeg ?? 90 : n === 8 ? 90 : n === 10 ? 72 : 60;
+  return { layout: kind, cylinders: n, bankDeg, litres: Math.round(E.cc / 10) / 100,
     valves: E.valves, grade: E.grade, intake: E.intake, sump: E.sump, block: E.block, turbos: E.turbo, intercooler: E.intercooler,
     gears: D.gears, gearbox: D.gearbox, lsd: D.lsd, awd: D.awd, colours: gradeColours(E.grade, E.block), crinkle: E.grade >= 2 }; }

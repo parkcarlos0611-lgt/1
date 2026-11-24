@@ -6,6 +6,9 @@
 // layers, as the baked pictures have them. A car something stands before shows its light outline over just the hidden
 // part. The picture is enlarged by whole pixels on the page.
 import { freeGpu, gpuMesh, program, placeMesh, mul, translate, rot, ATTR, type GpuMesh, type M4 } from './gpu';
+import { RIG_BONES, poseRig } from '../car/suspension';
+/** a rotation (three rows) as a matrix */
+const m4of = (R: number[][]): M4 => { const m = new Float32Array(16); for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) m[c * 4 + r] = R[r]![c]!; m[15] = 1; return m; };
 import type { GroundData } from './ground';
 import type { Mesh } from '../car/mesh';
 
@@ -157,10 +160,10 @@ vec3 toonRim(vec3 c, vec3 n, vec3 v) { float nv = dot(n, v), w = clamp(fwidth(nv
   return mix(c, vec3(0.62, 0.82, 1.) * (0.25 + 0.75 * uDay), rim * (0.35 + 0.3 * smoothstep(-0.3, 0.6, n.z))); }
 `;
 const OBJ_VS = `#version 300 es
-layout(location=0) in vec3 aPos; layout(location=1) in vec3 aNor; layout(location=2) in vec3 aCol; layout(location=3) in float aGloss; layout(location=4) in float aKind; layout(location=5) in float aPart; layout(location=6) in vec3 aSmo; layout(location=7) in vec4 aLamp; layout(location=8) in vec3 aLAx; layout(location=9) in vec3 aLRt; out vec4 vLamp; flat out vec3 vLAx, vLRt, vLUp;
+layout(location=0) in vec3 aPos; layout(location=1) in vec3 aNor; layout(location=2) in vec3 aCol; layout(location=3) in float aGloss; layout(location=4) in float aKind; layout(location=5) in float aPart; layout(location=6) in vec3 aSmo; layout(location=7) in vec4 aLamp; layout(location=8) in vec3 aLAx; layout(location=9) in vec3 aLRt; layout(location=10) in float aBone; out vec4 vLamp; flat out vec3 vLAx, vLRt, vLUp;
 uniform mat4 uVP, uModel, uPrevVP, uPrevModel; uniform float uBias; out vec3 vSN;   // the smoothed normal (review 116; none where a piece has no such layer)
 out vec4 vCur, vPrev;   // where this point is now and was a frame ago (the velocity layer, review 112)
-uniform int uWheel; uniform float uSpin, uDef[32], uTyreR, uRim; uniform vec2 uShift;
+uniform int uWheel; uniform float uSpin, uDef[32], uTyreR, uRim; uniform vec2 uShift; uniform vec4 uBone[${RIG_BONES * 3}];   // the suspension's bones (uWheel 2): three rows each
 out vec3 vWorld, vObj; flat out vec3 vN, vObjN, vCol; flat out float vGloss, vKind, vPart;
 void main() { vec3 p = aPos, nr = aNor, ns = dot(aSmo, aSmo) > 0.25 ? aSmo : aNor;
   if (uWheel == 1) {
@@ -171,6 +174,8 @@ void main() { vec3 p = aPos, nr = aNor, ns = dot(aSmo, aSmo) > 0.25 ? aSmo : aNo
       p.xz -= dir * d; p.y += sign(p.y) * d * 0.5 * (1. - abs(2. * t - 1.));   // the tread pressed in, the walls bulging out beside it
       p.y += uShift.y * t * low; p.x -= uShift.x * t * low; }   // the patch pulled across and along by the forces
     else { float c = cos(uSpin), s = sin(uSpin); p = vec3(c * p.x - s * p.z, p.y, s * p.x + c * p.z); nr = vec3(c * nr.x - s * nr.z, nr.y, s * nr.x + c * nr.z); ns = vec3(c * ns.x - s * ns.z, ns.y, s * ns.x + c * ns.z); } }
+  if (uWheel == 2) { int b = int(aBone + 0.5) * 3; vec4 q = vec4(p, 1.); vec3 r0 = uBone[b].xyz, r1 = uBone[b + 1].xyz, r2 = uBone[b + 2].xyz;   // a suspension part carried by its bone
+    p = vec3(dot(uBone[b], q), dot(uBone[b + 1], q), dot(uBone[b + 2], q)); nr = normalize(vec3(dot(r0, nr), dot(r1, nr), dot(r2, nr))); ns = normalize(vec3(dot(r0, ns), dot(r1, ns), dot(r2, ns))); }
   vec4 w = uModel * vec4(p, 1.); vWorld = w.xyz; vObj = p; vObjN = nr; vN = normalize(mat3(uModel) * nr); vSN = mat3(uModel) * ns; vLamp = aLamp; vLAx = normalize(mat3(uModel) * aLAx + 1e-9); vLRt = normalize(mat3(uModel) * aLRt + 1e-9); vLUp = normalize(mat3(uModel) * cross(aLAx, aLRt) + 1e-9); vCol = aCol; vGloss = aGloss; vKind = aKind; vPart = aPart;
   gl_Position = uVP * w; vCur = gl_Position; vPrev = uPrevVP * (uPrevModel * vec4(p, 1.)); gl_Position.z -= uBias; }`;
 const OBJ_FS = `#version 300 es
@@ -671,7 +676,7 @@ void main() { float r2 = dot(vUv, vUv); if (r2 > 1.) discard; float h = sqrt(1. 
   float A = 1. - Tv; if (A < 0.004) discard; vec3 x = col / max(A, 1e-3) * 0.55; if (uHDR == 1) { o = vec4(x * A, A); return; } vec3 c = pow(clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0., 1.), vec3(1. / 2.2)); o = vec4(c * A, A); }   /* the scene's filmic curve */`;
 
 interface WheelDraw { hubZ: number; spin: number; def: Float32Array; sx: number; sy: number; R: number; rim: number }
-type Piece = [{ vao: WebGLVertexArrayObject; n: number }, M4, WheelDraw?];
+type Piece = [{ vao: WebGLVertexArrayObject; n: number }, M4, WheelDraw?, Float32Array?];   // the last: a suspension piece's bones
 export class LiveRenderer {
   readonly gl: WebGL2RenderingContext; private obj: WebGLProgram; private aoP: WebGLProgram; private downP: WebGLProgram; private upP: WebGLProgram; private finalP: WebGLProgram; readonly hdr: boolean;
   /** render targets after the scene: 0 occlusion, 1 the composed picture, 2-5 the bloom's halvings */ private rt: { t: WebGLTexture; f: WebGLFramebuffer; w: number; h: number }[] = []; private smoke: WebGLProgram; private smokeVao: WebGLVertexArrayObject | null = null; private smokeBuf: WebGLBuffer | null = null; private ground: WebGLProgram; private depth: WebGLProgram; private post: WebGLProgram;
@@ -859,7 +864,7 @@ export class LiveRenderer {
       gl.uniform1f(this.loc(this.obj, 'uArtMM'), a.mm); gl.uniform1f(this.loc(this.obj, 'uArtC'), a.C); gl.uniform4fv(this.loc(this.obj, 'uArtR'), a.rects); gl.uniform2fv(this.loc(this.obj, 'uArtO'), a.origins); };
     artTo(null);
     let id = 1; const objU = (outline: number) => { gl.uniform2f(this.loc(this.obj, 'uObj'), (id & 255) / 255, ((id >> 8) & 255) / 255); gl.uniform1f(this.loc(this.obj, 'uOutline'), outline); id++; };
-    const draw = (part: { vao: WebGLVertexArrayObject; n: number }, M: M4, w?: WheelDraw, key?: string) => { if (!part.n) return; gl.uniformMatrix4fv(this.loc(this.obj, 'uModel'), false, M); gl.uniformMatrix4fv(this.loc(this.obj, 'uPrevModel'), false, (key && this.prevM.get(key)) || M); if (key) this.nextM.set(key, M); gl.uniform1i(this.loc(this.obj, 'uWheel'), w ? 1 : 0);
+    const draw = (part: { vao: WebGLVertexArrayObject; n: number }, M: M4, w?: WheelDraw, key?: string, bones?: Float32Array) => { if (!part.n) return; if (bones) gl.uniform4fv(this.loc(this.obj, 'uBone'), bones); gl.uniformMatrix4fv(this.loc(this.obj, 'uModel'), false, M); gl.uniformMatrix4fv(this.loc(this.obj, 'uPrevModel'), false, (key && this.prevM.get(key)) || M); if (key) this.nextM.set(key, M); gl.uniform1i(this.loc(this.obj, 'uWheel'), w ? 1 : bones ? 2 : 0);
       if (!w) gl.uniform1f(this.loc(this.obj, 'uObjZ'), 0); if (w) { gl.uniform1f(this.loc(this.obj, 'uSpin'), w.spin); gl.uniform1f(this.loc(this.obj, 'uObjZ'), w.hubZ); gl.uniform1fv(this.loc(this.obj, 'uDef'), w.def); gl.uniform2f(this.loc(this.obj, 'uShift'), w.sx, w.sy); gl.uniform1f(this.loc(this.obj, 'uTyreR'), w.R); gl.uniform1f(this.loc(this.obj, 'uRim'), w.rim); } gl.bindVertexArray(part.vao); gl.drawArrays(gl.TRIANGLES, 0, part.n); };
     const decals = (g: GpuMesh | null) => { const n = g ? g.decals.length : 0; gl.uniform1i(this.loc(this.obj, 'uDecN'), n); gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, n ? g!.decalTex : this.blank); if (!g || !n) return;
       gl.uniform3fv(this.loc(this.obj, 'uDecO'), g.decals.flatMap(d => d.o)); gl.uniform3fv(this.loc(this.obj, 'uDecN_'), g.decals.flatMap(d => { const l = Math.hypot(...d.n); return d.n.map(x => x / l); }));
@@ -877,9 +882,9 @@ export class LiveRenderer {
     // the cars a thing hides: their light outline first, tested against what stands before them (each pixel once), then the cars over it
     gl.uniform1i(this.loc(this.obj, 'uMode'), 1); gl.depthFunc(gl.GREATER); gl.depthMask(false); gl.enable(gl.STENCIL_TEST); gl.stencilFunc(gl.EQUAL, 0, 0xff); gl.stencilOp(gl.KEEP, gl.KEEP, gl.INCR);
     gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.NONE, gl.NONE, gl.NONE]); gl.uniform1f(this.loc(this.obj, 'uBias'), 0.25 / R);
-    cars.forEach((q, i) => { gl.uniform4f(this.loc(this.obj, 'uSil'), 1, 226 / 255, 168 / 255, q.player ? 0.6 : 0.4); for (const [part, M, w] of carM[i]!.opaque) draw(part, M, w); });
+    cars.forEach((q, i) => { gl.uniform4f(this.loc(this.obj, 'uSil'), 1, 226 / 255, 168 / 255, q.player ? 0.6 : 0.4); for (const [part, M, w, b] of carM[i]!.opaque) draw(part, M, w, undefined, b); });
     gl.disable(gl.STENCIL_TEST); gl.disable(gl.BLEND); gl.depthFunc(gl.LESS); gl.depthMask(true); gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.COLOR_ATTACHMENT1, gl.COLOR_ATTACHMENT2, gl.COLOR_ATTACHMENT3]); gl.uniform1f(this.loc(this.obj, 'uBias'), 0); gl.uniform1i(this.loc(this.obj, 'uMode'), 0);
-    gl.uniform1i(this.loc(this.obj, 'uIsCar'), 1); cars.forEach((q, i) => { objU(outlineC); const m = carM[i]!; gl.uniform1f(this.loc(this.obj, 'uLampOn'), q.lamps ?? 0); gl.uniform1f(this.loc(this.obj, 'uBrake'), q.brake ? 1 : 0); gl.uniform1i(this.loc(this.obj, 'uSelf'), boxIdx.get(q) ?? -1); gl.uniform3fv(this.loc(this.obj, 'uWear'), q.wear ?? [0, 0, 0]); gl.uniform1f(this.loc(this.obj, 'uCarH'), q.g.height); artTo(q.g); decals(q.g); draw(q.g.body, m.body, undefined, `c${this.idOf(q.g)}:0`); decals(null); m.opaque.slice(1).forEach(([part, M, w], j) => draw(part, M, w, `c${this.idOf(q.g)}:${j + 1}`)); });
+    gl.uniform1i(this.loc(this.obj, 'uIsCar'), 1); cars.forEach((q, i) => { objU(outlineC); const m = carM[i]!; gl.uniform1f(this.loc(this.obj, 'uLampOn'), q.lamps ?? 0); gl.uniform1f(this.loc(this.obj, 'uBrake'), q.brake ? 1 : 0); gl.uniform1i(this.loc(this.obj, 'uSelf'), boxIdx.get(q) ?? -1); gl.uniform3fv(this.loc(this.obj, 'uWear'), q.wear ?? [0, 0, 0]); gl.uniform1f(this.loc(this.obj, 'uCarH'), q.g.height); artTo(q.g); decals(q.g); draw(q.g.body, m.body, undefined, `c${this.idOf(q.g)}:0`); decals(null); m.opaque.slice(1).forEach(([part, M, w, b], j) => draw(part, M, w, `c${this.idOf(q.g)}:${j + 1}`, b)); });
     // smoke: parcels far to near, blended over what is drawn, hidden behind what stands before them
     if (o.smoke && o.smoke.n) { const S = o.smoke; if (!this.smokeVao) { this.smokeVao = gl.createVertexArray()!; gl.bindVertexArray(this.smokeVao); const corners = gl.createBuffer()!; gl.bindBuffer(gl.ARRAY_BUFFER, corners); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, 1, 1, -1, -1, 1, 1, -1, 1]), gl.STATIC_DRAW);
         gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0); this.smokeBuf = gl.createBuffer()!; gl.bindBuffer(gl.ARRAY_BUFFER, this.smokeBuf);
@@ -922,7 +927,11 @@ export class LiveRenderer {
     const g = q.g, base = placeMesh(g.len, q.x, q.y, q.z, q.yaw), mid = translate(g.len / 2, 0, 0), back = translate(-g.len / 2, 0, 0);
     const body = mul(base, mul(mid, mul(rot('x', q.roll), mul(rot('y', q.pitch), back))));
     const opaque: Piece[] = [[g.body, body]], glass: Piece[] = [[g.glass, body]];
-    for (const w of g.wheels) { const left = w.hub[1] > 0, wi = (w.front ? 0 : 2) + (left ? 0 : 1), M = mul(body, mul(translate(w.hub[0], w.hub[1], w.hub[2] + (q.travel?.[wi] ?? 0) * 1000), mul(w.front ? rot('z', -(left ? q.steerL : q.steerR)) : translate(0, 0, 0), rot('x', -(q.camber?.[wi] ?? 0)))));
+    // a car with a suspension rig: the linkage solved for each wheel's travel and steer (render/car/suspension), its parts by their
+    // bones in one draw, each wheel where its upright carries it (the camber and the toe are the linkage's own)
+    const pose = g.susp ? poseRig(g.susp.rig, (q.travel ?? [0, 0, 0, 0]).map(t => t * 1000), q.steerL, q.steerR, q.spin) : null; if (pose) opaque.push([g.susp!.part, body, undefined, pose.bones]);
+    for (const w of g.wheels) { const left = w.hub[1] > 0, wi = (w.front ? 0 : 2) + (left ? 0 : 1), pw = pose?.wheels[wi];
+      const M = pw ? mul(body, mul(translate(w.hub[0] + pw.wc[0] - pw.from[0], w.hub[1] + pw.wc[1] - pw.from[1], w.hub[2] + pw.wc[2] - pw.from[2]), m4of(pw.R))) : mul(body, mul(translate(w.hub[0], w.hub[1], w.hub[2] + (q.travel?.[wi] ?? 0) * 1000), mul(w.front ? rot('z', -(left ? q.steerL : q.steerR)) : translate(0, 0, 0), rot('x', -(q.camber?.[wi] ?? 0)))));
       const ty = q.tyres?.[(w.front ? 0 : 2) + (left ? 0 : 1)], def = new Float32Array(32); if (ty) for (let k = 0; k < 32; k++) def[k] = ty.u[k]! * 1000;
       const wd: WheelDraw = { hubZ: w.hub[2], spin: q.spin, def, sx: (ty?.sx ?? 0) * 1000, sy: (ty?.sy ?? 0) * 1000, R: w.R, rim: w.rim };
       opaque.push([w.part, M, wd]); if (w.glass) glass.push([w.glass, M, wd]); }

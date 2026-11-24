@@ -24,8 +24,9 @@ const build = (d: Design, lamps = 0) => { const { kit, tweak } = designKit(d, 0)
 const closed = (d: Design, lamps: number) => { const r = seamCheck(build(d, lamps)), what = `${d.body.base} ${d.body.nose} ${FACE_KEYS.map(k => d.body[k]).join(' ')} lamps ${lamps}`;
   expect(r.open.map(e => `${e.names} ${e.a.map(Math.round)}`), what).toEqual([]); expect(r.nonManifold.length, what).toBe(0); expect(r.duplicates, what).toBe(0); expect(r.overlaps, what).toBe(0); };
 const ok = (b: BaseId, f: Fc) => FACE_KEYS.every(k => !faceLock({ ...f, base: b }, k, f[k]));
-/** every triangle's points but the engine's (the powertrain is built from the design's machinery) */
-const shell = (A: ReturnType<typeof assemble>) => { const k: number[] = []; for (let t = 0; t < A.mesh.n; t++) if (A.panels[A.panelOf[t]!] !== 'engine') for (let i = 0; i < 9; i++) k.push(A.mesh.pos[t * 9 + i]!); return k; };
+/** every triangle's points but the machinery's (the powertrain is built from the design's engine, the suspension at the
+ *  engine's level of detail) */
+const shell = (A: ReturnType<typeof assemble>) => { const k: number[] = []; for (let t = 0; t < A.mesh.n; t++) if (A.panels[A.panelOf[t]!] !== 'engine' && A.panels[A.panelOf[t]!] !== 'suspension') for (let i = 0; i < 9; i++) k.push(A.mesh.pos[t * 9 + i]!); return k; };
 
 describe('face: format 3\'s nose and front as slots', () => {
   // alpha 0.11's patches, laid as its builder laid them
@@ -34,7 +35,7 @@ describe('face: format 3\'s nose and front as slots', () => {
     f355: { kit: F355_KIT, nose: { round: F355_ROUND_NOSE, pointed: null, mass: F355_MASS_NOSE }, front: { plain: F355_PLAIN_FRONT, sunk: null } },
     eb110: { kit: EB110_KIT, nose: { round: EB110_ROUND_NOSE, pointed: EB110_POINTED_NOSE, mass: null }, front: { plain: null, sunk: EB110_SUNK_FRONT } } };
   const v3 = (b: BaseId, nose: NoseKind, front: FrontKind): DesignV3 => { const { bumper: _b, grille: _g, head: _h, pod: _p, aux: _a, ...body } = own(b).body; void _b; void _g; void _h; void _p; void _a;
-    return { ...own(b), v: 3, body: { ...body, nose, front }, kit: { ...own(b).kit, wing: false, diffuser: false, tyres: [OLD[b].kit.lines.wheels.f.w, OLD[b].kit.lines.wheels.r.w] } }; };
+    return { ...own(b), v: 3, engine: own(b).engine as DesignV3['engine'], body: { ...body, nose, front }, kit: { ...own(b).kit, wing: false, diffuser: false, tyres: [OLD[b].kit.lines.wheels.f.w, OLD[b].kit.lines.wheels.r.w] } }; };
   for (const b of BASES) it(`on the ${b}: every nose and front of alpha 0.11 loads as the same body`, () => {
     for (const nose of NOSES) for (const front of FRONTS) { const d = normalise(v3(b, nose, front)), O = OLD[b]; let kit: CarKit = { ...O.kit, wing: undefined };
       for (const p of [O.nose[nose], O.front[front]]) if (p) kit = { ...kit, ...p };
@@ -47,6 +48,16 @@ describe('face: format 3\'s nose and front as slots', () => {
     const kept = asDesign(JSON.parse(JSON.stringify(made('nsx', { bumper: 'wedge', grille: 'oval', head: 'pocket', pod: 'round', aux: 'none' }))))!;
     expect({ ...kept.body }).toMatchObject({ bumper: 'wedge', grille: 'oval', head: 'pocket', pod: 'round', aux: 'none' });
     expect(asDesign({ ...made('f355', {}), body: { ...made('f355', {}).body, grille: 'teeth', head: 7 } })!.body).toMatchObject({ grille: 'oval', head: 'popup' });
+  });
+  it('a format-4 file made while its halves were apart (the engine\'s fields with a front; the face\'s slots alone) loads whole', () => {
+    for (const b of BASES) { const P = own(b), { bs: _s, quality: _q, ...engine } = P.engine; void _s; void _q;
+      const engineHalf = { ...v3(b, 'pointed', 'sunk'), v: 4, engine: { ...P.engine, layout: 'I6', bs: 0.9, quality: { ...P.engine.quality, head: 2 } } };
+      const faceHalf = { ...P, body: { ...P.body, bumper: 'airdam', grille: 'mesh', aux: 'none' }, engine };
+      for (const d of [normalise(engineHalf as unknown as Design), asDesign(JSON.parse(JSON.stringify(engineHalf)))!]) {
+        expect(d.v).toBe(4); expect('front' in d.body).toBe(false); expect({ ...d.body }).toMatchObject({ ...FACE_OWN[b], aux: 'round', nose: 'pointed' });
+        expect(d.engine).toMatchObject({ layout: 'I6', bs: 0.9 }); expect(d.engine.quality.head).toBe(2); }
+      for (const d of [normalise(faceHalf as unknown as Design), asDesign(JSON.parse(JSON.stringify(faceHalf)))!]) {
+        expect({ ...d.body }).toMatchObject({ bumper: 'airdam', grille: 'mesh', aux: 'none' }); expect(d.engine).toEqual(P.engine); } }
   });
 });
 

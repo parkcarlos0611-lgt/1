@@ -15,10 +15,12 @@ import { loadSky } from '../render/live/groundtex';
 import { studioFloor } from '../render/live/studio';
 import type { Mesh } from '../render/car/mesh';
 import { designMesh, designChoices, withoutParts } from '../render/car/design';
+import { bareMesh, bounce } from '../render/car/suspension/view';
 import { designSpec, designFigures, designHeight, type DesignFigures } from '../race/design';
 import { CLEARANCE, type FitResult } from '../race/fit';
-import { LIMITS, BASES, BODY_LIMITS, DIMS, type DimKey, GRADE_NAME, GRADES, gradeLock, gradeBoost, gradeRedline, normalise, applyPatch, type BaseId, type Design, type NoseKind, type TailKind, type WheelKind, FACE_KEYS, faceLock, type Face, type FaceKey,
+import { LIMITS, BASES, BODY_LIMITS, DIMS, LAYOUTS, LAYOUT_NAME, type DimKey, GRADE_NAME, GRADES, gradeLock, gradeBoost, gradeRedline, normalise, applyPatch, type BaseId, type Design, type NoseKind, type TailKind, type WheelKind, FACE_KEYS, faceLock, type Face, type FaceKey,
   type Grade, type Structure, type Panels, type Intake, type Compression, type Sump, type Block, type Turbos, type Interior } from '../core/design';
+import { savedEngines, joinEngine, withEngine } from '../core/engines';
 import { currentDesign, keepCurrent, savedDesigns, saveDesign, deleteDesign, fromPreset, encodeDesign, designJson, parseDesign, measured, designSig, newId, KEYS, type KeyStore } from '../core/designstore';
 import texAlb from '../assets/textures/pbr/albedo.jpg';
 import texNor from '../assets/textures/pbr/normal.jpg';
@@ -29,7 +31,9 @@ import texMeta from '../assets/textures/pbr/pbr.json';
  *  while it is taken off the page), the one renderer shared by the screens (its sky and textures loaded by the shell),
  *  the design to open, and what the test drive does (a screen of the same page instead of a new window). A page of its
  *  own (builder3d.page.html) gives nothing */
-export interface BuilderHost { root?: ParentNode; renderer?: LiveRenderer | null; design?: Design; onTestDrive?: (d: Design) => void }
+export interface BuilderHost { root?: ParentNode; renderer?: LiveRenderer | null; design?: Design; onTestDrive?: (d: Design) => void;
+  /** step ②'s "엔진 공방에서 편집": the engine designer opened with this car (the game's page; it hands the engine back through use()) */
+  onEngineShop?: (d: Design) => void }
 export interface BuilderApi { /** shown again (with another design, or as it was left: the same step) */ enter(d?: Design): void; /** hidden: it stops drawing */ leave(): void;
   readonly design: Design; readonly step: string; use(d: Design): void }
 // The builder below is one function's body, mounted once on its markup; it is not indented, so its lines read as before.
@@ -171,13 +175,23 @@ function btnRow(t: string, f: () => void): HTMLElement { const d = document.crea
   pick.addEventListener('input', () => { D.body.paint = pick.value; changed(); }); sw.append(pick);
   syncs.push(() => { pick.value = D.body.paint; for (const [c, b] of bs) b.setAttribute('aria-pressed', String(c === D.body.paint.toLowerCase())); });
   add('paint', field('도장 색', sw), range('광택', [0, 1], 0.05, () => D.body.gloss, v => { D.body.gloss = v; }, v => v.toFixed(2), 'gloss')); }
+// ② 엔진·구동계 (alpha 0.12): an engine from the library put in, or this car's engine opened in the engine designer
+{ const box = document.createElement('div'), list = document.createElement('ul'); list.className = 'list'; list.id = 'engLib'; list.hidden = true;
+  const fill = () => { list.textContent = ''; const all = savedEngines(store);
+    if (!all.length) { const li = document.createElement('li'); li.innerHTML = '<span>보관함에 엔진이 없습니다. 엔진 공방에서 만들어 저장하세요.</span>'; list.append(li); return; }
+    for (const s of all) { const e = joinEngine(s.family, s.variant, D), li = document.createElement('li'), t = document.createElement('span'), sm = document.createElement('small'), b = document.createElement('button');
+      t.textContent = s.name; sm.textContent = `${LAYOUT_NAME[e.layout]} ${(e.cc / 1000).toFixed(1)} · ${e.grade}등급${e.turbo ? ` · 터보 ${e.turbo}` : ''}`; b.type = 'button'; b.className = 'btn'; b.textContent = '얹기';
+      b.addEventListener('click', () => { D = withEngine(D, joinEngine(s.family, s.variant, D)); list.hidden = true; changed(); flash(`엔진을 얹었습니다: ${s.name}`); }); li.append(t, sm, b); list.append(li); } };
+  const row = btnRow('보관함에서 엔진 고르기', () => { list.hidden = !list.hidden; if (!list.hidden) fill(); }); row.querySelector('button')!.id = 'engPick';
+  if (host.onEngineShop) { const b = document.createElement('button'); b.type = 'button'; b.className = 'btn'; b.id = 'engShop'; b.textContent = '엔진 공방에서 편집'; b.addEventListener('click', () => host.onEngineShop!(structuredClone(D))); row.append(b); }
+  box.append(row, list); add('engine', box); }
 // ② 엔진·구동계: the grade first; the details it does not allow greyed out with the reason
 { const E = () => D.engine, lk = <K extends 'intake' | 'compression' | 'sump' | 'block' | 'valves' | 'turbo'>(k: K) => (v: Design['engine'][K]) => gradeLock(E().grade, k, v);
   const boost = range('부스트', LIMITS.boost, 0.05, () => E().boost, v => { E().boost = v; }, v => `${v.toFixed(2)} bar`, 'boost'), redline = range('레드라인', LIMITS.redline, 100, () => E().redline, v => { E().redline = v; }, v => `${v.toLocaleString()} rpm`, 'redline');
   const vtec = check('VTEC (두 가지 캠 프로필)', () => E().vtec, v => { E().vtec = v; }, 'vtec'), ic = check('인터쿨러', () => E().intercooler, v => { E().intercooler = v; }, 'intercooler');
   const gradeNote = note('');
   add('engine', h2('엔진'), seg<Grade>('개발 등급', GRADES.map(g => [g, `${g} ${GRADE_NAME[g]}`] as [Grade, string]), () => E().grade, v => { E().grade = v; D = normalise(D); }), gradeNote,
-    seg('배열', [['V6', 'V6'], ['V8', 'V8'], ['V12', 'V12']], () => E().layout, v => { E().layout = v; }),
+    seg('배열', LAYOUTS.map(l => [l, LAYOUT_NAME[l]]), () => E().layout, v => { E().layout = v; }),
     range('배기량', LIMITS.cc, 50, () => E().cc, v => { E().cc = v; }, v => `${v.toLocaleString()} cc`, 'cc'),
     seg('실린더당 밸브', [[2, '2'], [3, '3'], [4, '4'], [5, '5']], () => E().valves, v => { E().valves = v; }, lk('valves')), redline,
     seg<Intake>('흡기', [['single', '단일 스로틀'], ['variable', '가변 흡기'], ['itb', '개별 스로틀']], () => E().intake, v => { E().intake = v; }, lk('intake')),
@@ -236,7 +250,8 @@ function showList() { const list = $('list'), all = savedDesigns(store); list.te
     li.append(s, sm, load, del); list.append(li); } }
 
 // ---- the design changed: kept, the figures, the car (when its body changed), the link ----
-const bodyKey = (d: Design) => JSON.stringify([d.body.base, d.body.nose, ...FACE_KEYS.map(k => d.body[k]), d.body.tail, d.body.wheel, ...DIMS.map(k => d.body[k]), d.body.paint, d.body.gloss, d.kit.tyres, d.kit.rim, d.kit.wing, d.kit.diffuser]);
+// the engine's shape is in the key too (the car carries its powertrain: the engine view shows it)
+const bodyKey = (d: Design) => JSON.stringify([d.engine.layout, d.engine.cc, d.engine.bs, d.engine.valves, d.engine.block, d.engine.grade, d.engine.intake, d.engine.sump, d.engine.turbo, d.engine.intercooler, d.drive.gears, d.drive.gearbox, d.drive.awd, d.body.base, d.body.nose, ...FACE_KEYS.map(k => d.body[k]), d.body.tail, d.body.wheel, ...DIMS.map(k => d.body[k]), d.body.paint, d.body.gloss, d.kit.tyres, d.kit.rim, d.kit.wing, d.kit.diffuser]);
 let meshT = 0, figT = 0;
 function changed() { D = normalise(D); for (const s of syncs) s(); keepCurrent(store, D); savedState(); driveLink();
   clearTimeout(figT); figT = setTimeout(figures, 40) as unknown as number;
@@ -314,13 +329,13 @@ catch (e) { console.warn('live renderer unavailable', e); L = null; const p = do
 const DECK = ['bootLid', 'engineCover', 'rearPane'];
 let meshKey = '', down: Mesh | null = null, up: Mesh | null = null, onGpu: Mesh | null = null, builds = 0;
 const open = new WeakMap<Mesh, Mesh>();
-const view = { spin: false, lamps: false, engine: false, look: 2, yaw: 0, ang: 0, pitch: 0, zoom: 1 };
+const view = { spin: false, lamps: false, engine: false, /** the suspension view: the body off, the wheels' faces off, the wheels bouncing slowly */ susp: false, look: 2, yaw: 0, ang: 0, pitch: 0, zoom: 1 };
 let dirty = true, g: ReturnType<LiveRenderer['car']> | null = null, awake = true;   // awake: on screen (a page of its own always)
 function rebuild() { const key = bodyKey(D); if (key === meshKey && down) return; const t0 = performance.now(); meshKey = key; down = designMesh(D, 0, 0, 1); up = null; builds++; dirty = true; console.info(`design mesh ${D.body.base}: ${down.n} triangles, ${Math.round(performance.now() - t0)} ms`); }
-function shown(): Mesh { let M = view.lamps ? (up ??= designMesh(D, 0, 1, 1)) : down!; if (view.engine) { let o = open.get(M); if (!o) { o = withoutParts(M, DECK); open.set(M, o); } M = o; } return M; }
+function shown(): Mesh { let M = view.lamps ? (up ??= designMesh(D, 0, 1, 1)) : down!; if (view.susp) return bareMesh(M); if (view.engine) { let o = open.get(M); if (!o) { o = withoutParts(M, DECK); open.set(M, o); } M = o; } return M; }
 const home = () => { view.ang = Math.PI - 0.7; view.pitch = 17; view.zoom = 1; view.yaw = 0; dirty = true; }; home();
-const press = (id: string, k: 'spin' | 'lamps' | 'engine') => $(id).addEventListener('click', () => { view[k] = !view[k]; $(id).setAttribute('aria-pressed', String(view[k])); dirty = true; });
-press('spin', 'spin'); press('lamps', 'lamps'); press('engine', 'engine');
+const press = (id: string, k: 'spin' | 'lamps' | 'engine' | 'susp') => $(id).addEventListener('click', () => { view[k] = !view[k]; $(id).setAttribute('aria-pressed', String(view[k])); dirty = true; });
+press('spin', 'spin'); press('lamps', 'lamps'); press('engine', 'engine'); press('susp', 'susp');
 $('engine').addEventListener('click', () => { if (view.engine) { view.ang = view.yaw + 0.6; view.pitch = 42; view.zoom = 0.8; } });   // the engine bay seen from behind and above
 $<HTMLSelectElement>('look').addEventListener('change', e => { view.look = +(e.target as HTMLSelectElement).value; dirty = true; });
 $('home').addEventListener('click', home); cv.addEventListener('dblclick', home);
@@ -335,6 +350,7 @@ addEventListener('resize', () => { dirty = true; });
 let last = performance.now(), frames = 0;
 function frame(now: number) { const el = Math.min(0.1, (now - last) / 1000); last = now;
   if (view.spin) { view.yaw += el * 0.35; dirty = true; }
+  if (view.susp) dirty = true;   // the bounce demo runs
   if (L && down && dirty && awake) { dirty = false; frames++;
     const dpr = Math.min(2, devicePixelRatio || 1), W = Math.max(2, Math.round(cv.clientWidth * dpr)), H = Math.max(2, Math.round(cv.clientHeight * dpr)); if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
     const M = shown(); if (M !== onGpu) { g = onGpu ? L.swapCar(onGpu, M) : L.car(M); onGpu = M; }
@@ -346,7 +362,7 @@ function frame(now: number) { const el = Math.min(0.1, (now - last) / 1000); las
     const mm = Math.max(len * 1.3 / free, len * 0.62 / band) * view.zoom, ox = -shift * mm / 1000;
     const rx = Math.sin(view.ang), ry = -Math.cos(view.ang);   // the screen's right, in the world
     L.render({ x: rx * ox, y: ry * ox, z: 0.55, ang: view.ang, pitch: view.pitch, mm, W, H, cy: phone ? (top + bottom) / 2 / r.height : 0.55 },
-      [{ g: g!, x: 0, y: 0, z: -0.015, yaw: view.yaw, roll: 0, pitch: 0, steerL: 0.14, steerR: 0.12, spin: 0, player: true, lamps: view.lamps ? 1 : 0 }], [], [],
+      [{ g: g!, x: 0, y: 0, z: -0.015, yaw: view.yaw, roll: 0, pitch: 0, steerL: 0.14, steerR: 0.12, spin: 0, player: true, lamps: view.lamps ? 1 : 0, ...(view.susp ? bounce(now / 1000) : {}) }], [], [],
       { look: view.look, glass: 0.8, rays: true, bloomK: 1, reflK: 1.3, dof: 0, outW: 0.5, outK: 0.6 }); }
   requestAnimationFrame(frame); }
 // the phone's drawer

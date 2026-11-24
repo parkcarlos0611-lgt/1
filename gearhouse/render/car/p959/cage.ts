@@ -38,25 +38,25 @@ const COLS: (V | null)[][] = [
      1632 655 898; 1722 624 976; 1812 592 1066; 1902 560 1154; 1990 512 1238; 2146 498 1252; 2322 490 1256; 2500 484 1247; 2675 478 1227; 2856 470 1198
      3002 468 1150; 3144 470 1095; 3286 474 1040; 3428 478 985; 3570 482 930; 3720 482 866; 3864 470 826; 3876 470 872; 4010 450 913; 4140 436 908; 4254 426 896`),
   // 3
-  T(`48 420 424; 165 440 538; 268 455 584; 392 475 620; 530 500 654; 670 530 687; 810 562 721; 950 596 757; 1110 630 795; 1350 668 850
+  T(`48 420 424; 165 425 538; 268 438 584; 392 462 620; 530 500 654; 670 530 687; 810 562 721; 950 596 757; 1110 630 795; 1350 668 850
      1660 698 900; 1748 665 978; 1836 630 1066; 1923 596 1152; 2010 562 1228; 2152 553 1232; 2324 548 1236; 2500 542 1227; 2676 536 1207; 2860 528 1178
      3010 535 1128; 3152 548 1072; 3294 562 1015; 3436 572 962; 3575 578 915; 3722 575 860; 3870 572 828; 3880 572 871; 4010 556 912; 4140 540 907; 4246 530 896`),
   // 4
-  T(`70 520 420; 194 533 579; 270 499 640; 346 533 701; 520 575 750; 668 610 782; 808 640 800; 948 664 815; 1100 686 832; 1345 708 866
+  T(`70 520 420; 187 526 574; 270 489 640; 353 526 706; 520 575 750; 668 610 782; 808 640 800; 948 664 815; 1100 686 832; 1345 708 866
      1660 722 894; 1752 695 968; 1842 665 1052; 1932 634 1134; 2022 600 1210; 2190 592 1216; 2360 588 1219; 2530 583 1210; 2705 590 1188; 2880 612 1146
      3015 655 1080; 3125 712 1002; 3205 765 925; 3360 760 898; 3500 740 888; 3690 700 866; 3884 672 836; 3884 672 871; 4010 656 912; 4135 640 907; 4234 628 897`),
   // 5
-  T(`100 610 416; 162 615 554; 270 615 640; 378 615 726; 520 665 792; 668 702 815; 808 726 828; 948 741 838; 1095 750 848; 1340 754 868
+  T(`100 610 416; 153 615 546; 270 615 640; 387 615 734; 520 665 792; 668 702 815; 808 726 828; 948 741 838; 1095 750 848; 1340 754 868
      1620 748 878; 1760 750 874; 1900 750 871; 2030 748 869; 2150 746 868; 2310 744 868; 2450 742 868; 2590 742 868; 2760 750 870; 2900 760 874
-     3020 772 880; 3120 782 888; 3200 790 898; 3350 815 885; 3490 815 876; 3680 800 866; 3905 768 846; 3892 765 872; 4010 752 912; 4125 736 908; 4212 716 897`),
+     3020 772 880; 3120 782 888; 3200 790 898; 3350 815 885; 3490 815 876; 3680 800 866; 3905 768 846; 3892 765 872; 4010 752 908; 4125 736 904; 4212 716 893`),
   // 6
-  T(`150 690 412; 194 697 579; 270 731 640; 346 697 701; 515 762 762; 672 808 790; 810 830 804; 945 840 810; 1085 842 814; 1300 826 826
-     1480 792 850; 1630 790 850; 1780 790 850; 1930 790 850; 2080 790 850; 2240 790 850; 2410 790 850; 2585 792 850; 2690 815 852; 2940 852 852
-     3075 866 850; 3212 872 847; 3345 872 845; 3470 868 846; 3600 862 850; 3760 854 856; 3905 848 860; 3985 842 888; 4050 830 900; 4115 816 902; 4175 800 898`),
+  T(`150 690 412; 187 704 574; 270 741 640; 353 704 706; 515 762 762; 672 808 790; 810 830 804; 945 840 810; 1085 842 814; 1300 826 826
+     1480 792 850; 1630 790 850; 1780 790 850; 1930 790 850; 2080 790 850; 2240 790 850; 2410 790 850; 2585 792 850; 2690 815 852; 2940 846 852
+     3075 856 850; 3212 860 847; 3345 860 845; 3470 858 846; 3600 854 850; 3760 854 856; 3905 848 860; 3985 842 884; 4050 832 892; 4115 820 890; 4175 806 880`),
   // 7
   T(`208 752 409; 262 772 505; 325 798 585; 405 824 648; 540 856 705; 680 880 728; 812 891 741; 942 894 746; 1075 892 748; 1260 868 754
-     1458 817 772; 1612 815 772; 1765 815 772; 1918 815 772; 2070 815 772; 2232 815 772; 2404 815 772; 2580 816 772; 2680 866 772; 2950 904 766
-     3080 916 762; 3212 920 760; 3342 919 760; 3465 915 763; 3600 908 770; 3712 900 782; 3818 890 798; 3910 878 816; 3996 864 832; 4082 846 846; 4186 814 862`),
+     1458 817 772; 1612 815 772; 1765 815 772; 1918 815 772; 2070 815 772; 2232 815 772; 2404 815 772; 2580 816 772; 2680 866 772; 2950 902 775
+     3080 912 775; 3212 916 775; 3342 915 775; 3465 911 775; 3600 908 770; 3712 900 782; 3818 890 798; 3910 878 816; 3996 864 832; 4082 848 838; 4186 818 846`),
   // 8
   T(`285 800 407; 345 820 462; 410 842 503; 485 862 532; 570 880 548; 663 896 553; 787 899 648; 940 900 682; 1093 899 648; 1217 896 553
      1442 822 600; 1600 820 600; 1755 820 600; 1910 820 600; 2065 820 600; 2228 820 600; 2400 820 600; 2572 822 600; 2672 872 598; 2935 916 551
@@ -82,11 +82,11 @@ const COLS: (V | null)[][] = [
  *  9 (the bumper seam) carried on from row 30 round to the centre line, six steps; the line of column 6 becomes the
  *  trailing edge itself (row 30, columns 5 .. 0), so the corner point (row 30, column 6) has three faces round it */
 const WRAP: V[][] = [
-  T(`4226 728 866; 4245 636 868; 4254 534 868; 4258 428 868; 4260 228 868; 4261 0 868`) as V[],
+  T(`4226 728 858; 4245 636 868; 4254 534 868; 4258 428 868; 4260 228 868; 4261 0 868`) as V[],
   T(`4238 740 682; 4252 640 682; 4257 536 682; 4259 430 682; 4260 229 682; 4261 0 682`) as V[],
   T(`4238 740 562; 4252 640 562; 4257 536 562; 4259 430 562; 4260 229 562; 4261 0 562`) as V[]];
 /** the slot under the wing blade: its floor and roof half way through, at columns 0 .. 5 */
-const SLOT_FLOOR: V[] = T(`4070 0 750; 4070 240 749; 4068 448 747; 4066 550 745; 4062 650 743; 4056 738 742`) as V[];
+const SLOT_FLOOR: V[] = T(`4110 0 800; 4110 240 799; 4108 448 797; 4106 550 795; 4102 650 792; 4096 738 790`) as V[];
 const SLOT_ROOF: V[] = T(`4075 0 878; 4075 240 877; 4073 448 876; 4070 550 875; 4066 650 874; 4060 738 873`) as V[];
 
 export type Region = 'shell' | 'tail' | 'bumperF' | 'bumperR';
@@ -105,7 +105,7 @@ function cell(i: number, j: number): Tag {
   if (j === 4 && i >= 10 && i < 22) return { region: 'shell', mat: 'glass', panel: i < 17 ? 'doorGlass' : 'quarterGlass' };
   if (j < 2 && i >= 24 && i < 26) return { region: 'shell', mat: 'grille', panel: 'engineGrille' };
   if (i >= 26 && j < 6) return { region: 'tail', mat: 'paint', panel: 'wing' };
-  if (j === 8 && i >= 27) return { region: 'shell', mat: 'amber', panel: 'tailLampEnd', socket: 'tailLamp' };
+  if (j === 8 && i >= 28) return { region: 'shell', mat: 'amber', panel: 'tailLampEnd', socket: 'tailLamp' };
   if (i >= 1 && i < 3 && j >= 4 && j < 6) return { region: 'shell', mat: 'lens', panel: 'headLamp', socket: 'headLamp' };
   if (i === 17 && j === 7) return { region: 'shell', mat: 'dark', panel: 'sideIntake', socket: 'sideIntake' };
   if (j >= 9) return { region: 'shell', mat: 'paint', panel: 'sill' };
@@ -133,7 +133,7 @@ export function buildCage(): Cage959 {
     quad(wl(m, k), wl(m, k + 1), wl(m + 1, k + 1), wl(m + 1, k), m === 8 ? { region: 'shell', mat: k === 0 ? 'amber' : 'lamp', panel: k === 0 ? 'tailLampEnd' : 'tailLamp', socket: 'tailLamp' } : { region: 'tail', mat: 'paint', panel: 'wing' }); }
   // the slot under the blade: floor (the engine lid running on down to the lamp's top), side wall and roof (the blade's underside)
   const sf = SLOT_FLOOR.map(pt), sr = SLOT_ROOF.map(pt), fl: Tag = { region: 'tail', mat: 'dark', panel: 'wingSlot' }, rf: Tag = { region: 'tail', mat: 'paint', panel: 'wing' };
-  for (let j = 0; j < 5; j++) { quad(M[26]![j]!, sf[j]!, sf[j + 1]!, M[26]![j + 1]!, fl); quad(sf[j]!, wl(8, 6 - j), wl(8, 5 - j), sf[j + 1]!, fl);
+  for (let j = 0; j < 5; j++) { quad(M[26]![j]!, sf[j]!, sf[j + 1]!, M[26]![j + 1]!, fl); quad(sf[j]!, wl(8, 6 - j), wl(8, 5 - j), sf[j + 1]!, { region: 'tail', mat: 'paint', panel: 'tailPanel' });
     quad(M[27]![j]!, M[27]![j + 1]!, sr[j + 1]!, sr[j]!, rf); quad(sr[j]!, sr[j + 1]!, wl(7, 5 - j), wl(7, 6 - j), rf); }
   quad(M[26]![5]!, sf[5]!, sr[5]!, M[27]![5]!, fl); quad(sf[5]!, wl(8, 1), wl(7, 1), sr[5]!, fl);
   // the bumpers: placeholder modules hung on the seam loops. Each point of the seam carries three more below it
@@ -148,12 +148,12 @@ export function buildCage(): Cage959 {
   const BF = strip(seamF, 'bumperF', [340, 195, 124], 700, [onArch(A.f, 184, 886), onArch(A.f, 201, 876), onArch(A.f, 214, 832)], 'bumperF',
     (m, k) => m === 0 && k >= 6 && k < 11 ? ['amber', 'indicatorF'] : m === 1 && k >= 9 ? ['grille', 'intakeF'] : m === 1 && k >= 1 && k < 5 ? ['grille', 'ventF'] : null);
   const BR = strip(seamR, 'bumperR', [405, 255, 216], 3600, [onArch(A.r, 13, 908), onArch(A.r, -10, 900), onArch(A.r, -17, 862)], 'bumperR',
-    (m, k) => m === 1 && k >= 2 && k < 6 ? ['grille', 'ventR'] : m === 1 && k >= 9 ? ['dark', 'exhaustSlot'] : null);
+    (m, k) => m === 1 && k >= 3 && k < 8 ? ['grille', 'ventR'] : m === 1 && k >= 9 ? ['dark', 'exhaustSlot'] : null);
 
   const colPath = (j: number, i0: number, i1: number) => Array.from({ length: i1 - i0 + 1 }, (_, k) => M[i0 + k]![j]!), rowPath = (i: number, j0: number, j1: number) => Array.from({ length: j1 - j0 + 1 }, (_, k) => M[i]![j0 + k]!);
   // ---- sharp edges: the module seams (hard for the positions; the shading runs over them), and the creases (split)
   path(seamF); path(seamR);
-  path([27, 28, 29, 30].map(i => M[i]![8]!).concat(W[1]!));                                  // the tail lamp's top
+  path([28, 29, 30].map(i => M[i]![8]!).concat(W[1]!));                                  // the tail lamp's top
   path([0, 1, 2, 3].map(j => M[10]![j]!), 1, true);                                          // the screen's foot (the cowl)
   path([0, 1, 2, 3, 4, 5, 6].map(j => M[30]![j]!), 1, true); path([M[30]![7]!, ...W[0]!], 1, true);   // the blade's trailing edge, above and below
   path([0, 1, 2, 3, 4, 5].map(j => M[26]![j]!).concat([5, 4, 3, 2, 1, 0].map(j => M[27]![j]!)), 1, true);  // the slot's front mouth
@@ -176,18 +176,18 @@ export function buildCage(): Cage959 {
     { kind: 'trim', name: 'dripRail', path: colPath(3, 10, 19) },
     { kind: 'boot', name: 'engineLid', path: [...rowPath(24, 0, 2), M[25]![2]!, ...rowPath(26, 0, 2).reverse()] },
     { kind: 'panel', name: 'wingSeam', path: [...rowPath(26, 0, 6), M[26]![7]!] },
-    { kind: 'lamp', name: 'headLampRim', path: lampRing, closed: true }, { kind: 'lamp', name: 'tailLampTop', path: [27, 28, 29, 30].map(i => M[i]![8]!).concat(W[1]!) }, { kind: 'lamp', name: 'tailLampEnd', path: [M[27]![8]!, M[27]![9]!] },
+    { kind: 'lamp', name: 'headLampRim', path: lampRing, closed: true }, { kind: 'lamp', name: 'tailLampTop', path: [28, 29, 30].map(i => M[i]![8]!).concat(W[1]!) }, { kind: 'lamp', name: 'tailLampEnd', path: [M[28]![8]!, M[28]![9]!] },
     { kind: 'vent', name: 'sideIntake', path: intake, closed: true },
     ...[0.5].map(t => ({ kind: 'vent' as const, name: 'intakeFBar', path: [], between: { a: BF[1]!.slice(9), b: BF[2]!.slice(9), t } })), { kind: 'vent', name: 'intakeFTop', path: [BF[2]![9]!, ...BF[1]!.slice(9)] }, { kind: 'vent', name: 'intakeFFoot', path: BF[2]!.slice(9) },
     ...[0.25, 0.5, 0.75].map((t, q) => ({ kind: 'vent' as const, name: `ventFSlat${q}`, path: [], between: { a: BF[1]!.slice(1, 6), b: BF[2]!.slice(1, 6), t } })), { kind: 'vent', name: 'ventFRim', path: [...BF[1]!.slice(1, 6), ...BF[2]!.slice(1, 6).reverse()], closed: true },
-    ...[0.25, 0.5, 0.75].map((t, q) => ({ kind: 'vent' as const, name: `ventRSlat${q}`, path: [], between: { a: BR[1]!.slice(2, 7), b: BR[2]!.slice(2, 7), t } })), { kind: 'vent', name: 'ventRRim', path: [...BR[1]!.slice(2, 7), ...BR[2]!.slice(2, 7).reverse()], closed: true },
+    ...[0.25, 0.5, 0.75].map((t, q) => ({ kind: 'vent' as const, name: `ventRSlat${q}`, path: [], between: { a: BR[1]!.slice(3, 9), b: BR[2]!.slice(3, 9), t } })), { kind: 'vent', name: 'ventRRim', path: [...BR[1]!.slice(3, 9), ...BR[2]!.slice(3, 9).reverse()], closed: true },
     { kind: 'vent', name: 'exhaustSlotTop', path: [BR[2]![9]!, ...BR[1]!.slice(9)] }, { kind: 'vent', name: 'exhaustSlotFoot', path: BR[2]!.slice(9) }, { kind: 'lamp', name: 'indicatorF', path: [BF[0]![6]!, ...BF[1]!.slice(6, 12), BF[0]![11]!] },
     ...[[24, 25, 0.5], [24, 25, 1], [25, 26, 0.5]].map(([i0, i1, t], q) => ({ kind: 'vent' as const, name: `engineLouvre${q}`, path: [], between: { a: rowPath(i0!, 0, 2), b: rowPath(i1!, 0, 2), t: t! } })),
     { kind: 'trim', name: 'doorHandle', path: [], w: 2, between: { a: colPath(7, 16, 17), b: colPath(8, 16, 17), t: 0.14, span: [0.2, 0.75] } },
     { kind: 'crease', name: 'wingTrailingEdge', path: rowPath(30, 0, 6) }, { kind: 'crease', name: 'wingLowerEdge', path: [M[30]![7]!, ...W[0]!] }, { kind: 'vent', name: 'wingSlot', path: [...rowPath(26, 0, 5), ...rowPath(27, 0, 5).reverse()] },
   ];
   const loops: Record<string, number[]> = { frontBumper: seamF, rearBumper: seamR, headLamp: lampRing, sideIntake: intake,
-    tailLamp: [M[27]![9]!, M[27]![8]!, M[28]![8]!, M[29]![8]!, M[30]![8]!, ...W[1]!, ...W[2]!.slice().reverse(), M[30]![9]!, M[29]![9]!, M[28]![9]!],
+    tailLamp: [M[28]![9]!, M[28]![8]!, M[29]![8]!, M[30]![8]!, ...W[1]!, ...W[2]!.slice().reverse(), M[30]![9]!, M[29]![9]!, M[28]![9]!],
     wing: [...rowPath(26, 0, 6)], frontBumperFoot: BF[3]!, rearBumperFoot: BR[3]!, sillFoot: colPath(12, 9, 19) };
 
   // ---- the other half

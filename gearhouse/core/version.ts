@@ -1,10 +1,15 @@
 // The game's version, in one place (docs/systems/101 section 7: alpha 0.10 was the builder and the drive page as they
 // stood; 0.11 to 0.19 the stages S1 to S5 and the polish; 0.20 the company). Shown on the title and the about screen.
-export const ALPHA = '0.11';
+export const ALPHA = '0.12';
 /** the version as the screens write it */
 export const VERSION_NAME = `알파 ${ALPHA}`;
 /** what changed in this version, for the about screen (newest first) */
 export const CHANGES: readonly string[] = [
+  '0.12 · 엔진 공방: 받침대 위 3D 엔진, 계열과 변형(직렬·수평대향·V6~V12), 부품별 품질, 다이노 그래프, 엔진 소리와 회전 올리기, 분해도, 엔진 보관함',
+  '0.12 · 빌더 ② 단계에서 보관함의 엔진 고르기, 엔진 공방에서 편집하고 돌아오기',
+  '0.12 · 앞모습 교체: 코 모양, 범퍼, 그릴, 헤드라이트, 보조등을 따로 고르기 (맞지 않는 조합은 이유와 함께 흐리게)',
+  '0.12 · 서스펜션: 위시본, 스프링·댐퍼, 스태빌라이저, 브레이크가 바퀴를 따라 움직임, 빌더의 서스펜션 보기',
+  '0.11 · 아래는 0.11에서 바뀐 점',
   '한 페이지 게임: 타이틀, 차고, 차 빌더, 시험장, 레이스, 설정, 정보가 한 화면에서 이어집니다 (새 창과 새로 불러오기 없음)',
   '불러오기 화면 (진행 막대와 자동차 공학 팁)',
   '타이틀 화면: 턴테이블 위에서 최근 설계가 돕니다',

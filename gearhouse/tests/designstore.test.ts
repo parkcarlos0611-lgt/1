@@ -1,10 +1,10 @@
 // The builder's designs kept and carried (core/designstore.ts, docs/systems/98 B3-B4): a design through a link and
-// back, anything else turned away or mended, the saved list and the measurements in a fake storage, and the tyres'
-// warning against the arches.
+// back, anything else turned away or mended, the saved list and the measurements in a fake storage; format 1's designs
+// (before review 177) brought to format 2 (core/design.ts), and the engine's grade keeping its details in bounds.
 import { describe, it, expect } from 'vitest';
-import { DESIGN_NSX, DESIGN_F355, LIMITS, type Design } from '../core/design';
+import { DESIGN_NSX, DESIGN_F355, LIMITS, normalise, migrate, gradeFor, gradeLock, GRADE_RULES, type Design, type DesignV1 } from '../core/design';
 import { encodeDesign, decodeDesign, parseDesign, designJson, asDesign, savedDesigns, saveDesign, deleteDesign, currentDesign, keepCurrent,
-  measured, recordRun, tyreWarning, fromPreset, designSig, KEYS, type KeyStore } from '../core/designstore';
+  measured, recordRun, fromPreset, designSig, KEYS, type KeyStore } from '../core/designstore';
 
 /** a storage in a map; `broken` throws on every call (a private window) */
 const fake = (broken = false): KeyStore & { m: Map<string, string> } => { const m = new Map<string, string>(), no = () => { throw new Error('refused'); };
@@ -49,13 +49,40 @@ describe('the measurements', () => {
     const e = tweak(d, x => { x.engine.turbo = 1; }); recordRun(s, e, { topKmh: 270 }); const n = measured(s, d.id)!; expect(n.topKmh).toBe(270); expect(n.laps).toEqual({}); expect(n.sig).toBe(designSig(e)); });
 });
 
-describe('the tyres against the arches', () => {
-  it('fits the base cars and anything up to 40 mm wider; warns past it, the body widened making room', () => {
-    expect(tyreWarning(DESIGN_NSX)).toBeNull(); expect(tyreWarning(DESIGN_F355)).toBeNull();
-    expect(tyreWarning(tweak(DESIGN_NSX, d => { d.kit.tyres = [245, 265]; }))).toBeNull();
-    const w = tyreWarning(tweak(DESIGN_NSX, d => { d.kit.tyres = [205, 295]; }))!; expect(w).toContain('뒤 295'); expect(w).not.toContain('앞');
-    expect(tyreWarning(tweak(DESIGN_NSX, d => { d.kit.tyres = [205, 295]; d.body.width = 40; }))).toBeNull();
-    expect(tyreWarning(tweak(DESIGN_F355, d => { d.body.width = -40; }))).toBeNull(); expect(tyreWarning(tweak(DESIGN_F355, d => { d.body.width = -40; d.kit.tyres = [230, 265]; }))).toContain('앞 230'); });
+/** the two cars as format 1 wrote them (saved designs and links from before review 177) */
+const V1_NSX: DesignV1 = { v: 1, id: 'nsx', name: 'NSX', body: { base: 'nsx', nose: 'round', front: 'plain', tail: 'frame', wheel: 'fiveSpoke', wheelbase: 0, width: 0, paint: '#b0121b', gloss: 0.6, material: 'aluminium' },
+  engine: { layout: 'V6', cc: 2977, valves: 4, redline: 8000, turbo: 0, vtec: true }, drive: { gears: 5, gearbox: 'manual', final: 4.062, lsd: true, awd: false },
+  kit: { abs: true, tcs: true, steering: 'manual', dampers: 'fixed', wing: false, diffuser: false, tyres: [205, 225], rim: 16 } };
+const V1_F355: DesignV1 = { v: 1, id: 'f355', name: 'F355', body: { base: 'f355', nose: 'pointed', front: 'sunk', tail: 'ducktail', wheel: 'star', wheelbase: 0, width: 0, paint: '#f5c300', gloss: 0.6, material: 'steel' },
+  engine: { layout: 'V8', cc: 3496, valves: 5, redline: 8500, turbo: 0, vtec: false }, drive: { gears: 6, gearbox: 'manual', final: 4.1, lsd: true, awd: false },
+  kit: { abs: true, tcs: false, steering: 'hydraulic', dampers: 'adaptive', wing: false, diffuser: true, tyres: [225, 265], rim: 18 } };
+const v1Link = (d: unknown) => { const bytes = new TextEncoder().encode(JSON.stringify(d)); let bin = ''; for (const b of bytes) bin += String.fromCharCode(b); return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); };
+
+describe('format 1 brought to format 2', () => {
+  it('the two cars as format 1 wrote them come back as format 2\'s own, through normalise, a file, a link and the saved list', () => {
+    expect(normalise(V1_NSX)).toEqual(DESIGN_NSX); expect(normalise(V1_F355)).toEqual(DESIGN_F355); expect(migrate(V1_F355)).toEqual(DESIGN_F355);
+    expect(parseDesign(JSON.stringify(V1_NSX))).toEqual(DESIGN_NSX); expect(decodeDesign(v1Link(V1_F355))).toEqual(DESIGN_F355);
+    const s = fake(); s.m.set(KEYS.designs, JSON.stringify([{ ...V1_NSX, id: 'old', name: '예전 설계' }, DESIGN_F355])); s.m.set(KEYS.current, JSON.stringify(V1_F355));
+    expect(savedDesigns(s)).toEqual([{ ...DESIGN_NSX, id: 'old', name: '예전 설계' }, DESIGN_F355]); expect(currentDesign(s)).toEqual(DESIGN_F355); });
+  it('a format-1 turbo engine: its boost as format 1 fixed it, a middle compression; a design without a version but a material is format 1', () => {
+    const one = normalise({ ...V1_NSX, engine: { ...V1_NSX.engine, turbo: 1 } }), two = normalise({ ...V1_F355, engine: { ...V1_F355.engine, turbo: 2 } });
+    expect(one.engine.boost).toBe(0.8); expect(two.engine.boost).toBe(1.0); expect(two.engine.turbo).toBe(2); expect(two.engine.compression).toBe('mid'); expect(one.engine.grade).toBe(2);
+    const { v: _, ...bare } = V1_NSX; expect(asDesign({ ...bare, body: { ...bare.body, material: 'steel' } })!.body).toMatchObject({ structure: 'steel', panels: 'steel' }); });
+});
+
+describe('the engine\'s grade', () => {
+  it('keeps the details it does not allow out: each falls back to the best one allowed', () => {
+    const g = (grade: 1 | 2 | 3 | 4 | 5, e: Partial<Design['engine']>) => normalise(tweak(DESIGN_NSX, d => { Object.assign(d.engine, { grade }, e); })).engine;
+    expect(g(2, { intake: 'itb' }).intake).toBe('variable'); expect(g(3, { intake: 'itb' }).intake).toBe('itb'); expect(g(3, { block: 'magnesium' }).block).toBe('aluminium'); expect(g(4, { block: 'magnesium' }).block).toBe('magnesium');
+    expect(g(2, { turbo: 4 }).turbo).toBe(2); expect(g(3, { turbo: 4 }).turbo).toBe(4); expect(g(1, { turbo: 2 }).turbo).toBe(1); expect(g(2, { turbo: 2, boost: 1.4 }).boost).toBe(1.0); expect(g(4, { turbo: 2, boost: 1.4 }).boost).toBe(1.4);
+    expect(g(2, { redline: 9800 }).redline).toBe(9000); expect(g(1, { valves: 5 }).valves).toBe(4); expect(g(1, { vtec: true }).vtec).toBe(false); expect(g(1, { sump: 'dry' }).sump).toBe('wet'); expect(g(1, { compression: 'high' }).compression).toBe('mid');
+    expect(g(2, { boost: 0.1 }).boost).toBe(LIMITS.boost[0]); });
+  it('says from which grade a detail can be chosen', () => {
+    expect(gradeFor('intake', 'itb')).toBe(3); expect(gradeFor('block', 'magnesium')).toBe(4); expect(gradeFor('turbo', 4)).toBe(3); expect(gradeFor('valves', 5)).toBe(2); expect(gradeFor('intake', 'single')).toBe(1);
+    expect(gradeLock(2, 'intake', 'itb')).toBe('3등급(스포츠)부터 고를 수 있습니다'); expect(gradeLock(3, 'intake', 'itb')).toBeNull(); expect(gradeLock(3, 'block', 'magnesium')).toContain('4등급(경주 파생)');
+    for (const g of [1, 2, 3, 4] as const) { const a = GRADE_RULES[g], b = GRADE_RULES[(g + 1) as 2 | 3 | 4 | 5];   // a grade allows all a lower one does
+      for (const k of ['intake', 'compression', 'sump', 'block', 'valves'] as const) for (const v of a[k]) expect((b[k] as unknown[]).includes(v)).toBe(true);
+      expect(b.turbo).toBeGreaterThanOrEqual(a.turbo); expect(b.boost).toBeGreaterThanOrEqual(a.boost); expect(b.redline).toBeGreaterThanOrEqual(a.redline); } });
 });
 
 describe('the engine view', () => {

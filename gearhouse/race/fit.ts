@@ -147,10 +147,12 @@ function fixesFor(d: Design, c: Omit<FitResult, 'fixes'>): Fix[] {
       if (p) add({ label: `차체 폭 한쪽 +${p.body!.width! - B.width} mm (아치가 함께 넓어짐)${tag}`, patch: p, cost: 0.03 * (p.body!.width! - B.width) });
       const r = search(d, c.part, want, ([16, 17, 18] as const).filter(x => x !== d.kit.rim).map(x => ({ kit: { rim: x } })));
       if (r) add({ label: `${r.kit!.rim}″ 림${tag}`, patch: r, cost: 0 }); }
-    // another base whose bay takes the engine as it is
+    // another base whose bay takes the engine: as it is, or stretched
     if (c.part === 'bayLength' || c.part === 'bayWidth' || c.part === 'gearboxPlace') {
-      const other: BaseId = B.base === 'nsx' ? 'f355' : 'nsx', p = { body: { base: other } }, o = checks(applyPatch(d, p)).filter(x => x.part.startsWith('bay') || x.part === 'gearboxPlace');
-      if (o.every(x => rank[x.verdict] <= rank[want])) add({ label: `${other === 'nsx' ? 'NSX' : 'F355'} 바탕 (${BAYS[other].orient === 'mid-transverse' ? '가로' : '세로'} 엔진룸)${tag}`, patch: p, cost: 0 }); }
+      const other: BaseId = B.base === 'nsx' ? 'f355' : 'nsx', bays = (x: Design) => checks(x).filter(y => y.part.startsWith('bay') || y.part === 'gearboxPlace');
+      for (const wb of range(B.wheelbase, LIMITS.wheelbase[1], 10)) { const p: DesignPatch = wb === B.wheelbase ? { body: { base: other } } : { body: { base: other, wheelbase: wb } };
+        if (bays(applyPatch(d, p)).every(x => rank[x.verdict] <= rank[want])) {
+          add({ label: `${other === 'nsx' ? 'NSX' : 'F355'} 바탕 (${BAYS[other].orient === 'mid-transverse' ? '가로' : '세로'} 엔진룸)${wb !== B.wheelbase ? `, 휠베이스 ${wb > 0 ? '+' : ''}${wb} mm` : ''}${tag}`, patch: p, cost: 0.012 * Math.max(0, wb - B.wheelbase) }); break; } } }
   }
   return out.slice(0, 4); }
 

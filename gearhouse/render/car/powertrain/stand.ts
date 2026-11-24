@@ -26,13 +26,16 @@ export function standModel(d: Design, detail: 0 | 1 | 2 = 2): StandModel {
   const len = eb.max[0] - eb.min[0], x0 = STAND_LEN / 2 - len / 2 - eb.min[0], y0 = -(eb.min[1] + eb.max[1]) / 2, z0 = CRANK_Z;
   const pos = E.pos.slice(); for (let i = 0; i < pos.length; i += 3) { pos[i] = pos[i]! + x0; pos[i + 1] = pos[i + 1]! + y0; pos[i + 2] = pos[i + 2]! + z0; }
   const min: [number, number, number] = [eb.min[0] + x0, eb.min[1] + y0, eb.min[2] + z0], max: [number, number, number] = [eb.max[0] + x0, eb.max[1] + y0, eb.max[2] + z0];
-  // the stand: a post at the flange with its plate and arms, an H-shaped foot on four castors
-  const b = new Build(), fx = min[0] - 30, w = 0.5 * Math.max(260, max[1] - min[1]);
-  b.name('stand').mat('#2c5d8f', 0.45, 'paint').box(fx - 70, fx - 10, -60, 60, 60, CRANK_Z + 40)              // the post
-    .mat('#2c5d8f', 0.45, 'paint').box(fx - 10, fx + 10, -150, 150, CRANK_Z - 150, CRANK_Z + 150)             // the plate on the flange
-    .mat('#1f4670', 0.4, 'paint').box(fx - 420, fx + 300, -45, 45, 40, 90).box(fx - 420, fx - 360, -w, w, 40, 90).box(fx + 240, fx + 300, -w, w, 40, 90)   // the foot
-    .mat('#c9a227', 0.4, 'paint').box(fx - 60, fx - 20, -16, 16, CRANK_Z + 40, CRANK_Z + 120);               // the turning handle
-  b.name('stand').mat('#1a1a1a', 0.2, 'plain'); for (const x of [fx - 390, fx + 270]) for (const y of [-w + 25, w - 25]) b.box(x - 22, x + 22, y - 22, y + 22, 0, 40);   // the castors
+  // the stand: a workshop engine stand of bare steel, low and open, all of it behind the bellhousing face but its two
+  // feet: a cross-shaped head plate bolted to the face, an arm back to a slim post, a T-foot on castors
+  const b = new Build(), fx = min[0] - 12, w = 0.5 * Math.max(300, max[1] - min[1]) + 60, reach = Math.min(0.55 * (max[0] - min[0]), 420), STEEL = '#8b8f94', DARK = '#3b3d40';
+  b.name('stand').mat(STEEL, 0.5, 'metal').box(fx - 8, fx + 8, -150, 150, CRANK_Z - 18, CRANK_Z + 18).box(fx - 8, fx + 8, -18, 18, CRANK_Z - 150, CRANK_Z + 150)   // the head plate
+    .mat(STEEL, 0.5, 'metal').box(fx - 250, fx - 8, -22, 22, CRANK_Z - 22, CRANK_Z + 22)                                   // the arm
+    .mat(STEEL, 0.5, 'metal').box(fx - 290, fx - 240, -25, 25, 60, CRANK_Z + 30)                                           // the post
+    .mat(DARK, 0.35, 'metal').box(fx - 300, fx - 230, -w, w, 30, 60)                                                          // the foot across
+    .box(fx - 300, fx + reach, w - 70, w - 30, 30, 60).box(fx - 300, fx + reach, -w + 30, -w + 70, 30, 60)                    // the feet under the engine
+    .mat(DARK, 0.3, 'plain').box(fx - 275, fx - 255, -12, 12, CRANK_Z + 30, CRANK_Z + 90);                                   // the turning handle
+  b.name('stand').mat('#1a1a1a', 0.2, 'plain'); for (const [x, y] of [[fx - 265, w - 25], [fx - 265, -w + 25], [fx + reach - 25, w - 50], [fx + reach - 25, -w + 50]] as const) b.box(x - 18, x + 18, y - 18, y + 18, 0, 30);   // the castors
   return { mesh: merge(E, b.mesh(STAND_LEN), pos), built, min, max }; }
 
 /** two meshes as one (the second's parts numbered after the first's) */

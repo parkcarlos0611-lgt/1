@@ -20,10 +20,10 @@ describe('Millbrook site plan (review 181)', () => {
   it('is the same every time (seeded)', () => {
     const S2 = millbrookScenery(millbrook()); expect(JSON.stringify(S2.trees)).toBe(JSON.stringify(S.trees)); expect(JSON.stringify(S2.detail)).toBe(JSON.stringify(S.detail)); expect(S2.props.length).toBe(S.props.length);
   });
-  it('keeps every tree off the concrete (W2 + 10 m from any stretch), off the railway and the river', () => {
+  it("keeps every tree off the concrete and the run-off (W2 + 6 m from any stretch: the belt's edge up a banking's earth bank), off the railway and the river", () => {
     const rail = S.lines.find(l => l.kind === 'rail')!, river = S.lines.find(l => l.kind === 'river')!;
     let worst = Infinity; for (const t of S.trees!) { worst = Math.min(worst, gap(t.x, t.y)); expect(segGap(rail.pts, t.x, t.y)).toBeGreaterThan(8); expect(segGap(river.pts, t.x, t.y)).toBeGreaterThan(river.width / 2 + 5); }
-    expect(worst).toBeGreaterThan(W2 + 10);
+    expect(worst).toBeGreaterThan(W2 + 6);
   });
   it('keeps every small thing off the concrete and the run-off by the fence (W2 + 2.5 m), and off the railway and the river', () => {
     const rail = S.lines.find(l => l.kind === 'rail')!, river = S.lines.find(l => l.kind === 'river')!;
@@ -34,17 +34,23 @@ describe('Millbrook site plan (review 181)', () => {
     const encl = enclosures(T); let miss = 0;
     for (const t of S.trees!) { const { s, off } = T.locate(t.x, t.y), u = T.gap(start, s);
       // (the belt runs to the end of the lap; past the Fork's bend its last trees fall a few metres past the line when measured square to the track, and inside that right-hand bend nearer it)
-      const belt = off <= -(W2 + 11) && off >= -(W2 + 150 + 4) && !within(s, start - 80, start + 410) && !within(s, ME - 45, RA + 45);
+      const belt = off <= -(W2 + 6) && off >= -(W2 + 150 + 4) && !within(s, start - 80, start + 410) && !within(s, ME - 45, RA + 45);
       const railBelt = off <= -(W2 + 40 - 4) && off >= -(W2 + 130 + 4) && within(s, ME - 60, RA + 60);
       const grove = groves.some(g => Math.hypot(g.p.x - t.x, g.p.y - t.y) <= g.r + 1);
-      const line = (off >= W2 + 11 && off <= W2 + 27) || encl.some(e => within(s, e.s0 - 6, e.s1 + 6) && off >= e.o1 + 5 && off <= e.o1 + 16);
+      const line = (off >= W2 + 9 && off <= W2 + 25) || encl.some(e => within(s, e.s0 - 6, e.s1 + 6) && off >= e.o1 + 5 && off <= e.o1 + 16);
       const paddock = u >= -64 && u <= 275 && off >= W2 + 56 && off <= W2 + 92, park = u >= -70 && u <= 275 && off <= -(W2 + 111) && off >= -(W2 + 122);
       if (!(belt || railBelt || grove || line || paddock || park)) miss++; }
     expect(miss).toBe(0);
   });
+  it('closes the belt along the fence (review 184): every 20 m of the outside, where the belt runs, has trees within 25 m of the fence at the middle density', () => {
+    const mid = treesAt(S, 'mid'), hits = new Set<number>();
+    for (const t of mid) { const { s, off } = T.locate(t.x, t.y); if (off <= -(W2 + 5) && off >= -(W2 + 9 + 25)) hits.add(Math.floor(s / 20)); }
+    let gaps = 0, n = 0; for (let s = 0; s + 20 < L; s += 20) { if (within(s, start - 160, start + 430) || within(s, ME - 60, RA + 60)) continue; n++; if (!hits.has(Math.floor(s / 20))) gaps++; }
+    expect(n).toBeGreaterThan(100); expect(gaps).toBe(0);
+  });
   it('has the plan\'s woods at the middle density, fewer at low, more at high; the setting held', () => {
     const n = (d: 'low' | 'mid' | 'high') => treesAt(S, d).length, lo = n('low'), mid = n('mid'), hi = n('high');
-    expect(mid).toBeGreaterThan(8000); expect(mid).toBeLessThan(13000);   // the plan's script drew about 5 700 (9 m grid, 85 %); tightened on review to about 1.6 times
+    expect(mid).toBeGreaterThan(10000); expect(mid).toBeLessThan(15000);   // the plan's script drew about 5 700 (9 m grid, 85 %); tightened on review to about twice
     expect(hi).toBe(S.trees!.length); expect(lo / mid).toBeGreaterThan(0.4); expect(lo / mid).toBeLessThan(0.65); expect(hi / mid).toBeGreaterThan(1.5);
     for (const t of S.trees!) expect(t.rank).toBeLessThan(1);
     expect(DEFAULTS.graphics.scenery).toBe('mid'); expect(asSettings({ graphics: { scenery: 'high' } }).graphics.scenery).toBe('high'); expect(asSettings({ graphics: { scenery: 'dense!' } }).graphics.scenery).toBe('mid');

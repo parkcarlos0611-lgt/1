@@ -109,13 +109,14 @@ function millbrookPlan(T: Track, c: { props: Placed[]; lines: GroundLine[]; area
   const inPoly = (pts: [number, number][], x: number, y: number) => { let ins = false; for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) { const [xi, yi] = pts[i]!, [xj, yj] = pts[j]!; if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) ins = !ins; } return ins; };
   const BIG: Record<string, number> = { grandstandBay: 13, clubhouseWing: 10, clubhouseCentre: 10, garageBay: 11, hangarBay: 19, factoryBay: 14, stationBuilding: 11, platform: 10, signalBox: 6, biplane: 9, windsock: 5, bridgeAbutment: 7, riverBridge: 10, clockTower: 5, timingBox: 5, scoreboard: 9, hoarding: 6, teaHut: 5, fuelPumps: 5, telegraphPole: 2.5 };
   const big = c.props.filter(p => BIG[p.kind]), keepOut: [number, number][][] = [];
-  const clear = (x: number, y: number) => { if (trackGap(x, y) < W2 + 12 || inPoly(c.mown, x, y)) return false;
+  const clear = (x: number, y: number, near = W2 + 12) => { if (trackGap(x, y) < near || inPoly(c.mown, x, y)) return false;
     for (const l of c.lines) if (segGap(l.pts, x, y) < (l.kind === 'rail' ? 9 : l.kind === 'river' ? l.width / 2 + 6 : l.width / 2 + 4)) return false;
     for (const p of big) if (Math.hypot(p.x - x, p.y - y) < BIG[p.kind]! + 3) return false; for (const k of keepOut) if (inPoly(k, x, y)) return false; return true; };
-  const tree = (x: number, y: number, z: number, mix: number[], rank = rnd()) => { const k = rnd(); let kind = 0; for (let i = 0, acc = 0; i < mix.length; i++) { acc += mix[i]!; if (k < acc) { kind = i; break; } kind = i; }
-    const size = 0.82 + rnd() * 0.45, heading = rnd() * 6.283; if (clear(x, y)) trees.push({ x, y, z, kind, size: kind === 3 ? size * 1.1 : size, heading, rank }); };
-  const treeAt = (s: number, o: number, mix: number[], rank?: number) => { const p = T.point(s, o); tree(p.x, p.y, zAt(s, o), mix, rank); };
-  const BELT = [0.42, 0.3, 0.1, 0.18], LINE = [0.55, 0.05, 0.3, 0.1], GROVE = [0.62, 0.28, 0.04, 0.06];
+  const tree = (x: number, y: number, z: number, mix: number[], rank = rnd(), near?: number, grow = 1) => { const k = rnd(); let kind = 0; for (let i = 0, acc = 0; i < mix.length; i++) { acc += mix[i]!; if (k < acc) { kind = i; break; } kind = i; }
+    const size = (0.82 + rnd() * 0.45) * grow, heading = rnd() * 6.283; if (clear(x, y, near)) trees.push({ x, y, z, kind, size: kind === 3 ? size * 1.1 : size, heading, rank }); };
+  const treeAt = (s: number, o: number, mix: number[], rank?: number, near?: number, grow?: number) => { const p = T.point(s, o); tree(p.x, p.y, zAt(s, o), mix, rank, near, grow); };
+  // the belt's edge is mostly round-headed trees and poplars (a closed wall of crowns), few pines (their bare trunks read as gaps)
+  const BELT = [0.42, 0.3, 0.1, 0.18], EDGE = [0.6, 0.1, 0.2, 0.1], LINE = [0.55, 0.05, 0.3, 0.1], GROVE = [0.62, 0.28, 0.04, 0.06];
   // ---- the start (the plan's detail, review 165): along the track from the line (u) and to its left (v) ----
   const S = (u: number) => start + u, cu = 22, V = W2;
   // the clock tower's square: paving, a low brick wall round three sides (a gate in the back, the paths through the
@@ -158,16 +159,22 @@ function millbrookPlan(T: Track, c: { props: Placed[]; lines: GroundLine[]; area
   { let k = 0; for (let s = start + 220; s < HOME - 40; s += 30) put('adBoard', s, -(W2 + 5), k++); for (let s = ME + 120; s < RA - 120; s += 45) put('adBoard', s, -(W2 + 5), k++); }
   // ---- the woods: the belt outside (but along the stands and the car park, and thinner beyond the railway), the
   //      groves inside, the line along the inside (two rows). Tightened on review (the plan's belt read thin and far
-  //      from the driver's seat): the belt from W2+15 m (the plan's drawing from W2+30), on a 6 m grid jittered 3 m,
-  //      the inner line from W2+14 m; the middle density (보통) about 1.6 times the plan's own count ----
+  //      from the driver's seat, review 184): the belt's edge hugs the fence (W2+9 m on the level, on a banking from
+  //      W2+6.5 m up its earth bank, where the driver high on the concrete sees it), its first 40 m on a 4.5 m grid of
+  //      larger trees, ranked low so the middle density (보통) keeps three in four of them and the wall stays closed,
+  //      a row of bushes along its foot; behind, the plan's 6 m grid out to W2+150 m. The inner line from W2+11 m ----
   const segs: [number, number][] = []; { let cur: number | null = null; for (let s = 0; s < L; s += 10) { const ok = !(s >= start - 160 && s <= start + 420) && !(s >= ME - 60 && s <= RA + 60); if (ok && cur === null) cur = s; if (!ok && cur !== null) { segs.push([cur, s]); cur = null; } } if (cur !== null) segs.push([cur, L]); }
   const belt = (s0: number, s1: number, o0: number, o1: number, step: number) => { for (let s = s0; s < s1; s += step) for (let o = o0; o < o1; o += step) { const ss = s + (rnd() - 0.5) * 6, oo = o + (rnd() - 0.5) * 6; treeAt(ss, -oo, BELT); } };
-  for (const [a, b] of segs) belt(a, b, W2 + 15, W2 + 150, 6);
+  const EDGE_W = 40, onBank = (s: number) => T.ground(s, -(W2 + 1)) - T.bump(s) > 0.3;
+  const edge = (s0: number, s1: number) => { for (let s = s0; s < s1; s += 4.5) { const e = onBank(s) ? W2 + 6.5 : W2 + 9;
+      for (let o = e; o < W2 + 9 + EDGE_W; o += 4.5) treeAt(s + (rnd() - 0.5) * 4, -(o + rnd() * 3), EDGE, rnd() * 0.8, W2 + 6, 1.12);
+      if (!onBank(s)) treeAt(s + (rnd() - 0.5) * 2, -(W2 + 7 + rnd()), [0, 0, 0, 1], rnd() * 0.9, W2 + 6); } };
+  for (const [a, b] of segs) { edge(a, b); belt(a, b, W2 + 9 + EDGE_W, W2 + 150, 6); }
   belt(ME - 60, RA + 60, W2 + 40, W2 + 130, 6.5);
   for (const [s, off, R] of [[RA + 500, W2 + 110, 70], [RA + 1100, W2 + 140, 85], [BY - 300, W2 + 95, 60], [ME - 300, W2 + 150, 65], [HOME + 300, W2 + 190, 55], [RA + 1500, W2 + 80, 50], [ME + 300, W2 + 120, 60], [ME + 700, W2 + 110, 55]] as const) {
     const m = T.point(s, off), n = Math.round(R * R / 40 / 0.6); for (let k = 0; k < n; k++) { const a = rnd() * 6.283, d = R * Math.sqrt(rnd()); tree(m.x + d * Math.cos(a), m.y + d * Math.sin(a), -0.03, GROVE); } }
   for (let s = 0; s < L; s += 6) { if ((s >= start - 100 && s <= start + 420) || (s >= ME + 200 && s <= RA - 200)) continue;
-    const e = c.encl.find(q => s > q.s0 - 6 && s < q.s1 + 6); for (const row of [0, 1]) { const o = e ? e.o1 + 6 + row * 6 + rnd() * 3 : W2 + 14 + row * 7 + rnd() * 4; treeAt(s + (rnd() - 0.5) * 3 + row * 3, o, LINE); } }
+    const e = c.encl.find(q => s > q.s0 - 6 && s < q.s1 + 6); for (const row of [0, 1]) { const o = e ? e.o1 + 6 + row * 6 + rnd() * 3 : W2 + 11 + row * 7 + rnd() * 4; treeAt(s + (rnd() - 0.5) * 3 + row * 3, o, LINE, rnd(), W2 + 9.5); } }
   return { trees, detail }; }
 
 /** where a named piece of the track runs (the first piece of that name) */

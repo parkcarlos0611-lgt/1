@@ -96,5 +96,5 @@ export class DriveCam {
     [this.z, this.zV] = spring(this.z, this.zV, zWant, R.wZ, dt); const gz = ground(ex, ey) + 0.7; if (this.z < gz) { this.z = gz; this.zV = Math.max(0, this.zV); }
     const tv = fovTan(aspect, this.fov), drop = this.z - (c.z + 0.55);
     const pitch = aimPitch(drop, this.dist, tv, carY ?? R.carY) + this.tilt;
-    return { eye: [ex, ey, this.z], ang: a, pitch, fov: Math.atan(tv) * 360 / Math.PI, near: 0.25, at: [c.x + Math.cos(a) * 30, c.y + Math.sin(a) * 30, c.z] }; }
+    return { eye: [ex, ey, this.z], ang: a, pitch, fov: Math.atan(tv) * 360 / Math.PI, near: 0.6, at: [c.x + Math.cos(a) * 30, c.y + Math.sin(a) * 30, c.z] }; }
 }

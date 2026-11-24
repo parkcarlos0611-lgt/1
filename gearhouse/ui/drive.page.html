@@ -66,8 +66,8 @@
   /* the race on the picture: the standings, my times, a best lap's notice (hidden with the HUD in the cinematic view) */
   .raceovl { display: grid; gap: 4px; color: #f4f1ea; font-variant-numeric: tabular-nums; font-size: 0.74rem; line-height: 1.25; }
   .raceovl[hidden] { display: none; }
-  .stand { border-collapse: collapse; background: rgba(20,18,15,0.62); border-radius: 4px; }
-  .stand td { padding: 1px 6px; white-space: nowrap; } .stand td.n { text-align: right; color: #cfc6b4; } .stand td.g { text-align: right; } .stand td.l { color: #cfc6b4; text-align: right; }
+  .stand { font-size: inherit; border-collapse: collapse; background: rgba(20,18,15,0.62); border-radius: 4px; }
+  .stand td { padding: 1px 6px; white-space: nowrap; color: #f4f1ea; font-size: inherit; } .stand td.n { text-align: right; color: #cfc6b4; } .stand td.g { text-align: right; } .stand td.l { color: #cfc6b4; text-align: right; }
   .stand tr.me td { color: #ffcf8a; font-weight: 600; background: rgba(160,82,45,0.45); }
   .mytime { background: rgba(20,18,15,0.62); border-radius: 4px; padding: 3px 6px; display: grid; grid-template-columns: auto auto; gap: 0 10px; }
   .mytime span { color: #cfc6b4; } .mytime b { font-weight: 600; text-align: right; } .mytime b.pb { color: #b8f08a; }
@@ -79,7 +79,8 @@
   .resbox { background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; max-width: min(760px, 100%); max-height: 100%; overflow: auto; padding: 10px 14px 14px; box-sizing: border-box; }
   .resbox header { display: flex; justify-content: space-between; align-items: center; gap: 10px; } .resbox h2 { font-family: var(--display); font-weight: 500; font-size: 1.2rem; margin: 0; }
   .resbox .close { font: inherit; font-size: 1.1rem; width: 34px; height: 34px; border: 1px solid var(--line); border-radius: 4px; background: var(--bg); color: var(--ink); cursor: pointer; }
-  .restab { border-collapse: collapse; font-size: 0.8rem; font-variant-numeric: tabular-nums; width: 100%; margin-top: 8px; }
+  .restab td, .restab th { font-size: inherit; color: inherit; }
+  .restab { color: var(--ink); border-collapse: collapse; font-size: 0.8rem; font-variant-numeric: tabular-nums; width: 100%; margin-top: 8px; }
   .restab th { text-align: left; font-weight: 600; color: var(--soft); border-bottom: 1px solid var(--line); padding: 3px 6px; white-space: nowrap; }
   .restab td { padding: 3px 6px; border-bottom: 1px solid var(--line); vertical-align: top; } .restab td.t { white-space: nowrap; text-align: right; } .restab td.laps { color: var(--soft); font-size: 0.72rem; }
   .restab tr.me td { color: var(--accent); font-weight: 600; } .restab .best { color: var(--accent); font-weight: 600; }

@@ -92,7 +92,7 @@ void main() { vec2 fc = gl_FragCoord.xy; ivec2 F = ivec2(fc); float zd = texelFe
   o = vec4(c.rgb, 1. - (1. - c.a) * s); }`;
 
 /** cellular noise (Worley) in a 32³ tile, two octaves (4 and 8 cells across), 1 at a cell's point, 0 far from it */
-function worley(): Uint8Array { const S = 32, out = new Uint8Array(S * S * S * 2);
+export function worley(): Uint8Array { const S = 32, out = new Uint8Array(S * S * S * 2);
   for (const [ch, n] of [[0, 4], [1, 8]] as const) { const c = S / n, pts: number[] = []; let r = 1234 + n; const rnd = () => (r = (r * 16807) % 2147483647) / 2147483647;
     for (let i = 0; i < n * n * n; i++) pts.push(rnd(), rnd(), rnd());
     for (let z = 0; z < S; z++) for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) { const gx = Math.floor(x / c), gy = Math.floor(y / c), gz = Math.floor(z / c); let best = 9;

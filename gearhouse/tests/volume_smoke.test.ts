@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { VolumeSim, type VolParams, type VolEmit } from '../race/volume/sim';
 import { atlasLayout, atlasTexel, atlasCell } from '../render/live/volume/atlas';
 import { smokeTier, type GpuCaps } from '../render/live/volume/caps';
+import { invert, worley } from '../render/live/volume/draw';
+import { carBoxes } from '../render/live/volume/volume';
 
 const still: Partial<VolParams> = { fade: 0, spread: 0, vort: 0, wind: [0, 0], drag: 0, alpha: 0, betaS: 0, betaD: 0, edge: 0, settle: 0 };
 const maxAbs = (a: Float32Array) => a.reduce((m, x) => Math.max(m, Math.abs(x)), 0);
@@ -83,5 +85,23 @@ describe('the volume on the GPU: the atlas and the quality chosen', () => {
     expect(smokeTier('high', full)).toBe('high'); expect(smokeTier('mid', { ...full, coarse: true })).toBe('low');
     expect(smokeTier('high', { ...full, floatRT: false, halfRT: false })).toBe('parcels'); expect(smokeTier('mid', { ...full, webgl2: false })).toBe('parcels');
     expect(smokeTier('off', full)).toBe('off'); expect(smokeTier('parcels', full)).toBe('parcels');
+  });
+});
+describe('the volume drawn: the noise, the ray\'s matrix, the cars as boxes', () => {
+  it('makes cellular noise that tiles: 1 near each cell\'s point, falling off between, the same at the opposite sides', () => {
+    const N = worley(), S = 32, at = (x: number, y: number, z: number, c: number) => N[(((x + S) % S) + S * (((y + S) % S) + S * ((z + S) % S))) * 2 + c]!;
+    for (const c of [0, 1]) { let mx = 0, mn = 255; for (let q = c; q < N.length; q += 2) { mx = Math.max(mx, N[q]!); mn = Math.min(mn, N[q]!); } expect(mx).toBeGreaterThan(230); expect(mn).toBeLessThan(90);
+      let jump = 0; for (let y = 0; y < S; y++) for (let z = 0; z < S; z++) jump = Math.max(jump, Math.abs(at(0, y, z, c) - at(S - 1, y, z, c))); expect(jump).toBeLessThan(80); }
+  });
+  it('inverts the view matrix (the march unprojects each pixel with it)', () => {
+    const m = new Float32Array([1.2, 0.1, 0, 0, -0.2, 0.9, 0.3, 0, 0, -0.4, 1.1, -1, 3, 2, -5, 6]), r = invert(m)!;
+    for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) { let s = 0; for (let k = 0; k < 4; k++) s += m[i + 4 * k]! * r[k + 4 * j]!; expect(s).toBeCloseTo(i === j ? 1 : 0, 4); }
+    expect(invert(new Float32Array(16))).toBeNull();
+  });
+  it('gives each car two boxes, its lower body and its cabin, moving with it; at most four cars', () => {
+    const car = { x: 10, y: 5, z: 0.5, yaw: 0.3, vx: 12, vy: 3, len: 4.4, width: 1.8, height: 1.3 }, B = carBoxes([car]);
+    expect(B).toHaveLength(2); for (const b of B) { expect(b.vx).toBe(12); expect(b.yaw).toBe(0.3); expect(b.z - b.hz).toBeGreaterThanOrEqual(car.z); expect(b.z + b.hz).toBeLessThanOrEqual(car.z + car.height + 1e-9); }
+    expect(B[0]!.hx).toBeLessThan(car.len / 2); expect(B[1]!.hz + B[1]!.z).toBeGreaterThan(B[0]!.z + B[0]!.hz);
+    expect(carBoxes(Array(6).fill(car))).toHaveLength(8);
   });
 });

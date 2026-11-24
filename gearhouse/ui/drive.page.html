@@ -68,6 +68,8 @@
   .screen { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: #111; line-height: 0; overflow: hidden; }
   .setbtn { right: 48px; } .cambtn { right: 90px; font: 600 0.9rem var(--display); }
   .mini { top: 48px; }
+  @media (max-width: 900px) { .hud { padding-right: 176px; } }   /* a phone: the readout kept clear of the pause, camera, settings and full-screen buttons on the right */
+  @media (max-width: 600px) { .hud .bar { display: none; } .lcol { top: 82px; } }   /* held upright: the readout in more lines, the notes under it */
   .lcol { position: absolute; left: 8px; top: 52px; max-width: min(60ch, 62vw); display: grid; gap: 6px; justify-items: start; pointer-events: none; z-index: 2; }
   .notes { line-height: 1.4; display: grid; gap: 4px; }
   /* the race on the picture: the standings, my times, a best lap's notice (hidden with the HUD in the cinematic view) */

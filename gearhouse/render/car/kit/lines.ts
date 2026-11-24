@@ -15,7 +15,7 @@
 import { curve, clamp01, ginv, gp, inv01, type Tab } from './geom';
 
 export interface WheelSpec { /** the axle's station */ x: number; /** the tyre's radius */ r: number; /** half the track */ y: number; /** the tyre's width */ w: number; /** the rim's radius */ rim: number }
-export interface ArchSpec { /** the arch's radius about the hub */ r: number; /** the well's inner wall (half-width) */ yin: number }
+export interface ArchSpec { /** the arch's radius about the hub */ r: number; /** the well's inner wall (half-width) */ yin: number; /** its height over the hub when it is not round (half an ellipse; default r) */ rz?: number }
 /** a station given as a number (mm) or as a landmark's name */
 export type At = number | string;
 export interface StationSpec {
@@ -59,7 +59,7 @@ export interface LineSheet {
 /** a change to the sheet (mm): the proof that a car is a kit, not a carving */
 export interface Tweak { /** added between the arches */ wheelbase?: number; /** added to half the width (all y in proportion) */ halfWidth?: number }
 
-export interface Arch { x: number; r: number; /** the hub's height (the tyre's radius) */ z: number; yin: number }
+export interface Arch { x: number; r: number; /** the hub's height (the tyre's radius) */ z: number; yin: number; /** the arch's height over the hub */ rz: number }
 export interface Wheel { x: number; r: number; y: number; w: number; rim: number }
 export interface Lines {
   sheet: LineSheet; tweak: Tweak; length: number;
@@ -100,8 +100,8 @@ export function makeLines(S: LineSheet, tweak: Tweak = {}): Lines {
   const z = (n: string) => { const f = zC[n]; if (!f) throw new Error(`lines: no height line ${n}`); return f; }, w = (n: string) => { const f = wC[n]; if (!f) throw new Error(`lines: no width line ${n}`); return f; };
   const wheel = (s: WheelSpec): Wheel => ({ x: mx(s.x), r: s.r, y: my(s.y), w: s.w, rim: s.rim });
   const wheels = { f: wheel(S.wheels.f), r: wheel(S.wheels.r) };
-  const arches = { f: { x: wheels.f.x, r: S.arches.f.r, z: wheels.f.r, yin: my(S.arches.f.yin) }, r: { x: wheels.r.x, r: S.arches.r.r, z: wheels.r.r, yin: my(S.arches.r.yin) } };
-  const archZ = (x: number) => { for (const a of [arches.f, arches.r]) if (Math.abs(x - a.x) < a.r - 0.5) return a.z + Math.sqrt(a.r * a.r - (x - a.x) ** 2); return 0; };
+  const arches = { f: { x: wheels.f.x, r: S.arches.f.r, z: wheels.f.r, yin: my(S.arches.f.yin), rz: S.arches.f.rz ?? S.arches.f.r }, r: { x: wheels.r.x, r: S.arches.r.r, z: wheels.r.r, yin: my(S.arches.r.yin), rz: S.arches.r.rz ?? S.arches.r.r } };
+  const archZ = (x: number) => { for (const a of [arches.f, arches.r]) if (Math.abs(x - a.x) < a.r - 0.5) return a.z + a.rz / a.r * Math.sqrt(a.r * a.r - (x - a.x) ** 2); return 0; };
   // the stations: the arches' ends and every arcDeg round them, the car's own between
   const st = S.stations, pins = (st.pins ?? []).map(X), snap = st.snap ?? 20;
   const arc = (a: Arch) => { const n = Math.round(180 / st.arcDeg), out = [Math.round(a.x - a.r)]; for (let k = 1; k < n; k++) { const v = Math.round(a.x - a.r * Math.cos(k * st.arcDeg * Math.PI / 180)), p = pins.find(q => Math.abs(q - v) <= snap); out.push(p ?? v); } out.push(Math.round(a.x + a.r)); return out; };

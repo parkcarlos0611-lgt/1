@@ -31,12 +31,14 @@ export interface SectionSpec {
   shoulder: { reach: number; drop: number; lift: number };
   /** the door's two points, as shares of the way from H down to the sill's crease */
   door: [number, number];
+  /** the door's two points on height lines of the sheet instead (a crisp edge that stays level along the car) */
+  doorZ?: [string, string];
   /** the levels under the sill's crease (lines.sill) and over the foot (lines.foot): the step, the sill's face; the tuck under the foot */
   step: number; face: number; tuck: number;
   /** how far the flank stands in from the widest line by height, [z, inset], z falling from the sill's crease to the tuck */
   inset: Tab;
   /** behind the rear wheel the chain's levels move to the tail's (one per chain point) and its inset deepens toward the foot */
-  tail: { from: At; to: At; levels: number[]; pow: number };
+  tail: { from: At; to: At; levels: number[]; pow: number; /** the levels move in a straight run (default: eased in and out) */ linear?: boolean };
 }
 
 export interface BandSpec { reach: number; drop: number; lift: number }
@@ -60,14 +62,15 @@ export function flank(L: Lines, s: SectionSpec, K: (x: number) => V): Flank {
   if (s.tail.levels.length !== FLANK.N) throw new Error('section: the tail needs a level per chain point');
   const INS = lin(s.inset), sill = L.sill, foot = L.foot, insSill = INS(sill), insFoot = INS(foot), t0 = L.X(s.tail.from), t1 = L.X(s.tail.to);
   const H = (x: number): V => [x, L.half(x), L.z('shoulder')(x)];
-  const tailShare = (x: number) => sm(t0, t1, x);
+  const tailShare = (x: number) => s.tail.linear ? Math.max(0, Math.min(1, (x - t0) / (t1 - t0))) : sm(t0, t1, x);
+  const dz = s.doorZ ? [L.z(s.doorZ[0]), L.z(s.doorZ[1])] : null;
   const band = bandOf(s.shoulder);
   const inset = (x: number, z: number, zH: number) => { const std = z >= sill ? insSill * (zH - z) / (zH - sill) : INS(z), u = tailShare(x); return u > 0 ? lerp(std, insFoot * Math.max(0, (zH - z) / (zH - foot)) ** s.tail.pow, u) : std; };
   const surf = (x: number, z: number): V => { const k = K(x), h = H(x); if (z >= k[2]) return k; if (z < h[2]) return [x, h[1] - inset(x, z, h[2]), z];
     let lo = 0, hi = 1; for (let i = 0; i < 24; i++) { const m = (lo + hi) / 2; if (band(k, h, m)[2] > z) lo = m; else hi = m; } return band(k, h, (lo + hi) / 2); };
   const nS = FLANK.SHOULDER.length;
   const chain = (x: number, raw = false): V[] => { const k = K(x), h = H(x), zH = h[2], u = tailShare(x), az = raw ? 0 : L.archZ(x), out: V[] = [k];
-    const zs = [lerp(zH, sill, s.door[0]), lerp(zH, sill, s.door[1]), sill, s.step, s.face, foot, s.tuck];
+    const zs = [dz ? Math.min(zH, dz[0]!(x)) : lerp(zH, sill, s.door[0]), dz ? Math.min(zH, dz[1]!(x)) : lerp(zH, sill, s.door[1]), sill, s.step, s.face, foot, s.tuck];
     for (let i = 1; i < FLANK.N; i++) { let p: V = i < FLANK.H ? band(k, h, i / (nS + 1)) : i === FLANK.H ? h : [x, h[1] - inset(x, zs[i - FLANK.H - 1]!, zH), zs[i - FLANK.H - 1]!];
       if (u > 0) p = surf(x, lerp(p[2], s.tail.levels[i]!, u)); if (az > 0 && p[2] < az) p = surf(x, az); out.push(p); }
     return out; };

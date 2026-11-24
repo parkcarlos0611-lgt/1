@@ -39,5 +39,12 @@ export function curve(tab: Tab): (x: number) => number { const n = tab.length, h
   for (let i = 0; i < n; i++) { if (i === 0 || i === n - 1) { m[i] = d[i === 0 ? 0 : n - 2]!; continue; } const a = d[i - 1]!, c = d[i]!; if (a * c <= 0) { m[i] = 0; continue; } const w1 = 2 * h[i]! + h[i - 1]!, w2 = h[i]! + 2 * h[i - 1]!; m[i] = (w1 + w2) / (w1 / a + w2 / c); }
   return x => { if (x <= tab[0]![0]) return tab[0]![1]; if (x >= tab[n - 1]![0]) return tab[n - 1]![1]; let i = 0; while (x > tab[i + 1]![0]) i++; const t = (x - tab[i]![0]) / h[i]!, t2 = t * t, t3 = t2 * t;
     return (2 * t3 - 3 * t2 + 1) * tab[i]![1] + (t3 - 2 * t2 + t) * h[i]! * m[i]! + (3 * t2 - 2 * t3) * tab[i + 1]![1] + (t3 - t2) * h[i]! * m[i + 1]!; }; }
+/** where a line along axis `ic` through (a, b) on the axes `ia`, `ib` meets the cells of a grid (as given: the right half):
+ *  the farthest hit (or the nearest); NaN if it meets none. `pick` chooses the cells */
+export function gridProbe(G: Grid, ia: number, ib: number, ic: number, a: number, b: number, far = true, pick: (i: number, j: number) => boolean = () => true): number { let best = NaN;
+  for (let i = 0; i + 1 < G.length; i++) for (let j = 0; j + 1 < Math.min(G[i]!.length, G[i + 1]!.length); j++) { if (!pick(i, j)) continue; const q = [G[i]![j]!, G[i + 1]![j]!, G[i + 1]![j + 1]!, G[i]![j + 1]!];
+    for (const [p, r, t] of [[q[0]!, q[1]!, q[2]!], [q[0]!, q[2]!, q[3]!]] as const) { const den = (r[ib]! - t[ib]!) * (p[ia]! - t[ia]!) + (t[ia]! - r[ia]!) * (p[ib]! - t[ib]!); if (Math.abs(den) < 1e-9) continue;
+      const l0 = ((r[ib]! - t[ib]!) * (a - t[ia]!) + (t[ia]! - r[ia]!) * (b - t[ib]!)) / den, l1 = ((t[ib]! - p[ib]!) * (a - t[ia]!) + (p[ia]! - t[ia]!) * (b - t[ib]!)) / den, l2 = 1 - l0 - l1; if (l0 < -1e-6 || l1 < -1e-6 || l2 < -1e-6) continue;
+      const v = l0 * p[ic]! + l1 * r[ic]! + l2 * t[ic]!; if (!(far ? v <= best : v >= best)) best = v; } } return best; }
 /** the shares along a polyline (0 at its start, 1 at its end) */
 export function shares(P: V[]): number[] { const s = [0]; for (let i = 1; i < P.length; i++) s.push(s[i - 1]! + len(sub(P[i]!, P[i - 1]!))); const T = s[s.length - 1]! || 1; return s.map(v => v / T); }

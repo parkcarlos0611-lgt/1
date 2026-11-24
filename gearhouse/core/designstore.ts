@@ -4,8 +4,8 @@
 // the designs saved in this browser; and what the drive page measured of a design (its best laps, the top speed it
 // reached), kept per design and read by the builder. Pure: the storage is passed in (the browser's localStorage, or a
 // map in the tests), and a storage that throws (a private window, storage refused) keeps nothing and reads empty.
-import { BASES, NOSES, FRONTS, TAILS, WHEELS, GRADES, INTAKES, COMPRESSIONS, SUMPS, BLOCKS, STRUCTURES, PANELS, INTERIORS, DESIGN_NSX, DESIGN_F355, normalise,
-  type BaseId, type Design, type DesignV1 } from './design';
+import { BASES, NOSES, FRONTS, TAILS, WHEELS, GRADES, INTAKES, COMPRESSIONS, SUMPS, BLOCKS, STRUCTURES, PANELS, INTERIORS, DESIGN_NSX, DESIGN_F355, DESIGN_EB110, DIMS, normalise,
+  type BaseId, type BodyDims, type Design, type DesignV1 } from './design';
 
 /** what the helpers need of a storage (the browser's Storage has these) */
 export interface KeyStore { getItem(k: string): string | null; setItem(k: string, v: string): void; removeItem(k: string): void }
@@ -16,14 +16,14 @@ const read = (s: KeyStore | null, k: string): string | null => { try { return s 
 const write = (s: KeyStore | null, k: string, v: string | null): boolean => { try { if (!s) return false; if (v === null) s.removeItem(k); else s.setItem(k, v); return true; } catch { return false; } };
 
 // ---- a design checked: a loaded file, a pasted text or a link may be anything ----
-const PRESET: Record<BaseId, Design> = { nsx: DESIGN_NSX, f355: DESIGN_F355 };
+const PRESET: Record<BaseId, Design> = { nsx: DESIGN_NSX, f355: DESIGN_F355, eb110: DESIGN_EB110 };
 const num = (v: unknown, d: number) => typeof v === 'number' && Number.isFinite(v) ? v : d;
 const one = <T>(v: unknown, of: readonly T[], d: T): T => of.includes(v as T) ? v as T : d;
 const bool = (v: unknown, d: boolean) => typeof v === 'boolean' ? v : d;
 const obj = (v: unknown): Record<string, unknown> => v && typeof v === 'object' && !Array.isArray(v) ? v as Record<string, unknown> : {};
 /** any value made into a design: the fields it has kept where they are of the format, the rest from its base's own car
  *  (the NSX's or the F355's), then brought inside the limits and its engine's grade; null when it is not a design at
- *  all (no body or base). A format-1 design (one body material, a turbo count without a boost, no grade: saved before
+ *  all (no body or base). A format-2 design (no dimensions past the wheelbase and the width) takes its base's own. A format-1 design (one body material, a turbo count without a boost, no grade: saved before
  *  review 177, or in an old link) is read as format 1 and brought to format 2 (core/design.ts migrate) */
 export function asDesign(v: unknown): Design | null {
   const o = obj(v), b = obj(o.body); if (!o.body || !BASES.includes(b.base as BaseId)) return null;
@@ -31,8 +31,9 @@ export function asDesign(v: unknown): Design | null {
   const paint = typeof b.paint === 'string' && /^#[0-9a-f]{6}$/i.test(b.paint) ? b.paint.toLowerCase() : P.body.paint;
   const old = o.v === 1 || (o.v === undefined && 'material' in b);
   const head = { id: typeof o.id === 'string' && /^[\w-]{1,40}$/.test(o.id) ? o.id : newId(), name: typeof o.name === 'string' && o.name.trim() ? o.name.trim().slice(0, 40) : P.name };
+  const dims = Object.fromEntries(DIMS.map(k => [k, Math.round(num(b[k], 0) * 10) / 10])) as unknown as BodyDims;
   const body = { base: P.body.base, nose: one(b.nose, NOSES, P.body.nose), front: one(b.front, FRONTS, P.body.front), tail: one(b.tail, TAILS, P.body.tail), wheel: one(b.wheel, WHEELS, P.body.wheel),
-    wheelbase: Math.round(num(b.wheelbase, 0)), width: Math.round(num(b.width, 0)), paint, gloss: num(b.gloss, P.body.gloss) };
+    ...dims, paint, gloss: num(b.gloss, P.body.gloss) };
   const machine = { layout: one(e.layout, ['V6', 'V8', 'V12'] as const, P.engine.layout), cc: Math.round(num(e.cc, P.engine.cc)), valves: one(e.valves, [2, 3, 4, 5] as const, P.engine.valves),
     redline: Math.round(num(e.redline, P.engine.redline)), vtec: bool(e.vtec, P.engine.vtec) };
   const rest = { drive: { gears: one(r.gears, [5, 6] as const, P.drive.gears), gearbox: one(r.gearbox, ['manual', 'f1'] as const, P.drive.gearbox), final: num(r.final, P.drive.final), lsd: bool(r.lsd, P.drive.lsd), awd: bool(r.awd, P.drive.awd) },
@@ -41,7 +42,7 @@ export function asDesign(v: unknown): Design | null {
   const interior = one(k.interior, INTERIORS, P.kit.interior);
   if (old) { const mat = one(b.material, ['steel', 'aluminium'] as const, P.body.structure === 'steel' ? 'steel' : 'aluminium');
     return normalise({ v: 1, ...head, body: { ...body, material: mat }, engine: { ...machine, turbo: one(e.turbo, [0, 1, 2] as const, 0) }, ...rest } satisfies DesignV1); }
-  const d: Design = { v: 2, ...head, body: { ...body, structure: one(b.structure, STRUCTURES, P.body.structure), panels: one(b.panels, PANELS, P.body.panels) },
+  const d: Design = { v: 3, ...head, body: { ...body, structure: one(b.structure, STRUCTURES, P.body.structure), panels: one(b.panels, PANELS, P.body.panels) },
     engine: { grade: one(e.grade, GRADES, P.engine.grade), ...machine, intake: one(e.intake, INTAKES, P.engine.intake), compression: one(e.compression, COMPRESSIONS, P.engine.compression),
       sump: one(e.sump, SUMPS, P.engine.sump), block: one(e.block, BLOCKS, P.engine.block), turbo: one(e.turbo, [0, 1, 2, 3, 4] as const, P.engine.turbo),
       boost: num(e.boost, P.engine.boost), intercooler: bool(e.intercooler, P.engine.intercooler) }, drive: rest.drive, kit: { ...rest.kit, interior } };

@@ -169,3 +169,16 @@ export const EB110_FIVE_SPOKE: Pick<CarKit, 'wheel'> = { wheel: { ...NSX_KIT.whe
 export const EB110_STAR_WHEEL: Pick<CarKit, 'wheel'> = { wheel: F355_KIT.wheel };
 /** pop-up head lamps: the same blocks of the bonnet as hinged covers (behind the front edge's first row) */
 export const EB110_POPUP_LAMPS: Pick<CarKit, 'popup'> = { popup: { kind: 'popup', from: 396, to: 600, cols: [3, 6], open: 26, depth: 70, lens: [[0.08, 0.46], [0.54, 0.92]], lensV: [0.15, 0.8, 5] } };
+
+// ---- the builder's other kinds on this car (docs/systems/101, K1): each assembles and closes, as the swaps above ----
+/** a round nose: the bumper's lines on a fuller super-ellipse in plan (the corners rolled off), the bonnet's edge kept */
+export const EB110_ROUND_NOSE: Pick<CarKit, 'nose'> = { nose: { ...EB110_KIT.nose, kind: 'round', pow: 1.8 } };
+/** a pointed prow: the bumper's lines on a thin super-ellipse, each standing further forward on the centre line */
+export const EB110_POINTED_NOSE: Pick<CarKit, 'nose'> = { nose: { ...EB110_KIT.nose, kind: 'round', pow: 1.4, reach: [125, 100, 66, 44, 34, 30, 40, 58] } };
+/** a fog lamp sunk in a round recess at each corner of the bumper, where the brake ducts are */
+export const EB110_SUNK_FRONT: Pick<CarKit, 'intakes'> = { intakes: { ...EB110_KIT.intakes, patches: [], fog: { rows: [6, 8], cols: [6, 8], y: 735, z: 230, r: 36, depth: 26, seg: 10 } } };
+/** the frame tail with the lamp panel in the body's colour, two round lamps a side */
+export const EB110_ROUND_TAIL: Pick<CarKit, 'lines' | 'section' | 'deck' | 'tail' | 'tailLamps' | 'wing'> = { ...EB110_FRAME_TAIL, tail: { ...EB110_FRAME_TAIL.tail, kind: 'roundLamps' },
+  tailLamps: { ...EB110_FRAME_TAIL.tailLamps, patches: undefined, round: { y: [610, 440], z: 668, r: 40, rim: 7, lift: [4, 6], seg: 16, names: ['tailLamp', 'stopLamp'], colours: ['red', 'red'] } } };
+/** the GT's wing standing raised always on the other tails (no bed: they have none for it) */
+export const EB110_FIXED_WING: Pick<CarKit, 'wing'> = { wing: { ...EB110_KIT.wing!, kind: 'fixed', from: 4060, sit: 640, bed: undefined } };

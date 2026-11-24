@@ -22,7 +22,14 @@
 //   The mounts and the gearbox: each base's transaxle and engine mounts take its own engine's torque with a margin;
 //   past it they are reinforced (an uprated gearbox: a little heavier, dearer, less durable the further past), up to
 //   twice; past that no reinforcement in the kit takes it ('blocked').
-import { LIMITS, applyPatch, gradeFor, DESIGN_NSX, DESIGN_F355, type BaseId, type Design, type DesignPatch } from '../core/design';
+//   The EB110's bay (K1): lengthwise, as the F355's, its quad-turbo V12 ahead of the rear axle with its gearbox (the kit's
+//   bay and engine: render/car/cars/eb110.kit.ts), from the cabin's back to the tail's lid [~: its sheet has no bay box].
+//   The body's dimensions (E1): moving the cabin forward lengthens the bay behind it by as much (a V12 fits a cab-forward
+//   body), back shortens it; a wider track moves the tyres out toward the arches' lips (the room shrinks by as much as a
+//   tyre that much wider), a lower body brings the arches down onto the tyres (less travel left). The ground clearance:
+//   below 100 mm a body grounds on speed bumps, kerbs and ramps ('modified': a nose lift and skid plates, a stiffer
+//   ride); below 70 mm it is a race car's, not one for the road ('blocked').
+import { LIMITS, BASES, BODY_LIMITS, applyPatch, gradeFor, DESIGN_NSX, DESIGN_F355, DESIGN_EB110, type BaseId, type Design, type DesignPatch } from '../core/design';
 import { enginePackage, engineFigures, tyreR } from './designparts';
 import nsxSheet from '../data/cars/spec/nsx.json';
 import f355Sheet from '../data/cars/spec/f355.json';
@@ -30,7 +37,7 @@ import f355Sheet from '../data/cars/spec/f355.json';
 export type Verdict = 'ok' | 'modified' | 'blocked';
 export interface Fix { /** what it does (Korean) */ label: string; patch: DesignPatch; /** rough cost (the car's cost index points, race/design.ts) */ cost: number }
 export interface FitResult {
-  part: 'bayLength' | 'bayWidth' | 'bayHeight' | 'gearboxPlace' | 'mount' | 'gearbox' | 'archF' | 'archR';
+  part: 'bayLength' | 'bayWidth' | 'bayHeight' | 'gearboxPlace' | 'mount' | 'gearbox' | 'archF' | 'archR' | 'clearance';
   /** the part checked (Korean) */ name: string; verdict: Verdict; /** why (Korean) */ reason: string; fixes: Fix[];
   /** what a 'modified' verdict's work adds: kg (at `at`), the cost index, reliability points lost, drag area (m²) */
   mass: number; at: 'engine' | 'front' | 'rear'; cost: number; reliability: number; cdA: number }
@@ -39,15 +46,24 @@ type Orient = 'mid-longitudinal' | 'mid-transverse';
 interface Bay { orient: Orient; length: number; width: number; height: number; /** Nm: the mounts', the gearbox's */ mount: number; gearbox: number }
 const box = (s: { engineBay: { box: { x: number[]; y: number[]; z: number[] } } }) => { const b = s.engineBay.box; return { length: (b.x[1]! - b.x[0]!) / 1000, width: (b.y[1]! - b.y[0]!) / 1000, height: (b.z[1]! - b.z[0]!) / 1000 }; };
 /** the bases' bays (m) and torque limits: the NSX's transaxle (its own 284 Nm) to 360, its mounts 400; the F355's
- *  (363 Nm) to 430, its mounts 450 [~: margins of the kind such parts carry, no maker's figure] */
+ *  (363 Nm) to 430, its mounts 450; the EB110's (611 Nm) to 680, its mounts 720 [~: margins of the kind such parts
+ *  carry, no maker's figure]. The EB110's bay: from the cabin's back (2,530) to the tail's lid (4,050), 1.24 m across
+ *  between the side pods, from the floor at 150 to the glass cover at 850 */
 export const BAYS: Record<BaseId, Bay> = {
   nsx: { orient: 'mid-transverse', ...box(nsxSheet), mount: 400, gearbox: 360 },
-  f355: { orient: 'mid-longitudinal', ...box(f355Sheet), mount: 450, gearbox: 430 } };
-/** the arches' radii (m), front and rear, from the sheets (the kit's lines take theirs from the same place) */
+  f355: { orient: 'mid-longitudinal', ...box(f355Sheet), mount: 450, gearbox: 430 },
+  eb110: { orient: 'mid-longitudinal', length: 1.52, width: 1.24, height: 0.7, mount: 720, gearbox: 680 } };
+/** the arches' radii (m), front and rear, from the sheets (the kit's lines take theirs from the same place); the EB110's
+ *  half-ellipses by their height over the hub (render/car/cars/eb110.kit.ts arches rz) */
 export const ARCHES: Record<BaseId, [number, number]> = {
-  nsx: [nsxSheet.arches.front.radius / 1000, nsxSheet.arches.rear.radius / 1000], f355: [f355Sheet.arches.front.radius / 1000, f355Sheet.arches.rear.radius / 1000] };
+  nsx: [nsxSheet.arches.front.radius / 1000, nsxSheet.arches.rear.radius / 1000], f355: [f355Sheet.arches.front.radius / 1000, f355Sheet.arches.rear.radius / 1000], eb110: [0.362, 0.392] };
 /** the base's own car's tyres (mm): the room under its arches is set by them */
-export const OWN_TYRES: Record<BaseId, [number, number]> = { nsx: DESIGN_NSX.kit.tyres, f355: DESIGN_F355.kit.tyres };
+export const OWN_TYRES: Record<BaseId, [number, number]> = { nsx: DESIGN_NSX.kit.tyres, f355: DESIGN_F355.kit.tyres, eb110: DESIGN_EB110.kit.tyres };
+/** each base's own ground clearance (mm, the sheets' overall.groundClearance; the EB110's 100) */
+export const CLEARANCE: Record<BaseId, number> = { nsx: nsxSheet.overall.groundClearance, f355: f355Sheet.overall.groundClearance, eb110: 100 };
+/** the clearance a road car needs (mm): below the first it grounds on bumps and ramps, below the second it is a race car's */
+export const CLEAR_OK = 100, CLEAR_MIN = 70;
+const BASE_NAME: Record<BaseId, string> = { nsx: 'NSX', f355: 'F355', eb110: 'EB110' };
 /** how much wider than its base's own tyre a tyre fits before the arch is flared (mm); the travel left above a tyre (m) */
 export const ARCH_ROOM = 40, ARCH_TRAVEL = 0.015;
 /** how far past its room a part may be and still be fitted with work (the engine's bay 10 %, a tyre 30 mm, the torque
@@ -67,8 +83,8 @@ function footprint(d: Design) {
   if (B.orient === 'mid-longitudinal') return { along: P.length + P.box, across: P.width, height: P.height, miura: false, P };
   const miura = P.length / 2 + 0.1 > HALF_SHAFT;
   return { along: P.width + (miura ? 0.25 : 0), across: P.length + (miura ? 0 : P.boxEnd), height: P.height, miura, P }; }
-/** the bay as the design stretches it (m) */
-const bayOf = (d: Design) => { const B = BAYS[d.body.base]; return { length: B.length + d.body.wheelbase / 1000, width: B.width + 2 * d.body.width / 1000, height: B.height }; };
+/** the bay as the design stretches it (m): the wheelbase's stretch and the cabin moved forward lengthen it */
+const bayOf = (d: Design) => { const B = BAYS[d.body.base]; return { length: B.length + (d.body.wheelbase + d.body.cabin) / 1000, width: B.width + 2 * d.body.width / 1000, height: B.height }; };
 const overVerdict = (need: number, room: number): Verdict => need <= room ? 'ok' : need <= room * (1 + OVER_BAY) ? 'modified' : 'blocked';
 
 /** every check, without the fixes */
@@ -101,14 +117,20 @@ function checks(d: Design): Omit<FitResult, 'fixes'>[] {
   // the tyres under the arches
   const own = OWN_TYRES[d.body.base], archR = ARCHES[d.body.base];
   for (const [i, part, name, at] of [[0, 'archF', '앞 휠아치', 'front'], [1, 'archR', '뒤 휠아치', 'rear']] as const) {
-    const w = d.kit.tyres[i], room = own[i] + ARCH_ROOM + d.body.width, over = w - room, vw: Verdict = over <= 0 ? 'ok' : over <= OVER_TYRE ? 'modified' : 'blocked';
-    const r = tyreR(w, d.kit.rim), short = ARCH_TRAVEL - (archR[i] - r), vd: Verdict = short <= 0 ? 'ok' : short <= OVER_DIA ? 'modified' : 'blocked', v = worst(vw, vd);
+    const w = d.kit.tyres[i], room = own[i] + ARCH_ROOM + d.body.width - d.body.track, over = w - room, vw: Verdict = over <= 0 ? 'ok' : over <= OVER_TYRE ? 'modified' : 'blocked';
+    const r = tyreR(w, d.kit.rim), short = ARCH_TRAVEL - (archR[i] + d.body.ride / 1000 - r), vd: Verdict = short <= 0 ? 'ok' : short <= OVER_DIA ? 'modified' : 'blocked', v = worst(vw, vd);
     const why: string[] = [];
     if (vw !== 'ok') why.push(`타이어 ${w} mm가 아치의 여유(${room} mm)보다 ${over} mm 넓습니다`);
-    if (vd !== 'ok') why.push(`타이어 반지름 ${mm(r)} mm가 아치(${mm(archR[i])} mm)에 서스펜션이 움직일 틈을 ${mm(short)} mm 덜 남깁니다`);
+    if (vd !== 'ok') why.push(`타이어 반지름 ${mm(r)} mm가 아치(${mm(archR[i] + d.body.ride / 1000)} mm${d.body.ride ? `, 지상고 ${d.body.ride > 0 ? '+' : ''}${d.body.ride} mm` : ''})에 서스펜션이 움직일 틈을 ${mm(short)} mm 덜 남깁니다`);
     out.push({ part, name, verdict: v, ...none, at,
-      reason: v === 'ok' ? `타이어 ${w} mm (여유 ${room} mm), 반지름 ${mm(r)} mm (아치 ${mm(archR[i])} mm)` : why.join('; ') + (v === 'modified' ? `: ${vw !== 'ok' ? '펜더를 넓히고(오버펜더)' : ''}${vd !== 'ok' ? '아치 가장자리를 말아 올려' : ''} 넣습니다` : ''),
+      reason: v === 'ok' ? `타이어 ${w} mm (여유 ${room} mm), 반지름 ${mm(r)} mm (아치 ${mm(archR[i] + d.body.ride / 1000)} mm)` : why.join('; ') + (v === 'modified' ? `: ${vw !== 'ok' ? '펜더를 넓히고(오버펜더)' : ''}${vd !== 'ok' ? '아치 가장자리를 말아 올려' : ''} 넣습니다` : ''),
       ...(v === 'modified' ? { mass: (vw !== 'ok' ? 3 : 0) + (vd !== 'ok' ? 1 : 0), cost: (vw !== 'ok' ? 2 : 0) + (vd !== 'ok' ? 1.5 : 0), reliability: 0, cdA: vw !== 'ok' ? 0.004 : 0 } : {}) }); }
+  // the ground clearance
+  { const c = CLEARANCE[d.body.base] + d.body.ride, v: Verdict = c >= CLEAR_OK ? 'ok' : c >= CLEAR_MIN ? 'modified' : 'blocked';
+    out.push({ part: 'clearance', name: '지상고', verdict: v, ...none, at: 'front',
+      reason: v === 'ok' ? `지상고 ${Math.round(c)} mm` : v === 'modified' ? `지상고 ${Math.round(c)} mm: 과속방지턱·연석·경사로에 바닥이 닿을 위험이 있습니다. 코 들어올림 장치와 바닥 보호판을 달고 서스펜션을 단단히 합니다`
+        : `지상고 ${Math.round(c)} mm는 도로용이 아닙니다 (${CLEAR_MIN} mm 이상)`,
+      ...(v === 'modified' ? { mass: 8, cost: 3 + 0.1 * (CLEAR_OK - c), reliability: 2 } : {}) }); }
   return out; }
 
 /** the first change of a series that brings a check to `want` (or better); null when none does */
@@ -139,6 +161,12 @@ function fixesFor(d: Design, c: Omit<FitResult, 'fixes'>): Fix[] {
         if (p) add({ label: `부스트 ${p.engine!.boost!.toFixed(2)} bar로 낮춤${tag}`, patch: p, cost: 0 }); }
       const p = search(d, c.part, want, (function* () { for (const v of range(d.engine.cc - 100, LIMITS.cc[0], -100)) yield { engine: { cc: v } }; })());
       if (p) add({ label: `배기량 ${p.engine!.cc!.toLocaleString()} cc로 줄임${tag}`, patch: p, cost: 0 }); }
+    if (c.part === 'clearance' || ((c.part === 'archF' || c.part === 'archR') && d.body.ride < 0)) {
+      const p = search(d, c.part, want, (function* () { for (const v of range(B.ride + 5, BODY_LIMITS(B.base).ride[1], 5)) yield { body: { ride: v } }; })());
+      if (p) add({ label: `지상고 +${p.body!.ride! - B.ride} mm${tag}`, patch: p, cost: 0 }); }
+    if ((c.part === 'archF' || c.part === 'archR') && d.body.track > 0) {
+      const p = search(d, c.part, want, (function* () { for (const v of range(B.track - 10, BODY_LIMITS(B.base).track[0], -10)) yield { body: { track: v } }; })());
+      if (p) add({ label: `윤거 ${p.body!.track! > 0 ? '+' : ''}${p.body!.track} mm로${tag}`, patch: p, cost: 0 }); }
     if (c.part === 'archF' || c.part === 'archR') {
       const i = c.part === 'archF' ? 0 : 1, T = d.kit.tyres, tyre = (w: number): DesignPatch => ({ kit: { tyres: (i ? [T[0], w] : [w, T[1]]) as [number, number] } });
       const n = search(d, c.part, want, (function* () { for (const w of range(T[i] - 5, LIMITS.tyre[0], -5)) yield tyre(w); })());
@@ -147,12 +175,16 @@ function fixesFor(d: Design, c: Omit<FitResult, 'fixes'>): Fix[] {
       if (p) add({ label: `차체 폭 한쪽 +${p.body!.width! - B.width} mm (아치가 함께 넓어짐)${tag}`, patch: p, cost: 0.03 * (p.body!.width! - B.width) });
       const r = search(d, c.part, want, ([16, 17, 18] as const).filter(x => x !== d.kit.rim).map(x => ({ kit: { rim: x } })));
       if (r) add({ label: `${r.kit!.rim}″ 림${tag}`, patch: r, cost: 0 }); }
-    // another base whose bay takes the engine: as it is, or stretched
+    // the cabin moved forward: the bay behind it grows (a cab-forward body)
+    if (c.part === 'bayLength') {
+      const p = search(d, c.part, want, (function* () { for (const v of range(B.cabin + 10, BODY_LIMITS(B.base).cabin[1], 10)) yield { body: { cabin: v } }; })());
+      if (p) add({ label: `캐빈 앞으로 ${p.body!.cabin! - B.cabin} mm${tag}`, patch: p, cost: 0.01 * (p.body!.cabin! - B.cabin) }); }
+    // another base whose bay takes the engine: as it is, or stretched (its own dimensions brought inside its ranges)
     if (c.part === 'bayLength' || c.part === 'bayWidth' || c.part === 'gearboxPlace') {
-      const other: BaseId = B.base === 'nsx' ? 'f355' : 'nsx', bays = (x: Design) => checks(x).filter(y => y.part.startsWith('bay') || y.part === 'gearboxPlace');
-      for (const wb of range(B.wheelbase, LIMITS.wheelbase[1], 10)) { const p: DesignPatch = wb === B.wheelbase ? { body: { base: other } } : { body: { base: other, wheelbase: wb } };
+      const bays = (x: Design) => checks(x).filter(y => y.part.startsWith('bay') || y.part === 'gearboxPlace');
+      for (const other of BASES.filter(b => b !== B.base)) for (const wb of range(B.wheelbase, LIMITS.wheelbase[1], 10)) { const p: DesignPatch = wb === B.wheelbase ? { body: { base: other } } : { body: { base: other, wheelbase: wb } };
         if (bays(applyPatch(d, p)).every(x => rank[x.verdict] <= rank[want])) {
-          add({ label: `${other === 'nsx' ? 'NSX' : 'F355'} 바탕 (${BAYS[other].orient === 'mid-transverse' ? '가로' : '세로'} 엔진룸)${wb !== B.wheelbase ? `, 휠베이스 ${wb > 0 ? '+' : ''}${wb} mm` : ''}${tag}`, patch: p, cost: 0.012 * Math.max(0, wb - B.wheelbase) }); break; } } }
+          add({ label: `${BASE_NAME[other]} 바탕 (${BAYS[other].orient === 'mid-transverse' ? '가로' : '세로'} 엔진룸)${wb !== B.wheelbase ? `, 휠베이스 ${wb > 0 ? '+' : ''}${wb} mm` : ''}${tag}`, patch: p, cost: 0.012 * Math.max(0, wb - B.wheelbase) }); break; } } }
   }
   return out.slice(0, 4); }
 

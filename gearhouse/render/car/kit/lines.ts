@@ -11,8 +11,12 @@
 //   stations     the stations along the car where the standard section is laid: the car's own list between the
 //                arches, and every few degrees round each arch
 // The sheet is in the drawing's frame; a `Tweak` stretches it (the wheelbase between the arches, the half-width
-// across) and every line, landmark and station follows, so a panel built from the lines follows too.
-import { curve, clamp01, ginv, gp, inv01, type Tab } from './geom';
+// across, the wheels' track) and every line, landmark and station follows, so a panel built from the lines follows too.
+// The tweak's other dimensions (alpha 0.11, E1: the roof's height, the overhangs, the ride height, the cabin's place,
+// the screen's rake) are a warp of the built body (makeWarp): one smooth map of space, the same for every panel, so two
+// panels that shared a border point still share it (every seam stays closed) and no face folds over (each step of the
+// map keeps the order of points along the axis it moves them on). The wheels and the engine are moved, not bent.
+import { curve, clamp01, ginv, gp, inv01, type Tab, type V } from './geom';
 
 export interface WheelSpec { /** the axle's station */ x: number; /** the tyre's radius */ r: number; /** half the track */ y: number; /** the tyre's width */ w: number; /** the rim's radius */ rim: number }
 export interface ArchSpec { /** the arch's radius about the hub */ r: number; /** the well's inner wall (half-width) */ yin: number; /** its height over the hub when it is not round (half an ellipse; default r) */ rz?: number }
@@ -57,7 +61,14 @@ export interface LineSheet {
   stations: StationSpec;
 }
 /** a change to the sheet (mm): the proof that a car is a kit, not a carving */
-export interface Tweak { /** added between the arches */ wheelbase?: number; /** added to half the width (all y in proportion) */ halfWidth?: number }
+export interface Tweak { /** added between the arches */ wheelbase?: number; /** added to half the width (all y in proportion) */ halfWidth?: number;
+  /** added to each wheel's distance from the centre line (the wells' inner walls go with them) */ halfTrack?: number;
+  /** the warp (makeWarp): added to the roof's height (the glasshouse over the belt line scaled up or down) */ roof?: number;
+  /** the body stretched ahead of the front arch and behind the rear arch */ overhangF?: number; overhangR?: number;
+  /** the body raised over its wheels */ ride?: number;
+  /** the cabin moved forward (the screen, the roof and the glass over the belt line with it; the bonnet ahead of it and the
+   *  deck behind it give and take) */ cabin?: number;
+  /** degrees the screen lies further back: its top (and the roof's front edge) goes back, its foot stays */ rake?: number }
 
 export interface Arch { x: number; r: number; /** the hub's height (the tyre's radius) */ z: number; yin: number; /** the arch's height over the hub */ rz: number }
 export interface Wheel { x: number; r: number; y: number; w: number; rim: number }
@@ -98,9 +109,9 @@ export function makeLines(S: LineSheet, tweak: Tweak = {}): Lines {
   for (const [k, t] of Object.entries(S.z)) { zT[k] = t.map(([x, z]) => [mx(x), z]); zC[k] = curve(zT[k]!); }
   for (const [k, t] of Object.entries(S.w)) { wT[k] = t.map(([x, y]) => [mx(x), my(y)]); wC[k] = curve(wT[k]!); }
   const z = (n: string) => { const f = zC[n]; if (!f) throw new Error(`lines: no height line ${n}`); return f; }, w = (n: string) => { const f = wC[n]; if (!f) throw new Error(`lines: no width line ${n}`); return f; };
-  const wheel = (s: WheelSpec): Wheel => ({ x: mx(s.x), r: s.r, y: my(s.y), w: s.w, rim: s.rim });
+  const dT = tweak.halfTrack ?? 0, wheel = (s: WheelSpec): Wheel => ({ x: mx(s.x), r: s.r, y: my(s.y) + dT, w: s.w, rim: s.rim });
   const wheels = { f: wheel(S.wheels.f), r: wheel(S.wheels.r) };
-  const arches = { f: { x: wheels.f.x, r: S.arches.f.r, z: wheels.f.r, yin: my(S.arches.f.yin), rz: S.arches.f.rz ?? S.arches.f.r }, r: { x: wheels.r.x, r: S.arches.r.r, z: wheels.r.r, yin: my(S.arches.r.yin), rz: S.arches.r.rz ?? S.arches.r.r } };
+  const arches = { f: { x: wheels.f.x, r: S.arches.f.r, z: wheels.f.r, yin: my(S.arches.f.yin) + dT, rz: S.arches.f.rz ?? S.arches.f.r }, r: { x: wheels.r.x, r: S.arches.r.r, z: wheels.r.r, yin: my(S.arches.r.yin) + dT, rz: S.arches.r.rz ?? S.arches.r.r } };
   const archZ = (x: number) => { for (const a of [arches.f, arches.r]) if (Math.abs(x - a.x) < a.r - 0.5) return a.z + a.rz / a.r * Math.sqrt(a.r * a.r - (x - a.x) ** 2); return 0; };
   // the stations: the arches' ends and every arcDeg round them, the car's own between
   const st = S.stations, pins = (st.pins ?? []).map(X), snap = st.snap ?? 20;
@@ -120,4 +131,45 @@ export function makeLines(S: LineSheet, tweak: Tweak = {}): Lines {
     centre: x => x <= screen ? z('bonnet')(x) : x <= gfoot ? z('roof')(x) : z('deck')(x), half: x => w('half')(x),
     crest: x => [crestY(x), z('crest')(x)], belt: x => x >= b0 && x <= b1 ? [crestY(x), z('crest')(x)] : null, shoulder: x => [w('half')(x), z('shoulder')(x)],
     sill: S.levels.sill, foot: S.levels.foot, wheels, arches, nose, archZ, stations, at, atX, span: (a, b) => stations.slice(at(a), at(b) + 1) };
+}
+
+// ---- the body's warp: the tweak's dimensions past the sheet's own stretch ----
+export interface BodyWarp {
+  /** nothing to do (every dimension the base's own) */ none: boolean;
+  /** a point of the body (the shell, its closures, the parts laid on it) moved */ body(p: V): V;
+  /** how far a part moved whole goes: the wheels (with the overhang ahead, never with the ride), the engine (and the ride),
+   *  the cabin's inside (and the cabin's move) */ wheel: V; engine: V; inside: V;
+  /** the mesh's length after it */ length: number;
+  /** the screen's top's move back (mm) for the rake asked */ rakeX: number;
+}
+const ramp = (a: number, b: number, x: number) => b === a ? (x >= b ? 1 : 0) : clamp01((x - a) / (b - a));
+/** the warp for a tweak, from the car's landmarks: the screen's foot and the glass's foot (the sheet's centre line), the
+ *  roof's front and back edges (the canopy's); every band and window is the car's own, so each base keeps its character.
+ *  In order, each from the points the step before left:
+ *    cabin   points over the belt line (a band 110 deep under it, blended) slide along: by the whole move from the screen's
+ *            foot to the B pillar, by a share of it over the bonnet back from the front axle and over the deck forward from
+ *            the rear arch; the arches, the sills and the floor stay
+ *    rake    the glasshouse over the screen's foot, by its height (a share from the foot up to the screen's top): its top and
+ *            the roof's front edge go back, the roof between them and the B pillar shortening
+ *    roof    the glasshouse from the screen's foot to the glass's foot (blended in over 250 mm ahead and 300 behind) scaled
+ *            in height over the belt line
+ *    overhangs  the body ahead of the front arch and behind the rear arch stretched along the car
+ *    ride    all of it raised over the wheels */
+export function makeWarp(L: Lines, roofEdges: [At, At], t: Tweak): BodyWarp {
+  const dC = -(t.cabin ?? 0), dH = t.roof ?? 0, dF = t.overhangF ?? 0, dR = t.overhangR ?? 0, up = t.ride ?? 0, deg = t.rake ?? 0, S = L.sheet;
+  const XA = L.X(S.centre.screen), XG = L.X(S.centre.glassFoot), XR0 = L.X(roofEdges[0]), XR1 = L.X(roofEdges[1]), len = L.length;
+  const fx = L.wheels.f.x, xRa = L.arches.r.x - L.arches.r.r, xF = L.arches.f.x - L.arches.f.r, xR = L.arches.r.x + L.arches.r.r;
+  let zBelt = Infinity, zRoof = 0; for (let x = XA; x <= XR1; x += 20) zBelt = Math.min(zBelt, L.crest(x)[1]); for (let x = XR0; x <= XR1; x += 10) zRoof = Math.max(zRoof, L.centre(x));
+  const zFoot = L.centre(XA), zTop = L.centre(XR0), run = XR0 - XA, a0 = Math.atan2(zTop - zFoot, run), a1 = Math.max(0.12, a0 - deg * Math.PI / 180);
+  const rakeX = deg ? (zTop - zFoot) / Math.tan(a1) - run : 0, none = !dC && !dH && !dF && !dR && !up && !rakeX;
+  // the cabin's slide along the car, and how much of it a point takes by its height
+  const slide = (x: number) => x <= XA ? dC * ramp(fx, XA, x) : x <= XR1 ? dC : dC * (1 - ramp(XR1, xRa, x)), over = (z: number) => ramp(zBelt - 110, zBelt, z);
+  const body = (p: V): V => { let [x, y, z] = p;
+    if (dC) x += slide(x) * over(z);
+    const A = XA + dC, R0 = XR0 + dC, R1 = XR1 + dC, G = XG + dC;
+    if (rakeX) x += rakeX * (x <= A ? ramp(A - 150, A, x) : 1 - ramp(R0, R1, x)) * ramp(zFoot, zTop, z);
+    if (dH) z += dH * ramp(zBelt, zRoof, z) * (x <= G ? ramp(A - 250, A, x) : 1 - ramp(G, Math.min(G + 300, len), x));
+    x = x < xF ? x * (xF + dF) / xF : x > xR ? xR + dF + (x - xR) * (len - xR + dR) / (len - xR) : x + dF;
+    return [x, y, z + up]; };
+  return { none, body, wheel: [dF, 0, 0], engine: [dF, 0, up], inside: [dF + dC, 0, up], length: len + dF + dR, rakeX };
 }

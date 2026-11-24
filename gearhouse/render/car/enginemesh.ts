@@ -29,6 +29,13 @@ export interface EngineSpec {
   /** a crinkle-finish intake (a flat, grained lacquer: lower gloss) */
   crinkle?: boolean;
   label?: string;
+  // ---- what the whole powertrain is built from besides (render/car/powertrain; addEngine itself does not read these) ----
+  /** the development grade (core/design.ts; default 2), valves a cylinder (4), the block's metal (aluminium) */
+  grade?: 1 | 2 | 3 | 4 | 5; valves?: 2 | 3 | 4 | 5; block?: 'iron' | 'aluminium' | 'magnesium';
+  /** the intake's kind (default: one throttle and a plenum), the sump (wet), an intercooler with turbos (fitted) */
+  intake?: 'single' | 'variable' | 'itb'; sump?: 'wet' | 'dry'; intercooler?: boolean;
+  /** the gearbox and the drive (five gears, a manual change, a limited-slip differential, the rear wheels only) */
+  gears?: 5 | 6; gearbox?: 'manual' | 'f1'; lsd?: boolean; awd?: boolean;
 }
 export interface EngineOpts {
   /** the way the crank runs from `o`, the bellhousing end, to the pulleys (car axes); 'x' = '+x', 'y' = '+y' */
@@ -38,6 +45,8 @@ export interface EngineOpts {
   detail?: 0 | 1 | 2;
   /** a polished strut brace across the car over the engine (default: on at detail 1 and 2) */
   brace?: boolean;
+  /** the whole powertrain's specification, when it is not the engine's own (a design's: render/car/design.ts) */
+  powertrain?: import('./powertrain/spec').PowertrainSpec;
 }
 export interface EngineBuilt {
   tris: number;
@@ -253,11 +262,11 @@ export function addEngine(b: Build, spec: EngineSpec, o: V, opts: EngineOpts = {
 /** the engines of the mid-engined cars whose engines show (approximate colours, from photographs' general look) */
 export const ENGINES: Record<string, EngineSpec> = {
   /** Honda NSX (1990): C30A, transverse 3.0 V6 at 90 degrees behind the seats; black plenum with a light plate, silver block, black covers with a red stripe */
-  nsx: { layout: 'V', cylinders: 6, bankDeg: 90, litres: 3.0, transverse: true, plenum: 'single', colours: { block: '#a4a7ab', heads: '#8f9296', covers: '#17171a', plenum: '#1b1b1e', accent: '#c8202a', label: '#d8d8d0' }, label: 'VTEC' },
+  nsx: { layout: 'V', cylinders: 6, bankDeg: 90, litres: 3.0, transverse: true, plenum: 'single', intake: 'variable', gears: 5, colours: { block: '#a4a7ab', heads: '#8f9296', covers: '#17171a', plenum: '#1b1b1e', accent: '#c8202a', label: '#d8d8d0' }, label: 'VTEC' },
   /** Ferrari F355 (1994): F129B, longitudinal 3.5 V8 at 90 degrees under a louvred cover; red crinkle-finish intakes, silver block */
-  f355: { layout: 'V', cylinders: 8, bankDeg: 90, litres: 3.5, plenum: 'twin', crinkle: true, colours: { block: '#b0b2b5', heads: '#9c9ea2', covers: '#a8191c', plenum: '#b31a1c', accent: '#1a1a1a', label: '#d6c25a' }, label: 'FERRARI' },
+  f355: { layout: 'V', cylinders: 8, bankDeg: 90, litres: 3.5, plenum: 'twin', crinkle: true, valves: 5, sump: 'dry', gears: 6, colours: { block: '#b0b2b5', heads: '#9c9ea2', covers: '#a8191c', plenum: '#b31a1c', accent: '#1a1a1a', label: '#d6c25a' }, label: 'FERRARI' },
   /** Bugatti EB110 (1991): longitudinal 3.5 V12 at 60 degrees, four turbos, under a glass cover; black and silver */
-  eb110: { layout: 'V', cylinders: 12, bankDeg: 60, litres: 3.5, turbos: 4, plenum: 'twin', colours: { block: '#a9acb0', heads: '#b4b7bb', covers: '#1a1a1d', plenum: '#c3c6ca', accent: '#2a55b0', label: '#1b1b1e' }, label: 'BUGATTI' },
+  eb110: { layout: 'V', cylinders: 12, bankDeg: 60, litres: 3.5, turbos: 4, plenum: 'twin', valves: 5, sump: 'dry', gears: 6, awd: true, colours: { block: '#a9acb0', heads: '#b4b7bb', covers: '#1a1a1d', plenum: '#c3c6ca', accent: '#2a55b0', label: '#1b1b1e' }, label: 'BUGATTI' },
   /** Lamborghini Diablo (1990): longitudinal 5.7 V12 at 60 degrees under louvres; black plenums with red lettering, red cam covers */
-  diablo: { layout: 'V', cylinders: 12, bankDeg: 60, litres: 5.7, plenum: 'runners', colours: { block: '#9fa2a6', heads: '#8e9195', covers: '#a01a1c', plenum: '#151517', accent: '#151517', label: '#c21d20' }, label: 'LAMBORGHINI' },
+  diablo: { layout: 'V', cylinders: 12, bankDeg: 60, litres: 5.7, plenum: 'runners', grade: 3, gears: 5, colours: { block: '#9fa2a6', heads: '#8e9195', covers: '#a01a1c', plenum: '#151517', accent: '#151517', label: '#c21d20' }, label: 'LAMBORGHINI' },
 };

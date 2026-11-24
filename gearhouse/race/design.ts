@@ -14,14 +14,18 @@
 //           axle) and at its height (the engine by its height and its sump, the panels high, the structure low); the
 //           base's rest placed so its real car's front share and centre of gravity come out.
 //   drag:   the base's drag coefficient (its real car's drag area over its frontal area) on the design's frontal area (its
-//           width; its height is the base's: the kit's lines do not stretch it), the nose's and the tail's shapes; a
-//           wing and an undertray with a diffuser as tech.wing and tech.underbody; the fit's flares and scoops.
+//           width, its roof's height and its ride height: alpha 0.11's dimensions), the nose's and the tail's shapes, the
+//           screen's rake and a longer tail; a wing and an undertray with a diffuser as tech.wing and tech.underbody; the
+//           fit's flares and scoops.
+//   size:   the body's length (the wheelbase and the overhangs), width and roof's height set the structure's, the panels'
+//           and the rest's masses; the ride height lifts every mass but the wheels (the centre of gravity), the roof the
+//           upper body's. The yaw inertia is the vehicle's own (race/vehicle.ts: from the mass, the wheelbase, the track).
 //   gears:  a five- or six-speed box (the NSX's and the F355's ratios); a final drive of 0 is chosen so the top speed,
 //           where the power meets the drag and the rolling resistance, comes at the power peak in top gear.
 //   class, cost, reliability: designFigures (the class from the figures, doc 99 6-2; cost and reliability placeholders
 //           until B5).
 import type { Design, BaseId, Structure, Panels, Grade, Interior } from '../core/design';
-import { DESIGN_NSX, DESIGN_F355 } from '../core/design';
+import { DESIGN_NSX, DESIGN_F355, DESIGN_EB110 } from '../core/design';
 import { type RaceSpec, torqueAt, EPS_SPEED_SENSITIVE } from './cars';
 import { HP, CYL, engineFigures, engineMass, enginePackage, pistonSpeed, tyreR } from './designparts';
 import { fit, fitPenalty, type FitResult } from './fit';
@@ -33,11 +37,14 @@ const G = 9.81, RHO = 1.2, DRIVER = 75;
  *  length beyond the wheelbase (m); width, height: overall (m, the sheets); cgH: its centre of gravity's height (m);
  *  structure, panels: their masses were they of steel (a body in white with its subframes, about 360 kg at the NSX's
  *  size, and its doors, lids and wings, about 120: Honda's aluminium body saved some 200 kg against steel, 0.42 of
- *  these at the factors below); floor: the engine bay's floor (m, the sheets) */
+ *  these at the factors below); floor: the engine bay's floor (m, the sheets). The EB110's from its real car (race/cars.ts
+ *  NEW.eb110: 1,620 kg, 0.4 front, its drag area without the wing; data/cars/spec/eb110.json: 4,400 x 1,940 x 1,114, the
+ *  overhangs 1,040 and 810), its body in white and panels sized as the F355's to its larger plan [~] */
 interface Base { ref: Design; kerb: number; front: number; wheelbase: number; track: number; width: number; height: number; overhangs: number; cgH: number; cdA: number; structure: number; panels: number; floor: number }
 const BASES: Record<BaseId, Base> = {
   nsx: { ref: DESIGN_NSX, kerb: 1365, front: 0.42, wheelbase: 2.53, track: 1.52, width: 1.81, height: 1.17, overhangs: 1.9, cgH: 0.44, cdA: 0.63, structure: 360, panels: 120, floor: 0.18 },
-  f355: { ref: DESIGN_F355, kerb: 1450, front: 0.42, wheelbase: 2.45, track: 1.565, width: 1.9, height: 1.17, overhangs: 1.8, cgH: 0.44, cdA: 0.66, structure: 355, panels: 118, floor: 0.15 } };
+  f355: { ref: DESIGN_F355, kerb: 1450, front: 0.42, wheelbase: 2.45, track: 1.565, width: 1.9, height: 1.17, overhangs: 1.8, cgH: 0.44, cdA: 0.66, structure: 355, panels: 118, floor: 0.15 },
+  eb110: { ref: DESIGN_EB110, kerb: 1620, front: 0.4, wheelbase: 2.55, track: 1.584, width: 1.94, height: 1.114, overhangs: 1.85, cgH: 0.44, cdA: 0.58, structure: 380, panels: 126, floor: 0.15 } };
 /** the structures' and the panels' masses against steel's, for the same stiffness (doc 99 6-1) */
 export const STRUCTURE_K: Record<Structure, number> = { steel: 1, hss: 0.9, aluminium: 0.6, honeycomb: 0.5, cfrp: 0.45 };
 export const PANEL_K: Record<Panels, number> = { steel: 1, aluminium: 0.55, frp: 0.6, cfrp: 0.4 };
@@ -53,13 +60,13 @@ export const GEARSETS: Record<5 | 6, number[]> = { 5: [3.071, 1.727, 1.23, 0.967
 
 /** the engine's centre of mass above the ground (m): the bay's floor, the sump under the crank (a wet sump's pan 0.22
  *  deep, a dry sump's 0.16: the engine sits lower), the heads and the intake above it */
-const engineZ = (d: Design) => BASES[d.body.base].floor + (d.engine.sump === 'dry' ? 0.16 : 0.22) + 0.1 * enginePackage(d).height / 0.6;
+const engineZ = (d: Design) => BASES[d.body.base].floor + (d.engine.sump === 'dry' ? 0.16 : 0.22) + 0.1 * enginePackage(d).height / 0.6 + lift(d);
 
 // ---- the masses (kg) and where they sit (m behind the front axle) ----
 /** the parts' masses, each with its place along the wheelbase L (m behind the front axle) and its height z (m); the
  *  rest of the platform not counted */
 function parts(d: Design, L: number): { m: number; x: number; z: number }[] {
-  const K = d.kit, D = d.drive, B = BASES[d.body.base];
+  const K = d.kit, D = d.drive, B = BASES[d.body.base], up = lift(d);
   // the transaxle: 52 kg as a five-speed, 60 as a six; the F1's hydraulics 10; a limited-slip differential 4;
   // four-wheel drive 80 (a centre differential and its coupling with its transfer gears, a propeller shaft, the front
   // differential and shafts)
@@ -67,17 +74,23 @@ function parts(d: Design, L: number): { m: number; x: number; z: number }[] {
   // a wheel with its tyre: about 0.0055 kg per mm of width per inch of rim (the NSX's 225/50 R16 about 20 kg)
   const wheel = (w: number) => w * K.rim * 0.0055, rF = tyreR(K.tyres[0], K.rim), rR = tyreR(K.tyres[1], K.rim);
   const steer = K.steering === 'hydraulic' ? 9 : K.steering === 'electric' ? 7 : 0;
-  const out = [{ m: DRIVER, x: 1.15, z: 0.42 }, { m: engineMass(d), x: L - 0.75, z: engineZ(d) }, { m: box, x: L - 0.05, z: 0.33 }, { m: 2 * wheel(K.tyres[0]), x: 0, z: rF }, { m: 2 * wheel(K.tyres[1]), x: L, z: rR },
-    { m: K.abs ? 9 : 0, x: 0.4, z: 0.5 }, { m: K.tcs ? 3 : 0, x: L - 0.75, z: 0.5 }, { m: steer, x: 0.1, z: 0.45 }, { m: K.dampers === 'adaptive' ? 5 : 0, x: L / 2, z: 0.45 },
-    { m: K.wing ? 14 : 0, x: L + 0.6, z: 1.05 }, { m: K.diffuser ? 9 : 0, x: L * 0.6, z: 0.15 }];
-  if (D.awd) out.push({ m: 35, x: 0.05, z: 0.3 }, { m: 45, x: L * 0.6, z: 0.3 });   // the front differential at the front axle; the rest along the tunnel
-  // the structure and the panels, sized by their length and width against the base's, centred between the axles
-  const size = sizeOf(d, L);
-  out.push({ m: B.structure * STRUCTURE_K[d.body.structure] * size, x: L / 2, z: 0.4 }, { m: B.panels * PANEL_K[d.body.panels] * size, x: L / 2, z: 0.7 });
+  // the cabin moved forward takes the driver with it; the body's masses ride with it (the wheels do not)
+  const out = [{ m: DRIVER, x: 1.15 - d.body.cabin / 1000, z: 0.42 + up }, { m: engineMass(d), x: L - 0.75, z: engineZ(d) }, { m: box, x: L - 0.05, z: 0.33 + up }, { m: 2 * wheel(K.tyres[0]), x: 0, z: rF }, { m: 2 * wheel(K.tyres[1]), x: L, z: rR },
+    { m: K.abs ? 9 : 0, x: 0.4, z: 0.5 + up }, { m: K.tcs ? 3 : 0, x: L - 0.75, z: 0.5 + up }, { m: steer, x: 0.1, z: 0.45 + up }, { m: K.dampers === 'adaptive' ? 5 : 0, x: L / 2, z: 0.45 + up },
+    { m: K.wing ? 14 : 0, x: L + 0.6 + d.body.overhangR / 1000, z: 1.05 + up }, { m: K.diffuser ? 9 : 0, x: L * 0.6, z: 0.15 + up }];
+  if (D.awd) out.push({ m: 35, x: 0.05, z: 0.3 + up }, { m: 45, x: L * 0.6, z: 0.3 + up });   // the front differential at the front axle; the rest along the tunnel
+  // the structure and the panels, sized by their length, width and height against the base's, centred between the axles
+  // (the overhangs' share at their ends); the panels and the glass high, the roof's change half the panels' height
+  const size = sizeOf(d, L), ov = (d.body.overhangR - d.body.overhangF) / 2000;
+  out.push({ m: B.structure * STRUCTURE_K[d.body.structure] * size, x: L / 2 + ov, z: 0.4 + up }, { m: B.panels * PANEL_K[d.body.panels] * size, x: L / 2 + ov, z: 0.7 + up + d.body.roof / 2000 });
   return out;
 }
-/** the body's size against its base's (its length and width) */
-const sizeOf = (d: Design, L: number) => { const B = BASES[d.body.base]; return (L + B.overhangs) / (B.wheelbase + B.overhangs) * (B.width + 2 * d.body.width / 1000) / B.width; };
+/** how much the body rides higher than its base's (m): every mass but the wheels with it */
+const lift = (d: Design) => d.body.ride / 1000;
+/** the body's size against its base's: its length (the wheelbase and the overhangs), its width, and a third of its
+ *  height's change (the roof's: the glasshouse and the pillars, not the floor and the sills) */
+const sizeOf = (d: Design, L: number) => { const B = BASES[d.body.base], b = d.body;
+  return (L + B.overhangs + (b.overhangF + b.overhangR) / 1000) / (B.wheelbase + B.overhangs) * (B.width + 2 * b.width / 1000) / B.width * (1 + b.roof / 1000 / B.height / 3); };
 const wheelbase = (d: Design) => BASES[d.body.base].wheelbase + d.body.wheelbase / 1000;
 /** each base's rest of the car (kg, the trim, the glass, the suspension, the fluids: it grows a little with the body's
  *  size, and its secondary structure follows the structure's material) and its place as a share of the wheelbase and
@@ -89,8 +102,8 @@ function massing(d: Design) {
   const B = BASES[d.body.base], L = wheelbase(d), p = parts(d, L), area = sizeOf(d, L), rest = REST[d.body.base];
   const restM = rest.m * area ** 0.3 * (1 - SECONDARY + SECONDARY * STRUCTURE_K[d.body.structure] / STRUCTURE_K[B.ref.body.structure]) * INTERIOR_K[d.kit.interior];
   // the fit's work: at the engine (its bay, its mounts, its gearbox) or at an axle (the arches)
-  const mods = fitPenalty(d).mass.map(q => ({ m: q.m, x: q.at === 'front' ? 0 : q.at === 'rear' ? L : L - 0.75, z: q.at === 'engine' ? engineZ(d) : 0.5 }));
-  const all = [...p, ...mods, { m: restM, x: rest.x * L, z: rest.z }];
+  const mods = fitPenalty(d).mass.map(q => ({ m: q.m, x: q.at === 'front' ? 0 : q.at === 'rear' ? L : L - 0.75, z: q.at === 'engine' ? engineZ(d) : 0.5 + lift(d) }));
+  const all = [...p, ...mods, { m: restM, x: rest.x * L - d.body.cabin / 2000, z: rest.z + lift(d) + d.body.roof / 4000 }];
   const mass = all.reduce((s, q) => s + q.m, 0), front = 1 - all.reduce((s, q) => s + q.m * q.x, 0) / mass / L, cgH = all.reduce((s, q) => s + q.m * q.z, 0) / mass;
   return { mass, front, cgH, L, area };
 }
@@ -98,8 +111,10 @@ function massing(d: Design) {
 // ---- the shape's drag ----
 /** the nose's and the tail's drag against each other (a pointed nose parts the air a little more cleanly; the ducktail's
  *  lip holds the flow off the deck at a little drag); a base's own shapes give its real car's figure */
-const NOSE_K = { round: 1, pointed: 0.985 }, TAIL_K = { frame: 1, roundLamps: 1.005, ducktail: 1.01 };
-const shapeK = (d: Design) => NOSE_K[d.body.nose] * TAIL_K[d.body.tail];
+const NOSE_K = { round: 1, pointed: 0.985, mass: 1.01 }, TAIL_K = { frame: 1, roundLamps: 1.005, ducktail: 1.01, capsule: 0.995 };
+/** the body's proportions against its base's: a screen laid further back parts the air more cleanly (0.4 % a degree),
+ *  a longer tail lets it close behind the car (0.6 % a 100 mm), a longer nose a little (0.2 % a 100 mm) */
+const shapeK = (d: Design) => NOSE_K[d.body.nose] * TAIL_K[d.body.tail] * (1 - 0.004 * d.body.rake) * (1 - 0.00006 * d.body.overhangR) * (1 - 0.00002 * d.body.overhangF);
 
 /** the drag area all told (m²): the body's, the wing's, the undertray's */
 export const dragArea = (s: RaceSpec) => s.cdA + (s.tech?.wing?.cdA ?? 0) + (s.tech?.underbody?.cdA ?? 0);
@@ -130,9 +145,12 @@ export function zeroTo100(s: RaceSpec): number {
   return t; }
 
 /** the base's drag coefficient (its real car's drag area over its frontal area: about 0.81 of its width times its
- *  height, the roof's and the sills' taper), and the design's frontal area (m²) */
-const frontal = (B: Base, width: number) => 0.81 * width * B.height;
-export function frontalArea(d: Design): number { const B = BASES[d.body.base]; return frontal(B, B.width + 2 * d.body.width / 1000); }
+ *  height, the roof's and the sills' taper), and the design's frontal area (m²): its width, its height with the roof's
+ *  change counted at 0.7 (the glasshouse is narrower than the body) and the ride's at 0.5 (the gap under the body
+ *  shows the wheels, the suspension and the floor's edge) */
+const frontal = (B: Base, width: number, height = B.height) => 0.81 * width * height;
+export const designHeight = (d: Design) => BASES[d.body.base].height + (d.body.roof + d.body.ride) / 1000;
+export function frontalArea(d: Design): number { const B = BASES[d.body.base], b = d.body; return frontal(B, B.width + 2 * b.width / 1000, B.height + (0.7 * b.roof + 0.5 * b.ride) / 1000); }
 
 /** the design's physics for the driving game */
 export function designSpec(d: Design): RaceSpec {
@@ -153,7 +171,7 @@ export function designSpec(d: Design): RaceSpec {
   if (K.wing) tech.wing = { up: 0, down: -1, clA: 0.3, cdA: 0.05, body: 0 };
   if (K.diffuser) tech.underbody = { clA: 0.13, front: 0.5, cdA: 0.01 };   // the F355's undertray
   if (en.vtec) tech.vtec = en.vtec; if (en.turbo) tech.turbo = en.turbo;
-  const s: RaceSpec = { id: 'design:' + d.id, name: d.name, mass: M.mass, wheelbase: M.L, track: B.track + 2 * d.body.width / 1000, tyreR: R, tyreW: (K.tyres[0] + rearW) / 2000,
+  const s: RaceSpec = { id: 'design:' + d.id, name: d.name, mass: M.mass, wheelbase: M.L, track: B.track + (2 * d.body.width + d.body.track) / 1000, tyreR: R, tyreW: (K.tyres[0] + rearW) / 2000,
     cgH: M.cgH, frontShare: M.front, hp: en.hp, hpRpm: en.hpRpm, torqueRpm: en.torqueRpm, torquePeak: en.torquePeak, idle: E.layout === 'V6' ? 800 : 1000, redline: E.redline,
     gears, final: D.final || 3.5, eff, brakes: 'disc', hydraulic: true, brakeG: 1.0, cdA: cd * frontalArea(d) * shape + F.cdA, crr: 0.012, steerLock: 30, topKmh: 0, check: false,
     cooling: { siphon: false, margin: E.turbo ? 1.1 : 1.15 }, tyreKind: 'radial', era: '1990s', shiftT: D.gearbox === 'f1' ? 0.2 : D.gears === 5 ? 0.22 : 0.27, launchRpm: launch,

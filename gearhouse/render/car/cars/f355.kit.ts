@@ -150,3 +150,11 @@ export const F355_GLASS_DECK: Pick<CarKit, 'deck'> = { deck: { ...F355_KIT.deck,
 export const F355_FIXED_WING: Pick<CarKit, 'wing'> = { wing: { kind: 'fixed', from: 3820, back: 8, half: 720, sit: 560, across: [0, 0.25, 0.5, 0.75, 1], section: [[0, 0, -2], [0, 26, 8], [0.5, 0, 11], [1, -24, 9], [1, 0, 3], [0.5, 0, -8]], rise: 150, tilt: 7, pivot: 3930, struts: { y: [470], w: 50, t: 16 } } };
 /** fixed head lamps sunk in scooped pockets under flush glass, where the pop-up covers lie */
 export const F355_POCKET_LAMPS: Pick<CarKit, 'popup'> = { popup: { ...F355_KIT.popup, kind: 'pocket', depth: 66, shallow: 12, faceFrom: 0.7, lens: [[0.2, 0.52], [0.6, 0.92]], lensV: [0.16, 0.86, 4], round: [1], ramp: { share: 0.14, fins: 4 } } };
+
+// ---- the builder's other kinds on this car (docs/systems/101, K1) ----
+/** the EB110's kind of nose: the bumper a volume under the bonnet's edge, its apron straight across the middle */
+export const F355_MASS_NOSE: Pick<CarKit, 'lines' | 'nose'> = { ...F355_ROUND_NOSE, nose: { ...F355_ROUND_NOSE.nose, kind: 'mass', pow: 2.6, seam: true, apron: { y: [380, 720], min: 0.1 } } };
+/** the EB110's kind of tail: one plain panel from the lip down to the bumper's foot, the dark valance under it, capsule lamps */
+export const F355_CAPSULE_TAIL: Pick<CarKit, 'tail' | 'tailLamps'> = {
+  tail: { ...F355_KIT.tail, kind: 'capsule', split: 9, blade: undefined, lampIn: 0, valIn: 0, plateRows: [0, 0], plateDepth: 0, slots: [], pow: [1.65, 1.65] },
+  tailLamps: { badge: { dark: [0, 0, 0, 0], bright: [0, 0, 0, 0] }, capsule: { y: [400, 660], z: 660, h: 55, grow: 9, lift: [3, 7], lenses: [['reverseLamp', 'white', 0.7, 'plain', 400, 454], ['tailLamp', 'red', 0.5, 'lens', 454, 608], ['indicatorR', 'amber', 0.7, 'plain', 608, 660]], block: ['smoke', 454, 596, 596, 628] } } };

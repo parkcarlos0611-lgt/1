@@ -48,6 +48,7 @@ export interface DriveHost { root?: ParentNode; renderer?: LiveRenderer | null; 
 export interface DriveApi { /** the world held still (its picture kept) and on again */ pause(): void; resume(): void; readonly paused: boolean;
   /** the car put back behind the line (a race started again) */ restart(): void; /** another design driven (null: the car list's first) */ useDesign(d: Design | null): void;
   setTrack(id: string): void; readonly track: string; /** a race with these entrants and laps (the race tab's own fields) */ race(o: { opp?: number; lineup?: string; laps?: number; mode?: string }): void;
+  /** the race on (or done), null in practice */ readonly raceNow: Race | null;
   /** the track's materials and props loaded (or failed) */ readonly ready: Promise<void>; readonly drawerOpen: boolean; drawer(open: boolean): void }
 // The drive below is one function's body, mounted once on its markup; it is not indented, so its lines read as before.
 export function mountDrive(H: DriveHost = {}): DriveApi {
@@ -695,7 +696,7 @@ return {
   get track() { return TD.id; },
   race(o) { const set = (id: string, v: unknown) => { if (v !== undefined) $<HTMLSelectElement>(id).value = String(v); }; set('opp', o.opp); set('lineup', o.lineup); set('laps', o.laps); set('mode', o.mode);
     $('pickbox').hidden = $<HTMLSelectElement>('lineup').value !== 'pick'; startRace(); $('race').textContent = '다시 시작'; },
-  ready, get drawerOpen() { return document.body.classList.contains('drawer-open'); }, drawer(open: boolean) { drawer(open); } };
+  get raceNow() { return race; }, ready, get drawerOpen() { return document.body.classList.contains('drawer-open'); }, drawer(open: boolean) { drawer(open); } };
 }
 // a page of its own: the drive's markup is on it (the game's page mounts it on a screen instead)
 if (typeof document !== 'undefined' && document.getElementById('setbtn') && !document.getElementById('gh-app')) mountDrive();

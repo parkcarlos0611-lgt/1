@@ -6,12 +6,18 @@
 // Format 2 (review 177): the engine's development grade and its details (intake, compression, lubrication, block, up to
 // four turbos with a boost and an intercooler), the structure's and the panels' materials apart. Format 1's designs
 // (saved in browsers, carried in links) are brought to it by normalise().
+// Format 3 (alpha 0.11, E1): the body's dimensions beyond the wheelbase and the width (the track, the roof's height, the
+// overhangs, the ride height, the cabin's place, the screen's rake), each within its base's own range (BODY_LIMITS); the
+// EB110 a third base (K1), with its bumper-mass nose and capsule tail as kinds. Format 2's designs take the base's own
+// dimensions (all zero) and load unchanged.
 
 /** the kit's platforms (each a car built from the kit: its lines and its panels' measurements) */
-export type BaseId = 'nsx' | 'f355';
-export type NoseKind = 'round' | 'pointed';
+export type BaseId = 'nsx' | 'f355' | 'eb110';
+/** 'mass': the bumper a volume of its own standing ahead of the bonnet's front edge (the EB110's) */
+export type NoseKind = 'round' | 'pointed' | 'mass';
 export type FrontKind = 'plain' | 'sunk';
-export type TailKind = 'frame' | 'roundLamps' | 'ducktail';
+/** 'capsule': one plain panel leaning back under the deck's edge, capsule lamps on it (the EB110's) */
+export type TailKind = 'frame' | 'roundLamps' | 'ducktail' | 'capsule';
 export type WheelKind = 'fiveSpoke' | 'disc' | 'star';
 export type Layout = 'V6' | 'V8' | 'V12';
 /** the engine's development grade: 1 a mass-production engine, 2 a high-performance production one (the NSX's C30A, the
@@ -33,12 +39,20 @@ export type Panels = 'steel' | 'aluminium' | 'frp' | 'cfrp';
 /** the interior: stripped for lightness, as the base's own car, luxurious */
 export type Interior = 'light' | 'standard' | 'luxury';
 
+/** the body's dimensions a design changes from its base's own (mm; the rake in degrees), each within BODY_LIMITS */
+export interface BodyDims {
+  /** added between the arches (-150..+300) and to half the width (-40..+80) */ wheelbase: number; width: number;
+  /** added to the track (both sides together: the wheels out from the body, the wells' inner walls with them) */ track: number;
+  /** added to the roof's height (the glasshouse above the belt line scaled) */ roof: number;
+  /** added to the overhangs: the body stretched ahead of the front arch, behind the rear arch */ overhangF: number; overhangR: number;
+  /** the body raised over its wheels (the ground clearance with it) */ ride: number;
+  /** the cabin moved forward (+: cab-forward; the screen, the roof and the glass go with it, the engine bay grows behind it) */ cabin: number;
+  /** degrees the screen lies further back (+: more raked; its foot stays, its top goes back) */ rake: number }
+export type DimKey = keyof BodyDims;
 export interface Design {
-  /** the format's version */ v: 2;
+  /** the format's version */ v: 3;
   id: string; name: string;
-  body: { base: BaseId; nose: NoseKind; front: FrontKind; tail: TailKind; wheel: WheelKind;
-    /** mm added between the arches (-150..+300) and to half the width (-40..+80) */ wheelbase: number; width: number;
-    paint: string; gloss: number; structure: Structure; panels: Panels };
+  body: { base: BaseId; nose: NoseKind; front: FrontKind; tail: TailKind; wheel: WheelKind; paint: string; gloss: number; structure: Structure; panels: Panels } & BodyDims;
   engine: { grade: Grade; layout: Layout; /** cc */ cc: number; /** valves a cylinder */ valves: Valves;
     /** the red line (rpm) */ redline: number; intake: Intake; compression: Compression; sump: Sump; block: Block;
     turbo: Turbos; /** the boost at full (bar), when there are turbos */ boost: number; intercooler: boolean;
@@ -47,9 +61,13 @@ export interface Design {
   kit: { abs: boolean; tcs: boolean; steering: 'manual' | 'hydraulic' | 'electric'; dampers: 'fixed' | 'adaptive'; wing: boolean; diffuser: boolean;
     /** tyres' widths front and rear (mm) and the rims (in) */ tyres: [number, number]; rim: 16 | 17 | 18; interior: Interior };
 }
+/** the dimensions format 3 added (format 2's designs and older have the base's own: zero) */
+type NewDims = Exclude<DimKey, 'wheelbase' | 'width'>;
+/** format 2 (review 177 to alpha 0.10): the wheelbase and the width the body's only dimensions */
+export interface DesignV2 extends Omit<Design, 'v' | 'body'> { v: 2; body: Omit<Design['body'], NewDims> }
 /** format 1 (before review 177): one material for the whole body, a turbo count that fixed the boost, no grade */
 export interface DesignV1 extends Omit<Design, 'v' | 'body' | 'engine' | 'kit'> {
-  v: 1; kit: Omit<Design['kit'], 'interior'>; body: Omit<Design['body'], 'structure' | 'panels'> & { material: 'steel' | 'aluminium' };
+  v: 1; kit: Omit<Design['kit'], 'interior'>; body: Omit<Design['body'], 'structure' | 'panels' | NewDims> & { material: 'steel' | 'aluminium' };
   engine: { layout: Layout; cc: number; valves: Valves; redline: number; turbo: 0 | 1 | 2; vtec: boolean };
 }
 /** a change to a design, part by part (a fix offered by the fit check, race/fit.ts) */
@@ -57,10 +75,10 @@ export type DesignPatch = { [K in 'body' | 'engine' | 'drive' | 'kit']?: Partial
 export const applyPatch = (d: Design, p: DesignPatch): Design =>
   normalise({ ...d, body: { ...d.body, ...p.body }, engine: { ...d.engine, ...p.engine }, drive: { ...d.drive, ...p.drive }, kit: { ...d.kit, ...p.kit } });
 
-export const BASES: BaseId[] = ['nsx', 'f355'];
-export const NOSES: NoseKind[] = ['round', 'pointed'];
+export const BASES: BaseId[] = ['nsx', 'f355', 'eb110'];
+export const NOSES: NoseKind[] = ['round', 'pointed', 'mass'];
 export const FRONTS: FrontKind[] = ['plain', 'sunk'];
-export const TAILS: TailKind[] = ['frame', 'roundLamps', 'ducktail'];
+export const TAILS: TailKind[] = ['frame', 'roundLamps', 'ducktail', 'capsule'];
 export const WHEELS: WheelKind[] = ['fiveSpoke', 'disc', 'star'];
 export const GRADES: Grade[] = [1, 2, 3, 4, 5];
 export const INTAKES: Intake[] = ['single', 'variable', 'itb'];
@@ -73,6 +91,18 @@ export const INTERIORS: Interior[] = ['light', 'standard', 'luxury'];
 /** the parts' physical ranges (no power cap: docs/systems/98 section 9). The wheelbase runs to +300 so the F355's
  *  platform can carry a long V12 (the McLaren F1's 2,718 mm, +268), the width to +80 a side (the Diablo's 2,040 mm) */
 export const LIMITS = { wheelbase: [-150, 300], width: [-40, 80], cc: [1000, 8000], redline: [5000, 10000], tyre: [195, 335], final: [2.8, 4.8], boost: [0.3, 1.5] } as const;
+export const DIMS: DimKey[] = ['wheelbase', 'width', 'track', 'roof', 'overhangF', 'overhangR', 'ride', 'cabin', 'rake'];
+export const NO_DIMS: BodyDims = { wheelbase: 0, width: 0, track: 0, roof: 0, overhangF: 0, overhangR: 0, ride: 0, cabin: 0, rake: 0 };
+/** each base's ranges for its body's dimensions: as far as its lines take them with every body kind still closed at
+ *  every seam (tests/car_design.test.ts tries each end on every kind) and the shapes still sound. The wheelbase and the
+ *  width are every base's (LIMITS). The cabin: as far as the bonnet ahead of it and the deck behind it can give (the
+ *  NSX's screen already stands ahead of the front wheels' backs, the EB110's fastback leaves little deck); the rake: as
+ *  far as the roof between the screen's top and the B pillar can shorten; the ride: the EB110 sits lowest (100 mm) */
+const BODY_RANGES: Record<BaseId, Record<NewDims, readonly [number, number]>> = {
+  nsx: { track: [-60, 80], roof: [-80, 60], overhangF: [-100, 200], overhangR: [-120, 200], ride: [-30, 50], cabin: [-80, 120], rake: [-5, 8] },
+  f355: { track: [-60, 80], roof: [-80, 60], overhangF: [-120, 200], overhangR: [-100, 200], ride: [-30, 50], cabin: [-80, 150], rake: [-5, 8] },
+  eb110: { track: [-60, 60], roof: [-60, 60], overhangF: [-120, 160], overhangR: [-80, 200], ride: [-25, 60], cabin: [-100, 120], rake: [-4, 5] } };
+export const BODY_LIMITS = (b: BaseId): Record<DimKey, readonly [number, number]> => ({ wheelbase: LIMITS.wheelbase, width: LIMITS.width, ...BODY_RANGES[b] });
 
 // ---- the engine's grade and what it allows ----
 export const GRADE_NAME: Record<Grade, string> = { 1: '양산', 2: '양산 고성능', 3: '스포츠', 4: '경주 파생', 5: '경주' };
@@ -100,11 +130,11 @@ export const gradeRedline = (g: Grade) => Math.min(LIMITS.redline[1], GRADE_RULE
 /** the two cars the kit was made from, as designs (the generators are checked against their real figures). The NSX:
  *  an aluminium monocoque and panels, the C30A's variable intake, 10.2:1, a wet sump; the F355: a steel structure and
  *  panels, the F129B's 11:1, a dry sump */
-export const DESIGN_NSX: Design = { v: 2, id: 'nsx', name: 'NSX', body: { base: 'nsx', nose: 'round', front: 'plain', tail: 'frame', wheel: 'fiveSpoke', wheelbase: 0, width: 0, paint: '#b0121b', gloss: 0.6, structure: 'aluminium', panels: 'aluminium' },
+export const DESIGN_NSX: Design = { v: 3, id: 'nsx', name: 'NSX', body: { base: 'nsx', nose: 'round', front: 'plain', tail: 'frame', wheel: 'fiveSpoke', ...NO_DIMS, wheelbase: 0, width: 0, paint: '#b0121b', gloss: 0.6, structure: 'aluminium', panels: 'aluminium' },
   engine: { grade: 2, layout: 'V6', cc: 2977, valves: 4, redline: 8000, intake: 'variable', compression: 'mid', sump: 'wet', block: 'aluminium', turbo: 0, boost: 0.8, intercooler: true, vtec: true },
   drive: { gears: 5, gearbox: 'manual', final: 4.062, lsd: true, awd: false },
   kit: { abs: true, tcs: true, steering: 'manual', dampers: 'fixed', wing: false, diffuser: false, tyres: [205, 225], rim: 16, interior: 'standard' } };
-export const DESIGN_F355: Design = { v: 2, id: 'f355', name: 'F355', body: { base: 'f355', nose: 'pointed', front: 'sunk', tail: 'ducktail', wheel: 'star', wheelbase: 0, width: 0, paint: '#f5c300', gloss: 0.6, structure: 'steel', panels: 'steel' },
+export const DESIGN_F355: Design = { v: 3, id: 'f355', name: 'F355', body: { base: 'f355', nose: 'pointed', front: 'sunk', tail: 'ducktail', wheel: 'star', ...NO_DIMS, wheelbase: 0, width: 0, paint: '#f5c300', gloss: 0.6, structure: 'steel', panels: 'steel' },
   engine: { grade: 2, layout: 'V8', cc: 3496, valves: 5, redline: 8500, intake: 'single', compression: 'high', sump: 'dry', block: 'aluminium', turbo: 0, boost: 0.8, intercooler: true, vtec: false },
   drive: { gears: 6, gearbox: 'manual', final: 4.1, lsd: true, awd: false },
   kit: { abs: true, tcs: false, steering: 'hydraulic', dampers: 'adaptive', wing: false, diffuser: true, tyres: [225, 265], rim: 18, interior: 'standard' } };
@@ -115,15 +145,16 @@ export const DESIGN_F355: Design = { v: 2, id: 'f355', name: 'F355', body: { bas
 // NEW.eb110, NEW.xj220, with their sources) and, for the McLaren F1 (no RaceSpec), below.
 /** the 1990 Lamborghini Diablo: 5.7 V12 four valves, 492 hp at 7,000, five speeds, rear drive; a tubular steel frame
  *  with aluminium and composite panels; 2,650 wheelbase, 2,040 wide; 245/40 ZR17 and 335/35 ZR17 */
-export const DESIGN_DIABLO: Design = { v: 2, id: 'diablo', name: 'Diablo', body: { base: 'f355', nose: 'pointed', front: 'plain', tail: 'frame', wheel: 'star', wheelbase: 200, width: 70, paint: '#7a1fa2', gloss: 0.6, structure: 'steel', panels: 'aluminium' },
+export const DESIGN_DIABLO: Design = { v: 3, id: 'diablo', name: 'Diablo', body: { base: 'f355', nose: 'pointed', front: 'plain', tail: 'frame', wheel: 'star', ...NO_DIMS, wheelbase: 200, width: 70, paint: '#7a1fa2', gloss: 0.6, structure: 'steel', panels: 'aluminium' },
   engine: { grade: 3, layout: 'V12', cc: 5707, valves: 4, redline: 7300, intake: 'single', compression: 'mid', sump: 'wet', block: 'aluminium', turbo: 0, boost: 0.8, intercooler: true, vtec: false },
   drive: { gears: 5, gearbox: 'manual', final: 0, lsd: true, awd: false },
   kit: { abs: false, tcs: false, steering: 'manual', dampers: 'fixed', wing: false, diffuser: false, tyres: [245, 335], rim: 17, interior: 'standard' } };
-/** the 1991 Bugatti EB110 GT: 3.5 V12 five valves, four IHI turbos with intercoolers at about 1.05 bar, 553 hp at
+/** the 1991 Bugatti EB110 GT, on its own base (the kit's EB110: render/car/cars/eb110.kit.ts, the real car's 2,550 mm
+ *  wheelbase and 1,940 mm width): 3.5 V12 five valves, four IHI turbos with intercoolers at about 1.05 bar, 553 hp at
  *  8,000, 7.5:1, a dry sump; six speeds, four-wheel drive; a carbon-fibre monocoque (Aérospatiale's) with aluminium
- *  panels; a luxurious interior (leather, air conditioning: heavy for its materials); 2,550 wheelbase, 1,940 wide;
- *  245/40 ZR18 and 325/30 ZR18; 1,620 kg; 342 km/h */
-export const DESIGN_EB110: Design = { v: 2, id: 'eb110', name: 'EB110', body: { base: 'f355', nose: 'pointed', front: 'plain', tail: 'frame', wheel: 'disc', wheelbase: 100, width: 20, paint: '#1f5fbf', gloss: 0.6, structure: 'cfrp', panels: 'aluminium' },
+ *  panels; a luxurious interior (leather, air conditioning: heavy for its materials); its active rear wing; 245/40 ZR18
+ *  and 325/30 ZR18; 1,620 kg; 342 km/h */
+export const DESIGN_EB110: Design = { v: 3, id: 'eb110', name: 'EB110', body: { base: 'eb110', nose: 'mass', front: 'plain', tail: 'capsule', wheel: 'disc', ...NO_DIMS, paint: '#1b3a8a', gloss: 0.6, structure: 'cfrp', panels: 'aluminium' },
   engine: { grade: 3, layout: 'V12', cc: 3499, valves: 5, redline: 8250, intake: 'single', compression: 'low', sump: 'dry', block: 'aluminium', turbo: 4, boost: 1.0, intercooler: true, vtec: false },
   drive: { gears: 6, gearbox: 'manual', final: 0, lsd: true, awd: true },
   kit: { abs: true, tcs: false, steering: 'hydraulic', dampers: 'fixed', wing: true, diffuser: false, tyres: [245, 325], rim: 18, interior: 'luxury' } };
@@ -131,7 +162,7 @@ export const DESIGN_EB110: Design = { v: 2, id: 'eb110', name: 'EB110', body: { 
  *  intercoolers at about 1.0 bar, 8.3:1, a dry sump, 542 hp at 7,200; five speeds, rear drive; a bonded aluminium
  *  honeycomb tub and aluminium panels, underbody venturis; 2,640 wheelbase, 2,220 wide (here as wide as the NSX's base
  *  stretches, 1,970); 255/45 ZR17 and 345/35 ZR18 (here 335 on 18 at both ends: the builder's one rim size); 1,470 kg */
-export const DESIGN_XJ220: Design = { v: 2, id: 'xj220', name: 'XJ220', body: { base: 'nsx', nose: 'round', front: 'plain', tail: 'roundLamps', wheel: 'disc', wheelbase: 110, width: 80, paint: '#9aa1a6', gloss: 0.6, structure: 'honeycomb', panels: 'aluminium' },
+export const DESIGN_XJ220: Design = { v: 3, id: 'xj220', name: 'XJ220', body: { base: 'nsx', nose: 'round', front: 'plain', tail: 'roundLamps', wheel: 'disc', ...NO_DIMS, wheelbase: 110, width: 80, paint: '#9aa1a6', gloss: 0.6, structure: 'honeycomb', panels: 'aluminium' },
   engine: { grade: 4, layout: 'V6', cc: 3498, valves: 4, redline: 7800, intake: 'single', compression: 'low', sump: 'dry', block: 'aluminium', turbo: 2, boost: 1.0, intercooler: true, vtec: false },
   drive: { gears: 5, gearbox: 'manual', final: 0, lsd: true, awd: false },
   kit: { abs: false, tcs: false, steering: 'manual', dampers: 'fixed', wing: false, diffuser: true, tyres: [255, 335], rim: 18, interior: 'standard' } };
@@ -143,7 +174,7 @@ export const DESIGN_XJ220: Design = { v: 2, id: 'xj220', name: 'XJ220', body: { 
  *  wheelbase, 1,820 wide (here 1,860: the F355's arches need the room for its 315 mm rears), 1,140 high; Cd 0.32; ground-effect venturis with fans (here the
  *  undertray); 235/45 ZR17 and 315/45 ZR17; kerb 1,138 kg (about 1,140); 372 km/h on its production limiter, 386 km/h
  *  (240 mph, Ehra-Lessien 1998) with it raised; 0-100 km/h 3.2 s */
-export const DESIGN_MCLAREN_F1: Design = { v: 2, id: 'mclarenf1', name: 'McLaren F1', body: { base: 'f355', nose: 'pointed', front: 'plain', tail: 'frame', wheel: 'disc', wheelbase: 270, width: -20, paint: '#c9c3b6', gloss: 0.6, structure: 'cfrp', panels: 'cfrp' },
+export const DESIGN_MCLAREN_F1: Design = { v: 3, id: 'mclarenf1', name: 'McLaren F1', body: { base: 'f355', nose: 'pointed', front: 'plain', tail: 'frame', wheel: 'disc', ...NO_DIMS, wheelbase: 270, width: -20, paint: '#c9c3b6', gloss: 0.6, structure: 'cfrp', panels: 'cfrp' },
   engine: { grade: 4, layout: 'V12', cc: 6064, valves: 4, redline: 7500, intake: 'itb', compression: 'high', sump: 'dry', block: 'aluminium', turbo: 0, boost: 0.8, intercooler: true, vtec: false },
   drive: { gears: 6, gearbox: 'manual', final: 0, lsd: false, awd: false },
   kit: { abs: false, tcs: false, steering: 'manual', dampers: 'fixed', wing: false, diffuser: true, tyres: [235, 315], rim: 17, interior: 'light' } };
@@ -151,21 +182,22 @@ export const DESIGN_MCLAREN_F1: Design = { v: 2, id: 'mclarenf1', name: 'McLaren
 const clamp = (v: number, [a, b]: readonly [number, number]) => Math.min(b, Math.max(a, v));
 /** a value the grade allows: the asked one, else the best allowed one below it in the list's order */
 const allowed = <T>(v: T, order: readonly T[], ok: readonly T[]): T => { for (let i = order.indexOf(v); i >= 0; i--) if (ok.includes(order[i]!)) return order[i]!; return ok[0]!; };
-/** a format-1 design in format 2: the structure and the panels of its one material; the grade a high-performance
+/** a format-1 design in format 3: the structure and the panels of its one material; the grade a high-performance
  *  production engine's (format 1's figures were set by the NSX's and the F355's); the intake, the compression, the sump
  *  and the block its base's own car's, the compression a turbo engine's middle one; its turbos' boost what format 1
- *  fixed (one 0.8 bar, two 1.0) */
+ *  fixed (one 0.8 bar, two 1.0); the base's own dimensions */
 export function migrate(d: DesignV1): Design {
   const { material, ...body } = d.body, P = d.body.base === 'f355' ? DESIGN_F355 : DESIGN_NSX, E = d.engine;
-  return { ...d, v: 2, body: { ...body, structure: material, panels: material }, kit: { ...d.kit, interior: 'standard' },
+  return { ...d, v: 3, body: { ...NO_DIMS, ...body, structure: material, panels: material }, kit: { ...d.kit, interior: 'standard' },
     engine: { grade: 2, layout: E.layout, cc: E.cc, valves: E.valves, redline: E.redline, intake: P.engine.intake, compression: E.turbo ? 'mid' : P.engine.compression,
       sump: P.engine.sump, block: P.engine.block, turbo: E.turbo, boost: E.turbo === 2 ? 1.0 : 0.8, intercooler: true, vtec: E.vtec } };
 }
 /** a design brought inside the limits and what its engine's grade allows (a loaded file, a slider's value); a format-1
- *  design is brought to format 2 first */
-export function normalise(d0: Design | DesignV1): Design {
-  const d = d0.v === 1 ? migrate(d0) : d0, E = d.engine, g: Grade = GRADES.includes(E.grade) ? E.grade : 2, R = GRADE_RULES[g];
-  return { ...d, body: { ...d.body, wheelbase: clamp(d.body.wheelbase, LIMITS.wheelbase), width: clamp(d.body.width, LIMITS.width), gloss: clamp(d.body.gloss, [0, 1]) },
+ *  design is brought to format 3 first, a format-2 one takes its base's own dimensions (the new ones zero) */
+export function normalise(d0: Design | DesignV2 | DesignV1): Design {
+  const d: Design = d0.v === 1 ? migrate(d0) : d0.v === 3 ? d0 : { ...d0, v: 3, body: { ...NO_DIMS, ...d0.body } }, E = d.engine, g: Grade = GRADES.includes(E.grade) ? E.grade : 2, R = GRADE_RULES[g];
+  const lim = BODY_LIMITS(BASES.includes(d.body.base) ? d.body.base : 'nsx'), dims = Object.fromEntries(DIMS.map(k => [k, clamp(Number.isFinite(d.body[k]) ? d.body[k] : 0, lim[k])])) as unknown as BodyDims;
+  return { ...d, body: { ...d.body, ...dims, gloss: clamp(d.body.gloss, [0, 1]) },
     engine: { ...E, grade: g, cc: clamp(E.cc, LIMITS.cc), redline: clamp(E.redline, [LIMITS.redline[0], gradeRedline(g)]),
       intake: allowed(E.intake, INTAKES, R.intake), compression: allowed(E.compression, COMPRESSIONS, R.compression), sump: allowed(E.sump, SUMPS, R.sump),
       block: allowed(E.block, BLOCKS, R.block), valves: allowed(E.valves, [2, 3, 4, 5] as Valves[], R.valves), turbo: Math.min(E.turbo, R.turbo) as Turbos,

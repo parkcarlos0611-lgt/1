@@ -1,9 +1,11 @@
 // The assembler: an assembly spec (data, render/car/cars/<id>.kit.ts) in, a Mesh out. It makes the line system from
 // the sheet (with any tweak), lays the standard section along it (skin.ts), then calls each panel and part function
 // the spec names, in order, telling the emitter what each triangle is for (so the seam check can find the shell).
+// Last, the tweak's warp (lines.ts makeWarp: the roof, the overhangs, the ride, the cabin, the rake) moves the body's
+// points, the wheels, the engine and the cabin's inside whole.
 import type { Mesh } from '../mesh';
-import { Emit, type Role } from './emit';
-import { makeLines, type Lines, type Tweak } from './lines';
+import { Emit, ROLES, type Role } from './emit';
+import { makeLines, makeWarp, type BodyWarp, type Lines, type Tweak } from './lines';
 import { makeSkin, type Skin } from './skin';
 import type { Ctx } from './ctx';
 import type { CarKit } from './spec';
@@ -30,6 +32,7 @@ import { wiper } from './parts/wiper';
 import { exhaust } from './parts/exhaust';
 import { plate } from './parts/small';
 import { engine } from './parts/engine';
+import { diffuser } from './parts/diffuser';
 
 export interface AssembleOpts { /** the wheels turned (radians) */ spin?: number; /** the pop-up lamps raised 0..1 */ lamps?: number; /** an active rear wing raised 0..1 */ wing?: number; /** a change to the sheet's lines */ tweak?: Tweak }
 export interface Assembled { mesh: Mesh; lines: Lines; skin: Skin;
@@ -54,8 +57,20 @@ export function assemble(k: CarKit, o: AssembleOpts = {}): Assembled {
   // inside
   run('inside', 'cabin', () => cabin(x)); run('inside', 'engineBay', () => engineBay(x)); run('inside', 'engine', () => engine(x, k.engine.spec, k.engine.at, k.engine.opts));
   // the fittings and the wheels
-  run('part', 'mirror', () => mirror(x, k.mirror)); run('part', 'wiper', () => wiper(x, k.wiper)); run('part', 'wing', () => wing(x));
+  run('part', 'mirror', () => mirror(x, k.mirror)); run('part', 'wiper', () => wiper(x, k.wiper)); run('part', 'wing', () => wing(x)); run('part', 'diffuser', () => diffuser(x));
   for (const sg of [1, -1] as const) { run('part', 'wheel', () => { wheel(x, L.wheels.f, sg, true, k.wheel); wheel(x, L.wheels.r, sg, false, k.wheel); }); }
-  const mesh = e.b.mesh(L.length), r = e.roles(mesh.n);
+  const mesh = e.b.mesh(L.length), r = e.roles(mesh.n), W = makeWarp(L, [k.canopy.roof.from, k.canopy.roof.to], o.tweak ?? {});
+  if (!W.none) warp(mesh, r.role, r.panelOf, r.panel, W);
   return { mesh, lines: L, skin: s, role: r.role, panelOf: r.panelOf, panels: r.panel };
+}
+
+/** the warp laid on a built mesh: the wheels (and the axles' bars between them), the engine and the cabin's inside moved
+ *  whole, every other point through the body's warp */
+function warp(M: Mesh, role: Uint8Array, panelOf: Int16Array, panels: string[], W: BodyWarp): void {
+  const P = M.pos, part = ROLES.indexOf('part'), inside = ROLES.indexOf('inside');
+  for (let t = 0; t < M.n; t++) { const pn = panels[panelOf[t]!], rl = role[t]!;
+    const d = rl === part && (pn === 'wheel' || pn === 'underbody') ? W.wheel : rl === inside && pn === 'engine' ? W.engine : rl === inside && pn === 'cabin' ? W.inside : null;
+    for (let i = t * 9; i < t * 9 + 9; i += 3) { if (d) { P[i] += d[0]; P[i + 1] += d[1]; P[i + 2] += d[2]; continue; }
+      const q = W.body([P[i]!, P[i + 1]!, P[i + 2]!]); P[i] = q[0]; P[i + 1] = q[1]; P[i + 2] = q[2]; } }
+  M.length = W.length;
 }

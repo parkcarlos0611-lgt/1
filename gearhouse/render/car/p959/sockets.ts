@@ -4,9 +4,10 @@ import type { V } from './subdiv';
 
 export interface Hub { name: string; /** the wheel's outer face centre */ o: V; tyreR: number; rimR: number; width: number; archR: number; front: boolean }
 export interface Mount { name: string; o: V; /** the way it faces, out of the surface */ n: V }
-export interface Sockets { hubs: Hub[]; mirrors: Mount[] }
-export function sockets(): Sockets { const hubs: Hub[] = [], mirrors: Mount[] = [];
+export interface Sockets { hubs: Hub[]; mirrors: Mount[]; exhausts: { name: string; o: V; r: number }[] }
+export function sockets(): Sockets { const hubs: Hub[] = [], mirrors: Mount[] = [], exhausts: Sockets['exhausts'] = [];
   for (const s of [1, -1]) { hubs.push({ name: s > 0 ? 'hubFL' : 'hubFR', o: [DIM.axleF, s * (DIM.trackF / 2 + 118), DIM.hubZ], tyreR: DIM.tyreR, rimR: 222, width: 235, archR: DIM.archR, front: true });
     hubs.push({ name: s > 0 ? 'hubRL' : 'hubRR', o: [DIM.axleR, s * (DIM.trackR / 2 + 128), DIM.hubZ - 2], tyreR: DIM.tyreR - 2, rimR: 222, width: 255, archR: DIM.archR, front: false });
+    exhausts.push({ name: s > 0 ? 'exhaustL' : 'exhaustR', o: [4262, s * 335, 318], r: 46 });
     mirrors.push({ name: s > 0 ? 'mirrorL' : 'mirrorR', o: [1680, s * 760, 880], n: [0, s, 0] }); }
-  return { hubs, mirrors }; }
+  return { hubs, mirrors, exhausts }; }

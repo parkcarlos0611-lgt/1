@@ -16,6 +16,7 @@ export function png(path: string, w: number, h: number, rgb: Uint8Array) { const
 // ---- the drawing: the game's manner in small (two tones with a soft edge, one small highlight, a dark line round the
 //      car and between its parts, the drawn lines on top), with the shell's own normals. Drawn at twice the size and halved.
 type V3 = [number, number, number];
+const FORM = process.argv.includes('form');   // continuous shading, to judge the forms (the default is the game's two tones)
 const { mesh: M, shell: S, normals: NN, shellTris } = p959Model();
 const KIND_PAINT = KINDS.indexOf('paint'), KIND_GLASS = KINDS.indexOf('glass'), KIND_TYRE = KINDS.indexOf('tyre');
 const dot = (a: V3, b: V3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2], crs = (a: V3, b: V3): V3 => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]], un = (a: V3): V3 => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };
@@ -34,7 +35,7 @@ function flat(yawDeg: number, pitchDeg: number, o: DrawO = {}): Uint8Array { con
     for (let py = y0; py <= y1; py++) for (let px = x0; px <= x1; px++) { const X = px + 0.5, Y = py + 0.5, l0 = ((B[1] - C[1]) * (X - C[0]) + (C[0] - B[0]) * (Y - C[1])) / den, l1 = ((C[1] - A[1]) * (X - C[0]) + (A[0] - C[0]) * (Y - C[1])) / den, l2 = 1 - l0 - l1; if (l0 < -1e-5 || l1 < -1e-5 || l2 < -1e-5) continue;
       const d = l0 * A[2] + l1 * B[2] + l2 * C[2], zi = py * w + px; if (d >= zb[zi]!) continue; zb[zi] = d; id[zi] = M.part[t]!;
       const n = un([ns[0]![0] * l0 + ns[1]![0] * l1 + ns[2]![0] * l2, ns[0]![1] * l0 + ns[1]![1] * l1 + ns[2]![1] * l2, ns[0]![2] * l0 + ns[1]![2] * l1 + ns[2]![2] * l2]);
-      const nl = dot(n, light), lit = Math.max(0, Math.min(1, (nl - 0.18) / 0.08)), sp = kind === KIND_PAINT || kind === KIND_GLASS ? Math.max(0, Math.min(1, (Math.pow(Math.max(0, dot(n, half)), 90) - 0.5) / 0.15)) : 0;
+      const nl = dot(n, light), lit = FORM ? Math.max(0, nl) ** 1.5 : Math.max(0, Math.min(1, (nl - 0.18) / 0.08)), sp = kind === KIND_PAINT || kind === KIND_GLASS ? Math.max(0, Math.min(1, (Math.pow(Math.max(0, dot(n, half)), 90) - 0.5) / 0.15)) : 0;
       const sh: V3 = kind === KIND_GLASS ? [0.9, 0.95, 1] : [0.56 + 0.44 * lit, 0.6 + 0.4 * lit, 0.68 + 0.32 * lit], g = kind === KIND_TYRE ? 0.9 : 1;
       for (let c = 0; c < 3; c++) img[zi * 3 + c] = Math.min(255, base[c]! * sh[c]! * g + sp * 90); } }
   const ink = (zi: number, a = 1) => { for (let c = 0; c < 3; c++) img[zi * 3 + c] = img[zi * 3 + c]! * (1 - a) + 22 * a; };

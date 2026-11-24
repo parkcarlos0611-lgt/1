@@ -159,6 +159,6 @@ function linePart(gl: WebGL2RenderingContext, lines: { pts: V[]; closed?: boolea
  *  edges; a line on a suspension part on that part's bone (the wheels carry none) */
 export function styleLines(gl: WebGL2RenderingContext, g: GpuMesh): { body: LinePart | null; susp: LinePart | null } {
   if (g.lines) return g.lines; const M = g.body.src?.M; if (!M) return g.lines = { body: null, susp: null };
-  const own = M.lines?.length ? M.lines : hardEdgeLines(M, { tris: g.body.src!.tris }), rig = g.susp?.rig, body: typeof own = [], susp: (typeof own[number] & { bone: number })[] = [];
+  const own = [...(M.lines?.length ? M.lines : hardEdgeLines(M, { tris: g.body.src!.tris })), ...(M.partLines ?? [])], rig = g.susp?.rig, body: typeof own = [], susp: (typeof own[number] & { bone: number })[] = [];
   for (const l of own) { const m = l.pts[Math.floor(l.pts.length / 2)]!, b = rig && l.part ? boneAt(rig, l.part, m[0], m[1]) : -1; if (b > 0) susp.push({ ...l, bone: b }); else body.push(l); }
   return g.lines = { body: linePart(gl, body), susp: linePart(gl, susp) }; }

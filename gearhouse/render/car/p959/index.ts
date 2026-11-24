@@ -12,12 +12,12 @@ export { p959Lines } from './lines';
 import { p959Lines } from './lines';
 
 export interface P959Opts extends ShellOpts { paint?: string; /** leave out the placeholder modules that are not part of the skin (wheels, lenses, mirrors, exhausts) */ bare?: boolean }
-const MAT: Record<string, [string, number, Parameters<Build['mat']>[2]]> = { glass: ['#20262c', 0.9, 'glass'], grille: ['#17181a', 0.1, 'grille'], dark: ['#1b1c1e', 0.05, 'plain'], lamp: ['#b3261e', 0.5, 'lens'] };
+const MAT: Record<string, [string, number, Parameters<Build['mat']>[2]]> = { glass: ['#20262c', 0.9, 'glass'], grille: ['#17181a', 0.1, 'grille'], dark: ['#1b1c1e', 0.05, 'plain'], lamp: ['#b3261e', 0.5, 'lens'], amber: ['#d9861c', 0.5, 'lens'], lens: ['#dfe4e8', 0.8, 'lens'] };
 
 /** the faces of a shell laid into a builder, a part per panel and material */
 export function emitShell(b: Build, S: Shell959, paint: string, normals?: number[]): void { const groups = new Map<string, number[]>();
   S.tag.forEach((t, k) => { const key = `${t.panel}|${t.mat}`; (groups.get(key) ?? groups.set(key, []).get(key)!).push(k); });
-  for (const [key, fs] of groups) { const [panel, mat] = key.split('|') as [string, string], m = MAT[mat]; b.name(panel); if (m) b.mat(panel === 'headLamp' ? '#d9dde0' : m[0], m[1], m[2]); else b.mat(paint, 0.6, 'paint');
+  for (const [key, fs] of groups) { const [panel, mat] = key.split('|') as [string, string], m = MAT[mat]; b.name(panel); if (m) b.mat(m[0], m[1], m[2]); else b.mat(paint, 0.6, 'paint');
     for (const k of fs) for (const t of cut(S.P, S.F[k]!)) { b.tri(S.P[t[0]]!, S.P[t[1]]!, S.P[t[2]]!); if (normals) for (const v of t) normals.push(...S.N[k]![S.F[k]!.indexOf(v)]!); } } }
 
 /** the model: the mesh, the shell it was made from, and the shell's own shading normals (nine numbers a triangle, for
@@ -31,6 +31,7 @@ export function p959Model(o: P959Opts = {}): P959Model { const S = buildShell(o)
       const o: V = [h.o[0], h.o[1] - s * w / 2, h.o[2]], f = s * w / 2;
       b.name(h.front ? 'tyreF' : 'tyreR').mat('#1c1c1e', 0.1, 'tyre').lathe('y', o, [[-f, r - 26], [-f * 0.8, r], [f * 0.8, r], [f, r - 26], [f, rim]], 20, false);
       b.name('rim').mat('#c9ccd0', 0.75, 'metal').lathe('y', o, [[f, rim], [f - s * 14, rim - 12], [f - s * 40, rim * 0.5], [f - s * 55, 70], [f - s * 55, 0.5]], 20, false); }
+    for (const e of K.exhausts) b.name('exhaust').mat('#2a2b2d', 0.6, 'metal').lathe('x', [0, e.o[1], e.o[2]], [[e.o[0] - 60, e.r], [e.o[0] + 14, e.r], [e.o[0] + 14, e.r - 9], [e.o[0] - 60, e.r - 9]], 10, false);
     for (const m of K.mirrors) { const s = m.o[1] > 0 ? 1 : -1; b.name('mirror').mat(paint, 0.6, 'paint').box(m.o[0] - 30, m.o[0] + 60, Math.min(m.o[1], m.o[1] + s * 150), Math.max(m.o[1], m.o[1] + s * 150), m.o[2] + 10, m.o[2] + 105); } }
   const M = b.mesh(DIM.length);
   M.lines = p959Lines(S) as MeshLine[];

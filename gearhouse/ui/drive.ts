@@ -40,7 +40,19 @@ import { Health, WARN } from '../race/health';
 import { Sound, type Skid } from './sound';
 import specsData from '../data/cars/specs.json';
 
-const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
+/** what a page holding the drive gives it (the game's one page, ui/shell): the root its markup is in (found there even
+ *  while it is taken off the page), the one renderer shared by the screens (its sky and car textures loaded by the
+ *  shell), the design to drive (null: none; left out: the link's), and what going back to the design does. A page of
+ *  its own (drive.page.html) gives nothing */
+export interface DriveHost { root?: ParentNode; renderer?: LiveRenderer | null; design?: Design | null; onDesign?: () => void }
+export interface DriveApi { /** the world held still (its picture kept) and on again */ pause(): void; resume(): void; readonly paused: boolean;
+  /** the car put back behind the line (a race started again) */ restart(): void; /** another design driven (null: the car list's first) */ useDesign(d: Design | null): void;
+  setTrack(id: string): void; readonly track: string; /** a race with these entrants and laps (the race tab's own fields) */ race(o: { opp?: number; lineup?: string; laps?: number; mode?: string }): void;
+  /** the track's materials and props loaded (or failed) */ readonly ready: Promise<void>; readonly drawerOpen: boolean; drawer(open: boolean): void }
+// The drive below is one function's body, mounted once on its markup; it is not indented, so its lines read as before.
+export function mountDrive(H: DriveHost = {}): DriveApi {
+const R = H.root ?? document;
+const $ = <T extends HTMLElement>(id: string) => (R === document ? document.getElementById(id) : R.querySelector(`#${id}`)) as T;
 // the track (review 162): Millbrook, the Ashcombe Park road course or the Speed Bowl, chosen on the page (kept in this browser)
 const TRACK_KEY = 'gearhouse.drive.track';
 let TD: TrackDef = trackDef((() => { try { return localStorage.getItem(TRACK_KEY) ?? 'millbrook'; } catch { return 'millbrook'; } })()), T: Track = TD.make();
@@ -90,13 +102,14 @@ let myNum = '6';
 const meshOf = (id: string, num: string) => renumber(MESH_CARS.find(c => c.id === id)!.mesh(), num);
 const numOf = (e: Entrant): string => { if (!race) return myNum; let k = 0; for (const x of race.cars) { if (x === race.player) continue; k++; if (String(k) === myNum) k++; if (x === e) return String(k); } return myNum; };
 // ---- the live renderer (review 99): the scene drawn every frame by WebGL2, where the browser has it; the baked pictures otherwise ----
-const glCanvas = document.createElement('canvas'); let live: LiveRenderer | null = null, liveFence = -1;
+const glCanvas = H.renderer?.canvas ?? document.createElement('canvas'); let live: LiveRenderer | null = null, liveFence = -1;
 /** where the photographed props (drums, tyres, tables) stand at this track's pits */
 const propPlaces = (): PropPlace[] => { const W2 = T.spec.width / 2; return TD.id === 'millbrook' ? paddockProps() : TD.id === 'road' ? pitProps(1938, { s0: START - 200, n: 8, off: W2 + 30 }, { s: START - 215, off: W2 + 12 }, { s: START, off: W2 + 4 }) : pitProps(1991, { s0: START - 120, n: 4, off: W2 + 30 }, { s: START - 140, off: W2 + 12 }, { s: START, off: W2 + 4 }); };
 let propBase: Record<string, { min: number[]; max: number[] }> | null = null;
-try { live = new LiveRenderer(glCanvas); live.setGround(groundData(T, SCN, START, TD.groundStep)); live.setTrack(T.length, T.spec.width, T.spec.joints, START, rubberLine(T)); const L0 = live; void loadGround(L0, matchMedia('(pointer: coarse)').matches ? 512 : 1024).catch(e => console.warn('ground materials', e)); void loadSky(L0).catch(e => console.warn('sky', e)); void loadProps(L0, () => ({ T, places: propPlaces() })).then(b => { propBase = b; }).catch(e => console.warn('props', e)); void loadBuildings(L0).catch(e => console.warn('building materials', e)); } catch (e) { console.warn('live renderer unavailable', e); live = null; }
+const loads: Promise<unknown>[] = [];   // the track's materials and props, for a host waiting on them
+try { live = H.renderer ?? new LiveRenderer(glCanvas); live.setGround(groundData(T, SCN, START, TD.groundStep)); live.setTrack(T.length, T.spec.width, T.spec.joints, START, rubberLine(T)); const L0 = live; loads.push(loadGround(L0, matchMedia('(pointer: coarse)').matches ? 512 : 1024).catch(e => console.warn('ground materials', e))); if (!H.renderer) void loadSky(L0).catch(e => console.warn('sky', e)); loads.push(loadProps(L0, () => ({ T, places: propPlaces() })).then(b => { propBase = b; }).catch(e => console.warn('props', e))); loads.push(loadBuildings(L0).catch(e => console.warn('building materials', e))); } catch (e) { console.warn('live renderer unavailable', e); live = null; }
 // the PBR detail textures (Poly Haven, CC0): loaded once, laid on when ready
-if (live) { const L = live, im = [texAlb, texNor, texRgh].map(src => { const i = new Image(); i.src = src; return i; });
+if (live && !H.renderer) { const L = live, im = [texAlb, texNor, texRgh].map(src => { const i = new Image(); i.src = src; return i; });
   void Promise.all(im.map(i => i.decode())).then(() => L.setTextures(im[0]!, im[1]!, im[2]!, (texMeta as { layers: { size_m: number; luma_mean: number; rough_mean: number }[] }).layers)).catch(e => console.warn('textures', e)); }
 // the cars' age in the live picture (review 104): the player's set on the page, its dirt growing as it is driven (fast on
 // the grass); the others' by their entry, a mixed field
@@ -122,10 +135,12 @@ function wingUp(id: string, base: Mesh): Mesh { if (DESIGN && id === DESIGN.id) 
 // kit (render/car/design.ts, pop-up lamps on both bases); offered first in the car list and chosen; its runs (its best
 // lap at each track, the top speed it reached) recorded under the design for the builder's readouts ----
 const STORE: KeyStore | null = (() => { try { return localStorage; } catch { return null; } })();
-const DESIGN: { d: Design; id: string } | null = (() => { let q: string | null = null; try { q = new URLSearchParams(location.search).get('design'); if (q === 'stored' || q === '') q = STORE?.getItem(KEYS.testDrive) ?? null; } catch { q = null; }
-  if (!q) return null; const d = decodeDesign(q); if (!d) { console.warn('design: the link holds no design'); return null; }
-  const spec = designSpec(d); addRaceCar(spec); MESH_CARS.push({ id: spec.id, name: d.name, mesh: (spin?: number, lamps?: number) => designMesh(d, spin, lamps) });
-  EXP_ENGINE[spec.id] = { kind: 'ohv', layout: d.engine.layout }; POPUP.add(spec.id); carId = spec.id; return { d, id: spec.id }; })();
+/** a design made a car of the lists (the same design again: its car replaced) */
+function addDesign(d: Design): { d: Design; id: string } { const spec = designSpec(d), mc = { id: spec.id, name: d.name, mesh: (spin?: number, lamps?: number) => designMesh(d, spin, lamps) }; addRaceCar(spec);
+  const i = MESH_CARS.findIndex(c => c.id === spec.id); if (i >= 0) MESH_CARS[i] = mc; else MESH_CARS.push(mc);
+  EXP_ENGINE[spec.id] = { kind: 'ohv', layout: d.engine.layout }; POPUP.add(spec.id); carId = spec.id; return { d, id: spec.id }; }
+let DESIGN: { d: Design; id: string } | null = H.design !== undefined ? (H.design ? addDesign(H.design) : null) : (() => { let q: string | null = null; try { q = new URLSearchParams(location.search).get('design'); if (q === 'stored' || q === '') q = STORE?.getItem(KEYS.testDrive) ?? null; } catch { q = null; }
+  if (!q) return null; const d = decodeDesign(q); if (!d) { console.warn('design: the link holds no design'); return null; } return addDesign(d); })();
 let dTop = 0, dTopKept = 0, dTopAt = -Infinity;
 /** the design's run recorded: a lap done (s), or the top speed now and then as it climbs */
 function designRun(lap?: number) { if (!DESIGN || carId !== DESIGN.id) return; dTop = Math.max(dTop, car.speed * 3.6);
@@ -453,7 +468,7 @@ const ALL_CARS = [...RACE_CARS, ...NEW_CARS, ...EXP_CARS], yearOf = (id: string)
 const ERA = { period: ALL_CARS.filter(id => yearOf(id) < 1945), modern: ALL_CARS.filter(id => yearOf(id) >= 1980), mix: ALL_CARS };
 /** the opponents as the race tab sets them: so many, from an era, mixed, or picked by hand */
 function opponents(seed: number): { ids: string[]; note: string } { const n = +$<HTMLSelectElement>('opp').value, how = $<HTMLSelectElement>('lineup').value as keyof typeof ERA | 'pick';
-  if (how === 'pick') { const ids = Array.from(document.querySelectorAll<HTMLInputElement>('#picklist input:checked')).map(i => i.value).filter(id => id !== carId).slice(0, 7);
+  if (how === 'pick') { const ids = Array.from(R.querySelectorAll<HTMLInputElement>('#picklist input:checked')).map(i => i.value).filter(id => id !== carId).slice(0, 7);
     if (ids.length) return { ids, note: '' }; }
   const pool = (how === 'pick' ? ERA.period : ERA[how]).filter(id => id !== carId), want = Math.min(n, pool.length), out: string[] = []; let r = seed;
   while (out.length < want) { r = (r * 16807) % 2147483647; const id = pool[r % pool.length]!; if (!out.includes(id)) out.push(id); }
@@ -478,11 +493,11 @@ function press(k: string) { if (k === 'm') { st.auto = !st.auto; car.auto = st.a
   if (!st.auto && (k === 'e' || k === 'x')) manualGear = Math.min(car.spec.gears.length, manualGear + 1); if (!st.auto && (k === 'q' || k === 'z')) manualGear = Math.max(1, manualGear - 1);
   if (k === 'r') { car.place(car.s, 0, 0); say('트랙으로 복귀'); }
   if (k === 'c') setCine(!st.cine); }
-addEventListener('keydown', e => { const k = e.key.toLowerCase(); if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' '].includes(k)) e.preventDefault(); keys.add(k);
+addEventListener('keydown', e => { if (!running) return; const k = e.key.toLowerCase(); if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' '].includes(k)) e.preventDefault(); keys.add(k);
   if (!e.repeat) press(k); });
 addEventListener('keyup', e => keys.delete(e.key.toLowerCase()));
 // the screen buttons: held while a finger is on them (several at once), a tap for gears and reset
-for (const b of Array.from(document.querySelectorAll<HTMLButtonElement>('#pad button'))) { const k = b.dataset.key!, hold = k.startsWith('arrow');
+for (const b of Array.from(R.querySelectorAll<HTMLButtonElement>('#pad button'))) { const k = b.dataset.key!, hold = k.startsWith('arrow');
   const on = (e: PointerEvent) => { e.preventDefault(); b.setPointerCapture(e.pointerId); b.classList.add('on'); if (hold) keys.add(k); else press(k); };
   const off = (e: PointerEvent) => { e.preventDefault(); b.classList.remove('on'); if (hold) keys.delete(k); };
   b.addEventListener('pointerdown', on); b.addEventListener('pointerup', off); b.addEventListener('pointercancel', off); b.addEventListener('lostpointercapture', () => { b.classList.remove('on'); if (hold) keys.delete(k); });
@@ -508,7 +523,7 @@ function controls(dt: number): Controls { const left = down('arrowleft', 'a'), r
   if (car.reverse && car.speed * 3.6 > 20) thr = 0;
   return { steer: Math.max(-most, Math.min(most, steer)), throttle: thr, brake: input.brake, handbrake: input.hand, gear: manualGear }; }
 // ---- the loop ----
-let last = performance.now(), acc = 0;
+let last = performance.now(), acc = 0, running = true, looping = true;   // running: wanted on (a host pauses it); looping: a frame asked for
 function frame(now: number) { const el = Math.min(0.1, (now - last) / 1000); last = now; acc += el; clock += el; msgT -= el;
   while (acc >= DT) { acc -= DT; const u = st.pilot ? pilot.drive(car) : controls(DT);
     if (race) { race.step(DT, u); wheelTurn = race.player!.wheelTurn; if (race.done && !$('results').dataset.shown) results(); } else { car.step(DT, u); wheelTurn += (car.w[0]! + car.w[1]!) / 2 * DT; }
@@ -543,14 +558,18 @@ function frame(now: number) { const el = Math.min(0.1, (now - last) / 1000); las
   { const R = SCN.railway; let len = 0; for (let k = 0; k + 1 < R.length; k++) len += Math.hypot(R[k + 1]![0] - R[k]![0], R[k + 1]![1] - R[k]![1]);   // the train: now and then along the line
     if (train.d < 0) { train.wait -= el; if (train.wait <= 0) train.d = 0; } else { train.d += 24 * el; if (train.d > len + 80) { train.d = -1; train.wait = 70 + Math.random() * 120; } }
     if (snd) { const q = trainCars()[0]; snd.train = q ? Math.max(0, 1 - Math.hypot(q.x - car.x, q.y - car.y) / 400) : 0; } }
-  drawWorld(el); drawPuffs(); drawSteam(el); if (st.cine) letterbox(); else dials(); hud(); mini(); sounds(); (live ? 0 : sprites.work(5)); if (!live) for (const sp of others.values()) sp.work(2); requestAnimationFrame(frame); }
+  drawWorld(el); drawPuffs(); drawSteam(el); if (st.cine) letterbox(); else dials(); hud(); mini(); sounds(); (live ? 0 : sprites.work(5)); if (!live) for (const sp of others.values()) sp.work(2); if (running) requestAnimationFrame(frame); else looping = false; }
 // ---- page ----
 const pick = $<HTMLSelectElement>('car'); for (const id of RACE_CARS) pick.add(new Option(raceSpec(id).name, id));
 { const g = document.createElement('optgroup'); g.label = '새 3D 차 (레퍼런스 시트로 제작)'; for (const id of NEW_CARS) g.append(new Option(raceSpec(id).name, id)); pick.append(g); }
 { const g = document.createElement('optgroup'); g.label = '실험: 시대 밖의 차'; for (const id of EXP_CARS) g.append(new Option(`${raceSpec(id).name} — ${raceSpec(id).era}`, id)); pick.append(g); }
-if (DESIGN) { const g = document.createElement('optgroup'); g.label = '부품 빌더의 설계'; g.append(new Option(`${DESIGN.d.name} (설계)`, DESIGN.id)); pick.prepend(g); SHORT[DESIGN.id] = DESIGN.d.name.slice(0, 16);
+/** the design driven: first in the car list, a way back to the builder and a note in the drive tab */
+const designBits: HTMLElement[] = [];
+function showDesign() { for (const el of designBits.splice(0)) el.remove(); if (!DESIGN) return; const g = document.createElement('optgroup'); g.label = '부품 빌더의 설계'; g.append(new Option(`${DESIGN.d.name} (설계)`, DESIGN.id)); pick.prepend(g); SHORT[DESIGN.id] = DESIGN.d.name.slice(0, 16);
   const a = document.createElement('a'); a.className = 'btn'; a.href = 'builder.html'; a.textContent = '← 부품 빌더로'; const n = document.createElement('p'); n.className = 'note'; n.textContent = `설계 "${DESIGN.d.name}"을 시험 주행합니다. 랩 타임과 낸 최고 속도가 설계에 기록되어 빌더의 "측정"에 나옵니다.`;
-  document.querySelector('section[data-tab="drive"]')?.prepend(a, n); }
+  if (H.onDesign) a.addEventListener('click', e => { e.preventDefault(); H.onDesign!(); });
+  R.querySelector('section[data-tab="drive"]')?.prepend(a, n); designBits.push(g, a, n); }
+showDesign();
 pick.value = carId;
 // the race tab's own list of cars to pick as opponents (review 162)
 { const box = $('picklist'); for (const id of ALL_CARS) { const l = document.createElement('label'); l.className = 'check'; const c = document.createElement('input'); c.type = 'checkbox'; c.value = id; c.checked = ['dueSSJ35', 'fnTT33', 'bmw315'].includes(id); l.append(c, ` ${shortName(id)}`); box.append(l); }
@@ -578,10 +597,10 @@ $('fs').addEventListener('click', () => { const el = document.documentElement as
 // the settings drawer, sorted into tabs (review 145): opened by the gear button or Tab, closed by its cross, Esc or Tab
 const drawer = (open?: boolean) => { const on = open ?? !document.body.classList.contains('drawer-open'); document.body.classList.toggle('drawer-open', on); $('setbtn').setAttribute('aria-expanded', String(on)); if (!on) (document.activeElement as HTMLElement | null)?.blur(); };
 $('setbtn').addEventListener('click', () => drawer()); $('setclose').addEventListener('click', () => drawer(false));
-addEventListener('keydown', e => { if (e.key === 'Tab' && !(e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement || e.target instanceof HTMLButtonElement)) { e.preventDefault(); drawer(); } else if (e.key === 'Escape' && document.body.classList.contains('drawer-open')) drawer(false); });
-document.querySelectorAll<HTMLButtonElement>('.tabs button').forEach(b => b.addEventListener('click', () => { const t = b.dataset.tab;
-  document.querySelectorAll<HTMLButtonElement>('.tabs button').forEach(x => x.setAttribute('aria-selected', String(x === b)));
-  document.querySelectorAll<HTMLElement>('.dials section').forEach(sec => sec.classList.toggle('on', sec.dataset.tab === t)); }));
+addEventListener('keydown', e => { if (!running) return; if (e.key === 'Tab' && !(e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement || e.target instanceof HTMLButtonElement)) { e.preventDefault(); drawer(); } else if (e.key === 'Escape' && document.body.classList.contains('drawer-open')) drawer(false); });
+R.querySelectorAll<HTMLButtonElement>('.tabs button').forEach(b => b.addEventListener('click', () => { const t = b.dataset.tab;
+  R.querySelectorAll<HTMLButtonElement>('.tabs button').forEach(x => x.setAttribute('aria-selected', String(x === b)));
+  R.querySelectorAll<HTMLElement>('.dials section').forEach(sec => sec.classList.toggle('on', sec.dataset.tab === t)); }));
 // the surface (review 145): the period's concrete with its five bumps, or resurfaced smooth for the fast cars; the drawn ground follows
 // the track (review 162): everything that hangs on it built again: the scenery, the ground, the fence, the cameras,
 // the minimap, the rubbered line, the props at the pits; the car put back behind the line; a race stopped
@@ -632,7 +651,7 @@ const setFree = (on: boolean) => { st.free = on; ($('free') as HTMLInputElement)
   cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
   cv.addEventListener('wheel', e => { e.preventDefault(); zoom(e.deltaY > 0 ? 1 : -1); }, { passive: false });
   cv.addEventListener('dblclick', () => setFree(false));
-  addEventListener('keydown', e => { if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) return; const k = e.key;
+  addEventListener('keydown', e => { if (!running || e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) return; const k = e.key;
     if (k === ',' || k === '<') { if (!st.free) setFree(true); camAng += 0.12; camShow(); } if (k === '.' || k === '>') { if (!st.free) setFree(true); camAng -= 0.12; camShow(); }
     if (k === '-' || k === '_') zoom(1); if (k === '=' || k === '+') zoom(-1);
     if (k === 'PageUp') { e.preventDefault(); want(pitchDeg + 5, mm); } if (k === 'PageDown') { e.preventDefault(); want(pitchDeg - 5, mm); } if (k === 'Home') setFree(false); }); }
@@ -664,3 +683,19 @@ function fit() {   // the picture fills the window (review 145), in big pixels: 
   cv.width = VW; cv.height = VH; cv.style.width = `${VW * k}px`; cv.style.height = `${VH * k}px`; ctx.imageSmoothingEnabled = false; }
 addEventListener('resize', fit); addEventListener('orientationchange', () => setTimeout(fit, 200)); fit(); showTrack(); choose(carId); camX = car.x; camY = car.y; camZ = 0; camShow(); requestAnimationFrame(frame);
 (globalThis as { __drive?: unknown }).__drive = { set look(v: [number, number, number] | null) { lookAt = v; }, get car() { return car; }, get L() { return live; }, get damage() { const e = dmg.get(car); return e ? { worst: e.D.worst, taken: e.D.taken } : null; }, get race() { return race; }, /** run the world on by t seconds at once, the test driver at the wheel (page tests on slow software GL) */ advance(t: number) { for (let k = 0; k < t / DT; k++) { const u = pilot.drive(car); if (race) race.step(DT, u); else car.step(DT, u); } }, get SCN() { return SCN; }, get T() { return T; } };   // for the page tests (tools): place the car, read the scenery
+const ready = Promise.all(loads).then(() => undefined);
+return {
+  pause() { if (!running) return; running = false; keys.clear(); input.throttle = 0; input.brake = 0; input.hand = 0; void snd?.ctx.suspend().catch(() => {}); },
+  resume() { running = true; void snd?.ctx.resume().catch(() => {}); if (!looping) { looping = true; last = performance.now(); acc = 0; requestAnimationFrame(frame); } },
+  get paused() { return !running; },
+  restart() { if (race) { startRace(); return; } choose(carId); camX = car.x; camY = car.y; camZ = 0; camAng = car.yaw; },
+  useDesign(d: Design | null) { DESIGN = d ? addDesign(d) : null; if (!DESIGN && carId.startsWith('design:')) carId = RACE_CARS[0]!; dTop = 0; dTopKept = 0; showDesign(); pick.value = carId;
+    if (race) stopRace(); else choose(carId); camX = car.x; camY = car.y; camZ = 0; camAng = car.yaw; },
+  setTrack(id: string) { if (id === TD.id) return; $<HTMLSelectElement>('trackSel').value = id; useTrack(id); },
+  get track() { return TD.id; },
+  race(o) { const set = (id: string, v: unknown) => { if (v !== undefined) $<HTMLSelectElement>(id).value = String(v); }; set('opp', o.opp); set('lineup', o.lineup); set('laps', o.laps); set('mode', o.mode);
+    $('pickbox').hidden = $<HTMLSelectElement>('lineup').value !== 'pick'; startRace(); $('race').textContent = '다시 시작'; },
+  ready, get drawerOpen() { return document.body.classList.contains('drawer-open'); }, drawer(open: boolean) { drawer(open); } };
+}
+// a page of its own: the drive's markup is on it (the game's page mounts it on a screen instead)
+if (typeof document !== 'undefined' && document.getElementById('setbtn') && !document.getElementById('gh-app')) mountDrive();

@@ -57,7 +57,7 @@ describe('its dimensions (§4-4) on the shared frame map', () => {
     expect(f.x(1400)).toBeLessThan(1400 + 80 + 120); expect(f.x(1700)).toBeCloseTo(1700 + 200, 3);   // the stretch is ahead of the door; the cabin only moves
     const h = n33Hubs(f); expect(h[1]!.o[0] - h[0]!.o[0]).toBeCloseTo(DIM.wheelbase + 120, 3); });
   it('each end of each range keeps the surface rules and the closed surface', () => {
-    for (const k of FRAME_DIMS) for (const v of R[k]) { const S = buildN33Shell({ dims: { [k]: v } }); expect([...edgeUse(S.F).values()].filter(u => u !== 2).length, `${k} ${v}`).toBe(0); rules(S, `${k} ${v}`); } });
+    for (const k of FRAME_DIMS) for (const v of R[k]) { const S = buildN33Shell({ dims: { [k]: v } }); expect([...edgeUse(S.F).values()].filter(u => u !== 2).length, `${k} ${v}`).toBe(0); rules(S, `${k} ${v}`); expect(thin(S), `${k} ${v} thin`).toBe(0); } });
   it('all at once, either way', () => { for (const s of [0, 1]) rules(buildN33Shell({ glass: 'stock', dims: Object.fromEntries(FRAME_DIMS.map(k => [k, R[k][s]])) }), `all ${s}`); });
   it('are clamped to the frame\'s own ranges', () => expect(fitFrameDims('B33', { wheelbase: 999, roof: 999 })).toEqual({ ...NO_FRAME_DIMS, wheelbase: 120, roof: 30 }));
 });

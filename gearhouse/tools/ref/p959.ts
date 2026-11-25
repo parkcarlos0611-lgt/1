@@ -106,6 +106,8 @@ function flat(yawDeg: number, pitchDeg: number, o: DrawO = {}): Uint8Array { con
   const out2 = new Uint8Array(W * H * 3); for (let py = 0; py < H; py++) for (let px = 0; px < W; px++) for (let c = 0; c < 3; c++) { let s = 0; for (let dy = 0; dy < SS; dy++) for (let dx = 0; dx < SS; dx++) s += img[((py * SS + dy) * w + px * SS + dx) * 3 + c]!; out2[(py * W + px) * 3 + c] = s / (SS * SS); }
   return out2; }
 const VIEWS: Record<string, [number, number]> = { side: [0, 0], front: [90, 0], rear: [270, 0], top: [0, 89.9], front34: [35, 20], rear34: [215, 20], high34: [40, 40], rearhigh: [220, 42] };
+// view=<name>:<yaw>:<pitch>[,...]: more views (a photograph's angle), drawn when only= names them
+for (const v of arg('view')?.split(',') ?? []) { const [n, y, p] = v.split(':'); VIEWS[n!] = [+y!, +p!]; }
 for (const [n, [yaw, pitch]] of Object.entries(VIEWS)) if (!ONLY || ONLY.includes(n)) png(`${out}/${CAR}_${n}.png`, W, H, flat(yaw, pitch));
 if (!ONLY) { png(`${out}/${CAR}_cage_front34.png`, W, H, flat(35, 20, { wires: S.cage, mesh: false })); png(`${out}/${CAR}_cage_rear34.png`, W, H, flat(215, 20, { wires: S.cage, mesh: false }));
 png(`${out}/${CAR}_wire_front34.png`, W, H, flat(35, 20, { wires: S, lines: false })); }

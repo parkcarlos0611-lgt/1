@@ -22,8 +22,7 @@ export const NR = 31, NC = 13;
 /** the arches: hub, the cage's radius (the subdivided ring lands on archR), rows and the top column */
 export const ARCH = { f: { x: DIM.axleF, z: DIM.hubZ, rows: [5, 9] as [number, number] }, r: { x: DIM.axleR, z: DIM.hubZ - 2, rows: [19, 23] as [number, number] }, rc: 362, top: 8 };
 
-const T = (s: string): (V | null)[] => s.trim().split(/\s*[;
-]\s*/).map(r => r.trim() === '-' ? null : r.trim().split(/[\s,]+/).map(Number) as V);
+const T = (s: string): (V | null)[] => s.trim().split(/\s*[;\n]\s*/).map(r => r.trim() === '-' ? null : r.trim().split(/[\s,]+/).map(Number) as V);
 /** the columns, one row a line: x y z */
 const COLS: (V | null)[][] = [
   // 0 centre line
@@ -158,6 +157,7 @@ export function buildCage(o: CageOpts = {}): Cage959 {
   const BR = strip(seamR, 'bumperR', zr, kr === 'aero' ? [-3, -14, -40] : [-3, -22, -64], 3600, [archAt(A.r, zr[0], 910, false), archAt(A.r, zr[1], 902, false), archAt(A.r, zr[2], 862, false)], 'bumperR',
     (m, k) => m === 1 && k >= 3 && k < 8 && kr !== 'clean' ? ['grille', 'ventR'] : m === 2 && (k >= 9 || kr === 'aero') ? ['dark', kr === 'aero' ? 'diffuser' : 'exhaustSlot'] : null);
 
+  const colPath = (j: number, i0: number, i1: number) => Array.from({ length: i1 - i0 + 1 }, (_, k) => M[i0 + k]![j]!), rowPath = (i: number, j0: number, j1: number) => Array.from({ length: j1 - j0 + 1 }, (_, k) => M[i]![j0 + k]!);
   // ---- sharp edges: the module seams (hard for the positions; the shading runs over them), and the creases (split)
   path(seamF); path(seamR);
   path([28, 29, 30].map(i => M[i]![8]!).concat(W[1]!));                                  // the tail lamp's top

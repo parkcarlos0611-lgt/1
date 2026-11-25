@@ -14,5 +14,5 @@ for (const v of views) { const [out, spec] = v.split(':'), o = Object.fromEntrie
   const n = await page.evaluate(o => { const S = globalThis.__style; if (o.car) S.useCar(o.car); for (const k of ['yaw', 'pitch', 'zoom', 'tz']) if (o[k] !== undefined) S.st[k] = +o[k]; S.redraw(); return S.frames; }, o);
   await page.waitForFunction(n => globalThis.__style.frames > n, n, { timeout: 120000 }); await page.waitForTimeout(300);
   const box = await page.evaluate(() => { const r = document.getElementById('cv').getBoundingClientRect(); return { x: r.x, y: r.y, width: r.width, height: r.height }; });
-  await page.screenshot({ path: out, clip: box }); console.log(out, await page.evaluate(() => document.getElementById('stat').textContent)); }
+  await page.screenshot({ path: out, clip: box, timeout: 180000 }); console.log(out, await page.evaluate(() => document.getElementById('stat').textContent)); }
 await browser.close();

@@ -15,13 +15,16 @@ import { hardEdgeLines } from '../render/car/edges';
 import type { Mesh } from '../render/car/mesh';
 import type { GpuMesh } from '../render/live/gpu';
 import { dialState, stepDials, type DialState } from '../render/car/interior/gauges';
+import { restPose, poseCabin, gate } from '../render/car/interior/rig';
+import { meshToWorld, CABIN_FOV } from './drivecam';
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T, Q = new URLSearchParams(location.search);
 const cv = $<HTMLCanvasElement>('cv');
 // the cars, then the machinery on its own (an engine on the stand, in a bay, a suspension corner: ?car=bayI6_drift&pitch=32&tz=0.4)
 const STYLE_CARS = [...CARS, ...STYLE_PARTS];
 const st = { car: Q.get('car') ?? STYLE_CARS[0]!.id, look: +(Q.get('look') ?? 4), outline: true, lines: true, post: true, atlas: true, outPx: STYLE.outlinePx as number, linePx: STYLE.linePx as number,
-  az: +(Q.get('az') ?? 70), el: +(Q.get('el') ?? 40), spin: !Q.has('still'), persp: true, pitch: +(Q.get('pitch') ?? 14), tz: +(Q.get('tz') ?? 0.55), yaw: +(Q.get('yaw') ?? 160), zoom: +(Q.get('zoom') ?? 1) };
+  az: +(Q.get('az') ?? 70), el: +(Q.get('el') ?? 40), spin: !Q.has('still'), persp: true, pitch: +(Q.get('pitch') ?? 14), tz: +(Q.get('tz') ?? 0.55), yaw: +(Q.get('yaw') ?? 160), zoom: +(Q.get('zoom') ?? 1),
+  /** the driver posed (docs/systems/118): the steering wheel turned (degrees, left +), the inner hand on the lever in a gear (0: on the wheel); the picture from the driver's own eye */ wheel: +(Q.get('wheel') ?? 0), gear: +(Q.get('gear') ?? 0), cockpit: Q.has('cockpit') };
 let L: LiveRenderer | null = null, g: GpuMesh | null = null, M: Mesh | null = null, dirty = true, frames = 0, lineN = 0, last = performance.now();
 try { L = new LiveRenderer(cv); L.setGround(studioFloor()); L.setTrack(1, 30, 12, 0); void loadSky(L).then(() => { dirty = true; }).catch(e => console.warn('sky', e)); }
 catch (e) { $('stat').textContent = `이 기기에서 WebGL2를 쓸 수 없다: ${String(e)}`; }
@@ -57,8 +60,12 @@ function frame(now: number) { const dt = Math.min(0.1, (now - last) / 1000); las
     const fov = 28, aspect = W / H, need = len * 1.05 / Math.min(1, aspect * 0.95), dist = need / 2 / Math.tan(fov * Math.PI / 360) / st.zoom, cp = Math.cos(pitch * Math.PI / 180), sp = Math.sin(pitch * Math.PI / 180), tz = st.tz;
     const eye: [number, number, number] = [-Math.cos(ang) * cp * dist, -Math.sin(ang) * cp * dist, tz + sp * dist];
     const mm = Math.max(len * 1000 * 1.3 / W, len * 1000 * 0.62 / H) / st.zoom;
-    L.render({ x: 0, y: 0, z: tz, ang, pitch, mm, W, H, cy: 0.55, ...(st.persp ? { eye, fov, near: 0.2 } : {}) },
-      [{ g, x: 0, y: 0, z: -0.015, yaw: st.yaw * Math.PI / 180, roll: 0, pitch: 0, steerL: 0.14, steerR: 0.12, spin: 0, player: true, dials: dials?.v }], [], [],
+    // the driver posed: the wheel turned with both hands on it, the inner hand on the lever; the cockpit's own view from his eye
+    const C = M.dials?.cabin, w = st.wheel * Math.PI / 180, P = C ? restPose(C) : null; let cabin: Float32Array | null = null, cock: { eye: [number, number, number]; fov: number; near: number } | null = null;
+    if (C && P && (st.wheel || st.gear || st.cockpit)) { P.wheel = w; P.hands.L.alpha = C.wheel.home.L - w; P.hands.R.alpha = C.wheel.home.R - w; if (st.gear) { P.lever = gate(st.gear); P.hands[C.side > 0 ? 'R' : 'L'] = { ...P.hands[C.side > 0 ? 'R' : 'L'], task: 'lever', w: 1 }; }
+      P.hideHead = st.cockpit; cabin = poseCabin(M.dials!, dials?.v, P); if (st.cockpit) cock = { eye: meshToWorld({ x: 0, y: 0, z: -0.015, yaw: st.yaw * Math.PI / 180, vx: 0, vy: 0, speed: 0, r: 0, pitch: 0, roll: 0 }, M.length, P.eye!), fov: CABIN_FOV.def, near: 0.05 }; }
+    L.render(cock ? { x: 0, y: 0, z: tz, ang: st.yaw * Math.PI / 180, pitch: 6, mm, W, H, cy: 0.5, ...cock, inkNear: 2.2 } : { x: 0, y: 0, z: tz, ang, pitch, mm, W, H, cy: 0.55, ...(st.persp ? { eye, fov, near: 0.2 } : {}) },
+      [{ g, x: 0, y: 0, z: -0.015, yaw: st.yaw * Math.PI / 180, roll: 0, pitch: 0, steerL: cabin ? w / 15 : 0.14, steerR: cabin ? w / 15 * 0.9 : 0.12, spin: 0, player: true, dials: dials?.v, cabin }], [], [],
       { look: st.look, glass: +(Q.get('glass') ?? 0.8), rays: st.look !== 4, bloomK: st.look === 2 ? 1 : 0, dof: 0, art: false, outW: st.look === 2 ? 0.5 : 1, outK: st.look === 2 ? 0.6 : 1, sun: [Math.cos(el) * Math.cos(az), Math.cos(el) * Math.sin(az), Math.sin(el)],
         style: { outline: st.outline, lines: st.lines, post: st.post, atlas: st.atlas, outPx: st.outPx, linePx: st.linePx, dpr } });
     frames++; $('stat').textContent = `${M.n.toLocaleString()} 삼각형 · 선 ${lineN}개${M.lines?.length ? ' (모델에 표시한 선)' : ' (각진 모서리에서 찾은 선)'} · ${W}×${H} · 외곽선 ${screenPx(st.outPx, H, dpr).toFixed(1)} px, 선 ${screenPx(st.linePx, H, dpr).toFixed(1)} px · ${Math.round(performance.now() - t0)} ms`; }

@@ -116,5 +116,5 @@ export function buildSheet(root: HTMLElement, o: { onBack?: () => void } = {}): 
     sec('사선 줄무늬 띠', '', stripes(), stripes(true)),
     sec('아이콘', '굵은 외곽선의 단순한 그림. 52px와 22px, 색 바꾼 예.', icons),
     sec('전환', '패널이 미끄러져 들어오고 나간다. 움직임 줄이기 설정과 기기 설정을 따른다.', tbtns, stage));
-  root.append(topBand({ title: '디자인 견본 · UI KIT', onBack: o.onBack, money: 1250000, slots: [3, 8] }), body);
+  root.append(topBand({ title: 'UI KIT', onBack: o.onBack, money: 1250000, slots: [3, 8] }), body);
   void ROLE_KEY; }

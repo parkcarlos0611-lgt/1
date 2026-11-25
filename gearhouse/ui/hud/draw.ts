@@ -7,10 +7,9 @@ import type { GaugeFace, DialScale } from '../../render/car/interior/gauges';
 import { dialAngle } from '../../render/car/interior/gauges';
 import type { HudWheel } from './logic';
 
-export const INK = '#111214';
-/** the role colours: the face and its lower band */
-export const ROLE = { yellow: ['#ffd21f', '#e7a700'], green: ['#46d36b', '#229b48'], blue: ['#3d9cff', '#1f6fd0'], grey: ['#c3c5c8', '#8f9296'], red: ['#ff5a3c', '#c8301c'],
-  metal: ['#dfe3e8', '#a8aeb6'], dark: ['#3b3e44', '#26282c'] } as const;
+// the outline and the role colours are the design system's (docs/systems/110 G2, ui/kit/tokens.ts)
+import { INK, ROLE } from '../kit/tokens';
+export { INK, ROLE };
 const f1 = (x: number) => Math.round(x * 10) / 10;
 let uid = 0;
 /** a unique prefix for one drawing's clip paths (several drawings sit on one page) */

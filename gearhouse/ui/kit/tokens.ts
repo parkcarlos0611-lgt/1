@@ -18,19 +18,22 @@ export const ROLE_KEY: Record<Role, string> = { yellow: 'y', green: 'g', blue: '
 export const FONT = { head: `'Oswald', 'Noto Sans KR', 'Arial Narrow', sans-serif`, body: `'Noto Sans KR', system-ui, sans-serif`,
   /** the Google Fonts sheet both pages load */ sheet: 'https://fonts.googleapis.com/css2?family=Oswald:wght@500;700&family=Noto+Sans+KR:wght@400;700&display=swap' } as const;
 
-/** one palette: the ground behind the menus, the panels' face and lower band and the wells cut into them, the top
- *  band's two tones, the stripes' two colours, the text on a panel (and its softer line, its highlight) */
-export interface Palette { name: string; note: string; scheme: 'dark' | 'light'; ground: string; ground2: string; panel: [string, string]; well: string; top: [string, string]; stripe: [string, string];
+/** one palette: the ground behind the menus (always dark: the 3D scene and the shade over it) and its soft text line,
+ *  the panels' face and lower band and the wells cut into them, the top band's two tones, the stripes' two colours,
+ *  the text on a panel (and its softer line, its highlight) */
+export interface Palette { name: string; note: string; scheme: 'dark' | 'light'; ground: string; ground2: string; groundSoft: string; panel: [string, string]; well: string; top: [string, string]; stripe: [string, string];
   text: string; soft: string; hi: string; rule: string }
+/** the text on the ground (all palettes) */
+export const GROUND_TEXT = '#f3f0e8';
 export const PALETTES = {
   /** the default: the green-painted walls of an old workshop, hazard stripes, charcoal floor */
-  workshop: { name: '공방 녹색', note: '페인트칠한 작업장 벽의 짙은 청록, 바닥은 숯빛, 띠는 노랑·검정 경고 줄무늬', scheme: 'dark', ground: '#141819', ground2: '#1f2b29', panel: ['#2e5f57', '#224740'], well: '#142624', top: ['#1d2726', '#111716'], stripe: ['#f0b323', '#151a1a'],
+  workshop: { name: '공방 녹색', note: '페인트칠한 작업장 벽의 짙은 청록, 바닥은 숯빛, 띠는 노랑·검정 경고 줄무늬', scheme: 'dark', ground: '#141819', ground2: '#1f2b29', groundSoft: '#a9bdb7', panel: ['#2e5f57', '#224740'], well: '#142624', top: ['#1d2726', '#111716'], stripe: ['#f0b323', '#151a1a'],
     text: '#f5f2e9', soft: '#b5cbc4', hi: '#ffd21f', rule: 'rgba(255,255,255,0.16)' },
   /** a red tool chest: red drawers, black handles, a dark floor */
-  toolbox: { name: '공구함 빨강', note: '빨간 공구함 서랍, 검은 손잡이와 고무 매트, 띠는 검붉은 줄무늬', scheme: 'dark', ground: '#161211', ground2: '#2a1714', panel: ['#b3301f', '#86210f'], well: '#4a130b', top: ['#221d1c', '#141110'], stripe: ['#7a1c10', '#161212'],
+  toolbox: { name: '공구함 빨강', note: '빨간 공구함 서랍, 검은 손잡이와 고무 매트, 띠는 검붉은 줄무늬', scheme: 'dark', ground: '#161211', ground2: '#2a1714', groundSoft: '#d0b2a8', panel: ['#b3301f', '#86210f'], well: '#4a130b', top: ['#221d1c', '#141110'], stripe: ['#7a1c10', '#161212'],
     text: '#fff4e8', soft: '#f3c7b8', hi: '#ffd21f', rule: 'rgba(255,255,255,0.18)' },
   /** bare concrete and galvanised steel: a light grey workshop */
-  concrete: { name: '콘크리트 회색', note: '콘크리트 바닥과 아연 도금 철판의 밝은 회색, 띠는 노랑·검정', scheme: 'light', ground: '#2b2e32', ground2: '#464a50', panel: ['#a9afb5', '#899097'], well: '#5d6369', top: ['#3a3e43', '#272a2e'], stripe: ['#ffd21f', '#16181b'],
+  concrete: { name: '콘크리트 회색', note: '콘크리트 바닥과 아연 도금 철판의 밝은 회색, 띠는 노랑·검정', scheme: 'dark', ground: '#2b2e32', ground2: '#464a50', groundSoft: '#c3c8ce', panel: ['#a9afb5', '#899097'], well: '#5d6369', top: ['#3a3e43', '#272a2e'], stripe: ['#ffd21f', '#16181b'],
     text: '#121417', soft: '#30353b', hi: '#1f5fbf', rule: 'rgba(0,0,0,0.2)' },
 } as const satisfies Record<string, Palette>;
 export type PaletteId = keyof typeof PALETTES;
@@ -42,7 +45,7 @@ export const paletteOf = (v: unknown): PaletteId => typeof v === 'string' && (PA
 /** the palette's variables, as a declaration list */
 function paletteVars(p: Palette): string {
   return `color-scheme:${p.scheme};--gk-ground:${p.ground};--gk-ground2:${p.ground2};--gk-p0:${p.panel[0]};--gk-p1:${p.panel[1]};--gk-well:${p.well};--gk-t0:${p.top[0]};--gk-t1:${p.top[1]};`
-    + `--gk-sa:${p.stripe[0]};--gk-sb:${p.stripe[1]};--gk-text:${p.text};--gk-soft:${p.soft};--gk-hi:${p.hi};--gk-rule:${p.rule};--gk-shade:${p.ground}e0;`; }
+    + `--gk-sa:${p.stripe[0]};--gk-sb:${p.stripe[1]};--gk-text:${GROUND_TEXT};--gk-soft:${p.groundSoft};--gk-ptext:${p.text};--gk-psoft:${p.soft};--gk-hi:${p.hi};--gk-rule:${p.rule};--gk-shade:${p.ground}e0;`; }
 /** the tokens as CSS: the role colours, the type, the outline, the motion, the default palette on :root and each
  *  palette under :root[data-kit="..."] */
 export function tokenCss(): string {

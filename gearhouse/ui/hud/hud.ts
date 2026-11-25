@@ -3,7 +3,9 @@
 // The page keeps its own input handling (the wheel #tw, the pedals, the buttons with data-key); this adds the gear
 // lever's drag, puts the drawings in, poses them each frame from the car's state, and keeps the layout: a phone upright,
 // a phone on its side, or a computer (the touch controls hidden while a keyboard or a gamepad is being used).
-import { pedalSVG, pedalPose, wheelSVG, leverSVG, paddleSVG, handbrakeSVG, startSVG, tachSVG, ROLE } from './draw';
+import { pedalSVG, pedalPose, wheelSVG, leverSVG, paddleSVG, handbrakeSVG, startSVG, tachSVG } from './draw';
+import { ROLE } from '../kit/tokens';
+import { installKit } from '../kit/style';
 import { leverDown, leverMove, leverKnob, pedalPress, tachFace, tachScales, needleDeg, speedDigits, gearLabel, revLight, hudLayout, hudScale, hudAlpha, shifterOf, type LeverState, type HudWheel, type HudLayout, type Shifter } from './logic';
 import type { GaugeCar, DialScale } from '../../render/car/interior/gauges';
 import type { EnginePhase } from '../../race/ignition';
@@ -24,7 +26,7 @@ export class Hud {
   private tach: { el: SVGGElement; s: DialScale; last: number }[] = []; private top = 300; private redline = 7000; private n = 0; private lay: HudLayout | '' = '';
   private lever: LeverState | null = null; private last: Record<string, string | number> = {};
   constructor(private readonly root: ParentNode, private readonly hooks: HudHooks) {
-    this.q = <T extends Element = HTMLElement>(s: string) => root.querySelector<T>(s) as T | null;
+    this.q = <T extends Element = HTMLElement>(s: string) => root.querySelector<T>(s) as T | null; installKit();   // the design system's tokens: the page's HUD colours read them (docs/systems/110 G2)
     for (const k of ['gas', 'brake'] as const) { const b = this.q(`#pad .pedal.${k}`); if (b) b.innerHTML = pedalSVG(k); }
     const st = this.q('#startbtn'); if (st) st.innerHTML = startSVG();
     const hb = this.q('#hhand'); if (hb) hb.innerHTML = handbrakeSVG();
@@ -72,7 +74,7 @@ export class Hud {
     this.put('on', `${f.on}|${f.lamps}|${revLight(f.rpm, this.redline)}`, () => { cl?.classList.toggle('off', !f.on); const lp = cl?.querySelectorAll<SVGCircleElement>('.lp circle'); lp?.[0]?.setAttribute('fill', f.lamps ? ROLE.red[0] : '#3a1410'); lp?.[1]?.setAttribute('fill', f.lamps ? '#ffb020' : '#3a2a0c');
       const sl = cl?.querySelector('.sl'), r = revLight(f.rpm, this.redline); sl?.setAttribute('fill', !f.on ? '#2a2b2e' : r === 2 ? ROLE.red[0] : r === 1 ? ROLE.yellow[0] : '#2a2b2e'); sl?.classList.toggle('blink', f.on && r === 2); });
     this.put('lever', `${f.auto}`, () => { const lv = this.q('#hlever'); lv?.classList.toggle('auto', f.auto); const kf = lv?.querySelector('.kf'), kb = lv?.querySelector('.kb'), c = f.auto ? ROLE.grey : ROLE.yellow; kf?.setAttribute('fill', c[0]); kb?.setAttribute('fill', c[1]); });
-    this.put('start', f.phase, () => { const b = this.q('#startbtn'); if (!b) return; const c = f.phase === 'off' || f.phase === 'power' || f.phase === 'stalled' ? ROLE.yellow : f.phase === 'cranking' || f.phase === 'firing' ? ['#ff9a1f', '#d66b00'] as const : ROLE.green;
+    this.put('start', f.phase, () => { const b = this.q('#startbtn'); if (!b) return; const c = f.phase === 'off' || f.phase === 'power' || f.phase === 'stalled' ? ROLE.yellow : f.phase === 'cranking' || f.phase === 'firing' ? ROLE.orange : ROLE.green;
       b.querySelector('.sf')?.setAttribute('fill', c[0]); b.querySelector('.sb')?.setAttribute('fill', c[1]); b.dataset.phase = f.phase; });
     for (const k of ['gas', 'brake'] as const) { const v = Math.round((k === 'gas' ? f.gas : f.brake) * 50) / 50; this.put(k, v, () => { const s = this.q<SVGSVGElement>(`#pad .pedal.${k} svg`); if (s) pedalPose(s, pedalPress(v)); }); }
     this.put('hand', f.hand > 0.5 ? 1 : 0, () => { this.q('#hhand')?.classList.toggle('pulled', f.hand > 0.5); });

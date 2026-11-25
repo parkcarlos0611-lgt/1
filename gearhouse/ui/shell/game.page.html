@@ -9,8 +9,9 @@
      on top. Its look is the design system's (docs/systems/110 G2, ui/kit: the tokens and the parts' gk- classes, put on
      the page by ui/shell/main.ts): the old gh- tokens are mapped onto the kit's so the engine shop and the pages that
      read them follow the palette. Every name here starts gh- so the pages' own styles never meet these */
-  :root { --gh-bg: var(--gk-ground); --gh-panel: var(--gk-p0); --gh-solid: var(--gk-p0); --gh-ink: var(--gk-text); --gh-soft: var(--gk-soft); --gh-line: var(--gk-rule); --gh-accent: var(--gk-hi); --gh-accent-ink: var(--gk-ink);
+  :root { --gh-bg: var(--gk-ground); --gh-panel: var(--gk-p0); --gh-solid: var(--gk-p0); --gh-ink: var(--gk-text); --gh-soft: var(--gk-soft); --gh-line: var(--gk-rule); --gh-accent: var(--gk-y0); --gh-accent-ink: var(--gk-ink);
     --gh-warn: var(--gk-r0); --gh-good: var(--gk-g0); --gh-shade: var(--gk-shade); --gh-stage: #141311; --gh-display: var(--gk-head); --gh-body: var(--gk-body); --gh-r: 4px; }
+  .gk-panel { --gh-ink: var(--gk-text); --gh-soft: var(--gk-soft); --gh-accent: var(--gk-hi); }   /* the panel's own text colours (a light palette's panels take dark text) */
   html, body { height: 100%; margin: 0; }
   body { background: var(--gh-stage); color: var(--gh-ink); font-family: var(--gh-body); overflow: hidden; -webkit-text-size-adjust: 100%; }
   #gh-gl { position: fixed; inset: 0; width: 100%; height: 100%; display: block; visibility: hidden; touch-action: none; }
@@ -21,7 +22,7 @@
   #gh-over { position: fixed; inset: 0; z-index: 40; pointer-events: none; font-family: var(--gh-body); font-size: 15px; color: var(--gh-ink); }
   #gh-over > * { pointer-events: auto; }
   /* ---- the parts: the kit's buttons (gk-btn) and panels (gk-panel) carry the look; these are the shell's own ---- */
-  .gh-btn.gh-menu { width: 100%; text-align: left; white-space: normal; }
+  .gh-btn.gh-menu { width: 100%; display: flex; align-items: center; justify-content: flex-start; gap: 10px; text-align: left; white-space: normal; }
   .gh-btn-ts { display: grid; gap: 1px; min-width: 0; }
   .gh-btn-s { font-family: var(--gh-body); font-style: normal; font-weight: 700; font-size: 0.72rem; letter-spacing: 0; color: var(--gk-ink); text-shadow: none; opacity: 0.78; }
   .gk-btn.gk-dark .gh-btn-s, .gk-btn.gk-b .gh-btn-s, .gk-btn.gk-r .gh-btn-s { color: #fff; }

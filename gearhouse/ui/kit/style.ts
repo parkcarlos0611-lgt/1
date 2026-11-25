@@ -28,7 +28,7 @@ export const KIT_CSS = tokenCss() + `
 .gk-btn.gk-sq{width:52px;height:52px;min-height:0;padding:0}.gk-btn.gk-sq .gk-ic{margin:0;width:34px;height:34px}
 .gk-btn.gk-tilt{transform:skewX(-8deg)}.gk-btn.gk-tilt:active:not(:disabled){transform:skewX(-8deg) translateY(3px)}
 /* ---- panels: cut corners, a thick outline, a solid face over a darker lower band ---- */
-.gk-panel{--cut:var(--gk-cut);--face:var(--gk-p0);--band:var(--gk-p1);--bandh:9px;position:relative;isolation:isolate;background:var(--gk-ink);color:var(--gk-text);clip-path:${cut('var(--cut)')};padding:14px 16px 18px}
+.gk-panel{--cut:var(--gk-cut);--face:var(--gk-p0);--band:var(--gk-p1);--bandh:9px;position:relative;isolation:isolate;background:var(--gk-ink);--gk-text:var(--gk-ptext);--gk-soft:var(--gk-psoft);color:var(--gk-text);clip-path:${cut('var(--cut)')};padding:14px 16px 18px}
 .gk-panel::before{content:'';position:absolute;inset:var(--gk-bwp);z-index:-1;--c2:calc(var(--cut) - var(--gk-bwp) * .42);clip-path:${cut('var(--c2)')};
   background:linear-gradient(rgba(255,255,255,.13) 0 3px,transparent 3px),linear-gradient(var(--face) 0 calc(100% - var(--bandh)),var(--band) 0)}
 .gk-panel.gk-well{--face:var(--gk-well);--band:var(--gk-well)}
@@ -61,6 +61,7 @@ export const KIT_CSS = tokenCss() + `
 .gk-top-t{flex:1;min-width:0;font-size:1.5rem;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .gk-chip{display:inline-flex;align-items:center;gap:6px;padding:2px 12px 2px 3px;border:var(--gk-bw) solid var(--gk-ink);border-radius:6px;background:linear-gradient(var(--gk-well) 0 70%,rgba(0,0,0,.35) 70%);transform:skewX(-10deg);white-space:nowrap}
 .gk-chip>*{transform:skewX(10deg)}.gk-chip .gk-ic{width:30px;height:30px}.gk-chip .gk-num{font-size:1.2rem}
+@media (max-width:760px){.gk-top{gap:6px;padding:6px 8px 8px}.gk-top-t{font-size:1.15rem}.gk-top .gk-btn{min-height:40px;padding:4px 9px;font-size:.95rem}.gk-chip{padding:1px 8px 1px 2px}.gk-chip .gk-ic{width:22px;height:22px}.gk-chip .gk-num{font-size:.95rem}}
 /* ---- transitions ---- */
 @keyframes gk-in-r{from{transform:translateX(var(--gk-slide));opacity:0}}
 @keyframes gk-in-l{from{transform:translateX(calc(var(--gk-slide) * -1));opacity:0}}

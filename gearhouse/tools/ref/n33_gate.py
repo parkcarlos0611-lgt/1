@@ -21,10 +21,24 @@ def bp(name, at, origin, kx=1.0):
     x0, y0 = at[0] - origin[0] / 2 / kx, at[1] - origin[1] / 2; c = b.crop((int(round(x0)), int(round(y0)), int(round(x0 + w / 2 / kx)), int(round(y0 + h / 2)))).resize((w, h), Image.LANCZOS)
     dark = np.array(c.convert('L')) < 140; a = np.array(r).astype(float); a[dark] = a[dark] * 0.25 + np.array([200, 0, 30]) * 0.75
     return [lab(r, '모델 (정면·측면 직각 투영)'), lab(Image.fromarray(a.astype('uint8')), '도면 선(빨강)을 모델 위에'), lab(c, '도면')]
-rows = [shot('museum', 'docs/reference/bnr33/photo_front34_silver_museum.jpg', (60, 90, 1240, 680)), shot('silver_r', 'docs/reference/bnr33/photo_front34_silver_r.jpg', (40, 280, 2060, 1130)),
+def edges(name, photo, crop, w=860):
+    """the model's edges (every line and tone step of its picture) drawn on the photograph"""
+    p = Image.open(photo).convert('RGB'); r = Image.open(f'{D}/v3_{name}.png').convert('RGB').resize(p.size, Image.LANCZOS); p = fit(p.crop(crop), w); r = r.crop(crop).resize(p.size, Image.LANCZOS)
+    g = np.array(r.convert('L')).astype(float); e = (np.abs(np.diff(g, axis=1, prepend=g[:, :1])) + np.abs(np.diff(g, axis=0, prepend=g[:1]))) > 40
+    a = np.array(p).astype(float); a[e] = [255, 225, 0]; return lab(Image.fromarray(a.astype('uint8')), '모델의 선(노랑)을 사진 위에')
+REF = 'docs/reference/bnr33/'
+if len(sys.argv) > 3 and sys.argv[3] == 'rear':   # gate 2: the whole car, from behind and from the side
+    c = (0, 20, 900, 580); r = shot('rear_blue', REF + 'photo_rear34_blue.jpg', c); r.insert(2, edges('rear_blue', REF + 'photo_rear34_blue.jpg', c))
+    c2 = (60, 90, 1240, 680); f = shot('museum', REF + 'photo_front34_silver_museum.jpg', c2); f.insert(2, edges('museum', REF + 'photo_front34_silver_museum.jpg', c2))
+    side = bp('side', (183.5 - 950 / 5.5, 269), (40, 500)); rear = bp('rear', (684, 582), (380, 500), 1 / 0.957)
+    rows = [r, [side[0], side[1]], [rear[0], rear[1], rear[2]], f]; title = 'N33 차체 3차 — 관문 2: 차 전체 (뒤 3/4 사진, 측면·후면 도면, 앞 3/4 사진)'
+else:
+    rows = None; title = 'N33 차체 3차 — 관문 1: 앞 1/3 (뒤쪽은 임시 그루터기)'
+if rows is None:
+  rows = [shot('museum', 'docs/reference/bnr33/photo_front34_silver_museum.jpg', (60, 90, 1240, 680)), shot('silver_r', 'docs/reference/bnr33/photo_front34_silver_r.jpg', (40, 280, 2060, 1130)),
         bp('front', (190.5, 582), (380, 500), 1 / 0.957) + bp('side', (183.5 - 950 / 5.5, 269), (40, 500))[:2]]
 W = max(sum(i.width for i in r) + 16 * (len(r) - 1) for r in rows) + 40; H = sum(max(i.height for i in r) for r in rows) + 20 * (len(rows) + 1) + 56
-o = Image.new('RGB', (W, H), BG); ImageDraw.Draw(o).text((20, 12), 'N33 차체 3차 — 관문 1: 앞 1/3 (뒤쪽은 임시 그루터기)', fill=(10, 10, 10), font=ImageFont.truetype('/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc', 32)); y = 76
+o = Image.new('RGB', (W, H), BG); ImageDraw.Draw(o).text((20, 12), title, fill=(10, 10, 10), font=ImageFont.truetype('/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc', 32)); y = 76
 for r in rows:
     h = max(i.height for i in r); x = 20
     for i in r: o.paste(i, (x, y)); x += i.width + 16

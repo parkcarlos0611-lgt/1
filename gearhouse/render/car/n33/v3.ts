@@ -170,7 +170,7 @@ export function buildCageV3(o: V3Opts = {}): Cage959 { const NR = V3.rows, NC = 
   for (const L of SHELF) tailLines.push([pt(lerp(cornerTop, cornerFoot, (692 - L.z0) / (692 - 505))), ...seamAt.map(([x, y], k) => { const c = backO[k]!, d = Math.hypot(c[0] - x, c[1] - y), t = L.t(d); return pt([x + (c[0] - x) * t, y + (c[1] - y) * t, L.z]); })]);
   tailLines.push([M[R]![11]!, ...backO.map(([x, y]) => pt([x, y, 505]))]);
   for (let m = 0; m + 1 < tailLines.length; m++) for (let k = 0; k < K; k++) quad(tailLines[m]![k]!, tailLines[m]![k + 1]!, tailLines[m + 1]![k + 1]!, tailLines[m + 1]![k]!,
-    m >= 3 ? BUMPER_R_TAG : m === 1 && k < 2 ? { region: 'shell', mat: 'paint', panel: 'tailPanel', socket: 'tailLamp', was: 'lamp' } : { region: 'shell', mat: 'paint', panel: m === 0 ? 'bootLid' : 'tailPanel' });
+    m >= 3 ? BUMPER_R_TAG : m === 1 && k < 3 ? shown({ region: 'shell', mat: 'paint', panel: 'tailPanel', socket: 'tailLamp', was: 'lamp' }, 'lamp') : { region: 'shell', mat: 'paint', panel: m === 0 ? 'bootLid' : 'tailPanel' });
   F.push([M[R - 1]![10]!, M[R]![10]!, ...tailLines.slice(4, 9).map(l => l[0]!), M[R]![11]!, M[R - 1]![11]!]); tag.push(BUMPER_R_TAG);
 
   // ---- the main grid: every cell whose four points are there
@@ -237,12 +237,12 @@ export function buildCageV3(o: V3Opts = {}): Cage959 { const NR = V3.rows, NC = 
     { kind: 'glass', name: 'rearWindow', path: [...rowPath(23, 0, 5), ...colPath(5, 24, 27), ...rowPath(27, 0, 4).reverse()] },
     { kind: 'trim', name: 'dripRail', path: colPath(6, 14, 23) },
     { kind: 'boot', name: 'bootLid', path: [...rowPath(27, 0, 6), ...colPath(6, 28, R), ...rowPath(R, 0, 5).reverse()] },
-    { kind: 'crease', name: 'deckEdge', path: rowPath(R, 0, 7) }, { kind: 'crease', name: 'waist', path: colPath(10, 13, 22), w: 0.6 }, { kind: 'crease', name: 'waistR', path: colPath(10, 27, R - 1), w: 0.6 }, { kind: 'crease', name: 'shoulder', path: colPath(7, 24, R), w: 0.6 },
+    { kind: 'crease', name: 'deckEdge', path: rowPath(R, 0, 7) }, { kind: 'crease', name: 'waist', path: colPath(10, 13, 22), w: 0.6 }, { kind: 'crease', name: 'shoulder', path: colPath(7, 24, R), w: 0.6 },
     { kind: 'crease', name: 'bumperCreaseR', path: tailLines[tailLines.length - 1]!, w: 0.6 }, { kind: 'panel', name: 'tailFoot', path: tailLines[3]! },
   ];
   const glass = o.glass ?? null, drawn = lines.filter(l => !(!glass && /^(windscreen|sideGlass|rearWindow|bPillar|dripRail)$/.test(l.name)));
   const loops: Record<string, number[]> = { frontBumper: seamF, rearBumper: seamR, headLamp: [...rowPath(0, 2, 11), ...rowPath(2, 2, 11).reverse()], grille: [...rowPath(0, 0, 1), ...rowPath(2, 0, 1).reverse()],
-    tailLamp: [...tailLines[1]!.slice(0, 3), ...tailLines[2]!.slice(0, 3).reverse()], frontBumperFoot: BF[BF.length - 1]!, rearBumperFoot: BR[BR.length - 1]!, frontBumperArch: BF.map(r => r[0]!), rearBumperArch: BR.map(r => r[0]!), sillFoot: colPath(15, 12, 23) };
+    tailLamp: [...tailLines[1]!.slice(0, 4), ...tailLines[2]!.slice(0, 4).reverse()], frontBumperFoot: BF[BF.length - 1]!, rearBumperFoot: BR[BR.length - 1]!, frontBumperArch: BF.map(r => r[0]!), rearBumperArch: BR.map(r => r[0]!), sillFoot: colPath(15, 12, 23) };
 
   // ---- the other half
   const n = P.length, mirror: number[] = []; for (let v = 0; v < n; v++) mirror.push(Math.abs(P[v]![1]) < 1e-6 ? v : pt([P[v]![0], -P[v]![1], P[v]![2]]));

@@ -36,7 +36,7 @@ const KIND_PAINT = KINDS.indexOf('paint'), KIND_GLASS = KINDS.indexOf('glass'), 
 // ---- cameras. A photograph's: the eye, the way it looks (yaw from the car's axis, pitch down, roll), the focal
 //      length in the photograph's pixels. The car's visible side is -y in a photograph with its nose on the left.
 interface Cam { w: number; h: number; pr: (p: V3d) => V3d; fwd: V3d }
-interface Shot { name: string; w: number; h: number; p: number[]; marks: [V3d, [number, number]][] }
+interface Shot { name: string; w: number; h: number; p: number[]; marks: [V3d, [number, number]][]; /** taken from behind the car */ rear?: boolean }
 const persp = (w: number, h: number, q: number[], k = 1): Cam => { const [ex, ey, ez, yaw, pitch, roll, lf] = q as [number, number, number, number, number, number, number], f = Math.exp(lf) * k;
   const fwd: V3d = [Math.cos(pitch) * Math.cos(yaw), Math.cos(pitch) * Math.sin(yaw), -Math.sin(pitch)], r0 = un(crs(fwd, [0, 0, 1])), u0 = crs(r0, fwd), cr = Math.cos(roll), sr = Math.sin(roll);
   const right: V3d = [r0[0] * cr + u0[0] * sr, r0[1] * cr + u0[1] * sr, r0[2] * cr + u0[2] * sr], up: V3d = [u0[0] * cr - r0[0] * sr, u0[1] * cr - r0[1] * sr, u0[2] * cr - r0[2] * sr];
@@ -55,11 +55,14 @@ const SHOTS: Shot[] = [
   // the car in the car park: its tyres' outlines (its wheels are not the stock ones)
   { name: 'silver_r', w: 2080, h: 1386, p: [-5076.0, 5723.0, 701.5, -0.6806, 0.0084, -0.0053, 8.3878], marks: marks(1, [...wheelMarks(950, 862, 326, { top: [1040, 692], bottom: [1035, 1048], front: [1150, 850], rear: [920, 870] }),
     ...wheelMarks(3670, 867, 326, { top: [270, 690], bottom: [275, 960], front: [322, 840], rear: [215, 830] }), [BADGE, [1731, 709]], [STN, [801, 356]], [STF, [1189, 368]]]) },
+  // the blue car from behind: its rims' flanges and its four tail lamps' centres
+  { name: 'rear_blue', w: 900, h: 600, rear: true, p: [7169.6, 1722.1, 1165.0, -2.7038, 0.1357, 0.0043, 7.1870], marks: marks(1, [...wheelMarks(3670, 862, 232, { top: [703, 343], bottom: [700, 518], front: [728, 425], rear: [685, 440] }), ...wheelMarks(950, 857, 232, { top: [857, 252], bottom: [853, 350] }),
+    [[4583, 430, 815], [423, 275]], [[4565, 595, 815], [500, 280]], [[4583, -430, 815], [107, 253]], [[4565, -595, 815], [62, 248]], [[3262, 0, 1317], [495, 80]], [[4472, 558, 984], [481, 206]], [[4472, -558, 984], [75, 206]]]) },
 ];
-if (process.argv.includes('fit')) for (const s of SHOTS) { const err = (q: number[]) => { const c = persp(s.w, s.h, q); let e = 0; for (const [p, m] of s.marks) { const a = c.pr(p); e += (a[0] - m[0]) ** 2 + (a[1] - m[1]) ** 2; } return e; };
+if (process.argv.includes('fit')) for (const s of SHOTS) { if (process.argv.includes('fitrear') && !s.rear) continue; const err = (q: number[]) => { const c = persp(s.w, s.h, q); let e = 0; for (const [p, m] of s.marks) { const a = c.pr(p); e += (a[0] - m[0]) ** 2 + (a[1] - m[1]) ** 2; } return e; };
   // Nelder-Mead from a few starts round a guess (the eye ahead of the nose on the visible side, at head height)
   let best: number[] = [], be = Infinity; const side = s.marks[0]![0][1] < 0 ? -1 : 1;
-  for (let st = 0; st < 40; st++) { const rnd = (a: number) => (Math.sin(st * 12.9898 + a * 78.233) * 43758.5453 % 1) * 2, e0: V3d = [-3000 + 1500 * rnd(1), side * (4500 + 1500 * rnd(2)), 1400 + 400 * rnd(3)], to: V3d = [1800 - e0[0], -e0[1], 600 - e0[2]], l = Math.hypot(...to);
+  for (let st = 0; st < 40; st++) { const rnd = (a: number) => (Math.sin(st * 12.9898 + a * 78.233) * 43758.5453 % 1) * 2, e0: V3d = [(s.rear ? 8000 : -3000) + 1500 * rnd(1), side * (4500 + 1500 * rnd(2)), 1400 + 400 * rnd(3)], to: V3d = [1800 - e0[0], -e0[1], 600 - e0[2]], l = Math.hypot(...to);
     let x = [e0[0], e0[1], e0[2], Math.atan2(to[1], to[0]), -Math.asin(to[2] / l), 0, Math.log(s.w * (1 + 0.8 * rnd(4)))], sx: number[][] = [x, ...x.map((_, i) => x.map((v, j) => j === i ? v + (i < 3 ? 400 : 0.08) : v))];
     for (let it = 0; it < 4000; it++) { sx.sort((a, c) => err(a) - err(c)); const n = x.length, cen = x.map((_, j) => sx.slice(0, n).reduce((t, v) => t + v[j]!, 0) / n), w = sx[n]!, refl = cen.map((c, j) => 2 * c - w[j]!);
       if (err(refl) < err(sx[0]!)) { const ex = cen.map((c, j) => 3 * c - 2 * w[j]!); sx[n] = err(ex) < err(refl) ? ex : refl; } else if (err(refl) < err(sx[n - 1]!)) sx[n] = refl; else { const con = cen.map((c, j) => (c + w[j]!) / 2); if (err(con) < err(w)) sx[n] = con; else sx = sx.map((v, i) => i ? v.map((q, j) => (q + sx[0]![j]!) / 2) : v); } }
@@ -105,7 +108,7 @@ png(`${out}/${tagName}_rear.png`, 760, 560, draw(ortho(1520, 1120, [-1, 0, 0], [
 
 const use = [...edgeUse(S.F).values()], tris = (f: (t: (typeof S.tag)[number]) => boolean) => S.F.reduce((s, f2, k) => s + (f(S.tag[k]!) ? f2.length - 2 : 0), 0);
 console.log(`cage: ${S.cage.P.length} points, ${S.cage.F.length} faces; shell: ${S.F.length} faces, ${tris(() => true)} triangles (front bumper ${tris(t => t.region === 'bumperF')}); edges open ${use.filter(u => u === 1).length}, over-used ${use.filter(u => u > 2).length}`);
-if (process.argv.includes('report')) { const R = measure(S, []), front = (l: typeof R.mushy) => l.filter(e => e.at[0] < 1500);
+if (process.argv.includes('report')) { const R = measure(S, []), front = (l: typeof R.mushy) => l.filter(e => e.at[0] < 1500); for (const e of R.unmarked.filter(u => u.at[0] >= 1500 && u.at[1] > 0)) console.log(`   rear ${e.panel} ${e.deg.toFixed(1)} deg at ${e.at.map(v => Math.round(v)).join(' ')}`);
   console.log(`paint edges (whole car): < 8 deg ${R.smooth}, 8-20 ${R.soft}, 20-35 not creased ${R.mushy.length}, >= 35 not creased ${R.unmarked.length}; slivers ${R.slivers}`);
   console.log(`front third (x < 1500): 20-35 not creased ${front(R.mushy).length}, >= 35 not creased ${front(R.unmarked).length}`);
   for (const e of [...front(R.mushy), ...front(R.unmarked)].sort((a, c) => c.deg - a.deg).slice(0, 40)) console.log(`   ${e.panel} ${e.deg.toFixed(1)} deg at ${e.at.map(v => Math.round(v)).join(' ')}`); }

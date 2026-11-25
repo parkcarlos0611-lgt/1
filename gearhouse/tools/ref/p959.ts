@@ -1,6 +1,7 @@
 // The 959's pictures (docs/systems/109): the shell drawn from the side, front, rear, top and three-quarter views, and
 // the control cage as wires beside its subdivision.
 //   npx tsx tools/ref/p959.ts <out dir> [mm=4]
+// n33: the N33's lump "차체 B" instead (docs/systems/117 R1; glass=, dims= as for the 959's lump; masks against its blueprint)
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { deflateSync } from 'node:zlib';
 import { Build, KINDS } from '../../render/car/mesh';
@@ -10,8 +11,10 @@ import type { Placed } from '../../core/placed';
 import { fineGrid, lineStat, measure, PANELS, turning } from '../../render/car/p959/check';
 import { faceNormal } from '../../render/car/p959/subdiv';
 import { edgeUse } from '../../render/car/p959/shell';
+import { n33Model, N33_LUMP } from '../../render/car/n33';
+import { N33_PANELS } from '../../render/car/n33/check';
 
-const out = process.argv[2] ?? '.', mm = +(process.argv.find(a => a.startsWith('mm='))?.slice(3) ?? 4), W = Math.round(4800 / mm), H = Math.round(3000 / mm), BG = [206, 202, 192];
+const N33 = process.argv.includes('n33'), CAR = N33 ? 'n33' : 'p959', out = process.argv[2] ?? '.', mm = +(process.argv.find(a => a.startsWith('mm='))?.slice(3) ?? 4), W = Math.round((N33 ? 5200 : 4800) / mm), H = Math.round(3000 / mm), BG = [206, 202, 192];
 mkdirSync(out, { recursive: true });
 export function png(path: string, w: number, h: number, rgb: Uint8Array) { const raw = Buffer.alloc((w * 3 + 1) * h); for (let y = 0; y < h; y++) rgb.subarray(y * w * 3, (y + 1) * w * 3).forEach((v, i) => { raw[y * (w * 3 + 1) + 1 + i] = v; });
   const crcT = new Uint32Array(256).map((_, n) => { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; return c >>> 0; }), crc = (b: Buffer) => { let c = 0xffffffff; for (const v of b) c = crcT[(c ^ v) & 255]! ^ (c >>> 8); return (c ^ 0xffffffff) >>> 0; };
@@ -22,7 +25,7 @@ export function png(path: string, w: number, h: number, rgb: Uint8Array) { const
 type V3 = [number, number, number];
 const FORM = process.argv.includes('form');   // continuous shading, to judge the forms (the default is the game's two tones)
 // variants (docs/systems/109 S3): lamp=round|ellipsoid|square wheel=hollow5|dish|hole5 bf=std|aero|clean br=std|aero|clean; noplate=f|r|fr (plates off); at=x,y,z: the picture's centre; only=<view,...>
-const arg = (k: string) => process.argv.find(a => a.startsWith(k + '='))?.slice(k.length + 1), AT = (arg('at') ?? '2130,0,600').split(',').map(Number) as V3, ONLY = arg('only')?.split(',');
+const arg = (k: string) => process.argv.find(a => a.startsWith(k + '='))?.slice(k.length + 1), AT = (arg('at') ?? (N33 ? '2340,0,650' : '2130,0,600')).split(',').map(Number) as V3, ONLY = arg('only')?.split(',');
 // lump: the frame "차체 A" (docs/systems/115 F1) with any of the above put back; glass=none|stock|noQuarter|louvre; dims=wheelbase:150,width:-60,...
 const DIMS = arg('dims') ? Object.fromEntries(arg('dims')!.split(',').map(kv => { const [k, v] = kv.split(':'); return [k!, +v!]; })) : undefined, given = (o: Record<string, unknown>) => Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined));
 const OPTS: P959Opts = ({ ...(process.argv.includes('lump') ? P959_LUMP : {}), ...given({ lamp: arg('lamp') as never, wheel: arg('wheel') as never, bumperF: arg('bf') as never, bumperR: arg('br') as never, plate: arg('plate') ? plateText(arg('plate')!) : undefined }),
@@ -31,7 +34,7 @@ const OPTS: P959Opts = ({ ...(process.argv.includes('lump') ? P959_LUMP : {}), .
 const PLACED: Placed[] | undefined = arg('placed') ? (() => { const sk = shellSkin(buildShell({ ...OPTS, lamps: OPTS.lamp !== 'none' })); return arg('placed')!.split('/').map(e => { const [w, v] = e.split(':'), [y, z, rot, tilt, sc] = v!.split(',').map(Number), F = w === 'F';
   const h = sk.hit([F ? -800 : 5200, y!, z!], [F ? 1 : -1, 0, 0], 8000)!, p: Placed = { id: F ? 'plateF' : 'plateR', at: h.at!, rot: rot ?? 0, tilt: tilt ?? 0, scale: sc ?? 1 }, f = fitPlate(sk, p);
   console.log(`${p.id} at y ${y} z ${z}: ${f?.ok ? 'ok' : f?.why}, bracket ${f?.gap.toFixed(0)} mm`); return p; }); })() : undefined;
-const MODEL = p959Model({ ...OPTS, ...(PLACED ? { placed: PLACED } : {}) }), S = MODEL.shell, NN = MODEL.normals;
+const MODEL = N33 ? n33Model({ ...N33_LUMP, ...(arg('glass') ? { glass: arg('glass') === 'none' ? null : arg('glass') as never } : {}), ...(DIMS ? { dims: DIMS } : {}), ...(arg('paint') ? { paint: arg('paint') } : {}) }) : p959Model({ ...OPTS, ...(PLACED ? { placed: PLACED } : {}) }), S = MODEL.shell, NN = MODEL.normals;
 // plates=<a,b,...>: a sheet of number plates face on (two columns), instead of the car
 const PLATES = arg('plates')?.split(','), M = PLATES ? (() => { const b = new Build(); PLATES.forEach((t, k) => plate(b, { name: 'plate', o: [0, (k % 2 ? -1 : 1) * 200, 420 - Math.floor(k / 2) * 215], n: [-1, 0, 0], w: 335, h: 170 }, /^\d+$/.test(t) ? plateText(+t) : plateText(t))); return b.mesh(0); })() : MODEL.mesh, shellTris = PLATES ? 0 : MODEL.shellTris;
 // mirror=0 to draw the file's own axes; by default the car is drawn as the game draws it (+y on the left of the heading,
@@ -75,9 +78,9 @@ function flat(yawDeg: number, pitchDeg: number, o: DrawO = {}): Uint8Array { con
   const out2 = new Uint8Array(W * H * 3); for (let py = 0; py < H; py++) for (let px = 0; px < W; px++) for (let c = 0; c < 3; c++) { let s = 0; for (let dy = 0; dy < SS; dy++) for (let dx = 0; dx < SS; dx++) s += img[((py * SS + dy) * w + px * SS + dx) * 3 + c]!; out2[(py * W + px) * 3 + c] = s / (SS * SS); }
   return out2; }
 const VIEWS: Record<string, [number, number]> = { side: [0, 0], front: [90, 0], rear: [270, 0], top: [0, 89.9], front34: [35, 20], rear34: [215, 20], high34: [40, 40], rearhigh: [220, 42] };
-for (const [n, [yaw, pitch]] of Object.entries(VIEWS)) if (!ONLY || ONLY.includes(n)) png(`${out}/p959_${n}.png`, W, H, flat(yaw, pitch));
-if (!ONLY) { png(`${out}/p959_cage_front34.png`, W, H, flat(35, 20, { wires: S.cage, mesh: false })); png(`${out}/p959_cage_rear34.png`, W, H, flat(215, 20, { wires: S.cage, mesh: false }));
-png(`${out}/p959_wire_front34.png`, W, H, flat(35, 20, { wires: S, lines: false })); }
+for (const [n, [yaw, pitch]] of Object.entries(VIEWS)) if (!ONLY || ONLY.includes(n)) png(`${out}/${CAR}_${n}.png`, W, H, flat(yaw, pitch));
+if (!ONLY) { png(`${out}/${CAR}_cage_front34.png`, W, H, flat(35, 20, { wires: S.cage, mesh: false })); png(`${out}/${CAR}_cage_rear34.png`, W, H, flat(215, 20, { wires: S.cage, mesh: false }));
+png(`${out}/${CAR}_wire_front34.png`, W, H, flat(35, 20, { wires: S, lines: false })); }
 const use = [...edgeUse(S.F).values()], count = (f: (t: (typeof S.tag)[number]) => boolean) => S.F.reduce((s, f2, k) => s + (f(S.tag[k]!) ? f2.length - 2 : 0), 0);
 console.log(`cage: ${S.cage.P.length} points, ${S.cage.F.length} faces; shell: ${S.P.length} points, ${S.F.length} faces`);
 console.log(`triangles: all ${count(() => true)}; shell region ${count(t => t.region === 'shell')} (paint ${count(t => t.region === 'shell' && t.mat === 'paint')}, glass ${count(t => t.mat === 'glass')}, wells+floor ${count(t => t.panel === 'wheelWell' || t.panel === 'floor')}), tail ${count(t => t.region === 'tail')}, bumpers ${count(t => t.region === 'bumperF')} + ${count(t => t.region === 'bumperR')}`);
@@ -93,12 +96,17 @@ if (process.argv.includes('masks')) { const K = 4260 / 730 / 2;
     for (const l of M.lines ?? []) { const n = l.pts.length; for (let q = 0; q + 1 < n || (l.closed && q < n); q++) { const a = l.pts[q]!, b = l.pts[(q + 1) % n]!; if (!keep(a) || !keep(b)) continue; const A = pr(a[0], a[1], a[2]), B = pr(b[0], b[1], b[2]), st = Math.ceil(Math.hypot(B[0] - A[0], B[1] - A[1]));
       for (let i = 0; i <= st; i++) { const x = Math.round(A[0] + (B[0] - A[0]) * i / Math.max(1, st)), y = Math.round(A[1] + (B[1] - A[1]) * i / Math.max(1, st)); if (x >= 0 && y >= 0 && x < w && y < h) { m[(y * w + x) * 3] = 128; m[(y * w + x) * 3 + 1] = 0; m[(y * w + x) * 3 + 2] = 0; } } } }
     return m; };
+  if (N33) { const k = 5.5 / 2, ky = 5.5 * 1.037 / 2, kf = 5.5 * 0.957 / 2;   // the N33's blueprint: 5.5 mm a pixel along and up; its plan 3.7 % narrow and its front 4.3 % wide against the car's 1,780 (docs/systems/117 R0)
+    png(`${out}/mask_side.png`, 1780, 560, mask(1780, 560, (x, _y, z) => [40 + x / k, 500 - z / k], p => p[1]! >= 0));
+    png(`${out}/mask_plan.png`, 1780, 760, mask(1780, 760, (x, y) => [40 + x / k, 380 - y / ky]));
+    png(`${out}/mask_front.png`, 760, 560, mask(760, 560, (_x, y, z) => [380 + y / kf, 500 - z / k], p => p[0]! < 2000));
+    png(`${out}/mask_rear.png`, 760, 560, mask(760, 560, (_x, y, z) => [380 + y / kf, 500 - z / k], p => p[0]! > 3000)); } else {
   png(`${out}/mask_side.png`, 1640, 560, mask(1640, 560, (x, _y, z) => [40 + x / K, 500 - z / K], p => p[1]! >= 0));
   png(`${out}/mask_plan.png`, 1640, 760, mask(1640, 760, (x, y) => [40 + x / K, 380 - y / (1840 / 319 / 2)]));
   png(`${out}/mask_front.png`, 760, 560, mask(760, 560, (_x, y, z) => [380 + y / K, 500 - z / K], p => p[0]! < 1700));
-  png(`${out}/mask_rear.png`, 760, 560, mask(760, 560, (_x, y, z) => [380 + y / K, 500 - z / K], p => p[0]! > 2800)); }
+  png(`${out}/mask_rear.png`, 760, 560, mask(760, 560, (_x, y, z) => [380 + y / K, 500 - z / K], p => p[0]! > 2800)); } }
 
-if (process.argv.includes('report')) { const R = measure(S);
+if (process.argv.includes('report')) { const R = measure(S, N33 ? N33_PANELS : undefined);
   for (const p of R.panels) console.log(`${p.panel.name.padEnd(20)} lines ${String(p.lines).padStart(3)}  sign changes across ${p.across} (allowed ${p.panel.across ?? 0}) along ${p.along} (allowed ${p.panel.along ?? 0})  dimples ${p.dimples}  twist p95 ${p.twistP95.toFixed(1)} max ${p.twistMax.toFixed(1)}  off plane ${p.off.toFixed(1)} mm${p.panel.flat ? ' (flat)' : ''}`);
   console.log(`paint edges: < 8 deg ${R.smooth}, 8-20 ${R.soft}, 20-35 not creased ${R.mushy.length}, >= 35 not creased ${R.unmarked.length}; slivers ${R.slivers}`);
   const by = (l: typeof R.mushy) => { const m = new Map<string, number>(); for (const e of l) m.set(e.panel, (m.get(e.panel) ?? 0) + 1); return [...m].map(([k, v]) => `${k} ${v}`).join(', '); };
@@ -107,7 +115,7 @@ if (process.argv.includes('report')) { const R = measure(S);
 
 // debug=<panel name start>: every line of that panel whose curvature changes sign, with its turning at each point
 { const dbg = process.argv.find(a => a.startsWith('debug='))?.slice(6); if (dbg) { const G = fineGrid(S), P = S.P, vn: V3[] = P.map(() => [0, 0, 0] as V3); S.F.forEach(f => { const n = faceNormal(P, f); for (const v of f) { vn[v]![0] += n[0]; vn[v]![1] += n[1]; vn[v]![2] += n[2]; } });
-  for (const p of PANELS.filter(q => q.name.startsWith(dbg))) { const line = (idx: number[], label: string, allow: number) => { const vs = idx.filter(v => v >= 0); if (vs.length < 4 || vs.length !== idx.length) return; const pts = vs.map(v => P[v]!), st = lineStat(pts, vs.map(v => un(vn[v]!))); if (st.changes <= allow && !st.dimples) return;
+  for (const p of (N33 ? N33_PANELS : PANELS).filter(q => q.name.startsWith(dbg))) { const line = (idx: number[], label: string, allow: number) => { const vs = idx.filter(v => v >= 0); if (vs.length < 4 || vs.length !== idx.length) return; const pts = vs.map(v => P[v]!), st = lineStat(pts, vs.map(v => un(vn[v]!))); if (st.changes <= allow && !st.dimples) return;
       console.log(`${p.name} ${label}: changes ${st.changes} dimples ${st.dimples}  k = ${turning(pts, vs.map(v => un(vn[v]!))).map(v => v.toFixed(1)).join(' ')}`); };
     for (let j = p.cols[0] * 2; j <= p.cols[1] * 2; j++) line(Array.from({ length: (p.rows[1] - p.rows[0]) * 2 + 1 }, (_, k) => G[p.rows[0] * 2 + k]![j]!), `along col ${j / 2}`, p.along ?? 0);
     for (let i = p.rows[0] * 2; i <= p.rows[1] * 2; i++) line(Array.from({ length: (p.cols[1] - p.cols[0]) * 2 + 1 }, (_, k) => G[i]![p.cols[0] * 2 + k]!), `across row ${i / 2}`, p.across ?? 0); } } }

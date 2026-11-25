@@ -40,7 +40,7 @@ import bnr33Sheet from '../data/cars/spec/bnr33.json';
 export type Verdict = 'ok' | 'modified' | 'blocked';
 export interface Fix { /** what it does (Korean) */ label: string; patch: DesignPatch; /** rough cost (the car's cost index points, race/design.ts) */ cost: number }
 export interface FitResult {
-  part: 'bayLength' | 'bayWidth' | 'bayHeight' | 'gearboxPlace' | 'mount' | 'gearbox' | 'archF' | 'archR' | 'clearance';
+  part: 'bayLength' | 'bayWidth' | 'bayHeight' | 'gearboxPlace' | 'mount' | 'gearbox' | 'archF' | 'archR' | 'clearance' | 'cooling';
   /** the part checked (Korean) */ name: string; verdict: Verdict; /** why (Korean) */ reason: string; fixes: Fix[];
   /** what a 'modified' verdict's work adds: kg (at `at`), the cost index, reliability points lost, drag area (m²) */
   mass: number; at: 'engine' | 'front' | 'rear'; cost: number; reliability: number; cdA: number }

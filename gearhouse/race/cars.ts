@@ -70,7 +70,8 @@ export interface RaceSpec {
     damp?: { comfort: number; sport: number; speedK?: number };
     /** review 158: a flat floor and a rear diffuser: a lift area pressing the car down (q clA, a little more the lower it
      *  rides, much less sensitive to it than venturis), its share on the front axle, and the drag it adds (m²) */
-    underbody?: { clA: number; front: number; cdA?: number } };
+    underbody?: { clA: number; front: number; cdA?: number };
+    /** the placed parts' lift areas on each axle (docs/systems/115 P3, race/partsfig.ts: wings, lips, at their places; m², down +; their drag is in cdA) */ aero?: { clF: number; clR: number } };
   /** the body mesh's id where a spec shares another's body (a variant: another gearbox in the same car) */
   body?: string;
   /** alpha 0.13 (M4): the suspension's makings for the kinematic physics (race/kin.ts): a design's (race/design.ts);

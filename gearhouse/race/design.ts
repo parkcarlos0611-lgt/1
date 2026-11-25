@@ -31,6 +31,7 @@ import { HP, engineMass, enginePackage, tyreR, engineFigures, engineCost, engine
 import { fit, fitPenalty, type FitResult } from './fit';
 import { designSusp } from '../render/car/designsusp';
 import { tierById, type Tier } from './tiers';
+import { partsEffect, readsParts } from './partsfig';
 export { pistonSpeed } from './designparts';
 
 const G = 9.81, RHO = 1.2, DRIVER = 75;
@@ -100,7 +101,7 @@ function parts(d: Design, L: number): { m: number; x: number; z: number }[] {
   // the cabin moved forward takes the driver with it; the body's masses ride with it (the wheels do not)
   const out = [{ m: DRIVER, x: (B.driverX ?? 1.15) - d.body.cabin / 1000, z: 0.42 + up }, { m: engineMass(d), x: L + (B.engineX ?? -0.75), z: engineZ(d) }, { m: box, x: L + (B.boxX ?? -0.05), z: 0.33 + up }, { m: 2 * wheel(K.tyres[0]), x: 0, z: rF }, { m: 2 * wheel(K.tyres[1]), x: L, z: rR },
     { m: K.abs ? 9 : 0, x: 0.4, z: 0.5 + up }, { m: K.tcs ? 3 : 0, x: L + (B.engineX ?? -0.75), z: 0.5 + up }, { m: steer, x: 0.1, z: 0.45 + up }, { m: K.dampers === 'adaptive' ? 5 : 0, x: L / 2, z: 0.45 + up },
-    { m: K.wing ? 14 : 0, x: L + 0.6 + d.body.overhangR / 1000, z: 1.05 + up }, { m: K.diffuser ? 9 : 0, x: L * 0.6, z: 0.15 + up }];
+    { m: K.wing && !readsParts(d) ? 14 : 0, x: L + 0.6 + d.body.overhangR / 1000, z: 1.05 + up }, { m: K.diffuser ? 9 : 0, x: L * 0.6, z: 0.15 + up }];
   if (D.awd) out.push({ m: 35, x: 0.05, z: 0.3 + up }, { m: 45, x: L * 0.6, z: 0.3 + up });   // the front differential at the front axle; the rest along the tunnel
   // the structure and the panels, sized by their length, width and height against the base's, centred between the axles
   // (the overhangs' share at their ends); the panels and the glass high, the roof's change half the panels' height
@@ -126,7 +127,9 @@ function massing(d: Design) {
   const restM = rest.m * area ** 0.3 * (1 - SECONDARY + SECONDARY * STRUCTURE_K[d.body.structure] / STRUCTURE_K[B.ref.body.structure]) * INTERIOR_K[d.kit.interior] / INTERIOR_K[B.ref.kit.interior];
   // the fit's work: at the engine (its bay, its mounts, its gearbox) or at an axle (the arches)
   const mods = fitPenalty(d).mass.map(q => ({ m: q.m, x: q.at === 'front' ? 0 : q.at === 'rear' ? L : L + (B.engineX ?? -0.75), z: q.at === 'engine' ? engineZ(d) : 0.5 + lift(d) }));
-  const all = [...p, ...mods, { m: restM, x: rest.x * L - d.body.cabin / 2000, z: rest.z + lift(d) + d.body.roof / 4000 }];
+  // the parts placed on a model body (docs/systems/115 P3, race/partsfig.ts): each at its place, the stock set's the shell no longer draws taken off
+  const placed = (partsEffect(d)?.mass ?? []).map(q => ({ m: q.m, x: q.f * L, z: q.z }));
+  const all = [...p, ...mods, ...placed, { m: restM, x: rest.x * L - d.body.cabin / 2000, z: rest.z + lift(d) + d.body.roof / 4000 }];
   const mass = all.reduce((s, q) => s + q.m, 0), front = 1 - all.reduce((s, q) => s + q.m * q.x, 0) / mass / L, cgH = all.reduce((s, q) => s + q.m * q.z, 0) / mass;
   return { mass, front, cgH, L, area };
 }
@@ -141,11 +144,13 @@ const shapeK = (d: Design) => NOSE_K[d.body.nose] * TAIL_K[d.body.tail] * (1 - 0
 
 /** the drag area all told (m²): the body's, the wing's, the undertray's */
 export const dragArea = (s: RaceSpec) => s.cdA + (s.tech?.wing?.cdA ?? 0) + (s.tech?.underbody?.cdA ?? 0);
+/** the lift area all told (m², down +): the wing's and the body's, the undertray's, the placed parts' */
+export const liftArea = (s: RaceSpec) => (s.tech?.wing?.clA ?? 0) + (s.tech?.wing?.body ?? 0) + (s.tech?.underbody?.clA ?? 0) + (s.tech?.ground?.clA ?? 0) + (s.tech?.aero ? s.tech.aero.clF + s.tech.aero.clR : 0);
 
 /** the top speed on the flat (m/s) where full throttle in the best gear just meets the drag and the rolling resistance,
  *  the revs held under the red line (a wing up, the boost full) */
 export function topSpeed(s: RaceSpec): number {
-  const cd = dragArea(s), clA = (s.tech?.wing?.clA ?? 0) + (s.tech?.wing?.body ?? 0) + (s.tech?.underbody?.clA ?? 0); let best = 0;
+  const cd = dragArea(s), clA = (s.tech?.wing?.clA ?? 0) + (s.tech?.wing?.body ?? 0) + (s.tech?.underbody?.clA ?? 0) + (s.tech?.aero ? s.tech.aero.clF + s.tech.aero.clR : 0); let best = 0;
   for (const g of s.gears) for (let v = 5; v < 150; v += 0.05) { const rpm = v / s.tyreR * g * s.final * 30 / Math.PI; if (rpm > s.redline) break;
     const q = 0.5 * RHO * v * v, drive = torqueAt(s, rpm) * g * s.final * s.eff / s.tyreR, res = q * cd + s.crr * (s.mass * G + q * clA);
     if (drive >= res) best = Math.max(best, v); else if (v > best) break; }
@@ -194,13 +199,16 @@ export function designSpec(d: Design): RaceSpec {
   if (K.dampers === 'adaptive') tech.damp = { comfort: 0.65, sport: 1.3, speedK: 0.3 };   // the F355's two settings
   // a fixed rear wing of the period, up whenever the car moves (rising at 0 km/h, never stowing): its lift area on the
   // rear, its drag; the body itself makes none
-  if (K.wing) tech.wing = { up: 0, down: -1, clA: 0.3, cdA: 0.05, body: 0 };
+  // the placed parts (docs/systems/115 P3) take the kit's wing's place on a model body
+  const P = partsEffect(d);
+  if (K.wing && !P) tech.wing = { up: 0, down: -1, clA: 0.3, cdA: 0.05, body: 0 };
   if (K.diffuser) tech.underbody = { clA: 0.13, front: 0.5, cdA: 0.01 };   // the F355's undertray
+  if (P && (P.clF || P.clR)) tech.aero = { clF: P.clF, clR: P.clR };
   if (en.vtec) tech.vtec = cut < 1 ? { ...en.vtec, low: { ...en.vtec.low, torque: en.vtec.low.torque * cut } } : en.vtec; if (en.turbo) tech.turbo = en.turbo;
   const s: RaceSpec = { id: 'design:' + d.id, name: d.name, mass: M.mass, wheelbase: M.L, track: B.track + (2 * d.body.width + d.body.track) / 1000, tyreR: R, tyreW: (K.tyres[0] + rearW) / 2000,
     cgH: M.cgH, frontShare: M.front, hp: en.hp * cut, hpRpm: en.hpRpm, torqueRpm: en.torqueRpm, torquePeak: en.torquePeak * cut, idle: E.layout === 'V6' ? 800 : 1000, redline: E.redline,
-    gears, final: D.final || 3.5, eff, brakes: 'disc', hydraulic: true, brakeG: 1.0, cdA: cd * frontalArea(d) * shape + F.cdA, crr: 0.012, steerLock: 30, topKmh: 0, check: false,
-    cooling: { siphon: false, margin: E.turbo ? 1.1 : 1.15 }, tyreKind: 'radial', era: '1990s', shiftT: D.gearbox === 'f1' ? 0.2 : D.gears === 5 ? 0.22 : 0.27, launchRpm: launch,
+    gears, final: D.final || 3.5, eff, brakes: 'disc', hydraulic: true, brakeG: 1.0, cdA: cd * frontalArea(d) * shape + F.cdA + (P?.cdA ?? 0), crr: 0.012, steerLock: 30, topKmh: 0, check: false,
+    cooling: { siphon: false, margin: (E.turbo ? 1.1 : 1.15) * (P ? coolingShare(d, en.hp * cut) ** 0.35 : 1) }, tyreKind: 'radial', era: '1990s', shiftT: D.gearbox === 'f1' ? 0.2 : D.gears === 5 ? 0.22 : 0.27, launchRpm: launch,
     steer: { ratio: K.steering === 'manual' ? 19.5 : 19, ackermann: 0.6, rack: true },
     // the engine's turning mass: its size, a V12's longer crank, a racing engine's lighter flywheel and internals
     inertia: { engine: (0.06 + E.cc * 0.00002 + (E.layout === 'V12' ? 0.02 : 0)) * (E.grade >= 4 ? 0.85 : 1), wheel: 1.3 + 0.0025 * (rearW - 225) + 0.02 * (K.rim - 16) },
@@ -214,6 +222,19 @@ export function designSpec(d: Design): RaceSpec {
   if (T && Number.isFinite(T.topMax)) s.limiter = T.topMax;
   s.topKmh = Math.min(Math.round(topSpeed(s) * 3.6), s.limiter ?? Infinity);
   return s; }
+/** the placed parts' openings against what the engine's power needs (docs/systems/115 P3): the stock set's opening a
+ *  horsepower of its body's own engine is 1 (its own car's cooling, as it was); held between 0.3 and 1.6 for the drive
+ *  (its margin goes as the 0.35th power: a car with half the opening runs about a fifth hotter). Not reading the parts: 1 */
+export function coolingRatio(d: Design, hp = engineFigures(d).hp * restrictorShare(engineFigures(d).hp, classOf(d))): number { const P = partsEffect(d); if (!P || !(P.coolStock > 0)) return 1;
+  return P.cool / Math.max(1, hp) / (P.coolStock / Math.max(1, refHp(d))); }
+const coolingShare = (d: Design, hp: number) => Math.max(0.3, Math.min(1.6, coolingRatio(d, hp)));
+const REF_HP = new Map<BodyBase, number>(), refHp = (d: Design) => { const b = d.body.base; let h = REF_HP.get(b); if (h === undefined) { h = engineFigures(BASES[b].ref).hp; REF_HP.set(b, h); } return h; };
+/** the cooling check (docs/systems/115 §5-7): a warning when the openings are short of what the engine needs */
+export function coolingFit(d: Design): FitResult[] { if (!readsParts(d)) return []; const r = coolingRatio(d), pct = Math.round(r * 100);
+  const verdict = r < 0.7 ? 'modified' : 'ok', reason = r <= 0.02 ? '흡기구·그릴·벤트가 없어 엔진을 식힐 공기가 들어오지 않습니다. 달리면 금방 과열됩니다 (③ 부품에서 흡기구 달기)'
+    : r < 0.4 ? `냉각 열림이 엔진 출력에 비해 크게 모자랍니다 (필요의 ${pct} %). 달리면 엔진 온도가 빨리 오릅니다 (③ 부품에서 흡기구 달기)`
+    : r < 0.7 ? `냉각 열림이 조금 모자랍니다 (필요의 ${pct} %). 긴 전개에서 엔진 온도가 오릅니다 (흡기구를 키우거나 더 달기)` : `냉각 열림 충분 (필요의 ${pct} %)`;
+  return [{ part: 'cooling', name: '냉각', verdict, reason, fixes: [], mass: 0, at: 'engine', cost: 0, reliability: 0, cdA: 0 }]; }
 /** a design's chosen class (format 6's `tier`; none: a design read from an older format before the builder opened it) */
 export const classOf = (d: Design): Tier | undefined => d.tier ? tierById(d.tier) : undefined;
 /** the share of the engine's power a class's restrictor lets through (1: under the cap, or no class) */
@@ -270,11 +291,14 @@ export interface DesignFigures { mass: number; hp: number; torque: number; /** k
   perf: Record<PerfClass, number>; perfLabel: string; form: string; cost: number; reliability: number; serviceKm: number; fit: FitResult[];
   /** the class's holds (docs/systems/115 C1): the engine's power before the restrictor and what it takes off (hp, 0:
    *  none); the top speed without the limiter, and the limiter where it holds the car (km/h, 0: it does not) */
-  hpFree: number; restrictor: number; topFree: number; limiter: number }
+  hpFree: number; restrictor: number; topFree: number; limiter: number;
+  /** the downforce at 200 km/h (kg, every lift area: a wing, an undertray, the placed parts) and the cooling's opening
+   *  against the engine's need (1: its body's stock; docs/systems/115 P3) */ down200: number; cooling: number }
 export function designFigures(d: Design): DesignFigures {
   const s = designSpec(d), r = (x: number, n = 0) => Math.round(x * 10 ** n) / 10 ** n, hpt = s.hp / s.mass * 1000, perf = perfClass(hpt, s.topKmh), c = designCost(d);
   const free = engineFigures(d).hp, topFree = s.limiter && s.topKmh >= s.limiter ? Math.round(topSpeed(s) * 3.6) : s.topKmh;
   return { mass: r(s.mass), hp: r(s.hp), torque: r(s.torquePeak!), kgPerHp: r(s.mass / s.hp, 2), hpPerTonne: r(hpt), front: r(s.frontShare, 3),
     topKmh: s.topKmh, zeroTo100: r(zeroTo100(s), 1), cdA: r(dragArea(s), 3), cgH: r(s.cgH, 3),
-    perf, perfLabel: perfLabel(perf), form: BODY_FORM, cost: r(c.cost), reliability: r(c.reliability), serviceKm: c.serviceKm, fit: fit(d),
-    hpFree: r(free), restrictor: r(free) - r(s.hp), topFree, limiter: s.limiter && topFree > s.limiter ? s.limiter : 0 }; }
+    perf, perfLabel: perfLabel(perf), form: BODY_FORM, cost: r(c.cost), reliability: r(c.reliability), serviceKm: c.serviceKm, fit: [...fit(d), ...coolingFit(d)],
+    hpFree: r(free), restrictor: r(free) - r(s.hp), topFree, limiter: s.limiter && topFree > s.limiter ? s.limiter : 0,
+    down200: Math.round(liftArea(s) * 0.5 * RHO * (200 / 3.6) ** 2 / G), cooling: r(coolingRatio(d, s.hp), 2) }; }

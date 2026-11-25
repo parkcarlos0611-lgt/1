@@ -413,6 +413,7 @@ export class Vehicle {
         dF += Fu * U.front; dR += Fu * (1 - U.front); }
       if (Wg) { const body = q * Wg.body, wingF = q * Wg.clA * this.wing;   /* downforce: the body's (shared by the axles) and the wing's (on the rear) */
         dF += body * 0.42; dR += body * 0.58 + wingF; }
+      if (X?.aero) { dF += q * X.aero.clF; dR += q * X.aero.clR; }   /* the placed parts' wings and lips, each at its place (docs/systems/115 P3) */
       if (dF || dR) { addAt([this.axles[0].x, 0, 0], rotQ(this.q, [0, 0, -dF])); addAt([this.axles[1].x, 0, 0], rotQ(this.q, [0, 0, -dR])); }
       this.downF = dF; this.downR = dR; }
     // the whole car's weight across the body's up (the running gear goes where the body goes, sideways and along)

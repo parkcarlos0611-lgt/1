@@ -14,7 +14,7 @@ export const STEPS_06: StepId[] = ['frame', 'engine', 'parts', 'kit', 'paint', '
 /** the step each fit check answers to: the engine bay, its mounts and the gearbox the engine's and the drive's, the
  *  arches the tyres', the ground's clearance the lump's (its ride height; its fixes may reach into other steps: a longer
  *  wheelbase, a wider body) */
-export const FIT_STEP: Record<FitResult['part'], StepId> = { bayLength: 'engine', bayWidth: 'engine', bayHeight: 'engine', gearboxPlace: 'engine', mount: 'engine', gearbox: 'engine', archF: 'kit', archR: 'kit', clearance: 'frame' };
+export const FIT_STEP: Record<FitResult['part'], StepId> = { bayLength: 'engine', bayWidth: 'engine', bayHeight: 'engine', gearboxPlace: 'engine', mount: 'engine', gearbox: 'engine', archF: 'kit', archR: 'kit', clearance: 'frame', cooling: 'parts' };
 export const stepNo = (id: StepId): number => STEPS.findIndex(s => s[0] === id);
 export const isStep = (x: unknown): x is StepId => STEPS.some(s => s[0] === x);
 /** a kept step read back: an id as it is (a gone one as the step that took it over); a number as the six steps' (the old

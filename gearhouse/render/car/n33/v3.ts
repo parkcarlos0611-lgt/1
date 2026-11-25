@@ -220,7 +220,7 @@ export function buildCageV3(o: V3Opts = {}): Cage959 { const NR = V3.rows, NC = 
   const LINES: { out: number; z: number | null; dz?: number }[] = [{ out: NaN, z: null, dz: -2 }, { out: NaN, z: null, dz: -5 }, { out: NaN, z: null, dz: -6.3 }, { out: NaN, z: null, dz: -10 }, { out: 0, z: null, dz: -15 },
     { out: 0, z: 444 }, { out: -9, z: 422 }, { out: -9, z: 275 }, { out: -9, z: 240 }, { out: -3, z: 232 }, { out: 10, z: 152 }, { out: -30, z: 138 }], STEP = 6, FOOT_LINE = 9, LIP_EDGE = 11;
   const bumper: V[][] = LINES.map((L, m) => seamF.map((v, k) => { const s = P[v]!, z = L.z ?? s[2] + L.dz!, lipOut = L.out === 10 ? (k >= 12 ? 10 : k <= 3 ? 4 : 4 + (k - 3) * 0.66) : L.out;
-    if (k < 2) { const r = k ? V3.ringR + V3.flare : V3.ringR, y = (k ? 879 : 890) + (m < 4 ? 0 : lipOut); return [ringAt(z, r), y, z] as V; }
+    if (k < 2) { const r = k ? V3.ringR + V3.flare : V3.ringR, y = (k ? 879 : 890) + (m < 4 ? 0 : lipOut), zz = m < 5 ? s[2] - [5, 10, 15, 21, 28][m]! : z; return [ringAt(zz, r), y, zz] as V; }   // by the arch the ledge is gone: its lines spread down the flat side
     const a = O[k - 1]!, b = O[k + 1] ?? [O[k - 1]![0], -O[k - 1]![1]] as [number, number], c = O[k]!, tx = b[0] - a[0], ty = b[1] - a[1], tl = Math.hypot(tx, ty), n: [number, number] = [ty / tl, -tx / tl], sg = n[0] * (c[0] - 2000) + n[1] * c[1] > 0 ? 1 : -1;
     if (m < 4) { const d = Math.hypot(c[0] - s[0], c[1] - s[1]), t = d < 45 ? [0.25, 0.5, 0.7, 0.88][m]! : [12 / d, 1 - 10 / d, 1 - 5 / d, 1 - 1.3 / d][m]!; return [s[0] + (c[0] - s[0]) * t, s[1] + (c[1] - s[1]) * t, z] as V; }
     return [c[0] + n[0] * sg * lipOut, Math.max(0, c[1] + n[1] * sg * lipOut), z] as V; }));

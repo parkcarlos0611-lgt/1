@@ -7,7 +7,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { deflateSync } from 'node:zlib';
 import { Build, KINDS, type Mesh, type MeshLine } from '../../render/car/mesh';
-import { emitShell } from '../../render/car/p959';
+import { emitShellFine } from '../../render/car/n33/emit';
 import { p959Lines } from '../../render/car/p959/lines';
 import { wheel } from '../../render/car/p959/parts';
 import { edgeUse, type Shell959 } from '../../render/car/p959/shell';
@@ -26,7 +26,7 @@ const dot = (a: V3d, b: V3d) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2], crs = (
 // ---- the model: the shell with the gate's dark places for the lamps, the grille and the bumper's openings, the stock
 //      glass, and four wheels of the real size (245/45 R17: radius 326, the rim's flange 232)
 const S: Shell959 = OLD ? buildN33Shell({ glass: 'stock' }) : buildN33ShellV3({ glass: 'stock', face: true }), b = new Build(), nn: number[] = [];
-emitShell(b, S, '#b9bdc3', nn);
+const FINE = emitShellFine(b, S, '#b9bdc3', nn);
 const archR = OLD ? DIM.archR : V3.archR, rimR = OLD ? DIM.rimR : V3.rimR;
 for (const s of [1, -1]) for (const [x, tr, front] of [[DIM.axleF, DIM.trackF, true], [DIM.axleR, DIM.trackR, false]] as const)
   wheel(b, { name: 'hub', o: [x, s * (tr / 2 + 122.5), DIM.hubZ], tyreR: DIM.tyreR, rimR, width: 245, archR, front }, 'n5', true);
@@ -107,6 +107,7 @@ png(`${out}/${tagName}_side.png`, 1780, 560, draw(ortho(3560, 1120, [0, 1, 0], [
 png(`${out}/${tagName}_rear.png`, 760, 560, draw(ortho(1520, 1120, [-1, 0, 0], [0, 0, 605], 4 / 5.5)));
 
 const use = [...edgeUse(S.F).values()], tris = (f: (t: (typeof S.tag)[number]) => boolean) => S.F.reduce((s, f2, k) => s + (f(S.tag[k]!) ? f2.length - 2 : 0), 0);
+console.log(`drawn mesh: ${FINE.triangles} shell triangles (${FINE.divided} edges divided), thin painted triangles ${FINE.slivers}`);
 console.log(`cage: ${S.cage.P.length} points, ${S.cage.F.length} faces; shell: ${S.F.length} faces, ${tris(() => true)} triangles (front bumper ${tris(t => t.region === 'bumperF')}); edges open ${use.filter(u => u === 1).length}, over-used ${use.filter(u => u > 2).length}`);
 if (process.argv.includes('report')) { const R = measure(S, []), front = (l: typeof R.mushy) => l.filter(e => e.at[0] < 1500); for (const e of R.unmarked.filter(u => u.at[0] >= 1500 && u.at[1] > 0)) console.log(`   rear ${e.panel} ${e.deg.toFixed(1)} deg at ${e.at.map(v => Math.round(v)).join(' ')}`);
   console.log(`paint edges (whole car): < 8 deg ${R.smooth}, 8-20 ${R.soft}, 20-35 not creased ${R.mushy.length}, >= 35 not creased ${R.unmarked.length}; slivers ${R.slivers}`);

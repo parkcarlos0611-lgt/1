@@ -43,7 +43,7 @@ export interface P959Opts extends Omit<ShellOpts, 'lamps'> { paint?: string; lam
    *  are free parts then (docs/systems/115 P1: "599 순정 세트" puts them on as free parts at their own places) */ smalls?: boolean }
 /** the lump as the builder's first step shows it: no openings, blank bumpers, the plain steel wheel, no plates, no glass */
 export const P959_LUMP: P959Opts = { lamp: 'none', details: false, bumperF: 'blank', bumperR: 'blank', wheel: 'steel', plateF: false, plateR: false, glass: null };
-const MAT: Record<string, [string, number, Parameters<Build['mat']>[2]]> = { glass: ['#20262c', 0.9, 'glass'], grille: ['#17181a', 0.1, 'grille'], dark: ['#1b1c1e', 0.05, 'plain'], lamp: ['#b3261e', 0.5, 'lens'], amber: ['#d9861c', 0.5, 'lens'], lens: ['#17181a', 0.1, 'plain'] };
+export const MAT: Record<string, [string, number, Parameters<Build['mat']>[2]]> = { glass: ['#20262c', 0.9, 'glass'], grille: ['#17181a', 0.1, 'grille'], dark: ['#1b1c1e', 0.05, 'plain'], lamp: ['#b3261e', 0.5, 'lens'], amber: ['#d9861c', 0.5, 'lens'], lens: ['#17181a', 0.1, 'plain'] };
 
 /** the faces of a shell laid into a builder, a part per panel and material */
 export function emitShell(b: Build, S: Shell959, paint: string, normals?: number[]): void { const groups = new Map<string, number[]>();

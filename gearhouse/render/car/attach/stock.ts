@@ -36,11 +36,11 @@ export function stockAims(base: Lump, dims?: Partial<FrameDims>): Aim[] { const 
   return [{ id: 'mirror', o: [m[0], m[1] + 700, m[2]], d: [0, -1, 0], depth: 105, scale: 0.92 }, { id: 'wingStay', o: [w[0], 0, w[2] + 2000], d: [0, 0, -1], scale: 0.97, depth: 175, tilt: 6 },
     { id: 'exhaust1', o: [e[0] + 600, e[1], e[2]], d: [-1, 0, 0], scale: 1.4, depth: 30, one: true }, { id: 'marker', o: [k[0], k[1] + 700, k[2]], d: [0, -1, 0], scale: 0.9 },
     { id: 'handle', o: [h[0], h[1] + 700, h[2]], d: [0, -1, 0] }, { id: 'fuelLid', o: [fl[0], fl[1] - 700, fl[2]], d: [0, 1, 0], one: true },
-    along('lampSlant', at([199, 560, 657]), [-0.813, 0.487, 0.32], { depth: 12 }), along('grilleSlot', at([115, 0, 645]), [-0.96, 0, 0.279], { depth: 22 }),
-    { id: 'intakeOpen', o: [-600, 0, at([0, 0, 322])[2]], d: [1, 0, 0], scale: 1.12, depth: 70 }, { id: 'intakeOpen', o: [-600, at([0, 345, 0])[1], at([0, 0, 502])[2]], d: [1, 0, 0], scale: 0.3, sx: 0.62, depth: 45 },
-    { id: 'fogLamp', o: [-600, at([0, 585, 0])[1], at([0, 0, 322])[2]], d: [1, 0, 0], scale: 1.1, depth: 16 }, { id: 'lip', o: [-600, 0, at([0, 0, 205])[2]], d: [1, 0, 0] },
-    along('tailRound', at([4555, 416, 815]), [0.975, 0.13, 0.182], { scale: 1.23, depth: 10 }), along('tailRound', at([4511, 609, 815]), [0.913, 0.358, 0.197], { scale: 1.23, depth: 10 }),
-    { id: 'garnish', o: [at([4650, 0, 0])[0] + 600, 0, at([0, 0, 722])[2]], d: [-1, 0, 0] }]; }
+    along('lampSlant', at([195, 560, 646]), [-0.827, 0.402, 0.394], { depth: 12, scale: 0.95 }), along('grilleSlot', at([95, 0, 640]), [-0.948, 0, 0.319], { depth: 22, scale: 0.92 }),
+    { id: 'intakeOpen', o: [-600, 0, at([0, 0, 348])[2]], d: [1, 0, 0], scale: 0.88, sx: 1.18, depth: 70 }, { id: 'intakeOpen', o: [-600, at([0, 345, 0])[1], at([0, 0, 502])[2]], d: [1, 0, 0], scale: 0.3, sx: 0.62, depth: 45 },
+    { id: 'fogLamp', o: [-600, at([0, 590, 0])[1], at([0, 0, 348])[2]], d: [1, 0, 0], scale: 1.1, depth: 16 }, { id: 'lip', o: [-600, 0, at([0, 0, 200])[2]], d: [1, 0, 0] },
+    along('tailRound', at([4573, 425, 817]), [0.993, 0.077, 0.091], { scale: 1.23, depth: 10 }), along('tailRound', at([4522, 614, 817]), [0.86, 0.48, 0.16], { scale: 1.23, depth: 10 }),
+    { id: 'garnish', o: [at([4650, 0, 0])[0] + 600, 0, at([0, 0, 712])[2]], d: [-1, 0, 0] }]; }
 /** where a new part of a kind is put when the lump has no stock place for it (or that one is taken): aimed from the
  *  skin's bounds, so any lump has one */
 export function defaultAim(id: FreeId, box: [V, V]): Aim { const [lo, hi] = box, L = hi[0] - lo[0], H = hi[2] - lo[2], W = hi[1] - lo[1], x = (f: number) => lo[0] + L * f, z = (f: number) => lo[2] + H * f;

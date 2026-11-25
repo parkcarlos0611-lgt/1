@@ -13,7 +13,10 @@ import { wheel } from '../../render/car/p959/parts';
 import { edgeUse, type Shell959 } from '../../render/car/p959/shell';
 import { measure } from '../../render/car/p959/check';
 import { buildN33ShellV3, V3 } from '../../render/car/n33/v3';
-import { buildN33Shell, DIM } from '../../render/car/n33';
+import { buildN33Shell, n33Model, n33Skin, DIM } from '../../render/car/n33';
+import { stockParts } from '../../render/car/attach/stock';
+import { fitAll } from '../../render/car/attach';
+import { makeAtlas } from '../../render/live/style';
 
 type V3d = [number, number, number];
 const out = process.argv[2] ?? '.', FORM = process.argv.includes('form'), OLD = process.argv.includes('old'); mkdirSync(out, { recursive: true });
@@ -24,13 +27,21 @@ function png(path: string, w: number, h: number, rgb: Uint8Array) { const raw = 
 const dot = (a: V3d, b: V3d) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2], crs = (a: V3d, b: V3d): V3d => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]], un = (a: V3d): V3d => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };
 
 // ---- the model: the shell with the gate's dark places for the lamps, the grille and the bumper's openings, the stock
-//      glass, and four wheels of the real size (245/45 R17: radius 326, the rim's flange 232)
-const S: Shell959 = OLD ? buildN33Shell({ glass: 'stock' }) : buildN33ShellV3({ glass: 'stock', face: true }), b = new Build(), nn: number[] = [];
-const FINE = emitShellFine(b, S, '#b9bdc3', nn, (panel, t, deg) => console.log(`   thin ${panel} ${deg.toFixed(1)} deg: ${t.map(p => p.map(Math.round).join(' ')).join(' | ')}`));
-const archR = OLD ? DIM.archR : V3.archR, rimR = OLD ? DIM.rimR : V3.rimR;
-for (const s of [1, -1]) for (const [x, tr, front] of [[DIM.axleF, DIM.trackF, true], [DIM.axleR, DIM.trackR, false]] as const)
-  wheel(b, { name: 'hub', o: [x, s * (tr / 2 + 122.5), DIM.hubZ], tyreR: DIM.tyreR, rimR, width: 245, archR, front }, 'n5', true);
-const M: Mesh = b.mesh(DIM.length), NN = new Float32Array(nn), shellTris = nn.length / 9; M.lines = p959Lines(S, false) as MeshLine[];
+//      glass, and four wheels of the real size (245/45 R17: radius 326, the rim's flange 232); `stock`: the car as the
+//      game builds it, the N33's stock parts placed on the skin and their holes cut, the stock glass and wheels, its plates
+const STOCK = process.argv.includes('stock');
+let S: Shell959, M: Mesh, NN: Float32Array, shellTris: number, FINE = { triangles: 0, slivers: 0, divided: 0 };
+if (STOCK) { const skin = n33Skin(buildN33Shell({ glass: 'stock' })), parts = stockParts('bnr33', skin), fits = fitAll(skin, parts);
+  for (const f of fits) console.log(`   ${f.key}: ${f.ok ? 'ok' : f.why}${f.warn ? ' (' + f.warn + ')' : ''}`);
+  const m = n33Model({ glass: 'stock', wheel: 'n5', paint: '#b9bdc3', placed: parts, plateF: !process.argv.includes('noplate'), plateR: !process.argv.includes('noplate') }); S = m.shell; M = m.mesh; NN = m.normals; shellTris = m.shellTris; console.log(`stock car: ${M.n} triangles, shell ${shellTris}`); }
+else { S = OLD ? buildN33Shell({ glass: 'stock' }) : buildN33ShellV3({ glass: 'stock', face: true }); const b = new Build(), nn: number[] = [];
+  FINE = emitShellFine(b, S, '#b9bdc3', nn, (panel, t, deg) => console.log(`   thin ${panel} ${deg.toFixed(1)} deg: ${t.map(p => p.map(Math.round).join(' ')).join(' | ')}`));
+  for (const s of [1, -1]) for (const [x, tr, front] of [[DIM.axleF, DIM.trackF, true], [DIM.axleR, DIM.trackR, false]] as const)
+    wheel(b, { name: 'hub', o: [x, s * (tr / 2 + 122.5), DIM.hubZ], tyreR: DIM.tyreR, rimR: V3.rimR, width: 245, archR: V3.archR, front }, 'n5', true);
+  M = b.mesh(DIM.length); NN = new Float32Array(nn); shellTris = nn.length / 9; M.lines = p959Lines(S, false) as MeshLine[]; }
+// drawn as the game draws it (+y on the left of the heading: render/live/gpu.ts placeMesh), so the plates and whatever is on one side read as they do in the game
+for (let i = 1; i < M.pos.length; i += 3) M.pos[i] = -M.pos[i]!; for (let i = 1; i < NN.length; i += 3) NN[i] = -NN[i]!; M.lines = (M.lines ?? []).map(l => ({ ...l, pts: l.pts.map(p => [p[0], -p[1], p[2]] as V3d) }));
+const UV = M.uv && M.uv.length === M.n * 9 ? M.uv : null, ATLAS = makeAtlas(2048), KIND_LENS = KINDS.indexOf('lens');
 const KIND_PAINT = KINDS.indexOf('paint'), KIND_GLASS = KINDS.indexOf('glass'), KIND_TYRE = KINDS.indexOf('tyre'), BG = [206, 202, 192];
 
 // ---- cameras. A photograph's: the eye, the way it looks (yaw from the car's axis, pitch down, roll), the focal
@@ -84,7 +95,11 @@ function draw(c: Cam, lines = true): Uint8Array { const SS = 2, w = Math.round(c
       const n = un([ns[0]![0] * l0 + ns[1]![0] * l1 + ns[2]![0] * l2, ns[0]![1] * l0 + ns[1]![1] * l1 + ns[2]![1] * l2, ns[0]![2] * l0 + ns[1]![2] * l1 + ns[2]![2] * l2]);
       const nl = dot(n, light), lit = FORM ? 0.15 + 0.85 * Math.max(0, nl) : Math.max(0, Math.min(1, (nl - 0.18) / 0.08));
       const sh: V3d = kind === KIND_GLASS ? [0.9, 0.95, 1] : FORM && kind === KIND_PAINT ? [0.35 + 0.65 * lit, 0.35 + 0.65 * lit, 0.37 + 0.63 * lit] : [0.56 + 0.44 * lit, 0.6 + 0.4 * lit, 0.68 + 0.32 * lit], g = kind === KIND_TYRE ? 0.9 : 1;
-      for (let k = 0; k < 3; k++) img[zi * 3 + k] = Math.min(255, base[k]! * sh[k]! * g); } }
+      // a picture from the style's atlas (the lamps' insides, the plates), as the game lays it: over the face's colour; a lens shows it unshaded
+      let bc = base, own = false; if (UV && UV[t * 9 + 2]! > 0.5) { const u = UV[t * 9]! * l0 + UV[t * 9 + 3]! * l1 + UV[t * 9 + 6]! * l2, v = UV[t * 9 + 1]! * l0 + UV[t * 9 + 4]! * l1 + UV[t * 9 + 7]! * l2, ci = Math.round(UV[t * 9 + 2]!) - 1, R = ATLAS.rects.subarray(ci * 4, ci * 4 + 4);
+        const fx = (R[0]! + (0.004 + (u - Math.floor(u)) * 0.992) * R[2]!) * ATLAS.S, fy = (R[1]! + (0.004 + (v - Math.floor(v)) * 0.992) * R[3]!) * ATLAS.S, ao = (Math.min(ATLAS.S - 1, Math.floor(fy)) * ATLAS.S + Math.min(ATLAS.S - 1, Math.floor(fx))) * 4, al = ATLAS.data[ao + 3]! / 255;
+        bc = [base[0] * (1 - al) + ATLAS.data[ao]! * al, base[1] * (1 - al) + ATLAS.data[ao + 1]! * al, base[2] * (1 - al) + ATLAS.data[ao + 2]! * al]; own = al > 0.5 && kind === KIND_LENS; }
+      for (let k = 0; k < 3; k++) img[zi * 3 + k] = own ? bc[k]! : Math.min(255, bc[k]! * sh[k]! * g); } }
   const ink = (zi: number, a = 1) => { for (let k = 0; k < 3; k++) img[zi * 3 + k] = img[zi * 3 + k]! * (1 - a) + 22 * a; };
   for (let i = 0; i < w * h; i++) if (!Number.isFinite(zb[i]!)) { img[i * 3] = BG[0]!; img[i * 3 + 1] = BG[1]!; img[i * 3 + 2] = BG[2]!; }
   const mark = new Uint8Array(w * h);
@@ -98,7 +113,7 @@ function draw(c: Cam, lines = true): Uint8Array { const SS = 2, w = Math.round(c
   const o2 = new Uint8Array(W * H * 3); for (let py = 0; py < H; py++) for (let px = 0; px < W; px++) for (let k = 0; k < 3; k++) { let s = 0; for (let dy = 0; dy < SS; dy++) for (let dx = 0; dx < SS; dx++) s += img[((py * SS + dy) * w + px * SS + dx) * 3 + k]!; o2[(py * W + px) * 3 + k] = s / (SS * SS); }
   return o2; }
 
-const tagName = OLD ? 'old' : FORM ? 'form' : 'v3';
+const tagName = STOCK ? (FORM ? 'stockform' : 'stock') : OLD ? 'old' : FORM ? 'form' : 'v3';
 for (const s of SHOTS) { const k = 2 * Math.min(1, 1300 / s.w), c = persp(s.w, s.h, s.p, k); png(`${out}/${tagName}_${s.name}.png`, Math.round(c.w) / 2 | 0, Math.round(c.h) / 2 | 0, draw(c)); }
 // square on, for the blueprint (5.5 mm a pixel there; here twice that size, drawn at four times and halved): the front
 // (the picture's centre on the car's centre line, the ground at its row 500) and the front of the side

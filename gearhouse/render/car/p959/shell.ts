@@ -60,8 +60,13 @@ export function buildShell(o: ShellOpts = {}): Shell959 {
     for (const [u, v] of openEdges()) { const cu = cOf(u), cv = cOf(v), f = [v, u, cu, cv].filter((w, q, l) => l.indexOf(w) === q); if (f.length < 3) continue;
       // u and v are already reversed against their face; the centre points close the quad (a triangle where they meet)
       F.push(f); tag.push({ region: 'shell', mat: 'dark', panel: 'floor', right: P[u]![1] + P[v]![1] < 0 }); crease.add(ekey(u, v)); } }
+  // helper faces (lips, wells, socket walls, the slot, the floor) fold hard against their neighbours: those folds are creases too
+  { const helper = (t: Tag) => /Rim$|archLip|wheelWell|floor|wingSlot/.test(t.panel), first = new Map<string, number>(), nrm = F.map(f => unit(faceNormal(P, f)));
+    F.forEach((f, k) => f.forEach((a, q) => { const key = ekey(a, f[(q + 1) % f.length]!), o2 = first.get(key); if (o2 === undefined) first.set(key, k); else if ((helper(tag[o2]!) || helper(tag[k]!)) && nrm[o2]![0] * nrm[k]![0] + nrm[o2]![1] * nrm[k]![1] + nrm[o2]![2] * nrm[k]![2] < 0.82) crease.add(key); })); }
+  // the shading is also split where the material changes (glass, a grille or a lens against the paint), as the game splits it
+  { const cls = (t: Tag) => t.mat === 'paint' || t.mat === 'dark' ? 'body' : t.mat, first = new Map<string, number>();
+    F.forEach((f, k) => f.forEach((a, q) => { const key = ekey(a, f[(q + 1) % f.length]!), o2 = first.get(key); if (o2 === undefined) first.set(key, k); else if (cls(tag[o2]!) !== cls(tag[k]!)) crease.add(key); })); }
   const split = new Set<string>(crease);
-  // the shading also splits where the material changes to glass or a lamp's lens against paint? No: the glass lies in the skin. Only creases split.
   const N = cornerNormals(P, F, split);
   const faceOf = new Map<string, number>(); cage.F.forEach((f, k) => faceOf.set(f.slice().sort((a, b) => a - b).join(','), k));
   const lerp = (a: V, b: V, t: number): V => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
@@ -79,8 +84,13 @@ export function buildShell(o: ShellOpts = {}): Shell959 {
 
 /** the shell's edges and how many faces use each (a closed surface: every edge twice) */
 export function edgeUse(F: number[][]): Map<string, number> { const m = new Map<string, number>(); for (const f of F) f.forEach((a, q) => { const k = ekey(a, f[(q + 1) % f.length]!); m.set(k, (m.get(k) ?? 0) + 1); }); return m; }
-/** a quad cut into two triangles along the diagonal that leaves them flatter; equal: the one from corner 0 */
+/** a quad cut into two triangles (docs/systems/108 T3): where it is twisted by more than 2 degrees, along the diagonal
+ *  that leaves the two flatter; elsewhere along the diagonal that runs back and outward (down the side), the same way
+ *  over a whole panel and mirrored on the other side */
 export function cut(P: V[], f: number[]): [number, number, number][] { if (f.length === 3) return [[f[0]!, f[1]!, f[2]!]]; const [a, b, c, d] = f as [number, number, number, number];
   const nn = (p: number, q: number, r: number) => unit(faceNormal(P, [p, q, r])), dot = (u: V, v: V) => u[0] * v[0] + u[1] * v[1] + u[2] * v[2];
-  const t0 = dot(nn(a, b, c), nn(a, c, d)), t1 = dot(nn(b, c, d), nn(b, d, a)); return t1 > t0 + 1e-4 ? [[b, c, d], [b, d, a]] : [[a, b, c], [a, c, d]]; }
+  const t0 = dot(nn(a, b, c), nn(a, c, d)), t1 = dot(nn(b, c, d), nn(b, d, a)); let alt: boolean;
+  if (Math.abs(t1 - t0) > 6e-4) alt = t1 > t0; else { const n = unit(faceNormal(P, f)), side = P[a]![1] + P[b]![1] + P[c]![1] + P[d]![1] < 0 ? -1 : 1, g: V = [0, n[2] * side, -n[1] * side];   // across the face: n x (the car's length), turned over on the other side
+    const d0 = sub(P[c]!, P[a]!), d1 = sub(P[d]!, P[b]!), s0 = d0[0] * dot(d0, g), s1 = d1[0] * dot(d1, g); alt = s1 > s0 + 1e-6; }
+  return alt ? [[b, c, d], [b, d, a]] : [[a, b, c], [a, c, d]]; }
 export { add, sub, mul, len, unit };

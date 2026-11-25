@@ -30,6 +30,9 @@ import { buildFree } from '../../render/car/free/build';
 import { JK, JLIP, M as FM, type Body } from '../../render/car/free/body';
 import { CURVES } from '../../render/car/free/curves';
 import { PRESETS } from '../../render/car/free/presets';
+import { p959Model } from '../../render/car/p959';
+import { fineGrid, PANELS } from '../../render/car/p959/check';
+import { surfaceNormals } from '../../render/car/edges';
 
 type V = [number, number, number];
 const sub = (a: V, b: V): V => [a[0] - b[0], a[1] - b[1], a[2] - b[2]], add = (a: V, b: V): V => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
@@ -56,7 +59,7 @@ function weld(M: Mesh, pick: (t: number) => boolean): Skin { const ids = new Map
 
 interface Edge { a: number; b: number; t: number[]; th: number; anom: number; fold: boolean; split: boolean; jump: number; bad: boolean }
 interface Analysis { S: Skin; E: Edge[]; vH: number[]; vRing: number[][]; cornerErr: number[]; dimples: number[]; bumps: number[]; slivers: number; inconsistent: number; soft: number }
-function analyse(S: Skin): Analysis {
+function analyse(S: Skin, gameN?: ArrayLike<number>): Analysis {
   const { P, T, fn } = S, map = new Map<string, number>(), E: Edge[] = [], triE: number[][] = T.map(() => []), vT: number[][] = P.map(() => []);
   T.forEach((tr, k) => { for (let q = 0; q < 3; q++) { const a = tr[q]!, b = tr[(q + 1) % 3]!, key = a < b ? `${a}|${b}` : `${b}|${a}`; let ei = map.get(key);
     if (ei === undefined) { ei = E.length; E.push({ a, b, t: [], th: 0, anom: 0, fold: false, split: false, jump: 0, bad: false }); map.set(key, ei); } E[ei]!.t.push(k); triE[k]!.push(ei); vT[a]!.push(k); } });
@@ -81,7 +84,7 @@ function analyse(S: Skin): Analysis {
     for (const u of vT[v]!) { if (samePart && S.part[u] !== S.part[k]) continue; const g = fn[u]!; if (dot(g, f) <= 0.766) continue; let w = 1;
       if (weighted) { const tr = T[u]!, i = tr.indexOf(v), a = sub(P[tr[(i + 1) % 3]!]!, P[v]!), b = sub(P[tr[(i + 2) % 3]!]!, P[v]!); w = ang(a, b) / DEG; }
       s = add(s, [g[0] * w, g[1] * w, g[2] * w]); } return len(s) > 0 ? un(s) : f; };
-  T.forEach((_, k) => { for (let q = 0; q < 3; q++) { const g = corner(k, q, true, false), r = corner(k, q, false, true); gN[k * 3 + q] = g; cornerErr[k * 3 + q] = ang(g, r); } });
+  T.forEach((_, k) => { for (let q = 0; q < 3; q++) { const i = S.tri[k]! * 9 + q * 3, g: V = gameN ? [gameN[i]!, gameN[i + 1]!, gameN[i + 2]!] : corner(k, q, true, false), r = corner(k, q, false, true); gN[k * 3 + q] = g; cornerErr[k * 3 + q] = ang(g, r); } });
   for (const e of E) { if (e.t.length !== 2) continue; const [t1, t2] = e.t as [number, number]; let j = 0;
     for (const v of [e.a, e.b]) j = Math.max(j, ang(gN[t1 * 3 + T[t1]!.indexOf(v)]!, gN[t2 * 3 + T[t2]!.indexOf(v)]!));
     e.jump = j; e.split = Math.abs(e.th) < 30 && j > 2; }
@@ -172,7 +175,7 @@ function normCol(err: number): Col { if (err < 1) return WHITE; if (err < 3) ret
 const LEGEND: Col[][] = [[[120, 190, 120], [225, 180, 30], [240, 110, 20], [60, 100, 225], [240, 120, 110], [200, 10, 10], [40, 40, 140]], [[30, 70, 200], [150, 175, 235], WHITE, [245, 170, 160], [210, 20, 20]], [WHITE, [220, 180, 230], [190, 80, 205], [90, 10, 110], [20, 20, 20]]];
 
 // ---------------------------------------------------------------- the cars
-interface Car { id: string; label: string; mesh: Mesh; pick: (t: number) => boolean; grids: GridStat[]; tables: { name: string; n: number; at: number[] }[]; stations: number[]; note?: string }
+interface Car { id: string; label: string; mesh: Mesh; pick: (t: number) => boolean; grids: GridStat[]; tables: { name: string; n: number; at: number[] }[]; stations: number[]; note?: string; /** the game's own shading normals for this mesh (nine numbers a triangle), where it is drawn in the drift-game style (creases marked) */ normals?: Float32Array }
 const kitCar = (id: string, k: CarKit, opts?: AssembleOpts): Car => { const tweak = opts?.tweak, A = assemble(k, opts), s = A.skin, L = A.lines, zc = 450;
   const inArch = (x: number) => [L.arches.f, L.arches.r].some(a => Math.abs(x - a.x) < a.r + 1);
   const grids: GridStat[] = tweak ? [] : [gridCheck('flank (CH)', s.CH, zc, (i, j, al) => (al || j <= FLANK.SILL) && (j < FLANK.H || !inArch(s.SF[i]!))), gridCheck('front top (TFG)', s.TFG, zc), gridCheck('nose (NSG)', s.NSG, zc, (_, j, al) => al || j <= FLANK.H), gridCheck('deck (DKG)', s.DKG.slice(0, -1), zc), gridCheck('roof (RFG)', s.RFG, zc)];
@@ -184,13 +187,17 @@ const freeCar = (id: string, i: number): Car => { const sil = PRESETS[i]!, c = b
   const tables = CURVES.map(n => ({ name: n, ...inflections(sil.curves[n], 0.002) }));
   return { id, label: `${id} (${sil.name})`, mesh: c.mesh, pick: t => c.mesh.kind[t] === PAINT, grids: [gridCheck('rings', G, zc, keep)], tables, stations: b.sects.map(S => S.x) }; };
 
-const CARS: (() => Car)[] = [() => kitCar('nsx', NSX_KIT), () => kitCar('f355', F355_KIT), () => kitCar('eb110', EB110_KIT),
+/** the 959 (docs/systems/109): the shell from its cage; its panels are patches of the cage's grid; shaded as the style's renderer shades it */
+const p959Car = (): Car => { const { mesh, shell, shellTris } = p959Model(), G = fineGrid(shell), grp = Int32Array.from(mesh.kind, k => KINDS[k] === 'plain' ? PAINT : k);
+  const grids = PANELS.map(p => gridCheck(p.name, Array.from({ length: (p.rows[1] - p.rows[0]) * 2 + 1 }, (_, i) => Array.from({ length: (p.cols[1] - p.cols[0]) * 2 + 1 }, (_, j) => shell.P[G[p.rows[0] * 2 + i]![p.cols[0] * 2 + j]!]! as V)), 450));
+  return { id: '959', label: '959 (cage + one subdivision)', mesh, pick: t => t < shellTris && mesh.kind[t] === PAINT, grids, tables: [], stations: G.filter(r => r[0]! >= 0).map(r => shell.P[r[0]!]![0]), normals: surfaceNormals(mesh.pos, mesh.n, grp, { creases: mesh.creases }) }; };
+const CARS: (() => Car)[] = [p959Car, () => kitCar('nsx', NSX_KIT), () => kitCar('f355', F355_KIT), () => kitCar('eb110', EB110_KIT),
   () => ({ ...kitCar('nsx_tweak', NSX_KIT, { tweak: { cabin: 120, roof: -50, rake: 6, ride: -20 } }), note: 'NSX, tweak cabin +120, roof -50, rake +6, ride -20' }),
   () => freeCar('free_wedge', 0), () => freeCar('free_canopy', 1), () => freeCar('free_coke', 2), () => freeCar('free_longtail', 3)];
 
 const where = (p: V, L: number) => `x ${f0(p[0])} (${f0(p[0] / L * 100)}%) y ${f0(Math.abs(p[1]))} z ${f0(p[2])}`;
 const summary: string[] = [];
-for (const make of CARS) { const car = make(); if (only && !car.id.startsWith(only)) continue; const M = car.mesh, S = weld(M, car.pick), R = analyse(S), L = M.length;
+for (const make of CARS) { const car = make(); if (only && !car.id.startsWith(only)) continue; const M = car.mesh, S = weld(M, car.pick), R = analyse(S, car.normals), L = M.length;
   const E2 = R.E.filter(e => e.t.length === 2), abs = E2.map(e => Math.abs(e.th));
   const band = (a: number, b: number) => abs.filter(v => v >= a && v < b).length, folds = E2.filter(e => e.fold), splits = E2.filter(e => e.split), concave = E2.filter(e => e.th < -2 && !e.bad);
   const errs = R.cornerErr, bad3 = errs.filter(v => v > 3).length;

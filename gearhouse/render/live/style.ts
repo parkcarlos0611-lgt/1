@@ -3,6 +3,8 @@
 // painted from. Pure: the renderer (render/live/renderer.ts, look 4) and the style check page (ui/stylecheck.ts) use
 // these, and the tests check them.
 import { KINDS } from '../car/mesh';
+import { interiorSheet } from '../car/interior/atlas';
+import type { GaugeCar } from '../car/interior/gauges';
 
 /** the style's widths at a picture 1080 pixels high: the silhouette's outline and the drawn lines (doc 108 L1: outline
  *  2.5-3 px, panel lines 1.5-2 px) */
@@ -26,13 +28,14 @@ export function outlineShare(name: string, kind: number): number {
 
 // ---- the atlas (docs/systems/109 §5, shading): one picture for the painted detail. Each cell a square, its pictures
 //      drawn to its edge; a corner's coordinates (u, v) run 0..1 over a cell and repeat in it (a grille's mesh tiles) ----
-export const ATLAS_CELLS = ['headLamp', 'tailLamp', 'grille', 'wheelFace', 'gauge', 'vent'] as const;
+/* the last cell, 'interior', is the cabin's own sheet (render/car/interior/atlas.ts): the atlas's whole lower half, its regions found by the cabin's parts themselves */
+export const ATLAS_CELLS = ['headLamp', 'tailLamp', 'grille', 'wheelFace', 'gauge', 'vent', 'interior'] as const;
 export type AtlasCell = typeof ATLAS_CELLS[number];
-/** the atlas: four cells a row, each `S / 4` square; RGBA, alpha 0 where a cell shows the surface's own colour */
+/** the atlas: four cells a row, each `S / 4` square, and the cabin's sheet across the lower half; RGBA, alpha 0 where a cell shows the surface's own colour */
 export interface Atlas { S: number; data: Uint8Array; /** each cell's place (u0, v0, du, dv) in 0..1, in ATLAS_CELLS' order */ rects: Float32Array }
 const sm = (a: number, b: number, x: number) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 /** a cell's picture at (u, v) in -1..1 (y up): [r, g, b, a] 0..1 */
-function cellAt(c: AtlasCell, u: number, v: number): [number, number, number, number] {
+function cellAt(c: Exclude<AtlasCell, 'interior'>, u: number, v: number): [number, number, number, number] {
   const r = Math.hypot(u, v), a = Math.atan2(v, u), aa = 1.5 / 64;
   switch (c) {
     case 'headLamp': { if (r > 0.98) return [0, 0, 0, 0]; const bowl = 0.62 + 0.3 * (1 - r * r), ring = sm(0.8, 0.8 + aa, r) * (1 - sm(0.88, 0.88 + aa, r)), bulb = 1 - sm(0.16, 0.16 + aa, Math.hypot(u, v + 0.05));
@@ -48,10 +51,12 @@ function cellAt(c: AtlasCell, u: number, v: number): [number, number, number, nu
       k = Math.max(k, tick); return red ? [red[0]!, red[1]!, red[2]!, 1] : [k, k, k, 1]; }
     case 'vent': { const s = Math.abs(((v + 1) * 5) % 1 - 0.5), k = s > 0.3 ? 0.05 : 0.22 - 0.3 * s; return [k, k, k, 1]; }
   } }
-/** the placeholder atlas: the cells drawn by rule (a real one, painted, replaces it later; the cells keep their places) */
-export function makeAtlas(S = 1024): Atlas {
+/** the placeholder atlas: the cells drawn by rule (a real one, painted, replaces it later; the cells keep their places).
+ *  `car`: whose dials the cabin's sheet shows (its red line, its top speed; none: the 959's) */
+export function makeAtlas(S = 1024, car?: GaugeCar): Atlas {
   const data = new Uint8Array(S * S * 4), C = S / 4, rects = new Float32Array(ATLAS_CELLS.length * 4);
-  ATLAS_CELLS.forEach((c, i) => { const cx = (i % 4) * C, cy = Math.floor(i / 4) * C; rects.set([cx / S, cy / S, C / S, C / S], i * 4);
+  ATLAS_CELLS.forEach((c, i) => { if (c === 'interior') { rects.set([0, 0.5, 1, 0.5], i * 4); data.set(interiorSheet(S, car), S * (S / 2) * 4); return; }
+    const cx = (i % 4) * C, cy = Math.floor(i / 4) * C; rects.set([cx / S, cy / S, C / S, C / S], i * 4);
     for (let y = 0; y < C; y++) for (let x = 0; x < C; x++) { const p = cellAt(c, (x + 0.5) / C * 2 - 1, (y + 0.5) / C * 2 - 1), o = ((cy + y) * S + cx + x) * 4; for (let k = 0; k < 4; k++) data[o + k] = Math.round(Math.max(0, Math.min(1, p[k]!)) * 255); } });
   return { S, data, rects }; }
 /** atlas coordinates for a mesh's grilles where it brings none (three numbers a corner, as Mesh.uv): each grille face

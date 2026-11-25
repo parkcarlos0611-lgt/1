@@ -20,11 +20,12 @@ import type { RaceSpec } from './cars';
 import { torqueAt, steering, suspension, type AxleKind } from './cars';
 import type { Track } from './track';
 import { Health, type Failure } from './health';
+import { Ignition } from './ignition';
 import { TyreRing } from './tyre';
 import { kinOf, kinOn, kinRig, camberAt, toeAt, pathAt, springAt, jackAt, type KinRig } from './kin';
 import type { CornerTable } from '../render/car/suspension/tables';
 
-export interface Controls { throttle: number; brake: number; /** a share of the useful lock (usefulLock): 1 full for the grip; more (to catch a slide) up to the lock */ steer: number; clutch?: number; gear?: number; handbrake?: number }   // steer -1 (right) .. 1 (left)
+export interface Controls { throttle: number; brake: number; /** a share of the useful lock (usefulLock): 1 full for the grip; more (to catch a slide) up to the lock */ steer: number; clutch?: number; gear?: number; handbrake?: number; /** the start control held (race/ignition.ts) */ start?: boolean }   // steer -1 (right) .. 1 (left)
 const G = 9.81, RHO = 1.2, HANDS = 5 * Math.PI;   // a driver's hands: two and a half turns of the wheel a second at most (a quick catch, hand over hand)
 /** the road-wheel angle (rad) a driver winds on for full steer at speed v: the lock, or what the tyres can use there
  *  (the turn the grip holds, a / v², plus the slip angle they work at), whichever is less */
@@ -69,6 +70,8 @@ interface Axle { /** an anti-roll bar's stiffness (N/m of the two sides' differe
   /** the kinematic rig's (alpha 0.13): each side's table, the motion ratio at the static ride, the dampers going up and coming back (N s/m at the wheel there) */
   tab?: [CornerTable, CornerTable]; mr0?: [number, number]; cb?: number; cr?: number }
 
+/** the revs the starter turns a dead engine at (rpm) */
+export const STARTER_RPM = 250;
 export class Vehicle {
   /** the body's centre of gravity (world), its velocity (world), its turn (body to world), its turning rate (body axes) */
   readonly p: V3 = [0, 0, 0]; readonly v: V3 = [0, 0, 0]; q: Q = [1, 0, 0, 0]; readonly om: V3 = [0, 0, 0];
@@ -83,6 +86,7 @@ export class Vehicle {
   onGrass = [false, false, false, false]; over = false; upset = false;
   /** the engine's heat and wear; the last failure that happened (for the page to tell) */
   health: Health; lastFailure: Failure | null = null;
+  /** the ignition (docs/systems/110 G1): running unless the page puts the car off (the player's direct start) */ engine = new Ignition(); private engagedLast = 0;
   /** each tyre as a ring of nodes (FL FR RL RR): how it gives under its load, the road and its forces (review 101) */ rings: TyreRing[]; tfx = [0, 0, 0, 0]; tfy = [0, 0, 0, 0];
   rpm = 0; gear = 1; shift = 0; steer = 0; /** the steering wheel's angle (rad, left +): the road wheels' times the ratio */ sw = 0; ax = 0; ay = 0; tax = 0; tay = 0; brakeT = [20, 20, 20, 20]; /** each wheel's spin-up rate last step (rad/s²) */ dw = [0, 0, 0, 0]; auto = true; tilt = 0;
   /** blows the body has taken, for its structure to be bent by (review 121): where (body axes from the centre of
@@ -247,7 +251,10 @@ export class Vehicle {
     // what the lower gear will turn them at (a proportional opening, full 1,500 rpm short), and lets it close as it nears them
     this.blip = F1 && this.shift > 0 && down && p < 0.8 ? Math.max(0, Math.min(1, (wd * c.gears[this.gear - 1]! * c.final * 30 / Math.PI - this.rpm) / 1500)) : 0;
     const thr = this.shift <= 0 ? thrD : F1 ? Math.max(thrD * env, this.blip) : 0, fric = 0.06 * torqueAt(c, c.torqueRpm) * (0.3 + 0.7 * this.rpm / c.hpRpm);
-    const hp = this.health.power, alive = this.health.running;
+    // the ignition (race/ignition.ts): off, no fuel or spark (a car rolling in gear drags it round: the compression's
+    // braking); cranking, the starter's torque on the engine; after the catch, the idle control's aim raised (the flare)
+    const E = this.engine; E.step(dt, !!u.start, { rpm: this.rpm, idle: c.idle, manual: !this.auto && !F1 && this.shift <= 0, clutch: u.clutch, engaged: this.engagedLast, shaftRpm: Math.abs(wd * Gr) * 30 / Math.PI, water: this.health.water });
+    const hp = this.health.power, alive = this.health.running && E.fuelled;
     // VTEC (review 149): the high cam's oil passage opens above the switch-over revs and closes a little below them
     if (X?.vtec) { if (!this.vtecHigh && this.rpm > X.vtec.rpm) this.vtecHigh = true; else if (this.vtecHigh && this.rpm < X.vtec.rpm - X.vtec.hyst) this.vtecHigh = false; }
     const cam = X?.vtec ? (this.vtecHigh ? 'high' : 'low') : undefined;
@@ -262,7 +269,9 @@ export class Vehicle {
     // the turbos (review 125): boost builds with the exhaust's flow (revs and throttle) over the spool time, falls fast when the throttle shuts (the blow-off); off boost the engine makes what it would unblown
     let blow = 1; if (X?.turbo) { const T = X.turbo, want = thr * Math.min(1, Math.max(0, (this.rpm - T.full * 0.45) / (T.full * 0.55))), tau = want > this.boost ? T.spool * (1.6 - this.rpm / c.redline) * (this.boost > 0.4 ? 0.5 : 1) : 0.6;   /* the turbines keep turning through a short lift: the boost falls slowly and comes back quickly */
       this.boost += (want - this.boost) * Math.min(1, dt / Math.max(0.02, tau)); const base = 1 / (1 + T.boost * 0.95); blow = base + (1 - base) * this.boost; }
-    const Te = alive ? (this.rpm < c.redline * 1.1 ? thrE * torqueAt(c, this.rpm, cam) * hp * blow : 0) - fric * (1 - thrE) + (this.rpm < c.idle ? fric * 2 : 0) : -fric * 3 - (this.rpm > 1 ? 30 : 0);
+    const idleT = c.idle * (1 + E.flare), thrK = Math.max(thrE, E.flare > 0 && this.rpm < idleT ? Math.min(0.3, (idleT - this.rpm) / c.idle) : 0);   /* the flare's opening (0 once settled: as before) */
+    const starter = E.starter ? 2 * (0.054 * torqueAt(c, c.torqueRpm) + 30) * Math.max(0, 1 - this.rpm / (2 * STARTER_RPM)) : 0;   /* a motor's falling torque: it holds the dead engine's drag near STARTER_RPM */
+    const Te = alive ? (this.rpm < c.redline * 1.1 ? thrK * torqueAt(c, this.rpm, cam) * hp * blow : 0) - fric * (1 - thrK) + (this.rpm < idleT ? fric * 2 : 0) : -fric * 3 - (this.rpm > 1 ? 30 : 0) + starter;
     let engaged: number;
     if (!F1) { const autoC = this.shift > 0 ? 0 : Math.max(0, Math.min(1, wd * Gr > we * 0.97 ? 1 : (c.launchRpm ? (this.rpm - c.launchRpm * 0.8) / (c.launchRpm * 0.2) : (this.rpm - c.idle * 1.3) / (c.idle * 1.2))));
       engaged = u.clutch === undefined ? autoC : Math.min(autoC, 1 - u.clutch); }
@@ -275,7 +284,7 @@ export class Vehicle {
       const aim = this.rpm < c.idle * 1.1 ? 0 : ratio > 0.97 ? 1 : thrD < 0.03 ? 0 : Math.min(1, Math.max(x * x, (ratio - 0.4) / 0.57 * (1 - 0.7 * thrD)));   /* at full throttle the revs govern (no dumped clutch) */
       this.clutchF1 = aim < this.clutchF1 ? aim : this.clutchF1 + Math.min(aim - this.clutchF1, dt / 0.25);
       engaged = this.shift > 0 ? env : this.clutchF1; if (this.shift > 0) this.clutchF1 = 1; }
-    const cap = engaged * torqueAt(c, c.torqueRpm) * 2.2;
+    this.engagedLast = engaged; const cap = engaged * torqueAt(c, c.torqueRpm) * 2.2;
     const need = (we - wd * Gr) / (dt * (1 / this.Ie + Gr * Gr * (fF * fF + (1 - fF) * (1 - fF)) / (2 * this.Iw))), Tc = Math.max(-cap, Math.min(cap, need));
     this.rpm = Math.max(alive ? idle * 0.5 : 0, we + (Te - Tc) / this.Ie * dt) * 30 / Math.PI;
     { const f = this.health.step(dt, this.rpm, c.redline, Math.max(0, Te) * this.rpm * Math.PI / 30, this.speed); if (f) this.lastFailure = f; }

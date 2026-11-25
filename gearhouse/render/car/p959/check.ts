@@ -16,7 +16,7 @@ const pct = (v: number[], p: number) => { const s = v.slice().sort((a, b) => a -
 export interface Panel { name: string; rows: [number, number]; cols: [number, number]; across?: number; along?: number; flat?: number; why?: string }
 export const PANELS: Panel[] = [
   { name: 'bonnet', rows: [0, 10], cols: [0, 3] },
-  { name: 'wingF top (pod)', rows: [3, 10], cols: [3, 6], across: 1, along: 2, why: 'the pod rises out of the bonnet\'s valley (hollow at its foot, round over its crest); along it, the hollow behind the lamp\'s rim and the sweep up to the screen pillar' },
+  { name: 'wingF top (pod)', rows: [3, 9], cols: [3, 6], across: 1, along: 2, why: 'the pod rises out of the bonnet\'s valley (hollow at its foot, round over its crest); along it, the hollow behind the lamp\'s rim and the sweep up to the screen pillar' },
   { name: 'wingF side', rows: [0, 4], cols: [7, 9] },
   { name: 'roof', rows: [14, 19], cols: [0, 3] },
   { name: 'door', rows: [10, 16], cols: [5, 9] },
@@ -71,5 +71,13 @@ export function measure(S: Shell959): Measure { const G = fineGrid(S), P = S.P;
   let smooth = 0, soft = 0, slivers = 0; const mushy: Measure['mushy'] = [], unmarked: Measure['unmarked'] = [];
   for (const [key, fs] of E) { if (fs.length !== 2) continue; const d = ang(faceNormal(P, S.F[fs[0]!]!), faceNormal(P, S.F[fs[1]!]!)), [a] = key.split('|').map(Number) as [number, number];
     if (d < 8) smooth++; else if (d < 20) soft++; else if (!S.crease.has(key) && !/Rim$|archLip/.test(S.tag[fs[0]!]!.panel) && !/Rim$|archLip/.test(S.tag[fs[1]!]!.panel)) (d < 35 ? mushy : unmarked).push({ at: P[a]!, deg: d, panel: S.tag[fs[0]!]!.panel }); }
-  S.F.forEach((f, k) => { if (!paint(S.tag[k]!)) return; for (const t of cut(P, f)) { const [a, b, c] = t.map(v => P[v]!) as [V, V, V]; if (Math.min(ang(sub(b, a), sub(c, a)), ang(sub(a, b), sub(c, b)), ang(sub(a, c), sub(b, c))) < 5) slivers++; } });
+  S.F.forEach((f, k) => { if (!paint(S.tag[k]!) || /Rim$/.test(S.tag[k]!.panel)) return; for (const t of cut(P, f)) { const [a, b, c] = t.map(v => P[v]!) as [V, V, V]; if (Math.min(ang(sub(b, a), sub(c, a)), ang(sub(a, b), sub(c, b)), ang(sub(a, c), sub(b, c))) < 5) slivers++; } });
   return { panels, smooth, soft, mushy, unmarked, slivers }; }
+
+/** The shading error (docs/systems/108 S7): the game's normals (render/car/edges.ts surfaceNormals: smoothed per
+ *  surface, split at the mesh's creases, at folds over 35 degrees and where the material changes) against the shell's
+ *  own (angle weighted over the whole skin, split only at the marked creases), at every corner of the painted
+ *  triangles. `game` and `own`: nine numbers a triangle; `paint`: which triangles count. */
+export function shadingError(game: ArrayLike<number>, own: ArrayLike<number>, n: number, paint: (t: number) => boolean): { corners: number; over3: number; p95: number; max: number } { const e: number[] = [];
+  for (let t = 0; t < n; t++) { if (!paint(t)) continue; for (let q = 0; q < 3; q++) { const i = t * 9 + q * 3; e.push(ang([game[i]!, game[i + 1]!, game[i + 2]!], [own[i]!, own[i + 1]!, own[i + 2]!])); } }
+  return { corners: e.length, over3: e.filter(v => v > 3).length, p95: pct(e, 0.95), max: Math.max(0, ...e) }; }

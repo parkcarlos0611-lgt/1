@@ -275,9 +275,9 @@ vec3 toonLamp(vec2 uv, float flag) { float r = length(uv), w = clamp(fwidth(r), 
    and no mirrored world on the paint; the normals smoothed per surface and split at the creases (vFS, render/car/edges.ts);
    lamps, grilles and other painted detail from one atlas (render/live/style.ts); the outline an inverted hull (uMode 3)
    and the panel lines ribbons drawn after (LINE_VS) ---- */
-in vec3 vFS, vAtl; flat in float vHS; uniform int uFR, uSeamOff, uAtlOn; uniform sampler2D uAtlas; uniform vec4 uAtl[6]; uniform vec3 uInk;
+in vec3 vFS, vAtl; flat in float vHS; uniform int uFR, uSeamOff, uAtlOn; uniform sampler2D uAtlas; uniform vec4 uAtl[7]; uniform vec3 uInk;
 /** a corner's atlas coordinates (u, v repeating over the cell, the cell + 1) to its picture; nothing where there is none */
-vec4 atlasAt(vec3 a) { if (uAtlOn == 0 || a.z < 0.5) return vec4(0.); int i = clamp(int(a.z + 0.5) - 1, 0, 5); vec4 r = uAtl[i]; return texture(uAtlas, r.xy + (0.004 + fract(a.xy) * 0.992) * r.zw); }
+vec4 atlasAt(vec3 a) { if (uAtlOn == 0 || a.z < 0.5) return vec4(0.); int i = clamp(int(a.z + 0.5) - 1, 0, 6); vec4 r = uAtl[i]; return texture(uAtlas, r.xy + (0.004 + fract(a.xy) * 0.992) * r.zw); }
 vec3 frLight(vec3 c, vec3 n, vec3 l, float sh, float ao, vec3 p) { float t = max(0., dot(n, l)) * sh * smoothstep(0.3, 0.65, ao), w = clamp(fwidth(t), 0.004, 0.08) + 0.035, b = smoothstep(0.13 - w, 0.13 + w, t);
   vec3 sunT = mix(vec3(1., 0.62, 0.42), vec3(1., 0.985, 0.95), smoothstep(0.2, 0.8, uDay)), lit = c * sunT * (0.2 + 0.8 * uDay) * (0.94 + 0.06 * uLightK);
   vec3 shade = (c * vec3(0.6, 0.63, 0.76) + vec3(0.01, 0.014, 0.03)) * (0.14 + 0.86 * uDay);   /* darker, a little bluer; a black part a dark blue-grey */

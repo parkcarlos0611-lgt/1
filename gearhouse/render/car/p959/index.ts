@@ -4,7 +4,7 @@ import { Build, type Mesh, type MeshLine } from '../mesh';
 import { DIM } from './cage';
 import { buildShell, cut, type Shell959, type ShellOpts } from './shell';
 import { sockets } from './sockets';
-import type { V } from './subdiv';
+import { cornerNormals, type V } from './subdiv';
 export { buildCage, DIM } from './cage';
 export { buildShell, type Shell959 } from './shell';
 export { sockets } from './sockets';
@@ -17,8 +17,11 @@ const MAT: Record<string, [string, number, Parameters<Build['mat']>[2]]> = { gla
 /** the faces of a shell laid into a builder, a part per panel and material */
 export function emitShell(b: Build, S: Shell959, paint: string, normals?: number[]): void { const groups = new Map<string, number[]>();
   S.tag.forEach((t, k) => { const key = `${t.panel}|${t.mat}`; (groups.get(key) ?? groups.set(key, []).get(key)!).push(k); });
+  // the triangles (each quad cut once) and their normals: weighted by the corner angles of the triangles, split at the creases
+  const T: [number, number, number][][] = S.F.map(f => cut(S.P, f)), flat = T.flat(), first: number[] = []; let n = 0; for (const t of T) { first.push(n); n += t.length; }
+  const N = normals ? cornerNormals(S.P, flat, S.crease) : [];
   for (const [key, fs] of groups) { const [panel, mat] = key.split('|') as [string, string], m = MAT[mat]; b.name(panel); if (m) b.mat(m[0], m[1], m[2]); else b.mat(paint, 0.6, 'paint');
-    for (const k of fs) for (const t of cut(S.P, S.F[k]!)) { b.tri(S.P[t[0]]!, S.P[t[1]]!, S.P[t[2]]!); if (normals) for (const v of t) normals.push(...S.N[k]![S.F[k]!.indexOf(v)]!); } } }
+    for (const k of fs) T[k]!.forEach((t, q) => { b.tri(S.P[t[0]]!, S.P[t[1]]!, S.P[t[2]]!); if (normals) for (const c of N[first[k]! + q]!) normals.push(...c); }); } }
 
 /** the model: the mesh, the shell it was made from, and the shell's own shading normals (nine numbers a triangle, for
  *  the triangles that are the shell's: the first `shellTris`) */

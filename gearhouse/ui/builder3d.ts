@@ -20,7 +20,10 @@ import { bareMesh, bounce } from '../render/car/suspension/view';
 import { setPartStyle, partStyle, styleForLook } from '../render/car/powertrain';
 import { designSpec, designFigures, designHeight, type DesignFigures } from '../race/design';
 import { CLEARANCE, type FitResult } from '../race/fit';
-import { tierOf, tierRoom, tierFloor, tierTopFloor, tierChevrons, roomText, TIER_GROUP_NAME, type Tier } from '../race/tiers';
+import { tierOf, tierRoom, tierFloor, tierTopFloor, tierChevrons, roomText, tierFor, tierLock, tierById, outOfEra, ROAD_TIERS, TIER_GROUP_NAME, type Tier } from '../race/tiers';
+import { chosenTier, withTier, freeHp, needOf, needText, sliderWall, wallStop, fitEngine, type Need, type CapField } from './builder_tier';
+import { classPick } from './builder_classpick';
+import { loadSettings } from './shell/settings';
 import { BODY_NAME } from '../core/names';
 import { LIMITS, BODY_BASES, isModelBase, MODEL_OWN, BUMPERS959, LAMPS959, WHEELS959, plateOk, type BodyBase, type ModelSwaps, BODY_LIMITS, DIMS, LAYOUTS, LAYOUT_NAME, type DimKey, GRADE_NAME, GRADES, gradeLock, gradeBoost, gradeRedline, normalise, applyPatch, type BaseId, type Design, type NoseKind, type TailKind, type WheelKind, FACE_KEYS, faceLock, type Face, type FaceKey,
   type Grade, type Structure, type Panels, type Intake, type Compression, type Sump, type Block, type Turbos, type Interior,
@@ -60,6 +63,10 @@ const $ = <T extends HTMLElement>(id: string) => (R === document ? document.getE
 const store: KeyStore | null = (() => { try { return localStorage; } catch { return null; } })();
 // the enabled bodies only (docs/systems/113 V0): a design on an old body is not opened; a new one starts on the 959
 let D: Design = host.design && enabledDesign(host.design) ? structuredClone(host.design) : (() => { const c = currentDesign(store); return c && enabledDesign(c) ? c : starterDesign(); })();
+// the class (docs/systems/115 C1): an older design (no class) takes the rung it reaches, so it opens as it was; a new one asks first
+if (!D.fresh) D = withTier(D);
+/** the sandbox's era lock opened (settings > 샌드박스 "시대 잠금 풀기"): the hyper rungs may be chosen. Read from the game's saved settings */
+const eraOpen = (): boolean => { try { return loadSettings(store).sandbox.eraOpen; } catch { return false; } };
 
 // ---- the names on the page ----
 const BASE_NAME: Record<BodyBase, string> = { ...BODY_NAME, p959: `${BODY_NAME.p959} (모델 차체)` };
@@ -71,14 +78,33 @@ const PAINTS = ['#b0121b', '#f5c300', '#1d3f8f', '#f2f0ea', '#151515', '#2f6b3a'
 const syncs: (() => void)[] = [];
 const field = (label: string, el: HTMLElement, out?: HTMLElement) => { const r = document.createElement('div'); r.className = 'row'; const l = document.createElement('label'); l.textContent = label; if (out) l.append(out); r.append(l, el); return r; };
 /** a choice of buttons; `lock` greys a value out with its reason (shown under the buttons: a phone has no hover) */
-function seg<T extends string | number>(label: string, opts: [T, string][], get: () => T, set: (v: T) => void, lock?: (v: T) => string | null): HTMLElement {
+function seg<T extends string | number>(label: string, opts: [T, string][], get: () => T, set: (v: T) => void, lock?: (v: T) => string | null, need?: (v: T) => Need | null): HTMLElement {
   const box = document.createElement('div'); box.className = 'seg'; box.setAttribute('role', 'group'); box.setAttribute('aria-label', label);
-  const bs = opts.map(([v, t]) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'gk-opt'; b.textContent = t; b.addEventListener('click', () => { if (lock?.(v)) return; set(v); changed(); }); box.append(b); return [v, t, b] as const; });
+  const of = offerBox();
+  const bs = opts.map(([v, t]) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'gk-opt'; b.textContent = t;
+    b.addEventListener('click', () => { if (lock?.(v)) return; const N = v === get() ? null : need?.(v); if (N) { of.show(`${label} ${t}`, N, () => set(v)); return; } set(v); changed(); }); box.append(b); return [v, t, b] as const; });
   const why = document.createElement('small'); why.className = 'lock';
   syncs.push(() => { const locked: string[] = [];
-    for (const [v, t, b] of bs) { const L = lock?.(v) ?? null; b.setAttribute('aria-pressed', String(v === get())); b.disabled = !!L; b.title = L ?? ''; if (L) locked.push(`${t}: ${L}`); }
+    for (const [v, t, b] of bs) { const L = lock?.(v) ?? null, N = L || v === get() ? null : need?.(v) ?? null; b.setAttribute('aria-pressed', String(v === get())); b.disabled = !!L; b.title = L ?? ''; markNeed(b, N);
+      if (L) locked.push(`${t}: ${L}`); else if (N) locked.push(`${t}: ${needText(N)}`); }
     why.textContent = locked.join(' · '); why.hidden = !locked.length; });
-  const r = document.createElement('div'); r.className = 'row'; const l = document.createElement('span'); l.className = 'lab'; l.textContent = label; r.append(l, box, why); return r; }
+  const r = document.createElement('div'); r.className = 'row'; const l = document.createElement('span'); l.className = 'lab'; l.textContent = label; r.append(l, box, why, of.el); return r; }
+/** the class's wall on an option (docs/systems/115 §3): not greyed, but marked with the rung it needs in that rung's
+ *  colour and a lock; pressed, it says why and offers the class up */
+function markNeed(b: HTMLElement, N: Need | null) { for (const c of Array.from(b.classList)) if (c.startsWith('gk-tier-')) b.classList.remove(c);
+  b.classList.toggle('gk-need', !!N); if (N) { b.classList.add(`gk-tier-${N.need.group}`); b.dataset.need = N.need.id; b.setAttribute('aria-disabled', 'true'); b.title = needText(N); }
+  else { delete b.dataset.need; b.removeAttribute('aria-disabled'); } }
+/** the reason a wall holds, and the way past it: the class up to the rung it needs (closed rungs said so), then the change */
+const offers: HTMLElement[] = [];
+function offerBox(): { el: HTMLElement; show(what: string, N: Need, apply?: () => void): void } {
+  const o = document.createElement('div'); o.className = 'offer'; o.hidden = true; o.setAttribute('aria-live', 'polite'); offers.push(o);
+  return { el: o, show(what, N, apply) { const key = `${what}|${N.need.id}`; if (!o.hidden && o.dataset.k === key) return; o.dataset.k = key; o.textContent = ''; o.hidden = false; const p = document.createElement('p'), t = chosenTier(D);
+    p.textContent = `${what}: 출력 ${N.hp.toLocaleString()} hp로 ${t.id} 상한 ${t.hpMax.toLocaleString()} hp를 넘습니다. ${N.need.id} 필요.`; o.append(p);
+    const row = document.createElement('div'), b = document.createElement('button'); row.className = 'btns'; b.type = 'button'; b.className = BTN_MAIN;
+    b.textContent = N.locked ? `${N.need.id}: ${N.locked}` : apply ? `차급을 ${N.need.id}로 올리고 적용` : `차급을 ${N.need.id}로 올리기`; b.disabled = !!N.locked;
+    b.addEventListener('click', () => { o.hidden = true; D.tier = N.need.id; apply?.(); changed(); flash(`차급을 ${N.need.id}로 올렸습니다`); });
+    const x = document.createElement('button'); x.type = 'button'; x.className = BTN; x.textContent = '그대로 두기'; x.addEventListener('click', () => { o.hidden = true; });
+    row.append(b, x); o.append(row); navigator.vibrate?.(12); } }; }
 /** the parts library's way of a choice (docs/systems/110 G4): a grid of thumbnail cards, a picture and a name each; the
  *  chosen one green, a locked one grey with its lock and its reason written under the grid (a phone has no hover) */
 /** the cards' rendered pictures (ui/builder_thumbs.ts): a card given a part (the fourth of its option) shows its drawn
@@ -92,12 +118,38 @@ function cards<T extends string | number>(label: string, opts: [T, string, strin
     for (const [v, t, b] of bs) { const L = lock?.(v) ?? null; setCard(b, v === get(), L); if (L) locked.push(`${t}: ${L}`); }
     why.textContent = locked.join(' · '); why.hidden = !locked.length; });
   const r = document.createElement('div'); r.className = 'row'; r.dataset.slot = label; const l = document.createElement('span'); l.className = 'lab'; l.textContent = label; const part = opts.find(o => o[3])?.[3]; if (part) l.append(TH.viewChips(part.kind)); r.append(l, box, why); return r; }
-function range(label: string, [a, b]: readonly [number, number], step: number, get: () => number, set: (v: number) => void, show: (v: number) => string, id?: string): HTMLElement {
+function range(label: string, [a, b]: readonly [number, number], step: number, get: () => number, set: (v: number) => void, show: (v: number) => string, id?: string, wall?: CapField): HTMLElement {
   const i = document.createElement('input'); i.type = 'range'; i.className = 'gk-range'; i.min = String(a); i.max = String(b); i.step = String(step); if (id) i.id = id; const v = document.createElement('span'); v.className = 'v';
-  i.addEventListener('input', () => { set(+i.value); v.textContent = show(+i.value); changed(); }); syncs.push(() => { i.value = String(get()); v.textContent = show(get()); }); return field(label, i, v); }
-function check(label: string, get: () => boolean, set: (v: boolean) => void, id?: string): HTMLElement {
+  const of = wall ? offerBox() : null, wn = document.createElement('small'); wn.className = 'wallnote'; wn.hidden = true;
+  i.addEventListener('input', () => { let x = +i.value;
+    // the class's wall (docs/systems/115 §3): the handle stops at the last value under the cap, with a short buzz and the reason
+    if (wall) { const w = wallOf(wall, step), y = wallStop(w, get(), x); if (y !== x) { i.value = String(y);
+      if (w.need) { const t = chosenTier(D); flash(`${t.id} 상한 ${t.hpMax.toLocaleString()} hp: ${label} ${show(y)}까지`); of!.show(label, { need: w.need, hp: w.hp[w.values.indexOf(w.at!)] ?? 0, locked: tierLock(w.need, eraOpen()) }); } } x = y; }
+    set(x); v.textContent = show(x); changed(); });
+  syncs.push(() => { i.value = String(get()); v.textContent = show(get()); });
+  if (wall) syncs.push(() => { const w = wallOf(wall, step), lo = +i.min, hi = +i.max; i.classList.toggle('gk-walled', w.at !== null && hi > lo);
+    if (w.at !== null && w.need) { i.style.setProperty('--wall', `${Math.max(0, Math.min(100, (w.at - step / 2 - lo) / (hi - lo) * 100)).toFixed(1)}%`); i.style.setProperty('--beyond', `var(--gk-cls-${w.need.group.toLowerCase()}0)`);
+      wn.textContent = `${show(w.at)}부터 ${w.need.id} 필요`; wn.dataset.need = w.need.id; wn.className = `wallnote gk-tier-${w.need.group}`; wn.hidden = false; } else wn.hidden = true; });
+  const r = field(label, i, v); if (wall) r.append(wn, of!.el); return r; }
+/** each engine slider's wall, kept while the rest of the engine and the class stay as they are (a drag computes it once) */
+const walls = new Map<string, ReturnType<typeof sliderWall>>();
+function wallOf(k: CapField, step: number) { const key = `${k}|${D.tier}|${JSON.stringify({ ...D.engine, [k]: 0 })}`; let w = walls.get(key);
+  if (!w) { if (walls.size > 60) walls.clear(); w = sliderWall(D, k, step); walls.set(key, w); }
+  // the wall above the value as it is now (the table holds every step; only "where it is" moves during a drag)
+  const i0 = w.values.reduce((bi, x, j) => Math.abs(x - D.engine[k]) < Math.abs(w!.values[bi]! - D.engine[k]) ? j : bi, 0), lim = Math.max(w.cap, w.now); let at: number | null = null, need: Tier | null = null;
+  for (let j = i0 + 1; j < w.values.length; j++) if (w.hp[j]! > lim) { at = w.values[j]!; need = tierFor(w.hp[j]!); break; }
+  return { ...w, at, need }; }
+/** an engine option's need (the class's wall), kept while the engine and the class stay as they are */
+const needs = new Map<string, Need | null>();
+function needFor(k: string, change: (e: Design['engine']) => void): Need | null { const key = `${k}|${D.tier}|${JSON.stringify(D.engine)}`;
+  if (!needs.has(key)) { if (needs.size > 400) needs.clear(); needs.set(key, needOf(D, change, eraOpen())); } return needs.get(key)!; }
+function check(label: string, get: () => boolean, set: (v: boolean) => void, id?: string, need?: () => Need | null): HTMLElement {
   const l = document.createElement('label'); l.className = 'check'; const i = document.createElement('input'); i.type = 'checkbox'; if (id) i.id = id; l.append(i, ` ${label}`);
-  i.addEventListener('change', () => { set(i.checked); changed(); }); syncs.push(() => { i.checked = get(); }); return l; }
+  if (!need) { i.addEventListener('change', () => { set(i.checked); changed(); }); syncs.push(() => { i.checked = get(); }); return l; }
+  // a switch the class's wall holds (turning it on would pass the cap): marked with the rung it needs, the reason when pressed
+  const of = offerBox(), box = document.createElement('div'); box.className = 'checkrow'; box.append(l, of.el);
+  i.addEventListener('change', () => { const N = i.checked ? need() : null; if (N) { i.checked = false; of.show(label, N, () => set(true)); return; } set(i.checked); changed(); });
+  syncs.push(() => { i.checked = get(); markNeed(l, get() ? null : need()); }); return box; }
 function select<T extends string>(label: string, opts: [T, string][], get: () => T, set: (v: T) => void, id?: string): HTMLElement {
   const s = document.createElement('select'); s.className = 'gk-field'; if (id) s.id = id; for (const [v, t] of opts) s.add(new Option(t, v)); s.addEventListener('change', () => { set(s.value as T); changed(); }); syncs.push(() => { s.value = get(); }); return field(label, s); }
 /** the kit's buttons, the small size (docs/systems/110 G4): blue the secondary, yellow the main action */
@@ -232,24 +284,30 @@ function btnRow(t: string, f: () => void): HTMLElement { const d = document.crea
     if (!all.length) { const li = document.createElement('li'); li.innerHTML = '<span>보관함에 엔진이 없습니다. 엔진 공방에서 만들어 저장하세요.</span>'; list.append(li); return; }
     for (const s of all) { const e = joinEngine(s.family, s.variant, D), li = document.createElement('li'), t = document.createElement('span'), sm = document.createElement('small'), b = document.createElement('button');
       t.textContent = s.name; sm.textContent = `${LAYOUT_NAME[e.layout]} ${(e.cc / 1000).toFixed(1)} · ${e.grade}등급${e.turbo ? ` · 터보 ${e.turbo}` : ''}`; b.type = 'button'; b.className = BTN; b.textContent = '얹기';
-      b.addEventListener('click', () => { D = withEngine(D, joinEngine(s.family, s.variant, D)); list.hidden = true; changed(); flash(`엔진을 얹었습니다: ${s.name}`); }); li.append(t, sm, b); list.append(li); } };
-  const row = btnRow('보관함에서 엔진 고르기', () => { list.hidden = !list.hidden; if (!list.hidden) fill(); }); row.querySelector('button')!.id = 'engPick';
+      // the class's wall (docs/systems/115 C1): an engine past the chosen rung's cap is shown, marked with the rung it needs
+      const N = needOf(D, x => { Object.assign(x, structuredClone(e)); }, eraOpen()); markNeed(b, N); if (N) sm.textContent += ` · ${needText(N)}`;
+      const put = () => { D = withEngine(D, joinEngine(s.family, s.variant, D)); list.hidden = true; of.el.hidden = true; changed(); flash(`엔진을 얹었습니다: ${s.name}`); };
+      b.addEventListener('click', () => { if (N) of.show(`엔진 ${s.name}`, N, () => { D = withEngine(D, joinEngine(s.family, s.variant, D)); list.hidden = true; }); else put(); }); li.append(t, sm, b); list.append(li); } };
+  const of = offerBox();
+  const row = btnRow('보관함에서 엔진 고르기', () => { list.hidden = !list.hidden; of.el.hidden = true; if (!list.hidden) fill(); }); row.querySelector('button')!.id = 'engPick';
   if (host.onEngineShop) { const b = document.createElement('button'); b.type = 'button'; b.className = BTN; b.id = 'engShop'; b.textContent = '엔진 공방에서 편집'; b.addEventListener('click', () => host.onEngineShop!(structuredClone(D))); row.append(b); }
-  box.append(row, list); add('engine', box); }
+  box.append(row, list, of.el); add('engine', box); }
 // ② 엔진·구동계: the grade first; the details it does not allow greyed out with the reason
 { const E = () => D.engine, lk = <K extends 'intake' | 'compression' | 'sump' | 'block' | 'valves' | 'turbo'>(k: K) => (v: Design['engine'][K]) => gradeLock(E().grade, k, v);
-  const boost = range('부스트', LIMITS.boost, 0.05, () => E().boost, v => { E().boost = v; }, v => `${v.toFixed(2)} bar`, 'boost'), redline = range('레드라인', LIMITS.redline, 100, () => E().redline, v => { E().redline = v; }, v => `${v.toLocaleString()} rpm`, 'redline');
-  const vtec = check('가변 캠 (두 가지 캠 프로필)', () => E().vtec, v => { E().vtec = v; }, 'vtec'), ic = check('인터쿨러', () => E().intercooler, v => { E().intercooler = v; }, 'intercooler');
+  // the class's wall (docs/systems/115 C1): an option whose engine would pass the chosen rung's power cap needs a higher rung
+  const nd = <K extends 'grade' | 'layout' | 'intake' | 'compression' | 'sump' | 'block' | 'valves' | 'turbo'>(k: K) => (v: Design['engine'][K]) => needFor(`${k}=${v}`, e => { (e as Record<K, unknown>)[k] = v; });
+  const boost = range('부스트', LIMITS.boost, 0.05, () => E().boost, v => { E().boost = v; }, v => `${v.toFixed(2)} bar`, 'boost', 'boost'), redline = range('레드라인', LIMITS.redline, 100, () => E().redline, v => { E().redline = v; }, v => `${v.toLocaleString()} rpm`, 'redline', 'redline');
+  const vtec = check('가변 캠 (두 가지 캠 프로필)', () => E().vtec, v => { E().vtec = v; }, 'vtec', () => needFor('vtec', e => { e.vtec = true; })), ic = check('인터쿨러', () => E().intercooler, v => { E().intercooler = v; }, 'intercooler', () => needFor('ic', e => { e.intercooler = true; }));
   const gradeNote = note('');
-  add('engine', h2('엔진'), seg<Grade>('개발 등급', GRADES.map(g => [g, `${g} ${GRADE_NAME[g]}`] as [Grade, string]), () => E().grade, v => { E().grade = v; D = normalise(D); }), gradeNote,
-    seg('배열', LAYOUTS.map(l => [l, LAYOUT_NAME[l]]), () => E().layout, v => { E().layout = v; }),
-    range('배기량', LIMITS.cc, 50, () => E().cc, v => { E().cc = v; }, v => `${v.toLocaleString()} cc`, 'cc'),
-    seg('실린더당 밸브', [[2, '2'], [3, '3'], [4, '4'], [5, '5']], () => E().valves, v => { E().valves = v; }, lk('valves')), redline,
-    seg<Intake>('흡기', [['single', '단일 스로틀'], ['variable', '가변 흡기'], ['itb', '개별 스로틀']], () => E().intake, v => { E().intake = v; }, lk('intake')),
-    seg<Compression>('압축비', [['low', '낮음 (8.5)'], ['mid', '보통 (10)'], ['high', '높음 (11+)']], () => E().compression, v => { E().compression = v; }, lk('compression')),
-    seg<Sump>('윤활', [['wet', '웨트 섬프'], ['dry', '드라이 섬프']], () => E().sump, v => { E().sump = v; }, lk('sump')),
-    seg<Block>('블록 소재', [['iron', '주철'], ['aluminium', '알루미늄'], ['magnesium', '마그네슘']], () => E().block, v => { E().block = v; }, lk('block')),
-    seg<Turbos>('터보', [[0, '없음'], [1, '1'], [2, '2'], [3, '3'], [4, '4']], () => E().turbo, v => { E().turbo = v; }, lk('turbo')), boost, ic, vtec,
+  add('engine', h2('엔진'), seg<Grade>('개발 등급', GRADES.map(g => [g, `${g} ${GRADE_NAME[g]}`] as [Grade, string]), () => E().grade, v => { E().grade = v; D = normalise(D); }, undefined, nd('grade')), gradeNote,
+    seg('배열', LAYOUTS.map(l => [l, LAYOUT_NAME[l]]), () => E().layout, v => { E().layout = v; }, undefined, nd('layout')),
+    range('배기량', LIMITS.cc, 50, () => E().cc, v => { E().cc = v; }, v => `${v.toLocaleString()} cc`, 'cc', 'cc'),
+    seg('실린더당 밸브', [[2, '2'], [3, '3'], [4, '4'], [5, '5']], () => E().valves, v => { E().valves = v; }, lk('valves'), nd('valves')), redline,
+    seg<Intake>('흡기', [['single', '단일 스로틀'], ['variable', '가변 흡기'], ['itb', '개별 스로틀']], () => E().intake, v => { E().intake = v; }, lk('intake'), nd('intake')),
+    seg<Compression>('압축비', [['low', '낮음 (8.5)'], ['mid', '보통 (10)'], ['high', '높음 (11+)']], () => E().compression, v => { E().compression = v; }, lk('compression'), nd('compression')),
+    seg<Sump>('윤활', [['wet', '웨트 섬프'], ['dry', '드라이 섬프']], () => E().sump, v => { E().sump = v; }, lk('sump'), nd('sump')),
+    seg<Block>('블록 소재', [['iron', '주철'], ['aluminium', '알루미늄'], ['magnesium', '마그네슘']], () => E().block, v => { E().block = v; }, lk('block'), nd('block')),
+    seg<Turbos>('터보', [[0, '없음'], [1, '1'], [2, '2'], [3, '3'], [4, '4']], () => E().turbo, v => { E().turbo = v; }, lk('turbo'), nd('turbo')), boost, ic, vtec,
     note('등급이 높으면 고회전에서 출력이 크게 늘지만 저속 토크가 약해지고, 비싸지고, 정비 주기가 짧아집니다. 압축비가 높은 과급 엔진은 부스트를 많이 올리면 노킹이 나서 출력이 거의 늘지 않습니다.'));
   syncs.push(() => { const g = E().grade, R = gradeRedline(g), Bm = gradeBoost(g), ri = redline.querySelector('input')!, bi = boost.querySelector('input')!;
     ri.max = String(R); bi.max = String(Bm); bi.disabled = !E().turbo; (ic.querySelector('input')!).disabled = !E().turbo;

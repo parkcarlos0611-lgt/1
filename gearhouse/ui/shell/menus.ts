@@ -150,7 +150,8 @@ export function settingsScreen(ctx: ShellCtx): Screen<never> {
         chips('화면 밝기 (빌더·주행 화면)', [['auto', '기기 설정대로'], ['light', '밝게'], ['dark', '어둡게']], S().screen.theme, v => set(s => { s.screen.theme = v; }))),
       group('움직임과 전체화면', 'settings', toggle('움직임 줄이기 (전환 효과, 턴테이블)', S().screen.calm, v => set(s => { s.screen.calm = v; })),
         row('전체화면', button('전체화면 켜기·끄기', () => { const e = document.documentElement; if (document.fullscreenElement) void document.exitFullscreen().catch(() => {}); else void e.requestFullscreen?.().catch(() => toast('이 브라우저는 전체화면을 허락하지 않습니다')); }))));
-    const game = pane(group('샌드박스 규칙', 'wrench', toggle('연도 제한 (기술의 등장 연도)', S().sandbox.eraLimit, v => set(s => { s.sandbox.eraLimit = v; }), '켜면 엔진 공방이 설계한 해보다 늦게 나온 기술을 표시합니다. 0.12에서는 정보로만 보여 주고 막지는 않습니다(0.20 연구 체계와 함께 적용).')),
+    const game = pane(group('샌드박스 규칙', 'wrench', toggle('연도 제한 (기술의 등장 연도)', S().sandbox.eraLimit, v => set(s => { s.sandbox.eraLimit = v; }), '켜면 엔진 공방이 설계한 해보다 늦게 나온 기술을 표시합니다. 0.12에서는 정보로만 보여 주고 막지는 않습니다(0.20 연구 체계와 함께 적용).'),
+        toggle('시대 잠금 풀기 (하이퍼 H1~H3)', S().sandbox.eraOpen, v => set(s => { s.sandbox.eraOpen = v; }), '빌더의 차급에서 2000년대 이후의 하이퍼 칸(800 hp 넘게)을 엽니다. 이렇게 고른 설계에는 "시대 밖" 표시가 붙습니다.')),
       group('개발자', 'suspension', chips('개발자 · 주행 물리', [['kinematic', '기구학 물리'], ['old', '옛 물리']], S().sandbox.physics, v => set(s => { s.sandbox.physics = v; })),
         el('p', 'gh-note', '기구학 물리: 키트 바탕 차(1990년대)는 서스펜션 장착점에서 계산한 캠버·토·롤 센터로 달립니다. 옛 물리: 0.12까지의 근사식(비교용). 다음 주행부터 적용됩니다.')));
     const save = pane(group('저장 관리', 'money', el('p', 'gh-note', '설계, 측정 기록, 최고 랩, 설정은 이 브라우저에만 저장됩니다. 다른 기기로 옮기려면 전체를 파일로 내보내고 그 기기에서 가져오세요.'),

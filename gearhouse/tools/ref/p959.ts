@@ -5,7 +5,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { deflateSync } from 'node:zlib';
 import { Build, KINDS } from '../../render/car/mesh';
 import { plate, plateText } from '../../render/car/p959/parts';
-import { p959Model } from '../../render/car/p959';
+import { p959Model, P959_LUMP } from '../../render/car/p959';
 import { fineGrid, lineStat, measure, PANELS, turning } from '../../render/car/p959/check';
 import { faceNormal } from '../../render/car/p959/subdiv';
 import { edgeUse } from '../../render/car/p959/shell';
@@ -22,12 +22,16 @@ type V3 = [number, number, number];
 const FORM = process.argv.includes('form');   // continuous shading, to judge the forms (the default is the game's two tones)
 // variants (docs/systems/109 S3): lamp=round|ellipsoid|square wheel=hollow5|dish|hole5 bf=std|aero|clean br=std|aero|clean; noplate=f|r|fr (plates off); at=x,y,z: the picture's centre; only=<view,...>
 const arg = (k: string) => process.argv.find(a => a.startsWith(k + '='))?.slice(k.length + 1), AT = (arg('at') ?? '2130,0,600').split(',').map(Number) as V3, ONLY = arg('only')?.split(',');
-const MODEL = p959Model({ lamp: arg('lamp') as never, wheel: arg('wheel') as never, bumperF: arg('bf') as never, bumperR: arg('br') as never, plate: arg('plate') ? plateText(arg('plate')!) : undefined, plateF: !arg('noplate')?.includes('f'), plateR: !arg('noplate')?.includes('r') }), S = MODEL.shell, NN = MODEL.normals;
+// lump: the frame "차체 A" (docs/systems/115 F1) with any of the above put back; glass=none|stock|noQuarter|louvre; dims=wheelbase:150,width:-60,...
+const DIMS = arg('dims') ? Object.fromEntries(arg('dims')!.split(',').map(kv => { const [k, v] = kv.split(':'); return [k!, +v!]; })) : undefined, given = (o: Record<string, unknown>) => Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined));
+const MODEL = p959Model({ ...(process.argv.includes('lump') ? P959_LUMP : {}), ...given({ lamp: arg('lamp') as never, wheel: arg('wheel') as never, bumperF: arg('bf') as never, bumperR: arg('br') as never, plate: arg('plate') ? plateText(arg('plate')!) : undefined }),
+  ...(arg('noplate') !== undefined || !process.argv.includes('lump') ? { plateF: !arg('noplate')?.includes('f'), plateR: !arg('noplate')?.includes('r') } : {}), ...(arg('glass') ? { glass: arg('glass') === 'none' ? null : arg('glass') as never } : {}), ...(DIMS ? { dims: DIMS } : {}) }), S = MODEL.shell, NN = MODEL.normals;
 // plates=<a,b,...>: a sheet of number plates face on (two columns), instead of the car
 const PLATES = arg('plates')?.split(','), M = PLATES ? (() => { const b = new Build(); PLATES.forEach((t, k) => plate(b, { name: 'plate', o: [0, (k % 2 ? -1 : 1) * 200, 420 - Math.floor(k / 2) * 215], n: [-1, 0, 0], w: 335, h: 170 }, /^\d+$/.test(t) ? plateText(+t) : plateText(t))); return b.mesh(0); })() : MODEL.mesh, shellTris = PLATES ? 0 : MODEL.shellTris;
 // mirror=0 to draw the file's own axes; by default the car is drawn as the game draws it (+y on the left of the heading,
 // render/live/gpu.ts placeMesh), so plates and anything one-sided read as they do in the game
-if (arg('mirror') !== '0') { for (let i = 1; i < M.pos.length; i += 3) M.pos[i] = -M.pos[i]!; for (let i = 1; i < NN.length; i += 3) NN[i] = -NN[i]!; }
+const MIRRORED = arg('mirror') !== '0';
+if (MIRRORED) { for (let i = 1; i < M.pos.length; i += 3) M.pos[i] = -M.pos[i]!; for (let i = 1; i < NN.length; i += 3) NN[i] = -NN[i]!; }
 const KIND_PAINT = KINDS.indexOf('paint'), KIND_GLASS = KINDS.indexOf('glass'), KIND_TYRE = KINDS.indexOf('tyre');
 const dot = (a: V3, b: V3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2], crs = (a: V3, b: V3): V3 => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]], un = (a: V3): V3 => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };
 interface DrawO { wires?: { P: V3[]; F: number[][] }; lines?: boolean; mesh?: boolean }
@@ -38,7 +42,7 @@ function flat(yawDeg: number, pitchDeg: number, o: DrawO = {}): Uint8Array { con
   const zb = new Float32Array(w * h).fill(Infinity), id = new Int16Array(w * h).fill(-1), img = new Float32Array(w * h * 3);
   const LK = [-0.5, 0.62, 0.5], light = un([right[0] * LK[0]! + up[0] * LK[1]! - fwd[0] * LK[2]!, right[1] * LK[0]! + up[1] * LK[1]! - fwd[1] * LK[2]!, right[2] * LK[0]! + up[2] * LK[1]! - fwd[2] * LK[2]!]), half = un([light[0] - fwd[0], light[1] - fwd[1], light[2] - fwd[2]]);
   if (o.mesh !== false) for (let t = 0; t < M.n; t++) { const q = [0, 1, 2].map(c => [M.pos[t * 9 + c * 3]!, M.pos[t * 9 + c * 3 + 1]!, M.pos[t * 9 + c * 3 + 2]!] as V3), sc = q.map(pr), fnm = un(crs([q[1]![0] - q[0]![0], q[1]![1] - q[0]![1], q[1]![2] - q[0]![2]], [q[2]![0] - q[0]![0], q[2]![1] - q[0]![1], q[2]![2] - q[0]![2]]));
-    if (t < shellTris && dot(fnm, fwd) > 0.02) continue;   // the shell's back faces
+    if (t < shellTris && (MIRRORED ? -1 : 1) * dot(fnm, fwd) > 0.02) continue;   // the shell's back faces (mirrored, its winding runs the other way)
     const ff: V3 = dot(fnm, fwd) > 0 ? [-fnm[0], -fnm[1], -fnm[2]] : fnm, ns = t < shellTris ? [0, 1, 2].map(c => [NN[t * 9 + c * 3]!, NN[t * 9 + c * 3 + 1]!, NN[t * 9 + c * 3 + 2]!] as V3) : [ff, ff, ff], kind = M.kind[t]!, base: V3 = [M.col[t * 3]!, M.col[t * 3 + 1]!, M.col[t * 3 + 2]!];
     const [A, B, C] = sc as [V3, V3, V3], den = (B[1] - C[1]) * (A[0] - C[0]) + (C[0] - B[0]) * (A[1] - C[1]); if (Math.abs(den) < 1e-9) continue;
     const x0 = Math.max(0, Math.floor(Math.min(A[0], B[0], C[0]))), x1 = Math.min(w - 1, Math.ceil(Math.max(A[0], B[0], C[0]))), y0 = Math.max(0, Math.floor(Math.min(A[1], B[1], C[1]))), y1 = Math.min(h - 1, Math.ceil(Math.max(A[1], B[1], C[1])));

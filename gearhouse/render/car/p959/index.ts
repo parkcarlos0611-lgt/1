@@ -5,6 +5,7 @@ import { DIM } from './cage';
 import { buildShell, cut, type Shell959, type ShellOpts } from './shell';
 import { sockets } from './sockets';
 import { cornerNormals, type V } from './subdiv';
+import { frameOf, type Frame } from './frame';
 import { headLamp, mirror, plate, wheel, type LampKind, type PlateText, type WheelKind } from './parts';
 import { crestPlate, crestUV, lettering, skinNear, type CrestFrame } from './badge';
 export type { LampKind, WheelKind, PlateText } from './parts';
@@ -13,15 +14,22 @@ export { buildCage, DIM } from './cage';
 export { buildShell, type Shell959 } from './shell';
 export { sockets } from './sockets';
 export { p959Lines } from './lines';
+export { frameOf, stretchAt, STOCK_FRAME, ZONES, type Frame, type FrameDims } from './frame';
 import { p959Lines } from './lines';
 
-export interface P959Opts extends ShellOpts { paint?: string; lamp?: LampKind; wheel?: WheelKind; plate?: PlateText;
+/** the car as built (every option at its default), or the lump "차체 A" (docs/systems/115 §4-1: P959_LUMP) with parts put
+ *  back one by one: a lamp 'none' leaves its socket flush and painted, `details` off the other openings and the small
+ *  parts (the tail lamp band, the side intakes, the lid's grille, the mirrors, the exhausts, the crest and the lettering),
+ *  `glass` null the cabin in body colour with the panel lines faint (they come up once a glass set is picked) */
+export interface P959Opts extends Omit<ShellOpts, 'lamps'> { paint?: string; lamp?: LampKind | 'none'; wheel?: WheelKind; plate?: PlateText;
   /** the front and the rear plate fitted (default both): a plate taken off leaves the bumper's own painted skin, which runs
    *  whole under it (the plate, its frame and its dark plinth are laid on the surface, nothing is cut for them) */ plateF?: boolean; plateR?: boolean;
   /** leave out the placeholder modules that are not part of the skin (wheels, lenses, mirrors, exhausts) */ bare?: boolean;
   /** the tyres' widths, front and rear (mm; default the real car's 235 and 255): the wheels' middles stay where they are */ tyres?: [number, number];
   /** the wheels' own disc and caliper (default on; off where the car's suspension is drawn with its brakes: render/car/bodies.ts) */ brake?: boolean;
-  /** the crest on the front lid and the lettering across the tail (default on; docs/systems/116) */ marks?: boolean }
+  /** the crest on the front lid and the lettering across the tail (default: with the details; docs/systems/116) */ marks?: boolean }
+/** the lump as the builder's first step shows it: no openings, blank bumpers, the plain steel wheel, no plates, no glass */
+export const P959_LUMP: P959Opts = { lamp: 'none', details: false, bumperF: 'blank', bumperR: 'blank', wheel: 'steel', plateF: false, plateR: false, glass: null };
 const MAT: Record<string, [string, number, Parameters<Build['mat']>[2]]> = { glass: ['#20262c', 0.9, 'glass'], grille: ['#17181a', 0.1, 'grille'], dark: ['#1b1c1e', 0.05, 'plain'], lamp: ['#b3261e', 0.5, 'lens'], amber: ['#d9861c', 0.5, 'lens'], lens: ['#17181a', 0.1, 'plain'] };
 
 /** the faces of a shell laid into a builder, a part per panel and material */
@@ -33,22 +41,29 @@ export function emitShell(b: Build, S: Shell959, paint: string, normals?: number
   for (const [key, fs] of groups) { const [panel, mat] = key.split('|') as [string, string], m = MAT[mat]; b.name(panel); if (m) b.mat(m[0], m[1], m[2]); else b.mat(paint, 0.6, 'paint');
     for (const k of fs) T[k]!.forEach((t, q) => { b.tri(S.P[t[0]]!, S.P[t[1]]!, S.P[t[2]]!); if (normals) for (const c of N[first[k]! + q]!) normals.push(...c); }); } }
 
+/** a head lamp in its socket on the stretched car: the socket's centre and its axes carried by the frame (across, up the
+ *  lamp's slope), the lamp's half-axes scaled as its socket's are, so a lengthened nose takes an oval socket with an oval lamp */
+function lampIn(b: Build, f: Frame, kind: LampKind, c0: V, u0: V, v0: V, a: number, bb: number): void { const c = f.at(c0), d = (w: V): V => { const q = f.at([c0[0] + w[0] * 10, c0[1] + w[1] * 10, c0[2] + w[2] * 10]); return [(q[0] - c[0]) / 10, (q[1] - c[1]) / 10, (q[2] - c[2]) / 10]; };
+  const u = d(u0), v = d(v0), lu = Math.hypot(...u), lv = Math.hypot(...v), un: V = [u[0] / lu, u[1] / lu, u[2] / lu], vn: V = [v[0] / lv, v[1] / lv, v[2] / lv], n0: V = [vn[1] * un[2] - vn[2] * un[1], vn[2] * un[0] - vn[0] * un[2], vn[0] * un[1] - vn[1] * un[0]], ln = Math.hypot(...n0);
+  headLamp(b, kind, c, un, vn, [n0[0] / ln, n0[1] / ln, n0[2] / ln], a * lu, bb * lv); }
+
 /** the model: the mesh, the shell it was made from, and the shell's own shading normals (nine numbers a triangle, for
  *  the triangles that are the shell's: the first `shellTris`) */
 export interface P959Model { mesh: Mesh; shell: Shell959; normals: Float32Array; shellTris: number }
 export function p959Mesh(o: P959Opts = {}): Mesh { return p959Model(o).mesh; }
-export function p959Model(o: P959Opts = {}): P959Model { const S = buildShell(o), b = new Build(), paint = o.paint ?? '#b8bcc2', nn: number[] = [];
+export function p959Model(o: P959Opts = {}): P959Model { const lamps = o.lamp !== 'none', details = o.details !== false, marks = o.marks ?? details, fr = frameOf(o.dims);
+  const S = buildShell({ ...o, lamps }), b = new Build(), paint = o.paint ?? '#b8bcc2', nn: number[] = [];
   emitShell(b, S, paint, nn); let crest: CrestFrame | null = null;
-  if (!o.bare) { const K = sockets(), sl = 38.7 * Math.PI / 180;
+  if (!o.bare) { const K = sockets(fr), sl = 38.7 * Math.PI / 180;
     for (const h0 of K.hubs) { const w = o.tyres ? o.tyres[h0.front ? 0 : 1] : h0.width, s = h0.o[1] > 0 ? 1 : -1, h = { ...h0, width: w, o: [h0.o[0], h0.o[1] + s * (w - h0.width) / 2, h0.o[2]] as V };
       wheel(b, h, o.wheel ?? 'hollow5', o.brake !== false); }
-    for (const s of [1, -1]) headLamp(b, o.lamp ?? 'round', [270 + Math.sin(sl) * 14, s * 615, 640 - Math.cos(sl) * 14], [0, 1, 0], [Math.cos(sl), 0, Math.sin(sl)], [-Math.sin(sl), 0, Math.cos(sl)], 100, 122);
-    for (const e of K.exhausts) b.name('exhaust').mat('#2a2b2d', 0.6, 'metal').lathe('x', [0, e.o[1], e.o[2]], [[e.o[0] - 60, e.r], [e.o[0] + 14, e.r], [e.o[0] - 50, e.r - 10]], 8, false);
-    for (const m of K.mirrors) mirror(b, m, paint);
+    if (lamps) for (const s of [1, -1]) lampIn(b, fr, o.lamp as LampKind ?? 'round', [270 + Math.sin(sl) * 14, s * 615, 640 - Math.cos(sl) * 14], [0, 1, 0], [Math.cos(sl), 0, Math.sin(sl)], 100, 122);
+    if (details) for (const e of K.exhausts) b.name('exhaust').mat('#2a2b2d', 0.6, 'metal').lathe('x', [0, e.o[1], e.o[2]], [[e.o[0] - 60, e.r], [e.o[0] + 14, e.r], [e.o[0] - 50, e.r - 10]], 8, false);
+    if (details) for (const m of K.mirrors) mirror(b, m, paint);
     for (const m of K.marks) if (/^plate/.test(m.name) && (m.name === 'plateF' ? o.plateF : o.plateR) !== false) plate(b, m, o.plate);
-    if (o.marks !== false) for (const m of K.marks) { if (m.name === 'badge') crest = crestPlate(b, m, skinNear(S.P, S.F, m.o, 120)); else if (m.name === 'porscheLettering') lettering(b, m, skinNear(S.P, S.F, m.o, 420)); } }
-  const M = b.mesh(DIM.length);
+    if (marks) for (const m of K.marks) { if (m.name === 'badge') crest = crestPlate(b, m, skinNear(S.P, S.F, m.o, 120)); else if (m.name === 'porscheLettering') lettering(b, m, skinNear(S.P, S.F, m.o, 420)); } }
+  const M = b.mesh(o.dims ? fr.length : DIM.length);
   if (crest) M.uv = crestUV(M, crest);
-  M.lines = p959Lines(S).filter(l => o.marks === false || o.bare || !/^tailLampWordBar/.test(l.name)) as MeshLine[];   // the bar drawn where the word goes, gone once the word is there
+  M.lines = p959Lines(S, o.glass === null).filter(l => !marks || o.bare || !/^tailLampWordBar/.test(l.name)) as MeshLine[];   // the bar drawn where the word goes, gone once the word is there
   M.creases = [...S.crease].map(k => { const [a, c] = k.split('|').map(Number) as [number, number]; return [S.P[a]!, S.P[c]!] as [V, V]; });
   return { mesh: M, shell: S, normals: new Float32Array(nn), shellTris: nn.length / 9 }; }

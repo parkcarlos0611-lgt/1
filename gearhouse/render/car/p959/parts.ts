@@ -7,7 +7,8 @@ import type { Hub, Mount, Mark } from './sockets';
 import type { V } from './subdiv';
 
 export type LampKind = 'round' | 'ellipsoid' | 'square';
-export type WheelKind = 'hollow5' | 'dish' | 'hole5';
+/** 'steel': the lump's plain pressed-steel wheel (docs/systems/115 §4-1), a painted disc with a raised middle, six round vents and a small cap */
+export type WheelKind = 'hollow5' | 'dish' | 'hole5' | 'steel';
 const add = (a: V, b: V, k = 1): V => [a[0] + b[0] * k, a[1] + b[1] * k, a[2] + b[2] * k];
 
 /** a head lamp in its socket: `c` the socket floor's centre, `u` across, `v` up the lamp's slope, `n` out of it; `a`, `b` the half-axes inside the rim */
@@ -26,7 +27,7 @@ export function headLamp(b: Build, kind: LampKind, c: V, u: V, v: V, n: V, a: nu
 /** a road wheel on its hub: tyre, rim, the wheel's face in one of three designs, and the brake seen through it */
 export function wheel(b: Build, h: Hub, kind: WheelKind, brake = true): void { const s = h.o[1] > 0 ? 1 : -1, w = h.width, r = h.tyreR, rim = h.rimR, o: V = [h.o[0], h.o[1] - s * w / 2, h.o[2]], f = s * w / 2, SEG = 12;
   b.name(h.front ? 'tyreF' : 'tyreR').mat('#1c1c1e', 0.1, 'tyre').lathe('y', o, [[-f * 0.9, r - 12], [-f * 0.72, r], [f * 0.72, r], [f, r - 30], [f, rim]], SEG, false);
-  const metal = '#c9ccd0', dish = kind === 'dish' ? 78 : 24, face = f - s * dish;
+  const steel = kind === 'steel', metal = steel ? '#7b7f85' : '#c9ccd0', dish = kind === 'dish' ? 78 : steel ? 44 : 24, face = f - s * dish;
   b.name('rim').mat(metal, 0.5, 'plain').lathe('y', o, [[f, rim], [f - s * 8, rim - 12], [f - s * 130, rim - 22]], SEG, false);
   // the brake: a disc and a caliper behind the spokes
   if (brake) { b.name('brakeDisc').mat('#8d9094', 0.3, 'plain').lathe('y', o, [[f - s * 100, rim - 22], [f - s * 100, 0.5]], 12, false);   // (a car with its suspension drawn brings its own disc and caliper)
@@ -35,6 +36,9 @@ export function wheel(b: Build, h: Hub, kind: WheelKind, brake = true): void { c
   b.name('wheel').mat(metal, 0.5, 'plain');
   if (kind === 'hollow5') for (let q = 0; q < 5; q++) spoke((q / 5 + 0.05) * Math.PI * 2, 46, rim - 20, 58, 84, 10);        // broad hollow spokes, widening to the rim
   else if (kind === 'dish') for (let q = 0; q < 8; q++) spoke((q / 8) * Math.PI * 2, 40, rim - 20, 22, 16);
+  else if (steel) { b.lathe('y', o, [[face, rim - 18], [face, 178], [face + s * 18, 152], [face + s * 18, 70]], SEG, false); b.name('wheelHole').mat('#232426', 0.05, 'plain');
+    for (let q = 0; q < 6; q++) { const a = (q / 6 + 1 / 12) * Math.PI * 2; b.lathe('y', [o[0] + Math.cos(a) * 112, o[1], o[2] + Math.sin(a) * 112], [[face + s * 18.5, 22], [face + s * 19, 0.5]], 8, false); }
+    b.name('hub').mat('#c9ccd0', 0.5, 'plain').lathe('y', o, [[face + s * 18, 64], [face + s * 30, 52], [face + s * 34, 0.5]], 8, false); return; }
   else { b.lathe('y', o, [[face, rim - 18], [face + s * 8, 70]], SEG, false); b.name('wheelHole').mat('#232426', 0.05, 'plain'); for (let q = 0; q < 5; q++) { const a = (q / 5) * Math.PI * 2; b.lathe('y', [o[0] + Math.cos(a) * 128, o[1], o[2] + Math.sin(a) * 128], [[face + s * 10, 34], [face + s * 10.5, 0.5]], 8, false); } }
   b.name('hub').mat(metal, 0.5, 'plain').lathe('y', o, [[face - s * 6, 66], [face + s * 16, 50], [face + s * 18, 0.5]], 8, false); }
 

@@ -16,7 +16,7 @@ import type { Design, ModelBaseId } from '../../core/design';
 import { MODEL_OWN, plateOk } from '../../core/design';
 import { CAR_599 } from '../../core/names';
 import { Build, KINDS, type CarAnchors, type Mesh, type MeshLine } from './mesh';
-import { p959Mesh, plateText, DIM, type PlateText } from './p959';
+import { p959Mesh, plateText, DIM, STOCK_FRAME, type Frame, type PlateText } from './p959';
 import { addSuspension, type SuspWheel } from './suspension';
 import { suspFor } from './suspension/setup';
 import { addPowertrain, fromDesign, type Detail } from './powertrain';
@@ -52,27 +52,36 @@ function plateOf(d: Design): PlateText { const t = d.body.model?.plate; if (plat
 // ---- the 959 ----
 /** its wheels as the suspension takes them: the hubs' stations and tracks (p959/sockets.ts), the design's tyre widths
  *  (the drawn wheel is the model's own, its middle kept), the wheel's closed back as the kit's wheels have it */
-function p959Wheels(d: Design): { f: SuspWheel; r: SuspWheel } { const [wf, wr] = d.kit.tyres;
-  return { f: { x: DIM.axleF, y: DIM.trackF / 2, r: DIM.tyreR, w: wf, rim: 222, back: 0.6 * wf / 2 }, r: { x: DIM.axleR, y: DIM.trackR / 2, r: DIM.tyreR - 2, w: wr, rim: 222, back: 0.6 * wr / 2 } }; }
+function p959Wheels(d: Design, f: Frame = frameFor(d)): { f: SuspWheel; r: SuspWheel } { const [wf, wr] = d.kit.tyres;
+  return { f: { x: f.axleF, y: f.trackF / 2, r: DIM.tyreR, w: wf, rim: 222, back: 0.6 * wf / 2 }, r: { x: f.axleR, y: f.trackR / 2, r: DIM.tyreR - 2, w: wr, rim: 222, back: 0.6 * wr / 2 } }; }
+/** the frame a design's body is stretched by (docs/systems/115 §4-4) */
+function frameFor(_d: Design): Frame { return STOCK_FRAME; }
 /** the 959's powertrain site: the flat six hung behind the rear axle with its gearbox ahead, the two exhaust tips, the
  *  cabin's floor and tunnel (the same place as the style page's, render/car/styleparts.ts) */
-const P959_SITE: Site = { length: DIM.length, foot: 150, wheels: { f: { x: DIM.axleF, y: DIM.trackF / 2, r: DIM.tyreR, w: 235, z: DIM.hubZ }, r: { x: DIM.axleR, y: DIM.trackR / 2, r: DIM.tyreR - 2, w: 255, z: DIM.hubZ - 2 } },
-  engine: { at: [DIM.axleR + 112, 0, 440], dir: '+x' }, tips: { x: 4258, z: 256, y: [-335, 335], r: 40 }, cabin: { floor: 170, x: [1350, 2900], tunnel: [1350, 110, 330] } };
+const siteOf = (f: Frame): Site => { const z = (v: number) => f.at([0, 0, v])[2], tip = f.at([4258, 335, 256]);
+  return { length: f.length, foot: 150 + f.ride, wheels: { f: { x: f.axleF, y: f.trackF / 2, r: DIM.tyreR, w: 235, z: DIM.hubZ }, r: { x: f.axleR, y: f.trackR / 2, r: DIM.tyreR - 2, w: 255, z: DIM.hubZ - 2 } },
+    engine: { at: [f.axleR + 112, 0, z(440)], dir: '+x' }, tips: { x: tip[0], z: tip[2], y: [-tip[1], tip[1]], r: 40 }, cabin: { floor: z(170), x: [f.x(1350), f.x(2900)], tunnel: [f.x(1350), 110, z(330)] } }; };
 /** the 959's speed-effect anchors (render/live/trails.ts): the wing blade's outer trailing corners (its top, where the
  *  air leaves it) and the tail-lamp bar's outer halves, a little behind their faces; left (+y) first */
-const P959_ANCHORS: CarAnchors = { tips: [[4215, 760, 885], [4215, -760, 885]], lamps: [[4262, 560, 623], [4262, -560, 623]] };
+const anchorsOf = (f: Frame): CarAnchors => ({ tips: [f.at([4215, 760, 885]), f.at([4215, -760, 885])], lamps: [f.at([4262, 560, 623]), f.at([4262, -560, 623])] });
+const P959_ANCHORS = anchorsOf(STOCK_FRAME);
+/** the cabin's anchors carried by the frame: every place and height as the surface is, the half widths by the width's scale */
+export function cabinOf(f: Frame, A: CabinAnchors = P959_CABIN): CabinAnchors { const z = (v: number) => f.at([0, 0, v])[2], y = (v: number) => v * f.kY;
+  return { ...A, floorZ: z(A.floorZ), dashX: f.x(A.dashX), dashTopZ: z(A.dashTopZ), screenFoot: [f.x(A.screenFoot[0]), z(A.screenFoot[1])], screenTop: [f.x(A.screenTop[0]), z(A.screenTop[1])], screenHalf: [y(A.screenHalf[0]), y(A.screenHalf[1])],
+    wheel: f.at(A.wheel), hip: f.at(A.hip), half: y(A.half), doorX: [f.x(A.doorX[0]), f.x(A.doorX[1])], sillZ: z(A.sillZ), beltZ: z(A.beltZ), tunnelZ: z(A.tunnelZ), rearX: f.x(A.rearX), shelfZ: z(A.shelfZ), roofZ: z(A.roofZ), roofHalf: y(A.roofHalf),
+    ...(A.doorIn ? { doorIn: A.doorIn.map(([h, w]) => [z(h), y(w)] as [number, number]) } : {}), ...(A.wellX !== undefined ? { wellX: f.x(A.wellX) } : {}), ...(A.rearHalf !== undefined ? { rearHalf: y(A.rearHalf) } : {}) }; }
 const P959: ModelBody = { name: CAR_599, length: DIM.length, cabin: P959_CABIN, anchors: P959_ANCHORS, wheels: p959Wheels, open: ['engineGrille', 'engineLid', 'rearWindow'],
   gauges: (d, topKmh) => ({ ...P959_GAUGES, redline: d.engine.redline, topKmh: topKmh ?? P959_GAUGES.topKmh, ...(d.engine.turbo ? { boostBar: d.engine.boost } : { boostBar: undefined }) }),
-  mesh(d, o = {}) { const m = { ...MODEL_OWN.p959, ...d.body.model }, det = o.detail ?? 2;
-    const body = p959Mesh({ paint: d.body.paint, bumperF: m.bumperF, bumperR: m.bumperR, lamp: m.lamp, wheel: m.wheel, plate: plateOf(d), plateF: m.plateF !== false, plateR: m.plateR !== false, brake: !!o.bare, tyres: d.kit.tyres });
+  mesh(d, o = {}) { const m = { ...MODEL_OWN.p959, ...d.body.model }, det = o.detail ?? 2, f = frameFor(d), anchors = anchorsOf(f);
+    const body = p959Mesh({ ...(f === STOCK_FRAME ? {} : { dims: f.dims }), paint: d.body.paint, bumperF: m.bumperF, bumperR: m.bumperR, lamp: m.lamp, wheel: m.wheel, plate: plateOf(d), plateF: m.plateF !== false, plateR: m.plateR !== false, brake: !!o.bare, tyres: d.kit.tyres });
     // the paint's gloss as the design sets it (the model is made at 0.6)
     const P = KINDS.indexOf('paint'); for (let t = 0; t < body.n; t++) if (body.kind[t] === P) body.gloss[t] = d.body.gloss;
     if (o.bare) return body;
     // the suspension about the model's hubs, its rig on the body's mesh; the powertrain in the bay behind the cabin
-    const b = new Build(), S = addSuspension(b, suspFor('p959', d.susp), p959Wheels(d), { detail: det, setup: d.susp, ...(o.style ? { style: o.style } : {}) });
-    addPowertrain(b, fromDesign(d), P959_SITE, { detail: det, ...(o.style ? { style: o.style } : {}) });
-    const mach = b.mesh(DIM.length), cab = interiorMesh({ ...cabinFor(d), cabin: P959_CABIN, gauges: this.gauges(d, o.topKmh), length: DIM.length });
-    return { ...joinMeshes(DIM.length, body, mach, cab), susp: S.rig, anchors: P959_ANCHORS }; } };
+    const b = new Build(), S = addSuspension(b, suspFor('p959', d.susp), p959Wheels(d, f), { detail: det, setup: d.susp, ...(o.style ? { style: o.style } : {}) });
+    addPowertrain(b, fromDesign(d), siteOf(f), { detail: det, ...(o.style ? { style: o.style } : {}) });
+    const mach = b.mesh(f.length), cab = interiorMesh({ ...cabinFor(d), cabin: f === STOCK_FRAME ? P959_CABIN : cabinOf(f), gauges: this.gauges(d, o.topKmh), length: f.length });
+    return { ...joinMeshes(f.length, body, mach, cab), susp: S.rig, anchors }; } };
 
 /** the model-built bodies, by their base's id */
 export const MODEL_BODIES: Record<ModelBaseId, ModelBody> = { p959: P959 };

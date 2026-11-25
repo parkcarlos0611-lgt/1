@@ -3,8 +3,9 @@
 // sunk (head lamps, tail lamp bar, side intakes), the underside closed. The result is one closed surface of quads and
 // a few triangles, every face tagged with its region (the shell itself or a module hung on a boundary loop), material
 // and panel; with it the drawn lines, the hard creases (split shading) and the modules' boundary loops, as points.
-import { buildCage, ARCH, DIM, type Cage959, type CageOpts, type Tag } from './cage';
+import { buildCage, DIM, type Cage959, type CageOpts, type Tag } from './cage';
 import { cornerNormals, ekey, faceNormal, subdivide, type Fine, type V } from './subdiv';
+import { frameOf } from './frame';
 
 const add = (a: V, b: V): V => [a[0] + b[0], a[1] + b[1], a[2] + b[2]], sub = (a: V, b: V): V => [a[0] - b[0], a[1] - b[1], a[2] - b[2]], mul = (a: V, k: number): V => [a[0] * k, a[1] * k, a[2] * k];
 const len = (a: V) => Math.hypot(a[0], a[1], a[2]), unit = (a: V): V => { const l = len(a) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };
@@ -26,7 +27,8 @@ export function buildShell(o: ShellOpts = {}): Shell959 {
   const openEdges = () => { const m = new Map<string, [number, number, number]>(); F.forEach((f, k) => f.forEach((a, q) => { const b = f[(q + 1) % f.length]!, key = ekey(a, b); if (m.has(key)) m.set(key, [0, 0, -1]); else m.set(key, [a, b, k]); })); return [...m.values()].filter(e => e[2] >= 0); };
 
   // ---- the arches: the ring trued to its circle, a lip turned in, a well behind
-  for (const side of [1, -1]) for (const a of [ARCH.f, ARCH.r]) { const R = DIM.archR, rad = (p: V) => Math.hypot(p[0] - a.x, p[2] - a.z);
+  const fr = frameOf(o.dims), arches = [{ x: fr.archF[0], z: fr.archF[1] }, { x: fr.archR[0], z: fr.archR[1] }];   // the hubs on the stretched body
+  for (const side of [1, -1]) for (const a of arches) { const R = DIM.archR, rad = (p: V) => Math.hypot(p[0] - a.x, p[2] - a.z);
     const es = openEdges().filter(([u, v]) => [u, v].every(w => P[w]![1] * side > 600 && Math.abs(rad(P[w]!) - R) < 30)); if (!es.length) continue;
     // order the chain: each open edge runs a -> b in its face's winding
     const next = new Map<number, number>(), has = new Set<number>(); for (const [u, v] of es) { next.set(u, v); has.add(v); }
@@ -52,8 +54,10 @@ export function buildShell(o: ShellOpts = {}): Shell959 {
         const c = mul(vc.get(v)!, 1 / cnt.get(v)!), d = sub(c, P[v]!), flat = sub(d, mul(n, d[0] * n[0] + d[1] * n[1] + d[2] * n[2])), l = len(flat) || 1; moved.set(v, pt(add(add(P[v]!, down), mul(flat, inset / l)))); }
       for (const k of S) F[k] = F[k]!.map(v => moved.get(v) ?? v);
       for (const [a, b] of edges) { F.push([a, b, moved.get(b)!, moved.get(a)!]); const t = tag[[...S][0]!]!; tag.push({ region: t.region, mat: 'paint', panel: rim, right: P[a]![1] + P[b]![1] < 0 }); crease.add(ekey(a, b)); crease.add(ekey(moved.get(a)!, moved.get(b)!)); } };
-    for (const right of [false, true]) { sink(t => t.socket === 'headLamp' && !!t.right === right, 14, 5, 'headLampRim'); sink(t => t.socket === 'sideIntake' && !!t.right === right, 34, 4, 'sideIntakeRim'); }
-    sink(t => t.socket === 'tailLamp', 9, 3, 'tailLampRim'); }
+    // a socket whose module is not there (the lump's: its lamps, its intakes, its tail lamp band) stays flush
+    const lamps = o.lamps !== false, details = o.details !== false;
+    for (const right of [false, true]) { if (lamps) sink(t => t.socket === 'headLamp' && !!t.right === right, 14, 5, 'headLampRim'); if (details) sink(t => t.socket === 'sideIntake' && !!t.right === right, 34, 4, 'sideIntakeRim'); }
+    if (details) sink(t => t.socket === 'tailLamp', 9, 3, 'tailLampRim'); }
 
   // ---- the underside: every edge still open is on the outline of the floor; each is joined to the centre line
   { const centre = new Map<string, number>(), cOf = (v: number) => { const p = P[v]!; if (Math.abs(p[1]) < 1e-6) return v; const key = `${Math.round(p[0] * 10)},${Math.round(p[2] * 10)}`; let c = centre.get(key); if (c === undefined) { c = pt([p[0], 0, p[2]]); centre.set(key, c); } return c; };
@@ -61,10 +65,12 @@ export function buildShell(o: ShellOpts = {}): Shell959 {
       // u and v are already reversed against their face; the centre points close the quad (a triangle where they meet)
       F.push(f); tag.push({ region: 'shell', mat: 'dark', panel: 'floor', right: P[u]![1] + P[v]![1] < 0 }); crease.add(ekey(u, v)); } }
   // helper faces (lips, wells, socket walls, the slot, the floor) fold hard against their neighbours: those folds are creases too
+  // and a cell the lump paints over (its glass's sharp front corner by the A pillar) splits at a fold of 25 degrees or more
   { const helper = (t: Tag) => /Rim$|archLip|wheelWell|floor|wingSlot/.test(t.panel), first = new Map<string, number>(), nrm = F.map(f => unit(faceNormal(P, f)));
-    F.forEach((f, k) => f.forEach((a, q) => { const key = ekey(a, f[(q + 1) % f.length]!), o2 = first.get(key); if (o2 === undefined) first.set(key, k); else if ((helper(tag[o2]!) || helper(tag[k]!)) && nrm[o2]![0] * nrm[k]![0] + nrm[o2]![1] * nrm[k]![1] + nrm[o2]![2] * nrm[k]![2] < 0.82) crease.add(key); })); }
-  // the shading is also split where the material changes (glass, a grille or a lens against the paint), as the game splits it
-  { const cls = (t: Tag) => t.mat === 'paint' || t.mat === 'dark' ? 'body' : t.mat, first = new Map<string, number>();
+    F.forEach((f, k) => f.forEach((a, q) => { const key = ekey(a, f[(q + 1) % f.length]!), o2 = first.get(key); if (o2 === undefined) first.set(key, k); else if ((tag[o2]!.was === 'glass' || tag[k]!.was === 'glass') && nrm[o2]![0] * nrm[k]![0] + nrm[o2]![1] * nrm[k]![1] + nrm[o2]![2] * nrm[k]![2] < 0.906) crease.add(key); else if ((helper(tag[o2]!) || helper(tag[k]!)) && nrm[o2]![0] * nrm[k]![0] + nrm[o2]![1] * nrm[k]![1] + nrm[o2]![2] * nrm[k]![2] < 0.82) crease.add(key); })); }
+  // the shading is also split where the material changes (glass, a grille or a lens against the paint), as the game splits it;
+  // where the lump paints its glass over, where the glass's edge was (the folds round it are the same hard edges)
+  { const cls = (t: Tag) => { const m = t.was === 'glass' ? 'glass' : t.mat; return m === 'paint' || m === 'dark' ? 'body' : m; }, first = new Map<string, number>();
     F.forEach((f, k) => f.forEach((a, q) => { const key = ekey(a, f[(q + 1) % f.length]!), o2 = first.get(key); if (o2 === undefined) first.set(key, k); else if (cls(tag[o2]!) !== cls(tag[k]!)) crease.add(key); })); }
   const split = new Set<string>(crease);
   const N = cornerNormals(P, F, split);

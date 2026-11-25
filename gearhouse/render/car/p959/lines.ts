@@ -9,8 +9,10 @@ import { STYLE } from '../../live/style';
 const PANEL = new Set(['door', 'bonnet', 'boot', 'bumper', 'panel']);
 export const lineClass = (kind: string): 'panel' | 'character' => PANEL.has(kind) ? 'panel' : 'character';
 
-export function p959Lines(S: Shell959): ShellLine[] { const out: ShellLine[] = [];
-  for (const l0 of S.lines) { const l = lineClass(l0.kind) === 'panel' ? { ...l0, w: (l0.w ?? 1) * STYLE.panelPx / STYLE.linePx } : l0; out.push(l); const onCentre = l.pts.every(p => Math.abs(p[1]) < 1e-6); if (onCentre) continue;
+/** how far a faint panel line is drawn against a panel line (the lump before its glass is picked: docs/systems/115 §4-1) */
+export const FAINT = 0.5;
+export function p959Lines(S: Shell959, faint = false): ShellLine[] { const out: ShellLine[] = [];
+  for (const l0 of S.lines) { const l = lineClass(l0.kind) === 'panel' ? { ...l0, w: (l0.w ?? 1) * STYLE.panelPx / STYLE.linePx * (faint ? FAINT : 1) } : l0; out.push(l); const onCentre = l.pts.every(p => Math.abs(p[1]) < 1e-6); if (onCentre) continue;
     const m = l.pts.map(p => [p[0], -p[1], p[2]] as V);
     // a line that starts or ends on the centre line carries on into its mirror image as one line
     out.push({ ...l, name: l.name + 'R', pts: m }); }

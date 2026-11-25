@@ -27,6 +27,7 @@
 // The two halves of format 4 were made apart (M2 and E2) and are one format; neither half alone was published (alpha
 // 0.11 wrote format 3), but a format-4 file written with only one of them (the engine's fields with a `front`, or the
 // face's slots with no bore/stroke or quality) is read as format 3 is for the half it lacks (toV4).
+import { BODY_NAME } from './names';
 
 /** the kit's platforms (each a car built from the kit: its lines and its panels' measurements) */
 export type BaseId = 'nsx' | 'f355' | 'eb110';
@@ -40,7 +41,9 @@ export type BodyBase = BaseId | ModelBaseId;
 /** a model-built body's swaps (the 959's: render/car/p959 P959Opts): the bumpers, the head lamps, the wheels, the
  *  number plate's text. Each body reads the ones it has; a kit body has none */
 export interface ModelSwaps { bumperF: 'std' | 'aero' | 'clean'; bumperR: 'std' | 'aero' | 'clean'; lamp: 'round' | 'ellipsoid' | 'square'; wheel: 'hollow5' | 'dish' | 'hole5';
-  /** the plate's text, as "12가 3456" (render/car/p959 plateText) */ plate: string }
+  /** the plate's text, as "12가 3456" (render/car/p959 plateText) */ plate: string;
+  /** the front and the rear plate taken off (absent: fitted, as every design before them; only a removed plate is kept,
+   *  so an older design's signature does not change) */ plateF?: false; plateR?: false }
 /** 'mass': the bumper a volume of its own standing ahead of the bonnet's front edge (the EB110's) */
 export type NoseKind = 'round' | 'pointed' | 'mass';
 /** format 3's front (to alpha 0.11): the bumper's lamps flush ('plain') or sunk ('sunk'), the grille the base's own */
@@ -169,7 +172,7 @@ export const BUMPERS959: ModelSwaps['bumperF'][] = ['std', 'aero', 'clean'];
 export const LAMPS959: ModelSwaps['lamp'][] = ['round', 'ellipsoid', 'square'];
 export const WHEELS959: ModelSwaps['wheel'][] = ['hollow5', 'dish', 'hole5'];
 /** each model body's own swaps (its real car's); the plate a made-up number (a new design draws its own: designstore fromPreset) */
-export const MODEL_OWN: Record<ModelBaseId, ModelSwaps> = { p959: { bumperF: 'std', bumperR: 'std', lamp: 'round', wheel: 'hollow5', plate: '08루 0959' } };
+export const MODEL_OWN: Record<ModelBaseId, ModelSwaps> = { p959: { bumperF: 'std', bumperR: 'std', lamp: 'round', wheel: 'hollow5', plate: '08루 0599' } };
 export const NOSES: NoseKind[] = ['round', 'pointed', 'mass'];
 export const FRONTS: FrontKind[] = ['plain', 'sunk'];
 export const BUMPERS: BumperKind[] = ['upright', 'crease', 'wedge', 'airdam'];
@@ -295,11 +298,11 @@ export const gradeRedline = (g: Grade) => Math.min(LIMITS.redline[1], GRADE_RULE
 /** the two cars the kit was made from, as designs (the generators are checked against their real figures). The NSX:
  *  an aluminium monocoque and panels, the C30A's variable intake, 10.2:1, a wet sump; the F355: a steel structure and
  *  panels, the F129B's 11:1, a dry sump */
-export const DESIGN_NSX: Design = { v: 5, id: 'nsx', name: 'NSX', body: { base: 'nsx', nose: 'round', ...faceOf3('nsx', 'plain'), tail: 'frame', wheel: 'fiveSpoke', ...NO_DIMS, wheelbase: 0, width: 0, paint: '#b0121b', gloss: 0.6, structure: 'aluminium', panels: 'aluminium' },
+export const DESIGN_NSX: Design = { v: 5, id: 'nsx', name: BODY_NAME.nsx, body: { base: 'nsx', nose: 'round', ...faceOf3('nsx', 'plain'), tail: 'frame', wheel: 'fiveSpoke', ...NO_DIMS, wheelbase: 0, width: 0, paint: '#b0121b', gloss: 0.6, structure: 'aluminium', panels: 'aluminium' },
   engine: { grade: 2, layout: 'V6', cc: 2977, valves: 4, redline: 8000, intake: 'variable', compression: 'mid', sump: 'wet', block: 'aluminium', turbo: 0, boost: 0.8, intercooler: true, vtec: true, bs: BS_DEFAULT, quality: { ...NO_QUALITY } },
   drive: { gears: 5, gearbox: 'manual', final: 4.062, lsd: true, awd: false },
   kit: { abs: true, tcs: true, steering: 'manual', dampers: 'fixed', wing: false, diffuser: false, tyres: [205, 225], rim: 16, interior: 'standard' }, susp: structuredClone(SUSP_OWN.nsx) };
-export const DESIGN_F355: Design = { v: 5, id: 'f355', name: 'F355', body: { base: 'f355', nose: 'pointed', ...faceOf3('f355', 'sunk'), tail: 'ducktail', wheel: 'star', ...NO_DIMS, wheelbase: 0, width: 0, paint: '#f5c300', gloss: 0.6, structure: 'steel', panels: 'steel' },
+export const DESIGN_F355: Design = { v: 5, id: 'f355', name: BODY_NAME.f355, body: { base: 'f355', nose: 'pointed', ...faceOf3('f355', 'sunk'), tail: 'ducktail', wheel: 'star', ...NO_DIMS, wheelbase: 0, width: 0, paint: '#f5c300', gloss: 0.6, structure: 'steel', panels: 'steel' },
   engine: { grade: 2, layout: 'V8', cc: 3496, valves: 5, redline: 8500, intake: 'single', compression: 'high', sump: 'dry', block: 'aluminium', turbo: 0, boost: 0.8, intercooler: true, vtec: false, bs: BS_DEFAULT, quality: { ...NO_QUALITY } },
   drive: { gears: 6, gearbox: 'manual', final: 4.1, lsd: true, awd: false },
   kit: { abs: true, tcs: false, steering: 'hydraulic', dampers: 'adaptive', wing: false, diffuser: true, tyres: [225, 265], rim: 18, interior: 'standard' }, susp: structuredClone(SUSP_OWN.f355) };
@@ -311,7 +314,7 @@ export const DESIGN_F355: Design = { v: 5, id: 'f355', name: 'F355', body: { bas
  *  with the PSK's clutch varying the split (race/design.ts takes the base's own split); a steel monocoque under
  *  aramid and aluminium panels (here FRP's figure for the aramid); ABS; 235/45 ZR17 and 255/40 ZR17; 1,450 kg;
  *  317 km/h. The engine's quality figures land it on its power (tests/p959_game.test.ts) */
-export const DESIGN_P959: Design = { v: 5, id: 'p959', name: '959', body: { base: 'p959', nose: 'round', ...faceOf3('p959', 'plain'), tail: 'frame', wheel: 'fiveSpoke', ...NO_DIMS, paint: '#b8bcc2', gloss: 0.6, structure: 'steel', panels: 'frp',
+export const DESIGN_P959: Design = { v: 5, id: 'p959', name: '599', body: { base: 'p959', nose: 'round', ...faceOf3('p959', 'plain'), tail: 'frame', wheel: 'fiveSpoke', ...NO_DIMS, paint: '#b8bcc2', gloss: 0.6, structure: 'steel', panels: 'frp',
     model: { ...MODEL_OWN.p959 } },
   engine: { grade: 4, layout: 'F6', cc: 2849, valves: 4, redline: 7600, intake: 'single', compression: 'low', sump: 'dry', block: 'aluminium', turbo: 2, boost: 1.0, intercooler: true, vtec: false, sequential: true, bs: 1.4, quality: { ...NO_QUALITY, head: 1, intake: 1, exhaust: 1, turbo: 1 } },
   drive: { gears: 6, gearbox: 'manual', final: 0, lsd: true, awd: true },
@@ -323,7 +326,7 @@ export const DESIGN_P959: Design = { v: 5, id: 'p959', name: '959', body: { base
 // NEW.eb110, NEW.xj220, with their sources) and, for the McLaren F1 (no RaceSpec), below.
 /** the 1990 Lamborghini Diablo: 5.7 V12 four valves, 492 hp at 7,000, five speeds, rear drive; a tubular steel frame
  *  with aluminium and composite panels; 2,650 wheelbase, 2,040 wide; 245/40 ZR17 and 335/35 ZR17 */
-export const DESIGN_DIABLO: Design = { v: 5, id: 'diablo', name: 'Diablo', body: { base: 'f355', nose: 'pointed', ...faceOf3('f355', 'plain'), tail: 'frame', wheel: 'star', ...NO_DIMS, wheelbase: 200, width: 70, paint: '#7a1fa2', gloss: 0.6, structure: 'steel', panels: 'aluminium' },
+export const DESIGN_DIABLO: Design = { v: 5, id: 'diablo', name: '시험 차 D', body: { base: 'f355', nose: 'pointed', ...faceOf3('f355', 'plain'), tail: 'frame', wheel: 'star', ...NO_DIMS, wheelbase: 200, width: 70, paint: '#7a1fa2', gloss: 0.6, structure: 'steel', panels: 'aluminium' },
   engine: { grade: 3, layout: 'V12', cc: 5707, valves: 4, redline: 7300, intake: 'single', compression: 'mid', sump: 'wet', block: 'aluminium', turbo: 0, boost: 0.8, intercooler: true, vtec: false, bs: BS_DEFAULT, quality: { ...NO_QUALITY } },
   drive: { gears: 5, gearbox: 'manual', final: 0, lsd: true, awd: false },
   kit: { abs: false, tcs: false, steering: 'manual', dampers: 'fixed', wing: false, diffuser: false, tyres: [245, 335], rim: 17, interior: 'standard' }, susp: structuredClone(SUSP_OWN.f355) };
@@ -332,7 +335,7 @@ export const DESIGN_DIABLO: Design = { v: 5, id: 'diablo', name: 'Diablo', body:
  *  8,000, 7.5:1, a dry sump; six speeds, four-wheel drive; a carbon-fibre monocoque (Aérospatiale's) with aluminium
  *  panels; a luxurious interior (leather, air conditioning: heavy for its materials); its active rear wing; 245/40 ZR18
  *  and 325/30 ZR18; 1,620 kg; 342 km/h */
-export const DESIGN_EB110: Design = { v: 5, id: 'eb110', name: 'EB110', body: { base: 'eb110', nose: 'mass', ...faceOf3('eb110', 'plain'), tail: 'capsule', wheel: 'disc', ...NO_DIMS, paint: '#1b3a8a', gloss: 0.6, structure: 'cfrp', panels: 'aluminium' },
+export const DESIGN_EB110: Design = { v: 5, id: 'eb110', name: BODY_NAME.eb110, body: { base: 'eb110', nose: 'mass', ...faceOf3('eb110', 'plain'), tail: 'capsule', wheel: 'disc', ...NO_DIMS, paint: '#1b3a8a', gloss: 0.6, structure: 'cfrp', panels: 'aluminium' },
   engine: { grade: 3, layout: 'V12', cc: 3499, valves: 5, redline: 8250, intake: 'single', compression: 'low', sump: 'dry', block: 'aluminium', turbo: 4, boost: 1.0, intercooler: true, vtec: false, bs: BS_DEFAULT, quality: { ...NO_QUALITY } },
   drive: { gears: 6, gearbox: 'manual', final: 0, lsd: true, awd: true },
   kit: { abs: true, tcs: false, steering: 'hydraulic', dampers: 'fixed', wing: true, diffuser: false, tyres: [245, 325], rim: 18, interior: 'luxury' }, susp: structuredClone(SUSP_OWN.eb110) };
@@ -340,7 +343,7 @@ export const DESIGN_EB110: Design = { v: 5, id: 'eb110', name: 'EB110', body: { 
  *  intercoolers at about 1.0 bar, 8.3:1, a dry sump, 542 hp at 7,200; five speeds, rear drive; a bonded aluminium
  *  honeycomb tub and aluminium panels, underbody venturis; 2,640 wheelbase, 2,220 wide (here as wide as the NSX's base
  *  stretches, 1,970); 255/45 ZR17 and 345/35 ZR18 (here 335 on 18 at both ends: the builder's one rim size); 1,470 kg */
-export const DESIGN_XJ220: Design = { v: 5, id: 'xj220', name: 'XJ220', body: { base: 'nsx', nose: 'round', ...faceOf3('nsx', 'plain'), tail: 'roundLamps', wheel: 'disc', ...NO_DIMS, wheelbase: 110, width: 80, paint: '#9aa1a6', gloss: 0.6, structure: 'honeycomb', panels: 'aluminium' },
+export const DESIGN_XJ220: Design = { v: 5, id: 'xj220', name: '시험 차 E', body: { base: 'nsx', nose: 'round', ...faceOf3('nsx', 'plain'), tail: 'roundLamps', wheel: 'disc', ...NO_DIMS, wheelbase: 110, width: 80, paint: '#9aa1a6', gloss: 0.6, structure: 'honeycomb', panels: 'aluminium' },
   engine: { grade: 4, layout: 'V6', cc: 3498, valves: 4, redline: 7800, intake: 'single', compression: 'low', sump: 'dry', block: 'aluminium', turbo: 2, boost: 1.0, intercooler: true, vtec: false, bs: BS_DEFAULT, quality: { ...NO_QUALITY } },
   drive: { gears: 5, gearbox: 'manual', final: 0, lsd: true, awd: false },
   kit: { abs: false, tcs: false, steering: 'manual', dampers: 'fixed', wing: false, diffuser: true, tyres: [255, 335], rim: 18, interior: 'standard' }, susp: structuredClone(SUSP_OWN.nsx) };
@@ -353,7 +356,7 @@ export const DESIGN_XJ220: Design = { v: 5, id: 'xj220', name: 'XJ220', body: { 
  *  lower), 4,287 long (both overhangs 100 shorter than the F355's), its screen laid well back (4 degrees past the F355's); Cd 0.32; ground-effect venturis with fans (here the
  *  undertray); 235/45 ZR17 and 315/45 ZR17; kerb 1,138 kg (about 1,140); 372 km/h on its production limiter, 386 km/h
  *  (240 mph, Ehra-Lessien 1998) with it raised; 0-100 km/h 3.2 s */
-export const DESIGN_MCLAREN_F1: Design = { v: 5, id: 'mclarenf1', name: 'McLaren F1', body: { base: 'f355', nose: 'pointed', ...faceOf3('f355', 'plain'), tail: 'frame', wheel: 'disc', ...NO_DIMS, wheelbase: 270, width: -20, roof: -30, overhangF: -100, overhangR: -100, rake: 4, paint: '#c9c3b6', gloss: 0.6, structure: 'cfrp', panels: 'cfrp' },
+export const DESIGN_MCLAREN_F1: Design = { v: 5, id: 'mclarenf1', name: '시험 차 F', body: { base: 'f355', nose: 'pointed', ...faceOf3('f355', 'plain'), tail: 'frame', wheel: 'disc', ...NO_DIMS, wheelbase: 270, width: -20, roof: -30, overhangF: -100, overhangR: -100, rake: 4, paint: '#c9c3b6', gloss: 0.6, structure: 'cfrp', panels: 'cfrp' },
   engine: { grade: 4, layout: 'V12', cc: 6064, valves: 4, redline: 7500, intake: 'itb', compression: 'high', sump: 'dry', block: 'aluminium', turbo: 0, boost: 0.8, intercooler: true, vtec: false, bs: BS_DEFAULT, quality: { ...NO_QUALITY } },
   drive: { gears: 6, gearbox: 'manual', final: 0, lsd: false, awd: false },
   kit: { abs: false, tcs: false, steering: 'manual', dampers: 'fixed', wing: false, diffuser: true, tyres: [235, 315], rim: 17, interior: 'light' }, susp: structuredClone(SUSP_OWN.f355) };
@@ -361,7 +364,8 @@ export const DESIGN_MCLAREN_F1: Design = { v: 5, id: 'mclarenf1', name: 'McLaren
 /** a model body's swaps with what it does not have put back to its own */
 export function fitModel(base: ModelBaseId, m: Partial<ModelSwaps> | undefined): ModelSwaps { const o = MODEL_OWN[base], one = <T>(v: unknown, of: readonly T[], d: T): T => of.includes(v as T) ? v as T : d;
   return { bumperF: one(m?.bumperF, BUMPERS959, o.bumperF), bumperR: one(m?.bumperR, BUMPERS959, o.bumperR), lamp: one(m?.lamp, LAMPS959, o.lamp), wheel: one(m?.wheel, WHEELS959, o.wheel),
-    plate: plateOk(m?.plate) ? m!.plate!.replace(/\s+/g, '').replace(/^(\d{2}.)/, '$1 ') : o.plate }; }
+    plate: plateOk(m?.plate) ? m!.plate!.replace(/\s+/g, '').replace(/^(\d{2}.)/, '$1 ') : o.plate,
+    ...(m?.plateF === false ? { plateF: false as const } : {}), ...(m?.plateR === false ? { plateR: false as const } : {}) }; }
 /** the syllables the plate's figures can be drawn for (render/car/p959/parts.ts PLATE_SYLLABLES: the same list) */
 export const PLATE_SYLLABLES = '가나다라마바사아자거너더러머버서어저고노도로모보소오조구누두루무부수우주배하허호';
 /** a plate's text as the old green plate takes it: two digits, a syllable the plate's font has, four digits */

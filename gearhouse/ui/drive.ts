@@ -203,7 +203,7 @@ function techHud(): string { const X = car.spec.tech; if (!X) return ''; let o =
   if (X.tcs) o += `<span class="${car.tcsOn ? 'hot' : ''}">TCS${car.tcsOn ? ' 작동' : ''}</span>`;   /* review 153: the NSX's own traction control, and its VTEC cam */
   if (X.gearbox === 'f1') o += `<span class="${car.shifting ? 'hot' : ''}">F1${car.shifting ? ' 변속' : ''}</span>`;   /* review 158 */
   if (X.damp) o += `<span>댐퍼 ${car.damperMode === 'sport' ? '스포츠' : '컴포트'}</span>`;
-  if (X.vtec) o += `<span class="${car.vtecHigh ? 'hot' : ''}">VTEC${car.vtecHigh ? ' 고속 캠' : ''}</span>`;
+  if (X.vtec) o += `<span class="${car.vtecHigh ? 'hot' : ''}">가변 캠${car.vtecHigh ? ' 고속' : ''}</span>`;
   if (X.ground) o += `<span>다운포스 ${Math.round(0.5 * 1.2 * car.speed * car.speed * X.ground.clA / 9.81)} kg</span>`; return o; }
 /** where the cars' tyres lay their rubber (review 122): the test driver's line in a fast car, a metre at a time */
 function rubberLine(T: import('../race/track').Track): Float32Array { const d = new Driver(T), v = new Vehicle(raceSpec('dueSSJ35'), T).place(0, 0, 0); d.drive(v); return Float32Array.from({ length: Math.round(T.length) }, (_, s) => d.lineAt(s)); }
@@ -542,7 +542,7 @@ function oneMake(n: number): { ids: string[]; note: string; drivers: Record<stri
   for (const f of oneMakeField(Math.min(7, n), fieldSeed, $<HTMLSelectElement>('skill').value as Skill)) { const spec = designSpec(f.design); addRaceCar(spec); EXP_ENGINE[spec.id] = { kind: 'ohv', layout: f.design.engine.layout };
     const mc = { id: spec.id, name: f.design.name, mesh: () => fieldMesh(f.design, 1) }, i = MESH_CARS.findIndex(c => c.id === spec.id); if (i >= 0) MESH_CARS[i] = mc; else MESH_CARS.push(mc);
     ids.push(spec.id); drivers[spec.id] = { dare: f.dare, pace: f.pace }; }
-  return { ids, note: '959 원메이크', drivers }; }
+  return { ids, note: '599 원메이크', drivers }; }
 function startRace() { const laps = +$<HTMLSelectElement>('laps').value; raceSeed = (raceSeed * 48271) % 2147483647;
   const { ids: pick, note, drivers } = opponents(raceSeed), skill = $<HTMLSelectElement>('skill').value as Skill;
   const mode = handicapOK() && !drivers ? $<HTMLSelectElement>('mode').value as 'handicap' | 'scratch' : 'scratch'; race = new Race(T, [carId, ...pick], laps, carId, raceSeed, mode, skill, drivers);   /* a one-make field: one car, so one start (the book has no times between them) */ for (const e of race.cars) COL.equip(e.car); const me = race.player!; car = me.car; car.auto = st.auto; ignite(true); manualGear = 1; pilot = new Driver(T);

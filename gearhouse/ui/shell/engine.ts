@@ -264,7 +264,7 @@ export function engineScreen(ctx: ShellCtx): Screen<EngineParams> & { readonly a
     sheetBox.append(...dd('최고 출력', `${s.hp}`, `hp · ${s.hpRpm.toLocaleString()} rpm`), ...dd('최대 토크', `${s.torque}`, `Nm · ${s.torqueRpm.toLocaleString()} rpm`), ...dd('리터당 출력', `${s.specific}`, 'hp/L'),
       ...dd('보어 × 행정', `${s.bore} × ${s.stroke}`, 'mm'), ...dd('무게 (보기류 포함)', `${s.mass}`, 'kg'), ...dd('크기 (길이·폭·높이)', `${s.length} · ${s.width} · ${s.height}`, 'mm'), ...dd('변속기 길이', `${s.box}`, 'mm'),
       ...dd('연비 추정 (90 · 120 km/h)', `${s.fuel90} · ${s.fuel120}`, 'L/100km'), ...dd('배출가스 등급 (임시)', s.emissions), ...dd('신뢰성', `${s.reliability}`, `· 정비 ${(s.serviceKm / 1000).toLocaleString()}천 km`),
-      ...dd('엔진 원가 지수', `${s.cost}`, 'NSX C30A=100'), ...dd('개발 기간 (임시)', `${s.devMonths}`, '개월'));
+      ...dd('엔진 원가 지수', `${s.cost}`, '옛 바탕 A의 V6=100'), ...dd('개발 기간 (임시)', `${s.devMonths}`, '개월'));
     sheetBox.append(el('dt', '', '시험 차'), el('dd', '', el('small', '', `${car.name}: 연비는 이 차의 무게·공기 저항·기어로 셈합니다`))); }
   function drawTechs() { techs.textContent = ''; const limit = ctx.settings.sandbox.eraLimit, year = 1995, ts = engineTechs(E(), car.drive.gearbox);
     for (const t of ts) { const T = TECH_YEAR[t]; techs.append(el('span', `gh-tech${limit && T.year > year ? ' gh-late' : ''}`, `${T.name} ${T.year}`)); }

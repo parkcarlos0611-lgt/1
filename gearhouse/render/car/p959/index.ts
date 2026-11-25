@@ -14,7 +14,10 @@ export { sockets } from './sockets';
 export { p959Lines } from './lines';
 import { p959Lines } from './lines';
 
-export interface P959Opts extends ShellOpts { paint?: string; lamp?: LampKind; wheel?: WheelKind; plate?: PlateText; /** leave out the placeholder modules that are not part of the skin (wheels, lenses, mirrors, exhausts) */ bare?: boolean;
+export interface P959Opts extends ShellOpts { paint?: string; lamp?: LampKind; wheel?: WheelKind; plate?: PlateText;
+  /** the front and the rear plate fitted (default both): a plate taken off leaves the bumper's own painted skin, which runs
+   *  whole under it (the plate, its frame and its dark plinth are laid on the surface, nothing is cut for them) */ plateF?: boolean; plateR?: boolean;
+  /** leave out the placeholder modules that are not part of the skin (wheels, lenses, mirrors, exhausts) */ bare?: boolean;
   /** the tyres' widths, front and rear (mm; default the real car's 235 and 255): the wheels' middles stay where they are */ tyres?: [number, number];
   /** the wheels' own disc and caliper (default on; off where the car's suspension is drawn with its brakes: render/car/bodies.ts) */ brake?: boolean }
 const MAT: Record<string, [string, number, Parameters<Build['mat']>[2]]> = { glass: ['#20262c', 0.9, 'glass'], grille: ['#17181a', 0.1, 'grille'], dark: ['#1b1c1e', 0.05, 'plain'], lamp: ['#b3261e', 0.5, 'lens'], amber: ['#d9861c', 0.5, 'lens'], lens: ['#17181a', 0.1, 'plain'] };
@@ -40,7 +43,7 @@ export function p959Model(o: P959Opts = {}): P959Model { const S = buildShell(o)
     for (const s of [1, -1]) headLamp(b, o.lamp ?? 'round', [270 + Math.sin(sl) * 14, s * 615, 640 - Math.cos(sl) * 14], [0, 1, 0], [Math.cos(sl), 0, Math.sin(sl)], [-Math.sin(sl), 0, Math.cos(sl)], 100, 122);
     for (const e of K.exhausts) b.name('exhaust').mat('#2a2b2d', 0.6, 'metal').lathe('x', [0, e.o[1], e.o[2]], [[e.o[0] - 60, e.r], [e.o[0] + 14, e.r], [e.o[0] - 50, e.r - 10]], 8, false);
     for (const m of K.mirrors) mirror(b, m, paint);
-    for (const m of K.marks) if (/^plate/.test(m.name)) plate(b, m, o.plate); }
+    for (const m of K.marks) if (/^plate/.test(m.name) && (m.name === 'plateF' ? o.plateF : o.plateR) !== false) plate(b, m, o.plate); }
   const M = b.mesh(DIM.length);
   M.lines = p959Lines(S) as MeshLine[];
   M.creases = [...S.crease].map(k => { const [a, c] = k.split('|').map(Number) as [number, number]; return [S.P[a]!, S.P[c]!] as [V, V]; });

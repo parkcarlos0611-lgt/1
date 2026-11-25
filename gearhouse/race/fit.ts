@@ -30,6 +30,7 @@
 //   below 100 mm a body grounds on speed bumps, kerbs and ramps ('modified': a nose lift and skid plates, a stiffer
 //   ride); below 70 mm it is a race car's, not one for the road ('blocked').
 import { LIMITS, BASES, BODY_LIMITS, applyPatch, gradeFor, isModelBase, DESIGN_NSX, DESIGN_F355, DESIGN_EB110, DESIGN_P959, type BodyBase, type Design, type DesignPatch } from '../core/design';
+import { BODY_NAME } from '../core/names';
 import { enginePackage, engineFigures, tyreR } from './designparts';
 import nsxSheet from '../data/cars/spec/nsx.json';
 import f355Sheet from '../data/cars/spec/f355.json';
@@ -68,7 +69,6 @@ export const OWN_TYRES: Record<BodyBase, [number, number]> = { nsx: DESIGN_NSX.k
 export const CLEARANCE: Record<BodyBase, number> = { nsx: nsxSheet.overall.groundClearance, f355: f355Sheet.overall.groundClearance, eb110: 100, p959: p959Sheet.overall.groundClearance };
 /** the clearance a road car needs (mm): below the first it grounds on bumps and ramps, below the second it is a race car's */
 export const CLEAR_OK = 100, CLEAR_MIN = 70;
-const BASE_NAME: Record<BodyBase, string> = { nsx: 'NSX', f355: 'F355', eb110: 'EB110', p959: '959' };
 /** how much wider than its base's own tyre a tyre fits before the arch is flared (mm); the travel left above a tyre (m) */
 export const ARCH_ROOM = 40, ARCH_TRAVEL = 0.015;
 /** how far past its room a part may be and still be fitted with work (the engine's bay 10 %, a tyre 30 mm, the torque
@@ -110,7 +110,7 @@ function checks(d: Design): Omit<FitResult, 'fixes'>[] {
       reason: v === 'ok' ? `엔진 높이 ${mm(F.height)} mm, 엔진룸 ${mm(bay.height)} mm` : `엔진이 엔진 덮개보다 ${mm(over)} mm 높습니다${v === 'modified' ? ': 덮개에 돌출부(스쿠프)를 냅니다' : ''}`,
       ...(v === 'modified' ? { mass: 3, cost: 3, reliability: 1, cdA: 0.01 } : {}) }); }
   if (across) out.push({ part: 'gearboxPlace', name: '변속기 배치', verdict: F.miura ? 'modified' : 'ok', ...none,
-    reason: F.miura ? `가로 엔진이 길어(${mm(F.P.length)} mm) 끝에 변속기를 달면 종감속기가 중심에서 너무 멉니다: 미우라처럼 엔진 뒤 섬프 안에 변속기를 넣는 전용 변속기를 씁니다` : '변속기를 엔진 끝에 답니다 (NSX와 같은 배치)',
+    reason: F.miura ? `가로 엔진이 길어(${mm(F.P.length)} mm) 끝에 변속기를 달면 종감속기가 중심에서 너무 멉니다: 1960년대 가로 V12 미드십처럼 엔진 뒤 섬프 안에 변속기를 넣는 전용 변속기를 씁니다` : '변속기를 엔진 끝에 답니다 (옛 바탕 A와 같은 배치)',
     ...(F.miura ? { mass: 20, cost: 10, reliability: 4 } : {}) });
   // the torque
   const T = engineFigures(d).torquePeak;
@@ -189,7 +189,7 @@ function fixesFor(d: Design, c: Omit<FitResult, 'fixes'>): Fix[] {
       const bays = (x: Design) => checks(x).filter(y => y.part.startsWith('bay') || y.part === 'gearboxPlace');
       for (const other of BASES.filter(b => b !== B.base && !isModelBase(B.base))) for (const wb of range(B.wheelbase, LIMITS.wheelbase[1], 10)) { const p: DesignPatch = wb === B.wheelbase ? { body: { base: other } } : { body: { base: other, wheelbase: wb } };
         if (bays(applyPatch(d, p)).every(x => rank[x.verdict] <= rank[want])) {
-          add({ label: `${BASE_NAME[other]} 바탕 (${BAYS[other].orient === 'mid-transverse' ? '가로' : '세로'} 엔진룸)${wb !== B.wheelbase ? `, 휠베이스 ${wb > 0 ? '+' : ''}${wb} mm` : ''}${tag}`, patch: p, cost: 0.012 * Math.max(0, wb - B.wheelbase) }); break; } } }
+          add({ label: `${BODY_NAME[other]} (${BAYS[other].orient === 'mid-transverse' ? '가로' : '세로'} 엔진룸)${wb !== B.wheelbase ? `, 휠베이스 ${wb > 0 ? '+' : ''}${wb} mm` : ''}${tag}`, patch: p, cost: 0.012 * Math.max(0, wb - B.wheelbase) }); break; } } }
   }
   return out.slice(0, 4); }
 

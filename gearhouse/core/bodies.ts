@@ -3,6 +3,7 @@
 // car), as the settings' LOOKS_ON does for the looks. A body comes back (or a new one is added) by adding it here.
 import type { BodyBase, Design } from './design';
 import { fromPreset, currentDesign, savedDesigns, type KeyStore } from './designstore';
+import { CAR_599 } from './names';
 
 /** the bodies switched on in the game, in the order offered */
 export const ENABLED_BODIES: readonly BodyBase[] = ['p959'];
@@ -17,8 +18,8 @@ export const starterDesign = (name?: string): Design => fromPreset(DEFAULT_BODY,
 
 /** the 959 as it left the works: its own design and one id (its runs are kept under it), its own plate and swaps */
 let stock: Design | null = null;
-export function stockP959(): Design { if (!stock) { const d = fromPreset('p959', '포르쉐 959');
-    stock = { ...d, id: 'p959stock', body: { ...d.body, model: { bumperF: 'std', bumperR: 'std', lamp: 'round', wheel: 'hollow5', plate: '08루 0959' } } }; }
+export function stockP959(): Design { if (!stock) { const d = fromPreset('p959', CAR_599);
+    stock = { ...d, id: 'p959stock', body: { ...d.body, model: { bumperF: 'std', bumperR: 'std', lamp: 'round', wheel: 'hollow5', plate: '08루 0599' } } }; }
   return structuredClone(stock); }
 
 /** the design to show and go on with, from the enabled ones: the one on the bench, else the last saved, else the stock 959 */

@@ -20,6 +20,7 @@ import { bareMesh, bounce } from '../render/car/suspension/view';
 import { setPartStyle, partStyle, styleForLook } from '../render/car/powertrain';
 import { designSpec, designFigures, designHeight, type DesignFigures } from '../race/design';
 import { CLEARANCE, type FitResult } from '../race/fit';
+import { BODY_NAME } from '../core/names';
 import { LIMITS, BODY_BASES, isModelBase, MODEL_OWN, BUMPERS959, LAMPS959, WHEELS959, plateOk, type BodyBase, type ModelSwaps, BODY_LIMITS, DIMS, LAYOUTS, LAYOUT_NAME, type DimKey, GRADE_NAME, GRADES, gradeLock, gradeBoost, gradeRedline, normalise, applyPatch, type BaseId, type Design, type NoseKind, type TailKind, type WheelKind, FACE_KEYS, faceLock, type Face, type FaceKey,
   type Grade, type Structure, type Panels, type Intake, type Compression, type Sump, type Block, type Turbos, type Interior,
   SUSP_KINDS, SUSP_KIND_NAME, SUSP_LIMITS, SUSP_OWN, suspLock, suspFieldLock, type SuspKind, type RcPreset, type SuspAxle } from '../core/design';
@@ -59,7 +60,7 @@ const store: KeyStore | null = (() => { try { return localStorage; } catch { ret
 let D: Design = host.design && enabledDesign(host.design) ? structuredClone(host.design) : (() => { const c = currentDesign(store); return c && enabledDesign(c) ? c : starterDesign(); })();
 
 // ---- the names on the page ----
-const BASE_NAME: Record<BodyBase, string> = { nsx: 'NSX 바탕', f355: 'F355 바탕', eb110: 'EB110 바탕', p959: '959 (모델 차체)' };
+const BASE_NAME: Record<BodyBase, string> = { ...BODY_NAME, p959: `${BODY_NAME.p959} (모델 차체)` };
 const KIND_NAME: Record<string, string> = { round: '둥근 코', pointed: '뾰족한 코', mass: '덩어리 범퍼 코', capsule: '캡슐 꼬리', plain: '평평한 앞면', sunk: '램프가 들어간 앞면', frame: '테두리 꼬리', roundLamps: '둥근 램프 꼬리', ducktail: '덕테일',
   fiveSpoke: '5스포크', disc: '디스크', star: '스타' };
 const PAINTS = ['#b0121b', '#f5c300', '#1d3f8f', '#f2f0ea', '#151515', '#2f6b3a', '#9aa1a6', '#d8661c'];
@@ -151,7 +152,7 @@ add('chassis', cards<BodyBase>('바탕 차대', ENABLED_BODIES.map(b => [b, BASE
     const was = fromPreset(D.body.base), to = fromPreset(v); if (D.kit.tyres[0] === was.kit.tyres[0] && D.kit.tyres[1] === was.kit.tyres[1]) D.kit.tyres = [...to.kit.tyres]; if (D.kit.rim === was.kit.rim) D.kit.rim = to.kit.rim;
     if (JSON.stringify(D.susp) === JSON.stringify(SUSP_OWN[D.body.base])) D.susp = structuredClone(SUSP_OWN[v]);   // and the suspension, where it was the old base's own
     D.body.base = v; }),
-  note('바탕은 차체 패널의 치수와 치수를 바꿀 수 있는 범위를 정합니다. 코·앞면·꼬리·휠은 세 바탕 모두에 끼울 수 있습니다. 959는 손으로 짠 모델 차체라 치수를 바꾸지 않고, 범퍼·램프·휠·번호판을 바꿉니다(④).'),
+  note('바탕은 차체 패널의 치수와 치수를 바꿀 수 있는 범위를 정합니다. 코·앞면·꼬리·휠은 세 바탕 모두에 끼울 수 있습니다. 599는 손으로 짠 모델 차체라 치수를 바꾸지 않고, 범퍼·램프·휠·번호판을 바꿉니다(④).'),
   ...dimSliders(),
   seg<Structure>('구조 소재 (모노코크·프레임)', [['steel', '강철'], ['hss', '고장력강'], ['aluminium', '알루미늄'], ['honeycomb', '알루미늄 허니콤'], ['cfrp', '탄소섬유']], () => D.body.structure, v => { D.body.structure = v; }),
   note('같은 강성에서 강철 대비 무게: 고장력강 0.9, 알루미늄 0.6, 허니콤 0.5, 탄소섬유 0.45. 가벼울수록 비싸고, 탄소섬유는 수작업입니다.'),
@@ -205,12 +206,14 @@ function btnRow(t: string, f: () => void): HTMLElement { const d = document.crea
   const plateWhy = document.createElement('small'); plateWhy.className = 'lock'; plateWhy.hidden = true;
   plate.addEventListener('change', () => { if (plateOk(plate.value)) { M().plate = plate.value; plateWhy.hidden = true; changed(); } else { plateWhy.textContent = '숫자 2개 + 한글 한 글자(받침 없음) + 숫자 4개로 적어 주세요. 예: 12가 3456'; plateWhy.hidden = false; } });
   const plateRow = field('번호판 (옛 초록 번호판)', plate); plateRow.append(plateWhy, btnRow('무작위 번호', () => { M().plate = randomPlate(); plateWhy.hidden = true; changed(); }));
+  // each plate off and on again: a removed one is kept as false, a fitted one leaves no key (an older design's own way)
+  const plateOn = (k: 'plateF' | 'plateR', label: string) => seg<'on' | 'off'>(label, [['on', '달기'], ['off', '떼기']], () => M()[k] === false ? 'off' : 'on', v => { if (v === 'on') delete M()[k]; else M()[k] = false; });
   // the parts library (docs/systems/110 G4): each swap a card with its picture
-  const modelRows = [h2('959 부품'), cards<ModelSwaps['bumperF']>('앞 범퍼', BUMPERS959.map(k => [k, BUMPER_NAME[k], bumperPic(k)] as [ModelSwaps['bumperF'], string, string]), () => M().bumperF, sm('bumperF')),
+  const modelRows = [h2('599 부품'), cards<ModelSwaps['bumperF']>('앞 범퍼', BUMPERS959.map(k => [k, BUMPER_NAME[k], bumperPic(k)] as [ModelSwaps['bumperF'], string, string]), () => M().bumperF, sm('bumperF')),
     cards<ModelSwaps['bumperR']>('뒤 범퍼', BUMPERS959.map(k => [k, BUMPER_NAME[k], bumperPic(k, true)] as [ModelSwaps['bumperR'], string, string]), () => M().bumperR, sm('bumperR')),
     cards<ModelSwaps['lamp']>('헤드램프', LAMPS959.map(k => [k, { round: '둥근 렌즈 (순정)', ellipsoid: '프로젝터 2개', square: '사각 프로젝터' }[k], lampPic(k)] as [ModelSwaps['lamp'], string, string]), () => M().lamp, sm('lamp')),
     cards<ModelSwaps['wheel']>('휠', WHEELS959.map(k => [k, { hollow5: '속 빈 5스포크 (순정)', dish: '딥디시 8스포크', hole5: '5홀 디스크' }[k], wheelPic(k)] as [ModelSwaps['wheel'], string, string]), () => M().wheel, sm('wheel')),
-    plateRow, note('범퍼는 차체의 이음선 고리에 맞물려 바뀝니다. 번호판 글자는 판 위에 획으로 그립니다(가상의 번호만). 실내 사양(①)이 경량이면 버킷 시트와 롤케이지가 들어갑니다.')];
+    plateOn('plateF', '앞 번호판'), plateOn('plateR', '뒤 번호판'), plateRow, note('범퍼는 차체의 이음선 고리에 맞물려 바뀝니다. 번호판은 앞뒤를 따로 떼고 다시 달 수 있고, 뗀 자리는 범퍼 면 그대로입니다. 번호판 글자는 판 위에 획으로 그립니다(가상의 번호만). 실내 사양(①)이 경량이면 버킷 시트와 롤케이지가 들어갑니다.')];
   syncs.push(() => { const m = isModelBase(D.body.base); for (const e of kitRows) e.hidden = m; for (const e of modelRows) e.hidden = !m; if (m && document.activeElement !== plate) plate.value = M().plate; });
   add('body', ...kitRows, ...modelRows);
   const sw = document.createElement('div'); sw.className = 'swatches'; const pick = document.createElement('input'); pick.type = 'color'; pick.id = 'paint'; pick.setAttribute('aria-label', '직접 고르기');
@@ -231,7 +234,7 @@ function btnRow(t: string, f: () => void): HTMLElement { const d = document.crea
 // ② 엔진·구동계: the grade first; the details it does not allow greyed out with the reason
 { const E = () => D.engine, lk = <K extends 'intake' | 'compression' | 'sump' | 'block' | 'valves' | 'turbo'>(k: K) => (v: Design['engine'][K]) => gradeLock(E().grade, k, v);
   const boost = range('부스트', LIMITS.boost, 0.05, () => E().boost, v => { E().boost = v; }, v => `${v.toFixed(2)} bar`, 'boost'), redline = range('레드라인', LIMITS.redline, 100, () => E().redline, v => { E().redline = v; }, v => `${v.toLocaleString()} rpm`, 'redline');
-  const vtec = check('VTEC (두 가지 캠 프로필)', () => E().vtec, v => { E().vtec = v; }, 'vtec'), ic = check('인터쿨러', () => E().intercooler, v => { E().intercooler = v; }, 'intercooler');
+  const vtec = check('가변 캠 (두 가지 캠 프로필)', () => E().vtec, v => { E().vtec = v; }, 'vtec'), ic = check('인터쿨러', () => E().intercooler, v => { E().intercooler = v; }, 'intercooler');
   const gradeNote = note('');
   add('engine', h2('엔진'), seg<Grade>('개발 등급', GRADES.map(g => [g, `${g} ${GRADE_NAME[g]}`] as [Grade, string]), () => E().grade, v => { E().grade = v; D = normalise(D); }), gradeNote,
     seg('배열', LAYOUTS.map(l => [l, LAYOUT_NAME[l]]), () => E().layout, v => { E().layout = v; }),
@@ -246,7 +249,7 @@ function btnRow(t: string, f: () => void): HTMLElement { const d = document.crea
   syncs.push(() => { const g = E().grade, R = gradeRedline(g), Bm = gradeBoost(g), ri = redline.querySelector('input')!, bi = boost.querySelector('input')!;
     ri.max = String(R); bi.max = String(Bm); bi.disabled = !E().turbo; (ic.querySelector('input')!).disabled = !E().turbo;
     const vi = vtec.querySelector('input')!, vl = gradeLock(g, 'vtec', true); vi.disabled = !!vl; vtec.title = vl ?? '';
-    gradeNote.textContent = `${g}등급: 레드라인 ${R.toLocaleString()} rpm, 부스트 ${Bm.toFixed(1)} bar까지${vl ? ` · VTEC는 ${vl.replace(' 고를 수 있습니다', '')}` : ''}`; }); }
+    gradeNote.textContent = `${g}등급: 레드라인 ${R.toLocaleString()} rpm, 부스트 ${Bm.toFixed(1)} bar까지${vl ? ` · 가변 캠은 ${vl.replace(' 고를 수 있습니다', '')}` : ''}`; }); }
 // ② (on): the drive
 { const fin = range('종감속비', LIMITS.final, 0.01, () => D.drive.final || designSpec(D).final, v => { D.drive.final = v; }, v => v.toFixed(2), 'final');
   add('engine', h2('구동계'), seg('기어', [[5, '5단'], [6, '6단']], () => D.drive.gears, v => { D.drive.gears = v; }),
@@ -288,7 +291,7 @@ add('kit', check('ABS', () => D.kit.abs, v => { D.kit.abs = v; }, 'abs'), check(
   range('앞 타이어 폭', LIMITS.tyre, 5, () => D.kit.tyres[0], v => { D.kit.tyres = [v, D.kit.tyres[1]]; }, v => `${v} mm`, 'tyreF'),
   range('뒤 타이어 폭', LIMITS.tyre, 5, () => D.kit.tyres[1], v => { D.kit.tyres = [D.kit.tyres[0], v]; }, v => `${v} mm`, 'tyreR'),
   seg('림', [[16, '16″'], [17, '17″'], [18, '18″']], () => D.kit.rim, v => { D.kit.rim = v; }),
-  note('윙은 꼬리에 맞춰 차체에 달립니다(EB110 캡슐 꼬리는 능동 윙: 달리면 올라옵니다). 디퓨저는 뒤 바닥 아래에 그려집니다.'));
+  note('윙은 꼬리에 맞춰 차체에 달립니다(캡슐 꼬리는 능동 윙: 달리면 올라옵니다). 디퓨저는 뒤 바닥 아래에 그려집니다.'));
 // ⑦ 검사·시험 주행: the fit's checks with their fixes and the step each belongs to, the class, the cost and the
 // reliability, what was measured, the test drive and the save
 { const div = (id: string, cls: string) => { const d = document.createElement('div'); d.id = id; d.className = cls; return d; };
@@ -358,7 +361,7 @@ function figures() { const f = designFigures(D), s = designSpec(D); lastFigs = f
     + `<dt>마력당 무게</dt><dd>${f.kgPerHp.toFixed(2)} <small>kg/hp</small></dd><dt>앞 배분</dt><dd>${Math.round(f.front * 100)} <small>%</small></dd>`
     + `<dt>종감속</dt><dd>${s.final.toFixed(2)}${D.drive.final ? '' : ' <small>자동</small>'}</dd><dt>정비 주기</dt><dd>${(f.serviceKm / 1000).toLocaleString()}천 <small>km</small></dd>`;
   $('cls').innerHTML = $('cls6').innerHTML = `<b>${esc(f.perfLabel)}</b> <small>· ${esc(f.form)}</small>`;
-  $('cost6').innerHTML = `<dl><dt>원가 지수</dt><dd>${f.cost} <small>NSX=100</small></dd><dt>신뢰성</dt><dd>${f.reliability}</dd><dt>정비 주기</dt><dd>${(f.serviceKm / 1000).toLocaleString()}천 <small>km</small></dd>`
+  $('cost6').innerHTML = `<dl><dt>원가 지수</dt><dd>${f.cost} <small>옛 바탕 A=100</small></dd><dt>신뢰성</dt><dd>${f.reliability}</dd><dt>정비 주기</dt><dd>${(f.serviceKm / 1000).toLocaleString()}천 <small>km</small></dd>`
     + `<dt>무게</dt><dd>${f.mass.toLocaleString()} <small>kg</small></dd><dt>출력</dt><dd>${f.hp} <small>hp</small></dd><dt>최고 속도</dt><dd>${f.topKmh} <small>km/h</small></dd></dl>`;
   showFit(f.fit); stepMarks(f.fit); meas(); suspGraphs(); }
 /** each step marked with the fit checks that concern it and are not clean */

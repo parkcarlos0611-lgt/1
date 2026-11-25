@@ -14,6 +14,7 @@
 //   anchors   where the speed effects start: the wing's tips, the tail lamps (render/live/trails.ts; also on the mesh)
 import type { Design, ModelBaseId } from '../../core/design';
 import { MODEL_OWN, plateOk } from '../../core/design';
+import { CAR_599 } from '../../core/names';
 import { Build, KINDS, type CarAnchors, type Mesh, type MeshLine } from './mesh';
 import { p959Mesh, plateText, DIM, type PlateText } from './p959';
 import { addSuspension, type SuspWheel } from './suspension';
@@ -60,10 +61,10 @@ const P959_SITE: Site = { length: DIM.length, foot: 150, wheels: { f: { x: DIM.a
 /** the 959's speed-effect anchors (render/live/trails.ts): the wing blade's outer trailing corners (its top, where the
  *  air leaves it) and the tail-lamp bar's outer halves, a little behind their faces; left (+y) first */
 const P959_ANCHORS: CarAnchors = { tips: [[4215, 760, 885], [4215, -760, 885]], lamps: [[4262, 560, 623], [4262, -560, 623]] };
-const P959: ModelBody = { name: '959', length: DIM.length, cabin: P959_CABIN, anchors: P959_ANCHORS, wheels: p959Wheels, open: ['engineGrille', 'engineLid', 'rearWindow'],
+const P959: ModelBody = { name: CAR_599, length: DIM.length, cabin: P959_CABIN, anchors: P959_ANCHORS, wheels: p959Wheels, open: ['engineGrille', 'engineLid', 'rearWindow'],
   gauges: (d, topKmh) => ({ ...P959_GAUGES, redline: d.engine.redline, topKmh: topKmh ?? P959_GAUGES.topKmh, ...(d.engine.turbo ? { boostBar: d.engine.boost } : { boostBar: undefined }) }),
   mesh(d, o = {}) { const m = { ...MODEL_OWN.p959, ...d.body.model }, det = o.detail ?? 2;
-    const body = p959Mesh({ paint: d.body.paint, bumperF: m.bumperF, bumperR: m.bumperR, lamp: m.lamp, wheel: m.wheel, plate: plateOf(d), brake: !!o.bare, tyres: d.kit.tyres });
+    const body = p959Mesh({ paint: d.body.paint, bumperF: m.bumperF, bumperR: m.bumperR, lamp: m.lamp, wheel: m.wheel, plate: plateOf(d), plateF: m.plateF !== false, plateR: m.plateR !== false, brake: !!o.bare, tyres: d.kit.tyres });
     // the paint's gloss as the design sets it (the model is made at 0.6)
     const P = KINDS.indexOf('paint'); for (let t = 0; t < body.n; t++) if (body.kind[t] === P) body.gloss[t] = d.body.gloss;
     if (o.bare) return body;

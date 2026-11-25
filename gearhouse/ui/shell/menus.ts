@@ -13,6 +13,7 @@ import { saveSettings, exportAll, importAll, resetAll, loadSettings, DEFAULTS, t
 import { VERSION_NAME, CHANGES } from '../../core/version';
 import type { BodyBase, Design } from '../../core/design';
 import { ENABLED_BODIES, enabledDesign, stockP959 } from '../../core/bodies';
+import { BODY_NAME, CAR_599 } from '../../core/names';
 import { savedDesigns, saveDesign, deleteDesign, currentDesign, keepCurrent, fromPreset, newId, designJson, parseDesign, measured, designSig } from '../../core/designstore';
 import { designFigures } from '../../race/design';
 import { TRACKS } from '../../race/tracks';
@@ -22,7 +23,7 @@ import buildMeta from '../../assets/textures/buildings/buildings.json';
 import skyMeta from '../../assets/textures/sky/sky.json';
 import modelMeta from '../../assets/models/models.json';
 
-export const BASE_NAME: Record<string, string> = { nsx: 'NSX 바탕', f355: 'F355 바탕', eb110: 'EB110 바탕', p959: '포르쉐 959 (모델 차체)' };
+export const BASE_NAME: Record<string, string> = { ...BODY_NAME, p959: `${BODY_NAME.p959} (모델 차체)` };
 const SCREEN_NAME: Record<string, string> = { garage: '차고', builder: '차 빌더', drive: '시험 주행' };
 const fmtLap = (t: number) => `${Math.floor(t / 60)}:${(t % 60).toFixed(2).padStart(5, '0')}`;
 
@@ -46,7 +47,7 @@ export function titleScreen(ctx: ShellCtx): Screen<never> {
       if (l?.screen === 'drive') await r.go('drive', { design: des, track: l.track, from: 'builder' }); })(); };
     const nav = el('nav', 'gh-menu gh-tmenu', button('이어하기', cont, { kind: 'menu', tilt: true, icon: 'play', sub: last ? `${SCREEN_NAME[last.screen] ?? ''} · ${cur?.name ?? d.name}` : cur ? `차 빌더 · ${cur.name}` : '아직 이어 할 것이 없습니다', disabled: !last && !cur }),
       button('자유 설계', go('garage'), { kind: 'menu', tilt: true, icon: 'wrench', sub: '차고: 설계 목록, 새 차 설계, 엔진 공방' }), button('시험장', go('pick', { mode: 'test' }), { kind: 'menu', tilt: true, icon: 'flag', sub: '트랙을 골라 시험 주행' }),
-      button('레이스', go('pick', { mode: 'race' }), { kind: 'menu', tilt: true, icon: 'trophy', sub: '959 원메이크: 상대, 바퀴 수' }));
+      button('레이스', go('pick', { mode: 'race' }), { kind: 'menu', tilt: true, icon: 'trophy', sub: '599 원메이크: 상대, 바퀴 수' }));
     nav.setAttribute('aria-label', '메인 메뉴'); (nav.querySelector('button:not([disabled])') as HTMLElement | null)?.setAttribute('data-first', '');
     const corner = el('div', 'gh-tcorner', button('정보', go('about'), { kind: 'ghost', icon: 'info', square: true, title: `정보: ${VERSION_NAME}, 바뀐 점, 출처` }),
       button('설정', go('settings'), { kind: 'ghost', icon: 'settings', square: true, title: '설정: 그래픽, 소리, 조작, 화면, 저장' }));
@@ -102,9 +103,9 @@ export function pickScreen(ctx: ShellCtx): Screen<never> {
   const m = menu(ctx, 'pick', root => { const s = ctx.store, d = ctx.recent(); let track = (() => { try { return s?.getItem(TRACK_KEY) ?? 'millbrook'; } catch { return 'millbrook'; } })();
     const race = { opp: 3, lineup: 'p959', laps: 2 }; let car: 'design' | 'p959' = enabledDesign(d) && d.id !== 'p959stock' ? 'design' : 'p959';
     const cards = el('div', 'gh-grid gh-tracks'), drawTracks = () => { cards.textContent = ''; for (const t of TRACKS) cards.append(card({ title: t.title, lines: [t.label], selected: t.id === track, onPick: () => { track = t.id; drawTracks(); (cards.querySelector('.gh-on') as HTMLElement | null)?.focus(); } })); }; drawTracks();
-    const opts = el('div', 'gh-opts gk-panel', chips('차', [...(car === 'design' ? [['design', `설계: ${d.name}`] as ['design', string]] : []), ['p959', '포르쉐 959 (순정)']], car, v => { car = v; }));   // enabled bodies only (docs/systems/113 V0)
+    const opts = el('div', 'gh-opts gk-panel', chips('차', [...(car === 'design' ? [['design', `설계: ${d.name}`] as ['design', string]] : []), ['p959', `${CAR_599} (순정)`]], car, v => { car = v; }));   // enabled bodies only (docs/systems/113 V0)
     if (mode === 'race') opts.append(slider('상대 차 수', [1, 7, 1], race.opp, v => { race.opp = v; }, v => `${v}대`),
-      ...(ENABLED_BODIES.length > 1 ? [chips('상대 구성', [['p959', '959 원메이크']], race.lineup, v => { race.lineup = v; })] : []),   // one body on: a one-make field, nothing to choose
+      ...(ENABLED_BODIES.length > 1 ? [chips('상대 구성', [['p959', '599 원메이크']], race.lineup, v => { race.lineup = v; })] : []),   // one body on: a one-make field, nothing to choose
       chips('바퀴 수', [[1, '1'], [2, '2'], [3, '3'], [4, '4']], race.laps, v => { race.laps = v; }));
     const start = button(mode === 'race' ? '레이스 시작' : '주행 시작', () => { try { s?.setItem(TRACK_KEY, track); } catch { /* not kept */ }
       void ctx.router.go('drive', { design: car === 'design' ? d : p959Stock(), track, race: mode === 'race' ? { ...race } : undefined, from: 'pick' }); }, { kind: 'main', icon: 'play' });

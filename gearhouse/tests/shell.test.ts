@@ -85,7 +85,7 @@ describe('settings', () => {
 
 describe('version', () => {
   it('is alpha 0.12, written once', () => {
-    expect(ALPHA).toBe('0.12'); expect(VERSION_NAME).toBe('알파 0.12'); expect(CHANGES.length).toBeGreaterThan(3);
+    expect(ALPHA).toBe('0.2'); expect(VERSION_NAME).toBe('알파 0.2'); expect(CHANGES.length).toBeGreaterThan(3);
   });
 });
 

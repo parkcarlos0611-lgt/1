@@ -34,6 +34,7 @@ import { installPick, pickCard, setCard, railTab } from './kit/pick';
 import { statBar } from './kit/parts';
 import { STATS, type StatDef } from './kit/logic';
 import { stepIcon, STEP_SHORT, bumperPic, lampPic, wheelPic, basePic } from './builder_pics';
+import { partThumbs, type ThumbSpec } from './builder_thumbs';
 import texAlb from '../assets/textures/pbr/albedo.jpg';
 import texNor from '../assets/textures/pbr/normal.jpg';
 import texRgh from '../assets/textures/pbr/rough.jpg';
@@ -79,14 +80,17 @@ function seg<T extends string | number>(label: string, opts: [T, string][], get:
   const r = document.createElement('div'); r.className = 'row'; const l = document.createElement('span'); l.className = 'lab'; l.textContent = label; r.append(l, box, why); return r; }
 /** the parts library's way of a choice (docs/systems/110 G4): a grid of thumbnail cards, a picture and a name each; the
  *  chosen one green, a locked one grey with its lock and its reason written under the grid (a phone has no hover) */
-function cards<T extends string | number>(label: string, opts: [T, string, string][], get: () => T, set: (v: T) => void, lock?: (v: T) => string | null): HTMLElement {
+/** the cards' rendered pictures (ui/builder_thumbs.ts): a card given a part (the fourth of its option) shows its drawn
+ *  picture until the part's own is rendered, and its row gets the small toggle of the kind's view */
+const TH = partThumbs();
+function cards<T extends string | number>(label: string, opts: [T, string, string, ThumbSpec?][], get: () => T, set: (v: T) => void, lock?: (v: T) => string | null): HTMLElement {
   const box = document.createElement('div'); box.className = 'gk-cards'; box.setAttribute('role', 'group'); box.setAttribute('aria-label', label);
-  const bs = opts.map(([v, t, pic]) => { const b = pickCard({ pic, name: t }); b.dataset.v = String(v); b.addEventListener('click', () => { if (lock?.(v)) return; set(v); changed(); }); box.append(b); return [v, t, b] as const; });
+  const bs = opts.map(([v, t, pic, part]) => { const b = pickCard({ pic, name: t }); b.dataset.v = String(v); b.addEventListener('click', () => { if (lock?.(v)) return; set(v); changed(); }); if (part) TH.want(b, part); box.append(b); return [v, t, b] as const; });
   const why = document.createElement('small'); why.className = 'lock';
   syncs.push(() => { const locked: string[] = [];
     for (const [v, t, b] of bs) { const L = lock?.(v) ?? null; setCard(b, v === get(), L); if (L) locked.push(`${t}: ${L}`); }
     why.textContent = locked.join(' · '); why.hidden = !locked.length; });
-  const r = document.createElement('div'); r.className = 'row'; r.dataset.slot = label; const l = document.createElement('span'); l.className = 'lab'; l.textContent = label; r.append(l, box, why); return r; }
+  const r = document.createElement('div'); r.className = 'row'; r.dataset.slot = label; const l = document.createElement('span'); l.className = 'lab'; l.textContent = label; const part = opts.find(o => o[3])?.[3]; if (part) l.append(TH.viewChips(part.kind)); r.append(l, box, why); return r; }
 function range(label: string, [a, b]: readonly [number, number], step: number, get: () => number, set: (v: number) => void, show: (v: number) => string, id?: string): HTMLElement {
   const i = document.createElement('input'); i.type = 'range'; i.className = 'gk-range'; i.min = String(a); i.max = String(b); i.step = String(step); if (id) i.id = id; const v = document.createElement('span'); v.className = 'v';
   i.addEventListener('input', () => { set(+i.value); v.textContent = show(+i.value); changed(); }); syncs.push(() => { i.value = String(get()); v.textContent = show(get()); }); return field(label, i, v); }
@@ -145,7 +149,7 @@ $('next').addEventListener('click', () => go(STEPS[Math.min(STEPS.length - 1, st
 $('openFiles').addEventListener('click', () => { if (onFiles) go(step); else { go('files'); drawer(true); } });
 
 // 차대: the base, its stretch, its structure
-add('chassis', cards<BodyBase>('바탕 차대', ENABLED_BODIES.map(b => [b, BASE_NAME[b], basePic()] as [BodyBase, string, string]), () => D.body.base, v => { if (v === D.body.base) return;
+add('chassis', cards<BodyBase>('바탕 차대', ENABLED_BODIES.map(b => [b, BASE_NAME[b], basePic(), isModelBase(b) ? { kind: 'base', v: b } : undefined] as [BodyBase, string, string, ThumbSpec?]), () => D.body.base, v => { if (v === D.body.base) return;
     // a model-built body (the 959) brings its own swaps, a new plate number with them; its dimensions are its model's (zero)
     if (isModelBase(v)) { D.body.model = { ...MODEL_OWN[v], ...D.body.model, plate: plateOk(D.body.model?.plate) ? D.body.model!.plate : randomPlate() }; for (const k of DIMS) D.body[k] = 0; }
     // the tyres and the rims follow the base where they were its own
@@ -209,10 +213,10 @@ function btnRow(t: string, f: () => void): HTMLElement { const d = document.crea
   // each plate off and on again: a removed one is kept as false, a fitted one leaves no key (an older design's own way)
   const plateOn = (k: 'plateF' | 'plateR', label: string) => seg<'on' | 'off'>(label, [['on', '달기'], ['off', '떼기']], () => M()[k] === false ? 'off' : 'on', v => { if (v === 'on') delete M()[k]; else M()[k] = false; });
   // the parts library (docs/systems/110 G4): each swap a card with its picture
-  const modelRows = [h2('599 부품'), cards<ModelSwaps['bumperF']>('앞 범퍼', BUMPERS959.map(k => [k, BUMPER_NAME[k], bumperPic(k)] as [ModelSwaps['bumperF'], string, string]), () => M().bumperF, sm('bumperF')),
-    cards<ModelSwaps['bumperR']>('뒤 범퍼', BUMPERS959.map(k => [k, BUMPER_NAME[k], bumperPic(k, true)] as [ModelSwaps['bumperR'], string, string]), () => M().bumperR, sm('bumperR')),
-    cards<ModelSwaps['lamp']>('헤드램프', LAMPS959.map(k => [k, { round: '둥근 렌즈 (순정)', ellipsoid: '프로젝터 2개', square: '사각 프로젝터' }[k], lampPic(k)] as [ModelSwaps['lamp'], string, string]), () => M().lamp, sm('lamp')),
-    cards<ModelSwaps['wheel']>('휠', WHEELS959.map(k => [k, { hollow5: '속 빈 5스포크 (순정)', dish: '딥디시 8스포크', hole5: '5홀 디스크' }[k], wheelPic(k)] as [ModelSwaps['wheel'], string, string]), () => M().wheel, sm('wheel')),
+  const modelRows = [h2('599 부품'), cards<ModelSwaps['bumperF']>('앞 범퍼', BUMPERS959.map(k => [k, BUMPER_NAME[k], bumperPic(k), { kind: 'bumperF', v: k }] as [ModelSwaps['bumperF'], string, string, ThumbSpec]), () => M().bumperF, sm('bumperF')),
+    cards<ModelSwaps['bumperR']>('뒤 범퍼', BUMPERS959.map(k => [k, BUMPER_NAME[k], bumperPic(k, true), { kind: 'bumperR', v: k }] as [ModelSwaps['bumperR'], string, string, ThumbSpec]), () => M().bumperR, sm('bumperR')),
+    cards<ModelSwaps['lamp']>('헤드램프', LAMPS959.map(k => [k, { round: '둥근 렌즈 (순정)', ellipsoid: '프로젝터 2개', square: '사각 프로젝터' }[k], lampPic(k), { kind: 'lamp', v: k }] as [ModelSwaps['lamp'], string, string, ThumbSpec]), () => M().lamp, sm('lamp')),
+    cards<ModelSwaps['wheel']>('휠', WHEELS959.map(k => [k, { hollow5: '속 빈 5스포크 (순정)', dish: '딥디시 8스포크', hole5: '5홀 디스크' }[k], wheelPic(k), { kind: 'wheel', v: k }] as [ModelSwaps['wheel'], string, string, ThumbSpec]), () => M().wheel, sm('wheel')),
     plateOn('plateF', '앞 번호판'), plateOn('plateR', '뒤 번호판'), plateRow, note('범퍼는 차체의 이음선 고리에 맞물려 바뀝니다. 번호판은 앞뒤를 따로 떼고 다시 달 수 있고, 뗀 자리는 범퍼 면 그대로입니다. 번호판 글자는 판 위에 획으로 그립니다(가상의 번호만). 실내 사양(①)이 경량이면 버킷 시트와 롤케이지가 들어갑니다.')];
   syncs.push(() => { const m = isModelBase(D.body.base); for (const e of kitRows) e.hidden = m; for (const e of modelRows) e.hidden = !m; if (m && document.activeElement !== plate) plate.value = M().plate; });
   add('body', ...kitRows, ...modelRows);
@@ -429,6 +433,7 @@ let last = performance.now(), frames = 0;
 function frame(now: number) { const el = Math.min(0.1, (now - last) / 1000); last = now;
   if (view.spin) { view.yaw += el * 0.35; dirty = true; }
   if (view.susp) dirty = true;   // the bounce demo runs
+  if (L && down && awake && TH.pump(L, cv)) dirty = true;   // the parts' pictures, drawn in the canvas's corner: this frame is drawn over them
   if (L && down && dirty && awake) { dirty = false; frames++;
     const dpr = Math.min(2, devicePixelRatio || 1), W = Math.max(2, Math.round(cv.clientWidth * dpr)), H = Math.max(2, Math.round(cv.clientHeight * dpr)); if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
     const M = shown(); if (M !== onGpu) { g = onGpu ? L.swapCar(onGpu, M) : L.car(M); onGpu = M; }

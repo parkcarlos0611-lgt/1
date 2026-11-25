@@ -8,12 +8,18 @@ import { cornerNormals, type V } from './subdiv';
 import { frameOf, type Frame } from './frame';
 import { headLamp, mirror, plate, wheel, type LampKind, type PlateText, type WheelKind } from './parts';
 import { crestPlate, crestUV, lettering, skinNear, type CrestFrame } from './badge';
+import { subdivSkin, type Skin } from '../skin';
+import { fitPlate, drawPlate, type PlateFit } from './plates';
+import { placedOf, type Placed } from '../../../core/placed';
 export type { LampKind, WheelKind, PlateText } from './parts';
 export { plateText, PLATE_SYLLABLES } from './parts';
 export { buildCage, DIM } from './cage';
 export { buildShell, type Shell959 } from './shell';
 export { sockets } from './sockets';
 export { p959Lines } from './lines';
+export { fitPlate, drawPlate, stockPlace, snapCentre, PLATE_RULES, PLATE_W, PLATE_H, type PlateFit } from './plates';
+/** the shell's skin for parts placed freely on it (render/car/skin.ts, docs/systems/115 §5-2) */
+export const shellSkin = (S: Shell959): Skin => subdivSkin({ P: S.P, F: S.F, N: S.N, tag: S.tag, nSub: S.nSub, parent: S.fine.parent });
 export { frameOf, stretchAt, STOCK_FRAME, ZONES, type Frame, type FrameDims } from './frame';
 import { p959Lines } from './lines';
 
@@ -27,7 +33,9 @@ export interface P959Opts extends Omit<ShellOpts, 'lamps'> { paint?: string; lam
   /** leave out the placeholder modules that are not part of the skin (wheels, lenses, mirrors, exhausts) */ bare?: boolean;
   /** the tyres' widths, front and rear (mm; default the real car's 235 and 255): the wheels' middles stay where they are */ tyres?: [number, number];
   /** the wheels' own disc and caliper (default on; off where the car's suspension is drawn with its brakes: render/car/bodies.ts) */ brake?: boolean;
-  /** the crest on the front lid and the lettering across the tail (default: with the details; docs/systems/116) */ marks?: boolean }
+  /** the crest on the front lid and the lettering across the tail (default: with the details; docs/systems/116) */ marks?: boolean;
+  /** parts placed freely on the skin (docs/systems/115 P1a: the plates; core/placed.ts): a fitted plate with an entry sits
+   *  at its place, one without at the car's own; a place no longer on the skin falls back to the car's own */ placed?: readonly Placed[] }
 /** the lump as the builder's first step shows it: no openings, blank bumpers, the plain steel wheel, no plates, no glass */
 export const P959_LUMP: P959Opts = { lamp: 'none', details: false, bumperF: 'blank', bumperR: 'blank', wheel: 'steel', plateF: false, plateR: false, glass: null };
 const MAT: Record<string, [string, number, Parameters<Build['mat']>[2]]> = { glass: ['#20262c', 0.9, 'glass'], grille: ['#17181a', 0.1, 'grille'], dark: ['#1b1c1e', 0.05, 'plain'], lamp: ['#b3261e', 0.5, 'lens'], amber: ['#d9861c', 0.5, 'lens'], lens: ['#17181a', 0.1, 'plain'] };
@@ -60,7 +68,9 @@ export function p959Model(o: P959Opts = {}): P959Model { const lamps = o.lamp !=
     if (lamps) for (const s of [1, -1]) lampIn(b, fr, o.lamp as LampKind ?? 'round', [270 + Math.sin(sl) * 14, s * 615, 640 - Math.cos(sl) * 14], [0, 1, 0], [Math.cos(sl), 0, Math.sin(sl)], 100, 122);
     if (details) for (const e of K.exhausts) b.name('exhaust').mat('#2a2b2d', 0.6, 'metal').lathe('x', [0, e.o[1], e.o[2]], [[e.o[0] - 60, e.r], [e.o[0] + 14, e.r], [e.o[0] - 50, e.r - 10]], 8, false);
     if (details) for (const m of K.mirrors) mirror(b, m, paint);
-    for (const m of K.marks) if (/^plate/.test(m.name) && (m.name === 'plateF' ? o.plateF : o.plateR) !== false) plate(b, m, o.plate);
+    const skin = o.placed?.length ? shellSkin(S) : null, fits: PlateFit[] = [];
+    for (const m of K.marks) if (/^plate/.test(m.name) && (m.name === 'plateF' ? o.plateF : o.plateR) !== false) { const p = placedOf(o.placed, m.name as 'plateF' | 'plateR'), f = p && skin ? fitPlate(skin, p, fits) : null;
+      if (f && f.gap < 150) { fits.push(f); drawPlate(b, f, o.plate); } else plate(b, m, o.plate); }
     if (marks) for (const m of K.marks) { if (m.name === 'badge') crest = crestPlate(b, m, skinNear(S.P, S.F, m.o, 120)); else if (m.name === 'porscheLettering') lettering(b, m, skinNear(S.P, S.F, m.o, 420)); } }
   const M = b.mesh(o.dims ? fr.length : DIM.length);
   if (crest) M.uv = crestUV(M, crest);

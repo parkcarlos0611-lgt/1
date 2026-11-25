@@ -38,7 +38,9 @@ export function asDesign(v: unknown): Design | null {
   const body = { base: P.body.base, nose: one(b.nose, NOSES, P.body.nose), tail: one(b.tail, TAILS, P.body.tail), wheel: one(b.wheel, WHEELS, P.body.wheel),
     ...dims, paint, gloss: num(b.gloss, P.body.gloss), ...(isModelBase(P.body.base) ? { model: fitModel(P.body.base, obj(b.model)) } : {}),
     // format 6's frame and glass (F1): as the value has them (normalise checks them; absent: the car as built)
-    ...(b.frame && typeof b.frame === 'object' ? { frame: b.frame as Design['body']['frame'] } : {}), ...('glass' in b ? { glass: b.glass as Design['body']['glass'] } : {}) };
+    ...(b.frame && typeof b.frame === 'object' ? { frame: b.frame as Design['body']['frame'] } : {}), ...('glass' in b ? { glass: b.glass as Design['body']['glass'] } : {}),
+    // format 6's placed parts (P1a): as the value has them (normalise fits them)
+    ...(Array.isArray(b.parts) ? { parts: b.parts as Design['body']['parts'] } : {}) };
   // the face: its slots where the value has them; a format-3 value's (and older) from its front, the rest its base's own
   const front: FrontKind = one(b.front, FRONTS, P.body.aux === 'round' ? 'sunk' : 'plain'), f0: Face = FRONTS.includes(b.front as FrontKind) ? faceOf3(P.body.base, front) : P.body;
   const face = Object.fromEntries(FACE_KEYS.map(k => [k, one(b[k], FACE_KINDS[k] as readonly string[], f0[k])])) as unknown as Face;

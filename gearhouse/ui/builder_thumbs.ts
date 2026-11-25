@@ -15,27 +15,28 @@ import { BUMPERS_ALL, LAMPS959, WHEELS_ALL } from '../core/design';
 
 export type ThumbView = 'front' | 'side' | 'top';
 /** the parts' kinds, and the builder's first steps' cards (docs/systems/115 F1): the lump, its glass sets, its interior sets */
-export type ThumbKind = 'bumperF' | 'bumperR' | 'lamp' | 'wheel' | 'base' | 'frame' | 'glass' | 'interior';
+export type ThumbKind = 'bumperF' | 'bumperR' | 'lamp' | 'wheel' | 'base' | 'frame' | 'glass' | 'interior' | 'plateF' | 'plateR';
 export interface ThumbSpec { kind: ThumbKind; v: string }
 export const VIEWS: ThumbView[] = ['front', 'side', 'top'];
 export const VIEW_NAME: Record<ThumbView, string> = { front: '정면', side: '측면', top: '위' };
 /** the view rule: a part is seen from the way it faces out of the body. A part facing forward or back is seen head on
  *  (a rear part from behind), one facing sideways (a wheel, a side intake, a mirror, the body as a whole) from the left
  *  side, one facing up (a louvre, a bonnet duct) from above. A rear wing: from the side (its profile and its stands) */
-export const KIND_VIEW: Record<ThumbKind, ThumbView> = { bumperF: 'front', bumperR: 'front', lamp: 'front', wheel: 'side', base: 'side', frame: 'side', glass: 'side', interior: 'top' };
+export const KIND_VIEW: Record<ThumbKind, ThumbView> = { bumperF: 'front', bumperR: 'front', lamp: 'front', wheel: 'side', base: 'side', frame: 'side', glass: 'side', interior: 'top', plateF: 'front', plateR: 'front' };
 /** the camera of a view: the heading the screen looks along (as LiveView's ang) and the tilt down (degrees). Front and
  *  side a little above the eye line, so a part's top shows as a sliver; the top view straight down, the nose up */
 export const PITCH = 8;
 export function camera(kind: ThumbKind, view: ThumbView): { ang: number; pitch: number } {
   if (view === 'top') return { ang: 0, pitch: 90 };
   if (view === 'side') return { ang: 1.5 * Math.PI, pitch: PITCH };
-  return { ang: kind === 'bumperR' ? 0 : Math.PI, pitch: PITCH }; }
+  return { ang: kind === 'bumperR' || kind === 'plateR' ? 0 : Math.PI, pitch: PITCH }; }
 
 // ---- the parts taken out of the model ----
 const BUMPER_F = new Set(['bumperF', 'indicatorF', 'ventF', 'intakeF', 'lipF']), BUMPER_R = new Set(['bumperR', 'ventR', 'diffuser', 'exhaustSlot']);
-const LAMP = new Set(['lampBezel', 'headLamp', 'lampReflector', 'lampRing']), WHEEL = /^(tyre|rim|wheel|hub)/;
+const LAMP = new Set(['lampBezel', 'headLamp', 'lampReflector', 'lampRing']), WHEEL = /^(tyre|rim|wheel|hub)/, PLATE = /^plate/;
 /** the variants of a kind, in the library's order */
-export const VARIANTS: Record<ThumbKind, readonly string[]> = { bumperF: BUMPERS_ALL, bumperR: BUMPERS_ALL, lamp: LAMPS959, wheel: WHEELS_ALL, base: ['p959'], frame: ['A959'], glass: ['none', 'stock', 'noQuarter', 'louvre'], interior: ['stock', 'drift'] };
+export const VARIANTS: Record<ThumbKind, readonly string[]> = { bumperF: BUMPERS_ALL, bumperR: BUMPERS_ALL, lamp: LAMPS959, wheel: WHEELS_ALL, base: ['p959'], frame: ['A959'], glass: ['none', 'stock', 'noQuarter', 'louvre'], interior: ['stock', 'drift'],
+  /** the plates (docs/systems/115 P1a): each its own card, cut from the stock car where its plate sits at its own place */ plateF: ['plateF'], plateR: ['plateR'] };
 /** the model a variant is cut from: the n-th of each list together (four builds give every swap; the first is the stock
  *  car, the fourth the lump's blank bumper and steel wheel with the stock lamp) */
 export function modelIndex(s: ThumbSpec): number { return Math.max(0, VARIANTS[s.kind].indexOf(s.v)); }
@@ -59,7 +60,8 @@ export type Box = [V, V];
 export function isolate(md: P959Model, kind: ThumbKind, near = false): Mesh { const M = md.mesh; if (kind === 'base' || SETS.has(kind)) return M;
   const nm = (t: number) => M.names?.[M.part[t]!] ?? '', cy = (t: number) => (M.pos[t * 9 + 1]! + M.pos[t * 9 + 4]! + M.pos[t * 9 + 7]!) / 3, cx = (t: number) => (M.pos[t * 9]! + M.pos[t * 9 + 3]! + M.pos[t * 9 + 6]!) / 3;
   const keep = (t: number) => kind === 'bumperF' ? t < md.shellTris && BUMPER_F.has(nm(t)) : kind === 'bumperR' ? t < md.shellTris && BUMPER_R.has(nm(t))
-    : kind === 'lamp' ? t >= md.shellTris && LAMP.has(nm(t)) && cy(t) > 0 : t >= md.shellTris && WHEEL.test(nm(t)) && cy(t) > 0 && cx(t) < M.length / 2;
+    : kind === 'lamp' ? t >= md.shellTris && LAMP.has(nm(t)) && cy(t) > 0 : kind === 'plateF' || kind === 'plateR' ? t >= md.shellTris && PLATE.test(nm(t)) && (cx(t) < M.length / 2) === (kind === 'plateF')
+    : t >= md.shellTris && WHEEL.test(nm(t)) && cy(t) > 0 && cx(t) < M.length / 2;
   const T: number[] = []; for (let t = 0; t < M.n; t++) if (keep(t) && (!near || cy(t) > -1)) T.push(t);
   const n = T.length, pos = new Float32Array(n * 9), col = new Uint8Array(n * 3), gloss = new Float32Array(n), part = new Int16Array(n), kd = new Uint8Array(n), tex = new Uint8Array(n), uv = M.uv && M.uv.length === M.n * 9 ? new Float32Array(n * 9) : undefined;
   T.forEach((t, j) => { pos.set(M.pos.subarray(t * 9, t * 9 + 9), j * 9); col.set(M.col.subarray(t * 3, t * 3 + 3), j * 3); gloss[j] = M.gloss[t]!; part[j] = M.part[t]!; kd[j] = M.kind[t]!; tex[j] = M.tex[t]!; if (uv) uv.set(M.uv!.subarray(t * 9, t * 9 + 9), j * 9); });

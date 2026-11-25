@@ -75,17 +75,29 @@ export interface PlateText { top: string; big: string }
 export function plateText(src: string | number): PlateText { if (typeof src === 'string') { const m = src.replace(/\s+/g, '').match(/^(\d{2}.)(\d{4})$/); if (m && glyph(m[1]![2]!)) return { top: m[1]!, big: m[2]! }; throw new Error(`not a plate number: ${src}`); }
   let s = (src >>> 0) || 1; const r = (n: number) => { s = (Math.imul(s, 1664525) + 1013904223) >>> 0; return Math.floor(s / 4294967296 * n); }, d = () => String(r(10));
   return { top: d() + d() + [...PLATE_SYLLABLES][r(PLATE_SYLLABLES.length)]!, big: String(1 + r(9)) + d() + d() + d() }; }
-export function plate(b: Build, m: Mark, text: PlateText = { top: '08루', big: '0599' }): void { const W = 335, H = 170, n = m.n, u: V = [0, -n[0], 0], up: V = [0, 0, 1];   // u: to the reader's right as the game draws the car: its +y on the left of the heading (render/live/gpu.ts placeMesh), so the text is laid mirrored in the file's own axes
-  const at = (x: number, y: number, h: number): V => add(add(add(m.o, u, x), up, y), n, h), flip = n[0] * u[1] < 0;
+/** a plate placed freely (docs/systems/115 P1a, render/car/p959/plates.ts): its own across and up on the skin's plane, its
+ *  size, how far its face stands out along the normal (over the highest skin under it), and the bracket: the black
+ *  plinth's sides run back from its face to the skin under each point of its outline (x, y across and up, mm; `to` the
+ *  height along the normal where that side ends, a little into the skin) */
+export interface PlateAxes { u: V; up: V; s: number; lift: number; bracket?: { rim: [number, number][]; to: number[] } }
+export function plate(b: Build, m: Mark, text: PlateText = { top: '08루', big: '0599' }, g?: PlateAxes): void { const W = 335, H = 170, n = m.n, s = g?.s ?? 1, lift = g?.lift ?? 0;
+  // u: to the reader's right as the game draws the car: its +y on the left of the heading (render/live/gpu.ts placeMesh), so the text is laid mirrored in the file's own axes
+  const u: V = g?.u ?? [0, -n[0], 0], up: V = g?.up ?? [0, 0, 1];
+  const at = (x: number, y: number, h: number): V => add(add(add(m.o, u, x * s), up, y * s), n, h + lift), cu: V = [u[1] * up[2] - u[2] * up[1], u[2] * up[0] - u[0] * up[2], u[0] * up[1] - u[1] * up[0]], flip = cu[0] * n[0] + cu[1] * n[1] + cu[2] * n[2] < 0;
   const quad = (p: V, q: V, r: V, t: V) => flip ? b.quad(t, r, q, p) : b.quad(p, q, r, t), rect = (x0: number, x1: number, y0: number, y1: number, h: number) => quad(at(x0, y0, h), at(x1, y0, h), at(x1, y1, h), at(x0, y1, h));
   b.name('platePlinth').mat('#1b1c1e', 0.05, 'plain'); rect(-W / 2 - 22, W / 2 + 22, -H / 2 - 16, H / 2 + 16, 1);   // its own flat ground: nothing of the bumper shows through or crosses it
+  if (g?.bracket) { const B = g.bracket, raw = (x: number, y: number, h: number): V => add(add(add(m.o, u, x), up, y), n, h), top = lift + 1; b.name('plateBracket');
+    for (let i = 0; i < B.rim.length; i++) { const j = (i + 1) % B.rim.length, [x0, y0] = B.rim[i]!, [x1, y1] = B.rim[j]!, A = raw(x0, y0, top), Bq = raw(x1, y1, top), Cq = raw(x1, y1, B.to[j]!), Dq = raw(x0, y0, B.to[i]!);
+      // wound to face out of the plinth's middle
+      const e1 = [Bq[0] - A[0], Bq[1] - A[1], Bq[2] - A[2]], e2 = [Dq[0] - A[0], Dq[1] - A[1], Dq[2] - A[2]], f = [e1[1]! * e2[2]! - e1[2]! * e2[1]!, e1[2]! * e2[0]! - e1[0]! * e2[2]!, e1[0]! * e2[1]! - e1[1]! * e2[0]!], out = add(add([0, 0, 0], u, x0 + x1), up, y0 + y1);
+      if (f[0]! * out[0] + f[1]! * out[1] + f[2]! * out[2] >= 0) b.quad(A, Bq, Cq, Dq); else b.quad(Dq, Cq, Bq, A); } }
   b.name('plateFrame').mat('#c2c5c9', 0.6, 'plain'); rect(-W / 2 - 9, W / 2 + 9, -H / 2 - 9, H / 2 + 9, 3);
   b.name('plate').mat('#12804c', 0.3, 'plain'); rect(-W / 2, W / 2, -H / 2, H / 2, 5);
   b.name('plateText').mat('#f1f3f2', 0.2, 'plain');
   const face: StrokeFace = { quad, tri: (p, q, r) => flip ? b.tri(p, r, q) : b.tri(p, q, r) }, band = (pts: number[][], t: number) => strokeBand(face, at, pts, t, 6);
   const word = (s: string, x0: number, y0: number, w: number, h: number, gap: number, t: number) => [...s].forEach((ch, k) => { for (const line of glyph(ch) ?? []) band(line.map(q => [x0 + k * (w + gap) + q[0]! * w, y0 + q[1]! * h]), t); });
   word(text.top, -58, 38, 30, 34, 13, 8); word(text.big, -138, -68, 50, 86, 24, 13);
-  b.name('plateBolt').mat('#0f6b40', 0.3, 'plain'); for (const x of [-98, 98]) { const c = at(x, 52, 6), ring = Array.from({ length: 6 }, (_, i) => { const a = i / 6 * Math.PI * 2; return add(add(c, u, Math.cos(a) * 11), up, Math.sin(a) * 11); }), top = add(c, n, 5); for (let i = 0; i < 6; i++) flip ? b.tri(top, ring[(i + 1) % 6]!, ring[i]!) : b.tri(top, ring[i]!, ring[(i + 1) % 6]!); } }
+  b.name('plateBolt').mat('#0f6b40', 0.3, 'plain'); for (const x of [-98, 98]) { const c = at(x, 52, 6), ring = Array.from({ length: 6 }, (_, i) => { const a = i / 6 * Math.PI * 2; return add(add(c, u, Math.cos(a) * 11 * s), up, Math.sin(a) * 11 * s); }), top = add(c, n, 5); for (let i = 0; i < 6; i++) flip ? b.tri(top, ring[(i + 1) % 6]!, ring[i]!) : b.tri(top, ring[i]!, ring[(i + 1) % 6]!); } }
 
 /** what a stroke is laid with: a quad and a triangle, each wound to face out of the surface the figure is drawn on */
 export interface StrokeFace { quad(p: V, q: V, r: V, t: V): void; tri(a: V, b: V, c: V): void }

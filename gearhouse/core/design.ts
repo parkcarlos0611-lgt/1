@@ -38,6 +38,7 @@
 // the builder opens them; the figures are race/design.ts's, which this file does not call), and until then no cap holds.
 import { BODY_NAME } from './names';
 import type { TierId } from '../race/tiers';
+import { fitPlaced, type Placed } from './placed';
 import { FRAMES, isFrameId, fitFrameDims, bodyDimsOf, isGlassId, fitInterior, interiorOfKit, kitOfInterior, type FrameId, type FrameDims, type GlassId, type InteriorPick } from './frames';
 
 /** the kit's platforms (each a car built from the kit: its lines and its panels' measurements) */
@@ -141,7 +142,9 @@ export interface Design {
      *  file (they are what the body goes back to on a kit base) but a model body does not read them */ model?: ModelSwaps;
     /** format 6 (F1): the lump a model body is cut from and its dimensions (core/frames.ts; absent: 차체 A unstretched). A
      *  model body's own dimensions above are made from these (bodyDimsOf), so the physics reads them as any base's */ frame?: { id: FrameId; dims: FrameDims };
-    /** format 6 (F1): the glass set on its cabin (absent: the stock set; null: none picked, the cabin in body colour) */ glass?: GlassId | null } & Face & BodyDims;
+    /** format 6 (F1): the glass set on its cabin (absent: the stock set; null: none picked, the cabin in body colour) */ glass?: GlassId | null;
+    /** format 6 (P1a): the parts placed freely on a model body's skin (core/placed.ts: so far the plates; absent: each at
+     *  the car's own place, as every older design and every opponent) */ parts?: Placed[] } & Face & BodyDims;
   engine: { grade: Grade; layout: Layout; /** cc */ cc: number; /** valves a cylinder */ valves: Valves;
     /** the red line (rpm) */ redline: number; intake: Intake; compression: Compression; sump: Sump; block: Block;
     turbo: Turbos; /** the boost at full (bar), when there are turbos */ boost: number; intercooler: boolean;
@@ -442,13 +445,13 @@ export function normalise(d0: AnyDesign): Design {
   const d = toV6(d0), E = d.engine, g: Grade = GRADES.includes(E.grade) ? E.grade : 2, R = GRADE_RULES[g];
   const lim = BODY_LIMITS(BODY_BASES.includes(d.body.base) ? d.body.base : 'nsx'), dims = Object.fromEntries(DIMS.map(k => [k, clamp(Number.isFinite(d.body[k]) ? d.body[k] : 0, lim[k])])) as unknown as BodyDims;
   const q = (k: QualityPart) => { const v = E.quality?.[k]; return Number.isFinite(v) ? Math.round(clamp(v!, LIMITS.quality)) : 0; };
-  const base = BODY_BASES.includes(d.body.base) ? d.body.base : 'nsx', { model: m0, frame: f0, glass: g0, ...body0 } = d.body, model = isModelBase(base) ? fitModel(base, m0) : undefined;
+  const base = BODY_BASES.includes(d.body.base) ? d.body.base : 'nsx', { model: m0, frame: f0, glass: g0, parts: p0, ...body0 } = d.body, model = isModelBase(base) ? fitModel(base, m0) : undefined, parts = model ? fitPlaced(p0) : undefined;
   // format 6's frame, glass and interior (F1): a model body's only, each kept only where the design has it; the frame's
   // dimensions made into the body's own (the physics' and the fit's); the interior set into the kit's interior (its weight)
   const fid: FrameId = isFrameId(f0?.id) ? f0!.id : 'A959', frame = model && f0 ? { id: fid, dims: fitFrameDims(fid, f0.dims) } : undefined;
   const fdims = frame ? { ...bodyDimsOf(frame.id, frame.dims), cabin: 0, rake: 0 } : {}, glass = model && (g0 === null || isGlassId(g0)) ? { glass: g0 } : {};
   const interior = model && d.interior ? fitInterior(d.interior, interiorOfKit(d.kit.interior)) : undefined, { interior: _i, ...d1 } = d;
-  return { ...d1, ...(interior ? { interior } : {}), body: fitFace({ ...body0, base, ...dims, ...fdims, gloss: clamp(d.body.gloss, [0, 1]), ...(model ? { model } : {}), ...(frame ? { frame } : {}), ...glass }),
+  return { ...d1, ...(interior ? { interior } : {}), body: fitFace({ ...body0, base, ...dims, ...fdims, gloss: clamp(d.body.gloss, [0, 1]), ...(model ? { model } : {}), ...(frame ? { frame } : {}), ...glass, ...(parts ? { parts } : {}) }),
     engine: { ...E, grade: g, layout: LAYOUTS.includes(E.layout) ? E.layout : 'V6', cc: clamp(E.cc, LIMITS.cc), redline: clamp(E.redline, [LIMITS.redline[0], gradeRedline(g)]),
       intake: allowed(E.intake, INTAKES, R.intake), compression: allowed(E.compression, COMPRESSIONS, R.compression), sump: allowed(E.sump, SUMPS, R.sump),
       block: allowed(E.block, BLOCKS, R.block), valves: allowed(E.valves, [2, 3, 4, 5] as Valves[], R.valves), turbo: Math.min(E.turbo, R.turbo) as Turbos,

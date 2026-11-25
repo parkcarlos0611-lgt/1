@@ -52,6 +52,7 @@
   .gh-switch .gh-note { grid-column: 2; font-weight: 400; }
   .gh-card { display: flex; flex-direction: column; min-width: 0; padding: var(--gk-bwp) var(--gk-bwp) 12px; }
   .gh-card.gh-pick { cursor: pointer; } .gh-card.gh-pick:hover { filter: brightness(1.08); }
+  .gh-card.gh-old { filter: grayscale(1); opacity: 0.62; } .gh-card.gh-old .gh-card-t { color: var(--gh-soft); }   /* an old body's design (docs/systems/113 V0) */
   .gh-card.gh-pick:focus-visible { outline: none; filter: brightness(1.15); } .gh-card.gh-pick:focus-visible::after { content: ''; position: absolute; inset: 8px; border: 3px dashed #fff; pointer-events: none; }
   .gh-card-pic { background: linear-gradient(180deg, #4a4f55, #24272b); display: grid; place-items: center; aspect-ratio: 5 / 2; border-bottom: var(--gk-bw) solid var(--gk-ink); }
   .gh-carpic { width: 86%; height: auto; display: block; }

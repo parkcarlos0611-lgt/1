@@ -10,7 +10,8 @@ import { buildSheet } from '../kit/sheet';
 import { CAM_VIEWS, type CamView } from '../drivecam';
 import { saveSettings, exportAll, importAll, resetAll, loadSettings, DEFAULTS, type Settings } from './settings';
 import { VERSION_NAME, CHANGES } from '../../core/version';
-import { BODY_BASES, type BodyBase, type Design } from '../../core/design';
+import type { BodyBase, Design } from '../../core/design';
+import { ENABLED_BODIES, enabledDesign, stockP959 } from '../../core/bodies';
 import { savedDesigns, saveDesign, deleteDesign, currentDesign, keepCurrent, fromPreset, newId, designJson, parseDesign, measured, designSig } from '../../core/designstore';
 import { designFigures } from '../../race/design';
 import { TRACKS } from '../../race/tracks';
@@ -36,9 +37,9 @@ function menu(ctx: ShellCtx, id: string, build: (root: HTMLElement) => void, o: 
 
 // ---- the title ----
 export function titleScreen(ctx: ShellCtx): Screen<never> {
-  return menu(ctx, 'title', root => { const r = ctx.router, last = ctx.last(), cur = currentDesign(ctx.store), d = ctx.recent();
+  return menu(ctx, 'title', root => { const r = ctx.router, last = ctx.last(), c0 = currentDesign(ctx.store), cur = c0 && enabledDesign(c0) ? c0 : null, d = ctx.recent();
     const go = (screen: string, p?: unknown) => () => void r.go(screen, p);
-    const cont = () => { const l = ctx.last(), des = currentDesign(ctx.store) ?? d; void (async () => { await r.go('garage');
+    const cont = () => { const l = ctx.last(), c1 = currentDesign(ctx.store), des = c1 && enabledDesign(c1) ? c1 : d; void (async () => { await r.go('garage');
       if (l?.screen === 'builder' || l?.screen === 'drive') await r.go('builder', { design: des });
       if (l?.screen === 'drive') await r.go('drive', { design: des, track: l.track, from: 'builder' }); })(); };
     const nav = el('nav', 'gh-menu', button('이어하기', cont, { kind: 'menu', icon: 'play', sub: last ? `${SCREEN_NAME[last.screen] ?? ''} · ${cur?.name ?? d.name}` : cur ? `차 빌더 · ${cur.name}` : '아직 이어 할 것이 없습니다', disabled: !last && !cur }),
@@ -52,19 +53,23 @@ export function titleScreen(ctx: ShellCtx): Screen<never> {
 export function garageScreen(ctx: ShellCtx): Screen<never> {
   const s = ctx.store; let root: HTMLElement;
   const open = (d: Design) => { keepCurrent(s, d); void ctx.router.go('builder', { design: d }); };
-  const fresh = async () => { const b = await dialog('새 차 설계', ['어느 차대에서 시작할까요? 바탕은 차체 패널의 치수를 정합니다.'], [...BODY_BASES.map(id => [id, BASE_NAME[id] ?? id] as [string, string]), ['', '취소', { kind: 'ghost' as const }]]);
+  const fresh = async () => { const b = await dialog('새 차 설계', ['어느 차대에서 시작할까요? 바탕은 차체 패널의 치수를 정합니다.'], [...ENABLED_BODIES.map(id => [id, BASE_NAME[id] ?? id] as [string, string]), ['', '취소', { kind: 'ghost' as const }]]);
     if (!b) return; const d = fromPreset(b as BodyBase); saveDesign(s, d); open(d); };
   const lines = (d: Design): (string | HTMLElement)[] => { const out: (string | HTMLElement)[] = [];
     try { const f = designFigures(d); out.push(`${d.engine.layout} ${(d.engine.cc / 1000).toFixed(1)} L · ${f.hp} hp · 최고 ${f.topKmh} km/h · ${f.mass.toLocaleString()} kg`); } catch { out.push(`${d.engine.layout} ${(d.engine.cc / 1000).toFixed(1)} L`); }
     const m = measured(s, d.id); if (m && m.sig === designSig(d)) { const laps = Object.values(m.laps).map(l => `${l.track.replace(/\s*\(.*$/, '')} ${fmtLap(l.t)}`); out.push(el('p', 'gh-card-l gh-meas', `측정: 최고 ${m.topKmh || '-'} km/h${laps.length ? ` · ${laps.join(' · ')}` : ''}`)); }
     else out.push(el('p', 'gh-card-l gh-soft', '측정 없음 (시험 주행을 하면 기록됩니다)')); return out; };
+  const del = (d: Design) => button('삭제', () => { void dialog('설계 삭제', [`"${d.name}" 설계를 지울까요? 되돌릴 수 없습니다.`], [['del', '삭제', { kind: 'danger' }], ['', '취소', { kind: 'ghost' }]]).then(v => { if (v) { deleteDesign(s, d.id); if (currentDesign(s)?.id === d.id) try { s?.removeItem('gearhouse.builder.current.v1'); } catch { /* not kept */ } toast('지웠습니다'); fill(); } }); });
+  const exp = (d: Design) => button('내보내기', () => download(`${d.name.replace(/[^\w가-힣-]+/g, '_') || 'design'}.json`, designJson(d)));
   const fill = () => { root.textContent = ''; const all = savedDesigns(s), cur = currentDesign(s), list = cur && !all.some(d => d.id === cur.id) ? [cur, ...all] : all;
     const grid = el('div', 'gh-grid');
     for (const d of list) { const saved = all.some(x => x.id === d.id);
+      // an old body's design (docs/systems/113 V0): a grey card, kept in the storage; it can only be deleted or exported
+      if (!enabledDesign(d)) { const c = card({ pic: carPic(d.body.paint, d.body.base), title: d.name, tag: '옛 방식 · 비활성', lines: [BASE_NAME[d.body.base] ?? d.body.base, el('p', 'gh-card-l gh-soft', '이 차체는 지금 게임에서 꺼져 있습니다. 주행·레이스·편집은 할 수 없고, 설계는 그대로 남아 있습니다.')],
+          actions: [del(d), exp(d)] }); c.classList.add('gh-old'); grid.append(c); continue; }
       grid.append(card({ pic: carPic(d.body.paint, d.body.base), title: d.name, tag: !saved ? '저장 안 됨' : cur?.id === d.id ? '작업 중' : undefined, lines: [BASE_NAME[d.body.base] ?? d.body.base, ...lines(d)],
         actions: [button('열기', () => open(d), { kind: 'main' }), button('복제', () => { saveDesign(s, { ...structuredClone(d), id: newId(), name: `${d.name} 사본`.slice(0, 40) }); toast(`복제했습니다: ${d.name} 사본`); fill(); }),
-          button('삭제', () => { void dialog('설계 삭제', [`"${d.name}" 설계를 지울까요? 되돌릴 수 없습니다.`], [['del', '삭제', { kind: 'danger' }], ['', '취소', { kind: 'ghost' }]]).then(v => { if (v) { deleteDesign(s, d.id); if (cur?.id === d.id) try { s?.removeItem('gearhouse.builder.current.v1'); } catch { /* not kept */ } toast('지웠습니다'); fill(); } }); }),
-          button('내보내기', () => download(`${d.name.replace(/[^\w가-힣-]+/g, '_') || 'design'}.json`, designJson(d)))] })); }
+          del(d), exp(d)] })); }
     if (!list.length) grid.append(el('p', 'gh-empty', '아직 설계가 없습니다. "새 차 설계"로 시작하세요.'));
     root.append(topbar('차고', () => ctx.router.back(), slotsChip(all.length)), el('div', 'gh-body', el('div', 'gh-actions', button('새 차 설계', () => void fresh(), { kind: 'main', icon: 'body' }),
       button('엔진 공방', () => void ctx.router.go('engine', {}), { id: 'gh-engineshop', title: '엔진 설계와 엔진 보관함', icon: 'engine' }),
@@ -76,20 +81,20 @@ export function garageScreen(ctx: ShellCtx): Screen<never> {
 // ---- the test track's and the race's choices ----
 /** the 959 as it left the works (its own design, one id: its runs are kept under it), for the test track and the race without a design of one's own */
 let p959Own: Design | null = null;
-const p959Stock = (): Design => (p959Own ??= { ...fromPreset('p959', '포르쉐 959'), id: 'p959stock', body: { ...fromPreset('p959').body, model: { bumperF: 'std', bumperR: 'std', lamp: 'round', wheel: 'hollow5', plate: '08루 0959' } } });
+const p959Stock = (): Design => (p959Own ??= stockP959());
 export interface PickParams { mode: 'test' | 'race' }
 const TRACK_KEY = 'gearhouse.drive.track';
 export function pickScreen(ctx: ShellCtx): Screen<never> {
   let mode: PickParams['mode'] = 'test';
   const m = menu(ctx, 'pick', root => { const s = ctx.store, d = ctx.recent(); let track = (() => { try { return s?.getItem(TRACK_KEY) ?? 'millbrook'; } catch { return 'millbrook'; } })();
-    const race = { opp: 3, lineup: 'period', laps: 2 }; let car: 'design' | 'period' | 'p959' = 'design';
+    const race = { opp: 3, lineup: 'p959', laps: 2 }; let car: 'design' | 'p959' = enabledDesign(d) && d.id !== 'p959stock' ? 'design' : 'p959';
     const cards = el('div', 'gh-grid gh-tracks'), drawTracks = () => { cards.textContent = ''; for (const t of TRACKS) cards.append(card({ title: t.title, lines: [t.label], selected: t.id === track, onPick: () => { track = t.id; drawTracks(); (cards.querySelector('.gh-on') as HTMLElement | null)?.focus(); } })); }; drawTracks();
-    const opts = el('div', 'gh-opts gk-panel', chips('차', [['design', `설계: ${d.name}`], ['p959', '포르쉐 959 (순정)'], ['period', '주행 화면의 차 목록']], car, v => { car = v; }));
+    const opts = el('div', 'gh-opts gk-panel', chips('차', [...(car === 'design' ? [['design', `설계: ${d.name}`] as ['design', string]] : []), ['p959', '포르쉐 959 (순정)']], car, v => { car = v; }));   // enabled bodies only (docs/systems/113 V0)
     if (mode === 'race') opts.append(slider('상대 차 수', [1, 7, 1], race.opp, v => { race.opp = v; }, v => `${v}대`),
-      chips('상대 구성', [['period', '1930년대 차'], ['modern', '1990년대 차'], ['mix', '섞기']], race.lineup, v => { race.lineup = v; }),
+      ...(ENABLED_BODIES.length > 1 ? [chips('상대 구성', [['p959', '959 원메이크']], race.lineup, v => { race.lineup = v; })] : []),   // one body on: a one-make field, nothing to choose
       chips('바퀴 수', [[1, '1'], [2, '2'], [3, '3'], [4, '4']], race.laps, v => { race.laps = v; }));
     const start = button(mode === 'race' ? '레이스 시작' : '주행 시작', () => { try { s?.setItem(TRACK_KEY, track); } catch { /* not kept */ }
-      void ctx.router.go('drive', { design: car === 'design' ? d : car === 'p959' ? p959Stock() : null, track, race: mode === 'race' ? { ...race } : undefined, from: 'pick' }); }, { kind: 'main', icon: 'play' });
+      void ctx.router.go('drive', { design: car === 'design' ? d : p959Stock(), track, race: mode === 'race' ? { ...race } : undefined, from: 'pick' }); }, { kind: 'main', icon: 'play' });
     root.append(topbar(mode === 'race' ? '레이스' : '시험장', () => ctx.router.back(), start), el('div', 'gh-body', el('h2', 'gh-h2', '트랙'), cards, el('h2', 'gh-h2', mode === 'race' ? '차와 상대' : '차'), opts));
     (cards.querySelector('.gh-on') as HTMLElement | null)?.setAttribute('data-first', ''); });
   return { ...m, enter(p: PickParams, how) { if (how !== 'back') mode = p?.mode ?? 'test'; return m.enter(p as never, how); } }; }

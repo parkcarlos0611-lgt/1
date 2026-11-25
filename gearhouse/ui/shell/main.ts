@@ -24,8 +24,7 @@ import { engineScreen } from './engine';
 import { closeDialog, dialogBox, navKey, padKeys, uiSounds, blip } from './ui';
 import { TIPS } from './tips';
 import { VERSION_NAME } from '../../core/version';
-import { currentDesign, savedDesigns, fromPreset } from '../../core/designstore';
-import type { Design } from '../../core/design';
+import { recentEnabled } from '../../core/bodies';
 import { PHYSICS } from '../../race/kin';
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -55,12 +54,11 @@ addEventListener('popstate', () => router.popped());
 
 // ---- where play was left, the design to show ----
 const LAST_KEY = 'gearhouse.shell.last.v1';
-let preset: Design | null = null;
 const ctx: ShellCtx = { router, stage, backdrop, store, settings, layer: $('gh-layer'), pages: $('gh-pages'), over: $('gh-over'), loading,
   changed() { saveSettings(store, settings); applySettings(); },
   last() { try { const o = JSON.parse(store?.getItem(LAST_KEY) ?? 'null') as Last | null; return o && ['garage', 'builder', 'drive'].includes(o.screen) ? o : null; } catch { return null; } },
   keepLast(l) { try { store?.setItem(LAST_KEY, JSON.stringify(l)); } catch { /* not kept */ } },
-  recent() { return currentDesign(store) ?? savedDesigns(store)[0] ?? (preset ??= fromPreset('f355', 'F355 프리셋')); } };
+  recent() { return recentEnabled(store); } };   // an enabled body's design, else the stock 959 (docs/systems/113 V0)
 /** the settings at work: the theme, the menus' sounds, the calm screen, the drive's own fields */
 function applySettings() { const t = settings.screen.theme; if (t === 'auto') delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = t;
   setPalette(settings.screen.palette); document.documentElement.toggleAttribute('data-calm', settings.screen.calm);   // the design system's palette and its motion (docs/systems/110 G2)

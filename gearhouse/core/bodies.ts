@@ -9,7 +9,7 @@ export const ENABLED_BODIES: readonly BodyBase[] = ['p959'];
 /** a body on the list (a design on any other is an old one: shown greyed, not driven, raced or opened) */
 export const isEnabledBody = (b: unknown): b is BodyBase => (ENABLED_BODIES as readonly unknown[]).includes(b);
 /** a design whose body is on the list */
-export const enabledDesign = (d: Design | null | undefined): d is Design => !!d && isEnabledBody(d.body.base);
+export const enabledDesign = (d: Design | null | undefined): boolean => !!d && isEnabledBody(d.body.base);
 /** the body a new design starts on */
 export const DEFAULT_BODY: BodyBase = ENABLED_BODIES[0]!;
 /** a new design on the default body (a fresh id, a new plate) */
@@ -22,5 +22,5 @@ export function stockP959(): Design { if (!stock) { const d = fromPreset('p959',
   return structuredClone(stock); }
 
 /** the design to show and go on with, from the enabled ones: the one on the bench, else the last saved, else the stock 959 */
-export function recentEnabled(s: KeyStore | null): Design { const cur = currentDesign(s); if (enabledDesign(cur)) return cur;
+export function recentEnabled(s: KeyStore | null): Design { const cur = currentDesign(s); if (cur && enabledDesign(cur)) return cur;
   return savedDesigns(s).find(enabledDesign) ?? stockP959(); }

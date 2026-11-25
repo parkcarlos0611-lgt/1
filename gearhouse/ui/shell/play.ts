@@ -15,6 +15,7 @@ import builderPage from '../builder3d.page.html';
 import drivePage from '../drive.page.html';
 import type { Design } from '../../core/design';
 import { savedDesigns, saveDesign } from '../../core/designstore';
+import { enabledDesign, stockP959 } from '../../core/bodies';
 import { withEngine } from '../../core/engines';
 import { lapTimes } from '../../race/race';
 import { trackDef } from '../../race/tracks';
@@ -91,9 +92,10 @@ export function driveScreen(ctx: ShellCtx): Screen<DriveParams> & { readonly api
     toast('레이스 끝: 결과를 봅니다'); setTimeout(() => void ctx.router.go('results', { rows, track: trackDef(api!.track).title, laps: race.laps }), 1200); }, 400) as unknown as number; };
   return { get api() { return api; }, apply() { if (api) apply(); },
     async enter(p, how: Move) { ctx.backdrop.stop(); page ??= new PageScreen('drive', drivePage); ctx.stage.use('drive', false); page.show(ctx.pages); if (how !== 'back') params = p ?? {};
+      if (!params.design || !enabledDesign(params.design)) params = { ...params, design: stockP959() };   // an old body is never driven (docs/systems/113 V0)
       document.title = `GEARHOUSE · 시험 주행${params.design ? ` · ${params.design.name}` : ''}`;
       if (!api) { ctx.loading(true, '트랙을 준비하는 중', 0.2); await nextFrame();
-        api = mountDrive({ root: page.root, renderer: ctx.stage.L, design: params.design ?? null, onDesign: toDesign, camera: ctx.settings.camera.view,
+        api = mountDrive({ root: page.root, renderer: ctx.stage.L, design: params.design ?? null, oneMake: true, onDesign: toDesign, camera: ctx.settings.camera.view,
           onCamera: v => { if (ctx.settings.camera.view !== v) { ctx.settings.camera.view = v; ctx.changed(); } } }); shellize(page.root); apply(); ctx.loading(true, '트랙 재질과 소품을 불러오는 중', 0.6);
         await Promise.race([api.ready, new Promise(r => setTimeout(r, 20000))]); ctx.loading(false);
         if (params.track) api.setTrack(params.track); if (params.race) api.race(params.race); }

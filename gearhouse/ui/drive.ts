@@ -43,6 +43,9 @@ import { MESH_CARS } from '../render/car/meshcars';
 import { Driver } from '../race/driver';
 import { Collider } from '../race/collide';
 import { Race, lapTimes, bestOf, bookFor, type Entrant, type Skill } from '../race/race';
+import { oneMakeField } from '../race/onemake';
+import { fieldMesh } from '../render/car/fieldmesh';
+import { stockP959 } from '../core/bodies';
 import { Health, WARN } from '../race/health';
 import { Sound, designVoice, type Skid, type EngineVoiceSpec } from './sound';
 import specsData from '../data/cars/specs.json';
@@ -58,7 +61,8 @@ import { DriveCam, carEyes, nextView, perspective, pedalValue, pedalStep, isCamV
  *  shell), the design to drive (null: none; left out: the link's), and what going back to the design does. A page of
  *  its own (drive.page.html) gives nothing */
 export interface DriveHost { root?: ParentNode; renderer?: LiveRenderer | null; design?: Design | null; onDesign?: () => void;
-  /** the camera to start with (else the one kept in this browser), and told of each change (the shell keeps it in its settings) */ camera?: CamView; onCamera?: (v: CamView) => void }
+  /** the camera to start with (else the one kept in this browser), and told of each change (the shell keeps it in its settings) */ camera?: CamView; onCamera?: (v: CamView) => void;
+  /** the game's bodies only (docs/systems/113 V0): the car list holds the design alone (the stock 959 when none), and a race is a 959 one-make */ oneMake?: boolean }
 export interface DriveApi { /** the world held still (its picture kept) and on again */ pause(): void; resume(): void; readonly paused: boolean;
   /** the car put back behind the line (a race started again) */ restart(): void; /** another design driven (null: the car list's first) */ useDesign(d: Design | null): void;
   setTrack(id: string): void; readonly track: string; /** a race with these entrants and laps (the race tab's own fields) */ race(o: { opp?: number; lineup?: string; laps?: number; mode?: string }): void;
@@ -182,7 +186,7 @@ function dialsOf(c: Vehicle, rig: DialRig | undefined, dt: number): Float32Array
   const E = c.engine, i = inputFromVehicle(c, { boostBar: c.spec.tech?.turbo?.boost ?? 0, idle: c.spec.idle }, { fuel: 0.7 }), sw = E.gaugeSweep;   // the wheel stays still: the driver's arms do not follow it yet (S4)
   if (!E.ignition) i.on = false; else { i.on = true; if (sw > 0) { i.rpm = sweepValue(i.rpm ?? 0, sw, 0, c.spec.redline + 400); i.kmh = sweepValue(i.kmh ?? 0, sw, 0, c.spec.topKmh || 300); } }
   return stepDials(s, rig, i, dt); }
-let DESIGN: { d: Design; id: string } | null = H.design !== undefined ? (H.design ? addDesign(H.design) : null) : (() => { let q: string | null = null; try { q = new URLSearchParams(location.search).get('design'); if (q === 'stored' || q === '') q = STORE?.getItem(KEYS.testDrive) ?? null; } catch { q = null; }
+let DESIGN: { d: Design; id: string } | null = H.oneMake ? addDesign(H.design ?? stockP959()) : H.design !== undefined ? (H.design ? addDesign(H.design) : null) : (() => { let q: string | null = null; try { q = new URLSearchParams(location.search).get('design'); if (q === 'stored' || q === '') q = STORE?.getItem(KEYS.testDrive) ?? null; } catch { q = null; }
   if (!q) return null; const d = decodeDesign(q); if (!d) { console.warn('design: the link holds no design'); return null; } return addDesign(d); })();
 let dTop = 0, dTopKept = 0, dTopAt = -Infinity;
 /** the design's run recorded: a lap done (s), or the top speed now and then as it climbs */
@@ -524,15 +528,24 @@ function results() { const r = race!, me = r.player!, ord = r.order(); $('result
 const ALL_CARS = [...RACE_CARS, ...NEW_CARS, ...EXP_CARS], yearOf = (id: string) => parseInt(raceSpec(id).name, 10) || 1930;
 const ERA = { period: ALL_CARS.filter(id => yearOf(id) < 1945), modern: ALL_CARS.filter(id => yearOf(id) >= 1980), mix: ALL_CARS };
 /** the opponents as the race tab sets them: so many, from an era, mixed, or picked by hand */
-function opponents(seed: number): { ids: string[]; note: string } { const n = +$<HTMLSelectElement>('opp').value, how = $<HTMLSelectElement>('lineup').value as keyof typeof ERA | 'pick';
+function opponents(seed: number): { ids: string[]; note: string; drivers?: Record<string, { dare: number; pace: number }> } { const n = +$<HTMLSelectElement>('opp').value, how = $<HTMLSelectElement>('lineup').value as keyof typeof ERA | 'pick' | 'p959';
+  if (how === 'p959') return oneMake(n);
   if (how === 'pick') { const ids = Array.from(R.querySelectorAll<HTMLInputElement>('#picklist input:checked')).map(i => i.value).filter(id => id !== carId).slice(0, 7);
     if (ids.length) return { ids, note: '' }; }
   const pool = (how === 'pick' ? ERA.period : ERA[how]).filter(id => id !== carId), want = Math.min(n, pool.length), out: string[] = []; let r = seed;
   while (out.length < want) { r = (r * 16807) % 2147483647; const id = pool[r % pool.length]!; if (!out.includes(id)) out.push(id); }
   return { ids: out, note: how === 'pick' ? '고른 차가 없어 1930년대 차로 채웠습니다' : want < n ? `이 구성에는 ${want}대뿐입니다` : '' }; }
+/** a 959 one-make field (docs/systems/113 V0): each opponent a 959 design of its own, made a car of the lists (its mesh kept by
+ *  its shape and painted, render/car/fieldmesh.ts); the field drawn again only when a race is asked for anew (fieldSeed), not on a restart */
+let fieldSeed = 11;
+function oneMake(n: number): { ids: string[]; note: string; drivers: Record<string, { dare: number; pace: number }> } { const ids: string[] = [], drivers: Record<string, { dare: number; pace: number }> = {};
+  for (const f of oneMakeField(Math.min(7, n), fieldSeed, $<HTMLSelectElement>('skill').value as Skill)) { const spec = designSpec(f.design); addRaceCar(spec); EXP_ENGINE[spec.id] = { kind: 'ohv', layout: f.design.engine.layout };
+    const mc = { id: spec.id, name: f.design.name, mesh: () => fieldMesh(f.design, 1) }, i = MESH_CARS.findIndex(c => c.id === spec.id); if (i >= 0) MESH_CARS[i] = mc; else MESH_CARS.push(mc);
+    ids.push(spec.id); drivers[spec.id] = { dare: f.dare, pace: f.pace }; }
+  return { ids, note: '959 원메이크', drivers }; }
 function startRace() { const laps = +$<HTMLSelectElement>('laps').value; raceSeed = (raceSeed * 48271) % 2147483647;
-  const { ids: pick, note } = opponents(raceSeed), skill = $<HTMLSelectElement>('skill').value as Skill;
-  const mode = handicapOK() ? $<HTMLSelectElement>('mode').value as 'handicap' | 'scratch' : 'scratch'; race = new Race(T, [carId, ...pick], laps, carId, raceSeed, mode, skill); for (const e of race.cars) COL.equip(e.car); const me = race.player!; car = me.car; car.auto = st.auto; ignite(true); manualGear = 1; pilot = new Driver(T);
+  const { ids: pick, note, drivers } = opponents(raceSeed), skill = $<HTMLSelectElement>('skill').value as Skill;
+  const mode = handicapOK() && !drivers ? $<HTMLSelectElement>('mode').value as 'handicap' | 'scratch' : 'scratch'; race = new Race(T, [carId, ...pick], laps, carId, raceSeed, mode, skill, drivers);   /* a one-make field: one car, so one start (the book has no times between them) */ for (const e of race.cars) COL.equip(e.car); const me = race.player!; car = me.car; car.auto = st.auto; ignite(true); manualGear = 1; pilot = new Driver(T);
   seenLaps = 0; boardTick = 0; $('resmodal').hidden = true; $('results').innerHTML = ''; raceOverlay();
   others.clear(); const small = matchMedia('(pointer: coarse)').matches;
   for (const e of race.cars) if (e.driver) { const sp = new CarSprites(meshOf(e.id, numOf(e)), mm, pitchDeg, e.car.spec.steerLock * Math.PI / 180, { outline: 3, glass: 0.8 }, small ? 400 : 900); sp.prepare([0]); others.set(e, sp); }
@@ -639,9 +652,11 @@ function frame(now: number) { const el = Math.min(0.1, (now - last) / 1000); las
     if (snd) { const q = trainCars()[0]; snd.train = q ? Math.max(0, 1 - Math.hypot(q.x - car.x, q.y - car.y) / 400) : 0; } }
   drawWorld(el); drawPuffs(); drawSteam(el); if (st.cine) letterbox(); else dials(); hud(); mini(); sounds(); (live ? 0 : sprites.work(5)); if (!live) for (const sp of others.values()) sp.work(2); if (running) requestAnimationFrame(frame); else looping = false; }
 // ---- page ----
-const pick = $<HTMLSelectElement>('car'); for (const id of RACE_CARS) pick.add(new Option(raceSpec(id).name, id));
+const pick = $<HTMLSelectElement>('car'); if (!H.oneMake) { for (const id of RACE_CARS) pick.add(new Option(raceSpec(id).name, id));   // the game's page: the design alone (docs/systems/113 V0)
 { const g = document.createElement('optgroup'); g.label = '새 3D 차 (레퍼런스 시트로 제작)'; for (const id of NEW_CARS) g.append(new Option(raceSpec(id).name, id)); pick.append(g); }
-{ const g = document.createElement('optgroup'); g.label = '실험: 시대 밖의 차'; for (const id of EXP_CARS) g.append(new Option(`${raceSpec(id).name} — ${raceSpec(id).era}`, id)); pick.append(g); }
+{ const g = document.createElement('optgroup'); g.label = '실험: 시대 밖의 차'; for (const id of EXP_CARS) g.append(new Option(`${raceSpec(id).name} — ${raceSpec(id).era}`, id)); pick.append(g); } }
+// the 959 one-make field (docs/systems/113 V0): offered on the page of its own, the only field on the game's (the choice hidden)
+{ const lu = $<HTMLSelectElement>('lineup'); lu.add(new Option('959 원메이크', 'p959')); if (H.oneMake) { lu.value = 'p959'; (lu.closest('.row') as HTMLElement).hidden = true; } }
 /** the design driven: first in the car list, a way back to the builder and a note in the drive tab */
 const designBits: HTMLElement[] = [];
 function showDesign() { for (const el of designBits.splice(0)) el.remove(); if (!DESIGN) return; const g = document.createElement('optgroup'); g.label = '부품 빌더의 설계'; g.append(new Option(`${DESIGN.d.name} (설계)`, DESIGN.id)); pick.prepend(g); SHORT[DESIGN.id] = DESIGN.d.name.slice(0, 16);
@@ -653,7 +668,7 @@ pick.value = carId;
 // the race tab's own list of cars to pick as opponents (review 162)
 { const box = $('picklist'); for (const id of ALL_CARS) { const l = document.createElement('label'); l.className = 'check'; const c = document.createElement('input'); c.type = 'checkbox'; c.value = id; c.checked = ['dueSSJ35', 'fnTT33', 'bmw315'].includes(id); l.append(c, ` ${shortName(id)}`); box.append(l); }
   box.addEventListener('change', () => { const on = Array.from(box.querySelectorAll<HTMLInputElement>('input:checked')); if (on.length > 7) (on.find(i => i !== document.activeElement) ?? on[0]!).checked = false; }); }
-$<HTMLSelectElement>('lineup').addEventListener('change', e => { $('pickbox').hidden = (e.target as HTMLSelectElement).value !== 'pick'; ($('opp').closest('.row') as HTMLElement).hidden = !$('pickbox').hidden; });
+if (!H.oneMake) $<HTMLSelectElement>('lineup').addEventListener('change', e => { $('pickbox').hidden = (e.target as HTMLSelectElement).value !== 'pick'; ($('opp').closest('.row') as HTMLElement).hidden = !$('pickbox').hidden; });
 $('resclose').addEventListener('click', () => { $('resmodal').hidden = true; });
 pick.addEventListener('change', () => { carId = pick.value; if (race) stopRace(); else choose(pick.value); pick.blur(); });
 /** where the bonnet's and the driver's eyes are on this car's mesh (worked out once a mesh) */
@@ -797,11 +812,11 @@ return {
   resume() { running = true; void snd?.ctx.resume().catch(() => {}); if (!looping) { looping = true; last = performance.now(); acc = 0; requestAnimationFrame(frame); } },
   get paused() { return !running; },
   restart() { if (race) { startRace(); return; } choose(carId); camX = car.x; camY = car.y; camZ = 0; camAng = car.yaw; },
-  useDesign(d: Design | null) { DESIGN = d ? addDesign(d) : null; if (!DESIGN && carId.startsWith('design:')) carId = RACE_CARS[0]!; dTop = 0; dTopKept = 0; showDesign(); pick.value = carId;
+  useDesign(d: Design | null) { DESIGN = d ? addDesign(d) : H.oneMake ? addDesign(stockP959()) : null; if (!DESIGN && carId.startsWith('design:')) carId = RACE_CARS[0]!; dTop = 0; dTopKept = 0; showDesign(); pick.value = carId;
     if (race) stopRace(); else choose(carId); camX = car.x; camY = car.y; camZ = 0; camAng = car.yaw; },
   setTrack(id: string) { if (id === TD.id) return; $<HTMLSelectElement>('trackSel').value = id; useTrack(id); },
   get track() { return TD.id; },
-  race(o) { const set = (id: string, v: unknown) => { if (v !== undefined) $<HTMLSelectElement>(id).value = String(v); }; set('opp', o.opp); set('lineup', o.lineup); set('laps', o.laps); set('mode', o.mode);
+  race(o) { const set = (id: string, v: unknown) => { if (v !== undefined) $<HTMLSelectElement>(id).value = String(v); }; set('opp', o.opp); set('lineup', H.oneMake ? 'p959' : o.lineup); set('laps', o.laps); set('mode', o.mode); fieldSeed = (fieldSeed * 48271) % 2147483647;
     $('pickbox').hidden = $<HTMLSelectElement>('lineup').value !== 'pick'; startRace(); $('race').textContent = '다시 시작'; },
   get camera() { return camView; }, set camera(v: CamView) { if (v !== camView) useView(v); }, get cameras() { return CAM_VIEWS.map(c => c.id).filter(viewOk); },
   get speedFx() { return speedFxK; }, set speedFx(k: number) { speedFxK = Math.max(0, Math.min(1, k)); },

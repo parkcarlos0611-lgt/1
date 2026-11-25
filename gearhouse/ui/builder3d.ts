@@ -26,6 +26,7 @@ import { LIMITS, BODY_BASES, isModelBase, MODEL_OWN, BUMPERS959, LAMPS959, WHEEL
 import { STEPS, FIT_STEP, stepNo, isStep, stepFrom, seenFrom, type StepId } from './builder_steps';
 import { suspFigures, suspPanel } from './builder_susp';
 import { savedEngines, joinEngine, withEngine } from '../core/engines';
+import { ENABLED_BODIES, enabledDesign, starterDesign } from '../core/bodies';
 import { randomPlate, currentDesign, keepCurrent, savedDesigns, saveDesign, deleteDesign, fromPreset, encodeDesign, designJson, parseDesign, measured, designSig, newId, KEYS, type KeyStore } from '../core/designstore';
 import texAlb from '../assets/textures/pbr/albedo.jpg';
 import texNor from '../assets/textures/pbr/normal.jpg';
@@ -48,7 +49,8 @@ export function mountBuilder(host: BuilderHost = {}): BuilderApi {
 const R = host.root ?? document;
 const $ = <T extends HTMLElement>(id: string) => (R === document ? document.getElementById(id) : R.querySelector(`#${id}`)) as T;
 const store: KeyStore | null = (() => { try { return localStorage; } catch { return null; } })();
-let D: Design = host.design ? structuredClone(host.design) : currentDesign(store) ?? fromPreset('nsx');
+// the enabled bodies only (docs/systems/113 V0): a design on an old body is not opened; a new one starts on the 959
+let D: Design = host.design && enabledDesign(host.design) ? structuredClone(host.design) : (() => { const c = currentDesign(store); return c && enabledDesign(c) ? c : starterDesign(); })();
 
 // ---- the names on the page ----
 const BASE_NAME: Record<BodyBase, string> = { nsx: 'NSX 바탕', f355: 'F355 바탕', eb110: 'EB110 바탕', p959: '959 (모델 차체)' };
@@ -120,7 +122,7 @@ $('next').addEventListener('click', () => go(STEPS[Math.min(STEPS.length - 1, st
 $('openFiles').addEventListener('click', () => { if (onFiles) go(step); else { go('files'); drawer(true); } });
 
 // 차대: the base, its stretch, its structure
-add('chassis', seg<BodyBase>('바탕 차대', BODY_BASES.map(b => [b, BASE_NAME[b]] as [BodyBase, string]), () => D.body.base, v => { if (v === D.body.base) return;
+add('chassis', seg<BodyBase>('바탕 차대', ENABLED_BODIES.map(b => [b, BASE_NAME[b]] as [BodyBase, string]), () => D.body.base, v => { if (v === D.body.base) return;
     // a model-built body (the 959) brings its own swaps, a new plate number with them; its dimensions are its model's (zero)
     if (isModelBase(v)) { D.body.model = { ...MODEL_OWN[v], ...D.body.model, plate: plateOk(D.body.model?.plate) ? D.body.model!.plate : randomPlate() }; for (const k of DIMS) D.body[k] = 0; }
     // the tyres and the rims follow the base where they were its own
@@ -284,17 +286,18 @@ add('kit', check('ABS', () => D.kit.abs, v => { D.kit.abs = v; }, 'abs'), check(
   const row = (...els: HTMLElement[]) => { const d = document.createElement('div'); d.className = 'btns'; d.append(...els); return d; };
   const ta = document.createElement('textarea'); ta.id = 'json'; ta.placeholder = '설계 JSON을 여기에 붙여넣거나, "JSON 보기"로 지금 설계를 꺼냅니다'; ta.setAttribute('aria-label', '설계 JSON');
   const file = document.createElement('input'); file.type = 'file'; file.accept = '.json,application/json'; file.hidden = true; file.id = 'file';
-  file.addEventListener('change', () => { const f = file.files?.[0]; if (!f) return; void f.text().then(t => { const d = parseDesign(t); if (d) { use(d); flash(`불러옴: ${d.name}`); } else flash('설계 파일이 아닙니다'); file.value = ''; }); });
+  file.addEventListener('change', () => { const f = file.files?.[0]; if (!f) return; void f.text().then(t => { const d = parseDesign(t); if (d) { if (use(d)) flash(`불러옴: ${d.name}`); } else flash('설계 파일이 아닙니다'); file.value = ''; }); });
   add('files', h2('저장된 설계'), list,
-    h2('새 설계'), row(btn('NSX 바탕으로', () => { use(fromPreset('nsx')); flash('새 설계 (NSX 바탕)'); }), btn('F355 바탕으로', () => { use(fromPreset('f355')); flash('새 설계 (F355 바탕)'); }), btn('EB110 바탕으로', () => { use(fromPreset('eb110')); flash('새 설계 (EB110 바탕)'); }), btn('지금 설계 복사', () => { use({ ...structuredClone(D), id: newId(), name: `${D.name} 사본`.slice(0, 40) }); flash('사본을 만들었습니다 (아직 저장 전)'); })),
+    h2('새 설계'), row(...ENABLED_BODIES.map(b => btn(`${BASE_NAME[b]}으로`, () => { use(fromPreset(b)); flash(`새 설계 (${BASE_NAME[b]})`); })), btn('지금 설계 복사', () => { use({ ...structuredClone(D), id: newId(), name: `${D.name} 사본`.slice(0, 40) }); flash('사본을 만들었습니다 (아직 저장 전)'); })),
     h2('파일'), row(btn('JSON 파일 받기', download), btn('파일 열기', () => file.click()), btn('JSON 보기', () => { ta.value = designJson(D); ta.select(); try { void navigator.clipboard?.writeText(ta.value).catch(() => {}); } catch { /* no clipboard */ } }),
-      btn('붙여넣은 JSON 불러오기', () => { const d = parseDesign(ta.value); if (d) { use(d); flash(`불러옴: ${d.name}`); } else flash('JSON이 설계가 아닙니다'); })), ta, file,
+      btn('붙여넣은 JSON 불러오기', () => { const d = parseDesign(ta.value); if (d) { if (use(d)) flash(`불러옴: ${d.name}`); } else flash('JSON이 설계가 아닙니다'); })), ta, file,
     note('설계는 이 브라우저에만 저장됩니다. 다른 기기로 옮기려면 JSON 파일을 받거나 복사하세요.')); }
 function download() { const a = document.createElement('a'), url = URL.createObjectURL(new Blob([designJson(D)], { type: 'application/json' })); a.href = url; a.download = `${D.name.replace(/[^\w가-힣-]+/g, '_') || 'design'}.json`; document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000); }
 function showList() { const list = $('list'), all = savedDesigns(store); list.textContent = '';
   if (!all.length) { const li = document.createElement('li'); li.innerHTML = '<span>아직 저장한 설계가 없습니다</span>'; list.append(li); return; }
   for (const d of all) { const li = document.createElement('li'); if (d.id === D.id) li.className = 'me'; const s = document.createElement('span'); s.textContent = d.name; const sm = document.createElement('small'); sm.textContent = `${BASE_NAME[d.body.base]} · ${d.engine.layout} ${(d.engine.cc / 1000).toFixed(1)}`;
-    const load = document.createElement('button'); load.type = 'button'; load.className = 'btn'; load.textContent = '열기'; load.addEventListener('click', () => { use(d); flash(`열림: ${d.name}`); });
+    const load = document.createElement('button'); load.type = 'button'; load.className = 'btn'; load.textContent = '열기'; load.addEventListener('click', () => { if (use(d)) flash(`열림: ${d.name}`); });
+    if (!enabledDesign(d)) { li.classList.add('old'); sm.textContent = `${BASE_NAME[d.body.base]} · 옛 방식 · 비활성`; load.disabled = true; load.title = '이 차체는 지금 게임에서 꺼져 있습니다'; }
     const del = document.createElement('button'); del.type = 'button'; del.className = 'btn'; del.textContent = '삭제'; del.setAttribute('aria-label', `${d.name} 삭제`); del.addEventListener('click', () => { if (confirm(`"${d.name}" 설계를 지울까요?`)) { deleteDesign(store, d.id); showList(); savedState(); } });
     li.append(s, sm, load, del); list.append(li); } }
 
@@ -308,7 +311,7 @@ function changed() { D = normalise(D); for (const s of syncs) s(); keepCurrent(s
   clearTimeout(figT); figT = setTimeout(figures, 40) as unknown as number;
   if (bodyKey(D) !== meshKey) { clearTimeout(meshT); meshT = setTimeout(rebuild, 90) as unknown as number; } }
 /** another design on the bench */
-function use(d: Design) { D = structuredClone(d); $<HTMLInputElement>('name').value = D.name; lastFigs = null; restoreStep(); changed(); showList(); }
+function use(d: Design): boolean { if (!enabledDesign(d)) { flash(`옛 방식 설계는 열 수 없습니다 (${BASE_NAME[d.body.base]} · 비활성)`); return false; } D = structuredClone(d); $<HTMLInputElement>('name').value = D.name; lastFigs = null; restoreStep(); changed(); showList(); return true; }
 let flashT = 0; function flash(t: string) { $('saved').textContent = t; clearTimeout(flashT); flashT = setTimeout(savedState, 2500) as unknown as number; }
 function savedState() { const had = savedDesigns(store).find(x => x.id === D.id); $('saved').textContent = !had ? '저장 안 됨' : JSON.stringify(had) === JSON.stringify(D) ? '저장됨' : '바뀐 내용 저장 안 됨'; }
 $<HTMLInputElement>('name').addEventListener('input', e => { D.name = (e.target as HTMLInputElement).value.slice(0, 40) || '이름 없는 설계'; keepCurrent(store, D); savedState(); driveLink(); });

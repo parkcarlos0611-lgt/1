@@ -14,5 +14,5 @@ export interface ShellCtx {
   /** the screens' own layer (menus) and the pages' (builder, drive); the layer over both (a pause menu) */ layer: HTMLElement; pages: HTMLElement; over: HTMLElement;
   /** the loading cover: on with a line and a share done (0..1), or off */ loading(on: boolean, text?: string, done?: number): void;
   last(): Last | null; keepLast(l: Last): void;
-  /** the design to show and to go on with: the one on the bench, else the last saved, else the F355's */ recent(): Design;
+  /** the design to show and to go on with: the one on the bench, else the last saved, else the stock 959 (enabled bodies only, core/bodies.ts) */ recent(): Design;
 }

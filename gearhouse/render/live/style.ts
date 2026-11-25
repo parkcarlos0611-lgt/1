@@ -2,6 +2,7 @@
 // lines on the screen, each part's share of the outline, and the atlas its lamps, grilles, wheel faces and gauges are
 // painted from. Pure: the renderer (render/live/renderer.ts, look 4) and the style check page (ui/stylecheck.ts) use
 // these, and the tests check them.
+import { lampSheet } from '../car/lampart';
 import { KINDS } from '../car/mesh';
 import { interiorSheet } from '../car/interior/atlas';
 import type { GaugeCar } from '../car/interior/gauges';
@@ -34,7 +35,11 @@ export function outlineShare(name: string, kind: number): number {
 /* 'badge' is the Phorster crest (render/live/crest.ts, docs/systems/116), its far mip levels drawn flat by hand and set
    over the made ones (Atlas.mips); the last cell, 'interior', is the cabin's own sheet (render/car/interior/atlas.ts):
    the atlas's whole lower half, its regions found by the cabin's parts themselves */
-export const ATLAS_CELLS = ['headLamp', 'tailLamp', 'grille', 'wheelFace', 'gauge', 'vent', 'badge', 'interior'] as const;
+/* 'lamps' is the lamps' pictures (render/car/lampart.ts, docs/decisions 2026-11-25): two cells wide in the second row
+   (where the unused 'gauge' and 'vent' cells were), its far mip levels drawn in flat colours and set over the made ones */
+export const ATLAS_CELLS = ['headLamp', 'tailLamp', 'grille', 'wheelFace', 'lamps', 'badge', 'interior'] as const;
+/** each cell's place in the upper half: column, row, cells wide */
+const CELL_AT: Record<Exclude<AtlasCell, 'interior'>, [number, number, number]> = { headLamp: [0, 0, 1], tailLamp: [1, 0, 1], grille: [2, 0, 1], wheelFace: [3, 0, 1], lamps: [0, 1, 2], badge: [2, 1, 1] };
 export type AtlasCell = typeof ATLAS_CELLS[number];
 /** the atlas: four cells a row, each `S / 4` square, and the cabin's sheet across the lower half; RGBA, alpha 0 where a cell shows the surface's own colour */
 export interface Atlas { S: number; data: Uint8Array; /** each cell's place (u0, v0, du, dv) in 0..1, in ATLAS_CELLS' order */ rects: Float32Array;
@@ -42,7 +47,7 @@ export interface Atlas { S: number; data: Uint8Array; /** each cell's place (u0,
 export interface AtlasMip { level: number; x: number; y: number; w: number; h: number; data: Uint8Array }
 const sm = (a: number, b: number, x: number) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 /** a cell's picture at (u, v) in -1..1 (y up): [r, g, b, a] 0..1 */
-function cellAt(c: Exclude<AtlasCell, 'interior' | 'badge'>, u: number, v: number): [number, number, number, number] {
+function cellAt(c: Exclude<AtlasCell, 'interior' | 'badge' | 'lamps'>, u: number, v: number): [number, number, number, number] {
   const r = Math.hypot(u, v), a = Math.atan2(v, u), aa = 1.5 / 64;
   switch (c) {
     case 'headLamp': { if (r > 0.98) return [0, 0, 0, 0]; const bowl = 0.62 + 0.3 * (1 - r * r), ring = sm(0.8, 0.8 + aa, r) * (1 - sm(0.88, 0.88 + aa, r)), bulb = 1 - sm(0.16, 0.16 + aa, Math.hypot(u, v + 0.05));
@@ -53,10 +58,6 @@ function cellAt(c: Exclude<AtlasCell, 'interior' | 'badge'>, u: number, v: numbe
     case 'grille': { const gx = Math.abs(((u + 1) * 4) % 1 - 0.5), gy = Math.abs(((v + 1) * 4) % 1 - 0.5), wire = Math.max(sm(0.36, 0.42, gx), sm(0.36, 0.42, gy)); const k = 0.06 + 0.16 * wire; return [k, k, k * 1.05, 1]; }
     case 'wheelFace': { if (r > 0.98) return [0, 0, 0, 0]; const spoke = Math.abs(Math.sin(a * 2.5)) < 0.32 && r > 0.22 && r < 0.86 ? 0 : 1, lip = sm(0.86, 0.86 + aa, r), hub = 1 - sm(0.2, 0.2 + aa, r), nut = r > 0.1 && r < 0.16 && Math.abs(Math.sin(a * 2.5)) > 0.9 ? 1 : 0;
       const metal = 0.72 + 0.18 * (1 - r), dark = 0.08; const k = spoke === 0 ? dark : metal * (1 - 0.25 * lip) * (hub ? 0.85 : 1) * (nut ? 0.6 : 1); return [k, k, k * 1.03, 1]; }
-    case 'gauge': { if (r > 0.98) return [0, 0, 0, 0]; const ring = sm(0.86, 0.86 + aa, r); let k = 0.07 + 0.08 * ring; const tick = r > 0.66 && r < 0.8 && Math.abs(((a / (Math.PI * 2) * 24 + 24) % 1) - 0.5) > 0.42 && a < 1.9 && a > -2.6 + 0 ? 0.9 : 0;
-      const needle = Math.abs(u * Math.sin(2.3) - v * Math.cos(2.3)) < 0.025 && u * Math.cos(2.3) + v * Math.sin(2.3) > -0.05 && r < 0.7 ? 1 : 0; const red = needle ? [0.95, 0.35, 0.1] : null;
-      k = Math.max(k, tick); return red ? [red[0]!, red[1]!, red[2]!, 1] : [k, k, k, 1]; }
-    case 'vent': { const s = Math.abs(((v + 1) * 5) % 1 - 0.5), k = s > 0.3 ? 0.05 : 0.22 - 0.3 * s; return [k, k, k, 1]; }
   } }
 /** the crest's cell at `n` texels square: its baked level of that size, or the largest one sampled to it (an atlas over 1024) */
 function crestAt(n: number): Uint8Array { const L = crestLevels(), k = Math.log2(256 / n); if (Number.isInteger(k) && k >= 0 && k < L.length) return L[k]!;
@@ -67,7 +68,10 @@ function crestAt(n: number): Uint8Array { const L = crestLevels(), k = Math.log2
 export function makeAtlas(S = 1024, car?: GaugeCar): Atlas {
   const data = new Uint8Array(S * S * 4), C = S / 4, rects = new Float32Array(ATLAS_CELLS.length * 4), mips: AtlasMip[] = [];
   ATLAS_CELLS.forEach((c, i) => { if (c === 'interior') { rects.set([0, 0.5, 1, 0.5], i * 4); data.set(interiorSheet(S, car), S * (S / 2) * 4); return; }
-    const cx = (i % 4) * C, cy = Math.floor(i / 4) * C; rects.set([cx / S, cy / S, C / S, C / S], i * 4);
+    const [col, row, wide] = CELL_AT[c], cx = col * C, cy = row * C; rects.set([cx / S, cy / S, wide * C / S, C / S], i * 4);
+    if (c === 'lamps') { const W = wide * C, own = lampSheet(W); for (let y = 0; y < C; y++) data.set(own.subarray(y * W * 4, (y + 1) * W * 4), ((cy + y) * S + cx) * 4);
+      for (let lv = 2; C >> lv >= 1; lv++) mips.push({ level: lv, x: cx >> lv, y: cy >> lv, w: W >> lv, h: C >> lv, data: lampSheet(W >> lv, true, 3) });   // from a quarter size down: the flat drawings
+      return; }
     if (c === 'badge') { const own = crestAt(C); for (let y = 0; y < C; y++) data.set(own.subarray(y * C * 4, (y + 1) * C * 4), ((cy + y) * S + cx) * 4);
       for (let lv = 1; C >> lv >= 1; lv++) { const n = C >> lv; mips.push({ level: lv, x: cx >> lv, y: cy >> lv, w: n, h: n, data: crestAt(n) }); }   // each smaller level over the one the renderer makes
       return; }

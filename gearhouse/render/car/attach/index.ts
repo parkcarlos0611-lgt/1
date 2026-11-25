@@ -127,7 +127,9 @@ export function drawFit(b: Build, f: PartFit, paint: string, tint?: ArrayLike<nu
   for (const mir of f.twin ? [false, true] : [false]) { let part = -1;
     for (let t = 0; t < M.n; t++) { if (M.part[t] !== part) { part = M.part[t]!; const k = M.kind[t]!, c = tint ?? (k === P ? null : M.col.subarray(t * 3, t * 3 + 3)); b.name(M.names?.[part] ?? 'part').mat(c ? hexOf(c) : paint, M.gloss[t]!, KINDS[k] as Kind); }
       const v = (i: number): V => [M.pos[t * 9 + i * 3]!, (mir ? -1 : 1) * M.pos[t * 9 + i * 3 + 1]!, M.pos[t * 9 + i * 3 + 2]!];
-      if (mir) b.tri(v(0), v(2), v(1)); else b.tri(v(0), v(1), v(2)); } }
+      if (mir) b.tri(v(0), v(2), v(1)); else b.tri(v(0), v(1), v(2));
+      // a lens's picture goes with it (render/car/lampart.ts), the twin's mirrored as the lamp is
+      const U = M.uv; if (U && U[t * 9 + 2]) { const q = (i: number) => [U[t * 9 + i * 3]!, U[t * 9 + i * 3 + 1]!, U[t * 9 + i * 3 + 2]!]; b.art(mir ? [...q(0), ...q(2), ...q(1)] : [...q(0), ...q(1), ...q(2)]); } } }
   return f.crest ? [f.crest, ...(f.twin ? [{ ...f.crest, c: mirrorV(f.crest.c), n: mirrorV(f.crest.n), ex: mirrorV(f.crest.ex), ey: mirrorV(f.crest.ey) }] : [])] : []; }
 /** every free part of a design drawn on a car (each at its place; one whose place has left the skin is left out; a hole
  *  part only when its hole was cut: `cut`, the keys ./holes.ts cutShell cut), or the fits given */
@@ -271,21 +273,21 @@ function wingOn(b: Build, skin: Skin, pt: SkinPoint, kind: 'ring' | 'gt' | 'stay
     clear(yc, u => [x0 + u * C, zb - 0.07 * C + (u - 0.45) * C * sa]); return { chord: C, why }; }
   if (kind === 'stay') { // a blade between two end stays: each a fin raked back from a long foot on the deck's corner to the
     // blade, its top standing over the blade as an end plate; the blade turned about its mid chord at the stays' pivots
-    const C = span * 0.14, t0 = Math.max(24, span * 0.018), xb = pt.p[0] - 0.3 * C + height * 0.85, yIn = half - t0;
+    const C = span * 0.16, t0 = Math.max(28, span * 0.024), xb = pt.p[0] - 0.45 * C + height * 0.3, yIn = half - t0;
     const sec = (u: number, w: number): [number, number] => [xb + ((u - 0.5) * ca - w * sa + 0.5) * C, zb + ((u - 0.5) * sa + w * ca) * C];
-    const rings: V[][] = []; for (let i = 0; i <= 8; i++) { const y = -yIn + 2 * yIn * i / 8; rings.push(FOIL.map(([u, w]) => { const [x, z] = sec(u, w); return [x, y, z]; })); }
+    const rings: V[][] = []; for (let i = 0; i <= 8; i++) { const y = -yIn + 2 * yIn * i / 8; rings.push(FOIL.map(([u, w]) => { const [x, z] = sec(u, w * 1.5); return [x, y, z]; })); }
     b.name('wing').mat(PAINT, 0.6, 'paint'); loftOut(b, rings, true);
-    const zt = zb + 0.06 * C + 24, footF = pt.p[0] - 0.85 * C, footR = pt.p[0] + 0.5 * C, lean = span * 0.012;
+    const zt = zb + 0.07 * C + 12, footF = xb - 0.1 * C - height * 0.8, footR = xb + 0.82 * C, lean = span * 0.008;
     for (const s of [-1, 1]) { const R: V[][] = []; let lastZ = pt.p[2] - 40, hits = 0;
       const lv: [number, number, number, number][] = [[0, xb + 0.2 * C, xb + 0.92 * C, 0.3], [0.04, xb - 0.04 * C, xb + 1.08 * C, 0.5]];   // the rounded top: a level's fall, its front, its back, its half thickness
-      for (const f of [0.12, 0.3, 0.52, 0.76, 1]) lv.push([f, xb - 0.1 * C + (footF - xb + 0.1 * C) * f ** 0.85, xb + 1.12 * C + (footR - xb - 1.12 * C) * f ** 1.7, 0.5 * (1 + 0.9 * f * f)]);
+      for (const f of [0.12, 0.3, 0.52, 0.76, 1]) lv.push([f, xb - 0.04 * C + (footF - xb + 0.04 * C) * f ** 0.9, xb + 1.08 * C + (footR - xb - 1.08 * C) * f ** 1.4, 0.5 * (1 + 0.8 * f * f)]);
       for (const [f, xf, xr, th] of lv) { const Lx = xr - xf, y0 = s * (half - t0 / 2 + lean * f * f), h = th * t0, P: [number, number][] = [[xf, y0], [xf + 0.14 * Lx, y0 + h], [xr - 0.16 * Lx, y0 + h], [xr, y0], [xr - 0.16 * Lx, y0 - h], [xf + 0.14 * Lx, y0 - h]];
         R.push(P.map(([x, y]) => { const d = f > 0.1 ? down(x, y) : null; if (d) { lastZ = d.p[2] - 8; if (f === 1) hits++; } const top = zt - (f > 0 ? 9 : 0); return [x, y, f <= 0.04 ? top : top + (lastZ - top) * f] as V; })); }
       if (!hits) why ??= '윙 다리가 차체 밖에 닿습니다';
       b.name('wing').mat(PAINT, 0.6, 'paint'); loftOut(b, R, true);
       // the pivot's bolt and the angle's lock bolt on the stay's outer face
       b.name('wingBolt').mat('#1f2022', 0.4, 'plain'); for (const [u, r] of [[0.5, 8], [0.74, 5]] as const) { const [x, z] = sec(u, -0.02); disc(b, [x, s * (half + 1.2), z], r, [0, s, 0], [0, s, 0]); } }
-    clear(yIn, u => sec(u, -0.07)); return { chord: C, why }; }
+    clear(yIn, u => sec(u, -0.11)); return { chord: C, why }; }
   // the GT wing: two uprights under the blade, end plates
   const C = span * 0.18, x0 = pt.p[0] - C * 0.45;
   const sec = (u: number, w: number): [number, number] => [x0 + (u * ca - w * sa) * C, zb + (u * sa + w * ca) * C];

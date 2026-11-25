@@ -18,6 +18,7 @@ import { n33Model, N33_LUMP } from '../../render/car/n33';
 import { joinMeshes, N33_CABIN } from '../../render/car/bodies';
 import { interiorMesh, INTERIORS, TRIMS } from '../../render/car/interior';
 import { N33_PANELS } from '../../render/car/n33/check';
+import { makeAtlas } from '../../render/live/style';
 
 const N33 = process.argv.includes('n33'), CAR = N33 ? 'n33' : 'p959', out = process.argv[2] ?? '.', mm = +(process.argv.find(a => a.startsWith('mm='))?.slice(3) ?? 4), W = Math.round((N33 ? 5400 : 4800) / mm), H = Math.round(3000 / mm), BG = [206, 202, 192];
 mkdirSync(out, { recursive: true });
@@ -68,6 +69,7 @@ const PLATES = arg('plates')?.split(','), M = PLATES ? (() => { const b = new Bu
 // render/live/gpu.ts placeMesh), so plates and anything one-sided read as they do in the game
 const MIRRORED = arg('mirror') !== '0';
 if (MIRRORED) { for (let i = 1; i < M.pos.length; i += 3) M.pos[i] = -M.pos[i]!; for (let i = 1; i < NN.length; i += 3) NN[i] = -NN[i]!; }
+const UV = M.uv && M.uv.length === M.n * 9 ? M.uv : null, ATLAS = makeAtlas(2048), KIND_LENS = KINDS.indexOf('lens');
 const KIND_PAINT = KINDS.indexOf('paint'), KIND_GLASS = KINDS.indexOf('glass'), KIND_TYRE = KINDS.indexOf('tyre');
 const dot = (a: V3, b: V3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2], crs = (a: V3, b: V3): V3 => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]], un = (a: V3): V3 => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };
 interface DrawO { wires?: { P: V3[]; F: number[][] }; lines?: boolean; mesh?: boolean }
@@ -86,9 +88,13 @@ function flat(yawDeg: number, pitchDeg: number, o: DrawO = {}): Uint8Array { con
     for (let py = y0; py <= y1; py++) for (let px = x0; px <= x1; px++) { const X = px + 0.5, Y = py + 0.5, l0 = ((B[1] - C[1]) * (X - C[0]) + (C[0] - B[0]) * (Y - C[1])) / den, l1 = ((C[1] - A[1]) * (X - C[0]) + (A[0] - C[0]) * (Y - C[1])) / den, l2 = 1 - l0 - l1; if (l0 < -1e-5 || l1 < -1e-5 || l2 < -1e-5) continue;
       const d = l0 * A[2] + l1 * B[2] + l2 * C[2], zi = py * w + px; if (d >= zb[zi]!) continue; zb[zi] = d; id[zi] = M.part[t]!;
       const n = un([ns[0]![0] * l0 + ns[1]![0] * l1 + ns[2]![0] * l2, ns[0]![1] * l0 + ns[1]![1] * l1 + ns[2]![1] * l2, ns[0]![2] * l0 + ns[1]![2] * l1 + ns[2]![2] * l2]);
-      const nl = dot(n, light), lit = FORM ? Math.max(0, nl) ** 1.5 : Math.max(0, Math.min(1, (nl - 0.18) / 0.08)), sp = kind === KIND_PAINT || kind === KIND_GLASS ? Math.max(0, Math.min(1, (Math.pow(Math.max(0, dot(n, half)), 90) - 0.5) / 0.15)) : 0;
+      const nl = dot(n, light), lit = FORM ? Math.max(0, nl) ** 1.5 : Math.max(0, Math.min(1, (nl - 0.18) / 0.08)), sp = kind === KIND_PAINT || kind === KIND_GLASS ? Math.max(0, Math.min(1, (dot(n, half) - 0.9990) / 0.0006)) : 0;   // the game's own highlight: a small spot where the sun mirrors (render/live/renderer.ts frGloss)
       const sh: V3 = kind === KIND_GLASS ? [0.9, 0.95, 1] : [0.56 + 0.44 * lit, 0.6 + 0.4 * lit, 0.68 + 0.32 * lit], g = kind === KIND_TYRE ? 0.9 : 1;
-      for (let c = 0; c < 3; c++) img[zi * 3 + c] = Math.min(255, base[c]! * sh[c]! * g + sp * 90); } }
+      // a picture from the style's atlas (Mesh.uv: the crest, a lamp's insides), as the game lays it: over the face's colour; a lens shows it unshaded
+      let bc = base, own = false; if (UV && UV[t * 9 + 2]! > 0.5) { const u = UV[t * 9]! * l0 + UV[t * 9 + 3]! * l1 + UV[t * 9 + 6]! * l2, v = UV[t * 9 + 1]! * l0 + UV[t * 9 + 4]! * l1 + UV[t * 9 + 7]! * l2, ci = Math.round(UV[t * 9 + 2]!) - 1, R = ATLAS.rects.subarray(ci * 4, ci * 4 + 4);
+        const fx = (R[0]! + (0.004 + (u - Math.floor(u)) * 0.992) * R[2]!) * ATLAS.S, fy = (R[1]! + (0.004 + (v - Math.floor(v)) * 0.992) * R[3]!) * ATLAS.S, ao = (Math.min(ATLAS.S - 1, Math.floor(fy)) * ATLAS.S + Math.min(ATLAS.S - 1, Math.floor(fx))) * 4, al = ATLAS.data[ao + 3]! / 255;
+        bc = [base[0] * (1 - al) + ATLAS.data[ao]! * al, base[1] * (1 - al) + ATLAS.data[ao + 1]! * al, base[2] * (1 - al) + ATLAS.data[ao + 2]! * al]; own = al > 0.5 && kind === KIND_LENS; }
+      for (let c = 0; c < 3; c++) img[zi * 3 + c] = own ? bc[c]! : Math.min(255, bc[c]! * sh[c]! * g + sp * 90); } }
   const ink = (zi: number, a = 1) => { for (let c = 0; c < 3; c++) img[zi * 3 + c] = img[zi * 3 + c]! * (1 - a) + 22 * a; };
   const bgc = (zi: number) => !Number.isFinite(zb[zi]!);
   for (let i = 0; i < w * h; i++) if (bgc(i)) { img[i * 3] = BG[0]!; img[i * 3 + 1] = BG[1]!; img[i * 3 + 2] = BG[2]!; }

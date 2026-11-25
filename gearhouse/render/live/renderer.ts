@@ -291,6 +291,9 @@ float frGloss(vec3 n, vec3 v, vec3 l, float sh, float g) { float nh = dot(n, nor
 /** a lamp from the atlas (its face's own coordinates -1..1), lit when alight; the toon lamp where the atlas is off */
 vec3 frLamp(vec2 uv, float flag) { if (uAtlOn == 0) return toonLamp(uv, flag); vec4 a = atlasAt(vec3(uv * 0.5 + 0.5, flag < 1.5 ? 1. : 2.)); float glow = flag < 1.5 ? uLampOn : max(uLampOn * 0.35, uBrake);
   vec3 c = a.a > 0.5 ? a.rgb * (0.35 + 0.65 * uDay) : toonLamp(uv, flag); return mix(c, flag < 1.5 ? vec3(1., 0.97, 0.86) : vec3(1., 0.3, 0.2), glow * 0.85); }
+/** a lens that brings its own picture: lit by the day, and alight where the picture is bright (its lamps, not its housing) */
+vec3 frLampArt(vec3 c, float flag) { float glow = flag < 1.5 ? uLampOn : max(uLampOn * 0.35, uBrake), m = max(c.r, max(c.g, c.b));
+  return mix(c * (0.35 + 0.65 * uDay), flag < 1.5 ? vec3(1., 0.97, 0.86) : vec3(1., 0.3, 0.2), glow * 0.85 * smoothstep(0.45, 0.85, m)); }
 void main() { uEye = uCamP.w > 0.5 ? normalize(uCamP.xyz - vWorld) : uEyeD;
   if (uMode == 1) { oCol = uSil; oId = vec4(0.); oN = vec4(0.); oV = velo(); return; }
   if (uMode == 3) { oCol = vec4(uInk, 1.); oId = vec4(uObj, vPart / 255., 1.); oN = vec4(0.5, 0.5, 1., 0.); oV = velo(); return; }   /* the hull: ink, marked (alpha 1) so the outline pass leaves it be */
@@ -397,7 +400,7 @@ void main() { uEye = uCamP.w > 0.5 ? normalize(uCamP.xyz - vWorld) : uEyeD;
     float ao = rtao(vWorld, nw);
     if (uLook == 3 && uFR == 1) { vec3 fs = dot(vFS, vFS) > 1e-14 ? normalize(vFS) : nw; if (dot(fs, n) < 0.) fs = -fs;   /* the surface's normal (look 4) */
       vec4 at = atlasAt(vAtl); base = mix(base, at.rgb, at.a); vec3 col;
-      if (kind == 9 && vLamp.z > 0.5) col = frLamp(vLamp.xy, vLamp.z);
+      if (kind == 9 && vLamp.z > 0.5) col = at.a > 0.5 ? frLampArt(at.rgb, vLamp.z) : frLamp(vLamp.xy, vLamp.z);   /* a lens with its own picture (render/car/lampart.ts), else the lamp drawn by rule */
       else if (metal > 0.5 && at.a < 0.5) col = toonChrome(base, fs, uEye, uSun, sh);
       else { col = kind == 0 ? frLight3(base, fs, uSun, uEye, sh, ao, vWorld) : frLight(base, fs, uSun, sh, ao, vWorld); float g = kind == 1 ? coat : kind == 9 ? 1. : kind == 6 ? 0.3 : 0.; if (g > 0.05) col = mix(col, vec3(1.), frGloss(fs, uEye, uSun, sh, g)); }
       oCol = vec4(clamp(col, 0., 1.), 1.); oId = vec4(uObj, vPart / 255., uOutline / 8.); oN = vec4(fs * 0.5 + 0.5, 0.); oV = velo(); return; }

@@ -30,9 +30,10 @@ export function stockP959(): Design { if (!stock) { const d = fromPreset('p959',
  *  interior sets (B), its plates at their stock places (both on: the lump's are off), its stock paint */
 let stockN: Design | null = null;
 export function stockN33(): Design { if (!stockN) { const d = fromPreset('bnr33', CAR_N33);
-    // its own parts are R3's: the lump's blank bumpers and lamp bands stay, the five-spoke wheel stands in for its own
+    // its own parts (R3): the lump's stock set of free and hole parts put on at their places as the mesh is built
+    // (`stock`: render/car/bodies.ts), its own 17 inch five-spoke wheel
     const { plateF: _f, plateR: _r, ...model } = d.body.model!; void _f; void _r;
-    stockN = { ...d, id: 'n33stock', body: { ...d.body, glass: 'stock', model: { ...model, wheel: 'hollow5', plate: '33너 3300' } }, interior: { set: 'stock', trim: 'black' } }; }
+    stockN = { ...d, id: 'n33stock', body: { ...d.body, glass: 'stock', model: { ...model, wheel: 'n5', stock: true, plate: '33너 3300' } }, interior: { set: 'stock', trim: 'black' } }; }
   return structuredClone(stockN!); }
 
 /** the design to show and go on with, from the enabled ones: the one on the bench, else the last saved, else the stock 959 */

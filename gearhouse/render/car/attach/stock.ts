@@ -32,13 +32,13 @@ export function stockAims(base: Lump, dims?: Partial<FrameDims>): Aim[] { const 
   // its corners, the amber lamps beside it and the lip under it; two round tail lamps a side over the garnish band;
   // the stay wing on the deck's corners; door mirrors, flap handles, the fuel lid's line on the right rear wing, the
   // amber markers behind the front arches and one big tip at the rear left
-  const f = n33Frame(dims), at = f.at, m = at([1700, 860, 892]), w = at([4270, 0, 1000]), e = at([4560, 430, 345]), k = at([1420, 860, 640]), h = at([2790, 860, 800]), fl = at([3890, -860, 800]);
-  return [{ id: 'mirror', o: [m[0], m[1] + 700, m[2]], d: [0, -1, 0], depth: 105, scale: 0.92 }, { id: 'wingStay', o: [w[0], 0, w[2] + 2000], d: [0, 0, -1], scale: 0.97, depth: 190, tilt: 6 },
+  const f = n33Frame(dims), at = f.at, m = at([1700, 860, 892]), w = at([4235, 0, 1000]), e = at([4560, 430, 345]), k = at([1420, 860, 640]), h = at([2790, 860, 800]), fl = at([3890, -860, 800]);
+  return [{ id: 'mirror', o: [m[0], m[1] + 700, m[2]], d: [0, -1, 0], depth: 105, scale: 0.92 }, { id: 'wingStay', o: [w[0], 0, w[2] + 2000], d: [0, 0, -1], scale: 0.97, depth: 175, tilt: 6 },
     { id: 'exhaust1', o: [e[0] + 600, e[1], e[2]], d: [-1, 0, 0], scale: 1.4, depth: 30, one: true }, { id: 'marker', o: [k[0], k[1] + 700, k[2]], d: [0, -1, 0], scale: 0.9 },
     { id: 'handle', o: [h[0], h[1] + 700, h[2]], d: [0, -1, 0] }, { id: 'fuelLid', o: [fl[0], fl[1] - 700, fl[2]], d: [0, 1, 0], one: true },
     along('lampSlant', at([199, 560, 657]), [-0.813, 0.487, 0.32], { depth: 12 }), along('grilleSlot', at([115, 0, 645]), [-0.96, 0, 0.279], { depth: 22 }),
-    { id: 'intakeOpen', o: [-600, 0, at([0, 0, 335])[2]], d: [1, 0, 0], scale: 1.12, depth: 70 }, { id: 'intakeOpen', o: [-600, at([0, 345, 0])[1], at([0, 0, 508])[2]], d: [1, 0, 0], scale: 0.17, sx: 1, depth: 30 },
-    { id: 'fogLamp', o: [-600, at([0, 585, 0])[1], at([0, 0, 335])[2]], d: [1, 0, 0], scale: 1.1, depth: 16 }, { id: 'lip', o: [-600, 0, at([0, 0, 205])[2]], d: [1, 0, 0] },
+    { id: 'intakeOpen', o: [-600, 0, at([0, 0, 322])[2]], d: [1, 0, 0], scale: 1.12, depth: 70 }, { id: 'intakeOpen', o: [-600, at([0, 345, 0])[1], at([0, 0, 502])[2]], d: [1, 0, 0], scale: 0.3, sx: 0.62, depth: 45 },
+    { id: 'fogLamp', o: [-600, at([0, 585, 0])[1], at([0, 0, 322])[2]], d: [1, 0, 0], scale: 1.1, depth: 16 }, { id: 'lip', o: [-600, 0, at([0, 0, 205])[2]], d: [1, 0, 0] },
     along('tailRound', at([4555, 418, 815]), [0.975, 0.13, 0.182], { scale: 1.17, depth: 10 }), along('tailRound', at([4512, 607, 815]), [0.913, 0.358, 0.197], { scale: 1.17, depth: 10 }),
     { id: 'garnish', o: [at([4650, 0, 0])[0] + 600, 0, at([0, 0, 722])[2]], d: [-1, 0, 0] }]; }
 /** where a new part of a kind is put when the lump has no stock place for it (or that one is taken): aimed from the

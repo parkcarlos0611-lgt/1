@@ -47,6 +47,9 @@ export class Build {
   mat(colour: string, gloss = 0.2, kind: Kind = 'plain'): this { this.c = hex(colour); this.g = gloss; this.k = KINDS.indexOf(kind); this.part++; this.N[this.part] = this.nm; return this; }
   tri(a: V, b: V, c: V): this { this.P.push(...a, ...b, ...c); this.C.push(...this.c); this.G.push(this.g); this.T.push(this.part); this.K.push(this.k); this.X.push(this.x); return this; }
   quad(a: V, b: V, c: V, d: V): this { return this.tri(a, b, c).tri(a, c, d); }
+  /** picture coordinates for the triangle just added (Mesh.uv: u, v, the atlas cell + 1 for each of its corners, in their order) */
+  art(uv: readonly number[]): this { this.U.set(this.G.length - 1, uv); return this; }
+  private U = new Map<number, readonly number[]>();
   /** where the geometry has got to: pass it to tilt() to turn what is built after it */
   mark(): number { return this.P.length; }
   /** turn everything built since the mark about a line along y through o (degrees, +: the top goes forward, to -x) */
@@ -72,7 +75,8 @@ export class Build {
   line(l: MeshLine): this { this.LN.push(l); return this; }
   /** lay a decal on the paint (see Decal) */
   decal(d: Decal): this { this.D.push(d); return this; }
-  mesh(length: number): Mesh { return { ...(this.LN.length ? { partLines: this.LN.slice() } : {}), decals: this.D.slice(), n: this.G.length, pos: new Float32Array(this.P), col: new Uint8Array(this.C), gloss: new Float32Array(this.G), part: new Int16Array(this.T), kind: new Uint8Array(this.K), tex: new Uint8Array(this.X), length, names: this.N.slice() }; }
+  mesh(length: number): Mesh { const uv = this.U.size ? new Float32Array(this.G.length * 9) : null; if (uv) for (const [t, q] of this.U) uv.set(q, t * 9);
+    return { ...(this.LN.length ? { partLines: this.LN.slice() } : {}), ...(uv ? { uv } : {}), decals: this.D.slice(), n: this.G.length, pos: new Float32Array(this.P), col: new Uint8Array(this.C), gloss: new Float32Array(this.G), part: new Int16Array(this.T), kind: new Uint8Array(this.K), tex: new Uint8Array(this.X), length, names: this.N.slice() }; }
 }
 /** a body section at x: a closed ring, half-width w about y = 0, from zb up to zt; `top` and `bot` are how square the
  *  upper and lower halves are (2 a circle's roundness, 6 nearly a box); `k` points round */

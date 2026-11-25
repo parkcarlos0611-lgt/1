@@ -65,7 +65,7 @@ export function crestPlate(b: Build, m: Mark, skin: Skin): CrestFrame {
 export function crestUV(M: Mesh, f0: CrestFrame | readonly CrestFrame[], into?: Float32Array): Float32Array {
   // several crests (docs/systems/115 P1: the badge placed freely, as many as its limit): each triangle mapped from the nearest one's frame
   const fs = Array.isArray(f0) ? f0 : [f0 as CrestFrame], near = (p: V) => fs.reduce((a, g) => { const d = sub(p, g.c), e = sub(p, a.c); return dot(d, d) < dot(e, e) ? g : a; }, fs[0]!);
-  const uv = into ?? new Float32Array(M.n * 9), cell = ATLAS_CELLS.indexOf('badge') + 1, names = M.names ?? [];
+  const uv = into ?? (M.uv && M.uv.length === M.n * 9 ? M.uv : new Float32Array(M.n * 9)), cell = ATLAS_CELLS.indexOf('badge') + 1, names = M.names ?? [];
   // the shader reads a cell at 0.004 + 0.992 u of its width (render/live/renderer.ts atlasAt): undone here, so the
   // shield's box falls exactly on its texels
   const toCell = (t: number) => (t - 0.004) / 0.992, [bx, by, bw, bh] = CREST_BOX;

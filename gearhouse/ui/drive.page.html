@@ -2,7 +2,7 @@
 <title>Millbrook 시험 주행</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500&family=Noto+Sans+KR:wght@400;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;700&family=Noto+Sans+KR:wght@400;600&display=swap">
 <style>
   /* layout: the car on a strip of track surface, the controls beside it like a test bench's dials (stacked under it on a phone) */
   :root { --bg: #e9e6df; --panel: #f6f4ef; --ink: #23211d; --soft: #6b665c; --line: #cfc9bc; --accent: #a0522d; --ground: #c9c2b2; --warn: #c0392b;
@@ -33,24 +33,70 @@
   #rpmbar { height: 100%; width: 0; background: var(--accent); }
   #msg { color: var(--accent); font-weight: 600; min-height: 1.4em; }
   kbd { font: inherit; border: 1px solid var(--line); border-radius: 3px; padding: 0 4px; background: var(--panel); }
-  .pad { --b: clamp(44px, 13vw, 72px); position: absolute; inset: auto 0 0 0; display: none; justify-content: space-between; align-items: flex-end; padding: 6px; gap: 4px; pointer-events: none; }
-  .pad .side, .pad .mid { display: flex; gap: 6px; pointer-events: auto; }
-  .pad .mid { flex-direction: row; gap: 6px; position: absolute; right: 6px; bottom: calc(var(--b) * 2.5 + 16px); }   /* review 169: the gear buttons above the pedals, the bottom middle left for the gauges */
-  .pad button { width: var(--b); height: var(--b); border-radius: 50%; border: 2px solid rgba(255,255,255,0.7); background: rgba(30,28,24,0.42); color: #fff; font: 600 0.95rem var(--body); line-height: 1; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
-  .pad button.small { width: calc(var(--b) * 0.55); height: calc(var(--b) * 0.55); font-size: 0.75rem; }
-  .pad button.gas, .pad button.brake { font-size: 1rem; width: calc(var(--b) * 1.45); height: calc(var(--b) * 2.5); border-radius: 18px; position: relative; overflow: hidden; display: flex; align-items: flex-start; justify-content: center; padding-top: 10px; }   /* review 169: big pedals; alpha 0.12: upright, a throttle slid along */
-  .pad .pedal i { position: absolute; left: 0; right: 0; bottom: 0; height: 0; background: rgba(140,230,120,0.55); pointer-events: none; }   /* the pedal's opening: filled from the bottom as far as the finger is */
-  .pad .pedal.brake i { background: rgba(255,120,100,0.55); } .pad .pedal span { position: relative; pointer-events: none; }
-  .pad .pedal::after { content: ''; position: absolute; left: 18%; right: 18%; bottom: 8%; top: 30%; pointer-events: none; background: repeating-linear-gradient(transparent 0 9px, rgba(255,255,255,0.28) 9px 11px); }   /* the scale's ticks */
-  .pad .wheel { --w: calc(var(--b) * 2.3); width: var(--w); height: var(--w); border-radius: 50%; border: calc(var(--w) * 0.09) solid rgba(30,28,24,0.6); box-shadow: 0 0 0 2px rgba(255,255,255,0.7) inset, 0 0 0 2px rgba(255,255,255,0.7); background: rgba(30,28,24,0.18); position: relative; touch-action: none; pointer-events: auto; transform: rotate(var(--a, 0deg)); }
-  .pad .wheel i { position: absolute; left: 8%; right: 8%; top: 46%; height: 8%; background: rgba(30,28,24,0.6); border-radius: 4px; }
-  .pad .wheel b { position: absolute; left: 46%; width: 8%; top: 50%; bottom: 8%; background: rgba(30,28,24,0.6); border-radius: 4px; }
-  .pad .wheel::after { content: ''; position: absolute; left: 50%; top: -2px; width: 6px; height: 14%; margin-left: -3px; background: #e2574c; border-radius: 3px; }
-  .pad button.gas { background: rgba(60,120,60,0.5); } .pad button.brake { background: rgba(150,50,40,0.5); }
-  .pad button.start { width: calc(var(--b) * 0.8); height: calc(var(--b) * 0.8); font-size: 0.8rem; background: rgba(170,40,30,0.6); border-color: #f2d0a0; }   /* docs/systems/110 G1: held to crank */
-  .pad button.on { background: rgba(255,255,255,0.45); color: #222; } .pad .pedal.on { background: rgba(30,28,24,0.5); color: #fff; }
-  @media (pointer: coarse) { .pad { display: flex; } .keys-help { display: none; } .mini { width: 92px; height: 92px; } }
-  body.touch .pad { display: flex; }
+  /* docs/systems/110 G3: the cartoon HUD. The touch controls drawn as the real things (ui/hud/draw.ts): solid faces, a thick
+     black outline, a darker lower band; each placed by the layout (a phone upright, on its side) with inline sides so the
+     left-handed layout mirrors them (direction: rtl); their size and opacity from the settings (--hud-k, --hud-a) */
+  .pad { --u: calc(clamp(38px, 14vmin, 74px) * var(--hud-k, 1)); --gw: calc(var(--u) * 2.5 * 0.536); --bw: calc(var(--u) * 2.5 * 0.682); --ph: calc(var(--u) * 2.5); --ws: calc(var(--u) * 2.7);
+    position: absolute; inset: 0; display: none; pointer-events: none; direction: ltr; z-index: 2; }
+  body.hud-left .pad { direction: rtl; }
+  .pad > * { position: absolute; pointer-events: auto; opacity: var(--hud-a, 0.92); touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; background: none; border: 0; padding: 0; margin: 0; color: #fff; line-height: 0; }
+  .pad .hsvg { width: 100%; height: 100%; display: block; overflow: visible; pointer-events: none; }
+  .hsvg .hx { font-family: var(--display); font-weight: 700; font-style: italic; }
+  .pad .wheel { inset-inline-start: 14px; bottom: 10px; width: var(--ws); height: var(--ws); transform: rotate(var(--a, 0deg)); filter: drop-shadow(0 4px 0 rgba(0,0,0,0.35)); }
+  .pad .pedal { bottom: 8px; height: var(--ph); transition: filter 0.08s; filter: drop-shadow(0 4px 0 rgba(0,0,0,0.35)); }
+  .pad .pedal.gas { inset-inline-end: 12px; width: var(--gw); }
+  .pad .pedal.brake { inset-inline-end: calc(20px + var(--gw)); width: var(--bw); }
+  .pad .hand { inset-inline-end: calc(28px + var(--gw) + var(--bw)); bottom: 8px; height: calc(var(--u) * 2.1); width: calc(var(--u) * 2.1 * 0.476); filter: drop-shadow(0 4px 0 rgba(0,0,0,0.35)); }
+  .pad .hand .hb { transition: transform 0.06s; transform-box: view-box; transform-origin: 50% 80%; }
+  .pad .hand.on .hb, .pad .hand.pulled .hb { transform: translateY(26px) scale(1.08, 0.78); }
+  .pad .hand.on .hl circle:first-child, .pad .hand.pulled .hl circle:first-child { fill: #ff5a3c; }
+  .pad .shift { inset-inline-end: calc(28px + var(--gw) + var(--bw)); bottom: calc(16px + var(--u) * 2.1); display: flex; gap: 6px; align-items: flex-end; direction: ltr; }   /* − left, + right in either hand's layout; above the handbrake, under the minimap */
+  body.hud-portrait .pad .shift { inset-inline-end: calc(20px + var(--gw)); bottom: calc(16px + var(--ph)); }
+  .pad .lever { width: calc(var(--u) * 1.9 * 0.457); height: calc(var(--u) * 1.9); filter: drop-shadow(0 4px 0 rgba(0,0,0,0.35)); position: relative; }
+  .pad .lever.kick { filter: drop-shadow(0 4px 0 rgba(0,0,0,0.35)) brightness(1.25); }
+  .pad .paddle { width: calc(var(--u) * 0.86); height: calc(var(--u) * 1.2); background: none; border: 0; padding: 0; filter: drop-shadow(0 4px 0 rgba(0,0,0,0.35)); }
+  .pad .gbtn, .pad .reset { width: calc(var(--u) * 0.95); height: calc(var(--u) * 0.85); border: 3px solid #111; border-radius: 10px; background: linear-gradient(#3d9cff 0 64%, #1f6fd0 64%); box-shadow: 0 4px 0 #111;
+    font: italic 700 calc(var(--u) * 0.5)/1 var(--display); color: #fff; -webkit-text-stroke: 0.12em #111; paint-order: stroke fill; transform: skewX(-8deg); }
+  .pad .shift > * { display: none; } .pad[data-shifter="lever"] .lever, .pad[data-shifter="paddles"] .paddle { display: block; }
+  .pad[data-shifter="buttons"] .shift { flex-direction: column; } .pad[data-shifter="buttons"] .gbtn { display: block; position: static; }
+  .pad .reset { width: calc(var(--u) * 0.66); height: calc(var(--u) * 0.6); font-size: calc(var(--u) * 0.36); background: linear-gradient(#c3c5c8 0 64%, #8f9296 64%); }
+  .pad .start { width: calc(var(--u) * 1.1); height: calc(var(--u) * 1.1); border-radius: 50%; inset-inline-start: 12px; bottom: calc(18px + var(--ws)); filter: drop-shadow(0 4px 0 rgba(0,0,0,0.35)); }
+  .pad .start[data-phase="off"] { animation: hudpulse 1.4s ease-in-out infinite; }
+  .pad .reset { inset-inline-start: calc(22px + var(--u) * 1.1); bottom: calc(24px + var(--ws)); }
+  .pad button.on, .pad .lever.on { filter: drop-shadow(0 1px 0 rgba(0,0,0,0.35)); } .pad .gbtn.on, .pad .reset.on { transform: skewX(-8deg) translateY(3px); box-shadow: 0 1px 0 #111; }
+  .pad .start.on { transform: translateY(3px); }
+  @keyframes hudpulse { 50% { filter: drop-shadow(0 4px 0 rgba(0,0,0,0.35)) drop-shadow(0 0 10px rgba(255,210,31,0.9)); } }
+  @media (prefers-reduced-motion: reduce) { .pad .start[data-phase="off"] { animation: none; } }
+  /* a phone held upright: the wheel and the pedals at the bottom, the lever and the start above the pedals, the gauges above the wheel */
+  body.hud-portrait .pad { --u: calc(clamp(36px, 12.5vmin, 70px) * var(--hud-k, 1)); --ph: calc(var(--u) * 2.3); --gw: calc(var(--u) * 2.3 * 0.536); --bw: calc(var(--u) * 2.3 * 0.682); --ws: calc(var(--u) * 2.4); }
+  body.hud-portrait .pad .hand { height: calc(var(--u) * 1.9); width: calc(var(--u) * 1.9 * 0.476); }
+  body.hud-portrait .pad .start { inset-inline-start: auto; inset-inline-end: calc(20px + var(--gw)); bottom: calc(26px + var(--ph) + var(--u) * 1.9); width: var(--u); height: var(--u); }
+  body.hud-portrait .pad .reset { inset-inline-start: auto; inset-inline-end: 12px; bottom: calc(30px + var(--ph) + var(--u) * 1.9); }
+  body.hud-portrait .pad[data-shifter="buttons"] .start { bottom: calc(34px + var(--ph) + var(--u) * 1.7); }
+  @media (pointer: coarse) { .pad { display: block; } .keys-help { display: none; } .mini { width: 92px; height: 92px; } }
+  body.touch .pad { display: block; }
+  body.hud-keys .pad { display: none !important; }
+  /* the gauges: the car's own tachometer (its red line, its boost dial), the speed in big digits, the gear */
+  .hcl { --t: calc(clamp(96px, 30vmin, 150px) * var(--hud-k, 1)); position: absolute; display: flex; align-items: flex-end; pointer-events: none; z-index: 2; line-height: 1; bottom: 8px; left: 50%; transform: translateX(-50%); }
+  .htach { width: var(--t); height: var(--t); filter: drop-shadow(0 4px 0 rgba(0,0,0,0.35)); flex: none; }
+  .htach .hsvg { width: 100%; height: 100%; display: block; }
+  .hread { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; margin-left: calc(var(--t) * -0.12); margin-bottom: calc(var(--t) * 0.04); }
+  .hgear, .hspd { border: 3px solid #111; border-radius: 9px; transform: skewX(-9deg); box-shadow: 0 4px 0 rgba(0,0,0,0.35); color: #fff; font-family: var(--display); font-weight: 700; font-style: italic; -webkit-text-stroke: 0.1em #111; paint-order: stroke fill; }
+  .hgear { font-size: calc(var(--t) * 0.3); padding: 2px calc(var(--t) * 0.07) 3px; background: linear-gradient(#ffd21f 0 64%, #e7a700 64%); min-width: 1ch; text-align: center; }
+  .hgear[data-mode="A"]::after { content: 'A'; font-size: 0.4em; margin-left: 2px; color: #fff; }
+  .hspd { display: flex; align-items: baseline; gap: 4px; padding: 2px calc(var(--t) * 0.07) 4px; background: linear-gradient(#2e3238 0 64%, #1d2024 64%); }
+  .hspd b { font-size: calc(var(--t) * 0.32); min-width: 2.6ch; text-align: right; font-variant-numeric: tabular-nums; font-weight: 700; }
+  .hspd small { font-size: calc(var(--t) * 0.1); color: #ffd21f; -webkit-text-stroke: 0.08em #111; }
+  .hcl.off .htach .face { opacity: 0.55; } .hcl.off .hspd b { color: #8b9097; }
+  .hsvg .sl.blink { animation: blink 0.25s steps(2) infinite; }
+  .hwheel { position: absolute; left: 14px; bottom: 12px; width: 104px; display: none; flex-direction: column; align-items: center; gap: 4px; pointer-events: none; z-index: 2; line-height: 1; }
+  .hwheel .hw { width: 104px; height: 104px; transform: rotate(var(--a, 0deg)); filter: drop-shadow(0 3px 0 rgba(0,0,0,0.35)); } .hwheel .hw .hsvg { width: 100%; height: 100%; display: block; }
+  .hwheel b { font: italic 700 0.85rem var(--display); color: #fff; -webkit-text-stroke: 0.12em #111; paint-order: stroke fill; }
+  body.hud-portrait .hcl { --t: calc(clamp(90px, 26vmin, 130px) * var(--hud-k, 1)); left: 10px; transform: none; bottom: calc(22px + clamp(36px, 12.5vmin, 70px) * var(--hud-k, 1) * 2.4); }
+  body.hud-left.hud-portrait .hcl { left: auto; right: 10px; }
+  body.hud-pc .hcl { --t: clamp(150px, 24vh, 230px); left: auto; right: 16px; bottom: 14px; transform: none; }
+  body.hud-pc .hwheel { display: flex; }
+  body.cine .hcl, body.cine .hwheel { display: none; }
   .btn { font: inherit; padding: 8px 14px; border: 1px solid var(--line); border-radius: 4px; background: var(--bg); color: var(--ink); cursor: pointer; }
   .btn:first-child { border-color: var(--accent); color: var(--accent); font-weight: 600; }
   .board { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; font-size: 0.85rem; font-variant-numeric: tabular-nums; }
@@ -110,14 +156,31 @@
   .dials { flex: 1; overflow-y: auto; padding: 14px; display: block; }
   .dials section { display: none; gap: 14px; } .dials section.on { display: grid; }
   .dials h2 { font-size: 0.8rem; font-weight: 600; margin: 4px 0 0; color: var(--ink); }
+  /* docs/systems/110 G3: the readouts at the top as thick-outlined cards (the lap, the best lap, the place), the minimap a card, the top buttons in the secondary blue */
+  .hud { background: none; gap: 6px; padding-top: 6px; padding-bottom: 6px; padding-left: 8px; align-items: center; }
+  .hud .old { display: none; }
+  .hud .chip { display: inline-flex; align-items: baseline; gap: 6px; padding: 1px 9px 3px; border: 3px solid #111; border-radius: 8px; background: linear-gradient(#2e3238 0 64%, #1d2024 64%); box-shadow: 0 3px 0 rgba(0,0,0,0.35); transform: skewX(-9deg); font-family: var(--display); font-style: italic; font-weight: 700; line-height: 1.15; color: #fff; }
+  .hud .chip:empty { display: none; }
+  .hud .chip i { font-size: 0.72rem; color: #ffd21f; font-style: italic; letter-spacing: 0.03em; } .hud .chip b { font-size: 1.05rem; font-weight: 700; font-family: var(--display); -webkit-text-stroke: 0.1em #111; paint-order: stroke fill; }
+  .hud .chip.best i { color: #7cf09a; }
+  .hud .chip.pos { background: linear-gradient(#ffd21f 0 64%, #e7a700 64%); } .hud .chip.pos i { color: #111; } .hud .chip.pos b { font-size: 1.25rem; color: #fff; }
+  .hud #where { color: #e8e4da; text-shadow: 0 1px 2px #000; font-size: 0.72rem; }
+  .hud .heat > span { padding: 0 6px; border: 2px solid #111; border-radius: 6px; background: rgba(29,32,36,0.85); text-shadow: none; white-space: nowrap; }
+  .fsbtn { border: 3px solid #111; border-radius: 9px; background: linear-gradient(#3d9cff 0 62%, #1f6fd0 62%); box-shadow: 0 3px 0 #111; color: #fff; font-weight: 700; text-shadow: 0 1px 0 #111; }
+  .fsbtn:active { transform: translateY(2px); box-shadow: 0 1px 0 #111; }
+  .mini { border: 3px solid #111; border-radius: 12px; background: linear-gradient(rgba(46,50,56,0.82) 0 70%, rgba(29,32,36,0.86) 70%); box-shadow: 0 3px 0 rgba(0,0,0,0.35); box-sizing: border-box; }
 </style>
-<div class="screen"><div class="hud"><span><b id="spd">0</b> km/h</span><span>기어 <b id="gear">1</b></span><span><span class="bar"><span id="rpmbar"></span></span> <span id="rpm">0</span> rpm</span><span><span id="lap">-</span></span><span><span id="last">-</span></span><span><span id="best">-</span></span><span id="where"></span><span id="heat" class="heat"></span></div>
+<div class="screen"><div class="hud"><span class="old"><b id="spd">0</b> km/h</span><span class="old">기어 <b id="gear">1</b></span><span class="old"><span class="bar"><span id="rpmbar"></span></span> <span id="rpm">0</span> rpm</span><span id="lap" class="chip"></span><span id="last" class="chip"></span><span id="best" class="chip best"></span><span id="where"></span><span id="heat" class="heat"></span></div>
   <button type="button" id="fs" class="fsbtn" aria-label="전체화면">⛶</button><button type="button" id="setbtn" class="fsbtn setbtn" aria-label="설정" aria-expanded="false" aria-controls="drawer">⚙</button><button type="button" id="cambtn" class="fsbtn cambtn" aria-label="카메라 바꾸기 (C)" title="카메라 바꾸기 (C)">C</button><canvas id="mini" class="mini" width="150" height="150" aria-label="미니맵"></canvas>
   <div class="pedals" id="pedals" aria-hidden="true"><div><i id="gasbar"></i></div><div><i id="brakebar"></i></div></div><canvas id="view" width="768" height="432" aria-label="주행 화면"></canvas>
-  <div class="pad" id="pad" aria-label="터치 조작">
-    <div class="side"><div class="wheel" id="tw" role="slider" aria-label="핸들 (돌려서 조향)" aria-valuemin="-1" aria-valuemax="1" aria-valuenow="0"><i></i><b></b></div></div>
-    <div class="mid"><button type="button" data-key="c" class="small" aria-label="카메라 바꾸기">C</button><button type="button" data-key="q" class="small" aria-label="기어 내림">Q</button><button type="button" data-key="e" class="small" aria-label="기어 올림">E</button><button type="button" data-key="r" class="small" aria-label="트랙으로 복귀">R</button><button type="button" data-key="i" class="start" id="startbtn" aria-label="시동 (길게 눌러 크랭킹, 켜진 채 누르면 끄기)">시동</button></div>
-    <div class="side"><button type="button" class="pedal brake" role="slider" aria-valuemin="0" aria-valuemax="1" aria-valuenow="0" aria-label="브레이크 (위로 갈수록 세게)"><i></i><span>브레이크</span></button><button type="button" class="pedal gas" role="slider" aria-valuemin="0" aria-valuemax="1" aria-valuenow="0" aria-label="가속 (위로 갈수록 많이)"><i></i><span>가속</span></button></div>
+  <div class="hcl" id="hcl" aria-hidden="true"><div class="htach" id="htach"></div><div class="hread"><div class="hgear" id="hgear">1</div><div class="hspd"><b id="hspd">0</b><small>KM/H</small></div></div></div>
+  <div class="hwheel" id="hwheel" aria-hidden="true"><div class="hw"></div><b>0°</b></div>
+  <div class="pad" id="pad" aria-label="터치 조작" data-shifter="lever">
+    <div class="wheel" id="tw" role="slider" aria-label="핸들 (돌려서 조향)" aria-valuemin="-1" aria-valuemax="1" aria-valuenow="0"></div>
+    <button type="button" data-key="i" class="start" id="startbtn" aria-label="시동 (길게 눌러 크랭킹, 켜진 채 누르면 끄기)"></button><button type="button" data-key="r" class="reset" aria-label="트랙으로 복귀">R</button>
+    <div class="shift"><div class="lever" id="hlever" role="slider" aria-label="기어 레버 (위로 밀면 올림, 아래로 당기면 내림)" aria-valuemin="-1" aria-valuemax="1" aria-valuenow="0"></div><button type="button" data-key="q" class="paddle" id="hpadL" aria-label="기어 내림 (왼쪽 패들)"></button><button type="button" data-key="e" class="paddle" id="hpadR" aria-label="기어 올림 (오른쪽 패들)"></button><button type="button" data-key="e" class="gbtn" aria-label="기어 올림">+</button><button type="button" data-key="q" class="gbtn" aria-label="기어 내림">−</button></div>
+    <button type="button" data-key=" " class="hand" id="hhand" aria-label="핸드브레이크 (누르는 동안 뒷바퀴 잠김)"></button>
+    <button type="button" class="pedal brake" role="slider" aria-valuemin="0" aria-valuemax="1" aria-valuenow="0" aria-label="브레이크 (위로 갈수록 세게, 멈춘 채 길게: 후진)"></button><button type="button" class="pedal gas" role="slider" aria-valuemin="0" aria-valuemax="1" aria-valuenow="0" aria-label="가속 (위로 갈수록 많이)"></button>
   </div>
   <div class="lcol"><div id="raceovl" class="raceovl" hidden><table class="stand" aria-label="순위"><tbody id="stand"></tbody></table><div id="mytime" class="mytime"></div></div><div id="pbnote" class="pbnote" aria-live="polite"></div><div class="notes"><div id="msg"></div><div id="bake" class="note"></div></div></div>
   <div id="resmodal" class="resmodal" role="dialog" aria-label="레이스 결과" hidden><div class="resbox"><header><h2 id="restitle">레이스 결과</h2><button type="button" class="close" id="resclose" aria-label="결과 닫기">✕</button></header><div id="restable"></div></div></div></div>
@@ -141,6 +204,10 @@
     <label class="check"><input type="checkbox" id="lamps"> 헤드라이트 켜기 (팝업 램프는 올라옴, 브레이크등은 브레이크를 밟으면)</label>
     <button type="button" id="repair" class="btn">엔진 수리 (연습)</button>
     <label class="check"><input type="checkbox" id="touch"> 화면 버튼 보이기</label>
+    <div class="row"><label for="hudSize">화면 버튼 크기 <span class="val" id="hudSizev">100%</span></label><input type="range" id="hudSize" min="0.7" max="1.4" step="0.05" value="1"></div>
+    <div class="row"><label for="hudAlpha">화면 버튼 불투명도 <span class="val" id="hudAlphav">92%</span></label><input type="range" id="hudAlpha" min="0.35" max="1" step="0.05" value="0.92"></div>
+    <label class="check"><input type="checkbox" id="hudLeft"> 왼손 배치 (핸들은 오른쪽, 페달은 왼쪽)</label>
+    <div class="row"><label for="shifter">수동 변속 조작</label><select id="shifter"><option value="lever" selected>기어 레버 (위로 밀면 올림, 아래로 당기면 내림; F1 변속기는 패들)</option><option value="buttons">+ / − 버튼</option></select></div>
     <p class="note keys-help"><kbd>↑</kbd>/<kbd>W</kbd> 가속 · <kbd>↓</kbd>/<kbd>S</kbd> 브레이크 · <kbd>←</kbd><kbd>→</kbd>/<kbd>A</kbd><kbd>D</kbd> 조향 · <kbd>Space</kbd> 핸드브레이크 · 멈춘 채 <kbd>↓</kbd> 길게: 후진<br>수동 변속: <kbd>Q</kbd> 내림 · <kbd>E</kbd> 올림 · <kbd>R</kbd> 트랙으로 복귀 · <kbd>F</kbd> 클러치<br>시동: <kbd>I</kbd>/<kbd>Enter</kbd> 길게 (켜진 채 누르면 끄기) · 패드 <kbd>Y</kbd> 시동, <kbd>LB</kbd> 클러치<br>카메라: <kbd>,</kbd><kbd>.</kbd> 돌리기 · <kbd>PgUp</kbd><kbd>PgDn</kbd> 높이 · <kbd>-</kbd><kbd>=</kbd> 축소/확대 · <kbd>Home</kbd> 되돌리기 · <kbd>C</kbd> 시점 바꾸기 · <kbd>Shift</kbd>+<kbd>↑</kbd> 반 가속 · 설정 <kbd>Tab</kbd></p>
     <p class="note">휴대폰에서는 화면 아래로 조작합니다: 왼쪽 핸들을 돌려 조향, 오른쪽 브레이크와 가속 페달(손가락을 올릴수록 더 많이: 아래 끝 0 %, 위 끝 100 %, 떼면 0), 가운데 Q/E 기어(수동일 때)와 R 복귀. 멈춘 채 브레이크를 0.5초 넘게 누르면 후진(R)이 되고, 다시 가속을 누르면 전진합니다.</p>
   </section>

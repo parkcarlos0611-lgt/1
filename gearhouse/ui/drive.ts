@@ -48,7 +48,9 @@ import specsData from '../data/cars/specs.json';
 import { GLASS_REFL, type GlassRefl } from './shell/settings';
 import { smokeTier, gpuCaps, type SmokeSetting, type GpuCaps } from '../render/live/volume/caps';
 import { VolumeSmoke, type VolCar } from '../render/live/volume/volume';
-import { DriveCam, carEyes, nextView, perspective, pedalValue, pedalStep, dialPlace, isCamView, CAM_VIEWS, CAM_DEFAULT, type CamView, type CarEyes, type CamShot } from './drivecam';
+import { Hud } from './hud/hud';
+import { hudGaugeCar, wheelStyleOf } from './hud/logic';
+import { DriveCam, carEyes, nextView, perspective, pedalValue, pedalStep, isCamView, CAM_VIEWS, CAM_DEFAULT, type CamView, type CarEyes, type CamShot } from './drivecam';
 
 /** what a page holding the drive gives it (the game's one page, ui/shell): the root its markup is in (found there even
  *  while it is taken off the page), the one renderer shared by the screens (its sky and car textures loaded by the
@@ -99,6 +101,8 @@ let snd: Sound | null = null, lastS = 0, lastGear = 1, lastV = 0, wasAir = false
 let lookAt: [number, number, number] | null = null;   // a fixed point the camera looks at (page tests: tools set it through __drive.look)
 let car!: Vehicle, sprites!: CarSprites, carId = 'chevAB28', camX = 0, camY = 0, camZ = 0;
 const keys = new Set<string>(), input = { steer: 0, throttle: 0, brake: 0, hand: 0 }; let manualGear = 1, revHold = 0;
+// docs/systems/110 G3: the cartoon HUD (ui/hud): the controls' drawings, the gear lever's drag, the car's own tachometer
+const HUD = new Hud(R, { shift: d => press(d > 0 ? 'e' : 'q') });
 // the on-screen steering wheel (review 169): dragged round like a wheel, ±135° to full lock; let go, it springs back
 let wheelHeld = false, wheelSteer = 0;
 { const tw = document.getElementById('tw') as HTMLElement | null; if (tw) { let a0 = 0, s0 = 0; const ang = (e: PointerEvent) => { const r = tw.getBoundingClientRect(); return Math.atan2(e.clientX - (r.left + r.width / 2), -(e.clientY - (r.top + r.height / 2))); };
@@ -292,38 +296,17 @@ const MINI = $<HTMLCanvasElement>('mini'), mctx = MINI.getContext('2d')!; let mb
 function miniBox() { let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity; for (const n of T.nodes) { x0 = Math.min(x0, n.x); x1 = Math.max(x1, n.x); y0 = Math.min(y0, n.y); y1 = Math.max(y1, n.y); } const k = 130 / Math.max(x1 - x0, y1 - y0); mbox = { x0: x0 - (150 / k - (x1 - x0)) / 2, y0: y1 + (150 / k - (y1 - y0)) / 2, k }; }
 miniBox();
 const mp = (x: number, y: number): [number, number] => [(x - mbox.x0) * mbox.k, (mbox.y0 - y) * mbox.k];
-function mini() { mctx.clearRect(0, 0, 150, 150); mctx.strokeStyle = 'rgba(235,230,220,0.85)'; mctx.lineWidth = 3; mctx.beginPath(); const every = Math.max(8, Math.round(T.length / 600)); T.nodes.forEach((n, i) => { if (i % every) return; const [X, Y] = mp(n.x, n.y); if (i) mctx.lineTo(X, Y); else mctx.moveTo(X, Y); }); mctx.closePath(); mctx.stroke();
+function mini() { mctx.clearRect(0, 0, 150, 150); mctx.lineJoin = 'round'; mctx.strokeStyle = '#111'; mctx.lineWidth = 7; mctx.beginPath(); const every = Math.max(8, Math.round(T.length / 600)); T.nodes.forEach((n, i) => { if (i % every) return; const [X, Y] = mp(n.x, n.y); if (i) mctx.lineTo(X, Y); else mctx.moveTo(X, Y); }); mctx.closePath(); mctx.stroke(); mctx.strokeStyle = 'rgba(245,242,235,0.95)'; mctx.lineWidth = 3; mctx.stroke();
   { const a = T.point(START, -18), b = T.point(START, 18), [ax, ay] = mp(a.x, a.y), [bx, by] = mp(b.x, b.y); mctx.strokeStyle = '#fff'; mctx.lineWidth = 2; mctx.beginPath(); mctx.moveTo(ax, ay); mctx.lineTo(bx, by); mctx.stroke(); }
   const dots = race ? race.cars.map(e => ({ c: e.car, me: !e.driver })) : [{ c: car, me: true }];
   for (const d of dots) { const [X, Y] = mp(d.c.x, d.c.y); mctx.fillStyle = d.me ? '#ffb347' : '#9fc3ff'; mctx.beginPath(); mctx.arc(X, Y, d.me ? 4 : 3, 0, Math.PI * 2); mctx.fill(); if (d.me) { mctx.strokeStyle = '#000'; mctx.lineWidth = 1; mctx.stroke(); } } }
 // ---- steam from a boiling radiator or a blown gasket ----
-/** the dials (temporary): a speedometer and a revolution counter, bottom left, period faces */
-function dials() { const pad = document.getElementById('pad'), padOn = !!pad && getComputedStyle(pad).display !== 'none', tw = document.getElementById('tw');
-  // review 169: with the touch controls on, the gauges move right of the on-screen wheel, and its own drawn wheel is left out
-  let x0 = 8, right = VW - 8; if (padOn && tw) { const cr = cv.getBoundingClientRect(), k = cr.width / VW || 1, pd = pad!.querySelector('.pedal.brake'); x0 = Math.max(8, Math.round((tw.getBoundingClientRect().right - cr.left) / k) + 10); if (pd) right = Math.round((pd.getBoundingClientRect().left - cr.left) / k) - 8; }
-  const at = dialPlace(x0, right, VH - 8, Math.max(26, Math.min(46, Math.round(VH * 0.11))));   // a phone held upright: one above the other between the wheel and the pedals (ui/drivecam.ts)
-  const r = at.r, y = VH - r - 8, top = Math.ceil(car.spec.topKmh / 20) * 20 + 20, maxR = Math.ceil(car.spec.redline * 1.2 / 500) * 500;
-  const E = car.engine, sw = E.gaugeSweep, lit = E.ignition;   // docs/systems/110 G1: the needles' sweep at the ignition's coming on; the faces unlit when it is off
-  const dial = (cx: number, y: number, v0: number, max: number, step: number, label: string, red: number, sub: string) => { const v = sweepValue(v0, sw, 0, max); const a0 = Math.PI * 0.75, a1 = Math.PI * 2.25, ang = (x: number) => a0 + (a1 - a0) * Math.min(1, Math.max(0, x / max));
-    main.fillStyle = 'rgba(18,16,14,0.82)'; main.beginPath(); main.arc(cx, y, r, 0, Math.PI * 2); main.fill(); main.globalAlpha = lit ? 1 : 0.55; main.strokeStyle = '#b9a77e'; main.lineWidth = 2; main.stroke();
-    if (red < max) { main.strokeStyle = '#c0392b'; main.lineWidth = 3; main.beginPath(); main.arc(cx, y, r - 4, ang(red), ang(max)); main.stroke(); }
-    main.strokeStyle = '#efe7d2'; main.fillStyle = '#efe7d2'; main.font = `${Math.max(6, Math.round(r * 0.22))}px Oswald, sans-serif`; main.textAlign = 'center'; main.textBaseline = 'middle';
-    for (let x = 0; x <= max + 1e-6; x += step / 2) { const a = ang(x), big = Math.abs(x / step - Math.round(x / step)) < 1e-6, r0 = r - (big ? 8 : 5); main.lineWidth = big ? 1.5 : 1; main.beginPath(); main.moveTo(cx + Math.cos(a) * r0, y + Math.sin(a) * r0); main.lineTo(cx + Math.cos(a) * (r - 2), y + Math.sin(a) * (r - 2)); main.stroke();
-      if (big && r > 30) main.fillText(String(Math.round(x / (label === 'rpm' ? 1000 : 1))), cx + Math.cos(a) * (r - 15), y + Math.sin(a) * (r - 15)); }
-    const a = ang(v); main.strokeStyle = '#ff9f40'; main.lineWidth = 2; main.beginPath(); main.moveTo(cx - Math.cos(a) * 5, y - Math.sin(a) * 5); main.lineTo(cx + Math.cos(a) * (r - 6), y + Math.sin(a) * (r - 6)); main.stroke();
-    main.fillStyle = '#d8c9a3'; main.beginPath(); main.arc(cx, y, 3, 0, Math.PI * 2); main.fill(); main.fillStyle = '#efe7d2'; main.fillText(sub, cx, y + r * 0.45); main.font = `${Math.max(5, Math.round(r * 0.16))}px Oswald, sans-serif`; main.fillText(label === 'rpm' ? 'RPM ×1000' : 'KM/H', cx, y - r * 0.38);
-    if (label === 'rpm' && E.lamps) { main.fillStyle = '#e8503a'; main.beginPath(); main.arc(cx - r * 0.3, y + r * 0.18, Math.max(2, r * 0.07), 0, Math.PI * 2); main.fill(); main.fillStyle = '#f2b233'; main.beginPath(); main.arc(cx + r * 0.3, y + r * 0.18, Math.max(2, r * 0.07), 0, Math.PI * 2); main.fill(); }   /* the oil and charge lamps */
-    main.globalAlpha = 1; main.textAlign = 'left'; };
-  dial(at.speed[0], at.speed[1], car.speed * 3.6, top, top > 160 ? 40 : 20, 'km/h', top, `${(car.speed * 3.6).toFixed(0)}`);
-  dial(at.rpm[0], at.rpm[1], car.rpm, maxR, 1000, 'rpm', car.spec.redline, !E.fuelled ? E.label : car.reverse ? 'R' : `${car.gear}단`);
-  if (padOn) return;
-  // the steering wheel as the driver's hands have it (review 100): turned by the road wheels' angle times the ratio
-  { const cx = 8 + r * 5 + 16, rr = r * 0.8, a = -car.sw, S = steering(car.spec), l2l = 2 * car.spec.steerLock * S.ratio / 360;
-    main.save(); main.translate(cx, y); main.fillStyle = 'rgba(18,16,14,0.55)'; main.beginPath(); main.arc(0, 0, rr + 4, 0, Math.PI * 2); main.fill();
-    main.rotate(a); main.strokeStyle = '#2b2622'; main.lineWidth = 6; main.beginPath(); main.arc(0, 0, rr, 0, Math.PI * 2); main.stroke(); main.strokeStyle = '#8a6a44'; main.lineWidth = 4; main.stroke();
-    main.strokeStyle = '#c9c3b4'; main.lineWidth = 2; for (const k of [0, 1, 2]) { const t = Math.PI / 2 + k * Math.PI * 2 / 3; main.beginPath(); main.moveTo(0, 0); main.lineTo(Math.cos(t) * rr, Math.sin(t) * rr); main.stroke(); }
-    main.fillStyle = '#c0392b'; main.fillRect(-2, -rr - 3, 4, 6); main.fillStyle = '#d8c9a3'; main.beginPath(); main.arc(0, 0, rr * 0.22, 0, Math.PI * 2); main.fill(); main.restore();
-    main.fillStyle = '#efe7d2'; main.font = `${Math.max(6, Math.round(r * 0.2))}px Oswald, sans-serif`; main.textAlign = 'center'; main.fillText(`핸들 ${Math.round(car.sw * 180 / Math.PI)}°`, cx, y + rr + 4 + Math.max(6, r * 0.2)); main.fillText(`${S.ratio}:1 · ${l2l.toFixed(1)}회전`, cx, y - rr - 9); main.textAlign = 'left'; } }
+/** the gauges and the touch controls' poses (docs/systems/110 G3, ui/hud): the car's own tachometer with its boost dial,
+ *  the speed in big digits, the gear; the needles swept by the ignition coming on, at rest while it is off */
+function dials() { const E = car.engine, d = DESIGN && carId === DESIGN.id ? DESIGN.d : null;
+  HUD.setCar({ gauges: hudGaugeCar(car.spec), wheel: wheelStyleOf(d?.kit.interior), gearbox: car.gearboxType });
+  HUD.frame({ rpm: car.rpm, kmh: car.speed * 3.6, boost: car.boost * (car.spec.tech?.turbo?.boost ?? 0), gear: car.gear, reverse: car.reverse, auto: st.auto, phase: E.phase, on: E.ignition, sweep: E.gaugeSweep, lamps: E.lamps,
+    gas: Math.max(0, pedal.gas), brake: Math.max(0, pedal.brake), hand: input.hand, wheelRad: car.sw }); }
 function letterbox() { const b = Math.round(VH * 0.1); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, VW, b); ctx.fillRect(0, VH - b, VW, b);
   ctx.fillStyle = '#e9e4d8'; ctx.font = `${Math.max(7, Math.round(b * 0.42))}px Oswald, sans-serif`; ctx.textBaseline = 'middle';
   const me = race?.player, lap = me ? `${Math.min(race!.laps, me.lapAt.length)}/${race!.laps}바퀴 · ${race!.order().indexOf(me) + 1}위` : T.pieceAt(car.s);
@@ -468,15 +451,15 @@ const fmt = (t: number) => t > 0 ? `${Math.floor(t / 60)}:${(t % 60).toFixed(2).
 function hud() { for (const ev of car.engine.take()) { if (ev === 'catch') snd?.hit('catch'); const t = ENGINE_SAY[ev]; if (t) say(t); }
   const kmh = car.speed * 3.6; $('spd').textContent = kmh.toFixed(0); $('gear').textContent = car.reverse ? 'R' : String(car.gear); $('rpm').textContent = car.rpm.toFixed(0);
   ($('rpmbar') as HTMLElement).style.width = `${Math.min(100, car.rpm / car.spec.redline * 100)}%`; ($('rpmbar') as HTMLElement).style.background = car.rpm > car.spec.hpRpm * 1.05 ? 'var(--warn)' : 'var(--accent)';
-  $('lap').textContent = `이번 바퀴 ${lapStart >= 0 ? fmt(clock - lapStart) : '-'}`; $('last').textContent = `지난 ${fmt(lastLap)}`; $('best').textContent = `최고 ${fmt(bestLap)}`; $('where').textContent = T.pieceAt(car.s);
+  $('lap').innerHTML = `<i>LAP</i><b>${lapStart >= 0 ? fmt(clock - lapStart) : '-'}</b>`; $('last').innerHTML = `<i>LAST</i><b>${fmt(lastLap)}</b>`; $('last').classList.remove('pos'); $('best').innerHTML = `<i>BEST</i><b>${fmt(bestLap)}</b>`; $('where').textContent = T.pieceAt(car.s);
   { const h = car.health, w = h.warnings(car.rpm, car.spec.redline), cls = (k: string) => w.includes(k) ? (k === 'boil' ? 'boil' : 'hot') : '';
     $('heat').innerHTML = `<span class="${cls('boil') || cls('water')}">물 ${h.water.toFixed(0)}°</span><span class="${cls('oil')}">오일 ${h.oil.toFixed(0)}°</span>${h.level < 0.98 ? `<span class="hot">냉각수 ${(h.level * 100).toFixed(0)}%</span>` : ''}${w.includes('revs') ? '<span class="boil">과회전</span>' : ''}${h.failed ? `<span class="boil">${({ gasket: '개스킷 파손', valve: '밸브 손상', bearing: '베어링 소착', seized: '엔진 고착' } as Record<string, string>)[h.failed]}</span>` : ''}${techHud()}`; }
   if (car.lastFailure) { const f = car.lastFailure; car.lastFailure = null; snd?.hit('bang'); say(({ gasket: '헤드 개스킷이 나갔습니다 — 출력이 떨어지고 더 뜨거워집니다', valve: '과회전으로 밸브가 상했습니다 — 출력이 떨어집니다', bearing: '오일이 너무 뜨거워 베어링이 녹아붙었습니다 — 엔진이 멈췄습니다', seized: '과열로 엔진이 고착됐습니다 — 엔진이 멈췄습니다' } as Record<string, string>)[f]!); msgT = 6; }
   ($('gasbar') as HTMLElement).style.height = `${input.throttle * 100}%`; ($('brakebar') as HTMLElement).style.height = `${input.brake * 100}%`;
   $('bake').textContent = sprites.pending ? `그림 굽는 중 ${sprites.count}장` : ''; $('msg').textContent = msgT > 0 ? msg : '';
   if (race) { const me = race.player!, ord = race.order(), pos = ord.indexOf(me) + 1, wait = me.start - race.clock;
-    $('lap').textContent = wait > 0 ? (race.mode === 'scratch' ? `출발 신호 ${Math.ceil(wait)}` : `출발까지 ${Math.ceil(wait)}초`) : race.clock - me.start < 1.2 && race.mode === 'scratch' ? '출발!' : me.finish ? `완주 ${fmt(me.finish - me.start)}` : `${Math.min(race.laps, me.lapAt.length)}/${race.laps}바퀴 · ${fmt(race.clock - me.start)}`;
-    $('last').textContent = `${pos}/${race.cars.length}위`; $('best').textContent = '';
+    $('lap').innerHTML = '<i>LAP</i><b>' + (wait > 0 ? (race.mode === 'scratch' ? `출발 신호 ${Math.ceil(wait)}` : `출발까지 ${Math.ceil(wait)}초`) : race.clock - me.start < 1.2 && race.mode === 'scratch' ? '출발!' : me.finish ? `완주 ${fmt(me.finish - me.start)}` : `${Math.min(race.laps, me.lapAt.length)}/${race.laps} · ${fmt(race.clock - me.start)}`) + '</b>';
+    $('last').innerHTML = `<i>POS</i><b>${pos}/${race.cars.length}</b>`; $('last').classList.add('pos'); { const b = bestOf(lapTimes(me)); $('best').innerHTML = b ? `<i>BEST</i><b>${fmt(b)}</b>` : ''; }
     if (++boardTick % 6 === 0) { $('board').innerHTML = ord.map((e, k) => `<li${e === me ? ' class="me"' : ''}>${k + 1}. ${e.name}${e === me ? ' (나)' : ''} <span>${e.finish ? fmt(e.finish - e.start) : race!.clock < e.start ? `출발 ${Math.ceil(e.start - race!.clock)}초 뒤` : `${(e.dist / 1000).toFixed(2)} km`}</span></li>`).join(''); raceOverlay(); }
     myLaps(); }
   $('pbnote').textContent = clock < pbT ? pbMsg : ''; }
@@ -549,19 +532,23 @@ addEventListener('keydown', e => { if (!running) return; const k = e.key.toLower
   if (!e.repeat) press(k); });
 addEventListener('keyup', e => keys.delete(e.key.toLowerCase()));
 // the screen buttons: held while a finger is on them (several at once), a tap for gears and reset
-for (const b of Array.from(R.querySelectorAll<HTMLButtonElement>('#pad button[data-key]'))) { const k = b.dataset.key!, hold = k.startsWith('arrow') || k === 'i';   /* the start button (시동) is held to crank */
+for (const b of Array.from(R.querySelectorAll<HTMLButtonElement>('#pad button[data-key]'))) { const k = b.dataset.key!, hold = k.startsWith('arrow') || k === 'i' || k === ' ';   /* the start button (시동) is held to crank, the handbrake held to lock the rears */
   const on = (e: PointerEvent) => { e.preventDefault(); b.setPointerCapture(e.pointerId); b.classList.add('on'); if (hold) keys.add(k); else press(k); };
   const off = (e: PointerEvent) => { e.preventDefault(); b.classList.remove('on'); if (hold) keys.delete(k); };
   b.addEventListener('pointerdown', on); b.addEventListener('pointerup', off); b.addEventListener('pointercancel', off); b.addEventListener('lostpointercapture', () => { b.classList.remove('on'); if (hold) keys.delete(k); });
   b.addEventListener('contextmenu', e => e.preventDefault()); }
 $<HTMLInputElement>('touch').checked = matchMedia('(pointer: coarse)').matches; document.body.classList.toggle('touch', $<HTMLInputElement>('touch').checked);
 $<HTMLInputElement>('touch').addEventListener('change', e => document.body.classList.toggle('touch', (e.target as HTMLInputElement).checked));
+// the HUD's settings (docs/systems/110 G3): the touch controls' size and opacity, the left-handed layout, the lever or buttons
+{ const prefs = () => { const v = (id: string) => +$<HTMLInputElement>(id).value; $('hudSizev').textContent = `${Math.round(v('hudSize') * 100)}%`; $('hudAlphav').textContent = `${Math.round(v('hudAlpha') * 100)}%`;
+    HUD.setPrefs({ size: v('hudSize'), alpha: v('hudAlpha'), left: $<HTMLInputElement>('hudLeft').checked, shifter: $<HTMLSelectElement>('shifter').value === 'buttons' ? 'buttons' : 'lever' }); };
+  for (const id of ['hudSize', 'hudAlpha']) $(id).addEventListener('input', prefs); for (const id of ['hudLeft', 'shifter']) $(id).addEventListener('change', prefs); prefs(); }
 const down = (...ks: string[]) => ks.some(k => keys.has(k));
 // the touch pedals (alpha 0.12): upright throttles, pressed and slid; the finger's height on a pedal is its opening (the
 // bottom closed, the top wide open), its fill showing how far; let go, it closes. -1: no finger on it
 const pedal = { gas: -1, brake: -1 }, padIn = { gas: 0, brake: 0, steer: 0, start: false, clutch: 0 };   /* padIn: a gamepad's triggers and stick, read each frame */
-for (const b of Array.from(R.querySelectorAll<HTMLElement>('#pad .pedal'))) { const which = b.classList.contains('gas') ? 'gas' : 'brake', fill = b.querySelector<HTMLElement>('i');
-  const show = () => { const v = Math.max(0, pedal[which]); if (fill) fill.style.height = `${(v * 100).toFixed(0)}%`; b.setAttribute('aria-valuenow', v.toFixed(2)); };
+for (const b of Array.from(R.querySelectorAll<HTMLElement>('#pad .pedal'))) { const which = b.classList.contains('gas') ? 'gas' : 'brake';
+  const show = () => { b.setAttribute('aria-valuenow', Math.max(0, pedal[which]).toFixed(2)); };   /* the plate and its bar drawn by the HUD each frame (ui/hud) */
   const at = (e: PointerEvent) => { const r = b.getBoundingClientRect(); pedal[which] = pedalValue(e.clientY, r.top, r.height); show(); };
   b.addEventListener('pointerdown', e => { e.preventDefault(); b.setPointerCapture(e.pointerId); b.classList.add('on'); at(e); });
   b.addEventListener('pointermove', e => { if (b.hasPointerCapture(e.pointerId)) at(e); });
@@ -569,6 +556,7 @@ for (const b of Array.from(R.querySelectorAll<HTMLElement>('#pad .pedal'))) { co
   b.addEventListener('pointerup', off); b.addEventListener('pointercancel', off); b.addEventListener('lostpointercapture', off); b.addEventListener('contextmenu', e => e.preventDefault()); }
 /** a gamepad's right and left triggers (throttle and brake, as far as pressed) and left stick (steering), where the browser has one */
 function readPad() { padIn.gas = 0; padIn.brake = 0; padIn.steer = 0; padIn.start = false; padIn.clutch = 0; let g: Gamepad | null | undefined; try { g = Array.from(navigator.getGamepads?.() ?? []).find(q => q?.connected); } catch { g = null; } if (!g) return;
+  if (g.buttons.some(b => b.pressed) || g.axes.some(a => Math.abs(a) > 0.3)) HUD.keysUsed();   /* docs/systems/110 G3 */
   padIn.gas = g.buttons[7]?.value ?? 0; padIn.brake = g.buttons[6]?.value ?? 0; padIn.start = !!g.buttons[3]?.pressed; padIn.clutch = g.buttons[4]?.value ?? 0;   /* Y: the start (held), LB: the clutch */ const a = g.axes[0] ?? 0; padIn.steer = Math.abs(a) > 0.08 ? -a : 0; }
 function controls(dt: number): Controls { const left = down('arrowleft', 'a'), right = down('arrowright', 'd'), want = left === right ? 0 : left ? 1 : -1;
   if (wheelHeld) input.steer = wheelSteer; else if (padIn.steer && !left && !right) input.steer = padIn.steer; else
@@ -658,8 +646,8 @@ function useView(v: CamView, announce = false) { if (perspective(v) && !live) v 
  *  picture leave it clear (none: the rig's own); measured again after each resize */
 let aimY: number | undefined, aimAt = -1;
 function carAim(): number | undefined { if (aimAt === fitN) return aimY; aimAt = fitN; aimY = undefined; const W = innerWidth, Hh = innerHeight, x0 = W * 0.32, x1 = W * 0.68; let top = 0;
-  const pad = document.getElementById('pad'); if (pad && getComputedStyle(pad).display !== 'none') for (const e of Array.from(pad.querySelectorAll<HTMLElement>('button, .wheel'))) { const r = e.getBoundingClientRect(); if (r.width && r.right > x0 && r.left < x1) top = Math.max(top, (Hh - r.top) / Hh); }
-  if (!st.cine) { const r = Math.max(26, Math.min(46, Math.round(VH * 0.11))); top = Math.max(top, (2 * r + 12) / VH); }   /* the gauges, bottom left of the middle */
+  const pad = document.getElementById('pad'); if (pad && getComputedStyle(pad).display !== 'none') for (const e of Array.from(pad.querySelectorAll<HTMLElement>('button, .wheel, .lever'))) { const r = e.getBoundingClientRect(); if (r.width && r.right > x0 && r.left < x1) top = Math.max(top, (Hh - r.top) / Hh); }
+  if (!st.cine) { const g = document.getElementById('hcl')?.getBoundingClientRect(); if (g && g.width && g.right > x0 && g.left < x1) top = Math.max(top, (Hh - g.top) / Hh); }   /* the gauges (docs/systems/110 G3) */
   if (top > 0) aimY = Math.min(0.66, Math.max(0.52, 1 - top - 0.12)); return aimY; }
 const setCine = (on: boolean) => { st.cine = on; ($('cine') as HTMLInputElement).checked = on; document.body.classList.toggle('cine', on); shot.until = 0; fit(); };
 $<HTMLInputElement>('cine').addEventListener('change', e => useView((e.target as HTMLInputElement).checked ? 'cine' : CAM_DEFAULT));

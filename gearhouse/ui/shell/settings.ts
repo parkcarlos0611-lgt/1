@@ -28,7 +28,8 @@ export interface Settings {
     /** 선 굵기: the drift-game style's lines (the outline, the character lines, the panel lines) scaled together (docs/systems/109 §5) */ lineWeight: LineWeight };
   sound: { /** the engine and the place in the drive */ on: boolean; volume: number; /** the menus' short sounds */ ui: boolean };
   controls: { /** the drive's screen buttons: by the screen's kind (a touch screen shows them), always, never */ touch: 'auto' | 'on' | 'off'; auto: boolean; tcs: boolean; assist: boolean; progressive: boolean;
-    /** the ignition (docs/systems/110 G1): 직접 시동 (held start control, the default) or 자동 시동 (running at once, as before); stalling a manual box (off: it never stalls) */ ignition: 'direct' | 'auto'; stall: boolean };
+    /** the ignition (docs/systems/110 G1): 직접 시동 (held start control, the default) or 자동 시동 (running at once, as before); stalling a manual box (off: it never stalls) */ ignition: 'direct' | 'auto'; stall: boolean;
+    /** the driving HUD (docs/systems/110 G3): the touch controls' size (0.7..1.4) and opacity (0.35..1), the left-handed layout, the manual box's lever or +/- buttons */ hudSize: number; hudAlpha: number; leftHand: boolean; shifter: 'lever' | 'buttons' };
   screen: { theme: 'auto' | 'light' | 'dark'; /** fewer moving things (the fades, the turntable) */ calm: boolean };
   /** the sandbox's rules (alpha 0.12): the technologies held to their years (docs/systems/101 1-2 ⑦; off, and in 0.12
    *  only shown as the engine designer's year tags) */
@@ -40,7 +41,7 @@ export const SETTINGS_KEY = 'gearhouse.settings.v1';
 export const DEFAULTS: Settings = {
   graphics: { live: true, look: 'drift', photoGround: true, hdri: true, blur: true, scenery: 'mid', glassRefl: 'mid', smoke: 'mid', smokeSize: 'big', lineWeight: 'normal' },
   sound: { on: false, volume: 0.7, ui: false },
-  controls: { touch: 'auto', auto: true, tcs: true, assist: false, progressive: false, ignition: 'direct', stall: true },
+  controls: { touch: 'auto', auto: true, tcs: true, assist: false, progressive: false, ignition: 'direct', stall: true, hudSize: 1, hudAlpha: 0.92, leftHand: false, shifter: 'lever' },
   screen: { theme: 'auto', calm: false },
   sandbox: { eraLimit: false, physics: 'kinematic' },
   camera: { view: CAM_DEFAULT },
@@ -50,13 +51,15 @@ const obj = (v: unknown): Record<string, unknown> => v && typeof v === 'object' 
 const bool = (v: unknown, d: boolean) => typeof v === 'boolean' ? v : d;
 const one = <T>(v: unknown, of: readonly T[], d: T): T => of.includes(v as T) ? v as T : d;
 const unit = (v: unknown, d: number) => typeof v === 'number' && Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : d;
+const within = (v: unknown, lo: number, hi: number, d: number) => typeof v === 'number' && Number.isFinite(v) ? Math.max(lo, Math.min(hi, v)) : d;
 /** any value made into settings: the fields it has right, the rest the defaults */
 export function asSettings(v: unknown): Settings { const o = obj(v), g = obj(o.graphics), s = obj(o.sound), c = obj(o.controls), sc = obj(o.screen), sb = obj(o.sandbox), cm = obj(o.camera), D = DEFAULTS;
   return {
     graphics: { live: bool(g.live, D.graphics.live), look: one(g.look, LOOKS_ON, D.graphics.look), photoGround: bool(g.photoGround, D.graphics.photoGround), hdri: bool(g.hdri, D.graphics.hdri), blur: bool(g.blur, D.graphics.blur), scenery: one(g.scenery, ['low', 'mid', 'high'] as const, D.graphics.scenery), glassRefl: one(g.glassRefl, ['off', 'weak', 'mid'] as const, D.graphics.glassRefl), smoke: one(g.smoke, ['off', 'parcels', 'mid', 'high'] as const, D.graphics.smoke), smokeSize: one(g.smokeSize, ['normal', 'big'] as const, D.graphics.smokeSize), lineWeight: one(g.lineWeight, ['thin', 'normal', 'bold', 'heavy'] as const, D.graphics.lineWeight) },
     sound: { on: bool(s.on, D.sound.on), volume: unit(s.volume, D.sound.volume), ui: bool(s.ui, D.sound.ui) },
     controls: { touch: one(c.touch, ['auto', 'on', 'off'] as const, D.controls.touch), auto: bool(c.auto, D.controls.auto), tcs: bool(c.tcs, D.controls.tcs), assist: bool(c.assist, D.controls.assist), progressive: bool(c.progressive, D.controls.progressive),
-      ignition: one(c.ignition, ['direct', 'auto'] as const, D.controls.ignition), stall: bool(c.stall, D.controls.stall) },
+      ignition: one(c.ignition, ['direct', 'auto'] as const, D.controls.ignition), stall: bool(c.stall, D.controls.stall),
+      hudSize: within(c.hudSize, 0.7, 1.4, D.controls.hudSize), hudAlpha: within(c.hudAlpha, 0.35, 1, D.controls.hudAlpha), leftHand: bool(c.leftHand, D.controls.leftHand), shifter: one(c.shifter, ['lever', 'buttons'] as const, D.controls.shifter) },
     screen: { theme: one(sc.theme, ['auto', 'light', 'dark'] as const, D.screen.theme), calm: bool(sc.calm, D.screen.calm) },
     sandbox: { eraLimit: bool(sb.eraLimit, D.sandbox.eraLimit), physics: one(sb.physics, ['kinematic', 'old'] as const, D.sandbox.physics) }, camera: { view: isCamView(cm.view) ? cm.view : D.camera.view } }; }
 export function loadSettings(st: KeyStore | null): Settings { try { const t = st?.getItem(SETTINGS_KEY); return asSettings(t ? JSON.parse(t) : null); } catch { return asSettings(null); } }

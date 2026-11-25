@@ -108,6 +108,9 @@ export function settingsScreen(ctx: ShellCtx): Screen<never> {
       slider('음량', [0, 1, 0.05], S().sound.volume, v => set(s => { s.sound.volume = v; }), v => `${Math.round(v * 100)} %`),
       toggle('메뉴 소리 (버튼, 이동)', S().sound.ui, v => set(s => { s.sound.ui = v; })));
     const ctl = pane(chips('화면 버튼 (핸들, 페달)', [['auto', '자동 (터치 화면)'], ['on', '항상'], ['off', '끄기']], S().controls.touch, v => set(s => { s.controls.touch = v; })),
+      // docs/systems/110 G3: the driving HUD's touch controls
+      slider('화면 버튼 크기', [0.7, 1.4, 0.05], S().controls.hudSize, v => set(s => { s.controls.hudSize = v; }), v => `${Math.round(v * 100)}%`), slider('화면 버튼 불투명도', [0.35, 1, 0.05], S().controls.hudAlpha, v => set(s => { s.controls.hudAlpha = v; }), v => `${Math.round(v * 100)}%`),
+      toggle('왼손 배치 (핸들 오른쪽, 페달 왼쪽)', S().controls.leftHand, v => set(s => { s.controls.leftHand = v; })), chips('수동 변속 조작', [['lever', '기어 레버 (F1은 패들)'], ['buttons', '+ / − 버튼']], S().controls.shifter, v => set(s => { s.controls.shifter = v; })),
       toggle('자동 변속', S().controls.auto, v => set(s => { s.controls.auto = v; })), toggle('트랙션 보조 (키보드용)', S().controls.tcs, v => set(s => { s.controls.tcs = v; })),
       toggle('카운터스티어 보조', S().controls.assist, v => set(s => { s.controls.assist = v; })), toggle('가속 게이지 모드 (오래 누를수록 차오름)', S().controls.progressive, v => set(s => { s.controls.progressive = v; })),
       chips('시동', [['direct', '직접 시동 (I/Enter 길게)'], ['auto', '자동 시동']], S().controls.ignition, v => set(s => { s.controls.ignition = v; })), toggle('시동 꺼짐 (수동 변속, 직접 시동)', S().controls.stall, v => set(s => { s.controls.stall = v; })),

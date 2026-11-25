@@ -17,7 +17,7 @@ export interface Panel { name: string; rows: [number, number]; cols: [number, nu
 export const PANELS: Panel[] = [
   { name: 'bonnet', rows: [0, 10], cols: [0, 3] },
   { name: 'wingF top (pod)', rows: [3, 10], cols: [3, 6], across: 1, why: 'the pod rises out of the bonnet\'s valley: hollow at its foot, round over its crest' },
-  { name: 'wingF side', rows: [0, 5], cols: [6, 9] },
+  { name: 'wingF side', rows: [0, 4], cols: [7, 9] },
   { name: 'roof', rows: [14, 19], cols: [0, 3] },
   { name: 'door', rows: [10, 16], cols: [5, 9] },
   { name: 'door lower (flat)', rows: [11, 16], cols: [8, 9], flat: 2 },

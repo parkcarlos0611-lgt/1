@@ -19,6 +19,7 @@
 //   Gear ratios other than the Model T's, drag areas, centres of gravity: [?]. The tyres' grip on dry concrete (0.78)
 //   [?]: period tests found about 0.4 sliding on wet concrete.
 import specs from '../data/cars/specs.json';
+import type { AutoBox } from './autobox';
 
 export interface RaceSpec {
   id: string; name: string; mass: number; wheelbase: number; track: number; tyreR: number; tyreW: number;
@@ -63,8 +64,10 @@ export interface RaceSpec {
      *  whole of shiftT. 'f1': an electro-hydraulic automated manual (the same gears, a robotised single-plate clutch and
      *  shift, paddles, no clutch pedal): a shift of shiftT cuts the torque as the clutch opens, swaps the gear with it open,
      *  and refills it as the clutch closes; downshifts blip the throttle to the new gear's revs; the control unit refuses a
-     *  downshift that would over-rev, steps one gear a pull, and makes the standing start on its own launch-clutch curve */
-    gearbox?: 'manual' | 'f1';
+     *  downshift that would over-rev, steps one gear a pull, and makes the standing start on its own launch-clutch curve.
+     *  'auto' (docs/systems/119 K4, race/autobox.ts): a torque-converter automatic, its converter and box in `auto`
+     *  (absent: autoBoxOf the car's figures) */
+    gearbox?: 'manual' | 'f1' | 'auto'; auto?: AutoBox;
     /** review 158: electronically controlled dampers: multipliers on the damping coefficient. 'sport' fixed; 'comfort'
      *  softer at low speed, firming by speedK of itself per 100 km/h (up to the sport setting) */
     damp?: { comfort: number; sport: number; speedK?: number };

@@ -24,6 +24,7 @@
 //           where the power meets the drag and the rolling resistance, comes at the power peak in top gear.
 //   class, cost, reliability: designFigures (the class from the figures, doc 99 6-2; cost and reliability placeholders
 //           until B5).
+import { AUTO_GEARSETS, autoBoxOf, capacity, converter, upRpm } from './autobox';
 import type { Design, BodyBase, Structure, Panels, Interior } from '../core/design';
 import { DESIGN_NSX, DESIGN_F355, DESIGN_EB110, DESIGN_P959, DESIGN_BNR33 } from '../core/design';
 import { type RaceSpec, torqueAt, EPS_SPEED_SENSITIVE } from './cars';
@@ -94,7 +95,8 @@ function parts(d: Design, L: number): { m: number; x: number; z: number }[] {
   // the transaxle: 52 kg as a five-speed, 60 as a six; the F1's hydraulics 10; a limited-slip differential 4;
   // four-wheel drive 80 (a centre differential and its coupling with its transfer gears, a propeller shaft, the front
   // differential and shafts)
-  const box = (D.gears === 5 ? 52 : 60) + (D.gearbox === 'f1' ? 10 : 0) + (D.lsd ? 4 : 0);
+  // the automatic (docs/systems/119 K4): its converter with its fluid, the planetary sets and the valve body, 70 + 6 a gear over four
+  const box = (D.gearbox === 'auto' ? 70 + 6 * (D.gears - 4) : D.gears === 5 ? 52 : 60) + (D.gearbox === 'f1' ? 10 : 0) + (D.lsd ? 4 : 0);
   // a wheel with its tyre: about 0.0055 kg per mm of width per inch of rim (the NSX's 225/50 R16 about 20 kg)
   const wheel = (w: number) => w * K.rim * 0.0055, rF = tyreR(K.tyres[0], K.rim), rR = tyreR(K.tyres[1], K.rim);
   const steer = K.steering === 'hydraulic' ? 9 : K.steering === 'electric' ? 7 : 0;
@@ -161,11 +163,17 @@ export function topSpeed(s: RaceSpec): number {
  *  run is the measure) */
 export function zeroTo100(s: RaceSpec): number {
   const dt = 0.005, mu = 1.12 * 0.92, Iw = 4 * (s.inertia?.wheel ?? 1.3), Ie = s.inertia?.engine ?? 0.12, awd = !!s.tech?.drive, up = Math.min(s.hpRpm * 1.04, s.redline * 0.92);
+  // the automatic (docs/systems/119 K4): no launch revs; the engine runs where its full-throttle torque meets the
+  // converter's (found by halving), the turbine taking that times the torque ratio; its shift a torque cut, not a gap
+  const B = s.tech?.gearbox === 'auto' ? s.tech.auto ?? autoBoxOf(s) : null, C0 = B ? capacity(s, B) : 0, upA = B ? upRpm(s, 1) : up;
   let v = 0, t = 0, gear = 0, shift = 0;
   while (v < 100 / 3.6 && t < 30) {
     const g = s.gears[gear]! * s.final, wheelRpm = v / s.tyreR * g * 30 / Math.PI;
-    if (wheelRpm > up && gear < s.gears.length - 1) { gear++; shift = s.shiftT ?? 0.25; continue; }
-    const rpm = Math.max(wheelRpm, s.launchRpm ?? s.hpRpm * 0.6), drive = shift > 0 ? 0 : torqueAt(s, rpm) * g * s.eff / s.tyreR;
+    if (wheelRpm > upA && gear < s.gears.length - 1) { gear++; shift = B ? B.shiftT : s.shiftT ?? 0.25; continue; }
+    let rpm = Math.max(wheelRpm, s.launchRpm ?? s.hpRpm * 0.6), drive = shift > 0 ? 0 : torqueAt(s, rpm) * g * s.eff / s.tyreR;
+    if (B) { let a = Math.max(wheelRpm, s.idle), b = s.redline; const k = Math.PI / 30;
+      for (let i = 0; i < 30; i++) { const e = (a + b) / 2; if (torqueAt(s, e) > converter(C0, B, e * k, wheelRpm * k).Ti) a = e; else b = e; }
+      rpm = (a + b) / 2; drive = converter(C0, B, rpm * k, wheelRpm * k).Tt * (shift > 0 ? 0.55 : 1) * g * s.eff / s.tyreR; }
     const meff = s.mass + (Iw + (wheelRpm >= rpm ? Ie * g * g : 0)) / s.tyreR ** 2, a0 = drive / meff;
     const load = awd ? s.mass * G : s.mass * G * (1 - s.frontShare) + s.mass * a0 * s.cgH / s.wheelbase, grip = mu * load;
     const F = Math.min(drive, grip) - 0.5 * RHO * dragArea(s) * v * v - s.crr * s.mass * G;
@@ -187,8 +195,8 @@ export function designSpec(d: Design): RaceSpec {
   // engine down to it (the whole curve in proportion); its top speed is held by a limiter. No class chosen: neither
   const T = classOf(d), cut = restrictorShare(en.hp, T);
   const cd = B.cdA / frontal(B, B.width), shape = shapeK(d) / shapeK(B.ref);
-  const rearW = K.tyres[1], R = tyreR(rearW, K.rim), gears = GEARSETS[D.gears];
-  const eff = (D.gears === 5 ? 0.9 : 0.88) - (D.awd ? 0.03 : 0);   // the NSX's five-speed 0.9, the F355's six 0.88; the front drive's gears
+  const rearW = K.tyres[1], R = tyreR(rearW, K.rim), AT = D.gearbox === 'auto', gears = AT ? AUTO_GEARSETS[D.gears] : GEARSETS[D.gears === 4 ? 5 : D.gears];
+  const eff = (AT ? 0.86 : D.gears === 5 ? 0.9 : 0.88) - (D.awd ? 0.03 : 0);   // the automatic's pump, its clutches' drag and planetary sets: 0.86 (its converter's slip on top, in the physics)   // the NSX's five-speed 0.9, the F355's six 0.88; the front drive's gears
   const launch = Math.round((E.turbo ? Math.max(en.torqueRpm * 0.93, en.turbo!.full * 1.2) : en.torqueRpm * 0.93) / 100) * 100;
   const tech: NonNullable<RaceSpec['tech']> = { rollF: 0.47, tyreWF: K.tyres[0] / 1000, tyreWR: rearW / 1000, gearbox: D.gearbox };
   if (D.lsd) tech.rearLsd = 1.9;                                   // a torque-sensing differential (the NSX's 2.0, the F355's 1.8)
@@ -208,7 +216,7 @@ export function designSpec(d: Design): RaceSpec {
   const s: RaceSpec = { id: 'design:' + d.id, name: d.name, mass: M.mass, wheelbase: M.L, track: B.track + (2 * d.body.width + d.body.track) / 1000, tyreR: R, tyreW: (K.tyres[0] + rearW) / 2000,
     cgH: M.cgH, frontShare: M.front, hp: en.hp * cut, hpRpm: en.hpRpm, torqueRpm: en.torqueRpm, torquePeak: en.torquePeak * cut, idle: E.layout === 'V6' ? 800 : 1000, redline: E.redline,
     gears, final: D.final || 3.5, eff, brakes: 'disc', hydraulic: true, brakeG: 1.0, cdA: cd * frontalArea(d) * shape + F.cdA + (P?.cdA ?? 0), crr: 0.012, steerLock: 30, topKmh: 0, check: false,
-    cooling: { siphon: false, margin: (E.turbo ? 1.1 : 1.15) * (P ? coolingShare(d, en.hp * cut) ** 0.35 : 1) }, tyreKind: 'radial', era: '1990s', shiftT: D.gearbox === 'f1' ? 0.2 : D.gears === 5 ? 0.22 : 0.27, launchRpm: launch,
+    cooling: { siphon: false, margin: (E.turbo ? 1.1 : 1.15) * (P ? coolingShare(d, en.hp * cut) ** 0.35 : 1) }, tyreKind: 'radial', era: '1990s', shiftT: D.gearbox === 'f1' ? 0.2 : AT ? 0.4 : D.gears === 5 ? 0.22 : 0.27, launchRpm: launch,
     steer: { ratio: K.steering === 'manual' ? 19.5 : 19, ackermann: 0.6, rack: true },
     // the engine's turning mass: its size, a V12's longer crank, a racing engine's lighter flywheel and internals
     inertia: { engine: (0.06 + E.cc * 0.00002 + (E.layout === 'V12' ? 0.02 : 0)) * (E.grade >= 4 ? 0.85 : 1), wheel: 1.3 + 0.0025 * (rearW - 225) + 0.02 * (K.rim - 16) },
@@ -216,6 +224,7 @@ export function designSpec(d: Design): RaceSpec {
     body: d.body.base, tech };
   // alpha 0.13 (M4): the suspension's linkage as the car's mesh is built with it, for the kinematic physics (race/kin.ts)
   { const k = designSusp(d); if (k) s.kin = k; }
+  if (AT) tech.auto = autoBoxOf(s);   // the torque-converter automatic's converter and lock-up (docs/systems/119 K4)
   if (!D.final) {   // the final drive for the top speed: the power peak in top gear where the power meets the resistance
     const P = s.hp * HP * s.eff, cd = dragArea(s); let v = 50; for (let k = 0; k < 60; k++) v = Math.cbrt(Math.max(1, P - s.crr * s.mass * G * v) / (0.5 * RHO * cd));
     s.final = Math.min(4.8, Math.max(2.8, s.hpRpm * Math.PI / 30 * R / (v * gears[gears.length - 1]!))); }
@@ -275,7 +284,7 @@ function rawCost(d: Design): number {
   const D = d.drive, K = d.kit, L = wheelbase(d), size = sizeOf(d, L);
   const engine = engineCost(d);   // race/designparts.ts: the grade, the size, the details, the parts' quality
   const body = 25 * STRUCTURE_COST[d.body.structure] * size + 10 * PANEL_COST[d.body.panels] * size + 10;
-  const drive = (D.gears === 5 ? 7 : 8) + (D.gearbox === 'f1' ? 4 : 0) + (D.lsd ? 1.5 : 0) + (D.awd ? 8 : 0);
+  const drive = (D.gearbox === 'auto' ? 7 + D.gears - 4 : D.gears === 5 ? 7 : 8) + (D.gearbox === 'f1' ? 4 : 0) + (D.lsd ? 1.5 : 0) + (D.awd ? 8 : 0);
   const kit = { light: 5, standard: 0, luxury: 6 }[K.interior] + (K.abs ? 3 : 0) + (K.tcs ? 2 : 0) + { manual: 0, hydraulic: 1.5, electric: 2 }[K.steering] + (K.dampers === 'adaptive' ? 3 : 0) + (K.wing ? 1.5 : 0) + (K.diffuser ? 2 : 0)
     + (K.tyres[0] + K.tyres[1]) * K.rim / 8000;
   return engine + body + drive + kit + fitPenalty(d).cost; }

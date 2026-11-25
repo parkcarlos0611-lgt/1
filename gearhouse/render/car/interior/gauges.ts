@@ -56,7 +56,7 @@ export const DIAL_BONES = 2 + DIAL_IDS.length + 15 + 5;
 /** what the instruments read: the drive's state, in the dials' own units. Anything left out rests */
 export interface InteriorInput { /** the engine running (off: every needle falls to its rest) */ on?: boolean; rpm?: number; /** km/h */ kmh?: number; /** bar over the air's */ boost?: number; /** deg C */ oilTemp?: number; water?: number; /** bar */ oilPress?: number; /** 0..1 */ oilLevel?: number; fuel?: number; /** the steering wheel's angle (rad, to the left +) */ steer?: number;
   /** the driver's controls (docs/systems/118 D2): the pedals (0..1), the gear (and reverse), the box's forward gears, a paddle box (no lever), the handbrake (0..1), the starter turning, the engine running */
-  throttle?: number; brake?: number; clutch?: number; gear?: number; reverse?: boolean; gears?: number; paddles?: boolean; handbrake?: number; cranking?: boolean; running?: boolean;
+  throttle?: number; brake?: number; clutch?: number; gear?: number; reverse?: boolean; gears?: number; paddles?: boolean; /** a torque-converter automatic (docs/systems/119 K4): its selector stays in D, no clutch, no reach on a shift */ selector?: boolean; handbrake?: number; cranking?: boolean; running?: boolean;
   /** the body's motion (the head's sway): its accelerations along and across (m/s², forward and left +), its velocity in its own axes (m/s), its yaw rate (rad/s, left +), the road's knock (m/s up the springs) */
   ax?: number; ay?: number; vx?: number; vy?: number; yawRate?: number; bump?: number }
 /** the readings as the needles show them now, in DialRig.dials' order: stepDials moves them toward the input with each needle's lag */
@@ -91,5 +91,5 @@ export function inputFromVehicle(v: VehicleLike, car: { boostBar?: number; idle?
   const u = v.ctl;
   return { on: v.rpm > (car.idle ?? 600) * 0.4, rpm: v.rpm, kmh: v.speed * 3.6, boost: (v.boost ?? 0) * (car.boostBar ?? 0), ...(v.health ? { water: v.health.water, oilTemp: v.health.oil } : {}), ...(o.fuel !== undefined ? { fuel: o.fuel } : {}), ...(o.steer ? { steer: v.sw ?? 0 } : {}),
     ...(u ? { throttle: u.throttle, brake: u.brake, handbrake: u.handbrake ?? 0, ...(u.clutch !== undefined ? { clutch: u.clutch } : {}) } : {}),
-    ...(v.gear !== undefined ? { gear: v.gear, reverse: !!v.reverse } : {}), ...(v.spec?.gears ? { gears: v.spec.gears.length } : {}), ...(v.spec?.tech?.gearbox === 'f1' ? { paddles: true } : {}),
+    ...(v.gear !== undefined ? { gear: v.gear, reverse: !!v.reverse } : {}), ...(v.spec?.gears ? { gears: v.spec.gears.length } : {}), ...(v.spec?.tech?.gearbox === 'f1' ? { paddles: true } : {}), ...(v.spec?.tech?.gearbox === 'auto' ? { selector: true } : {}),
     ...(v.engine ? { cranking: !!v.engine.starter, running: v.engine.fuelled !== false } : {}), ...(v.ax !== undefined ? { ax: v.ax, ay: v.ay ?? 0, vx: v.vx ?? 0, vy: v.vy ?? 0, yawRate: v.r ?? 0 } : {}) }; }

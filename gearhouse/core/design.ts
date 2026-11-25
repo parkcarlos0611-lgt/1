@@ -159,7 +159,7 @@ export interface Design {
      *  boost comes earlier; only with two or more turbos (an older file: none) */ sequential?: boolean;
     /** the bore against the stroke (1: square; over 1 oversquare, revs freely; under 1 long-stroke, more torque low down) */ bs: number;
     /** each part's quality over the grade, -3..+3 (0 for all: the grade's own engine) */ quality: EngineQuality };
-  drive: { gears: 5 | 6; gearbox: 'manual' | 'f1'; /** the final drive's ratio; 0: chosen for the top speed */ final: number; lsd: boolean; awd: boolean };
+  drive: { /** forward gears (four only with the automatic) */ gears: 4 | 5 | 6; /** 'auto': the torque-converter automatic (docs/systems/119 K4) */ gearbox: 'manual' | 'f1' | 'auto'; /** the final drive's ratio; 0: chosen for the top speed */ final: number; lsd: boolean; awd: boolean };
   kit: { abs: boolean; tcs: boolean; steering: 'manual' | 'hydraulic' | 'electric'; dampers: 'fixed' | 'adaptive'; wing: boolean; diffuser: boolean;
     /** tyres' widths front and rear (mm) and the rims (in) */ tyres: [number, number]; rim: 16 | 17 | 18; interior: Interior };
   /** the suspension (format 5) */ susp: SuspDesign;
@@ -484,7 +484,7 @@ export function normalise(d0: AnyDesign): Design {
       boost: Math.round(clamp(E.boost, [LIMITS.boost[0], gradeBoost(g)]) * 100) / 100, vtec: E.vtec && R.vtec, ...(E.sequential ? { sequential: Math.min(E.turbo, R.turbo) >= 2 } : {}),
       bs: Math.round(clamp(Number.isFinite(E.bs) ? E.bs : BS_DEFAULT, LIMITS.bs) * 100) / 100,
       quality: Object.fromEntries(QUALITY_PARTS.map(k => [k, q(k)])) as EngineQuality },
-    drive: { ...d.drive, final: d.drive.final ? clamp(d.drive.final, LIMITS.final) : 0 },
+    drive: { ...d.drive, gears: d.drive.gears === 4 && d.drive.gearbox !== 'auto' ? 5 : d.drive.gears, final: d.drive.final ? clamp(d.drive.final, LIMITS.final) : 0 },   /* four speeds only with the automatic */
     kit: { ...d.kit, tyres: [clamp(d.kit.tyres[0], LIMITS.tyre), clamp(d.kit.tyres[1], LIMITS.tyre)], ...(interior ? { interior: kitOfInterior(interior) } : {}) },
     susp: (o => ({ front: fitAxle(d.susp?.front ?? o.front, o.front, true), rear: fitAxle(d.susp?.rear ?? o.rear, o.rear, false) }))(SUSP_OWN[base]) };
 }

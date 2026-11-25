@@ -18,7 +18,7 @@ export interface PowertrainSpec {
   sump: 'wet' | 'dry';
   block: 'iron' | 'aluminium' | 'magnesium';
   turbos: 0 | 1 | 2 | 3 | 4; intercooler: boolean;
-  gears: 5 | 6; gearbox: 'manual' | 'f1'; lsd: boolean; awd: boolean;
+  gears: 4 | 5 | 6; gearbox: 'manual' | 'f1' | 'auto'; lsd: boolean; awd: boolean;
   /** a transverse engine too long for a gearbox at its end: the gearbox behind it, under the crank (the Miura's) */
   gearboxBehind?: boolean;
   colours: PowertrainColours; /** a crinkle finish on the covers and the intake */ crinkle: boolean; label?: string;

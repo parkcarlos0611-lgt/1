@@ -6,12 +6,12 @@
 import { pedalSVG, pedalPose, wheelSVG, leverSVG, paddleSVG, handbrakeSVG, startSVG, tachSVG } from './draw';
 import { ROLE } from '../kit/tokens';
 import { installKit } from '../kit/style';
-import { leverDown, leverMove, leverKnob, pedalPress, tachFace, tachScales, needleDeg, speedDigits, gearLabel, revLight, hudLayout, hudScale, hudAlpha, shifterOf, type LeverState, type HudWheel, type HudLayout, type Shifter } from './logic';
+import { leverDown, leverMove, leverKnob, pedalPress, tachFace, tachScales, needleDeg, speedDigits, gearLabel, gearLabelAuto, revLight, hudLayout, hudScale, hudAlpha, shifterOf, type LeverState, type HudWheel, type HudLayout, type Shifter } from './logic';
 import type { GaugeCar, DialScale } from '../../render/car/interior/gauges';
 import type { EnginePhase } from '../../race/ignition';
 
 /** the car the HUD is drawn for */
-export interface HudCar { gauges: GaugeCar; wheel: HudWheel; gearbox: 'manual' | 'f1' }
+export interface HudCar { gauges: GaugeCar; wheel: HudWheel; gearbox: 'manual' | 'f1' | 'auto' }
 /** the HUD's settings (ui/shell/settings.ts controls) */
 export interface HudPrefs { size: number; alpha: number; left: boolean; shifter: 'lever' | 'buttons' }
 /** one frame's state */
@@ -44,7 +44,7 @@ export class Hud {
     const w = wheelSVG(c.wheel), tw = this.q('#tw'), pw = this.q('#hwheel .hw'); if (tw) tw.innerHTML = w; if (pw) pw.innerHTML = w;
     this.root.querySelector('#hcl')?.classList.toggle('boost', !!c.gauges.boostBar);
     this.useShifter(shifterOf(c.gearbox, this.prefs.shifter)); this.gearbox = c.gearbox; }
-  private gearbox: 'manual' | 'f1' = 'manual';
+  private gearbox: 'manual' | 'f1' | 'auto' = 'manual';
   /** the settings: the size and opacity of the touch controls, the left-handed layout, the lever or buttons */
   setPrefs(p: Partial<HudPrefs>): void { this.prefs = { ...this.prefs, ...p }; const b = document.body, pad = this.q('#pad'), cl = this.q('#hcl');
     for (const el of [pad, cl]) { el?.style.setProperty('--hud-k', hudScale(this.prefs.size).toFixed(2)); } pad?.style.setProperty('--hud-a', hudAlpha(this.prefs.alpha).toFixed(2));
@@ -70,7 +70,8 @@ export class Hud {
       if (a !== t.last) { t.last = a; const tr = t.el.getAttribute('transform') ?? ''; t.el.setAttribute('transform', tr.replace(/rotate\([^)]*\)/, `rotate(${a})`)); } }
     const cl = this.q('#hcl');
     this.put('spd', speedDigits(f.kmh, f.sweep, f.on, this.top), () => { const e = this.q('#hspd'); if (e) e.textContent = speedDigits(f.kmh, f.sweep, f.on, this.top); });
-    const g = gearLabel(f.gear, f.reverse); this.put('gear', g + (f.auto ? 'A' : 'M'), () => { const e = this.q('#hgear'); if (e) { e.textContent = g; e.dataset.mode = f.auto ? 'A' : 'M'; } const k = this.q('#hlever .kg'); if (k) k.textContent = f.auto ? 'A' : g; });
+    const AT = this.gearbox === 'auto', g = AT ? gearLabelAuto(f.gear, f.reverse, f.auto) : gearLabel(f.gear, f.reverse);   /* the automatic: D and its gear */
+    this.put('gear', g + (f.auto ? 'A' : 'M'), () => { const e = this.q('#hgear'); if (e) { e.textContent = g; e.dataset.mode = f.auto ? 'A' : 'M'; } const k = this.q('#hlever .kg'); if (k) k.textContent = AT ? (f.reverse ? 'R' : f.auto ? 'D' : 'M') : f.auto ? 'A' : g; });
     this.put('on', `${f.on}|${f.lamps}|${revLight(f.rpm, this.redline)}`, () => { cl?.classList.toggle('off', !f.on); const lp = cl?.querySelectorAll<SVGCircleElement>('.lp circle'); lp?.[0]?.setAttribute('fill', f.lamps ? ROLE.red[0] : '#3a1410'); lp?.[1]?.setAttribute('fill', f.lamps ? '#ffb020' : '#3a2a0c');
       const sl = cl?.querySelector('.sl'), r = revLight(f.rpm, this.redline); sl?.setAttribute('fill', !f.on ? '#2a2b2e' : r === 2 ? ROLE.red[0] : r === 1 ? ROLE.yellow[0] : '#2a2b2e'); sl?.classList.toggle('blink', f.on && r === 2); });
     this.put('lever', `${f.auto}`, () => { const lv = this.q('#hlever'); lv?.classList.toggle('auto', f.auto); const kf = lv?.querySelector('.kf'), kb = lv?.querySelector('.kb'), c = f.auto ? ROLE.grey : ROLE.yellow; kf?.setAttribute('fill', c[0]); kb?.setAttribute('fill', c[1]); });

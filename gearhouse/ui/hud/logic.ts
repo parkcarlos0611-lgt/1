@@ -45,6 +45,8 @@ export function speedDigits(kmh: number, sweep: number, on: boolean, top: number
   if (!on) return '---'; return String(Math.round(sweepValue(Math.abs(kmh), sweep, 0, top))); }
 /** the gear as its badge shows it */
 export const gearLabel = (gear: number, reverse: boolean): string => reverse ? 'R' : String(Math.max(1, Math.round(gear)));
+/** the torque-converter automatic's badge (docs/systems/119 K4): the selector's D (M with the driver's own gears) and the gear it holds */
+export const gearLabelAuto = (gear: number, reverse: boolean, auto: boolean): string => reverse ? 'R' : (auto ? 'D' : 'M') + Math.max(1, Math.round(gear));
 /** the rev light: 0 below 85 % of the red line, 1 near it, 2 at or past it (the shift light blinks) */
 export const revLight = (rpm: number, redline: number): 0 | 1 | 2 => rpm >= redline * 0.985 ? 2 : rpm >= redline * 0.85 ? 1 : 0;
 
@@ -55,7 +57,7 @@ export type HudWheel = 'stock' | 'drift';
 export const wheelStyleOf = (interior?: string): HudWheel => interior === undefined || interior === 'light' ? 'drift' : 'stock';
 export type Shifter = 'lever' | 'paddles' | 'buttons';
 /** the shifter drawn: the F1 box's paddles, else the lever; the buttons when the setting asks for them */
-export const shifterOf = (gearbox: 'manual' | 'f1' | undefined, pref: 'lever' | 'buttons'): Shifter => pref === 'buttons' ? 'buttons' : gearbox === 'f1' ? 'paddles' : 'lever';
+export const shifterOf = (gearbox: 'manual' | 'f1' | 'auto' | undefined, pref: 'lever' | 'buttons'): Shifter => pref === 'buttons' ? 'buttons' : gearbox === 'f1' ? 'paddles' : 'lever';
 
 // ---- the layouts ----
 export type HudLayout = 'portrait' | 'landscape' | 'pc';

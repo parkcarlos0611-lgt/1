@@ -96,7 +96,7 @@ export const TECH_YEAR: Record<Tech, { year: number; name: string }> = {
   fiveValve: { year: 1985, name: '실린더당 5밸브' }, fourValve: { year: 1966, name: '실린더당 4밸브' }, magnesium: { year: 1992, name: '마그네슘 블록' }, aluminium: { year: 1932, name: '알루미늄 블록' },
   f1Gearbox: { year: 1997, name: 'F1 변속기' }, flat: { year: 1934, name: '수평대향 배열' }, v10: { year: 1989, name: 'V10 배열' } };
 /** the technologies an engine (and its car's gearbox) uses, the latest first */
-export function engineTechs(e: Design['engine'], gearbox?: 'manual' | 'f1'): Tech[] {
+export function engineTechs(e: Design['engine'], gearbox?: 'manual' | 'f1' | 'auto'): Tech[] {
   const t: Tech[] = ['efi'];
   if (e.vtec) t.push('vvt'); if (e.intake === 'itb') t.push('itb'); if (e.intake === 'variable') t.push('variable');
   if (e.turbo) t.push('turbo'); if (e.turbo >= 3) t.push('multiTurbo'); if (e.turbo && e.intercooler) t.push('intercooler'); if (e.sump === 'dry') t.push('dry');
@@ -104,4 +104,4 @@ export function engineTechs(e: Design['engine'], gearbox?: 'manual' | 'f1'): Tec
   if (e.layout[0] === 'F') t.push('flat'); if (e.layout === 'V10') t.push('v10'); if (gearbox === 'f1') t.push('f1Gearbox');
   return t.sort((a, b) => TECH_YEAR[b].year - TECH_YEAR[a].year); }
 /** the earliest year all of an engine's technologies were about */
-export const engineYear = (e: Design['engine'], gearbox?: 'manual' | 'f1') => Math.max(...engineTechs(e, gearbox).map(k => TECH_YEAR[k].year));
+export const engineYear = (e: Design['engine'], gearbox?: 'manual' | 'f1' | 'auto') => Math.max(...engineTechs(e, gearbox).map(k => TECH_YEAR[k].year));

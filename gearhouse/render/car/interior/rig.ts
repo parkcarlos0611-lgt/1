@@ -120,9 +120,9 @@ export class DriverMotion {
     if (!this.h) { this.h = { L: { g: W.home.L, regrip: null, task: null, w: 0, still: 0 }, R: { g: W.home.R, regrip: null, task: null, w: 0, still: 0 } }; this.gear = i.reverse ? 'R' : i.gear ?? 1; this.lever = gate(this.gear, gears); }
     const H = this.h;
     // ---- the gear lever: a change of gear starts the hand's reach, the lever's move and the hand's return ----
-    const gNow: Gear = i.reverse ? 'R' : Math.max(1, Math.round(i.gear ?? 1)), S = this.shift, f1 = !!i.paddles;
+    const gNow: Gear = i.reverse ? 'R' : Math.max(1, Math.round(i.gear ?? 1)), S = this.shift, f1 = !!i.paddles || !!i.selector;   /* the automatic's shifts as the paddles': the hands stay on the wheel, no clutch */
     if (gNow !== this.gear) { const was = this.gear; this.gear = gNow;
-      if (f1) { this.lever = gate(gNow, gears); }
+      if (f1) { if (!i.selector) this.lever = gate(gNow, gears); else if (gNow === 'R' || was === 'R') this.lever = gate(gNow === 'R' ? 'R' : 1, gears); }   /* the selector moves only between D and R */
       else if (S.phase === 'idle' || S.phase === 'back') { S.phase = 'reach'; S.t = 0; S.from = was; S.to = gNow; S.next = gNow; }
       else S.next = gNow; }
     const down = (S.phase === 'reach' || S.phase === 'move') && typeof S.to === 'number' && typeof S.from === 'number' && S.to < S.from;

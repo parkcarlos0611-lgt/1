@@ -21,6 +21,7 @@ import { torqueAt, steering, suspension, type AxleKind } from './cars';
 import type { Track } from './track';
 import { Health, type Failure } from './health';
 import { Ignition } from './ignition';
+import { autoBoxOf, capacity, converter, scheduled, kickdown, type AutoBox } from './autobox';
 import { TyreRing } from './tyre';
 import { kinOf, kinOn, kinRig, camberAt, toeAt, pathAt, springAt, jackAt, type KinRig } from './kin';
 import type { CornerTable } from '../render/car/suspension/tables';
@@ -116,7 +117,11 @@ export class Vehicle {
   damperMode: 'comfort' | 'sport' = 'sport'; dampK = 1; clutchF1 = 0; /** a variable centre clutch's front share now (tech.drive.vary) */ awdF = 0; blip = 0; downF = 0; downR = 0;
   /** the gear the current shift came from, and the shift's whole time (s) */ private gearFrom = 1; private shiftDur = 0.5;
   /** a gear change under way (for the HUD) */ get shifting(): boolean { return this.shift > 0; }
-  /** how the gearbox is worked (for the HUD) */ get gearboxType(): 'manual' | 'f1' { return this.spec.tech?.gearbox ?? 'manual'; }
+  /** how the gearbox is worked (for the HUD) */ get gearboxType(): 'manual' | 'f1' | 'auto' { return this.spec.tech?.gearbox ?? 'manual'; }
+  /** the torque-converter automatic's state (docs/systems/119 K4; null on every other box): its figures and capacity, the
+   *  lock-up clutch's engagement (0..1), the converter's speed ratio now (turbine over engine), the pedal as the control
+   *  unit reads it (smoothed), the pedal last step (the kick-down switch), the time since the last shift (s) */
+  readonly at: { box: AutoBox; C0: number } | null; atLock = 0; atSR = 1; private atThr = 0; private atPedal = 0; private atDwell = 9;
   /** each tyre's side deflection (m): the side force builds as the tyre rolls (the relaxation length) */ private yd = [0, 0, 0, 0];
   readonly axles: [Axle, Axle];
   private ms: number; private Ix: number; private Iy: number; private Iz: number; private Iw: number; private Ie: number; private kt: number[];
@@ -149,7 +154,8 @@ export class Vehicle {
     this.ms = m - this.axles[0].mu - this.axles[1].mu;
     this.Iz = m * (L * L + spec.track * spec.track) / 12 * 1.15; this.Iy = this.ms * L * L / 14; this.Ix = this.ms * spec.track * spec.track / 10;
     this.Iw = spec.inertia?.wheel ?? 1.2 + spec.tyreR * spec.tyreR * 10; this.Ie = spec.inertia?.engine ?? 0.25 + spec.hp / 400; this.rpm = spec.idle; this.health = new Health(spec.hp, spec.cooling, Math.floor(Math.random() * 1e9));
-    this.hl = L / 2 + 0.6; this.hwd = spec.track / 2 + 0.12; this.hh = 1.25 - spec.cgH; }
+    this.hl = L / 2 + 0.6; this.hwd = spec.track / 2 + 0.12; this.hh = 1.25 - spec.cgH;
+    if (spec.tech?.gearbox === 'auto') { const box = spec.tech.auto ?? autoBoxOf(spec); this.at = { box, C0: capacity(spec, box) }; } else this.at = null; }
   // ---- the old readers' view: position and velocity in the plane, the heading and its rate ----
   get x(): number { return this.p[0]; } set x(v: number) { this.p[0] = v; }
   get y(): number { return this.p[1]; } set y(v: number) { this.p[1] = v; }
@@ -168,7 +174,20 @@ export class Vehicle {
     this.v[0] = Math.cos(n.h) * v; this.v[1] = Math.sin(n.h) * v; this.v[2] = 0; this.om[0] = 0; this.om[1] = 0; this.om[2] = v * n.k;
     this.s = s; this.off = off; this.over = false; this.upset = false; this.upsetT = 0;
     for (const a of this.axles) { a.d = [0, 0]; a.dv = [0, 0]; a.da = [0, 0]; a.wu = 0; a.wv = 0; } this.yd = [0, 0, 0, 0]; this.aPrev = [0, 0, 0];
-    this.w = this.w.map(() => v / c.tyreR); this.dw = [0, 0, 0, 0]; this.sw = 0; this.steer = 0; this.gear = this.auto ? this.bestGear(v) : 1; this.rpm = Math.max(c.idle, v / c.tyreR * c.gears[this.gear - 1]! * c.final * 30 / Math.PI); return this; }
+    this.w = this.w.map(() => v / c.tyreR); this.dw = [0, 0, 0, 0]; this.sw = 0; this.steer = 0; this.gear = this.auto || this.at ? this.bestGear(v) : 1; this.rpm = Math.max(c.idle, v / c.tyreR * c.gears[this.gear - 1]! * c.final * 30 / Math.PI); this.atLock = 0; this.atDwell = 9; return this; }
+  /** the automatic's control unit (docs/systems/119 K4): reads the pedal (smoothed: quick to rise, slow to fall, so a
+   *  lift does not change up at once), picks the gear by the schedule once 0.8 s has passed since the last shift, drops to
+   *  the kick-down gear the moment the pedal goes through 0.9; with the driver's own gears (the assist off) it takes the
+   *  gear asked for, refusing a downshift that would over-rev. `w`: the output's speed as engine revs at ratio 1 */
+  private atShift(dt: number, u: Controls, w: number, readOnly = false): number {
+    const c = this.spec, pedal = Math.max(0, Math.min(1, u.throttle)), kick = pedal > 0.9 && this.atPedal <= 0.9;
+    this.atThr += (pedal - this.atThr) * Math.min(1, dt / (pedal > this.atThr ? 0.15 : 0.6)); this.atPedal = pedal; this.atDwell += dt;
+    if (readOnly) return this.gear;
+    let to = this.gear;
+    if (!this.auto && u.gear) { const want = Math.max(1, Math.min(c.gears.length, u.gear)); if (!(want < this.gear && w * c.gears[want - 1]! > c.redline)) to = want; return to; }
+    if (this.atDwell > 0.8) to = scheduled(c, this.gear, w, this.atThr);
+    if (kick) { const k = kickdown(c, this.gear, w); if (k < this.gear) { to = k; this.atThr = pedal; } }
+    return to; }
   private bestGear(v: number): number { const c = this.spec; for (let g = 1; g <= c.gears.length; g++) { const rpm = v / c.tyreR * c.gears[g - 1]! * c.final * 30 / Math.PI; if (rpm < c.hpRpm * 1.02) return g; } return c.gears.length; }
   /** for drawing the body as it is in the world (review 120): the point on the ground under its centre of gravity (where
    *  the model's origin goes), its roll (left up +, all the way round when on its roof) and pitch (nose up +) */
@@ -215,7 +234,7 @@ export class Vehicle {
     const T = this.track, cr = Math.cos(this.yaw - T.at(this.s).h);
     for (let i = 0; i < 4; i++) { const sW = this.s + this.wheelAt(i)[0] * cr, b0 = T.bump(sW); this.rings[i]!.step(dt, Fz[i]!, this.tfx[i]!, this.tfy[i]!, x => T.bump(sW + x * cr) - b0); }
     // at a standstill it stays put
-    if (this.speed < 0.5 && thr < 0.05 && !this.airborne.some(Boolean)) { const kk = Math.exp(-dt * 6); this.v[0] *= kk; this.v[1] *= kk; this.om[2] *= kk; }
+    if (this.speed < 0.5 && thr < 0.05 && !this.airborne.some(Boolean) && !(this.at && u.brake < 0.05 && this.engine.fuelled)) {   /* the automatic creeps in gear off the brake */ const kk = Math.exp(-dt * 6); this.v[0] *= kk; this.v[1] *= kk; this.om[2] *= kk; }
     // the pictures' view of the body against the surface under it
     const g = T.groundAt(this.s, this.off), up = rotQ(this.q, [0, 0, 1]), fw = rotQ(this.q, [1, 0, 0]), lf = rotQ(this.q, [0, 1, 0]), hd = this.yaw, rel = hd - T.at(this.s).h, sl = T.slope(this.s, this.off);
     this.tilt = Math.atan(sl.across * Math.cos(rel) - sl.along * Math.sin(rel));
@@ -238,19 +257,21 @@ export class Vehicle {
       this.steerEffort = effort; this.steerAssist = assist;
       this.sw += Math.max(-rate * dt, Math.min(rate * dt, want - this.sw)); this.steer = this.sw / N; }
     // ---- drive line: gear changes, the engine, the clutch, the open differential ----
-    this.shift -= dt; const vxh = this.vx, F1 = c.tech?.gearbox === 'f1';
+    this.shift -= dt; const vxh = this.vx, F1 = c.tech?.gearbox === 'f1', AT = this.at;
     const wheelRpm = Math.max(0, vxh) / R * c.gears[this.gear - 1]! * c.final * 30 / Math.PI;
     if (this.reverse) { this.gear = 1; this.shift = 0; }   /* review 169: in reverse the box stays put */
     if (this.shift <= 0 && !this.reverse) { let to = this.gear;
-      if (this.auto) { if (wheelRpm > Math.min(c.hpRpm * 1.04, c.redline * 0.92) && this.gear < c.gears.length) to = this.gear + 1; else if (this.gear > 1 && wheelRpm * c.gears[this.gear - 2]! / c.gears[this.gear - 1]! < c.hpRpm * 0.8) to = this.gear - 1; }
+      if (AT) to = this.atShift(dt, u, Math.max(0, vxh) / R * c.final * 30 / Math.PI);
+      else if (this.auto) { if (wheelRpm > Math.min(c.hpRpm * 1.04, c.redline * 0.92) && this.gear < c.gears.length) to = this.gear + 1; else if (this.gear > 1 && wheelRpm * c.gears[this.gear - 2]! / c.gears[this.gear - 1]! < c.hpRpm * 0.8) to = this.gear - 1; }
       else if (u.gear && u.gear !== this.gear) to = F1 ? this.gear + Math.sign(u.gear - this.gear) : Math.max(1, Math.min(c.gears.length, u.gear));   /* the paddles step one gear a pull */
       if (F1 && to < this.gear && wheelRpm * c.gears[to - 1]! / c.gears[this.gear - 1]! > c.redline) to = this.gear;   /* the control unit refuses a downshift that would over-rev */
-      if (to !== this.gear) { this.gearFrom = this.gear; this.gear = to; this.shift = this.shiftDur = c.shiftT ?? 0.5; } }
+      if (to !== this.gear) { this.gearFrom = this.gear; this.gear = to; this.shift = this.shiftDur = AT ? AT.box.shiftT : c.shiftT ?? 0.5; if (AT) { this.atDwell = 0; this.atLock = 0; } } }
+    else if (AT) this.atShift(dt, u, 0, true);   /* the pedal's reading goes on through a shift */
     // the automated manual's shift (review 158), by its progress p (0..1): the clutch opens as the torque is cut (to 0.25),
     // stays open while the gear is swapped (at 0.45), closes as the torque refills (from 0.65); `env` the clutch's and the
     // torque's share through it. A manual shift is one dead time: no drive, no clutch
     const p = this.shift > 0 ? 1 - this.shift / this.shiftDur : 1, env = p < 0.25 ? 1 - p / 0.25 : p < 0.65 ? 0 : (p - 0.65) / 0.35, down = this.gear < this.gearFrom;
-    const gi = F1 && this.shift > 0 && p < 0.45 ? this.gearFrom : this.gear;   /* the old gear until the clutch is open */
+    const gi = (F1 && this.shift > 0 && p < 0.45) || (AT && this.shift > 0 && p < 0.4) ? this.gearFrom : this.gear;   /* the automatic: the torque phase on the old gear, the inertia phase on the new */   /* the old gear until the clutch is open */
     const X = c.tech, wFa = (this.w[0]! + this.w[1]!) / 2, wRa = (this.w[2]! + this.w[3]!) / 2;   /* the centre differential: the shaft turns at the axles' speeds weighted by their torque shares */
     // a variable centre clutch (docs/systems/117 R4): rear-driven at its base share, the front's share rising toward its
     // most as the rear axle overruns the front (its slip against the front's speed), followed over tau s; else fixed
@@ -261,14 +282,14 @@ export class Vehicle {
     const Gr = (this.reverse ? -c.gears[0]! * 1.1 : c.gears[gi - 1]!) * c.final,   /* review 169: reverse a little lower than first, turning the shaft the other way */ we = this.rpm * Math.PI / 30, wd = fF * wFa + (1 - fF) * wRa, idle = c.idle * Math.PI / 30;
     // the class's speed limiter (docs/systems/115 §3): the fuel cut over the last 2 km/h under it
     const lim = c.limiter ? Math.max(0, Math.min(1, (c.limiter - vxh * 3.6) / 2)) : 1;
-    const thrD = Math.max(0, Math.min(1, u.throttle)) * (this.auto && this.rpm > c.redline * 0.98 ? 0.25 : 1) * lim;
+    const thrD = Math.max(0, Math.min(1, u.throttle)) * ((this.auto || AT) && this.rpm > c.redline * 0.98 ? 0.25 : 1) * lim;
     // the blip: on a downshift, with the clutch opening and open, the control unit opens the throttle to bring the revs to
     // what the lower gear will turn them at (a proportional opening, full 1,500 rpm short), and lets it close as it nears them
     this.blip = F1 && this.shift > 0 && down && p < 0.8 ? Math.max(0, Math.min(1, (wd * c.gears[this.gear - 1]! * c.final * 30 / Math.PI - this.rpm) / 1500)) : 0;
-    const thr = this.shift <= 0 ? thrD : F1 ? Math.max(thrD * env, this.blip) : 0, fric = 0.06 * torqueAt(c, c.torqueRpm) * (0.3 + 0.7 * this.rpm / c.hpRpm);
+    const thr = this.shift <= 0 ? thrD : F1 ? Math.max(thrD * env, this.blip) : AT ? thrD * 0.55 : 0, fric = 0.06 * torqueAt(c, c.torqueRpm) * (0.3 + 0.7 * this.rpm / c.hpRpm);
     // the ignition (race/ignition.ts): off, no fuel or spark (a car rolling in gear drags it round: the compression's
     // braking); cranking, the starter's torque on the engine; after the catch, the idle control's aim raised (the flare)
-    const E = this.engine; E.step(dt, !!u.start, { rpm: this.rpm, idle: c.idle, manual: !this.auto && !F1 && this.shift <= 0, clutch: u.clutch, engaged: this.engagedLast, shaftRpm: Math.abs(wd * Gr) * 30 / Math.PI, water: this.health.water });
+    const E = this.engine; E.step(dt, !!u.start, { rpm: this.rpm, idle: c.idle, manual: !this.auto && !F1 && !AT && this.shift <= 0, clutch: u.clutch, engaged: this.engagedLast, shaftRpm: Math.abs(wd * Gr) * 30 / Math.PI, water: this.health.water });
     const hp = this.health.power, alive = this.health.running && E.fuelled;
     // VTEC (review 149): the high cam's oil passage opens above the switch-over revs and closes a little below them
     if (X?.vtec) { if (!this.vtecHigh && this.rpm > X.vtec.rpm) this.vtecHigh = true; else if (this.vtecHigh && this.rpm < X.vtec.rpm - X.vtec.hyst) this.vtecHigh = false; }
@@ -284,11 +305,12 @@ export class Vehicle {
     // the turbos (review 125): boost builds with the exhaust's flow (revs and throttle) over the spool time, falls fast when the throttle shuts (the blow-off); off boost the engine makes what it would unblown
     let blow = 1; if (X?.turbo) { const T = X.turbo, want = thr * Math.min(1, Math.max(0, (this.rpm - T.full * 0.45) / (T.full * 0.55))), tau = want > this.boost ? T.spool * (1.6 - this.rpm / c.redline) * (this.boost > 0.4 ? 0.5 : 1) : 0.6;   /* the turbines keep turning through a short lift: the boost falls slowly and comes back quickly */
       this.boost += (want - this.boost) * Math.min(1, dt / Math.max(0.02, tau)); const base = 1 / (1 + T.boost * 0.95); blow = base + (1 - base) * this.boost; }
-    const idleT = c.idle * (1 + E.flare), thrK = Math.max(thrE, E.flare > 0 && this.rpm < idleT ? Math.min(0.3, (idleT - this.rpm) / c.idle) : 0);   /* the flare's opening (0 once settled: as before) */
+    const idleT = c.idle * (1 + E.flare), thrK = Math.max(thrE, E.flare > 0 && this.rpm < idleT ? Math.min(0.3, (idleT - this.rpm) / c.idle) : 0, AT ? Math.min(0.35, Math.max(0, (c.idle - this.rpm) / (0.12 * c.idle))) : 0);   /* the automatic's idle control holds the idle against the converter's drag in D */   /* the flare's opening (0 once settled: as before) */
     const starter = E.starter ? 2 * (0.054 * torqueAt(c, c.torqueRpm) + 30) * Math.max(0, 1 - this.rpm / (2 * STARTER_RPM)) : 0;   /* a motor's falling torque: it holds the dead engine's drag near STARTER_RPM */
     const Te = alive ? (this.rpm < c.redline * 1.1 ? thrK * torqueAt(c, this.rpm, cam) * hp * blow : 0) - fric * (1 - thrK) + (this.rpm < idleT ? fric * 2 : 0) : -fric * 3 - (this.rpm > 1 ? 30 : 0) + starter;
-    let engaged: number;
-    if (!F1) { const autoC = this.shift > 0 ? 0 : Math.max(0, Math.min(1, wd * Gr > we * 0.97 ? 1 : (c.launchRpm ? (this.rpm - c.launchRpm * 0.8) / (c.launchRpm * 0.2) : (this.rpm - c.idle * 1.3) / (c.idle * 1.2))));
+    let engaged: number, TcE = 0, TcT = 0;
+    if (AT) engaged = 0;
+    else if (!F1) { const autoC = this.shift > 0 ? 0 : Math.max(0, Math.min(1, wd * Gr > we * 0.97 ? 1 : (c.launchRpm ? (this.rpm - c.launchRpm * 0.8) / (c.launchRpm * 0.2) : (this.rpm - c.idle * 1.3) / (c.idle * 1.2))));
       engaged = u.clutch === undefined ? autoC : Math.min(autoC, 1 - u.clutch); }
     else { // the automated manual (review 158): no clutch pedal. Moving off, the control unit's launch curve: the clutch's
       // aim rises with the revs over idle (squared: a soft first bite, firm by the launch revs at full throttle, sooner at part) and with how near the
@@ -301,9 +323,15 @@ export class Vehicle {
       engaged = this.shift > 0 ? env : this.clutchF1; if (this.shift > 0) this.clutchF1 = 1; }
     this.engagedLast = engaged; const cap = engaged * torqueAt(c, c.torqueRpm) * 2.2;
     const need = (we - wd * Gr) / (dt * (1 / this.Ie + Gr * Gr * (fF * fF + (1 - fF) * (1 - fF)) / (2 * this.Iw))), Tc = Math.max(-cap, Math.min(cap, need));
-    this.rpm = Math.max(alive ? idle * 0.5 : 0, we + (Te - Tc) / this.Ie * dt) * 30 / Math.PI;
+    if (AT) { // the converter's fluid torque, and the lock-up clutch across it (engaged in the upper gears over its speed,
+      // out through a shift): the clutch takes what would bring the two sides together, up to its capacity
+      const cv = converter(AT.C0, AT.box, we, wd * Gr), lockOn = this.shift <= 0 && !this.reverse && this.gear >= AT.box.lockGear && vxh * 3.6 > AT.box.lockKmh;
+      this.atLock = lockOn ? Math.min(1, this.atLock + dt / 0.5) : 0; const capL = this.atLock * torqueAt(c, c.torqueRpm) * 1.6, Tl = Math.max(-capL, Math.min(capL, need - cv.Ti));
+      TcE = cv.Ti + Tl; TcT = cv.Tt + Tl; this.atSR = cv.SR; this.engagedLast = this.atLock; }
+    else { TcE = Tc; TcT = Tc; }
+    this.rpm = Math.max(alive ? idle * 0.5 : 0, we + (Te - TcE) / this.Ie * dt) * 30 / Math.PI;
     { const f = this.health.step(dt, this.rpm, c.redline, Math.max(0, Te) * this.rpm * Math.PI / 30, this.speed); if (f) this.lastFailure = f; }
-    const Taxle = Tc * Gr * c.eff;
+    const Taxle = TcT * Gr * c.eff;
     { // to the wheels: the centre differential's shares and the viscous coupling across it (it passes torque from the faster
       // axle to the slower as they slip apart); each axle's own differential, the rear torque-sensing (up to its bias ratio)
       const Tv = X?.drive ? X.drive.visc * (wRa - wFa) : 0, TF = fF * Taxle + Tv, TR = (1 - fF) * Taxle - Tv, w = this.w;

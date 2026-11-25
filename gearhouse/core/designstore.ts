@@ -46,7 +46,7 @@ export function asDesign(v: unknown): Design | null {
   const face = Object.fromEntries(FACE_KEYS.map(k => [k, one(b[k], FACE_KINDS[k] as readonly string[], f0[k])])) as unknown as Face;
   const machine = { layout: one(e.layout, LAYOUTS, P.engine.layout), cc: Math.round(num(e.cc, P.engine.cc)), valves: one(e.valves, [2, 3, 4, 5] as const, P.engine.valves),
     redline: Math.round(num(e.redline, P.engine.redline)), vtec: bool(e.vtec, P.engine.vtec) };
-  const rest = { drive: { gears: one(r.gears, [5, 6] as const, P.drive.gears), gearbox: one(r.gearbox, ['manual', 'f1'] as const, P.drive.gearbox), final: num(r.final, P.drive.final), lsd: bool(r.lsd, P.drive.lsd), awd: bool(r.awd, P.drive.awd) },
+  const rest = { drive: { gears: one(r.gears, [4, 5, 6] as const, P.drive.gears), gearbox: one(r.gearbox, ['manual', 'f1', 'auto'] as const, P.drive.gearbox), final: num(r.final, P.drive.final), lsd: bool(r.lsd, P.drive.lsd), awd: bool(r.awd, P.drive.awd) },
     kit: { abs: bool(k.abs, P.kit.abs), tcs: bool(k.tcs, P.kit.tcs), steering: one(k.steering, ['manual', 'hydraulic', 'electric'] as const, P.kit.steering), dampers: one(k.dampers, ['fixed', 'adaptive'] as const, P.kit.dampers),
       wing: bool(k.wing, P.kit.wing), diffuser: bool(k.diffuser, P.kit.diffuser), tyres: [Math.round(num(ty[0], P.kit.tyres[0])), Math.round(num(ty[1], P.kit.tyres[1]))] as [number, number], rim: one(k.rim, [16, 17, 18] as const, P.kit.rim) } };
   const interior = one(k.interior, INTERIORS, P.kit.interior);

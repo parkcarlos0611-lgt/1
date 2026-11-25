@@ -34,7 +34,7 @@ export function p959Model(o: P959Opts = {}): P959Model { const S = buildShell(o)
   if (!o.bare) { const K = sockets(), sl = 38.7 * Math.PI / 180;
     for (const h of K.hubs) wheel(b, h, o.wheel ?? 'hollow5');
     for (const s of [1, -1]) headLamp(b, o.lamp ?? 'round', [270 + Math.sin(sl) * 14, s * 615, 640 - Math.cos(sl) * 14], [0, 1, 0], [Math.cos(sl), 0, Math.sin(sl)], [-Math.sin(sl), 0, Math.cos(sl)], 100, 122);
-    for (const e of K.exhausts) b.name('exhaust').mat('#2a2b2d', 0.6, 'metal').lathe('x', [0, e.o[1], e.o[2]], [[e.o[0] - 60, e.r], [e.o[0] + 14, e.r], [e.o[0] + 14, e.r - 9], [e.o[0] - 60, e.r - 9]], 10, false);
+    for (const e of K.exhausts) b.name('exhaust').mat('#2a2b2d', 0.6, 'metal').lathe('x', [0, e.o[1], e.o[2]], [[e.o[0] - 60, e.r], [e.o[0] + 14, e.r], [e.o[0] - 50, e.r - 10]], 8, false);
     for (const m of K.mirrors) mirror(b, m, paint);
     for (const m of K.marks) if (/^plate/.test(m.name)) plate(b, m, o.plate); }
   const M = b.mesh(DIM.length);

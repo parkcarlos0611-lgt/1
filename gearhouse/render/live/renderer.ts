@@ -6,7 +6,7 @@
 // layers, as the baked pictures have them. A car something stands before shows its light outline over just the hidden
 // part. The picture is enlarged by whole pixels on the page.
 import { freeGpu, gpuMesh, program, placeMesh, mul, translate, rot, scale, ATTR, styleUp, styleLines, type GpuMesh, type M4 } from './gpu';
-import { STYLE, screenPx, makeAtlas, type Atlas } from './style';
+import { STYLE, lineWeight, screenPx, makeAtlas, type Atlas } from './style';
 import { RIG_BONES, poseRig } from '../car/suspension';
 import { ENGINE_BONES, poseInternals } from '../car/powertrain/internals';
 import { DIAL_BONES, poseDials } from '../car/interior/gauges';

@@ -90,6 +90,7 @@ export function carEyes(M: Mesh): CarEyes {
   if (x0 < x1) { const sx = x0 + (x1 - x0) * 0.62, sy = y1 - y0 > 700 ? y1 - 260 : (y0 + y1) / 2; let sz = z0 + 840, roof = Infinity;
     for (let i = 0; i < n * 9; i += 3) { const x = P[i]!, y = P[i + 1]!, z = P[i + 2]!; if (Math.abs(x - sx) < 250 && Math.abs(y - sy) < 200 && z > z0 + 500) roof = Math.min(roof, z); }
     if (roof < Infinity) sz = Math.min(sz, roof - 90); seat = [sx, sy, sz]; }
+  const rig = M.dials?.cabin?.driver.eye; if (rig) seat = [rig[0], rig[1], rig[2]];   /* a cabin with a driver: his eye (docs/systems/118 D1) */
   return { len, height: top, hood: [hx, hz + 170], seat }; }
 
 // ---- the camera rig ----
@@ -117,7 +118,7 @@ export class DriveCam {
   reset() { this.fresh = true; }
   /** a drag on the picture: turn round the car and tilt; let go, it comes back after a moment */
   drag(dx: number, dy: number) { this.orbit = Math.max(-Math.PI, Math.min(Math.PI, this.orbit - dx * 0.008)); this.tilt = Math.max(-8, Math.min(25, this.tilt + dy * 0.12)); this.held = 1.2; }
-  /** the cockpit's vertical field of view (degrees, the setting 운전석 시야: 50..75) */ cabinFov = CABIN_FOV.def;
+  /** the cockpit's vertical field of view (degrees, the setting 운전석 시야: 50..75) */ cabinFov: number = CABIN_FOV.def;
   step(view: CamView, c: CamCar, E: CarEyes, ground: (x: number, y: number) => number, aspect: number, dt: number, carY?: number, head?: CabinHead): CamShot {
     const L = E.len / 1000, fw = Math.min(1, c.speed / 55);   // fw: how fast, 0 standing .. 1 about 200 km/h
     const heading = c.speed > 2 ? Math.atan2(c.vy, c.vx) : c.yaw;

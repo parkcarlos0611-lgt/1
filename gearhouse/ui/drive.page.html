@@ -97,6 +97,7 @@
   body.hud-pc .hcl { --t: clamp(150px, 24vh, 230px); left: auto; right: 16px; bottom: 14px; transform: none; }
   body.hud-pc .hwheel { display: flex; }
   body.cine .hcl, body.cine .hwheel { display: none; }
+  body.cab-nowheel .hwheel { display: none; }   /* docs/systems/118 D1: the cockpit shows the real wheel */
   .btn { font: inherit; padding: 8px 14px; border: 1px solid var(--line); border-radius: 4px; background: var(--bg); color: var(--ink); cursor: pointer; }
   .btn:first-child { border-color: var(--accent); color: var(--accent); font-weight: 600; }
   .board { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; font-size: 0.85rem; font-variant-numeric: tabular-nums; }

@@ -13,6 +13,7 @@ import { MODEL_BODIES } from '../render/car/bodies';
 import { makeAtlas } from '../render/live/style';
 import { setPartStyle, partStyle, styleForLook } from '../render/car/powertrain';
 import { dialState, stepDials, inputFromVehicle, type DialState, type DialRig } from '../render/car/interior/gauges';
+import { DriverMotion, poseCabin, type CabinPose, type HeadMove } from '../render/car/interior/rig';
 import { decodeDesign, recordRun, designSig, KEYS, type KeyStore } from '../core/designstore';
 import { Vehicle, usefulLock, type Controls } from '../race/vehicle';
 import { Ignition, carStartsOff, sweepValue } from '../race/ignition';
@@ -69,7 +70,8 @@ export interface DriveApi { /** the world held still (its picture kept) and on a
   /** the race on (or done), null in practice */ readonly raceNow: Race | null; /** the player's engine's state as the screens write it (docs/systems/110 G1) */ readonly engine: string;
   /** the track's materials and props loaded (or failed) */ readonly ready: Promise<void>; readonly drawerOpen: boolean; drawer(open: boolean): void;
   /** the camera (drivecam.ts): the view now, and the views this car can have */ camera: CamView; readonly cameras: CamView[];
-  /** 속도 효과's strength (render/live/trails.ts SPEED_FX: 0 off .. 1 보통) */ speedFx: number }
+  /** 속도 효과's strength (render/live/trails.ts SPEED_FX: 0 off .. 1 보통) */ speedFx: number;
+  /** the cockpit's view (docs/systems/118 D1): its vertical field of view (degrees), the head's sway, the HUD's wheel drawn in it */ cabinFov: number; headMove: HeadMove; cabinHudWheel: boolean }
 // The drive below is one function's body, mounted once on its markup; it is not indented, so its lines read as before.
 export function mountDrive(H: DriveHost = {}): DriveApi {
 const R = H.root ?? document;
@@ -181,11 +183,21 @@ function cabinAtlas(L: LiveRenderer) { const d = DESIGN?.d; if (!d || !isModelBa
 /** a cabin's needles (docs/systems/109 S4/S5): each car's readings stepped toward its state, the ignition's sweep on the
  *  revs and the speed, every needle at rest while the ignition is off (race/ignition.ts) */
 const dialSt = new WeakMap<Vehicle, DialState>();
-function dialsOf(c: Vehicle, rig: DialRig | undefined, dt: number): Float32Array | null { if (!rig) return null;
+function dialsOf(c: Vehicle, rig: DialRig | undefined, dt: number, drive = false): Float32Array | null { if (!rig) return null;
   let s = dialSt.get(c); if (!s || s.v.length !== rig.dials.length) { s = dialState(rig); dialSt.set(c, s); }
-  const E = c.engine, i = inputFromVehicle(c, { boostBar: c.spec.tech?.turbo?.boost ?? 0, idle: c.spec.idle }, { fuel: 0.7 }), sw = E.gaugeSweep;   // the wheel stays still: the driver's arms do not follow it yet (S4)
+  const E = c.engine, i = inputFromVehicle(c, { boostBar: c.spec.tech?.turbo?.boost ?? 0, idle: c.spec.idle }, { fuel: 0.7 }), sw = E.gaugeSweep;
   if (!E.ignition) i.on = false; else { i.on = true; if (sw > 0) { i.rpm = sweepValue(i.rpm ?? 0, sw, 0, c.spec.redline + 400); i.kmh = sweepValue(i.kmh ?? 0, sw, 0, c.spec.topKmh || 300); } }
-  return stepDials(s, rig, i, dt); }
+  const v = stepDials(s, rig, i, dt); if (drive && rig.cabin) driveCabin(c, rig, i, dt); return v; }
+/** the driver (docs/systems/118 D2-D4): posed for the player's car and the nearest few others (CABIN_NEAR), the rest
+ *  sitting still with the wheel straight; the head left out in the player's own cockpit view */
+const motionOf = new WeakMap<Vehicle, { m: DriverMotion; travel: number; pose: CabinPose | null }>(), CABIN_NEAR = 3; let headMove: HeadMove = 'subtle', cabinHudWheel = false;
+function driveCabin(c: Vehicle, rig: DialRig, i: ReturnType<typeof inputFromVehicle>, dt: number) { let r = motionOf.get(c); if (!r) { r = { m: new DriverMotion(), travel: 0, pose: null }; motionOf.set(c, r); }
+  const tv = (c.travel[0]! + c.travel[1]! + c.travel[2]! + c.travel[3]!) / 4; i.bump = dt > 0 ? Math.max(-1, Math.min(1, (tv - r.travel) / dt)) : 0; r.travel = tv;
+  i.steer = c.sw; r.m.move = c === car ? headMove : 'subtle'; r.pose = r.m.step(dt, i, rig.cabin!); }
+function cabinBones(c: Vehicle, rig: DialRig | undefined, v: Float32Array | null): Float32Array | null { const r = motionOf.get(c); if (!rig?.cabin || !r?.pose) return null;
+  r.pose.hideHead = c === car && camView === 'cabin' && !!camShot && perspective(camView); return poseCabin(rig, v, r.pose); }
+/** the player's driver's head as the cockpit's camera takes it */
+const headOf = () => { const P = motionOf.get(car)?.pose; return P?.eye ? { eye: P.eye, yaw: P.head[0], pitch: P.head[1] } : undefined; };
 let DESIGN: { d: Design; id: string } | null = H.oneMake ? addDesign(H.design ?? stockP959()) : H.design !== undefined ? (H.design ? addDesign(H.design) : null) : (() => { let q: string | null = null; try { q = new URLSearchParams(location.search).get('design'); if (q === 'stored' || q === '') q = STORE?.getItem(KEYS.testDrive) ?? null; } catch { q = null; }
   if (!q) return null; const d = decodeDesign(q); if (!d) { console.warn('design: the link holds no design'); return null; } return addDesign(d); })();
 let dTop = 0, dTopKept = 0, dTopAt = -Infinity;
@@ -214,7 +226,8 @@ function drawLive(el: number) { const L = live!; cabinAtlas(L);
   glCanvas.width = VW; glCanvas.height = VH;
   const list = race ? race.cars.map(e => ({ c: e.car, sp: e.driver ? others.get(e)! : sprites, turn: e.wheelTurn })) : [{ c: car, sp: sprites, turn: wheelTurn }];
   if (DAMAGE) for (const { c, sp } of list) bend(c, sp.mesh, L); else for (const { c } of list) c.hits.length = 0;
-  const cars = list.map(({ c, sp, turn }, k) => ({ wear: wearOf(c, k), g: (() => { const M = dmg.get(c)?.M ?? (c.wing > 0.5 ? wingUp(c.spec.id, sp.mesh) : lampsOn && POPUP.has(c.spec.id) ? lampsUp(c.spec.id, sp.mesh) : sp.mesh), g = L.car(M); artFor(L, g, c.spec.id, M); return g; })(), tyres: c.rings, ...(() => { const b = c.base; return { x: b[0], y: b[1], z: b[2] - (c.rings[0]!.rest + c.rings[2]!.rest) / 2 }; })(),   /* the body where it is in 3D (review 120), drawn lower by the tyres' standing give */ yaw: c.yaw, roll: c.rollW + c.roll * 0.5, pitch: c.pitchW, travel: c.travel, camber: c.camber, steerL: c.steerAt(0), steerR: c.steerAt(1), spin: turn, player: c === car, lamps: lampsOn ? 1 : 0, brake: c === car && input.brake > 0.1 })).map((q, k) => ({ ...q, dials: dialsOf(list[k]!.c, q.g.dials?.rig, el) }));
+  const near = new Set([car, ...list.map(e => e.c).filter(c => c !== car).sort((a, b) => Math.hypot(a.x - car.x, a.y - car.y) - Math.hypot(b.x - car.x, b.y - car.y)).slice(0, CABIN_NEAR)]);   /* whose drivers move */
+  const cars = list.map(({ c, sp, turn }, k) => ({ wear: wearOf(c, k), g: (() => { const M = dmg.get(c)?.M ?? (c.wing > 0.5 ? wingUp(c.spec.id, sp.mesh) : lampsOn && POPUP.has(c.spec.id) ? lampsUp(c.spec.id, sp.mesh) : sp.mesh), g = L.car(M); artFor(L, g, c.spec.id, M); return g; })(), tyres: c.rings, ...(() => { const b = c.base; return { x: b[0], y: b[1], z: b[2] - (c.rings[0]!.rest + c.rings[2]!.rest) / 2 }; })(),   /* the body where it is in 3D (review 120), drawn lower by the tyres' standing give */ yaw: c.yaw, roll: c.rollW + c.roll * 0.5, pitch: c.pitchW, travel: c.travel, camber: c.camber, steerL: c.steerAt(0), steerR: c.steerAt(1), spin: turn, player: c === car, lamps: lampsOn ? 1 : 0, brake: c === car && input.brake > 0.1 })).map((q, k) => { const c = list[k]!.c, rig = q.g.dials?.rig, d = dialsOf(c, rig, el, near.has(c)); return { ...q, dials: d, cabin: near.has(c) ? cabinBones(c, rig, d) : null }; });
   const props: import('../render/live/renderer').LiveProp[] = [...SCN.props, ...trainCars()].flatMap(q => { const f = PROPS[q.kind]; return f ? [{ g: L.prop(q.arg ? `${q.kind}@${q.arg}` : q.kind, () => f(q.arg)), x: q.x, y: q.y, z: q.z ?? 0, h: q.heading }] : []; });
   // the fence (review 112): solid, in chunks near the camera, lit, shadowed and outlined as everything else; its loose pieces
   { const near = T.locate(camX, camY, car.s).s, nC = Math.ceil(T.length / CHUNK); for (let d = -5; d <= 5; d++) for (const side of [-1, 1]) { const c = ((Math.floor(near / CHUNK) + d) % nC + nC) % nC, key = `${side}:${c}`;
@@ -238,7 +251,7 @@ function drawLive(el: number) { const L = live!; cabinAtlas(L);
   const sp8 = new Float32Array(smoke.parcels.length * 8); smoke.parcels.forEach((q, k) => sp8.set([q.x, q.y, q.z, q.r, q.rho, q.T, SK[q.kind], q.seed], k * 8));
   if (smokeNow() !== 'off' && live?.vol?.sim) { const z0 = T.height(car.s, car.off);   /* the volumetric smoke's step */ live.vol.size = smoke.size;
     live.vol.poll(); live.vol.step(Math.min(0.1, el), [car.x, car.y, z0], vc, (x, y) => { const q = T.locate(x, y, car.s), g = T.ground(q.s, q.off); return Math.abs(Math.abs(q.off) - FENCE) < 0.2 && fenceOk(Math.sign(q.off), Math.floor(q.s)) ? g + 1.0 : g; }); }
-  const S = camShot, view = S ? { x: S.at[0], y: S.at[1], z: S.at[2], ang: S.ang, pitch: S.pitch, W: VW, H: VH, cy: 0.5, eye: S.eye, fov: S.fov, near: S.near,
+  const S = camShot, view = S ? { x: S.at[0], y: S.at[1], z: S.at[2], ang: S.ang, pitch: S.pitch, W: VW, H: VH, cy: 0.5, eye: S.eye, fov: S.fov, near: S.near, inkNear: camView === 'cabin' && eyes().seat ? 2.2 : 0,
       /* the scale at the car (the outlines' and the ground's specks' size by it) */ mm: Math.max(4, Math.min(130, Math.round(Math.max(4, Math.hypot(S.eye[0] - car.x, S.eye[1] - car.y)) * 2 * Math.tan(S.fov * Math.PI / 360) / VH * 1000))) }
     : { x: camX, y: camY, z: camZ, ang: turning() ? camAng : Math.PI / 2, pitch: pitchDeg, mm, W: VW, H: VH, cy: st.chase && !st.cine ? 0.66 : 0.55 };
   ctx = main; main.clearRect(0, 0, VW, VH);
@@ -646,7 +659,8 @@ function frame(now: number) { const el = Math.min(0.1, (now - last) / 1000); las
   camShot = null;
   if (live && perspective(camView) && !lookAt && !st.free && !st.cine) { const b = car.base, E = eyes(), W2 = T.spec.width / 2;
     const ground = (x: number, y: number) => { const q = T.locate(x, y, car.s); return T.height(q.s, Math.max(-W2, Math.min(W2, q.off))); };
-    camShot = dcam.step(camView === 'cabin' && !E.seat ? 'hood' : camView, { x: b[0], y: b[1], z: b[2] - (car.rings[0]!.rest + car.rings[2]!.rest) / 2, yaw: car.yaw, vx: car.v[0], vy: car.v[1], speed: car.speed, r: car.r, pitch: car.pitchW, roll: car.rollW }, E, ground, VW / VH, el, carAim()); }
+    camShot = dcam.step(camView === 'cabin' && !E.seat ? 'hood' : camView, { x: b[0], y: b[1], z: b[2] - (car.rings[0]!.rest + car.rings[2]!.rest) / 2, yaw: car.yaw, vx: car.v[0], vy: car.v[1], speed: car.speed, r: car.r, pitch: car.pitchW, roll: car.rollW + car.roll * 0.5 }, E, ground, VW / VH, el, carAim(), camView === 'cabin' ? headOf() : undefined); }
+  document.body.classList.toggle('cab-nowheel', camView === 'cabin' && !!camShot && !cabinHudWheel);   /* docs/systems/118 D1: the real wheel is in sight */
   { const R = SCN.railway; let len = 0; for (let k = 0; k + 1 < R.length; k++) len += Math.hypot(R[k + 1]![0] - R[k]![0], R[k + 1]![1] - R[k]![1]);   // the train: now and then along the line
     if (train.d < 0) { train.wait -= el; if (train.wait <= 0) train.d = 0; } else { train.d += 24 * el; if (train.d > len + 80) { train.d = -1; train.wait = 70 + Math.random() * 120; } }
     if (snd) { const q = trainCars()[0]; snd.train = q ? Math.max(0, 1 - Math.hypot(q.x - car.x, q.y - car.y) / 400) : 0; } }
@@ -820,6 +834,7 @@ return {
     $('pickbox').hidden = $<HTMLSelectElement>('lineup').value !== 'pick'; startRace(); $('race').textContent = '다시 시작'; },
   get camera() { return camView; }, set camera(v: CamView) { if (v !== camView) useView(v); }, get cameras() { return CAM_VIEWS.map(c => c.id).filter(viewOk); },
   get speedFx() { return speedFxK; }, set speedFx(k: number) { speedFxK = Math.max(0, Math.min(1, k)); },
+  get cabinFov() { return dcam.cabinFov; }, set cabinFov(v: number) { dcam.cabinFov = v; }, get headMove() { return headMove; }, set headMove(v: HeadMove) { headMove = v; }, get cabinHudWheel() { return cabinHudWheel; }, set cabinHudWheel(v: boolean) { cabinHudWheel = v; },
   get raceNow() { return race; }, get engine() { return car.engine.label; }, ready, get drawerOpen() { return document.body.classList.contains('drawer-open'); }, drawer(open: boolean) { drawer(open); } };
 }
 // a page of its own: the drive's markup is on it (the game's page mounts it on a screen instead)

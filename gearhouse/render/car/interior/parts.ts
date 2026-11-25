@@ -35,7 +35,7 @@ export function seat(b: InteriorBuild, f: Frame, style: SeatStyle, name: string,
   b.loft(S.back.map(([s, hw, bol, T, pw0]) => { const p = Math.min(pw0!, hw! - 75); return whole([[0, 0], [p, 0], [hw! - 62, -bol! * 0.45], [hw! - 28, -bol!], [hw!, -bol! * 0.5], [hw!, T! * 0.55], [hw! - 45, T!], [0, T!]]).map(([y, d]) => P(s!, y, d)); }));
   const [s0, s1] = S.pleatS, pb = S.back[1]![4]!; b.paint(S.region, P((s0 + s1) / 2, 0, 0), [0, -1, 0], U, pb * 2 + 2, s1 - s0 + 2, mul(Bk, -1));
   b.line('trim', [P(S.back[1]![0]!, pb, -2), P(s1, pb, -2), P(s1, -pb, -2), P(S.back[1]![0]!, -pb, -2)], { w: 0.7 });
-  b.part(`${name}Rail`, metal, 0.5, 'metal'); for (const y of [-185, 185]) b.box(-390, 70, y - 16, y + 16, floorDz, -198); }
+  b.part(`${name}Rail`, metal, 0.5); for (const y of [-185, 185]) b.box(-390, 70, y - 16, y + 16, floorDz, -198); }
 
 // ---- the dash: the frame's origin on its front plane at its top, on the centre line ----
 export interface DashOut { dials: DialBone[] }
@@ -50,7 +50,7 @@ export function dash(b: InteriorBuild, A: CabinAnchors, T: Trim, faces: GaugeFac
   b.part('dashRadio', '#141416', 0.2).plate([24, py(172), -74], R, Uz, N, 184, 69, 6, 'radio'); b.part('dashSwitches', '#141416', 0.2).plate([23, py(172), -128], R, Uz, N, 96, 36, 5, 'console');
   b.part('dashSwitches', '#141416', 0.2).plate([24, py(372), -92], R, Uz, N, 188, 86, 6, 'switches');
   b.line('trim', [[20, py(480), -44], [20, py(hw - 130), -44], [20, py(hw - 130), -140], [20, py(480), -140]], { closed: true, w: 0.7 });   // the glove box's lid
-  if (o.stickers) b.part('dashSticker', '#e8e4d8', 0.1).plate([21, py(560), -92], R, Uz, N, 150, 60, 2, 'stickerA'); else b.part('dashPlaque', '#9a9ca0', 0.4, 'metal').plate([21, py(560), -64], R, Uz, N, 72, 36, 2, 'plaque');
+  if (o.stickers) b.part('dashSticker', '#e8e4d8', 0.1).plate([21, py(560), -92], R, Uz, N, 150, 60, 2, 'stickerA'); else b.part('dashPlaque', '#9a9ca0', 0.4).plate([21, py(560), -64], R, Uz, N, 72, 36, 2, 'plaque');
   // ---- the binnacle: one hood over five dials, tipped up toward the driver's eyes ----
   const g = within(f, leaning([10, A.wheel[1], 0], -8)), hood = whole([[0, 48], [95, 44], [185, 30], [255, 6], [292, -38], [298, -106], [0, -106]]), hr = (x: number, k: number, dz = 0): V[] => hood.map(([y, z]) => [x, y * k, (z + 30) * k - 30 + dz] as V);
   b.frame(g).part('dashBinnacle', T.dash, 0.18, 'leather').loft([hr(-80, 0.96, -14), hr(64, 1), hr(64, 0.93), hr(24, 0.93)]);
@@ -79,9 +79,9 @@ export function steeringWheel(b: InteriorBuild, A: CabinAnchors, T: Trim, style:
     b.part('steerWheelPad', T.wheel, 0.2, 'leather').loft([pad(-44, 0.94), pad(-8, 1), pad(2, 0.9)]).paint('padStock', [2, 0, -8], Rt, Zv, 196 * 0.9, 112 * 0.9, [1, 0, 0]);
     b.part('steerWheelSpokes', T.wheel, 0.2, 'leather'); for (const sg of [-1, 1]) { b.slab([-16, sg * 86, 16], [-2, sg * 178, 26], Zv, 36, 13, 30); b.slab([-16, sg * 66, -52], [-2, sg * 126, -134], [1, 0, 0], 13, 32, 13); } }
   else { b.part('steerWheelRim', '#1d1d20', 0.08, 'leather').tube(ring([0, 0, 0], Yv, Zv, rimR, 18), 17, 6, { loop: true });
-    b.part('steerWheelSpokes', '#2b2c2f', 0.55, 'metal'); for (const d of [[0, 1, 0], [0, -1, 0], [0, 0, -1]] as V[]) { const side = unit(cross(d, [1, 0, 0])); b.slab(add([-72, 0, 0], mul(d, 26)), add([-5, 0, 0], mul(d, rimR - 8)), side, 58, 5, 34).paint('spokePrint', [-38, 0, 0], Rt, Zv, 340, 340, [1, 0, 0]); }
+    b.part('steerWheelSpokes', '#2b2c2f', 0.55); for (const d of [[0, 1, 0], [0, -1, 0], [0, 0, -1]] as V[]) { const side = unit(cross(d, [1, 0, 0])); b.slab(add([-72, 0, 0], mul(d, 26)), add([-5, 0, 0], mul(d, rimR - 8)), side, 58, 5, 34).paint('spokePrint', [-38, 0, 0], Rt, Zv, 340, 340, [1, 0, 0]); }
     b.part('steerWheelHorn', '#e9c014', 0.4).turn([-74, 0, 0], [1, 0, 0], [[-6, 40], [6, 40], [8, 30]], 10).paint('hornButton', [-66, 0, 0], Rt, Zv, 62, 62, [1, 0, 0]);
-    b.part('steerWheelHub', '#8d8f93', 0.6, 'metal').turn([0, 0, 0], [-1, 0, 0], [[78, 38], [104, 38], [108, 48], [142, 48], [146, 32]], 8); }
+    b.part('steerWheelHub', '#8d8f93', 0.6).turn([0, 0, 0], [-1, 0, 0], [[78, 38], [104, 38], [108, 48], [142, 48], [146, 32]], 8); }
   b.onBone(0).part('steerWheelColumn', T.plastic, 0.15).turn([0, 0, 0], [-1, 0, 0], style === 'stock' ? [[40, 30], [98, 32], [104, 54], [350, 58]] : [[146, 30], [200, 32], [206, 54], [350, 58]], 8);
   b.part('steerWheelStalks', T.plastic, 0.15); for (const sg of [-1, 1]) b.slab([-230, sg * 50, 6], [-205, sg * 168, 14], [1, 0, 0], 16, 11, 12);
   return { dial: { id: 'steer', bone, pivot: A.wheel, right: unit(dir(f, Rt)), up: unit(dir(f, Zv)), min: -8, max: 8, a0: 0, a1: 0, rest: 0, tau: 0 }, rimR, f }; }
@@ -90,17 +90,17 @@ export function steeringWheel(b: InteriorBuild, A: CabinAnchors, T: Trim, style:
 export function shifter(b: InteriorBuild, o: V, T: Trim, style: 'tall' | 'short'): void { b.frame({ o, x: [1, 0, 0], y: [0, 1, 0], z: [0, 0, 1] });
   const sq = (z: number, h: number): V[] => [[-h, -h, z], [h, -h, z], [h, h, z], [-h, h, z]];
   if (style === 'tall') { const top: V = [30, 0, 262], ax = unit(sub(top, [0, 0, 50])); b.part('shifterBoot', T.seat2, 0.2, 'leather').loft([sq(0, 46), sq(12, 44), sq(62, 15)]);
-    b.part('shifterLever', T.metal, 0.6, 'metal').tube([[6, 0, 56], top], 6.5, 6); b.part('shifterKnob', '#1b1b1d', 0.35).turn(top, ax, [[-14, 10], [0, 17], [22, 23], [42, 21], [54, 12], [58, 0]], 8); }
-  else { const top: V = [14, 0, 128], ax = unit(sub(top, [0, 0, 10])); b.part('shifterBase', T.metal, 0.6, 'metal').loft([sq(0, 52), sq(10, 50), sq(26, 20)]);
-    b.part('shifterLever', T.metal, 0.6, 'metal').tube([[2, 0, 22], top], 8, 6); b.part('shifterKnob', '#eeeae0', 0.5).turn(top, ax, [[-10, 11], [2, 22], [22, 27], [42, 22], [51, 0]], 8); } }
+    b.part('shifterLever', T.metal, 0.6).tube([[6, 0, 56], top], 6.5, 6); b.part('shifterKnob', '#1b1b1d', 0.35).turn(top, ax, [[-14, 10], [0, 17], [22, 23], [42, 21], [54, 12], [58, 0]], 8); }
+  else { const top: V = [14, 0, 128], ax = unit(sub(top, [0, 0, 10])); b.part('shifterBase', T.metal, 0.6).loft([sq(0, 52), sq(10, 50), sq(26, 20)]);
+    b.part('shifterLever', T.metal, 0.6).tube([[2, 0, 22], top], 8, 6); b.part('shifterKnob', '#eeeae0', 0.5).turn(top, ax, [[-10, 11], [2, 22], [22, 27], [42, 22], [51, 0]], 8); } }
 export function handbrake(b: InteriorBuild, o: V, T: Trim, style: 'lever' | 'hydro'): void { b.frame({ o, x: [1, 0, 0], y: [0, 1, 0], z: [0, 0, 1] });
   if (style === 'lever') { const a: V = [40, 0, 24], e: V = [-215, 0, 82], m = lerp(a, e, 0.42); b.part('handbrakeLeverBase', T.plastic, 0.15).box(-30, 70, -24, 24, 0, 26);
-    b.part('handbrakeLever', T.metal, 0.6, 'metal').tube([a, m], 9, 6); b.part('handbrakeLeverGrip', '#1b1b1d', 0.2).tube([m, lerp(a, e, 0.97)], 14, 6); b.part('handbrakeLeverButton', T.metal, 0.6, 'metal').tube([lerp(a, e, 0.97), lerp(a, e, 1.04)], 7, 6); }
-  else { const a: V = [0, 0, 30], e: V = [58, 0, 345], m = lerp(a, e, 0.62); b.part('handbrakeLeverBase', T.metal, 0.6, 'metal').box(-60, 40, -26, 26, 0, 34); b.part('handbrakeLeverCylinder', '#2b2c2f', 0.5, 'metal').tube([[-20, 0, 34], [-120, 0, 60]], 15, 6);
-    b.part('handbrakeLever', T.metal, 0.6, 'metal').tube([a, m], 9, 6); b.part('handbrakeLeverGrip', '#e9c014', 0.3).tube([m, e], 15, 6); } }
+    b.part('handbrakeLever', T.metal, 0.6).tube([a, m], 9, 6); b.part('handbrakeLeverGrip', '#1b1b1d', 0.2).tube([m, lerp(a, e, 0.97)], 14, 6); b.part('handbrakeLeverButton', T.metal, 0.6).tube([lerp(a, e, 0.97), lerp(a, e, 1.04)], 7, 6); }
+  else { const a: V = [0, 0, 30], e: V = [58, 0, 345], m = lerp(a, e, 0.62); b.part('handbrakeLeverBase', T.metal, 0.6).box(-60, 40, -26, 26, 0, 34); b.part('handbrakeLeverCylinder', '#2b2c2f', 0.5).tube([[-20, 0, 34], [-120, 0, 60]], 15, 6);
+    b.part('handbrakeLever', T.metal, 0.6).tube([a, m], 9, 6); b.part('handbrakeLeverGrip', '#e9c014', 0.3).tube([m, e], 15, 6); } }
 export function pedals(b: InteriorBuild, o: V, T: Trim): { clutch: V; throttle: V } { const f: Frame = { o, x: [1, 0, 0], y: [0, 1, 0], z: [0, 0, 1] }, n = unit([0.85, 0, 0.52]), up = unit([-0.52, 0, 0.85]), R: V = [0, -1, 0];
   b.frame(f); for (const [nm, y, z, w, h] of [['Clutch', 95, 150, 52, 66], ['Brake', 0, 150, 56, 66], ['Throttle', -100, 105, 42, 150]] as const) { const c: V = [0, y, z];
-    b.part(`pedal${nm}`, '#18181a', 0.2).plate(c, R, up, n, w, h, 10, 'pedal'); b.part(`pedalArm${nm}`, T.metal, 0.5, 'metal').slab([28, y, 0], add(c, mul(n, -10)), [0, 1, 0], 16, 9); }
+    b.part(`pedal${nm}`, '#18181a', 0.2).plate(c, R, up, n, w, h, 10, 'pedal'); b.part(`pedalArm${nm}`, T.metal, 0.5).slab([28, y, 0], add(c, mul(n, -10)), [0, 1, 0], 16, 9); }
   return { clutch: at(f, [30, 95, 150]), throttle: at(f, [30, -100, 120]) }; }
 
 // ---- the cabin's fixed trim: tunnel, floor, the rear, door cards (the last three stand in for the body's own until it is fitted) ----
@@ -120,7 +120,7 @@ export function doorCards(b: InteriorBuild, A: CabinAnchors, T: Trim, which: 'bo
     b.part(`${nm}Roll`, T.dash, 0.18, 'leather').loft([d0, d1].map(x => ([[0, 0], [-26, -4], [-34, -30], [-26, -58], [0, -64]] as const).map(([dy, dz]) => [x, y(-dy), A.beltZ + dz] as V)));
     b.part(`${nm}Armrest`, T.door, 0.15, 'leather').loft([d0 + 300, d0 + 380, d1 - 250, d1 - 200].map((x, i) => { const k = i === 0 || i === 3 ? 0.35 : 1; return ([[0, 0], [62 * k, -6], [70 * k, -34], [40 * k, -62], [0, -70]] as const).map(([dy, dz]) => [x, y(dy), A.beltZ - 250 + dz] as V); }));
     const px0 = d0 + 110, px1 = d1 - 110, pz0 = A.sillZ + 22, pz1 = A.sillZ + 232; b.part(`${nm}Pocket`, T.door, 0.15, 'leather').box(px0, px1, y(0), y(42), pz0, pz1).paint('doorPleat', [(px0 + px1) / 2, y(42), (pz0 + pz1) / 2], [-sg, 0, 0], [0, 0, 1], px1 - px0 + 2, pz1 - pz0 + 2, [0, -sg, 0]);
-    b.part(`${nm}Pull`, T.metal, 0.6, 'metal').slab([d0 + 180, y(20), A.beltZ - 150], [d0 + 290, y(20), A.beltZ - 150], [0, 0, 1], 16, 10); } }
+    b.part(`${nm}Pull`, T.metal, 0.6).slab([d0 + 180, y(20), A.beltZ - 150], [d0 + 290, y(20), A.beltZ - 150], [0, 0, 1], 16, 10); } }
 
 // ---- the driver: helmet, a plain body, the hands on the wheel, the feet at the pedals. The frame is the seat's ----
 export function driver(b: InteriorBuild, f: Frame, o: { recline: number; wheel: Frame; rimR: number; feet: { clutch: V; throttle: V }; suit: string; helmet: string; gloves: string }): void { const th = (o.recline - 2) * RAD, U: V = [Math.sin(th), 0, Math.cos(th)], Fw: V = [-Math.cos(th), 0, Math.sin(th)], Yv: V = [0, 1, 0];
@@ -141,7 +141,7 @@ export function driver(b: InteriorBuild, f: Frame, o: { recline: number; wheel: 
 
 // ---- the roll cage (an option): tubes along the cabin's corners, from its anchors ----
 export function cage(b: InteriorBuild, A: CabinAnchors, colour: string): void { const r = 21, hx = Math.min(A.rearX - 30, A.hip[0] + 450), top = A.roofZ - 55, P: Record<string, V> = {};
-  b.frame({ o: [0, 0, 0], x: [1, 0, 0], y: [0, 1, 0], z: [0, 0, 1] }).part('cage', colour, 0.45, 'metal');
+  b.frame({ o: [0, 0, 0], x: [1, 0, 0], y: [0, 1, 0], z: [0, 0, 1] }).part('cage', colour, 0.45);
   for (const [k, sg] of [['L', 1], ['R', -1]] as const) { P[`hf${k}`] = [hx, sg * (A.half - 48), A.floorZ]; P[`hk${k}`] = [hx, sg * (A.half - 62), A.roofZ - 270]; P[`hc${k}`] = [hx, sg * (A.roofHalf - 75), top];
     P[`ff${k}`] = [A.doorX[0] + 60, sg * (A.half - 44), A.floorZ]; P[`fd${k}`] = [A.screenFoot[0] + 75, sg * (A.screenHalf[0] + 8), A.screenFoot[1] + 34]; P[`ft${k}`] = [A.screenTop[0] + 35, sg * (A.screenHalf[1] - 12), A.screenTop[1] - 34]; P[`rs${k}`] = [A.rearX + 320, sg * (A.roofHalf - 130), A.shelfZ + 24]; }
   const on = (a: V, c: V, z: number): V => lerp(a, c, (z - a[2]) / (c[2] - a[2]));

@@ -208,7 +208,8 @@ export class Vehicle {
   /** the ground's height and normal from three looks (forward differences), cheaper than the track's own */
   private groundFast(s: number, off: number): { z: number; n: V3 } { const T = this.track, e = 0.3, z = T.ground(s, off), dA = (T.ground(s + e, off) - z) / e, dL = (T.ground(s, off + e) - z) / e, h = T.at(s).h, c = Math.cos(h), sn = Math.sin(h);
     const gx = c * dA - sn * dL, gy = sn * dA + c * dL, l = Math.hypot(gx, gy, 1); return { z, n: [-gx / l, -gy / l, 1 / l] }; }
-  step(dt: number, u: Controls): void { const n = Math.max(1, Math.round(dt / SUB)), h = dt / n; let thr = 0, Fz: number[] = [0, 0, 0, 0];
+  /** the controls given at the last step (the cabin's driver is posed from them: render/car/interior/rig.ts) */ ctl: Controls | null = null;
+  step(dt: number, u: Controls): void { this.ctl = u; const n = Math.max(1, Math.round(dt / SUB)), h = dt / n; let thr = 0, Fz: number[] = [0, 0, 0, 0];
     for (let k = 0; k < n; k++) { const o = this.sub(h, u); thr = o.thr; Fz = o.Fz; }
     // the tyres' rings: their give under the load, over the road's profile along the car (a bump rolls through the tread)
     const T = this.track, cr = Math.cos(this.yaw - T.at(this.s).h);

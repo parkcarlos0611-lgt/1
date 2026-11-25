@@ -8,6 +8,7 @@
 // Angles on a face are a clock's: degrees clockwise from twelve, as the driver sees it.
 import type { V } from '../mesh';
 import type { Region } from './atlas';
+import type { CabinRig } from './rig';
 
 export const DIAL_IDS = ['oilTemp', 'oilLevel', 'oilPress', 'tach', 'boost', 'speedo', 'fuel', 'water'] as const;
 export type DialId = typeof DIAL_IDS[number];
@@ -47,11 +48,17 @@ export const dialAngle = (s: { min: number; max: number; a0: number; a1: number 
 /** a part turning in a plane: about `pivot`, `right` and `up` the plane's own as the eye sees it (unit vectors, the
  *  car's axes, mm). Bone 0 is the cabin itself. A needle is built pointing at its scale's `min` */
 export interface DialBone { id: DialId | 'steer'; bone: number; pivot: V; right: V; up: V; min: number; max: number; /** clock angles (degrees) at min and max */ a0: number; a1: number; rest: number; tau: number }
-export interface DialRig { dials: DialBone[]; bones: number }
-/** the most bones a cabin has: itself, the eight needles, the steering wheel */
-export const DIAL_BONES = 2 + DIAL_IDS.length;
+/** the cabin's bones (docs/systems/118 D2): the needles and the steering wheel each turning in a plane (`dials`), and
+ *  where the cabin has a driver, the driver's fifteen pieces and the five controls he moves (render/car/interior/rig.ts) */
+export interface DialRig { dials: DialBone[]; bones: number; cabin?: CabinRig }
+/** the most bones a cabin has: itself, the eight needles, the steering wheel, the driver's fifteen pieces, the lever, the handbrake, three pedals */
+export const DIAL_BONES = 2 + DIAL_IDS.length + 15 + 5;
 /** what the instruments read: the drive's state, in the dials' own units. Anything left out rests */
-export interface InteriorInput { /** the engine running (off: every needle falls to its rest) */ on?: boolean; rpm?: number; /** km/h */ kmh?: number; /** bar over the air's */ boost?: number; /** deg C */ oilTemp?: number; water?: number; /** bar */ oilPress?: number; /** 0..1 */ oilLevel?: number; fuel?: number; /** the steering wheel's angle (rad, to the left +) */ steer?: number }
+export interface InteriorInput { /** the engine running (off: every needle falls to its rest) */ on?: boolean; rpm?: number; /** km/h */ kmh?: number; /** bar over the air's */ boost?: number; /** deg C */ oilTemp?: number; water?: number; /** bar */ oilPress?: number; /** 0..1 */ oilLevel?: number; fuel?: number; /** the steering wheel's angle (rad, to the left +) */ steer?: number;
+  /** the driver's controls (docs/systems/118 D2): the pedals (0..1), the gear (and reverse), the box's forward gears, a paddle box (no lever), the handbrake (0..1), the starter turning, the engine running */
+  throttle?: number; brake?: number; clutch?: number; gear?: number; reverse?: boolean; gears?: number; paddles?: boolean; handbrake?: number; cranking?: boolean; running?: boolean;
+  /** the body's motion (the head's sway): its accelerations along and across (m/s², forward and left +), its velocity in its own axes (m/s), its yaw rate (rad/s, left +), the road's knock (m/s up the springs) */
+  ax?: number; ay?: number; vx?: number; vy?: number; yawRate?: number; bump?: number }
 /** the readings as the needles show them now, in DialRig.dials' order: stepDials moves them toward the input with each needle's lag */
 export interface DialState { v: Float32Array; started: boolean }
 export const dialState = (rig: DialRig): DialState => ({ v: Float32Array.from(rig.dials.map(d => d.rest)), started: false });
@@ -68,14 +75,21 @@ export function stepDials(st: DialState, rig: DialRig, input: InteriorInput, dt:
 /** the bones for the readings (in DialRig.dials' order; none: at rest): three rows a bone, as the renderer's shaders
  *  take them. A needle turns in its face's plane from where it was built (its scale's min) to its reading */
 export function poseDials(rig: DialRig, v?: ArrayLike<number> | null, out = new Float32Array(Math.max(rig.bones, 1) * 12)): Float32Array {
-  out.set([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0], 0);
+  for (let b = 0; b < Math.max(rig.bones, 1); b++) out.set([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0], b * 12);   /* every bone as built (the driver's, the controls') unless posed below */
   rig.dials.forEach((d, k) => { const val = v?.[k] ?? d.rest, deg = d.id === 'steer' ? -val * 180 / Math.PI : dialAngle(d, val) - d.a0, a = deg * Math.PI / 180, c = Math.cos(a), s = Math.sin(a), R = d.right, U = d.up;
     // in the face's plane a turn by `a` clockwise sends right to (cos, -sin) and up to (sin, cos); the axis stays
     const N: V = [R[1] * U[2] - R[2] * U[1], R[2] * U[0] - R[0] * U[2], R[0] * U[1] - R[1] * U[0]], R2: V = [c * R[0] - s * U[0], c * R[1] - s * U[1], c * R[2] - s * U[2]], U2: V = [s * R[0] + c * U[0], s * R[1] + c * U[1], s * R[2] + c * U[2]];
     for (let i = 0; i < 3; i++) { const m = [R2[i]! * R[0] + U2[i]! * U[0] + N[i]! * N[0], R2[i]! * R[1] + U2[i]! * U[1] + N[i]! * N[1], R2[i]! * R[2] + U2[i]! * U[2] + N[i]! * N[2]];
       out.set([m[0]!, m[1]!, m[2]!, d.pivot[i]! - (m[0]! * d.pivot[0] + m[1]! * d.pivot[1] + m[2]! * d.pivot[2])], d.bone * 12 + i * 4); } });
   return out; }
-/** the instruments' input from a car being driven (race/vehicle.ts and its health), read by shape so the cabin does not
- *  depend on the drive: speed in m/s, the boost as a share of the engine's full boost, the health's temperatures */
-export function inputFromVehicle(v: { rpm: number; speed: number; boost?: number; sw?: number; health?: { water: number; oil: number; failed?: unknown } }, car: { boostBar?: number; idle?: number } = {}, o: { fuel?: number; steer?: boolean } = {}): InteriorInput {
-  return { on: v.rpm > (car.idle ?? 600) * 0.4, rpm: v.rpm, kmh: v.speed * 3.6, boost: (v.boost ?? 0) * (car.boostBar ?? 0), ...(v.health ? { water: v.health.water, oilTemp: v.health.oil } : {}), ...(o.fuel !== undefined ? { fuel: o.fuel } : {}), ...(o.steer ? { steer: v.sw ?? 0 } : {}) }; }
+/** the instruments' and the driver's input from a car being driven (race/vehicle.ts and its health), read by shape so the
+ *  cabin does not depend on the drive: speed in m/s, the boost as a share of the engine's full boost, the health's
+ *  temperatures; the steering wheel's angle (`sw`), the controls the car was given last (`ctl`), the gear, the shift */
+export interface VehicleLike { rpm: number; speed: number; boost?: number; sw?: number; health?: { water: number; oil: number; failed?: unknown }; gear?: number; reverse?: boolean; auto?: boolean;
+  ctl?: { throttle: number; brake: number; clutch?: number; handbrake?: number } | null; ax?: number; ay?: number; vx?: number; vy?: number; r?: number; engine?: { starter?: boolean; fuelled?: boolean }; spec?: { gears?: readonly number[]; tech?: { gearbox?: string } } }
+export function inputFromVehicle(v: VehicleLike, car: { boostBar?: number; idle?: number } = {}, o: { fuel?: number; steer?: boolean } = {}): InteriorInput {
+  const u = v.ctl;
+  return { on: v.rpm > (car.idle ?? 600) * 0.4, rpm: v.rpm, kmh: v.speed * 3.6, boost: (v.boost ?? 0) * (car.boostBar ?? 0), ...(v.health ? { water: v.health.water, oilTemp: v.health.oil } : {}), ...(o.fuel !== undefined ? { fuel: o.fuel } : {}), ...(o.steer ? { steer: v.sw ?? 0 } : {}),
+    ...(u ? { throttle: u.throttle, brake: u.brake, handbrake: u.handbrake ?? 0, ...(u.clutch !== undefined ? { clutch: u.clutch } : {}) } : {}),
+    ...(v.gear !== undefined ? { gear: v.gear, reverse: !!v.reverse } : {}), ...(v.spec?.gears ? { gears: v.spec.gears.length } : {}), ...(v.spec?.tech?.gearbox === 'f1' ? { paddles: true } : {}),
+    ...(v.engine ? { cranking: !!v.engine.starter, running: v.engine.fuelled !== false } : {}), ...(v.ax !== undefined ? { ax: v.ax, ay: v.ay ?? 0, vx: v.vx ?? 0, vy: v.vy ?? 0, yawRate: v.r ?? 0 } : {}) }; }

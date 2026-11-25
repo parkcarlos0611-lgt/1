@@ -93,7 +93,7 @@ export class InteriorBuild {
       t.uv = q.flatMap(([a, b]) => [u0 + (u1 - u0) * Math.max(0, Math.min(1, a!)), v0 + (v1 - v0) * Math.max(0, Math.min(1, b!))]); }
     return this; }
   /** a drawn line (Mesh.lines), in the frame set */
-  line(kind: LineKind, pts: V[], o: { closed?: boolean; w?: number } = {}): this { this.lines.push({ kind, pts: pts.map(p => at(this.f, p)), ...o }); return this; }
+  line(kind: LineKind, pts: V[], o: { closed?: boolean; w?: number } = {}): this { this.lines.push({ kind, pts: pts.map(p => at(this.f, p)), ...o, ...(this.bone ? { bone: this.bone } : {}) }); return this; }
   get tris(): number { this.flush(); return this.n; }
   mesh(length: number): Mesh { this.flush(); const M = this.b.mesh(length); return { ...M, uv: new Float32Array(this.uv), dial: new Uint8Array(this.dial), lines: this.lines.slice() }; }
 }

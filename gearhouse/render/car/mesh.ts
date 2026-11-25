@@ -28,7 +28,7 @@ export type LineKind = 'door' | 'bonnet' | 'boot' | 'bumper' | 'lamp' | 'crease'
  *  the surface; drawn as a ribbon of even width on the screen, a hair toward the eye, hidden where the car hides it.
  *  `part`: the part it lies on, when that part moves on its own (a suspension part follows its bone); `w`: its width
  *  against the style's line width (default 1) */
-export interface MeshLine { kind: LineKind; pts: V[]; closed?: boolean; part?: string; w?: number }
+export interface MeshLine { kind: LineKind; pts: V[]; closed?: boolean; part?: string; w?: number; /** the cabin's bone it rides on (render/car/interior: the driver's helmet) */ bone?: number }
 /** where a car's speed effects start (render/live/trails.ts), in the mesh's axes (mm): the rear wing's two tips (or the
  *  tail's top corners), the two tail lamps; left first */
 export interface CarAnchors { tips: [V, V]; lamps: [V, V] }

@@ -6,12 +6,13 @@
 //   interiorMesh({ ...INTERIORS.stock })                     the 959's cabin as it left the works
 //   interiorMesh({ ...INTERIORS.drift, trim: 'black' })      the same cabin stripped for drifting
 import type { Mesh } from '../mesh';
-import { InteriorBuild, leaning, type Frame } from './build';
+import { InteriorBuild, leaning, at, type Frame } from './build';
+import { SEGS, CONTROLS, HAND_HOME, type CabinRig, type Control } from './rig';
 import { P959_CABIN, TRIMS, type CabinAnchors, type Trim, type TrimName } from './anchors';
 import { gaugeSet, P959_GAUGES, type DialRig, type GaugeCar } from './gauges';
 import { seat, dash, steeringWheel, shifter, handbrake, pedals, tunnel, floorAndRear, doorCards, driver, cage, previewShell, type SeatStyle, type WheelStyle } from './parts';
 
-export * from './anchors'; export * from './gauges'; export { REGIONS, SHEET, regionUV, interiorSheet, redrawGauges, type Region } from './atlas';
+export * from './anchors'; export * from './gauges'; export * from './rig'; export { REGIONS, SHEET, regionUV, interiorSheet, redrawGauges, type Region } from './atlas';
 export interface InteriorOptions { /** the cabin it goes into (default the 959's) */ cabin?: CabinAnchors; trim?: TrimName | Trim; wheel?: WheelStyle; seats?: SeatStyle; shifter?: 'tall' | 'short'; handbrake?: 'lever' | 'hydro';
   cage?: boolean; driver?: boolean; /** the N33's dash (docs/systems/117 R2): four dials, the centre stack's gauges, the A pillar's pod */ binnacle?: 'five' | 'four'; consoleGauges?: boolean; pillarPod?: boolean; /** the passenger's seat (drift cars often run without) */ passengerSeat?: boolean; /** the door cards, floor and rear trim standing in for the body's own */ shellTrim?: boolean; /** pod gauges and stickers on the dash */ pods?: boolean; stickers?: boolean; /** which door cards are in (a picture through an open door leaves one out) */ doors?: 'both' | 'L' | 'R' | 'none';
   helmet?: string; suit?: string; gloves?: string; cageColour?: string; bucketColour?: string; /** whose dials (the red line, the top speed) */ gauges?: GaugeCar; /** a plain cabin shell with a windscreen round it, for pictures */ preview?: string | false; /** the mesh's length (the car's, so it sits where the car's cabin is) */ length?: number }
@@ -37,11 +38,16 @@ export function interiorMesh(opt: InteriorOptions = INTERIORS.stock): Mesh { con
   const four = o.binnacle === 'four', D = dash(b, A, T, four ? [faces[4]!, faces[2]!, faces[3]!, faces[1]!] : faces, { pods: o.pods, stickers: o.stickers, binnacle: o.binnacle, consoleGauges: o.consoleGauges, pillarPod: o.pillarPod }), W = steeringWheel(b, A, T, o.wheel ?? 'stock', D.dials.length + 1);
   seat(b, hipF(A.side), o.seats ?? 'sport', A.side > 0 ? 'seatL' : 'seatR', seatCol, A.recline, floorDz, T.metal);
   if (o.passengerSeat !== false) seat(b, hipF(-A.side), o.seats ?? 'sport', A.side > 0 ? 'seatR' : 'seatL', seatCol, A.recline, floorDz, T.metal);
-  shifter(b, [A.hip[0] - 395, 0, A.tunnelZ], T, o.shifter ?? 'tall');
-  handbrake(b, o.handbrake === 'hydro' ? [A.hip[0] - 330, A.side * 62, A.tunnelZ - 60] : [A.hip[0] - 40, 0, A.tunnelZ], T, o.handbrake ?? 'lever');
-  const feet = pedals(b, [A.dashX - 200, A.wheel[1], A.floorZ], T);
-  if (o.driver !== false) driver(b, hipF(A.side), { recline: A.recline, wheel: W.f, rimR: W.rimR, feet, suit: o.suit ?? '#c9302c', helmet: o.helmet ?? '#ece9e2', gloves: o.gloves ?? '#1b1b1d' });
+  // the bones after the needles and the wheel (docs/systems/118 D2): the driver's fifteen pieces, then the lever, the handbrake, the three pedals
+  const first = D.dials.length + 2, ctl = first + SEGS.length, cb = (c: Control) => ctl + CONTROLS.indexOf(c);
+  const lever = shifter(b, [A.hip[0] - 395, 0, A.tunnelZ], T, o.shifter ?? 'tall', cb('lever'));
+  const hb = handbrake(b, o.handbrake === 'hydro' ? [A.hip[0] - 330, A.side * 62, A.tunnelZ - 60] : [A.hip[0] - 40, 0, A.tunnelZ], T, o.handbrake ?? 'lever', cb('handbrake'));
+  const feet = pedals(b, [A.dashX - 200, A.wheel[1], A.floorZ], T, [cb('clutch'), cb('brake'), cb('throttle')]);
+  const drv = o.driver !== false ? driver(b, hipF(A.side), { recline: A.recline, wheel: W.f, rimR: W.rimR, feet, suit: o.suit ?? '#c9302c', helmet: o.helmet ?? '#ece9e2', gloves: o.gloves ?? '#1b1b1d', bone: s => first + SEGS.indexOf(s) }) : null;
   if (o.cage) cage(b, A, o.cageColour ?? '#c4c8cd');
   if (o.preview) previewShell(b, A, o.preview);
-  const dials: DialRig = { dials: [...D.dials, W.dial], bones: D.dials.length + 2 };
+  // the key (or the start button) on the column's right, a hand's reach behind the rim
+  const cabin: CabinRig | undefined = drv ? { first, ctl, side: A.side, driver: drv, controls: { lever, handbrake: hb, pedals: feet.rest, key: at(W.f, [-140, -70, -20]) },
+    wheel: { centre: W.f.o, axis: W.f.x, y: W.f.y, z: W.f.z, rimR: W.rimR, grip: 10, home: { L: HAND_HOME, R: Math.PI - HAND_HOME } } } : undefined;
+  const dials: DialRig = { dials: [...D.dials, W.dial], bones: ctl + CONTROLS.length, ...(cabin ? { cabin } : {}) };
   return { ...b.mesh(o.length ?? 4260), dials }; }

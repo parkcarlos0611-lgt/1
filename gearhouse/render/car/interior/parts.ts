@@ -9,6 +9,7 @@ import type { V } from '../mesh';
 import { InteriorBuild, add, sub, mul, dot, cross, unit, len, lerp, ring, leaning, within, at, dir, type Frame } from './build';
 import type { CabinAnchors, Trim } from './anchors';
 import type { DialBone, GaugeFace } from './gauges';
+import { HAND_HOME, type DriverRest, type Seg } from './rig';
 
 const RAD = Math.PI / 180;
 /** a half outline (from the middle round one side to the middle again) made whole by its mirror */
@@ -109,21 +110,33 @@ export function steeringWheel(b: InteriorBuild, A: CabinAnchors, T: Trim, style:
   return { dial: { id: 'steer', bone, pivot: A.wheel, right: unit(dir(f, Rt)), up: unit(dir(f, Zv)), min: -8, max: 8, a0: 0, a1: 0, rest: 0, tau: 0 }, rimR, f }; }
 
 // ---- on the tunnel: the lever, the handbrake; and the pedals ----
-export function shifter(b: InteriorBuild, o: V, T: Trim, style: 'tall' | 'short'): void { b.frame({ o, x: [1, 0, 0], y: [0, 1, 0], z: [0, 0, 1] });
+/** the lever (its rod and knob on `bone`, the boot or base still): where it pivots and its knob's middle, car mm (docs/systems/118 D4) */
+export function shifter(b: InteriorBuild, o: V, T: Trim, style: 'tall' | 'short', bone = 0): { pivot: V; knob: V } { b.frame({ o, x: [1, 0, 0], y: [0, 1, 0], z: [0, 0, 1] });
   const sq = (z: number, h: number): V[] => [[-h, -h, z], [h, -h, z], [h, h, z], [-h, h, z]];
   if (style === 'tall') { const top: V = [30, 0, 262], ax = unit(sub(top, [0, 0, 50])); b.part('shifterBoot', T.seat2, 0.2, 'leather').loft([sq(0, 46), sq(12, 44), sq(62, 15)]);
-    b.part('shifterLever', T.metal, 0.6).tube([[6, 0, 56], top], 6.5, 6); b.part('shifterKnob', '#1b1b1d', 0.35).turn(top, ax, [[-14, 10], [0, 17], [22, 23], [42, 21], [54, 12], [58, 0]], 8); }
-  else { const top: V = [14, 0, 128], ax = unit(sub(top, [0, 0, 10])); b.part('shifterBase', T.metal, 0.6).loft([sq(0, 52), sq(10, 50), sq(26, 20)]);
-    b.part('shifterLever', T.metal, 0.6).tube([[2, 0, 22], top], 8, 6); b.part('shifterKnob', '#eeeae0', 0.5).turn(top, ax, [[-10, 11], [2, 22], [22, 27], [42, 22], [51, 0]], 8); } }
-export function handbrake(b: InteriorBuild, o: V, T: Trim, style: 'lever' | 'hydro'): void { b.frame({ o, x: [1, 0, 0], y: [0, 1, 0], z: [0, 0, 1] });
+    b.onBone(bone).part('shifterLever', T.metal, 0.6).tube([[6, 0, 56], top], 6.5, 6); b.part('shifterKnob', '#1b1b1d', 0.35).turn(top, ax, [[-14, 10], [0, 17], [22, 23], [42, 21], [54, 12], [58, 0]], 8); b.onBone(0);
+    return { pivot: add(o, [6, 0, 50]), knob: add(o, add(top, mul(ax, 26))) }; }
+  const top: V = [14, 0, 128], ax = unit(sub(top, [0, 0, 10])); b.part('shifterBase', T.metal, 0.6).loft([sq(0, 52), sq(10, 50), sq(26, 20)]);
+  b.onBone(bone).part('shifterLever', T.metal, 0.6).tube([[2, 0, 22], top], 8, 6); b.part('shifterKnob', '#eeeae0', 0.5).turn(top, ax, [[-10, 11], [2, 22], [22, 27], [42, 22], [51, 0]], 8); b.onBone(0);
+  return { pivot: add(o, [2, 0, 20]), knob: add(o, add(top, mul(ax, 24))) }; }
+/** the handbrake (its lever on `bone`): the hinge it is pulled about, the pull, the grip's middle, car mm */
+export function handbrake(b: InteriorBuild, o: V, T: Trim, style: 'lever' | 'hydro', bone = 0): { pivot: V; axis: V; max: number; grip: V } { b.frame({ o, x: [1, 0, 0], y: [0, 1, 0], z: [0, 0, 1] });
   if (style === 'lever') { const a: V = [40, 0, 24], e: V = [-215, 0, 82], m = lerp(a, e, 0.42); b.part('handbrakeLeverBase', T.plastic, 0.15).box(-30, 70, -24, 24, 0, 26);
-    b.part('handbrakeLever', T.metal, 0.6).tube([a, m], 9, 6); b.part('handbrakeLeverGrip', '#1b1b1d', 0.2).tube([m, lerp(a, e, 0.97)], 14, 6); b.part('handbrakeLeverButton', T.metal, 0.6).tube([lerp(a, e, 0.97), lerp(a, e, 1.04)], 7, 6); }
-  else { const a: V = [0, 0, 30], e: V = [58, 0, 345], m = lerp(a, e, 0.62); b.part('handbrakeLeverBase', T.metal, 0.6).box(-60, 40, -26, 26, 0, 34); b.part('handbrakeLeverCylinder', '#2b2c2f', 0.5).tube([[-20, 0, 34], [-120, 0, 60]], 15, 6);
-    b.part('handbrakeLever', T.metal, 0.6).tube([a, m], 9, 6); b.part('handbrakeLeverGrip', '#e9c014', 0.3).tube([m, e], 15, 6); } }
-export function pedals(b: InteriorBuild, o: V, T: Trim): { clutch: V; throttle: V } { const f: Frame = { o, x: [1, 0, 0], y: [0, 1, 0], z: [0, 0, 1] }, n = unit([0.85, 0, 0.52]), up = unit([-0.52, 0, 0.85]), R: V = [0, -1, 0];
-  b.frame(f); for (const [nm, y, z, w, h] of [['Clutch', 95, 150, 52, 66], ['Brake', 0, 150, 56, 66], ['Throttle', -100, 105, 42, 150]] as const) { const c: V = [0, y, z];
-    b.part(`pedal${nm}`, '#18181a', 0.2).plate(c, R, up, n, w, h, 10, 'pedal'); b.part(`pedalArm${nm}`, T.metal, 0.5).slab([28, y, 0], add(c, mul(n, -10)), [0, 1, 0], 16, 9); }
-  return { clutch: at(f, [30, 95, 150]), throttle: at(f, [30, -100, 120]) }; }
+    b.onBone(bone).part('handbrakeLever', T.metal, 0.6).tube([a, m], 9, 6); b.part('handbrakeLeverGrip', '#1b1b1d', 0.2).tube([m, lerp(a, e, 0.97)], 14, 6); b.part('handbrakeLeverButton', T.metal, 0.6).tube([lerp(a, e, 0.97), lerp(a, e, 1.04)], 7, 6); b.onBone(0);
+    return { pivot: add(o, a), axis: unit(cross(sub(e, a), [0, 0, 1])), max: 0.42, grip: add(o, lerp(a, e, 0.75)) }; }
+  const a: V = [0, 0, 30], e: V = [58, 0, 345], m = lerp(a, e, 0.62); b.part('handbrakeLeverBase', T.metal, 0.6).box(-60, 40, -26, 26, 0, 34); b.part('handbrakeLeverCylinder', '#2b2c2f', 0.5).tube([[-20, 0, 34], [-120, 0, 60]], 15, 6);
+  b.onBone(bone).part('handbrakeLever', T.metal, 0.6).tube([a, m], 9, 6); b.part('handbrakeLeverGrip', '#e9c014', 0.3).tube([m, e], 15, 6); b.onBone(0);
+  return { pivot: add(o, a), axis: unit(cross(sub(e, a), [1, 0, 0])), max: 0.33, grip: add(o, lerp(a, e, 0.82)) }; }
+/** the pedals (each on its bone, [clutch, brake, throttle]): each one's hinge at its foot on the floor, pressed forward,
+ *  and where the driver's foot sits on it, car mm */
+export type PedalRest = { pivot: V; axis: V; max: number; foot: V };
+export function pedals(b: InteriorBuild, o: V, T: Trim, bones: [number, number, number] = [0, 0, 0]): { clutch: V; throttle: V; rest: Record<'clutch' | 'brake' | 'throttle', PedalRest> } { const f: Frame = { o, x: [1, 0, 0], y: [0, 1, 0], z: [0, 0, 1] }, n = unit([0.85, 0, 0.52]), up = unit([-0.52, 0, 0.85]), R: V = [0, -1, 0];
+  const rest = {} as Record<'clutch' | 'brake' | 'throttle', PedalRest>;
+  b.frame(f); ([['Clutch', 95, 150, 52, 66], ['Brake', 0, 150, 56, 66], ['Throttle', -100, 105, 42, 150]] as const).forEach(([nm, y, z, w, h], i) => { const c: V = [0, y, z];
+    b.onBone(bones[i]!).part(`pedal${nm}`, '#18181a', 0.2).plate(c, R, up, n, w, h, 10, 'pedal'); b.part(`pedalArm${nm}`, T.metal, 0.5).slab([28, y, 0], add(c, mul(n, -10)), [0, 1, 0], 16, 9);
+    rest[nm === 'Clutch' ? 'clutch' : nm === 'Brake' ? 'brake' : 'throttle'] = { pivot: at(f, [28, y, 0]), axis: [0, -1, 0], max: nm === 'Throttle' ? 0.26 : 0.3, foot: at(f, nm === 'Throttle' ? [30, y, 120] : [30, y, 150]) }; });
+  b.onBone(0);
+  return { clutch: at(f, [30, 95, 150]), throttle: at(f, [30, -100, 120]), rest }; }
 
 // ---- the cabin's fixed trim: tunnel, floor, the rear, door cards (the last three stand in for the body's own until it is fitted) ----
 export function tunnel(b: InteriorBuild, A: CabinAnchors, T: Trim): void { const th = A.tunnelHalf, sec = (x: number, top: number): V[] => [[x, -th, A.floorZ], [x, -th + 18, top], [x, th - 18, top], [x, th, A.floorZ]];
@@ -178,22 +191,34 @@ export function doorCards(b: InteriorBuild, A: CabinAnchors, T: Trim, which: 'bo
     const px0 = d0 + 110, px1 = d1 - 110, py = (d: number) => P ? yz(d, pz1) : y(d); b.part(`${nm}Pocket`, T.door, 0.15, 'leather').box(px0, px1, py(0), py(42), pz0, pz1).paint('doorPleat', [(px0 + px1) / 2, py(42), (pz0 + pz1) / 2], [-sg, 0, 0], [0, 0, 1], px1 - px0 + 2, pz1 - pz0 + 2, [0, -sg, 0]);
     b.part(`${nm}Pull`, T.metal, 0.6).slab([d0 + 180, P ? yz(20, rz - 150) : y(20), rz - 150], [d0 + 290, P ? yz(20, rz - 150) : y(20), rz - 150], [0, 0, 1], 16, 10); } }
 
-// ---- the driver: helmet, a plain body, the hands on the wheel, the feet at the pedals. The frame is the seat's ----
-export function driver(b: InteriorBuild, f: Frame, o: { recline: number; wheel: Frame; rimR: number; feet: { clutch: V; throttle: V }; suit: string; helmet: string; gloves: string }): void { const th = (o.recline - 2) * RAD, U: V = [Math.sin(th), 0, Math.cos(th)], Fw: V = [-Math.cos(th), 0, Math.sin(th)], Yv: V = [0, 1, 0];
-  const inv = (p: V): V => { const d = sub(p, f.o); return [dot(d, f.x), dot(d, f.y), dot(d, f.z)]; };   // a point of the car in the seat's frame
-  b.frame(f).part('driver', o.suit, 0.1, 'canvas').loft(([[-75, 150, 105], [60, 150, 100], [230, 172, 112], [375, 192, 104], [438, 150, 84], [468, 72, 62]] as const).map(([s, w, d]) => ring(mul(U, s), Yv, Fw, w, 10, d, 0.5)));
+// ---- the driver (docs/systems/118 D2): fifteen rigid pieces, each on its own bone when `bone` is given (render/car/interior/rig.ts):
+//      the pelvis and the torso, the head (helmet and neck), each arm's upper arm, forearm (a ball at the elbow) and
+//      glove, each leg's thigh, shin (a ball at the knee) and shoe (a ball at the ankle). The hands hold the rim at nine
+//      and three, the feet are on the clutch and the throttle. The frame is the seat's ----
+export function driver(b: InteriorBuild, f: Frame, o: { recline: number; wheel: Frame; rimR: number; feet: { clutch: V; throttle: V }; suit: string; helmet: string; gloves: string; bone?: (s: Seg) => number }): DriverRest { const th = (o.recline - 2) * RAD, U: V = [Math.sin(th), 0, Math.cos(th)], Fw: V = [-Math.cos(th), 0, Math.sin(th)], Yv: V = [0, 1, 0];
+  const inv = (p: V): V => { const d = sub(p, f.o); return [dot(d, f.x), dot(d, f.y), dot(d, f.z)]; }, car = (p: V): V => at(f, p), B = (s: Seg) => o.bone?.(s) ?? 0;   // inv: a point of the car in the seat's frame
+  const ball = (c: V, r: number) => b.turn(c, [0, 0, 1], [[-r, 0], [-r * 0.71, r * 0.71], [0, r], [r * 0.71, r * 0.71], [r, 0]], 6);
+  const body = ([[-75, 150, 105], [60, 150, 100], [230, 172, 112], [375, 192, 104], [438, 150, 84], [468, 72, 62]] as const).map(([s, w, d]) => ring(mul(U, s), Yv, Fw, w, 10, d, 0.5));
+  b.frame(f).onBone(B('pelvis')).part('driver', o.suit, 0.1, 'canvas').loft(body.slice(0, 2)); b.onBone(B('torso')).loft(body.slice(1));
   b.paint('suit', add(mul(U, 215), mul(Fw, 100)), [0, 1, 0], U, 300, 430, Fw, 0.35);
   const neck = mul(U, 468), head = add(neck, [-28, 0, 150]), hax: V = [0, 0, 1];
-  b.part('driverNeck', '#1b1b1d', 0.1).tube([add(neck, [0, 0, -20]), add(head, [10, 0, -120])], 52, 6);
+  b.onBone(B('head')).part('driverNeck', '#1b1b1d', 0.1).tube([add(neck, [0, 0, -20]), add(head, [10, 0, -120])], 52, 6);
   b.part('driverHelmet', o.helmet, 0.55).turn(head, hax, [[-150, 92], [-118, 120], [-55, 135], [0, 139], [55, 133], [100, 110], [130, 68], [144, 30], [147, 0]], 14, { hint: [1, 0, 0], turn: 0.5 }).paint('visor', add(head, [-140, 0, 0]), [0, 1, 0], [0, 0, 1], 290, 114, [-1, 0, 0], 0.2);
   b.line('trim', [add(head, [-128, -62, -52]), add(head, [-141, 0, -54]), add(head, [-128, 62, -52])], { w: 0.8 });
-  for (const sg of [-1, 1]) { const sh = add(mul(U, 392), [0, sg * 188, 0]), a = 18 * RAD, hand = inv(at(o.wheel, [10, sg * o.rimR * Math.cos(a), o.rimR * Math.sin(a)])), el = joint(sh, hand, 325, 300, [0.2, sg * 0.8, -1]);
-    b.part(sg > 0 ? 'driverArmL' : 'driverArmR', o.suit, 0.1, 'canvas').tube([add(sh, [0, -sg * 30, -10]), sh, el, lerp(el, hand, 0.86)], [50, 54, 42, 31], 8);
+  const R: Partial<DriverRest> & Record<string, unknown> = { hip: car([0, 0, 0]), up: dir(f, U), fwd: dir(f, Fw), neck: car(neck), eye: car(add(head, [-95, 0, 8])), arm: [325, 300], leg: [440, 430] };
+  const J: Record<string, Partial<Record<'L' | 'R', V>>> = { shoulder: {}, elbow: {}, hand: {}, handAxis: {}, hipJ: {}, knee: {}, ankle: {}, elbowPole: {}, kneePole: {} };
+  for (const sg of [-1, 1]) { const k = sg > 0 ? 'L' : 'R', sh = add(mul(U, 392), [0, sg * 188, 0]), a = HAND_HOME, hand = inv(at(o.wheel, [10, sg * o.rimR * Math.cos(a), o.rimR * Math.sin(a)])), pole: V = [0.2, sg * 0.8, -1], el = joint(sh, hand, 325, 300, pole);
+    b.onBone(B(`upperArm${k}`)).part(sg > 0 ? 'driverArmL' : 'driverArmR', o.suit, 0.1, 'canvas').tube([add(sh, [0, -sg * 30, -10]), sh, el], [50, 54, 42], 8);
+    b.onBone(B(`foreArm${k}`)).tube([el, lerp(el, hand, 0.86)], [42, 31], 8); ball(el, 43);
     const tan = unit(sub(inv(at(o.wheel, [10, sg * o.rimR * Math.cos(a + 0.2), o.rimR * Math.sin(a + 0.2)])), inv(at(o.wheel, [10, sg * o.rimR * Math.cos(a - 0.2), o.rimR * Math.sin(a - 0.2)]))));
-    b.part(sg > 0 ? 'driverGloveL' : 'driverGloveR', o.gloves, 0.15).turn(hand, tan, [[-48, 0], [-40, 31], [40, 33], [50, 0]], 6);
-    const hipJ: V = [-5, sg * 88, -12], foot = inv(sg > 0 ? o.feet.clutch : o.feet.throttle), ankle = add(foot, [45, 0, 10]), knee = joint(hipJ, ankle, 440, 430, [0, sg * 0.35, 1]);
-    b.part(sg > 0 ? 'driverLegL' : 'driverLegR', o.suit, 0.1, 'canvas').tube([hipJ, knee, ankle], [84, 62, 44], 8);
-    b.part(sg > 0 ? 'driverShoeL' : 'driverShoeR', '#1b1b1d', 0.15).slab(add(ankle, [38, 0, -52]), add(ankle, [-70, 0, 82]), [0, 1, 0], 84, 52, 70); } }
+    b.onBone(B(`hand${k}`)).part(sg > 0 ? 'driverGloveL' : 'driverGloveR', o.gloves, 0.15).turn(hand, tan, [[-48, 0], [-40, 31], [40, 33], [50, 0]], 6);
+    const hipJ: V = [-5, sg * 88, -12], foot = inv(sg > 0 ? o.feet.clutch : o.feet.throttle), ankle = add(foot, [45, 0, 10]), kpole: V = [0, sg * 0.35, 1], knee = joint(hipJ, ankle, 440, 430, kpole);
+    b.onBone(B(`thigh${k}`)).part(sg > 0 ? 'driverLegL' : 'driverLegR', o.suit, 0.1, 'canvas').tube([hipJ, knee], [84, 62], 8);
+    b.onBone(B(`shin${k}`)).tube([knee, ankle], [62, 44], 8); ball(knee, 63);
+    b.onBone(B(`foot${k}`)).part(sg > 0 ? 'driverShoeL' : 'driverShoeR', '#1b1b1d', 0.15).slab(add(ankle, [38, 0, -52]), add(ankle, [-70, 0, 82]), [0, 1, 0], 84, 52, 70); ball(ankle, 42);
+    J.shoulder![k] = car(sh); J.elbow![k] = car(el); J.hand![k] = car(hand); J.handAxis![k] = dir(f, tan); J.hipJ![k] = car(hipJ); J.knee![k] = car(knee); J.ankle![k] = car(ankle); J.elbowPole![k] = dir(f, pole); J.kneePole![k] = dir(f, kpole); }
+  b.onBone(0);
+  return { ...R, ...J } as DriverRest; }
 
 // ---- the roll cage (an option): tubes along the cabin's corners, from its anchors ----
 export function cage(b: InteriorBuild, A: CabinAnchors, colour: string): void { const r = 21, hx = Math.min(A.rearX - 30, A.hip[0] + 450), top = A.roofZ - 55, P: Record<string, V> = {}, hh = A.wellX !== undefined && hx > A.wellX - 40 ? Math.min(A.half, (A.rearHalf ?? A.half) + 40) : A.half;

@@ -83,6 +83,8 @@ export function along(path: [number, number][], u: number): [number, number] { c
 /** the lever's lean at a gate place: degrees across a plane, degrees along */
 export const LEVER_DEG = { across: 7, along: 11 } as const;
 
+/** the hands' hold at rest: a little above nine and three (rad above the rim's level) */
+export const HAND_HOME = 6 * Math.PI / 180;
 // ---- the timing ----
 export const MOTION = { reach: 0.12, move: 0.15, back: 0.15, regrip: 0.2, foot: 0.1, key: 0.25, /** past this a hand lets go and takes the rim again (rad) */ regripAt: 120 * Math.PI / 180, lead: 40 * Math.PI / 180 } as const;
 /** a hand's state: its angle on the rim as the cabin sees it (rad from the left, toward the top), lifted off the rim

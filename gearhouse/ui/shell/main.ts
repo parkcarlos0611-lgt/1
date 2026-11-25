@@ -13,8 +13,8 @@ import texNor from '../../assets/textures/pbr/normal.jpg';
 import texRgh from '../../assets/textures/pbr/rough.jpg';
 import texMeta from '../../assets/textures/pbr/pbr.json';
 import { Router, type Screen } from './router';
-import { Stage, Backdrop } from './stage';
-import { loadSettings, saveSettings, type ListStore } from './settings';
+import { Stage, Backdrop, LOOK_NUM } from './stage';
+import { loadSettings, saveSettings, GLASS_REFL, type ListStore } from './settings';
 import { setSceneryDensity } from '../../race/scenery';
 import type { ShellCtx, Last } from './ctx';
 import { titleScreen, garageScreen, pickScreen, settingsScreen, aboutScreen, kitScreen } from './menus';
@@ -65,7 +65,8 @@ function applySettings() { const t = settings.screen.theme; if (t === 'auto') de
   PHYSICS.kinematic = settings.sandbox.physics !== 'old';   // the developers' physics switch (race/kin.ts), for the next car made
   setLineWeight(LINE_WEIGHT[settings.graphics.lineWeight]);   // the toon look's line widths (render/live/style.ts)
   setPartStyle(styleForLook(settings.graphics.look === 'drift' ? 4 : 2));   // look 4: the engines and the suspensions built in their drift look (docs/systems/109 section 10)
-  uiSounds(settings.sound.ui); setSceneryDensity(settings.graphics.scenery); backdrop.calm = settings.screen.calm || matchMedia('(prefers-reduced-motion: reduce)').matches; backdrop.redraw(); screens.drive?.apply?.(); }
+  uiSounds(settings.sound.ui); setSceneryDensity(settings.graphics.scenery); backdrop.calm = settings.screen.calm || matchMedia('(prefers-reduced-motion: reduce)').matches;
+  backdrop.look = LOOK_NUM[settings.graphics.look] ?? 4; backdrop.glassRefl = GLASS_REFL[settings.graphics.glassRefl]; backdrop.redraw(); screens.drive?.apply?.(); }   // the title's car in the game's look (drift by default), not PBR (docs/systems/110 G4)
 
 const drive = driveScreen(ctx), builder = builderScreen(ctx), engine = engineScreen(ctx);
 Object.assign(screens, { title: titleScreen(ctx), garage: garageScreen(ctx), pick: pickScreen(ctx), settings: settingsScreen(ctx), about: aboutScreen(ctx), kit: kitScreen(ctx), builder, drive, engine, results: resultsScreen(ctx) });

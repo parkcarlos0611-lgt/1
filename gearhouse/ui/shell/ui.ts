@@ -23,18 +23,22 @@ const svgOf = (s: string): Element => { const t = document.createElement('templa
 // big yellow menu button
 export type BtnKind = 'main' | 'ok' | 'alt' | 'watch' | 'ghost' | 'danger' | 'menu';
 const KIND_ROLE: Record<BtnKind | '', string> = { main: 'gk-y', ok: 'gk-g', alt: 'gk-b', watch: 'gk-o', ghost: 'gk-dark', danger: 'gk-r', menu: 'gk-y gk-big', '': 'gk-b' };
-export interface BtnOpts { kind?: BtnKind; title?: string; id?: string; sub?: string; disabled?: boolean; icon?: IconName }
+/** big: a menu-sized button in its kind's colour (docs/systems/110 G4); tilt: slanted as the title's menu; square: the
+ *  icon alone (the label its accessible name and tip) */
+export interface BtnOpts { kind?: BtnKind; title?: string; id?: string; sub?: string; disabled?: boolean; icon?: IconName; big?: boolean; tilt?: boolean; square?: boolean }
 export function button(label: string, onClick: () => void, o: BtnOpts = {}): HTMLButtonElement {
-  const b = el('button', `gh-btn${o.kind ? ` gh-${o.kind}` : ''} gk-btn ${KIND_ROLE[o.kind ?? '']}`); b.type = 'button'; if (o.id) b.id = o.id; if (o.title) b.title = o.title; b.disabled = !!o.disabled;
+  const b = el('button', `gh-btn${o.kind ? ` gh-${o.kind}` : ''}${o.big && o.kind !== 'menu' ? ' gh-menu gk-big' : ''} gk-btn ${KIND_ROLE[o.kind ?? '']}${o.tilt ? ' gk-tilt' : ''}${o.square ? ' gk-sq' : ''}`); b.type = 'button'; if (o.id) b.id = o.id; if (o.title) b.title = o.title; b.disabled = !!o.disabled;
   if (o.icon) b.append(svgOf(icon(o.icon)));
-  if (o.sub) b.append(el('span', 'gh-btn-ts', el('span', 'gh-btn-t', label), el('small', 'gh-btn-s', o.sub))); else if (o.icon) b.append(el('span', '', label)); else b.textContent = label;
+  if (o.square && o.icon) { b.setAttribute('aria-label', label); if (!o.title) b.title = label; }
+  else if (o.sub) b.append(el('span', 'gh-btn-ts', el('span', 'gh-btn-t', label), el('small', 'gh-btn-s', o.sub))); else if (o.icon) b.append(el('span', '', label)); else b.textContent = label;
   pressable(b); b.addEventListener('click', () => onClick()); return b; }
 
 // ---- tabs: one panel shown at a time ----
-export function tabs(items: [string, string, HTMLElement][], first = items[0]?.[0]): { el: HTMLElement; select(id: string): void } {
+/** items: id, name, pane and, if given, the tab's icon */
+export function tabs(items: [string, string, HTMLElement, IconName?][], first = items[0]?.[0]): { el: HTMLElement; select(id: string): void } {
   const bar = el('div', 'gh-tabs'), box = el('div', 'gh-tabpanes'), btns = new Map<string, HTMLButtonElement>(); bar.setAttribute('role', 'tablist');
   const select = (id: string) => { for (const [k, b] of btns) b.setAttribute('aria-selected', String(k === id)); for (const [k, , p] of items) p.hidden = k !== id; };
-  for (const [id, name, pane] of items) { const b = el('button', 'gh-tab', name); b.type = 'button'; b.setAttribute('role', 'tab'); b.addEventListener('click', () => { blip('move'); select(id); }); btns.set(id, b); bar.append(b); pane.classList.add('gh-pane'); pane.setAttribute('role', 'tabpanel'); box.append(pane); }
+  for (const [id, name, pane, ic] of items) { const b = el('button', 'gh-tab', ...(ic ? [svgOf(icon(ic)), el('span', '', name)] : [name])); b.type = 'button'; b.setAttribute('role', 'tab'); b.addEventListener('click', () => { blip('move'); select(id); }); btns.set(id, b); bar.append(b); pane.classList.add('gh-pane'); pane.setAttribute('role', 'tabpanel'); box.append(pane); }
   if (first) select(first); return { el: el('div', 'gh-tabbox', bar, box), select }; }
 
 // ---- a labelled row; a slider, a switch, chips (one of several), a select ----
@@ -98,14 +102,38 @@ export function padKeys(send: (key: string) => void): void { if (!('getGamepads'
     requestAnimationFrame(poll); };
   addEventListener('gamepadconnected', () => { was = []; }, { once: false }); requestAnimationFrame(poll); }
 
-/** a car's side seen small (a placeholder until the garage's own pictures, U3): its paint, its base's line */
+/** a car's side seen small, in the interface's cartoon manner (docs/systems/110 G4): a thick black outline, its paint
+ *  over a darker lower band, the side glass with a glint, outlined wheels. The 959 (the model-built body) has its own
+ *  line (the long low nose, the round roof, the deck rising to the looped wing); the old bases share a generic one.
+ *  A placeholder until the garage's own rendered pictures. */
+let picN = 0;
 export function carPic(paint: string, base: string): HTMLElement {
-  const long = base === 'f355' ? 0 : base === 'eb110' ? 6 : 3, s = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); s.setAttribute('viewBox', '0 0 200 80'); s.setAttribute('aria-hidden', 'true'); s.classList.add('gh-carpic');
-  s.innerHTML = `<ellipse cx="100" cy="66" rx="88" ry="6" fill="rgba(0,0,0,0.25)"/>`
-    + `<path d="M${14 - long} 56 C${14 - long} 46 22 42 40 40 L${66 - long} 36 C78 24 96 20 116 21 C134 22 146 30 158 38 L${178 + long} 42 C${188 + long} 44 ${190 + long} 50 ${189 + long} 57 L${14 - long} 58 Z" fill="${paint}" stroke="rgba(0,0,0,0.45)" stroke-width="1.2"/>`
-    + `<path d="M76 37 C86 27 100 24 114 25 C128 26 138 31 146 38 Z" fill="rgba(30,40,50,0.75)"/>`
-    + `<circle cx="${50 - long / 2}" cy="57" r="11" fill="#1d1c1a"/><circle cx="${50 - long / 2}" cy="57" r="5.5" fill="#9aa1a6"/><circle cx="${154 + long / 2}" cy="57" r="11.5" fill="#1d1c1a"/><circle cx="${154 + long / 2}" cy="57" r="5.8" fill="#9aa1a6"/>`;
+  const K = '#111214', id = `ghcp${++picN}`, s = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); s.setAttribute('viewBox', '0 0 200 80'); s.setAttribute('aria-hidden', 'true'); s.classList.add('gh-carpic');
+  const p959 = base === 'p959', long = base === 'f355' ? 0 : base === 'eb110' ? 6 : 3;
+  // nose to the right; the wheels' centres; the body, the side glass, the lamps
+  const body = p959 ? 'M12 57 L11 45 C11 39 15 35 22 34 L40 33 C56 30 70 21 92 19.5 C106 19 117 22 129 32 C144 36 168 39 182 43 C190 45 193 50 192 57 Z'
+    : `M${14 - long} 57 C${14 - long} 46 22 42 40 40 L${66 - long} 36 C78 24 96 20 116 21 C134 22 146 30 158 38 L${178 + long} 42 C${188 + long} 44 ${190 + long} 50 ${189 + long} 57 Z`;
+  const glass = p959 ? 'M66 31 C78 24 94 22 106 22.5 C115 23 120 27 124 32 Z' : 'M76 37 C86 27 100 24 114 25 C128 26 138 31 146 38 Z';
+  const [wr, wf] = p959 ? [46, 157] : [50 - long / 2, 154 + long / 2];
+  const wheel = (x: number) => `<circle cx="${x}" cy="57" r="12.5" fill="#1b1c1f" stroke="${K}" stroke-width="3"/><circle cx="${x}" cy="57" r="6.8" fill="#c9ced4" stroke="${K}" stroke-width="2"/><circle cx="${x}" cy="57" r="2" fill="${K}"/>`;
+  s.innerHTML = `<defs><clipPath id="${id}"><path d="${body}"/></clipPath></defs><ellipse cx="100" cy="69" rx="90" ry="5" fill="rgba(0,0,0,0.35)"/>`
+    + `<path d="${body}" fill="${paint}"/><g clip-path="url(#${id})"><rect x="0" y="47" width="200" height="20" fill="rgba(0,0,0,0.28)"/><rect x="0" y="0" width="200" height="${p959 ? 29 : 31}" fill="rgba(255,255,255,0.14)"/></g>`
+    + `<path d="${glass}" fill="#26323c" stroke="${K}" stroke-width="2" stroke-linejoin="round"/><path d="${p959 ? 'M84 30 L96 23.5 L101 23.5 L89 30 Z' : 'M96 36 L108 27 L113 27 L101 36 Z'}" fill="rgba(255,255,255,0.55)"/>`
+    + (p959 ? `<path d="M100 31 L101 52" stroke="${K}" stroke-width="1.6" fill="none"/><path d="M13 34.5 L38 32.5" stroke="${K}" stroke-width="3.2" stroke-linecap="round"/><path d="M178 44 L189 47 L190 50 L180 48 Z" fill="#fff3c4" stroke="${K}" stroke-width="1.6" stroke-linejoin="round"/><rect x="11.5" y="40" width="4" height="6" fill="#e2352a" stroke="${K}" stroke-width="1.4"/>`
+      : `<path d="M112 37 L113 52" stroke="${K}" stroke-width="1.6" fill="none"/>`)
+    + `<path d="${body}" fill="none" stroke="${K}" stroke-width="3" stroke-linejoin="round"/>` + wheel(wr) + wheel(wf);
   return s as unknown as HTMLElement; }
+
+/** a group of a screen's fields (docs/systems/110 G4): a kit panel, its name on a band across its top with an icon */
+export function group(title: string, ic: IconName, ...kids: (HTMLElement | null | false)[]): HTMLElement {
+  return el('section', 'gh-group gk-panel', el('h3', 'gh-group-h', svgOf(icon(ic)), el('span', 'gk-head', title)), el('div', 'gh-form', ...kids)); }
+/** a big card's head (docs/systems/110 G4: the pause, the results): the top band's two tones across the card, an icon,
+ *  the title in large outlined type, the stripes running on, a line on the right */
+export function cardHead(title: string, ic?: IconName, sub?: string): HTMLElement {
+  return el('header', 'gh-cardhead', ...(ic ? [svgOf(icon(ic))] : []), el('h2', 'gh-cardhead-t gk-head', title), el('i', 'gh-sec-s'), sub ? el('span', 'gh-cardhead-s gk-head', sub) : null); }
+/** a section's heading (docs/systems/110 G4): a tilted plate with an icon, the stripes running on after it */
+export function secHead(title: string, ic?: IconName, right?: HTMLElement): HTMLElement {
+  return el('div', 'gh-sec', el('h2', 'gh-sec-t', ...(ic ? [svgOf(icon(ic))] : []), el('span', 'gk-head', title)), el('i', 'gh-sec-s'), right ?? null); }
 
 /** a text handed to the viewer as a file */
 export function download(name: string, text: string, type = 'application/json') { const a = document.createElement('a'), url = URL.createObjectURL(new Blob([text], { type }));

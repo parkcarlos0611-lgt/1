@@ -88,3 +88,12 @@ describe('version', () => {
     expect(ALPHA).toBe('0.12'); expect(VERSION_NAME).toBe('알파 0.12'); expect(CHANGES.length).toBeGreaterThan(3);
   });
 });
+
+describe('the title backdrop (docs/systems/110 G4)', () => {
+  it('draws the car in the game look, the drift look by default, never PBR', async () => {
+    const { LOOK_NUM, backdropOpts } = await import('../ui/shell/stage');
+    expect(LOOK_NUM[DEFAULTS.graphics.look]).toBe(4);
+    expect(backdropOpts(LOOK_NUM.drift!, 1).look).toBe(4); expect(backdropOpts(4, 1).outW).toBe(1);
+    for (const l of ['drift', 'toon', 'baked'] as const) expect(LOOK_NUM[l]).not.toBe(2);
+  });
+});

@@ -7,7 +7,7 @@
 import type { Screen, Move } from './router';
 import type { ShellCtx } from './ctx';
 import { PageScreen } from './stage';
-import { el, button, chips, toggle, toast } from './ui';
+import { el, button, chips, toggle, toast, group, cardHead } from './ui';
 import { slideIn } from '../kit/parts';
 import { mountBuilder, type BuilderApi } from '../builder3d';
 import { mountDrive, type DriveApi } from '../drive';
@@ -75,15 +75,17 @@ export function driveScreen(ctx: ShellCtx): Screen<DriveParams> & { readonly api
   const closePause = () => { if (!menuOn) return; menuOn = false; pause?.remove(); pause = null; api?.resume(); (document.activeElement as HTMLElement | null)?.blur(); };
   const buildPause = () => { pause?.remove(); const r = R(), f = (id: string) => r.querySelector<HTMLInputElement & HTMLSelectElement>(`#${id}`)!;
     const keepCtl = (k: 'auto' | 'tcs' | 'assist', v: boolean) => { ctx.settings.controls[k] = v; ctx.changed(); };
-    const nav = el('nav', 'gh-menu gh-pausemenu', button('계속', closePause, { kind: 'menu', id: 'gh-resume' }), button('다시 시작', () => { closePause(); api!.restart(); }, { kind: 'menu' }),
-      params.design ? button('설계로 돌아가기', toDesign, { kind: 'menu', sub: params.design.name }) : null, button('설정', () => void ctx.router.go('settings'), { kind: 'menu' }), button('타이틀로', () => void ctx.router.reset('title'), { kind: 'menu' }));
-    const quick = el('div', 'gh-form gh-quick', el('h3', 'gh-h3', '주행 중 조절'),
+    // docs/systems/110 G4: a big card, its head band; the tilted menu (계속 green, the others yellow, the settings blue, the title dark) beside the adjustments' panel
+    const nav = el('nav', 'gh-menu gh-pausemenu', button('계속', closePause, { kind: 'ok', big: true, tilt: true, icon: 'play', id: 'gh-resume' }), button('다시 시작', () => { closePause(); api!.restart(); }, { kind: 'menu', tilt: true, icon: 'flag' }),
+      params.design ? button('설계로 돌아가기', toDesign, { kind: 'menu', tilt: true, icon: 'wrench', sub: params.design.name }) : null, button('설정', () => void ctx.router.go('settings'), { kind: 'alt', big: true, tilt: true, icon: 'settings' }),
+      button('타이틀로', () => void ctx.router.reset('title'), { kind: 'ghost', big: true, tilt: true, icon: 'back' }));
+    const quick = group('주행 중 조절', 'steering',
       chips('카메라 (C)', CAM_VIEWS.filter(c => api!.cameras.includes(c.id)).map(c => [c.id, c.name] as [CamView, string]), api!.camera, v => { api!.camera = v; }),
       chips('댐퍼 (가변 댐퍼가 있는 차)', [['sport', '스포츠'], ['comfort', '컴포트']], f('damper').value, v => setField(r, 'damper', v)),
       toggle('자동 변속 (M)', f('auto').checked, v => { setField(r, 'auto', v); keepCtl('auto', v); }), toggle('트랙션 보조', f('tcs').checked, v => { setField(r, 'tcs', v); keepCtl('tcs', v); }),
       toggle('카운터스티어 보조', f('assist').checked, v => { setField(r, 'assist', v); keepCtl('assist', v); }), toggle('시험 운전자에게 맡기기', f('pilot').checked, v => setField(r, 'pilot', v)));
-    quick.append(el('p', 'gh-note', `엔진: ${api!.engine}`));   // docs/systems/110 G1
-    pause = el('div', 'gh-pause', el('div', 'gh-panel gk-panel gh-pausebox', el('h2', 'gh-h2 gh-display', '일시정지'), el('div', 'gh-pausecols', nav, quick)));
+    quick.classList.add('gh-quick'); quick.querySelector('.gh-form')?.append(el('p', 'gh-note', `엔진: ${api!.engine}`));   // docs/systems/110 G1
+    pause = el('div', 'gh-pause', el('div', 'gh-panel gk-panel gh-pausebox', cardHead('일시정지', 'flag', `${trackDef(api!.track).title}${api!.raceNow ? ' · 레이스' : ' · 시험 주행'}`), el('div', 'gh-pausecols', nav, quick)));
     pause.setAttribute('role', 'dialog'); pause.setAttribute('aria-label', '일시정지'); pause.addEventListener('click', e => { if (e.target === pause) closePause(); });
     ctx.over.append(pause); slideIn(pause.firstElementChild as HTMLElement, 'pop'); requestAnimationFrame(() => pause?.querySelector<HTMLElement>('#gh-resume')?.focus()); };
   /** a race's end: its results shown on their own screen */
@@ -106,15 +108,22 @@ export function driveScreen(ctx: ShellCtx): Screen<DriveParams> & { readonly api
     /** Esc and the phone's back: the drawer closed first, else the pause menu on and off */
     back() { if (!api) return false; if (api.drawerOpen) { api.drawer(false); return true; } if (menuOn) closePause(); else openPause(); return true; } }; }
 
-// ---- the race's results (a first version) ----
+// ---- the race's results (docs/systems/110 G4): one big card, my place in big figures, the order and the lap times in a
+// bold table (the podium's places in gold, silver and bronze plates, my row green, the fastest lap marked) ----
 export interface ResultParams { rows: ResultRow[]; track: string; laps: number }
 const fmt = (t: number) => t > 0 ? `${Math.floor(t / 60)}:${(t % 60).toFixed(2).padStart(5, '0')}` : '-';
+/** a row's gap to the winner: the winner's own a dash, one not finished a dash */
+export const gapText = (r: ResultRow, win: ResultRow | undefined): string => !win || !(r.total > 0) || !(win.total > 0) ? '-' : r === win ? '—' : `+${(r.total - win.total).toFixed(2)}`;
 export function resultsScreen(ctx: ShellCtx): Screen<ResultParams> {
   const root = el('section', 'gh-screen gh-dim gh-results');
-  return { enter(p) { root.textContent = ''; const tb = el('table', 'gh-table'); tb.innerHTML = '<thead><tr><th>순위</th><th>차</th><th>최고 랩</th><th>기록</th></tr></thead>';
-      const body = el('tbody'); for (const r of p.rows) { const tr = el('tr', r.me ? 'gh-me' : ''); for (const c of [String(r.pos), r.name, fmt(r.best), fmt(r.total)]) tr.append(el('td', '', c)); body.append(tr); } tb.append(body);
-      const again = button('다시 하기', () => { restartAsked = true; ctx.router.back(); }, { kind: 'main' });
-      root.append(el('header', 'gh-bar', el('h1', 'gh-bar-t gk-head', `레이스 결과 · ${p.track} · ${p.laps}바퀴`), el('span', 'gh-grow')), el('div', 'gh-body gh-narrow', el('div', 'gh-panel gk-panel', tb),
-        el('div', 'gh-actions', again, button('차고로', () => void ctx.router.reset('title').then(() => ctx.router.go('garage'))), button('타이틀로', () => void ctx.router.reset('title')))));
-      ctx.layer.append(root); ctx.backdrop.setDesign(ctx.recent()); ctx.backdrop.start(); requestAnimationFrame(() => again.focus()); },
+  return { enter(p) { root.textContent = ''; const win = p.rows[0], me = p.rows.find(r => r.me), fast = Math.min(...p.rows.map(r => r.best > 0 ? r.best : Infinity));
+      const tb = el('table', 'gh-table gh-restable'); tb.innerHTML = '<colgroup><col class="gh-c-pos"><col><col class="gh-c-t"><col class="gh-c-t"><col class="gh-c-gap"></colgroup><thead><tr><th>순위</th><th>차</th><th>최고 랩</th><th>기록</th><th class="gh-gapc">차이</th></tr></thead>';
+      const body = el('tbody'); for (const r of p.rows) { const tr = el('tr', `${r.me ? 'gh-me ' : ''}gh-p${Math.min(r.pos, 4)}`);
+        tr.append(el('td', 'gh-posc', el('span', 'gh-posb', String(r.pos))), el('td', 'gh-name', r.name), el('td', `gh-tc${r.best > 0 && r.best === fast ? ' gh-fast' : ''}`, fmt(r.best)), el('td', 'gh-tc', fmt(r.total)), el('td', 'gh-tc gh-gapc', gapText(r, win))); body.append(tr); } tb.append(body);
+      const hero = me ? el('div', 'gh-reshero', el('span', 'gh-respos', `P${me.pos}`), el('span', 'gh-resof gk-num', `/ ${p.rows.length}`),
+        el('div', 'gh-resline', el('b', 'gk-head', me.pos === 1 ? '우승!' : me.pos <= 3 ? '시상대!' : me.total > 0 ? '완주' : '레이스 끝'), el('span', '', `최고 랩 ${fmt(me.best)} · 기록 ${fmt(me.total)}${me.best > 0 && me.best === fast ? ' · 가장 빠른 랩' : ''}`))) : null;
+      const again = button('다시 하기', () => { restartAsked = true; ctx.router.back(); }, { kind: 'menu', tilt: true, icon: 'flag' });
+      root.append(el('div', 'gh-body gh-narrow gh-resbody', el('div', 'gh-panel gk-panel gh-resbox', cardHead('레이스 결과', 'trophy', `${p.track} · ${p.laps}바퀴`), hero, el('div', 'gh-reswrap', tb)),
+        el('div', 'gh-actions gh-resacts', again, button('차고로', () => void ctx.router.reset('title').then(() => ctx.router.go('garage')), { kind: 'alt', big: true, tilt: true, icon: 'wrench' }), button('타이틀로', () => void ctx.router.reset('title'), { kind: 'ghost', big: true, tilt: true, icon: 'back' }))));
+      ctx.layer.append(root); slideIn(root.querySelector('.gh-resbox') as HTMLElement, 'pop'); ctx.backdrop.setDesign(ctx.recent()); ctx.backdrop.start(); requestAnimationFrame(() => again.focus()); },
     leave() { root.remove(); } }; }

@@ -7,6 +7,7 @@ import { studioFloor } from '../../render/live/studio';
 import { designMesh } from '../../render/car/design';
 import type { Mesh } from '../../render/car/mesh';
 import type { Design } from '../../core/design';
+import { partStyle } from '../../render/car/powertrain';
 
 /** the renderer's scene owned by one screen at a time: the one leaving keeps its set pieces, the one coming puts its own
  *  back (or sets them up, the first time) */
@@ -37,18 +38,29 @@ export class PageScreen {
   hide() { if (!this.on) return; this.on = false; this.classes = Array.from(document.body.classList).filter(c => !c.startsWith('gh-')); for (const c of this.classes) document.body.classList.remove(c); this.style.media = 'not all'; this.root.remove(); }
 }
 
+/** the renderer's look for a look of the settings (render/live/renderer.ts): drift 4, toon 3, the PBR ones 2 and 1, baked 0 */
+export const LOOK_NUM: Record<string, number> = { baked: 0, stepped: 1, pbr: 2, toon: 3, drift: 4 };
+/** the backdrop's render options for a look: the drift look's ink outline at its full weight (as the drive draws it),
+ *  the others the soft outline they had */
+export function backdropOpts(look: number, dpr: number, glassRefl = 1) {
+  return look === 4 ? { look, glass: 0.8, glassRefl, rays: false, bloomK: 1, reflK: 1, dof: 0, outW: 1, outK: 1, style: { dpr } }
+    : { look, glass: 0.8, glassRefl, rays: look > 0 && look < 3, bloomK: 1, reflK: 1.3, dof: 0, outW: 0.5, outK: 0.6 }; }
+
 /** the backdrop: the studio floor, a car on the turntable turning slowly (still when the screen is to be calm), drawn
- *  while a menu screen shows; the car framed right of the menu on a wide window, above it on a narrow one */
+ *  while a menu screen shows, in the game's look (the drift look by default: the PBR looks are off, docs/decisions
+ *  2026-11-25); the car framed right of the menu on a wide window, between the logo and the menu on a narrow one */
 export class Backdrop {
-  private M: Mesh | null = null; private key = ''; private g: ReturnType<LiveRenderer['car']> | null = null; private yaw = 2.3; private last = 0; private raf = 0; private drawn = false;
+  private M: Mesh | null = null; private key = ''; private d: Design | null = null; private g: ReturnType<LiveRenderer['car']> | null = null; private yaw = 2.3; private last = 0; private raf = 0; private drawn = false;
   calm = false; frames = 0; private at = 0; private cost = 0; private drewLast = false;
+  /** the renderer's look (LOOK_NUM) and the toon glass's reflection, set from the settings */
+  look = 4; glassRefl = 1;
   constructor(private stage: Stage) {}
-  /** the car on the turntable: a design (its body built only when it changed) */
-  setDesign(d: Design) { const k = JSON.stringify([d.body, d.kit.tyres, d.kit.rim]); if (k === this.key) return; this.key = k; this.M = designMesh(d, 0, 0); this.g = null; this.drawn = false; }
+  /** the car on the turntable: a design (its body built only when it or the parts' style changed: the drift look's engines and suspensions) */
+  setDesign(d: Design) { const k = JSON.stringify([d.body, d.kit.tyres, d.kit.rim, partStyle()]); this.d = d; if (k === this.key) return; this.key = k; this.M = designMesh(d, 0, 0); this.g = null; this.drawn = false; }
   start() { this.stage.use('backdrop', true, L => { L.setGround(studioFloor()); L.setTrack(1, 30, 12, 0); }); if (this.raf) return; this.last = performance.now(); this.drawn = false; this.raf = requestAnimationFrame(t => this.frame(t)); }
   stop() { cancelAnimationFrame(this.raf); this.raf = 0; }
   /** drawn again on the next frame (the window resized, the sky arrived) */
-  redraw() { this.drawn = false; }
+  redraw() { this.drawn = false; if (this.d) this.setDesign(this.d); }
   private frame(now: number) { const el = Math.min(0.1, (now - this.last) / 1000); this.last = now; this.raf = requestAnimationFrame(t => this.frame(t));
     const L = this.stage.L, cv = this.stage.canvas; if (!L || !this.M || (this.calm && this.drawn)) return; if (!this.calm) this.yaw += el * 0.22;
     // a slow GPU (software GL) draws the turning car at a lower rate, the picture held between: what a frame cost is
@@ -58,10 +70,10 @@ export class Backdrop {
     if (this.drawn && now - this.at < Math.max(0, this.cost - 20) * 3) return;
     // at most about two million pixels (a large window at a high density is drawn a little softer)
     const k0 = Math.min(1.5, devicePixelRatio || 1), k = Math.min(k0, Math.sqrt(2.1e6 / Math.max(1, cv.clientWidth * cv.clientHeight))), W = Math.max(2, Math.round(cv.clientWidth * k)), H = Math.max(2, Math.round(cv.clientHeight * k)); if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
-    this.g ??= L.car(this.M); const wide = innerWidth > 760, len = this.M.length, free = (wide ? W * 0.55 : W) , band = wide ? H : H * 0.45;
+    this.g ??= L.car(this.M); const wide = innerWidth > 760, len = this.M.length, free = (wide ? W * 0.55 : W) , band = wide ? H : H * 0.36;
     const mm = Math.max(len * 1.25 / free, len * 0.6 / band), shift = wide ? W * 0.2 : 0, ang = 0.25, ox = -shift * mm / 1000;
-    L.render({ x: Math.sin(ang) * ox, y: -Math.cos(ang) * ox, z: 0.55, ang, pitch: 14, mm, W, H, cy: wide ? 0.6 : 0.36 },
+    L.render({ x: Math.sin(ang) * ox, y: -Math.cos(ang) * ox, z: 0.55, ang, pitch: 14, mm, W, H, cy: wide ? 0.6 : 0.47 },
       [{ g: this.g, x: 0, y: 0, z: -0.015, yaw: this.yaw, roll: 0, pitch: 0, steerL: 0.14, steerR: 0.12, spin: 0, player: true, lamps: 0 }], [], [],
-      { look: 2, glass: 0.8, rays: true, bloomK: 1, reflK: 1.3, dof: 0, outW: 0.5, outK: 0.6 });
+      backdropOpts(this.look, k, this.glassRefl));
     this.at = now; this.drewLast = true; this.drawn = true; this.frames++; }
 }

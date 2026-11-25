@@ -61,7 +61,7 @@ function lay(S: PowertrainSpec, site: Site, opts: PowertrainOpts, st: DriftStyle
   const o: V = [long && U[0] < 0 ? Math.min(at[0], wr.x + 20) : at[0], at[1], at[2] - (S.sump === 'dry' ? DRY_DROP * E0.B * scale : 0)];
   const T = (p: V): V => [o[0] + (U[0] * p[0] + Vx[0] * p[1]) * scale, o[1] + (U[1] * p[0] + Vx[1] * p[1]) * scale, o[2] + p[2] * scale];
   const T1 = (p: V): V => [o[0] + U[0] * p[0] + Vx[0] * p[1], o[1] + U[1] * p[0] + Vx[1] * p[1], o[2] + p[2]];
-  const g = new Geo(st); g.frame(T); const E = buildEngine(g, S, det, !long); g.frame(null);
+  const g = new Geo(st, det === 2); g.frame(T); const E = buildEngine(g, S, det, !long); g.frame(null);
   // the engine's bounds in the car: the realistic engine's in either look, so everything round it stands where it did
   let eb = g.bounds(); if (st) { const r = new Geo(); r.frame(T); buildEngine(r, S, det, !long); eb = r.bounds(); }
   const railZ = Math.max(site.foot + 78, (site.bay?.floor ?? 0) + 34);

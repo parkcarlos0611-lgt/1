@@ -65,6 +65,8 @@ export function assemble(k: CarKit, o: AssembleOpts = {}): Assembled {
   for (const sg of [1, -1] as const) { run('part', 'wheel', () => { wheel(x, L.wheels.f, sg, true, k.wheel); wheel(x, L.wheels.r, sg, false, k.wheel); }); }
   const mesh = e.b.mesh(L.length), r = e.roles(mesh.n), W = makeWarp(L, [k.canopy.roof.from, k.canopy.roof.to], o.tweak ?? {});
   if (!W.none) warp(mesh, r.role, r.panelOf, r.panel, W);
+  // the lines drawn on the machinery's parts (the drift look's) go with the engine and the suspension
+  if (!W.none && mesh.partLines) mesh.partLines = mesh.partLines.map(l => ({ ...l, pts: l.pts.map(p => [p[0] + W.engine[0], p[1] + W.engine[1], p[2] + W.engine[2]] as V) }));
   if (rig) { const N = mesh.names ?? [], eng = r.panel.indexOf('engine'), own = new Set<string>(), other = new Set<string>();   // the powertrain's own part names
     for (let t = 0; t < mesh.n; t++) (r.panelOf[t] === eng ? own : other).add(N[mesh.part[t]!] ?? ''); mesh.susp = { ...moveRig(rig, W.engine), chassis: [...own].filter(n => !other.has(n)) }; }
   return { mesh, lines: L, skin: s, role: r.role, panelOf: r.panelOf, panels: r.panel };

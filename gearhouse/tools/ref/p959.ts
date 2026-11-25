@@ -5,6 +5,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { deflateSync } from 'node:zlib';
 import { KINDS } from '../../render/car/mesh';
 import { p959Model } from '../../render/car/p959';
+import { measure } from '../../render/car/p959/check';
 import { edgeUse } from '../../render/car/p959/shell';
 
 const out = process.argv[2] ?? '.', mm = +(process.argv.find(a => a.startsWith('mm='))?.slice(3) ?? 4), W = Math.round(4800 / mm), H = Math.round(2300 / mm), BG = [206, 202, 192];
@@ -77,3 +78,10 @@ if (process.argv.includes('masks')) { const K = 4260 / 730 / 2;
   png(`${out}/mask_plan.png`, 1640, 760, mask(1640, 760, (x, y) => [40 + x / K, 380 - y / (1840 / 319 / 2)]));
   png(`${out}/mask_front.png`, 760, 560, mask(760, 560, (_x, y, z) => [380 + y / K, 500 - z / K], p => p[0]! < 1700));
   png(`${out}/mask_rear.png`, 760, 560, mask(760, 560, (_x, y, z) => [380 + y / K, 500 - z / K], p => p[0]! > 2800)); }
+
+if (process.argv.includes('report')) { const R = measure(S);
+  for (const p of R.panels) console.log(`${p.panel.name.padEnd(20)} lines ${String(p.lines).padStart(3)}  sign changes across ${p.across} (allowed ${p.panel.across ?? 0}) along ${p.along} (allowed ${p.panel.along ?? 0})  dimples ${p.dimples}  twist p95 ${p.twistP95.toFixed(1)} max ${p.twistMax.toFixed(1)}  off plane ${p.off.toFixed(1)} mm${p.panel.flat ? ' (flat)' : ''}`);
+  console.log(`paint edges: < 8 deg ${R.smooth}, 8-20 ${R.soft}, 20-35 not creased ${R.mushy.length}, >= 35 not creased ${R.unmarked.length}; slivers ${R.slivers}`);
+  const by = (l: typeof R.mushy) => { const m = new Map<string, number>(); for (const e of l) m.set(e.panel, (m.get(e.panel) ?? 0) + 1); return [...m].map(([k, v]) => `${k} ${v}`).join(', '); };
+  console.log(`  20-35 by panel: ${by(R.mushy)}\n  >=35 by panel: ${by(R.unmarked)}`);
+  for (const e of [...R.mushy, ...R.unmarked].sort((a, b) => b.deg - a.deg).slice(0, 14)) console.log(`   ${e.panel} ${e.deg.toFixed(1)} deg at ${e.at.map(v => Math.round(v)).join(' ')}`); }

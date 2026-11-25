@@ -39,7 +39,8 @@ export class Geo {
   private rule: KindRule | null = null; private seen = new Map<string, string[]>(); private ref: V | null = null;
   private thin = new Map<string, number>(); private L: MeshLine[] = [];
   /** `style`: the drift-game look (null: the realistic one) */
-  constructor(private readonly st: DriftStyle | null = null) {}
+  /** `full`: the builder's detail (the lighter details keep the look's colours and thicknesses, without its bevels and extra sides) */
+  constructor(private readonly st: DriftStyle | null = null, private readonly full = true) {}
   /** built in the drift-game look */
   get drift(): boolean { return !!this.st; }
   /** what follows is this part, in this material (`as`: drawn by another kind's rule than the part's own) */
@@ -50,8 +51,8 @@ export class Geo {
     this.c = { name, col, gloss, kind, t: [] }; this.g.push(this.c); return this; }
   frame(f: ((p: V) => V) | null): this { this.xf = f; this.k = f ? len(sub(f([1, 0, 0]), f([0, 0, 0]))) || 1 : 1; return this; }
   /** a round section's radius by the part's rule (and the part's thinnest noted) */
-  private rr(r: number): number { const u = this.rule; if (u) r = Math.max(r * u.scale, u.minPx * REF / 2 / this.k); const d = 2 * r * this.k, n = this.c.name; if (d < (this.thin.get(n) ?? Infinity)) this.thin.set(n, d); return r; }
-  private sg(seg: number): number { return this.rule?.seg || seg; }
+  rr(r: number): number { const u = this.rule; if (u) r = Math.max(r * u.scale, u.minPx * REF / 2 / this.k); const d = 2 * r * this.k, n = this.c.name; if (d < (this.thin.get(n) ?? Infinity)) this.thin.set(n, d); return r; }
+  private sg(seg: number): number { return this.full && this.rule?.seg ? Math.max(seg, this.rule.seg) : seg; }
   /** a line drawn on the part being built (the drift look's: a rib, a seam, a core's rows), in the frame being built in */
   line(kind: LineKind, pts: V[], closed = false, w?: number): this { if (!this.st) return this; const f = this.xf;
     this.L.push({ kind, pts: f ? pts.map(f) : pts, part: this.c.name, ...(closed ? { closed } : {}), ...(w ? { w } : {}) }); return this; }
@@ -72,7 +73,7 @@ export class Geo {
   obox(c: V, e1: V, h1: number, e2: V, h2: number, e3: V, h3: number, open = ''): this {
     if (h1 < 0.5 || h2 < 0.5 || h3 < 0.5) return this;
     if (this.st) { const u = this.rule!, lo = u.seg ? 0 : u.minPx * REF / 2 / this.k;   /* a plate's least thickness (kinds drawn as tubes keep their boxes) */ h1 = Math.max(h1, lo); h2 = Math.max(h2, lo); h3 = Math.max(h3, lo);
-      const ch = Math.min(u.bevel / this.k, 0.3 * Math.min(h1, h2, h3)); this.ref = c; if (ch * this.k >= 2) this.cbox(c, [e1, e2, e3], [h1, h2, h3], ch, open); else this.faces(c, e1, h1, e2, h2, e3, h3, open); this.ref = null; return this; }
+      const ch = this.full ? Math.min(u.bevel / this.k, 0.3 * Math.min(h1, h2, h3)) : 0; this.ref = c; if (ch * this.k >= 2) this.cbox(c, [e1, e2, e3], [h1, h2, h3], ch, open); else this.faces(c, e1, h1, e2, h2, e3, h3, open); this.ref = null; return this; }
     return this.faces(c, e1, h1, e2, h2, e3, h3, open); }
   private faces(c: V, e1: V, h1: number, e2: V, h2: number, e3: V, h3: number, open: string): this {
     const P = (i: number, j: number, k: number) => add(add(add(c, mul(e1, i * h1)), mul(e2, j * h2)), mul(e3, k * h3));
@@ -116,7 +117,7 @@ export class Geo {
   /** a round tube through points */
   tube(pts: V[], r: number, seg: number, caps: boolean | 'a' | 'b' = false): this { return this.sweep(pts, circle(this.rr(r), this.sg(seg)), caps); }
   /** a round tube bent smoothly from a (leaving along ta) to b (arriving along tb), in n lengths; `k` how far the ends hold their direction */
-  bend(a: V, ta: V, b: V, tb: V, r: number, seg: number, n = 5, k = 0.4, caps: boolean | 'a' | 'b' = false): this { return this.tube(bendPath(a, ta, b, tb, this.st ? Math.max(n, 4) : n, k), r, seg, caps); }
+  bend(a: V, ta: V, b: V, tb: V, r: number, seg: number, n = 5, k = 0.4, caps: boolean | 'a' | 'b' = false): this { return this.tube(bendPath(a, ta, b, tb, n, k), r, seg, caps); }
 
   /** the bounds of everything collected so far */
   bounds(): { min: V; max: V } { const min: V = [Infinity, Infinity, Infinity], max: V = [-Infinity, -Infinity, -Infinity];

@@ -14,6 +14,7 @@ import type { SuspDesign } from '../../../core/design';
 import { AFF_ID, NB, affInv, affMul, affPt, bones, m3m, m3t, m3v, solve, sub, type Aff, type M3, type Pose, type V } from './kinematics';
 import { axleParts, cornerParts, type Detail } from './parts';
 import { PART_BONE } from './names';
+import { resolveStyle, type StyleOpt } from '../powertrain/style';
 
 export type { Hardpoints, SuspSpec, SuspWheel, SuspType, AxleSpec, WishboneSpec } from './hardpoints';
 export { SUSPENSION, TRAVEL, axlePoints, wishbonePoints } from './hardpoints';
@@ -31,8 +32,8 @@ export interface SuspBuilt { rig: SuspRig; tris: number; parts: Map<string, Boun
 
 /** the suspension built into a car's mesh at its static ride: `ride` how far the body is raised over its wheels from the
  *  base's own height (the wheels then hang that much lower on their arms) */
-export function addSuspension(b: Build, spec: SuspSpec, wheels: { f: SuspWheel; r: SuspWheel }, opts: { detail?: Detail; ride?: number; setup?: SuspDesign } = {}): SuspBuilt {
-  const det = opts.detail ?? 2, ride = opts.ride ?? 0, g = new Geo(), corners = rigCorners(spec, wheels, opts.setup, ride), undo: Aff[][] = [];
+export function addSuspension(b: Build, spec: SuspSpec, wheels: { f: SuspWheel; r: SuspWheel }, opts: { detail?: Detail; ride?: number; setup?: SuspDesign; /** the look the parts are drawn in (default: the setting's, ../powertrain/style.ts): the same parts on the same bones either way */ style?: StyleOpt } = {}): SuspBuilt {
+  const det = opts.detail ?? 2, ride = opts.ride ?? 0, g = new Geo(resolveStyle(opts.style), det === 2), corners = rigCorners(spec, wheels, opts.setup, ride), undo: Aff[][] = [];
   // the parts are drawn in the hardpoints' own pose and carried to the static ride (with its toe) by their bones
   const toe = corners.map(H => H.steer.rack && opts.setup ? frontToe(H.side, opts.setup.front.toe) : 0);
   corners.forEach((H, k) => { const P = solve(H, -ride, toe[k]), at = bones(H, P); if (!P.ok) throw new Error(`suspension: the ${H.front ? 'front' : 'rear'} linkage does not reach its static ride`);

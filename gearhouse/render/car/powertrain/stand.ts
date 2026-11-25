@@ -19,6 +19,7 @@ import { DRY_DROP, engineDims } from './engine';
 import { Geo, type V } from './geo';
 import { buildInternals, type CrankKind, type EngineRig } from './internals';
 import type { Site } from './layout';
+import type { StyleOpt } from './style';
 import type { Design, QualityPart } from '../../../core/design';
 
 /** the mesh's length: the stand and the engine's longest (a V12's or an in-line six's) with its exploded parts */
@@ -29,8 +30,8 @@ const SITE: Site = { length: STAND_LEN, foot: 0, wheels: { f: { x: 0, y: 760, r:
 
 export interface StandModel { mesh: Mesh; built: PowertrainBuilt; /** the engine's bounds on the stand (mm, the mesh's frame) */ min: [number, number, number]; max: [number, number, number]; /** the cutaway's insides */ rig?: EngineRig }
 /** the design's engine on its stand; `cut`: cut open with its insides (the crank's kind where the layout has a choice) */
-export function standModel(d: Design, detail: 0 | 1 | 2 = 2, cut?: { crank?: CrankKind }): StandModel {
-  const { mesh: E, built } = powertrainMesh(fromDesign(d), SITE, { detail, engineOnly: true }), eb = built.engine;
+export function standModel(d: Design, detail: 0 | 1 | 2 = 2, cut?: { crank?: CrankKind }, style?: StyleOpt): StandModel {
+  const { mesh: E, built } = powertrainMesh(fromDesign(d), SITE, { detail, engineOnly: true, ...(style ? { style } : {}) }), eb = built.engine;
   // the engine moved so its middle stands at the mesh's middle, its crank at the stand's height
   const len = eb.max[0] - eb.min[0], x0 = STAND_LEN / 2 - len / 2 - eb.min[0], y0 = -(eb.min[1] + eb.max[1]) / 2, z0 = CRANK_Z;
   const pos = E.pos.slice(); for (let i = 0; i < pos.length; i += 3) { pos[i] = pos[i]! + x0; pos[i + 1] = pos[i + 1]! + y0; pos[i + 2] = pos[i + 2]! + z0; }
@@ -45,6 +46,8 @@ export function standModel(d: Design, detail: 0 | 1 | 2 = 2, cut?: { crank?: Cra
     .box(fx - 300, fx + reach, w - 70, w - 30, 30, 60).box(fx - 300, fx + reach, -w + 30, -w + 70, 30, 60)                    // the feet under the engine
     .mat(DARK, 0.3, 'plain').box(fx - 275, fx - 255, -12, 12, CRANK_Z + 30, CRANK_Z + 90);                                   // the turning handle
   b.name('stand').mat('#1a1a1a', 0.2, 'plain'); for (const [x, y] of [[fx - 265, w - 25], [fx - 265, -w + 25], [fx + reach - 25, w - 50], [fx + reach - 25, -w + 50]] as const) b.box(x - 18, x + 18, y - 18, y + 18, 0, 30);   // the castors
+  // the lines drawn on the engine's parts (the drift look's) moved with it
+  if (E.partLines) E.partLines = E.partLines.map(l => ({ ...l, pts: l.pts.map(p => [p[0] + x0, p[1] + y0, p[2] + z0] as V) }));
   if (!cut) return { mesh: merge(E, b.mesh(STAND_LEN), pos), built, min, max };
   // ---- the cutaway ----
   const S = fromDesign(d), D = engineDims(S), off: V = [x0, y0, z0 - (S.sump === 'dry' ? DRY_DROP * D.B : 0)];
@@ -82,7 +85,7 @@ export function cutMesh(M: Mesh, rule: (name: string) => 'keep' | 'clip' | 'drop
     for (let k = 0; k < planes.length; k++) { let poly = T; for (let j = 0; j < k && poly.length >= 3; j++) poly = clip(poly, j, 1); if (poly.length >= 3) poly = clip(poly, k, -1);
       for (let j = 1; j + 1 < poly.length; j++) { P.push(...poly[0]!, ...poly[j]!, ...poly[j + 1]!); tri.push(t); } } }
   const n = tri.length, pick = <A extends Uint8Array | Float32Array | Int16Array>(src: A, w: number, make: (k: number) => A): A => { const o = make(n * w); tri.forEach((t, j) => { for (let k = 0; k < w; k++) o[j * w + k] = src[t * w + k]!; }); return o; };
-  return { ...M, n, pos: new Float32Array(P), col: pick(M.col, 3, k => new Uint8Array(k)), gloss: pick(M.gloss, 1, k => new Float32Array(k)), part: pick(M.part, 1, k => new Int16Array(k)), kind: pick(M.kind, 1, k => new Uint8Array(k)), tex: pick(M.tex, 1, k => new Uint8Array(k)), ...(M.bone ? { bone: pick(M.bone, 1, k => new Uint8Array(k)) } : {}) }; }
+  return { ...M, ...(M.partLines ? { partLines: M.partLines.filter(l => rule(l.part ?? '') === 'keep') } : {}), n, pos: new Float32Array(P), col: pick(M.col, 3, k => new Uint8Array(k)), gloss: pick(M.gloss, 1, k => new Float32Array(k)), part: pick(M.part, 1, k => new Int16Array(k)), kind: pick(M.kind, 1, k => new Uint8Array(k)), tex: pick(M.tex, 1, k => new Uint8Array(k)), ...(M.bone ? { bone: pick(M.bone, 1, k => new Uint8Array(k)) } : {}) }; }
 /** meshes as one (each one's parts numbered after the last's), their bones kept */
 function mergeAll(L: Mesh[]): Mesh { let M = L[0]!; for (const B of L.slice(1)) { const bone = M.bone || B.bone ? new Uint8Array(M.n + B.n) : null; if (bone) { if (M.bone) bone.set(M.bone); if (B.bone) bone.set(B.bone, M.n); }
     M = merge(M, B); if (bone) M.bone = bone; } return M; }
@@ -92,7 +95,7 @@ function merge(A: Mesh, B: Mesh, posA = A.pos): Mesh {
   const n = A.n + B.n, NA = A.names ?? [], off = NA.length, cat = <T extends Float32Array | Uint8Array>(a: T, b: T, make: (k: number) => T) => { const o = make(a.length + b.length); o.set(a); o.set(b, a.length); return o; };
   const part = new Int16Array(n); part.set(A.part); for (let t = 0; t < B.n; t++) part[A.n + t] = B.part[t]! + off;
   return { n, pos: cat(posA, B.pos, k => new Float32Array(k)), col: cat(A.col, B.col, k => new Uint8Array(k)), gloss: cat(A.gloss, B.gloss, k => new Float32Array(k)), part, kind: cat(A.kind, B.kind, k => new Uint8Array(k)),
-    tex: cat(A.tex, B.tex, k => new Uint8Array(k)), length: STAND_LEN, names: [...NA, ...(B.names ?? [])], decals: [...(A.decals ?? []), ...(B.decals ?? [])] }; }
+    tex: cat(A.tex, B.tex, k => new Uint8Array(k)), length: STAND_LEN, ...(A.partLines || B.partLines ? { partLines: [...(A.partLines ?? []), ...(B.partLines ?? [])] } : {}), names: [...NA, ...(B.names ?? [])], decals: [...(A.decals ?? []), ...(B.decals ?? [])] }; }
 
 // ---- the parts' names and what each answers to ----
 /** each part's Korean name and the quality slider it answers to (null: none of the five) */
@@ -134,7 +137,12 @@ export function exploded(M: Mesh, k: number): Mesh {
   if (k <= 0) return M; let S = spreadCache.get(M); if (!S) { S = spreads(M); spreadCache.set(M, S); }
   const pos = M.pos.slice(); for (let t = 0; t < M.n; t++) { const p = M.part[t]!, dx = S[p * 3]! * k, dy = S[p * 3 + 1]! * k, dz = S[p * 3 + 2]! * k; if (!dx && !dy && !dz) continue;
     for (let v = 0; v < 3; v++) { const i = t * 9 + v * 3; pos[i] = pos[i]! + dx; pos[i + 1] = pos[i + 1]! + dy; pos[i + 2] = pos[i + 2]! + dz; } }
-  return { ...M, pos }; }
+  return { ...M, pos, ...(M.partLines ? { partLines: movedLines(M, S, k) } : {}) }; }
+/** the lines drawn on the parts (the drift look's), each moved with its part: the part of its name that goes to the line's side */
+function movedLines(M: Mesh, S: Float32Array, k: number): NonNullable<Mesh['partLines']> { const N = M.names ?? [];
+  return (M.partLines ?? []).map(l => { const y = l.pts[0]![1], side = y < -15 ? -1 : y > 15 ? 1 : 0; let p = -1;
+    for (let i = 0; i < N.length; i++) if (N[i] === l.part && (p < 0 || Math.sign(S[i * 3 + 1]!) === side)) { p = i; if (Math.sign(S[i * 3 + 1]!) === side) break; }
+    if (p < 0) return l; const d: V = [S[p * 3]! * k, S[p * 3 + 1]! * k, S[p * 3 + 2]! * k]; return { ...l, pts: l.pts.map(q => [q[0] + d[0], q[1] + d[1], q[2] + d[2]] as V) }; }); }
 
 // ---- the part under a point of the picture ----
 /** the live renderer's view (render/live/renderer.ts LiveView) and where the mesh stands (a car's place, its heading 0) */

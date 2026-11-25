@@ -22,22 +22,22 @@ export type PartKind = 'pipe' | 'exhaust' | 'runner' | 'header' | 'hose' | 'line
 /** a kind's rules. Round sections (tubes, cylinders, bars) are drawn `scale` times as thick and never thinner than
  *  `minPx` pixels across in the reference view; a box's edges are cut by `bevel` mm (never more than a share of its
  *  thinnest side); a kind with no tubes of its own (`seg` 0) has no box side thinner than `minPx` either; `seg`: the
- *  sides of its tubes (0: as the builder says) */
+ *  least sides of its tubes at full detail (0: as the builder says) */
 export interface KindRule { scale: number; minPx: number; bevel: number; seg: number }
 /** the reference view the least thicknesses are given in: an engine bay filling a phone's picture, 2.5 mm a pixel */
 export const REF_MM_PER_PX = 2.5;
 export const DRIFT_RULES: Record<PartKind, KindRule> = {
-  pipe: { scale: 1.75, minPx: 24, bevel: 0, seg: 10 },     // charge and water pipes: the references' thick yellow and blue ones
-  exhaust: { scale: 1.1, minPx: 16, bevel: 0, seg: 8 },    // under the floor and into the body's own tips: little thicker than true
-  runner: { scale: 1.3, minPx: 18, bevel: 0, seg: 6 },
-  header: { scale: 1.25, minPx: 16, bevel: 0, seg: 6 },
-  hose: { scale: 1.5, minPx: 14, bevel: 0, seg: 8 },
-  line: { scale: 1.5, minPx: 9, bevel: 0, seg: 5 },
+  pipe: { scale: 1.75, minPx: 24, bevel: 0, seg: 8 },     // charge and water pipes: the references' thick yellow and blue ones
+  exhaust: { scale: 1.1, minPx: 16, bevel: 0, seg: 0 },    // under the floor and into the body's own tips: little thicker than true
+  runner: { scale: 1.3, minPx: 18, bevel: 0, seg: 5 },
+  header: { scale: 1.25, minPx: 16, bevel: 0, seg: 5 },
+  hose: { scale: 1.5, minPx: 14, bevel: 0, seg: 6 },
+  line: { scale: 1.5, minPx: 9, bevel: 0, seg: 4 },
   belt: { scale: 1.4, minPx: 10, bevel: 0, seg: 0 },
   link: { scale: 1.6, minPx: 8, bevel: 0, seg: 6 },
-  shaft: { scale: 1.5, minPx: 16, bevel: 0, seg: 8 },
+  shaft: { scale: 1.5, minPx: 16, bevel: 0, seg: 6 },
   arm: { scale: 1.9, minPx: 14, bevel: 0, seg: 6 },
-  frame: { scale: 1.2, minPx: 16, bevel: 0, seg: 6 },
+  frame: { scale: 1.2, minPx: 16, bevel: 0, seg: 5 },
   spring: { scale: 1.7, minPx: 7, bevel: 0, seg: 4 },
   casting: { scale: 1, minPx: 0, bevel: 7, seg: 0 },
   cover: { scale: 1, minPx: 0, bevel: 14, seg: 0 },

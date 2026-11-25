@@ -208,5 +208,6 @@ export function buildCage(o: CageOpts = {}): Cage959 {
   for (let v = n; v < P.length; v++) mirror.push(mirror.indexOf(v));
   const nf = F.length; for (let k = 0; k < nf; k++) { F.push(F[k]!.map(v => mirror[v]!).reverse()); tag.push({ ...tag[k]!, right: true }); }
   for (const [key, s] of [...sharp]) { const [a, b] = key.split('|').map(Number) as [number, number], mk = ekey(mirror[a]!, mirror[b]!); sharp.set(mk, s); if (crease.has(key)) crease.add(mk); }
-  return { P, F, sharp, tag, M, W, crease, lines, loops, mirror };
+  const drawn = lines.filter(l => !(kf === 'clean' && /^ventF/.test(l.name)) && !(kr === 'clean' && /^ventR/.test(l.name)));
+  return { P, F, sharp, tag, M, W, crease, lines: drawn, loops, mirror };
 }

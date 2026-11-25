@@ -52,7 +52,8 @@ export class Geo {
   frame(f: ((p: V) => V) | null): this { this.xf = f; this.k = f ? len(sub(f([1, 0, 0]), f([0, 0, 0]))) || 1 : 1; return this; }
   /** a round section's radius by the part's rule (and the part's thinnest noted) */
   rr(r: number): number { const u = this.rule; if (u) r = Math.max(r * u.scale, u.minPx * REF / 2 / this.k); const d = 2 * r * this.k, n = this.c.name; if (d < (this.thin.get(n) ?? Infinity)) this.thin.set(n, d); return r; }
-  private sg(seg: number): number { return this.full && this.rule?.seg ? Math.max(seg, this.rule.seg) : seg; }
+  /** a tube's sides: the kind's at full detail; where the builder itself asks for the fewest (many small pipes: a twelve's headers) no more than six, but for the few hero pipes with couplers */
+  private sg(seg: number): number { const u = this.rule; return this.full && u?.seg ? Math.max(seg, seg <= 4 && !u.clamp ? Math.min(u.seg, 6) : u.seg) : seg; }
   /** a line drawn on the part being built (the drift look's: a rib, a seam, a core's rows), in the frame being built in */
   line(kind: LineKind, pts: V[], closed = false, w?: number): this { if (!this.st) return this; const f = this.xf;
     this.L.push({ kind, pts: f ? pts.map(f) : pts, part: this.c.name, ...(closed ? { closed } : {}), ...(w ? { w } : {}) }); return this; }
@@ -115,7 +116,12 @@ export class Geo {
       rings.push(sec.map(([x, y]) => { const v = add(mul(n, x), mul(q, y)), s = dot(v, tn) * (k - 1); return add(add(P[i]!, v), mul(tn, s)); })); }
     return this.loft(rings, caps); }
   /** a round tube through points */
-  tube(pts: V[], r: number, seg: number, caps: boolean | 'a' | 'b' = false): this { return this.sweep(pts, circle(this.rr(r), this.sg(seg)), caps); }
+  tube(pts: V[], r: number, seg: number, caps: boolean | 'a' | 'b' = false): this { const R = this.rr(r); this.sweep(pts, circle(R, this.sg(seg)), caps);
+    // the drift look's couplers: a band round the tube a little way in from each end, in the palette's coupler colour (the same part)
+    if (this.st && this.full && this.rule?.clamp && pts.length > 1) { const c = this.c, p = this.st.palette.coupler, w = Math.max(16, R * 0.7); this.c = { name: c.name, col: p.col, gloss: p.gloss, kind: p.kind, t: [] }; this.g.push(this.c);
+      for (const [a, b] of [[pts[0]!, pts[1]!], [pts[pts.length - 1]!, pts[pts.length - 2]!]] as const) { const d = sub(b, a), l = len(d); if (l < w * 1.6) continue; const n = mul(d, 1 / l), s = Math.min(l - w, w * 0.6); this.prism(add(a, mul(n, s)), add(a, mul(n, s + w)), circle(R * 1.1, this.sg(seg)), [0, 0, 1], false); }
+      this.c = { name: c.name, col: c.col, gloss: c.gloss, kind: c.kind, t: [] }; this.g.push(this.c); }
+    return this; }
   /** a round tube bent smoothly from a (leaving along ta) to b (arriving along tb), in n lengths; `k` how far the ends hold their direction */
   bend(a: V, ta: V, b: V, tb: V, r: number, seg: number, n = 5, k = 0.4, caps: boolean | 'a' | 'b' = false): this { return this.tube(bendPath(a, ta, b, tb, n, k), r, seg, caps); }
 

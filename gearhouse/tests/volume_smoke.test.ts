@@ -48,16 +48,16 @@ describe('volumetric smoke, the CPU reference (docs/systems/104 B-5)', () => {
     let left = 0, right = 0; for (let k = 0; k < 4; k++) for (let i = 14; i < nx; i++) { for (let j = 0; j < 3; j++) left += s2.S[s2.idx(i, j, k)]!; for (let j = 13; j < ny; j++) right += s2.S[s2.idx(i, j, k)]!; }
     expect(left).toBeGreaterThan(0.05); expect(right).toBeGreaterThan(0.05);
   });
-  it('is bored through by a box driven through it; the hole stays a while and fills again', () => {
+  it('is bored through by a box driven through it; the hole stays clear 2 s (the cut, V4) and fills again slowly', () => {
     const P: Partial<VolParams> = { nx: 40, ny: 16, nz: 10, h: 0.4, open: true, fade: 0, wind: [0, 0], alpha: 0, betaS: 0, edge: 0 };
     const bank = () => { const s = new VolumeSim(P), { nx, ny, nz } = s.P;   // a bank of smoke 0.8 dense, up to 2 m, across the middle third
       for (let k = 0; k < nz; k++) for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) s.S[s.idx(i, j, k)] = i >= 12 && i < 30 && k < 5 ? 0.8 : 0; return s; };
     const s = bank(), ref = bank(), at = (v: VolumeSim) => v.densityAt(8.4, 3.2, 0.6), step = () => { s.step(1 / 30); ref.step(1 / 30); };
     const car = { x: 1, y: 3.2, z: 0.7, hx: 2.0, hy: 0.85, hz: 0.6, yaw: 0, vx: 12, vy: 0, vz: 0 };
     for (; car.x < 15.5; car.x += car.vx / 30) { s.step(1 / 30, [], [car]); ref.step(1 / 30); }
-    expect(at(s)).toBeLessThan(at(ref) * 0.4);   // the hole, just after (the same smoke without the car beside it)
-    for (let n = 0; n < 30; n++) step(); expect(at(s)).toBeLessThan(at(ref) * 0.6);   // still there a second on
-    for (let n = 0; n < 90; n++) step(); expect(at(s)).toBeGreaterThan(at(ref) * 0.5);   // filled again by 4 s
+    expect(at(s)).toBeLessThan(at(ref) * 0.2);   // the hole, just after (the same smoke without the car beside it)
+    for (let n = 0; n < 60; n++) step(); expect(at(s)).toBeLessThan(at(ref) * 0.35);   // still clear two seconds on
+    for (let n = 0; n < 180; n++) step(); expect(at(s)).toBeGreaterThan(at(ref) * 0.5);   // filled again by 8 s
   });
   it('moved by whole cells, keeps the smoke where it is in the world', () => {
     const s = new VolumeSim({ ...still }); ball(s, 8, 8, 4, 3); const pts: [number, number, number][] = [[2, 2, 1], [2.3, 1.8, 0.9], [1.6, 2.4, 1.2]], a = pts.map(p => s.densityAt(...p));

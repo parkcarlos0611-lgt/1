@@ -1,7 +1,7 @@
 // The volumetric smoke's simulation on the GPU (docs/systems/104 B-1, B-2, step V2): the passes of the CPU reference
 // (race/volume/sim.ts), one fragment a cell, each grid a 2D atlas of its slices (atlas.ts) in half-float textures drawn
 // to. The sums are the reference's, line for line, so the two can be compared (the same input, a small grid: B-4 V2).
-//   fields: scal (r smoke, g dust, b heat), vel (x, y, z the faces' u, v, w), p (pressure), div, obs (xyz a solid's
+//   fields: scal (r smoke, g dust, b heat, a the cut: where a car has just been, V4), vel (x, y, z the faces' u, v, w), p (pressure), div, obs (xyz a solid's
 //   velocity, w solid), curl (xyz the vorticity, w its size), vf (the confinement's force), light (half resolution)
 // The textures sit on units 24..31, past the renderer's own, so its bindings are left as they were.
 import { program } from '../gpu';
@@ -34,7 +34,7 @@ void main() { ivec3 c = cellHere(); if (c.z >= uN.z) { o = vec4(0.); return; } i
 float g(vec3 p, vec4 e) { vec3 d = (uO + p * uH - e.xyz) / e.w; float d2 = dot(d, d); return d2 > 4. ? 0. : exp(-d2); }
 void main() { ivec3 c = cellHere(); if (c.z >= uN.z) { o0 = o1 = vec4(0.); return; } vec4 s = at(uScal, c), v = at(uVel, c); vec3 p = vec3(c);
   for (int k = 0; k < 32; k++) { if (k >= uEN) break; vec4 e = uE0[k], a = uE1[k], w = uE2[k]; float m = g(p + .5, e);
-    if (m > 0.) { s.r += a.x * m; s.g += a.y * m; s.b += (a.z - s.b) * m; }
+    if (m > 0.) { s.r += a.x * m; s.g += a.y * m; s.b += (a.z - s.b) * m; s.a *= max(0., 1. - 2. * m); }
     v.x += (w.x - v.x) * g(p + vec3(0., .5, .5), e) * 0.8; v.y += (w.y - v.y) * g(p + vec3(.5, 0., .5), e) * 0.8; v.z += (w.z - v.z) * g(p + vec3(.5, .5, 0.), e) * 0.8; }
   o0 = s; o1 = v; }`,
   obstacles: `uniform sampler2D uTop; uniform int uBN; uniform vec4 uB0[8], uB1[8], uB2[8]; ${OUT1}
@@ -44,12 +44,12 @@ void main() { ivec3 c = cellHere(); if (c.z >= uN.z) { o = vec4(0.); return; } v
     if (abs(l.x) < e.x && abs(l.y) < e.y && abs(w.z - b.z) < e.z) { s = 1.; v = uB2[k].xyz; } }
   o = vec4(v, s); }`,
   carve: `uniform sampler2D uScal, uObs; ${OUT1}
-void main() { ivec3 c = cellHere(); if (c.z >= uN.z) { o = vec4(0.); return; } if (solidAt(uObs, c)) { o = vec4(0.); return; } vec4 s = at(uScal, c); vec2 m = vec2(0.);
+void main() { ivec3 c = cellHere(); if (c.z >= uN.z) { o = vec4(0.); return; } if (solidAt(uObs, c)) { o = vec4(0., 0., 0., 1.); return; } vec4 s = at(uScal, c); vec2 m = vec2(0.);
   for (int k = 0; k < 6; k++) { ivec3 n = c + NB[k]; if (!inside(n)) continue; if (solidAt(uObs, n)) m += at(uScal, n).rg; }
   s.rg += m / 6.; o = s; }`,
   advect: `uniform sampler2D uScal, uVel, uObs; uniform float uSettle; ${OUT2}
-void main() { ivec3 c = cellHere(); if (c.z >= uN.z) { o0 = o1 = vec4(0.); return; } vec3 p = vec3(c); vec4 s = vec4(0.);
-  if (!solidAt(uObs, c)) { vec4 a = tri(uScal, back(uVel, p + .5, 0.), vec3(.5)); s.r = a.r; s.b = a.b; s.g = tri(uScal, back(uVel, p + .5, uSettle), vec3(.5)).g; }
+void main() { ivec3 c = cellHere(); if (c.z >= uN.z) { o0 = o1 = vec4(0.); return; } vec3 p = vec3(c); vec4 s = vec4(0., 0., 0., 1.);
+  if (!solidAt(uObs, c)) { vec4 a = tri(uScal, back(uVel, p + .5, 0.), vec3(.5)); s.r = a.r; s.b = a.b; s.a = a.a; s.g = tri(uScal, back(uVel, p + .5, uSettle), vec3(.5)).g; }
   vec3 v; v.x = tri(uVel, back(uVel, p + vec3(0., .5, .5), 0.), vec3(0., .5, .5)).x; v.y = tri(uVel, back(uVel, p + vec3(.5, 0., .5), 0.), vec3(.5, 0., .5)).y; v.z = tri(uVel, back(uVel, p + vec3(.5, .5, 0.), 0.), vec3(.5, .5, 0.)).z;
   o0 = s; o1 = vec4(v, 0.); }`,
   curl: `uniform sampler2D uVel; ${OUT1}
@@ -57,15 +57,15 @@ vec3 cvel(ivec3 c) { c = clampC(c); return 0.5 * (at(uVel, c).xyz + vec3(faceU(u
 void main() { ivec3 c = cellHere(); if (c.z >= uN.z) { o = vec4(0.); return; } float d = 1. / (2. * uH);
   vec3 xp = cvel(c + X), xm = cvel(c - X), yp = cvel(c + Y), ym = cvel(c - Y), zp = cvel(c + Z), zm = cvel(c - Z);
   vec3 w = vec3((yp.z - ym.z) - (zp.y - zm.y), (zp.x - zm.x) - (xp.z - xm.z), (xp.y - xm.y) - (yp.x - ym.x)) * d; o = vec4(w, length(w)); }`,
-  vforce: `uniform sampler2D uCurl, uScal; uniform float uVort; ${OUT1}
+  vforce: `uniform sampler2D uCurl, uScal; uniform float uVort, uCutSwirl; ${OUT1}
 void main() { ivec3 c = cellHere(); if (c.z >= uN.z) { o = vec4(0.); return; }
   vec3 g = vec3(at(uCurl, c + X).w - at(uCurl, c - X).w, at(uCurl, c + Y).w - at(uCurl, c - Y).w, at(uCurl, c + Z).w - at(uCurl, c - Z).w); vec3 N = g / (length(g) + 1e-5);
-  vec4 s = at(uScal, c); float e = uVort * uH * min(1., (s.r + s.g) * 4.); o = vec4(e * cross(N, at(uCurl, c).xyz), 0.); }`,
-  forces: `uniform sampler2D uVel, uVF, uScal; uniform float uAlpha, uBetaS, uBetaD, uDrag; uniform vec2 uWind; ${OUT1}
+  vec4 s = at(uScal, c); float e = uVort * uH * min(1., (s.r + s.g) * 4.) * (1. + uCutSwirl * 4. * s.a * (1. - s.a)); o = vec4(e * cross(N, at(uCurl, c).xyz), 0.); }`,
+  forces: `uniform sampler2D uVel, uVF, uScal; uniform float uAlpha, uBetaS, uBetaD, uDrag, uCutPush; uniform vec2 uWind; ${OUT1}
 void main() { ivec3 c = cellHere(); if (c.z >= uN.z) { o = vec4(0.); return; } vec3 v = at(uVel, c).xyz, f = at(uVF, c).xyz; vec4 s = at(uScal, c), sb = at(uScal, c - Z);
   float T = (sb.b + s.b) / 2., S = (sb.r + s.r) / 2., D = (sb.g + s.g) / 2.;
-  v.x += uDt * ((at(uVF, c - X).x + f.x) / 2. + uDrag * (uWind.x - v.x)); v.y += uDt * ((at(uVF, c - Y).y + f.y) / 2. + uDrag * (uWind.y - v.y));
-  v.z += uDt * ((at(uVF, c - Z).z + f.z) / 2. + uAlpha * T - uBetaS * S - uBetaD * D - uDrag * 0.3 * v.z); o = vec4(v, 0.); }`,
+  v.x += uDt * ((at(uVF, c - X).x + f.x) / 2. + uDrag * (uWind.x - v.x) - uCutPush * (s.a - at(uScal, c - X).a)); v.y += uDt * ((at(uVF, c - Y).y + f.y) / 2. + uDrag * (uWind.y - v.y) - uCutPush * (s.a - at(uScal, c - Y).a));
+  v.z += uDt * ((at(uVF, c - Z).z + f.z) / 2. + uAlpha * T - uBetaS * S - uBetaD * D - uDrag * 0.3 * v.z - uCutPush * (s.a - sb.a)); o = vec4(v, 0.); }`,
   bounds: `uniform sampler2D uVel, uObs; ${OUT1}
 void main() { ivec3 c = cellHere(); if (c.z >= uN.z) { o = vec4(0.); return; } vec3 v = at(uVel, c).xyz; vec4 oc = at(uObs, c); bool sq = oc.w > 0.5;
   if (c.x > 0) { vec4 r = at(uObs, c - X); bool sr = r.w > 0.5; if (sq || sr) v.x = sq && sr ? (oc.x + r.x) / 2. : sq ? oc.x : r.x; } else if (sq) v.x = oc.x;
@@ -84,11 +84,11 @@ void main() { ivec3 c = cellHere(); if (c.z >= uN.z || solidAt(uObs, c)) { o = v
 float P(ivec3 c) { return any(lessThan(c, ivec3(0))) ? 0. : at(uP, c).r; }
 void main() { ivec3 c = cellHere(); if (c.z >= uN.z) { o = vec4(0.); return; } vec3 v = at(uVel, c).xyz; float pc = at(uP, c).r;
   if (c.x > 0 || uOpen == 1) v.x -= pc - P(c - X); if (c.y > 0 || uOpen == 1) v.y -= pc - P(c - Y); if (c.z > 0) v.z -= pc - P(c - Z); o = vec4(v, 0.); }`,
-  dissipate: `uniform sampler2D uScal, uObs; uniform float uFade, uCool, uK; uniform int uEdge; ${OUT1}
+  dissipate: `uniform sampler2D uScal, uObs; uniform float uFade, uCool, uK, uCutFade, uCutHold; uniform int uEdge; ${OUT1}
 void main() { ivec3 c = cellHere(); if (c.z >= uN.z) { o = vec4(0.); return; } vec4 s0 = at(uScal, c); if (solidAt(uObs, c)) { o = s0; return; } vec2 s = s0.rg;
-  for (int k = 0; k < 6; k++) { ivec3 q = c + NB[k]; if (!inside(q) || solidAt(uObs, q)) continue; vec2 r = at(uScal, q).rg; s += min(vec2(1. / 7.), uK * (r + s0.rg) / 2.) * (r - s0.rg); }
-  float f = exp(-uFade * uDt); if (uOpen == 1 && uEdge > 0) { int e = min(min(min(c.x, c.y), min(uN.x - 1 - c.x, uN.y - 1 - c.y)), uN.z - 1 - c.z); if (e < uEdge) f *= 1. - uDt * 3. * (1. - float(e) / float(uEdge)); }
-  o = vec4(s * f, s0.b * exp(-uCool * uDt), 0.); }`,
+  for (int k = 0; k < 6; k++) { ivec3 q = c + NB[k]; if (!inside(q) || solidAt(uObs, q)) continue; vec4 rq = at(uScal, q); vec2 r = rq.rg; float hb = 1. - 0.85 * max(s0.a, rq.a); s += min(vec2(1. / 7.), uK * hb * (r + s0.rg) / 2.) * (r - s0.rg); }
+  float f = exp(-uFade * uDt) * max(0., 1. - uCutHold * uDt * smoothstep(0.45, 0.85, s0.a)); if (uOpen == 1 && uEdge > 0) { int e = min(min(min(c.x, c.y), min(uN.x - 1 - c.x, uN.y - 1 - c.y)), uN.z - 1 - c.z); if (e < uEdge) f *= 1. - uDt * 3. * (1. - float(e) / float(uEdge)); }
+  o = vec4(s * f, s0.b * exp(-uCool * uDt), s0.a * exp(-uCutFade * uDt)); }`,
   light: LIGHT_FS,
 } as const;
 type PassName = keyof typeof SRC;
@@ -148,13 +148,13 @@ export class GpuVolume {
     this.run('carve', [this.scal[1]!], { uScal: this.scal[0]!, uObs: this.obs }); this.swap(this.scal);
     this.run('advect', [this.scal[1]!, this.vel[1]!], { uScal: this.scal[0]!, uVel: this.vel[0]!, uObs: this.obs }, L => { dtU(L); gl.uniform1f(L('uSettle'), P.settle); }); this.swap(this.scal); this.swap(this.vel);
     this.run('curl', [this.curl], { uVel: this.vel[0]! });
-    this.run('vforce', [this.vf], { uCurl: this.curl, uScal: this.scal[0]! }, L => gl.uniform1f(L('uVort'), P.vort));
-    this.run('forces', [this.vel[1]!], { uVel: this.vel[0]!, uVF: this.vf, uScal: this.scal[0]! }, L => { dtU(L); gl.uniform1f(L('uAlpha'), P.alpha); gl.uniform1f(L('uBetaS'), P.betaS); gl.uniform1f(L('uBetaD'), P.betaD); gl.uniform1f(L('uDrag'), P.drag); gl.uniform2fv(L('uWind'), P.wind); }); this.swap(this.vel);
+    this.run('vforce', [this.vf], { uCurl: this.curl, uScal: this.scal[0]! }, L => { gl.uniform1f(L('uVort'), P.vort); gl.uniform1f(L('uCutSwirl'), P.cutSwirl); });
+    this.run('forces', [this.vel[1]!], { uVel: this.vel[0]!, uVF: this.vf, uScal: this.scal[0]! }, L => { dtU(L); gl.uniform1f(L('uAlpha'), P.alpha); gl.uniform1f(L('uBetaS'), P.betaS); gl.uniform1f(L('uBetaD'), P.betaD); gl.uniform1f(L('uDrag'), P.drag); gl.uniform1f(L('uCutPush'), P.cutPush); gl.uniform2fv(L('uWind'), P.wind); }); this.swap(this.vel);
     this.bounds();
     this.run('div', [this.div], { uVel: this.vel[0]!, uObs: this.obs });
     for (let i = 0; i < P.iters; i++) { this.run('jacobi', [this.p[1]!], { uP: this.p[0]!, uDiv: this.div, uObs: this.obs }); this.swap(this.p); }
     this.run('project', [this.vel[1]!], { uVel: this.vel[0]!, uP: this.p[0]! }); this.swap(this.vel); this.bounds();
-    this.run('dissipate', [this.scal[1]!], { uScal: this.scal[0]!, uObs: this.obs }, L => { dtU(L); gl.uniform1f(L('uFade'), P.fade); gl.uniform1f(L('uCool'), P.cool); gl.uniform1f(L('uK'), P.spread * dt / (P.h * P.h)); gl.uniform1i(L('uEdge'), P.edge); }); this.swap(this.scal); }
+    this.run('dissipate', [this.scal[1]!], { uScal: this.scal[0]!, uObs: this.obs }, L => { dtU(L); gl.uniform1f(L('uFade'), P.fade); gl.uniform1f(L('uCool'), P.cool); gl.uniform1f(L('uK'), P.spread * dt / (P.h * P.h)); gl.uniform1i(L('uEdge'), P.edge); gl.uniform1f(L('uCutFade'), P.cutFade); gl.uniform1f(L('uCutHold'), P.cutHold); }); this.swap(this.scal); }
   /** the light's grid: the share of the sun reaching each (half-resolution) cell */
   lightPass(sun: readonly number[], sigma = 4): void { const gl = this.gl;
     this.run('light', [this.light], { uScal: this.scal[0]! }, L => { gl.uniform3i(L('uNL'), this.AL.nx, this.AL.ny, this.AL.nz); gl.uniform1i(L('uColsL'), this.AL.cols); gl.uniform3fv(L('uSunG'), [...sun]); gl.uniform1f(L('uSigma'), sigma); }, this.AL); }

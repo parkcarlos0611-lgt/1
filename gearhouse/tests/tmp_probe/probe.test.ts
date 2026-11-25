@@ -1,7 +1,7 @@
 import { it } from 'vitest';
 import { VolumeSim, type VolParams } from '../../race/volume/sim';
 it('probe', () => {
-  for (const extra of [{}, { cutPush: 0 }, { cutSwirl: 0 }, { cutPush: 0, cutSwirl: 0 }, { cutHold: 0, cutPush: 0, cutSwirl: 0 }] as Partial<VolParams>[]) {
+  for (const extra of [{ cutSwirl: 0.3 }, { cutHold: 5, cutFade: 0.25, cutSwirl: 0.3 }, { cutHold: 5, cutFade: 0.25, cutSwirl: 0.5 }, { cutHold: 4, cutFade: 0.3, cutSwirl: 0.4 }] as Partial<VolParams>[]) {
   const P: Partial<VolParams> = { nx: 40, ny: 16, nz: 10, h: 0.4, open: true, fade: 0, wind: [0, 0], alpha: 0, betaS: 0, edge: 0, ...extra };
   const bank = () => { const s = new VolumeSim(P), { nx, ny, nz } = s.P; for (let k = 0; k < nz; k++) for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) s.S[s.idx(i, j, k)] = i >= 12 && i < 30 && k < 5 ? 0.8 : 0; return s; };
   const s = bank(), ref = bank(), at = (v: VolumeSim) => v.densityAt(8.4, 3.2, 0.6);

@@ -72,6 +72,8 @@ export function buildEngine(g: Geo, S0: PowertrainSpec, det: Detail, transverse 
   g.part('engineBlock', C.block, 0.3);
   g.box(u0 - 20, Lb, -1.15 * B, 1.15 * B, -0.55 * B, 0.7 * B);
   for (const s of S) { const [ua, ub] = bankU(s); bankBox(s, ua, ub, -0.95 * B, 0.95 * B, 0.2 * B, Hd, '-3'); }
+  // the drift look: a core plug's ring drawn on each bank's end, so the block's end faces are not bare
+  if (dr && det === 2) for (const s of S) { const [ua] = bankU(s), c = P(s, ua - 1.5, 0, 0.2 * B + (Hd - 0.2 * B) * 0.55); g.line('trim', Array.from({ length: 10 }, (_, i) => { const a = i / 10 * Math.PI * 2; return add(c, add(mul(acr(s), 0.42 * B * Math.cos(a)), mul(ax(s), 0.42 * B * Math.sin(a)))); }), true); }
   if (vee) g.box(u0, Lb - 10, -vin * 0.55, vin * 0.55, 0.6 * B, inner(1, Hd)[2] - 0.1 * B, '-3');
   g.part('engineBlock', C.block, 0.25).prism([0, 0, 0.05 * B], [u0 - 20, 0, 0.05 * B], rsec(1.5 * B, 1.3 * B, det === 0 ? 6 : 8, 2.6), [0, 0, 1]);
   if (det === 2 && nb <= 4 && turbos < 3 && !dr) { g.part('engineBlock', C.block, 0.2); for (const s of S) for (let i = 0; i + 1 < nb; i++) { const u = cylU(s, i) + pitch / 2; bankBox(s, u - 3, u + 3, 0.95 * B, 1.02 * B, 0.3 * B, Hd - 0.2 * B, '-2'); } }   // the block's ribs between the bores
@@ -95,14 +97,21 @@ export function buildEngine(g: Geo, S0: PowertrainSpec, det: Detail, transverse 
     g.part('cylinderHead', C.heads, 0.35); bankBox(s, ua, ub, -hw, hw, Hd, Hd + Hh, '-3');
     if (det === 0) { g.part('camCover', C.covers, crinkle); bankBox(s, ua + 8, ub - 8, -hw * 0.92, hw * 0.92, Hd + Hh, topA, '-3'); continue; }
     // the drift look: one big bevelled cover a bank over both cams, a line along it between them and two ribs across
-    if (dr) { g.part('camCover', C.covers, crinkle); bankBox(s, ua + 10, ub - 10, -hw * 0.94, hw * 0.94, Hd + Hh, topA, '-3');
-      if (det === 2) { const z = topA + 2, m = (ua + ub) / 2, q = (ub - ua) / 2 - 30; for (const k of [-0.55, 0.55]) g.line('crease', [P(s, m + k * q, -hw * 0.7, z), P(s, m + k * q, hw * 0.7, z)]); } }
+    if (dr) { g.part('camCover', C.covers, crinkle);
+      if (det < 2) bankBox(s, ua + 10, ub - 10, -hw * 0.94, hw * 0.94, Hd + Hh, topA, '-3');
+      else { // a rounded pillow: a round-shouldered section along the bank, drawn in at its two ends (twelve sides: the look's shading runs smooth over it)
+        const sec = (k: number, lift: number) => (x: number): V[] => rsec(hw * 0.95 * k, Hc * 0.62 * k, 12, 3.4).map(([a, b]) => P(s, x, a, Hd + Hh + Hc * 0.5 + b + lift));
+        g.loft([sec(0.8, -Hc * 0.14)(ua + 8), sec(1, 0)(ua + 8 + 0.3 * B), sec(1, 0)(ub - 8 - 0.3 * B), sec(0.8, -Hc * 0.14)(ub - 8)], true);
+        // its name plate: a bright plate on the crown (a single cam's cover; between the stripes it would hide the plugs of a twin cam's)
+        const z = Hd + Hh + Hc * 1.12 + 1.5, m = (ua + ub) / 2; if (!twin) g.part('camCover', '#d9dce0', 0.45).quad(P(s, m - 0.9 * B, -0.2 * B, z), P(s, m + 0.9 * B, -0.2 * B, z), P(s, m + 0.9 * B, 0.2 * B, z), P(s, m - 0.9 * B, 0.2 * B, z)); } }
     for (const k of twin ? [-1, 1] : [0]) { const off = k * 0.5 * B, wd = twin ? 0.36 * B : 0.7 * B, c0 = P(s, ua + 10, off, Hd + Hh + Hc / 2), c1 = P(s, ub - 10, off, Hd + Hh + Hc / 2);
       if (!dr) g.part('camCover', C.covers, crinkle).prism(c0, c1, rsec(wd, Hc / 2, twin ? 6 : 8, 3), ax(s));
-      g.part('camCover', C.accent, 0.4).quad(P(s, ua + 40, off - 0.11 * B, topA + 1.5), P(s, ub - 40, off - 0.11 * B, topA + 1.5), P(s, ub - 40, off + 0.11 * B, topA + 1.5), P(s, ua + 40, off + 0.11 * B, topA + 1.5)); }
+      // the stripe: on the cover's top (the drift look's rounded cover: on its skin at each edge)
+      const zs = (a: number) => dr && det === 2 ? Hd + Hh + Hc * 0.5 + Hc * 0.62 * (1 - Math.min(1, Math.abs(a / (hw * 0.95))) ** 3.4) ** (1 / 3.4) + 2 : topA + 1.5;
+      g.part('camCover', C.accent, 0.4).quad(P(s, ua + 40, off - 0.11 * B, zs(off - 0.11 * B)), P(s, ub - 40, off - 0.11 * B, zs(off - 0.11 * B)), P(s, ub - 40, off + 0.11 * B, zs(off + 0.11 * B)), P(s, ua + 40, off + 0.11 * B, zs(off + 0.11 * B))); }
     // the plugs: between the two covers; under one cover on the exhaust side
     const pa = twin ? 0 : 0.86 * B;
-    if (det === 2 && nb <= 4 && turbos < 3) { g.part('coilPack', '#121214', 0.2); for (let i = 0; i < nb; i++) { const u = cylU(s, i); bankBox(s, u - 0.22 * B, u + 0.22 * B, pa - 0.12 * B, pa + 0.12 * B, Hd + Hh - 4, twin ? topA + 6 : Hd + Hh + 0.3 * B, '-3'); } }
+    if (det === 2 && nb <= 4 && turbos < 3) { g.part('coilPack', '#121214', 0.2); for (let i = 0; i < nb; i++) { const u = cylU(s, i); bankBox(s, u - 0.22 * B, u + 0.22 * B, pa - 0.12 * B, pa + 0.12 * B, Hd + Hh - 4, twin ? topA + (dr ? 0.24 * B : 6) : Hd + Hh + 0.3 * B, '-3'); } }
     else { g.part('coilPack', '#121214', 0.1).quad(P(s, ua + 15, pa - 0.12 * B, Hd + Hh + 1), P(s, ub - 15, pa - 0.12 * B, Hd + Hh + 1), P(s, ub - 15, pa + 0.12 * B, Hd + Hh + 1), P(s, ua + 15, pa + 0.12 * B, Hd + Hh + 1)); } }
 
   // ---- the accessory end: timing covers, pulleys, the belt, what the belt drives ----
@@ -132,7 +141,8 @@ export function buildEngine(g: Geo, S0: PowertrainSpec, det: Detail, transverse 
     else for (let i = 0; i < nb; i++) { const u = cylU(s, i), toward = mid - u, a = P(s, u, hw - 2, Hd + 0.4 * Hh), c = P(s, u + toward * 0.25, colX, colA);
       if (det === 2) g.tube(nb > 4 ? [a, P(s, u + toward * 0.06, hw + 0.62 * B, Hd + 0.2 * Hh), c] : [a, P(s, u, hw + 0.5 * B, Hd + 0.25 * Hh), P(s, u + toward * 0.12, colX + 0.05 * B, colA + 0.55 * B), c], pipeR, nb > 4 ? 4 : pseg); else g.tube([a, c], pipeR, 4); }
     if (det > 0) { g.part('exhaustManifold', tubular ? HOT : '#4a4643', 0.35, tubular ? 'metal' : 'plain').cyl(P(s, cu0, colX, colA), P(s, cu1, colX, colA), colR, 6, true);
-      g.part('heatShield', SHIELD, 0.8, 'metal'); bankBox(s, cu0 + 15, cu1 - 15, colX - 0.45 * B, colX + 0.45 * B, colA + 0.4 * B, colA + 0.46 * B); }
+      g.part('heatShield', SHIELD, 0.8, 'metal'); if (dr) bankBox(s, mid - 0.5 * B, mid + 0.5 * B, colX - 0.3 * B, colX + 0.3 * B, colA + 0.5 * B, colA + 0.56 * B);   /* the drift look: a small plate over the collector's middle, so the thick headers show */
+      else bankBox(s, cu0 + 15, cu1 - 15, colX - 0.45 * B, colX + 0.45 * B, colA + 0.4 * B, colA + 0.46 * B); }
     // where the gas leaves the bank: with no turbo, the collector's end by the flange (straight back), or under its middle on an engine set across the car
     const line = (u: number): V => P(s, u, colX + 0.6 * B, colA - 0.75 * B);
     if (nt === 0) { outlets.push(transverse ? { p: add(P(s, mid, colX, colA), [0, 0, -colR]), d: [0, 0, -1], r: colR * 0.95, side: s } : { p: P(s, cu0, colX, colA), d: [-1, 0, 0], r: colR * 0.95, side: s }); return; }

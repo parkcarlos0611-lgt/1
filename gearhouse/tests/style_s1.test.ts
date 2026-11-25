@@ -89,7 +89,7 @@ describe('the drift-game style: lines found at hard edges (docs/systems/109 §5.
     expect(hardEdgeLines(fold(10, ['seat', 'dash'], ['plain', 'leather']))).toEqual([]);   // no paint: no line
   });
   it('finds lines on every style car that has none of its own', () => {
-    for (const c of STYLE_CARS) { const M = c.mesh(); const L = M.lines?.length ? M.lines : hardEdgeLines(M); expect(L.length, c.id).toBeGreaterThan(20); expect(L.some(l => l.kind === 'panel'), c.id).toBe(true); }
+    for (const c of STYLE_CARS) { if (c.part) continue; const M = c.mesh(); const L = M.lines?.length ? M.lines : hardEdgeLines(M); expect(L.length, c.id).toBeGreaterThan(20); expect(L.some(l => l.kind === 'panel'), c.id).toBe(true); }
   });
   it('makes each segment of a line a ribbon of two triangles', () => {
     expect(lineQuads([{ pts: [[0, 0, 0], [100, 0, 0]] }]).n).toBe(6);

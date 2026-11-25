@@ -18,19 +18,21 @@ export function setPartStyle(s: PartStyle): void { current = s; }
 /** the machinery's look for a renderer look: the drift-game look (4) has its own, every other the realistic one */
 export const styleForLook = (look: number): PartStyle => look === 4 ? 'drift' : 'real';
 
-export type PartKind = 'pipe' | 'exhaust' | 'runner' | 'header' | 'hose' | 'line' | 'belt' | 'link' | 'shaft' | 'arm' | 'frame' | 'spring' | 'casting' | 'cover' | 'box' | 'plate' | 'round';
+export type PartKind = 'pipe' | 'intake' | 'exhaust' | 'runner' | 'header' | 'hose' | 'line' | 'belt' | 'link' | 'shaft' | 'arm' | 'frame' | 'spring' | 'casting' | 'cover' | 'box' | 'plate' | 'round';
 /** a kind's rules. Round sections (tubes, cylinders, bars) are drawn `scale` times as thick and never thinner than
  *  `minPx` pixels across in the reference view; a box's edges are cut by `bevel` mm (never more than a share of its
  *  thinnest side); a kind with no tubes of its own (`seg` 0) has no box side thinner than `minPx` either; `seg`: the
  *  least sides of its tubes at full detail (0: as the builder says) */
-export interface KindRule { scale: number; minPx: number; bevel: number; seg: number }
+export interface KindRule { scale: number; minPx: number; bevel: number; seg: number; /** a coupler's band near each end of its tubes (the palette's `coupler`) */ clamp?: boolean }
 /** the reference view the least thicknesses are given in: an engine bay filling a phone's picture, 2.5 mm a pixel */
 export const REF_MM_PER_PX = 2.5;
 export const DRIFT_RULES: Record<PartKind, KindRule> = {
-  pipe: { scale: 1.75, minPx: 24, bevel: 0, seg: 8 },     // charge and water pipes: the references' thick yellow and blue ones
+  pipe: { scale: 1.75, minPx: 24, bevel: 0, seg: 12, clamp: true },
+  intake: { scale: 1.3, minPx: 24, bevel: 0, seg: 12, clamp: true },   // the air's way in: one thick round pipe, as the references'
+      // charge and water pipes: the references' thick yellow and blue ones
   exhaust: { scale: 1.1, minPx: 16, bevel: 0, seg: 0 },    // under the floor and into the body's own tips: little thicker than true
   runner: { scale: 1.3, minPx: 18, bevel: 0, seg: 5 },
-  header: { scale: 1.25, minPx: 16, bevel: 0, seg: 5 },
+  header: { scale: 1.45, minPx: 16, bevel: 0, seg: 12 },
   hose: { scale: 1.5, minPx: 14, bevel: 0, seg: 6 },
   line: { scale: 1.5, minPx: 9, bevel: 0, seg: 4 },
   belt: { scale: 1.4, minPx: 10, bevel: 0, seg: 0 },
@@ -39,7 +41,7 @@ export const DRIFT_RULES: Record<PartKind, KindRule> = {
   arm: { scale: 1.9, minPx: 14, bevel: 0, seg: 6 },
   frame: { scale: 1.2, minPx: 16, bevel: 0, seg: 5 },
   spring: { scale: 1.7, minPx: 7, bevel: 0, seg: 4 },
-  casting: { scale: 1, minPx: 0, bevel: 7, seg: 0 },
+  casting: { scale: 1, minPx: 0, bevel: 12, seg: 0 },
   cover: { scale: 1, minPx: 0, bevel: 14, seg: 0 },
   box: { scale: 1, minPx: 0, bevel: 12, seg: 0 },
   plate: { scale: 1, minPx: 4, bevel: 0, seg: 0 },
@@ -54,7 +56,7 @@ export const PART_KIND: Record<string, PartKind> = {
   engineBlock: 'casting', sump: 'casting', cylinderHead: 'casting', timingCover: 'casting', camCover: 'cover', coilPack: 'round', oilPump: 'round', oilFilter: 'round', starter: 'round',
   pulley: 'round', belt: 'belt', alternator: 'round', waterPump: 'round', exhaustManifold: 'header', heatShield: 'plate', turbo: 'round', wastegate: 'round', airFilter: 'round', exhaustDownpipe: 'exhaust',
   intakePlenum: 'cover', intakeRunner: 'runner', intakeTrumpet: 'round', throttleBody: 'round', throttleLinkage: 'link', fuelRail: 'link', intakeActuator: 'round', intakeLabel: 'plate', airbox: 'box',
-  intakeHose: 'hose', intercooler: 'box', boostPipe: 'pipe', thermostat: 'casting', coolantHose: 'hose', oilFiller: 'round', dipstick: 'line',
+  intakeHose: 'intake', intercooler: 'box', boostPipe: 'pipe', thermostat: 'casting', coolantHose: 'hose', oilFiller: 'round', dipstick: 'line',
   // the drivetrain and the exhaust
   clutchHousing: 'round', gearbox: 'casting', shiftActuator: 'box', shiftLinkage: 'link', differential: 'round', driveshaft: 'shaft', cvJoint: 'round', cvBoot: 'round', shaftBearing: 'round',
   centreDiff: 'round', propShaft: 'shaft', propJoint: 'round', frontDifferential: 'round', exhaustPipe: 'exhaust', catalyst: 'round', muffler: 'round', tailpipe: 'exhaust',
@@ -92,10 +94,10 @@ export const CALIPER_COLOURS = ['#d8281e', '#f0c81e', '#27a844', '#f08a1e', '#24
 /** each part's roles: its first colour as built takes the first, its second the second, and so on (null, or none
  *  left: it keeps the colour the builder gives, the engine's own: its block, heads, covers and intake) */
 export const DRIFT_PAINT: Record<string, (PaletteRole | null)[]> = {
-  engineBlock: [null], sump: [null, 'black'], cylinderHead: [null], camCover: [null, null], timingCover: ['castingDark'], intakePlenum: [null], intakeRunner: [null], intakeLabel: [null],
-  coilPack: ['black'], oilPump: ['steel'], oilFilter: ['filterBlue'], starter: ['black', 'steel'], pulley: ['steel'], belt: ['rubber'], alternator: ['casting'], waterPump: ['castingDark'],
-  exhaustManifold: ['exhaustHot', 'exhaustHot'], heatShield: ['shield'], turbo: ['iron', 'castingDark', 'steel'], wastegate: ['gold'], airFilter: ['filter'], exhaustDownpipe: ['exhaustHot'],
-  intakeTrumpet: ['steel', 'black'], throttleBody: ['steel'], throttleLinkage: ['steel'], fuelRail: ['red'], intakeActuator: ['gold'], airbox: ['plasticBlack', 'black'], intakeHose: ['hose'],
+  engineBlock: [null], sump: [null, 'black'], cylinderHead: [null], camCover: [null, null, 'steel'], timingCover: ['castingDark'], intakePlenum: [null], intakeRunner: [null], intakeLabel: [null],
+  coilPack: ['red'], oilPump: ['steel'], oilFilter: ['filterBlue'], starter: ['black', 'steel'], pulley: ['steel'], belt: ['rubber'], alternator: ['casting'], waterPump: ['castingDark'],
+  exhaustManifold: ['exhaustHot', 'exhaustHot'], heatShield: ['castingDark'], turbo: ['iron', 'castingDark', 'steel'], wastegate: ['gold'], airFilter: ['filter'], exhaustDownpipe: ['exhaustHot'],
+  intakeTrumpet: ['steel', 'black'], throttleBody: ['steel'], throttleLinkage: ['steel'], fuelRail: ['red'], intakeActuator: ['gold'], airbox: ['plasticBlack', 'black'], intakeHose: ['pipeAlu'],
   intercooler: ['core', 'pipeAlu', 'coreDark'], boostPipe: ['pipeBoost'], thermostat: ['casting'], coolantHose: ['hose'], oilFiller: ['capYellow'], dipstick: ['capYellow'],
   clutchHousing: ['casting'], gearbox: ['casting', 'castingDark'], shiftActuator: ['black', 'gold'], shiftLinkage: ['black', 'steel'], differential: ['castingDark', 'casting'], driveshaft: ['iron'],
   cvJoint: ['castingDark'], cvBoot: ['rubber'], shaftBearing: ['castingDark'], centreDiff: ['castingDark'], propShaft: ['iron'], propJoint: ['castingDark'], frontDifferential: ['castingDark'],

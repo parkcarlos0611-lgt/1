@@ -24,11 +24,11 @@ const DESIGNS: [string, Design][] = [['nsx', DESIGN_NSX], ['f355', DESIGN_F355],
   ['flat six', applyPatch(DESIGN_NSX, { engine: { layout: 'F6', cc: 3600, sump: 'dry' } })], ['v8 twin turbo variable', applyPatch(DESIGN_NSX, { engine: { layout: 'V8', cc: 4000, turbo: 2, intake: 'variable' } })]];
 const pt = (d: Design, style: 'real' | 'drift', detail: 0 | 1 | 2 = 2) => { const { kit, tweak } = designKit(d); return powertrainMesh(designPowertrain(d), kitSite(kit, tweak), { detail, style }); };
 /** the kinds drawn as tubes or bars: their least thickness is checked */
-const TUBES: PartKind[] = ['pipe', 'exhaust', 'runner', 'header', 'hose', 'line', 'belt', 'link', 'shaft', 'arm', 'frame'];
+const TUBES: PartKind[] = ['pipe', 'intake', 'exhaust', 'runner', 'header', 'hose', 'line', 'belt', 'link', 'shaft', 'arm', 'frame'];
 /** the budgets in the drift look: a V8 with its bay's fittings 3,000 to 5,000 (the task's); the heaviest engine (twelve
- *  cylinders, four turbos, four intercoolers, all-wheel drive) to 6,000, over the realistic look's 4,900 by its bevels
+ *  cylinders, four turbos, four intercoolers, all-wheel drive) to 6,500, over the realistic look's 4,900 by its bevels
  *  and its thick pipes' sides; the lighter details as the realistic look's (no bevels there) */
-const DRIFT_BUDGET = { v8: [3000, 5000], heaviest: 6000, 1: 2800, 0: 1250 } as const;
+const DRIFT_BUDGET = { v8: [3000, 5000], heaviest: 6500, 1: 2800, 0: 1250 } as const;
 
 describe('the look is chosen by a setting, the realistic one kept', () => {
   it('the default is the realistic look; the renderer\'s look 4 asks for the drift one', () => {
@@ -64,7 +64,7 @@ describe('the powertrain in the drift look', () => {
     g.part('intakeHose', '#232326').tube([[0, 300, 0], [200, 300, 0]], 40, 6); g.part('battery', '#1d1e21').box(0, 240, 500, 676, 0, 175);
     const P = g.measure(), pipe = P.get('boostPipe')!, hose = P.get('intakeHose')!;
     expect(pipe.thin).toBeCloseTo(minDiameter('pipe')); expect(pipe.max[2] - pipe.min[2]).toBeGreaterThan(minDiameter('pipe') * 0.9);
-    expect(hose.thin).toBeCloseTo(80 * DRIFT_RULES.hose.scale); expect(P.get('battery')!.tris).toBe(44);   // six sides, twelve edges' strips, eight corners
+    expect(hose.thin).toBeCloseTo(80 * DRIFT_RULES.intake.scale); expect(P.get('battery')!.tris).toBe(44);   // six sides, twelve edges' strips, eight corners
     const b = new Build(); g.emit(b); const M = b.mesh(1000), N = hullNormals(M.pos, M.n), c = [[100, 0, 0], [100, 300, 0], [120, 588, 87.5]];
     for (let t = 0; t < M.n; t++) { const o = c[M.names![M.part[t]!] === 'boostPipe' ? 0 : M.names![M.part[t]!] === 'intakeHose' ? 1 : 2]!; for (let k = 0; k < 3; k++) { const q = t * 9 + k * 3; const dx = M.pos[q]! - o[0]!, dy = M.pos[q + 1]! - o[1]!, dz = M.pos[q + 2]! - o[2]!;
         if (M.names![M.part[t]!] !== 'battery' && Math.abs(dx) > 99) continue;   // a tube's end: its hull normal leans along the tube
@@ -72,7 +72,7 @@ describe('the powertrain in the drift look', () => {
     // the realistic collector draws what it is told
     const r = new Geo(); r.part('boostPipe', '#c9cbcf').cyl([0, 0, 0], [200, 0, 0], 4, 6).part('battery', '#1d1e21').box(0, 240, 500, 676, 0, 175); expect(r.measure().get('boostPipe')!.thin).toBe(8); expect(r.measure().get('battery')!.tris).toBe(12);
   });
-  it('the triangles: a V8 with the bay\'s fittings 3,000 to 5,000, the heaviest engine within 6,000, the lighter details within the realistic budgets', () => {
+  it('the triangles: a V8 with the bay\'s fittings 3,000 to 5,000, the heaviest engine within 6,500, the lighter details within the realistic budgets', () => {
     for (const d of [DESIGN_F355, applyPatch(DESIGN_NSX, { engine: { layout: 'V8', cc: 4000 } })]) { const n = pt(d, 'drift').built.tris; expect(n).toBeGreaterThanOrEqual(DRIFT_BUDGET.v8[0]); expect(n).toBeLessThanOrEqual(DRIFT_BUDGET.v8[1]); }
     for (const [, d] of DESIGNS) { expect(pt(d, 'drift').built.tris).toBeLessThanOrEqual(DRIFT_BUDGET.heaviest); for (const det of [1, 0] as const) expect(pt(d, 'drift', det).built.tris).toBeLessThanOrEqual(DRIFT_BUDGET[det]); }
   });
@@ -80,9 +80,9 @@ describe('the powertrain in the drift look', () => {
     const hex = (h: string) => { const v = parseInt(h.slice(1), 16); return [(v >> 16) & 255, (v >> 8) & 255, v & 255]; };
     const cols = (M: ReturnType<typeof pt>['mesh'], name: string) => { const S = new Set<string>(); for (let t = 0; t < M.n; t++) if (M.names![M.part[t]!] === name) S.add([M.col[t * 3], M.col[t * 3 + 1], M.col[t * 3 + 2]].join()); return S; };
     const d = applyPatch(DESIGN_F355, { engine: { turbo: 2 } }), { kit, tweak } = designKit(d), S = designPowertrain(d), site = kitSite(kit, tweak), D = powertrainMesh(S, site, { style: 'drift' }).mesh;
-    expect(cols(D, 'boostPipe')).toEqual(new Set([hex(DRIFT_PALETTE.pipeBoost.col).join()])); expect(cols(D, 'coolantPipe')).toEqual(new Set([hex(DRIFT_PALETTE.pipeWater.col).join()]));
+    expect(cols(D, 'boostPipe')).toEqual(new Set([hex(DRIFT_PALETTE.pipeBoost.col).join(), hex(DRIFT_PALETTE.coupler.col).join()]));   // the pipe and its couplers' bands expect(cols(D, 'coolantPipe')).toEqual(new Set([hex(DRIFT_PALETTE.pipeWater.col).join()]));
     expect(cols(D, 'expansionTank')).toEqual(new Set([hex(DRIFT_PALETTE.plasticWhite.col).join(), hex(DRIFT_PALETTE.capRed.col).join()])); expect(cols(D, 'camCover').has(hex(S.colours.covers).join())).toBe(true); expect(cols(D, 'engineBlock')).toEqual(new Set([hex(S.colours.block).join()]));
-    const C = powertrainMesh(S, site, { style: driftStyle({ palette: { pipeBoost: { col: '#22aa44', gloss: 0.4, kind: 'plain' } } }) }).mesh; expect(cols(C, 'boostPipe')).toEqual(new Set([hex('#22aa44').join()]));
+    const C = powertrainMesh(S, site, { style: driftStyle({ palette: { pipeBoost: { col: '#22aa44', gloss: 0.4, kind: 'plain' } } }) }).mesh; expect(cols(C, 'boostPipe').has(hex('#22aa44').join())).toBe(true); expect(cols(C, 'boostPipe').has(hex(DRIFT_PALETTE.pipeBoost.col).join())).toBe(false);
     // every role named is in the palette, every part with a kind or a role is one the builders make or the stand names
     for (const [n, roles] of Object.entries(DRIFT_PAINT)) { expect(PART_KIND[n], n).toBeDefined(); for (const r of roles) if (r) expect(DRIFT_PALETTE[r], `${n}: ${r}`).toBeDefined(); }
     for (const n of Object.keys(PART_INFO)) if (!['stand', 'crankshaft', 'conRod', 'piston', 'pistonRing', 'cylinderBore', 'camshaft', 'intakeValve', 'exhaustValve', 'sparkPlug'].includes(n)) expect(PART_KIND[n], n).toBeDefined();

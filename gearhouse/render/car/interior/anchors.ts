@@ -15,11 +15,18 @@ export interface CabinAnchors {
   /** the cabin's half width at the door cards (the elbow's height), the doors' front and rear edges, the sill's top and the belt line */ half: number; doorX: [number, number]; sillZ: number; beltZ: number;
   /** the tunnel between the seats: its half width and its top */ tunnelHalf: number; tunnelZ: number;
   /** the rear wall behind the seats (the back seats' foot) and the shelf's height */ rearX: number; shelfZ: number;
-  /** the roof lining's height over the seats and the roof's half width inside */ roofZ: number; roofHalf: number }
+  /** the roof lining's height over the seats and the roof's half width inside */ roofZ: number; roofHalf: number;
+  /** the door skin's inside as the card follows it: [z, half width] from the sill up to the belt (none: a card standing
+   *  straight at `half`) */ doorIn?: [number, number][];
+  /** where the rear wheels' wells begin (x) and the cabin's half width between them behind that (none: the cabin keeps `half` to its back) */ wellX?: number; rearHalf?: number }
 
-/** the 959's cabin (render/car/p959: the screen's foot at x 1440, z 890, its top at 1983, 1249; doors 1437..2594, sill top 427, belt 876, roof 1281 outside) */
+/** the 959's cabin, fitted to its shell (render/car/p959, docs/systems/109 S5): the screen's foot at x 1440, z 890, its
+ *  top at 1983, 1249; the doors 1441..2608 with their skin's inside at 820 mm from the middle up to z 700 and 783 at the
+ *  belt (876), the A pillar's foot at x 1660; the sill's top at 427; the floor closed at 118 under the carpet; the rear wells'
+ *  inner walls 554 mm from the middle from x 2871; the roof 1281 outside */
 export const P959_CABIN: CabinAnchors = { side: 1, floorZ: 175, dashX: 1800, dashTopZ: 852, screenFoot: [1470, 884], screenTop: [1990, 1205], screenHalf: [640, 520], wheel: [2035, 365, 772], rake: 22,
-  hip: [2470, 365, 430], recline: 23, half: 716, doorX: [1500, 2580], sillZ: 330, beltZ: 868, tunnelHalf: 100, tunnelZ: 318, rearX: 2960, shelfZ: 640, roofZ: 1232, roofHalf: 560 };
+  hip: [2470, 365, 430], recline: 23, half: 790, doorX: [1460, 2590], sillZ: 420, beltZ: 868, tunnelHalf: 100, tunnelZ: 318, rearX: 2960, shelfZ: 640, roofZ: 1232, roofHalf: 560,
+  doorIn: [[420, 796], [560, 795], [700, 786], [800, 772], [868, 756]], wellX: 2850, rearHalf: 530 };
 
 /** the trim's colours by role */
 export interface Trim { name: string; /** the seats' leather and the seats' second tone (bolsters, piping) */ seat: string; seat2: string; /** the dash's pad (top and knee roll) and its face band */ dash: string; face: string; /** door cards, carpet, the tunnel's cover */ door: string; carpet: string; tunnel: string;

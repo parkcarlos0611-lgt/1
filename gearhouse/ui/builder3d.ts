@@ -393,7 +393,7 @@ function setSuspView(on: boolean) { view.susp = on; $('susp').setAttribute('aria
 $('engine').addEventListener('click', () => { if (view.engine) { view.ang = view.yaw + 0.6; view.pitch = 42; view.zoom = 0.8; } });   // the engine bay seen from behind and above
 $<HTMLSelectElement>('look').addEventListener('change', e => { view.look = +(e.target as HTMLSelectElement).value; dirty = true;
   // the engine's and the suspension's look follow (look 4: their drift look, render/car/powertrain/style.ts): the car built again in it
-  const ps = styleForLook(view.look); if (ps !== partStyle()) { setPartStyle(ps); meshKey = ''; open.clear?.(); clearTimeout(meshT); meshT = setTimeout(rebuild, 30) as unknown as number; } });
+  const ps = styleForLook(view.look); if (ps !== partStyle()) { setPartStyle(ps); meshKey = ''; clearTimeout(meshT); meshT = setTimeout(rebuild, 30) as unknown as number; } });
 $('home').addEventListener('click', home); cv.addEventListener('dblclick', home);
 { const ptrs = new Map<number, { x: number; y: number }>(); let pinch = 0;
   cv.addEventListener('pointerdown', e => { cv.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY }); if (ptrs.size === 2) { const [a, b] = [...ptrs.values()]; pinch = Math.hypot(a!.x - b!.x, a!.y - b!.y); } });

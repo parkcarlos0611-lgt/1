@@ -170,7 +170,7 @@ function cabinAtlas(L: LiveRenderer) { const d = DESIGN?.d; if (!d || !isModelBa
 const dialSt = new WeakMap<Vehicle, DialState>();
 function dialsOf(c: Vehicle, rig: DialRig | undefined, dt: number): Float32Array | null { if (!rig) return null;
   let s = dialSt.get(c); if (!s || s.v.length !== rig.dials.length) { s = dialState(rig); dialSt.set(c, s); }
-  const E = c.engine, i = inputFromVehicle(c, { boostBar: c.spec.tech?.turbo?.boost ?? 0, idle: c.spec.idle }, { fuel: 0.7, steer: true }), sw = E.gaugeSweep;
+  const E = c.engine, i = inputFromVehicle(c, { boostBar: c.spec.tech?.turbo?.boost ?? 0, idle: c.spec.idle }, { fuel: 0.7 }), sw = E.gaugeSweep;   // the wheel stays still: the driver's arms do not follow it yet (S4)
   if (!E.ignition) i.on = false; else { i.on = true; if (sw > 0) { i.rpm = sweepValue(i.rpm ?? 0, sw, 0, c.spec.redline + 400); i.kmh = sweepValue(i.kmh ?? 0, sw, 0, c.spec.topKmh || 300); } }
   return stepDials(s, rig, i, dt); }
 let DESIGN: { d: Design; id: string } | null = H.design !== undefined ? (H.design ? addDesign(H.design) : null) : (() => { let q: string | null = null; try { q = new URLSearchParams(location.search).get('design'); if (q === 'stored' || q === '') q = STORE?.getItem(KEYS.testDrive) ?? null; } catch { q = null; }

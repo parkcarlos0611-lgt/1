@@ -31,8 +31,10 @@ describe('the interior (docs/systems/109 section 4)', () => {
     const A = P959_CABIN, rim = box(stock, /^steerWheelRim$/).mid; for (let i = 0; i < 3; i++) expect(rim[i]).toBeCloseTo(A.wheel[i]!, 0);
     const sl = box(stock, /^seatL$/), sr = box(stock, /^seatR$/); expect(sl.mid[1]).toBeCloseTo(A.hip[1], 0); expect(sr.mid[1]).toBeCloseTo(-A.hip[1], 0); expect(sl.lo[0]).toBeLessThan(A.hip[0]); expect(sl.hi[0]).toBeGreaterThan(A.hip[0]); expect(sl.hi[2]).toBeLessThan(A.roofZ);
     expect(box(stock, /^dash$/).lo[0]).toBeCloseTo(A.screenFoot[0], 0); expect(box(stock, /^driverHelmet$/).hi[2]).toBeLessThan(A.roofZ); expect(box(stock, /^cabinFloor$/).hi[2]).toBeCloseTo(A.floorZ, 3);
+    // the 959's door cards follow its skin's inside (S5): inside the skin's 820 mm everywhere, close to it at the elbow
+    for (const re of [/^doorCardL/, /^doorCardLRoll$/, /^doorCardLArmrest$/]) expect(box(stock, re).hi[1]).toBeLessThan(800); expect(box(stock, /^doorCardL$/).hi[1]).toBeGreaterThan(770);
     // another cabin: longer, wider, the driver on the right
-    const B: CabinAnchors = { ...A, side: -1, wheel: [A.wheel[0] + 200, -400, A.wheel[2] + 40], hip: [A.hip[0] + 200, -400, A.hip[2] + 40], half: 780, dashX: A.dashX + 200, screenFoot: [A.screenFoot[0] + 200, A.screenFoot[1]] };
+    const B: CabinAnchors = { ...A, side: -1, wheel: [A.wheel[0] + 200, -400, A.wheel[2] + 40], hip: [A.hip[0] + 200, -400, A.hip[2] + 40], half: 780, doorIn: undefined, dashX: A.dashX + 200, screenFoot: [A.screenFoot[0] + 200, A.screenFoot[1]] };
     const other = interiorMesh({ ...INTERIORS.stock, cabin: B }), rim2 = box(other, /^steerWheelRim$/).mid; expect(rim2[0]).toBeCloseTo(B.wheel[0], 0); expect(rim2[1]).toBeCloseTo(-400, 0);
     expect(box(other, /^driver$/).mid[1]).toBeLessThan(0); expect(box(other, /^doorCardL$/).lo[1]).toBeCloseTo(780, 0); expect(box(other, /^gaugeFace2$/).mid[1]).toBeCloseTo(-400, 0);
   });

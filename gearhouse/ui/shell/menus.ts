@@ -7,7 +7,7 @@ import { el, button, card, chips, toggle, slider, tabs, row, dialog, toast, down
 import { CAM_VIEWS, type CamView } from '../drivecam';
 import { saveSettings, exportAll, importAll, resetAll, loadSettings, DEFAULTS, type Settings } from './settings';
 import { VERSION_NAME, CHANGES } from '../../core/version';
-import { BASES, type BaseId, type Design } from '../../core/design';
+import { BODY_BASES, type BodyBase, type Design } from '../../core/design';
 import { savedDesigns, saveDesign, deleteDesign, currentDesign, keepCurrent, fromPreset, newId, designJson, parseDesign, measured, designSig } from '../../core/designstore';
 import { designFigures } from '../../race/design';
 import { TRACKS } from '../../race/tracks';
@@ -17,7 +17,7 @@ import buildMeta from '../../assets/textures/buildings/buildings.json';
 import skyMeta from '../../assets/textures/sky/sky.json';
 import modelMeta from '../../assets/models/models.json';
 
-export const BASE_NAME: Record<string, string> = { nsx: 'NSX 바탕', f355: 'F355 바탕', eb110: 'EB110 바탕' };
+export const BASE_NAME: Record<string, string> = { nsx: 'NSX 바탕', f355: 'F355 바탕', eb110: 'EB110 바탕', p959: '포르쉐 959 (모델 차체)' };
 const SCREEN_NAME: Record<string, string> = { garage: '차고', builder: '차 빌더', drive: '시험 주행' };
 const fmtLap = (t: number) => `${Math.floor(t / 60)}:${(t % 60).toFixed(2).padStart(5, '0')}`;
 
@@ -46,8 +46,8 @@ export function titleScreen(ctx: ShellCtx): Screen<never> {
 export function garageScreen(ctx: ShellCtx): Screen<never> {
   const s = ctx.store; let root: HTMLElement;
   const open = (d: Design) => { keepCurrent(s, d); void ctx.router.go('builder', { design: d }); };
-  const fresh = async () => { const b = await dialog('새 차 설계', ['어느 차대에서 시작할까요? 바탕은 차체 패널의 치수를 정합니다.'], [...BASES.map(id => [id, BASE_NAME[id] ?? id] as [string, string]), ['', '취소', { kind: 'ghost' as const }]]);
-    if (!b) return; const d = fromPreset(b as BaseId); saveDesign(s, d); open(d); };
+  const fresh = async () => { const b = await dialog('새 차 설계', ['어느 차대에서 시작할까요? 바탕은 차체 패널의 치수를 정합니다.'], [...BODY_BASES.map(id => [id, BASE_NAME[id] ?? id] as [string, string]), ['', '취소', { kind: 'ghost' as const }]]);
+    if (!b) return; const d = fromPreset(b as BodyBase); saveDesign(s, d); open(d); };
   const lines = (d: Design): (string | HTMLElement)[] => { const out: (string | HTMLElement)[] = [];
     try { const f = designFigures(d); out.push(`${d.engine.layout} ${(d.engine.cc / 1000).toFixed(1)} L · ${f.hp} hp · 최고 ${f.topKmh} km/h · ${f.mass.toLocaleString()} kg`); } catch { out.push(`${d.engine.layout} ${(d.engine.cc / 1000).toFixed(1)} L`); }
     const m = measured(s, d.id); if (m && m.sig === designSig(d)) { const laps = Object.values(m.laps).map(l => `${l.track.replace(/\s*\(.*$/, '')} ${fmtLap(l.t)}`); out.push(el('p', 'gh-card-l gh-meas', `측정: 최고 ${m.topKmh || '-'} km/h${laps.length ? ` · ${laps.join(' · ')}` : ''}`)); }
@@ -68,19 +68,22 @@ export function garageScreen(ctx: ShellCtx): Screen<never> {
   const m = menu(ctx, 'garage', r => { root = r; fill(); }); return m; }
 
 // ---- the test track's and the race's choices ----
+/** the 959 as it left the works (its own design, one id: its runs are kept under it), for the test track and the race without a design of one's own */
+let p959Own: Design | null = null;
+const p959Stock = (): Design => (p959Own ??= { ...fromPreset('p959', '포르쉐 959'), id: 'p959stock', body: { ...fromPreset('p959').body, model: { bumperF: 'std', bumperR: 'std', lamp: 'round', wheel: 'hollow5', plate: '08루 0959' } } });
 export interface PickParams { mode: 'test' | 'race' }
 const TRACK_KEY = 'gearhouse.drive.track';
 export function pickScreen(ctx: ShellCtx): Screen<never> {
   let mode: PickParams['mode'] = 'test';
   const m = menu(ctx, 'pick', root => { const s = ctx.store, d = ctx.recent(); let track = (() => { try { return s?.getItem(TRACK_KEY) ?? 'millbrook'; } catch { return 'millbrook'; } })();
-    const race = { opp: 3, lineup: 'period', laps: 2 }; let car: 'design' | 'period' = 'design';
+    const race = { opp: 3, lineup: 'period', laps: 2 }; let car: 'design' | 'period' | 'p959' = 'design';
     const cards = el('div', 'gh-grid gh-tracks'), drawTracks = () => { cards.textContent = ''; for (const t of TRACKS) cards.append(card({ title: t.title, lines: [t.label], selected: t.id === track, onPick: () => { track = t.id; drawTracks(); (cards.querySelector('.gh-on') as HTMLElement | null)?.focus(); } })); }; drawTracks();
-    const opts = el('div', 'gh-opts', chips('차', [['design', `설계: ${d.name}`], ['period', '주행 화면의 차 목록']], car, v => { car = v; }));
+    const opts = el('div', 'gh-opts', chips('차', [['design', `설계: ${d.name}`], ['p959', '포르쉐 959 (순정)'], ['period', '주행 화면의 차 목록']], car, v => { car = v; }));
     if (mode === 'race') opts.append(slider('상대 차 수', [1, 7, 1], race.opp, v => { race.opp = v; }, v => `${v}대`),
       chips('상대 구성', [['period', '1930년대 차'], ['modern', '1990년대 차'], ['mix', '섞기']], race.lineup, v => { race.lineup = v; }),
       chips('바퀴 수', [[1, '1'], [2, '2'], [3, '3'], [4, '4']], race.laps, v => { race.laps = v; }));
     const start = button(mode === 'race' ? '레이스 시작 ▶' : '주행 시작 ▶', () => { try { s?.setItem(TRACK_KEY, track); } catch { /* not kept */ }
-      void ctx.router.go('drive', { design: car === 'design' ? d : null, track, race: mode === 'race' ? { ...race } : undefined, from: 'pick' }); }, { kind: 'main' });
+      void ctx.router.go('drive', { design: car === 'design' ? d : car === 'p959' ? p959Stock() : null, track, race: mode === 'race' ? { ...race } : undefined, from: 'pick' }); }, { kind: 'main' });
     root.append(topbar(mode === 'race' ? '레이스' : '시험장', () => ctx.router.back(), start), el('div', 'gh-body', el('h2', 'gh-h2', '트랙'), cards, el('h2', 'gh-h2', mode === 'race' ? '차와 상대' : '차'), opts));
     (cards.querySelector('.gh-on') as HTMLElement | null)?.setAttribute('data-first', ''); });
   return { ...m, enter(p: PickParams, how) { if (how !== 'back') mode = p?.mode ?? 'test'; return m.enter(p as never, how); } }; }

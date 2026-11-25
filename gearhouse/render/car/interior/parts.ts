@@ -39,7 +39,7 @@ export function seat(b: InteriorBuild, f: Frame, style: SeatStyle, name: string,
 
 // ---- the dash: the frame's origin on its front plane at its top, on the centre line ----
 export interface DashOut { dials: DialBone[] }
-export function dash(b: InteriorBuild, A: CabinAnchors, T: Trim, faces: GaugeFace[], o: { pods?: boolean; stickers?: boolean }): DashOut { const f: Frame = { o: [A.dashX, 0, A.dashTopZ], x: [1, 0, 0], y: [0, 1, 0], z: [0, 0, 1] }, hw = A.half + 8, s = A.side;
+export function dash(b: InteriorBuild, A: CabinAnchors, T: Trim, faces: GaugeFace[], o: { pods?: boolean; stickers?: boolean }): DashOut { const f: Frame = { o: [A.dashX, 0, A.dashTopZ], x: [1, 0, 0], y: [0, 1, 0], z: [0, 0, 1] }, hw = A.doorIn ? A.doorIn[A.doorIn.length - 1]![1] - 20 : A.half + 8, s = A.side;
   const cx = A.screenFoot[0] - A.dashX, cz = A.screenFoot[1] - A.dashTopZ, prof: [number, number][] = [[cx, cz], [-22, 10], [0, -6], [9, -32], [15, -150], [42, -162], [50, -198], [30, -228], [-120, -244], [cx, -244]];
   b.frame(f).part('dash', T.dash, 0.18, 'leather').loft([-1, -0.55, 0, 0.55, 1].map(k => prof.map(([x, z], i) => [x, k * hw, z + (i < 2 ? 7 * (1 - k * k) : 0)] as V)));
   b.line('trim', [[2, -hw, -8], [2, hw, -8]], { w: 0.7 }).line('trim', [[44, -hw, -163], [44, hw, -163]], { w: 0.7 });
@@ -107,21 +107,29 @@ export function pedals(b: InteriorBuild, o: V, T: Trim): { clutch: V; throttle: 
 export function tunnel(b: InteriorBuild, A: CabinAnchors, T: Trim): void { const th = A.tunnelHalf, sec = (x: number, top: number): V[] => [[x, -th, A.floorZ], [x, -th + 18, top], [x, th - 18, top], [x, th, A.floorZ]];
   b.frame({ o: [0, 0, 0], x: [1, 0, 0], y: [0, 1, 0], z: [0, 0, 1] }).part('tunnel', T.tunnel, 0.12).loft([sec(A.screenFoot[0] + 30, A.tunnelZ + 60), sec(A.dashX + 60, A.tunnelZ), sec(A.rearX, A.tunnelZ)]);
   b.part('tunnelConsole', '#141416', 0.2).plate([A.hip[0] - 245, 0, A.tunnelZ + 7], [0, -1, 0], [-1, 0, 0], [0, 0, 1], 118, 74, 7, 'console'); }
-export function floorAndRear(b: InteriorBuild, A: CabinAnchors, T: Trim): void { const x0 = A.screenFoot[0], h = A.half;
-  b.frame({ o: [0, 0, 0], x: [1, 0, 0], y: [0, 1, 0], z: [0, 0, 1] }).part('cabinFloor', T.carpet, 0.05).box(x0, A.rearX, -h, h, A.floorZ - 14, A.floorZ);
+export function floorAndRear(b: InteriorBuild, A: CabinAnchors, T: Trim): void { const x0 = A.screenFoot[0], h = A.half, xw = Math.min(A.rearX, A.wellX ?? A.rearX), hr = A.rearHalf ?? h;
+  // the floor to the rear wheels' wells at the full width, between them behind (the 959's: its rear seats sit between the wells)
+  b.frame({ o: [0, 0, 0], x: [1, 0, 0], y: [0, 1, 0], z: [0, 0, 1] }).part('cabinFloor', T.carpet, 0.05).box(x0, xw, -h, h, A.floorZ - 14, A.floorZ); if (xw < A.rearX) b.box(xw, A.rearX, -hr, hr, A.floorZ - 14, A.floorZ);
   b.part('cabinFirewall', T.carpet, 0.05).loft([[[x0 - 12, -h, A.floorZ], [x0 - 12, h, A.floorZ], [x0 - 12, h, A.dashTopZ - 200], [x0 - 12, -h, A.dashTopZ - 200]], [[x0 + 90, -h, A.floorZ], [x0 + 90, h, A.floorZ], [x0 + 8, h, A.dashTopZ - 200], [x0 + 8, -h, A.dashTopZ - 200]]]);
-  for (const sg of [-1, 1]) b.part(sg > 0 ? 'cabinSillL' : 'cabinSillR', T.carpet, 0.05).box(x0, A.rearX, sg * (h - 34), sg * h, A.floorZ, A.sillZ);
+  for (const sg of [-1, 1]) b.part(sg > 0 ? 'cabinSillL' : 'cabinSillR', T.carpet, 0.05).box(x0, xw, sg * (h - 34), sg * h, A.floorZ, A.sillZ);
   // the rear: the small seats' bases and their backs as one step up to the shelf
   const sx = A.rearX - 300, sz = A.floorZ + 215; const step = [[sx, sz], [sx + 30, sz + 22], [A.rearX - 40, sz + 8], [A.rearX + 70, A.shelfZ], [A.rearX + 330, A.shelfZ], [A.rearX + 330, A.floorZ], [sx, A.floorZ]];
-  b.part('cabinRear', T.seat2, 0.15, 'leather').loft([-h, h].map(y => step.map(([x, z]) => [x!, y, z!] as V))); }
+  b.part('cabinRear', T.seat2, 0.15, 'leather').loft([-hr, hr].map(y => step.map(([x, z]) => [x!, y, z!] as V))); }
 export function doorCards(b: InteriorBuild, A: CabinAnchors, T: Trim, which: 'both' | 'L' | 'R' | 'none' = 'both'): void { const [d0, d1] = A.doorX, h = A.half;
   b.frame({ o: [0, 0, 0], x: [1, 0, 0], y: [0, 1, 0], z: [0, 0, 1] });
-  for (const sg of [-1, 1]) { if (which === 'none' || which === (sg > 0 ? 'R' : 'L')) continue; const nm = sg > 0 ? 'doorCardL' : 'doorCardR', y = (d: number) => sg * (h - d);
-    b.part(nm, T.door, 0.15, 'leather').box(d0, d1, y(0), y(-14), A.sillZ, A.beltZ);
-    b.part(`${nm}Roll`, T.dash, 0.18, 'leather').loft([d0, d1].map(x => ([[0, 0], [-26, -4], [-34, -30], [-26, -58], [0, -64]] as const).map(([dy, dz]) => [x, y(-dy), A.beltZ + dz] as V)));
-    b.part(`${nm}Armrest`, T.door, 0.15, 'leather').loft([d0 + 300, d0 + 380, d1 - 250, d1 - 200].map((x, i) => { const k = i === 0 || i === 3 ? 0.35 : 1; return ([[0, 0], [62 * k, -6], [70 * k, -34], [40 * k, -62], [0, -70]] as const).map(([dy, dz]) => [x, y(dy), A.beltZ - 250 + dz] as V); }));
-    const px0 = d0 + 110, px1 = d1 - 110, pz0 = A.sillZ + 22, pz1 = A.sillZ + 232; b.part(`${nm}Pocket`, T.door, 0.15, 'leather').box(px0, px1, y(0), y(42), pz0, pz1).paint('doorPleat', [(px0 + px1) / 2, y(42), (pz0 + pz1) / 2], [-sg, 0, 0], [0, 0, 1], px1 - px0 + 2, pz1 - pz0 + 2, [0, -sg, 0]);
-    b.part(`${nm}Pull`, T.metal, 0.6).slab([d0 + 180, y(20), A.beltZ - 150], [d0 + 290, y(20), A.beltZ - 150], [0, 0, 1], 16, 10); } }
+  // the card's face at a height: the door skin's inside less the card's thickness where the cabin has its profile
+  const P = A.doorIn, face = (z: number) => { if (!P) return h; if (z <= P[0]![0]) return P[0]![1] - 16; for (let i = 1; i < P.length; i++) if (z <= P[i]![0]) { const [z0, w0] = P[i - 1]!, [z1, w1] = P[i]!; return w0 + (w1 - w0) * (z - z0) / (z1 - z0) - 16; } return P[P.length - 1]![1] - 16; };
+  for (const sg of [-1, 1]) { if (which === 'none' || which === (sg > 0 ? 'R' : 'L')) continue; const nm = sg > 0 ? 'doorCardL' : 'doorCardR', yz = (d: number, z: number) => sg * (face(z) - d), y = (d: number) => sg * (h - d);
+    if (A.doorIn) { const P = A.doorIn, out = P.map(([z, w]) => [sg * w, z] as const), inn = [...P].reverse().map(([z, w]) => [sg * (w - 16), z] as const), ring = (x: number) => [...out, ...inn].map(([yy, z]) => [x, yy, z] as V);
+      // its front edge leans back over the belt's last 170 mm, 290 mm back at the top (the door's top starts at the A pillar, behind the wing's crown)
+      const lean = (x: number) => (p: V): V => [x + Math.max(0, p[2] - (A.beltZ - 170)) / 170 * 290, p[1], p[2]];
+      b.part(nm, T.door, 0.15, 'leather').loft([ring(d0).map(lean(d0)), ring(d1)]); }   // the card following the door skin's inside, 16 mm thick
+    else b.part(nm, T.door, 0.15, 'leather').box(d0, d1, y(0), y(-14), A.sillZ, A.beltZ);
+    const rz = A.beltZ, az = A.beltZ - 250, pz0 = A.sillZ + 22, pz1 = A.sillZ + 232;
+    b.part(`${nm}Roll`, T.dash, 0.18, 'leather').loft([P ? d0 + 290 : d0, d1].map(x => ([[0, 0], [-26, -4], [-34, -30], [-26, -58], [0, -64]] as const).map(([dy, dz]) => [x, P ? yz(-dy - 10, rz) : y(-dy), rz + dz] as V)));
+    b.part(`${nm}Armrest`, T.door, 0.15, 'leather').loft([d0 + 300, d0 + 380, d1 - 250, d1 - 200].map((x, i) => { const k = i === 0 || i === 3 ? 0.35 : 1; return ([[0, 0], [62 * k, -6], [70 * k, -34], [40 * k, -62], [0, -70]] as const).map(([dy, dz]) => [x, P ? yz(dy, az) : y(dy), az + dz] as V); }));
+    const px0 = d0 + 110, px1 = d1 - 110, py = (d: number) => P ? yz(d, pz1) : y(d); b.part(`${nm}Pocket`, T.door, 0.15, 'leather').box(px0, px1, py(0), py(42), pz0, pz1).paint('doorPleat', [(px0 + px1) / 2, py(42), (pz0 + pz1) / 2], [-sg, 0, 0], [0, 0, 1], px1 - px0 + 2, pz1 - pz0 + 2, [0, -sg, 0]);
+    b.part(`${nm}Pull`, T.metal, 0.6).slab([d0 + 180, P ? yz(20, rz - 150) : y(20), rz - 150], [d0 + 290, P ? yz(20, rz - 150) : y(20), rz - 150], [0, 0, 1], 16, 10); } }
 
 // ---- the driver: helmet, a plain body, the hands on the wheel, the feet at the pedals. The frame is the seat's ----
 export function driver(b: InteriorBuild, f: Frame, o: { recline: number; wheel: Frame; rimR: number; feet: { clutch: V; throttle: V }; suit: string; helmet: string; gloves: string }): void { const th = (o.recline - 2) * RAD, U: V = [Math.sin(th), 0, Math.cos(th)], Fw: V = [-Math.cos(th), 0, Math.sin(th)], Yv: V = [0, 1, 0];
@@ -141,9 +149,9 @@ export function driver(b: InteriorBuild, f: Frame, o: { recline: number; wheel: 
     b.part(sg > 0 ? 'driverShoeL' : 'driverShoeR', '#1b1b1d', 0.15).slab(add(ankle, [38, 0, -52]), add(ankle, [-70, 0, 82]), [0, 1, 0], 84, 52, 70); } }
 
 // ---- the roll cage (an option): tubes along the cabin's corners, from its anchors ----
-export function cage(b: InteriorBuild, A: CabinAnchors, colour: string): void { const r = 21, hx = Math.min(A.rearX - 30, A.hip[0] + 450), top = A.roofZ - 55, P: Record<string, V> = {};
+export function cage(b: InteriorBuild, A: CabinAnchors, colour: string): void { const r = 21, hx = Math.min(A.rearX - 30, A.hip[0] + 450), top = A.roofZ - 55, P: Record<string, V> = {}, hh = A.wellX !== undefined && hx > A.wellX - 40 ? Math.min(A.half, (A.rearHalf ?? A.half) + 40) : A.half;
   b.frame({ o: [0, 0, 0], x: [1, 0, 0], y: [0, 1, 0], z: [0, 0, 1] }).part('cage', colour, 0.45);
-  for (const [k, sg] of [['L', 1], ['R', -1]] as const) { P[`hf${k}`] = [hx, sg * (A.half - 48), A.floorZ]; P[`hk${k}`] = [hx, sg * (A.half - 62), A.roofZ - 270]; P[`hc${k}`] = [hx, sg * (A.roofHalf - 75), top];
+  for (const [k, sg] of [['L', 1], ['R', -1]] as const) { P[`hf${k}`] = [hx, sg * (hh - 48), A.floorZ]; P[`hk${k}`] = [hx, sg * (hh - 62), A.roofZ - 270]; P[`hc${k}`] = [hx, sg * (A.roofHalf - 75), top];
     P[`ff${k}`] = [A.doorX[0] + 60, sg * (A.half - 44), A.floorZ]; P[`fd${k}`] = [A.screenFoot[0] + 75, sg * (A.screenHalf[0] + 8), A.screenFoot[1] + 34]; P[`ft${k}`] = [A.screenTop[0] + 35, sg * (A.screenHalf[1] - 12), A.screenTop[1] - 34]; P[`rs${k}`] = [A.rearX + 320, sg * (A.roofHalf - 130), A.shelfZ + 24]; }
   const on = (a: V, c: V, z: number): V => lerp(a, c, (z - a[2]) / (c[2] - a[2]));
   b.tube([P.hfL!, P.hkL!, P.hcL!, P.hcR!, P.hkR!, P.hfR!], r, 8);   // the main hoop

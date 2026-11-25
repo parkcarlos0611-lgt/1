@@ -196,10 +196,11 @@ function drawLive(el: number) { const L = live!; void el;
       const g = L.prop(`fence_${p.kind}`, () => pieceMesh(p.kind as 'post' | 'rail')), shrink = Math.min(1, p.life / 1.5), sx = (p.kind === 'rail' ? p.len : 1) * shrink / 1000;
       props.push({ g, x: p.x, y: p.y, z: p.z, h: 0, outline: 1, key: `d${p.id}`, m: m4mul(m4t(p.x, p.y, p.z), m4mul(m4rot('z', p.yaw), m4mul(m4rot('y', p.pitch), m4mul(m4rot('x', p.roll), new Float32Array([sx, 0, 0, 0, 0, shrink / 1000, 0, 0, 0, 0, shrink / 1000, 0, 0, 0, 0, 1]))))) }); } }
   // the smoke: exhaust from the tail when the throttle is opened hard low in the revs (rich old engines); then a step
+  const vc: VolCar[] = list.map(({ c }, k) => ({ x: c.x, y: c.y, z: cars[k]!.z, yaw: c.yaw, vx: c.v[0], vy: c.v[1], len: cars[k]!.g.len / 1000, width: cars[k]!.g.width, height: cars[k]!.g.height }));   /* the cars as the smoke sees them: they bore through it */
   { const ex = (c0: Vehicle) => { const L = c0.spec.wheelbase * c0.spec.frontShare + 0.9, z = T.height(c0.s, c0.off); smoke.emit('exhaust', c0.x - Math.cos(c0.yaw) * L, c0.y - Math.sin(c0.yaw) * L, z + 0.35, -Math.cos(c0.yaw) * 2 + c0.vx * Math.cos(c0.yaw) * 0.6, -Math.sin(c0.yaw) * 2 + c0.vx * Math.sin(c0.yaw) * 0.6, 0.3, 1, z); };
-    if (input.throttle > 0.7 && car.rpm < car.spec.hpRpm * 0.6 && Math.random() < 0.25) ex(car); smoke.step(Math.min(0.05, el)); }
+    if (input.throttle > 0.7 && car.rpm < car.spec.hpRpm * 0.6 && Math.random() < 0.25) ex(car); smoke.cars = vc; smoke.step(Math.min(0.05, el)); }
   const sp8 = new Float32Array(smoke.parcels.length * 8); smoke.parcels.forEach((q, k) => sp8.set([q.x, q.y, q.z, q.r, q.rho, q.T, SK[q.kind], q.seed], k * 8));
-  if (smokeNow() !== 'off' && live?.vol?.sim) { const z0 = T.height(car.s, car.off), vc: VolCar[] = list.map(({ c }, k) => ({ x: c.x, y: c.y, z: cars[k]!.z, yaw: c.yaw, vx: c.v[0], vy: c.v[1], len: cars[k]!.g.len / 1000, width: cars[k]!.g.width, height: cars[k]!.g.height }));   /* the volumetric smoke's step */
+  if (smokeNow() !== 'off' && live?.vol?.sim) { const z0 = T.height(car.s, car.off);   /* the volumetric smoke's step */ live.vol.size = smoke.size;
     live.vol.poll(); live.vol.step(Math.min(0.1, el), [car.x, car.y, z0], vc, (x, y) => { const q = T.locate(x, y, car.s), g = T.ground(q.s, q.off); return Math.abs(Math.abs(q.off) - FENCE) < 0.2 && fenceOk(Math.sign(q.off), Math.floor(q.s)) ? g + 1.0 : g; }); }
   const S = camShot, view = S ? { x: S.at[0], y: S.at[1], z: S.at[2], ang: S.ang, pitch: S.pitch, W: VW, H: VH, cy: 0.5, eye: S.eye, fov: S.fov, near: S.near,
       /* the scale at the car (the outlines' and the ground's specks' size by it) */ mm: Math.max(4, Math.min(130, Math.round(Math.max(4, Math.hypot(S.eye[0] - car.x, S.eye[1] - car.y)) * 2 * Math.tan(S.fov * Math.PI / 360) / VH * 1000))) }
@@ -340,7 +341,7 @@ function marks(c: Vehicle) { markTick++; for (let i = 0; i < 4; i++) { const k =
       smoke.emit('dust', x, y, 0.2, -cy * 1.5 + (Math.random() - 0.5) * 2, -sy2 * 1.5 + (Math.random() - 0.5) * 2, trap ? 2 : 1.2, Math.min(1, c.speed / (trap ? 12 : 25)), 0); }   /* dust thrown up off the grass, a cloud of it out of a gravel trap */
     if (k.amount <= 0 || markTick % 2) continue;
     const [px, py] = c.wheelAt(i), cy = Math.cos(c.yaw), sy2 = Math.sin(c.yaw), x = c.x + px * cy - py * sy2, y = c.y + px * sy2 + py * cy, q = T.locate(x, y, c.s), z = T.height(q.s, q.off);
-    if (Math.random() < 0.22 * k.amount) { const vx = c.vx * Math.cos(c.yaw) * 0.25, vy = c.vx * Math.sin(c.yaw) * 0.25; smoke.emit('tyre', x, y, z + 0.15, vx + (Math.random() - 0.5), vy + (Math.random() - 0.5), 0.6, k.amount, z); }   /* the live picture's tyre smoke */
+    if (Math.random() < 0.4 * k.amount) { const vx = c.vx * Math.cos(c.yaw) * 0.25, vy = c.vx * Math.sin(c.yaw) * 0.25; smoke.emit('tyre', x, y, z + 0.15, vx + (Math.random() - 0.5), vy + (Math.random() - 0.5), 0.6, k.amount, z); }   /* the live picture's tyre smoke */
     skids.push({ x, y, z, a: Math.min(0.6, 0.12 + 0.45 * k.amount) * (k.kind === 'lock' ? 1.2 : 1) }); if (skids.length > 9000) skids.shift(); if (Math.random() < 0.12 * (0.3 + k.amount)) puffs.push({ x, y, z: z + 0.2, r: 0.3, a: 0.35, vx: (Math.random() - 0.5) * 0.6, vy: (Math.random() - 0.5) * 0.6 }); } }
 /** every car in view, the farthest first */
 /** the scenery and the cars together, the farthest first; decks over the track after them all */
@@ -731,6 +732,7 @@ const setFree = (on: boolean) => { st.free = on; ($('free') as HTMLInputElement)
 const toonRows = () => { for (const id of ['toonBRow', 'toonSRow', 'glassReflRow']) $(id).hidden = look !== 'toon'; };
 $<HTMLSelectElement>('look').addEventListener('change', e => { look = (e.target as HTMLSelectElement).value as typeof look; toonRows(); (e.target as HTMLElement).blur(); }); toonRows();
 $<HTMLInputElement>('toonB').addEventListener('input', e => { toonB = +(e.target as HTMLInputElement).value; $('toonBv').textContent = String(toonB); });
+$<HTMLSelectElement>('smokeSize').addEventListener('change', e => { smoke.size = (e.target as HTMLSelectElement).value === 'normal' ? 0.55 : 1; (e.target as HTMLElement).blur(); });   /* 연기 크기 */
 $<HTMLSelectElement>('smokeQ').addEventListener('change', e => { smokeQ = (e.target as HTMLSelectElement).value as SmokeSetting; const t = smokeNow(); $('smokeNote').textContent = (smokeQ === 'mid' || smokeQ === 'high') && t === 'parcels' ? '이 기기는 부동소수 렌더 타깃이 없어 덩어리로 그립니다' : ''; (e.target as HTMLElement).blur(); });
 $<HTMLSelectElement>('glassRefl').addEventListener('change', e => { glassRefl = GLASS_REFL[(e.target as HTMLSelectElement).value as GlassRefl] ?? 1; (e.target as HTMLElement).blur(); });
 $<HTMLInputElement>('toonS').addEventListener('input', e => { toonS = +(e.target as HTMLInputElement).value; });

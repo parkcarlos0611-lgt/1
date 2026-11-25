@@ -21,7 +21,9 @@
 // where it is high the spreading is mostly held back (the tunnel's walls stay crisp) and what the flow smears back in is
 // thinned again, so the car-shaped hole stays clear for 2-3 s and then fills slowly. Its slope pushes the air out of the
 // tunnel (the smoke shoved aside) and the vorticity confinement is stronger in it (a swirl in the wake). Fresh smoke put
-// in fills the cut (a drifting car's own smoke is not eaten by its own tunnel).
+// in fills the cut (a drifting car's own smoke is not eaten by its own tunnel). It is a wake: the hold (and the drawing's
+// clearing, draw.ts) starts only once the cut has faded below 0.9 (about 0.4 s after the car), so the smoke the car is
+// in, pushed round its body, still covers it; the tunnel opens behind it.
 export interface VolParams {
   nx: number; ny: number; nz: number; /** a cell's size, m */ h: number;
   /** the pressure's Jacobi sweeps */ iters: number;
@@ -37,8 +39,10 @@ export interface VolParams {
    *  cell's step of the cut); the extra swirl in it (x the confinement) */ cutFade: number; cutHold: number; cutPush: number; cutSwirl: number;
 }
 export const VOL_DEFAULT: VolParams = { nx: 16, ny: 16, nz: 8, h: 0.25, iters: 16, open: true, alpha: 0.012, betaS: 0.35, betaD: 2.2, wind: [1.2, 0.5], drag: 1.0, vort: 4, settle: 0.35, fade: 0.05, cool: 0.9, spread: 0.3, edge: 2, cutFade: 0.25, cutHold: 5, cutPush: 10, cutSwirl: 0.3 };
-/** how much of the hold works at a cut of c: all of it from 0.85, none below 0.45 */
-export const cutHoldAt = (c: number): number => { const t = Math.min(1, Math.max(0, (c - 0.45) / 0.4)); return t * t * (3 - 2 * t); };
+const sstep = (a: number, b: number, x: number) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+/** how much of the hold works at a cut of c: none below 0.45, all of it at 0.85-0.9, none again over 0.97 (where the car
+ *  still is or has only just been: the wake opens behind it) */
+export const cutHoldAt = (c: number): number => sstep(0.45, 0.85, c) * (1 - sstep(0.9, 0.97, c));
 
 /** a puff put into the grid: where (world, m), its size (m, a Gaussian's radius), how much smoke and dust (peak density),
  *  its heat (degrees above the air) and its velocity (m/s) */
@@ -47,7 +51,7 @@ export interface VolEmit { x: number; y: number; z: number; r: number; smoke: nu
 export interface VolBox { x: number; y: number; z: number; hx: number; hy: number; hz: number; yaw: number; vx: number; vy: number; vz: number }
 
 /** the puffs' kinds as the grid takes them: the smoke and dust shares, the heat, the size (from race/smoke.ts's kinds) */
-export const VOL_KIND = { tyre: { smoke: 0.75, dust: 0, T: 160, r: 1.5 }, dust: { smoke: 0, dust: 0.6, T: 5, r: 1.1 }, steam: { smoke: 0.7, dust: 0, T: 90, r: 0.45 }, exhaust: { smoke: 0.4, dust: 0, T: 220, r: 0.32 } } as const;
+export const VOL_KIND = { tyre: { smoke: 0.6, dust: 0, T: 160, r: 0.35 }, dust: { smoke: 0, dust: 0.6, T: 5, r: 0.45 }, steam: { smoke: 0.7, dust: 0, T: 90, r: 0.28 }, exhaust: { smoke: 0.4, dust: 0, T: 220, r: 0.2 } } as const;
 
 export class VolumeSim {
   readonly P: VolParams; readonly n: number;

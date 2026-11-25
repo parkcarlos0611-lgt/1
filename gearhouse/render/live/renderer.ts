@@ -763,21 +763,21 @@ float dens(vec3 q) { float r2 = dot(q, q); if (r2 > 1.) return 0.; vec3 n = q * 
 float hg(float c, float g) { float g2 = g * g; return (1. - g2) / (4. * 3.14159 * pow(1. + g2 - 2. * g * c, 1.5)); }
 /* the cartoon puff (the toon looks, docs/systems/103): a big round lobe and six smaller ones about it, each a ball facing
    the eye, the nearest surface wins; lit in three flat bands with a bluish shade, a dark line round every lobe's rim (the
-   silhouette and the cauliflower's inner folds alike). As the parcel thins the big lobe shrinks first and the small ones
-   one by one, so an old cloud breaks into round puffs that shrink away, never turning see-through. */
+   silhouette and the cauliflower's inner folds alike). As the parcel thins its lobes draw in a little, all together, and
+   at the end it fades out softly (docs/systems/104 B-9: no popping, no breaking into dots). */
 vec4 toonPuff(vec3 alb, float w) { float rho = vGas.x, sd = vGas.w, best = -9., rim = 0.; vec3 nb = vec3(0., 0., 1.);
   for (int k = 0; k < 7; k++) { float fk = float(k), a = sd * 6.283 + fk * 1.0472, hk = fract(sin(fk * 12.9898 + sd * 78.233) * 43758.5453);
     vec2 c = k == 0 ? vec2(0., -0.05) : vec2(cos(a), sin(a) * 0.8 + 0.1) * (0.42 + 0.1 * hk);
-    float r = k == 0 ? 0.6 * smoothstep(0.05, 0.3, rho) : (0.3 + 0.1 * hk) * sqrt(smoothstep(0.015 + 0.05 * hk, 0.2, rho));
+    float r = (k == 0 ? 0.6 : 0.3 + 0.1 * hk) * (0.85 + 0.15 * smoothstep(0.02, 0.25, rho));
     vec2 d = vUv - c; float q = dot(d, d); if (r < 0.02 || q > r * r) continue; float hz = sqrt(r * r - q), z = hz + (k == 0 ? 0.15 : 0.3 * hk - 0.1);
     if (z > best) { best = z; nb = vec3(d, hz) / r; rim = sqrt(q) > r - w ? 1. : 0.; } }
   if (best < -8.) return vec4(0.);
   vec3 n = normalize(uRx * nb.x + uUp * nb.y - uVd * nb.z); float lit = dot(n, uSun) * 0.5 + 0.5, band = lit > 0.64 ? 1. : lit > 0.4 ? 0.62 : 0.;
-  vec3 shade = alb * vec3(0.52, 0.58, 0.78), c = mix(shade, alb, band); c = mix(c, vec3(0.16, 0.15, 0.17), rim); return vec4(clamp(c, 0., 1.), 1.); }
+  vec3 shade = alb * vec3(0.52, 0.58, 0.78), c = mix(shade, alb, band); c = mix(c, vec3(0.16, 0.15, 0.17), rim); float A = smoothstep(0.015, 0.14, rho); return vec4(clamp(c, 0., 1.) * A, A); }
 void main() { float lw = fwidth(vUv.x) * 1.7;   /* the toon's line, about two pixels (taken before any discard) */
   float r2 = dot(vUv, vUv); if (r2 > 1.) discard; float h = sqrt(1. - r2); int kind = int(vGas.z + 0.5);
   vec3 alb = kind == 1 ? vec3(0.62, 0.55, 0.42) : kind == 2 ? vec3(0.95) : kind == 3 ? vec3(0.62, 0.66, 0.72) : vec3(0.86, 0.85, 0.83);
-  if (uToon == 1) { vec4 t = toonPuff(alb * 1.08, lw); if (t.a < 0.5) discard; o = t; return; }
+  if (uToon == 1) { vec4 t = toonPuff(alb * 1.08, lw); if (t.a < 0.004) discard; o = t; return; }
   vec3 sunL = uSun, eyeIn = uVd, SUN = vec3(1., 0.95, 0.84) * 3., SKY = vec3(0.35, 0.42, 0.55);
   float sigma = 3.2 * vR, cosT = dot(sunL, eyeIn);   // extinction over the sphere's size; the angle between the light's way and the eye's
   float phase = mix(hg(cosT, 0.62), hg(cosT, -0.25), 0.3);   // two lobes: strong forward (a glow and bright rims with the sun behind), a little back

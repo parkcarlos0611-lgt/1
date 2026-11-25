@@ -87,7 +87,7 @@ void main() { ivec3 c = cellHere(); if (c.z >= uN.z) { o = vec4(0.); return; } v
   dissipate: `uniform sampler2D uScal, uObs; uniform float uFade, uCool, uK, uCutFade, uCutHold; uniform int uEdge; ${OUT1}
 void main() { ivec3 c = cellHere(); if (c.z >= uN.z) { o = vec4(0.); return; } vec4 s0 = at(uScal, c); if (solidAt(uObs, c)) { o = s0; return; } vec2 s = s0.rg;
   for (int k = 0; k < 6; k++) { ivec3 q = c + NB[k]; if (!inside(q) || solidAt(uObs, q)) continue; vec4 rq = at(uScal, q); vec2 r = rq.rg; float hb = 1. - 0.85 * max(s0.a, rq.a); s += min(vec2(1. / 7.), uK * hb * (r + s0.rg) / 2.) * (r - s0.rg); }
-  float f = exp(-uFade * uDt) * max(0., 1. - uCutHold * uDt * smoothstep(0.45, 0.85, s0.a)); if (uOpen == 1 && uEdge > 0) { int e = min(min(min(c.x, c.y), min(uN.x - 1 - c.x, uN.y - 1 - c.y)), uN.z - 1 - c.z); if (e < uEdge) f *= 1. - uDt * 3. * (1. - float(e) / float(uEdge)); }
+  float f = exp(-uFade * uDt) * max(0., 1. - uCutHold * uDt * smoothstep(0.45, 0.85, s0.a) * (1. - smoothstep(0.9, 0.97, s0.a))); if (uOpen == 1 && uEdge > 0) { int e = min(min(min(c.x, c.y), min(uN.x - 1 - c.x, uN.y - 1 - c.y)), uN.z - 1 - c.z); if (e < uEdge) f *= 1. - uDt * 3. * (1. - float(e) / float(uEdge)); }
   o = vec4(s * f, s0.b * exp(-uCool * uDt), s0.a * exp(-uCutFade * uDt)); }`,
   light: LIGHT_FS,
 } as const;

@@ -216,6 +216,7 @@ function drawLive(el: number) { const L = live!; cabinAtlas(L);
       const g = L.prop(`fence_${p.kind}`, () => pieceMesh(p.kind as 'post' | 'rail')), shrink = Math.min(1, p.life / 1.5), sx = (p.kind === 'rail' ? p.len : 1) * shrink / 1000;
       props.push({ g, x: p.x, y: p.y, z: p.z, h: 0, outline: 1, key: `d${p.id}`, m: m4mul(m4t(p.x, p.y, p.z), m4mul(m4rot('z', p.yaw), m4mul(m4rot('y', p.pitch), m4mul(m4rot('x', p.roll), new Float32Array([sx, 0, 0, 0, 0, shrink / 1000, 0, 0, 0, 0, shrink / 1000, 0, 0, 0, 0, 1]))))) }); } }
   // the smoke: exhaust from the tail when the throttle is opened hard low in the revs (rich old engines); then a step
+  list.forEach(({ c }, k) => { const q = cars[k]!; tyreAt.set(c, [0, 1, 2, 3].map(i => { const w = q.g.wheels.find(w => w.front === i < 2 && (w.hub[1] > 0) === (i % 2 === 0)); return w ? [(q.g.len / 2 - w.hub[0]) / 1000, w.hub[1] / 1000, q.x - c.x, q.y - c.y] : null; })); });   /* where the tyres are drawn: the smoke starts there */
   const vc: VolCar[] = list.map(({ c }, k) => ({ x: c.x, y: c.y, z: cars[k]!.z, yaw: c.yaw, vx: c.v[0], vy: c.v[1], len: cars[k]!.g.len / 1000, width: cars[k]!.g.width, height: cars[k]!.g.height }));   /* the cars as the smoke sees them: they bore through it */
   { const ex = (c0: Vehicle) => { const L = c0.spec.wheelbase * c0.spec.frontShare + 0.9, z = T.height(c0.s, c0.off); smoke.emit('exhaust', c0.x - Math.cos(c0.yaw) * L, c0.y - Math.sin(c0.yaw) * L, z + 0.35, -Math.cos(c0.yaw) * 2 + c0.vx * Math.cos(c0.yaw) * 0.6, -Math.sin(c0.yaw) * 2 + c0.vx * Math.sin(c0.yaw) * 0.6, 0.3, 1, z); };
     if (input.throttle > 0.7 && car.rpm < car.spec.hpRpm * 0.6 && Math.random() < 0.25) ex(car); smoke.cars = vc; smoke.step(Math.min(0.05, el)); }
@@ -335,12 +336,22 @@ function sounds() { if (!snd) return; const me = race?.player, keep = new Set<un
 function skidOf(c: Vehicle, i: number): Skid { if (c.airborne[i] || c.onGrass[i]) return { amount: 0, kind: 'side', load: 0 }; const sx = c.slipX[i]!, sa = Math.abs(c.slipA[i]!), sl = Math.max(Math.abs(sx) / 0.15, sa / 0.12), a = Math.max(0, Math.min(1, (sl - 1) / 0.6));
   return { amount: a, kind: sx < -0.3 ? 'lock' : sx > 0.3 ? 'spin' : 'side', load: Math.min(1.5, c.load[i]! / (c.spec.mass * 9.81 / 4)) }; }
 let markTick = 0;
+/** each car's drawn tyres (along the heading and to the left of the middle, m; the drawn middle less the physics' x, y),
+ *  from the last frame; and each wheel's share of a puff owed (the smoke's rate ramps with the slip, no bursts) */
+const tyreAt = new WeakMap<Vehicle, ([number, number, number, number] | null)[]>(), puffOwed = new WeakMap<Vehicle, number[]>();
+/** where a tyre meets the road (world x, y): the drawn tyre where there is one, else the physics' wheel */
+function tyreSpot(c: Vehicle, i: number): [number, number] { const cy = Math.cos(c.yaw), sy = Math.sin(c.yaw), d = tyreAt.get(c)?.[i];
+  if (d) return [c.x + d[2] + d[0] * cy - d[1] * sy, c.y + d[3] + d[0] * sy + d[1] * cy];
+  const [px, py] = c.wheelAt(i); return [c.x + px * cy - py * sy, c.y + px * sy + py * cy]; }
 function marks(c: Vehicle) { markTick++; for (let i = 0; i < 4; i++) { const k = skidOf(c, i), sl = 1 + k.amount * 0.6;
-    const trap = (c.offSurf[i]?.drag ?? 0) > 0; if (c.onGrass[i] && c.speed > (trap ? 2 : 4) && markTick % 2 === 0 && Math.random() < Math.min(trap ? 0.9 : 0.5, c.speed / (trap ? 20 : 60))) { const [px, py] = c.wheelAt(i), cy = Math.cos(c.yaw), sy2 = Math.sin(c.yaw), x = c.x + px * cy - py * sy2, y = c.y + px * sy2 + py * cy;
+    const trap = (c.offSurf[i]?.drag ?? 0) > 0; if (c.onGrass[i] && c.speed > (trap ? 2 : 4) && markTick % 2 === 0 && Math.random() < Math.min(trap ? 0.9 : 0.5, c.speed / (trap ? 20 : 60))) { const cy = Math.cos(c.yaw), sy2 = Math.sin(c.yaw), [x, y] = tyreSpot(c, i);
       smoke.emit('dust', x, y, 0.2, -cy * 1.5 + (Math.random() - 0.5) * 2, -sy2 * 1.5 + (Math.random() - 0.5) * 2, trap ? 2 : 1.2, Math.min(1, c.speed / (trap ? 12 : 25)), 0); }   /* dust thrown up off the grass, a cloud of it out of a gravel trap */
+    if (k.amount > 0) { const owed = puffOwed.get(c) ?? [0, 0, 0, 0]; puffOwed.set(c, owed); owed[i] = owed[i]! + 16 * k.amount * DT;   /* up to 16 puffs a second a wheel, by the slip */
+      const [tx, ty] = tyreSpot(c, i), sp = Math.hypot(c.v[0], c.v[1]) || 1, tq = T.locate(tx, ty, c.s), z = T.height(tq.s, tq.off);
+      while (owed[i]! >= 1) { owed[i] = owed[i]! - 1; const back = 0.15 + 0.2 * Math.random();   // at the contact patch, a little behind it on the ground's way past
+        smoke.emit('tyre', tx - c.v[0] / sp * back, ty - c.v[1] / sp * back, z + 0.08, c.v[0] * 0.15 + (Math.random() - 0.5) * 0.4, c.v[1] * 0.15 + (Math.random() - 0.5) * 0.4, 0.35, 0.3 + 0.7 * k.amount, z); } }   /* the live picture's tyre smoke: low at the tyre, slow, dragged a little by the car */
     if (k.amount <= 0 || markTick % 2) continue;
-    const [px, py] = c.wheelAt(i), cy = Math.cos(c.yaw), sy2 = Math.sin(c.yaw), x = c.x + px * cy - py * sy2, y = c.y + px * sy2 + py * cy, q = T.locate(x, y, c.s), z = T.height(q.s, q.off);
-    if (Math.random() < 0.4 * k.amount) { const vx = c.vx * Math.cos(c.yaw) * 0.25, vy = c.vx * Math.sin(c.yaw) * 0.25; smoke.emit('tyre', x, y, z + 0.15, vx + (Math.random() - 0.5), vy + (Math.random() - 0.5), 0.6, k.amount, z); }   /* the live picture's tyre smoke */
+    const [x, y] = tyreSpot(c, i), q = T.locate(x, y, c.s), z = T.height(q.s, q.off);
     skids.push({ x, y, z, a: Math.min(0.6, 0.12 + 0.45 * k.amount) * (k.kind === 'lock' ? 1.2 : 1) }); if (skids.length > 9000) skids.shift(); if (Math.random() < 0.12 * (0.3 + k.amount)) puffs.push({ x, y, z: z + 0.2, r: 0.3, a: 0.35, vx: (Math.random() - 0.5) * 0.6, vy: (Math.random() - 0.5) * 0.6 }); } }
 /** every car in view, the farthest first */
 /** the scenery and the cars together, the farthest first; decks over the track after them all */
@@ -738,7 +749,7 @@ $<HTMLSelectElement>('look').addEventListener('change', e => { look = (e.target 
   // the machinery's look follows (the drift look's engines and suspensions: render/car/powertrain/style.ts); the cars built again in it
   const ps = styleForLook(look === 'drift' ? 4 : 2); if (ps !== partStyle()) { setPartStyle(ps); wingMeshes.clear(); lampMeshes.clear(); rebake(true); } }); toonRows();
 $<HTMLInputElement>('toonB').addEventListener('input', e => { toonB = +(e.target as HTMLInputElement).value; $('toonBv').textContent = String(toonB); });
-$<HTMLSelectElement>('smokeSize').addEventListener('change', e => { smoke.size = (e.target as HTMLSelectElement).value === 'normal' ? 0.55 : 1; (e.target as HTMLElement).blur(); });   /* 연기 크기 */
+$<HTMLSelectElement>('smokeSize').addEventListener('change', e => { smoke.size = (e.target as HTMLSelectElement).value === 'normal' ? 0.7 : 1; (e.target as HTMLElement).blur(); });   /* 연기 크기 */
 $<HTMLSelectElement>('smokeQ').addEventListener('change', e => { smokeQ = (e.target as HTMLSelectElement).value as SmokeSetting; const t = smokeNow(); $('smokeNote').textContent = (smokeQ === 'mid' || smokeQ === 'high') && t === 'parcels' ? '이 기기는 부동소수 렌더 타깃이 없어 덩어리로 그립니다' : ''; (e.target as HTMLElement).blur(); });
 $<HTMLSelectElement>('glassRefl').addEventListener('change', e => { glassRefl = GLASS_REFL[(e.target as HTMLSelectElement).value as GlassRefl] ?? 1; (e.target as HTMLElement).blur(); });
 $<HTMLInputElement>('toonS').addEventListener('input', e => { toonS = +(e.target as HTMLInputElement).value; });

@@ -72,7 +72,6 @@ export const KIT_CSS = tokenCss() + roleCls + `
 .gk-in-r{animation:gk-in-r var(--gk-t) cubic-bezier(.2,.9,.3,1.12) both}.gk-in-l{animation:gk-in-l var(--gk-t) cubic-bezier(.2,.9,.3,1.12) both}
 .gk-in-u{animation:gk-in-u var(--gk-t) cubic-bezier(.2,.9,.3,1.1) both}.gk-in-d{animation:gk-in-d var(--gk-t) ease-out both}.gk-pop{animation:gk-pop var(--gk-t) cubic-bezier(.2,.9,.3,1.3) both}
 .gk-out-r{animation:gk-out-r calc(var(--gk-t) * .8) ease-in both}.gk-out-l{animation:gk-out-l calc(var(--gk-t) * .8) ease-in both}
-.gk-stagger>*{animation-delay:calc(var(--i,0) * 35ms)}
 @media (prefers-reduced-motion:reduce){.gk-in-r,.gk-in-l,.gk-in-u,.gk-in-d,.gk-pop,.gk-out-r,.gk-out-l{animation:none}.gk-fill{transition:none}}
 :root[data-calm] :is(.gk-in-r,.gk-in-l,.gk-in-u,.gk-in-d,.gk-pop,.gk-out-r,.gk-out-l){animation:none}
 `;

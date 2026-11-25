@@ -3,17 +3,19 @@
 // toward the wind; curl noise stirs it at two scales (a large slow swirl and a finer break-up: curl noise has no
 // divergence, so it swirls without bunching the parcels); its density fades (dissipation) and it spreads as it ages.
 // Dust is cold and heavy and settles; tyre smoke starts hot and fast; steam hot and white. World axes, metres, seconds.
-// The sizes are a cartoon's (docs/systems/103): a drift's tyre smoke a puff over a metre across at once, growing to
-// clouds of several metres that hang for ten seconds and more; dust as big but settling; steam and exhaust smaller.
-// The cars bore through it (V4 for the parcels): a parcel a car drives into is shoved out of its box, sideways and up,
-// with the car's speed, and shrinks, so a gap opens where it went; the gap fills only as the parcels grow and drift.
+// The sizes (docs/systems/104 B-9, after the device): a tyre's puff starts small at the tyre (0.3 m) and grows slowly,
+// fast at first and then less (a logarithm of its age), to about the car's width at most (its kind's rMax); it hangs
+// for ten seconds and more while its density fades softly. Dust is a little bigger and settles; steam and exhaust smaller.
+// The cars bore through it as a wake (V4 for the parcels): a parcel whose middle the back of a car's body passes through
+// is shoved out sideways or over the roof with the car's speed, and shrinks, so a gap opens behind the car; what is ahead
+// of the car stays until the car is in it, so a car driven into a cloud is hidden by it, not cut out of it.
 export type SmokeKind = 'tyre' | 'dust' | 'steam' | 'exhaust';
 export interface Parcel { x: number; y: number; z: number; vx: number; vy: number; vz: number; T: number; rho: number; r: number; age: number; kind: SmokeKind; seed: number; floor: number }
-const KIND: Record<SmokeKind, { T: number; rho: number; r: number; grow: number; cool: number; fade: number; heavy: number; life: number }> = {
-  tyre: { T: 160, rho: 0.75, r: 1.2, grow: 1.4, cool: 1.6, fade: 0.11, heavy: 0, life: 22 },
-  dust: { T: 5, rho: 0.6, r: 1.0, grow: 1.1, cool: 0.8, fade: 0.16, heavy: 0.9, life: 16 },
-  steam: { T: 90, rho: 0.7, r: 0.3, grow: 1.0, cool: 1.0, fade: 0.5, heavy: 0, life: 7 },
-  exhaust: { T: 220, rho: 0.35, r: 0.18, grow: 0.8, cool: 2.5, fade: 0.6, heavy: 0, life: 5 } };
+const KIND: Record<SmokeKind, { T: number; rho: number; r: number; grow: number; rMax: number; cool: number; fade: number; heavy: number; life: number }> = {
+  tyre: { T: 160, rho: 0.75, r: 0.3, grow: 0.42, rMax: 1.1, cool: 1.6, fade: 0.12, heavy: 0, life: 22 },
+  dust: { T: 5, rho: 0.6, r: 0.35, grow: 0.5, rMax: 1.3, cool: 0.8, fade: 0.16, heavy: 0.9, life: 16 },
+  steam: { T: 90, rho: 0.7, r: 0.2, grow: 0.5, rMax: 0.8, cool: 1.0, fade: 0.5, heavy: 0, life: 7 },
+  exhaust: { T: 220, rho: 0.35, r: 0.12, grow: 0.4, rMax: 0.6, cool: 2.5, fade: 0.6, heavy: 0, life: 5 } };
 /** a car as the smoke sees it: where (its ground), heading, velocity (world), size (m) */
 export interface SmokeCar { x: number; y: number; z: number; yaw: number; vx: number; vy: number; len: number; width: number; height: number }
 
@@ -49,16 +51,17 @@ export class Smoke {
       p.vx += (c1[0] * a1 + c2[0] * a2) * dt * 3; p.vy += (c1[1] * a1 + c2[1] * a2) * dt * 3; p.vz += (c1[2] * a1 + c2[2] * a2) * dt * 1.5;
       p.x += p.vx * dt; p.y += p.vy * dt; p.z += p.vz * dt; if (p.z < p.floor + p.r * 0.5) { p.z = p.floor + p.r * 0.5; if (p.vz < 0) p.vz *= -0.2; }
       // cooling toward the air (fast while hot), dissipation, spreading
-      p.T -= p.T * K.cool * (0.4 + p.T / 200) * dt; p.rho *= Math.exp(-K.fade * dt * (1 + p.age * 0.15)); p.r += K.grow * this.size * dt / (1 + p.age * 0.8); p.age += dt;
+      p.T -= p.T * K.cool * (0.4 + p.T / 200) * dt; p.rho *= Math.exp(-K.fade * dt * (1 + p.age * 0.15)); p.r = Math.min(K.rMax * this.size, p.r + K.grow * this.size * dt / (1 + p.age * 0.8)); p.age += dt;
       if (p.age > 0.4) for (const c of this.cars) bore(p, c, dt);   // not a puff just made (a drifting car's own smoke starts at its wheels)
       if (p.rho < 0.015 || p.age > K.life) this.parcels.splice(i, 1); } }
 }
-/** a parcel in a car's box (padded by part of its size) shoved out of the nearer side or the roof, given the car's
- *  speed outward and a little lift, and shrunk: the hole a car bores through a cloud */
-export function bore(p: Parcel, c: SmokeCar, dt: number): void { const sp = Math.hypot(c.vx, c.vy); if (sp < 2) return;
-  const pad = p.r * 0.6, hx = c.len / 2 + pad, hy = c.width / 2 + pad, top = c.z + c.height + pad, cs = Math.cos(c.yaw), sn = Math.sin(c.yaw), dx = p.x - c.x, dy = p.y - c.y;
-  const lx = dx * cs + dy * sn, ly = -dx * sn + dy * cs; if (Math.abs(lx) > hx || Math.abs(ly) > hy || p.z > top || p.z < c.z - pad) return;
-  const side = ly !== 0 ? Math.sign(ly) : p.seed < 0.5 ? -1 : 1, outY = hy - Math.abs(ly), outZ = top - p.z;
-  if (outZ < outY * 0.6) { p.z = top; p.vz = Math.max(p.vz, sp * 0.25); }   // nearer the roof: over it
-  else { const ny = side * hy; p.x = c.x + lx * cs - ny * sn; p.y = c.y + lx * sn + ny * cs; p.vx += -sn * side * sp * 0.35; p.vy += cs * side * sp * 0.35; p.vz += sp * 0.12; }
-  p.vx += c.vx * 0.25; p.vy += c.vy * 0.25; p.r *= 0.75; }
+/** a parcel whose middle is in the back part of a car's body (from a fifth ahead of its middle to its tail) shoved out of
+ *  the nearer side or over the roof, given the car's speed outward and a little lift, and shrunk: the wake a car bores
+ *  through a cloud (the front part left alone, so the smoke the car drives into covers it) */
+export function bore(p: Parcel, c: SmokeCar, dt: number): void { const sp = Math.hypot(c.vx, c.vy); if (sp < 2 || dt <= 0) return;
+  const hx = c.len / 2, hy = c.width / 2, top = c.z + c.height, cs = Math.cos(c.yaw), sn = Math.sin(c.yaw), dx = p.x - c.x, dy = p.y - c.y;
+  const lx = dx * cs + dy * sn, ly = -dx * sn + dy * cs; if (lx > hx * 0.2 || lx < -hx || Math.abs(ly) > hy || p.z > top || p.z < c.z - 0.3) return;
+  const side = ly !== 0 ? Math.sign(ly) : p.seed < 0.5 ? -1 : 1, outY = hy - Math.abs(ly), outZ = top - p.z, push = hy + p.r * 0.3;
+  if (outZ < outY * 0.6) { p.z = top + p.r * 0.3; p.vz = Math.max(p.vz, sp * 0.25); }   // nearer the roof: over it
+  else { const ny = side * push; p.x = c.x + lx * cs - ny * sn; p.y = c.y + lx * sn + ny * cs; p.vx += -sn * side * sp * 0.3; p.vy += cs * side * sp * 0.3; p.vz += sp * 0.1; }
+  p.vx += c.vx * 0.2; p.vy += c.vy * 0.2; p.r *= 0.75; }

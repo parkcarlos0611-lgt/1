@@ -19,6 +19,7 @@ import { withEngine } from '../../core/engines';
 import { lapTimes } from '../../race/race';
 import { trackDef } from '../../race/tracks';
 import { GLASS_REFL, type Settings } from './settings';
+import { SPEED_FX } from '../../render/live/trails';
 import { CAM_VIEWS, type CamView } from '../drivecam';
 
 const LOOK_B: Record<Settings['graphics']['look'], string> = { pbr: '2', toon: '3', stepped: '0', baked: '0', drift: '4' };
@@ -55,7 +56,7 @@ export function driveScreen(ctx: ShellCtx): Screen<DriveParams> & { readonly api
   const apply = () => { if (!page) return; const s = ctx.settings, r = R(); setField(r, 'live', s.graphics.live); setField(r, 'look', s.graphics.look); setField(r, 'photoGround', s.graphics.photoGround); setField(r, 'hdri', s.graphics.hdri); setField(r, 'blur', s.graphics.blur); setField(r, 'glassRefl', s.graphics.glassRefl); setField(r, 'smokeQ', s.graphics.smoke); setField(r, 'smokeSize', s.graphics.smokeSize);
     setField(r, 'touch', s.controls.touch === 'auto' ? matchMedia('(pointer: coarse)').matches : s.controls.touch === 'on'); setField(r, 'auto', s.controls.auto); setField(r, 'tcs', s.controls.tcs); setField(r, 'assist', s.controls.assist); setField(r, 'progressive', s.controls.progressive); setField(r, 'ignition', s.controls.ignition); setField(r, 'stall', s.controls.stall);
     setField(r, 'hudSize', s.controls.hudSize); setField(r, 'hudAlpha', s.controls.hudAlpha); setField(r, 'hudLeft', s.controls.leftHand); setField(r, 'shifter', s.controls.shifter);   // docs/systems/110 G3
-    setField(r, 'vol', s.sound.volume); setField(r, 'sound', s.sound.on); if (api) api.camera = s.camera.view; };
+    setField(r, 'vol', s.sound.volume); setField(r, 'sound', s.sound.on); if (api) { api.camera = s.camera.view; api.speedFx = SPEED_FX[s.graphics.speedFx]; } };
   /** the drive's drawer for the game: what the pause menu and the settings now hold taken out of it, the effects folded under 개발자 */
   const shellize = (r: HTMLElement) => { const hide = (id: string) => { const f = r.querySelector(`#${id}`); const box = f?.closest<HTMLElement>('.row, label.check'); if (box) box.style.display = 'none'; };
     for (const id of ['auto', 'assist', 'ignition', 'stall', 'tcs', 'pilot', 'progressive', 'touch', 'hudSize', 'hudAlpha', 'hudLeft', 'shifter', 'damper', 'chase', 'cine', 'live', 'look', 'photoGround', 'hdri', 'blur', 'sound', 'vol', 'smokeQ', 'smokeSize']) hide(id);

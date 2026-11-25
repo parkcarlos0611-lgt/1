@@ -28,6 +28,7 @@ import { groundData, fenceData } from '../render/live/ground';
 import { Smoke, type SmokeKind } from '../race/smoke';
 import { Debris } from '../race/debris';
 import { fenceChunk, pieceMesh, CHUNK } from '../render/live/fence';
+import { CarTrails, anchorsOf, RIBBON_FLOATS } from '../render/live/trails';
 import { mul as m4mul, translate as m4t, rot as m4rot, scale as m4s } from '../render/live/gpu';
 import texAlb from '../assets/textures/pbr/albedo.jpg';
 import texNor from '../assets/textures/pbr/normal.jpg';
@@ -63,7 +64,8 @@ export interface DriveApi { /** the world held still (its picture kept) and on a
   setTrack(id: string): void; readonly track: string; /** a race with these entrants and laps (the race tab's own fields) */ race(o: { opp?: number; lineup?: string; laps?: number; mode?: string }): void;
   /** the race on (or done), null in practice */ readonly raceNow: Race | null; /** the player's engine's state as the screens write it (docs/systems/110 G1) */ readonly engine: string;
   /** the track's materials and props loaded (or failed) */ readonly ready: Promise<void>; readonly drawerOpen: boolean; drawer(open: boolean): void;
-  /** the camera (drivecam.ts): the view now, and the views this car can have */ camera: CamView; readonly cameras: CamView[] }
+  /** the camera (drivecam.ts): the view now, and the views this car can have */ camera: CamView; readonly cameras: CamView[];
+  /** 속도 효과's strength (render/live/trails.ts SPEED_FX: 0 off .. 1 보통) */ speedFx: number }
 // The drive below is one function's body, mounted once on its markup; it is not indented, so its lines read as before.
 export function mountDrive(H: DriveHost = {}): DriveApi {
 const R = H.root ?? document;
@@ -144,6 +146,9 @@ const wearOf = (c: Vehicle, k: number): [number, number, number] => { if (c === 
 // each car's 2D art (its part model's views), laid on its mesh in the live picture (review 105), loaded when first wanted
 const ART: Record<string, string> = { bmw315: artBmw, buick28: artBuick, chevAB28: artChev, dodgeV28: artDodge, dueA21: artDueA, dueSSJ35: artSSJ, fnTT33: artFN, fordT23: artFord, plymU29: artPlym, pontiac29: artPont, willys27: artWillys };
 const artAsked = new WeakSet<object>(); let artOn = true, raysOn = true, texK = 1, lightK = 1, mbK = 1.6, aoK = 1, reflK = 1.3, bloomK = 1, deep = 1, day = 1, dof = 0.5, outW = 1, outK = 1, inK = 1, innerOn: 'auto' | 'on' | 'off' = 'auto';   /* the outline (review 110) */
+/** 속도 효과 (docs/systems/114): its strength (render/live/trails.ts SPEED_FX; the game's setting through DriveApi.speedFx), each car's
+ *  trails (begun again with another mesh), the smoke about its tail (smoothed), their clock and this frame's vertices */
+let speedFxK = 1, fxClock = 0; const trailsOf = new WeakMap<Vehicle, { m: Mesh; t: CarTrails; smoke: number }>(); let trailV = new Float32Array(0); const trailOut: number[] = [];
 let toonB = 3, toonS = 0.55, glassRefl = 1;   /* the toon look (review 92): its bands, how far its shade's hue moves; its glass's reflection (doc 104 A) */
 function artFor(L: LiveRenderer, g: ReturnType<LiveRenderer['car']>, id: string, M: import('../render/car/mesh').Mesh) { if (artAsked.has(g) || !ART[id] || !M.names?.some(Boolean)) return; artAsked.add(g);   // only a mesh with its parts named can take it
   const meta = artMeta as unknown as { mm: number; groups: string[]; cars: Record<string, { C: number; views: Record<string, number[]> }> }, groups = M.names!.map(n => n ? meta.groups.indexOf(canonical(n)) + 1 : 0);
@@ -220,6 +225,12 @@ function drawLive(el: number) { const L = live!; cabinAtlas(L);
   const vc: VolCar[] = list.map(({ c }, k) => ({ x: cars[k]!.x, y: cars[k]!.y, z: cars[k]!.z, yaw: c.yaw, vx: c.v[0], vy: c.v[1], len: cars[k]!.g.len / 1000, width: cars[k]!.g.width, height: cars[k]!.g.height }));   /* the cars as the smoke sees them: they bore through it */
   { const ex = (c0: Vehicle) => { const L = c0.spec.wheelbase * c0.spec.frontShare + 0.9, z = T.height(c0.s, c0.off); smoke.emit('exhaust', c0.x - Math.cos(c0.yaw) * L, c0.y - Math.sin(c0.yaw) * L, z + 0.35, -Math.cos(c0.yaw) * 2 + c0.vx * Math.cos(c0.yaw) * 0.6, -Math.sin(c0.yaw) * 2 + c0.vx * Math.sin(c0.yaw) * 0.6, 0.3, 1, z); };
     if (input.throttle > 0.7 && car.rpm < car.spec.hpRpm * 0.6 && Math.random() < 0.25) ex(car); smoke.cars = vc; smoke.step(Math.min(0.05, el)); }
+  // the speed effects: each car's anchors recorded where it is drawn, the ribbons through their recent places
+  fxClock += el; trailOut.length = 0;
+  if (speedFxK > 0) list.forEach(({ c, sp }, k) => { const q = cars[k]!; let r = trailsOf.get(c); if (!r || r.m !== sp.mesh) { r = { m: sp.mesh, t: new CarTrails(anchorsOf(sp.mesh, q.g.lamps.filter(l => l.flag === 2).map(l => l.c))), smoke: 0 }; trailsOf.set(c, r); }
+    const sk = Math.max(skidOf(c, 2).amount, skidOf(c, 3).amount); r.smoke += (sk - r.smoke) * Math.min(1, el * 3);   /* a sliding tail is a smoking one: its streaks thin */
+    r.t.step(fxClock, { len: q.g.len, x: q.x, y: q.y, z: q.z, yaw: q.yaw, roll: q.roll, pitch: q.pitch, kmh: c.speed * 3.6, brake: c === car ? input.brake : Math.max(0, Math.min(1, (-c.ax - 2) / 6)), smoke: r.smoke }, speedFxK, day, trailOut); });
+  if (trailV.length < trailOut.length) trailV = new Float32Array(trailOut.length * 2); trailV.set(trailOut); const trails = { v: trailV, n: trailOut.length / RIBBON_FLOATS };
   const sp8 = new Float32Array(smoke.parcels.length * 8); smoke.parcels.forEach((q, k) => sp8.set([q.x, q.y, q.z, q.r, q.rho, q.T, SK[q.kind], q.seed], k * 8));
   if (smokeNow() !== 'off' && live?.vol?.sim) { const z0 = T.height(car.s, car.off);   /* the volumetric smoke's step */ live.vol.size = smoke.size;
     live.vol.poll(); live.vol.step(Math.min(0.1, el), [car.x, car.y, z0], vc, (x, y) => { const q = T.locate(x, y, car.s), g = T.ground(q.s, q.off); return Math.abs(Math.abs(q.off) - FENCE) < 0.2 && fenceOk(Math.sign(q.off), Math.floor(q.s)) ? g + 1.0 : g; }); }
@@ -233,7 +244,7 @@ function drawLive(el: number) { const L = live!; cabinAtlas(L);
     main.fillStyle = 'rgba(0,0,0,0.55)'; main.fillRect(0, VH - 20, VW, 20); main.fillStyle = '#f2ead6'; main.font = '11px sans-serif'; main.textAlign = 'center';
     for (let k = 0; k < 3; k++) main.fillText(names[k]!, k * w3 + w3 / 2, VH - 6); main.fillStyle = '#000'; for (let k = 1; k < 3; k++) main.fillRect(k * w3 - 1, 0, 2, VH); main.textAlign = 'left'; }
   else if (fxMode === 1 && filmRate && clock - heldAt < 1 / 18 && held.width === VW && heldAt <= clock) { /* the hand-cranked camera: 18 frames a second, the picture held between */ }
-  else { L.render(view, cars, props, skids, { glass: 0.8, look: look === 'stepped' ? 1 : look === 'pbr' ? 2 : look === 'toon' ? 3 : look === 'drift' ? 4 : 0, toonBands: toonB, toonShade: toonS, glassRefl, art: artOn, rays: raysOn, texK, lightK, aoK, reflK, bloomK, deep, day, photoGround: photoOn, hdri: hdriOn, dof, mb: blurOn ? mbK * (S ? 0.5 : 1) : 0, outW, outK, inner: innerOn === 'auto' ? undefined : innerOn === 'on', inK, smoke: smokeNow() === 'off' ? undefined : { p: sp8, n: smoke.parcels.length, time: smoke.time }, fx: fxMode, fxK, fxPx: Math.max(1, Math.round(VH / 480)) }); held.width = VW; held.height = VH; held.getContext('2d')!.drawImage(glCanvas, 0, 0); heldAt = clock; }
+  else { L.render(view, cars, props, skids, { glass: 0.8, look: look === 'stepped' ? 1 : look === 'pbr' ? 2 : look === 'toon' ? 3 : look === 'drift' ? 4 : 0, toonBands: toonB, toonShade: toonS, glassRefl, art: artOn, rays: raysOn, texK, lightK, aoK, reflK, bloomK, deep, day, photoGround: photoOn, hdri: hdriOn, dof, mb: blurOn ? mbK * (S ? 0.5 : 1) : 0, outW, outK, inner: innerOn === 'auto' ? undefined : innerOn === 'on', inK, smoke: smokeNow() === 'off' ? undefined : { p: sp8, n: smoke.parcels.length, time: smoke.time }, fx: fxMode, fxK, fxPx: Math.max(1, Math.round(VH / 480)), trails }); held.width = VW; held.height = VH; held.getContext('2d')!.drawImage(glCanvas, 0, 0); heldAt = clock; }
   if (look !== 'split') main.drawImage(held, 0, 0);
   drawDebris(el);
   if (car.speed > 30) { const v = Math.min(1, (car.speed - 30) / 30) * 0.35, g = main.createRadialGradient(VW / 2, VH / 2, VH * 0.35, VW / 2, VH / 2, VW * 0.62); g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, `rgba(0,0,0,${v})`); main.fillStyle = g; main.fillRect(0, 0, VW, VH); } }
@@ -793,6 +804,7 @@ return {
   race(o) { const set = (id: string, v: unknown) => { if (v !== undefined) $<HTMLSelectElement>(id).value = String(v); }; set('opp', o.opp); set('lineup', o.lineup); set('laps', o.laps); set('mode', o.mode);
     $('pickbox').hidden = $<HTMLSelectElement>('lineup').value !== 'pick'; startRace(); $('race').textContent = '다시 시작'; },
   get camera() { return camView; }, set camera(v: CamView) { if (v !== camView) useView(v); }, get cameras() { return CAM_VIEWS.map(c => c.id).filter(viewOk); },
+  get speedFx() { return speedFxK; }, set speedFx(k: number) { speedFxK = Math.max(0, Math.min(1, k)); },
   get raceNow() { return race; }, get engine() { return car.engine.label; }, ready, get drawerOpen() { return document.body.classList.contains('drawer-open'); }, drawer(open: boolean) { drawer(open); } };
 }
 // a page of its own: the drive's markup is on it (the game's page mounts it on a screen instead)

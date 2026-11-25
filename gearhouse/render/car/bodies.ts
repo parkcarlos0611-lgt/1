@@ -11,9 +11,10 @@
 //             render/car/designsusp.ts)
 //   gauges    what the cabin's dials are drawn for (the red line, the top speed, the boost)
 //   open      the parts lifted off for the builder's engine view
+//   anchors   where the speed effects start: the wing's tips, the tail lamps (render/live/trails.ts; also on the mesh)
 import type { Design, ModelBaseId } from '../../core/design';
 import { MODEL_OWN, plateOk } from '../../core/design';
-import { Build, KINDS, type Mesh, type MeshLine } from './mesh';
+import { Build, KINDS, type CarAnchors, type Mesh, type MeshLine } from './mesh';
 import { p959Mesh, plateText, DIM, type PlateText } from './p959';
 import { addSuspension, type SuspWheel } from './suspension';
 import { suspFor } from './suspension/setup';
@@ -24,7 +25,7 @@ import { interiorMesh, INTERIORS, P959_CABIN, P959_GAUGES, type CabinAnchors, ty
 
 export interface BodyMeshOpts { /** the powertrain's and the suspension's detail (2 the builder's, 1 the drive's) */ detail?: Detail; /** the look the machinery is drawn in (default: the setting's) */ style?: StyleOpt;
   /** the car's top speed (km/h) for the speedometer's scale (default: the real car's) */ topKmh?: number; /** leave the machinery out (a picture of the body alone) */ bare?: boolean }
-export interface ModelBody { name: string; length: number; cabin: CabinAnchors; mesh(d: Design, o?: BodyMeshOpts): Mesh; wheels(d: Design): { f: SuspWheel; r: SuspWheel }; gauges(d: Design, topKmh?: number): GaugeCar; open: readonly string[] }
+export interface ModelBody { name: string; length: number; cabin: CabinAnchors; /** where the speed effects start (wing tips, tail lamps) */ anchors?: CarAnchors; mesh(d: Design, o?: BodyMeshOpts): Mesh; wheels(d: Design): { f: SuspWheel; r: SuspWheel }; gauges(d: Design, topKmh?: number): GaugeCar; open: readonly string[] }
 
 /** meshes laid into one: each one's parts renumbered after the ones before, its picture coordinates and needles' bones
  *  kept (zero where a mesh has none), its lines joined; the first mesh's rigs and creases stay */
@@ -56,7 +57,10 @@ function p959Wheels(d: Design): { f: SuspWheel; r: SuspWheel } { const [wf, wr] 
  *  cabin's floor and tunnel (the same place as the style page's, render/car/styleparts.ts) */
 const P959_SITE: Site = { length: DIM.length, foot: 150, wheels: { f: { x: DIM.axleF, y: DIM.trackF / 2, r: DIM.tyreR, w: 235, z: DIM.hubZ }, r: { x: DIM.axleR, y: DIM.trackR / 2, r: DIM.tyreR - 2, w: 255, z: DIM.hubZ - 2 } },
   engine: { at: [DIM.axleR + 112, 0, 440], dir: '+x' }, tips: { x: 4258, z: 256, y: [-335, 335], r: 40 }, cabin: { floor: 170, x: [1350, 2900], tunnel: [1350, 110, 330] } };
-const P959: ModelBody = { name: '959', length: DIM.length, cabin: P959_CABIN, wheels: p959Wheels, open: ['engineGrille', 'engineLid', 'rearWindow'],
+/** the 959's speed-effect anchors (render/live/trails.ts): the wing blade's outer trailing corners (its top, where the
+ *  air leaves it) and the tail-lamp bar's outer halves, a little behind their faces; left (+y) first */
+const P959_ANCHORS: CarAnchors = { tips: [[4215, 760, 885], [4215, -760, 885]], lamps: [[4262, 560, 623], [4262, -560, 623]] };
+const P959: ModelBody = { name: '959', length: DIM.length, cabin: P959_CABIN, anchors: P959_ANCHORS, wheels: p959Wheels, open: ['engineGrille', 'engineLid', 'rearWindow'],
   gauges: (d, topKmh) => ({ ...P959_GAUGES, redline: d.engine.redline, topKmh: topKmh ?? P959_GAUGES.topKmh, ...(d.engine.turbo ? { boostBar: d.engine.boost } : { boostBar: undefined }) }),
   mesh(d, o = {}) { const m = { ...MODEL_OWN.p959, ...d.body.model }, det = o.detail ?? 2;
     const body = p959Mesh({ paint: d.body.paint, bumperF: m.bumperF, bumperR: m.bumperR, lamp: m.lamp, wheel: m.wheel, plate: plateOf(d), brake: !!o.bare, tyres: d.kit.tyres });
@@ -67,7 +71,7 @@ const P959: ModelBody = { name: '959', length: DIM.length, cabin: P959_CABIN, wh
     const b = new Build(), S = addSuspension(b, suspFor('p959', d.susp), p959Wheels(d), { detail: det, setup: d.susp, ...(o.style ? { style: o.style } : {}) });
     addPowertrain(b, fromDesign(d), P959_SITE, { detail: det, ...(o.style ? { style: o.style } : {}) });
     const mach = b.mesh(DIM.length), cab = interiorMesh({ ...cabinFor(d), cabin: P959_CABIN, gauges: this.gauges(d, o.topKmh), length: DIM.length });
-    return { ...joinMeshes(DIM.length, body, mach, cab), susp: S.rig }; } };
+    return { ...joinMeshes(DIM.length, body, mach, cab), susp: S.rig, anchors: P959_ANCHORS }; } };
 
 /** the model-built bodies, by their base's id */
 export const MODEL_BODIES: Record<ModelBaseId, ModelBody> = { p959: P959 };

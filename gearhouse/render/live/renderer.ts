@@ -790,6 +790,22 @@ void main() { float lw = fwidth(vUv.x) * 1.7;   /* the toon's line, about two pi
     float ext = sigma * d * dt; col += Tv * (1. - exp(-ext)) * alb * L; Tv *= exp(-ext); if (Tv < 0.02) break; }
   float A = 1. - Tv; if (A < 0.004) discard; vec3 x = col / max(A, 1e-3) * 0.55; if (uHDR == 1) { o = vec4(x * A, A); return; } vec3 c = pow(clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0., 1.), vec3(1. / 2.2)); o = vec4(c * A, A); }   /* the scene's filmic curve */`;
 
+// ---- the speed effects (docs/systems/114, render/live/trails.ts): thin ribbons through each anchor's recent places,
+// widened across the eye's line in the vertex shader, never thinner than about a pixel (thinner: fainter instead) ----
+const TRAIL_VS = `#version 300 es
+layout(location=0) in vec3 aP; layout(location=1) in vec3 aT; layout(location=2) in vec3 aS;   // place; the trail's way; signed half width, opacity, kind
+uniform mat4 uVP; uniform vec4 uCamP; uniform vec3 uVd; uniform vec2 uWpp; out float vA, vE; flat out float vK;
+void main() { vec3 toEye = uCamP.w > .5 ? normalize(uCamP.xyz - aP) : -uVd, n = cross(aT, toEye); float l = length(n); n = l > 1e-4 ? n / l : vec3(0., 0., 1.);
+  float wpp = uCamP.w > .5 ? uWpp.y * distance(uCamP.xyz, aP) : uWpp.x, hw = abs(aS.x), a = aS.y, lo = wpp * 0.8; if (hw < lo) { a *= hw / lo; hw = lo; }
+  vA = a; vE = sign(aS.x); vK = aS.z; gl_Position = uVP * vec4(aP + n * hw * sign(aS.x), 1.); }`;
+const TRAIL_FS = `#version 300 es
+precision highp float;
+in float vA, vE; flat in float vK; uniform int uHDR; out vec4 o;
+void main() { float e = 1. - vE * vE, a = vA * smoothstep(0., .45, e); if (a < .003) discard;   /* a firm edge: drawn, not a glow */
+  vec3 c = vK > .5 ? mix(vec3(1., .13, .1), vec3(1., .62, .5), e * e) : vec3(.93, .97, 1.);   /* a red light with a hot core; white with a little sky */
+  if (uHDR == 1) c = pow(c, vec3(2.2)) * (vK > .5 ? 1.8 : 1.);
+  o = vec4(c * a, a * (vK > .5 ? .5 : 1.)); }   /* premultiplied; the lamps' light adds more than it covers */`;
+
 interface WheelDraw { hubZ: number; spin: number; def: Float32Array; sx: number; sy: number; R: number; rim: number }
 type Piece = [{ vao: WebGLVertexArrayObject; n: number }, M4, WheelDraw?, Float32Array?];   // the last: a suspension piece's bones
 export class LiveRenderer {
@@ -864,7 +880,7 @@ export class LiveRenderer {
   /** the woods drawn now (trees in 3D, as cards, triangles), for the page tests */
   get woodsStats() { return this.layer?.woods?.stats ?? null; }
   setFence(d: GroundData) { this.fenceVao = this.vaoOf(d); this.fenceN = d.n; }
-  private frameN = 0; private propP!: WebGLProgram; private depthI!: WebGLProgram; private lineP!: WebGLProgram;
+  private frameN = 0; private propP!: WebGLProgram; private depthI!: WebGLProgram; private lineP!: WebGLProgram; private trailP: WebGLProgram | null = null; private trailVao: WebGLVertexArrayObject | null = null; private trailBuf: WebGLBuffer | null = null;
   /** the drift-game style's atlas (render/live/style.ts): the placeholder drawn by rule until a painted one is set */
   private atlas: { tex: WebGLTexture; rects: Float32Array } | null = null;
   setAtlas(a: Atlas) { const gl = this.gl; if (this.atlas) gl.deleteTexture(this.atlas.tex); const t = gl.createTexture()!; gl.bindTexture(gl.TEXTURE_2D, t); gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
@@ -934,7 +950,8 @@ export class LiveRenderer {
   render(v: LiveView, cars: LiveCar[], props: LiveProp[], skids: Skid[], o: { glass?: number; /** 0 the baked look, 1 PBR stepped, 2 PBR smooth, 3 toon (review 92) */ look?: number; /** the toon look: its bands (2 or 3), how far its shade's hue moves (0 plain darker, 1 as set, up to 1.5) */ toonBands?: number; toonShade?: number; /** the toon glass's reflection: 0 off, 0.5 weak, 1 as made (default) (docs/systems/104 A) */ glassRefl?: number; /** lay the 2D art on (default yes) */ art?: boolean; /** the rays in the picture: occlusion, contact shadows, reflections (default yes) */ rays?: boolean; /** strengths: the textures, the light (1: as set) */ texK?: number; /** the time of day: 1 day (default), toward 0 dusk and night (review 117) */ day?: number; /** the concrete from photographed materials (default yes, once loaded) (review 124) */ photoGround?: boolean; /** the photographed sky in the mirrors and the light (default yes, once loaded) */ hdri?: boolean; /** the photographed props (review 125) */ props?: boolean; /** the period's pictures (review 129): 1 a 1930s newsreel, 2 a 1990s television broadcast; their strength; the size of a film or video pixel on screen */ fx?: number; fxK?: number; fxPx?: number; /** the colour's depth: deeper lacquer, the hue kept through the tone curve (0: as before; default 1) (review 116) */ deep?: number; lightK?: number; /** after the scene: occlusion and reflection strengths, bloom, depth of field (0 none; pixels of blur a metre from the focus) */ aoK?: number; reflK?: number; bloomK?: number; dof?: number; /** motion blur: the shutter, a share of a frame (0 none) */ mb?: number; /** the outline: width (times each thing's own; 0 none), darkness 0..1; the lines inside a thing (default: the baked look only), their darkness */ outW?: number; outK?: number; inner?: boolean; inK?: number; /** smoke parcels: centre, radius, density, heat, kind (0 tyre 1 dust 2 steam 3 exhaust), seed; and the time */ smoke?: { p: Float32Array; n: number; time: number };
     /** the sun's direction (toward it, world axes; default from the upper left of the default view) */ sun?: [number, number, number];
     /** the drift-game style (look 4, docs/systems/109 §5): the inverted hull's outline and the drawn lines (default on), the outline pass filling the gaps (default on); their widths (px at 1080 high: 2.5 and 1.75), the picture's device pixel ratio, the ink; the atlas (default on) */
-    style?: LiveStyle } = {}) { const gl = this.gl; this.size(v.W, v.H);
+    style?: LiveStyle;
+    /** the speed effects' ribbons (render/live/trails.ts ribbon: RIBBON_FLOATS a vertex), how many vertices */ trails?: { v: Float32Array; n: number } } = {}) { const gl = this.gl; this.size(v.W, v.H);
     const fr = o.look === 4, look = fr ? 3 : o.look ?? 0, SUN = o.sun ? (() => { const l = Math.hypot(...o.sun!) || 1; return o.sun!.map(c => c / l) as [number, number, number]; })() : SUN_W, st = o.style ?? {}, ink = st.ink ?? [0.045, 0.045, 0.055];   /* look 4: the toon look's world, the style's cars */
     const toon = (look) === 3, toonTo = (p: WebGLProgram) => { gl.uniform1f(this.loc(p, 'uToonB'), o.toonBands ?? 3); gl.uniform1f(this.loc(p, 'uToonS'), o.toonShade ?? 1); };
     // ---- the camera: orthographic, turned to v.ang, tilted down by v.pitch, v.mm millimetres a pixel, snapped to whole pixels ----
@@ -1050,6 +1067,13 @@ export class LiveRenderer {
     // depth-tested against the scene: parcels far to near, then the volume. Its own framebuffer: the picture and the depth
     if (!this.smokeF) this.smokeF = gl.createFramebuffer()!; gl.bindFramebuffer(gl.FRAMEBUFFER, this.smokeF); gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, RT[1]!.t, 0); gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.DEPTH_STENCIL_ATTACHMENT, gl.TEXTURE_2D, this.tDepth, 0);
     gl.drawBuffers([gl.COLOR_ATTACHMENT0]); gl.viewport(0, 0, v.W, v.H); gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LESS); gl.disable(gl.STENCIL_TEST);
+    // the speed effects' ribbons first (docs/systems/114): over the outlines (they have none), under the smoke, which covers them where it is dense
+    if (o.trails && o.trails.n) { const T = o.trails; if (!this.trailP) { this.trailP = program(gl, TRAIL_VS, TRAIL_FS); this.trailVao = gl.createVertexArray()!; gl.bindVertexArray(this.trailVao); this.trailBuf = gl.createBuffer()!; gl.bindBuffer(gl.ARRAY_BUFFER, this.trailBuf);
+        for (let i = 0; i < 3; i++) { gl.enableVertexAttribArray(i); gl.vertexAttribPointer(i, 3, gl.FLOAT, false, 36, i * 12); } gl.bindVertexArray(null); }
+      const P = this.trailP; gl.useProgram(P); gl.uniformMatrix4fv(this.loc(P, 'uVP'), false, VP); gl.uniform4f(this.loc(P, 'uCamP'), pv ? pv.e[0] : 0, pv ? pv.e[1] : 0, pv ? pv.e[2] : 0, pv ? 1 : 0); gl.uniform3fv(this.loc(P, 'uVd'), vd);
+      gl.uniform2f(this.loc(P, 'uWpp'), v.mm / 1000, pv ? 2 * pv.ty / v.H : 0); gl.uniform1i(this.loc(P, 'uHDR'), hdrOn);
+      gl.bindVertexArray(this.trailVao); gl.bindBuffer(gl.ARRAY_BUFFER, this.trailBuf); gl.bufferData(gl.ARRAY_BUFFER, T.v.subarray(0, T.n * 9), gl.DYNAMIC_DRAW);
+      gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false); gl.drawArrays(gl.TRIANGLES, 0, T.n); gl.bindVertexArray(null); gl.disable(gl.BLEND); gl.depthMask(true); gl.useProgram(this.obj); }
     if (o.smoke && o.smoke.n) { const S = o.smoke; if (!this.smokeVao) { this.smokeVao = gl.createVertexArray()!; gl.bindVertexArray(this.smokeVao); const corners = gl.createBuffer()!; gl.bindBuffer(gl.ARRAY_BUFFER, corners); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, 1, 1, -1, -1, 1, 1, -1, 1]), gl.STATIC_DRAW);
         gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0); this.smokeBuf = gl.createBuffer()!; gl.bindBuffer(gl.ARRAY_BUFFER, this.smokeBuf);
         gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1, 4, gl.FLOAT, false, 32, 0); gl.vertexAttribDivisor(1, 1); gl.enableVertexAttribArray(2); gl.vertexAttribPointer(2, 4, gl.FLOAT, false, 32, 16); gl.vertexAttribDivisor(2, 1); gl.bindVertexArray(null); }

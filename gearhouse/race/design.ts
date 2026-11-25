@@ -24,8 +24,8 @@
 //           where the power meets the drag and the rolling resistance, comes at the power peak in top gear.
 //   class, cost, reliability: designFigures (the class from the figures, doc 99 6-2; cost and reliability placeholders
 //           until B5).
-import type { Design, BaseId, Structure, Panels, Interior } from '../core/design';
-import { DESIGN_NSX, DESIGN_F355, DESIGN_EB110 } from '../core/design';
+import type { Design, BodyBase, Structure, Panels, Interior } from '../core/design';
+import { DESIGN_NSX, DESIGN_F355, DESIGN_EB110, DESIGN_P959 } from '../core/design';
 import { type RaceSpec, torqueAt, EPS_SPEED_SENSITIVE } from './cars';
 import { HP, engineMass, enginePackage, tyreR, engineFigures, engineCost, engineReliability } from './designparts';
 import { fit, fitPenalty, type FitResult } from './fit';
@@ -41,11 +41,23 @@ const G = 9.81, RHO = 1.2, DRIVER = 75;
  *  these at the factors below); floor: the engine bay's floor (m, the sheets). The EB110's from its real car (race/cars.ts
  *  NEW.eb110: 1,620 kg, 0.4 front, its drag area without the wing; data/cars/spec/eb110.json: 4,400 x 1,940 x 1,114, the
  *  overhangs 1,040 and 810), its body in white and panels sized as the F355's to its larger plan [~] */
-interface Base { ref: Design; kerb: number; front: number; wheelbase: number; track: number; width: number; height: number; overhangs: number; cgH: number; cdA: number; structure: number; panels: number; floor: number }
-const BASES: Record<BaseId, Base> = {
+interface Base { ref: Design; kerb: number; front: number; wheelbase: number; track: number; width: number; height: number; overhangs: number; cgH: number; cdA: number; structure: number; panels: number; floor: number;
+  /** where the engine's middle, the gearbox and the driver's hips sit (m: the engine and the gearbox from the rear axle, +
+   *  behind it; the driver behind the front axle). Unset: a mid-engined car's (the engine 0.75 ahead of the rear axle,
+   *  the transaxle at it, the driver 1.15 behind the front one) */ engineX?: number; boxX?: number; driverX?: number;
+  /** the four-wheel drive's own split and coupling (unset: a viscous centre coupling sending 30 % to the front) */ awd?: { front: number; visc: number } }
+/** the 959 (data/cars/spec/p959.json; race/cars.ts has no spec of it): 1,450 kg, 41 % on the front (a rear engine on
+ *  a 2,272 mm wheelbase), Cd 0.31 on about 1.9 m², its body in white the 911's steel one (a little lighter than the
+ *  kit's mid-engined bases at their size), aramid and aluminium panels; the flat six's middle 0.25 m behind the rear axle,
+ *  the six-speed gearbox ahead of it, the driver 1.5 m behind the front axle (its cabin's hip point at x 2,470); the PSK's
+ *  multi-plate centre clutch as a stiff coupling over a 30 % front share (Porsche: 20 to 50 % by the conditions) [~] */
+const P959_BASE: Base = { ref: DESIGN_P959, kerb: 1450, front: 0.41, wheelbase: 2.272, track: 1.527, width: 1.84, height: 1.28, overhangs: 1.988, cgH: 0.47, cdA: 0.59, structure: 330, panels: 112, floor: 0.2,
+  engineX: 0.25, boxX: -0.3, driverX: 1.53, awd: { front: 0.3, visc: 140 } };
+const BASES: Record<BodyBase, Base> = {
   nsx: { ref: DESIGN_NSX, kerb: 1365, front: 0.42, wheelbase: 2.53, track: 1.52, width: 1.81, height: 1.17, overhangs: 1.9, cgH: 0.44, cdA: 0.63, structure: 360, panels: 120, floor: 0.18 },
   f355: { ref: DESIGN_F355, kerb: 1450, front: 0.42, wheelbase: 2.45, track: 1.565, width: 1.9, height: 1.17, overhangs: 1.8, cgH: 0.44, cdA: 0.66, structure: 355, panels: 118, floor: 0.15 },
-  eb110: { ref: DESIGN_EB110, kerb: 1620, front: 0.4, wheelbase: 2.55, track: 1.584, width: 1.94, height: 1.114, overhangs: 1.85, cgH: 0.44, cdA: 0.58, structure: 380, panels: 126, floor: 0.15 } };
+  eb110: { ref: DESIGN_EB110, kerb: 1620, front: 0.4, wheelbase: 2.55, track: 1.584, width: 1.94, height: 1.114, overhangs: 1.85, cgH: 0.44, cdA: 0.58, structure: 380, panels: 126, floor: 0.15 },
+  p959: P959_BASE };
 /** the structures' and the panels' masses against steel's, for the same stiffness (doc 99 6-1) */
 export const STRUCTURE_K: Record<Structure, number> = { steel: 1, hss: 0.9, aluminium: 0.6, honeycomb: 0.5, cfrp: 0.45 };
 export const PANEL_K: Record<Panels, number> = { steel: 1, aluminium: 0.55, frp: 0.6, cfrp: 0.4 };
@@ -76,8 +88,8 @@ function parts(d: Design, L: number): { m: number; x: number; z: number }[] {
   const wheel = (w: number) => w * K.rim * 0.0055, rF = tyreR(K.tyres[0], K.rim), rR = tyreR(K.tyres[1], K.rim);
   const steer = K.steering === 'hydraulic' ? 9 : K.steering === 'electric' ? 7 : 0;
   // the cabin moved forward takes the driver with it; the body's masses ride with it (the wheels do not)
-  const out = [{ m: DRIVER, x: 1.15 - d.body.cabin / 1000, z: 0.42 + up }, { m: engineMass(d), x: L - 0.75, z: engineZ(d) }, { m: box, x: L - 0.05, z: 0.33 + up }, { m: 2 * wheel(K.tyres[0]), x: 0, z: rF }, { m: 2 * wheel(K.tyres[1]), x: L, z: rR },
-    { m: K.abs ? 9 : 0, x: 0.4, z: 0.5 + up }, { m: K.tcs ? 3 : 0, x: L - 0.75, z: 0.5 + up }, { m: steer, x: 0.1, z: 0.45 + up }, { m: K.dampers === 'adaptive' ? 5 : 0, x: L / 2, z: 0.45 + up },
+  const out = [{ m: DRIVER, x: (B.driverX ?? 1.15) - d.body.cabin / 1000, z: 0.42 + up }, { m: engineMass(d), x: L + (B.engineX ?? -0.75), z: engineZ(d) }, { m: box, x: L + (B.boxX ?? -0.05), z: 0.33 + up }, { m: 2 * wheel(K.tyres[0]), x: 0, z: rF }, { m: 2 * wheel(K.tyres[1]), x: L, z: rR },
+    { m: K.abs ? 9 : 0, x: 0.4, z: 0.5 + up }, { m: K.tcs ? 3 : 0, x: L + (B.engineX ?? -0.75), z: 0.5 + up }, { m: steer, x: 0.1, z: 0.45 + up }, { m: K.dampers === 'adaptive' ? 5 : 0, x: L / 2, z: 0.45 + up },
     { m: K.wing ? 14 : 0, x: L + 0.6 + d.body.overhangR / 1000, z: 1.05 + up }, { m: K.diffuser ? 9 : 0, x: L * 0.6, z: 0.15 + up }];
   if (D.awd) out.push({ m: 35, x: 0.05, z: 0.3 + up }, { m: 45, x: L * 0.6, z: 0.3 + up });   // the front differential at the front axle; the rest along the tunnel
   // the structure and the panels, sized by their length, width and height against the base's, centred between the axles
@@ -96,14 +108,14 @@ const wheelbase = (d: Design) => BASES[d.body.base].wheelbase + d.body.wheelbase
 /** each base's rest of the car (kg, the trim, the glass, the suspension, the fluids: it grows a little with the body's
  *  size, and its secondary structure follows the structure's material) and its place as a share of the wheelbase and
  *  its height: what its real car's kerb weight, front share and centre of gravity leave */
-const REST: Record<BaseId, { m: number; x: number; z: number }> = Object.fromEntries((Object.keys(BASES) as BaseId[]).map(b => {
+const REST: Record<BodyBase, { m: number; x: number; z: number }> = Object.fromEntries((Object.keys(BASES) as BodyBase[]).map(b => {
   const B = BASES[b], L = B.wheelbase, p = parts(B.ref, L), M = B.kerb + DRIVER, m = M - p.reduce((s, q) => s + q.m, 0);
-  const x = ((1 - B.front) * M * L - p.reduce((s, q) => s + q.m * q.x, 0)) / m / L, z = (B.cgH * M - p.reduce((s, q) => s + q.m * q.z, 0)) / m; return [b, { m, x, z }]; })) as Record<BaseId, { m: number; x: number; z: number }>;
+  const x = ((1 - B.front) * M * L - p.reduce((s, q) => s + q.m * q.x, 0)) / m / L, z = (B.cgH * M - p.reduce((s, q) => s + q.m * q.z, 0)) / m; return [b, { m, x, z }]; })) as Record<BodyBase, { m: number; x: number; z: number }>;
 function massing(d: Design) {
   const B = BASES[d.body.base], L = wheelbase(d), p = parts(d, L), area = sizeOf(d, L), rest = REST[d.body.base];
   const restM = rest.m * area ** 0.3 * (1 - SECONDARY + SECONDARY * STRUCTURE_K[d.body.structure] / STRUCTURE_K[B.ref.body.structure]) * INTERIOR_K[d.kit.interior] / INTERIOR_K[B.ref.kit.interior];
   // the fit's work: at the engine (its bay, its mounts, its gearbox) or at an axle (the arches)
-  const mods = fitPenalty(d).mass.map(q => ({ m: q.m, x: q.at === 'front' ? 0 : q.at === 'rear' ? L : L - 0.75, z: q.at === 'engine' ? engineZ(d) : 0.5 + lift(d) }));
+  const mods = fitPenalty(d).mass.map(q => ({ m: q.m, x: q.at === 'front' ? 0 : q.at === 'rear' ? L : L + (B.engineX ?? -0.75), z: q.at === 'engine' ? engineZ(d) : 0.5 + lift(d) }));
   const all = [...p, ...mods, { m: restM, x: rest.x * L - d.body.cabin / 2000, z: rest.z + lift(d) + d.body.roof / 4000 }];
   const mass = all.reduce((s, q) => s + q.m, 0), front = 1 - all.reduce((s, q) => s + q.m * q.x, 0) / mass / L, cgH = all.reduce((s, q) => s + q.m * q.z, 0) / mass;
   return { mass, front, cgH, L, area };
@@ -162,7 +174,7 @@ export function designSpec(d: Design): RaceSpec {
   const launch = Math.round((E.turbo ? Math.max(en.torqueRpm * 0.93, en.turbo!.full * 1.2) : en.torqueRpm * 0.93) / 100) * 100;
   const tech: NonNullable<RaceSpec['tech']> = { rollF: 0.47, tyreWF: K.tyres[0] / 1000, tyreWR: rearW / 1000, gearbox: D.gearbox };
   if (D.lsd) tech.rearLsd = 1.9;                                   // a torque-sensing differential (the NSX's 2.0, the F355's 1.8)
-  if (D.awd) tech.drive = { front: 0.3, visc: 60 };              // a viscous centre coupling, 30 % to the front (the EB110's 27)
+  if (D.awd) tech.drive = { ...(B.awd ?? { front: 0.3, visc: 60 }) };   // a viscous centre coupling, 30 % to the front (the EB110's 27); the 959's PSK clutch stiffer
   if (K.abs) tech.abs = true;
   if (K.tcs) tech.tcs = { slip: 0.1, tau: 0.15, cut: 0.7 };      // the NSX's throttle-actuator system
   if (K.steering === 'hydraulic') tech.power = true; else if (K.steering === 'electric') tech.eps = EPS_SPEED_SENSITIVE;

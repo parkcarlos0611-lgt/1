@@ -112,7 +112,8 @@ export function engineFigures(d: Design): EngineFigures {
   // VTEC as the NSX's: the low cam's peak (284 Nm at 5,300), the switch-over at 0.817 of the power peak's revs, the high
   // cam peaking at 0.915 of them
   const vtec = E.vtec ? { rpm: Math.round(hpRpm * 0.817 / 10) * 10, hyst: 200, low: { torque: torquePeak, rpm: Math.round(hpRpm * (E.turbo ? 0.6 : 0.746) / 10) * 10 }, high: { rpm: Math.round(hpRpm * 0.915 / 10) * 10 } } : undefined;
-  const turbo = E.turbo ? { n: E.turbo, boost: E.boost, full: Math.round(hpRpm * 0.5 / 10) * 10, spool: E.turbo === 1 ? 0.6 : 0.45 } : undefined;
+  // sequential turbos (the 959's): the first blows alone low down, so the boost is full sooner and answers quicker
+  const seq = !!E.sequential && E.turbo >= 2, turbo = E.turbo ? { n: E.turbo, boost: E.boost, full: Math.round(hpRpm * (seq ? 0.4 : 0.5) / 10) * 10, spool: E.turbo === 1 ? 0.6 : seq ? 0.32 : 0.45 } : undefined;
   return { hp, hpRpm, torqueRpm: vtec ? vtec.low.rpm : torqueRpm, torquePeak, overKnock: b.overKnock, vtec, turbo }; }
 
 // ---- the engine's package (m) and mass (kg) ----

@@ -156,5 +156,13 @@ const EB110: SuspSpec = {
   rear: { type: 'doubleWishbone', lower: { len: 330, span: [-200, 200], rise: 16 }, upper: { len: 232, span: [-270, 270], fall: 24, inset: 20, trail: 0 },
     damper: { dx: [-84, 84], at: 0.46, top: [150, 275], spring: [33, 5.5], body: 20 }, bar: { dx: 255, z: 165, r: 9, at: 0.62, link: -44 }, steer: { dx: 128, up: 50, rack: false, trim: 1.5 }, brake: { r: 166, t: 28, caliper: 124, at: 0 } },
   look: { arms: '#2a2c30', armGloss: 0.35, armKind: 'tube', upright: '#a2a5a9', spring: '#1f4fa3', damper: '#2a2c30', caliper: '#3a3d42', disc: DISC } };
-/** each kit base's suspension, by the kit's id */
-export const SUSPENSION: Record<string, SuspSpec> = { nsx: NSX, f355: F355, eb110: EB110 };
+/** the 959 (1987): double wishbones all round with two coil-overs a wheel, one ahead of the axle and one behind (the
+ *  rally car's; the road car's ride-height hydraulics are left out), bars both ends; 322 / 304 mm discs, red calipers */
+const P959: SuspSpec = {
+  front: { type: 'doubleWishbone', lower: { len: 330, span: [-160, 180], rise: 14 }, upper: { len: 238, span: [-170, 190], fall: 22, inset: 22, trail: 20 },
+    damper: { dx: [-70, 70], at: 0.5, top: [135, 225], spring: [33, 5.5], body: 20 }, bar: { dx: -240, z: 255, r: 10, at: 0.62, link: 70 }, steer: { dx: -112, up: 52, rack: true, trim: 1.5 }, brake: { r: 161, t: 32, caliper: 120, at: 180 } },
+  rear: { type: 'doubleWishbone', lower: { len: 320, span: [-190, 200], rise: 16 }, upper: { len: 228, span: [-230, 250], fall: 24, inset: 20, trail: 0 },
+    damper: { dx: [-80, 80], at: 0.46, top: [150, 270], spring: [33, 5.5], body: 20 }, bar: { dx: 250, z: 170, r: 9, at: 0.62, link: -44 }, steer: { dx: 124, up: 50, rack: false, trim: 1.5 }, brake: { r: 152, t: 28, caliper: 112, at: 0 } },
+  look: { arms: '#2a2c30', armGloss: 0.35, armKind: 'tube', upright: '#a2a5a9', spring: '#c9a227', damper: '#2a2c30', caliper: '#b3161b', disc: DISC } };
+/** each base's suspension, by the kit's id or the model-built body's (render/car/bodies.ts) */
+export const SUSPENSION: Record<string, SuspSpec> = { nsx: NSX, f355: F355, eb110: EB110, p959: P959 };

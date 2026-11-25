@@ -30,6 +30,17 @@
 
 /** the kit's platforms (each a car built from the kit: its lines and its panels' measurements) */
 export type BaseId = 'nsx' | 'f355' | 'eb110';
+/** the bodies built whole from a hand-made model instead of the kit (docs/systems/109 S5: the 959's control cage,
+ *  render/car/p959; the 993 next): their shape is the model's own, so they take no face, tail or wheel kinds and no
+ *  stretched dimensions; what they swap is their model's own parts (Design['body']['model']). The render side's
+ *  registry of them is render/car/bodies.ts */
+export type ModelBaseId = 'p959';
+/** what a design's body stands on: a kit base or a model-built body */
+export type BodyBase = BaseId | ModelBaseId;
+/** a model-built body's swaps (the 959's: render/car/p959 P959Opts): the bumpers, the head lamps, the wheels, the
+ *  number plate's text. Each body reads the ones it has; a kit body has none */
+export interface ModelSwaps { bumperF: 'std' | 'aero' | 'clean'; bumperR: 'std' | 'aero' | 'clean'; lamp: 'round' | 'ellipsoid' | 'square'; wheel: 'hollow5' | 'dish' | 'hole5';
+  /** the plate's text, as "12가 3456" (render/car/p959 plateText) */ plate: string }
 /** 'mass': the bumper a volume of its own standing ahead of the bonnet's front edge (the EB110's) */
 export type NoseKind = 'round' | 'pointed' | 'mass';
 /** format 3's front (to alpha 0.11): the bumper's lamps flush ('plain') or sunk ('sunk'), the grille the base's own */
@@ -106,11 +117,15 @@ export type SuspField = keyof SuspAxle | 'caster';
 export interface Design {
   /** the format's version */ v: 5;
   id: string; name: string;
-  body: { base: BaseId; nose: NoseKind; tail: TailKind; wheel: WheelKind; paint: string; gloss: number; structure: Structure; panels: Panels } & Face & BodyDims;
+  body: { base: BodyBase; nose: NoseKind; tail: TailKind; wheel: WheelKind; paint: string; gloss: number; structure: Structure; panels: Panels;
+    /** a model-built body's own swaps (MODEL_BASES; a kit body: none). The face, tail and wheel kinds above stay in the
+     *  file (they are what the body goes back to on a kit base) but a model body does not read them */ model?: ModelSwaps } & Face & BodyDims;
   engine: { grade: Grade; layout: Layout; /** cc */ cc: number; /** valves a cylinder */ valves: Valves;
     /** the red line (rpm) */ redline: number; intake: Intake; compression: Compression; sump: Sump; block: Block;
     turbo: Turbos; /** the boost at full (bar), when there are turbos */ boost: number; intercooler: boolean;
     /** two cam profiles */ vtec: boolean;
+    /** the turbos sequential (the 959's: one blows alone at low revs, the second joins over about 4,300 rpm), so the
+     *  boost comes earlier; only with two or more turbos (an older file: none) */ sequential?: boolean;
     /** the bore against the stroke (1: square; over 1 oversquare, revs freely; under 1 long-stroke, more torque low down) */ bs: number;
     /** each part's quality over the grade, -3..+3 (0 for all: the grade's own engine) */ quality: EngineQuality };
   drive: { gears: 5 | 6; gearbox: 'manual' | 'f1'; /** the final drive's ratio; 0: chosen for the top speed */ final: number; lsd: boolean; awd: boolean };
@@ -141,7 +156,20 @@ export type DesignPatch = { [K in 'body' | 'engine' | 'drive' | 'kit']?: Partial
 export const applyPatch = (d: Design, p: DesignPatch): Design =>
   normalise({ ...d, body: { ...d.body, ...p.body }, engine: { ...d.engine, ...p.engine }, drive: { ...d.drive, ...p.drive }, kit: { ...d.kit, ...p.kit }, susp: { front: { ...d.susp.front, ...p.susp?.front }, rear: { ...d.susp.rear, ...p.susp?.rear } } });
 
+/** the kit's bases (the tables keyed by BaseId are the kit's) */
 export const BASES: BaseId[] = ['nsx', 'f355', 'eb110'];
+export const MODEL_BASES: ModelBaseId[] = ['p959'];
+/** every body a design can stand on: the kit's bases, then the model-built bodies */
+export const BODY_BASES: BodyBase[] = [...BASES, ...MODEL_BASES];
+/** a model-built body (render/car/bodies.ts), not one of the kit's */
+export const isModelBase = (b: BodyBase): b is ModelBaseId => (MODEL_BASES as string[]).includes(b);
+/** the kit base a design stands on, or null for a model-built body */
+export const kitBase = (b: BodyBase): BaseId | null => isModelBase(b) ? null : b;
+export const BUMPERS959: ModelSwaps['bumperF'][] = ['std', 'aero', 'clean'];
+export const LAMPS959: ModelSwaps['lamp'][] = ['round', 'ellipsoid', 'square'];
+export const WHEELS959: ModelSwaps['wheel'][] = ['hollow5', 'dish', 'hole5'];
+/** each model body's own swaps (its real car's); the plate a made-up number (a new design draws its own: designstore fromPreset) */
+export const MODEL_OWN: Record<ModelBaseId, ModelSwaps> = { p959: { bumperF: 'std', bumperR: 'std', lamp: 'round', wheel: 'hollow5', plate: '08루 0959' } };
 export const NOSES: NoseKind[] = ['round', 'pointed', 'mass'];
 export const FRONTS: FrontKind[] = ['plain', 'sunk'];
 export const BUMPERS: BumperKind[] = ['upright', 'crease', 'wedge', 'airdam'];
@@ -152,30 +180,31 @@ export const AUXES: AuxKind[] = ['strip', 'round', 'none'];
 export const FACE_KEYS: FaceKey[] = ['bumper', 'grille', 'head', 'pod', 'aux'];
 export const FACE_KINDS: { [K in FaceKey]: Face[K][] } = { bumper: BUMPERS, grille: GRILLES, head: HEADS, pod: PODS, aux: AUXES };
 /** each base's own face (its own car's): the slots a format-3 design had no say in take these */
-export const FACE_OWN: Record<BaseId, Face> = {
+export const FACE_OWN: Record<BodyBase, Face> = {
   nsx: { bumper: 'upright', grille: 'slot', head: 'popup', pod: 'twin', aux: 'strip' },
   f355: { bumper: 'crease', grille: 'oval', head: 'popup', pod: 'twin', aux: 'round' },
-  eb110: { bumper: 'wedge', grille: 'horseshoe', head: 'pocket', pod: 'twin', aux: 'none' } };
+  eb110: { bumper: 'wedge', grille: 'horseshoe', head: 'pocket', pod: 'twin', aux: 'none' },
+  /** a model body's face is its model's: these are only what the slots hold in its file */ p959: { bumper: 'wedge', grille: 'none', head: 'fixed', pod: 'round', aux: 'strip' } };
 /** what format 3's front stood for on each base: the auxiliary lamps flush or sunk (the EB110's plain front has none: its
  *  turn lamps are at the troughs' mouths on the bonnet) */
-export const FRONT_AS: Record<BaseId, Record<FrontKind, AuxKind>> = { nsx: { plain: 'strip', sunk: 'round' }, f355: { plain: 'strip', sunk: 'round' }, eb110: { plain: 'none', sunk: 'round' } };
+export const FRONT_AS: Record<BodyBase, Record<FrontKind, AuxKind>> = { nsx: { plain: 'strip', sunk: 'round' }, f355: { plain: 'strip', sunk: 'round' }, eb110: { plain: 'none', sunk: 'round' }, p959: { plain: 'strip', sunk: 'strip' } };
 /** a format-3 body's face: its base's own, the auxiliary lamps its front's */
-export const faceOf3 = (base: BaseId, front: FrontKind): Face => ({ ...FACE_OWN[base], aux: FRONT_AS[base][front] ?? FACE_OWN[base].aux });
+export const faceOf3 = (base: BodyBase, front: FrontKind): Face => ({ ...FACE_OWN[base], aux: FRONT_AS[base][front] ?? FACE_OWN[base].aux });
 
 // ---- the face's rules: what cannot go together (the builder greys the value out with the reason) ----
 /** the bases on which a wide mesh grille runs out to the bumper's corners, where the fog lamps' recesses would be (the
  *  EB110's bumper is wide enough past its mouth for both) */
-export const MESH_TAKES_CORNERS: Record<BaseId, boolean> = { nsx: true, f355: true, eb110: false };
+export const MESH_TAKES_CORNERS: Record<BodyBase, boolean> = { nsx: true, f355: true, eb110: false, p959: false };
 /** why a face slot's value cannot be chosen on this body as it stands (Korean), null when it can. The rules:
  *  round fog lamps and a mesh grille both want the bumper's corners (MESH_TAKES_CORNERS).
  *  What only needs re-fitting is not a rule: a grille and the lamps take their rows from the bumper chosen (render/car/face.ts) */
-export function faceLock<K extends FaceKey>(b: Face & { base: BaseId }, k: K, v: Face[K]): string | null {
+export function faceLock<K extends FaceKey>(b: Face & { base: BodyBase }, k: K, v: Face[K]): string | null {
   const corners = MESH_TAKES_CORNERS[b.base];
   if (k === 'grille' && v === 'mesh' && corners && b.aux === 'round') return '둥근 안개등이 범퍼 모서리를 차지합니다 (보조등을 띠나 없음으로 바꾸면 고를 수 있습니다)';
   if (k === 'aux' && v === 'round' && corners && b.grille === 'mesh') return '메시 그릴이 범퍼 모서리까지 차지해 안개등을 넣을 자리가 없습니다';
   return null; }
 /** a body's face with what the rules do not allow put right: a strip for fog lamps the mesh leaves no room for */
-export const fitFace = <B extends Face & { base: BaseId }>(b: B): B => faceLock(b, 'aux', b.aux) ? { ...b, aux: 'strip' } : b;
+export const fitFace = <B extends Face & { base: BodyBase }>(b: B): B => faceLock(b, 'aux', b.aux) ? { ...b, aux: 'strip' } : b;
 export const TAILS: TailKind[] = ['frame', 'roundLamps', 'ducktail', 'capsule'];
 export const WHEELS: WheelKind[] = ['fiveSpoke', 'disc', 'star'];
 export const GRADES: Grade[] = [1, 2, 3, 4, 5];
@@ -206,11 +235,12 @@ export const NO_DIMS: BodyDims = { wheelbase: 0, width: 0, track: 0, roof: 0, ov
  *  width are every base's (LIMITS). The cabin: as far as the bonnet ahead of it and the deck behind it can give (the
  *  NSX's screen already stands ahead of the front wheels' backs, the EB110's fastback leaves little deck); the rake: as
  *  far as the roof between the screen's top and the B pillar can shorten; the ride: the EB110 sits lowest (100 mm) */
-const BODY_RANGES: Record<BaseId, Record<NewDims, readonly [number, number]>> = {
+const BODY_RANGES: Record<BodyBase, Record<NewDims, readonly [number, number]>> = {
   nsx: { track: [-60, 80], roof: [-80, 60], overhangF: [-100, 200], overhangR: [-120, 200], ride: [-30, 50], cabin: [-80, 120], rake: [-5, 8] },
   f355: { track: [-60, 80], roof: [-80, 60], overhangF: [-120, 200], overhangR: [-100, 200], ride: [-30, 50], cabin: [-80, 150], rake: [-5, 8] },
-  eb110: { track: [-50, 60], roof: [-60, 60], overhangF: [-120, 160], overhangR: [-80, 200], ride: [-25, 60], cabin: [-100, 120], rake: [-4, 5] } };
-export const BODY_LIMITS = (b: BaseId): Record<DimKey, readonly [number, number]> => ({ wheelbase: LIMITS.wheelbase, width: LIMITS.width, ...BODY_RANGES[b] });
+  eb110: { track: [-50, 60], roof: [-60, 60], overhangF: [-120, 160], overhangR: [-80, 200], ride: [-25, 60], cabin: [-100, 120], rake: [-4, 5] },
+  /** a model body is its model's shape: nothing stretches (its dimensions stay at zero) */ p959: { track: [0, 0], roof: [0, 0], overhangF: [0, 0], overhangR: [0, 0], ride: [0, 0], cabin: [0, 0], rake: [0, 0] } };
+export const BODY_LIMITS = (b: BodyBase): Record<DimKey, readonly [number, number]> => isModelBase(b) ? { wheelbase: [0, 0], width: [0, 0], ...BODY_RANGES[b] } : { wheelbase: LIMITS.wheelbase, width: LIMITS.width, ...BODY_RANGES[b] };
 
 // ---- the suspension (format 5) ----
 export const SUSP_KINDS: SuspKind[] = ['doubleWishbone', 'macpherson', 'multilink', 'beamLeaf'];
@@ -223,10 +253,13 @@ export const SUSP_LIMITS = { arm: [0.5, 1.0], hz: [1.0, 2.6], bump: [0.1, 0.6], 
  *  render/car/suspension/hardpoints.ts; the springs at the frequencies the physics had before format 5, 1.35 and 1.5 Hz,
  *  the dampers at the 0.28 of critical it had both ways split into a softer bump and a firmer rebound) */
 const OWN_AXLE = (arm: number, hz: number, camber: number, toe: number): SuspAxle => ({ type: 'doubleWishbone', arm, rc: 'mid', hz, bump: 0.24, rebound: 0.32, bar: 1, camber, toe });
-export const SUSP_OWN: Record<BaseId, SuspDesign> = {
+export const SUSP_OWN: Record<BodyBase, SuspDesign> = {
   nsx: { front: { ...OWN_AXLE(0.7, 1.35, -0.5, 0), caster: 3.4 }, rear: OWN_AXLE(0.72, 1.5, -1, 0.1) },
   f355: { front: { ...OWN_AXLE(0.7, 1.35, -0.5, 0), caster: 3.0 }, rear: OWN_AXLE(0.71, 1.5, -1, 0.1) },
-  eb110: { front: { ...OWN_AXLE(0.7, 1.35, -0.5, 0), caster: 2.9 }, rear: OWN_AXLE(0.7, 1.5, -1, 0.1) } };
+  eb110: { front: { ...OWN_AXLE(0.7, 1.35, -0.5, 0), caster: 2.9 }, rear: OWN_AXLE(0.7, 1.5, -1, 0.1) },
+  /** the 959: double wishbones all round with two coil-overs a wheel (the ride height's hydraulics left out), a soft
+   *  front for the rally car it came from, a little more rear camber under the engine */
+  p959: { front: { ...OWN_AXLE(0.72, 1.3, -0.6, 0), caster: 4.5 }, rear: OWN_AXLE(0.72, 1.45, -1.2, 0.1) } };
 /** why an axle's kind cannot be chosen (Korean), null when it can: the beam axle is the 1930s bases' (the restoration
  *  work's), a multilink is a rear's */
 export function suspLock(front: boolean, k: SuspKind): string | null {
@@ -271,6 +304,19 @@ export const DESIGN_F355: Design = { v: 5, id: 'f355', name: 'F355', body: { bas
   drive: { gears: 6, gearbox: 'manual', final: 4.1, lsd: true, awd: false },
   kit: { abs: true, tcs: false, steering: 'hydraulic', dampers: 'adaptive', wing: false, diffuser: true, tyres: [225, 265], rim: 18, interior: 'standard' }, susp: structuredClone(SUSP_OWN.f355) };
 
+/** the 1987 Porsche 959 (docs/systems/109; data/cars/spec/p959.json), on its own model-built body: the 2,849 cc flat
+ *  six from the 956/962's (water-cooled four-valve heads on an air-cooled block, 8.3:1, a dry sump), two KKK turbos
+ *  run in sequence with intercoolers at about 1.0 bar, 450 PS (444 hp) at 6,500 and 500 Nm at 5,000, the red line at
+ *  7,600; six speeds (the first a crawler, G as Porsche called it: here the builder's six-speed box), four-wheel drive
+ *  with the PSK's clutch varying the split (race/design.ts takes the base's own split); a steel monocoque under
+ *  aramid and aluminium panels (here FRP's figure for the aramid); ABS; 235/45 ZR17 and 255/40 ZR17; 1,450 kg;
+ *  317 km/h. The engine's quality figures land it on its power (tests/p959_game.test.ts) */
+export const DESIGN_P959: Design = { v: 5, id: 'p959', name: '959', body: { base: 'p959', nose: 'round', ...faceOf3('p959', 'plain'), tail: 'frame', wheel: 'fiveSpoke', ...NO_DIMS, paint: '#b8bcc2', gloss: 0.6, structure: 'steel', panels: 'frp',
+    model: { ...MODEL_OWN.p959 } },
+  engine: { grade: 4, layout: 'F6', cc: 2849, valves: 4, redline: 7600, intake: 'single', compression: 'low', sump: 'dry', block: 'aluminium', turbo: 2, boost: 1.0, intercooler: true, vtec: false, sequential: true, bs: 1.4, quality: { ...NO_QUALITY } },
+  drive: { gears: 6, gearbox: 'manual', final: 0, lsd: true, awd: true },
+  kit: { abs: true, tcs: false, steering: 'hydraulic', dampers: 'adaptive', wing: false, diffuser: false, tyres: [235, 255], rim: 17, interior: 'standard' }, susp: structuredClone(SUSP_OWN.p959) };
+
 // ---- four more cars as designs: the figures' check (docs/systems/99, 1-8), not used to set them ----
 // Each is built on one of the bases (the base is only the body: its panels' shapes and sizes), stretched toward the real
 // car's wheelbase, width, height and overhangs (the EB110 on its own base); the machinery as the real car's. Real figures in race/cars.ts (NEW.diablo,
@@ -312,6 +358,14 @@ export const DESIGN_MCLAREN_F1: Design = { v: 5, id: 'mclarenf1', name: 'McLaren
   drive: { gears: 6, gearbox: 'manual', final: 0, lsd: false, awd: false },
   kit: { abs: false, tcs: false, steering: 'manual', dampers: 'fixed', wing: false, diffuser: true, tyres: [235, 315], rim: 17, interior: 'light' }, susp: structuredClone(SUSP_OWN.f355) };
 
+/** a model body's swaps with what it does not have put back to its own */
+export function fitModel(base: ModelBaseId, m: Partial<ModelSwaps> | undefined): ModelSwaps { const o = MODEL_OWN[base], one = <T>(v: unknown, of: readonly T[], d: T): T => of.includes(v as T) ? v as T : d;
+  return { bumperF: one(m?.bumperF, BUMPERS959, o.bumperF), bumperR: one(m?.bumperR, BUMPERS959, o.bumperR), lamp: one(m?.lamp, LAMPS959, o.lamp), wheel: one(m?.wheel, WHEELS959, o.wheel),
+    plate: plateOk(m?.plate) ? m!.plate!.replace(/\s+/g, '').replace(/^(\d{2}.)/, '$1 ') : o.plate }; }
+/** the syllables the plate's figures can be drawn for (render/car/p959/parts.ts PLATE_SYLLABLES: the same list) */
+export const PLATE_SYLLABLES = '가나다라마바사아자거너더러머버서어저고노도로모보소오조구누두루무부수우주배하허호';
+/** a plate's text as the old green plate takes it: two digits, a syllable the plate's font has, four digits */
+export const plateOk = (t: unknown): t is string => { if (typeof t !== 'string') return false; const m = t.replace(/\s+/g, '').match(/^\d{2}(.)\d{4}$/); return !!m && PLATE_SYLLABLES.includes(m[1]!); };
 const clamp = (v: number, [a, b]: readonly [number, number]) => Math.min(b, Math.max(a, v));
 /** a value the grade allows: the asked one, else the best allowed one below it in the list's order */
 const allowed = <T>(v: T, order: readonly T[], ok: readonly T[]): T => { for (let i = order.indexOf(v); i >= 0; i--) if (ok.includes(order[i]!)) return order[i]!; return ok[0]!; };
@@ -337,7 +391,7 @@ export function toV4(d0: DesignV4 | DesignV3 | DesignV2 | DesignV1): DesignV4 {
 }
 /** any format brought to format 5: an older one through toV4, then its base's own suspension (SUSP_OWN) */
 export function toV5(d0: Design | DesignV4 | DesignV3 | DesignV2 | DesignV1): Design {
-  if (d0.v === 5) return d0; const d4 = toV4(d0), base = BASES.includes(d4.body.base) ? d4.body.base : 'nsx';
+  if (d0.v === 5) return d0; const d4 = toV4(d0), base = BODY_BASES.includes(d4.body.base) ? d4.body.base : 'nsx';
   return { ...d4, v: 5, susp: structuredClone(SUSP_OWN[base]) }; }
 /** an axle's suspension inside its ranges (a kind it cannot have: the base's own) */
 function fitAxle<A extends SuspAxle>(a: A, own: A, front: boolean): A { const L = SUSP_LIMITS, n = (k: keyof typeof L, v: unknown, d: number, q = 100) => Math.round(clamp(typeof v === 'number' && Number.isFinite(v) ? v : d, L[k]) * q) / q;
@@ -349,16 +403,17 @@ function fitAxle<A extends SuspAxle>(a: A, own: A, front: boolean): A { const L 
  *  format is brought to format 4 first (toV4); a face the rules do not allow is put right (fitFace) */
 export function normalise(d0: Design | DesignV4 | DesignV3 | DesignV2 | DesignV1): Design {
   const d = toV5(d0), E = d.engine, g: Grade = GRADES.includes(E.grade) ? E.grade : 2, R = GRADE_RULES[g];
-  const lim = BODY_LIMITS(BASES.includes(d.body.base) ? d.body.base : 'nsx'), dims = Object.fromEntries(DIMS.map(k => [k, clamp(Number.isFinite(d.body[k]) ? d.body[k] : 0, lim[k])])) as unknown as BodyDims;
+  const lim = BODY_LIMITS(BODY_BASES.includes(d.body.base) ? d.body.base : 'nsx'), dims = Object.fromEntries(DIMS.map(k => [k, clamp(Number.isFinite(d.body[k]) ? d.body[k] : 0, lim[k])])) as unknown as BodyDims;
   const q = (k: QualityPart) => { const v = E.quality?.[k]; return Number.isFinite(v) ? Math.round(clamp(v!, LIMITS.quality)) : 0; };
-  return { ...d, body: fitFace({ ...d.body, ...dims, gloss: clamp(d.body.gloss, [0, 1]) }),
+  const base = BODY_BASES.includes(d.body.base) ? d.body.base : 'nsx', { model: m0, ...body0 } = d.body, model = isModelBase(base) ? fitModel(base, m0) : undefined;
+  return { ...d, body: fitFace({ ...body0, base, ...dims, gloss: clamp(d.body.gloss, [0, 1]), ...(model ? { model } : {}) }),
     engine: { ...E, grade: g, layout: LAYOUTS.includes(E.layout) ? E.layout : 'V6', cc: clamp(E.cc, LIMITS.cc), redline: clamp(E.redline, [LIMITS.redline[0], gradeRedline(g)]),
       intake: allowed(E.intake, INTAKES, R.intake), compression: allowed(E.compression, COMPRESSIONS, R.compression), sump: allowed(E.sump, SUMPS, R.sump),
       block: allowed(E.block, BLOCKS, R.block), valves: allowed(E.valves, [2, 3, 4, 5] as Valves[], R.valves), turbo: Math.min(E.turbo, R.turbo) as Turbos,
-      boost: Math.round(clamp(E.boost, [LIMITS.boost[0], gradeBoost(g)]) * 100) / 100, vtec: E.vtec && R.vtec,
+      boost: Math.round(clamp(E.boost, [LIMITS.boost[0], gradeBoost(g)]) * 100) / 100, vtec: E.vtec && R.vtec, ...(E.sequential ? { sequential: Math.min(E.turbo, R.turbo) >= 2 } : {}),
       bs: Math.round(clamp(Number.isFinite(E.bs) ? E.bs : BS_DEFAULT, LIMITS.bs) * 100) / 100,
       quality: Object.fromEntries(QUALITY_PARTS.map(k => [k, q(k)])) as EngineQuality },
     drive: { ...d.drive, final: d.drive.final ? clamp(d.drive.final, LIMITS.final) : 0 },
     kit: { ...d.kit, tyres: [clamp(d.kit.tyres[0], LIMITS.tyre), clamp(d.kit.tyres[1], LIMITS.tyre)] },
-    susp: (o => ({ front: fitAxle(d.susp?.front ?? o.front, o.front, true), rear: fitAxle(d.susp?.rear ?? o.rear, o.rear, false) }))(SUSP_OWN[BASES.includes(d.body.base) ? d.body.base : 'nsx']) };
+    susp: (o => ({ front: fitAxle(d.susp?.front ?? o.front, o.front, true), rear: fitAxle(d.susp?.rear ?? o.rear, o.rear, false) }))(SUSP_OWN[base]) };
 }

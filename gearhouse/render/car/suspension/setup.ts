@@ -3,7 +3,7 @@
 // corner's static camber and toe set by its shims and its toe link (kinematics.ts Hardpoints.adj). The car's mesh
 // (kit/parts/suspension.ts) and the physics (race/kin.ts) both take their corners from here, so the wheel the
 // picture leans is the one the physics leans.
-import type { BaseId, Design, SuspAxle, SuspDesign } from '../../../core/design';
+import type { BodyBase, Design, SuspAxle, SuspDesign } from '../../../core/design';
 import { SUSP_OWN } from '../../../core/design';
 import { axlePoints, SUSPENSION, type AxleSpec, type Hardpoints, type StrutSpec, type SuspSpec, type SuspWheel, type WishboneSpec } from './hardpoints';
 import { camberOf, solve, steerOf } from './kinematics';
@@ -29,7 +29,7 @@ export function axleFor(W: AxleSpec, a: SuspAxle & { caster?: number }, own: Sus
   return { ...W, lower: { ...W.lower, rise: W.lower.rise + rc }, upper, ...(caster !== undefined ? { caster } : {}), ...(multi ? { kind: 'multilink' as const } : {}) }; }
 
 /** the base's suspension with a design's settings */
-export function suspFor(base: BaseId, s: SuspDesign): SuspSpec { const S = SUSPENSION[base]!, own = SUSP_OWN[base];
+export function suspFor(base: BodyBase, s: SuspDesign): SuspSpec { const S = SUSPENSION[base]!, own = SUSP_OWN[base];
   return { ...S, front: axleFor(S.front, s.front, own.front, true), rear: axleFor(S.rear, s.rear, own.rear, false) }; }
 
 const DEG = Math.PI / 180;
@@ -57,5 +57,5 @@ export function rigCorners(S: SuspSpec, wheels: { f: SuspWheel; r: SuspWheel }, 
 
 /** what a design's suspension is made of: its base's axles with its settings, its wheels (the kit's lines with the
  *  design's track, tyres and rims), the body's ride over them and the settings */
-export interface DesignSusp { spec: SuspSpec; wheels: { f: SuspWheel; r: SuspWheel }; ride: number; setup: SuspDesign; base: BaseId }
+export interface DesignSusp { spec: SuspSpec; wheels: { f: SuspWheel; r: SuspWheel }; ride: number; setup: SuspDesign; base: BodyBase }
 export type { Design };

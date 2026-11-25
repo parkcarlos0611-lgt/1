@@ -4,8 +4,8 @@
 // the designs saved in this browser; and what the drive page measured of a design (its best laps, the top speed it
 // reached), kept per design and read by the builder. Pure: the storage is passed in (the browser's localStorage, or a
 // map in the tests), and a storage that throws (a private window, storage refused) keeps nothing and reads empty.
-import { BASES, NOSES, FRONTS, FACE_KEYS, FACE_KINDS, faceOf3, TAILS, WHEELS, GRADES, INTAKES, COMPRESSIONS, SUMPS, BLOCKS, STRUCTURES, PANELS, INTERIORS, DESIGN_NSX, DESIGN_F355, DESIGN_EB110, DIMS, LAYOUTS, QUALITY_PARTS, BS_DEFAULT, normalise,
-  SUSP_OWN, SUSP_KINDS, RC_PRESETS, type BaseId, type BodyDims, type Design, type DesignV1, type EngineQuality, type Face, type FrontKind, type SuspAxle } from './design';
+import { BODY_BASES, NOSES, FRONTS, FACE_KEYS, FACE_KINDS, faceOf3, TAILS, WHEELS, GRADES, INTAKES, COMPRESSIONS, SUMPS, BLOCKS, STRUCTURES, PANELS, INTERIORS, DESIGN_NSX, DESIGN_F355, DESIGN_EB110, DESIGN_P959, DIMS, PLATE_SYLLABLES, isModelBase, fitModel, LAYOUTS, QUALITY_PARTS, BS_DEFAULT, normalise,
+  SUSP_OWN, SUSP_KINDS, RC_PRESETS, type BodyBase, type BodyDims, type Design, type DesignV1, type EngineQuality, type Face, type FrontKind, type SuspAxle } from './design';
 
 /** what the helpers need of a storage (the browser's Storage has these) */
 export interface KeyStore { getItem(k: string): string | null; setItem(k: string, v: string): void; removeItem(k: string): void }
@@ -16,7 +16,7 @@ const read = (s: KeyStore | null, k: string): string | null => { try { return s 
 const write = (s: KeyStore | null, k: string, v: string | null): boolean => { try { if (!s) return false; if (v === null) s.removeItem(k); else s.setItem(k, v); return true; } catch { return false; } };
 
 // ---- a design checked: a loaded file, a pasted text or a link may be anything ----
-const PRESET: Record<BaseId, Design> = { nsx: DESIGN_NSX, f355: DESIGN_F355, eb110: DESIGN_EB110 };
+const PRESET: Record<BodyBase, Design> = { nsx: DESIGN_NSX, f355: DESIGN_F355, eb110: DESIGN_EB110, p959: DESIGN_P959 };
 const num = (v: unknown, d: number) => typeof v === 'number' && Number.isFinite(v) ? v : d;
 const one = <T>(v: unknown, of: readonly T[], d: T): T => of.includes(v as T) ? v as T : d;
 const bool = (v: unknown, d: boolean) => typeof v === 'boolean' ? v : d;
@@ -26,14 +26,14 @@ const obj = (v: unknown): Record<string, unknown> => v && typeof v === 'object' 
  *  all (no body or base). A format-2 design (no dimensions past the wheelbase and the width) takes its base's own. A format-1 design (one body material, a turbo count without a boost, no grade: saved before
  *  review 177, or in an old link) is read as format 1 and brought to format 2 (core/design.ts migrate) */
 export function asDesign(v: unknown): Design | null {
-  const o = obj(v), b = obj(o.body); if (!o.body || !BASES.includes(b.base as BaseId)) return null;
-  const P = PRESET[b.base as BaseId], e = obj(o.engine), r = obj(o.drive), k = obj(o.kit), ty = Array.isArray(k.tyres) ? k.tyres : [];
+  const o = obj(v), b = obj(o.body); if (!o.body || !BODY_BASES.includes(b.base as BodyBase)) return null;
+  const P = PRESET[b.base as BodyBase], e = obj(o.engine), r = obj(o.drive), k = obj(o.kit), ty = Array.isArray(k.tyres) ? k.tyres : [];
   const paint = typeof b.paint === 'string' && /^#[0-9a-f]{6}$/i.test(b.paint) ? b.paint.toLowerCase() : P.body.paint;
   const old = o.v === 1 || (o.v === undefined && 'material' in b);
   const head = { id: typeof o.id === 'string' && /^[\w-]{1,40}$/.test(o.id) ? o.id : newId(), name: typeof o.name === 'string' && o.name.trim() ? o.name.trim().slice(0, 40) : P.name };
   const dims = Object.fromEntries(DIMS.map(k => [k, Math.round(num(b[k], 0) * 10) / 10])) as unknown as BodyDims;
   const body = { base: P.body.base, nose: one(b.nose, NOSES, P.body.nose), tail: one(b.tail, TAILS, P.body.tail), wheel: one(b.wheel, WHEELS, P.body.wheel),
-    ...dims, paint, gloss: num(b.gloss, P.body.gloss) };
+    ...dims, paint, gloss: num(b.gloss, P.body.gloss), ...(isModelBase(P.body.base) ? { model: fitModel(P.body.base, obj(b.model)) } : {}) };
   // the face: its slots where the value has them; a format-3 value's (and older) from its front, the rest its base's own
   const front: FrontKind = one(b.front, FRONTS, P.body.aux === 'round' ? 'sunk' : 'plain'), f0: Face = FRONTS.includes(b.front as FrontKind) ? faceOf3(P.body.base, front) : P.body;
   const face = Object.fromEntries(FACE_KEYS.map(k => [k, one(b[k], FACE_KINDS[k] as readonly string[], f0[k])])) as unknown as Face;
@@ -55,14 +55,18 @@ export function asDesign(v: unknown): Design | null {
   const d: Design = { v: 5, ...head, body: { ...body, ...face, structure: one(b.structure, STRUCTURES, P.body.structure), panels: one(b.panels, PANELS, P.body.panels) },
     engine: { grade: one(e.grade, GRADES, P.engine.grade), ...machine, intake: one(e.intake, INTAKES, P.engine.intake), compression: one(e.compression, COMPRESSIONS, P.engine.compression),
       sump: one(e.sump, SUMPS, P.engine.sump), block: one(e.block, BLOCKS, P.engine.block), turbo: one(e.turbo, [0, 1, 2, 3, 4] as const, P.engine.turbo),
-      boost: num(e.boost, P.engine.boost), intercooler: bool(e.intercooler, P.engine.intercooler),
+      boost: num(e.boost, P.engine.boost), intercooler: bool(e.intercooler, P.engine.intercooler), ...(bool(e.sequential, false) ? { sequential: true } : {}),
       bs: num(e.bs, BS_DEFAULT), quality }, drive: rest.drive, kit: { ...rest.kit, interior }, susp };
   return normalise(d); }
 
 /** a new design's id: short, unlikely to meet another in one browser */
 export function newId(): string { return 'd' + Date.now().toString(36) + Math.floor(Math.random() * 36 ** 4).toString(36).padStart(4, '0'); }
 /** a new design from a base's own car: a fresh id, its name */
-export function fromPreset(base: BaseId, name?: string): Design { const P = structuredClone(PRESET[base]); return { ...P, id: newId(), name: name ?? `${P.name} 개조` }; }
+export function fromPreset(base: BodyBase, name?: string): Design { const P = structuredClone(PRESET[base]); if (P.body.model) P.body.model.plate = randomPlate();
+  return { ...P, id: newId(), name: name ?? `${P.name} 개조` }; }
+/** a made-up plate number for a new car (two digits, a syllable the plate's font draws, four digits; never a real one on purpose) */
+export function randomPlate(rnd: () => number = Math.random): string { const d = () => String(Math.floor(rnd() * 10)), sy = [...PLATE_SYLLABLES];
+  return `${d()}${d()}${sy[Math.floor(rnd() * sy.length)]!} ${1 + Math.floor(rnd() * 9)}${d()}${d()}${d()}`; }
 /** the parts that make the car (not its id or name): two designs with the same signature drive alike */
 export const designSig = (d: Design): string => JSON.stringify([d.body, d.engine, d.drive, d.kit, d.susp]);
 

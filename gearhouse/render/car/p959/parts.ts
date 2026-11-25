@@ -24,13 +24,13 @@ export function headLamp(b: Build, kind: LampKind, c: V, u: V, v: V, n: V, a: nu
     b.name('lampRing').mat('#5d6166', 0.5, 'plain'); band(sq(11, 1.15), sq(17)); b.name('headLamp').mat('#f2f5f7', 0.8, 'lens'); band(sq(17), sq(24, 0.8)); const t = sq(24, 0.8); b.quad(t[0]!, t[1]!, t[2]!, t[3]!); } }
 
 /** a road wheel on its hub: tyre, rim, the wheel's face in one of three designs, and the brake seen through it */
-export function wheel(b: Build, h: Hub, kind: WheelKind): void { const s = h.o[1] > 0 ? 1 : -1, w = h.width, r = h.tyreR, rim = h.rimR, o: V = [h.o[0], h.o[1] - s * w / 2, h.o[2]], f = s * w / 2, SEG = 12;
+export function wheel(b: Build, h: Hub, kind: WheelKind, brake = true): void { const s = h.o[1] > 0 ? 1 : -1, w = h.width, r = h.tyreR, rim = h.rimR, o: V = [h.o[0], h.o[1] - s * w / 2, h.o[2]], f = s * w / 2, SEG = 12;
   b.name(h.front ? 'tyreF' : 'tyreR').mat('#1c1c1e', 0.1, 'tyre').lathe('y', o, [[-f * 0.9, r - 12], [-f * 0.72, r], [f * 0.72, r], [f, r - 30], [f, rim]], SEG, false);
   const metal = '#c9ccd0', dish = kind === 'dish' ? 78 : 24, face = f - s * dish;
   b.name('rim').mat(metal, 0.5, 'plain').lathe('y', o, [[f, rim], [f - s * 8, rim - 12], [f - s * 130, rim - 22]], SEG, false);
   // the brake: a disc and a caliper behind the spokes
-  b.name('brakeDisc').mat('#8d9094', 0.3, 'plain').lathe('y', o, [[f - s * 100, rim - 22], [f - s * 100, 0.5]], 12, false);
-  b.name('brakeCaliper').mat('#b3261e', 0.3, 'plain').box(o[0] + 70, o[0] + 150, Math.min(h.o[1] - s * 112, h.o[1] - s * 84), Math.max(h.o[1] - s * 112, h.o[1] - s * 84), o[2] - 70, o[2] + 70);
+  if (brake) { b.name('brakeDisc').mat('#8d9094', 0.3, 'plain').lathe('y', o, [[f - s * 100, rim - 22], [f - s * 100, 0.5]], 12, false);   // (a car with its suspension drawn brings its own disc and caliper)
+  b.name('brakeCaliper').mat('#b3261e', 0.3, 'plain').box(o[0] + 70, o[0] + 150, Math.min(h.o[1] - s * 112, h.o[1] - s * 84), Math.max(h.o[1] - s * 112, h.o[1] - s * 84), o[2] - 70, o[2] + 70); }
   const y = h.o[1] - s * (dish + 6), spoke = (a: number, r0: number, r1: number, t0: number, t1: number, lift = 0) => { const c = Math.cos(a), sn = Math.sin(a); b.bar([o[0] + c * r0, y + s * lift, o[2] + sn * r0], [o[0] + c * r1, y, o[2] + sn * r1], t0, t1); };
   b.name('wheel').mat(metal, 0.5, 'plain');
   if (kind === 'hollow5') for (let q = 0; q < 5; q++) spoke((q / 5 + 0.05) * Math.PI * 2, 46, rim - 20, 58, 84, 10);        // broad hollow spokes, widening to the rim

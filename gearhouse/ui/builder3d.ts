@@ -32,7 +32,7 @@ import { STEPS, FIT_STEP, stepNo, isStep, stepFrom, seenFrom, type StepId } from
 import { suspFigures, suspPanel } from './builder_susp';
 import { savedEngines, joinEngine, withEngine } from '../core/engines';
 import { ENABLED_BODIES, enabledDesign, starterDesign } from '../core/bodies';
-import { randomPlate, currentDesign, keepCurrent, savedDesigns, saveDesign, deleteDesign, fromPreset, encodeDesign, designJson, parseDesign, measured, designSig, newId, KEYS, type KeyStore } from '../core/designstore';
+import { randomPlate, currentDesign, keepCurrent, savedDesigns, saveDesign, deleteDesign, fromPreset, newDesign, encodeDesign, designJson, parseDesign, measured, designSig, newId, KEYS, type KeyStore } from '../core/designstore';
 import { installKit } from './kit/style';
 import { installPick, pickCard, setCard, railTab } from './kit/pick';
 import { statBar } from './kit/parts';
@@ -179,12 +179,9 @@ const chip = document.createElement('button'); chip.type = 'button'; chip.id = '
 chip.addEventListener('click', () => openPick(false));
 /** the class pick (ui/builder_classpick.ts): a new design's first screen, and the chip's */
 const picker = classPick($('tierPick'), {
-  choose(t, fit) { const was = freeHp(D); D.tier = t.id; if (D.fresh) startLump(); delete D.fresh; if (fit) D = fitEngine(D, t.hpMax); const now = freeHp(D);
+  choose(t, fit) { const was = freeHp(D); D.tier = t.id; delete D.fresh; if (fit) D = fitEngine(D, t.hpMax); const now = freeHp(D);
     changed(); flash(now < was ? `차급 ${t.id}: 엔진을 ${now.toLocaleString()} hp로 맞췄습니다` : `차급 ${t.id} · ${TIER_GROUP_NAME[t.group]}: 출력 ${Number.isFinite(t.hpMax) ? `${t.hpMax.toLocaleString()} hp까지` : '상한 없음'}`); },
   cancel() { if (!D.fresh) return; delete D.fresh; D = withTier(D); changed(); } });
-/** a new design starts as the lump (docs/systems/115 §4-1, F1): 차체 A unstretched, no openings, blank bumpers, the steel
- *  wheel, no plates, no glass, the stock interior; parts are put on in ③, or all at once by "599 순정 세트" */
-function startLump() { if (!isModelBase(D.body.base)) return; D.body.model = LUMP_SWAPS(D.body.model?.plate ?? randomPlate()); D.body.frame = { id: 'A959', dims: { ...NO_FRAME_DIMS } }; D.body.glass = null; D.interior = { set: 'stock', trim: 'black' }; }
 function openPick(fresh: boolean) { drawer(false); picker.open({ design: D, fresh, eraOpen: eraOpen() }); }
 /** where each design was left (its step, the steps seen), kept in this browser (a step kept by the six-step builder
  *  before alpha 0.13 is read by stepFrom: by its id, or a number as the six steps') */
@@ -391,8 +388,8 @@ add('kit', check('ABS', () => D.kit.abs, v => { D.kit.abs = v; }, 'abs'), check(
   seg('림', [[16, '16″'], [17, '17″'], [18, '18″']], () => D.kit.rim, v => { D.kit.rim = v; }),
   note('윙은 꼬리에 맞춰 차체에 달립니다(캡슐 꼬리는 능동 윙: 달리면 올라옵니다). 디퓨저는 뒤 바닥 아래에 그려집니다.'),
   // the interior (docs/systems/115 §4-3): a set of the lump's own, not placed freely; its trim's colour in ⑦
-  h2('실내'), cards<InteriorSetId>('실내 세트', INTERIOR_SET_IDS.map(k => [k, `${INTERIOR_SETS[k].name} · ${INTERIOR_SETS[k].note}`, icon('interior'), { kind: 'interior', v: k }] as [InteriorSetId, string, string, ThumbSpec]), () => interiorD().set, v => { D.interior = { ...interiorD(), set: v }; }),
-  note('실내는 정해 둔 세트에서 고릅니다. 드리프트 세트는 가볍고(무게 계수 경량), 순정 세트를 황갈색으로 고르면 가죽·에어컨의 고급 사양으로 무게를 셉니다. 색은 ⑦ 칠·마감에서 고릅니다.'));
+  h2('실내'), cards<InteriorSetId>('실내 세트', INTERIOR_SET_IDS.map(k => [k, INTERIOR_SETS[k].name, icon('interior'), { kind: 'interior', v: k }] as [InteriorSetId, string, string, ThumbSpec]), () => interiorD().set, v => { D.interior = { ...interiorD(), set: v }; }),
+  ...INTERIOR_SET_IDS.map(k => note(`${INTERIOR_SETS[k].name}: ${INTERIOR_SETS[k].note}`)), note('실내는 정해 둔 세트에서 고릅니다. 드리프트 세트는 가볍고(무게 계수 경량), 순정 세트를 황갈색으로 고르면 가죽·에어컨의 고급 사양으로 무게를 셉니다. 색은 ⑦ 칠·마감에서 고릅니다.'));
 // ⑧ 검사·시험 주행: the fit's checks with their fixes and the step each belongs to, the class, the cost and the
 // reliability, what was measured, the test drive and the save
 { const div = (id: string, cls: string) => { const d = document.createElement('div'); d.id = id; d.className = cls; return d; };
@@ -409,7 +406,7 @@ add('kit', check('ABS', () => D.kit.abs, v => { D.kit.abs = v; }, 'abs'), check(
   const file = document.createElement('input'); file.type = 'file'; file.accept = '.json,application/json'; file.hidden = true; file.id = 'file';
   file.addEventListener('change', () => { const f = file.files?.[0]; if (!f) return; void f.text().then(t => { const d = parseDesign(t); if (d) { if (use(d)) flash(`불러옴: ${d.name}`); } else flash('설계 파일이 아닙니다'); file.value = ''; }); });
   add('files', h2('저장된 설계'), list,
-    h2('새 설계'), row(...ENABLED_BODIES.map(b => btn(`${BASE_NAME[b]}으로`, () => { use(fromPreset(b)); flash(`새 설계 (${BASE_NAME[b]})`); })), btn('지금 설계 복사', () => { use({ ...structuredClone(D), id: newId(), name: `${D.name} 사본`.slice(0, 40) }); flash('사본을 만들었습니다 (아직 저장 전)'); })),
+    h2('새 설계'), row(...ENABLED_BODIES.map(b => btn(`${BASE_NAME[b]}으로`, () => { use(newDesign(b)); flash(`새 설계 (${BASE_NAME[b]})`); })), btn('지금 설계 복사', () => { use({ ...structuredClone(D), id: newId(), name: `${D.name} 사본`.slice(0, 40) }); flash('사본을 만들었습니다 (아직 저장 전)'); })),
     h2('파일'), row(btn('JSON 파일 받기', download), btn('파일 열기', () => file.click()), btn('JSON 보기', () => { ta.value = designJson(D); ta.select(); try { void navigator.clipboard?.writeText(ta.value).catch(() => {}); } catch { /* no clipboard */ } }),
       btn('붙여넣은 JSON 불러오기', () => { const d = parseDesign(ta.value); if (d) { if (use(d)) flash(`불러옴: ${d.name}`); } else flash('JSON이 설계가 아닙니다'); })), ta, file,
     note('설계는 이 브라우저에만 저장됩니다. 다른 기기로 옮기려면 JSON 파일을 받거나 복사하세요.')); }

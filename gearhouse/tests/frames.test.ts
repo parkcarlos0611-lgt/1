@@ -64,3 +64,31 @@ describe('the frame data (core/frames.ts)', () => {
   it('the interior sets stand for the old kit interiors both ways', () => { for (const k of ['light', 'standard', 'luxury'] as const) expect(kitOfInterior(interiorOfKit(k))).toBe(k);
     expect(fitInterior({ set: 'drift', trim: 'pink' }, { set: 'stock', trim: 'tan' })).toEqual({ set: 'drift', trim: 'tan' }); });
 });
+
+// format 6's frame, glass and interior (docs/systems/115 §7): absent on an older design (the car as built, its
+// signature unchanged); a new design's lump kept through files and links; the physics and the fit reading the frame
+import { DESIGN_P959, normalise, LUMP_SWAPS, MODEL_OWN, type Design } from '../core/design';
+import { designJson, parseDesign, fromPreset, encodeDesign, decodeDesign } from '../core/designstore';
+import { designFigures, frontalArea } from '../race/design';
+import { fit } from '../race/fit';
+import { designMesh } from '../render/car/design';
+import { KINDS } from '../render/car/mesh';
+const lumpDesign = (dims: Partial<typeof NO_FRAME_DIMS> = {}): Design => { const d = fromPreset('p959'); delete d.fresh;
+  d.body.model = LUMP_SWAPS(d.body.model!.plate); d.body.frame = { id: 'A959', dims: { ...NO_FRAME_DIMS, ...dims } }; d.body.glass = null; d.interior = { set: 'drift', trim: 'brown' }; return normalise(d); };
+describe('format 6: frame, glass, interior', () => {
+  it('an older design gains none of them: read as the car as built, its file unchanged', () => { const d = normalise(DESIGN_P959);
+    expect('frame' in d.body || 'glass' in d.body || 'interior' in d).toBe(false); expect(designJson(normalise(JSON.parse(designJson(d))))).toBe(designJson(d)); });
+  it('a lump design keeps its frame, glass and interior through a file and a link; its dimensions become the body\'s own', () => {
+    const d = lumpDesign({ wheelbase: 150, width: 60, overhangR: 999 }), back = parseDesign(designJson(d))!, link = decodeDesign(encodeDesign(d))!;
+    for (const x of [back, link]) { expect(x.body.frame).toEqual({ id: 'A959', dims: { ...NO_FRAME_DIMS, wheelbase: 150, width: 60, overhangR: 80 } }); expect(x.body.glass).toBeNull(); expect(x.interior).toEqual({ set: 'drift', trim: 'brown' });
+      expect(x.body.model).toEqual(LUMP_SWAPS(d.body.model!.plate)); expect(x.body.wheelbase).toBe(150); expect(x.body.width).toBe(30); expect(x.body.overhangR).toBe(80); expect(x.kit.interior).toBe('light'); } });
+  it('the dimensions move the figures: a longer, wider car is heavier, its frontal area larger; the rear overhang lengthens the engine bay', () => {
+    const a = lumpDesign(), b = lumpDesign({ wheelbase: 150, width: 60, overhangR: 80, roof: 40 }), fa = designFigures(a), fb = designFigures(b);
+    expect(fb.mass).toBeGreaterThan(fa.mass); expect(frontalArea(b)).toBeGreaterThan(frontalArea(a)); expect(fb.front).not.toBeCloseTo(fa.front, 3);
+    const bay = (d: Design) => fit(d).find(x => x.part === 'bayLength')!.reason; expect(bay(b)).not.toBe(bay(a)); });
+  it('drawn as the lump: no glass, no lamps, no mirrors; the stock set puts the car as built back', () => { const G = KINDS.indexOf('glass'), d = lumpDesign(), M = designMesh(d, 0, 0, 0, 1), N = new Set(M.names);
+    expect(M.kind.filter(k => k === G).length).toBe(0); for (const n of ['mirror', 'headLamp', 'exhaust', 'plate']) expect(N.has(n), n).toBe(false); expect(N.has('seatL') || N.has('seatR')).toBe(true);
+    const stock = normalise({ ...d, body: { ...d.body, model: { ...MODEL_OWN.p959, plate: d.body.model!.plate }, glass: 'stock' }, interior: { set: 'stock', trim: 'black' } });
+    const own = normalise({ ...DESIGN_P959, body: { ...DESIGN_P959.body, model: { ...MODEL_OWN.p959, plate: d.body.model!.plate } } });
+    expect(designMesh(stock, 0, 0, 0, 1).n).toBe(designMesh(own, 0, 0, 0, 1).n); });
+});

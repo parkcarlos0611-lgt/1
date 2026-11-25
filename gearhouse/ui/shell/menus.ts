@@ -14,7 +14,7 @@ import { VERSION_NAME, CHANGES } from '../../core/version';
 import type { BodyBase, Design } from '../../core/design';
 import { ENABLED_BODIES, enabledDesign, stockP959 } from '../../core/bodies';
 import { BODY_NAME, CAR_599 } from '../../core/names';
-import { savedDesigns, saveDesign, deleteDesign, currentDesign, keepCurrent, fromPreset, newId, designJson, parseDesign, measured, designSig } from '../../core/designstore';
+import { savedDesigns, saveDesign, deleteDesign, currentDesign, keepCurrent, newDesign, newId, designJson, parseDesign, measured, designSig } from '../../core/designstore';
 import { designFigures } from '../../race/design';
 import { tierOf, tierLabel } from '../../race/tiers';
 import { TRACKS } from '../../race/tracks';
@@ -61,7 +61,7 @@ export function garageScreen(ctx: ShellCtx): Screen<never> {
   const s = ctx.store; let root: HTMLElement;
   const open = (d: Design) => { keepCurrent(s, d); void ctx.router.go('builder', { design: d }); };
   const fresh = async () => { const b = await dialog('새 차 설계', ['어느 차대에서 시작할까요? 바탕은 차체 패널의 치수를 정합니다.'], [...ENABLED_BODIES.map(id => [id, BASE_NAME[id] ?? id] as [string, string]), ['', '취소', { kind: 'ghost' as const }]]);
-    if (!b) return; const d = fromPreset(b as BodyBase); saveDesign(s, d); open(d); };
+    if (!b) return; const d = newDesign(b as BodyBase); saveDesign(s, d); open(d); };
   /** the design's figures as the kit's bars (power, weight, top speed; grip has no figure of the design's yet), its engine and class line, its runs */
   const lines = (d: Design): (string | HTMLElement)[] => { const out: (string | HTMLElement)[] = [], m = measured(s, d.id), meas = m && m.sig === designSig(d) ? m : null;
     try { const f = designFigures(d); out.push(el('p', 'gh-card-l gh-spec', `${d.engine.layout} ${(d.engine.cc / 1000).toFixed(1)} L · ${tierLabel(tierOf(f))} · 0-100 ${f.zeroTo100} s`));

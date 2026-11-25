@@ -7,6 +7,8 @@
 import { BODY_BASES, NOSES, FRONTS, FACE_KEYS, FACE_KINDS, faceOf3, TAILS, WHEELS, GRADES, INTAKES, COMPRESSIONS, SUMPS, BLOCKS, STRUCTURES, PANELS, INTERIORS, DESIGN_NSX, DESIGN_F355, DESIGN_EB110, DESIGN_P959, DIMS, PLATE_SYLLABLES, isModelBase, fitModel, LAYOUTS, QUALITY_PARTS, BS_DEFAULT, normalise,
   SUSP_OWN, SUSP_KINDS, RC_PRESETS, type BodyBase, type BodyDims, type Design, type DesignV1, type EngineQuality, type Face, type FrontKind, type SuspAxle } from './design';
 import { isTierId } from '../race/tiers';
+import { LUMP_SWAPS } from './design';
+import { NO_FRAME_DIMS } from './frames';
 
 /** what the helpers need of a storage (the browser's Storage has these) */
 export interface KeyStore { getItem(k: string): string | null; setItem(k: string, v: string): void; removeItem(k: string): void }
@@ -71,6 +73,11 @@ export function newId(): string { return 'd' + Date.now().toString(36) + Math.fl
  *  opens on the class pick) */
 export function fromPreset(base: BodyBase, name?: string): Design { const P = structuredClone(PRESET[base]); if (P.body.model) P.body.model.plate = randomPlate();
   return { ...P, id: newId(), name: name ?? `${P.name} 개조`, fresh: true }; }
+/** a new design as the builder starts one (docs/systems/115 F1): from a base's own car, a model body's taken back to its
+ *  lump ("차체 A" unstretched, no openings, blank bumpers, the steel wheel, no plates, no glass, the stock interior), so
+ *  its parts are put on in the builder (or all at once by "599 순정 세트"); its class not chosen yet */
+export function newDesign(base: BodyBase, name?: string): Design { const d = fromPreset(base, name); if (!d.body.model) return d;
+  return { ...d, body: { ...d.body, model: LUMP_SWAPS(d.body.model.plate), frame: { id: 'A959', dims: { ...NO_FRAME_DIMS } }, glass: null }, interior: { set: 'stock', trim: 'black' } }; }
 /** a made-up plate number for a new car (two digits, a syllable the plate's font draws, four digits; never a real one on purpose) */
 export function randomPlate(rnd: () => number = Math.random): string { const d = () => String(Math.floor(rnd() * 10)), sy = [...PLATE_SYLLABLES];
   return `${d()}${d()}${sy[Math.floor(rnd() * sy.length)]!} ${1 + Math.floor(rnd() * 9)}${d()}${d()}${d()}`; }

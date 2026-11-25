@@ -2,7 +2,7 @@
 // filters through this list (the builder's base choices, the garage's cards, the car picker, the race's field, the title
 // car), as the settings' LOOKS_ON does for the looks. A body comes back (or a new one is added) by adding it here.
 import type { BodyBase, Design } from './design';
-import { fromPreset, currentDesign, savedDesigns, type KeyStore } from './designstore';
+import { fromPreset, newDesign, currentDesign, savedDesigns, type KeyStore } from './designstore';
 import { CAR_599 } from './names';
 
 /** the bodies switched on in the game, in the order offered */
@@ -13,8 +13,8 @@ export const isEnabledBody = (b: unknown): b is BodyBase => (ENABLED_BODIES as r
 export const enabledDesign = (d: Design | null | undefined): boolean => !!d && isEnabledBody(d.body.base);
 /** the body a new design starts on */
 export const DEFAULT_BODY: BodyBase = ENABLED_BODIES[0]!;
-/** a new design on the default body (a fresh id, a new plate) */
-export const starterDesign = (name?: string): Design => fromPreset(DEFAULT_BODY, name);
+/** a new design on the default body (a fresh id, a new plate; a model body as its lump: docs/systems/115 F1) */
+export const starterDesign = (name?: string): Design => newDesign(DEFAULT_BODY, name);
 
 /** the 959 as it left the works: its own design and one id (its runs are kept under it), its own plate and swaps */
 let stock: Design | null = null;

@@ -1,17 +1,18 @@
 // The parts library's rendered thumbnails (docs/systems/110 §2-6): the parts taken out of the model, the view rule and
 // the framing shared by a kind, the background keyed out.
 import { describe, it, expect } from 'vitest';
-import { buildModel, isolate, meshBox, union, fit, camera, keyDown, INK_RGB, KIND_VIEW, VARIANTS, type ThumbKind } from '../ui/builder_thumbs';
+import { buildModel, buildSet, isolate, meshBox, union, fit, camera, keyDown, INK_RGB, KIND_VIEW, VARIANTS, type ThumbKind } from '../ui/builder_thumbs';
 import { DIM } from '../render/car/p959';
+import { KINDS } from '../render/car/mesh';
 
-const models = [0, 1, 2].map(buildModel);
+const models = [0, 1, 2, 3].map(buildModel);   // the fourth: the lump's blank bumpers and steel wheel (with the stock lamp)
 const names = (k: ThumbKind, i: number) => { const M = isolate(models[i]!, k); return new Set(Array.from(M.part, p => M.names![p]!)); };
 
 describe('the parts alone', () => {
   it('each kind keeps its own triangles, the left front one of a pair, and the variants differ', () => {
     for (const k of ['bumperF', 'bumperR', 'lamp', 'wheel'] as ThumbKind[]) {
       const parts = models.map(m => isolate(m, k)); for (const M of parts) expect(M.n).toBeGreaterThan(20);
-      expect(new Set(parts.map(M => `${M.n}|${meshBox(M).flat().map(Math.round).join(',')}|${M.col.reduce((a, c, i) => a + c * (i % 97), 0)}`)).size).toBe(3); }   // the clean bumper: the same shape, the vents in paint
+      expect(parts.slice(0, 3).length).toBe(3); expect(new Set(parts.slice(0, 3).map(M => `${M.n}|${meshBox(M).flat().map(Math.round).join(',')}|${M.col.reduce((a, c, i) => a + c * (i % 97), 0)}`)).size).toBe(3); }   // the clean bumper: the same shape, the vents in paint
     expect([...names('bumperF', 1)]).toEqual(expect.arrayContaining(['bumperF', 'lipF'])); expect(names('bumperF', 0).has('plate')).toBe(false);
     expect(names('bumperR', 1).has('diffuser')).toBe(true); expect(names('bumperR', 0).has('exhaust')).toBe(false);
     const lamp = meshBox(isolate(models[0]!, 'lamp')); expect(lamp[0][1]).toBeGreaterThan(0); expect(lamp[1][0] - lamp[0][0]).toBeLessThan(300);
@@ -21,9 +22,19 @@ describe('the parts alone', () => {
     const half = isolate(models[0]!, 'bumperR', true), all = isolate(models[0]!, 'bumperR'); expect(half.n).toBeLessThan(all.n * 0.6); expect(meshBox(half)[0][1]).toBeGreaterThan(-5); });
 });
 
+describe('the first steps\' cards (docs/systems/115 F1)', () => {
+  it('the lump, each glass set on it, each interior set alone', () => {
+    const lump = buildSet('frame', 'A959'), glass = ['none', 'stock', 'noQuarter', 'louvre'].map(v => buildSet('glass', v)), cab = ['stock', 'drift'].map(v => buildSet('interior', v));
+    expect(isolate(lump, 'frame')).toBe(lump.mesh); expect(new Set(lump.mesh.names)).not.toContain('mirror');
+    for (const g of glass) expect(g.mesh.n).toBe(lump.mesh.n);   // the glass is tags only
+    const G = KINDS.indexOf('glass'), glassTris = (m: typeof lump) => m.mesh.kind.filter(k => k === G).length; expect(glassTris(glass[0]!)).toBe(0); expect(glassTris(glass[1]!)).toBeGreaterThan(glassTris(glass[2]!));
+    expect(cab[0]!.mesh.n).toBeGreaterThan(500); expect(cab[1]!.mesh.n).not.toBe(cab[0]!.mesh.n); expect((cab[1]!.mesh.names ?? []).some(n => /^cage/.test(n))).toBe(true);
+    const blank = isolate(models[3]!, 'bumperF'); expect(new Set(Array.from(blank.part, p => blank.names![p]!))).toEqual(new Set(['bumperF'])); });
+});
+
 describe('the views and the framing', () => {
   it('front for what faces forward or back, side for the wheel and the body', () => {
-    expect(KIND_VIEW).toEqual({ bumperF: 'front', bumperR: 'front', lamp: 'front', wheel: 'side', base: 'side' });
+    expect(KIND_VIEW).toEqual({ bumperF: 'front', bumperR: 'front', lamp: 'front', wheel: 'side', base: 'side', frame: 'side', glass: 'side', interior: 'top' });
     expect(camera('bumperF', 'front').ang).toBeCloseTo(Math.PI); expect(camera('bumperR', 'front').ang).toBeCloseTo(0); expect(camera('wheel', 'top').pitch).toBe(90); });
   it('one box for all the variants of a kind fits the picture, the same scale for each', () => {
     for (const k of ['bumperF', 'bumperR', 'lamp', 'wheel'] as ThumbKind[]) { const box = VARIANTS[k].map((_, i) => meshBox(isolate(models[i]!, k))).reduce(union);

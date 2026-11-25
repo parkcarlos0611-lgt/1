@@ -37,6 +37,7 @@ import { installKit } from './kit/style';
 import { installPick, pickCard, setCard, railTab } from './kit/pick';
 import { statBar } from './kit/parts';
 import { STATS, type StatDef } from './kit/logic';
+import { icon } from './kit/icons';
 import { stepIcon, STEP_SHORT, bumperPic, lampPic, wheelPic, basePic } from './builder_pics';
 import { partThumbs, type ThumbSpec } from './builder_thumbs';
 import { FRAMES, FRAME_IDS, FRAME_DIMS, FRAME_DIM_NAME, NO_FRAME_DIMS, GLASS, GLASS_IDS, INTERIOR_SETS, INTERIOR_SET_IDS, TRIM_IDS, TRIM_NAME, interiorOfKit, type FrameId, type FrameDimKey, type GlassId, type InteriorSetId, type TrimId } from '../core/frames';
@@ -50,7 +51,7 @@ import texMeta from '../assets/textures/pbr/pbr.json';
  *  the design to open, and what the test drive does (a screen of the same page instead of a new window). A page of its
  *  own (builder3d.page.html) gives nothing */
 export interface BuilderHost { root?: ParentNode; renderer?: LiveRenderer | null; design?: Design; onTestDrive?: (d: Design) => void;
-  /** step ②'s "엔진 공방에서 편집": the engine designer opened with this car (the game's page; it hands the engine back through use()) */
+  /** step ④'s "엔진 공방에서 편집": the engine designer opened with this car (the game's page; it hands the engine back through use()) */
   onEngineShop?: (d: Design) => void;
   /** the toon glass's reflection, as the game's settings hold it now (0 off .. 1 as made; a page of its own: as made) */
   glassRefl?: () => number }
@@ -194,10 +195,10 @@ function keepStep() { try { const rest = Object.entries(keptSteps()).filter(([k]
 /** the step a design was left at (a new one starts at the first) */
 function restoreStep() { const k = keptSteps()[D.id]; step = stepFrom(k?.step) ?? 'frame'; seen = new Set([...seenFrom(k?.seen), step]); onFiles = false; showStep(); }
 function go(id: StepId | 'files') { if (id === 'files') onFiles = true; else { onFiles = false; step = id; seen.add(id); keepStep(); } showStep(); $('panes').scrollTop = 0; }
-/** the suspension view put on by step ③ (and off again when it is left, unless the viewer had it on already) */
+/** the suspension view put on by step ⑤ (and off again when it is left, unless the viewer had it on already) */
 let suspAuto = false;
 function showStep() { const at = onFiles ? 'files' : step;
-  document.body.classList.toggle('at-check', at === 'check');   // the figures' own fit list folded away while ⑦ shows it in full
+  document.body.classList.toggle('at-check', at === 'check');   // the figures' own fit list folded away while ⑧ shows it in full
   if (at === 'susp' && !view.susp) { suspAuto = true; setSuspView(true); } else if (at !== 'susp' && suspAuto) { suspAuto = false; setSuspView(false); }
   if (at === 'susp') suspGraphs();
   for (const [k, q] of pane) q.classList.toggle('on', k === at);
@@ -218,6 +219,8 @@ $('openFiles').addEventListener('click', () => { if (onFiles) go(step); else { g
 // ① 차체 덩어리 (docs/systems/115 §4, F1): the lump's card, its dimensions (§4-4: the cage stretched; the physics reads
 // them as the body's own), its structure. A kit base's own dimensions (the old bases, off in the game) stay below, hidden
 const frameD = () => D.body.frame ?? { id: 'A959' as FrameId, dims: { ...NO_FRAME_DIMS } };
+/** the interior set and its trim (an older design: its kit's as a set) */
+const interiorD = () => D.interior ?? interiorOfKit(D.kit.interior);
 add('frame', cards<FrameId>('차체 덩어리', FRAME_IDS.map(id => [id, `${FRAMES[id].name} · ${FRAMES[id].suits}`, basePic(), { kind: 'frame', v: id }] as [FrameId, string, string, ThumbSpec]), () => frameD().id, v => { D.body.frame = { ...frameD(), id: v }; }),
   note('차체 덩어리는 구멍이 하나도 없는 차체입니다. 바퀴 아치와 허브 자리, 엔진룸 크기, 앞면적이 여기서 정해집니다. 창문은 ②에서, 램프·범퍼·휠 같은 부품은 ③에서 고릅니다. 차급과는 무관하고, 카드의 "추천"은 꼬리표일 뿐입니다.'),
   ...frameSliders(), ...dimSliders(),
@@ -256,7 +259,7 @@ function dimSliders(): HTMLElement[] {
     btnRow('치수 원래대로', () => { for (const k of DIMS) D.body[k] = 0; changed(); }));
   kitOnly(out[0]!); kitOnly(out[out.length - 2]!); kitOnly(out[out.length - 1]!); return out; }
 function btnRow(t: string, f: () => void): HTMLElement { const d = document.createElement('div'); d.className = 'btns'; const b = document.createElement('button'); b.type = 'button'; b.className = BTN; b.textContent = t; b.addEventListener('click', f); d.append(b); return d; }
-// ④ 차체 형태: the panels' kinds; ⑥ 칠·마감: the paint
+// ③ 부품: the panels' kinds (a kit base's) or the model body's swaps; ⑦ 칠·마감: the paint
 { const ch = designChoices('nsx'), kinds = <T extends string>(ks: T[]) => ks.map(k => [k, KIND_NAME[k] ?? k] as [T, string]);
   // the face in slots (core/design.ts Face; render/car/face.ts): chips with a small drawing each, a value the rules do not
   // allow greyed out with its reason (faceLock), the car built again at each choice
@@ -282,7 +285,7 @@ function btnRow(t: string, f: () => void): HTMLElement { const d = document.crea
     h2('뒷모습·휠'), seg<TailKind>('꼬리', kinds(ch.tail), () => D.body.tail, v => { D.body.tail = v; }), seg<WheelKind>('휠', kinds(ch.wheel), () => D.body.wheel, v => { D.body.wheel = v; })];
   // a model-built body's own swaps (the 959's: render/car/p959), in place of the kit's kinds
   const M = (): ModelSwaps => (D.body.model ??= { ...MODEL_OWN.p959 }), sm = <K extends keyof ModelSwaps>(k: K) => (v: ModelSwaps[K]) => { M()[k] = v; };
-  const BUMPER_NAME: Record<ModelSwaps['bumperF'], string> = { std: '순정', aero: '에어로 (깊은 립·디퓨저)', clean: '깔끔 (모서리 벤트 없음)' };
+  const BUMPER_NAME: Record<ModelSwaps['bumperF'], string> = { std: '순정', aero: '에어로 (깊은 립·디퓨저)', clean: '깔끔 (모서리 벤트 없음)', blank: '민짜 (덩어리)' };
   const plate = document.createElement('input'); plate.type = 'text'; plate.className = 'gk-field'; plate.id = 'plate'; plate.maxLength = 10; plate.placeholder = '12가 3456'; plate.setAttribute('aria-label', '번호판 글자'); plate.autocomplete = 'off';
   const plateWhy = document.createElement('small'); plateWhy.className = 'lock'; plateWhy.hidden = true;
   plate.addEventListener('change', () => { if (plateOk(plate.value)) { M().plate = plate.value; plateWhy.hidden = true; changed(); } else { plateWhy.textContent = '숫자 2개 + 한글 한 글자(받침 없음) + 숫자 4개로 적어 주세요. 예: 12가 3456'; plateWhy.hidden = false; } });
@@ -290,19 +293,27 @@ function btnRow(t: string, f: () => void): HTMLElement { const d = document.crea
   // each plate off and on again: a removed one is kept as false, a fitted one leaves no key (an older design's own way)
   const plateOn = (k: 'plateF' | 'plateR', label: string) => seg<'on' | 'off'>(label, [['on', '달기'], ['off', '떼기']], () => M()[k] === false ? 'off' : 'on', v => { if (v === 'on') delete M()[k]; else M()[k] = false; });
   // the parts library (docs/systems/110 G4): each swap a card with its picture
-  const modelRows = [h2('599 부품'), cards<ModelSwaps['bumperF']>('앞 범퍼', BUMPERS959.map(k => [k, BUMPER_NAME[k], bumperPic(k), { kind: 'bumperF', v: k }] as [ModelSwaps['bumperF'], string, string, ThumbSpec]), () => M().bumperF, sm('bumperF')),
-    cards<ModelSwaps['bumperR']>('뒤 범퍼', BUMPERS959.map(k => [k, BUMPER_NAME[k], bumperPic(k, true), { kind: 'bumperR', v: k }] as [ModelSwaps['bumperR'], string, string, ThumbSpec]), () => M().bumperR, sm('bumperR')),
-    cards<ModelSwaps['lamp']>('헤드램프', LAMPS959.map(k => [k, { round: '둥근 렌즈 (순정)', ellipsoid: '프로젝터 2개', square: '사각 프로젝터' }[k], lampPic(k), { kind: 'lamp', v: k }] as [ModelSwaps['lamp'], string, string, ThumbSpec]), () => M().lamp, sm('lamp')),
-    cards<ModelSwaps['wheel']>('휠', WHEELS959.map(k => [k, { hollow5: '속 빈 5스포크 (순정)', dish: '딥디시 8스포크', hole5: '5홀 디스크' }[k], wheelPic(k), { kind: 'wheel', v: k }] as [ModelSwaps['wheel'], string, string, ThumbSpec]), () => M().wheel, sm('wheel')),
-    plateOn('plateF', '앞 번호판'), plateOn('plateR', '뒤 번호판'), plateRow, note('범퍼는 차체의 이음선 고리에 맞물려 바뀝니다. 번호판은 앞뒤를 따로 떼고 다시 달 수 있고, 뗀 자리는 범퍼 면 그대로입니다. 번호판 글자는 판 위에 획으로 그립니다(가상의 번호만). 실내 사양(①)이 경량이면 버킷 시트와 롤케이지가 들어갑니다.')];
+  // "599 순정 세트" (docs/systems/115 §4-1): every part as the car left the works, its glass the stock set; the lump's
+  // dimensions and the plate's text kept
+  const stockRow = btnRow('599 순정 세트', () => { D.body.model = { ...MODEL_OWN.p959, plate: M().plate }; D.body.glass = 'stock'; changed(); flash('599 순정 부품과 창문을 달았습니다'); });
+  stockRow.querySelector('button')!.className = BTN_MAIN; stockRow.querySelector('button')!.id = 'stockSet';
+  const lumpRow = btnRow('모두 떼기 (덩어리로)', () => { D.body.model = LUMP_SWAPS(M().plate); changed(); });
+  stockRow.append(lumpRow.querySelector('button')!);
+  const modelRows = [h2('599 부품'), stockRow, note('순정 세트는 부품과 창문을 지금 599와 같게 답니다. 치수와 번호판 글자는 그대로 둡니다.'), cards<ModelSwaps['bumperF']>('앞 범퍼', BUMPERS_ALL.map(k => [k, BUMPER_NAME[k], bumperPic(k), { kind: 'bumperF', v: k }] as [ModelSwaps['bumperF'], string, string, ThumbSpec]), () => M().bumperF, sm('bumperF')),
+    cards<ModelSwaps['bumperR']>('뒤 범퍼', BUMPERS_ALL.map(k => [k, BUMPER_NAME[k], bumperPic(k, true), { kind: 'bumperR', v: k }] as [ModelSwaps['bumperR'], string, string, ThumbSpec]), () => M().bumperR, sm('bumperR')),
+    cards<ModelSwaps['lamp']>('헤드램프', LAMPS_ALL.map(k => [k, { round: '둥근 렌즈 (순정)', ellipsoid: '프로젝터 2개', square: '사각 프로젝터', none: '없음 (막힘)' }[k], lampPic(k), ...(k === 'none' ? [] : [{ kind: 'lamp', v: k }])] as [ModelSwaps['lamp'], string, string, ThumbSpec?]), () => M().lamp, sm('lamp')),
+    cards<ModelSwaps['wheel']>('휠', WHEELS_ALL.map(k => [k, { hollow5: '속 빈 5스포크 (순정)', dish: '딥디시 8스포크', hole5: '5홀 디스크', steel: '민짜 강철 휠' }[k], wheelPic(k), { kind: 'wheel', v: k }] as [ModelSwaps['wheel'], string, string, ThumbSpec]), () => M().wheel, sm('wheel')),
+    seg<'on' | 'off'>('그 밖의 순정 부품 (테일램프 띠, 옆 흡기구, 엔진 덮개 그릴, 미러, 배기구, 배지·레터링)', [['on', '달기'], ['off', '떼기']], () => M().details === false ? 'off' : 'on', v => { if (v === 'on') delete M().details; else M().details = false; }),
+    plateOn('plateF', '앞 번호판'), plateOn('plateR', '뒤 번호판'), plateRow, note('범퍼는 차체의 이음선 고리에 맞물려 바뀝니다. 헤드램프를 빼면 램프 자리는 차체 색으로 막힙니다. 번호판은 앞뒤를 따로 떼고 다시 달 수 있고, 뗀 자리는 범퍼 면 그대로입니다. 번호판 글자는 판 위에 획으로 그립니다(가상의 번호만). 부품을 아무 곳에나 붙이는 방식은 다음 단계(P1, P2)에서 옵니다.')];
   syncs.push(() => { const m = isModelBase(D.body.base); for (const e of kitRows) e.hidden = m; for (const e of modelRows) e.hidden = !m; if (m && document.activeElement !== plate) plate.value = M().plate; });
-  add('body', ...kitRows, ...modelRows);
+  add('parts', ...kitRows, ...modelRows);
   const sw = document.createElement('div'); sw.className = 'swatches'; const pick = document.createElement('input'); pick.type = 'color'; pick.id = 'paint'; pick.setAttribute('aria-label', '직접 고르기');
   const bs = PAINTS.map(c => { const b = document.createElement('button'); b.type = 'button'; b.style.background = c; b.setAttribute('aria-label', c); b.addEventListener('click', () => { D.body.paint = c; changed(); }); sw.append(b); return [c, b] as const; });
   pick.addEventListener('input', () => { D.body.paint = pick.value; changed(); }); sw.append(pick);
   syncs.push(() => { pick.value = D.body.paint; for (const [c, b] of bs) b.setAttribute('aria-pressed', String(c === D.body.paint.toLowerCase())); });
-  add('paint', field('도장 색', sw), range('광택', [0, 1], 0.05, () => D.body.gloss, v => { D.body.gloss = v; }, v => v.toFixed(2), 'gloss')); }
-// ② 엔진·구동계 (alpha 0.12): an engine from the library put in, or this car's engine opened in the engine designer
+  add('paint', field('도장 색', sw), range('광택', [0, 1], 0.05, () => D.body.gloss, v => { D.body.gloss = v; }, v => v.toFixed(2), 'gloss'),
+    seg<TrimId>('실내 색', TRIM_IDS.map(t => [t, TRIM_NAME[t]] as [TrimId, string]), () => interiorD().trim, v => { D.interior = { ...interiorD(), trim: v }; })); }
+// ④ 엔진·구동계 (alpha 0.12): an engine from the library put in, or this car's engine opened in the engine designer
 { const box = document.createElement('div'), list = document.createElement('ul'); list.className = 'list'; list.id = 'engLib'; list.hidden = true;
   const fill = () => { list.textContent = ''; const all = savedEngines(store);
     if (!all.length) { const li = document.createElement('li'); li.innerHTML = '<span>보관함에 엔진이 없습니다. 엔진 공방에서 만들어 저장하세요.</span>'; list.append(li); return; }
@@ -316,7 +327,7 @@ function btnRow(t: string, f: () => void): HTMLElement { const d = document.crea
   const row = btnRow('보관함에서 엔진 고르기', () => { list.hidden = !list.hidden; of.el.hidden = true; if (!list.hidden) fill(); }); row.querySelector('button')!.id = 'engPick';
   if (host.onEngineShop) { const b = document.createElement('button'); b.type = 'button'; b.className = BTN; b.id = 'engShop'; b.textContent = '엔진 공방에서 편집'; b.addEventListener('click', () => host.onEngineShop!(structuredClone(D))); row.append(b); }
   box.append(row, list, of.el); add('engine', box); }
-// ② 엔진·구동계: the grade first; the details it does not allow greyed out with the reason
+// ④ 엔진·구동계: the grade first; the details it does not allow greyed out with the reason
 { const E = () => D.engine, lk = <K extends 'intake' | 'compression' | 'sump' | 'block' | 'valves' | 'turbo'>(k: K) => (v: Design['engine'][K]) => gradeLock(E().grade, k, v);
   // the class's wall (docs/systems/115 C1): an option whose engine would pass the chosen rung's power cap needs a higher rung
   const nd = <K extends 'grade' | 'layout' | 'intake' | 'compression' | 'sump' | 'block' | 'valves' | 'turbo'>(k: K) => (v: Design['engine'][K]) => needFor(`${k}=${v}`, e => { (e as Record<K, unknown>)[k] = v; });
@@ -337,14 +348,14 @@ function btnRow(t: string, f: () => void): HTMLElement { const d = document.crea
     ri.max = String(R); bi.max = String(Bm); bi.disabled = !E().turbo; (ic.querySelector('input')!).disabled = !E().turbo;
     const vi = vtec.querySelector('input')!, vl = gradeLock(g, 'vtec', true); vi.disabled = !!vl; vtec.title = vl ?? '';
     gradeNote.textContent = `${g}등급: 레드라인 ${R.toLocaleString()} rpm, 부스트 ${Bm.toFixed(1)} bar까지${vl ? ` · 가변 캠은 ${vl.replace(' 고를 수 있습니다', '')}` : ''}`; }); }
-// ② (on): the drive
+// ④ (on): the drive
 { const fin = range('종감속비', LIMITS.final, 0.01, () => D.drive.final || designSpec(D).final, v => { D.drive.final = v; }, v => v.toFixed(2), 'final');
   add('engine', h2('구동계'), seg('기어', [[5, '5단'], [6, '6단']], () => D.drive.gears, v => { D.drive.gears = v; }),
     seg('변속기', [['manual', '수동'], ['f1', 'F1 (반자동)']], () => D.drive.gearbox, v => { D.drive.gearbox = v; }),
     check('종감속 자동 (최고 속도가 출력 정점에서 나오게)', () => !D.drive.final, v => { D.drive.final = v ? 0 : +designSpec(D).final.toFixed(2); }, 'autofinal'), fin,
     check('LSD (차동 제한)', () => D.drive.lsd, v => { D.drive.lsd = v; }, 'lsd'), check('4륜 구동 (점성 센터 커플링, 앞 30 %)', () => D.drive.awd, v => { D.drive.awd = v; }, 'awd'));
   syncs.push(() => { (fin.querySelector('input') as HTMLInputElement).disabled = !D.drive.final; }); }
-// ③ 서스펜션 (alpha 0.13): each axle's kind, its arms, its springs and dampers, its bar, its static camber and toe, the
+// ⑤ 서스펜션 (alpha 0.13): each axle's kind, its arms, its springs and dampers, its bar, its static camber and toe, the
 // front's caster, the ride; the small graphs from the linkage as the physics reads it (ui/builder_susp.ts)
 { const deg = (n: number) => (v: number) => `${v > 0 ? '+' : ''}${v.toFixed(n)}°`, pct = (v: number) => `${Math.round(v * 100)} %`;
   const RC_NAME: [RcPreset, string][] = [['low', '낮음'], ['mid', '보통'], ['high', '높음']];
@@ -363,13 +374,13 @@ function btnRow(t: string, f: () => void): HTMLElement { const d = document.crea
   const graphs = document.createElement('div'); graphs.id = 'suspGraphs'; graphs.className = 'suspgraphs'; graphs.setAttribute('aria-live', 'polite');
   add('susp', note('장착점(하드포인트)에서 링크를 풀어 바퀴가 오르내릴 때의 캠버·토·롤 센터를 계산합니다. 시험 주행의 물리도 같은 표를 씁니다. 이 단계에서는 서스펜션 보기가 켜집니다.'), graphs,
     ...axle(true), ...axle(false),
-    h2('차고'), range('지상고 (① 치수와 같은 값)', BODY_LIMITS(D.body.base).ride, 5, () => D.body.ride, v => { D.body.ride = v; }, v => `${sign(v, 'mm')} · ${CLEARANCE[D.body.base] + v} mm`, 'susp-ride'),
+    h2('차고'), range('지상고 (① 치수와 같은 값)', isModelBase(D.body.base) ? FRAMES.A959.ranges.ride : BODY_LIMITS(D.body.base).ride, 5, () => isModelBase(D.body.base) ? frameD().dims.ride : D.body.ride, v => { if (isModelBase(D.body.base)) D.body.frame = { ...frameD(), dims: { ...frameD().dims, ride: v } }; else D.body.ride = v; }, v => `${sign(v, 'mm')} · ${CLEARANCE[D.body.base] + v} mm`, 'susp-ride'),
     note('스프링이 단단할수록(진동수가 높을수록) 덜 기울고 덜 숙이지만 요철에서 접지가 흔들립니다. 롤 센터가 높으면 롤이 줄지만 바퀴가 옆으로 밀리며 차가 들립니다. 음의 캠버는 코너에서 바깥 바퀴를 세웁니다. 일체 차축·판스프링은 1930년대 차대(복원 작업)용입니다.'),
     btnRow('서스펜션 원래대로', () => { D.susp = structuredClone(SUSP_OWN[D.body.base]); changed(); }));
-  syncs.push(() => { const r = $('susp-ride') as HTMLInputElement | null; if (r) { const [a, b] = BODY_LIMITS(D.body.base).ride; r.min = String(a); r.max = String(b); } }); }
+  syncs.push(() => { const r = $('susp-ride') as HTMLInputElement | null; if (r) { const [a, b] = isModelBase(D.body.base) ? FRAMES[frameD().id].ranges.ride : BODY_LIMITS(D.body.base).ride; r.min = String(a); r.max = String(b); } }); }
 /** the step's graphs drawn again (with the figures, a moment after a change) */
 function suspGraphs() { const el = $('suspGraphs'); if (!el || (step !== 'susp' && el.innerHTML)) return; try { el.innerHTML = suspPanel(suspFigures(D)); } catch (e) { console.warn('suspension graphs', e); el.innerHTML = ''; } }
-// ⑤ 장비
+// ⑥ 장비
 add('kit', check('ABS', () => D.kit.abs, v => { D.kit.abs = v; }, 'abs'), check('TCS (트랙션 컨트롤)', () => D.kit.tcs, v => { D.kit.tcs = v; }, 'tcs'),
   select('스티어링', [['manual', '수동'], ['hydraulic', '유압 파워'], ['electric', '전동 파워']], () => D.kit.steering, v => { D.kit.steering = v; }, 'steering'),
   seg('댐퍼', [['fixed', '고정'], ['adaptive', '가변 (두 가지 모드)']], () => D.kit.dampers, v => { D.kit.dampers = v; }),
@@ -378,8 +389,11 @@ add('kit', check('ABS', () => D.kit.abs, v => { D.kit.abs = v; }, 'abs'), check(
   range('앞 타이어 폭', LIMITS.tyre, 5, () => D.kit.tyres[0], v => { D.kit.tyres = [v, D.kit.tyres[1]]; }, v => `${v} mm`, 'tyreF'),
   range('뒤 타이어 폭', LIMITS.tyre, 5, () => D.kit.tyres[1], v => { D.kit.tyres = [D.kit.tyres[0], v]; }, v => `${v} mm`, 'tyreR'),
   seg('림', [[16, '16″'], [17, '17″'], [18, '18″']], () => D.kit.rim, v => { D.kit.rim = v; }),
-  note('윙은 꼬리에 맞춰 차체에 달립니다(캡슐 꼬리는 능동 윙: 달리면 올라옵니다). 디퓨저는 뒤 바닥 아래에 그려집니다.'));
-// ⑦ 검사·시험 주행: the fit's checks with their fixes and the step each belongs to, the class, the cost and the
+  note('윙은 꼬리에 맞춰 차체에 달립니다(캡슐 꼬리는 능동 윙: 달리면 올라옵니다). 디퓨저는 뒤 바닥 아래에 그려집니다.'),
+  // the interior (docs/systems/115 §4-3): a set of the lump's own, not placed freely; its trim's colour in ⑦
+  h2('실내'), cards<InteriorSetId>('실내 세트', INTERIOR_SET_IDS.map(k => [k, `${INTERIOR_SETS[k].name} · ${INTERIOR_SETS[k].note}`, icon('interior'), { kind: 'interior', v: k }] as [InteriorSetId, string, string, ThumbSpec]), () => interiorD().set, v => { D.interior = { ...interiorD(), set: v }; }),
+  note('실내는 정해 둔 세트에서 고릅니다. 드리프트 세트는 가볍고(무게 계수 경량), 순정 세트를 황갈색으로 고르면 가죽·에어컨의 고급 사양으로 무게를 셉니다. 색은 ⑦ 칠·마감에서 고릅니다.'));
+// ⑧ 검사·시험 주행: the fit's checks with their fixes and the step each belongs to, the class, the cost and the
 // reliability, what was measured, the test drive and the save
 { const div = (id: string, cls: string) => { const d = document.createElement('div'); d.id = id; d.className = cls; return d; };
   const drv = document.createElement('a'); drv.id = 'drive6'; drv.className = BTN_MAIN; drv.target = '_blank'; drv.rel = 'opener'; drv.textContent = '시험 주행 ▶'; drv.href = 'drive.html';
@@ -410,7 +424,7 @@ function showList() { const list = $('list'), all = savedDesigns(store); list.te
 
 // ---- the design changed: kept, the figures, the car (when its body changed), the link ----
 // the engine's shape is in the key too (the car carries its powertrain: the engine view shows it)
-const bodyKey = (d: Design) => JSON.stringify([d.body.model ?? null, isModelBase(d.body.base) ? [d.kit.interior, d.engine.redline, d.engine.boost] : 0, d.engine.layout, d.engine.cc, d.engine.bs, d.engine.valves, d.engine.block, d.engine.grade, d.engine.intake, d.engine.sump, d.engine.turbo, d.engine.intercooler, d.drive.gears, d.drive.gearbox, d.drive.awd, d.body.base, d.body.nose, ...FACE_KEYS.map(k => d.body[k]), d.body.tail, d.body.wheel, ...DIMS.map(k => d.body[k]), d.body.paint, d.body.gloss, d.kit.tyres, d.kit.rim, d.kit.wing, d.kit.diffuser,
+const bodyKey = (d: Design) => JSON.stringify([d.body.model ?? null, isModelBase(d.body.base) ? [d.kit.interior, d.interior ?? null, d.body.frame ?? null, d.body.glass === undefined ? 'stock' : d.body.glass, d.engine.redline, d.engine.boost] : 0, d.engine.layout, d.engine.cc, d.engine.bs, d.engine.valves, d.engine.block, d.engine.grade, d.engine.intake, d.engine.sump, d.engine.turbo, d.engine.intercooler, d.drive.gears, d.drive.gearbox, d.drive.awd, d.body.base, d.body.nose, ...FACE_KEYS.map(k => d.body[k]), d.body.tail, d.body.wheel, ...DIMS.map(k => d.body[k]), d.body.paint, d.body.gloss, d.kit.tyres, d.kit.rim, d.kit.wing, d.kit.diffuser,
   // the suspension's linkage (its kind, arms, roll centre, caster, static camber and toe: the rig is built with them; not the springs, the dampers or the bars)
   ...[d.susp.front, d.susp.rear].map(a => [a.type, a.arm, a.rc, a.camber, a.toe]), d.susp.front.caster]);
 let meshT = 0, figT = 0;
@@ -492,7 +506,7 @@ function showFit(r: FitResult[]) {
   const bad = r.filter(x => x.verdict !== 'ok').sort((a, b) => (a.verdict === 'blocked' ? 0 : 1) - (b.verdict === 'blocked' ? 0 : 1)), ok = r.filter(x => x.verdict === 'ok');
   const nb = bad.filter(x => x.verdict === 'blocked').length, nm = bad.length - nb, el = $('fit');
   const open = fitOpen ?? (nb > 0 || (nm > 0 && innerWidth > 760));
-  // in ⑥ each check also names its step, a button that goes there
+  // in ⑧ each check also names its step, a button that goes there
   const item = (x: FitResult, toStep = false) => `<li class="${x.verdict}"><span class="ic" aria-hidden="true">${ICON[x.verdict]}</span><div><b>${esc(x.name)}</b> <span>${esc(x.reason)}</span>`
     + (x.fixes.length || (toStep && x.verdict !== 'ok') ? `<div class="fixes">${x.fixes.map((fx, i) => `<button type="button" class="${BTN} fix" data-part="${x.part}" data-i="${i}">${esc(fx.label)}</button>`).join('')}`
       + (toStep && x.verdict !== 'ok' ? `<button type="button" class="${BTN} go" data-step="${FIT_STEP[x.part]}">◀ ${stepNo(FIT_STEP[x.part]) + 1}단계 ${STEPS[stepNo(FIT_STEP[x.part])]![1]}로</button>` : '') + '</div>' : '') + '</div></li>';
@@ -529,7 +543,7 @@ const home = () => { view.ang = Math.PI - 0.7; view.pitch = 17; view.zoom = 1; v
 const press = (id: string, k: 'spin' | 'lamps' | 'engine' | 'susp') => $(id).addEventListener('click', () => { view[k] = !view[k]; $(id).setAttribute('aria-pressed', String(view[k])); dirty = true; });
 press('spin', 'spin'); press('lamps', 'lamps'); press('engine', 'engine'); press('susp', 'susp');
 $('susp').addEventListener('click', () => { suspAuto = false; });   // the viewer's own choice from now on
-/** the suspension view on or off (step ③ puts it on) */
+/** the suspension view on or off (step ⑤ puts it on) */
 function setSuspView(on: boolean) { view.susp = on; $('susp').setAttribute('aria-pressed', String(on)); dirty = true; }
 $('engine').addEventListener('click', () => { if (view.engine) { view.ang = view.yaw + 0.6; view.pitch = 42; view.zoom = 0.8; } });   // the engine bay seen from behind and above
 $<HTMLSelectElement>('look').addEventListener('change', e => { view.look = +(e.target as HTMLSelectElement).value; dirty = true;

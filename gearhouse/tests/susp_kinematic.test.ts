@@ -69,7 +69,7 @@ describe('the kinematic tables', () => {
 describe('the design (format 5)', () => {
   it('a format-4 design (and a link or a file of one) takes its base\'s own suspension, and drives as the base\'s own design does', () => {
     for (const [id, d] of BASES) { const { susp: _s, ...rest } = structuredClone(d); void _s; const v4: DesignV4 = { ...rest, v: 4 };
-      const n = normalise(v4); expect(n.v).toBe(5); expect(n.susp).toEqual(SUSP_OWN[id as 'nsx']); expect(n).toEqual(d);
+      const n = normalise(v4); expect(n.v).toBe(6); expect(n.susp).toEqual(SUSP_OWN[id as 'nsx']); expect(n).toEqual(d);
       const f = asDesign(JSON.parse(JSON.stringify(v4)))!; expect(f.susp).toEqual(SUSP_OWN[id as 'nsx']);
       expect(JSON.stringify(designSpec(f).kin?.setup)).toBe(JSON.stringify(designSpec(d).kin?.setup)); }
   });
@@ -77,7 +77,7 @@ describe('the design (format 5)', () => {
     for (const [id, d] of BASES) { const { susp: _s, ...rest } = structuredClone(d); void _s; const v4: DesignV4 = { ...rest, v: 4 }, own = SUSP_OWN[id as 'nsx'];
       const { bs: _b, quality: _q, ...engine } = v4.engine; void _b; void _q;
       const v3 = { ...v4, v: 3, engine: { ...engine, layout: 'V8' } } as unknown as DesignV3, v2 = { ...v3, v: 2 } as unknown as DesignV2;
-      for (const old of [v3, v2]) { const n = normalise(old); expect(n.v, `${id} v${old.v}`).toBe(5); expect(n.susp, `${id} v${old.v}`).toEqual(own); expect(n.susp).not.toBe(own); expect(n).toEqual(normalise(toV4(old))); } }
+      for (const old of [v3, v2]) { const n = normalise(old); expect(n.v, `${id} v${old.v}`).toBe(6); expect(n.susp, `${id} v${old.v}`).toEqual(own); expect(n.susp).not.toBe(own); expect(n).toEqual(normalise(toV4(old))); } }
   });
   it('the settings are held to their ranges; the beam axle and a front multilink are not offered on the 1990s bases', () => {
     const n = normalise({ ...DESIGN_NSX, susp: { front: { ...DESIGN_NSX.susp.front, type: 'beamLeaf', hz: 9, camber: -40, caster: 99 }, rear: { ...DESIGN_NSX.susp.rear, type: 'multilink', bar: -3, toe: 4 } } });
@@ -123,14 +123,15 @@ describe('the extremes', () => {
   });
 });
 
-describe('the builder\'s seven steps', () => {
-  it('in order, the suspension third; a step kept by the six-step builder found again (by its id, or by its number)', () => {
-    expect(STEPS.map(s => s[0])).toEqual(['chassis', 'engine', 'susp', 'body', 'kit', 'paint', 'check']); expect(STEPS[2]![1]).toBe('서스펜션'); expect(stepMark('check')).toBe('⑦');
-    expect(stepFrom('kit')).toBe('kit'); expect(stepFrom('susp')).toBe('susp'); expect(stepFrom(2)).toBe('body'); expect(stepFrom(5)).toBe('check'); expect(stepFrom(0)).toBe('chassis');
+describe('the builder\'s eight steps (docs/systems/115 §6, F1)', () => {
+  it('in order, the lump, its glass and its parts first; a step kept by the seven-step or the six-step builder found again', () => {
+    expect(STEPS.map(s => s[0])).toEqual(['frame', 'glass', 'parts', 'engine', 'susp', 'kit', 'paint', 'check']); expect(STEPS[4]![1]).toBe('서스펜션'); expect(stepMark('check')).toBe('⑧');
+    expect(stepFrom('kit')).toBe('kit'); expect(stepFrom('susp')).toBe('susp'); expect(stepFrom('chassis')).toBe('frame'); expect(stepFrom('body')).toBe('parts');
+    expect(stepFrom(2)).toBe('parts'); expect(stepFrom(5)).toBe('check'); expect(stepFrom(0)).toBe('frame');
     expect(stepFrom(6)).toBeNull(); expect(stepFrom('files')).toBeNull(); expect(stepFrom(undefined)).toBeNull(); expect(stepFrom(1.5)).toBeNull();
-    expect(seenFrom(['chassis', 2, 'susp', 'oops', 2])).toEqual(['chassis', 'body', 'susp']); expect(seenFrom('x')).toEqual([]);
+    expect(seenFrom(['chassis', 2, 'susp', 'oops', 2])).toEqual(['frame', 'parts', 'susp']); expect(seenFrom('x')).toEqual([]);
     expect(STEPS_06.every(s => stepNo(s) >= 0)).toBe(true); for (const s of Object.values(FIT_STEP)) expect(stepNo(s)).toBeGreaterThanOrEqual(0);
-    expect(stepNo('body')).toBe(3); expect(stepNo(FIT_STEP.archF)).toBe(4);
+    expect(stepNo('parts')).toBe(2); expect(stepNo(FIT_STEP.archF)).toBe(5); expect(FIT_STEP.clearance).toBe('frame');
   });
 });
 

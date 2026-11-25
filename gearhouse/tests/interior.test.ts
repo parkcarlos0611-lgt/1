@@ -38,7 +38,7 @@ describe('the interior (docs/systems/109 section 4)', () => {
   });
   it('swaps parts without touching the rest: wheel, seats, lever, cage, trim', () => {
     const w = interiorMesh({ ...INTERIORS.stock, wheel: 'drift' }); expect(names(w).has('steerWheelHorn')).toBe(true); expect(names(w).has('steerWheelPad')).toBe(false); expect(box(w, /^seatL$/)).toEqual(box(stock, /^seatL$/));
-    const s = interiorMesh({ ...INTERIORS.stock, seats: 'bucket' }); expect(box(s, /^seatL$/).hi[2]).toBeGreaterThan(box(stock, /^seatL$/).hi[2]); expect(box(s, /^steerWheelRim$/)).toEqual(box(stock, /^steerWheelRim$/));
+    const s = interiorMesh({ ...INTERIORS.stock, seats: 'bucket' }); expect(box(s, /^seatL$/).hi[2]!).toBeGreaterThan(box(stock, /^seatL$/).hi[2]!); expect(box(s, /^steerWheelRim$/)).toEqual(box(stock, /^steerWheelRim$/));
     const c = interiorMesh({ ...INTERIORS.stock, cage: true }); expect(c.n - stock.n).toBe(interiorBudget(c).cage);
     const tan = interiorMesh({ ...INTERIORS.stock, trim: 'tan' }); expect(tan.n).toBe(stock.n); expect(Array.from(tan.pos)).toEqual(Array.from(stock.pos)); expect(Array.from(tan.col)).not.toEqual(Array.from(stock.col));
     expect(Object.keys(TRIMS)).toEqual(['black', 'brown', 'tan']);

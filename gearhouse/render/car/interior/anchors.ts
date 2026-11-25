@@ -25,7 +25,7 @@ export const P959_CABIN: CabinAnchors = { side: 1, floorZ: 175, dashX: 1800, das
 export interface Trim { name: string; /** the seats' leather and the seats' second tone (bolsters, piping) */ seat: string; seat2: string; /** the dash's pad (top and knee roll) and its face band */ dash: string; face: string; /** door cards, carpet, the tunnel's cover */ door: string; carpet: string; tunnel: string;
   /** the wheel's rim and pad, hard plastics (column, stalks, the binnacle's panel), bright metal (levers, rails) */ wheel: string; plastic: string; metal: string }
 export const TRIMS = {
-  black: { name: '검정', seat: '#34353a', seat2: '#26272b', dash: '#2b2c30', face: '#17181a', door: '#303136', carpet: '#3a3b40', tunnel: '#2a2b2f', wheel: '#232427', plastic: '#1c1d20', metal: '#9a9ca0' },
+  black: { name: '검정', seat: '#3d3e44', seat2: '#2c2d32', dash: '#35363b', face: '#19191b', door: '#393a40', carpet: '#44454b', tunnel: '#313237', wheel: '#27282c', plastic: '#1e1f22', metal: '#9a9ca0' },
   brown: { name: '갈색', seat: '#7a3b27', seat2: '#63301f', dash: '#6b3322', face: '#222224', door: '#733826', carpet: '#52291d', tunnel: '#5c2d1f', wheel: '#6b3322', plastic: '#1f1f22', metal: '#9a9ca0' },
   tan: { name: '황갈색', seat: '#c08a50', seat2: '#a87540', dash: '#b47e47', face: '#232325', door: '#bb854c', carpet: '#8a6642', tunnel: '#a87540', wheel: '#b47e47', plastic: '#222224', metal: '#9a9ca0' },
 } as const satisfies Record<string, Trim>;

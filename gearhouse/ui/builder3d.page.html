@@ -228,8 +228,13 @@
   .placebar .pb-v { text-align: right; font-variant-numeric: tabular-nums; } .placebar .pb-snap { font-size: 0.85rem; }
   .placebar .pb-why { margin: 0; font-size: 0.82rem; color: #7fe08f; } .placebar .pb-why.bad { color: #ff7a6e; font-weight: 700; }
   .placebar .btns { display: flex; gap: 6px; flex-wrap: wrap; }
+  .placebar .pb-rows { display: grid; gap: 4px; } .placebar .pb-toggles { display: flex; gap: 4px 14px; flex-wrap: wrap; } .placebar .pb-toggles [hidden] { display: none; }
+  .placebar .pb-why.warn { color: #ffd166; }
+  .placebar .pb-pad { display: flex; gap: 4px; } .placebar .pb-nudge { min-width: 40px; min-height: 36px; padding: 0 8px; }
+  .placedlist { display: flex; gap: 6px; flex-wrap: wrap; }
   body.placing .viewbar, body.placing .hint { display: none; }
-  @media (max-width: 760px) { .placebar { left: 8px; right: 8px; bottom: calc(var(--railH) + 8px); max-width: none; padding: 8px 10px 10px; gap: 3px; } .placebar .pb-hint { display: none; } body.open .placebar { display: none; } .placebar .pb-row { grid-template-columns: 3.6em minmax(0, 1fr) 6.8em; } }
+  @media (max-width: 760px) { .placebar { left: 8px; right: 8px; bottom: calc(var(--railH) + 8px); max-width: none; padding: 8px 10px 10px; gap: 3px; } .placebar .pb-hint { display: none; } body.open .placebar { display: none; } .placebar .pb-row { grid-template-columns: 3.6em minmax(0, 1fr) 6.8em; }
+    .placebar .pb-rows { grid-template-columns: 1fr 1fr; column-gap: 10px; } .placebar .pb-rows .pb-row { grid-template-columns: minmax(0, 1fr) 5.2em; } .placebar .pb-rows .pb-l { grid-column: 1 / -1; font-size: 0.75rem; } }
 </style>
 <canvas id="view" aria-label="3D 미리보기 (끌어서 돌리기, 휠·두 손가락으로 확대)"></canvas>
 <div class="top">

@@ -53,3 +53,16 @@ export function wheelPic(kind: 'hollow5' | 'dish' | 'hole5' | 'steel'): string {
   return svg64(b); }
 /** a body base's card picture: the kit's body */
 export const basePic = (): string => icon('body');
+/** a free surface part's drawn card (docs/systems/115 P1), until its rendered picture comes: a mirror, a wing (ring or
+ *  GT), one or two tips, the crest's shield, a marker, a vent or a louvre */
+export function partPic(id: 'mirror' | 'wingRing' | 'wingGT' | 'exhaust1' | 'exhaust2' | 'badge' | 'marker' | 'vent' | 'louvre'): string {
+  switch (id) {
+    case 'mirror': return svg64(`<path d="M10 38L26 26" ${st(5)}/><path d="M22 14H50Q56 14 56 22V28Q56 34 50 34H26Q20 34 20 26V20Q20 14 22 14Z" fill="#fff" ${st()}/><path d="M27 19H49V29H27Z" fill="${MET}" ${st(2)}/>`);
+    case 'wingRing': return svg64(`<path d="M6 40Q8 18 18 14H46Q56 18 58 40" fill="none" ${st(6)}/><path d="M6 40Q8 18 18 14H46Q56 18 58 40" fill="none" stroke="#fff" stroke-width="3"/>`);
+    case 'wingGT': return svg64(`<rect x="6" y="12" width="52" height="7" rx="3" fill="#fff" ${st()}/><path d="M20 19V40M44 19V40" ${st(4)}/><path d="M5 9V24M59 9V24" ${st(4)}/>`);
+    case 'exhaust1': return svg64(`<circle cx="32" cy="24" r="14" fill="${MET}" ${st()}/><circle cx="32" cy="24" r="9" fill="${DARK}" ${st(2)}/>`);
+    case 'exhaust2': return svg64(`${[19, 45].map(x => `<circle cx="${x}" cy="24" r="11" fill="${MET}" ${st()}/><circle cx="${x}" cy="24" r="7" fill="${DARK}" ${st(2)}/>`).join('')}`);
+    case 'badge': return svg64(`<path d="M20 8H44V26Q44 38 32 42Q20 38 20 26Z" fill="${ROLE.yellow[0]}" ${st()}/><path d="M25 16H39M32 16V34" stroke="${K}" stroke-width="2.5"/>`);
+    case 'marker': return svg64(`<rect x="12" y="17" width="40" height="14" rx="7" fill="${ROLE.yellow[0]}" ${st()}/>`);
+    case 'vent': return svg64(`<rect x="6" y="14" width="52" height="20" rx="7" fill="#fff" ${st()}/><rect x="12" y="19" width="40" height="10" rx="3" fill="${DARK}" ${st(2)}/>`);
+    default: return svg64(`<rect x="8" y="8" width="48" height="32" rx="3" fill="${DARK}" ${st()}/>${[14, 20, 26, 32].map(y => `<path d="M12 ${y}H52" stroke="#9aa0a6" stroke-width="2.5"/>`).join('')}`); } }

@@ -39,11 +39,13 @@ import { installPick, pickCard, setCard, railTab } from './kit/pick';
 import { statBar } from './kit/parts';
 import { STATS, type StatDef } from './kit/logic';
 import { icon } from './kit/icons';
-import { stepIcon, STEP_SHORT, bumperPic, lampPic, wheelPic, basePic } from './builder_pics';
-import { partThumbs, type ThumbSpec } from './builder_thumbs';
-import { placeTool } from './builder_place';
+import { stepIcon, STEP_SHORT, bumperPic, lampPic, wheelPic, basePic, partPic } from './builder_pics';
+import { partThumbs, PART_THUMB, type ThumbSpec } from './builder_thumbs';
+import { placeTool, partName } from './builder_place';
+import { modelSkin } from '../render/car/bodies';
+import { stockParts } from '../render/car/attach/stock';
 import { viewRay } from '../render/car/skin';
-import type { PlacedId } from '../core/placed';
+import { FREE_IDS, PART_GROUPS, PART_KINDS, freeParts, type PlacedId, type FreeId, type Placed } from '../core/placed';
 import { FRAMES, FRAME_OF_BASE, interiorSetOf, FRAME_IDS, FRAME_DIMS, FRAME_DIM_NAME, NO_FRAME_DIMS, GLASS, GLASS_IDS, INTERIOR_SETS, INTERIOR_SET_IDS, TRIM_IDS, TRIM_NAME, interiorOfKit, type FrameId, type FrameDimKey, type GlassId, type InteriorSetId, type TrimId } from '../core/frames';
 import texAlb from '../assets/textures/pbr/albedo.jpg';
 import texNor from '../assets/textures/pbr/normal.jpg';
@@ -309,7 +311,7 @@ function btnRow(t: string, f: () => void): HTMLElement { const d = document.crea
   // the parts library (docs/systems/110 G4): each swap a card with its picture
   // "599 순정 세트" (docs/systems/115 §4-1): every part as the car left the works, its glass the stock set; the lump's
   // dimensions and the plate's text kept
-  const stockRow = btnRow('599 순정 세트', () => { place.end(); D.body.model = { ...MODEL_OWN.p959, plate: M().plate }; D.body.glass = 'stock'; delete D.body.parts; changed(); flash('599 순정 부품과 창문을 달았습니다 (번호판도 순정 자리로)'); });
+  const stockRow = btnRow('599 순정 세트', () => { place.end(); D.body.model = { ...MODEL_OWN.p959, plate: M().plate, smalls: false }; D.body.glass = 'stock'; delete D.body.parts; D.body.parts = stockFree(); changed(); flash('599 순정 부품과 창문을 달았습니다 (번호판도 순정 자리로, 미러·배기구·배지는 자유 부착 부품으로)'); });
   stockRow.querySelector('button')!.className = BTN_MAIN; stockRow.querySelector('button')!.id = 'stockSet';
   const lumpRow = btnRow('모두 떼기 (덩어리로)', () => { place.end(); D.body.model = LUMP_SWAPS(M().plate); delete D.body.parts; changed(); });
   stockRow.append(lumpRow.querySelector('button')!);
@@ -322,11 +324,27 @@ function btnRow(t: string, f: () => void): HTMLElement { const d = document.crea
   // the plates: the 599's and the N33's alike (each body's own skin and stock places: render/car/bodies.ts modelSkin)
   const plateRows = [plateOn('plateF', '앞 번호판'), plateOn('plateR', '뒤 번호판'), plateCards, note(`번호판 카드를 누르면 "놓기"가 됩니다. 판을 끌어 차체 위 아무 곳으로나 옮기고, 회전·기울기·크기를 고릅니다. 앞 번호판은 앞을, 뒤 번호판은 뒤를 보는 면(차 축에서 35° 안)에만 붙고, 굽은 면에서는 판이 평평한 채 검은 받침이 틈을 메웁니다(최대 70 mm). 램프·유리·다른 번호판과 겹치면 붙지 않습니다. 레이스 상대와 순정 세트는 순정 자리입니다.`),
     plateRow];
-  const modelTail = [note('범퍼는 차체의 이음선 고리에 맞물려 바뀝니다. 헤드램프를 빼면 램프 자리는 차체 색으로 막힙니다. 번호판은 앞뒤를 따로 떼고 다시 달 수 있고, 뗀 자리는 범퍼 면 그대로입니다. 번호판 글자는 판 위에 획으로 그립니다(가상의 번호만). 다른 부품의 자유 부착은 다음 단계(P1, P2)에서 옵니다.')];
+  const modelTail = [note('범퍼는 차체의 이음선 고리에 맞물려 바뀝니다. 헤드램프를 빼면 램프 자리는 차체 색으로 막힙니다. 번호판은 앞뒤를 따로 떼고 다시 달 수 있고, 뗀 자리는 범퍼 면 그대로입니다. 번호판 글자는 판 위에 획으로 그립니다(가상의 번호만). 구멍을 내는 부품(램프·흡기구·그릴)의 자유 부착은 다음 단계(P2)에서 옵니다.')];
+  // the free surface parts (docs/systems/115 P1): a card for each kind, grouped, with its rendered picture; pressed, a new
+  // one is put on (at the lump's stock place for it, or a default one) and placed (ui/builder_place.ts); the parts on the
+  // car listed to pick one again; the lump's stock set of them, and all of them off
+  const stockFree = (): Placed[] | undefined => { const s = modelSkin({ ...D, body: { ...D.body, parts: undefined } }); if (!s) return undefined; const ps = stockParts(D.body.base as 'p959' | 'bnr33', s.skin, D.body.frame?.dims); return ps.length ? ps : undefined; };
+  const keepPlates = () => (D.body.parts ?? []).filter(p => p.id === 'plateF' || p.id === 'plateR');
+  const freeCards = PART_GROUPS.map(([g, label]) => cards<FreeId | ''>(label, FREE_IDS.filter(id => PART_KINDS[id].group === g).map(id => [id, PART_KINDS[id].name, partPic(id), { kind: PART_THUMB[id], v: id }] as [FreeId, string, string, ThumbSpec]),
+    () => place.id && FREE_IDS.includes(place.id as FreeId) && PART_KINDS[place.id as FreeId].group === g ? place.id as FreeId : '', v => { if (v) place.add(v); }));
+  const onCar = document.createElement('div'); onCar.className = 'btns placedlist'; onCar.setAttribute('role', 'group'); onCar.setAttribute('aria-label', '붙인 부품');
+  syncs.push(() => { const ps = freeParts(D.body.parts), key = JSON.stringify(ps.map(p => [p.id, p.n ?? 0, !!p.one, place.id === p.id && place.n === (p.n ?? 0)])); if (onCar.dataset.k === key) return; onCar.dataset.k = key; onCar.textContent = '';
+    if (!ps.length) { const e = document.createElement('small'); e.className = 'lock'; e.textContent = '아직 붙인 부품이 없습니다.'; onCar.append(e); }
+    for (const p of ps) { const b = document.createElement('button'); b.type = 'button'; b.className = BTN; const K = PART_KINDS[p.id as FreeId]; b.textContent = `${partName(p.id)}${p.n ? ` ${p.n + 1}` : ''}${K.pair && !p.one ? ' ×2' : ''}`;
+      b.setAttribute('aria-pressed', String(place.id === p.id && place.n === (p.n ?? 0))); b.addEventListener('click', () => place.start(p.id, p.n ?? 0)); onCar.append(b); } });
+  const freeStock = btnRow('순정 부착 부품', () => { place.end(); const ps = stockFree(); D.body.parts = [...keepPlates(), ...(ps ?? [])].length ? [...keepPlates(), ...(ps ?? [])] : undefined; if (D.body.base === 'p959') M().smalls = false; changed(); flash('이 차체의 순정 부착 부품을 순정 자리에 달았습니다'); });
+  freeStock.append(btnRow('부착 부품 모두 떼기', () => { place.end(); const k = keepPlates(); D.body.parts = k.length ? k : undefined; if (D.body.base === 'p959') M().smalls = false; changed(); }).querySelector('button')!);
+  const freeRows = [h2('붙이는 부품'), note('카드를 누르면 새 부품이 붙고 "놓기"가 됩니다. 끌어서 차체 어디에나 옮기고 크기·깊이·각도를 고릅니다. 짝 부품(미러·배기구·표시등·벤트)은 가운데 선 건너편에 거울처럼 함께 붙고 "한쪽만"으로 끌 수 있습니다. 윙은 가운데 선 위에만, 배지는 하나씩 붙습니다. 이 부품들은 구멍을 내지 않고 표면에 붙습니다(구멍 부품은 P2).'),
+    ...freeCards, field('붙인 부품 (눌러서 다시 놓기)', onCar), freeStock];
   // the N33's own parts come in R3 (docs/systems/117): its lump takes none of the 599's yet
-  const n33Note = note('차체 B(N33)의 부품은 아직 없습니다(문서 117 R3에서 수확합니다). 지금은 덩어리, 창문 세트, 실내 세트, 번호판을 고를 수 있습니다.');
-  syncs.push(() => { const m = isModelBase(D.body.base), p = D.body.base === 'p959'; for (const e of kitRows) e.hidden = m; for (const e of [...modelRows, ...modelTail]) e.hidden = !p; for (const e of plateRows) e.hidden = !m; n33Note.hidden = D.body.base !== 'bnr33'; if (m && document.activeElement !== plate) plate.value = M().plate; });
-  add('parts', ...kitRows, ...modelRows, n33Note, ...plateRows, ...modelTail);
+  const n33Note = note('차체 B(N33)의 부품은 아직 없습니다(문서 117 R3에서 수확합니다). 지금은 덩어리, 창문 세트, 실내 세트, 번호판, 붙이는 부품(미러·윙·배기구·배지·표시등·벤트)을 고를 수 있습니다.');
+  syncs.push(() => { const m = isModelBase(D.body.base), p = D.body.base === 'p959'; for (const e of kitRows) e.hidden = m; for (const e of [...modelRows, ...modelTail]) e.hidden = !p; for (const e of [...plateRows, ...freeRows]) e.hidden = !m; n33Note.hidden = D.body.base !== 'bnr33'; if (m && document.activeElement !== plate) plate.value = M().plate; });
+  add('parts', ...kitRows, ...modelRows, n33Note, ...freeRows, ...plateRows, ...modelTail);
   const sw = document.createElement('div'); sw.className = 'swatches'; const pick = document.createElement('input'); pick.type = 'color'; pick.id = 'paint'; pick.setAttribute('aria-label', '직접 고르기');
   const bs = PAINTS.map(c => { const b = document.createElement('button'); b.type = 'button'; b.style.background = c; b.setAttribute('aria-label', c); b.addEventListener('click', () => { D.body.paint = c; changed(); }); sw.append(b); return [c, b] as const; });
   pick.addEventListener('input', () => { D.body.paint = pick.value; changed(); }); sw.append(pick);

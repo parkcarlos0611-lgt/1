@@ -27,7 +27,7 @@ export function stockAims(base: Lump, dims?: Partial<FrameDims>): Aim[] { if (ba
  *  skin's bounds, so any lump has one */
 export function defaultAim(id: FreeId, box: [V, V]): Aim { const [lo, hi] = box, L = hi[0] - lo[0], H = hi[2] - lo[2], W = hi[1] - lo[1], x = (f: number) => lo[0] + L * f, z = (f: number) => lo[2] + H * f;
   switch (PART_KINDS[id].group) {
-    case 'mirror': return { id, o: [x(0.37), hi[1] + 600, z(0.66)], d: [0, -1, 0] };
+    case 'mirror': return { id, o: [x(0.37), hi[1] + 600, z(0.58)], d: [0, -1, 0] };
     case 'wing': return { id, o: [x(0.93), 0, hi[2] + 1000], d: [0, 0, -1] };
     case 'exhaust': return { id, o: [hi[0] + 600, W * 0.18, z(0.2)], d: [-1, 0, 0] };
     case 'badge': return { id, o: [lo[0] - 600, 0, z(0.45)], d: [1, 0, 0] };

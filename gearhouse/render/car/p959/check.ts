@@ -16,7 +16,7 @@ const pct = (v: number[], p: number) => { const s = v.slice().sort((a, b) => a -
 export interface Panel { name: string; rows: [number, number]; cols: [number, number]; across?: number; along?: number; flat?: number; why?: string }
 export const PANELS: Panel[] = [
   { name: 'bonnet', rows: [0, 10], cols: [0, 3] },
-  { name: 'wingF top (pod)', rows: [3, 9], cols: [3, 6], across: 1, along: 2, why: 'the pod rises out of the bonnet\'s valley (hollow at its foot, round over its crest); along it, the hollow behind the lamp\'s rim and the sweep up to the screen pillar' },
+  { name: 'wingF top (pod)', rows: [3, 8], cols: [3, 6], across: 1, along: 2, why: 'the pod rises out of the bonnet\'s valley (hollow at its foot, round over its crest); along it, the hollow behind the lamp\'s rim and the sweep up to the screen pillar' },
   { name: 'wingF side', rows: [0, 4], cols: [7, 9] },
   { name: 'roof', rows: [14, 19], cols: [0, 3] },
   { name: 'door', rows: [10, 16], cols: [5, 9] },

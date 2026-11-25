@@ -3,7 +3,7 @@
 // sunk (head lamps, tail lamp bar, side intakes), the underside closed. The result is one closed surface of quads and
 // a few triangles, every face tagged with its region (the shell itself or a module hung on a boundary loop), material
 // and panel; with it the drawn lines, the hard creases (split shading) and the modules' boundary loops, as points.
-import { buildCage, ARCH, DIM, type Cage959, type Tag } from './cage';
+import { buildCage, ARCH, DIM, type Cage959, type CageOpts, type Tag } from './cage';
 import { cornerNormals, ekey, faceNormal, subdivide, type Fine, type V } from './subdiv';
 
 const add = (a: V, b: V): V => [a[0] + b[0], a[1] + b[1], a[2] + b[2]], sub = (a: V, b: V): V => [a[0] - b[0], a[1] - b[1], a[2] - b[2]], mul = (a: V, k: number): V => [a[0] * k, a[1] * k, a[2] * k];
@@ -18,9 +18,9 @@ export interface Shell959 { P: V[]; F: number[][]; tag: Tag[]; /** shading norma
 function finePath(c: Cage959, f: Fine, path: number[], closed = false): number[] { const out: number[] = []; const n = path.length;
   for (let q = 0; q < n; q++) { out.push(f.vp[path[q]!]!); if (q + 1 < n || closed) out.push(f.ep.get(ekey(path[q]!, path[(q + 1) % n]!))!); } return out; }
 
-export interface ShellOpts { /** leave the sockets flush (no recess) */ flush?: boolean }
+export interface ShellOpts extends CageOpts { /** leave the sockets flush (no recess) */ flush?: boolean }
 export function buildShell(o: ShellOpts = {}): Shell959 {
-  const cage = buildCage(), fine = subdivide(cage), P = fine.P, F: number[][] = fine.F.map(q => q.slice()), tag: Tag[] = fine.parent.map(k => cage.tag[k]!), nSub = F.length;
+  const cage = buildCage(o), fine = subdivide(cage), P = fine.P, F: number[][] = fine.F.map(q => q.slice()), tag: Tag[] = fine.parent.map(k => cage.tag[k]!), nSub = F.length;
   const crease = new Set<string>(); for (const key of cage.crease) { const [a, b] = key.split('|').map(Number) as [number, number], m = fine.ep.get(key)!; crease.add(ekey(fine.vp[a]!, m)); crease.add(ekey(m, fine.vp[b]!)); }
   const pt = (p: V) => P.push(p) - 1;
   const openEdges = () => { const m = new Map<string, [number, number, number]>(); F.forEach((f, k) => f.forEach((a, q) => { const b = f[(q + 1) % f.length]!, key = ekey(a, b); if (m.has(key)) m.set(key, [0, 0, -1]); else m.set(key, [a, b, k]); })); return [...m.values()].filter(e => e[2] >= 0); };

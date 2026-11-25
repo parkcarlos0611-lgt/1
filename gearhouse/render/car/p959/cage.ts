@@ -22,33 +22,34 @@ export const NR = 31, NC = 13;
 /** the arches: hub, the cage's radius (the subdivided ring lands on archR), rows and the top column */
 export const ARCH = { f: { x: DIM.axleF, z: DIM.hubZ, rows: [5, 9] as [number, number] }, r: { x: DIM.axleR, z: DIM.hubZ - 2, rows: [19, 23] as [number, number] }, rc: 362, top: 8 };
 
-const T = (s: string): (V | null)[] => s.trim().split(/\s*[;\n]\s*/).map(r => r.trim() === '-' ? null : r.trim().split(/[\s,]+/).map(Number) as V);
+const T = (s: string): (V | null)[] => s.trim().split(/\s*[;
+]\s*/).map(r => r.trim() === '-' ? null : r.trim().split(/[\s,]+/).map(Number) as V);
 /** the columns, one row a line: x y z */
 const COLS: (V | null)[][] = [
   // 0 centre line
   T(`20 0 432; 130 0 548; 250 0 596; 380 0 636; 520 0 672; 660 0 706; 800 0 739; 940 0 770; 1080 0 800; 1250 0 834
      1430 0 868; 1562 0 964; 1695 0 1060; 1828 0 1155; 1960 0 1250; 2140 0 1281; 2320 0 1285; 2500 0 1276; 2675 0 1256; 2850 0 1226
-     2992 0 1169; 3134 0 1112; 3276 0 1056; 3418 0 999; 3560 0 942; 3715 0 866; 3860 0 802; 3872 0 890; 4010 0 940; 4140 0 930; 4260 0 906`),
+     2992 0 1169; 3134 0 1112; 3276 0 1056; 3418 0 999; 3560 0 942; 3715 0 866; 3860 0 802; 3872 0 868; 4010 0 940; 4140 0 930; 4260 0 906`),
   // 1
   T(`22 160 431; 132 195 546; 253 208 592; 383 218 632; 523 228 668; 663 240 702; 803 255 735; 943 270 766; 1083 290 796; 1262 312 831
      1465 330 868; 1594 320 962; 1723 310 1057; 1852 300 1151; 1975 290 1244; 2140 290 1273; 2320 290 1277; 2500 288 1268; 2675 285 1248; 2852 280 1218
-     2996 280 1162; 3138 281 1106; 3280 283 1050; 3422 285 993; 3564 286 937; 3717 270 862; 3861 255 800; 3873 255 890; 4010 240 938; 4140 232 928; 4258 226 905`),
+     2996 280 1162; 3138 281 1106; 3280 283 1050; 3422 285 993; 3564 286 937; 3717 270 862; 3861 255 800; 3873 255 868; 4010 240 938; 4140 232 928; 4258 226 905`),
   // 2
   T(`30 310 428; 141 330 541; 262 345 584; 390 362 624; 528 385 660; 668 415.2 693.6; 808 450.6 726.7; 948 489.3 758.8; 1110 534.9 793.3; 1400 610.3 845
      1632 655 874; 1722 624 968; 1812 592 1060; 1902 560 1151; 1990 512 1238; 2146 498 1252; 2322 490 1256; 2500 484 1247; 2675 478 1227; 2856 470 1198
-     3002 468 1150; 3144 470 1095; 3286 474 1040; 3428 478 985; 3570 482 930; 3720 482 858; 3864 470 798; 3876 470 890; 4010 450 935; 4140 436 926; 4254 426 904`),
+     3002 468 1150; 3144 470 1095; 3286 474 1040; 3428 478 985; 3570 482 930; 3720 482 858; 3864 470 798; 3876 470 868; 4010 450 935; 4140 436 926; 4254 426 904`),
   // 3
   T(`48 420 424; 155 425 533; 268 440.6 572.5; 392 464.6 611.1; 530 496.1 649.8; 670 529.8 685.9; 810 562.4 719.9; 950 592.2 752.2; 1110 621.8 787.1; 1430 667.9 847.3
      1660 698 876; 1748 665 970; 1836 630 1061; 1923 596 1150; 2010 562 1228; 2152 553 1232; 2324 548 1236; 2500 542 1227; 2676 536 1207; 2860 528 1178
-     3010 535 1128; 3152 548 1072; 3294 562 1015; 3436 572 961; 3575 578 911; 3722 575 854; 3870 572 800; 3880 572 889; 4010 556 932; 4140 540 923; 4246 530 902`),
+     3010 535 1128; 3152 548 1072; 3294 562 1015; 3436 572 961; 3575 578 911; 3722 575 854; 3870 572 800; 3880 572 868; 4010 556 932; 4140 540 923; 4246 530 902`),
   // 4
   T(`70 520 420; 187 526 574; 270 489 640; 353 526 706; 520 586 771; 668 609.5 790.8; 808 631.7 807.2; 948 653.9 821.3; 1100 678 834.3; 1440 709.1 862
      1660 722 878; 1752 695 962; 1842 665 1049; 1932 634 1133; 2022 600 1210; 2190 592 1216; 2360 588 1219; 2530 583 1210; 2705 590 1188; 2880 612 1146
-     3015 655 1080; 3125 712 1002; 3205 765 925; 3360 760 898; 3500 740 888; 3690 700 864; 3884 672 808; 3884 672 886; 4010 656 927; 4135 640 918; 4234 628 898`),
+     3015 655 1080; 3125 712 1002; 3205 765 925; 3360 760 898; 3500 740 888; 3690 700 864; 3884 672 808; 3884 672 866; 4010 656 927; 4135 640 918; 4234 628 898`),
   // 5
   T(`100 610 416; 153 615 546; 270 615 640; 387 615 734; 520 680 800; 668 699 822.4; 808 715.3 837.2; 948 729.3 846.5; 1095 740.8 851.7; 1430 751.8 861.2
      1620 746 870; 1760 745.4 870; 1900 744.9 870; 2050 744.3 870; 2200 743.7 870; 2380 743.1 870; 2560 742.6 870; 2590 742 870; 2760 750 870; 2900 760 874
-     3020 772 880; 3120 782 888; 3200 790 898; 3350 815 876; 3490 815 872; 3680 800 866; 3905 768 846; 3960 754 880; 4010 744 916; 4125 726 906; 4208 704 888`),
+     3020 772 880; 3120 782 888; 3200 790 898; 3350 815 876; 3490 815 872; 3680 800 866; 3905 768 846; 3960 754 862; 4010 744 916; 4125 726 906; 4208 704 888`),
   // 6
   T(`150 690 412; 187 704 574; 270 741 640; 353 704 706; 515 800 770; 672 812.3 790.3; 810 824.8 804.9; 945 834.4 816.5; 1085 837.5 826.3; 1300 818.8 839.7
      1480 768 853; 1664 768 853; 1848 768 853; 2032 768 853; 2217 768 853; 2401 768 853; 2585 768 853; 2640 786 854; 2740 812 854; 2940 846 852
@@ -118,7 +119,9 @@ function cell(i: number, j: number): Tag {
   return { region: 'shell', mat: 'paint', panel: 'wingR' };
 }
 
-export function buildCage(): Cage959 {
+export type BumperKind = 'std' | 'aero' | 'clean';
+export interface CageOpts { bumperF?: BumperKind; bumperR?: BumperKind }
+export function buildCage(o: CageOpts = {}): Cage959 {
   const P: V[] = [], F: number[][] = [], tag: Tag[] = [], sharp = new Map<string, number>(), crease = new Set<string>();
   const pt = (p: V) => P.push([p[0], p[1], p[2]]) - 1, quad = (a: number, b: number, c: number, d: number, t: Tag) => { F.push([a, b, c, d]); tag.push(t); };
   const M: number[][] = Array.from({ length: NR }, (_, i) => Array.from({ length: NC }, (_, j) => COLS[j]![i] ? pt(COLS[j]![i]!) : -1));
@@ -146,12 +149,15 @@ export function buildCage(): Cage959 {
   const A = ARCH, onArch = (a: { x: number; z: number }, deg: number, y: number): V => [a.x + A.rc * Math.cos(deg * Math.PI / 180), y, a.z + A.rc * Math.sin(deg * Math.PI / 180)];
   const seamF = [5, 4, 3, 2, 1].map(i => M[i]![9]!).concat([9, 8, 7, 6, 5, 4, 3, 2, 1, 0].map(j => M[0]![j]!));
   const seamR = [23, 24, 25, 26, 27, 28, 29, 30].map(i => M[i]![9]!).concat(W[2]!);
-  const BF = strip(seamF, 'bumperF', [340, 195, 124], [10, 4, -42], 700, [onArch(A.f, 184, 886), onArch(A.f, 201, 876), onArch(A.f, 214, 832)], 'bumperF',
-    (m, k) => m === 0 && k >= 6 && k < 11 ? ['amber', 'indicatorF'] : m === 1 && k >= 9 ? ['grille', 'intakeF'] : m === 1 && k >= 1 && k < 5 ? ['grille', 'ventF'] : null);
-  const BR = strip(seamR, 'bumperR', [405, 255, 216], [-3, -22, -64], 3600, [onArch(A.r, 13, 908), onArch(A.r, -10, 900), onArch(A.r, -17, 862)], 'bumperR',
-    (m, k) => m === 1 && k >= 3 && k < 8 ? ['grille', 'ventR'] : m === 1 && k >= 9 ? ['dark', 'exhaustSlot'] : null);
+  // the arch end of a bumper's lines: on the arch's circle at each line's height
+  const archAt = (a: { x: number; z: number }, z: number, y: number, front: boolean): V => { const t = Math.asin(Math.max(-1, Math.min(1, (z - a.z) / A.rc))); return [a.x + (front ? -1 : 1) * A.rc * Math.cos(t), y, z]; };
+  // the variants (docs/systems/109 S3): std the car's own; aero a deeper lip (front) or a diffuser (rear); clean without the corner vents
+  const kf = o.bumperF ?? 'std', kr = o.bumperR ?? 'std', zf: [number, number, number] = kf === 'aero' ? [365, 150, 92] : [365, 180, 124], zr: [number, number, number] = kr === 'aero' ? [520, 290, 175] : [520, 295, 216];
+  const BF = strip(seamF, 'bumperF', zf, kf === 'aero' ? [12, 34, -6] : [10, 4, -42], 700, [archAt(A.f, zf[0], 888, true), archAt(A.f, zf[1], 878, true), archAt(A.f, Math.max(zf[2], 120), 832, true)], 'bumperF',
+    (m, k) => m === 0 && k >= 6 && k < 11 ? ['amber', 'indicatorF'] : m === 1 && k >= 9 ? ['grille', 'intakeF'] : m === 1 && k >= 1 && k < 5 && kf !== 'clean' ? ['grille', 'ventF'] : kf === 'aero' && m === 2 ? ['dark', 'lipF'] : null);
+  const BR = strip(seamR, 'bumperR', zr, kr === 'aero' ? [-3, -14, -40] : [-3, -22, -64], 3600, [archAt(A.r, zr[0], 910, false), archAt(A.r, zr[1], 902, false), archAt(A.r, zr[2], 862, false)], 'bumperR',
+    (m, k) => m === 1 && k >= 3 && k < 8 && kr !== 'clean' ? ['grille', 'ventR'] : m === 2 && (k >= 9 || kr === 'aero') ? ['dark', kr === 'aero' ? 'diffuser' : 'exhaustSlot'] : null);
 
-  const colPath = (j: number, i0: number, i1: number) => Array.from({ length: i1 - i0 + 1 }, (_, k) => M[i0 + k]![j]!), rowPath = (i: number, j0: number, j1: number) => Array.from({ length: j1 - j0 + 1 }, (_, k) => M[i]![j0 + k]!);
   // ---- sharp edges: the module seams (hard for the positions; the shading runs over them), and the creases (split)
   path(seamF); path(seamR);
   path([28, 29, 30].map(i => M[i]![8]!).concat(W[1]!));                                  // the tail lamp's top
@@ -186,7 +192,7 @@ export function buildCage(): Cage959 {
     ...[0.5].map(t => ({ kind: 'vent' as const, name: 'intakeFBar', path: [], between: { a: BF[1]!.slice(9), b: BF[2]!.slice(9), t } })), { kind: 'vent', name: 'intakeFTop', path: [BF[2]![9]!, ...BF[1]!.slice(9)] }, { kind: 'vent', name: 'intakeFFoot', path: BF[2]!.slice(9) },
     ...[0.25, 0.5, 0.75].map((t, q) => ({ kind: 'vent' as const, name: `ventFSlat${q}`, path: [], between: { a: BF[1]!.slice(1, 6), b: BF[2]!.slice(1, 6), t } })), { kind: 'vent', name: 'ventFRim', path: [...BF[1]!.slice(1, 6), ...BF[2]!.slice(1, 6).reverse()], closed: true },
     ...[0.25, 0.5, 0.75].map((t, q) => ({ kind: 'vent' as const, name: `ventRSlat${q}`, path: [], between: { a: BR[1]!.slice(3, 9), b: BR[2]!.slice(3, 9), t } })), { kind: 'vent', name: 'ventRRim', path: [...BR[1]!.slice(3, 9), ...BR[2]!.slice(3, 9).reverse()], closed: true },
-    { kind: 'vent', name: 'exhaustSlotTop', path: [BR[2]![9]!, ...BR[1]!.slice(9)] }, { kind: 'vent', name: 'exhaustSlotFoot', path: BR[2]!.slice(9) }, { kind: 'lamp', name: 'indicatorF', path: [BF[0]![6]!, ...BF[1]!.slice(6, 12), BF[0]![11]!] },
+    { kind: 'vent', name: 'exhaustSlotTop', path: BR[2]!.slice(9) }, { kind: 'trim', name: 'tailLampWordBar', path: [], w: 1.6, between: { a: [M[30]![8]!, ...W[1]!].slice(3), b: [M[30]![9]!, ...W[2]!].slice(3), t: 0.5 } }, { kind: 'lamp', name: 'indicatorF', path: [BF[0]![6]!, ...BF[1]!.slice(6, 12), BF[0]![11]!] },
     ...[[24, 25, 0.5], [24, 25, 1], [25, 26, 0.5]].map(([i0, i1, t], q) => ({ kind: 'vent' as const, name: `engineLouvre${q}`, path: [], between: { a: rowPath(i0!, 0, 2), b: rowPath(i1!, 0, 2), t: t! } })),
     { kind: 'trim', name: 'doorHandle', path: [], w: 2, between: { a: colPath(7, 15, 16), b: colPath(8, 15, 16), t: 0.14, span: [0.3, 0.85] } },
     ...[0.25, 0.5, 0.75].map((t, q) => ({ kind: 'vent' as const, name: `sideIntakeSlat${q}`, path: [], between: { a: [M[17]![7]!, M[18]![7]!], b: [M[17]![8]!, M[18]![8]!], t } })),

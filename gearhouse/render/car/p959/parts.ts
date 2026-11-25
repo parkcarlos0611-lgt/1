@@ -79,16 +79,17 @@ export function plate(b: Build, m: Mark, text: PlateText = { top: '08루', big: 
   b.name('plate').mat('#12804c', 0.3, 'plain'); rect(-W / 2, W / 2, -H / 2, H / 2, 5);
   b.name('plateText').mat('#f1f3f2', 0.2, 'plain');
   // a figure's stroke: one band along the whole polyline, mitred at its corners (no notches), square at its ends
-  const strip = (pts: number[][], t: number, closed: boolean) => { const n = pts.length, m = closed ? n - 1 : n, dir = (i: number, j: number) => { const dx = pts[j]![0]! - pts[i]![0]!, dy = pts[j]![1]! - pts[i]![1]!, l = Math.hypot(dx, dy) || 1; return [dx / l, dy / l]; };
+  const strip = (pts: number[][], t: number, closed: boolean, cap0 = true, cap1 = true) => { const n = pts.length, m = closed ? n - 1 : n, dir = (i: number, j: number) => { const dx = pts[j]![0]! - pts[i]![0]!, dy = pts[j]![1]! - pts[i]![1]!, l = Math.hypot(dx, dy) || 1; return [dx / l, dy / l]; };
     const L: number[][] = [], R: number[][] = [];
     for (let i = 0; i < m; i++) { const d0 = i > 0 ? dir(i - 1, i) : closed ? dir(m - 1, 0) : dir(0, 1), d1 = i + 1 < n ? dir(i, i + 1) : closed ? dir(0, 1) : d0, bx = d0[0]! + d1[0]!, by = d0[1]! + d1[1]!, bl = Math.hypot(bx, by) || 1, nx = -by / bl, ny = bx / bl, k = t / 2 / Math.max(0.5, nx * -d0[1]! + ny * d0[0]!);
-      const end = !closed && (i === 0 || i === m - 1) ? (i === 0 ? -1 : 1) * t / 2 : 0, px = pts[i]![0]! + d0[0]! * end, py = pts[i]![1]! + d0[1]! * end; L.push([px + nx * k, py + ny * k]); R.push([px - nx * k, py - ny * k]); }
+      const end = !closed && ((i === 0 && cap0) || (i === m - 1 && cap1)) ? (i === 0 ? -1 : 1) * t / 2 : 0, px = pts[i]![0]! + d0[0]! * end, py = pts[i]![1]! + d0[1]! * end; L.push([px + nx * k, py + ny * k]); R.push([px - nx * k, py - ny * k]); }
     for (let i = 0; i + 1 < m || (closed && i < m); i++) { const j = (i + 1) % m; quad(at(R[i]![0]!, R[i]![1]!, 6), at(R[j]![0]!, R[j]![1]!, 6), at(L[j]![0]!, L[j]![1]!, 6), at(L[i]![0]!, L[i]![1]!, 6)); } };
   // a figure's stroke: a band of one width along the polyline. Gentle corners are mitred; at a sharp corner (a turn over
-  // about 75 degrees) the band ends square, half a width past the corner, and a new one starts the same way: the two overlap and fill it
+  // about 75 degrees) the band ends at the corner, a new one starts there, and a round patch of the stroke's width covers the joint
   const band = (pts: number[][], t: number) => { const n = pts.length, closed = n > 3 && Math.hypot(pts[0]![0]! - pts[n - 1]![0]!, pts[0]![1]! - pts[n - 1]![1]!) < 1e-6, turn = (i: number) => { const a = pts[i - 1]!, c = pts[i]!, e = pts[i + 1]!, l0 = Math.hypot(c[0]! - a[0]!, c[1]! - a[1]!) || 1, l1 = Math.hypot(e[0]! - c[0]!, e[1]! - c[1]!) || 1; return ((c[0]! - a[0]!) * (e[0]! - c[0]!) + (c[1]! - a[1]!) * (e[1]! - c[1]!)) / l0 / l1; };
     const cuts = [0]; for (let i = 1; i + 1 < n; i++) if (turn(i) < 0.25) cuts.push(i); cuts.push(n - 1);
-    if (closed && cuts.length === 2) { strip(pts, t, true); return; } for (let q = 0; q + 1 < cuts.length; q++) strip(pts.slice(cuts[q]!, cuts[q + 1]! + 1), t, false); };
+    if (closed && cuts.length === 2) { strip(pts, t, true); return; } for (let q = 0; q + 1 < cuts.length; q++) strip(pts.slice(cuts[q]!, cuts[q + 1]! + 1), t, false, q === 0, q + 2 === cuts.length);
+    for (const i of cuts.slice(1, -1)) { const c = pts[i]!, o8 = Array.from({ length: 8 }, (_, k) => { const a2 = (k + 0.5) / 8 * Math.PI * 2; return at(c[0]! + Math.cos(a2) * t * 0.54, c[1]! + Math.sin(a2) * t * 0.54, 6); }); for (let k = 1; k + 1 < 8; k++) flip ? b.tri(o8[0]!, o8[k + 1]!, o8[k]!) : b.tri(o8[0]!, o8[k]!, o8[k + 1]!); } };
   const word = (s: string, x0: number, y0: number, w: number, h: number, gap: number, t: number) => [...s].forEach((ch, k) => { for (const line of glyph(ch) ?? []) band(line.map(q => [x0 + k * (w + gap) + q[0]! * w, y0 + q[1]! * h]), t); });
   word(text.top, -58, 38, 30, 34, 13, 8); word(text.big, -138, -68, 50, 86, 24, 13);
   b.name('plateBolt').mat('#0f6b40', 0.3, 'plain'); for (const x of [-98, 98]) { const c = at(x, 52, 6), ring = Array.from({ length: 6 }, (_, i) => { const a = i / 6 * Math.PI * 2; return add(add(c, u, Math.cos(a) * 11), up, Math.sin(a) * 11); }), top = add(c, n, 5); for (let i = 0; i < 6; i++) flip ? b.tri(top, ring[(i + 1) % 6]!, ring[i]!) : b.tri(top, ring[i]!, ring[(i + 1) % 6]!); } }

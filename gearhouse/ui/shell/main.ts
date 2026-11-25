@@ -3,6 +3,8 @@
 // page: one WebGL canvas and one renderer handed from screen to screen, the textures loaded once, no new window and no
 // page loaded again between the builder and the drive. Esc and the phone's back button go back along the screens' way;
 // the arrow keys walk the menus (a pad's cross too). Built by tools/ref/buildsite.mjs into game.html.
+import { setLineWeight } from '../../render/live/style';
+import { LINE_WEIGHT } from './settings';
 import { LiveRenderer } from '../../render/live/renderer';
 import { loadSky } from '../../render/live/groundtex';
 import texAlb from '../../assets/textures/pbr/albedo.jpg';
@@ -59,6 +61,7 @@ const ctx: ShellCtx = { router, stage, backdrop, store, settings, layer: $('gh-l
 /** the settings at work: the theme, the menus' sounds, the calm screen, the drive's own fields */
 function applySettings() { const t = settings.screen.theme; if (t === 'auto') delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = t;
   PHYSICS.kinematic = settings.sandbox.physics !== 'old';   // the developers' physics switch (race/kin.ts), for the next car made
+  setLineWeight(LINE_WEIGHT[settings.graphics.lineWeight]);   // the toon look's line widths (render/live/style.ts)
   uiSounds(settings.sound.ui); setSceneryDensity(settings.graphics.scenery); backdrop.calm = settings.screen.calm || matchMedia('(prefers-reduced-motion: reduce)').matches; backdrop.redraw(); screens.drive?.apply?.(); }
 
 const drive = driveScreen(ctx), builder = builderScreen(ctx), engine = engineScreen(ctx);

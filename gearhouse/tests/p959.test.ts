@@ -4,7 +4,7 @@
 // along a panel's lines but the declared ones, no short dimples, no unmarked hard folds, the game's shading within
 // 3 degrees of the surface's own on 99 % of the painted corners. The measured values are printed.
 import { describe, expect, it } from 'vitest';
-import { KINDS } from '../render/car/mesh';
+import { KINDS, wheelsOf } from '../render/car/mesh';
 import { surfaceNormals } from '../render/car/edges';
 import { p959Model, sockets, DIM } from '../render/car/p959';
 import { measure, shadingError } from '../render/car/p959/check';
@@ -45,4 +45,24 @@ describe('p959: the surface rules (docs/systems/108)', () => { const R = measure
     console.log(`p959 shading: ${E.corners} painted corners, over 3 deg ${E.over3} (${(E.over3 / E.corners * 100).toFixed(2)} %), p95 ${E.p95.toFixed(2)}, max ${E.max.toFixed(1)} deg`);
     expect(E.over3 / E.corners).toBeLessThanOrEqual(0.01); });
   it('every crease is an edge of the shell', () => { const use = edgeUse(S.F); for (const k of S.crease) expect(use.has(k)).toBe(true); expect(ekey(2, 1)).toBe('1|2'); });
+});
+
+// Step S3: the attached parts, their alternatives on the same loops and sockets, the number plate
+import { p959Mesh, plateText, PLATE_SYLLABLES } from '../render/car/p959';
+import { buildShell } from '../render/car/p959/shell';
+import { glyph } from '../render/car/p959/parts';
+import { lineClass } from '../render/car/p959/lines';
+import { STYLE } from '../render/live/style';
+describe('p959: the attached parts (S3)', () => {
+  it('the exterior with its parts stays near the budget (9,200) and carries the parts', () => { const names = new Set(M.names!.filter(Boolean)); console.log(`p959 exterior with parts: ${M.n} triangles`); expect(M.n).toBeLessThanOrEqual(9450);
+    for (const n of ['headLamp', 'lampBezel', 'tyreF', 'tyreR', 'rim', 'wheel', 'hub', 'brakeDisc', 'brakeCaliper', 'mirror', 'exhaust', 'plate', 'plateText', 'plateFrame', 'plateBolt', 'indicatorF', 'ventF', 'ventR', 'tailLamp', 'tailLampEnd', 'sideIntake']) expect(names.has(n), n).toBe(true); });
+  it('every bumper variant closes on the same seam loops', () => { const base = buildShell(), key = (p: number[]) => p.map(v => Math.round(v * 100)).join(',');
+    for (const k of ['aero', 'clean'] as const) { const s = buildShell({ bumperF: k, bumperR: k }), use = [...edgeUse(s.F).values()]; expect(use.filter(u => u !== 2).length, k).toBe(0);
+      expect(s.loops.frontBumper!.map(key)).toEqual(base.loops.frontBumper!.map(key)); expect(s.loops.rearBumper!.map(key)).toEqual(base.loops.rearBumper!.map(key));
+      expect(s.F.filter((_, q) => s.tag[q]!.region === 'shell').length).toBe(base.F.filter((_, q) => base.tag[q]!.region === 'shell').length); } });
+  it('the lamp and wheel alternatives swap in the same sockets', () => { for (const lamp of ['round', 'ellipsoid', 'square'] as const) for (const wheel of ['hollow5', 'dish', 'hole5'] as const) { const m = p959Mesh({ lamp, wheel }); expect(m.n, `${lamp} ${wheel}`).toBeLessThanOrEqual(9700); expect(Array.from(m.pos).every(Number.isFinite)).toBe(true); expect(wheelsOf(m).length).toBe(4); } });
+  it('plate numbers: given or made from a seed, every plate syllable has its strokes', () => { expect(plateText('12가 3456')).toEqual({ top: '12가', big: '3456' }); expect(plateText(7)).toEqual(plateText(7)); expect(plateText(7)).not.toEqual(plateText(8)); expect(() => plateText('1가 23')).toThrow();
+    for (const ch of [...PLATE_SYLLABLES, ...'0123456789']) expect(glyph(ch)?.length, ch).toBeGreaterThan(0); expect(glyph('각')).toBeNull();
+    const a = p959Mesh({ plate: plateText('45노 7802') }), c = p959Mesh(); expect(a.n).not.toBe(c.n); });
+  it('panel lines are drawn thinner than character lines', () => { const door = M.lines!.find(l => l.kind === 'door')!, lamp = M.lines!.find(l => l.kind === 'lamp')!; expect(lineClass('door')).toBe('panel'); expect(lineClass('lamp')).toBe('character'); expect(door.w).toBeCloseTo(STYLE.panelPx / STYLE.linePx); expect(lamp.w ?? 1).toBe(1); });
 });

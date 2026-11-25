@@ -9,8 +9,9 @@ import { frameOf, type Frame } from './frame';
 import { headLamp, mirror, plate, wheel, type LampKind, type PlateText, type WheelKind } from './parts';
 import { crestPlate, crestUV, lettering, skinNear, type CrestFrame } from './badge';
 import { subdivSkin, type Skin } from '../skin';
-import { fitPlate, drawPlate, type PlateFit } from './plates';
+import { fitPlate, drawPlate, PLATE_W, PLATE_H, type PlateFit } from './plates';
 import { placedOf, type Placed } from '../../../core/placed';
+import { drawPlaced, footprints } from '../attach';
 export type { LampKind, WheelKind, PlateText } from './parts';
 export { plateText, PLATE_SYLLABLES } from './parts';
 export { buildCage, DIM } from './cage';
@@ -35,7 +36,10 @@ export interface P959Opts extends Omit<ShellOpts, 'lamps'> { paint?: string; lam
   /** the wheels' own disc and caliper (default on; off where the car's suspension is drawn with its brakes: render/car/bodies.ts) */ brake?: boolean;
   /** the crest on the front lid and the lettering across the tail (default: with the details; docs/systems/116) */ marks?: boolean;
   /** parts placed freely on the skin (docs/systems/115 P1a: the plates; core/placed.ts): a fitted plate with an entry sits
-   *  at its place, one without at the car's own; a place no longer on the skin falls back to the car's own */ placed?: readonly Placed[] }
+   *  at its place, one without at the car's own; a place no longer on the skin falls back to the car's own. P1: the free
+   *  surface parts (render/car/attach), each at its place */ placed?: readonly Placed[];
+  /** the car's own small parts (its mirrors, its exhaust tips, its crest) left off where `details` would draw them: they
+   *  are free parts then (docs/systems/115 P1: "599 순정 세트" puts them on as free parts at their own places) */ smalls?: boolean }
 /** the lump as the builder's first step shows it: no openings, blank bumpers, the plain steel wheel, no plates, no glass */
 export const P959_LUMP: P959Opts = { lamp: 'none', details: false, bumperF: 'blank', bumperR: 'blank', wheel: 'steel', plateF: false, plateR: false, glass: null };
 const MAT: Record<string, [string, number, Parameters<Build['mat']>[2]]> = { glass: ['#20262c', 0.9, 'glass'], grille: ['#17181a', 0.1, 'grille'], dark: ['#1b1c1e', 0.05, 'plain'], lamp: ['#b3261e', 0.5, 'lens'], amber: ['#d9861c', 0.5, 'lens'], lens: ['#17181a', 0.1, 'plain'] };
@@ -61,19 +65,21 @@ export interface P959Model { mesh: Mesh; shell: Shell959; normals: Float32Array;
 export function p959Mesh(o: P959Opts = {}): Mesh { return p959Model(o).mesh; }
 export function p959Model(o: P959Opts = {}): P959Model { const lamps = o.lamp !== 'none', details = o.details !== false, marks = o.marks ?? details, fr = frameOf(o.dims);
   const S = buildShell({ ...o, lamps }), b = new Build(), paint = o.paint ?? '#b8bcc2', nn: number[] = [];
-  emitShell(b, S, paint, nn); let crest: CrestFrame | null = null;
+  emitShell(b, S, paint, nn); const crests: CrestFrame[] = [];
   if (!o.bare) { const K = sockets(fr), sl = 38.7 * Math.PI / 180;
     for (const h0 of K.hubs) { const w = o.tyres ? o.tyres[h0.front ? 0 : 1] : h0.width, s = h0.o[1] > 0 ? 1 : -1, h = { ...h0, width: w, o: [h0.o[0], h0.o[1] + s * (w - h0.width) / 2, h0.o[2]] as V };
       wheel(b, h, o.wheel ?? 'hollow5', o.brake !== false); }
     if (lamps) for (const s of [1, -1]) lampIn(b, fr, o.lamp as LampKind ?? 'round', [270 + Math.sin(sl) * 14, s * 615, 640 - Math.cos(sl) * 14], [0, 1, 0], [Math.cos(sl), 0, Math.sin(sl)], 100, 122);
-    if (details) for (const e of K.exhausts) b.name('exhaust').mat('#2a2b2d', 0.6, 'metal').lathe('x', [0, e.o[1], e.o[2]], [[e.o[0] - 60, e.r], [e.o[0] + 14, e.r], [e.o[0] - 50, e.r - 10]], 8, false);
-    if (details) for (const m of K.mirrors) mirror(b, m, paint);
+    const smalls = o.smalls !== false;
+    if (details && smalls) for (const e of K.exhausts) b.name('exhaust').mat('#2a2b2d', 0.6, 'metal').lathe('x', [0, e.o[1], e.o[2]], [[e.o[0] - 60, e.r], [e.o[0] + 14, e.r], [e.o[0] - 50, e.r - 10]], 8, false);
+    if (details && smalls) for (const m of K.mirrors) mirror(b, m, paint);
     const skin = o.placed?.length ? shellSkin(S) : null, fits: PlateFit[] = [];
     for (const m of K.marks) if (/^plate/.test(m.name) && (m.name === 'plateF' ? o.plateF : o.plateR) !== false) { const p = placedOf(o.placed, m.name as 'plateF' | 'plateR'), f = p && skin ? fitPlate(skin, p, fits) : null;
       if (f && f.gap < 150) { fits.push(f); drawPlate(b, f, o.plate); } else plate(b, m, o.plate); }
-    if (marks) for (const m of K.marks) { if (m.name === 'badge') crest = crestPlate(b, m, skinNear(S.P, S.F, m.o, 120)); else if (m.name === 'porscheLettering') lettering(b, m, skinNear(S.P, S.F, m.o, 420)); } }
+    if (skin) { const plates = fits.map(f => ({ F: f.F, hw: PLATE_W / 2 * f.s, hh: PLATE_H / 2 * f.s, twin: false })).flatMap(footprints); crests.push(...drawPlaced(b, skin, o.placed, paint, plates).crests); }
+    if (marks) for (const m of K.marks) { if (m.name === 'badge' && smalls) crests.push(crestPlate(b, m, skinNear(S.P, S.F, m.o, 120))); else if (m.name === 'porscheLettering') lettering(b, m, skinNear(S.P, S.F, m.o, 420)); } }
   const M = b.mesh(o.dims ? fr.length : DIM.length);
-  if (crest) M.uv = crestUV(M, crest);
+  if (crests.length) M.uv = crestUV(M, crests);
   M.lines = p959Lines(S, o.glass === null).filter(l => !marks || o.bare || !/^tailLampWordBar/.test(l.name)) as MeshLine[];   // the bar drawn where the word goes, gone once the word is there
   M.creases = [...S.crease].map(k => { const [a, c] = k.split('|').map(Number) as [number, number]; return [S.P[a]!, S.P[c]!] as [V, V]; });
   return { mesh: M, shell: S, normals: new Float32Array(nn), shellTris: nn.length / 9 }; }

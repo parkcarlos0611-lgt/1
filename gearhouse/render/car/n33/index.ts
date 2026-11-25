@@ -11,7 +11,10 @@ import type { V } from '../p959/subdiv';
 import type { Mark } from '../p959/sockets';
 import { fitPlate, drawPlate, stockPlace, type PlateFit } from '../p959/plates';
 import type { PlateText } from '../p959/parts';
-import { placedOf, type Placed } from '../../../core/placed';
+import { placedOf, freeParts, type Placed } from '../../../core/placed';
+import { drawPlaced, footprints } from '../attach';
+import { crestUV } from '../p959/badge';
+import { PLATE_W, PLATE_H } from '../p959/plates';
 import { buildCage, DIM, type CageOpts } from './cage';
 import { frameOf, STOCK_FRAME, type Frame } from './frame';
 export { buildCage, DIM, NR, NC, ARCH } from './cage';
@@ -39,10 +42,14 @@ export const N33_LUMP: N33Opts = { glass: null, wheel: 'steel' };
 export function n33Model(o: N33Opts = {}): P959Model { const fr = frameOf(o.dims), S = buildN33Shell(o), b = new Build(), nn: number[] = [];
   emitShell(b, S, o.paint ?? '#b8bcc2', nn);
   if (!o.bare) for (const h of n33Hubs(fr, o.tyres)) wheel(b, h, o.wheel ?? 'steel', o.brake !== false);
-  if (!o.bare && (o.plateF || o.plateR)) { const skin = n33Skin(S), fits: PlateFit[] = [];
+  const skin = !o.bare && (o.plateF || o.plateR || freeParts(o.placed).length) ? n33Skin(S) : null, fits: PlateFit[] = [];
+  if (skin && (o.plateF || o.plateR)) {
     for (const m of n33Marks(fr)) { const id = m.name as 'plateF' | 'plateR'; if (!(id === 'plateF' ? o.plateF : o.plateR)) continue; const at = stockPlace(skin, m), p = placedOf(o.placed, id) ?? (at ? { id, at, rot: 0, tilt: 0, scale: 1 } : null), f = p ? fitPlate(skin, p, fits) ?? (at ? fitPlate(skin, { id, at, rot: 0, tilt: 0, scale: 1 }, fits) : null) : null;
       if (f && f.gap < 150) { fits.push(f); drawPlate(b, f, o.plate); } } }
+  // the free surface parts (docs/systems/115 P1: render/car/attach), measured for overlap against the plates
+  const crests = skin ? drawPlaced(b, skin, o.placed, o.paint ?? '#b8bcc2', fits.flatMap(f => footprints({ F: f.F, hw: PLATE_W / 2 * f.s, hh: PLATE_H / 2 * f.s, twin: false }))).crests : [];
   const M: Mesh = b.mesh(o.dims ? fr.length : DIM.length);
+  if (crests.length) M.uv = crestUV(M, crests);
   M.lines = p959Lines(S, !o.glass) as MeshLine[];
   M.creases = [...S.crease].map(k => { const [a, c] = k.split('|').map(Number) as [number, number]; return [S.P[a]!, S.P[c]!] as [V, V]; });
   return { mesh: M, shell: S, normals: new Float32Array(nn), shellTris: nn.length / 9 }; }

@@ -78,7 +78,7 @@ export function cabinOf(f: Frame, A: CabinAnchors = P959_CABIN): CabinAnchors { 
 const P959: ModelBody = { name: CAR_599, length: DIM.length, cabin: P959_CABIN, anchors: P959_ANCHORS, wheels: p959Wheels, open: ['engineGrille', 'engineLid', 'rearWindow'],
   gauges: (d, topKmh) => ({ ...P959_GAUGES, redline: d.engine.redline, topKmh: topKmh ?? P959_GAUGES.topKmh, ...(d.engine.turbo ? { boostBar: d.engine.boost } : { boostBar: undefined }) }),
   mesh(d, o = {}) { const m = { ...MODEL_OWN.p959, ...d.body.model }, det = o.detail ?? 2, f = frameFor(d), anchors = anchorsOf(f);
-    const body = p959Mesh({ ...(f === STOCK_FRAME ? {} : { dims: f.dims }), ...(d.body.glass !== undefined ? { glass: d.body.glass } : {}), ...(m.details === false ? { details: false } : {}), paint: d.body.paint, bumperF: m.bumperF, bumperR: m.bumperR, lamp: m.lamp, wheel: m.wheel, plate: plateOf(d), plateF: m.plateF !== false, plateR: m.plateR !== false, ...(d.body.parts ? { placed: d.body.parts } : {}), brake: !!o.bare, tyres: d.kit.tyres });
+    const body = p959Mesh({ ...(f === STOCK_FRAME ? {} : { dims: f.dims }), ...(d.body.glass !== undefined ? { glass: d.body.glass } : {}), ...(m.details === false ? { details: false } : {}), ...(m.smalls === false ? { smalls: false } : {}), paint: d.body.paint, bumperF: m.bumperF, bumperR: m.bumperR, lamp: m.lamp, wheel: m.wheel, plate: plateOf(d), plateF: m.plateF !== false, plateR: m.plateR !== false, ...(d.body.parts ? { placed: d.body.parts } : {}), brake: !!o.bare, tyres: d.kit.tyres });
     // the paint's gloss as the design sets it (the model is made at 0.6)
     const P = KINDS.indexOf('paint'); for (let t = 0; t < body.n; t++) if (body.kind[t] === P) body.gloss[t] = d.body.gloss;
     if (o.bare) return body;

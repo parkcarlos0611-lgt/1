@@ -55,6 +55,8 @@ export type BodyBase = BaseId | ModelBaseId;
 export interface ModelSwaps { bumperF: 'std' | 'aero' | 'clean' | 'blank'; bumperR: 'std' | 'aero' | 'clean' | 'blank'; lamp: 'round' | 'ellipsoid' | 'square' | 'none'; wheel: 'hollow5' | 'dish' | 'hole5' | 'steel';
   /** the car's other openings and small parts (the tail lamp band, the side intakes, the lid's grille, the mirrors, the
    *  exhausts, the crest and the lettering) left off: the lump's (absent: on, as every design before it) */ details?: false;
+  /** the car's own mirrors, exhaust tips and crest left off (docs/systems/115 P1): they are free parts (body.parts) instead,
+   *  as "599 순정 세트" puts them on (absent: drawn with the details, as every design before it) */ smalls?: false;
   /** the plate's text, as "12가 3456" (render/car/p959 plateText) */ plate: string;
   /** the front and the rear plate taken off (absent: fitted, as every design before them; only a removed plate is kept,
    *  so an older design's signature does not change) */ plateF?: false; plateR?: false }
@@ -413,7 +415,7 @@ export const DESIGN_MCLAREN_F1: Design = { v: 6, id: 'mclarenf1', name: '시험 
 /** a model body's swaps with what it does not have put back to its own */
 export function fitModel(base: ModelBaseId, m: Partial<ModelSwaps> | undefined): ModelSwaps { const o = MODEL_OWN[base], one = <T>(v: unknown, of: readonly T[], d: T): T => of.includes(v as T) ? v as T : d;
   return { bumperF: one(m?.bumperF, BUMPERS_ALL, o.bumperF), bumperR: one(m?.bumperR, BUMPERS_ALL, o.bumperR), lamp: one(m?.lamp, LAMPS_ALL, o.lamp), wheel: one(m?.wheel, WHEELS_ALL, o.wheel),
-    ...(m?.details === false ? { details: false as const } : {}),
+    ...(m?.details === false ? { details: false as const } : {}), ...(m?.smalls === false ? { smalls: false as const } : {}),
     plate: plateOk(m?.plate) ? m!.plate!.replace(/\s+/g, '').replace(/^(\d{2}.)/, '$1 ') : o.plate,
     ...(m?.plateF === false ? { plateF: false as const } : {}), ...(m?.plateR === false ? { plateR: false as const } : {}) }; }
 /** the syllables the plate's figures can be drawn for (render/car/p959/parts.ts PLATE_SYLLABLES: the same list) */

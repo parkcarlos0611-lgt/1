@@ -23,7 +23,8 @@ export interface Skin {
   /** the first face a ray meets (origin, direction, both in the body's axes, mm), and how far along it (in lengths of `d`) */
   hit(o: V, d: V, maxT?: number): (SkinPoint & { t: number }) | null;
   /** a place given by its surface coordinates on this skin (null: no such face here) */
-  at(a: SurfaceAt): SkinPoint | null; }
+  at(a: SurfaceAt): SkinPoint | null;
+  /** the skin's bounds (its own axes, mm): where the parts' default places are aimed from */ box?: [V, V] }
 /** a shell made by one subdivision of a cage: its points and faces, the shading normals per face corner, each face's tag,
  *  how many of the faces came from the subdivision (the first `nSub`), and the cage face each of those came from */
 export interface SubdivShell { P: V[]; F: number[][]; N: V[][]; tag: SkinTag[]; nSub: number; parent: number[] }
@@ -35,12 +36,14 @@ const madd = (a: V, b: V, k: number): V => [a[0] + b[0] * k, a[1] + b[1] * k, a[
 export { sub as vsub, dot as vdot, cross as vcross, unit as vunit, madd as vmadd };
 /** a cage square's corners (u, v): the face's first corner, its second, third and fourth */
 const C: [number, number][] = [[0, 0], [1, 0], [1, 1], [0, 1]];
+/** a ray along a seam (the centre line, where the two halves' triangles meet) must not slip between them */
+const EPS = 1e-7;
 const mid = (a: [number, number], b: [number, number]): [number, number] => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
 
 /** the skin of a once-subdivided shell. A fine quad q of a cage face runs (its corners in order) from the cage face's
  *  corner q to the middle of the edge after it, the face's middle and the middle of the edge before it (subdiv.ts), so
  *  in the cage face's square it is the quarter at corner q, and the map between the two is affine */
-export function subdivSkin(S: SubdivShell): Skin {
+export function subdivSkin(S: SubdivShell, accel = true): Skin {
   // each cage face's fine quads (consecutive, in corner order); a cage face of other than four corners has no coordinates
   const first = new Map<number, number>(), count = new Map<number, number>();
   for (let k = 0; k < S.nSub; k++) { const c = S.parent[k]!; if (!first.has(c)) first.set(c, k); count.set(c, (count.get(c) ?? 0) + 1); }
@@ -57,19 +60,60 @@ export function subdivSkin(S: SubdivShell): Skin {
     let p: V = [0, 0, 0], n: V = [0, 0, 0]; f.forEach((v, i) => { p = madd(p, S.P[v]!, w[i]!); n = madd(n, S.N[k]?.[i] ?? [0, 0, 1], w[i]!); }); return { p, n: unit(n) }; };
   const nAt = (k: number, bc: [number, number, number], tri: number): V => { const N = S.N[k], tr = T[tri]!; if (!N) return unit(cross(tr.e1, tr.e2));
     let n: V = [0, 0, 0]; for (let j = 0; j < 3; j++) n = madd(n, N[tr.ci[j]!] ?? N[0]!, bc[j]!); return unit(n); };
+  const triHit = (i: number, o: V, d: V, bt: number): [number, number, number] | null => { const tr = T[i]!, p = cross(d, tr.e2), det = dot(tr.e1, p); if (Math.abs(det) < 1e-9) return null; const inv = 1 / det, s = sub(o, tr.a), u = dot(s, p) * inv; if (u < -EPS || u > 1 + EPS) return null;
+    const q = cross(s, tr.e1), v = dot(d, q) * inv; if (v < -EPS || u + v > 1 + EPS) return null; const t = dot(tr.e2, q) * inv; return t <= 1e-6 || t >= bt ? null : [t, u, v]; };
+  const bvh = accel ? buildBvh(T.map(tr => [tr.a, madd(tr.a, tr.e1, 1), madd(tr.a, tr.e2, 1)])) : null;
   return {
     hit(o, d, maxT = Infinity) { let best = -1, bt = maxT, bu = 0, bv = 0;
-      for (let i = 0; i < T.length; i++) { const tr = T[i]!, p = cross(d, tr.e2), det = dot(tr.e1, p); if (Math.abs(det) < 1e-9) continue; const inv = 1 / det, s = sub(o, tr.a), u = dot(s, p) * inv; if (u < 0 || u > 1) continue;
-        const q = cross(s, tr.e1), v = dot(d, q) * inv; if (v < 0 || u + v > 1) continue; const t = dot(tr.e2, q) * inv; if (t <= 1e-6 || t >= bt) continue; best = i; bt = t; bu = u; bv = v; }
+      const test = (i: number) => { const r = triHit(i, o, d, bt); if (r) { best = i; [bt, bu, bv] = r; } };
+      if (bvh) bvh.walk(o, d, () => bt, test); else for (let i = 0; i < T.length; i++) test(i);
       if (best < 0) return null; const tr = T[best]!, bc: [number, number, number] = [1 - bu - bv, bu, bv], p = madd(madd(tr.a, tr.e1, bu), tr.e2, bv);
       const st: [number, number] | null = tr.st ? [bc[0] * tr.st[0]![0] + bc[1] * tr.st[1]![0] + bc[2] * tr.st[2]![0], bc[0] * tr.st[0]![1] + bc[1] * tr.st[1]![1] + bc[2] * tr.st[2]![1]] : null;
       return { p, n: nAt(tr.k, bc, best), face: tr.k, tag: S.tag[tr.k]!, at: st ? atOf(tr.k, st) : null, t: bt }; },
+    box: bounds(S.P),
     at(a) { const k0 = first.get(a.f); if (k0 === undefined || count.get(a.f) !== 4) return null; const u = Math.min(1, Math.max(0, a.u)), v = Math.min(1, Math.max(0, a.v));
       const q = u < 0.5 ? (v < 0.5 ? 0 : 3) : (v < 0.5 ? 1 : 2), { A, B, D } = quarter(q), k = k0 + q;
       // (u, v) = A + s (B - A) + t (D - A): the quarter's edges are half a side long, along the square's axes
       const bx = B[0] - A[0], by = B[1] - A[1], dx = D[0] - A[0], dy = D[1] - A[1], det = bx * dy - by * dx, ru = u - A[0], rv = v - A[1];
       const s = Math.min(1, Math.max(0, (ru * dy - rv * dx) / det)), t = Math.min(1, Math.max(0, (bx * rv - by * ru) / det)), { p, n } = onQuad(k, s, t);
       return { p, n, face: k, tag: S.tag[k]!, at: { f: a.f, u, v } }; } }; }
+
+/** a skin's bounds */
+const bounds = (P: readonly V[]): [V, V] => { const lo: V = [Infinity, Infinity, Infinity], hi: V = [-Infinity, -Infinity, -Infinity]; for (const p of P) for (let k = 0; k < 3; k++) { if (p[k]! < lo[k]!) lo[k] = p[k]!; if (p[k]! > hi[k]!) hi[k] = p[k]!; } return [lo, hi]; };
+/** a bounding volume hierarchy over triangles (docs/systems/115 P1: a ray meets about 7,000 triangles brute force; the
+ *  builder's drag and a part's probes shoot hundreds of rays a move). Built once a skin, split at the middle of the
+ *  longest side of the centroids' box, four triangles a leaf; a ray walks the boxes it crosses, nearer child first,
+ *  skipping a box beyond the nearest hit so far. The answer is the brute force's (tests/skin.test.ts) */
+export interface Bvh { walk(o: V, d: V, far: () => number, test: (tri: number) => void): void }
+export function buildBvh(tris: readonly [V, V, V][]): Bvh {
+  const n = tris.length, idx = new Int32Array(n), cen = new Float64Array(n * 3), lo = new Float64Array(n * 3), hi = new Float64Array(n * 3);
+  for (let i = 0; i < n; i++) { idx[i] = i; const t = tris[i]!; for (let k = 0; k < 3; k++) { const a = t[0][k]!, b = t[1][k]!, c = t[2][k]!; lo[i * 3 + k] = Math.min(a, b, c); hi[i * 3 + k] = Math.max(a, b, c); cen[i * 3 + k] = (a + b + c) / 3; } }
+  // nodes: box (6), then either a leaf's first index and count (count > 0) or the two children (count 0)
+  const box: number[] = [], kid: number[] = [], first: number[] = [], count: number[] = [];
+  const make = (s: number, e: number): number => { const id = count.length; count.push(0); first.push(0); kid.push(0, 0); const b = [Infinity, Infinity, Infinity, -Infinity, -Infinity, -Infinity], cb = [Infinity, Infinity, Infinity, -Infinity, -Infinity, -Infinity];
+    for (let j = s; j < e; j++) { const i = idx[j]!; for (let k = 0; k < 3; k++) { b[k] = Math.min(b[k]!, lo[i * 3 + k]!); b[k + 3] = Math.max(b[k + 3]!, hi[i * 3 + k]!); cb[k] = Math.min(cb[k]!, cen[i * 3 + k]!); cb[k + 3] = Math.max(cb[k + 3]!, cen[i * 3 + k]!); } }
+    box.push(...b); const ax = [0, 1, 2].reduce((a, k) => cb[k + 3]! - cb[k]! > cb[a + 3]! - cb[a]! ? k : a, 0), mid = (cb[ax]! + cb[ax + 3]!) / 2;
+    if (e - s <= 4 || cb[ax + 3]! - cb[ax]! < 1e-6) { first[id] = s; count[id] = e - s; return id; }
+    let m = s; for (let j = s; j < e; j++) if (cen[idx[j]! * 3 + ax]! < mid) { const t = idx[j]!; idx[j] = idx[m]!; idx[m] = t; m++; }
+    if (m === s || m === e) m = (s + e) >> 1;
+    const a = make(s, m), c = make(m, e); kid[id * 2] = a; kid[id * 2 + 1] = c; return id; };
+  if (n) make(0, n);
+  /** where a ray enters a node's box (Infinity: it misses it) */
+  const enter = (nd: number, o: V, inv: V, far: number) => { let t0 = 0, t1 = far; for (let k = 0; k < 3; k++) { let a = (box[nd * 6 + k]! - o[k]!) * inv[k]!, b = (box[nd * 6 + k + 3]! - o[k]!) * inv[k]!; if (a > b) { const t = a; a = b; b = t; }
+      if (a > t0) t0 = a; if (b < t1) t1 = b; if (t0 > t1 * (1 + 1e-9) + 1e-9) return Infinity; } return t0; };
+  return { walk(o, d, far, test) { if (!n) return; const iv = (x: number) => 1 / (Math.abs(x) < 1e-12 ? 1e-12 : x), inv: V = [iv(d[0]), iv(d[1]), iv(d[2])], stack: number[] = [0];
+    while (stack.length) { const nd = stack.pop()!; if (enter(nd, o, inv, far()) === Infinity) continue;
+      if (count[nd]) { for (let j = first[nd]!; j < first[nd]! + count[nd]!; j++) test(idx[j]!); continue; }
+      const a = kid[nd * 2]!, c = kid[nd * 2 + 1]!, ta = enter(a, o, inv, far()), tc = enter(c, o, inv, far());
+      // the nearer child walked first (pushed last)
+      if (ta <= tc) { if (tc !== Infinity) stack.push(c); if (ta !== Infinity) stack.push(a); } else { if (ta !== Infinity) stack.push(a); if (tc !== Infinity) stack.push(c); } } } }; }
+
+/** a flat skin (a plane through `o` facing `n`, a square of `half` mm round it): the parts' library pictures stand a part
+ *  on it alone (ui/builder_thumbs.ts); no surface coordinates */
+export function planeSkin(o: V, n0: V, half = 3000): Skin { const n = unit(n0), tag: SkinTag = { panel: 'flat', mat: 'paint' };
+  return { hit(r, d, maxT = Infinity) { const den = dot(d, n); if (Math.abs(den) < 1e-9) return null; const t = dot(sub(o, r), n) / den; if (t <= 1e-6 || t >= maxT) return null;
+      const p = madd(r, d, t), q = sub(p, o); if (Math.abs(q[0]) > half || Math.abs(q[1]) > half || Math.abs(q[2]) > half) return null; return { p, n, face: 0, tag, at: null, t }; },
+    at: () => null, box: [madd(o, [1, 1, 1], -half), madd(o, [1, 1, 1], half)] }; }
 
 /** a flat part's frame on the skin: its centre, its normal (out of the face), its across (the reader's right as the game
  *  draws the car: the files' +y on the left of the heading, so across = normal x up) and its up (the world's up laid in

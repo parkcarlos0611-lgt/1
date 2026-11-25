@@ -7,7 +7,10 @@ import { deflateSync } from 'node:zlib';
 import { Build, KINDS } from '../../render/car/mesh';
 import { plate, plateText } from '../../render/car/p959/parts';
 import { p959Model, P959_LUMP, buildShell, shellSkin, fitPlate, type P959Opts } from '../../render/car/p959';
-import type { Placed } from '../../core/placed';
+import type { Placed, FreeId } from '../../core/placed';
+import { fitAll } from '../../render/car/attach';
+import { stockParts, aimPart } from '../../render/car/attach/stock';
+import { buildN33Shell, n33Skin } from '../../render/car/n33';
 import { fineGrid, lineStat, measure, PANELS, turning } from '../../render/car/p959/check';
 import { faceNormal } from '../../render/car/p959/subdiv';
 import { edgeUse } from '../../render/car/p959/shell';
@@ -36,7 +39,16 @@ const OPTS: P959Opts = ({ ...(process.argv.includes('lump') ? P959_LUMP : {}), .
 const PLACED: Placed[] | undefined = arg('placed') ? (() => { const sk = shellSkin(buildShell({ ...OPTS, lamps: OPTS.lamp !== 'none' })); return arg('placed')!.split('/').map(e => { const [w, v] = e.split(':'), [y, z, rot, tilt, sc] = v!.split(',').map(Number), F = w === 'F';
   const h = sk.hit([F ? -800 : 5200, y!, z!], [F ? 1 : -1, 0, 0], 8000)!, p: Placed = { id: F ? 'plateF' : 'plateR', at: h.at!, rot: rot ?? 0, tilt: tilt ?? 0, scale: sc ?? 1 }, f = fitPlate(sk, p);
   console.log(`${p.id} at y ${y} z ${z}: ${f?.ok ? 'ok' : f?.why}, bracket ${f?.gap.toFixed(0)} mm`); return p; }); })() : undefined;
-const MODEL0 = N33 ? n33Model({ ...N33_LUMP, ...(arg('glass') ? { glass: arg('glass') === 'none' ? null : arg('glass') as never } : {}), ...(DIMS ? { dims: DIMS } : {}), ...(arg('paint') ? { paint: arg('paint') } : {}) }) : p959Model({ ...OPTS, ...(PLACED ? { placed: PLACED } : {}) });
+// parts=stock|odd (docs/systems/115 P1): the free surface parts, the lump's stock set or a set placed unusually (a GT wing on
+// the roof, mirrors on the rear wings, a big turned crest on the door, louvres on the bonnet, vents, markers, a centre tip)
+const PARTS: Placed[] | undefined = arg('parts') ? (() => { const sk = N33 ? n33Skin(buildN33Shell({ ...N33_LUMP, ...(DIMS ? { dims: DIMS } : {}) })) : shellSkin(buildShell({ ...OPTS, lamps: OPTS.lamp !== 'none' })), base = N33 ? 'bnr33' : 'p959';
+  if (arg('parts') === 'stock') return stockParts(base, sk, DIMS);
+  const L = N33 ? 4675 : 4260, H = N33 ? 1364 : 1281, a = (id: FreeId, o: V3, d: V3, x: Partial<Placed> = {}): Placed[] => { const p = aimPart(sk, { id, o, d }); return p ? [{ ...p, ...x }] : []; };
+  const ps = [...a('wingGT', [L * 0.52, 0, 3000], [0, 0, -1], { scale: 0.75, depth: 120, tilt: 12 }), ...a('mirror', [L * 0.78, 1600, H * 0.62], [0, -1, 0], { scale: 1.3, depth: 80, rot: 15 }),
+    ...a('badge', [L * 0.5, 1600, H * 0.5], [0, -1, 0], { scale: 2.2, rot: 25 }), ...a('louvre', [L * 0.17, 0, 3000], [0, 0, -1], { scale: 1.1 }), ...a('vent', [L * 0.8, 400, 3000], [0, 0, -1], { scale: 0.8 }),
+    ...a('marker', [-500, 600, H * 0.33], [1, 0, 0], { scale: 1.2, rot: -20 }), ...a('exhaust1', [L + 600, 0, H * 0.45], [-1, 0, 0], { scale: 1.4, depth: 50 }), ...a('wingRing', [L * 0.95, 0, 3000], [0, 0, -1], { scale: N33 ? 0.85 : 0.8, depth: 220, tilt: 10, n: 0 })];
+  const fs = fitAll(sk, ps); for (const f of fs) console.log(`${f.key}: ${f.ok ? 'ok' : f.why}${f.warn ? ' (' + f.warn + ')' : ''}, ${f.mesh.n} triangles${f.twin ? ' x2' : ''}`); return ps; })() : undefined;
+const MODEL0 = N33 ? n33Model({ ...N33_LUMP, ...(PARTS ? { placed: PARTS } : {}), ...(arg('glass') ? { glass: arg('glass') === 'none' ? null : arg('glass') as never } : {}), ...(DIMS ? { dims: DIMS } : {}), ...(arg('paint') ? { paint: arg('paint') } : {}) }) : p959Model({ ...OPTS, ...(PLACED || PARTS ? { placed: [...(PLACED ?? []), ...(PARTS ?? [])] } : {}) });
 // cabin=n33Stock|n33Sport[:trim] (the N33's interior sets in its cabin, docs/systems/117 R2); cut=<z>: the shell's triangles above z left out (to see in)
 const CAB = N33 && arg('cabin') ? arg('cabin')!.split(':') : null, CUT = arg('cut') ? +arg('cut')! : Infinity;
 const MODEL = CAB ? { ...MODEL0, mesh: joinMeshes(MODEL0.mesh.length, MODEL0.mesh, interiorMesh({ ...INTERIORS[CAB[0] as 'n33Stock'], ...(CAB[1] ? { trim: CAB[1] as 'tan', ...(CAB[0] === 'n33Sport' ? { bucketColour: TRIMS[CAB[1] as 'tan'].seat } : {}) } : {}), cabin: N33_CABIN, length: MODEL0.mesh.length })) } : MODEL0, S = MODEL.shell, NN = MODEL.normals;

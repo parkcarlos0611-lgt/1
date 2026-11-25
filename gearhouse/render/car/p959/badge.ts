@@ -62,12 +62,14 @@ export function crestPlate(b: Build, m: Mark, skin: Skin): CrestFrame {
 
 /** the crest's atlas coordinates on a mesh: the plate's face (part 'badge') mapped flat from its frame into the crest
  *  cell's shield box; every other triangle none. `into` keeps coordinates a mesh already has. */
-export function crestUV(M: Mesh, f: CrestFrame, into?: Float32Array): Float32Array {
+export function crestUV(M: Mesh, f0: CrestFrame | readonly CrestFrame[], into?: Float32Array): Float32Array {
+  // several crests (docs/systems/115 P1: the badge placed freely, as many as its limit): each triangle mapped from the nearest one's frame
+  const fs = Array.isArray(f0) ? f0 : [f0 as CrestFrame], near = (p: V) => fs.reduce((a, g) => { const d = sub(p, g.c), e = sub(p, a.c); return dot(d, d) < dot(e, e) ? g : a; }, fs[0]!);
   const uv = into ?? new Float32Array(M.n * 9), cell = ATLAS_CELLS.indexOf('badge') + 1, names = M.names ?? [];
   // the shader reads a cell at 0.004 + 0.992 u of its width (render/live/renderer.ts atlasAt): undone here, so the
   // shield's box falls exactly on its texels
   const toCell = (t: number) => (t - 0.004) / 0.992, [bx, by, bw, bh] = CREST_BOX;
-  for (let t = 0; t < M.n; t++) { if (names[M.part[t]!] !== 'badge') continue;
+  for (let t = 0; t < M.n; t++) { if (names[M.part[t]!] !== 'badge' || !fs.length) continue; const f = near([M.pos[t * 9]!, M.pos[t * 9 + 1]!, M.pos[t * 9 + 2]!]);
     for (let k = 0; k < 3; k++) { const o = t * 9 + k * 3, p: V = [M.pos[o]!, M.pos[o + 1]!, M.pos[o + 2]!], d = sub(p, f.c), x = dot(d, f.ex) / f.W + 0.5, y = 0.5 - dot(d, f.ey) / f.H;
       uv[o] = toCell((bx + bw * x) / 256); uv[o + 1] = toCell((by + bh * y) / 256); uv[o + 2] = cell; } }
   return uv; }

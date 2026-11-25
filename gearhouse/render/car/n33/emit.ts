@@ -39,13 +39,12 @@ export function emitShellFine(b: Build, S: Shell959, paint: string, normals?: nu
       const want = Math.min(big, Math.ceil(L / (1.1 * w))); for (const i of [pair, pair + 2]) if (get(f, i) < want) { div.set(ekey(f[i]!, f[(i + 1) % 4]!), want); moved = true; } } } }
   const groups = new Map<string, number[]>(); S.tag.forEach((t, k) => { const key = `${t.panel}|${t.mat}`; (groups.get(key) ?? groups.set(key, []).get(key)!).push(k); });
   const st: FineStat = { triangles: 0, slivers: 0, divided: [...div.values()].filter(n => n > 1).length };
-  const tri = (a: Pt, c: Pt, d: Pt, k: number) => { b.tri(a.p, c.p, d.p); if (normals) normals.push(...a.n, ...c.n, ...d.n); st.triangles++; if (painted(k) && minAngle(a.p, c.p, d.p) < 5) { st.slivers++; if (process.env.SLIVERS) console.log('sliver', how, S.tag[k]!.panel, a.p.map(Math.round).join(' '), '|', c.p.map(Math.round).join(' '), '|', d.p.map(Math.round).join(' '), minAngle(a.p, c.p, d.p).toFixed(1)); } };
-  let how = '';
+  const tri = (a: Pt, c: Pt, d: Pt, k: number) => { b.tri(a.p, c.p, d.p); if (normals) normals.push(...a.n, ...c.n, ...d.n); st.triangles++; if (painted(k) && minAngle(a.p, c.p, d.p) < 5) st.slivers++; };
   for (const [key, fs] of groups) { const [panel, mat] = key.split('|') as [string, string], m = MAT[mat]; b.name(panel); if (m) b.mat(m[0], m[1], m[2]); else b.mat(paint, 0.6, 'paint');
     for (const k of fs) { const f = F[k]!, nc = f.length, cnt = f.map((v, i) => div.get(ekey(v, f[(i + 1) % nc]!)) ?? 1), corner = (i: number): Pt => ({ p: P[f[i % nc]!]!, n: N[k]![i % nc]! });
       /** the points along side i, from its first corner to its second (both included) */
       const along = (i: number): Pt[] => { const a = corner(i), c = corner(i + 1), n = cnt[i]!; return Array.from({ length: n + 1 }, (_, j) => j === 0 ? a : j === n ? c : { p: mix(a.p, c.p, j / n), n: unit(mix(a.n, c.n, j / n)) }); };
-      if (cnt.every(n => n === 1)) { how = 'cut'; for (const t of cut(P, f)) { const [x, y, z] = t.map(v => corner(f.indexOf(v))) as [Pt, Pt, Pt]; tri(x, y, z, k); } continue; }
+      if (cnt.every(n => n === 1)) { for (const t of cut(P, f)) { const [x, y, z] = t.map(v => corner(f.indexOf(v))) as [Pt, Pt, Pt]; tri(x, y, z, k); } continue; }
       // candidates: two rails side by side where the other two sides are whole (the triangles step along whichever
       // rail is behind), and a fan round the middle; the one whose worst angle is the larger is laid
       const cands: [Pt, Pt, Pt][][] = [], rails = nc === 4 ? (cnt[1] === 1 && cnt[3] === 1 ? 0 : cnt[0] === 1 && cnt[2] === 1 ? 1 : -1) : -1;
@@ -55,5 +54,5 @@ export function emitShellFine(b: Build, S: Shell959, paint: string, normals?: nu
         const mid: Pt = { p: f.reduce((s, v) => [s[0] + P[v]![0] / nc, s[1] + P[v]![1] / nc, s[2] + P[v]![2] / nc] as V, [0, 0, 0] as V), n: unit(f.reduce((s, _, i) => { const q = corner(i).n; return [s[0] + q[0], s[1] + q[1], s[2] + q[2]] as V; }, [0, 0, 0] as V)) };
         cands.push(rim.map((q, j) => [mid, q, rim[(j + 1) % rim.length]!] as [Pt, Pt, Pt])); }
       const worst = (T: [Pt, Pt, Pt][]) => Math.min(...T.map(t => minAngle(t[0].p, t[1].p, t[2].p))), best = cands.reduce((a, c) => worst(c) > worst(a) ? c : a);
-      how = best === cands[0] && rails >= 0 ? 'rails' : 'fan'; for (const t of best) tri(t[0], t[1], t[2], k); } }
+      for (const t of best) tri(t[0], t[1], t[2], k); } }
   return st; }

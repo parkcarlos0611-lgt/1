@@ -3,7 +3,9 @@
 // game draws with its drawn lines and creases. The glass sets of the builder's second step are tags on the same cells.
 import { Build, type Mesh, type MeshLine } from '../mesh';
 import { shellFrom, type Shell959 } from '../p959/shell';
-import { emitShell, type P959Model } from '../p959';
+import type { P959Model } from '../p959';
+import { emitShellFine } from './emit';
+import { buildCageV3 } from './v3';
 import { p959Lines } from '../p959/lines';
 import { wheel, type WheelKind } from '../p959/parts';
 import { subdivSkin, type Skin } from '../skin';
@@ -16,14 +18,14 @@ import { drawPlaced, fitAll, footprints } from '../attach';
 import { cutShell, clipLines } from '../attach/holes';
 import { crestUV } from '../p959/badge';
 import { PLATE_W, PLATE_H } from '../p959/plates';
-import { buildCage, DIM, type CageOpts } from './cage';
+import { DIM, type CageOpts } from './cage';
 import { frameOf, STOCK_FRAME, type Frame } from './frame';
 export { buildCage, DIM, NR, NC, ARCH } from './cage';
 export { frameOf, STOCK_FRAME, ZONES, type Frame } from './frame';
 
 /** the shell: the cage subdivided, the arches trued with a lip and a well about the (stretched) hubs, no sockets sunk */
 export function buildN33Shell(o: CageOpts = {}): Shell959 { const f = frameOf(o.dims);
-  return shellFrom(buildCage(o), { arches: [{ x: f.archF[0], z: f.archF[1] }, { x: f.archR[0], z: f.archR[1] }], archR: DIM.archR }); }
+  return shellFrom(buildCageV3(o), { arches: [{ x: f.archF[0], z: f.archF[1] }, { x: f.archR[0], z: f.archR[1] }], archR: DIM.archR }); }
 export const n33Skin = (S: Shell959): Skin => subdivSkin({ P: S.P, F: S.F, N: S.N, tag: S.tag, nSub: S.nSub, parent: S.fine.parent });
 
 /** the wheels' hubs on the stretched car: at the axles and the track (the tyre's outer face half a width out), on the ground */
@@ -48,7 +50,7 @@ export function n33Model(o: N33Opts = {}): P959Model { const fr = frameOf(o.dims
       if (f && f.gap < 150) fits.push(f); } }
   const parts = skin && freeParts(o.placed).length ? fitAll(skin, o.placed!, fits.flatMap(f => footprints({ F: f.F, hw: PLATE_W / 2 * f.s, hh: PLATE_H / 2 * f.s, twin: false }))) : [];
   const holes = parts.filter(f => f.hole && f.ok).flatMap(f => f.hole!.cuts), C = holes.length ? cutShell(S0, skin!, holes) : null, S = C?.S ?? S0;
-  emitShell(b, S, paint, nn);
+  emitShellFine(b, S, paint, nn);   // the narrow bands cut finer (docs/systems/108 S9)
   if (!o.bare) for (const h of n33Hubs(fr, o.tyres)) wheel(b, h, o.wheel ?? 'steel', o.brake !== false);
   for (const f of fits) drawPlate(b, f, o.plate);
   // the free parts (docs/systems/115 P1, P2: render/car/attach), measured for overlap against the plates

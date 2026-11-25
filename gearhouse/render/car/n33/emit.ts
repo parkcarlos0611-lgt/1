@@ -18,7 +18,7 @@ const ang = (u: V, v: V) => Math.acos(Math.max(-1, Math.min(1, (u[0] * v[0] + u[
 export const minAngle = (a: V, b: V, c: V) => Math.min(ang(sub(b, a), sub(c, a)), ang(sub(a, b), sub(c, b)), ang(sub(a, c), sub(b, c)));
 /** a quad is thin when its long sides are more than this many times its short ones; its long sides are then divided
  *  into pieces at most this many times the short ones (a piece cut corner to corner keeps an angle well over 5 degrees) */
-const THIN = 5, PIECE = 3.2, MOST = 64;
+const THIN = 8, PIECE = 6, MOST = 64;
 interface Pt { p: V; n: V }
 
 export interface FineStat { triangles: number; /** painted triangles with an angle under 5 degrees */ slivers: number; /** edges divided */ divided: number }
@@ -36,7 +36,7 @@ export function emitShellFine(b: Build, S: Shell959, paint: string, normals?: nu
   const quads = F.map((f, k) => f.length === 4 ? k : -1).filter(k => k >= 0), get = (f: number[], i: number) => div.get(ekey(f[i]!, f[(i + 1) % 4]!)) ?? 1;
   for (let it = 0, moved = true; moved && it < 60; it++) { moved = false; for (const k of quads) { const f = F[k]!, l = sides(f);
     for (const pair of [0, 1]) { const n0 = get(f, pair), n1 = get(f, pair + 2), big = Math.max(n0, n1); if (big === 1) continue; const L = Math.max(l[pair]!, l[pair + 2]!), w = Math.max(0.05, (l[pair + 1]! + l[(pair + 3) % 4]!) / 2);
-      const want = Math.min(big, Math.ceil(L / (1.1 * w))); for (const i of [pair, pair + 2]) if (get(f, i) < want) { div.set(ekey(f[i]!, f[(i + 1) % 4]!), want); moved = true; } } } }
+      const want = Math.min(big, Math.ceil(L / (1.5 * w))); for (const i of [pair, pair + 2]) if (get(f, i) < want) { div.set(ekey(f[i]!, f[(i + 1) % 4]!), want); moved = true; } } } }
   const groups = new Map<string, number[]>(); S.tag.forEach((t, k) => { const key = `${t.panel}|${t.mat}`; (groups.get(key) ?? groups.set(key, []).get(key)!).push(k); });
   const st: FineStat = { triangles: 0, slivers: 0, divided: [...div.values()].filter(n => n > 1).length };
   const tri = (a: Pt, c: Pt, d: Pt, k: number) => { b.tri(a.p, c.p, d.p); if (normals) normals.push(...a.n, ...c.n, ...d.n); st.triangles++; if (painted(k) && minAngle(a.p, c.p, d.p) < 5) st.slivers++; };

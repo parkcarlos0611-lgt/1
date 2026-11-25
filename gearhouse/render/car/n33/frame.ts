@@ -10,8 +10,9 @@ import { frameMaker, type Frame, type FrameDims } from '../frame';
 export { NO_DIMS, stretchAt, type Frame, type FrameDims } from '../frame';
 
 /** the car's own measurements (mm; the cage's: cage.ts; docs/systems/117 §3, data/cars/spec/bnr33.json): 245/45 R17
- *  tyres (radius 326), the arches' lips at 368 round the hubs (the blueprint's: about 370) */
-export const DIM = { length: 4675, width: 1780, height: 1364, wheelbase: 2720, axleF: 950, axleR: 3670, trackF: 1480, trackR: 1490, hubZ: 326, tyreR: 326, rimR: 216, archR: 368 } as const;
+ *  tyres (radius 326), the rim as it is seen (its flange, 232; the bead seat is 216), the arches' lips at 350 round the
+ *  hubs (the blueprint's about 362: the style standard's gap, docs/systems/108 4.1) */
+export const DIM = { length: 4675, width: 1780, height: 1364, wheelbase: 2720, axleF: 950, axleR: 3670, trackF: 1480, trackR: 1490, hubZ: 326, tyreR: 326, rimR: 232, archR: 350 } as const;
 const RZ = 395;   // an arch's rigid zone each side of its hub (its ring reaches 377)
 export const ZONES = { overhangF: { x: [0, 300], rise: 0.3, fall: 0.6 }, wheelbase: { x: [DIM.axleF + RZ, 1640], rise: 0.35, fall: 0.35 }, overhangR: { x: [DIM.axleR + RZ, DIM.length + 1], rise: 0.4, fall: 0.6 } } as const;
 export const frameOf: (d?: Partial<FrameDims>) => Frame = frameMaker({ dim: DIM, archZ: [DIM.hubZ, DIM.hubZ], zones: ZONES, belt: 918, top: 1364, knee: 0.15 });

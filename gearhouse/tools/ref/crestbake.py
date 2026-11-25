@@ -15,7 +15,7 @@ Deterministic: the same artwork gives the same files.
   python3 tools/ref/crestbake.py"""
 import base64, math, os
 import numpy as np
-from PIL import Image, ImageDraw, ImageFilter
+from PIL import Image, ImageFilter
 
 ROOT = os.path.normpath(os.path.join(os.path.dirname(__file__), '..', '..'))
 SRC = os.path.join(ROOT, 'assets/brand/phorster_crest_src.png')
@@ -91,122 +91,104 @@ def level0():
     return np.clip(out.round(), 0, 255).astype(np.uint8)
 
 # ---- the flat drawings ----
-# shield coordinates: x 0..1 across its width, y 0..1 down its height
-def arc_band(x): return 0.14 + 0.045 * ((x - 0.5) / 0.45) ** 2          # the lettering band's lower edge
-LETTERS = {   # the same strokes as render/car/p959/badge.ts LETTERS (unit box, x right, y up)
-    'P': [[[0, 0], [0, 1], [.82, 1], [1, .84], [1, .64], [.82, .48], [0, .48]]],
-    'H': [[[0, 0], [0, 1]], [[1, 0], [1, 1]], [[0, .5], [1, .5]]],
-    'O': [[[.2, 0], [.8, 0], [1, .2], [1, .8], [.8, 1], [.2, 1], [0, .8], [0, .2], [.2, 0]]],
-    'R': [[[0, 0], [0, 1], [.82, 1], [1, .84], [1, .66], [.82, .5], [0, .5]], [[.5, .5], [1, 0]]],
-    'S': [[[1, .84], [.84, 1], [.16, 1], [0, .84], [0, .66], [.16, .52], [.84, .48], [1, .34], [1, .16], [.84, 0], [.16, 0], [0, .16]]],
-    'T': [[[0, 1], [1, 1]], [[.5, 1], [.5, 0]]],
-    'E': [[[1, 1], [0, 1], [0, 0], [1, 0]], [[0, .5], [.8, .5]]],
-}
-CENTRE = [(0.318, 0.334), (0.688, 0.334), (0.688, 0.52), (0.672, 0.575), (0.635, 0.615), (0.565, 0.645), (0.503, 0.66),
-          (0.441, 0.645), (0.371, 0.615), (0.334, 0.575), (0.318, 0.52)]
-BULL = [(0.405, 0.555), (0.425, 0.568), (0.452, 0.542), (0.458, 0.575), (0.444, 0.600), (0.470, 0.602), (0.484, 0.560),
-        (0.520, 0.552), (0.545, 0.578), (0.535, 0.600), (0.560, 0.600), (0.572, 0.565), (0.586, 0.596), (0.612, 0.596),
-        (0.606, 0.540), (0.616, 0.490), (0.612, 0.458), (0.572, 0.433), (0.512, 0.425), (0.476, 0.442), (0.450, 0.456),
-        (0.425, 0.466), (0.410, 0.488), (0.400, 0.525)]
-HORNS = [[(0.420, 0.472), (0.385, 0.462), (0.362, 0.452), (0.356, 0.432)], [(0.452, 0.458), (0.468, 0.440), (0.466, 0.418)]]
-TAIL = [(0.612, 0.462), (0.628, 0.440), (0.626, 0.420), (0.640, 0.410), (0.648, 0.418)]
-# the two wreaths: each two branches from where their stems cross up to their tips (a quadratic curve through a middle point)
-WREATHS = [((0.245, 0.435), [((0.215, 0.445), (0.10, 0.33), (0.135, 0.19)), ((0.275, 0.445), (0.39, 0.33), (0.355, 0.19))]),
-           ((0.715, 0.848), [((0.685, 0.858), (0.565, 0.74), (0.595, 0.615)), ((0.745, 0.858), (0.865, 0.74), (0.84, 0.615))])]
+# The artwork posterised to the five flat colours (a median filter first takes off the gold's pebbling and the leather's
+# grain; the rim's band is the dark gold, the field the light), then for each far level:
+#   64: the posterised picture averaged over each texel, the ink a little heavier so the letters and leaves hold;
+#   32: the same with the ink heavier still, the bars laid on whole texel rows (each bar at least one row);
+#   16: drawn by hand, texel by texel (below): a picture that small cannot be found by any filter.
+# Shield coordinates: x 0..1 across its width, y 0..1 down its height.
+def posterised():
+    guess = dict(COL); guess['B'] = (85, 50, 30)             # the dark brown lines along the lettering band: ink
+    keys = list(guess); ix = {k: i for i, k in enumerate(keys)}
+    med = np.asarray(src.convert('RGB').filter(ImageFilter.MedianFilter(5))).astype(np.float64)
+    cls = np.stack([((med - np.array(guess[k])) ** 2).sum(-1) for k in keys], -1).argmin(-1)
+    cls[cls == ix['B']] = ix['K']
+    inner = np.asarray(Image.fromarray((inside * 255).astype(np.uint8)).filter(ImageFilter.MinFilter(23))) > 0
+    cls[inside & ~inner] = ix['D']; cls[inner & (cls == ix['D'])] = ix['G']; cls[~inside] = ix['D']
+    cls = np.asarray(Image.fromarray(cls.astype(np.uint8)).filter(ImageFilter.ModeFilter(5)))   # specks off
+    return cls, keys
+POST, PKEYS = posterised()
+PX = {k: i for i, k in enumerate(PKEYS)}
+PCOL = np.array([COL.get(k, COL['K']) for k in PKEYS], np.float64)
 
-def bez(p, m, q, n):   # a quadratic through p, near m, to q
-    c = (2 * m[0] - (p[0] + q[0]) / 2, 2 * m[1] - (p[1] + q[1]) / 2)
-    return [((1 - t) ** 2 * p[0] + 2 * t * (1 - t) * c[0] + t * t * q[0], (1 - t) ** 2 * p[1] + 2 * t * (1 - t) * c[1] + t * t * q[1]) for t in (i / n for i in range(n + 1))]
+def fractions(C):
+    """each texel's share of each flat colour, the posterised picture laid in the cell at C texels"""
+    bx, by, bw, bh = (v * C / CELL for v in BOX)
+    big = np.full((C * SS, C * SS), PX['D'], np.uint8)
+    sub = np.asarray(Image.fromarray(POST.astype(np.uint8)).resize((int(round(bw * SS)), int(round(bh * SS))), Image.NEAREST))
+    x0, y0 = int(round(bx * SS)), int(round(by * SS)); big[y0:y0 + sub.shape[0], x0:x0 + sub.shape[1]] = sub
+    return np.stack([(big == i).reshape(C, SS, C, SS).mean((1, 3)) for i in range(len(PKEYS))], -1)
+
+def averaged(F, boost):
+    F = F.copy()
+    for k, b in boost.items():
+        i = PX[k]; f = np.minimum(1, F[..., i] * b); rest = F.sum(-1) - F[..., i]
+        F *= np.where(rest > 0, (1 - f) / np.maximum(rest, 1e-9), 0)[..., None]; F[..., i] = f
+    return F @ PCOL
+
+# the bars of the two striped quarters: x from, x to, and each bar's colour and rows (y from, y to)
+BARS = [(0.506, 1.0, [('K', 0.145, 0.226), ('W', 0.236, 0.271), ('R', 0.271, 0.324), ('K', 0.334, 0.411), ('W', 0.421, 0.452), ('R', 0.452, 0.513)]),
+        (0.0, 0.494, [('K', 0.523, 0.607), ('W', 0.620, 0.651), ('R', 0.651, 0.708), ('K', 0.716, 0.793), ('W', 0.802, 0.829), ('R', 0.829, 1.0)])]
+CENTRE = [(0.318, 0.334), (0.688, 0.334), (0.688, 0.52), (0.672, 0.575), (0.635, 0.615), (0.565, 0.645), (0.503, 0.66),
+          (0.441, 0.645), (0.371, 0.615), (0.334, 0.575), (0.318, 0.52)]   # the small centre shield (the bull's)
+def under_band(x, y): return y >= 0.14 + 0.045 * ((x - 0.5) / 0.45) ** 2   # below the lettering band's curved lower edge
+def inpoly(poly, x, y):
+    n = len(poly); r = False; j = n - 1
+    for i in range(n):
+        (xi, yi), (xj, yj) = poly[i], poly[j]
+        if (yi > y) != (yj > y) and x < (xj - xi) * (y - yi) / (yj - yi) + xi: r = not r
+        j = i
+    return r
+def bar_rows(C, bars):
+    """the bars on whole texel rows, in order, each at least one row: the rows shared out by largest remainder"""
+    by, bh = BOX[1] * C / CELL, BOX[3] * C / CELL
+    edges = [bars[0][1]] + [(bars[i][2] + bars[i + 1][1]) / 2 for i in range(len(bars) - 1)] + [bars[-1][2]]
+    t = [by + e * bh for e in edges]; r0, r1 = int(round(t[0])), int(round(t[-1]))
+    want = [t[i + 1] - t[i] for i in range(len(bars))]; k = (r1 - r0) / sum(want); want = [w * k for w in want]
+    n = [max(1, int(w)) for w in want]
+    while sum(n) < r1 - r0: i = max(range(len(n)), key=lambda i: want[i] - n[i]); n[i] += 1
+    while sum(n) > r1 - r0: i = max(range(len(n)), key=lambda i: (n[i] - want[i]) if n[i] > 1 else -9); n[i] -= 1
+    rows, r = {}, r0
+    for (c, _, _), m in zip(bars, n):
+        for _ in range(m): rows[r] = c; r += 1
+    return rows
+
+GRID16 = """
+DDDDDDDDDDDDDDDD
+DDDDDGGGGGGDDDDD
+DDGKKGKGKKGKKGDD
+DDGGGGGGKKKKKKDD
+DDGKGGKGWWWWWWDD
+DDGKGGDDDDRRRRDD
+DDGGKKGDDGKKKKDD
+DDGGGDGKKKRRRRDD
+DDKKKKGKKKDGGGDD
+DDWWWWGKGKGGGGDD
+DDDRRRRGGKGGKGDD
+DDDKKKKKGKGGKDDD
+DDDDWWWWGGKKGDDD
+DDDDDRRRGGDDDDDD
+DDDDDDRRGGDDDDDD
+DDDDDDDDDDDDDDDD
+"""   # the 16 level by hand: the lettering band (dark marks on gold), the bars, the centre shield with its dark-gold edge
+      # and the bull (a dark block, its head low on the left, two legs), the two wreaths as small open cups
 
 def flat(C):
-    """the crest drawn flat for a cell of C texels: each feature at least about a texel wide, so it survives"""
-    k = C * SS / CELL; tx = SS                     # hi-res pixels a cell texel
-    bx, by, bw, bh = (v * k for v in BOX)
-    P = lambda x, y: (bx + x * bw, by + y * bh)
-    big = C >= 64
-    img = Image.new('RGB', (C * SS, C * SS), COL['D']); dr = ImageDraw.Draw(img)
-    # the shield, the rim inside it, the field
-    sh = Image.fromarray((inside * 255).astype(np.uint8)).resize((int(round(bw)), int(round(bh))), Image.BILINEAR).point(lambda v: 255 if v >= 128 else 0)
-    mask = Image.new('L', img.size, 0); mask.paste(sh, (int(round(bx)), int(round(by))))
-    rim = max(0.022 * bw, (0.9 if big else 0.6) * tx)
-    inner = mask.filter(ImageFilter.MinFilter(2 * int(round(rim)) + 1))
-    field = Image.new('RGB', img.size, COL['G']); img.paste(field, (0, 0), inner)
-    lay = Image.new('RGB', img.size, COL['G']); ld = ImageDraw.Draw(lay)   # everything inside the rim, pasted through it at the end
-    line = lambda pts, w, c: ld.line([P(*p) for p in pts], fill=c, width=max(1, int(round(w))), joint='curve')
-    # the bars: top right and bottom left, each colour across its quadrant
-    gap = max(0.006 * bh, 0.35 * tx)
-    for x0, x1, bars in [(0.506, 1.0, [('K', None, 0.226), ('W', 0.236, 0.271), ('R', 0.271, 0.324), ('K', 0.334, 0.411), ('W', 0.421, 0.452), ('R', 0.452, 0.513)]),
-                         (0.0, 0.494, [('K', 0.523, 0.607), ('W', 0.620, 0.651), ('R', 0.651, 0.708), ('K', 0.716, 0.793), ('W', 0.802, 0.829), ('R', 0.829, 1.0)])]:
-        for c, y0, y1 in bars:
-            if y0 is None:   # the first bar starts at the lettering band's edge
-                pts = [P(x, arc_band(x) + 0.004) for x in np.linspace(x0, x1, 12)] + [P(x1, y1), P(x0, y1)]
-                ld.polygon(pts, fill=COL[c])
-            else: ld.rectangle([P(x0, y0), P(x1, y1)], fill=COL[c])
-    if not big:   # small: the thin gold gaps between bars would vanish; draw them at a fixed width so the bars stay apart
-        for x0, x1, ys in [(0.506, 1.0, (0.231, 0.329, 0.416)), (0.0, 0.494, (0.613, 0.712, 0.797))]:
-            for y in ys: ld.line([P(x0, y), P(x1, y)], fill=COL['G'], width=max(1, int(round(gap))))
-    # the lettering band: gold, ink along both edges, the letters in ink following its curve
-    band_hi = [P(x, 0.0) for x in np.linspace(0, 1, 2)]
-    ld.polygon([P(0, 0), P(1, 0)] + [P(x, arc_band(x)) for x in np.linspace(1, 0, 24)], fill=COL['G'])
-    edge_w = max(0.006 * bh, (0.45 if big else 0.4) * tx)
-    ld.line([P(x, arc_band(x)) for x in np.linspace(0, 1, 32)], fill=COL['K'], width=max(1, int(round(edge_w))))
-    top_edge = Image.new('L', img.size, 0)   # the band's upper ink line: just inside the rim
-    inner2 = inner.filter(ImageFilter.MinFilter(2 * int(round(edge_w)) + 1))
-    ring = Image.fromarray((np.asarray(inner) > 0) & ~(np.asarray(inner2) > 0)).convert('L')
-    band_zone = Image.new('L', img.size, 0); ImageDraw.Draw(band_zone).polygon([P(0, 0), P(1, 0)] + [P(x, arc_band(x)) for x in np.linspace(1, 0, 24)], fill=255)
-    lay.paste(Image.new('RGB', img.size, COL['K']), (0, 0), Image.fromarray(np.asarray(ring) & np.asarray(band_zone)))
-    word, x0, x1 = 'PHORSTER', 0.075, 0.925
-    pitch = (x1 - x0) / len(word); lw = pitch * 0.80; capH = 0.072
-    stroke = max(0.022 * bh, (0.75 if C >= 64 else 0.85 if C >= 32 else 0.8) * tx)
-    for i, ch in enumerate(word):
-        xc = x0 + (i + 0.5) * pitch; base = arc_band(xc) - 0.024
-        slope = (arc_band(xc + 0.01) - arc_band(xc - 0.01)) / 0.02 * bh / bw
-        ca, sa = math.cos(math.atan(slope)), math.sin(math.atan(slope))
-        for st in LETTERS[ch]:
-            pts = []
-            for u, v in st:
-                dx, dy = (u - 0.5) * lw * bw, -v * capH * bh   # pixels from the letter's foot, y down
-                pts.append((bx + xc * bw + dx * ca - dy * sa, by + base * bh + dx * sa + dy * ca))
-            ld.line(pts, fill=COL['K'], width=max(1, int(round(stroke))), joint='curve')
-    # the dividers: a gold cross between the quadrants
-    div = max(0.012 * bw, 0.5 * tx)
-    ld.line([P(0.5, arc_band(0.5)), P(0.5, 1.0)], fill=COL['G'], width=max(1, int(round(div))))
-    ld.line([P(0, 0.517), P(1, 0.517)], fill=COL['G'], width=max(1, int(round(div))))
-    # the wreaths: a stem and leaves; small, a thick stroke
-    for (cross, branches) in WREATHS:
-        for (p, m, q) in branches:
-            pts = bez(p, m, q, 16)
-            if C >= 64:
-                line(pts, max(0.008 * bw, 0.5 * tx), COL['K'])
-                for j in range(1, 8):   # leaves both sides, pointing up the branch
-                    a, b = pts[2 * j - 1], pts[2 * j]; t = (b[0] - a[0], b[1] - a[1]); L = math.hypot(*t) or 1; t = (t[0] / L, t[1] / L); nrm = (-t[1], t[0])
-                    for s in (1, -1):
-                        ox, oy = a[0] + nrm[0] * s * 0.022 + t[0] * 0.01, a[1] + nrm[1] * s * 0.022 * bw / bh + t[1] * 0.01
-                        lx, ly = (t[0] + nrm[0] * s * 0.9), (t[1] + nrm[1] * s * 0.9); ll = math.hypot(lx, ly); lx, ly = lx / ll, ly / ll
-                        leaf = [P(ox - lx * 0.028, oy - ly * 0.028 * bw / bh), P(ox + lx * 0.028, oy + ly * 0.028 * bw / bh)]
-                        ld.line(leaf, fill=COL['K'], width=max(1, int(round(0.026 * bw))))
-            else: line(pts, (1.05 if C >= 32 else 0.95) * tx, COL['K'])
-        # the crossed stems under the wreath
-        line([(cross[0] - 0.045, cross[1] - 0.015), (cross[0] + 0.045, cross[1] + 0.022)], max(0.008 * bw, 0.5 * tx), COL['K'])
-        line([(cross[0] + 0.045, cross[1] - 0.015), (cross[0] - 0.045, cross[1] + 0.022)], max(0.008 * bw, 0.5 * tx), COL['K'])
-    # the centre shield: a gold ring round it over the bars, its ink edge, its gold field; the town's name as a dark line; the bull
-    ringw = max(0.012 * bw, 0.45 * tx)
-    cen = [P(*p) for p in CENTRE]
-    ld.polygon(cen, fill=COL['G'], outline=COL['G'], width=max(1, int(round(ringw * 2))))
-    ld.line(cen + [cen[0]], fill=COL['G'], width=max(1, int(round(ringw * 2 + max(0.008 * bw, 0.45 * tx) * 2))), joint='curve')
-    ld.line(cen + [cen[0]], fill=COL['K'], width=max(1, int(round(max(0.009 * bw, 0.45 * tx)))), joint='curve')
-    if C >= 32: line([(0.36, 0.372), (0.646, 0.372)], max(0.03 * bh, 0.55 * tx) if C >= 64 else 0.5 * tx, COL['K'])
-    bull = [P(*p) for p in BULL]
-    if C >= 64:
-        ld.polygon(bull, fill=COL['K'])
-        for h in HORNS: line(h, max(0.012 * bw, 0.6 * tx), COL['K'])
-        line(TAIL, max(0.01 * bw, 0.5 * tx), COL['K'])
-    else:   # a block of a body, the head down to the left, a horn up
-        grow = (0.5 if C >= 32 else 0.35) * tx
-        ld.polygon(bull, fill=COL['K'], outline=COL['K'], width=max(1, int(round(grow))))
-        for h in HORNS[:1 if C < 32 else 2]: line(h, 0.6 * tx, COL['K'])
-    img.paste(lay, (0, 0), inner)
-    return np.asarray(img.reduce(SS))
+    if C == 16:
+        rows = [r for r in GRID16.split() if r]
+        assert len(rows) == 16 and all(len(r) == 16 for r in rows)
+        return np.array([[COL[c] for c in r] for r in rows], np.uint8)
+    F = fractions(C)
+    img = averaged(F, {'K': 1.3, 'W': 1.15} if C >= 64 else {'K': 1.7, 'W': 1.3})
+    if C < 64:   # the bars on whole rows, where the texel is in that quarter, off the centre shield and inside the rim
+        bx, by, bw, bh = (v * C / CELL for v in BOX)
+        for x0, x1, bars in BARS:
+            for r, c in bar_rows(C, bars).items():
+                for q in range(C):
+                    xn, yn = (q + 0.5 - bx) / bw, (r + 0.5 - by) / bh
+                    if x0 <= xn <= x1 and under_band(xn, yn) and not inpoly(CENTRE, xn, yn) and F[r, q, PX['D']] < 0.5 and F[r, q, PX['G']] + F[r, q, PX['K']] + F[r, q, PX['W']] + F[r, q, PX['R']] > 0.5:
+                        img[r, q] = COL[c]
+    return np.clip(img.round(), 0, 255).astype(np.uint8)
 
 L0 = level0()
 FL = {C: flat(C) for C in FLAT}

@@ -138,7 +138,8 @@ export function styleUp(gl: WebGL2RenderingContext, p: Part): void { if (p.style
   const P = new Float32Array(nt * 9), K = new Uint8Array(nt), grp = new Int32Array(nt); tris.forEach((t, j) => { P.set(M.pos.subarray(t * 9, t * 9 + 9), j * 9); K[j] = M.kind[t]!; grp[j] = K[j] === PLAIN_K ? PAINT_K : K[j]!; });   /* paint and the plain trim beside it shade as one surface where they meet flush; any fold still splits them */
   const S = surfaceNormals(P, nt, grp, { creases: M.creases }), Hn = hullNormals(P, nt), H = new Float32Array(nt * 12);
   tris.forEach((t, j) => { const nm = M.names?.[M.part[t]!] ?? '', w = nm === 'seam' ? -1 : outlineShare(nm, M.kind[t]!); for (let k = 0; k < 3; k++) H.set([Hn[j * 9 + k * 3]!, Hn[j * 9 + k * 3 + 1]!, Hn[j * 9 + k * 3 + 2]!, w], (j * 3 + k) * 4); });
-  let A: Float32Array | null = null; if (M.uv && M.uv.length === M.n * 9) { A = new Float32Array(nt * 9); tris.forEach((t, j) => A!.set(M.uv!.subarray(t * 9, t * 9 + 9), j * 9)); } else A = autoAtlasUV(P, K, nt);
+  const auto = autoAtlasUV(P, K, nt); let A: Float32Array | null = auto;   /* a mesh's own coordinates where it has them (a cell given), the grilles' found ones elsewhere */
+  if (M.uv && M.uv.length === M.n * 9) { A = new Float32Array(nt * 9); tris.forEach((t, j) => A!.set(M.uv![t * 9 + 2]! > 0 || !auto ? M.uv!.subarray(t * 9, t * 9 + 9) : auto.subarray(j * 9, j * 9 + 9), j * 9)); }
   gl.bindVertexArray(p.vao); const bufs = p.bufs ?? (p.bufs = []);
   const buf = (loc: number, data: Float32Array, size: number) => { const b = gl.createBuffer()!; bufs.push(b); gl.bindBuffer(gl.ARRAY_BUFFER, b); gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, size, gl.FLOAT, false, 0, 0); };
   buf(ATTR.hull, H, 4); buf(ATTR.surf, S, 3); if (A) buf(ATTR.atl, A, 3); gl.bindVertexArray(null); }

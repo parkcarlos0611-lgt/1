@@ -30,6 +30,7 @@ import { type RaceSpec, torqueAt, EPS_SPEED_SENSITIVE } from './cars';
 import { HP, engineMass, enginePackage, tyreR, engineFigures, engineCost, engineReliability } from './designparts';
 import { fit, fitPenalty, type FitResult } from './fit';
 import { designSusp } from '../render/car/designsusp';
+import { tierById, type Tier } from './tiers';
 export { pistonSpeed } from './designparts';
 
 const G = 9.81, RHO = 1.2, DRIVER = 75;
@@ -168,6 +169,9 @@ export function frontalArea(d: Design): number { const B = BASES[d.body.base], b
 /** the design's physics for the driving game */
 export function designSpec(d: Design): RaceSpec {
   const B = BASES[d.body.base], E = d.engine, D = d.drive, K = d.kit, en = engineFigures(d), M = massing(d), F = fitPenalty(d);
+  // the chosen class's caps (docs/systems/115 C1, format 6's `tier`): past its power cap an intake restrictor takes the
+  // engine down to it (the whole curve in proportion); its top speed is held by a limiter. No class chosen: neither
+  const T = classOf(d), cut = restrictorShare(en.hp, T);
   const cd = B.cdA / frontal(B, B.width), shape = shapeK(d) / shapeK(B.ref);
   const rearW = K.tyres[1], R = tyreR(rearW, K.rim), gears = GEARSETS[D.gears];
   const eff = (D.gears === 5 ? 0.9 : 0.88) - (D.awd ? 0.03 : 0);   // the NSX's five-speed 0.9, the F355's six 0.88; the front drive's gears
@@ -183,9 +187,9 @@ export function designSpec(d: Design): RaceSpec {
   // rear, its drag; the body itself makes none
   if (K.wing) tech.wing = { up: 0, down: -1, clA: 0.3, cdA: 0.05, body: 0 };
   if (K.diffuser) tech.underbody = { clA: 0.13, front: 0.5, cdA: 0.01 };   // the F355's undertray
-  if (en.vtec) tech.vtec = en.vtec; if (en.turbo) tech.turbo = en.turbo;
+  if (en.vtec) tech.vtec = cut < 1 ? { ...en.vtec, low: { ...en.vtec.low, torque: en.vtec.low.torque * cut } } : en.vtec; if (en.turbo) tech.turbo = en.turbo;
   const s: RaceSpec = { id: 'design:' + d.id, name: d.name, mass: M.mass, wheelbase: M.L, track: B.track + (2 * d.body.width + d.body.track) / 1000, tyreR: R, tyreW: (K.tyres[0] + rearW) / 2000,
-    cgH: M.cgH, frontShare: M.front, hp: en.hp, hpRpm: en.hpRpm, torqueRpm: en.torqueRpm, torquePeak: en.torquePeak, idle: E.layout === 'V6' ? 800 : 1000, redline: E.redline,
+    cgH: M.cgH, frontShare: M.front, hp: en.hp * cut, hpRpm: en.hpRpm, torqueRpm: en.torqueRpm, torquePeak: en.torquePeak * cut, idle: E.layout === 'V6' ? 800 : 1000, redline: E.redline,
     gears, final: D.final || 3.5, eff, brakes: 'disc', hydraulic: true, brakeG: 1.0, cdA: cd * frontalArea(d) * shape + F.cdA, crr: 0.012, steerLock: 30, topKmh: 0, check: false,
     cooling: { siphon: false, margin: E.turbo ? 1.1 : 1.15 }, tyreKind: 'radial', era: '1990s', shiftT: D.gearbox === 'f1' ? 0.2 : D.gears === 5 ? 0.22 : 0.27, launchRpm: launch,
     steer: { ratio: K.steering === 'manual' ? 19.5 : 19, ackermann: 0.6, rack: true },
@@ -198,8 +202,13 @@ export function designSpec(d: Design): RaceSpec {
   if (!D.final) {   // the final drive for the top speed: the power peak in top gear where the power meets the resistance
     const P = s.hp * HP * s.eff, cd = dragArea(s); let v = 50; for (let k = 0; k < 60; k++) v = Math.cbrt(Math.max(1, P - s.crr * s.mass * G * v) / (0.5 * RHO * cd));
     s.final = Math.min(4.8, Math.max(2.8, s.hpRpm * Math.PI / 30 * R / (v * gears[gears.length - 1]!))); }
-  s.topKmh = Math.round(topSpeed(s) * 3.6);
+  if (T && Number.isFinite(T.topMax)) s.limiter = T.topMax;
+  s.topKmh = Math.min(Math.round(topSpeed(s) * 3.6), s.limiter ?? Infinity);
   return s; }
+/** a design's chosen class (format 6's `tier`; none: a design read from an older format before the builder opened it) */
+export const classOf = (d: Design): Tier | undefined => d.tier ? tierById(d.tier) : undefined;
+/** the share of the engine's power a class's restrictor lets through (1: under the cap, or no class) */
+export const restrictorShare = (hp: number, t: Tier | undefined): number => t && Number.isFinite(t.hpMax) && hp > t.hpMax ? t.hpMax / hp : 1;
 
 // ---- the class (doc 99 6-2, axis 1): performance grades as soft memberships from the figures ----
 export type PerfClass = 'normal' | 'high' | 'sports' | 'super' | 'hyper';
@@ -249,9 +258,14 @@ export function designCost(d: Design): { cost: number; reliability: number; serv
  *  reliability (placeholders), the fit (race/fit.ts) */
 export interface DesignFigures { mass: number; hp: number; torque: number; /** kg a hp */ kgPerHp: number; /** hp a tonne */ hpPerTonne: number;
   front: number; topKmh: number; zeroTo100: number; cdA: number; /** m */ cgH: number;
-  perf: Record<PerfClass, number>; perfLabel: string; form: string; cost: number; reliability: number; serviceKm: number; fit: FitResult[] }
+  perf: Record<PerfClass, number>; perfLabel: string; form: string; cost: number; reliability: number; serviceKm: number; fit: FitResult[];
+  /** the class's holds (docs/systems/115 C1): the engine's power before the restrictor and what it takes off (hp, 0:
+   *  none); the top speed without the limiter, and the limiter where it holds the car (km/h, 0: it does not) */
+  hpFree: number; restrictor: number; topFree: number; limiter: number }
 export function designFigures(d: Design): DesignFigures {
   const s = designSpec(d), r = (x: number, n = 0) => Math.round(x * 10 ** n) / 10 ** n, hpt = s.hp / s.mass * 1000, perf = perfClass(hpt, s.topKmh), c = designCost(d);
+  const free = engineFigures(d).hp, topFree = s.limiter && s.topKmh >= s.limiter ? Math.round(topSpeed(s) * 3.6) : s.topKmh;
   return { mass: r(s.mass), hp: r(s.hp), torque: r(s.torquePeak!), kgPerHp: r(s.mass / s.hp, 2), hpPerTonne: r(hpt), front: r(s.frontShare, 3),
     topKmh: s.topKmh, zeroTo100: r(zeroTo100(s), 1), cdA: r(dragArea(s), 3), cgH: r(s.cgH, 3),
-    perf, perfLabel: perfLabel(perf), form: BODY_FORM, cost: r(c.cost), reliability: r(c.reliability), serviceKm: c.serviceKm, fit: fit(d) }; }
+    perf, perfLabel: perfLabel(perf), form: BODY_FORM, cost: r(c.cost), reliability: r(c.reliability), serviceKm: c.serviceKm, fit: fit(d),
+    hpFree: r(free), restrictor: r(free) - r(s.hp), topFree, limiter: s.limiter && topFree > s.limiter ? s.limiter : 0 }; }

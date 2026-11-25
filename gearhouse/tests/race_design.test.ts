@@ -121,7 +121,7 @@ describe('the rules run the right way', () => {
 
 describe('any design inside the limits', () => {
   const pick = <T>(r: Rng, a: readonly T[]) => a[Math.floor(r.float() * a.length)]!, span = (r: Rng, [a, b]: readonly [number, number]) => a + (b - a) * r.float();
-  const random = (r: Rng, i: number): Design => { const base = pick(r, BASES), lim = BODY_LIMITS(base); return { v: 5, id: 'r' + i, name: 'random ' + i,
+  const random = (r: Rng, i: number): Design => { const base = pick(r, BASES), lim = BODY_LIMITS(base); return { v: 6, id: 'r' + i, name: 'random ' + i,
     body: { base, nose: pick(r, NOSES), ...faceOf3(base, pick(r, FRONTS)), tail: pick(r, TAILS), wheel: pick(r, WHEELS), ...Object.fromEntries(DIMS.map(k => [k, span(r, lim[k])])) as unknown as BodyDims, paint: '#808080', gloss: 0.5, structure: pick(r, STRUCTURES), panels: pick(r, PANELS) },
     engine: { grade: pick(r, GRADES), layout: pick(r, LAYOUTS), cc: span(r, LIMITS.cc), valves: pick(r, [2, 3, 4, 5] as const), redline: span(r, LIMITS.redline), intake: pick(r, INTAKES), compression: pick(r, COMPRESSIONS),
       sump: pick(r, SUMPS), block: pick(r, BLOCKS), turbo: pick(r, [0, 1, 2, 3, 4] as const), boost: span(r, LIMITS.boost), intercooler: r.float() < 0.8, vtec: r.float() < 0.3,

@@ -252,7 +252,9 @@ export class Vehicle {
     const gi = F1 && this.shift > 0 && p < 0.45 ? this.gearFrom : this.gear;   /* the old gear until the clutch is open */
     const X = c.tech, fF = X?.drive ? X.drive.front : 0, wFa = (this.w[0]! + this.w[1]!) / 2, wRa = (this.w[2]! + this.w[3]!) / 2;   /* the centre differential: the shaft turns at the axles' speeds weighted by their torque shares */
     const Gr = (this.reverse ? -c.gears[0]! * 1.1 : c.gears[gi - 1]!) * c.final,   /* review 169: reverse a little lower than first, turning the shaft the other way */ we = this.rpm * Math.PI / 30, wd = fF * wFa + (1 - fF) * wRa, idle = c.idle * Math.PI / 30;
-    const thrD = Math.max(0, Math.min(1, u.throttle)) * (this.auto && this.rpm > c.redline * 0.98 ? 0.25 : 1);
+    // the class's speed limiter (docs/systems/115 §3): the fuel cut over the last 2 km/h under it
+    const lim = c.limiter ? Math.max(0, Math.min(1, (c.limiter - vxh * 3.6) / 2)) : 1;
+    const thrD = Math.max(0, Math.min(1, u.throttle)) * (this.auto && this.rpm > c.redline * 0.98 ? 0.25 : 1) * lim;
     // the blip: on a downshift, with the clutch opening and open, the control unit opens the throttle to bring the revs to
     // what the lower gear will turn them at (a proportional opening, full 1,500 rpm short), and lets it close as it nears them
     this.blip = F1 && this.shift > 0 && down && p < 0.8 ? Math.max(0, Math.min(1, (wd * c.gears[this.gear - 1]! * c.final * 30 / Math.PI - this.rpm) / 1500)) : 0;

@@ -45,7 +45,7 @@ export function p959WithEngine(style: PartStyle, open = false): { mesh: Mesh; sh
   const keep: number[] = []; for (let t = 0; t < A.n; t++) if (!open || !hide.test(A.names?.[A.part[t]!] ?? '')) keep.push(t);
   const n = keep.length + E.n, cat = <T extends Float32Array | Uint8Array | Int16Array>(a: T, e: T, w: number, make: (k: number) => T, off = 0): T => { const o = make(n * w); keep.forEach((t, i) => o.set(a.subarray(t * w, t * w + w), i * w)); for (let i = 0; i < e.length; i++) o[keep.length * w + i] = e[i]! + off; return o; };
   const NA = A.names ?? [], mesh: Mesh = { ...A, n, pos: cat(A.pos, E.pos, 9, k => new Float32Array(k)), col: cat(A.col, E.col, 3, k => new Uint8Array(k)), gloss: cat(A.gloss, E.gloss, 1, k => new Float32Array(k)), part: cat(A.part, E.part, 1, k => new Int16Array(k), NA.length),
-    kind: cat(A.kind, E.kind, 1, k => new Uint8Array(k)), tex: cat(A.tex, E.tex, 1, k => new Uint8Array(k)), names: [...NA, ...(E.names ?? [])], ...(E.partLines ? { partLines: E.partLines } : {}), ...(A.uv ? { uv: undefined } : {}) };
+    kind: cat(A.kind, E.kind, 1, k => new Uint8Array(k)), tex: cat(A.tex, E.tex, 1, k => new Uint8Array(k)), names: [...NA, ...(E.names ?? [])], ...(E.partLines ? { partLines: E.partLines } : {}), ...(A.uv && A.uv.length === A.n * 9 ? { uv: cat(A.uv, new Float32Array(E.n * 9), 9, k => new Float32Array(k)) } : {}) };
   return { mesh, shellTris: open ? 0 : car.shellTris, engineTris: [keep.length, n], built }; }
 /** a kit car with its machinery in the drift look, its engine's cover (the deck and the glass over the bay) taken off */
 function kitOpen(d: Design, style: PartStyle): Mesh { const was = partStyle(); setPartStyle(style);

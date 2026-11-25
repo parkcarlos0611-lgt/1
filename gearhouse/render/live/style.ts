@@ -5,6 +5,7 @@
 import { KINDS } from '../car/mesh';
 import { interiorSheet } from '../car/interior/atlas';
 import type { GaugeCar } from '../car/interior/gauges';
+import { crestLevels } from './crest';
 
 /** the style's widths at a picture 1080 pixels high: the silhouette's outline and the drawn lines (doc 108 L1, raised 2026-11-25 to the user's choice: outline
  *  3.5-4 px, character lines 2.5-3 px, panel gaps 2 px) */
@@ -20,22 +21,28 @@ export function worldPerPx(view: { H: number; fovDeg?: number; mm?: number }, di
  *  stays `px` wide on the screen near or far */
 export const hullPush = (px: number, view: { H: number; fovDeg?: number; mm?: number }, dist: number): number => px * worldPerPx(view, dist);
 /** each part's share of the outline (docs/systems/109 §5.1): the body and the wheels whole, a glass's frame 0.7, the
- *  cabin's insides half */
+ *  cabin's insides half; none for the badge and the lettering laid on the skin (doc 116: a black rim would swallow a
+ *  badge a dozen pixels high) */
 export function outlineShare(name: string, kind: number): number {
+  if (/^(badge|badgeEdge|rearLettering)$/.test(name)) return 0;
   if (kind === KINDS.indexOf('glass') || /frame|surround|seal|rubber|pillarTrim/i.test(name)) return 0.7;
   if (/seat|dash|steer(ing)?Wheel|driver|helmet|cage|cockpit|interior|cabin|gauge|pedal|shift|lever|tunnel|harness|console|doorCard/i.test(name)) return 0.5;
   return 1; }
 
 // ---- the atlas (docs/systems/109 §5, shading): one picture for the painted detail. Each cell a square, its pictures
 //      drawn to its edge; a corner's coordinates (u, v) run 0..1 over a cell and repeat in it (a grille's mesh tiles) ----
-/* the last cell, 'interior', is the cabin's own sheet (render/car/interior/atlas.ts): the atlas's whole lower half, its regions found by the cabin's parts themselves */
-export const ATLAS_CELLS = ['headLamp', 'tailLamp', 'grille', 'wheelFace', 'gauge', 'vent', 'interior'] as const;
+/* 'badge' is the Phorster crest (render/live/crest.ts, docs/systems/116), its far mip levels drawn flat by hand and set
+   over the made ones (Atlas.mips); the last cell, 'interior', is the cabin's own sheet (render/car/interior/atlas.ts):
+   the atlas's whole lower half, its regions found by the cabin's parts themselves */
+export const ATLAS_CELLS = ['headLamp', 'tailLamp', 'grille', 'wheelFace', 'gauge', 'vent', 'badge', 'interior'] as const;
 export type AtlasCell = typeof ATLAS_CELLS[number];
 /** the atlas: four cells a row, each `S / 4` square, and the cabin's sheet across the lower half; RGBA, alpha 0 where a cell shows the surface's own colour */
-export interface Atlas { S: number; data: Uint8Array; /** each cell's place (u0, v0, du, dv) in 0..1, in ATLAS_CELLS' order */ rects: Float32Array }
+export interface Atlas { S: number; data: Uint8Array; /** each cell's place (u0, v0, du, dv) in 0..1, in ATLAS_CELLS' order */ rects: Float32Array;
+  /** pictures set over a cell's region in the mip levels the renderer makes (level 1 and down), each RGBA */ mips?: AtlasMip[] }
+export interface AtlasMip { level: number; x: number; y: number; w: number; h: number; data: Uint8Array }
 const sm = (a: number, b: number, x: number) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 /** a cell's picture at (u, v) in -1..1 (y up): [r, g, b, a] 0..1 */
-function cellAt(c: Exclude<AtlasCell, 'interior'>, u: number, v: number): [number, number, number, number] {
+function cellAt(c: Exclude<AtlasCell, 'interior' | 'badge'>, u: number, v: number): [number, number, number, number] {
   const r = Math.hypot(u, v), a = Math.atan2(v, u), aa = 1.5 / 64;
   switch (c) {
     case 'headLamp': { if (r > 0.98) return [0, 0, 0, 0]; const bowl = 0.62 + 0.3 * (1 - r * r), ring = sm(0.8, 0.8 + aa, r) * (1 - sm(0.88, 0.88 + aa, r)), bulb = 1 - sm(0.16, 0.16 + aa, Math.hypot(u, v + 0.05));
@@ -51,14 +58,21 @@ function cellAt(c: Exclude<AtlasCell, 'interior'>, u: number, v: number): [numbe
       k = Math.max(k, tick); return red ? [red[0]!, red[1]!, red[2]!, 1] : [k, k, k, 1]; }
     case 'vent': { const s = Math.abs(((v + 1) * 5) % 1 - 0.5), k = s > 0.3 ? 0.05 : 0.22 - 0.3 * s; return [k, k, k, 1]; }
   } }
+/** the crest's cell at `n` texels square: its baked level of that size, or the largest one sampled to it (an atlas over 1024) */
+function crestAt(n: number): Uint8Array { const L = crestLevels(), k = Math.log2(256 / n); if (Number.isInteger(k) && k >= 0 && k < L.length) return L[k]!;
+  const src = L[0]!, out = new Uint8Array(n * n * 4); for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) { const o = (Math.min(255, Math.floor(y * 256 / n)) * 256 + Math.min(255, Math.floor(x * 256 / n))) * 4; out.set(src.subarray(o, o + 4), (y * n + x) * 4); }
+  return out; }
 /** the placeholder atlas: the cells drawn by rule (a real one, painted, replaces it later; the cells keep their places).
  *  `car`: whose dials the cabin's sheet shows (its red line, its top speed; none: the 959's) */
 export function makeAtlas(S = 1024, car?: GaugeCar): Atlas {
-  const data = new Uint8Array(S * S * 4), C = S / 4, rects = new Float32Array(ATLAS_CELLS.length * 4);
+  const data = new Uint8Array(S * S * 4), C = S / 4, rects = new Float32Array(ATLAS_CELLS.length * 4), mips: AtlasMip[] = [];
   ATLAS_CELLS.forEach((c, i) => { if (c === 'interior') { rects.set([0, 0.5, 1, 0.5], i * 4); data.set(interiorSheet(S, car), S * (S / 2) * 4); return; }
     const cx = (i % 4) * C, cy = Math.floor(i / 4) * C; rects.set([cx / S, cy / S, C / S, C / S], i * 4);
+    if (c === 'badge') { const own = crestAt(C); for (let y = 0; y < C; y++) data.set(own.subarray(y * C * 4, (y + 1) * C * 4), ((cy + y) * S + cx) * 4);
+      for (let lv = 1; C >> lv >= 1; lv++) { const n = C >> lv; mips.push({ level: lv, x: cx >> lv, y: cy >> lv, w: n, h: n, data: crestAt(n) }); }   // each smaller level over the one the renderer makes
+      return; }
     for (let y = 0; y < C; y++) for (let x = 0; x < C; x++) { const p = cellAt(c, (x + 0.5) / C * 2 - 1, (y + 0.5) / C * 2 - 1), o = ((cy + y) * S + cx + x) * 4; for (let k = 0; k < 4; k++) data[o + k] = Math.round(Math.max(0, Math.min(1, p[k]!)) * 255); } });
-  return { S, data, rects }; }
+  return { S, data, rects, mips }; }
 /** atlas coordinates for a mesh's grilles where it brings none (three numbers a corner, as Mesh.uv): each grille face
  *  laid flat along its own normal, the grille cell repeating every `pitch` mm */
 export function autoAtlasUV(pos: ArrayLike<number>, kinds: ArrayLike<number>, nt: number, pitch = 90): Float32Array | null {

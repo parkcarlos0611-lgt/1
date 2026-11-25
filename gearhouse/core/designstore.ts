@@ -6,6 +6,7 @@
 // map in the tests), and a storage that throws (a private window, storage refused) keeps nothing and reads empty.
 import { BODY_BASES, NOSES, FRONTS, FACE_KEYS, FACE_KINDS, faceOf3, TAILS, WHEELS, GRADES, INTAKES, COMPRESSIONS, SUMPS, BLOCKS, STRUCTURES, PANELS, INTERIORS, DESIGN_NSX, DESIGN_F355, DESIGN_EB110, DESIGN_P959, DIMS, PLATE_SYLLABLES, isModelBase, fitModel, LAYOUTS, QUALITY_PARTS, BS_DEFAULT, normalise,
   SUSP_OWN, SUSP_KINDS, RC_PRESETS, type BodyBase, type BodyDims, type Design, type DesignV1, type EngineQuality, type Face, type FrontKind, type SuspAxle } from './design';
+import { isTierId } from '../race/tiers';
 
 /** what the helpers need of a storage (the browser's Storage has these) */
 export interface KeyStore { getItem(k: string): string | null; setItem(k: string, v: string): void; removeItem(k: string): void }
@@ -52,7 +53,10 @@ export function asDesign(v: unknown): Design | null {
     return { ...d, type: one(a.type, SUSP_KINDS, d.type), rc: one(a.rc, RC_PRESETS, d.rc), arm: num(a.arm, d.arm), hz: num(a.hz, d.hz), bump: num(a.bump, d.bump), rebound: num(a.rebound, d.rebound), bar: num(a.bar, d.bar),
       camber: num(a.camber, d.camber), toe: num(a.toe, d.toe), ...('caster' in d ? { caster: num(a.caster, (d as { caster: number }).caster) } : {}) }; };
   const susp = { front: axle(su.front, own.front), rear: axle(su.rear, own.rear) };
-  const d: Design = { v: 5, ...head, body: { ...body, ...face, structure: one(b.structure, STRUCTURES, P.body.structure), panels: one(b.panels, PANELS, P.body.panels) },
+  // format 6's class: the chosen rung where the value has one (an older format's has none: its figures place it), and a
+  // new design's mark that it has not been chosen yet
+  const cls = { ...(isTierId(o.tier) ? { tier: o.tier } : {}), ...(o.fresh === true && !isTierId(o.tier) ? { fresh: true as const } : {}) };
+  const d: Design = { v: 6, ...head, ...cls, body: { ...body, ...face, structure: one(b.structure, STRUCTURES, P.body.structure), panels: one(b.panels, PANELS, P.body.panels) },
     engine: { grade: one(e.grade, GRADES, P.engine.grade), ...machine, intake: one(e.intake, INTAKES, P.engine.intake), compression: one(e.compression, COMPRESSIONS, P.engine.compression),
       sump: one(e.sump, SUMPS, P.engine.sump), block: one(e.block, BLOCKS, P.engine.block), turbo: one(e.turbo, [0, 1, 2, 3, 4] as const, P.engine.turbo),
       boost: num(e.boost, P.engine.boost), intercooler: bool(e.intercooler, P.engine.intercooler), ...(bool(e.sequential, false) ? { sequential: true } : {}),
@@ -61,9 +65,10 @@ export function asDesign(v: unknown): Design | null {
 
 /** a new design's id: short, unlikely to meet another in one browser */
 export function newId(): string { return 'd' + Date.now().toString(36) + Math.floor(Math.random() * 36 ** 4).toString(36).padStart(4, '0'); }
-/** a new design from a base's own car: a fresh id, its name */
+/** a new design from a base's own car: a fresh id, its name; its class not chosen yet (format 6's `fresh`: the builder
+ *  opens on the class pick) */
 export function fromPreset(base: BodyBase, name?: string): Design { const P = structuredClone(PRESET[base]); if (P.body.model) P.body.model.plate = randomPlate();
-  return { ...P, id: newId(), name: name ?? `${P.name} 개조` }; }
+  return { ...P, id: newId(), name: name ?? `${P.name} 개조`, fresh: true }; }
 /** a made-up plate number for a new car (two digits, a syllable the plate's font draws, four digits; never a real one on purpose) */
 export function randomPlate(rnd: () => number = Math.random): string { const d = () => String(Math.floor(rnd() * 10)), sy = [...PLATE_SYLLABLES];
   return `${d()}${d()}${sy[Math.floor(rnd() * sy.length)]!} ${1 + Math.floor(rnd() * 9)}${d()}${d()}${d()}`; }

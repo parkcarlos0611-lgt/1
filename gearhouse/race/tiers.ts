@@ -4,7 +4,10 @@
 // §2-2 table exactly: a car belongs to the lowest rung whose power cap it does not pass (the cap itself included), so
 // the floor of a rung is the cap of the one below. The racing rungs are cut by race rules (§9), which do not exist
 // yet: they are listed so the ladder has its fifteen, but no road car lands on them.
-// C0 only shows the rung and the room left to its caps; nothing is enforced yet (C1 makes the chosen rung a wall).
+// C1: the rung a design chooses (core/design.ts format 6's `tier`) is its wall: the builder holds its sliders and locks
+// its options at the cap (ui/builder_tier.ts), and what passes it by another way is held by an intake restrictor (the
+// power) and a speed limiter (the top speed) in the design's physics (race/design.ts). There is no floor: a car is
+// named for the rung it reaches.
 
 export type TierGroup = 'N' | 'S' | 'P' | 'H' | 'R';
 export type TierId = `${TierGroup}${1 | 2 | 3}`;
@@ -63,3 +66,24 @@ export const tierChevrons = (t: Tier): string => '‹'.repeat(t.n);
 export function roomText(v: number, unit: string): string {
   if (!Number.isFinite(v)) return '상한 없음';
   const r = Math.round(v); return `${r < 0 ? '−' : '+'}${Math.abs(r).toLocaleString()} ${unit}`; }
+
+/** why a rung cannot be chosen now (null: it can): the racing rungs' rules are not written ("준비 중"); the hyper rungs
+ *  are the 2000s' and later, closed in the 1990s' sandbox unless its settings open the era (doc 115 §2-5) */
+export function tierLock(t: Tier, eraOpen = false): string | null {
+  if (t.pending) return '준비 중';
+  if (t.era === '2000s' && !eraOpen) return '2000년대 이후';
+  return null; }
+/** a rung of the 2000s chosen in the 1990s' sandbox (the era's lock opened in the settings): "시대 밖" */
+export const outOfEra = (t: Tier): boolean => t.era === '2000s';
+/** the road rung a power needs (its own rung: the lowest whose cap it stays within) */
+export const tierFor = (hp: number): Tier => tierOf({ hp, topKmh: 0 });
+/** the rung's place on the ladder (0 for N1), to tell a move up from a move down */
+export const tierIndex = (t: Tier): number => TIERS.indexOf(t);
+
+/** each rung's line on the class pick: the kind of car it holds (the game's own names only, never a real one) */
+export const TIER_NOTE: Record<TierId, string> = {
+  N1: '경차', N2: '보통 세단·해치', N3: '빠른 세단', S1: '핫해치·가벼운 로드스터', S2: '옛 바탕 A', S3: '옛 바탕 B · 빠른 세단',
+  P1: '포스터 599', P2: '시험 차 D', P3: '옛 바탕 C · 1990년대의 끝', H1: '2000년대 슈퍼카', H2: '1,000마력급', H3: '전기 하이퍼',
+  R1: 'GT 경주차', R2: '프로토타입', R3: '포뮬러' };
+/** each group's line on the class pick */
+export const GROUP_NOTE: Record<TierGroup, string> = { N: '매일 타는 차', S: '스포츠카와 빠른 세단', P: '1990년대의 슈퍼카', H: '2000년대 이후의 급', R: '경주 규정으로 자름' };

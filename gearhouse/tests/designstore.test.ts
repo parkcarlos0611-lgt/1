@@ -104,6 +104,6 @@ describe('format 2 (alpha 0.10) designs in format 3', () => {
   });
   it('the dimensions brought inside their base\'s ranges; the EB110 a base of its own', () => {
     const d = asDesign({ body: { base: 'eb110', roof: -999, cabin: 40, rake: 99 } })!;
-    expect(d.body.roof).toBe(BODY_LIMITS('eb110').roof[0]); expect(d.body.cabin).toBe(40); expect(d.body.rake).toBe(BODY_LIMITS('eb110').rake[1]); expect(d.body.tail).toBe('capsule'); expect(d.v).toBe(5);
+    expect(d.body.roof).toBe(BODY_LIMITS('eb110').roof[0]); expect(d.body.cabin).toBe(40); expect(d.body.rake).toBe(BODY_LIMITS('eb110').rake[1]); expect(d.body.tail).toBe('capsule'); expect(d.v).toBe(6);
   });
 });

@@ -75,6 +75,8 @@ export interface RaceSpec {
   kin?: import('./kin').KinSpec;
   cdA: number; crr: number; steerLock: number;          // drag area m², rolling resistance, front wheels' lock (deg)
   topKmh: number; check: boolean;
+  /** a top-speed limiter (km/h; docs/systems/115 §3, the class's cap): the fuel is cut over its last 2 km/h. Unset: none */
+  limiter?: number;
   cooling: { siphon: boolean; margin: number } }   // the water's circulation (no pump on the Model T [v]), the radiator against the engine's heat [?]
 
 /** tyre sizes: 30x3.5 (overall diameter x section, inches), 4.50-20 (section - rim), 33x5 */

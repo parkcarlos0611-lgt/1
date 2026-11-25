@@ -18,6 +18,7 @@ import { savedDesigns, saveDesign, deleteDesign, currentDesign, keepCurrent, new
 import { designFigures } from '../../race/design';
 import { tierOf, tierLabel } from '../../race/tiers';
 import { TRACKS } from '../../race/tracks';
+import { titleCar } from './titleset';
 import pbrMeta from '../../assets/textures/pbr/pbr.json';
 import groundMeta from '../../assets/textures/ground/ground.json';
 import buildMeta from '../../assets/textures/buildings/buildings.json';
@@ -32,14 +33,15 @@ const fmtLap = (t: number) => `${Math.floor(t / 60)}:${(t % 60).toFixed(2).padSt
 function arrive(root: HTMLElement): void { const bar = root.querySelector<HTMLElement>(':scope > .gh-bar'), body = root.querySelector<HTMLElement>(':scope > .gh-body'), nav = root.querySelector<HTMLElement>(':scope > .gh-menu');
   if (bar) slideIn(bar, 'd'); if (body) slideIn(body, 'u'); if (nav) stagger(nav, 'l'); }
 /** a menu screen: its root built on entering (the backdrop behind, dimmed except on the title), focus on its first item */
-function menu(ctx: ShellCtx, id: string, build: (root: HTMLElement) => void, o: { dim?: boolean } = {}): Screen<never> & { root: HTMLElement } {
+function menu(ctx: ShellCtx, id: string, build: (root: HTMLElement) => void, o: { dim?: boolean; car?: () => Design; leave?: () => void } = {}): Screen<never> & { root: HTMLElement } {
   const root = el('section', `gh-screen gh-${id}${o.dim === false ? '' : ' gh-dim'}`); root.dataset.screen = id;
-  return { root, enter() { root.textContent = ''; build(root); ctx.layer.append(root); ctx.backdrop.setDesign(ctx.recent()); ctx.backdrop.start(); arrive(root);
+  return { root, enter() { root.textContent = ''; build(root); ctx.layer.append(root); ctx.backdrop.setDesign((o.car ?? ctx.recent)()); ctx.backdrop.start(); arrive(root);
       requestAnimationFrame(() => { if (!root.contains(document.activeElement)) (root.querySelector<HTMLElement>('[data-first]') ?? focusables(root)[0])?.focus({ preventScroll: true }); }); },
-    leave() { root.remove(); } }; }
+    leave() { o.leave?.(); root.remove(); } }; }
 
 // ---- the title (docs/systems/110 G4): the big tilted logo, the tilted yellow menu stacked at the bottom left, the
-// settings' gear (and the about screen) at the top right, the car turning behind ----
+// settings' gear (and the about screen) at the top right; behind, the stock car without its plates on a piece of
+// circuit, its wheels turned (ui/shell/titleset.ts) ----
 export function titleScreen(ctx: ShellCtx): Screen<never> {
   return menu(ctx, 'title', root => { const r = ctx.router, last = ctx.last(), c0 = currentDesign(ctx.store), cur = c0 && enabledDesign(c0) ? c0 : null, d = ctx.recent();
     const go = (screen: string, p?: unknown) => () => void r.go(screen, p);
@@ -53,7 +55,7 @@ export function titleScreen(ctx: ShellCtx): Screen<never> {
     const corner = el('div', 'gh-tcorner', button('정보', go('about'), { kind: 'ghost', icon: 'info', square: true, title: `정보: ${VERSION_NAME}, 바뀐 점, 출처` }),
       button('설정', go('settings'), { kind: 'ghost', icon: 'settings', square: true, title: '설정: 그래픽, 소리, 조작, 화면, 저장' }));
     root.append(el('div', 'gh-brand', el('h1', 'gh-logo gk-logo', 'GEARHOUSE'), el('i', 'gh-logoband gk-stripes'), el('div', 'gh-brandrow', el('span', 'gh-ver', VERSION_NAME), el('span', 'gh-tagline', '설계하고, 만들고, 시험하는 자동차'))), nav, corner,
-      el('p', 'gh-foot', `턴테이블: ${d.name} · ↑↓ 이동 · Enter 선택 · Esc 뒤로`)); }, { dim: false }); }
+      el('p', 'gh-foot', '↑↓ 이동 · Enter 선택 · Esc 뒤로')); }, { dim: false, car: titleCar }); }
 
 // ---- the garage: the saved designs as cards (docs/systems/110 G4: cut-corner kit cards with the car's picture, its
 // stat bars, the working design green, an old body's design grey and locked) ----

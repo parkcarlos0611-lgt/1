@@ -18,7 +18,7 @@ const ang = (u: V, v: V) => Math.acos(Math.max(-1, Math.min(1, (u[0] * v[0] + u[
 export const minAngle = (a: V, b: V, c: V) => Math.min(ang(sub(b, a), sub(c, a)), ang(sub(a, b), sub(c, b)), ang(sub(a, c), sub(b, c)));
 /** a quad is thin when its long sides are more than this many times its short ones; its long sides are then divided
  *  into pieces at most this many times the short ones (a piece cut corner to corner keeps an angle well over 5 degrees) */
-const THIN = 8, PIECE = 6, MOST = 64;
+const THIN = 5, PIECE = 4.2, MOST = 64;
 interface Pt { p: V; n: V }
 
 export interface FineStat { triangles: number; /** painted triangles with an angle under 5 degrees */ slivers: number; /** edges divided */ divided: number }
@@ -44,7 +44,10 @@ export function emitShellFine(b: Build, S: Shell959, paint: string, normals?: nu
     for (const k of fs) { const f = F[k]!, nc = f.length, cnt = f.map((v, i) => div.get(ekey(v, f[(i + 1) % nc]!)) ?? 1), corner = (i: number): Pt => ({ p: P[f[i % nc]!]!, n: N[k]![i % nc]! });
       /** the points along side i, from its first corner to its second (both included) */
       const along = (i: number): Pt[] => { const a = corner(i), c = corner(i + 1), n = cnt[i]!; return Array.from({ length: n + 1 }, (_, j) => j === 0 ? a : j === n ? c : { p: mix(a.p, c.p, j / n), n: unit(mix(a.n, c.n, j / n)) }); };
-      if (cnt.every(n => n === 1)) { for (const t of cut(P, f)) { const [x, y, z] = t.map(v => corner(f.indexOf(v))) as [Pt, Pt, Pt]; tri(x, y, z, k); } continue; }
+      if (cnt.every(n => n === 1)) { let T = cut(P, f); const bad = (U: [number, number, number][]) => Math.min(...U.map(t => minAngle(P[t[0]]!, P[t[1]]!, P[t[2]]!)));
+        // a whole quad as the shell cuts it, unless that leaves a thin triangle and the other diagonal does not
+        if (nc === 4 && bad(T) < 5) { const [q0, q1, q2, q3] = f as [number, number, number, number], U: [number, number, number][] = T[0]!.includes(q0) && T[0]!.includes(q2) ? [[q1, q2, q3], [q1, q3, q0]] : [[q0, q1, q2], [q0, q2, q3]]; if (bad(U) > bad(T)) T = U; }
+        for (const t of T) { const [x, y, z] = t.map(v => corner(f.indexOf(v))) as [Pt, Pt, Pt]; tri(x, y, z, k); } continue; }
       // candidates: two rails side by side where the other two sides are whole (the triangles step along whichever
       // rail is behind), and a fan round the middle; the one whose worst angle is the larger is laid
       const cands: [Pt, Pt, Pt][][] = [], rails = nc === 4 ? (cnt[1] === 1 && cnt[3] === 1 ? 0 : cnt[0] === 1 && cnt[2] === 1 ? 1 : -1) : -1;

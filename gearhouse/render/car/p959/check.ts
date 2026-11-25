@@ -16,16 +16,16 @@ const pct = (v: number[], p: number) => { const s = v.slice().sort((a, b) => a -
 export interface Panel { name: string; rows: [number, number]; cols: [number, number]; across?: number; along?: number; flat?: number; why?: string }
 export const PANELS: Panel[] = [
   { name: 'bonnet', rows: [0, 10], cols: [0, 3] },
-  { name: 'wingF top (pod)', rows: [3, 10], cols: [3, 6], across: 1, why: 'the pod rises out of the bonnet\'s valley: hollow at its foot, round over its crest' },
+  { name: 'wingF top (pod)', rows: [3, 10], cols: [3, 6], across: 1, along: 2, why: 'the pod rises out of the bonnet\'s valley (hollow at its foot, round over its crest); along it, the hollow behind the lamp\'s rim and the sweep up to the screen pillar' },
   { name: 'wingF side', rows: [0, 4], cols: [7, 9] },
   { name: 'roof', rows: [14, 19], cols: [0, 3] },
   { name: 'door', rows: [10, 16], cols: [5, 9] },
   { name: 'door lower (flat)', rows: [11, 16], cols: [8, 9], flat: 2 },
   { name: 'sill', rows: [10, 17], cols: [10, 12] },
-  { name: 'wingR top', rows: [22, 26], cols: [3, 6], along: 1, why: 'the wing top sweeps up into the wing blade\'s leg' },
-  { name: 'wingR side', rows: [23, 30], cols: [6, 9], along: 1, why: 'the shoulder line sweeps up into the wing blade' },
-  { name: 'haunch', rows: [17, 19], cols: [5, 9], along: 1, why: 'the haunch stands out of the door: hollow where it starts, round over the wheel' },
-  { name: 'wing blade', rows: [27, 30], cols: [0, 5] },
+  { name: 'haunch', rows: [18, 19], cols: [5, 8] },
+  { name: 'wingR top', rows: [23, 25], cols: [3, 6], across: 2, along: 1, why: 'the C pillar\'s foot is a hollow between the pillar and the wing top; along the car the deck sweeps from the glass\'s slope to the lid' },
+  { name: 'wingR side', rows: [24, 30], cols: [7, 8], along: 1, why: 'the upper side sweeps up into the wing blade\'s leg' },
+  { name: 'wing blade', rows: [28, 30], cols: [0, 5] },
 ];
 
 /** the fine points of the main grid: [2 * row][2 * column] the cage points', between them the edges' and faces' (-1 none) */

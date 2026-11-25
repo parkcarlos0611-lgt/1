@@ -49,8 +49,9 @@ export function bayProps(x: Ctx, tub: boolean, engineOnly: boolean): void {
   // the panel across the car's end: the cross bars, the uprights and (at the front) the two struts down to the lower bar
   const xq = xp + e * 26, W = Math.min(2 * inner + 120, 760), H = Math.min(330, rim - z0 - 110), zc = z0 + 60 + H / 2;
   g.part('radiatorPanel', '#2b2d31', 0.25);
-  g.bar([xq, -half - wall, rim - 24], [xq, half + wall, rim - 24], 46, 46); g.bar([xq, -half - wall, z0 + 22], [xq, half + wall, z0 + 22], 46, 46);
-  for (const s of [1, -1]) g.bar([xq, s * (W / 2 + 58), z0 + 40], [xq, s * (W / 2 + 58), rim - 40], 46, 46, false);
+  if (B.front) g.bar([xq, -half - wall, rim - 24], [xq, half + wall, rim - 24], 46, 46);   /* a rear bay's end is open over the lower bar: the engine's end and its fan show */
+  g.bar([xq, -half - wall, z0 + 22], [xq, half + wall, z0 + 22], 46, 46);
+  for (const s of [1, -1]) g.bar([xq, s * (W / 2 + 58), z0 + 40], [xq, s * (W / 2 + 58), B.front ? rim - 40 : shelf + 30], 46, 46, false);
   if (B.front && det > 0) for (const s of [1, -1]) g.bar([xq + e * 30, s * 50, rim - 40], [xq + e * 30, s * W * 0.3, z0 + 40], 30, 30, false);
   // the lamps' backs at the panel's corners
   if (det > 0) { g.part('lampBack', '#3a3d42', 0.3); for (const s of [1, -1]) { const y = s * (half - 105), z = shelf + 30; g.box(Math.min(xq + e * 30, xq + e * 150), Math.max(xq + e * 30, xq + e * 150), y - 130, y + 130, z, z + 150);
@@ -59,7 +60,7 @@ export function bayProps(x: Ctx, tub: boolean, engineOnly: boolean): void {
   if (B.front && engineOnly) { const xr = xp + e * 2;
     g.part('radiator', '#2c2f33', 0.25, 'metal').box(xr - 18, xr + 18, -W / 2, W / 2, zc - H / 2, zc + H / 2);
     for (const s of [1, -1]) g.part('radiator', '#c3c6ca', 0.6, 'metal').box(xr - 22, xr + 22, s * W / 2 - (s < 0 ? 30 : 0), s * W / 2 + (s > 0 ? 30 : 0), zc - H / 2 - 6, zc + H / 2 + 6);
-    if (det === 2) for (let k = 1; k < 6; k++) { const z = zc - H / 2 + k * H / 6; g.line('vent', [[xr - e * 20, -W / 2 + 10, z], [xr - e * 20, W / 2 - 10, z]]); }
+    if (det === 2) for (let k = 1; k < 6; k++) { const z = zc - H / 2 + k * H / 6; for (const f of [-1, 1]) g.line('vent', [[xr + f * 20, -W / 2 + 10, z], [xr + f * 20, W / 2 - 10, z]]); }
     if (det > 0) { const ports = x.E.water.map(x.T), back = x.U.map(v => -v) as V;
       [1, -1].forEach((s, k) => { const a: V = [xr - e * 24, s * (W / 2 - 60), zc + (k ? -1 : 1) * H * 0.34], p = ports[k]!;
         g.part('coolantHose', '#1c1c1f', 0.15).bend(a, [-e, 0, 0], add(p, [x.U[0] * 30, x.U[1] * 30, 0]), back, 17, 5, 4, 0.5); }); } }

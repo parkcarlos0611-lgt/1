@@ -26,9 +26,9 @@ const pt = (d: Design, style: 'real' | 'drift', detail: 0 | 1 | 2 = 2) => { cons
 /** the kinds drawn as tubes or bars: their least thickness is checked */
 const TUBES: PartKind[] = ['pipe', 'intake', 'exhaust', 'runner', 'header', 'hose', 'line', 'belt', 'link', 'shaft', 'arm', 'frame'];
 /** the budgets in the drift look: a V8 with its bay's fittings 3,000 to 5,000 (the task's); the heaviest engine (twelve
- *  cylinders, four turbos, four intercoolers, all-wheel drive) to 6,500, over the realistic look's 4,900 by its bevels
+ *  cylinders, four turbos, four intercoolers, all-wheel drive) to 6,600, over the realistic look's 4,900 by its bevels
  *  and its thick pipes' sides; the lighter details as the realistic look's (no bevels there) */
-const DRIFT_BUDGET = { v8: [3000, 5000], heaviest: 6500, 1: 2800, 0: 1250 } as const;
+const DRIFT_BUDGET = { v8: [3000, 5000], heaviest: 6600, 1: 2800, 0: 1250 } as const;
 
 describe('the look is chosen by a setting, the realistic one kept', () => {
   it('the default is the realistic look; the renderer\'s look 4 asks for the drift one', () => {
@@ -72,7 +72,7 @@ describe('the powertrain in the drift look', () => {
     // the realistic collector draws what it is told
     const r = new Geo(); r.part('boostPipe', '#c9cbcf').cyl([0, 0, 0], [200, 0, 0], 4, 6).part('battery', '#1d1e21').box(0, 240, 500, 676, 0, 175); expect(r.measure().get('boostPipe')!.thin).toBe(8); expect(r.measure().get('battery')!.tris).toBe(12);
   });
-  it('the triangles: a V8 with the bay\'s fittings 3,000 to 5,000, the heaviest engine within 6,500, the lighter details within the realistic budgets', () => {
+  it('the triangles: a V8 with the bay\'s fittings 3,000 to 5,000, the heaviest engine within 6,600, the lighter details within the realistic budgets', () => {
     for (const d of [DESIGN_F355, applyPatch(DESIGN_NSX, { engine: { layout: 'V8', cc: 4000 } })]) { const n = pt(d, 'drift').built.tris; expect(n).toBeGreaterThanOrEqual(DRIFT_BUDGET.v8[0]); expect(n).toBeLessThanOrEqual(DRIFT_BUDGET.v8[1]); }
     for (const [, d] of DESIGNS) { expect(pt(d, 'drift').built.tris).toBeLessThanOrEqual(DRIFT_BUDGET.heaviest); for (const det of [1, 0] as const) expect(pt(d, 'drift', det).built.tris).toBeLessThanOrEqual(DRIFT_BUDGET[det]); }
   });

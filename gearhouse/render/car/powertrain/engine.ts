@@ -247,7 +247,7 @@ export function buildEngine(g: Geo, S0: PowertrainSpec, det: Detail, transverse 
     g.part('oilFiller', '#d0c020', 0.4); { const c = P(1, cylU(1, nb - 1), twin ? 0.5 * B : 0, topA); g.cyl(c, add(c, mul(ax(1), 0.25 * B)), 0.28 * B, 6, true, [1, 0, 0]); }
     if (!dry) { g.part('dipstick', '#e2a21a', 0.4); const c = P(S[S.length - 1]!, cylU(S[S.length - 1]!, 0), hw + 0.2 * B, Hd * 0.9); g.bar(c, add(c, [0, 0, 0.35 * B]), 0.12 * B); } }
   // the drift look's hero on a flat engine: the cooling fan's big round shroud over the pulleys' end, its dark mouth and bright hub (a part of its own, only drawn in that look)
-  if (dr && S0.layout === 'flat' && det > 0) { const r = Math.min(1.3 * B, Math.max(0.9 * B, (plTop + 0.35 * B) / 1.75)), c: V = [ue + 0.4 * B, 0, plTop - r * 0.75], n = det === 2 ? 14 : 8;
+  if (dr && S0.layout === 'flat' && det > 0) { const r = 1.3 * B, c: V = [ue + 0.4 * B, 0, plTop + 0.15 * B - r],   // its top a little over the intake's n = det === 2 ? 14 : 8;
     g.part('fanShroud', '#ee5a1c', 0.4).lathe(c, [1, 0, 0], [[0, r], [0.5 * B, r], [0.62 * B, r * 0.86]], n, 'a');
     g.part('fanShroud', '#151517', 0.2).lathe(add(c, [0.62 * B, 0, 0]), [1, 0, 0], [[0, r * 0.86], [-0.2 * B, r * 0.8]], n, 'b');
     g.part('fanShroud', '#d9dce0', 0.45).lathe(add(c, [0.4 * B, 0, 0]), [1, 0, 0], [[0, r * 0.3], [0.3 * B, r * 0.22]], 8, 'b');

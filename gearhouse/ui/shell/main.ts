@@ -4,6 +4,7 @@
 // page loaded again between the builder and the drive. Esc and the phone's back button go back along the screens' way;
 // the arrow keys walk the menus (a pad's cross too). Built by tools/ref/buildsite.mjs into game.html.
 import { setLineWeight } from '../../render/live/style';
+import { setPartStyle, styleForLook } from '../../render/car/powertrain';
 import { LINE_WEIGHT } from './settings';
 import { LiveRenderer } from '../../render/live/renderer';
 import { loadSky } from '../../render/live/groundtex';
@@ -62,6 +63,7 @@ const ctx: ShellCtx = { router, stage, backdrop, store, settings, layer: $('gh-l
 function applySettings() { const t = settings.screen.theme; if (t === 'auto') delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = t;
   PHYSICS.kinematic = settings.sandbox.physics !== 'old';   // the developers' physics switch (race/kin.ts), for the next car made
   setLineWeight(LINE_WEIGHT[settings.graphics.lineWeight]);   // the toon look's line widths (render/live/style.ts)
+  setPartStyle(styleForLook(settings.graphics.look === 'drift' ? 4 : 2));   // look 4: the engines and the suspensions built in their drift look (docs/systems/109 section 10)
   uiSounds(settings.sound.ui); setSceneryDensity(settings.graphics.scenery); backdrop.calm = settings.screen.calm || matchMedia('(prefers-reduced-motion: reduce)').matches; backdrop.redraw(); screens.drive?.apply?.(); }
 
 const drive = driveScreen(ctx), builder = builderScreen(ctx), engine = engineScreen(ctx);

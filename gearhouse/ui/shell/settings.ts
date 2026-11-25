@@ -9,7 +9,8 @@ import type { SmokeSetting } from '../../render/live/volume/caps';
 export interface KeyStore { getItem(k: string): string | null; setItem(k: string, v: string): void; removeItem(k: string): void }
 export interface ListStore extends KeyStore { readonly length: number; key(i: number): string | null }
 
-export type Look = 'pbr' | 'stepped' | 'baked' | 'toon';
+/** 'drift': the drift-game style (the live renderer's look 4, docs/systems/109 S1): outlines, drawn lines, two bands; the engines and the suspensions in their drift look too */
+export type Look = 'pbr' | 'stepped' | 'baked' | 'toon' | 'drift';
 export type GlassRefl = 'off' | 'weak' | 'mid';
 /** the toon glass's reflection as the renderer takes it (its `glassRefl`) */
 export const GLASS_REFL: Record<GlassRefl, number> = { off: 0, weak: 0.5, mid: 1 };
@@ -49,7 +50,7 @@ const unit = (v: unknown, d: number) => typeof v === 'number' && Number.isFinite
 /** any value made into settings: the fields it has right, the rest the defaults */
 export function asSettings(v: unknown): Settings { const o = obj(v), g = obj(o.graphics), s = obj(o.sound), c = obj(o.controls), sc = obj(o.screen), sb = obj(o.sandbox), cm = obj(o.camera), D = DEFAULTS;
   return {
-    graphics: { live: bool(g.live, D.graphics.live), look: one(g.look, ['pbr', 'stepped', 'baked', 'toon'] as const, D.graphics.look), photoGround: bool(g.photoGround, D.graphics.photoGround), hdri: bool(g.hdri, D.graphics.hdri), blur: bool(g.blur, D.graphics.blur), scenery: one(g.scenery, ['low', 'mid', 'high'] as const, D.graphics.scenery), glassRefl: one(g.glassRefl, ['off', 'weak', 'mid'] as const, D.graphics.glassRefl), smoke: one(g.smoke, ['off', 'parcels', 'mid', 'high'] as const, D.graphics.smoke), smokeSize: one(g.smokeSize, ['normal', 'big'] as const, D.graphics.smokeSize), lineWeight: one(g.lineWeight, ['thin', 'normal', 'bold', 'heavy'] as const, D.graphics.lineWeight) },
+    graphics: { live: bool(g.live, D.graphics.live), look: one(g.look, ['pbr', 'stepped', 'baked', 'toon', 'drift'] as const, D.graphics.look), photoGround: bool(g.photoGround, D.graphics.photoGround), hdri: bool(g.hdri, D.graphics.hdri), blur: bool(g.blur, D.graphics.blur), scenery: one(g.scenery, ['low', 'mid', 'high'] as const, D.graphics.scenery), glassRefl: one(g.glassRefl, ['off', 'weak', 'mid'] as const, D.graphics.glassRefl), smoke: one(g.smoke, ['off', 'parcels', 'mid', 'high'] as const, D.graphics.smoke), smokeSize: one(g.smokeSize, ['normal', 'big'] as const, D.graphics.smokeSize), lineWeight: one(g.lineWeight, ['thin', 'normal', 'bold', 'heavy'] as const, D.graphics.lineWeight) },
     sound: { on: bool(s.on, D.sound.on), volume: unit(s.volume, D.sound.volume), ui: bool(s.ui, D.sound.ui) },
     controls: { touch: one(c.touch, ['auto', 'on', 'off'] as const, D.controls.touch), auto: bool(c.auto, D.controls.auto), tcs: bool(c.tcs, D.controls.tcs), assist: bool(c.assist, D.controls.assist), progressive: bool(c.progressive, D.controls.progressive),
       ignition: one(c.ignition, ['direct', 'auto'] as const, D.controls.ignition), stall: bool(c.stall, D.controls.stall) },

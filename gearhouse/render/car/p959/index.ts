@@ -15,6 +15,7 @@ export { p959Lines } from './lines';
 import { p959Lines } from './lines';
 
 export interface P959Opts extends ShellOpts { paint?: string; lamp?: LampKind; wheel?: WheelKind; plate?: PlateText; /** leave out the placeholder modules that are not part of the skin (wheels, lenses, mirrors, exhausts) */ bare?: boolean;
+  /** the tyres' widths, front and rear (mm; default the real car's 235 and 255): the wheels' middles stay where they are */ tyres?: [number, number];
   /** the wheels' own disc and caliper (default on; off where the car's suspension is drawn with its brakes: render/car/bodies.ts) */ brake?: boolean }
 const MAT: Record<string, [string, number, Parameters<Build['mat']>[2]]> = { glass: ['#20262c', 0.9, 'glass'], grille: ['#17181a', 0.1, 'grille'], dark: ['#1b1c1e', 0.05, 'plain'], lamp: ['#b3261e', 0.5, 'lens'], amber: ['#d9861c', 0.5, 'lens'], lens: ['#17181a', 0.1, 'plain'] };
 
@@ -34,7 +35,8 @@ export function p959Mesh(o: P959Opts = {}): Mesh { return p959Model(o).mesh; }
 export function p959Model(o: P959Opts = {}): P959Model { const S = buildShell(o), b = new Build(), paint = o.paint ?? '#b8bcc2', nn: number[] = [];
   emitShell(b, S, paint, nn);
   if (!o.bare) { const K = sockets(), sl = 38.7 * Math.PI / 180;
-    for (const h of K.hubs) wheel(b, h, o.wheel ?? 'hollow5', o.brake !== false);
+    for (const h0 of K.hubs) { const w = o.tyres ? o.tyres[h0.front ? 0 : 1] : h0.width, s = h0.o[1] > 0 ? 1 : -1, h = { ...h0, width: w, o: [h0.o[0], h0.o[1] + s * (w - h0.width) / 2, h0.o[2]] as V };
+      wheel(b, h, o.wheel ?? 'hollow5', o.brake !== false); }
     for (const s of [1, -1]) headLamp(b, o.lamp ?? 'round', [270 + Math.sin(sl) * 14, s * 615, 640 - Math.cos(sl) * 14], [0, 1, 0], [Math.cos(sl), 0, Math.sin(sl)], [-Math.sin(sl), 0, Math.cos(sl)], 100, 122);
     for (const e of K.exhausts) b.name('exhaust').mat('#2a2b2d', 0.6, 'metal').lathe('x', [0, e.o[1], e.o[2]], [[e.o[0] - 60, e.r], [e.o[0] + 14, e.r], [e.o[0] - 50, e.r - 10]], 8, false);
     for (const m of K.mirrors) mirror(b, m, paint);

@@ -8,8 +8,12 @@ import type { Track } from '../race/track';
 import { raceSpec, RACE_CARS, EXP_CARS, NEW_CARS, EXP_ENGINE, steering, addRaceCar } from '../race/cars';
 import { designSpec } from '../race/design';
 import { designMesh } from '../render/car/design';
-import type { Design } from '../core/design';
-import { decodeDesign, recordRun, KEYS, type KeyStore } from '../core/designstore';
+import { isModelBase, type Design } from '../core/design';
+import { MODEL_BODIES } from '../render/car/bodies';
+import { makeAtlas } from '../render/live/style';
+import { setPartStyle, partStyle, styleForLook } from '../render/car/powertrain';
+import { dialState, stepDials, inputFromVehicle, type DialState, type DialRig } from '../render/car/interior/gauges';
+import { decodeDesign, recordRun, designSig, KEYS, type KeyStore } from '../core/designstore';
 import { Vehicle, usefulLock, type Controls } from '../race/vehicle';
 import { Ignition, carStartsOff, sweepValue } from '../race/ignition';
 import { CarSprites, PropSprites } from '../race/sprites';
@@ -154,9 +158,21 @@ function wingUp(id: string, base: Mesh): Mesh {   /* a design's mesh takes the l
 // lap at each track, the top speed it reached) recorded under the design for the builder's readouts ----
 const STORE: KeyStore | null = (() => { try { return localStorage; } catch { return null; } })();
 /** a design made a car of the lists (the same design again: its car replaced) */
-function addDesign(d: Design): { d: Design; id: string } { const spec = designSpec(d), mc = { id: spec.id, name: d.name, mesh: (spin?: number, lamps?: number) => designMesh(d, spin, lamps, 0, 1) }   /* the powertrain at detail 1: the driving scene kept light (the builder draws 2) */; addRaceCar(spec);
+function addDesign(d: Design): { d: Design; id: string } { const spec = designSpec(d), model = isModelBase(d.body.base), mc = { id: spec.id, name: d.name, mesh: (spin?: number, lamps?: number) => designMesh(d, spin, lamps, 0, 1, { topKmh: spec.topKmh }) }   /* the powertrain at detail 1: the driving scene kept light (the builder draws 2) */; addRaceCar(spec);
   const i = MESH_CARS.findIndex(c => c.id === spec.id); if (i >= 0) MESH_CARS[i] = mc; else MESH_CARS.push(mc);
-  EXP_ENGINE[spec.id] = { kind: 'ohv', layout: d.engine.layout }; POPUP.add(spec.id); carId = spec.id; return { d, id: spec.id }; }
+  EXP_ENGINE[spec.id] = { kind: 'ohv', layout: d.engine.layout }; if (!model) POPUP.add(spec.id); carId = spec.id;
+  return { d, id: spec.id }; }
+/** a model-built body's cabin (the 959's): its dials' faces drawn for the design into the style's atlas (render/car/bodies.ts gauges), once a design */
+let atlasFor = '';
+function cabinAtlas(L: LiveRenderer) { const d = DESIGN?.d; if (!d || !isModelBase(d.body.base) || atlasFor === designSig(d)) return; atlasFor = designSig(d); L.setAtlas(makeAtlas(1024, MODEL_BODIES[d.body.base].gauges(d, designSpec(d).topKmh))); }
+/** a cabin's needles (docs/systems/109 S4/S5): each car's readings stepped toward its state, the ignition's sweep on the
+ *  revs and the speed, every needle at rest while the ignition is off (race/ignition.ts) */
+const dialSt = new WeakMap<Vehicle, DialState>();
+function dialsOf(c: Vehicle, rig: DialRig | undefined, dt: number): Float32Array | null { if (!rig) return null;
+  let s = dialSt.get(c); if (!s || s.v.length !== rig.dials.length) { s = dialState(rig); dialSt.set(c, s); }
+  const E = c.engine, i = inputFromVehicle(c, { boostBar: c.spec.tech?.turbo?.boost ?? 0, idle: c.spec.idle }, { fuel: 0.7, steer: true }), sw = E.gaugeSweep;
+  if (!E.ignition) i.on = false; else { i.on = true; if (sw > 0) { i.rpm = sweepValue(i.rpm ?? 0, sw, 0, c.spec.redline + 400); i.kmh = sweepValue(i.kmh ?? 0, sw, 0, c.spec.topKmh || 300); } }
+  return stepDials(s, rig, i, dt); }
 let DESIGN: { d: Design; id: string } | null = H.design !== undefined ? (H.design ? addDesign(H.design) : null) : (() => { let q: string | null = null; try { q = new URLSearchParams(location.search).get('design'); if (q === 'stored' || q === '') q = STORE?.getItem(KEYS.testDrive) ?? null; } catch { q = null; }
   if (!q) return null; const d = decodeDesign(q); if (!d) { console.warn('design: the link holds no design'); return null; } return addDesign(d); })();
 let dTop = 0, dTopKept = 0, dTopAt = -Infinity;
@@ -178,14 +194,14 @@ function techHud(): string { const X = car.spec.tech; if (!X) return ''; let o =
   if (X.ground) o += `<span>다운포스 ${Math.round(0.5 * 1.2 * car.speed * car.speed * X.ground.clA / 9.81)} kg</span>`; return o; }
 /** where the cars' tyres lay their rubber (review 122): the test driver's line in a fast car, a metre at a time */
 function rubberLine(T: import('../race/track').Track): Float32Array { const d = new Driver(T), v = new Vehicle(raceSpec('dueSSJ35'), T).place(0, 0, 0); d.drive(v); return Float32Array.from({ length: Math.round(T.length) }, (_, s) => d.lineAt(s)); }
-const liveOK = !!live; let liveR = live; let look: 'baked' | 'stepped' | 'pbr' | 'split' | 'toon' = 'pbr';   /* the light and materials: the baked pictures' stepped light, or physically based (review 102) */
-function drawLive(el: number) { const L = live!; void el;
+const liveOK = !!live; let liveR = live; let look: 'baked' | 'stepped' | 'pbr' | 'split' | 'toon' | 'drift' = 'pbr';   /* the light and materials: the baked pictures' stepped light, or physically based (review 102) */
+function drawLive(el: number) { const L = live!; cabinAtlas(L);
   if (++wearTick % 30 === 0 && document.activeElement?.id !== 'wdirt') $<HTMLInputElement>('wdirt').value = myWear[2].toFixed(2);   /* the dirt slider follows the dirt */
   if (broken.size !== liveFence) { liveFence = broken.size; for (const k of [...fenceGpu.keys()]) if (dirtyChunks.has(k)) fenceGpu.delete(k); dirtyChunks.clear(); }
   glCanvas.width = VW; glCanvas.height = VH;
   const list = race ? race.cars.map(e => ({ c: e.car, sp: e.driver ? others.get(e)! : sprites, turn: e.wheelTurn })) : [{ c: car, sp: sprites, turn: wheelTurn }];
   if (DAMAGE) for (const { c, sp } of list) bend(c, sp.mesh, L); else for (const { c } of list) c.hits.length = 0;
-  const cars = list.map(({ c, sp, turn }, k) => ({ wear: wearOf(c, k), g: (() => { const M = dmg.get(c)?.M ?? (c.wing > 0.5 ? wingUp(c.spec.id, sp.mesh) : lampsOn && POPUP.has(c.spec.id) ? lampsUp(c.spec.id, sp.mesh) : sp.mesh), g = L.car(M); artFor(L, g, c.spec.id, M); return g; })(), tyres: c.rings, ...(() => { const b = c.base; return { x: b[0], y: b[1], z: b[2] - (c.rings[0]!.rest + c.rings[2]!.rest) / 2 }; })(),   /* the body where it is in 3D (review 120), drawn lower by the tyres' standing give */ yaw: c.yaw, roll: c.rollW + c.roll * 0.5, pitch: c.pitchW, travel: c.travel, camber: c.camber, steerL: c.steerAt(0), steerR: c.steerAt(1), spin: turn, player: c === car, lamps: lampsOn ? 1 : 0, brake: c === car && input.brake > 0.1 }));
+  const cars = list.map(({ c, sp, turn }, k) => ({ wear: wearOf(c, k), g: (() => { const M = dmg.get(c)?.M ?? (c.wing > 0.5 ? wingUp(c.spec.id, sp.mesh) : lampsOn && POPUP.has(c.spec.id) ? lampsUp(c.spec.id, sp.mesh) : sp.mesh), g = L.car(M); artFor(L, g, c.spec.id, M); return g; })(), tyres: c.rings, ...(() => { const b = c.base; return { x: b[0], y: b[1], z: b[2] - (c.rings[0]!.rest + c.rings[2]!.rest) / 2 }; })(),   /* the body where it is in 3D (review 120), drawn lower by the tyres' standing give */ yaw: c.yaw, roll: c.rollW + c.roll * 0.5, pitch: c.pitchW, travel: c.travel, camber: c.camber, steerL: c.steerAt(0), steerR: c.steerAt(1), spin: turn, player: c === car, lamps: lampsOn ? 1 : 0, brake: c === car && input.brake > 0.1 })).map((q, k) => ({ ...q, dials: dialsOf(list[k]!.c, q.g.dials?.rig, el) }));
   const props: import('../render/live/renderer').LiveProp[] = [...SCN.props, ...trainCars()].flatMap(q => { const f = PROPS[q.kind]; return f ? [{ g: L.prop(q.arg ? `${q.kind}@${q.arg}` : q.kind, () => f(q.arg)), x: q.x, y: q.y, z: q.z ?? 0, h: q.heading }] : []; });
   // the fence (review 112): solid, in chunks near the camera, lit, shadowed and outlined as everything else; its loose pieces
   { const near = T.locate(camX, camY, car.s).s, nC = Math.ceil(T.length / CHUNK); for (let d = -5; d <= 5; d++) for (const side of [-1, 1]) { const c = ((Math.floor(near / CHUNK) + d) % nC + nC) % nC, key = `${side}:${c}`;
@@ -212,7 +228,7 @@ function drawLive(el: number) { const L = live!; void el;
     main.fillStyle = 'rgba(0,0,0,0.55)'; main.fillRect(0, VH - 20, VW, 20); main.fillStyle = '#f2ead6'; main.font = '11px sans-serif'; main.textAlign = 'center';
     for (let k = 0; k < 3; k++) main.fillText(names[k]!, k * w3 + w3 / 2, VH - 6); main.fillStyle = '#000'; for (let k = 1; k < 3; k++) main.fillRect(k * w3 - 1, 0, 2, VH); main.textAlign = 'left'; }
   else if (fxMode === 1 && filmRate && clock - heldAt < 1 / 18 && held.width === VW && heldAt <= clock) { /* the hand-cranked camera: 18 frames a second, the picture held between */ }
-  else { L.render(view, cars, props, skids, { glass: 0.8, look: look === 'stepped' ? 1 : look === 'pbr' ? 2 : look === 'toon' ? 3 : 0, toonBands: toonB, toonShade: toonS, glassRefl, art: artOn, rays: raysOn, texK, lightK, aoK, reflK, bloomK, deep, day, photoGround: photoOn, hdri: hdriOn, dof, mb: blurOn ? mbK * (S ? 0.5 : 1) : 0, outW, outK, inner: innerOn === 'auto' ? undefined : innerOn === 'on', inK, smoke: smokeNow() === 'off' ? undefined : { p: sp8, n: smoke.parcels.length, time: smoke.time }, fx: fxMode, fxK, fxPx: Math.max(1, Math.round(VH / 480)) }); held.width = VW; held.height = VH; held.getContext('2d')!.drawImage(glCanvas, 0, 0); heldAt = clock; }
+  else { L.render(view, cars, props, skids, { glass: 0.8, look: look === 'stepped' ? 1 : look === 'pbr' ? 2 : look === 'toon' ? 3 : look === 'drift' ? 4 : 0, toonBands: toonB, toonShade: toonS, glassRefl, art: artOn, rays: raysOn, texK, lightK, aoK, reflK, bloomK, deep, day, photoGround: photoOn, hdri: hdriOn, dof, mb: blurOn ? mbK * (S ? 0.5 : 1) : 0, outW, outK, inner: innerOn === 'auto' ? undefined : innerOn === 'on', inK, smoke: smokeNow() === 'off' ? undefined : { p: sp8, n: smoke.parcels.length, time: smoke.time }, fx: fxMode, fxK, fxPx: Math.max(1, Math.round(VH / 480)) }); held.width = VW; held.height = VH; held.getContext('2d')!.drawImage(glCanvas, 0, 0); heldAt = clock; }
   if (look !== 'split') main.drawImage(held, 0, 0);
   drawDebris(el);
   if (car.speed > 30) { const v = Math.min(1, (car.speed - 30) / 30) * 0.35, g = main.createRadialGradient(VW / 2, VH / 2, VH * 0.35, VW / 2, VH / 2, VW * 0.62); g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, `rgba(0,0,0,${v})`); main.fillStyle = g; main.fillRect(0, 0, VW, VH); } }
@@ -730,7 +746,9 @@ const setFree = (on: boolean) => { st.free = on; ($('free') as HTMLInputElement)
 { const t = $<HTMLInputElement>('live'); t.checked = liveOK; t.disabled = !liveOK; if (!liveOK) $('livenote').textContent = '이 브라우저는 WebGL2가 없어 구운 그림으로 그립니다';
   t.addEventListener('change', () => { live = t.checked ? liveR : null; if (!live) rebake(true); t.blur(); }); }
 const toonRows = () => { for (const id of ['toonBRow', 'toonSRow', 'glassReflRow']) $(id).hidden = look !== 'toon'; };
-$<HTMLSelectElement>('look').addEventListener('change', e => { look = (e.target as HTMLSelectElement).value as typeof look; toonRows(); (e.target as HTMLElement).blur(); }); toonRows();
+$<HTMLSelectElement>('look').addEventListener('change', e => { look = (e.target as HTMLSelectElement).value as typeof look; toonRows(); (e.target as HTMLElement).blur();
+  // the machinery's look follows (the drift look's engines and suspensions: render/car/powertrain/style.ts); the cars built again in it
+  const ps = styleForLook(look === 'drift' ? 4 : 2); if (ps !== partStyle()) { setPartStyle(ps); wingMeshes.clear(); lampMeshes.clear(); rebake(true); } }); toonRows();
 $<HTMLInputElement>('toonB').addEventListener('input', e => { toonB = +(e.target as HTMLInputElement).value; $('toonBv').textContent = String(toonB); });
 $<HTMLSelectElement>('smokeSize').addEventListener('change', e => { smoke.size = (e.target as HTMLSelectElement).value === 'normal' ? 0.55 : 1; (e.target as HTMLElement).blur(); });   /* 연기 크기 */
 $<HTMLSelectElement>('smokeQ').addEventListener('change', e => { smokeQ = (e.target as HTMLSelectElement).value as SmokeSetting; const t = smokeNow(); $('smokeNote').textContent = (smokeQ === 'mid' || smokeQ === 'high') && t === 'parcels' ? '이 기기는 부동소수 렌더 타깃이 없어 덩어리로 그립니다' : ''; (e.target as HTMLElement).blur(); });

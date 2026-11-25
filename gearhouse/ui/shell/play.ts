@@ -20,7 +20,7 @@ import { trackDef } from '../../race/tracks';
 import { GLASS_REFL, type Settings } from './settings';
 import { CAM_VIEWS, type CamView } from '../drivecam';
 
-const LOOK_B: Record<Settings['graphics']['look'], string> = { pbr: '2', toon: '3', stepped: '0', baked: '0' };
+const LOOK_B: Record<Settings['graphics']['look'], string> = { pbr: '2', toon: '3', stepped: '0', baked: '0', drift: '4' };
 /** a page field set as a person would (its own listeners told), only when it differs */
 function setField(root: ParentNode, id: string, v: boolean | string | number) { const f = root.querySelector<HTMLInputElement | HTMLSelectElement>(`#${id}`); if (!f || f.disabled) return;
   if (f instanceof HTMLInputElement && f.type === 'checkbox') { if (f.checked === v) return; f.checked = !!v; f.dispatchEvent(new Event('change')); return; }

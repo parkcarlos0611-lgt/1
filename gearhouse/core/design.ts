@@ -313,7 +313,7 @@ export const DESIGN_F355: Design = { v: 5, id: 'f355', name: 'F355', body: { bas
  *  317 km/h. The engine's quality figures land it on its power (tests/p959_game.test.ts) */
 export const DESIGN_P959: Design = { v: 5, id: 'p959', name: '959', body: { base: 'p959', nose: 'round', ...faceOf3('p959', 'plain'), tail: 'frame', wheel: 'fiveSpoke', ...NO_DIMS, paint: '#b8bcc2', gloss: 0.6, structure: 'steel', panels: 'frp',
     model: { ...MODEL_OWN.p959 } },
-  engine: { grade: 4, layout: 'F6', cc: 2849, valves: 4, redline: 7600, intake: 'single', compression: 'low', sump: 'dry', block: 'aluminium', turbo: 2, boost: 1.0, intercooler: true, vtec: false, sequential: true, bs: 1.4, quality: { ...NO_QUALITY } },
+  engine: { grade: 4, layout: 'F6', cc: 2849, valves: 4, redline: 7600, intake: 'single', compression: 'low', sump: 'dry', block: 'aluminium', turbo: 2, boost: 1.0, intercooler: true, vtec: false, sequential: true, bs: 1.4, quality: { ...NO_QUALITY, head: 1, intake: 1, exhaust: 1, turbo: 1 } },
   drive: { gears: 6, gearbox: 'manual', final: 0, lsd: true, awd: true },
   kit: { abs: true, tcs: false, steering: 'hydraulic', dampers: 'adaptive', wing: false, diffuser: false, tyres: [235, 255], rim: 17, interior: 'standard' }, susp: structuredClone(SUSP_OWN.p959) };
 

@@ -15,17 +15,18 @@ import { LiveRenderer } from '../render/live/renderer';
 import { loadSky } from '../render/live/groundtex';
 import { studioFloor } from '../render/live/studio';
 import type { Mesh } from '../render/car/mesh';
-import { designMesh, designChoices, withoutParts } from '../render/car/design';
+import { designMesh, designChoices, withoutParts, openParts } from '../render/car/design';
 import { bareMesh, bounce } from '../render/car/suspension/view';
+import { setPartStyle, partStyle, styleForLook } from '../render/car/powertrain';
 import { designSpec, designFigures, designHeight, type DesignFigures } from '../race/design';
 import { CLEARANCE, type FitResult } from '../race/fit';
-import { LIMITS, BASES, BODY_LIMITS, DIMS, LAYOUTS, LAYOUT_NAME, type DimKey, GRADE_NAME, GRADES, gradeLock, gradeBoost, gradeRedline, normalise, applyPatch, type BaseId, type Design, type NoseKind, type TailKind, type WheelKind, FACE_KEYS, faceLock, type Face, type FaceKey,
+import { LIMITS, BODY_BASES, isModelBase, MODEL_OWN, BUMPERS959, LAMPS959, WHEELS959, plateOk, type BodyBase, type ModelSwaps, BODY_LIMITS, DIMS, LAYOUTS, LAYOUT_NAME, type DimKey, GRADE_NAME, GRADES, gradeLock, gradeBoost, gradeRedline, normalise, applyPatch, type BaseId, type Design, type NoseKind, type TailKind, type WheelKind, FACE_KEYS, faceLock, type Face, type FaceKey,
   type Grade, type Structure, type Panels, type Intake, type Compression, type Sump, type Block, type Turbos, type Interior,
   SUSP_KINDS, SUSP_KIND_NAME, SUSP_LIMITS, SUSP_OWN, suspLock, suspFieldLock, type SuspKind, type RcPreset, type SuspAxle } from '../core/design';
 import { STEPS, FIT_STEP, stepNo, isStep, stepFrom, seenFrom, type StepId } from './builder_steps';
 import { suspFigures, suspPanel } from './builder_susp';
 import { savedEngines, joinEngine, withEngine } from '../core/engines';
-import { currentDesign, keepCurrent, savedDesigns, saveDesign, deleteDesign, fromPreset, encodeDesign, designJson, parseDesign, measured, designSig, newId, KEYS, type KeyStore } from '../core/designstore';
+import { randomPlate, currentDesign, keepCurrent, savedDesigns, saveDesign, deleteDesign, fromPreset, encodeDesign, designJson, parseDesign, measured, designSig, newId, KEYS, type KeyStore } from '../core/designstore';
 import texAlb from '../assets/textures/pbr/albedo.jpg';
 import texNor from '../assets/textures/pbr/normal.jpg';
 import texRgh from '../assets/textures/pbr/rough.jpg';
@@ -50,7 +51,7 @@ const store: KeyStore | null = (() => { try { return localStorage; } catch { ret
 let D: Design = host.design ? structuredClone(host.design) : currentDesign(store) ?? fromPreset('nsx');
 
 // ---- the names on the page ----
-const BASE_NAME: Record<BaseId, string> = { nsx: 'NSX 바탕', f355: 'F355 바탕', eb110: 'EB110 바탕' };
+const BASE_NAME: Record<BodyBase, string> = { nsx: 'NSX 바탕', f355: 'F355 바탕', eb110: 'EB110 바탕', p959: '959 (모델 차체)' };
 const KIND_NAME: Record<string, string> = { round: '둥근 코', pointed: '뾰족한 코', mass: '덩어리 범퍼 코', capsule: '캡슐 꼬리', plain: '평평한 앞면', sunk: '램프가 들어간 앞면', frame: '테두리 꼬리', roundLamps: '둥근 램프 꼬리', ducktail: '덕테일',
   fiveSpoke: '5스포크', disc: '디스크', star: '스타' };
 const PAINTS = ['#b0121b', '#f5c300', '#1d3f8f', '#f2f0ea', '#151515', '#2f6b3a', '#9aa1a6', '#d8661c'];
@@ -119,12 +120,14 @@ $('next').addEventListener('click', () => go(STEPS[Math.min(STEPS.length - 1, st
 $('openFiles').addEventListener('click', () => { if (onFiles) go(step); else { go('files'); drawer(true); } });
 
 // 차대: the base, its stretch, its structure
-add('chassis', seg<BaseId>('바탕 차대', BASES.map(b => [b, BASE_NAME[b]] as [BaseId, string]), () => D.body.base, v => { if (v === D.body.base) return;
+add('chassis', seg<BodyBase>('바탕 차대', BODY_BASES.map(b => [b, BASE_NAME[b]] as [BodyBase, string]), () => D.body.base, v => { if (v === D.body.base) return;
+    // a model-built body (the 959) brings its own swaps, a new plate number with them; its dimensions are its model's (zero)
+    if (isModelBase(v)) { D.body.model = { ...MODEL_OWN[v], ...D.body.model, plate: plateOk(D.body.model?.plate) ? D.body.model!.plate : randomPlate() }; for (const k of DIMS) D.body[k] = 0; }
     // the tyres and the rims follow the base where they were its own
     const was = fromPreset(D.body.base), to = fromPreset(v); if (D.kit.tyres[0] === was.kit.tyres[0] && D.kit.tyres[1] === was.kit.tyres[1]) D.kit.tyres = [...to.kit.tyres]; if (D.kit.rim === was.kit.rim) D.kit.rim = to.kit.rim;
     if (JSON.stringify(D.susp) === JSON.stringify(SUSP_OWN[D.body.base])) D.susp = structuredClone(SUSP_OWN[v]);   // and the suspension, where it was the old base's own
     D.body.base = v; }),
-  note('바탕은 차체 패널의 치수와 치수를 바꿀 수 있는 범위를 정합니다. 코·앞면·꼬리·휠은 세 바탕 모두에 끼울 수 있습니다.'),
+  note('바탕은 차체 패널의 치수와 치수를 바꿀 수 있는 범위를 정합니다. 코·앞면·꼬리·휠은 세 바탕 모두에 끼울 수 있습니다. 959는 손으로 짠 모델 차체라 치수를 바꾸지 않고, 범퍼·램프·휠·번호판을 바꿉니다(④).'),
   ...dimSliders(),
   seg<Structure>('구조 소재 (모노코크·프레임)', [['steel', '강철'], ['hss', '고장력강'], ['aluminium', '알루미늄'], ['honeycomb', '알루미늄 허니콤'], ['cfrp', '탄소섬유']], () => D.body.structure, v => { D.body.structure = v; }),
   note('같은 강성에서 강철 대비 무게: 고장력강 0.9, 알루미늄 0.6, 허니콤 0.5, 탄소섬유 0.45. 가벼울수록 비싸고, 탄소섬유는 수작업입니다.'),
@@ -139,13 +142,13 @@ function dimSliders(): HTMLElement[] {
     ['roof', '전고', 5, v => `${mm(v)} · ${H().toLocaleString()} mm`], ['overhangF', '앞 오버행', 10, mm], ['overhangR', '뒤 오버행', 10, mm],
     ['ride', '지상고', 5, v => `${mm(v)} · ${CLEARANCE[D.body.base] + v} mm`], ['cabin', '캐빈 위치 (+ 앞으로)', 10, mm],
     ['rake', '앞유리 각도 (+ 눕힘)', 0.5, v => `${v > 0 ? '+' : ''}${v}°`]];
-  const out: HTMLElement[] = [h2('치수')];
+  const out: HTMLElement[] = [h2('치수')], kitOnly = (e: HTMLElement) => { syncs.push(() => { e.hidden = isModelBase(D.body.base); }); return e; };
   for (const [k, name, step, show] of rows) { const r = range(name, BODY_LIMITS(D.body.base)[k], step, () => D.body[k], v => { D.body[k] = v; }, show, `dim-${k}`), i = r.querySelector('input')!;
     // the range first (the value's own sync, pushed by range(), comes after it)
-    syncs.splice(syncs.length - 1, 0, () => { const [a, b] = BODY_LIMITS(D.body.base)[k]; i.min = String(a); i.max = String(b); }); out.push(r); }
+    syncs.splice(syncs.length - 1, 0, () => { const [a, b] = BODY_LIMITS(D.body.base)[k]; i.min = String(a); i.max = String(b); }); out.push(kitOnly(r)); }
   out.push(note('전고는 벨트라인 위 캐빈을 늘이고 줄입니다. 캐빈을 앞으로 옮기면 뒤의 엔진룸이 그만큼 길어집니다(긴 V12가 들어갈 수 있습니다). 지상고가 100 mm보다 낮으면 바닥이 닿을 위험이 있다는 경고가 나옵니다.'),
     btnRow('치수 원래대로', () => { for (const k of DIMS) D.body[k] = 0; changed(); }));
-  return out; }
+  kitOnly(out[0]!); kitOnly(out[out.length - 2]!); kitOnly(out[out.length - 1]!); return out; }
 function btnRow(t: string, f: () => void): HTMLElement { const d = document.createElement('div'); d.className = 'btns'; const b = document.createElement('button'); b.type = 'button'; b.className = 'btn'; b.textContent = t; b.addEventListener('click', f); d.append(b); return d; }
 // ④ 차체 형태: the panels' kinds; ⑥ 칠·마감: the paint
 { const ch = designChoices('nsx'), kinds = <T extends string>(ks: T[]) => ks.map(k => [k, KIND_NAME[k] ?? k] as [T, string]);
@@ -174,9 +177,23 @@ function btnRow(t: string, f: () => void): HTMLElement { const d = document.crea
       why.textContent = locked.join(' · '); why.hidden = !locked.length; });
     const r = document.createElement('div'); r.className = 'row'; r.dataset.slot = label; const l = document.createElement('span'); l.className = 'lab'; l.textContent = label; r.append(l, box, why); return r; }
   const slot = <K extends FaceKey>(k: K) => chips<Face[K]>(FACE[k][0], FACE[k][1], () => D.body[k], v => { (D.body as Face)[k] = v; }, v => faceLock(D.body, k, v));
-  add('body', h2('앞모습'), chips<NoseKind>('코 모양', NOSE, () => D.body.nose, v => { D.body.nose = v; }), ...FACE_KEYS.map(slot),
+  const kitRows = [h2('앞모습'), chips<NoseKind>('코 모양', NOSE, () => D.body.nose, v => { D.body.nose = v; }), ...FACE_KEYS.map(slot),
     note('앞모습의 다섯 칸은 세 바탕 모두에서 따로 바꿀 수 있습니다. 그릴과 보조등은 고른 범퍼의 선에 맞춰 자리를 다시 잡습니다. 함께 쓸 수 없는 조합은 흐리게 표시하고 이유를 적습니다.'),
-    h2('뒷모습·휠'), seg<TailKind>('꼬리', kinds(ch.tail), () => D.body.tail, v => { D.body.tail = v; }), seg<WheelKind>('휠', kinds(ch.wheel), () => D.body.wheel, v => { D.body.wheel = v; }));
+    h2('뒷모습·휠'), seg<TailKind>('꼬리', kinds(ch.tail), () => D.body.tail, v => { D.body.tail = v; }), seg<WheelKind>('휠', kinds(ch.wheel), () => D.body.wheel, v => { D.body.wheel = v; })];
+  // a model-built body's own swaps (the 959's: render/car/p959), in place of the kit's kinds
+  const M = (): ModelSwaps => (D.body.model ??= { ...MODEL_OWN.p959 }), sm = <K extends keyof ModelSwaps>(k: K) => (v: ModelSwaps[K]) => { M()[k] = v; };
+  const BUMPER_NAME: Record<ModelSwaps['bumperF'], string> = { std: '순정', aero: '에어로 (깊은 립·디퓨저)', clean: '깔끔 (모서리 벤트 없음)' };
+  const plate = document.createElement('input'); plate.type = 'text'; plate.id = 'plate'; plate.maxLength = 10; plate.placeholder = '12가 3456'; plate.setAttribute('aria-label', '번호판 글자'); plate.autocomplete = 'off';
+  const plateWhy = document.createElement('small'); plateWhy.className = 'lock'; plateWhy.hidden = true;
+  plate.addEventListener('change', () => { if (plateOk(plate.value)) { M().plate = plate.value; plateWhy.hidden = true; changed(); } else { plateWhy.textContent = '숫자 2개 + 한글 한 글자(받침 없음) + 숫자 4개로 적어 주세요. 예: 12가 3456'; plateWhy.hidden = false; } });
+  const plateRow = field('번호판 (옛 초록 번호판)', plate); plateRow.append(plateWhy, btnRow('무작위 번호', () => { M().plate = randomPlate(); plateWhy.hidden = true; changed(); }));
+  const modelRows = [h2('959 부품'), seg<ModelSwaps['bumperF']>('앞 범퍼', BUMPERS959.map(k => [k, BUMPER_NAME[k]] as [ModelSwaps['bumperF'], string]), () => M().bumperF, sm('bumperF')),
+    seg<ModelSwaps['bumperR']>('뒤 범퍼', BUMPERS959.map(k => [k, BUMPER_NAME[k]] as [ModelSwaps['bumperR'], string]), () => M().bumperR, sm('bumperR')),
+    seg<ModelSwaps['lamp']>('헤드램프', LAMPS959.map(k => [k, { round: '둥근 렌즈 (순정)', ellipsoid: '프로젝터 2개', square: '사각 프로젝터' }[k]] as [ModelSwaps['lamp'], string]), () => M().lamp, sm('lamp')),
+    seg<ModelSwaps['wheel']>('휠', WHEELS959.map(k => [k, { hollow5: '속 빈 5스포크 (순정)', dish: '딥디시 8스포크', hole5: '5홀 디스크' }[k]] as [ModelSwaps['wheel'], string]), () => M().wheel, sm('wheel')),
+    plateRow, note('범퍼는 차체의 이음선 고리에 맞물려 바뀝니다. 번호판 글자는 판 위에 획으로 그립니다(가상의 번호만). 실내 사양(①)이 경량이면 버킷 시트와 롤케이지가 들어갑니다.')];
+  syncs.push(() => { const m = isModelBase(D.body.base); for (const e of kitRows) e.hidden = m; for (const e of modelRows) e.hidden = !m; if (m && document.activeElement !== plate) plate.value = M().plate; });
+  add('body', ...kitRows, ...modelRows);
   const sw = document.createElement('div'); sw.className = 'swatches'; const pick = document.createElement('input'); pick.type = 'color'; pick.id = 'paint'; pick.setAttribute('aria-label', '직접 고르기');
   const bs = PAINTS.map(c => { const b = document.createElement('button'); b.type = 'button'; b.style.background = c; b.setAttribute('aria-label', c); b.addEventListener('click', () => { D.body.paint = c; changed(); }); sw.append(b); return [c, b] as const; });
   pick.addEventListener('input', () => { D.body.paint = pick.value; changed(); }); sw.append(pick);
@@ -283,7 +300,7 @@ function showList() { const list = $('list'), all = savedDesigns(store); list.te
 
 // ---- the design changed: kept, the figures, the car (when its body changed), the link ----
 // the engine's shape is in the key too (the car carries its powertrain: the engine view shows it)
-const bodyKey = (d: Design) => JSON.stringify([d.engine.layout, d.engine.cc, d.engine.bs, d.engine.valves, d.engine.block, d.engine.grade, d.engine.intake, d.engine.sump, d.engine.turbo, d.engine.intercooler, d.drive.gears, d.drive.gearbox, d.drive.awd, d.body.base, d.body.nose, ...FACE_KEYS.map(k => d.body[k]), d.body.tail, d.body.wheel, ...DIMS.map(k => d.body[k]), d.body.paint, d.body.gloss, d.kit.tyres, d.kit.rim, d.kit.wing, d.kit.diffuser,
+const bodyKey = (d: Design) => JSON.stringify([d.body.model ?? null, isModelBase(d.body.base) ? [d.kit.interior, d.engine.redline, d.engine.boost] : 0, d.engine.layout, d.engine.cc, d.engine.bs, d.engine.valves, d.engine.block, d.engine.grade, d.engine.intake, d.engine.sump, d.engine.turbo, d.engine.intercooler, d.drive.gears, d.drive.gearbox, d.drive.awd, d.body.base, d.body.nose, ...FACE_KEYS.map(k => d.body[k]), d.body.tail, d.body.wheel, ...DIMS.map(k => d.body[k]), d.body.paint, d.body.gloss, d.kit.tyres, d.kit.rim, d.kit.wing, d.kit.diffuser,
   // the suspension's linkage (its kind, arms, roll centre, caster, static camber and toe: the rig is built with them; not the springs, the dampers or the bars)
   ...[d.susp.front, d.susp.rear].map(a => [a.type, a.arm, a.rc, a.camber, a.toe]), d.susp.front.caster]);
 let meshT = 0, figT = 0;
@@ -366,7 +383,7 @@ const open = new WeakMap<Mesh, Mesh>();
 const view = { spin: false, lamps: false, engine: false, /** the suspension view: the body off, the wheels' faces off, the wheels bouncing slowly */ susp: false, look: 2, yaw: 0, ang: 0, pitch: 0, zoom: 1 };
 let dirty = true, g: ReturnType<LiveRenderer['car']> | null = null, awake = true;   // awake: on screen (a page of its own always)
 function rebuild() { const key = bodyKey(D); if (key === meshKey && down) return; const t0 = performance.now(); meshKey = key; down = designMesh(D, 0, 0, 1); up = null; builds++; dirty = true; console.info(`design mesh ${D.body.base}: ${down.n} triangles, ${Math.round(performance.now() - t0)} ms`); }
-function shown(): Mesh { let M = view.lamps ? (up ??= designMesh(D, 0, 1, 1)) : down!; if (view.susp) return bareMesh(M); if (view.engine) { let o = open.get(M); if (!o) { o = withoutParts(M, DECK); open.set(M, o); } M = o; } return M; }
+function shown(): Mesh { let M = view.lamps ? (up ??= designMesh(D, 0, 1, 1)) : down!; if (view.susp) return bareMesh(M); if (view.engine) { let o = open.get(M); if (!o) { o = withoutParts(M, openParts(D.body.base, DECK)); open.set(M, o); } M = o; } return M; }
 const home = () => { view.ang = Math.PI - 0.7; view.pitch = 17; view.zoom = 1; view.yaw = 0; dirty = true; }; home();
 const press = (id: string, k: 'spin' | 'lamps' | 'engine' | 'susp') => $(id).addEventListener('click', () => { view[k] = !view[k]; $(id).setAttribute('aria-pressed', String(view[k])); dirty = true; });
 press('spin', 'spin'); press('lamps', 'lamps'); press('engine', 'engine'); press('susp', 'susp');
@@ -374,7 +391,9 @@ $('susp').addEventListener('click', () => { suspAuto = false; });   // the viewe
 /** the suspension view on or off (step ③ puts it on) */
 function setSuspView(on: boolean) { view.susp = on; $('susp').setAttribute('aria-pressed', String(on)); dirty = true; }
 $('engine').addEventListener('click', () => { if (view.engine) { view.ang = view.yaw + 0.6; view.pitch = 42; view.zoom = 0.8; } });   // the engine bay seen from behind and above
-$<HTMLSelectElement>('look').addEventListener('change', e => { view.look = +(e.target as HTMLSelectElement).value; dirty = true; });
+$<HTMLSelectElement>('look').addEventListener('change', e => { view.look = +(e.target as HTMLSelectElement).value; dirty = true;
+  // the engine's and the suspension's look follow (look 4: their drift look, render/car/powertrain/style.ts): the car built again in it
+  const ps = styleForLook(view.look); if (ps !== partStyle()) { setPartStyle(ps); meshKey = ''; open.clear?.(); clearTimeout(meshT); meshT = setTimeout(rebuild, 30) as unknown as number; } });
 $('home').addEventListener('click', home); cv.addEventListener('dblclick', home);
 { const ptrs = new Map<number, { x: number; y: number }>(); let pinch = 0;
   cv.addEventListener('pointerdown', e => { cv.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY }); if (ptrs.size === 2) { const [a, b] = [...ptrs.values()]; pinch = Math.hypot(a!.x - b!.x, a!.y - b!.y); } });

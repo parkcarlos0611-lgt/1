@@ -5,8 +5,9 @@
 // the colours, the body's dimensions into the lines' tweak (the wheelbase, the width and the track stretch the lines; the
 // roof, the overhangs, the ride, the cabin and the rake warp the built body: kit/lines.ts makeWarp), the tyres' widths and
 // the rims' size into the wheels, the wing (the base's own for the tail chosen) and the diffuser when the kit has them.
-import type { BaseId, Design, Face, NoseKind, TailKind, WheelKind } from '../../core/design';
-import { FACE_KINDS, NOSES, TAILS, WHEELS } from '../../core/design';
+import type { BaseId, BodyBase, Design, Face, NoseKind, TailKind, WheelKind } from '../../core/design';
+import { FACE_KINDS, NOSES, TAILS, WHEELS, isModelBase } from '../../core/design';
+import { MODEL_BODIES, type BodyMeshOpts } from './bodies';
 import { faceKit } from './face';
 import type { Mesh } from './mesh';
 import { assemble } from './kit/assemble';
@@ -49,7 +50,8 @@ function darken(hex: string, k: number): string {
 
 /** the design's body as the kit's assembly spec and the tweak to its lines */
 export function designKit(d: Design, detail?: Detail): { kit: CarKit; tweak: Tweak } {
-  const B = BASE[d.body.base], b = d.body; if (!B) throw new Error(`design: no base ${b.base}`);
+  const b = d.body; if (isModelBase(b.base)) throw new Error(`design: ${b.base} is a model-built body (render/car/bodies.ts), not the kit's`);
+  const B = BASE[b.base]; if (!B) throw new Error(`design: no base ${b.base}`);
   // the face first (a tail's patch may carry lines of its own over the prow's: the deck's)
   let kit: CarKit = faceKit(b.base, b);
   for (const p of [B.tail[b.tail], B.wheel[b.wheel]]) if (p) kit = { ...kit, ...p };
@@ -71,6 +73,7 @@ export function designKit(d: Design, detail?: Detail): { kit: CarKit; tweak: Twe
 }
 /** the design's powertrain: its engine and drive; machinery that is the base's own car's keeps that engine's colours and label */
 export function designPowertrain(d: Design): PowertrainSpec {
+  if (isModelBase(d.body.base)) return fromDesign(d);
   const own = BASE[d.body.base].kit.engine.spec, o = fromEngineSpec(own), p = fromDesign(d, own), { colours: _c, crinkle: _k, label: _l, litres: _v, ...rest } = o; void _c; void _k; void _l; void _v;
   const same = Math.abs(p.litres - o.litres) < 0.06 && (Object.keys(rest) as (keyof typeof rest)[]).every(k => p[k] === o[k]);
   if (same) return { ...p, litres: o.litres, colours: o.colours, crinkle: o.crinkle, ...(o.label ? { label: o.label } : {}) };
@@ -79,9 +82,13 @@ export function designPowertrain(d: Design): PowertrainSpec {
 
 /** the design's car; `spin` turns the wheels, `lamps` 0..1 raises the head lamps, `wing` 0..1 an active rear wing (a fixed one stands always);
  *  `powertrain` the powertrain's detail (2 the builder's, the default; 1 or 0 a lighter car for the drive) */
-export function designMesh(d: Design, spin = 0, lamps = 0, wing = 0, powertrain?: Detail): Mesh {
+export function designMesh(d: Design, spin = 0, lamps = 0, wing = 0, powertrain?: Detail, o: Omit<BodyMeshOpts, 'detail'> = {}): Mesh {
+  // a model-built body (the 959): its own mesh, the machinery and the cabin in it (render/car/bodies.ts); no pop-up lamps or active wing
+  if (isModelBase(d.body.base)) return MODEL_BODIES[d.body.base].mesh(d, { ...o, ...(powertrain === undefined ? {} : { detail: powertrain }) });
   const { kit, tweak } = designKit(d, powertrain); return assemble(kit, { spin, lamps, wing, tweak }).mesh;
 }
+/** the parts the builder's engine view lifts off a body (the deck's lids and glass) */
+export const openParts = (base: BodyBase, kit: readonly string[]): readonly string[] => isModelBase(base) ? MODEL_BODIES[base].open : kit;
 
 /** the kinds the builder offers on a base: every one closes on every base (tests/car_design.test.ts tries every combination) */
 export function designChoices(base: BaseId): { nose: NoseKind[]; tail: TailKind[]; wheel: WheelKind[] } & { [K in keyof Face]: Face[K][] } {

@@ -179,7 +179,7 @@
   </section>
   <section data-tab="gfx">
     <label class="check"><input type="checkbox" id="live" checked> 실시간 렌더러 (WebGL2: 매 프레임 직접 그림, 그림자, 굽기 없음) <span class="note" id="livenote"></span></label>
-    <div class="row"><label for="look">조명·재질</label><select id="look"><option value="pbr" selected>PBR (사실적, 재질 텍스처)</option><option value="stepped">PBR 단계화</option><option value="baked">기존: 단계 조명</option><option value="toon">툰 (카툰 렌더링)</option><option value="split">세 가지 나란히 비교</option></select></div>
+    <div class="row"><label for="look">조명·재질</label><select id="look"><option value="pbr" selected>PBR (사실적, 재질 텍스처)</option><option value="stepped">PBR 단계화</option><option value="baked">기존: 단계 조명</option><option value="toon">툰 (카툰 렌더링)</option><option value="drift">드리프트 (화풍 4: 선·2단 음영)</option><option value="split">세 가지 나란히 비교</option></select></div>
     <div class="row" id="toonBRow" hidden><label for="toonB">밴드 수 <span class="val" id="toonBv">3</span></label><input type="range" id="toonB" min="2" max="3" step="1" value="3"></div>
     <div class="row" id="glassReflRow" hidden><label for="glassRefl">유리 반사</label><select id="glassRefl"><option value="off">끔</option><option value="weak">약함</option><option value="mid" selected>보통</option></select></div>
     <div class="row"><label for="smokeQ">연기 품질</label><select id="smokeQ"><option value="off">끔</option><option value="parcels">덩어리</option><option value="mid" selected>부피 보통</option><option value="high">부피 높음</option></select> <span class="note" id="smokeNote"></span></div>

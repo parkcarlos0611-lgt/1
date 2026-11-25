@@ -60,9 +60,9 @@ const zC = pc([[100, 682], [112, 690], [136, 705], [215, 751], [320, 808], [470,
 /** the raised middle's edge in plan (from the grille's corner out to the screen's) */
 const yRise = (x: number) => 283 + (x - 112) * 112 / 1218;
 /** the shut line: plan and height (the valley between the bonnet's flank and the wing's crest) */
-const yShut = pc([[300, 700], [500, 705], [1000, 710], [1400, 706], [1500, 698]]), zShut = pc([[300, 698], [400, 741], [500, 784], [700, 840], [1000, 869], [1300, 906], [1500, 928]]);
+const yShut = pc([[308, 700], [500, 705], [1000, 710], [1400, 706], [1500, 698]]), zShut = pc([[308, 706], [400, 743], [500, 784], [700, 840], [1000, 869], [1300, 906], [1500, 928]]);
 /** the wing's crest */
-const yCrest = pc([[330, 726], [500, 740], [1000, 746], [1400, 742], [1500, 737]]), zCrest = pc([[330, 712], [400, 750], [500, 792], [700, 847], [1000, 876], [1300, 913], [1500, 930]]);
+const yCrest = pc([[336, 726], [500, 740], [1000, 746], [1400, 742], [1500, 737]]), zCrest = pc([[336, 714], [400, 750], [500, 792], [700, 847], [1000, 876], [1300, 913], [1500, 930]]);
 /** the shoulder crease's top (the side view's second line) */
 const yShoulder = pc([[372, 762], [500, 783], [700, 792], [1000, 794], [1300, 786], [1500, 762]]), zShoulder = pc([[372, 705], [420, 738], [500, 778], [700, 833], [1000, 862], [1300, 900], [1500, 918]]);
 /** the wing's side half way down */
@@ -71,7 +71,7 @@ const ySide = pc([[432, 798], [520, 832], [620, 852], [800, 862], [1100, 862], [
 /** the rows' places along the centre line, how much of the leading edge's sweep and of the cowl's each keeps */
 const XC = [0, 112, 136, 215, 320, 470, 620, 780, 940, 1090, 1220, 1305, 1330], FL = [0, 1, 1, 0.9, 0.75, 0.5, 0.3, 0.12, 0, 0, 0, 0, 0], FC = [0, 0, 0, 0, 0, 0, 0, 0, 0.1, 0.3, 0.62, 1, 1];
 /** the leading edge's and the cowl's sweep back at the bonnet's columns 0 .. 5 */
-const LEAD = [0, 2, 7, 84, 172, 188], COWL = [0, 60, 72, 110, 167, 170];
+const LEAD = [0, 2, 7, 93, 180, 196], COWL = [0, 60, 72, 110, 167, 170];
 /** the arch's spokes (rows 5 .. 11): angles round the hub, from the rear horizontal over the top */
 const SPOKE = [132, 114, 96, 78, 60, 44, 28], RING_DOWN = [28, 10.6, -6, -17, -28], RING_Y = [890, 886, 876, 864, 850];
 const HUB = { x: DIM.axleF, z: DIM.hubZ }, ring = (deg: number, r: number, y: number): V => [HUB.x + r * Math.cos(deg * Math.PI / 180), y, HUB.z + r * Math.sin(deg * Math.PI / 180)];
@@ -80,7 +80,7 @@ const ringAt = (z: number, r: number) => HUB.x - Math.sqrt(Math.max(0, r * r - (
 
 /** rows 0 and 1 (the lamps' foot and top) and the wing's columns' first rows, placed by hand */
 const FOOT = T(`78 0 592; 82 250 592; 88 330 592; 110 400 592; 135 480 592; 168 560 592; 215 640 592; 262 700 592; 310 745 594; 350 775 596; 385 795 598; 420 808 600`);
-const TOP = T(`112 0 690; 114 283 692; 119 311 693; 196 540 696; 284 680 698; 300 700 698; 330 726 712; 372 762 705; 392 776 698; 432 798 680; 470 815 650; 486 822 606`);
+const TOP = T(`112 0 690; 114 283 692; 119 311 693; 205 540 702; 292 680 706; 308 700 706; 336 726 714; 372 762 705; 392 776 698; 432 798 680; 470 815 650; 486 822 606`);
 /** columns 6 .. 9 at rows 2 .. 4: x alone (their y and z from the curves) */
 const WING_X: number[][] = [[352, 396, 416, 462], [400, 445, 465, 515], [470, 520, 540, 600]];
 /** columns 10 and 11 at rows 2 .. 3 (row 4's are the flare's corner and its ring at the seam) */
@@ -89,7 +89,7 @@ const TIP_LINE = T(`505 829 645; 575 855 636`), SEAM_SIDE = T(`520 838 603; 585 
 const ROW12 = T(`1490 737 930; 1492 762 918; 1490 778 902; 1420 840 815; 1345 870 722`);
 /** the front bumper's outline in plan (its widest line: the ledge's edge and the face) under each of the seam's
  *  points from the third (the first two are on the arch's lip and the flare's ring) */
-const OUTLINE: [number, number][] = [[575, 884], [500, 872], [440, 858], [372, 838], [318, 816], [270, 790], [224, 758], [178, 716], [130, 655], [88, 572], [58, 488], [42, 425], [32, 375], [17, 250], [8, 0]];
+const OUTLINE: [number, number][] = [[575, 885], [505, 876], [442, 866], [375, 850], [318, 830], [266, 806], [218, 776], [170, 735], [124, 675], [84, 590], [58, 500], [46, 445], [36, 400], [17, 250], [8, 0]];
 /** the rear bumper under its upper line (the second cage's: the stub) */
 const BUMPER_R: V[][] = [
   `4035.2 884 420; 4195 826 425; 4385 770 430; 4478 724 480; 4602 550 507; 4609 516 508; 4639 256 510; 4645 0 510`,
@@ -109,7 +109,7 @@ export function buildCageV3(o: V3Opts = {}): Cage959 { const NR = V3.rows, NC = 
     // the bonnet: the raised middle, the ramp, the flat flank down to the shut line
     row[0] = [bx(0), 0, zC(bx(0))]; row[1] = [bx(1), yRise(bx(1)), zC(bx(1)) - 3 * fade]; row[2] = [bx(2), yRise(bx(2)) + 28, zC(bx(2)) - 11 * fade];
     row[5] = [bx(5), yShut(bx(5)), zShut(bx(5))];
-    for (const [j, t] of [[3, 0.5], [4, 1 - 20 / (row[5][1] - row[2][1])]] as const) { const q = lerp(row[2], row[5], t); row[j] = [bx(j), q[1], q[2]]; }
+    for (const [j, t] of [[3, 0.5], [4, 1 - 20 / (row[5]![1] - row[2]![1])]] as const) { const q = lerp(row[2]!, row[5]!, t); row[j] = [bx(j), q[1], q[2]]; }
     if (i === 12) { ROW12.forEach((p, k) => { row[6 + k] = p; }); RING_DOWN.forEach((a, k) => { row[11 + k] = ring(k ? a : 20, V3.ringR + V3.flare, RING_Y[k]! - (k ? 10 : 11)); }); continue; }
     // the lip (column 11) and the flare's ring (column 10); ahead of the arch the seam and the lamp's tip line
     if (i <= 3) { row[10] = TIP_LINE[i - 2]!; row[11] = SEAM_SIDE[i - 2]!; }
@@ -140,7 +140,7 @@ export function buildCageV3(o: V3Opts = {}): Cage959 { const NR = V3.rows, NC = 
 
   // ---- the stub's tail: the wrapped strip under the deck's trailing edge and the rear bumper (the second cage's, with
   //      this cage's three more columns laid between its second and third)
-  const R = NR - 1, wide = (l: V[]): V[] => [...l.slice(0, 2), lerp(l[1]!, l[2]!, 0.15 / 1), lerp(l[1]!, l[2]!, 0.4), lerp(l[1]!, l[2]!, 0.7), ...l.slice(2)];   // [.., the old column 2, three between, the old column 1, 0]
+  const R = NR - 1, wide = (l: V[]): V[] => [...l.slice(0, 2), lerp(l[1]!, l[2]!, 0.15), lerp(l[1]!, l[2]!, 0.4), lerp(l[1]!, l[2]!, 0.7), ...l.slice(2)];   // [.., the old column 2, three between, the old column 1, 0]
   const W: number[][] = old.W.map(l => wide([l[0]!, l[1]!, l[2]!, l[3]!].map(v => old.P[v]!)).map(pt)), K = W[0]!.length;
   const wl = (m: number, k: number) => m === 7 ? M[R]![7 - k]! : k === 0 ? M[R]![m]! : W[m - 8]![k - 1]!;
   for (let k = 0; k < K; k++) for (let m = 7; m < 11; m++) quad(wl(m, k), wl(m, k + 1), wl(m + 1, k + 1), wl(m + 1, k),
@@ -154,18 +154,20 @@ export function buildCageV3(o: V3Opts = {}): Cage959 { const NR = V3.rows, NC = 
   // ---- the front bumper under its seam (from the arch forward along column 11, then row 0 in to the centre line)
   const seamF = [...colPath(11, 1, 5).reverse(), ...rowPath(0, 0, 11).reverse()], NS = seamF.length;
   const O: [number, number][] = [[0, 0], [P[seamF[1]!]![0], P[seamF[1]!]![1]], ...OUTLINE];
-  /** the bumper's lines: how far each stands in from (-) or out of the outline, and its height (null: from the seam's) */
-  const LINES: { out: number; z: number | null; dz?: number }[] = [{ out: NaN, z: null, dz: -2 }, { out: NaN, z: null, dz: -12 }, { out: 0, z: null, dz: -34 }, { out: 0, z: 444 }, { out: -9, z: 424 }, { out: -9, z: 262 }, { out: -9, z: 240 }, { out: -3, z: 232 }, { out: 30, z: 152 }, { out: -30, z: 138 }];
-  const bumper: V[][] = LINES.map((L, m) => seamF.map((v, k) => { const s = P[v]!, z = L.z ?? s[2] + L.dz!, lipOut = L.out === 30 ? (k >= 9 ? 30 : k <= 3 ? 8 : 8 + 22 * (k - 3) / 6) : L.out;
-    if (k < 2) { const r = k ? V3.ringR + V3.flare : V3.ringR, y = (k ? 879 : 890) + (m < 2 ? 0 : lipOut); return [ringAt(z, r), y, z] as V; }
-    const a = O[k - 1]!, b = O[k + 1] ?? [O[k]![0], -O[k - 1]![1]] as [number, number], c = O[k]!, tx = b[0] - a[0], ty = b[1] - a[1], tl = Math.hypot(tx, ty), n: [number, number] = [ty / tl, -tx / tl], sg = n[0] * (c[0] - 2000) + n[1] * c[1] > 0 ? 1 : -1;
-    if (m < 2) { const d = Math.hypot(c[0] - s[0], c[1] - s[1]), t = d < 45 ? (m ? 0.7 : 0.3) : m ? 1 - 18 / d : 12 / d; return [s[0] + (c[0] - s[0]) * t, s[1] + (c[1] - s[1]) * t, z] as V; }
+  /** the bumper's lines: how far each stands in from (-) or out of the outline, and its height (null: from the seam's).
+   *  The first four are the ledge: its inner support, then the edge as a quarter round of 16 mm (top, middle, foot) */
+  const LINES: { out: number; z: number | null; dz?: number }[] = [{ out: NaN, z: null, dz: -2 }, { out: NaN, z: null, dz: -9 }, { out: NaN, z: null, dz: -13.7 }, { out: 0, z: null, dz: -27 },
+    { out: 0, z: 444 }, { out: -9, z: 422 }, { out: -9, z: 275 }, { out: -9, z: 240 }, { out: -3, z: 232 }, { out: 10, z: 152 }, { out: -30, z: 138 }], STEP = 5, FOOT_LINE = 8, LIP_EDGE = 10;
+  const bumper: V[][] = LINES.map((L, m) => seamF.map((v, k) => { const s = P[v]!, z = L.z ?? s[2] + L.dz!, lipOut = L.out === 10 ? (k >= 9 ? 10 : k <= 3 ? 4 : 4 + (k - 3)) : L.out;
+    if (k < 2) { const r = k ? V3.ringR + V3.flare : V3.ringR, y = (k ? 879 : 890) + (m < 3 ? 0 : lipOut); return [ringAt(z, r), y, z] as V; }
+    const a = O[k - 1]!, b = O[k + 1] ?? [O[k - 1]![0], -O[k - 1]![1]] as [number, number], c = O[k]!, tx = b[0] - a[0], ty = b[1] - a[1], tl = Math.hypot(tx, ty), n: [number, number] = [ty / tl, -tx / tl], sg = n[0] * (c[0] - 2000) + n[1] * c[1] > 0 ? 1 : -1;
+    if (m < 3) { const d = Math.hypot(c[0] - s[0], c[1] - s[1]), t = d < 45 ? [0.3, 0.65, 0.88][m]! : [12 / d, 1 - 16 / d, 1 - 4.7 / d][m]!; return [s[0] + (c[0] - s[0]) * t, s[1] + (c[1] - s[1]) * t, z] as V; }
     return [c[0] + n[0] * sg * lipOut, Math.max(0, c[1] + n[1] * sg * lipOut), z] as V; }));
   // its faces: the paint, the two openings' places (the centre intake; the corner pocket of the lamp and the duct), the dark lip
   const bumperTag = (m: number, k: number): Tag => { const kk = NS - 2 - k;   // cells counted from the centre line out
-    if (m >= 7) return { region: 'bumperF', mat: 'dark', panel: 'lipF' };
-    if (m === 5 && kk < 2) return shown({ region: 'bumperF', mat: 'paint', panel: 'bumperF', socket: 'intake', was: 'grille' }, 'grille');
-    if (m === 5 && kk >= 3 && kk < 7) return shown({ region: 'bumperF', mat: 'paint', panel: 'bumperF', socket: 'duct', was: 'grille' }, 'grille');
+    if (m >= FOOT_LINE) return { region: 'bumperF', mat: 'dark', panel: 'lipF' };
+    if (m === STEP + 1 && kk < 2) return shown({ region: 'bumperF', mat: 'paint', panel: 'bumperF', socket: 'intake', was: 'grille' }, 'grille');
+    if (m === STEP + 1 && kk >= 3 && kk < 7) return shown({ region: 'bumperF', mat: 'paint', panel: 'bumperF', socket: 'duct', was: 'grille' }, 'grille');
     return { region: 'bumperF', mat: 'paint', panel: 'bumperF' }; };
   const BF = strip(seamF, bumper, bumperTag, true);
 
@@ -175,7 +177,7 @@ export function buildCageV3(o: V3Opts = {}): Cage959 { const NR = V3.rows, NC = 
   path(rowPath(0, 0, 11), 1, true);                                           // the lamps' foot on the bumper's ledge
   path(rowPath(1, 0, 11), 1, true);                                           // the bonnet's and the wings' leading edge over the lamps
   path(rowPath(12, 0, 5), 1, true);                                           // the cowl
-  path(BF[7]!, 1, true); path(BF[9]!, 1, true);                               // the painted face's foot over the lip, the lip's edge
+  path(BF[FOOT_LINE]!, 1, true); path(BF[LIP_EDGE]!, 1, true); path(colPath(11, 1, 4), 1, true);                               // the painted face's foot over the lip, the lip's edge
   // the stub's (as the second cage's): the screen's foot, the belt and the side glass's top, the windows' edges, the
   // deck's trailing edge, the tail's shelf, the shoulder, the waist, the skirt
   path(rowPath(13, 0, 7), 1, true); path(colPath(8, 13, 23), 1, true); path(colPath(7, 13, 23), 1, true);
@@ -188,7 +190,7 @@ export function buildCageV3(o: V3Opts = {}): Cage959 { const NR = V3.rows, NC = 
     { kind: 'bonnet', name: 'bonnetShut', path: colPath(5, 1, 12) }, { kind: 'bonnet', name: 'bonnetFront', path: rowPath(1, 0, 5) }, { kind: 'bonnet', name: 'bonnetRear', path: rowPath(12, 0, 5) },
     { kind: 'lamp', name: 'lampTop', path: rowPath(1, 5, 11) }, { kind: 'lamp', name: 'grilleSide', path: [M[0]![1]!, M[1]![1]!] }, { kind: 'lamp', name: 'lampInner', path: [M[0]![2]!, M[1]![2]!] },
     { kind: 'crease', name: 'bonnetRise', path: colPath(1, 2, 12), w: 0.6 }, { kind: 'crease', name: 'shoulderF', path: colPath(7, 1, 12), w: 0.6 },
-    { kind: 'crease', name: 'bumperStep', path: [], between: { a: BF[4]!, b: BF[5]!, t: 0.5 }, w: 0.6 }, { kind: 'panel', name: 'lipLine', path: BF[7]! },
+    { kind: 'crease', name: 'bumperStep', path: [], between: { a: BF[STEP]!, b: BF[STEP + 1]!, t: 0.5 }, w: 0.6 }, { kind: 'panel', name: 'lipLine', path: BF[FOOT_LINE]! },
     { kind: 'crease', name: 'archLipF', path: [], between: { a: colPath(11, 5, 11), b: colPath(10, 5, 11), t: 0.9 }, w: 0.6 },
     { kind: 'door', name: 'doorFront', path: rowPath(13, 8, 13) }, { kind: 'door', name: 'doorRear', path: rowPath(20, 8, 13) }, { kind: 'door', name: 'doorFoot', path: colPath(13, 13, 20) }, { kind: 'door', name: 'doorTop', path: colPath(8, 13, 20) },
     { kind: 'panel', name: 'sillLine', path: colPath(14, 12, 22) },
@@ -199,7 +201,7 @@ export function buildCageV3(o: V3Opts = {}): Cage959 { const NR = V3.rows, NC = 
   ];
   const glass = o.glass ?? null, drawn = lines.filter(l => !(!glass && /^(windscreen|sideGlass|rearWindow|bPillar)$/.test(l.name)));
   const loops: Record<string, number[]> = { frontBumper: seamF, rearBumper: seamR, headLamp: [...rowPath(0, 2, 11), ...rowPath(1, 2, 11).reverse()], grille: [...rowPath(0, 0, 1), ...rowPath(1, 0, 1).reverse()],
-    frontBumperFoot: BF[10]!, rearBumperFoot: BR[3]!, frontBumperArch: BF.map(r => r[0]!), rearBumperArch: BR.map(r => r[0]!), sillFoot: colPath(15, 11, 22) };
+    frontBumperFoot: BF[BF.length - 1]!, rearBumperFoot: BR[3]!, frontBumperArch: BF.map(r => r[0]!), rearBumperArch: BR.map(r => r[0]!), sillFoot: colPath(15, 11, 22) };
 
   // ---- the other half
   const n = P.length, mirror: number[] = []; for (let v = 0; v < n; v++) mirror.push(Math.abs(P[v]![1]) < 1e-6 ? v : pt([P[v]![0], -P[v]![1], P[v]![2]]));

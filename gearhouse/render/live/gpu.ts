@@ -6,6 +6,7 @@ import { surfaceNormals, hullNormals, hardEdgeLines } from '../car/edges';
 import { outlineShare, autoAtlasUV } from './style';
 import { boneAt, type SuspRig } from '../car/suspension';
 import type { EngineRig } from '../car/powertrain/internals';
+import type { DialRig } from '../car/interior/gauges';
 
 export type M4 = Float32Array;
 export const m4 = (): M4 => { const m = new Float32Array(16); m[0] = m[5] = m[10] = m[15] = 1; return m; };

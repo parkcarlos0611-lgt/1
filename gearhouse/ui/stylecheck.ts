@@ -14,6 +14,7 @@ import { STYLE, screenPx } from '../render/live/style';
 import { hardEdgeLines } from '../render/car/edges';
 import type { Mesh } from '../render/car/mesh';
 import type { GpuMesh } from '../render/live/gpu';
+import { dialState, stepDials, type DialState } from '../render/car/interior/gauges';
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T, Q = new URLSearchParams(location.search);
 const cv = $<HTMLCanvasElement>('cv');
@@ -25,7 +26,9 @@ let L: LiveRenderer | null = null, g: GpuMesh | null = null, M: Mesh | null = nu
 try { L = new LiveRenderer(cv); L.setGround(studioFloor()); L.setTrack(1, 30, 12, 0); void loadSky(L).then(() => { dirty = true; }).catch(e => console.warn('sky', e)); }
 catch (e) { $('stat').textContent = `이 기기에서 WebGL2를 쓸 수 없다: ${String(e)}`; }
 const pick = $<HTMLSelectElement>('car'); for (const c of STYLE_CARS) pick.add(new Option(c.name, c.id)); pick.value = st.car;
-function useCar(id: string) { const c = STYLE_CARS.find(k => k.id === id) ?? STYLE_CARS[0]!; st.car = c.id; setPartStyle(styleForLook(st.look)); M = c.mesh(); if (L) g = L.car(M); lineN = M.lines?.length ?? hardEdgeLines(M).length; dirty = true; }
+// an interior's instruments: ?rpm=5200&kmh=140&boost=0.8 for a still; while the table turns the engine is run up and down
+let dials: DialState | null = null, clock = 0; const Qn = (k: string) => Q.has(k) ? +Q.get(k)! : undefined;
+function useCar(id: string) { const c = STYLE_CARS.find(k => k.id === id) ?? STYLE_CARS[0]!; st.car = c.id; setPartStyle(styleForLook(st.look)); M = c.mesh(); if (L) g = L.car(M); dials = M.dials ? dialState(M.dials) : null; lineN = M.lines?.length ?? hardEdgeLines(M).length; dirty = true; }
 pick.addEventListener('change', () => useCar(pick.value));
 // ---- the switches ----
 const check = (id: string, key: 'outline' | 'lines' | 'post' | 'atlas' | 'spin' | 'persp') => { const el = $<HTMLInputElement>(id); el.checked = st[key]; el.addEventListener('change', () => { st[key] = el.checked; dirty = true; }); };
@@ -45,6 +48,8 @@ cv.addEventListener('wheel', e => { e.preventDefault(); st.zoom = Math.max(0.5, 
 addEventListener('resize', () => { dirty = true; });
 function frame(now: number) { const dt = Math.min(0.1, (now - last) / 1000); last = now;
   if (st.spin) { st.yaw = (st.yaw + dt * 18) % 360; dirty = true; }
+  if (dials && M?.dials) { clock += dt; const run = st.spin ? 0.5 - 0.5 * Math.cos(clock * 0.9) : 0, on = st.spin || Q.has('rpm');
+    stepDials(dials, M.dials, { on, rpm: Qn('rpm') ?? 900 + 6200 * run, kmh: Qn('kmh') ?? 300 * run * run, boost: Qn('boost') ?? Math.max(0, run - 0.45) * 1.8, fuel: 0.7 }, st.spin ? dt : 100); }
   if (dirty && L && g && M) { dirty = false; const dpr = Math.min(2, devicePixelRatio || 1), W = Math.max(64, Math.min(2560, Math.round(cv.clientWidth * dpr))), H = Math.max(64, Math.min(1600, Math.round(cv.clientHeight * dpr)));
     if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
     const len = M.length / 1000, ang = -0.9, pitch = st.pitch, t0 = performance.now(), az = st.az * Math.PI / 180, el = st.el * Math.PI / 180;
@@ -53,7 +58,7 @@ function frame(now: number) { const dt = Math.min(0.1, (now - last) / 1000); las
     const eye: [number, number, number] = [-Math.cos(ang) * cp * dist, -Math.sin(ang) * cp * dist, tz + sp * dist];
     const mm = Math.max(len * 1000 * 1.3 / W, len * 1000 * 0.62 / H) / st.zoom;
     L.render({ x: 0, y: 0, z: tz, ang, pitch, mm, W, H, cy: 0.55, ...(st.persp ? { eye, fov, near: 0.2 } : {}) },
-      [{ g, x: 0, y: 0, z: -0.015, yaw: st.yaw * Math.PI / 180, roll: 0, pitch: 0, steerL: 0.14, steerR: 0.12, spin: 0, player: true }], [], [],
+      [{ g, x: 0, y: 0, z: -0.015, yaw: st.yaw * Math.PI / 180, roll: 0, pitch: 0, steerL: 0.14, steerR: 0.12, spin: 0, player: true, dials: dials?.v }], [], [],
       { look: st.look, glass: 0.8, rays: st.look !== 4, bloomK: st.look === 2 ? 1 : 0, dof: 0, art: false, outW: st.look === 2 ? 0.5 : 1, outK: st.look === 2 ? 0.6 : 1, sun: [Math.cos(el) * Math.cos(az), Math.cos(el) * Math.sin(az), Math.sin(el)],
         style: { outline: st.outline, lines: st.lines, post: st.post, atlas: st.atlas, outPx: st.outPx, linePx: st.linePx, dpr } });
     frames++; $('stat').textContent = `${M.n.toLocaleString()} 삼각형 · 선 ${lineN}개${M.lines?.length ? ' (모델에 표시한 선)' : ' (각진 모서리에서 찾은 선)'} · ${W}×${H} · 외곽선 ${screenPx(st.outPx, H, dpr).toFixed(1)} px, 선 ${screenPx(st.linePx, H, dpr).toFixed(1)} px · ${Math.round(performance.now() - t0)} ms`; }

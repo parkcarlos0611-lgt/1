@@ -57,7 +57,7 @@ export function dash(b: InteriorBuild, A: CabinAnchors, T: Trim, faces: GaugeFac
   b.part('gaugePanel', T.plastic, 0.1).fan([26, 0, -30], hr(26, 0.925), [1, 0, 0]);
   const ys = [216, 120, 0, -122, -224], zs = [-46, -44, -30, -42, -46], dials: DialBone[] = []; let bone = 0;
   faces.forEach((F, i) => { const y = ys[i]!, z = zs[i]!, seg = F.R > 58 ? 16 : 14, c: V = [26, y, z];
-    b.onBone(0).part(`gaugeBezel${i}`, '#19191b', 0.6, 'metal').turn(c, [1, 0, 0], [[0, F.R + 7], [12, F.R + 4], [3, F.R]], seg, { loop: true });
+    b.onBone(0).part(`gaugeBezel${i}`, '#222225', 0.3).turn(c, [1, 0, 0], [[0, F.R + 7], [12, F.R + 4], [3, F.R]], seg, { loop: true });
     b.part(`gaugeFace${i}`, '#0c0c0e', 0.3).fan([29, y, z], ring([29, y, z], [0, 1, 0], [0, 0, 1], F.R, seg), [1, 0, 0]).paint(F.region, [29, y, z], R, Uz, F.R * 2 / 0.985, F.R * 2 / 0.985);
     for (const sc of F.scales) { bone++; const pv: V = [33, y - sc.c[0] * F.R, z + sc.c[1] * F.R], a = sc.a0 * RAD, d: V = [0, -Math.sin(a), Math.cos(a)], q: V = [0, -Math.cos(a), -Math.sin(a)], L = sc.r * F.R * 0.96, w = sc.r < 0.5 ? 2.6 : 4.2, hub = F.R * (sc.r < 0.5 ? 0.055 : 0.105);
       b.onBone(bone).part(`gaugeNeedle_${sc.id}`, '#f24a12', 0.3).panel([[add(pv, add(mul(d, -L * 0.16), mul(q, w / 2))), add(pv, add(mul(d, L), mul(q, 0.8)))], [add(pv, add(mul(d, -L * 0.16), mul(q, -w / 2))), add(pv, add(mul(d, L), mul(q, -0.8)))]], [1, 0, 0]);

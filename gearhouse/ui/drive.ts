@@ -36,6 +36,7 @@ import artDueA from '../assets/art/dueA21.png'; import artSSJ from '../assets/ar
 import artPlym from '../assets/art/plymU29.png'; import artPont from '../assets/art/pontiac29.png'; import artWillys from '../assets/art/willys27.png';
 import { MESH_CARS } from '../render/car/meshcars';
 import { Driver } from '../race/driver';
+import { Collider } from '../race/collide';
 import { Race, lapTimes, bestOf, bookFor, type Entrant, type Skill } from '../race/race';
 import { Health, WARN } from '../race/health';
 import { Sound, designVoice, type Skid, type EngineVoiceSpec } from './sound';
@@ -105,7 +106,7 @@ let wheelHeld = false, wheelSteer = 0;
 const skids: { x: number; y: number; z: number; a: number }[] = [], puffs: { x: number; y: number; z: number; r: number; a: number; vx: number; vy: number }[] = [];
 let lapStart = -1, lastLap = 0, bestLap = 0, clock = 0, prevS = 0, msg = '', msgT = 0;
 // a race: the entrants and their pictures (the player's car is `car`, its pictures `sprites`)
-let SCN: Scenery = TD.scenery(T); const propSprites = new Map<string, PropSprites>(); const train = { d: -1, wait: 40 };
+let SCN: Scenery = TD.scenery(T), COL = Collider.of(T, SCN);   /* the edge's barriers and the woods' trunks, struck (docs/systems/111 T3) */ const propSprites = new Map<string, PropSprites>(); const train = { d: -1, wait: 40 };
 const propPic = (kind: string, arg?: number) => { const key = arg ? `${kind}@${arg}` : kind; let p = propSprites.get(key); if (!p) { const f = PROPS[kind]; if (!f) return null; p = new PropSprites(f(arg), mm, pitchDeg); propSprites.set(key, p); } return p; };
 let race: Race | null = null; const others = new Map<Entrant, CarSprites>(); let raceSeed = 7;
 // race numbers (review 96): the player's from the page, the others' 1, 2, 3... by the entry list, skipping the player's;
@@ -116,7 +117,7 @@ const numOf = (e: Entrant): string => { if (!race) return myNum; let k = 0; for 
 // ---- the live renderer (review 99): the scene drawn every frame by WebGL2, where the browser has it; the baked pictures otherwise ----
 const glCanvas = H.renderer?.canvas ?? document.createElement('canvas'); let live: LiveRenderer | null = null, liveFence = -1;
 /** where the photographed props (drums, tyres, tables) stand at this track's pits */
-const propPlaces = (): PropPlace[] => { const W2 = T.spec.width / 2; return TD.id === 'millbrook' ? paddockProps() : TD.id === 'road' ? pitProps(1938, { s0: START - 200, n: 8, off: W2 + 30 }, { s: START - 215, off: W2 + 12 }, { s: START, off: W2 + 4 }) : pitProps(1991, { s0: START - 120, n: 4, off: W2 + 30 }, { s: START - 140, off: W2 + 12 }, { s: START, off: W2 + 4 }); };
+const propPlaces = (): PropPlace[] => { const W2 = T.spec.width / 2; if (SCN.edge) return []; /* docs/systems/111 T1: the pits' things gone with the pits */ return TD.id === 'millbrook' ? paddockProps() : TD.id === 'road' ? pitProps(1938, { s0: START - 200, n: 8, off: W2 + 30 }, { s: START - 215, off: W2 + 12 }, { s: START, off: W2 + 4 }) : pitProps(1991, { s0: START - 120, n: 4, off: W2 + 30 }, { s: START - 140, off: W2 + 12 }, { s: START, off: W2 + 4 }); };
 let propBase: Record<string, { min: number[]; max: number[] }> | null = null;
 const loads: Promise<unknown>[] = [];   // the track's materials and props, for a host waiting on them
 try { live = H.renderer ?? new LiveRenderer(glCanvas); live.setGround(groundData(T, SCN, START, TD.groundStep)); live.setTrack(T.length, T.spec.width, T.spec.joints, START, rubberLine(T)); const L0 = live; loads.push(loadGround(L0, matchMedia('(pointer: coarse)').matches ? 512 : 1024).catch(e => console.warn('ground materials', e))); if (!H.renderer) void loadSky(L0).catch(e => console.warn('sky', e)); loads.push(loadProps(L0, () => ({ T, places: propPlaces() })).then(b => { propBase = b; }).catch(e => console.warn('props', e))); loads.push(loadBuildings(L0).catch(e => console.warn('building materials', e))); } catch (e) { console.warn('live renderer unavailable', e); live = null; }
@@ -216,7 +217,7 @@ function drawLive(el: number) { const L = live!; void el;
   if (car.speed > 30) { const v = Math.min(1, (car.speed - 30) / 30) * 0.35, g = main.createRadialGradient(VW / 2, VH / 2, VH * 0.35, VW / 2, VH / 2, VW * 0.62); g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, `rgba(0,0,0,${v})`); main.fillStyle = g; main.fillRect(0, 0, VW, VH); } }
 
 function choose(id: string) { carId = id; dcam.reset(); propSprites.clear(); broken.clear(); debris.length = 0; debris3.pieces.length = 0; fenceGpu.clear(); const spec = raceSpec(id), m = MESH_CARS.find(c => c.id === id)!;
-  car = new Vehicle(spec, T); car.auto = st.auto; car.place(START + 30, 0, 0); manualGear = 1; ignite(false);
+  car = COL.equip(new Vehicle(spec, T)); car.auto = st.auto; car.place(START + 30, 0, 0); manualGear = 1; ignite(false);
   sprites = new CarSprites(meshOf(id, myNum), mm, pitchDeg, spec.steerLock * Math.PI / 180, { outline: 3, glass: 0.8 }, matchMedia('(pointer: coarse)').matches ? 1200 : 2400); sprites.prepare([0]); (live ? 0 : sprites.work(500)); sprites.prepare([-1, 1, -2, 2, -3, -4, -5]); camAng = car.yaw;
   car.damperMode = $<HTMLSelectElement>('damper').value as 'sport' | 'comfort'; pilot = new Driver(T); lapStart = -1; lastLap = 0; bestLap = 0; skids.length = 0; puffs.length = 0; say(`${spec.name} · 출발선 뒤에서 시작${car.engine.fuelled ? '' : ' · 시동: I/Enter 길게 (화면 버튼: 시동)'}`); }
 /** the player's car's ignition (docs/systems/110 G1, race/ignition.ts): off on a practice run in the direct mode, running in a race and in the automatic mode */
@@ -335,8 +336,8 @@ function skidOf(c: Vehicle, i: number): Skid { if (c.airborne[i] || c.onGrass[i]
   return { amount: a, kind: sx < -0.3 ? 'lock' : sx > 0.3 ? 'spin' : 'side', load: Math.min(1.5, c.load[i]! / (c.spec.mass * 9.81 / 4)) }; }
 let markTick = 0;
 function marks(c: Vehicle) { markTick++; for (let i = 0; i < 4; i++) { const k = skidOf(c, i), sl = 1 + k.amount * 0.6;
-    if (c.onGrass[i] && c.speed > 4 && markTick % 2 === 0 && Math.random() < Math.min(0.5, c.speed / 60)) { const [px, py] = c.wheelAt(i), cy = Math.cos(c.yaw), sy2 = Math.sin(c.yaw), x = c.x + px * cy - py * sy2, y = c.y + px * sy2 + py * cy;
-      smoke.emit('dust', x, y, 0.2, -cy * 1.5 + (Math.random() - 0.5) * 2, -sy2 * 1.5 + (Math.random() - 0.5) * 2, 1.2, Math.min(1, c.speed / 25), 0); }   /* dust thrown up off the grass */
+    const trap = (c.offSurf[i]?.drag ?? 0) > 0; if (c.onGrass[i] && c.speed > (trap ? 2 : 4) && markTick % 2 === 0 && Math.random() < Math.min(trap ? 0.9 : 0.5, c.speed / (trap ? 20 : 60))) { const [px, py] = c.wheelAt(i), cy = Math.cos(c.yaw), sy2 = Math.sin(c.yaw), x = c.x + px * cy - py * sy2, y = c.y + px * sy2 + py * cy;
+      smoke.emit('dust', x, y, 0.2, -cy * 1.5 + (Math.random() - 0.5) * 2, -sy2 * 1.5 + (Math.random() - 0.5) * 2, trap ? 2 : 1.2, Math.min(1, c.speed / (trap ? 12 : 25)), 0); }   /* dust thrown up off the grass, a cloud of it out of a gravel trap */
     if (k.amount <= 0 || markTick % 2) continue;
     const [px, py] = c.wheelAt(i), cy = Math.cos(c.yaw), sy2 = Math.sin(c.yaw), x = c.x + px * cy - py * sy2, y = c.y + px * sy2 + py * cy, q = T.locate(x, y, c.s), z = T.height(q.s, q.off);
     if (Math.random() < 0.22 * k.amount) { const vx = c.vx * Math.cos(c.yaw) * 0.25, vy = c.vx * Math.sin(c.yaw) * 0.25; smoke.emit('tyre', x, y, z + 0.15, vx + (Math.random() - 0.5), vy + (Math.random() - 0.5), 0.6, k.amount, z); }   /* the live picture's tyre smoke */
@@ -389,7 +390,7 @@ function bend(c: Vehicle, base: Mesh, L: LiveRenderer) { let e = dmg.get(c);
 // ---- the fence: a car that reaches it smashes a few metres of it into flying pieces ----
 const debris3 = new Debris(), dirtyChunks = new Set<string>(), fenceGpu = new Map<string, { g: ReturnType<LiveRenderer['car']>; m: Float32Array; x: number; y: number } | null>();   /* the fence as solid things, its pieces as bodies (review 112) */
 const broken = new Set<string>(), debris: { x: number; y: number; z: number; vx: number; vy: number; vz: number; a: number; va: number; len: number; col: string; life: number }[] = [];
-let FENCE = T.spec.width / 2 + 1.5; const fenceOk = (side: number, m: number) => !broken.has(`${side}:${((m % Math.round(T.length)) + Math.round(T.length)) % Math.round(T.length)}`);
+let FENCE = T.spec.width / 2 + 1.5; const fenceOk = (side: number, m: number) => !SCN.edge && !broken.has(`${side}:${((m % Math.round(T.length)) + Math.round(T.length)) % Math.round(T.length)}`);
 function fence(c: Vehicle) { const side = Math.sign(c.off), reach = Math.abs(c.off) + c.spec.track / 2 + 0.3; if (reach < FENCE || Math.abs(c.off) > FENCE + 3) return; const m = Math.floor(c.s); if (!fenceOk(side, m)) return;
   const sp = Math.hypot(c.vx, c.vy); if (sp < 2) return;
   for (let k = -2; k <= 3; k++) broken.add(`${side}:${((m + k) % Math.round(T.length) + Math.round(T.length)) % Math.round(T.length)}`);
@@ -403,6 +404,9 @@ function fence(c: Vehicle) { const side = Math.sign(c.off), reach = Math.abs(c.o
   c.vx *= 0.86; c.vy *= 0.9; c.r += (Math.random() - 0.5) * 0.4;   // the blow costs speed and turns the car a little
   { const h = T.at(c.s).h, into: [number, number, number] = [Math.sin(h) * side, -Math.cos(h) * side, 0], at = c.toWorld([0.3, side * c.box.hw * Math.sign(Math.cos(c.yaw - h) || 1), 0.1]); c.blow(at, into, Math.min(25000, 0.5 * c.spec.mass * sp * sp * 0.03), 0.6); }   /* the rails and posts dent its flank (review 121) */
   if (c === car) { snd?.crash(Math.min(1.3, sp / 20)); shake = 4; } else { const d = Math.hypot(c.x - car.x, c.y - car.y); if (d < 120) snd?.crash(Math.min(1, sp / 20) / (1 + (d / 25) ** 2)); } }
+/** a blow against a barrier or a tree (race/collide.ts): the crash heard, the picture shaken */
+function hits() { COL.onHit = (c, h) => { const k = Math.min(1.3, Math.sqrt(h.E / 4e4)) * (h.mat === 'tyres' ? 0.6 : 1); if (c === car) { snd?.crash(k); shake = 4 * k; } else { const d = Math.hypot(c.x - car.x, c.y - car.y); if (d < 120) snd?.crash(k / (1 + (d / 25) ** 2)); } }; }
+hits();
 function stepDebris3(el: number) { const cs = (race ? race.cars.map(e => e.car) : [car]).map(c => ({ x: c.x, y: c.y, vx: c.vx * Math.cos(c.yaw) - c.vy * Math.sin(c.yaw), vy: c.vx * Math.sin(c.yaw) + c.vy * Math.cos(c.yaw), r: c.spec.wheelbase * 0.7 }));
   debris3.step(Math.min(0.05, el), (x, y) => { const q = T.locate(x, y, car.s); return Math.abs(q.off) < T.spec.width / 2 ? T.height(q.s, q.off) : 0; }, cs); }
 function drawDebris(el: number) { stepDebris3(el); if (!live) for (const d of debris3.pieces) { const L2 = (d.kind === 'rail' ? d.len : 1) / 2, ex = Math.cos(d.yaw) * Math.cos(d.pitch) * L2, ey = Math.sin(d.yaw) * Math.cos(d.pitch) * L2, ez = (d.kind === 'post' ? Math.cos(d.pitch) : Math.sin(d.pitch)) * L2;
@@ -506,7 +510,7 @@ function opponents(seed: number): { ids: string[]; note: string } { const n = +$
   return { ids: out, note: how === 'pick' ? '고른 차가 없어 1930년대 차로 채웠습니다' : want < n ? `이 구성에는 ${want}대뿐입니다` : '' }; }
 function startRace() { const laps = +$<HTMLSelectElement>('laps').value; raceSeed = (raceSeed * 48271) % 2147483647;
   const { ids: pick, note } = opponents(raceSeed), skill = $<HTMLSelectElement>('skill').value as Skill;
-  const mode = handicapOK() ? $<HTMLSelectElement>('mode').value as 'handicap' | 'scratch' : 'scratch'; race = new Race(T, [carId, ...pick], laps, carId, raceSeed, mode, skill); const me = race.player!; car = me.car; car.auto = st.auto; ignite(true); manualGear = 1; pilot = new Driver(T);
+  const mode = handicapOK() ? $<HTMLSelectElement>('mode').value as 'handicap' | 'scratch' : 'scratch'; race = new Race(T, [carId, ...pick], laps, carId, raceSeed, mode, skill); for (const e of race.cars) COL.equip(e.car); const me = race.player!; car = me.car; car.auto = st.auto; ignite(true); manualGear = 1; pilot = new Driver(T);
   seenLaps = 0; boardTick = 0; $('resmodal').hidden = true; $('results').innerHTML = ''; raceOverlay();
   others.clear(); const small = matchMedia('(pointer: coarse)').matches;
   for (const e of race.cars) if (e.driver) { const sp = new CarSprites(meshOf(e.id, numOf(e)), mm, pitchDeg, e.car.spec.steerLock * Math.PI / 180, { outline: 3, glass: 0.8 }, small ? 400 : 900); sp.prepare([0]); others.set(e, sp); }
@@ -671,7 +675,7 @@ const TRACK_NOTE: Record<string, string> = { millbrook: '1907년 콘크리트 �
 function showTrack() { const name = TD.label.replace(/\s*\(.*$/, ''); $('title').textContent = `${name} 시험 주행`; document.title = `${name} 시험 주행`; $('tracknote').textContent = TRACK_NOTE[TD.id] ?? '';
   $('surfaceBox').hidden = !T.spec.bumps.length; const ok = handicapOK(), mode = $<HTMLSelectElement>('mode'); (mode.options[0] as HTMLOptionElement).disabled = !ok; if (!ok) mode.value = 'scratch'; }
 function useTrack(id: string) { if (race) { race = null; others.clear(); $('board').innerHTML = ''; $('raceovl').hidden = true; $('resmodal').hidden = true; $('race').textContent = '레이스 시작'; }
-  TD = trackDef(id); T = TD.make(); T.bumpK = $<HTMLSelectElement>('surface').value === 'smooth' ? 0 : 1; START = startOf(T); SCN = TD.scenery(T); CAMS = cameras(); FENCE = T.spec.width / 2 + 1.5; miniBox();
+  TD = trackDef(id); T = TD.make(); T.bumpK = $<HTMLSelectElement>('surface').value === 'smooth' ? 0 : 1; START = startOf(T); SCN = TD.scenery(T); COL = Collider.of(T, SCN); hits(); COL.equip(car); CAMS = cameras(); FENCE = T.spec.width / 2 + 1.5; miniBox();
   broken.clear(); dirtyChunks.clear(); fenceGpu.clear(); debris.length = 0; debris3.pieces.length = 0; skids.length = 0; puffs.length = 0; train.d = -1; train.wait = 40; shot.until = 0;
   if (liveR) { const t0 = performance.now(), g = groundData(T, SCN, START, TD.groundStep); liveR.setGround(g); liveR.setTrack(T.length, T.spec.width, T.spec.joints, START, rubberLine(T)); if (propBase) placeProps(liveR, T, propPlaces(), propBase); console.info(`track ${TD.id}: ${T.length} m, ground ${g.n} vertices, ${Math.round(performance.now() - t0)} ms`); }
   try { localStorage.setItem(TRACK_KEY, TD.id); } catch { /* not kept */ }

@@ -4,6 +4,7 @@
 // World axes, metres. Every vertex: position, colour, and a flag (1: grass, given a fine speckle by the shader).
 import type { Track } from '../../race/track';
 import type { Scenery } from '../../race/scenery';
+import { edgeAt } from '../../race/trackside';
 
 /** trk (review 122): each vertex's place on the track (distance along, offset across, m) and what it is (1 the concrete), for the shader's concrete */
 export interface GroundData { pos: Float32Array; col: Uint8Array; flag: Float32Array; n: number; trk?: Float32Array;
@@ -16,6 +17,7 @@ class Tris { P: number[] = []; C: number[] = []; F: number[] = []; K: number[] =
   quad(a: number[], b: number[], c: number[], d: number[], col: number[], flag = 0, t?: number[][]) { this.tri(a, b, c, col, flag, t && [t[0]!, t[1]!, t[2]!]); this.tri(a, c, d, col, flag, t && [t[0]!, t[2]!, t[3]!]); }
   done(): GroundData { return { pos: new Float32Array(this.P), col: new Uint8Array(this.C), flag: new Float32Array(this.F), n: this.P.length / 3, trk: new Float32Array(this.K) }; } }
 const hex = (h: string) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+const KERB_R = hex('#c8302e'), KERB_W = hex('#ecebe6'), PAINT = hex('#4d7f8c'), GRAVEL = hex('#c9b994');
 
 /** a polygon cut into triangles (ear clipping; the scenery's areas are simple outlines) */
 function earcut(pts: [number, number][]): [number, number, number][] { const idx = pts.map((_, i) => i), out: [number, number, number][] = [];
@@ -67,6 +69,15 @@ export function groundData(T: Track, S: Scenery, start: number, maxStep = 1): Gr
       g.quad([a.x, a.y, a.z], [b.x, b.y, b.z], [fb.x, fb.y, -0.025], [fa.x, fa.y, -0.025], hex('#4c6340'), 1, [[s, out * W2, 2], [s1, out * W2, 2], [s1, out * rb, 2], [s, out * ra, 2]]); }   /* the earth bank, its top a verge too (review 125) */
     // the verge (review 125): a strip of worn earth and gravel along the concrete's edge, a few centimetres below it,
     // grass coming back over it outward, the shader laying it by its distance from the edge
+    // the real circuit's edge (docs/systems/111): kerbs red and white in 2 m blocks, the painted run-off, a gravel trap;
+    // the grass strip is the fields' own (the verge's worn earth gone with the old fence)
+    if (S.edge) { for (const side of [-1, 1]) { const ea = edgeAt(S.edge, s, side), eb = edgeAt(S.edge, s1 - 0.01, side); if (ea.banked) continue;
+        const strip = (oa0: number, oa1: number, ob0: number, ob1: number, col: number[], dz: number, grass = 0) => { if (oa1 - oa0 < 0.01 && ob1 - ob0 < 0.01) return; const z = (q: number, o: number) => T.ground(q, side * o) + dz, A = T.point(s, side * oa0), B = T.point(s1, side * ob0), C = T.point(s1, side * ob1), D = T.point(s, side * oa1);
+          g.quad([A.x, A.y, z(s, oa0)], [B.x, B.y, z(s1, ob0)], [C.x, C.y, z(s1, ob1)], [D.x, D.y, z(s, oa1)], col, grass); };
+        strip(W2, ea.kerb, W2, eb.kerb, Math.floor(s / 2) % 2 ? KERB_R : KERB_W, -0.003);
+        strip(ea.kerb, ea.paint, eb.kerb, eb.paint, PAINT, -0.006);
+        if (ea.trap === 'gravel') strip(ea.paint, ea.trapOut + 0.3, eb.paint, eb.trap === 'gravel' ? eb.trapOut + 0.3 : eb.paint, GRAVEL, -0.01); }
+      continue; }
     for (const side of [-1, 1]) { if (bank && side === out) continue; const o0 = side * W2, o1 = side * (W2 + 2.2), e0 = T.height(s, o0), e1 = T.height(s1, o0);
       const A = T.point(s, o0), B = T.point(s1, o0), C = T.point(s1, o1), D = T.point(s, o1), m = [A.x + (D.x - A.x) * 0.2, A.y + (D.y - A.y) * 0.2], n2 = [B.x + (C.x - B.x) * 0.2, B.y + (C.y - B.y) * 0.2];
       const zo = (e: number) => Math.min(e - 0.035, -0.012), zm = (e: number) => e - 0.03;

@@ -12,10 +12,6 @@
 //   marker     a small side marker lamp: an amber lens in a dark bezel, every point laid on the skin
 //   vent       a stick-on vent: a raised rim in body colour round a dark floor with bars, every point on the skin
 //   louvre     a stick-on louvre panel: a dark frame and slats raised toward its top edge (on a bonnet: the rear)
-//   wingN33    (docs/systems/117 R3) a GT wing on two swept stays at its ends with end plates, its blade's angle set
-//   lipF       a front lip: a dark wedge laid along the bumper's foot round its corners (the tail lamp band's fan of rays)
-//   garnish    the rear garnish band: a thin plate laid across the tail round its corners, smoked at its ends
-//   exhaustBig1/2  a big oval tip, or a big body holding two round tips
 // Each fit also keeps what P3 will read (the kind, the place, the frontal and plan areas, a wing's span and chord and
 // angle, a mass): the figures are not in the physics yet.
 import { Build, KINDS, type Kind, type Mesh, type V } from '../mesh';
@@ -23,7 +19,7 @@ import { partFrame, framePt, probe, rectPoints, footprintsMeet, vdot, vsub, vmad
 import { PART_KINDS, placedKey, isPlate, isHole, type Placed, type FreeId, type SurfId, type HoleId, type PartKind } from '../../../core/placed';
 import { CREST_BOX, CREST_OUTLINE, CREST_COLOURS } from '../../live/crest.gen';
 import type { CrestFrame } from '../p959/badge';
-import { fitHoleAt, rayAt, dirAt, type HoleFit, type Proj } from './holes';
+import { fitHoleAt, type HoleFit } from './holes';
 
 /** what P3 will read of a fitted part (docs/systems/115 §5-7): its kind, its centre (the car's axes, mm; a pair's on the
  *  centre line), how many (a pair 2), the area it shows to the air ahead and from above (m², both together), a wing's
@@ -75,7 +71,6 @@ function faceRule(id: FreeId, n: V): string | null {
     case 'wing': return n[2] < 0.5 ? '위를 보는 면(트렁크·덮개·지붕)에만 붙일 수 있습니다' : null;
     case 'exhaust': return n[0] < 0.35 ? '뒤를 보는 면에만 붙일 수 있습니다' : null;
     case 'marker': return Math.abs(n[2]) > 0.75 ? '옆·앞·뒤를 보는 면에만 붙일 수 있습니다' : null;
-    case 'trim': return id === 'lipF' ? (n[0] > -0.35 ? '앞을 보는 면(앞 범퍼)에만 붙일 수 있습니다' : null) : n[0] < 0.35 ? '뒤를 보는 면에만 붙일 수 있습니다' : null;
     default: return null; } }
 /** a frame mirrored across the centre line */
 const mirrorV = (a: V): V => [a[0], -a[1], a[2]];
@@ -94,19 +89,18 @@ export function fitAt(skin: Skin, pt: SkinPoint, p: Placed, others: readonly Foo
   const F = partFrame(pt.p, pt.n, K.group === 'wing' ? 0 : p.rot, K.group === 'wing' || K.group === 'exhaust' || K.group === 'mirror' ? 0 : p.tilt);
   const twin = K.pair && !p.one && Math.abs(pt.p[1]) > 2;
   let why = faceRule(id, pt.n), crest: CrestFrame | undefined, hw = size / 2, hh = size / 2, extra: string | null = null, wing: PartFigures['wing'];
-  const S = surface(skin, F), dark = K.group === 'exhaust', tags: SkinTag[] = [];
+  const S = surface(skin, F), dark = K.group === 'exhaust';
   switch (K.group) {
     case 'marker': { hh = size * 0.21; extra = marker(b, S, hw, hh, depth); break; }
     case 'vent': { if (id === 'vent') { hh = size * 0.18; vent(b, S, hw, hh, depth); } else { hh = size * 0.35; louvre(b, S, hw, hh, depth); } break; }
     case 'badge': { hh = size / 2; hw = hh * CREST_BOX[2] / CREST_BOX[3]; const r = crestOn(b, S, F, size, depth); crest = r.frame; if (r.gap > 10) extra = `면이 너무 굽었습니다 (틈 ${Math.round(r.gap)} mm, 최대 10 mm)`; break; }
-    case 'exhaust': { const r = size / 2, two = id === 'exhaust2' || id === 'exhaustBig2', big = id === 'exhaustBig1' || id === 'exhaustBig2'; hw = two ? r * 2.2 : big ? r * 1.15 : r; hh = r; extra = big ? bigTip(b, skin, F, r, two, depth, p.rot, p.tilt) : exhaust(b, skin, F, r, two, depth, p.rot, p.tilt); break; }
+    case 'exhaust': { const r = size / 2, two = id === 'exhaust2'; hw = two ? r * 2.2 : r; hh = r; extra = exhaust(b, skin, F, r, two, depth, p.rot, p.tilt); break; }
     case 'mirror': { const k = p.scale; hw = 30 * k; hh = 22 * k; extra = mirror(b, skin, S, F, k, depth, p.rot, p.tilt); break; }
-    case 'trim': { const r = bandOn(b, skin, F, K, p.scale, depth, id === 'lipF'); hw = r.hw; hh = r.hh; extra = r.why; tags.push(...r.tags); break; }
-    case 'wing': { const r = id === 'wingRing' ? ringWing(b, skin, pt, size, depth, p.tilt) : wingOn(b, skin, pt, id === 'wingN33', size, depth, p.tilt); hw = size / 2; hh = r.chord / 2; extra = r.why; wing = { span: size, chord: r.chord, aoa: p.tilt, height: depth }; break; } }
+    case 'wing': { const r = wingOn(b, skin, pt, id === 'wingRing', size, depth, p.tilt); hw = size / 2; hh = r.chord / 2; extra = r.why; wing = { span: size, chord: r.chord, aoa: p.tilt, height: depth }; break; } }
   // the rules: the face's way, on the body, not on glass, a lamp or an arch, its own rule; not across the line from its twin
-  const own = K.group === 'wing' || K.group === 'exhaust' || K.group === 'mirror' || K.group === 'trim', pts = rectPoints(hw * 0.92, hh * 0.92, Math.max(15, Math.min(hw, hh) / 2)), R = own ? [] : probe(skin, F, [...pts.rim, ...pts.inside]);
-  why ??= R.some(r => !r) || S.miss > 0 && !own ? '부품이 차체 밖으로 나갑니다' : null;
-  why ??= [pt.tag, ...R.map(r => r!.tag), ...tags].map(t => badTag(t, dark)).find(Boolean) ?? null;
+  const pts = rectPoints(hw * 0.92, hh * 0.92, Math.max(15, Math.min(hw, hh) / 2)), R = K.group === 'wing' || K.group === 'exhaust' || K.group === 'mirror' ? [] : probe(skin, F, [...pts.rim, ...pts.inside]);
+  why ??= R.some(r => !r) || S.miss > 0 && K.group !== 'wing' && K.group !== 'mirror' ? '부품이 차체 밖으로 나갑니다' : null;
+  why ??= [pt.tag, ...R.map(r => r!.tag)].map(t => badTag(t, dark)).find(Boolean) ?? null;
   why ??= extra;
   if (!why && twin) { const ys = [...pts.rim].map(([x, y]) => framePt(F, x / 0.92, y / 0.92)[1]); if (ys.some(y => Math.sign(y) !== Math.sign(pt.p[1]) || Math.abs(y) < 3)) why = '가운데 선을 넘습니다 (한쪽만으로 하거나 옆으로 옮기세요)'; }
   if (!why && K.centreOnly && Math.abs(pt.p[1]) > 5) why = '가운데 선 위에만 붙일 수 있습니다';
@@ -135,7 +129,7 @@ export function drawPlaced(b: Build, skin: Skin, ps: readonly Placed[] | undefin
 export const partFigures = (fits: readonly PartFit[]): PartFigures[] => fits.map(f => f.fig);
 
 // ---- the figures ----
-const MASS: Record<SurfId, number> = { mirror: 1.1, wingRing: 9, wingGT: 7, exhaust1: 0.5, exhaust2: 0.9, badge: 0.03, marker: 0.06, vent: 0.35, louvre: 0.9, wingN33: 6.5, lipF: 1.8, garnish: 0.6, exhaustBig1: 0.8, exhaustBig2: 1.3 };
+const MASS: Record<SurfId, number> = { mirror: 1.1, wingRing: 9, wingGT: 7, exhaust1: 0.5, exhaust2: 0.9, badge: 0.03, marker: 0.06, vent: 0.35, louvre: 0.9 };
 /** a closed mesh's shadow on a plane is half the sum of its faces' areas times how square they stand to it */
 function figures(M: Mesh, id: SurfId, twin: boolean, at: V, wing?: PartFigures['wing']): PartFigures { let fx = 0, fz = 0; const P = M.pos;
   for (let t = 0; t < M.n; t++) { const a: V = [P[t * 9]!, P[t * 9 + 1]!, P[t * 9 + 2]!], n = vcross(vsub([P[t * 9 + 3]!, P[t * 9 + 4]!, P[t * 9 + 5]!], a), vsub([P[t * 9 + 6]!, P[t * 9 + 7]!, P[t * 9 + 8]!], a)); fx += Math.abs(n[0]) / 2; fz += Math.abs(n[2]) / 2; }
@@ -196,13 +190,12 @@ function crestOn(b: Build, S: Surf, F: PartFrame, H: number, lift: number): { fr
   for (let i = 0; i < T.length; i++) { const j = (i + 1) % T.length, out = vsub(add(T[i]!, T[j]!), add(c, c)); quad(b, T[i]!, T[j]!, B[j]!, B[i]!, out); }
   return { frame: { c, n: F.n, ex: F.u, ey: F.up, W, H }, gap: top - Math.min(...under) }; }
 
-/** a round tube along `a` from `p0` to `p1` (radii r0 at the start, r1 at the end; `sx` times as wide across as high),
- *  10 sides (14 before docs/systems/117 R3: the tips' triangles), facing out */
-function tube(b: Build, p0: V, p1: V, r0: number, r1: number, a: V, inward = false, sx = 1): void { const e1 = vunit(Math.abs(a[2]) > 0.9 ? vcross(a, [1, 0, 0]) : vcross(a, [0, 0, 1])), e2 = vcross(a, e1), N = 10;
-  const ring = (c: V, r: number) => Array.from({ length: N }, (_, i) => { const t = i / N * Math.PI * 2; return vmadd(vmadd(c, e1, Math.cos(t) * r * sx), e2, Math.sin(t) * r); });
+/** a round tube along `a` from `p0` to `p1` (radii r0 at the start, r1 at the end), 14 sides, facing out */
+function tube(b: Build, p0: V, p1: V, r0: number, r1: number, a: V, inward = false): void { const e1 = vunit(Math.abs(a[2]) > 0.9 ? vcross(a, [1, 0, 0]) : vcross(a, [0, 0, 1])), e2 = vcross(a, e1), N = 14;
+  const ring = (c: V, r: number) => Array.from({ length: N }, (_, i) => { const t = i / N * Math.PI * 2; return vmadd(vmadd(c, e1, Math.cos(t) * r), e2, Math.sin(t) * r); });
   const A = ring(p0, r0), B = ring(p1, r1); for (let i = 0; i < N; i++) { const j = (i + 1) % N, out = vsub(mul(add(A[i]!, A[j]!), 0.5), p0), o2 = vsub(out, mul(a, vdot(out, a))); quad(b, A[i]!, A[j]!, B[j]!, B[i]!, inward ? neg(o2) : o2); } }
-const disc = (b: Build, c: V, r: number, a: V, out: V, sx = 1) => { const e1 = vunit(Math.abs(a[2]) > 0.9 ? vcross(a, [1, 0, 0]) : vcross(a, [0, 0, 1])), e2 = vcross(a, e1), N = 10;
-  for (let i = 0; i < N; i++) { const t0 = i / N * Math.PI * 2, t1 = (i + 1) / N * Math.PI * 2; tri(b, c, vmadd(vmadd(c, e1, Math.cos(t0) * r * sx), e2, Math.sin(t0) * r), vmadd(vmadd(c, e1, Math.cos(t1) * r * sx), e2, Math.sin(t1) * r), out); } };
+const disc = (b: Build, c: V, r: number, a: V, out: V) => { const e1 = vunit(Math.abs(a[2]) > 0.9 ? vcross(a, [1, 0, 0]) : vcross(a, [0, 0, 1])), e2 = vcross(a, e1), N = 14;
+  for (let i = 0; i < N; i++) { const t0 = i / N * Math.PI * 2, t1 = (i + 1) / N * Math.PI * 2; tri(b, c, vmadd(vmadd(c, e1, Math.cos(t0) * r), e2, Math.sin(t0) * r), vmadd(vmadd(c, e1, Math.cos(t1) * r), e2, Math.sin(t1) * r), out); } };
 /** the car's back (+x) turned `rot` degrees about the vertical and `tilt` up */
 const aim = (rot: number, tilt: number): V => { const r = rot * Math.PI / 180, t = tilt * Math.PI / 180; return [Math.cos(t) * Math.cos(r), Math.cos(t) * Math.sin(r), Math.sin(t)]; };
 /** exhaust tips: one (or two side by side across the face) round chrome tips coming out of the skin, rolled at the lip,
@@ -214,124 +207,51 @@ function exhaust(b: Build, skin: Skin, F: PartFrame, r: number, two: boolean, re
     b.name('exhaustInner').mat('#141516', 0.05, 'plain'); tube(b, p1, inner, r - 5.5, r - 5.5, a, true); disc(b, inner, r - 5.5, a, a); }
   return null; }
 
-/** a big tip (docs/systems/117 R3): one oval tip, or one oval body holding two round tips side by side; chrome, rolled
- *  at the lip, dark inside, pointing back */
-function bigTip(b: Build, skin: Skin, F: PartFrame, r: number, two: boolean, reach: number, rot: number, tilt: number): string | null { const a = aim(rot, tilt), h = skin.hit(vmadd(F.o, a, 300), neg(a), 700); if (!h) return '배기구가 차체 밖으로 나갑니다';
-  const s = h.p, p0 = vmadd(s, a, -45), p1 = vmadd(s, a, reach), lip = vmadd(p1, a, 2), sx = two ? 2.05 : 1.18;
-  b.name('exhaustTip').mat('#c4c7cb', 0.8, 'metal'); tube(b, p0, p1, r, r, a, false, sx); tube(b, p1, lip, r, r - 4, a, false, sx); tube(b, lip, p1, r - 4, r - 7, a, false, sx);
-  b.name('exhaustInner').mat('#141516', 0.05, 'plain');
-  if (!two) { const inner = vmadd(p1, a, -60); tube(b, p1, inner, r - 7, r - 7, a, true, sx); disc(b, inner, r - 7, a, a, sx); return null; }
-  // the body's mouth dark a little in, two round chrome tips in it
-  const back = vmadd(p1, a, -24); tube(b, p1, back, r - 7, r - 7, a, true, sx); disc(b, back, r - 7, a, a, sx);
-  const across = vunit(Math.abs(a[2]) > 0.9 ? vcross(a, [1, 0, 0]) : vcross(a, [0, 0, 1])), rt = r * 0.78;
-  for (const off of [-r * 0.98, r * 0.98]) { const c0 = vmadd(back, across, off), c1 = vmadd(c0, a, 20); b.name('exhaustTip').mat('#c4c7cb', 0.8, 'metal'); tube(b, c0, c1, rt, rt, a); tube(b, c1, c0, rt - 3, rt - 3, a, true);
-    b.name('exhaustInner').mat('#141516', 0.05, 'plain'); disc(b, vmadd(c1, a, -16), rt - 3, a, a); }
-  return null; }
-
-/** a band laid on the skin by the fan of rays a wrapped tail lamp band is cut by (docs/systems/117 R3): the front lip, a
- *  dark wedge whose top lies on the bumper and whose foot stands `reach` out of it with a short drop under; or the rear
- *  garnish, a thin plate `reach` thick, smoked at its ends and in body colour in its middle (the lettering's place) */
-function bandOn(b: Build, skin: Skin, F: PartFrame, K: PartKind, scale: number, reach: number, lip: boolean): { hw: number; hh: number; why: string | null; tags: SkinTag[] } {
-  const B = K.band!, hw = K.size * scale / 2, hh = K.size * B.aspect * scale / 2, P: Proj = { F, L0: hw * B.wrap.flat, R: B.wrap.r * scale }, tags: SkinTag[] = []; let why: string | null = null;
-  const ss: number[] = [], marks = [-hw, ...(P.L0 < hw ? [-P.L0, P.L0] : []), hw];
-  for (let k = 0; k + 1 < marks.length; k++) { const a = marks[k]!, c = marks[k + 1]!, n = Math.max(1, Math.ceil((c - a) / (Math.abs((a + c) / 2) > P.L0 ? 35 : 60))); for (let i = 0; i < n; i++) ss.push(a + (c - a) * i / n); } ss.push(hw);
-  const hitAt = (sv: number, y: number) => { const r = rayAt(P, sv, y), h = skin.hit(r.o, r.d, r.max); if (!h) { why ??= '부품이 차체 밖으로 나갑니다'; return { p: vmadd(r.o, r.d, r.max / 2), d: neg(r.d) }; } tags.push(h.tag); return { p: h.p, d: neg(r.d) }; };
-  const col = ss.map(sv => ({ t: hitAt(sv, hh), m: hitAt(sv, 0), f: hitAt(sv, -hh), d: dirAt(P, sv) }));
-  const up = F.up, at = (q: { p: V; d: V }, h: number): V => vmadd(q.p, q.d, h);
-  if (lip) { // the wedge: top on the skin, its face out to the foot, a drop under it, the underside back to the skin
-    b.name('lip').mat('#1d1e20', 0.25, 'plain'); const prof = (c: typeof col[number]): V[] => [at(c.t, -1), at(c.m, reach * 0.32), vmadd(at(c.f, reach), up, -14), vmadd(at(c.f, reach * 0.55), up, -16), at(c.f, -1)];
-    const R = col.map(prof); for (let i = 0; i + 1 < R.length; i++) for (let k = 0; k + 1 < 5; k++) { const A = R[i]!, C = R[i + 1]!, out = k < 2 ? col[i]!.d : vmadd(neg(up), col[i]!.d, k === 2 ? 0.6 : -0.6); quad(b, A[k]!, C[k]!, C[k + 1]!, A[k + 1]!, out); }
-    for (const [A, N] of [[R[0]!, R[1]!], [R[R.length - 1]!, R[R.length - 2]!]] as const) { const c = centroid(A), o = vsub(c, centroid(N)); for (let k = 0; k < 5; k++) tri(b, c, A[k]!, A[(k + 1) % 5]!, o); } }
-  else { // the plate: its face, its top and foot edges down to the skin, its ends; smoked at the ends, body colour in the middle
-    const mid = hw * 0.38;
-    for (let i = 0; i + 1 < col.length; i++) { const A = col[i]!, C = col[i + 1]!, xm = (ss[i]! + ss[i + 1]!) / 2; if (Math.abs(xm) < mid) b.name('garnishMid').mat(PAINT, 0.6, 'paint'); else b.name('garnish').mat('#4a4e55', 0.85, 'plain');
-      quad(b, at(A.t, reach), at(C.t, reach), at(C.f, reach), at(A.f, reach), A.d); quad(b, at(A.t, reach), at(C.t, reach), at(C.t, -1), at(A.t, -1), up); quad(b, at(A.f, reach), at(C.f, reach), at(C.f, -1), at(A.f, -1), neg(up)); }
-    for (const [c, n] of [[col[0]!, col[1]!], [col[col.length - 1]!, col[col.length - 2]!]] as const) quad(b, at(c.t, reach), at(c.f, reach), at(c.f, -1), at(c.t, -1), vsub(c.m.p, n.m.p)); }
-  return { hw, hh, why, tags }; }
-
-/** a mirror: a sail-shaped foot laid on the skin, a short arm out from it to the housing's inner front foot, a rounded
- *  housing (its outer end the fullest, its nose tapering forward) whose glass looks back (docs/systems/117 R3: ten points a
- *  section in place of the octagon, one ring less, the arm in sight in front of the housing) */
+/** a mirror: a foot laid on the skin, an arm out and up, a housing whose glass looks back (the 599's shape, docs/systems/109) */
 function mirror(b: Build, skin: Skin, S: Surf, F: PartFrame, k: number, reach: number, rot: number, tilt: number): string | null {
   const s = F.n[1] >= 0 ? 1 : -1, L: V = [0, s, 0], X0: V = [1, 0, 0], Z0: V = [0, 0, 1], c = add(add(F.o, mul(L, reach)), [20 * k, 0, reach * 0.52]);
   // the housing's axes turned (rot about the vertical, its outer end toward the back for +) and tilted (tilt about the car's across)
   const r = rot * Math.PI / 180 * s, t = tilt * Math.PI / 180, turn = (v: V): V => { const x1 = v[0] * Math.cos(r) - v[1] * Math.sin(r), y1 = v[0] * Math.sin(r) + v[1] * Math.cos(r); return [x1 * Math.cos(t) - v[2] * Math.sin(t), y1, x1 * Math.sin(t) + v[2] * Math.cos(t)]; };
   const X = turn(X0), Lr = turn(L), Z = turn(Z0), at = (x: number, l: number, z: number): V => add(add(add(c, mul(X, x)), mul(Lr, l)), mul(Z, z));
-  // the section (l out, z up): the outer end round and full, the inner side flatter, the top a little flatter than the foot
-  const O: [number, number][] = [[1, 0.25], [0.8, 0.82], [0.15, 1], [-0.62, 0.92], [-1, 0.45], [-1, -0.4], [-0.62, -0.88], [0.15, -0.96], [0.8, -0.78], [1, -0.22]];
+  const O: [number, number][] = [[1, 0.55], [0.62, 1], [-0.62, 1], [-1, 0.45], [-1, -0.45], [-0.62, -1], [0.62, -1], [1, -0.55]];
   const ringAt = (x: number, hw: number, hh: number, dl = 0, dz = 0) => O.map(([l, z]) => at(x, dl + l * hw, dz + z * hh));
-  const R0 = ringAt(-52 * k, 30 * k, 20 * k, -10 * k, -4 * k), R1 = ringAt(-22 * k, 54 * k, 38 * k, -2 * k), R2 = ringAt(36 * k, 60 * k, 44 * k), G = ringAt(30 * k, 53 * k, 37 * k);
+  const R0 = ringAt(-48 * k, 30 * k, 22 * k, -6 * k, -3 * k), R1 = ringAt(-18 * k, 56 * k, 41 * k), R2 = ringAt(42 * k, 62 * k, 46 * k), R3 = ringAt(40 * k, 54 * k, 39 * k), G = ringAt(36 * k, 54 * k, 39 * k);
   b.name('mirror').mat(PAINT, 0.6, 'paint'); loftOut(b, [R0, R1, R2], false);
-  { const c0 = centroid(R0); for (let i = 0; i < O.length; i++) tri(b, c0, R0[i]!, R0[(i + 1) % O.length]!, neg(X)); }
-  for (let i = 0; i < O.length; i++) { const j = (i + 1) % O.length; quad(b, R2[i]!, R2[j]!, G[j]!, G[i]!, vsub(centroid(G), R2[i]!)); }
-  b.name('mirrorGlass').mat('#5e6a75', 0.9, 'plain'); { const cg = centroid(G); for (let i = 0; i < O.length; i++) tri(b, cg, G[i]!, G[(i + 1) % O.length]!, X); }
-  // the arm: from the foot out to the housing's inner front foot, flat (wide along the car, thin up and down), in front of the housing's inner end
-  b.name('mirror').mat(PAINT, 0.6, 'paint'); const foot = vmadd(vmadd(F.o, F.n, -4), [1, 0, 0], -6 * k), end = at(-26 * k, -44 * k, -14 * k);
-  const arm = (p: V, w: number, h: number) => [vmadd(vmadd(p, X, -w), Z, -h), vmadd(vmadd(p, X, w), Z, -h), vmadd(vmadd(p, X, w), Z, h), vmadd(vmadd(p, X, -w), Z, h)];
-  loftOut(b, [arm(foot, 26 * k, 9 * k), arm(end, 18 * k, 7 * k)], false);
-  // the foot: a sail laid on the door's corner
-  const FO = rrect(36 * k, 26 * k, 14 * k, 1); wall(b, S, FO, -3, 6); cover(b, S, FO, 6, 1);
+  { const c0 = centroid(R0); for (let i = 0; i < 8; i++) tri(b, c0, R0[i]!, R0[(i + 1) % 8]!, neg(X)); }
+  for (let i = 0; i < 8; i++) { const j = (i + 1) % 8; quad(b, R2[i]!, R2[j]!, R3[j]!, R3[i]!, X); quad(b, R3[i]!, R3[j]!, G[j]!, G[i]!, vsub(centroid(G), R3[i]!)); }
+  b.name('mirrorGlass').mat('#5e6a75', 0.9, 'plain'); { const cg = centroid(G); for (let i = 0; i < 8; i++) tri(b, cg, G[i]!, G[(i + 1) % 8]!, X); }
+  // the arm and the foot
+  b.name('mirror').mat(PAINT, 0.6, 'paint'); const foot = vmadd(F.o, F.n, -4), end = at(-10 * k, -40 * k, -14 * k); b.bar(foot, end, 26 * k, 18 * k);
+  const FO = rrect(34 * k, 24 * k, 14 * k, 2); wall(b, S, FO, -3, 5); cover(b, S, FO, 5, 1);
   // the housing must stand clear of the body: its middle outside the skin (a ray out of it meets no skin) and the skin
   // not within its reach
   if (skin.hit(c, L, 3000)) return '미러가 차체에 묻힙니다';
   const g = skin.hit(c, neg(L), reach + 200); if (g && g.t < 30 * k) return '미러가 차체에 너무 붙었습니다';
   return null; }
 
-/** the blade's section: an inverted aerofoil (u along the chord from its leading edge, w up), as the 599's */
-const PR: [number, number][] = [[0, 0], [0.04, 0.03], [0.2, 0.045], [0.5, 0.04], [0.85, 0.02], [1, 0.008], [1, -0.006], [0.85, -0.032], [0.5, -0.075], [0.2, -0.07], [0.04, -0.035]];
-/** a wing on the centre line: a blade level across the car `height` over the skin under its middle, its section turned
- *  `aoa` degrees (its trailing edge up). The GT wing stands on two uprights with end plates; the N33's (docs/systems/117
- *  R3) on two broad stays at its ends, swept back as they rise from the deck's corners, small dark end plates outside them.
- *  The feet are laid on the skin under each corner */
-function wingOn(b: Build, skin: Skin, pt: SkinPoint, n33: boolean, span: number, height: number, aoa: number): { chord: number; why: string | null } {
-  const C = span * (n33 ? 0.165 : 0.18), x0 = pt.p[0] - C * 0.45, zb = pt.p[2] + height, A = aoa * Math.PI / 180, ca = Math.cos(A), sa = Math.sin(A);
+/** a wing on the centre line: a blade level across the car `height` over the skin under its middle, its section an
+ *  inverted aerofoil turned `aoa` degrees (its trailing edge up); the ring wing's ends turn down into broad legs, the
+ *  GT wing stands on two uprights with end plates. Its legs' feet are laid on the skin under each corner */
+function wingOn(b: Build, skin: Skin, pt: SkinPoint, ring: boolean, span: number, height: number, aoa: number): { chord: number; why: string | null } {
+  const C = span * (ring ? 0.2 : 0.18), x0 = pt.p[0] - C * 0.45, zb = pt.p[2] + height, A = aoa * Math.PI / 180, ca = Math.cos(A), sa = Math.sin(A);
+  const PR: [number, number][] = [[0, 0], [0.04, 0.03], [0.2, 0.045], [0.5, 0.04], [0.85, 0.02], [1, 0.008], [1, -0.006], [0.85, -0.032], [0.5, -0.075], [0.2, -0.07], [0.04, -0.035]];
   const sec = (u: number, w: number): [number, number] => [x0 + (u * ca - w * sa) * C, zb + (u * sa + w * ca) * C];
   const lowZ = (u: number) => sec(u, -0.07)[1];
-  const half = span / 2, yEnd = half, ny = 10;
+  const half = span / 2, legW = Math.max(26, span * 0.022), yEnd = ring ? half - legW / 2 : half, ny = 10;
   const rings: V[][] = []; for (let i = 0; i <= ny; i++) { const y = -yEnd + 2 * yEnd * i / ny; rings.push(PR.map(([u, w]) => { const [x, z] = sec(u, w); return [x, y, z]; })); }
   b.name('wing').mat(PAINT, 0.6, 'paint'); loftOut(b, rings, true);
   let why: string | null = null; const down = (x: number, y: number) => skin.hit([x, y, zb + 1500], [0, 0, -1], 4000);
-  /** an upright from the blade's underside to the skin: its section (x0..x1 along, y0..y1 across) laid on the skin at each
-   *  corner; toward its foot its chord `grow`s, it moves `out` across and `fwd` along */
-  const upright = (xa: number, xb: number, ya: number, yb: number, top: number, out = 0, grow = 1, fwd = 0) => { const st = 4, R: V[][] = [];
-    for (let k = 0; k <= st; k++) { const f = k / st, xm = (xa + xb) / 2 + fwd * f, hl = (xb - xa) / 2 * (1 + (grow - 1) * f * f), dy = out * f * f;
+  /** an upright from the blade's underside to the skin: its section (x0..x1 along, y0..y1 across) laid on the skin at each corner */
+  const upright = (xa: number, xb: number, ya: number, yb: number, top: number, out = 0, grow = 1) => { const st = 4, R: V[][] = [];
+    for (let k = 0; k <= st; k++) { const f = k / st, xm = (xa + xb) / 2, hl = (xb - xa) / 2 * (1 + (grow - 1) * f * f), dy = out * f * f;
       const cs: [number, number][] = [[xm - hl, ya + dy], [xm + hl, ya + dy], [xm + hl, yb + dy], [xm - hl, yb + dy]];
       R.push(cs.map(([x, y]) => { const h = down(x, y); if (!h) { why ??= '윙 다리가 차체 밖에 닿습니다'; return [x, y, top - 200] as V; } const zf = h.p[2] - 8; return [x, y, top + (zf - top) * f] as V; })); }
     loftOut(b, R, true); };
-  if (n33) { // the stays at the ends: as long as the blade's chord at the top, longer and further forward at the deck
-    for (const s of [-1, 1]) upright(x0 + 0.08 * C, x0 + 0.9 * C, s * (half - 64), s * (half - 22), lowZ(0.5) + 6, 0, 1.25, -0.45 * C);
-    b.name('wingPlate').mat('#1f2022', 0.4, 'plain');
-    for (const s of [-1, 1]) { const out: [number, number][] = [[-0.04, -0.2], [1.04, -0.12], [1.06, 0.16], [0.08, 0.12]], P = (y: number) => out.map(([u, w]) => { const [x, z] = sec(u, w); return [x, y, z] as V; });
-      loftOut(b, [P(s * half), P(s * (half + 6))], true); } }
+  if (ring) for (const s of [-1, 1]) upright(x0 + 0.04 * C, x0 + 0.96 * C, s * (half - legW), s * half, zb + 0.01 * C, s * span * 0.025, 1.35);
   else { for (const s of [-1, 1]) upright(x0 + 0.3 * C, x0 + 0.8 * C, s * (span * 0.3 - 6), s * (span * 0.3 + 6), lowZ(0.55) + 4);
     b.name('wingPlate').mat('#1f2022', 0.4, 'plain');
     for (const s of [-1, 1]) { const out: [number, number][] = [[-0.08, -0.34], [1.08, -0.2], [1.14, 0.24], [0.1, 0.22], [-0.08, 0.05]], P = (y: number) => out.map(([u, w]) => { const [x, z] = [x0 + u * C, zb + w * C]; return [x, y, z] as V; });
       loftOut(b, [P(s * half), P(s * (half + 8))], true); } }
   // the blade clear of the body: the skin under its leading edge, middle and trailing edge, across its span, well below it
   if (!why) for (const u of [0, 0.5, 1]) for (let i = 0; i <= 8; i++) { const y = -yEnd * 0.98 + yEnd * 1.96 * i / 8, h = down(sec(u, 0)[0], y); if (h && h.p[2] > lowZ(u) - 20) { why = '날개가 차체에 닿습니다 (높이를 올리세요)'; break; } }
-  return { chord: C, why }; }
-
-/** the 599's ring wing as a part (docs/systems/117 R3, in place of P1's blade on flat legs): one hoop, the blade's section
- *  carried along it: straight across the car `height` over the skin, turning down round both ends and running down as
- *  legs whose chord grows and which lean out toward their feet on the skin. The blade's angle fades out down the legs */
-function ringWing(b: Build, skin: Skin, pt: SkinPoint, span: number, height: number, aoa: number): { chord: number; why: string | null } {
-  const C = span * 0.2, half = span / 2, zb = pt.p[2] + height, xm = pt.p[0] - C * 0.45; let why: string | null = null;
-  const down = (x: number, y: number) => skin.hit([x, y, zb + 1500], [0, 0, -1], 4000);
-  // the feet: the skin under each leg's middle (a leg leans out a little toward it)
-  const yF = half + span * 0.02, feet = [-1, 1].map(s => { const h = down(xm + C * 0.5, s * yF); if (!h) why ??= '윙 다리가 차체 밖에 닿습니다'; return h ? h.p[2] - 10 : zb - height; });
-  const Rc = Math.min(height * 0.55, span * 0.1, 150), top = zb + 0.03 * C;
-  // the hoop's path in (y, z) and its outward normal, with how far down the leg (0 on the blade .. 1 at the foot)
-  const path: { y: number; z: number; ny: number; nz: number; f: number }[] = [];
-  for (const s of [-1, 1]) { const pts: typeof path = [], zf = feet[s < 0 ? 0 : 1]!, legTop = top - Rc;
-    for (let k = 2; k >= 1; k--) { const f = k / 2, z = legTop + (zf - legTop) * f; pts.push({ y: s * (half - Rc + Rc + (yF - half) * f * f), z, ny: s, nz: 0, f: 0.4 + 0.6 * f }); }
-    for (let k = 0; k <= 3; k++) { const a = (k / 3) * Math.PI / 2; pts.push({ y: s * (half - Rc + Rc * Math.cos(a)), z: legTop + Rc * Math.sin(a), ny: s * Math.cos(a), nz: Math.sin(a), f: 0.4 * (1 - k / 3) }); }
-    if (s < 0) path.push(...pts); else path.push(...pts.reverse()); }
-  // the straight blade between the arcs' ends
-  const iR = path.findIndex((q, i) => i > 0 && q.y > 0); const mid: typeof path = []; for (let k = 1; k < 5; k++) { const y = -(half - Rc) + 2 * (half - Rc) * k / 5; mid.push({ y, z: top, ny: 0, nz: 1, f: 0 }); }
-  path.splice(iR, 0, ...mid);
-  const rings = path.map(q => { const Cl = C * (1 + 0.4 * q.f * q.f), A = aoa * Math.PI / 180 * (1 - Math.min(1, q.f * 2)), ca = Math.cos(A), sa = Math.sin(A), x0 = xm - (Cl - C) * 0.4;
-    return PR.map(([u, w]) => { const x = x0 + (u * ca - w * sa) * Cl, o = (u * sa + w * ca) * Cl * (q.nz > 0.5 ? 1 : 0.85) - 0.03 * C; return [x, q.y + q.ny * o, q.z + q.nz * o] as V; }); });
-  b.name('wing').mat(PAINT, 0.6, 'paint'); loftOut(b, rings, true);
-  // the blade clear of the body
-  if (!why) for (const u of [0, 0.5, 1]) for (let i = 0; i <= 6; i++) { const y = -(half - Rc) + 2 * (half - Rc) * i / 6, h = down(xm + u * C, y); if (h && h.p[2] > top - 0.08 * C - 20) { why = '날개가 차체에 닿습니다 (높이를 올리세요)'; break; } }
   return { chord: C, why }; }

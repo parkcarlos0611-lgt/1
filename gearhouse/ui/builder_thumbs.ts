@@ -24,8 +24,7 @@ export type ThumbView = 'front' | 'side' | 'top';
 /** the parts' kinds, and the builder's first steps' cards (docs/systems/115 F1): the lump, its glass sets, its interior sets */
 export type ThumbKind = 'bumperF' | 'bumperR' | 'lamp' | 'wheel' | 'base' | 'frame' | 'glass' | 'interior' | 'plateF' | 'plateR'
   /** the free surface parts (docs/systems/115 P1): a kind a group of the library */ | 'pMirror' | 'pWing' | 'pExhaust' | 'pBadge' | 'pMarker' | 'pVent'
-  /** the hole parts (P2) */ | 'pLamp' | 'pTail' | 'pIntake' | 'pVentCut'
-  /** docs/systems/117 R3 */ | 'pAux' | 'pLip' | 'pGarnish';
+  /** the hole parts (P2) */ | 'pLamp' | 'pTail' | 'pIntake' | 'pVentCut';
 export interface ThumbSpec { kind: ThumbKind; v: string }
 export const VIEWS: ThumbView[] = ['front', 'side', 'top'];
 export const VIEW_NAME: Record<ThumbView, string> = { front: '정면', side: '측면', top: '위' };
@@ -35,14 +34,14 @@ export const VIEW_NAME: Record<ThumbView, string> = { front: '정면', side: '�
 export const KIND_VIEW: Record<ThumbKind, ThumbView> = { bumperF: 'front', bumperR: 'front', lamp: 'front', wheel: 'side', base: 'side', frame: 'side', glass: 'side', interior: 'top', plateF: 'front', plateR: 'front',
   /** the free parts: a mirror from the front (its housing and arm), a wing from the side (its blade's section and its
    *  legs), the tips from behind, the crest and the vents head on, a marker from the side */ pMirror: 'front', pWing: 'side', pExhaust: 'front', pBadge: 'front', pMarker: 'side', pVent: 'front',
-  /** the hole parts head on (a tail lamp from behind) */ pLamp: 'front', pTail: 'front', pIntake: 'front', pVentCut: 'front', pAux: 'front', pLip: 'front', pGarnish: 'front' };
+  /** the hole parts head on (a tail lamp from behind) */ pLamp: 'front', pTail: 'front', pIntake: 'front', pVentCut: 'front' };
 /** the camera of a view: the heading the screen looks along (as LiveView's ang) and the tilt down (degrees). Front and
  *  side a little above the eye line, so a part's top shows as a sliver; the top view straight down, the nose up */
 export const PITCH = 8;
 export function camera(kind: ThumbKind, view: ThumbView): { ang: number; pitch: number } {
   if (view === 'top') return { ang: 0, pitch: 90 };
   if (view === 'side') return { ang: 1.5 * Math.PI, pitch: PITCH };
-  return { ang: kind === 'bumperR' || kind === 'plateR' || kind === 'pExhaust' || kind === 'pTail' || kind === 'pGarnish' ? 0 : Math.PI, pitch: PITCH }; }
+  return { ang: kind === 'bumperR' || kind === 'plateR' || kind === 'pExhaust' || kind === 'pTail' ? 0 : Math.PI, pitch: PITCH }; }
 
 // ---- the parts taken out of the model ----
 const BUMPER_F = new Set(['bumperF', 'indicatorF', 'ventF', 'intakeF', 'lipF']), BUMPER_R = new Set(['bumperR', 'ventR', 'diffuser', 'exhaustSlot']);
@@ -50,17 +49,15 @@ const LAMP = new Set(['lampBezel', 'headLamp', 'lampReflector', 'lampRing']), WH
 /** the variants of a kind, in the library's order */
 export const VARIANTS: Record<ThumbKind, readonly string[]> = { bumperF: BUMPERS_ALL, bumperR: BUMPERS_ALL, lamp: LAMPS959, wheel: WHEELS_ALL, base: ['p959'], frame: ['A959', 'B33'], glass: ['none', 'stock', 'noQuarter', 'louvre', 'B33:none', 'B33:stock', 'B33:noQuarter', 'B33:louvre'], interior: ['stock', 'drift', 'B33:stock', 'B33:drift'],
   /** the plates (docs/systems/115 P1a): each its own card, cut from the stock car where its plate sits at its own place */ plateF: ['plateF'], plateR: ['plateR'],
-  pMirror: ['mirror'], pWing: ['wingRing', 'wingGT', 'wingN33'], pExhaust: ['exhaust1', 'exhaust2', 'exhaustBig1', 'exhaustBig2'], pBadge: ['badge'], pMarker: ['marker'], pVent: ['vent', 'louvre'],
-  pLamp: ['lampRound', 'lampEllipsoid', 'lampSquare', 'lampN33'], pTail: ['tailBand', 'tailRound'], pIntake: ['grille', 'grilleN33', 'intakeN33', 'sideIntake'], pVentCut: ['ventCut', 'louvreCut'],
-  /** docs/systems/117 R3: the bumper's fog lamps and ducts (seen from ahead), the lip and the garnish (laid on a nose, a tail) */ pAux: ['fogLamp', 'brakeDuct'], pLip: ['lipF'], pGarnish: ['garnish'] };
+  pMirror: ['mirror'], pWing: ['wingRing', 'wingGT'], pExhaust: ['exhaust1', 'exhaust2'], pBadge: ['badge'], pMarker: ['marker'], pVent: ['vent', 'louvre'],
+  pLamp: ['lampRound', 'lampEllipsoid', 'lampSquare'], pTail: ['tailBand', 'tailRound'], pIntake: ['grille', 'sideIntake'], pVentCut: ['ventCut', 'louvreCut'] };
 /** a free part's card: the kind of its group */
 export const PART_THUMB: Record<FreeId, ThumbKind> = { mirror: 'pMirror', wingRing: 'pWing', wingGT: 'pWing', exhaust1: 'pExhaust', exhaust2: 'pExhaust', badge: 'pBadge', marker: 'pMarker', vent: 'pVent', louvre: 'pVent',
-  lampRound: 'pLamp', lampEllipsoid: 'pLamp', lampSquare: 'pLamp', tailBand: 'pTail', tailRound: 'pTail', grille: 'pIntake', sideIntake: 'pIntake', ventCut: 'pVentCut', louvreCut: 'pVentCut',
-  wingN33: 'pWing', exhaustBig1: 'pExhaust', exhaustBig2: 'pExhaust', lampN33: 'pLamp', grilleN33: 'pIntake', intakeN33: 'pIntake', fogLamp: 'pAux', brakeDuct: 'pAux', lipF: 'pLip', garnish: 'pGarnish' };
+  lampRound: 'pLamp', lampEllipsoid: 'pLamp', lampSquare: 'pLamp', tailBand: 'pTail', tailRound: 'pTail', grille: 'pIntake', sideIntake: 'pIntake', ventCut: 'pVentCut', louvreCut: 'pVentCut' };
 /** a free part alone, at its kind's defaults, stood on a flat skin facing the way its view looks at it (a mirror on the
  *  car's left side, a wing on a deck, the tips on a tail, the crest and the vents on a nose, a marker on a side): one of
  *  a pair, no twin */
-export function partAlone(id: FreeId): Mesh { const g = PART_THUMB[id], [o, n]: [V, V] = g === 'pMirror' || g === 'pMarker' ? [[1680, 880, 860], [0, 1, 0]] : g === 'pWing' ? [[3900, 0, 950], [0, 0, 1]] : g === 'pGarnish' ? [[4250, 0, 600], [1, 0, 0]] : g === 'pExhaust' || g === 'pTail' ? [[4250, 300, 300], [1, 0, 0]] : g === 'pLip' ? [[0, 0, 300], [-1, 0, 0]] : [[0, 0, 500], [-1, 0, 0]];
+export function partAlone(id: FreeId): Mesh { const g = PART_THUMB[id], [o, n]: [V, V] = g === 'pMirror' || g === 'pMarker' ? [[1680, 880, 860], [0, 1, 0]] : g === 'pWing' ? [[3900, 0, 950], [0, 0, 1]] : g === 'pExhaust' || g === 'pTail' ? [[4250, 300, 300], [1, 0, 0]] : [[0, 0, 500], [-1, 0, 0]];
   // a hole part (P2) shown as the builder's drag shows it: its footprint laid on the flat skin, its insides lifted to it (the
   // tail lamp band shorter, so its wrapped ends still meet the plane)
   const skin = planeSkin(o, n, 2000), pt = skin.hit([o[0] + n[0] * 100, o[1] + n[1] * 100, o[2] + n[2] * 100], [-n[0], -n[1], -n[2]])!, f = fitAt(skin, pt, { ...freshPart(id, { f: 0, u: 0, v: 0 }), one: true, ...(id === 'tailBand' ? { scale: 0.6, sx: 0.8 } : {}) });
@@ -72,7 +69,7 @@ export function modelIndex(s: ThumbSpec): number { return Math.max(0, VARIANTS[s
 export function buildModel(i: number): P959Model { return p959Model({ bumperF: BUMPERS_ALL[i], bumperR: BUMPERS_ALL[i], lamp: LAMPS959[i], wheel: WHEELS_ALL[i], brake: false }); }
 /** the models of the first steps' cards: the lump; the lump with each glass set (none: the cabin in body colour); each
  *  interior set alone (its cabin's parts, no driver) */
-const SETS = new Set<ThumbKind>(['frame', 'glass', 'interior', 'pMirror', 'pWing', 'pExhaust', 'pBadge', 'pMarker', 'pVent', 'pLamp', 'pTail', 'pIntake', 'pVentCut', 'pAux', 'pLip', 'pGarnish']);
+const SETS = new Set<ThumbKind>(['frame', 'glass', 'interior', 'pMirror', 'pWing', 'pExhaust', 'pBadge', 'pMarker', 'pVent', 'pLamp', 'pTail', 'pIntake', 'pVentCut']);
 export function buildSet(kind: ThumbKind, v: string): P959Model { if (kind.startsWith('p') && kind !== 'plateF' && kind !== 'plateR') return { mesh: partAlone(v as FreeId), shell: undefined as never, normals: new Float32Array(0), shellTris: 0 };
   if (v.startsWith('B33:')) { const w = v.slice(4);   // 차체 B's sets (docs/systems/117 R2): its glass on its lump, its own interiors in its cabin
     if (kind === 'interior') return { mesh: interiorMesh({ ...INTERIORS[w === 'drift' ? 'n33Sport' : 'n33Stock'], cabin: N33_CABIN, driver: false }), shell: undefined as never, normals: new Float32Array(0), shellTris: 0 };

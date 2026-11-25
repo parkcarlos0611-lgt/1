@@ -52,7 +52,7 @@ export type ModelBaseId = 'p959' | 'bnr33';
 export type BodyBase = BaseId | ModelBaseId;
 /** a model-built body's swaps (the 959's: render/car/p959 P959Opts): the bumpers, the head lamps, the wheels, the
  *  number plate's text. Each body reads the ones it has; a kit body has none */
-export interface ModelSwaps { bumperF: 'std' | 'aero' | 'clean' | 'blank'; bumperR: 'std' | 'aero' | 'clean' | 'blank'; lamp: 'round' | 'ellipsoid' | 'square' | 'none'; wheel: 'hollow5' | 'dish' | 'hole5' | 'steel' | 'n33five' | 'six' | 'deep5';
+export interface ModelSwaps { bumperF: 'std' | 'aero' | 'clean' | 'blank'; bumperR: 'std' | 'aero' | 'clean' | 'blank'; lamp: 'round' | 'ellipsoid' | 'square' | 'none'; wheel: 'hollow5' | 'dish' | 'hole5' | 'steel';
   /** the car's other openings and small parts (the tail lamp band, the side intakes, the lid's grille, the mirrors, the
    *  exhausts, the crest and the lettering) left off: the lump's (absent: on, as every design before it) */ details?: false;
   /** the car's own mirrors, exhaust tips and crest left off (docs/systems/115 P1): they are free parts (body.parts) instead,
@@ -202,9 +202,7 @@ export const BUMPERS959: ModelSwaps['bumperF'][] = ['std', 'aero', 'clean'];
 export const LAMPS959: ModelSwaps['lamp'][] = ['round', 'ellipsoid', 'square'];
 export const WHEELS959: ModelSwaps['wheel'][] = ['hollow5', 'dish', 'hole5'];
 /** and the lump's blanks beside them (docs/systems/115 §4-1) */
-export const BUMPERS_ALL: ModelSwaps['bumperF'][] = [...BUMPERS959, 'blank'], LAMPS_ALL: ModelSwaps['lamp'][] = [...LAMPS959, 'none'], WHEELS_ALL: ModelSwaps['wheel'][] = [...WHEELS959, 'steel', 'n33five', 'six', 'deep5'];
-/** each wheel's name in the library (docs/systems/117 R3 added the last three: generic shapes from the N33's photos) */
-export const WHEEL_NAME: Record<ModelSwaps['wheel'], string> = { hollow5: '속 빈 5스포크 (599 순정)', dish: '딥디시 8스포크', hole5: '5홀 디스크', steel: '민짜 강철 휠', n33five: '17인치 5스포크 (N33 순정)', six: '6스포크', deep5: '딥디시 5스포크' };
+export const BUMPERS_ALL: ModelSwaps['bumperF'][] = [...BUMPERS959, 'blank'], LAMPS_ALL: ModelSwaps['lamp'][] = [...LAMPS959, 'none'], WHEELS_ALL: ModelSwaps['wheel'][] = [...WHEELS959, 'steel'];
 /** the lump "차체 A" as a new design starts it (docs/systems/115 F1): its swaps blank, no plates, no details, no glass; the
  *  plate's text kept for when one is put on */
 export const LUMP_SWAPS = (plate: string): ModelSwaps => ({ bumperF: 'blank', bumperR: 'blank', lamp: 'none', wheel: 'steel', plate, plateF: false, plateR: false, details: false });

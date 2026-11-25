@@ -8,6 +8,7 @@
 import type { Mesh, MeshLine, V } from '../render/car/mesh';
 import { p959Model, type P959Model } from '../render/car/p959';
 import { freeGpu } from '../render/live/gpu';
+import { STYLE, screenPx, lineWeight } from '../render/live/style';
 import type { LiveRenderer } from '../render/live/renderer';
 import { BUMPERS959, LAMPS959, WHEELS959 } from '../core/design';
 
@@ -42,12 +43,13 @@ const NO_LINE: MeshLine = { kind: 'trim', pts: [[0, 0, -1e5], [0, 10, -1e5]] };
 const within = (p: V, b: Box, m: number) => p[0] >= b[0][0] - m && p[0] <= b[1][0] + m && p[1] >= b[0][1] - m && p[1] <= b[1][1] + m && p[2] >= b[0][2] - m && p[2] <= b[1][2] + m;
 export type Box = [V, V];
 /** the part alone: its triangles (a bumper is a region of the shell; the lamp and the wheel are the left front one of the
- *  modules hung after it), and the body's drawn lines and creases lying on it */
-export function isolate(md: P959Model, kind: ThumbKind): Mesh { const M = md.mesh; if (kind === 'base') return M;
+ *  modules hung after it), and the body's drawn lines and creases lying on it. `near`: a bumper's left half only (seen
+ *  from the side, an open strip would show the inside of its far half through its near one) */
+export function isolate(md: P959Model, kind: ThumbKind, near = false): Mesh { const M = md.mesh; if (kind === 'base') return M;
   const nm = (t: number) => M.names?.[M.part[t]!] ?? '', cy = (t: number) => (M.pos[t * 9 + 1]! + M.pos[t * 9 + 4]! + M.pos[t * 9 + 7]!) / 3, cx = (t: number) => (M.pos[t * 9]! + M.pos[t * 9 + 3]! + M.pos[t * 9 + 6]!) / 3;
   const keep = (t: number) => kind === 'bumperF' ? t < md.shellTris && BUMPER_F.has(nm(t)) : kind === 'bumperR' ? t < md.shellTris && BUMPER_R.has(nm(t))
     : kind === 'lamp' ? t >= md.shellTris && LAMP.has(nm(t)) && cy(t) > 0 : t >= md.shellTris && WHEEL.test(nm(t)) && cy(t) > 0 && cx(t) < M.length / 2;
-  const T: number[] = []; for (let t = 0; t < M.n; t++) if (keep(t)) T.push(t);
+  const T: number[] = []; for (let t = 0; t < M.n; t++) if (keep(t) && (!near || cy(t) > -1)) T.push(t);
   const n = T.length, pos = new Float32Array(n * 9), col = new Uint8Array(n * 3), gloss = new Float32Array(n), part = new Int16Array(n), kd = new Uint8Array(n), tex = new Uint8Array(n), uv = M.uv && M.uv.length === M.n * 9 ? new Float32Array(n * 9) : undefined;
   T.forEach((t, j) => { pos.set(M.pos.subarray(t * 9, t * 9 + 9), j * 9); col.set(M.col.subarray(t * 3, t * 3 + 3), j * 3); gloss[j] = M.gloss[t]!; part[j] = M.part[t]!; kd[j] = M.kind[t]!; tex[j] = M.tex[t]!; if (uv) uv.set(M.uv!.subarray(t * 9, t * 9 + 9), j * 9); });
   const out: Mesh = { n, pos, col, gloss, part, kind: kd, tex, length: M.length, decals: [], ...(M.names ? { names: M.names } : {}), ...(uv ? { uv } : {}) }, b = meshBox(out);
@@ -72,18 +74,32 @@ export function fit(box: Box, len: number, cam: { ang: number; pitch: number }, 
 export function sunFor(cam: { ang: number; pitch: number }): [number, number, number] { const a = cam.ang - Math.PI / 2, SP = Math.sin(cam.pitch * Math.PI / 180), CP = Math.cos(cam.pitch * Math.PI / 180);
   const rx = [Math.cos(a), Math.sin(a), 0], ry = [-Math.sin(a), Math.cos(a), 0], up = [ry[0]! * SP, ry[1]! * SP, CP], vd = [ry[0]! * CP, ry[1]! * CP, -SP];
   return [0, 1, 2].map(k => -vd[k]! * 0.7 + up[k]! * 0.55 - rx[k]! * 0.45) as [number, number, number]; }
-/** a picture read back (rows bottom up, RGBA) to the shown one: the background (the colour in its corner) keyed out,
- *  `ss` x `ss` pixels to one (top row first, straight alpha) */
-export function keyDown(px: Uint8Array, W: number, H: number, ss: number): Uint8ClampedArray { const w = Math.floor(W / ss), h = Math.floor(H / ss), out = new Uint8ClampedArray(w * h * 4), bg = [px[0]!, px[1]!, px[2]!];
+/** the style's ink as it comes out of the picture (sRGB) */
+export const INK_RGB: [number, number, number] = [12, 12, 15];
+/** a picture read back (rows bottom up, RGBA) to the shown one: the background (the colour in its corner) keyed out;
+ *  the outline `ring` pixels wide laid round the silhouette where the inverted hull left none (an open part alone, a
+ *  bumper or a lamp's bezel, has no back faces to make it, and with no ground behind it the outline pass has nothing to
+ *  draw on): measured from the part's own pixels, not from ink already there, so a closed part's outline is not
+ *  doubled; then `ss` x `ss` pixels to one (top row first, straight alpha) */
+export function keyDown(px: Uint8Array, W: number, H: number, ss: number, ring = 0): Uint8ClampedArray { const w = Math.floor(W / ss), h = Math.floor(H / ss), out = new Uint8ClampedArray(w * h * 4), bg = [px[0]!, px[1]!, px[2]!];
+  const N = W * H, isBg = new Uint8Array(N); for (let q = 0; q < N; q++) { const R = px[q * 4]!, G = px[q * 4 + 1]!, B = px[q * 4 + 2]!; isBg[q] = Math.abs(R - bg[0]!) <= 4 && Math.abs(G - bg[1]!) <= 4 && Math.abs(B - bg[2]!) <= 4 ? 1 : 0; }
+  let inkAt: Uint8Array | null = null;
+  if (ring > 0) { // a chamfer distance (3-4, in thirds of a pixel) from the part's pixels that are not ink
+    const D = new Float32Array(N), INF = 1e9; for (let q = 0; q < N; q++) { const R = px[q * 4]!, G = px[q * 4 + 1]!, B = px[q * 4 + 2]!, ink = Math.max(R, G, B) <= 26 && Math.max(R, G, B) - Math.min(R, G, B) <= 8; D[q] = !isBg[q] && !ink ? 0 : INF; }
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const q = y * W + x; let d = D[q]!; if (x > 0) d = Math.min(d, D[q - 1]! + 3); if (y > 0) { d = Math.min(d, D[q - W]! + 3); if (x > 0) d = Math.min(d, D[q - W - 1]! + 4); if (x < W - 1) d = Math.min(d, D[q - W + 1]! + 4); } D[q] = d; }
+    for (let y = H - 1; y >= 0; y--) for (let x = W - 1; x >= 0; x--) { const q = y * W + x; let d = D[q]!; if (x < W - 1) d = Math.min(d, D[q + 1]! + 3); if (y < H - 1) { d = Math.min(d, D[q + W]! + 3); if (x < W - 1) d = Math.min(d, D[q + W + 1]! + 4); if (x > 0) d = Math.min(d, D[q + W - 1]! + 4); } D[q] = d; }
+    inkAt = new Uint8Array(N); for (let q = 0; q < N; q++) if (isBg[q] && D[q]! <= ring * 3) { inkAt[q] = 1; isBg[q] = 0; } }
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { let n = 0, r = 0, g = 0, b = 0;
-    for (let j = 0; j < ss; j++) for (let i = 0; i < ss; i++) { const q = ((H - 1 - (y * ss + j)) * W + x * ss + i) * 4, R = px[q]!, G = px[q + 1]!, B = px[q + 2]!;
-      if (Math.abs(R - bg[0]!) <= 4 && Math.abs(G - bg[1]!) <= 4 && Math.abs(B - bg[2]!) <= 4) continue; n++; r += R; g += G; b += B; }
+    for (let j = 0; j < ss; j++) for (let i = 0; i < ss; i++) { const q = (H - 1 - (y * ss + j)) * W + x * ss + i; if (isBg[q]) continue; n++;
+      if (inkAt?.[q]) { r += INK_RGB[0]; g += INK_RGB[1]; b += INK_RGB[2]; } else { r += px[q * 4]!; g += px[q * 4 + 1]!; b += px[q * 4 + 2]!; } }
     const o = (y * w + x) * 4; if (n) { out[o] = r / n; out[o + 1] = g / n; out[o + 2] = b / n; out[o + 3] = 255 * n / (ss * ss); } }
   return out; }
 
 // ---- the cache and the queue (per page: the models, the parts, the pictures) ----
 const MODELS = new Map<number, P959Model>(), PARTS = new Map<string, Mesh>(), BOXES = new Map<ThumbKind, Box>(), PICS = new Map<string, string>();
-const partOf = (kind: ThumbKind, i: number): Mesh => { const k = `${kind}|${i}`; let m = PARTS.get(k); if (!m) { m = isolate(MODELS.get(i)!, kind); PARTS.set(k, m); } return m; };
+/** a part as a view shows it: a bumper from the side its near half */
+export const nearHalf = (kind: ThumbKind, view: ThumbView) => view === 'side' && (kind === 'bumperF' || kind === 'bumperR');
+const partOf = (kind: ThumbKind, i: number, near = false): Mesh => { const k = `${kind}|${i}|${near}`; let m = PARTS.get(k); if (!m) { m = isolate(MODELS.get(i)!, kind, near); PARTS.set(k, m); } return m; };
 /** the picture's size on the card (CSS px, 4:3: the card's picture plate) */
 export const PIC_W = 160, PIC_H = 120;
 const CSS = `.gk-card-pic.gk-has-thumb{position:relative}.gk-card-pic.gk-has-thumb>svg{visibility:hidden}
@@ -108,12 +124,12 @@ export function partThumbs(): PartThumbs {
   function shoot(L: LiveRenderer, cv: HTMLCanvasElement, s: ThumbSpec): string { const v = view.get(s.kind) ?? KIND_VIEW[s.kind], cam = camera(s.kind, v), r = dpr();
     let W = Math.round(PIC_W * r), H = Math.round(PIC_H * r), ss = 2; if (cv.width < W * ss || cv.height < H * ss) ss = 1;
     const k = Math.min(1, cv.width / (W * ss), cv.height / (H * ss)); W = Math.max(8, Math.floor(W * k)); H = Math.max(6, Math.floor(H * k));
-    const M = partOf(s.kind, modelIndex(s)), f = fit(BOXES.get(s.kind)!, M.length, cam, W * ss, H * ss), gl = L.gl, g = L.car(M);
+    const M = partOf(s.kind, modelIndex(s), nearHalf(s.kind, v)), f = fit(BOXES.get(s.kind)!, M.length, cam, W * ss, H * ss), gl = L.gl, g = L.car(M);
     try { L.render({ x: f.x, y: f.y, z: f.z, ang: cam.ang, pitch: cam.pitch, mm: f.mm, W: W * ss, H: H * ss, cy: 0.5 },
         [{ g, x: 0, y: 0, z: 0, yaw: 0, roll: 0, pitch: 0, steerL: 0, steerR: 0, spin: 0, player: false }], [], [],
         { look: 4, glass: 0.8, rays: false, bloomK: 0, dof: 0, sun: sunFor(cam), style: { dpr: r * ss } });
       const px = new Uint8Array(W * ss * H * ss * 4); gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.readPixels(0, 0, W * ss, H * ss, gl.RGBA, gl.UNSIGNED_BYTE, px);
-      const c = document.createElement('canvas'); c.width = W; c.height = H; c.getContext('2d')!.putImageData(new ImageData(keyDown(px, W * ss, H * ss, ss), W, H), 0, 0); return c.toDataURL('image/png'); }
+      const c = document.createElement('canvas'); c.width = W; c.height = H; c.getContext('2d')!.putImageData(new ImageData(keyDown(px, W * ss, H * ss, ss, screenPx(STYLE.outlinePx * lineWeight.k, H * ss, r * ss)), W, H), 0, 0); return c.toDataURL('image/png'); }
     finally { freeGpu(gl, g); L.forget(M); } }
   return {
     want(card, spec) { cards.set(card, { spec, shown: '' }); idle = 0; },

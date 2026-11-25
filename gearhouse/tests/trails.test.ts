@@ -20,7 +20,7 @@ describe('speed effects (trails)', () => {
     expect(trailLook(90, 0, 1).air.life).toBeGreaterThanOrEqual(0.3); expect(trailLook(300, 0, 1).air.life).toBeCloseTo(0.6, 5);
     expect(trailLook(200, 0, 1).air.life).toBeGreaterThan(trailLook(120, 0, 1).air.life);
     // the kept history follows the length: about the life, not the whole drive
-    const { ct } = drive(200, 2); expect(ct.tr[0]!.span(2)).toBeLessThan(trailLook(200, 0, 1).life + 0.1); expect(ct.tr[0]!.span(2)).toBeGreaterThan(0.4);
+    const { ct } = drive(200, 2); expect(ct.tr[0]!.span(2)).toBeLessThan(trailLook(200, 0, 1).air.life + 0.1); expect(ct.tr[0]!.span(2)).toBeGreaterThan(0.4);
   });
   it('brightens and lengthens the lamps under braking, not the air', () => {
     const off = trailLook(150, 0, 1, 0.5), on = trailLook(150, 1, 1, 0.5);

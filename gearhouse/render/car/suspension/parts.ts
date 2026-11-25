@@ -32,10 +32,10 @@ export function cornerParts(g: Geo, H: Hardpoints, look: SuspLook, det: Detail, 
   const along = (y: number): V => add(wc, mul(out, y));
   // ---- the arms ----
   const arm = (name: string, bone: number, A: { f: V; r: V; bj: V }, r: number, brace: number) => { on(bone); g.part(name, look.arms, look.armGloss, 'metal');
-    for (const p of [A.f, A.r]) { if (tube || det < 2) g.cyl(p, A.bj, det === 0 ? r * 1.15 : r, det === 2 ? 5 : det === 1 ? 4 : 3, false); else g.bar(p, A.bj, r * 2.7, r * 1.5, false); }
-    if (det === 2 && brace > 0) { const a = mix(A.f, A.bj, brace), b = mix(A.r, A.bj, brace); if (tube) g.cyl(a, b, r * 0.85, 4, false); else g.bar(a, b, r * 2.4, r * 1.3, false); }
+    for (const p of [A.f, A.r]) { if (tube || det < 2 || dr) g.cyl(p, A.bj, det === 0 ? r * 1.15 : r, det === 2 ? 5 : det === 1 ? 4 : 3, false); else g.bar(p, A.bj, r * 2.7, r * 1.5, false); }
+    if (det === 2 && brace > 0) { const a = mix(A.f, A.bj, brace), b = mix(A.r, A.bj, brace); if (tube || dr) g.cyl(a, b, r * 0.85, 4, false); else g.bar(a, b, r * 2.4, r * 1.3, false); }
     if (det > 0) g.cyl(add(A.bj, [0, 0, -r * 1.3]), add(A.bj, [0, 0, r * 1.3]), r * 1.55, det === 2 ? 5 : 4, true, [1, 0, 0]);
-    if (det === 2) { g.part(name, RUBBER, 0.1); for (const p of [A.f, A.r]) g.cyl(add(p, [-20, 0, 0]), add(p, [20, 0, 0]), r * 1.6, 5, false); } };
+    if (det === 2) { g.part(name, RUBBER, 0.1, 'plain', dr ? 'bush' : undefined); for (const p of [A.f, A.r]) g.cyl(add(p, [-20, 0, 0]), add(p, [20, 0, 0]), r * 1.6, 5, dr); } };
   // a strut has no upper arm: its coil-over's body is clamped in the upright (below)
   arm('wishboneLower', 0, H.lower, 11, H.dampers.length && H.type !== 'macpherson' ? 0.5 : 0); if (H.type !== 'macpherson') arm('wishboneUpper', 1, H.upper, 9, 0);
   // ---- the upright: the bearing's housing inboard of the wheel's back, a leg to each ball joint, the steering arm ----

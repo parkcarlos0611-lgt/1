@@ -118,7 +118,7 @@ describe('the suspension in the drift look', () => {
       expect([...D.parts.keys()].sort()).toEqual([...R.parts.keys()].sort()); expect(D.rig).toEqual(R.rig); for (const n of D.parts.keys()) expect(PART_BONE[n], n).toBeDefined();
       for (const n of ['wishboneLower', 'wishboneUpper']) expect(D.parts.get(n)!.thin! / R.parts.get(n)!.thin!, `${id} ${n}`).toBeGreaterThanOrEqual(1.8);
       for (const n of ['tieRod', 'toeLink', 'dropLink', 'antiRollBar']) if (R.parts.get(n)?.thin) { expect(D.parts.get(n)!.thin!).toBeGreaterThan(R.parts.get(n)!.thin! * 1.3); expect(D.parts.get(n)!.thin!).toBeGreaterThanOrEqual(minDiameter('link') - 1e-6); }
-      if (det === 2) { expect(D.parts.get('spring')!.thin!).toBeGreaterThanOrEqual(minDiameter('spring') * 0.8); expect(D.tris).toBeLessThanOrEqual(R.tris * 1.3); }
+      if (det === 2) { expect(D.parts.get('spring')!.thin!).toBeGreaterThanOrEqual(minDiameter('spring') * 0.8); expect(D.tris).toBeLessThanOrEqual(R.tris * 1.5); }
       // a bigger caliper, still a block on the disc's edge
       const size = (P: typeof R.parts, n: string) => { const b = P.get(n)!; return (b.max[0] - b.min[0]) * (b.max[2] - b.min[2]); }; expect(size(D.parts, 'caliper')).toBeGreaterThan(size(R.parts, 'caliper') * (det === 2 ? 1.15 : 1.3)); }
   });

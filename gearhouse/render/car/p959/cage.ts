@@ -142,7 +142,7 @@ export function buildCage(o: CageOpts = {}): Cage959 {
   // the bumpers: placeholder modules hung on the seam loops. Each point of the seam carries three more below it
   // (the face's middle, the lip, the foot), set out from the seam's own point; at the arch they lie on its circle
   const strip = (seam: number[], region: Region, zs: [number, number, number], offs: [number, number, number], cx: number, arch: V[], name: string, what: (m: number, k: number) => [Mat, string] | null) => { const rows: number[][] = [seam];
-    for (let m = 0; m < 3; m++) rows.push(seam.map((s, k) => { if (k === 0) return pt(arch[m]!); const p = P[s]!, dx = p[0] - cx, l = Math.hypot(dx, p[1]) || 1, o = offs[m]!; return pt([p[0] + dx / l * o, Math.max(0, p[1] + p[1] / l * o), zs[m]! + (m === 0 ? (p[2] - P[seam[seam.length - 1]!]![2]) * 0.2 : 0)]); }));
+    for (let m = 0; m < 3; m++) rows.push(seam.map((s, k) => { if (k === 0) return pt(arch[m]!); const p = P[s]!, dx = p[0] - cx, l = Math.hypot(dx, p[1]) || 1, o = offs[m]!; return pt([p[0] + dx / l * o, Math.max(0, p[1] + p[1] / l * o), m === 0 ? Math.min(zs[0]! + (p[2] - P[seam[seam.length - 1]!]![2]) * 0.2, p[2] - 40) : zs[m]!]); }));
     for (let m = 0; m < 3; m++) for (let k = 0; k + 1 < seam.length; k++) { const q = [rows[m]![k]!, rows[m]![k + 1]!, rows[m + 1]![k + 1]!, rows[m + 1]![k]!]; if (region === 'bumperF') q.reverse(); const w = what(m, k); quad(q[0]!, q[1]!, q[2]!, q[3]!, { region, mat: w ? w[0] : 'paint', panel: w ? w[1] : name }); }
     return rows; };
   const A = ARCH, onArch = (a: { x: number; z: number }, deg: number, y: number): V => [a.x + A.rc * Math.cos(deg * Math.PI / 180), y, a.z + A.rc * Math.sin(deg * Math.PI / 180)];
@@ -154,7 +154,7 @@ export function buildCage(o: CageOpts = {}): Cage959 {
   const kf = o.bumperF ?? 'std', kr = o.bumperR ?? 'std', zf: [number, number, number] = kf === 'aero' ? [365, 150, 92] : [365, 180, 124], zr: [number, number, number] = kr === 'aero' ? [520, 290, 175] : [520, 295, 216];
   const BF = strip(seamF, 'bumperF', zf, kf === 'aero' ? [12, 34, -6] : [10, 4, -42], 700, [archAt(A.f, zf[0], 888, true), archAt(A.f, zf[1], 878, true), archAt(A.f, Math.max(zf[2], 120), 832, true)], 'bumperF',
     (m, k) => m === 0 && k >= 6 && k < 11 ? ['amber', 'indicatorF'] : m === 1 && k >= 9 ? ['grille', 'intakeF'] : m === 1 && k >= 1 && k < 5 && kf !== 'clean' ? ['grille', 'ventF'] : kf === 'aero' && m === 2 ? ['dark', 'lipF'] : null);
-  const BR = strip(seamR, 'bumperR', zr, kr === 'aero' ? [-3, -14, -40] : [-3, -22, -64], 3600, [archAt(A.r, zr[0], 910, false), archAt(A.r, zr[1], 902, false), archAt(A.r, zr[2], 862, false)], 'bumperR',
+  const BR = strip(seamR, 'bumperR', zr, kr === 'aero' ? [-3, -14, -40] : [-3, -22, -64], 3600, [archAt(A.r, Math.min(zr[0], P[seamR[0]!]![2] - 40), 910, false), archAt(A.r, zr[1], 902, false), archAt(A.r, zr[2], 862, false)], 'bumperR',
     (m, k) => m === 1 && k >= 3 && k < 8 && kr !== 'clean' ? ['grille', 'ventR'] : m === 2 && (k >= 9 || kr === 'aero') ? ['dark', kr === 'aero' ? 'diffuser' : 'exhaustSlot'] : null);
 
   const colPath = (j: number, i0: number, i1: number) => Array.from({ length: i1 - i0 + 1 }, (_, k) => M[i0 + k]![j]!), rowPath = (i: number, j0: number, j1: number) => Array.from({ length: j1 - j0 + 1 }, (_, k) => M[i]![j0 + k]!);

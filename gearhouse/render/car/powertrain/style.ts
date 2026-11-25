@@ -18,7 +18,7 @@ export function setPartStyle(s: PartStyle): void { current = s; }
 /** the machinery's look for a renderer look: the drift-game look (4) has its own, every other the realistic one */
 export const styleForLook = (look: number): PartStyle => look === 4 ? 'drift' : 'real';
 
-export type PartKind = 'pipe' | 'intake' | 'exhaust' | 'runner' | 'header' | 'hose' | 'line' | 'belt' | 'link' | 'shaft' | 'arm' | 'frame' | 'spring' | 'casting' | 'cover' | 'box' | 'plate' | 'round';
+export type PartKind = 'bush' | 'pipe' | 'intake' | 'exhaust' | 'runner' | 'header' | 'hose' | 'line' | 'belt' | 'link' | 'shaft' | 'arm' | 'frame' | 'spring' | 'casting' | 'cover' | 'box' | 'plate' | 'round';
 /** a kind's rules. Round sections (tubes, cylinders, bars) are drawn `scale` times as thick and never thinner than
  *  `minPx` pixels across in the reference view; a box's edges are cut by `bevel` mm (never more than a share of its
  *  thinnest side); a kind with no tubes of its own (`seg` 0) has no box side thinner than `minPx` either; `seg`: the
@@ -39,6 +39,7 @@ export const DRIFT_RULES: Record<PartKind, KindRule> = {
   link: { scale: 1.6, minPx: 8, bevel: 0, seg: 6 },
   shaft: { scale: 1.5, minPx: 16, bevel: 0, seg: 6 },
   arm: { scale: 1.9, minPx: 14, bevel: 0, seg: 6 },
+  bush: { scale: 1.45, minPx: 14, bevel: 0, seg: 8 },     // an arm's rubber bush: a round puck, closed at its ends
   frame: { scale: 1.2, minPx: 16, bevel: 0, seg: 5 },
   spring: { scale: 1.7, minPx: 7, bevel: 0, seg: 4 },
   casting: { scale: 1, minPx: 0, bevel: 12, seg: 0 },

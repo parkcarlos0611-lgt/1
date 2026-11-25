@@ -19,14 +19,16 @@ export function png(path: string, w: number, h: number, rgb: Uint8Array) { const
 //      car and between its parts, the drawn lines on top), with the shell's own normals. Drawn at twice the size and halved.
 type V3 = [number, number, number];
 const FORM = process.argv.includes('form');   // continuous shading, to judge the forms (the default is the game's two tones)
-const { mesh: M, shell: S, normals: NN, shellTris } = p959Model();
+// variants (docs/systems/109 S3): lamp=round|ellipsoid|square wheel=hollow5|dish|hole5 bf=std|aero|clean br=std|aero|clean; at=x,y,z: the picture's centre; only=<view,...>
+const arg = (k: string) => process.argv.find(a => a.startsWith(k + '='))?.slice(k.length + 1), AT = (arg('at') ?? '2130,0,600').split(',').map(Number) as V3, ONLY = arg('only')?.split(',');
+const { mesh: M, shell: S, normals: NN, shellTris } = p959Model({ lamp: arg('lamp') as never, wheel: arg('wheel') as never, bumperF: arg('bf') as never, bumperR: arg('br') as never });
 const KIND_PAINT = KINDS.indexOf('paint'), KIND_GLASS = KINDS.indexOf('glass'), KIND_TYRE = KINDS.indexOf('tyre');
 const dot = (a: V3, b: V3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2], crs = (a: V3, b: V3): V3 => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]], un = (a: V3): V3 => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };
 interface DrawO { wires?: { P: V3[]; F: number[][] }; lines?: boolean; mesh?: boolean }
 function flat(yawDeg: number, pitchDeg: number, o: DrawO = {}): Uint8Array { const SS = 2, w = W * SS, h = H * SS, k = mm / SS, y = yawDeg * Math.PI / 180, p = pitchDeg * Math.PI / 180;
   // yaw 0: the car's left side, nose to the left; the eye looks along fwd
-  const fwd: V3 = [Math.sin(y) * Math.cos(p), Math.cos(y) * Math.cos(p), -Math.sin(p)], right: V3 = un(crs(fwd, [0, 0, 1])), up = crs(right, fwd), cx = 2130, cz = 600;
-  const pr = (a: V3): V3 => { const q: V3 = [a[0] - cx, a[1], a[2] - cz]; return [w / 2 + dot(q, right) / k, h * 0.5 - dot(q, up) / k, dot(q, fwd)]; };
+  const fwd: V3 = [Math.sin(y) * Math.cos(p), Math.cos(y) * Math.cos(p), -Math.sin(p)], right: V3 = un(crs(fwd, [0, 0, 1])), up = crs(right, fwd), cx = AT[0], cz = AT[2];
+  const pr = (a: V3): V3 => { const q: V3 = [a[0] - cx, a[1] - AT[1], a[2] - cz]; return [w / 2 + dot(q, right) / k, h * 0.5 - dot(q, up) / k, dot(q, fwd)]; };
   const zb = new Float32Array(w * h).fill(Infinity), id = new Int16Array(w * h).fill(-1), img = new Float32Array(w * h * 3);
   const LK = [-0.5, 0.62, 0.5], light = un([right[0] * LK[0]! + up[0] * LK[1]! - fwd[0] * LK[2]!, right[1] * LK[0]! + up[1] * LK[1]! - fwd[1] * LK[2]!, right[2] * LK[0]! + up[2] * LK[1]! - fwd[2] * LK[2]!]), half = un([light[0] - fwd[0], light[1] - fwd[1], light[2] - fwd[2]]);
   if (o.mesh !== false) for (let t = 0; t < M.n; t++) { const q = [0, 1, 2].map(c => [M.pos[t * 9 + c * 3]!, M.pos[t * 9 + c * 3 + 1]!, M.pos[t * 9 + c * 3 + 2]!] as V3), sc = q.map(pr), fnm = un(crs([q[1]![0] - q[0]![0], q[1]![1] - q[0]![1], q[1]![2] - q[0]![2]], [q[2]![0] - q[0]![0], q[2]![1] - q[0]![1], q[2]![2] - q[0]![2]]));
@@ -57,9 +59,9 @@ function flat(yawDeg: number, pitchDeg: number, o: DrawO = {}): Uint8Array { con
   const out2 = new Uint8Array(W * H * 3); for (let py = 0; py < H; py++) for (let px = 0; px < W; px++) for (let c = 0; c < 3; c++) { let s = 0; for (let dy = 0; dy < SS; dy++) for (let dx = 0; dx < SS; dx++) s += img[((py * SS + dy) * w + px * SS + dx) * 3 + c]!; out2[(py * W + px) * 3 + c] = s / (SS * SS); }
   return out2; }
 const VIEWS: Record<string, [number, number]> = { side: [0, 0], front: [90, 0], rear: [270, 0], top: [0, 89.9], front34: [35, 20], rear34: [215, 20], high34: [40, 40], rearhigh: [220, 42] };
-for (const [n, [yaw, pitch]] of Object.entries(VIEWS)) png(`${out}/p959_${n}.png`, W, H, flat(yaw, pitch));
-png(`${out}/p959_cage_front34.png`, W, H, flat(35, 20, { wires: S.cage, mesh: false })); png(`${out}/p959_cage_rear34.png`, W, H, flat(215, 20, { wires: S.cage, mesh: false }));
-png(`${out}/p959_wire_front34.png`, W, H, flat(35, 20, { wires: S, lines: false }));
+for (const [n, [yaw, pitch]] of Object.entries(VIEWS)) if (!ONLY || ONLY.includes(n)) png(`${out}/p959_${n}.png`, W, H, flat(yaw, pitch));
+if (!ONLY) { png(`${out}/p959_cage_front34.png`, W, H, flat(35, 20, { wires: S.cage, mesh: false })); png(`${out}/p959_cage_rear34.png`, W, H, flat(215, 20, { wires: S.cage, mesh: false }));
+png(`${out}/p959_wire_front34.png`, W, H, flat(35, 20, { wires: S, lines: false })); }
 const use = [...edgeUse(S.F).values()], count = (f: (t: (typeof S.tag)[number]) => boolean) => S.F.reduce((s, f2, k) => s + (f(S.tag[k]!) ? f2.length - 2 : 0), 0);
 console.log(`cage: ${S.cage.P.length} points, ${S.cage.F.length} faces; shell: ${S.P.length} points, ${S.F.length} faces`);
 console.log(`triangles: all ${count(() => true)}; shell region ${count(t => t.region === 'shell')} (paint ${count(t => t.region === 'shell' && t.mat === 'paint')}, glass ${count(t => t.mat === 'glass')}, wells+floor ${count(t => t.panel === 'wheelWell' || t.panel === 'floor')}), tail ${count(t => t.region === 'tail')}, bumpers ${count(t => t.region === 'bumperF')} + ${count(t => t.region === 'bumperR')}`);

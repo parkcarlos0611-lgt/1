@@ -67,3 +67,8 @@ export function autoAtlasUV(pos: ArrayLike<number>, kinds: ArrayLike<number>, nt
     const n = [Math.abs(ay * bz - az * by), Math.abs(az * bx - ax * bz), Math.abs(ax * by - ay * bx)], m = n[0]! >= n[1]! && n[0]! >= n[2]! ? 0 : n[1]! >= n[2]! ? 1 : 2, [i, j] = m === 0 ? [1, 2] : m === 1 ? [0, 2] : [0, 1];
     for (let k = 0; k < 3; k++) out.set([pos[q + k * 3 + i!]! / pitch, pos[q + k * 3 + j!]! / pitch, cell], q + k * 3); }
   return any ? out : null; }
+
+/** the player's line weight (settings, "선 굵기"): one scale on the outline, the character lines and the panel lines
+ *  together (a panel line keeps its share of the character line's width), 0.75 .. 1.5 */
+export const lineWeight = { k: 1 };
+export function setLineWeight(k: number): number { lineWeight.k = Math.max(0.75, Math.min(1.5, Number.isFinite(k) ? k : 1)); return lineWeight.k; }

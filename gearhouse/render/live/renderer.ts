@@ -1071,12 +1071,12 @@ export class LiveRenderer {
   private styleInk(v: LiveView, cars: LiveCar[], carM: { body: M4; opaque: Piece[] }[], carIds: number[], VP: Float32Array, st: LiveStyle, ink: [number, number, number], ty: number,
     eyeTo: (p: WebGLProgram) => void, draw: (part: { vao: WebGLVertexArrayObject; n: number }, M: M4, w?: WheelDraw, key?: string, bones?: Float32Array) => void) { const gl = this.gl, dpr = st.dpr ?? 1;
     const det = (m: M4) => m[0]! * (m[5]! * m[10]! - m[6]! * m[9]!) - m[4]! * (m[1]! * m[10]! - m[2]! * m[9]!) + m[8]! * (m[1]! * m[6]! - m[2]! * m[5]!);
-    if (st.outline !== false) { gl.uniform1i(this.loc(this.obj, 'uMode'), 3); gl.uniform1f(this.loc(this.obj, 'uHull'), screenPx(st.outPx ?? STYLE.outlinePx, v.H, dpr)); gl.enable(gl.CULL_FACE);
+    if (st.outline !== false) { gl.uniform1i(this.loc(this.obj, 'uMode'), 3); gl.uniform1f(this.loc(this.obj, 'uHull'), screenPx((st.outPx ?? STYLE.outlinePx) * lineWeight.k, v.H, dpr)); gl.enable(gl.CULL_FACE);
       cars.forEach((q, i) => { const cid = carIds[i]!; gl.uniform2f(this.loc(this.obj, 'uObj'), (cid & 255) / 255, ((cid >> 8) & 255) / 255);
         for (const [part, M, w, b] of carM[i]!.opaque) { gl.cullFace(det(M) < 0 ? gl.BACK : gl.FRONT); draw(part, M, w, undefined, b); } });   /* a mirrored placing turns the winding over: cull what then faces the eye */
       gl.disable(gl.CULL_FACE); gl.uniform1f(this.loc(this.obj, 'uHull'), 0); gl.uniform1i(this.loc(this.obj, 'uMode'), 0); }
     if (st.lines === false) return; const P = this.lineP; gl.useProgram(P); gl.uniformMatrix4fv(this.loc(P, 'uVP'), false, VP); gl.uniform2f(this.loc(P, 'uVpx'), v.W, v.H); gl.uniform3fv(this.loc(P, 'uInk'), ink); eyeTo(P);
-    gl.uniform1f(this.loc(P, 'uW'), screenPx(st.linePx ?? STYLE.linePx, v.H, dpr)); gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false); gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.NONE, gl.NONE, gl.NONE]);
+    gl.uniform1f(this.loc(P, 'uW'), screenPx((st.linePx ?? STYLE.linePx) * lineWeight.k, v.H, dpr)); gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false); gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.NONE, gl.NONE, gl.NONE]);
     cars.forEach((q, i) => { const L = styleLines(gl, q.g), m = carM[i]!; if (!L.body && !L.susp) return;
       const wpp = v.eye && ty ? 2 * Math.hypot(q.x - v.eye[0], q.y - v.eye[1], q.z - v.eye[2]) * ty / v.H : v.mm / 1000; gl.uniform1f(this.loc(P, 'uLift'), Math.max(STYLE.lift, Math.min(0.03, wpp * 1.5)));   /* a pixel and a half toward the eye, at least 4 mm */
       gl.uniformMatrix4fv(this.loc(P, 'uModel'), false, m.body);

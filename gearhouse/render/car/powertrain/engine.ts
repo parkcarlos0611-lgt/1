@@ -227,6 +227,8 @@ export function buildEngine(g: Geo, S0: PowertrainSpec, det: Detail, transverse 
 
   // ---- the charge air: each compressor up to an intercooler standing beside its bank (when fitted), on to the throttle ----
   if (comp.length) { const into = (s: number): V => { const t = tbAt.find(q => Math.sign(q[1]) === s) ?? tbAt[0]!; return [t[0] + 0.55 * B, t[1], t[2]]; };
+    // the way the charge pipe comes to the throttle: round from the front; in the drift look on a flat engine in from its side, behind the fan's shroud (so no pipe crosses the fan's face)
+    const side = (s: number): V => dr && S0.layout === 'flat' ? [0, -s, 0] : [-1, 0, 0];
     const reach = Math.max(...comp.map(c => Math.abs(c.top[1]))) + 0.75 * B, sides = S.filter(s => comp.some(c => c.s === s));
     for (const s of sides) { const mine = comp.filter(c => c.s === s), end = into(s);
       if (S0.intercooler) { const i0 = Lb - 1.9 * B, i1 = Lb + 0.3 * B, ic: V = [(i0 + i1) / 2, s * reach, mine[0]!.top[2] + 0.5 * B], ih = 0.85 * B, it = 0.26 * B;
@@ -236,8 +238,8 @@ export function buildEngine(g: Geo, S0: PowertrainSpec, det: Detail, transverse 
           if (det === 2 && !dr) { g.part('intercooler', '#2c2f33', 0.3, 'metal'); for (let k = 1; k < 5; k++) { const w = ic[2] - ih + k * ih * 0.4, yo = ic[1] + s * (it + 1.5); g.quad([i0, yo, w - 3], [i1, yo, w - 3], [i1, yo, w + 3], [i0, yo, w + 3]); } } }
         g.part('boostPipe', ALU, 0.75, 'metal');
         for (const m of mine) { const tank: V = [i0 - 0.15 * B, ic[1], ic[2] - ih * 0.5]; if (det === 0) g.tube([m.top, tank], 0.18 * B, 4); else g.bend(m.top, add(mul(acr(s), -0.2), [0.2, 0, 1]), tank, [0.6, s * 0.8, 0.2], 0.18 * B, 4, 3, 0.45); }
-        const out: V = [i1 + 0.15 * B, ic[1], ic[2] + ih * 0.6]; if (det === 0) g.tube([out, end], 0.2 * B, 4); else g.bend(out, [0.3, 0, 1], end, [-1, 0, 0], 0.2 * B, pseg, det === 2 ? 5 : 4, 0.6); }
-      else { g.part('boostPipe', ALU, 0.75, 'metal'); for (const m of mine) { if (det === 0) g.tube([m.top, end], 0.18 * B, 4); else g.bend(m.top, [0.3, s * 0.3, 1], end, [-1, 0, 0], 0.19 * B, pseg + 1, det === 2 ? 6 : 4, 0.7); } } }
+        const out: V = [i1 + 0.15 * B, ic[1], ic[2] + ih * 0.6]; if (det === 0) g.tube([out, end], 0.2 * B, 4); else g.bend(out, [0.3, 0, 1], end, side(s), 0.2 * B, pseg, det === 2 ? 5 : 4, 0.6); }
+      else { g.part('boostPipe', ALU, 0.75, 'metal'); for (const m of mine) { if (det === 0) g.tube([m.top, end], 0.18 * B, 4); else g.bend(m.top, [0.3, s * 0.3, 1], end, side(s), 0.19 * B, pseg + 1, det === 2 ? 6 : 4, 0.7); } } }
     // a throttle no intercooler feeds (one turbo under two plenums): a pipe across from the other
     if (tbAt.length === 2 && sides.length === 1 && det > 0) { const a = into(sides[0]!), c = into(-sides[0]!); g.part('boostPipe', ALU, 0.75, 'metal').tube([a, [a[0] + 0.35 * B, a[1] * 0.6, a[2]], [c[0] + 0.35 * B, c[1] * 0.6, c[2]], c], 0.19 * B, pseg + 1); }
     if (itb && det > 0) { g.part('throttleBody', STEEL, 0.7, 'metal'); for (const t of tbAt) g.cyl(t, [t[0] + 0.55 * B, t[1], t[2]], 0.34 * B, seg2, true); } }
@@ -252,8 +254,8 @@ export function buildEngine(g: Geo, S0: PowertrainSpec, det: Detail, transverse 
     g.part('oilFiller', '#d0c020', 0.4); { const c = P(1, cylU(1, nb - 1), twin ? 0.5 * B : 0, topA); g.cyl(c, add(c, mul(ax(1), 0.25 * B)), 0.28 * B, 6, true, [1, 0, 0]); }
     if (!dry) { g.part('dipstick', '#e2a21a', 0.4); const c = P(S[S.length - 1]!, cylU(S[S.length - 1]!, 0), hw + 0.2 * B, Hd * 0.9); g.bar(c, add(c, [0, 0, 0.35 * B]), 0.12 * B); } }
   // the drift look's hero on a flat engine: the cooling fan's big round shroud over the pulleys' end, its dark mouth and bright hub (a part of its own, only drawn in that look)
-  if (dr && S0.layout === 'flat' && det > 0) { // (its top a little over the intake's; with turbos under the charge pipe that comes round to the throttle, so no pipe crosses its face)
-    const top = turbos > 0 && tbAt.length ? Math.min(...tbAt.map(t => t[2])) - 0.5 * B : plTop + 0.15 * B, r = Math.min(1.3 * B, (top - floor + 0.1 * B) / 2), c: V = [ue + 0.4 * B, 0, top - r], n = det === 2 ? 14 : 8;
+  if (dr && S0.layout === 'flat' && det > 0) { // (its top a little over the intake's; the charge pipes come to the throttle from the side, behind it)
+    const top = plTop + 0.15 * B, r = Math.min(2.3 * B, (top - floor) / 2), c: V = [ue + 0.62 * B, 0, top - r], n = det === 2 ? 14 : 8;
     g.part('fanShroud', '#ee5a1c', 0.4).lathe(c, [1, 0, 0], [[0, r], [0.5 * B, r], [0.62 * B, r * 0.86]], n, 'a');
     g.part('fanShroud', '#151517', 0.2).lathe(add(c, [0.62 * B, 0, 0]), [1, 0, 0], [[0, r * 0.86], [-0.2 * B, r * 0.8]], n, 'b');
     g.part('fanShroud', '#d9dce0', 0.45).lathe(add(c, [0.4 * B, 0, 0]), [1, 0, 0], [[0, r * 0.3], [0.3 * B, r * 0.22]], 8, 'b');

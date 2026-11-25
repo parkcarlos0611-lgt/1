@@ -5,7 +5,7 @@
 // fittings and the bay drawn on its own are there; its colours and rules are data a customisation can change.
 import { describe, it, expect } from 'vitest';
 import { DESIGN_NSX, DESIGN_F355, DESIGN_EB110, applyPatch, type Design } from '../core/design';
-import { designKit, designPowertrain } from '../render/car/design';
+import { designKit, designMesh, designPowertrain } from '../render/car/design';
 import { assemble, type Assembled } from '../render/car/kit/assemble';
 import { kitSite } from '../render/car/kit/parts/engine';
 import { powertrainMesh, fromDesign, setPartStyle, partStyle, styleForLook, driftStyle } from '../render/car/powertrain';
@@ -17,7 +17,7 @@ import { SUSPENSION, TRAVEL, addSuspension, isSuspPart, poseMesh, poseRig, boneA
 import { kitWheels } from '../render/car/kit/parts/suspension';
 import { makeLines } from '../render/car/kit/lines';
 import { hullNormals } from '../render/car/edges';
-import { STYLE_PARTS, FRONT_SITE, REAR_SITE, I6_TURBO, F6_NA, V8_NA } from '../render/car/styleparts';
+import { p959WithEngine, STYLE_PARTS, FRONT_SITE, REAR_SITE, I6_TURBO, F6_NA, V8_NA } from '../render/car/styleparts';
 
 const HEAVY = applyPatch(DESIGN_F355, { body: { wheelbase: 250 }, engine: { grade: 4, layout: 'V12', cc: 5000, turbo: 4, intake: 'itb' }, drive: { awd: true, gearbox: 'f1' } });
 const DESIGNS: [string, Design][] = [['nsx', DESIGN_NSX], ['f355', DESIGN_F355], ['eb110', DESIGN_EB110], ['v12 four turbos awd', HEAVY], ['i6 turbo', applyPatch(DESIGN_F355, { engine: { layout: 'I6', cc: 3000, turbo: 1 } })],
@@ -108,6 +108,21 @@ describe('the powertrain in the drift look', () => {
     // the realistic look has no bay; the style page's machinery builds in both looks
     expect(powertrainMesh(fromDesign(V8_NA), FRONT_SITE, { engineOnly: true, bay: true, style: 'real' }).built.parts.has('bayTub')).toBe(false);
     for (const c of STYLE_PARTS) { const M = c.mesh(); expect(M.n, c.id).toBeGreaterThan(300); expect(M.length).toBeGreaterThan(300); }
+  });
+});
+
+describe('the drift look in the cars', () => {
+  it('the 959 (a flat six with two turbos behind its rear axle): the fan\'s shroud, the turbos and the charge pipes clear its engine lid and its tail; no charge pipe crosses the fan\'s face', () => {
+    const D = p959WithEngine('drift'), P = D.built.parts, M = D.mesh, N = M.names!, f = P.get('fanShroud')!;
+    // the lid's grille stands from 799 mm up, the tail's panel from 4,158 mm back (measured on the shell)
+    for (const n of ['fanShroud', 'boostPipe', 'intercooler', 'turbo', 'airFilter', 'intakePlenum', 'camCover']) { const b = P.get(n)!; expect(b.max[2], n).toBeLessThan(799 - 60); expect(b.max[0], n).toBeLessThan(4158 - 150); }
+    const cy = (f.min[1] + f.max[1]) / 2, cz = (f.min[2] + f.max[2]) / 2, r = (f.max[2] - f.min[2]) / 2; expect(r).toBeGreaterThan(120);   // the hero: a big round shroud
+    for (let t = D.engineTris[0]; t < D.engineTris[1]; t++) { if (N[M.part[t]!] !== 'boostPipe') continue; for (let k = 0; k < 3; k++) { const q = t * 9 + k * 3; if (M.pos[q]! > f.min[0] - 5) expect(Math.hypot(M.pos[q + 1]! - cy, M.pos[q + 2]! - cz)).toBeGreaterThan(r); } }
+    expect(p959WithEngine('real').built.engine).toEqual(D.built.engine);
+  });
+  it('the whole car with drift machinery (measured: over the realistic look\'s 16,600 by the bevels and the round pipes; its own ceiling 20,000)', () => {
+    const n = (d: Design, style: 'real' | 'drift') => { setPartStyle(style); try { return designMesh(d).n; } finally { setPartStyle('real'); } };
+    for (const d of [DESIGN_NSX, DESIGN_F355, DESIGN_EB110, HEAVY]) { expect(n(d, 'real')).toBeLessThanOrEqual(16600); expect(n(d, 'drift')).toBeLessThanOrEqual(20000); expect(n(d, 'drift')).toBeGreaterThan(n(d, 'real')); }
   });
 });
 

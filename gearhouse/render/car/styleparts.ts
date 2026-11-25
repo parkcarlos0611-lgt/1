@@ -2,12 +2,14 @@
 // the style check page (ui/stylecheck.ts): an engine on the workshop's stand, an engine in a bay drawn on its own (an
 // in-line six with a turbo and a V8 at the front, a flat six at the rear), a suspension corner; each in the realistic
 // look and in the drift look, so the two can be set side by side. Each stands on the floor at the mesh's middle.
-import type { Mesh, V } from './mesh';
+import { Build, KINDS, type Mesh, type V } from './mesh';
+import { p959Model } from './p959';
+import { DIM } from './p959/cage';
 import type { StyleCar } from './stylecars';
 import { DESIGN_F355, DESIGN_NSX, applyPatch, type Design, type DesignPatch } from '../../core/design';
 import { designKit } from './design';
 import { assemble } from './kit/assemble';
-import { powertrainMesh, setPartStyle, partStyle, fromDesign, type PartStyle, type Site } from './powertrain';
+import { addPowertrain, powertrainMesh, setPartStyle, partStyle, fromDesign, type PartStyle, type PowertrainBuilt, type Site } from './powertrain';
 import { standModel } from './powertrain/stand';
 import { isSuspPart } from './suspension';
 
@@ -34,6 +36,26 @@ export const V8_NA = DESIGN_F355;
 /** a flat six with two turbos (the 959's kind) */
 export const F6_NA = design(DESIGN_NSX, { engine: { layout: 'F6', cc: 2850, turbo: 2, intake: 'single', intercooler: true, grade: 1 } });
 
+/** the 959's site for its powertrain, off its own measurements (p959/cage.ts DIM, sockets.ts): the flat six hung behind the rear axle, the gearbox ahead of it, the body's two exhaust tips */
+export const P959_SITE: Site = { length: DIM.length, foot: 150, wheels: { f: { x: DIM.axleF, y: DIM.trackF / 2, r: DIM.tyreR, w: 235, z: DIM.hubZ }, r: { x: DIM.axleR, y: DIM.trackR / 2, r: DIM.tyreR - 2, w: 255, z: DIM.hubZ - 2 } },
+  engine: { at: [DIM.axleR + 112, 0, 440], dir: '+x' }, tips: { x: 4258, z: 256, y: [-335, 335], r: 40 }, cabin: { floor: 170, x: [1350, 2900], tunnel: [1350, 110, 330] } };
+/** the 959 with its powertrain in it (the realistic look or the drift one); `open`: its engine lid, wing and rear window taken off so the bay shows */
+export function p959WithEngine(style: PartStyle, open = false): { mesh: Mesh; shellTris: number; engineTris: [number, number]; built: PowertrainBuilt } {
+  const car = p959Model(), b = new Build(), built = addPowertrain(b, fromDesign(F6_NA), P959_SITE, { detail: 2, style }), E = b.mesh(DIM.length), A = car.mesh, hide = /^(engineGrille|engineLid|wing|wingSlot|rearWindow|tailPanel)$/;
+  const keep: number[] = []; for (let t = 0; t < A.n; t++) if (!open || !hide.test(A.names?.[A.part[t]!] ?? '')) keep.push(t);
+  const n = keep.length + E.n, cat = <T extends Float32Array | Uint8Array | Int16Array>(a: T, e: T, w: number, make: (k: number) => T, off = 0): T => { const o = make(n * w); keep.forEach((t, i) => o.set(a.subarray(t * w, t * w + w), i * w)); for (let i = 0; i < e.length; i++) o[keep.length * w + i] = e[i]! + off; return o; };
+  const NA = A.names ?? [], mesh: Mesh = { ...A, n, pos: cat(A.pos, E.pos, 9, k => new Float32Array(k)), col: cat(A.col, E.col, 3, k => new Uint8Array(k)), gloss: cat(A.gloss, E.gloss, 1, k => new Float32Array(k)), part: cat(A.part, E.part, 1, k => new Int16Array(k), NA.length),
+    kind: cat(A.kind, E.kind, 1, k => new Uint8Array(k)), tex: cat(A.tex, E.tex, 1, k => new Uint8Array(k)), names: [...NA, ...(E.names ?? [])], ...(E.partLines ? { partLines: E.partLines } : {}), ...(A.uv ? { uv: undefined } : {}) };
+  return { mesh, shellTris: open ? 0 : car.shellTris, engineTris: [keep.length, n], built }; }
+/** a kit car with its machinery in the drift look, its engine's cover (the deck and the glass over the bay) taken off */
+function kitOpen(d: Design, style: PartStyle): Mesh { const was = partStyle(); setPartStyle(style);
+  try { const { kit, tweak } = designKit(d, 2), A = assemble(kit, { tweak }), M = A.mesh, deck = A.panels.indexOf('deck'), G = KINDS.indexOf('glass'), x0 = (kit.cabin.x[1] ?? 0) - 250, K: number[] = [];
+    for (let t = 0; t < M.n; t++) { if (A.panelOf[t] === deck) continue; if (M.kind[t] === G && Math.min(M.pos[t * 9]!, M.pos[t * 9 + 3]!, M.pos[t * 9 + 6]!) > x0) continue; K.push(t); }
+    const pick = <T extends Float32Array | Uint8Array | Int16Array>(a: T, w: number, make: (k: number) => T): T => { const o = make(K.length * w); K.forEach((t, i) => o.set(a.subarray(t * w, t * w + w), i * w)); return o; };
+    const { susp: _s, ...rest } = M; void _s;
+    return { ...rest, decals: [], n: K.length, pos: pick(M.pos, 9, k => new Float32Array(k)), col: pick(M.col, 3, k => new Uint8Array(k)), gloss: pick(M.gloss, 1, k => new Float32Array(k)), part: pick(M.part, 1, k => new Int16Array(k)), kind: pick(M.kind, 1, k => new Uint8Array(k)), tex: pick(M.tex, 1, k => new Uint8Array(k)) }; }
+  finally { setPartStyle(was); } }
+
 const stand = (d: Design, style: PartStyle) => centred(standModel(d, 2, undefined, style).mesh);
 /** an engine in its bay; the realistic look has no bay of its own: the engine alone, as the drift look's is compared with */
 const bay = (d: Design, site: Site, style: PartStyle) => centred(powertrainMesh(fromDesign(d), site, { detail: 2, engineOnly: true, style, bay: true }).mesh);
@@ -49,4 +71,5 @@ export const STYLE_PARTS: StyleCar[] = [
   ...both('standV8', '받침대 위 V8', s => stand(V8_NA, s)), ...both('standI6', '받침대 위 직렬 6기통 터보', s => stand(I6_TURBO, s)), ...both('standF6', '받침대 위 수평대향 6기통', s => stand(F6_NA, s)),
   ...both('bayI6', '앞 엔진룸: 직렬 6기통 터보', s => bay(I6_TURBO, FRONT_SITE, s)), ...both('bayV8', '앞 엔진룸: V8', s => bay(V8_NA, FRONT_SITE, s)), ...both('bayF6', '뒤 엔진룸: 수평대향 6기통', s => bay(F6_NA, REAR_SITE, s)),
   ...both('corner', '서스펜션 앞 코너', corner),
+  ...both('p959bay', '959: 엔진 덮개를 뗀 모습', s => p959WithEngine(s, true).mesh), ...both('f355bay', 'F355: 엔진 덮개를 뗀 모습', s => kitOpen(DESIGN_F355, s)),
 ];

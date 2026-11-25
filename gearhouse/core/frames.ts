@@ -1,11 +1,13 @@
 // The builder's frames, glass sets and interior sets (docs/systems/115 §4, step F1): data only. A frame is a body lump
 // with no openings ("차체 A": the 959's control cage with its sockets flushed, its bumpers blank, a plain steel wheel,
-// its panel lines faint), stretched by a few dimensions within the frame's own ranges; the glass is picked after it as
+// its panel lines faint; "차체 B": the N33's, docs/systems/117 R1, the first front-engined one), stretched by a few dimensions within the frame's own ranges; the glass is picked after it as
 // a set of the frame's own cells (material tags only, no new faces); the interior is picked from the frame's sets,
 // its colour apart. The render side reads these (render/car/p959: the cage stretched, the cells tagged); the physics
 // reads a frame's dimensions as the body's own (bodyDimsOf: race/design.ts, race/fit.ts take them as any base's).
 
-export type FrameId = 'A959';
+import type { ModelBaseId } from './design';
+
+export type FrameId = 'A959' | 'B33';
 /** a frame's dimensions against its own (mm): the front overhang, the wheelbase and the rear overhang apart (the length
  *  is their sum), the width overall (the track follows it), the roof's height, the ride height (the body over its hubs) */
 export interface FrameDims { overhangF: number; wheelbase: number; overhangR: number; width: number; roof: number; ride: number }
@@ -14,7 +16,7 @@ export const FRAME_DIMS: FrameDimKey[] = ['overhangF', 'wheelbase', 'overhangR',
 export const FRAME_DIM_NAME: Record<FrameDimKey, string> = { overhangF: '앞 오버행', wheelbase: '휠베이스', overhangR: '뒤 오버행', width: '차폭', roof: '지붕 높이', ride: '지상고' };
 export const NO_FRAME_DIMS: FrameDims = { overhangF: 0, wheelbase: 0, overhangR: 0, width: 0, roof: 0, ride: 0 };
 
-export interface FrameDef { id: FrameId; /** the card's name */ name: string; /** the model body it is cut from (core/design.ts MODEL_BASES) */ base: 'p959';
+export interface FrameDef { id: FrameId; /** the card's name */ name: string; /** the model body it is cut from (core/design.ts MODEL_BASES) */ base: ModelBaseId;
   /** the card's tag: the classes it suits (a label, not a limit) */ suits: string;
   /** its own measurements (mm): what the dimensions are added to */ own: { length: number; wheelbase: number; width: number; height: number; trackF: number; trackR: number };
   /** each dimension's range (mm): as far as the stretched surface stays sound (tests/frames.test.ts measures both ends) */ ranges: Record<FrameDimKey, readonly [number, number]> }
@@ -22,8 +24,15 @@ export interface FrameDef { id: FrameId; /** the card's name */ name: string; /*
  *  dimple, no unmarked fold) at either end, the stretch laid where its lines take it (render/car/p959/frame.ts) */
 export const FRAMES: Record<FrameId, FrameDef> = {
   A959: { id: 'A959', name: '차체 A', base: 'p959', suits: '추천 S3~P3', own: { length: 4260, wheelbase: 2272, width: 1840, height: 1280, trackF: 1504, trackR: 1550 },
-    ranges: { overhangF: [-80, 80], wheelbase: [-150, 150], overhangR: [-60, 80], width: [-60, 60], roof: [-40, 40], ride: [-30, 40] } } };
-export const FRAME_IDS: FrameId[] = ['A959'];
+    ranges: { overhangF: [-80, 80], wheelbase: [-150, 150], overhangR: [-60, 80], width: [-60, 60], roof: [-40, 40], ride: [-30, 40] } },
+  /** 차체 B: the N33's lump (docs/systems/117 R1), a front-engined 2+2 coupe. Its wheelbase is laid over the bonnet's
+   *  back and the screen's foot (render/car/n33/frame.ts), so a longer one is a longer engine bay; the ranges are where
+   *  its surface keeps the same rules (tests/frames.test.ts) */
+  B33: { id: 'B33', name: '차체 B', base: 'bnr33', suits: '추천 S1~S3', own: { length: 4675, wheelbase: 2720, width: 1780, height: 1364, trackF: 1480, trackR: 1490 },
+    ranges: { overhangF: [-60, 80], wheelbase: [-100, 120], overhangR: [-80, 80], width: [-40, 60], roof: [-40, 30], ride: [-30, 40] } } };
+export const FRAME_IDS: FrameId[] = ['A959', 'B33'];
+/** each model body's frame (a design on a body takes its frame) */
+export const FRAME_OF_BASE: Record<ModelBaseId, FrameId> = { p959: 'A959', bnr33: 'B33' };
 export const isFrameId = (v: unknown): v is FrameId => (FRAME_IDS as unknown[]).includes(v);
 
 /** a frame's dimensions from anything (a file, a link): each a whole number of millimetres within the frame's range */

@@ -165,4 +165,5 @@ const P959: SuspSpec = {
     damper: { dx: [-80, 80], at: 0.46, top: [150, 270], spring: [33, 5.5], body: 20 }, bar: { dx: 250, z: 170, r: 9, at: 0.62, link: -44 }, steer: { dx: 124, up: 50, rack: false, trim: 1.5 }, brake: { r: 152, t: 28, caliper: 112, at: 0 } },
   look: { arms: '#2a2c30', armGloss: 0.35, armKind: 'tube', upright: '#a2a5a9', spring: '#c9a227', damper: '#2a2c30', caliper: '#b3161b', disc: DISC } };
 /** each base's suspension, by the kit's id or the model-built body's (render/car/bodies.ts) */
-export const SUSPENSION: Record<string, SuspSpec> = { nsx: NSX, f355: F355, eb110: EB110, p959: P959 };
+export const SUSPENSION: Record<string, SuspSpec> = { nsx: NSX, f355: F355, eb110: EB110, p959: P959,
+  /** the N33 (docs/systems/117 R1): its multilinks drawn as the 959's double wishbones until R4 [~] */ bnr33: P959 };

@@ -29,12 +29,13 @@
 //   tyre that much wider), a lower body brings the arches down onto the tyres (less travel left). The ground clearance:
 //   below 100 mm a body grounds on speed bumps, kerbs and ramps ('modified': a nose lift and skid plates, a stiffer
 //   ride); below 70 mm it is a race car's, not one for the road ('blocked').
-import { LIMITS, BASES, BODY_LIMITS, applyPatch, gradeFor, isModelBase, DESIGN_NSX, DESIGN_F355, DESIGN_EB110, DESIGN_P959, type BodyBase, type Design, type DesignPatch } from '../core/design';
+import { LIMITS, BASES, BODY_LIMITS, applyPatch, gradeFor, isModelBase, DESIGN_NSX, DESIGN_F355, DESIGN_EB110, DESIGN_P959, DESIGN_BNR33, type BodyBase, type Design, type DesignPatch } from '../core/design';
 import { BODY_NAME } from '../core/names';
 import { enginePackage, engineFigures, tyreR } from './designparts';
 import nsxSheet from '../data/cars/spec/nsx.json';
 import f355Sheet from '../data/cars/spec/f355.json';
 import p959Sheet from '../data/cars/spec/p959.json';
+import bnr33Sheet from '../data/cars/spec/bnr33.json';
 
 export type Verdict = 'ok' | 'modified' | 'blocked';
 export interface Fix { /** what it does (Korean) */ label: string; patch: DesignPatch; /** rough cost (the car's cost index points, race/design.ts) */ cost: number }
@@ -44,7 +45,7 @@ export interface FitResult {
   /** what a 'modified' verdict's work adds: kg (at `at`), the cost index, reliability points lost, drag area (m²) */
   mass: number; at: 'engine' | 'front' | 'rear'; cost: number; reliability: number; cdA: number }
 
-type Orient = 'mid-longitudinal' | 'mid-transverse' | 'rear-longitudinal';
+type Orient = 'mid-longitudinal' | 'mid-transverse' | 'rear-longitudinal' | 'front-longitudinal';
 interface Bay { orient: Orient; length: number; width: number; height: number; /** Nm: the mounts', the gearbox's */ mount: number; gearbox: number }
 const box = (s: { engineBay: { box: { x: number[]; y: number[]; z: number[] } } }) => { const b = s.engineBay.box; return { length: (b.x[1]! - b.x[0]!) / 1000, width: (b.y[1]! - b.y[0]!) / 1000, height: (b.z[1]! - b.z[0]!) / 1000 }; };
 /** the bases' bays (m) and torque limits: the NSX's transaxle (its own 284 Nm) to 360, its mounts 400; the F355's
@@ -58,15 +59,20 @@ export const BAYS: Record<BodyBase, Bay> = {
   /** the 959's: the flat six behind the rear axle under the engine lid (the cabin's back at 2,960 to the tail's panel at
    *  4,100), its gearbox ahead of the axle under the rear seats' tunnel; 1.24 m between the rear wells, from the floor at
    *  200 to the lid at 820; its own 500 Nm with margins of the kind */
-  p959: { orient: 'rear-longitudinal', length: 1.6, width: 1.24, height: 0.62, mount: 650, gearbox: 600 } };
+  p959: { orient: 'rear-longitudinal', length: 1.6, width: 1.24, height: 0.62, mount: 650, gearbox: 600 },
+  /** the N33's: the straight six lengthwise under the bonnet, from the radiator's back (x 420) to the bulkhead under the
+   *  screen's foot (1,450; the gearbox behind it in the tunnel, not in the bay's length), 0.98 m between the front wells,
+   *  from the floor at 220 to the bonnet at 880; its own 368 Nm with the margins of the kind (the six's block was known
+   *  for taking far more) [~] */
+  bnr33: { orient: 'front-longitudinal', length: 1.03, width: 0.98, height: 0.66, mount: 600, gearbox: 480 } };
 /** the arches' radii (m), front and rear, from the sheets (the kit's lines take theirs from the same place); the EB110's
  *  half-ellipses by their height over the hub (render/car/cars/eb110.kit.ts arches rz) */
 export const ARCHES: Record<BodyBase, [number, number]> = {
-  nsx: [nsxSheet.arches.front.radius / 1000, nsxSheet.arches.rear.radius / 1000], f355: [f355Sheet.arches.front.radius / 1000, f355Sheet.arches.rear.radius / 1000], eb110: [0.362, 0.392], p959: [0.355, 0.355] };   // the 959's cage: render/car/p959/cage.ts DIM.archR
+  nsx: [nsxSheet.arches.front.radius / 1000, nsxSheet.arches.rear.radius / 1000], f355: [f355Sheet.arches.front.radius / 1000, f355Sheet.arches.rear.radius / 1000], eb110: [0.362, 0.392], p959: [0.355, 0.355], bnr33: [0.368, 0.368] };   // the 959's cage: render/car/p959/cage.ts DIM.archR
 /** the base's own car's tyres (mm): the room under its arches is set by them */
-export const OWN_TYRES: Record<BodyBase, [number, number]> = { nsx: DESIGN_NSX.kit.tyres, f355: DESIGN_F355.kit.tyres, eb110: DESIGN_EB110.kit.tyres, p959: DESIGN_P959.kit.tyres };
+export const OWN_TYRES: Record<BodyBase, [number, number]> = { nsx: DESIGN_NSX.kit.tyres, f355: DESIGN_F355.kit.tyres, eb110: DESIGN_EB110.kit.tyres, p959: DESIGN_P959.kit.tyres, bnr33: DESIGN_BNR33.kit.tyres };
 /** each base's own ground clearance (mm, the sheets' overall.groundClearance; the EB110's 100) */
-export const CLEARANCE: Record<BodyBase, number> = { nsx: nsxSheet.overall.groundClearance, f355: f355Sheet.overall.groundClearance, eb110: 100, p959: p959Sheet.overall.groundClearance };
+export const CLEARANCE: Record<BodyBase, number> = { nsx: nsxSheet.overall.groundClearance, f355: f355Sheet.overall.groundClearance, eb110: 100, p959: p959Sheet.overall.groundClearance, bnr33: bnr33Sheet.overall.groundClearance };
 /** the clearance a road car needs (mm): below the first it grounds on bumps and ramps, below the second it is a race car's */
 export const CLEAR_OK = 100, CLEAR_MIN = 70;
 /** how much wider than its base's own tyre a tyre fits before the arch is flared (mm); the travel left above a tyre (m) */
@@ -85,22 +91,25 @@ const rank = { ok: 0, modified: 1, blocked: 2 } as const;
 /** the engine's footprint in the bay (m): along the car, across it, its height; whether it needs the Miura's gearbox */
 function footprint(d: Design) {
   const P = enginePackage(d), B = BAYS[d.body.base];
+  if (B.orient === 'front-longitudinal') return { along: P.length, across: P.width, height: P.height, miura: false, P };   // the gearbox behind the bulkhead, in the tunnel
   if (B.orient !== 'mid-transverse') return { along: P.length + P.box, across: P.width, height: P.height, miura: false, P };
   const miura = P.length / 2 + 0.1 > HALF_SHAFT;
   return { along: P.width + (miura ? 0.25 : 0), across: P.length + (miura ? 0 : P.boxEnd), height: P.height, miura, P }; }
 /** the bay as the design stretches it (m): the wheelbase's stretch and the cabin moved forward lengthen it; a bay behind
- *  the rear axle (the 959's) is lengthened by the rear overhang instead (its frame stretches the wheelbase ahead of it) */
-const bayOf = (d: Design) => { const B = BAYS[d.body.base]; return { length: B.length + (B.orient === 'rear-longitudinal' ? d.body.overhangR : d.body.wheelbase + d.body.cabin) / 1000, width: B.width + 2 * d.body.width / 1000, height: B.height }; };
+ *  the rear axle (the 959's) is lengthened by the rear overhang instead (its frame stretches the wheelbase ahead of it);
+ *  a bay under the bonnet (the N33's) by the wheelbase, which its frame lays over the bonnet's back (render/car/n33/frame.ts),
+ *  and by the front overhang, the radiator moving forward with the nose */
+const bayOf = (d: Design) => { const B = BAYS[d.body.base]; return { length: B.length + (B.orient === 'rear-longitudinal' ? d.body.overhangR : B.orient === 'front-longitudinal' ? d.body.wheelbase + d.body.overhangF : d.body.wheelbase + d.body.cabin) / 1000, width: B.width + 2 * d.body.width / 1000, height: B.height }; };
 const overVerdict = (need: number, room: number): Verdict => need <= room ? 'ok' : need <= room * (1 + OVER_BAY) ? 'modified' : 'blocked';
 
 /** every check, without the fixes */
 function checks(d: Design): Omit<FitResult, 'fixes'>[] {
   const out: Omit<FitResult, 'fixes'>[] = [], F = footprint(d), bay = bayOf(d), B = BAYS[d.body.base], across = B.orient === 'mid-transverse';
-  const orientName = across ? '가로 배치' : '세로 배치';
+  const orientName = across ? '가로 배치' : B.orient === 'front-longitudinal' ? '앞 세로 배치' : '세로 배치', box = across || B.orient === 'front-longitudinal' ? '' : '과 변속기';
   // the bay: along the car, across, up
   { const v = overVerdict(F.along, bay.length), over = F.along - bay.length;
     out.push({ part: 'bayLength', name: '엔진룸 길이', verdict: v, ...none,
-      reason: v === 'ok' ? `엔진${across ? '' : '과 변속기'} ${mm(F.along)} mm, 엔진룸 ${mm(bay.length)} mm (${orientName})` : `엔진${across ? '' : '과 변속기'}가 엔진룸보다 ${mm(over)} mm 깁니다 (${mm(F.along)} / ${mm(bay.length)} mm)${v === 'modified' ? ': 격벽을 깎고 배기를 다시 짜서 넣습니다' : ''}`,
+      reason: v === 'ok' ? `엔진${box} ${mm(F.along)} mm, 엔진룸 ${mm(bay.length)} mm (${orientName})` : `엔진${box}${box ? '가' : '이'} 엔진룸보다 ${mm(over)} mm 깁니다 (${mm(F.along)} / ${mm(bay.length)} mm)${v === 'modified' ? ': 격벽을 깎고 배기를 다시 짜서 넣습니다' : ''}`,
       ...(v === 'modified' ? { mass: 10, cost: 6 + 60 * over / bay.length, reliability: 4 } : {}) }); }
   { const v = overVerdict(F.across, bay.width), over = F.across - bay.width, what = across ? `엔진${F.miura ? '' : '과 끝의 변속기'}` : '엔진 폭';
     out.push({ part: 'bayWidth', name: '엔진룸 폭', verdict: v, ...none,

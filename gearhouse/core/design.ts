@@ -39,7 +39,7 @@
 import { BODY_NAME } from './names';
 import type { TierId } from '../race/tiers';
 import { fitPlaced, type Placed } from './placed';
-import { FRAMES, isFrameId, fitFrameDims, bodyDimsOf, isGlassId, fitInterior, interiorOfKit, kitOfInterior, type FrameId, type FrameDims, type GlassId, type InteriorPick } from './frames';
+import { FRAMES, FRAME_OF_BASE, isFrameId, fitFrameDims, bodyDimsOf, isGlassId, fitInterior, interiorOfKit, kitOfInterior, type FrameId, type FrameDims, type GlassId, type InteriorPick } from './frames';
 
 /** the kit's platforms (each a car built from the kit: its lines and its panels' measurements) */
 export type BaseId = 'nsx' | 'f355' | 'eb110';
@@ -47,7 +47,7 @@ export type BaseId = 'nsx' | 'f355' | 'eb110';
  *  render/car/p959; the 993 next): their shape is the model's own, so they take no face, tail or wheel kinds and no
  *  stretched dimensions; what they swap is their model's own parts (Design['body']['model']). The render side's
  *  registry of them is render/car/bodies.ts */
-export type ModelBaseId = 'p959';
+export type ModelBaseId = 'p959' | 'bnr33';
 /** what a design's body stands on: a kit base or a model-built body */
 export type BodyBase = BaseId | ModelBaseId;
 /** a model-built body's swaps (the 959's: render/car/p959 P959Opts): the bumpers, the head lamps, the wheels, the
@@ -186,7 +186,7 @@ export const applyPatch = (d: Design, p: DesignPatch): Design =>
 
 /** the kit's bases (the tables keyed by BaseId are the kit's) */
 export const BASES: BaseId[] = ['nsx', 'f355', 'eb110'];
-export const MODEL_BASES: ModelBaseId[] = ['p959'];
+export const MODEL_BASES: ModelBaseId[] = ['p959', 'bnr33'];
 /** every body a design can stand on: the kit's bases, then the model-built bodies */
 export const BODY_BASES: BodyBase[] = [...BASES, ...MODEL_BASES];
 /** a model-built body (render/car/bodies.ts), not one of the kit's */
@@ -203,7 +203,8 @@ export const BUMPERS_ALL: ModelSwaps['bumperF'][] = [...BUMPERS959, 'blank'], LA
  *  plate's text kept for when one is put on */
 export const LUMP_SWAPS = (plate: string): ModelSwaps => ({ bumperF: 'blank', bumperR: 'blank', lamp: 'none', wheel: 'steel', plate, plateF: false, plateR: false, details: false });
 /** each model body's own swaps (its real car's); the plate a made-up number (a new design draws its own: designstore fromPreset) */
-export const MODEL_OWN: Record<ModelBaseId, ModelSwaps> = { p959: { bumperF: 'std', bumperR: 'std', lamp: 'round', wheel: 'hollow5', plate: '08루 0599' } };
+export const MODEL_OWN: Record<ModelBaseId, ModelSwaps> = { p959: { bumperF: 'std', bumperR: 'std', lamp: 'round', wheel: 'hollow5', plate: '08루 0599' },
+  /** the N33 (docs/systems/117): only its lump so far (R1); its own parts come in R3, so its swaps are the lump's */ bnr33: { ...LUMP_SWAPS('33너 3300') } };
 export const NOSES: NoseKind[] = ['round', 'pointed', 'mass'];
 export const FRONTS: FrontKind[] = ['plain', 'sunk'];
 export const BUMPERS: BumperKind[] = ['upright', 'crease', 'wedge', 'airdam'];
@@ -218,17 +219,18 @@ export const FACE_OWN: Record<BodyBase, Face> = {
   nsx: { bumper: 'upright', grille: 'slot', head: 'popup', pod: 'twin', aux: 'strip' },
   f355: { bumper: 'crease', grille: 'oval', head: 'popup', pod: 'twin', aux: 'round' },
   eb110: { bumper: 'wedge', grille: 'horseshoe', head: 'pocket', pod: 'twin', aux: 'none' },
-  /** a model body's face is its model's: these are only what the slots hold in its file */ p959: { bumper: 'wedge', grille: 'none', head: 'fixed', pod: 'round', aux: 'strip' } };
+  /** a model body's face is its model's: these are only what the slots hold in its file */ p959: { bumper: 'wedge', grille: 'none', head: 'fixed', pod: 'round', aux: 'strip' },
+  bnr33: { bumper: 'upright', grille: 'mesh', head: 'fixed', pod: 'twin', aux: 'round' } };
 /** what format 3's front stood for on each base: the auxiliary lamps flush or sunk (the EB110's plain front has none: its
  *  turn lamps are at the troughs' mouths on the bonnet) */
-export const FRONT_AS: Record<BodyBase, Record<FrontKind, AuxKind>> = { nsx: { plain: 'strip', sunk: 'round' }, f355: { plain: 'strip', sunk: 'round' }, eb110: { plain: 'none', sunk: 'round' }, p959: { plain: 'strip', sunk: 'strip' } };
+export const FRONT_AS: Record<BodyBase, Record<FrontKind, AuxKind>> = { nsx: { plain: 'strip', sunk: 'round' }, f355: { plain: 'strip', sunk: 'round' }, eb110: { plain: 'none', sunk: 'round' }, p959: { plain: 'strip', sunk: 'strip' }, bnr33: { plain: 'round', sunk: 'round' } };
 /** a format-3 body's face: its base's own, the auxiliary lamps its front's */
 export const faceOf3 = (base: BodyBase, front: FrontKind): Face => ({ ...FACE_OWN[base], aux: FRONT_AS[base][front] ?? FACE_OWN[base].aux });
 
 // ---- the face's rules: what cannot go together (the builder greys the value out with the reason) ----
 /** the bases on which a wide mesh grille runs out to the bumper's corners, where the fog lamps' recesses would be (the
  *  EB110's bumper is wide enough past its mouth for both) */
-export const MESH_TAKES_CORNERS: Record<BodyBase, boolean> = { nsx: true, f355: true, eb110: false, p959: false };
+export const MESH_TAKES_CORNERS: Record<BodyBase, boolean> = { nsx: true, f355: true, eb110: false, p959: false, bnr33: false };
 /** why a face slot's value cannot be chosen on this body as it stands (Korean), null when it can. The rules:
  *  round fog lamps and a mesh grille both want the bumper's corners (MESH_TAKES_CORNERS).
  *  What only needs re-fitting is not a rule: a grille and the lamps take their rows from the bumper chosen (render/car/face.ts) */
@@ -273,7 +275,8 @@ const BODY_RANGES: Record<BodyBase, Record<NewDims, readonly [number, number]>> 
   nsx: { track: [-60, 80], roof: [-80, 60], overhangF: [-100, 200], overhangR: [-120, 200], ride: [-30, 50], cabin: [-80, 120], rake: [-5, 8] },
   f355: { track: [-60, 80], roof: [-80, 60], overhangF: [-120, 200], overhangR: [-100, 200], ride: [-30, 50], cabin: [-80, 150], rake: [-5, 8] },
   eb110: { track: [-50, 60], roof: [-60, 60], overhangF: [-120, 160], overhangR: [-80, 200], ride: [-25, 60], cabin: [-100, 120], rake: [-4, 5] },
-  /** a model body is its model's shape: nothing stretches (its dimensions stay at zero) */ p959: { track: [0, 0], roof: [0, 0], overhangF: [0, 0], overhangR: [0, 0], ride: [0, 0], cabin: [0, 0], rake: [0, 0] } };
+  /** a model body is its model's shape: nothing stretches (its dimensions stay at zero) */ p959: { track: [0, 0], roof: [0, 0], overhangF: [0, 0], overhangR: [0, 0], ride: [0, 0], cabin: [0, 0], rake: [0, 0] },
+  bnr33: { track: [0, 0], roof: [0, 0], overhangF: [0, 0], overhangR: [0, 0], ride: [0, 0], cabin: [0, 0], rake: [0, 0] } };
 export const BODY_LIMITS = (b: BodyBase): Record<DimKey, readonly [number, number]> => isModelBase(b) ? { wheelbase: [0, 0], width: [0, 0], ...BODY_RANGES[b] } : { wheelbase: LIMITS.wheelbase, width: LIMITS.width, ...BODY_RANGES[b] };
 
 // ---- the suspension (format 5) ----
@@ -293,7 +296,9 @@ export const SUSP_OWN: Record<BodyBase, SuspDesign> = {
   eb110: { front: { ...OWN_AXLE(0.7, 1.35, -0.5, 0), caster: 2.9 }, rear: OWN_AXLE(0.7, 1.5, -1, 0.1) },
   /** the 959: double wishbones all round with two coil-overs a wheel (the ride height's hydraulics left out), a soft
    *  front for the rally car it came from, a little more rear camber under the engine */
-  p959: { front: { ...OWN_AXLE(0.72, 1.3, -0.6, 0), caster: 4.5 }, rear: OWN_AXLE(0.72, 1.45, -1.2, 0.1) } };
+  p959: { front: { ...OWN_AXLE(0.72, 1.3, -0.6, 0), caster: 4.5 }, rear: OWN_AXLE(0.72, 1.45, -1.2, 0.1) },
+  /** the N33: multilinks all round, drawn as double wishbones until R4 (the builder's multilink is a rear's) [~] */
+  bnr33: { front: { ...OWN_AXLE(0.7, 1.45, -0.8, 0), caster: 5.5 }, rear: OWN_AXLE(0.72, 1.55, -1.2, 0.1) } };
 /** why an axle's kind cannot be chosen (Korean), null when it can: the beam axle is the 1930s bases' (the restoration
  *  work's), a multilink is a rear's */
 export function suspLock(front: boolean, k: SuspKind): string | null {
@@ -350,6 +355,16 @@ export const DESIGN_P959: Design = { v: 6, id: 'p959', name: '599', body: { base
   engine: { grade: 4, layout: 'F6', cc: 2849, valves: 4, redline: 7600, intake: 'single', compression: 'low', sump: 'dry', block: 'aluminium', turbo: 2, boost: 1.0, intercooler: true, vtec: false, sequential: true, bs: 1.4, quality: { ...NO_QUALITY, head: 1, intake: 1, exhaust: 1, turbo: 1 } },
   drive: { gears: 6, gearbox: 'manual', final: 0, lsd: true, awd: true },
   kit: { abs: true, tcs: false, steering: 'hydraulic', dampers: 'adaptive', wing: false, diffuser: false, tyres: [235, 255], rim: 17, interior: 'standard' }, susp: structuredClone(SUSP_OWN.p959) };
+
+/** the N33 (docs/systems/117 §3; data/cars/spec/bnr33.json) on its own model-built body, its lump only so far (R1):
+ *  the 2,568 cc straight six, four valves, two turbos with an intercooler at about 0.8 bar, 280 PS (276 hp) at 6,800 and
+ *  368 Nm at 4,400 (more in fact, by most accounts [~]), five speeds, four-wheel drive (its own split and clutch: R4);
+ *  a steel body and panels; ABS; 245/45 R17; about 1,530 kg. Not offered as a stock car, raced or listed until R4 */
+export const DESIGN_BNR33: Design = { v: 6, id: 'bnr33', name: 'N33 GT-X', body: { base: 'bnr33', nose: 'round', ...faceOf3('bnr33', 'plain'), tail: 'roundLamps', wheel: 'fiveSpoke', ...NO_DIMS, paint: '#8d9196', gloss: 0.6, structure: 'steel', panels: 'steel',
+    model: { ...MODEL_OWN.bnr33 } },
+  engine: { grade: 3, layout: 'I6', cc: 2568, valves: 4, redline: 8000, intake: 'single', compression: 'mid', sump: 'wet', block: 'iron', turbo: 2, boost: 0.8, intercooler: true, vtec: false, bs: 1.15, quality: { ...NO_QUALITY } },
+  drive: { gears: 5, gearbox: 'manual', final: 0, lsd: true, awd: true },
+  kit: { abs: true, tcs: false, steering: 'hydraulic', dampers: 'fixed', wing: false, diffuser: false, tyres: [245, 245], rim: 17, interior: 'standard' }, susp: structuredClone(SUSP_OWN.bnr33) };
 
 // ---- four more cars as designs: the figures' check (docs/systems/99, 1-8), not used to set them ----
 // Each is built on one of the bases (the base is only the body: its panels' shapes and sizes), stretched toward the real
@@ -448,7 +463,7 @@ export function normalise(d0: AnyDesign): Design {
   const base = BODY_BASES.includes(d.body.base) ? d.body.base : 'nsx', { model: m0, frame: f0, glass: g0, parts: p0, ...body0 } = d.body, model = isModelBase(base) ? fitModel(base, m0) : undefined, parts = model ? fitPlaced(p0) : undefined;
   // format 6's frame, glass and interior (F1): a model body's only, each kept only where the design has it; the frame's
   // dimensions made into the body's own (the physics' and the fit's); the interior set into the kit's interior (its weight)
-  const fid: FrameId = isFrameId(f0?.id) ? f0!.id : 'A959', frame = model && f0 ? { id: fid, dims: fitFrameDims(fid, f0.dims) } : undefined;
+  const fid: FrameId | null = model ? (isFrameId(f0?.id) && FRAMES[f0!.id].base === base ? f0!.id : FRAME_OF_BASE[base as ModelBaseId]) : null, frame = model && f0 && fid ? { id: fid, dims: fitFrameDims(fid, f0.dims) } : undefined;
   const fdims = frame ? { ...bodyDimsOf(frame.id, frame.dims), cabin: 0, rake: 0 } : {}, glass = model && (g0 === null || isGlassId(g0)) ? { glass: g0 } : {};
   const interior = model && d.interior ? fitInterior(d.interior, interiorOfKit(d.kit.interior)) : undefined, { interior: _i, ...d1 } = d;
   return { ...d1, ...(interior ? { interior } : {}), body: fitFace({ ...body0, base, ...dims, ...fdims, gloss: clamp(d.body.gloss, [0, 1]), ...(model ? { model } : {}), ...(frame ? { frame } : {}), ...glass, ...(parts ? { parts } : {}) }),

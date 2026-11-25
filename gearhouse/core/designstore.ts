@@ -4,11 +4,11 @@
 // the designs saved in this browser; and what the drive page measured of a design (its best laps, the top speed it
 // reached), kept per design and read by the builder. Pure: the storage is passed in (the browser's localStorage, or a
 // map in the tests), and a storage that throws (a private window, storage refused) keeps nothing and reads empty.
-import { BODY_BASES, NOSES, FRONTS, FACE_KEYS, FACE_KINDS, faceOf3, TAILS, WHEELS, GRADES, INTAKES, COMPRESSIONS, SUMPS, BLOCKS, STRUCTURES, PANELS, INTERIORS, DESIGN_NSX, DESIGN_F355, DESIGN_EB110, DESIGN_P959, DIMS, PLATE_SYLLABLES, isModelBase, fitModel, LAYOUTS, QUALITY_PARTS, BS_DEFAULT, normalise,
-  SUSP_OWN, SUSP_KINDS, RC_PRESETS, type BodyBase, type BodyDims, type Design, type DesignV1, type EngineQuality, type Face, type FrontKind, type SuspAxle } from './design';
+import { BODY_BASES, NOSES, FRONTS, FACE_KEYS, FACE_KINDS, faceOf3, TAILS, WHEELS, GRADES, INTAKES, COMPRESSIONS, SUMPS, BLOCKS, STRUCTURES, PANELS, INTERIORS, DESIGN_NSX, DESIGN_F355, DESIGN_EB110, DESIGN_P959, DESIGN_BNR33, DIMS, PLATE_SYLLABLES, isModelBase, fitModel, LAYOUTS, QUALITY_PARTS, BS_DEFAULT, normalise,
+  SUSP_OWN, SUSP_KINDS, RC_PRESETS, type BodyBase, type ModelBaseId, type BodyDims, type Design, type DesignV1, type EngineQuality, type Face, type FrontKind, type SuspAxle } from './design';
 import { isTierId } from '../race/tiers';
 import { LUMP_SWAPS } from './design';
-import { NO_FRAME_DIMS } from './frames';
+import { NO_FRAME_DIMS, FRAME_OF_BASE } from './frames';
 
 /** what the helpers need of a storage (the browser's Storage has these) */
 export interface KeyStore { getItem(k: string): string | null; setItem(k: string, v: string): void; removeItem(k: string): void }
@@ -19,7 +19,7 @@ const read = (s: KeyStore | null, k: string): string | null => { try { return s 
 const write = (s: KeyStore | null, k: string, v: string | null): boolean => { try { if (!s) return false; if (v === null) s.removeItem(k); else s.setItem(k, v); return true; } catch { return false; } };
 
 // ---- a design checked: a loaded file, a pasted text or a link may be anything ----
-const PRESET: Record<BodyBase, Design> = { nsx: DESIGN_NSX, f355: DESIGN_F355, eb110: DESIGN_EB110, p959: DESIGN_P959 };
+const PRESET: Record<BodyBase, Design> = { nsx: DESIGN_NSX, f355: DESIGN_F355, eb110: DESIGN_EB110, p959: DESIGN_P959, bnr33: DESIGN_BNR33 };
 const num = (v: unknown, d: number) => typeof v === 'number' && Number.isFinite(v) ? v : d;
 const one = <T>(v: unknown, of: readonly T[], d: T): T => of.includes(v as T) ? v as T : d;
 const bool = (v: unknown, d: boolean) => typeof v === 'boolean' ? v : d;
@@ -79,7 +79,7 @@ export function fromPreset(base: BodyBase, name?: string): Design { const P = st
  *  lump ("차체 A" unstretched, no openings, blank bumpers, the steel wheel, no plates, no glass, the stock interior), so
  *  its parts are put on in the builder (or all at once by "599 순정 세트"); its class not chosen yet */
 export function newDesign(base: BodyBase, name?: string): Design { const d = fromPreset(base, name); if (!d.body.model) return d;
-  return { ...d, body: { ...d.body, model: LUMP_SWAPS(d.body.model.plate), frame: { id: 'A959', dims: { ...NO_FRAME_DIMS } }, glass: null }, interior: { set: 'stock', trim: 'black' } }; }
+  return { ...d, body: { ...d.body, model: LUMP_SWAPS(d.body.model.plate), frame: { id: FRAME_OF_BASE[base as ModelBaseId], dims: { ...NO_FRAME_DIMS } }, glass: null }, interior: { set: 'stock', trim: 'black' } }; }
 /** a made-up plate number for a new car (two digits, a syllable the plate's font draws, four digits; never a real one on purpose) */
 export function randomPlate(rnd: () => number = Math.random): string { const d = () => String(Math.floor(rnd() * 10)), sy = [...PLATE_SYLLABLES];
   return `${d()}${d()}${sy[Math.floor(rnd() * sy.length)]!} ${1 + Math.floor(rnd() * 9)}${d()}${d()}${d()}`; }

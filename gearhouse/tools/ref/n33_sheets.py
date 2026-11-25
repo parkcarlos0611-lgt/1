@@ -73,12 +73,12 @@ elif mode == 'lump':
     print(match(S))
 elif mode == 'dims':
     names = [('stock', '치수 0 (순정 창문 세트를 얹음)'), ('max', sys.argv[4]), ('min', sys.argv[5])]
-    im = lambda n, v: Image.open(f'{S}/d_{n}/n33_{v}.png').convert('RGB')
+    im = lambda n, v: (lambda i: i.crop((0, 0, i.width - 8, i.height)))(Image.open(f'{S}/d_{n}/n33_{v}.png').convert('RGB'))   # the picture's last columns hold an edge of the outline pass
     def box(ims):
         bs = []
         for i in ims:
             a = np.abs(np.array(i).astype(int) - np.array(BG)).sum(2) > 24; ys, xs = np.nonzero(a); bs.append((xs.min(), ys.min(), xs.max(), ys.max()))
-        return (min(b[0] for b in bs) - 12, min(b[1] for b in bs) - 12, max(b[2] for b in bs) + 12, max(b[3] for b in bs) + 12)
+        return (max(0, min(b[0] for b in bs) - 12), max(0, min(b[1] for b in bs) - 12), min(ims[0].width, max(b[2] for b in bs) + 12), min(ims[0].height, max(b[3] for b in bs) + 12))
     sides = [im(n, 'side') for n, _ in names]; B = box(sides); rows = []
     for (n, t), i in zip(names, sides):
         c = i.crop(B); dr = ImageDraw.Draw(c)

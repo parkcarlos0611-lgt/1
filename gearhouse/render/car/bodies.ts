@@ -14,12 +14,13 @@
 //   anchors   where the speed effects start: the wing's tips, the tail lamps (render/live/trails.ts; also on the mesh)
 import type { Design, ModelBaseId } from '../../core/design';
 import { MODEL_OWN, plateOk } from '../../core/design';
-import { CAR_599 } from '../../core/names';
+import { CAR_599, CAR_N33 } from '../../core/names';
 import { Build, KINDS, type CarAnchors, type Mesh, type MeshLine } from './mesh';
 import { p959Mesh, plateText, DIM, STOCK_FRAME, frameOf, buildShell, shellSkin, sockets, type Frame, type PlateText } from './p959';
 import type { Skin } from './skin';
 import type { Mark } from './p959/sockets';
 import { interiorOfKit } from '../../core/frames';
+import { n33Model, frameOf as n33FrameOf, STOCK_FRAME as N33_STOCK, DIM as N33_DIM } from './n33';
 import { addSuspension, type SuspWheel } from './suspension';
 import { suspFor } from './suspension/setup';
 import { addPowertrain, fromDesign, type Detail } from './powertrain';
@@ -87,8 +88,34 @@ const P959: ModelBody = { name: CAR_599, length: DIM.length, cabin: P959_CABIN, 
     const mach = b.mesh(f.length), cab = interiorMesh({ ...cabinFor(d), cabin: f === STOCK_FRAME ? P959_CABIN : cabinOf(f), gauges: this.gauges(d, o.topKmh), length: f.length });
     return { ...joinMeshes(f.length, body, mach, cab), susp: S.rig, anchors }; } };
 
+// ---- the N33 (docs/systems/117 R1): its lump "차체 B" only; its parts (R3), its interior (R2) and its machinery's
+//      own figures (R4) are still to come. The cabin is the 959's interior laid in its cabin, turned to right-hand drive
+//      (a placeholder until R2); the straight six lengthwise under the bonnet, its clutch end at the bulkhead
+/** its cabin: the screen's foot at x 1370, z 962, its top at 2060, 1320; the doors 1530..2855, their skin's inside about
+ *  800 from the middle at the elbow; the sill's top inside at 400; the rear wells from x 3290; right-hand drive */
+export const N33_CABIN: CabinAnchors = { side: -1, floorZ: 200, dashX: 1700, dashTopZ: 930, screenFoot: [1420, 962], screenTop: [2060, 1318], screenHalf: [650, 520], wheel: [1960, -370, 840], rake: 22,
+  hip: [2420, -370, 460], recline: 23, half: 770, doorX: [1530, 2855], sillZ: 400, beltZ: 918, tunnelHalf: 110, tunnelZ: 340, rearX: 3290, shelfZ: 1030, roofZ: 1310, roofHalf: 520,
+  doorIn: [[400, 790], [560, 792], [700, 786], [820, 768], [918, 735]], wellX: 3290, rearHalf: 600 };
+const n33FrameFor = (d: Design) => { const f = d.body.frame; return f && f.id === 'B33' && Object.values(f.dims).some(v => v) ? n33FrameOf(f.dims) : N33_STOCK; };
+function n33Wheels(d: Design, f = n33FrameFor(d)): { f: SuspWheel; r: SuspWheel } { const [wf, wr] = d.kit.tyres;
+  return { f: { x: f.axleF, y: f.trackF / 2, r: N33_DIM.tyreR, w: wf, rim: N33_DIM.rimR, back: 0.6 * wf / 2 }, r: { x: f.axleR, y: f.trackR / 2, r: N33_DIM.tyreR, w: wr, rim: N33_DIM.rimR, back: 0.6 * wr / 2 } }; }
+const n33Site = (f: Frame): Site => { const z = (v: number) => f.at([0, 0, v])[2], tip = f.at([4560, 430, 300]);
+  return { length: f.length, foot: 150 + f.ride, wheels: { f: { x: f.axleF, y: f.trackF / 2, r: N33_DIM.tyreR, w: 245, z: N33_DIM.hubZ }, r: { x: f.axleR, y: f.trackR / 2, r: N33_DIM.tyreR, w: 245, z: N33_DIM.hubZ } },
+    engine: { at: [f.x(1640), 0, z(470)], dir: '-x' }, tips: { x: tip[0], z: tip[2], y: [tip[1] - 35, tip[1] + 35], r: 38 }, cabin: { floor: z(200), x: [f.x(1700), f.x(3290)], tunnel: [f.x(1700), 110, z(340)] } }; };
+const n33Anchors = (f: Frame): CarAnchors => ({ tips: [f.at([4470, 640, 1000]), f.at([4470, -640, 1000])], lamps: [f.at([4585, 560, 810]), f.at([4585, -560, 810])] });
+const N33: ModelBody = { name: CAR_N33, length: N33_DIM.length, cabin: N33_CABIN, anchors: n33Anchors(N33_STOCK), wheels: n33Wheels, open: ['bonnet'],
+  gauges: (d, topKmh) => ({ ...P959_GAUGES, redline: d.engine.redline, topKmh: topKmh ?? 260, odoKm: 3300, tripKm: 33.3, ...(d.engine.turbo ? { boostBar: d.engine.boost } : { boostBar: undefined }) }),
+  mesh(d, o = {}) { const m = { ...MODEL_OWN.bnr33, ...d.body.model }, det = o.detail ?? 2, f = n33FrameFor(d);
+    const body = n33Model({ ...(f === N33_STOCK ? {} : { dims: f.dims }), glass: d.body.glass === undefined ? 'stock' : d.body.glass, paint: d.body.paint, wheel: m.wheel, brake: !!o.bare, tyres: d.kit.tyres }).mesh;
+    const P = KINDS.indexOf('paint'); for (let t = 0; t < body.n; t++) if (body.kind[t] === P) body.gloss[t] = d.body.gloss;
+    if (o.bare) return body;
+    const b = new Build(), S = addSuspension(b, suspFor('bnr33', d.susp), n33Wheels(d, f), { detail: det, setup: d.susp, ...(o.style ? { style: o.style } : {}) });
+    addPowertrain(b, fromDesign(d), n33Site(f), { detail: det, ...(o.style ? { style: o.style } : {}) });
+    const mach = b.mesh(f.length), cab = interiorMesh({ ...cabinFor(d), cabin: f === N33_STOCK ? N33_CABIN : cabinOf(f, N33_CABIN), gauges: this.gauges(d, o.topKmh), length: f.length });
+    return { ...joinMeshes(f.length, body, mach, cab), susp: S.rig, anchors: n33Anchors(f) }; } };
+
 /** the model-built bodies, by their base's id */
-export const MODEL_BODIES: Record<ModelBaseId, ModelBody> = { p959: P959 };
+export const MODEL_BODIES: Record<ModelBaseId, ModelBody> = { p959: P959, bnr33: N33 };
 
 /** a model body's skin as the design builds it (render/car/skin.ts: the builder's picking and the placed parts' rules,
  *  docs/systems/115 §5-2), and its stock plates' marks; the last few kept (a build is about a tenth of a second) */

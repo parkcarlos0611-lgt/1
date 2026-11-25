@@ -1,0 +1,44 @@
+{
+ "id": "bnr33",
+ "name": "Nissan Skyline GT-R (BCNR33, 1995-1998: twin-turbo 2.6 L straight six, variable four-wheel drive, 2+2 coupe). In the game: NISSINO N33 GT-X",
+ "doc": "docs/systems/117_bnr33_plan.md",
+ "model": "render/car/n33 (cage.ts: the hand-placed control cage, the frame 차체 B; frame.ts: its stretch; render/car/p959/shell.ts shellFrom finishes it)",
+ "axes": "mm; x from the nose tip (0) back to the tail (4675); y half-width from the centre line; z from the ground",
+ "approximate": "values marked [~] are read loosely or from general sources outside the repository; R4 checks them against the car's figures",
+ "tolerance": {
+  "overall": "makers' figures: exact (length 4675, width 1780, height 1360, wheelbase 2720); the model's roof is the blueprint's 1364",
+  "tracks": "[~] 1480 front, 1490 rear (the usual quoted figures; not on the drawings)",
+  "overhangs": "+-15: 950 front, 1005 rear (the blueprint's axles at 183.5 and 678 px; its nose and tail 7 and 26 mm short of the maker's length, the model takes the maker's)",
+  "profile": "+-15 in z on the centre line, the bonnet's crest line and the deck (the blueprint every 6 px), +-25 where only photographs show it (the lamps' band round the corner, the tail panel)",
+  "plan": "+-20 on the outline after the plan is scaled across to 1780 (see drawingChecks)",
+  "parts": "the lump has no parts: lamps, grille, tail lamps, wing, mirrors are later parts (R3)"
+ },
+ "sources": [
+  "docs/reference/bnr33/bp_line_4view_hires.png: four views, line drawing (the main source; 5.5 mm/px along and up)",
+  "docs/reference/bnr33/bp_line_4view.jpg: the same drawing at a lower size (cross-check)",
+  "docs/reference/bnr33/bp_vt_blue.jpg: four views with 4675, 2720, 1780, 1360 (the figures)",
+  "docs/reference/bnr33/bp_blue_4view_spec.jpg: four views (cross-check of the glasshouse and the tail)",
+  "docs/reference/bnr33/photo_*.jpg: the faces, the arches' flares, the boot, the tail",
+  "not used: bp_line_r32_mixed.jpg (its side view is the generation before), bp_400r_yellow.jpg (the wide-fendered variant: R5)"
+ ],
+ "drawingChecks": {
+  "hiresSide": "nose px 12, tail px 856 (844 px); front wheel's contact px 183.5, rear 678 (494.5 px = 2720: 5.50 mm/px); ground row 269, roof row 21 (248 px = 1364)",
+  "hiresPlan": "the same x as the side view; widest 312 px about row 792.5 = 1716 at 5.5: drawn 3.7 % narrow, scaled by 1.037 across",
+  "hiresFrontRear": "height 245 px = 1348 at 5.5; widest below the mirrors 338 px = 1859: drawn 4.3 % wide, scaled by 0.957 across; the outlines include the mirrors (z 860-1040) and the tyres",
+  "lowres": "bp_line_4view.jpg is the same drawing (its proportions agree to a pixel at its size)",
+  "vtBlue": "its front view is as wide against its side view as the hires one (about 1.88 m at the side's scale): the plan's and the figures' 1780 is taken"
+ },
+ "overall": { "length": 4675, "width": 1780, "height": 1360, "wheelbase": 2720, "axleF": 950, "axleR": 3670, "overhangF": 950, "overhangR": 1005, "trackF": 1480, "trackR": 1490,
+  "tyre": "245/45 R17 (radius 326)", "wheel": "17 in five-spoke alloy", "groundClearance": 135, "kerbWeight": 1530, "kerbWeightRange": "1530-1540" },
+ "powertrain": { "engine": "straight six, 2568 cc, DOHC 24 valves, twin turbo with intercooler", "power": "280 PS (276 hp) at 6800 rpm (more in fact by most accounts [~])", "torque": "368 Nm at 4400 rpm",
+  "gearbox": "5-speed manual", "drive": "four-wheel drive on a rear-drive base: 0-50 % to the front through an electronically controlled multi-plate clutch", "layout": "front engine, longitudinal" },
+ "chassis": { "suspension": "multilink front and rear", "brakes": "ventilated discs, four-piston front calipers [~]" },
+ "performance": { "topSpeed": "180 km/h limited (Japanese market); about 250+ unlimited [~]", "cd": "about 0.35 [~]", "zeroTo100": "about 5 s [~]" },
+ "landmarks": {
+  "_": "x, half-width y, z as modelled (the cage's own points are control points: the surface lies a little inside them)",
+  "frontBumperSeam": 572, "bonnetLeadingEdge": [98, 0, 705], "lampsBand": "z 572-705, y 330 out round the corner", "bonnetAtAxle": [950, 0, 924], "wingCrestAtAxle": [950, 745, 845],
+  "screenFoot": [1370, 0, 962], "screenTop": [2060, 0, 1320], "roofTop": [2600, 0, 1364], "belt": 918, "doorFrontEdge": 1530, "doorRearEdge": 2855, "doorHalfWidth": 840, "sillTop": 278, "skirtFoot": 150,
+  "quarterGlassPoint": [3310, 705, 975], "backWindow": "x 3170-4040, z 1333-1050, half-width 400-385 at its edge", "deck": "x 4040-4490, z 1050-1000", "tailPanel": "z 1000-595, its face x 4490-4581",
+  "arches": "lips 368 about the hubs (z 326); front wings 887 half-width over the arch, rear 888", "rearBumperSeam": "z 531 at the side, 595 across the back"
+ }
+}

@@ -4,12 +4,12 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { BANNED, BODY_NAME, CAR_599, MAKE_LATIN, bannedIn } from '../core/names';
+import { BANNED, BODY_NAME, CAR_599, CAR_N33, MAKE_LATIN, bannedIn } from '../core/names';
 import { CHANGES } from '../core/version';
 import { TIPS } from '../ui/shell/tips';
 import { stockP959 } from '../core/bodies';
 import { fromPreset } from '../core/designstore';
-import { BODY_BASES, DESIGN_NSX, DESIGN_F355, DESIGN_EB110, DESIGN_P959, DESIGN_DIABLO, DESIGN_XJ220, DESIGN_MCLAREN_F1 } from '../core/design';
+import { BODY_BASES, DESIGN_NSX, DESIGN_F355, DESIGN_EB110, DESIGN_P959, DESIGN_BNR33, DESIGN_DIABLO, DESIGN_XJ220, DESIGN_MCLAREN_F1 } from '../core/design';
 import { oneMakeField, PAINTS_1980S } from '../race/onemake';
 import { TECH_YEAR } from '../core/engines';
 
@@ -47,11 +47,14 @@ describe('no real brand on a screen', () => {
     expect(bannedIn('포르쉐 959')).toEqual(['포르쉐']); expect(bannedIn('NSX 바탕')).toEqual(['NSX']); expect(bannedIn("'nsx' 'f355' DESIGN_NSX")).toEqual([]);
     expect(bannedIn('Alfa  Romeo')).toEqual(['Alfa Romeo']); expect(clean('959 원메이크')).toEqual(['959']); expect(clean("'p959' p959stock")).toEqual([]);
     expect(BANNED.length).toBeGreaterThan(40);
+    // the N33's real names (docs/systems/117 §5): its maker, model, chassis code, tuner and its four-wheel drive's name
+    expect(bannedIn('Nissan Skyline GT-R R33 BNR33')).toEqual(['Nissan', 'Skyline', 'GT-R', 'BNR33', 'R33']); expect(bannedIn('닛산 스카이라인 니스모')).toEqual(['닛산', '스카이라인', '니스모']);
+    expect(bannedIn('NISMO ATTESA RB26 V-spec')).toEqual(['NISMO', 'RB26', 'ATTESA', 'V-spec']);
   });
   it('the bodies, the 599 and the presets are named in the game\'s own names', () => {
-    expect(CAR_599).toBe('포스터 599'); expect(MAKE_LATIN).toBe('Phorster');
+    expect(CAR_599).toBe('포스터 599'); expect(MAKE_LATIN).toBe('Phorster'); expect(CAR_N33).toBe('NISSINO N33 GT-X'); expect(BODY_NAME.bnr33).toBe(CAR_N33);
     for (const b of BODY_BASES) { expect(BODY_NAME[b]).toBeTruthy(); expect(clean(BODY_NAME[b])).toEqual([]); expect(clean(fromPreset(b).name)).toEqual([]); }
-    for (const d of [DESIGN_NSX, DESIGN_F355, DESIGN_EB110, DESIGN_P959, DESIGN_DIABLO, DESIGN_XJ220, DESIGN_MCLAREN_F1]) expect(clean(d.name)).toEqual([]);
+    for (const d of [DESIGN_NSX, DESIGN_F355, DESIGN_EB110, DESIGN_P959, DESIGN_BNR33, DESIGN_DIABLO, DESIGN_XJ220, DESIGN_MCLAREN_F1]) expect(clean(d.name)).toEqual([]);
     expect(stockP959().name).toBe(CAR_599); expect(stockP959().id).toBe('p959stock');   // the id kept: its runs are stored under it
   });
   it('the about screen\'s changes, the loading tips, the technologies and the race field', () => {

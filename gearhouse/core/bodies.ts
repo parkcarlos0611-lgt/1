@@ -7,8 +7,12 @@ import { CAR_599 } from './names';
 
 /** the bodies switched on in the game, in the order offered */
 export const ENABLED_BODIES: readonly BodyBase[] = ['p959'];
-/** a body on the list (a design on any other is an old one: shown greyed, not driven, raced or opened) */
-export const isEnabledBody = (b: unknown): b is BodyBase => (ENABLED_BODIES as readonly unknown[]).includes(b);
+/** the bodies a player's design may stand on beyond those: a frame's body picked in the builder's first step (the N33's
+ *  "차체 B", docs/systems/117 R1). It is driven and opened as any design, but offered nowhere else (no stock car, no race
+ *  field, no title car of its own) until it joins the list above (R4) */
+export const FRAME_ONLY_BODIES: readonly BodyBase[] = ['bnr33'];
+/** a body on the lists (a design on any other is an old one: shown greyed, not driven, raced or opened) */
+export const isEnabledBody = (b: unknown): b is BodyBase => (ENABLED_BODIES as readonly unknown[]).includes(b) || (FRAME_ONLY_BODIES as readonly unknown[]).includes(b);
 /** a design whose body is on the list */
 export const enabledDesign = (d: Design | null | undefined): boolean => !!d && isEnabledBody(d.body.base);
 /** the body a new design starts on */

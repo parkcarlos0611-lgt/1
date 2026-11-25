@@ -25,7 +25,7 @@
 //   class, cost, reliability: designFigures (the class from the figures, doc 99 6-2; cost and reliability placeholders
 //           until B5).
 import type { Design, BodyBase, Structure, Panels, Interior } from '../core/design';
-import { DESIGN_NSX, DESIGN_F355, DESIGN_EB110, DESIGN_P959 } from '../core/design';
+import { DESIGN_NSX, DESIGN_F355, DESIGN_EB110, DESIGN_P959, DESIGN_BNR33 } from '../core/design';
 import { type RaceSpec, torqueAt, EPS_SPEED_SENSITIVE } from './cars';
 import { HP, engineMass, enginePackage, tyreR, engineFigures, engineCost, engineReliability } from './designparts';
 import { fit, fitPenalty, type FitResult } from './fit';
@@ -54,11 +54,18 @@ interface Base { ref: Design; kerb: number; front: number; wheelbase: number; tr
  *  multi-plate centre clutch as a stiff coupling over a 30 % front share (Porsche: 20 to 50 % by the conditions) [~] */
 const P959_BASE: Base = { ref: DESIGN_P959, kerb: 1450, front: 0.41, wheelbase: 2.272, track: 1.527, width: 1.84, height: 1.28, overhangs: 1.988, cgH: 0.47, cdA: 0.59, structure: 330, panels: 112, floor: 0.2,
   engineX: 0.25, boxX: -0.3, driverX: 1.53, awd: { front: 0.3, visc: 140 } };
+/** the N33 (docs/systems/117 §3; data/cars/spec/bnr33.json): about 1,530 kg, 59 % on the front with the driver (a long
+ *  straight six ahead of the cabin and the four-wheel drive's front half [~]), Cd about 0.35 on about 1.95 m² [~], a
+ *  steel body in white and steel panels; the six's middle 2.05 m ahead of the rear axle (its own 0.67 m behind the front
+ *  one), the gearbox behind it under the tunnel, the driver 1.45 m behind the front axle; its variable split until R4
+ *  as a stiff coupling over a 25 % front share [~]. Placeholder figures for the lump's driving (R1): R4 checks them */
+const BNR33_BASE: Base = { ref: DESIGN_BNR33, kerb: 1530, front: 0.59, wheelbase: 2.72, track: 1.485, width: 1.78, height: 1.36, overhangs: 1.955, cgH: 0.5, cdA: 0.68, structure: 380, panels: 125, floor: 0.22,
+  engineX: -2.05, boxX: -1.45, driverX: 1.45, awd: { front: 0.25, visc: 140 } };
 const BASES: Record<BodyBase, Base> = {
   nsx: { ref: DESIGN_NSX, kerb: 1365, front: 0.42, wheelbase: 2.53, track: 1.52, width: 1.81, height: 1.17, overhangs: 1.9, cgH: 0.44, cdA: 0.63, structure: 360, panels: 120, floor: 0.18 },
   f355: { ref: DESIGN_F355, kerb: 1450, front: 0.42, wheelbase: 2.45, track: 1.565, width: 1.9, height: 1.17, overhangs: 1.8, cgH: 0.44, cdA: 0.66, structure: 355, panels: 118, floor: 0.15 },
   eb110: { ref: DESIGN_EB110, kerb: 1620, front: 0.4, wheelbase: 2.55, track: 1.584, width: 1.94, height: 1.114, overhangs: 1.85, cgH: 0.44, cdA: 0.58, structure: 380, panels: 126, floor: 0.15 },
-  p959: P959_BASE };
+  p959: P959_BASE, bnr33: BNR33_BASE };
 /** the structures' and the panels' masses against steel's, for the same stiffness (doc 99 6-1) */
 export const STRUCTURE_K: Record<Structure, number> = { steel: 1, hss: 0.9, aluminium: 0.6, honeycomb: 0.5, cfrp: 0.45 };
 export const PANEL_K: Record<Panels, number> = { steel: 1, aluminium: 0.55, frp: 0.6, cfrp: 0.4 };

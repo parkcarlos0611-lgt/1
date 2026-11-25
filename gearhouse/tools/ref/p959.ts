@@ -14,7 +14,7 @@ import { edgeUse } from '../../render/car/p959/shell';
 import { n33Model, N33_LUMP } from '../../render/car/n33';
 import { N33_PANELS } from '../../render/car/n33/check';
 
-const N33 = process.argv.includes('n33'), CAR = N33 ? 'n33' : 'p959', out = process.argv[2] ?? '.', mm = +(process.argv.find(a => a.startsWith('mm='))?.slice(3) ?? 4), W = Math.round((N33 ? 5200 : 4800) / mm), H = Math.round(3000 / mm), BG = [206, 202, 192];
+const N33 = process.argv.includes('n33'), CAR = N33 ? 'n33' : 'p959', out = process.argv[2] ?? '.', mm = +(process.argv.find(a => a.startsWith('mm='))?.slice(3) ?? 4), W = Math.round((N33 ? 5400 : 4800) / mm), H = Math.round(3000 / mm), BG = [206, 202, 192];
 mkdirSync(out, { recursive: true });
 export function png(path: string, w: number, h: number, rgb: Uint8Array) { const raw = Buffer.alloc((w * 3 + 1) * h); for (let y = 0; y < h; y++) rgb.subarray(y * w * 3, (y + 1) * w * 3).forEach((v, i) => { raw[y * (w * 3 + 1) + 1 + i] = v; });
   const crcT = new Uint32Array(256).map((_, n) => { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; return c >>> 0; }), crc = (b: Buffer) => { let c = 0xffffffff; for (const v of b) c = crcT[(c ^ v) & 255]! ^ (c >>> 8); return (c ^ 0xffffffff) >>> 0; };

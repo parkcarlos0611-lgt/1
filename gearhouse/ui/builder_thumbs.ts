@@ -7,6 +7,7 @@
 // fails, the cards keep their drawn pictures (ui/builder_pics.ts).
 import type { Mesh, MeshLine, V } from '../render/car/mesh';
 import { p959Model, P959_LUMP, type P959Model } from '../render/car/p959';
+import { n33Model, N33_LUMP } from '../render/car/n33';
 import { interiorMesh, INTERIORS } from '../render/car/interior';
 import { freeGpu } from '../render/live/gpu';
 import { STYLE, screenPx, lineWeight } from '../render/live/style';
@@ -35,7 +36,7 @@ export function camera(kind: ThumbKind, view: ThumbView): { ang: number; pitch: 
 const BUMPER_F = new Set(['bumperF', 'indicatorF', 'ventF', 'intakeF', 'lipF']), BUMPER_R = new Set(['bumperR', 'ventR', 'diffuser', 'exhaustSlot']);
 const LAMP = new Set(['lampBezel', 'headLamp', 'lampReflector', 'lampRing']), WHEEL = /^(tyre|rim|wheel|hub)/, PLATE = /^plate/;
 /** the variants of a kind, in the library's order */
-export const VARIANTS: Record<ThumbKind, readonly string[]> = { bumperF: BUMPERS_ALL, bumperR: BUMPERS_ALL, lamp: LAMPS959, wheel: WHEELS_ALL, base: ['p959'], frame: ['A959'], glass: ['none', 'stock', 'noQuarter', 'louvre'], interior: ['stock', 'drift'],
+export const VARIANTS: Record<ThumbKind, readonly string[]> = { bumperF: BUMPERS_ALL, bumperR: BUMPERS_ALL, lamp: LAMPS959, wheel: WHEELS_ALL, base: ['p959'], frame: ['A959', 'B33'], glass: ['none', 'stock', 'noQuarter', 'louvre'], interior: ['stock', 'drift'],
   /** the plates (docs/systems/115 P1a): each its own card, cut from the stock car where its plate sits at its own place */ plateF: ['plateF'], plateR: ['plateR'] };
 /** the model a variant is cut from: the n-th of each list together (four builds give every swap; the first is the stock
  *  car, the fourth the lump's blank bumper and steel wheel with the stock lamp) */
@@ -46,6 +47,7 @@ export function buildModel(i: number): P959Model { return p959Model({ bumperF: B
 const SETS = new Set<ThumbKind>(['frame', 'glass', 'interior']);
 export function buildSet(kind: ThumbKind, v: string): P959Model { if (kind === 'interior') { const mesh = interiorMesh({ ...INTERIORS[v as 'stock' | 'drift'], driver: false });
     return { mesh, shell: undefined as never, normals: new Float32Array(0), shellTris: 0 }; }
+  if (kind === 'frame' && v === 'B33') return n33Model({ ...N33_LUMP, brake: false });   // 차체 B: the N33's lump (docs/systems/117 R1)
   return p959Model({ ...P959_LUMP, brake: false, ...(kind === 'glass' ? { glass: v === 'none' ? null : v as never } : {}) }); }
 /** the cache's key of a card's model: the parts' kinds share the four builds; each set's card has its own */
 const modelKey = (s: ThumbSpec) => SETS.has(s.kind) ? `${s.kind}|${s.v}` : `m|${modelIndex(s)}`;

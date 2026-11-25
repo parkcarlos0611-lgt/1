@@ -44,7 +44,7 @@ import { partThumbs, type ThumbSpec } from './builder_thumbs';
 import { placeTool } from './builder_place';
 import { viewRay } from '../render/car/skin';
 import type { PlacedId } from '../core/placed';
-import { FRAMES, FRAME_IDS, FRAME_DIMS, FRAME_DIM_NAME, NO_FRAME_DIMS, GLASS, GLASS_IDS, INTERIOR_SETS, INTERIOR_SET_IDS, TRIM_IDS, TRIM_NAME, interiorOfKit, type FrameId, type FrameDimKey, type GlassId, type InteriorSetId, type TrimId } from '../core/frames';
+import { FRAMES, FRAME_OF_BASE, FRAME_IDS, FRAME_DIMS, FRAME_DIM_NAME, NO_FRAME_DIMS, GLASS, GLASS_IDS, INTERIOR_SETS, INTERIOR_SET_IDS, TRIM_IDS, TRIM_NAME, interiorOfKit, type FrameId, type FrameDimKey, type GlassId, type InteriorSetId, type TrimId } from '../core/frames';
 import texAlb from '../assets/textures/pbr/albedo.jpg';
 import texNor from '../assets/textures/pbr/normal.jpg';
 import texRgh from '../assets/textures/pbr/rough.jpg';
@@ -220,10 +220,14 @@ $('openFiles').addEventListener('click', () => { if (onFiles) go(step); else { g
 
 // ① 차체 덩어리 (docs/systems/115 §4, F1): the lump's card, its dimensions (§4-4: the cage stretched; the physics reads
 // them as the body's own), its structure. A kit base's own dimensions (the old bases, off in the game) stay below, hidden
-const frameD = () => D.body.frame ?? { id: 'A959' as FrameId, dims: { ...NO_FRAME_DIMS } };
+const frameD = () => D.body.frame ?? { id: isModelBase(D.body.base) ? FRAME_OF_BASE[D.body.base] : 'A959' as FrameId, dims: { ...NO_FRAME_DIMS } };
+/** another frame picked: the design moves onto that frame's body as its lump (docs/systems/117 R1: 차체 B is the N33's),
+ *  its paint, plate, interior, engine and machinery kept; the body's own suspension geometry */
+function pickFrame(v: FrameId): void { const base = FRAMES[v].base; if (base === D.body.base) { D.body.frame = { ...frameD(), id: v }; return; }
+  const L = newDesign(base), plate = D.body.model?.plate; D = normalise({ ...D, body: { ...L.body, paint: D.body.paint, gloss: D.body.gloss, structure: D.body.structure, panels: D.body.panels, ...(plate ? { model: { ...L.body.model!, plate } } : {}) }, susp: L.susp }); }
 /** the interior set and its trim (an older design: its kit's as a set) */
 const interiorD = () => D.interior ?? interiorOfKit(D.kit.interior);
-add('frame', cards<FrameId>('차체 덩어리', FRAME_IDS.map(id => [id, `${FRAMES[id].name} · ${FRAMES[id].suits}`, basePic(), { kind: 'frame', v: id }] as [FrameId, string, string, ThumbSpec]), () => frameD().id, v => { D.body.frame = { ...frameD(), id: v }; }),
+add('frame', cards<FrameId>('차체 덩어리', FRAME_IDS.map(id => [id, `${FRAMES[id].name} · ${FRAMES[id].suits}`, basePic(), { kind: 'frame', v: id }] as [FrameId, string, string, ThumbSpec]), () => frameD().id, v => pickFrame(v)),
   note('차체 덩어리는 구멍이 하나도 없는 차체입니다. 바퀴 아치와 허브 자리, 엔진룸 크기, 앞면적이 여기서 정해집니다. 창문은 ②에서, 램프·범퍼·휠 같은 부품은 ③에서 고릅니다. 차급과는 무관하고, 카드의 "추천"은 꼬리표일 뿐입니다.'),
   ...frameSliders(), ...dimSliders(),
   seg<Structure>('구조 소재 (모노코크·프레임)', [['steel', '강철'], ['hss', '고장력강'], ['aluminium', '알루미늄'], ['honeycomb', '알루미늄 허니콤'], ['cfrp', '탄소섬유']], () => D.body.structure, v => { D.body.structure = v; }),
@@ -237,7 +241,9 @@ function frameSliders(): HTMLElement[] { const o = () => FRAMES[frameD().id], d 
     ride: v => `${mm(v)} · ${CLEARANCE[D.body.base] + v} mm` };
   const out: HTMLElement[] = [h2('치수')], modelOnly = (e: HTMLElement) => { syncs.push(() => { e.hidden = !isModelBase(D.body.base); }); return e; };
   for (const k of FRAME_DIMS) out.push(modelOnly(range(FRAME_DIM_NAME[k], FRAMES.A959.ranges[k], k === 'wheelbase' ? 10 : 5, () => d()[k], v => { D.body.frame = { ...frameD(), dims: { ...d(), [k]: v } }; }, SHOW[k], `frame-${k}`)));
-  out.push(note('케이지를 구간별로 늘입니다: 앞 오버행은 코, 휠베이스는 지붕과 문, 뒤 오버행은 엔진 덮개와 꼬리. 바퀴 아치는 늘이지 않고 옮기기만 해서 둥근 모양을 지킵니다. 범위 양 끝에서 면이 늘어지거나 꺾이지 않는지 검사했습니다. 치수는 앞면적, 무게, 무게 배분, 엔진룸 크기(뒤 오버행)에 들어갑니다.'),
+  // each frame's own ranges (차체 B's are its own)
+  syncs.push(() => { for (const k of FRAME_DIMS) { const r = $(`frame-${k}`) as HTMLInputElement | null; if (r) { r.min = String(o().ranges[k][0]); r.max = String(o().ranges[k][1]); } } });
+  out.push(note('케이지를 구간별로 늘입니다. 차체 A(뒤 엔진): 앞 오버행은 코, 휠베이스는 지붕과 문, 뒤 오버행은 엔진 덮개와 꼬리. 차체 B(앞 엔진): 휠베이스는 보닛 뒤쪽과 앞 유리 발치(엔진룸이 길어짐), 뒤 오버행은 트렁크. 바퀴 아치는 늘이지 않고 옮기기만 해서 둥근 모양을 지킵니다. 범위 양 끝에서 면이 늘어지거나 꺾이지 않는지 검사했습니다. 치수는 앞면적, 무게, 무게 배분, 엔진룸 크기(차체 A는 뒤 오버행, 차체 B는 휠베이스와 앞 오버행)에 들어갑니다.'),
     btnRow('치수 원래대로', () => { D.body.frame = { ...frameD(), dims: { ...NO_FRAME_DIMS } }; changed(); }));
   modelOnly(out[0]!); modelOnly(out[out.length - 2]!); modelOnly(out[out.length - 1]!); return out; }
 // ② 창문 (§4-2): a set of the lump's own cells (material only, no new faces); none: the cabin in body colour
@@ -311,8 +317,10 @@ function btnRow(t: string, f: () => void): HTMLElement { const d = document.crea
     seg<'on' | 'off'>('그 밖의 순정 부품 (테일램프 띠, 옆 흡기구, 엔진 덮개 그릴, 미러, 배기구, 배지·레터링)', [['on', '달기'], ['off', '떼기']], () => M().details === false ? 'off' : 'on', v => { if (v === 'on') delete M().details; else M().details = false; }),
     plateOn('plateF', '앞 번호판'), plateOn('plateR', '뒤 번호판'), plateCards, note(`번호판 카드를 누르면 "놓기"가 됩니다. 판을 끌어 차체 위 아무 곳으로나 옮기고, 회전·기울기·크기를 고릅니다. 앞 번호판은 앞을, 뒤 번호판은 뒤를 보는 면(차 축에서 35° 안)에만 붙고, 굽은 면에서는 판이 평평한 채 검은 받침이 틈을 메웁니다(최대 70 mm). 램프·유리·다른 번호판과 겹치면 붙지 않습니다. 레이스 상대와 순정 세트는 순정 자리입니다.`),
     plateRow, note('범퍼는 차체의 이음선 고리에 맞물려 바뀝니다. 헤드램프를 빼면 램프 자리는 차체 색으로 막힙니다. 번호판은 앞뒤를 따로 떼고 다시 달 수 있고, 뗀 자리는 범퍼 면 그대로입니다. 번호판 글자는 판 위에 획으로 그립니다(가상의 번호만). 다른 부품의 자유 부착은 다음 단계(P1, P2)에서 옵니다.')];
-  syncs.push(() => { const m = isModelBase(D.body.base); for (const e of kitRows) e.hidden = m; for (const e of modelRows) e.hidden = !m; if (m && document.activeElement !== plate) plate.value = M().plate; });
-  add('parts', ...kitRows, ...modelRows);
+  // the N33's own parts come in R3 (docs/systems/117): its lump takes none of the 599's yet
+  const n33Note = note('차체 B(N33)의 부품은 아직 없습니다. 지금은 덩어리와 창문 세트만 고를 수 있습니다(문서 117 R3에서 부품을 수확합니다).');
+  syncs.push(() => { const m = isModelBase(D.body.base), p = D.body.base === 'p959'; for (const e of kitRows) e.hidden = m; for (const e of modelRows) e.hidden = !p; n33Note.hidden = D.body.base !== 'bnr33'; if (p && document.activeElement !== plate) plate.value = M().plate; });
+  add('parts', ...kitRows, ...modelRows, n33Note);
   const sw = document.createElement('div'); sw.className = 'swatches'; const pick = document.createElement('input'); pick.type = 'color'; pick.id = 'paint'; pick.setAttribute('aria-label', '직접 고르기');
   const bs = PAINTS.map(c => { const b = document.createElement('button'); b.type = 'button'; b.style.background = c; b.setAttribute('aria-label', c); b.addEventListener('click', () => { D.body.paint = c; changed(); }); sw.append(b); return [c, b] as const; });
   pick.addEventListener('input', () => { D.body.paint = pick.value; changed(); }); sw.append(pick);

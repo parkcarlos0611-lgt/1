@@ -39,7 +39,7 @@ export function titleScreen(ctx: ShellCtx): Screen<never> {
       button('자유 설계', go('garage'), { kind: 'menu', sub: '차고: 설계 목록, 새 차 설계, 엔진 공방' }), button('시험장', go('pick', { mode: 'test' }), { kind: 'menu', sub: '트랙을 골라 시험 주행' }),
       button('레이스', go('pick', { mode: 'race' }), { kind: 'menu', sub: '트랙, 상대, 바퀴 수' }), button('설정', go('settings'), { kind: 'menu', sub: '그래픽, 소리, 조작, 화면, 저장' }), button('정보', go('about'), { kind: 'menu', sub: `${VERSION_NAME}, 바뀐 점, 출처` }));
     nav.setAttribute('aria-label', '메인 메뉴'); (nav.querySelector('button:not([disabled])') as HTMLElement | null)?.setAttribute('data-first', '');
-    root.append(el('div', 'gh-brand', el('h1', 'gh-logo', 'GEARHOUSE'), el('span', 'gh-ver', VERSION_NAME), el('p', 'gh-tagline', '설계하고, 만들고, 시험하는 자동차')), nav,
+    root.append(el('div', 'gh-brand', el('h1', 'gh-logo gk-logo', 'GEARHOUSE'), el('span', 'gh-ver', VERSION_NAME), el('p', 'gh-tagline', '설계하고, 만들고, 시험하는 자동차')), nav,
       el('p', 'gh-foot', `턴테이블: ${d.name} · ↑↓ 이동 · Enter 선택 · Esc 뒤로`)); }, { dim: false }); }
 
 // ---- the garage: the saved designs as cards ----
@@ -78,7 +78,7 @@ export function pickScreen(ctx: ShellCtx): Screen<never> {
   const m = menu(ctx, 'pick', root => { const s = ctx.store, d = ctx.recent(); let track = (() => { try { return s?.getItem(TRACK_KEY) ?? 'millbrook'; } catch { return 'millbrook'; } })();
     const race = { opp: 3, lineup: 'period', laps: 2 }; let car: 'design' | 'period' | 'p959' = 'design';
     const cards = el('div', 'gh-grid gh-tracks'), drawTracks = () => { cards.textContent = ''; for (const t of TRACKS) cards.append(card({ title: t.title, lines: [t.label], selected: t.id === track, onPick: () => { track = t.id; drawTracks(); (cards.querySelector('.gh-on') as HTMLElement | null)?.focus(); } })); }; drawTracks();
-    const opts = el('div', 'gh-opts', chips('차', [['design', `설계: ${d.name}`], ['p959', '포르쉐 959 (순정)'], ['period', '주행 화면의 차 목록']], car, v => { car = v; }));
+    const opts = el('div', 'gh-opts gk-panel', chips('차', [['design', `설계: ${d.name}`], ['p959', '포르쉐 959 (순정)'], ['period', '주행 화면의 차 목록']], car, v => { car = v; }));
     if (mode === 'race') opts.append(slider('상대 차 수', [1, 7, 1], race.opp, v => { race.opp = v; }, v => `${v}대`),
       chips('상대 구성', [['period', '1930년대 차'], ['modern', '1990년대 차'], ['mix', '섞기']], race.lineup, v => { race.lineup = v; }),
       chips('바퀴 수', [[1, '1'], [2, '2'], [3, '3'], [4, '4']], race.laps, v => { race.laps = v; }));
@@ -138,8 +138,8 @@ export function aboutScreen(ctx: ShellCtx): Screen<never> {
       return el('span', '', a, ` — ${(x.authors ?? []).join(', ')}${x.license ? ` · ${x.license}` : ''}`); })));
     const P = pbrMeta as { layers: Src[] }, G = groundMeta as { layers: Src[] }, B = buildMeta as { layers: Src[] }, K = skyMeta as Src, M = modelMeta as { models: Src[] };
     root.append(topbar('정보', () => ctx.router.back()), el('div', 'gh-body gh-narrow',
-      el('div', 'gh-panel', el('h2', 'gh-logo gh-small', 'GEARHOUSE'), el('p', 'gh-ver', VERSION_NAME), el('p', 'gh-note', '1930년대부터 이어지는 자동차 회사를 꿈꾸는 게임의 설계·시험 샌드박스입니다. 차를 설계하고, 시험장에서 측정하고, 레이스를 합니다. 회사 경영은 알파 0.20부터 들어옵니다.')),
-      el('div', 'gh-panel', el('h2', 'gh-h2', '바뀐 점'), ul([...CHANGES])),
-      el('div', 'gh-panel', el('h2', 'gh-h2', '만든 이와 자료 출처'), el('p', 'gh-note', '사진 재질, 하늘, 소품 모델은 모두 Poly Haven(polyhaven.com)의 CC0 자료입니다. 글꼴: Oswald, Noto Sans KR (SIL Open Font License, Google Fonts). 차의 모양과 물리, 트랙, 소리는 이 게임에서 만들었습니다.'),
+      el('div', 'gh-panel gk-panel', el('h2', 'gh-logo gk-logo gh-small', 'GEARHOUSE'), el('p', 'gh-ver', VERSION_NAME), el('p', 'gh-note', '1930년대부터 이어지는 자동차 회사를 꿈꾸는 게임의 설계·시험 샌드박스입니다. 차를 설계하고, 시험장에서 측정하고, 레이스를 합니다. 회사 경영은 알파 0.20부터 들어옵니다.')),
+      el('div', 'gh-panel gk-panel', el('h2', 'gh-h2', '바뀐 점'), ul([...CHANGES])),
+      el('div', 'gh-panel gk-panel', el('h2', 'gh-h2', '만든 이와 자료 출처'), el('p', 'gh-note', '사진 재질, 하늘, 소품 모델은 모두 Poly Haven(polyhaven.com)의 CC0 자료입니다. 글꼴: Oswald, Noto Sans KR (SIL Open Font License, Google Fonts). 차의 모양과 물리, 트랙, 소리는 이 게임에서 만들었습니다.'),
         src('차 재질 텍스처', P.layers), src('트랙 노면 재질', G.layers), src('건물 재질', B.layers), src('하늘 (HDRI)', [K]), src('소품 모델', M.models))));
     root.querySelector('.gh-bar .gh-btn')?.setAttribute('data-first', ''); }); }

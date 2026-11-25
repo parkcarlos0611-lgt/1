@@ -80,7 +80,7 @@ export function driveScreen(ctx: ShellCtx): Screen<DriveParams> & { readonly api
       toggle('자동 변속 (M)', f('auto').checked, v => { setField(r, 'auto', v); keepCtl('auto', v); }), toggle('트랙션 보조', f('tcs').checked, v => { setField(r, 'tcs', v); keepCtl('tcs', v); }),
       toggle('카운터스티어 보조', f('assist').checked, v => { setField(r, 'assist', v); keepCtl('assist', v); }), toggle('시험 운전자에게 맡기기', f('pilot').checked, v => setField(r, 'pilot', v)));
     quick.append(el('p', 'gh-note', `엔진: ${api!.engine}`));   // docs/systems/110 G1
-    pause = el('div', 'gh-pause', el('div', 'gh-panel gh-pausebox', el('h2', 'gh-h2 gh-display', '일시정지'), el('div', 'gh-pausecols', nav, quick)));
+    pause = el('div', 'gh-pause', el('div', 'gh-panel gk-panel gh-pausebox', el('h2', 'gh-h2 gh-display', '일시정지'), el('div', 'gh-pausecols', nav, quick)));
     pause.setAttribute('role', 'dialog'); pause.setAttribute('aria-label', '일시정지'); pause.addEventListener('click', e => { if (e.target === pause) closePause(); });
     ctx.over.append(pause); requestAnimationFrame(() => pause?.querySelector<HTMLElement>('#gh-resume')?.focus()); };
   /** a race's end: its results shown on their own screen */
@@ -110,7 +110,7 @@ export function resultsScreen(ctx: ShellCtx): Screen<ResultParams> {
   return { enter(p) { root.textContent = ''; const tb = el('table', 'gh-table'); tb.innerHTML = '<thead><tr><th>순위</th><th>차</th><th>최고 랩</th><th>기록</th></tr></thead>';
       const body = el('tbody'); for (const r of p.rows) { const tr = el('tr', r.me ? 'gh-me' : ''); for (const c of [String(r.pos), r.name, fmt(r.best), fmt(r.total)]) tr.append(el('td', '', c)); body.append(tr); } tb.append(body);
       const again = button('다시 하기', () => { restartAsked = true; ctx.router.back(); }, { kind: 'main' });
-      root.append(el('header', 'gh-bar', el('h1', 'gh-bar-t', `레이스 결과 · ${p.track} · ${p.laps}바퀴`), el('span', 'gh-grow')), el('div', 'gh-body gh-narrow', el('div', 'gh-panel', tb),
+      root.append(el('header', 'gh-bar', el('h1', 'gh-bar-t gk-head', `레이스 결과 · ${p.track} · ${p.laps}바퀴`), el('span', 'gh-grow')), el('div', 'gh-body gh-narrow', el('div', 'gh-panel gk-panel', tb),
         el('div', 'gh-actions', again, button('차고로', () => void ctx.router.reset('title').then(() => ctx.router.go('garage'))), button('타이틀로', () => void ctx.router.reset('title')))));
       ctx.layer.append(root); ctx.backdrop.setDesign(ctx.recent()); ctx.backdrop.start(); requestAnimationFrame(() => again.focus()); },
     leave() { root.remove(); } }; }

@@ -212,7 +212,7 @@ export function engineScreen(ctx: ShellCtx): Screen<EngineParams> & { readonly a
   const viewBox = el('div', 'gh-eng-view', glint, el('div', 'gh-eng-tools', exBtn, cutBtn, homeBtn), tip, el('span', 'gh-eng-hint', '끌어서 돌리기 · 휠·두 손가락으로 확대 · 부품을 눌러 이름 보기'), cutBar);
   const side = el('div', 'gh-eng-side', tb.el);
   const applyBtn = button('빌더에 적용 ◀', () => apply(), { kind: 'main', id: 'gh-eng-apply' });
-  const bar = el('header', 'gh-bar', button('◀ 뒤로', () => ctx.router.back(), { kind: 'ghost', title: '뒤로 (Esc)' }), el('h1', 'gh-bar-t', '엔진 공방'), el('span', 'gh-grow'), applyBtn);
+  const bar = el('header', 'gh-bar', button('뒤로', () => ctx.router.back(), { kind: 'ghost', title: '뒤로 (Esc)', icon: 'back' }), el('h1', 'gh-bar-t gk-head', '엔진 공방'), el('span', 'gh-grow'), applyBtn);
   root.append(bar, side, viewBox, info);
   // a phone: the view on top, the panels scrolling under it
   const scroll = el('div', 'gh-eng-scroll'); scroll.append(side, info); root.append(scroll);

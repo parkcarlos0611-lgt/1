@@ -1,6 +1,7 @@
 // The builder's pictures in the design system's cartoon manner (docs/systems/110 G4): the steps' rail icons (the kit's
 // icons, plus a chassis frame drawn here) and the parts library's thumbnails for the model body's swaps (bumpers,
 // lamps, wheels): a white or metal face, one accent, a thick black outline, as inline SVG text (no picture files).
+import type { FreeId } from '../core/placed';
 import { INK, ROLE } from './kit/tokens';
 import { icon, type IconName } from './kit/icons';
 import type { StepId } from './builder_steps';
@@ -55,8 +56,18 @@ export function wheelPic(kind: 'hollow5' | 'dish' | 'hole5' | 'steel'): string {
 export const basePic = (): string => icon('body');
 /** a free surface part's drawn card (docs/systems/115 P1), until its rendered picture comes: a mirror, a wing (ring or
  *  GT), one or two tips, the crest's shield, a marker, a vent or a louvre */
-export function partPic(id: 'mirror' | 'wingRing' | 'wingGT' | 'exhaust1' | 'exhaust2' | 'badge' | 'marker' | 'vent' | 'louvre' | 'lampRound' | 'lampEllipsoid' | 'lampSquare' | 'tailBand' | 'tailRound' | 'grille' | 'sideIntake' | 'ventCut' | 'louvreCut'): string {
+export function partPic(id: FreeId): string {
   switch (id) {
+    // the N33's kinds (docs/systems/117 R3)
+    case 'lampSlant': return svg64(`<path d="M6 30L10 16H46Q56 18 60 28L58 32H10Z" fill="${DARK}" ${st()}/><circle cx="20" cy="24" r="4" fill="#fff" ${st(1.5)}/><circle cx="31" cy="24" r="6" fill="#fff" ${st(2)}/><circle cx="44" cy="24" r="6" fill="${MET}" ${st(2)}/>`);
+    case 'fogLamp': return svg64(`<circle cx="32" cy="24" r="14" fill="${DARK}" ${st()}/><circle cx="32" cy="24" r="10" fill="${ROLE.yellow[0]}" ${st(2)}/>`);
+    case 'grilleSlot': return svg64(`<rect x="4" y="17" width="56" height="14" rx="6" fill="${DARK}" ${st()}/><path d="M8 24H24M40 24H56" stroke="#9aa0a6" stroke-width="2"/><ellipse cx="32" cy="24" rx="7" ry="5" fill="${MET}" ${st(2)}/>`);
+    case 'intakeOpen': return svg64(`<rect x="4" y="12" width="56" height="24" rx="5" fill="${DARK}" ${st()}/>${[18, 24, 30].map(y => `<path d="M9 ${y}H55" stroke="#6d7379" stroke-width="2"/>`).join('')}<path d="M23 13V35M41 13V35" ${st(3)}/>`);
+    case 'wingStay': return svg64(`<rect x="8" y="14" width="48" height="6" rx="3" fill="#fff" ${st()}/><path d="M8 8L12 8L16 40H4Z" fill="#fff" ${st(2)}/><path d="M56 8L52 8L48 40H60Z" fill="#fff" ${st(2)}/>`);
+    case 'lip': return svg64(`<path d="M4 20Q32 14 60 20L58 30Q32 24 6 30Z" fill="#fff" ${st()}/><path d="M6 30Q32 24 58 30L56 35Q32 29 8 35Z" fill="${DARK}" ${st(2)}/>`);
+    case 'garnish': return svg64(`<rect x="4" y="20" width="56" height="8" rx="2" fill="${DARK}" ${st()}/><path d="M6 22H18V26H6ZM46 22H58V26H46Z" fill="#fff"/><circle cx="32" cy="12" r="5" fill="${MET}" ${st(2)}/>`);
+    case 'handle': return svg64(`<rect x="10" y="15" width="44" height="18" rx="8" fill="${DARK}" ${st()}/><rect x="15" y="18" width="34" height="8" rx="3" fill="#fff" ${st(2)}/>`);
+    case 'fuelLid': return svg64(`<rect x="16" y="8" width="32" height="32" rx="7" fill="#fff" ${st()}/><path d="M46 20V28" ${st(3)}/>`);
     // the hole parts (docs/systems/115 P2): the opening dark, the part's own face in it
     case 'lampRound': return svg64(`<ellipse cx="32" cy="24" rx="17" ry="20" fill="${DARK}" ${st()}/><circle cx="32" cy="24" r="12" fill="#fff" ${st(2)}/>`);
     case 'lampEllipsoid': return svg64(`<ellipse cx="32" cy="24" rx="20" ry="18" fill="${DARK}" ${st()}/><circle cx="25" cy="24" r="8" fill="#fff" ${st(2)}/><circle cx="41" cy="24" r="5" fill="#fff" ${st(2)}/>`);

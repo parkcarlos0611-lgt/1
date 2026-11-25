@@ -22,7 +22,7 @@ const THIN = 8, PIECE = 6, MOST = 64;
 interface Pt { p: V; n: V }
 
 export interface FineStat { triangles: number; /** painted triangles with an angle under 5 degrees */ slivers: number; /** edges divided */ divided: number }
-export function emitShellFine(b: Build, S: Shell959, paint: string, normals?: number[]): FineStat { const P = S.P, F = S.F, N = cornerNormals(P, F, S.crease), div = new Map<string, number>();
+export function emitShellFine(b: Build, S: Shell959, paint: string, normals?: number[], thinAt?: (panel: string, tri: [V, V, V], deg: number) => void): FineStat { const P = S.P, F = S.F, N = cornerNormals(P, F, S.crease), div = new Map<string, number>();
   const painted = (k: number) => { const t = S.tag[k]!; return t.mat === 'paint' && !/Rim$|wheelWell|floor/.test(t.panel); };
   const sides = (f: number[]) => f.map((v, i) => len(sub(P[f[(i + 1) % f.length]!]!, P[v]!)));
   // the thin painted quads: which pair of sides is long, and into how many pieces
@@ -39,7 +39,7 @@ export function emitShellFine(b: Build, S: Shell959, paint: string, normals?: nu
       const want = Math.min(big, Math.ceil(L / (1.5 * w))); for (const i of [pair, pair + 2]) if (get(f, i) < want) { div.set(ekey(f[i]!, f[(i + 1) % 4]!), want); moved = true; } } } }
   const groups = new Map<string, number[]>(); S.tag.forEach((t, k) => { const key = `${t.panel}|${t.mat}`; (groups.get(key) ?? groups.set(key, []).get(key)!).push(k); });
   const st: FineStat = { triangles: 0, slivers: 0, divided: [...div.values()].filter(n => n > 1).length };
-  const tri = (a: Pt, c: Pt, d: Pt, k: number) => { b.tri(a.p, c.p, d.p); if (normals) normals.push(...a.n, ...c.n, ...d.n); st.triangles++; if (painted(k) && minAngle(a.p, c.p, d.p) < 5) st.slivers++; };
+  const tri = (a: Pt, c: Pt, d: Pt, k: number) => { b.tri(a.p, c.p, d.p); if (normals) normals.push(...a.n, ...c.n, ...d.n); st.triangles++; if (painted(k) && minAngle(a.p, c.p, d.p) < 5) { st.slivers++; thinAt?.(S.tag[k]!.panel, [a.p, c.p, d.p], minAngle(a.p, c.p, d.p)); } };
   for (const [key, fs] of groups) { const [panel, mat] = key.split('|') as [string, string], m = MAT[mat]; b.name(panel); if (m) b.mat(m[0], m[1], m[2]); else b.mat(paint, 0.6, 'paint');
     for (const k of fs) { const f = F[k]!, nc = f.length, cnt = f.map((v, i) => div.get(ekey(v, f[(i + 1) % nc]!)) ?? 1), corner = (i: number): Pt => ({ p: P[f[i % nc]!]!, n: N[k]![i % nc]! });
       /** the points along side i, from its first corner to its second (both included) */

@@ -26,7 +26,7 @@ const dot = (a: V3d, b: V3d) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2], crs = (
 // ---- the model: the shell with the gate's dark places for the lamps, the grille and the bumper's openings, the stock
 //      glass, and four wheels of the real size (245/45 R17: radius 326, the rim's flange 232)
 const S: Shell959 = OLD ? buildN33Shell({ glass: 'stock' }) : buildN33ShellV3({ glass: 'stock', face: true }), b = new Build(), nn: number[] = [];
-const FINE = emitShellFine(b, S, '#b9bdc3', nn);
+const FINE = emitShellFine(b, S, '#b9bdc3', nn, (panel, t, deg) => console.log(`   thin ${panel} ${deg.toFixed(1)} deg: ${t.map(p => p.map(Math.round).join(' ')).join(' | ')}`));
 const archR = OLD ? DIM.archR : V3.archR, rimR = OLD ? DIM.rimR : V3.rimR;
 for (const s of [1, -1]) for (const [x, tr, front] of [[DIM.axleF, DIM.trackF, true], [DIM.axleR, DIM.trackR, false]] as const)
   wheel(b, { name: 'hub', o: [x, s * (tr / 2 + 122.5), DIM.hubZ], tyreR: DIM.tyreR, rimR, width: 245, archR, front }, 'n5', true);

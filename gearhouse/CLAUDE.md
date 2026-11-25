@@ -18,6 +18,7 @@ A 1990s car builder and racing game: TypeScript + WebGL2, built with esbuild/vit
 ## Work rules
 - Verification is minimal. Run tsc and the tests for the files you touch. No full-suite runs, no long regressions, no repeated renders. Headless browsers on software GPU are very slow, so make one or two pictures at most.
 - Modelling and visual quality checks are NOT reduced. Judge your pictures against the references honestly (blueprint overlay, surfacecheck, photo comparison where relevant).
+- Every car body and part follows `docs/systems/108_style_standard.md` at all times (big flat panels, curvature only in narrow edge bands, explicit creases on character lines). A shape passes only on a same-angle photo comparison of its feature lines and face, never on silhouette numbers alone (see `docs/decisions.md`).
 - Triangle budgets are targets with a separate ceiling (see `docs/decisions.md`). Do not cut shape to hit a number.
 - No model names or IDs in code, comments or docs.
 - Other agents work in the tree at the same time. Commit only your own files (`git add <paths>`, never `-A`), and pull with `git pull --no-rebase` before pushing.

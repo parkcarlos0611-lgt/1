@@ -47,6 +47,7 @@
   .pad .wheel b { position: absolute; left: 46%; width: 8%; top: 50%; bottom: 8%; background: rgba(30,28,24,0.6); border-radius: 4px; }
   .pad .wheel::after { content: ''; position: absolute; left: 50%; top: -2px; width: 6px; height: 14%; margin-left: -3px; background: #e2574c; border-radius: 3px; }
   .pad button.gas { background: rgba(60,120,60,0.5); } .pad button.brake { background: rgba(150,50,40,0.5); }
+  .pad button.start { width: calc(var(--b) * 0.8); height: calc(var(--b) * 0.8); font-size: 0.8rem; background: rgba(170,40,30,0.6); border-color: #f2d0a0; }   /* docs/systems/110 G1: held to crank */
   .pad button.on { background: rgba(255,255,255,0.45); color: #222; } .pad .pedal.on { background: rgba(30,28,24,0.5); color: #fff; }
   @media (pointer: coarse) { .pad { display: flex; } .keys-help { display: none; } .mini { width: 92px; height: 92px; } }
   body.touch .pad { display: flex; }
@@ -115,7 +116,7 @@
   <div class="pedals" id="pedals" aria-hidden="true"><div><i id="gasbar"></i></div><div><i id="brakebar"></i></div></div><canvas id="view" width="768" height="432" aria-label="주행 화면"></canvas>
   <div class="pad" id="pad" aria-label="터치 조작">
     <div class="side"><div class="wheel" id="tw" role="slider" aria-label="핸들 (돌려서 조향)" aria-valuemin="-1" aria-valuemax="1" aria-valuenow="0"><i></i><b></b></div></div>
-    <div class="mid"><button type="button" data-key="c" class="small" aria-label="카메라 바꾸기">C</button><button type="button" data-key="q" class="small" aria-label="기어 내림">Q</button><button type="button" data-key="e" class="small" aria-label="기어 올림">E</button><button type="button" data-key="r" class="small" aria-label="트랙으로 복귀">R</button></div>
+    <div class="mid"><button type="button" data-key="c" class="small" aria-label="카메라 바꾸기">C</button><button type="button" data-key="q" class="small" aria-label="기어 내림">Q</button><button type="button" data-key="e" class="small" aria-label="기어 올림">E</button><button type="button" data-key="r" class="small" aria-label="트랙으로 복귀">R</button><button type="button" data-key="i" class="start" id="startbtn" aria-label="시동 (길게 눌러 크랭킹, 켜진 채 누르면 끄기)">시동</button></div>
     <div class="side"><button type="button" class="pedal brake" role="slider" aria-valuemin="0" aria-valuemax="1" aria-valuenow="0" aria-label="브레이크 (위로 갈수록 세게)"><i></i><span>브레이크</span></button><button type="button" class="pedal gas" role="slider" aria-valuemin="0" aria-valuemax="1" aria-valuenow="0" aria-label="가속 (위로 갈수록 많이)"><i></i><span>가속</span></button></div>
   </div>
   <div class="lcol"><div id="raceovl" class="raceovl" hidden><table class="stand" aria-label="순위"><tbody id="stand"></tbody></table><div id="mytime" class="mytime"></div></div><div id="pbnote" class="pbnote" aria-live="polite"></div><div class="notes"><div id="msg"></div><div id="bake" class="note"></div></div></div>
@@ -131,6 +132,8 @@
     <div class="row"><label for="num">차 번호 (번호판이 있는 차)</label><input type="text" id="num" value="6" maxlength="3" inputmode="numeric" pattern="[0-9]*" style="width:5em"></div>
     <label class="check"><input type="checkbox" id="auto" checked> 자동 변속 (<kbd>M</kbd>)</label>
     <label class="check"><input type="checkbox" id="assist"> 카운터스티어 보조</label>
+    <div class="row"><label for="ignition">시동</label><select id="ignition"><option value="direct" selected>직접 시동 (I/Enter 길게, 켜진 채 누르면 끄기)</option><option value="auto">자동 시동 (바로 출발)</option></select></div>
+    <label class="check"><input type="checkbox" id="stall" checked> 시동 꺼짐 (수동 변속에서 F 클러치를 낮은 회전에 급히 떼면)</label>
     <div class="row"><label for="damper">댐퍼 모드 (가변 댐퍼가 있는 차: F355)</label><select id="damper"><option value="sport" selected>스포츠</option><option value="comfort">컴포트</option></select></div>
     <label class="check"><input type="checkbox" id="tcs" checked> 트랙션 보조 (바퀴가 헛돌면 가속을 줄임, 키보드용)</label>
     <label class="check"><input type="checkbox" id="progressive"> 가속 게이지 모드 (오래 누를수록 가속이 차오름)</label>
@@ -138,7 +141,7 @@
     <label class="check"><input type="checkbox" id="lamps"> 헤드라이트 켜기 (팝업 램프는 올라옴, 브레이크등은 브레이크를 밟으면)</label>
     <button type="button" id="repair" class="btn">엔진 수리 (연습)</button>
     <label class="check"><input type="checkbox" id="touch"> 화면 버튼 보이기</label>
-    <p class="note keys-help"><kbd>↑</kbd>/<kbd>W</kbd> 가속 · <kbd>↓</kbd>/<kbd>S</kbd> 브레이크 · <kbd>←</kbd><kbd>→</kbd>/<kbd>A</kbd><kbd>D</kbd> 조향 · <kbd>Space</kbd> 핸드브레이크 · 멈춘 채 <kbd>↓</kbd> 길게: 후진<br>수동 변속: <kbd>Q</kbd> 내림 · <kbd>E</kbd> 올림 · <kbd>R</kbd> 트랙으로 복귀<br>카메라: <kbd>,</kbd><kbd>.</kbd> 돌리기 · <kbd>PgUp</kbd><kbd>PgDn</kbd> 높이 · <kbd>-</kbd><kbd>=</kbd> 축소/확대 · <kbd>Home</kbd> 되돌리기 · <kbd>C</kbd> 시점 바꾸기 · <kbd>Shift</kbd>+<kbd>↑</kbd> 반 가속 · 설정 <kbd>Tab</kbd></p>
+    <p class="note keys-help"><kbd>↑</kbd>/<kbd>W</kbd> 가속 · <kbd>↓</kbd>/<kbd>S</kbd> 브레이크 · <kbd>←</kbd><kbd>→</kbd>/<kbd>A</kbd><kbd>D</kbd> 조향 · <kbd>Space</kbd> 핸드브레이크 · 멈춘 채 <kbd>↓</kbd> 길게: 후진<br>수동 변속: <kbd>Q</kbd> 내림 · <kbd>E</kbd> 올림 · <kbd>R</kbd> 트랙으로 복귀 · <kbd>F</kbd> 클러치<br>시동: <kbd>I</kbd>/<kbd>Enter</kbd> 길게 (켜진 채 누르면 끄기) · 패드 <kbd>Y</kbd> 시동, <kbd>LB</kbd> 클러치<br>카메라: <kbd>,</kbd><kbd>.</kbd> 돌리기 · <kbd>PgUp</kbd><kbd>PgDn</kbd> 높이 · <kbd>-</kbd><kbd>=</kbd> 축소/확대 · <kbd>Home</kbd> 되돌리기 · <kbd>C</kbd> 시점 바꾸기 · <kbd>Shift</kbd>+<kbd>↑</kbd> 반 가속 · 설정 <kbd>Tab</kbd></p>
     <p class="note">휴대폰에서는 화면 아래로 조작합니다: 왼쪽 핸들을 돌려 조향, 오른쪽 브레이크와 가속 페달(손가락을 올릴수록 더 많이: 아래 끝 0 %, 위 끝 100 %, 떼면 0), 가운데 Q/E 기어(수동일 때)와 R 복귀. 멈춘 채 브레이크를 0.5초 넘게 누르면 후진(R)이 되고, 다시 가속을 누르면 전진합니다.</p>
   </section>
   <section data-tab="race">

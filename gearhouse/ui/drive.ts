@@ -54,7 +54,7 @@ export interface DriveHost { root?: ParentNode; renderer?: LiveRenderer | null; 
 export interface DriveApi { /** the world held still (its picture kept) and on again */ pause(): void; resume(): void; readonly paused: boolean;
   /** the car put back behind the line (a race started again) */ restart(): void; /** another design driven (null: the car list's first) */ useDesign(d: Design | null): void;
   setTrack(id: string): void; readonly track: string; /** a race with these entrants and laps (the race tab's own fields) */ race(o: { opp?: number; lineup?: string; laps?: number; mode?: string }): void;
-  /** the race on (or done), null in practice */ readonly raceNow: Race | null;
+  /** the race on (or done), null in practice */ readonly raceNow: Race | null; /** the player's engine's state as the screens write it (docs/systems/110 G1) */ readonly engine: string;
   /** the track's materials and props loaded (or failed) */ readonly ready: Promise<void>; readonly drawerOpen: boolean; drawer(open: boolean): void;
   /** the camera (drivecam.ts): the view now, and the views this car can have */ camera: CamView; readonly cameras: CamView[] }
 // The drive below is one function's body, mounted once on its markup; it is not indented, so its lines read as before.
@@ -770,7 +770,7 @@ return {
   race(o) { const set = (id: string, v: unknown) => { if (v !== undefined) $<HTMLSelectElement>(id).value = String(v); }; set('opp', o.opp); set('lineup', o.lineup); set('laps', o.laps); set('mode', o.mode);
     $('pickbox').hidden = $<HTMLSelectElement>('lineup').value !== 'pick'; startRace(); $('race').textContent = '다시 시작'; },
   get camera() { return camView; }, set camera(v: CamView) { if (v !== camView) useView(v); }, get cameras() { return CAM_VIEWS.map(c => c.id).filter(viewOk); },
-  get raceNow() { return race; }, ready, get drawerOpen() { return document.body.classList.contains('drawer-open'); }, drawer(open: boolean) { drawer(open); } };
+  get raceNow() { return race; }, get engine() { return car.engine.label; }, ready, get drawerOpen() { return document.body.classList.contains('drawer-open'); }, drawer(open: boolean) { drawer(open); } };
 }
 // a page of its own: the drive's markup is on it (the game's page mounts it on a screen instead)
 if (typeof document !== 'undefined' && document.getElementById('setbtn') && !document.getElementById('gh-app')) mountDrive();

@@ -105,6 +105,7 @@ export function settingsScreen(ctx: ShellCtx): Screen<never> {
     const ctl = pane(chips('화면 버튼 (핸들, 페달)', [['auto', '자동 (터치 화면)'], ['on', '항상'], ['off', '끄기']], S().controls.touch, v => set(s => { s.controls.touch = v; })),
       toggle('자동 변속', S().controls.auto, v => set(s => { s.controls.auto = v; })), toggle('트랙션 보조 (키보드용)', S().controls.tcs, v => set(s => { s.controls.tcs = v; })),
       toggle('카운터스티어 보조', S().controls.assist, v => set(s => { s.controls.assist = v; })), toggle('가속 게이지 모드 (오래 누를수록 차오름)', S().controls.progressive, v => set(s => { s.controls.progressive = v; })),
+      chips('시동', [['direct', '직접 시동 (I/Enter 길게)'], ['auto', '자동 시동']], S().controls.ignition, v => set(s => { s.controls.ignition = v; })), toggle('시동 꺼짐 (수동 변속, 직접 시동)', S().controls.stall, v => set(s => { s.controls.stall = v; })),
       chips('주행 카메라 (주행 중 C로 바꿈)', CAM_VIEWS.map(c => [c.id, c.name] as [CamView, string]), S().camera.view, v => set(s => { s.camera.view = v; })),
       el('p', 'gh-note', '주행: ↑/W 가속 · ↓/S 브레이크 · ←→/A D 조향 · Space 핸드브레이크 · Q/E 기어 · M 자동/수동 · R 복귀 · C 시네마틱 · Esc 일시정지. 메뉴: 화살표, Enter, Esc (게임패드의 십자키, A, B도 됩니다).'));
     const scr = pane(chips('화면 밝기', [['auto', '기기 설정대로'], ['light', '밝게'], ['dark', '어둡게']], S().screen.theme, v => set(s => { s.screen.theme = v; })),

@@ -39,7 +39,7 @@ function literals(src: string): string[] {
 const ROOT = join(__dirname, '..');
 /** the sources of the game's screens and the texts they show */
 const SOURCES = [...readdirSync(join(ROOT, 'ui/shell')).filter(f => f.endsWith('.ts')).map(f => `ui/shell/${f}`), ...readdirSync(join(ROOT, 'ui/kit')).filter(f => f.endsWith('.ts')).map(f => `ui/kit/${f}`),
-  'ui/builder3d.ts', 'core/version.ts', 'core/bodies.ts', 'core/engines.ts', 'race/fit.ts', 'race/onemake.ts'];
+  'ui/builder3d.ts', 'ui/builder_tier.ts', 'ui/builder_classpick.ts', 'race/tiers.ts', 'core/version.ts', 'core/bodies.ts', 'core/engines.ts', 'race/fit.ts', 'race/onemake.ts'];
 const PAGES = ['ui/shell/game.page.html', 'ui/builder3d.page.html', 'ui/drive.page.html'];
 
 describe('no real brand on a screen', () => {

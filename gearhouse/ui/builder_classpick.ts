@@ -24,9 +24,10 @@ const num = (v: number) => v.toLocaleString();
 /** a rung's plate: its code large, its chevrons in the class colour, a strip of how far up the power scale its cap is */
 function plate(t: Tier): string {
   const [c0, c1] = TIER_COLOUR[t.group], cap = Number.isFinite(t.hpMax) ? t.hpMax : 2000, k = t.pending ? 1 : Math.min(1, Math.log(cap / 40) / Math.log(2000 / 40));
-  const chev = Array.from({ length: t.n }, (_, i) => { const x = 60 - (t.n - 1) * 9 + i * 18; return `<path d="M${x + 5} 58 L${x - 4} 66 L${x + 5} 74" fill="none" stroke="${INK}" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/><path d="M${x + 5} 58 L${x - 4} 66 L${x + 5} 74" fill="none" stroke="${c0}" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/>`; }).join('');
-  return `<svg viewBox="0 0 120 90" aria-hidden="true"><text x="60" y="47" text-anchor="middle" font-family="Oswald, 'Arial Narrow', sans-serif" font-weight="700" font-style="italic" font-size="42" fill="#fff" stroke="${INK}" stroke-width="6" stroke-linejoin="round" paint-order="stroke">${t.id}</text>${chev}`
-    + `<rect x="14" y="80" width="92" height="6" rx="1" fill="${INK}"/><rect x="15" y="81" width="${(90 * k).toFixed(1)}" height="4" fill="${c0}"/><rect x="15" y="84" width="${(90 * k).toFixed(1)}" height="1" fill="${c1}"/></svg>`; }
+  const chev = Array.from({ length: t.n }, (_, i) => { const x = 60 - (t.n - 1) * 8 + i * 16, d = `M${x + 4} 38 L${x - 3} 44 L${x + 4} 50`;
+    return `<path d="${d}" fill="none" stroke="${INK}" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"/><path d="${d}" fill="none" stroke="${c0}" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>`; }).join('');
+  return `<svg viewBox="0 0 120 60" aria-hidden="true"><text x="60" y="32" text-anchor="middle" font-family="Oswald, 'Arial Narrow', sans-serif" font-weight="700" font-style="italic" font-size="32" fill="#fff" stroke="${INK}" stroke-width="5" stroke-linejoin="round" paint-order="stroke">${t.id}</text>${chev}`
+    + `<rect x="20" y="53" width="80" height="5" rx="1" fill="${INK}"/><rect x="21" y="54" width="${(78 * k).toFixed(1)}" height="3" fill="${c0}"/><rect x="21" y="56" width="${(78 * k).toFixed(1)}" height="1" fill="${c1}"/></svg>`; }
 
 export function classPick(root: HTMLElement, host: ClassPickHost): ClassPick {
   root.classList.add('tierpick'); root.hidden = true; root.setAttribute('role', 'dialog'); root.setAttribute('aria-modal', 'true'); root.setAttribute('aria-labelledby', 'tpTitle');
@@ -83,7 +84,7 @@ export function classPick(root: HTMLElement, host: ClassPickHost): ClassPick {
         c.card.title = L ? `${tierLabel(t)}: ${L}` : tierLabel(t); c.lock.hidden = !L; c.lock.querySelector('.tp-lt')!.textContent = L ?? '';
         c.now.hidden = t.id !== reach.id || (!!chosen && chosen.id === reach.id && !o.fresh); }
       for (const [g, f] of famEls) { const ts = TIERS.filter(x => x.group === g), Ls = ts.map(t => tierLock(t, o.eraOpen)), all = Ls.every(Boolean);
-        f.fam.classList.toggle('tp-closed', all); f.why.textContent = all ? Ls[0]! + (g === 'H' ? ' · 설정 > 샌드박스에서 열기' : '') : ''; }
+        f.fam.classList.toggle('tp-closed', all); f.why.textContent = all && g === 'H' ? '설정 > 샌드박스 "시대 잠금 풀기"로 열기' : ''; }
       root.hidden = false; root.scrollTop = 0; fams.scrollTop = 0;
       (cards.get((chosen ?? reach).id)!.card).focus({ preventScroll: true }); },
     close() { root.hidden = true; confirm.hidden = true; } };

@@ -59,10 +59,11 @@ export function fitEngine(d0: Design, cap: number): Design {
   let d = normalise(d0); if (!Number.isFinite(cap) || freeHp(d) <= cap) return d;
   const over = () => freeHp(d) > cap, set = (f: (e: Design['engine']) => void) => { const e = structuredClone(d.engine); f(e); d = normalise({ ...d, engine: e }); };
   // one step at a time, the gentlest first: a turbo's boost, then a turbo off (the rest at their full boost again, so the
-  // boost is taken down first once more), then the displacement, the grade, the red line
+  // boost is taken down first once more; the last one off leaves the boost at its least, so a turbo put back starts gently),
+  // then the displacement, the grade, the red line
   for (let k = 0; k < 400 && over(); k++) { const E = d.engine;
     if (E.turbo && E.boost > LIMITS.boost[0] + 1e-6) set(e => { e.boost = Math.max(LIMITS.boost[0], +(e.boost - 0.05).toFixed(2)); });
-    else if (E.turbo) set(e => { e.turbo = (e.turbo - 1) as Turbos; e.boost = gradeBoost(e.grade); if (e.turbo < 2) delete e.sequential; });
+    else if (E.turbo) set(e => { e.turbo = (e.turbo - 1) as Turbos; e.boost = e.turbo ? gradeBoost(e.grade) : LIMITS.boost[0]; if (e.turbo < 2) delete e.sequential; });
     else if (E.cc > LIMITS.cc[0]) set(e => { e.cc = Math.max(LIMITS.cc[0], e.cc - 50); });
     else if (E.grade > GRADES[0]!) set(e => { e.grade = (e.grade - 1) as Design['engine']['grade']; });
     else if (E.redline > LIMITS.redline[0]) set(e => { e.redline = Math.max(LIMITS.redline[0], e.redline - 100); });

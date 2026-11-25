@@ -100,7 +100,7 @@ export const n33CabinFor = (d: Design): InteriorOptions => { const p = d.interio
 /** its cabin: the screen's foot at x 1370, z 962, its top at 2060, 1320; the doors 1530..2855, their skin's inside about
  *  800 from the middle at the elbow; the sill's top inside at 400; the rear wells from x 3290; right-hand drive */
 export const N33_CABIN: CabinAnchors = { side: -1, floorZ: 200, dashX: 1720, dashTopZ: 925, screenFoot: [1545, 948], screenTop: [2070, 1318], screenHalf: [612, 490], wheel: [1990, -372, 845], rake: 22,
-  hip: [2440, -372, 455], recline: 23, half: 780, doorX: [1530, 2855], sillZ: 400, beltZ: 918, tunnelHalf: 110, tunnelZ: 340, rearX: 3330, shelfZ: 700, roofZ: 1310, roofHalf: 510,
+  hip: [2410, -372, 505], recline: 23, half: 780, doorX: [1530, 2855], sillZ: 400, beltZ: 918, tunnelHalf: 110, tunnelZ: 340, rearX: 3330, shelfZ: 700, roofZ: 1310, roofHalf: 510,
   // the door skin's inside (the skin less 24 mm: 836 at the elbow, 812 at z 800, the belt's 732), the card's front edge nearly upright
   doorIn: [[400, 812], [560, 818], [700, 815], [800, 790], [860, 756], [918, 708]], doorLean: 50, wellX: 3300, rearHalf: 610,
   // the screen's foot as the cowl bows (measured on the shell: 1425 on the centre line, 1575 at the glass's corner)

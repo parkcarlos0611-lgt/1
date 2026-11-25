@@ -28,7 +28,7 @@ export interface CabinAnchors {
  *  belt (876), the A pillar's foot at x 1660; the sill's top at 427; the floor closed at 118 under the carpet; the rear wells'
  *  inner walls 554 mm from the middle from x 2871; the roof 1281 outside */
 export const P959_CABIN: CabinAnchors = { side: 1, floorZ: 175, dashX: 1800, dashTopZ: 852, screenFoot: [1470, 884], screenTop: [1990, 1205], screenHalf: [640, 520], wheel: [2035, 365, 772], rake: 22,
-  hip: [2470, 365, 430], recline: 23, half: 790, doorX: [1460, 2590], sillZ: 420, beltZ: 868, tunnelHalf: 100, tunnelZ: 318, rearX: 2960, shelfZ: 640, roofZ: 1232, roofHalf: 560,
+  hip: [2440, 365, 430], recline: 23, half: 790, doorX: [1460, 2590], sillZ: 420, beltZ: 868, tunnelHalf: 100, tunnelZ: 318, rearX: 2960, shelfZ: 640, roofZ: 1232, roofHalf: 560,
   doorIn: [[420, 796], [560, 795], [700, 786], [800, 772], [868, 756]], wellX: 2850, rearHalf: 530 };
 
 /** the trim's colours by role */

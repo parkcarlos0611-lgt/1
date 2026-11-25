@@ -198,16 +198,16 @@ export function doorCards(b: InteriorBuild, A: CabinAnchors, T: Trim, which: 'bo
 export function driver(b: InteriorBuild, f: Frame, o: { recline: number; wheel: Frame; rimR: number; feet: { clutch: V; throttle: V }; suit: string; helmet: string; gloves: string; bone?: (s: Seg) => number }): DriverRest { const th = (o.recline - 2) * RAD, U: V = [Math.sin(th), 0, Math.cos(th)], Fw: V = [-Math.cos(th), 0, Math.sin(th)], Yv: V = [0, 1, 0];
   const inv = (p: V): V => { const d = sub(p, f.o); return [dot(d, f.x), dot(d, f.y), dot(d, f.z)]; }, car = (p: V): V => at(f, p), B = (s: Seg) => o.bone?.(s) ?? 0;   // inv: a point of the car in the seat's frame
   const ball = (c: V, r: number) => b.turn(c, [0, 0, 1], [[-r, 0], [-r * 0.71, r * 0.71], [0, r], [r * 0.71, r * 0.71], [r, 0]], 6);
-  const body = ([[-75, 150, 105], [60, 150, 100], [230, 172, 112], [375, 192, 104], [438, 150, 84], [468, 72, 62]] as const).map(([s, w, d]) => ring(mul(U, s), Yv, Fw, w, 10, d, 0.5));
+  const body = ([[-75, 150, 105], [60, 150, 100], [245, 172, 112], [405, 192, 104], [470, 150, 84], [500, 72, 62]] as const).map(([s, w, d]) => ring(mul(U, s), Yv, Fw, w, 10, d, 0.5));
   b.frame(f).onBone(B('pelvis')).part('driver', o.suit, 0.1, 'canvas').loft(body.slice(0, 2)); b.onBone(B('torso')).loft(body.slice(1));
   b.paint('suit', add(mul(U, 215), mul(Fw, 100)), [0, 1, 0], U, 300, 430, Fw, 0.35);
-  const neck = mul(U, 468), head = add(neck, [-28, 0, 150]), hax: V = [0, 0, 1];
+  const neck = mul(U, 500), head = add(neck, [-60, 0, 160]), hax: V = [0, 0, 1];
   b.onBone(B('head')).part('driverNeck', '#1b1b1d', 0.1).tube([add(neck, [0, 0, -20]), add(head, [10, 0, -120])], 52, 6);
   b.part('driverHelmet', o.helmet, 0.55).turn(head, hax, [[-150, 92], [-118, 120], [-55, 135], [0, 139], [55, 133], [100, 110], [130, 68], [144, 30], [147, 0]], 14, { hint: [1, 0, 0], turn: 0.5 }).paint('visor', add(head, [-140, 0, 0]), [0, 1, 0], [0, 0, 1], 290, 114, [-1, 0, 0], 0.2);
   b.line('trim', [add(head, [-128, -62, -52]), add(head, [-141, 0, -54]), add(head, [-128, 62, -52])], { w: 0.8 });
   const R: Partial<DriverRest> & Record<string, unknown> = { hip: car([0, 0, 0]), up: dir(f, U), fwd: dir(f, Fw), neck: car(neck), eye: car(add(head, [-95, 0, 8])), arm: [325, 300], leg: [440, 430] };
   const J: Record<string, Partial<Record<'L' | 'R', V>>> = { shoulder: {}, elbow: {}, hand: {}, handAxis: {}, hipJ: {}, knee: {}, ankle: {}, elbowPole: {}, kneePole: {} };
-  for (const sg of [-1, 1]) { const k = sg > 0 ? 'L' : 'R', sh = add(mul(U, 392), [0, sg * 188, 0]), a = HAND_HOME, hand = inv(at(o.wheel, [10, sg * o.rimR * Math.cos(a), o.rimR * Math.sin(a)])), pole: V = [0.2, sg * 0.8, -1], el = joint(sh, hand, 325, 300, pole);
+  for (const sg of [-1, 1]) { const k = sg > 0 ? 'L' : 'R', sh = add(mul(U, 422), [0, sg * 188, 0]), a = HAND_HOME, hand = inv(at(o.wheel, [10, sg * o.rimR * Math.cos(a), o.rimR * Math.sin(a)])), pole: V = [0.2, sg * 0.8, -1], el = joint(sh, hand, 325, 300, pole);
     b.onBone(B(`upperArm${k}`)).part(sg > 0 ? 'driverArmL' : 'driverArmR', o.suit, 0.1, 'canvas').tube([add(sh, [0, -sg * 30, -10]), sh, el], [50, 54, 42], 8);
     b.onBone(B(`foreArm${k}`)).tube([el, lerp(el, hand, 0.86)], [42, 31], 8); ball(el, 43);
     const tan = unit(sub(inv(at(o.wheel, [10, sg * o.rimR * Math.cos(a + 0.2), o.rimR * Math.sin(a + 0.2)])), inv(at(o.wheel, [10, sg * o.rimR * Math.cos(a - 0.2), o.rimR * Math.sin(a - 0.2)]))));

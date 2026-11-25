@@ -16,7 +16,7 @@ import type { Mesh } from '../render/car/mesh';
 import type { GpuMesh } from '../render/live/gpu';
 import { dialState, stepDials, type DialState } from '../render/car/interior/gauges';
 import { restPose, poseCabin, gate } from '../render/car/interior/rig';
-import { meshToWorld, CABIN_FOV } from './drivecam';
+import { meshToWorld, CABIN_FOV, CABIN_TILT } from './drivecam';
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T, Q = new URLSearchParams(location.search);
 const cv = $<HTMLCanvasElement>('cv');
@@ -64,7 +64,7 @@ function frame(now: number) { const dt = Math.min(0.1, (now - last) / 1000); las
     const C = M.dials?.cabin, w = st.wheel * Math.PI / 180, P = C ? restPose(C) : null; let cabin: Float32Array | null = null, cock: { eye: [number, number, number]; fov: number; near: number } | null = null;
     if (C && P && (st.wheel || st.gear || st.cockpit)) { P.wheel = w; P.hands.L.alpha = C.wheel.home.L - w; P.hands.R.alpha = C.wheel.home.R - w; if (st.gear) { P.lever = gate(st.gear); P.hands[C.side > 0 ? 'R' : 'L'] = { ...P.hands[C.side > 0 ? 'R' : 'L'], task: 'lever', w: 1 }; }
       P.hideHead = st.cockpit; cabin = poseCabin(M.dials!, dials?.v, P); if (st.cockpit) cock = { eye: meshToWorld({ x: 0, y: 0, z: -0.015, yaw: st.yaw * Math.PI / 180, vx: 0, vy: 0, speed: 0, r: 0, pitch: 0, roll: 0 }, M.length, P.eye!), fov: CABIN_FOV.def, near: 0.05 }; }
-    L.render(cock ? { x: 0, y: 0, z: tz, ang: st.yaw * Math.PI / 180, pitch: 6, mm, W, H, cy: 0.5, ...cock, inkNear: 2.2 } : { x: 0, y: 0, z: tz, ang, pitch, mm, W, H, cy: 0.55, ...(st.persp ? { eye, fov, near: 0.2 } : {}) },
+    L.render(cock ? { x: 0, y: 0, z: tz, ang: st.yaw * Math.PI / 180, pitch: CABIN_TILT, mm, W, H, cy: 0.5, ...cock, inkNear: 2.2 } : { x: 0, y: 0, z: tz, ang, pitch, mm, W, H, cy: 0.55, ...(st.persp ? { eye, fov, near: 0.2 } : {}) },
       [{ g, x: 0, y: 0, z: -0.015, yaw: st.yaw * Math.PI / 180, roll: 0, pitch: 0, steerL: cabin ? w / 15 : 0.14, steerR: cabin ? w / 15 * 0.9 : 0.12, spin: 0, player: true, dials: dials?.v, cabin }], [], [],
       { look: st.look, glass: +(Q.get('glass') ?? 0.8), rays: st.look !== 4, bloomK: st.look === 2 ? 1 : 0, dof: 0, art: false, outW: st.look === 2 ? 0.5 : 1, outK: st.look === 2 ? 0.6 : 1, sun: [Math.cos(el) * Math.cos(az), Math.cos(el) * Math.sin(az), Math.sin(el)],
         style: { outline: st.outline, lines: st.lines, post: st.post, atlas: st.atlas, outPx: st.outPx, linePx: st.linePx, dpr } });

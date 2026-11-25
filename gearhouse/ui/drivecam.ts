@@ -101,6 +101,8 @@ export interface CamShot { eye: [number, number, number]; /** heading up the pic
  *  field of view, how quickly the heading and the height follow (rad/s), where the car sits on the picture */
 /** the cockpit's field of view setting (vertical degrees) */
 export const CABIN_FOV = { min: 50, max: 75, def: 60 } as const;
+/** the cockpit's tilt (degrees down) at rest: the eye looks a little down the road, the screen's header still in view */
+export const CABIN_TILT = 4;
 /** the driver's head as the cockpit's camera takes it (docs/systems/118 D1): the eye where the rig posed it (mesh mm: x
  *  back from the nose, y left, z up), the head's turn (left +) and nod (forward +), rad */
 export interface CabinHead { eye: [number, number, number]; yaw: number; pitch: number }
@@ -147,6 +149,6 @@ export class DriveCam {
    *  and pitch, looking where the head turns; the field of view the setting's; the near plane 5 cm so the dash is whole */
   private cockpit(c: CamCar, E: CarEyes, aspect: number, head?: CabinHead): CamShot { this.fresh = true;
     const p = head?.eye ?? E.seat!, eye = meshToWorld(c, E.len, p), ang = c.yaw + this.orbit + (head?.yaw ?? 0), tv = fovTan(aspect, Math.max(CABIN_FOV.min, Math.min(CABIN_FOV.max, this.cabinFov)));
-    const pitch = 6 - c.pitch * 180 / Math.PI * 0.85 + (head?.pitch ?? 0) * 180 / Math.PI + this.tilt;   /* the head keeps a little of the horizon against the body's pitch */
+    const pitch = CABIN_TILT - c.pitch * 180 / Math.PI * 0.85 + (head?.pitch ?? 0) * 180 / Math.PI + this.tilt;   /* the head keeps a little of the horizon against the body's pitch */
     return { eye, ang, pitch, fov: Math.atan(tv) * 360 / Math.PI, near: 0.05, at: [c.x + Math.cos(c.yaw) * 25, c.y + Math.sin(c.yaw) * 25, c.z] }; }
 }

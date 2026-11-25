@@ -5,7 +5,8 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { deflateSync } from 'node:zlib';
 import { KINDS } from '../../render/car/mesh';
 import { p959Model } from '../../render/car/p959';
-import { measure } from '../../render/car/p959/check';
+import { fineGrid, lineStat, measure, PANELS, turning } from '../../render/car/p959/check';
+import { faceNormal } from '../../render/car/p959/subdiv';
 import { edgeUse } from '../../render/car/p959/shell';
 
 const out = process.argv[2] ?? '.', mm = +(process.argv.find(a => a.startsWith('mm='))?.slice(3) ?? 4), W = Math.round(4800 / mm), H = Math.round(2300 / mm), BG = [206, 202, 192];
@@ -85,3 +86,10 @@ if (process.argv.includes('report')) { const R = measure(S);
   const by = (l: typeof R.mushy) => { const m = new Map<string, number>(); for (const e of l) m.set(e.panel, (m.get(e.panel) ?? 0) + 1); return [...m].map(([k, v]) => `${k} ${v}`).join(', '); };
   console.log(`  20-35 by panel: ${by(R.mushy)}\n  >=35 by panel: ${by(R.unmarked)}`);
   for (const e of [...R.mushy, ...R.unmarked].sort((a, b) => b.deg - a.deg).slice(0, 60)) console.log(`   ${e.panel} ${e.deg.toFixed(1)} deg at ${e.at.map(v => Math.round(v)).join(' ')}`); }
+
+// debug=<panel name start>: every line of that panel whose curvature changes sign, with its turning at each point
+{ const dbg = process.argv.find(a => a.startsWith('debug='))?.slice(6); if (dbg) { const G = fineGrid(S), P = S.P, vn: V3[] = P.map(() => [0, 0, 0] as V3); S.F.forEach(f => { const n = faceNormal(P, f); for (const v of f) { vn[v]![0] += n[0]; vn[v]![1] += n[1]; vn[v]![2] += n[2]; } });
+  for (const p of PANELS.filter(q => q.name.startsWith(dbg))) { const line = (idx: number[], label: string, allow: number) => { const vs = idx.filter(v => v >= 0); if (vs.length < 4 || vs.length !== idx.length) return; const pts = vs.map(v => P[v]!), st = lineStat(pts, vs.map(v => un(vn[v]!))); if (st.changes <= allow && !st.dimples) return;
+      console.log(`${p.name} ${label}: changes ${st.changes} dimples ${st.dimples}  k = ${turning(pts, vs.map(v => un(vn[v]!))).map(v => v.toFixed(1)).join(' ')}`); };
+    for (let j = p.cols[0] * 2; j <= p.cols[1] * 2; j++) line(Array.from({ length: (p.rows[1] - p.rows[0]) * 2 + 1 }, (_, k) => G[p.rows[0] * 2 + k]![j]!), `along col ${j / 2}`, p.along ?? 0);
+    for (let i = p.rows[0] * 2; i <= p.rows[1] * 2; i++) line(Array.from({ length: (p.cols[1] - p.cols[0]) * 2 + 1 }, (_, k) => G[i]![p.cols[0] * 2 + k]!), `across row ${i / 2}`, p.across ?? 0); } } }

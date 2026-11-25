@@ -44,13 +44,16 @@ export interface DashOut { dials: DialBone[] }
 export interface DashOpts { pods?: boolean; stickers?: boolean; binnacle?: 'five' | 'four'; consoleGauges?: boolean; pillarPod?: boolean }
 export function dash(b: InteriorBuild, A: CabinAnchors, T: Trim, faces: GaugeFace[], o: DashOpts): DashOut { const f: Frame = { o: [A.dashX, 0, A.dashTopZ], x: [1, 0, 0], y: [0, 1, 0], z: [0, 0, 1] }, hw = A.doorIn ? A.doorIn[A.doorIn.length - 1]![1] - 20 : A.half + 8, s = A.side;
   const cx = A.screenFoot[0] - A.dashX, cz = A.screenFoot[1] - A.dashTopZ, prof: [number, number][] = [[cx, cz], [-22, 10], [0, -6], [9, -32], [15, -150], [42, -162], [50, -198], [30, -228], [-120, -244], [cx, -244]];
-  b.frame(f).part('dash', T.dash, 0.18, 'leather').loft([-1, -0.55, 0, 0.55, 1].map(k => prof.map(([x, z], i) => [x, k * hw, z + (i < 2 ? 7 * (1 - k * k) : 0)] as V)));
+  // the dash's front edge follows the screen's foot where the cabin gives its bow (the N33's: no gap under the glass)
+  const cowlAt = (y: number): number => { const C = A.cowl; if (!C) return cx; const q = Math.abs(y); for (let i = 1; i < C.length; i++) if (q <= C[i]![0]) { const [y0, x0] = C[i - 1]!, [y1, x1] = C[i]!; return x0 + (x1 - x0) * (q - y0) / (y1 - y0) - A.dashX; } return C[C.length - 1]![1] - A.dashX; };
+  b.frame(f).part('dash', T.dash, 0.18, 'leather').loft((A.cowl ? [-1, -0.88, -0.72, -0.55, -0.36, -0.18, 0, 0.18, 0.36, 0.55, 0.72, 0.88, 1] : [-1, -0.55, 0, 0.55, 1]).map(k => prof.map(([x, z], i) => [i === 0 || i === prof.length - 1 ? cowlAt(k * hw) : x, k * hw, z + (i < 2 ? 7 * (1 - k * k) : 0)] as V)));
   b.line('trim', [[2, -hw, -8], [2, hw, -8]], { w: 0.7 }).line('trim', [[44, -hw, -163], [44, hw, -163]], { w: 0.7 });
   b.part('dashFace', T.face, 0.12).box(11, 19, -hw + 6, hw - 6, -148, -36);
   // the pictures on the face band: vents at both ends and in the middle, the radio and the switches toward the passenger
   const R: V = [0, -1, 0], Uz: V = [0, 0, 1], N: V = [1, 0, 0], py = (y: number) => -s * y;   // py: a distance toward the passenger
-  b.part('dashVent', '#141416', 0.2); for (const y of [hw - 62, -(hw - 62)]) b.plate([24, y, -121], R, Uz, N, 100, 46, 6, 'vent'); b.plate([24, 0, -92], R, Uz, N, 122, 76, 6, 'vent');
-  b.part('dashRadio', '#141416', 0.2).plate([24, py(172), -74], R, Uz, N, 184, 69, 6, 'radio'); b.part('dashSwitches', '#141416', 0.2).plate([23, py(172), -128], R, Uz, N, 96, 36, 5, 'console');
+  b.part('dashVent', '#141416', 0.2); for (const y of [hw - 62, -(hw - 62)]) b.plate([24, y, -121], R, Uz, N, 100, 46, 6, 'vent');
+  if (!o.consoleGauges) { b.plate([24, 0, -92], R, Uz, N, 122, 76, 6, 'vent');
+    b.part('dashRadio', '#141416', 0.2).plate([24, py(172), -74], R, Uz, N, 184, 69, 6, 'radio'); b.part('dashSwitches', '#141416', 0.2).plate([23, py(172), -128], R, Uz, N, 96, 36, 5, 'console'); }
   b.part('dashSwitches', '#141416', 0.2).plate([24, py(372), -92], R, Uz, N, 188, 86, 6, 'switches');
   b.line('trim', [[20, py(480), -44], [20, py(hw - 130), -44], [20, py(hw - 130), -140], [20, py(480), -140]], { closed: true, w: 0.7 });   // the glove box's lid
   if (o.stickers) b.part('dashSticker', '#e8e4d8', 0.1).plate([21, py(560), -92], R, Uz, N, 150, 60, 2, 'stickerA'); else b.part('dashPlaque', '#9a9ca0', 0.4).plate([21, py(560), -64], R, Uz, N, 72, 36, 2, 'plaque');
@@ -71,9 +74,18 @@ export function dash(b: InteriorBuild, A: CabinAnchors, T: Trim, faces: GaugeFac
   if (o.pods) { b.frame(f); ([['podA', 150], ['podB', 235], ['podC', 320]] as const).forEach(([r, y], i) => { const c: V = [-90, py(y), 62], ax = unit([1, s * 0.22 * (i + 1) * 0.6, 0.12]), [u, v] = [unit(cross([0, 0, 1], ax)), [0, 0, 1] as V], up = unit(cross(ax, u)); void v;
       b.part(`gaugePod${i}`, '#161618', 0.5).turn(c, ax, [[-58, 16], [-28, 31], [0, 33], [-6, 28]], 8); b.part(`gaugePodFace${i}`, '#0c0c0e', 0.3).picture(add(c, mul(ax, -5)), mul(u, -1), up, ax, 58, 58, r);
       b.part(`gaugePodFoot${i}`, '#161618', 0.4).box(c[0] - 50, c[0] - 20, c[1] - 9, c[1] + 9, 0, 40); }); }
-  // the N33's centre stack: three round gauges in a row under the middle vent, faced a little toward the driver
-  if (o.consoleGauges) { b.frame(f).onBone(0); ([['podA', 64], ['podB', 0], ['podC', -64]] as const).forEach(([r, y], i) => { const c: V = [26, y, -150], ax = unit([1, s * 0.12, 0.05]), u = unit(cross([0, 0, 1], ax)), up = unit(cross(ax, u));
-      b.part(`gaugeConsole${i}`, '#161618', 0.4).turn(c, ax, [[-6, 30], [4, 30], [6, 26]], 10); b.part(`gaugeConsoleFace${i}`, '#0c0c0e', 0.3).picture(add(c, mul(ax, 5)), mul(u, -1), up, ax, 50, 50, r); }); }
+  // the N33's centre stack (docs/reference/bnr33/interior): a dark panel standing proud of the face band and running on
+  // under the dash; on it from the top two vents, the row of three round buttons, three round gauges (the voltmeter,
+  // oil pressure, boost: the boost nearest the driver), the climate panel and the radio
+  if (o.consoleGauges) { b.frame(f).onBone(0); const sw = 128, sx = 57;
+    b.part('dashStack', '#1c1c1f', 0.15).loft([-sw, sw].map(y => ([[14, -30], [sx - 5, -34], [sx, -44], [sx, -300], [14, -312]] as const).map(([x, z]) => [x, y, z] as V)));
+    b.line('trim', [[sx + 0.5, -sw, -44], [sx + 0.5, sw, -44]], { w: 0.7 });
+    b.part('dashVent', '#141416', 0.2); for (const y of [-59, 59]) b.plate([sx + 4, y, -66], R, Uz, N, 110, 46, 4, 'vent');
+    b.part('dashStackButtons', '#141416', 0.2).plate([sx + 3, 0, -104], R, Uz, N, 128, 32, 3, 'stackButtons');
+    ([['podV', 68], ['podB', 0], ['podA', -68]] as const).forEach(([r, y0], i) => { const c: V = [sx + 2, -s * y0, -148], ax = unit([1, s * 0.12, 0.05]), u = unit(cross([0, 0, 1], ax)), up = unit(cross(ax, u));
+      b.part(`gaugeConsole${i}`, '#161618', 0.4).turn(c, ax, [[-6, 31], [4, 31], [6, 27]], 12); b.part(`gaugeConsoleFace${i}`, '#0c0c0e', 0.3).fan(add(c, mul(ax, 6.8)), ring(add(c, mul(ax, 6.8)), u, up, 27, 12), ax).paint(r, add(c, mul(ax, 6.8)), mul(u, -1), up, 54.8, 54.8); });
+    b.part('dashClimate', '#141416', 0.2).plate([sx + 3, 0, -206], R, Uz, N, 168, 63, 3, 'climate');
+    b.part('dashRadio', '#141416', 0.2).plate([sx + 3, 0, -268], R, Uz, N, 150, 56, 3, 'radio'); }
   // a boost gauge in a pod on the driver's A pillar, turned to the driver's eyes
   if (o.pillarPod) { b.frame(f).onBone(0); const p: V = [A.screenFoot[0] - A.dashX + 70, s * (A.screenHalf[0] - 70), A.screenFoot[1] - A.dashTopZ + 120], eye: V = [A.hip[0] - A.dashX, A.hip[1], A.hip[2] + 700 - A.dashTopZ], ax = unit(sub(eye, p)), u = unit(cross([0, 0, 1], ax)), up = unit(cross(ax, u));
     b.part('gaugePillarPod', '#161618', 0.5).turn(p, ax, [[-46, 14], [-22, 34], [0, 36], [-5, 31]], 10); b.part('gaugePillarFace', '#0c0c0e', 0.3).picture(add(p, mul(ax, -4)), mul(u, -1), up, ax, 62, 62, 'podA'); }
@@ -122,9 +134,34 @@ export function floorAndRear(b: InteriorBuild, A: CabinAnchors, T: Trim): void {
   b.frame({ o: [0, 0, 0], x: [1, 0, 0], y: [0, 1, 0], z: [0, 0, 1] }).part('cabinFloor', T.carpet, 0.05).box(x0, xw, -h, h, A.floorZ - 14, A.floorZ); if (xw < A.rearX) b.box(xw, A.rearX, -hr, hr, A.floorZ - 14, A.floorZ);
   b.part('cabinFirewall', T.carpet, 0.05).loft([[[x0 - 12, -h, A.floorZ], [x0 - 12, h, A.floorZ], [x0 - 12, h, A.dashTopZ - 200], [x0 - 12, -h, A.dashTopZ - 200]], [[x0 + 90, -h, A.floorZ], [x0 + 90, h, A.floorZ], [x0 + 8, h, A.dashTopZ - 200], [x0 + 8, -h, A.dashTopZ - 200]]]);
   for (const sg of [-1, 1]) b.part(sg > 0 ? 'cabinSillL' : 'cabinSillR', T.carpet, 0.05).box(x0, xw, sg * (h - 34), sg * h, A.floorZ, A.sillZ);
+  if (A.rear) { rearSeats(b, A, T); return; }
   // the rear: the small seats' bases and their backs as one step up to the shelf
   const sx = A.rearX - 300, sz = A.floorZ + 215; const step = [[sx, sz], [sx + 30, sz + 22], [A.rearX - 40, sz + 8], [A.rearX + 70, A.shelfZ], [A.rearX + 330, A.shelfZ], [A.rearX + 330, A.floorZ], [sx, A.floorZ]];
   b.part('cabinRear', T.seat2, 0.15, 'leather').loft([-hr, hr].map(y => step.map(([x, z]) => [x!, y, z!] as V))); }
+/** a 2+2's rear (docs/systems/117 R2, the N33's): two shaped seats (a cushion with raised sides, a leaning back with
+ *  bolsters, pleated middles) either side of the tunnel's hump, the shelf from the backs' top to the rear screen's foot,
+ *  and the trim panels on the body's sides behind the doors (the door skin's profile carried back to the seat backs) */
+export function rearSeats(b: InteriorBuild, A: CabinAnchors, T: Trim): void { const R = A.rear!, [x0, x1] = R.seatX, [bx, bz] = R.backTop, [sx, sz, sh] = R.shelf, hr = A.rearHalf ?? A.half, th = A.tunnelHalf, zc = A.floorZ + 225, fz = A.floorZ;
+  b.frame({ o: [0, 0, 0], x: [1, 0, 0], y: [0, 1, 0], z: [0, 0, 1] });
+  const y0 = th + 16, y1 = hr - 6, ym = (y0 + y1) / 2, hw = (y1 - y0) / 2, foot: V = [x1 - 6, 0, zc - 22], top: V = [bx, 0, bz], L = len(sub(top, foot)), U = unit(sub(top, foot)), Bk: V = [U[2], 0, -U[0]];
+  for (const sg of [-1, 1]) { const nm = sg > 0 ? 'seatRearL' : 'seatRearR', Y = (dy: number) => sg * (ym + dy);
+    const cush: [number, number, number][] = [[x0, zc - 70, 0], [x0 + 22, zc + 2, 12], [x0 + 130, zc + 12, 26], [x1 - 60, zc - 12, 22], [x1 + 40, zc - 34, 6]];
+    b.part(nm, T.seat, 0.22, 'leather').loft(cush.map(([x, z, bol]) => ([[-hw, fz], [-hw, z + bol * 0.6], [-hw + 28, z + bol], [-hw + 58, z + bol * 0.4], [-hw + 84, z], [hw - 84, z], [hw - 58, z + bol * 0.4], [hw - 28, z + bol], [hw, z + bol * 0.6], [hw, fz]] as const).map(([dy, zz]) => [x, Y(dy), zz] as V)));
+    b.paint('seatPleat', [(x0 + x1) / 2 + 30, Y(0), zc], [0, -1, 0], [-1, 0, 0], (hw - 84) * 2 + 2, x1 - x0 - 100, [0, 0, 1]);
+    const P = (t: number, dy: number, d: number): V => add(add(foot, mul(U, t * L)), add([0, Y(dy), 0], mul(Bk, d)));
+    const back: [number, number, number, number][] = [[0, 1, 10, 90], [0.1, 1, 26, 96], [0.5, 1, 30, 90], [0.86, 0.985, 22, 76], [0.97, 0.95, 8, 60], [1, 0.88, 0, 40]];
+    b.loft(back.map(([t, k, bol, th2]) => ([[-hw * k, th2], [-hw * k, -bol * 0.5], [-hw * k + 28, -bol], [-hw * k + 60, -bol * 0.45], [-hw * k + 88, 0], [hw * k - 88, 0], [hw * k - 60, -bol * 0.45], [hw * k - 28, -bol], [hw * k, -bol * 0.5], [hw * k, th2]] as const).map(([dy, d]) => P(t, dy, d))));
+    b.paint('seatPleat', P(0.48, 0, 0), [0, 1, 0], U, (hw - 88) * 2 + 2, L * 0.72, mul(Bk, -1));
+    b.line('trim', [P(0.12, hw - 88, -2), P(0.84, hw - 88, -2), P(0.84, -(hw - 88), -2), P(0.12, -(hw - 88), -2)], { w: 0.7 });
+    // the side trim behind the door, to the seat back: the door card's own profile carried back
+    const D = A.doorIn; if (D) { const ring = (x: number, k: number) => [...D.map(([z, w]) => [x, sg * (w - 16) * k, z] as V), ...[...D].reverse().map(([z, w]) => [x, sg * (w + 2) * k, z] as V)];
+      b.part(sg > 0 ? 'cabinQuarterL' : 'cabinQuarterR', T.door, 0.15, 'leather').loft([ring(A.doorX[1] + 4, 1), ring(Math.min(A.wellX ?? x1, x1), 1), ring(bx + 60, 0.97)]); } }
+  // the hump between the seats and the backs' middle, set back a little
+  b.part('seatRearMid', T.seat2, 0.15, 'leather').box(x0 + 14, x1 + 30, -y0 - 2, y0 + 2, fz, zc - 30);
+  b.loft([0, 0.5, 1].map(t => [[-y0 - 2, 16], [y0 + 2, 16], [y0 + 2, 80 - 40 * t], [-y0 - 2, 80 - 40 * t]].map(([y, d]) => add(add(foot, mul(U, t * L * 0.98)), add([0, y!, 0], mul(Bk, d!))))));
+  // the shelf: from the backs' top to under the rear screen's foot, narrowing with the body
+  b.part('cabinShelf', T.tunnel, 0.1).loft([[bx + 20, hr, bz - 6], [(bx + sx) / 2, (hr + sh) / 2 + 8, (bz + sz) / 2], [sx, sh, sz]].map(([x, h, z]) => [[x!, -h!, z!], [x!, h!, z!], [x!, h!, z! - 24], [x!, -h!, z! - 24]] as V[]));
+  b.part('cabinRear', T.carpet, 0.05).box(x1 + 30, bx + 30, -hr, hr, fz, zc - 60); }
 export function doorCards(b: InteriorBuild, A: CabinAnchors, T: Trim, which: 'both' | 'L' | 'R' | 'none' = 'both'): void { const [d0, d1] = A.doorX, h = A.half;
   b.frame({ o: [0, 0, 0], x: [1, 0, 0], y: [0, 1, 0], z: [0, 0, 1] });
   // the card's face at a height: the door skin's inside less the card's thickness where the cabin has its profile
@@ -132,11 +169,11 @@ export function doorCards(b: InteriorBuild, A: CabinAnchors, T: Trim, which: 'bo
   for (const sg of [-1, 1]) { if (which === 'none' || which === (sg > 0 ? 'R' : 'L')) continue; const nm = sg > 0 ? 'doorCardL' : 'doorCardR', yz = (d: number, z: number) => sg * (face(z) - d), y = (d: number) => sg * (h - d);
     if (A.doorIn) { const P = A.doorIn, out = P.map(([z, w]) => [sg * w, z] as const), inn = [...P].reverse().map(([z, w]) => [sg * (w - 16), z] as const), ring = (x: number) => [...out, ...inn].map(([yy, z]) => [x, yy, z] as V);
       // its front edge leans back over the belt's last 170 mm, 290 mm back at the top (the door's top starts at the A pillar, behind the wing's crown)
-      const lean = (x: number) => (p: V): V => [x + Math.max(0, p[2] - (A.beltZ - 170)) / 170 * 290, p[1], p[2]];
+      const LN = A.doorLean ?? 290, lean = (x: number) => (p: V): V => [x + Math.max(0, p[2] - (A.beltZ - 170)) / 170 * LN, p[1], p[2]];
       b.part(nm, T.door, 0.15, 'leather').loft([ring(d0).map(lean(d0)), ring(d1)]); }   // the card following the door skin's inside, 16 mm thick
     else b.part(nm, T.door, 0.15, 'leather').box(d0, d1, y(0), y(-14), A.sillZ, A.beltZ);
     const rz = A.beltZ, az = A.beltZ - 250, pz0 = A.sillZ + 22, pz1 = A.sillZ + 232;
-    b.part(`${nm}Roll`, T.dash, 0.18, 'leather').loft([P ? d0 + 290 : d0, d1].map(x => ([[0, 0], [-26, -4], [-34, -30], [-26, -58], [0, -64]] as const).map(([dy, dz]) => [x, P ? yz(-dy - 10, rz) : y(-dy), rz + dz] as V)));
+    b.part(`${nm}Roll`, T.dash, 0.18, 'leather').loft([P ? d0 + (A.doorLean ?? 290) : d0, d1].map(x => ([[0, 0], [-26, -4], [-34, -30], [-26, -58], [0, -64]] as const).map(([dy, dz]) => [x, P ? yz(-dy - 10, rz) : y(-dy), rz + dz] as V)));
     b.part(`${nm}Armrest`, T.door, 0.15, 'leather').loft([d0 + 300, d0 + 380, d1 - 250, d1 - 200].map((x, i) => { const k = i === 0 || i === 3 ? 0.35 : 1; return ([[0, 0], [62 * k, -6], [70 * k, -34], [40 * k, -62], [0, -70]] as const).map(([dy, dz]) => [x, P ? yz(dy, az) : y(dy), az + dz] as V); }));
     const px0 = d0 + 110, px1 = d1 - 110, py = (d: number) => P ? yz(d, pz1) : y(d); b.part(`${nm}Pocket`, T.door, 0.15, 'leather').box(px0, px1, py(0), py(42), pz0, pz1).paint('doorPleat', [(px0 + px1) / 2, py(42), (pz0 + pz1) / 2], [-sg, 0, 0], [0, 0, 1], px1 - px0 + 2, pz1 - pz0 + 2, [0, -sg, 0]);
     b.part(`${nm}Pull`, T.metal, 0.6).slab([d0 + 180, P ? yz(20, rz - 150) : y(20), rz - 150], [d0 + 290, P ? yz(20, rz - 150) : y(20), rz - 150], [0, 0, 1], 16, 10); } }

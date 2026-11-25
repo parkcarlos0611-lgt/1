@@ -76,6 +76,7 @@ const P959_ANCHORS = anchorsOf(STOCK_FRAME);
 export function cabinOf(f: Frame, A: CabinAnchors = P959_CABIN): CabinAnchors { const z = (v: number) => f.at([0, 0, v])[2], y = (v: number) => v * f.kY;
   return { ...A, floorZ: z(A.floorZ), dashX: f.x(A.dashX), dashTopZ: z(A.dashTopZ), screenFoot: [f.x(A.screenFoot[0]), z(A.screenFoot[1])], screenTop: [f.x(A.screenTop[0]), z(A.screenTop[1])], screenHalf: [y(A.screenHalf[0]), y(A.screenHalf[1])],
     wheel: f.at(A.wheel), hip: f.at(A.hip), half: y(A.half), doorX: [f.x(A.doorX[0]), f.x(A.doorX[1])], sillZ: z(A.sillZ), beltZ: z(A.beltZ), tunnelZ: z(A.tunnelZ), rearX: f.x(A.rearX), shelfZ: z(A.shelfZ), roofZ: z(A.roofZ), roofHalf: y(A.roofHalf),
+    ...(A.cowl ? { cowl: A.cowl.map(([w, x]) => [y(w), f.x(x)] as [number, number]) } : {}), ...(A.rear ? { rear: { seatX: [f.x(A.rear.seatX[0]), f.x(A.rear.seatX[1])] as [number, number], backTop: [f.x(A.rear.backTop[0]), z(A.rear.backTop[1])] as [number, number], shelf: [f.x(A.rear.shelf[0]), z(A.rear.shelf[1]), y(A.rear.shelf[2])] as [number, number, number] } } : {}),
     ...(A.doorIn ? { doorIn: A.doorIn.map(([h, w]) => [z(h), y(w)] as [number, number]) } : {}), ...(A.wellX !== undefined ? { wellX: f.x(A.wellX) } : {}), ...(A.rearHalf !== undefined ? { rearHalf: y(A.rearHalf) } : {}) }; }
 const P959: ModelBody = { name: CAR_599, length: DIM.length, cabin: P959_CABIN, anchors: P959_ANCHORS, wheels: p959Wheels, open: ['engineGrille', 'engineLid', 'rearWindow'],
   gauges: (d, topKmh) => ({ ...P959_GAUGES, redline: d.engine.redline, topKmh: topKmh ?? P959_GAUGES.topKmh, ...(d.engine.turbo ? { boostBar: d.engine.boost } : { boostBar: undefined }) }),
@@ -100,7 +101,12 @@ export const n33CabinFor = (d: Design): InteriorOptions => { const p = d.interio
  *  800 from the middle at the elbow; the sill's top inside at 400; the rear wells from x 3290; right-hand drive */
 export const N33_CABIN: CabinAnchors = { side: -1, floorZ: 200, dashX: 1720, dashTopZ: 925, screenFoot: [1545, 948], screenTop: [2070, 1318], screenHalf: [612, 490], wheel: [1990, -372, 845], rake: 22,
   hip: [2440, -372, 455], recline: 23, half: 780, doorX: [1530, 2855], sillZ: 400, beltZ: 918, tunnelHalf: 110, tunnelZ: 340, rearX: 3330, shelfZ: 700, roofZ: 1310, roofHalf: 510,
-  doorIn: [[400, 800], [560, 805], [700, 805], [820, 772], [918, 712]], wellX: 3300, rearHalf: 610 };
+  // the door skin's inside (the skin less 24 mm: 836 at the elbow, 812 at z 800, the belt's 732), the card's front edge nearly upright
+  doorIn: [[400, 812], [560, 818], [700, 815], [800, 790], [860, 756], [918, 708]], doorLean: 50, wellX: 3300, rearHalf: 610,
+  // the screen's foot as the cowl bows (measured on the shell: 1425 on the centre line, 1575 at the glass's corner)
+  cowl: [[0, 1428], [200, 1440], [300, 1454], [400, 1478], [500, 1518], [560, 1550], [612, 1576], [700, 1600]],
+  // the 2+2's rear seats between the doors' rear edge and the rear wells, their backs' top under the rear screen, the shelf to the screen's foot
+  rear: { seatX: [2900, 3290], backTop: [3445, 905], shelf: [4020, 992, 520] } };
 const n33FrameFor = (d: Design) => { const f = d.body.frame; return f && f.id === 'B33' && Object.values(f.dims).some(v => v) ? n33FrameOf(f.dims) : N33_STOCK; };
 function n33Wheels(d: Design, f = n33FrameFor(d)): { f: SuspWheel; r: SuspWheel } { const [wf, wr] = d.kit.tyres;
   return { f: { x: f.axleF, y: f.trackF / 2, r: N33_DIM.tyreR, w: wf, rim: N33_DIM.rimR, back: 0.6 * wf / 2 }, r: { x: f.axleR, y: f.trackR / 2, r: N33_DIM.tyreR, w: wr, rim: N33_DIM.rimR, back: 0.6 * wr / 2 } }; }

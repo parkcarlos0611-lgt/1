@@ -73,7 +73,7 @@ describe('the body in the game', () => {
 
 // R2 (docs/systems/117 §6): its own interior sets, right-hand drive, in the 959's interior manner and budget (doc 109 S4:
 // 4,000 - 5,000 triangles); its plates on the generic skin
-import { interiorMesh, INTERIORS, interiorBudget } from '../render/car/interior';
+import { interiorMesh, INTERIORS, interiorBudget, regionUV } from '../render/car/interior';
 import { N33_CABIN, modelSkin } from '../render/car/bodies';
 import { fitPlate, stockPlace } from '../render/car/p959/plates';
 import { n33Marks, n33Skin } from '../render/car/n33';
@@ -86,6 +86,18 @@ describe('its interior sets and plates (R2)', () => {
       expect(ys(/^steerWheelRim/)).toBeLessThan(-250); expect(ys(/^gaugeFace\d/)).toBeLessThan(-250); expect(ys(/^driver/)).toBeLessThan(-200);
       expect([0, 1, 2, 3].every(i => names.has(`gaugeFace${i}`))).toBe(true); expect(names.has('gaugeFace4')).toBe(false); expect([0, 1, 2].every(i => names.has(`gaugeConsoleFace${i}`))).toBe(true);
       expect(names.has('gaugePillarPod')).toBe(k === 'n33Sport'); } });
+  it('fitted to the remade body (docs/systems/117 §14): the dash\'s front edge on the bowed cowl, door cards to the belt inside the glass, a 2+2\'s rear seats and shelf, the voltmeter in the centre stack', () => {
+    const m = interiorMesh({ ...INTERIORS.n33Stock, cabin: N33_CABIN, length: 4675 }), names = new Set(m.names!.filter(Boolean)), sk = n33Skin(n33Model({ glass: 'stock', bare: true }).shell);
+    const pts = (re: RegExp) => { const out: number[][] = []; for (let t = 0; t < m.n; t++) if (re.test(m.names![m.part[t]!] ?? '')) for (let k = 0; k < 3; k++) out.push([m.pos[t * 9 + k * 3]!, m.pos[t * 9 + k * 3 + 1]!, m.pos[t * 9 + k * 3 + 2]!]); return out; };
+    // the dash's front edge against the screen's foot found on the shell (a ray forward just over the cowl): within 40 mm on the centre line and at 500 out (it stood 120 mm short on the centre line)
+    const D = pts(/^dash$/); for (const y of [0, 500]) { const edge = Math.min(...D.filter(p => Math.abs(Math.abs(p[1]!) - y) < 40).map(p => p[0]!)), glass = sk.hit([2300, y, 990], [-1, 0, 0], 3000)!.p[0]; expect(Math.abs(edge - glass), `cowl at y ${y}: dash ${edge.toFixed(0)}, glass ${glass.toFixed(0)}`).toBeLessThan(40); }
+    // the door cards: inside the body's skin everywhere, their top at the belt within the glass's 726..740
+    const C = pts(/^doorCard[LR]$/); for (const p of C) { const h = sk.hit([p[0]!, Math.sign(p[1]!) * 1600, Math.min(p[2]!, 915)], [0, -Math.sign(p[1]!), 0], 3000); if (h) expect(Math.abs(p[1]!)).toBeLessThan(Math.abs(h.p[1]) - 5); }
+    expect(Math.max(...C.filter(p => p[2]! > 910).map(p => Math.abs(p[1]!)))).toBeLessThan(726); expect(Math.max(...C.map(p => p[2]!))).toBeCloseTo(918, 0);
+    for (const n of ['seatRearL', 'seatRearR', 'seatRearMid', 'cabinShelf', 'cabinQuarterL', 'dashStack', 'dashClimate', 'dashStackButtons']) expect(names.has(n), n).toBe(true);
+    const S = pts(/^seatRear[LR]$/); expect(Math.min(...S.map(p => p[0]!))).toBeGreaterThan(2850); expect(Math.max(...S.map(p => p[2]!))).toBeLessThan(960); expect(Math.max(...S.map(p => Math.abs(p[1]!)))).toBeLessThan(612);
+    // the first of the centre stack's three faces shows the voltmeter's region of the sheet
+    const [u0, v0, u1, v1] = regionUV('podV'); let n = 0; for (let t = 0; t < m.n; t++) if (m.names![m.part[t]!] === 'gaugeConsoleFace0') { n++; expect(m.uv![t * 9]).toBeGreaterThanOrEqual(u0 - 1e-6); expect(m.uv![t * 9]).toBeLessThanOrEqual(u1 + 1e-6); expect(m.uv![t * 9 + 1]).toBeGreaterThanOrEqual(v0 - 1e-6); expect(m.uv![t * 9 + 1]).toBeLessThanOrEqual(v1 + 1e-6); } expect(n).toBe(12); });
   it('the builder\'s cards draw 차체 B\'s own glass and interior sets', () => { expect(buildSet('glass', 'B33:stock').shell.P.length).toBe(lump.shell.P.length); expect(buildSet('interior', 'B33:drift').mesh.n).toBeGreaterThan(1000); });
   it('plates sit on its bumpers at their own places, and placed freely through the generic skin', () => { const skin = n33Skin(lump.shell);
     for (const m of n33Marks()) { const at = stockPlace(skin, m)!; expect(at).toBeTruthy(); const f = fitPlate(skin, { id: m.name as 'plateF', at, rot: 0, tilt: 0, scale: 1 })!; expect(f.ok, `${m.name} ${f.why}`).toBe(true); }

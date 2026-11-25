@@ -18,6 +18,9 @@ export interface CabinAnchors {
   /** the roof lining's height over the seats and the roof's half width inside */ roofZ: number; roofHalf: number;
   /** the door skin's inside as the card follows it: [z, half width] from the sill up to the belt (none: a card standing
    *  straight at `half`) */ doorIn?: [number, number][];
+  /** the screen's foot as it bows across the car: [half width, x] from the centre line out (none: straight at screenFoot's x); the dash's front edge follows it */ cowl?: [number, number][];
+  /** how far back the door card's front edge leans at the belt (the door's top starting behind its foot; default 290, the 959's) */ doorLean?: number;
+  /** a 2+2's rear seats: the cushions' front and rear (x), the seat backs' top (x, z), the shelf's rear end under the rear screen's foot (x, z) and its half width there */ rear?: { seatX: [number, number]; backTop: [number, number]; shelf: [number, number, number] };
   /** where the rear wheels' wells begin (x) and the cabin's half width between them behind that (none: the cabin keeps `half` to its back) */ wellX?: number; rearHalf?: number }
 
 /** the 959's cabin, fitted to its shell (render/car/p959, docs/systems/109 S5): the screen's foot at x 1440, z 890, its

@@ -77,6 +77,10 @@ describe('in the game', () => {
     expect(d.body.paint).toBe(DESIGN_BNR33.body.paint); expect(stockN33()).toEqual(d);
     for (const f of oneMakeField(7, 3)) expect(f.design.body.base).toBe('p959');
     const m = designMesh(normalise(d), 0, 0, 0, 1); expect(m.susp).toBeTruthy(); expect(m.names!.some(n => /plate/i.test(n))).toBe(true);
+    // its own parts (docs/systems/117 R3): the lump's stock set put on by the `stock` flag (kept through normalise), its own five-spoke wheel; a stretched frame carries them
+    expect(normalise(d).body.model!.stock).toBe(true); expect(d.body.model!.wheel).toBe('n5'); const names = new Set(m.names);
+    for (const n of ['headLamp', 'tailLamp', 'fogLamp', 'lip', 'garnish', 'wing', 'mirror', 'handle', 'grilleMesh', 'intakeCore', 'exhaustTip', 'wheelNut']) expect(names.has(n), n).toBe(true);
+    const long = designMesh(normalise({ ...d, body: { ...d.body, frame: { id: 'B33', dims: { overhangF: 0, wheelbase: 100, overhangR: 60, width: 0, roof: 0, ride: 0 } } } }), 0, 0, 0, 1); for (const n of ['headLamp', 'tailLamp', 'lip', 'wing']) expect(long.names!.includes(n), n).toBe(true);
   });
   it('its engine is in the workshop\'s library as a stock family and variant, the design\'s own', () => {
     const e = STOCK_ENGINES.find(x => x.id === 'stock-n33')!; expect(e.name).toBe(ENGINE_N33); expect(bannedIn(e.name)).toEqual([]);

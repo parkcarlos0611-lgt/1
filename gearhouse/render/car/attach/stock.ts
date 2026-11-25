@@ -39,7 +39,7 @@ export function stockAims(base: Lump, dims?: Partial<FrameDims>): Aim[] { const 
     along('lampSlant', at([199, 560, 657]), [-0.813, 0.487, 0.32], { depth: 12 }), along('grilleSlot', at([115, 0, 645]), [-0.96, 0, 0.279], { depth: 22 }),
     { id: 'intakeOpen', o: [-600, 0, at([0, 0, 322])[2]], d: [1, 0, 0], scale: 1.12, depth: 70 }, { id: 'intakeOpen', o: [-600, at([0, 345, 0])[1], at([0, 0, 502])[2]], d: [1, 0, 0], scale: 0.3, sx: 0.62, depth: 45 },
     { id: 'fogLamp', o: [-600, at([0, 585, 0])[1], at([0, 0, 322])[2]], d: [1, 0, 0], scale: 1.1, depth: 16 }, { id: 'lip', o: [-600, 0, at([0, 0, 205])[2]], d: [1, 0, 0] },
-    along('tailRound', at([4555, 418, 815]), [0.975, 0.13, 0.182], { scale: 1.17, depth: 10 }), along('tailRound', at([4512, 607, 815]), [0.913, 0.358, 0.197], { scale: 1.17, depth: 10 }),
+    along('tailRound', at([4555, 416, 815]), [0.975, 0.13, 0.182], { scale: 1.23, depth: 10 }), along('tailRound', at([4511, 609, 815]), [0.913, 0.358, 0.197], { scale: 1.23, depth: 10 }),
     { id: 'garnish', o: [at([4650, 0, 0])[0] + 600, 0, at([0, 0, 722])[2]], d: [-1, 0, 0] }]; }
 /** where a new part of a kind is put when the lump has no stock place for it (or that one is taken): aimed from the
  *  skin's bounds, so any lump has one */

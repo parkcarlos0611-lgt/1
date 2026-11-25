@@ -1,0 +1,9 @@
+# Search tools (ripgrep and the agents' Grep) skip these. Nothing is deleted: open a file by its path when it is needed.
+# The 1930s 2D game and its documents (superseded; kept for history)
+gearhouse/legacy/
+gearhouse/docs/archive/
+# Build output and copies
+gearhouse/dist/
+gearhouse/node_modules/
+# A separate project in this repository, not the car game
+cage/

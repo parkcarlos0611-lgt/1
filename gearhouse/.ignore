@@ -1,0 +1,4 @@
+# Search tools skip these (see ../.ignore and CLAUDE.md). Open a file by path when needed.
+legacy/
+docs/archive/
+dist/

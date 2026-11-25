@@ -13,14 +13,17 @@
 
 export type PlateId = 'plateF' | 'plateR';
 /** the free surface parts' kinds (docs/systems/115 P1, §5-4's first column) */
-export type SurfId = 'mirror' | 'wingRing' | 'wingGT' | 'exhaust1' | 'exhaust2' | 'badge' | 'marker' | 'vent' | 'louvre';
+export type SurfId = 'mirror' | 'wingRing' | 'wingGT' | 'exhaust1' | 'exhaust2' | 'badge' | 'marker' | 'vent' | 'louvre'
+  /** the N33's (docs/systems/117 R3): its adjustable wing, the front lip and the rear garnish band (laid round the corners), the big tips */ | 'wingN33' | 'lipF' | 'garnish' | 'exhaustBig1' | 'exhaustBig2';
 /** the hole-cutting parts (docs/systems/115 P2, §5-4's second column) */
-export type HoleId = 'lampRound' | 'lampEllipsoid' | 'lampSquare' | 'tailBand' | 'tailRound' | 'grille' | 'sideIntake' | 'ventCut' | 'louvreCut';
+export type HoleId = 'lampRound' | 'lampEllipsoid' | 'lampSquare' | 'tailBand' | 'tailRound' | 'grille' | 'sideIntake' | 'ventCut' | 'louvreCut'
+  /** the N33's (docs/systems/117 R3): the slanted head lamp wrapping the corner, the grille with the emblem's place, the
+   *  bumper's big intake, the fog lamps in their ducts, the brake ducts low in the lip */ | 'lampN33' | 'grilleN33' | 'intakeN33' | 'fogLamp' | 'brakeDuct';
 export type FreeId = SurfId | HoleId;
 export type PlacedId = PlateId | FreeId;
 export const PLATE_IDS: readonly PlateId[] = ['plateF', 'plateR'];
-export const HOLE_IDS: readonly HoleId[] = ['lampRound', 'lampEllipsoid', 'lampSquare', 'tailBand', 'tailRound', 'grille', 'sideIntake', 'ventCut', 'louvreCut'];
-export const FREE_IDS: readonly FreeId[] = ['mirror', 'wingRing', 'wingGT', 'exhaust1', 'exhaust2', 'badge', 'marker', 'vent', 'louvre', ...HOLE_IDS];
+export const HOLE_IDS: readonly HoleId[] = ['lampRound', 'lampEllipsoid', 'lampSquare', 'lampN33', 'tailBand', 'tailRound', 'grille', 'grilleN33', 'intakeN33', 'sideIntake', 'fogLamp', 'brakeDuct', 'ventCut', 'louvreCut'];
+export const FREE_IDS: readonly FreeId[] = ['mirror', 'wingRing', 'wingGT', 'wingN33', 'exhaust1', 'exhaust2', 'exhaustBig1', 'exhaustBig2', 'badge', 'marker', 'lipF', 'garnish', 'vent', 'louvre', ...HOLE_IDS];
 export const isHole = (id: PlacedId): id is HoleId => (HOLE_IDS as readonly string[]).includes(id);
 export const PLACED_IDS: readonly PlacedId[] = [...PLATE_IDS, ...FREE_IDS];
 export const isPlate = (id: PlacedId): id is PlateId => id === 'plateF' || id === 'plateR';
@@ -45,10 +48,15 @@ export interface PartKind { group: PartGroup; name: string; size: number; sizeOf
   /** a hole part (P2): its footprint's height against its width (`size` the width), the width ratio's range, the
    *  outline's shape (an ellipse or a rounded rectangle, its corner radius against the smaller half side), and for a
    *  band that wraps round a corner the radius it is laid round (mm at scale 1; its middle `flat` of the width laid
-   *  straight) */ hole?: { aspect: number; sx: readonly [number, number]; shape: 'ellipse' | 'rrect'; r?: number; wrap?: { r: number; flat: number } } }
-export type PartGroup = 'mirror' | 'wing' | 'exhaust' | 'badge' | 'marker' | 'vent' | 'lamp' | 'tail' | 'intake' | 'ventCut';
-export const PART_GROUPS: readonly [PartGroup, string][] = [['lamp', '헤드램프 (구멍)'], ['tail', '테일램프 (구멍)'], ['intake', '흡기구·그릴 (구멍)'], ['ventCut', '벤트·루버 (구멍)'],
-  ['mirror', '미러'], ['wing', '뒤 윙'], ['exhaust', '배기구 끝'], ['badge', '배지'], ['marker', '옆 표시등'], ['vent', '벤트·루버 (붙임)']];
+   *  straight; `outer`: only its end toward the car's side wraps, a head lamp round its corner). 'poly': a four-sided
+   *  outline with rounded corners, its top falling by `slant` of its height toward the outer end (a slanted lamp) and its
+   *  foot narrower by `taper` of its width each side (an intake, a grille) */ hole?: { aspect: number; sx: readonly [number, number]; shape: 'ellipse' | 'rrect' | 'poly'; r?: number; slant?: number; taper?: number; wrap?: Wrap };
+  /** a surface part laid as a band on the skin by the same rays as a wrapped hole (docs/systems/117 R3: the lip, the
+   *  garnish): its height against its width and how it wraps */ band?: { aspect: number; wrap: Wrap } }
+export interface Wrap { r: number; flat: number; outer?: true }
+export type PartGroup = 'mirror' | 'wing' | 'exhaust' | 'badge' | 'marker' | 'vent' | 'lamp' | 'tail' | 'intake' | 'ventCut' | 'aux' | 'trim';
+export const PART_GROUPS: readonly [PartGroup, string][] = [['lamp', '헤드램프 (구멍)'], ['tail', '테일램프 (구멍)'], ['intake', '흡기구·그릴 (구멍)'], ['aux', '안개등·덕트 (구멍)'], ['ventCut', '벤트·루버 (구멍)'],
+  ['mirror', '미러'], ['wing', '뒤 윙'], ['exhaust', '배기구 끝'], ['trim', '립·가니시'], ['badge', '배지'], ['marker', '옆 표시등'], ['vent', '벤트·루버 (붙임)']];
 export const PART_KINDS: Record<FreeId, PartKind> = {
   mirror: { group: 'mirror', name: '미러', size: 124, sizeOf: '폭', scale: [0.6, 1.6], depth: [40, 220], depth0: 120, depthName: '팔 길이', rot: [-30, 30], tilt: [-20, 20], tilt0: 0, tiltName: '기울기', pair: true, centre: false, max: 4 },
   wingRing: { group: 'wing', name: '링 윙 (599형)', size: 1500, sizeOf: '폭', scale: [0.6, 1.25], depth: [60, 400], depth0: 130, depthName: '높이', rot: [0, 0], tilt: [-5, 20], tilt0: 4, tiltName: '날개 각', pair: false, centre: true, centreOnly: true, max: 2 },
@@ -60,6 +68,14 @@ export const PART_KINDS: Record<FreeId, PartKind> = {
   marker: { group: 'marker', name: '옆 표시등', size: 70, sizeOf: '폭', scale: [0.5, 2.2], depth: [1, 8], depth0: 2.5, depthName: '두께', rot: [-45, 45], tilt: [0, 0], tilt0: 0, tiltName: '', pair: true, centre: false, max: 6 },
   vent: { group: 'vent', name: '벤트 (붙임)', size: 220, sizeOf: '폭', scale: [0.35, 2.7], depth: [2, 20], depth0: 6, depthName: '높이', rot: [-90, 90], tilt: [0, 0], tilt0: 0, tiltName: '', pair: true, centre: true, max: 8 },
   louvre: { group: 'vent', name: '루버 (붙임)', size: 360, sizeOf: '폭', scale: [0.3, 1.7], depth: [4, 25], depth0: 10, depthName: '날개 높이', rot: [-90, 90], tilt: [0, 0], tilt0: 0, tiltName: '', pair: true, centre: true, max: 6 },
+  // ---- docs/systems/117 R3: the N33's surface parts, generic (any lump): the GT wing on swept stays at its ends with end
+  //      plates (its blade's angle set), the front lip under the bumper and the rear garnish band (both laid round the
+  //      body's corners as the tail lamp band is), a big single tip and a big twin in one body
+  wingN33: { group: 'wing', name: 'GT 윙 (N33형, 각도 조절)', size: 1500, sizeOf: '폭', scale: [0.6, 1.2], depth: [80, 400], depth0: 165, depthName: '높이', rot: [0, 0], tilt: [-5, 20], tilt0: 3, tiltName: '날개 각', pair: false, centre: true, centreOnly: true, max: 2 },
+  lipF: { group: 'trim', name: '앞 립 (N33형)', size: 1700, sizeOf: '폭', scale: [0.5, 1.15], depth: [10, 80], depth0: 34, depthName: '돌출', rot: [0, 0], tilt: [0, 0], tilt0: 0, tiltName: '', pair: false, centre: true, centreOnly: true, max: 2, band: { aspect: 62 / 1700, wrap: { r: 230, flat: 0.6 } } },
+  garnish: { group: 'trim', name: '뒤 가니시 띠 (N33형)', size: 1480, sizeOf: '폭', scale: [0.5, 1.15], depth: [1, 6], depth0: 2.5, depthName: '두께', rot: [0, 0], tilt: [0, 0], tilt0: 0, tiltName: '', pair: false, centre: true, centreOnly: true, max: 2, band: { aspect: 50 / 1480, wrap: { r: 200, flat: 0.72 } } },
+  exhaustBig1: { group: 'exhaust', name: '큰 배기구 (1구)', size: 112, sizeOf: '지름', scale: [0.6, 1.6], depth: [0, 120], depth0: 22, depthName: '돌출', rot: [-15, 15], tilt: [-15, 15], tilt0: 0, tiltName: '위아래', pair: true, centre: true, max: 4 },
+  exhaustBig2: { group: 'exhaust', name: '큰 배기구 (2구 한 몸)', size: 96, sizeOf: '지름', scale: [0.6, 1.5], depth: [0, 120], depth0: 22, depthName: '돌출', rot: [-15, 15], tilt: [-15, 15], tilt0: 0, tiltName: '위아래', pair: true, centre: true, max: 4 },
   // ---- P2: the parts that cut their hole (render/car/attach/holes.ts); `depth` is how deep the pocket behind goes.
   //      The sizes are the 599's own openings (docs/systems/109 S3): its lamp sockets 234 x 278 mm, the tail lamp band
   //      across the tail and round its corners, the side intake 109 x 190, the engine lid's grille 936 x 345
@@ -71,6 +87,15 @@ export const PART_KINDS: Record<FreeId, PartKind> = {
   grille: { group: 'intake', name: '흡기구·그릴 (망)', size: 600, sizeOf: '폭', scale: [0.3, 2], depth: [10, 80], depth0: 40, depthName: '깊이', rot: [-30, 30], tilt: [0, 0], tilt0: 0, tiltName: '', pair: true, centre: true, max: 6, hole: { aspect: 0.375, sx: [0.4, 3], shape: 'rrect', r: 0.25 } },
   sideIntake: { group: 'intake', name: '옆 흡기구 (599형)', size: 109, sizeOf: '폭', scale: [0.5, 2.2], depth: [10, 60], depth0: 34, depthName: '깊이', rot: [-45, 45], tilt: [0, 0], tilt0: 0, tiltName: '', pair: true, centre: false, max: 4, hole: { aspect: 190 / 109, sx: [0.6, 2.5], shape: 'rrect', r: 0.35 } },
   ventCut: { group: 'ventCut', name: '벤트 (구멍)', size: 220, sizeOf: '폭', scale: [0.35, 2.7], depth: [8, 50], depth0: 20, depthName: '깊이', rot: [-90, 90], tilt: [0, 0], tilt0: 0, tiltName: '', pair: true, centre: true, max: 8, hole: { aspect: 0.36, sx: [0.5, 2], shape: 'rrect', r: 0.6 } },
+  // ---- docs/systems/117 R3: the N33's openings, generic: the head lamp (its top falling toward the car's side, its outer
+  //      end wrapping round the corner; a projector and a reflector inside, a clear corner lens), the grille between the
+  //      lamps (slats and the emblem's place), the bumper's big intake (narrower at its foot), the fog lamp in its duct and
+  //      the brake duct low in the lip. Sizes from the blueprint's front view (docs/reference/bnr33)
+  lampN33: { group: 'lamp', name: '헤드램프 (N33형, 모서리 감쌈)', size: 470, sizeOf: '폭', scale: [0.6, 1.4], depth: [8, 40], depth0: 16, depthName: '깊이', rot: [-30, 30], tilt: [0, 0], tilt0: 0, tiltName: '', pair: true, centre: false, max: 4, hole: { aspect: 0.24, sx: [0.7, 1.4], shape: 'poly', r: 0.3, slant: 0.4, wrap: { r: 170, flat: 0.5, outer: true } } },
+  grilleN33: { group: 'intake', name: '그릴 (N33형, 엠블럼 자리)', size: 560, sizeOf: '폭', scale: [0.5, 1.6], depth: [10, 60], depth0: 30, depthName: '깊이', rot: [0, 0], tilt: [0, 0], tilt0: 0, tiltName: '', pair: false, centre: true, centreOnly: true, max: 2, hole: { aspect: 0.18, sx: [0.6, 1.6], shape: 'poly', r: 0.3, taper: 0.07 } },
+  intakeN33: { group: 'intake', name: '큰 흡기구 (N33형 범퍼)', size: 780, sizeOf: '폭', scale: [0.5, 1.3], depth: [20, 120], depth0: 70, depthName: '깊이', rot: [0, 0], tilt: [0, 0], tilt0: 0, tiltName: '', pair: false, centre: true, centreOnly: true, max: 2, hole: { aspect: 0.24, sx: [0.6, 1.5], shape: 'poly', r: 0.25, taper: 0.06 } },
+  fogLamp: { group: 'aux', name: '안개등 (덕트 겸)', size: 250, sizeOf: '폭', scale: [0.5, 1.6], depth: [10, 60], depth0: 30, depthName: '깊이', rot: [-30, 30], tilt: [0, 0], tilt0: 0, tiltName: '', pair: true, centre: false, max: 4, hole: { aspect: 0.5, sx: [0.6, 1.6], shape: 'rrect', r: 0.3 } },
+  brakeDuct: { group: 'aux', name: '브레이크 덕트', size: 270, sizeOf: '폭', scale: [0.5, 1.6], depth: [10, 80], depth0: 40, depthName: '깊이', rot: [-30, 30], tilt: [0, 0], tilt0: 0, tiltName: '', pair: true, centre: true, max: 4, hole: { aspect: 0.18, sx: [0.5, 2], shape: 'rrect', r: 0.45 } },
   louvreCut: { group: 'ventCut', name: '루버 (구멍)', size: 360, sizeOf: '폭', scale: [0.3, 2.2], depth: [8, 50], depth0: 18, depthName: '깊이', rot: [-90, 90], tilt: [0, 0], tilt0: 0, tiltName: '', pair: true, centre: true, max: 6, hole: { aspect: 0.5, sx: [0.5, 2], shape: 'rrect', r: 0.12 } } };
 /** the most entries a design keeps (docs/systems/115 §5-3: about 40 parts; a pair is one entry) */
 export const MAX_PLACED = 32;

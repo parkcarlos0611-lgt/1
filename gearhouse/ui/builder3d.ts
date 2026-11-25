@@ -26,7 +26,7 @@ import { chosenTier, withTier, freeHp, needOf, needText, sliderWall, wallStop, f
 import { classPick } from './builder_classpick';
 import { loadSettings } from './shell/settings';
 import { BODY_NAME } from '../core/names';
-import { LIMITS, BODY_BASES, isModelBase, MODEL_OWN, BUMPERS_ALL, LAMPS_ALL, WHEELS_ALL, LUMP_SWAPS, plateOk, type BodyBase, type ModelSwaps, BODY_LIMITS, DIMS, LAYOUTS, LAYOUT_NAME, type DimKey, GRADE_NAME, GRADES, gradeLock, gradeBoost, gradeRedline, normalise, applyPatch, type BaseId, type Design, type NoseKind, type TailKind, type WheelKind, FACE_KEYS, faceLock, type Face, type FaceKey,
+import { LIMITS, BODY_BASES, isModelBase, MODEL_OWN, BUMPERS_ALL, LAMPS_ALL, WHEELS_ALL, WHEEL_NAME, LUMP_SWAPS, plateOk, type BodyBase, type ModelSwaps, BODY_LIMITS, DIMS, LAYOUTS, LAYOUT_NAME, type DimKey, GRADE_NAME, GRADES, gradeLock, gradeBoost, gradeRedline, normalise, applyPatch, type BaseId, type Design, type NoseKind, type TailKind, type WheelKind, FACE_KEYS, faceLock, type Face, type FaceKey,
   type Grade, type Structure, type Panels, type Intake, type Compression, type Sump, type Block, type Turbos, type Interior,
   SUSP_KINDS, SUSP_KIND_NAME, SUSP_LIMITS, SUSP_OWN, suspLock, suspFieldLock, type SuspKind, type RcPreset, type SuspAxle } from '../core/design';
 import { STEPS, FIT_STEP, stepNo, isStep, stepFrom, seenFrom, type StepId } from './builder_steps';
@@ -319,11 +319,12 @@ function btnRow(t: string, f: () => void): HTMLElement { const d = document.crea
   const modelRows = [h2('599 부품'), stockRow, note('순정 세트는 부품과 창문을 지금 599와 같게 답니다. 치수와 번호판 글자는 그대로 둡니다.'), cards<ModelSwaps['bumperF']>('앞 범퍼', BUMPERS_ALL.map(k => [k, BUMPER_NAME[k], bumperPic(k), { kind: 'bumperF', v: k }] as [ModelSwaps['bumperF'], string, string, ThumbSpec]), () => M().bumperF, sm('bumperF')),
     cards<ModelSwaps['bumperR']>('뒤 범퍼', BUMPERS_ALL.map(k => [k, BUMPER_NAME[k], bumperPic(k, true), { kind: 'bumperR', v: k }] as [ModelSwaps['bumperR'], string, string, ThumbSpec]), () => M().bumperR, sm('bumperR')),
     cards<ModelSwaps['lamp']>('헤드램프', LAMPS_ALL.map(k => [k, { round: '둥근 렌즈 (순정)', ellipsoid: '프로젝터 2개', square: '사각 프로젝터', none: '없음 (막힘)' }[k], lampPic(k), ...(k === 'none' ? [] : [{ kind: 'lamp', v: k }])] as [ModelSwaps['lamp'], string, string, ThumbSpec?]), () => M().lamp, sm('lamp')),
-    cards<ModelSwaps['wheel']>('휠', WHEELS_ALL.map(k => [k, { hollow5: '속 빈 5스포크 (순정)', dish: '딥디시 8스포크', hole5: '5홀 디스크', steel: '민짜 강철 휠' }[k], wheelPic(k), { kind: 'wheel', v: k }] as [ModelSwaps['wheel'], string, string, ThumbSpec]), () => M().wheel, sm('wheel')),
     seg<'on' | 'off'>('그 밖의 순정 부품 (테일램프 띠, 옆 흡기구, 엔진 덮개 그릴, 미러, 배기구, 배지·레터링)', [['on', '달기'], ['off', '떼기']], () => M().details === false ? 'off' : 'on', v => { if (v === 'on') delete M().details; else M().details = false; }),
     ];
+  // the wheels: any model body's (docs/systems/117 R3 added the N33's stock five-spoke, a six-spoke and a deep-dish five)
+  const wheelRow = cards<ModelSwaps['wheel']>('휠', WHEELS_ALL.map(k => [k, WHEEL_NAME[k], wheelPic(k), { kind: 'wheel', v: k }] as [ModelSwaps['wheel'], string, string, ThumbSpec]), () => M().wheel, sm('wheel'));
   // the plates: the 599's and the N33's alike (each body's own skin and stock places: render/car/bodies.ts modelSkin)
-  const plateRows = [plateOn('plateF', '앞 번호판'), plateOn('plateR', '뒤 번호판'), plateCards, note(`번호판 카드를 누르면 "놓기"가 됩니다. 판을 끌어 차체 위 아무 곳으로나 옮기고, 회전·기울기·크기를 고릅니다. 앞 번호판은 앞을, 뒤 번호판은 뒤를 보는 면(차 축에서 35° 안)에만 붙고, 굽은 면에서는 판이 평평한 채 검은 받침이 틈을 메웁니다(최대 70 mm). 램프·유리·다른 번호판과 겹치면 붙지 않습니다. 레이스 상대와 순정 세트는 순정 자리입니다.`),
+  const plateRows = [wheelRow, plateOn('plateF', '앞 번호판'), plateOn('plateR', '뒤 번호판'), plateCards, note(`번호판 카드를 누르면 "놓기"가 됩니다. 판을 끌어 차체 위 아무 곳으로나 옮기고, 회전·기울기·크기를 고릅니다. 앞 번호판은 앞을, 뒤 번호판은 뒤를 보는 면(차 축에서 35° 안)에만 붙고, 굽은 면에서는 판이 평평한 채 검은 받침이 틈을 메웁니다(최대 70 mm). 램프·유리·다른 번호판과 겹치면 붙지 않습니다. 레이스 상대와 순정 세트는 순정 자리입니다.`),
     plateRow];
   const modelTail = [note('범퍼는 차체의 이음선 고리에 맞물려 바뀝니다. 위의 헤드램프 카드는 예전 소켓 방식(순정 자리 고정)이고, 아래 "구멍" 부품은 어디에나 붙어 그 모양대로 차체에 구멍을 냅니다. 번호판은 앞뒤를 따로 떼고 다시 달 수 있고, 뗀 자리는 범퍼 면 그대로입니다. 번호판 글자는 판 위에 획으로 그립니다(가상의 번호만).')];
   // the free surface parts (docs/systems/115 P1): a card for each kind, grouped, with its rendered picture; pressed, a new

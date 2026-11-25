@@ -32,22 +32,26 @@ type P2 = [number, number];
 
 // ---- the footprint ----
 /** how a footprint is laid on the skin: its frame, and for a wrapped band the half length laid straight (`L0`) and the
- *  radius it turns about beyond it (`R`); a flat part: L0 infinite */
-export interface Proj { F: PartFrame; L0: number; R: number }
+ *  radius it turns about beyond it (`R`); a flat part: L0 infinite. `side` (a head lamp wrapping only its outer end): only
+ *  the end whose s has this sign turns, the other is laid straight on */
+export interface Proj { F: PartFrame; L0: number; R: number; side?: number }
 const axisOf = (P: Proj) => vmadd(P.F.o, P.F.n, -P.R);
+/** whether s lies on a part of the footprint laid straight */
+const straight = (P: Proj, s: number) => Math.abs(s) <= P.L0 || (!!P.side && Math.sign(s) !== P.side);
 /** the way out of the skin at a footprint's s (a flat part: its normal) */
-export function dirAt(P: Proj, s: number): V { if (Math.abs(s) <= P.L0) return P.F.n; const f = (Math.abs(s) - P.L0) / P.R, g = Math.sign(s); return vunit(add(mul(P.F.n, Math.cos(f)), mul(P.F.u, g * Math.sin(f)))); }
+export function dirAt(P: Proj, s: number): V { if (straight(P, s)) return P.F.n; const f = (Math.abs(s) - P.L0) / P.R, g = Math.sign(s); return vunit(add(mul(P.F.n, Math.cos(f)), mul(P.F.u, g * Math.sin(f)))); }
 /** the ray that lays a footprint's point (s, y) on the skin: from outside, inward */
 export function rayAt(P: Proj, s: number, y: number, reach = 300): { o: V; d: V; max: number } {
   const d = dirAt(P, s); if (!Number.isFinite(P.L0)) { const base = vmadd(vmadd(P.F.o, P.F.u, s), P.F.up, y); return { o: vmadd(base, d, reach), d: neg(d), max: reach * 2 }; }
-  const base = vmadd(vmadd(axisOf(P), P.F.u, Math.sign(s) * Math.min(Math.abs(s), P.L0)), P.F.up, y); return { o: vmadd(base, d, P.R + reach), d: neg(d), max: P.R + reach * 2 }; }
+  const base = vmadd(vmadd(axisOf(P), P.F.u, straight(P, s) ? s : Math.sign(s) * P.L0), P.F.up, y); return { o: vmadd(base, d, P.R + reach), d: neg(d), max: P.R + reach * 2 }; }
 /** a point's footprint coordinates: (s, y) and its height over the frame's plane (a band: over its wrapped surface) */
 export function coordOf(P: Proj, p: V): [number, number, number] { const F = P.F;
   if (!Number.isFinite(P.L0)) { const d = vsub(p, F.o); return [vdot(d, F.u), vdot(d, F.up), vdot(d, F.n)]; }
-  const q = vsub(p, axisOf(P)), a = vdot(q, F.u), b = vdot(q, F.n), y = vdot(q, F.up); if (Math.abs(a) <= P.L0) return [a, y, b - P.R];
+  const q = vsub(p, axisOf(P)), a = vdot(q, F.u), b = vdot(q, F.n), y = vdot(q, F.up); if (straight(P, a)) return [a, y, b - P.R];
   const g = Math.sign(a), a2 = Math.abs(a) - P.L0, f = Math.atan2(a2, b); return [g * (P.L0 + f * P.R), y, Math.hypot(a2, b) - P.R]; }
 /** a kind's footprint for an entry: its half sizes and its outline (s, y), counter-clockwise, a point every 25..40 mm */
-export function outlineOf(K: PartKind, p: Placed): { hw: number; hh: number; O: P2[]; r: number } { const H = K.hole!, w = K.size * p.scale * (p.sx ?? 1), h = K.size * H.aspect * p.scale, hw = w / 2, hh = h / 2;
+export function outlineOf(K: PartKind, p: Placed, side = 1): { hw: number; hh: number; O: P2[]; r: number } { const H = K.hole!, w = K.size * p.scale * (p.sx ?? 1), h = K.size * H.aspect * p.scale, hw = w / 2, hh = h / 2;
+  if (H.shape === 'poly') return { hw, hh, r: Math.min(hw, hh) * (H.r ?? 0.2), O: polyOutline(hw, hh, Math.min(hw, hh) * (H.r ?? 0.2), H.slant ?? 0, H.taper ?? 0, side, H.wrap ? hw * H.wrap.flat : Infinity) };
   if (H.shape === 'ellipse') { const per = Math.PI * (3 * (hw + hh) - Math.sqrt((3 * hw + hh) * (hw + 3 * hh))), n = clamp(Math.ceil(per / 26), 16, 64);
     return { hw, hh, r: Math.min(hw, hh), O: Array.from({ length: n }, (_, i) => { const t = i / n * Math.PI * 2; return [Math.cos(t) * hw, Math.sin(t) * hh] as P2; }) }; }
   // a straight side a point every 60 mm (a fine cell of the shell is about 70); a band's sides where they wrap round its corners every 35
@@ -60,6 +64,19 @@ export function outlineOf(K: PartKind, p: Placed): { hw: number; hh: number; O: 
   // counter-clockwise from the right side's foot
   line([hw, -hh + r], [hw, hh - r]); arc(hw - r, hh - r, 0); line([hw - r, hh], [-hw + r, hh]); arc(-hw + r, hh - r, 0.5); line([-hw, hh - r], [-hw, -hh + r]); arc(-hw + r, -hh + r, 1); line([-hw + r, -hh], [hw - r, -hh]); arc(hw - r, -hh + r, 1.5);
   return { hw, hh, r, O }; }
+/** a four-sided outline (s, y), counter-clockwise: its top falling by `slant` of its height toward the end of s's sign
+ *  `side`, its foot narrower by `taper` of its width each side, each corner rounded by two points `r` along its sides
+ *  (and one between them); a point every 60 mm along a side (35 where a wrapped band turns, beyond `L0`) */
+function polyOutline(hw: number, hh: number, r: number, slant: number, taper: number, side: number, L0: number): P2[] {
+  const g = side < 0 ? -1 : 1, C: P2[] = [[g * hw * (1 - taper), -hh], [g * hw, hh - 2 * hh * slant], [-g * hw, hh], [-g * hw * (1 - taper), -hh]];
+  if (g < 0) C.reverse();   // counter-clockwise whichever way the slant falls
+  const out: P2[] = [], n = C.length;
+  for (let i = 0; i < n; i++) { const a = C[i]!, b = C[(i + 1) % n]!, c = C[(i + 2) % n]!, la = Math.hypot(b[0] - a[0], b[1] - a[1]), lb = Math.hypot(c[0] - b[0], c[1] - b[1]), ra = Math.min(r, la * 0.4), rb = Math.min(r, lb * 0.4);
+    const p0: P2 = [a[0] + (b[0] - a[0]) * ra / la, a[1] + (b[1] - a[1]) * ra / la], p1: P2 = [b[0] - (b[0] - a[0]) * ra / la, b[1] - (b[1] - a[1]) * ra / la], q0: P2 = [b[0] + (c[0] - b[0]) * rb / lb, b[1] + (c[1] - b[1]) * rb / lb];
+    // the side from p0 to p1, then the corner at b: p1, its middle pulled toward b, q0
+    let x = 0; const len = Math.hypot(p1[0] - p0[0], p1[1] - p0[1]); while (x < len - 1) { out.push([p0[0] + (p1[0] - p0[0]) * x / len, p0[1] + (p1[1] - p0[1]) * x / len]); const s = p0[0] + (p1[0] - p0[0]) * x / len; x += Math.abs(s) > L0 - 1 ? 35 : 60; }
+    out.push(p1, [(p1[0] + q0[0]) / 4 + b[0] / 2, (p1[1] + q0[1]) / 4 + b[1] / 2]); }
+  return out; }
 /** a point inside a convex outline (counter-clockwise), `m` mm in from it (negative: out) */
 function insideO(O: readonly P2[], x: number, y: number, m = 0): boolean { for (let i = 0; i < O.length; i++) { const a = O[i]!, b = O[(i + 1) % O.length]!, ex = b[0] - a[0], ey = b[1] - a[1], l = Math.hypot(ex, ey) || 1;
     if ((ex * (y - a[1]) - ey * (x - a[0])) / l < m) return false; } return true; }
@@ -82,6 +99,7 @@ function pocketOf(id: HoleId, hw: number): Pick<HoleCut, 'wall' | 'floor' | 'lin
   case 'lampRound': case 'lampEllipsoid': case 'lampSquare': return { wall: 'paint', floor: () => 'dark', line: 'lamp' };
   case 'tailBand': { const amber = hw * 0.743; return { wall: 'paint', floor: s => Math.abs(s) > amber ? 'amber' : 'lamp', line: 'lamp' }; }
   case 'tailRound': return { wall: 'dark', floor: () => 'dark', line: 'lamp' };
+  case 'lampN33': case 'fogLamp': return { wall: 'paint', floor: () => 'dark', line: 'lamp' };
   case 'sideIntake': return { wall: 'paint', floor: () => 'grille', line: 'vent' };
   default: return { wall: 'dark', floor: () => 'grille', line: 'vent' }; } }
 
@@ -91,8 +109,10 @@ function lay(skin: Skin, P: Proj, pts: readonly P2[]): ({ p: V; n: V; d: V; tag:
 /** a hole part fitted at a point of the skin: the rules, its pocket's ring, its insides (`mesh`, drawn in the pocket) and
  *  its preview; `others`: the footprints already on the body (a hole's: refused within 40 mm; another part's: a warning) */
 export function fitHoleAt(skin: Skin, pt: SkinPoint, p: Placed & { id: HoleId }, others: readonly Footprint[]): PartFit {
-  const id = p.id, K = PART_KINDS[id], H = K.hole!, depth = p.depth ?? K.depth0, F = partFrame(pt.p, pt.n, p.rot, 0), { hw, hh, O } = outlineOf(K, p);
-  const P: Proj = H.wrap ? { F, L0: hw * H.wrap.flat, R: H.wrap.r * p.scale } : { F, L0: Infinity, R: 0 };
+  const id = p.id, K = PART_KINDS[id], H = K.hole!, depth = p.depth ?? K.depth0, F = partFrame(pt.p, pt.n, p.rot, 0);
+  // the car's side is the end of s whose frame axis points away from the centre line (a part on the line: +s)
+  const side = Math.sign(F.u[1] * pt.p[1]) || 1, { hw, hh, O } = outlineOf(K, p, side);
+  const P: Proj = H.wrap ? { F, L0: hw * H.wrap.flat, R: H.wrap.r * p.scale, ...(H.wrap.outer ? { side } : {}) } : { F, L0: Infinity, R: 0 };
   const twin = K.pair && !p.one && Math.abs(pt.p[1]) > 2; let why: string | null = null;
   // the rim on the skin, and probes inside it and just outside it (the rules read every face the cut will take)
   const rim = lay(skin, P, O), grid: P2[] = [], st = clamp(Math.min(hw, hh) / 2, 15, 60);
@@ -118,13 +138,13 @@ export function fitHoleAt(skin: Skin, pt: SkinPoint, p: Placed & { id: HoleId },
   // the insides, on the skin under the footprint (a point's height along the way out: negative into the pocket)
   const cache = new Map<string, { p: V; d: V } | null>(), under = (s: number, y: number) => { const k = `${s.toFixed(1)},${y.toFixed(1)}`; if (!cache.has(k)) { const r = rayAt(P, s, y), h = skin.hit(r.o, r.d, r.max); cache.set(k, h ? { p: h.p, d: neg(r.d) } : null); } return cache.get(k)!; };
   const at = (s: number, y: number, h: number): V => { const u = under(s, y); return u ? vmadd(u.p, u.d, h) : vmadd(framePtOf(F, s, y), F.n, h); };
-  const b = new Build(); if (!why) insides(b, id, F, at, hw, hh, depth, pt);
+  const b = new Build(); if (!why) insides(b, id, F, at, hw, hh, depth, pt, side, O);
   const mesh = b.mesh(0), area = Math.PI * hw * hh * (H.shape === 'ellipse' ? 1 : 4 / Math.PI) / 1e6, open = /^lamp|^tail/.test(id) ? 0 : area * (id === 'grille' ? 0.7 : id === 'louvreCut' ? 0.5 : 0.6) * (twin ? 2 : 1);
   const fig: PartFigures = { id, at: twin ? [pt.p[0], 0, pt.p[2]] : pt.p, count: twin ? 2 : 1, frontal: 0, plan: 0, mass: Math.round(MASS[id] * (twin ? 2 : 1) * p.scale * 100) / 100, open, facing: Math.abs(pt.n[0]) };
   const hole: HoleFit = { cuts, open, prints: mine, preview: () => previewOf(cut, mesh, depth) };
   return { p, key: placedKey(p), kind: K, F, size: K.size * p.scale, depth, twin, hw, hh, ok: !why, why, warn, mesh, fig, hole }; }
 const framePtOf = (F: PartFrame, x: number, y: number): V => vmadd(vmadd(F.o, F.u, x), F.up, y);
-const MASS: Record<HoleId, number> = { lampRound: 2.2, lampEllipsoid: 2.4, lampSquare: 2.4, tailBand: 1.6, tailRound: 0.4, grille: 0.8, sideIntake: 0.3, ventCut: 0.3, louvreCut: 0.6 };
+const MASS: Record<HoleId, number> = { lampRound: 2.2, lampEllipsoid: 2.4, lampSquare: 2.4, tailBand: 1.6, tailRound: 0.4, grille: 0.8, sideIntake: 0.3, ventCut: 0.3, louvreCut: 0.6, lampN33: 2.8, grilleN33: 0.7, intakeN33: 0.9, fogLamp: 0.9, brakeDuct: 0.3 };
 /** a cut mirrored across the centre line (a pair's twin) */
 export function mirrorCut(c: HoleCut): HoleCut { const F = c.proj.F; return { ...c, key: c.key + '~', proj: { ...c.proj, F: { o: mirV(F.o), n: mirV(F.n), u: mirV(F.u), up: mirV(F.up) } }, ring: c.ring.map(mirV), dirs: c.dirs.map(mirV) }; }
 /** a hole's footprint for the overlap rules: its frame's rectangle, and its own test (inside its outline 40 mm wide, near its skin) */
@@ -143,7 +163,29 @@ function bar(b: Build, at: At, F: PartFrame, a0: number, a1: number, c: number, 
     quadOut(b, P(x0, -t / 2, h), P(x1, -t / 2, h), P(x1, t / 2, h), P(x0, t / 2, h), F.n); quadOut(b, P(x0, -t / 2, h), P(x1, -t / 2, h), P(x1, -t / 2, h0), P(x0, -t / 2, h0), vert ? neg(F.u) : neg(F.up)); } }
 /** the half width of the outline at a height (an ellipse's or a rounded rectangle's, drawn a little inside it) */
 const spanAt = (round: boolean, hw: number, hh: number, r: number, y: number) => round ? hw * Math.sqrt(Math.max(0, 1 - (y / hh) ** 2)) : Math.abs(y) <= hh - r ? hw : hw - r + Math.sqrt(Math.max(0, r * r - (Math.abs(y) - hh + r) ** 2));
-function insides(b: Build, id: HoleId, F: PartFrame, at: At, hw: number, hh: number, depth: number, pt: SkinPoint): void {
+/** an outline's span across at a height: its least and greatest s (a convex outline) */
+function spanO(O: readonly P2[], y: number): [number, number] { let lo = Infinity, hi = -Infinity;
+  for (let i = 0; i < O.length; i++) { const a = O[i]!, c = O[(i + 1) % O.length]!; if ((a[1] - y) * (c[1] - y) > 0 || a[1] === c[1]) continue; const s = a[0] + (c[0] - a[0]) * (y - a[1]) / (c[1] - a[1]); lo = Math.min(lo, s); hi = Math.max(hi, s); }
+  return lo <= hi ? [lo, hi] : [0, 0]; }
+/** an outline's span up at an s: its least and greatest y (a convex outline) */
+function spanY(O: readonly P2[], x: number): [number, number] { let lo = Infinity, hi = -Infinity;
+  for (let i = 0; i < O.length; i++) { const a = O[i]!, c = O[(i + 1) % O.length]!; if ((a[0] - x) * (c[0] - x) > 0 || a[0] === c[0]) continue; const y = a[1] + (c[1] - a[1]) * (x - a[0]) / (c[0] - a[0]); lo = Math.min(lo, y); hi = Math.max(hi, y); }
+  return lo <= hi ? [lo, hi] : [0, 0]; }
+/** a ring of points round (cs, cy) in the footprint (radii rs across, ry up), `n` of them, at height h */
+const ringAt = (at: At, cs: number, cy: number, rs: number, ry: number, h: number, n: number) => Array.from({ length: n }, (_, i) => { const t = i / n * Math.PI * 2; return at(cs + Math.cos(t) * rs, cy + Math.sin(t) * ry, h); });
+/** a round lamp's face in the pocket: a bright ring, the lens stepping up to a dome (`col` the lens's colour) */
+function roundLens(b: Build, at: At, F: PartFrame, cs: number, cy: number, r: number, h0: number, ring: string, col: string, n = 10) {
+  const band = (A: V[], B: V[]) => { for (let i = 0; i < A.length; i++) { const j = (i + 1) % A.length; quadOut(b, A[i]!, A[j]!, B[j]!, B[i]!, F.n); } };
+  b.name('lampRing').mat(ring, 0.7, 'metal'); band(ringAt(at, cs, cy, r, r, h0, n), ringAt(at, cs, cy, r * 0.8, r * 0.8, h0 + 3, n));
+  b.name('headLamp').mat(col, 0.8, 'lens'); const L = ringAt(at, cs, cy, r * 0.8, r * 0.8, h0 + 3, n), c = at(cs, cy, h0 + 3 + r * 0.25); for (let i = 0; i < n; i++) { const t = [c, L[i]!, L[(i + 1) % n]!] as const; vdot(vcross(vsub(t[1], t[0]), vsub(t[2], t[0])), F.n) >= 0 ? b.tri(t[0], t[1], t[2]) : b.tri(t[0], t[2], t[1]); } }
+/** a mesh of bars over an outline's inside: `nh` across, vertical ones every `pitch` mm */
+function meshBars(b: Build, at: At, F: PartFrame, O: readonly P2[], hh: number, depth: number, nh: number, pitch: number, s0 = -Infinity, s1 = Infinity) {
+  b.name('grilleMesh').mat('#2a2b2d', 0.3, 'plain'); const hf = -depth * 0.35;
+  for (let k = 1; k <= nh; k++) { const y = -hh + 2 * hh * k / (nh + 1), [a, c] = spanO(O, y); bar(b, at, F, Math.max(a + 3, s0), Math.min(c - 3, s1), y, 5, hf, -depth + 2); }
+  const [a0, c0] = spanO(O, 0), lo = Math.max(a0, s0), hi = Math.min(c0, s1), nv = Math.max(0, Math.round((hi - lo) / pitch) - 1);
+  for (let k = 1; k <= nv; k++) { const x = lo + (hi - lo) * k / (nv + 1); let y0 = Infinity, y1 = -Infinity; for (let y = -hh; y <= hh; y += 4) { const [a, c] = spanO(O, y); if (x > a + 4 && x < c - 4) { y0 = Math.min(y0, y); y1 = Math.max(y1, y); } }
+    if (y1 > y0) bar(b, at, F, y0 + 2, y1 - 2, x, 4, hf - 1.5, -depth + 2, true); } }
+function insides(b: Build, id: HoleId, F: PartFrame, at: At, hw: number, hh: number, depth: number, pt: SkinPoint, side = 1, O: readonly P2[] = []): void {
   const K = PART_KINDS[id], r = Math.min(hw, hh) * (K.hole!.r ?? 0.2);
   switch (id) {
     case 'lampRound': case 'lampEllipsoid': case 'lampSquare': { const inset = Math.min(12, Math.min(hw, hh) * 0.1), c = vmadd(pt.p, F.n, -depth);
@@ -151,7 +193,32 @@ function insides(b: Build, id: HoleId, F: PartFrame, at: At, hw: number, hh: num
     case 'tailRound': { const ring = (k: number, h: number) => Array.from({ length: 14 }, (_, i) => { const t = i / 14 * Math.PI * 2; return at(Math.cos(t) * hw * k, Math.sin(t) * hh * k, h); });
       const band = (A: V[], B: V[]) => { for (let i = 0; i < A.length; i++) { const j = (i + 1) % A.length; quadOut(b, A[i]!, A[j]!, B[j]!, B[i]!, F.n); } };
       b.name('tailLampBezel').mat('#c4c7cb', 0.7, 'metal'); band(ring(0.97, -Math.min(depth, 4)), ring(0.84, -1.5));
-      b.name('tailLamp').mat('#b3261e', 0.5, 'lens'); const L = ring(0.84, -1.5), M = ring(0.45, 1.5); band(L, M); const c = at(0, 0, 3); for (let i = 0; i < 14; i++) { const t = [c, M[i]!, M[(i + 1) % 14]!] as const; vdot(vcross(vsub(t[1], t[0]), vsub(t[2], t[0])), F.n) >= 0 ? b.tri(t[0], t[1], t[2]) : b.tri(t[0], t[2], t[1]); } return; }
+      // the lens: a red ring, a step up to the inner ring (the signature's lamp within the lamp), its dome
+      b.name('tailLamp').mat('#b3261e', 0.5, 'lens'); const L = ring(0.84, -1.5), M = ring(0.5, 1.5), N = ring(0.42, 4); band(L, M);
+      b.name('tailLampInner').mat('#8f1c17', 0.6, 'lens'); band(M, N); b.name('tailLamp').mat('#c22a22', 0.5, 'lens'); const c = at(0, 0, 6); for (let i = 0; i < 14; i++) { const t = [c, N[i]!, N[(i + 1) % 14]!] as const; vdot(vcross(vsub(t[1], t[0]), vsub(t[2], t[0])), F.n) >= 0 ? b.tri(t[0], t[1], t[2]) : b.tri(t[0], t[2], t[1]); } return; }
+    case 'lampN33': { // x runs toward the car's side (s * side); the top falls toward it
+      const S = (x: number) => x * side, top = (x: number) => spanY(O, S(x))[1], foot = (x: number) => spanY(O, S(x))[0], fl = -depth + 2;
+      // the reflector's bright back over the inner two thirds, the corner lens (clear, a touch warm) over the outer third, round the corner
+      b.name('lampReflector').mat('#9ea4aa', 0.6, 'plain'); const xs = [-hw + 6, -hw * 0.5, 0, hw * 0.38];
+      for (let i = 0; i + 1 < xs.length; i++) { const x0 = xs[i]!, x1 = xs[i + 1]!; quadOut(b, at(S(x0), foot(x0) + 6, fl), at(S(x1), foot(x1) + 6, fl), at(S(x1), top(x1) - 6, fl), at(S(x0), top(x0) - 6, fl), F.n); }
+      b.name('lampCorner').mat('#dfe3e6', 0.8, 'lens'); const cx = [hw * 0.38, hw * 0.6, hw * 0.8, hw - 6];
+      for (let i = 0; i + 1 < cx.length; i++) { const x0 = cx[i]!, x1 = cx[i + 1]!, h = -depth * 0.45; quadOut(b, at(S(x0), foot(x0) + 6, h), at(S(x1), foot(x1) + 6, h), at(S(x1), top(x1) - 6, h), at(S(x0), top(x0) - 6, h), F.n); }
+      // the projector (inner, round) and the reflector's cup beside it (a rounded square)
+      const r1 = Math.min(hh * 0.62, hw * 0.2); roundLens(b, at, F, S(-hw * 0.64), -hh * 0.08, r1, fl + 1, '#5d6166', '#f2f5f7', 10);
+      const r2 = Math.min(hh * 0.66, hw * 0.22), c2 = S(-hw * 0.12), sq = (k: number, h: number) => [[-1, -1], [1, -1], [1, 1], [-1, 1]].flatMap(([u, v]) => [at(c2 + u! * r2 * k * 0.92, v! * r2 * k * 0.8 - hh * 0.1 + (u! * -0.2), h), at(c2 + u! * r2 * k * 0.7, v! * r2 * k, h)]);
+      const band8 = (A: V[], B: V[]) => { for (let i = 0; i < A.length; i++) { const j = (i + 1) % A.length; quadOut(b, A[i]!, A[j]!, B[j]!, B[i]!, F.n); } };
+      b.name('lampRing').mat('#c2c5c9', 0.6, 'metal'); band8(sq(1.1, fl + 1), sq(0.92, fl + 6)); b.name('headLamp').mat('#eef2f4', 0.8, 'lens'); const T = sq(0.92, fl + 6), m = at(c2, -hh * 0.1, fl + 12);
+      for (let i = 0; i < T.length; i++) { const t = [m, T[i]!, T[(i + 1) % T.length]!] as const; vdot(vcross(vsub(t[1], t[0]), vsub(t[2], t[0])), F.n) >= 0 ? b.tri(t[0], t[1], t[2]) : b.tri(t[0], t[2], t[1]); } return; }
+    case 'grilleN33': { meshBars(b, at, F, O, hh, depth, 2, 80);
+      // the emblem's place (docs/decisions 2026-11-25: the user's emblem art comes later): a blank oval plate standing proud in the middle
+      b.name('emblem').mat('#c4c7cb', 0.7, 'metal'); const ea = Math.min(hw * 0.17, 52), eb = Math.min(hh * 0.5, 26), es = Array.from({ length: 12 }, (_, i) => [Math.cos(i / 12 * Math.PI * 2) * ea, Math.sin(i / 12 * Math.PI * 2) * eb] as P2);
+      const E = es.map(([x, y]) => at(x, y, 3)), E0 = es.map(([x, y]) => at(x, y, -depth * 0.3)), c = at(0, 0, 4.5);
+      for (let i = 0; i < 12; i++) { const j = (i + 1) % 12, t = [c, E[i]!, E[j]!] as const; vdot(vcross(vsub(t[1], t[0]), vsub(t[2], t[0])), F.n) >= 0 ? b.tri(t[0], t[1], t[2]) : b.tri(t[0], t[2], t[1]); quadOut(b, E[i]!, E[j]!, E0[j]!, E0[i]!, vsub(E[i]!, c)); }
+      return; }
+    case 'intakeN33': meshBars(b, at, F, O, hh, depth, 3, 70); return;
+    case 'brakeDuct': { meshBars(b, at, F, O, hh, depth, 1, 1e9); b.name('ductBar').mat('#2a2b2d', 0.3, 'plain'); bar(b, at, F, -hh + 2, hh - 2, 0, 12, -2, -depth + 2, true); return; }
+    case 'fogLamp': { const r = Math.min(hh * 0.62, hw * 0.4), cx = side * (hw - hh * 0.9); roundLens(b, at, F, cx, 0, r, -depth * 0.5, '#5d6166', '#e8a531', 10);
+      meshBars(b, at, F, O, hh, depth, 3, 1e9, side > 0 ? -Infinity : cx + r + 12, side > 0 ? cx - r - 12 : Infinity); return; }
     case 'grille': { b.name('grilleMesh').mat('#2a2b2d', 0.3, 'plain'); const hf = -depth * 0.35, nh = clamp(Math.round(2 * hh / 42), 1, 7), nv = clamp(Math.round(2 * hw / 58), 2, 16);
       for (let k = 1; k <= nh; k++) { const y = -hh + 2 * hh * k / (nh + 1), w = spanAt(false, hw, hh, r, y) - 2; bar(b, at, F, -w, w, y, 5, hf, -depth + 2); }
       for (let k = 1; k <= nv; k++) { const x = -hw + 2 * hw * k / (nv + 1), hy = spanAt(false, hh, hw, r, x) - 2; bar(b, at, F, -hy, hy, x, 4, hf - 1.5, -depth + 2, true); } return; }

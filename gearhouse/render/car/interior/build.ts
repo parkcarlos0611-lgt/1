@@ -17,8 +17,8 @@ export interface Frame { o: V; x: V; y: V; z: V }
 export const WORLD: Frame = { o: [0, 0, 0], x: [1, 0, 0], y: [0, 1, 0], z: [0, 0, 1] };
 /** a frame at `o` leaning about the y axis: `deg` > 0 turns its z axis toward +x (a seat back reclined, a column raked) */
 export function leaning(o: V, deg: number): Frame { const a = deg * Math.PI / 180, c = Math.cos(a), s = Math.sin(a); return { o, x: [c, 0, -s], y: [0, 1, 0], z: [s, 0, c] }; }
-const at = (f: Frame, p: V): V => [f.o[0] + f.x[0] * p[0] + f.y[0] * p[1] + f.z[0] * p[2], f.o[1] + f.x[1] * p[0] + f.y[1] * p[1] + f.z[1] * p[2], f.o[2] + f.x[2] * p[0] + f.y[2] * p[1] + f.z[2] * p[2]];
-const dir = (f: Frame, p: V): V => sub(at(f, p), f.o);
+export const at = (f: Frame, p: V): V => [f.o[0] + f.x[0] * p[0] + f.y[0] * p[1] + f.z[0] * p[2], f.o[1] + f.x[1] * p[0] + f.y[1] * p[1] + f.z[1] * p[2], f.o[2] + f.x[2] * p[0] + f.y[2] * p[1] + f.z[2] * p[2]];
+export const dir = (f: Frame, p: V): V => sub(at(f, p), f.o);
 /** frame `g` given in frame `f`'s terms, as a frame of the car */
 export const within = (f: Frame, g: Frame): Frame => ({ o: at(f, g.o), x: dir(f, g.x), y: dir(f, g.y), z: dir(f, g.z) });
 /** a frame mirrored across the car's centre plane */
@@ -36,7 +36,7 @@ export class InteriorBuild {
   private cell = ATLAS_CELLS.indexOf('interior') + 1;
   /** the frame what follows is built in */
   frame(f: Frame): this { this.flush(); this.f = f; return this; }
-  get at(): Frame { return this.f; }
+  get frameNow(): Frame { return this.f; }
   /** a new part: its name (the outline's share goes by it, render/live/style.ts), colour, gloss and kind */
   part(name: string, colour: string, gloss = 0.15, kind: Kind = 'plain'): this { this.flush(); this.nm = name; this.b.name(name).mat(colour, gloss, kind); return this; }
   /** the bone what follows hangs on (0: none; a needle's, render/car/interior/gauges.ts) */

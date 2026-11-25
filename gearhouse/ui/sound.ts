@@ -58,9 +58,9 @@ export class Sound {
   /** the train's nearness, 0..1 */
   set train(v: number) { this.amb.trainNear = v; }
   /** one-off: a knock, a gear change, a bang */
-  hit(kind: 'knock' | 'shift' | 'bang' | 'thud' | 'joint', strength = 1): void { const c = this.ctx, t = c.currentTime, s = c.createBufferSource(); s.buffer = this.noise; s.playbackRate.value = kind === 'bang' ? 0.5 : 1;
-    const f = c.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = kind === 'shift' ? 1800 : kind === 'bang' ? 900 : kind === 'joint' ? 260 : 400; const g = c.createGain(); const dur = kind === 'bang' ? 0.9 : kind === 'shift' ? 0.06 : kind === 'joint' ? 0.05 : 0.18;
-    g.gain.setValueAtTime(Math.min(1, (kind === 'bang' ? 0.9 : kind === 'shift' ? 0.25 : kind === 'joint' ? 0.12 : 0.6) * strength), t); g.gain.exponentialRampToValueAtTime(0.001, t + dur); s.connect(f).connect(g).connect(this.master); s.start(t); s.stop(t + dur + 0.05); }
+  hit(kind: 'knock' | 'shift' | 'bang' | 'thud' | 'joint' | 'catch', strength = 1): void { const c = this.ctx, t = c.currentTime, s = c.createBufferSource(); s.buffer = this.noise; s.playbackRate.value = kind === 'bang' ? 0.5 : 1;
+    const f = c.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = kind === 'shift' ? 1800 : kind === 'bang' ? 900 : kind === 'joint' ? 260 : kind === 'catch' ? 320 : 400; const g = c.createGain(); const dur = kind === 'bang' ? 0.9 : kind === 'shift' ? 0.06 : kind === 'joint' ? 0.05 : kind === 'catch' ? 0.3 : 0.18;   /* catch: the engine's first firing (docs/systems/110 G1), a soft low cough */
+    g.gain.setValueAtTime(Math.min(1, (kind === 'bang' ? 0.9 : kind === 'shift' ? 0.25 : kind === 'joint' ? 0.12 : kind === 'catch' ? 0.45 : 0.6) * strength), t); g.gain.exponentialRampToValueAtTime(0.001, t + dur); s.connect(f).connect(g).connect(this.master); s.start(t); s.stop(t + dur + 0.05); }
   /** timber breaking: a thump, then a run of cracks and splinters, the bits landing */
   crash(strength = 1): void { const c = this.ctx, t = c.currentTime, burst = (at: number, f: number, q: number, dur: number, vol: number, type: BiquadFilterType = 'bandpass') => { const s = c.createBufferSource(); s.buffer = this.noise; s.playbackRate.value = 0.7 + Math.random() * 0.6;
       const fl = c.createBiquadFilter(); fl.type = type; fl.frequency.value = f; fl.Q.value = q; const g = c.createGain(); g.gain.setValueAtTime(0, t + at); g.gain.linearRampToValueAtTime(vol, t + at + 0.004); g.gain.exponentialRampToValueAtTime(0.001, t + at + dur); s.connect(fl).connect(g).connect(this.master); s.start(t + at); s.stop(t + at + dur + 0.05); };
@@ -125,10 +125,18 @@ export class Voice {
     if (this.roar) { this.roar.f.frequency.setTargetAtTime(Math.min(3500, 300 + fire * 2.2), t, 0.05); this.roar.g.gain.setTargetAtTime(running ? 0.14 * throttle * (0.3 + 0.7 * r) * loud : 0, t, 0.04); }
     this.lastThr = throttle;
     this.pan.pan.setTargetAtTime(Math.max(-1, Math.min(1, pan)), t, 0.05); }
+  /** the starter (docs/systems/110 G1): its motor's whirr through its gears, rising with the revs it turns the engine at,
+   *  beating with each cylinder's compression (the engine's own note stays silent until it catches); off, silent */
+  starter(on: boolean, rpm: number, loud = 1): void { const c = this.snd.ctx, t = c.currentTime;
+    if (!this.st) { if (!on) return; const o = c.createOscillator(), g = c.createGain(), f = c.createBiquadFilter(), lfo = c.createOscillator(), d = c.createGain();
+      o.type = 'sawtooth'; f.type = 'bandpass'; f.Q.value = 2.5; f.frequency.value = 900; g.gain.value = 0; lfo.type = 'sine'; d.gain.value = 0; lfo.connect(d).connect(g.gain); o.connect(f).connect(g).connect(this.pan); o.start(); lfo.start(); this.st = { o, g, lfo, d }; }
+    const S = this.st, pulse = Math.max(1, rpm / 60 * this.spec.cylinders / 2), a = on ? 0.09 * loud : 0;
+    S.o.frequency.setTargetAtTime(160 + rpm * 0.9, t, 0.06); S.lfo.frequency.setTargetAtTime(pulse, t, 0.05); S.g.gain.setTargetAtTime(a, t, on ? 0.03 : 0.06); S.d.gain.setTargetAtTime(a * 0.8, t, 0.05); }
+  private st: { o: OscillatorNode; g: GainNode; lfo: OscillatorNode; d: GainNode } | null = null;
   /** the blow-off valve's hiss */
   private blowOff(k: number): void { const c = this.snd.ctx, t = c.currentTime, s = c.createBufferSource(); s.buffer = this.snd.noiseBuffer; const f = c.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = 2500; const g = c.createGain();
     g.gain.setValueAtTime(0.22 * k, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.45); s.connect(f).connect(g).connect(this.pan); s.start(t); s.stop(t + 0.5); }
-  stop(): void { for (const o of [this.osc, this.sub, this.rough, this.tickLfo, this.whine, this.whistle]) try { o?.stop(); } catch { /* stopped */ } this.pan.disconnect(); }
+  stop(): void { for (const o of [this.osc, this.sub, this.rough, this.tickLfo, this.whine, this.whistle, this.st?.o, this.st?.lfo]) try { o?.stop(); } catch { /* stopped */ } this.pan.disconnect(); }
 }
 /** around the track (temporary: synthesised) */
 class Ambience {

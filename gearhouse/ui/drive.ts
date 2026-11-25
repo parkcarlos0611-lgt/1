@@ -11,6 +11,7 @@ import { designMesh } from '../render/car/design';
 import type { Design } from '../core/design';
 import { decodeDesign, recordRun, KEYS, type KeyStore } from '../core/designstore';
 import { Vehicle, usefulLock, type Controls } from '../race/vehicle';
+import { Ignition, carStartsOff, sweepValue } from '../race/ignition';
 import { CarSprites, PropSprites } from '../race/sprites';
 import type { Placed, Scenery } from '../race/scenery';
 import { PROPS } from '../render/props/index';
@@ -71,7 +72,7 @@ let fxMode = 0, fxK = 1, filmRate = true, heldAt = -1; const held = document.cre
 let lampsOn = false, photoOn = true, hdriOn = true, blurOn = true, lastCamX = 0, lastCamY = 0, shake = 0;
 let SP = Math.sin(30 * Math.PI / 180), CP = Math.cos(30 * Math.PI / 180), pitchDeg = 30; const DT = 1 / 200; let START = startOf(T);
 let VW = 768, VH = 432, mm = 50;                                               // the picture's own pixels, millimetres a pixel
-const st = { auto: true, assist: false, tcs: true, pilot: false, chase: false, progressive: false, cine: false, free: false };
+const st = { auto: true, assist: false, tcs: true, pilot: false, chase: false, progressive: false, cine: false, free: false, /** docs/systems/110 G1 */ ignition: 'direct' as 'direct' | 'auto', stall: true };
 const turning = () => st.chase || st.cine || st.free;
 // ---- the cameras (alpha 0.12): the perspective chase (far, the default; near), the bonnet, the driver's seat, beside the
 // orthographic views (the cinematic shots; from above, turning with the car). C or the camera button goes round them ----
@@ -215,9 +216,13 @@ function drawLive(el: number) { const L = live!; void el;
   if (car.speed > 30) { const v = Math.min(1, (car.speed - 30) / 30) * 0.35, g = main.createRadialGradient(VW / 2, VH / 2, VH * 0.35, VW / 2, VH / 2, VW * 0.62); g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, `rgba(0,0,0,${v})`); main.fillStyle = g; main.fillRect(0, 0, VW, VH); } }
 
 function choose(id: string) { carId = id; dcam.reset(); propSprites.clear(); broken.clear(); debris.length = 0; debris3.pieces.length = 0; fenceGpu.clear(); const spec = raceSpec(id), m = MESH_CARS.find(c => c.id === id)!;
-  car = new Vehicle(spec, T); car.auto = st.auto; car.place(START + 30, 0, 0); manualGear = 1;
+  car = new Vehicle(spec, T); car.auto = st.auto; car.place(START + 30, 0, 0); manualGear = 1; ignite(false);
   sprites = new CarSprites(meshOf(id, myNum), mm, pitchDeg, spec.steerLock * Math.PI / 180, { outline: 3, glass: 0.8 }, matchMedia('(pointer: coarse)').matches ? 1200 : 2400); sprites.prepare([0]); (live ? 0 : sprites.work(500)); sprites.prepare([-1, 1, -2, 2, -3, -4, -5]); camAng = car.yaw;
-  car.damperMode = $<HTMLSelectElement>('damper').value as 'sport' | 'comfort'; pilot = new Driver(T); lapStart = -1; lastLap = 0; bestLap = 0; skids.length = 0; puffs.length = 0; say(`${spec.name} · 출발선 뒤에서 시작`); }
+  car.damperMode = $<HTMLSelectElement>('damper').value as 'sport' | 'comfort'; pilot = new Driver(T); lapStart = -1; lastLap = 0; bestLap = 0; skids.length = 0; puffs.length = 0; say(`${spec.name} · 출발선 뒤에서 시작${car.engine.fuelled ? '' : ' · 시동: I/Enter 길게 (화면 버튼: 시동)'}`); }
+/** the player's car's ignition (docs/systems/110 G1, race/ignition.ts): off on a practice run in the direct mode, running in a race and in the automatic mode */
+function ignite(inRace: boolean) { car.engine = new Ignition(carStartsOff(st.ignition, inRace) ? 'off' : 'running', Math.floor(Math.random() * 1e9)); if (!carStartsOff(st.ignition, inRace)) car.rpm = Math.max(car.rpm, car.spec.idle); else car.rpm = 0; engineMode(); }
+function engineMode() { car.engine.auto = st.ignition === 'auto'; car.engine.stallable = st.stall; }
+const ENGINE_SAY: Partial<Record<string, string>> = { catch: '시동이 걸렸습니다', stall: '시동이 꺼졌습니다 — I/Enter 길게 눌러 다시 시동', off: '엔진을 껐습니다', crankStop: '' };
 function say(t: string) { msg = t; msgT = 3; }
 // ---- the world to the picture ----
 // world to picture: the camera turned so that the heading camAng points up the screen (fixed camera: north up)
@@ -280,16 +285,19 @@ function dials() { const pad = document.getElementById('pad'), padOn = !!pad && 
   let x0 = 8, right = VW - 8; if (padOn && tw) { const cr = cv.getBoundingClientRect(), k = cr.width / VW || 1, pd = pad!.querySelector('.pedal.brake'); x0 = Math.max(8, Math.round((tw.getBoundingClientRect().right - cr.left) / k) + 10); if (pd) right = Math.round((pd.getBoundingClientRect().left - cr.left) / k) - 8; }
   const at = dialPlace(x0, right, VH - 8, Math.max(26, Math.min(46, Math.round(VH * 0.11))));   // a phone held upright: one above the other between the wheel and the pedals (ui/drivecam.ts)
   const r = at.r, y = VH - r - 8, top = Math.ceil(car.spec.topKmh / 20) * 20 + 20, maxR = Math.ceil(car.spec.redline * 1.2 / 500) * 500;
-  const dial = (cx: number, y: number, v: number, max: number, step: number, label: string, red: number, sub: string) => { const a0 = Math.PI * 0.75, a1 = Math.PI * 2.25, ang = (x: number) => a0 + (a1 - a0) * Math.min(1, Math.max(0, x / max));
-    main.fillStyle = 'rgba(18,16,14,0.82)'; main.beginPath(); main.arc(cx, y, r, 0, Math.PI * 2); main.fill(); main.strokeStyle = '#b9a77e'; main.lineWidth = 2; main.stroke();
+  const E = car.engine, sw = E.gaugeSweep, lit = E.ignition;   // docs/systems/110 G1: the needles' sweep at the ignition's coming on; the faces unlit when it is off
+  const dial = (cx: number, y: number, v0: number, max: number, step: number, label: string, red: number, sub: string) => { const v = sweepValue(v0, sw, 0, max); const a0 = Math.PI * 0.75, a1 = Math.PI * 2.25, ang = (x: number) => a0 + (a1 - a0) * Math.min(1, Math.max(0, x / max));
+    main.fillStyle = 'rgba(18,16,14,0.82)'; main.beginPath(); main.arc(cx, y, r, 0, Math.PI * 2); main.fill(); main.globalAlpha = lit ? 1 : 0.55; main.strokeStyle = '#b9a77e'; main.lineWidth = 2; main.stroke();
     if (red < max) { main.strokeStyle = '#c0392b'; main.lineWidth = 3; main.beginPath(); main.arc(cx, y, r - 4, ang(red), ang(max)); main.stroke(); }
     main.strokeStyle = '#efe7d2'; main.fillStyle = '#efe7d2'; main.font = `${Math.max(6, Math.round(r * 0.22))}px Oswald, sans-serif`; main.textAlign = 'center'; main.textBaseline = 'middle';
     for (let x = 0; x <= max + 1e-6; x += step / 2) { const a = ang(x), big = Math.abs(x / step - Math.round(x / step)) < 1e-6, r0 = r - (big ? 8 : 5); main.lineWidth = big ? 1.5 : 1; main.beginPath(); main.moveTo(cx + Math.cos(a) * r0, y + Math.sin(a) * r0); main.lineTo(cx + Math.cos(a) * (r - 2), y + Math.sin(a) * (r - 2)); main.stroke();
       if (big && r > 30) main.fillText(String(Math.round(x / (label === 'rpm' ? 1000 : 1))), cx + Math.cos(a) * (r - 15), y + Math.sin(a) * (r - 15)); }
     const a = ang(v); main.strokeStyle = '#ff9f40'; main.lineWidth = 2; main.beginPath(); main.moveTo(cx - Math.cos(a) * 5, y - Math.sin(a) * 5); main.lineTo(cx + Math.cos(a) * (r - 6), y + Math.sin(a) * (r - 6)); main.stroke();
-    main.fillStyle = '#d8c9a3'; main.beginPath(); main.arc(cx, y, 3, 0, Math.PI * 2); main.fill(); main.fillStyle = '#efe7d2'; main.fillText(sub, cx, y + r * 0.45); main.font = `${Math.max(5, Math.round(r * 0.16))}px Oswald, sans-serif`; main.fillText(label === 'rpm' ? 'RPM ×1000' : 'KM/H', cx, y - r * 0.38); main.textAlign = 'left'; };
+    main.fillStyle = '#d8c9a3'; main.beginPath(); main.arc(cx, y, 3, 0, Math.PI * 2); main.fill(); main.fillStyle = '#efe7d2'; main.fillText(sub, cx, y + r * 0.45); main.font = `${Math.max(5, Math.round(r * 0.16))}px Oswald, sans-serif`; main.fillText(label === 'rpm' ? 'RPM ×1000' : 'KM/H', cx, y - r * 0.38);
+    if (label === 'rpm' && E.lamps) { main.fillStyle = '#e8503a'; main.beginPath(); main.arc(cx - r * 0.3, y + r * 0.18, Math.max(2, r * 0.07), 0, Math.PI * 2); main.fill(); main.fillStyle = '#f2b233'; main.beginPath(); main.arc(cx + r * 0.3, y + r * 0.18, Math.max(2, r * 0.07), 0, Math.PI * 2); main.fill(); }   /* the oil and charge lamps */
+    main.globalAlpha = 1; main.textAlign = 'left'; };
   dial(at.speed[0], at.speed[1], car.speed * 3.6, top, top > 160 ? 40 : 20, 'km/h', top, `${(car.speed * 3.6).toFixed(0)}`);
-  dial(at.rpm[0], at.rpm[1], car.rpm, maxR, 1000, 'rpm', car.spec.redline, car.reverse ? 'R' : `${car.gear}단`);
+  dial(at.rpm[0], at.rpm[1], car.rpm, maxR, 1000, 'rpm', car.spec.redline, !E.fuelled ? E.label : car.reverse ? 'R' : `${car.gear}단`);
   if (padOn) return;
   // the steering wheel as the driver's hands have it (review 100): turned by the road wheels' angle times the ratio
   { const cx = 8 + r * 5 + 16, rr = r * 0.8, a = -car.sw, S = steering(car.spec), l2l = 2 * car.spec.steerLock * S.ratio / 360;
@@ -310,7 +318,7 @@ const ENGINE = (specsData as { cars: Record<string, { engine: { kind: string; la
 const voiceOf = (id: string): EngineVoiceSpec => { if (DESIGN && id === DESIGN.id) return designVoice(DESIGN.d.engine);   /* a designed engine's own voice (alpha 0.12) */
   const e = ENGINE[id]?.engine ?? EXP_ENGINE[id]!; return { cylinders: +e.layout.replace(/\D/g, '') || 4, kind: (e.kind === 'sleeve' ? 'sleeve' : e.kind === 'ohv' ? 'ohv' : 'sv') as 'sv' | 'ohv' | 'sleeve', supercharged: id === 'dueSSJ35' || !!EXP_ENGINE[id]?.supercharged }; };
 function sounds() { if (!snd) return; const me = race?.player, keep = new Set<unknown>(['me']);
-  snd.voice('me', voiceOf(carId)).set(car.rpm, st.pilot ? 0.7 : input.throttle, 1, 0, car.health.running);
+  { const v = snd.voice('me', voiceOf(carId)), E = car.engine; v.set(car.rpm, st.pilot ? 0.7 : input.throttle, 1, 0, car.health.running && E.fuelled); v.starter(E.starter, car.rpm); }   /* off: silent; cranking: the starter's whirr (docs/systems/110 G1) */
   if (race) for (const e of race.cars) { if (e === me) continue; const d = Math.hypot(e.car.x - car.x, e.car.y - car.y); if (d > 220) continue; keep.add(e); const [X] = P(e.car.x, e.car.y, 0);
     snd.voice(e, voiceOf(e.id)).set(e.car.rpm, 0.8, 1 / (1 + (d / 30) ** 2), (X - VW / 2) / (VW / 2), e.car.health.running); }
   snd.dropVoices(keep);
@@ -436,7 +444,8 @@ function drawCar() { const z = T.height(car.s, car.off) + car.zb, roll = car.til
   const f = sprites.get(sprites.key(car.yaw - a, roll, car.steer, wheelTurn, car.speed)), [X, Y] = P(car.x, car.y, z); ctx.drawImage(f.canvas, Math.round(X - f.ax), Math.round(Y - f.ay)); }
 function drawPuffs() { if (live) return; for (const p of puffs) { ctx.fillStyle = `rgba(205,200,190,${p.a})`; const r = p.r * 1000 / mm; ctx.beginPath(); ctx.arc(...P(p.x, p.y, p.z), r, 0, Math.PI * 2); ctx.fill(); } }
 const fmt = (t: number) => t > 0 ? `${Math.floor(t / 60)}:${(t % 60).toFixed(2).padStart(5, '0')}` : '-';
-function hud() { const kmh = car.speed * 3.6; $('spd').textContent = kmh.toFixed(0); $('gear').textContent = car.reverse ? 'R' : String(car.gear); $('rpm').textContent = car.rpm.toFixed(0);
+function hud() { for (const ev of car.engine.take()) { if (ev === 'catch') snd?.hit('catch'); const t = ENGINE_SAY[ev]; if (t) say(t); }
+  const kmh = car.speed * 3.6; $('spd').textContent = kmh.toFixed(0); $('gear').textContent = car.reverse ? 'R' : String(car.gear); $('rpm').textContent = car.rpm.toFixed(0);
   ($('rpmbar') as HTMLElement).style.width = `${Math.min(100, car.rpm / car.spec.redline * 100)}%`; ($('rpmbar') as HTMLElement).style.background = car.rpm > car.spec.hpRpm * 1.05 ? 'var(--warn)' : 'var(--accent)';
   $('lap').textContent = `이번 바퀴 ${lapStart >= 0 ? fmt(clock - lapStart) : '-'}`; $('last').textContent = `지난 ${fmt(lastLap)}`; $('best').textContent = `최고 ${fmt(bestLap)}`; $('where').textContent = T.pieceAt(car.s);
   { const h = car.health, w = h.warnings(car.rpm, car.spec.redline), cls = (k: string) => w.includes(k) ? (k === 'boil' ? 'boil' : 'hot') : '';
@@ -497,7 +506,7 @@ function opponents(seed: number): { ids: string[]; note: string } { const n = +$
   return { ids: out, note: how === 'pick' ? '고른 차가 없어 1930년대 차로 채웠습니다' : want < n ? `이 구성에는 ${want}대뿐입니다` : '' }; }
 function startRace() { const laps = +$<HTMLSelectElement>('laps').value; raceSeed = (raceSeed * 48271) % 2147483647;
   const { ids: pick, note } = opponents(raceSeed), skill = $<HTMLSelectElement>('skill').value as Skill;
-  const mode = handicapOK() ? $<HTMLSelectElement>('mode').value as 'handicap' | 'scratch' : 'scratch'; race = new Race(T, [carId, ...pick], laps, carId, raceSeed, mode, skill); const me = race.player!; car = me.car; car.auto = st.auto; manualGear = 1; pilot = new Driver(T);
+  const mode = handicapOK() ? $<HTMLSelectElement>('mode').value as 'handicap' | 'scratch' : 'scratch'; race = new Race(T, [carId, ...pick], laps, carId, raceSeed, mode, skill); const me = race.player!; car = me.car; car.auto = st.auto; ignite(true); manualGear = 1; pilot = new Driver(T);
   seenLaps = 0; boardTick = 0; $('resmodal').hidden = true; $('results').innerHTML = ''; raceOverlay();
   others.clear(); const small = matchMedia('(pointer: coarse)').matches;
   for (const e of race.cars) if (e.driver) { const sp = new CarSprites(meshOf(e.id, numOf(e)), mm, pitchDeg, e.car.spec.steerLock * Math.PI / 180, { outline: 3, glass: 0.8 }, small ? 400 : 900); sp.prepare([0]); others.set(e, sp); }
@@ -519,7 +528,7 @@ addEventListener('keydown', e => { if (!running) return; const k = e.key.toLower
   if (!e.repeat) press(k); });
 addEventListener('keyup', e => keys.delete(e.key.toLowerCase()));
 // the screen buttons: held while a finger is on them (several at once), a tap for gears and reset
-for (const b of Array.from(R.querySelectorAll<HTMLButtonElement>('#pad button[data-key]'))) { const k = b.dataset.key!, hold = k.startsWith('arrow');
+for (const b of Array.from(R.querySelectorAll<HTMLButtonElement>('#pad button[data-key]'))) { const k = b.dataset.key!, hold = k.startsWith('arrow') || k === 'i';   /* the start button (시동) is held to crank */
   const on = (e: PointerEvent) => { e.preventDefault(); b.setPointerCapture(e.pointerId); b.classList.add('on'); if (hold) keys.add(k); else press(k); };
   const off = (e: PointerEvent) => { e.preventDefault(); b.classList.remove('on'); if (hold) keys.delete(k); };
   b.addEventListener('pointerdown', on); b.addEventListener('pointerup', off); b.addEventListener('pointercancel', off); b.addEventListener('lostpointercapture', () => { b.classList.remove('on'); if (hold) keys.delete(k); });
@@ -529,7 +538,7 @@ $<HTMLInputElement>('touch').addEventListener('change', e => document.body.class
 const down = (...ks: string[]) => ks.some(k => keys.has(k));
 // the touch pedals (alpha 0.12): upright throttles, pressed and slid; the finger's height on a pedal is its opening (the
 // bottom closed, the top wide open), its fill showing how far; let go, it closes. -1: no finger on it
-const pedal = { gas: -1, brake: -1 }, padIn = { gas: 0, brake: 0, steer: 0 };   /* padIn: a gamepad's triggers and stick, read each frame */
+const pedal = { gas: -1, brake: -1 }, padIn = { gas: 0, brake: 0, steer: 0, start: false, clutch: 0 };   /* padIn: a gamepad's triggers and stick, read each frame */
 for (const b of Array.from(R.querySelectorAll<HTMLElement>('#pad .pedal'))) { const which = b.classList.contains('gas') ? 'gas' : 'brake', fill = b.querySelector<HTMLElement>('i');
   const show = () => { const v = Math.max(0, pedal[which]); if (fill) fill.style.height = `${(v * 100).toFixed(0)}%`; b.setAttribute('aria-valuenow', v.toFixed(2)); };
   const at = (e: PointerEvent) => { const r = b.getBoundingClientRect(); pedal[which] = pedalValue(e.clientY, r.top, r.height); show(); };
@@ -538,8 +547,8 @@ for (const b of Array.from(R.querySelectorAll<HTMLElement>('#pad .pedal'))) { co
   const off = () => { b.classList.remove('on'); pedal[which] = -1; show(); };
   b.addEventListener('pointerup', off); b.addEventListener('pointercancel', off); b.addEventListener('lostpointercapture', off); b.addEventListener('contextmenu', e => e.preventDefault()); }
 /** a gamepad's right and left triggers (throttle and brake, as far as pressed) and left stick (steering), where the browser has one */
-function readPad() { padIn.gas = 0; padIn.brake = 0; padIn.steer = 0; let g: Gamepad | null | undefined; try { g = Array.from(navigator.getGamepads?.() ?? []).find(q => q?.connected); } catch { g = null; } if (!g) return;
-  padIn.gas = g.buttons[7]?.value ?? 0; padIn.brake = g.buttons[6]?.value ?? 0; const a = g.axes[0] ?? 0; padIn.steer = Math.abs(a) > 0.08 ? -a : 0; }
+function readPad() { padIn.gas = 0; padIn.brake = 0; padIn.steer = 0; padIn.start = false; padIn.clutch = 0; let g: Gamepad | null | undefined; try { g = Array.from(navigator.getGamepads?.() ?? []).find(q => q?.connected); } catch { g = null; } if (!g) return;
+  padIn.gas = g.buttons[7]?.value ?? 0; padIn.brake = g.buttons[6]?.value ?? 0; padIn.start = !!g.buttons[3]?.pressed; padIn.clutch = g.buttons[4]?.value ?? 0;   /* Y: the start (held), LB: the clutch */ const a = g.axes[0] ?? 0; padIn.steer = Math.abs(a) > 0.08 ? -a : 0; }
 function controls(dt: number): Controls { const left = down('arrowleft', 'a'), right = down('arrowright', 'd'), want = left === right ? 0 : left ? 1 : -1;
   if (wheelHeld) input.steer = wheelSteer; else if (padIn.steer && !left && !right) input.steer = padIn.steer; else
   input.steer += want === 0 ? -Math.sign(input.steer) * Math.min(Math.abs(input.steer), dt * 4) : Math.max(-dt * 2.6, Math.min(dt * 2.6, want - input.steer));
@@ -553,11 +562,13 @@ function controls(dt: number): Controls { const left = down('arrowleft', 'a'), r
   // the traction assist (review 147, for the keyboard, which cannot feather a pedal): the throttle eased while a driven wheel spins past about 10 %
   let thr = input.throttle; if (st.tcs && car.speed > 2) { const f = car.spec.tech?.drive?.front ?? 0, sx = Math.max(...[0, 1, 2, 3].filter(i => (i < 2 ? f : 1 - f) > 0).map(i => car.slipX[i]!)); if (sx > 0.08) thr *= Math.max(0.15, 1 - (sx - 0.08) / 0.12); }
   if (car.reverse && car.speed * 3.6 > 20) thr = 0;
-  return { steer: Math.max(-most, Math.min(most, steer)), throttle: thr, brake: input.brake, handbrake: input.hand, gear: manualGear }; }
+  // docs/systems/110 G1: the start control held (I or Enter, the 시동 button, a gamepad's Y); the clutch (F, a gamepad's LB) only for a manual box, else the automatic clutch alone
+  const clutch = !st.auto ? Math.max(down('f') ? 1 : 0, padIn.clutch) : 0;
+  return { steer: Math.max(-most, Math.min(most, steer)), throttle: thr, brake: input.brake, handbrake: input.hand, gear: manualGear, start: down('i', 'enter') || padIn.start, ...(clutch > 0 || car.engine.stallable ? { clutch } : {}) }; }
 // ---- the loop ----
 let last = performance.now(), acc = 0, running = true, looping = true;   // running: wanted on (a host pauses it); looping: a frame asked for
 function frame(now: number) { const el = Math.min(0.1, (now - last) / 1000); last = now; acc += el; clock += el; msgT -= el; readPad();
-  while (acc >= DT) { acc -= DT; const u = burn ? { ...controls(DT), throttle: 0.35, brake: 0, steer: 0 } : st.pilot ? pilot.drive(car) : controls(DT);
+  while (acc >= DT) { acc -= DT; if (st.pilot && !car.engine.fuelled) car.engine.startNow(); const u = burn ? { ...controls(DT), throttle: 0.35, brake: 0, steer: 0 } : st.pilot ? pilot.drive(car) : controls(DT);
     if (race) { race.step(DT, u); wheelTurn = race.player!.wheelTurn; if (race.done && !$('results').dataset.shown) results(); } else { car.step(DT, u); wheelTurn += (car.w[0]! + car.w[1]!) / 2 * DT; }
     if (burn) { car.p.splice(0, 3, ...burn.p); car.q.splice(0, 4, ...burn.q); car.v.fill(0); car.om.fill(0); car.w[2] = car.w[3] = 14; if ((burn.t -= DT) <= 0) burn = null; }   /* the rear tyres spinning on the spot */
     for (const c of race ? race.cars.map(e => e.car) : [car]) { marks(c); fence(c); }
@@ -673,6 +684,8 @@ $('practice').addEventListener('click', e => { stopRace(); $('race').textContent
 $<HTMLInputElement>('auto').addEventListener('change', e => { st.auto = (e.target as HTMLInputElement).checked; car.auto = st.auto; manualGear = car.gear; });
 $<HTMLInputElement>('pilot').addEventListener('change', e => { st.pilot = (e.target as HTMLInputElement).checked; if (st.pilot) { car.auto = true; } else car.auto = st.auto; });
 $<HTMLInputElement>('assist').addEventListener('change', e => { st.assist = (e.target as HTMLInputElement).checked; });
+$<HTMLSelectElement>('ignition').addEventListener('change', e => { st.ignition = (e.target as HTMLSelectElement).value === 'auto' ? 'auto' : 'direct'; engineMode(); if (st.ignition === 'auto' && !car.engine.fuelled) car.engine.startNow(); (e.target as HTMLElement).blur(); });
+$<HTMLInputElement>('stall').addEventListener('change', e => { st.stall = (e.target as HTMLInputElement).checked; engineMode(); });
 $<HTMLSelectElement>('damper').addEventListener('change', e => { car.damperMode = (e.target as HTMLSelectElement).value as 'sport' | 'comfort'; });   /* review 158 */
 $<HTMLInputElement>('tcs').addEventListener('change', e => { st.tcs = (e.target as HTMLInputElement).checked; });
 $<HTMLInputElement>('chase').addEventListener('change', e => { st.chase = (e.target as HTMLInputElement).checked; camAng = car.yaw; if (camView !== 'top') useView('top'); });

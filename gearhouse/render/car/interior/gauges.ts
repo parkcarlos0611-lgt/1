@@ -29,14 +29,14 @@ export function gaugeSet(car: GaugeCar = P959_GAUGES): GaugeFace[] {
   const tach: DialScale = { id: 'tach', min: 0, max: tachMax, a0: -140, a1: 125, major: 1000, minor: 250, num: 1000, numFrom: 1000, div: 1000, red: [car.redline, tachMax], c: [0, 0], r: 0.9, label: '1/MIN', unit: 'X1000', rest: 0, tau: 0.06 };
   const boost: DialScale = { id: 'boost', min: 0, max: boostMax, a0: 235, a1: 108, major: 0.5, minor: 0.25, num: 0.5, c: [0, -0.4], r: 0.28, unit: 'BAR', rest: 0, tau: 0.12 };
   return [
-    { region: 'dialA', R: 50, scales: [{ id: 'oilTemp', min: 60, max: 170, a0: -125, a1: 125, major: 30, minor: 10, num: 30, red: [150, 170], c: [0, 0], r: 0.9, label: 'OIL', unit: 'C', rest: 60, tau: 1.5 }] },
-    { region: 'dialB', R: 50, lamps: true, scales: [
+    { region: 'dialA', R: 44, scales: [{ id: 'oilTemp', min: 60, max: 170, a0: -125, a1: 125, major: 30, minor: 10, num: 30, red: [150, 170], c: [0, 0], r: 0.9, label: 'OIL', unit: 'C', rest: 60, tau: 1.5 }] },
+    { region: 'dialB', R: 48, lamps: true, scales: [
       { id: 'oilLevel', min: 0, max: 1, a0: -128, a1: -52, major: 0.5, minor: 0.25, c: [0, 0], r: 0.88, ends: ['L', 'H'], amber: [0, 0.2], label: 'OIL', rest: 0, tau: 2 },
       { id: 'oilPress', min: 0, max: 5, a0: 128, a1: 52, major: 1, num: 1, c: [0, 0], r: 0.88, unit: 'BAR', rest: 0, tau: 0.25 }] },
-    { region: 'tach', R: 64, scales: car.boostBar ? [tach, boost] : [tach] },
-    { region: 'speedo', R: 58, odo: { total: car.odoKm ?? 0, trip: car.tripKm ?? 0 }, scales: [{ id: 'speedo', min: 0, max: vMax / k, a0: -128, a1: 128, major: step / k, minor: step / k / 2, num: step / k, numFrom: step / k, div: 1 / k, c: [0, 0], r: 0.9,
+    { region: 'tach', R: 62, scales: car.boostBar ? [tach, boost] : [tach] },
+    { region: 'speedo', R: 54, odo: { total: car.odoKm ?? 0, trip: car.tripKm ?? 0 }, scales: [{ id: 'speedo', min: 0, max: vMax / k, a0: -128, a1: 128, major: step / k, minor: step / k / 2, num: step / k, numFrom: step / k, div: 1 / k, c: [0, 0], r: 0.9,
       unit: car.mph ? 'MPH' : 'KM/H', rest: 0, tau: 0.18, inner: car.mph ? { k: 1, num: 60, label: 'KM/H' } : { k: 0.621371, num: 40, label: 'MPH' } }] },
-    { region: 'dialC', R: 50, scales: [
+    { region: 'dialC', R: 44, scales: [
       { id: 'fuel', min: 0, max: 1, a0: -128, a1: -52, major: 0.5, minor: 0.25, c: [0, 0], r: 0.88, ends: ['0', '1'], red: [0, 0.12], label: 'FUEL', rest: 0, tau: 2.5 },
       { id: 'water', min: 50, max: 130, a0: 128, a1: 52, major: 40, minor: 20, c: [0, 0], r: 0.88, ends: ['C', 'H'], red: [112, 130], label: 'WATER', rest: 50, tau: 1.5 }] },
   ]; }

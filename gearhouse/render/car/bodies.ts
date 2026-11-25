@@ -96,7 +96,7 @@ const P959: ModelBody = { name: CAR_599, length: DIM.length, cabin: P959_CABIN, 
 export const n33CabinFor = (d: Design): InteriorOptions => { const p = d.interior ?? interiorOfKit(d.kit.interior); return { ...INTERIORS[p.set === 'drift' ? 'n33Sport' : 'n33Stock'], trim: p.trim, ...(p.set === 'drift' ? { bucketColour: TRIMS[p.trim].seat } : {}) }; };
 /** its cabin: the screen's foot at x 1370, z 962, its top at 2060, 1320; the doors 1530..2855, their skin's inside about
  *  800 from the middle at the elbow; the sill's top inside at 400; the rear wells from x 3290; right-hand drive */
-export const N33_CABIN: CabinAnchors = { side: -1, floorZ: 200, dashX: 1720, dashTopZ: 925, screenFoot: [1420, 958], screenTop: [2060, 1318], screenHalf: [620, 500], wheel: [1990, -372, 845], rake: 22,
+export const N33_CABIN: CabinAnchors = { side: -1, floorZ: 200, dashX: 1720, dashTopZ: 925, screenFoot: [1545, 948], screenTop: [2070, 1318], screenHalf: [612, 490], wheel: [1990, -372, 845], rake: 22,
   hip: [2440, -372, 455], recline: 23, half: 780, doorX: [1530, 2855], sillZ: 400, beltZ: 918, tunnelHalf: 110, tunnelZ: 340, rearX: 3330, shelfZ: 700, roofZ: 1310, roofHalf: 510,
   doorIn: [[400, 800], [560, 805], [700, 805], [820, 772], [918, 712]], wellX: 3300, rearHalf: 610 };
 const n33FrameFor = (d: Design) => { const f = d.body.frame; return f && f.id === 'B33' && Object.values(f.dims).some(v => v) ? n33FrameOf(f.dims) : N33_STOCK; };
@@ -105,7 +105,7 @@ function n33Wheels(d: Design, f = n33FrameFor(d)): { f: SuspWheel; r: SuspWheel 
 const n33Site = (f: Frame): Site => { const z = (v: number) => f.at([0, 0, v])[2], tip = f.at([4560, 430, 300]);
   return { length: f.length, foot: 150 + f.ride, wheels: { f: { x: f.axleF, y: f.trackF / 2, r: N33_DIM.tyreR, w: 245, z: N33_DIM.hubZ }, r: { x: f.axleR, y: f.trackR / 2, r: N33_DIM.tyreR, w: 245, z: N33_DIM.hubZ } },
     engine: { at: [f.x(1640), 0, z(470)], dir: '-x' }, tips: { x: tip[0], z: tip[2], y: [tip[1] - 35, tip[1] + 35], r: 38 }, cabin: { floor: z(200), x: [f.x(1700), f.x(3290)], tunnel: [f.x(1700), 110, z(340)] } }; };
-const n33Anchors = (f: Frame): CarAnchors => ({ tips: [f.at([4470, 640, 1000]), f.at([4470, -640, 1000])], lamps: [f.at([4585, 560, 810]), f.at([4585, -560, 810])] });
+const n33Anchors = (f: Frame): CarAnchors => ({ tips: [f.at([4445, 640, 958]), f.at([4445, -640, 958])], lamps: [f.at([4535, 512, 815]), f.at([4535, -512, 815])] });
 const N33: ModelBody = { name: CAR_N33, length: N33_DIM.length, cabin: N33_CABIN, anchors: n33Anchors(N33_STOCK), wheels: n33Wheels, open: ['bonnet'],
   gauges: (d, topKmh) => ({ ...P959_GAUGES, redline: d.engine.redline, topKmh: topKmh ?? 260, odoKm: 3300, tripKm: 33.3, ...(d.engine.turbo ? { boostBar: d.engine.boost } : { boostBar: undefined }) }),
   mesh(d, o = {}) { const m = { ...MODEL_OWN.bnr33, ...d.body.model }, det = o.detail ?? 2, f = n33FrameFor(d);

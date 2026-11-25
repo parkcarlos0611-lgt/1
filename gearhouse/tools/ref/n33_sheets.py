@@ -8,9 +8,10 @@
 # The blueprint (docs/reference/bnr33/bp_line_4view_hires.png): 5.5 mm a pixel along and up (its wheelbase 494.5 px is
 # the car's 2,720; its height 248 px the car's 1,364), the front axle at x 183.5 px, the ground at y 269 px. Its plan is
 # 3.7 % narrow and its front and rear views 4.3 % wide against the car's 1,780 mm: they are scaled across to it.
-import sys, numpy as np
+import os, sys, numpy as np
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
 S, OUT, mode = sys.argv[1], sys.argv[2], sys.argv[3]; BG = (206, 202, 192)
+TITLE = os.environ.get('TITLE')   # a sheet's own title (the remade body's sheets: docs/systems/117)
 F = ImageFont.truetype('/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc', 22)
 bp = Image.open('docs/reference/bnr33/bp_line_4view_hires.png').convert('RGB')
 def trim(im, pad=16):
@@ -63,6 +64,7 @@ def match(d):
         pad = max(0, int(np.ceil(-x0 * 2 * kx)))   # columns left of the blueprint's edge (no drawing there) are not counted
         m, fill = m[:, pad:], fill[:, pad:]
         out[n] = (m & fill).sum() / max(1, (m | fill).sum())
+        if n != 'side': k = int(org[1] - 330 / 2.75); out[n + ' (z > 330)'] = (m[:k] & fill[:k]).sum() / max(1, (m[:k] | fill[:k]).sum())
     return out
 if mode == 'overlay':
     overlay(S).save(OUT); print(match(S))
@@ -71,7 +73,7 @@ elif mode == 'lump':
     stack([[lab(trim(r('side')), '측면'), lab(trim(r('front')), '정면'), lab(trim(r('rear')), '뒤')],
            [lab(trim(r('top')), '위'), lab(trim(r('front34')), '앞 3/4'), lab(trim(r('rear34')), '뒤 3/4')],
            [lab(ov, '블루프린트 겹침: 빨강 = 덩어리 실루엣, 파랑 = 그린 선 (평면도는 폭 3.7 % 넓혀, 정면·뒤는 4.3 % 좁혀 1,780 mm에 맞춤)')]],
-          OUT, 'R1 · 차체 B (N33 덩어리): 구멍 없음, 민짜 범퍼, 강철 휠, 흐린 패널선, 창문 고르기 전')
+          OUT, TITLE or 'R1 · 차체 B (N33 덩어리): 구멍 없음, 민짜 범퍼, 강철 휠, 흐린 패널선, 창문 고르기 전')
     print(match(S))
 elif mode == 'dims':
     names = [('stock', '치수 0 (순정 창문 세트를 얹음)'), ('max', sys.argv[4]), ('min', sys.argv[5])]
@@ -89,9 +91,9 @@ elif mode == 'dims':
         rows.append([lab(c, t)])
     fr = [im(n, 'front') for n, _ in names]; Bf = box(fr); rows.append([lab(i.crop(Bf), t) for i, t in zip(fr, ['정면: 0', '최대', '최소'])])
     rows.append([lab(trim(im(n, 'front34')), t) for n, t in [('max', '최대 3/4'), ('min', '최소 3/4')]])
-    stack(rows, OUT, 'R1 · 차체 B 치수 양 끝 (파란 세로선: 순정 앞끝·앞뒤 차축·뒤끝)')
+    stack(rows, OUT, TITLE or 'R1 · 차체 B 치수 양 끝 (파란 세로선: 순정 앞끝·앞뒤 차축·뒤끝)')
 elif mode == 'photos':
     p1 = Image.open('docs/reference/bnr33/photo_front34_silver_studio.jpg').convert('RGB'); p2 = Image.open('docs/reference/bnr33/photo_rear34_blue.jpg').convert('RGB')
     a, b = trim(Image.open(sys.argv[4]).convert('RGB')), trim(Image.open(sys.argv[5]).convert('RGB'))
     hh = 420; f = lambda i: scale(i, hh / i.height)
-    stack([[lab(f(p1), '사진: 앞 3/4'), lab(f(a), '렌더: 덩어리 B (순정 창문 세트)')], [lab(f(p2), '사진: 뒤 3/4'), lab(f(b), '렌더')]], OUT, 'R1 · 사진과 비교 (덩어리라 램프·그릴·윙·미러는 아직 부품이 아님)')
+    stack([[lab(f(p1), '사진: 앞 3/4'), lab(f(a), '렌더: 덩어리 B (순정 창문 세트)')], [lab(f(p2), '사진: 뒤 3/4'), lab(f(b), '렌더')]], OUT, TITLE or 'R1 · 사진과 비교 (덩어리라 램프·그릴·윙·미러는 아직 부품이 아님)')

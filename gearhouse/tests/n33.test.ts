@@ -1,4 +1,4 @@
-// The N33's frame "차체 B" (docs/systems/117 R1): its lump from the hand-placed cage (closed, in its budget, keeping the
+// The N33's frame "차체 B" (docs/systems/117 R1, remade in §13): its lump from the hand-placed cage (closed, in its budget, keeping the
 // surface rules of docs/systems/108 as the 959's does, at both ends of each dimension's range), its glass sets as tags,
 // its stretch on the shared frame map (render/car/frame.ts), and its body in the game (core/frames.ts, the design,
 // the physics, the front engine bay's fit) without it being offered as a stock car or in a race yet.

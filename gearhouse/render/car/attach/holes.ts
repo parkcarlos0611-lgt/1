@@ -167,7 +167,11 @@ function insides(b: Build, id: HoleId, F: PartFrame, at: At, hw: number, hh: num
     case 'lampSlant': { // three round units under the slanted band (a small inner lamp, the projector, the big reflector) and the
       // clear corner lamp in its pointed outer end, all laid on the wrapped skin
       const N = 12, ring = (cx: number, cy: number, rr: number, h: number) => Array.from({ length: N }, (_, i) => { const t = i / N * Math.PI * 2; return at(cx + Math.cos(t) * rr, cy + Math.sin(t) * rr, h); });
-      const f = -depth + 1.5, units: [number, number, number, boolean][] = [[-0.6, -0.1, 0.52, false], [-0.27, -0.02, 0.8, true], [0.13, 0, 0.84, false]];
+      const f = -depth + 1.5, units: [number, number, number, boolean][] = [[-0.63, -0.1, 0.56, false], [-0.3, -0.02, 0.86, true], [0.1, 0, 0.9, false]];
+      // the housing behind them: a bright plate over the pocket's floor, inside the outline (so the lamp reads as glass over silver, not a dark slot)
+      { const Q = PART_KINDS.lampSlant.hole!.poly!, cut = (x: number): [number, number] => { let lo = Infinity, hi = -Infinity; Q.forEach((a, i) => { const c = Q[(i + 1) % Q.length]!; if ((a[0] - x) * (c[0] - x) > 0 || a[0] === c[0]) return; const y = a[1] + (c[1] - a[1]) * (x - a[0]) / (c[0] - a[0]); lo = Math.min(lo, y); hi = Math.max(hi, y); }); return [lo, hi]; };
+        const m = 14, x0 = -0.955, x1 = 0.955, P = (i: number) => { const x = x0 + (x1 - x0) * i / m, [lo, hi] = cut(x), c = (lo + hi) / 2, h = (hi - lo) / 2 - Math.min(0.12, (hi - lo) * 0.1); return [at(x * hw, (c - h) * hh, f - 0.8), at(x * hw, (c + h) * hh, f - 0.8)] as const; };
+        b.name('lampHousing').mat('#8d939a', 0.6, 'plain'); for (let i = 0; i < m; i++) { const A = P(i), B = P(i + 1); quadOut(b, A[0], B[0], B[1], A[1], F.n); } }
       for (const [sx, sy, k, proj] of units) { const cx = sx * hw, cy = sy * hh, rr = hh * k, h1 = f + Math.min(7, depth * 0.5);
         b.name('lampRing').mat(proj ? '#4a4e54' : '#c2c5c9', 0.6, 'plain'); band(b, F, ring(cx, cy, rr, f), ring(cx, cy, rr * 0.84, h1));
         if (proj) { b.name('headLamp').mat('#f2f5f7', 0.8, 'lens'); const B = ring(cx, cy, rr * 0.5, f + Math.min(11, depth * 0.8)); band(b, F, ring(cx, cy, rr * 0.84, h1), B); cap(b, F, B, at(cx, cy, f + Math.min(13, depth * 0.9))); }

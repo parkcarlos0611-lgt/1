@@ -121,6 +121,8 @@ const N33: ModelBody = { name: CAR_N33, length: N33_DIM.length, cabin: N33_CABIN
 /** the model-built bodies, by their base's id */
 export const MODEL_BODIES: Record<ModelBaseId, ModelBody> = { p959: P959, bnr33: N33 };
 
+/** the frame a model body's design is stretched by (its axles' places for the placed parts' figures, race/partsfig.ts) */
+export const modelFrame = (d: Design): Frame | null => d.body.base === 'bnr33' ? n33FrameFor(d) : d.body.base === 'p959' ? frameFor(d) : null;
 /** a model body's skin as the design builds it (render/car/skin.ts: the builder's picking and the placed parts' rules,
  *  docs/systems/115 §5-2), and its stock plates' marks; the last few kept (a build is about a tenth of a second) */
 const SKINS = new Map<string, { skin: Skin; marks: Mark[] }>();

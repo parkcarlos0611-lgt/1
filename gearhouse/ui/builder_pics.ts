@@ -44,10 +44,12 @@ export function lampPic(kind: 'round' | 'ellipsoid' | 'square' | 'none'): string
   else b += [14, 36].map(x => `<rect x="${x}" y="16" width="14" height="16" rx="2" fill="${MET}" ${st()}/><rect x="${x + 4}" y="20.5" width="6" height="7" rx="1" fill="#fff" ${st(1.8)}/>`).join('');
   return svg64(b); }
 /** a model body's wheel: hollow five spokes, a deep dish of eight, a disc with five holes */
-export function wheelPic(kind: 'hollow5' | 'dish' | 'hole5' | 'steel'): string {
+export function wheelPic(kind: 'hollow5' | 'dish' | 'hole5' | 'steel' | 'n5' | 'n6' | 'deep5'): string {
   const c = (r: number, fill: string, w = 3) => `<circle cx="32" cy="24" r="${r}" fill="${fill}" ${st(w)}/>`, at = (i: number, n: number, r: number): [number, number] => { const t = i / n * Math.PI * 2; return [r1(32 + Math.sin(t) * r), r1(24 - Math.cos(t) * r)]; };
   let b = `<circle cx="32" cy="24" r="22" fill="${K}"/>`;
-  if (kind === 'hollow5') { b += c(16, DARK); for (let i = 0; i < 5; i++) { const [x, y] = at(i, 5, 14); b += rim(`M32 24L${x} ${y}`, MET, 4.5); b += `<path d="M32 24L${x} ${y}" stroke="${DARK}" stroke-width="1.6"/>`; } b += c(4.5, '#fff', 2.5); }
+  if (kind === 'n5' || kind === 'n6' || kind === 'deep5') { const n = kind === 'n6' ? 6 : 5, R = kind === 'deep5' ? 11 : 15; b += c(17, kind === 'deep5' ? '#fff' : DARK); if (kind === 'deep5') b += c(11.5, DARK, 2);
+    for (let i = 0; i < n; i++) { const [x, y] = at(i, n, R); b += rim(`M32 24L${x} ${y}`, kind === 'n6' ? '#9aa0a6' : MET, kind === 'n6' ? 3 : 5); } b += c(4, kind === 'n6' ? '#9aa0a6' : '#fff', 2.2); }
+  else if (kind === 'hollow5') { b += c(16, DARK); for (let i = 0; i < 5; i++) { const [x, y] = at(i, 5, 14); b += rim(`M32 24L${x} ${y}`, MET, 4.5); b += `<path d="M32 24L${x} ${y}" stroke="${DARK}" stroke-width="1.6"/>`; } b += c(4.5, '#fff', 2.5); }
   else if (kind === 'dish') { b += c(16, '#fff'); b += c(12, MET, 2); for (let i = 0; i < 8; i++) { const [x, y] = at(i, 8, 11); b += `<path d="M32 24L${x} ${y}" ${st(2.5)}/>`; } b += c(3.5, ROLE.yellow[0], 2); }
   else if (kind === 'steel') { b += c(16, '#8b9097'); b += c(10, '#a3a8ae', 2); for (let i = 0; i < 6; i++) { const [x, y] = at(i + 0.5, 6, 7.5); b += `<circle cx="${x}" cy="${y}" r="2" fill="${DARK}"/>`; } b += c(3.2, '#fff', 2); }
   else { b += c(16, '#fff'); for (let i = 0; i < 5; i++) { const [x, y] = at(i + 0.5, 5, 9.5); b += `<circle cx="${x}" cy="${y}" r="3.4" fill="${DARK}" ${st(2)}/>`; } b += c(4, MET, 2.2); }

@@ -173,6 +173,8 @@ export function buildCage(o: CageOpts = {}): Cage959 { const glass = o.glass ?? 
     { kind: 'crease', name: 'deckEdge', path: rowPath(26, 0, 4) },
     { kind: 'crease', name: 'waist', path: colPath(7, 9, 24), w: 0.6 }, { kind: 'crease', name: 'lampLine', path: colPath(7, 2, 5), w: 0.6 }, { kind: 'crease', name: 'shoulder', path: colPath(4, 20, 26), w: 0.6 },
     { kind: 'crease', name: 'bonnetRise', path: colPath(1, 2, 9), w: 0.6 },
+    // the arches' lips: a line a little outside each ring, where the lip's flat meets the wing's side (docs/systems/117 R3)
+    { kind: 'crease', name: 'archLipF', path: [], between: { a: colPath(8, 5, 9), b: colPath(7, 5, 9), t: 0.5 }, w: 0.6 }, { kind: 'crease', name: 'archLipR', path: [], between: { a: colPath(8, 19, 23), b: colPath(7, 19, 23), t: 0.5 }, w: 0.6 },
   ];
   const loops: Record<string, number[]> = { frontBumper: seamF, rearBumper: seamR, headLamp: [...rowPath(0, 1, 7), M[1]![7]!, ...rowPath(2, 1, 7).reverse(), M[1]![1]!], grille: [...rowPath(0, 0, 1), M[1]![1]!, ...rowPath(2, 0, 1).reverse()],
     tailLamp: [wl(5, 0), wl(5, 1), wl(5, 2), wl(6, 2), wl(6, 1), wl(6, 0)], frontBumperFoot: BF[4]!, rearBumperFoot: BR[3]!, frontBumperArch: BF.map(r => r[0]!), rearBumperArch: BR.map(r => r[0]!), sillFoot: colPath(12, 9, 19) };

@@ -10,6 +10,9 @@
 //   slope, its light in two or three bands with a blue shade (the toon look's), an outline where the surface's depth jumps
 //   or the smoke ends, a thin see-through rim; as the smoke thins only the noise's puffs stay above the threshold, so it
 //   breaks into ever smaller round blobs instead of fading. The exhaust's flames as stars (one frame each).
+//   In the toon the noise is coarser (lobes of most of a metre: the big round bumps of a cartoon cloud, docs/systems/103).
+//   구멍 (V4): where the simulation's cut is high (a car has just been, scal.a) the density is taken away outright, so the
+//   car-shaped tunnel reads clean, outlined like any other edge of the cloud, until the cut fades and the smoke comes back.
 //   그림자: the same upsample pass darkens the ground and the cars under the smoke (shadow.ts).
 import { program } from '../gpu';
 import type { Atlas } from './atlas';
@@ -36,13 +39,13 @@ layout(location=0) out vec4 o0; layout(location=1) out vec4 o1;
 float hash(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
 float hg(float c, float g) { float g2 = g * g; return (1. - g2) / (4. * 3.14159 * pow(1. + g2 - 2. * g * c, 1.5)); }
 /** the density at a point, its edge eaten by the flowing cellular noise; its dust's share in y */
-vec2 dens(vec3 p) { vec3 g = grid(p); vec4 s = smoothAt(uScal, g, uN, uCols, uAS); float d = s.r + s.g; if (d < 0.004) return vec2(0.);
+vec2 dens(vec3 p) { vec3 g = grid(p); vec4 s = smoothAt(uScal, g, uN, uCols, uAS); float d = (s.r + s.g) * (1. - smoothstep(0.3, 0.65, s.a)); if (d < 0.004) return vec2(0.);
   vec3 N = vec3(uN); float e = min(min(min(g.x, g.y), min(N.x - g.x, N.y - g.y)), N.z - g.z); d *= clamp(e / 2., 0., 1.);   /* the box's sides: thinned over two cells */
   vec3 v = smoothAt(uVel, g, uN, uCols, uAS).xyz; float T = 1.6, a = fract(uTime / T), b = fract(uTime / T + .5), wa = abs(2. * a - 1.);
-  vec3 q = p * 0.85 + vec3(0., 0., -uTime * 0.12);
-  vec2 na = texture(uNoise, q - v * a * T * 0.85).rg, nb = texture(uNoise, q - v * b * T * 0.85 + 0.37).rg; vec2 n = mix(na, nb, wa);
+  float sc = uToon == 1 ? 0.36 : 0.85; vec3 q = p * sc + vec3(0., 0., -uTime * 0.12 * sc);   /* the toon's lobes coarser */
+  vec2 na = texture(uNoise, q - v * a * T * sc).rg, nb = texture(uNoise, q - v * b * T * sc + 0.37).rg; vec2 n = mix(na, nb, wa);
   float base = n.r * 0.68 + n.g * 0.32;   /* 1 at a puff's middle */
-  float k = uToon == 1 ? 0.55 : 0.42; return vec2(max(0., d * 1.25 - (1. - base) * k * (1. - 0.35 * smoothstep(0.4, 1.4, d))), s.g / max(d, 1e-3)); }
+  float k = uToon == 1 ? 0.62 : 0.42; return vec2(max(0., d * 1.25 - (1. - base) * k * (1. - 0.35 * smoothstep(0.4, 1.4, d))), s.g / max(d, 1e-3)); }
 vec3 filmic(vec3 x) { return pow(clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0., 1.), vec3(1. / 2.2)); }
 vec3 shadeOf(vec3 c) { return c * vec3(0.52, 0.58, 0.78); }
 void main() { ivec2 f = ivec2(gl_FragCoord.xy) * 2; ivec2 m = ivec2(uFull) - 1;

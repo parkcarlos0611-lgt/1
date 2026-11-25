@@ -36,7 +36,7 @@ export interface VolParams {
   /** the cut: how fast it fades (1/s); how hard the smoke is thinned in it (1/s); the push out of it (m/s² across a
    *  cell's step of the cut); the extra swirl in it (x the confinement) */ cutFade: number; cutHold: number; cutPush: number; cutSwirl: number;
 }
-export const VOL_DEFAULT: VolParams = { nx: 16, ny: 16, nz: 8, h: 0.25, iters: 16, open: true, alpha: 0.012, betaS: 0.35, betaD: 2.2, wind: [1.2, 0.5], drag: 1.0, vort: 4, settle: 0.35, fade: 0.12, cool: 0.9, spread: 0.3, edge: 2, cutFade: 0.25, cutHold: 5, cutPush: 10, cutSwirl: 0.3 };
+export const VOL_DEFAULT: VolParams = { nx: 16, ny: 16, nz: 8, h: 0.25, iters: 16, open: true, alpha: 0.012, betaS: 0.35, betaD: 2.2, wind: [1.2, 0.5], drag: 1.0, vort: 4, settle: 0.35, fade: 0.05, cool: 0.9, spread: 0.3, edge: 2, cutFade: 0.25, cutHold: 5, cutPush: 10, cutSwirl: 0.3 };
 /** how much of the hold works at a cut of c: all of it from 0.85, none below 0.45 */
 export const cutHoldAt = (c: number): number => { const t = Math.min(1, Math.max(0, (c - 0.45) / 0.4)); return t * t * (3 - 2 * t); };
 

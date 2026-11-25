@@ -82,3 +82,16 @@ describe('the control unit', () => {
       c.step(dt, { throttle: r > 0.3 ? r : 0, brake: r < 0.1 ? 1 : 0, steer: r > 0.6 ? 0.6 : r > 0.4 ? -0.6 : 0 }); expect(Number.isFinite(c.speed) && Number.isFinite(c.rpm)).toBe(true); expect(c.rpm).toBeLessThan(AUTO.redline * 1.15); }
   });
 });
+
+// K0 (docs/systems/119): the large saloon's sheet and its names on screen
+import { readFileSync } from 'node:fs';
+import { CAR_KREMLIN, TRIM_TSAR, TRIM_OLYMPIC, bannedIn } from '../core/names';
+describe('the Kremlin\'s sheet and names (K0)', () => {
+  it('the sheet holds the maker\'s figures; the game\'s names carry none of the real ones, the banned list catches them', () => {
+    const S = JSON.parse(readFileSync(new URL('../data/cars/spec/s180.json', import.meta.url), 'utf8'));
+    expect(S.overall).toMatchObject({ length: 4840, width: 1780, height: 1470, wheelbase: 2850 }); expect(S.overall.axleR - S.overall.axleF).toBe(2850);
+    expect(S.overall.overhangF + S.overall.wheelbase + S.overall.overhangR).toBe(4840);
+    for (const n of [CAR_KREMLIN, TRIM_TSAR, TRIM_OLYMPIC, `${TRIM_TSAR} 그릴`, `${TRIM_OLYMPIC} 앞 범퍼`]) expect(bannedIn(n)).toEqual([]);
+    expect(bannedIn('Toyota Crown Athlete')).toEqual(expect.arrayContaining(['Crown', 'Athlete'])); expect(bannedIn('크라운 로얄 살롱')).toContain('크라운');
+  });
+});

@@ -14,8 +14,8 @@
 //            takes a little off the front).
 //   lips:    a front lip or splitter: its plan area (the blade out ahead of the face) a lift area at 1.0, its drag a tenth
 //            of that and a little of its face.
-//   surface: a mirror's frontal area at 0.5, the stick-on trim's (vents, louvres, markers, badges, handles, a garnish)
-//            at 0.1 (most of it lies in the body's own flow), exhaust tips none (they stand in the wake).
+//   surface: a mirror's frontal area at 0.5, the stick-on vents', louvres' and markers' at
+//            0.1 (most of it lies in the body's own flow), the flush trim's (badges, handles, a garnish) at 0.02, exhaust tips none (they stand in the wake).
 //   holes:   their open area (the footprint times its open share, P2's `fig.open`), counted by how squarely it faces the
 //            air (0.4 + 0.6 of how far its face looks forward) toward the cooling; the air taken through costs a little
 //            drag (0.1 of the open area, more for a face looking forward). A lamp's hole has no opening.
@@ -30,7 +30,8 @@ import type { Design } from '../core/design';
 import { MODEL_OWN, isModelBase } from '../core/design';
 import { PART_KINDS, freeParts, type FreeId, type Placed } from '../core/placed';
 import { modelSkin, modelFrame } from '../render/car/bodies';
-import { fitAll, type PartFigures, type PartFit } from '../render/car/attach';
+import { fitPart, type PartFigures, type PartFit } from '../render/car/attach';
+import type { Skin } from '../render/car/skin';
 import { stockParts } from '../render/car/attach/stock';
 
 const RHO = 1.2, G = 9.81, Q200 = 0.5 * RHO * (200 / 3.6) ** 2;
@@ -53,7 +54,7 @@ export function partAero(f: PartFigures): PartAero {
   else if (g === 'mirror') out.cdA = 0.5 * f.frontal;
   else if (g === 'exhaust') out.cdA = 0;
   else if (f.open !== undefined) { out.cool = coolOf(f); out.cdA = (f.open ?? 0) * 0.1 * (0.3 + 0.7 * (f.facing ?? 0)); }
-  else out.cdA = 0.1 * f.frontal;
+  else out.cdA = (g === 'trim' || g === 'badge' ? 0.02 : 0.1) * f.frontal;
   return out; }
 /** the line the place bar shows for a part (docs/systems/115 P3): its mass, its downforce at 200 km/h, its drag
  *  against the car's (`cdA` the car's drag area now, m²), its opening */
@@ -81,7 +82,12 @@ interface Term { a: PartAero; f: number; z: number; k: 1 | -1 }
 export interface PartsEffect { mass: { m: number; f: number; z: number }[]; cdA: number; clF: number; clR: number; cool: number; coolStock: number;
   /** the parts as fitted (the builder's lines) */ terms: number }
 const CACHE = new Map<string, PartsEffect | null>();
-const fitsOf = (d: Design, ps: readonly Placed[]): PartFit[] => { const s = modelSkin(d); return s ? fitAll(s.skin, ps) : []; };
+/** each part fitted alone on its skin, kept by its entry (a part's figures do not depend on the others: only the overlap
+ *  warning does), so dragging one part fits only that one again */
+const FITS = new WeakMap<Skin, Map<string, PartFit | null>>();
+function fitsOn(skin: Skin, ps: readonly Placed[]): PartFit[] { let m = FITS.get(skin); if (!m) FITS.set(skin, m = new Map()); if (m.size > 400) m.clear(); const out: PartFit[] = [];
+  for (const p of freeParts(ps)) { const k = JSON.stringify(p); if (!m.has(k)) m.set(k, fitPart(skin, p)); const f = m.get(k); if (f) out.push(f); } return out; }
+const fitsOf = (d: Design, ps: readonly Placed[]): PartFit[] => { const s = modelSkin(d); return s ? fitsOn(s.skin, ps) : []; };
 /** the placed parts' effect on a design's figures (null: the design does not read them, `readsParts`) */
 export function partsEffect(d: Design): PartsEffect | null {
   if (!readsParts(d)) return null;
@@ -94,9 +100,10 @@ export function partsEffect(d: Design): PartsEffect | null {
     // the stock set on the shell the stock set is put on (its own openings flush, its own small parts off), its parts the
     // shell does not draw taken off; the cooling's reference is the whole set's
     const base = d.body.base as 'p959' | 'bnr33', bare: Design = { ...d, body: { ...d.body, parts: undefined, ...(base === 'p959' ? { model: { ...MODEL_OWN.p959, ...d.body.model, lamp: 'none', smalls: false, openings: false } } : {}) } };
-    const sk = modelSkin(bare), stock = sk ? fitAll(sk.skin, stockParts(base, sk.skin, d.body.frame?.dims)) : []; let coolStock = 0, coolShell = 0;
+    const sk = modelSkin(bare), stock = sk ? fitsOn(sk.skin, stockParts(base, sk.skin, d.body.frame?.dims)) : []; let coolStock = 0, coolShell = 0;
     for (const f of stock) { if (f.hole && !f.ok) continue; const a = partAero(f.fig); coolStock += a.cool; if (drawnByShell(d, f.fig.id)) coolShell += a.cool; else terms.push({ a, f: along(f.fig.at[0]), z: f.fig.at[2] / 1000, k: -1 }); }
-    const sum = (g: (t: Term) => number) => terms.reduce((s, t) => s + t.k * g(t), 0);
+    // (the stock set on its own places cancels to rounding: kept exactly nothing)
+    const sum = (g: (t: Term) => number) => { const v = terms.reduce((s, t) => s + t.k * g(t), 0); return Math.abs(v) < 1e-6 ? 0 : v; };
     return { mass: terms.map(t => ({ m: t.k * t.a.mass, f: t.f, z: t.z })), cdA: sum(t => t.a.cdA), clF: sum(t => t.a.clA * (1 - t.f)), clR: sum(t => t.a.clA * t.f),
       cool: coolShell + terms.filter(t => t.k > 0).reduce((s, t) => s + t.a.cool, 0), coolStock, terms: terms.filter(t => t.k > 0).length }; })();
   if (CACHE.size > 40) CACHE.clear(); CACHE.set(key, out); return out; }

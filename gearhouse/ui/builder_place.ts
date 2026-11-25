@@ -21,7 +21,8 @@ import { Build, type Mesh, type V } from '../render/car/mesh';
 import { modelSkin } from '../render/car/bodies';
 import { fitPlate, drawPlate, stockPlace, snapCentre, plateText, PLATE_W, PLATE_H, type PlateFit } from '../render/car/p959';
 import { crestUV } from '../render/car/p959/badge';
-import { fitPart, fitAll, drawFit, footprints, type PartFit, type Footprint } from '../render/car/attach';
+import { fitPart, fitAll, drawFit, footprints, type PartFit, type Footprint, type PartFigures } from '../render/car/attach';
+import { partLine } from '../race/partsfig';
 import { newPart } from '../render/car/attach/stock';
 import { vdot, vsub, vmadd, type Skin, type PartFrame } from '../render/car/skin';
 import { MODEL_OWN, type Design } from '../core/design';
@@ -29,7 +30,9 @@ import { PLACED_LIMITS, PART_KINDS, placedOf, withPlaced, nextN, isPlate, type P
 
 export interface PlaceHost { /** the design on the bench */ design(): Design; /** the design changed (its parts or swaps): kept, the figures, the link */ changed(): void;
   flash(t: string): void; redraw(): void; /** the ray under a point of the page (the body's axes), or null with no picture */ ray(clientX: number, clientY: number): { o: V; d: V } | null;
-  /** the bar's place on the page */ bar: HTMLElement; /** the mode on or off (the page hides what the bar covers) */ mode(on: boolean): void }
+  /** the bar's place on the page */ bar: HTMLElement; /** the mode on or off (the page hides what the bar covers) */ mode(on: boolean): void;
+  /** the car's drag area now (m²: the part's own drag reads against it) */ dragArea?(): number;
+  /** the parts as they would be with the one being placed where it is now (the figures follow it live, docs/systems/115 P3) */ live?(parts: Placed[] | undefined): void }
 export interface PlaceTool { readonly id: PlacedId | null; readonly n: number; start(id: PlacedId, n?: number): void; /** a new free part put on and placed */ add(id: FreeId): void; end(): void;
   /** the design as the car's mesh is built while placing: the part being placed taken off (it is drawn apart) */ shown(d: Design): Design;
   /** the part being placed, drawn alone for the overlay (the car's length: placed as the car is); a new mesh when it moved */ overlay(len: number): Mesh | null;
@@ -39,7 +42,7 @@ const PLATE_NAME: Record<PlateId, string> = { plateF: '앞 번호판', plateR: '
 export const partName = (id: PlacedId) => isPlate(id) ? PLATE_NAME[id] : PART_KINDS[id].name;
 const RED = [208, 22, 27];
 /** what the tool reads of a fitted plate or part: its frame, its footprint, the verdict, its grab sphere, how to draw it */
-interface View { F: PartFrame; hw: number; hh: number; ok: boolean; why: string | null; warn: string | null; info: string; twin: boolean; c: V; r: number; mesh(len: number): Mesh }
+interface View { F: PartFrame; hw: number; hh: number; ok: boolean; why: string | null; warn: string | null; info: string; twin: boolean; c: V; r: number; mesh(len: number): Mesh; /** a free part's figures (P3) */ fig?: PartFigures }
 const mir = (a: V): V => [a[0], -a[1], a[2]];
 
 export function placeTool(h: PlaceHost): PlaceTool {
@@ -63,15 +66,15 @@ export function placeTool(h: PlaceHost): PlaceTool {
       return { F: f.F, hw: PLATE_W / 2 * f.s + 40, hh: PLATE_H / 2 * f.s + 40, ok: f.ok, why: f.why, warn: null, info: `받침 ${Math.round(f.gap)} mm`, twin: false, c: f.F.o, r: Math.hypot(PLATE_W, PLATE_H) / 2 * f.s + 30, mesh: draw }; }
     const f0: PartFit | null = fitPart(s, p, others); if (!f0) return null; const f: PartFit = f0.hole ? { ...f0, mesh: f0.hole.preview() } : f0, bx = boxOf(f.mesh);
     const draw = (len: number) => { const b = new Build(), cr = drawFit(b, f, D().body.paint, f.ok ? undefined : RED), M = b.mesh(len); if (cr.length) M.uv = crestUV(M, cr); return M; };
-    return { F: f.F, hw: f.hw, hh: f.hh, ok: f.ok, why: f.why, warn: f.warn, info: f.twin ? '좌우 한 쌍' : f.kind.pair ? '한쪽만' : '하나', twin: f.twin, c: bx.c, r: bx.r + 20, mesh: draw }; };
-  const refit = () => { const s = skin(); view = s && cur ? viewOf(s, cur) : null; ver++; sync(); h.redraw(); };
+    return { F: f.F, hw: f.hw, hh: f.hh, ok: f.ok, why: f.why, warn: f.warn, info: f.twin ? '좌우 한 쌍' : f.kind.pair ? '한쪽만' : '하나', twin: f.twin, c: bx.c, r: bx.r + 20, mesh: draw, fig: f0.fig }; };
+  const refit = () => { const s = skin(); view = s && cur ? viewOf(s, cur) : null; ver++; sync(); h.redraw(); if (id && cur && view?.ok && free()) h.live?.(withPlaced(D().body.parts, id, cur, n)); };
   /** the place kept in the design (and a step to undo); only a good one */
   const commit = (force = false) => { if (!id || !cur || (!view?.ok && !force)) return; const d = D(), now = placedOf(d.body.parts, id, n); if (now && JSON.stringify(now) === JSON.stringify(cur)) { good = structuredClone(cur); return; }
     undo.push(d.body.parts ? structuredClone(d.body.parts) : undefined); if (undo.length > 40) undo.shift(); d.body.parts = withPlaced(d.body.parts, id, cur, n); if (view?.ok) good = structuredClone(cur); h.changed(); };
   // ---- the bar ----
   const bar = h.bar; bar.textContent = ''; bar.hidden = true;
   const el = <K extends keyof HTMLElementTagNameMap>(t: K, cls = '', text = '') => { const e = document.createElement(t); if (cls) e.className = cls; if (text) e.textContent = text; return e; };
-  const title = el('b', 'pb-t'), why = el('p', 'pb-why'), hint = el('p', 'pb-hint', '부품을 끌어 차체 위로 옮깁니다(두 손가락: 크기·회전). 차체의 다른 곳을 누르면 그리로 갑니다. 빈 곳을 끌면 시점이 돕니다.'), rows = el('div', 'pb-rows');
+  const title = el('b', 'pb-t'), why = el('p', 'pb-why'), figLine = el('p', 'pb-fig'), hint = el('p', 'pb-hint', '부품을 끌어 차체 위로 옮깁니다(두 손가락: 크기·회전). 차체의 다른 곳을 누르면 그리로 갑니다. 빈 곳을 끌면 시점이 돕니다.'), rows = el('div', 'pb-rows');
   why.setAttribute('aria-live', 'polite');
   let sliders: { sync(): void }[] = [];
   const slider = (label: string, [a, b]: readonly [number, number], step: number, get: () => number, set: (v: number) => void, show: (v: number) => string) => {
@@ -101,10 +104,11 @@ export function placeTool(h: PlaceHost): PlaceTool {
     if (placedOf(d.body.parts, id)) { undo.push(structuredClone(d.body.parts)); d.body.parts = withPlaced(d.body.parts, id, null); h.changed(); }
     cur = stockOf(); good = cur && structuredClone(cur); refit(); h.flash(`${partName(id)}을 순정 자리로`); });
   const row = el('div', 'btns'); row.append(undoB, offB, btn('완료', () => tool.end(), 'btn main gk-btn gk-sm gk-y'));
-  bar.append(title, hint, rows, toggles, pad, why, row);
+  bar.append(title, hint, rows, toggles, pad, why, figLine, row);
   function sync() { if (!id) return; title.textContent = `${partName(id)}${free() && n ? ` ${n + 1}` : ''} 놓기`; for (const s of sliders) s.sync(); undoB.disabled = !undo.length;
     const K = kind(); one.l.hidden = !K?.pair; one.cb.checked = !!cur?.one; sn.l.hidden = !!K && (!K.centre || !!K.centreOnly); offB.textContent = free() ? '떼기' : '순정 자리로';
-    why.textContent = !view ? '이 자리는 차체 위가 아닙니다' : view.ok ? `붙일 수 있음 · ${view.info}${view.warn ? ` · ${view.warn}` : ''}` : view.why!; why.classList.toggle('bad', !view?.ok); why.classList.toggle('warn', !!view?.ok && !!view.warn); }
+    why.textContent = !view ? '이 자리는 차체 위가 아닙니다' : view.ok ? `붙일 수 있음 · ${view.info}${view.warn ? ` · ${view.warn}` : ''}` : view.why!; why.classList.toggle('bad', !view?.ok); why.classList.toggle('warn', !!view?.ok && !!view.warn);
+    figLine.textContent = view?.fig ? partLine(view.fig, h.dragArea?.() ?? 0) : ''; figLine.hidden = !view?.fig; }
   /** a plate at the car's own place, as a placed one (the place found on this skin) */
   function stockOf(): Placed | null { const s = modelSkin(D()); if (!s || !id || !isPlate(id)) return null; const mk = s.marks.find(k => k.name === id), a = mk ? stockPlace(s.skin, mk) : null; return a ? { id, at: a, rot: 0, tilt: 0, scale: 1 } : null; }
   /** back to the last good place */

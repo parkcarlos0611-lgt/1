@@ -475,7 +475,7 @@ const bodyKey = (d: Design) => JSON.stringify([d.body.model ?? null, isModelBase
   ...[d.susp.front, d.susp.rear].map(a => [a.type, a.arm, a.rc, a.camber, a.toe]), d.susp.front.caster]);
 let meshT = 0, figT = 0;
 function changed() { D = normalise(D); for (const s of syncs) s(); keepCurrent(store, D); savedState(); driveLink();
-  clearTimeout(figT); figT = setTimeout(figures, 40) as unknown as number;
+  clearTimeout(figT); figT = setTimeout(() => figures(), 40) as unknown as number;
   if (bodyKey(place.shown(D)) !== meshKey) { clearTimeout(meshT); meshT = setTimeout(rebuild, 90) as unknown as number; } }
 /** another design on the bench */
 function use(d: Design): boolean { if (!enabledDesign(d)) { flash(`옛 방식 설계는 열 수 없습니다 (${BASE_NAME[d.body.base]} · 비활성)`); return false; }
@@ -505,9 +505,13 @@ const FIG_BARS: [StatDef, (f: DesignFigures) => number][] = [[STATS.power, f => 
   [{ id: 'zero', name: '0→100', unit: 's', min: 2, max: 12, role: 'green', icon: 'play', digits: 1, low: true }, f => f.zeroTo100],
   [{ id: 'torque', name: '토크', unit: 'Nm', min: 0, max: 800, role: 'yellow', icon: 'gearbox', digits: 0 }, f => f.torque],
   [{ id: 'rel', name: '신뢰성', unit: '', min: 0, max: 110, role: 'metal', icon: 'wrench', digits: 0 }, f => f.reliability],
-  [{ id: 'cost', name: '원가', unit: '', min: 0, max: 300, role: 'red', icon: 'money', digits: 0 }, f => f.cost]];
+  [{ id: 'cost', name: '원가', unit: '', min: 0, max: 300, role: 'red', icon: 'money', digits: 0 }, f => f.cost],
+  // the placed parts' (docs/systems/115 P3): the downforce at 200 km/h, the cooling's opening against the engine's need
+  [{ id: 'down', name: '다운포스 200', unit: 'kg', min: 0, max: 200, role: 'green', icon: 'suspension', digits: 0 }, f => f.down200],
+  [{ id: 'cool', name: '냉각', unit: '%', min: 0, max: 150, role: 'blue', icon: 'turbo', digits: 0 }, f => Math.round(f.cooling * 100)]];
 const figBars = FIG_BARS.map(([d, v]) => { const b = statBar(d, NaN); b.dataset.stat = d.id; $('bars').append(b); return [b, v] as const; });
-function figures() { const f = designFigures(D), s = designSpec(D); lastFigs = f;
+/** the figures of the design on the bench, or of it with the part being placed where it is now (live, P3) */
+function figures(live?: { parts: Placed[] | undefined }) { const d = live ? { ...D, body: { ...D.body, parts: live.parts } } : D, f = designFigures(d), s = designSpec(d); lastFigs = f;
   for (const [b, v] of figBars) if (b.value !== v(f)) b.set(v(f));
   $('figs').innerHTML = `<dt>출력 정점</dt><dd>${s.hpRpm.toLocaleString()} <small>rpm</small></dd><dt>토크 정점</dt><dd>${s.torqueRpm.toLocaleString()} <small>rpm</small></dd>`
     + `<dt>마력당 무게</dt><dd>${f.kgPerHp.toFixed(2)} <small>kg/hp</small></dd><dt>앞 배분</dt><dd>${Math.round(f.front * 100)} <small>%</small></dd>`
@@ -586,7 +590,8 @@ let dirty = true, g: ReturnType<LiveRenderer['car']> | null = null, awake = true
 /** the last picture's camera (the free placing's rays) and the overlaid part on the GPU */
 let cam: { v: Parameters<typeof viewRay>[0]; len: number } | null = null, overM: Mesh | null = null, overG: ReturnType<LiveRenderer['car']> | null = null;
 /** the free placing (docs/systems/115 P1a): a plate's card in ③ starts it; its bar over the view, its rays from the last picture's camera */
-const place = placeTool({ design: () => D, changed, flash, redraw: () => { dirty = true; }, bar: $('placeBar'),
+const place = placeTool({ design: () => D, changed, flash, redraw: () => { dirty = true; }, bar: $('placeBar'), dragArea: () => lastFigs?.cdA ?? 0,
+  live(parts) { clearTimeout(figT); figT = setTimeout(() => figures({ parts }), 60) as unknown as number; },
   ray(cx, cy) { if (!cam) return null; const r = cv.getBoundingClientRect(); return viewRay(cam.v, { x: 0, y: 0, z: -0.015, yaw: view.yaw, len: cam.len }, (cx - r.left) * cv.width / r.width, (cy - r.top) * cv.height / r.height); },
   mode(on) { document.body.classList.toggle('placing', on); if (on && innerWidth <= 760) drawer(false); if (on) { view.spin = false; $('spin').setAttribute('aria-pressed', 'false'); } dirty = true; } });
 addEventListener('keydown', e => { if (!awake || !place.id) return; const t = e.target as HTMLElement | null; if (t && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) && e.key !== 'Escape') return; if (place.key(e)) e.preventDefault(); });   // awake: on screen (a page of its own always)

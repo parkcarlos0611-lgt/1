@@ -203,7 +203,7 @@ export function designSpec(d: Design): RaceSpec {
   const P = partsEffect(d);
   if (K.wing && !P) tech.wing = { up: 0, down: -1, clA: 0.3, cdA: 0.05, body: 0 };
   if (K.diffuser) tech.underbody = { clA: 0.13, front: 0.5, cdA: 0.01 };   // the F355's undertray
-  if (P && (P.clF || P.clR)) tech.aero = { clF: P.clF, clR: P.clR };
+  if (P && (Math.abs(P.clF) > 1e-4 || Math.abs(P.clR) > 1e-4)) tech.aero = { clF: P.clF, clR: P.clR };
   if (en.vtec) tech.vtec = cut < 1 ? { ...en.vtec, low: { ...en.vtec.low, torque: en.vtec.low.torque * cut } } : en.vtec; if (en.turbo) tech.turbo = en.turbo;
   const s: RaceSpec = { id: 'design:' + d.id, name: d.name, mass: M.mass, wheelbase: M.L, track: B.track + (2 * d.body.width + d.body.track) / 1000, tyreR: R, tyreW: (K.tyres[0] + rearW) / 2000,
     cgH: M.cgH, frontShare: M.front, hp: en.hp * cut, hpRpm: en.hpRpm, torqueRpm: en.torqueRpm, torquePeak: en.torquePeak * cut, idle: E.layout === 'V6' ? 800 : 1000, redline: E.redline,

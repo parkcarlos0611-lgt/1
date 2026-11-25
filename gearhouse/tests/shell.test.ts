@@ -66,7 +66,7 @@ describe('settings', () => {
   it('reads rubbish and half-right settings as the defaults where they are wrong', () => {
     const st = new MapStore(); st.setItem(SETTINGS_KEY, '{not json'); expect(loadSettings(st)).toEqual(DEFAULTS);
     st.setItem(SETTINGS_KEY, JSON.stringify({ graphics: { look: 'neon', blur: false }, sound: { volume: 7 }, screen: 'dark' }));
-    const s = loadSettings(st); expect(s.graphics.look).toBe('pbr'); expect(s.graphics.blur).toBe(false); expect(s.sound.volume).toBe(1); expect(s.screen).toEqual(DEFAULTS.screen);
+    const s = loadSettings(st); expect(s.graphics.look).toBe('drift'); expect(s.graphics.blur).toBe(false); expect(s.sound.volume).toBe(1); expect(s.screen).toEqual(DEFAULTS.screen);
     expect(asSettings([1, 2])).toEqual(DEFAULTS);
   });
   it('works on through a storage that throws', () => {

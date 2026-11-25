@@ -94,7 +94,7 @@ export function settingsScreen(ctx: ShellCtx): Screen<never> {
   return menu(ctx, 'settings', root => { const S = (): Settings => ctx.settings, set = (f: (s: Settings) => void) => { f(ctx.settings); ctx.changed(); };
     const pane = (...kids: HTMLElement[]) => el('div', 'gh-form', ...kids);
     const gfx = pane(toggle('실시간 렌더러 (WebGL2)', S().graphics.live, v => set(s => { s.graphics.live = v; }), '끄면 구운 그림으로 그립니다 (느린 기기)'),
-      chips('조명·재질', [['pbr', 'PBR'], ['stepped', 'PBR 단계화'], ['toon', '툰'], ['drift', '드리프트 (화풍 4)'], ['baked', '단계 조명']], S().graphics.look, v => set(s => { s.graphics.look = v; })),
+      chips('조명·재질', [['drift', '드리프트 (화풍 4)'], ['toon', '툰'], ['baked', '단계 조명']], S().graphics.look, v => set(s => { s.graphics.look = v; })),
       chips('연기 품질', [['off', '끔'], ['parcels', '덩어리'], ['mid', '부피 보통'], ['high', '부피 높음']], S().graphics.smoke, v => set(s => { s.graphics.smoke = v; })),
       chips('연기 크기', [['normal', '보통'], ['big', '크게']], S().graphics.smokeSize, v => set(s => { s.graphics.smokeSize = v; })),
       chips('선 굵기 (툰·드리프트)', [['thin', '가늘게 ×0.75'], ['normal', '보통'], ['bold', '굵게 ×1.25'], ['heavy', '아주 굵게 ×1.5']], S().graphics.lineWeight, v => set(s => { s.graphics.lineWeight = v; })),

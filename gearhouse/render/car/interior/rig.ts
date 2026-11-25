@@ -95,7 +95,7 @@ export interface CabinPose { wheel: number; hands: LR<HandPose>; /** the lever's
   /** the right foot: 0 on the throttle .. 1 on the brake; heel and toe (0..1) */ foot: number; heelToe: number; /** the head's turn (left +), nod (forward +), lean (to the car's left +), rad */ head: [number, number, number];
   /** leave the head out (the cockpit's own view) */ hideHead?: boolean; /** written by poseCabin: the eye as posed (car mm) */ eye?: V }
 /** the pose at rest: as the driver was built */
-export function restPose(rig: CabinRig): CabinPose { const h = rig.wheel.home; return { wheel: 0, hands: { L: { alpha: h.L, lift: 0, task: null, w: 0 }, R: { alpha: h.R, lift: 0, task: null, w: 0 } }, lever: gate(1), handbrake: 0, pedals: { clutch: 0, brake: 0, throttle: 0 }, foot: 0, heelToe: 0, head: [0, 0, 0] }; }
+export function restPose(rig: CabinRig): CabinPose { const h = rig.wheel.home; return { wheel: 0, hands: { L: { alpha: h.L, lift: 0, task: null, w: 0 }, R: { alpha: h.R, lift: 0, task: null, w: 0 } }, lever: [0, 0], handbrake: 0, pedals: { clutch: 0, brake: 0, throttle: 0 }, foot: 0, heelToe: 0, head: [0, 0, 0] }; }
 
 /** the head's sway settings: 끔, 아주 약하게 (the default), 약하게, 보통 */
 export type HeadMove = 'off' | 'subtle' | 'weak' | 'normal';
@@ -104,7 +104,7 @@ const wrap = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
 const toward = (x: number, to: number, rate: number, dt: number) => x < to ? Math.min(to, x + rate * dt) : Math.max(to, x - rate * dt);
 const ease = (t: number) => t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t);
 
-interface Regrip { t: number; from: number; /** the new hold, on the wheel's own frame */ to: number }
+interface Regrip { t: number; from: number; /** the way round it goes (+1: toward the top from the left), back the way the hand came */ way: number; /** the new hold, on the wheel's own frame */ to: number; /** its time (s): quicker while the wheel spins fast */ dur: number }
 interface HandState { g: number; regrip: Regrip | null; task: HandPose['task']; w: number; still: number }
 /** one car's driver moving: fed the drive's state each frame (InteriorInput), gives the pose */
 export class DriverMotion {
@@ -140,12 +140,13 @@ export class DriverMotion {
     // ---- the rim: each hand holds where it took the wheel; past 120 degrees from its home it lets go and takes it again ----
     for (const k of [outer, inner] as const) { const s = H[k], o = H[k === 'L' ? 'R' : 'L'], home = W.home[k];
       if (s.task) { s.regrip = null; continue; }
-      if (s.regrip) { s.regrip.t += dt; if (s.regrip.t >= MOTION.regrip) { s.g = s.regrip.to; s.regrip = null; } continue; }
+      if (s.regrip) { s.regrip.t += dt; if (s.regrip.t >= s.regrip.dur) { s.g = s.regrip.to; s.regrip = null; } continue; }
       const a = wrap(s.g - wheel), off = wrap(a - home), otherBusy = !!o.regrip || (!!o.task && o.w > 0);
       s.still = Math.abs(this.rate) < 0.3 ? s.still + dt : 0;
-      if (Math.abs(off) > MOTION.regripAt && (!o.regrip || Math.abs(off) > MOTION.regripAt + 0.7)) s.regrip = { t: 0, from: a, to: home - Math.sign(off) * MOTION.lead + wheel };
-      else if (Math.abs(off) > 35 * Math.PI / 180 && s.still > 0.6 && !otherBusy) s.regrip = { t: 0, from: a, to: home + wheel }; }
-    const hand = (k: 'L' | 'R'): HandPose => { const s = H[k]; if (s.regrip) { const u = ease(s.regrip.t / MOTION.regrip), to = wrap(s.regrip.to - wheel), d = wrap(to - s.regrip.from); return { alpha: s.regrip.from + d * u, lift: 55 * Math.sin(Math.PI * u), task: null, w: 0 }; }
+      const dur = Math.max(0.1, Math.min(MOTION.regrip, 0.5 / Math.max(1e-3, Math.abs(this.rate))));
+      if (Math.abs(off) > MOTION.regripAt && (!o.regrip || Math.abs(off) > MOTION.regripAt + 0.9)) s.regrip = { t: 0, from: a, to: home - Math.sign(off) * MOTION.lead + wheel, dur, way: -Math.sign(off) };
+      else if (Math.abs(off) > 8 * Math.PI / 180 && s.still > 0.6 && !otherBusy) s.regrip = { t: 0, from: a, to: home + wheel, dur: MOTION.regrip, way: -Math.sign(off) }; }
+    const hand = (k: 'L' | 'R'): HandPose => { const s = H[k]; if (s.regrip) { const u = ease(s.regrip.t / s.regrip.dur), to = wrap(s.regrip.to - wheel); let d = wrap(to - s.regrip.from); if (d * s.regrip.way < 0) d += s.regrip.way * 2 * Math.PI;   /* over the rim the way it came, never across the hub */ return { alpha: s.regrip.from + d * u, lift: 55 * Math.sin(Math.PI * u), task: null, w: 0 }; }
       return { alpha: wrap(s.g - wheel), lift: 0, task: s.task, w: ease(s.w) }; };
     // ---- the feet: the clutch on a shift and moving off, the right foot between the pedals, heel and toe ----
     const kmh = Math.abs(i.kmh ?? 0), thr = Math.max(0, Math.min(1, i.throttle ?? 0)), brk = Math.max(0, Math.min(1, i.brake ?? 0));

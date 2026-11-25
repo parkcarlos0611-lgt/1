@@ -28,7 +28,7 @@ describe('the driver\'s rig (docs/systems/118 D2-D4)', () => {
   it('past 120 degrees a hand lets go and takes the rim again (hand over hand), one at a time, and comes back home when the wheel rests', () => {
     const C = rigOf(stock), m = new DriverMotion(); let lifted = 0, both = 0, most = 0;
     // a quick wind to 400 degrees of lock and back, as a drift's counter-steer
-    for (let k = 0; k < 240; k++) { const t = k / 60, w = (t < 1.5 ? t / 1.5 : Math.max(0, 1 - (t - 2) / 1.5)) * 400 * Math.PI / 180, P = m.step(1 / 60, { steer: w, on: true, kmh: 60, gear: 3 }, C);
+    for (let k = 0; k < 240; k++) { const t = k / 60, w = (t < 1.5 ? t / 1.5 : Math.max(0, Math.min(1, 1 - (t - 2) / 1.5))) * 400 * Math.PI / 180, P = m.step(1 / 60, { steer: w, on: true, kmh: 60, gear: 3 }, C);
       const offL = Math.abs(Math.atan2(Math.sin(P.hands.L.alpha - C.wheel.home.L), Math.cos(P.hands.L.alpha - C.wheel.home.L))), offR = Math.abs(Math.atan2(Math.sin(P.hands.R.alpha - C.wheel.home.R), Math.cos(P.hands.R.alpha - C.wheel.home.R)));
       most = Math.max(most, Math.min(offL, offR)); if (P.hands.L.lift > 0 || P.hands.R.lift > 0) lifted++; if (P.hands.L.lift > 0 && P.hands.R.lift > 0) both++;
       const S = solveDriver(C, P); expect(Math.max(S.gap.L, S.gap.R), `reach at ${t.toFixed(2)} s`).toBeLessThan(3); }

@@ -100,7 +100,8 @@ for (const s of SHOTS) { const k = 2 * Math.min(1, 1300 / s.w), c = persp(s.w, s
 // square on, for the blueprint (5.5 mm a pixel there; here twice that size, drawn at four times and halved): the front
 // (the picture's centre on the car's centre line, the ground at its row 500) and the front of the side
 png(`${out}/${tagName}_front.png`, 760, 560, draw(ortho(1520, 1120, [1, 0, 0], [0, 0, 605], 4 / 5.5)));
-png(`${out}/${tagName}_side.png`, 760, 560, draw(ortho(1520, 1120, [0, 1, 0], [935, 0, 605], 4 / 5.5)));
+png(`${out}/${tagName}_side.png`, 1780, 560, draw(ortho(3560, 1120, [0, 1, 0], [(890 - 40) * 2.75, 0, 605], 4 / 5.5)));
+png(`${out}/${tagName}_rear.png`, 760, 560, draw(ortho(1520, 1120, [-1, 0, 0], [0, 0, 605], 4 / 5.5)));
 
 const use = [...edgeUse(S.F).values()], tris = (f: (t: (typeof S.tag)[number]) => boolean) => S.F.reduce((s, f2, k) => s + (f(S.tag[k]!) ? f2.length - 2 : 0), 0);
 console.log(`cage: ${S.cage.P.length} points, ${S.cage.F.length} faces; shell: ${S.F.length} faces, ${tris(() => true)} triangles (front bumper ${tris(t => t.region === 'bumperF')}); edges open ${use.filter(u => u === 1).length}, over-used ${use.filter(u => u > 2).length}`);

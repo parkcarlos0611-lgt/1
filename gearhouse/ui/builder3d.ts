@@ -44,7 +44,7 @@ import { partThumbs, type ThumbSpec } from './builder_thumbs';
 import { placeTool } from './builder_place';
 import { viewRay } from '../render/car/skin';
 import type { PlacedId } from '../core/placed';
-import { FRAMES, FRAME_OF_BASE, FRAME_IDS, FRAME_DIMS, FRAME_DIM_NAME, NO_FRAME_DIMS, GLASS, GLASS_IDS, INTERIOR_SETS, INTERIOR_SET_IDS, TRIM_IDS, TRIM_NAME, interiorOfKit, type FrameId, type FrameDimKey, type GlassId, type InteriorSetId, type TrimId } from '../core/frames';
+import { FRAMES, FRAME_OF_BASE, interiorSetOf, FRAME_IDS, FRAME_DIMS, FRAME_DIM_NAME, NO_FRAME_DIMS, GLASS, GLASS_IDS, INTERIOR_SETS, INTERIOR_SET_IDS, TRIM_IDS, TRIM_NAME, interiorOfKit, type FrameId, type FrameDimKey, type GlassId, type InteriorSetId, type TrimId } from '../core/frames';
 import texAlb from '../assets/textures/pbr/albedo.jpg';
 import texNor from '../assets/textures/pbr/normal.jpg';
 import texRgh from '../assets/textures/pbr/rough.jpg';
@@ -247,8 +247,11 @@ function frameSliders(): HTMLElement[] { const o = () => FRAMES[frameD().id], d 
     btnRow('치수 원래대로', () => { D.body.frame = { ...frameD(), dims: { ...NO_FRAME_DIMS } }; changed(); }));
   modelOnly(out[0]!); modelOnly(out[out.length - 2]!); modelOnly(out[out.length - 1]!); return out; }
 // ② 창문 (§4-2): a set of the lump's own cells (material only, no new faces); none: the cabin in body colour
-add('glass', cards<GlassId | 'none'>('창문 세트', [['none', '고르지 않음 (차체 색)', basePic(), { kind: 'glass', v: 'none' }] as [GlassId | 'none', string, string, ThumbSpec],
-    ...GLASS_IDS.map(g => [g, GLASS[g].name, basePic(), { kind: 'glass', v: g }] as [GlassId | 'none', string, string, ThumbSpec])], () => D.body.glass === undefined ? 'stock' : D.body.glass ?? 'none', v => { D.body.glass = v === 'none' ? null : v; }),
+/** a set's cards for each frame, shown while its frame is the design's (their pictures are that frame's lump with the set) */
+const perFrame = (make: (f: FrameId) => HTMLElement): HTMLElement[] => FRAME_IDS.map(f => { const e = make(f); syncs.push(() => { e.hidden = frameD().id !== f; }); return e; });
+const thumbOf = (f: FrameId, v: string) => f === 'A959' ? v : `${f}:${v}`;
+add('glass', ...perFrame(f => cards<GlassId | 'none'>('창문 세트', [['none', '고르지 않음 (차체 색)', basePic(), { kind: 'glass', v: thumbOf(f, 'none') }] as [GlassId | 'none', string, string, ThumbSpec],
+    ...GLASS_IDS.map(g => [g, GLASS[g].name, basePic(), { kind: 'glass', v: thumbOf(f, g) }] as [GlassId | 'none', string, string, ThumbSpec])], () => D.body.glass === undefined ? 'stock' : D.body.glass ?? 'none', v => { D.body.glass = v === 'none' ? null : v; })),
   note('창문 세트는 덩어리의 면을 그대로 두고 어느 칸이 유리인지만 정합니다(삼각형이 늘지 않습니다). 세트를 고르면 문·보닛·엔진 덮개의 패널선이 진해집니다. 유리 색은 나중에 칠·마감에서 고릅니다.'),
   ...GLASS_IDS.map(g => note(`${GLASS[g].name}: ${GLASS[g].note}`)));
 /** a kit base's dimensions (the old bases, off in the game): against the base's own (core/design.ts BodyDims), each
@@ -315,12 +318,15 @@ function btnRow(t: string, f: () => void): HTMLElement { const d = document.crea
     cards<ModelSwaps['lamp']>('헤드램프', LAMPS_ALL.map(k => [k, { round: '둥근 렌즈 (순정)', ellipsoid: '프로젝터 2개', square: '사각 프로젝터', none: '없음 (막힘)' }[k], lampPic(k), ...(k === 'none' ? [] : [{ kind: 'lamp', v: k }])] as [ModelSwaps['lamp'], string, string, ThumbSpec?]), () => M().lamp, sm('lamp')),
     cards<ModelSwaps['wheel']>('휠', WHEELS_ALL.map(k => [k, { hollow5: '속 빈 5스포크 (순정)', dish: '딥디시 8스포크', hole5: '5홀 디스크', steel: '민짜 강철 휠' }[k], wheelPic(k), { kind: 'wheel', v: k }] as [ModelSwaps['wheel'], string, string, ThumbSpec]), () => M().wheel, sm('wheel')),
     seg<'on' | 'off'>('그 밖의 순정 부품 (테일램프 띠, 옆 흡기구, 엔진 덮개 그릴, 미러, 배기구, 배지·레터링)', [['on', '달기'], ['off', '떼기']], () => M().details === false ? 'off' : 'on', v => { if (v === 'on') delete M().details; else M().details = false; }),
-    plateOn('plateF', '앞 번호판'), plateOn('plateR', '뒤 번호판'), plateCards, note(`번호판 카드를 누르면 "놓기"가 됩니다. 판을 끌어 차체 위 아무 곳으로나 옮기고, 회전·기울기·크기를 고릅니다. 앞 번호판은 앞을, 뒤 번호판은 뒤를 보는 면(차 축에서 35° 안)에만 붙고, 굽은 면에서는 판이 평평한 채 검은 받침이 틈을 메웁니다(최대 70 mm). 램프·유리·다른 번호판과 겹치면 붙지 않습니다. 레이스 상대와 순정 세트는 순정 자리입니다.`),
-    plateRow, note('범퍼는 차체의 이음선 고리에 맞물려 바뀝니다. 헤드램프를 빼면 램프 자리는 차체 색으로 막힙니다. 번호판은 앞뒤를 따로 떼고 다시 달 수 있고, 뗀 자리는 범퍼 면 그대로입니다. 번호판 글자는 판 위에 획으로 그립니다(가상의 번호만). 다른 부품의 자유 부착은 다음 단계(P1, P2)에서 옵니다.')];
+    ];
+  // the plates: the 599's and the N33's alike (each body's own skin and stock places: render/car/bodies.ts modelSkin)
+  const plateRows = [plateOn('plateF', '앞 번호판'), plateOn('plateR', '뒤 번호판'), plateCards, note(`번호판 카드를 누르면 "놓기"가 됩니다. 판을 끌어 차체 위 아무 곳으로나 옮기고, 회전·기울기·크기를 고릅니다. 앞 번호판은 앞을, 뒤 번호판은 뒤를 보는 면(차 축에서 35° 안)에만 붙고, 굽은 면에서는 판이 평평한 채 검은 받침이 틈을 메웁니다(최대 70 mm). 램프·유리·다른 번호판과 겹치면 붙지 않습니다. 레이스 상대와 순정 세트는 순정 자리입니다.`),
+    plateRow];
+  const modelTail = [note('범퍼는 차체의 이음선 고리에 맞물려 바뀝니다. 헤드램프를 빼면 램프 자리는 차체 색으로 막힙니다. 번호판은 앞뒤를 따로 떼고 다시 달 수 있고, 뗀 자리는 범퍼 면 그대로입니다. 번호판 글자는 판 위에 획으로 그립니다(가상의 번호만). 다른 부품의 자유 부착은 다음 단계(P1, P2)에서 옵니다.')];
   // the N33's own parts come in R3 (docs/systems/117): its lump takes none of the 599's yet
-  const n33Note = note('차체 B(N33)의 부품은 아직 없습니다. 지금은 덩어리와 창문 세트만 고를 수 있습니다(문서 117 R3에서 부품을 수확합니다).');
-  syncs.push(() => { const m = isModelBase(D.body.base), p = D.body.base === 'p959'; for (const e of kitRows) e.hidden = m; for (const e of modelRows) e.hidden = !p; n33Note.hidden = D.body.base !== 'bnr33'; if (p && document.activeElement !== plate) plate.value = M().plate; });
-  add('parts', ...kitRows, ...modelRows, n33Note);
+  const n33Note = note('차체 B(N33)의 부품은 아직 없습니다(문서 117 R3에서 수확합니다). 지금은 덩어리, 창문 세트, 실내 세트, 번호판을 고를 수 있습니다.');
+  syncs.push(() => { const m = isModelBase(D.body.base), p = D.body.base === 'p959'; for (const e of kitRows) e.hidden = m; for (const e of [...modelRows, ...modelTail]) e.hidden = !p; for (const e of plateRows) e.hidden = !m; n33Note.hidden = D.body.base !== 'bnr33'; if (m && document.activeElement !== plate) plate.value = M().plate; });
+  add('parts', ...kitRows, ...modelRows, n33Note, ...plateRows, ...modelTail);
   const sw = document.createElement('div'); sw.className = 'swatches'; const pick = document.createElement('input'); pick.type = 'color'; pick.id = 'paint'; pick.setAttribute('aria-label', '직접 고르기');
   const bs = PAINTS.map(c => { const b = document.createElement('button'); b.type = 'button'; b.style.background = c; b.setAttribute('aria-label', c); b.addEventListener('click', () => { D.body.paint = c; changed(); }); sw.append(b); return [c, b] as const; });
   pick.addEventListener('input', () => { D.body.paint = pick.value; changed(); }); sw.append(pick);
@@ -405,8 +411,8 @@ add('kit', check('ABS', () => D.kit.abs, v => { D.kit.abs = v; }, 'abs'), check(
   seg('림', [[16, '16″'], [17, '17″'], [18, '18″']], () => D.kit.rim, v => { D.kit.rim = v; }),
   note('윙은 꼬리에 맞춰 차체에 달립니다(캡슐 꼬리는 능동 윙: 달리면 올라옵니다). 디퓨저는 뒤 바닥 아래에 그려집니다.'),
   // the interior (docs/systems/115 §4-3): a set of the lump's own, not placed freely; its trim's colour in ⑦
-  h2('실내'), cards<InteriorSetId>('실내 세트', INTERIOR_SET_IDS.map(k => [k, INTERIOR_SETS[k].name, icon('interior'), { kind: 'interior', v: k }] as [InteriorSetId, string, string, ThumbSpec]), () => interiorD().set, v => { D.interior = { ...interiorD(), set: v }; }),
-  ...INTERIOR_SET_IDS.map(k => note(`${INTERIOR_SETS[k].name}: ${INTERIOR_SETS[k].note}`)), note('실내는 정해 둔 세트에서 고릅니다. 드리프트 세트는 가볍고(무게 계수 경량), 순정 세트를 황갈색으로 고르면 가죽·에어컨의 고급 사양으로 무게를 셉니다. 색은 ⑦ 칠·마감에서 고릅니다.'));
+  h2('실내'), ...perFrame(f => cards<InteriorSetId>('실내 세트', INTERIOR_SET_IDS.map(k => [k, interiorSetOf(f, k).name, icon('interior'), { kind: 'interior', v: thumbOf(f, k) }] as [InteriorSetId, string, string, ThumbSpec]), () => interiorD().set, v => { D.interior = { ...interiorD(), set: v }; })),
+  ...perFrame(f => { const d = document.createElement('div'); d.append(...INTERIOR_SET_IDS.map(k => note(`${interiorSetOf(f, k).name}: ${interiorSetOf(f, k).note}`))); return d; }), note('실내는 정해 둔 세트에서 고릅니다. 드리프트 세트는 가볍고(무게 계수 경량), 순정 세트를 황갈색으로 고르면 가죽·에어컨의 고급 사양으로 무게를 셉니다. 색은 ⑦ 칠·마감에서 고릅니다.'));
 // ⑧ 검사·시험 주행: the fit's checks with their fixes and the step each belongs to, the class, the cost and the
 // reliability, what was measured, the test drive and the save
 { const div = (id: string, cls: string) => { const d = document.createElement('div'); d.id = id; d.className = cls; return d; };

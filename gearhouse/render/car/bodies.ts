@@ -20,13 +20,13 @@ import { p959Mesh, plateText, DIM, STOCK_FRAME, frameOf, buildShell, shellSkin, 
 import type { Skin } from './skin';
 import type { Mark } from './p959/sockets';
 import { interiorOfKit } from '../../core/frames';
-import { n33Model, frameOf as n33FrameOf, STOCK_FRAME as N33_STOCK, DIM as N33_DIM } from './n33';
+import { n33Model, n33Skin, n33Marks, buildN33Shell, frameOf as n33FrameOf, STOCK_FRAME as N33_STOCK, DIM as N33_DIM } from './n33';
 import { addSuspension, type SuspWheel } from './suspension';
 import { suspFor } from './suspension/setup';
 import { addPowertrain, fromDesign, type Detail } from './powertrain';
 import type { Site } from './powertrain/layout';
 import type { StyleOpt } from './powertrain/style';
-import { interiorMesh, INTERIORS, P959_CABIN, P959_GAUGES, type CabinAnchors, type GaugeCar, type InteriorOptions } from './interior';
+import { interiorMesh, INTERIORS, TRIMS, P959_CABIN, P959_GAUGES, type CabinAnchors, type GaugeCar, type InteriorOptions } from './interior';
 
 export interface BodyMeshOpts { /** the powertrain's and the suspension's detail (2 the builder's, 1 the drive's) */ detail?: Detail; /** the look the machinery is drawn in (default: the setting's) */ style?: StyleOpt;
   /** the car's top speed (km/h) for the speedometer's scale (default: the real car's) */ topKmh?: number; /** leave the machinery out (a picture of the body alone) */ bare?: boolean }
@@ -88,14 +88,17 @@ const P959: ModelBody = { name: CAR_599, length: DIM.length, cabin: P959_CABIN, 
     const mach = b.mesh(f.length), cab = interiorMesh({ ...cabinFor(d), cabin: f === STOCK_FRAME ? P959_CABIN : cabinOf(f), gauges: this.gauges(d, o.topKmh), length: f.length });
     return { ...joinMeshes(f.length, body, mach, cab), susp: S.rig, anchors }; } };
 
-// ---- the N33 (docs/systems/117 R1): its lump "차체 B" only; its parts (R3), its interior (R2) and its machinery's
-//      own figures (R4) are still to come. The cabin is the 959's interior laid in its cabin, turned to right-hand drive
-//      (a placeholder until R2); the straight six lengthwise under the bonnet, its clutch end at the bulkhead
+// ---- the N33 (docs/systems/117 R1, R2): its lump "차체 B", its glass sets and its own interior sets (right-hand drive:
+//      the stock one with four dials, the four-spoke wheel and the centre stack's three gauges; the tuned one with a dished
+//      wheel, buckets and a boost pod on the A pillar); its parts (R3) and its machinery's own figures (R4) are still to
+//      come. The straight six lengthwise under the bonnet, its clutch end at the bulkhead
+/** the N33's interior set for a design (the frame's two sets: stock, and the tuned one in the drift set's place) in its trim */
+export const n33CabinFor = (d: Design): InteriorOptions => { const p = d.interior ?? interiorOfKit(d.kit.interior); return { ...INTERIORS[p.set === 'drift' ? 'n33Sport' : 'n33Stock'], trim: p.trim, ...(p.set === 'drift' ? { bucketColour: TRIMS[p.trim].seat } : {}) }; };
 /** its cabin: the screen's foot at x 1370, z 962, its top at 2060, 1320; the doors 1530..2855, their skin's inside about
  *  800 from the middle at the elbow; the sill's top inside at 400; the rear wells from x 3290; right-hand drive */
-export const N33_CABIN: CabinAnchors = { side: -1, floorZ: 200, dashX: 1700, dashTopZ: 930, screenFoot: [1420, 962], screenTop: [2060, 1318], screenHalf: [650, 520], wheel: [1960, -370, 840], rake: 22,
-  hip: [2420, -370, 460], recline: 23, half: 770, doorX: [1530, 2855], sillZ: 400, beltZ: 918, tunnelHalf: 110, tunnelZ: 340, rearX: 3290, shelfZ: 1030, roofZ: 1310, roofHalf: 520,
-  doorIn: [[400, 790], [560, 792], [700, 786], [820, 768], [918, 735]], wellX: 3290, rearHalf: 600 };
+export const N33_CABIN: CabinAnchors = { side: -1, floorZ: 200, dashX: 1720, dashTopZ: 925, screenFoot: [1420, 958], screenTop: [2060, 1318], screenHalf: [620, 500], wheel: [1990, -372, 845], rake: 22,
+  hip: [2440, -372, 455], recline: 23, half: 780, doorX: [1530, 2855], sillZ: 400, beltZ: 918, tunnelHalf: 110, tunnelZ: 340, rearX: 3330, shelfZ: 700, roofZ: 1310, roofHalf: 510,
+  doorIn: [[400, 800], [560, 805], [700, 805], [820, 772], [918, 712]], wellX: 3300, rearHalf: 610 };
 const n33FrameFor = (d: Design) => { const f = d.body.frame; return f && f.id === 'B33' && Object.values(f.dims).some(v => v) ? n33FrameOf(f.dims) : N33_STOCK; };
 function n33Wheels(d: Design, f = n33FrameFor(d)): { f: SuspWheel; r: SuspWheel } { const [wf, wr] = d.kit.tyres;
   return { f: { x: f.axleF, y: f.trackF / 2, r: N33_DIM.tyreR, w: wf, rim: N33_DIM.rimR, back: 0.6 * wf / 2 }, r: { x: f.axleR, y: f.trackR / 2, r: N33_DIM.tyreR, w: wr, rim: N33_DIM.rimR, back: 0.6 * wr / 2 } }; }
@@ -106,12 +109,13 @@ const n33Anchors = (f: Frame): CarAnchors => ({ tips: [f.at([4470, 640, 1000]), 
 const N33: ModelBody = { name: CAR_N33, length: N33_DIM.length, cabin: N33_CABIN, anchors: n33Anchors(N33_STOCK), wheels: n33Wheels, open: ['bonnet'],
   gauges: (d, topKmh) => ({ ...P959_GAUGES, redline: d.engine.redline, topKmh: topKmh ?? 260, odoKm: 3300, tripKm: 33.3, ...(d.engine.turbo ? { boostBar: d.engine.boost } : { boostBar: undefined }) }),
   mesh(d, o = {}) { const m = { ...MODEL_OWN.bnr33, ...d.body.model }, det = o.detail ?? 2, f = n33FrameFor(d);
-    const body = n33Model({ ...(f === N33_STOCK ? {} : { dims: f.dims }), glass: d.body.glass === undefined ? 'stock' : d.body.glass, paint: d.body.paint, wheel: m.wheel, brake: !!o.bare, tyres: d.kit.tyres }).mesh;
+    const body = n33Model({ ...(f === N33_STOCK ? {} : { dims: f.dims }), glass: d.body.glass === undefined ? 'stock' : d.body.glass, paint: d.body.paint, wheel: m.wheel, brake: !!o.bare, tyres: d.kit.tyres,
+      plate: plateOf(d), plateF: m.plateF !== false, plateR: m.plateR !== false, ...(d.body.parts ? { placed: d.body.parts } : {}) }).mesh;
     const P = KINDS.indexOf('paint'); for (let t = 0; t < body.n; t++) if (body.kind[t] === P) body.gloss[t] = d.body.gloss;
     if (o.bare) return body;
     const b = new Build(), S = addSuspension(b, suspFor('bnr33', d.susp), n33Wheels(d, f), { detail: det, setup: d.susp, ...(o.style ? { style: o.style } : {}) });
     addPowertrain(b, fromDesign(d), n33Site(f), { detail: det, ...(o.style ? { style: o.style } : {}) });
-    const mach = b.mesh(f.length), cab = interiorMesh({ ...cabinFor(d), cabin: f === N33_STOCK ? N33_CABIN : cabinOf(f, N33_CABIN), gauges: this.gauges(d, o.topKmh), length: f.length });
+    const mach = b.mesh(f.length), cab = interiorMesh({ ...n33CabinFor(d), cabin: f === N33_STOCK ? N33_CABIN : cabinOf(f, N33_CABIN), gauges: this.gauges(d, o.topKmh), length: f.length });
     return { ...joinMeshes(f.length, body, mach, cab), susp: S.rig, anchors: n33Anchors(f) }; } };
 
 /** the model-built bodies, by their base's id */
@@ -120,7 +124,9 @@ export const MODEL_BODIES: Record<ModelBaseId, ModelBody> = { p959: P959, bnr33:
 /** a model body's skin as the design builds it (render/car/skin.ts: the builder's picking and the placed parts' rules,
  *  docs/systems/115 §5-2), and its stock plates' marks; the last few kept (a build is about a tenth of a second) */
 const SKINS = new Map<string, { skin: Skin; marks: Mark[] }>();
-export function modelSkin(d: Design): { skin: Skin; marks: Mark[] } | null { if (d.body.base !== 'p959') return null;
+export function modelSkin(d: Design): { skin: Skin; marks: Mark[] } | null { if (d.body.base === 'bnr33') { const f = n33FrameFor(d), key = JSON.stringify(['n33', f.dims, d.body.glass ?? 'u']); let s = SKINS.get(key);
+    if (!s) { s = { skin: n33Skin(buildN33Shell({ ...(f === N33_STOCK ? {} : { dims: f.dims }), glass: d.body.glass === undefined ? 'stock' : d.body.glass })), marks: n33Marks(f) }; if (SKINS.size > 4) SKINS.clear(); SKINS.set(key, s); } return s; }
+  if (d.body.base !== 'p959') return null;
   const m = { ...MODEL_OWN.p959, ...d.body.model }, f = frameFor(d), key = JSON.stringify([f.dims, d.body.glass ?? 'u', m.details, m.bumperF, m.bumperR, m.lamp]); let s = SKINS.get(key);
   if (!s) { const S = buildShell({ ...(f === STOCK_FRAME ? {} : { dims: f.dims }), ...(d.body.glass !== undefined ? { glass: d.body.glass } : {}), ...(m.details === false ? { details: false } : {}), bumperF: m.bumperF, bumperR: m.bumperR, lamps: m.lamp !== 'none' });
     s = { skin: shellSkin(S), marks: sockets(f).marks.filter(k => /^plate/.test(k.name)) }; if (SKINS.size > 4) SKINS.clear(); SKINS.set(key, s); }

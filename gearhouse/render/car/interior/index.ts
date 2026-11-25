@@ -13,12 +13,16 @@ import { seat, dash, steeringWheel, shifter, handbrake, pedals, tunnel, floorAnd
 
 export * from './anchors'; export * from './gauges'; export { REGIONS, SHEET, regionUV, interiorSheet, redrawGauges, type Region } from './atlas';
 export interface InteriorOptions { /** the cabin it goes into (default the 959's) */ cabin?: CabinAnchors; trim?: TrimName | Trim; wheel?: WheelStyle; seats?: SeatStyle; shifter?: 'tall' | 'short'; handbrake?: 'lever' | 'hydro';
-  cage?: boolean; driver?: boolean; /** the passenger's seat (drift cars often run without) */ passengerSeat?: boolean; /** the door cards, floor and rear trim standing in for the body's own */ shellTrim?: boolean; /** pod gauges and stickers on the dash */ pods?: boolean; stickers?: boolean; /** which door cards are in (a picture through an open door leaves one out) */ doors?: 'both' | 'L' | 'R' | 'none';
+  cage?: boolean; driver?: boolean; /** the N33's dash (docs/systems/117 R2): four dials, the centre stack's gauges, the A pillar's pod */ binnacle?: 'five' | 'four'; consoleGauges?: boolean; pillarPod?: boolean; /** the passenger's seat (drift cars often run without) */ passengerSeat?: boolean; /** the door cards, floor and rear trim standing in for the body's own */ shellTrim?: boolean; /** pod gauges and stickers on the dash */ pods?: boolean; stickers?: boolean; /** which door cards are in (a picture through an open door leaves one out) */ doors?: 'both' | 'L' | 'R' | 'none';
   helmet?: string; suit?: string; gloves?: string; cageColour?: string; bucketColour?: string; /** whose dials (the red line, the top speed) */ gauges?: GaugeCar; /** a plain cabin shell with a windscreen round it, for pictures */ preview?: string | false; /** the mesh's length (the car's, so it sits where the car's cabin is) */ length?: number }
 /** the two interiors of the first car: as built, and stripped for drifting */
 export const INTERIORS = {
   stock: { trim: 'black', wheel: 'stock', seats: 'sport', shifter: 'tall', handbrake: 'lever', cage: false, driver: true, passengerSeat: true, shellTrim: true },
   drift: { trim: 'black', wheel: 'drift', seats: 'bucket', shifter: 'short', handbrake: 'hydro', cage: true, driver: true, passengerSeat: true, shellTrim: true, pods: true, stickers: true },
+  /** the N33's (docs/systems/117 R2, right-hand drive by its cabin): as built, four dials and the four-spoke wheel, the
+   *  three gauges in the centre stack; and the tuned one of the photographs, a dished wheel, buckets, a boost pod on the A pillar */
+  n33Stock: { trim: 'black', wheel: 'four', seats: 'sport', shifter: 'tall', handbrake: 'lever', cage: false, driver: true, passengerSeat: true, shellTrim: true, binnacle: 'four', consoleGauges: true },
+  n33Sport: { trim: 'black', wheel: 'drift', seats: 'bucket', shifter: 'short', handbrake: 'lever', cage: false, driver: true, passengerSeat: true, shellTrim: true, binnacle: 'four', consoleGauges: true, pillarPod: true },
 } as const satisfies Record<string, InteriorOptions>;
 /** the budget's groups (docs/systems/109 section 4): which group a part's name falls in */
 export const GROUPS: [string, RegExp][] = [['dash', /^(dash|gauge)/], ['wheel', /^steerWheel/], ['seats', /^seat/], ['driver', /^driver/], ['controls', /^(shifter|handbrake|pedal|tunnel|doorCard)/], ['cage', /^cage/], ['floor', /^cabin/], ['preview', /^(bodyShell|windscreen)/]];
@@ -30,7 +34,7 @@ export function interiorMesh(opt: InteriorOptions = INTERIORS.stock): Mesh { con
   const faces = gaugeSet(o.gauges ?? P959_GAUGES), hipF = (side: number): Frame => leaning([A.hip[0], side * Math.abs(A.hip[1]), A.hip[2]], 0), floorDz = A.floorZ - A.hip[2], seatCol = o.seats === 'bucket' ? o.bucketColour ?? '#274a9a' : T.seat;
   if (o.shellTrim !== false) { floorAndRear(b, A, T); doorCards(b, A, T, o.doors ?? 'both'); }
   tunnel(b, A, T);
-  const D = dash(b, A, T, faces, { pods: o.pods, stickers: o.stickers }), W = steeringWheel(b, A, T, o.wheel ?? 'stock', D.dials.length + 1);
+  const four = o.binnacle === 'four', D = dash(b, A, T, four ? [faces[4]!, faces[2]!, faces[3]!, faces[1]!] : faces, { pods: o.pods, stickers: o.stickers, binnacle: o.binnacle, consoleGauges: o.consoleGauges, pillarPod: o.pillarPod }), W = steeringWheel(b, A, T, o.wheel ?? 'stock', D.dials.length + 1);
   seat(b, hipF(A.side), o.seats ?? 'sport', A.side > 0 ? 'seatL' : 'seatR', seatCol, A.recline, floorDz, T.metal);
   if (o.passengerSeat !== false) seat(b, hipF(-A.side), o.seats ?? 'sport', A.side > 0 ? 'seatR' : 'seatL', seatCol, A.recline, floorDz, T.metal);
   shifter(b, [A.hip[0] - 395, 0, A.tunnelZ], T, o.shifter ?? 'tall');

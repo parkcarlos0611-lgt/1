@@ -60,6 +60,8 @@ def match(d):
         else:   # the mirrors (parts) out of the drawing's rows: the band they stand in takes the row under it
             r0, r1 = int(org[1] - 1040 / 2.75), int(org[1] - 850 / 2.75)
             for y in range(r0, r1): fill[y] = fill[r1]
+        pad = max(0, int(np.ceil(-x0 * 2 * kx)))   # columns left of the blueprint's edge (no drawing there) are not counted
+        m, fill = m[:, pad:], fill[:, pad:]
         out[n] = (m & fill).sum() / max(1, (m | fill).sum())
     return out
 if mode == 'overlay':

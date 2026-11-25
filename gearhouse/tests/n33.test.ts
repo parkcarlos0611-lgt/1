@@ -70,3 +70,25 @@ describe('the body in the game', () => {
   it('draws whole: the body, the suspension about its hubs, the machinery, the right-hand-drive placeholder cabin', () => { const m = designMesh(normalise({ ...DESIGN_BNR33 }));
     expect(m.n).toBeGreaterThan(lump.mesh.n); expect(m.susp).toBeTruthy(); });
 });
+
+// R2 (docs/systems/117 §6): its own interior sets, right-hand drive, in the 959's interior manner and budget (doc 109 S4:
+// 4,000 - 5,000 triangles); its plates on the generic skin
+import { interiorMesh, INTERIORS, interiorBudget } from '../render/car/interior';
+import { N33_CABIN, modelSkin } from '../render/car/bodies';
+import { fitPlate, stockPlace } from '../render/car/p959/plates';
+import { n33Marks, n33Skin } from '../render/car/n33';
+import { buildSet } from '../ui/builder_thumbs';
+describe('its interior sets and plates (R2)', () => {
+  it('right-hand drive: the wheel, the binnacle and the driver on the right; four dials and the centre stack\'s three gauges; in the budget', () => {
+    for (const k of ['n33Stock', 'n33Sport'] as const) { const m = interiorMesh({ ...INTERIORS[k], cabin: N33_CABIN, length: 4675 }), B = interiorBudget(m), names = new Set(m.names!.filter(Boolean));
+      console.log(`N33 interior ${k}: ${B.total} triangles`); expect(B.total).toBeGreaterThan(2500); expect(B.total).toBeLessThanOrEqual(5000);
+      const ys = (re: RegExp) => { let s = 0, n = 0; for (let t = 0; t < m.n; t++) if (re.test(m.names![m.part[t]!] ?? '')) { s += m.pos[t * 9 + 1]!; n++; } return s / n; };
+      expect(ys(/^steerWheelRim/)).toBeLessThan(-250); expect(ys(/^gaugeFace\d/)).toBeLessThan(-250); expect(ys(/^driver/)).toBeLessThan(-200);
+      expect([0, 1, 2, 3].every(i => names.has(`gaugeFace${i}`))).toBe(true); expect(names.has('gaugeFace4')).toBe(false); expect([0, 1, 2].every(i => names.has(`gaugeConsoleFace${i}`))).toBe(true);
+      expect(names.has('gaugePillarPod')).toBe(k === 'n33Sport'); } });
+  it('the builder\'s cards draw 차체 B\'s own glass and interior sets', () => { expect(buildSet('glass', 'B33:stock').shell.P.length).toBe(lump.shell.P.length); expect(buildSet('interior', 'B33:drift').mesh.n).toBeGreaterThan(1000); });
+  it('plates sit on its bumpers at their own places, and placed freely through the generic skin', () => { const skin = n33Skin(lump.shell);
+    for (const m of n33Marks()) { const at = stockPlace(skin, m)!; expect(at).toBeTruthy(); const f = fitPlate(skin, { id: m.name as 'plateF', at, rot: 0, tilt: 0, scale: 1 })!; expect(f.ok, `${m.name} ${f.why}`).toBe(true); }
+    const d = normalise(newDesign('bnr33')); expect(modelSkin(d)!.marks.map(k => k.name)).toEqual(['plateF', 'plateR']);
+    const withPlates = n33Model({ ...N33_LUMP, plateF: true, plateR: true }).mesh; expect(withPlates.n).toBeGreaterThan(lump.mesh.n); });
+});

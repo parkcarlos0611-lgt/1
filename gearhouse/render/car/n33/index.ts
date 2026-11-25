@@ -8,6 +8,10 @@ import { p959Lines } from '../p959/lines';
 import { wheel, type WheelKind } from '../p959/parts';
 import { subdivSkin, type Skin } from '../skin';
 import type { V } from '../p959/subdiv';
+import type { Mark } from '../p959/sockets';
+import { fitPlate, drawPlate, stockPlace, type PlateFit } from '../p959/plates';
+import type { PlateText } from '../p959/parts';
+import { placedOf, type Placed } from '../../../core/placed';
 import { buildCage, DIM, type CageOpts } from './cage';
 import { frameOf, STOCK_FRAME, type Frame } from './frame';
 export { buildCage, DIM, NR, NC, ARCH } from './cage';
@@ -25,12 +29,19 @@ export function n33Hubs(f: Frame = STOCK_FRAME, tyres: [number, number] = [245, 
     out.push({ name: s > 0 ? 'hubRL' : 'hubRR', o: [f.axleR, s * (DIM.trackR / 2 * f.kY + tyres[1] / 2), DIM.hubZ], tyreR: DIM.tyreR, rimR: DIM.rimR, width: tyres[1], archR: DIM.archR, front: false }); }
   return out; }
 
-export interface N33Opts extends CageOpts { paint?: string; wheel?: WheelKind; /** leave the wheels out (the skin alone) */ bare?: boolean; tyres?: [number, number]; brake?: boolean }
+/** the plates' own places (docs/systems/115 P1a, by the generic skin): the front bumper's middle and the rear bumper's, on
+ *  the stretched car; a plate is laid on the skin found along the car's axis from them (render/car/p959/plates.ts) */
+export const n33Marks = (f: Frame = STOCK_FRAME): Mark[] => [{ name: 'plateF', o: f.at([0, 0, 425]), n: [-1, 0, 0], w: 335, h: 170 }, { name: 'plateR', o: f.at([4650, 0, 455]), n: [1, 0, 0], w: 335, h: 170 }];
+export interface N33Opts extends CageOpts { paint?: string; wheel?: WheelKind; /** leave the wheels out (the skin alone) */ bare?: boolean; tyres?: [number, number]; brake?: boolean;
+  /** the plates (default none: the lump's), their text, and their places when placed freely (core/placed.ts) */ plateF?: boolean; plateR?: boolean; plate?: PlateText; placed?: readonly Placed[] }
 /** the lump as the builder's first step shows it (everything else of the car is a part still to come) */
 export const N33_LUMP: N33Opts = { glass: null, wheel: 'steel' };
 export function n33Model(o: N33Opts = {}): P959Model { const fr = frameOf(o.dims), S = buildN33Shell(o), b = new Build(), nn: number[] = [];
   emitShell(b, S, o.paint ?? '#b8bcc2', nn);
   if (!o.bare) for (const h of n33Hubs(fr, o.tyres)) wheel(b, h, o.wheel ?? 'steel', o.brake !== false);
+  if (!o.bare && (o.plateF || o.plateR)) { const skin = n33Skin(S), fits: PlateFit[] = [];
+    for (const m of n33Marks(fr)) { const id = m.name as 'plateF' | 'plateR'; if (!(id === 'plateF' ? o.plateF : o.plateR)) continue; const at = stockPlace(skin, m), p = placedOf(o.placed, id) ?? (at ? { id, at, rot: 0, tilt: 0, scale: 1 } : null), f = p ? fitPlate(skin, p, fits) ?? (at ? fitPlate(skin, { id, at, rot: 0, tilt: 0, scale: 1 }, fits) : null) : null;
+      if (f && f.gap < 150) { fits.push(f); drawPlate(b, f, o.plate); } } }
   const M: Mesh = b.mesh(o.dims ? fr.length : DIM.length);
   M.lines = p959Lines(S, !o.glass) as MeshLine[];
   M.creases = [...S.crease].map(k => { const [a, c] = k.split('|').map(Number) as [number, number]; return [S.P[a]!, S.P[c]!] as [V, V]; });

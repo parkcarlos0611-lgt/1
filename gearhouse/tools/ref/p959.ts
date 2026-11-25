@@ -12,6 +12,8 @@ import { fineGrid, lineStat, measure, PANELS, turning } from '../../render/car/p
 import { faceNormal } from '../../render/car/p959/subdiv';
 import { edgeUse } from '../../render/car/p959/shell';
 import { n33Model, N33_LUMP } from '../../render/car/n33';
+import { joinMeshes, N33_CABIN } from '../../render/car/bodies';
+import { interiorMesh, INTERIORS, TRIMS } from '../../render/car/interior';
 import { N33_PANELS } from '../../render/car/n33/check';
 
 const N33 = process.argv.includes('n33'), CAR = N33 ? 'n33' : 'p959', out = process.argv[2] ?? '.', mm = +(process.argv.find(a => a.startsWith('mm='))?.slice(3) ?? 4), W = Math.round((N33 ? 5400 : 4800) / mm), H = Math.round(3000 / mm), BG = [206, 202, 192];
@@ -34,7 +36,10 @@ const OPTS: P959Opts = ({ ...(process.argv.includes('lump') ? P959_LUMP : {}), .
 const PLACED: Placed[] | undefined = arg('placed') ? (() => { const sk = shellSkin(buildShell({ ...OPTS, lamps: OPTS.lamp !== 'none' })); return arg('placed')!.split('/').map(e => { const [w, v] = e.split(':'), [y, z, rot, tilt, sc] = v!.split(',').map(Number), F = w === 'F';
   const h = sk.hit([F ? -800 : 5200, y!, z!], [F ? 1 : -1, 0, 0], 8000)!, p: Placed = { id: F ? 'plateF' : 'plateR', at: h.at!, rot: rot ?? 0, tilt: tilt ?? 0, scale: sc ?? 1 }, f = fitPlate(sk, p);
   console.log(`${p.id} at y ${y} z ${z}: ${f?.ok ? 'ok' : f?.why}, bracket ${f?.gap.toFixed(0)} mm`); return p; }); })() : undefined;
-const MODEL = N33 ? n33Model({ ...N33_LUMP, ...(arg('glass') ? { glass: arg('glass') === 'none' ? null : arg('glass') as never } : {}), ...(DIMS ? { dims: DIMS } : {}), ...(arg('paint') ? { paint: arg('paint') } : {}) }) : p959Model({ ...OPTS, ...(PLACED ? { placed: PLACED } : {}) }), S = MODEL.shell, NN = MODEL.normals;
+const MODEL0 = N33 ? n33Model({ ...N33_LUMP, ...(arg('glass') ? { glass: arg('glass') === 'none' ? null : arg('glass') as never } : {}), ...(DIMS ? { dims: DIMS } : {}), ...(arg('paint') ? { paint: arg('paint') } : {}) }) : p959Model({ ...OPTS, ...(PLACED ? { placed: PLACED } : {}) });
+// cabin=n33Stock|n33Sport[:trim] (the N33's interior sets in its cabin, docs/systems/117 R2); cut=<z>: the shell's triangles above z left out (to see in)
+const CAB = N33 && arg('cabin') ? arg('cabin')!.split(':') : null, CUT = arg('cut') ? +arg('cut')! : Infinity;
+const MODEL = CAB ? { ...MODEL0, mesh: joinMeshes(MODEL0.mesh.length, MODEL0.mesh, interiorMesh({ ...INTERIORS[CAB[0] as 'n33Stock'], ...(CAB[1] ? { trim: CAB[1] as 'tan', ...(CAB[0] === 'n33Sport' ? { bucketColour: TRIMS[CAB[1] as 'tan'].seat } : {}) } : {}), cabin: N33_CABIN, length: MODEL0.mesh.length })) } : MODEL0, S = MODEL.shell, NN = MODEL.normals;
 // plates=<a,b,...>: a sheet of number plates face on (two columns), instead of the car
 const PLATES = arg('plates')?.split(','), M = PLATES ? (() => { const b = new Build(); PLATES.forEach((t, k) => plate(b, { name: 'plate', o: [0, (k % 2 ? -1 : 1) * 200, 420 - Math.floor(k / 2) * 215], n: [-1, 0, 0], w: 335, h: 170 }, /^\d+$/.test(t) ? plateText(+t) : plateText(t))); return b.mesh(0); })() : MODEL.mesh, shellTris = PLATES ? 0 : MODEL.shellTris;
 // mirror=0 to draw the file's own axes; by default the car is drawn as the game draws it (+y on the left of the heading,
@@ -52,6 +57,7 @@ function flat(yawDeg: number, pitchDeg: number, o: DrawO = {}): Uint8Array { con
   const LK = [-0.5, 0.62, 0.5], light = un([right[0] * LK[0]! + up[0] * LK[1]! - fwd[0] * LK[2]!, right[1] * LK[0]! + up[1] * LK[1]! - fwd[1] * LK[2]!, right[2] * LK[0]! + up[2] * LK[1]! - fwd[2] * LK[2]!]), half = un([light[0] - fwd[0], light[1] - fwd[1], light[2] - fwd[2]]);
   if (o.mesh !== false) for (let t = 0; t < M.n; t++) { const q = [0, 1, 2].map(c => [M.pos[t * 9 + c * 3]!, M.pos[t * 9 + c * 3 + 1]!, M.pos[t * 9 + c * 3 + 2]!] as V3), sc = q.map(pr), fnm = un(crs([q[1]![0] - q[0]![0], q[1]![1] - q[0]![1], q[1]![2] - q[0]![2]], [q[2]![0] - q[0]![0], q[2]![1] - q[0]![1], q[2]![2] - q[0]![2]]));
     if (t < shellTris && (MIRRORED ? -1 : 1) * dot(fnm, fwd) > 0.02) continue;   // the shell's back faces (mirrored, its winding runs the other way)
+    if (t < shellTris && Math.max(q[0]![2], q[1]![2], q[2]![2]) > CUT) continue;
     const ff: V3 = dot(fnm, fwd) > 0 ? [-fnm[0], -fnm[1], -fnm[2]] : fnm, ns = t < shellTris ? [0, 1, 2].map(c => [NN[t * 9 + c * 3]!, NN[t * 9 + c * 3 + 1]!, NN[t * 9 + c * 3 + 2]!] as V3) : [ff, ff, ff], kind = M.kind[t]!, base: V3 = [M.col[t * 3]!, M.col[t * 3 + 1]!, M.col[t * 3 + 2]!];
     const [A, B, C] = sc as [V3, V3, V3], den = (B[1] - C[1]) * (A[0] - C[0]) + (C[0] - B[0]) * (A[1] - C[1]); if (Math.abs(den) < 1e-9) continue;
     const x0 = Math.max(0, Math.floor(Math.min(A[0], B[0], C[0]))), x1 = Math.min(w - 1, Math.ceil(Math.max(A[0], B[0], C[0]))), y0 = Math.max(0, Math.floor(Math.min(A[1], B[1], C[1]))), y1 = Math.min(h - 1, Math.ceil(Math.max(A[1], B[1], C[1])));
@@ -73,7 +79,7 @@ function flat(yawDeg: number, pitchDeg: number, o: DrawO = {}): Uint8Array { con
     for (let i = 0; i <= n; i++) { const t = i / n, x = A[0] + (B[0] - A[0]) * t, yv = A[1] + (B[1] - A[1]) * t, d = A[2] + (B[2] - A[2]) * t, r = wpx / 2;
       for (let py = Math.floor(yv - r); py <= Math.ceil(yv + r); py++) for (let px = Math.floor(x - r); px <= Math.ceil(x + r); px++) { if (px < 0 || py < 0 || px >= w || py >= h || Math.hypot(px + 0.5 - x, py + 0.5 - yv) > r) continue; const zi = py * w + px; if (d > zb[zi]! + tol) continue;
         if (col) { img[zi * 3] = col[0]; img[zi * 3 + 1] = col[1]; img[zi * 3 + 2] = col[2]; } else ink(zi); } } };
-  if (o.lines !== false && M.lines) for (const l of M.lines) { const n = l.pts.length; for (let q = 0; q + 1 < n || (l.closed && q < n); q++) seg(l.pts[q]! as V3, l.pts[(q + 1) % n]! as V3, 3 * (l.w ?? 1), 18); }
+  if (o.lines !== false && M.lines) for (const l of M.lines) { const n = l.pts.length; for (let q = 0; q + 1 < n || (l.closed && q < n); q++) if (Math.max(l.pts[q]![2], l.pts[(q + 1) % n]![2]) <= CUT) seg(l.pts[q]! as V3, l.pts[(q + 1) % n]! as V3, 3 * (l.w ?? 1), 18); }
   if (o.wires) for (const f of o.wires.F) f.forEach((a, q) => { const b = f[(q + 1) % f.length]!; if (a < b || !f.includes(b)) seg(o.wires!.P[a]!, o.wires!.P[b]!, 2, o.mesh === false ? 1e9 : 30, [20, 60, 170]); });
   const out2 = new Uint8Array(W * H * 3); for (let py = 0; py < H; py++) for (let px = 0; px < W; px++) for (let c = 0; c < 3; c++) { let s = 0; for (let dy = 0; dy < SS; dy++) for (let dx = 0; dx < SS; dx++) s += img[((py * SS + dy) * w + px * SS + dx) * 3 + c]!; out2[(py * W + px) * 3 + c] = s / (SS * SS); }
   return out2; }

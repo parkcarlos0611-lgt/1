@@ -65,6 +65,10 @@ export const INTERIOR_SETS: Record<InteriorSetId, InteriorSetDef> = {
   stock: { id: 'stock', name: '순정', note: '가죽 스포츠 시트, 뒷좌석', kit: 'standard' },
   drift: { id: 'drift', name: '드리프트', note: '버킷 시트, 롤 케이지, 계기 포드', kit: 'light' } };
 export const INTERIOR_SET_IDS: InteriorSetId[] = ['stock', 'drift'];
+/** a frame's own sets where they are not the 959's (docs/systems/117 R2: the N33's, right-hand drive; the tuned one in the drift set's place, its weight the same) */
+export const FRAME_INTERIOR: Partial<Record<FrameId, Record<InteriorSetId, { name: string; note: string }>>> = {
+  B33: { stock: { name: '순정', note: '오른쪽 핸들, 계기 4개, 가운데 둥근 계기 3개(부스트·유압·수온), 4스포크 핸들' }, drift: { name: '스포츠', note: '딥디시 핸들, 버킷 시트, A필러 부스트계' } } };
+export const interiorSetOf = (f: FrameId, s: InteriorSetId): { name: string; note: string } => FRAME_INTERIOR[f]?.[s] ?? INTERIOR_SETS[s];
 export const TRIM_IDS: TrimId[] = ['black', 'brown', 'tan'];
 export const TRIM_NAME: Record<TrimId, string> = { black: '검정', brown: '갈색', tan: '황갈색' };
 export interface InteriorPick { set: InteriorSetId; trim: TrimId }

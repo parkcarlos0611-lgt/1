@@ -8,6 +8,7 @@
 import type { Mesh, MeshLine, V } from '../render/car/mesh';
 import { p959Model, P959_LUMP, type P959Model } from '../render/car/p959';
 import { n33Model, N33_LUMP } from '../render/car/n33';
+import { N33_CABIN } from '../render/car/bodies';
 import { interiorMesh, INTERIORS } from '../render/car/interior';
 import { freeGpu } from '../render/live/gpu';
 import { STYLE, screenPx, lineWeight } from '../render/live/style';
@@ -36,7 +37,7 @@ export function camera(kind: ThumbKind, view: ThumbView): { ang: number; pitch: 
 const BUMPER_F = new Set(['bumperF', 'indicatorF', 'ventF', 'intakeF', 'lipF']), BUMPER_R = new Set(['bumperR', 'ventR', 'diffuser', 'exhaustSlot']);
 const LAMP = new Set(['lampBezel', 'headLamp', 'lampReflector', 'lampRing']), WHEEL = /^(tyre|rim|wheel|hub)/, PLATE = /^plate/;
 /** the variants of a kind, in the library's order */
-export const VARIANTS: Record<ThumbKind, readonly string[]> = { bumperF: BUMPERS_ALL, bumperR: BUMPERS_ALL, lamp: LAMPS959, wheel: WHEELS_ALL, base: ['p959'], frame: ['A959', 'B33'], glass: ['none', 'stock', 'noQuarter', 'louvre'], interior: ['stock', 'drift'],
+export const VARIANTS: Record<ThumbKind, readonly string[]> = { bumperF: BUMPERS_ALL, bumperR: BUMPERS_ALL, lamp: LAMPS959, wheel: WHEELS_ALL, base: ['p959'], frame: ['A959', 'B33'], glass: ['none', 'stock', 'noQuarter', 'louvre', 'B33:none', 'B33:stock', 'B33:noQuarter', 'B33:louvre'], interior: ['stock', 'drift', 'B33:stock', 'B33:drift'],
   /** the plates (docs/systems/115 P1a): each its own card, cut from the stock car where its plate sits at its own place */ plateF: ['plateF'], plateR: ['plateR'] };
 /** the model a variant is cut from: the n-th of each list together (four builds give every swap; the first is the stock
  *  car, the fourth the lump's blank bumper and steel wheel with the stock lamp) */
@@ -45,7 +46,10 @@ export function buildModel(i: number): P959Model { return p959Model({ bumperF: B
 /** the models of the first steps' cards: the lump; the lump with each glass set (none: the cabin in body colour); each
  *  interior set alone (its cabin's parts, no driver) */
 const SETS = new Set<ThumbKind>(['frame', 'glass', 'interior']);
-export function buildSet(kind: ThumbKind, v: string): P959Model { if (kind === 'interior') { const mesh = interiorMesh({ ...INTERIORS[v as 'stock' | 'drift'], driver: false });
+export function buildSet(kind: ThumbKind, v: string): P959Model { if (v.startsWith('B33:')) { const w = v.slice(4);   // 차체 B's sets (docs/systems/117 R2): its glass on its lump, its own interiors in its cabin
+    if (kind === 'interior') return { mesh: interiorMesh({ ...INTERIORS[w === 'drift' ? 'n33Sport' : 'n33Stock'], cabin: N33_CABIN, driver: false }), shell: undefined as never, normals: new Float32Array(0), shellTris: 0 };
+    return n33Model({ ...N33_LUMP, brake: false, glass: w === 'none' ? null : w as never }); }
+  if (kind === 'interior') { const mesh = interiorMesh({ ...INTERIORS[v as 'stock' | 'drift'], driver: false });
     return { mesh, shell: undefined as never, normals: new Float32Array(0), shellTris: 0 }; }
   if (kind === 'frame' && v === 'B33') return n33Model({ ...N33_LUMP, brake: false });   // 차체 B: the N33's lump (docs/systems/117 R1)
   return p959Model({ ...P959_LUMP, brake: false, ...(kind === 'glass' ? { glass: v === 'none' ? null : v as never } : {}) }); }

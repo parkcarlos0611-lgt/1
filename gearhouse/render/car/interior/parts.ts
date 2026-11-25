@@ -39,7 +39,10 @@ export function seat(b: InteriorBuild, f: Frame, style: SeatStyle, name: string,
 
 // ---- the dash: the frame's origin on its front plane at its top, on the centre line ----
 export interface DashOut { dials: DialBone[] }
-export function dash(b: InteriorBuild, A: CabinAnchors, T: Trim, faces: GaugeFace[], o: { pods?: boolean; stickers?: boolean }): DashOut { const f: Frame = { o: [A.dashX, 0, A.dashTopZ], x: [1, 0, 0], y: [0, 1, 0], z: [0, 0, 1] }, hw = A.doorIn ? A.doorIn[A.doorIn.length - 1]![1] - 20 : A.half + 8, s = A.side;
+/** the dash's options: the drift cars' pods and stickers; the N33's (docs/systems/117 R2): four dials under the hood, three round
+ *  gauges in the centre stack under the middle vent (boost, oil, water), a boost gauge in a pod on the driver's A pillar */
+export interface DashOpts { pods?: boolean; stickers?: boolean; binnacle?: 'five' | 'four'; consoleGauges?: boolean; pillarPod?: boolean }
+export function dash(b: InteriorBuild, A: CabinAnchors, T: Trim, faces: GaugeFace[], o: DashOpts): DashOut { const f: Frame = { o: [A.dashX, 0, A.dashTopZ], x: [1, 0, 0], y: [0, 1, 0], z: [0, 0, 1] }, hw = A.doorIn ? A.doorIn[A.doorIn.length - 1]![1] - 20 : A.half + 8, s = A.side;
   const cx = A.screenFoot[0] - A.dashX, cz = A.screenFoot[1] - A.dashTopZ, prof: [number, number][] = [[cx, cz], [-22, 10], [0, -6], [9, -32], [15, -150], [42, -162], [50, -198], [30, -228], [-120, -244], [cx, -244]];
   b.frame(f).part('dash', T.dash, 0.18, 'leather').loft([-1, -0.55, 0, 0.55, 1].map(k => prof.map(([x, z], i) => [x, k * hw, z + (i < 2 ? 7 * (1 - k * k) : 0)] as V)));
   b.line('trim', [[2, -hw, -8], [2, hw, -8]], { w: 0.7 }).line('trim', [[44, -hw, -163], [44, hw, -163]], { w: 0.7 });
@@ -55,7 +58,7 @@ export function dash(b: InteriorBuild, A: CabinAnchors, T: Trim, faces: GaugeFac
   const g = within(f, leaning([10, A.wheel[1], 0], -8)), hood = whole([[0, 48], [95, 44], [185, 30], [255, 6], [292, -38], [298, -106], [0, -106]]), hr = (x: number, k: number, dz = 0): V[] => hood.map(([y, z]) => [x, y * k, (z + 30) * k - 30 + dz] as V);
   b.frame(g).part('dashBinnacle', T.dash, 0.18, 'leather').loft([hr(-80, 0.96, -14), hr(64, 1), hr(64, 0.93), hr(24, 0.93)]);
   b.part('gaugePanel', T.plastic, 0.1).fan([26, 0, -30], hr(26, 0.925), [1, 0, 0]);
-  const ys = [216, 120, 0, -122, -224], zs = [-46, -44, -30, -42, -46], dials: DialBone[] = []; let bone = 0;
+  const four = o.binnacle === 'four', ys = four ? [178, 64, -62, -172] : [216, 120, 0, -122, -224], zs = four ? [-44, -32, -34, -44] : [-46, -44, -30, -42, -46], dials: DialBone[] = []; let bone = 0;
   faces.forEach((F, i) => { const y = ys[i]!, z = zs[i]!, seg = F.R > 58 ? 14 : 12, c: V = [26, y, z];
     b.onBone(0).part(`gaugeBezel${i}`, '#222225', 0.3).turn(c, [1, 0, 0], [[0, F.R + 7], [12, F.R + 4], [3, F.R]], seg, { loop: true });
     b.part(`gaugeFace${i}`, '#0c0c0e', 0.3).fan([29, y, z], ring([29, y, z], [0, 1, 0], [0, 0, 1], F.R, seg), [1, 0, 0]).paint(F.region, [29, y, z], R, Uz, F.R * 2 / 0.985, F.R * 2 / 0.985);
@@ -63,26 +66,33 @@ export function dash(b: InteriorBuild, A: CabinAnchors, T: Trim, faces: GaugeFac
       b.onBone(bone).part(`gaugeNeedle_${sc.id}`, '#f24a12', 0.3).panel([[add(pv, add(mul(d, -L * 0.16), mul(q, w / 2))), add(pv, add(mul(d, L), mul(q, 0.8)))], [add(pv, add(mul(d, -L * 0.16), mul(q, -w / 2))), add(pv, add(mul(d, L), mul(q, -0.8)))]], [1, 0, 0]);
       b.part(`gaugeHub_${sc.id}`, '#0a0a0b', 0.5).fan(add(pv, [1.5, 0, 0]), ring(add(pv, [1.5, 0, 0]), [0, 1, 0], [0, 0, 1], hub, 6), [1, 0, 0]);
       dials.push({ id: sc.id, bone, pivot: at(g, pv), right: unit(dir(g, R)), up: unit(dir(g, Uz)), min: sc.min, max: sc.max, a0: sc.a0, a1: sc.a1, rest: sc.rest, tau: sc.tau }); } });
-  b.onBone(0).part('gaugeLamps', '#101012', 0.3).picture([27.5, 60, 14], R, Uz, N, 20, 20, 'lampA').picture([27.5, -62, 16], R, Uz, N, 20, 20, 'lampB');
+  b.onBone(0).part('gaugeLamps', '#101012', 0.3).picture([27.5, four ? 0 : 60, 14], R, Uz, N, 20, 20, 'lampA').picture([27.5, four ? -122 : -62, 16], R, Uz, N, 20, 20, 'lampB');
   // the drift cars' extra gauges: three pods on the dash's top, turned to the driver (painted faces: they are dress, not instruments)
   if (o.pods) { b.frame(f); ([['podA', 150], ['podB', 235], ['podC', 320]] as const).forEach(([r, y], i) => { const c: V = [-90, py(y), 62], ax = unit([1, s * 0.22 * (i + 1) * 0.6, 0.12]), [u, v] = [unit(cross([0, 0, 1], ax)), [0, 0, 1] as V], up = unit(cross(ax, u)); void v;
       b.part(`gaugePod${i}`, '#161618', 0.5).turn(c, ax, [[-58, 16], [-28, 31], [0, 33], [-6, 28]], 8); b.part(`gaugePodFace${i}`, '#0c0c0e', 0.3).picture(add(c, mul(ax, -5)), mul(u, -1), up, ax, 58, 58, r);
       b.part(`gaugePodFoot${i}`, '#161618', 0.4).box(c[0] - 50, c[0] - 20, c[1] - 9, c[1] + 9, 0, 40); }); }
+  // the N33's centre stack: three round gauges in a row under the middle vent, faced a little toward the driver
+  if (o.consoleGauges) { b.frame(f).onBone(0); ([['podA', 64], ['podB', 0], ['podC', -64]] as const).forEach(([r, y], i) => { const c: V = [26, y, -150], ax = unit([1, s * 0.12, 0.05]), u = unit(cross([0, 0, 1], ax)), up = unit(cross(ax, u));
+      b.part(`gaugeConsole${i}`, '#161618', 0.4).turn(c, ax, [[-6, 30], [4, 30], [6, 26]], 10); b.part(`gaugeConsoleFace${i}`, '#0c0c0e', 0.3).picture(add(c, mul(ax, 5)), mul(u, -1), up, ax, 50, 50, r); }); }
+  // a boost gauge in a pod on the driver's A pillar, turned to the driver's eyes
+  if (o.pillarPod) { b.frame(f).onBone(0); const p: V = [A.screenFoot[0] - A.dashX + 70, s * (A.screenHalf[0] - 70), A.screenFoot[1] - A.dashTopZ + 120], eye: V = [A.hip[0] - A.dashX, A.hip[1], A.hip[2] + 700 - A.dashTopZ], ax = unit(sub(eye, p)), u = unit(cross([0, 0, 1], ax)), up = unit(cross(ax, u));
+    b.part('gaugePillarPod', '#161618', 0.5).turn(p, ax, [[-46, 14], [-22, 34], [0, 36], [-5, 31]], 10); b.part('gaugePillarFace', '#0c0c0e', 0.3).picture(add(p, mul(ax, -4)), mul(u, -1), up, ax, 62, 62, 'podA'); }
   return { dials }; }
 
 // ---- the steering wheel: the frame's origin its centre; x up the column toward the driver, y left, z up in its plane ----
-export type WheelStyle = 'stock' | 'drift';
-export function steeringWheel(b: InteriorBuild, A: CabinAnchors, T: Trim, style: WheelStyle, bone: number): { dial: DialBone; rimR: number; f: Frame } { const f = leaning(A.wheel, -A.rake), Yv: V = [0, 1, 0], Zv: V = [0, 0, 1], Rt: V = [0, -1, 0], rimR = style === 'stock' ? 186 : 168;
+/** 'four': the N33's own (docs/systems/117 R2): the stock rim and pad on four spokes, two across and two down to the corners */
+export type WheelStyle = 'stock' | 'drift' | 'four';
+export function steeringWheel(b: InteriorBuild, A: CabinAnchors, T: Trim, style: WheelStyle, bone: number): { dial: DialBone; rimR: number; f: Frame } { const f = leaning(A.wheel, -A.rake), Yv: V = [0, 1, 0], Zv: V = [0, 0, 1], Rt: V = [0, -1, 0], rimR = style === 'drift' ? 168 : 186;
   b.frame(f).onBone(bone);
-  if (style === 'stock') { b.part('steerWheelRim', T.wheel, 0.25, 'leather').tube(ring([0, 0, 0], Yv, Zv, rimR, 24), 15, 6, { loop: true });
+  if (style !== 'drift') { b.part('steerWheelRim', T.wheel, 0.25, 'leather').tube(ring([0, 0, 0], Yv, Zv, rimR, 24), 15, 6, { loop: true });
     const pad = (x: number, k: number): V[] => ([[98, 40], [82, 56], [-82, 56], [-98, 40], [-98, -40], [-82, -56], [82, -56], [98, -40]] as const).map(([y, z]) => [x, y * k, z * k - 8] as V);
     b.part('steerWheelPad', T.wheel, 0.2, 'leather').loft([pad(-44, 0.94), pad(-8, 1), pad(2, 0.9)]).paint('padStock', [2, 0, -8], Rt, Zv, 196 * 0.9, 112 * 0.9, [1, 0, 0]);
-    b.part('steerWheelSpokes', T.wheel, 0.2, 'leather'); for (const sg of [-1, 1]) { b.slab([-16, sg * 86, 16], [-2, sg * 178, 26], Zv, 36, 13, 30); b.slab([-16, sg * 66, -52], [-2, sg * 126, -134], [1, 0, 0], 13, 32, 13); } }
+    b.part('steerWheelSpokes', T.wheel, 0.2, 'leather'); for (const sg of [-1, 1]) { if (style === 'four') { b.slab([-16, sg * 90, -4], [-2, sg * 178, -14], Zv, 30, 12, 26); b.slab([-16, sg * 52, -50], [-2, sg * 112, -146], [1, 0, 0], 12, 30, 12); } else { b.slab([-16, sg * 86, 16], [-2, sg * 178, 26], Zv, 36, 13, 30); b.slab([-16, sg * 66, -52], [-2, sg * 126, -134], [1, 0, 0], 13, 32, 13); } } }
   else { b.part('steerWheelRim', '#1d1d20', 0.08, 'leather').tube(ring([0, 0, 0], Yv, Zv, rimR, 20), 17, 6, { loop: true });
     b.part('steerWheelSpokes', '#2b2c2f', 0.55); for (const d of [[0, 1, 0], [0, -1, 0], [0, 0, -1]] as V[]) { const side = unit(cross(d, [1, 0, 0])); b.slab(add([-72, 0, 0], mul(d, 26)), add([-5, 0, 0], mul(d, rimR - 8)), side, 58, 5, 34).paint('spokePrint', [-38, 0, 0], Rt, Zv, 340, 340, [1, 0, 0]); }
     b.part('steerWheelHorn', '#e9c014', 0.4).turn([-74, 0, 0], [1, 0, 0], [[-6, 40], [6, 40], [8, 30]], 10).paint('hornButton', [-66, 0, 0], Rt, Zv, 62, 62, [1, 0, 0]);
     b.part('steerWheelHub', '#8d8f93', 0.6).turn([0, 0, 0], [-1, 0, 0], [[78, 38], [104, 38], [108, 48], [142, 48], [146, 32]], 8); }
-  b.onBone(0).part('steerWheelColumn', T.plastic, 0.15).turn([0, 0, 0], [-1, 0, 0], style === 'stock' ? [[40, 30], [98, 32], [104, 54], [350, 58]] : [[146, 30], [200, 32], [206, 54], [350, 58]], 8);
+  b.onBone(0).part('steerWheelColumn', T.plastic, 0.15).turn([0, 0, 0], [-1, 0, 0], style !== 'drift' ? [[40, 30], [98, 32], [104, 54], [350, 58]] : [[146, 30], [200, 32], [206, 54], [350, 58]], 8);
   b.part('steerWheelStalks', T.plastic, 0.15); for (const sg of [-1, 1]) b.slab([-230, sg * 50, 6], [-205, sg * 168, 14], [1, 0, 0], 16, 11, 12);
   return { dial: { id: 'steer', bone, pivot: A.wheel, right: unit(dir(f, Rt)), up: unit(dir(f, Zv)), min: -8, max: 8, a0: 0, a1: 0, rest: 0, tau: 0 }, rimR, f }; }
 

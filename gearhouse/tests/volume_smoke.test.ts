@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { VolumeSim, type VolParams, type VolEmit } from '../race/volume/sim';
+import { VolumeSim, cutHoldAt, type VolParams, type VolEmit } from '../race/volume/sim';
 import { atlasLayout, atlasTexel, atlasCell } from '../render/live/volume/atlas';
 import { smokeTier, type GpuCaps } from '../render/live/volume/caps';
 import { invert, worley } from '../render/live/volume/draw';
@@ -58,6 +58,7 @@ describe('volumetric smoke, the CPU reference (docs/systems/104 B-5)', () => {
     expect(at(s)).toBeLessThan(at(ref) * 0.2);   // the hole, just after (the same smoke without the car beside it)
     for (let n = 0; n < 60; n++) step(); expect(at(s)).toBeLessThan(at(ref) * 0.35);   // still clear two seconds on
     for (let n = 0; n < 180; n++) step(); expect(at(s)).toBeGreaterThan(at(ref) * 0.5);   // filled again by 8 s
+    expect(cutHoldAt(1)).toBe(0); expect(cutHoldAt(0.88)).toBeGreaterThan(0.95); expect(cutHoldAt(0.3)).toBe(0);   // a wake: not held where the car still is
   });
   it('moved by whole cells, keeps the smoke where it is in the world', () => {
     const s = new VolumeSim({ ...still }); ball(s, 8, 8, 4, 3); const pts: [number, number, number][] = [[2, 2, 1], [2.3, 1.8, 0.9], [1.6, 2.4, 1.2]], a = pts.map(p => s.densityAt(...p));

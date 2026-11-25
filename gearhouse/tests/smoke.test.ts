@@ -6,7 +6,7 @@ describe('smoke as parcels of gas (review 107)', () => {
     const T0 = s.parcels[0]!.T; for (let t = 0; t < 1.5; t += 1 / 60) s.step(1 / 60);
     const [hot, dust] = s.parcels; expect(hot!.z - hot!.r * 0.5).toBeGreaterThan(0.4); expect(hot!.T).toBeLessThan(T0 * 0.5); expect(dust!.z - dust!.r * 0.5).toBeLessThan(0.1);   // the hot off the ground, the dust down on it
     for (let t = 0; t < 6; t += 1 / 60) s.step(1 / 60); expect(s.parcels.length).toBe(2);   // lingers (docs/systems/103): still there after 7.5 s
-    expect(s.parcels[0]!.r).toBeGreaterThan(2.5);   // and grown to a cloud metres across
+    expect(s.parcels[0]!.r).toBeGreaterThan(0.8); expect(s.parcels[0]!.r).toBeLessThanOrEqual(1.1);   // grown from 0.3 m at the tyre, to about a car's width at most
     for (let t = 0; t < 20; t += 1 / 60) s.step(1 / 60); expect(s.parcels.length).toBe(0);
   });
   it('is bored through by a car: the parcels in its box shoved out sideways or over it, shrunk, a gap left', () => {
@@ -17,7 +17,9 @@ describe('smoke as parcels of gas (review 107)', () => {
     for (let t = 0; t < 0.8; t += 1 / 60) { car.x += car.vx / 60; s.cars = [car]; s.step(1 / 60); ref.step(1 / 60); }
     const inBox = s.parcels.filter(p => Math.abs(p.x - car.x) < 2.2 && Math.abs(p.y) < 0.9 && p.z < 1.3); expect(inBox).toHaveLength(0);
     const lane = s.parcels.filter(p => p.x > 10 && p.x < 14 && Math.abs(p.y) < 0.9 && p.z < 1.3); expect(lane).toHaveLength(0);   // the car's lane through the cloud empty behind it
-    expect(s.parcels.some(p => Math.abs(p.vy) > 3 || p.vz > 3)).toBe(true); expect(s.parcels).toHaveLength(40); expect(s.parcels.filter((p, i) => p.r < ref.parcels[i]!.r * 0.9).length).toBeGreaterThan(5);   // shrunk where shoved
+    expect(s.parcels.some(p => Math.abs(p.vy) > 3 || p.vz > 3)).toBe(true); expect(s.parcels).toHaveLength(40); const shoved = s.parcels.filter((p, i) => Math.abs(p.y - ref.parcels[i]!.y) > 0.5 || p.z - ref.parcels[i]!.z > 0.5);
+    expect(shoved.length).toBeGreaterThan(1); for (const p of shoved) expect(p.r).toBeLessThan(ref.parcels[s.parcels.indexOf(p)]!.r * 0.9);   // shrunk where shoved
+    const ahead = s.parcels.filter((p, i) => p.x > car.x + 0.5 && Math.abs(p.y) < 0.9); for (const p of ahead) expect(p.r).toBeCloseTo(ref.parcels[s.parcels.indexOf(p)]!.r, 5);   // ahead of the car's middle untouched (a wake, not a cut-out)
   });
   it('stirs with curl noise, a field without divergence', () => {
     const e = 0.01, div = (x: number, y: number, z: number) => (curl(x + e, y, z)[0] - curl(x - e, y, z)[0] + curl(x, y + e, z)[1] - curl(x, y - e, z)[1] + curl(x, y, z + e)[2] - curl(x, y, z - e)[2]) / (2 * e);

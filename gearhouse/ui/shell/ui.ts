@@ -9,21 +9,26 @@ type Kids = (Node | string | null | undefined | false)[];
 export function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls = '', ...kids: Kids): HTMLElementTagNameMap[K] {
   const e = document.createElement(tag); if (cls) e.className = cls; for (const k of kids) if (k) e.append(k); return e; }
 
-// ---- the menus' sounds: a soft tick to move, a higher one to choose, a lower one back ----
-let ac: AudioContext | null = null, soundOn = false;
-export function uiSounds(on: boolean) { soundOn = on; }
-export function blip(kind: 'move' | 'ok' | 'back') { if (!soundOn) return;
-  try { ac ??= new AudioContext(); const t = ac.currentTime, o = ac.createOscillator(), g = ac.createGain(), f = kind === 'ok' ? 880 : kind === 'back' ? 330 : 560;
-    o.type = 'triangle'; o.frequency.setValueAtTime(f, t); o.frequency.exponentialRampToValueAtTime(f * (kind === 'back' ? 0.8 : 1.15), t + 0.06);
-    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.06, t + 0.008); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.09);
-    o.connect(g).connect(ac.destination); o.start(t); o.stop(t + 0.1); } catch { /* no sound here */ } }
+// ---- the menus' sounds: the design system's (ui/kit/sound.ts), off unless the settings turn them on ----
+import { blip, uiSounds } from '../kit/sound';
+import { icon, type IconName } from '../kit/icons';
+import { pressable, slideIn } from '../kit/parts';
+import { moneyText } from '../kit/logic';
+export { blip, uiSounds };
+const svgOf = (s: string): Element => { const t = document.createElement('template'); t.innerHTML = s; return t.content.firstElementChild!; };
 
 // ---- buttons ----
-export interface BtnOpts { kind?: 'main' | 'ghost' | 'danger' | 'menu'; title?: string; id?: string; sub?: string; disabled?: boolean }
+// the design system's buttons (docs/systems/110 G2, ui/kit): the kind sets the role colour. main yellow (the main
+// action), ok green (confirm), alt blue (secondary, also the default), watch orange, danger red, ghost dark, menu the
+// big yellow menu button
+export type BtnKind = 'main' | 'ok' | 'alt' | 'watch' | 'ghost' | 'danger' | 'menu';
+const KIND_ROLE: Record<BtnKind | '', string> = { main: 'gk-y', ok: 'gk-g', alt: 'gk-b', watch: 'gk-o', ghost: 'gk-dark', danger: 'gk-r', menu: 'gk-y gk-big', '': 'gk-b' };
+export interface BtnOpts { kind?: BtnKind; title?: string; id?: string; sub?: string; disabled?: boolean; icon?: IconName }
 export function button(label: string, onClick: () => void, o: BtnOpts = {}): HTMLButtonElement {
-  const b = el('button', `gh-btn${o.kind ? ` gh-${o.kind}` : ''}`); b.type = 'button'; if (o.id) b.id = o.id; if (o.title) b.title = o.title; b.disabled = !!o.disabled;
-  if (o.sub) b.append(el('span', 'gh-btn-t', label), el('small', 'gh-btn-s', o.sub)); else b.textContent = label;
-  b.addEventListener('click', () => { blip('ok'); onClick(); }); return b; }
+  const b = el('button', `gh-btn${o.kind ? ` gh-${o.kind}` : ''} gk-btn ${KIND_ROLE[o.kind ?? '']}`); b.type = 'button'; if (o.id) b.id = o.id; if (o.title) b.title = o.title; b.disabled = !!o.disabled;
+  if (o.icon) b.append(svgOf(icon(o.icon)));
+  if (o.sub) b.append(el('span', 'gh-btn-ts', el('span', 'gh-btn-t', label), el('small', 'gh-btn-s', o.sub))); else if (o.icon) b.append(el('span', '', label)); else b.textContent = label;
+  pressable(b); b.addEventListener('click', () => onClick()); return b; }
 
 // ---- tabs: one panel shown at a time ----
 export function tabs(items: [string, string, HTMLElement][], first = items[0]?.[0]): { el: HTMLElement; select(id: string): void } {
@@ -50,7 +55,7 @@ export function chips<T extends string | number>(label: string, opts: [T, string
 
 // ---- a card: a picture, a title, lines under it, buttons ----
 export function card(o: { pic?: HTMLElement | null; title: string; tag?: string; lines?: (string | HTMLElement)[]; actions?: HTMLElement[]; onPick?: () => void; selected?: boolean }): HTMLElement {
-  const c = el('article', `gh-card${o.selected ? ' gh-on' : ''}`); if (o.pic) c.append(el('div', 'gh-card-pic', o.pic));
+  const c = el('article', `gh-card gk-panel${o.selected ? ' gh-on gk-sel' : ''}`); if (o.pic) c.append(el('div', 'gh-card-pic', o.pic));
   const h = el('h3', 'gh-card-t', o.title); if (o.tag) h.append(' ', el('span', 'gh-tag', o.tag)); const body = el('div', 'gh-card-b', h);
   for (const l of o.lines ?? []) body.append(typeof l === 'string' ? el('p', 'gh-card-l', l) : l); c.append(body);
   if (o.actions?.length) c.append(el('div', 'gh-card-a', ...o.actions));
@@ -61,10 +66,10 @@ export function card(o: { pic?: HTMLElement | null; title: string; tag?: string;
 // ---- a dialog: a question over the page, answered by one of its buttons (Esc: none) ----
 const open: { box: HTMLElement; close: (v: string | null) => void }[] = [];
 export function dialog(title: string, body: (string | HTMLElement)[], actions: [string, string, BtnOpts?][]): Promise<string | null> {
-  return new Promise(res => { const was = document.activeElement as HTMLElement | null, shade = el('div', 'gh-shade'), box = el('div', 'gh-dialog'); box.setAttribute('role', 'dialog'); box.setAttribute('aria-modal', 'true'); box.setAttribute('aria-label', title);
+  return new Promise(res => { const was = document.activeElement as HTMLElement | null, shade = el('div', 'gh-shade'), box = el('div', 'gh-dialog gk-panel'); box.setAttribute('role', 'dialog'); box.setAttribute('aria-modal', 'true'); box.setAttribute('aria-label', title);
     const close = (v: string | null) => { const i = open.findIndex(d => d.box === box); if (i >= 0) open.splice(i, 1); shade.remove(); was?.focus?.(); res(v); };
-    box.append(el('h2', 'gh-dialog-t', title), ...body.map(b => typeof b === 'string' ? el('p', 'gh-dialog-p', b) : b), el('div', 'gh-dialog-a', ...actions.map(([v, t, o]) => button(t, () => close(v), o))));
-    shade.append(box); shade.addEventListener('click', e => { if (e.target === shade) close(null); }); document.getElementById('gh-app')!.append(shade); open.push({ box, close });
+    box.append(el('h2', 'gh-dialog-t gk-head', title), ...body.map(b => typeof b === 'string' ? el('p', 'gh-dialog-p', b) : b), el('div', 'gh-dialog-a', ...actions.map(([v, t, o]) => button(t, () => close(v), o))));
+    shade.append(box); shade.addEventListener('click', e => { if (e.target === shade) close(null); }); document.getElementById('gh-app')!.append(shade); slideIn(box, 'pop'); open.push({ box, close });
     (box.querySelector<HTMLElement>('.gh-main, .gh-btn'))?.focus(); }); }
 /** the top dialog closed as if Esc were pressed; false when none is open */
 export function closeDialog(): boolean { const d = open[open.length - 1]; if (!d) return false; blip('back'); d.close(null); return true; }
@@ -108,6 +113,10 @@ export function download(name: string, text: string, type = 'application/json') 
 /** a file chosen by the viewer, as text (null: none chosen) */
 export function pickFile(accept = '.json,application/json'): Promise<string | null> { return new Promise(res => { const i = document.createElement('input'); i.type = 'file'; i.accept = accept;
   i.addEventListener('change', () => { const f = i.files?.[0]; if (!f) { res(null); return; } void f.text().then(res, () => res(null)); }); i.click(); }); }
-/** a screen's bar: back, its name, things on the right */
+/** a chip of the top band (docs/systems/110 G2): an icon and a figure (the money, the slots) */
+export function barChip(ic: IconName, text: string, label: string): HTMLElement { const c = el('span', 'gk-chip'); c.append(svgOf(icon(ic)), el('b', 'gk-num', text)); c.setAttribute('aria-label', label); c.title = label; return c; }
+export const moneyChip = (v: number) => barChip('money', moneyText(v), `돈 ${moneyText(v)}`);
+export const slotsChip = (used: number, of?: number) => barChip('wrench', of ? `${used}/${of}` : String(used), of ? `슬롯 ${used}/${of}` : `설계 ${used}개`);
+/** a screen's bar, the design system's top band: back, its name, things on the right (chips, buttons) */
 export function topbar(title: string, onBack: () => void, ...right: HTMLElement[]): HTMLElement {
-  return el('header', 'gh-bar', button('◀ 뒤로', onBack, { kind: 'ghost', title: '뒤로 (Esc)' }), el('h1', 'gh-bar-t', title), el('span', 'gh-grow'), ...right); }
+  return el('header', 'gh-bar', button('뒤로', onBack, { kind: 'ghost', title: '뒤로 (Esc)', icon: 'back' }), el('h1', 'gh-bar-t gk-head', title), el('span', 'gh-grow'), ...right); }

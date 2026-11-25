@@ -103,14 +103,14 @@ export function buildEngine(g: Geo, S0: PowertrainSpec, det: Detail, transverse 
     if (dr) { g.part('camCover', C.covers, crinkle);
       if (det < 2) bankBox(s, ua + 10, ub - 10, -hw * 0.94, hw * 0.94, Hd + Hh, topA, '-3');
       else { // a rounded pillow: a round-shouldered section along the bank, drawn in at its two ends (twelve sides: the look's shading runs smooth over it)
-        const sec = (k: number, lift: number) => (x: number): V[] => rsec(hw * 0.95 * k, Hc * 0.62 * k, 12, 3.4).map(([a, b]) => P(s, x, a, Hd + Hh + Hc * 0.5 + b + lift));
-        g.loft([sec(0.8, -Hc * 0.14)(ua + 8), sec(1, 0)(ua + 8 + 0.3 * B), sec(1, 0)(ub - 8 - 0.3 * B), sec(0.8, -Hc * 0.14)(ub - 8)], true);
+        const sec = (k: number, lift: number) => (x: number): V[] => rsec(hw * 0.95 * k, Hc * 0.66 * k, 12, 2.7).map(([a, b]) => P(s, x, a, Hd + Hh + Hc * 0.5 + b + lift));
+        g.loft([sec(0.72, -Hc * 0.18)(ua + 8), sec(1, 0)(ua + 8 + 0.4 * B), sec(1, 0)(ub - 8 - 0.4 * B), sec(0.72, -Hc * 0.18)(ub - 8)], true);
         // its name plate: a bright plate on the crown (a single cam's cover; between the stripes it would hide the plugs of a twin cam's)
-        const z = Hd + Hh + Hc * 1.12 + 1.5, m = (ua + ub) / 2; if (!twin) g.part('camCover', '#d9dce0', 0.45).quad(P(s, m - 0.9 * B, -0.2 * B, z), P(s, m + 0.9 * B, -0.2 * B, z), P(s, m + 0.9 * B, 0.2 * B, z), P(s, m - 0.9 * B, 0.2 * B, z)); } }
+        const z = Hd + Hh + Hc * 1.16 + 1.5, m = (ua + ub) / 2; if (!twin) g.part('camCover', '#d9dce0', 0.45).quad(P(s, m - 0.9 * B, -0.2 * B, z), P(s, m + 0.9 * B, -0.2 * B, z), P(s, m + 0.9 * B, 0.2 * B, z), P(s, m - 0.9 * B, 0.2 * B, z)); } }
     for (const k of twin ? [-1, 1] : [0]) { const off = k * 0.5 * B, wd = twin ? 0.36 * B : 0.7 * B, c0 = P(s, ua + 10, off, Hd + Hh + Hc / 2), c1 = P(s, ub - 10, off, Hd + Hh + Hc / 2);
       if (!dr) g.part('camCover', C.covers, crinkle).prism(c0, c1, rsec(wd, Hc / 2, twin ? 6 : 8, 3), ax(s));
       // the stripe: on the cover's top (the drift look's rounded cover: on its skin at each edge)
-      const zs = (a: number) => dr && det === 2 ? Hd + Hh + Hc * 0.5 + Hc * 0.62 * (1 - Math.min(1, Math.abs(a / (hw * 0.95))) ** 3.4) ** (1 / 3.4) + 2 : topA + 1.5;
+      const zs = (a: number) => dr && det === 2 ? Hd + Hh + Hc * 0.5 + Hc * 0.66 * (1 - Math.min(1, Math.abs(a / (hw * 0.95))) ** 2.7) ** (1 / 2.7) + 2 : topA + 1.5;
       g.part('camCover', C.accent, 0.4).quad(P(s, ua + 40, off - 0.11 * B, zs(off - 0.11 * B)), P(s, ub - 40, off - 0.11 * B, zs(off - 0.11 * B)), P(s, ub - 40, off + 0.11 * B, zs(off + 0.11 * B)), P(s, ua + 40, off + 0.11 * B, zs(off + 0.11 * B))); }
     // the plugs: between the two covers; under one cover on the exhaust side
     const pa = twin ? 0 : 0.86 * B;
@@ -142,7 +142,8 @@ export function buildEngine(g: Geo, S0: PowertrainSpec, det: Detail, transverse 
     g.part('exhaustManifold', tubular ? (S0.grade >= 3 ? BLUED : C.pipes) : '#4a4643', tubular ? 0.5 : 0.2, tubular ? 'metal' : 'plain');
     if (!tubular || det === 0 || (det === 1 && nb > 4)) g.obox(P(s, mid, hw + 0.35 * B, Hd * 0.75), [1, 0, 0], (cu1 - cu0) / 2, acr(s), 0.35 * B, ax(s), 0.3 * Hd);   // one casting
     else for (let i = 0; i < nb; i++) { const u = cylU(s, i), toward = mid - u, a = P(s, u, hw - 2, Hd + 0.4 * Hh), c = P(s, u + toward * 0.25, colX, colA);
-      if (det === 2) g.tube(nb > 4 ? [a, P(s, u + toward * 0.06, hw + 0.62 * B, Hd + 0.2 * Hh), c] : [a, P(s, u, hw + 0.5 * B, Hd + 0.25 * Hh), P(s, u + toward * 0.12, colX + 0.05 * B, colA + 0.55 * B), c], pipeR, nb > 4 ? 4 : pseg); else g.tube([a, c], pipeR, 4); }
+      if (dr && det === 2) g.bend(a, acr(s), c, mul(ax(s), -1), pipeR, pseg, nb > 4 ? 3 : 4, 0.6);   /* the drift look: one smooth round bend out of the port and down into the collector */
+      else if (det === 2) g.tube(nb > 4 ? [a, P(s, u + toward * 0.06, hw + 0.62 * B, Hd + 0.2 * Hh), c] : [a, P(s, u, hw + 0.5 * B, Hd + 0.25 * Hh), P(s, u + toward * 0.12, colX + 0.05 * B, colA + 0.55 * B), c], pipeR, nb > 4 ? 4 : pseg); else g.tube([a, c], pipeR, 4); }
     if (det > 0) { g.part('exhaustManifold', tubular ? HOT : '#4a4643', 0.35, tubular ? 'metal' : 'plain').cyl(P(s, cu0, colX, colA), P(s, cu1, colX, colA), colR, 6, true);
       g.part('heatShield', SHIELD, 0.8, 'metal'); if (dr) bankBox(s, mid - 0.5 * B, mid + 0.5 * B, colX - 0.3 * B, colX + 0.3 * B, colA + 0.5 * B, colA + 0.56 * B);   /* the drift look: a small plate over the collector's middle, so the thick headers show */
       else bankBox(s, cu0 + 15, cu1 - 15, colX - 0.45 * B, colX + 0.45 * B, colA + 0.4 * B, colA + 0.46 * B); }
@@ -245,6 +246,12 @@ export function buildEngine(g: Geo, S0: PowertrainSpec, det: Detail, transverse 
     if (banks > 1) g.part('coolantHose', HOSE, 0.15).tube([[Lb - 0.2 * B, -vin * 0.6, camTop - 0.3 * B], [ue + 0.02 * B, -vin * 0.3, wOut[2]], [ue + 0.02 * B, vin * 0.3, wOut[2]], [Lb - 0.2 * B, vin * 0.6, camTop - 0.3 * B]], 0.13 * B, 5);
     g.part('oilFiller', '#d0c020', 0.4); { const c = P(1, cylU(1, nb - 1), twin ? 0.5 * B : 0, topA); g.cyl(c, add(c, mul(ax(1), 0.25 * B)), 0.28 * B, 6, true, [1, 0, 0]); }
     if (!dry) { g.part('dipstick', '#e2a21a', 0.4); const c = P(S[S.length - 1]!, cylU(S[S.length - 1]!, 0), hw + 0.2 * B, Hd * 0.9); g.bar(c, add(c, [0, 0, 0.35 * B]), 0.12 * B); } }
+  // the drift look's hero on a flat engine: the cooling fan's big round shroud over the pulleys' end, its dark mouth and bright hub (a part of its own, only drawn in that look)
+  if (dr && S0.layout === 'flat' && det > 0) { const r = Math.min(1.3 * B, Math.max(0.9 * B, (plTop + 0.35 * B) / 1.75)), c: V = [ue + 0.4 * B, 0, plTop - r * 0.75], n = det === 2 ? 14 : 8;
+    g.part('fanShroud', '#ee5a1c', 0.4).lathe(c, [1, 0, 0], [[0, r], [0.5 * B, r], [0.62 * B, r * 0.86]], n, 'a');
+    g.part('fanShroud', '#151517', 0.2).lathe(add(c, [0.62 * B, 0, 0]), [1, 0, 0], [[0, r * 0.86], [-0.2 * B, r * 0.8]], n, 'b');
+    g.part('fanShroud', '#d9dce0', 0.45).lathe(add(c, [0.4 * B, 0, 0]), [1, 0, 0], [[0, r * 0.3], [0.3 * B, r * 0.22]], 8, 'b');
+    if (det === 2) for (let k = 0; k < 6; k++) { const a = k / 6 * Math.PI * 2; g.line('vent', [add(c, [0.43 * B, r * 0.32 * Math.cos(a), r * 0.32 * Math.sin(a)]), add(c, [0.43 * B, r * 0.76 * Math.cos(a + 0.5), r * 0.76 * Math.sin(a + 0.5)])]); } }
   const mounts: V[] = [1, -1].map(s => [u0 + 0.35 * (Lb - u0), s * 1.15 * B, -0.2 * B]);
   return { B, Lb, ue, outlets, water: [wOut, wIn], oil, pump: dry ? [Lb - 3.2 * B, -1.42 * B, -0.72 * B] : null, mounts, half: Math.max(...S.map(s => Math.abs(P(s, 0, hw, Hd + Hh)[1])), 1.15 * B), top: plTop, floor, throttles: tbAt };
 }

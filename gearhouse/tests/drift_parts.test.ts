@@ -40,9 +40,9 @@ describe('the look is chosen by a setting, the realistic one kept', () => {
 
 describe('the powertrain in the drift look', () => {
   for (const [name, d] of DESIGNS) it(`${name}: every part's name kept, the fit and the checks' numbers the realistic build's, no bad number`, () => {
-    for (const det of [2, 1, 0] as const) { const R = pt(d, 'real', det), D = pt(d, 'drift', det), rn = [...R.built.parts.keys()], dn = [...D.built.parts.keys()];
+    const S = designPowertrain(d); for (const det of [2, 1, 0] as const) { const R = pt(d, 'real', det), D = pt(d, 'drift', det), rn = [...R.built.parts.keys()], dn = [...D.built.parts.keys()];
       for (const n of rn) expect(dn, `${n} at detail ${det}`).toContain(n);
-      expect(dn.filter(n => !rn.includes(n)).sort()).toEqual(['fuseBox', 'washerTank']);
+      expect(dn.filter(n => !rn.includes(n)).sort()).toEqual(S.layout === 'flat' && det > 0 ? ['fanShroud', 'fuseBox', 'washerTank'] : ['fuseBox', 'washerTank']);   // the bay's fittings, a flat engine's fan shroud
       expect(D.built.scale).toBe(R.built.scale); expect(D.built.engine).toEqual(R.built.engine); expect(D.built.core).toEqual(R.built.core); expect(D.built.placed).toEqual(R.built.placed);
       for (let i = 0; i < D.mesh.pos.length; i++) if (!Number.isFinite(D.mesh.pos[i]!)) throw new Error('a bad number');
       for (const l of D.mesh.partLines ?? []) { expect(dn).toContain(l.part); for (const p of l.pts) for (const v of p) expect(Number.isFinite(v)).toBe(true); } }

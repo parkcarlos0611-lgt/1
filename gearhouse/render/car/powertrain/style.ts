@@ -20,8 +20,8 @@ export const styleForLook = (look: number): PartStyle => look === 4 ? 'drift' : 
 
 export type PartKind = 'bush' | 'pipe' | 'intake' | 'exhaust' | 'runner' | 'header' | 'hose' | 'line' | 'belt' | 'link' | 'shaft' | 'arm' | 'frame' | 'spring' | 'casting' | 'cover' | 'box' | 'plate' | 'round';
 /** a kind's rules. Round sections (tubes, cylinders, bars) are drawn `scale` times as thick and never thinner than
- *  `minPx` pixels across in the reference view; a box's edges are cut by `bevel` mm (never more than a share of its
- *  thinnest side); a kind with no tubes of its own (`seg` 0) has no box side thinner than `minPx` either; `seg`: the
+ *  `minPx` pixels across in the reference view; a box's edges are cut by up to `bevel` mm (0.18 of its thinnest side:
+ *  the references' big bevels); a kind with no tubes of its own (`seg` 0) has no box side thinner than `minPx` either; `seg`: the
  *  least sides of its tubes at full detail (0: as the builder says) */
 export interface KindRule { scale: number; minPx: number; bevel: number; seg: number; /** a coupler's band near each end of its tubes (the palette's `coupler`) */ clamp?: boolean }
 /** the reference view the least thicknesses are given in: an engine bay filling a phone's picture, 2.5 mm a pixel */
@@ -42,9 +42,9 @@ export const DRIFT_RULES: Record<PartKind, KindRule> = {
   bush: { scale: 1.45, minPx: 14, bevel: 0, seg: 8 },     // an arm's rubber bush: a round puck, closed at its ends
   frame: { scale: 1.2, minPx: 16, bevel: 0, seg: 5 },
   spring: { scale: 1.7, minPx: 7, bevel: 0, seg: 4 },
-  casting: { scale: 1, minPx: 0, bevel: 12, seg: 0 },
-  cover: { scale: 1, minPx: 0, bevel: 14, seg: 0 },
-  box: { scale: 1, minPx: 0, bevel: 12, seg: 0 },
+  casting: { scale: 1, minPx: 0, bevel: 30, seg: 0 },
+  cover: { scale: 1, minPx: 0, bevel: 40, seg: 0 },
+  box: { scale: 1, minPx: 0, bevel: 26, seg: 0 },
   plate: { scale: 1, minPx: 4, bevel: 0, seg: 0 },
   round: { scale: 1, minPx: 0, bevel: 0, seg: 0 },
 };
@@ -65,7 +65,7 @@ export const PART_KIND: Record<string, PartKind> = {
   radiator: 'box', radiatorFan: 'round', coolantPipe: 'hose', expansionTank: 'box', battery: 'box', fuelTank: 'round', fuelFiller: 'runner', fuelLine: 'line', oilCooler: 'box', oilLine: 'line',
   oilTank: 'round', subframe: 'frame', subframeFront: 'frame', strutBrace: 'frame', engineMount: 'frame',
   // the bay's own (the drift look's)
-  washerTank: 'box', fuseBox: 'box', bayTub: 'box', radiatorPanel: 'frame', lampBack: 'box',
+  fanShroud: 'round', washerTank: 'box', fuseBox: 'box', bayTub: 'box', radiatorPanel: 'frame', lampBack: 'box',
   // the suspension
   wishboneLower: 'arm', wishboneUpper: 'arm', upright: 'casting', hubFlange: 'round', caliper: 'box', brakeDisc: 'round', tieRod: 'link', toeLink: 'link', damper: 'round', damperRod: 'link',
   spring: 'spring', antiRollBar: 'link', dropLink: 'link', steeringRack: 'shaft',
@@ -78,10 +78,10 @@ const P = (col: string, gloss = 0.25, kind: Kind = 'plain'): Paint => ({ col, gl
  *  yellow and blue pipes). Flat finishes: the look's two bands of light do the shading */
 export const DRIFT_PALETTE = {
   casting: P('#c2c6cb', 0.3), castingDark: P('#878c93', 0.3), steel: P('#d9dce0', 0.45), iron: P('#5c6066', 0.25), black: P('#1d1e21', 0.2), rubber: P('#17181a', 0.1),
-  pipeBoost: P('#f2c12e', 0.4), pipeWater: P('#2f6fd6', 0.4), pipeAlu: P('#dfe2e6', 0.45), pipeExhaust: P('#a9aeb5', 0.4), exhaustHot: P('#8b6f5c', 0.3), coupler: P('#2456c8', 0.3),
+  pipeBoost: P('#f2c12e', 0.4), pipeWater: P('#2f6fd6', 0.4), pipeAlu: P('#dfe2e6', 0.45), pipeExhaust: P('#a9aeb5', 0.4), exhaustHot: P('#b0835f', 0.35), coupler: P('#2456c8', 0.3),
   hose: P('#202124', 0.15), capRed: P('#dc2a1f', 0.4), capYellow: P('#f4cc1f', 0.4), capBlue: P('#2a63d4', 0.4), capBlack: P('#1a1b1d', 0.3),
   plasticWhite: P('#f0efe8', 0.3), plasticBlack: P('#232427', 0.2), core: P('#9aa0a8', 0.3), coreDark: P('#5b6068', 0.25), filter: P('#d5301f', 0.25), filterBlue: P('#2456c8', 0.35),
-  gold: P('#d6a531', 0.4), red: P('#d8281e', 0.4), battery: P('#1c1d20', 0.25), batteryTop: P('#34363b', 0.2), terminalPlus: P('#dc2a1f', 0.4), terminalMinus: P('#2b2d31', 0.4),
+  gold: P('#d6a531', 0.4), shroud: P('#ee5a1c', 0.4), red: P('#d8281e', 0.4), battery: P('#1c1d20', 0.25), batteryTop: P('#34363b', 0.2), terminalPlus: P('#dc2a1f', 0.4), terminalMinus: P('#2b2d31', 0.4),
   frame: P('#2b2d31', 0.25), tub: P('#151618', 0.12), tubLip: P('#222326', 0.15), lamp: P('#3a3d42', 0.3), brace: P('#e3e5e8', 0.5), tank: P('#3a3d42', 0.3), shield: P('#cfd2d6', 0.4),
   // the suspension and the brakes (the caliper's is the one a player chooses: red, yellow, green, orange, blue, purple, black)
   arm: P('#2a2c30', 0.3), upright: P('#b7bbc1', 0.3), caliper: P('#d8281e', 0.5, 'paint'), disc: P('#c9ccd1', 0.45), discHole: P('#3a3c40', 0.2), discBell: P('#4a4d53', 0.3),
@@ -106,7 +106,7 @@ export const DRIFT_PAINT: Record<string, (PaletteRole | null)[]> = {
   radiator: ['core', 'pipeAlu', 'coreDark'], radiatorFan: ['black', 'plasticBlack'], coolantPipe: ['pipeWater'], expansionTank: ['plasticWhite', 'capRed'], battery: ['battery', 'batteryTop', 'terminalPlus', 'terminalMinus'],
   fuelTank: ['tank'], fuelFiller: ['steel'], fuelLine: ['iron'], oilCooler: ['core', 'pipeAlu'], oilLine: ['pipeWater'], oilTank: ['pipeAlu', 'capBlack'],
   subframe: ['frame'], subframeFront: ['frame'], strutBrace: ['brace'], engineMount: ['rubber', 'steel'],
-  washerTank: ['plasticWhite', 'capBlue'], fuseBox: ['plasticBlack', 'black'], bayTub: ['tub', 'tubLip'], radiatorPanel: ['frame'], lampBack: ['lamp'],
+  fanShroud: ['shroud', 'black', 'steel'], washerTank: ['plasticWhite', 'capBlue'], fuseBox: ['plasticBlack', 'black'], bayTub: ['tub', 'tubLip'], radiatorPanel: ['frame'], lampBack: ['lamp'],
   wishboneLower: ['arm', 'bush'], wishboneUpper: ['arm', 'bush'], upright: ['upright'], hubFlange: ['iron'], caliper: ['caliper', 'black'], brakeDisc: ['disc', 'discBell', 'discHole'],
   tieRod: ['rod', 'iron'], toeLink: ['rod', 'iron'], damper: ['damper', 'iron'], damperRod: ['rod', 'iron', 'bush'], spring: ['spring'], antiRollBar: ['iron'], dropLink: ['rod'], steeringRack: ['casting', 'rubber', 'casting'],
 };

@@ -4,6 +4,7 @@
 // a whole: every key of the game's carried out as one file, read back, or cleared.
 import { CAM_DEFAULT, isCamView, type CamView } from '../drivecam';
 import type { SmokeSetting } from '../../render/live/volume/caps';
+import { DEFAULT_PALETTE, paletteOf, type PaletteId } from '../kit/tokens';
 
 /** what the helpers need of a storage (the browser's Storage has these) */
 export interface KeyStore { getItem(k: string): string | null; setItem(k: string, v: string): void; removeItem(k: string): void }
@@ -30,7 +31,8 @@ export interface Settings {
   controls: { /** the drive's screen buttons: by the screen's kind (a touch screen shows them), always, never */ touch: 'auto' | 'on' | 'off'; auto: boolean; tcs: boolean; assist: boolean; progressive: boolean;
     /** the ignition (docs/systems/110 G1): 직접 시동 (held start control, the default) or 자동 시동 (running at once, as before); stalling a manual box (off: it never stalls) */ ignition: 'direct' | 'auto'; stall: boolean;
     /** the driving HUD (docs/systems/110 G3): the touch controls' size (0.7..1.4) and opacity (0.35..1), the left-handed layout, the manual box's lever or +/- buttons */ hudSize: number; hudAlpha: number; leftHand: boolean; shifter: 'lever' | 'buttons' };
-  screen: { theme: 'auto' | 'light' | 'dark'; /** fewer moving things (the fades, the turntable) */ calm: boolean };
+  screen: { theme: 'auto' | 'light' | 'dark'; /** fewer moving things (the fades, the turntable) */ calm: boolean;
+    /** the interface's palette (docs/systems/110 G2, ui/kit/tokens.ts): 공방 녹색 (the default), 공구함 빨강, 콘크리트 회색 */ palette: PaletteId };
   /** the sandbox's rules (alpha 0.12): the technologies held to their years (docs/systems/101 1-2 ⑦; off, and in 0.12
    *  only shown as the engine designer's year tags) */
   sandbox: { eraLimit: boolean; /** alpha 0.13 (M4): the developers' physics switch: the kinematic suspension (race/kin.ts) or the rules before it */ physics: 'kinematic' | 'old' };
@@ -42,7 +44,7 @@ export const DEFAULTS: Settings = {
   graphics: { live: true, look: 'drift', photoGround: true, hdri: true, blur: true, scenery: 'mid', glassRefl: 'mid', smoke: 'mid', smokeSize: 'big', lineWeight: 'normal' },
   sound: { on: false, volume: 0.7, ui: false },
   controls: { touch: 'auto', auto: true, tcs: true, assist: false, progressive: false, ignition: 'direct', stall: true, hudSize: 1, hudAlpha: 0.92, leftHand: false, shifter: 'lever' },
-  screen: { theme: 'auto', calm: false },
+  screen: { theme: 'auto', calm: false, palette: DEFAULT_PALETTE },
   sandbox: { eraLimit: false, physics: 'kinematic' },
   camera: { view: CAM_DEFAULT },
 };
@@ -60,7 +62,7 @@ export function asSettings(v: unknown): Settings { const o = obj(v), g = obj(o.g
     controls: { touch: one(c.touch, ['auto', 'on', 'off'] as const, D.controls.touch), auto: bool(c.auto, D.controls.auto), tcs: bool(c.tcs, D.controls.tcs), assist: bool(c.assist, D.controls.assist), progressive: bool(c.progressive, D.controls.progressive),
       ignition: one(c.ignition, ['direct', 'auto'] as const, D.controls.ignition), stall: bool(c.stall, D.controls.stall),
       hudSize: within(c.hudSize, 0.7, 1.4, D.controls.hudSize), hudAlpha: within(c.hudAlpha, 0.35, 1, D.controls.hudAlpha), leftHand: bool(c.leftHand, D.controls.leftHand), shifter: one(c.shifter, ['lever', 'buttons'] as const, D.controls.shifter) },
-    screen: { theme: one(sc.theme, ['auto', 'light', 'dark'] as const, D.screen.theme), calm: bool(sc.calm, D.screen.calm) },
+    screen: { theme: one(sc.theme, ['auto', 'light', 'dark'] as const, D.screen.theme), calm: bool(sc.calm, D.screen.calm), palette: paletteOf(sc.palette) },
     sandbox: { eraLimit: bool(sb.eraLimit, D.sandbox.eraLimit), physics: one(sb.physics, ['kinematic', 'old'] as const, D.sandbox.physics) }, camera: { view: isCamView(cm.view) ? cm.view : D.camera.view } }; }
 export function loadSettings(st: KeyStore | null): Settings { try { const t = st?.getItem(SETTINGS_KEY); return asSettings(t ? JSON.parse(t) : null); } catch { return asSettings(null); } }
 /** kept; false when the storage keeps nothing */

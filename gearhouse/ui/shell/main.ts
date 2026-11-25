@@ -17,7 +17,8 @@ import { Stage, Backdrop } from './stage';
 import { loadSettings, saveSettings, type ListStore } from './settings';
 import { setSceneryDensity } from '../../race/scenery';
 import type { ShellCtx, Last } from './ctx';
-import { titleScreen, garageScreen, pickScreen, settingsScreen, aboutScreen } from './menus';
+import { titleScreen, garageScreen, pickScreen, settingsScreen, aboutScreen, kitScreen } from './menus';
+import { installKit, setPalette } from '../kit/style';
 import { builderScreen, driveScreen, resultsScreen } from './play';
 import { engineScreen } from './engine';
 import { closeDialog, dialogBox, navKey, padKeys, uiSounds, blip } from './ui';
@@ -28,6 +29,7 @@ import type { Design } from '../../core/design';
 import { PHYSICS } from '../../race/kin';
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
+installKit();   // the design system's tokens and parts (docs/systems/110 G2, ui/kit)
 const store: ListStore | null = (() => { try { return localStorage; } catch { return null; } })();
 const settings = loadSettings(store);
 const canvas = $<HTMLCanvasElement>('gh-gl');
@@ -61,14 +63,15 @@ const ctx: ShellCtx = { router, stage, backdrop, store, settings, layer: $('gh-l
   recent() { return currentDesign(store) ?? savedDesigns(store)[0] ?? (preset ??= fromPreset('f355', 'F355 프리셋')); } };
 /** the settings at work: the theme, the menus' sounds, the calm screen, the drive's own fields */
 function applySettings() { const t = settings.screen.theme; if (t === 'auto') delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = t;
+  setPalette(settings.screen.palette); document.documentElement.toggleAttribute('data-calm', settings.screen.calm);   // the design system's palette and its motion (docs/systems/110 G2)
   PHYSICS.kinematic = settings.sandbox.physics !== 'old';   // the developers' physics switch (race/kin.ts), for the next car made
   setLineWeight(LINE_WEIGHT[settings.graphics.lineWeight]);   // the toon look's line widths (render/live/style.ts)
   setPartStyle(styleForLook(settings.graphics.look === 'drift' ? 4 : 2));   // look 4: the engines and the suspensions built in their drift look (docs/systems/109 section 10)
   uiSounds(settings.sound.ui); setSceneryDensity(settings.graphics.scenery); backdrop.calm = settings.screen.calm || matchMedia('(prefers-reduced-motion: reduce)').matches; backdrop.redraw(); screens.drive?.apply?.(); }
 
 const drive = driveScreen(ctx), builder = builderScreen(ctx), engine = engineScreen(ctx);
-Object.assign(screens, { title: titleScreen(ctx), garage: garageScreen(ctx), pick: pickScreen(ctx), settings: settingsScreen(ctx), about: aboutScreen(ctx), builder, drive, engine, results: resultsScreen(ctx) });
-router.onChange = s => { if (s.id !== 'builder' && s.id !== 'drive' && s.id !== 'engine') document.title = s.id === 'title' ? 'GEARHOUSE' : `GEARHOUSE · ${({ garage: '차고', pick: '시험장', settings: '설정', about: '정보', results: '레이스 결과' } as Record<string, string>)[s.id] ?? ''}`;
+Object.assign(screens, { title: titleScreen(ctx), garage: garageScreen(ctx), pick: pickScreen(ctx), settings: settingsScreen(ctx), about: aboutScreen(ctx), kit: kitScreen(ctx), builder, drive, engine, results: resultsScreen(ctx) });
+router.onChange = s => { if (s.id !== 'builder' && s.id !== 'drive' && s.id !== 'engine') document.title = s.id === 'title' ? 'GEARHOUSE' : `GEARHOUSE · ${({ garage: '차고', pick: '시험장', settings: '설정', about: '정보', kit: '디자인 견본', results: '레이스 결과' } as Record<string, string>)[s.id] ?? ''}`;
   if (s.id === 'garage') ctx.keepLast({ screen: 'garage' }); };
 
 // ---- keys: Esc back (a dialog first, a text field let go of), the arrows through the menus; a pad's cross the same ----

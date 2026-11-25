@@ -3,7 +3,10 @@
 // it shows is read from the storage then), over the backdrop's turning car.
 import type { Screen } from './router';
 import type { ShellCtx } from './ctx';
-import { el, button, card, chips, toggle, slider, tabs, row, dialog, toast, download, pickFile, topbar, carPic, focusables } from './ui';
+import { el, button, card, chips, toggle, slider, tabs, row, dialog, toast, download, pickFile, topbar, carPic, focusables, slotsChip } from './ui';
+import { slideIn, stagger } from '../kit/parts';
+import { PALETTES, PALETTE_IDS } from '../kit/tokens';
+import { buildSheet } from '../kit/sheet';
 import { CAM_VIEWS, type CamView } from '../drivecam';
 import { saveSettings, exportAll, importAll, resetAll, loadSettings, DEFAULTS, type Settings } from './settings';
 import { VERSION_NAME, CHANGES } from '../../core/version';
@@ -21,10 +24,13 @@ export const BASE_NAME: Record<string, string> = { nsx: 'NSX 바탕', f355: 'F35
 const SCREEN_NAME: Record<string, string> = { garage: '차고', builder: '차 빌더', drive: '시험 주행' };
 const fmtLap = (t: number) => `${Math.floor(t / 60)}:${(t % 60).toFixed(2).padStart(5, '0')}`;
 
+/** a screen's parts slide in (docs/systems/110 G2): the bar from the top, the body up, the title's menu buttons one by one */
+function arrive(root: HTMLElement): void { const bar = root.querySelector<HTMLElement>(':scope > .gh-bar'), body = root.querySelector<HTMLElement>(':scope > .gh-body'), nav = root.querySelector<HTMLElement>(':scope > .gh-menu');
+  if (bar) slideIn(bar, 'd'); if (body) slideIn(body, 'u'); if (nav) stagger(nav, 'l'); }
 /** a menu screen: its root built on entering (the backdrop behind, dimmed except on the title), focus on its first item */
 function menu(ctx: ShellCtx, id: string, build: (root: HTMLElement) => void, o: { dim?: boolean } = {}): Screen<never> & { root: HTMLElement } {
   const root = el('section', `gh-screen gh-${id}${o.dim === false ? '' : ' gh-dim'}`); root.dataset.screen = id;
-  return { root, enter() { root.textContent = ''; build(root); ctx.layer.append(root); ctx.backdrop.setDesign(ctx.recent()); ctx.backdrop.start();
+  return { root, enter() { root.textContent = ''; build(root); ctx.layer.append(root); ctx.backdrop.setDesign(ctx.recent()); ctx.backdrop.start(); arrive(root);
       requestAnimationFrame(() => { if (!root.contains(document.activeElement)) (root.querySelector<HTMLElement>('[data-first]') ?? focusables(root)[0])?.focus({ preventScroll: true }); }); },
     leave() { root.remove(); } }; }
 
@@ -35,9 +41,9 @@ export function titleScreen(ctx: ShellCtx): Screen<never> {
     const cont = () => { const l = ctx.last(), des = currentDesign(ctx.store) ?? d; void (async () => { await r.go('garage');
       if (l?.screen === 'builder' || l?.screen === 'drive') await r.go('builder', { design: des });
       if (l?.screen === 'drive') await r.go('drive', { design: des, track: l.track, from: 'builder' }); })(); };
-    const nav = el('nav', 'gh-menu', button('이어하기', cont, { kind: 'menu', sub: last ? `${SCREEN_NAME[last.screen] ?? ''} · ${cur?.name ?? d.name}` : cur ? `차 빌더 · ${cur.name}` : '아직 이어 할 것이 없습니다', disabled: !last && !cur }),
-      button('자유 설계', go('garage'), { kind: 'menu', sub: '차고: 설계 목록, 새 차 설계, 엔진 공방' }), button('시험장', go('pick', { mode: 'test' }), { kind: 'menu', sub: '트랙을 골라 시험 주행' }),
-      button('레이스', go('pick', { mode: 'race' }), { kind: 'menu', sub: '트랙, 상대, 바퀴 수' }), button('설정', go('settings'), { kind: 'menu', sub: '그래픽, 소리, 조작, 화면, 저장' }), button('정보', go('about'), { kind: 'menu', sub: `${VERSION_NAME}, 바뀐 점, 출처` }));
+    const nav = el('nav', 'gh-menu', button('이어하기', cont, { kind: 'menu', icon: 'play', sub: last ? `${SCREEN_NAME[last.screen] ?? ''} · ${cur?.name ?? d.name}` : cur ? `차 빌더 · ${cur.name}` : '아직 이어 할 것이 없습니다', disabled: !last && !cur }),
+      button('자유 설계', go('garage'), { kind: 'menu', icon: 'wrench', sub: '차고: 설계 목록, 새 차 설계, 엔진 공방' }), button('시험장', go('pick', { mode: 'test' }), { kind: 'menu', icon: 'flag', sub: '트랙을 골라 시험 주행' }),
+      button('레이스', go('pick', { mode: 'race' }), { kind: 'menu', icon: 'trophy', sub: '트랙, 상대, 바퀴 수' }), button('설정', go('settings'), { kind: 'menu', icon: 'settings', sub: '그래픽, 소리, 조작, 화면, 저장' }), button('정보', go('about'), { kind: 'menu', icon: 'info', sub: `${VERSION_NAME}, 바뀐 점, 출처` }));
     nav.setAttribute('aria-label', '메인 메뉴'); (nav.querySelector('button:not([disabled])') as HTMLElement | null)?.setAttribute('data-first', '');
     root.append(el('div', 'gh-brand', el('h1', 'gh-logo gk-logo', 'GEARHOUSE'), el('span', 'gh-ver', VERSION_NAME), el('p', 'gh-tagline', '설계하고, 만들고, 시험하는 자동차')), nav,
       el('p', 'gh-foot', `턴테이블: ${d.name} · ↑↓ 이동 · Enter 선택 · Esc 뒤로`)); }, { dim: false }); }
@@ -60,8 +66,8 @@ export function garageScreen(ctx: ShellCtx): Screen<never> {
           button('삭제', () => { void dialog('설계 삭제', [`"${d.name}" 설계를 지울까요? 되돌릴 수 없습니다.`], [['del', '삭제', { kind: 'danger' }], ['', '취소', { kind: 'ghost' }]]).then(v => { if (v) { deleteDesign(s, d.id); if (cur?.id === d.id) try { s?.removeItem('gearhouse.builder.current.v1'); } catch { /* not kept */ } toast('지웠습니다'); fill(); } }); }),
           button('내보내기', () => download(`${d.name.replace(/[^\w가-힣-]+/g, '_') || 'design'}.json`, designJson(d)))] })); }
     if (!list.length) grid.append(el('p', 'gh-empty', '아직 설계가 없습니다. "새 차 설계"로 시작하세요.'));
-    root.append(topbar('차고', () => ctx.router.back()), el('div', 'gh-body', el('div', 'gh-actions', button('새 차 설계', () => void fresh(), { kind: 'main' }),
-      button('엔진 공방', () => void ctx.router.go('engine', {}), { id: 'gh-engineshop', title: '엔진 설계와 엔진 보관함' }),
+    root.append(topbar('차고', () => ctx.router.back(), slotsChip(all.length)), el('div', 'gh-body', el('div', 'gh-actions', button('새 차 설계', () => void fresh(), { kind: 'main', icon: 'body' }),
+      button('엔진 공방', () => void ctx.router.go('engine', {}), { id: 'gh-engineshop', title: '엔진 설계와 엔진 보관함', icon: 'engine' }),
       button('가져오기', () => void pickFile().then(t => { if (t === null) return; const d = parseDesign(t); if (!d) { toast('설계 파일이 아닙니다'); return; } saveDesign(s, d); toast(`가져왔습니다: ${d.name}`); fill(); })),
       el('span', 'gh-note', `설계 ${all.length}개 · 이 브라우저에 저장`)), grid));
     root.querySelector('.gh-actions .gh-main')?.setAttribute('data-first', ''); };
@@ -82,8 +88,8 @@ export function pickScreen(ctx: ShellCtx): Screen<never> {
     if (mode === 'race') opts.append(slider('상대 차 수', [1, 7, 1], race.opp, v => { race.opp = v; }, v => `${v}대`),
       chips('상대 구성', [['period', '1930년대 차'], ['modern', '1990년대 차'], ['mix', '섞기']], race.lineup, v => { race.lineup = v; }),
       chips('바퀴 수', [[1, '1'], [2, '2'], [3, '3'], [4, '4']], race.laps, v => { race.laps = v; }));
-    const start = button(mode === 'race' ? '레이스 시작 ▶' : '주행 시작 ▶', () => { try { s?.setItem(TRACK_KEY, track); } catch { /* not kept */ }
-      void ctx.router.go('drive', { design: car === 'design' ? d : car === 'p959' ? p959Stock() : null, track, race: mode === 'race' ? { ...race } : undefined, from: 'pick' }); }, { kind: 'main' });
+    const start = button(mode === 'race' ? '레이스 시작' : '주행 시작', () => { try { s?.setItem(TRACK_KEY, track); } catch { /* not kept */ }
+      void ctx.router.go('drive', { design: car === 'design' ? d : car === 'p959' ? p959Stock() : null, track, race: mode === 'race' ? { ...race } : undefined, from: 'pick' }); }, { kind: 'main', icon: 'play' });
     root.append(topbar(mode === 'race' ? '레이스' : '시험장', () => ctx.router.back(), start), el('div', 'gh-body', el('h2', 'gh-h2', '트랙'), cards, el('h2', 'gh-h2', mode === 'race' ? '차와 상대' : '차'), opts));
     (cards.querySelector('.gh-on') as HTMLElement | null)?.setAttribute('data-first', ''); });
   return { ...m, enter(p: PickParams, how) { if (how !== 'back') mode = p?.mode ?? 'test'; return m.enter(p as never, how); } }; }
@@ -116,7 +122,8 @@ export function settingsScreen(ctx: ShellCtx): Screen<never> {
       chips('시동', [['direct', '직접 시동 (I/Enter 길게)'], ['auto', '자동 시동']], S().controls.ignition, v => set(s => { s.controls.ignition = v; })), toggle('시동 꺼짐 (수동 변속, 직접 시동)', S().controls.stall, v => set(s => { s.controls.stall = v; })),
       chips('주행 카메라 (주행 중 C로 바꿈)', CAM_VIEWS.map(c => [c.id, c.name] as [CamView, string]), S().camera.view, v => set(s => { s.camera.view = v; })),
       el('p', 'gh-note', '주행: ↑/W 가속 · ↓/S 브레이크 · ←→/A D 조향 · Space 핸드브레이크 · Q/E 기어 · M 자동/수동 · R 복귀 · C 시네마틱 · Esc 일시정지. 메뉴: 화살표, Enter, Esc (게임패드의 십자키, A, B도 됩니다).'));
-    const scr = pane(chips('화면 밝기', [['auto', '기기 설정대로'], ['light', '밝게'], ['dark', '어둡게']], S().screen.theme, v => set(s => { s.screen.theme = v; })),
+    const scr = pane(chips('화면 색 (팔레트)', PALETTE_IDS.map(id => [id, PALETTES[id].name] as [typeof id, string]), S().screen.palette, v => set(s => { s.screen.palette = v; })),
+      chips('화면 밝기 (빌더·주행 화면)', [['auto', '기기 설정대로'], ['light', '밝게'], ['dark', '어둡게']], S().screen.theme, v => set(s => { s.screen.theme = v; })),
       toggle('움직임 줄이기 (전환 효과, 턴테이블)', S().screen.calm, v => set(s => { s.screen.calm = v; })),
       row('전체화면', button('전체화면 켜기·끄기', () => { const e = document.documentElement; if (document.fullscreenElement) void document.exitFullscreen().catch(() => {}); else void e.requestFullscreen?.().catch(() => toast('이 브라우저는 전체화면을 허락하지 않습니다')); })));
     const game = pane(toggle('연도 제한 (기술의 등장 연도)', S().sandbox.eraLimit, v => set(s => { s.sandbox.eraLimit = v; }), '켜면 엔진 공방이 설계한 해보다 늦게 나온 기술을 표시합니다. 0.12에서는 정보로만 보여 주고 막지는 않습니다(0.20 연구 체계와 함께 적용).'),
@@ -137,9 +144,13 @@ export function aboutScreen(ctx: ShellCtx): Screen<never> {
     const src = (title: string, list: Src[]) => el('details', 'gh-src', el('summary', '', `${title} (${list.length})`), ul(list.map(x => { const a = el('a', '', (x.source ?? '').replace('https://polyhaven.com/a/', '')); a.href = x.source ?? '#'; a.target = '_blank'; a.rel = 'noopener';
       return el('span', '', a, ` — ${(x.authors ?? []).join(', ')}${x.license ? ` · ${x.license}` : ''}`); })));
     const P = pbrMeta as { layers: Src[] }, G = groundMeta as { layers: Src[] }, B = buildMeta as { layers: Src[] }, K = skyMeta as Src, M = modelMeta as { models: Src[] };
-    root.append(topbar('정보', () => ctx.router.back()), el('div', 'gh-body gh-narrow',
+    root.append(topbar('정보', () => ctx.router.back(), button('디자인 견본', () => void ctx.router.go('kit'), { kind: 'alt', icon: 'spray', title: '인터페이스 디자인 체계 견본 (문서 110 G2)' })), el('div', 'gh-body gh-narrow',
       el('div', 'gh-panel gk-panel', el('h2', 'gh-logo gk-logo gh-small', 'GEARHOUSE'), el('p', 'gh-ver', VERSION_NAME), el('p', 'gh-note', '1930년대부터 이어지는 자동차 회사를 꿈꾸는 게임의 설계·시험 샌드박스입니다. 차를 설계하고, 시험장에서 측정하고, 레이스를 합니다. 회사 경영은 알파 0.20부터 들어옵니다.')),
       el('div', 'gh-panel gk-panel', el('h2', 'gh-h2', '바뀐 점'), ul([...CHANGES])),
       el('div', 'gh-panel gk-panel', el('h2', 'gh-h2', '만든 이와 자료 출처'), el('p', 'gh-note', '사진 재질, 하늘, 소품 모델은 모두 Poly Haven(polyhaven.com)의 CC0 자료입니다. 글꼴: Oswald, Noto Sans KR (SIL Open Font License, Google Fonts). 차의 모양과 물리, 트랙, 소리는 이 게임에서 만들었습니다.'),
         src('차 재질 텍스처', P.layers), src('트랙 노면 재질', G.layers), src('건물 재질', B.layers), src('하늘 (HDRI)', [K]), src('소품 모델', M.models))));
     root.querySelector('.gh-bar .gh-btn')?.setAttribute('data-first', ''); }); }
+
+// ---- the design system's style sheet (docs/systems/110 G2), from the about screen ----
+export function kitScreen(ctx: ShellCtx): Screen<never> {
+  return menu(ctx, 'kit', root => { const d = el('div'); root.append(d); buildSheet(d, { onBack: () => ctx.router.back() }); root.querySelector<HTMLElement>('.gk-top .gk-btn')?.setAttribute('data-first', ''); }); }

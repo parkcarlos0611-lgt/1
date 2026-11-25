@@ -8,6 +8,7 @@ import type { Screen, Move } from './router';
 import type { ShellCtx } from './ctx';
 import { PageScreen } from './stage';
 import { el, button, chips, toggle, toast } from './ui';
+import { slideIn } from '../kit/parts';
 import { mountBuilder, type BuilderApi } from '../builder3d';
 import { mountDrive, type DriveApi } from '../drive';
 import builderPage from '../builder3d.page.html';
@@ -82,7 +83,7 @@ export function driveScreen(ctx: ShellCtx): Screen<DriveParams> & { readonly api
     quick.append(el('p', 'gh-note', `엔진: ${api!.engine}`));   // docs/systems/110 G1
     pause = el('div', 'gh-pause', el('div', 'gh-panel gk-panel gh-pausebox', el('h2', 'gh-h2 gh-display', '일시정지'), el('div', 'gh-pausecols', nav, quick)));
     pause.setAttribute('role', 'dialog'); pause.setAttribute('aria-label', '일시정지'); pause.addEventListener('click', e => { if (e.target === pause) closePause(); });
-    ctx.over.append(pause); requestAnimationFrame(() => pause?.querySelector<HTMLElement>('#gh-resume')?.focus()); };
+    ctx.over.append(pause); slideIn(pause.firstElementChild as HTMLElement, 'pop'); requestAnimationFrame(() => pause?.querySelector<HTMLElement>('#gh-resume')?.focus()); };
   /** a race's end: its results shown on their own screen */
   const watch = () => { clearInterval(poll); poll = setInterval(() => { const race = api?.raceNow; if (!race?.done || race === raceSeen || menuOn) return; raceSeen = race;
     const ord = race.order(), rows: ResultRow[] = ord.map((e, i) => { const laps = lapTimes(e); return { pos: i + 1, name: e.name, best: laps.length ? Math.min(...laps) : 0, total: e.finish ? e.finish - e.start : 0, me: e === race.player }; });

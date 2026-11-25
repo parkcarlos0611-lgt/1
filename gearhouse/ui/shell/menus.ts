@@ -19,13 +19,17 @@ import { designFigures } from '../../race/design';
 import { tierOf, tierLabel } from '../../race/tiers';
 import { TRACKS } from '../../race/tracks';
 import { titleCar } from './titleset';
+import { carThumbs } from './carthumbs';
+import { FRAMES } from '../../core/frames';
 import pbrMeta from '../../assets/textures/pbr/pbr.json';
 import groundMeta from '../../assets/textures/ground/ground.json';
 import buildMeta from '../../assets/textures/buildings/buildings.json';
 import skyMeta from '../../assets/textures/sky/sky.json';
 import modelMeta from '../../assets/models/models.json';
 
-export const BASE_NAME: Record<string, string> = { ...BODY_NAME, p959: `${BODY_NAME.p959} (모델 차체)` };
+export const BASE_NAME: Record<string, string> = { ...BODY_NAME };
+/** what a card says the car is built on: an enabled body's design its body lump ("차체 A"), not the model it came from */
+const frameName = (d: Design): string => FRAMES[d.body.frame?.id ?? 'A959']?.name ?? FRAMES.A959.name;
 const SCREEN_NAME: Record<string, string> = { garage: '차고', builder: '차 빌더', drive: '시험 주행' };
 const fmtLap = (t: number) => `${Math.floor(t / 60)}:${(t % 60).toFixed(2).padStart(5, '0')}`;
 
@@ -62,8 +66,9 @@ export function titleScreen(ctx: ShellCtx): Screen<never> {
 export function garageScreen(ctx: ShellCtx): Screen<never> {
   const s = ctx.store; let root: HTMLElement;
   const open = (d: Design) => { keepCurrent(s, d); void ctx.router.go('builder', { design: d }); };
-  const fresh = async () => { const b = await dialog('새 차 설계', ['어느 차대에서 시작할까요? 바탕은 차체 패널의 치수를 정합니다.'], [...ENABLED_BODIES.map(id => [id, BASE_NAME[id] ?? id] as [string, string]), ['', '취소', { kind: 'ghost' as const }]]);
-    if (!b) return; const d = newDesign(b as BodyBase); saveDesign(s, d); open(d); };
+  // a new design goes straight to the builder: its class first, then the body lump (docs/systems/115 C1, F1); no body asked here
+  const fresh = () => { const d = newDesign(ENABLED_BODIES[0] as BodyBase); saveDesign(s, d); open(d); };
+  const thumbs = carThumbs();
   /** the design's figures as the kit's bars (power, weight, top speed; grip has no figure of the design's yet), its engine and class line, its runs */
   const lines = (d: Design): (string | HTMLElement)[] => { const out: (string | HTMLElement)[] = [], m = measured(s, d.id), meas = m && m.sig === designSig(d) ? m : null;
     try { const f = designFigures(d); out.push(el('p', 'gh-card-l gh-spec', `${d.engine.layout} ${(d.engine.cc / 1000).toFixed(1)} L · ${tierLabel(tierOf(f))} · 0-100 ${f.zeroTo100} s`));
@@ -75,25 +80,26 @@ export function garageScreen(ctx: ShellCtx): Screen<never> {
   const exp = (d: Design) => button('내보내기', () => download(`${d.name.replace(/[^\w가-힣-]+/g, '_') || 'design'}.json`, designJson(d)), { kind: 'ghost' });
   /** a card's badge pinned on its picture */
   const pin = (c: HTMLElement, b: HTMLElement) => { c.querySelector('.gh-card-pic')?.append(b); };
-  const fill = () => { root.textContent = ''; const all = savedDesigns(s), cur = currentDesign(s), list = cur && !all.some(d => d.id === cur.id) ? [cur, ...all] : all;
+  const fill = () => { root.textContent = ''; thumbs.clear(); ctx.backdrop.pre = (L, cv) => thumbs.pump(L, cv); const all = savedDesigns(s), cur = currentDesign(s), list = cur && !all.some(d => d.id === cur.id) ? [cur, ...all] : all;
     const grid = el('div', 'gh-grid gh-designs'); let old = 0;
     for (const d of list) { const saved = all.some(x => x.id === d.id);
       // an old body's design (docs/systems/113 V0): a grey card, kept in the storage; it can only be deleted or exported
       if (!enabledDesign(d)) { old++; const c = card({ pic: carPic(d.body.paint, d.body.base), title: d.name, lines: [el('p', 'gh-card-l gh-spec', BASE_NAME[d.body.base] ?? d.body.base), el('p', 'gh-card-l gh-soft', '이 차체는 지금 게임에서 꺼져 있습니다. 주행·레이스·편집은 할 수 없고, 설계는 그대로 남아 있습니다.')],
           actions: [del(d), exp(d)] }); c.classList.add('gh-old'); pin(c, badge('lock', '옛 방식 · 비활성', true)); grid.append(c); continue; }
-      const working = cur?.id === d.id, c = card({ pic: carPic(d.body.paint, d.body.base), title: d.name, selected: working, lines: [el('p', 'gh-card-l gh-base', BASE_NAME[d.body.base] ?? d.body.base), ...lines(d)],
+      const working = cur?.id === d.id, c = card({ pic: carPic(d.body.paint, d.body.base), title: d.name, selected: working, lines: [el('p', 'gh-card-l gh-base', frameName(d)), ...lines(d)],
         actions: [button('열기', () => open(d), { kind: 'main', icon: 'wrench' }), button('복제', () => { saveDesign(s, { ...structuredClone(d), id: newId(), name: `${d.name} 사본`.slice(0, 40) }); toast(`복제했습니다: ${d.name} 사본`); fill(); }),
           del(d), exp(d)] });
+      thumbs.want(c.querySelector<HTMLElement>('.gh-card-pic')!, d);
       if (!saved) pin(c, badge('hot', '저장 안 됨', true)); else if (working) pin(c, badge('beta', '작업 중', true));
       grid.append(c); }
     if (!list.length) grid.append(el('p', 'gh-empty', '아직 설계가 없습니다. "새 차 설계"로 시작하세요.'));
-    const acts = el('div', 'gh-gacts', button('새 차 설계', () => void fresh(), { kind: 'main', icon: 'body', big: true, tilt: true, sub: ENABLED_BODIES.length === 1 ? `${(BASE_NAME[ENABLED_BODIES[0]!] ?? '').replace(/\s*\(.*$/, '')} 차대에서 시작` : '차대를 골라 시작' }),
+    const acts = el('div', 'gh-gacts', button('새 차 설계', fresh, { kind: 'main', icon: 'body', big: true, tilt: true, sub: '차급을 고르고 차체 덩어리부터' }),
       button('엔진 공방', () => void ctx.router.go('engine', {}), { id: 'gh-engineshop', title: '엔진 설계와 엔진 보관함', icon: 'engine', kind: 'watch', big: true, tilt: true, sub: '엔진 설계와 보관함' }),
       button('가져오기', () => void pickFile().then(t => { if (t === null) return; const d = parseDesign(t); if (!d) { toast('설계 파일이 아닙니다'); return; } saveDesign(s, d); toast(`가져왔습니다: ${d.name}`); fill(); }), { kind: 'alt', title: '설계 파일(.json) 가져오기' }));
     root.append(topbar('차고', () => ctx.router.back(), slotsChip(all.length)), el('div', 'gh-body', acts,
       secHead('내 설계', 'body', el('span', 'gh-note', `설계 ${all.length}개${old ? ` · 옛 방식 ${old}개` : ''} · 이 브라우저에 저장`)), grid));
     root.querySelector('.gh-gacts .gh-main')?.setAttribute('data-first', ''); };
-  const m = menu(ctx, 'garage', r => { root = r; fill(); }); return m; }
+  const m = menu(ctx, 'garage', r => { root = r; fill(); }, { leave: () => { thumbs.clear(); ctx.backdrop.pre = null; } }); return m; }
 
 // ---- the test track's and the race's choices ----
 /** the 959 as it left the works (its own design, one id: its runs are kept under it), for the test track and the race without a design of one's own */

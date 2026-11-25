@@ -75,7 +75,7 @@ if (!D.fresh) D = withTier(D);
 const eraOpen = (): boolean => { try { return loadSettings(store).sandbox.eraOpen; } catch { return false; } };
 
 // ---- the names on the page ----
-const BASE_NAME: Record<BodyBase, string> = { ...BODY_NAME, p959: `${BODY_NAME.p959} (모델 차체)` };
+const BASE_NAME: Record<BodyBase, string> = { ...BODY_NAME };
 const KIND_NAME: Record<string, string> = { round: '둥근 코', pointed: '뾰족한 코', mass: '덩어리 범퍼 코', capsule: '캡슐 꼬리', plain: '평평한 앞면', sunk: '램프가 들어간 앞면', frame: '테두리 꼬리', roundLamps: '둥근 램프 꼬리', ducktail: '덕테일',
   fiveSpoke: '5스포크', disc: '디스크', star: '스타' };
 const PAINTS = ['#b0121b', '#f5c300', '#1d3f8f', '#f2f0ea', '#151515', '#2f6b3a', '#9aa1a6', '#d8661c'];
@@ -415,14 +415,14 @@ add('kit', check('ABS', () => D.kit.abs, v => { D.kit.abs = v; }, 'abs'), check(
   const file = document.createElement('input'); file.type = 'file'; file.accept = '.json,application/json'; file.hidden = true; file.id = 'file';
   file.addEventListener('change', () => { const f = file.files?.[0]; if (!f) return; void f.text().then(t => { const d = parseDesign(t); if (d) { if (use(d)) flash(`불러옴: ${d.name}`); } else flash('설계 파일이 아닙니다'); file.value = ''; }); });
   add('files', h2('저장된 설계'), list,
-    h2('새 설계'), row(...ENABLED_BODIES.map(b => btn(`${BASE_NAME[b]}으로`, () => { use(newDesign(b)); flash(`새 설계 (${BASE_NAME[b]})`); })), btn('지금 설계 복사', () => { use({ ...structuredClone(D), id: newId(), name: `${D.name} 사본`.slice(0, 40) }); flash('사본을 만들었습니다 (아직 저장 전)'); })),
+    h2('새 설계'), row(btn('새 설계 (차급부터)', () => { use(newDesign(ENABLED_BODIES[0]!)); flash('새 설계: 차급을 고르세요'); }), btn('지금 설계 복사', () => { use({ ...structuredClone(D), id: newId(), name: `${D.name} 사본`.slice(0, 40) }); flash('사본을 만들었습니다 (아직 저장 전)'); })),
     h2('파일'), row(btn('JSON 파일 받기', download), btn('파일 열기', () => file.click()), btn('JSON 보기', () => { ta.value = designJson(D); ta.select(); try { void navigator.clipboard?.writeText(ta.value).catch(() => {}); } catch { /* no clipboard */ } }),
       btn('붙여넣은 JSON 불러오기', () => { const d = parseDesign(ta.value); if (d) { if (use(d)) flash(`불러옴: ${d.name}`); } else flash('JSON이 설계가 아닙니다'); })), ta, file,
     note('설계는 이 브라우저에만 저장됩니다. 다른 기기로 옮기려면 JSON 파일을 받거나 복사하세요.')); }
 function download() { const a = document.createElement('a'), url = URL.createObjectURL(new Blob([designJson(D)], { type: 'application/json' })); a.href = url; a.download = `${D.name.replace(/[^\w가-힣-]+/g, '_') || 'design'}.json`; document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000); }
 function showList() { const list = $('list'), all = savedDesigns(store); list.textContent = '';
   if (!all.length) { const li = document.createElement('li'); li.innerHTML = '<span>아직 저장한 설계가 없습니다</span>'; list.append(li); return; }
-  for (const d of all) { const li = document.createElement('li'); if (d.id === D.id) li.className = 'me'; const s = document.createElement('span'); s.textContent = d.name; const sm = document.createElement('small'); sm.textContent = `${BASE_NAME[d.body.base]} · ${d.engine.layout} ${(d.engine.cc / 1000).toFixed(1)}`;
+  for (const d of all) { const li = document.createElement('li'); if (d.id === D.id) li.className = 'me'; const s = document.createElement('span'); s.textContent = d.name; const sm = document.createElement('small'); sm.textContent = `${enabledDesign(d) ? FRAMES[d.body.frame?.id ?? 'A959'].name : BASE_NAME[d.body.base]} · ${d.engine.layout} ${(d.engine.cc / 1000).toFixed(1)}`;
     const load = document.createElement('button'); load.type = 'button'; load.className = BTN; load.textContent = '열기'; load.addEventListener('click', () => { if (use(d)) flash(`열림: ${d.name}`); });
     if (!enabledDesign(d)) { li.classList.add('old'); sm.textContent = `${BASE_NAME[d.body.base]} · 옛 방식 · 비활성`; load.disabled = true; load.title = '이 차체는 지금 게임에서 꺼져 있습니다'; }
     const del = document.createElement('button'); del.type = 'button'; del.className = BTN; del.textContent = '삭제'; del.setAttribute('aria-label', `${d.name} 삭제`); del.addEventListener('click', () => { if (confirm(`"${d.name}" 설계를 지울까요?`)) { deleteDesign(store, d.id); showList(); savedState(); } });

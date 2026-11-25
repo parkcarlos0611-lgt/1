@@ -2,7 +2,7 @@
 // it, in place of the studio turntable. A small piece of track built for the picture only (not a real circuit's ground:
 // light on a phone): flat grey asphalt in the drift look's plain colours, the white edge line, a red and white kerb,
 // a few drift marks, the grass; beyond it a wall of tyres (render/props/trackside.ts), cones, a floodlight mast, firs
-// and round trees (render/props/aerodrome.ts), low blue hills far off. The camera: low, at the car's front three
+// and round trees (render/props/aerodrome.ts) up to the sky. The camera: low, at the car's front three
 // quarters, a little perspective, drifting slowly round; the car's front wheels turned toward it so the tyre's side and
 // the wheel's face show. World axes as the drive's: x along the track, the car's nose toward +x, z up (m).
 import type { GroundData } from '../../render/live/ground';
@@ -38,6 +38,8 @@ export function titleGround(): GroundData {
   for (const r of [15.2, 16.7]) { const cx = 2.4, cy = -15.6, w = 0.24, N = 40;
     for (let i = 0; i < N; i++) { const a0 = 1.42 + i / N * 0.95, a1 = 1.42 + (i + 1) / N * 0.95, p = (a: number, rr: number) => [cx + Math.cos(a) * rr, cy + Math.sin(a) * rr, -0.01];
       quad(p(a0, r - w / 2), p(a1, r - w / 2), p(a1, r + w / 2), p(a0, r + w / 2), mark); } }
+  // laid out on the +y side, then turned over to the -y side: each y negated, each triangle's corners reversed (its winding kept)
+  for (let t = 0; t < P.length; t += 9) { for (let k = 1; k < 9; k += 3) P[t + k] = -P[t + k]!; for (let k = 0; k < 3; k++) { const a = P[t + 3 + k]!; P[t + 3 + k] = P[t + 6 + k]!; P[t + 6 + k] = a; } }
   const n = P.length / 3; return { pos: new Float32Array(P), col: new Uint8Array(C), flag: new Float32Array(n), n, trk: new Float32Array(n * 3) }; }
 
 // ---- the set's own small things (each mesh x from 0 to its length, its middle at the prop's place) ----
@@ -62,35 +64,30 @@ export function mast(): Mesh { const b = new Build(), L = 2600, X = L / 2;
   b.mat('#5c6166', 0.3, 'metal').box(X - 1300, X + 1300, -150, 150, 13600, 14700);
   b.mat('#f4f1df', 0.6, 'paint'); for (let i = 0; i < 4; i++) { const x = X - 1050 + i * 700; b.box(x - 260, x + 260, -230, -150, 13700, 14600); }
   return b.mesh(L); }
-/** a low hill far off, `arg` m wide: a blunt cone of a few faces, blue with the distance */
-export function hill(arg = 400): Mesh { const b = new Build(), R = arg * 500, L = 2 * R, X = R, N = 7;
-  const ring = (r: number, z: number, t = 0): V[] => Array.from({ length: N }, (_, i) => [X + Math.cos((i + t) / N * Math.PI * 2) * r, Math.sin((i + t) / N * Math.PI * 2) * r * 0.7, z]);
-  b.mat('#7d9bb0', 0.1, 'canvas').loft([ring(R, -2000), ring(R * 0.55, R * 0.32, 0.4), ring(R * 0.12, R * 0.5, 0.2)]);
-  return b.mesh(L); }
 
 /** the set's things and where they stand (x, y, heading; a tree's kind and size) */
 export function titleProps(L: LiveRenderer): LiveProp[] {
   const P = (kind: string, make: () => Mesh) => L.prop(`title:${kind}`, make), out: LiveProp[] = [];
-  const at = (kind: string, make: () => Mesh, x: number, y: number, h = 0, z = 0) => out.push({ g: P(kind, make), x, y, z, h });
-  // the tyre wall behind the kerb's grass, its face toward the road (-y), in 6 m lengths
-  for (let x = -66; x < 30; x += 6) at('tyres', () => edgeTyres(6000), x + 3, 13.2, 0);
+  // laid out on the +y side as the ground is, then put on the -y side (y negated, the headings turned over)
+  const at = (kind: string, make: () => Mesh, x: number, y: number, h = 0, z = 0) => out.push({ g: P(kind, make), x, y: -y, z, h: -h });
+  // the tyre wall behind the kerb's grass, its face toward the road, in 6 m lengths
+  for (let x = -66; x < 30; x += 6) at('tyres', () => edgeTyres(6000), x + 3, 13.2, Math.PI);
   for (const [x, y] of [[-7.5, -4.2], [-12.5, 4.6], [5.8, 5.4], [-21, 5.8]] as [number, number][]) at('cone', cone, x, y, rnd(x) * 3);
-  at('mast', mast, -26, 17.5, 0.2);
+  at('mast', mast, -9, 23, 0.2);
   // the trees: a belt of firs with round trees and poplars among them, thinning out toward the horizon
   for (let i = 0; i < 46; i++) { const x = -150 + rnd(i) * 190, y = 19 + Math.pow(rnd(i + 50), 1.6) * 70, s = 8 + Math.round(rnd(i + 99) * 6), pick = rnd(i + 7);
     if (pick < 0.62) at(`fir${s}`, () => fir(s), x, y, rnd(i + 3) * 6); else if (pick < 0.85) at('round', treeRound, x, y, rnd(i + 3) * 6); else at('poplar', treePoplar, x, y, rnd(i + 3) * 6); }
-  // the hills: far off past the trees, toward where the camera looks
-  for (const [x, y, w] of [[-620, 520, 520], [-180, 760, 700], [-900, 260, 420], [240, 900, 560]] as [number, number, number][]) at(`hill${w}`, () => hill(w), x, y, 0.3, -1);
   return out; }
 
 /** the title's car: the stock one, without its plates */
 export function titleCar(): Design { const d = stockP959(); if (d.body.model) d.body.model = { ...d.body.model, plateF: false, plateR: false }; return d; }
 
-/** the car's front wheels turned to the left (rad, left +; the inner one more): its near (right) front tyre's side and
- *  wheel face toward the camera */
-export const STEER = { L: 0.46, R: 0.39 };
-/** the camera round the car (rad from the nose, - to the right side), its height (m), the car's middle's height */
-const AZ = -0.64, EYE_Z = 0.95, MID_Z = 0.6;
+/** the car's front wheels turned away from the camera (rad, left +; the inner one more): the near front tyre's side
+ *  and its wheel's face toward the camera */
+export const STEER = { L: -0.39, R: -0.46 };
+/** the camera round the car (rad from the nose; the nose then toward the screen's left, at the menu, as a title shows
+ *  it), its height (m), the car's middle's height */
+const AZ = 0.64, EYE_Z = 0.95, MID_Z = 0.6;
 
 /** the camera for a W x H picture at time t (s): wide (the car right of the menu, lower) or narrow (a phone: the car
  *  across the picture between the logo and the menu); `len` the car's length (mm). The drift: a few degrees round the car
@@ -100,7 +97,7 @@ export function titleView(W: number, H: number, t: number, len: number): LiveVie
   // the field of view: wide 30 degrees high; narrow 44 degrees across (then tall)
   const tanV = wide ? Math.tan(15 * Math.PI / 180) : Math.tan(22 * Math.PI / 180) / aspect, tanH = tanV * aspect;
   const az = AZ + 0.06 * Math.sin(t * 0.11), car = len / 1000, across = car * Math.abs(Math.cos(az)) + 1.85 * Math.abs(Math.sin(az));
-  const frac = wide ? 0.56 : 0.96, cx = wide ? 0.62 : 0.5, cy = wide ? 0.63 : 0.49, D = across / (frac * 2 * tanH);
+  const frac = wide ? 0.5 : 0.9, cx = wide ? 0.69 : 0.53, cy = wide ? 0.64 : 0.5, D = across / (frac * 2 * tanH);
   const eye: [number, number, number] = [Math.cos(az) * D, Math.sin(az) * D, EYE_Z + 0.05 * Math.sin(t * 0.07)];
   const toward = (tx: number, ty: number) => Math.atan2(ty - eye[1], tx - eye[0]);
   const a0 = toward(0, 0), right = [Math.sin(a0), -Math.cos(a0)], off = (2 * cx - 1) * D * tanH;

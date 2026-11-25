@@ -77,7 +77,7 @@ export function classPick(root: HTMLElement, host: ClassPickHost): ClassPick {
       lead.textContent = o.fresh ? '새 설계는 차급부터 고릅니다. 고른 칸의 출력 상한과 제한기 안에서만 개발합니다. 차는 실제로 닿은 칸의 이름으로 불립니다.'
         : `목표 ${chosen!.id} · 지금 차 ${reach.id}. 올리면 제한이 풀리고, 내리면 무엇이 묶이는지 먼저 보여 드립니다.`;
       close.textContent = o.fresh ? `지금 차 그대로 (${reach.id})` : '닫기';
-      foot.textContent = o.fresh ? '599의 엔진이 고른 칸보다 세면 칸에 맞게 줄여서 시작합니다. 차급은 나중에 레일 위의 칩으로 바꿀 수 있습니다.'
+      foot.textContent = o.fresh ? '시작 엔진이 고른 칸보다 세면 칸에 맞게 줄여서 시작합니다. 차급은 나중에 레일 위의 칩으로 바꿀 수 있습니다.'
         : '위는 벽, 아래는 이름표: 고른 칸을 넘는 출력은 막고, 아래 칸에 머물면 그 칸의 이름으로 부릅니다.';
       for (const t of TIERS) { const c = cards.get(t.id)!, L = tierLock(t, o.eraOpen);
         c.card.setAttribute('aria-pressed', String(!!chosen && chosen.id === t.id)); c.card.disabled = !!L; c.card.classList.toggle('gk-locked', !!L);

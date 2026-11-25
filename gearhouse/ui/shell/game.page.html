@@ -58,6 +58,8 @@
     background: radial-gradient(ellipse 60% 40% at 50% 88%, rgba(255,255,255,0.16), transparent 70%), repeating-linear-gradient(-45deg, rgba(255,255,255,0.045) 0 12px, transparent 12px 24px), linear-gradient(#26302f, #0f1514); }
   .gh-card-pic .gk-badge.gk-pin { right: 12px; top: 12px; }
   .gh-carpic { width: 88%; height: auto; display: block; }
+  .gh-card-pic.gh-has-thumb > .gh-carpic { visibility: hidden; }   /* the design's rendered car over its drawn one (ui/shell/carthumbs.ts) */
+  .gh-card-pic img.gh-thumb { position: absolute; inset: 3% 4% 6%; width: 92%; height: 91%; object-fit: contain; pointer-events: none; filter: drop-shadow(0 7px 3px rgba(0,0,0,0.45)); }
   .gh-card-b { padding: 10px 12px 4px; display: grid; gap: 3px; min-width: 0; }
   .gh-card-t { font-family: var(--gk-head); font-weight: 700; font-style: italic; letter-spacing: 0.02em; font-size: 1.32rem; margin: 0; overflow-wrap: anywhere; color: #fff; text-shadow: var(--gk-edge-s); }
   .gh-card-l { margin: 0; font-size: 0.82rem; color: var(--gh-ink); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }

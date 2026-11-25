@@ -96,4 +96,18 @@ describe('the title backdrop (docs/systems/110 G4)', () => {
     expect(backdropOpts(LOOK_NUM.drift!, 1).look).toBe(4); expect(backdropOpts(4, 1).outW).toBe(1);
     for (const l of ['drift', 'toon', 'baked'] as const) expect(LOOK_NUM[l]).not.toBe(2);
   });
+  it('stands the stock car without plates on a piece of track, its front wheels turned, framed where the menu leaves room', async () => {
+    const { titleCar, titleGround, titleView, STEER } = await import('../ui/shell/titleset');
+    const d = titleCar(); expect(d.body.model?.plateF).toBe(false); expect(d.body.model?.plateR).toBe(false); expect(d.body.model?.bumperF).toBe('std');
+    const g = titleGround(); expect(g.n).toBeGreaterThan(100); expect(g.n % 3).toBe(0); expect(g.trk!.every(v => v === 0)).toBe(true);   // plain colours, not the track's concrete
+    expect(Math.abs(STEER.R)).toBeGreaterThan(0.3); expect(Math.abs(STEER.R)).toBeGreaterThan(Math.abs(STEER.L)); expect(Math.sign(STEER.L)).toBe(Math.sign(STEER.R));
+    // the car's middle on the screen: a perspective camera from the eye (ang the heading, pitch down +)
+    const onScreen = (W: number, H: number) => { const v = titleView(W, H, 0, 4260), e = v.eye!, a = v.ang, p = v.pitch * Math.PI / 180, ty = Math.tan(v.fov! * Math.PI / 360);
+      const f = [Math.cos(a) * Math.cos(p), Math.sin(a) * Math.cos(p), -Math.sin(p)], r = [Math.sin(a), -Math.cos(a), 0], u = [r[1]! * f[2]! - r[2]! * f[1]!, r[2]! * f[0]! - r[0]! * f[2]!, r[0]! * f[1]! - r[1]! * f[0]!];
+      const c = [0 - e[0], 0 - e[1], 0.6 - e[2]], dot = (q: number[]) => q[0]! * c[0]! + q[1]! * c[1]! + q[2]! * c[2]!, z = dot(f);
+      expect(e[2]).toBeLessThan(1.2); expect(z).toBeGreaterThan(3);   // low, in front
+      return [0.5 + dot(r) / z / (ty * W / H) / 2, 0.5 - dot(u) / z / ty / 2] as [number, number]; };
+    const [wx, wy] = onScreen(1280, 800); expect(wx).toBeGreaterThan(0.6); expect(wx).toBeLessThan(0.75); expect(wy).toBeGreaterThan(0.55);   // right of the menu, low
+    const [px, py] = onScreen(390, 844); expect(Math.abs(px - 0.53)).toBeLessThan(0.05); expect(Math.abs(py - 0.5)).toBeLessThan(0.06);   // a phone: between the logo and the menu
+  });
 });

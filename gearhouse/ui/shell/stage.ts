@@ -67,8 +67,8 @@ export class Backdrop {
   redraw() { this.drawn = false; if (this.d) this.setDesign(this.d); }
   private frame(now: number) { const el = Math.min(0.1, (now - this.last) / 1000); this.last = now; this.raf = requestAnimationFrame(t => this.frame(t));
     const L = this.stage.L, cv = this.stage.canvas; if (!L || !this.M) return;
-    // at most about two million pixels (a large window at a high density is drawn a little softer; a phone's touch screen at most 1.25 to one)
-    const coarse = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches, k0 = Math.min(coarse ? 1.25 : 1.5, devicePixelRatio || 1), k = Math.min(k0, Math.sqrt(2.1e6 / Math.max(1, cv.clientWidth * cv.clientHeight))), W = Math.max(2, Math.round(cv.clientWidth * k)), H = Math.max(2, Math.round(cv.clientHeight * k)); if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; this.drawn = false; }
+    // at most about two million pixels (a large window at a high density is drawn a little softer)
+    const coarse = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches, k0 = Math.min(1.5, devicePixelRatio || 1), k = Math.min(k0, Math.sqrt(2.1e6 / Math.max(1, cv.clientWidth * cv.clientHeight))), W = Math.max(2, Math.round(cv.clientWidth * k)), H = Math.max(2, Math.round(cv.clientHeight * k)); if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; this.drawn = false; }
     if (this.pre?.(L, cv)) this.drawn = false;
     if (this.calm && this.drawn) return; if (!this.calm) this.t += el;
     // a slow GPU (software GL) draws at a lower rate, the picture held between: what a frame cost is seen in when the

@@ -39,9 +39,9 @@
   .stepnav span { flex: 1; min-width: 0; text-align: center; font-family: var(--gk-head); font-style: italic; font-weight: 700; font-size: 0.84rem; color: #fff; text-shadow: var(--gk-edge-s); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .stepnav .btn:disabled { opacity: 0.5; cursor: default; } .stepnav .btn[hidden] { display: none; }
   .panes { flex: 1; overflow-y: auto; padding: 4px 8px 12px; scrollbar-width: thin; }
-  .pane { display: none; gap: 14px; } .pane.on { display: grid; }
+  .pane { display: none; gap: 14px; grid-template-columns: minmax(0, 1fr); } .pane.on { display: grid; }
   .pane [hidden] { display: none !important; }   /* a row a body does not use (the kit's slots under a model body, and back) */
-  .row { display: grid; gap: 6px; }
+  .row { display: grid; gap: 6px; grid-template-columns: minmax(0, 1fr); min-width: 0; }
   .row > label, .lab { font-family: var(--gk-head); font-weight: 700; font-style: italic; font-size: 0.92rem; letter-spacing: 0.02em; color: #fff; text-shadow: var(--gk-edge-s); display: flex; justify-content: space-between; gap: 8px; }
   .row > label .v { color: var(--gk-y0); font-variant-numeric: tabular-nums; letter-spacing: 0; }
   select.gk-field, .top .name { width: 100%; }
@@ -108,11 +108,11 @@
   .viewbar > * { pointer-events: auto; }
   .viewbar .btn[aria-pressed="true"] { --f0: var(--gk-g0); --f1: var(--gk-g1); }
   .viewbar select { width: auto; min-height: 36px; }
-  .hint { position: fixed; bottom: 62px; left: 452px; right: 326px; text-align: center; font-size: 0.74rem; color: #d8d2c4; text-shadow: 0 1px 2px #000; pointer-events: none; z-index: 2; }
+  .hint { position: fixed; top: calc(var(--topH) + 14px); left: 452px; right: 326px; text-align: center; font-size: 0.74rem; color: #d8d2c4; text-shadow: 0 1px 2px #000; pointer-events: none; z-index: 2; }
   .toggle { display: none; }
   /* a phone: the rail a strip at the bottom, the choices a drawer above it, the figures a folded strip under the bar */
   @media (max-width: 760px) {
-    :root { --topH: 58px; --railH: 62px; }
+    :root { --topH: 64px; --railH: 72px; }
     .top { padding: 6px 8px 5px; gap: 6px; min-height: 50px; } .top h1, .top .saved { display: none; }
     .top .name { flex: 1 1 auto; min-width: 40px; } .top .gk-btn.gk-sm, .top > .gh-btn { padding: 3px 8px; font-size: 0.86rem; min-height: 34px; }
     .rail { top: auto; bottom: 0; left: 0; right: 0; max-height: none; overflow: visible; z-index: 6; }

@@ -13,7 +13,7 @@ export const PICK_CSS = `
 .gk-btn.gk-sm .gk-ic{width:1.4em;height:1.4em}
 .gk-btn.gk-sm:active:not(:disabled),.gk-btn.gk-sm.gk-down{transform:translateY(2px);box-shadow:0 1px 0 var(--gk-ink)}
 /* ---- thumbnail cards: cut corners, a thick outline, a picture plate, the name; chosen green, locked grey ---- */
-.gk-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(var(--gk-card-w,96px),1fr));gap:10px}
+.gk-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(var(--gk-card-w,96px),100%),1fr));gap:10px;min-width:0}
 .gk-card{--face:var(--gk-dark0);--band:var(--gk-dark1);--plate:linear-gradient(180deg,#4a4f55,#2a2d31);position:relative;isolation:isolate;display:grid;grid-template-rows:auto 1fr;gap:0;
   min-width:0;padding:var(--gk-bw);border:0;background:var(--gk-ink);clip-path:${cut('11px')};cursor:pointer;color:#fff;font:inherit;text-align:center;
   transition:transform 60ms,filter 80ms;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}

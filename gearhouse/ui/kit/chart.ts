@@ -33,8 +33,8 @@ export function drawCartoonChart(g: CanvasRenderingContext2D, W: number, H: numb
   // the plate: a dark well, cut corners, a thick outline
   const c = 10 * k, bw = 3 * k; g.beginPath(); g.moveTo(c, 0); g.lineTo(W, 0); g.lineTo(W, H - c); g.lineTo(W - c, H); g.lineTo(0, H); g.lineTo(0, c); g.closePath(); g.fillStyle = INK; g.fill();
   g.save(); g.beginPath(); const i = bw, ci = c - bw * 0.4; g.moveTo(i + ci, i); g.lineTo(W - i, i); g.lineTo(W - i, H - i - ci); g.lineTo(W - i - ci, H - i); g.lineTo(i, H - i); g.lineTo(i, i + ci); g.closePath(); g.fillStyle = o.plate; g.fill(); g.clip();
-  g.font = f(13); const yw = Math.max(g.measureText(String(A0.max)).width, g.measureText(String(A1?.max ?? '')).width);
-  const L = 14 * k + yw, R = W - (A1 ? 14 * k + yw : 14 * k), T = 30 * k, B = H - 34 * k;
+  g.font = f(14); const yw = Math.max(g.measureText(String(A0.max)).width, g.measureText(String(A1?.max ?? '')).width);
+  const L = 16 * k + yw, R = W - (A1 ? 16 * k + yw : 16 * k), T = 30 * k, B = H - 36 * k;
   const X = (v: number) => L + (R - L) * v / o.xMax, Y = (a: ChartAxis, v: number) => B - (B - T) * v / a.max;
   // the grid: chunky soft lines
   g.lineWidth = 2 * k; g.strokeStyle = 'rgba(255,255,255,0.10)';
@@ -49,11 +49,11 @@ export function drawCartoonChart(g: CanvasRenderingContext2D, W: number, H: numb
   for (const s of o.series) { const a = (s.axis ? A1 : A0) ?? A0, p = pts(s, a); if (p.length < 2) continue;
     if (s.fill) { g.beginPath(); g.moveTo(p[0]![0], B); for (const [x, y] of p) g.lineTo(x, y); g.lineTo(p[p.length - 1]![0], B); g.closePath(); g.fillStyle = ROLE[s.role][0] + '30'; g.fill(); }
     g.lineJoin = 'round'; g.lineCap = 'round';
-    for (const [w, col] of [[10, INK], [5, ROLE[s.role][0]]] as const) { g.lineWidth = w * k; g.strokeStyle = col; g.beginPath(); p.forEach(([x, y], j) => j ? g.lineTo(x, y) : g.moveTo(x, y)); g.stroke(); }
-    g.lineWidth = 1.6 * k; g.strokeStyle = 'rgba(255,255,255,0.55)'; g.beginPath(); p.forEach(([x, y], j) => j ? g.lineTo(x, y - 1.2 * k) : g.moveTo(x, y - 1.2 * k)); g.stroke(); }
+    for (const [w, col] of [[13, INK], [7, ROLE[s.role][0]]] as const) { g.lineWidth = w * k; g.strokeStyle = col; g.beginPath(); p.forEach(([x, y], j) => j ? g.lineTo(x, y) : g.moveTo(x, y)); g.stroke(); }
+    g.lineWidth = 2 * k; g.strokeStyle = 'rgba(255,255,255,0.6)'; g.beginPath(); p.forEach(([x, y], j) => j ? g.lineTo(x, y - 1.8 * k) : g.moveTo(x, y - 1.8 * k)); g.stroke(); }
   // the axes: thick black lines, the ticks' labels rimmed in the title type, the axes' names in their colours
   g.lineCap = 'square'; g.lineWidth = 4 * k; g.strokeStyle = INK; g.beginPath(); g.moveTo(L, T - 6 * k); g.lineTo(L, B); g.lineTo(R, B); if (A1) g.lineTo(R, T - 6 * k); g.stroke();
-  g.font = f(13); g.textBaseline = 'middle';
+  g.font = f(14); g.textBaseline = 'middle';
   for (let v = 0; v <= o.xMax + 1e-9; v += o.xStep) { g.textAlign = 'center'; rimText(g, o.xText(v), X(v), B + 13 * k, '#fff', 3.5 * k); g.lineWidth = 3 * k; g.strokeStyle = INK; g.beginPath(); g.moveTo(X(v), B); g.lineTo(X(v), B + 5 * k); g.stroke(); }
   for (const [a, side] of [[A0, 0], [A1, 1]] as const) { if (!a) continue;
     for (let v = 0; v <= a.max + 1e-9; v += a.step) { g.textAlign = side ? 'left' : 'right'; rimText(g, String(Math.round(v)), side ? R + 7 * k : L - 7 * k, Y(a, v), ROLE[a.role][0], 3.5 * k); } }
@@ -67,7 +67,7 @@ export function drawCartoonChart(g: CanvasRenderingContext2D, W: number, H: numb
   for (const s of o.series) { const pk = s.peak, a = (s.axis ? A1 : A0) ?? A0; if (!pk || o.xs[pk.i]! > upTo) continue; const px = X(o.xs[pk.i]!), py = Y(a, s.ys[pk.i]!);
     g.font = f(14); const w = Math.max(g.measureText(pk.text).width, (g.font = f(10.5), g.measureText(pk.sub ?? '').width)) + 16 * k, h = (pk.sub ? 36 : 22) * k;
     tags.push({ x: Math.max(L + 2 * k, Math.min(R - w - 2 * k, px - w / 2)), y: Math.max(T - 26 * k, py - h - 14 * k), w, h, below: h + 28 * k, s, px, py }); }
-  const tops = placeTags(tags);
+  const tops = placeTags(tags.map(t => ({ ...t, x: t.x - 6 * k, w: t.w + 12 * k, h: t.h + 4 * k })));
   tags.forEach((t, j) => { const y = Math.min(B - t.h - 4 * k, tops[j]!), col = ROLE[t.s.role], up = y + t.h < t.py;
     g.lineWidth = 3 * k; g.strokeStyle = INK; g.beginPath(); g.moveTo(t.px, t.py); g.lineTo(Math.max(t.x + 8 * k, Math.min(t.x + t.w - 8 * k, t.px)), up ? y + t.h : y); g.stroke();
     g.save(); g.translate(t.x, y); g.transform(1, 0, -0.14, 1, 0, 0); g.fillStyle = INK; g.fillRect(0, 2 * k, t.w, t.h); g.fillStyle = col[0]; g.fillRect(0, 0, t.w, t.h);

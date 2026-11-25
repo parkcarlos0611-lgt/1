@@ -214,6 +214,7 @@ function techHud(): string { const X = car.spec.tech; if (!X) return ''; let o =
   if (X.wing) o += `<span>윙 ${car.wing > 0.5 ? '올림' : '내림'}</span>`;
   if (X.tcs) o += `<span class="${car.tcsOn ? 'hot' : ''}">TCS${car.tcsOn ? ' 작동' : ''}</span>`;   /* review 153: the NSX's own traction control, and its VTEC cam */
   if (X.gearbox === 'f1') o += `<span class="${car.shifting ? 'hot' : ''}">F1${car.shifting ? ' 변속' : ''}</span>`;   /* review 158 */
+  if (X.gearbox === 'auto') o += `<span class="${car.shifting ? 'hot' : ''}">자동${car.shifting ? ' 변속' : car.atLock > 0.9 ? ' 록업' : ` 미끄럼 ${Math.round(Math.max(0, 1 - car.atSR) * 100)} %`}</span>`;   /* docs/systems/119 K4: the converter's slip, its lock-up */
   if (X.damp) o += `<span>댐퍼 ${car.damperMode === 'sport' ? '스포츠' : '컴포트'}</span>`;
   if (X.vtec) o += `<span class="${car.vtecHigh ? 'hot' : ''}">가변 캠${car.vtecHigh ? ' 고속' : ''}</span>`;
   if (X.ground) o += `<span>다운포스 ${Math.round(0.5 * 1.2 * car.speed * car.speed * X.ground.clA / 9.81)} kg</span>`; return o; }

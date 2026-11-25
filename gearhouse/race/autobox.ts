@@ -19,9 +19,10 @@ export interface AutoBox {
 }
 /** the coupling point: above it the stator freewheels and the torque ratio is 1 */
 export const COUPLE_SR = 0.85;
-/** a box for a car: a stall a little over the torque peak's half (a passenger car's 2,000 - 2,600 rpm), ratio 2 */
+/** a box for a car: a stall a little over the torque peak's half (a passenger car's 2,000 - 2,600 rpm), ratio 1.9, the
+ *  lock-up from third over 60 km/h, a period shift of half a second */
 export function autoBoxOf(s: Pick<RaceSpec, 'torqueRpm' | 'idle' | 'gears'>): AutoBox {
-  return { stall: Math.round(Math.max(s.idle * 2.6, Math.min(2800, s.torqueRpm * 0.55)) / 50) * 50, tr0: 2.0, lockGear: 3, lockKmh: 60, shiftT: 0.4 };
+  return { stall: Math.round(Math.max(s.idle * 2.6, Math.min(2800, s.torqueRpm * 0.55)) / 50) * 50, tr0: 1.9, lockGear: 3, lockKmh: 60, shiftT: 0.5 };
 }
 /** the impeller's capacity C0 (Nm per (rad/s)^2): full throttle's torque at the stall revs over their square */
 export const capacity = (s: RaceSpec, B: AutoBox) => torqueAt(s, B.stall) / (B.stall * Math.PI / 30) ** 2;
@@ -36,8 +37,8 @@ export function converter(C0: number, B: AutoBox, we: number, wt: number): { Ti:
   const r = e / wt, Ti = -0.6 * C0 * wt * wt * (1 - r ** 4); return { Ti, Tt: Ti, SR };
 }
 
-/** the control unit's shift points (engine revs at the box's output speed in the gear): up above U, down when the gear
- *  below would turn under 0.7 U (a 30 % gap after an upshift: no hunting); the pedal read smoothed */
+/** the control unit's shift points (engine revs at the box's output speed in the gear): up from gear n when its revs
+ *  pass U, back down to n when n's revs would fall under 0.7 U (a 30 % band: no hunting); the pedal read smoothed */
 export function upRpm(s: RaceSpec, thr: number): number {
   const top = Math.min(s.hpRpm * 1.04, s.redline * 0.92), lo = Math.max(s.idle * 2.2, top * 0.36);
   return lo + (top - lo) * Math.max(0, Math.min(1, thr)) ** 1.3; }
@@ -46,13 +47,12 @@ export function upRpm(s: RaceSpec, thr: number): number {
 export function scheduled(s: RaceSpec, gear: number, w: number, thr: number): number {
   const g = s.gears, U = upRpm(s, thr), rpm = w * g[gear - 1]!;
   if (gear < g.length && rpm > U) return gear + 1;
-  if (gear > 1) { const lower = w * g[gear - 2]!, floor = Math.max(s.idle * 1.4, 0.7 * U * g[gear - 2]! / g[gear - 1]!);
-    if (rpm < floor && lower < s.redline * 0.9) return gear - 1; }
+  if (gear > 1) { const lower = w * g[gear - 2]!; if (lower < Math.max(s.idle * 1.4, 0.7 * U) || rpm < s.idle * 1.1) return lower < s.redline * 0.9 ? gear - 1 : gear; }
   return gear; }
-/** the kick-down (the pedal pressed through to the floor): the lowest gear whose revs stay under 0.9 of the upshift
- *  point at full throttle, so it may drop two gears at once */
+/** the kick-down (the pedal pressed through to the floor): the lowest gear whose revs stay under 0.8 of the upshift
+ *  point at full throttle (room to pull in it), so it may drop two gears at once */
 export function kickdown(s: RaceSpec, gear: number, w: number): number {
-  const top = upRpm(s, 1); let to = gear; for (let k = gear - 1; k >= 1; k--) { if (w * s.gears[k - 1]! < top * 0.9) to = k; else break; } return to; }
+  const top = upRpm(s, 1); let to = gear; for (let k = gear - 1; k >= 1; k--) { if (w * s.gears[k - 1]! < top * 0.8) to = k; else break; } return to; }
 
 /** the box's ratios: wider spread than the manuals' (a planetary box, a converter to start on), a tall overdrive top */
 export const AUTO_GEARSETS: Record<4 | 5 | 6, number[]> = {

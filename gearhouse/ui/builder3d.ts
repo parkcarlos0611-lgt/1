@@ -396,8 +396,8 @@ function btnRow(t: string, f: () => void): HTMLElement { const d = document.crea
     gradeNote.textContent = `${g}등급: 레드라인 ${R.toLocaleString()} rpm, 부스트 ${Bm.toFixed(1)} bar까지${vl ? ` · 가변 캠은 ${vl.replace(' 고를 수 있습니다', '')}` : ''}`; }); }
 // ④ (on): the drive
 { const fin = range('종감속비', LIMITS.final, 0.01, () => D.drive.final || designSpec(D).final, v => { D.drive.final = v; }, v => v.toFixed(2), 'final');
-  add('engine', h2('구동계'), seg('기어', [[5, '5단'], [6, '6단']], () => D.drive.gears, v => { D.drive.gears = v; }),
-    seg('변속기', [['manual', '수동'], ['f1', 'F1 (반자동)']], () => D.drive.gearbox, v => { D.drive.gearbox = v; }),
+  add('engine', h2('구동계'), seg('기어', [[4, '4단'], [5, '5단'], [6, '6단']], () => D.drive.gears, v => { D.drive.gears = v; }, v => v === 4 && D.drive.gearbox !== 'auto' ? '4단은 자동 변속기만 있습니다' : null),
+    seg('변속기', [['manual', '수동'], ['f1', 'F1 (반자동)'], ['auto', '자동 (토크 컨버터)']], () => D.drive.gearbox, v => { D.drive.gearbox = v; if (v !== 'auto' && D.drive.gears === 4) D.drive.gears = 5; }),   /* docs/systems/119 K4 */
     check('종감속 자동 (최고 속도가 출력 정점에서 나오게)', () => !D.drive.final, v => { D.drive.final = v ? 0 : +designSpec(D).final.toFixed(2); }, 'autofinal'), fin,
     check('LSD (차동 제한)', () => D.drive.lsd, v => { D.drive.lsd = v; }, 'lsd'), check('4륜 구동 (점성 센터 커플링, 앞 30 %)', () => D.drive.awd, v => { D.drive.awd = v; }, 'awd'));
   syncs.push(() => { (fin.querySelector('input') as HTMLInputElement).disabled = !D.drive.final; }); }

@@ -24,7 +24,7 @@
 //           where the power meets the drag and the rolling resistance, comes at the power peak in top gear.
 //   class, cost, reliability: designFigures (the class from the figures, doc 99 6-2; cost and reliability placeholders
 //           until B5).
-import { AUTO_GEARSETS, autoBoxOf, capacity, converter, upRpm } from './autobox';
+import { AUTO_GEARSETS, autoBoxOf, capacity, converter, upRpm, COUPLE_SR } from './autobox';
 import type { Design, BodyBase, Structure, Panels, Interior } from '../core/design';
 import { DESIGN_NSX, DESIGN_F355, DESIGN_EB110, DESIGN_P959, DESIGN_BNR33 } from '../core/design';
 import { type RaceSpec, torqueAt, EPS_SPEED_SENSITIVE } from './cars';
@@ -174,7 +174,7 @@ export function zeroTo100(s: RaceSpec): number {
     if (B) { let a = Math.max(wheelRpm, s.idle), b = s.redline; const k = Math.PI / 30;
       for (let i = 0; i < 30; i++) { const e = (a + b) / 2; if (torqueAt(s, e) > converter(C0, B, e * k, wheelRpm * k).Ti) a = e; else b = e; }
       rpm = (a + b) / 2; drive = converter(C0, B, rpm * k, wheelRpm * k).Tt * (shift > 0 ? 0.55 : 1) * g * s.eff / s.tyreR; }
-    const meff = s.mass + (Iw + (wheelRpm >= rpm ? Ie * g * g : 0)) / s.tyreR ** 2, a0 = drive / meff;
+    const meff = s.mass + (Iw + (wheelRpm >= rpm ? Ie * g * g : B && wheelRpm > COUPLE_SR * rpm ? (Ie + 0.05) * g * g : 0)) / s.tyreR ** 2, a0 = drive / meff;   /* the automatic's engine (and its converter's impeller) spun up with the car once the converter couples */
     const load = awd ? s.mass * G : s.mass * G * (1 - s.frontShare) + s.mass * a0 * s.cgH / s.wheelbase, grip = mu * load;
     const F = Math.min(drive, grip) - 0.5 * RHO * dragArea(s) * v * v - s.crr * s.mass * G;
     v += Math.max(0, F) / meff * dt; t += dt; shift -= dt; }
@@ -196,7 +196,7 @@ export function designSpec(d: Design): RaceSpec {
   const T = classOf(d), cut = restrictorShare(en.hp, T);
   const cd = B.cdA / frontal(B, B.width), shape = shapeK(d) / shapeK(B.ref);
   const rearW = K.tyres[1], R = tyreR(rearW, K.rim), AT = D.gearbox === 'auto', gears = AT ? AUTO_GEARSETS[D.gears] : GEARSETS[D.gears === 4 ? 5 : D.gears];
-  const eff = (AT ? 0.86 : D.gears === 5 ? 0.9 : 0.88) - (D.awd ? 0.03 : 0);   // the automatic's pump, its clutches' drag and planetary sets: 0.86 (its converter's slip on top, in the physics)   // the NSX's five-speed 0.9, the F355's six 0.88; the front drive's gears
+  const eff = (AT ? 0.84 : D.gears === 5 ? 0.9 : 0.88) - (D.awd ? 0.03 : 0);   // the automatic's oil pump, its clutches' drag and planetary sets: 0.84 (its converter's slip on top, in the physics); the NSX's five-speed 0.9, the F355's six 0.88; the front drive's gears
   const launch = Math.round((E.turbo ? Math.max(en.torqueRpm * 0.93, en.turbo!.full * 1.2) : en.torqueRpm * 0.93) / 100) * 100;
   const tech: NonNullable<RaceSpec['tech']> = { rollF: 0.47, tyreWF: K.tyres[0] / 1000, tyreWR: rearW / 1000, gearbox: D.gearbox };
   if (D.lsd) tech.rearLsd = 1.9;                                   // a torque-sensing differential (the NSX's 2.0, the F355's 1.8)

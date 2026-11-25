@@ -155,7 +155,7 @@ export class Vehicle {
     this.Iz = m * (L * L + spec.track * spec.track) / 12 * 1.15; this.Iy = this.ms * L * L / 14; this.Ix = this.ms * spec.track * spec.track / 10;
     this.Iw = spec.inertia?.wheel ?? 1.2 + spec.tyreR * spec.tyreR * 10; this.Ie = spec.inertia?.engine ?? 0.25 + spec.hp / 400; this.rpm = spec.idle; this.health = new Health(spec.hp, spec.cooling, Math.floor(Math.random() * 1e9));
     this.hl = L / 2 + 0.6; this.hwd = spec.track / 2 + 0.12; this.hh = 1.25 - spec.cgH;
-    if (spec.tech?.gearbox === 'auto') { const box = spec.tech.auto ?? autoBoxOf(spec); this.at = { box, C0: capacity(spec, box) }; } else this.at = null; }
+    if (spec.tech?.gearbox === 'auto') { const box = spec.tech.auto ?? autoBoxOf(spec); this.at = { box, C0: capacity(spec, box) }; this.Ie += 0.05; } else this.at = null; }   /* the converter's impeller and its fluid turn with the engine */
   // ---- the old readers' view: position and velocity in the plane, the heading and its rate ----
   get x(): number { return this.p[0]; } set x(v: number) { this.p[0] = v; }
   get y(): number { return this.p[1]; } set y(v: number) { this.p[1] = v; }
@@ -326,7 +326,7 @@ export class Vehicle {
     if (AT) { // the converter's fluid torque, and the lock-up clutch across it (engaged in the upper gears over its speed,
       // out through a shift): the clutch takes what would bring the two sides together, up to its capacity
       const cv = converter(AT.C0, AT.box, we, wd * Gr), lockOn = this.shift <= 0 && !this.reverse && this.gear >= AT.box.lockGear && vxh * 3.6 > AT.box.lockKmh;
-      this.atLock = lockOn ? Math.min(1, this.atLock + dt / 0.5) : 0; const capL = this.atLock * torqueAt(c, c.torqueRpm) * 1.6, Tl = Math.max(-capL, Math.min(capL, need - cv.Ti));
+      this.atLock = lockOn ? Math.min(1, this.atLock + dt / 0.5) : 0; const capL = this.atLock * Math.max(c.torquePeak ?? 0, torqueAt(c, c.torqueRpm)) * 1.8,   /* the lock-up clutch: well over the engine's peak with its boost */ Tl = Math.max(-capL, Math.min(capL, need - cv.Ti));
       TcE = cv.Ti + Tl; TcT = cv.Tt + Tl; this.atSR = cv.SR; this.engagedLast = this.atLock; }
     else { TcE = Tc; TcT = Tc; }
     this.rpm = Math.max(alive ? idle * 0.5 : 0, we + (Te - TcE) / this.Ie * dt) * 30 / Math.PI;

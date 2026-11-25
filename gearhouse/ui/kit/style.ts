@@ -56,8 +56,8 @@ export const KIT_CSS = tokenCss() + `
 .gk-badge.gk-new{--f0:var(--gk-r0);--f1:var(--gk-r1)}.gk-badge.gk-beta{--f0:var(--gk-g0);--f1:var(--gk-g1)}.gk-badge.gk-lockb{--f0:var(--gk-grey0);--f1:var(--gk-grey1)}.gk-badge.gk-hot{--f0:var(--gk-o0);--f1:var(--gk-o1)}
 .gk-badge.gk-pin{position:absolute;right:-8px;top:-12px;z-index:2}
 /* ---- the class (docs/systems/115 §3-7): the class colour on the border band and the glow only, the face dark, the text
-   white; a locked rung darkened (with the lock icon beside it), never greyed. Its room meters: the rung's span a band
-   of its colour along the track's foot, the cap the track's right end ---- */
+   white; a locked rung darkened (with the lock icon beside it), never greyed. Its room meters: the track the rung's span
+   (the cap below to its own cap, the right end thick), a band of the class colour along its foot ---- */
 .gk-tier{--c0:var(--gk-cls-n0);--c1:var(--gk-cls-n1);display:inline-flex;align-items:center;gap:5px;font-family:var(--gk-head);font-weight:700;font-style:italic;font-size:.9rem;line-height:1;letter-spacing:.04em;color:#fff;text-shadow:var(--gk-edge-s);
   padding:3px 9px 4px 15px;background:linear-gradient(90deg,var(--c0) 0 6px,var(--c1) 6px 9px,#1b1e22 9px);border:2.5px solid var(--gk-ink);border-radius:3px;box-shadow:0 0 0 2px var(--c0),0 0 10px 2px var(--c0);transform:skewX(-8deg);white-space:nowrap;vertical-align:middle}
 .gk-tier>*{transform:skewX(8deg)}.gk-tier-cd{font-size:1.08em}.gk-tier-nm{font-family:var(--gk-body);font-style:normal;font-size:.86em;letter-spacing:0}.gk-tier-ch{font-size:.9em;opacity:.85;letter-spacing:-.08em}
@@ -68,7 +68,7 @@ export const KIT_CSS = tokenCss() + `
 .gk-room-k{position:relative;height:13px;border:2px solid var(--gk-ink);border-right-width:4px;border-radius:2px;background:var(--gk-well);overflow:hidden;transform:skewX(-12deg)}
 .gk-room-k>i{position:absolute;display:block}
 .gk-room-f{left:0;top:0;bottom:0;width:calc(var(--k,0) * 100%);background:linear-gradient(var(--gk-metal0) 0 60%,var(--gk-metal1) 60%);border-right:2px solid var(--gk-ink);transition:width .4s ease-out}
-.gk-room-b{right:0;bottom:0;height:4px;left:calc(var(--b,0) * 100%);background:var(--c0)}
+.gk-room-b{left:0;right:0;bottom:0;height:4px;background:var(--c0)}
 .gk-room.gk-over .gk-room-f{background:linear-gradient(var(--gk-r0) 0 60%,var(--gk-r1) 60%)}.gk-room.gk-over .gk-room-t{color:var(--gk-r0)}
 .gk-room.gk-open .gk-room-f,.gk-room.gk-open .gk-room-b{display:none}
 /* ---- stripes ---- */

@@ -45,6 +45,8 @@ export function tierOf(f: TierFigures): Tier {
 
 /** a rung's floor: the cap of the road rung below it (0 for N1; the racing rungs have none) */
 export function tierFloor(t: Tier): number { const i = ROAD_TIERS.indexOf(t); return i > 0 ? ROAD_TIERS[i - 1]!.hpMax : 0; }
+/** the limiter of the road rung below (0 for N1): where a rung's top-speed meter starts */
+export function tierTopFloor(t: Tier): number { const i = ROAD_TIERS.indexOf(t); return i > 0 ? ROAD_TIERS[i - 1]!.topMax : 0; }
 
 /** the room a car has under a rung's caps: power and top speed (positive: under the cap; negative: past it, which C0
  *  only shows; Infinity: no cap), each also as the share of the cap it uses (0 where there is no cap) */

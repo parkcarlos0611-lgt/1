@@ -20,7 +20,7 @@ import { bareMesh, bounce } from '../render/car/suspension/view';
 import { setPartStyle, partStyle, styleForLook } from '../render/car/powertrain';
 import { designSpec, designFigures, designHeight, type DesignFigures } from '../race/design';
 import { CLEARANCE, type FitResult } from '../race/fit';
-import { tierOf, tierRoom, tierFloor, tierChevrons, roomText, TIER_GROUP_NAME, type Tier } from '../race/tiers';
+import { tierOf, tierRoom, tierFloor, tierTopFloor, tierChevrons, roomText, TIER_GROUP_NAME, type Tier } from '../race/tiers';
 import { BODY_NAME } from '../core/names';
 import { LIMITS, BODY_BASES, isModelBase, MODEL_OWN, BUMPERS959, LAMPS959, WHEELS959, plateOk, type BodyBase, type ModelSwaps, BODY_LIMITS, DIMS, LAYOUTS, LAYOUT_NAME, type DimKey, GRADE_NAME, GRADES, gradeLock, gradeBoost, gradeRedline, normalise, applyPatch, type BaseId, type Design, type NoseKind, type TailKind, type WheelKind, FACE_KEYS, faceLock, type Face, type FaceKey,
   type Grade, type Structure, type Panels, type Intake, type Compression, type Sump, type Block, type Turbos, type Interior,
@@ -374,13 +374,15 @@ function figures() { const f = designFigures(D), s = designSpec(D); lastFigs = f
  *  the caps yet (C1). On a phone's folded strip the badge and the power's room stand alone */
 const tierBadge = (t: Tier) => `<span class="gk-tier gk-tier-${t.group}" title="차급 ${t.id} · ${TIER_GROUP_NAME[t.group]}: 출력(hp)으로만 정합니다"><span class="gk-tier-cd">${t.id}</span><span class="gk-tier-nm">${TIER_GROUP_NAME[t.group]}</span><span class="gk-tier-ch" aria-hidden="true">${tierChevrons(t)}</span></span>`;
 function roomRow(name: string, v: number, cap: number, floor: number, unit: string, t: Tier): string {
-  const open = !Number.isFinite(cap), r = cap - v, k = open ? 0 : Math.max(0, Math.min(1, v / cap)), b = open ? 0 : Math.max(0, Math.min(1, floor / cap));
+  // the track spans the rung (from the cap below to its own), so the room reads at a glance; under the floor it is empty
+  const open = !Number.isFinite(cap), r = cap - v, k = open ? 0 : Math.max(0, Math.min(1, (v - floor) / (cap - floor)));
   const text = open ? '상한 없음' : r < 0 ? `${roomText(r, unit)} <small>넘음 · ${cap.toLocaleString()}</small>` : `${roomText(r, unit)} <small>/ ${cap.toLocaleString()}</small>`;
+  const span = open ? '' : ` title="${name}: ${floor.toLocaleString()}~${cap.toLocaleString()} ${unit} 칸에서 ${Math.round(v).toLocaleString()}"`;
   return `<div class="gk-room gk-tier-${t.group}${open ? ' gk-open' : ''}${r < 0 ? ' gk-over' : ''}" role="meter" aria-label="${name} 여유" aria-valuenow="${Math.round(v)}"${open ? '' : ` aria-valuemax="${cap}"`}>`
-    + `<span class="gk-room-l">${name}</span><div class="gk-room-k"><i class="gk-room-b" style="--b:${b.toFixed(3)}"></i><i class="gk-room-f" style="--k:${k.toFixed(3)}"></i></div><span class="gk-room-t">${text}</span></div>`; }
+    + `<span class="gk-room-l">${name}</span><div class="gk-room-k"${span}><i class="gk-room-b"></i><i class="gk-room-f" style="--k:${k.toFixed(3)}"></i></div><span class="gk-room-t">${text}</span></div>`; }
 function showTier(f: DesignFigures) { const t = tierOf(f), room = tierRoom(f, t);
   $('cls').innerHTML = `${tierBadge(t)}<small class="room">${roomText(room.hp, 'hp')}</small><small class="form">· ${esc(f.form)}</small>`;
-  $('tier').innerHTML = roomRow('출력 상한', f.hp, t.hpMax, tierFloor(t), 'hp', t) + roomRow('제한기', f.topKmh, t.topMax, 0, 'km/h', t); }
+  $('tier').innerHTML = roomRow('출력 상한', f.hp, t.hpMax, tierFloor(t), 'hp', t) + roomRow('제한기', f.topKmh, t.topMax, tierTopFloor(t), 'km/h', t); }
 /** each step marked with the fit checks that concern it and are not clean */
 function stepMarks(r: FitResult[]) { for (const [id, b] of stepBtn) { const mine = r.filter(x => FIT_STEP[x.part] === id), nb = mine.filter(x => x.verdict === 'blocked').length, nm = mine.filter(x => x.verdict === 'modified').length, badge = b.querySelector<HTMLElement>('.badge')!;
   badge.hidden = !nb && !nm; badge.className = `badge${nb ? ' blocked' : ''}`; badge.textContent = nb ? `⛔${nb > 1 ? nb : ''}` : `⚠️${nm > 1 ? nm : ''}`;

@@ -3,7 +3,7 @@
 // are known. The measures are those of tools/ref/surfacecheck.ts: a line's turning at each point (convex +), the
 // changes of its sign (a wave), short dimples, a cell's twist, a flat panel's distance from its plane, the fold at
 // every edge, and the shading error of the game's normals against the surface's own.
-import { NC, NR, type Tag } from './cage';
+import type { Tag } from './cage';
 import { cut, type Shell959 } from './shell';
 import { ekey, faceNormal, type V } from './subdiv';
 
@@ -29,7 +29,7 @@ export const PANELS: Panel[] = [
 ];
 
 /** the fine points of the main grid: [2 * row][2 * column] the cage points', between them the edges' and faces' (-1 none) */
-export function fineGrid(S: Shell959): number[][] { const M = S.cage.M, f = S.fine, faceOf = new Map<string, number>(); S.cage.F.forEach((q, k) => faceOf.set(q.slice().sort((a, b) => a - b).join(','), k));
+export function fineGrid(S: Shell959): number[][] { const M = S.cage.M, NR = M.length, NC = M[0]!.length, f = S.fine, faceOf = new Map<string, number>(); S.cage.F.forEach((q, k) => faceOf.set(q.slice().sort((a, b) => a - b).join(','), k));
   const G: number[][] = Array.from({ length: 2 * NR - 1 }, () => new Array<number>(2 * NC - 1).fill(-1)), at = (i: number, j: number) => M[i]?.[j] ?? -1;
   for (let i = 0; i < NR; i++) for (let j = 0; j < NC; j++) { const a = at(i, j); if (a < 0) continue; G[2 * i]![2 * j] = f.vp[a]!;
     const b = at(i + 1, j), d = at(i, j + 1), c = at(i + 1, j + 1); if (b >= 0) G[2 * i + 1]![2 * j] = f.ep.get(ekey(a, b)) ?? -1; if (d >= 0) G[2 * i]![2 * j + 1] = f.ep.get(ekey(a, d)) ?? -1;
@@ -52,10 +52,10 @@ export function lineStat(pts: V[], out: V[]): LineStat { const k = turning(pts, 
 
 export interface PanelStat { panel: Panel; lines: number; /** the most sign changes on one line across the car and along it */ across: number; along: number; dimples: number; twistP95: number; twistMax: number; /** furthest point from the panel's plane (mm) */ off: number }
 export interface Measure { panels: PanelStat[]; /** edges of the painted skin by fold: under 8, 8-20, 20-35 not at a crease (should be none on a panel), 35 and over not at a crease */ smooth: number; soft: number; mushy: { at: V; deg: number; panel: string }[]; unmarked: { at: V; deg: number; panel: string }[]; slivers: number }
-export function measure(S: Shell959): Measure { const G = fineGrid(S), P = S.P;
+export function measure(S: Shell959, panels: Panel[] = PANELS): Measure { const G = fineGrid(S), P = S.P;
   // the way out at each point: its faces' normals
   const vn: V[] = P.map(() => [0, 0, 0]); S.F.forEach(f => { const n = faceNormal(P, f); for (const v of f) { const o = vn[v]!; o[0] += n[0]; o[1] += n[1]; o[2] += n[2]; } }); const out = vn.map(unit);
-  const panels: PanelStat[] = PANELS.map(p => { const [i0, i1] = [p.rows[0] * 2, p.rows[1] * 2], [j0, j1] = [p.cols[0] * 2, p.cols[1] * 2]; let across = 0, along = 0, dimples = 0, lines = 0; const twist: number[] = [];
+  const stats: PanelStat[] = panels.map(p => { const [i0, i1] = [p.rows[0] * 2, p.rows[1] * 2], [j0, j1] = [p.cols[0] * 2, p.cols[1] * 2]; let across = 0, along = 0, dimples = 0, lines = 0; const twist: number[] = [];
     const run = (idx: number[], al: boolean) => { let cur: number[] = []; const flush = () => { if (cur.length >= 4) { const st = lineStat(cur.map(v => P[v]!), cur.map(v => out[v]!)); lines++; dimples += st.dimples; if (al) along = Math.max(along, st.changes); else across = Math.max(across, st.changes); } cur = []; }; for (const v of idx) { if (v >= 0) cur.push(v); else flush(); } flush(); };
     for (let j = j0; j <= j1; j++) run(Array.from({ length: i1 - i0 + 1 }, (_, k) => G[i0 + k]![j]!), true);
     for (let i = i0; i <= i1; i++) run(Array.from({ length: j1 - j0 + 1 }, (_, k) => G[i]![j0 + k]!), false);
@@ -72,7 +72,7 @@ export function measure(S: Shell959): Measure { const G = fineGrid(S), P = S.P;
   for (const [key, fs] of E) { if (fs.length !== 2) continue; const d = ang(faceNormal(P, S.F[fs[0]!]!), faceNormal(P, S.F[fs[1]!]!)), [a] = key.split('|').map(Number) as [number, number];
     if (d < 8) smooth++; else if (d < 20) soft++; else if (!S.crease.has(key) && !/Rim$|archLip/.test(S.tag[fs[0]!]!.panel) && !/Rim$|archLip/.test(S.tag[fs[1]!]!.panel)) (d < 35 ? mushy : unmarked).push({ at: P[a]!, deg: d, panel: S.tag[fs[0]!]!.panel }); }
   S.F.forEach((f, k) => { if (!paint(S.tag[k]!) || /Rim$/.test(S.tag[k]!.panel)) return; for (const t of cut(P, f)) { const [a, b, c] = t.map(v => P[v]!) as [V, V, V]; if (Math.min(ang(sub(b, a), sub(c, a)), ang(sub(a, b), sub(c, b)), ang(sub(a, c), sub(b, c))) < 5) slivers++; } });
-  return { panels, smooth, soft, mushy, unmarked, slivers }; }
+  return { panels: stats, smooth, soft, mushy, unmarked, slivers }; }
 
 /** The shading error (docs/systems/108 S7): the game's normals (render/car/edges.ts surfaceNormals: smoothed per
  *  surface, split at the mesh's creases, at folds over 35 degrees and where the material changes) against the shell's

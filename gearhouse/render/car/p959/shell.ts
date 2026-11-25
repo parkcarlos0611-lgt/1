@@ -20,16 +20,27 @@ function finePath(c: Cage959, f: Fine, path: number[], closed = false): number[]
   for (let q = 0; q < n; q++) { out.push(f.vp[path[q]!]!); if (q + 1 < n || closed) out.push(f.ep.get(ekey(path[q]!, path[(q + 1) % n]!))!); } return out; }
 
 export interface ShellOpts extends CageOpts { /** leave the sockets flush (no recess) */ flush?: boolean }
-export function buildShell(o: ShellOpts = {}): Shell959 {
-  const cage = buildCage(o), fine = subdivide(cage), P = fine.P, F: number[][] = fine.F.map(q => q.slice()), tag: Tag[] = fine.parent.map(k => cage.tag[k]!), nSub = F.length;
+export function buildShell(o: ShellOpts = {}): Shell959 { const fr = frameOf(o.dims), lamps = o.lamps !== false, details = o.details !== false;
+  return shellFrom(buildCage(o), { arches: [{ x: fr.archF[0], z: fr.archF[1] }, { x: fr.archR[0], z: fr.archR[1] }], archR: DIM.archR,   // the hubs on the stretched body
+    sinks: o.flush ? [] : [...[false, true].flatMap(right => [...(lamps ? [{ pick: (t: Tag) => t.socket === 'headLamp' && !!t.right === right, depth: 14, inset: 5, rim: 'headLampRim' }] : []), ...(details ? [{ pick: (t: Tag) => t.socket === 'sideIntake' && !!t.right === right, depth: 34, inset: 4, rim: 'sideIntakeRim' }] : [])]),
+      ...(details ? [{ pick: (t: Tag) => t.socket === 'tailLamp', depth: 9, inset: 3, rim: 'tailLampRim' }] : [])] }); }
+
+/** a socket's recess: the cells it picks sunk `depth` below the skin, a wall `inset` in from their loop (its panel `rim`) */
+export interface Sink { pick: (t: Tag) => boolean; depth: number; inset: number; rim: string }
+/** how a cage is finished into a shell: its arches' hubs on the body (the ring of open edges at radius `archR` round
+ *  each, at |y| over `archY`, trued and given a lip and a well), the sockets sunk in order */
+export interface ShellFinish { arches: { x: number; z: number }[]; archR: number; archY?: number; sinks?: Sink[] }
+/** any cage-built body's shell (the 959's above; the N33's: render/car/n33): the cage subdivided once, its arches,
+ *  its sockets, its floor, its creases, normals, lines and loops */
+export function shellFrom(cage: Cage959, o: ShellFinish): Shell959 {
+  const fine = subdivide(cage), P = fine.P, F: number[][] = fine.F.map(q => q.slice()), tag: Tag[] = fine.parent.map(k => cage.tag[k]!), nSub = F.length;
   const crease = new Set<string>(); for (const key of cage.crease) { const [a, b] = key.split('|').map(Number) as [number, number], m = fine.ep.get(key)!; crease.add(ekey(fine.vp[a]!, m)); crease.add(ekey(m, fine.vp[b]!)); }
   const pt = (p: V) => P.push(p) - 1;
   const openEdges = () => { const m = new Map<string, [number, number, number]>(); F.forEach((f, k) => f.forEach((a, q) => { const b = f[(q + 1) % f.length]!, key = ekey(a, b); if (m.has(key)) m.set(key, [0, 0, -1]); else m.set(key, [a, b, k]); })); return [...m.values()].filter(e => e[2] >= 0); };
 
   // ---- the arches: the ring trued to its circle, a lip turned in, a well behind
-  const fr = frameOf(o.dims), arches = [{ x: fr.archF[0], z: fr.archF[1] }, { x: fr.archR[0], z: fr.archR[1] }];   // the hubs on the stretched body
-  for (const side of [1, -1]) for (const a of arches) { const R = DIM.archR, rad = (p: V) => Math.hypot(p[0] - a.x, p[2] - a.z);
-    const es = openEdges().filter(([u, v]) => [u, v].every(w => P[w]![1] * side > 600 && Math.abs(rad(P[w]!) - R) < 30)); if (!es.length) continue;
+  for (const side of [1, -1]) for (const a of o.arches) { const R = o.archR, rad = (p: V) => Math.hypot(p[0] - a.x, p[2] - a.z);
+    const es = openEdges().filter(([u, v]) => [u, v].every(w => P[w]![1] * side > (o.archY ?? 600) && Math.abs(rad(P[w]!) - R) < 30)); if (!es.length) continue;
     // order the chain: each open edge runs a -> b in its face's winding
     const next = new Map<number, number>(), has = new Set<number>(); for (const [u, v] of es) { next.set(u, v); has.add(v); }
     let s = [...next.keys()].find(u => !has.has(u))!; const ring = [s]; while (next.has(s)) { s = next.get(s)!; ring.push(s); }
@@ -43,7 +54,7 @@ export function buildShell(o: ShellOpts = {}): Shell959 {
 
   // ---- the sockets: a shallow recess for each module (docs/systems/109 §3). The loop round it stays where it is (the
   //      module's boundary); inside it a wall steps in and the floor lies `depth` below the skin
-  if (!o.flush) { const sink = (pick: (t: Tag) => boolean, depth: number, inset: number, rim: string) => { const S = new Set<number>(); F.forEach((_, k) => { if (k < nSub && pick(tag[k]!)) S.add(k); }); if (!S.size) return;
+  { const sink = (pick: (t: Tag) => boolean, depth: number, inset: number, rim: string) => { const S = new Set<number>(); F.forEach((_, k) => { if (k < nSub && pick(tag[k]!)) S.add(k); }); if (!S.size) return;
       const use = new Map<string, number>(), vn = new Map<number, V>(), vc = new Map<number, V>(), cnt = new Map<number, number>();
       for (const k of S) { const f = F[k]!, n = unit(faceNormal(P, f)), c = mul(f.reduce((q, v) => add(q, P[v]!), [0, 0, 0] as V), 1 / f.length);
         f.forEach((v, q) => { const key = ekey(v, f[(q + 1) % f.length]!); use.set(key, (use.get(key) ?? 0) + 1); vn.set(v, add(vn.get(v) ?? [0, 0, 0], n)); vc.set(v, add(vc.get(v) ?? [0, 0, 0], c)); cnt.set(v, (cnt.get(v) ?? 0) + 1); }); }
@@ -54,10 +65,8 @@ export function buildShell(o: ShellOpts = {}): Shell959 {
         const c = mul(vc.get(v)!, 1 / cnt.get(v)!), d = sub(c, P[v]!), flat = sub(d, mul(n, d[0] * n[0] + d[1] * n[1] + d[2] * n[2])), l = len(flat) || 1; moved.set(v, pt(add(add(P[v]!, down), mul(flat, inset / l)))); }
       for (const k of S) F[k] = F[k]!.map(v => moved.get(v) ?? v);
       for (const [a, b] of edges) { F.push([a, b, moved.get(b)!, moved.get(a)!]); const t = tag[[...S][0]!]!; tag.push({ region: t.region, mat: 'paint', panel: rim, right: P[a]![1] + P[b]![1] < 0 }); crease.add(ekey(a, b)); crease.add(ekey(moved.get(a)!, moved.get(b)!)); } };
-    // a socket whose module is not there (the lump's: its lamps, its intakes, its tail lamp band) stays flush
-    const lamps = o.lamps !== false, details = o.details !== false;
-    for (const right of [false, true]) { if (lamps) sink(t => t.socket === 'headLamp' && !!t.right === right, 14, 5, 'headLampRim'); if (details) sink(t => t.socket === 'sideIntake' && !!t.right === right, 34, 4, 'sideIntakeRim'); }
-    if (details) sink(t => t.socket === 'tailLamp', 9, 3, 'tailLampRim'); }
+    // a socket whose module is not there (the lump's: its lamps, its intakes, its tail lamp band) stays flush: not in the list
+    for (const s of o.sinks ?? []) sink(s.pick, s.depth, s.inset, s.rim); }
 
   // ---- the underside: every edge still open is on the outline of the floor; each is joined to the centre line
   { const centre = new Map<string, number>(), cOf = (v: number) => { const p = P[v]!; if (Math.abs(p[1]) < 1e-6) return v; const key = `${Math.round(p[0] * 10)},${Math.round(p[2] * 10)}`; let c = centre.get(key); if (c === undefined) { c = pt([p[0], 0, p[2]]); centre.set(key, c); } return c; };

@@ -4,6 +4,7 @@
 // its anchor stands, its heading (where its -x points; its front, -y, faces the track when placed by `facing`), and
 // for a deck over the track its height. Seeded, so the woods stand in the same places every time.
 import type { Track } from './track';
+import type { EdgeLayout } from './trackside';
 
 export interface Placed { kind: string; x: number; y: number; heading: number; z?: number; overhead?: boolean; /** a size the prop's mesh takes (an abutment's height, mm) */ arg?: number }
 export interface GroundLine { pts: [number, number][]; width: number; kind: 'rail' | 'river' | 'road' }
@@ -16,7 +17,8 @@ export interface GroundArea { pts: [number, number][]; kind: 'apron' | 'mown' | 
 export interface Tree { x: number; y: number; z: number; kind: number; size: number; heading: number; rank: number }
 /** props: drawn one by one (and in the baked pictures); detail: the many small things of the site plan (review 181),
  *  which the live renderer gathers into a few meshes by place; trees: the woods, instanced */
-export interface Scenery { props: Placed[]; lines: GroundLine[]; areas: GroundArea[]; railway: [number, number][]; trees?: Tree[]; detail?: Placed[] }
+export interface Scenery { props: Placed[]; lines: GroundLine[]; areas: GroundArea[]; railway: [number, number][]; trees?: Tree[]; detail?: Placed[];
+  /** the real circuit's edge (docs/systems/111: kerbs, run-off, traps, barriers, tyres, fence; race/trackside.ts) */ edge?: EdgeLayout }
 /** the graphics setting 풍경 밀도 (scenery density): how many of the woods' trees stand */
 export type Density = 'low' | 'mid' | 'high';
 export const DENSITY_SHARE: Record<Density, number> = { low: 0.3, mid: 0.6, high: 1 };

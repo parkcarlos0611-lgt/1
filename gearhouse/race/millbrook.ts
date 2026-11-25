@@ -25,7 +25,7 @@ export const MILLBROOK_OUTER: TrackSpec = {
     { s0: HOME, s1: ME, height: 9.5, curve: 2.2, ease: 140, name: "Members' Banking" },
     { s0: RA, s1: BY, height: 6.4, curve: 1.8, ease: 160, name: 'Byfleet Banking' }],
   bumps: [
-    { s: HOME + 70, height: 0.16, len: 7, name: "under the Members' Bridge" },   // the famous one: cars left the ground here
+    // docs/systems/111 T1: the 16 cm step under the Members' Bridge (cars left the ground there) is levelled with the bridge gone
     { s: HOME + 260, height: 0.07, len: 5 }, { s: ME + 380, height: 0.06, len: 5 },
     { s: RA + 420, height: 0.09, len: 6, name: 'Byfleet Bridge over the river' }, { s: BY - 200, height: 0.05, len: 4 }],
   landmarks: [

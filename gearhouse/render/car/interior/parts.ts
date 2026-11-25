@@ -113,9 +113,9 @@ export function floorAndRear(b: InteriorBuild, A: CabinAnchors, T: Trim): void {
   for (const sg of [-1, 1]) b.part(sg > 0 ? 'cabinSillL' : 'cabinSillR', T.carpet, 0.05).box(x0, A.rearX, sg * (h - 34), sg * h, A.floorZ, A.sillZ);
   // the rear: the small seats' bases and their backs as one step up to the shelf
   const sx = A.rearX - 300, sz = A.floorZ + 215; b.part('cabinRear', T.seat2, 0.15, 'leather').loft([[sx, sz], [sx + 30, sz + 22], [A.rearX - 40, sz + 8], [A.rearX + 70, A.shelfZ], [A.rearX + 330, A.shelfZ], [A.rearX + 330, A.floorZ], [sx, A.floorZ]].map(([x, z]) => [x!, -h, z!] as V).map((p, _, r) => r).slice(0, 1).flatMap(r => [r, r.map(([x, , z]) => [x, h, z] as V)])); }
-export function doorCards(b: InteriorBuild, A: CabinAnchors, T: Trim): void { const [d0, d1] = A.doorX, h = A.half;
+export function doorCards(b: InteriorBuild, A: CabinAnchors, T: Trim, which: 'both' | 'L' | 'R' | 'none' = 'both'): void { const [d0, d1] = A.doorX, h = A.half;
   b.frame({ o: [0, 0, 0], x: [1, 0, 0], y: [0, 1, 0], z: [0, 0, 1] });
-  for (const sg of [-1, 1]) { const nm = sg > 0 ? 'doorCardL' : 'doorCardR', y = (d: number) => sg * (h - d);
+  for (const sg of [-1, 1]) { if (which === 'none' || which === (sg > 0 ? 'R' : 'L')) continue; const nm = sg > 0 ? 'doorCardL' : 'doorCardR', y = (d: number) => sg * (h - d);
     b.part(nm, T.door, 0.15, 'leather').box(d0, d1, y(0), y(-14), A.sillZ, A.beltZ);
     b.part(`${nm}Roll`, T.dash, 0.18, 'leather').loft([d0, d1].map(x => ([[0, 0], [-26, -4], [-34, -30], [-26, -58], [0, -64]] as const).map(([dy, dz]) => [x, y(-dy), A.beltZ + dz] as V)));
     b.part(`${nm}Armrest`, T.door, 0.15, 'leather').loft([d0 + 300, d0 + 380, d1 - 250, d1 - 200].map((x, i) => { const k = i === 0 || i === 3 ? 0.35 : 1; return ([[0, 0], [62 * k, -6], [70 * k, -34], [40 * k, -62], [0, -70]] as const).map(([dy, dz]) => [x, y(dy), A.beltZ - 250 + dz] as V); }));

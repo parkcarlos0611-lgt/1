@@ -9,9 +9,10 @@ import { freeGpu, gpuMesh, program, placeMesh, mul, translate, rot, scale, ATTR,
 import { STYLE, screenPx, makeAtlas, type Atlas } from './style';
 import { RIG_BONES, poseRig } from '../car/suspension';
 import { ENGINE_BONES, poseInternals } from '../car/powertrain/internals';
+import { DIAL_BONES, poseDials } from '../car/interior/gauges';
 /** the bones the shaders hold: a suspension's or an engine's insides, whichever needs more (three rows each; with the
  *  tyres' 32 and the four matrices about 220 of the 256 vertex rows WebGL2 promises) */
-export const BONE_SLOTS = Math.max(RIG_BONES, ENGINE_BONES);
+export const BONE_SLOTS = Math.max(RIG_BONES, ENGINE_BONES, DIAL_BONES);
 /** a rotation (three rows) as a matrix */
 const m4of = (R: number[][]): M4 => { const m = new Float32Array(16); for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) m[c * 4 + r] = R[r]![c]!; m[15] = 1; return m; };
 import type { GroundData } from './ground';
@@ -27,7 +28,7 @@ export interface LiveView { x: number; y: number; z: number; /** the world headi
   eye?: [number, number, number]; fov?: number; near?: number }
 /** a tyre's shape this moment (review 101): its ring's give at 32 angles from straight down toward the front (m), the patch's shift (m, along and across) */
 export interface LiveTyre { u: Float32Array; sx: number; sy: number }
-export interface LiveCar { /** age: rust, fading, dirt (0..1) (review 104) */ wear?: [number, number, number]; /** FL FR RL RR */ tyres?: LiveTyre[]; g: GpuMesh; x: number; y: number; z: number; yaw: number; roll: number; pitch: number; /** each front wheel's own angle (rad, left +): the inner one more */ steerL: number; steerR: number; spin: number; player: boolean; /** head lamps alight 0..1, brakes on (review 117) */ lamps?: number; brake?: boolean; /** the crank's angle (degrees, 0..720): an engine's insides posed (the workshop's cutaway) */ crank?: number; /** each wheel's rise against the body (m) and lean (rad, top to the left +): the suspension's travel (review 120) */ travel?: number[]; camber?: number[] }
+export interface LiveCar { /** age: rust, fading, dirt (0..1) (review 104) */ wear?: [number, number, number]; /** FL FR RL RR */ tyres?: LiveTyre[]; g: GpuMesh; x: number; y: number; z: number; yaw: number; roll: number; pitch: number; /** each front wheel's own angle (rad, left +): the inner one more */ steerL: number; steerR: number; spin: number; player: boolean; /** head lamps alight 0..1, brakes on (review 117) */ lamps?: number; brake?: boolean; /** the crank's angle (degrees, 0..720): an engine's insides posed (the workshop's cutaway) */ crank?: number; /** each wheel's rise against the body (m) and lean (rad, top to the left +): the suspension's travel (review 120) */ travel?: number[]; camber?: number[]; /** a cabin's readings, in its rig's order (render/car/interior/gauges.ts stepDials); none: the needles at rest */ dials?: ArrayLike<number> | null }
 export interface LiveProp { g: GpuMesh; x: number; y: number; z: number; h: number; /** its own placing (else by x, y, z, h), its outline's width, a name to follow it frame to frame (a moving piece) */ m?: M4; outline?: number; key?: string }
 /** the drift-game style's switches (look 4, docs/systems/109 §5): the inverted hull's outline and the drawn lines
  *  (default on), the outline pass filling the gaps (default on); their widths (px at 1080 high: STYLE), the picture's
@@ -939,7 +940,7 @@ export class LiveRenderer {
     const seen = pv ? 650 : reach, near = (x: number, y: number, r: number) => Math.abs(x - v.x) < seen + r + 20 && Math.abs(y - v.y) < seen + r + 20;
     const W = this.layer?.woods; W?.update(pv ? pv.e[0] : v.x, pv ? pv.e[1] : v.y, !pv, seen);
     const ps = (this.layer ? props.concat(this.layer.statics) : props).filter(p => near(p.x, p.y, p.g.radius)), carM = cars.map(q => this.carParts(q));
-    if (fr) { for (const q of cars) { const g = q.g; for (const p of [g.body, g.glass, ...(g.susp ? [g.susp.part] : []), ...(g.inner ? [g.inner.part] : []), ...g.wheels.flatMap(w => w.glass ? [w.part, w.glass] : [w.part])]) styleUp(gl, p); } if (!this.atlas && st.atlas !== false) this.setAtlas(makeAtlas(1024)); }   /* look 4: each car's style layers, made once */
+    if (fr) { for (const q of cars) { const g = q.g; for (const p of [g.body, g.glass, ...(g.susp ? [g.susp.part] : []), ...(g.inner ? [g.inner.part] : []), ...(g.dials ? [g.dials.part] : []), ...g.wheels.flatMap(w => w.glass ? [w.part, w.glass] : [w.part])]) styleUp(gl, p); } if (!this.atlas && st.atlas !== false) this.setAtlas(makeAtlas(1024)); }   /* look 4: each car's style layers, made once */
     // the head lamps alight (review 117): each lamp's middle and beam in the world, the nearest eight
     const lmpP: number[] = [], lmpD: number[] = []; cars.forEach((q, i) => { if (!q.lamps) return; const B = carM[i]!.body; for (const l of q.g.lamps) { if (l.flag !== 1 || lmpP.length >= 24) continue;
         const [x, y, z] = l.c, [a, b, c] = l.ax, wx = B[0]! * x + B[4]! * y + B[8]! * z + B[12]!, wy = B[1]! * x + B[5]! * y + B[9]! * z + B[13]!, wz = B[2]! * x + B[6]! * y + B[10]! * z + B[14]!;
@@ -1077,6 +1078,7 @@ export class LiveRenderer {
     // bones in one draw, each wheel where its upright carries it (the camber and the toe are the linkage's own)
     const pose = g.susp ? poseRig(g.susp.rig, (q.travel ?? [0, 0, 0, 0]).map(t => t * 1000), q.steerL, q.steerR, q.spin) : null; if (pose) opaque.push([g.susp!.part, body, undefined, pose.bones]);
     if (g.inner) opaque.push([g.inner.part, body, undefined, poseInternals(g.inner.rig, q.crank ?? 0)]);   // an engine's insides at the crank's angle, on their bones in one draw
+    if (g.dials) opaque.push([g.dials.part, body, undefined, poseDials(g.dials.rig, q.dials, new Float32Array(BONE_SLOTS * 12))]);   // a cabin's needles at their readings (and its steering wheel), on their bones in one draw
     for (const w of g.wheels) { const left = w.hub[1] > 0, wi = (w.front ? 0 : 2) + (left ? 0 : 1), pw = pose?.wheels[wi];
       const M = pw ? mul(body, mul(translate(w.hub[0] + pw.wc[0] - pw.from[0], w.hub[1] + pw.wc[1] - pw.from[1], w.hub[2] + pw.wc[2] - pw.from[2]), m4of(pw.R))) : mul(body, mul(translate(w.hub[0], w.hub[1], w.hub[2] + (q.travel?.[wi] ?? 0) * 1000), mul(w.front ? rot('z', -(left ? q.steerL : q.steerR)) : translate(0, 0, 0), rot('x', -(q.camber?.[wi] ?? 0)))));
       const ty = q.tyres?.[(w.front ? 0 : 2) + (left ? 0 : 1)], def = new Float32Array(32); if (ty) for (let k = 0; k < 32; k++) def[k] = ty.u[k]! * 1000;

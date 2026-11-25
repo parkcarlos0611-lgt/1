@@ -45,7 +45,7 @@ export const TYRES: Record<'crossply' | 'racing30' | 'racing50' | 'radial', Tyre
   radial:   { mu: 1.12, B: 2.4, C: 1.4, E: 0.3, loadSens: 0.1, peakSlip: 0.08, peakAngle: 0.08 } };
 
 
-type V3 = [number, number, number];
+export type V3 = [number, number, number];
 const dot = (a: V3, b: V3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2], cross = (a: V3, b: V3): V3 => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
 const norm = (a: V3): V3 => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };
 /** a unit quaternion [w, x, y, z] turning body axes into the world's */
@@ -61,7 +61,9 @@ function frameQ(h: number, n: V3): Q { const f0: V3 = [Math.cos(h), Math.sin(h),
   else if (m11 > m22) { const S = Math.sqrt(1 + m11 - m00 - m22) * 2; q = [(z[0] - x[2]) / S, (y[0] + x[1]) / S, 0.25 * S, (z[1] + y[2]) / S]; }
   else { const S = Math.sqrt(1 + m22 - m00 - m11) * 2; q = [(x[1] - y[0]) / S, (z[0] + x[2]) / S, (z[1] + y[2]) / S, 0.25 * S]; }
   return q; }
-const SUB = 0.001;   // the inner step (s)
+const SUB = 0.001;
+/** off the concrete with no edge given: the grass */
+const OFF_ROAD = { mu: 0.55, crr: 0.07, drag: 0 };   // the inner step (s)
 
 /** one axle's running gear: its kind, where it is, its masses and springs */
 interface Axle { /** an anti-roll bar's stiffness (N/m of the two sides' difference) */ arb: number; kind: AxleKind; x: number; tw: number; ts: number; mu: number; Ia: number; k: number; c: number; fric: number; F0: number; rc: number; drive: boolean;
@@ -94,6 +96,10 @@ export class Vehicle {
   readonly hits: { at: V3; dir: V3; E: number; r: number }[] = [];
   /** each wheel knocked askew by damage (rad): toe (front of the wheel to the left +) and camber (top to the left +) */
   toeDmg = [0, 0, 0, 0]; camDmg = [0, 0, 0, 0]; private bodyHitT = 0;
+  /** the track's edge (docs/systems/111 T3, race/collide.ts): what the car strikes, run each sub-step; and the surface
+   *  off the concrete at (s, off) (its grip times the tyre's, rolling resistance, drag). Unset: the plain grass */
+  contact: (() => void) | null = null; surface: ((s: number, off: number) => { mu: number; crr: number; drag: number }) | null = null;
+  /** each wheel's surface off the concrete now (null on the concrete), for the page's dust */ readonly offSurf: ({ mu: number; crr: number; drag: number } | null)[] = [null, null, null, null];
   /** record a blow at a world point along a world direction into the car, of E joules (r: the size of what struck, m) */
   blow(at: V3, dir: V3, E: number, r = 0.32): void { if (E < 150) return; const b = this.toBody(at), d = invRotQ(this.q, dir); this.hits.push({ at: b, dir: norm(d), E, r }); if (this.hits.length > 12) this.hits.shift(); }
   /** later technology's state (review 125): the turbos' boost (0..1 of full), each wheel's anti-lock pressure (1 full),
@@ -316,7 +322,7 @@ export class Vehicle {
         const lean = (KT ? -sy * camberAt(KT, t, st) : beam ? A.d[1] : A.kind === 'swing' ? -sy * t / (A.tw / 2) : -sy * t * 0.5) + this.camDmg[i]!;
         const path = KT ? pathAt(KT, t) : null, hubB: V3 = path ? [A.x - path[0], yW + sy * path[1], zh0 + t] : [A.x, yW, zh0 + t], hub = this.toWorld(hubB);
         const axB: V3 = [-Math.sin(st) * Math.cos(lean), Math.cos(st) * Math.cos(lean), Math.sin(lean)], axW = rotQ(this.q, axB);   // the spin axis, pointing left
-        const q = this.near(hub[0], hub[1]), gr = this.groundFast(q.s, q.off), gn = gr.n; this.onGrass[i] = Math.abs(q.off) > T.spec.width / 2;
+        const q = this.near(hub[0], hub[1]), gr = this.groundFast(q.s, q.off), gn = gr.n; this.onGrass[i] = Math.abs(q.off) > T.spec.width / 2; const sf = this.onGrass[i] ? (this.surface?.(q.s, q.off) ?? OFF_ROAD) : null; this.offSurf[i] = sf;
         const dist = (hub[2] - gr.z) * gn[2], dlt = R - dist;   // the tyre pressed in (m)
         this.camber[i] = -Math.asin(Math.max(-1, Math.min(1, dot(axW, gn))));
         const fwd = norm(cross(axW, gn)), lat = cross(gn, fwd);
@@ -330,7 +336,7 @@ export class Vehicle {
         const kappa = (this.w[i]! * R - lx) / v0, tanA = this.yd[i]! / sig; this.slipX[i] = kappa; this.slipA[i] = Math.atan(tanA);
         const patch = Math.min(1.15, this.rings[i]!.patch);
         const wr = X?.tyreWF && X.tyreWR ? (i < 2 ? X.tyreWF : X.tyreWR) / ((X.tyreWF + X.tyreWR) / 2) : 1, wide = wr ** 0.3;   /* a wider tyre more grip, and (review 147) it bears a heavier load before its grip falls off: its load sensitivity is against its own rated load */
-        const mu = ty.mu * wide * (1 - ty.loadSens * (fz / (m * G / 4 * wr) - 1)) * (this.onGrass[i] ? 0.55 : 1) * (0.85 + 0.15 * patch);
+        const mu = ty.mu * wide * (1 - ty.loadSens * (fz / (m * G / 4 * wr) - 1)) * (sf ? sf.mu : 1) * (0.85 + 0.15 * patch);
         const sx = kappa / ty.peakSlip, sa = tanA / ty.peakAngle, sg = Math.hypot(sx, sa);
         let fx = 0, fy = 0; if (sg > 1e-9 && fz > 0) { const Bs = ty.B * sg, f = Math.sin(ty.C * Math.atan(Bs - ty.E * (Bs - Math.atan(Bs)))); fx = mu * fz * f * sx / sg; fy = -mu * fz * f * sa / sg; }
         fy += 0.35 * this.camber[i]! * fz; { const l = Math.hypot(fx, fy), cap2 = mu * fz * 1.02; if (l > cap2) { fx *= cap2 / l; fy *= cap2 / l; } }   // camber thrust, within the grip
@@ -339,10 +345,11 @@ export class Vehicle {
         if (X?.abs && u.brake > 0.05 && this.speed > 2) {   /* anti-lock (review 125): a wheel slipping toward locking has its pressure let off, then built again, about a dozen times a second */
           const k = this.slipX[i]!; this.absP[i] = Math.max(0.15, Math.min(1, this.absP[i]! + (k < -0.13 ? -28 : k > -0.07 ? 14 : 0) * dt)); bt *= this.absP[i]!; if (this.absP[i]! < 0.97) absNow = true; } else this.absP[i] = 1;
         const K = mu * Math.max(fz, 1) * ty.C * ty.B / ty.peakSlip * R * R / v0;
-        const w0 = this.w[i]!, drv = this.Tw[i]!, wf = w0 + (drv - fx * R - fz * (this.onGrass[i] ? 0.07 : c.crr) * R * Math.tanh(w0) + K * this.dw[i]! * dt) / (this.Iw + K * dt) * dt, bs = bt / (this.Iw + K * dt) * dt;
+        const w0 = this.w[i]!, drv = this.Tw[i]!, wf = w0 + (drv - fx * R - fz * (sf ? sf.crr : c.crr) * R * Math.tanh(w0) + K * this.dw[i]! * dt) / (this.Iw + K * dt) * dt, bs = bt / (this.Iw + K * dt) * dt;
         this.w[i] = Math.abs(wf) <= bs ? 0 : wf - Math.sign(wf) * bs; this.dw[i] = bs > 0 || fz === 0 ? 0 : (this.w[i]! - w0) / dt; tbAx += (wf - this.w[i]!) * (this.Iw + K * dt) / dt;   /* the brake's torque, felt by the axle's housing */
         this.brakeT[i] = this.brakeT[i]! + (bt * Math.abs(this.w[i]!) / 9000 - (this.brakeT[i]! - 20) * (0.004 + this.speed * 0.0004) * (disc ? 2.2 : 1)) * dt;
         this.tfx[i] = fx; this.tfy[i] = fy; fxs[i] = fx; fys[i] = fy;
+        if (sf && sf.drag > 0 && fz > 0) { const vh = Math.hypot(lx, ly), k = sf.drag * fz * Math.min(1, vh / 2) / Math.max(vh, 1e-6); addAt([A.x, yW, -c.cgH], [-(fwd[0] * lx + lat[0] * ly) * k, -(fwd[1] * lx + lat[1] * ly) * k, 0]); }   /* a gravel trap ploughs the wheel */
         if (A.drive && beam) A.wu += 0; // (the wind-up is stepped below, from the axle's torques)
         // the tyre's force on the running gear (world), split: along the body's up into the springs, the rest straight to the body at the roll centre
         const ft: V3 = [gn[0] * fz + fwd[0] * fx + lat[0] * fy, gn[1] * fz + fwd[1] * fx + lat[1] * fy, gn[2] * fz + fwd[2] * fx + lat[2] * fy];
@@ -413,6 +420,7 @@ export class Vehicle {
     { const [wx, wy, wz] = this.om, Ix = this.Ix, Iy = this.Iy, Iz = this.Iz;
       this.om[0] = wx + (Tb[0] - (Iz - Iy) * wy * wz) / Ix * dt; this.om[1] = wy + (Tb[1] - (Ix - Iz) * wz * wx) / Iy * dt; this.om[2] = wz + (Tb[2] - (Iy - Ix) * wx * wy) / Iz * dt;
       const [a, b, cc] = this.om, [qw, qx, qy, qz] = this.q, hq = dt / 2, nq: Q = [qw + hq * (-qx * a - qy * b - qz * cc), qx + hq * (qw * a + qy * cc - qz * b), qy + hq * (qw * b + qz * a - qx * cc), qz + hq * (qw * cc + qx * b - qy * a)], l = Math.hypot(...nq); this.q = [nq[0] / l, nq[1] / l, nq[2] / l, nq[3] / l]; }
+    this.contact?.();
     this.load = Fz; void ex; void ey;
     return { thr, Fz }; }
 }

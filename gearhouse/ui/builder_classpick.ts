@@ -46,8 +46,9 @@ export function classPick(root: HTMLElement, host: ClassPickHost): ClassPick {
       const card = pickCard({ pic: plate(t), name, sub }); card.classList.add('gk-tcard', `gk-tier-${g}`); card.dataset.tier = t.id;
       const lock = el('span', 'tp-lock'); lock.append(svgEl(icon('lock', { accent: TIER_COLOUR[g][0] })), el('span', 'tp-lt')); lock.hidden = true;
       const now = el('span', 'gk-badge gk-beta tp-now', '지금 차'); now.hidden = true;
-      card.append(lock, now); card.addEventListener('click', () => pick(t));
-      const slot = el('div', 'tp-slot'); slot.append(card); rungs.append(slot); cards.set(t.id, { card, lock, now }); }
+      card.addEventListener('click', () => pick(t));
+      // the lock and the mark sit over the card (not in it: a closed card is darkened, its lock is not)
+      const slot = el('div', 'tp-slot'); slot.append(card, lock, now); rungs.append(slot); cards.set(t.id, { card, lock, now }); }
     fam.append(band, rungs); fams.append(fam); famEls.set(g, { fam, why }); }
   close.addEventListener('click', () => { api.close(); host.cancel(); });
   root.addEventListener('keydown', e => { if (e.key === 'Escape') { e.stopPropagation(); api.close(); host.cancel(); } });

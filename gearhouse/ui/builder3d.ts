@@ -171,6 +171,16 @@ for (const [id, name] of STEPS) { const li = document.createElement('li'), b = r
     if (phone && open && !onFiles && id === step) { drawer(false); return; } go(id); if (phone) drawer(true); });
   li.append(b); $('steps').append(li); stepBtn.set(id, b); }
 const add = (tab: string, ...els: HTMLElement[]) => pane.get(tab)!.append(...els);
+// the class chip (docs/systems/115 §3): the chosen rung at the rail's head (the phone's strip: its start); it opens the class pick
+const chip = document.createElement('button'); chip.type = 'button'; chip.id = 'tierChip'; chip.className = 'gk-tchip';
+{ const li = document.createElement('li'); li.className = 'tierchip'; li.append(chip); $('steps').prepend(li); }
+chip.addEventListener('click', () => openPick(false));
+/** the class pick (ui/builder_classpick.ts): a new design's first screen, and the chip's */
+const picker = classPick($('tierPick'), {
+  choose(t, fit) { const was = freeHp(D); D.tier = t.id; delete D.fresh; if (fit) D = fitEngine(D, t.hpMax); const now = freeHp(D);
+    changed(); flash(now < was ? `차급 ${t.id}: 엔진을 ${now.toLocaleString()} hp로 맞췄습니다` : `차급 ${t.id} · ${TIER_GROUP_NAME[t.group]}: 출력 ${Number.isFinite(t.hpMax) ? `${t.hpMax.toLocaleString()} hp까지` : '상한 없음'}`); },
+  cancel() { if (!D.fresh) return; delete D.fresh; D = withTier(D); changed(); } });
+function openPick(fresh: boolean) { drawer(false); picker.open({ design: D, fresh, eraOpen: eraOpen() }); }
 /** where each design was left (its step, the steps seen), kept in this browser (a step kept by the six-step builder
  *  before alpha 0.13 is read by stepFrom: by its id, or a number as the six steps') */
 const STEP_KEY = 'gearhouse.builder.step.v1';
@@ -394,9 +404,14 @@ function changed() { D = normalise(D); for (const s of syncs) s(); keepCurrent(s
   clearTimeout(figT); figT = setTimeout(figures, 40) as unknown as number;
   if (bodyKey(D) !== meshKey) { clearTimeout(meshT); meshT = setTimeout(rebuild, 90) as unknown as number; } }
 /** another design on the bench */
-function use(d: Design): boolean { if (!enabledDesign(d)) { flash(`옛 방식 설계는 열 수 없습니다 (${BASE_NAME[d.body.base]} · 비활성)`); return false; } D = structuredClone(d); $<HTMLInputElement>('name').value = D.name; lastFigs = null; restoreStep(); changed(); showList(); return true; }
+function use(d: Design): boolean { if (!enabledDesign(d)) { flash(`옛 방식 설계는 열 수 없습니다 (${BASE_NAME[d.body.base]} · 비활성)`); return false; }
+  D = structuredClone(d); if (!D.fresh) D = withTier(D); $<HTMLInputElement>('name').value = D.name; lastFigs = null; for (const o of offers) o.hidden = true; restoreStep(); changed(); showList();
+  // a new design asks its class first; an engine brought back past the class's cap (the engine designer) is held by the restrictor, and said so
+  if (D.fresh) openPick(true); else { picker.close(); const t = chosenTier(D), over = freeHp(D) - t.hpMax; if (over > 0) flash(`리스트릭터가 출력을 ${t.id} 상한에 묶습니다 (−${Math.round(over).toLocaleString()} hp)`); }
+  return true; }
 let flashT = 0; function flash(t: string) { $('saved').textContent = t; clearTimeout(flashT); flashT = setTimeout(savedState, 2500) as unknown as number; }
-function savedState() { const had = savedDesigns(store).find(x => x.id === D.id); $('saved').textContent = !had ? '저장 안 됨' : JSON.stringify(had) === JSON.stringify(D) ? '저장됨' : '바뀐 내용 저장 안 됨'; }
+// (an older design's class, given when it opened, is not a change of its own: it is compared with the class it reaches)
+function savedState() { const had = savedDesigns(store).find(x => x.id === D.id), h = had && !had.fresh ? withTier(had) : had; $('saved').textContent = !h ? '저장 안 됨' : JSON.stringify(h) === JSON.stringify(D) ? '저장됨' : '바뀐 내용 저장 안 됨'; }
 $<HTMLInputElement>('name').addEventListener('input', e => { D.name = (e.target as HTMLInputElement).value.slice(0, 40) || '이름 없는 설계'; keepCurrent(store, D); savedState(); driveLink(); });
 function saveNow() { flash(saveDesign(store, D) ? `저장했습니다: ${D.name}` : '이 브라우저는 저장을 허락하지 않습니다'); showList(); }
 $('save').addEventListener('click', saveNow);
@@ -423,7 +438,7 @@ function figures() { const f = designFigures(D), s = designSpec(D); lastFigs = f
   $('figs').innerHTML = `<dt>출력 정점</dt><dd>${s.hpRpm.toLocaleString()} <small>rpm</small></dd><dt>토크 정점</dt><dd>${s.torqueRpm.toLocaleString()} <small>rpm</small></dd>`
     + `<dt>마력당 무게</dt><dd>${f.kgPerHp.toFixed(2)} <small>kg/hp</small></dd><dt>앞 배분</dt><dd>${Math.round(f.front * 100)} <small>%</small></dd>`
     + `<dt>종감속</dt><dd>${s.final.toFixed(2)}${D.drive.final ? '' : ' <small>자동</small>'}</dd><dt>정비 주기</dt><dd>${(f.serviceKm / 1000).toLocaleString()}천 <small>km</small></dd>`;
-  showTier(f); $('cls6').innerHTML = `${tierBadge(tierOf(f))} <small>· ${esc(f.form)}</small>`;
+  showTier(f); { const t = chosenTier(D), reach = tierOf(f); $('cls6').innerHTML = `${tierBadge(t)}${outOfEra(t) ? ' <small class="era">시대 밖</small>' : ''} <small>${reach.id !== t.id ? `목표 ${t.id} · 지금 ${reach.id} (${TIER_GROUP_NAME[reach.group]}) · ` : ''}${esc(f.form)}</small>`; }
   $('cost6').innerHTML = `<dl><dt>원가 지수</dt><dd>${f.cost} <small>옛 바탕 A=100</small></dd><dt>신뢰성</dt><dd>${f.reliability}</dd><dt>정비 주기</dt><dd>${(f.serviceKm / 1000).toLocaleString()}천 <small>km</small></dd>`
     + `<dt>무게</dt><dd>${f.mass.toLocaleString()} <small>kg</small></dd><dt>출력</dt><dd>${f.hp} <small>hp</small></dd><dt>최고 속도</dt><dd>${f.topKmh} <small>km/h</small></dd></dl>`;
   showFit(f.fit); stepMarks(f.fit); meas(); suspGraphs(); }
@@ -438,9 +453,22 @@ function roomRow(name: string, v: number, cap: number, floor: number, unit: stri
   const span = open ? '' : ` title="${name}: ${floor.toLocaleString()}~${cap.toLocaleString()} ${unit} 칸에서 ${Math.round(v).toLocaleString()}"`;
   return `<div class="gk-room gk-tier-${t.group}${open ? ' gk-open' : ''}${r < 0 ? ' gk-over' : ''}" role="meter" aria-label="${name} 여유" aria-valuenow="${Math.round(v)}"${open ? '' : ` aria-valuemax="${cap}"`}>`
     + `<span class="gk-room-l">${name}</span><div class="gk-room-k"${span}><i class="gk-room-b"></i><i class="gk-room-f" style="--k:${k.toFixed(3)}"></i></div><span class="gk-room-t">${text}</span></div>`; }
-function showTier(f: DesignFigures) { const t = tierOf(f), room = tierRoom(f, t);
-  $('cls').innerHTML = `${tierBadge(t)}<small class="room">${roomText(room.hp, 'hp')}</small><small class="form">· ${esc(f.form)}</small>`;
-  $('tier').innerHTML = roomRow('출력 상한', f.hp, t.hpMax, tierFloor(t), 'hp', t) + roomRow('제한기', f.topKmh, t.topMax, tierTopFloor(t), 'km/h', t); }
+function showTier(f: DesignFigures) { const t = chosenTier(D), reach = tierOf(f), room = tierRoom(f, t), era = outOfEra(t) ? '<small class="era">시대 밖</small>' : '';
+  // the name is the rung reached (no floor, doc 115 §2-4): under the chosen one the bar says both
+  const goal = reach.id !== t.id ? `<small class="goal">목표 ${t.id} · 지금 ${reach.id}</small>` : '';
+  $('cls').innerHTML = `${tierBadge(t)}${era}<small class="room">${f.restrictor ? `묶임 −${f.restrictor} hp` : roomText(room.hp, 'hp')}</small>${goal}<small class="form">· ${esc(f.form)}</small>`;
+  // the holds (doc 115 §3 간접 초과): the restrictor's cut and the limiter where they hold the car, each with its way out
+  const up = (to: Tier, label: string) => { const L = tierLock(to, eraOpen()); return `<button type="button" class="${BTN}" data-act="up" data-to="${to.id}"${L ? ` disabled title="${to.id}: ${L}"` : ''}>${L ? `${to.id}: ${L}` : label}</button>`; };
+  const topUp = ROAD_TIERS.find(x => x.topMax >= f.topFree && ROAD_TIERS.indexOf(x) > ROAD_TIERS.indexOf(t));
+  const holds = (f.restrictor ? `<div class="hold"><b>리스트릭터 −${f.restrictor.toLocaleString()} hp</b><span>엔진 ${f.hpFree.toLocaleString()} hp를 ${t.id} 상한 ${t.hpMax.toLocaleString()} hp로 묶음</span><div class="btns">${up(tierFor(f.hpFree), `차급을 ${tierFor(f.hpFree).id}로`)}<button type="button" class="${BTN}" data-act="fit">엔진을 ${t.id}에 맞추기</button></div></div>` : '')
+    + (f.limiter ? `<div class="hold"><b>제한기 ${f.limiter} km/h</b><span>풀면 ${f.topFree} km/h</span>${topUp ? `<div class="btns">${up(topUp, `차급을 ${topUp.id}로`)}</div>` : ''}</div>` : '');
+  $('tier').innerHTML = roomRow('출력 상한', f.hp, t.hpMax, tierFloor(reach), 'hp', t) + roomRow('제한기', f.topKmh, t.topMax, tierTopFloor(reach), 'km/h', t) + holds;
+  for (const b of Array.from($('tier').querySelectorAll<HTMLButtonElement>('button[data-act]'))) b.addEventListener('click', () => {
+    if (b.dataset.act === 'fit') { D = fitEngine(D, t.hpMax); changed(); flash(`엔진을 ${t.id}에 맞췄습니다 (${freeHp(D).toLocaleString()} hp)`); return; }
+    const to = tierById(b.dataset.to ?? ''); if (to) { D.tier = to.id; changed(); flash(`차급을 ${to.id}로 올렸습니다`); } });
+  // the chip: the chosen rung's code, its chevrons, its group (the class colour on its border and band only)
+  chip.className = `gk-tchip gk-tier-${t.group}`; chip.title = `차급 ${t.id} · ${TIER_GROUP_NAME[t.group]} (눌러서 바꾸기)`; chip.setAttribute('aria-label', `차급 ${t.id} ${TIER_GROUP_NAME[t.group]}, 바꾸기`);
+  chip.innerHTML = `<span class="gk-tchip-cd">${t.id}</span><span class="gk-tchip-ch" aria-hidden="true">${tierChevrons(t)}</span><span class="gk-tchip-nm">${outOfEra(t) ? '시대 밖' : TIER_GROUP_NAME[t.group]}</span>`; }
 /** each step marked with the fit checks that concern it and are not clean */
 function stepMarks(r: FitResult[]) { for (const [id, b] of stepBtn) { const mine = r.filter(x => FIT_STEP[x.part] === id), nb = mine.filter(x => x.verdict === 'blocked').length, nm = mine.filter(x => x.verdict === 'modified').length, badge = b.querySelector<HTMLElement>('.badge')!;
   badge.hidden = !nb && !nm; badge.className = `badge${nb ? ' blocked' : ''}`; badge.textContent = nb ? `⛔${nb > 1 ? nb : ''}` : `⚠️${nm > 1 ? nm : ''}`;
@@ -528,6 +556,7 @@ $('toggle').addEventListener('click', () => drawer(!document.body.classList.cont
 $('figsToggle').addEventListener('click', () => { const on = !document.body.classList.contains('figs-open'); document.body.classList.toggle('figs-open', on); $('figsToggle').setAttribute('aria-expanded', String(on)); dirty = true; });
 
 $<HTMLInputElement>('name').value = D.name; for (const s of syncs) s(); restoreStep(); rebuild(); figures(); showList(); savedState(); driveLink(); requestAnimationFrame(frame);
+if (D.fresh) openPick(true);   // a new design: its class first (docs/systems/115 C1)
 (globalThis as { __builder?: unknown }).__builder = { get design() { return D; }, use, get builds() { return builds; }, get frames() { return frames; }, get triangles() { return onGpu?.n ?? 0; }, get step() { return onFiles ? 'files' : step; }, go, /** a base's preset opened; the view (its angle, pitch, the car's yaw) set and drawn again */ preset: (id: BaseId) => use(fromPreset(id)), view, redraw() { dirty = true; } };   // for the page tests (tools)
 return { enter(d?: Design) { if (d && JSON.stringify(d) !== JSON.stringify(D)) use(d); awake = true; dirty = true; meas(); }, leave() { awake = false; drawer(false); },
   get design() { return D; }, get step() { return onFiles ? 'files' : step; }, use };

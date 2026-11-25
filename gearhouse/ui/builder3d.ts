@@ -28,6 +28,11 @@ import { suspFigures, suspPanel } from './builder_susp';
 import { savedEngines, joinEngine, withEngine } from '../core/engines';
 import { ENABLED_BODIES, enabledDesign, starterDesign } from '../core/bodies';
 import { randomPlate, currentDesign, keepCurrent, savedDesigns, saveDesign, deleteDesign, fromPreset, encodeDesign, designJson, parseDesign, measured, designSig, newId, KEYS, type KeyStore } from '../core/designstore';
+import { installKit } from './kit/style';
+import { installPick, pickCard, setCard, railTab } from './kit/pick';
+import { statBar } from './kit/parts';
+import { STATS, type StatDef } from './kit/logic';
+import { stepIcon, STEP_SHORT, bumperPic, lampPic, wheelPic, basePic } from './builder_pics';
 import texAlb from '../assets/textures/pbr/albedo.jpg';
 import texNor from '../assets/textures/pbr/normal.jpg';
 import texRgh from '../assets/textures/pbr/rough.jpg';
@@ -46,6 +51,7 @@ export interface BuilderApi { /** shown again (with another design, or as it was
   readonly design: Design; readonly step: string; use(d: Design): void }
 // The builder below is one function's body, mounted once on its markup; it is not indented, so its lines read as before.
 export function mountBuilder(host: BuilderHost = {}): BuilderApi {
+installKit(); installPick();   // the design system's parts (docs/systems/110 G2, G4): once a page
 const R = host.root ?? document;
 const $ = <T extends HTMLElement>(id: string) => (R === document ? document.getElementById(id) : R.querySelector(`#${id}`)) as T;
 const store: KeyStore | null = (() => { try { return localStorage; } catch { return null; } })();
@@ -64,20 +70,32 @@ const field = (label: string, el: HTMLElement, out?: HTMLElement) => { const r =
 /** a choice of buttons; `lock` greys a value out with its reason (shown under the buttons: a phone has no hover) */
 function seg<T extends string | number>(label: string, opts: [T, string][], get: () => T, set: (v: T) => void, lock?: (v: T) => string | null): HTMLElement {
   const box = document.createElement('div'); box.className = 'seg'; box.setAttribute('role', 'group'); box.setAttribute('aria-label', label);
-  const bs = opts.map(([v, t]) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = t; b.addEventListener('click', () => { if (lock?.(v)) return; set(v); changed(); }); box.append(b); return [v, t, b] as const; });
+  const bs = opts.map(([v, t]) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'gk-opt'; b.textContent = t; b.addEventListener('click', () => { if (lock?.(v)) return; set(v); changed(); }); box.append(b); return [v, t, b] as const; });
   const why = document.createElement('small'); why.className = 'lock';
   syncs.push(() => { const locked: string[] = [];
     for (const [v, t, b] of bs) { const L = lock?.(v) ?? null; b.setAttribute('aria-pressed', String(v === get())); b.disabled = !!L; b.title = L ?? ''; if (L) locked.push(`${t}: ${L}`); }
     why.textContent = locked.join(' · '); why.hidden = !locked.length; });
   const r = document.createElement('div'); r.className = 'row'; const l = document.createElement('span'); l.className = 'lab'; l.textContent = label; r.append(l, box, why); return r; }
+/** the parts library's way of a choice (docs/systems/110 G4): a grid of thumbnail cards, a picture and a name each; the
+ *  chosen one green, a locked one grey with its lock and its reason written under the grid (a phone has no hover) */
+function cards<T extends string | number>(label: string, opts: [T, string, string][], get: () => T, set: (v: T) => void, lock?: (v: T) => string | null): HTMLElement {
+  const box = document.createElement('div'); box.className = 'gk-cards'; box.setAttribute('role', 'group'); box.setAttribute('aria-label', label);
+  const bs = opts.map(([v, t, pic]) => { const b = pickCard({ pic, name: t }); b.dataset.v = String(v); b.addEventListener('click', () => { if (lock?.(v)) return; set(v); changed(); }); box.append(b); return [v, t, b] as const; });
+  const why = document.createElement('small'); why.className = 'lock';
+  syncs.push(() => { const locked: string[] = [];
+    for (const [v, t, b] of bs) { const L = lock?.(v) ?? null; setCard(b, v === get(), L); if (L) locked.push(`${t}: ${L}`); }
+    why.textContent = locked.join(' · '); why.hidden = !locked.length; });
+  const r = document.createElement('div'); r.className = 'row'; r.dataset.slot = label; const l = document.createElement('span'); l.className = 'lab'; l.textContent = label; r.append(l, box, why); return r; }
 function range(label: string, [a, b]: readonly [number, number], step: number, get: () => number, set: (v: number) => void, show: (v: number) => string, id?: string): HTMLElement {
-  const i = document.createElement('input'); i.type = 'range'; i.min = String(a); i.max = String(b); i.step = String(step); if (id) i.id = id; const v = document.createElement('span'); v.className = 'v';
+  const i = document.createElement('input'); i.type = 'range'; i.className = 'gk-range'; i.min = String(a); i.max = String(b); i.step = String(step); if (id) i.id = id; const v = document.createElement('span'); v.className = 'v';
   i.addEventListener('input', () => { set(+i.value); v.textContent = show(+i.value); changed(); }); syncs.push(() => { i.value = String(get()); v.textContent = show(get()); }); return field(label, i, v); }
 function check(label: string, get: () => boolean, set: (v: boolean) => void, id?: string): HTMLElement {
   const l = document.createElement('label'); l.className = 'check'; const i = document.createElement('input'); i.type = 'checkbox'; if (id) i.id = id; l.append(i, ` ${label}`);
   i.addEventListener('change', () => { set(i.checked); changed(); }); syncs.push(() => { i.checked = get(); }); return l; }
 function select<T extends string>(label: string, opts: [T, string][], get: () => T, set: (v: T) => void, id?: string): HTMLElement {
-  const s = document.createElement('select'); if (id) s.id = id; for (const [v, t] of opts) s.add(new Option(t, v)); s.addEventListener('change', () => { set(s.value as T); changed(); }); syncs.push(() => { s.value = get(); }); return field(label, s); }
+  const s = document.createElement('select'); s.className = 'gk-field'; if (id) s.id = id; for (const [v, t] of opts) s.add(new Option(t, v)); s.addEventListener('change', () => { set(s.value as T); changed(); }); syncs.push(() => { s.value = get(); }); return field(label, s); }
+/** the kit's buttons, the small size (docs/systems/110 G4): blue the secondary, yellow the main action */
+const BTN = 'btn gk-btn gk-sm gk-b', BTN_MAIN = 'btn main gk-btn gk-sm gk-y';
 const note = (t: string) => { const p = document.createElement('p'); p.className = 'note'; p.textContent = t; return p; };
 const h2 = (t: string) => { const h = document.createElement('h2'); h.textContent = t; return h; };
 const sign = (v: number, u: string) => `${v > 0 ? '+' : ''}${v} ${u}`;
@@ -87,9 +105,13 @@ const sign = (v: number, u: string) => `${v > 0 ? '+' : ''}${v} ${u}`;
 // (the steps, their order and the fit checks' steps: ui/builder_steps.ts)
 const pane = new Map<string, HTMLElement>(), stepBtn = new Map<StepId, HTMLButtonElement>();
 for (const id of [...STEPS.map(s => s[0]), 'files']) { const p = document.createElement('section'); p.className = 'pane'; p.dataset.tab = id; $('panes').append(p); pane.set(id, p); }
-for (const [id, name] of STEPS) { const li = document.createElement('li'), b = document.createElement('button'); b.type = 'button'; b.dataset.step = id;
-  b.innerHTML = `<span class="n">${stepNo(id) + 1}</span><span class="t">${name.replace('·', '·<wbr>')}</span><span class="badge" hidden></span>`;
-  b.addEventListener('click', () => go(id)); li.append(b); $('steps').append(li); stepBtn.set(id, b); }
+// the steps on a rail of icon tabs (docs/systems/110 G4: a vertical rail at the left, a strip at the bottom on a phone,
+// where a tab opens the drawer at its step and the current one closes it again)
+for (const [id, name] of STEPS) { const li = document.createElement('li'), b = railTab({ pic: stepIcon(id), label: STEP_SHORT[id], n: stepNo(id) + 1 }); b.dataset.step = id; b.title = name;
+  const badge = document.createElement('span'); badge.className = 'badge'; badge.hidden = true; b.append(badge);
+  b.addEventListener('click', () => { const phone = innerWidth <= 760, open = document.body.classList.contains('open');
+    if (phone && open && !onFiles && id === step) { drawer(false); return; } go(id); if (phone) drawer(true); });
+  li.append(b); $('steps').append(li); stepBtn.set(id, b); }
 const add = (tab: string, ...els: HTMLElement[]) => pane.get(tab)!.append(...els);
 /** where each design was left (its step, the steps seen), kept in this browser (a step kept by the six-step builder
  *  before alpha 0.13 is read by stepFrom: by its id, or a number as the six steps') */
@@ -108,7 +130,7 @@ function showStep() { const at = onFiles ? 'files' : step;
   if (at === 'susp') suspGraphs();
   for (const [k, q] of pane) q.classList.toggle('on', k === at);
   for (const [id, b] of stepBtn) { const now = !onFiles && id === step, done = seen.has(id) && !now;
-    if (now) b.setAttribute('aria-current', 'step'); else b.removeAttribute('aria-current'); b.classList.toggle('done', done); b.classList.toggle('unseen', !seen.has(id)); b.dataset.state = now ? '지금 단계' : done ? '본 단계' : '아직 안 본 단계'; label(id); }
+    if (now) b.setAttribute('aria-current', 'step'); else b.removeAttribute('aria-current'); b.classList.toggle('gk-seen', done); b.classList.toggle('gk-unseen', !seen.has(id)); b.dataset.state = now ? '지금 단계' : done ? '본 단계' : '아직 안 본 단계'; label(id); }
   const i = stepNo(step), prev = $<HTMLButtonElement>('prev'), next = $<HTMLButtonElement>('next');
   prev.textContent = onFiles ? '◀ 설계로 돌아가기' : '◀ 이전'; prev.disabled = !onFiles && i === 0; next.hidden = onFiles || i === STEPS.length - 1;
   $('stepof').textContent = onFiles ? '저장·불러오기' : `${i + 1} / ${STEPS.length} · ${STEPS[i]![1]}`;
@@ -122,7 +144,7 @@ $('next').addEventListener('click', () => go(STEPS[Math.min(STEPS.length - 1, st
 $('openFiles').addEventListener('click', () => { if (onFiles) go(step); else { go('files'); drawer(true); } });
 
 // 차대: the base, its stretch, its structure
-add('chassis', seg<BodyBase>('바탕 차대', ENABLED_BODIES.map(b => [b, BASE_NAME[b]] as [BodyBase, string]), () => D.body.base, v => { if (v === D.body.base) return;
+add('chassis', cards<BodyBase>('바탕 차대', ENABLED_BODIES.map(b => [b, BASE_NAME[b], basePic()] as [BodyBase, string, string]), () => D.body.base, v => { if (v === D.body.base) return;
     // a model-built body (the 959) brings its own swaps, a new plate number with them; its dimensions are its model's (zero)
     if (isModelBase(v)) { D.body.model = { ...MODEL_OWN[v], ...D.body.model, plate: plateOk(D.body.model?.plate) ? D.body.model!.plate : randomPlate() }; for (const k of DIMS) D.body[k] = 0; }
     // the tyres and the rims follow the base where they were its own
@@ -151,7 +173,7 @@ function dimSliders(): HTMLElement[] {
   out.push(note('전고는 벨트라인 위 캐빈을 늘이고 줄입니다. 캐빈을 앞으로 옮기면 뒤의 엔진룸이 그만큼 길어집니다(긴 V12가 들어갈 수 있습니다). 지상고가 100 mm보다 낮으면 바닥이 닿을 위험이 있다는 경고가 나옵니다.'),
     btnRow('치수 원래대로', () => { for (const k of DIMS) D.body[k] = 0; changed(); }));
   kitOnly(out[0]!); kitOnly(out[out.length - 2]!); kitOnly(out[out.length - 1]!); return out; }
-function btnRow(t: string, f: () => void): HTMLElement { const d = document.createElement('div'); d.className = 'btns'; const b = document.createElement('button'); b.type = 'button'; b.className = 'btn'; b.textContent = t; b.addEventListener('click', f); d.append(b); return d; }
+function btnRow(t: string, f: () => void): HTMLElement { const d = document.createElement('div'); d.className = 'btns'; const b = document.createElement('button'); b.type = 'button'; b.className = BTN; b.textContent = t; b.addEventListener('click', f); d.append(b); return d; }
 // ④ 차체 형태: the panels' kinds; ⑥ 칠·마감: the paint
 { const ch = designChoices('nsx'), kinds = <T extends string>(ks: T[]) => ks.map(k => [k, KIND_NAME[k] ?? k] as [T, string]);
   // the face in slots (core/design.ts Face; render/car/face.ts): chips with a small drawing each, a value the rules do not
@@ -171,13 +193,7 @@ function btnRow(t: string, f: () => void): HTMLElement { const d = document.crea
     aux: ['보조등', [['strip', '띠형', I('<rect x="3" y="6" width="20" height="4"/><path d="M16 6 V10"/>')], ['round', '원형 안개등', I('<circle cx="13" cy="8" r="4.5"/><path d="M3 5 H7 M19 5 H23"/>')], ['none', '없음', I('<path d="M3 8 H23" stroke-dasharray="2 3"/>')]]] };
   /** a slot's chips: a drawing and a name each; a locked value is greyed out and its reason written under the row */
   function chips<T extends string>(label: string, opts: [T, string, string][], get: () => T, set: (v: T) => void, lock?: (v: T) => string | null): HTMLElement {
-    const box = document.createElement('div'); box.className = 'seg chips'; box.setAttribute('role', 'group'); box.setAttribute('aria-label', label);
-    const bs = opts.map(([v, t, icon]) => { const b = document.createElement('button'); b.type = 'button'; b.innerHTML = icon; b.append(t); b.dataset.v = v; b.addEventListener('click', () => { if (lock?.(v)) return; set(v); changed(); }); box.append(b); return [v, t, b] as const; });
-    const why = document.createElement('small'); why.className = 'lock';
-    syncs.push(() => { const locked: string[] = [];
-      for (const [v, t, b] of bs) { const L = lock?.(v) ?? null; b.setAttribute('aria-pressed', String(v === get())); b.disabled = !!L; b.title = L ?? ''; if (L) locked.push(`${t}: ${L}`); }
-      why.textContent = locked.join(' · '); why.hidden = !locked.length; });
-    const r = document.createElement('div'); r.className = 'row'; r.dataset.slot = label; const l = document.createElement('span'); l.className = 'lab'; l.textContent = label; r.append(l, box, why); return r; }
+    const r = cards(label, opts, get, set, lock); r.querySelector('.gk-cards')!.classList.add('facecards'); return r; }
   const slot = <K extends FaceKey>(k: K) => chips<Face[K]>(FACE[k][0], FACE[k][1], () => D.body[k], v => { (D.body as Face)[k] = v; }, v => faceLock(D.body, k, v));
   const kitRows = [h2('앞모습'), chips<NoseKind>('코 모양', NOSE, () => D.body.nose, v => { D.body.nose = v; }), ...FACE_KEYS.map(slot),
     note('앞모습의 다섯 칸은 세 바탕 모두에서 따로 바꿀 수 있습니다. 그릴과 보조등은 고른 범퍼의 선에 맞춰 자리를 다시 잡습니다. 함께 쓸 수 없는 조합은 흐리게 표시하고 이유를 적습니다.'),
@@ -185,14 +201,15 @@ function btnRow(t: string, f: () => void): HTMLElement { const d = document.crea
   // a model-built body's own swaps (the 959's: render/car/p959), in place of the kit's kinds
   const M = (): ModelSwaps => (D.body.model ??= { ...MODEL_OWN.p959 }), sm = <K extends keyof ModelSwaps>(k: K) => (v: ModelSwaps[K]) => { M()[k] = v; };
   const BUMPER_NAME: Record<ModelSwaps['bumperF'], string> = { std: '순정', aero: '에어로 (깊은 립·디퓨저)', clean: '깔끔 (모서리 벤트 없음)' };
-  const plate = document.createElement('input'); plate.type = 'text'; plate.id = 'plate'; plate.maxLength = 10; plate.placeholder = '12가 3456'; plate.setAttribute('aria-label', '번호판 글자'); plate.autocomplete = 'off';
+  const plate = document.createElement('input'); plate.type = 'text'; plate.className = 'gk-field'; plate.id = 'plate'; plate.maxLength = 10; plate.placeholder = '12가 3456'; plate.setAttribute('aria-label', '번호판 글자'); plate.autocomplete = 'off';
   const plateWhy = document.createElement('small'); plateWhy.className = 'lock'; plateWhy.hidden = true;
   plate.addEventListener('change', () => { if (plateOk(plate.value)) { M().plate = plate.value; plateWhy.hidden = true; changed(); } else { plateWhy.textContent = '숫자 2개 + 한글 한 글자(받침 없음) + 숫자 4개로 적어 주세요. 예: 12가 3456'; plateWhy.hidden = false; } });
   const plateRow = field('번호판 (옛 초록 번호판)', plate); plateRow.append(plateWhy, btnRow('무작위 번호', () => { M().plate = randomPlate(); plateWhy.hidden = true; changed(); }));
-  const modelRows = [h2('959 부품'), seg<ModelSwaps['bumperF']>('앞 범퍼', BUMPERS959.map(k => [k, BUMPER_NAME[k]] as [ModelSwaps['bumperF'], string]), () => M().bumperF, sm('bumperF')),
-    seg<ModelSwaps['bumperR']>('뒤 범퍼', BUMPERS959.map(k => [k, BUMPER_NAME[k]] as [ModelSwaps['bumperR'], string]), () => M().bumperR, sm('bumperR')),
-    seg<ModelSwaps['lamp']>('헤드램프', LAMPS959.map(k => [k, { round: '둥근 렌즈 (순정)', ellipsoid: '프로젝터 2개', square: '사각 프로젝터' }[k]] as [ModelSwaps['lamp'], string]), () => M().lamp, sm('lamp')),
-    seg<ModelSwaps['wheel']>('휠', WHEELS959.map(k => [k, { hollow5: '속 빈 5스포크 (순정)', dish: '딥디시 8스포크', hole5: '5홀 디스크' }[k]] as [ModelSwaps['wheel'], string]), () => M().wheel, sm('wheel')),
+  // the parts library (docs/systems/110 G4): each swap a card with its picture
+  const modelRows = [h2('959 부품'), cards<ModelSwaps['bumperF']>('앞 범퍼', BUMPERS959.map(k => [k, BUMPER_NAME[k], bumperPic(k)] as [ModelSwaps['bumperF'], string, string]), () => M().bumperF, sm('bumperF')),
+    cards<ModelSwaps['bumperR']>('뒤 범퍼', BUMPERS959.map(k => [k, BUMPER_NAME[k], bumperPic(k, true)] as [ModelSwaps['bumperR'], string, string]), () => M().bumperR, sm('bumperR')),
+    cards<ModelSwaps['lamp']>('헤드램프', LAMPS959.map(k => [k, { round: '둥근 렌즈 (순정)', ellipsoid: '프로젝터 2개', square: '사각 프로젝터' }[k], lampPic(k)] as [ModelSwaps['lamp'], string, string]), () => M().lamp, sm('lamp')),
+    cards<ModelSwaps['wheel']>('휠', WHEELS959.map(k => [k, { hollow5: '속 빈 5스포크 (순정)', dish: '딥디시 8스포크', hole5: '5홀 디스크' }[k], wheelPic(k)] as [ModelSwaps['wheel'], string, string]), () => M().wheel, sm('wheel')),
     plateRow, note('범퍼는 차체의 이음선 고리에 맞물려 바뀝니다. 번호판 글자는 판 위에 획으로 그립니다(가상의 번호만). 실내 사양(①)이 경량이면 버킷 시트와 롤케이지가 들어갑니다.')];
   syncs.push(() => { const m = isModelBase(D.body.base); for (const e of kitRows) e.hidden = m; for (const e of modelRows) e.hidden = !m; if (m && document.activeElement !== plate) plate.value = M().plate; });
   add('body', ...kitRows, ...modelRows);
@@ -206,10 +223,10 @@ function btnRow(t: string, f: () => void): HTMLElement { const d = document.crea
   const fill = () => { list.textContent = ''; const all = savedEngines(store);
     if (!all.length) { const li = document.createElement('li'); li.innerHTML = '<span>보관함에 엔진이 없습니다. 엔진 공방에서 만들어 저장하세요.</span>'; list.append(li); return; }
     for (const s of all) { const e = joinEngine(s.family, s.variant, D), li = document.createElement('li'), t = document.createElement('span'), sm = document.createElement('small'), b = document.createElement('button');
-      t.textContent = s.name; sm.textContent = `${LAYOUT_NAME[e.layout]} ${(e.cc / 1000).toFixed(1)} · ${e.grade}등급${e.turbo ? ` · 터보 ${e.turbo}` : ''}`; b.type = 'button'; b.className = 'btn'; b.textContent = '얹기';
+      t.textContent = s.name; sm.textContent = `${LAYOUT_NAME[e.layout]} ${(e.cc / 1000).toFixed(1)} · ${e.grade}등급${e.turbo ? ` · 터보 ${e.turbo}` : ''}`; b.type = 'button'; b.className = BTN; b.textContent = '얹기';
       b.addEventListener('click', () => { D = withEngine(D, joinEngine(s.family, s.variant, D)); list.hidden = true; changed(); flash(`엔진을 얹었습니다: ${s.name}`); }); li.append(t, sm, b); list.append(li); } };
   const row = btnRow('보관함에서 엔진 고르기', () => { list.hidden = !list.hidden; if (!list.hidden) fill(); }); row.querySelector('button')!.id = 'engPick';
-  if (host.onEngineShop) { const b = document.createElement('button'); b.type = 'button'; b.className = 'btn'; b.id = 'engShop'; b.textContent = '엔진 공방에서 편집'; b.addEventListener('click', () => host.onEngineShop!(structuredClone(D))); row.append(b); }
+  if (host.onEngineShop) { const b = document.createElement('button'); b.type = 'button'; b.className = BTN; b.id = 'engShop'; b.textContent = '엔진 공방에서 편집'; b.addEventListener('click', () => host.onEngineShop!(structuredClone(D))); row.append(b); }
   box.append(row, list); add('engine', box); }
 // ② 엔진·구동계: the grade first; the details it does not allow greyed out with the reason
 { const E = () => D.engine, lk = <K extends 'intake' | 'compression' | 'sump' | 'block' | 'valves' | 'turbo'>(k: K) => (v: Design['engine'][K]) => gradeLock(E().grade, k, v);
@@ -275,14 +292,14 @@ add('kit', check('ABS', () => D.kit.abs, v => { D.kit.abs = v; }, 'abs'), check(
 // ⑦ 검사·시험 주행: the fit's checks with their fixes and the step each belongs to, the class, the cost and the
 // reliability, what was measured, the test drive and the save
 { const div = (id: string, cls: string) => { const d = document.createElement('div'); d.id = id; d.className = cls; return d; };
-  const drv = document.createElement('a'); drv.id = 'drive6'; drv.className = 'btn main'; drv.target = '_blank'; drv.rel = 'opener'; drv.textContent = '시험 주행 ▶'; drv.href = 'drive.html';
-  const b = (t: string, f: () => void, id: string) => { const x = document.createElement('button'); x.type = 'button'; x.className = 'btn'; x.id = id; x.textContent = t; x.addEventListener('click', f); return x; };
+  const drv = document.createElement('a'); drv.id = 'drive6'; drv.className = BTN_MAIN; drv.target = '_blank'; drv.rel = 'opener'; drv.textContent = '시험 주행 ▶'; drv.href = 'drive.html';
+  const b = (t: string, f: () => void, id: string) => { const x = document.createElement('button'); x.type = 'button'; x.className = BTN; x.id = id; x.textContent = t; x.addEventListener('click', f); return x; };
   const row = document.createElement('div'); row.className = 'btns'; row.append(drv, b('저장', saveNow, 'save6'), b('저장·불러오기', () => go('files'), 'files6'));
   add('check', row, note('앞 단계를 바꾸면 이 검사는 바로 다시 계산됩니다. 문제가 생긴 단계는 위 단계 표시에 ⚠️·⛔로 나옵니다.'),
     h2('장착 검사'), div('fit6', 'fit6'), h2('차종'), div('cls6', 'cls6'), h2('원가와 신뢰성'), div('cost6', 'sumfig'), div('meas6', 'meas6')); }
 // 저장·불러오기: the saved designs, new ones, files
 { const list = document.createElement('ul'); list.className = 'list'; list.id = 'list';
-  const btn = (t: string, f: () => void, cls = 'btn') => { const b = document.createElement('button'); b.type = 'button'; b.className = cls; b.textContent = t; b.addEventListener('click', f); return b; };
+  const btn = (t: string, f: () => void, cls = BTN) => { const b = document.createElement('button'); b.type = 'button'; b.className = cls; b.textContent = t; b.addEventListener('click', f); return b; };
   const row = (...els: HTMLElement[]) => { const d = document.createElement('div'); d.className = 'btns'; d.append(...els); return d; };
   const ta = document.createElement('textarea'); ta.id = 'json'; ta.placeholder = '설계 JSON을 여기에 붙여넣거나, "JSON 보기"로 지금 설계를 꺼냅니다'; ta.setAttribute('aria-label', '설계 JSON');
   const file = document.createElement('input'); file.type = 'file'; file.accept = '.json,application/json'; file.hidden = true; file.id = 'file';
@@ -296,9 +313,9 @@ function download() { const a = document.createElement('a'), url = URL.createObj
 function showList() { const list = $('list'), all = savedDesigns(store); list.textContent = '';
   if (!all.length) { const li = document.createElement('li'); li.innerHTML = '<span>아직 저장한 설계가 없습니다</span>'; list.append(li); return; }
   for (const d of all) { const li = document.createElement('li'); if (d.id === D.id) li.className = 'me'; const s = document.createElement('span'); s.textContent = d.name; const sm = document.createElement('small'); sm.textContent = `${BASE_NAME[d.body.base]} · ${d.engine.layout} ${(d.engine.cc / 1000).toFixed(1)}`;
-    const load = document.createElement('button'); load.type = 'button'; load.className = 'btn'; load.textContent = '열기'; load.addEventListener('click', () => { if (use(d)) flash(`열림: ${d.name}`); });
+    const load = document.createElement('button'); load.type = 'button'; load.className = BTN; load.textContent = '열기'; load.addEventListener('click', () => { if (use(d)) flash(`열림: ${d.name}`); });
     if (!enabledDesign(d)) { li.classList.add('old'); sm.textContent = `${BASE_NAME[d.body.base]} · 옛 방식 · 비활성`; load.disabled = true; load.title = '이 차체는 지금 게임에서 꺼져 있습니다'; }
-    const del = document.createElement('button'); del.type = 'button'; del.className = 'btn'; del.textContent = '삭제'; del.setAttribute('aria-label', `${d.name} 삭제`); del.addEventListener('click', () => { if (confirm(`"${d.name}" 설계를 지울까요?`)) { deleteDesign(store, d.id); showList(); savedState(); } });
+    const del = document.createElement('button'); del.type = 'button'; del.className = BTN; del.textContent = '삭제'; del.setAttribute('aria-label', `${d.name} 삭제`); del.addEventListener('click', () => { if (confirm(`"${d.name}" 설계를 지울까요?`)) { deleteDesign(store, d.id); showList(); savedState(); } });
     li.append(s, sm, load, del); list.append(li); } }
 
 // ---- the design changed: kept, the figures, the car (when its body changed), the link ----
@@ -325,22 +342,21 @@ for (const id of ['drive', 'drive6']) $(id).addEventListener('click', e => { kee
 // ---- the figures ----
 let lastFigs: DesignFigures | null = null, fitOpen: boolean | null = null;
 const fmtLap = (t: number) => `${Math.floor(t / 60)}:${(t % 60).toFixed(2).padStart(5, '0')}`;
-type NumKey = { [K in keyof DesignFigures]: DesignFigures[K] extends number ? K : never }[keyof DesignFigures];
 const ICON = { ok: '✅', modified: '⚠️', blocked: '⛔' } as const;
 const esc = (t: string) => t.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
-function figures() { const f = designFigures(D), s = designSpec(D), was = lastFigs; lastFigs = f;
-  /** a figure, marked when it moved since the last change: better (up) or worse (down); `more`: is more better */
-  const cell = (k: NumKey, text: string, more: boolean | null) => { const a = was?.[k], b = f[k], moved = more !== null && a !== undefined && Math.abs(b - a) > 1e-9; return `<dd${moved ? ` class="${(b > a) === more ? 'up' : 'down'}"` : ''}>${text}</dd>`; };
-  $('figs').innerHTML = `<dt>무게</dt>${cell('mass', `${f.mass.toLocaleString()} <small>kg</small>`, false)}`
-    + `<dt>출력</dt>${cell('hp', `${f.hp} <small>hp<span class="rpm"> · ${s.hpRpm.toLocaleString()}</span></small>`, true)}`
-    + `<dt>토크</dt>${cell('torque', `${f.torque} <small>Nm<span class="rpm"> · ${s.torqueRpm.toLocaleString()}</span></small>`, true)}`
-    + `<dt>마력당 무게</dt>${cell('kgPerHp', `${f.kgPerHp.toFixed(2)} <small>kg/hp</small>`, false)}`
-    + `<dt>앞 배분</dt>${cell('front', `${Math.round(f.front * 100)} <small>%</small>`, null)}`
-    + `<dt>최고 속도</dt>${cell('topKmh', `${f.topKmh} <small>km/h</small>`, true)}`
-    + `<dt>0→100</dt>${cell('zeroTo100', `${f.zeroTo100.toFixed(1)} <small>s</small>`, false)}`
-    + `<dt>종감속</dt><dd>${s.final.toFixed(2)}${D.drive.final ? '' : ' <small>자동</small>'}</dd>`
-    + `<dt>원가 지수</dt>${cell('cost', `${f.cost} <small>NSX=100</small>`, false)}`
-    + `<dt>신뢰성</dt>${cell('reliability', `${f.reliability} <small>· ${(f.serviceKm / 1000).toLocaleString()}천 km</small>`, true)}`;
+/** the figures as the kit's bars (docs/systems/110 G4), growing and shrinking as they change; the first four on a
+ *  phone's folded strip. Grip is not among them: the builder works out no grip figure */
+const FIG_BARS: [StatDef, (f: DesignFigures) => number][] = [[STATS.power, f => f.hp], [STATS.weight, f => f.mass], [STATS.top, f => f.topKmh],
+  [{ id: 'zero', name: '0→100', unit: 's', min: 2, max: 12, role: 'green', icon: 'play', digits: 1, low: true }, f => f.zeroTo100],
+  [{ id: 'torque', name: '토크', unit: 'Nm', min: 0, max: 800, role: 'yellow', icon: 'gearbox', digits: 0 }, f => f.torque],
+  [{ id: 'rel', name: '신뢰성', unit: '', min: 0, max: 110, role: 'metal', icon: 'wrench', digits: 0 }, f => f.reliability],
+  [{ id: 'cost', name: '원가', unit: '', min: 0, max: 300, role: 'red', icon: 'money', digits: 0 }, f => f.cost]];
+const figBars = FIG_BARS.map(([d, v]) => { const b = statBar(d, NaN); b.dataset.stat = d.id; $('bars').append(b); return [b, v] as const; });
+function figures() { const f = designFigures(D), s = designSpec(D); lastFigs = f;
+  for (const [b, v] of figBars) if (b.value !== v(f)) b.set(v(f));
+  $('figs').innerHTML = `<dt>출력 정점</dt><dd>${s.hpRpm.toLocaleString()} <small>rpm</small></dd><dt>토크 정점</dt><dd>${s.torqueRpm.toLocaleString()} <small>rpm</small></dd>`
+    + `<dt>마력당 무게</dt><dd>${f.kgPerHp.toFixed(2)} <small>kg/hp</small></dd><dt>앞 배분</dt><dd>${Math.round(f.front * 100)} <small>%</small></dd>`
+    + `<dt>종감속</dt><dd>${s.final.toFixed(2)}${D.drive.final ? '' : ' <small>자동</small>'}</dd><dt>정비 주기</dt><dd>${(f.serviceKm / 1000).toLocaleString()}천 <small>km</small></dd>`;
   $('cls').innerHTML = $('cls6').innerHTML = `<b>${esc(f.perfLabel)}</b> <small>· ${esc(f.form)}</small>`;
   $('cost6').innerHTML = `<dl><dt>원가 지수</dt><dd>${f.cost} <small>NSX=100</small></dd><dt>신뢰성</dt><dd>${f.reliability}</dd><dt>정비 주기</dt><dd>${(f.serviceKm / 1000).toLocaleString()}천 <small>km</small></dd>`
     + `<dt>무게</dt><dd>${f.mass.toLocaleString()} <small>kg</small></dd><dt>출력</dt><dd>${f.hp} <small>hp</small></dd><dt>최고 속도</dt><dd>${f.topKmh} <small>km/h</small></dd></dl>`;
@@ -356,8 +372,8 @@ function showFit(r: FitResult[]) {
   const open = fitOpen ?? (nb > 0 || (nm > 0 && innerWidth > 760));
   // in ⑥ each check also names its step, a button that goes there
   const item = (x: FitResult, toStep = false) => `<li class="${x.verdict}"><span class="ic" aria-hidden="true">${ICON[x.verdict]}</span><div><b>${esc(x.name)}</b> <span>${esc(x.reason)}</span>`
-    + (x.fixes.length || (toStep && x.verdict !== 'ok') ? `<div class="fixes">${x.fixes.map((fx, i) => `<button type="button" class="btn fix" data-part="${x.part}" data-i="${i}">${esc(fx.label)}</button>`).join('')}`
-      + (toStep && x.verdict !== 'ok' ? `<button type="button" class="btn go" data-step="${FIT_STEP[x.part]}">◀ ${stepNo(FIT_STEP[x.part]) + 1}단계 ${STEPS[stepNo(FIT_STEP[x.part])]![1]}로</button>` : '') + '</div>' : '') + '</div></li>';
+    + (x.fixes.length || (toStep && x.verdict !== 'ok') ? `<div class="fixes">${x.fixes.map((fx, i) => `<button type="button" class="${BTN} fix" data-part="${x.part}" data-i="${i}">${esc(fx.label)}</button>`).join('')}`
+      + (toStep && x.verdict !== 'ok' ? `<button type="button" class="${BTN} go" data-step="${FIT_STEP[x.part]}">◀ ${stepNo(FIT_STEP[x.part]) + 1}단계 ${STEPS[stepNo(FIT_STEP[x.part])]![1]}로</button>` : '') + '</div>' : '') + '</div></li>';
   el.innerHTML = `<details${open ? ' open' : ''}><summary>장착 검사 <span class="sum">${nb ? `⛔ ${nb} ` : ''}${nm ? `⚠️ ${nm} ` : ''}${!bad.length ? '✅ 모두 장착' : `✅ ${ok.length}`}</span></summary>`
     + `<ul>${bad.map(x => item(x)).join('')}${ok.map(x => item(x)).join('')}</ul></details>`;
   const el6 = $('fit6'); el6.innerHTML = `<p class="note">${nb ? `⛔ 장착 불가 ${nb} · ` : ''}${nm ? `⚠️ 개조 필요 ${nm} · ` : ''}✅ 장착 ${ok.length}</p><ul>${bad.map(x => item(x, true)).join('')}${ok.map(x => item(x)).join('')}</ul>`;
@@ -416,7 +432,7 @@ function frame(now: number) { const el = Math.min(0.1, (now - last) / 1000); las
     // the free middle between the panels (a phone: the strip above, the drawer below when open): the car framed in it
     const r = cv.getBoundingClientRect(), phone = innerWidth <= 760, sideR = phone ? 0 : $('side').getBoundingClientRect().right, figs = $('figs').closest('section')!.getBoundingClientRect(), figL = phone ? r.width : figs.left;
     // on a phone the band between the figures' strip and the drawer (or the view's buttons)
-    const top = phone ? figs.bottom : 0, bottom = phone ? (document.body.classList.contains('open') ? $('side').getBoundingClientRect().top : r.height - 60) : r.height;
+    const top = phone ? figs.bottom : 0, bottom = phone ? (document.body.classList.contains('open') ? $('side').getBoundingClientRect().top : $('steps').getBoundingClientRect().top - 52) : r.height;
     const free = Math.max(160, figL - sideR) * dpr, band = Math.max(120, bottom - top) * dpr, shift = ((sideR + figL) / 2 - r.width / 2) * dpr, len = M.length;
     const mm = Math.max(len * 1.3 / free, len * 0.62 / band) * view.zoom, ox = -shift * mm / 1000;
     const rx = Math.sin(view.ang), ry = -Math.cos(view.ang);   // the screen's right, in the world
@@ -427,6 +443,8 @@ function frame(now: number) { const el = Math.min(0.1, (now - last) / 1000); las
 // the phone's drawer
 function drawer(on: boolean) { if (on === document.body.classList.contains('open')) return; document.body.classList.toggle('open', on); $('toggle').setAttribute('aria-expanded', String(on)); $('toggle').textContent = on ? '✕ 닫기' : '⚙ 설계'; dirty = true; if (on) showStep(); }
 $('toggle').addEventListener('click', () => drawer(!document.body.classList.contains('open')));
+// the phone's figures: a folded strip of the first bars, unfolded to all of them, the class, the fit and the runs
+$('figsToggle').addEventListener('click', () => { const on = !document.body.classList.contains('figs-open'); document.body.classList.toggle('figs-open', on); $('figsToggle').setAttribute('aria-expanded', String(on)); dirty = true; });
 
 $<HTMLInputElement>('name').value = D.name; for (const s of syncs) s(); restoreStep(); rebuild(); figures(); showList(); savedState(); driveLink(); requestAnimationFrame(frame);
 (globalThis as { __builder?: unknown }).__builder = { get design() { return D; }, use, get builds() { return builds; }, get frames() { return frames; }, get triangles() { return onGpu?.n ?? 0; }, get step() { return onFiles ? 'files' : step; }, go, /** a base's preset opened; the view (its angle, pitch, the car's yaw) set and drawn again */ preset: (id: BaseId) => use(fromPreset(id)), view, redraw() { dirty = true; } };   // for the page tests (tools)

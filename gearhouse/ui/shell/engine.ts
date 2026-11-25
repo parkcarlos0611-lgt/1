@@ -33,6 +33,11 @@ import { torqueAt, type RaceSpec } from '../../race/cars';
 import { dynoCurve, engineSheet, type DynoCurve, type EngineSheet } from '../../race/dyno';
 import { QUALITY } from '../../race/designparts';
 import { Sound, designVoice, type Voice } from '../sound';
+import { statBar, panel } from '../kit/parts';
+import { STATS, type StatDef } from '../kit/logic';
+import { installPick, bigFigure } from '../kit/pick';
+import { drawCartoonChart, niceAxis } from '../kit/chart';
+import { ROLE_KEY, type Role } from '../kit/tokens';
 
 export interface EngineParams { /** the car whose engine is edited (else the car on the turntable carries a new engine) */ design?: Design;
   /** an engine of the library to open */ entry?: SavedEngine; /** the builder's: the edited engine handed back */ onApply?: (e: Design['engine']) => void }
@@ -43,6 +48,17 @@ const KO = {
   compression: { low: '낮음 (8.5)', mid: '보통 (10)', high: '높음 (11+)' } as Record<Compression, string>,
   sump: { wet: '웨트 섬프', dry: '드라이 섬프' } as Record<Sump, string> };
 const yr = (k: keyof typeof TECH_YEAR) => ` · ${TECH_YEAR[k].year}`;
+/** the engine card's bars beside the kit's power (docs/systems/110 G4): spans wide enough for a 1.0 L four and a turbo V12 */
+const ENG_STATS = {
+  torque: { id: 'torque', name: '토크', unit: 'Nm', min: 0, max: 800, role: 'blue', icon: 'gearbox', digits: 0 },
+  specific: { id: 'specific', name: '리터당', unit: 'hp/L', min: 0, max: 200, role: 'orange', icon: 'turbo', digits: 0 },
+  mass: { id: 'mass', name: '무게', unit: 'kg', min: 50, max: 400, role: 'metal', icon: 'engine', digits: 0 },
+  reliability: { id: 'reliability', name: '신뢰성', unit: '', min: 0, max: 110, role: 'green', icon: 'wrench', digits: 0 },
+} as const satisfies Record<string, StatDef>;
+/** the dyno's colours: the torque blue on the left axis, the power yellow on the right (as the card's bars) */
+const DYNO_ROLE = { torque: 'blue', hp: 'yellow' } as const satisfies Record<string, Role>;
+/** a kit button's pressed state: aria-pressed, and its face green (the kit's selected) instead of blue */
+function pressedKit(b: HTMLElement, on: boolean) { b.setAttribute('aria-pressed', String(on)); b.classList.toggle('gk-g', on); b.classList.toggle('gk-b', !on); }
 
 /** the design's figures as the part pointed at carries them (Korean) */
 function partSpec(n: string, d: Design, s: EngineSheet, rig?: StandModel['rig']): string {
@@ -66,49 +82,54 @@ function partSpec(n: string, d: Design, s: EngineSheet, rig?: StandModel['rig'])
 
 type Speed = 'real' | '10' | '50' | 'manual';
 let styled = false;
-function style() { if (styled) return; styled = true; const s = document.createElement('style'); s.dataset.screen = 'engine'; s.textContent = `
-  .gh-eng { display: grid; grid-template-columns: minmax(300px, 340px) minmax(0, 1fr) minmax(320px, 390px); grid-template-rows: auto minmax(0, 1fr); overflow: hidden; background: transparent; }
+function style() { if (styled) return; styled = true; installPick(); const s = document.createElement('style'); s.dataset.screen = 'engine'; s.textContent = `
+  /* the workshop's layout and its own pieces (docs/systems/110 G4); the buttons, panels, bars and chips are the kit's
+     (ui/kit), only sized here (gk-sm), never repainted */
+  .gh-eng { display: grid; grid-template-columns: minmax(300px, 340px) minmax(0, 1fr) minmax(330px, 400px); grid-template-rows: auto minmax(0, 1fr); overflow: hidden; background: transparent; }
   .gh-eng > .gh-bar { grid-column: 1 / -1; }
-  .gh-eng-side, .gh-eng-info { overflow-y: auto; background: var(--gh-panel); padding: 12px 14px 18px; display: grid; gap: 12px; align-content: start; min-height: 0; }
-  .gh-eng-side { border-right: 1px solid var(--gh-line); } .gh-eng-info { border-left: 1px solid var(--gh-line); }
+  .gh-eng-side, .gh-eng-info { overflow-y: auto; background: linear-gradient(90deg, var(--gk-p0), var(--gk-p1)); padding: 14px 14px 20px; display: grid; gap: 14px; align-content: start; min-height: 0; color: var(--gk-ptext); --gh-ink: var(--gk-ptext); --gh-soft: var(--gk-psoft); }
+  .gh-eng-side { border-right: var(--gk-bw) solid var(--gk-ink); } .gh-eng-info { border-left: var(--gk-bw) solid var(--gk-ink); }
   .gh-eng-view { position: relative; min-width: 0; min-height: 0; touch-action: none; cursor: grab; }
   .gh-eng-view:active { cursor: grabbing; }
-  .gh-eng-tools { position: absolute; left: 10px; top: 10px; display: flex; flex-wrap: wrap; gap: 6px; }
-  .gh-eng-tools .gh-btn { min-height: 34px; padding: 5px 11px; font-size: 0.84rem; background: var(--gh-panel); }
-  .gh-eng-tools .gh-btn[aria-pressed="true"] { border-color: var(--gh-accent); color: var(--gh-accent); font-weight: 600; }
-  .gh-eng-tip { position: absolute; pointer-events: none; background: var(--gh-solid); border: 1px solid var(--gh-accent); border-radius: 8px; padding: 6px 10px; font-size: 0.8rem; max-width: min(300px, 80%); box-shadow: 0 4px 16px rgba(0,0,0,0.3); }
-  .gh-eng-tip b { display: block; font-size: 0.9rem; }
+  .gh-eng-tools { position: absolute; left: 10px; top: 14px; display: flex; flex-wrap: wrap; gap: 8px; }
+  .gh-eng-tip { position: absolute; pointer-events: none; background: var(--gk-well); color: var(--gk-text); border: var(--gk-bw) solid var(--gk-ink); border-radius: 4px; padding: 6px 10px 8px; font-size: 0.8rem; max-width: min(300px, 80%); box-shadow: 0 4px 0 var(--gk-ink); }
+  .gh-eng-tip b { display: block; font: italic 700 1rem var(--gk-head); color: var(--gk-y0); text-shadow: var(--gk-edge-s); }
   .gh-eng-tip[hidden] { display: none; }
   .gh-eng-hint { position: absolute; left: 10px; bottom: 8px; font-size: 0.74rem; color: #e9e4d8; text-shadow: 0 1px 3px #000; }
-  .gh-dyno { width: 100%; aspect-ratio: 16 / 10; display: block; border-radius: 6px; background: var(--gh-solid); border: 1px solid var(--gh-line); }
+  .gh-eng-card { display: grid; gap: 10px; }
+  .gh-eng-card .gh-h2 { margin: 0; font-size: 1.2rem; }
+  .gh-eng-card .gk-stat { grid-template-columns: auto 4.2em minmax(50px, 1fr) 5.6em; gap: 7px; }
+  .gh-eng-card .gk-stat .gk-ic { width: 26px; height: 26px; } .gh-eng-card .gk-stat-l { font-size: 0.9rem; } .gh-eng-card .gk-stat-n { font-size: 1.15rem; }
+  .gh-eng-bars { display: grid; gap: 7px; }
+  .gh-dyno { width: 100%; aspect-ratio: 16 / 11; display: block; }
+  .gh-dyno-key { display: flex; gap: 14px; flex-wrap: wrap; font: italic 700 0.86rem var(--gk-head); color: #fff; text-shadow: var(--gk-edge-s); }
+  .gh-dyno-key i { display: inline-block; width: 22px; height: 7px; margin-right: 6px; vertical-align: middle; border: 2px solid var(--gk-ink); border-radius: 3px; }
   .gh-rev { display: grid; grid-template-columns: auto 1fr; gap: 8px 10px; align-items: center; }
-  .gh-rev .gh-btn { touch-action: none; user-select: none; -webkit-user-select: none; }
-  .gh-rev .gh-btn.gh-held { background: var(--gh-accent); color: var(--gh-accent-ink); }
-  .gh-tach { font-family: var(--gh-display); font-size: 1.4rem; font-variant-numeric: tabular-nums; letter-spacing: 0.03em; }
-  .gh-tach small { font-family: var(--gh-body); font-size: 0.72rem; color: var(--gh-soft); }
-  .gh-sheet { display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; margin: 0; font-size: 0.86rem; font-variant-numeric: tabular-nums; }
-  .gh-sheet dt { color: var(--gh-soft); } .gh-sheet dd { margin: 0; text-align: right; } .gh-sheet small { color: var(--gh-soft); }
-  .gh-techs { display: flex; flex-wrap: wrap; gap: 5px; }
-  .gh-tech { font-size: 0.72rem; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--gh-line); color: var(--gh-soft); white-space: nowrap; }
-  .gh-tech.gh-late { border-color: var(--gh-warn); color: var(--gh-warn); }
-  .gh-lock { font-size: 0.74rem; color: var(--gh-soft); margin: -2px 0 0; } .gh-lock:empty { display: none; }
+  .gh-rev .gk-btn { touch-action: none; user-select: none; -webkit-user-select: none; }
+  .gh-tach { font: italic 700 1.7rem var(--gk-head); font-variant-numeric: tabular-nums; letter-spacing: 0.02em; color: #fff; text-shadow: var(--gk-edge); }
+  .gh-tach small { font-family: var(--gk-body); font-style: normal; font-size: 0.72rem; color: var(--gk-psoft); text-shadow: none; }
+  .gh-sheet { display: grid; grid-template-columns: auto 1fr; gap: 0; margin: 0; font-size: 0.84rem; font-variant-numeric: tabular-nums; border: var(--gk-bw) solid var(--gk-ink); border-radius: 4px; background: var(--gk-well); overflow: hidden; }
+  .gh-sheet dt, .gh-sheet dd { padding: 4px 8px; border-bottom: 1px solid var(--gk-rule); } .gh-sheet dt { color: var(--gk-psoft); font-weight: 700; } .gh-sheet dd { margin: 0; text-align: right; color: var(--gk-ptext); font-weight: 700; } .gh-sheet small { color: var(--gk-psoft); font-weight: 400; }
+  .gh-techs { display: flex; flex-wrap: wrap; gap: 7px; }
+  .gh-tech { font: italic 700 0.76rem var(--gk-head); letter-spacing: 0.02em; padding: 3px 9px 4px; border: 2px solid var(--gk-ink); border-radius: 3px; color: #fff; text-shadow: var(--gk-edge-s); white-space: nowrap; background: linear-gradient(var(--gk-dark0) 0 66%, var(--gk-dark1) 66%); transform: skewX(-8deg); }
+  .gh-tech.gh-late { background: linear-gradient(var(--gk-r0) 0 66%, var(--gk-r1) 66%); }
+  .gh-lock { font-size: 0.74rem; color: var(--gk-psoft); margin: -2px 0 0; } .gh-lock:empty { display: none; }
   .gh-q { display: grid; gap: 4px; } .gh-q .gh-note { margin-top: -2px; }
-  .gh-elist { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
-  .gh-elist li { border: 1px solid var(--gh-line); border-radius: 8px; padding: 8px 10px; display: grid; gap: 6px; background: var(--gh-solid); }
-  .gh-elist li.gh-me { border-color: var(--gh-accent); }
-  .gh-elist .gh-actions .gh-btn { min-height: 34px; padding: 4px 10px; font-size: 0.82rem; }
-  .gh-name { font: inherit; font-size: 0.95rem; padding: 7px 10px; border: 1px solid var(--gh-line); border-radius: 6px; background: var(--gh-solid); color: var(--gh-ink); width: 100%; }
-  .gh-chip:disabled { opacity: 0.4; cursor: not-allowed; }
-  .gh-eng-cut { position: absolute; left: 8px; right: 8px; bottom: 8px; display: grid; gap: 5px; padding: 6px 8px; border-radius: 8px; background: color-mix(in srgb, var(--gh-panel) 88%, transparent); border: 1px solid var(--gh-line); font-size: 0.8rem; }
+  .gh-elist { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+  .gh-elist li { border: var(--gk-bw) solid var(--gk-ink); border-radius: 4px; padding: 8px 10px; display: grid; gap: 6px; background: var(--gk-well); box-shadow: 0 3px 0 var(--gk-ink); }
+  .gh-elist li b { font: italic 700 1.05rem var(--gk-head); color: #fff; text-shadow: var(--gk-edge-s); }
+  .gh-elist li.gh-me { background: linear-gradient(var(--gk-g1) 0 82%, #17702f 82%); } .gh-elist li.gh-me .gh-note { color: #e9fbe9; }
+  .gh-elist .gh-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+  .gh-name { font: inherit; font-size: 0.95rem; font-weight: 700; padding: 7px 10px; border: var(--gk-bw) solid var(--gk-ink); border-radius: 4px; background: var(--gk-well); color: var(--gk-text); width: 100%; box-sizing: border-box; }
+  .gh-eng .gh-chip:disabled { background: linear-gradient(var(--gk-grey0) 0 66%, var(--gk-grey1) 66%); color: #f2f3f4; cursor: not-allowed; }
+  .gh-eng-cut { position: absolute; left: 8px; right: 8px; bottom: 8px; display: grid; gap: 6px; padding: 8px 10px; border: var(--gk-bw) solid var(--gk-ink); border-radius: 4px; background: color-mix(in srgb, var(--gk-well) 90%, transparent); font-size: 0.8rem; color: var(--gk-text); }
   .gh-eng-cut[hidden] { display: none; }
   .gh-eng-cut .gh-row2 { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-  .gh-eng-cut .gh-btn { min-height: 28px; padding: 2px 8px; font-size: 0.76rem; background: var(--gh-solid); }
-  .gh-eng-cut .gh-btn[aria-pressed="true"] { border-color: var(--gh-accent); color: var(--gh-accent); font-weight: 600; }
   .gh-eng-cut input[type=range] { flex: 1 1 160px; min-width: 120px; }
-  .gh-eng-read { font-variant-numeric: tabular-nums; }
-  .gh-cyls { display: flex; flex-wrap: wrap; gap: 3px; }
-  .gh-cyl { min-width: 34px; padding: 1px 3px; border-radius: 5px; text-align: center; font-size: 0.68rem; line-height: 1.1; color: #fff; font-variant-numeric: tabular-nums; }
-  .gh-cyl b { display: block; font-size: 0.78rem; }
+  .gh-eng-read { font-variant-numeric: tabular-nums; font-weight: 700; }
+  .gh-cyls { display: flex; flex-wrap: wrap; gap: 4px; }
+  .gh-cyl { min-width: 34px; padding: 1px 3px; border: 2px solid var(--gk-ink); border-radius: 4px; text-align: center; font-size: 0.68rem; line-height: 1.1; color: #fff; font-variant-numeric: tabular-nums; }
+  .gh-cyl b { display: block; font: italic 700 0.8rem var(--gk-head); }
   .gh-cyl[data-k="0"] { background: #b23a1e; } .gh-cyl[data-k="1"] { background: #6b6e73; } .gh-cyl[data-k="2"] { background: #2f6aa8; } .gh-cyl[data-k="3"] { background: #b8860b; }
   .gh-cyl.gh-spark { box-shadow: 0 0 0 2px #fff6c0, 0 0 10px 3px #ffd84a; }
   .gh-eng-glint { position: absolute; inset: 0; pointer-events: none; width: 100%; height: 100%; }
@@ -117,7 +138,8 @@ function style() { if (styled) return; styled = true; const s = document.createE
     .gh-eng { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 40vh minmax(0, 1fr); }
     .gh-eng-view { grid-row: 2; }
     .gh-eng-scroll { grid-row: 3; overflow-y: auto; min-height: 0; }
-    .gh-eng-side, .gh-eng-info { overflow: visible; border: 0; border-top: 1px solid var(--gh-line); }
+    .gh-eng-side, .gh-eng-info { overflow: visible; border: 0; border-top: var(--gk-bw) solid var(--gk-ink); }
+    .gh-eng-tools { top: 10px; gap: 6px; }
   }
   @media (min-width: 761px) { .gh-eng-scroll { display: contents; } .gh-eng-side { grid-column: 1; grid-row: 2; } .gh-eng-view { grid-column: 2; grid-row: 2; } .gh-eng-info { grid-column: 3; grid-row: 2; } }`; document.head.append(s); }
 
@@ -182,7 +204,8 @@ export function engineScreen(ctx: ShellCtx): Screen<EngineParams> & { readonly a
     for (const s of all) { const e = joinEngine(s.family, s.variant, car), d = withEngine(car, e); let hp = ''; try { hp = ` · ${Math.round(designSpec(d).hp)} hp`; } catch { /* shown without */ }
       list.append(el('li', entry?.id === s.id ? 'gh-me' : '', el('b', '', s.name), el('span', 'gh-note', `${LAYOUT_NAME[e.layout]} ${e.cc.toLocaleString()} cc · ${e.grade}등급${e.turbo ? ` · 터보 ${e.turbo}` : ''}${hp} · 범위 ${s.family.cc[0].toLocaleString()}~${s.family.cc[1].toLocaleString()} cc`),
         el('div', 'gh-actions', button('열기', () => open(s), { kind: 'main' }), button('복제', () => { const c = duplicateEngine(ctx.store, s.id); toast(c ? `복제했습니다: ${c.name}` : '저장하지 못했습니다'); fillList(); }),
-          button('삭제', () => void dialog('엔진 삭제', [`"${s.name}" 엔진을 보관함에서 지울까요? 이 엔진을 얹은 차는 그대로 남습니다.`], [['del', '삭제', { kind: 'danger' }], ['', '취소', { kind: 'ghost' }]]).then(v => { if (!v) return; deleteEngine(ctx.store, s.id); if (entry?.id === s.id) entry = null; toast('지웠습니다'); fillList(); }))))); } }
+          button('삭제', () => void dialog('엔진 삭제', [`"${s.name}" 엔진을 보관함에서 지울까요? 이 엔진을 얹은 차는 그대로 남습니다.`], [['del', '삭제', { kind: 'danger' }], ['', '취소', { kind: 'ghost' }]]).then(v => { if (!v) return; deleteEngine(ctx.store, s.id); if (entry?.id === s.id) entry = null; toast('지웠습니다'); fillList(); }))))); }
+    for (const b of Array.from(list.querySelectorAll('.gk-btn'))) b.classList.add('gk-sm'); }
   const library = el('div', 'gh-form', el('label', 'gh-row', el('span', 'gh-label', '엔진 이름'), nameIn),
     el('div', 'gh-actions', button('보관함에 저장', () => save(false), { kind: 'main', id: 'gh-eng-save' }), button('새 엔진으로 저장', () => save(true))),
     note('엔진(계열과 변형)은 차와 따로 보관됩니다. 차 빌더 ② 단계에서 보관함의 엔진을 골라 얹을 수 있습니다.'), h('보관함'), list);
@@ -190,19 +213,27 @@ export function engineScreen(ctx: ShellCtx): Screen<EngineParams> & { readonly a
 
   // ---- the right: the dyno, the rev control, the sheet, the years ----
   const dyno = el('canvas', 'gh-dyno'); dyno.setAttribute('role', 'img'); dyno.setAttribute('aria-label', '다이노: 회전수에 따른 토크와 출력');
-  const tach = el('div', 'gh-tach'), revBtn = button('회전 올리기 (누르고 있기)', () => {}, { id: 'gh-rev' }), thr = el('input', 'gh-slider'); thr.type = 'range'; thr.min = '0'; thr.max = '1'; thr.step = '0.01'; thr.value = '0'; thr.setAttribute('aria-label', '스로틀');
+  const tach = el('div', 'gh-tach'), revBtn = button('회전 올리기 (누르고 있기)', () => {}, { id: 'gh-rev', kind: 'main' }), thr = el('input', 'gh-slider'); thr.type = 'range'; thr.min = '0'; thr.max = '1'; thr.step = '0.01'; thr.value = '0'; thr.setAttribute('aria-label', '스로틀');
   const soundRow = el('div'), sheetBox = el('dl', 'gh-sheet'), techs = el('div', 'gh-techs'), yearNote = note('');
-  const info = el('div', 'gh-eng-info', el('h3', 'gh-h2', '다이노'), dyno, el('div', 'gh-rev', revBtn, tach, el('span', 'gh-label', '스로틀'), thr), soundRow,
+  // the engine's card (docs/systems/110 G4): its name, the two peaks as big figures, its key figures as the kit's bars
+  const cardName = el('h3', 'gh-h2', ''), bigHp = bigFigure('최고 출력', 'y'), bigTq = bigFigure('최대 토크', 'b');
+  const BARS: [StatDef, (s: EngineSheet) => number][] = [[STATS.power, s => s.hp], [ENG_STATS.torque, s => s.torque], [ENG_STATS.specific, s => s.specific], [ENG_STATS.mass, s => s.mass], [ENG_STATS.reliability, s => s.reliability]];
+  const bars = BARS.map(([d, f]) => [statBar(d, f(sheet)), f] as const);
+  const engCard = panel('', cardName, el('div', 'gk-bigs', bigHp, bigTq), el('div', 'gh-eng-bars', ...bars.map(b => b[0]))); engCard.classList.add('gh-eng-card');
+  const key = (role: Role, t: string) => { const i = el('i'); i.style.background = `var(--gk-${ROLE_KEY[role]}0)`; return el('span', '', i, t); };
+  const dynoBox = panel('well', el('h3', 'gh-h2', '다이노'), dyno, el('div', 'gh-dyno-key', key(DYNO_ROLE.torque, '토크 (Nm, 왼쪽)'), key(DYNO_ROLE.hp, '출력 (hp, 오른쪽)'))); dynoBox.classList.add('gh-eng-card');
+  const info = el('div', 'gh-eng-info', engCard, dynoBox, el('div', 'gh-rev', revBtn, tach, el('span', 'gh-label', '스로틀'), thr), soundRow,
     el('h3', 'gh-h2', '엔진 평가표'), sheetBox, el('h3', 'gh-h2', '기술과 연도'), techs, yearNote);
   // ---- the middle: the view ----
   const tip = el('div', 'gh-eng-tip'); tip.hidden = true;
-  const exBtn = button('분해도', () => { if (cut.on) setCut(false); view.explode = !view.explode; exBtn.setAttribute('aria-pressed', String(view.explode)); view.anim = performance.now(); dirty = true; }, { id: 'gh-explode' }); exBtn.setAttribute('aria-pressed', 'false');
+  const exBtn = button('분해도', () => { if (cut.on) setCut(false); view.explode = !view.explode; pressedKit(exBtn, view.explode); view.anim = performance.now(); dirty = true; }, { id: 'gh-explode' }); pressedKit(exBtn, false);
   const homeBtn = button('시점 초기화', () => { home(); });
-  const cutBtn = button('절단 보기', () => setCut(!cut.on), { id: 'gh-cutaway' }); cutBtn.setAttribute('aria-pressed', 'false');
+  const cutBtn = button('절단 보기', () => setCut(!cut.on), { id: 'gh-cutaway' }); pressedKit(cutBtn, false);
+  for (const b of [exBtn, homeBtn, cutBtn]) b.classList.add('gk-sm');
   // ---- the cutaway's bar: the speed, the crank (a V8's), the hand's slider, the angle and the order, each cylinder's stroke ----
   const SPEEDS: [Speed, string][] = [['real', '실제 속도'], ['10', '1/10'], ['50', '1/50'], ['manual', '한 사이클 수동']];
-  const speedBtns = SPEEDS.map(([k, t]) => { const b = button(t, () => { cut.speed = k; syncCut(); }); b.dataset.speed = k; return b; });
-  const crankBtns = (['flat', 'cross'] as const).map(k => { const b = button(k === 'flat' ? '평면 크랭크' : '십자 크랭크', () => { cut.crank = k; cut.model = null; syncCut(); dirty = true; }); b.dataset.crank = k; b.title = k === 'flat' ? '평면(180°): 핀이 0°와 180°, 두 뱅크가 번갈아 점화 (F355)' : '십자(90°): 핀이 90°씩, 한 뱅크가 두 번 잇달아 점화하는 곳이 있음 (특유의 두근거림)'; return b; });
+  const speedBtns = SPEEDS.map(([k, t]) => { const b = button(t, () => { cut.speed = k; syncCut(); }); b.dataset.speed = k; b.classList.add('gk-sm'); return b; });
+  const crankBtns = (['flat', 'cross'] as const).map(k => { const b = button(k === 'flat' ? '평면 크랭크' : '십자 크랭크', () => { cut.crank = k; cut.model = null; syncCut(); dirty = true; }); b.dataset.crank = k; b.classList.add('gk-sm'); b.title = k === 'flat' ? '평면(180°): 핀이 0°와 180°, 두 뱅크가 번갈아 점화 (F355)' : '십자(90°): 핀이 90°씩, 한 뱅크가 두 번 잇달아 점화하는 곳이 있음 (특유의 두근거림)'; return b; });
   const crankRow = el('span', 'gh-row2', ...crankBtns);
   const hand = el('input', 'gh-slider'); hand.type = 'range'; hand.min = '0'; hand.max = '720'; hand.step = '1'; hand.value = '0'; hand.setAttribute('aria-label', '크랭크 각도 (한 사이클 0~720°)'); hand.id = 'gh-crank';
   hand.addEventListener('input', () => { cut.theta = +hand.value; dirty = true; });
@@ -227,6 +258,9 @@ export function engineScreen(ctx: ShellCtx): Screen<EngineParams> & { readonly a
   function figures() { spec = designSpec(car); curve = dynoCurve(car); sheet = engineSheet(car, curve); sweep = performance.now(); drawSheet(); drawTechs(); drawSoundRow(); dirtyDyno = true; }
   const dd = (t: string, v: string, u = '') => [el('dt', '', t), (() => { const x = el('dd', '', v); if (u) x.append(' ', el('small', '', u)); return x; })()];
   function drawSheet() { const s = sheet; sheetBox.textContent = '';
+    cardName.textContent = `${LAYOUT_NAME[E().layout]} ${(E().cc / 1000).toFixed(1)} L · ${E().grade}등급${E().turbo ? ` · 터보 ${E().turbo}` : ''}`;
+    bigHp.set(String(s.hp), 'hp', `${s.hpRpm.toLocaleString()} rpm`); bigTq.set(String(s.torque), 'Nm', `${s.torqueRpm.toLocaleString()} rpm`);
+    for (const [b, f] of bars) if (b.value !== f(s)) b.set(f(s));
     sheetBox.append(...dd('최고 출력', `${s.hp}`, `hp · ${s.hpRpm.toLocaleString()} rpm`), ...dd('최대 토크', `${s.torque}`, `Nm · ${s.torqueRpm.toLocaleString()} rpm`), ...dd('리터당 출력', `${s.specific}`, 'hp/L'),
       ...dd('보어 × 행정', `${s.bore} × ${s.stroke}`, 'mm'), ...dd('무게 (보기류 포함)', `${s.mass}`, 'kg'), ...dd('크기 (길이·폭·높이)', `${s.length} · ${s.width} · ${s.height}`, 'mm'), ...dd('변속기 길이', `${s.box}`, 'mm'),
       ...dd('연비 추정 (90 · 120 km/h)', `${s.fuel90} · ${s.fuel120}`, 'L/100km'), ...dd('배출가스 등급 (임시)', s.emissions), ...dd('신뢰성', `${s.reliability}`, `· 정비 ${(s.serviceKm / 1000).toLocaleString()}천 km`),
@@ -239,29 +273,19 @@ export function engineScreen(ctx: ShellCtx): Screen<EngineParams> & { readonly a
   // ---- the dyno: the curves drawn as the revs sweep up, the peaks marked; the rev control's needle ----
   let sweep = 0, dirtyDyno = true;
   const css = (n: string, d: string) => getComputedStyle(document.documentElement).getPropertyValue(n).trim() || d;
+  /** the dyno as the kit's cartoon graph (ui/kit/chart.ts): the torque and the power swept up from idle, their peaks tagged */
   function drawDyno(now: number) { const c = dyno, dpr = Math.min(2, devicePixelRatio || 1), W = Math.max(10, Math.round(c.clientWidth * dpr)), H = Math.max(10, Math.round(c.clientHeight * dpr)); if (c.width !== W || c.height !== H) { c.width = W; c.height = H; }
-    const g = c.getContext('2d'); if (!g) return; const C = curve, ink = css('--gh-ink', '#222'), soft = css('--gh-soft', '#777'), line = css('--gh-line', '#ccc'), acc = css('--gh-accent', '#a0522d'), pw = css('--gh-good', '#3f7a3a');
-    g.clearRect(0, 0, W, H); const L = 38 * dpr, R = W - 38 * dpr, T = 14 * dpr, B = H - 34 * dpr, r0 = 0, r1 = Math.ceil(C.redline / 1000) * 1000;
-    const tMax = Math.ceil(Math.max(...C.torque) * 1.15 / 50) * 50, pMax = Math.ceil(Math.max(...C.hp) * 1.15 / 50) * 50;
-    const X = (r: number) => L + (R - L) * (r - r0) / (r1 - r0), YT = (t: number) => B - (B - T) * t / tMax, YP = (p: number) => B - (B - T) * p / pMax;
-    g.font = `${10 * dpr}px ${css('--gh-body', 'sans-serif')}`; g.lineWidth = dpr; g.strokeStyle = line; g.fillStyle = soft; g.textAlign = 'center';
-    for (let r = 0; r <= r1; r += 1000) { g.beginPath(); g.moveTo(X(r), T); g.lineTo(X(r), B); g.stroke(); g.fillText(String(r / 1000), X(r), B + 14 * dpr); }
-    g.textAlign = 'right'; for (let k = 0; k <= 4; k++) { const y = B - (B - T) * k / 4; g.beginPath(); g.moveTo(L, y); g.lineTo(R, y); g.stroke(); g.fillStyle = acc; g.fillText(String(Math.round(tMax * k / 4)), L - 4 * dpr, y + 3 * dpr); g.textAlign = 'left'; g.fillStyle = pw; g.fillText(String(Math.round(pMax * k / 4)), R + 4 * dpr, y + 3 * dpr); g.textAlign = 'right'; }
-    g.fillStyle = soft; g.textAlign = 'center'; g.fillText('×1000 rpm', (L + R) / 2, H - 2 * dpr); g.textAlign = 'left'; g.fillStyle = acc; g.fillText('토크 Nm', L, T - 3 * dpr); g.textAlign = 'right'; g.fillStyle = pw; g.fillText('출력 hp', R, T - 3 * dpr);
-    // the red line's band
-    g.fillStyle = 'rgba(200,40,30,0.12)'; g.fillRect(X(C.redline), T, R - X(C.redline), B - T);
+    const g = c.getContext('2d'); if (!g) return; const C = curve, xStep = C.redline > 10000 ? 2000 : 1000, xMax = Math.ceil(C.redline / xStep) * xStep;
     // the sweep: the revs rise from idle to the red line over 1.2 s (at once when the screen is to be calm)
     const calm = ctx.settings.screen.calm, k = calm ? 1 : Math.min(1, (now - sweep) / 1200), upTo = C.idle + (C.redline - C.idle) * (1 - (1 - k) ** 2);
-    const path = (ys: number[], Y: (v: number) => number, col: string) => { g.strokeStyle = col; g.lineWidth = 2.5 * dpr; g.beginPath(); let first = true;
-      for (let i = 0; i < C.rpm.length; i++) { if (C.rpm[i]! > upTo) break; const x = X(C.rpm[i]!), y = Y(ys[i]!); if (first) g.moveTo(x, y); else g.lineTo(x, y); first = false; } g.stroke(); };
-    path(C.torque, YT, acc); path(C.hp, YP, pw);
-    const mark = (r: number, y: number, col: string, text: string, right: boolean) => { if (r > upTo) return; g.fillStyle = col; g.beginPath(); g.arc(X(r), y, 4 * dpr, 0, Math.PI * 2); g.fill();
-      g.font = `600 ${10.5 * dpr}px ${css('--gh-body', 'sans-serif')}`; g.textAlign = right ? 'right' : 'left'; g.fillStyle = ink; g.fillText(text, X(r) + (right ? -7 : 7) * dpr, y - 6 * dpr); };
-    mark(C.peakTorque.rpm, YT(C.peakTorque.torque), acc, `${Math.round(C.peakTorque.torque)} Nm @ ${C.peakTorque.rpm.toLocaleString()}`, C.peakTorque.rpm > (r0 + r1) / 2);
-    mark(C.peakHp.rpm, YP(C.peakHp.hp), pw, `${Math.round(C.peakHp.hp)} hp @ ${C.peakHp.rpm.toLocaleString()}`, true);
+    const near = (r: number) => { let best = 0; C.rpm.forEach((x, i) => { if (Math.abs(x - r) < Math.abs(C.rpm[best]! - r)) best = i; }); return best; };
+    const tA = niceAxis(Math.max(...C.torque)), pA = niceAxis(Math.max(...C.hp));
     // the cursor of the sweep, or the rev control's needle
     const needle = k < 1 ? upTo : rev.rpm > spec.idle * 1.05 || rev.thr > 0 ? rev.rpm : 0;
-    if (needle) { g.strokeStyle = ink; g.lineWidth = 1.2 * dpr; g.setLineDash([4 * dpr, 3 * dpr]); g.beginPath(); g.moveTo(X(needle), T); g.lineTo(X(needle), B); g.stroke(); g.setLineDash([]); }
+    drawCartoonChart(g, W, H, { xs: C.rpm, xMax, xStep, xText: v => String(v / 1000), xLabel: '회전수 ×1000 rpm', dpr, font: css('--gk-head', 'sans-serif'), plate: css('--gk-well', '#142624'),
+      axes: [{ ...tA, label: '토크 Nm', role: DYNO_ROLE.torque }, { ...pA, label: '출력 hp', role: DYNO_ROLE.hp }], upTo, band: C.redline, needle,
+      series: [{ ys: C.hp, role: DYNO_ROLE.hp, axis: 1, fill: true, peak: { i: near(C.peakHp.rpm), text: `${Math.round(C.peakHp.hp)} hp`, sub: `@ ${C.peakHp.rpm.toLocaleString()} rpm` } },
+        { ys: C.torque, role: DYNO_ROLE.torque, axis: 0, peak: { i: near(C.peakTorque.rpm), text: `${Math.round(C.peakTorque.torque)} Nm`, sub: `@ ${C.peakTorque.rpm.toLocaleString()} rpm` } }] });
     dirtyDyno = k < 1; }
 
   // ---- the rev control: a small engine model on the stand (its torque the physics', its own friction), the voice ----
@@ -274,7 +298,7 @@ export function engineScreen(ctx: ShellCtx): Screen<EngineParams> & { readonly a
   function stopSound() { snd?.close(); snd = null; voice = null; voiceKey = ''; }
   function drawSoundRow() { soundRow.textContent = ''; if (wantSound()) soundRow.append(el('p', 'gh-note', `엔진 소리: ${LAYOUT_NAME[E().layout]}${E().turbo ? `, 터보 ${E().turbo}` : ''}${E().intake === 'itb' ? ', 개별 스로틀 흡기음' : ''} · 음량은 설정 → 소리에서 바꿉니다`));
     else soundRow.append(toggle('엔진 소리 켜기 (게임 설정의 주행 소리)', false, v => { ctx.settings.sound.on = v; ctx.changed(); drawSoundRow(); if (v) startSound(); })); }
-  const hold = (on: boolean) => { rev.held = on; revBtn.classList.toggle('gh-held', on); if (on) startSound(); };
+  const hold = (on: boolean) => { rev.held = on; revBtn.classList.toggle('gk-down', on); revBtn.classList.toggle('gk-o', on); revBtn.classList.toggle('gk-y', !on); if (on) startSound(); };   // held: pressed down, orange
   revBtn.addEventListener('pointerdown', e => { e.preventDefault(); revBtn.setPointerCapture(e.pointerId); hold(true); });
   for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture'] as const) revBtn.addEventListener(ev, () => hold(false));
   revBtn.addEventListener('keydown', e => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); hold(true); } });
@@ -310,13 +334,13 @@ export function engineScreen(ctx: ShellCtx): Screen<EngineParams> & { readonly a
   // ---- the cutaway: its model (built when first shown), the crank turned by the revs at the chosen speed or by hand ----
   function cutModel(): StandModel | null { if (!cut.model) { const t0 = performance.now(); try { cut.model = standModel(car, 2, { crank: cut.crank ?? undefined }); } catch (e) { console.warn('engine cutaway', e); return null; }
       console.info(`engine cutaway ${E().layout}: ${cut.model.mesh.n} triangles, ${cut.model.rig?.bones} bones, ${Math.round(performance.now() - t0)} ms`); syncCut(); } return cut.model; }
-  function setCut(on: boolean) { cut.on = on; cutBtn.setAttribute('aria-pressed', String(on)); viewBox.classList.toggle('gh-cutting', on); cutBar.hidden = !on; tip.hidden = true;
-    if (on) { if (view.explode) { view.explode = false; view.k = 0; exBtn.setAttribute('aria-pressed', 'false'); }
+  function setCut(on: boolean) { cut.on = on; pressedKit(cutBtn, on); viewBox.classList.toggle('gh-cutting', on); cutBar.hidden = !on; tip.hidden = true;
+    if (on) { if (view.explode) { view.explode = false; view.k = 0; pressedKit(exBtn, false); }
       if (!cut.crank) cut.crank = E().redline >= 8000 ? 'flat' : 'cross';
       const flat = E().layout[0] === 'F'; view.ang = flat ? 1.0 : 1.35; view.pitch = flat ? 46 : 24; view.zoom = 0.8; }   // an in-line engine or a V from the open side (a V's near bank opened to its crankcase), a flat one from above
     syncCut(); dirty = true; }
-  function syncCut() { for (const b of speedBtns) b.setAttribute('aria-pressed', String(b.dataset.speed === cut.speed)); handRow.hidden = cut.speed !== 'manual'; handRow.style.display = cut.speed === 'manual' ? '' : 'none';
-    const v8 = E().layout === 'V8'; crankRow.style.display = v8 ? '' : 'none'; for (const b of crankBtns) b.setAttribute('aria-pressed', String(b.dataset.crank === cut.crank));
+  function syncCut() { for (const b of speedBtns) pressedKit(b, b.dataset.speed === cut.speed); handRow.hidden = cut.speed !== 'manual'; handRow.style.display = cut.speed === 'manual' ? '' : 'none';
+    const v8 = E().layout === 'V8'; crankRow.style.display = v8 ? '' : 'none'; for (const b of crankBtns) pressedKit(b, b.dataset.crank === cut.crank);
     if (cut.speed === 'manual') hand.value = String(Math.round(cut.theta));
     const rig = cut.model?.rig ?? null; if (rig !== cut.rigOf) { cut.rigOf = rig; cylBox.textContent = ''; cut.chips = [];
       if (rig) for (const c of [...rig.cyl].sort((a, b) => a.no - b.no)) { const ch = el('span', 'gh-cyl'); ch.dataset.no = String(c.no); ch.title = `${c.no}번 실린더`; cylBox.append(ch); cut.chips.push(ch); } } }
@@ -382,7 +406,7 @@ export function engineScreen(ctx: ShellCtx): Screen<EngineParams> & { readonly a
     enter(p: EngineParams, how: Move) { style(); ctx.backdrop.stop(); ctx.stage.use('engine', true, R => { R.setGround(studioFloor()); R.setTrack(1, 30, 12, 0); });
       if (how !== 'back') { onApply = p?.onApply; const base = p?.design ?? ctx.recent(); car = normalise(structuredClone(base)); entry = null; range = familyRange(car.engine.cc);
         if (p?.entry) { car = withEngine(car, joinEngine(p.entry.family, p.entry.variant, car)); range = [...p.entry.family.cc]; entry = { id: p.entry.id, name: p.entry.name }; }
-        nameIn.value = entry?.name ?? (p?.design ? `${car.name}의 엔진` : `${LAYOUT_NAME[car.engine.layout]} ${(car.engine.cc / 1000).toFixed(1)}`); start = sig(); meshKey = ''; rev.rpm = 0; view.explode = false; view.k = 0; exBtn.setAttribute('aria-pressed', 'false'); cut.crank = null; cut.model = null; setCut(false); }
+        nameIn.value = entry?.name ?? (p?.design ? `${car.name}의 엔진` : `${LAYOUT_NAME[car.engine.layout]} ${(car.engine.cc / 1000).toFixed(1)}`); start = sig(); meshKey = ''; rev.rpm = 0; view.explode = false; view.k = 0; pressedKit(exBtn, false); cut.crank = null; cut.model = null; setCut(false); }
       document.title = `GEARHOUSE · 엔진 공방${onApply ? ` · ${car.name}` : ''}`;
       ctx.layer.append(root); on = true; changed(); figures(); drawSoundRow(); fillList(); dirty = true; last = performance.now(); cancelAnimationFrame(raf); raf = requestAnimationFrame(frame); addEventListener('resize', onResize);
       requestAnimationFrame(() => { if (!root.contains(document.activeElement)) (root.querySelector<HTMLElement>('.gh-tab[aria-selected="true"]'))?.focus({ preventScroll: true }); }); },

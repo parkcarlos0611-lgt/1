@@ -2,8 +2,9 @@
 // fills for a figure, what a change shows (the part gained or lost), and the figure counting to its new value.
 import type { Role } from './tokens';
 
-/** a stat the bars show: its name, unit, the span its bar covers, its colour, its icon */
-export interface StatDef { id: string; name: string; unit: string; min: number; max: number; role: Role; icon: string; digits: number }
+/** a stat the bars show: its name, unit, the span its bar covers, its colour, its icon; `low`: a lower figure is
+ *  better (a 0-100 time), so the bar fills from the span's top down (G4) */
+export interface StatDef { id: string; name: string; unit: string; min: number; max: number; role: Role; icon: string; digits: number; low?: boolean }
 /** power, weight, grip, top speed: spans wide enough for the 1930s cars and the 1990s supercars alike */
 export const STATS = {
   power: { id: 'power', name: '출력', unit: 'hp', min: 0, max: 700, role: 'yellow', icon: 'engine', digits: 0 },
@@ -16,10 +17,11 @@ export type StatId = keyof typeof STATS;
 /** the least a bar shows for any figure above its span's bottom: a sliver, so a small value never reads as none */
 export const SLIVER = 0.03;
 /** the share of its track a bar fills for a figure (0..1): its place in the span, held to the ends; a figure at or
- *  below the bottom (or not a number) is empty, one just above it a sliver */
-export function statShare(v: number, s: { min: number; max: number }): number {
-  if (!Number.isFinite(v) || !(s.max > s.min) || v <= s.min) return 0;
-  return Math.max(SLIVER, Math.min(1, (v - s.min) / (s.max - s.min))); }
+ *  below the bottom (or not a number) is empty, one just above it a sliver (a `low` stat the other way round) */
+export function statShare(v: number, s: { min: number; max: number; low?: boolean }): number {
+  if (!Number.isFinite(v) || !(s.max > s.min)) return 0;
+  const k = s.low ? (s.max - v) / (s.max - s.min) : (v - s.min) / (s.max - s.min);
+  return k <= 0 ? 0 : Math.max(SLIVER, Math.min(1, k)); }
 /** a change of a bar from one share to another: the part kept (`base`), and the part `gained` (grown into, drawn
  *  light ahead of the fill) or `lost` (cut away, drawn red behind it). One of gained and lost is 0 */
 export function barDelta(from: number, to: number): { base: number; gained: number; lost: number } {

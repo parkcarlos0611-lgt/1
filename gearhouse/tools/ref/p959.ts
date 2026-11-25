@@ -3,7 +3,8 @@
 //   npx tsx tools/ref/p959.ts <out dir> [mm=4]
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { deflateSync } from 'node:zlib';
-import { KINDS } from '../../render/car/mesh';
+import { Build, KINDS } from '../../render/car/mesh';
+import { plate, plateText } from '../../render/car/p959/parts';
 import { p959Model } from '../../render/car/p959';
 import { fineGrid, lineStat, measure, PANELS, turning } from '../../render/car/p959/check';
 import { faceNormal } from '../../render/car/p959/subdiv';
@@ -21,7 +22,9 @@ type V3 = [number, number, number];
 const FORM = process.argv.includes('form');   // continuous shading, to judge the forms (the default is the game's two tones)
 // variants (docs/systems/109 S3): lamp=round|ellipsoid|square wheel=hollow5|dish|hole5 bf=std|aero|clean br=std|aero|clean; at=x,y,z: the picture's centre; only=<view,...>
 const arg = (k: string) => process.argv.find(a => a.startsWith(k + '='))?.slice(k.length + 1), AT = (arg('at') ?? '2130,0,600').split(',').map(Number) as V3, ONLY = arg('only')?.split(',');
-const { mesh: M, shell: S, normals: NN, shellTris } = p959Model({ lamp: arg('lamp') as never, wheel: arg('wheel') as never, bumperF: arg('bf') as never, bumperR: arg('br') as never });
+const MODEL = p959Model({ lamp: arg('lamp') as never, wheel: arg('wheel') as never, bumperF: arg('bf') as never, bumperR: arg('br') as never, plate: arg('plate') ? plateText(arg('plate')!) : undefined }), S = MODEL.shell, NN = MODEL.normals;
+// plates=<a,b,...>: a sheet of number plates face on (two columns), instead of the car
+const PLATES = arg('plates')?.split(','), M = PLATES ? (() => { const b = new Build(); PLATES.forEach((t, k) => plate(b, { name: 'plate', o: [0, (k % 2 ? -1 : 1) * 200, 420 - Math.floor(k / 2) * 215], n: [-1, 0, 0], w: 335, h: 170 }, /^\d+$/.test(t) ? plateText(+t) : plateText(t))); return b.mesh(0); })() : MODEL.mesh, shellTris = PLATES ? 0 : MODEL.shellTris;
 const KIND_PAINT = KINDS.indexOf('paint'), KIND_GLASS = KINDS.indexOf('glass'), KIND_TYRE = KINDS.indexOf('tyre');
 const dot = (a: V3, b: V3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2], crs = (a: V3, b: V3): V3 => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]], un = (a: V3): V3 => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };
 interface DrawO { wires?: { P: V3[]; F: number[][] }; lines?: boolean; mesh?: boolean }

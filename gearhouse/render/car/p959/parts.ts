@@ -50,8 +50,27 @@ const GLYPH: Record<string, number[][][]> = {
   '5': [[[1, 1], [.1, 1], [0, .55], [.75, .6], [1, .42], [1, .2], [.8, 0], [.2, 0], [0, .15]]], '6': [[[.9, .9], [.7, 1], [.25, 1], [0, .75], [0, .2], [.2, 0], [.8, 0], [1, .2], [1, .4], [.8, .58], [.2, .58], [0, .4]]],
   '7': [[[0, 1], [1, 1], [.4, 0]]], '8': [[[.2, .52], [0, .68], [0, .84], [.2, 1], [.8, 1], [1, .84], [1, .68], [.8, .52], [.2, .52], [0, .36], [0, .18], [.2, 0], [.8, 0], [1, .18], [1, .36], [.8, .52]]],
   '9': [[[.1, .1], [.3, 0], [.75, 0], [1, .25], [1, .8], [.8, 1], [.2, 1], [0, .8], [0, .6], [.2, .42], [.8, .42], [1, .6]]],
-  '루': [[[.15, 1], [.85, 1], [.85, .8], [.15, .8], [.15, .6], [.85, .6]], [[0, .38], [1, .38]], [[.5, .38], [.5, 0]]] };
+ };
+// Hangul for the plate's top line: a syllable without a final consonant, composed from its two jamo. Each jamo is
+// strokes in its own unit box; the boxes are laid out by the vowel: a standing vowel (ㅏ ㅓ ㅐ) to the right of the
+// consonant, a lying one (ㅗ ㅜ) under it.
+const O8 = [[.3, 0], [.7, 0], [1, .3], [1, .7], [.7, 1], [.3, 1], [0, .7], [0, .3], [.3, 0]];
+const CHO: Record<number, number[][][]> = { 0: [[[0, 1], [1, 1], [1, 0]]], 2: [[[0, 1], [0, 0], [1, 0]]], 3: [[[1, 1], [0, 1], [0, 0], [1, 0]]], 5: [[[0, 1], [1, 1], [1, .5], [0, .5], [0, 0], [1, 0]]],
+  6: [[[0, 0], [0, 1], [1, 1], [1, 0], [0, 0]]], 7: [[[0, 1], [0, 0], [1, 0], [1, 1]], [[0, .5], [1, .5]]], 9: [[[.5, 1], [.38, .5], [0, 0]], [[.5, 1], [.62, .5], [1, 0]]], 11: [O8],
+  12: [[[0, 1], [1, 1]], [[.5, 1], [.38, .5], [0, 0]], [[.5, 1], [.62, .5], [1, 0]]], 18: [[[.3, 1], [.7, 1]], [[0, .72], [1, .72]], [O8.map(q => [q[0]!, q[1]! * 0.5])] .flat()] };
+const JUNG: Record<number, { lying: boolean; strokes: number[][][] }> = { 0: { lying: false, strokes: [[[.25, 1], [.25, 0]], [[.25, .5], [1, .5]]] }, 1: { lying: false, strokes: [[[0, 1], [0, 0]], [[1, 1], [1, 0]], [[0, .5], [1, .5]]] },
+  4: { lying: false, strokes: [[[1, 1], [1, 0]], [[0, .5], [1, .5]]] }, 8: { lying: true, strokes: [[[0, 0], [1, 0]], [[.5, 0], [.5, 1]]] }, 13: { lying: true, strokes: [[[0, 1], [1, 1]], [[.5, 1], [.5, 0]]] } };
+/** a figure's strokes in the unit box: a digit, or a Hangul syllable of an initial consonant and a vowel this plate font has */
+export function glyph(ch: string): number[][][] | null { if (GLYPH[ch]) return GLYPH[ch]!; const c = ch.charCodeAt(0) - 0xac00; if (c < 0 || c > 11171 || c % 28) return null; const cho = CHO[Math.floor(c / 588)], jung = JUNG[Math.floor(c / 28) % 21]; if (!cho || !jung) return null;
+  const box = (st: number[][][], x0: number, x1: number, y0: number, y1: number) => st.map(l => l.map(q => [x0 + q[0]! * (x1 - x0), y0 + q[1]! * (y1 - y0)]));
+  return jung.lying ? [...box(cho, 0.12, 0.88, 0.5, 1), ...box(jung.strokes, 0, 1, 0, 0.36)] : [...box(cho, 0, 0.56, 0.04, 0.96), ...box(jung.strokes, 0.7, 1, 0, 1)]; }
+/** the syllables a private car's plate may carry (those this font composes) */
+export const PLATE_SYLLABLES = '가나다라마바사아자거너더러머버서어저고노도로모보소오조구누두루무부수우주배하허호';
 export interface PlateText { top: string; big: string }
+/** a plate's text: from a string like "12가 3456", or made up from a seed (two digits, a syllable, four digits) */
+export function plateText(src: string | number): PlateText { if (typeof src === 'string') { const m = src.replace(/\s+/g, '').match(/^(\d{2}.)(\d{4})$/); if (m && glyph(m[1]![2]!)) return { top: m[1]!, big: m[2]! }; throw new Error(`not a plate number: ${src}`); }
+  let s = (src >>> 0) || 1; const r = (n: number) => { s = (Math.imul(s, 1664525) + 1013904223) >>> 0; return Math.floor(s / 4294967296 * n); }, d = () => String(r(10));
+  return { top: d() + d() + [...PLATE_SYLLABLES][r(PLATE_SYLLABLES.length)]!, big: String(1 + r(9)) + d() + d() + d() }; }
 export function plate(b: Build, m: Mark, text: PlateText = { top: '08루', big: '0959' }): void { const W = 335, H = 170, n = m.n, u: V = [0, n[0], 0], up: V = [0, 0, 1];   // u: to the reader's right
   const at = (x: number, y: number, h: number): V => add(add(add(m.o, u, x), up, y), n, h), flip = n[0] * u[1] < 0;
   const quad = (p: V, q: V, r: V, t: V) => flip ? b.quad(t, r, q, p) : b.quad(p, q, r, t), rect = (x0: number, x1: number, y0: number, y1: number, h: number) => quad(at(x0, y0, h), at(x1, y0, h), at(x1, y1, h), at(x0, y1, h));
@@ -65,7 +84,6 @@ export function plate(b: Build, m: Mark, text: PlateText = { top: '08루', big: 
     for (let i = 0; i < m; i++) { const d0 = i > 0 ? dir(i - 1, i) : closed ? dir(m - 1, 0) : dir(0, 1), d1 = i + 1 < n ? dir(i, i + 1) : closed ? dir(0, 1) : d0, bx = d0[0]! + d1[0]!, by = d0[1]! + d1[1]!, bl = Math.hypot(bx, by) || 1, nx = -by / bl, ny = bx / bl, k = Math.min(2.2, 1 / Math.max(0.3, nx * -d0[1]! + ny * d0[0]!)) * t / 2;
       const end = !closed && (i === 0 || i === m - 1) ? (i === 0 ? -1 : 1) * t / 2 : 0, px = pts[i]![0]! + d0[0]! * end, py = pts[i]![1]! + d0[1]! * end; L.push([px + nx * k, py + ny * k]); R.push([px - nx * k, py - ny * k]); }
     for (let i = 0; i + 1 < m || (closed && i < m); i++) { const j = (i + 1) % m; quad(at(R[i]![0]!, R[i]![1]!, 6), at(R[j]![0]!, R[j]![1]!, 6), at(L[j]![0]!, L[j]![1]!, 6), at(L[i]![0]!, L[i]![1]!, 6)); } };
-  const word = (s: string, x0: number, y0: number, w: number, h: number, gap: number, t: number) => [...s].forEach((ch, k) => { for (const line of GLYPH[ch] ?? []) band(line.map(q => [x0 + k * (w + gap) + q[0]! * w, y0 + q[1]! * h]), t); });
+  const word = (s: string, x0: number, y0: number, w: number, h: number, gap: number, t: number) => [...s].forEach((ch, k) => { for (const line of glyph(ch) ?? []) band(line.map(q => [x0 + k * (w + gap) + q[0]! * w, y0 + q[1]! * h]), t); });
   word(text.top, -58, 38, 30, 34, 13, 6); word(text.big, -138, -68, 50, 86, 24, 13);
-  for (const k of [[-W / 2 + 6, W / 2 - 6, H / 2 - 8, H / 2 - 5], [-W / 2 + 6, W / 2 - 6, -H / 2 + 5, -H / 2 + 8], [-W / 2 + 5, -W / 2 + 8, -H / 2 + 5, H / 2 - 5], [W / 2 - 8, W / 2 - 5, -H / 2 + 5, H / 2 - 5]]) rect(k[0]!, k[1]!, k[2]!, k[3]!, 6);   // the white line inside the edge
   b.name('plateBolt').mat('#0f6b40', 0.3, 'plain'); for (const x of [-98, 98]) { const c = at(x, 52, 6), ring = Array.from({ length: 6 }, (_, i) => { const a = i / 6 * Math.PI * 2; return add(add(c, u, Math.cos(a) * 11), up, Math.sin(a) * 11); }), top = add(c, n, 5); for (let i = 0; i < 6; i++) flip ? b.tri(top, ring[(i + 1) % 6]!, ring[i]!) : b.tri(top, ring[i]!, ring[(i + 1) % 6]!); } }

@@ -19,8 +19,8 @@ import type { Ctx } from './layout';
  *  walls, its floor, shelf and rim; `front`: the engine is ahead of the car's middle, `e`: the way to the car's end */
 export function bayBox(x: Ctx): { front: boolean; e: number; xf: number; xp: number; half: number; inner: number; z0: number; shelf: number; rim: number } {
   const { eb, site } = x, front = (eb.min[0] + eb.max[0]) / 2 < (site.wheels.f.x + site.wheels.r.x) / 2, e = front ? -1 : 1, eh = Math.max(-eb.min[1], eb.max[1]), h = eb.max[2] - eb.min[2];
-  const inner = eh + 35, z0 = eb.min[2] + 20, shelf = Math.max(eb.max[2] - 210, z0 + 0.42 * h);
-  return { front, e, xf: (front ? eb.max[0] : eb.min[0]) - e * 90, xp: (front ? eb.min[0] : eb.max[0]) + e * 170, half: inner + 215, inner, z0, shelf, rim: eb.max[2] + 70 }; }
+  const inner = eh + 35, z0 = eb.min[2] + 20, shelf = Math.max(eb.max[2] - 190, z0 + 0.42 * h);
+  return { front, e, xf: (front ? eb.max[0] : eb.min[0]) - e * 90, xp: (front ? eb.min[0] : eb.max[0]) + e * 170, half: inner + 215, inner, z0, shelf, rim: eb.max[2] + 30 }; }
 
 export function bayProps(x: Ctx, tub: boolean, engineOnly: boolean): void {
   const { g, det } = x; g.frame(null);
@@ -64,7 +64,7 @@ export function bayProps(x: Ctx, tub: boolean, engineOnly: boolean): void {
       [1, -1].forEach((s, k) => { const a: V = [xr - e * 24, s * (W / 2 - 60), zc + (k ? -1 : 1) * H * 0.34], p = ports[k]!;
         g.part('coolantHose', '#1c1c1f', 0.15).bend(a, [-e, 0, 0], add(p, [x.U[0] * 30, x.U[1] * 30, 0]), back, 17, 5, 4, 0.5); }); } }
   // ---- the fittings on the shelves: by the bulkhead and by the panel, each side ----
-  const yS = (s: number) => s * (inner + half) / 2, nearF = xf + e * 190, nearP = xp - e * 150;
+  const yS = (s: number) => s * (inner + half) / 2, nearF = xf + e * 190, nearP = xf + e * Math.max(430, Math.abs(xp - xf) * 0.62);   /* the tanks along the shelf's middle, clear of the panel's bar */
   tank('washerTank', [nearP, yS(1), shelf], 72, 64, 72, '#2a63d4'); fuse([nearF, yS(1), shelf], 85, 62);
   if (engineOnly) { battery([nearF + e * 20, yS(-1), shelf]);
     g.part('expansionTank', '#d6d2c2', 0.35).box(nearP - 66, nearP + 66, yS(-1) - 60, yS(-1) + 60, shelf, shelf + 130); if (det > 0) g.part('expansionTank', '#17181a', 0.3).cyl([nearP, yS(-1), shelf + 128], [nearP, yS(-1), shelf + 156], 30, 8, true, [1, 0, 0]); }

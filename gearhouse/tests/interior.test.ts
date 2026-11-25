@@ -69,9 +69,9 @@ describe('the instruments: faces from data, needles on bones', () => {
   });
   const M = interiorMesh(INTERIORS.stock), rig = M.dials!;
   it('hangs each needle on its own bone, within the renderer\'s bones', () => {
-    expect(rig.dials.map(d => d.id)).toEqual(['oilTemp', 'oilLevel', 'oilPress', 'tach', 'boost', 'speedo', 'fuel', 'water', 'steer']); expect(rig.bones).toBe(DIAL_BONES); expect(DIAL_BONES).toBeLessThanOrEqual(BONE_SLOTS);
+    expect(rig.dials.map(d => d.id)).toEqual(['oilTemp', 'oilLevel', 'oilPress', 'tach', 'boost', 'speedo', 'fuel', 'water', 'steer']); expect(rig.bones).toBe(DIAL_BONES); expect(DIAL_BONES).toBeLessThanOrEqual(BONE_SLOTS);   // with the driver's and the controls' (docs/systems/118 D2: tests/driver_rig.test.ts)
     const used = new Set(Array.from(M.dial!)); for (const d of rig.dials) expect(used.has(d.bone), d.id).toBe(true);
-    for (let t = 0; t < M.n; t++) { const nm = M.names![M.part[t]!]!, b = M.dial![t]!; if (/^gauge(Needle|Hub)_/.test(nm)) expect(b).toBe(rig.dials.find(d => d.id === nm.split('_')[1])!.bone); else if (/^steerWheel(Rim|Pad|Spokes|Horn|Hub)$/.test(nm)) expect(b).toBe(rig.dials[rig.dials.length - 1]!.bone); else expect(b, nm).toBe(0); }
+    for (let t = 0; t < M.n; t++) { const nm = M.names![M.part[t]!]!, b = M.dial![t]!; if (/^gauge(Needle|Hub)_/.test(nm)) expect(b).toBe(rig.dials.find(d => d.id === nm.split('_')[1])!.bone); else if (/^steerWheel(Rim|Pad|Spokes|Horn|Hub)$/.test(nm)) expect(b).toBe(rig.dials[rig.dials.length - 1]!.bone); else if (/^(driver|shifter(Lever|Knob)$|handbrakeLever(Grip|Button)?$|pedal)/.test(nm)) expect(b, nm).toBeGreaterThan(rig.dials[rig.dials.length - 1]!.bone); else expect(b, nm).toBe(0); }
   });
   it('poses a needle from its reading: built at the scale\'s start, turned to the reading\'s angle about its pivot', () => {
     const d = rig.dials.find(k => k.id === 'tach')!, k = rig.dials.indexOf(d), tip = (v: number[]) => { const B = poseDials(rig, v); let far = 0, out = [0, 0, 0];

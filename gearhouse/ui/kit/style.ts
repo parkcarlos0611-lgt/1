@@ -8,7 +8,7 @@ import { tokenCss, ROLE, ROLE_KEY, type Role } from './tokens';
 const roleCls = (Object.keys(ROLE) as Role[]).map(r => `.gk-${ROLE_KEY[r]}{--f0:var(--gk-${ROLE_KEY[r]}0);--f1:var(--gk-${ROLE_KEY[r]}1)}`).join('');
 const cut = (c: string) => `polygon(${c} 0,100% 0,100% calc(100% - ${c}),calc(100% - ${c}) 100%,0 100%,0 ${c})`;
 
-export const KIT_CSS = tokenCss() + roleCls + `
+export const KIT_CSS = tokenCss() + `
 .gk-head{font-family:var(--gk-head);font-weight:700;font-style:italic;letter-spacing:.02em;color:#fff;text-shadow:var(--gk-edge);line-height:1.1}
 .gk-num{font-family:var(--gk-head);font-weight:700;font-style:italic;font-variant-numeric:tabular-nums;color:#fff;text-shadow:var(--gk-edge-s)}
 .gk-logo{font-family:var(--gk-head);font-weight:700;font-style:italic;letter-spacing:.04em;line-height:1;color:transparent;background:linear-gradient(#ffe45c 0 30%,#ffb31a 62%,#ff7a12);-webkit-background-clip:text;background-clip:text;
@@ -74,7 +74,7 @@ export const KIT_CSS = tokenCss() + roleCls + `
 .gk-out-r{animation:gk-out-r calc(var(--gk-t) * .8) ease-in both}.gk-out-l{animation:gk-out-l calc(var(--gk-t) * .8) ease-in both}
 @media (prefers-reduced-motion:reduce){.gk-in-r,.gk-in-l,.gk-in-u,.gk-in-d,.gk-pop,.gk-out-r,.gk-out-l{animation:none}.gk-fill{transition:none}}
 :root[data-calm] :is(.gk-in-r,.gk-in-l,.gk-in-u,.gk-in-d,.gk-pop,.gk-out-r,.gk-out-l){animation:none}
-`;
+` + roleCls;   // the roles last: they set a part's colours over its default
 /** the kit's style put on the page once (later calls do nothing) */
 export function installKit(doc: Document = document): void { if (doc.getElementById('gk-style')) return; const s = doc.createElement('style'); s.id = 'gk-style'; s.textContent = KIT_CSS; doc.head.prepend(s); }
 /** the palette chosen (data-kit on the root) */

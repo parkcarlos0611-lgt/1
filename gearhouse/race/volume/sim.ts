@@ -15,6 +15,13 @@
 // velocity; the divergence, the pressure (Jacobi, warm-started from the last step's) and the projection; then the
 // smoke's fading, the heat cooling, a spreading that fills holes from where the smoke is thick (a diffusion whose
 // strength grows with the density, so a thin edge stays crisp), and a fade near the open sides.
+//
+// The cut (docs/systems/103, step V4): a car's hole in the smoke is kept a while, as cartoons draw it ("숭 뚫리는"). A
+// fourth field, C, is 1 where a solid stood and is carried along the flow like the smoke, fading over a few seconds;
+// where it is high the spreading is mostly held back (the tunnel's walls stay crisp) and what the flow smears back in is
+// thinned again, so the car-shaped hole stays clear for 2-3 s and then fills slowly. Its slope pushes the air out of the
+// tunnel (the smoke shoved aside) and the vorticity confinement is stronger in it (a swirl in the wake). Fresh smoke put
+// in fills the cut (a drifting car's own smoke is not eaten by its own tunnel).
 export interface VolParams {
   nx: number; ny: number; nz: number; /** a cell's size, m */ h: number;
   /** the pressure's Jacobi sweeps */ iters: number;
@@ -26,8 +33,12 @@ export interface VolParams {
   /** the smoke's and the dust's fading, the heat's cooling (1/s) */ fade: number; cool: number;
   /** the spreading's strength, m²/s at unit density */ spread: number;
   /** the fade at the open sides: the cells it covers */ edge: number;
+  /** the cut: how fast it fades (1/s); how hard the smoke is thinned in it (1/s); the push out of it (m/s² across a
+   *  cell's step of the cut); the extra swirl in it (x the confinement) */ cutFade: number; cutHold: number; cutPush: number; cutSwirl: number;
 }
-export const VOL_DEFAULT: VolParams = { nx: 16, ny: 16, nz: 8, h: 0.25, iters: 16, open: true, alpha: 0.012, betaS: 0.35, betaD: 2.2, wind: [1.2, 0.5], drag: 1.0, vort: 4, settle: 0.35, fade: 0.12, cool: 0.9, spread: 0.3, edge: 2 };
+export const VOL_DEFAULT: VolParams = { nx: 16, ny: 16, nz: 8, h: 0.25, iters: 16, open: true, alpha: 0.012, betaS: 0.35, betaD: 2.2, wind: [1.2, 0.5], drag: 1.0, vort: 4, settle: 0.35, fade: 0.12, cool: 0.9, spread: 0.3, edge: 2, cutFade: 0.3, cutHold: 2.5, cutPush: 10, cutSwirl: 2.5 };
+/** how much of the hold works at a cut of c: all of it from 0.85, none below 0.45 */
+export const cutHoldAt = (c: number): number => { const t = Math.min(1, Math.max(0, (c - 0.45) / 0.4)); return t * t * (3 - 2 * t); };
 
 /** a puff put into the grid: where (world, m), its size (m, a Gaussian's radius), how much smoke and dust (peak density),
  *  its heat (degrees above the air) and its velocity (m/s) */
@@ -36,17 +47,18 @@ export interface VolEmit { x: number; y: number; z: number; r: number; smoke: nu
 export interface VolBox { x: number; y: number; z: number; hx: number; hy: number; hz: number; yaw: number; vx: number; vy: number; vz: number }
 
 /** the puffs' kinds as the grid takes them: the smoke and dust shares, the heat, the size (from race/smoke.ts's kinds) */
-export const VOL_KIND = { tyre: { smoke: 0.9, dust: 0, T: 160, r: 0.45 }, dust: { smoke: 0, dust: 0.8, T: 5, r: 0.5 }, steam: { smoke: 0.8, dust: 0, T: 90, r: 0.3 }, exhaust: { smoke: 0.45, dust: 0, T: 220, r: 0.22 } } as const;
+export const VOL_KIND = { tyre: { smoke: 0.75, dust: 0, T: 160, r: 1.5 }, dust: { smoke: 0, dust: 0.6, T: 5, r: 1.1 }, steam: { smoke: 0.7, dust: 0, T: 90, r: 0.45 }, exhaust: { smoke: 0.4, dust: 0, T: 220, r: 0.32 } } as const;
 
 export class VolumeSim {
   readonly P: VolParams; readonly n: number;
   /** the corner of cell (0,0,0), world metres */ origin: [number, number, number] = [0, 0, 0];
+  /** the cut (1 where a solid has just been, fading) */ C: Float32Array;
   S: Float32Array; D: Float32Array; T: Float32Array; p: Float32Array; u: Float32Array; v: Float32Array; w: Float32Array;
   /** 1 where solid this step; the solid's velocity */ solid: Uint8Array; ou: Float32Array; ov: Float32Array; ow: Float32Array;
   /** the top of the solid ground and fences in each column (world z), nx x ny; -Infinity: none */ top: Float32Array;
   /** the last divergence (before the projection), for the tests */ div: Float32Array;
   constructor(p: Partial<VolParams> = {}) { this.P = { ...VOL_DEFAULT, ...p }; const { nx, ny, nz } = this.P; this.n = nx * ny * nz; const f = () => new Float32Array(this.n);
-    this.S = f(); this.D = f(); this.T = f(); this.p = f(); this.u = f(); this.v = f(); this.w = f(); this.solid = new Uint8Array(this.n); this.ou = f(); this.ov = f(); this.ow = f(); this.div = f();
+    this.S = f(); this.D = f(); this.T = f(); this.C = f(); this.p = f(); this.u = f(); this.v = f(); this.w = f(); this.solid = new Uint8Array(this.n); this.ou = f(); this.ov = f(); this.ow = f(); this.div = f();
     this.top = new Float32Array(nx * ny).fill(-Infinity); }
   idx(i: number, j: number, k: number): number { return i + this.P.nx * (j + this.P.ny * k); }
   /** the world point of grid coordinates (cells; a cell's middle at +0.5) */
@@ -69,7 +81,7 @@ export class VolumeSim {
   // ---- the passes ----
   /** the grid moved by whole cells (di, dj, dk): what stays in the box keeps its world place, the new cells empty */
   shift(di: number, dj: number, dk: number): void { if (!di && !dj && !dk) return; const { nx, ny, nz, h } = this.P;
-    for (const F of [this.S, this.D, this.T, this.p, this.u, this.v, this.w]) { const c = F.slice();
+    for (const F of [this.S, this.D, this.T, this.C, this.p, this.u, this.v, this.w]) { const c = F.slice();
       for (let k = 0; k < nz; k++) for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) { const a = i + di, b = j + dj, e = k + dk;
         F[this.idx(i, j, k)] = a >= 0 && a < nx && b >= 0 && b < ny && e >= 0 && e < nz ? c[this.idx(a, b, e)]! : 0; } }
     this.origin = [this.origin[0] + di * h, this.origin[1] + dj * h, this.origin[2] + dk * h]; }
@@ -77,7 +89,7 @@ export class VolumeSim {
   inject(E: readonly VolEmit[]): void { if (!E.length) return; const { nx, ny, nz, h } = this.P, o = this.origin;
     for (let k = 0; k < nz; k++) for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) { const q = this.idx(i, j, k);
       for (const e of E) { const g = (x: number, y: number, z: number) => { const dx = (o[0] + x * h - e.x) / e.r, dy = (o[1] + y * h - e.y) / e.r, dz = (o[2] + z * h - e.z) / e.r, d2 = dx * dx + dy * dy + dz * dz; return d2 > 4 ? 0 : Math.exp(-d2); };
-        const c = g(i + 0.5, j + 0.5, k + 0.5); if (c > 0) { this.S[q] = this.S[q]! + (e.smoke * c); this.D[q] = this.D[q]! + (e.dust * c); this.T[q] = this.T[q]! + ((e.T - this.T[q]!) * c); }
+        const c = g(i + 0.5, j + 0.5, k + 0.5); if (c > 0) { this.S[q] = this.S[q]! + (e.smoke * c); this.D[q] = this.D[q]! + (e.dust * c); this.T[q] = this.T[q]! + ((e.T - this.T[q]!) * c); this.C[q] = this.C[q]! * Math.max(0, 1 - 2 * c); }
         const gu = g(i, j + 0.5, k + 0.5), gv = g(i + 0.5, j, k + 0.5), gw = g(i + 0.5, j + 0.5, k);
         this.u[q] = this.u[q]! + ((e.vx - this.u[q]!) * gu * 0.8); this.v[q] = this.v[q]! + ((e.vy - this.v[q]!) * gv * 0.8); this.w[q] = this.w[q]! + ((e.vz - this.w[q]!) * gw * 0.8); } } }
   /** the solid cells: below the height map's top in its column, or inside a box (and moving with it) */
@@ -87,23 +99,25 @@ export class VolumeSim {
       for (const b of B) { const dx = x - b.x, dy = y - b.y, c = Math.cos(b.yaw), sn = Math.sin(b.yaw), lx = dx * c + dy * sn, ly = -dx * sn + dy * c;
         if (Math.abs(lx) < b.hx && Math.abs(ly) < b.hy && Math.abs(z - b.z) < b.hz) { s = 1; vx = b.vx; vy = b.vy; vz = b.vz; } }
       this.solid[q] = s; this.ou[q] = vx; this.ov[q] = vy; this.ow[q] = vz; } }
-  /** what a solid now stands in pushed to the cells beside it (each takes a sixth from each solid neighbour), the solid emptied */
+  /** what a solid now stands in pushed to the cells beside it (each takes a sixth from each solid neighbour), the solid
+   *  emptied and cut */
   carve(): void { const { nx, ny, nz } = this.P, S0 = this.S.slice(), D0 = this.D.slice();
     for (let k = 0; k < nz; k++) for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) { const q = this.idx(i, j, k);
-      if (this.solid[q]) { this.S[q] = 0; this.D[q] = 0; this.T[q] = 0; continue; } let s = 0, d = 0;
+      if (this.solid[q]) { this.S[q] = 0; this.D[q] = 0; this.T[q] = 0; this.C[q] = 1; continue; } let s = 0, d = 0;
       for (const [a, b, c] of NB) { const x = i + a, y = j + b, z = k + c; if (x < 0 || y < 0 || z < 0 || x >= nx || y >= ny || z >= nz) continue; const r = this.idx(x, y, z); if (this.solid[r]) { s += S0[r]!; d += D0[r]!; } }
       this.S[q] = this.S[q]! + (s / 6); this.D[q] = this.D[q]! + (d / 6); } }
   /** everything carried along the flow (from the velocity before this pass) */
-  advect(dt: number): void { const { nx, ny, nz } = this.P, S = new Float32Array(this.n), D = new Float32Array(this.n), T = new Float32Array(this.n), U = new Float32Array(this.n), V = new Float32Array(this.n), W = new Float32Array(this.n);
+  advect(dt: number): void { const { nx, ny, nz } = this.P, S = new Float32Array(this.n), D = new Float32Array(this.n), T = new Float32Array(this.n), C = new Float32Array(this.n).fill(1), U = new Float32Array(this.n), V = new Float32Array(this.n), W = new Float32Array(this.n);
     for (let k = 0; k < nz; k++) for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) { const q = this.idx(i, j, k);
-      if (!this.solid[q]) { const [x, y, z] = this.back(i + 0.5, j + 0.5, k + 0.5, dt); S[q] = this.sample(this.S, x, y, z, 0.5, 0.5, 0.5); T[q] = this.sample(this.T, x, y, z, 0.5, 0.5, 0.5);
+      if (!this.solid[q]) { const [x, y, z] = this.back(i + 0.5, j + 0.5, k + 0.5, dt); S[q] = this.sample(this.S, x, y, z, 0.5, 0.5, 0.5); T[q] = this.sample(this.T, x, y, z, 0.5, 0.5, 0.5); C[q] = this.sample(this.C, x, y, z, 0.5, 0.5, 0.5);
         const [a, b, c] = this.back(i + 0.5, j + 0.5, k + 0.5, dt, this.P.settle); D[q] = this.sample(this.D, a, b, c, 0.5, 0.5, 0.5); }
       { const [x, y, z] = this.back(i, j + 0.5, k + 0.5, dt); U[q] = this.sample(this.u, x, y, z, 0, 0.5, 0.5); }
       { const [x, y, z] = this.back(i + 0.5, j, k + 0.5, dt); V[q] = this.sample(this.v, x, y, z, 0.5, 0, 0.5); }
       { const [x, y, z] = this.back(i + 0.5, j + 0.5, k, dt); W[q] = this.sample(this.w, x, y, z, 0.5, 0.5, 0); } }
-    this.S = S; this.D = D; this.T = T; this.u = U; this.v = V; this.w = W; }
-  /** the forces: buoyancy, the drag toward the wind, vorticity confinement (at the cells' middles, then onto the faces) */
-  forces(dt: number): void { const { nx, ny, nz, h, alpha, betaS, betaD, drag, vort } = this.P, [wx, wy] = this.P.wind;
+    this.S = S; this.D = D; this.T = T; this.C = C; this.u = U; this.v = V; this.w = W; }
+  /** the forces: buoyancy, the drag toward the wind, vorticity confinement (at the cells' middles, then onto the faces),
+   *  the push out of the cut */
+  forces(dt: number): void { const { nx, ny, nz, h, alpha, betaS, betaD, drag, vort, cutPush, cutSwirl } = this.P, [wx, wy] = this.P.wind;
     // the velocity at the cells' middles, its curl, and the confinement's force there
     const at = (F: Float32Array, i: number, j: number, k: number) => F[this.idx(Math.min(nx - 1, Math.max(0, i)), Math.min(ny - 1, Math.max(0, j)), Math.min(nz - 1, Math.max(0, k)))]!;
     const cU = new Float32Array(this.n), cV = new Float32Array(this.n), cW = new Float32Array(this.n);
@@ -116,13 +130,14 @@ export class VolumeSim {
     const fx = new Float32Array(this.n), fy = new Float32Array(this.n), fz = new Float32Array(this.n);
     for (let k = 0; k < nz; k++) for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) { const q = this.idx(i, j, k);
       const gx = at(om, i + 1, j, k) - at(om, i - 1, j, k), gy = at(om, i, j + 1, k) - at(om, i, j - 1, k), gz = at(om, i, j, k + 1) - at(om, i, j, k - 1), gl = Math.hypot(gx, gy, gz) + 1e-5;
-      const Nx = gx / gl, Ny = gy / gl, Nz = gz / gl, e = vort * h * Math.min(1, (this.S[q]! + this.D[q]!) * 4);
+      const Nx = gx / gl, Ny = gy / gl, Nz = gz / gl, e = vort * h * Math.min(1, (this.S[q]! + this.D[q]!) * 4) * (1 + cutSwirl * this.C[q]!);
       fx[q] = e * (Ny * oz[q]! - Nz * oy[q]!); fy[q] = e * (Nz * ox[q]! - Nx * oz[q]!); fz[q] = e * (Nx * oy[q]! - Ny * ox[q]!); }
     for (let k = 0; k < nz; k++) for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) { const q = this.idx(i, j, k);
       const T = (at(this.T, i, j, k - 1) + this.T[q]!) / 2, S = (at(this.S, i, j, k - 1) + this.S[q]!) / 2, D = (at(this.D, i, j, k - 1) + this.D[q]!) / 2;
-      this.u[q] = this.u[q]! + (dt * ((at(fx, i - 1, j, k) + fx[q]!) / 2 + drag * (wx - this.u[q]!)));
-      this.v[q] = this.v[q]! + (dt * ((at(fy, i, j - 1, k) + fy[q]!) / 2 + drag * (wy - this.v[q]!)));
-      this.w[q] = this.w[q]! + (dt * ((at(fz, i, j, k - 1) + fz[q]!) / 2 + alpha * T - betaS * S - betaD * D - drag * 0.3 * this.w[q]!)); } }
+      const Cq = this.C[q]!;
+      this.u[q] = this.u[q]! + (dt * ((at(fx, i - 1, j, k) + fx[q]!) / 2 + drag * (wx - this.u[q]!) - cutPush * (Cq - at(this.C, i - 1, j, k))));
+      this.v[q] = this.v[q]! + (dt * ((at(fy, i, j - 1, k) + fy[q]!) / 2 + drag * (wy - this.v[q]!) - cutPush * (Cq - at(this.C, i, j - 1, k))));
+      this.w[q] = this.w[q]! + (dt * ((at(fz, i, j, k - 1) + fz[q]!) / 2 + alpha * T - betaS * S - betaD * D - drag * 0.3 * this.w[q]! - cutPush * (Cq - at(this.C, i, j, k - 1)))); } }
   /** the faces by a solid or the box's walls: the solid's velocity; the open sides' faces as the face inside */
   bounds(): void { const { nx, ny, nz, open } = this.P;
     for (let k = 0; k < nz; k++) for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) { const q = this.idx(i, j, k), sq = this.solid[q]!;
@@ -149,14 +164,14 @@ export class VolumeSim {
     for (let k = 0; k < nz; k++) for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) { const q = this.idx(i, j, k), pc = this.p[q]!;
       if (i > 0 || open) this.u[q] = this.u[q]! - (pc - P(i - 1, j, k)); if (j > 0 || open) this.v[q] = this.v[q]! - (pc - P(i, j - 1, k)); if (k > 0) this.w[q] = this.w[q]! - (pc - P(i, j, k - 1)); }
     this.bounds(); }
-  /** the smoke fades, the heat cools; the spreading (a flux between neighbours by their densities, so the sum is kept);
-   *  near the open sides the smoke thins away */
-  dissipate(dt: number): void { const { nx, ny, nz, h, fade, cool, spread, open, edge } = this.P, S0 = this.S.slice(), D0 = this.D.slice(), kf = Math.exp(-fade * dt), kc = Math.exp(-cool * dt), K = spread * dt / (h * h);
+  /** the smoke fades, the heat cools; the spreading (a flux between neighbours by their densities, so the sum is kept;
+   *  held back across a cut); near the open sides the smoke thins away; in a fresh cut it is thinned, the cut fades */
+  dissipate(dt: number): void { const { nx, ny, nz, h, fade, cool, spread, open, edge, cutFade, cutHold } = this.P, S0 = this.S.slice(), D0 = this.D.slice(), C0 = this.C.slice(), kf = Math.exp(-fade * dt), kc = Math.exp(-cool * dt), K = spread * dt / (h * h), kC = Math.exp(-cutFade * dt);
     for (let k = 0; k < nz; k++) for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) { const q = this.idx(i, j, k); if (this.solid[q]) continue; let s = S0[q]!, d = D0[q]!;
       for (const [a, b, c] of NB) { const x = i + a, y = j + b, z = k + c; if (x < 0 || y < 0 || z < 0 || x >= nx || y >= ny || z >= nz) continue; const r = this.idx(x, y, z); if (this.solid[r]) continue;
-        s += Math.min(1 / 7, K * (S0[r]! + S0[q]!) / 2) * (S0[r]! - S0[q]!); d += Math.min(1 / 7, K * (D0[r]! + D0[q]!) / 2) * (D0[r]! - D0[q]!); }
-      let f = kf; if (open && edge > 0) { const e = Math.min(i, j, nx - 1 - i, ny - 1 - j, nz - 1 - k); if (e < edge) f *= 1 - dt * 3 * (1 - e / edge); }
-      this.S[q] = s * f; this.D[q] = d * f; this.T[q] = this.T[q]! * kc; } }
+        const hb = 1 - 0.85 * Math.max(C0[q]!, C0[r]!); s += Math.min(1 / 7, K * hb * (S0[r]! + S0[q]!) / 2) * (S0[r]! - S0[q]!); d += Math.min(1 / 7, K * hb * (D0[r]! + D0[q]!) / 2) * (D0[r]! - D0[q]!); }
+      let f = kf * Math.max(0, 1 - cutHold * dt * cutHoldAt(C0[q]!)); if (open && edge > 0) { const e = Math.min(i, j, nx - 1 - i, ny - 1 - j, nz - 1 - k); if (e < edge) f *= 1 - dt * 3 * (1 - e / edge); }
+      this.S[q] = s * f; this.D[q] = d * f; this.T[q] = this.T[q]! * kc; this.C[q] = C0[q]! * kC; } }
   /** one step of dt (the puffs put in first) */
   step(dt: number, emits: readonly VolEmit[] = [], boxes: readonly VolBox[] = []): void {
     this.inject(emits); this.obstacles(boxes); this.carve(); this.advect(dt); this.forces(dt); this.bounds();

@@ -24,7 +24,7 @@ const grey = (k: number, a = 1): RGBA => [k * 0.97, k, k * 1.04, a], over = (c: 
 /** a picture at (x, y), each -1..1 across its region (y up): in detail, or `flat` in a few plain colours */
 export function lampPaint(k: LampArt, x: number, y: number, flat: boolean): RGBA { const r = Math.hypot(x, y);
   switch (k) {
-    case 'n33Head': { const X = x * 300, Y = y * 48, e = flat ? 4 : 1.2, d = (cx: number, cy: number) => Math.hypot(X - cx, Y - cy), ring = (q: number, r0: number, r1: number) => sm(r0 - e, r0, q) * (1 - sm(r1, r1 + e, q));
+    case 'n33Head': { const X = x * 300, Y = y * 48, e = flat ? 0.01 : 1.2, d = (cx: number, cy: number) => Math.hypot(X - cx, Y - cy), ring = (q: number, r0: number, r1: number) => sm(r0 - e, r0, q) * (1 - sm(r1, r1 + e, q));
       // the housing: silver, darker under the bonnet's edge; the corner lamp's clear ribbed glass beyond the reflector
       let c = grey(flat ? 0.5 : 0.5 + 0.07 * y - 0.22 * sm(30, 46, Y));
       const corner = sm(84, 84 + e * 2, X) * (1 - sm(34 - 30 * sm(190, 290, X) - e, 34 - 30 * sm(190, 290, X), Math.abs(Y + 2)));

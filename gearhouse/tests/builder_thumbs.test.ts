@@ -38,7 +38,7 @@ describe('the first steps\' cards (docs/systems/115 F1)', () => {
 describe('the views and the framing', () => {
   it('front for what faces forward or back, side for the wheel and the body', () => {
     expect(KIND_VIEW).toEqual({ bumperF: 'front', bumperR: 'front', lamp: 'front', wheel: 'side', base: 'side', frame: 'side', glass: 'side', interior: 'top', plateF: 'front', plateR: 'front',
-      pMirror: 'front', pWing: 'side', pExhaust: 'front', pBadge: 'front', pMarker: 'side', pVent: 'front', pLamp: 'front', pTail: 'front', pIntake: 'front', pVentCut: 'front' });
+      pMirror: 'front', pWing: 'side', pExhaust: 'front', pBadge: 'front', pMarker: 'side', pVent: 'front', pLamp: 'front', pTail: 'front', pIntake: 'front', pVentCut: 'front', pLip: 'front', pTrim: 'side' });
     expect(camera('bumperF', 'front').ang).toBeCloseTo(Math.PI); expect(camera('bumperR', 'front').ang).toBeCloseTo(0); expect(camera('plateR', 'front').ang).toBeCloseTo(0); expect(camera('wheel', 'top').pitch).toBe(90); });
   it('one box for all the variants of a kind fits the picture, the same scale for each', () => {
     for (const k of ['bumperF', 'bumperR', 'lamp', 'wheel'] as ThumbKind[]) { const box = VARIANTS[k].map((_, i) => meshBox(isolate(models[i]!, k))).reduce(union);
@@ -66,7 +66,7 @@ describe('the background keyed out', () => {
 describe('the free surface parts\' cards (docs/systems/115 P1)', () => {
   it('each part alone on its flat skin: a few hundred triangles, no twin; the tips seen from behind; a kind\'s variants share one box', () => {
     for (const id of Object.keys(PART_THUMB) as (keyof typeof PART_THUMB)[]) { const M = partAlone(id); expect(M.n, id).toBeGreaterThan(40); expect(M.n, id).toBeLessThan(600); expect(isolate(buildSet(PART_THUMB[id], id), PART_THUMB[id]).n).toBe(M.n); }
-    expect(camera('pExhaust', 'front').ang).toBeCloseTo(0); expect(VARIANTS.pWing).toEqual(['wingRing', 'wingGT']);
+    expect(camera('pExhaust', 'front').ang).toBeCloseTo(0); expect(VARIANTS.pWing).toEqual(['wingRing', 'wingGT', 'wingStay']);
     const crest = partAlone('badge'); expect(crest.uv).toBeDefined(); expect(meshBox(partAlone('mirror'))[0][1]).toBeGreaterThan(800);   // on the left side, no twin across
   });
 });

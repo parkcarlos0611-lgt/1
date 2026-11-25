@@ -94,7 +94,8 @@ describe('the stock sets', () => {
   it('triangles: the stock set about 10.6 thousand (the ceiling is about 10,000: over it by the free mirrors and tips of P1 and the pockets; docs/systems/115 P2)', () => {
     expect(old.mesh.n).toBe(9550); expect(now.mesh.n).toBeGreaterThan(10000); expect(now.mesh.n).toBeLessThan(10800);
     for (const [k, n] of now.holes!) expect(n, k).toBeLessThan(k === 'tailBand' ? 260 : 180); });
-  it('the N33\'s placeholders: square lamps, the grille, two round tail lamps a side, all cut', () => {
+  it('the N33\'s own set (docs/systems/117 R3): slanted lamps, the emblem grille, the bumper\'s intake, ducts and amber lamps, two round tail lamps a side, all cut', () => {
     const nk = n33Skin(buildN33Shell({ glass: 'stock' })), ps = stockParts('bnr33', nk), M = n33Model({ glass: 'stock', placed: ps, plateF: true, plateR: true });
-    expect([...M.holes!.keys()].sort()).toEqual(['grille', 'lampSquare', 'lampSquare~', 'tailRound', 'tailRound#1', 'tailRound#1~', 'tailRound~']); expect(watertight(M.shell)).toEqual({ open: 0, over: 0, twice: 0 }); });
+    expect([...M.holes!.keys()].sort()).toEqual(['fogLamp', 'fogLamp~', 'grilleSlot', 'intakeOpen', 'intakeOpen#1', 'intakeOpen#1~', 'lampSlant', 'lampSlant~', 'tailRound', 'tailRound#1', 'tailRound#1~', 'tailRound~']); expect(watertight(M.shell)).toEqual({ open: 0, over: 0, twice: 0 });
+    for (const [k, n] of M.holes!) expect(n, k).toBeLessThan(180); console.log(`N33 stock set: ${M.mesh.n} triangles (steel wheel)`); });
 });

@@ -10,6 +10,8 @@ import { fitPlaced, fitPlacedOne, withPlaced, nextN, PART_KINDS, FREE_IDS, type 
 import { fromPreset, parseDesign, designJson } from '../core/designstore';
 import { normalise } from '../core/design';
 import type { V } from '../render/car/mesh';
+import { makeAtlas, ATLAS_CELLS } from '../render/live/style';
+import { lampSheet, lampUV, lampPaint, LAMP_ART, type LampArt } from '../render/car/lampart';
 
 const SA = buildShell({ lamps: false, details: false, bumperF: 'blank', bumperR: 'blank', glass: null }), SB = buildN33Shell({ glass: null });
 const A = shellSkin(SA), B = n33Skin(SB);
@@ -30,6 +32,8 @@ describe('the ray picking', () => {
 describe('the parts on the skin', () => {
   it('every kind fits at its default place on both lumps (the N33\'s ring wing a little narrower), each a few hundred triangles', () => {
     for (const [skin, base] of [[A, 'p959'], [B, 'bnr33']] as const) for (const id of FREE_IDS) { const p = newPart(base, skin, id, 1, undefined)!, f = fitPart(skin, base === 'bnr33' && id === 'wingRing' ? { ...p, scale: 0.85 } : p)!;
+      // the 599's lump carries its own hoop: the ring wing as a part is refused there (no double wing; docs/systems/117 R3)
+      if (base === 'p959' && id === 'wingRing') { expect(f.why).toMatch(/차체의 일부/); continue; }
       // a hole part (P2): its drag preview (its insides lifted onto its footprint) stands for it
       const n = f.hole ? f.hole.preview().n : f.mesh.n; expect(f.ok, `${base} ${id}: ${f.why}`).toBe(true); expect(n).toBeGreaterThan(40); expect(n).toBeLessThan(500); } });
   it('a pair is mirrored across the centre line; one side only has no twin; near the line a centre kind is single', () => {
@@ -66,7 +70,18 @@ describe('the stock sets', () => {
     for (const re of [/^mirror$/, /^exhaust/, /^badge$/]) { const [a, b] = [box(own, re), box(free, re)]; for (let k = 0; k < 3; k++) expect(Math.abs((a![0]![k]! + a![1]![k]!) / 2 - (b![0]![k]! + b![1]![k]!) / 2), `${re} axis ${k}`).toBeLessThan(45); }
     expect(free.uv).toBeDefined();
     const nm = n33Mesh({ glass: 'stock', plateF: true, plateR: true, placed: stockParts('bnr33', n33Skin(buildN33Shell({ glass: 'stock' }))) }), names = new Set(Array.from(nm.part, p => nm.names![p]!));
-    for (const n of ['wing', 'wingPlate', 'mirror', 'exhaustTip', 'markerLamp', 'plate']) expect(names.has(n), n).toBe(true); });
+    for (const n of ['wing', 'wingBolt', 'mirror', 'exhaustTip', 'markerLamp', 'plate', 'lip', 'garnish', 'garnishLamp', 'emblemPlace', 'handle', 'fuelLidLine', 'headLamp', 'tailLamp', 'fogLamp', 'grilleMesh', 'intakeCore']) expect(names.has(n), n).toBe(true);
+    // the lamps' lenses carry their pictures' atlas coordinates (render/car/lampart.ts): every head, tail and fog lens triangle, both sides
+    const cell = ATLAS_CELLS.indexOf('lamps') + 1; let lens = 0; for (let t = 0; t < nm.n; t++) if (/^(headLamp|tailLamp|fogLamp)$/.test(nm.names![nm.part[t]!]!)) { lens++; expect(nm.uv![t * 9 + 2]).toBe(cell); expect(nm.uv![t * 9]).toBeGreaterThan(-0.01); expect(nm.uv![t * 9]).toBeLessThanOrEqual(1); }
+    expect(lens).toBeGreaterThan(300); });
+  it('the lamps\' pictures: each in its region of the lamps cell, the far levels in a few flat colours', () => {
+    const A = makeAtlas(1024), i = ATLAS_CELLS.indexOf('lamps'); expect(Array.from(A.rects.subarray(i * 4, i * 4 + 4))).toEqual([0, 0.25, 0.5, 0.25]);
+    const colours = (l: Uint8Array) => new Set(Array.from({ length: l.length / 4 }, (_, q) => `${l[q * 4]},${l[q * 4 + 1]},${l[q * 4 + 2]},${l[q * 4 + 3]}`)).size;
+    expect(colours(lampSheet(512))).toBeGreaterThan(400); expect(colours(lampSheet(64, true, 1))).toBeLessThanOrEqual(12);
+    const lm = A.mips!.filter(m => m.w === 2 * m.h); expect(lm.map(m => m.level)).toEqual([2, 3, 4, 5, 6, 7, 8]); expect(lm[0]).toMatchObject({ x: 0, y: 64, w: 128, h: 64 });
+    for (const [k, [x, y, w, h]] of Object.entries(LAMP_ART)) { const [u, v, c] = lampUV(k as LampArt, 0.5, 0.5); expect(c).toBe(i + 1); expect(u * 0.992 + 0.004).toBeCloseTo((x + w / 2) / 512, 5); expect(v * 0.992 + 0.004).toBeCloseTo((y + h / 2) / 256, 5); }
+    // the head lamp's picture: its projector's lens pale blue, its housing grey; the tail lamp's middle brighter than its outer ring
+    expect(lampPaint('n33Head', -98 / 300, 0.3, false)[2]).toBeGreaterThan(0.8); expect(lampPaint('tailRings', 0.4, 0, false)[0]).toBeGreaterThan(lampPaint('tailRings', 0.8, 0, false)[0] + 0.1); });
 });
 
 describe('format 6: the free parts', () => {

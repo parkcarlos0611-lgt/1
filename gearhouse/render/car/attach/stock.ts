@@ -50,6 +50,8 @@ export function defaultAim(id: FreeId, box: [V, V]): Aim { const [lo, hi] = box,
     case 'exhaust': return { id, o: [hi[0] + 600, W * 0.18, z(0.2)], d: [-1, 0, 0] };
     case 'badge': return { id, o: [lo[0] - 600, 0, z(0.3)], d: [1, 0, 0] };   // the bumper's face (higher, a nose's leading edge is too sharp for a flat crest)
     case 'marker': return { id, o: [x(0.12), hi[1] + 600, z(0.42)], d: [0, -1, 0] };
+    case 'lip': return { id, o: [lo[0] - 600, 0, z(0.1)], d: [1, 0, 0] };   // low on the front bumper's face
+    case 'trim': return id === 'garnish' ? { id, o: [hi[0] + 600, 0, z(0.5)], d: [-1, 0, 0] } : { id, o: [x(id === 'handle' ? 0.56 : 0.8), hi[1] + 600, z(0.55)], d: [0, -1, 0] };
     case 'lamp': return { id, o: [lo[0] - 600, W * 0.3, z(0.45)], d: [1, 0, 0] };
     case 'tail': return id === 'tailBand' ? { id, o: [hi[0] + 600, 0, z(0.42)], d: [-1, 0, 0] } : { id, o: [hi[0] + 600, W * 0.3, z(0.42)], d: [-1, 0, 0] };
     case 'intake': return id === 'sideIntake' ? { id, o: [x(0.64), hi[1] + 600, z(0.55)], d: [0, -1, 0] } : { id, o: [lo[0] - 600, 0, z(0.22)], d: [1, 0, 0] };   // low in the front bumper's face, under its shelf

@@ -107,7 +107,8 @@ describe('p959: the crest and the lettering (doc 116)', () => {
     const colours = (l: Uint8Array) => new Set(Array.from({ length: l.length / 4 }, (_, i) => `${l[i * 4]},${l[i * 4 + 1]},${l[i * 4 + 2]}`)).size;
     expect(colours(L[0]!)).toBeGreaterThan(100); expect(colours(L[4]!)).toBeLessThanOrEqual(5);   // the artwork; the 16 drawn in the five flat colours
     const A = makeAtlas(1024), i = CELLS.indexOf('badge'); expect(Array.from(A.rects.subarray(i * 4, i * 4 + 4))).toEqual([0.5, 0.25, 0.25, 0.25]);
-    expect(A.mips!.map(m => m.level)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]); expect(A.mips![3]!).toMatchObject({ x: 32, y: 16, w: 16, h: 16 }); expect(A.mips![3]!.data).toBe(L[4]);
+    const bm = A.mips!.filter(m => m.w === m.h);   // the crest's (the lamps' pictures bring their own flat levels, twice as wide as high: render/car/lampart.ts)
+    expect(bm.map(m => m.level)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]); expect(bm[3]!).toMatchObject({ x: 32, y: 16, w: 16, h: 16 }); expect(bm[3]!.data).toBe(L[4]);
     expect(Array.from(A.data.subarray(((256 + 128) * 1024 + 512 + 128) * 4, ((256 + 128) * 1024 + 512 + 128) * 4 + 4))).toEqual(Array.from(L[0]!.subarray((128 * 256 + 128) * 4, (128 * 256 + 128) * 4 + 4)));
   });
 });

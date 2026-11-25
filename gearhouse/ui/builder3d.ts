@@ -20,6 +20,7 @@ import { bareMesh, bounce } from '../render/car/suspension/view';
 import { setPartStyle, partStyle, styleForLook } from '../render/car/powertrain';
 import { designSpec, designFigures, designHeight, type DesignFigures } from '../race/design';
 import { CLEARANCE, type FitResult } from '../race/fit';
+import { tierOf, tierRoom, tierFloor, tierChevrons, roomText, TIER_GROUP_NAME, type Tier } from '../race/tiers';
 import { BODY_NAME } from '../core/names';
 import { LIMITS, BODY_BASES, isModelBase, MODEL_OWN, BUMPERS959, LAMPS959, WHEELS959, plateOk, type BodyBase, type ModelSwaps, BODY_LIMITS, DIMS, LAYOUTS, LAYOUT_NAME, type DimKey, GRADE_NAME, GRADES, gradeLock, gradeBoost, gradeRedline, normalise, applyPatch, type BaseId, type Design, type NoseKind, type TailKind, type WheelKind, FACE_KEYS, faceLock, type Face, type FaceKey,
   type Grade, type Structure, type Panels, type Intake, type Compression, type Sump, type Block, type Turbos, type Interior,
@@ -364,10 +365,22 @@ function figures() { const f = designFigures(D), s = designSpec(D); lastFigs = f
   $('figs').innerHTML = `<dt>출력 정점</dt><dd>${s.hpRpm.toLocaleString()} <small>rpm</small></dd><dt>토크 정점</dt><dd>${s.torqueRpm.toLocaleString()} <small>rpm</small></dd>`
     + `<dt>마력당 무게</dt><dd>${f.kgPerHp.toFixed(2)} <small>kg/hp</small></dd><dt>앞 배분</dt><dd>${Math.round(f.front * 100)} <small>%</small></dd>`
     + `<dt>종감속</dt><dd>${s.final.toFixed(2)}${D.drive.final ? '' : ' <small>자동</small>'}</dd><dt>정비 주기</dt><dd>${(f.serviceKm / 1000).toLocaleString()}천 <small>km</small></dd>`;
-  $('cls').innerHTML = $('cls6').innerHTML = `<b>${esc(f.perfLabel)}</b> <small>· ${esc(f.form)}</small>`;
+  showTier(f); $('cls6').innerHTML = `${tierBadge(tierOf(f))} <small>· ${esc(f.form)}</small>`;
   $('cost6').innerHTML = `<dl><dt>원가 지수</dt><dd>${f.cost} <small>옛 바탕 A=100</small></dd><dt>신뢰성</dt><dd>${f.reliability}</dd><dt>정비 주기</dt><dd>${(f.serviceKm / 1000).toLocaleString()}천 <small>km</small></dd>`
     + `<dt>무게</dt><dd>${f.mass.toLocaleString()} <small>kg</small></dd><dt>출력</dt><dd>${f.hp} <small>hp</small></dd><dt>최고 속도</dt><dd>${f.topKmh} <small>km/h</small></dd></dl>`;
   showFit(f.fit); stepMarks(f.fit); meas(); suspGraphs(); }
+/** the class (docs/systems/115 C0): the rung the car reaches by its power, as a badge in its class colour, and the room
+ *  left under that rung's caps (power, and top speed under its limiter) as two meters. Shown only: nothing is held to
+ *  the caps yet (C1). On a phone's folded strip the badge and the power's room stand alone */
+const tierBadge = (t: Tier) => `<span class="gk-tier gk-tier-${t.group}" title="차급 ${t.id} · ${TIER_GROUP_NAME[t.group]}: 출력(hp)으로만 정합니다"><span class="gk-tier-cd">${t.id}</span><span class="gk-tier-nm">${TIER_GROUP_NAME[t.group]}</span><span class="gk-tier-ch" aria-hidden="true">${tierChevrons(t)}</span></span>`;
+function roomRow(name: string, v: number, cap: number, floor: number, unit: string, t: Tier): string {
+  const open = !Number.isFinite(cap), r = cap - v, k = open ? 0 : Math.max(0, Math.min(1, v / cap)), b = open ? 0 : Math.max(0, Math.min(1, floor / cap));
+  const text = open ? '상한 없음' : r < 0 ? `${roomText(r, unit)} <small>넘음 · ${cap.toLocaleString()}</small>` : `${roomText(r, unit)} <small>/ ${cap.toLocaleString()}</small>`;
+  return `<div class="gk-room gk-tier-${t.group}${open ? ' gk-open' : ''}${r < 0 ? ' gk-over' : ''}" role="meter" aria-label="${name} 여유" aria-valuenow="${Math.round(v)}"${open ? '' : ` aria-valuemax="${cap}"`}>`
+    + `<span class="gk-room-l">${name}</span><div class="gk-room-k"><i class="gk-room-b" style="--b:${b.toFixed(3)}"></i><i class="gk-room-f" style="--k:${k.toFixed(3)}"></i></div><span class="gk-room-t">${text}</span></div>`; }
+function showTier(f: DesignFigures) { const t = tierOf(f), room = tierRoom(f, t);
+  $('cls').innerHTML = `${tierBadge(t)}<small class="room">${roomText(room.hp, 'hp')}</small><small class="form">· ${esc(f.form)}</small>`;
+  $('tier').innerHTML = roomRow('출력 상한', f.hp, t.hpMax, tierFloor(t), 'hp', t) + roomRow('제한기', f.topKmh, t.topMax, 0, 'km/h', t); }
 /** each step marked with the fit checks that concern it and are not clean */
 function stepMarks(r: FitResult[]) { for (const [id, b] of stepBtn) { const mine = r.filter(x => FIT_STEP[x.part] === id), nb = mine.filter(x => x.verdict === 'blocked').length, nm = mine.filter(x => x.verdict === 'modified').length, badge = b.querySelector<HTMLElement>('.badge')!;
   badge.hidden = !nb && !nm; badge.className = `badge${nb ? ' blocked' : ''}`; badge.textContent = nb ? `⛔${nb > 1 ? nb : ''}` : `⚠️${nm > 1 ? nm : ''}`;

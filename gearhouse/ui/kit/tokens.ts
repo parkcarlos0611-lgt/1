@@ -14,6 +14,12 @@ export type Role = keyof typeof ROLE;
 /** the roles' short names in the CSS variables (--gk-y0, --gk-y1 ...) and classes (.gk-y ...) */
 export const ROLE_KEY: Record<Role, string> = { yellow: 'y', green: 'g', blue: 'b', orange: 'o', grey: 'grey', red: 'r', metal: 'metal', dark: 'dark' };
 
+/** the class ladder's colours (docs/systems/115 §3-7), a face and its lower band each, kept apart from the role colours:
+ *  they are for a class card's border, band and glow only (a locked rung is the lock and a darkened card, never grey),
+ *  so the role grey (locked) and red (danger) keep their meaning. N grey, S blue, P purple, H red, R gold */
+export const TIER_COLOUR = { N: ['#aab3bd', '#737d88'], S: ['#2f8cff', '#1a5fc4'], P: ['#b05cff', '#7b2fd0'], H: ['#ff3b54', '#c01a34'], R: ['#ffc83a', '#c98d00'] } as const;
+export type TierColourKey = keyof typeof TIER_COLOUR;
+
 /** the type: Oswald 700 for the headlines and figures (Latin), Noto Sans KR 700 taking the Hangul in the same line */
 export const FONT = { head: `'Oswald', 'Noto Sans KR', 'Arial Narrow', sans-serif`, body: `'Noto Sans KR', system-ui, sans-serif`,
   /** the Google Fonts sheet both pages load */ sheet: 'https://fonts.googleapis.com/css2?family=Oswald:wght@500;700&family=Noto+Sans+KR:wght@400;700&display=swap' } as const;
@@ -46,12 +52,13 @@ export const paletteOf = (v: unknown): PaletteId => typeof v === 'string' && (PA
 function paletteVars(p: Palette): string {
   return `color-scheme:${p.scheme};--gk-ground:${p.ground};--gk-ground2:${p.ground2};--gk-p0:${p.panel[0]};--gk-p1:${p.panel[1]};--gk-well:${p.well};--gk-t0:${p.top[0]};--gk-t1:${p.top[1]};`
     + `--gk-sa:${p.stripe[0]};--gk-sb:${p.stripe[1]};--gk-text:${GROUND_TEXT};--gk-soft:${p.groundSoft};--gk-ptext:${p.text};--gk-psoft:${p.soft};--gk-hi:${p.hi};--gk-rule:${p.rule};--gk-shade:${p.ground}e0;`; }
-/** the tokens as CSS: the role colours, the type, the outline, the motion, the default palette on :root and each
+/** the tokens as CSS: the role colours, the class colours (--gk-cls-n0 ...), the type, the outline, the motion, the default palette on :root and each
  *  palette under :root[data-kit="..."] */
 export function tokenCss(): string {
   const roles = (Object.keys(ROLE) as Role[]).map(r => `--gk-${ROLE_KEY[r]}0:${ROLE[r][0]};--gk-${ROLE_KEY[r]}1:${ROLE[r][1]};`).join('');
+  const tiers = (Object.keys(TIER_COLOUR) as TierColourKey[]).map(k => `--gk-cls-${k.toLowerCase()}0:${TIER_COLOUR[k][0]};--gk-cls-${k.toLowerCase()}1:${TIER_COLOUR[k][1]};`).join('');
   const e = (w: number, d: number) => [[w, 0], [-w, 0], [0, w], [0, -w], [w * 0.7, w * 0.7], [-w * 0.7, w * 0.7], [w * 0.7, -w * 0.7], [-w * 0.7, -w * 0.7], [0, d]].map(([x, y]) => `${x}px ${y}px 0 ${INK}`).join(',');
-  return `:root{--gk-ink:${INK};${roles}--gk-head:${FONT.head};--gk-body:${FONT.body};--gk-bw:3px;--gk-bwp:4px;--gk-cut:14px;`
+  return `:root{--gk-ink:${INK};${roles}${tiers}--gk-head:${FONT.head};--gk-body:${FONT.body};--gk-bw:3px;--gk-bwp:4px;--gk-cut:14px;`
     + `--gk-edge:${e(2, 4)};--gk-edge-s:${e(1.4, 2.4)};--gk-slide:44px;--gk-t:220ms;${paletteVars(PALETTES[DEFAULT_PALETTE])}}`
     + PALETTE_IDS.map(id => `:root[data-kit="${id}"]{${paletteVars(PALETTES[id])}}`).join('')
     + `@media (max-width:760px){:root{--gk-slide:18px;--gk-t:150ms}}`; }

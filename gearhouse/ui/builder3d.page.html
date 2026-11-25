@@ -96,6 +96,12 @@
   .figsbar .ttl { font-family: var(--gk-head); font-weight: 700; font-style: italic; font-size: 1.2rem; color: #fff; text-shadow: var(--gk-edge); }
   .figsbar .cls { font-size: 0.82rem; color: var(--ink); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .figsbar .cls b { color: var(--gk-y0); } .figsbar .cls small { color: var(--soft); }
   .figsbar .chev { display: none; }
+  /* the class (doc 115 C0): the badge in the bar, the room meters under it; on a phone's folded strip the power's room beside the badge */
+  .figsbar .cls { display: inline-flex; align-items: center; gap: 8px; padding: 3px 0 3px 3px; overflow: visible; }
+  .figsbar .cls .room { display: none; font-family: var(--gk-head); font-style: italic; font-weight: 700; font-size: 0.86rem; color: #fff; text-shadow: var(--gk-edge-s); }
+  .figsbar .cls .form { color: var(--soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .tierbar { display: grid; gap: 4px; padding: 0 0 7px; border-bottom: 2px solid var(--line); }
+  .cls6 .gk-tier { margin: 2px 4px 2px 3px; }
   .bars { display: grid; gap: 7px; }
   .bars .gk-stat { grid-template-columns: auto 3.9em minmax(40px, 1fr) 5.4em; gap: 6px; }
   .bars .gk-stat .gk-ic { width: 24px; height: 24px; } .bars .gk-stat-l { font-size: 0.86rem; } .bars .gk-stat-n { font-size: 1.12rem; } .bars .gk-track { height: 18px; }
@@ -126,6 +132,8 @@
     .bars { grid-template-columns: 1fr 1fr; gap: 5px 10px; }
     .bars .gk-stat { grid-template-columns: auto minmax(30px, 1fr) auto; gap: 5px; } .bars .gk-stat-l { display: none; } .bars .gk-stat .gk-ic { width: 20px; height: 20px; }
     .bars .gk-stat-n { font-size: 0.98rem; min-width: 3.6em; } .bars .gk-track { height: 14px; }
+    .figsbar .cls .room { display: inline; } .figsbar .cls .form { display: none; } body.figs-open .figsbar .cls .room { display: none; }
+    body:not(.figs-open) .tierbar { display: none; } .tierbar { padding-bottom: 5px; }
     body:not(.figs-open) .bars .gk-stat:nth-child(n+5), body:not(.figs-open) .figs dl, body:not(.figs-open) .figs .fit, body:not(.figs-open) .figs .meas { display: none; }
     body.figs-open .bars .gk-stat-l { display: inline; } body.figs-open .bars { grid-template-columns: 1fr; } body.figs-open .bars .gk-stat { grid-template-columns: auto 3.9em minmax(40px, 1fr) 5.2em; }
     .fit ul { max-height: 34vh; overflow-y: auto; }
@@ -159,7 +167,8 @@
 </aside>
 <button type="button" id="toggle" class="btn toggle gk-btn gk-sm gk-dark" aria-expanded="false" aria-controls="side">⚙ 설계</button>
 <section class="figs gk-panel" aria-label="수치">
-  <button type="button" class="figsbar" id="figsToggle" aria-expanded="false" aria-controls="bars"><span class="ttl">수치</span><span id="cls" class="cls" aria-label="차종 (성능 등급)"></span><span class="chev" aria-hidden="true">▾</span></button>
+  <button type="button" class="figsbar" id="figsToggle" aria-expanded="false" aria-controls="bars"><span class="ttl">수치</span><span id="cls" class="cls" aria-label="차급"></span><span class="chev" aria-hidden="true">▾</span></button>
+  <div id="tier" class="tierbar" aria-label="차급 여유 (표시만, 아직 제한하지 않음)"></div>
   <div id="bars" class="bars"></div>
   <dl id="figs"></dl>
   <div id="fit" class="fit" aria-live="polite"></div>

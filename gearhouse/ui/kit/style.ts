@@ -3,9 +3,11 @@
 // role with a pressed state, panels with cut corners (a thick outline, a solid face, a darker lower band), stat bars,
 // tilted badges, diagonal stripe bands, the top band with its chips, and the slide transitions (short, shorter on a
 // phone, none with reduced motion or the calm setting).
-import { tokenCss, ROLE, ROLE_KEY, type Role } from './tokens';
+import { tokenCss, ROLE, ROLE_KEY, TIER_COLOUR, type Role, type TierColourKey } from './tokens';
 
 const roleCls = (Object.keys(ROLE) as Role[]).map(r => `.gk-${ROLE_KEY[r]}{--f0:var(--gk-${ROLE_KEY[r]}0);--f1:var(--gk-${ROLE_KEY[r]}1)}`).join('');
+/** the class ladder's colour classes (.gk-tier-N ...): a class's face and band as --c0 and --c1 */
+const tierCls = (Object.keys(TIER_COLOUR) as TierColourKey[]).map(k => `.gk-tier-${k}{--c0:var(--gk-cls-${k.toLowerCase()}0);--c1:var(--gk-cls-${k.toLowerCase()}1)}`).join('');
 const cut = (c: string) => `polygon(${c} 0,100% 0,100% calc(100% - ${c}),calc(100% - ${c}) 100%,0 100%,0 ${c})`;
 
 export const KIT_CSS = tokenCss() + `
@@ -53,6 +55,22 @@ export const KIT_CSS = tokenCss() + `
 .gk-badge .gk-ic{width:1.3em;height:1.3em;margin:-2px 0}
 .gk-badge.gk-new{--f0:var(--gk-r0);--f1:var(--gk-r1)}.gk-badge.gk-beta{--f0:var(--gk-g0);--f1:var(--gk-g1)}.gk-badge.gk-lockb{--f0:var(--gk-grey0);--f1:var(--gk-grey1)}.gk-badge.gk-hot{--f0:var(--gk-o0);--f1:var(--gk-o1)}
 .gk-badge.gk-pin{position:absolute;right:-8px;top:-12px;z-index:2}
+/* ---- the class (docs/systems/115 §3-7): the class colour on the border band and the glow only, the face dark, the text
+   white; a locked rung darkened (with the lock icon beside it), never greyed. Its room meters: the rung's span a band
+   of its colour along the track's foot, the cap the track's right end ---- */
+.gk-tier{--c0:var(--gk-cls-n0);--c1:var(--gk-cls-n1);display:inline-flex;align-items:center;gap:5px;font-family:var(--gk-head);font-weight:700;font-style:italic;font-size:.9rem;line-height:1;letter-spacing:.04em;color:#fff;text-shadow:var(--gk-edge-s);
+  padding:3px 9px 4px 15px;background:linear-gradient(90deg,var(--c0) 0 6px,var(--c1) 6px 9px,#1b1e22 9px);border:2.5px solid var(--gk-ink);border-radius:3px;box-shadow:0 0 0 2px var(--c0),0 0 10px 2px var(--c0);transform:skewX(-8deg);white-space:nowrap;vertical-align:middle}
+.gk-tier>*{transform:skewX(8deg)}.gk-tier-cd{font-size:1.08em}.gk-tier-nm{font-family:var(--gk-body);font-style:normal;font-size:.86em;letter-spacing:0}.gk-tier-ch{font-size:.9em;opacity:.85;letter-spacing:-.08em}
+.gk-tier.gk-locked{filter:brightness(.5) saturate(.6)}
+.gk-room{display:grid;grid-template-columns:4.6em minmax(40px,1fr) auto;align-items:center;gap:6px;font-size:.78rem;font-weight:700}
+.gk-room-l{color:var(--gk-psoft);white-space:nowrap}
+.gk-room-t{font-family:var(--gk-head);font-style:italic;font-variant-numeric:tabular-nums;color:#fff;text-shadow:var(--gk-edge-s);white-space:nowrap;text-align:right}.gk-room-t small{font-family:var(--gk-body);font-style:normal;font-weight:400;color:var(--gk-psoft);text-shadow:none;margin-left:3px}
+.gk-room-k{position:relative;height:13px;border:2px solid var(--gk-ink);border-right-width:4px;border-radius:2px;background:var(--gk-well);overflow:hidden;transform:skewX(-12deg)}
+.gk-room-k>i{position:absolute;display:block}
+.gk-room-f{left:0;top:0;bottom:0;width:calc(var(--k,0) * 100%);background:linear-gradient(var(--gk-metal0) 0 60%,var(--gk-metal1) 60%);border-right:2px solid var(--gk-ink);transition:width .4s ease-out}
+.gk-room-b{right:0;bottom:0;height:4px;left:calc(var(--b,0) * 100%);background:var(--c0)}
+.gk-room.gk-over .gk-room-f{background:linear-gradient(var(--gk-r0) 0 60%,var(--gk-r1) 60%)}.gk-room.gk-over .gk-room-t{color:var(--gk-r0)}
+.gk-room.gk-open .gk-room-f,.gk-room.gk-open .gk-room-b{display:none}
 /* ---- stripes ---- */
 .gk-stripes{height:16px;background:repeating-linear-gradient(-45deg,var(--gk-sa) 0 11px,var(--gk-sb) 11px 22px);border-block:var(--gk-bw) solid var(--gk-ink)}
 .gk-stripes.gk-thin{height:8px;border-top:0}
@@ -73,9 +91,9 @@ export const KIT_CSS = tokenCss() + `
 .gk-in-r{animation:gk-in-r var(--gk-t) cubic-bezier(.2,.9,.3,1.12) both}.gk-in-l{animation:gk-in-l var(--gk-t) cubic-bezier(.2,.9,.3,1.12) both}
 .gk-in-u{animation:gk-in-u var(--gk-t) cubic-bezier(.2,.9,.3,1.1) both}.gk-in-d{animation:gk-in-d var(--gk-t) ease-out both}.gk-pop{animation:gk-pop var(--gk-t) cubic-bezier(.2,.9,.3,1.3) both}
 .gk-out-r{animation:gk-out-r calc(var(--gk-t) * .8) ease-in both}.gk-out-l{animation:gk-out-l calc(var(--gk-t) * .8) ease-in both}
-@media (prefers-reduced-motion:reduce){.gk-in-r,.gk-in-l,.gk-in-u,.gk-in-d,.gk-pop,.gk-out-r,.gk-out-l{animation:none}.gk-fill{transition:none}}
+@media (prefers-reduced-motion:reduce){.gk-in-r,.gk-in-l,.gk-in-u,.gk-in-d,.gk-pop,.gk-out-r,.gk-out-l{animation:none}.gk-fill,.gk-room-f{transition:none}}
 :root[data-calm] :is(.gk-in-r,.gk-in-l,.gk-in-u,.gk-in-d,.gk-pop,.gk-out-r,.gk-out-l){animation:none}
-` + roleCls;   // the roles last: they set a part's colours over its default
+` + tierCls + roleCls;   // the roles last: they set a part's colours over its default
 /** the kit's style put on the page once (later calls do nothing) */
 export function installKit(doc: Document = document): void { if (doc.getElementById('gk-style')) return; const s = doc.createElement('style'); s.id = 'gk-style'; s.textContent = KIT_CSS; doc.head.prepend(s); }
 /** the palette chosen (data-kit on the root) */

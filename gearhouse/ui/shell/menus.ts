@@ -16,6 +16,7 @@ import { ENABLED_BODIES, enabledDesign, stockP959 } from '../../core/bodies';
 import { BODY_NAME, CAR_599 } from '../../core/names';
 import { savedDesigns, saveDesign, deleteDesign, currentDesign, keepCurrent, fromPreset, newId, designJson, parseDesign, measured, designSig } from '../../core/designstore';
 import { designFigures } from '../../race/design';
+import { tierOf, tierLabel } from '../../race/tiers';
 import { TRACKS } from '../../race/tracks';
 import pbrMeta from '../../assets/textures/pbr/pbr.json';
 import groundMeta from '../../assets/textures/ground/ground.json';
@@ -63,7 +64,7 @@ export function garageScreen(ctx: ShellCtx): Screen<never> {
     if (!b) return; const d = fromPreset(b as BodyBase); saveDesign(s, d); open(d); };
   /** the design's figures as the kit's bars (power, weight, top speed; grip has no figure of the design's yet), its engine and class line, its runs */
   const lines = (d: Design): (string | HTMLElement)[] => { const out: (string | HTMLElement)[] = [], m = measured(s, d.id), meas = m && m.sig === designSig(d) ? m : null;
-    try { const f = designFigures(d); out.push(el('p', 'gh-card-l gh-spec', `${d.engine.layout} ${(d.engine.cc / 1000).toFixed(1)} L · ${f.perfLabel.split(' · ')[0]!.replace(/\s*\d+\s*%$/, '')}급 · 0-100 ${f.zeroTo100} s`));
+    try { const f = designFigures(d); out.push(el('p', 'gh-card-l gh-spec', `${d.engine.layout} ${(d.engine.cc / 1000).toFixed(1)} L · ${tierLabel(tierOf(f))} · 0-100 ${f.zeroTo100} s`));
       out.push(el('div', 'gh-stats', statBar(STATS.power, f.hp), statBar(STATS.weight, f.mass), statBar(STATS.top, meas?.topKmh || f.topKmh))); }
     catch { out.push(el('p', 'gh-card-l gh-spec', `${d.engine.layout} ${(d.engine.cc / 1000).toFixed(1)} L`)); }
     if (meas) { const laps = Object.values(meas.laps).map(l => `${l.track.replace(/\s*\(.*$/, '')} ${fmtLap(l.t)}`); out.push(el('p', 'gh-card-l gh-meas', `측정: 최고 ${meas.topKmh || '-'} km/h${laps.length ? ` · ${laps.join(' · ')}` : ''}`)); }

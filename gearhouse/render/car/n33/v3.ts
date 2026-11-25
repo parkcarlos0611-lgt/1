@@ -68,18 +68,22 @@ const lerp = (a: V, b: V, t: number): V => [a[0] + (b[0] - a[0]) * t, a[1] + (b[
 const T = (s: string): V[] => s.trim().split(/\s*;\s*/).map(r => r.trim().split(/[\s,]+/).map(Number) as V);
 
 // ---- the car's lines as curves of x (the side view and the plan of the blueprint)
+/** a height along the car without a ripple: a + b x + c x^2 + d sqrt(x - x0), fitted by least squares to the heights read
+ *  off the blueprint's side view (within 8 mm of them; a curve through every reading waved between them) */
+const smooth = (x0: number, [a, b, c, d]: number[]) => (x: number) => a! + b! * x + c! * x * x + d! * Math.sqrt(Math.max(0, x - x0));
 /** the bonnet's centre line (the side view's top line) */
-const zC = pc([[100, 682], [112, 690], [136, 705], [215, 751], [320, 808], [470, 847], [620, 878], [780, 903], [940, 921], [1090, 938], [1220, 951], [1330, 957]]);
+const zC = smooth(60, [590.520357, -0.116094693, -1.63456194e-05, 15.4197698]);
 /** the raised middle's edge in plan (from the grille's corner out to the screen's) */
 const yRise = (x: number) => 283 + (x - 112) * 112 / 1218;
 /** the shut line: plan and height (the valley between the bonnet's flank and the wing's crest) */
-const yShut = pc([[308, 700], [500, 705], [1000, 710], [1400, 706], [1500, 698]]), zShut = pc([[308, 706], [400, 743], [500, 784], [700, 840], [1000, 869], [1300, 906], [1500, 928]]);
+const yShut = pc([[308, 700], [500, 705], [1000, 710], [1400, 706], [1500, 698]]), zShut = (x: number) => zCrest(x) - 8;
 /** the wing's crest */
-const yCrest = pc([[336, 726], [500, 740], [1000, 746], [1400, 742], [1500, 737]]), zCrest = pc([[336, 714], [400, 750], [500, 792], [700, 847], [1000, 876], [1300, 913], [1500, 930]]);
+const yCrest = pc([[336, 726], [500, 740], [1000, 746], [1400, 742], [1500, 737]]);
+const zCrest = smooth(250, [653.71073, -0.452356173, 8.05763124e-05, 21.8811906]);
 /** the shoulder crease's top (the side view's second line) */
-const yShoulder = pc([[372, 762], [500, 783], [700, 792], [1000, 794], [1300, 786], [1500, 762]]), zShoulder = pc([[372, 705], [420, 738], [500, 778], [700, 833], [1000, 862], [1300, 900], [1500, 918]]);
+const yShoulder = pc([[372, 762], [500, 783], [700, 792], [1000, 794], [1300, 786], [1500, 762]]), zShoulder = smooth(250, [629.049539, -0.941938506, 0.000186938478, 36.2530379]);
 /** the wing's side half way down */
-const ySide = pc([[418, 792], [520, 832], [620, 852], [800, 862], [1100, 862], [1345, 850], [1420, 840]]), zSide = pc([[418, 678], [520, 722], [620, 752], [800, 782], [1000, 795], [1345, 815], [1420, 815]]);
+const ySide = pc([[418, 792], [520, 832], [620, 852], [800, 862], [1100, 862], [1345, 850], [1420, 840]]), zSide = smooth(250, [557.255306, -0.764944733, 0.000117579145, 32.3950665]);
 
 /** the rows' places along the centre line (rows 2 .. 13), how much of the leading edge's sweep and of the cowl's each keeps */
 const XC = [0, 0, 112, 136, 215, 320, 470, 620, 780, 940, 1090, 1220, 1305, 1330], FL = [0, 0, 1, 1, 0.9, 0.75, 0.5, 0.3, 0.12, 0, 0, 0, 0, 0], FC = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0.1, 0.3, 0.62, 1, 1];
@@ -244,7 +248,7 @@ export function buildCageV3(o: V3Opts = {}): Cage959 { const NR = V3.rows, NC = 
   // the skirt's step
   path(rowPath(14, 0, SHO), 1, true); path(colPath(BELT, 14, 24), 1, true); path(colPath(SHO, 14, 24), 1, true);
   path([...rowPath(14, 0, 5), ...colPath(5, 15, 18)]); path(rowPath(18, 0, 5)); path([...rowPath(23, 0, 5), ...colPath(5, 24, 27)]); path(rowPath(27, 0, 5));
-  path(colPath(CREST, 23, 27), 0.5);
+  path(colPath(CREST, 23, 27), 0.5); path(colPath(SHO, 13, 14));   // (the shoulder's line into the A pillar's foot: the foot's point stays where it is)
   path(rowPath(R, 0, SHO), 1, true); path(tailLines[SEAM_LINE]!, 1, true); path(BR[2]!, 1, true);
   path(colPath(SHO, 24, R), 0.5); path(colPath(WAIST, 14, R), 0.45); path(colPath(LOW + 1, 14, 22), 1, true); path(colPath(LOW + 2, 14, 22), 1, true);
 

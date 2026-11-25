@@ -6,6 +6,8 @@ import { describe, expect, it } from 'vitest';
 import { n33Model, N33_LUMP, DIM, frameOf, buildN33Shell, n33Hubs } from '../render/car/n33';
 import { N33_PANELS } from '../render/car/n33/check';
 import { measure } from '../render/car/p959/check';
+import { emitShellFine } from '../render/car/n33/emit';
+import { Build } from '../render/car/mesh';
 import { edgeUse } from '../render/car/p959/shell';
 import { FRAMES, FRAME_DIMS, FRAME_OF_BASE, fitFrameDims, NO_FRAME_DIMS, GLASS_IDS } from '../core/frames';
 import { normalise, DESIGN_BNR33 } from '../core/design';
@@ -19,7 +21,11 @@ import { designMesh } from '../render/car/design';
 const lump = n33Model(N33_LUMP), tris = (S: typeof lump.shell, pick: (k: number) => boolean) => S.F.reduce((n, f, k) => n + (pick(k) ? f.length - 2 : 0), 0);
 const rules = (S: typeof lump.shell, at: string) => { const M = measure(S, N33_PANELS);
   for (const p of M.panels) { expect(p.across, `${at} ${p.panel.name}`).toBeLessThanOrEqual(p.panel.across ?? 0); expect(p.along, `${at} ${p.panel.name}`).toBeLessThanOrEqual(p.panel.along ?? 0); expect(p.dimples, `${at} ${p.panel.name}`).toBe(0); }
-  expect(M.unmarked.length, at).toBe(0); expect(Math.max(0, ...M.mushy.map(e => e.deg)), at).toBeLessThan(30); expect(M.mushy.length, at).toBeLessThanOrEqual(80); expect(M.slivers, at).toBe(0); return M; };
+  // the folds of 20 - 35 degrees are the narrow bands' own steps (the bumpers' ledge and shelf rounds, the arches' flares:
+  // docs/systems/117 §17), no fold of 35 or more is unmarked; thin triangles are counted on the drawn mesh (below): the
+  // shell's bands are a few millimetres wide and the mesh cuts them finer (render/car/n33/emit.ts)
+  expect(M.unmarked.length, at).toBe(0); expect(Math.max(0, ...M.mushy.map(e => e.deg)), at).toBeLessThan(35); expect(M.mushy.length, at).toBeLessThanOrEqual(180); return M; };
+const thin = (S: typeof lump.shell) => emitShellFine(new Build(), S, '#888888').slivers;
 
 describe('the lump (차체 B)', () => {
   const S = lump.shell;
@@ -29,9 +35,10 @@ describe('the lump (차체 B)', () => {
     const names = new Set(lump.mesh.names!.filter(Boolean)); for (const n of ['wheel', 'wheelHole', 'wheelWell', 'archLip', 'bonnet', 'door', 'bootLid']) expect(names.has(n), n).toBe(true);
     // the sockets' places kept as tags for the parts to come
     for (const s of ['headLamp', 'grille', 'tailLamp']) expect(S.tag.some(t => t.socket === s), s).toBe(true); });
-  it('keeps its shell near the budget (target 5,000 - 6,000, ceiling 10,000 for the car) and its cage hand-sized', () => {
-    const shell = tris(S, k => S.tag[k]!.region === 'shell'); console.log(`N33 lump: cage ${S.cage.F.length} faces, body shell ${shell} triangles, bumpers ${tris(S, k => S.tag[k]!.region !== 'shell')}, whole lump ${lump.mesh.n}`);
-    expect(shell).toBeGreaterThan(4500); expect(shell).toBeLessThanOrEqual(6000); expect(lump.mesh.n).toBeLessThan(10000); });
+  it('its triangles (recorded, not cut to a number: docs/decisions.md 2026-11-25): the cage, the shell, the drawn mesh with its bands cut finer', () => {
+    const shell = tris(S, k => S.tag[k]!.region === 'shell'); console.log(`N33 lump: cage ${S.cage.F.length} faces, body shell ${shell} triangles, bumpers ${tris(S, k => S.tag[k]!.region !== 'shell')}, whole lump drawn ${lump.mesh.n}`);
+    expect(shell).toBeGreaterThan(4500); expect(shell).toBeLessThanOrEqual(11000); expect(lump.mesh.n).toBeLessThan(32000); });
+  it('has no thin triangle on its paint as drawn (docs/systems/108 S9)', () => expect(thin(S)).toBe(0));
   it('keeps the surface rules', () => { const M = rules(S, 'stock'); console.log(`N33 folds: 20-35 unmarked ${M.mushy.length} (worst ${Math.max(0, ...M.mushy.map(e => e.deg)).toFixed(1)})`); });
   it('the panel lines are faint until a glass set is picked; the glass sets are tags on the same faces', () => {
     const door = (m: typeof lump.mesh) => m.lines!.find(l => l.kind === 'door')!.w!, withGlass = n33Model({ ...N33_LUMP, glass: 'stock' }).mesh; expect(door(lump.mesh)).toBeCloseTo(door(withGlass) / 2);

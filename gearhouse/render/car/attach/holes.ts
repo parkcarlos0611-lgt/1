@@ -50,6 +50,10 @@ export function coordOf(P: Proj, p: V): [number, number, number] { const F = P.F
 export function outlineOf(K: PartKind, p: Placed): { hw: number; hh: number; O: P2[]; r: number } { const H = K.hole!, w = K.size * p.scale * (p.sx ?? 1), h = K.size * H.aspect * p.scale, hw = w / 2, hh = h / 2;
   if (H.shape === 'ellipse') { const per = Math.PI * (3 * (hw + hh) - Math.sqrt((3 * hw + hh) * (hw + 3 * hh))), n = clamp(Math.ceil(per / 26), 16, 64);
     return { hw, hh, r: Math.min(hw, hh), O: Array.from({ length: n }, (_, i) => { const t = i / n * Math.PI * 2; return [Math.cos(t) * hw, Math.sin(t) * hh] as P2; }) }; }
+  // its own convex outline (a slanted lamp's): each side a point every 45 mm at most
+  if (H.shape === 'poly') { const Q = H.poly!.map(([x, y]) => [x * hw, y * hh] as P2), O: P2[] = [];
+    Q.forEach((a, i) => { const b = Q[(i + 1) % Q.length]!, k = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / 45)); for (let j = 0; j < k; j++) O.push([a[0] + (b[0] - a[0]) * j / k, a[1] + (b[1] - a[1]) * j / k]); });
+    return { hw, hh, r: Math.min(hw, hh) * 0.2, O }; }
   // a straight side a point every 60 mm (a fine cell of the shell is about 70); a band's sides where they wrap round its corners every 35
   const r = Math.min(hw, hh) * (H.r ?? 0.2), O: P2[] = [], L0 = H.wrap ? hw * H.wrap.flat : Infinity, line = (a: P2, b: P2) => { const len = Math.hypot(b[0] - a[0], b[1] - a[1]), k = Math.max(1, Math.ceil(len / 60));
     if (a[1] !== b[1] || !Number.isFinite(L0)) { for (let i = 0; i < k; i++) O.push([a[0] + (b[0] - a[0]) * i / k, a[1] + (b[1] - a[1]) * i / k]); return; }
@@ -79,7 +83,8 @@ function holeTag(t: SkinTag): string | null { if (HOLE_BAD_PANEL.test(t.panel)) 
 /** the kinds' pockets: the wall's material (the 599's sockets' rims are painted), the floor's (a lamp band's floor is its
  *  lens, amber at its ends), the rim's line */
 function pocketOf(id: HoleId, hw: number): Pick<HoleCut, 'wall' | 'floor' | 'line'> { switch (id) {
-  case 'lampRound': case 'lampEllipsoid': case 'lampSquare': return { wall: 'paint', floor: () => 'dark', line: 'lamp' };
+  case 'lampRound': case 'lampEllipsoid': case 'lampSquare': case 'lampSlant': return { wall: 'paint', floor: () => 'dark', line: 'lamp' };
+  case 'fogLamp': return { wall: 'dark', floor: () => 'dark', line: 'lamp' };
   case 'tailBand': { const amber = hw * 0.743; return { wall: 'paint', floor: s => Math.abs(s) > amber ? 'amber' : 'lamp', line: 'lamp' }; }
   case 'tailRound': return { wall: 'dark', floor: () => 'dark', line: 'lamp' };
   case 'sideIntake': return { wall: 'paint', floor: () => 'grille', line: 'vent' };
@@ -119,12 +124,12 @@ export function fitHoleAt(skin: Skin, pt: SkinPoint, p: Placed & { id: HoleId },
   const cache = new Map<string, { p: V; d: V } | null>(), under = (s: number, y: number) => { const k = `${s.toFixed(1)},${y.toFixed(1)}`; if (!cache.has(k)) { const r = rayAt(P, s, y), h = skin.hit(r.o, r.d, r.max); cache.set(k, h ? { p: h.p, d: neg(r.d) } : null); } return cache.get(k)!; };
   const at = (s: number, y: number, h: number): V => { const u = under(s, y); return u ? vmadd(u.p, u.d, h) : vmadd(framePtOf(F, s, y), F.n, h); };
   const b = new Build(); if (!why) insides(b, id, F, at, hw, hh, depth, pt);
-  const mesh = b.mesh(0), area = Math.PI * hw * hh * (H.shape === 'ellipse' ? 1 : 4 / Math.PI) / 1e6, open = /^lamp|^tail/.test(id) ? 0 : area * (id === 'grille' ? 0.7 : id === 'louvreCut' ? 0.5 : 0.6) * (twin ? 2 : 1);
+  const mesh = b.mesh(0), area = Math.PI * hw * hh * (H.shape === 'ellipse' ? 1 : 4 / Math.PI) / 1e6, open = /^lamp|^tail|^fog/.test(id) ? 0 : area * (id === 'grille' || id === 'grilleSlot' ? 0.7 : id === 'intakeOpen' ? 0.85 : id === 'louvreCut' ? 0.5 : 0.6) * (twin ? 2 : 1);
   const fig: PartFigures = { id, at: twin ? [pt.p[0], 0, pt.p[2]] : pt.p, count: twin ? 2 : 1, frontal: 0, plan: 0, mass: Math.round(MASS[id] * (twin ? 2 : 1) * p.scale * 100) / 100, open, facing: Math.abs(pt.n[0]) };
   const hole: HoleFit = { cuts, open, prints: mine, preview: () => previewOf(cut, mesh, depth) };
   return { p, key: placedKey(p), kind: K, F, size: K.size * p.scale, depth, twin, hw, hh, ok: !why, why, warn, mesh, fig, hole }; }
 const framePtOf = (F: PartFrame, x: number, y: number): V => vmadd(vmadd(F.o, F.u, x), F.up, y);
-const MASS: Record<HoleId, number> = { lampRound: 2.2, lampEllipsoid: 2.4, lampSquare: 2.4, tailBand: 1.6, tailRound: 0.4, grille: 0.8, sideIntake: 0.3, ventCut: 0.3, louvreCut: 0.6 };
+const MASS: Record<HoleId, number> = { lampRound: 2.2, lampEllipsoid: 2.4, lampSquare: 2.4, lampSlant: 2.8, fogLamp: 0.5, grilleSlot: 0.5, intakeOpen: 0.9, tailBand: 1.6, tailRound: 0.4, grille: 0.8, sideIntake: 0.3, ventCut: 0.3, louvreCut: 0.6 };
 /** a cut mirrored across the centre line (a pair's twin) */
 export function mirrorCut(c: HoleCut): HoleCut { const F = c.proj.F; return { ...c, key: c.key + '~', proj: { ...c.proj, F: { o: mirV(F.o), n: mirV(F.n), u: mirV(F.u), up: mirV(F.up) } }, ring: c.ring.map(mirV), dirs: c.dirs.map(mirV) }; }
 /** a hole's footprint for the overlap rules: its frame's rectangle, and its own test (inside its outline 40 mm wide, near its skin) */
@@ -137,6 +142,9 @@ function holesMeet(a: Footprint, b: Footprint): boolean { const inRect = (P: Foo
 // ---- the insides ----
 type At = (s: number, y: number, h: number) => V;
 const quadOut = (b: Build, p: V, q: V, r: V, s: V, out: V) => { const t = (a: V, c: V, d: V) => vdot(vcross(vsub(c, a), vsub(d, a)), out) >= 0 ? b.tri(a, c, d) : b.tri(a, d, c); t(p, q, r); t(p, r, s); };
+/** rings of the same count joined (facing out of the skin), and a ring closed to a point */
+const band = (b: Build, F: PartFrame, A: V[], B: V[]) => { for (let i = 0; i < A.length; i++) { const j = (i + 1) % A.length; quadOut(b, A[i]!, A[j]!, B[j]!, B[i]!, F.n); } };
+const cap = (b: Build, F: PartFrame, A: V[], c: V) => { for (let i = 0; i < A.length; i++) { const t = [c, A[i]!, A[(i + 1) % A.length]!] as const; vdot(vcross(vsub(t[1], t[0]), vsub(t[2], t[0])), F.n) >= 0 ? b.tri(t[0], t[1], t[2]) : b.tri(t[0], t[2], t[1]); } };
 /** a bar across the pocket from (s0, y) to (s1, y) (or along y when `vert`), `t` wide, its face at `h`, its side down to `h0`, in pieces along the skin */
 function bar(b: Build, at: At, F: PartFrame, a0: number, a1: number, c: number, t: number, h: number, h0: number, vert = false) { const k = Math.max(1, Math.ceil(Math.abs(a1 - a0) / 70)), P = (a: number, o: number, hh: number) => vert ? at(c + o, a, hh) : at(a, c + o, hh);
   for (let i = 0; i < k; i++) { const x0 = a0 + (a1 - a0) * i / k, x1 = a0 + (a1 - a0) * (i + 1) / k;
@@ -148,10 +156,41 @@ function insides(b: Build, id: HoleId, F: PartFrame, at: At, hw: number, hh: num
   switch (id) {
     case 'lampRound': case 'lampEllipsoid': case 'lampSquare': { const inset = Math.min(12, Math.min(hw, hh) * 0.1), c = vmadd(pt.p, F.n, -depth);
       headLamp(b, id === 'lampRound' ? 'round' : id === 'lampEllipsoid' ? 'ellipsoid' : 'square', c, F.u, F.up, F.n, hw - inset, hh - inset); return; }
-    case 'tailRound': { const ring = (k: number, h: number) => Array.from({ length: 14 }, (_, i) => { const t = i / 14 * Math.PI * 2; return at(Math.cos(t) * hw * k, Math.sin(t) * hh * k, h); });
-      const band = (A: V[], B: V[]) => { for (let i = 0; i < A.length; i++) { const j = (i + 1) % A.length; quadOut(b, A[i]!, A[j]!, B[j]!, B[i]!, F.n); } };
-      b.name('tailLampBezel').mat('#c4c7cb', 0.7, 'metal'); band(ring(0.97, -Math.min(depth, 4)), ring(0.84, -1.5));
-      b.name('tailLamp').mat('#b3261e', 0.5, 'lens'); const L = ring(0.84, -1.5), M = ring(0.45, 1.5); band(L, M); const c = at(0, 0, 3); for (let i = 0; i < 14; i++) { const t = [c, M[i]!, M[(i + 1) % 14]!] as const; vdot(vcross(vsub(t[1], t[0]), vsub(t[2], t[0])), F.n) >= 0 ? b.tri(t[0], t[1], t[2]) : b.tri(t[0], t[2], t[1]); } return; }
+    case 'tailRound': case 'fogLamp': { const N = 16, ring = (k: number, h: number) => Array.from({ length: N }, (_, i) => { const t = i / N * Math.PI * 2; return at(Math.cos(t) * hw * k, Math.sin(t) * hh * k, h); });
+      if (id === 'fogLamp') {   // a dark bezel, an amber lens domed a little
+        b.name('fogBezel').mat('#2a2b2d', 0.4, 'plain'); band(b, F, ring(0.98, -Math.min(depth, 3)), ring(0.8, -depth * 0.45));
+        b.name('fogLamp').mat('#e0961d', 0.6, 'lens'); const L = ring(0.8, -depth * 0.45), M = ring(0.42, -depth * 0.45 + 5); band(b, F, L, M); cap(b, F, M, at(0, 0, -depth * 0.45 + 7)); return; }
+      // a chrome rim, a dark red outer ring stepped down to the brighter lens in its middle (the N33's: two rings a lamp)
+      b.name('tailLampBezel').mat('#c4c7cb', 0.7, 'metal'); band(b, F, ring(0.97, -Math.min(depth, 4)), ring(0.86, -1.5));
+      b.name('tailLampRing').mat('#8e1c17', 0.5, 'lens'); band(b, F, ring(0.86, -1.5), ring(0.6, 0.5)); band(b, F, ring(0.6, 0.5), ring(0.56, -2));
+      b.name('tailLamp').mat('#b3261e', 0.5, 'lens'); const L = ring(0.56, -2), M = ring(0.3, 2); band(b, F, L, M); cap(b, F, M, at(0, 0, 3.5)); return; }
+    case 'lampSlant': { // three round units under the slanted band (a small inner lamp, the projector, the big reflector) and the
+      // clear corner lamp in its pointed outer end, all laid on the wrapped skin
+      const N = 12, ring = (cx: number, cy: number, rr: number, h: number) => Array.from({ length: N }, (_, i) => { const t = i / N * Math.PI * 2; return at(cx + Math.cos(t) * rr, cy + Math.sin(t) * rr, h); });
+      const f = -depth + 1.5, units: [number, number, number, boolean][] = [[-0.6, -0.1, 0.52, false], [-0.27, -0.02, 0.8, true], [0.13, 0, 0.84, false]];
+      for (const [sx, sy, k, proj] of units) { const cx = sx * hw, cy = sy * hh, rr = hh * k, h1 = f + Math.min(7, depth * 0.5);
+        b.name('lampRing').mat(proj ? '#4a4e54' : '#c2c5c9', 0.6, 'plain'); band(b, F, ring(cx, cy, rr, f), ring(cx, cy, rr * 0.84, h1));
+        if (proj) { b.name('headLamp').mat('#f2f5f7', 0.8, 'lens'); const B = ring(cx, cy, rr * 0.5, f + Math.min(11, depth * 0.8)); band(b, F, ring(cx, cy, rr * 0.84, h1), B); cap(b, F, B, at(cx, cy, f + Math.min(13, depth * 0.9))); }
+        else { b.name('lampReflector').mat('#aeb4ba', 0.7, 'plain'); const B = ring(cx, cy, rr * 0.42, f + 1.5); band(b, F, ring(cx, cy, rr * 0.84, h1), B); b.name('headLamp').mat('#f2f5f7', 0.8, 'lens'); cap(b, F, B, at(cx, cy, f + 4)); } }
+      // the corner lamp: a clear ribbed lens from behind the reflector toward the point
+      { const x0 = 0.47 * hw, x1 = 0.88 * hw, n = 4, top = (x: number) => hh * (0.74 - 1.3 * Math.max(0, x / hw - 0.5)), bot = (x: number) => -hh * (0.78 - 0.4 * Math.max(0, x / hw - 0.75));
+        b.name('cornerLamp').mat('#dfe4e8', 0.7, 'lens');
+        for (let i = 0; i < n; i++) { const xa = x0 + (x1 - x0) * i / n, xb = x0 + (x1 - x0) * (i + 1) / n, h = f + 3 + (i & 1) * 2.5; quadOut(b, at(xa, bot(xa), h), at(xb, bot(xb), h), at(xb, top(xb), h), at(xa, top(xa), h), F.n); } }
+      return; }
+    case 'grilleSlot': { // fine bars across and uprights, and in its middle a blank plinth: an emblem's place
+      const hf = -depth * 0.4, eh = hh * 0.82, ew = Math.min(hw * 0.3, eh * 1.9); b.name('grilleMesh').mat('#2a2b2d', 0.3, 'plain');
+      for (const y of [-hh * 0.36, hh * 0.36]) { const w = spanAt(false, hw, hh, r, y) - 2; bar(b, at, F, -w, -ew - 4, y, 4, hf, -depth + 2); bar(b, at, F, ew + 4, w, y, 4, hf, -depth + 2); }
+      const nv = clamp(Math.round(2 * hw / 46), 4, 24); for (let k = 1; k <= nv; k++) { const x = -hw + 2 * hw * k / (nv + 1); if (Math.abs(x) < ew + 6) continue; const hy = spanAt(false, hh, hw, r, x) - 2; bar(b, at, F, -hy, hy, x, 3, hf - 1.5, -depth + 2, true); }
+      const N = 14, ring = (k: number, h: number) => Array.from({ length: N }, (_, i) => { const t = i / N * Math.PI * 2; return at(Math.cos(t) * ew * k, Math.sin(t) * eh * k, h); });
+      b.name('emblemRim').mat('#c4c7cb', 0.7, 'metal'); { const A = ring(1, -depth + 2), B = ring(1, -1.5), c0 = at(0, 0, -1.5); for (let i = 0; i < N; i++) { const j = (i + 1) % N; quadOut(b, A[i]!, A[j]!, B[j]!, B[i]!, vsub(B[i]!, c0)); } band(b, F, B, ring(0.86, -0.5)); }
+      b.name('emblemPlace').mat('#34363a', 0.3, 'plain'); cap(b, F, ring(0.86, -0.5), at(0, 0, -0.5));
+      return; }
+    case 'intakeOpen': { // a core set deep in the opening (a lighter panel with fins across it) behind two uprights
+      const iw = hw - Math.min(14, hw * 0.12), ih = hh - Math.min(10, hh * 0.14), hc = -depth + 3, m = Math.max(1, Math.ceil(2 * iw / 150));
+      b.name('intakeCore').mat('#3a3d42', 0.3, 'plain'); for (let i = 0; i < m; i++) { const x0 = -iw + 2 * iw * i / m, x1 = -iw + 2 * iw * (i + 1) / m; quadOut(b, at(x0, -ih, hc), at(x1, -ih, hc), at(x1, ih, hc), at(x0, ih, hc), F.n); }
+      b.name('intakeFin').mat('#5a5e64', 0.4, 'plain'); const nf = clamp(Math.round(2 * ih / 22), 2, 9); for (let k = 1; k <= nf; k++) { const y = -ih + 2 * ih * k / (nf + 1); bar(b, at, F, -iw, iw, y, clamp(ih / nf * 0.5, 2.5, 6), hc + 3, hc); }
+      b.name('intakeBar').mat('#1f2022', 0.3, 'plain'); const nb = hw > 160 ? 2 : 0; for (let k = 1; k <= nb; k++) { const x = -hw + 2 * hw * k / (nb + 1), hy = spanAt(false, hh, hw, r, x) - 1; bar(b, at, F, -hy, hy, x, 10, -depth * 0.35, hc, true); }
+      return; }
     case 'grille': { b.name('grilleMesh').mat('#2a2b2d', 0.3, 'plain'); const hf = -depth * 0.35, nh = clamp(Math.round(2 * hh / 42), 1, 7), nv = clamp(Math.round(2 * hw / 58), 2, 16);
       for (let k = 1; k <= nh; k++) { const y = -hh + 2 * hh * k / (nh + 1), w = spanAt(false, hw, hh, r, y) - 2; bar(b, at, F, -w, w, y, 5, hf, -depth + 2); }
       for (let k = 1; k <= nv; k++) { const x = -hw + 2 * hw * k / (nv + 1), hy = spanAt(false, hh, hw, r, x) - 2; bar(b, at, F, -hy, hy, x, 4, hf - 1.5, -depth + 2, true); } return; }

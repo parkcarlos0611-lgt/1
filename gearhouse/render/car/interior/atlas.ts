@@ -16,6 +16,8 @@ export const REGIONS = {
   vent: [0, 224, 128, 80], console: [0, 304, 128, 80], radio: [128, 224, 192, 72], switches: [128, 296, 192, 88], padStock: [320, 224, 192, 112], hornButton: [320, 336, 48, 48], pedal: [368, 336, 48, 48], plaque: [416, 336, 96, 48],
   spokePrint: [512, 224, 160, 160], seatPleat: [672, 224, 128, 160], seatBucket: [800, 224, 112, 160], suit: [912, 224, 112, 160],
   doorPleat: [0, 384, 224, 128], visor: [224, 384, 160, 64], stickerA: [224, 448, 160, 64], stickerB: [384, 384, 192, 64], stickerC: [384, 448, 192, 64], podA: [576, 384, 128, 128], podB: [704, 384, 128, 128], podC: [832, 384, 128, 128],
+  // the N33's centre stack (docs/systems/117): the voltmeter beside the two pods above, the three round buttons under the vents, the climate panel
+  podV: [960, 384, 64, 64], stackButtons: [960, 448, 64, 16], climate: [960, 464, 64, 24],
 } as const satisfies Record<string, readonly [number, number, number, number]>;
 export type Region = keyof typeof REGIONS;
 /** a region's corners on the sheet, 0..1 (u0, v0, u1, v1), a hair inside its edge so a neighbour never bleeds in */
@@ -145,7 +147,13 @@ function drawTrim(p: SheetPaint): void {
   { const [w, h] = p.into('banner'); p.rect(0, 0, w, h, [0.05, 0.05, 0.06]).text('GEARHOUSE DRIFT TEAM', w / 2, h / 2, 17, WHITE, { w: 3.2, wide: 1.5 }); }
   drawPod(p, 'podA', { min: -1, max: 2, a0: -130, a1: 130, major: 0.5, minor: 0.1, num: 1, unit: 'BAR' }, 0.6, 'BOOST');
   drawPod(p, 'podB', { min: 0, max: 10, a0: -130, a1: 130, major: 1, minor: 0.5, num: 2, unit: 'BAR' }, 4.2, 'OIL P');
-  drawPod(p, 'podC', { min: 40, max: 140, a0: -130, a1: 130, major: 10, minor: 5, num: 20, unit: 'C', red: [120, 140] }, 92, 'WATER'); }
+  drawPod(p, 'podC', { min: 40, max: 140, a0: -130, a1: 130, major: 10, minor: 5, num: 20, unit: 'C', red: [120, 140] }, 92, 'WATER');
+  drawPod(p, 'podV', { min: 8, max: 16, a0: -130, a1: 130, major: 2, minor: 1, num: 4, unit: 'V', red: [15, 16] }, 13.6, 'VOLT');
+  { const [w, h] = p.into('stackButtons'); p.rect(0, 0, w, h, dark);   // three round buttons in a row: the rear screen's heater, the hazard lamps (red), the wiper's
+    [0, 1, 2].forEach(i => { const x = w * (0.2 + i * 0.3), c = h / 2; p.disc(x, c, 6, i === 1 ? [0.62, 0.1, 0.08] : mid).circle(x, c, 6, 1, lite); if (i === 1) p.line(x - 2.6, c + 2, x, c - 2.6, 0.9, WHITE).line(x, c - 2.6, x + 2.6, c + 2, 0.9, WHITE).line(x - 2.6, c + 2, x + 2.6, c + 2, 0.9, WHITE); else p.rect(x - 2.5, c - 1.8, 5, 3.6, WHITE, 0.7, 0.8); }); }
+  { const [w, h] = p.into('climate'); p.rect(0, 0, w, h, dark).frame(1, 1, w - 2, h - 2, 1, lite, 1, 2);   // the climate panel: its window with the temperature, a row of keys
+    p.rect(5, 4, 30, 9, [0.06, 0.13, 0.1], 1, 1).text('24.5', 20, 8.5, 5.5, [0.45, 0.9, 0.6], { w: 0.9 }); for (let i = 0; i < 3; i++) p.rect(39 + i * 7.5, 4, 6, 9, mid, 1, 1);
+    for (let i = 0; i < 7; i++) p.rect(5 + i * 7.9, 15.5, 6.6, 5, i === 0 ? [0.5, 0.33, 0.06] : mid, 1, 1); } }
 
 /** the interior's sheet, `W` pixels wide and half as high: straight RGBA bytes, clear where a part's colour shows */
 export function interiorSheet(W: number, car?: GaugeCar): Uint8Array { const p = new SheetPaint(W, W / 2); drawTrim(p); for (const f of gaugeSet(car)) drawGauge(p, f); return p.bytes(); }

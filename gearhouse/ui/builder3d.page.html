@@ -220,6 +220,16 @@
   @media (max-width: 370px) { .top #openFiles { display: none; } }   /* the narrowest phones: the bar's main buttons kept on screen (the list from ⑦) */
   @media (max-width: 760px) and (max-height: 560px) { .side { height: 70vh; } body.open .toggle { bottom: calc(70vh + var(--railH) + 6px); } }
   @media (prefers-reduced-motion: reduce) { .side { transition: none; } }
+  /* the free placing's bar (docs/systems/115 P1a): over the view's free middle; on a phone above the step strip, the drawer closed */
+  .placebar { position: fixed; bottom: 60px; left: 452px; right: 326px; margin: 0 auto; max-width: 460px; z-index: 5; display: grid; gap: 6px; padding: 10px 14px 14px; box-sizing: border-box; }
+  .placebar[hidden] { display: none; }
+  .placebar .pb-t { font-size: 1rem; } .placebar .pb-hint { margin: 0; font-size: 0.78rem; opacity: 0.8; }
+  .placebar .pb-row { display: grid; grid-template-columns: 4.2em minmax(0, 1fr) 7.6em; align-items: center; gap: 8px; font-size: 0.85rem; }
+  .placebar .pb-v { text-align: right; font-variant-numeric: tabular-nums; } .placebar .pb-snap { font-size: 0.85rem; }
+  .placebar .pb-why { margin: 0; font-size: 0.82rem; color: #7fe08f; } .placebar .pb-why.bad { color: #ff7a6e; font-weight: 700; }
+  .placebar .btns { display: flex; gap: 6px; flex-wrap: wrap; }
+  body.placing .viewbar, body.placing .hint { display: none; }
+  @media (max-width: 760px) { .placebar { left: 8px; right: 8px; bottom: calc(var(--railH) + 8px); max-width: none; padding: 8px 10px 10px; gap: 3px; } .placebar .pb-hint { display: none; } body.open .placebar { display: none; } .placebar .pb-row { grid-template-columns: 3.6em minmax(0, 1fr) 6.8em; } }
 </style>
 <canvas id="view" aria-label="3D 미리보기 (끌어서 돌리기, 휠·두 손가락으로 확대)"></canvas>
 <div class="top">
@@ -255,6 +265,7 @@
   <select id="look" class="gk-field" aria-label="조명·재질"><option value="2" selected>PBR</option><option value="3">툰</option><option value="0">단계 조명</option><option value="4">드리프트 (선·2단 음영)</option></select>
   <button type="button" class="btn gk-btn gk-sm gk-dark" id="home">시점 초기화</button>
 </div>
+<div id="placeBar" class="placebar gk-panel" hidden aria-label="부품 놓기"></div>
 <div class="hint">끌어서 돌리기 · 휠/두 손가락으로 확대 · 두 번 눌러 시점 초기화</div>
 <section id="tierPick" hidden></section>
 <script>/*BUNDLE*/</script>

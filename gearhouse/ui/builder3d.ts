@@ -12,6 +12,7 @@
 // and what the drive page measured of it. Designs are kept in this browser, carried as JSON files, and sent to
 // the drive page in its link ("시험 주행"), which drives them with the physics made from them and records its runs.
 import { LiveRenderer } from '../render/live/renderer';
+import { freeGpu } from '../render/live/gpu';
 import { loadSky } from '../render/live/groundtex';
 import { studioFloor } from '../render/live/studio';
 import type { Mesh } from '../render/car/mesh';
@@ -40,6 +41,9 @@ import { STATS, type StatDef } from './kit/logic';
 import { icon } from './kit/icons';
 import { stepIcon, STEP_SHORT, bumperPic, lampPic, wheelPic, basePic } from './builder_pics';
 import { partThumbs, type ThumbSpec } from './builder_thumbs';
+import { placeTool } from './builder_place';
+import { viewRay } from '../render/car/skin';
+import type { PlacedId } from '../core/placed';
 import { FRAMES, FRAME_IDS, FRAME_DIMS, FRAME_DIM_NAME, NO_FRAME_DIMS, GLASS, GLASS_IDS, INTERIOR_SETS, INTERIOR_SET_IDS, TRIM_IDS, TRIM_NAME, interiorOfKit, type FrameId, type FrameDimKey, type GlassId, type InteriorSetId, type TrimId } from '../core/frames';
 import texAlb from '../assets/textures/pbr/albedo.jpg';
 import texNor from '../assets/textures/pbr/normal.jpg';
@@ -198,6 +202,7 @@ function showStep() { const at = onFiles ? 'files' : step;
   document.body.classList.toggle('at-check', at === 'check');   // the figures' own fit list folded away while ⑧ shows it in full
   if (at === 'susp' && !view.susp) { suspAuto = true; setSuspView(true); } else if (at !== 'susp' && suspAuto) { suspAuto = false; setSuspView(false); }
   if (at === 'susp') suspGraphs();
+  if (at !== 'parts') place.end();
   for (const [k, q] of pane) q.classList.toggle('on', k === at);
   for (const [id, b] of stepBtn) { const now = !onFiles && id === step, done = seen.has(id) && !now;
     if (now) b.setAttribute('aria-current', 'step'); else b.removeAttribute('aria-current'); b.classList.toggle('gk-seen', done); b.classList.toggle('gk-unseen', !seen.has(id)); b.dataset.state = now ? '지금 단계' : done ? '본 단계' : '아직 안 본 단계'; label(id); }
@@ -288,20 +293,24 @@ function btnRow(t: string, f: () => void): HTMLElement { const d = document.crea
   plate.addEventListener('change', () => { if (plateOk(plate.value)) { M().plate = plate.value; plateWhy.hidden = true; changed(); } else { plateWhy.textContent = '숫자 2개 + 한글 한 글자(받침 없음) + 숫자 4개로 적어 주세요. 예: 12가 3456'; plateWhy.hidden = false; } });
   const plateRow = field('번호판 (옛 초록 번호판)', plate); plateRow.append(plateWhy, btnRow('무작위 번호', () => { M().plate = randomPlate(); plateWhy.hidden = true; changed(); }));
   // each plate off and on again: a removed one is kept as false, a fitted one leaves no key (an older design's own way)
-  const plateOn = (k: 'plateF' | 'plateR', label: string) => seg<'on' | 'off'>(label, [['on', '달기'], ['off', '떼기']], () => M()[k] === false ? 'off' : 'on', v => { if (v === 'on') delete M()[k]; else M()[k] = false; });
+  const plateOn = (k: 'plateF' | 'plateR', label: string) => seg<'on' | 'off'>(label, [['on', '달기'], ['off', '떼기']], () => M()[k] === false ? 'off' : 'on', v => { if (v === 'on') delete M()[k]; else { if (place.id === k) place.end(); M()[k] = false; } });
+  // the plates placed freely (docs/systems/115 P1a): a card each; pressed, "놓기" (ui/builder_place.ts)
+  const plateCards = cards<PlacedId | ''>('번호판 놓기 (눌러서 자유 배치)', ([['plateF', '앞 번호판'], ['plateR', '뒤 번호판']] as [PlacedId, string][]).map(([k, t]) => [k, t, bumperPic('std', k === 'plateR'), { kind: k, v: k }] as [PlacedId, string, string, ThumbSpec]),
+    () => place.id ?? '', v => { if (v) place.start(v); });
   // the parts library (docs/systems/110 G4): each swap a card with its picture
   // "599 순정 세트" (docs/systems/115 §4-1): every part as the car left the works, its glass the stock set; the lump's
   // dimensions and the plate's text kept
-  const stockRow = btnRow('599 순정 세트', () => { D.body.model = { ...MODEL_OWN.p959, plate: M().plate }; D.body.glass = 'stock'; changed(); flash('599 순정 부품과 창문을 달았습니다'); });
+  const stockRow = btnRow('599 순정 세트', () => { place.end(); D.body.model = { ...MODEL_OWN.p959, plate: M().plate }; D.body.glass = 'stock'; delete D.body.parts; changed(); flash('599 순정 부품과 창문을 달았습니다 (번호판도 순정 자리로)'); });
   stockRow.querySelector('button')!.className = BTN_MAIN; stockRow.querySelector('button')!.id = 'stockSet';
-  const lumpRow = btnRow('모두 떼기 (덩어리로)', () => { D.body.model = LUMP_SWAPS(M().plate); changed(); });
+  const lumpRow = btnRow('모두 떼기 (덩어리로)', () => { place.end(); D.body.model = LUMP_SWAPS(M().plate); delete D.body.parts; changed(); });
   stockRow.append(lumpRow.querySelector('button')!);
   const modelRows = [h2('599 부품'), stockRow, note('순정 세트는 부품과 창문을 지금 599와 같게 답니다. 치수와 번호판 글자는 그대로 둡니다.'), cards<ModelSwaps['bumperF']>('앞 범퍼', BUMPERS_ALL.map(k => [k, BUMPER_NAME[k], bumperPic(k), { kind: 'bumperF', v: k }] as [ModelSwaps['bumperF'], string, string, ThumbSpec]), () => M().bumperF, sm('bumperF')),
     cards<ModelSwaps['bumperR']>('뒤 범퍼', BUMPERS_ALL.map(k => [k, BUMPER_NAME[k], bumperPic(k, true), { kind: 'bumperR', v: k }] as [ModelSwaps['bumperR'], string, string, ThumbSpec]), () => M().bumperR, sm('bumperR')),
     cards<ModelSwaps['lamp']>('헤드램프', LAMPS_ALL.map(k => [k, { round: '둥근 렌즈 (순정)', ellipsoid: '프로젝터 2개', square: '사각 프로젝터', none: '없음 (막힘)' }[k], lampPic(k), ...(k === 'none' ? [] : [{ kind: 'lamp', v: k }])] as [ModelSwaps['lamp'], string, string, ThumbSpec?]), () => M().lamp, sm('lamp')),
     cards<ModelSwaps['wheel']>('휠', WHEELS_ALL.map(k => [k, { hollow5: '속 빈 5스포크 (순정)', dish: '딥디시 8스포크', hole5: '5홀 디스크', steel: '민짜 강철 휠' }[k], wheelPic(k), { kind: 'wheel', v: k }] as [ModelSwaps['wheel'], string, string, ThumbSpec]), () => M().wheel, sm('wheel')),
     seg<'on' | 'off'>('그 밖의 순정 부품 (테일램프 띠, 옆 흡기구, 엔진 덮개 그릴, 미러, 배기구, 배지·레터링)', [['on', '달기'], ['off', '떼기']], () => M().details === false ? 'off' : 'on', v => { if (v === 'on') delete M().details; else M().details = false; }),
-    plateOn('plateF', '앞 번호판'), plateOn('plateR', '뒤 번호판'), plateRow, note('범퍼는 차체의 이음선 고리에 맞물려 바뀝니다. 헤드램프를 빼면 램프 자리는 차체 색으로 막힙니다. 번호판은 앞뒤를 따로 떼고 다시 달 수 있고, 뗀 자리는 범퍼 면 그대로입니다. 번호판 글자는 판 위에 획으로 그립니다(가상의 번호만). 부품을 아무 곳에나 붙이는 방식은 다음 단계(P1, P2)에서 옵니다.')];
+    plateOn('plateF', '앞 번호판'), plateOn('plateR', '뒤 번호판'), plateCards, note(`번호판 카드를 누르면 "놓기"가 됩니다. 판을 끌어 차체 위 아무 곳으로나 옮기고, 회전·기울기·크기를 고릅니다. 앞 번호판은 앞을, 뒤 번호판은 뒤를 보는 면(차 축에서 35° 안)에만 붙고, 굽은 면에서는 판이 평평한 채 검은 받침이 틈을 메웁니다(최대 70 mm). 램프·유리·다른 번호판과 겹치면 붙지 않습니다. 레이스 상대와 순정 세트는 순정 자리입니다.`),
+    plateRow, note('범퍼는 차체의 이음선 고리에 맞물려 바뀝니다. 헤드램프를 빼면 램프 자리는 차체 색으로 막힙니다. 번호판은 앞뒤를 따로 떼고 다시 달 수 있고, 뗀 자리는 범퍼 면 그대로입니다. 번호판 글자는 판 위에 획으로 그립니다(가상의 번호만). 다른 부품의 자유 부착은 다음 단계(P1, P2)에서 옵니다.')];
   syncs.push(() => { const m = isModelBase(D.body.base); for (const e of kitRows) e.hidden = m; for (const e of modelRows) e.hidden = !m; if (m && document.activeElement !== plate) plate.value = M().plate; });
   add('parts', ...kitRows, ...modelRows);
   const sw = document.createElement('div'); sw.className = 'swatches'; const pick = document.createElement('input'); pick.type = 'color'; pick.id = 'paint'; pick.setAttribute('aria-label', '직접 고르기');
@@ -421,16 +430,16 @@ function showList() { const list = $('list'), all = savedDesigns(store); list.te
 
 // ---- the design changed: kept, the figures, the car (when its body changed), the link ----
 // the engine's shape is in the key too (the car carries its powertrain: the engine view shows it)
-const bodyKey = (d: Design) => JSON.stringify([d.body.model ?? null, isModelBase(d.body.base) ? [d.kit.interior, d.interior ?? null, d.body.frame ?? null, d.body.glass === undefined ? 'stock' : d.body.glass, d.engine.redline, d.engine.boost] : 0, d.engine.layout, d.engine.cc, d.engine.bs, d.engine.valves, d.engine.block, d.engine.grade, d.engine.intake, d.engine.sump, d.engine.turbo, d.engine.intercooler, d.drive.gears, d.drive.gearbox, d.drive.awd, d.body.base, d.body.nose, ...FACE_KEYS.map(k => d.body[k]), d.body.tail, d.body.wheel, ...DIMS.map(k => d.body[k]), d.body.paint, d.body.gloss, d.kit.tyres, d.kit.rim, d.kit.wing, d.kit.diffuser,
+const bodyKey = (d: Design) => JSON.stringify([d.body.model ?? null, isModelBase(d.body.base) ? [d.kit.interior, d.interior ?? null, d.body.frame ?? null, d.body.glass === undefined ? 'stock' : d.body.glass, d.body.parts ?? null, d.engine.redline, d.engine.boost] : 0, d.engine.layout, d.engine.cc, d.engine.bs, d.engine.valves, d.engine.block, d.engine.grade, d.engine.intake, d.engine.sump, d.engine.turbo, d.engine.intercooler, d.drive.gears, d.drive.gearbox, d.drive.awd, d.body.base, d.body.nose, ...FACE_KEYS.map(k => d.body[k]), d.body.tail, d.body.wheel, ...DIMS.map(k => d.body[k]), d.body.paint, d.body.gloss, d.kit.tyres, d.kit.rim, d.kit.wing, d.kit.diffuser,
   // the suspension's linkage (its kind, arms, roll centre, caster, static camber and toe: the rig is built with them; not the springs, the dampers or the bars)
   ...[d.susp.front, d.susp.rear].map(a => [a.type, a.arm, a.rc, a.camber, a.toe]), d.susp.front.caster]);
 let meshT = 0, figT = 0;
 function changed() { D = normalise(D); for (const s of syncs) s(); keepCurrent(store, D); savedState(); driveLink();
   clearTimeout(figT); figT = setTimeout(figures, 40) as unknown as number;
-  if (bodyKey(D) !== meshKey) { clearTimeout(meshT); meshT = setTimeout(rebuild, 90) as unknown as number; } }
+  if (bodyKey(place.shown(D)) !== meshKey) { clearTimeout(meshT); meshT = setTimeout(rebuild, 90) as unknown as number; } }
 /** another design on the bench */
 function use(d: Design): boolean { if (!enabledDesign(d)) { flash(`옛 방식 설계는 열 수 없습니다 (${BASE_NAME[d.body.base]} · 비활성)`); return false; }
-  D = structuredClone(d); if (!D.fresh) D = withTier(D); $<HTMLInputElement>('name').value = D.name; lastFigs = null; for (const o of offers) o.hidden = true; restoreStep(); changed(); showList();
+  place.end(); D = structuredClone(d); if (!D.fresh) D = withTier(D); $<HTMLInputElement>('name').value = D.name; lastFigs = null; for (const o of offers) o.hidden = true; restoreStep(); changed(); showList();
   // a new design asks its class first; an engine brought back past the class's cap (the engine designer) is held by the restrictor, and said so
   if (D.fresh) openPick(true); else { picker.close(); const t = chosenTier(D), over = freeHp(D) - t.hpMax; if (over > 0) flash(`리스트릭터가 출력을 ${t.id} 상한에 묶습니다 (−${Math.round(over).toLocaleString()} hp)`); }
   return true; }
@@ -533,9 +542,16 @@ const DECK = ['bootLid', 'engineCover', 'rearPane'];
 let meshKey = '', down: Mesh | null = null, up: Mesh | null = null, onGpu: Mesh | null = null, builds = 0;
 const open = new WeakMap<Mesh, Mesh>();
 const view = { spin: false, lamps: false, engine: false, /** the suspension view: the body off, the wheels' faces off, the wheels bouncing slowly */ susp: false, look: 2, yaw: 0, ang: 0, pitch: 0, zoom: 1 };
-let dirty = true, g: ReturnType<LiveRenderer['car']> | null = null, awake = true;   // awake: on screen (a page of its own always)
-function rebuild() { const key = bodyKey(D); if (key === meshKey && down) return; const t0 = performance.now(); meshKey = key; down = designMesh(D, 0, 0, 1); up = null; builds++; dirty = true; console.info(`design mesh ${D.body.base}: ${down.n} triangles, ${Math.round(performance.now() - t0)} ms`); }
-function shown(): Mesh { let M = view.lamps ? (up ??= designMesh(D, 0, 1, 1)) : down!; if (view.susp) return bareMesh(M); if (view.engine) { let o = open.get(M); if (!o) { o = withoutParts(M, openParts(D.body.base, DECK)); open.set(M, o); } M = o; } return M; }
+let dirty = true, g: ReturnType<LiveRenderer['car']> | null = null, awake = true;
+/** the last picture's camera (the free placing's rays) and the overlaid part on the GPU */
+let cam: { v: Parameters<typeof viewRay>[0]; len: number } | null = null, overM: Mesh | null = null, overG: ReturnType<LiveRenderer['car']> | null = null;
+/** the free placing (docs/systems/115 P1a): a plate's card in ③ starts it; its bar over the view, its rays from the last picture's camera */
+const place = placeTool({ design: () => D, changed, flash, redraw: () => { dirty = true; }, bar: $('placeBar'),
+  ray(cx, cy) { if (!cam) return null; const r = cv.getBoundingClientRect(); return viewRay(cam.v, { x: 0, y: 0, z: -0.015, yaw: view.yaw, len: cam.len }, (cx - r.left) * cv.width / r.width, (cy - r.top) * cv.height / r.height); },
+  mode(on) { document.body.classList.toggle('placing', on); if (on && innerWidth <= 760) drawer(false); if (on) { view.spin = false; $('spin').setAttribute('aria-pressed', 'false'); } dirty = true; } });
+addEventListener('keydown', e => { if (!awake || !place.id) return; const t = e.target as HTMLElement | null; if (t && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) && e.key !== 'Escape') return; if (place.key(e)) e.preventDefault(); });   // awake: on screen (a page of its own always)
+function rebuild() { const S = place.shown(D), key = bodyKey(S); if (key === meshKey && down) return; const t0 = performance.now(); meshKey = key; down = designMesh(S, 0, 0, 1); up = null; builds++; dirty = true; console.info(`design mesh ${D.body.base}: ${down.n} triangles, ${Math.round(performance.now() - t0)} ms`); }
+function shown(): Mesh { let M = view.lamps ? (up ??= designMesh(place.shown(D), 0, 1, 1)) : down!; if (view.susp) return bareMesh(M); if (view.engine) { let o = open.get(M); if (!o) { o = withoutParts(M, openParts(D.body.base, DECK)); open.set(M, o); } M = o; } return M; }
 const home = () => { view.ang = Math.PI - 0.7; view.pitch = 17; view.zoom = 1; view.yaw = 0; dirty = true; }; home();
 const press = (id: string, k: 'spin' | 'lamps' | 'engine' | 'susp') => $(id).addEventListener('click', () => { view[k] = !view[k]; $(id).setAttribute('aria-pressed', String(view[k])); dirty = true; });
 press('spin', 'spin'); press('lamps', 'lamps'); press('engine', 'engine'); press('susp', 'susp');
@@ -548,12 +564,12 @@ $<HTMLSelectElement>('look').addEventListener('change', e => { view.look = +(e.t
   const ps = styleForLook(view.look); if (ps !== partStyle()) { setPartStyle(ps); meshKey = ''; clearTimeout(meshT); meshT = setTimeout(rebuild, 30) as unknown as number; } });
 $('home').addEventListener('click', home); cv.addEventListener('dblclick', home);
 { const ptrs = new Map<number, { x: number; y: number }>(); let pinch = 0;
-  cv.addEventListener('pointerdown', e => { cv.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY }); if (ptrs.size === 2) { const [a, b] = [...ptrs.values()]; pinch = Math.hypot(a!.x - b!.x, a!.y - b!.y); } });
-  cv.addEventListener('pointermove', e => { const p = ptrs.get(e.pointerId); if (!p) return; const dx = e.clientX - p.x, dy = e.clientY - p.y; p.x = e.clientX; p.y = e.clientY;
+  cv.addEventListener('pointerdown', e => { cv.setPointerCapture(e.pointerId); if (ptrs.size === 0 && place.down(e)) return; ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY }); if (ptrs.size === 2) { const [a, b] = [...ptrs.values()]; pinch = Math.hypot(a!.x - b!.x, a!.y - b!.y); } });
+  cv.addEventListener('pointermove', e => { if (place.move(e)) return; const p = ptrs.get(e.pointerId); if (!p) return; const dx = e.clientX - p.x, dy = e.clientY - p.y; p.x = e.clientX; p.y = e.clientY;
     if (ptrs.size === 1) { view.ang -= dx * 0.007; view.pitch = Math.max(6, Math.min(85, view.pitch + dy * 0.25)); dirty = true; }
     else if (ptrs.size === 2 && pinch) { const [a, b] = [...ptrs.values()], d = Math.hypot(a!.x - b!.x, a!.y - b!.y); view.zoom = Math.max(0.35, Math.min(3, view.zoom * pinch / d)); pinch = d; dirty = true; } });
-  const off = (e: PointerEvent) => { ptrs.delete(e.pointerId); pinch = 0; }; cv.addEventListener('pointerup', off); cv.addEventListener('pointercancel', off);
-  cv.addEventListener('wheel', e => { e.preventDefault(); view.zoom = Math.max(0.35, Math.min(3, view.zoom * (e.deltaY > 0 ? 1.12 : 1 / 1.12))); dirty = true; }, { passive: false }); }
+  const off = (e: PointerEvent) => { place.up(e); ptrs.delete(e.pointerId); pinch = 0; }; cv.addEventListener('pointerup', off); cv.addEventListener('pointercancel', off);
+  cv.addEventListener('wheel', e => { e.preventDefault(); if (place.wheel(e)) return; view.zoom = Math.max(0.35, Math.min(3, view.zoom * (e.deltaY > 0 ? 1.12 : 1 / 1.12))); dirty = true; }, { passive: false }); }
 addEventListener('resize', () => { dirty = true; });
 let last = performance.now(), frames = 0;
 function frame(now: number) { const el = Math.min(0.1, (now - last) / 1000); last = now;
@@ -570,8 +586,11 @@ function frame(now: number) { const el = Math.min(0.1, (now - last) / 1000); las
     const free = Math.max(160, figL - sideR) * dpr, band = Math.max(120, bottom - top) * dpr, shift = ((sideR + figL) / 2 - r.width / 2) * dpr, len = M.length;
     const mm = Math.max(len * 1.3 / free, len * 0.62 / band) * view.zoom, ox = -shift * mm / 1000;
     const rx = Math.sin(view.ang), ry = -Math.cos(view.ang);   // the screen's right, in the world
-    L.render({ x: rx * ox, y: ry * ox, z: 0.55, ang: view.ang, pitch: view.pitch, mm, W, H, cy: phone ? (top + bottom) / 2 / r.height : 0.55 },
-      [{ g: g!, x: 0, y: 0, z: -0.015, yaw: view.yaw, roll: 0, pitch: 0, steerL: 0.14, steerR: 0.12, spin: 0, player: true, lamps: view.lamps ? 1 : 0, ...(view.susp ? bounce(now / 1000) : {}) }], [], [],
+    const V = { x: rx * ox, y: ry * ox, z: 0.55, ang: view.ang, pitch: view.pitch, mm, W, H, cy: phone ? (top + bottom) / 2 / r.height : 0.55 }; cam = { v: V, len };
+    // the part being placed, drawn apart over the car (ui/builder_place.ts): made again only when it moved
+    const OM = view.susp ? null : place.overlay(len); if (OM !== overM) { if (overM && overG) { freeGpu(L.gl, overG); L.forget(overM); } overM = OM; overG = OM ? L.car(OM) : null; }
+    const at = { x: 0, y: 0, z: -0.015, yaw: view.yaw, roll: 0, pitch: 0, steerL: 0.14, steerR: 0.12, spin: 0 };
+    L.render(V, [{ g: g!, ...at, player: true, lamps: view.lamps ? 1 : 0, ...(view.susp ? bounce(now / 1000) : {}) }, ...(overG ? [{ g: overG, ...at, player: false }] : [])], [], [],
       { look: view.look, glass: 0.8, glassRefl: host.glassRefl?.() ?? 1, rays: true, bloomK: 1, reflK: 1.3, dof: 0, outW: 0.5, outK: 0.6 }); }
   requestAnimationFrame(frame); }
 // the phone's drawer
@@ -583,7 +602,7 @@ $('figsToggle').addEventListener('click', () => { const on = !document.body.clas
 $<HTMLInputElement>('name').value = D.name; for (const s of syncs) s(); restoreStep(); rebuild(); figures(); showList(); savedState(); driveLink(); requestAnimationFrame(frame);
 if (D.fresh) openPick(true);   // a new design: its class first (docs/systems/115 C1)
 (globalThis as { __builder?: unknown }).__builder = { get design() { return D; }, use, get builds() { return builds; }, get frames() { return frames; }, get triangles() { return onGpu?.n ?? 0; }, get step() { return onFiles ? 'files' : step; }, go, /** a base's preset opened; the view (its angle, pitch, the car's yaw) set and drawn again */ preset: (id: BaseId) => use(fromPreset(id)), view, redraw() { dirty = true; } };   // for the page tests (tools)
-return { enter(d?: Design) { if (d && JSON.stringify(d) !== JSON.stringify(D)) use(d); awake = true; dirty = true; meas(); }, leave() { awake = false; drawer(false); },
+return { enter(d?: Design) { if (d && JSON.stringify(d) !== JSON.stringify(D)) use(d); awake = true; dirty = true; meas(); }, leave() { place.end(); awake = false; drawer(false); },
   get design() { return D; }, get step() { return onFiles ? 'files' : step; }, use };
 }
 // a page of its own: the builder's markup is on it (the game's page mounts it on a screen instead)

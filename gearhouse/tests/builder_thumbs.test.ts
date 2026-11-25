@@ -29,13 +29,16 @@ describe('the first steps\' cards (docs/systems/115 F1)', () => {
     for (const g of glass) expect(g.mesh.n).toBe(lump.mesh.n);   // the glass is tags only
     const G = KINDS.indexOf('glass'), glassTris = (m: typeof lump) => m.mesh.kind.filter(k => k === G).length; expect(glassTris(glass[0]!)).toBe(0); expect(glassTris(glass[1]!)).toBeGreaterThan(glassTris(glass[2]!));
     expect(cab[0]!.mesh.n).toBeGreaterThan(500); expect(cab[1]!.mesh.n).not.toBe(cab[0]!.mesh.n); expect((cab[1]!.mesh.names ?? []).some(n => /^cage/.test(n))).toBe(true);
+    // the plates' cards (P1a): each plate alone at its own place, the front one at the nose, the rear one at the tail
+    const pf = isolate(models[0]!, 'plateF'), pr = isolate(models[0]!, 'plateR'); expect(pf.n).toBeGreaterThan(20); expect(pr.n).toBe(pf.n);
+    expect(meshBox(pf)[1][0]).toBeLessThan(100); expect(meshBox(pr)[0][0]).toBeGreaterThan(4100); expect([...new Set(Array.from(pf.part, p => pf.names![p]!))].every(n => /^plate/.test(n))).toBe(true);
     const blank = isolate(models[3]!, 'bumperF'); expect(new Set(Array.from(blank.part, p => blank.names![p]!))).toEqual(new Set(['bumperF'])); });
 });
 
 describe('the views and the framing', () => {
   it('front for what faces forward or back, side for the wheel and the body', () => {
-    expect(KIND_VIEW).toEqual({ bumperF: 'front', bumperR: 'front', lamp: 'front', wheel: 'side', base: 'side', frame: 'side', glass: 'side', interior: 'top' });
-    expect(camera('bumperF', 'front').ang).toBeCloseTo(Math.PI); expect(camera('bumperR', 'front').ang).toBeCloseTo(0); expect(camera('wheel', 'top').pitch).toBe(90); });
+    expect(KIND_VIEW).toEqual({ bumperF: 'front', bumperR: 'front', lamp: 'front', wheel: 'side', base: 'side', frame: 'side', glass: 'side', interior: 'top', plateF: 'front', plateR: 'front' });
+    expect(camera('bumperF', 'front').ang).toBeCloseTo(Math.PI); expect(camera('bumperR', 'front').ang).toBeCloseTo(0); expect(camera('plateR', 'front').ang).toBeCloseTo(0); expect(camera('wheel', 'top').pitch).toBe(90); });
   it('one box for all the variants of a kind fits the picture, the same scale for each', () => {
     for (const k of ['bumperF', 'bumperR', 'lamp', 'wheel'] as ThumbKind[]) { const box = VARIANTS[k].map((_, i) => meshBox(isolate(models[i]!, k))).reduce(union);
       for (const v of ['front', 'side', 'top'] as const) { const f = fit(box, DIM.length, camera(k, v), 640, 480); expect(f.mm).toBeGreaterThan(0.2); expect(f.mm).toBeLessThan(10);

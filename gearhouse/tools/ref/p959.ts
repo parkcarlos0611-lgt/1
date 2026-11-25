@@ -5,7 +5,8 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { deflateSync } from 'node:zlib';
 import { Build, KINDS } from '../../render/car/mesh';
 import { plate, plateText } from '../../render/car/p959/parts';
-import { p959Model, P959_LUMP } from '../../render/car/p959';
+import { p959Model, P959_LUMP, buildShell, shellSkin, fitPlate, type P959Opts } from '../../render/car/p959';
+import type { Placed } from '../../core/placed';
 import { fineGrid, lineStat, measure, PANELS, turning } from '../../render/car/p959/check';
 import { faceNormal } from '../../render/car/p959/subdiv';
 import { edgeUse } from '../../render/car/p959/shell';
@@ -24,8 +25,13 @@ const FORM = process.argv.includes('form');   // continuous shading, to judge th
 const arg = (k: string) => process.argv.find(a => a.startsWith(k + '='))?.slice(k.length + 1), AT = (arg('at') ?? '2130,0,600').split(',').map(Number) as V3, ONLY = arg('only')?.split(',');
 // lump: the frame "차체 A" (docs/systems/115 F1) with any of the above put back; glass=none|stock|noQuarter|louvre; dims=wheelbase:150,width:-60,...
 const DIMS = arg('dims') ? Object.fromEntries(arg('dims')!.split(',').map(kv => { const [k, v] = kv.split(':'); return [k!, +v!]; })) : undefined, given = (o: Record<string, unknown>) => Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined));
-const MODEL = p959Model({ ...(process.argv.includes('lump') ? P959_LUMP : {}), ...given({ lamp: arg('lamp') as never, wheel: arg('wheel') as never, bumperF: arg('bf') as never, bumperR: arg('br') as never, plate: arg('plate') ? plateText(arg('plate')!) : undefined }),
-  ...(arg('noplate') !== undefined || !process.argv.includes('lump') ? { plateF: !arg('noplate')?.includes('f'), plateR: !arg('noplate')?.includes('r') } : {}), ...(arg('glass') ? { glass: arg('glass') === 'none' ? null : arg('glass') as never } : {}), ...(DIMS ? { dims: DIMS } : {}) }), S = MODEL.shell, NN = MODEL.normals;
+const OPTS: P959Opts = ({ ...(process.argv.includes('lump') ? P959_LUMP : {}), ...given({ lamp: arg('lamp') as never, wheel: arg('wheel') as never, bumperF: arg('bf') as never, bumperR: arg('br') as never, plate: arg('plate') ? plateText(arg('plate')!) : undefined }),
+  ...(arg('noplate') !== undefined || !process.argv.includes('lump') ? { plateF: !arg('noplate')?.includes('f'), plateR: !arg('noplate')?.includes('r') } : {}), ...(arg('glass') ? { glass: arg('glass') === 'none' ? null : arg('glass') as never } : {}), ...(DIMS ? { dims: DIMS } : {}) });
+// placed=F:y,z,rot,tilt,scale/R:y,z,rot,tilt,scale (docs/systems/115 P1a): the plates placed freely, each at the skin met by a ray along the car's axis at (y, z)
+const PLACED: Placed[] | undefined = arg('placed') ? (() => { const sk = shellSkin(buildShell({ ...OPTS, lamps: OPTS.lamp !== 'none' })); return arg('placed')!.split('/').map(e => { const [w, v] = e.split(':'), [y, z, rot, tilt, sc] = v!.split(',').map(Number), F = w === 'F';
+  const h = sk.hit([F ? -800 : 5200, y!, z!], [F ? 1 : -1, 0, 0], 8000)!, p: Placed = { id: F ? 'plateF' : 'plateR', at: h.at!, rot: rot ?? 0, tilt: tilt ?? 0, scale: sc ?? 1 }, f = fitPlate(sk, p);
+  console.log(`${p.id} at y ${y} z ${z}: ${f?.ok ? 'ok' : f?.why}, bracket ${f?.gap.toFixed(0)} mm`); return p; }); })() : undefined;
+const MODEL = p959Model({ ...OPTS, ...(PLACED ? { placed: PLACED } : {}) }), S = MODEL.shell, NN = MODEL.normals;
 // plates=<a,b,...>: a sheet of number plates face on (two columns), instead of the car
 const PLATES = arg('plates')?.split(','), M = PLATES ? (() => { const b = new Build(); PLATES.forEach((t, k) => plate(b, { name: 'plate', o: [0, (k % 2 ? -1 : 1) * 200, 420 - Math.floor(k / 2) * 215], n: [-1, 0, 0], w: 335, h: 170 }, /^\d+$/.test(t) ? plateText(+t) : plateText(t))); return b.mesh(0); })() : MODEL.mesh, shellTris = PLATES ? 0 : MODEL.shellTris;
 // mirror=0 to draw the file's own axes; by default the car is drawn as the game draws it (+y on the left of the heading,

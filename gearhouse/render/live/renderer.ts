@@ -25,10 +25,12 @@ import type { VolumeSmoke } from './volume/volume';
 export interface LiveView { x: number; y: number; z: number; /** the world heading that points up the screen */ ang: number; pitch: number; mm: number; W: number; H: number; /** the target's height on the screen (0 top .. 1 bottom) */ cy: number;
   /** a perspective camera instead (the drive's chase, bonnet and cabin views): the eye, the vertical field of view (degrees), the
    *  near plane (m); turned by ang and tilted by pitch as the orthographic one, x, y, z then only where the shadows and the props gather */
-  eye?: [number, number, number]; fov?: number; near?: number }
+  eye?: [number, number, number]; fov?: number; near?: number;
+  /** the drift style's ink thinned near the eye (docs/systems/118 D1, the cockpit's view): within this many metres the outline and the lines narrow with the distance, to a third at the eye (0: off) */ inkNear?: number }
 /** a tyre's shape this moment (review 101): its ring's give at 32 angles from straight down toward the front (m), the patch's shift (m, along and across) */
 export interface LiveTyre { u: Float32Array; sx: number; sy: number }
-export interface LiveCar { /** age: rust, fading, dirt (0..1) (review 104) */ wear?: [number, number, number]; /** FL FR RL RR */ tyres?: LiveTyre[]; g: GpuMesh; x: number; y: number; z: number; yaw: number; roll: number; pitch: number; /** each front wheel's own angle (rad, left +): the inner one more */ steerL: number; steerR: number; spin: number; player: boolean; /** head lamps alight 0..1, brakes on (review 117) */ lamps?: number; brake?: boolean; /** the crank's angle (degrees, 0..720): an engine's insides posed (the workshop's cutaway) */ crank?: number; /** each wheel's rise against the body (m) and lean (rad, top to the left +): the suspension's travel (review 120) */ travel?: number[]; camber?: number[]; /** a cabin's readings, in its rig's order (render/car/interior/gauges.ts stepDials); none: the needles at rest */ dials?: ArrayLike<number> | null }
+export interface LiveCar { /** age: rust, fading, dirt (0..1) (review 104) */ wear?: [number, number, number]; /** FL FR RL RR */ tyres?: LiveTyre[]; g: GpuMesh; x: number; y: number; z: number; yaw: number; roll: number; pitch: number; /** each front wheel's own angle (rad, left +): the inner one more */ steerL: number; steerR: number; spin: number; player: boolean; /** head lamps alight 0..1, brakes on (review 117) */ lamps?: number; brake?: boolean; /** the crank's angle (degrees, 0..720): an engine's insides posed (the workshop's cutaway) */ crank?: number; /** each wheel's rise against the body (m) and lean (rad, top to the left +): the suspension's travel (review 120) */ travel?: number[]; camber?: number[]; /** a cabin's readings, in its rig's order (render/car/interior/gauges.ts stepDials); none: the needles at rest */ dials?: ArrayLike<number> | null;
+  /** a cabin's bones already posed (render/car/interior/rig.ts poseCabin: the needles, the wheel, the driver and the controls); used in place of `dials` */ cabin?: Float32Array | null }
 export interface LiveProp { g: GpuMesh; x: number; y: number; z: number; h: number; /** its own placing (else by x, y, z, h), its outline's width, a name to follow it frame to frame (a moving piece) */ m?: M4; outline?: number; key?: string }
 /** the drift-game style's switches (look 4, docs/systems/109 §5): the inverted hull's outline and the drawn lines
  *  (default on), the outline pass filling the gaps (default on); their widths (px at 1080 high: STYLE), the picture's
@@ -180,6 +182,7 @@ const OBJ_VS = `#version 300 es
 layout(location=0) in vec3 aPos; layout(location=1) in vec3 aNor; layout(location=2) in vec3 aCol; layout(location=3) in float aGloss; layout(location=4) in float aKind; layout(location=5) in float aPart; layout(location=6) in vec3 aSmo; layout(location=7) in vec4 aLamp; layout(location=8) in vec3 aLAx; layout(location=9) in vec3 aLRt; layout(location=10) in float aBone; out vec4 vLamp; flat out vec3 vLAx, vLRt, vLUp;
 /* the drift-game style's layers (look 4, docs/systems/109 §5): the inverted hull's normal and the part's share of the outline; the normal smoothed per surface; the atlas's coordinates. uHull: the hull's width (px; 0: an ordinary draw), uVpx the picture's size */
 layout(location=11) in vec4 aHull; layout(location=12) in vec3 aSurf; layout(location=13) in vec3 aAtl; uniform float uHull; uniform vec2 uVpx; out vec3 vFS, vAtl; flat out float vHS;
+uniform vec4 uInkNear;   /* the eye (xyz) and the distance (w, m) within which the ink thins toward the eye (0: off) */
 uniform mat4 uVP, uModel, uPrevVP, uPrevModel; uniform float uBias; out vec3 vSN;   // the smoothed normal (review 116; none where a piece has no such layer)
 out vec4 vCur, vPrev;   // where this point is now and was a frame ago (the velocity layer, review 112)
 uniform int uWheel; uniform float uSpin, uDef[32], uTyreR, uRim; uniform vec2 uShift; uniform vec4 uBone[${BONE_SLOTS * 3}];   // the suspension's or the engine's bones (uWheel 2): three rows each
@@ -201,7 +204,8 @@ void main() { vec3 p = aPos, nr = aNor, ns = dot(aSmo, aSmo) > 0.25 ? aSmo : aNo
   /* the inverted hull (look 4): each corner pushed out along its hull normal by uHull pixels times its part's share, the
      push measured on the screen (the normal's way there, normalised), so the outline keeps its width near and far */
   if (uHull > 0.) { vec3 hw = mat3(uModel) * hn; if (dot(hw, hw) > 1e-12 && aHull.w > 0.) { vec4 c1 = uVP * vec4(w.xyz + normalize(hw) * 0.05, 1.); vec2 d = (c1.xy / c1.w - gl_Position.xy / gl_Position.w) * uVpx; float L = length(d);
-    if (L > 1e-5) gl_Position.xy += d / L * uHull * aHull.w * 2. / uVpx * gl_Position.w; } }
+    float kn = uInkNear.w > 0. ? clamp(length(w.xyz - uInkNear.xyz) / uInkNear.w, 0.33, 1.) : 1.;
+    if (L > 1e-5) gl_Position.xy += d / L * uHull * aHull.w * kn * 2. / uVpx * gl_Position.w; } }
   gl_Position.z -= uBias * gl_Position.w; }`;
 const OBJ_FS = `#version 300 es
 precision highp float;
@@ -595,11 +599,11 @@ precision mediump float; out vec4 o; void main() { o = vec4(1.); }`;
 //      by that part's bone. The edge a pixel soft ----
 const LINE_VS = `#version 300 es
 layout(location=0) in vec3 aP; layout(location=1) in vec3 aQ; layout(location=2) in vec2 aS; layout(location=3) in float aBone;
-uniform mat4 uVP, uModel; uniform vec2 uVpx; uniform float uW, uLift; uniform int uSkin; uniform vec4 uBone[${BONE_SLOTS * 3}]; uniform vec3 uEyeD; uniform vec4 uCamP; out float vD; flat out float vH;
+uniform mat4 uVP, uModel; uniform vec2 uVpx; uniform float uW, uLift; uniform int uSkin; uniform vec4 uBone[${BONE_SLOTS * 3}]; uniform vec3 uEyeD; uniform vec4 uCamP, uInkNear; out float vD; flat out float vH;
 vec3 posed(vec3 p) { if (uSkin == 0) return p; int b = int(aBone + 0.5) * 3; vec4 q = vec4(p, 1.); return vec3(dot(uBone[b], q), dot(uBone[b + 1], q), dot(uBone[b + 2], q)); }
 void main() { vec3 wp = (uModel * vec4(posed(aP), 1.)).xyz, wq = (uModel * vec4(posed(aQ), 1.)).xyz, e = uCamP.w > 0.5 ? normalize(uCamP.xyz - wp) : uEyeD;
   vec4 cp = uVP * vec4(wp + e * uLift, 1.), cq = uVP * vec4(wq + e * uLift, 1.); vec2 d = (cq.xy / max(cq.w, 1e-4) - cp.xy / cp.w) * uVpx; float L = length(d); d = L > 1e-5 ? d / L : vec2(1., 0.);
-  float hw = uW * aS.y * 0.5, h = hw + 0.5; vec2 off = vec2(-d.y, d.x) * aS.x * h - d * h;
+  float hw = uW * aS.y * 0.5 * (uInkNear.w > 0. ? clamp(length(wp - uInkNear.xyz) / uInkNear.w, 0.33, 1.) : 1.), h = hw + 0.5; vec2 off = vec2(-d.y, d.x) * aS.x * h - d * h;
   gl_Position = cp; gl_Position.xy += off * 2. / uVpx * cp.w; vD = aS.x * h; vH = hw; }`;
 const LINE_FS = `#version 300 es
 precision highp float; in float vD; flat in float vH; uniform vec3 uInk; layout(location=0) out vec4 oCol;
@@ -1107,17 +1111,19 @@ export class LiveRenderer {
   private styleInk(v: LiveView, cars: LiveCar[], carM: { body: M4; opaque: Piece[] }[], carIds: number[], VP: Float32Array, st: LiveStyle, ink: [number, number, number], ty: number,
     eyeTo: (p: WebGLProgram) => void, draw: (part: { vao: WebGLVertexArrayObject; n: number }, M: M4, w?: WheelDraw, key?: string, bones?: Float32Array) => void) { const gl = this.gl, dpr = st.dpr ?? 1;
     const det = (m: M4) => m[0]! * (m[5]! * m[10]! - m[6]! * m[9]!) - m[4]! * (m[1]! * m[10]! - m[2]! * m[9]!) + m[8]! * (m[1]! * m[6]! - m[2]! * m[5]!);
-    if (st.outline !== false) { gl.uniform1i(this.loc(this.obj, 'uMode'), 3); gl.uniform1f(this.loc(this.obj, 'uHull'), screenPx((st.outPx ?? STYLE.outlinePx) * lineWeight.k, v.H, dpr)); gl.enable(gl.CULL_FACE);
+    const inkNear = (p: WebGLProgram) => gl.uniform4f(this.loc(p, 'uInkNear'), v.eye?.[0] ?? 0, v.eye?.[1] ?? 0, v.eye?.[2] ?? 0, v.eye && v.inkNear ? v.inkNear : 0);
+    if (st.outline !== false) { gl.uniform1i(this.loc(this.obj, 'uMode'), 3); gl.uniform1f(this.loc(this.obj, 'uHull'), screenPx((st.outPx ?? STYLE.outlinePx) * lineWeight.k, v.H, dpr)); inkNear(this.obj); gl.enable(gl.CULL_FACE);
       cars.forEach((q, i) => { const cid = carIds[i]!; gl.uniform2f(this.loc(this.obj, 'uObj'), (cid & 255) / 255, ((cid >> 8) & 255) / 255);
         for (const [part, M, w, b] of carM[i]!.opaque) { gl.cullFace(det(M) < 0 ? gl.BACK : gl.FRONT); draw(part, M, w, undefined, b); } });   /* a mirrored placing turns the winding over: cull what then faces the eye */
-      gl.disable(gl.CULL_FACE); gl.uniform1f(this.loc(this.obj, 'uHull'), 0); gl.uniform1i(this.loc(this.obj, 'uMode'), 0); }
-    if (st.lines === false) return; const P = this.lineP; gl.useProgram(P); gl.uniformMatrix4fv(this.loc(P, 'uVP'), false, VP); gl.uniform2f(this.loc(P, 'uVpx'), v.W, v.H); gl.uniform3fv(this.loc(P, 'uInk'), ink); eyeTo(P);
+      gl.disable(gl.CULL_FACE); gl.uniform1f(this.loc(this.obj, 'uHull'), 0); gl.uniform1i(this.loc(this.obj, 'uMode'), 0); gl.uniform4f(this.loc(this.obj, 'uInkNear'), 0, 0, 0, 0); }
+    if (st.lines === false) return; const P = this.lineP; gl.useProgram(P); gl.uniformMatrix4fv(this.loc(P, 'uVP'), false, VP); gl.uniform2f(this.loc(P, 'uVpx'), v.W, v.H); gl.uniform3fv(this.loc(P, 'uInk'), ink); eyeTo(P); inkNear(P);
     gl.uniform1f(this.loc(P, 'uW'), screenPx((st.linePx ?? STYLE.linePx) * lineWeight.k, v.H, dpr)); gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false); gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.NONE, gl.NONE, gl.NONE]);
-    cars.forEach((q, i) => { const L = styleLines(gl, q.g), m = carM[i]!; if (!L.body && !L.susp) return;
+    cars.forEach((q, i) => { const L = styleLines(gl, q.g), m = carM[i]!; if (!L.body && !L.susp && !L.cabin) return;
       const wpp = v.eye && ty ? 2 * Math.hypot(q.x - v.eye[0], q.y - v.eye[1], q.z - v.eye[2]) * ty / v.H : v.mm / 1000; gl.uniform1f(this.loc(P, 'uLift'), Math.max(STYLE.lift, Math.min(0.03, wpp * 1.5)));   /* a pixel and a half toward the eye, at least 4 mm */
       gl.uniformMatrix4fv(this.loc(P, 'uModel'), false, m.body);
       if (L.body) { gl.uniform1i(this.loc(P, 'uSkin'), 0); gl.bindVertexArray(L.body.vao); gl.drawArrays(gl.TRIANGLES, 0, L.body.n); }
-      const sp = q.g.susp ? m.opaque.find(x => x[0] === q.g.susp!.part) : undefined; if (L.susp && sp?.[3]) { gl.uniform1i(this.loc(P, 'uSkin'), 1); gl.uniform4fv(this.loc(P, 'uBone'), sp[3]); gl.bindVertexArray(L.susp.vao); gl.drawArrays(gl.TRIANGLES, 0, L.susp.n); } });
+      const sp = q.g.susp ? m.opaque.find(x => x[0] === q.g.susp!.part) : undefined; if (L.susp && sp?.[3]) { gl.uniform1i(this.loc(P, 'uSkin'), 1); gl.uniform4fv(this.loc(P, 'uBone'), sp[3]); gl.bindVertexArray(L.susp.vao); gl.drawArrays(gl.TRIANGLES, 0, L.susp.n); }
+      const cp = q.g.dials ? m.opaque.find(x => x[0] === q.g.dials!.part) : undefined; if (L.cabin && cp?.[3]) { gl.uniform1i(this.loc(P, 'uSkin'), 1); gl.uniform4fv(this.loc(P, 'uBone'), cp[3]); gl.bindVertexArray(L.cabin.vao); gl.drawArrays(gl.TRIANGLES, 0, L.cabin.n); } });
     gl.disable(gl.BLEND); gl.depthMask(true); gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.COLOR_ATTACHMENT1, gl.COLOR_ATTACHMENT2, gl.COLOR_ATTACHMENT3]); gl.useProgram(this.obj); }
   /** a car's pieces with their matrices: the body on its springs (rolled and pitched about its middle), each wheel at its
    *  hub, turned on its axle and the front ones steered */
@@ -1129,7 +1135,7 @@ export class LiveRenderer {
     // bones in one draw, each wheel where its upright carries it (the camber and the toe are the linkage's own)
     const pose = g.susp ? poseRig(g.susp.rig, (q.travel ?? [0, 0, 0, 0]).map(t => t * 1000), q.steerL, q.steerR, q.spin) : null; if (pose) opaque.push([g.susp!.part, body, undefined, pose.bones]);
     if (g.inner) opaque.push([g.inner.part, body, undefined, poseInternals(g.inner.rig, q.crank ?? 0)]);   // an engine's insides at the crank's angle, on their bones in one draw
-    if (g.dials) opaque.push([g.dials.part, body, undefined, poseDials(g.dials.rig, q.dials, new Float32Array(BONE_SLOTS * 12))]);   // a cabin's needles at their readings (and its steering wheel), on their bones in one draw
+    if (g.dials) opaque.push([g.dials.part, body, undefined, q.cabin ?? poseDials(g.dials.rig, q.dials, new Float32Array(BONE_SLOTS * 12))]);   // a cabin's needles at their readings (and its steering wheel), on their bones in one draw
     for (const w of g.wheels) { const left = w.hub[1] > 0, wi = (w.front ? 0 : 2) + (left ? 0 : 1), pw = pose?.wheels[wi];
       const M = pw ? mul(body, mul(translate(w.hub[0] + pw.wc[0] - pw.from[0], w.hub[1] + pw.wc[1] - pw.from[1], w.hub[2] + pw.wc[2] - pw.from[2]), m4of(pw.R))) : mul(body, mul(translate(w.hub[0], w.hub[1], w.hub[2] + (q.travel?.[wi] ?? 0) * 1000), mul(w.front ? rot('z', -(left ? q.steerL : q.steerR)) : translate(0, 0, 0), rot('x', -(q.camber?.[wi] ?? 0)))));
       const ty = q.tyres?.[(w.front ? 0 : 2) + (left ? 0 : 1)], def = new Float32Array(32); if (ty) for (let k = 0; k < 32; k++) def[k] = ty.u[k]! * 1000;

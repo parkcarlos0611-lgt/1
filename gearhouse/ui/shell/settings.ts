@@ -2,7 +2,8 @@
 // drive page's drawer (its graphics, its sound, the controls) with the screen's (the theme, motion) and kept in this
 // browser. Pure: the storage is passed in, and one that throws or holds rubbish reads as the defaults. Also the save as
 // a whole: every key of the game's carried out as one file, read back, or cleared.
-import { CAM_DEFAULT, isCamView, type CamView } from '../drivecam';
+import { CAM_DEFAULT, CABIN_FOV, isCamView, type CamView } from '../drivecam';
+import type { HeadMove } from '../../render/car/interior/rig';
 import type { SmokeSetting } from '../../render/live/volume/caps';
 import type { SpeedFx } from '../../render/live/trails';
 import { DEFAULT_PALETTE, paletteOf, type PaletteId } from '../kit/tokens';
@@ -41,7 +42,9 @@ export interface Settings {
     /** 시대 잠금 풀기 (alpha 0.2, docs/systems/115 §2-5): the 2000s' hyper rungs (H1-H3) open in the builder's class pick */ eraOpen: boolean;
     /** alpha 0.13 (M4): the developers' physics switch: the kinematic suspension (race/kin.ts) or the rules before it */ physics: 'kinematic' | 'old' };
   /** the drive's camera (alpha 0.12, ui/drivecam.ts): the view last chosen, by the C key, its button or the pause menu */
-  camera: { view: CamView };
+  camera: { view: CamView;
+    /** the cockpit's view (docs/systems/118 D1): 운전석 시야 (vertical degrees, 50..75), 머리 움직임 (the head's sway: 끔, 아주 약하게, 약하게, 보통), the HUD's steering wheel drawn in that view as well (off: hidden, the real wheel is in sight) */
+    fov: number; head: HeadMove; hudWheel: boolean };
 }
 export const SETTINGS_KEY = 'gearhouse.settings.v1';
 export const DEFAULTS: Settings = {
@@ -50,7 +53,7 @@ export const DEFAULTS: Settings = {
   controls: { touch: 'auto', auto: true, tcs: true, assist: false, progressive: false, ignition: 'direct', stall: true, hudSize: 1, hudAlpha: 0.92, leftHand: false, shifter: 'lever' },
   screen: { theme: 'auto', calm: false, palette: DEFAULT_PALETTE },
   sandbox: { eraLimit: false, eraOpen: false, physics: 'kinematic' },
-  camera: { view: CAM_DEFAULT },
+  camera: { view: CAM_DEFAULT, fov: CABIN_FOV.def, head: 'subtle', hudWheel: false },
 };
 
 const obj = (v: unknown): Record<string, unknown> => v && typeof v === 'object' && !Array.isArray(v) ? v as Record<string, unknown> : {};
@@ -67,7 +70,7 @@ export function asSettings(v: unknown): Settings { const o = obj(v), g = obj(o.g
       ignition: one(c.ignition, ['direct', 'auto'] as const, D.controls.ignition), stall: bool(c.stall, D.controls.stall),
       hudSize: within(c.hudSize, 0.7, 1.4, D.controls.hudSize), hudAlpha: within(c.hudAlpha, 0.35, 1, D.controls.hudAlpha), leftHand: bool(c.leftHand, D.controls.leftHand), shifter: one(c.shifter, ['lever', 'buttons'] as const, D.controls.shifter) },
     screen: { theme: one(sc.theme, ['auto', 'light', 'dark'] as const, D.screen.theme), calm: bool(sc.calm, D.screen.calm), palette: paletteOf(sc.palette) },
-    sandbox: { eraLimit: bool(sb.eraLimit, D.sandbox.eraLimit), eraOpen: bool(sb.eraOpen, D.sandbox.eraOpen), physics: one(sb.physics, ['kinematic', 'old'] as const, D.sandbox.physics) }, camera: { view: isCamView(cm.view) ? cm.view : D.camera.view } }; }
+    sandbox: { eraLimit: bool(sb.eraLimit, D.sandbox.eraLimit), eraOpen: bool(sb.eraOpen, D.sandbox.eraOpen), physics: one(sb.physics, ['kinematic', 'old'] as const, D.sandbox.physics) }, camera: { view: isCamView(cm.view) ? cm.view : D.camera.view, fov: Math.round(within(cm.fov, CABIN_FOV.min, CABIN_FOV.max, D.camera.fov)), head: one(cm.head, ['off', 'subtle', 'weak', 'normal'] as const, D.camera.head), hudWheel: bool(cm.hudWheel, D.camera.hudWheel) } }; }
 export function loadSettings(st: KeyStore | null): Settings { try { const t = st?.getItem(SETTINGS_KEY); return asSettings(t ? JSON.parse(t) : null); } catch { return asSettings(null); } }
 /** kept; false when the storage keeps nothing */
 export function saveSettings(st: KeyStore | null, s: Settings): boolean { try { if (!st) return false; st.setItem(SETTINGS_KEY, JSON.stringify(s)); return true; } catch { return false; } }

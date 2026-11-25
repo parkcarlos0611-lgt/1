@@ -101,7 +101,7 @@ function splitTyres(M: Mesh, tris: number[], hub: [number, number, number]): Mes
 }
 /** a mesh on the GPU: the body, each road wheel apart (to steer and turn it about its hub), the glass apart (drawn last),
  *  and its decals as pictures */
-export interface GpuMesh { len: number; body: Part; glass: Part; wheels: { part: Part; glass: Part | null; hub: [number, number, number]; front: boolean; /** the tyre's outer and inner radius (mm) */ R: number; rim: number }[]; decals: Decal[]; decalTex: WebGLTexture | null; /** the suspension's moving parts apart, each corner with its bone, and the rig that poses them (render/car/suspension) */ susp?: { part: Part; rig: SuspRig }; /** an engine's moving insides (the workshop's cutaway), each part on its bone */ inner?: { part: Part; rig: EngineRig }; /** a cabin's needles and steering wheel (render/car/interior), each on its bone, and the rig that poses them from the drive's state */ dials?: { part: Part; rig: DialRig }; radius: number; height: number; width: number; /** its lamps (review 117) */ lamps: LampAt[]; /** the drift-game style's drawn lines, made when first drawn (styleLines) */ lines?: { body: LinePart | null; susp: LinePart | null } }
+export interface GpuMesh { len: number; body: Part; glass: Part; wheels: { part: Part; glass: Part | null; hub: [number, number, number]; front: boolean; /** the tyre's outer and inner radius (mm) */ R: number; rim: number }[]; decals: Decal[]; decalTex: WebGLTexture | null; /** the suspension's moving parts apart, each corner with its bone, and the rig that poses them (render/car/suspension) */ susp?: { part: Part; rig: SuspRig }; /** an engine's moving insides (the workshop's cutaway), each part on its bone */ inner?: { part: Part; rig: EngineRig }; /** a cabin's needles and steering wheel (render/car/interior), each on its bone, and the rig that poses them from the drive's state */ dials?: { part: Part; rig: DialRig }; radius: number; height: number; width: number; /** its lamps (review 117) */ lamps: LampAt[]; /** the drift-game style's drawn lines, made when first drawn (styleLines) */ lines?: { body: LinePart | null; susp: LinePart | null; cabin?: LinePart | null } }
 const GLASS = KINDS.indexOf('glass'), SHINE = KINDS.indexOf('shine'), TYRE = KINDS.indexOf('tyre'), LENS = KINDS.indexOf('lens');
 export function gpuMesh(gl: WebGL2RenderingContext, M: Mesh, wheels = true): GpuMesh {
   const W = wheels ? wheelsOf(M) : [], inWheel = new Int32Array(M.n).fill(-1); W.forEach((w, k) => { for (const t of w.tris) inWheel[t] = k; });
@@ -159,8 +159,9 @@ function linePart(gl: WebGL2RenderingContext, lines: { pts: V[]; closed?: boolea
   gl.bindVertexArray(null); return { vao, n: L.n, bufs }; }
 /** a mesh's drawn lines on the GPU (made once): its own (Mesh.lines) or, without them, those found at its body's hard
  *  edges; a line on a suspension part on that part's bone (the wheels carry none) */
-export function styleLines(gl: WebGL2RenderingContext, g: GpuMesh): { body: LinePart | null; susp: LinePart | null } {
+export function styleLines(gl: WebGL2RenderingContext, g: GpuMesh): { body: LinePart | null; susp: LinePart | null; cabin?: LinePart | null } {
   if (g.lines) return g.lines; const M = g.body.src?.M; if (!M) return g.lines = { body: null, susp: null };
-  const own = [...(M.lines?.length ? M.lines : hardEdgeLines(M, { tris: g.body.src!.tris })), ...(M.partLines ?? [])], rig = g.susp?.rig, body: typeof own = [], susp: (typeof own[number] & { bone: number })[] = [];
-  for (const l of own) { const m = l.pts[Math.floor(l.pts.length / 2)]!, b = rig && l.part ? boneAt(rig, l.part, m[0], m[1]) : -1; if (b > 0) susp.push({ ...l, bone: b }); else body.push(l); }
-  return g.lines = { body: linePart(gl, body), susp: linePart(gl, susp) }; }
+  const own = [...(M.lines?.length ? M.lines : hardEdgeLines(M, { tris: g.body.src!.tris })), ...(M.partLines ?? [])], rig = g.susp?.rig, body: typeof own = [], susp: (typeof own[number] & { bone: number })[] = [], cabin: (typeof own[number] & { bone: number })[] = [];
+  for (const l of own) { if (l.bone && g.dials) { cabin.push({ ...l, bone: l.bone }); continue; }   /* a line on a cabin's bone (the driver's helmet: docs/systems/118) */
+    const m = l.pts[Math.floor(l.pts.length / 2)]!, b = rig && l.part ? boneAt(rig, l.part, m[0], m[1]) : -1; if (b > 0) susp.push({ ...l, bone: b }); else body.push(l); }
+  return g.lines = { body: linePart(gl, body), susp: linePart(gl, susp), cabin: linePart(gl, cabin) }; }

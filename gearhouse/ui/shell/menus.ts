@@ -8,7 +8,7 @@ import { slideIn, stagger, statBar, badge } from '../kit/parts';
 import { STATS } from '../kit/logic';
 import { PALETTES, PALETTE_IDS } from '../kit/tokens';
 import { buildSheet } from '../kit/sheet';
-import { CAM_VIEWS, type CamView } from '../drivecam';
+import { CAM_VIEWS, CABIN_FOV, type CamView } from '../drivecam';
 import { saveSettings, exportAll, importAll, resetAll, loadSettings, DEFAULTS, type Settings } from './settings';
 import { VERSION_NAME, CHANGES } from '../../core/version';
 import type { BodyBase, Design } from '../../core/design';
@@ -154,7 +154,11 @@ export function settingsScreen(ctx: ShellCtx): Screen<never> {
       group('주행 보조', 'wheel', toggle('자동 변속', S().controls.auto, v => set(s => { s.controls.auto = v; })), toggle('트랙션 보조 (키보드용)', S().controls.tcs, v => set(s => { s.controls.tcs = v; })),
         toggle('카운터스티어 보조', S().controls.assist, v => set(s => { s.controls.assist = v; })), toggle('가속 게이지 모드 (오래 누를수록 차오름)', S().controls.progressive, v => set(s => { s.controls.progressive = v; }))),
       group('시동과 카메라', 'engine', chips('시동', [['direct', '직접 시동 (I/Enter 길게)'], ['auto', '자동 시동']], S().controls.ignition, v => set(s => { s.controls.ignition = v; })), toggle('시동 꺼짐 (수동 변속, 직접 시동)', S().controls.stall, v => set(s => { s.controls.stall = v; })),
-        chips('주행 카메라 (주행 중 C로 바꿈)', CAM_VIEWS.map(c => [c.id, c.name] as [CamView, string]), S().camera.view, v => set(s => { s.camera.view = v; }))),
+        chips('주행 카메라 (주행 중 C로 바꿈)', CAM_VIEWS.map(c => [c.id, c.name] as [CamView, string]), S().camera.view, v => set(s => { s.camera.view = v; })),
+        // docs/systems/118 D1: the cockpit's view
+        slider('운전석 시야 (세로 각도)', [CABIN_FOV.min, CABIN_FOV.max, 1], S().camera.fov, v => set(s => { s.camera.fov = v; }), v => `${Math.round(v)}°`),
+        chips('머리 움직임 (운전석 시점)', [['off', '끔'], ['subtle', '아주 약하게'], ['weak', '약하게'], ['normal', '보통']], S().camera.head, v => set(s => { s.camera.head = v; })),
+        toggle('운전석 시점에서도 화면 핸들 그림 보이기', S().camera.hudWheel, v => set(s => { s.camera.hudWheel = v; }), '끄면 실제 핸들이 보이므로 핸들 그림을 숨깁니다 (터치 핸들은 그대로)')),
       group('키와 패드', 'info', el('p', 'gh-note', '주행: ↑/W 가속 · ↓/S 브레이크 · ←→/A D 조향 · Space 핸드브레이크 · Q/E 기어 · M 자동/수동 · R 복귀 · C 시네마틱 · Esc 일시정지. 메뉴: 화살표, Enter, Esc (게임패드의 십자키, A, B도 됩니다).')));
     const scr = pane(
       group('색과 밝기', 'spray', chips('화면 색 (팔레트)', PALETTE_IDS.map(id => [id, PALETTES[id].name] as [typeof id, string]), S().screen.palette, v => set(s => { s.screen.palette = v; })),

@@ -98,6 +98,17 @@ export interface CamShot { eye: [number, number, number]; /** heading up the pic
   /** the point the shadows gather round */ at: [number, number, number] }
 /** the chase rigs: distance behind the car's middle beyond its half length, height over its foot, the base vertical
  *  field of view, how quickly the heading and the height follow (rad/s), where the car sits on the picture */
+/** the cockpit's field of view setting (vertical degrees) */
+export const CABIN_FOV = { min: 50, max: 75, def: 60 } as const;
+/** the driver's head as the cockpit's camera takes it (docs/systems/118 D1): the eye where the rig posed it (mesh mm: x
+ *  back from the nose, y left, z up), the head's turn (left +) and nod (forward +), rad */
+export interface CabinHead { eye: [number, number, number]; yaw: number; pitch: number }
+/** a point of the car's mesh (mm) in the world as the renderer places the body: rolled and pitched about the mesh's
+ *  middle at its foot, then set on the car's place and heading (render/live/renderer.ts carParts, gpu.ts placeMesh) */
+export function meshToWorld(c: CamCar, len: number, p: readonly [number, number, number]): [number, number, number] {
+  const d0 = p[0] - len / 2, cp = Math.cos(c.pitch), sp = Math.sin(c.pitch), cr = Math.cos(c.roll), sr = Math.sin(c.roll);
+  const x1 = cp * d0 + sp * p[2], z1 = -sp * d0 + cp * p[2], y2 = cr * p[1] - sr * z1, z2 = sr * p[1] + cr * z1, mx = x1 + len / 2, ch = Math.cos(c.yaw), sh = Math.sin(c.yaw);
+  return [c.x + (ch * len / 2 - ch * mx - sh * y2) / 1000, c.y + (sh * len / 2 - sh * mx + ch * y2) / 1000, c.z + z2 / 1000]; }
 export const RIGS = { far: { back: 6.2, up: 2.45, fov: 62, wYaw: 3.0, wZ: 3.6, carY: 0.64 }, near: { back: 3.4, up: 1.6, fov: 66, wYaw: 4.2, wZ: 4.8, carY: 0.68 } } as const;
 export class DriveCam {
   yaw = 0; yawV = 0; z = 0; zV = 0; dist = 0; distV = 0; fov = 62; fovV = 0; /** a drag's turn round the car (rad), and its tilt (deg) */ orbit = 0; tilt = 0; private held = 0;
@@ -106,15 +117,17 @@ export class DriveCam {
   reset() { this.fresh = true; }
   /** a drag on the picture: turn round the car and tilt; let go, it comes back after a moment */
   drag(dx: number, dy: number) { this.orbit = Math.max(-Math.PI, Math.min(Math.PI, this.orbit - dx * 0.008)); this.tilt = Math.max(-8, Math.min(25, this.tilt + dy * 0.12)); this.held = 1.2; }
-  step(view: CamView, c: CamCar, E: CarEyes, ground: (x: number, y: number) => number, aspect: number, dt: number, carY?: number): CamShot {
+  /** the cockpit's vertical field of view (degrees, the setting 운전석 시야: 50..75) */ cabinFov = CABIN_FOV.def;
+  step(view: CamView, c: CamCar, E: CarEyes, ground: (x: number, y: number) => number, aspect: number, dt: number, carY?: number, head?: CabinHead): CamShot {
     const L = E.len / 1000, fw = Math.min(1, c.speed / 55);   // fw: how fast, 0 standing .. 1 about 200 km/h
     const heading = c.speed > 2 ? Math.atan2(c.vy, c.vx) : c.yaw;
     if (this.held > 0) this.held -= dt; else { this.orbit *= Math.exp(-2.5 * dt); this.tilt *= Math.exp(-2.5 * dt); }
+    if (view === 'cabin' && E.seat) return this.cockpit(c, E, aspect, head);
     if (view === 'hood' || view === 'cabin') {   // on the car: its heading, a little of its pitch and roll's swing
-      const [ex, ez] = view === 'cabin' && E.seat ? [E.seat[0], E.seat[2]] : E.hood, ey = view === 'cabin' && E.seat ? E.seat[1] : 0, f = (E.len / 2 - ex) / 1000, s = ey / 1000, ch = Math.cos(c.yaw), sh = Math.sin(c.yaw);
-      const eye: [number, number, number] = [c.x + ch * f - sh * s, c.y + sh * f + ch * s, c.z + ez / 1000]; this.fresh = true;
-      const fov = (view === 'cabin' ? 70 : 64) + 6 * fw, tv = fovTan(aspect, fov);
-      return { eye, ang: c.yaw + this.orbit, pitch: (view === 'cabin' ? 7 : 4.5) - c.pitch * 180 / Math.PI * 0.5 + this.tilt, fov: Math.atan(tv) * 360 / Math.PI, near: 0.06, at: [c.x + ch * 25, c.y + sh * 25, c.z] }; }
+      const [ex, ez] = E.hood, f = (E.len / 2 - ex) / 1000, ch = Math.cos(c.yaw), sh = Math.sin(c.yaw);
+      const eye: [number, number, number] = [c.x + ch * f, c.y + sh * f, c.z + ez / 1000]; this.fresh = true;
+      const fov = 64 + 6 * fw, tv = fovTan(aspect, fov);
+      return { eye, ang: c.yaw + this.orbit, pitch: 4.5 - c.pitch * 180 / Math.PI * 0.5 + this.tilt, fov: Math.atan(tv) * 360 / Math.PI, near: 0.06, at: [c.x + ch * 25, c.y + sh * 25, c.z] }; }
     const R = view === 'near' ? RIGS.near : RIGS.far;
     // the heading: where the car goes, a little ahead into a turn (by the yaw rate), followed on a spring
     const lead = Math.max(-0.32, Math.min(0.32, c.r * 0.22)), want = heading + lead;
@@ -129,4 +142,10 @@ export class DriveCam {
     const tv = fovTan(aspect, this.fov), drop = this.z - (c.z + 0.55);
     const pitch = aimPitch(drop, this.dist, tv, carY ?? R.carY) + this.tilt;
     return { eye: [ex, ey, this.z], ang: a, pitch, fov: Math.atan(tv) * 360 / Math.PI, near: 0.6, at: [c.x + Math.cos(a) * 30, c.y + Math.sin(a) * 30, c.z] }; }
+  /** the driver's own eye (docs/systems/118 D1): in the head the rig posed (else the seat's), carried with the body's roll
+   *  and pitch, looking where the head turns; the field of view the setting's; the near plane 5 cm so the dash is whole */
+  private cockpit(c: CamCar, E: CarEyes, aspect: number, head?: CabinHead): CamShot { this.fresh = true;
+    const p = head?.eye ?? E.seat!, eye = meshToWorld(c, E.len, p), ang = c.yaw + this.orbit + (head?.yaw ?? 0), tv = fovTan(aspect, Math.max(CABIN_FOV.min, Math.min(CABIN_FOV.max, this.cabinFov)));
+    const pitch = 6 - c.pitch * 180 / Math.PI * 0.85 + (head?.pitch ?? 0) * 180 / Math.PI + this.tilt;   /* the head keeps a little of the horizon against the body's pitch */
+    return { eye, ang, pitch, fov: Math.atan(tv) * 360 / Math.PI, near: 0.05, at: [c.x + Math.cos(c.yaw) * 25, c.y + Math.sin(c.yaw) * 25, c.z] }; }
 }

@@ -52,7 +52,7 @@ import { DIM, frameOf } from './frame';
  *  cage's ring that subdivides onto it, the flare's width, and the wheel's rim as it is seen (the flange, not the seat) */
 export const V3 = { archR: 350, ringR: 355, flare: 30, rimR: 232, rows: 31, cols: 18, front: 14 } as const;
 /** the second cage's column each of this cage's columns takes behind the cowl (between two: laid between them) */
-const OLD_COL = [0, 1, 1.3, 1.6, 1.85, 2, 3, 3.5, 4, 5, 6, 7, 7.5, 8, 9, 10, 11, 12], OLD_ROW0 = 10;
+const OLD_COL = [0, 1, 1.25, 1.5, 1.75, 2, 3, 3.5, 4, 5, 6, 7, 7.5, 8, 9, 10, 11, 12], OLD_ROW0 = 10;
 /** the columns by name */
 const CREST = 6, MID = 7, SHO = 8, BELT = 9, SIDE = 10, WAIST = 11, FLARE = 12, RING = 13, LOW = 14;
 

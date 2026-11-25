@@ -46,7 +46,7 @@ export function emitShellFine(b: Build, S: Shell959, paint: string, normals?: nu
       const along = (i: number): Pt[] => { const a = corner(i), c = corner(i + 1), n = cnt[i]!; return Array.from({ length: n + 1 }, (_, j) => j === 0 ? a : j === n ? c : { p: mix(a.p, c.p, j / n), n: unit(mix(a.n, c.n, j / n)) }); };
       if (cnt.every(n => n === 1)) { let T = cut(P, f); const bad = (U: [number, number, number][]) => Math.min(...U.map(t => minAngle(P[t[0]]!, P[t[1]]!, P[t[2]]!)));
         // a whole quad as the shell cuts it, unless that leaves a thin triangle and the other diagonal does not
-        if (nc === 4 && bad(T) < 5) { const [q0, q1, q2, q3] = f as [number, number, number, number], U: [number, number, number][] = T[0]!.includes(q0) && T[0]!.includes(q2) ? [[q1, q2, q3], [q1, q3, q0]] : [[q0, q1, q2], [q0, q2, q3]]; if (bad(U) > bad(T)) T = U; }
+        if (nc === 4 && bad(T) < 8) { const [q0, q1, q2, q3] = f as [number, number, number, number], U: [number, number, number][] = T[0]!.includes(q0) && T[0]!.includes(q2) ? [[q1, q2, q3], [q1, q3, q0]] : [[q0, q1, q2], [q0, q2, q3]]; if (bad(U) > bad(T)) T = U; }
         for (const t of T) { const [x, y, z] = t.map(v => corner(f.indexOf(v))) as [Pt, Pt, Pt]; tri(x, y, z, k); } continue; }
       // candidates: two rails side by side where the other two sides are whole (the triangles step along whichever
       // rail is behind), and a fan round the middle; the one whose worst angle is the larger is laid

@@ -6,8 +6,8 @@ import type { Panel } from '../p959/check';
 
 export const N33_PANELS: Panel[] = [
   { name: 'bonnet middle', rows: [5, 12], cols: [0, 1] },
-  { name: 'bonnet flank', rows: [5, 12], cols: [2, 4], across: 1, why: 'the foot of the ramp down from the raised middle (a drawn line)' },
-  { name: 'wingF top', rows: [5, 11], cols: [6, 8] },
+  { name: 'bonnet flank', rows: [5, 12], cols: [2, 4], across: 1, along: 1, why: 'the foot of the ramp down from the raised middle (a drawn line); along it, the wheelbase\'s stretch begins under the bonnet\'s back corners' },
+  { name: 'wingF top', rows: [5, 11], cols: [6, 8], along: 1, why: 'the wheelbase\'s stretch begins under the wing\'s back' },
   { name: 'wingF side', rows: [6, 11], cols: [9, 11] },
   { name: 'roof', rows: [18, 23], cols: [0, 5] },
   { name: 'door', rows: [14, 21], cols: [9, 14] },

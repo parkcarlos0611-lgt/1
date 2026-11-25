@@ -8,6 +8,7 @@ import { pieceSpan } from '../race/scenery';
 import { edgeLayout, edgeAt, roadGrid } from '../race/trackside';
 import { Collider, SURFACE } from '../race/collide';
 import { millbrook } from '../race/millbrook';
+import { Driver } from '../race/driver';
 
 // docs/systems/111 T1 and T3: the tracks cleared to the road and the woods, a real circuit's edge, and what it does to a car
 const flat = new Track({ name: 'flat', pieces: [{ kind: 'straight', len: 3000, name: 'a' }, { kind: 'arc', radius: 300, turn: 180, name: 'b' }, { kind: 'straight', len: 3000, name: 'c' }, { kind: 'arc', radius: 300, turn: 180, name: 'd' }], start: { x: 0, y: 0, heading: 0 }, width: 14, easing: 30, banking: [], bumps: [], landmarks: [], joints: 10 });
@@ -44,5 +45,10 @@ describe('collisions (T3)', () => {
   it('slows a car in a gravel trap far quicker than on the painted run-off', () => {
     const run = (sf: typeof SURFACE.gravel) => { const car = new Vehicle(raceSpec('dueSSJ35'), flat).place(300, -12, 30); car.surface = () => sf; for (let t = 0; t < 2; t += dt) car.step(dt, none); return car.speed; };
     expect(run(SURFACE.gravel)).toBeLessThan(run(SURFACE.paint) - 12);
+  });
+  it('lets the test driver lap Ashcombe Park among the barriers, striking none', () => {
+    const D = trackDef('road'), T = D.make(), Co = Collider.of(T, D.scenery(T)), car = Co.equip(new Vehicle(raceSpec('dueSSJ35'), T).place(16, 0, 0)), d = new Driver(T); let t = 0, dist = 0, prev = car.s;
+    while (dist < T.length + 50 && t < 300) { car.step(dt, d.drive(car)); t += dt; dist += T.gap(prev, car.s); prev = car.s; }
+    expect(dist).toBeGreaterThan(T.length); expect(car.hits.length).toBe(0);
   });
 });

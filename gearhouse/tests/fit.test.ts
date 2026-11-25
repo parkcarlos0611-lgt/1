@@ -35,7 +35,7 @@ describe('the fit: the verdicts', () => {
     expect(mod.patch.body!.wheelbase!).toBeLessThan(wb.patch.body!.wheelbase!); expect(part(m, 'bayLength').mass).toBeGreaterThan(0);
     // the same engine across the NSX's bay: its crank fits across, its gearbox cannot sit at its end (the Miura's arrangement)
     const across = tweak(DESIGN_NSX, d => { d.engine.layout = 'V12'; d.engine.cc = 5700; d.engine.vtec = false; });
-    expect(part(across, 'gearboxPlace').verdict).toBe('modified'); expect(part(across, 'gearboxPlace').reason).toContain('미우라');
+    expect(part(across, 'gearboxPlace').verdict).toBe('modified'); expect(part(across, 'gearboxPlace').reason).toContain('가로 V12 미드십');
     expect(part(DESIGN_NSX, 'gearboxPlace').verdict).toBe('ok'); expect(part(tweak(DESIGN_NSX, d => { d.engine.layout = 'V8'; d.engine.cc = 3500; }), 'gearboxPlace').verdict).toBe('ok');
     expect(part(DESIGN_F355, 'gearboxPlace')).toBeUndefined();
     // a wide engine (four turbos) across the bay of a narrowed body; a tall one under the lid
@@ -77,7 +77,7 @@ describe('the fit: the fixes and the figures', () => {
   it('a base swap offered for an engine the bay will not take', () => {
     const d = tweak(DESIGN_NSX, e => { e.engine.layout = 'V12'; e.engine.cc = 8000; e.engine.turbo = 4; e.engine.grade = 3; e.engine.vtec = false; e.body.width = -40; });
     expect(fitVerdict(fit(d))).toBe('blocked'); const swap = fit(d).flatMap(r => r.fixes).find(f => f.patch.body?.base === 'f355')!; expect(BASES).toContain('f355');
-    expect(swap.label).toMatch(/^F355 바탕 \(세로 엔진룸\)/); expect(fit(applyPatch(d, swap.patch)).filter(r => r.part.startsWith('bay')).every(r => r.verdict === 'ok')).toBe(true);
+    expect(swap.label).toMatch(/^옛 바탕 B \(세로 엔진룸\)/); expect(fit(applyPatch(d, swap.patch)).filter(r => r.part.startsWith('bay')).every(r => r.verdict === 'ok')).toBe(true);
   });
   it('a modified part\'s work adds its mass, its cost and its drag to the figures, and takes from the reliability', () => {
     const ok = tweak(DESIGN_NSX, d => { d.kit.tyres = [245, 225]; }), mod = tweak(DESIGN_NSX, d => { d.kit.tyres = [250, 225]; });

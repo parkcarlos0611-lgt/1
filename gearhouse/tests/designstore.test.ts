@@ -25,7 +25,7 @@ describe('a design in a link', () => {
     expect(d.kit.tyres).toEqual([LIMITS.tyre[1], DESIGN_F355.kit.tyres[1]]); expect(d.id).toMatch(/^[\w-]+$/); });
   it('a file round trip; a preset copy is its own design that drives the same', () => {
     expect(parseDesign(designJson(DESIGN_NSX))).toEqual(DESIGN_NSX);
-    const p = fromPreset('nsx'); expect(p.id).not.toBe('nsx'); expect(p.name).toContain('NSX'); expect(designSig(p)).toBe(designSig(DESIGN_NSX)); expect(fromPreset('nsx').id).not.toBe(p.id); });
+    const p = fromPreset('nsx'); expect(p.id).not.toBe('nsx'); expect(p.name).toContain('옛 바탕 A'); expect(designSig(p)).toBe(designSig(DESIGN_NSX)); expect(fromPreset('nsx').id).not.toBe(p.id); });
 });
 
 describe('the saved designs', () => {
@@ -50,10 +50,10 @@ describe('the measurements', () => {
 });
 
 /** the two cars as format 1 wrote them (saved designs and links from before review 177) */
-const V1_NSX: DesignV1 = { v: 1, id: 'nsx', name: 'NSX', body: { base: 'nsx', nose: 'round', front: 'plain', tail: 'frame', wheel: 'fiveSpoke', wheelbase: 0, width: 0, paint: '#b0121b', gloss: 0.6, material: 'aluminium' },
+const V1_NSX: DesignV1 = { v: 1, id: 'nsx', name: '옛 바탕 A', body: { base: 'nsx', nose: 'round', front: 'plain', tail: 'frame', wheel: 'fiveSpoke', wheelbase: 0, width: 0, paint: '#b0121b', gloss: 0.6, material: 'aluminium' },
   engine: { layout: 'V6', cc: 2977, valves: 4, redline: 8000, turbo: 0, vtec: true }, drive: { gears: 5, gearbox: 'manual', final: 4.062, lsd: true, awd: false },
   kit: { abs: true, tcs: true, steering: 'manual', dampers: 'fixed', wing: false, diffuser: false, tyres: [205, 225], rim: 16 } };
-const V1_F355: DesignV1 = { v: 1, id: 'f355', name: 'F355', body: { base: 'f355', nose: 'pointed', front: 'sunk', tail: 'ducktail', wheel: 'star', wheelbase: 0, width: 0, paint: '#f5c300', gloss: 0.6, material: 'steel' },
+const V1_F355: DesignV1 = { v: 1, id: 'f355', name: '옛 바탕 B', body: { base: 'f355', nose: 'pointed', front: 'sunk', tail: 'ducktail', wheel: 'star', wheelbase: 0, width: 0, paint: '#f5c300', gloss: 0.6, material: 'steel' },
   engine: { layout: 'V8', cc: 3496, valves: 5, redline: 8500, turbo: 0, vtec: false }, drive: { gears: 6, gearbox: 'manual', final: 4.1, lsd: true, awd: false },
   kit: { abs: true, tcs: false, steering: 'hydraulic', dampers: 'adaptive', wing: false, diffuser: true, tyres: [225, 265], rim: 18 } };
 const v1Link = (d: unknown) => { const bytes = new TextEncoder().encode(JSON.stringify(d)); let bin = ''; for (const b of bytes) bin += String.fromCharCode(b); return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); };

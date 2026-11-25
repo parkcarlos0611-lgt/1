@@ -24,7 +24,7 @@ describe('the enabled bodies', () => {
     expect(recentEnabled(s).id).toBe('p959stock'); expect(savedDesigns(s).map(d => d.id)).toEqual([old.id]);
     const mine = fromPreset('p959', '내 959'); saveDesign(s, mine);
     expect(recentEnabled(s).id).toBe(mine.id); keepCurrent(s, mine); expect(recentEnabled(s).id).toBe(mine.id);
-    expect(stockP959().body.model?.plate).toBe('08루 0959');
+    expect(stockP959().body.model?.plate).toBe('08루 0599');
   });
 });
 

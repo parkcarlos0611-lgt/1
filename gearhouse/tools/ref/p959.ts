@@ -20,9 +20,9 @@ export function png(path: string, w: number, h: number, rgb: Uint8Array) { const
 //      car and between its parts, the drawn lines on top), with the shell's own normals. Drawn at twice the size and halved.
 type V3 = [number, number, number];
 const FORM = process.argv.includes('form');   // continuous shading, to judge the forms (the default is the game's two tones)
-// variants (docs/systems/109 S3): lamp=round|ellipsoid|square wheel=hollow5|dish|hole5 bf=std|aero|clean br=std|aero|clean; at=x,y,z: the picture's centre; only=<view,...>
+// variants (docs/systems/109 S3): lamp=round|ellipsoid|square wheel=hollow5|dish|hole5 bf=std|aero|clean br=std|aero|clean; noplate=f|r|fr (plates off); at=x,y,z: the picture's centre; only=<view,...>
 const arg = (k: string) => process.argv.find(a => a.startsWith(k + '='))?.slice(k.length + 1), AT = (arg('at') ?? '2130,0,600').split(',').map(Number) as V3, ONLY = arg('only')?.split(',');
-const MODEL = p959Model({ lamp: arg('lamp') as never, wheel: arg('wheel') as never, bumperF: arg('bf') as never, bumperR: arg('br') as never, plate: arg('plate') ? plateText(arg('plate')!) : undefined }), S = MODEL.shell, NN = MODEL.normals;
+const MODEL = p959Model({ lamp: arg('lamp') as never, wheel: arg('wheel') as never, bumperF: arg('bf') as never, bumperR: arg('br') as never, plate: arg('plate') ? plateText(arg('plate')!) : undefined, plateF: !arg('noplate')?.includes('f'), plateR: !arg('noplate')?.includes('r') }), S = MODEL.shell, NN = MODEL.normals;
 // plates=<a,b,...>: a sheet of number plates face on (two columns), instead of the car
 const PLATES = arg('plates')?.split(','), M = PLATES ? (() => { const b = new Build(); PLATES.forEach((t, k) => plate(b, { name: 'plate', o: [0, (k % 2 ? -1 : 1) * 200, 420 - Math.floor(k / 2) * 215], n: [-1, 0, 0], w: 335, h: 170 }, /^\d+$/.test(t) ? plateText(+t) : plateText(t))); return b.mesh(0); })() : MODEL.mesh, shellTris = PLATES ? 0 : MODEL.shellTris;
 // mirror=0 to draw the file's own axes; by default the car is drawn as the game draws it (+y on the left of the heading,

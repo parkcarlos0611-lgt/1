@@ -18,6 +18,7 @@ export const BANNED: readonly string[] = [
   'Auburn', '오번', 'Duesenberg', '듀센버그', 'Napier', '네이피어', 'Railton', 'Ford', '포드', 'Chevrolet', '쉐보레', 'Plymouth', 'Pontiac', 'Dodge',
   'Willys', 'Buick', 'Bentley', '벤틀리', 'Rolls', '롤스', 'BMW', 'Peugeot', '푸조', 'Yamaha', '야마하', 'VTEC', 'C30A', 'Oldsmobile', 'Lotus',
   'Cosworth', 'Lancia', 'Maserati', 'Aston', 'Toyota', 'Nissan', 'Mazda', 'Subaru', 'Audi', 'Volkswagen', 'Fiat', 'Alfa Romeo'];
-/** the banned names a text holds (none: an empty list); Latin names are matched as whole words, any letter case */
+/** the banned names a text holds (none: an empty list); Latin names are matched as whole words in their own letter case
+ *  (so the code's lower-case ids, 'nsx' or 'f355', are not names on a screen) */
 export function bannedIn(text: string): string[] {
-  return BANNED.filter(w => /^[\x20-\x7e]+$/.test(w) ? new RegExp(`(^|[^A-Za-z0-9])${w.replace(/ /g, '\\s+')}($|[^A-Za-z0-9])`, 'i').test(text) : text.includes(w)); }
+  return BANNED.filter(w => /^[\x20-\x7e]+$/.test(w) ? new RegExp(`(^|[^A-Za-z0-9_])${w.replace(/ /g, '\\s+')}($|[^A-Za-z0-9_])`).test(text) : text.includes(w)); }

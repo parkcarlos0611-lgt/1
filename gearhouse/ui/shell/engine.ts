@@ -233,7 +233,7 @@ export function engineScreen(ctx: ShellCtx): Screen<EngineParams> & { readonly a
   // ---- the cutaway's bar: the speed, the crank (a V8's), the hand's slider, the angle and the order, each cylinder's stroke ----
   const SPEEDS: [Speed, string][] = [['real', '실제 속도'], ['10', '1/10'], ['50', '1/50'], ['manual', '한 사이클 수동']];
   const speedBtns = SPEEDS.map(([k, t]) => { const b = button(t, () => { cut.speed = k; syncCut(); }); b.dataset.speed = k; b.classList.add('gk-sm'); return b; });
-  const crankBtns = (['flat', 'cross'] as const).map(k => { const b = button(k === 'flat' ? '평면 크랭크' : '십자 크랭크', () => { cut.crank = k; cut.model = null; syncCut(); dirty = true; }); b.dataset.crank = k; b.classList.add('gk-sm'); b.title = k === 'flat' ? '평면(180°): 핀이 0°와 180°, 두 뱅크가 번갈아 점화 (F355)' : '십자(90°): 핀이 90°씩, 한 뱅크가 두 번 잇달아 점화하는 곳이 있음 (특유의 두근거림)'; return b; });
+  const crankBtns = (['flat', 'cross'] as const).map(k => { const b = button(k === 'flat' ? '평면 크랭크' : '십자 크랭크', () => { cut.crank = k; cut.model = null; syncCut(); dirty = true; }); b.dataset.crank = k; b.classList.add('gk-sm'); b.title = k === 'flat' ? '평면(180°): 핀이 0°와 180°, 두 뱅크가 번갈아 점화 (고회전 V8)' : '십자(90°): 핀이 90°씩, 한 뱅크가 두 번 잇달아 점화하는 곳이 있음 (특유의 두근거림)'; return b; });
   const crankRow = el('span', 'gh-row2', ...crankBtns);
   const hand = el('input', 'gh-slider'); hand.type = 'range'; hand.min = '0'; hand.max = '720'; hand.step = '1'; hand.value = '0'; hand.setAttribute('aria-label', '크랭크 각도 (한 사이클 0~720°)'); hand.id = 'gh-crank';
   hand.addEventListener('input', () => { cut.theta = +hand.value; dirty = true; });

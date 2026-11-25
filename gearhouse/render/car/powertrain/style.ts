@@ -33,7 +33,7 @@ export const DRIFT_RULES: Record<PartKind, KindRule> = {
   exhaust: { scale: 1.1, minPx: 16, bevel: 0, seg: 0 },    // under the floor and into the body's own tips: little thicker than true
   runner: { scale: 1.3, minPx: 18, bevel: 0, seg: 5 },
   header: { scale: 1.45, minPx: 16, bevel: 0, seg: 12 },
-  hose: { scale: 1.5, minPx: 14, bevel: 0, seg: 6 },
+  hose: { scale: 1.5, minPx: 14, bevel: 0, seg: 5 },
   line: { scale: 1.5, minPx: 9, bevel: 0, seg: 4 },
   belt: { scale: 1.4, minPx: 10, bevel: 0, seg: 0 },
   link: { scale: 1.6, minPx: 8, bevel: 0, seg: 6 },
@@ -81,8 +81,8 @@ export const DRIFT_PALETTE = {
   pipeBoost: P('#f2c12e', 0.4), pipeWater: P('#2f6fd6', 0.4), pipeAlu: P('#dfe2e6', 0.45), pipeExhaust: P('#a9aeb5', 0.4), exhaustHot: P('#b0835f', 0.35), coupler: P('#2456c8', 0.3),
   hose: P('#202124', 0.15), capRed: P('#dc2a1f', 0.4), capYellow: P('#f4cc1f', 0.4), capBlue: P('#2a63d4', 0.4), capBlack: P('#1a1b1d', 0.3),
   plasticWhite: P('#f0efe8', 0.3), plasticBlack: P('#232427', 0.2), core: P('#9aa0a8', 0.3), coreDark: P('#5b6068', 0.25), filter: P('#d5301f', 0.25), filterBlue: P('#2456c8', 0.35),
-  gold: P('#d6a531', 0.4), shroud: P('#ee5a1c', 0.4), red: P('#d8281e', 0.4), battery: P('#1c1d20', 0.25), batteryTop: P('#34363b', 0.2), terminalPlus: P('#dc2a1f', 0.4), terminalMinus: P('#2b2d31', 0.4),
-  frame: P('#2b2d31', 0.25), tub: P('#151618', 0.12), tubLip: P('#222326', 0.15), lamp: P('#3a3d42', 0.3), brace: P('#e3e5e8', 0.5), tank: P('#3a3d42', 0.3), shield: P('#cfd2d6', 0.4),
+  gold: P('#d6a531', 0.4), ownDark: P('#5d626b', 0.25), shroud: P('#ee5a1c', 0.4), red: P('#d8281e', 0.4), battery: P('#1c1d20', 0.25), batteryTop: P('#34363b', 0.2), terminalPlus: P('#dc2a1f', 0.4), terminalMinus: P('#2b2d31', 0.4),
+  frame: P('#2b2d31', 0.25), tub: P('#22252a', 0.12), tubLip: P('#3a3e45', 0.15), lamp: P('#3a3d42', 0.3), brace: P('#e3e5e8', 0.5), tank: P('#3a3d42', 0.3), shield: P('#cfd2d6', 0.4),
   // the suspension and the brakes (the caliper's is the one a player chooses: red, yellow, green, orange, blue, purple, black)
   arm: P('#2a2c30', 0.3), upright: P('#b7bbc1', 0.3), caliper: P('#d8281e', 0.5, 'paint'), disc: P('#c9ccd1', 0.45), discHole: P('#3a3c40', 0.2), discBell: P('#4a4d53', 0.3),
   spring: P('#e8c21e', 0.4, 'paint'), damper: P('#3b6fd0', 0.35), rod: P('#e3e5e8', 0.5), bush: P('#17181a', 0.1),
@@ -112,11 +112,13 @@ export const DRIFT_PAINT: Record<string, (PaletteRole | null)[]> = {
 };
 
 /** the drift look as a collector takes it: the rules, the palette, the parts' roles */
-export interface DriftStyle { rules: Record<PartKind, KindRule>; palette: Palette; paint: Record<string, (PaletteRole | null)[]>; kinds: Record<string, PartKind> }
+/** the engine's own colours (its covers, its intake: the roles left null) are kept, but one darker than this (0..1, by its brightest channel) is lifted to `ownDark`: a black crinkle cover would vanish against the bay's black tub */
+export const OWN_DARK = { under: 0.2, to: 'ownDark' as const };
+export interface DriftStyle { /** an own colour's least brightness (0: none lifted) */ ownDark: number; rules: Record<PartKind, KindRule>; palette: Palette; paint: Record<string, (PaletteRole | null)[]>; kinds: Record<string, PartKind> }
 /** the drift look, with what a customisation changes laid over the standard */
 export function driftStyle(over: { palette?: Partial<Palette>; rules?: Partial<Record<PartKind, Partial<KindRule>>>; paint?: Record<string, (PaletteRole | null)[]> } = {}): DriftStyle {
   const rules = { ...DRIFT_RULES }; for (const k of Object.keys(over.rules ?? {}) as PartKind[]) rules[k] = { ...rules[k], ...over.rules![k] };
-  return { rules, palette: { ...DRIFT_PALETTE, ...over.palette }, paint: { ...DRIFT_PAINT, ...over.paint }, kinds: PART_KIND }; }
+  return { ownDark: OWN_DARK.under, rules, palette: { ...DRIFT_PALETTE, ...over.palette }, paint: { ...DRIFT_PAINT, ...over.paint }, kinds: PART_KIND }; }
 /** what a builder is asked for as a collector's style: 'real' (or the setting's) none, 'drift' the standard, or a customised one */
 export type StyleOpt = PartStyle | DriftStyle;
 export const resolveStyle = (s?: StyleOpt): DriftStyle | null => { const v = s ?? current; return v === 'real' ? null : v === 'drift' ? driftStyle() : v; };

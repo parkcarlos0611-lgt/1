@@ -283,6 +283,9 @@ vec3 frLight(vec3 c, vec3 n, vec3 l, float sh, float ao, vec3 p) { float t = max
   vec3 sunT = mix(vec3(1., 0.62, 0.42), vec3(1., 0.985, 0.95), smoothstep(0.2, 0.8, uDay)), lit = c * sunT * (0.2 + 0.8 * uDay) * (0.94 + 0.06 * uLightK);
   vec3 shade = (c * vec3(0.6, 0.63, 0.76) + vec3(0.01, 0.014, 0.03)) * (0.14 + 0.86 * uDay);   /* darker, a little bluer; a black part a dark blue-grey */
   return mix(shade, lit, b) + c * min(vec3(1.), lampsAt(p, n) * 0.12); }
+/** the machinery's plain parts (look 4, docs/systems/109 section 10): a third, brighter band where the light falls square, and a soft pale edge where a face turns away from the eye, so a big flat face is not one tone */
+vec3 frLight3(vec3 c, vec3 n, vec3 l, vec3 v, float sh, float ao, vec3 p) { vec3 col = frLight(c, n, l, sh, ao, p); float t = max(0., dot(n, l)) * sh, w = clamp(fwidth(t), 0.004, 0.08) + 0.03, hi = smoothstep(0.74 - w, 0.74 + w, t);
+  float rim = (1. - smoothstep(0.12, 0.42, abs(dot(n, v)))) * (0.45 + 0.55 * clamp(n.z, 0., 1.)); return col * (1. + 0.14 * hi) + (c * 0.45 + 0.1) * 0.3 * rim * (0.2 + 0.8 * uDay); }
 /** the one highlight: a small round spot where the sun mirrors, its edge a pixel */
 float frGloss(vec3 n, vec3 v, vec3 l, float sh, float g) { float nh = dot(n, normalize(l + v)), w = clamp(fwidth(nh), 0.001, 0.03), e = 0.9994 - 0.0008 * g; return smoothstep(e - w, e + w, nh) * step(0.5, sh) * (0.2 + 0.8 * uDay); }
 /** a lamp from the atlas (its face's own coordinates -1..1), lit when alight; the toon lamp where the atlas is off */
@@ -396,7 +399,7 @@ void main() { uEye = uCamP.w > 0.5 ? normalize(uCamP.xyz - vWorld) : uEyeD;
       vec4 at = atlasAt(vAtl); base = mix(base, at.rgb, at.a); vec3 col;
       if (kind == 9 && vLamp.z > 0.5) col = frLamp(vLamp.xy, vLamp.z);
       else if (metal > 0.5 && at.a < 0.5) col = toonChrome(base, fs, uEye, uSun, sh);
-      else { col = frLight(base, fs, uSun, sh, ao, vWorld); float g = kind == 1 ? coat : kind == 9 ? 1. : kind == 6 ? 0.3 : 0.; if (g > 0.05) col = mix(col, vec3(1.), frGloss(fs, uEye, uSun, sh, g)); }
+      else { col = kind == 0 ? frLight3(base, fs, uSun, uEye, sh, ao, vWorld) : frLight(base, fs, uSun, sh, ao, vWorld); float g = kind == 1 ? coat : kind == 9 ? 1. : kind == 6 ? 0.3 : 0.; if (g > 0.05) col = mix(col, vec3(1.), frGloss(fs, uEye, uSun, sh, g)); }
       oCol = vec4(clamp(col, 0., 1.), 1.); oId = vec4(uObj, vPart / 255., uOutline / 8.); oN = vec4(fs * 0.5 + 0.5, 0.); oV = velo(); return; }
     if (uLook == 3) {   /* toon: bands and coloured shade; paint's gloss as crisp white shapes; chrome a two-tone ramp; the cars rimmed with sky blue */
       vec3 col;

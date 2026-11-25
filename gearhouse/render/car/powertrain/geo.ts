@@ -46,7 +46,10 @@ export class Geo {
   /** what follows is this part, in this material (`as`: drawn by another kind's rule than the part's own) */
   part(name: string, col: string, gloss = 0.2, kind: Kind = 'plain', as?: PartKind): this {
     if (this.st) { let S = this.seen.get(name); if (!S) this.seen.set(name, S = []); let i = S.indexOf(col); if (i < 0) i = S.push(col) - 1;
-      const role = this.st.paint[name]?.[i], p = role ? this.st.palette[role] : null; if (p) { col = p.col; gloss = p.gloss; kind = p.kind; }
+      const role = this.st.paint[name]?.[i], roles = this.st.paint[name]; let p = role ? this.st.palette[role] : null;
+      // a colour of the engine's own that is near black: lifted to the palette's dark grey, so the part stands off the bay's black tub
+      if (!p && roles && i < roles.length && roles[i] === null) { const v = parseInt(col.replace('#', ''), 16); if (Math.max((v >> 16) & 255, (v >> 8) & 255, v & 255) / 255 < this.st.ownDark) p = { ...this.st.palette.ownDark, kind }; }
+      if (p) { col = p.col; gloss = p.gloss; kind = p.kind; }
       this.rule = this.st.rules[as ?? this.st.kinds[name] ?? 'casting']; }
     this.c = { name, col, gloss, kind, t: [] }; this.g.push(this.c); return this; }
   frame(f: ((p: V) => V) | null): this { this.xf = f; this.k = f ? len(sub(f([1, 0, 0]), f([0, 0, 0]))) || 1 : 1; return this; }

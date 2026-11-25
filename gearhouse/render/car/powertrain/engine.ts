@@ -142,9 +142,14 @@ export function buildEngine(g: Geo, S0: PowertrainSpec, det: Detail, transverse 
     g.part('exhaustManifold', tubular ? (S0.grade >= 3 ? BLUED : C.pipes) : '#4a4643', tubular ? 0.5 : 0.2, tubular ? 'metal' : 'plain');
     if (!tubular || det === 0 || (det === 1 && nb > 4)) g.obox(P(s, mid, hw + 0.35 * B, Hd * 0.75), [1, 0, 0], (cu1 - cu0) / 2, acr(s), 0.35 * B, ax(s), 0.3 * Hd);   // one casting
     else for (let i = 0; i < nb; i++) { const u = cylU(s, i), toward = mid - u, a = P(s, u, hw - 2, Hd + 0.4 * Hh), c = P(s, u + toward * 0.25, colX, colA);
-      if (dr && det === 2) g.bend(a, acr(s), c, mul(ax(s), -1), pipeR, S0.cylinders > 8 ? 4 : pseg, 3, 0.6);   /* the drift look: one smooth round bend out of the port and down into the collector */
+      if (dr && det === 2) g.bend(a, acr(s), c, mul(ax(s), -1), pipeR, S0.cylinders > 8 ? 4 : pseg, 3, 0.62);   /* the drift look: one smooth round bend out of the port and down into the collector */
       else if (det === 2) g.tube(nb > 4 ? [a, P(s, u + toward * 0.06, hw + 0.62 * B, Hd + 0.2 * Hh), c] : [a, P(s, u, hw + 0.5 * B, Hd + 0.25 * Hh), P(s, u + toward * 0.12, colX + 0.05 * B, colA + 0.55 * B), c], pipeR, nb > 4 ? 4 : pseg); else g.tube([a, c], pipeR, 4); }
-    if (det > 0) { g.part('exhaustManifold', tubular ? HOT : '#4a4643', 0.35, tubular ? 'metal' : 'plain').cyl(P(s, cu0, colX, colA), P(s, cu1, colX, colA), colR, 6, true);
+    if (dr && det === 2) { // the drift look: the collector a round log, its ends drawn in to a neck (the gas's way on), a weld's ring drawn where each header joins
+      const R = g.part('exhaustManifold', tubular ? HOT : '#4a4643', 0.35, tubular ? 'metal' : 'plain').rr(colR), L = cu1 - cu0;
+      g.lathe(P(s, cu0, colX, colA), [1, 0, 0], [[-0.12 * B, R * 0.5], [0.22 * B, R], [L - 0.22 * B, R], [L + 0.12 * B, R * 0.5]], S0.cylinders > 8 ? 8 : 12, true, ax(s));
+      if (tubular) for (let i = 0; i < nb; i++) { const u = cylU(s, i) + (mid - cylU(s, i)) * 0.25 + 0.34 * B; if (u > cu0 + 0.3 * B && u < cu1 - 0.3 * B) g.line('crease', Array.from({ length: 12 }, (_, j) => { const a = j / 12 * Math.PI * 2; return add(P(s, u, colX, colA), add(mul(acr(s), (R + 1.5) * Math.cos(a)), mul(ax(s), (R + 1.5) * Math.sin(a)))); }), true); } }
+    else if (det > 0) { g.part('exhaustManifold', tubular ? HOT : '#4a4643', 0.35, tubular ? 'metal' : 'plain').cyl(P(s, cu0, colX, colA), P(s, cu1, colX, colA), colR, 6, true); }
+    if (det > 0) {
       g.part('heatShield', SHIELD, 0.8, 'metal'); if (dr) bankBox(s, mid - 0.5 * B, mid + 0.5 * B, colX - 0.3 * B, colX + 0.3 * B, colA + 0.5 * B, colA + 0.56 * B);   /* the drift look: a small plate over the collector's middle, so the thick headers show */
       else bankBox(s, cu0 + 15, cu1 - 15, colX - 0.45 * B, colX + 0.45 * B, colA + 0.4 * B, colA + 0.46 * B); }
     // where the gas leaves the bank: with no turbo, the collector's end by the flange (straight back), or under its middle on an engine set across the car
@@ -247,7 +252,8 @@ export function buildEngine(g: Geo, S0: PowertrainSpec, det: Detail, transverse 
     g.part('oilFiller', '#d0c020', 0.4); { const c = P(1, cylU(1, nb - 1), twin ? 0.5 * B : 0, topA); g.cyl(c, add(c, mul(ax(1), 0.25 * B)), 0.28 * B, 6, true, [1, 0, 0]); }
     if (!dry) { g.part('dipstick', '#e2a21a', 0.4); const c = P(S[S.length - 1]!, cylU(S[S.length - 1]!, 0), hw + 0.2 * B, Hd * 0.9); g.bar(c, add(c, [0, 0, 0.35 * B]), 0.12 * B); } }
   // the drift look's hero on a flat engine: the cooling fan's big round shroud over the pulleys' end, its dark mouth and bright hub (a part of its own, only drawn in that look)
-  if (dr && S0.layout === 'flat' && det > 0) { const r = 1.3 * B, c: V = [ue + 0.4 * B, 0, plTop + 0.15 * B - r], n = det === 2 ? 14 : 8;
+  if (dr && S0.layout === 'flat' && det > 0) { // (its top a little over the intake's; with turbos under the charge pipe that comes round to the throttle, so no pipe crosses its face)
+    const top = turbos > 0 && tbAt.length ? Math.min(...tbAt.map(t => t[2])) - 0.5 * B : plTop + 0.15 * B, r = Math.min(1.3 * B, (top - floor + 0.1 * B) / 2), c: V = [ue + 0.4 * B, 0, top - r], n = det === 2 ? 14 : 8;
     g.part('fanShroud', '#ee5a1c', 0.4).lathe(c, [1, 0, 0], [[0, r], [0.5 * B, r], [0.62 * B, r * 0.86]], n, 'a');
     g.part('fanShroud', '#151517', 0.2).lathe(add(c, [0.62 * B, 0, 0]), [1, 0, 0], [[0, r * 0.86], [-0.2 * B, r * 0.8]], n, 'b');
     g.part('fanShroud', '#d9dce0', 0.45).lathe(add(c, [0.4 * B, 0, 0]), [1, 0, 0], [[0, r * 0.3], [0.3 * B, r * 0.22]], 8, 'b');

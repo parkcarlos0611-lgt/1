@@ -9,7 +9,7 @@ import { designKit, designPowertrain } from '../render/car/design';
 import { assemble, type Assembled } from '../render/car/kit/assemble';
 import { kitSite } from '../render/car/kit/parts/engine';
 import { powertrainMesh, fromDesign, setPartStyle, partStyle, styleForLook, driftStyle } from '../render/car/powertrain';
-import { DRIFT_RULES, DRIFT_PALETTE, DRIFT_PAINT, PART_KIND, CALIPER_COLOURS, kindOf, minDiameter, type PartKind } from '../render/car/powertrain/style';
+import { OWN_DARK, DRIFT_RULES, DRIFT_PALETTE, DRIFT_PAINT, PART_KIND, CALIPER_COLOURS, kindOf, minDiameter, type PartKind } from '../render/car/powertrain/style';
 import { Geo } from '../render/car/powertrain/geo';
 import { standModel, exploded, PART_INFO } from '../render/car/powertrain/stand';
 import { Build } from '../render/car/mesh';
@@ -81,7 +81,8 @@ describe('the powertrain in the drift look', () => {
     const cols = (M: ReturnType<typeof pt>['mesh'], name: string) => { const S = new Set<string>(); for (let t = 0; t < M.n; t++) if (M.names![M.part[t]!] === name) S.add([M.col[t * 3], M.col[t * 3 + 1], M.col[t * 3 + 2]].join()); return S; };
     const d = applyPatch(DESIGN_F355, { engine: { turbo: 2 } }), { kit, tweak } = designKit(d), S = designPowertrain(d), site = kitSite(kit, tweak), D = powertrainMesh(S, site, { style: 'drift' }).mesh;
     expect(cols(D, 'boostPipe')).toEqual(new Set([hex(DRIFT_PALETTE.pipeBoost.col).join(), hex(DRIFT_PALETTE.coupler.col).join()]));   // the pipe and its couplers' bands expect(cols(D, 'coolantPipe')).toEqual(new Set([hex(DRIFT_PALETTE.pipeWater.col).join()]));
-    expect(cols(D, 'expansionTank')).toEqual(new Set([hex(DRIFT_PALETTE.plasticWhite.col).join(), hex(DRIFT_PALETTE.capRed.col).join()])); expect(cols(D, 'camCover').has(hex(S.colours.covers).join())).toBe(true); expect(cols(D, 'engineBlock')).toEqual(new Set([hex(S.colours.block).join()]));
+    expect(cols(D, 'expansionTank')).toEqual(new Set([hex(DRIFT_PALETTE.plasticWhite.col).join(), hex(DRIFT_PALETTE.capRed.col).join()])); const dark = (h: string) => Math.max(...hex(h)) / 255 < OWN_DARK.under, own = (h: string) => hex(dark(h) ? DRIFT_PALETTE.ownDark.col : h).join();   // a near-black cover is lifted to the palette's dark grey
+    expect(cols(D, 'camCover').has(own(S.colours.covers))).toBe(true); expect(cols(D, 'bayTub').size).toBe(0); expect(cols(D, 'engineBlock')).toEqual(new Set([hex(S.colours.block).join()]));
     const C = powertrainMesh(S, site, { style: driftStyle({ palette: { pipeBoost: { col: '#22aa44', gloss: 0.4, kind: 'plain' } } }) }).mesh; expect(cols(C, 'boostPipe').has(hex('#22aa44').join())).toBe(true); expect(cols(C, 'boostPipe').has(hex(DRIFT_PALETTE.pipeBoost.col).join())).toBe(false);
     // every role named is in the palette, every part with a kind or a role is one the builders make or the stand names
     for (const [n, roles] of Object.entries(DRIFT_PAINT)) { expect(PART_KIND[n], n).toBeDefined(); for (const r of roles) if (r) expect(DRIFT_PALETTE[r], `${n}: ${r}`).toBeDefined(); }

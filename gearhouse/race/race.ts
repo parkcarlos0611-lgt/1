@@ -37,8 +37,9 @@ export function gapBetween(a: Pick<Entrant, 'trail' | 'dist' | 'finish'>, b: Pic
 
 export class Race {
   readonly cars: Entrant[] = []; clock = -5; done = false; readonly startS: number; readonly limitTime: number;
-  /** mode: 'handicap' (the limit first, scratch last, by the book) or 'scratch' (all at once from a grid in pairs, the slowest at the front) */
-  constructor(readonly track: Track, ids: string[], readonly laps: number, player: string | null, seed = 1, readonly mode: 'handicap' | 'scratch' = 'handicap', skill: Skill = 'normal') {
+  /** mode: 'handicap' (the limit first, scratch last, by the book) or 'scratch' (all at once from a grid in pairs, the slowest at the front);
+   *  drivers: an opponent's own dare and pace (a one-make field's, race/onemake.ts), else drawn from the skill's range */
+  constructor(readonly track: Track, ids: string[], readonly laps: number, player: string | null, seed = 1, readonly mode: 'handicap' | 'scratch' = 'handicap', skill: Skill = 'normal', drivers: Record<string, { dare: number; pace: number }> = {}) {
     this.startS = track.spec.landmarks.find(l => l.kind === 'line')!.s; const tk = track.spec.id ?? 'millbrook', bt = (id: string) => bookTime(id, laps, tk);
     this.limitTime = Math.max(...ids.map(bt));
     // across the line, each in its own place; the start each is given
@@ -47,7 +48,7 @@ export class Race {
     ids.forEach((id, k) => { const spec = raceSpec(id), car = new Vehicle(spec, track), at = order.indexOf(id);
       const grid = mode === 'scratch' ? (at % 2 ? 5 : -5) : -10 + k * (20 / Math.max(1, ids.length - 1)), back = mode === 'scratch' ? 6 + Math.floor(at / 2) * 9 : 6;
       car.place(this.startS - back, grid, 0);
-      const driver = id === player ? null : (() => { const dare = pick(K.dare), pace = pick(K.pace); return new Driver(track, dare, 3.0, pace); })();   // the draws in this order: 'normal' gives the field it always did
+      const driver = id === player ? null : (() => { const dare = pick(K.dare), pace = pick(K.pace), own = drivers[id]; return new Driver(track, own?.dare ?? dare, 3.0, own?.pace ?? pace); })();   // the draws in this order: 'normal' gives the field it always did
       this.cars.push({ id, name: spec.name, car, driver, start: mode === 'scratch' ? 0 : this.limitTime - bt(id), laps: 0, lapAt: [], finish: 0, dist: -back, prevS: car.s, stuck: 0, wheelTurn: 0, grid, trail: [] }); }); }   /* dist from the line: a back row starts behind it */
   get player(): Entrant | undefined { return this.cars.find(c => !c.driver); }
   /** the standings: each car in order, its lap (the one it is on, or done), its gap to the leader and to the car ahead */

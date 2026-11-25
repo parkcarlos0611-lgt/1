@@ -6,21 +6,23 @@
 // keyed out, shrunk two to one (smooth edges) and kept per part, view and pixel ratio. Without WebGL, or if a render
 // fails, the cards keep their drawn pictures (ui/builder_pics.ts).
 import type { Mesh, MeshLine, V } from '../render/car/mesh';
-import { p959Model, type P959Model } from '../render/car/p959';
+import { p959Model, P959_LUMP, type P959Model } from '../render/car/p959';
+import { interiorMesh, INTERIORS } from '../render/car/interior';
 import { freeGpu } from '../render/live/gpu';
 import { STYLE, screenPx, lineWeight } from '../render/live/style';
 import type { LiveRenderer } from '../render/live/renderer';
-import { BUMPERS959, LAMPS959, WHEELS959 } from '../core/design';
+import { BUMPERS_ALL, LAMPS959, WHEELS_ALL } from '../core/design';
 
 export type ThumbView = 'front' | 'side' | 'top';
-export type ThumbKind = 'bumperF' | 'bumperR' | 'lamp' | 'wheel' | 'base';
+/** the parts' kinds, and the builder's first steps' cards (docs/systems/115 F1): the lump, its glass sets, its interior sets */
+export type ThumbKind = 'bumperF' | 'bumperR' | 'lamp' | 'wheel' | 'base' | 'frame' | 'glass' | 'interior';
 export interface ThumbSpec { kind: ThumbKind; v: string }
 export const VIEWS: ThumbView[] = ['front', 'side', 'top'];
 export const VIEW_NAME: Record<ThumbView, string> = { front: '정면', side: '측면', top: '위' };
 /** the view rule: a part is seen from the way it faces out of the body. A part facing forward or back is seen head on
  *  (a rear part from behind), one facing sideways (a wheel, a side intake, a mirror, the body as a whole) from the left
  *  side, one facing up (a louvre, a bonnet duct) from above. A rear wing: from the side (its profile and its stands) */
-export const KIND_VIEW: Record<ThumbKind, ThumbView> = { bumperF: 'front', bumperR: 'front', lamp: 'front', wheel: 'side', base: 'side' };
+export const KIND_VIEW: Record<ThumbKind, ThumbView> = { bumperF: 'front', bumperR: 'front', lamp: 'front', wheel: 'side', base: 'side', frame: 'side', glass: 'side', interior: 'top' };
 /** the camera of a view: the heading the screen looks along (as LiveView's ang) and the tilt down (degrees). Front and
  *  side a little above the eye line, so a part's top shows as a sliver; the top view straight down, the nose up */
 export const PITCH = 8;
@@ -33,10 +35,19 @@ export function camera(kind: ThumbKind, view: ThumbView): { ang: number; pitch: 
 const BUMPER_F = new Set(['bumperF', 'indicatorF', 'ventF', 'intakeF', 'lipF']), BUMPER_R = new Set(['bumperR', 'ventR', 'diffuser', 'exhaustSlot']);
 const LAMP = new Set(['lampBezel', 'headLamp', 'lampReflector', 'lampRing']), WHEEL = /^(tyre|rim|wheel|hub)/;
 /** the variants of a kind, in the library's order */
-export const VARIANTS: Record<ThumbKind, readonly string[]> = { bumperF: BUMPERS959, bumperR: BUMPERS959, lamp: LAMPS959, wheel: WHEELS959, base: ['p959'] };
-/** the model a variant is cut from: the n-th of each list together (three builds give every swap; the first is the stock car) */
+export const VARIANTS: Record<ThumbKind, readonly string[]> = { bumperF: BUMPERS_ALL, bumperR: BUMPERS_ALL, lamp: LAMPS959, wheel: WHEELS_ALL, base: ['p959'], frame: ['A959'], glass: ['none', 'stock', 'noQuarter', 'louvre'], interior: ['stock', 'drift'] };
+/** the model a variant is cut from: the n-th of each list together (four builds give every swap; the first is the stock
+ *  car, the fourth the lump's blank bumper and steel wheel with the stock lamp) */
 export function modelIndex(s: ThumbSpec): number { return Math.max(0, VARIANTS[s.kind].indexOf(s.v)); }
-export function buildModel(i: number): P959Model { return p959Model({ bumperF: BUMPERS959[i], bumperR: BUMPERS959[i], lamp: LAMPS959[i], wheel: WHEELS959[i], brake: false }); }
+export function buildModel(i: number): P959Model { return p959Model({ bumperF: BUMPERS_ALL[i], bumperR: BUMPERS_ALL[i], lamp: LAMPS959[i], wheel: WHEELS_ALL[i], brake: false }); }
+/** the models of the first steps' cards: the lump; the lump with each glass set (none: the cabin in body colour); each
+ *  interior set alone (its cabin's parts, no driver) */
+const SETS = new Set<ThumbKind>(['frame', 'glass', 'interior']);
+export function buildSet(kind: ThumbKind, v: string): P959Model { if (kind === 'interior') { const mesh = interiorMesh({ ...INTERIORS[v as 'stock' | 'drift'], driver: false });
+    return { mesh, shell: undefined as never, normals: new Float32Array(0), shellTris: 0 }; }
+  return p959Model({ ...P959_LUMP, brake: false, ...(kind === 'glass' ? { glass: v === 'none' ? null : v as never } : {}) }); }
+/** the cache's key of a card's model: the parts' kinds share the four builds; each set's card has its own */
+const modelKey = (s: ThumbSpec) => SETS.has(s.kind) ? `${s.kind}|${s.v}` : `m|${modelIndex(s)}`;
 /** a line far under the ground (clipped off every view): a part that keeps none of the body's lines is not given lines
  *  found at its hard edges either, as on the car */
 const NO_LINE: MeshLine = { kind: 'trim', pts: [[0, 0, -1e5], [0, 10, -1e5]] };
@@ -45,7 +56,7 @@ export type Box = [V, V];
 /** the part alone: its triangles (a bumper is a region of the shell; the lamp and the wheel are the left front one of the
  *  modules hung after it), and the body's drawn lines and creases lying on it. `near`: a bumper's left half only (seen
  *  from the side, an open strip would show the inside of its far half through its near one) */
-export function isolate(md: P959Model, kind: ThumbKind, near = false): Mesh { const M = md.mesh; if (kind === 'base') return M;
+export function isolate(md: P959Model, kind: ThumbKind, near = false): Mesh { const M = md.mesh; if (kind === 'base' || SETS.has(kind)) return M;
   const nm = (t: number) => M.names?.[M.part[t]!] ?? '', cy = (t: number) => (M.pos[t * 9 + 1]! + M.pos[t * 9 + 4]! + M.pos[t * 9 + 7]!) / 3, cx = (t: number) => (M.pos[t * 9]! + M.pos[t * 9 + 3]! + M.pos[t * 9 + 6]!) / 3;
   const keep = (t: number) => kind === 'bumperF' ? t < md.shellTris && BUMPER_F.has(nm(t)) : kind === 'bumperR' ? t < md.shellTris && BUMPER_R.has(nm(t))
     : kind === 'lamp' ? t >= md.shellTris && LAMP.has(nm(t)) && cy(t) > 0 : t >= md.shellTris && WHEEL.test(nm(t)) && cy(t) > 0 && cx(t) < M.length / 2;
@@ -96,10 +107,10 @@ export function keyDown(px: Uint8Array, W: number, H: number, ss: number, ring =
   return out; }
 
 // ---- the cache and the queue (per page: the models, the parts, the pictures) ----
-const MODELS = new Map<number, P959Model>(), PARTS = new Map<string, Mesh>(), BOXES = new Map<ThumbKind, Box>(), PICS = new Map<string, string>();
+const MODELS = new Map<string, P959Model>(), PARTS = new Map<string, Mesh>(), BOXES = new Map<ThumbKind, Box>(), PICS = new Map<string, string>();
 /** a part as a view shows it: a bumper from the side its near half */
 export const nearHalf = (kind: ThumbKind, view: ThumbView) => view === 'side' && (kind === 'bumperF' || kind === 'bumperR');
-const partOf = (kind: ThumbKind, i: number, near = false): Mesh => { const k = `${kind}|${i}|${near}`; let m = PARTS.get(k); if (!m) { m = isolate(MODELS.get(i)!, kind, near); PARTS.set(k, m); } return m; };
+const partOf = (s: ThumbSpec, near = false): Mesh => { const k = `${s.kind}|${modelKey(s)}|${near}`; let m = PARTS.get(k); if (!m) { m = isolate(MODELS.get(modelKey(s))!, s.kind, near); PARTS.set(k, m); } return m; };
 /** the picture's size on the card (CSS px, 4:3: the card's picture plate) */
 export const PIC_W = 160, PIC_H = 120;
 const CSS = `.gk-card-pic.gk-has-thumb{position:relative}.gk-card-pic.gk-has-thumb>svg{visibility:hidden}
@@ -124,7 +135,7 @@ export function partThumbs(): PartThumbs {
   function shoot(L: LiveRenderer, cv: HTMLCanvasElement, s: ThumbSpec): string { const v = view.get(s.kind) ?? KIND_VIEW[s.kind], cam = camera(s.kind, v), r = dpr();
     let W = Math.round(PIC_W * r), H = Math.round(PIC_H * r), ss = 2; if (cv.width < W * ss || cv.height < H * ss) ss = 1;
     const k = Math.min(1, cv.width / (W * ss), cv.height / (H * ss)); W = Math.max(8, Math.floor(W * k)); H = Math.max(6, Math.floor(H * k));
-    const M = partOf(s.kind, modelIndex(s), nearHalf(s.kind, v)), f = fit(BOXES.get(s.kind)!, M.length, cam, W * ss, H * ss), gl = L.gl, g = L.car(M);
+    const M = partOf(s, nearHalf(s.kind, v)), f = fit(BOXES.get(s.kind)!, M.length, cam, W * ss, H * ss), gl = L.gl, g = L.car(M);
     try { L.render({ x: f.x, y: f.y, z: f.z, ang: cam.ang, pitch: cam.pitch, mm: f.mm, W: W * ss, H: H * ss, cy: 0.5 },
         [{ g, x: 0, y: 0, z: 0, yaw: 0, roll: 0, pitch: 0, steerL: 0, steerR: 0, spin: 0, player: false }], [], [],
         { look: 4, glass: 0.8, rays: false, bloomK: 0, dof: 0, sun: sunFor(cam), style: { dpr: r * ss } });
@@ -144,9 +155,9 @@ export function partThumbs(): PartThumbs {
       for (const [c, j] of due) { const u = PICS.get(key(j.spec)); if (u) { show(c, u); j.shown = key(j.spec); } }
       due = due.filter(([, j]) => j.shown !== key(j.spec)); if (!due.length) return false;
       // the models of the first kind due: one build a frame (about a tenth of a second each), then its framing from all of them
-      const kind = due[0]![1].spec.kind, n = VARIANTS[kind].length, need = kind === 'base' ? [0] : Array.from({ length: n }, (_, i) => i);
-      const miss = need.find(i => !MODELS.has(i)); if (miss !== undefined) { try { MODELS.set(miss, buildModel(miss)); } catch (e) { console.warn('part thumbnails', e); off = true; } return false; }
-      if (!BOXES.has(kind)) BOXES.set(kind, need.map(i => meshBox(partOf(kind, i))).reduce(union));
+      const kind = due[0]![1].spec.kind, specs: ThumbSpec[] = (kind === 'base' ? ['p959'] : VARIANTS[kind]).map(v => ({ kind, v }));
+      const miss = specs.find(sp => !MODELS.has(modelKey(sp))); if (miss) { try { MODELS.set(modelKey(miss), SETS.has(kind) ? buildSet(kind, miss.v) : buildModel(modelIndex(miss))); } catch (e) { console.warn('part thumbnails', e); off = true; } return false; }
+      if (!BOXES.has(kind)) BOXES.set(kind, specs.map(sp => meshBox(partOf(sp))).filter(b => Number.isFinite(b[0][0])).reduce(union));
       const t0 = performance.now(), scene = L.takeScene(); let drew = false;
       try { for (const [c, j] of due) { if (j.spec.kind !== kind) continue; const k = key(j.spec); let u = PICS.get(k);
           if (!u) { if (performance.now() - t0 > 30 && drew) break; u = shoot(L, cv, j.spec); drew = true; PICS.set(k, u); } show(c, u); j.shown = k; } }

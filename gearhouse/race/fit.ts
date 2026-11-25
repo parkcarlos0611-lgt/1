@@ -88,8 +88,9 @@ function footprint(d: Design) {
   if (B.orient !== 'mid-transverse') return { along: P.length + P.box, across: P.width, height: P.height, miura: false, P };
   const miura = P.length / 2 + 0.1 > HALF_SHAFT;
   return { along: P.width + (miura ? 0.25 : 0), across: P.length + (miura ? 0 : P.boxEnd), height: P.height, miura, P }; }
-/** the bay as the design stretches it (m): the wheelbase's stretch and the cabin moved forward lengthen it */
-const bayOf = (d: Design) => { const B = BAYS[d.body.base]; return { length: B.length + (d.body.wheelbase + d.body.cabin) / 1000, width: B.width + 2 * d.body.width / 1000, height: B.height }; };
+/** the bay as the design stretches it (m): the wheelbase's stretch and the cabin moved forward lengthen it; a bay behind
+ *  the rear axle (the 959's) is lengthened by the rear overhang instead (its frame stretches the wheelbase ahead of it) */
+const bayOf = (d: Design) => { const B = BAYS[d.body.base]; return { length: B.length + (B.orient === 'rear-longitudinal' ? d.body.overhangR : d.body.wheelbase + d.body.cabin) / 1000, width: B.width + 2 * d.body.width / 1000, height: B.height }; };
 const overVerdict = (need: number, room: number): Verdict => need <= room ? 'ok' : need <= room * (1 + OVER_BAY) ? 'modified' : 'blocked';
 
 /** every check, without the fixes */

@@ -29,11 +29,16 @@
 // face's slots with no bore/stroke or quality) is read as format 3 is for the half it lacks (toV4).
 // Format 6 (alpha 0.2, docs/systems/115 C1 and §7): the class chosen for the car (`tier`, a rung of race/tiers.ts: the
 // cap it is developed under), and `fresh` on a new design whose class is not chosen yet (the builder opens on the class
-// pick). The frame, the glass and the interior sets (F1) and the free parts (P1, P2) come into this format next, beside
-// these. Formats 1 to 5 have no class: their figures place them (the rung they reach is taken as the chosen one when
+// pick). Beside it (docs/systems/115 F1, §7): the body's frame (`body.frame`: the lump it is cut from, "차체 A", and its
+// dimensions), its glass set (`body.glass`: none picked yet, null, the cabin all body colour) and the interior set
+// (`interior`: the set and its trim); a model body's swaps take the lump's blank values (a blank bumper, no head lamp,
+// the steel wheel, `details` off: the other openings and small parts). Each is absent on an older design and reads as the
+// car as built (the frame unstretched, the stock glass, the interior its kit's), so formats 1 to 5 look as they did and
+// keep their signatures. The free parts (P1, P2) come into this format next. Formats 1 to 5 have no class: their figures place them (the rung they reach is taken as the chosen one when
 // the builder opens them; the figures are race/design.ts's, which this file does not call), and until then no cap holds.
 import { BODY_NAME } from './names';
 import type { TierId } from '../race/tiers';
+import { FRAMES, isFrameId, fitFrameDims, bodyDimsOf, isGlassId, fitInterior, interiorOfKit, kitOfInterior, type FrameId, type FrameDims, type GlassId, type InteriorPick } from './frames';
 
 /** the kit's platforms (each a car built from the kit: its lines and its panels' measurements) */
 export type BaseId = 'nsx' | 'f355' | 'eb110';
@@ -46,7 +51,9 @@ export type ModelBaseId = 'p959';
 export type BodyBase = BaseId | ModelBaseId;
 /** a model-built body's swaps (the 959's: render/car/p959 P959Opts): the bumpers, the head lamps, the wheels, the
  *  number plate's text. Each body reads the ones it has; a kit body has none */
-export interface ModelSwaps { bumperF: 'std' | 'aero' | 'clean'; bumperR: 'std' | 'aero' | 'clean'; lamp: 'round' | 'ellipsoid' | 'square'; wheel: 'hollow5' | 'dish' | 'hole5';
+export interface ModelSwaps { bumperF: 'std' | 'aero' | 'clean' | 'blank'; bumperR: 'std' | 'aero' | 'clean' | 'blank'; lamp: 'round' | 'ellipsoid' | 'square' | 'none'; wheel: 'hollow5' | 'dish' | 'hole5' | 'steel';
+  /** the car's other openings and small parts (the tail lamp band, the side intakes, the lid's grille, the mirrors, the
+   *  exhausts, the crest and the lettering) left off: the lump's (absent: on, as every design before it) */ details?: false;
   /** the plate's text, as "12가 3456" (render/car/p959 plateText) */ plate: string;
   /** the front and the rear plate taken off (absent: fitted, as every design before them; only a removed plate is kept,
    *  so an older design's signature does not change) */ plateF?: false; plateR?: false }
@@ -131,7 +138,10 @@ export interface Design {
   /** format 6: a new design whose class is not chosen yet (the builder asks first); gone once it is */ fresh?: true;
   body: { base: BodyBase; nose: NoseKind; tail: TailKind; wheel: WheelKind; paint: string; gloss: number; structure: Structure; panels: Panels;
     /** a model-built body's own swaps (MODEL_BASES; a kit body: none). The face, tail and wheel kinds above stay in the
-     *  file (they are what the body goes back to on a kit base) but a model body does not read them */ model?: ModelSwaps } & Face & BodyDims;
+     *  file (they are what the body goes back to on a kit base) but a model body does not read them */ model?: ModelSwaps;
+    /** format 6 (F1): the lump a model body is cut from and its dimensions (core/frames.ts; absent: 차체 A unstretched). A
+     *  model body's own dimensions above are made from these (bodyDimsOf), so the physics reads them as any base's */ frame?: { id: FrameId; dims: FrameDims };
+    /** format 6 (F1): the glass set on its cabin (absent: the stock set; null: none picked, the cabin in body colour) */ glass?: GlassId | null } & Face & BodyDims;
   engine: { grade: Grade; layout: Layout; /** cc */ cc: number; /** valves a cylinder */ valves: Valves;
     /** the red line (rpm) */ redline: number; intake: Intake; compression: Compression; sump: Sump; block: Block;
     turbo: Turbos; /** the boost at full (bar), when there are turbos */ boost: number; intercooler: boolean;
@@ -144,6 +154,7 @@ export interface Design {
   kit: { abs: boolean; tcs: boolean; steering: 'manual' | 'hydraulic' | 'electric'; dampers: 'fixed' | 'adaptive'; wing: boolean; diffuser: boolean;
     /** tyres' widths front and rear (mm) and the rims (in) */ tyres: [number, number]; rim: 16 | 17 | 18; interior: Interior };
   /** the suspension (format 5) */ susp: SuspDesign;
+  /** format 6 (F1): the interior set and its trim (core/frames.ts; absent: the kit's interior as a set, interiorOfKit) */ interior?: InteriorPick;
 }
 /** format 5 (alpha 0.13): no class */
 export interface DesignV5 extends Omit<Design, 'v' | 'tier' | 'fresh'> { v: 5 }
@@ -179,9 +190,15 @@ export const BODY_BASES: BodyBase[] = [...BASES, ...MODEL_BASES];
 export const isModelBase = (b: BodyBase): b is ModelBaseId => (MODEL_BASES as string[]).includes(b);
 /** the kit base a design stands on, or null for a model-built body */
 export const kitBase = (b: BodyBase): BaseId | null => isModelBase(b) ? null : b;
+/** the 959's real swaps (what a one-make field draws from) */
 export const BUMPERS959: ModelSwaps['bumperF'][] = ['std', 'aero', 'clean'];
 export const LAMPS959: ModelSwaps['lamp'][] = ['round', 'ellipsoid', 'square'];
 export const WHEELS959: ModelSwaps['wheel'][] = ['hollow5', 'dish', 'hole5'];
+/** and the lump's blanks beside them (docs/systems/115 §4-1) */
+export const BUMPERS_ALL: ModelSwaps['bumperF'][] = [...BUMPERS959, 'blank'], LAMPS_ALL: ModelSwaps['lamp'][] = [...LAMPS959, 'none'], WHEELS_ALL: ModelSwaps['wheel'][] = [...WHEELS959, 'steel'];
+/** the lump "차체 A" as a new design starts it (docs/systems/115 F1): its swaps blank, no plates, no details, no glass; the
+ *  plate's text kept for when one is put on */
+export const LUMP_SWAPS = (plate: string): ModelSwaps => ({ bumperF: 'blank', bumperR: 'blank', lamp: 'none', wheel: 'steel', plate, plateF: false, plateR: false, details: false });
 /** each model body's own swaps (its real car's); the plate a made-up number (a new design draws its own: designstore fromPreset) */
 export const MODEL_OWN: Record<ModelBaseId, ModelSwaps> = { p959: { bumperF: 'std', bumperR: 'std', lamp: 'round', wheel: 'hollow5', plate: '08루 0599' } };
 export const NOSES: NoseKind[] = ['round', 'pointed', 'mass'];
@@ -374,7 +391,8 @@ export const DESIGN_MCLAREN_F1: Design = { v: 6, id: 'mclarenf1', name: '시험 
 
 /** a model body's swaps with what it does not have put back to its own */
 export function fitModel(base: ModelBaseId, m: Partial<ModelSwaps> | undefined): ModelSwaps { const o = MODEL_OWN[base], one = <T>(v: unknown, of: readonly T[], d: T): T => of.includes(v as T) ? v as T : d;
-  return { bumperF: one(m?.bumperF, BUMPERS959, o.bumperF), bumperR: one(m?.bumperR, BUMPERS959, o.bumperR), lamp: one(m?.lamp, LAMPS959, o.lamp), wheel: one(m?.wheel, WHEELS959, o.wheel),
+  return { bumperF: one(m?.bumperF, BUMPERS_ALL, o.bumperF), bumperR: one(m?.bumperR, BUMPERS_ALL, o.bumperR), lamp: one(m?.lamp, LAMPS_ALL, o.lamp), wheel: one(m?.wheel, WHEELS_ALL, o.wheel),
+    ...(m?.details === false ? { details: false as const } : {}),
     plate: plateOk(m?.plate) ? m!.plate!.replace(/\s+/g, '').replace(/^(\d{2}.)/, '$1 ') : o.plate,
     ...(m?.plateF === false ? { plateF: false as const } : {}), ...(m?.plateR === false ? { plateR: false as const } : {}) }; }
 /** the syllables the plate's figures can be drawn for (render/car/p959/parts.ts PLATE_SYLLABLES: the same list) */
@@ -424,8 +442,13 @@ export function normalise(d0: AnyDesign): Design {
   const d = toV6(d0), E = d.engine, g: Grade = GRADES.includes(E.grade) ? E.grade : 2, R = GRADE_RULES[g];
   const lim = BODY_LIMITS(BODY_BASES.includes(d.body.base) ? d.body.base : 'nsx'), dims = Object.fromEntries(DIMS.map(k => [k, clamp(Number.isFinite(d.body[k]) ? d.body[k] : 0, lim[k])])) as unknown as BodyDims;
   const q = (k: QualityPart) => { const v = E.quality?.[k]; return Number.isFinite(v) ? Math.round(clamp(v!, LIMITS.quality)) : 0; };
-  const base = BODY_BASES.includes(d.body.base) ? d.body.base : 'nsx', { model: m0, ...body0 } = d.body, model = isModelBase(base) ? fitModel(base, m0) : undefined;
-  return { ...d, body: fitFace({ ...body0, base, ...dims, gloss: clamp(d.body.gloss, [0, 1]), ...(model ? { model } : {}) }),
+  const base = BODY_BASES.includes(d.body.base) ? d.body.base : 'nsx', { model: m0, frame: f0, glass: g0, ...body0 } = d.body, model = isModelBase(base) ? fitModel(base, m0) : undefined;
+  // format 6's frame, glass and interior (F1): a model body's only, each kept only where the design has it; the frame's
+  // dimensions made into the body's own (the physics' and the fit's); the interior set into the kit's interior (its weight)
+  const fid: FrameId = isFrameId(f0?.id) ? f0!.id : 'A959', frame = model && f0 ? { id: fid, dims: fitFrameDims(fid, f0.dims) } : undefined;
+  const fdims = frame ? { ...bodyDimsOf(frame.id, frame.dims), cabin: 0, rake: 0 } : {}, glass = model && (g0 === null || isGlassId(g0)) ? { glass: g0 } : {};
+  const interior = model && d.interior ? fitInterior(d.interior, interiorOfKit(d.kit.interior)) : undefined, { interior: _i, ...d1 } = d;
+  return { ...d1, ...(interior ? { interior } : {}), body: fitFace({ ...body0, base, ...dims, ...fdims, gloss: clamp(d.body.gloss, [0, 1]), ...(model ? { model } : {}), ...(frame ? { frame } : {}), ...glass }),
     engine: { ...E, grade: g, layout: LAYOUTS.includes(E.layout) ? E.layout : 'V6', cc: clamp(E.cc, LIMITS.cc), redline: clamp(E.redline, [LIMITS.redline[0], gradeRedline(g)]),
       intake: allowed(E.intake, INTAKES, R.intake), compression: allowed(E.compression, COMPRESSIONS, R.compression), sump: allowed(E.sump, SUMPS, R.sump),
       block: allowed(E.block, BLOCKS, R.block), valves: allowed(E.valves, [2, 3, 4, 5] as Valves[], R.valves), turbo: Math.min(E.turbo, R.turbo) as Turbos,
@@ -433,6 +456,6 @@ export function normalise(d0: AnyDesign): Design {
       bs: Math.round(clamp(Number.isFinite(E.bs) ? E.bs : BS_DEFAULT, LIMITS.bs) * 100) / 100,
       quality: Object.fromEntries(QUALITY_PARTS.map(k => [k, q(k)])) as EngineQuality },
     drive: { ...d.drive, final: d.drive.final ? clamp(d.drive.final, LIMITS.final) : 0 },
-    kit: { ...d.kit, tyres: [clamp(d.kit.tyres[0], LIMITS.tyre), clamp(d.kit.tyres[1], LIMITS.tyre)] },
+    kit: { ...d.kit, tyres: [clamp(d.kit.tyres[0], LIMITS.tyre), clamp(d.kit.tyres[1], LIMITS.tyre)], ...(interior ? { interior: kitOfInterior(interior) } : {}) },
     susp: (o => ({ front: fitAxle(d.susp?.front ?? o.front, o.front, true), rear: fitAxle(d.susp?.rear ?? o.rear, o.rear, false) }))(SUSP_OWN[base]) };
 }

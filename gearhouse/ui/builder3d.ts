@@ -25,7 +25,7 @@ import { chosenTier, withTier, freeHp, needOf, needText, sliderWall, wallStop, f
 import { classPick } from './builder_classpick';
 import { loadSettings } from './shell/settings';
 import { BODY_NAME } from '../core/names';
-import { LIMITS, BODY_BASES, isModelBase, MODEL_OWN, BUMPERS959, LAMPS959, WHEELS959, plateOk, type BodyBase, type ModelSwaps, BODY_LIMITS, DIMS, LAYOUTS, LAYOUT_NAME, type DimKey, GRADE_NAME, GRADES, gradeLock, gradeBoost, gradeRedline, normalise, applyPatch, type BaseId, type Design, type NoseKind, type TailKind, type WheelKind, FACE_KEYS, faceLock, type Face, type FaceKey,
+import { LIMITS, BODY_BASES, isModelBase, MODEL_OWN, BUMPERS_ALL, LAMPS_ALL, WHEELS_ALL, LUMP_SWAPS, plateOk, type BodyBase, type ModelSwaps, BODY_LIMITS, DIMS, LAYOUTS, LAYOUT_NAME, type DimKey, GRADE_NAME, GRADES, gradeLock, gradeBoost, gradeRedline, normalise, applyPatch, type BaseId, type Design, type NoseKind, type TailKind, type WheelKind, FACE_KEYS, faceLock, type Face, type FaceKey,
   type Grade, type Structure, type Panels, type Intake, type Compression, type Sump, type Block, type Turbos, type Interior,
   SUSP_KINDS, SUSP_KIND_NAME, SUSP_LIMITS, SUSP_OWN, suspLock, suspFieldLock, type SuspKind, type RcPreset, type SuspAxle } from '../core/design';
 import { STEPS, FIT_STEP, stepNo, isStep, stepFrom, seenFrom, type StepId } from './builder_steps';
@@ -39,6 +39,7 @@ import { statBar } from './kit/parts';
 import { STATS, type StatDef } from './kit/logic';
 import { stepIcon, STEP_SHORT, bumperPic, lampPic, wheelPic, basePic } from './builder_pics';
 import { partThumbs, type ThumbSpec } from './builder_thumbs';
+import { FRAMES, FRAME_IDS, FRAME_DIMS, FRAME_DIM_NAME, NO_FRAME_DIMS, GLASS, GLASS_IDS, INTERIOR_SETS, INTERIOR_SET_IDS, TRIM_IDS, TRIM_NAME, interiorOfKit, type FrameId, type FrameDimKey, type GlassId, type InteriorSetId, type TrimId } from '../core/frames';
 import texAlb from '../assets/textures/pbr/albedo.jpg';
 import texNor from '../assets/textures/pbr/normal.jpg';
 import texRgh from '../assets/textures/pbr/rough.jpg';
@@ -177,18 +178,21 @@ const chip = document.createElement('button'); chip.type = 'button'; chip.id = '
 chip.addEventListener('click', () => openPick(false));
 /** the class pick (ui/builder_classpick.ts): a new design's first screen, and the chip's */
 const picker = classPick($('tierPick'), {
-  choose(t, fit) { const was = freeHp(D); D.tier = t.id; delete D.fresh; if (fit) D = fitEngine(D, t.hpMax); const now = freeHp(D);
+  choose(t, fit) { const was = freeHp(D); D.tier = t.id; if (D.fresh) startLump(); delete D.fresh; if (fit) D = fitEngine(D, t.hpMax); const now = freeHp(D);
     changed(); flash(now < was ? `차급 ${t.id}: 엔진을 ${now.toLocaleString()} hp로 맞췄습니다` : `차급 ${t.id} · ${TIER_GROUP_NAME[t.group]}: 출력 ${Number.isFinite(t.hpMax) ? `${t.hpMax.toLocaleString()} hp까지` : '상한 없음'}`); },
   cancel() { if (!D.fresh) return; delete D.fresh; D = withTier(D); changed(); } });
+/** a new design starts as the lump (docs/systems/115 §4-1, F1): 차체 A unstretched, no openings, blank bumpers, the steel
+ *  wheel, no plates, no glass, the stock interior; parts are put on in ③, or all at once by "599 순정 세트" */
+function startLump() { if (!isModelBase(D.body.base)) return; D.body.model = LUMP_SWAPS(D.body.model?.plate ?? randomPlate()); D.body.frame = { id: 'A959', dims: { ...NO_FRAME_DIMS } }; D.body.glass = null; D.interior = { set: 'stock', trim: 'black' }; }
 function openPick(fresh: boolean) { drawer(false); picker.open({ design: D, fresh, eraOpen: eraOpen() }); }
 /** where each design was left (its step, the steps seen), kept in this browser (a step kept by the six-step builder
  *  before alpha 0.13 is read by stepFrom: by its id, or a number as the six steps') */
 const STEP_KEY = 'gearhouse.builder.step.v1';
-let step: StepId = 'chassis', onFiles = false, seen = new Set<StepId>(['chassis']);
+let step: StepId = 'frame', onFiles = false, seen = new Set<StepId>(['frame']);
 function keptSteps(): Record<string, { step: StepId; seen: StepId[] }> { try { const o: unknown = JSON.parse(store?.getItem(STEP_KEY) ?? '{}'); return o && typeof o === 'object' ? o as Record<string, { step: StepId; seen: StepId[] }> : {}; } catch { return {}; } }
 function keepStep() { try { const rest = Object.entries(keptSteps()).filter(([k]) => k !== D.id).slice(0, 99); store?.setItem(STEP_KEY, JSON.stringify(Object.fromEntries([[D.id, { step, seen: [...seen] }], ...rest]))); } catch { /* not kept */ } }
 /** the step a design was left at (a new one starts at the first) */
-function restoreStep() { const k = keptSteps()[D.id]; step = stepFrom(k?.step) ?? 'chassis'; seen = new Set([...seenFrom(k?.seen), step]); onFiles = false; showStep(); }
+function restoreStep() { const k = keptSteps()[D.id]; step = stepFrom(k?.step) ?? 'frame'; seen = new Set([...seenFrom(k?.seen), step]); onFiles = false; showStep(); }
 function go(id: StepId | 'files') { if (id === 'files') onFiles = true; else { onFiles = false; step = id; seen.add(id); keepStep(); } showStep(); $('panes').scrollTop = 0; }
 /** the suspension view put on by step ③ (and off again when it is left, unless the viewer had it on already) */
 let suspAuto = false;
@@ -211,23 +215,33 @@ $('prev').addEventListener('click', () => { if (onFiles) go(step); else go(STEPS
 $('next').addEventListener('click', () => go(STEPS[Math.min(STEPS.length - 1, stepNo(step) + 1)]![0]));
 $('openFiles').addEventListener('click', () => { if (onFiles) go(step); else { go('files'); drawer(true); } });
 
-// 차대: the base, its stretch, its structure
-add('chassis', cards<BodyBase>('바탕 차대', ENABLED_BODIES.map(b => [b, BASE_NAME[b], basePic(), isModelBase(b) ? { kind: 'base', v: b } : undefined] as [BodyBase, string, string, ThumbSpec?]), () => D.body.base, v => { if (v === D.body.base) return;
-    // a model-built body (the 959) brings its own swaps, a new plate number with them; its dimensions are its model's (zero)
-    if (isModelBase(v)) { D.body.model = { ...MODEL_OWN[v], ...D.body.model, plate: plateOk(D.body.model?.plate) ? D.body.model!.plate : randomPlate() }; for (const k of DIMS) D.body[k] = 0; }
-    // the tyres and the rims follow the base where they were its own
-    const was = fromPreset(D.body.base), to = fromPreset(v); if (D.kit.tyres[0] === was.kit.tyres[0] && D.kit.tyres[1] === was.kit.tyres[1]) D.kit.tyres = [...to.kit.tyres]; if (D.kit.rim === was.kit.rim) D.kit.rim = to.kit.rim;
-    if (JSON.stringify(D.susp) === JSON.stringify(SUSP_OWN[D.body.base])) D.susp = structuredClone(SUSP_OWN[v]);   // and the suspension, where it was the old base's own
-    D.body.base = v; }),
-  note('바탕은 차체 패널의 치수와 치수를 바꿀 수 있는 범위를 정합니다. 코·앞면·꼬리·휠은 세 바탕 모두에 끼울 수 있습니다. 599는 손으로 짠 모델 차체라 치수를 바꾸지 않고, 범퍼·램프·휠·번호판을 바꿉니다(④).'),
-  ...dimSliders(),
+// ① 차체 덩어리 (docs/systems/115 §4, F1): the lump's card, its dimensions (§4-4: the cage stretched; the physics reads
+// them as the body's own), its structure. A kit base's own dimensions (the old bases, off in the game) stay below, hidden
+const frameD = () => D.body.frame ?? { id: 'A959' as FrameId, dims: { ...NO_FRAME_DIMS } };
+add('frame', cards<FrameId>('차체 덩어리', FRAME_IDS.map(id => [id, `${FRAMES[id].name} · ${FRAMES[id].suits}`, basePic(), { kind: 'frame', v: id }] as [FrameId, string, string, ThumbSpec]), () => frameD().id, v => { D.body.frame = { ...frameD(), id: v }; }),
+  note('차체 덩어리는 구멍이 하나도 없는 차체입니다. 바퀴 아치와 허브 자리, 엔진룸 크기, 앞면적이 여기서 정해집니다. 창문은 ②에서, 램프·범퍼·휠 같은 부품은 ③에서 고릅니다. 차급과는 무관하고, 카드의 "추천"은 꼬리표일 뿐입니다.'),
+  ...frameSliders(), ...dimSliders(),
   seg<Structure>('구조 소재 (모노코크·프레임)', [['steel', '강철'], ['hss', '고장력강'], ['aluminium', '알루미늄'], ['honeycomb', '알루미늄 허니콤'], ['cfrp', '탄소섬유']], () => D.body.structure, v => { D.body.structure = v; }),
   note('같은 강성에서 강철 대비 무게: 고장력강 0.9, 알루미늄 0.6, 허니콤 0.5, 탄소섬유 0.45. 가벼울수록 비싸고, 탄소섬유는 수작업입니다.'),
   seg<Panels>('패널 소재', [['steel', '강철'], ['aluminium', '알루미늄'], ['frp', 'FRP'], ['cfrp', '탄소섬유']], () => D.body.panels, v => { D.body.panels = v; }),
-  note('패널 무게: 알루미늄 0.55, FRP 0.6 (소량 생산에 싸다), 탄소섬유 0.4. 강철은 수리가 쉽습니다.'),
-  seg<Interior>('실내 사양', [['light', '경량 (얇은 유리, 가벼운 시트)'], ['standard', '표준'], ['luxury', '고급 (가죽, 에어컨)']], () => D.kit.interior, v => { D.kit.interior = v; }));
-/** ① 치수: the body's dimensions against the base's own (core/design.ts BodyDims), each slider's range its base's
- *  (BODY_LIMITS, set again when the base changes); the car is built again a moment after a slider rests */
+  note('패널 무게: 알루미늄 0.55, FRP 0.6 (소량 생산에 싸다), 탄소섬유 0.4. 강철은 수리가 쉽습니다.'));
+/** ① the lump's dimensions (§4-4): each within its frame's range, the measure the car then has beside the change */
+function frameSliders(): HTMLElement[] { const o = () => FRAMES[frameD().id], d = () => frameD().dims, mm = (v: number) => sign(v, 'mm'), n = (v: number) => Math.round(v).toLocaleString();
+  const SHOW: Record<FrameDimKey, (v: number) => string> = { overhangF: v => `${mm(v)} · 전장 ${n(o().own.length + d().overhangF + d().wheelbase + d().overhangR)} mm`, wheelbase: v => `${mm(v)} · ${n(o().own.wheelbase + v)} mm`,
+    overhangR: v => `${mm(v)} · 전장 ${n(o().own.length + d().overhangF + d().wheelbase + d().overhangR)} mm`, width: v => `${mm(v)} · ${n(o().own.width + v)} mm (윤거도 함께)`, roof: v => `${mm(v)} · 전고 ${n(o().own.height + v + d().ride)} mm`,
+    ride: v => `${mm(v)} · ${CLEARANCE[D.body.base] + v} mm` };
+  const out: HTMLElement[] = [h2('치수')], modelOnly = (e: HTMLElement) => { syncs.push(() => { e.hidden = !isModelBase(D.body.base); }); return e; };
+  for (const k of FRAME_DIMS) out.push(modelOnly(range(FRAME_DIM_NAME[k], FRAMES.A959.ranges[k], k === 'wheelbase' ? 10 : 5, () => d()[k], v => { D.body.frame = { ...frameD(), dims: { ...d(), [k]: v } }; }, SHOW[k], `frame-${k}`)));
+  out.push(note('케이지를 구간별로 늘입니다: 앞 오버행은 코, 휠베이스는 지붕과 문, 뒤 오버행은 엔진 덮개와 꼬리. 바퀴 아치는 늘이지 않고 옮기기만 해서 둥근 모양을 지킵니다. 범위 양 끝에서 면이 늘어지거나 꺾이지 않는지 검사했습니다. 치수는 앞면적, 무게, 무게 배분, 엔진룸 크기(뒤 오버행)에 들어갑니다.'),
+    btnRow('치수 원래대로', () => { D.body.frame = { ...frameD(), dims: { ...NO_FRAME_DIMS } }; changed(); }));
+  modelOnly(out[0]!); modelOnly(out[out.length - 2]!); modelOnly(out[out.length - 1]!); return out; }
+// ② 창문 (§4-2): a set of the lump's own cells (material only, no new faces); none: the cabin in body colour
+add('glass', cards<GlassId | 'none'>('창문 세트', [['none', '고르지 않음 (차체 색)', basePic(), { kind: 'glass', v: 'none' }] as [GlassId | 'none', string, string, ThumbSpec],
+    ...GLASS_IDS.map(g => [g, GLASS[g].name, basePic(), { kind: 'glass', v: g }] as [GlassId | 'none', string, string, ThumbSpec])], () => D.body.glass === undefined ? 'stock' : D.body.glass ?? 'none', v => { D.body.glass = v === 'none' ? null : v; }),
+  note('창문 세트는 덩어리의 면을 그대로 두고 어느 칸이 유리인지만 정합니다(삼각형이 늘지 않습니다). 세트를 고르면 문·보닛·엔진 덮개의 패널선이 진해집니다. 유리 색은 나중에 칠·마감에서 고릅니다.'),
+  ...GLASS_IDS.map(g => note(`${GLASS[g].name}: ${GLASS[g].note}`)));
+/** a kit base's dimensions (the old bases, off in the game): against the base's own (core/design.ts BodyDims), each
+ *  slider's range its base's (BODY_LIMITS); the car is built again a moment after a slider rests */
 function dimSliders(): HTMLElement[] {
   const mm = (v: number) => sign(v, 'mm'), H = () => Math.round((designHeight(D) + 0) * 1000);
   const rows: [DimKey, string, number, (v: number) => string][] = [['wheelbase', '휠베이스', 10, mm], ['width', '폭 (한쪽)', 5, mm], ['track', '윤거', 10, mm],

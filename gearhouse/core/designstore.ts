@@ -34,7 +34,9 @@ export function asDesign(v: unknown): Design | null {
   const head = { id: typeof o.id === 'string' && /^[\w-]{1,40}$/.test(o.id) ? o.id : newId(), name: typeof o.name === 'string' && o.name.trim() ? o.name.trim().slice(0, 40) : P.name };
   const dims = Object.fromEntries(DIMS.map(k => [k, Math.round(num(b[k], 0) * 10) / 10])) as unknown as BodyDims;
   const body = { base: P.body.base, nose: one(b.nose, NOSES, P.body.nose), tail: one(b.tail, TAILS, P.body.tail), wheel: one(b.wheel, WHEELS, P.body.wheel),
-    ...dims, paint, gloss: num(b.gloss, P.body.gloss), ...(isModelBase(P.body.base) ? { model: fitModel(P.body.base, obj(b.model)) } : {}) };
+    ...dims, paint, gloss: num(b.gloss, P.body.gloss), ...(isModelBase(P.body.base) ? { model: fitModel(P.body.base, obj(b.model)) } : {}),
+    // format 6's frame and glass (F1): as the value has them (normalise checks them; absent: the car as built)
+    ...(b.frame && typeof b.frame === 'object' ? { frame: b.frame as Design['body']['frame'] } : {}), ...('glass' in b ? { glass: b.glass as Design['body']['glass'] } : {}) };
   // the face: its slots where the value has them; a format-3 value's (and older) from its front, the rest its base's own
   const front: FrontKind = one(b.front, FRONTS, P.body.aux === 'round' ? 'sunk' : 'plain'), f0: Face = FRONTS.includes(b.front as FrontKind) ? faceOf3(P.body.base, front) : P.body;
   const face = Object.fromEntries(FACE_KEYS.map(k => [k, one(b[k], FACE_KINDS[k] as readonly string[], f0[k])])) as unknown as Face;
@@ -60,7 +62,7 @@ export function asDesign(v: unknown): Design | null {
     engine: { grade: one(e.grade, GRADES, P.engine.grade), ...machine, intake: one(e.intake, INTAKES, P.engine.intake), compression: one(e.compression, COMPRESSIONS, P.engine.compression),
       sump: one(e.sump, SUMPS, P.engine.sump), block: one(e.block, BLOCKS, P.engine.block), turbo: one(e.turbo, [0, 1, 2, 3, 4] as const, P.engine.turbo),
       boost: num(e.boost, P.engine.boost), intercooler: bool(e.intercooler, P.engine.intercooler), ...(bool(e.sequential, false) ? { sequential: true } : {}),
-      bs: num(e.bs, BS_DEFAULT), quality }, drive: rest.drive, kit: { ...rest.kit, interior }, susp };
+      bs: num(e.bs, BS_DEFAULT), quality }, drive: rest.drive, kit: { ...rest.kit, interior }, susp, ...(o.interior && typeof o.interior === 'object' ? { interior: o.interior as Design['interior'] } : {}) };
   return normalise(d); }
 
 /** a new design's id: short, unlikely to meet another in one browser */

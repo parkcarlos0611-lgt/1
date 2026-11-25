@@ -16,7 +16,8 @@ import type { Design, ModelBaseId } from '../../core/design';
 import { MODEL_OWN, plateOk } from '../../core/design';
 import { CAR_599 } from '../../core/names';
 import { Build, KINDS, type CarAnchors, type Mesh, type MeshLine } from './mesh';
-import { p959Mesh, plateText, DIM, STOCK_FRAME, type Frame, type PlateText } from './p959';
+import { p959Mesh, plateText, DIM, STOCK_FRAME, frameOf, type Frame, type PlateText } from './p959';
+import { interiorOfKit } from '../../core/frames';
 import { addSuspension, type SuspWheel } from './suspension';
 import { suspFor } from './suspension/setup';
 import { addPowertrain, fromDesign, type Detail } from './powertrain';
@@ -43,8 +44,9 @@ export function joinMeshes(length: number, ...ms: Mesh[]): Mesh {
   return { n, pos, col, gloss, part, kind, tex, length, names, decals: ms.flatMap(m => m.decals ?? []), ...(lines.length ? { lines } : {}), ...(partLines.length ? { partLines } : {}), ...(creases.length ? { creases } : {}),
     ...(uv ? { uv } : {}), ...(dial ? { dial } : {}), ...(first.susp ? { susp: first.susp } : {}), ...(ms.find(m => m.dials) ? { dials: ms.find(m => m.dials)!.dials } : {}) }; }
 
-/** the interior a design's kit asks for: stripped (the drift cabin: buckets, a cage), as built (black), luxurious (tan) */
-const cabinFor = (d: Design): InteriorOptions => d.kit.interior === 'light' ? { ...INTERIORS.drift } : d.kit.interior === 'luxury' ? { ...INTERIORS.stock, trim: 'tan' } : { ...INTERIORS.stock };
+/** the interior a design asks for: its set (docs/systems/115 §4-3: the stock cabin or the drift one, buckets and a cage)
+ *  in its trim; an older design's from its kit (stripped: the drift set; as built: stock in black; luxurious: in tan) */
+const cabinFor = (d: Design): InteriorOptions => { const p = d.interior ?? interiorOfKit(d.kit.interior); return { ...INTERIORS[p.set], trim: p.trim }; };
 /** a plate's text from the design (a text the plate cannot draw: one made from the design's id) */
 function plateOf(d: Design): PlateText { const t = d.body.model?.plate; if (plateOk(t)) { try { return plateText(t); } catch { /* not drawable: below */ } }
   let h = 7; for (const c of d.id) h = Math.imul(h ^ c.charCodeAt(0), 16777619) >>> 0; return plateText(h); }
@@ -55,7 +57,7 @@ function plateOf(d: Design): PlateText { const t = d.body.model?.plate; if (plat
 function p959Wheels(d: Design, f: Frame = frameFor(d)): { f: SuspWheel; r: SuspWheel } { const [wf, wr] = d.kit.tyres;
   return { f: { x: f.axleF, y: f.trackF / 2, r: DIM.tyreR, w: wf, rim: 222, back: 0.6 * wf / 2 }, r: { x: f.axleR, y: f.trackR / 2, r: DIM.tyreR - 2, w: wr, rim: 222, back: 0.6 * wr / 2 } }; }
 /** the frame a design's body is stretched by (docs/systems/115 §4-4) */
-function frameFor(_d: Design): Frame { return STOCK_FRAME; }
+function frameFor(d: Design): Frame { const f = d.body.frame; return f && Object.values(f.dims).some(v => v) ? frameOf(f.dims) : STOCK_FRAME; }
 /** the 959's powertrain site: the flat six hung behind the rear axle with its gearbox ahead, the two exhaust tips, the
  *  cabin's floor and tunnel (the same place as the style page's, render/car/styleparts.ts) */
 const siteOf = (f: Frame): Site => { const z = (v: number) => f.at([0, 0, v])[2], tip = f.at([4258, 335, 256]);
@@ -73,7 +75,7 @@ export function cabinOf(f: Frame, A: CabinAnchors = P959_CABIN): CabinAnchors { 
 const P959: ModelBody = { name: CAR_599, length: DIM.length, cabin: P959_CABIN, anchors: P959_ANCHORS, wheels: p959Wheels, open: ['engineGrille', 'engineLid', 'rearWindow'],
   gauges: (d, topKmh) => ({ ...P959_GAUGES, redline: d.engine.redline, topKmh: topKmh ?? P959_GAUGES.topKmh, ...(d.engine.turbo ? { boostBar: d.engine.boost } : { boostBar: undefined }) }),
   mesh(d, o = {}) { const m = { ...MODEL_OWN.p959, ...d.body.model }, det = o.detail ?? 2, f = frameFor(d), anchors = anchorsOf(f);
-    const body = p959Mesh({ ...(f === STOCK_FRAME ? {} : { dims: f.dims }), paint: d.body.paint, bumperF: m.bumperF, bumperR: m.bumperR, lamp: m.lamp, wheel: m.wheel, plate: plateOf(d), plateF: m.plateF !== false, plateR: m.plateR !== false, brake: !!o.bare, tyres: d.kit.tyres });
+    const body = p959Mesh({ ...(f === STOCK_FRAME ? {} : { dims: f.dims }), ...(d.body.glass !== undefined ? { glass: d.body.glass } : {}), ...(m.details === false ? { details: false } : {}), paint: d.body.paint, bumperF: m.bumperF, bumperR: m.bumperR, lamp: m.lamp, wheel: m.wheel, plate: plateOf(d), plateF: m.plateF !== false, plateR: m.plateR !== false, brake: !!o.bare, tyres: d.kit.tyres });
     // the paint's gloss as the design sets it (the model is made at 0.6)
     const P = KINDS.indexOf('paint'); for (let t = 0; t < body.n; t++) if (body.kind[t] === P) body.gloss[t] = d.body.gloss;
     if (o.bare) return body;

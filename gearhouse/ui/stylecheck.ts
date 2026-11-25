@@ -59,7 +59,7 @@ function frame(now: number) { const dt = Math.min(0.1, (now - last) / 1000); las
     const mm = Math.max(len * 1000 * 1.3 / W, len * 1000 * 0.62 / H) / st.zoom;
     L.render({ x: 0, y: 0, z: tz, ang, pitch, mm, W, H, cy: 0.55, ...(st.persp ? { eye, fov, near: 0.2 } : {}) },
       [{ g, x: 0, y: 0, z: -0.015, yaw: st.yaw * Math.PI / 180, roll: 0, pitch: 0, steerL: 0.14, steerR: 0.12, spin: 0, player: true, dials: dials?.v }], [], [],
-      { look: st.look, glass: 0.8, rays: st.look !== 4, bloomK: st.look === 2 ? 1 : 0, dof: 0, art: false, outW: st.look === 2 ? 0.5 : 1, outK: st.look === 2 ? 0.6 : 1, sun: [Math.cos(el) * Math.cos(az), Math.cos(el) * Math.sin(az), Math.sin(el)],
+      { look: st.look, glass: +(Q.get('glass') ?? 0.8), rays: st.look !== 4, bloomK: st.look === 2 ? 1 : 0, dof: 0, art: false, outW: st.look === 2 ? 0.5 : 1, outK: st.look === 2 ? 0.6 : 1, sun: [Math.cos(el) * Math.cos(az), Math.cos(el) * Math.sin(az), Math.sin(el)],
         style: { outline: st.outline, lines: st.lines, post: st.post, atlas: st.atlas, outPx: st.outPx, linePx: st.linePx, dpr } });
     frames++; $('stat').textContent = `${M.n.toLocaleString()} 삼각형 · 선 ${lineN}개${M.lines?.length ? ' (모델에 표시한 선)' : ' (각진 모서리에서 찾은 선)'} · ${W}×${H} · 외곽선 ${screenPx(st.outPx, H, dpr).toFixed(1)} px, 선 ${screenPx(st.linePx, H, dpr).toFixed(1)} px · ${Math.round(performance.now() - t0)} ms`; }
   requestAnimationFrame(frame); }

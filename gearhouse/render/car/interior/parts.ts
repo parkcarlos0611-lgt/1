@@ -33,7 +33,7 @@ export function seat(b: InteriorBuild, f: Frame, style: SeatStyle, name: string,
   // the back: sections up its lean from a pivot behind the hip; the front face lies about 110 mm behind the hip point
   const U: V = [Math.sin(th), 0, Math.cos(th)], Bk: V = [Math.cos(th), 0, -Math.sin(th)], pv: V = [70, 0, -125], P = (s: number, y: number, d: number): V => add(add(pv, mul(U, s)), add([0, y, 0], mul(Bk, d)));
   b.loft(S.back.map(([s, hw, bol, T, pw0]) => { const p = Math.min(pw0!, hw! - 75); return whole([[0, 0], [p, 0], [hw! - 62, -bol! * 0.45], [hw! - 28, -bol!], [hw!, -bol! * 0.5], [hw!, T! * 0.55], [hw! - 45, T!], [0, T!]]).map(([y, d]) => P(s!, y, d)); }));
-  const [s0, s1] = S.pleatS, pb = S.back[1]![4]!; b.paint(S.region, P((s0 + s1) / 2, 0, 0), [0, -1, 0], U, pb * 2 + 2, s1 - s0 + 2, mul(Bk, -1));
+  const [s0, s1] = S.pleatS, pb = S.back[1]![4]!; b.paint(S.region, P((s0 + s1) / 2, 0, 0), [0, 1, 0], U, pb * 2 + 2, s1 - s0 + 2, mul(Bk, -1));
   b.line('trim', [P(S.back[1]![0]!, pb, -2), P(s1, pb, -2), P(s1, -pb, -2), P(S.back[1]![0]!, -pb, -2)], { w: 0.7 });
   b.part(`${name}Rail`, metal, 0.5); for (const y of [-185, 185]) b.box(-390, 70, y - 16, y + 16, floorDz, -198); }
 
@@ -66,7 +66,7 @@ export function dash(b: InteriorBuild, A: CabinAnchors, T: Trim, faces: GaugeFac
   b.onBone(0).part('gaugeLamps', '#101012', 0.3).picture([27.5, 60, 14], R, Uz, N, 20, 20, 'lampA').picture([27.5, -62, 16], R, Uz, N, 20, 20, 'lampB');
   // the drift cars' extra gauges: three pods on the dash's top, turned to the driver (painted faces: they are dress, not instruments)
   if (o.pods) { b.frame(f); ([['podA', 150], ['podB', 235], ['podC', 320]] as const).forEach(([r, y], i) => { const c: V = [-90, py(y), 62], ax = unit([1, s * 0.22 * (i + 1) * 0.6, 0.12]), [u, v] = [unit(cross([0, 0, 1], ax)), [0, 0, 1] as V], up = unit(cross(ax, u)); void v;
-      b.part(`gaugePod${i}`, '#161618', 0.5).turn(c, ax, [[-58, 16], [-28, 31], [0, 33], [-6, 28]], 8); b.part(`gaugePodFace${i}`, '#0c0c0e', 0.3).picture(add(c, mul(ax, -5)), mul(u, 1), up, ax, 58, 58, r);
+      b.part(`gaugePod${i}`, '#161618', 0.5).turn(c, ax, [[-58, 16], [-28, 31], [0, 33], [-6, 28]], 8); b.part(`gaugePodFace${i}`, '#0c0c0e', 0.3).picture(add(c, mul(ax, -5)), mul(u, -1), up, ax, 58, 58, r);
       b.part(`gaugePodFoot${i}`, '#161618', 0.4).box(c[0] - 50, c[0] - 20, c[1] - 9, c[1] + 9, 0, 40); }); }
   return { dials }; }
 
@@ -132,8 +132,8 @@ export function driver(b: InteriorBuild, f: Frame, o: { recline: number; wheel: 
   b.part('driverNeck', '#1b1b1d', 0.1).tube([add(neck, [0, 0, -20]), add(head, [10, 0, -120])], 52, 6);
   b.part('driverHelmet', o.helmet, 0.55).turn(head, hax, [[-150, 92], [-118, 120], [-55, 135], [0, 139], [55, 133], [100, 110], [130, 68], [144, 30], [147, 0]], 14, { hint: [1, 0, 0], turn: 0.5 }).paint('visor', add(head, [-140, 0, 0]), [0, 1, 0], [0, 0, 1], 290, 114, [-1, 0, 0], 0.2);
   b.line('trim', [add(head, [-128, -62, -52]), add(head, [-141, 0, -54]), add(head, [-128, 62, -52])], { w: 0.8 });
-  for (const sg of [-1, 1]) { const sh = add(mul(U, 392), [0, sg * 188, 0]), a = 18 * RAD, hand = inv(at(o.wheel, [10, sg * o.rimR * Math.cos(a), o.rimR * Math.sin(a)])), el = joint(sh, hand, 300, 285, [0.2, sg * 0.7, -1]);
-    b.part(sg > 0 ? 'driverArmL' : 'driverArmR', o.suit, 0.1, 'canvas').tube([sh, el, lerp(el, hand, 0.86)], [52, 42, 32], 6);
+  for (const sg of [-1, 1]) { const sh = add(mul(U, 392), [0, sg * 188, 0]), a = 18 * RAD, hand = inv(at(o.wheel, [10, sg * o.rimR * Math.cos(a), o.rimR * Math.sin(a)])), el = joint(sh, hand, 325, 300, [0.2, sg * 0.8, -1]);
+    b.part(sg > 0 ? 'driverArmL' : 'driverArmR', o.suit, 0.1, 'canvas').tube([add(sh, [0, -sg * 30, -10]), sh, el, lerp(el, hand, 0.86)], [50, 54, 42, 31], 8);
     const tan = unit(sub(inv(at(o.wheel, [10, sg * o.rimR * Math.cos(a + 0.2), o.rimR * Math.sin(a + 0.2)])), inv(at(o.wheel, [10, sg * o.rimR * Math.cos(a - 0.2), o.rimR * Math.sin(a - 0.2)]))));
     b.part(sg > 0 ? 'driverGloveL' : 'driverGloveR', o.gloves, 0.15).turn(hand, tan, [[-48, 0], [-40, 31], [40, 33], [50, 0]], 6);
     const hipJ: V = [-5, sg * 88, -12], foot = inv(sg > 0 ? o.feet.clutch : o.feet.throttle), ankle = add(foot, [45, 0, 10]), knee = joint(hipJ, ankle, 440, 430, [0, sg * 0.35, 1]);

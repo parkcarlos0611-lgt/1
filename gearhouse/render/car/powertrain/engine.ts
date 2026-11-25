@@ -74,6 +74,9 @@ export function buildEngine(g: Geo, S0: PowertrainSpec, det: Detail, transverse 
   for (const s of S) { const [ua, ub] = bankU(s); bankBox(s, ua, ub, -0.95 * B, 0.95 * B, 0.2 * B, Hd, '-3'); }
   // the drift look: a core plug's ring drawn on each bank's end, so the block's end faces are not bare
   if (dr && det === 2) for (const s of S) { const [ua] = bankU(s), c = P(s, ua - 1.5, 0, 0.2 * B + (Hd - 0.2 * B) * 0.55); g.line('trim', Array.from({ length: 10 }, (_, i) => { const a = i / 10 * Math.PI * 2; return add(c, add(mul(acr(s), 0.42 * B * Math.cos(a)), mul(ax(s), 0.42 * B * Math.sin(a)))); }), true); }
+  // and a ring at each bore on the block's bare flanks (an in-line block's two, the others' outer ones)
+  if (dr && det === 2 && nb <= 6) for (const s of S) for (const k of banks === 1 ? [-1, 1] : [1]) for (let i = 0; i < nb; i++) { const c = P(s, cylU(s, i), k * (0.95 * B + 1.5), 0.2 * B + (Hd - 0.2 * B) * 0.42);
+    g.line('trim', Array.from({ length: 8 }, (_, j) => { const a = j / 8 * Math.PI * 2; return add(c, add([0.24 * B * Math.cos(a), 0, 0], mul(ax(s), 0.24 * B * Math.sin(a)))); }), true); }
   if (vee) g.box(u0, Lb - 10, -vin * 0.55, vin * 0.55, 0.6 * B, inner(1, Hd)[2] - 0.1 * B, '-3');
   g.part('engineBlock', C.block, 0.25).prism([0, 0, 0.05 * B], [u0 - 20, 0, 0.05 * B], rsec(1.5 * B, 1.3 * B, det === 0 ? 6 : 8, 2.6), [0, 0, 1]);
   if (det === 2 && nb <= 4 && turbos < 3 && !dr) { g.part('engineBlock', C.block, 0.2); for (const s of S) for (let i = 0; i + 1 < nb; i++) { const u = cylU(s, i) + pitch / 2; bankBox(s, u - 3, u + 3, 0.95 * B, 1.02 * B, 0.3 * B, Hd - 0.2 * B, '-2'); } }   // the block's ribs between the bores

@@ -750,7 +750,7 @@ uniform mat4 uVP; uniform vec3 uRx, uUp; out vec2 vUv; flat out vec4 vGas; flat 
 void main() { vUv = aCorner; vGas = aGas; vR = aPR.w; vec3 w = aPR.xyz + (uRx * aCorner.x + uUp * aCorner.y) * aPR.w; gl_Position = uVP * vec4(w, 1.); }`;
 const SMOKE_FS = `#version 300 es
 precision highp float;
-in vec2 vUv; flat in vec4 vGas; flat in float vR; uniform vec3 uRx, uUp, uVd, uSun; uniform float uTime; uniform int uHDR; out vec4 o;
+in vec2 vUv; flat in vec4 vGas; flat in float vR; uniform vec3 uRx, uUp, uVd, uSun; uniform float uTime; uniform int uHDR, uToon; out vec4 o;
 float h3(vec3 p) { p = fract(p * 0.3183099 + 0.1); p *= 17.; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
 float vn(vec3 x) { vec3 i = floor(x), f = fract(x); f = f * f * (3. - 2. * f);
   return mix(mix(mix(h3(i), h3(i + vec3(1, 0, 0)), f.x), mix(h3(i + vec3(0, 1, 0)), h3(i + vec3(1, 1, 0)), f.x), f.y), mix(mix(h3(i + vec3(0, 0, 1)), h3(i + vec3(1, 0, 1)), f.x), mix(h3(i + vec3(0, 1, 1)), h3(i + vec3(1, 1, 1)), f.x), f.y), f.z); }
@@ -758,8 +758,22 @@ float vn(vec3 x) { vec3 i = floor(x), f = fract(x); f = f * f * (3. - 2. * f);
 float dens(vec3 q) { float r2 = dot(q, q); if (r2 > 1.) return 0.; vec3 n = q * 2.1 + vGas.w * 37. + vec3(0., 0., -uTime * 0.6);
   float b = vn(n) * 0.55 + vn(n * 2.3 + 11.) * 0.3 + vn(n * 5.1 - 7.) * 0.15; return vGas.x * max(0., (1. - r2) * 1.6 - 0.35) * smoothstep(0.25, 0.75, b + (1. - r2) * 0.35); }
 float hg(float c, float g) { float g2 = g * g; return (1. - g2) / (4. * 3.14159 * pow(1. + g2 - 2. * g * c, 1.5)); }
+/* the cartoon puff (the toon looks, docs/systems/103): a big round lobe and six smaller ones about it, each a ball facing
+   the eye, the nearest surface wins; lit in three flat bands with a bluish shade, a dark line round every lobe's rim (the
+   silhouette and the cauliflower's inner folds alike). As the parcel thins the big lobe shrinks first and the small ones
+   one by one, so an old cloud breaks into round puffs that shrink away, never turning see-through. */
+vec4 toonPuff(vec3 alb) { float rho = vGas.x, sd = vGas.w, best = -9., rim = 0.; vec3 nb = vec3(0., 0., 1.); float w = fwidth(vUv.x) * 1.7;
+  for (int k = 0; k < 7; k++) { float fk = float(k), a = sd * 6.283 + fk * 1.0472, hk = fract(sin(fk * 12.9898 + sd * 78.233) * 43758.5453);
+    vec2 c = k == 0 ? vec2(0., -0.05) : vec2(cos(a), sin(a) * 0.8 + 0.1) * (0.42 + 0.1 * hk);
+    float r = k == 0 ? 0.6 * smoothstep(0.05, 0.3, rho) : (0.3 + 0.1 * hk) * sqrt(smoothstep(0.015 + 0.05 * hk, 0.2, rho));
+    vec2 d = vUv - c; float q = dot(d, d); if (r < 0.02 || q > r * r) continue; float hz = sqrt(r * r - q), z = hz + (k == 0 ? 0.15 : 0.3 * hk - 0.1);
+    if (z > best) { best = z; nb = vec3(d, hz) / r; rim = sqrt(q) > r - w ? 1. : 0.; } }
+  if (best < -8.) return vec4(0.);
+  vec3 n = normalize(uRx * nb.x + uUp * nb.y - uVd * nb.z); float lit = dot(n, uSun) * 0.5 + 0.5, band = lit > 0.64 ? 1. : lit > 0.4 ? 0.62 : 0.;
+  vec3 shade = alb * vec3(0.52, 0.58, 0.78), c = mix(shade, alb, band); c = mix(c, vec3(0.16, 0.15, 0.17), rim); return vec4(clamp(c, 0., 1.), 1.); }
 void main() { float r2 = dot(vUv, vUv); if (r2 > 1.) discard; float h = sqrt(1. - r2); int kind = int(vGas.z + 0.5);
   vec3 alb = kind == 1 ? vec3(0.62, 0.55, 0.42) : kind == 2 ? vec3(0.95) : kind == 3 ? vec3(0.62, 0.66, 0.72) : vec3(0.86, 0.85, 0.83);
+  if (uToon == 1) { vec4 t = toonPuff(alb * 1.08); if (t.a < 0.5) discard; o = t; return; }
   vec3 sunL = uSun, eyeIn = uVd, SUN = vec3(1., 0.95, 0.84) * 3., SKY = vec3(0.35, 0.42, 0.55);
   float sigma = 3.2 * vR, cosT = dot(sunL, eyeIn);   // extinction over the sphere's size; the angle between the light's way and the eye's
   float phase = mix(hg(cosT, 0.62), hg(cosT, -0.25), 0.3);   // two lobes: strong forward (a glow and bright rims with the sun behind), a little back
@@ -1019,7 +1033,7 @@ export class LiveRenderer {
         gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1, 4, gl.FLOAT, false, 32, 0); gl.vertexAttribDivisor(1, 1); gl.enableVertexAttribArray(2); gl.vertexAttribPointer(2, 4, gl.FLOAT, false, 32, 16); gl.vertexAttribDivisor(2, 1); gl.bindVertexArray(null); }
       const idx = Array.from({ length: S.n }, (_, k) => k).sort((a, b) => dot([S.p[b * 8]!, S.p[b * 8 + 1]!, S.p[b * 8 + 2]!], vd) - dot([S.p[a * 8]!, S.p[a * 8 + 1]!, S.p[a * 8 + 2]!], vd)), sorted = new Float32Array(S.n * 8);
       idx.forEach((k, j) => sorted.set(S.p.subarray(k * 8, k * 8 + 8), j * 8));
-      gl.useProgram(this.smoke); gl.uniformMatrix4fv(this.loc(this.smoke, 'uVP'), false, VP); gl.uniform3fv(this.loc(this.smoke, 'uRx'), rx); gl.uniform3fv(this.loc(this.smoke, 'uUp'), up); gl.uniform3fv(this.loc(this.smoke, 'uVd'), vd); gl.uniform3fv(this.loc(this.smoke, 'uSun'), SUN); gl.uniform1f(this.loc(this.smoke, 'uTime'), S.time); gl.uniform1i(this.loc(this.smoke, 'uHDR'), hdrOn);
+      gl.useProgram(this.smoke); gl.uniformMatrix4fv(this.loc(this.smoke, 'uVP'), false, VP); gl.uniform3fv(this.loc(this.smoke, 'uRx'), rx); gl.uniform3fv(this.loc(this.smoke, 'uUp'), up); gl.uniform3fv(this.loc(this.smoke, 'uVd'), vd); gl.uniform3fv(this.loc(this.smoke, 'uSun'), SUN); gl.uniform1f(this.loc(this.smoke, 'uTime'), S.time); gl.uniform1i(this.loc(this.smoke, 'uHDR'), hdrOn); gl.uniform1i(this.loc(this.smoke, 'uToon'), toon ? 1 : 0);
       gl.bindVertexArray(this.smokeVao); gl.bindBuffer(gl.ARRAY_BUFFER, this.smokeBuf); gl.bufferData(gl.ARRAY_BUFFER, sorted, gl.DYNAMIC_DRAW);
       gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false); gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.NONE, gl.NONE, gl.NONE]); gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, S.n);
       gl.disable(gl.BLEND); gl.depthMask(true); gl.useProgram(this.obj); }

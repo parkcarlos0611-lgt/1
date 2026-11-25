@@ -55,10 +55,10 @@ export function cornerParts(g: Geo, H: Hardpoints, look: SuspLook, det: Detail, 
     if (dr) { const c = add(add(along(DISC_OUT), mul(out, -5)), mul(dir, B.r - 24));   // the drift look: a big block over a third of the disc, grown inboard and toward the hub (the wheel's face and barrel stay clear)
       const half = Math.min(B.caliper * 0.72, B.r * 0.62);
       if (det < 2) g.obox(c, tan, half, out, hy + 5, dir, 34);
-      else { // two blocks leaning round the disc's edge, a groove drawn along each: it reads as one curved caliper
-        const lean = Math.asin(Math.min(0.5, half / 2 / (B.r - 24)));
-        for (const k of [-1, 1]) { const b = a + k * lean, d2: V = [-Math.cos(b), 0, Math.sin(b)], t2: V = [Math.sin(b), 0, Math.cos(b)], c2 = add(add(along(DISC_OUT), mul(out, -5)), mul(d2, B.r - 24));
-          g.obox(c2, t2, half * 0.56, out, hy + 5, d2, 34); const f = add(c2, mul(out, hy + 6.5)); g.line('crease', [add(f, mul(t2, -half * 0.4)), add(f, mul(t2, half * 0.4))]); } } }
+      else { // three blocks leaning round the disc's edge, a groove drawn on the middle one: it reads as one curved caliper
+        const lean = 2 * Math.asin(Math.min(0.4, half / 3 / (B.r - 24)));
+        for (const k of [-1, 0, 1]) { const b = a + k * lean, d2: V = [-Math.cos(b), 0, Math.sin(b)], t2: V = [Math.sin(b), 0, Math.cos(b)], c2 = add(add(along(DISC_OUT), mul(out, -5)), mul(d2, B.r - 24));
+          g.obox(c2, t2, half * 0.37, out, hy + 5, d2, 34); if (k) continue; const f = add(c2, mul(out, hy + 6.5)); g.line('crease', [add(f, mul(t2, -half * 0.25)), add(f, mul(t2, half * 0.25))]); } } }
     else g.obox(add(along(DISC_OUT), mul(dir, B.r - 14)), tan, B.caliper / 2, out, hy, dir, 24);
     if (det === 2 && !dr) g.obox(add(along(DISC_OUT), mul(dir, B.r + 13)), tan, B.caliper * 0.3, out, hy * 0.62, dir, 4, '-3'); }
   // ---- the disc and its bell: they turn with the wheel ----

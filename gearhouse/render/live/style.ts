@@ -6,9 +6,9 @@ import { KINDS } from '../car/mesh';
 import { interiorSheet } from '../car/interior/atlas';
 import type { GaugeCar } from '../car/interior/gauges';
 
-/** the style's widths at a picture 1080 pixels high: the silhouette's outline and the drawn lines (doc 108 L1: outline
- *  2.5-3 px, panel lines 1.5-2 px) */
-export const STYLE = { outlinePx: 2.5, linePx: 1.75, ref: 1080, /** a line's lift toward the eye (m), so it never fights the surface under it */ lift: 0.004 } as const;
+/** the style's widths at a picture 1080 pixels high: the silhouette's outline and the drawn lines (doc 108 L1, raised 2026-11-25 to the user's choice: outline
+ *  3.5-4 px, character lines 2.5-3 px, panel gaps 2 px) */
+export const STYLE = { outlinePx: 3.75, linePx: 2.75, /** door, bonnet and lid gaps: a step thinner than the character lines */ panelPx: 2.0, ref: 1080, /** a line's lift toward the eye (m), so it never fights the surface under it */ lift: 0.004 } as const;
 /** a width given at 1080 pixels high, in this picture's pixels: by its height, and never thinner than a fixed share of
  *  a device pixel ratio's (a phone's small but dense picture), nor under one pixel */
 export function screenPx(px1080: number, H: number, dpr = 1): number { return Math.max(1, px1080 * Math.max(H / STYLE.ref, dpr / 2)); }

@@ -79,7 +79,7 @@ export function drawGauge(p: SheetPaint, f: GaugeFace): void { const [w] = p.int
     if (s.num) { const from = s.numFrom ?? s.min, big = Math.max(...[from, s.max].map(v => fig(v / (s.div ?? 1)).length)), h = R * (sub ? 0.085 : side ? 0.1 : big >= 3 ? 0.105 : 0.2);
       for (let v = from; v <= s.max + eps; v += s.num) { const t = fig(v / (s.div ?? 1)), [x, y] = pol(s.c, sub ? s.r + 0.12 : s.r - maj - h / R * (big >= 3 ? 1.15 : 0.75), ang(v)); p.text(t, x, y, h, WHITE, { w: h * 0.17 }); } }
     if (s.ends) { const h = R * 0.13; [[s.min, s.ends[0]], [s.max, s.ends[1]]].forEach(([v, t]) => { const [x, y] = pol(s.c, s.r - maj - 0.13, ang(v as number)); p.text(t as string, x, y, h, WHITE, { w: h * 0.17 }); }); }
-    if (s.inner) { const r2 = s.r - maj - 0.3, h = R * 0.07; for (let v = s.inner.num; v * 1 <= s.max * s.inner.k + eps; v += s.inner.num) { const a = ang(v / s.inner.k), [ax, ay] = pol(s.c, r2, a), [bx, by] = pol(s.c, r2 + 0.035, a), [x, y] = pol(s.c, r2 - 0.075, a);
+    if (s.inner) { const r2 = s.r - maj - 0.36, h = R * 0.065; for (let v = s.inner.num; v * 1 <= s.max * s.inner.k + eps; v += s.inner.num) { const a = ang(v / s.inner.k), [ax, ay] = pol(s.c, r2, a), [bx, by] = pol(s.c, r2 + 0.035, a), [x, y] = pol(s.c, r2 - 0.075, a);
         p.line(ax, ay, bx, by, tw * 0.8, WHITE); if (Math.round(v / s.inner.num) % 2 === 0) p.text(fig(v), x, y, h, WHITE, { w: h * 0.16 }); }
       p.text(s.inner.label, X(0), Y(-0.45), R * 0.06, WHITE, { a: 0.85 }); }
     // the captions: by the scale's kind (a small dial's above its pivot, a side arc's inside its middle, a full dial's above and below its hub)

@@ -36,13 +36,17 @@ export function sweepValue(v: number, sweep: number, min: number, max: number): 
 /** how long the starter must turn it (s): 0.6 warm (water 70 C or more), 1.5 at -10 C, a little either way by `jitter` (0..1) */
 export function crankTime(water: number | undefined, jitter = 0.5): number { const cold = Math.max(0, Math.min(1, (70 - (water ?? 20)) / 80)), j = (jitter - 0.5) * 0.2;
   return Math.max(IGN.crankMin, Math.min(IGN.crankMax, IGN.crankMin + (IGN.crankMax - IGN.crankMin) * cold + j)); }
+/** how the player's car starts (the setting "직접 시동", the default, or "자동 시동", which runs as before): on a practice
+ *  run (the 시험장) in the direct mode it stands off, to be started; in a race it is already running on the grid, as the
+ *  other cars are (a stall there is started again the same way); in the automatic mode always running */
+export function carStartsOff(mode: 'direct' | 'auto', race: boolean): boolean { return mode === 'direct' && !race; }
 const NAMES: Record<EnginePhase, string> = { off: '꺼짐', power: '전원 켜짐', cranking: '크랭킹', firing: '시동 걸리는 중', idle: '공회전', running: '작동 중', stalled: '시동 꺼뜨림' };
 
 export class Ignition {
   phase: EnginePhase; /** time in the phase (s) */ t = 0; /** since the ignition came on (s; -1 off) */ private onT = -1;
   /** the automatic start (the hold latched, no stalling) and whether a stall can happen at all (off on the easy settings) */ auto = false; stallable = false;
   /** what happened, oldest first, for the page to take (its sounds and notes) */ readonly events: IgnitionEvent[] = [];
-  private need = IGN.crankMin; private held = false; private firstHold = false; private holdT = 0; private latch = false;
+  private need: number = IGN.crankMin; private held = false; private firstHold = false; private holdT = 0; private latch = false;
   private pedal = 0; private sinceDown = Infinity; private lugT = 0; private rnd: () => number;
   constructor(start: 'off' | 'running' = 'running', seed = 1) { this.phase = start; let r = (seed * 2654435761) % 2147483647 || 1; this.rnd = () => { r = (r * 16807) % 2147483647; return r / 2147483647; }; }
   /** the engine makes its torque (fuel and spark) */ get fuelled(): boolean { return this.phase === 'firing' || this.phase === 'idle' || this.phase === 'running'; }

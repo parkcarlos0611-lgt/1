@@ -44,7 +44,7 @@ export function bayProps(x: Ctx, tub: boolean, engineOnly: boolean): void {
   for (const s of [1, -1]) { const ya = s * inner, yb = s * (half + wall);
     g.box(xa, xb, Math.min(ya, yb), Math.max(ya, yb), z0, shelf);                                                       // the shelf
     g.box(xa, xb, Math.min(s * half, yb), Math.max(s * half, yb), shelf, rim, '-3'); }                                  // the wall over it
-  g.box(Math.min(xf, xf - e * wall), Math.max(xf, xf - e * wall), -half - wall, half + wall, z0, rim + 90);              // the bulkhead
+  g.box(Math.min(xf, xf - e * wall), Math.max(xf, xf - e * wall), -half - wall, half + wall, z0, rim + (B.front ? 90 : 30));              // the bulkhead
   if (det > 0) { g.part('bayTub', LIP, 0.15); for (const s of [1, -1]) g.box(xa, xb, s * half - 34, s * half + 34 + s * wall / 2, rim, rim + 22, '-3'); }   // the rim's lip
   // the panel across the car's end: the cross bars, the uprights and (at the front) the two struts down to the lower bar
   const xq = xp + e * 26, W = Math.min(2 * inner + 120, 760), H = Math.min(330, rim - z0 - 110), zc = z0 + 60 + H / 2;

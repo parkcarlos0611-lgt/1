@@ -29,9 +29,9 @@ const WHEELS = { f: { x: 850, y: 760, r: 320, w: 225, z: 320 }, r: { x: 3450, y:
 export const FRONT_SITE: Site = { length: 4500, foot: 150, wheels: WHEELS, engine: { at: [1820, 0, 330], dir: '-x' } };
 export const REAR_SITE: Site = { length: 4300, foot: 150, wheels: WHEELS, engine: { at: [WHEELS.r.x + 112, 0, 300], dir: '+x' } };
 const design = (base: Design, p: DesignPatch): Design => applyPatch(base, p);
-export const I6_TURBO = design(DESIGN_NSX, { engine: { layout: 'I6', cc: 3000, turbo: 1, intake: 'single', intercooler: true } });
+export const I6_TURBO = design(DESIGN_NSX, { engine: { layout: 'I6', cc: 3000, turbo: 1, intake: 'single', intercooler: true, grade: 1 } });
 export const V8_NA = DESIGN_F355;
-export const F6_NA = design(DESIGN_NSX, { engine: { layout: 'F6', cc: 3600, turbo: 0, intake: 'single' } });
+export const F6_NA = design(DESIGN_NSX, { engine: { layout: 'F6', cc: 3600, turbo: 0, intake: 'single', grade: 1 } });
 
 const stand = (d: Design, style: PartStyle) => centred(standModel(d, 2, undefined, style).mesh);
 /** an engine in its bay; the realistic look has no bay of its own: the engine alone, as the drift look's is compared with */

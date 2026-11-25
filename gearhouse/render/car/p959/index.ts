@@ -33,9 +33,14 @@ export function p959Model(o: P959Opts = {}): P959Model { const S = buildShell(o)
     for (const h of K.hubs) { const s = h.o[1] > 0 ? 1 : -1, w = h.width, r = h.tyreR, rim = h.rimR;
       const o: V = [h.o[0], h.o[1] - s * w / 2, h.o[2]], f = s * w / 2;
       b.name(h.front ? 'tyreF' : 'tyreR').mat('#1c1c1e', 0.1, 'tyre').lathe('y', o, [[-f, r - 26], [-f * 0.8, r], [f * 0.8, r], [f, r - 26], [f, rim]], 20, false);
-      b.name('rim').mat('#c9ccd0', 0.75, 'metal').lathe('y', o, [[f, rim], [f - s * 14, rim - 12], [f - s * 40, rim * 0.5], [f - s * 55, 70], [f - s * 55, 0.5]], 20, false); }
+      // a placeholder for the 959's hollow five-spoke wheel (the wheel module comes in step S3): rim lip, a dark barrel, five spokes, a cap
+      b.name('rim').mat('#c9ccd0', 0.5, 'plain').lathe('y', o, [[f, rim], [f - s * 10, rim - 14], [f - s * 70, rim - 20]], 20, false);
+      b.name('wheel').mat('#232426', 0.05, 'plain').lathe('y', o, [[f - s * 70, rim - 20], [f - s * 80, 0.5]], 20, false);
+      b.name('wheel').mat('#c9ccd0', 0.5, 'plain'); for (let q = 0; q < 5; q++) { const a = (q / 5 + 0.05) * Math.PI * 2, c = Math.cos(a), sn = Math.sin(a), y = h.o[1] - s * 22; b.bar([o[0] + c * 40, y, o[2] + sn * 40], [o[0] + c * (rim - 18), y + s * 8, o[2] + sn * (rim - 18)], 74, 26); }
+      b.name('hub').mat('#c9ccd0', 0.5, 'plain').lathe('y', o, [[f - s * 30, 62], [f - s * 12, 52], [f - s * 8, 0.5]], 10, false); }
     for (const e of K.exhausts) b.name('exhaust').mat('#2a2b2d', 0.6, 'metal').lathe('x', [0, e.o[1], e.o[2]], [[e.o[0] - 60, e.r], [e.o[0] + 14, e.r], [e.o[0] + 14, e.r - 9], [e.o[0] - 60, e.r - 9]], 10, false);
-    for (const m of K.mirrors) { const s = m.o[1] > 0 ? 1 : -1; b.name('mirror').mat(paint, 0.6, 'paint').box(m.o[0] - 30, m.o[0] + 60, Math.min(m.o[1], m.o[1] + s * 150), Math.max(m.o[1], m.o[1] + s * 150), m.o[2] + 10, m.o[2] + 105); } }
+    for (const m of K.mirrors) { const s = m.o[1] > 0 ? 1 : -1, c: V = [m.o[0] + 20, m.o[1] + s * 120, m.o[2] + 62]; b.name('mirror').mat(paint, 0.6, 'paint').bar(m.o, [c[0], c[1] - s * 30, c[2] - 20], 26)
+      .loft([[c[0] - 45, c[1], c[2]], [c[0] + 55, c[1] - s * 5, c[2]]].map(([x, y, z], q) => { const hw = q ? 62 : 40, hh = q ? 46 : 30; return [[x!, y! - s * hw, z! - hh], [x!, y! + s * hw, z! - hh * 0.8], [x!, y! + s * hw, z! + hh * 0.8], [x!, y! - s * hw, z! + hh]] as V[]; })); } }
   const M = b.mesh(DIM.length);
   M.lines = p959Lines(S) as MeshLine[];
   M.creases = [...S.crease].map(k => { const [a, c] = k.split('|').map(Number) as [number, number]; return [S.P[a]!, S.P[c]!] as [V, V]; });

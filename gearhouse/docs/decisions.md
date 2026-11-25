@@ -3,6 +3,7 @@
 Each decision is listed with its date. The newest come first.
 
 ## 2026-11-25 — BNR33의 게임 이름
+- NISUNO 이름은 그대로. 엠블럼은 사용자가 줄 예정. 순서: 번호판 자유 부착 시험 → BNR33 → 운전석·운전자(문서 118, 결정은 그 문서 §9).
 - 게임 이름은 **NISSINO N33 GT-X**. 바리에이션 R-SPEC(상위 사양 패러디)과 NISUNO(튜너 완성차 패러디)는 문서 117 §5-1에서 검토 중.
 
 ## 2026-11-25 — 버전 표시 0.2

@@ -22,7 +22,7 @@ export const PANELS: Panel[] = [
   { name: 'door', rows: [10, 15], cols: [5, 9] },
   { name: 'door lower (flat)', rows: [11, 15], cols: [8, 9], flat: 2 },
   { name: 'sill', rows: [10, 16], cols: [10, 12] },
-  { name: 'haunch', rows: [18, 19], cols: [5, 8] },
+  { name: 'haunch', rows: [18, 19], cols: [5, 7] },
   { name: 'wingR top', rows: [23, 25], cols: [3, 6], across: 2, along: 1, why: 'the C pillar\'s foot is a hollow between the pillar and the wing top; along the car the deck sweeps from the glass\'s slope to the lid' },
   { name: 'wingR side', rows: [24, 30], cols: [7, 8], along: 1, why: 'the upper side sweeps up into the wing blade\'s leg' },
   { name: 'wing blade', rows: [28, 30], cols: [0, 5] },

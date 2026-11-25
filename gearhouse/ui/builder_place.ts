@@ -13,6 +13,10 @@
 // A place that breaks a rule (render/car/p959/plates.ts, render/car/attach) shows the part red and the reason; let go
 // there, it goes back to the last good place. An overlap with another surface part is shown, not refused. Each good
 // place is kept in the design (core/placed.ts, format 6 body.parts).
+// A hole part (P2: render/car/attach/holes.ts) stays in the car's mesh, its hole cut, while it is not held; once it is
+// dragged, pinched or its slider moved, the car is built once without it (the hole closes) and the part follows as a
+// preview laid on the skin; let go, the car is built again with the hole cut at the new place (a phone never cuts the
+// shell while a finger moves).
 import { Build, type Mesh, type V } from '../render/car/mesh';
 import { modelSkin } from '../render/car/bodies';
 import { fitPlate, drawPlate, stockPlace, snapCentre, plateText, PLATE_W, PLATE_H, type PlateFit } from '../render/car/p959';
@@ -39,12 +43,14 @@ interface View { F: PartFrame; hw: number; hh: number; ok: boolean; why: string 
 const mir = (a: V): V => [a[0], -a[1], a[2]];
 
 export function placeTool(h: PlaceHost): PlaceTool {
-  let id: PlacedId | null = null, n = 0, cur: Placed | null = null, view: View | null = null, good: Placed | null = null, snap = true, ver = 0, made = -1, mesh: Mesh | null = null, others: Footprint[] = [], plateOthers: PlateFit[] = [];
+  let id: PlacedId | null = null, n = 0, cur: Placed | null = null, view: View | null = null, good: Placed | null = null, snap = true, ver = 0, made = -1, mesh: Mesh | null = null, others: Footprint[] = [], plateOthers: PlateFit[] = [], hold = false;
   let drag: { pid: number; off: [number, number]; x: number; y: number; moved: boolean; on: boolean; twin: boolean } | null = null;
   let gest: { pid: number; x: number; y: number; d0: number; a0: number; s0: number; r0: number } | null = null;
   const undo: (Placed[] | undefined)[] = [];
   const D = () => h.design(), skin = (): Skin | null => modelSkin(D())?.skin ?? null, base = () => D().body.base as 'p959' | 'bnr33', dims = () => D().body.frame?.dims;
-  const free = () => !!id && !isPlate(id), kind = () => (id && !isPlate(id) ? PART_KINDS[id] : null);
+  const free = () => !!id && !isPlate(id), kind = () => (id && !isPlate(id) ? PART_KINDS[id] : null), hole = () => !!kind()?.hole;
+  /** a hole part held (dragged, pinched, its slider moving): the car built once without it; let go: built with its hole */
+  const holdOn = () => { if (!hole() || hold) return; hold = true; ver++; h.changed(); }, holdOff = () => { if (!hold) return; hold = false; ver++; h.changed(); h.redraw(); };
   /** the other parts as they sit: the plates' fits (a plate's own rule) and every footprint (a free part's overlap) */
   const measure = () => { others = []; plateOthers = []; const s = modelSkin(D()); if (!s || !id) return; const d = D(), m = d.body.model;
     for (const pid of ['plateF', 'plateR'] as const) { if (pid === id || m?.[pid] === false) continue; const p = placedOf(d.body.parts, pid) ?? (() => { const mk = s.marks.find(k => k.name === pid), a = mk ? stockPlace(s.skin, mk) : null; return a ? { id: pid, at: a, rot: 0, tilt: 0, scale: 1 } : null; })();
@@ -55,7 +61,7 @@ export function placeTool(h: PlaceHost): PlaceTool {
   const viewOf = (s: Skin, p: Placed): View | null => {
     if (isPlate(p.id)) { const f = fitPlate(s, p, plateOthers); if (!f) return null; const draw = (len: number) => { const b = new Build(); drawPlate(b, f, plateText(D().body.model?.plate ?? '08루 0599')); return b.mesh(len); };
       return { F: f.F, hw: PLATE_W / 2 * f.s + 40, hh: PLATE_H / 2 * f.s + 40, ok: f.ok, why: f.why, warn: null, info: `받침 ${Math.round(f.gap)} mm`, twin: false, c: f.F.o, r: Math.hypot(PLATE_W, PLATE_H) / 2 * f.s + 30, mesh: draw }; }
-    const f: PartFit | null = fitPart(s, p, others); if (!f) return null; const bx = boxOf(f.mesh);
+    const f0: PartFit | null = fitPart(s, p, others); if (!f0) return null; const f: PartFit = f0.hole ? { ...f0, mesh: f0.hole.preview() } : f0, bx = boxOf(f.mesh);
     const draw = (len: number) => { const b = new Build(), cr = drawFit(b, f, D().body.paint, f.ok ? undefined : RED), M = b.mesh(len); if (cr.length) M.uv = crestUV(M, cr); return M; };
     return { F: f.F, hw: f.hw, hh: f.hh, ok: f.ok, why: f.why, warn: f.warn, info: f.twin ? '좌우 한 쌍' : f.kind.pair ? '한쪽만' : '하나', twin: f.twin, c: bx.c, r: bx.r + 20, mesh: draw }; };
   const refit = () => { const s = skin(); view = s && cur ? viewOf(s, cur) : null; ver++; sync(); h.redraw(); };
@@ -70,7 +76,7 @@ export function placeTool(h: PlaceHost): PlaceTool {
   let sliders: { sync(): void }[] = [];
   const slider = (label: string, [a, b]: readonly [number, number], step: number, get: () => number, set: (v: number) => void, show: (v: number) => string) => {
     const r = el('label', 'pb-row'), l = el('span', 'pb-l', label), i = el('input', 'gk-range'), v = el('span', 'pb-v'); i.type = 'range'; i.min = String(a); i.max = String(b); i.step = String(step);
-    i.addEventListener('input', () => { if (!cur) return; set(+i.value); v.textContent = show(+i.value); refit(); }); i.addEventListener('change', () => { if (view?.ok) commit(); else back(); });
+    i.addEventListener('input', () => { if (!cur) return; holdOn(); set(+i.value); v.textContent = show(+i.value); refit(); }); i.addEventListener('change', () => { if (view?.ok) commit(); else back(); holdOff(); });
     r.append(l, i, v); rows.append(r); sliders.push({ sync: () => { i.value = String(get()); v.textContent = show(get()); } }); };
   const deg = (x: number) => `${x > 0 ? '+' : ''}${Math.round(x)}°`;
   /** the sliders of the part's kind (a plate: turn, tilt, size; a free part: size, depth and whichever angles it has) */
@@ -80,7 +86,9 @@ export function placeTool(h: PlaceHost): PlaceTool {
     slider('크기', K.scale, 0.01, () => cur?.scale ?? 1, v => { cur!.scale = v; }, v => `${K.sizeOf} ${Math.round(K.size * v)} mm`);
     const dr = K.depth[1] - K.depth[0]; slider(K.depthName, K.depth, dr < 10 ? 0.1 : 1, () => cur?.depth ?? K.depth0, v => { cur!.depth = v; }, v => `${dr < 10 ? v.toFixed(1) : Math.round(v)} mm`);
     if (K.rot[1] > K.rot[0]) slider('회전', K.rot, 1, () => cur?.rot ?? 0, v => { cur!.rot = Math.abs(v) < 1.5 ? 0 : v; }, deg);
-    if (K.tilt[1] > K.tilt[0]) slider(K.tiltName, K.tilt, 1, () => cur?.tilt ?? K.tilt0, v => { cur!.tilt = v; }, deg); }
+    if (K.tilt[1] > K.tilt[0]) slider(K.tiltName, K.tilt, 1, () => cur?.tilt ?? K.tilt0, v => { cur!.tilt = v; }, deg);
+    // a hole part's width against its own shape (P2)
+    const H = K.hole; if (H && H.sx[1] > H.sx[0]) slider('가로 비율', H.sx, 0.01, () => cur?.sx ?? 1, v => { if (Math.abs(v - 1) < 0.01) delete cur!.sx; else cur!.sx = v; }, v => `×${v.toFixed(2)} (폭 ${Math.round(K.size * (cur?.scale ?? 1) * v)} mm)`); }
   const check = (label: string, on: (v: boolean) => void) => { const l = el('label', 'check pb-snap'), cb = el('input'); cb.type = 'checkbox'; l.append(cb, ` ${label}`); cb.addEventListener('change', () => on(cb.checked)); return { l, cb }; };
   const sn = check('가운데 선에 붙이기 (30 mm 안)', v => { snap = v; }), one = check('한쪽만 (거울 짝 없음)', v => { if (!cur) return; if (v) cur.one = true; else delete cur.one; refit(); if (view?.ok) commit(); else back(); });
   sn.cb.checked = true; const toggles = el('div', 'pb-toggles'); toggles.append(sn.l, one.l);
@@ -128,15 +136,15 @@ export function placeTool(h: PlaceHost): PlaceTool {
     add(p) { const d = D(), s = modelSkin(d); if (!s) return; const k = nextN(d.body.parts, p); if (k === null) { h.flash(`${partName(p)}은 더 달 수 없습니다`); return; }
       const e = newPart(base(), s.skin, p, k, d.body.parts, dims()); if (!e) { h.flash('붙일 자리를 찾지 못했습니다'); return; }
       if (id) tool.end(); const was = d.body.parts ? structuredClone(d.body.parts) : undefined; d.body.parts = withPlaced(d.body.parts, p, e, k); tool.start(p, k); undo.push(was); sync(); },
-    end() { if (!id) return; id = null; cur = null; view = null; drag = null; gest = null; bar.hidden = true; ver++; h.mode(false); h.changed(); h.redraw(); },
-    shown(d) { if (!id) return d; return isPlate(id) ? { ...d, body: { ...d.body, model: { ...(d.body.model ?? MODEL_OWN.p959), [id]: false }, parts: withPlaced(d.body.parts, id, null) } } : { ...d, body: { ...d.body, parts: withPlaced(d.body.parts, id, null, n) } }; },
-    overlay(len) { if (!id || !view) return null; if (made === ver && mesh) return mesh; const M = view.mesh(len);
+    end() { if (!id) return; id = null; cur = null; view = null; drag = null; gest = null; hold = false; bar.hidden = true; ver++; h.mode(false); h.changed(); h.redraw(); },
+    shown(d) { if (!id || (hole() && !hold)) return d; return isPlate(id) ? { ...d, body: { ...d.body, model: { ...(d.body.model ?? MODEL_OWN.p959), [id]: false }, parts: withPlaced(d.body.parts, id, null) } } : { ...d, body: { ...d.body, parts: withPlaced(d.body.parts, id, null, n) } }; },
+    overlay(len) { if (!id || !view || (hole() && !hold && view.ok)) return null; if (made === ver && mesh) return mesh; const M = view.mesh(len);
       if (!view.ok && isPlate(id)) for (let t = 0; t < M.n; t++) if (/^plate(Plinth|Bracket|Frame)$/.test(M.names![M.part[t]!] ?? '')) M.col.set(RED, t * 3);
       made = ver; mesh = M; return M; },
     down(e) { if (!id || !view) return false;
       // a second finger while the part is held: pinch and twist
       if (drag && drag.pid !== e.pointerId) { if (!drag.on) { drag = null; return false; } if (gest || !cur) return true; const d = Math.hypot(e.clientX - drag.x, e.clientY - drag.y), a = Math.atan2(e.clientY - drag.y, e.clientX - drag.x);
-        gest = { pid: e.pointerId, x: e.clientX, y: e.clientY, d0: Math.max(20, d), a0: a, s0: cur.scale, r0: cur.rot }; drag.moved = true; return true; }
+        gest = { pid: e.pointerId, x: e.clientX, y: e.clientY, d0: Math.max(20, d), a0: a, s0: cur.scale, r0: cur.rot }; drag.moved = true; holdOn(); return true; }
       if (drag) return false; const s = skin(), r = h.ray(e.clientX, e.clientY); if (!s || !r) return false; const hit = s.hit(r.o, r.d);
       // on the part: the ray passes its drawn shape (or its twin's), or meets the skin inside its footprint
       const near = (c: V) => pass(r.o, r.d, c) < view!.r, onTwin = !!view.twin && near(mir(view.c)) && !near(view.c);
@@ -147,11 +155,11 @@ export function placeTool(h: PlaceHost): PlaceTool {
     move(e) { if (gest && drag && cur) { if (e.pointerId === gest.pid) { gest.x = e.clientX; gest.y = e.clientY; } else if (e.pointerId === drag.pid) { drag.x = e.clientX; drag.y = e.clientY; } else return false;
         const d = Math.hypot(gest.x - drag.x, gest.y - drag.y), a = Math.atan2(gest.y - drag.y, gest.x - drag.x); setSize(gest.s0 * d / gest.d0); setRot(gest.r0 - (a - gest.a0) * 180 / Math.PI); refit(); return true; }
       if (!drag || drag.pid !== e.pointerId) return false; if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 6) drag.moved = true;
-      if (!drag.on) { if (drag.moved) drag = null; return false; } placeUnder(e.clientX, e.clientY, drag.off, drag.twin); return true; },
-    up(e) { if (gest && (e.pointerId === gest.pid || e.pointerId === drag?.pid)) { gest = null; drag = null; if (view?.ok) commit(); else back(); return true; }
+      if (!drag.on) { if (drag.moved) drag = null; return false; } if (drag.moved) holdOn(); placeUnder(e.clientX, e.clientY, drag.off, drag.twin); return true; },
+    up(e) { if (gest && (e.pointerId === gest.pid || e.pointerId === drag?.pid)) { gest = null; drag = null; if (view?.ok) commit(); else back(); holdOff(); return true; }
       if (!drag || drag.pid !== e.pointerId) return false; const g = drag; drag = null;
       if (!g.on && !g.moved) placeUnder(e.clientX, e.clientY, [0, 0]); else if (!g.on) return false;
-      if (view?.ok) commit(); else back(); return true; },
+      if (view?.ok) commit(); else back(); holdOff(); return true; },
     key(e) { if (!id) return false; const k = e.key, st = e.shiftKey ? 20 : 5;
       if (k === 'Escape' || k === 'Enter') { tool.end(); return true; }
       if ((k === 'Delete' || k === 'Backspace') && free()) { offB.click(); return true; }

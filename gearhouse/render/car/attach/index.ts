@@ -16,21 +16,24 @@
 // angle, a mass): the figures are not in the physics yet.
 import { Build, KINDS, type Kind, type Mesh, type V } from '../mesh';
 import { partFrame, framePt, probe, rectPoints, footprintsMeet, vdot, vsub, vmadd, vunit, vcross, type Skin, type PartFrame, type SkinPoint, type SkinTag } from '../skin';
-import { PART_KINDS, placedKey, isPlate, type Placed, type FreeId, type PartKind } from '../../../core/placed';
+import { PART_KINDS, placedKey, isPlate, isHole, type Placed, type FreeId, type SurfId, type HoleId, type PartKind } from '../../../core/placed';
 import { CREST_BOX, CREST_OUTLINE, CREST_COLOURS } from '../../live/crest.gen';
 import type { CrestFrame } from '../p959/badge';
+import { fitHoleAt, type HoleFit } from './holes';
 
 /** what P3 will read of a fitted part (docs/systems/115 §5-7): its kind, its centre (the car's axes, mm; a pair's on the
  *  centre line), how many (a pair 2), the area it shows to the air ahead and from above (m², both together), a wing's
  *  blade, and a mass estimate (kg, both together) */
-export interface PartFigures { id: FreeId; at: V; count: number; frontal: number; plan: number; mass: number; wing?: { span: number; chord: number; aoa: number; height: number } }
+export interface PartFigures { id: FreeId; at: V; count: number; frontal: number; plan: number; mass: number; wing?: { span: number; chord: number; aoa: number; height: number };
+  /** a hole part (P2): the opening the air can pass (m², both together; a lamp none) and how square it faces forward (0..1) */ open?: number; facing?: number }
 /** a part fitted at its place: its frame and size, whether it has a twin, its footprint (half sizes in the frame's
  *  plane), the rules' verdict (`why` the first rule it breaks; `warn` an overlap, shown but allowed), its drawn mesh (the
  *  first of a pair; paint parts in a placeholder colour) and its figures */
 export interface PartFit { p: Placed; key: string; kind: PartKind; F: PartFrame; size: number; depth: number; twin: boolean; hw: number; hh: number;
-  ok: boolean; why: string | null; warn: string | null; mesh: Mesh; crest?: CrestFrame; fig: PartFigures }
-/** a footprint another part's overlap is measured against (a plate, a part, a twin) */
-export interface Footprint { F: PartFrame; hw: number; hh: number }
+  ok: boolean; why: string | null; warn: string | null; mesh: Mesh; crest?: CrestFrame; fig: PartFigures;
+  /** a hole part (P2, ./holes.ts): its cut (and its twin's), its drag preview; `mesh` is then its insides, drawn in the pocket */ hole?: HoleFit }
+/** a footprint another part's overlap is measured against (a plate, a part, a twin); a hole's (P2) with its own test */
+export interface Footprint { F: PartFrame; hw: number; hh: number; hole?: true; pts?: V[]; inside?: (p: V) => boolean }
 
 const neg = (a: V): V => [-a[0], -a[1], -a[2]], add = (a: V, b: V): V => [a[0] + b[0], a[1] + b[1], a[2] + b[2]], mul = (a: V, k: number): V => [a[0] * k, a[1] * k, a[2] * k];
 const hexOf = (c: ArrayLike<number>) => '#' + Array.from(c, v => Math.round(v).toString(16).padStart(2, "0")).join("");
@@ -73,7 +76,7 @@ function faceRule(id: FreeId, n: V): string | null {
 const mirrorV = (a: V): V => [a[0], -a[1], a[2]];
 export const mirrorFrame = (F: PartFrame): PartFrame => ({ o: mirrorV(F.o), n: mirrorV(F.n), u: mirrorV(F.u), up: mirrorV(F.up) });
 /** a fit's footprints: its own and its twin's */
-export const footprints = (f: { F: PartFrame; hw: number; hh: number; twin: boolean }): Footprint[] => [{ F: f.F, hw: f.hw, hh: f.hh }, ...(f.twin ? [{ F: mirrorFrame(f.F), hw: f.hw, hh: f.hh }] : [])];
+export const footprints = (f: { F: PartFrame; hw: number; hh: number; twin: boolean; hole?: HoleFit }): Footprint[] => f.hole ? f.hole.prints : [{ F: f.F, hw: f.hw, hh: f.hh }, ...(f.twin ? [{ F: mirrorFrame(f.F), hw: f.hw, hh: f.hh }] : [])];
 const PAINT = '#b8bcc2';
 
 /** a part at its place on this skin (null: the place is not on this skin) */
@@ -81,6 +84,7 @@ export function fitPart(skin: Skin, p: Placed, others: readonly Footprint[] = []
 /** a part at a point of the skin (the library's pictures stand one on a plane, where there are no surface coordinates) */
 export function fitAt(skin: Skin, pt: SkinPoint, p: Placed, others: readonly Footprint[] = []): PartFit {
   if (isPlate(p.id)) throw new Error('a plate is fitted by render/car/p959/plates.ts');
+  if (isHole(p.id)) return fitHoleAt(skin, pt, p as Placed & { id: HoleId }, others);
   const id = p.id, K = PART_KINDS[id], size = K.size * p.scale, depth = p.depth ?? K.depth0, b = new Build();
   const F = partFrame(pt.p, pt.n, K.group === 'wing' ? 0 : p.rot, K.group === 'wing' || K.group === 'exhaust' || K.group === 'mirror' ? 0 : p.tilt);
   const twin = K.pair && !p.one && Math.abs(pt.p[1]) > 2;
@@ -100,9 +104,9 @@ export function fitAt(skin: Skin, pt: SkinPoint, p: Placed, others: readonly Foo
   why ??= extra;
   if (!why && twin) { const ys = [...pts.rim].map(([x, y]) => framePt(F, x / 0.92, y / 0.92)[1]); if (ys.some(y => Math.sign(y) !== Math.sign(pt.p[1]) || Math.abs(y) < 3)) why = '가운데 선을 넘습니다 (한쪽만으로 하거나 옆으로 옮기세요)'; }
   if (!why && K.centreOnly && Math.abs(pt.p[1]) > 5) why = '가운데 선 위에만 붙일 수 있습니다';
-  const mine = footprints({ F, hw, hh, twin }), warn = others.some(o => mine.some(m => footprintsMeet(m, o, 60))) ? '다른 부품과 겹칩니다 (붙일 수는 있습니다)' : null;
+  const mine = footprints({ F, hw, hh, twin }), warn = others.some(o => o.inside ? mine.some(m => [...rectPoints(m.hw, m.hh, 40).rim, [0, 0] as [number, number]].some(([x, y]) => o.inside!(framePt(m.F, x, y)))) : mine.some(m => footprintsMeet(m, o, 60))) ? '다른 부품과 겹칩니다 (붙일 수는 있습니다)' : null;
   const mesh = b.mesh(0);
-  return { p, key: placedKey(p), kind: K, F, size, depth, twin, hw, hh, ok: !why, why, warn, mesh, ...(crest ? { crest } : {}), fig: figures(mesh, id, twin, pt.p, wing) }; }
+  return { p, key: placedKey(p), kind: K, F, size, depth, twin, hw, hh, ok: !why, why, warn, mesh, ...(crest ? { crest } : {}), fig: figures(mesh, id as SurfId, twin, pt.p, wing) }; }
 
 /** fit every free part of a list, in order, each measured for overlap against the ones before it and `fixed` (the plates) */
 export function fitAll(skin: Skin, ps: readonly Placed[], fixed: readonly Footprint[] = []): PartFit[] { const out: PartFit[] = [], seen: Footprint[] = [...fixed];
@@ -116,16 +120,18 @@ export function drawFit(b: Build, f: PartFit, paint: string, tint?: ArrayLike<nu
       const v = (i: number): V => [M.pos[t * 9 + i * 3]!, (mir ? -1 : 1) * M.pos[t * 9 + i * 3 + 1]!, M.pos[t * 9 + i * 3 + 2]!];
       if (mir) b.tri(v(0), v(2), v(1)); else b.tri(v(0), v(1), v(2)); } }
   return f.crest ? [f.crest, ...(f.twin ? [{ ...f.crest, c: mirrorV(f.crest.c), n: mirrorV(f.crest.n), ex: mirrorV(f.crest.ex), ey: mirrorV(f.crest.ey) }] : [])] : []; }
-/** every free part of a design drawn on a car (each at its place; one whose place has left the skin is left out) */
-export function drawPlaced(b: Build, skin: Skin, ps: readonly Placed[] | undefined, paint: string, fixed: readonly Footprint[] = []): { fits: PartFit[]; crests: CrestFrame[] } {
-  const fits = ps?.some(p => !isPlate(p.id)) ? fitAll(skin, ps, fixed) : []; return { fits, crests: fits.flatMap(f => drawFit(b, f, paint)) }; }
+/** every free part of a design drawn on a car (each at its place; one whose place has left the skin is left out; a hole
+ *  part only when its hole was cut: `cut`, the keys ./holes.ts cutShell cut), or the fits given */
+export function drawPlaced(b: Build, skin: Skin, ps: readonly Placed[] | undefined, paint: string, fixed: readonly Footprint[] = [], given?: { fits: PartFit[]; cut: ReadonlySet<string> }): { fits: PartFit[]; crests: CrestFrame[] } {
+  const fits = given?.fits ?? (ps?.some(p => !isPlate(p.id)) ? fitAll(skin, ps!, fixed) : []), cut = given?.cut;
+  return { fits, crests: fits.filter(f => !f.hole || cut?.has(f.key)).flatMap(f => drawFit(b, f, paint)) }; }
 /** a design's free parts' figures for P3 (docs/systems/115 §5-7) */
 export const partFigures = (fits: readonly PartFit[]): PartFigures[] => fits.map(f => f.fig);
 
 // ---- the figures ----
-const MASS: Record<FreeId, number> = { mirror: 1.1, wingRing: 9, wingGT: 7, exhaust1: 0.5, exhaust2: 0.9, badge: 0.03, marker: 0.06, vent: 0.35, louvre: 0.9 };
+const MASS: Record<SurfId, number> = { mirror: 1.1, wingRing: 9, wingGT: 7, exhaust1: 0.5, exhaust2: 0.9, badge: 0.03, marker: 0.06, vent: 0.35, louvre: 0.9 };
 /** a closed mesh's shadow on a plane is half the sum of its faces' areas times how square they stand to it */
-function figures(M: Mesh, id: FreeId, twin: boolean, at: V, wing?: PartFigures['wing']): PartFigures { let fx = 0, fz = 0; const P = M.pos;
+function figures(M: Mesh, id: SurfId, twin: boolean, at: V, wing?: PartFigures['wing']): PartFigures { let fx = 0, fz = 0; const P = M.pos;
   for (let t = 0; t < M.n; t++) { const a: V = [P[t * 9]!, P[t * 9 + 1]!, P[t * 9 + 2]!], n = vcross(vsub([P[t * 9 + 3]!, P[t * 9 + 4]!, P[t * 9 + 5]!], a), vsub([P[t * 9 + 6]!, P[t * 9 + 7]!, P[t * 9 + 8]!], a)); fx += Math.abs(n[0]) / 2; fz += Math.abs(n[2]) / 2; }
   const k = twin ? 2 : 1, s = PART_KINDS[id];
   return { id, at: twin ? [at[0], 0, at[2]] : at, count: k, frontal: fx / 2 * k / 1e6, plan: fz / 2 * k / 1e6, mass: Math.round(MASS[id] * (s.group === 'badge' ? 1 : 1) * k * 100) / 100, ...(wing ? { wing } : {}) }; }

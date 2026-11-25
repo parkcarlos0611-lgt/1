@@ -5,16 +5,23 @@
 //   - P1a: the number plates, one each, no mirror twin. A plate with no entry sits where the car's own plate sits.
 //   - P1: the surface parts (mirrors, rear wings, exhaust tips, the crest badge, side marker lamps, stick-on vents and
 //     louvres), as many of a kind as its limit; a kind that comes in pairs is mirrored across the centre line unless the
-//     entry says "one side only"; one that may sit on the line is single there. They cut no holes (that is P2).
+//     entry says "one side only"; one that may sit on the line is single there. They cut no holes.
+//   - P2: the hole-cutting parts (head lamps, tail lamps, intakes and grilles, cut vents and louvres): the same entries,
+//     with a width ratio (`sx`); the body's skin is cut to each one's footprint (render/car/attach/holes.ts), never stored.
 // The render side reads these (render/car/attach for the free parts, render/car/p959/plates.ts for the plates); the
 // builder writes them (ui/builder_place.ts).
 
 export type PlateId = 'plateF' | 'plateR';
 /** the free surface parts' kinds (docs/systems/115 P1, §5-4's first column) */
-export type FreeId = 'mirror' | 'wingRing' | 'wingGT' | 'exhaust1' | 'exhaust2' | 'badge' | 'marker' | 'vent' | 'louvre';
+export type SurfId = 'mirror' | 'wingRing' | 'wingGT' | 'exhaust1' | 'exhaust2' | 'badge' | 'marker' | 'vent' | 'louvre';
+/** the hole-cutting parts (docs/systems/115 P2, §5-4's second column) */
+export type HoleId = 'lampRound' | 'lampEllipsoid' | 'lampSquare' | 'tailBand' | 'tailRound' | 'grille' | 'sideIntake' | 'ventCut' | 'louvreCut';
+export type FreeId = SurfId | HoleId;
 export type PlacedId = PlateId | FreeId;
 export const PLATE_IDS: readonly PlateId[] = ['plateF', 'plateR'];
-export const FREE_IDS: readonly FreeId[] = ['mirror', 'wingRing', 'wingGT', 'exhaust1', 'exhaust2', 'badge', 'marker', 'vent', 'louvre'];
+export const HOLE_IDS: readonly HoleId[] = ['lampRound', 'lampEllipsoid', 'lampSquare', 'tailBand', 'tailRound', 'grille', 'sideIntake', 'ventCut', 'louvreCut'];
+export const FREE_IDS: readonly FreeId[] = ['mirror', 'wingRing', 'wingGT', 'exhaust1', 'exhaust2', 'badge', 'marker', 'vent', 'louvre', ...HOLE_IDS];
+export const isHole = (id: PlacedId): id is HoleId => (HOLE_IDS as readonly string[]).includes(id);
 export const PLACED_IDS: readonly PlacedId[] = [...PLATE_IDS, ...FREE_IDS];
 export const isPlate = (id: PlacedId): id is PlateId => id === 'plateF' || id === 'plateR';
 /** a place on a body's skin: the cage face and the point in it (u along the face's first edge, v along its last) */
@@ -24,7 +31,8 @@ export interface Placed { id: PlacedId; /** the free parts: which one of its kin
   /** degrees the part leans back from the skin's plane about its own across axis (+: its top back); a wing: its blade's angle */ tilt: number;
   /** times the part's own size (a plate: 335 x 170 mm; a free part: its kind's `size`) */ scale: number;
   /** the free parts: how far it stands off the skin (mm: a mirror's arm, a wing's height, a tip's reach, a stick-on's thickness) */ depth?: number;
-  /** the free parts that come in pairs: this one alone, no mirror twin ("한쪽만") */ one?: true }
+  /** the free parts that come in pairs: this one alone, no mirror twin ("한쪽만") */ one?: true;
+  /** the hole parts: the width against the kind's own shape (1: as made; the height is the size's) */ sx?: number }
 /** the plates' freedoms: the turn, the tilt, the size (the law's size, so only a little) */
 export const PLACED_LIMITS = { rot: [-20, 20], tilt: [-15, 15], scale: [0.85, 1.15] } as const;
 
@@ -33,9 +41,14 @@ export const PLACED_LIMITS = { rot: [-20, 20], tilt: [-15, 15], scale: [0.85, 1.
  *  on the line (a single part there; `centreOnly`: only there), and how many of it a design may have */
 export interface PartKind { group: PartGroup; name: string; size: number; sizeOf: string; scale: readonly [number, number];
   depth: readonly [number, number]; depth0: number; depthName: string; rot: readonly [number, number]; tilt: readonly [number, number]; tilt0: number; tiltName: string;
-  pair: boolean; centre: boolean; centreOnly?: boolean; max: number }
-export type PartGroup = 'mirror' | 'wing' | 'exhaust' | 'badge' | 'marker' | 'vent';
-export const PART_GROUPS: readonly [PartGroup, string][] = [['mirror', '미러'], ['wing', '뒤 윙'], ['exhaust', '배기구 끝'], ['badge', '배지'], ['marker', '옆 표시등'], ['vent', '벤트·루버 (붙임)']];
+  pair: boolean; centre: boolean; centreOnly?: boolean; max: number;
+  /** a hole part (P2): its footprint's height against its width (`size` the width), the width ratio's range, the
+   *  outline's shape (an ellipse or a rounded rectangle, its corner radius against the smaller half side), and for a
+   *  band that wraps round a corner the radius it is laid round (mm at scale 1; its middle `flat` of the width laid
+   *  straight) */ hole?: { aspect: number; sx: readonly [number, number]; shape: 'ellipse' | 'rrect'; r?: number; wrap?: { r: number; flat: number } } }
+export type PartGroup = 'mirror' | 'wing' | 'exhaust' | 'badge' | 'marker' | 'vent' | 'lamp' | 'tail' | 'intake' | 'ventCut';
+export const PART_GROUPS: readonly [PartGroup, string][] = [['lamp', '헤드램프 (구멍)'], ['tail', '테일램프 (구멍)'], ['intake', '흡기구·그릴 (구멍)'], ['ventCut', '벤트·루버 (구멍)'],
+  ['mirror', '미러'], ['wing', '뒤 윙'], ['exhaust', '배기구 끝'], ['badge', '배지'], ['marker', '옆 표시등'], ['vent', '벤트·루버 (붙임)']];
 export const PART_KINDS: Record<FreeId, PartKind> = {
   mirror: { group: 'mirror', name: '미러', size: 124, sizeOf: '폭', scale: [0.6, 1.6], depth: [40, 220], depth0: 120, depthName: '팔 길이', rot: [-30, 30], tilt: [-20, 20], tilt0: 0, tiltName: '기울기', pair: true, centre: false, max: 4 },
   wingRing: { group: 'wing', name: '링 윙 (599형)', size: 1500, sizeOf: '폭', scale: [0.6, 1.25], depth: [60, 400], depth0: 130, depthName: '높이', rot: [0, 0], tilt: [-5, 20], tilt0: 4, tiltName: '날개 각', pair: false, centre: true, centreOnly: true, max: 2 },
@@ -46,7 +59,19 @@ export const PART_KINDS: Record<FreeId, PartKind> = {
   badge: { group: 'badge', name: '문장 배지', size: 50, sizeOf: '높이', scale: [0.5, 2.4], depth: [0.5, 6], depth0: 1.2, depthName: '두께', rot: [-30, 30], tilt: [0, 0], tilt0: 0, tiltName: '', pair: false, centre: true, max: 4 },
   marker: { group: 'marker', name: '옆 표시등', size: 70, sizeOf: '폭', scale: [0.5, 2.2], depth: [1, 8], depth0: 2.5, depthName: '두께', rot: [-45, 45], tilt: [0, 0], tilt0: 0, tiltName: '', pair: true, centre: false, max: 6 },
   vent: { group: 'vent', name: '벤트 (붙임)', size: 220, sizeOf: '폭', scale: [0.35, 2.7], depth: [2, 20], depth0: 6, depthName: '높이', rot: [-90, 90], tilt: [0, 0], tilt0: 0, tiltName: '', pair: true, centre: true, max: 8 },
-  louvre: { group: 'vent', name: '루버 (붙임)', size: 360, sizeOf: '폭', scale: [0.3, 1.7], depth: [4, 25], depth0: 10, depthName: '날개 높이', rot: [-90, 90], tilt: [0, 0], tilt0: 0, tiltName: '', pair: true, centre: true, max: 6 } };
+  louvre: { group: 'vent', name: '루버 (붙임)', size: 360, sizeOf: '폭', scale: [0.3, 1.7], depth: [4, 25], depth0: 10, depthName: '날개 높이', rot: [-90, 90], tilt: [0, 0], tilt0: 0, tiltName: '', pair: true, centre: true, max: 6 },
+  // ---- P2: the parts that cut their hole (render/car/attach/holes.ts); `depth` is how deep the pocket behind goes.
+  //      The sizes are the 599's own openings (docs/systems/109 S3): its lamp sockets 234 x 278 mm, the tail lamp band
+  //      across the tail and round its corners, the side intake 109 x 190, the engine lid's grille 936 x 345
+  lampRound: { group: 'lamp', name: '헤드램프 (둥근 렌즈)', size: 224, sizeOf: '폭', scale: [0.6, 1.6], depth: [8, 40], depth0: 14, depthName: '깊이', rot: [-45, 45], tilt: [0, 0], tilt0: 0, tiltName: '', pair: true, centre: false, max: 4, hole: { aspect: 1.2, sx: [0.7, 1.6], shape: 'ellipse' } },
+  lampEllipsoid: { group: 'lamp', name: '헤드램프 (프로젝터 2개)', size: 224, sizeOf: '폭', scale: [0.6, 1.6], depth: [8, 40], depth0: 14, depthName: '깊이', rot: [-45, 45], tilt: [0, 0], tilt0: 0, tiltName: '', pair: true, centre: false, max: 4, hole: { aspect: 1.2, sx: [0.7, 2], shape: 'ellipse' } },
+  lampSquare: { group: 'lamp', name: '헤드램프 (사각 프로젝터)', size: 224, sizeOf: '폭', scale: [0.5, 1.6], depth: [8, 40], depth0: 14, depthName: '깊이', rot: [-45, 45], tilt: [0, 0], tilt0: 0, tiltName: '', pair: true, centre: false, max: 4, hole: { aspect: 1.2, sx: [0.7, 2.6], shape: 'rrect', r: 0.3 } },
+  tailBand: { group: 'tail', name: '테일램프 띠 (599형)', size: 1964, sizeOf: '폭', scale: [0.6, 1.15], depth: [4, 30], depth0: 9, depthName: '깊이', rot: [0, 0], tilt: [0, 0], tilt0: 0, tiltName: '', pair: false, centre: true, centreOnly: true, max: 2, hole: { aspect: 120 / 1964, sx: [0.8, 1.1], shape: 'rrect', r: 0.2, wrap: { r: 200, flat: 650 / 982 } } },
+  tailRound: { group: 'tail', name: '둥근 테일램프', size: 120, sizeOf: '지름', scale: [0.6, 2], depth: [4, 30], depth0: 10, depthName: '깊이', rot: [0, 0], tilt: [0, 0], tilt0: 0, tiltName: '', pair: true, centre: false, max: 6, hole: { aspect: 1, sx: [1, 1.8], shape: 'ellipse' } },
+  grille: { group: 'intake', name: '흡기구·그릴 (망)', size: 600, sizeOf: '폭', scale: [0.3, 2], depth: [10, 80], depth0: 40, depthName: '깊이', rot: [-30, 30], tilt: [0, 0], tilt0: 0, tiltName: '', pair: true, centre: true, max: 6, hole: { aspect: 0.375, sx: [0.4, 3], shape: 'rrect', r: 0.25 } },
+  sideIntake: { group: 'intake', name: '옆 흡기구 (599형)', size: 109, sizeOf: '폭', scale: [0.5, 2.2], depth: [10, 60], depth0: 34, depthName: '깊이', rot: [-45, 45], tilt: [0, 0], tilt0: 0, tiltName: '', pair: true, centre: false, max: 4, hole: { aspect: 190 / 109, sx: [0.6, 2.5], shape: 'rrect', r: 0.35 } },
+  ventCut: { group: 'ventCut', name: '벤트 (구멍)', size: 220, sizeOf: '폭', scale: [0.35, 2.7], depth: [8, 50], depth0: 20, depthName: '깊이', rot: [-90, 90], tilt: [0, 0], tilt0: 0, tiltName: '', pair: true, centre: true, max: 8, hole: { aspect: 0.36, sx: [0.5, 2], shape: 'rrect', r: 0.6 } },
+  louvreCut: { group: 'ventCut', name: '루버 (구멍)', size: 360, sizeOf: '폭', scale: [0.3, 2.2], depth: [8, 50], depth0: 18, depthName: '깊이', rot: [-90, 90], tilt: [0, 0], tilt0: 0, tiltName: '', pair: true, centre: true, max: 6, hole: { aspect: 0.5, sx: [0.5, 2], shape: 'rrect', r: 0.12 } } };
 /** the most entries a design keeps (docs/systems/115 §5-3: about 40 parts; a pair is one entry) */
 export const MAX_PLACED = 32;
 /** the most a cage's face number can be (the 959's cage has about 700; a later lump may have more) */
@@ -66,7 +91,8 @@ export function fitPlacedOne(v: unknown): Placed | null { if (!v || typeof v !==
   if (isPlate(id)) return { id, at, rot: r1(num(o.rot, 0), PLACED_LIMITS.rot), tilt: r1(num(o.tilt, 0), PLACED_LIMITS.tilt), scale: Math.round(clamp(num(o.scale, 1), PLACED_LIMITS.scale) * 100) / 100 };
   const K = PART_KINDS[id], n = Math.round(clamp(num(o.n, 0), [0, K.max - 1]));
   return { id, ...(n ? { n } : {}), at, rot: r1(num(o.rot, 0), K.rot), tilt: r1(num(o.tilt, K.tilt0), K.tilt), scale: Math.round(clamp(num(o.scale, 1), K.scale) * 100) / 100,
-    depth: r1(num(o.depth, K.depth0), K.depth), ...(o.one === true && K.pair ? { one: true as const } : {}) }; }
+    depth: r1(num(o.depth, K.depth0), K.depth), ...(o.one === true && K.pair ? { one: true as const } : {}),
+    ...(K.hole && typeof o.sx === 'number' && Number.isFinite(o.sx) && Math.abs(o.sx - 1) > 0.004 ? { sx: Math.round(clamp(o.sx, K.hole.sx) * 100) / 100 } : {}) }; }
 const order = (p: Placed) => PLACED_IDS.indexOf(p.id) * 64 + (p.n ?? 0);
 /** the list from anything: each part once (the last entry for a key wins), in the kinds' order; undefined when none is
  *  left (the design then has no `parts` at all, as an older one) */
@@ -84,4 +110,4 @@ export const freeParts = (ps: readonly Placed[] | undefined): Placed[] => (ps ??
 export function nextN(ps: readonly Placed[] | undefined, id: FreeId): number | null { if ((ps?.length ?? 0) >= MAX_PLACED) return null;
   for (let n = 0; n < PART_KINDS[id].max; n++) if (!placedOf(ps, id, n)) return n; return null; }
 /** a free part's size as the builder writes it (mm) */
-export const sizeMm = (p: Placed) => isPlate(p.id) ? 335 * p.scale : PART_KINDS[p.id].size * p.scale;
+export const sizeMm = (p: Placed) => isPlate(p.id) ? 335 * p.scale : PART_KINDS[p.id].size * p.scale * (p.sx ?? 1);

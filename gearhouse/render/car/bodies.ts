@@ -78,7 +78,7 @@ export function cabinOf(f: Frame, A: CabinAnchors = P959_CABIN): CabinAnchors { 
 const P959: ModelBody = { name: CAR_599, length: DIM.length, cabin: P959_CABIN, anchors: P959_ANCHORS, wheels: p959Wheels, open: ['engineGrille', 'engineLid', 'rearWindow'],
   gauges: (d, topKmh) => ({ ...P959_GAUGES, redline: d.engine.redline, topKmh: topKmh ?? P959_GAUGES.topKmh, ...(d.engine.turbo ? { boostBar: d.engine.boost } : { boostBar: undefined }) }),
   mesh(d, o = {}) { const m = { ...MODEL_OWN.p959, ...d.body.model }, det = o.detail ?? 2, f = frameFor(d), anchors = anchorsOf(f);
-    const body = p959Mesh({ ...(f === STOCK_FRAME ? {} : { dims: f.dims }), ...(d.body.glass !== undefined ? { glass: d.body.glass } : {}), ...(m.details === false ? { details: false } : {}), ...(m.smalls === false ? { smalls: false } : {}), paint: d.body.paint, bumperF: m.bumperF, bumperR: m.bumperR, lamp: m.lamp, wheel: m.wheel, plate: plateOf(d), plateF: m.plateF !== false, plateR: m.plateR !== false, ...(d.body.parts ? { placed: d.body.parts } : {}), brake: !!o.bare, tyres: d.kit.tyres });
+    const body = p959Mesh({ ...(f === STOCK_FRAME ? {} : { dims: f.dims }), ...(d.body.glass !== undefined ? { glass: d.body.glass } : {}), ...(m.details === false ? { details: false } : {}), ...(m.smalls === false ? { smalls: false } : {}), ...(m.openings === false ? { openings: false } : {}), paint: d.body.paint, bumperF: m.bumperF, bumperR: m.bumperR, lamp: m.lamp, wheel: m.wheel, plate: plateOf(d), plateF: m.plateF !== false, plateR: m.plateR !== false, ...(d.body.parts ? { placed: d.body.parts } : {}), brake: !!o.bare, tyres: d.kit.tyres });
     // the paint's gloss as the design sets it (the model is made at 0.6)
     const P = KINDS.indexOf('paint'); for (let t = 0; t < body.n; t++) if (body.kind[t] === P) body.gloss[t] = d.body.gloss;
     if (o.bare) return body;
@@ -127,7 +127,7 @@ const SKINS = new Map<string, { skin: Skin; marks: Mark[] }>();
 export function modelSkin(d: Design): { skin: Skin; marks: Mark[] } | null { if (d.body.base === 'bnr33') { const f = n33FrameFor(d), key = JSON.stringify(['n33', f.dims, d.body.glass ?? 'u']); let s = SKINS.get(key);
     if (!s) { s = { skin: n33Skin(buildN33Shell({ ...(f === N33_STOCK ? {} : { dims: f.dims }), glass: d.body.glass === undefined ? 'stock' : d.body.glass })), marks: n33Marks(f) }; if (SKINS.size > 4) SKINS.clear(); SKINS.set(key, s); } return s; }
   if (d.body.base !== 'p959') return null;
-  const m = { ...MODEL_OWN.p959, ...d.body.model }, f = frameFor(d), key = JSON.stringify([f.dims, d.body.glass ?? 'u', m.details, m.bumperF, m.bumperR, m.lamp]); let s = SKINS.get(key);
-  if (!s) { const S = buildShell({ ...(f === STOCK_FRAME ? {} : { dims: f.dims }), ...(d.body.glass !== undefined ? { glass: d.body.glass } : {}), ...(m.details === false ? { details: false } : {}), bumperF: m.bumperF, bumperR: m.bumperR, lamps: m.lamp !== 'none' });
+  const m = { ...MODEL_OWN.p959, ...d.body.model }, f = frameFor(d), key = JSON.stringify([f.dims, d.body.glass ?? 'u', m.details, m.openings, m.bumperF, m.bumperR, m.lamp]); let s = SKINS.get(key);
+  if (!s) { const S = buildShell({ ...(f === STOCK_FRAME ? {} : { dims: f.dims }), ...(d.body.glass !== undefined ? { glass: d.body.glass } : {}), ...(m.details === false ? { details: false } : {}), ...(m.openings === false ? { openings: false } : {}), bumperF: m.bumperF, bumperR: m.bumperR, lamps: m.lamp !== 'none' });
     s = { skin: shellSkin(S), marks: sockets(f).marks.filter(k => /^plate/.test(k.name)) }; if (SKINS.size > 4) SKINS.clear(); SKINS.set(key, s); }
   return s; }

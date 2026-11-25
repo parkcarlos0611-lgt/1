@@ -309,9 +309,10 @@ function btnRow(t: string, f: () => void): HTMLElement { const d = document.crea
   const plateCards = cards<PlacedId | ''>('번호판 놓기 (눌러서 자유 배치)', ([['plateF', '앞 번호판'], ['plateR', '뒤 번호판']] as [PlacedId, string][]).map(([k, t]) => [k, t, bumperPic('std', k === 'plateR'), { kind: k, v: k }] as [PlacedId, string, string, ThumbSpec]),
     () => place.id ?? '', v => { if (v) place.start(v); });
   // the parts library (docs/systems/110 G4): each swap a card with its picture
-  // "599 순정 세트" (docs/systems/115 §4-1): every part as the car left the works, its glass the stock set; the lump's
-  // dimensions and the plate's text kept
-  const stockRow = btnRow('599 순정 세트', () => { place.end(); D.body.model = { ...MODEL_OWN.p959, plate: M().plate, smalls: false }; D.body.glass = 'stock'; delete D.body.parts; D.body.parts = stockFree(); changed(); flash('599 순정 부품과 창문을 달았습니다 (번호판도 순정 자리로, 미러·배기구·배지는 자유 부착 부품으로)'); });
+  // "599 순정 세트" (docs/systems/115 §4-1, P2): every part as the car left the works, its glass the stock set; the lump's
+  // dimensions and the plate's text kept. Since P2 its openings are hole parts (lamps, tail lamp band, side intakes, the
+  // lid's grille) and its small parts free parts, so the shell's own sockets stay flush (lamp none, openings off)
+  const stockRow = btnRow('599 순정 세트', () => { place.end(); D.body.model = { ...MODEL_OWN.p959, lamp: 'none', plate: M().plate, smalls: false, openings: false }; D.body.glass = 'stock'; delete D.body.parts; D.body.parts = stockFree(); changed(); flash('599 순정 부품과 창문을 달았습니다 (램프·테일램프·흡기구·그릴은 구멍 부품, 미러·배기구·배지는 붙이는 부품, 번호판은 순정 자리)'); });
   stockRow.querySelector('button')!.className = BTN_MAIN; stockRow.querySelector('button')!.id = 'stockSet';
   const lumpRow = btnRow('모두 떼기 (덩어리로)', () => { place.end(); D.body.model = LUMP_SWAPS(M().plate); delete D.body.parts; changed(); });
   stockRow.append(lumpRow.querySelector('button')!);
@@ -324,7 +325,7 @@ function btnRow(t: string, f: () => void): HTMLElement { const d = document.crea
   // the plates: the 599's and the N33's alike (each body's own skin and stock places: render/car/bodies.ts modelSkin)
   const plateRows = [plateOn('plateF', '앞 번호판'), plateOn('plateR', '뒤 번호판'), plateCards, note(`번호판 카드를 누르면 "놓기"가 됩니다. 판을 끌어 차체 위 아무 곳으로나 옮기고, 회전·기울기·크기를 고릅니다. 앞 번호판은 앞을, 뒤 번호판은 뒤를 보는 면(차 축에서 35° 안)에만 붙고, 굽은 면에서는 판이 평평한 채 검은 받침이 틈을 메웁니다(최대 70 mm). 램프·유리·다른 번호판과 겹치면 붙지 않습니다. 레이스 상대와 순정 세트는 순정 자리입니다.`),
     plateRow];
-  const modelTail = [note('범퍼는 차체의 이음선 고리에 맞물려 바뀝니다. 헤드램프를 빼면 램프 자리는 차체 색으로 막힙니다. 번호판은 앞뒤를 따로 떼고 다시 달 수 있고, 뗀 자리는 범퍼 면 그대로입니다. 번호판 글자는 판 위에 획으로 그립니다(가상의 번호만). 구멍을 내는 부품(램프·흡기구·그릴)의 자유 부착은 다음 단계(P2)에서 옵니다.')];
+  const modelTail = [note('범퍼는 차체의 이음선 고리에 맞물려 바뀝니다. 위의 헤드램프 카드는 예전 소켓 방식(순정 자리 고정)이고, 아래 "구멍" 부품은 어디에나 붙어 그 모양대로 차체에 구멍을 냅니다. 번호판은 앞뒤를 따로 떼고 다시 달 수 있고, 뗀 자리는 범퍼 면 그대로입니다. 번호판 글자는 판 위에 획으로 그립니다(가상의 번호만).')];
   // the free surface parts (docs/systems/115 P1): a card for each kind, grouped, with its rendered picture; pressed, a new
   // one is put on (at the lump's stock place for it, or a default one) and placed (ui/builder_place.ts); the parts on the
   // car listed to pick one again; the lump's stock set of them, and all of them off
@@ -337,12 +338,13 @@ function btnRow(t: string, f: () => void): HTMLElement { const d = document.crea
     if (!ps.length) { const e = document.createElement('small'); e.className = 'lock'; e.textContent = '아직 붙인 부품이 없습니다.'; onCar.append(e); }
     for (const p of ps) { const b = document.createElement('button'); b.type = 'button'; b.className = BTN; const K = PART_KINDS[p.id as FreeId]; b.textContent = `${partName(p.id)}${p.n ? ` ${p.n + 1}` : ''}${K.pair && !p.one ? ' ×2' : ''}`;
       b.setAttribute('aria-pressed', String(place.id === p.id && place.n === (p.n ?? 0))); b.addEventListener('click', () => place.start(p.id, p.n ?? 0)); onCar.append(b); } });
-  const freeStock = btnRow('순정 부착 부품', () => { place.end(); const ps = stockFree(); D.body.parts = [...keepPlates(), ...(ps ?? [])].length ? [...keepPlates(), ...(ps ?? [])] : undefined; if (D.body.base === 'p959') M().smalls = false; changed(); flash('이 차체의 순정 부착 부품을 순정 자리에 달았습니다'); });
+  // the lump's stock parts, the hole parts with them (P2): on the 599 its own sockets then stay flush
+  const freeStock = btnRow('순정 부착 부품', () => { place.end(); if (D.body.base === 'p959') Object.assign(M(), { smalls: false, lamp: 'none', openings: false }); const ps = stockFree(); D.body.parts = [...keepPlates(), ...(ps ?? [])].length ? [...keepPlates(), ...(ps ?? [])] : undefined; changed(); flash('이 차체의 순정 부품(구멍 부품 포함)을 순정 자리에 달았습니다'); });
   freeStock.append(btnRow('부착 부품 모두 떼기', () => { place.end(); const k = keepPlates(); D.body.parts = k.length ? k : undefined; if (D.body.base === 'p959') M().smalls = false; changed(); }).querySelector('button')!);
-  const freeRows = [h2('붙이는 부품'), note('카드를 누르면 새 부품이 붙고 "놓기"가 됩니다. 끌어서 차체 어디에나 옮기고 크기·깊이·각도를 고릅니다. 짝 부품(미러·배기구·표시등·벤트)은 가운데 선 건너편에 거울처럼 함께 붙고 "한쪽만"으로 끌 수 있습니다. 윙은 가운데 선 위에만, 배지는 하나씩 붙습니다. 이 부품들은 구멍을 내지 않고 표면에 붙습니다(구멍 부품은 P2).'),
+  const freeRows = [h2('붙이는 부품'), note('카드를 누르면 새 부품이 붙고 "놓기"가 됩니다. 끌어서 차체 어디에나 옮기고 크기·깊이·각도를 고릅니다. 짝 부품(램프·흡기구·미러·배기구·표시등·벤트)은 가운데 선 건너편에 거울처럼 함께 붙고 "한쪽만"으로 끌 수 있습니다. 윙과 테일램프 띠는 가운데 선 위에만, 배지는 하나씩 붙습니다. "구멍" 부품은 그 모양대로 차체에 구멍을 내고 안을 막습니다. 끄는 동안은 구멍을 내지 않고, 손을 떼면 다시 뚫습니다. 유리·램프·아치·문 틈 위와 다른 구멍 40 mm 안에는 낼 수 없습니다(구멍 합치기는 P4).'),
     ...freeCards, field('붙인 부품 (눌러서 다시 놓기)', onCar), freeStock];
   // the N33's own parts come in R3 (docs/systems/117): its lump takes none of the 599's yet
-  const n33Note = note('차체 B(N33)의 부품은 아직 없습니다(문서 117 R3에서 수확합니다). 지금은 덩어리, 창문 세트, 실내 세트, 번호판, 붙이는 부품(미러·윙·배기구·배지·표시등·벤트)을 고를 수 있습니다.');
+  const n33Note = note('차체 B(N33)의 자기 부품은 아직 없습니다(문서 117 R3에서 수확합니다). 지금은 덩어리, 창문 세트, 실내 세트, 번호판, 붙이는 부품과 구멍 부품을 고를 수 있고, "순정 부착 부품"은 램프 띠·그릴·둥근 테일램프 자리에 공용 구멍 부품을 임시로 답니다.');
   syncs.push(() => { const m = isModelBase(D.body.base), p = D.body.base === 'p959'; for (const e of kitRows) e.hidden = m; for (const e of [...modelRows, ...modelTail]) e.hidden = !p; for (const e of [...plateRows, ...freeRows]) e.hidden = !m; n33Note.hidden = D.body.base !== 'bnr33'; if (m && document.activeElement !== plate) plate.value = M().plate; });
   add('parts', ...kitRows, ...modelRows, n33Note, ...freeRows, ...plateRows, ...modelTail);
   const sw = document.createElement('div'); sw.className = 'swatches'; const pick = document.createElement('input'); pick.type = 'color'; pick.id = 'paint'; pick.setAttribute('aria-label', '직접 고르기');

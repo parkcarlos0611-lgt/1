@@ -33,7 +33,9 @@ const FORM = process.argv.includes('form');   // continuous shading, to judge th
 const arg = (k: string) => process.argv.find(a => a.startsWith(k + '='))?.slice(k.length + 1), AT = (arg('at') ?? (N33 ? '2340,0,650' : '2130,0,600')).split(',').map(Number) as V3, ONLY = arg('only')?.split(',');
 // lump: the frame "차체 A" (docs/systems/115 F1) with any of the above put back; glass=none|stock|noQuarter|louvre; dims=wheelbase:150,width:-60,...
 const DIMS = arg('dims') ? Object.fromEntries(arg('dims')!.split(',').map(kv => { const [k, v] = kv.split(':'); return [k!, +v!]; })) : undefined, given = (o: Record<string, unknown>) => Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined));
-const OPTS: P959Opts = ({ ...(process.argv.includes('lump') ? P959_LUMP : {}), ...given({ lamp: arg('lamp') as never, wheel: arg('wheel') as never, bumperF: arg('bf') as never, bumperR: arg('br') as never, plate: arg('plate') ? plateText(arg('plate')!) : undefined }),
+// stockset: the 599's stock set as the builder puts it on since P2 (docs/systems/115): the openings flush, the lamps' sockets painted, the
+// small parts and the openings as placed parts (with parts=stock)
+const OPTS: P959Opts = ({ ...(process.argv.includes('lump') ? P959_LUMP : {}), ...(process.argv.includes('stockset') ? { lamp: 'none', openings: false, smalls: false } as P959Opts : {}), ...given({ lamp: arg('lamp') as never, wheel: arg('wheel') as never, bumperF: arg('bf') as never, bumperR: arg('br') as never, plate: arg('plate') ? plateText(arg('plate')!) : undefined }),
   ...(arg('noplate') !== undefined || !process.argv.includes('lump') ? { plateF: !arg('noplate')?.includes('f'), plateR: !arg('noplate')?.includes('r') } : {}), ...(arg('glass') ? { glass: arg('glass') === 'none' ? null : arg('glass') as never } : {}), ...(DIMS ? { dims: DIMS } : {}) });
 // placed=F:y,z,rot,tilt,scale/R:y,z,rot,tilt,scale (docs/systems/115 P1a): the plates placed freely, each at the skin met by a ray along the car's axis at (y, z)
 const PLACED: Placed[] | undefined = arg('placed') ? (() => { const sk = shellSkin(buildShell({ ...OPTS, lamps: OPTS.lamp !== 'none' })); return arg('placed')!.split('/').map(e => { const [w, v] = e.split(':'), [y, z, rot, tilt, sc] = v!.split(',').map(Number), F = w === 'F';
@@ -43,6 +45,14 @@ const PLACED: Placed[] | undefined = arg('placed') ? (() => { const sk = shellSk
 // the roof, mirrors on the rear wings, a big turned crest on the door, louvres on the bonnet, vents, markers, a centre tip)
 const PARTS: Placed[] | undefined = arg('parts') ? (() => { const sk = N33 ? n33Skin(buildN33Shell({ ...N33_LUMP, ...(DIMS ? { dims: DIMS } : {}) })) : shellSkin(buildShell({ ...OPTS, lamps: OPTS.lamp !== 'none' })), base = N33 ? 'bnr33' : 'p959';
   if (arg('parts') === 'stock') return stockParts(base, sk, DIMS);
+  // parts=holes (docs/systems/115 P2): the hole parts placed unusually (projector lamps on the rear wings, square lamps on the
+  // bonnet, round tail lamps in the nose, a grille on the bonnet, intakes behind the front wheels, a louvre in the roof, cut
+  // vents in the doors, the tail lamp band low across the rear bumper's seam)
+  if (arg('parts') === 'holes') { const L = N33 ? 4675 : 4260, H = N33 ? 1364 : 1281, a = (id: FreeId, o: V3, d: V3, x: Partial<Placed> = {}): Placed[] => { const p = aimPart(sk, { id, o, d }); return p ? [{ ...p, ...x }] : []; };
+    const ps = [...a('lampEllipsoid', [L * 0.8, 1600, H * 0.6], [0, -1, 0], { scale: 0.7, sx: 1.3 }), ...a('lampSquare', [L * 0.13, 330, 3000], [0, 0, -1], { scale: 0.55, sx: 2 }), ...a('tailRound', [-600, 420, H * 0.33], [1, 0, 0]),
+      ...a('grille', [L * 0.22, 0, 3000], [0, 0, -1], { scale: 0.55, sx: 1.2 }), ...a('sideIntake', [L * 0.29, 1600, H * 0.52], [0, -1, 0], { scale: 0.9 }), ...a('louvreCut', [L * 0.5, 0, 3000], [0, 0, -1], { scale: 1.1 }),
+      ...a('ventCut', [L * 0.47, 1600, H * 0.4], [0, -1, 0], { rot: 15 }), ...a('tailBand', [L + 600, 0, H * 0.33], [-1, 0, 0], { scale: 0.8 })];
+    const fs = fitAll(sk, ps); for (const f of fs) console.log(`${f.key}: ${f.ok ? 'ok' : f.why}${f.warn ? ' (' + f.warn + ')' : ''}, insides ${f.mesh.n}${f.twin ? ' x2' : ''}`); return ps; }
   const L = N33 ? 4675 : 4260, H = N33 ? 1364 : 1281, a = (id: FreeId, o: V3, d: V3, x: Partial<Placed> = {}): Placed[] => { const p = aimPart(sk, { id, o, d }); return p ? [{ ...p, ...x }] : []; };
   const ps = [...a('wingGT', [L * 0.52, 0, 3000], [0, 0, -1], { scale: 0.75, depth: 120, tilt: 12 }), ...a('mirror', [L * 0.78, 1600, H * 0.62], [0, -1, 0], { scale: 1.3, depth: 80, rot: 15 }),
     ...a('badge', [L * 0.5, 1600, H * 0.5], [0, -1, 0], { scale: 2.2, rot: 25 }), ...a('louvre', [L * 0.17, 0, 3000], [0, 0, -1], { scale: 1.1 }), ...a('vent', [L * 0.86, N33 ? 640 : 600, 3000], [0, 0, -1], { scale: 0.8 }),

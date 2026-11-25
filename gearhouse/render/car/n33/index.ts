@@ -12,7 +12,8 @@ import type { Mark } from '../p959/sockets';
 import { fitPlate, drawPlate, stockPlace, type PlateFit } from '../p959/plates';
 import type { PlateText } from '../p959/parts';
 import { placedOf, freeParts, type Placed } from '../../../core/placed';
-import { drawPlaced, footprints } from '../attach';
+import { drawPlaced, fitAll, footprints } from '../attach';
+import { cutShell, clipLines } from '../attach/holes';
 import { crestUV } from '../p959/badge';
 import { PLATE_W, PLATE_H } from '../p959/plates';
 import { buildCage, DIM, type CageOpts } from './cage';
@@ -39,18 +40,23 @@ export interface N33Opts extends CageOpts { paint?: string; wheel?: WheelKind; /
   /** the plates (default none: the lump's), their text, and their places when placed freely (core/placed.ts) */ plateF?: boolean; plateR?: boolean; plate?: PlateText; placed?: readonly Placed[] }
 /** the lump as the builder's first step shows it (everything else of the car is a part still to come) */
 export const N33_LUMP: N33Opts = { glass: null, wheel: 'steel' };
-export function n33Model(o: N33Opts = {}): P959Model { const fr = frameOf(o.dims), S = buildN33Shell(o), b = new Build(), nn: number[] = [];
-  emitShell(b, S, o.paint ?? '#b8bcc2', nn);
-  if (!o.bare) for (const h of n33Hubs(fr, o.tyres)) wheel(b, h, o.wheel ?? 'steel', o.brake !== false);
-  const skin = !o.bare && (o.plateF || o.plateR || freeParts(o.placed).length) ? n33Skin(S) : null, fits: PlateFit[] = [];
+export function n33Model(o: N33Opts = {}): P959Model { const fr = frameOf(o.dims), S0 = buildN33Shell(o), b = new Build(), nn: number[] = [], paint = o.paint ?? '#b8bcc2';
+  // the plates and the free parts fitted on the uncut shell, the hole parts' holes cut (docs/systems/115 P2) before it is laid in
+  const skin = !o.bare && (o.plateF || o.plateR || freeParts(o.placed).length) ? n33Skin(S0) : null, fits: PlateFit[] = [];
   if (skin && (o.plateF || o.plateR)) {
     for (const m of n33Marks(fr)) { const id = m.name as 'plateF' | 'plateR'; if (!(id === 'plateF' ? o.plateF : o.plateR)) continue; const at = stockPlace(skin, m), p = placedOf(o.placed, id) ?? (at ? { id, at, rot: 0, tilt: 0, scale: 1 } : null), f = p ? fitPlate(skin, p, fits) ?? (at ? fitPlate(skin, { id, at, rot: 0, tilt: 0, scale: 1 }, fits) : null) : null;
-      if (f && f.gap < 150) { fits.push(f); drawPlate(b, f, o.plate); } } }
-  // the free surface parts (docs/systems/115 P1: render/car/attach), measured for overlap against the plates
-  const crests = skin ? drawPlaced(b, skin, o.placed, o.paint ?? '#b8bcc2', fits.flatMap(f => footprints({ F: f.F, hw: PLATE_W / 2 * f.s, hh: PLATE_H / 2 * f.s, twin: false }))).crests : [];
+      if (f && f.gap < 150) fits.push(f); } }
+  const parts = skin && freeParts(o.placed).length ? fitAll(skin, o.placed!, fits.flatMap(f => footprints({ F: f.F, hw: PLATE_W / 2 * f.s, hh: PLATE_H / 2 * f.s, twin: false }))) : [];
+  const holes = parts.filter(f => f.hole && f.ok).flatMap(f => f.hole!.cuts), C = holes.length ? cutShell(S0, skin!, holes) : null, S = C?.S ?? S0;
+  emitShell(b, S, paint, nn);
+  if (!o.bare) for (const h of n33Hubs(fr, o.tyres)) wheel(b, h, o.wheel ?? 'steel', o.brake !== false);
+  for (const f of fits) drawPlate(b, f, o.plate);
+  // the free parts (docs/systems/115 P1, P2: render/car/attach), measured for overlap against the plates
+  const crests = skin ? drawPlaced(b, skin, o.placed, paint, [], { fits: parts, cut: C?.done ?? new Set() }).crests : [];
   const M: Mesh = b.mesh(o.dims ? fr.length : DIM.length);
   if (crests.length) M.uv = crestUV(M, crests);
-  M.lines = p959Lines(S, !o.glass) as MeshLine[];
+  const lines = p959Lines(S, !o.glass) as MeshLine[];
+  M.lines = C ? [...clipLines(lines, skin!, holes.filter(h => C.done.has(h.key))), ...C.rims] : lines;
   M.creases = [...S.crease].map(k => { const [a, c] = k.split('|').map(Number) as [number, number]; return [S.P[a]!, S.P[c]!] as [V, V]; });
-  return { mesh: M, shell: S, normals: new Float32Array(nn), shellTris: nn.length / 9 }; }
+  return { mesh: M, shell: S, normals: new Float32Array(nn), shellTris: nn.length / 9, ...(C ? { uncut: S0, holes: C.added } : {}) }; }
 export const n33Mesh = (o: N33Opts = {}): Mesh => n33Model(o).mesh;

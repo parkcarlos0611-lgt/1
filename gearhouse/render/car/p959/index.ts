@@ -11,7 +11,8 @@ import { crestPlate, crestUV, lettering, skinNear, type CrestFrame } from './bad
 import { subdivSkin, type Skin } from '../skin';
 import { fitPlate, drawPlate, PLATE_W, PLATE_H, type PlateFit } from './plates';
 import { placedOf, type Placed } from '../../../core/placed';
-import { drawPlaced, footprints } from '../attach';
+import { drawPlaced, fitAll, footprints } from '../attach';
+import { cutShell, clipLines } from '../attach/holes';
 export type { LampKind, WheelKind, PlateText } from './parts';
 export { plateText, PLATE_SYLLABLES } from './parts';
 export { buildCage, DIM } from './cage';
@@ -61,25 +62,33 @@ function lampIn(b: Build, f: Frame, kind: LampKind, c0: V, u0: V, v0: V, a: numb
 
 /** the model: the mesh, the shell it was made from, and the shell's own shading normals (nine numbers a triangle, for
  *  the triangles that are the shell's: the first `shellTris`) */
-export interface P959Model { mesh: Mesh; shell: Shell959; normals: Float32Array; shellTris: number }
+export interface P959Model { mesh: Mesh; shell: Shell959; normals: Float32Array; shellTris: number;
+  /** with hole parts (docs/systems/115 P2): the shell before its holes were cut (`shell` is the cut one, which has no
+   *  surface coordinates) and the triangles each hole added to it, by its key (a twin's ends in ~) */ uncut?: Shell959; holes?: Map<string, number> }
 export function p959Mesh(o: P959Opts = {}): Mesh { return p959Model(o).mesh; }
 export function p959Model(o: P959Opts = {}): P959Model { const lamps = o.lamp !== 'none', details = o.details !== false, marks = o.marks ?? details, fr = frameOf(o.dims);
-  const S = buildShell({ ...o, lamps }), b = new Build(), paint = o.paint ?? '#b8bcc2', nn: number[] = [];
+  const S0 = buildShell({ ...o, lamps }), b = new Build(), paint = o.paint ?? '#b8bcc2', nn: number[] = [], K = sockets(fr);
+  // the parts placed freely are fitted on the uncut shell (their places are its surface coordinates); the hole parts'
+  // holes are then cut in it (docs/systems/115 P2: render/car/attach/holes.ts) before it is laid into the mesh
+  const skin = !o.bare && o.placed?.length ? shellSkin(S0) : null, fits: PlateFit[] = [], plates: (() => void)[] = [];
+  if (!o.bare) for (const m of K.marks) if (/^plate/.test(m.name) && (m.name === 'plateF' ? o.plateF : o.plateR) !== false) { const p = placedOf(o.placed, m.name as 'plateF' | 'plateR'), f = p && skin ? fitPlate(skin, p, fits) : null;
+    if (f && f.gap < 150) { fits.push(f); plates.push(() => drawPlate(b, f, o.plate)); } else plates.push(() => plate(b, m, o.plate)); }
+  const parts = skin ? fitAll(skin, o.placed!, fits.map(f => ({ F: f.F, hw: PLATE_W / 2 * f.s, hh: PLATE_H / 2 * f.s, twin: false })).flatMap(footprints)) : [];
+  const holes = parts.filter(f => f.hole && f.ok).flatMap(f => f.hole!.cuts), C = holes.length ? cutShell(S0, skin!, holes) : null, S = C?.S ?? S0;
   emitShell(b, S, paint, nn); const crests: CrestFrame[] = [];
-  if (!o.bare) { const K = sockets(fr), sl = 38.7 * Math.PI / 180;
+  if (!o.bare) { const sl = 38.7 * Math.PI / 180;
     for (const h0 of K.hubs) { const w = o.tyres ? o.tyres[h0.front ? 0 : 1] : h0.width, s = h0.o[1] > 0 ? 1 : -1, h = { ...h0, width: w, o: [h0.o[0], h0.o[1] + s * (w - h0.width) / 2, h0.o[2]] as V };
       wheel(b, h, o.wheel ?? 'hollow5', o.brake !== false); }
     if (lamps) for (const s of [1, -1]) lampIn(b, fr, o.lamp as LampKind ?? 'round', [270 + Math.sin(sl) * 14, s * 615, 640 - Math.cos(sl) * 14], [0, 1, 0], [Math.cos(sl), 0, Math.sin(sl)], 100, 122);
     const smalls = o.smalls !== false;
     if (details && smalls) for (const e of K.exhausts) b.name('exhaust').mat('#2a2b2d', 0.6, 'metal').lathe('x', [0, e.o[1], e.o[2]], [[e.o[0] - 60, e.r], [e.o[0] + 14, e.r], [e.o[0] - 50, e.r - 10]], 8, false);
     if (details && smalls) for (const m of K.mirrors) mirror(b, m, paint);
-    const skin = o.placed?.length ? shellSkin(S) : null, fits: PlateFit[] = [];
-    for (const m of K.marks) if (/^plate/.test(m.name) && (m.name === 'plateF' ? o.plateF : o.plateR) !== false) { const p = placedOf(o.placed, m.name as 'plateF' | 'plateR'), f = p && skin ? fitPlate(skin, p, fits) : null;
-      if (f && f.gap < 150) { fits.push(f); drawPlate(b, f, o.plate); } else plate(b, m, o.plate); }
-    if (skin) { const plates = fits.map(f => ({ F: f.F, hw: PLATE_W / 2 * f.s, hh: PLATE_H / 2 * f.s, twin: false })).flatMap(footprints); crests.push(...drawPlaced(b, skin, o.placed, paint, plates).crests); }
+    for (const d of plates) d();
+    if (skin) crests.push(...drawPlaced(b, skin, o.placed, paint, [], { fits: parts, cut: C?.done ?? new Set() }).crests);
     if (marks) for (const m of K.marks) { if (m.name === 'badge' && smalls) crests.push(crestPlate(b, m, skinNear(S.P, S.F, m.o, 120))); else if (m.name === 'porscheLettering') lettering(b, m, skinNear(S.P, S.F, m.o, 420)); } }
   const M = b.mesh(o.dims ? fr.length : DIM.length);
   if (crests.length) M.uv = crestUV(M, crests);
-  M.lines = p959Lines(S, o.glass === null).filter(l => !marks || o.bare || !/^tailLampWordBar/.test(l.name)) as MeshLine[];   // the bar drawn where the word goes, gone once the word is there
+  const lines = p959Lines(S, o.glass === null).filter(l => !marks || o.bare || !/^tailLampWordBar/.test(l.name)) as MeshLine[];   // the bar drawn where the word goes, gone once the word is there
+  M.lines = C ? [...clipLines(lines, skin!, holes.filter(h => C.done.has(h.key))), ...C.rims] : lines;
   M.creases = [...S.crease].map(k => { const [a, c] = k.split('|').map(Number) as [number, number]; return [S.P[a]!, S.P[c]!] as [V, V]; });
-  return { mesh: M, shell: S, normals: new Float32Array(nn), shellTris: nn.length / 9 }; }
+  return { mesh: M, shell: S, normals: new Float32Array(nn), shellTris: nn.length / 9, ...(C ? { uncut: S0, holes: C.added } : {}) }; }

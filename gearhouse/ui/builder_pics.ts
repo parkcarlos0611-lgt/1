@@ -55,8 +55,18 @@ export function wheelPic(kind: 'hollow5' | 'dish' | 'hole5' | 'steel'): string {
 export const basePic = (): string => icon('body');
 /** a free surface part's drawn card (docs/systems/115 P1), until its rendered picture comes: a mirror, a wing (ring or
  *  GT), one or two tips, the crest's shield, a marker, a vent or a louvre */
-export function partPic(id: 'mirror' | 'wingRing' | 'wingGT' | 'exhaust1' | 'exhaust2' | 'badge' | 'marker' | 'vent' | 'louvre'): string {
+export function partPic(id: 'mirror' | 'wingRing' | 'wingGT' | 'exhaust1' | 'exhaust2' | 'badge' | 'marker' | 'vent' | 'louvre' | 'lampRound' | 'lampEllipsoid' | 'lampSquare' | 'tailBand' | 'tailRound' | 'grille' | 'sideIntake' | 'ventCut' | 'louvreCut'): string {
   switch (id) {
+    // the hole parts (docs/systems/115 P2): the opening dark, the part's own face in it
+    case 'lampRound': return svg64(`<ellipse cx="32" cy="24" rx="17" ry="20" fill="${DARK}" ${st()}/><circle cx="32" cy="24" r="12" fill="#fff" ${st(2)}/>`);
+    case 'lampEllipsoid': return svg64(`<ellipse cx="32" cy="24" rx="20" ry="18" fill="${DARK}" ${st()}/><circle cx="25" cy="24" r="8" fill="#fff" ${st(2)}/><circle cx="41" cy="24" r="5" fill="#fff" ${st(2)}/>`);
+    case 'lampSquare': return svg64(`<rect x="8" y="12" width="48" height="24" rx="6" fill="${DARK}" ${st()}/><rect x="14" y="17" width="14" height="14" fill="#fff" ${st(2)}/><rect x="36" y="17" width="14" height="14" fill="#fff" ${st(2)}/>`);
+    case 'tailBand': return svg64(`<rect x="4" y="19" width="56" height="10" rx="2" fill="#b3261e" ${st()}/><path d="M4 19H11V29H4ZM53 19H60V29H53Z" fill="${ROLE.yellow[0]}"/>`);
+    case 'tailRound': return svg64(`<circle cx="32" cy="24" r="15" fill="${DARK}" ${st()}/><circle cx="32" cy="24" r="11" fill="#b3261e" ${st(2)}/>`);
+    case 'grille': return svg64(`<rect x="6" y="12" width="52" height="24" rx="5" fill="${DARK}" ${st()}/>${[18, 24, 30].map(y => `<path d="M10 ${y}H54" stroke="#9aa0a6" stroke-width="2"/>`).join('')}${[16, 24, 32, 40, 48].map(x => `<path d="M${x} 14V34" stroke="#9aa0a6" stroke-width="1.5"/>`).join('')}`);
+    case 'sideIntake': return svg64(`<rect x="22" y="6" width="20" height="36" rx="7" fill="${DARK}" ${st()}/>${[15, 24, 33].map(y => `<path d="M24 ${y}H40" stroke="#9aa0a6" stroke-width="2.5"/>`).join('')}`);
+    case 'ventCut': return svg64(`<rect x="6" y="15" width="52" height="18" rx="9" fill="${DARK}" ${st()}/>${[21, 27].map(y => `<path d="M12 ${y}H52" stroke="#9aa0a6" stroke-width="2.5"/>`).join('')}`);
+    case 'louvreCut': return svg64(`<rect x="8" y="8" width="48" height="32" rx="3" fill="${DARK}" ${st()}/>${[13, 19, 25, 31].map(y => `<path d="M12 ${y + 4}L52 ${y}" stroke="#9aa0a6" stroke-width="2.5"/>`).join('')}`);
     case 'mirror': return svg64(`<path d="M10 38L26 26" ${st(5)}/><path d="M22 14H50Q56 14 56 22V28Q56 34 50 34H26Q20 34 20 26V20Q20 14 22 14Z" fill="#fff" ${st()}/><path d="M27 19H49V29H27Z" fill="${MET}" ${st(2)}/>`);
     case 'wingRing': return svg64(`<path d="M6 40Q8 18 18 14H46Q56 18 58 40" fill="none" ${st(6)}/><path d="M6 40Q8 18 18 14H46Q56 18 58 40" fill="none" stroke="#fff" stroke-width="3"/>`);
     case 'wingGT': return svg64(`<rect x="6" y="12" width="52" height="7" rx="3" fill="#fff" ${st()}/><path d="M20 19V40M44 19V40" ${st(4)}/><path d="M5 9V24M59 9V24" ${st(4)}/>`);

@@ -30,7 +30,8 @@ describe('the ray picking', () => {
 describe('the parts on the skin', () => {
   it('every kind fits at its default place on both lumps (the N33\'s ring wing a little narrower), each a few hundred triangles', () => {
     for (const [skin, base] of [[A, 'p959'], [B, 'bnr33']] as const) for (const id of FREE_IDS) { const p = newPart(base, skin, id, 1, undefined)!, f = fitPart(skin, base === 'bnr33' && id === 'wingRing' ? { ...p, scale: 0.85 } : p)!;
-      expect(f.ok, `${base} ${id}: ${f.why}`).toBe(true); expect(f.mesh.n).toBeGreaterThan(40); expect(f.mesh.n).toBeLessThan(500); } });
+      // a hole part (P2): its drag preview (its insides lifted onto its footprint) stands for it
+      const n = f.hole ? f.hole.preview().n : f.mesh.n; expect(f.ok, `${base} ${id}: ${f.why}`).toBe(true); expect(n).toBeGreaterThan(40); expect(n).toBeLessThan(500); } });
   it('a pair is mirrored across the centre line; one side only has no twin; near the line a centre kind is single', () => {
     const v = at(A, 'vent', [800, 300, 3000], [0, 0, -1]), f = fitPart(A, v)!; expect(f.twin).toBe(true);
     const draw = (p: Placed) => { const M = p959Mesh({ lamp: 'none', details: false, bumperF: 'blank', bumperR: 'blank', glass: null, plateF: false, plateR: false, placed: [p] }), ys: number[] = [];

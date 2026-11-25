@@ -20,7 +20,7 @@ function finePath(c: Cage959, f: Fine, path: number[], closed = false): number[]
   for (let q = 0; q < n; q++) { out.push(f.vp[path[q]!]!); if (q + 1 < n || closed) out.push(f.ep.get(ekey(path[q]!, path[(q + 1) % n]!))!); } return out; }
 
 export interface ShellOpts extends CageOpts { /** leave the sockets flush (no recess) */ flush?: boolean }
-export function buildShell(o: ShellOpts = {}): Shell959 { const fr = frameOf(o.dims), lamps = o.lamps !== false, details = o.details !== false;
+export function buildShell(o: ShellOpts = {}): Shell959 { const fr = frameOf(o.dims), lamps = o.lamps !== false, details = o.openings ?? o.details !== false;
   return shellFrom(buildCage(o), { arches: [{ x: fr.archF[0], z: fr.archF[1] }, { x: fr.archR[0], z: fr.archR[1] }], archR: DIM.archR,   // the hubs on the stretched body
     sinks: o.flush ? [] : [...[false, true].flatMap(right => [...(lamps ? [{ pick: (t: Tag) => t.socket === 'headLamp' && !!t.right === right, depth: 14, inset: 5, rim: 'headLampRim' }] : []), ...(details ? [{ pick: (t: Tag) => t.socket === 'sideIntake' && !!t.right === right, depth: 34, inset: 4, rim: 'sideIntakeRim' }] : [])]),
       ...(details ? [{ pick: (t: Tag) => t.socket === 'tailLamp', depth: 9, inset: 3, rim: 'tailLampRim' }] : [])] }); }

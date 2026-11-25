@@ -103,13 +103,13 @@ export interface Cage959 extends Cage { tag: Tag[]; /** the main grid's point nu
   /** the mirror image of each point (itself on the centre line) */ mirror: number[] }
 
 /** what of the car's own openings the cage carries (docs/systems/115 §4-1: the lump "차체 A" has none of them) */
-interface Look { lamps: boolean; details: boolean; glass: GlassId | null }
+interface Look { lamps: boolean; details: boolean; openings: boolean; glass: GlassId | null }
 /** the material and panel of the main grid's cell between rows i, i+1 and columns j, j+1, as the look has it: a cell
  *  whose opening is not there keeps its panel's name and socket and is painted (the lump: its glass, lamps, grilles in body colour) */
 function cell(i: number, j: number, L: Look): Tag { const t = cellOwn(i, j);
   if (t.mat === 'glass') return !L.glass || (L.glass === 'noQuarter' && t.panel === 'quarterGlass') ? { ...t, mat: 'paint', was: 'glass' } : L.glass === 'louvre' && t.panel === 'rearWindow' ? { ...t, mat: 'grille', was: 'glass' } : t;
   if (t.mat === 'lens') return L.lamps ? t : { ...t, mat: 'paint', was: 'lens', panel: 'wingF' };
-  if (t.mat === 'grille' || t.mat === 'amber') return L.details ? t : { ...t, mat: 'paint', was: t.mat, panel: t.panel === 'sideIntake' || t.panel === 'tailLampEnd' ? 'wingR' : t.panel };
+  if (t.mat === 'grille' || t.mat === 'amber') return L.openings ? t : { ...t, mat: 'paint', was: t.mat, panel: t.panel === 'sideIntake' || t.panel === 'tailLampEnd' ? 'wingR' : t.panel };
   return t; }
 function cellOwn(i: number, j: number): Tag {
   if (j < 2 && i >= 10 && i < 14) return { region: 'shell', mat: 'glass', panel: 'windscreen' };
@@ -133,9 +133,12 @@ export type BumperKind = 'std' | 'aero' | 'clean' | 'blank';
 export interface CageOpts { bumperF?: BumperKind; bumperR?: BumperKind;
   /** the head lamps' lenses in their cells (default on; off: the cells painted, the lump's) */ lamps?: boolean;
   /** the car's other openings (default on; off: the lump's): the tail lamp band, the side intakes, the engine lid's grille, the door handles' lines */ details?: boolean;
+  /** the openings alone (default: as `details`): off, the tail lamp band, the side intakes and the engine lid's grille are
+   *  painted over and flush while the door handles' lines (and the model's lettering) stay: the hole parts cut them
+   *  instead (docs/systems/115 P2, "599 순정 세트") */ openings?: boolean;
   /** the glass set on the cabin's cells (docs/systems/115 §4-2; default the car's own; null: none, the cabin all body colour) */ glass?: GlassId | null;
   /** the frame's dimensions (docs/systems/115 §4-4): the cage stretched by them (render/car/p959/frame.ts) */ dims?: Partial<FrameDims> }
-export function buildCage(o: CageOpts = {}): Cage959 { const look: Look = { lamps: o.lamps !== false, details: o.details !== false, glass: o.glass === undefined ? 'stock' : o.glass };
+export function buildCage(o: CageOpts = {}): Cage959 { const look: Look = { lamps: o.lamps !== false, details: o.details !== false, openings: o.openings ?? o.details !== false, glass: o.glass === undefined ? 'stock' : o.glass };
   const P: V[] = [], F: number[][] = [], tag: Tag[] = [], sharp = new Map<string, number>(), crease = new Set<string>();
   const pt = (p: V) => P.push([p[0], p[1], p[2]]) - 1, quad = (a: number, b: number, c: number, d: number, t: Tag) => { F.push([a, b, c, d]); tag.push(t); };
   const M: number[][] = Array.from({ length: NR }, (_, i) => Array.from({ length: NC }, (_, j) => COLS[j]![i] ? pt(COLS[j]![i]!) : -1));
@@ -148,7 +151,7 @@ export function buildCage(o: CageOpts = {}): Cage959 { const look: Look = { lamp
   // the tail's corner: the wrapped strip. Its top line is row 30 read inward (column 6 the corner, then 5 .. 0)
   const W: number[][] = WRAP.map(l => l.map(pt)), wl = (m: number, k: number) => m === 6 ? M[30]![6 - k]! : k === 0 ? M[30]![m]! : W[m - 7]![k - 1]!;
   for (let k = 0; k < 6; k++) for (let m = 6; m < 9; m++) { if (m === 7 && k >= 1) continue;   // the slot's rear mouth
-    quad(wl(m, k), wl(m, k + 1), wl(m + 1, k + 1), wl(m + 1, k), m === 8 ? { region: 'shell', mat: !look.details ? 'paint' : k === 0 ? 'amber' : 'lamp', panel: k === 0 ? 'tailLampEnd' : 'tailLamp', socket: 'tailLamp', ...(look.details ? {} : { was: k === 0 ? 'amber' as const : 'lamp' as const, panel: 'wing' }) } : { region: 'tail', mat: 'paint', panel: 'wing' }); }
+    quad(wl(m, k), wl(m, k + 1), wl(m + 1, k + 1), wl(m + 1, k), m === 8 ? { region: 'shell', mat: !look.openings ? 'paint' : k === 0 ? 'amber' : 'lamp', panel: k === 0 ? 'tailLampEnd' : 'tailLamp', socket: 'tailLamp', ...(look.openings ? {} : { was: k === 0 ? 'amber' as const : 'lamp' as const, panel: 'wing' }) } : { region: 'tail', mat: 'paint', panel: 'wing' }); }
   // the slot under the blade: floor (the engine lid running on down to the lamp's top), side wall and roof (the blade's underside)
   const sf = SLOT_FLOOR.map(pt), sr = SLOT_ROOF.map(pt), fl: Tag = { region: 'tail', mat: 'dark', panel: 'wingSlot' }, rf: Tag = fl;
   for (let j = 0; j < 5; j++) { quad(M[26]![j]!, sf[j]!, sf[j + 1]!, M[26]![j + 1]!, fl); quad(sf[j]!, wl(8, 6 - j), wl(8, 5 - j), sf[j + 1]!, { region: 'tail', mat: 'paint', panel: 'tailPanel' });
@@ -182,7 +185,7 @@ export function buildCage(o: CageOpts = {}): Cage959 { const look: Look = { lamp
   path([0, 1, 2, 3, 4, 5].map(j => M[26]![j]!).concat([5, 4, 3, 2, 1, 0].map(j => M[27]![j]!)), 1, true);  // the slot's front mouth
   path([wl(8, 6), wl(8, 5), wl(8, 4), wl(8, 3), wl(8, 2), wl(8, 1), wl(7, 1), wl(7, 2), wl(7, 3), wl(7, 4), wl(7, 5), wl(7, 6)], 1, true);   // its rear mouth
   const lampRing = [M[1]![4]!, M[1]![5]!, M[1]![6]!, M[2]![6]!, M[3]![6]!, M[3]![5]!, M[3]![4]!, M[2]![4]!]; path(lampRing, 1, true, true);   // kept on the lump too: the lamp's face is a flat of its own on the pod (smoothed, it folds 30 degrees across)
-  const intake = [M[17]![7]!, M[18]![7]!, M[18]![8]!, M[17]![8]!]; if (look.details) path(intake, 1, true, true);
+  const intake = [M[17]![7]!, M[18]![7]!, M[18]![8]!, M[17]![8]!]; if (look.openings) path(intake, 1, true, true);
   path(colPath(5, 10, 22), 1, true); path(colPath(4, 10, 22), 1, true);                       // the side glass's foot (the belt) and top
   path([...rowPath(10, 0, 2), ...colPath(2, 11, 14)]); path(rowPath(14, 0, 2)); path([...rowPath(19, 0, 2), ...colPath(2, 20, 24)]); path(rowPath(24, 0, 2));   // the screen's and the back window's edges
   path(colPath(4, 3, 9), 1, true);                                                           // the lamp pod's inner edge
@@ -227,7 +230,7 @@ export function buildCage(o: CageOpts = {}): Cage959 { const look: Look = { lamp
   // the lines of what is not there go with it: a blank bumper's vents and lamps, the lump's lamp rims, intakes, louvres and
   // handle, the glass's edges with no glass (the belt and the cowl stay as creases of the shape); a set of its own lines
   const gone = (n: string) => (kf === 'clean' && /^ventF/.test(n)) || (kr === 'clean' && /^ventR/.test(n)) || (kf === 'blank' && /^(ventF|intakeF|indicatorF)/.test(n)) || (kr === 'blank' && /^(ventR|exhaustSlot)/.test(n))
-    || (!look.lamps && n === 'headLampRim') || (!look.details && /^(tailLamp|sideIntake|engineLouvre|doorHandle)/.test(n))
+    || (!look.lamps && n === 'headLampRim') || (!look.openings && /^(tailLamp|sideIntake|engineLouvre)/.test(n)) || (!look.details && /^doorHandle/.test(n))
     || (!look.glass && /^(windscreen|sideGlass|rearWindow|bPillar|dripRail)$/.test(n)) || (look.glass === 'noQuarter' && n === 'bPillar');
   const drawn = lines.filter(l => !gone(l.name)).map(l => look.glass === 'noQuarter' && l.name === 'sideGlass' ? { ...l, path: [...colPath(4, 10, 17), ...colPath(5, 10, 17).reverse()] } : l);
   if (look.glass === 'louvre') for (let i = 20; i < 24; i++) drawn.push({ kind: 'vent', name: `rearLouvre${i}`, path: rowPath(i, 0, 2) }, ...[0.5].map(t => ({ kind: 'vent' as const, name: `rearLouvre${i}h`, path: [], between: { a: rowPath(i, 0, 2), b: rowPath(i + 1, 0, 2), t } })));

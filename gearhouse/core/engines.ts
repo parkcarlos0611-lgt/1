@@ -6,9 +6,10 @@
 // variant put together; an engine taken from the library into a car is copied in (the car keeps its own, the library
 // its own). Also the technologies' years (1-2 ⑦): shown as information in 0.12, a "연도 제한" setting off by default.
 // Pure: the storage is passed in, and one that throws (a private window, storage refused) keeps nothing and reads empty.
-import { BLOCKS, COMPRESSIONS, GRADES, INTAKES, LAYOUTS, LIMITS, QUALITY_PARTS, SUMPS, BS_DEFAULT, NO_QUALITY, normalise, DESIGN_F355,
+import { BLOCKS, COMPRESSIONS, GRADES, INTAKES, LAYOUTS, LIMITS, QUALITY_PARTS, SUMPS, BS_DEFAULT, NO_QUALITY, normalise, DESIGN_F355, DESIGN_P959, DESIGN_BNR33,
   type Block, type Design, type EngineQuality, type Layout, type Valves } from './design';
 import type { KeyStore } from './designstore';
+import { ENGINE_599, ENGINE_N33 } from './names';
 
 export interface EngineFamily { layout: Layout; block: Block; valves: Valves; /** the bore over the stroke */ bs: number;
   /** the displacements the block takes (cc): its bores from the smallest liner to the thinnest wall */ cc: [number, number] }
@@ -33,6 +34,11 @@ export function joinEngine(f: EngineFamily, v: EngineVariant, carrier: Design = 
   return normalise({ ...carrier, engine: { ...structuredClone(v), cc, layout: f.layout, block: f.block, valves: f.valves, bs: f.bs } }).engine; }
 /** the engine put into a car (the car's own engine replaced) */
 export const withEngine = (d: Design, e: Design['engine']): Design => normalise({ ...d, engine: structuredClone(e) });
+
+/** the stock cars' engines as families and variants, listed in the workshop's library beside the saved ones (opened,
+ *  not deleted): the 599's flat six, and the N33's straight six (docs/systems/117 R4: an iron block bored 86 x 73.7, the
+ *  family 2.4 to 2.8 l as the block took in its tuned versions, the variant at 2,568 cc on two turbos at about 0.6 bar) */
+export const STOCK_ENGINES: readonly SavedEngine[] = [engineEntry(DESIGN_P959.engine, ENGINE_599, undefined, 'stock-599'), engineEntry(DESIGN_BNR33.engine, ENGINE_N33, [2350, 2800], 'stock-n33')];
 
 // ---- a saved engine checked: a stored list may hold anything ----
 const num = (v: unknown, d: number) => typeof v === 'number' && Number.isFinite(v) ? v : d;

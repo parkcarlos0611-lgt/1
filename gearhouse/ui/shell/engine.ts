@@ -27,7 +27,7 @@ import { standModel, exploded, pickPart, partName, onPicture, PART_INFO, type St
 import { STROKES, strokeOf, plugGlint, type CrankKind } from '../../render/car/powertrain/internals';
 import { LAYOUTS, LAYOUT_NAME, LIMITS, GRADES, GRADE_NAME, QUALITY_PARTS, INTAKES, COMPRESSIONS, SUMPS, BLOCKS, CYLINDERS, gradeLock, gradeBoost, gradeRedline, normalise,
   type Design, type Grade, type Intake, type Compression, type Sump, type Block, type Valves, type Turbos, type Layout, type QualityPart } from '../../core/design';
-import { savedEngines, saveEngine, deleteEngine, duplicateEngine, engineEntry, joinEngine, withEngine, familyRange, engineTechs, engineYear, TECH_YEAR, type SavedEngine } from '../../core/engines';
+import { STOCK_ENGINES, savedEngines, saveEngine, deleteEngine, duplicateEngine, engineEntry, joinEngine, withEngine, familyRange, engineTechs, engineYear, TECH_YEAR, type SavedEngine } from '../../core/engines';
 import { designSpec } from '../../race/design';
 import { torqueAt, type RaceSpec } from '../../race/cars';
 import { dynoCurve, engineSheet, type DynoCurve, type EngineSheet } from '../../race/dyno';
@@ -200,11 +200,12 @@ export function engineScreen(ctx: ShellCtx): Screen<EngineParams> & { readonly a
     if (!saveEngine(ctx.store, e)) { toast('이 브라우저는 저장을 허락하지 않습니다'); return; } entry = { id: e.id, name: e.name }; nameIn.value = e.name; start = sig(); toast(`보관함에 저장했습니다: ${e.name}`); fillList(); };
   const open = (s: SavedEngine) => { car = withEngine(car, joinEngine(s.family, s.variant, car)); range = [...s.family.cc]; entry = { id: s.id, name: s.name }; nameIn.value = s.name; start = sig(); changed(); toast(`열었습니다: ${s.name}`); };
   function fillList() { list.textContent = ''; const all = savedEngines(ctx.store);
-    if (!all.length) list.append(el('li', '', el('span', 'gh-note', '아직 저장한 엔진이 없습니다. 위에서 이름을 붙여 저장하세요.')));
-    for (const s of all) { const e = joinEngine(s.family, s.variant, car), d = withEngine(car, e); let hp = ''; try { hp = ` · ${Math.round(designSpec(d).hp)} hp`; } catch { /* shown without */ }
-      list.append(el('li', entry?.id === s.id ? 'gh-me' : '', el('b', '', s.name), el('span', 'gh-note', `${LAYOUT_NAME[e.layout]} ${e.cc.toLocaleString()} cc · ${e.grade}등급${e.turbo ? ` · 터보 ${e.turbo}` : ''}${hp} · 범위 ${s.family.cc[0].toLocaleString()}~${s.family.cc[1].toLocaleString()} cc`),
-        el('div', 'gh-actions', button('열기', () => open(s), { kind: 'main' }), button('복제', () => { const c = duplicateEngine(ctx.store, s.id); toast(c ? `복제했습니다: ${c.name}` : '저장하지 못했습니다'); fillList(); }),
+    // the stock cars' engines first (opened, not changed or deleted: saving one keeps a copy under the player's name)
+    for (const s of [...STOCK_ENGINES, ...all]) { const stock = STOCK_ENGINES.includes(s), e = joinEngine(s.family, s.variant, car), d = withEngine(car, e); let hp = ''; try { hp = ` · ${Math.round(designSpec(d).hp)} hp`; } catch { /* shown without */ }
+      list.append(el('li', entry?.id === s.id ? 'gh-me' : '', el('b', '', s.name), el('span', 'gh-note', `${stock ? '순정 · ' : ''}${LAYOUT_NAME[e.layout]} ${e.cc.toLocaleString()} cc · ${e.grade}등급${e.turbo ? ` · 터보 ${e.turbo}` : ''}${hp} · 범위 ${s.family.cc[0].toLocaleString()}~${s.family.cc[1].toLocaleString()} cc`),
+        stock ? el('div', 'gh-actions', button('열기', () => { open(s); entry = null; }, { kind: 'main' })) : el('div', 'gh-actions', button('열기', () => open(s), { kind: 'main' }), button('복제', () => { const c = duplicateEngine(ctx.store, s.id); toast(c ? `복제했습니다: ${c.name}` : '저장하지 못했습니다'); fillList(); }),
           button('삭제', () => void dialog('엔진 삭제', [`"${s.name}" 엔진을 보관함에서 지울까요? 이 엔진을 얹은 차는 그대로 남습니다.`], [['del', '삭제', { kind: 'danger' }], ['', '취소', { kind: 'ghost' }]]).then(v => { if (!v) return; deleteEngine(ctx.store, s.id); if (entry?.id === s.id) entry = null; toast('지웠습니다'); fillList(); }))))); }
+    if (!all.length) list.append(el('li', '', el('span', 'gh-note', '아직 저장한 엔진이 없습니다. 위에서 이름을 붙여 저장하세요.')));
     for (const b of Array.from(list.querySelectorAll('.gk-btn'))) b.classList.add('gk-sm'); }
   const library = el('div', 'gh-form', el('label', 'gh-row', el('span', 'gh-label', '엔진 이름'), nameIn),
     el('div', 'gh-actions', button('보관함에 저장', () => save(false), { kind: 'main', id: 'gh-eng-save' }), button('새 엔진으로 저장', () => save(true))),

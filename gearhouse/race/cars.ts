@@ -42,7 +42,10 @@ export interface RaceSpec {
    *  rear differential (its bias ratio); anti-lock brakes; turbochargers (how many, the boost at full in bar, the revs
    *  where it comes fully, the spool's time in s); a speed-sensitive rear wing (up and down in km/h, its lift area
    *  pressing the rear, its drag area; the body's own downforce area); power steering; the tyres' widths front and rear (m) */
-  tech?: { drive?: { front: number; visc: number }; rearLsd?: number; /** a viscous-coupling rear differential instead (Nm per rad/s between the wheels) */ rearVisc?: number;
+  tech?: { drive?: { front: number; visc: number;
+      /** a variable centre clutch instead of a fixed split (docs/systems/117 R4): the front's share rises from `front` to
+       *  `max` as the rear axle's slip over the front grows from slip0 to slip1, followed over tau s */
+      vary?: { max: number; slip0: number; slip1: number; tau: number } }; rearLsd?: number; /** a viscous-coupling rear differential instead (Nm per rad/s between the wheels) */ rearVisc?: number;
     /** ground effect (review 126): the underbody's venturis, a lift area pressing the car down more the lower it rides (its share on the front) */ ground?: { clA: number; front: number }; abs?: boolean; turbo?: { n: number; boost: number; full: number; spool: number };
     wing?: { up: number; down: number; clA: number; cdA: number; body: number }; power?: boolean; tyreWF?: number; tyreWR?: number;
     /** review 147: the front axle's share of the roll stiffness (an anti-roll bar added at the front to reach it); unset: the springs' own */ rollF?: number;

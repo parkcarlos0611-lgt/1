@@ -90,8 +90,8 @@ const P959: ModelBody = { name: CAR_599, length: DIM.length, cabin: P959_CABIN, 
 
 // ---- the N33 (docs/systems/117 R1, R2): its lump "차체 B", its glass sets and its own interior sets (right-hand drive:
 //      the stock one with four dials, the four-spoke wheel and the centre stack's three gauges; the tuned one with a dished
-//      wheel, buckets and a boost pod on the A pillar); its parts (R3) and its machinery's own figures (R4) are still to
-//      come. The straight six lengthwise under the bonnet, its clutch end at the bulkhead
+//      wheel, buckets and a boost pod on the A pillar); its parts (R3) are still to come. The straight six lengthwise
+//      under the bonnet, its clutch end at the bulkhead; its own multilinks (R4)
 /** the N33's interior set for a design (the frame's two sets: stock, and the tuned one in the drift set's place) in its trim */
 export const n33CabinFor = (d: Design): InteriorOptions => { const p = d.interior ?? interiorOfKit(d.kit.interior); return { ...INTERIORS[p.set === 'drift' ? 'n33Sport' : 'n33Stock'], trim: p.trim, ...(p.set === 'drift' ? { bucketColour: TRIMS[p.trim].seat } : {}) }; };
 /** its cabin: the screen's foot at x 1370, z 962, its top at 2060, 1320; the doors 1530..2855, their skin's inside about
@@ -110,7 +110,7 @@ const N33: ModelBody = { name: CAR_N33, length: N33_DIM.length, cabin: N33_CABIN
   gauges: (d, topKmh) => ({ ...P959_GAUGES, redline: d.engine.redline, topKmh: topKmh ?? 260, odoKm: 3300, tripKm: 33.3, ...(d.engine.turbo ? { boostBar: d.engine.boost } : { boostBar: undefined }) }),
   mesh(d, o = {}) { const m = { ...MODEL_OWN.bnr33, ...d.body.model }, det = o.detail ?? 2, f = n33FrameFor(d);
     const body = n33Model({ ...(f === N33_STOCK ? {} : { dims: f.dims }), glass: d.body.glass === undefined ? 'stock' : d.body.glass, paint: d.body.paint, wheel: m.wheel, brake: !!o.bare, tyres: d.kit.tyres,
-      plate: plateOf(d), plateF: m.plateF !== false, plateR: m.plateR !== false, ...(d.body.parts ? { placed: d.body.parts } : {}) }).mesh;
+      plate: plateOf(d), plateF: d.body.model?.plateF !== false, plateR: d.body.model?.plateR !== false, ...(d.body.parts ? { placed: d.body.parts } : {}) }).mesh;   // a plate is on unless the design took it off (the builder's way; the lump's own swaps take both off)
     const P = KINDS.indexOf('paint'); for (let t = 0; t < body.n; t++) if (body.kind[t] === P) body.gloss[t] = d.body.gloss;
     if (o.bare) return body;
     const b = new Build(), S = addSuspension(b, suspFor('bnr33', d.susp), n33Wheels(d, f), { detail: det, setup: d.susp, ...(o.style ? { style: o.style } : {}) });

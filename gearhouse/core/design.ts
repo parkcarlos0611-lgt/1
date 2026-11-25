@@ -297,8 +297,9 @@ export const SUSP_OWN: Record<BodyBase, SuspDesign> = {
   /** the 959: double wishbones all round with two coil-overs a wheel (the ride height's hydraulics left out), a soft
    *  front for the rally car it came from, a little more rear camber under the engine */
   p959: { front: { ...OWN_AXLE(0.72, 1.3, -0.6, 0), caster: 4.5 }, rear: OWN_AXLE(0.72, 1.45, -1.2, 0.1) },
-  /** the N33: multilinks all round, drawn as double wishbones until R4 (the builder's multilink is a rear's) [~] */
-  bnr33: { front: { ...OWN_AXLE(0.7, 1.45, -0.8, 0), caster: 5.5 }, rear: OWN_AXLE(0.72, 1.55, -1.2, 0.1) } };
+  /** the N33: multilinks front and rear (render/car/suspension/hardpoints.ts N33: the front's high upper arm, drawn and
+   *  solved as its links; the builder's own multilink kind is a rear's, so the front is listed as the wishbones it amounts to) */
+  bnr33: { front: { ...OWN_AXLE(0.7, 1.45, -0.8, 0), caster: 5.5 }, rear: { ...OWN_AXLE(0.72, 1.55, -1.2, 0.1), type: 'multilink' } } };
 /** why an axle's kind cannot be chosen (Korean), null when it can: the beam axle is the 1930s bases' (the restoration
  *  work's), a multilink is a rear's */
 export function suspLock(front: boolean, k: SuspKind): string | null {
@@ -356,13 +357,15 @@ export const DESIGN_P959: Design = { v: 6, id: 'p959', name: '599', body: { base
   drive: { gears: 6, gearbox: 'manual', final: 0, lsd: true, awd: true },
   kit: { abs: true, tcs: false, steering: 'hydraulic', dampers: 'adaptive', wing: false, diffuser: false, tyres: [235, 255], rim: 17, interior: 'standard' }, susp: structuredClone(SUSP_OWN.p959) };
 
-/** the N33 (docs/systems/117 §3; data/cars/spec/bnr33.json) on its own model-built body, its lump only so far (R1):
- *  the 2,568 cc straight six, four valves, two turbos with an intercooler at about 0.8 bar, 280 PS (276 hp) at 6,800 and
- *  368 Nm at 4,400 (more in fact, by most accounts [~]), five speeds, four-wheel drive (its own split and clutch: R4);
- *  a steel body and panels; ABS; 245/45 R17; about 1,530 kg. Not offered as a stock car, raced or listed until R4 */
+/** the N33 (docs/systems/117 §3, R4; data/cars/spec/bnr33.json) on its own model-built body: the 2,568 cc straight six
+ *  (86 x 73.7, an iron block, four valves, 8.5:1, a wet sump), two turbos with an intercooler held to about 0.6 bar (the
+ *  period's agreed 280 PS: the engine took more, by most accounts [~]), 280 PS (276 hp) at 6,800 and 368 Nm at 4,400,
+ *  five speeds, four-wheel drive with a variable centre clutch (race/design.ts BNR33_BASE: rear-driven, the front's share
+ *  0 to 50 % by the rear's slip); multilinks front and rear; a steel body and panels; ABS; 245/45 R17; about 1,530 kg.
+ *  The engine's grade (a production high-performance one) lands it on its power (tests/n33_game.test.ts) */
 export const DESIGN_BNR33: Design = { v: 6, id: 'bnr33', name: 'N33 GT-X', body: { base: 'bnr33', nose: 'round', ...faceOf3('bnr33', 'plain'), tail: 'roundLamps', wheel: 'fiveSpoke', ...NO_DIMS, paint: '#8d9196', gloss: 0.6, structure: 'steel', panels: 'steel',
     model: { ...MODEL_OWN.bnr33 } },
-  engine: { grade: 3, layout: 'I6', cc: 2568, valves: 4, redline: 8000, intake: 'single', compression: 'mid', sump: 'wet', block: 'iron', turbo: 2, boost: 0.8, intercooler: true, vtec: false, bs: 1.15, quality: { ...NO_QUALITY } },
+  engine: { grade: 2, layout: 'I6', cc: 2568, valves: 4, redline: 7700, intake: 'single', compression: 'low', sump: 'wet', block: 'iron', turbo: 2, boost: 0.6, intercooler: true, vtec: false, bs: 1.17, quality: { ...NO_QUALITY } },
   drive: { gears: 5, gearbox: 'manual', final: 0, lsd: true, awd: true },
   kit: { abs: true, tcs: false, steering: 'hydraulic', dampers: 'fixed', wing: false, diffuser: false, tyres: [245, 245], rim: 17, interior: 'standard' }, susp: structuredClone(SUSP_OWN.bnr33) };
 

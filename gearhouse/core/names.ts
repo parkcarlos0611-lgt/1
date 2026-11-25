@@ -10,6 +10,8 @@ export const MAKE = '포스터', MAKE_LATIN = 'Phorster';
 export const CAR_599 = `${MAKE} 599`;
 /** the N33's make and name in the game (docs/systems/117 §5, decision 2026-11-25) */
 export const MAKE_N33 = 'NISSINO', CAR_N33 = `${MAKE_N33} N33 GT-X`;
+/** the stock engines as the engine workshop's library lists them (core/engines.ts STOCK_ENGINES) */
+export const ENGINE_599 = `${CAR_599} 수평대향 6 2.8 트윈 터보`, ENGINE_N33 = `${MAKE_N33} 직렬 6 2.6 트윈 터보`;
 /** each body as the screens name it: the old kit bases by a letter, the model-built body by its make and number */
 export const BODY_NAME: Record<BodyBase, string> = { nsx: '옛 바탕 A', f355: '옛 바탕 B', eb110: '옛 바탕 C', p959: CAR_599, bnr33: CAR_N33 };
 

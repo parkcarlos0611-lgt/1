@@ -164,6 +164,17 @@ const P959: SuspSpec = {
   rear: { type: 'doubleWishbone', lower: { len: 320, span: [-190, 200], rise: 16 }, upper: { len: 228, span: [-230, 250], fall: 24, inset: 20, trail: 0 },
     damper: { dx: [-80, 80], at: 0.46, top: [150, 270], spring: [33, 5.5], body: 20 }, bar: { dx: 250, z: 170, r: 9, at: 0.62, link: -44 }, steer: { dx: 124, up: 50, rack: false, trim: 1.5 }, brake: { r: 152, t: 28, caliper: 112, at: 0 } },
   look: { arms: '#2a2c30', armGloss: 0.35, armKind: 'tube', upright: '#a2a5a9', spring: '#c9a227', damper: '#2a2c30', caliper: '#b3161b', disc: DISC } };
+/** the N33 (docs/systems/117 R4): multilinks front and rear, each pair of links solved as the wishbone it amounts to.
+ *  The front's upper link is a long A-arm set high in the tower (its pivots well apart, a little more caster from its
+ *  trail), the lower one a transverse link with a compression rod behind (a wide span); one coil-over a wheel on the
+ *  lower link. The rear's upper links long and tilted (anti-squat under the rear-biased drive), the lower a wide pair
+ *  with the coil-over between, the toe link behind the axle. Bars both ends; 324 / 300 mm discs, dark four- and
+ *  two-pot calipers [~]. The points are about each wheel, so the frame's track and wheelbase place them (bodies.ts n33Wheels) */
+const N33: SuspSpec = {
+  front: { type: 'doubleWishbone', kind: 'multilink', lower: { len: 340, span: [-170, 230], rise: 14 }, upper: { len: 250, span: [-190, 170], fall: 26, inset: 24, trail: 24 },
+    damper: { dx: [30], at: 0.55, top: [140, 230], spring: [36, 6], body: 23 }, bar: { dx: -230, z: 255, r: 11, at: 0.6, link: 72 }, steer: { dx: -116, up: 52, rack: true, trim: 1.5 }, brake: { r: 162, t: 30, caliper: 122, at: 180 } },
+  rear: { type: 'doubleWishbone', kind: 'multilink', lower: { len: 330, span: [-210, 210], rise: 16 }, upper: { len: 236, span: [-200, 230], fall: 26, inset: 20, trail: 0 },
+    damper: { dx: [50], at: 0.52, top: [150, 270], spring: [36, 6], body: 22 }, bar: { dx: 245, z: 172, r: 9.5, at: 0.62, link: -44 }, steer: { dx: 126, up: 50, rack: false, trim: 1.5 }, brake: { r: 150, t: 22, caliper: 104, at: 0 } },
+  look: { arms: '#2a2c30', armGloss: 0.35, armKind: 'tube', upright: '#a2a5a9', spring: '#3a64a8', damper: '#2a2c30', caliper: '#3a3d42', disc: DISC } };
 /** each base's suspension, by the kit's id or the model-built body's (render/car/bodies.ts) */
-export const SUSPENSION: Record<string, SuspSpec> = { nsx: NSX, f355: F355, eb110: EB110, p959: P959,
-  /** the N33 (docs/systems/117 R1): its multilinks drawn as the 959's double wishbones until R4 [~] */ bnr33: P959 };
+export const SUSPENSION: Record<string, SuspSpec> = { nsx: NSX, f355: F355, eb110: EB110, p959: P959, bnr33: N33 };

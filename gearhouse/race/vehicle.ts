@@ -113,7 +113,7 @@ export class Vehicle {
   /** review 158: the dampers' setting (the driver's switch, sport for racing) and the multiplier on the damping it gives
    *  now; the automated manual's state: the clutch's engagement (0..1, the control unit's own), the throttle it blips on a
    *  downshift (0..1); the air pressing each axle down (N: front, rear) from every aerodynamic source */
-  damperMode: 'comfort' | 'sport' = 'sport'; dampK = 1; clutchF1 = 0; blip = 0; downF = 0; downR = 0;
+  damperMode: 'comfort' | 'sport' = 'sport'; dampK = 1; clutchF1 = 0; /** a variable centre clutch's front share now (tech.drive.vary) */ awdF = 0; blip = 0; downF = 0; downR = 0;
   /** the gear the current shift came from, and the shift's whole time (s) */ private gearFrom = 1; private shiftDur = 0.5;
   /** a gear change under way (for the HUD) */ get shifting(): boolean { return this.shift > 0; }
   /** how the gearbox is worked (for the HUD) */ get gearboxType(): 'manual' | 'f1' { return this.spec.tech?.gearbox ?? 'manual'; }
@@ -250,7 +250,13 @@ export class Vehicle {
     // torque's share through it. A manual shift is one dead time: no drive, no clutch
     const p = this.shift > 0 ? 1 - this.shift / this.shiftDur : 1, env = p < 0.25 ? 1 - p / 0.25 : p < 0.65 ? 0 : (p - 0.65) / 0.35, down = this.gear < this.gearFrom;
     const gi = F1 && this.shift > 0 && p < 0.45 ? this.gearFrom : this.gear;   /* the old gear until the clutch is open */
-    const X = c.tech, fF = X?.drive ? X.drive.front : 0, wFa = (this.w[0]! + this.w[1]!) / 2, wRa = (this.w[2]! + this.w[3]!) / 2;   /* the centre differential: the shaft turns at the axles' speeds weighted by their torque shares */
+    const X = c.tech, wFa = (this.w[0]! + this.w[1]!) / 2, wRa = (this.w[2]! + this.w[3]!) / 2;   /* the centre differential: the shaft turns at the axles' speeds weighted by their torque shares */
+    // a variable centre clutch (docs/systems/117 R4): rear-driven at its base share, the front's share rising toward its
+    // most as the rear axle overruns the front (its slip against the front's speed), followed over tau s; else fixed
+    let fF = X?.drive ? X.drive.front : 0;
+    if (X?.drive?.vary) { const V = X.drive.vary, slip = (Math.abs(wRa) - Math.abs(wFa)) * R / Math.max(Math.abs(wFa) * R, 2);
+      const aim = fF + (V.max - fF) * Math.max(0, Math.min(1, (slip - V.slip0) / (V.slip1 - V.slip0)));
+      this.awdF += (aim - this.awdF) * Math.min(1, dt / V.tau); fF = Math.max(X.drive.front, Math.min(V.max, this.awdF)); }
     const Gr = (this.reverse ? -c.gears[0]! * 1.1 : c.gears[gi - 1]!) * c.final,   /* review 169: reverse a little lower than first, turning the shaft the other way */ we = this.rpm * Math.PI / 30, wd = fF * wFa + (1 - fF) * wRa, idle = c.idle * Math.PI / 30;
     // the class's speed limiter (docs/systems/115 §3): the fuel cut over the last 2 km/h under it
     const lim = c.limiter ? Math.max(0, Math.min(1, (c.limiter - vxh * 3.6) / 2)) : 1;

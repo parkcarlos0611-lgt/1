@@ -12,8 +12,8 @@ import { CAM_VIEWS, type CamView } from '../drivecam';
 import { saveSettings, exportAll, importAll, resetAll, loadSettings, DEFAULTS, type Settings } from './settings';
 import { VERSION_NAME, CHANGES } from '../../core/version';
 import type { BodyBase, Design } from '../../core/design';
-import { ENABLED_BODIES, enabledDesign, stockP959 } from '../../core/bodies';
-import { BODY_NAME, CAR_599 } from '../../core/names';
+import { ENABLED_BODIES, enabledDesign, stockP959, stockN33 } from '../../core/bodies';
+import { BODY_NAME, CAR_599, CAR_N33 } from '../../core/names';
 import { savedDesigns, saveDesign, deleteDesign, currentDesign, keepCurrent, newDesign, newId, designJson, parseDesign, measured, designSig } from '../../core/designstore';
 import { designFigures } from '../../race/design';
 import { tierOf, tierLabel } from '../../race/tiers';
@@ -105,19 +105,22 @@ export function garageScreen(ctx: ShellCtx): Screen<never> {
 /** the 959 as it left the works (its own design, one id: its runs are kept under it), for the test track and the race without a design of one's own */
 let p959Own: Design | null = null;
 const p959Stock = (): Design => (p959Own ??= stockP959());
+/** the N33 as it left the works (docs/systems/117 R4), as the 599's */
+let n33Own: Design | null = null;
+const n33Stock = (): Design => (n33Own ??= stockN33());
 export interface PickParams { mode: 'test' | 'race' }
 const TRACK_KEY = 'gearhouse.drive.track';
 export function pickScreen(ctx: ShellCtx): Screen<never> {
   let mode: PickParams['mode'] = 'test';
   const m = menu(ctx, 'pick', root => { const s = ctx.store, d = ctx.recent(); let track = (() => { try { return s?.getItem(TRACK_KEY) ?? 'millbrook'; } catch { return 'millbrook'; } })();
-    const race = { opp: 3, lineup: 'p959', laps: 2 }; let car: 'design' | 'p959' = enabledDesign(d) && d.id !== 'p959stock' ? 'design' : 'p959';
+    const race = { opp: 3, lineup: 'p959', laps: 2 }; let car: 'design' | 'p959' | 'n33' = enabledDesign(d) && d.id !== 'p959stock' && d.id !== 'n33stock' ? 'design' : d.id === 'n33stock' ? 'n33' : 'p959';
     const cards = el('div', 'gh-grid gh-tracks'), drawTracks = () => { cards.textContent = ''; for (const t of TRACKS) cards.append(card({ title: t.title, lines: [t.label], selected: t.id === track, onPick: () => { track = t.id; drawTracks(); (cards.querySelector('.gh-on') as HTMLElement | null)?.focus(); } })); }; drawTracks();
-    const opts = el('div', 'gh-opts gk-panel', chips('차', [...(car === 'design' ? [['design', `설계: ${d.name}`] as ['design', string]] : []), ['p959', `${CAR_599} (순정)`]], car, v => { car = v; }));   // enabled bodies only (docs/systems/113 V0)
+    const opts = el('div', 'gh-opts gk-panel', chips('차', [...(car === 'design' ? [['design', `설계: ${d.name}`] as ['design', string]] : []), ['p959', `${CAR_599} (순정)`], ['n33', `${CAR_N33} (순정)`]], car, v => { car = v; }));   // enabled bodies only (docs/systems/113 V0)
     if (mode === 'race') opts.append(slider('상대 차 수', [1, 7, 1], race.opp, v => { race.opp = v; }, v => `${v}대`),
-      ...(ENABLED_BODIES.length > 1 ? [chips('상대 구성', [['p959', '599 원메이크']], race.lineup, v => { race.lineup = v; })] : []),   // one body on: a one-make field, nothing to choose
+      // the field is the 599's one-make whatever the player drives (docs/systems/117 R4: the N33 is the player's, not an opponent): nothing to choose
       chips('바퀴 수', [[1, '1'], [2, '2'], [3, '3'], [4, '4']], race.laps, v => { race.laps = v; }));
     const start = button(mode === 'race' ? '레이스 시작' : '주행 시작', () => { try { s?.setItem(TRACK_KEY, track); } catch { /* not kept */ }
-      void ctx.router.go('drive', { design: car === 'design' ? d : p959Stock(), track, race: mode === 'race' ? { ...race } : undefined, from: 'pick' }); }, { kind: 'main', icon: 'play' });
+      void ctx.router.go('drive', { design: car === 'design' ? d : car === 'n33' ? n33Stock() : p959Stock(), track, race: mode === 'race' ? { ...race } : undefined, from: 'pick' }); }, { kind: 'main', icon: 'play' });
     root.append(topbar(mode === 'race' ? '레이스' : '시험장', () => ctx.router.back(), start), el('div', 'gh-body', el('h2', 'gh-h2', '트랙'), cards, el('h2', 'gh-h2', mode === 'race' ? '차와 상대' : '차'), opts));
     (cards.querySelector('.gh-on') as HTMLElement | null)?.setAttribute('data-first', ''); });
   return { ...m, enter(p: PickParams, how) { if (how !== 'back') mode = p?.mode ?? 'test'; return m.enter(p as never, how); } }; }

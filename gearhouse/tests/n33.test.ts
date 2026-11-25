@@ -61,7 +61,7 @@ describe('the body in the game', () => {
     const back = parseDesign(designJson({ ...d, body: { ...d.body, frame: { id: 'B33', dims: { ...NO_FRAME_DIMS, wheelbase: 100 } } } }))!; expect(back.body.frame).toEqual({ id: 'B33', dims: { ...NO_FRAME_DIMS, wheelbase: 100 } });
     // a frame of another body is not kept on it
     expect(normalise({ ...d, body: { ...d.body, frame: { id: 'A959', dims: NO_FRAME_DIMS } } }).body.frame!.id).toBe('B33'); });
-  it('is driven and opened, but not yet offered: not on the enabled list, not the race field\'s', () => { expect(isEnabledBody('bnr33')).toBe(true); expect(ENABLED_BODIES).toEqual(['p959']); expect(stockP959().body.base).toBe('p959'); });
+  it('is on the enabled list (R4), after the 959: a new design still starts on the 959', () => { expect(isEnabledBody('bnr33')).toBe(true); expect(ENABLED_BODIES).toEqual(['p959', 'bnr33']); expect(stockP959().body.base).toBe('p959'); });
   it('its name on the screens is the made-up one', () => { expect(BODY_NAME.bnr33).toBe('NISSINO N33 GT-X'); expect(bannedIn(BODY_NAME.bnr33)).toEqual([]); expect(bannedIn('Skyline GT-R')).toEqual(['Skyline', 'GT-R']); });
   it('the physics reads it: the engine ahead, the weight on the front; the bay under the bonnet grows with the wheelbase', () => { const d = normalise(newDesign('bnr33')), F = designFigures(d);
     expect(F.front).toBeGreaterThan(0.52); expect(F.mass).toBeGreaterThan(1350); expect(F.mass).toBeLessThan(1700);

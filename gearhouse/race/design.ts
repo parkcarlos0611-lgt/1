@@ -46,7 +46,8 @@ interface Base { ref: Design; kerb: number; front: number; wheelbase: number; tr
   /** where the engine's middle, the gearbox and the driver's hips sit (m: the engine and the gearbox from the rear axle, +
    *  behind it; the driver behind the front axle). Unset: a mid-engined car's (the engine 0.75 ahead of the rear axle,
    *  the transaxle at it, the driver 1.15 behind the front one) */ engineX?: number; boxX?: number; driverX?: number;
-  /** the four-wheel drive's own split and coupling (unset: a viscous centre coupling sending 30 % to the front) */ awd?: { front: number; visc: number } }
+  /** the four-wheel drive's own split and coupling (unset: a viscous centre coupling sending 30 % to the front; `vary`: a
+   *  variable centre clutch, race/cars.ts) */ awd?: NonNullable<NonNullable<RaceSpec['tech']>['drive']> }
 /** the 959 (data/cars/spec/p959.json; race/cars.ts has no spec of it): 1,450 kg, 41 % on the front (a rear engine on
  *  a 2,272 mm wheelbase), Cd 0.31 on about 1.9 m², its body in white the 911's steel one (a little lighter than the
  *  kit's mid-engined bases at their size), aramid and aluminium panels; the flat six's middle 0.25 m behind the rear axle,
@@ -54,13 +55,14 @@ interface Base { ref: Design; kerb: number; front: number; wheelbase: number; tr
  *  multi-plate centre clutch as a stiff coupling over a 30 % front share (Porsche: 20 to 50 % by the conditions) [~] */
 const P959_BASE: Base = { ref: DESIGN_P959, kerb: 1450, front: 0.41, wheelbase: 2.272, track: 1.527, width: 1.84, height: 1.28, overhangs: 1.988, cgH: 0.47, cdA: 0.59, structure: 330, panels: 112, floor: 0.2,
   engineX: 0.25, boxX: -0.3, driverX: 1.53, awd: { front: 0.3, visc: 140 } };
-/** the N33 (docs/systems/117 §3; data/cars/spec/bnr33.json): about 1,530 kg, 59 % on the front with the driver (a long
- *  straight six ahead of the cabin and the four-wheel drive's front half [~]), Cd about 0.35 on about 1.95 m² [~], a
- *  steel body in white and steel panels; the six's middle 2.05 m ahead of the rear axle (its own 0.67 m behind the front
- *  one), the gearbox behind it under the tunnel, the driver 1.45 m behind the front axle; its variable split until R4
- *  as a stiff coupling over a 25 % front share [~]. Placeholder figures for the lump's driving (R1): R4 checks them */
+/** the N33 (docs/systems/117 §3, R4; data/cars/spec/bnr33.json): 1,530 kg, 59 % on the front with the driver (a long
+ *  straight six ahead of the cabin, the four-wheel drive's front half [~]), Cd about 0.35 on about 1.95 m² [~], a steel
+ *  body in white and steel panels; the six's middle 2.05 m ahead of the rear axle (its own 0.67 m behind the front one),
+ *  the gearbox behind it under the tunnel, the driver 1.45 m behind the front axle. Its centre clutch: rear-driven, the
+ *  front's share rising to half as the rear axle slips 1 to 6 % over the front, in a tenth of a second (the
+ *  electronically controlled multi-plate clutch, by its wheel-speed sensing; the lateral-g input left out) [~] */
 const BNR33_BASE: Base = { ref: DESIGN_BNR33, kerb: 1530, front: 0.59, wheelbase: 2.72, track: 1.485, width: 1.78, height: 1.36, overhangs: 1.955, cgH: 0.5, cdA: 0.68, structure: 380, panels: 125, floor: 0.22,
-  engineX: -2.05, boxX: -1.45, driverX: 1.45, awd: { front: 0.25, visc: 140 } };
+  engineX: -2.05, boxX: -1.45, driverX: 1.45, awd: { front: 0, visc: 0, vary: { max: 0.5, slip0: 0.01, slip1: 0.06, tau: 0.1 } } };
 const BASES: Record<BodyBase, Base> = {
   nsx: { ref: DESIGN_NSX, kerb: 1365, front: 0.42, wheelbase: 2.53, track: 1.52, width: 1.81, height: 1.17, overhangs: 1.9, cgH: 0.44, cdA: 0.63, structure: 360, panels: 120, floor: 0.18 },
   f355: { ref: DESIGN_F355, kerb: 1450, front: 0.42, wheelbase: 2.45, track: 1.565, width: 1.9, height: 1.17, overhangs: 1.8, cgH: 0.44, cdA: 0.66, structure: 355, panels: 118, floor: 0.15 },
@@ -185,7 +187,7 @@ export function designSpec(d: Design): RaceSpec {
   const launch = Math.round((E.turbo ? Math.max(en.torqueRpm * 0.93, en.turbo!.full * 1.2) : en.torqueRpm * 0.93) / 100) * 100;
   const tech: NonNullable<RaceSpec['tech']> = { rollF: 0.47, tyreWF: K.tyres[0] / 1000, tyreWR: rearW / 1000, gearbox: D.gearbox };
   if (D.lsd) tech.rearLsd = 1.9;                                   // a torque-sensing differential (the NSX's 2.0, the F355's 1.8)
-  if (D.awd) tech.drive = { ...(B.awd ?? { front: 0.3, visc: 60 }) };   // a viscous centre coupling, 30 % to the front (the EB110's 27); the 959's PSK clutch stiffer
+  if (D.awd) tech.drive = structuredClone(B.awd ?? { front: 0.3, visc: 60 });   // a viscous centre coupling, 30 % to the front (the EB110's 27); the 959's PSK clutch stiffer
   if (K.abs) tech.abs = true;
   if (K.tcs) tech.tcs = { slip: 0.1, tau: 0.15, cut: 0.7 };      // the NSX's throttle-actuator system
   if (K.steering === 'hydraulic') tech.power = true; else if (K.steering === 'electric') tech.eps = EPS_SPEED_SENSITIVE;

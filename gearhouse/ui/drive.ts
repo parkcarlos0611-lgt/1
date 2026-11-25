@@ -197,7 +197,7 @@ addEventListener('pagehide', () => { if (DESIGN && dTop > dTopKept) recordRun(ST
 /** the later technology's readouts (review 125): boost, ABS working, the wing up, the drive's split */
 function techHud(): string { const X = car.spec.tech; if (!X) return ''; let o = '';
   if (X.turbo) o += `<span>부스트 ${(car.boost * X.turbo.boost).toFixed(2)} bar</span>`;
-  if (X.drive) o += `<span>4WD ${Math.round(X.drive.front * 100)}:${Math.round((1 - X.drive.front) * 100)}</span>`;
+  if (X.drive) { const f = X.drive.vary ? car.awdF : X.drive.front; o += `<span>4WD ${Math.round(f * 100)}:${Math.round((1 - f) * 100)}${X.drive.vary ? ' 가변' : ''}</span>`; }   // a variable clutch's share as it is now
   if (X.abs) o += `<span class="${car.absOn ? 'hot' : ''}">ABS${car.absOn ? ' 작동' : ''}</span>`;
   if (X.wing) o += `<span>윙 ${car.wing > 0.5 ? '올림' : '내림'}</span>`;
   if (X.tcs) o += `<span class="${car.tcsOn ? 'hot' : ''}">TCS${car.tcsOn ? ' 작동' : ''}</span>`;   /* review 153: the NSX's own traction control, and its VTEC cam */

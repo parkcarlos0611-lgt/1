@@ -14,8 +14,8 @@ import { KINDS, type Mesh } from '../render/car/mesh';
 const mem = (): KeyStore => { const m = new Map<string, string>(); return { getItem: k => m.get(k) ?? null, setItem: (k, v) => void m.set(k, v), removeItem: k => void m.delete(k) }; };
 
 describe('the enabled bodies', () => {
-  it('holds the 959 alone; the kit bases are off', () => {
-    expect(ENABLED_BODIES).toEqual(['p959']); expect(isEnabledBody('p959')).toBe(true);
+  it('holds the 959 and (docs/systems/117 R4) the N33, the 959 first; the kit bases are off', () => {
+    expect(ENABLED_BODIES).toEqual(['p959', 'bnr33']); expect(isEnabledBody('p959')).toBe(true);
     for (const b of ['nsx', 'f355', 'eb110', 'xyz']) expect(isEnabledBody(b)).toBe(false);
     expect(starterDesign().body.base).toBe('p959'); expect(enabledDesign(fromPreset('nsx'))).toBe(false);
   });

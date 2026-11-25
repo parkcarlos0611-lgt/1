@@ -3,14 +3,14 @@
 // car), as the settings' LOOKS_ON does for the looks. A body comes back (or a new one is added) by adding it here.
 import type { BodyBase, Design } from './design';
 import { fromPreset, newDesign, currentDesign, savedDesigns, type KeyStore } from './designstore';
-import { CAR_599 } from './names';
+import { CAR_599, CAR_N33 } from './names';
 
-/** the bodies switched on in the game, in the order offered */
-export const ENABLED_BODIES: readonly BodyBase[] = ['p959'];
-/** the bodies a player's design may stand on beyond those: a frame's body picked in the builder's first step (the N33's
- *  "차체 B", docs/systems/117 R1). It is driven and opened as any design, but offered nowhere else (no stock car, no race
- *  field, no title car of its own) until it joins the list above (R4) */
-export const FRAME_ONLY_BODIES: readonly BodyBase[] = ['bnr33'];
+/** the bodies switched on in the game, in the order offered (the first is a new design's; the race field stays the
+ *  599's one-make, race/onemake.ts: the N33 is the player's to pick and drive, docs/systems/117 R4) */
+export const ENABLED_BODIES: readonly BodyBase[] = ['p959', 'bnr33'];
+/** the bodies a player's design may stand on beyond those (a frame's body picked in the builder's first step, offered
+ *  nowhere else until it joins the list above); none now that the N33 has (R4) */
+export const FRAME_ONLY_BODIES: readonly BodyBase[] = [];
 /** a body on the lists (a design on any other is an old one: shown greyed, not driven, raced or opened) */
 export const isEnabledBody = (b: unknown): b is BodyBase => (ENABLED_BODIES as readonly unknown[]).includes(b) || (FRAME_ONLY_BODIES as readonly unknown[]).includes(b);
 /** a design whose body is on the list */
@@ -25,6 +25,15 @@ let stock: Design | null = null;
 export function stockP959(): Design { if (!stock) { const d = fromPreset('p959', CAR_599);
     stock = { ...d, id: 'p959stock', body: { ...d.body, model: { bumperF: 'std', bumperR: 'std', lamp: 'round', wheel: 'hollow5', plate: '08루 0599' } } }; }
   return structuredClone(stock); }
+
+/** the N33 as it left the works (docs/systems/117 R4): its own design and one id, its lump with the stock glass and
+ *  interior sets (B), its plates at their stock places (both on: the lump's are off), its stock paint */
+let stockN: Design | null = null;
+export function stockN33(): Design { if (!stockN) { const d = fromPreset('bnr33', CAR_N33);
+    // its own parts are R3's: the lump's blank bumpers and lamp bands stay, the five-spoke wheel stands in for its own
+    const { plateF: _f, plateR: _r, ...model } = d.body.model!; void _f; void _r;
+    stockN = { ...d, id: 'n33stock', body: { ...d.body, glass: 'stock', model: { ...model, wheel: 'hollow5', plate: '33너 3300' } }, interior: { set: 'stock', trim: 'black' } }; }
+  return structuredClone(stockN!); }
 
 /** the design to show and go on with, from the enabled ones: the one on the bench, else the last saved, else the stock 959 */
 export function recentEnabled(s: KeyStore | null): Design { const cur = currentDesign(s); if (cur && enabledDesign(cur)) return cur;

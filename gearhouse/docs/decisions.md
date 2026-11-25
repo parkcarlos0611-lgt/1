@@ -2,6 +2,9 @@
 
 Each decision is listed with its date. The newest come first.
 
+## 2026-11-25 — BNR33의 게임 이름
+- 게임 이름은 **NISSINO N33 GT-X**. 바리에이션 R-SPEC(상위 사양 패러디)과 NISUNO(튜너 완성차 패러디)는 문서 117 §5-1에서 검토 중.
+
 ## 2026-11-25 — 버전 표시 0.2
 - 게임의 버전 표시를 알파 0.2로 올린다(0.12에서). North Star의 버전 표(0.20 회사, 0.30 시장, 0.40 클래식)를 어떻게 다시 매길지는 아직 정하지 않았다.
 

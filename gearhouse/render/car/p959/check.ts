@@ -70,6 +70,6 @@ export function measure(S: Shell959): Measure { const G = fineGrid(S), P = S.P;
   const paint = (t: Tag) => t.mat === 'paint', E = new Map<string, number[]>(); S.F.forEach((f, k) => { if (!paint(S.tag[k]!)) return; f.forEach((a, q) => { const key = ekey(a, f[(q + 1) % f.length]!); (E.get(key) ?? E.set(key, []).get(key)!).push(k); }); });
   let smooth = 0, soft = 0, slivers = 0; const mushy: Measure['mushy'] = [], unmarked: Measure['unmarked'] = [];
   for (const [key, fs] of E) { if (fs.length !== 2) continue; const d = ang(faceNormal(P, S.F[fs[0]!]!), faceNormal(P, S.F[fs[1]!]!)), [a] = key.split('|').map(Number) as [number, number];
-    if (d < 8) smooth++; else if (d < 20) soft++; else if (!S.crease.has(key)) (d < 35 ? mushy : unmarked).push({ at: P[a]!, deg: d, panel: S.tag[fs[0]!]!.panel }); }
+    if (d < 8) smooth++; else if (d < 20) soft++; else if (!S.crease.has(key) && !/Rim$|archLip/.test(S.tag[fs[0]!]!.panel) && !/Rim$|archLip/.test(S.tag[fs[1]!]!.panel)) (d < 35 ? mushy : unmarked).push({ at: P[a]!, deg: d, panel: S.tag[fs[0]!]!.panel }); }
   S.F.forEach((f, k) => { if (!paint(S.tag[k]!)) return; for (const t of cut(P, f)) { const [a, b, c] = t.map(v => P[v]!) as [V, V, V]; if (Math.min(ang(sub(b, a), sub(c, a)), ang(sub(a, b), sub(c, b)), ang(sub(a, c), sub(b, c))) < 5) slivers++; } });
   return { panels, smooth, soft, mushy, unmarked, slivers }; }

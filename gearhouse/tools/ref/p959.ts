@@ -27,7 +27,7 @@ function flat(yawDeg: number, pitchDeg: number, o: DrawO = {}): Uint8Array { con
   const fwd: V3 = [Math.sin(y) * Math.cos(p), Math.cos(y) * Math.cos(p), -Math.sin(p)], right: V3 = un(crs(fwd, [0, 0, 1])), up = crs(right, fwd), cx = 2130, cz = 600;
   const pr = (a: V3): V3 => { const q: V3 = [a[0] - cx, a[1], a[2] - cz]; return [w / 2 + dot(q, right) / k, h * 0.5 - dot(q, up) / k, dot(q, fwd)]; };
   const zb = new Float32Array(w * h).fill(Infinity), id = new Int16Array(w * h).fill(-1), img = new Float32Array(w * h * 3);
-  const light = un([right[0] * -0.45 + up[0] * 0.75 - fwd[0] * 0.55, right[1] * -0.45 + up[1] * 0.75 - fwd[1] * 0.55, right[2] * -0.45 + up[2] * 0.75 - fwd[2] * 0.55]), half = un([light[0] - fwd[0], light[1] - fwd[1], light[2] - fwd[2]]);
+  const LK = [-0.5, 0.62, 0.5], light = un([right[0] * LK[0]! + up[0] * LK[1]! - fwd[0] * LK[2]!, right[1] * LK[0]! + up[1] * LK[1]! - fwd[1] * LK[2]!, right[2] * LK[0]! + up[2] * LK[1]! - fwd[2] * LK[2]!]), half = un([light[0] - fwd[0], light[1] - fwd[1], light[2] - fwd[2]]);
   if (o.mesh !== false) for (let t = 0; t < M.n; t++) { const q = [0, 1, 2].map(c => [M.pos[t * 9 + c * 3]!, M.pos[t * 9 + c * 3 + 1]!, M.pos[t * 9 + c * 3 + 2]!] as V3), sc = q.map(pr), fnm = un(crs([q[1]![0] - q[0]![0], q[1]![1] - q[0]![1], q[1]![2] - q[0]![2]], [q[2]![0] - q[0]![0], q[2]![1] - q[0]![1], q[2]![2] - q[0]![2]]));
     if (t < shellTris && dot(fnm, fwd) > 0.02) continue;   // the shell's back faces
     const ff: V3 = dot(fnm, fwd) > 0 ? [-fnm[0], -fnm[1], -fnm[2]] : fnm, ns = t < shellTris ? [0, 1, 2].map(c => [NN[t * 9 + c * 3]!, NN[t * 9 + c * 3 + 1]!, NN[t * 9 + c * 3 + 2]!] as V3) : [ff, ff, ff], kind = M.kind[t]!, base: V3 = [M.col[t * 3]!, M.col[t * 3 + 1]!, M.col[t * 3 + 2]!];
@@ -84,4 +84,4 @@ if (process.argv.includes('report')) { const R = measure(S);
   console.log(`paint edges: < 8 deg ${R.smooth}, 8-20 ${R.soft}, 20-35 not creased ${R.mushy.length}, >= 35 not creased ${R.unmarked.length}; slivers ${R.slivers}`);
   const by = (l: typeof R.mushy) => { const m = new Map<string, number>(); for (const e of l) m.set(e.panel, (m.get(e.panel) ?? 0) + 1); return [...m].map(([k, v]) => `${k} ${v}`).join(', '); };
   console.log(`  20-35 by panel: ${by(R.mushy)}\n  >=35 by panel: ${by(R.unmarked)}`);
-  for (const e of [...R.mushy, ...R.unmarked].sort((a, b) => b.deg - a.deg).slice(0, 14)) console.log(`   ${e.panel} ${e.deg.toFixed(1)} deg at ${e.at.map(v => Math.round(v)).join(' ')}`); }
+  for (const e of [...R.mushy, ...R.unmarked].sort((a, b) => b.deg - a.deg).slice(0, 60)) console.log(`   ${e.panel} ${e.deg.toFixed(1)} deg at ${e.at.map(v => Math.round(v)).join(' ')}`); }

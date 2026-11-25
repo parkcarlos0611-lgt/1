@@ -53,7 +53,7 @@ const GLYPH: Record<string, number[][][]> = {
   '9': [[[.1, .1], [.3, 0], [.75, 0], [1, .25], [1, .8], [.8, 1], [.2, 1], [0, .8], [0, .6], [.2, .42], [.8, .42], [1, .6]]],
   '루': [[[.15, 1], [.85, 1], [.85, .8], [.15, .8], [.15, .6], [.85, .6]], [[0, .38], [1, .38]], [[.5, .38], [.5, 0]]] };
 export interface PlateText { top: string; big: string }
-export function plate(b: Build, m: Mark, text: PlateText = { top: '08루', big: '0959' }): void { const W = 335, H = 170, n = m.n, u: V = [0, -n[0], 0], up: V = [0, 0, 1];   // u: to the reader's right
+export function plate(b: Build, m: Mark, text: PlateText = { top: '08루', big: '0959' }): void { const W = 335, H = 170, n = m.n, u: V = [0, n[0], 0], up: V = [0, 0, 1];   // u: to the reader's right
   const at = (x: number, y: number, h: number): V => add(add(add(m.o, u, x), up, y), n, h), flip = n[0] * u[1] < 0;
   const quad = (p: V, q: V, r: V, t: V) => flip ? b.quad(t, r, q, p) : b.quad(p, q, r, t), rect = (x0: number, x1: number, y0: number, y1: number, h: number) => quad(at(x0, y0, h), at(x1, y0, h), at(x1, y1, h), at(x0, y1, h));
   b.name('plateFrame').mat('#c2c5c9', 0.6, 'plain'); rect(-W / 2 - 9, W / 2 + 9, -H / 2 - 9, H / 2 + 9, 3);

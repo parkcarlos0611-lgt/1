@@ -25,6 +25,9 @@ const arg = (k: string) => process.argv.find(a => a.startsWith(k + '='))?.slice(
 const MODEL = p959Model({ lamp: arg('lamp') as never, wheel: arg('wheel') as never, bumperF: arg('bf') as never, bumperR: arg('br') as never, plate: arg('plate') ? plateText(arg('plate')!) : undefined }), S = MODEL.shell, NN = MODEL.normals;
 // plates=<a,b,...>: a sheet of number plates face on (two columns), instead of the car
 const PLATES = arg('plates')?.split(','), M = PLATES ? (() => { const b = new Build(); PLATES.forEach((t, k) => plate(b, { name: 'plate', o: [0, (k % 2 ? -1 : 1) * 200, 420 - Math.floor(k / 2) * 215], n: [-1, 0, 0], w: 335, h: 170 }, /^\d+$/.test(t) ? plateText(+t) : plateText(t))); return b.mesh(0); })() : MODEL.mesh, shellTris = PLATES ? 0 : MODEL.shellTris;
+// mirror=0 to draw the file's own axes; by default the car is drawn as the game draws it (+y on the left of the heading,
+// render/live/gpu.ts placeMesh), so plates and anything one-sided read as they do in the game
+if (arg('mirror') !== '0') { for (let i = 1; i < M.pos.length; i += 3) M.pos[i] = -M.pos[i]!; for (let i = 1; i < NN.length; i += 3) NN[i] = -NN[i]!; }
 const KIND_PAINT = KINDS.indexOf('paint'), KIND_GLASS = KINDS.indexOf('glass'), KIND_TYRE = KINDS.indexOf('tyre');
 const dot = (a: V3, b: V3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2], crs = (a: V3, b: V3): V3 => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]], un = (a: V3): V3 => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };
 interface DrawO { wires?: { P: V3[]; F: number[][] }; lines?: boolean; mesh?: boolean }

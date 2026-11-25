@@ -89,7 +89,7 @@ describe('the powertrain in the drift look', () => {
   });
   it('the stand: the same parts by name in both looks, the lines moved with the engine and with the parts spread apart, the cutaway keeping only its parts\' lines', () => {
     for (const d of [V8_NA, I6_TURBO, F6_NA]) { const R = standModel(d, 2, undefined, 'real'), D = standModel(d, 2, undefined, 'drift');
-      expect(new Set(D.mesh.names)).toEqual(new Set(R.mesh.names)); expect(D.min).toEqual(R.min); expect(D.max).toEqual(R.max); expect(R.mesh.partLines).toBeUndefined();
+      expect(new Set(D.mesh.names!.filter(n => n !== 'fanShroud'))).toEqual(new Set(R.mesh.names)); expect(D.mesh.names!.includes('fanShroud')).toBe(d === F6_NA); expect(D.min).toEqual(R.min); expect(D.max).toEqual(R.max); expect(R.mesh.partLines).toBeUndefined();
       const L = D.mesh.partLines!; expect(L.length).toBeGreaterThan(0); for (const l of L) for (const p of l.pts) { expect(p[0]).toBeGreaterThan(D.min[0] - 60); expect(p[0]).toBeLessThan(D.max[0] + 60); expect(p[2]).toBeGreaterThan(D.min[2] - 5); }
       const X = exploded(D.mesh, 1).partLines!, cam = L.findIndex(l => l.part === 'camCover'); expect(X.length).toBe(L.length); if (cam >= 0) expect(X[cam]!.pts[0]![2] - L[cam]!.pts[0]![2]).toBeCloseTo(230);
       const C = standModel(d, 2, {}, 'drift'); for (const l of C.mesh.partLines ?? []) expect(l.part).not.toBe('camCover'); expect(C.rig).toBeDefined(); }

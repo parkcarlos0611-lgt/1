@@ -142,7 +142,7 @@ export function buildEngine(g: Geo, S0: PowertrainSpec, det: Detail, transverse 
     g.part('exhaustManifold', tubular ? (S0.grade >= 3 ? BLUED : C.pipes) : '#4a4643', tubular ? 0.5 : 0.2, tubular ? 'metal' : 'plain');
     if (!tubular || det === 0 || (det === 1 && nb > 4)) g.obox(P(s, mid, hw + 0.35 * B, Hd * 0.75), [1, 0, 0], (cu1 - cu0) / 2, acr(s), 0.35 * B, ax(s), 0.3 * Hd);   // one casting
     else for (let i = 0; i < nb; i++) { const u = cylU(s, i), toward = mid - u, a = P(s, u, hw - 2, Hd + 0.4 * Hh), c = P(s, u + toward * 0.25, colX, colA);
-      if (dr && det === 2) g.bend(a, acr(s), c, mul(ax(s), -1), pipeR, pseg, nb > 4 ? 3 : 4, 0.6);   /* the drift look: one smooth round bend out of the port and down into the collector */
+      if (dr && det === 2) g.bend(a, acr(s), c, mul(ax(s), -1), pipeR, S0.cylinders > 8 ? 4 : pseg, 3, 0.6);   /* the drift look: one smooth round bend out of the port and down into the collector */
       else if (det === 2) g.tube(nb > 4 ? [a, P(s, u + toward * 0.06, hw + 0.62 * B, Hd + 0.2 * Hh), c] : [a, P(s, u, hw + 0.5 * B, Hd + 0.25 * Hh), P(s, u + toward * 0.12, colX + 0.05 * B, colA + 0.55 * B), c], pipeR, nb > 4 ? 4 : pseg); else g.tube([a, c], pipeR, 4); }
     if (det > 0) { g.part('exhaustManifold', tubular ? HOT : '#4a4643', 0.35, tubular ? 'metal' : 'plain').cyl(P(s, cu0, colX, colA), P(s, cu1, colX, colA), colR, 6, true);
       g.part('heatShield', SHIELD, 0.8, 'metal'); if (dr) bankBox(s, mid - 0.5 * B, mid + 0.5 * B, colX - 0.3 * B, colX + 0.3 * B, colA + 0.5 * B, colA + 0.56 * B);   /* the drift look: a small plate over the collector's middle, so the thick headers show */

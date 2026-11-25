@@ -13,11 +13,15 @@ export type Look = 'pbr' | 'stepped' | 'baked' | 'toon';
 export type GlassRefl = 'off' | 'weak' | 'mid';
 /** the toon glass's reflection as the renderer takes it (its `glassRefl`) */
 export const GLASS_REFL: Record<GlassRefl, number> = { off: 0, weak: 0.5, mid: 1 };
+export type LineWeight = 'thin' | 'normal' | 'bold' | 'heavy';
+/** the scale each line weight puts on the style's line widths */
+export const LINE_WEIGHT: Record<LineWeight, number> = { thin: 0.75, normal: 1, bold: 1.25, heavy: 1.5 };
 export interface Settings {
   graphics: { /** the live renderer (WebGL2) where the browser has it */ live: boolean; look: Look; photoGround: boolean; hdri: boolean; blur: boolean; /** 풍경 밀도: how many trees the woods have (review 181) */ scenery: 'low' | 'mid' | 'high';
     /** 유리 반사: the toon look's glass mirroring its drawn sky (docs/systems/104 A) */ glassRefl: GlassRefl;
     /** 연기 품질 (docs/systems/104 B, V0): none, the parcels (덩어리), the volume (보통, 높음); the volume falls back to the parcels where the device has no float render targets */ smoke: SmokeSetting;
-    /** 연기 크기 (docs/systems/103): the puffs at their full cartoon size (크게) or about half (보통) */ smokeSize: 'normal' | 'big' };
+    /** 연기 크기 (docs/systems/103): the puffs at their full cartoon size (크게) or about half (보통) */ smokeSize: 'normal' | 'big';
+    /** 선 굵기: the drift-game style's lines (the outline, the character lines, the panel lines) scaled together (docs/systems/109 §5) */ lineWeight: LineWeight };
   sound: { /** the engine and the place in the drive */ on: boolean; volume: number; /** the menus' short sounds */ ui: boolean };
   controls: { /** the drive's screen buttons: by the screen's kind (a touch screen shows them), always, never */ touch: 'auto' | 'on' | 'off'; auto: boolean; tcs: boolean; assist: boolean; progressive: boolean;
     /** the ignition (docs/systems/110 G1): 직접 시동 (held start control, the default) or 자동 시동 (running at once, as before); stalling a manual box (off: it never stalls) */ ignition: 'direct' | 'auto'; stall: boolean };
@@ -30,7 +34,7 @@ export interface Settings {
 }
 export const SETTINGS_KEY = 'gearhouse.settings.v1';
 export const DEFAULTS: Settings = {
-  graphics: { live: true, look: 'pbr', photoGround: true, hdri: true, blur: true, scenery: 'mid', glassRefl: 'mid', smoke: 'mid', smokeSize: 'big' },
+  graphics: { live: true, look: 'pbr', photoGround: true, hdri: true, blur: true, scenery: 'mid', glassRefl: 'mid', smoke: 'mid', smokeSize: 'big', lineWeight: 'normal' },
   sound: { on: false, volume: 0.7, ui: false },
   controls: { touch: 'auto', auto: true, tcs: true, assist: false, progressive: false, ignition: 'direct', stall: true },
   screen: { theme: 'auto', calm: false },
@@ -45,7 +49,7 @@ const unit = (v: unknown, d: number) => typeof v === 'number' && Number.isFinite
 /** any value made into settings: the fields it has right, the rest the defaults */
 export function asSettings(v: unknown): Settings { const o = obj(v), g = obj(o.graphics), s = obj(o.sound), c = obj(o.controls), sc = obj(o.screen), sb = obj(o.sandbox), cm = obj(o.camera), D = DEFAULTS;
   return {
-    graphics: { live: bool(g.live, D.graphics.live), look: one(g.look, ['pbr', 'stepped', 'baked', 'toon'] as const, D.graphics.look), photoGround: bool(g.photoGround, D.graphics.photoGround), hdri: bool(g.hdri, D.graphics.hdri), blur: bool(g.blur, D.graphics.blur), scenery: one(g.scenery, ['low', 'mid', 'high'] as const, D.graphics.scenery), glassRefl: one(g.glassRefl, ['off', 'weak', 'mid'] as const, D.graphics.glassRefl), smoke: one(g.smoke, ['off', 'parcels', 'mid', 'high'] as const, D.graphics.smoke), smokeSize: one(g.smokeSize, ['normal', 'big'] as const, D.graphics.smokeSize) },
+    graphics: { live: bool(g.live, D.graphics.live), look: one(g.look, ['pbr', 'stepped', 'baked', 'toon'] as const, D.graphics.look), photoGround: bool(g.photoGround, D.graphics.photoGround), hdri: bool(g.hdri, D.graphics.hdri), blur: bool(g.blur, D.graphics.blur), scenery: one(g.scenery, ['low', 'mid', 'high'] as const, D.graphics.scenery), glassRefl: one(g.glassRefl, ['off', 'weak', 'mid'] as const, D.graphics.glassRefl), smoke: one(g.smoke, ['off', 'parcels', 'mid', 'high'] as const, D.graphics.smoke), smokeSize: one(g.smokeSize, ['normal', 'big'] as const, D.graphics.smokeSize), lineWeight: one(g.lineWeight, ['thin', 'normal', 'bold', 'heavy'] as const, D.graphics.lineWeight) },
     sound: { on: bool(s.on, D.sound.on), volume: unit(s.volume, D.sound.volume), ui: bool(s.ui, D.sound.ui) },
     controls: { touch: one(c.touch, ['auto', 'on', 'off'] as const, D.controls.touch), auto: bool(c.auto, D.controls.auto), tcs: bool(c.tcs, D.controls.tcs), assist: bool(c.assist, D.controls.assist), progressive: bool(c.progressive, D.controls.progressive),
       ignition: one(c.ignition, ['direct', 'auto'] as const, D.controls.ignition), stall: bool(c.stall, D.controls.stall) },

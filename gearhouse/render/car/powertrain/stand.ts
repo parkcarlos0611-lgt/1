@@ -69,7 +69,7 @@ export function standModel(d: Design, detail: 0 | 1 | 2 = 2, cut?: { crank?: Cra
 /** what the cutaway cuts open, what else it cuts on a V's near bank, and what it takes away (the timing case and the belt drive too: they hid the front cylinder) */
 const CUT_CLIP = new Set(['engineBlock', 'cylinderHead', 'sump', 'cylinderBore']);
 const CUT_NEAR = new Set(['exhaustManifold', 'exhaustDownpipe', 'heatShield', 'turbo', 'wastegate', 'airFilter']);
-const CUT_DROP = new Set(['timingCover', 'oilFilter', 'pulley', 'belt', 'alternator', 'waterPump', 'camCover', 'coilPack', 'oilFiller', 'intakePlenum', 'intakeRunner', 'intakeTrumpet', 'throttleBody', 'throttleLinkage', 'intakeActuator', 'intakeLabel', 'airbox', 'intakeHose', 'fuelRail', 'boostPipe', 'intercooler', 'coolantHose']);
+const CUT_DROP = new Set(['fanShroud', 'timingCover', 'oilFilter', 'pulley', 'belt', 'alternator', 'waterPump', 'camCover', 'coilPack', 'oilFiller', 'intakePlenum', 'intakeRunner', 'intakeTrumpet', 'throttleBody', 'throttleLinkage', 'intakeActuator', 'intakeLabel', 'airbox', 'intakeHose', 'fuelRail', 'boostPipe', 'intercooler', 'coolantHose']);
 /** a mesh with the region where every plane's dot(p - o, n) > 0 taken out of its clipped parts (the triangles cut along
  *  the planes), its dropped parts and the faces `face` names left off */
 export function cutMesh(M: Mesh, rule: (name: string) => 'keep' | 'clip' | 'drop', planes: { o: V; n: V }[], face?: (name: string, pos: Float32Array, i: number) => boolean): Mesh {
@@ -108,7 +108,7 @@ export const PART_INFO: Record<string, { ko: string; q: QualityPart | null }> = 
   exhaustManifold: { ko: '배기 매니폴드·헤더', q: 'exhaust' }, exhaustDownpipe: { ko: '배기 다운파이프', q: 'exhaust' }, heatShield: { ko: '열 차폐판', q: 'exhaust' },
   turbo: { ko: '터보차저', q: 'turbo' }, wastegate: { ko: '웨이스트게이트', q: 'turbo' }, intercooler: { ko: '인터쿨러', q: 'turbo' }, boostPipe: { ko: '부스트 파이프', q: 'turbo' },
   pulley: { ko: '풀리', q: null }, belt: { ko: '구동 벨트', q: null }, alternator: { ko: '발전기', q: null }, waterPump: { ko: '워터 펌프', q: null }, starter: { ko: '시동 모터', q: null },
-  thermostat: { ko: '서모스탯', q: null }, coolantHose: { ko: '냉각수 호스', q: null }, stand: { ko: '엔진 받침대', q: null },
+  thermostat: { ko: '서모스탯', q: null }, fanShroud: { ko: '냉각 팬 덮개', q: null }, coolantHose: { ko: '냉각수 호스', q: null }, stand: { ko: '엔진 받침대', q: null },
   // the cutaway's insides
   crankshaft: { ko: '크랭크축', q: 'block' }, conRod: { ko: '커넥팅 로드', q: 'block' }, piston: { ko: '피스톤', q: 'block' }, pistonRing: { ko: '피스톤 링', q: 'block' }, cylinderBore: { ko: '실린더 보어', q: 'block' },
   camshaft: { ko: '캠축', q: 'head' }, intakeValve: { ko: '흡기 밸브', q: 'head' }, exhaustValve: { ko: '배기 밸브', q: 'head' }, sparkPlug: { ko: '점화 플러그', q: 'head' } };
@@ -122,7 +122,7 @@ const SPREAD: Record<string, [number, number, number]> = {
   fuelRail: [350, 0, 0], intakeHose: [300, 200, 0],
   exhaustManifold: [0, 260, 0], exhaustDownpipe: [-60, 320, 0], heatShield: [40, 300, 0], turbo: [60, 400, 0], wastegate: [80, 420, 0], intercooler: [200, 380, 0], boostPipe: [180, 330, 0],
   sump: [-230, 0, 0], oilPump: [-200, 150, 0], oilFilter: [-60, 220, 80], dipstick: [150, 80, 0],
-  timingCover: [0, 0, 160], pulley: [0, 0, 300], belt: [0, 0, 330], alternator: [0, 120, 280], waterPump: [0, 60, 260], thermostat: [60, 0, 240], coolantHose: [100, 60, 200], starter: [-40, 220, 0] };
+  timingCover: [0, 0, 160], fanShroud: [0, 0, 420], pulley: [0, 0, 300], belt: [0, 0, 330], alternator: [0, 120, 280], waterPump: [0, 60, 260], thermostat: [60, 0, 240], coolantHose: [100, 60, 200], starter: [-40, 220, 0] };
 /** each part number's spread at full (mm, the mesh's frame): by its name, out to the side its own middle is on */
 function spreads(M: Mesh): Float32Array {
   const N = M.names ?? [], k = N.length, ys = new Float64Array(k), cnt = new Float64Array(k);

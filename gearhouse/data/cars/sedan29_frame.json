@@ -1,0 +1,15 @@
+{
+  "about": "Hard points and groups of the 1929 sedan for the drawing board (review 32). x in mm from the front bumper. A: front of the front door; B: front door's rear edge; C: rear door's rear edge; Q: where the rear door would end with no quarter window (4-light); K: the front of the rear wheel block (everything behind it moves with the rear axle). Seam and handle positions are the body's side-view units.",
+  "A": 1650, "B": 2260, "C": 2882, "Q": 3150, "K": 2630,
+  "seamB": 0.3511, "seamC": 0.6518,
+  "windows": { "front": ["wframe0", "glass0"], "rear": ["wframe1", "glass1"], "quarter": ["wframe2", "glass2"] },
+  "steps": { "front": "step0", "rear": "step1" },
+  "groups": {
+    "lamp": ["lamp", "lampGap", "lens"], "lampStand": ["lampStand"], "lampBar": ["lampBar"],
+    "grille": ["shell", "lip", "core", "cap", "radiatorCore"], "hood": ["hood"],
+    "bumperF": ["bumperF0", "bumperF1"], "bumperFmount": ["clampF0", "clampF1", "ironF"],
+    "bumperR": ["bumperR0", "bumperR1"], "bumperRmount": ["ironR"],
+    "fenderF": ["fenderF"], "fenderR": ["fenderR"], "fenderLinked": ["board", "step0", "step1", "splash"],
+    "tail": ["tail", "tailRim"]
+  }
+}

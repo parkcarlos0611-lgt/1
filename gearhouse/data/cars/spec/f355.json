@@ -1,0 +1,125 @@
+{
+ "id": "f355",
+ "name": "Ferrari F355 Berlinetta (1994: pop-up head lamps, 3.5 L F129B V8 with five valves a cylinder, 380 PS, six-speed manual)",
+ "doc": "docs/systems/88_f355_sheet.md",
+ "axes": "mm; x from the nose tip (0) back to the tail (4250); y half-width from the centre line (symmetric, positive); z from the ground at static ride height",
+ "tolerance": {
+  "overall": "makers' figures (the 4-view's own dimensions and the spec tables agree): length 4250, width 1900, height 1170, wheelbase 2450, overhangs 1032/768, tracks 1514/1615, tyres 225/40 ZR18 and 265/40 ZR18 (checked by web search on several spec sheets)",
+  "profile": "+-25 in z, +-30 in x (the 4-view side, read column by column)",
+  "plan": "+-25 (the 4-view plan, column by column)",
+  "lines": "belt, crease, sill: +-25",
+  "parts": "+-40 for parts read on the 4-view; +-60 for those placed from the renders only (quarter glass tip, exhaust tips, scoop depth, engine bay)",
+  "renders": "the yellow 3D-model renders are perspective (side: ends shrunk about 5 %, the overhangs 907/711 at the wheelbase's scale); used for layout, colours and shapes, not for numbers"
+ },
+ "sources": [
+  "f355_4view_dims.png: dimensioned 4-view (side, plan, front, rear), the main measuring source",
+  "render_side/front/rear/top.png: an accurate 3D model in yellow (near orthographic, some perspective): quarter glass, scoop, tail lamps, exhausts, interior colour",
+  "wire_front34.png, wire_rear34.png: wireframes (perspective): panel split and edge flow (bonnet, covers, bumper, buttresses, tail panel)",
+  "spec tables (cars-data, auto-data, parkers, wikipedia, supercarnostalgia): 4250 x 1900 x 1170, wheelbase 2450, tracks 1514/1615, 225/40 ZR18 on 7.5Jx18 front, 265/40 ZR18 on 10Jx18 rear"
+ ],
+ "drawingChecks": {
+  "_": "each view's scale checked per axis (the corrections_138 lesson) before use",
+  "side": "dimension ticks at px 441 (front axle = the hub's centre on the drawing) and 1370 (rear axle), tail 1655, nose 33, ground row 451, roof row 13. Wheelbase 929 px -> 2.637 mm/px along; the nose sits 408 px ahead of the axle (1075 at that scale, 43 long) and the tail 285 px behind (751, 17 short): x mapped piecewise per overhang so nose and tail land on 0 and 4250. z by the height: 1170/438 = 2.671 mm/px (1.3 % taller than x: as good as unsquashed). Front tyre 111-116 px radius = 296-310 at these scales against 319 real: the drawn wheel is a touch small, not the body",
+  "plan": "nose px 29, tail 1640 (crop): 2.638 mm/px along; widest 714 px at the rear wings against 1900: 2.664 mm/px across (2 % wider than along), centre row 394.5",
+  "front": "tyre centre ticks 1976/2545.5 = 1514: 2.658 mm/px; ground 455, roof 18: 2.677 mm/px in z (not squashed)",
+  "rear": "ticks 1962/2557.5 = 1615: 2.714 mm/px across; ground 1379, roof 939: 2.659 mm/px in z (2 % squashed in z against y; z taken by height)"
+ },
+ "overall": {
+  "length": 4250, "width": 1900, "height": 1170, "wheelbase": 2450, "overhangF": 1032, "overhangR": 768,
+  "axleF": 1032, "axleR": 3482, "trackF": 1514, "trackR": 1615,
+  "tyreF": "225/40 ZR18 (radius 319)", "tyreR": "265/40 ZR18 (radius 335)", "wheelF": "7.5Jx18", "wheelR": "10Jx18",
+  "groundClearance": 120, "groundClearanceNote": "sill foot 110-126 on the 4-view, the front lip 144-158, the flat floor 120",
+  "widthWithMirrors": 2010,
+  "shares": "screen foot at 27 % of the length (centre) and 34 % (corners), roof 46-64 %, rear glass 64-68 %, louvred cover 69-96 %"
+ },
+ "profile": {
+  "_": "the silhouette from the side [x, z] (highest line across the car): nose -> bonnet -> screen -> roof -> buttress top -> deck -> ducktail lip -> tail; then the underside back to the nose (wheels excluded)",
+  "top": [[0, 300], [5, 425], [18, 465], [43, 478], [94, 502], [195, 561], [296, 609], [397, 641], [498, 673], [599, 705], [701, 729], [802, 751], [903, 767], [1004, 785], [1108, 812], [1135, 817], [1214, 815], [1267, 839], [1372, 890], [1478, 940], [1583, 988], [1689, 1036], [1794, 1079], [1900, 1122], [2005, 1154], [2111, 1165], [2216, 1170], [2348, 1170], [2480, 1165], [2612, 1157], [2664, 1146], [2744, 1122], [2849, 1087], [2955, 1058], [3060, 1023], [3166, 991], [3271, 954], [3377, 922], [3482, 884], [3536, 863], [3644, 857], [3751, 849], [3859, 841], [3967, 836], [4021, 855], [4048, 879], [4075, 871], [4102, 857], [4123, 831], [4137, 809], [4118, 788], [4161, 745], [4175, 660], [4177, 617], [4250, 596], [4255, 532], [4245, 489], [4218, 425], [4201, 382], [4215, 339], [4207, 318]],
+  "bottom": [[4207, 318], [4210, 323], [4183, 254], [4156, 230], [4102, 224], [4048, 198], [3940, 187], [3805, 171], [3113, 102], [2955, 118], [2440, 123], [1530, 118], [1412, 110], [713, 139], [612, 128], [486, 142], [157, 144], [132, 158], [81, 158], [56, 200], [30, 329], [5, 419]],
+  "runs": {
+   "nose": "0-60: the bumper face nearly upright (x 5-60 between z 190 and 450), its top rolling back into the bonnet at z 465-500; the lip's foot set back (z 158 at x 80-130)",
+   "bonnet": "60-1135: a long straight slope, about 18 deg at the covers easing to 10 deg at the cowl (z 812 at x 1108)",
+   "cowl": "1135-1214 nearly level at 812-817 (the bonnet's vents at its back edge and the screen's foot)",
+   "screen": "1214-2005 at about 24 deg on the centre line, curving into the roof",
+   "roof": "2005-2664, highest 1170 at x 2200-2400",
+   "buttress": "2664-3536: the flying buttresses' top edge, a straight fall from the roof's back corners to their tips (z 863 at x 3536); between them the upright rear glass and the louvred engine cover, lower (not in the silhouette)",
+   "deck": "3536-3970: the cover's back and the deck at 857-836",
+   "lip": "3970-4100: the ducktail lip rising to 879 at x 4048, its trailing edge at 4100 (z 857)",
+   "tail": "the tail panel under the lip leans back from x 4118 (z 830) to 4177 (z 617); the bumper steps out to its face at 4250 (z 596-510) and tucks under to 4200 (z 380-450); below it the black lower grille and the exhausts (z 200-330)"
+  },
+  "screenFoot": [1160, 812], "roofPeak": [2280, 1170], "buttressTip": [3536, 863], "lipTop": [4048, 879]
+ },
+ "plan": {
+  "_": "half-width at the widest line (the shoulder crease), mirrors excluded; the plan's across-scale normalised to the 1900 width",
+  "half": [[0, 95], [21, 400], [42, 550], [63, 640], [84, 720], [106, 755], [148, 790], [190, 810], [253, 830], [338, 850], [422, 865], [507, 880], [591, 892], [696, 901], [929, 907], [1076, 915], [1266, 920], [1400, 934], [1879, 940], [2661, 943], [3000, 948], [3230, 950], [3458, 942], [3567, 931], [3735, 920], [3925, 915], [4010, 896], [4093, 870], [4155, 843], [4195, 811], [4214, 753], [4234, 546], [4250, 0]],
+  "popupCovers": { "x": [160, 460], "y": [445, 735] },
+  "bonnet": { "x": [190, 1058], "y": [-427, 427], "note": "the front lid's shut lines run straight back at y +-427; two dark vents across its back edge (x 1005-1050, y 40-410 each side)" },
+  "screenFoot": [[1160, 0], [1250, 400], [1350, 620], [1442, 745]],
+  "screenTop": [[2060, 0], [2030, 300], [1971, 540]],
+  "roof": { "front": 2060, "back": 2730, "halfWidth": "480 flat, rolling down to the rail at 560-590" },
+  "rearGlass": { "x": [2730, 2900], "y": [-490, 490], "note": "upright window sunk between the buttresses: top 1130 at x 2730, foot 900 at 2900 (plan: the narrow white strip x 2778-2898)" },
+  "buttress": { "outerTop": [[2730, 590], [3100, 625], [3565, 650]], "innerTop": [[2730, 500], [3100, 540], [3565, 620]], "innerFoot": [[2760, 495], [3100, 520], [3565, 570]], "note": "the flying buttresses: dark inner faces seen from above (the plan's black wedges), pointed tips at x 3565 y 645" },
+  "engineCover": { "x": [2930, 4080], "edge": [[2930, 470], [3500, 535], [4080, 600]], "slots": "12 slots a side, pitch 77 (x 3085-3990), each 35 wide, y 190-450; the raised centre panel x 3200-3580, y +-220" }
+ },
+ "sections": {
+  "_": "heights of the lines along the flank, [x, z]",
+  "belt": [[1442, 790], [2000, 805], [2650, 825], [3150, 870]],
+  "beltNote": "the side glass's foot; behind the B pillar the quarter glass's foot rises to its tip (x 3150-3250, z about 875, render)",
+  "crease": [[0, 500], [1000, 505], [1450, 530], [2000, 560], [2650, 595], [3000, 600], [4100, 605]],
+  "creaseNote": "one shoulder crease round the car: the bumper's top line at the nose (z 500), rising gently along the door to 600 over the rear wing, the widest line; it also caps the side scoop",
+  "sill": [[1400, 250], [3100, 250]],
+  "sillFoot": [[1400, 118], [3100, 112]],
+  "doorLines": { "front": [[1487, 790], [1487, 150]], "rear": [[2700, 825], [2720, 600], [2700, 400], [2665, 250], [2650, 150]] }
+ },
+ "arches": {
+  "front": { "centre": 1032, "hubZ": 319, "radius": 345, "top": 664, "from": 675, "to": 1390, "shape": "round with a slight lip; the wing rises over it" },
+  "rear": { "centre": 3482, "hubZ": 335, "radius": 360, "top": 695, "from": 3125, "to": 3860, "shape": "round, slight lip" }
+ },
+ "panels": {
+  "_": "each its own surface meeting the next at a shared edge",
+  "1_frontBumper": "below the crease (z 500), x 0-675: the oval grille, the turn lamp slots, round fog lamps, the splitter lip",
+  "2_bonnet": "between y +-427 from x 190 to 1058, the vents at its back edge",
+  "3_popupCovers": "x 160-460, y 445-735, flush when down, hinged at their back edge",
+  "4_frontWings": "nose corners over the front wheel to the door (x 1487); their tops round off into the crease",
+  "5_glasshouse": "screen (body-colour A pillars), roof in body colour, door glass, black B pillar (x 2600-2680), quarter glass to its tip (3250)",
+  "6_doors": "x 1487-2700; the scoop starts in the door",
+  "7_scoop": "see sideScoop",
+  "8_sills": "z 118-250, a lip at 250 and the dark sill slot (x 1900-2600, z 185-240) under the scoop",
+  "9_rearWings": "from the door to the tail, rising into the buttresses",
+  "10_buttresses": "see plan.buttress",
+  "11_rearGlass": "upright, between the buttresses",
+  "12_engineCover": "louvred (see plan.engineCover), the V8's red intakes between the slots",
+  "13_lip": "the ducktail across the tail, x 3970-4100",
+  "14_tailPanel": "x 4118-4177, z 617-850: the black slot with the script (z 807-845, y +-610), four round lamps, the horse",
+  "15_rearBumper": "face at 4250 (z 510-596) with the plate recess, a black line at 408, the black lower grille with the exhausts (z 228-332), valance below",
+  "16_floor": "flat at 120, wells dark",
+  "17_wheels": "five-spoke star, 18 in, rear wider",
+  "sideScoop": "a deep tapering channel from the door's front third (x 1550, 0 deep, z 330-530) back to the intake ahead of the rear wheel (x 2650, 110 deep): its top edge under the crease (z 525-545), its foot at 330-300; the rear end rounded, the last 250 mm dark (the intake); the sill's lip below it"
+ },
+ "engineBay": {
+  "_": "longitudinal F129B V8 (90 deg, five valves a cylinder) behind the cabin under the louvred cover; gearbox behind it under the tail",
+  "box": { "x": [2900, 4050], "y": [-600, 600], "z": [150, 880] },
+  "engine": { "x": [3230, 3800], "crankZ": 380, "note": "bellhousing at x 3800, pulleys forward at 3230; the red crinkle intakes along the banks show between the slots" }
+ },
+ "parts": [
+  { "id": "popupLamp", "pair": true, "x": [160, 460], "y": [445, 735], "z": [545, 645], "shape": "flush cover; raised: a box turned forward, dark face with two round lamps" },
+  { "id": "grille", "x": 5, "y": [-405, 405], "z": [308, 460], "shape": "oval opening, black mesh, the horse in the middle" },
+  { "id": "turnLamp", "pair": true, "x": 8, "y": [471, 771], "z": [394, 460], "shape": "rounded slot, amber and clear lens" },
+  { "id": "fogLamp", "pair": true, "x": 15, "y": 455, "z": 283, "r": 55, "shape": "round, dark" },
+  { "id": "splitter", "x": [0, 140], "y": [-800, 800], "z": [150, 225], "shape": "the bumper's lip" },
+  { "id": "bonnetVents", "pair": true, "x": [1005, 1050], "y": [40, 410], "shape": "dark slots across the bonnet's back edge" },
+  { "id": "badgeF", "x": 400, "y": [-30, 30], "shape": "small yellow shield on the bonnet's nose" },
+  { "id": "mirror", "pair": true, "x": [1640, 1850], "y": [780, 1005], "z": [830, 980], "shape": "body-colour head on a stalk from the door's front corner" },
+  { "id": "bPillar", "pair": true, "x": [2600, 2680], "shape": "black" },
+  { "id": "quarterGlass", "pair": true, "x": [2680, 3250], "shape": "triangle under the buttress's top edge" },
+  { "id": "doorHandle", "pair": true, "x": 2580, "z": 720, "shape": "small round push button high on the door's rear (4-view dot)" },
+  { "id": "tailLamp", "pair": true, "y": [730, 565], "z": 707, "r": 70, "shape": "two round lamps a side: the outer bright red, the inner darker (fog/reversing)" },
+  { "id": "tailSlot", "y": [-610, 610], "z": [807, 845], "shape": "black band across the tail panel's top, the 'F355 berlinetta' script at its right" },
+  { "id": "plateR", "y": [-293, 282], "z": [418, 551], "shape": "recess in the bumper face" },
+  { "id": "lowerGrille", "y": [-515, 515], "z": [228, 332], "shape": "black grille under the bumper, cut-outs for the exhausts" },
+  { "id": "exhaust", "pair": true, "y": [360, 490], "z": 265, "r": 40, "shape": "two round tips a side" },
+  { "id": "wheelF", "pair": true, "x": 1032, "y": 757, "radius": 319, "rim": 18, "width": 225, "shape": "five-spoke star, silver" },
+  { "id": "wheelR", "pair": true, "x": 3482, "y": 807, "radius": 335, "rim": 18, "width": 265, "shape": "as the front, wider" }
+ ],
+ "colours": { "paint": "#f6c400 Giallo Modena (gloss)", "black": "B pillars, slots, grilles, the tail slot", "interior": "tan leather (renders)" }
+}

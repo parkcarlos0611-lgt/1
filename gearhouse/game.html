@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>GEARHOUSE</title>
+<style>
+  /* One pixel-art screen (480 x 270), scaled by a whole number where it fits, centred on a dark ground. */
+  :root { --bg: #1c1410; color-scheme: dark; }
+  html, body { margin: 0; height: 100%; background: var(--bg); }
+  .wrap { min-height: 100%; display: grid; place-items: center; }
+  canvas { display: block; image-rendering: pixelated; image-rendering: crisp-edges; touch-action: manipulation; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <canvas id="board" aria-label="GEARHOUSE 게임 화면"></canvas>
+  <input id="typer" type="text" inputmode="numeric" autocomplete="off" aria-label="숫자 입력" style="position:fixed;left:-200px;top:0;width:80px;opacity:0">
+</div>
+<script>window.GEARHOUSE_HTML_DESK = true;</script>
+<script type="module" src="/ui/game.ts"></script>
+</body>
+</html>

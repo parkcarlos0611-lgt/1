@@ -1,0 +1,375 @@
+{
+ "note": "Weather of the slice's Midwest town (review 11). Proposed starting values, not checked against climate records. months: chance of rain and snow on a day; the rest is clear. conds: what a spell brings while it lasts (bill: until the next monthly bill after it; extraDays: so long after it). Heating in a cold wave; ice and electric fans in a heat wave (workshops had no air cooling in the 1930s). after: what follows when it ends.",
+ "months": {
+  "1": [
+   0.05,
+   0.25
+  ],
+  "2": [
+   0.05,
+   0.25
+  ],
+  "3": [
+   0.2,
+   0.1
+  ],
+  "4": [
+   0.3,
+   0.01
+  ],
+  "5": [
+   0.3,
+   0
+  ],
+  "6": [
+   0.25,
+   0
+  ],
+  "7": [
+   0.25,
+   0
+  ],
+  "8": [
+   0.25,
+   0
+  ],
+  "9": [
+   0.2,
+   0
+  ],
+  "10": [
+   0.2,
+   0
+  ],
+  "11": [
+   0.15,
+   0.1
+  ],
+  "12": [
+   0.05,
+   0.25
+  ]
+ },
+ "persistence": 0.15,
+ "visit": {
+  "rain": 0.8,
+  "snow": 0.6,
+  "min": 0.3,
+  "max": 1.6
+ },
+ "startChance": {
+  "winter": 0.04,
+  "summer": 0.03,
+  "other": 0.015
+ },
+ "grace": [
+  7,
+  14
+ ],
+ "graceWinter": [
+  5,
+  10
+ ],
+ "maxDays": 30,
+ "returnShare": 0.5,
+ "returnDays": 14,
+ "events": [
+  {
+   "id": "cold_wave",
+   "months": [
+    12,
+    1,
+    2
+   ],
+   "days": [
+    4,
+    14
+   ],
+   "rain": 0,
+   "snow": 0.2,
+   "visit": 0.5,
+   "strength": 0.7,
+   "words": [
+    "한파",
+    "강추위"
+   ],
+   "conds": [
+    {
+     "cond": "utilities",
+     "value": 1.4,
+     "bill": true
+    },
+    {
+     "cond": "want",
+     "key": "closed_roof",
+     "value": 0.3
+    }
+   ]
+  },
+  {
+   "id": "blizzard",
+   "months": [
+    12,
+    1,
+    2,
+    3
+   ],
+   "days": [
+    2,
+    6
+   ],
+   "rain": 0,
+   "snow": 0.9,
+   "visit": 0.3,
+   "strength": 1,
+   "words": [
+    "폭설",
+    "눈보라"
+   ],
+   "conds": [
+    {
+     "cond": "supplier_lead",
+     "value": 1.5,
+     "extraDays": 3
+    },
+    {
+     "cond": "supplier_reliability",
+     "value": 0.8,
+     "extraDays": 3
+    }
+   ]
+  },
+  {
+   "id": "long_rain",
+   "months": [
+    6,
+    7
+   ],
+   "days": [
+    10,
+    24
+   ],
+   "rain": 0.8,
+   "snow": 0,
+   "visit": 0.7,
+   "strength": 0.7,
+   "oncePerYear": true,
+   "words": [
+    "긴 비",
+    "큰비"
+   ],
+   "after": {
+    "conds": [
+     {
+      "cond": "want",
+      "key": "high_clearance",
+      "value": 0.3,
+      "days": 42
+     }
+    ],
+    "news": {
+     "importance": 3,
+     "headlines": [
+      "긴 비에 군도 곳곳 진창… 차 다니기 어려워",
+      "비 그친 뒤 길마다 패여, 수레와 차 발 묶여"
+     ]
+    }
+   }
+  },
+  {
+   "id": "heat_wave",
+   "months": [
+    7,
+    8
+   ],
+   "days": [
+    5,
+    18
+   ],
+   "rain": 0.03,
+   "snow": 0,
+   "visit": 0.75,
+   "strength": 0.7,
+   "words": [
+    "폭염",
+    "무더위"
+   ],
+   "conds": [
+    {
+     "cond": "utilities",
+     "value": 1.15,
+     "bill": true
+    },
+    {
+     "cond": "want",
+     "key": "folding_top",
+     "value": 0.2
+    }
+   ]
+  },
+  {
+   "id": "drought",
+   "months": [
+    6,
+    7,
+    8,
+    9
+   ],
+   "days": [
+    14,
+    30
+   ],
+   "rain": 0.03,
+   "snow": 0,
+   "visit": 0.9,
+   "strength": 0.6,
+   "words": [
+    "가뭄"
+   ],
+   "conds": [
+    {
+     "cond": "demand_type",
+     "key": "farmer",
+     "value": 0.8,
+     "extraDays": 56
+    },
+    {
+     "cond": "budget",
+     "key": "farmer",
+     "value": 0.9,
+     "extraDays": 56
+    }
+   ],
+   "blocksTopics": [
+    "good_season"
+   ],
+   "blockDays": 90
+  },
+  {
+   "id": "fine_autumn",
+   "months": [
+    9,
+    10
+   ],
+   "days": [
+    7,
+    14
+   ],
+   "rain": 0.03,
+   "snow": 0,
+   "visit": 1.15,
+   "strength": 0.4,
+   "words": [],
+   "conds": [
+    {
+     "cond": "want",
+     "key": "folding_top",
+     "value": 0.25
+    }
+   ]
+  }
+ ],
+ "dayWords": {
+  "rain": [
+   "비",
+   "큰비"
+  ],
+  "snow": [
+   "눈",
+   "큰눈"
+  ],
+  "clear": []
+ },
+ "notes": {
+  "cold_wave": {
+   "title": "한파",
+   "start": [
+    "주초부터 수은주가 뚝 떨어졌다. 노인들은 당분간 풀리지 않을 것으로 본다.",
+    "매서운 추위가 닥쳤다. 읍내 거리에 사람이 드물다.",
+    "강추위에 우물이 얼었다. 장작 값이 오를 모양이다."
+   ],
+   "ongoing": [
+    "추위가 {days}일째다. 가게마다 난로 곁에만 사람이 모인다.",
+    "한파가 물러갈 줄 모른다. 장터도 한산하다."
+   ],
+   "end": [
+    "추위가 한풀 꺾였다. 읍내 거리에 다시 사람이 나왔다.",
+    "날이 풀렸다. 미뤄 둔 볼일을 보러 나온 이들로 중심가가 붐빈다."
+   ]
+  },
+  "blizzard": {
+   "title": "폭설",
+   "start": [
+    "큰눈이 내려 길이 막혔다. 학교는 문을 닫았다.",
+    "눈보라가 읍을 덮었다. 우편도 하루 걸렀다."
+   ],
+   "ongoing": [
+    "눈이 {days}일째 그치지 않는다. 군도는 썰매나 다닌다.",
+    "쌓인 눈에 장터 길이 끊겼다."
+   ],
+   "end": [
+    "눈이 그치고 길이 뚫렸다. 읍 일꾼들이 사흘을 치웠다.",
+    "눈 치운 길로 다시 수레와 차가 다닌다."
+   ]
+  },
+  "long_rain": {
+   "title": "긴 비",
+   "start": [
+    "비가 여러 날 이어지고 있다. 밭일이 멈췄다.",
+    "초여름 비가 길어질 모양이다. 장터 길이 질다."
+   ],
+   "ongoing": [
+    "비가 {days}일째다. 장터 길은 수레도 다니기 어렵다.",
+    "비가 그칠 줄 모른다. 가게마다 손님이 뜸하다."
+   ],
+   "end": [
+    "긴 비가 그쳤다. 빨래가 집집마다 널렸다.",
+    "모처럼 해가 났다. 읍내에 다시 발길이 는다."
+   ]
+  },
+  "heat_wave": {
+   "title": "무더위",
+   "start": [
+    "더위가 닥쳤다. 한낮에는 거리가 빈다.",
+    "수은주가 연일 치솟는다. 얼음 가게만 바쁘다."
+   ],
+   "ongoing": [
+    "더위가 {days}일째다. 일은 새벽과 저녁에 몰아서 한다.",
+    "무더위가 이어진다. 한낮의 중심가는 조용하다."
+   ],
+   "end": [
+    "더위가 한풀 꺾였다. 읍내 거리에 다시 사람이 나왔다.",
+    "저녁 바람이 선선해졌다. 가게들이 한숨 돌린다."
+   ]
+  },
+  "drought": {
+   "title": "가뭄",
+   "start": [
+    "비가 온 지 오래다. 농가들이 하늘만 본다.",
+    "가물어 개울이 줄었다. 밭이 갈라진다."
+   ],
+   "ongoing": [
+    "가뭄이 {days}일째다. 교회에서 비를 비는 기도회가 열렸다.",
+    "비 소식이 없다. 농가의 걱정이 깊다."
+   ],
+   "end": [
+    "기다리던 비가 왔다. 농가들이 한숨 돌렸다.",
+    "단비가 밭을 적셨다. 늦었지만 반가운 비다."
+   ]
+  },
+  "fine_autumn": {
+   "title": "가을볕",
+   "start": [
+    "맑은 가을날이 이어진다. 나들이 나온 이가 많다.",
+    "볕이 좋아 중심가가 붐빈다."
+   ],
+   "ongoing": [
+    "좋은 날씨가 {days}일째다. 장터가 북적인다."
+   ],
+   "end": [
+    "좋던 날씨가 물러가고 아침저녁이 차다.",
+    "가을볕이 끝났다. 겨울 채비를 할 때다."
+   ]
+  }
+ }
+}

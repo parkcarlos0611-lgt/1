@@ -1,0 +1,290 @@
+{
+ "car": "sedan29",
+ "source": "Checked 2026-11-20 against hobby and restoration sources (forum and club pages, not factory documents): Model A bodies in pyroxylin lacquer, low gloss, beside high-gloss black enamel on fenders, splash aprons and running boards; engine bay in dull black japan; bright work nickel plated in 1928-29 (chrome over nickel on the radiator shell and bumpers from about 1930); closed-car roofs rubberized fabric over a wooden frame until the all-steel 'turret top' of 1935; many 1920s bodies steel panels on ash framing. Exact primer and baking steps for the Model A were not confirmed. Sources: mafca.com tech Q&A on paint, mtfca.com and fordbarn.com threads, modelaclub.com, finishing.com, Wikipedia 'Body solder' and 'Coachwork'.",
+ "finishes": {
+  "body_lacquer": {
+   "name": "차체 판 (래커)",
+   "base": {
+    "kind": "steel",
+    "gauge_mm": 0.9,
+    "colour": "#a8aeb4",
+    "rusts": true,
+    "takesLead": true
+   },
+   "coats": [
+    {
+     "kind": "primer",
+     "colour": "#7c4a36",
+     "um": 25,
+     "hardness": 1.3,
+     "gloss": 0.1
+    },
+    {
+     "kind": "surfacer",
+     "colour": "#8e8a82",
+     "um": 40,
+     "hardness": 0.9,
+     "gloss": 0.15
+    },
+    {
+     "kind": "lacquer",
+     "colour": "paint",
+     "um": 60,
+     "hardness": 1.0,
+     "gloss": 0.35
+    }
+   ],
+   "note": "Steel panels, partly on ash framing; red-oxide primer, a grey surfacer sanded smooth, then thin coats of pyroxylin (nitrocellulose) lacquer: low gloss against the enamel fenders."
+  },
+  "fender_enamel": {
+   "name": "펜더 (구운 검은 에나멜)",
+   "base": {
+    "kind": "steel",
+    "gauge_mm": 1.2,
+    "colour": "#9ea4aa",
+    "rusts": true,
+    "takesLead": true
+   },
+   "coats": [
+    {
+     "kind": "japan",
+     "colour": "#2a2624",
+     "um": 15,
+     "hardness": 1.6,
+     "gloss": 0.4
+    },
+    {
+     "kind": "enamel",
+     "colour": "paint2",
+     "um": 75,
+     "hardness": 1.8,
+     "gloss": 0.95
+    }
+   ],
+   "note": "Black enamel, high gloss, on fenders, splash aprons and running boards; a baked prime coat under it (Model T practice; Model A steps unconfirmed)."
+  },
+  "hood_lacquer": {
+   "name": "보닛 (래커)",
+   "base": {
+    "kind": "steel",
+    "gauge_mm": 0.8,
+    "colour": "#a8aeb4",
+    "rusts": true,
+    "takesLead": true
+   },
+   "coats": [
+    {
+     "kind": "primer",
+     "colour": "#7c4a36",
+     "um": 25,
+     "hardness": 1.3,
+     "gloss": 0.1
+    },
+    {
+     "kind": "surfacer",
+     "colour": "#8e8a82",
+     "um": 35,
+     "hardness": 0.9,
+     "gloss": 0.15
+    },
+    {
+     "kind": "lacquer",
+     "colour": "paint",
+     "um": 55,
+     "hardness": 1.0,
+     "gloss": 0.35
+    }
+   ]
+  },
+  "chassis_black": {
+   "name": "섀시 · 흙받이 (검은 에나멜)",
+   "base": {
+    "kind": "steel",
+    "gauge_mm": 2.5,
+    "colour": "#8a9096",
+    "rusts": true,
+    "takesLead": false
+   },
+   "coats": [
+    {
+     "kind": "enamel",
+     "colour": "#1e1c1e",
+     "um": 50,
+     "hardness": 1.5,
+     "gloss": 0.5
+    }
+   ]
+  },
+  "running_board": {
+   "name": "발판 (고무 매트)",
+   "base": {
+    "kind": "steel",
+    "gauge_mm": 1.5,
+    "colour": "#9ea4aa",
+    "rusts": true,
+    "takesLead": false
+   },
+   "coats": [
+    {
+     "kind": "dressing",
+     "colour": "#26262a",
+     "um": 3000,
+     "hardness": 6,
+     "gloss": 0.2
+    }
+   ],
+   "note": "Ribbed rubber mat on steel; scuffs rather than wears through."
+  },
+  "roof_cloth": {
+   "name": "지붕 가운데 (인조 가죽)",
+   "base": {
+    "kind": "cloth",
+    "colour": "#2c2a28",
+    "rusts": false,
+    "takesLead": false
+   },
+   "coats": [
+    {
+     "kind": "dressing",
+     "colour": "#26241f",
+     "um": 400,
+     "hardness": 2,
+     "gloss": 0.3
+    }
+   ],
+   "note": "Rubberized fabric over wooden bows and slats (closed cars until the 1935 all-steel turret top); torn, not scraped; replaced."
+  },
+  "nickel": {
+   "name": "니켈 도금 (황동 바탕)",
+   "base": {
+    "kind": "brass",
+    "colour": "#c8a050",
+    "rusts": false,
+    "takesLead": false
+   },
+   "coats": [
+    {
+     "kind": "nickel",
+     "colour": "#c8c4b4",
+     "um": 12,
+     "hardness": 4,
+     "gloss": 0.9
+    }
+   ],
+   "note": "1928-29: nickel plate on brass or steel, buffs bright but dulls quickly; from about 1930 chrome over nickel on the radiator shell and bumpers."
+  },
+  "glass": {
+   "name": "판유리",
+   "base": {
+    "kind": "glass",
+    "colour": "#b8c8cc",
+    "rusts": false,
+    "takesLead": false
+   },
+   "coats": []
+  },
+  "tyre": {
+   "name": "타이어 (고무)",
+   "base": {
+    "kind": "rubber",
+    "colour": "#1c1c20",
+    "rusts": false,
+    "takesLead": false
+   },
+   "coats": []
+  },
+  "wheel_paint": {
+   "name": "철사 휠 (칠)",
+   "base": {
+    "kind": "steel",
+    "colour": "#8a9096",
+    "rusts": true,
+    "takesLead": false
+   },
+   "coats": [
+    {
+     "kind": "enamel",
+     "colour": "#3a3e28",
+     "um": 60,
+     "hardness": 1.6,
+     "gloss": 0.6
+    }
+   ]
+  },
+  "engine_japan": {
+   "name": "엔진룸 (무광 검은 재팬)",
+   "base": {
+    "kind": "iron",
+    "colour": "#7a7e84",
+    "rusts": true,
+    "takesLead": false
+   },
+   "coats": [
+    {
+     "kind": "japan",
+     "colour": "#24221f",
+     "um": 40,
+     "hardness": 1.4,
+     "gloss": 0.15
+    }
+   ],
+   "note": "Dull black gasoline-resistant japan on engine-bay parts."
+  }
+ },
+ "parts": {
+  "body": "body_lacquer",
+  "cowl": "body_lacquer",
+  "wframe0": "body_lacquer",
+  "wframe1": "body_lacquer",
+  "wframe2": "body_lacquer",
+  "rearApron": "chassis_black",
+  "hood": "hood_lacquer",
+  "fenderF": "fender_enamel",
+  "fenderR": "fender_enamel",
+  "splash": "chassis_black",
+  "apron": "chassis_black",
+  "board": "running_board",
+  "roof": "roof_cloth",
+  "pillar": "chassis_black",
+  "shell": "nickel",
+  "cap": "nickel",
+  "lamp": "nickel",
+  "lampBar": "nickel",
+  "lampStand": "nickel",
+  "bumperF0": "nickel",
+  "bumperF1": "nickel",
+  "bumperR0": "nickel",
+  "bumperR1": "nickel",
+  "clampF0": "nickel",
+  "clampF1": "nickel",
+  "tailRim": "nickel",
+  "handleR": "nickel",
+  "plateLamp": "nickel",
+  "step0": "nickel",
+  "step1": "nickel",
+  "spareHub": "nickel",
+  "screen": "glass",
+  "glass0": "glass",
+  "glass1": "glass",
+  "glass2": "glass",
+  "rearGlass": "glass",
+  "lens": "glass",
+  "tail": "glass",
+  "tyreF": "tyre",
+  "tyreR": "tyre",
+  "spare": "tyre"
+ },
+ "fallback": "chassis_black",
+ "lead": {
+  "alloy": "lead-tin body solder, about 70/30 or 80/20 Pb/Sn",
+  "flux": "zinc chloride with ammonium chloride (tinning paste)",
+  "steps": [
+   "clean to bright steel (scrape, file, steel wool)",
+   "tin: flux and a thin coat of solder wiped on",
+   "build up: solder stick softened with a torch, worked with an oak paddle greased with beeswax",
+   "shape: body file (not sandpaper)",
+   "wash off the flux (it corrodes)"
+  ],
+  "note": "Lead was the filler at the factory and in shops until plastic fillers (about 1955)."
+ }
+}

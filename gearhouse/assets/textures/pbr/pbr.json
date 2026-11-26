@@ -1,0 +1,84 @@
+{
+ "about": "PBR detail textures for the live renderer (review 103): Poly Haven, CC0. 512 px a layer, stacked top to bottom in this order. The albedo is used for its light and dark (the game keeps its own colours).",
+ "tile": 512,
+ "layers": [
+  {
+   "name": "concrete",
+   "source": "https://polyhaven.com/a/brushed_concrete_03",
+   "authors": [
+    "Amal Kumar"
+   ],
+   "license": "CC0",
+   "size_m": 2.0,
+   "luma_mean": 0.3742,
+   "rough_mean": 0.8542
+  },
+  {
+   "name": "grass",
+   "source": "https://polyhaven.com/a/sparse_grass",
+   "authors": [
+    "Amal Kumar"
+   ],
+   "license": "CC0",
+   "size_m": 2.0,
+   "luma_mean": 0.2439,
+   "rough_mean": 0.9433
+  },
+  {
+   "name": "metal",
+   "source": "https://polyhaven.com/a/blue_metal_plate",
+   "authors": [
+    "Rob Tuytel"
+   ],
+   "license": "CC0",
+   "size_m": 2.5,
+   "luma_mean": 0.2257,
+   "rough_mean": 0.2844
+  },
+  {
+   "name": "rubber",
+   "source": "https://polyhaven.com/a/rubberized_track",
+   "authors": [
+    "Charlotte Baglioni"
+   ],
+   "license": "CC0",
+   "size_m": 2.0,
+   "luma_mean": 0.2998,
+   "rough_mean": 0.9243
+  },
+  {
+   "name": "leather",
+   "source": "https://polyhaven.com/a/brown_leather",
+   "authors": [
+    "Rob Tuytel"
+   ],
+   "license": "CC0",
+   "size_m": 0.4,
+   "luma_mean": 0.2063,
+   "rough_mean": 0.6622
+  },
+  {
+   "name": "canvas",
+   "source": "https://polyhaven.com/a/waffle_pique_cotton",
+   "authors": [
+    "colormass",
+    "Rico Cilliers"
+   ],
+   "license": "CC0",
+   "size_m": 0.281,
+   "luma_mean": 0.624,
+   "rough_mean": 0.6959
+  },
+  {
+   "name": "wood",
+   "source": "https://polyhaven.com/a/oak_wood_planks",
+   "authors": [
+    "Dimitrios Savva"
+   ],
+   "license": "CC0",
+   "size_m": 1.2,
+   "luma_mean": 0.498,
+   "rough_mean": 0.4423
+  }
+ ]
+}

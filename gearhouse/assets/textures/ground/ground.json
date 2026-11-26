@@ -1,0 +1,89 @@
+{
+ "about": "Poly Haven CC0 materials for the concrete (review 124), 1K, packed: alb, nor (GL), pack (R ao, G rough, B height)",
+ "res": 1024,
+ "layers": [
+  {
+   "layer": "slab",
+   "source": "https://polyhaven.com/a/granular_concrete",
+   "size": 2.4,
+   "authors": [
+    "Dario Barresi",
+    "Michael Jenkins"
+   ],
+   "license": "CC0"
+  },
+  {
+   "layer": "slab2",
+   "source": "https://polyhaven.com/a/gravel_concrete",
+   "size": 2.12,
+   "authors": [
+    "Dario Barresi",
+    "Charlotte Baglioni"
+   ],
+   "license": "CC0"
+  },
+  {
+   "layer": "cracks",
+   "source": "https://polyhaven.com/a/cracked_concrete",
+   "size": 2.0,
+   "authors": [
+    "Dimitrios Savva"
+   ],
+   "license": "CC0"
+  },
+  {
+   "layer": "tar",
+   "source": "https://polyhaven.com/a/tarred_gravel",
+   "size": 2.2,
+   "authors": [
+    "Dimitrios Savva"
+   ],
+   "license": "CC0"
+  },
+  {
+   "layer": "rubber",
+   "source": "https://polyhaven.com/a/asphalt_track",
+   "size": 2.0,
+   "authors": [
+    "Dimitrios Savva"
+   ],
+   "license": "CC0"
+  },
+  {
+   "layer": "moss",
+   "source": "https://polyhaven.com/a/concrete_moss",
+   "size": 3.0,
+   "authors": [
+    "Rob Tuytel"
+   ],
+   "license": "CC0"
+  },
+  {
+   "layer": "paint",
+   "source": "https://polyhaven.com/a/rough_concrete",
+   "size": 1.23,
+   "authors": [
+    "Dimitrios Savva"
+   ],
+   "license": "CC0"
+  },
+  {
+   "layer": "verge",
+   "source": "https://polyhaven.com/a/grass_path_3",
+   "size": 1.0,
+   "authors": [
+    "Rob Tuytel"
+   ],
+   "license": "CC0"
+  },
+  {
+   "layer": "grass",
+   "source": "https://polyhaven.com/a/grass_ground",
+   "size": 2.51,
+   "authors": [
+    "Charlotte Baglioni"
+   ],
+   "license": "CC0"
+  }
+ ]
+}

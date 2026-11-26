@@ -1,0 +1,462 @@
+[
+ {
+  "id": "ff_cycle",
+  "cat": "fenderF",
+  "slot": "fenderF",
+  "name": "FRONT CYCLE",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "ff_clamshell",
+  "cat": "fenderF",
+  "slot": "fenderF",
+  "name": "FRONT CLAMSHELL",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "ff_longsweep",
+  "cat": "fenderF",
+  "slot": "fenderF",
+  "name": "FRONT LONGSWEEP",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "ff_valanced",
+  "cat": "fenderF",
+  "slot": "fenderF",
+  "name": "FRONT VALANCED",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "ff_sidemount",
+  "cat": "fenderF",
+  "slot": "fenderF",
+  "name": "FRONT SIDEMOUNT",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "ff_pontoon",
+  "cat": "fenderF",
+  "slot": "fenderF",
+  "name": "FRONT PONTOON",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "ff_lampPod",
+  "cat": "fenderF",
+  "slot": "fenderF",
+  "name": "FRONT LAMPPOD",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "ff_teardrop",
+  "cat": "fenderF",
+  "slot": "fenderF",
+  "name": "FRONT TEARDROP",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "ff_skirted",
+  "cat": "fenderF",
+  "slot": "fenderF",
+  "name": "FRONT SKIRTED",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "ff_racingWing",
+  "cat": "fenderF",
+  "slot": "fenderF",
+  "name": "FRONT RACINGWING",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "fr_arch",
+  "cat": "fenderR",
+  "slot": "fenderR",
+  "name": "REAR ARCH",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "fr_longTail",
+  "cat": "fenderR",
+  "slot": "fenderR",
+  "name": "REAR LONGTAIL",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "fr_spatFull",
+  "cat": "fenderR",
+  "slot": "fenderR",
+  "name": "REAR SPATFULL",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "fr_spatHalf",
+  "cat": "fenderR",
+  "slot": "fenderR",
+  "name": "REAR SPATHALF",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "fr_pontoon",
+  "cat": "fenderR",
+  "slot": "fenderR",
+  "name": "REAR PONTOON",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "fr_teardrop",
+  "cat": "fenderR",
+  "slot": "fenderR",
+  "name": "REAR TEARDROP",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "fr_cycle",
+  "cat": "fenderR",
+  "slot": "fenderR",
+  "name": "REAR CYCLE",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "fr_bustle",
+  "cat": "fenderR",
+  "slot": "fenderR",
+  "name": "REAR BUSTLE",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "rb_rubberAlu",
+  "cat": "board",
+  "slot": "board",
+  "name": "RUBBERALU",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "rb_ribbed",
+  "cat": "board",
+  "slot": "board",
+  "name": "RIBBED",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "rb_checker",
+  "cat": "board",
+  "slot": "board",
+  "name": "CHECKER",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "rb_woodSlat",
+  "cat": "board",
+  "slot": "board",
+  "name": "WOODSLAT",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "rb_stepPads",
+  "cat": "board",
+  "slot": "board",
+  "name": "STEPPADS",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "sp_rearExposed",
+  "cat": "spare",
+  "slot": "spare",
+  "name": "REAREXPOSED",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "sp_rearCover",
+  "cat": "spare",
+  "slot": "spare",
+  "name": "REARCOVER",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "sp_dualRear",
+  "cat": "spare",
+  "slot": "spare",
+  "name": "DUALREAR",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "sp_sideExposed",
+  "cat": "spare",
+  "slot": "spare",
+  "name": "SIDEEXPOSED",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "sp_sideCover",
+  "cat": "spare",
+  "slot": "spare",
+  "name": "SIDECOVER",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "sp_sideMirror",
+  "cat": "spare",
+  "slot": "spare",
+  "name": "SIDEMIRROR",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "sp_sideStrap",
+  "cat": "spare",
+  "slot": "spare",
+  "name": "SIDESTRAP",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "tr_rack",
+  "cat": "trunk",
+  "slot": "trunk",
+  "name": "RACK",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "tr_box",
+  "cat": "trunk",
+  "slot": "trunk",
+  "name": "BOX",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "tr_integrated",
+  "cat": "trunk",
+  "slot": "trunk",
+  "name": "INTEGRATED",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "tr_beavertail",
+  "cat": "trunk",
+  "slot": "trunk",
+  "name": "BEAVERTAIL",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "tr_bustle",
+  "cat": "trunk",
+  "slot": "trunk",
+  "name": "BUSTLE",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "tr_rumble",
+  "cat": "trunk",
+  "slot": "trunk",
+  "name": "RUMBLE",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "ms_cap",
+  "cat": "mascot",
+  "slot": "mascot",
+  "name": "CAP (V2)",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "ms_motometer",
+  "cat": "mascot",
+  "slot": "mascot",
+  "name": "MOTOMETER (V2)",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "ms_wingcap",
+  "cat": "mascot",
+  "slot": "mascot",
+  "name": "WINGCAP (V2)",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "ms_eagle",
+  "cat": "mascot",
+  "slot": "mascot",
+  "name": "EAGLE (V2)",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "ms_arrow",
+  "cat": "mascot",
+  "slot": "mascot",
+  "name": "ARROW (V2)",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "ms_swan",
+  "cat": "mascot",
+  "slot": "mascot",
+  "name": "SWAN (V2)",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "ms_hound",
+  "cat": "mascot",
+  "slot": "mascot",
+  "name": "HOUND (V2)",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "ms_rocket",
+  "cat": "mascot",
+  "slot": "mascot",
+  "name": "ROCKET (V2)",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "ms_propeller",
+  "cat": "mascot",
+  "slot": "mascot",
+  "name": "PROPELLER (V2)",
+  "years": [
+   1928,
+   1939
+  ]
+ },
+ {
+  "id": "ms_figure",
+  "cat": "mascot",
+  "slot": "mascot",
+  "name": "FIGURE (V2)",
+  "years": [
+   1928,
+   1939
+  ]
+ }
+]

@@ -1,0 +1,183 @@
+{
+ "about": "The handicapper's books, one per track (the test driver's lap times in seconds: standing, from rest to the end of the first lap; flying, a lap at speed). Timed by tools/ref/handicaps.ts <id> [track].",
+ "tracks": {
+  "millbrook": {
+   "about": "Millbrook Outer Circuit handicapper's book (reviews 86, 89): the test driver's lap times in seconds, from rest to the end of the first lap (standing) and a lap at speed (flying), from tools/ref/handicaps.ts, with the review-89 tyres; retimed in review 97 (the free wheels no longer drag); retimed in review 120 (the car in 3D: its axles, the tyres' relaxation, crests felt). Retimed in review 152 (the driver looks far enough ahead to brake from its own speed, and does not floor a powerful car near the grip in a bend). The NSX (review 153) timed on the resurfaced track: on the period concrete its tail swings out after landing from the Members' Bridge bump. The F355 and F355 F1 (review 158) timed on the resurfaced track, like the NSX.",
+   "cars": {
+    "dueSSJ35": {
+     "standing": 97.8,
+     "flying": 89.7
+    },
+    "bmw315": {
+     "standing": 153.4,
+     "flying": 139.7
+    },
+    "fnTT33": {
+     "standing": 134,
+     "flying": 122.2
+    },
+    "dueA21": {
+     "standing": 155,
+     "flying": 142.5
+    },
+    "plymU29": {
+     "standing": 182.4,
+     "flying": 171.7
+    },
+    "buick28": {
+     "standing": 172,
+     "flying": 161.1
+    },
+    "chevAB28": {
+     "standing": 205.6,
+     "flying": 195.4
+    },
+    "dodgeV28": {
+     "standing": 174.5,
+     "flying": 164.9
+    },
+    "pontiac29": {
+     "standing": 177.4,
+     "flying": 169
+    },
+    "willys27": {
+     "standing": 189.5,
+     "flying": 181.9
+    },
+    "fordT23": {
+     "standing": 257,
+     "flying": 245.6
+    },
+    "napier33": {
+     "standing": 88,
+     "flying": 81.5
+    },
+    "jagD55": {
+     "standing": 87.6,
+     "flying": 81
+    },
+    "auburn851": {
+     "standing": 116.3,
+     "flying": 102
+    },
+    "mb540k": {
+     "standing": 114.8,
+     "flying": 99.3
+    },
+    "eb110": {
+     "standing": 83.3,
+     "flying": 78.2
+    },
+    "xj220": {
+     "standing": 83.2,
+     "flying": 77.5
+    },
+    "diablo": {
+     "standing": 83.7,
+     "flying": 78.4
+    },
+    "nsx": {
+     "standing": 88.9,
+     "flying": 82.5
+    },
+    "f355": {
+     "standing": 85.6,
+     "flying": 80.0
+    },
+    "f355f1": {
+     "standing": 85.4,
+     "flying": 79.9
+    }
+   }
+  },
+  "road": {
+   "about": "Ashcombe Park road course (review 162), timed with tools/ref/handicaps.ts <id> road: flat, 3.77 km. Every car laps at the test driver's usual dare (0.7) except the Model T, which runs off at the Hairpin and is timed at 0.63. The driver now plans its braking within the car's brakes and brakes sooner and firmer for slow corners (Millbrook's times unchanged by it).",
+   "cars": {
+    "dueSSJ35": {
+     "standing": 135.4,
+     "flying": 129
+    },
+    "bmw315": {
+     "standing": 163.6,
+     "flying": 153.1
+    },
+    "fnTT33": {
+     "standing": 148.5,
+     "flying": 139.7
+    },
+    "dueA21": {
+     "standing": 161.8,
+     "flying": 151.8
+    },
+    "plymU29": {
+     "standing": 175.1,
+     "flying": 165.1
+    },
+    "buick28": {
+     "standing": 169.5,
+     "flying": 159.4
+    },
+    "chevAB28": {
+     "standing": 189.6,
+     "flying": 179.5
+    },
+    "dodgeV28": {
+     "standing": 168.5,
+     "flying": 159.3
+    },
+    "pontiac29": {
+     "standing": 168.4,
+     "flying": 160.1
+    },
+    "willys27": {
+     "standing": 174.9,
+     "flying": 167.2
+    },
+    "fordT23": {
+     "standing": 228.6,
+     "flying": 217.2
+    },
+    "napier33": {
+     "standing": 126,
+     "flying": 120.6
+    },
+    "jagD55": {
+     "standing": 123.7,
+     "flying": 118.5
+    },
+    "auburn851": {
+     "standing": 142,
+     "flying": 133.1
+    },
+    "mb540k": {
+     "standing": 143.5,
+     "flying": 134.5
+    },
+    "eb110": {
+     "standing": 119,
+     "flying": 115.1
+    },
+    "xj220": {
+     "standing": 118.7,
+     "flying": 114.4
+    },
+    "diablo": {
+     "standing": 119.2,
+     "flying": 115.1
+    },
+    "nsx": {
+     "standing": 124.7,
+     "flying": 119.5
+    },
+    "f355": {
+     "standing": 121.2,
+     "flying": 116.8
+    },
+    "f355f1": {
+     "standing": 120.6,
+     "flying": 116.2
+    }
+   }
+  }
+ }
+}

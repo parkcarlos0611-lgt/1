@@ -1,0 +1,16 @@
+<title>GEARHOUSE 제도판</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+  /* One pixel-art screen (480 x 270) scaled up without smoothing, centred on a dark desk-lamp ground. */
+  :root { --bg: #1c1410; --fg: #e6d8b2; --dim: #a8987a; color-scheme: dark; }
+  body { background: var(--bg); color: var(--fg); font: 14px/1.5 system-ui, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; }
+  .wrap { min-height: 100%; display: grid; place-items: center; gap: 10px; padding-block: 12px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  canvas { display: block; width: min(100%, calc((100vh - 70px) * 16 / 9)); max-width: 1440px; aspect-ratio: 16 / 9; image-rendering: pixelated; image-rendering: crisp-edges; touch-action: manipulation; }
+  p { margin: 0; max-width: 70ch; color: var(--dim); font-size: 13px; text-align: center; }
+</style>
+<div class="wrap">
+  <canvas id="board" data-reserve="80" aria-label="제도판: 1929 4도어 세단 도면과 주문서"></canvas>
+  <input id="typer" type="text" inputmode="numeric" autocomplete="off" aria-label="치수 입력 (mm)" style="position:fixed;left:-200px;top:0;width:80px;opacity:0">
+  <p>−/+ 또는 숫자 창을 눌러 치수를 키보드로 입력합니다(Enter 확정, Esc 취소). 바꾸면 빨간 선으로 겹쳐 그리고, "수정"(Enter)은 지우고 다시 그리며 "취소"(Esc)는 빨간 선만 지웁니다. 위 탭은 주문서 · 견적 · 외장, 아래 버튼은 도면 종류(회사 규모 · 시대). 가로 화면을 권합니다.</p>
+</div>
+<script>/*BUNDLE*/</script>

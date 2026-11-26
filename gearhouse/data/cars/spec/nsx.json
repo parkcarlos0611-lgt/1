@@ -1,0 +1,1350 @@
+{
+ "id": "nsx",
+ "name": "Honda NSX (NA1, 1990: pop-up head lamps, 3.0 L C30A V6 DOHC VTEC, 274 PS, coupe with the black roof)",
+ "doc": "docs/systems/85_nsx_sheet.md",
+ "axes": "mm; x from the nose tip (0) back to the tail (4405); y half-width from the centre line (symmetric, positive; parts on one side only say so); z from the ground at static ride height",
+ "tolerance": {
+  "overall": "makers' figures for the 1990 car: exact (length 4405, width 1810, height 1170, wheelbase 2530, tracks 1510/1530, tyres)",
+  "overhangs": "+-20: 930/945 split read on the blueprint side (axle-to-nose 149.5 px, axle-to-tail 151.5 px at 6.13 mm/px), stretched to the 1875 total; Honda's own drawing (later 4430 car) gives the same front 930",
+  "profile": "+-25 in z, +-30 in x on the centre line; the deck and spoiler +-30 (sources disagree by 20-40 there)",
+  "plan": "+-25: the blueprint plan, 6.23 mm/px along, 6.37 across (the plan is drawn 2 % long for its width)",
+  "lines": "belt, crease, skirt, door lines: +-25 (blueprint side, checked on photos)",
+  "parts": "+-40 for parts read on the drawings; +-60 for those placed from photographs only (rear side marker, intake depth, engine bay contents)",
+  "frontRearViews": "blueprint front and rear views: widths +-30 (scaled by the tracks); their heights are squashed 10-12 % and were used only for order and layout, the z values come from the side view"
+ },
+ "sources": [
+  "makers' data for the 1990 NA1 (Acura/Honda via Wikipedia, cararac, thecarspec, parkers, auto-data): 4405 x 1810 x 1170, wheelbase 2530, tracks 1510/1530, tyres 205/50 ZR15 on 6.5JJx15 front, 225/50 ZR16 on 8JJx16 rear, ground clearance 135 (5.3 in)",
+  "Honda's dimensioned drawing (dims_drawing.png): 4430 long, 1160 high, rear track 1540 = the later car (1997-2005 figures); used for the cabin figures, ground clearance at the floor (125) and as a check of the profile; not for the 1990 overall figures",
+  "blueprint 4-view (blueprint_4view_blue_NA2text.png): its text is about the 3.2 L car but the drawing is a 1990-type body (five-spoke 15/16 in wheels, pop-up covers, the low spoiler): the main source for profile, lines, plan and parts",
+  "model-copy 4-view: the same drawing family (feature check only)",
+  "Hum3D renders of the 2002 fixed-lamp car: tail lamp layout, deck and spoiler heights (common body only)",
+  "grey 3D model, two three-quarter views: engine bay under the (removed) rear glass, the cabin back window, the boot lid",
+  "wireframe front (perspective): the panel split of the nose (bonnet between two shut lines, the cover outlines, bumper lamps, three intakes)",
+  "photographs of the 1990-type car (red front three-quarter x2, red rear three-quarter from above, green Type R front): the black canopy, B pillar, quarter glass, rear glass foot, the intake, fuel flap, tail band, bumper lamps"
+ ],
+ "drawingChecks": {
+  "_": "the corrections_138 lesson: each drawing's scale checked per axis before use",
+  "blueprintSide": "wheel centres px (220.5, 245.5) and (633.5, 244.5): wheelbase 412.5 px -> 6.133 mm/px along; tyres round (r 50.5 px across, 50 px up); ground row 295.5, roof row 96. At the x scale the roof would stand 1224 (real 1170): the drawing is 4.6 % tall for its length. z scaled by the height: 5.865 mm/px. Nose px 71, tail px 785 (4379 at the x scale, 0.6 % short): overhangs mapped piecewise so the tail lands on 4405",
+  "hondaDrawing": "wheel centres px 117.5 / 277.5 (wheelbase 160 px -> 15.8 mm/px); 4430 line spans 281 px (15.77): x consistent. Roof 70 px above the ground = 1103 at that scale against the labelled 1160: squashed 5 % in z, so z scaled at 16.57 mm/px. Its '830' rear figure ends at px 330 = the rear lamp face, not the bumper (the bumper ends at px 339); its '1050' runs from the front axle to the 1962 mark (not a front overhang)",
+  "blueprintPlan": "length 707 px, widest 284 px: 6.23 mm/px along (4405), 6.37 across (1810); centre column 246",
+  "blueprintFront": "track line 240 px = 1510 -> 6.29 mm/px across; roof to tyre foot 206 px for 1170 = 5.68 mm/px: squashed 10 % in z",
+  "blueprintRear": "track line 240 px = 1530 -> 6.375 across; height 5.65 mm/px: squashed 12 %",
+  "hum3d": "side view: wheelbase 168 px -> 15.1 mm/px but roof 72 px above the ground = 1080 against 1160: squashed 7 %, z scaled by height",
+  "wireframeFront": "perspective (the nose's features too wide by 5-10 % against the plan): split of panels only",
+  "lengthChoice": "4405 for 1990: the Acura/Honda NA1 figure quoted by most sources; 4425 (auto-data, 1997-2001) and 4430 (the Honda drawing, 2002-05 and some JDM lists) are later cars. The overlay of the Honda drawing on the axles matches the nose to 10 mm and runs about 25 past this tail: the extra length is at the rear (later bumper and higher spoiler)"
+ },
+ "overall": {
+  "length": 4405,
+  "width": 1810,
+  "height": 1170,
+  "wheelbase": 2530,
+  "overhangF": 930,
+  "overhangR": 945,
+  "axleF": 930,
+  "axleR": 3460,
+  "trackF": 1510,
+  "trackR": 1530,
+  "tyreF": "205/50 ZR15 (radius 293)",
+  "tyreR": "225/50 ZR16 (radius 316)",
+  "wheelF": "6.5JJx15",
+  "wheelR": "8JJx16",
+  "groundClearance": 135,
+  "groundClearanceNote": "1990 spec 135 (5.3 in); Honda's later drawing 125 at the floor's middle; the sill's foot reads 120-125 on the blueprint, the front lip 108-120",
+  "widthWithMirrors": 1980,
+  "cab": {
+   "_": "the NSX is a mid-engine 'cab forward' for its day: the screen's foot ahead of the front wheel's back edge line, the cabin in the middle of the wheelbase",
+   "screenFootCentre": 1110,
+   "screenFootCorner": [
+    1460,
+    720
+   ],
+   "screenTop": 2050,
+   "aPillarFoot": [
+    1376,
+    716
+   ],
+   "hipPoint": "x about 2360-2400, z about 300 (the Honda drawing's 960 head-room line stands at x 2395; seat back 2500-2650); +-60",
+   "bulkhead": 2700,
+   "hondaCabinFigures": "960 head room (vertical from the hip point), 870* along the torso, 475 (seat), 920 and 795* horizontal cabin figures, 1050 from the front axle; the * figures are with the seat in its rearmost place; meanings of 920/795 not certain, not used for geometry",
+   "shares": "screen foot at 25 % of the length, roof peak at 53-55 %, rear glass foot at 80 %, engine bay 61-80 %"
+  }
+ },
+ "profile": {
+  "_": "the silhouette from the side [x, z] (the highest line across the car): top runs nose -> bonnet -> screen -> roof -> rear glass -> deck -> spoiler -> lamp face -> bumper; bottom back to the nose. Wheels not included",
+  "top": [
+   [
+    0,
+    300
+   ],
+   [
+    0,
+    430
+   ],
+   [
+    25,
+    475
+   ],
+   [
+    50,
+    493
+   ],
+   [
+    100,
+    516
+   ],
+   [
+    200,
+    563
+   ],
+   [
+    300,
+    604
+   ],
+   [
+    400,
+    639
+   ],
+   [
+    500,
+    669
+   ],
+   [
+    600,
+    698
+   ],
+   [
+    700,
+    721
+   ],
+   [
+    800,
+    739
+   ],
+   [
+    900,
+    751
+   ],
+   [
+    1000,
+    762
+   ],
+   [
+    1110,
+    778
+   ],
+   [
+    1200,
+    805
+   ],
+   [
+    1300,
+    850
+   ],
+   [
+    1500,
+    944
+   ],
+   [
+    1700,
+    1032
+   ],
+   [
+    1900,
+    1112
+   ],
+   [
+    2000,
+    1142
+   ],
+   [
+    2100,
+    1160
+   ],
+   [
+    2250,
+    1169
+   ],
+   [
+    2400,
+    1170
+   ],
+   [
+    2550,
+    1165
+   ],
+   [
+    2650,
+    1156
+   ],
+   [
+    2700,
+    1149
+   ],
+   [
+    2800,
+    1126
+   ],
+   [
+    2900,
+    1102
+   ],
+   [
+    3000,
+    1073
+   ],
+   [
+    3200,
+    1003
+   ],
+   [
+    3400,
+    927
+   ],
+   [
+    3520,
+    878
+   ],
+   [
+    3600,
+    872
+   ],
+   [
+    3700,
+    862
+   ],
+   [
+    3850,
+    856
+   ],
+   [
+    3950,
+    866
+   ],
+   [
+    4050,
+    887
+   ],
+   [
+    4150,
+    897
+   ],
+   [
+    4290,
+    897
+   ],
+   [
+    4300,
+    885
+   ],
+   [
+    4290,
+    830
+   ],
+   [
+    4258,
+    815
+   ],
+   [
+    4290,
+    640
+   ],
+   [
+    4330,
+    580
+   ],
+   [
+    4395,
+    560
+   ],
+   [
+    4405,
+    540
+   ],
+   [
+    4405,
+    385
+   ]
+  ],
+  "bottom": [
+   [
+    4405,
+    385
+   ],
+   [
+    4380,
+    350
+   ],
+   [
+    4340,
+    290
+   ],
+   [
+    4300,
+    210
+   ],
+   [
+    4250,
+    195
+   ],
+   [
+    4150,
+    180
+   ],
+   [
+    4000,
+    155
+   ],
+   [
+    3860,
+    165
+   ],
+   [
+    3100,
+    125
+   ],
+   [
+    1290,
+    125
+   ],
+   [
+    560,
+    110
+   ],
+   [
+    300,
+    108
+   ],
+   [
+    150,
+    118
+   ],
+   [
+    40,
+    135
+   ],
+   [
+    0,
+    300
+   ]
+  ],
+  "runs": {
+   "nose": "0-50: the bumper's face, round in plan, its top at z 430 leaning back to 493 at x 50",
+   "bonnet": "50-1110: a long convex slope (about 25 deg at the nose easing to 7 deg at the cowl) over the pop-up covers (x 250-630) which lie flush in it",
+   "screen": "1110-2050 on the centre line at about 25 deg, curving into the roof; the corners' foot at x 1460",
+   "roof": "2050-2700, highest 1170 at x 2300-2450, black",
+   "rearGlass": "2700-3520 at about 17 deg: the big glass over the engine; black canopy down to its foot (z 878 at x 3520)",
+   "deck": "3520-3950: the boot lid, nearly flat at 856-872",
+   "spoiler": "3950-4300: the integrated spoiler rising from the deck to a flat top at 897 (x 4150-4290), its trailing edge at 4300",
+   "tail": "under the spoiler the lamp face leans forward to x 4258 at z 815 then down and back to 4290 at 640; the bumper's top at 580 steps out to the bumper face at 4405 (z 540-385)"
+  },
+  "screenFoot": [
+   1110,
+   778
+  ],
+  "roofPeak": [
+   2400,
+   1170
+  ],
+  "rearGlassFoot": [
+   3520,
+   878
+  ],
+  "spoilerTop": [
+   4290,
+   897
+  ]
+ },
+ "plan": {
+  "_": "half-width at x at the widest line (mirrors excluded); the nose is a round 'U', front wings widest at 882 (x 700-1200), a slight waist at the doors (866-873), widest at the rear wings 905 (x 3250-3350), the tail rounding in from 3750",
+  "half": [
+   [
+    0,
+    0
+   ],
+   [
+    12,
+    240
+   ],
+   [
+    75,
+    494
+   ],
+   [
+    137,
+    627
+   ],
+   [
+    200,
+    723
+   ],
+   [
+    262,
+    761
+   ],
+   [
+    324,
+    787
+   ],
+   [
+    386,
+    806
+   ],
+   [
+    449,
+    825
+   ],
+   [
+    511,
+    841
+   ],
+   [
+    573,
+    860
+   ],
+   [
+    636,
+    876
+   ],
+   [
+    698,
+    882
+   ],
+   [
+    1200,
+    882
+   ],
+   [
+    1383,
+    866
+   ],
+   [
+    1632,
+    866
+   ],
+   [
+    1900,
+    869
+   ],
+   [
+    2500,
+    873
+   ],
+   [
+    2700,
+    878
+   ],
+   [
+    2950,
+    881
+   ],
+   [
+    3100,
+    893
+   ],
+   [
+    3250,
+    903
+   ],
+   [
+    3350,
+    905
+   ],
+   [
+    3600,
+    898
+   ],
+   [
+    3700,
+    894
+   ],
+   [
+    3750,
+    882
+   ],
+   [
+    3813,
+    869
+   ],
+   [
+    3875,
+    860
+   ],
+   [
+    3937,
+    854
+   ],
+   [
+    4000,
+    841
+   ],
+   [
+    4062,
+    834
+   ],
+   [
+    4124,
+    825
+   ],
+   [
+    4187,
+    812
+   ],
+   [
+    4249,
+    799
+   ],
+   [
+    4311,
+    771
+   ],
+   [
+    4374,
+    586
+   ],
+   [
+    4405,
+    0
+   ]
+  ],
+  "bonnetEdge": "the bonnet's shut lines run from y 357 at x 150 to 452 at the cowl (x 1100), nearly straight; outboard of them the front wings' tops",
+  "popupCovers": {
+   "x": [
+    250,
+    630
+   ],
+   "y": [
+    440,
+    700
+   ]
+  },
+  "screenFoot": [
+   [
+    1110,
+    0
+   ],
+   [
+    1180,
+    300
+   ],
+   [
+    1300,
+    520
+   ],
+   [
+    1420,
+    680
+   ],
+   [
+    1460,
+    720
+   ]
+  ],
+  "roof": {
+   "frontCentre": 1975,
+   "frontCorner": [
+    2050,
+    484
+   ],
+   "halfWidth": "455 (black panel), drip edge 500",
+   "back": [
+    2650,
+    470
+   ],
+   "backCentre": 2650
+  },
+  "doorGlassFoot": "y 760 at the belt (tumblehome: 12 % in from the widest line); the glass leans in to y 600 at the top",
+  "rearGlass": [
+   [
+    2700,
+    0
+   ],
+   [
+    2720,
+    560
+   ],
+   [
+    2850,
+    680
+   ],
+   [
+    3050,
+    690
+   ],
+   [
+    3300,
+    640
+   ],
+   [
+    3480,
+    480
+   ],
+   [
+    3520,
+    0
+   ]
+  ],
+  "rearWingRidge": "the rear wings' tops stand beside the rear glass: y 750-800 at x 2800-3500, curving in to 650 at 4000 and running into the spoiler's ends",
+  "bootLid": "x 3520-4000, shut lines at y +-590",
+  "spoiler": [
+   [
+    3950,
+    0
+   ],
+   [
+    4000,
+    700
+   ],
+   [
+    4150,
+    800
+   ],
+   [
+    4300,
+    770
+   ]
+  ]
+ },
+ "sections": {
+  "_": "heights of the lines along the flank, [x, z]",
+  "belt": [
+   [
+    1250,
+    745
+   ],
+   [
+    1500,
+    732
+   ],
+   [
+    1750,
+    748
+   ],
+   [
+    2000,
+    757
+   ],
+   [
+    2250,
+    772
+   ],
+   [
+    2500,
+    790
+   ],
+   [
+    2750,
+    805
+   ],
+   [
+    2950,
+    824
+   ]
+  ],
+  "beltNote": "where the black canopy meets the body colour: low at the A pillar's foot (745), lowest behind the mirror (732), rising steadily to the B pillar's base (805 at x 2750) and the quarter glass's foot (824 at 2950)",
+  "canopyRear": [
+   [
+    2950,
+    824
+   ],
+   [
+    2990,
+    880
+   ],
+   [
+    3300,
+    880
+   ],
+   [
+    3520,
+    878
+   ]
+  ],
+  "crestF": "the front wing's top runs with the bonnet's edge, 0-15 above the centre line's height from the covers back to the A pillar (z 765 at x 1300)",
+  "shoulder": [
+   [
+    700,
+    520
+   ],
+   [
+    930,
+    540
+   ],
+   [
+    2000,
+    560
+   ],
+   [
+    3000,
+    590
+   ],
+   [
+    3460,
+    600
+   ],
+   [
+    4000,
+    590
+   ]
+  ],
+  "doorCrease": [
+   [
+    1450,
+    590
+   ],
+   [
+    2000,
+    597
+   ],
+   [
+    2300,
+    605
+   ],
+   [
+    2500,
+    610
+   ],
+   [
+    2690,
+    612
+   ]
+  ],
+  "doorCreaseNote": "a soft horizontal crease along the door (z about 600) from behind the front wheel into the intake's top front corner",
+  "skirt": [
+   [
+    1300,
+    355
+   ],
+   [
+    3050,
+    355
+   ]
+  ],
+  "skirtNote": "the top of the side sill: a crease at z 355 from arch to arch, the sill's face falling to its foot at 125",
+  "sill": [
+   [
+    1290,
+    125
+   ],
+   [
+    3100,
+    125
+   ]
+  ],
+  "bumperShutF": "the bonnet/bumper line round the nose at z about 455 (centre) dipping to the bumper lamps' tops, running back along the side at z 455-470 to the front arch",
+  "tailBandEdge": "under the lamp band the bumper's top at z 580-640, a narrow body-colour ledge"
+ },
+ "arches": {
+  "front": {
+   "centre": 930,
+   "shape": "round, a slight lip",
+   "radius": 355,
+   "top": 648,
+   "from": 575,
+   "to": 1285,
+   "tyreRadius": 293
+  },
+  "rear": {
+   "centre": 3460,
+   "shape": "round, a slight lip; the opening runs a little long at the foot (3085-3858 at z 320-365)",
+   "radius": 352,
+   "top": 668,
+   "from": 3108,
+   "to": 3812,
+   "tyreRadius": 316
+  }
+ },
+ "panels": {
+  "_": "the aluminium body's panels, each its own surface meeting the next at a shared edge (for the panel model and for damage later)",
+  "1_frontBumper": "below the shut line z 455 (nose) / 470 (sides), x 0-575: the long combination lamps at its top corners, the centre intake and two outer intakes (with the fog lamps) below, a thin lip at z 108-130",
+  "2_bonnet": "the long front lid between the two shut lines (y 357 at x 150 to 452 at the cowl), from the bumper line to the cowl (x 1100); the H badge at its nose",
+  "3_popupCovers": "x 250-630, y 440-700: each the bonnet-side corner of the nose, flush with the slope when down, hinged at the back edge; raised, a pod about 350 wide and 140 tall faces forward",
+  "4_frontWings": "from the nose's corners round the covers, over the front wheel to the door's front edge x 1376; their tops meet the bonnet at its shut lines; repeater behind the arch",
+  "5_canopy": "the black glasshouse: screen (black band round it), black A pillars, black roof panel, door glass, black B pillar garnish behind the glass, quarter glass and the rear glass; it sits on the body colour along the belt and the rear wings' ridges (see the canopy notes)",
+  "6_doors": "x 1376-2748 at the top; the rear edge curves down and forward to 2422 at the foot (z 208); the soft crease at z 600 runs into the intake",
+  "7_sills": "z 125-355 under the doors, the crease at 355 on top",
+  "8_rearWings": "from the door's back edge to the tail: the intake, the fuel flap (left side), the ridge beside the rear glass, the arch; their tops carry the spoiler's ends",
+  "9_rearGlass": "the engine cover glass, x 2700-3520, hinged at the roof; under it the engine bay",
+  "10_bootLid": "x 3520-4000 between the rear wings' ridges, nearly flat",
+  "11_spoiler": "the integrated spoiler bridging the rear wings across the tail, x 3950-4300, top 897",
+  "12_tailBand": "the full-width smoked black lamp band under the spoiler, z 640-815",
+  "13_rearBumper": "body colour, z 385-640 face, with the plate recess, wrapping the corners to the rear arches; a black valance with the pipes under it (z 180-385)",
+  "14_floor": "flat at z 125, wheel wells dark",
+  "15_wheels": "1990 cast five-spoke, 15 in front, 16 in rear",
+  "canopy": {
+   "_": "how the black 'fighter canopy' sits on the body (photos + blueprint side): one black glasshouse on a red lower body",
+   "black": "screen frame, A pillars, roof panel (painted black on the 1990 coupe), B pillar garnish (gloss black, flush behind/among the glass; the pillar itself does not show), quarter glass, rear glass, and the trim of the door glass frame",
+   "lowerEdgeSide": "the belt line (sections.belt): 745 at the A pillar's foot (x 1250-1376), 732 behind the mirror, 757 mid door, 805 at the B pillar's base (x 2750), 824 at the quarter glass's foot (x 2950); there it steps up onto the rear wing's ridge: the rear glass's side edge runs back at z 880 from x 2990 to its foot",
+   "rearEnd": "the canopy ends at the rear glass's foot, x 3520 on the centre line (z 878), the foot curving forward to the sides (plan.rearGlass: y 480 at x 3480, 640 at 3300); behind it the body-colour boot lid; beside it the body-colour ridges of the rear wings, so the black ends as a rounded tongue lying between two red ridges",
+   "bPillar": "black garnish x 2687 (top) - 2748 (foot), leaning back; the quarter glass behind it is a triangle up to the slanting edge from (2728, 1117) to (2953, 824), the rear glass seen beyond it",
+   "plan": "black from the screen's foot (1110 centre, 1460 at the corners) to the rear glass's foot (3520); the roof's black panel x 1975-2650, half-width 455"
+  },
+  "tail": {
+   "spoiler": "a body-colour blade rising out of the deck at x 3950 to a flat top at 897, its trailing edge at x 4300 (z 885); in plan it bows forward at the centre (leading edge x 3950 centre, 4150 at y 800) and its ends run into the rear wings' tops (no struts)",
+   "gap": "between the blade's underside (about 830) and the lamp band's top (about 815) a dark slot shows over the band from behind; from the side the lamp face is set back under the blade (4258 against 4300). Drawn faintly in the blueprint; read as 20-40 tall, +-30",
+   "band": "full width y +-800 (wing to wing), z 640-815, a smoked black lens leaning forward at the top; lamps inside: amber at the outer ends (y 680-800), red y 260-680, clear reverse y 150-250, a black centre panel y +-140",
+   "below": "a body-colour ledge (z 580-640) and the bumper face with the plate recess"
+  },
+  "sideIntake": "behind the door: a deep scoop x 2697-2973, z 365-619, its front edge leaning with the door's back edge, its top level, rear and lower corners rounded; it opens back and in about 150 deep; inside dark (a black grille deep in the duct). The fins of the brief were not seen on the 1990 photos: if modelled, 2-3 dark horizontal slats deep inside, not on the surface",
+  "fuelFlap": "left rear wing only, above and behind the intake: x 2987-3167, z 648-775, a rounded square flush in the skin"
+ },
+ "engineBay": {
+  "_": "transverse C30A V6 (90 deg, DOHC VTEC) behind the seats, under the rear glass; the gearbox on the car's left end of the engine, the differential on the rear axle line",
+  "box": {
+   "x": [
+    2720,
+    3540
+   ],
+   "y": [
+    -660,
+    660
+   ],
+   "z": [
+    180,
+    840
+   ],
+   "note": "the space an engine mesh may fill; the rear glass above it falls from z 1126 at x 2800 to 927 at 3400 and 878 at 3520; bulkhead (cabin back) at x 2700 with a small upright cabin window; the boot behind at 3540"
+  },
+  "glassOutline": "plan.rearGlass: the clear area x 2720-3500, widest y 690 at x 2850-3050, 480 at 3480",
+  "engine": {
+   "x": [
+    2880,
+    3420
+   ],
+   "y": [
+    -560,
+    420
+   ],
+   "z": [
+    220,
+    820
+   ],
+   "note": "block and heads with the crankshaft across the car near x 3150, z 400; the gearbox x 3050-3450 at y -400..-650 (left); +-60"
+  },
+  "visible": "through the glass: the cast aluminium intake plenum across the bay with six short runners (x 2950-3250, top z about 800), the rear bank's cam cover (dark, crinkle finish) behind it, an air cleaner box and hoses at the left side (blueprint plan x 3065-3345, y -390..-550), and a bar across the bay's rear (x about 3400, y +-560, bolted at both ends: the strut brace in the blueprint plan); the bay's walls black"
+ },
+ "parts": [
+  {
+   "id": "popupLamp",
+   "pair": true,
+   "x": [
+    250,
+    630
+   ],
+   "y": [
+    440,
+    700
+   ],
+   "z": [
+    560,
+    700
+   ],
+   "shape": "cover flush in the bonnet's slope, its seams the only sign; raised: a pod about 350 wide and 140 tall turned forward, lamp face dark with a wide rectangular lens (the 1990 lamp detail not checked in the references; raised state optional)",
+   "src": "blueprint plan and side, photos, wireframe"
+  },
+  {
+   "id": "lampWell",
+   "pair": true,
+   "x": [
+    250,
+    630
+   ],
+   "y": [
+    440,
+    700
+   ],
+   "depth": 120,
+   "shape": "dark well under the cover"
+  },
+  {
+   "id": "bumperLampF",
+   "pair": true,
+   "x": [
+    0,
+    290
+   ],
+   "y": [
+    440,
+    790
+   ],
+   "z": [
+    390,
+    455
+   ],
+   "shape": "long thin clear/amber combination lamp in the bumper's top corner, wrapping round the corner along the side (the side marker in the US car)",
+   "src": "blueprint front and side, photos"
+  },
+  {
+   "id": "intakeFrontCentre",
+   "x": 20,
+   "y": [
+    -377,
+    377
+   ],
+   "z": [
+    199,
+    355
+   ],
+   "depth": 120,
+   "shape": "wide rounded slot under the bumper lamps, dark, a few vertical bars; the plate is carried on it"
+  },
+  {
+   "id": "intakeFrontOuter",
+   "pair": true,
+   "x": 40,
+   "y": [
+    455,
+    740
+   ],
+   "z": [
+    227,
+    312
+   ],
+   "shape": "slot at the bumper's corners, the fog lamp in its outer half"
+  },
+  {
+   "id": "fogLamp",
+   "pair": true,
+   "x": 45,
+   "y": [
+    540,
+    680
+   ],
+   "z": [
+    235,
+    305
+   ],
+   "shape": "clear square lens in the outer intake"
+  },
+  {
+   "id": "lipF",
+   "x": [
+    0,
+    500
+   ],
+   "y": [
+    -760,
+    760
+   ],
+   "z": [
+    108,
+    130
+   ],
+   "shape": "the bumper's thin lower lip"
+  },
+  {
+   "id": "plateF",
+   "x": 15,
+   "y": [
+    -260,
+    260
+   ],
+   "z": [
+    230,
+    340
+   ],
+   "shape": "plate on the centre intake (optional)"
+  },
+  {
+   "id": "badgeF",
+   "x": [
+    60,
+    110
+   ],
+   "y": [
+    -50,
+    50
+   ],
+   "z": [
+    480,
+    520
+   ],
+   "shape": "chrome H in a square on the bonnet's nose"
+  },
+  {
+   "id": "washerNozzle",
+   "pair": true,
+   "x": 120,
+   "y": 330,
+   "z": 500,
+   "shape": "small black nozzle on the bonnet's front edge"
+  },
+  {
+   "id": "repeaterF",
+   "pair": true,
+   "x": [
+    1248,
+    1325
+   ],
+   "z": [
+    566,
+    599
+   ],
+   "shape": "small amber rounded oblong on the front wing behind the arch"
+  },
+  {
+   "id": "windscreen",
+   "x": [
+    1110,
+    2050
+   ],
+   "shape": "wrap-round, black band round it; foot bowed forward (plan.screenFoot)"
+  },
+  {
+   "id": "wipers",
+   "x": [
+    1000,
+    1150
+   ],
+   "y": [
+    -650,
+    600
+   ],
+   "z": [
+    765,
+    790
+   ],
+   "shape": "two black arms parked along the cowl"
+  },
+  {
+   "id": "mirror",
+   "pair": true,
+   "x": [
+    1611,
+    1815
+   ],
+   "y": [
+    786,
+    990
+   ],
+   "z": [
+    687,
+    863
+   ],
+   "shape": "body colour head on a short stalk from the door's top front corner (x 1621, z 716)"
+  },
+  {
+   "id": "doorGlass",
+   "pair": true,
+   "x": [
+    1376,
+    2700
+   ],
+   "zFoot": "sections.belt",
+   "top": "under the roof's edge, about 1100",
+   "shape": "frameless look, black frame trim"
+  },
+  {
+   "id": "bPillar",
+   "pair": true,
+   "x": [
+    2687,
+    2748
+   ],
+   "z": [
+    804,
+    1137
+   ],
+   "shape": "gloss black garnish leaning back, part of the black canopy"
+  },
+  {
+   "id": "quarterGlass",
+   "pair": true,
+   "outline": [
+    [
+     2748,
+     804
+    ],
+    [
+     2728,
+     1117
+    ],
+    [
+     2953,
+     824
+    ]
+   ],
+   "shape": "triangle of dark glass behind the B pillar"
+  },
+  {
+   "id": "rearGlass",
+   "x": [
+    2700,
+    3520
+   ],
+   "plan": "plan.rearGlass",
+   "shape": "large engine cover glass, black edge band; the engine seen through"
+  },
+  {
+   "id": "cabinBackWindow",
+   "x": 2700,
+   "y": [
+    -450,
+    450
+   ],
+   "z": [
+    850,
+    1050
+   ],
+   "shape": "small upright window in the bulkhead behind the seats, seen through the rear glass"
+  },
+  {
+   "id": "doorLines",
+   "pair": true,
+   "front": [
+    [
+     1376,
+     716
+    ],
+    [
+     1390,
+     500
+    ],
+    [
+     1400,
+     350
+    ],
+    [
+     1417,
+     208
+    ]
+   ],
+   "rear": [
+    [
+     2748,
+     814
+    ],
+    [
+     2735,
+     700
+    ],
+    [
+     2715,
+     600
+    ],
+    [
+     2680,
+     450
+    ],
+    [
+     2600,
+     320
+    ],
+    [
+     2500,
+     240
+    ],
+    [
+     2422,
+     208
+    ]
+   ],
+   "shape": "front edge nearly upright; rear edge upright to the crease, then sweeping down and forward to the sill"
+  },
+  {
+   "id": "doorLock",
+   "pair": true,
+   "x": 2646,
+   "z": 716,
+   "d": 30,
+   "shape": "round lock barrel high on the door's rear; the handle a flush pull under the door glass's back corner"
+  },
+  {
+   "id": "sideIntake",
+   "pair": true,
+   "x": [
+    2697,
+    2973
+   ],
+   "z": [
+    365,
+    619
+   ],
+   "depth": 150,
+   "shape": "deep scoop; see panels.sideIntake"
+  },
+  {
+   "id": "fuelFlap",
+   "side": "left",
+   "x": [
+    2987,
+    3167
+   ],
+   "z": [
+    648,
+    775
+   ],
+   "shape": "rounded square flush flap"
+  },
+  {
+   "id": "markerR",
+   "pair": true,
+   "x": [
+    3990,
+    4080
+   ],
+   "z": [
+    460,
+    500
+   ],
+   "shape": "small red reflector on the rear bumper's side behind the arch (photo, +-60)"
+  },
+  {
+   "id": "bootLid",
+   "x": [
+    3520,
+    4000
+   ],
+   "y": [
+    -590,
+    590
+   ],
+   "z": [
+    856,
+    872
+   ],
+   "shape": "flat lid between the wing ridges"
+  },
+  {
+   "id": "spoiler",
+   "x": [
+    3950,
+    4300
+   ],
+   "y": [
+    -800,
+    800
+   ],
+   "z": [
+    850,
+    897
+   ],
+   "shape": "see panels.tail.spoiler"
+  },
+  {
+   "id": "tailBand",
+   "x": [
+    4258,
+    4290
+   ],
+   "y": [
+    -800,
+    800
+   ],
+   "z": [
+    640,
+    815
+   ],
+   "shape": "see panels.tail.band"
+  },
+  {
+   "id": "tailLamp",
+   "pair": true,
+   "y": [
+    260,
+    680
+   ],
+   "z": [
+    660,
+    800
+   ],
+   "shape": "red, behind the smoked band"
+  },
+  {
+   "id": "indicatorR",
+   "pair": true,
+   "y": [
+    680,
+    800
+   ],
+   "z": [
+    660,
+    800
+   ],
+   "shape": "amber at the band's ends, wrapping a little round the corner"
+  },
+  {
+   "id": "reverseLamp",
+   "pair": true,
+   "y": [
+    150,
+    250
+   ],
+   "z": [
+    690,
+    770
+   ],
+   "shape": "clear square"
+  },
+  {
+   "id": "plateR",
+   "x": 4405,
+   "y": [
+    -190,
+    190
+   ],
+   "z": [
+    410,
+    510
+   ],
+   "shape": "plate recess in the bumper face"
+  },
+  {
+   "id": "valanceR",
+   "x": [
+    4250,
+    4400
+   ],
+   "y": [
+    -760,
+    760
+   ],
+   "z": [
+    180,
+    385
+   ],
+   "shape": "black lower panel, a box in the middle (y +-250)"
+  },
+  {
+   "id": "exhaust",
+   "pair": true,
+   "x": 4390,
+   "y": 600,
+   "z": 235,
+   "d": 90,
+   "shape": "one round tip each side under the bumper's outer corners"
+  },
+  {
+   "id": "wheelF",
+   "pair": true,
+   "x": 930,
+   "y": 755,
+   "radius": 293,
+   "rim": 15,
+   "width": 205,
+   "shape": "1990 cast five-spoke (wide flat spokes, five bolts), silver"
+  },
+  {
+   "id": "wheelR",
+   "pair": true,
+   "x": 3460,
+   "y": 765,
+   "radius": 316,
+   "rim": 16,
+   "width": 225,
+   "shape": "as the front, 16 in"
+  }
+ ],
+ "colours": {
+  "paint": "#c8102e (Formula Red) gloss; also Berlina Black, Grand Prix White, Sebring Silver",
+  "black": "canopy (roof panel, pillars, garnish), tail band, lower valances, intakes",
+  "interior": "black or ivory leather"
+ },
+ "versions": {
+  "1990 NA1": "this sheet: pop-up lamps, 3.0 C30A 274 PS (AT about 265 PS), 15/16 in five-spoke wheels, 205/50 and 225/50, black roof, 4405 long, 1170 high, tracks 1510/1530",
+  "1992 Type R (JDM)": "same body, about 120 kg lighter, stiffer, lower (height about 1160), Championship White common; light alloy wheels, no interior trim",
+  "1995 NSX-T": "targa: removable roof panel (the black roof becomes a lift-out panel), extra stiffening; the coupe phased out in some markets",
+  "1997": "3.2 C32B (280 PS JDM, 294 PS Europe), six-speed manual; 16/17 in wheels (215/45 ZR16, 245/40 ZR17); length 4425-4430, rear track 1540",
+  "2002 NA2 facelift": "fixed HID head lamps (no pop-ups), new front bumper and intakes, revised rear and a higher spoiler lip, 4430 long, 1160 high (the Honda drawing and the Hum3D renders show this car)",
+  "photographs": "the green Type R photo shows a later car's seven-spoke wheels: use it for the body only"
+ }
+}

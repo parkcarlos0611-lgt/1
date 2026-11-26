@@ -1,0 +1,343 @@
+{
+ "note": "Fictional suppliers for the slice. mailDays is the one-way post time; 0 is the same town.",
+ "suppliers": [
+  {
+   "id": "kessler_hardware",
+   "name": "Kessler Hardware",
+   "size": "shop",
+   "mailDays": 0,
+   "knownAtStart": true,
+   "phone": true,
+   "reliability": 0.95,
+   "consistency": 0.6,
+   "temper": 0.3,
+   "catalog": [
+    {
+     "part": "paint_set",
+     "grade": 1,
+     "price": 28,
+     "minOrder": 1,
+     "leadDays": 1
+    },
+    {
+     "part": "fittings_set",
+     "grade": 1,
+     "price": 80,
+     "minOrder": 1,
+     "leadDays": 1
+    },
+    {
+     "part": "chassis_steel_set",
+     "grade": 1,
+     "price": 60,
+     "minOrder": 1,
+     "leadDays": 1
+    }
+   ]
+  },
+  {
+   "id": "main_street_tire",
+   "name": "Main Street Tire Co.",
+   "size": "shop",
+   "mailDays": 0,
+   "knownAtStart": true,
+   "phone": true,
+   "reliability": 0.95,
+   "consistency": 0.7,
+   "temper": 0.3,
+   "catalog": [
+    {
+     "part": "wheels_tyres_set",
+     "grade": 2,
+     "price": 84,
+     "minOrder": 1,
+     "leadDays": 1
+    }
+   ]
+  },
+  {
+   "id": "dunmore_glass",
+   "name": "Dunmore Glass & Mirror",
+   "size": "shop",
+   "mailDays": 0,
+   "knownAtStart": false,
+   "phone": false,
+   "reliability": 0.9,
+   "consistency": 0.75,
+   "temper": 0.4,
+   "catalog": [
+    {
+     "part": "glass_set",
+     "grade": 2,
+     "price": 32,
+     "minOrder": 1,
+     "leadDays": 3
+    }
+   ]
+  },
+  {
+   "id": "tri_county_supply",
+   "name": "Tri-County Auto Supply",
+   "size": "wholesaler",
+   "mailDays": 2,
+   "knownAtStart": false,
+   "phone": true,
+   "reliability": 0.85,
+   "consistency": 0.7,
+   "temper": 0.5,
+   "catalog": [
+    {
+     "part": "body_steel_set",
+     "grade": 2,
+     "price": 62,
+     "minOrder": 1,
+     "leadDays": 9
+    },
+    {
+     "part": "ash_frame_set",
+     "grade": 2,
+     "price": 34,
+     "minOrder": 1,
+     "leadDays": 9
+    },
+    {
+     "part": "paint_set",
+     "grade": 2,
+     "price": 22,
+     "minOrder": 1,
+     "leadDays": 9
+    },
+    {
+     "part": "glass_set",
+     "grade": 2,
+     "price": 28,
+     "minOrder": 1,
+     "leadDays": 9
+    },
+    {
+     "part": "fittings_set",
+     "grade": 2,
+     "price": 64,
+     "minOrder": 1,
+     "leadDays": 9
+    },
+    {
+     "part": "trim_set",
+     "grade": 2,
+     "price": 58,
+     "minOrder": 1,
+     "leadDays": 9
+    }
+   ]
+  },
+  {
+   "id": "wabash_lumber",
+   "name": "Wabash Valley Lumber",
+   "size": "wholesaler",
+   "mailDays": 1,
+   "knownAtStart": false,
+   "phone": false,
+   "reliability": 0.9,
+   "consistency": 0.8,
+   "temper": 0.5,
+   "catalog": [
+    {
+     "part": "ash_frame_set",
+     "grade": 3,
+     "price": 37,
+     "minOrder": 1,
+     "leadDays": 6
+    }
+   ]
+  },
+  {
+   "id": "hoosier_steel",
+   "name": "Hoosier Sheet & Steel",
+   "size": "wholesaler",
+   "mailDays": 2,
+   "knownAtStart": false,
+   "phone": true,
+   "reliability": 0.8,
+   "consistency": 0.65,
+   "temper": 0.6,
+   "catalog": [
+    {
+     "part": "body_steel_set",
+     "grade": 2,
+     "price": 57,
+     "minOrder": 1,
+     "leadDays": 8
+    },
+    {
+     "part": "chassis_steel_set",
+     "grade": 2,
+     "price": 44,
+     "minOrder": 1,
+     "leadDays": 8
+    },
+    {
+     "part": "body_steel_set",
+     "grade": 3,
+     "price": 69,
+     "minOrder": 1,
+     "leadDays": 10
+    }
+   ]
+  },
+  {
+   "id": "calloway_leather",
+   "name": "Calloway Leather & Trimmings",
+   "size": "wholesaler",
+   "mailDays": 3,
+   "knownAtStart": false,
+   "phone": false,
+   "reliability": 0.85,
+   "consistency": 0.8,
+   "temper": 0.4,
+   "catalog": [
+    {
+     "part": "trim_set",
+     "grade": 3,
+     "price": 72,
+     "minOrder": 1,
+     "leadDays": 12
+    },
+    {
+     "part": "trim_set",
+     "grade": 2,
+     "price": 55,
+     "minOrder": 1,
+     "leadDays": 10
+    }
+   ]
+  },
+  {
+   "id": "lakeshore_paint",
+   "name": "Lakeshore Paint & Varnish",
+   "size": "wholesaler",
+   "mailDays": 3,
+   "knownAtStart": false,
+   "phone": true,
+   "reliability": 0.9,
+   "consistency": 0.85,
+   "temper": 0.4,
+   "catalog": [
+    {
+     "part": "paint_set",
+     "grade": 3,
+     "price": 26,
+     "minOrder": 1,
+     "leadDays": 7
+    }
+   ]
+  },
+  {
+   "id": "great_lakes_axle",
+   "name": "Great Lakes Axle & Gear",
+   "size": "maker",
+   "mailDays": 3,
+   "knownAtStart": false,
+   "phone": true,
+   "reliability": 0.75,
+   "consistency": 0.85,
+   "temper": 0.2,
+   "catalog": [
+    {
+     "part": "axles_set",
+     "grade": 3,
+     "price": 114,
+     "minOrder": 2,
+     "leadDays": 21
+    },
+    {
+     "part": "gearbox",
+     "grade": 3,
+     "price": 52,
+     "minOrder": 2,
+     "leadDays": 21
+    }
+   ]
+  },
+  {
+   "id": "marlowe_motor",
+   "name": "Marlowe Motor Works",
+   "size": "maker",
+   "mailDays": 4,
+   "knownAtStart": false,
+   "phone": true,
+   "reliability": 0.8,
+   "consistency": 0.9,
+   "temper": 0.2,
+   "catalog": [
+    {
+     "part": "engine",
+     "grade": 3,
+     "price": 180,
+     "minOrder": 2,
+     "leadDays": 25
+    },
+    {
+     "part": "engine",
+     "grade": 2,
+     "price": 162,
+     "minOrder": 2,
+     "leadDays": 18
+    },
+    {
+     "part": "gearbox",
+     "grade": 2,
+     "price": 47,
+     "minOrder": 2,
+     "leadDays": 18
+    }
+   ]
+  },
+  {
+   "id": "standard_chassis",
+   "name": "Standard Chassis Corporation",
+   "size": "maker",
+   "mailDays": 4,
+   "knownAtStart": false,
+   "phone": true,
+   "reliability": 0.8,
+   "consistency": 0.85,
+   "temper": 0.15,
+   "catalog": [
+    {
+     "part": "rolling_chassis",
+     "grade": 2,
+     "price": 399,
+     "minOrder": 2,
+     "leadDays": 30
+    },
+    {
+     "part": "rolling_chassis",
+     "grade": 3,
+     "price": 504,
+     "minOrder": 1,
+     "leadDays": 35
+    }
+   ]
+  },
+  {
+   "id": "ohio_lamp",
+   "name": "Ohio Lamp & Fittings",
+   "size": "maker",
+   "mailDays": 3,
+   "knownAtStart": false,
+   "phone": true,
+   "reliability": 0.85,
+   "consistency": 0.85,
+   "temper": 0.3,
+   "catalog": [
+    {
+     "part": "fittings_set",
+     "grade": 3,
+     "price": 67,
+     "minOrder": 2,
+     "leadDays": 14
+    }
+   ]
+  }
+ ]
+}

@@ -1,0 +1,34 @@
+// The names the player reads. No real maker, model or engine maker is named on any screen: the cars the game's bodies
+// were drawn from keep their real names only in the code (ids such as 'p959', 'nsx', comments, file names, docs and
+// tests). Every body the screens name is named here; the banned list below is what tests/names.test.ts scans the
+// game's name tables and texts for.
+import type { BodyBase } from './design';
+
+/** the game's own make (its badge's lettering is the Latin spelling) */
+export const MAKE = '포스터', MAKE_LATIN = 'Phorster';
+/** the 959's name in the game */
+export const CAR_599 = `${MAKE} 599`;
+/** the N33's make and name in the game (docs/systems/117 §5, decision 2026-11-25) */
+export const MAKE_N33 = 'NISSINO', CAR_N33 = `${MAKE_N33} N33 GT-X`;
+/** the stock engines as the engine workshop's library lists them (core/engines.ts STOCK_ENGINES) */
+export const ENGINE_599 = `${CAR_599} 수평대향 6 2.8 트윈 터보`, ENGINE_N33 = `${MAKE_N33} 직렬 6 2.6 트윈 터보`;
+/** the large saloon's make, name and trims in the game (docs/systems/119 §7-1; its body, 차체 C, comes with K1): the trims
+ *  name the two part lines ("차르 그릴", "올림픽 앞 범퍼") */
+export const MAKE_KREMLIN = 'TAITO', CAR_KREMLIN = `${MAKE_KREMLIN} 크렘린`, TRIM_TSAR = '차르', TRIM_OLYMPIC = '올림픽';
+/** each body as the screens name it: the old kit bases by a letter, the model-built body by its make and number */
+export const BODY_NAME: Record<BodyBase, string> = { nsx: '옛 바탕 A', f355: '옛 바탕 B', eb110: '옛 바탕 C', p959: CAR_599, bnr33: CAR_N33 };
+
+/** real makers, models and engine makers (Latin and Korean spellings) that must not reach a screen */
+export const BANNED: readonly string[] = [
+  'Porsche', '포르쉐', 'Honda', '혼다', 'Acura', '어큐라', 'NSX', 'Ferrari', '페라리', 'F355', 'Bugatti', '부가티', 'EB110', 'Lamborghini', '람보르기니',
+  'Diablo', '디아블로', 'Miura', '미우라', 'Countach', '쿤타치', 'Jaguar', '재규어', 'XJ220', 'McLaren', '맥라렌', 'Mercedes', '메르세데스', '벤츠',
+  'Auburn', '오번', 'Duesenberg', '듀센버그', 'Napier', '네이피어', 'Railton', 'Ford', '포드', 'Chevrolet', '쉐보레', 'Plymouth', 'Pontiac', 'Dodge',
+  'Willys', 'Buick', 'Bentley', '벤틀리', 'Rolls', '롤스', 'BMW', 'Peugeot', '푸조', 'Yamaha', '야마하', 'VTEC', 'C30A', 'Oldsmobile', 'Lotus',
+  'Cosworth', 'Lancia', 'Maserati', 'Aston', 'Toyota', 'Nissan', 'Mazda', 'Subaru', 'Audi', 'Volkswagen', 'Fiat', 'Alfa Romeo',
+  '닛산', 'Skyline', 'SKYLINE', '스카이라인', 'GT-R', 'BNR33', 'BCNR33', 'R33', 'Nismo', 'NISMO', '니스모', 'RB26', 'ATTESA', 'V-spec',
+  // the large saloon's (docs/systems/119): its maker, model, chassis code, trims and its maker's other badge
+  'TOYOTA', '토요타', '도요타', 'Crown', 'CROWN', '크라운', 'Athlete', 'ATHLETE', '애슬리트', 'Royal Saloon', '로얄 살롱', '로열 살롱', 'S180', 'GRS180', 'GRS182', 'GRS184', 'Lexus', '렉서스'];
+/** the banned names a text holds (none: an empty list); Latin names are matched as whole words in their own letter case
+ *  (so the code's lower-case ids, 'nsx' or 'f355', are not names on a screen) */
+export function bannedIn(text: string): string[] {
+  return BANNED.filter(w => /^[\x20-\x7e]+$/.test(w) ? new RegExp(`(^|[^A-Za-z0-9_])${w.replace(/ /g, '\\s+')}($|[^A-Za-z0-9_])`).test(text) : text.includes(w)); }

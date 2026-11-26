@@ -1,0 +1,16 @@
+<title>GEARHOUSE</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Old+Standard+TT:ital,wght@0,400;0,700;1,400&family=Oswald:wght@500&display=swap">
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+  /* One pixel-art screen (480 x 270), scaled by a whole number where it fits, centred on a dark ground. */
+  :root { --bg: #1c1410; color-scheme: dark; }
+  html, body { margin: 0; height: 100%; background: var(--bg); }
+  .wrap { min-height: 100%; display: grid; place-items: center; }
+  canvas { display: block; image-rendering: pixelated; image-rendering: crisp-edges; touch-action: manipulation; }
+</style>
+<div class="wrap">
+  <canvas id="board" aria-label="GEARHOUSE 게임 화면"></canvas>
+  <input id="typer" type="text" inputmode="numeric" autocomplete="off" aria-label="숫자 입력" style="position:fixed;left:-200px;top:0;width:80px;opacity:0">
+</div>
+<script>/*BUNDLE*/</script>

@@ -1,0 +1,270 @@
+{
+ "about": "The running gear's layout as each sheet's under view shows it (review 64), read off a gridded zoom: distances along the car from the front axle (mm, + backwards), half-widths of the frame rails from the centre line (mm). front/rear: the frame's ends; narrowEnd: where the narrow front part ends; wideFrom: where the rails reach their full width; cross: [x, width] of each cross member; engineFrom: where the engine's front stands. track and tyreW: the tyres' centres apart and their width where they stand, measured on the front and rear views (the wings were drawn to them).",
+ "cars": {
+  "chevAB28": {
+   "front": -198,
+   "narrowEnd": 576,
+   "wideFrom": 1026,
+   "rear": 3231,
+   "hwFront": 320,
+   "hwMid": 450,
+   "hwRear": 423,
+   "cross": [
+    [
+     -171,
+     60
+    ],
+    [
+     999,
+     90
+    ],
+    [
+     2124,
+     80
+    ],
+    [
+     3159,
+     80
+    ]
+   ],
+   "engineFrom": 60,
+   "track": 1405,
+   "tyreW": 187
+  },
+  "fordT23": {
+   "front": -166,
+   "narrowEnd": 147,
+   "wideFrom": 782,
+   "rear": 2931,
+   "hwFront": 361,
+   "hwMid": 430,
+   "hwRear": 430,
+   "cross": [
+    [
+     -117,
+     60
+    ],
+    [
+     801,
+     60
+    ],
+    [
+     1338,
+     60
+    ],
+    [
+     2315,
+     60
+    ],
+    [
+     2853,
+     60
+    ]
+   ],
+   "engineFrom": 244,
+   "tank": "seat",
+   "track": 1500,
+   "tyreW": 200
+  },
+  "plymU29": {
+   "front": -234,
+   "narrowEnd": 655,
+   "wideFrom": 1030,
+   "rear": 3323,
+   "hwFront": 351,
+   "hwMid": 491,
+   "hwRear": 445,
+   "cross": [
+    [
+     -215,
+     60
+    ],
+    [
+     983,
+     90
+    ],
+    [
+     2200,
+     90
+    ],
+    [
+     3210,
+     70
+    ]
+   ],
+   "engineFrom": 0,
+   "track": 1384,
+   "tyreW": 183
+  },
+  "pontiac29": {
+   "front": -360,
+   "narrowEnd": 90,
+   "wideFrom": 856,
+   "rear": 3289,
+   "hwFront": 338,
+   "hwMid": 450,
+   "hwRear": 428,
+   "cross": [
+    [
+     -315,
+     60
+    ],
+    [
+     883,
+     90
+    ],
+    [
+     2343,
+     90
+    ],
+    [
+     3199,
+     70
+    ]
+   ],
+   "engineFrom": 45,
+   "track": 1382,
+   "tyreW": 214
+  },
+  "dodgeV28": {
+   "front": -398,
+   "narrowEnd": 664,
+   "wideFrom": 901,
+   "rear": 3365,
+   "hwFront": 389,
+   "hwMid": 455,
+   "hwRear": 441,
+   "cross": [
+    [
+     -379,
+     60
+    ],
+    [
+     265,
+     60
+    ],
+    [
+     1071,
+     90
+    ],
+    [
+     2294,
+     90
+    ],
+    [
+     3242,
+     70
+    ]
+   ],
+   "engineFrom": 95,
+   "track": 1600,
+   "tyreW": 220
+  },
+  "willys27": {
+   "front": -408,
+   "narrowEnd": 764,
+   "wideFrom": 1019,
+   "rear": 3414,
+   "hwFront": 346,
+   "hwMid": 520,
+   "hwRear": 448,
+   "cross": [
+    [
+     -377,
+     60
+    ],
+    [
+     734,
+     80
+    ],
+    [
+     1600,
+     70
+    ],
+    [
+     2466,
+     80
+    ],
+    [
+     3342,
+     70
+    ]
+   ],
+   "engineFrom": -51,
+   "track": 1569,
+   "tyreW": 229
+  },
+  "buick28": {
+   "front": -392,
+   "narrowEnd": 509,
+   "wideFrom": 999,
+   "rear": 3495,
+   "hwFront": 426,
+   "hwMid": 475,
+   "hwRear": 445,
+   "cross": [
+    [
+     -323,
+     60
+    ],
+    [
+     313,
+     60
+    ],
+    [
+     1116,
+     90
+    ],
+    [
+     2271,
+     90
+    ],
+    [
+     3299,
+     70
+    ]
+   ],
+   "engineFrom": 69,
+   "track": 1613,
+   "tyreW": 222
+  },
+  "hudson26": {
+   "front": -477,
+   "narrowEnd": 2528,
+   "wideFrom": 2719,
+   "rear": 3768,
+   "hwFront": 353,
+   "hwMid": 477,
+   "hwRear": 477,
+   "cross": [
+    [
+     -410,
+     50
+    ],
+    [
+     -238,
+     50
+    ],
+    [
+     363,
+     70
+    ],
+    [
+     1126,
+     90
+    ],
+    [
+     3053,
+     80
+    ],
+    [
+     3578,
+     80
+    ]
+   ],
+   "engineFrom": -48,
+   "track": 1534,
+   "tyreW": 212
+  }
+ }
+}

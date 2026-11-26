@@ -1,0 +1,45 @@
+{
+ "id": "p959",
+ "name": "Porsche 959 (1987: twin-turbo 2.85 L flat six, four-wheel drive, the wide body on the 911's cabin, the hoop wing)",
+ "doc": "docs/systems/109_959_fr_style_plan.md",
+ "model": "render/car/p959 (cage.ts: the hand-placed control cage; shell.ts: one subdivision and the finishing operations; sockets.ts, lines.ts)",
+ "axes": "mm; x from the nose tip (0) back to the tail (4260); y half-width from the centre line; z from the ground",
+ "tolerance": {
+  "overall": "makers' figures: exact (length 4260, width 1840, height 1280, wheelbase 2272)",
+  "tracks": "+-10: 1504 front, 1550 rear (the usual quoted figures; not on the drawings)",
+  "overhangs": "+-15: 940 front, 1048 rear, read on the blueprint's side view (axles at 218 and 607 px of 730 px for 4260)",
+  "profile": "+-15 in z on the centre line and the wing crests (the blueprint's outline every 70 mm), +-25 where only photographs show it (the bonnet between the lamp pods, the slot under the wing)",
+  "plan": "+-15 on the outline; the doors' own width (820 half) from the 911 body the car is built on, +-20",
+  "parts": "+-30 for lamps, vents and lines read on the drawings; placeholders (bumper details, wheels, mirrors) are not to size"
+ },
+ "sources": [
+  "docs/reference/959/bp_canepa_4view.jpg: four views with 4260, 2272, 1840, 1280 (the main source; 5.836 mm/px along and up, 5.77 mm/px across in the plan)",
+  "docs/reference/959/bp_1987_4view.jpg, drawn_4view.png, line_4view.gif, line_side.jpg: the panel lines, the door, the quarter window, the lamps and vents",
+  "docs/reference/959/photo_*.{jpg,webp}: the lamp pods, the haunches, the hoop wing and its slot, the tail lamp bar, the sills"
+ ],
+ "drawingChecks": {
+  "bpCanepaSide": "nose px 57, tail px 787 (730 px = 4260); wheel centres px 218 and 607 (389 px = 2270: consistent); ground row 331, roof row 112 (219 px = 1278: consistent)",
+  "bpCanepaPlan": "length 733 px; widest 319 px = 1862 at the side view's scale: drawn 1.2 % wide, scaled by 1840/319 across",
+  "bpCanepaFrontRear": "the body's width 317 px at the side view's scale; the outlines include the mirrors (z 890-1030) and the tyres"
+ },
+ "overall": { "length": 4260, "width": 1840, "height": 1280, "wheelbase": 2272, "axleF": 940, "axleR": 3212, "overhangF": 940, "overhangR": 1048, "trackF": 1504, "trackR": 1550,
+  "tyreF": "235/45 ZR17 (radius 322)", "tyreR": "255/40 ZR17 (radius 318)", "wheel": "17 in hollow-spoke magnesium, centre lock", "groundClearance": 120, "kerbWeight": 1450 },
+ "landmarks": {
+  "_": "x, half-width y, z as modelled (the cage's own points are control points: the surface lies a little inside them)",
+  "noseSeam": [20, 0, 432], "headLampCentre": [270, 615, 640], "headLampAxes": "214 across, 255 up its slope of 39 deg",
+  "bonnetCentreAtAxle": [940, 0, 770], "wingCrestAtAxle": [948, 729, 836], "frontWingHalfWidth": 900,
+  "screenFoot": [1430, 0, 868], "screenTop": [1960, 0, 1250], "aPillarFoot": [1660, 698, 876], "roofTop": [2320, 0, 1285],
+  "doorFrontEdge": 1480, "doorRearEdge": 2585, "doorHalfWidth": 820, "belt": 870, "sillTop": 292, "sillHalfWidth": 866,
+  "quarterWindowTip": [3200, 790, 898], "backWindow": "x 2850-3560, z 1226-942, half-width 470-482",
+  "sideIntake": "x 2585-2680, z 600-806, behind the door's rear edge", "rearWingHalfWidth": 922,
+  "engineLidEnd": [3860, 0, 818], "wingBlade": "leading edge x 3872 z 880, crown x 4010 z 932, trailing edge x 4260 z 906-868",
+  "tailLampBar": "z 562-682, round the corners to x 3996", "rearBumperSeam": 562, "frontBumperSeam": 407
+ },
+ "modules": {
+  "_": "docs/systems/109 section 3; the loops are in Shell959.loops (render/car/p959/shell.ts), the mounts in sockets.ts",
+  "regionOnABoundaryLoop": ["frontBumper", "rearBumper", "wing (the tail: blade, legs, the slot under it)"],
+  "socket": ["headLamp (sunk 14)", "tailLamp (the bar, sunk 9)", "sideIntake (sunk 34)"],
+  "mount": ["hubFL/FR/RL/RR", "mirrorL/R", "exhaustL/R"],
+  "markedForPictures": ["porscheLettering", "badge", "plateF", "plateR", "sideMarkerL/R", "fogLampL/R", "doorHandleL/R"]
+ }
+}

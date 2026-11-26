@@ -1,0 +1,553 @@
+{
+ "note": "Real events for the newspaper, written from memory. Every date and fact is to be verified against sources before release. Car makers' names are left out on purpose.",
+ "events": [
+  {
+   "id": "bank_holiday",
+   "level": "historic",
+   "relation": "essential",
+   "headlines": [
+    "전국 은행 일제히 휴업… 루스벨트 대통령 긴급 선포",
+    "은행 문 모두 닫혔다: 대통령, 나흘간 전국 휴업 명령",
+    "\"은행 휴일\" 선포, 현금 구하기 어려워"
+   ],
+   "date": "1933-03-06",
+   "effect": {
+    "kind": "demand",
+    "mult": [
+     0.55
+    ],
+    "weeks": 5
+   }
+  },
+  {
+   "id": "nira",
+   "level": "historic",
+   "relation": "related",
+   "headlines": [
+    "산업부흥법 서명… 업종마다 임금·근무 시간 규약 만든다",
+    "루스벨트, 산업부흥법 서명: 최저 임금과 주당 근무 시간 정한다",
+    "새 산업법 발효, 자동차 업계도 규약 대상"
+   ],
+   "date": "1933-06-16"
+  },
+  {
+   "id": "fdr_elected",
+   "level": "historic",
+   "relation": "background",
+   "headlines": [
+    "루스벨트, 후버 누르고 대통령 당선",
+    "민주당 압승: 루스벨트 당선, \"새 판\" 약속",
+    "후버 낙선… 루스벨트 42개 주 석권"
+   ],
+   "date": "1932-11-08"
+  },
+  {
+   "id": "social_security",
+   "level": "historic",
+   "relation": "background",
+   "headlines": [
+    "루스벨트 대통령, 사회보장법에 서명",
+    "노령 연금 시대 열린다: 사회보장법 발효",
+    "사회보장법 서명… 실업 보험도 도입"
+   ],
+   "date": "1935-08-14"
+  },
+  {
+   "id": "repeal",
+   "level": "historic",
+   "relation": "unrelated",
+   "headlines": [
+    "금주법 폐지, 13년 만에 술집 문 다시 열려",
+    "\"금주 시대\" 막 내려… 수정 헌법 21조 비준",
+    "금주법 끝났다: 오늘 밤부터 합법"
+   ],
+   "date": "1933-12-05"
+  },
+  {
+   "id": "hitler_chancellor",
+   "level": "historic",
+   "relation": "unrelated",
+   "headlines": [
+    "히틀러, 독일 총리에 임명",
+    "독일 새 총리에 히틀러… 힌덴부르크 대통령 지명",
+    "히틀러 내각 출범, 베를린 횃불 행진"
+   ],
+   "date": "1933-01-30"
+  },
+  {
+   "id": "bank_of_us",
+   "level": "very_important",
+   "relation": "essential",
+   "headlines": [
+    "뉴욕의 대형 은행 문 닫아, 예금주 수십만 명 발 동동",
+    "뱅크 오브 유나이티드 스테이츠 지급 정지… 사상 최대 은행 도산",
+    "뉴욕 은행 도산 충격, 전국 예금주 불안"
+   ],
+   "date": "1930-12-11",
+   "effect": {
+    "kind": "demand",
+    "mult": [
+     0.93
+    ],
+    "weeks": 8
+   }
+  },
+  {
+   "id": "fdic_start",
+   "level": "very_important",
+   "relation": "essential",
+   "headlines": [
+    "오늘부터 예금 보험 시행… 2,500달러까지 정부 보증",
+    "예금 보험 시대: 은행 망해도 예금 돌려받는다",
+    "연방예금보험 출범, 은행 줄서기 사라질까"
+   ],
+   "date": "1934-01-01"
+  },
+  {
+   "id": "excise_1932",
+   "level": "very_important",
+   "relation": "essential",
+   "headlines": [
+    "새 세법 발효: 자동차·타이어·휘발유에 연방세",
+    "휘발유 갤런당 1센트 연방세, 오늘부터",
+    "자동차에 3퍼센트 물품세… 업계 \"불황에 설상가상\""
+   ],
+   "date": "1932-06-21",
+   "effect": {
+    "kind": "demand",
+    "mult": [
+     0.96
+    ],
+    "weeks": 26
+   }
+  },
+  {
+   "id": "smoot_hawley",
+   "level": "very_important",
+   "relation": "related",
+   "headlines": [
+    "후버 대통령, 관세법에 서명",
+    "스무트-홀리 관세법 발효… 수입품 값 오른다",
+    "새 관세법 서명, 외국의 보복 관세 우려"
+   ],
+   "date": "1930-06-17"
+  },
+  {
+   "id": "rfc",
+   "level": "very_important",
+   "relation": "related",
+   "headlines": [
+    "재건금융공사 출범, 은행·철도에 정부 대출",
+    "후버, 재건금융공사법 서명… 20억 달러 푼다",
+    "정부, 은행 살리기 나서: 재건금융공사 설립"
+   ],
+   "date": "1932-01-22"
+  },
+  {
+   "id": "wagner_act",
+   "level": "very_important",
+   "relation": "related",
+   "headlines": [
+    "와그너법 서명… 노동자 단결권 보장",
+    "새 노동법 발효: 회사는 노조와 교섭해야",
+    "루스벨트, 전국노동관계법 서명"
+   ],
+   "date": "1935-07-05"
+  },
+  {
+   "id": "schechter",
+   "level": "very_important",
+   "relation": "related",
+   "headlines": [
+    "대법원, 산업부흥법 위헌 판결",
+    "\"푸른 독수리\" 추락: 산업 규약 무효",
+    "대법원 만장일치: 업종 규약은 위헌"
+   ],
+   "date": "1935-05-27"
+  },
+  {
+   "id": "century_of_progress",
+   "level": "very_important",
+   "relation": "related",
+   "headlines": [
+    "시카고 만국박람회 개막… 자동차관에 인파",
+    "\"진보의 세기\" 박람회 열려, 유선형 신차 눈길",
+    "시카고 박람회 첫날 12만 명"
+   ],
+   "date": "1933-05-27"
+  },
+  {
+   "id": "uk_gold",
+   "level": "very_important",
+   "relation": "background",
+   "headlines": [
+    "영국, 금본위제 떠난다",
+    "파운드화 금 태환 정지… 세계 금융 충격",
+    "영국 금본위 포기, 뉴욕 증시 출렁"
+   ],
+   "date": "1931-09-21"
+  },
+  {
+   "id": "us_gold",
+   "level": "very_important",
+   "relation": "background",
+   "headlines": [
+    "미국도 금본위 떠난다… 대통령 금 수출 금지",
+    "달러, 금에서 풀려: 물가 오를까",
+    "루스벨트, 금본위 정지 선언"
+   ],
+   "date": "1933-04-19"
+  },
+  {
+   "id": "fdr_inaugural",
+   "level": "very_important",
+   "relation": "background",
+   "headlines": [
+    "루스벨트 취임: \"두려워할 것은 두려움뿐\"",
+    "새 대통령 취임… \"즉각 행동\" 약속",
+    "루스벨트 선서, 은행 위기 속 새 정부 출범"
+   ],
+   "date": "1933-03-04"
+  },
+  {
+   "id": "aaa",
+   "level": "very_important",
+   "relation": "background",
+   "headlines": [
+    "농업조정법 서명… 덜 심는 농가에 보조금",
+    "새 농업법: 정부가 작물 값 떠받친다",
+    "농업조정법 발효, 군내 농가도 신청 가능"
+   ],
+   "date": "1933-05-12"
+  },
+  {
+   "id": "sec",
+   "level": "very_important",
+   "relation": "background",
+   "headlines": [
+    "증권거래위원회 생긴다… 월가 감독",
+    "증권거래법 서명, 주식 사기 막는다",
+    "월가에 감시자: 증권거래위원회 출범"
+   ],
+   "date": "1934-06-06"
+  },
+  {
+   "id": "wpa",
+   "level": "very_important",
+   "relation": "background",
+   "headlines": [
+    "공공사업진흥국 출범… 실직자에 일자리",
+    "정부, 도로·학교 짓는 일자리 수백만 개 만든다",
+    "새 구호 사업 시작: 일해서 받는 구호"
+   ],
+   "date": "1935-05-06"
+  },
+  {
+   "id": "lindbergh_baby",
+   "level": "very_important",
+   "relation": "unrelated",
+   "headlines": [
+    "린드버그 아기 납치… 전국 충격",
+    "린드버그 대령 아들 사라져, 몸값 요구 쪽지",
+    "\"세기의 범죄\": 비행 영웅의 아기 납치"
+   ],
+   "date": "1932-03-01"
+  },
+  {
+   "id": "earhart",
+   "level": "very_important",
+   "relation": "unrelated",
+   "headlines": [
+    "에어하트, 여성 첫 대서양 단독 횡단",
+    "어밀리아 에어하트 아일랜드 착륙… 15시간 단독 비행",
+    "\"하늘의 여왕\" 대서양 홀로 건너"
+   ],
+   "date": "1932-05-21"
+  },
+  {
+   "id": "empire_state",
+   "level": "very_important",
+   "relation": "unrelated",
+   "headlines": [
+    "세계 최고층 엠파이어 스테이트 빌딩 문 열어",
+    "102층 마천루 개관, 후버 대통령 점등",
+    "뉴욕에 세계에서 가장 높은 건물"
+   ],
+   "date": "1931-05-01"
+  },
+  {
+   "id": "bonus_army",
+   "level": "very_important",
+   "relation": "unrelated",
+   "headlines": [
+    "군대, 워싱턴의 참전 용사 천막촌 철거",
+    "\"보너스 군대\" 해산… 수도에 기병과 탱크",
+    "참전 용사 시위대 쫓겨나, 천막촌 불타"
+   ],
+   "date": "1932-07-28"
+  },
+  {
+   "id": "capone",
+   "level": "very_important",
+   "relation": "unrelated",
+   "headlines": [
+    "카포네, 탈세로 유죄",
+    "시카고 암흑가 두목 카포네 유죄 평결",
+    "\"스카페이스\" 카포네, 세금 못 피했다"
+   ],
+   "date": "1931-10-17"
+  },
+  {
+   "id": "auto_show",
+   "level": "important",
+   "relation": "related",
+   "headlines": [
+    "뉴욕 자동차 쇼 개막… 새해 신형 한자리에",
+    "전국 자동차 쇼 열려, 올해 화두는 값과 맵시",
+    "뉴욕 자동차 쇼 첫날, 관람객 줄이어"
+   ],
+   "annual": {
+    "month": 1,
+    "day": 6,
+    "from": 1930,
+    "to": 1935
+   }
+  },
+  {
+   "id": "indy500",
+   "level": "important",
+   "relation": "related",
+   "headlines": [
+    "인디애나폴리스 500마일 경주 오늘 열려",
+    "현충일의 굉음: 500마일 경주에 관중 십수만",
+    "인디애나폴리스 500마일, 올해도 속도 기록 도전"
+   ],
+   "annual": {
+    "month": 5,
+    "day": 30,
+    "from": 1930,
+    "to": 1935
+   }
+  },
+  {
+   "id": "black_sunday",
+   "level": "important",
+   "relation": "related",
+   "headlines": [
+    "\"검은 일요일\": 대평원에 사상 최악의 흙폭풍",
+    "한낮이 밤처럼… 흙먼지 폭풍 평원 덮쳐",
+    "흙폭풍에 농가 줄줄이 떠난다"
+   ],
+   "date": "1935-04-14"
+  },
+  {
+   "id": "dust_storm_1934",
+   "level": "important",
+   "relation": "related",
+   "headlines": [
+    "대평원의 흙먼지, 동부 해안까지 뒤덮어",
+    "흙폭풍 3억 톤… 뉴욕 하늘도 누렇게",
+    "가뭄 든 평원의 흙, 대서양까지 날아가"
+   ],
+   "date": "1934-05-11"
+  },
+  {
+   "id": "census_1930",
+   "level": "important",
+   "relation": "background",
+   "headlines": [
+    "인구 조사 시작… 조사원 집집마다 방문",
+    "1930년 국세 조사 개시, 라디오 보유도 묻는다",
+    "전국 인구 조사, 실직자 수도 센다"
+   ],
+   "date": "1930-04-01"
+  },
+  {
+   "id": "hoover_dam",
+   "level": "important",
+   "relation": "background",
+   "headlines": [
+    "볼더 댐 준공, 대통령 참석",
+    "콜로라도강 막은 거대한 댐 완공",
+    "세계 최대 댐 문 열어… 5년 공사 마쳐"
+   ],
+   "date": "1935-09-30"
+  },
+  {
+   "id": "golden_gate",
+   "level": "important",
+   "relation": "background",
+   "headlines": [
+    "샌프란시스코 금문교 착공",
+    "금문 해협에 세계 최장 현수교 놓는다",
+    "금문교 첫 삽, 4년 공사 시작"
+   ],
+   "date": "1933-01-05"
+  },
+  {
+   "id": "world_series",
+   "level": "important",
+   "relation": "background",
+   "headlines": [
+    "월드 시리즈 개막, 라디오 앞에 모여",
+    "가을의 고전 월드 시리즈 오늘 첫 경기",
+    "월드 시리즈 열기… 이발소마다 라디오 중계"
+   ],
+   "annual": {
+    "month": 10,
+    "day": 3,
+    "from": 1930,
+    "to": 1935
+   }
+  },
+  {
+   "id": "beer_1933",
+   "level": "important",
+   "relation": "unrelated",
+   "headlines": [
+    "맥주 돌아왔다: 3.2도 맥주 오늘부터 합법",
+    "13년 만의 합법 맥주, 양조장 앞 장사진",
+    "\"행복한 날이 다시\": 맥주 판매 재개"
+   ],
+   "date": "1933-04-07"
+  },
+  {
+   "id": "pluto",
+   "level": "important",
+   "relation": "unrelated",
+   "headlines": [
+    "아홉 번째 행성 찾았다",
+    "로웰 천문대, 새 행성 발견 발표",
+    "해왕성 너머 새 행성… 젊은 조수가 사진에서 찾아"
+   ],
+   "date": "1930-03-13"
+  },
+  {
+   "id": "olympics_la",
+   "level": "important",
+   "relation": "unrelated",
+   "headlines": [
+    "로스앤젤레스 올림픽 개막",
+    "제10회 올림픽 열려, 10만 관중",
+    "불황 속 올림픽 개막… 37개국 참가"
+   ],
+   "date": "1932-07-30"
+  },
+  {
+   "id": "dillinger",
+   "level": "important",
+   "relation": "unrelated",
+   "headlines": [
+    "딜린저, 시카고 극장 앞에서 사살",
+    "\"공공의 적 1호\" 딜린저 최후",
+    "연방 요원들, 은행 강도 딜린저 사살"
+   ],
+   "date": "1934-07-22"
+  },
+  {
+   "id": "bonnie_clyde",
+   "level": "important",
+   "relation": "unrelated",
+   "headlines": [
+    "보니와 클라이드, 매복에 걸려 사살",
+    "2인조 강도 보니와 클라이드 최후… 차에 총탄 백여 발",
+    "루이지애나 시골길서 2인조 강도 사살"
+   ],
+   "date": "1934-05-23"
+  },
+  {
+   "id": "huey_long",
+   "level": "important",
+   "relation": "unrelated",
+   "headlines": [
+    "휴이 롱 상원의원 피격 끝에 숨져",
+    "루이지애나의 \"킹피시\" 휴이 롱 사망",
+    "휴이 롱 암살… 정가 충격"
+   ],
+   "date": "1935-09-10"
+  },
+  {
+   "id": "rogers_post",
+   "level": "important",
+   "relation": "unrelated",
+   "headlines": [
+    "윌 로저스와 와일리 포스트, 알래스카서 추락사",
+    "국민 익살꾼 윌 로저스 비행기 사고로 숨져",
+    "알래스카 추락 사고… 로저스·포스트 사망"
+   ],
+   "date": "1935-08-15"
+  },
+  {
+   "id": "anthem",
+   "level": "important",
+   "relation": "unrelated",
+   "headlines": [
+    "\"성조기여 영원하라\" 국가로 정해져",
+    "의회, 국가 제정 법안 통과… 대통령 서명",
+    "미국에 공식 국가 생겼다"
+   ],
+   "date": "1931-03-03"
+  },
+  {
+   "id": "kentucky_derby",
+   "level": "important",
+   "relation": "unrelated",
+   "headlines": [
+    "켄터키 더비 오늘 출발",
+    "장미의 경주 켄터키 더비, 올해 우승마는",
+    "처칠 다운스에 관중 운집… 켄터키 더비"
+   ],
+   "annual": {
+    "month": 5,
+    "day": 4,
+    "from": 1930,
+    "to": 1935
+   }
+  },
+  {
+   "id": "gas_tax_talk",
+   "level": "important",
+   "relation": "essential",
+   "headlines": [
+    "의회, 휘발유 연방세 논의… 자동차 업계 반발",
+    "휘발유세·자동차세 신설안, 하원 통과",
+    "세수 메우려 자동차에 세금? 의회 논쟁"
+   ],
+   "date": "1932-04-01"
+  }
+ ],
+ "angles": {
+  "essential": [
+   "군내 상공인들도 영향을 피하기 어려울 전망이다.",
+   "{town} 가게들은 당장 현금 사정부터 걱정하고 있다.",
+   "읍내 공방과 상점들은 대책을 서두르고 있다.",
+   "이 소식에 {town} 은행 창구가 종일 붐볐다.",
+   "지역 상공회는 긴급 모임을 열기로 했다.",
+   "우리 군 살림에도 곧 여파가 미칠 것으로 보인다."
+  ],
+  "related": [
+   "읍내 자동차 상인들은 엇갈린 반응을 보였다.",
+   "군내 정비소와 공방들도 눈여겨보고 있다.",
+   "{town}에서도 자동차 이야기가 화제다.",
+   "지역 대리점들은 주문에 미칠 영향을 따지고 있다.",
+   "차 가진 주민들 사이에서 말이 많다.",
+   "이웃 군 업자들도 같은 걱정을 하고 있다."
+  ],
+  "background": [
+   "{town} 주민들은 라디오 앞에 모여 소식을 들었다.",
+   "읍내 이발소와 잡화점마다 이 이야기뿐이다.",
+   "군내 농가들은 조심스레 지켜보고 있다.",
+   "지역 어른들은 \"두고 볼 일\"이라고 입을 모았다.",
+   "우리 군에 미칠 영향은 아직 알 수 없다.",
+   "읍 회관에서는 이 일을 두고 토론이 벌어졌다."
+  ],
+  "unrelated": [
+   "{town}에서도 호외가 금세 동났다.",
+   "읍내 극장은 관련 뉴스 영화를 틀기로 했다.",
+   "학교에서는 이 소식을 수업 시간에 다뤘다.",
+   "주민들은 저녁 내내 이 이야기를 나눴다.",
+   "우체국 앞 게시판에 전보가 나붙었다.",
+   "라디오 가진 집마다 이웃이 몰려들었다."
+  ]
+ }
+}

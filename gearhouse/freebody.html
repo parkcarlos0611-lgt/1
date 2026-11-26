@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>자유 차체 시제품</title>
+<style>
+  /* the dev page of the free body prototype (docs/systems/106): the car turned by hand, the silhouette's controls beside it */
+  :root { --bg: #e9e6df; --panel: #f6f4ef; --ink: #23211d; --soft: #6b665c; --line: #cfc9bc; --accent: #a0522d; --ground: #cfc8b8; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #1b1a18; --panel: #24231f; --ink: #ebe7de; --soft: #a39d90; --line: #3a3832; --accent: #d78a5c; --ground: #3a372f; color-scheme: dark; } }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.45 system-ui, 'Noto Sans KR', sans-serif; padding: 16px; }
+  h1 { font-size: 1.2rem; margin: 0 0 4px; } .lede { color: var(--soft); margin: 0 0 12px; max-width: 70ch; }
+  .bench { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; }
+  .stage { flex: 1 1 560px; min-width: 0; display: grid; gap: 8px; }
+  .view { background: var(--ground); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+  canvas { display: block; max-width: 100%; image-rendering: pixelated; touch-action: none; }
+  #view { cursor: grab; width: 100%; } #prof, #plan { width: 100%; background: var(--panel); cursor: crosshair; }
+  .dials { flex: 1 1 280px; max-width: 380px; display: grid; gap: 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 14px; }
+  label { display: grid; gap: 4px; font-size: 0.8rem; color: var(--soft); } select, input[type=range] { width: 100%; accent-color: var(--accent); }
+  select { font: inherit; padding: 5px; border: 1px solid var(--line); border-radius: 4px; background: var(--bg); color: var(--ink); }
+  fieldset { border: 1px solid var(--line); border-radius: 4px; padding: 8px; display: grid; gap: 6px; } legend { font-size: 0.8rem; color: var(--soft); }
+  .row { display: flex; gap: 8px; } .row > * { flex: 1; } .chk { display: flex; gap: 6px; align-items: center; color: var(--ink); font-size: 0.85rem; }
+  #stat { color: var(--soft); font-size: 0.8rem; font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body>
+<h1>자유 차체 시제품</h1>
+<p class="lede">기본 차 없이 제어 곡선만으로 만든 차체. 실루엣을 고르고 섞고, 조각을 이어 붙이고, 옆 윤곽과 평면의 점을 끌어 다듬고, 부품을 차체 어디에나 놓는다.</p>
+<div class="bench">
+  <div class="stage">
+    <div class="view"><canvas id="view" width="560" height="300"></canvas></div>
+    <div id="stat"></div>
+    <div class="view"><canvas id="prof" width="560" height="150"></canvas></div>
+    <div class="view"><canvas id="plan" width="560" height="110"></canvas></div>
+  </div>
+  <div class="dials">
+    <fieldset><legend>실루엣</legend>
+      <label>방식<select id="mode"><option value="blend">두 실루엣 섞기</option><option value="pieces">조각 이어 붙이기</option></select></label>
+      <div class="row" id="blendRow"><label>A<select id="a"></select></label><label>B<select id="b"></select></label></div>
+      <label id="tRow">섞는 비율 <input id="t" type="range" min="0" max="1" step="0.05" value="0"></label>
+      <div class="row" id="pieceRow" hidden><label>앞코<select id="pn"></select></label><label>캐빈<select id="pc"></select></label><label>꼬리<select id="pt"></select></label></div>
+      <label>윤곽 곡선 (아래 그림에서 점 끌기)<select id="curve"><option value="top">가운데 높이 (옆 윤곽)</option><option value="crest">크레스트·벨트</option><option value="floor">바닥</option></select></label>
+    </fieldset>
+    <fieldset><legend>부품</legend><div id="fx"></div>
+      <label>고를 부품<select id="sel"></select></label>
+      <label>위치 s (앞뒤) <input id="fs" type="range" min="0.1" max="2.9" step="0.01"></label>
+      <label>위치 a (둘레) <input id="fa" type="range" min="0.05" max="0.8" step="0.01"></label>
+      <label>크기 <input id="fk" type="range" min="0.6" max="1.5" step="0.05" value="1"></label>
+      <label>회전 <input id="fr" type="range" min="-45" max="45" step="1" value="0"></label>
+    </fieldset>
+    <label>색<select id="paint"><option>#c8281e</option><option>#e2b21c</option><option>#1f4f9c</option><option>#e8e6e0</option><option>#2f7a4a</option></select></label>
+  </div>
+</div>
+<script type="module" src="./ui/freebody.ts"></script>
+</body>
+</html>

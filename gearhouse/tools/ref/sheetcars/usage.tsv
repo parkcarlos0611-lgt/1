@@ -1,0 +1,28 @@
+car	model	tokens	tools	minutes
+hudson26(trial)	fable	255882	64	14.7
+hudson26(trial)	opus	260591	85	17.4
+stude25(trial)	opus	240109	51	13.2
+fordT23	fable	228607	53	12.7
+pontiac29	fable	252125	60	15.0
+chevAB28	fable	246531	59	15.4
+plymU29	fable	298320	69	17.1
+willys27	fable	236152	45	12.9
+buick28	fable	275006	59	16.2
+dodgeV28	fable	250884	69	16.8
+fnTT33(open)	opus	154272	33	8.2
+fnTT33(open)	fable	182605	33	9.5
+bmw315(open)	opus	171080	43	9.2
+bmw315(open)	fable	192150	43	11.3
+dueSSJ35(open)	fable	162019	36	8.1
+dueA21	fable	190103	40	10.5
+dueSSJ35(fix)	fable	18557	10	2.0
+dueA21(fix)	fable	31188	11	3.4
+pontiac29+dodgeV28(mesh)	fable	182141	37	8.3
+willys27+buick28(mesh)	fable	238292	47	13.5
+fordT23+chevAB28+plymU29(mesh)	fable	229850	36	14.5
+fnTT33+bmw315+dueA21(mesh)	fable	258253	54	16.9
+interiors fordT23+chevAB28+plymU29+dueA21(mesh)	fable	189511	38	9.3
+interiors pontiac29+dodgeV28+willys27+buick28(mesh)	fable	208985	48	10.7
+props paddock (6)	fable	96369	12	3.5
+props aerodrome (9)	fable	114280	22	5.0
+props railway (8)	fable	136280	29	7.2

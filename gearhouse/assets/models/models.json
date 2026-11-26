@@ -1,0 +1,86 @@
+{
+ "about": "Poly Haven CC0 props (review 125), glTF 1K",
+ "models": [
+  {
+   "id": "barrel_03",
+   "source": "https://polyhaven.com/a/barrel_03",
+   "authors": [
+    "Serhii Khromov"
+   ],
+   "license": "CC0",
+   "polycount": 1473
+  },
+  {
+   "id": "Barrel_01",
+   "source": "https://polyhaven.com/a/Barrel_01",
+   "authors": [
+    "Jorge Camacho"
+   ],
+   "license": "CC0",
+   "polycount": 2682
+  },
+  {
+   "id": "old_tyre",
+   "source": "https://polyhaven.com/a/old_tyre",
+   "authors": [
+    "MP"
+   ],
+   "license": "CC0",
+   "polycount": 2880
+  },
+  {
+   "id": "old_military_crate",
+   "source": "https://polyhaven.com/a/old_military_crate",
+   "authors": [
+    "Jack Mava"
+   ],
+   "license": "CC0",
+   "polycount": 10476
+  },
+  {
+   "id": "painted_wooden_bench",
+   "source": "https://polyhaven.com/a/painted_wooden_bench",
+   "authors": [
+    "Kirill Sannikov"
+   ],
+   "license": "CC0",
+   "polycount": 630
+  },
+  {
+   "id": "WoodenTable_01",
+   "source": "https://polyhaven.com/a/WoodenTable_01",
+   "authors": [
+    "Ethan Place"
+   ],
+   "license": "CC0",
+   "polycount": 952
+  },
+  {
+   "id": "folding_wooden_stool",
+   "source": "https://polyhaven.com/a/folding_wooden_stool",
+   "authors": [
+    "Ulan Cabanilla"
+   ],
+   "license": "CC0",
+   "polycount": 6324
+  },
+  {
+   "id": "metal_jerrycan",
+   "source": "https://polyhaven.com/a/metal_jerrycan",
+   "authors": [
+    "Sean Buckley"
+   ],
+   "license": "CC0",
+   "polycount": 20022
+  },
+  {
+   "id": "oil_tin",
+   "source": "https://polyhaven.com/a/oil_tin",
+   "authors": [
+    "Niklas"
+   ],
+   "license": "CC0",
+   "polycount": 2834
+  }
+ ]
+}
